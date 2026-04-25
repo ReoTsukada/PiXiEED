@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.25-shared-catchup-before-realtime1';
+  const APP_BUILD_VERSION = '2026.04.25-shared-replay-dedupe-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -57223,12 +57223,18 @@
     try {
       for (let index = 0; index < list.length; index += 1) {
         const op = list[index];
+        const opId = normalizeSharedProjectOpId(op);
         const seq = getSharedProjectOpSeq(op);
+        if (fromRemote && opId && sharedProjectSeenOpIds.has(opId)) {
+          continue;
+        }
         if (!seq) {
           continue;
         }
         if (seq <= sharedProjectLastAppliedSeq) {
-          applyOp(op, { fromRemote, provisional: false });
+          if (!(fromRemote && opId && sharedProjectSeenOpIds.has(opId))) {
+            applyOp(op, { fromRemote, provisional: false });
+          }
           continue;
         }
         if (seq > sharedProjectLastAppliedSeq + 1) {
