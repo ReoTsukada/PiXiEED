@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.25-shared-realtime-stability-fix1';
+  const APP_BUILD_VERSION = '2026.04.25-shared-inflight-op-protection1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -3219,6 +3219,9 @@
   const sharedProjectPendingProvisionalOps = new Map();
   const sharedProjectSeenOpIds = new Set();
   const sharedProjectSeenOpSeqById = new Map();
+  const sharedProjectLocalInFlightOps = new Map();
+  const SHARED_PROJECT_LOCAL_OP_ACK_TIMEOUT_MS = 12000;
+  const SHARED_PROJECT_LOCAL_OP_EXPIRE_MS = SHARED_PROJECT_LOCAL_OP_ACK_TIMEOUT_MS * 3;
   let sharedProjectReplayRenderBatchDepth = 0;
   let sharedProjectReplayRenderNeedsFull = false;
   let sharedProjectReplayRenderDirtyRect = null;
@@ -20796,7 +20799,13 @@
       name: createSharedProjectSnapshotTitle(project.title || normalizedEntry.name || state.documentName || DEFAULT_DOCUMENT_NAME),
       fileName: normalizedEntry.fileName || normalizeDocumentName(`${normalizedEntry.name || DEFAULT_DOCUMENT_NAME}.pixiedraw`),
       thumbnail,
-      roleHint: normalizedEntry.sharedRoleHint || 'guest',
+      roleHint: (
+        accountState.userId
+        && typeof project.owner_user_id === 'string'
+        && project.owner_user_id === accountState.userId
+      )
+        ? 'master'
+        : 'guest',
       autoJoin: normalizedEntry.sharedAutoJoin !== false,
       revision: Math.max(0, Math.round(Number(project.latest_revision) || 0)),
       structureRevision: Math.max(0, Math.round(Number(project.latest_structure_revision) || 0)),
@@ -54742,6 +54751,15 @@
     }
   }
 
+  function resetPendingSharedProjectRemoteState() {
+    if (sharedProjectPendingRemoteOps.size) {
+      sharedProjectPendingRemoteOps.clear();
+    }
+    if (sharedProjectPendingProvisionalOps.size) {
+      sharedProjectPendingProvisionalOps.clear();
+    }
+  }
+
   function clearSharedProjectStructureMismatchRecovery() {
     if (sharedProjectStructureMismatchTimer !== null) {
       window.clearTimeout(sharedProjectStructureMismatchTimer);
@@ -55593,6 +55611,243 @@
       return opRecord.opId.trim();
     }
     return '';
+  }
+
+  function normalizeSharedProjectOpId(opRecord) {
+    const payload = extractSharedProjectOpPayload(opRecord);
+    if (typeof payload?.opId === 'string' && payload.opId.trim()) {
+      return payload.opId.trim();
+    }
+    if (typeof payload?.id === 'string' && payload.id.trim()) {
+      return payload.id.trim();
+    }
+    if (typeof payload?.operationId === 'string' && payload.operationId.trim()) {
+      return payload.operationId.trim();
+    }
+    if (typeof opRecord?.opId === 'string' && opRecord.opId.trim()) {
+      return opRecord.opId.trim();
+    }
+    if (typeof opRecord?.id === 'string' && opRecord.id.trim()) {
+      return opRecord.id.trim();
+    }
+    if (typeof opRecord?.operationId === 'string' && opRecord.operationId.trim()) {
+      return opRecord.operationId.trim();
+    }
+    return '';
+  }
+
+  function logSharedProjectLocalOpLifecycle(stage, opRecord, {
+    source = '',
+    error = null,
+    status = '',
+    opType = '',
+  } = {}) {
+    const opId = normalizeSharedProjectOpId(opRecord);
+    const payload = extractSharedProjectOpPayload(opRecord);
+    const resolvedOpType = opType || classifySharedProjectOpType(
+      String(opRecord?.historyLabel || payload?.historyLabel || '')
+    );
+    console.info('[shared-local-op]', {
+      stage,
+      opId,
+      projectId: activeSharedProjectId || '',
+      projectKey: normalizeMultiProjectKey(opRecord?.projectKey || payload?.projectKey || activeSharedProjectKey || ''),
+      activeSharedProjectRevision,
+      sharedProjectSessionId: sharedProjectSessionId || '',
+      opType: resolvedOpType,
+      source,
+      status,
+      error: error ? String(error?.message || error || '') : '',
+    });
+  }
+
+  function rememberSharedProjectLocalInFlightOp(opRecord, meta = {}) {
+    const opId = normalizeSharedProjectOpId(opRecord);
+    if (!opId) {
+      return null;
+    }
+    const payload = extractSharedProjectOpPayload(opRecord);
+    const nextEntry = {
+      op: opRecord,
+      projectKey: normalizeMultiProjectKey(opRecord?.projectKey || payload?.projectKey || activeSharedProjectKey || ''),
+      opType: meta.opType || classifySharedProjectOpType(String(opRecord?.historyLabel || payload?.historyLabel || '')),
+      source: meta.source || '',
+      status: meta.status || 'remembered',
+      createdAtMs: Date.now(),
+      updatedAtMs: Date.now(),
+      expiresAtMs: Date.now() + SHARED_PROJECT_LOCAL_OP_EXPIRE_MS,
+      lastError: '',
+    };
+    sharedProjectLocalInFlightOps.set(opId, nextEntry);
+    return nextEntry;
+  }
+
+  function markSharedProjectLocalOpBroadcastSent(opRecord, meta = {}) {
+    const opId = normalizeSharedProjectOpId(opRecord);
+    if (!opId) {
+      return;
+    }
+    const entry = sharedProjectLocalInFlightOps.get(opId) || rememberSharedProjectLocalInFlightOp(opRecord, meta);
+    if (!entry) {
+      return;
+    }
+    entry.status = 'broadcast-sent';
+    entry.source = meta.source || entry.source || 'realtime';
+    entry.updatedAtMs = Date.now();
+    sharedProjectLocalInFlightOps.set(opId, entry);
+    logSharedProjectLocalOpLifecycle('broadcast sent', opRecord, {
+      source: entry.source,
+      status: entry.status,
+      opType: entry.opType,
+    });
+  }
+
+  function markSharedProjectLocalOpCommitStarted(opRecord, meta = {}) {
+    const opId = normalizeSharedProjectOpId(opRecord);
+    if (!opId) {
+      return;
+    }
+    const entry = sharedProjectLocalInFlightOps.get(opId) || rememberSharedProjectLocalInFlightOp(opRecord, meta);
+    if (!entry) {
+      return;
+    }
+    entry.status = 'commit-started';
+    entry.source = meta.source || entry.source || 'db';
+    entry.updatedAtMs = Date.now();
+    sharedProjectLocalInFlightOps.set(opId, entry);
+    logSharedProjectLocalOpLifecycle('commit started', opRecord, {
+      source: entry.source,
+      status: entry.status,
+      opType: entry.opType,
+    });
+  }
+
+  function markSharedProjectLocalOpCommitConfirmed(opOrOpId, meta = {}) {
+    const opId = typeof opOrOpId === 'string' ? opOrOpId.trim() : normalizeSharedProjectOpId(opOrOpId);
+    if (!opId) {
+      return;
+    }
+    const entry = sharedProjectLocalInFlightOps.get(opId) || null;
+    const opRecord = typeof opOrOpId === 'string' ? (entry?.op || null) : opOrOpId;
+    sharedProjectLocalInFlightOps.delete(opId);
+    sharedProjectSeenOpIds.add(opId);
+    sharedProjectSeenOpSeqById.set(opId, Math.max(
+      0,
+      Math.round(Number(sharedProjectSeenOpSeqById.get(opId)) || 0),
+      Math.round(Number(meta.revision) || getSharedProjectOpSeq(opRecord) || 0)
+    ));
+    logSharedProjectLocalOpLifecycle('commit confirmed', opRecord || { opId }, {
+      source: meta.source || entry?.source || 'db',
+      status: 'confirmed',
+      opType: entry?.opType || '',
+    });
+  }
+
+  function markSharedProjectLocalOpCommitFailed(opOrOpId, error, meta = {}) {
+    const opId = typeof opOrOpId === 'string' ? opOrOpId.trim() : normalizeSharedProjectOpId(opOrOpId);
+    if (!opId) {
+      return;
+    }
+    const entry = sharedProjectLocalInFlightOps.get(opId) || rememberSharedProjectLocalInFlightOp(
+      typeof opOrOpId === 'string' ? { opId } : opOrOpId,
+      meta
+    );
+    if (!entry) {
+      return;
+    }
+    entry.status = 'commit-failed';
+    entry.source = meta.source || entry.source || 'db';
+    entry.updatedAtMs = Date.now();
+    entry.lastError = String(error?.message || error || '');
+    sharedProjectLocalInFlightOps.set(opId, entry);
+    logSharedProjectLocalOpLifecycle('commit failed', entry.op || { opId }, {
+      source: entry.source,
+      status: entry.status,
+      opType: entry.opType,
+      error,
+    });
+  }
+
+  function pruneSharedProjectLocalInFlightOps() {
+    const now = Date.now();
+    Array.from(sharedProjectLocalInFlightOps.entries()).forEach(([opId, entry]) => {
+      if (!entry) {
+        sharedProjectLocalInFlightOps.delete(opId);
+        return;
+      }
+      if (entry.status === 'confirmed') {
+        sharedProjectLocalInFlightOps.delete(opId);
+        return;
+      }
+      if (Number(entry.expiresAtMs || 0) > 0 && Number(entry.expiresAtMs || 0) <= now) {
+        logSharedProjectLocalOpLifecycle('in-flight expired', entry.op || { opId }, {
+          source: entry.source || '',
+          status: entry.status || 'expired',
+          opType: entry.opType || '',
+          error: entry.lastError || '',
+        });
+        sharedProjectLocalInFlightOps.delete(opId);
+      }
+    });
+  }
+
+  function getSharedProjectLocalInFlightOps() {
+    pruneSharedProjectLocalInFlightOps();
+    return Array.from(sharedProjectLocalInFlightOps.values());
+  }
+
+  function hasSharedProjectLocalInFlightOps() {
+    return getSharedProjectLocalInFlightOps().length > 0;
+  }
+
+  function confirmSharedProjectLocalOpsFromServerOps(ops, meta = {}) {
+    const list = Array.isArray(ops) ? ops : [];
+    list.forEach(opRecord => {
+      const opId = normalizeSharedProjectOpId(opRecord);
+      if (!opId || !sharedProjectLocalInFlightOps.has(opId)) {
+        return;
+      }
+      markSharedProjectLocalOpCommitConfirmed(opRecord, {
+        source: meta.source || 'refresh',
+        revision: getSharedProjectOpSeq(opRecord),
+      });
+    });
+  }
+
+  function replaySharedProjectLocalInFlightOps(reason = 'refresh') {
+    const inflightOps = getSharedProjectLocalInFlightOps();
+    let replayed = 0;
+    inflightOps.forEach(entry => {
+      const opRecord = entry?.op || null;
+      if (!opRecord) {
+        return;
+      }
+      const applied = applyOp(opRecord, { fromRemote: false, provisional: true });
+      if (!applied) {
+        logSharedProjectLocalOpLifecycle('local replay failed', opRecord, {
+          source: reason,
+          status: entry.status || '',
+          opType: entry.opType || '',
+        });
+        return;
+      }
+      replayed += 1;
+    });
+    return replayed;
+  }
+
+  function deferSharedProjectSnapshotApplyIfLocalOpsInFlight(reason = 'snapshot-refresh') {
+    if (!hasSharedProjectLocalInFlightOps()) {
+      return false;
+    }
+    logSharedProjectLocalOpLifecycle('snapshot apply deferred', { opId: '' }, {
+      source: reason,
+      status: 'deferred',
+      opType: 'snapshot',
+    });
+    replaySharedProjectLocalInFlightOps(reason);
+    queueSharedProjectRefresh({ immediate: false, reason, force: true });
+    return true;
   }
 
   function createOp(historyLabel = '', opPayload = null, { projectKey = activeSharedProjectKey } = {}) {
@@ -56997,6 +57252,7 @@
       ensureActiveSharedProjectRealtimeChannel().catch(() => {});
       return;
     }
+    markSharedProjectLocalOpBroadcastSent(op, { source: 'realtime' });
     activeSharedProjectChannel.send({
       type: 'broadcast',
       event: SHARED_PROJECT_BROADCAST_EVENT,
@@ -57476,6 +57732,7 @@
         return [];
       }
       const result = Array.isArray(data) ? data : [];
+      confirmSharedProjectLocalOpsFromServerOps(result, { source: 'refresh' });
       console.debug('[shared-backend] fetch-ops-since result', {
         ...rpcDebugInfo,
         durationMs: Math.max(0, Date.now() - startedAt),
@@ -57531,6 +57788,7 @@
     if (!ops.length) {
       return false;
     }
+    confirmSharedProjectLocalOpsFromServerOps(ops, { source: 'refresh' });
     sharedProjectLastAppliedSeq = Math.max(sharedProjectLastAppliedSeq, baseRevision);
     const replayed = await replayOps(ops, { fromRemote: true });
     if (!replayed) {
@@ -57963,6 +58221,12 @@
         0,
         Math.round(Number(project.latest_snapshot_revision) || Number(project.latest_revision) || 0)
       );
+      confirmSharedProjectLocalOpsFromServerOps(await fetchMissingOps(activeSharedProjectKey, Math.max(0, snapshotRevision - 1), Math.min(64, SHARED_PROJECT_MAX_MISSING_OP_FETCH)), {
+        source: 'refresh',
+      });
+      if (deferSharedProjectSnapshotApplyIfLocalOpsInFlight(reason || 'snapshot-refresh')) {
+        return false;
+      }
       const trustedSnapshotRevision = shouldTrustSharedProjectSnapshotRevision(snapshotRevision, nextRevision);
       const prefersFreshCanonicalSnapshot = (
         force
@@ -58038,7 +58302,7 @@
         Math.max(0, Math.round(Number(project.latest_snapshot_structure_revision) || Number(project.latest_structure_revision) || 0)),
         project.id || ''
       );
-      prunePendingSharedProjectRemoteState(snapshotRevision);
+      resetPendingSharedProjectRemoteState();
       let replayedAfterSnapshot = false;
       if (trustedSnapshotRevision) {
         sharedProjectLastAppliedSeq = Math.max(0, snapshotRevision);
@@ -58230,6 +58494,7 @@
       return null;
     }
     try {
+      markSharedProjectLocalOpCommitStarted(resolvedOp, { source: 'db' });
       const supabase = await ensurePixieedAccountClient();
       if (!supabase) {
         return null;
@@ -58255,6 +58520,7 @@
         },
       });
       if (error) {
+        markSharedProjectLocalOpCommitFailed(resolvedOp, error, { source: 'db' });
         if (resolvedOpType === 'draw' || resolvedOpType === 'palette' || resolvedOpType === 'structure') {
           queueSharedProjectRefresh({ immediate: true, reason: 'commit-failed', force: true });
         }
@@ -58263,12 +58529,14 @@
       }
       const result = Array.isArray(data) ? (data[0] || null) : (data || null);
       if (!result) {
+        markSharedProjectLocalOpCommitFailed(resolvedOp, new Error('Missing commit result'), { source: 'db' });
         if (resolvedOpType === 'draw' || resolvedOpType === 'palette' || resolvedOpType === 'structure') {
           queueSharedProjectRefresh({ immediate: true, reason: 'commit-failed', force: true });
         }
         return null;
       }
       if (result.commit_status === 'conflict') {
+        markSharedProjectLocalOpCommitFailed(resolvedOp, new Error('commit conflict'), { source: 'db' });
         queueSharedProjectRefresh({ immediate: true, reason: 'commit-failed', force: true });
         if (retryOnConflict && (resolvedOpType === 'draw' || resolvedOpType === 'palette')) {
           pendingSharedProjectConflictReplay = {
@@ -58319,6 +58587,10 @@
         committedStructureRevision: Math.max(0, Math.round(Number(result.latest_structure_revision) || 0)),
       }).catch(error => {
         console.warn('Failed to mark shared local op journal entry confirmed', error);
+      });
+      markSharedProjectLocalOpCommitConfirmed(resolvedOp, {
+        source: 'db',
+        revision: Math.max(0, Math.round(Number(result.latest_revision) || 0)),
       });
       markDocumentDurablySaved();
       noteSharedProjectOperationApplied({ opType: resolvedOpType, fromRemote: false });
