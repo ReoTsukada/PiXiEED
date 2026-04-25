@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.25-shared-inflight-op-protection1';
+  const APP_BUILD_VERSION = '2026.04.25-shared-catchup-before-realtime1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -3030,6 +3030,7 @@
   let sharedProjectRefreshTimer = null;
   let sharedProjectRefreshInFlight = false;
   let sharedProjectSnapshotReplayInFlight = false;
+  let sharedProjectDeferRealtimeUntilSynced = false;
   function getCurrentAccountStorageNamespace() {
     const userId = typeof accountState.userId === 'string' ? accountState.userId.trim() : '';
     return userId || 'anonymous';
@@ -8719,7 +8720,7 @@
     }
     ensureSharedProjectRefreshLoop();
     const hasProjectIdForRealtime = Boolean(activeSharedProjectId);
-    const shouldEnsureRealtimeChannel = hasProjectIdForRealtime && (
+    const shouldEnsureRealtimeChannel = hasProjectIdForRealtime && !sharedProjectDeferRealtimeUntilSynced && (
       projectChanged
       || (
         activeSharedProjectChannelSignature !== nextChannelSignature
@@ -8730,6 +8731,14 @@
     if (shouldEnsureRealtimeChannel) {
       ensureActiveSharedProjectRealtimeChannel().catch(error => {
         reportSharedProjectRealtimeSubscribeFailure(error);
+      });
+    } else if (sharedProjectDeferRealtimeUntilSynced) {
+      logSharedProjectRealtimeChannelLifecycle('skip-realtime-rebind', {
+        caller: 'setActiveSharedProjectSession',
+        reason: 'defer-until-synced',
+        projectKey: normalizedProjectKey,
+        projectId: activeSharedProjectId,
+        channelSignature: nextChannelSignature,
       });
     } else if (!hasProjectIdForRealtime) {
       logSharedProjectRealtimeChannelLifecycle('skip-realtime-rebind', {
@@ -21555,6 +21564,7 @@
     setMultiDesiredRole(requestedRole);
     setMultiUiView(requestedRole);
     multiEntryJoinPanelOpen = false;
+    setSharedProjectDeferRealtimeUntilSynced(true);
     setActiveSharedProjectSession(
       resolvedProjectKey,
       Math.max(0, Math.round(Number(freshestProject.latest_snapshot_revision) || Number(freshestProject.latest_revision) || 0)),
@@ -21585,6 +21595,10 @@
       }
     }
     setActiveSharedProjectSyncState('synced');
+    setSharedProjectDeferRealtimeUntilSynced(false);
+    ensureActiveSharedProjectRealtimeChannel().catch(error => {
+      reportSharedProjectRealtimeSubscribeFailure(error);
+    });
     restorePendingSharedLocalOps(resolvedProjectKey, {
       announce: true,
       refreshReason: 'open-shared-resume-pending-local-ops',
@@ -55800,6 +55814,10 @@
     return getSharedProjectLocalInFlightOps().length > 0;
   }
 
+  function setSharedProjectDeferRealtimeUntilSynced(nextValue = false) {
+    sharedProjectDeferRealtimeUntilSynced = Boolean(nextValue);
+  }
+
   function confirmSharedProjectLocalOpsFromServerOps(ops, meta = {}) {
     const list = Array.isArray(ops) ? ops : [];
     list.forEach(opRecord => {
@@ -57784,15 +57802,24 @@
     }
     setActiveSharedProjectSyncState('catching-up', { announce: true });
     const baseRevision = Math.max(0, Math.round(Number(afterRevision) || 0));
-    const ops = await fetchMissingOps(projectKey, baseRevision, Math.max(SHARED_PROJECT_MAX_MISSING_OP_FETCH, targetRevision - baseRevision + 8));
-    if (!ops.length) {
-      return false;
-    }
-    confirmSharedProjectLocalOpsFromServerOps(ops, { source: 'refresh' });
     sharedProjectLastAppliedSeq = Math.max(sharedProjectLastAppliedSeq, baseRevision);
-    const replayed = await replayOps(ops, { fromRemote: true });
-    if (!replayed) {
-      return false;
+    while (sharedProjectLastAppliedSeq < targetRevision) {
+      const ops = await fetchMissingOps(
+        projectKey,
+        sharedProjectLastAppliedSeq,
+        Math.max(SHARED_PROJECT_MAX_MISSING_OP_FETCH, targetRevision - sharedProjectLastAppliedSeq + 8)
+      );
+      if (!ops.length) {
+        return false;
+      }
+      confirmSharedProjectLocalOpsFromServerOps(ops, { source: 'refresh' });
+      const replayed = await replayOps(ops, { fromRemote: true });
+      if (!replayed) {
+        return false;
+      }
+      if (sharedProjectPendingRemoteOps.size && sharedProjectLastAppliedSeq < targetRevision) {
+        break;
+      }
     }
     if (sharedProjectPendingRemoteOps.size || sharedProjectLastAppliedSeq < targetRevision) {
       if (!sharedProjectSnapshotReplayInFlight && !sharedProjectRefreshInFlight) {
@@ -57812,6 +57839,12 @@
     );
     if (sharedProjectLastAppliedSeq >= targetRevision) {
       setActiveSharedProjectSyncState('synced');
+      if (sharedProjectDeferRealtimeUntilSynced) {
+        setSharedProjectDeferRealtimeUntilSynced(false);
+        ensureActiveSharedProjectRealtimeChannel().catch(error => {
+          reportSharedProjectRealtimeSubscribeFailure(error);
+        });
+      }
     }
     return sharedProjectLastAppliedSeq >= targetRevision;
   }
@@ -58296,6 +58329,7 @@
       sharedProjectRemoteApplyFailureKeys.clear();
       markDocumentDurablySaved();
       markActiveSharedProjectDocumentLoaded(activeSharedProjectKey);
+      setSharedProjectDeferRealtimeUntilSynced(true);
       setActiveSharedProjectSession(
         activeSharedProjectKey,
         trustedSnapshotRevision ? snapshotRevision : nextRevision,
@@ -58325,6 +58359,12 @@
           targetRevision: nextRevision,
         },
       });
+      if (replayedAfterSnapshot || snapshotRevision >= nextRevision) {
+        setSharedProjectDeferRealtimeUntilSynced(false);
+        ensureActiveSharedProjectRealtimeChannel().catch(error => {
+          reportSharedProjectRealtimeSubscribeFailure(error);
+        });
+      }
       await syncSharedProjectMembers(activeSharedProjectKey, project.id || '');
       await upsertSharedRecentProjectEntry({
         projectKey: activeSharedProjectKey,
