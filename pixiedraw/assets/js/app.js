@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.24-shared-batch-replay-fix1';
+  const APP_BUILD_VERSION = '2026.04.25-shared-refresh-loop-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -54644,6 +54644,15 @@
     );
   }
 
+  function hasSharedProjectHardLocalWorkInFlight() {
+    return (
+      pointerState.active
+      || sharedProjectOpCommitInFlight
+      || sharedProjectPendingLocalOps.length > 0
+      || sharedProjectSyncInFlight
+    );
+  }
+
   function setActiveSharedProjectSyncState(nextState = 'idle', { announce = false } = {}) {
     const normalizedState = nextState === 'catching-up' || nextState === 'synced' ? nextState : 'idle';
     activeSharedProjectSyncState = normalizedState;
@@ -54683,9 +54692,9 @@
     );
   }
 
-  function canApplyIncomingSharedProjectSnapshot() {
+  function canApplyIncomingSharedProjectSnapshot({ force = false } = {}) {
     return (
-      !hasSharedProjectLocalWorkInFlight()
+      !(force ? hasSharedProjectHardLocalWorkInFlight() : hasSharedProjectLocalWorkInFlight())
       && !autosaveWriteInFlight
       && !multiState.applyRemoteInProgress
       && !multiState.connecting
@@ -57884,7 +57893,7 @@
           return false;
         }
       }
-      if (!canApplyIncomingSharedProjectSnapshot()) {
+      if (!canApplyIncomingSharedProjectSnapshot({ force })) {
         logSharedProjectRealtimeChannelLifecycle('refresh-result', {
           caller: 'refreshActiveSharedProjectSnapshot',
           reason: reason || 'refresh',
@@ -57892,6 +57901,7 @@
             force,
             result: 'snapshot-apply-blocked',
             blockedByLocalWork: hasSharedProjectLocalWorkInFlight(),
+            blockedByHardLocalWork: hasSharedProjectHardLocalWorkInFlight(),
           },
         });
         if (force) {
@@ -57926,27 +57936,6 @@
         0,
         Math.round(Number(project.latest_snapshot_revision) || Number(project.latest_revision) || 0)
       );
-      if (snapshotRevision < nextRevision) {
-        if (hadLoadedDocument) {
-          markActiveSharedProjectDocumentLoaded(activeSharedProjectKey);
-        }
-        logSharedProjectRealtimeChannelLifecycle('refresh-result', {
-          caller: 'refreshActiveSharedProjectSnapshot',
-          reason: reason || 'refresh',
-          extra: {
-            force,
-            result: 'stale-canonical-snapshot-skipped',
-            snapshotRevision,
-            nextRevision,
-          },
-        });
-        queueSharedProjectRefresh({
-          immediate: false,
-          reason: `${reason || 'refresh'}-await-exact-snapshot`,
-          force: true,
-        });
-        return false;
-      }
       const trustedSnapshotRevision = shouldTrustSharedProjectSnapshotRevision(snapshotRevision, nextRevision);
       const prefersFreshCanonicalSnapshot = (
         force
@@ -58014,6 +58003,7 @@
         },
       });
       sharedProjectRemoteApplyFailureKeys.clear();
+      markDocumentDurablySaved();
       markActiveSharedProjectDocumentLoaded(activeSharedProjectKey);
       setActiveSharedProjectSession(
         activeSharedProjectKey,
