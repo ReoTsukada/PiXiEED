@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.25-shared-replay-base-fix1';
+  const APP_BUILD_VERSION = '2026.04.25-shared-realtime-stability-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -8715,7 +8715,8 @@
       sharedProjectLastRealtimeActivityAt = Date.now();
     }
     ensureSharedProjectRefreshLoop();
-    const shouldEnsureRealtimeChannel = (
+    const hasProjectIdForRealtime = Boolean(activeSharedProjectId);
+    const shouldEnsureRealtimeChannel = hasProjectIdForRealtime && (
       projectChanged
       || (
         activeSharedProjectChannelSignature !== nextChannelSignature
@@ -8726,6 +8727,14 @@
     if (shouldEnsureRealtimeChannel) {
       ensureActiveSharedProjectRealtimeChannel().catch(error => {
         reportSharedProjectRealtimeSubscribeFailure(error);
+      });
+    } else if (!hasProjectIdForRealtime) {
+      logSharedProjectRealtimeChannelLifecycle('skip-realtime-rebind', {
+        caller: 'setActiveSharedProjectSession',
+        reason: 'missing-project-id',
+        projectKey: normalizedProjectKey,
+        projectId: activeSharedProjectId,
+        channelSignature: nextChannelSignature,
       });
     } else {
       logSharedProjectRealtimeChannelLifecycle('skip-realtime-rebind', {
@@ -54719,6 +54728,20 @@
     }
   }
 
+  function prunePendingSharedProjectRemoteState(minRevision = 0) {
+    const normalizedMinRevision = Math.max(0, Math.round(Number(minRevision) || 0));
+    if (sharedProjectPendingRemoteOps.size) {
+      Array.from(sharedProjectPendingRemoteOps.keys()).forEach(seq => {
+        if (Math.max(0, Math.round(Number(seq) || 0)) <= normalizedMinRevision) {
+          sharedProjectPendingRemoteOps.delete(seq);
+        }
+      });
+    }
+    if (sharedProjectPendingProvisionalOps.size) {
+      sharedProjectPendingProvisionalOps.clear();
+    }
+  }
+
   function clearSharedProjectStructureMismatchRecovery() {
     if (sharedProjectStructureMismatchTimer !== null) {
       window.clearTimeout(sharedProjectStructureMismatchTimer);
@@ -58015,6 +58038,7 @@
         Math.max(0, Math.round(Number(project.latest_snapshot_structure_revision) || Number(project.latest_structure_revision) || 0)),
         project.id || ''
       );
+      prunePendingSharedProjectRemoteState(snapshotRevision);
       let replayedAfterSnapshot = false;
       if (trustedSnapshotRevision) {
         sharedProjectLastAppliedSeq = Math.max(0, snapshotRevision);
