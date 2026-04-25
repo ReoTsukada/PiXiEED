@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.25-shared-refresh-loop-fix1';
+  const APP_BUILD_VERSION = '2026.04.25-shared-replay-base-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -3029,6 +3029,7 @@
   let sharedProjectPollingTimer = null;
   let sharedProjectRefreshTimer = null;
   let sharedProjectRefreshInFlight = false;
+  let sharedProjectSnapshotReplayInFlight = false;
   function getCurrentAccountStorageNamespace() {
     const userId = typeof accountState.userId === 'string' ? accountState.userId.trim() : '';
     return userId || 'anonymous';
@@ -57502,21 +57503,24 @@
       return true;
     }
     setActiveSharedProjectSyncState('catching-up', { announce: true });
-    const ops = await fetchMissingOps(projectKey, afterRevision, Math.max(SHARED_PROJECT_MAX_MISSING_OP_FETCH, targetRevision - afterRevision + 8));
+    const baseRevision = Math.max(0, Math.round(Number(afterRevision) || 0));
+    const ops = await fetchMissingOps(projectKey, baseRevision, Math.max(SHARED_PROJECT_MAX_MISSING_OP_FETCH, targetRevision - baseRevision + 8));
     if (!ops.length) {
       return false;
     }
-    sharedProjectLastAppliedSeq = Math.max(sharedProjectLastAppliedSeq, Math.round(Number(afterRevision) || 0));
+    sharedProjectLastAppliedSeq = Math.max(sharedProjectLastAppliedSeq, baseRevision);
     const replayed = await replayOps(ops, { fromRemote: true });
     if (!replayed) {
       return false;
     }
     if (sharedProjectPendingRemoteOps.size || sharedProjectLastAppliedSeq < targetRevision) {
-      queueSharedProjectRefresh({
-        immediate: true,
-        reason: 'replay-gap-fallback',
-        force: true,
-      });
+      if (!sharedProjectSnapshotReplayInFlight && !sharedProjectRefreshInFlight) {
+        queueSharedProjectRefresh({
+          immediate: true,
+          reason: 'replay-gap-fallback',
+          force: true,
+        });
+      }
       return false;
     }
     setActiveSharedProjectSession(
@@ -58011,9 +58015,17 @@
         Math.max(0, Math.round(Number(project.latest_snapshot_structure_revision) || Number(project.latest_structure_revision) || 0)),
         project.id || ''
       );
-      const replayedAfterSnapshot = trustedSnapshotRevision
-        ? await applySharedProjectOpsSinceRevision(project, snapshotRevision)
-        : false;
+      let replayedAfterSnapshot = false;
+      if (trustedSnapshotRevision) {
+        sharedProjectLastAppliedSeq = Math.max(0, snapshotRevision);
+        activeSharedProjectRevision = Math.max(activeSharedProjectRevision, sharedProjectLastAppliedSeq);
+        sharedProjectSnapshotReplayInFlight = true;
+        try {
+          replayedAfterSnapshot = await applySharedProjectOpsSinceRevision(project, snapshotRevision);
+        } finally {
+          sharedProjectSnapshotReplayInFlight = false;
+        }
+      }
       logSharedProjectRealtimeChannelLifecycle('refresh-post-snapshot-ops', {
         caller: 'refreshActiveSharedProjectSnapshot',
         reason: reason || 'refresh',
