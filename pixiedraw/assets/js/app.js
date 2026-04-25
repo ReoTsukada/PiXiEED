@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.25-shared-replay-dedupe-fix1';
+  const APP_BUILD_VERSION = '2026.04.25-shared-catchup-snapshot-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -57845,6 +57845,11 @@
     );
     if (sharedProjectLastAppliedSeq >= targetRevision) {
       setActiveSharedProjectSyncState('synced');
+      queueSharedProjectCurrentSnapshotCapture({
+        delayMs: 0,
+        projectKey,
+        historyLabel: 'sharedRemoteDrawCheckpoint',
+      });
       if (sharedProjectDeferRealtimeUntilSynced) {
         setSharedProjectDeferRealtimeUntilSynced(false);
         ensureActiveSharedProjectRealtimeChannel().catch(error => {
