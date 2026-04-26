@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.26-shared-op-poll-backoff-fix1';
+  const APP_BUILD_VERSION = '2026.04.26-shared-remote-commit-apply-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -54802,7 +54802,7 @@
   function shouldDeferIncomingSharedProjectRemoteApply() {
     return (
       !activeSharedProjectDocumentLoaded
-      || hasSharedProjectLocalWorkInFlight()
+      || hasSharedProjectHardLocalWorkInFlight()
       || autosaveWriteInFlight
       || multiState.applyRemoteInProgress
       || multiState.connecting
