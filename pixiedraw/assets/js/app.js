@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.26-shared-forced-canonical-snapshot-fix1';
+  const APP_BUILD_VERSION = '2026.04.26-shared-no-stale-snapshot-during-catchup1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -59098,6 +59098,9 @@
     if (!resolvedProjectKey || (!force && !hasDocumentUnsavedChanges())) {
       return;
     }
+    if (!force && isSharedProjectCatchingUp(resolvedProjectKey)) {
+      return;
+    }
     const resolvedOpType = classifySharedProjectOpType(historyLabel);
     if (
       isSharedProjectRealtimePrimaryActive(resolvedProjectKey)
@@ -59114,6 +59117,9 @@
     sharedProjectCaptureTimer = window.setTimeout(() => {
       sharedProjectCaptureTimer = null;
       if (!canUseSharedProjectsBackend() || (!force && !hasDocumentUnsavedChanges())) {
+        return;
+      }
+      if (!force && isSharedProjectCatchingUp(resolvedProjectKey)) {
         return;
       }
       if (resolvedProjectKey !== resolveSharedProjectKeyForCurrentState(resolvedProjectKey)) {
