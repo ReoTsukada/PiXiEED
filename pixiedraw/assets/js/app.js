@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.26-shared-reload-base-fix1';
+  const APP_BUILD_VERSION = '2026.04.26-shared-op-poll-backoff-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -2828,6 +2828,10 @@
   let startupSharedReloadProjectKey = '';
   let startupSharedReloadRevision = 0;
   let startupSharedReloadStructureRevision = 0;
+  let sharedProjectLastRescueAfterSeq = -1;
+  let sharedProjectLastRescueOpCount = -1;
+  let sharedProjectRescueStallCount = 0;
+  let sharedProjectOpsRescueRetryTimer = null;
   let projectDotBaselineSnapshot = null;
   let projectDotCumulativeStats = null;
   let autosaveLifecycleFlushAt = 0;
@@ -57018,20 +57022,42 @@
         sharedProjectLastRealtimeActivityAt = Date.now();
       }
       if (!advanced) {
+        const repeatedSameWindow = (
+          sharedProjectLastRescueAfterSeq === afterSeq
+          && sharedProjectLastRescueOpCount === ops.length
+        );
+        sharedProjectLastRescueAfterSeq = afterSeq;
+        sharedProjectLastRescueOpCount = ops.length;
+        sharedProjectRescueStallCount = repeatedSameWindow
+          ? (sharedProjectRescueStallCount + 1)
+          : 1;
         console.warn('[shared-realtime] rescue-op-poll-stalled', {
           reason,
           projectKey: activeSharedProjectKey || '',
           afterSeq,
           opCount: ops.length,
           pendingRemoteOps: sharedProjectPendingRemoteOps.size,
+          stallCount: sharedProjectRescueStallCount,
         });
-        queueSharedProjectRefresh({
-          immediate: true,
-          reason: 'canonical-resync',
-          force: true,
-        });
+        if (sharedProjectRescueStallCount >= 3) {
+          queueSharedProjectRefresh({
+            immediate: false,
+            reason: 'canonical-resync',
+            force: true,
+          });
+          scheduleSharedProjectOpsRescueRetry(
+            Math.min(4000, SHARED_PROJECT_OP_RESCUE_POLL_INTERVAL_MS * Math.max(2, sharedProjectRescueStallCount))
+          );
+        } else {
+          scheduleSharedProjectOpsRescueRetry(
+            Math.min(1500, SHARED_PROJECT_OP_RESCUE_POLL_INTERVAL_MS * (sharedProjectRescueStallCount + 1))
+          );
+        }
         return false;
       }
+      sharedProjectLastRescueAfterSeq = sharedProjectLastAppliedSeq;
+      sharedProjectLastRescueOpCount = 0;
+      sharedProjectRescueStallCount = 0;
       return replayed;
     } catch (error) {
       console.warn('[shared-realtime] rescue-op-poll-failed', {
@@ -57247,7 +57273,12 @@
     if (!activeSharedProjectKey) {
       return;
     }
-    window.setTimeout(() => {
+    if (sharedProjectOpsRescueRetryTimer !== null) {
+      window.clearTimeout(sharedProjectOpsRescueRetryTimer);
+      sharedProjectOpsRescueRetryTimer = null;
+    }
+    sharedProjectOpsRescueRetryTimer = window.setTimeout(() => {
+      sharedProjectOpsRescueRetryTimer = null;
       if (!activeSharedProjectKey || sharedProjectRefreshInFlight || sharedProjectGapRecoveryPromise) {
         return;
       }
@@ -57297,9 +57328,6 @@
           continue;
         }
         if (seq <= sharedProjectLastAppliedSeq) {
-          if (!(fromRemote && opId && sharedProjectSeenOpIds.has(opId))) {
-            applyOp(op, { fromRemote, provisional: false });
-          }
           continue;
         }
         if (seq > sharedProjectLastAppliedSeq + 1) {
