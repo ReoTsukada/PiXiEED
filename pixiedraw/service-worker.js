@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'pixiedraw-v2026.04.25-shared-catchup-snapshot-fix1';
+const CACHE_VERSION = 'pixiedraw-v2026.04.26-shared-failed-op-unblock-fix1';
 const CORE_ASSETS = [
   '/pixiedraw/',
   '/pixiedraw/index.html',
