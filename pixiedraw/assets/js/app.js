@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.26-shared-pagehide-lifecycle-fix1';
+  const APP_BUILD_VERSION = '2026.04.26-shared-first-broadcast-retry-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -3226,6 +3226,7 @@
   let sharedProjectLastAppliedSeq = 0;
   const sharedProjectPendingRemoteOps = new Map();
   const sharedProjectPendingProvisionalOps = new Map();
+  const sharedProjectPendingBroadcastOps = new Map();
   const sharedProjectAppliedProvisionalOpIds = new Set();
   const sharedProjectSeenOpIds = new Set();
   const sharedProjectSeenOpSeqById = new Map();
@@ -8360,6 +8361,7 @@
     sharedProjectPendingLocalOps = [];
     sharedProjectPendingRemoteOps.clear();
     sharedProjectPendingProvisionalOps.clear();
+    sharedProjectPendingBroadcastOps.clear();
     sharedProjectAppliedProvisionalOpIds.clear();
     sharedProjectSeenOpIds.clear();
     sharedProjectSeenOpSeqById.clear();
@@ -57373,15 +57375,42 @@
     return true;
   }
 
-  function sendSharedProjectBroadcastOp(op) {
+  function scheduleSharedProjectBroadcastRetry(op, delayMs = 120) {
+    const opId = getSharedProjectOpId(op);
+    if (!op || !opId) {
+      return;
+    }
+    sharedProjectPendingBroadcastOps.set(opId, op);
+    window.setTimeout(() => {
+      const queued = sharedProjectPendingBroadcastOps.get(opId);
+      if (!queued || !activeSharedProjectKey || queued.projectKey !== activeSharedProjectKey) {
+        sharedProjectPendingBroadcastOps.delete(opId);
+        return;
+      }
+      sendSharedProjectBroadcastOp(queued, { allowRetry: false });
+    }, Math.max(32, Math.round(Number(delayMs) || 120)));
+  }
+
+  function sendSharedProjectBroadcastOp(op, { allowRetry = true } = {}) {
+    const opId = getSharedProjectOpId(op);
     if (!activeSharedProjectChannel || typeof activeSharedProjectChannel.send !== 'function') {
       console.debug('[shared-realtime] broadcast-send-skipped', {
         reason: 'missing-active-channel',
         projectKey: op?.projectKey || '',
-        opId: getSharedProjectOpId(op),
+        opId,
         kind: typeof op?.kind === 'string' ? op.kind : '',
       });
-      ensureActiveSharedProjectRealtimeChannel().catch(() => {});
+      ensureActiveSharedProjectRealtimeChannel()
+        .then(() => {
+          if (allowRetry) {
+            scheduleSharedProjectBroadcastRetry(op, 48);
+          }
+        })
+        .catch(() => {
+          if (allowRetry) {
+            scheduleSharedProjectBroadcastRetry(op, 160);
+          }
+        });
       return;
     }
     markSharedProjectLocalOpBroadcastSent(op, { source: 'realtime' });
@@ -57390,18 +57419,24 @@
       event: SHARED_PROJECT_BROADCAST_EVENT,
       payload: op,
     }).then(() => {
+      if (opId) {
+        sharedProjectPendingBroadcastOps.delete(opId);
+      }
       console.debug('[shared-realtime] broadcast-send-ok', {
         projectKey: op?.projectKey || '',
-        opId: getSharedProjectOpId(op),
+        opId,
         kind: typeof op?.kind === 'string' ? op.kind : '',
       });
     }).catch(error => {
       console.warn('[shared-realtime] broadcast-send-failed', {
         projectKey: op?.projectKey || '',
-        opId: getSharedProjectOpId(op),
+        opId,
         kind: typeof op?.kind === 'string' ? op.kind : '',
         error: String(error?.message || error || ''),
       });
+      if (allowRetry) {
+        scheduleSharedProjectBroadcastRetry(op, 180);
+      }
       // Ignore broadcast transport failures and let DB insert become the source of truth.
     });
   }
