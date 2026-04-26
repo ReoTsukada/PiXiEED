@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.26-shared-failed-op-unblock-fix1';
+  const APP_BUILD_VERSION = '2026.04.26-shared-forced-canonical-snapshot-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -3213,6 +3213,7 @@
   let sharedProjectOpsSinceCheckpoint = 0;
   let sharedProjectLastCheckpointAt = 0;
   let sharedProjectLastRealtimeActivityAt = 0;
+  let sharedProjectLastProvisionalRemoteAt = 0;
   let sharedProjectOpCommitInFlight = false;
   let sharedProjectPendingLocalOps = [];
   let sharedProjectLastAppliedSeq = 0;
@@ -56925,6 +56926,9 @@
     if (!activeSharedProjectKey || !canUseSharedProjectsBackend()) {
       return false;
     }
+    if ((Date.now() - sharedProjectLastProvisionalRemoteAt) < 900) {
+      return false;
+    }
     if (
       sharedProjectOpPollInFlight
       || sharedProjectGapRecoveryPromise
@@ -57439,6 +57443,9 @@
       layerId: diagnostics.layerId || '',
       frameIndex: diagnostics.frameIndex,
     });
+    if (fromRemote && provisional) {
+      sharedProjectLastProvisionalRemoteAt = Date.now();
+    }
     if (!provisional && shouldCreateSharedProjectCheckpoint('draw')) {
       // snapshot is recovery/checkpoint only
       scheduleSharedProjectCheckpoint({ historyLabel: 'sharedRemoteDrawCheckpoint' });
@@ -57846,15 +57853,17 @@
       Math.max(targetStructureRevision, activeSharedProjectStructureRevision),
       projectRecord?.id || activeSharedProjectId
     );
-    if (sharedProjectLastAppliedSeq >= targetRevision) {
-      setActiveSharedProjectSyncState('synced');
-      queueSharedProjectCurrentSnapshotCapture({
-        delayMs: 0,
-        projectKey,
-        historyLabel: 'sharedRemoteDrawCheckpoint',
-      });
-      if (sharedProjectDeferRealtimeUntilSynced) {
-        setSharedProjectDeferRealtimeUntilSynced(false);
+      if (sharedProjectLastAppliedSeq >= targetRevision) {
+        setActiveSharedProjectSyncState('synced');
+        queueSharedProjectCurrentSnapshotCapture({
+          delayMs: 0,
+          projectKey,
+          historyLabel: 'sharedRemoteDrawCheckpoint',
+          force: true,
+          revision: targetRevision,
+        });
+        if (sharedProjectDeferRealtimeUntilSynced) {
+          setSharedProjectDeferRealtimeUntilSynced(false);
         ensureActiveSharedProjectRealtimeChannel().catch(error => {
           reportSharedProjectRealtimeSubscribeFailure(error);
         });
@@ -58662,6 +58671,8 @@
           projectKey: normalizedProjectKey,
           title: createSharedProjectSnapshotTitle(state.documentName || DEFAULT_DOCUMENT_NAME),
           historyLabel: 'realtimeSnapshotSync',
+          force: true,
+          revision: Math.max(0, Math.round(Number(result.latest_revision) || 0)),
         });
       }
       if (shouldCreateSharedProjectCheckpoint(resolvedOpType)) {
@@ -59077,12 +59088,14 @@
     projectKey = '',
     title = '',
     historyLabel = '',
+    force = false,
+    revision = null,
   } = {}) {
     if (!canUseSharedProjectsBackend()) {
       return;
     }
     const resolvedProjectKey = resolveSharedProjectKeyForCurrentState(projectKey);
-    if (!resolvedProjectKey || !hasDocumentUnsavedChanges()) {
+    if (!resolvedProjectKey || (!force && !hasDocumentUnsavedChanges())) {
       return;
     }
     const resolvedOpType = classifySharedProjectOpType(historyLabel);
@@ -59100,7 +59113,7 @@
     }
     sharedProjectCaptureTimer = window.setTimeout(() => {
       sharedProjectCaptureTimer = null;
-      if (!canUseSharedProjectsBackend() || !hasDocumentUnsavedChanges()) {
+      if (!canUseSharedProjectsBackend() || (!force && !hasDocumentUnsavedChanges())) {
         return;
       }
       if (resolvedProjectKey !== resolveSharedProjectKeyForCurrentState(resolvedProjectKey)) {
@@ -59119,6 +59132,7 @@
         projectKey: resolvedProjectKey,
         title: createSharedProjectSnapshotTitle(title || state.documentName || DEFAULT_DOCUMENT_NAME),
         historyLabel,
+        revision,
       });
     }, Math.max(0, Math.round(Number(delayMs) || 0)));
   }
