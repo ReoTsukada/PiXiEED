@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.26-shared-first-broadcast-retry-fix1';
+  const APP_BUILD_VERSION = '2026.04.26-shared-committed-draw-converge-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -57554,18 +57554,42 @@
           : (payload?.command === 'curve' || opRecord?.kind === 'curve-command'
             ? applySharedProjectCurveCommand(opRecord, { fromRemote })
             : (payload?.command === 'region' || opRecord?.kind === 'region-command'
-              ? applySharedProjectRegionCommand(opRecord, { fromRemote })
-              : applyLayerPatch(opRecord, { fromRemote })))));
+            ? applySharedProjectRegionCommand(opRecord, { fromRemote })
+            : applyLayerPatch(opRecord, { fromRemote })))));
     if (!applied) {
+      const opId = getSharedProjectOpId(opRecord);
+      const committedAfterProvisional = (
+        fromRemote
+        && !provisional
+        && opId
+        && sharedProjectAppliedProvisionalOpIds.has(opId)
+      );
+      if (committedAfterProvisional) {
+        sharedProjectAppliedProvisionalOpIds.delete(opId);
+        console.debug('[shared-realtime] draw-commit-converged-from-provisional', {
+          opId,
+          seq: getSharedProjectOpSeq(opRecord),
+          kind: typeof opRecord?.kind === 'string' ? opRecord.kind : '',
+          canvasId: diagnostics.canvasId || '',
+          layerId: diagnostics.layerId || '',
+          frameIndex: diagnostics.frameIndex,
+          structureRevision: diagnostics.structureRevision,
+          activeStructureRevision: diagnostics.activeStructureRevision,
+        });
+        return true;
+      }
       console.debug('[shared-realtime] draw-apply-failed', {
         provisional,
         fromRemote,
-        opId: getSharedProjectOpId(opRecord),
+        opId,
         seq: getSharedProjectOpSeq(opRecord),
         kind: typeof opRecord?.kind === 'string' ? opRecord.kind : '',
         canvasId: diagnostics.canvasId || '',
         layerId: diagnostics.layerId || '',
         frameIndex: diagnostics.frameIndex,
+        reason: diagnostics.reason || '',
+        structureRevision: diagnostics.structureRevision,
+        activeStructureRevision: diagnostics.activeStructureRevision,
       });
       return false;
     }
