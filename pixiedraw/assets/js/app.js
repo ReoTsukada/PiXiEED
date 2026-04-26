@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.25-shared-catchup-snapshot-fix1';
+  const APP_BUILD_VERSION = '2026.04.26-shared-failed-op-unblock-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -55773,13 +55773,13 @@
     entry.source = meta.source || entry.source || 'db';
     entry.updatedAtMs = Date.now();
     entry.lastError = String(error?.message || error || '');
-    sharedProjectLocalInFlightOps.set(opId, entry);
     logSharedProjectLocalOpLifecycle('commit failed', entry.op || { opId }, {
       source: entry.source,
       status: entry.status,
       opType: entry.opType,
       error,
     });
+    sharedProjectLocalInFlightOps.delete(opId);
   }
 
   function pruneSharedProjectLocalInFlightOps() {
@@ -55807,7 +55807,10 @@
 
   function getSharedProjectLocalInFlightOps() {
     pruneSharedProjectLocalInFlightOps();
-    return Array.from(sharedProjectLocalInFlightOps.values());
+    return Array.from(sharedProjectLocalInFlightOps.values()).filter(entry => (
+      entry
+      && entry.status !== 'commit-failed'
+    ));
   }
 
   function hasSharedProjectLocalInFlightOps() {
