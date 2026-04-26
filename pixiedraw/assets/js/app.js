@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.26-shared-no-stale-snapshot-during-catchup1';
+  const APP_BUILD_VERSION = '2026.04.26-shared-reload-base-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -2825,6 +2825,9 @@
   let autosaveDirtyGeneration = 0;
   let autosaveProjectId = '';
   let startupAutosaveRestoreProjectId = '';
+  let startupSharedReloadProjectKey = '';
+  let startupSharedReloadRevision = 0;
+  let startupSharedReloadStructureRevision = 0;
   let projectDotBaselineSnapshot = null;
   let projectDotCumulativeStats = null;
   let autosaveLifecycleFlushAt = 0;
@@ -21511,6 +21514,16 @@
     );
     const freshestLatestRevision = Math.max(0, Math.round(Number(freshestProject.latest_revision) || 0));
     const sharedSnapshot = freshestProject.latest_snapshot;
+    const canReuseReloadBase = Boolean(
+      reloadSnapshotRestored
+      && isCurrentProjectSharedEntry()
+      && normalizeMultiProjectKey(activeSharedProjectKey || '') === resolvedProjectKey
+      && normalizeMultiProjectKey(startupSharedReloadProjectKey || '') === resolvedProjectKey
+      && activeSharedProjectRevision > freshestSnapshotRevision
+      && activeSharedProjectRevision <= freshestLatestRevision
+      && Array.isArray(state.frames)
+      && state.frames.length
+    );
     if (!sharedSnapshot || typeof sharedSnapshot !== 'object') {
       if (!silent) {
         setMultiStatus(
@@ -21523,25 +21536,28 @@
       }
       return false;
     }
-    const loadedSnapshot = await loadDocumentFromText(JSON.stringify(sharedSnapshot), null, {
-      projectId: buildSharedRecentProjectId(resolvedProjectKey),
-      suppressAutosaveStatus: true,
-      openedFromRecent: true,
-      preserveDotStats: true,
-      sharedProjectKey: resolvedProjectKey,
-      sharedProjectRevision: freshestSnapshotRevision,
-    });
-    if (!loadedSnapshot) {
-      if (!silent) {
-        setMultiStatus(
-          localizeText(
-            '共有プロジェクトの最新スナップショットを読み込めませんでした。',
-            'Failed to load the latest shared project snapshot.'
-          ),
-          'error'
-        );
+    let loadedSnapshot = true;
+    if (!canReuseReloadBase) {
+      loadedSnapshot = await loadDocumentFromText(JSON.stringify(sharedSnapshot), null, {
+        projectId: buildSharedRecentProjectId(resolvedProjectKey),
+        suppressAutosaveStatus: true,
+        openedFromRecent: true,
+        preserveDotStats: true,
+        sharedProjectKey: resolvedProjectKey,
+        sharedProjectRevision: freshestSnapshotRevision,
+      });
+      if (!loadedSnapshot) {
+        if (!silent) {
+          setMultiStatus(
+            localizeText(
+              '共有プロジェクトの最新スナップショットを読み込めませんでした。',
+              'Failed to load the latest shared project snapshot.'
+            ),
+            'error'
+          );
+        }
+        return false;
       }
-      return false;
     }
     markActiveSharedProjectDocumentLoaded(resolvedProjectKey);
     setActiveAutosaveProjectId(buildSharedRecentProjectId(resolvedProjectKey));
@@ -21566,15 +21582,21 @@
     setMultiUiView(requestedRole);
     multiEntryJoinPanelOpen = false;
     setSharedProjectDeferRealtimeUntilSynced(true);
+    const baseRevision = canReuseReloadBase
+      ? Math.max(0, Math.round(Number(activeSharedProjectRevision) || 0))
+      : Math.max(0, Math.round(Number(freshestProject.latest_snapshot_revision) || Number(freshestProject.latest_revision) || 0));
+    const baseStructureRevision = canReuseReloadBase
+      ? Math.max(0, Math.round(Number(activeSharedProjectStructureRevision) || 0))
+      : Math.max(0, Math.round(Number(freshestProject.latest_snapshot_structure_revision) || Number(freshestProject.latest_structure_revision) || 0));
     setActiveSharedProjectSession(
       resolvedProjectKey,
-      Math.max(0, Math.round(Number(freshestProject.latest_snapshot_revision) || Number(freshestProject.latest_revision) || 0)),
-      Math.max(0, Math.round(Number(freshestProject.latest_snapshot_structure_revision) || Number(freshestProject.latest_structure_revision) || 0)),
+      baseRevision,
+      baseStructureRevision,
       freshestProject.id || ''
     );
     ensureSharedProjectSessionHeartbeat();
     markActiveSharedProjectDocumentLoaded(resolvedProjectKey);
-    const sharedSnapshotRevision = Math.max(0, Math.round(Number(freshestProject.latest_snapshot_revision) || 0));
+    const sharedSnapshotRevision = baseRevision;
     const sharedLatestRevision = freshestLatestRevision;
     if (sharedSnapshotRevision < sharedLatestRevision) {
       setActiveSharedProjectSyncState('catching-up', { announce: !silent });
@@ -51353,6 +51375,9 @@
     const currentSnapshot = compressHistorySnapshot(makeHistorySnapshot({ clonePixelData: false }));
     const activeProjectTab = getActiveOpenProjectTab();
     const activeProjectId = normalizeAutosaveProjectId(activeProjectTab?.projectId || '');
+    const activeSharedEntry = isCurrentProjectSharedEntry()
+      ? getCurrentSharedRecentProjectEntry()
+      : null;
     const normalizedHistoryLimit = Math.max(MIN_HISTORY_LIMIT, Math.round(Number(history.limit) || DEFAULT_HISTORY_LIMIT));
     const maxAvailable = Math.max(
       Array.isArray(history.past) ? history.past.length : 0,
@@ -51373,6 +51398,27 @@
       version: RELOAD_SNAPSHOT_VERSION,
       at: Date.now(),
       projectId: activeProjectId || normalizeAutosaveProjectId(autosaveProjectId || ''),
+      sharedProjectKey: activeSharedProjectKey || normalizeMultiProjectKey(activeSharedEntry?.sharedProjectKey || ''),
+      sharedProjectRevision: Math.max(
+        0,
+        Math.round(
+          Number(
+            activeSharedProjectKey
+              ? activeSharedProjectRevision
+              : activeSharedEntry?.sharedProjectRevision
+          ) || 0
+        )
+      ),
+      sharedProjectStructureRevision: Math.max(
+        0,
+        Math.round(
+          Number(
+            activeSharedProjectKey
+              ? activeSharedProjectStructureRevision
+              : activeSharedEntry?.sharedProjectStructureRevision
+          ) || 0
+        )
+      ),
       current: currentSnapshot,
       past,
       future,
@@ -51532,11 +51578,6 @@
     if (!canUseSessionStorage) {
       return;
     }
-    if (isCurrentProjectSharedEntry()) {
-      clearLocalRestoreStorage(RELOAD_SNAPSHOT_STORAGE_KEY);
-      clearLocalRestoreStorage(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY);
-      return;
-    }
     if (multiState.connected || multiState.connecting) {
       return;
     }
@@ -51582,7 +51623,7 @@
   }
 
   function persistReloadProjectFallback() {
-    if (!canUseSessionStorage || isCurrentProjectSharedEntry()) {
+    if (!canUseSessionStorage) {
       return;
     }
     try {
@@ -51805,17 +51846,34 @@
       resetDocumentUnsavedChanges();
     }
     const restoredProjectId = normalizeAutosaveProjectId(payload.projectId || '');
-    if (restoredProjectId.startsWith(SHARED_PROJECT_ID_PREFIX)) {
-      clearLocalRestoreStorage(RELOAD_SNAPSHOT_STORAGE_KEY);
-      clearLocalRestoreStorage(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY);
-      return false;
-    }
+    const restoredSharedProjectKey = normalizeMultiProjectKey(payload.sharedProjectKey || '');
+    const restoredSharedProjectRevision = Math.max(0, Math.round(Number(payload.sharedProjectRevision) || 0));
+    const restoredSharedStructureRevision = Math.max(0, Math.round(Number(payload.sharedProjectStructureRevision) || 0));
     const resolvedProjectId = normalizeAutosaveProjectId(
       restoredProjectId || readReloadTargetProjectId() || autosaveProjectId || ''
     );
     if (resolvedProjectId) {
       startupAutosaveRestoreProjectId = resolvedProjectId;
       setActiveAutosaveProjectId(resolvedProjectId, { persist: false });
+    }
+    if (restoredProjectId.startsWith(SHARED_PROJECT_ID_PREFIX) && restoredSharedProjectKey) {
+      startupSharedReloadProjectKey = restoredSharedProjectKey;
+      startupSharedReloadRevision = restoredSharedProjectRevision;
+      startupSharedReloadStructureRevision = restoredSharedStructureRevision;
+      setActiveSharedProjectSession(
+        restoredSharedProjectKey,
+        restoredSharedProjectRevision,
+        restoredSharedStructureRevision,
+        ''
+      );
+      setMultiStatus(
+        localizeText('共有モード: 再読み込み復元ベースを適用しました', 'Shared mode: restored reload base'),
+        'info'
+      );
+    } else {
+      startupSharedReloadProjectKey = '';
+      startupSharedReloadRevision = 0;
+      startupSharedReloadStructureRevision = 0;
     }
     clearLocalRestoreStorage(RELOAD_SNAPSHOT_STORAGE_KEY);
     clearLocalRestoreStorage(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY);
