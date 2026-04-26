@@ -3226,6 +3226,7 @@
   let sharedProjectLastAppliedSeq = 0;
   const sharedProjectPendingRemoteOps = new Map();
   const sharedProjectPendingProvisionalOps = new Map();
+  const sharedProjectAppliedProvisionalOpIds = new Set();
   const sharedProjectSeenOpIds = new Set();
   const sharedProjectSeenOpSeqById = new Map();
   const sharedProjectLocalInFlightOps = new Map();
@@ -8375,6 +8376,7 @@
     sharedProjectPendingLocalOps = [];
     sharedProjectPendingRemoteOps.clear();
     sharedProjectPendingProvisionalOps.clear();
+    sharedProjectAppliedProvisionalOpIds.clear();
     sharedProjectSeenOpIds.clear();
     sharedProjectSeenOpSeqById.clear();
     sharedProjectInFlightStroke = null;
@@ -57294,7 +57296,21 @@
         return false;
       }
       const nextOp = sharedProjectPendingRemoteOps.get(nextSeq);
+      const nextOpId = normalizeSharedProjectOpId(nextOp);
       sharedProjectPendingRemoteOps.delete(nextSeq);
+      if (
+        nextOpId
+        && (sharedProjectSeenOpIds.has(nextOpId) || sharedProjectAppliedProvisionalOpIds.has(nextOpId))
+      ) {
+        sharedProjectAppliedProvisionalOpIds.delete(nextOpId);
+        sharedProjectLastAppliedSeq = nextSeq;
+        activeSharedProjectRevision = Math.max(activeSharedProjectRevision, nextSeq);
+        activeSharedProjectStructureRevision = Math.max(
+          activeSharedProjectStructureRevision,
+          Math.max(0, Math.round(Number(nextOp?.structure_revision) || 0))
+        );
+        continue;
+      }
       if (!applyOp(nextOp, { fromRemote: true })) {
         sharedProjectPendingRemoteOps.set(nextSeq, nextOp);
         return false;
@@ -57321,10 +57337,26 @@
         const op = list[index];
         const opId = normalizeSharedProjectOpId(op);
         const seq = getSharedProjectOpSeq(op);
-        if (fromRemote && opId && sharedProjectSeenOpIds.has(opId)) {
+        if (!seq) {
           continue;
         }
-        if (!seq) {
+        if (
+          fromRemote
+          && opId
+          && (sharedProjectSeenOpIds.has(opId) || sharedProjectAppliedProvisionalOpIds.has(opId))
+        ) {
+          sharedProjectAppliedProvisionalOpIds.delete(opId);
+          if (seq === sharedProjectLastAppliedSeq + 1) {
+            sharedProjectLastAppliedSeq = seq;
+            activeSharedProjectRevision = Math.max(activeSharedProjectRevision, seq);
+            activeSharedProjectStructureRevision = Math.max(
+              activeSharedProjectStructureRevision,
+              Math.max(0, Math.round(Number(op?.structure_revision) || 0))
+            );
+            if (!drainPendingSharedProjectRemoteOps()) {
+              return false;
+            }
+          }
           continue;
         }
         if (seq <= sharedProjectLastAppliedSeq) {
@@ -57530,6 +57562,10 @@
       frameIndex: diagnostics.frameIndex,
     });
     if (fromRemote && provisional) {
+      const provisionalOpId = getSharedProjectOpId(opRecord);
+      if (provisionalOpId) {
+        sharedProjectAppliedProvisionalOpIds.add(provisionalOpId);
+      }
       sharedProjectLastProvisionalRemoteAt = Date.now();
     }
     if (!provisional && shouldCreateSharedProjectCheckpoint('draw')) {
