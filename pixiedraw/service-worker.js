@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'pixiedraw-v2026.04.26-shared-reload-base-fix1';
+const CACHE_VERSION = 'pixiedraw-v2026.04.26-shared-op-poll-backoff-fix1';
 const CORE_ASSETS = [
   '/pixiedraw/',
   '/pixiedraw/index.html',
