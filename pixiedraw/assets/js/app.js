@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.26-shared-remote-commit-apply-fix1';
+  const APP_BUILD_VERSION = '2026.04.26-shared-pagehide-lifecycle-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -3790,26 +3790,14 @@
   state.mirror = normalizeMirrorAxisState(state.mirror, state.width, state.height);
   updateGridDecorations();
   const pointerState = createPointerState();
-  window.addEventListener('beforeunload', handleUnsavedBeforeUnload);
   window.addEventListener('pagehide', handleAutosavePageHide);
-  window.addEventListener('beforeunload', () => {
-    flushActiveSharedProjectFinalSnapshot({ historyLabel: 'sharedFinalSnapshotBeforeUnload' });
-  });
   window.addEventListener('pagehide', () => {
     flushActiveSharedProjectFinalSnapshot({ historyLabel: 'sharedFinalSnapshotPageHide' });
   });
-  window.addEventListener('beforeunload', () => {
-    if (sharedProjectPendingLocalOps.length && activeSharedProjectKey) {
-      flushSharedProjectPendingLocalOps();
-    }
-  });
   window.addEventListener('pagehide', () => {
     if (sharedProjectPendingLocalOps.length && activeSharedProjectKey) {
       flushSharedProjectPendingLocalOps();
     }
-  });
-  window.addEventListener('beforeunload', () => {
-    releaseSharedProjectSessionLock().catch(() => {});
   });
   window.addEventListener('pagehide', () => {
     releaseSharedProjectSessionLock().catch(() => {});
@@ -3820,15 +3808,11 @@
   window.addEventListener('online', handleMultiOnline);
   installMobileBackButtonGuard();
   if (RELOAD_SNAPSHOT_ENABLED) {
-    window.addEventListener('beforeunload', persistReloadSessionSnapshot);
     window.addEventListener('pagehide', persistReloadSessionSnapshot);
   }
-  window.addEventListener('beforeunload', storePendingMultiResumeSession);
   window.addEventListener('pagehide', storePendingMultiResumeSession);
   if (canUseSessionStorage) {
     window.addEventListener('storage', handleAutosaveStorageEvent);
-    window.addEventListener('beforeunload', persistSessionState);
-    window.addEventListener('beforeunload', releaseAutosaveTabLock);
     window.addEventListener('pagehide', releaseAutosaveTabLock);
   }
   let hoverPixel = null;
@@ -14371,7 +14355,6 @@
         // Ignore unload persistence failures
       });
     };
-    window.addEventListener('beforeunload', flush);
     window.addEventListener('pagehide', flush);
     iosSnapshotUnloadListenerBound = true;
   }
