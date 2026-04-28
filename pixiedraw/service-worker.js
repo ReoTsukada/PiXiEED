@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'pixiedraw-v2026.04.28-shared-reconnect-broader-doc-gate-fix1';
+const CACHE_VERSION = 'pixiedraw-v2026.04.28-shared-reconnect-op-retry-fix1';
 const CORE_ASSETS = [
   '/pixiedraw/',
   '/pixiedraw/index.html',
