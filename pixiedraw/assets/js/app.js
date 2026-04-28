@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.28-shared-createdat-fifo-fix1';
+  const APP_BUILD_VERSION = '2026.04.28-shared-post-subscribe-gap-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -59808,6 +59808,16 @@
       activeSharedProjectChannel = channel;
       activeSharedProjectChannelKey = projectKey;
       activeSharedProjectChannelSignature = channelSignature;
+      recoverSharedProjectRealtimeGap(projectKey, {
+        afterSeq: sharedProjectLastAppliedSeq,
+        reason: 'post-subscribe-gap-check',
+      }).then(recovered => {
+        if (!recovered) {
+          scheduleSharedProjectOpsRescueRetry();
+        }
+      }).catch(() => {
+        scheduleSharedProjectOpsRescueRetry();
+      });
       return channel;
     })();
     try {
