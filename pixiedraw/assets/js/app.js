@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.26-shared-committed-draw-converge-fix1';
+  const APP_BUILD_VERSION = '2026.04.28-shared-local-retry-unblock-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -38239,6 +38239,9 @@
     if (soleCanvas.id === normalizedCanvasId) {
       return soleCanvas;
     }
+    if (isSharedProjectCollaborativeMode() && canvases.length === 1) {
+      return soleCanvas;
+    }
     const previousCanvasId = typeof soleCanvas.id === 'string' ? soleCanvas.id : '';
     soleCanvas.id = normalizedCanvasId;
     if (projectCanvasStore.activeCanvasId === previousCanvasId || !projectCanvasStore.activeCanvasId) {
@@ -38298,11 +38301,29 @@
 
   function replaceProjectCanvasDocuments(canvases, activeCanvasId = '') {
     const sourceCanvases = collapseToSingleProjectCanvasSource(canvases, activeCanvasId);
-    projectCanvasStore.canvases = sourceCanvases.map((canvas, index) => createProjectCanvasDocument(canvas, {
+    const currentCanvases = Array.isArray(projectCanvasStore.canvases) ? projectCanvasStore.canvases : [];
+    const sharedStableSingleCanvasId = (
+      isSharedProjectCollaborativeMode()
+      && currentCanvases.length === 1
+      && sourceCanvases.length === 1
+      && typeof currentCanvases[0]?.id === 'string'
+      && currentCanvases[0].id.trim()
+    )
+      ? currentCanvases[0].id.trim()
+      : '';
+    const normalizedSourceCanvases = sharedStableSingleCanvasId
+      ? sourceCanvases.map((canvas, index) => (
+        index === 0
+          ? { ...canvas, id: sharedStableSingleCanvasId }
+          : canvas
+      ))
+      : sourceCanvases;
+    const normalizedActiveCanvasId = sharedStableSingleCanvasId || activeCanvasId;
+    projectCanvasStore.canvases = normalizedSourceCanvases.map((canvas, index) => createProjectCanvasDocument(canvas, {
       clonePixelData: true,
       fallbackIndex: index + 1,
     }));
-    const nextActive = projectCanvasStore.canvases.find(canvas => canvas?.id === activeCanvasId) || projectCanvasStore.canvases[0];
+    const nextActive = projectCanvasStore.canvases.find(canvas => canvas?.id === normalizedActiveCanvasId) || projectCanvasStore.canvases[0];
     projectCanvasStore.activeCanvasId = nextActive?.id || projectCanvasStore.canvases[0]?.id || '';
     const activeIndex = getActiveProjectCanvasIndex();
     localViewportCanvasState = normalizeLocalViewportCanvasState(
@@ -44118,31 +44139,20 @@
     } else {
       // Non-spectator: existing restrictions for drawing guests
       if (HISTORY_DRAW_TOOLS.has(activeTool)) {
-        if (isSharedProjectCatchingUp()) {
-          logSharedProjectDrawBlock('shared-sync-catching-up');
+        if (isSharedProjectAwaitingReady()) {
+          logSharedProjectDrawBlock(
+            sharedProjectDeferRealtimeUntilSynced
+              ? 'shared-sync-awaiting-ready'
+              : 'shared-sync-catching-up'
+          );
           updateAutosaveStatus(
             localizeText(
-              '共有プロジェクトを最新状態へ同期中です。完了してから描画してください',
-              'The shared project is syncing to the latest state. Please wait until it finishes before drawing.'
+              '共有プロジェクトの接続と同期が完了するまでお待ちください',
+              'Please wait until the shared project finishes connecting and syncing.'
             ),
             'warn'
           );
           return;
-        }
-        if (isSharedProjectCollaborativeMode() && !activeSharedProjectDocumentLoaded) {
-          if (hasUsableActiveSharedProjectDocumentState()) {
-            markActiveSharedProjectDocumentLoaded(activeSharedProjectKey);
-          } else {
-          logSharedProjectDrawBlock('document-not-loaded');
-          updateAutosaveStatus(
-            localizeText(
-              '共有プロジェクトの最新内容を読込中です。完了してから描画してください',
-              'Shared project is still loading the latest state. Please wait before drawing.'
-            ),
-            'warn'
-          );
-          return;
-          }
         }
         if (isMultiAssignedCellRestrictedEditorMode() && !enforceGuestAssignedLayerSelection({ announce: true })) {
           logSharedProjectDrawBlock('assigned-cell-restriction');
@@ -54761,6 +54771,17 @@
     return isSharedProjectCollaborativeMode(projectKey) && activeSharedProjectSyncState === 'catching-up';
   }
 
+  function isSharedProjectAwaitingReady(projectKey = '') {
+    return Boolean(
+      isSharedProjectCollaborativeMode(projectKey)
+      && (
+        sharedProjectDeferRealtimeUntilSynced
+        || !activeSharedProjectDocumentLoaded
+        || isSharedProjectCatchingUp(projectKey)
+      )
+    );
+  }
+
   function isSharedProjectsBlockedByRuntime() {
     return window.location?.protocol === 'file:';
   }
@@ -55885,9 +55906,46 @@
     });
   }
 
+  function requeueSharedProjectLocalOpForRetry(entry, reason = 'retry') {
+    const opRecord = entry?.op || null;
+    const opId = normalizeSharedProjectOpId(opRecord);
+    const projectKey = normalizeMultiProjectKey(entry?.projectKey || opRecord?.projectKey || activeSharedProjectKey || '');
+    if (!opRecord || !opId || !projectKey) {
+      return false;
+    }
+    const alreadyQueued = sharedProjectPendingLocalOps.some(candidate => (
+      normalizeSharedProjectOpId(candidate?.op || null) === opId
+    ));
+    if (!alreadyQueued) {
+      const queuedEntry = {
+        projectKey,
+        historyLabel: opRecord.historyLabel || '',
+        op: opRecord,
+        opPayload: opRecord.payload || null,
+        retryOnConflict: true,
+      };
+      if (classifySharedProjectOpType(opRecord.historyLabel || '') === 'draw') {
+        sharedProjectPendingLocalOps.unshift(queuedEntry);
+      } else {
+        sharedProjectPendingLocalOps.push(queuedEntry);
+      }
+    }
+    sharedProjectLocalInFlightOps.delete(opId);
+    logSharedProjectLocalOpLifecycle('requeued after local replay failure', opRecord, {
+      source: reason,
+      status: 'requeued',
+      opType: entry?.opType || '',
+    });
+    window.setTimeout(() => {
+      flushSharedProjectPendingLocalOps();
+    }, 0);
+    return true;
+  }
+
   function replaySharedProjectLocalInFlightOps(reason = 'refresh') {
     const inflightOps = getSharedProjectLocalInFlightOps();
     let replayed = 0;
+    let requeued = 0;
     inflightOps.forEach(entry => {
       const opRecord = entry?.op || null;
       if (!opRecord) {
@@ -55900,11 +55958,14 @@
           status: entry.status || '',
           opType: entry.opType || '',
         });
+        if (requeueSharedProjectLocalOpForRetry(entry, reason)) {
+          requeued += 1;
+        }
         return;
       }
       replayed += 1;
     });
-    return replayed;
+    return { replayed, requeued };
   }
 
   function deferSharedProjectSnapshotApplyIfLocalOpsInFlight(reason = 'snapshot-refresh') {
@@ -55916,7 +55977,14 @@
       status: 'deferred',
       opType: 'snapshot',
     });
-    replaySharedProjectLocalInFlightOps(reason);
+    const { requeued = 0 } = replaySharedProjectLocalInFlightOps(reason) || {};
+    if (hasSharedProjectLocalInFlightOps()) {
+      queueSharedProjectRefresh({ immediate: false, reason, force: true });
+      return true;
+    }
+    if (requeued > 0) {
+      return false;
+    }
     queueSharedProjectRefresh({ immediate: false, reason, force: true });
     return true;
   }
