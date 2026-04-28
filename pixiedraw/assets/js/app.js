@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.28-shared-reconnect-draw-unblock-fix1';
+  const APP_BUILD_VERSION = '2026.04.28-shared-reconnect-usable-doc-gate-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -54776,7 +54776,10 @@
       isSharedProjectCollaborativeMode(projectKey)
       && (
         sharedProjectDeferRealtimeUntilSynced
-        || !activeSharedProjectDocumentLoaded
+        || (
+          !activeSharedProjectDocumentLoaded
+          && !hasUsableActiveSharedProjectDocumentState()
+        )
       )
     );
   }
