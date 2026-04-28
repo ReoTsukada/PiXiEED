@@ -19808,6 +19808,15 @@
     return isSharedRecentProjectEntry(entry) ? normalizeSharedRecentProjectEntry(entry) : null;
   }
 
+  function resolveSharedRecentProjectRoleHint(projectKey = '', fallbackRole = 'guest') {
+    const trackedEntry = getTrackedSharedRecentProjectEntry(projectKey);
+    const trackedRoleHint = typeof trackedEntry?.sharedRoleHint === 'string' ? trackedEntry.sharedRoleHint.trim() : '';
+    if (trackedRoleHint === 'master' || trackedRoleHint === 'guest') {
+      return trackedRoleHint;
+    }
+    return fallbackRole === 'master' ? 'master' : 'guest';
+  }
+
   function getSharedRecentProjectEntry(projectKey = '') {
     return getCurrentSharedRecentProjectEntry(projectKey);
   }
@@ -20827,13 +20836,7 @@
       name: createSharedProjectSnapshotTitle(project.title || normalizedEntry.name || state.documentName || DEFAULT_DOCUMENT_NAME),
       fileName: normalizedEntry.fileName || normalizeDocumentName(`${normalizedEntry.name || DEFAULT_DOCUMENT_NAME}.pixiedraw`),
       thumbnail,
-      roleHint: (
-        accountState.userId
-        && typeof project.owner_user_id === 'string'
-        && project.owner_user_id === accountState.userId
-      )
-        ? 'master'
-        : 'guest',
+      roleHint: project?.membership_role === 'owner' ? 'master' : 'guest',
       autoJoin: normalizedEntry.sharedAutoJoin !== false,
       revision: Math.max(0, Math.round(Number(project.latest_revision) || 0)),
       structureRevision: Math.max(0, Math.round(Number(project.latest_structure_revision) || 0)),
@@ -21460,7 +21463,7 @@
             title: createSharedProjectSnapshotTitle(state.documentName || DEFAULT_DOCUMENT_NAME),
           })
         : await loadSharedProjectSnapshotRecord(normalizedProjectKey, {
-            createIfMissing: normalizedRequestedRole === 'master',
+            createIfMissing: false,
             title: createSharedProjectSnapshotTitle(state.documentName || DEFAULT_DOCUMENT_NAME),
           });
       if (!sharedProject?.project_key) {
@@ -21520,7 +21523,7 @@
           title: createSharedProjectSnapshotTitle(state.documentName || DEFAULT_DOCUMENT_NAME),
         })
       : await loadSharedProjectSnapshotRecord(normalizedProjectKey, {
-          createIfMissing: requestedRole === 'master',
+          createIfMissing: false,
           title: createSharedProjectSnapshotTitle(state.documentName || DEFAULT_DOCUMENT_NAME),
         });
     if (!sharedProject?.project_key) {
@@ -59752,7 +59755,7 @@
             inviteToken: saved.invite_token || '',
             visibility: saved.visibility || 'private',
             name: createSharedProjectSnapshotTitle(saved.title || nextPayload.title),
-            roleHint: normalizeMultiDesiredRole(multiState.role || multiState.desiredRole || 'spectator'),
+            roleHint: resolveSharedRecentProjectRoleHint(nextPayload.projectKey, 'master'),
             autoJoin: false,
             revision: Math.max(0, Math.round(Number(saved.latest_revision) || 0)),
             structureRevision: nextStructureRevision,
