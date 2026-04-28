@@ -55987,6 +55987,59 @@
     return '';
   }
 
+  function getSharedProjectDrawChangedPixelCount(opRecord) {
+    const payload = extractSharedProjectOpPayload(opRecord);
+    if (!payload || typeof payload !== 'object') {
+      return 0;
+    }
+    if (payload.command === 'region') {
+      return Math.max(0, Math.round(Number(payload.width) || 0) * Math.round(Number(payload.height) || 0));
+    }
+    if (payload.command === 'stroke') {
+      return Math.max(0, normalizeSharedProjectStrokePoints(payload.points).length);
+    }
+    if (payload.command === 'shape') {
+      const start = payload.start || null;
+      const end = payload.end || null;
+      if (!start || !end) {
+        return 0;
+      }
+      const width = Math.abs(Math.round(Number(end.x) || 0) - Math.round(Number(start.x) || 0)) + 1;
+      const height = Math.abs(Math.round(Number(end.y) || 0) - Math.round(Number(start.y) || 0)) + 1;
+      return Math.max(0, width * height);
+    }
+    if (payload.command === 'fill') {
+      return 0;
+    }
+    return Math.max(0, Math.floor(Number(payload.pixelCount) || 0));
+  }
+
+  function logSharedProjectDrawLifecycle(event, opRecord, extra = {}) {
+    const payload = extractSharedProjectOpPayload(opRecord);
+    const diagnostics = extra.diagnostics && typeof extra.diagnostics === 'object' ? extra.diagnostics : {};
+    console.info('[shared-draw-op]', {
+      event,
+      opId: normalizeSharedProjectOpId(opRecord),
+      revision: getSharedProjectOpSeq(opRecord),
+      kind: typeof opRecord?.kind === 'string' ? opRecord.kind : '',
+      mode: typeof extra.mode === 'string' ? extra.mode : '',
+      canvasId: typeof payload?.canvasId === 'string' ? payload.canvasId.trim() : '',
+      resolvedCanvasId: diagnostics.resolvedCanvasId || '',
+      frameId: typeof payload?.frameId === 'string' ? payload.frameId.trim() : '',
+      resolvedFrameId: diagnostics.resolvedFrameId || '',
+      frameIndex: Math.max(0, Math.round(Number(payload?.frameIndex) || 0)),
+      layerId: typeof payload?.layerId === 'string' ? payload.layerId.trim() : '',
+      resolvedLayerId: diagnostics.resolvedLayerId || '',
+      layerIndex: Math.max(-1, Math.round(Number(payload?.layerIndex) || -1)),
+      changedPixelCount: getSharedProjectDrawChangedPixelCount(opRecord),
+      activeSharedProjectRevision,
+      activeSharedProjectStructureRevision,
+      reason: typeof extra.reason === 'string' ? extra.reason : '',
+      skipReason: typeof extra.skipReason === 'string' ? extra.skipReason : '',
+      error: extra.error ? String(extra.error?.message || extra.error || '') : '',
+    });
+  }
+
   function logSharedProjectLocalOpLifecycle(stage, opRecord, {
     source = '',
     error = null,
@@ -57183,6 +57236,14 @@
         return true;
       }
     }
+    if (fromRemote && !provisional) {
+      console.info('[shared-sync]', {
+        event: 'remote-confirmed-op-received',
+        opId,
+        revision: seq,
+        kind,
+      });
+    }
     if (!provisional && opId && sharedProjectSeenOpIds.has(opId) && !seq) {
       return true;
     }
@@ -57200,6 +57261,11 @@
       || kind === 'stroke-commit'
       || kind === 'draw'
     ) {
+      if (fromRemote && !provisional) {
+        logSharedProjectDrawLifecycle('remote-confirmed-op-apply-start', opRecord, {
+          mode: 'remote-confirmed',
+        });
+      }
       applied = applyIncomingSharedProjectDrawOp(opRecord, { fromRemote, provisional });
     } else if (
       kind === 'palette-update'
@@ -57237,6 +57303,11 @@
         kind,
         provisional,
       });
+      if (fromRemote) {
+        logSharedProjectDrawLifecycle('remote-confirmed-op-applied', opRecord, {
+          mode: isSharedProjectRemoteOpFromCurrentSession(opRecord) ? 'self-confirmed-ack' : 'remote-confirmed',
+        });
+      }
       sharedProjectSeenOpIds.add(opId);
       sharedProjectSeenOpSeqById.set(
         opId,
@@ -57263,6 +57334,10 @@
         revision: seq,
         kind,
         provisional,
+      });
+      logSharedProjectDrawLifecycle('remote-confirmed-op-skipped', opRecord, {
+        mode: isSharedProjectRemoteOpFromCurrentSession(opRecord) ? 'self-confirmed-ack' : 'remote-confirmed',
+        skipReason: 'apply-returned-false',
       });
     }
     return applied;
@@ -57534,9 +57609,6 @@
     if (normalizedType === 'create' || normalizedType === 'snapshot' || normalizedType === 'structure') {
       return true;
     }
-    if (normalizedLabel === 'realtimeSnapshotSync') {
-      return true;
-    }
     if (isSharedProjectCheckpointHistoryLabel(historyLabel)) {
       return true;
     }
@@ -57770,6 +57842,12 @@
           && opId
           && (sharedProjectSeenOpIds.has(opId) || sharedProjectAppliedProvisionalOpIds.has(opId))
         ) {
+          if (isSharedProjectRemoteOpFromCurrentSession(op)) {
+            logSharedProjectDrawLifecycle('remote-confirmed-op-applied', op, {
+              mode: 'self-confirmed-ack',
+              reason: 'self-ack-without-reapply',
+            });
+          }
           sharedProjectAppliedProvisionalOpIds.delete(opId);
           if (seq === sharedProjectLastAppliedSeq + 1) {
             sharedProjectLastAppliedSeq = seq;
@@ -57785,9 +57863,21 @@
           continue;
         }
         if (seq <= sharedProjectLastAppliedSeq) {
+          if (fromRemote) {
+            logSharedProjectDrawLifecycle('remote-confirmed-op-skipped', op, {
+              mode: isSharedProjectRemoteOpFromCurrentSession(op) ? 'self-confirmed-ack' : 'remote-confirmed',
+              skipReason: 'revision-too-old',
+            });
+          }
           continue;
         }
         if (seq > sharedProjectLastAppliedSeq + 1) {
+          console.info('[shared-sync]', {
+            event: 'replay-gap-detected',
+            opId,
+            revision: seq,
+            activeRevision: sharedProjectLastAppliedSeq,
+          });
           sharedProjectPendingRemoteOps.set(seq, op);
           continue;
         }
@@ -57885,15 +57975,37 @@
     if (!op || typeof op !== 'object' || !op.projectKey) {
       return;
     }
+    const opType = classifySharedProjectOpType(op.historyLabel || '');
     rememberSharedProjectLocalInFlightOp(op, {
       source: 'local',
       status: 'created',
-      opType: classifySharedProjectOpType(op.historyLabel || ''),
+      opType,
     });
-    markSharedProjectLocalOpProvisionalApplied(op, {
-      source: 'local',
-      opType: classifySharedProjectOpType(op.historyLabel || ''),
-    });
+    if (opType === 'draw') {
+      logSharedProjectDrawLifecycle('local-provisional-apply-start', op, {
+        mode: 'local-provisional',
+      });
+    }
+    try {
+      markSharedProjectLocalOpProvisionalApplied(op, {
+        source: 'local',
+        opType,
+      });
+      if (opType === 'draw') {
+        logSharedProjectDrawLifecycle('local-provisional-apply-done', op, {
+          mode: 'local-provisional',
+        });
+      }
+    } catch (error) {
+      if (opType === 'draw') {
+        logSharedProjectDrawLifecycle('local-provisional-apply-failed', op, {
+          mode: 'local-provisional',
+          error,
+        });
+      }
+      markSharedProjectLocalOpCommitFailed(op, error, { source: 'local-provisional' });
+      return;
+    }
     // shared_project_ops is the source of truth; local journal is a durability buffer.
     appendSharedLocalOpJournal(op, { status: 'pending' }).catch(error => {
       console.warn('Failed to append shared local op journal entry', error);
@@ -57907,6 +58019,12 @@
       opPayload: op.payload || null,
       retryOnConflict,
     };
+    console.info('[shared-sync]', {
+      event: 'commit-queue-add',
+      opId: getSharedProjectOpId(op),
+      projectKey: op.projectKey,
+      queueLengthBefore: sharedProjectPendingLocalOps.length,
+    });
     sharedProjectPendingLocalOps.push(queuedOp);
     sortSharedProjectPendingLocalOps();
     flushSharedProjectPendingLocalOps();
@@ -58015,6 +58133,11 @@
         frameIndex: diagnostics.frameIndex,
         structureRevision: diagnostics.structureRevision,
         activeStructureRevision: diagnostics.activeStructureRevision,
+      });
+      logSharedProjectDrawLifecycle('remote-confirmed-op-skipped', opRecord, {
+        mode: provisional ? 'local-provisional' : (isSharedProjectRemoteOpFromCurrentSession(opRecord) ? 'self-confirmed-ack' : 'remote-confirmed'),
+        diagnostics,
+        skipReason: diagnostics.reason || 'invalid-payload',
       });
       if (
         fromRemote
@@ -58139,6 +58262,11 @@
         structureRevision: diagnostics.structureRevision,
         activeStructureRevision: diagnostics.activeStructureRevision,
       });
+      logSharedProjectDrawLifecycle('remote-confirmed-op-skipped', opRecord, {
+        mode: provisional ? 'local-provisional' : (isSharedProjectRemoteOpFromCurrentSession(opRecord) ? 'self-confirmed-ack' : 'remote-confirmed'),
+        diagnostics,
+        skipReason: diagnostics.reason || 'apply-returned-false',
+      });
       return false;
     }
     console.debug('[shared-realtime] draw-applied', {
@@ -58151,6 +58279,12 @@
       layerId: diagnostics.layerId || '',
       frameIndex: diagnostics.frameIndex,
     });
+    if (!fromRemote && provisional) {
+      logSharedProjectDrawLifecycle('local-provisional-apply-done', opRecord, {
+        mode: 'local-provisional',
+        diagnostics,
+      });
+    }
     if (fromRemote && provisional) {
       const provisionalOpId = getSharedProjectOpId(opRecord);
       if (provisionalOpId) {
@@ -58538,11 +58672,23 @@
         afterRevision: sharedProjectLastAppliedSeq,
         targetRevision,
       });
+      console.info('[shared-sync]', {
+        event: 'missing-ops-fetch-start',
+        projectKey,
+        afterRevision: sharedProjectLastAppliedSeq,
+        targetRevision,
+      });
       const ops = await fetchMissingOps(
         projectKey,
         sharedProjectLastAppliedSeq,
         Math.max(SHARED_PROJECT_MAX_MISSING_OP_FETCH, targetRevision - sharedProjectLastAppliedSeq + 8)
       );
+      console.info('[shared-sync]', {
+        event: 'missing-ops-fetch-done',
+        projectKey,
+        afterRevision: sharedProjectLastAppliedSeq,
+        fetchedCount: ops.length,
+      });
       if (!ops.length) {
         console.info('[shared-sync]', {
           event: 'replay-gap-fallback',
@@ -58583,6 +58729,12 @@
       }
       return false;
     }
+    console.info('[shared-sync]', {
+      event: 'replay-gap-filled',
+      projectKey,
+      activeRevision: sharedProjectLastAppliedSeq,
+      targetRevision,
+    });
     setActiveSharedProjectSession(
       projectKey,
       Math.max(sharedProjectLastAppliedSeq, targetRevision),
@@ -59339,6 +59491,13 @@
       }
       const previousRevision = Math.max(0, Math.round(Number(activeSharedProjectRevision) || 0));
       const previousStructureRevision = Math.max(0, Math.round(Number(activeSharedProjectStructureRevision) || 0));
+      console.info('[shared-sync]', {
+        event: 'commit-started',
+        opId: resolvedOp.opId || '',
+        projectKey: normalizedProjectKey,
+        baseRevision: previousRevision,
+        baseStructureRevision: previousStructureRevision,
+      });
       const { data, error } = await supabase.rpc('pixieed_commit_shared_project_op', {
         target_project_key: normalizedProjectKey,
         base_revision: previousRevision,
@@ -59475,16 +59634,6 @@
           latestStructureRevision: Math.max(0, Math.round(Number(result.latest_structure_revision) || 0)),
         });
       }
-      if (resolvedOpType === 'draw' || resolvedOpType === 'palette' || resolvedOpType === 'structure') {
-        queueSharedProjectCurrentSnapshotCapture({
-          delayMs: 0,
-          projectKey: normalizedProjectKey,
-          title: createSharedProjectSnapshotTitle(state.documentName || DEFAULT_DOCUMENT_NAME),
-          historyLabel: 'realtimeSnapshotSync',
-          force: true,
-          revision: Math.max(0, Math.round(Number(result.latest_revision) || 0)),
-        });
-      }
       if (shouldCreateSharedProjectCheckpoint(resolvedOpType)) {
         scheduleSharedProjectCheckpoint({
           historyLabel: resolvedOpType === 'structure' ? historyLabel : 'checkpoint',
@@ -59497,6 +59646,12 @@
       });
       return result;
     } catch (error) {
+      console.info('[shared-sync]', {
+        event: 'commit-failed',
+        opId: resolvedOp?.opId || '',
+        projectKey: normalizedProjectKey,
+        error: String(error?.message || error || ''),
+      });
       markSharedProjectLocalOpCommitFailed(resolvedOp, error, { source: 'db-exception' });
       requeueSharedProjectOperationCommit(resolvedOp, {
         retryOnConflict,
@@ -59520,6 +59675,12 @@
     if (!nextOp) {
       return;
     }
+    console.info('[shared-sync]', {
+      event: 'commit-queue-drain-start',
+      opId: getSharedProjectOpId(nextOp.op || nextOp),
+      projectKey: nextOp.projectKey || '',
+      remainingQueueLength: sharedProjectPendingLocalOps.length,
+    });
     sharedProjectOpCommitInFlight = true;
     commitSharedProjectOperation(nextOp.projectKey, {
       historyLabel: nextOp.historyLabel,
