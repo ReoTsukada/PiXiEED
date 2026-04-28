@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.28-shared-post-subscribe-gap-fix1';
+  const APP_BUILD_VERSION = '2026.04.28-shared-provisional-recovery-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -44120,16 +44120,18 @@
     } else {
       // Non-spectator: existing restrictions for drawing guests
       if (HISTORY_DRAW_TOOLS.has(activeTool)) {
-        if (isSharedProjectAwaitingReady()) {
+        if (!canAcceptSharedProjectLocalDrawOps()) {
           logSharedProjectDrawBlock(
-            sharedProjectDeferRealtimeUntilSynced
-              ? 'shared-sync-awaiting-ready'
-              : 'shared-sync-catching-up'
+            isSharedProjectAwaitingReady()
+              ? (sharedProjectDeferRealtimeUntilSynced
+                ? 'shared-sync-awaiting-ready'
+                : 'shared-sync-catching-up')
+              : 'shared-realtime-not-ready'
           );
           updateAutosaveStatus(
             localizeText(
-              '共有プロジェクトの接続と同期が完了するまでお待ちください',
-              'Please wait until the shared project finishes connecting and syncing.'
+              '共有プロジェクトの接続が安定するまでお待ちください',
+              'Please wait until the shared project connection is stable.'
             ),
             'warn'
           );
@@ -54765,6 +54767,22 @@
     );
   }
 
+  function canAcceptSharedProjectLocalDrawOps(projectKey = '') {
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || activeSharedProjectKey || '');
+    if (!isSharedProjectCollaborativeMode(normalizedProjectKey)) {
+      return true;
+    }
+    if (isSharedProjectAwaitingReady(normalizedProjectKey)) {
+      return false;
+    }
+    return Boolean(
+      activeSharedProjectChannel
+      && activeSharedProjectChannelKey === normalizedProjectKey
+      && sharedProjectRealtimeStatus === 'subscribed'
+      && !sharedProjectRealtimeConnectPromise
+    );
+  }
+
   function isSharedProjectsBlockedByRuntime() {
     return window.location?.protocol === 'file:';
   }
@@ -57567,7 +57585,7 @@
       if (
         fromRemote
         && provisional
-        && diagnostics.reason === 'structure-revision-mismatch'
+        && shouldRefreshForSharedProjectApplySkip(diagnostics.reason)
       ) {
         if (opId) {
           sharedProjectPendingProvisionalOps.set(opId, {
@@ -57577,7 +57595,26 @@
         }
         if (!sharedProjectRemoteApplyFailureKeys.has(failureKey)) {
           sharedProjectRemoteApplyFailureKeys.add(failureKey);
-          scheduleSharedProjectStructureMismatchRecovery();
+          if (diagnostics.reason === 'structure-revision-mismatch') {
+            scheduleSharedProjectStructureMismatchRecovery();
+          } else {
+            const recoveryReason = `provisional-apply-skip-${diagnostics.reason}`;
+            triggerImmediateSharedProjectRecovery(recoveryReason).then(recovered => {
+              if (!recovered) {
+                queueSharedProjectRefresh({
+                  immediate: true,
+                  reason: recoveryReason,
+                  force: true,
+                });
+              }
+            }).catch(() => {
+              queueSharedProjectRefresh({
+                immediate: true,
+                reason: recoveryReason,
+                force: true,
+              });
+            });
+          }
         }
       }
       if (
