@@ -41,6 +41,21 @@
   const lastSyncedCounts = new Map();
   const RPC_VALUE_KEYS = ['get_global_dot_total', 'sync_project_dot_count', 'total_dots', 'value', 'all_time_total', 'today_total'];
 
+  function isRecoverablePreflightError(error) {
+    const status = Number(error?.status || 0);
+    const code = String(error?.code || '').trim();
+    const message = String(error?.message || '').toLowerCase();
+    return (
+      status === 0
+      && !code
+      && (
+        message.includes('load failed')
+        || message.includes('failed to fetch')
+        || message.includes('networkerror')
+      )
+    );
+  }
+
   function normalizeDotCount(value) {
     const parsed = Number(value);
     if (!Number.isFinite(parsed)) {
@@ -770,6 +785,16 @@
     }
     const promise = flushProjectSync(queueKey, normalizedProjectId, normalizedApp).catch(error => {
       inflightSyncs.delete(queueKey);
+      if (isRecoverablePreflightError(error)) {
+        console.debug('[pixieed-dot-stats] sync skipped after recoverable preflight failure', {
+          app: normalizedApp,
+          projectId: normalizedProjectId,
+          dotCount: normalizedCount,
+          online: typeof navigator !== 'undefined' ? Boolean(navigator.onLine) : null,
+          visibilityState: typeof document !== 'undefined' ? String(document.visibilityState || '') : '',
+        });
+        return null;
+      }
       console.warn('Failed to sync project dot count', error);
       return null;
     });
