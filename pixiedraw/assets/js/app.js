@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.28-shared-confirmed-only-remote-fix1';
+  const APP_BUILD_VERSION = '2026.04.28-shared-broadcast-gap-only-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
@@ -54995,6 +54995,18 @@
     );
   }
 
+  function isSharedProjectOpAlreadySettled(opRecord, afterSeq = sharedProjectLastAppliedSeq) {
+    const seq = getSharedProjectOpSeq(opRecord);
+    if (seq && seq <= Math.max(0, Math.round(Number(afterSeq) || 0))) {
+      return true;
+    }
+    const opId = normalizeSharedProjectOpId(opRecord);
+    if (!opId) {
+      return false;
+    }
+    return sharedProjectSeenOpIds.has(opId) || sharedProjectAppliedProvisionalOpIds.has(opId);
+  }
+
   function buildSharedProjectLayerSnapshotKey(canvasId, frameIndex, layerId) {
     const normalizedCanvasId = typeof canvasId === 'string' ? canvasId.trim() : '';
     const normalizedLayerId = typeof layerId === 'string' ? layerId.trim() : '';
@@ -57056,6 +57068,20 @@
       const advanced = sharedProjectLastAppliedSeq > afterSeq;
       if (replayed) {
         sharedProjectLastRealtimeActivityAt = Date.now();
+      }
+      const fetchedOnlySettledOps = Array.isArray(ops) && ops.length > 0
+        && ops.every(op => isSharedProjectOpAlreadySettled(op, afterSeq));
+      if (!advanced && fetchedOnlySettledOps) {
+        sharedProjectLastRescueAfterSeq = sharedProjectLastAppliedSeq;
+        sharedProjectLastRescueOpCount = 0;
+        sharedProjectRescueStallCount = 0;
+        console.debug('[shared-realtime] rescue-op-poll-settled-window', {
+          reason,
+          projectKey: activeSharedProjectKey || '',
+          afterSeq,
+          opCount: ops.length,
+        });
+        return false;
       }
       if (!advanced) {
         const repeatedSameWindow = (
@@ -59662,20 +59688,19 @@
           sessionId: typeof op?.sessionId === 'string' ? op.sessionId : '',
         });
         const drawKind = typeof op?.kind === 'string' ? op.kind : '';
-        if (SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY && isSharedProjectDrawKind(drawKind)) {
-          recoverSharedProjectRealtimeGap(projectKey, {
-            afterSeq: sharedProjectLastAppliedSeq,
-            reason: 'broadcast-draw-gap',
-          }).then(recovered => {
-            if (!recovered) {
-              scheduleSharedProjectOpsRescueRetry(96);
-            }
-          }).catch(() => {
+        const recoveryReason = SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY && isSharedProjectDrawKind(drawKind)
+          ? 'broadcast-draw-gap'
+          : 'broadcast-op-gap';
+        recoverSharedProjectRealtimeGap(projectKey, {
+          afterSeq: sharedProjectLastAppliedSeq,
+          reason: recoveryReason,
+        }).then(recovered => {
+          if (!recovered) {
             scheduleSharedProjectOpsRescueRetry(96);
-          });
-          return;
-        }
-        applyOp(op, { fromRemote: true, provisional: true });
+          }
+        }).catch(() => {
+          scheduleSharedProjectOpsRescueRetry(96);
+        });
       }
     );
       if (shouldEnableSharedProjectRealtimeStage(realtimeStage, 'projects')) {
