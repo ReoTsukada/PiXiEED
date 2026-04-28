@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'pixiedraw-v2026.04.28-shared-strict-fifo-queue-fix1';
+const CACHE_VERSION = 'pixiedraw-v2026.04.28-shared-createdat-fifo-fix1';
 const CORE_ASSETS = [
   '/pixiedraw/',
   '/pixiedraw/index.html',
