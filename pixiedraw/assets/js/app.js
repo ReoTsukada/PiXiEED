@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.28-shared-reconnect-usable-doc-gate-fix1';
+  const APP_BUILD_VERSION = '2026.04.28-shared-reconnect-broader-doc-gate-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -8776,22 +8776,7 @@
     if (!canvasDoc || !Array.isArray(canvasDoc.frames) || !canvasDoc.frames.length) {
       return false;
     }
-    const activeFrameIndex = clamp(
-      Math.round(Number(canvasDoc.activeFrame ?? state.activeFrame) || 0),
-      0,
-      Math.max(0, canvasDoc.frames.length - 1)
-    );
-    const frame = canvasDoc.frames[activeFrameIndex];
-    if (!frame || !Array.isArray(frame.layers) || !frame.layers.length) {
-      return false;
-    }
-    const activeLayerId = typeof (state.activeLayer || canvasDoc.activeLayer) === 'string'
-      ? String(state.activeLayer || canvasDoc.activeLayer).trim()
-      : '';
-    if (!activeLayerId) {
-      return frame.layers.some(layer => Boolean(layer?.id));
-    }
-    return frame.layers.some(layer => layer?.id === activeLayerId);
+    return canvasDoc.frames.some(frame => Array.isArray(frame?.layers) && frame.layers.length > 0);
   }
 
   function canPersistActiveSharedProjectDocument(projectKey = activeSharedProjectKey, historyLabel = '') {
