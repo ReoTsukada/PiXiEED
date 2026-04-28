@@ -4,8 +4,9 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.28-shared-noisy-preflight-fix1';
+  const APP_BUILD_VERSION = '2026.04.28-shared-confirmed-only-remote-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
+  const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
   const dom = {
     appRoot: document.getElementById('appRoot'),
@@ -54977,6 +54978,23 @@
     return 'session';
   }
 
+  function isSharedProjectDrawKind(kind = '') {
+    const normalizedKind = typeof kind === 'string' ? kind.trim() : '';
+    return (
+      normalizedKind === 'stroke-command'
+      || normalizedKind === 'stroke'
+      || normalizedKind === 'shape-command'
+      || normalizedKind === 'fill-command'
+      || normalizedKind === 'curve-command'
+      || normalizedKind === 'region-command'
+      || normalizedKind === 'layer-patch'
+      || normalizedKind === 'fill'
+      || normalizedKind === 'selection-transform'
+      || normalizedKind === 'stroke-commit'
+      || normalizedKind === 'draw'
+    );
+  }
+
   function buildSharedProjectLayerSnapshotKey(canvasId, frameIndex, layerId) {
     const normalizedCanvasId = typeof canvasId === 'string' ? canvasId.trim() : '';
     const normalizedLayerId = typeof layerId === 'string' ? layerId.trim() : '';
@@ -59644,16 +59662,17 @@
           sessionId: typeof op?.sessionId === 'string' ? op.sessionId : '',
         });
         const drawKind = typeof op?.kind === 'string' ? op.kind : '';
-        if (
-          drawKind === 'layer-patch'
-          || drawKind === 'fill'
-          || drawKind === 'selection-transform'
-          || drawKind === 'stroke-commit'
-          || drawKind === 'draw'
-        ) {
-          if (!shouldDeferIncomingSharedProjectRemoteApply()) {
-            applyOp(op, { fromRemote: true, provisional: true });
-          }
+        if (SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY && isSharedProjectDrawKind(drawKind)) {
+          recoverSharedProjectRealtimeGap(projectKey, {
+            afterSeq: sharedProjectLastAppliedSeq,
+            reason: 'broadcast-draw-gap',
+          }).then(recovered => {
+            if (!recovered) {
+              scheduleSharedProjectOpsRescueRetry(96);
+            }
+          }).catch(() => {
+            scheduleSharedProjectOpsRescueRetry(96);
+          });
           return;
         }
         applyOp(op, { fromRemote: true, provisional: true });
