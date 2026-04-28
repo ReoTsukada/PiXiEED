@@ -3020,6 +3020,9 @@
   let activeSharedProjectKey = '';
   let activeSharedProjectRevision = 0;
   let activeSharedProjectStructureRevision = 0;
+  let activeSharedProjectSnapshotRevision = 0;
+  let activeSharedProjectOpenInProgress = false;
+  let activeSharedProjectSynced = false;
   let activeSharedProjectDocumentLoaded = false;
   let activeSharedProjectSyncState = 'idle';
   let sharedProjectDeviceId = '';
@@ -3038,6 +3041,7 @@
   let sharedProjectRefreshTimer = null;
   let sharedProjectRefreshInFlight = false;
   let sharedProjectSnapshotReplayInFlight = false;
+  let sharedProjectRecoveryInProgress = false;
   let sharedProjectDeferRealtimeUntilSynced = false;
   function getCurrentAccountStorageNamespace() {
     const userId = typeof accountState.userId === 'string' ? accountState.userId.trim() : '';
@@ -3250,6 +3254,7 @@
   let sharedProjectMembers = [];
   let sharedProjectMembersSyncPromise = null;
   let sharedProjectImmediateRecoveryPromise = null;
+  let sharedProjectLastCanonicalLoadAt = 0;
   let multiSupabaseClientPromise = null;
   let recentProjectsWritePromise = Promise.resolve();
   let sharedLocalOpJournalWritePromise = Promise.resolve();
@@ -8344,6 +8349,15 @@
   }
 
   function clearActiveSharedProjectSession(reason = 'clear-session') {
+    if (activeSharedProjectOpenInProgress) {
+      console.info('[shared-sync]', {
+        event: 'clear-session-skipped',
+        reason,
+        beforeProjectKey: activeSharedProjectKey || '',
+        beforeProjectId: activeSharedProjectId || '',
+      });
+      return;
+    }
     releaseSharedProjectSessionLock().catch(() => {});
     logSharedProjectRealtimeChannelLifecycle('clear-session', {
       caller: 'clearActiveSharedProjectSession',
@@ -8353,6 +8367,9 @@
     activeSharedProjectKey = '';
     activeSharedProjectRevision = 0;
     activeSharedProjectStructureRevision = 0;
+    activeSharedProjectSnapshotRevision = 0;
+    activeSharedProjectOpenInProgress = false;
+    activeSharedProjectSynced = false;
     activeSharedProjectDocumentLoaded = false;
     activeSharedProjectSyncState = 'idle';
     sharedProjectLastAppliedSeq = 0;
@@ -8388,6 +8405,8 @@
       sharedProjectRefreshTimer = null;
     }
     clearSharedProjectStructureMismatchRecovery();
+    sharedProjectRecoveryInProgress = false;
+    sharedProjectLastCanonicalLoadAt = 0;
     sharedProjectLastRefreshQueuedAt = 0;
     sharedProjectLastRefreshQueuedReason = '';
     clearDeferredSharedProjectRemoteOpsDrain();
@@ -8757,6 +8776,20 @@
     syncSharedProjectMembers(normalizedProjectKey, activeSharedProjectId).catch(error => {
       console.warn('Failed to load shared project members', error);
     });
+  }
+
+  function setActiveSharedProjectSnapshotState(snapshotRevision = 0, {
+    structureRevision = activeSharedProjectStructureRevision,
+    synced = false,
+    canonicalLoadedAt = Date.now(),
+  } = {}) {
+    activeSharedProjectSnapshotRevision = Math.max(0, Math.round(Number(snapshotRevision) || 0));
+    activeSharedProjectStructureRevision = Math.max(
+      activeSharedProjectStructureRevision,
+      Math.max(0, Math.round(Number(structureRevision) || 0))
+    );
+    activeSharedProjectSynced = Boolean(synced);
+    sharedProjectLastCanonicalLoadAt = Math.max(0, Math.round(Number(canonicalLoadedAt) || 0));
   }
 
   function markActiveSharedProjectDocumentLoaded(projectKey = activeSharedProjectKey) {
@@ -21387,6 +21420,80 @@
     }
   }
 
+  async function openSharedProjectCanonical({
+    projectKey = '',
+    inviteToken = '',
+    requestedRole = 'guest',
+    autoJoin = true,
+    reason = 'open',
+    hideStartup = true,
+    silent = false,
+    successMessage = '',
+  } = {}) {
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
+    const normalizedInviteToken = typeof inviteToken === 'string' ? inviteToken.trim() : '';
+    const normalizedRequestedRole = requestedRole === 'master' || requestedRole === 'guest' || requestedRole === 'spectator'
+      ? requestedRole
+      : 'guest';
+    activeSharedProjectOpenInProgress = true;
+    activeSharedProjectSynced = false;
+    console.info('[shared-sync]', {
+      event: 'shared-open-start',
+      reason,
+      projectKey: normalizedProjectKey,
+      inviteToken: normalizedInviteToken ? 'present' : '',
+    });
+    try {
+      const sharedProject = normalizedInviteToken
+        ? await loadSharedProjectSnapshotRecordByInvite(normalizedInviteToken, {
+            createIfMissing: false,
+            title: createSharedProjectSnapshotTitle(state.documentName || DEFAULT_DOCUMENT_NAME),
+          })
+        : await loadSharedProjectSnapshotRecord(normalizedProjectKey, {
+            createIfMissing: normalizedRequestedRole === 'master',
+            title: createSharedProjectSnapshotTitle(state.documentName || DEFAULT_DOCUMENT_NAME),
+          });
+      if (!sharedProject?.project_key) {
+        if (!silent) {
+          setMultiStatus(localizeText('共有プロジェクトが見つかりませんでした', 'Shared project not found'), 'error');
+        }
+        console.info('[shared-sync]', { event: 'shared-open-failed', reason, failure: 'project-not-found' });
+        return false;
+      }
+      console.info('[shared-sync]', {
+        event: 'shared-open-project-fetched',
+        reason,
+        projectKey: sharedProject.project_key || '',
+        latestRevision: Math.max(0, Math.round(Number(sharedProject.latest_revision) || 0)),
+        latestSnapshotRevision: Math.max(0, Math.round(Number(sharedProject.latest_snapshot_revision) || 0)),
+      });
+      const opened = await openSharedProjectAccess({
+        inviteToken: normalizedInviteToken,
+        projectKey: sharedProject.project_key || normalizedProjectKey,
+        requestedRole: normalizedRequestedRole,
+        autoJoin,
+      }, {
+        hideStartup,
+        silent,
+        successMessage,
+      });
+      if (opened) {
+        activeSharedProjectSynced = activeSharedProjectSyncState === 'synced';
+        sharedProjectLastCanonicalLoadAt = Date.now();
+        console.info('[shared-sync]', {
+          event: 'shared-open-synced',
+          reason,
+          projectKey: activeSharedProjectKey || '',
+          revision: activeSharedProjectRevision,
+          snapshotRevision: activeSharedProjectSnapshotRevision,
+        });
+      }
+      return opened;
+    } finally {
+      activeSharedProjectOpenInProgress = false;
+    }
+  }
+
   async function openSharedProjectAccess(access, {
     hideStartup = true,
     silent = false,
@@ -21510,6 +21617,12 @@
     }
     let loadedSnapshot = true;
     if (!canReuseReloadBase) {
+      console.info('[shared-sync]', {
+        event: 'shared-open-snapshot-loaded',
+        reason: 'canonical-open',
+        projectKey: resolvedProjectKey,
+        snapshotRevision: freshestSnapshotRevision,
+      });
       loadedSnapshot = await loadDocumentFromText(JSON.stringify(sharedSnapshot), null, {
         projectId: buildSharedRecentProjectId(resolvedProjectKey),
         suppressAutosaveStatus: true,
@@ -21570,12 +21683,36 @@
     markActiveSharedProjectDocumentLoaded(resolvedProjectKey);
     const sharedSnapshotRevision = baseRevision;
     const sharedLatestRevision = freshestLatestRevision;
+    setActiveSharedProjectSnapshotState(sharedSnapshotRevision, {
+      structureRevision: baseStructureRevision,
+      synced: false,
+      canonicalLoadedAt: Date.now(),
+    });
     if (sharedSnapshotRevision < sharedLatestRevision) {
+      console.info('[shared-sync]', {
+        event: 'shared-open-ops-fetch-start',
+        reason: 'canonical-open',
+        projectKey: resolvedProjectKey,
+        afterRevision: sharedSnapshotRevision,
+        latestRevision: sharedLatestRevision,
+      });
       setActiveSharedProjectSyncState('catching-up', { announce: !silent });
+      console.info('[shared-sync]', {
+        event: 'shared-open-ops-replay-start',
+        reason: 'canonical-open',
+        projectKey: resolvedProjectKey,
+      });
       const replayedToLatest = await applySharedProjectOpsSinceRevision(
         freshestProject,
         sharedSnapshotRevision
       );
+      console.info('[shared-sync]', {
+        event: 'shared-open-ops-replay-done',
+        reason: 'canonical-open',
+        projectKey: resolvedProjectKey,
+        replayedToLatest,
+        revision: activeSharedProjectRevision,
+      });
       if (!replayedToLatest) {
         if (!silent) {
           setMultiStatus(
@@ -21590,9 +21727,19 @@
       }
     }
     setActiveSharedProjectSyncState('synced');
+    setActiveSharedProjectSnapshotState(sharedSnapshotRevision, {
+      structureRevision: baseStructureRevision,
+      synced: true,
+      canonicalLoadedAt: Date.now(),
+    });
     setSharedProjectDeferRealtimeUntilSynced(false);
     ensureActiveSharedProjectRealtimeChannel().catch(error => {
       reportSharedProjectRealtimeSubscribeFailure(error);
+    });
+    console.info('[shared-sync]', {
+      event: 'shared-open-realtime-subscribed',
+      reason: 'canonical-open',
+      projectKey: resolvedProjectKey,
     });
     restorePendingSharedLocalOps(resolvedProjectKey, {
       announce: true,
@@ -21697,12 +21844,12 @@
         const refreshedEntry = await refreshSharedRecentProjectEntryFromBackend(latestEntryForFallback);
         latestEntryForFallback = normalizeSharedRecentProjectEntry(refreshedEntry || latestEntryForFallback) || latestEntryForFallback;
         setStartupProgressLabel(localizeText('共有プロジェクトを読み込み中…', 'Loading shared project...'));
-        opened = await openSharedProjectAccess({
+        opened = await openSharedProjectCanonical({
           inviteToken: latestEntryForFallback.sharedProjectInviteToken || '',
           projectKey: latestEntryForFallback.sharedProjectKey || '',
           requestedRole: latestEntryForFallback.sharedRoleHint || 'guest',
           autoJoin: latestEntryForFallback.sharedAutoJoin !== false,
-        }, {
+          reason: 'recent-open',
           hideStartup,
           silent,
           successMessage: localizeText(
@@ -38221,6 +38368,13 @@
       return soleCanvas;
     }
     if (isSharedProjectCollaborativeMode() && canvases.length === 1) {
+      console.info('[shared-sync]', {
+        event: 'adopted-single-canvas-id',
+        requestedCanvasId: normalizedCanvasId,
+        resolvedCanvasId: soleCanvas.id || '',
+        projectKey: activeSharedProjectKey || '',
+        mutation: false,
+      });
       return soleCanvas;
     }
     const previousCanvasId = typeof soleCanvas.id === 'string' ? soleCanvas.id : '';
@@ -38235,10 +38389,13 @@
       hoveredProjectCanvasId = normalizedCanvasId;
     }
     syncProjectCanvasSurfaceDocumentRefs();
-    console.info('[shared-realtime] adopted-single-canvas-id', {
+    console.info('[shared-sync]', {
+      event: 'adopted-single-canvas-id',
       previousCanvasId,
-      nextCanvasId: normalizedCanvasId,
-      activeSharedProjectKey: activeSharedProjectKey || '',
+      requestedCanvasId: normalizedCanvasId,
+      resolvedCanvasId: normalizedCanvasId,
+      projectKey: activeSharedProjectKey || '',
+      mutation: true,
     });
     return soleCanvas;
   }
@@ -51850,6 +52007,12 @@
         restoredSharedStructureRevision,
         ''
       );
+      setActiveSharedProjectSnapshotState(restoredSharedProjectRevision, {
+        structureRevision: restoredSharedStructureRevision,
+        synced: false,
+        canonicalLoadedAt: 0,
+      });
+      activeSharedProjectSynced = false;
       setMultiStatus(
         localizeText('共有モード: 再読み込み復元ベースを適用しました', 'Shared mode: restored reload base'),
         'info'
@@ -53174,12 +53337,12 @@
         });
         return false;
       }
-      return await openSharedProjectAccess({
+      return await openSharedProjectCanonical({
         inviteToken: invite.inviteToken || '',
         projectKey: normalizedInviteProjectKey,
         requestedRole,
         autoJoin: invite.autoJoin !== false,
-      }, {
+        reason: 'url-invite',
         hideStartup: true,
         silent: true,
         successMessage: localizeText(
@@ -53358,11 +53521,12 @@
       });
       return false;
     }
-    const opened = await openSharedProjectAccess({
+    const opened = await openSharedProjectCanonical({
       inviteToken: access.inviteToken || '',
       projectKey: access.projectKey || '',
       requestedRole: 'guest',
       autoJoin: false,
+      reason: 'manual-open',
     });
     if (opened) {
       clearPendingSharedInvite();
@@ -54732,6 +54896,7 @@
   function setActiveSharedProjectSyncState(nextState = 'idle', { announce = false } = {}) {
     const normalizedState = nextState === 'catching-up' || nextState === 'synced' ? nextState : 'idle';
     activeSharedProjectSyncState = normalizedState;
+    activeSharedProjectSynced = normalizedState === 'synced';
     if (!announce || !isSharedProjectCollaborativeMode()) {
       return;
     }
@@ -54746,7 +54911,11 @@
       return;
     }
     if (normalizedState === 'synced') {
-      setMultiStatus(localizeText('共有モード: ON', 'Shared mode: ON'), 'success');
+      if (hasSharedProjectLocalInFlightOps()) {
+        setMultiStatus(localizeText('共有モード: 未確定変更あり', 'Shared mode: pending local changes'), 'info');
+      } else {
+        setMultiStatus(localizeText('共有モード: 最新', 'Shared mode: up to date'), 'success');
+      }
     }
   }
 
@@ -55015,6 +55184,39 @@
       return '';
     }
     return `${normalizedCanvasId}\u0000${normalizedFrameIndex}\u0000${normalizedLayerId}`;
+  }
+
+  function logSharedProjectResolveEvent(event, {
+    opId = '',
+    revision = 0,
+    kind = '',
+    canvasId = '',
+    resolvedCanvasId = '',
+    frameId = '',
+    resolvedFrameId = '',
+    layerId = '',
+    resolvedLayerId = '',
+    structureRevision = 0,
+    activeStructureRevision = activeSharedProjectStructureRevision,
+    result = '',
+    skipReason = '',
+  } = {}) {
+    console.info('[shared-sync]', {
+      event,
+      opId,
+      revision,
+      kind,
+      canvasId,
+      resolvedCanvasId,
+      frameId,
+      resolvedFrameId,
+      layerId,
+      resolvedLayerId,
+      structureRevision,
+      activeStructureRevision,
+      result,
+      skipReason,
+    });
   }
 
   function clearSharedProjectInFlightStroke() {
@@ -55797,14 +55999,44 @@
       projectKey: normalizeMultiProjectKey(opRecord?.projectKey || payload?.projectKey || activeSharedProjectKey || ''),
       opType: meta.opType || classifySharedProjectOpType(String(opRecord?.historyLabel || payload?.historyLabel || '')),
       source: meta.source || '',
-      status: meta.status || 'remembered',
+      status: meta.status || 'created',
       createdAtMs: Date.now(),
       updatedAtMs: Date.now(),
       expiresAtMs: Date.now() + SHARED_PROJECT_LOCAL_OP_EXPIRE_MS,
       lastError: '',
+      retryCount: Math.max(0, Math.round(Number(meta.retryCount) || 0)),
+      provisionalApplied: Boolean(meta.provisionalApplied),
+      committedRevision: Math.max(0, Math.round(Number(meta.committedRevision) || 0)),
+      committedStructureRevision: Math.max(0, Math.round(Number(meta.committedStructureRevision) || 0)),
     };
     sharedProjectLocalInFlightOps.set(opId, nextEntry);
+    logSharedProjectLocalOpLifecycle('created', opRecord, {
+      source: nextEntry.source,
+      status: nextEntry.status,
+      opType: nextEntry.opType,
+    });
     return nextEntry;
+  }
+
+  function markSharedProjectLocalOpProvisionalApplied(opRecord, meta = {}) {
+    const opId = normalizeSharedProjectOpId(opRecord);
+    if (!opId) {
+      return;
+    }
+    const entry = sharedProjectLocalInFlightOps.get(opId) || rememberSharedProjectLocalInFlightOp(opRecord, meta);
+    if (!entry) {
+      return;
+    }
+    entry.status = 'provisional-applied';
+    entry.provisionalApplied = true;
+    entry.source = meta.source || entry.source || 'local';
+    entry.updatedAtMs = Date.now();
+    sharedProjectLocalInFlightOps.set(opId, entry);
+    logSharedProjectLocalOpLifecycle('provisional applied', opRecord, {
+      source: entry.source,
+      status: entry.status,
+      opType: entry.opType,
+    });
   }
 
   function markSharedProjectLocalOpBroadcastSent(opRecord, meta = {}) {
@@ -55861,6 +56093,10 @@
       Math.round(Number(sharedProjectSeenOpSeqById.get(opId)) || 0),
       Math.round(Number(meta.revision) || getSharedProjectOpSeq(opRecord) || 0)
     ));
+    if (entry) {
+      entry.committedRevision = Math.max(0, Math.round(Number(meta.revision) || getSharedProjectOpSeq(opRecord) || 0));
+      entry.committedStructureRevision = Math.max(0, Math.round(Number(meta.structureRevision) || 0));
+    }
     logSharedProjectLocalOpLifecycle('commit confirmed', opRecord || { opId }, {
       source: meta.source || entry?.source || 'db',
       status: 'confirmed',
@@ -55884,6 +56120,7 @@
     entry.source = meta.source || entry.source || 'db';
     entry.updatedAtMs = Date.now();
     entry.lastError = String(error?.message || error || '');
+    entry.retryCount = Math.max(0, Math.round(Number(entry.retryCount) || 0)) + 1;
     logSharedProjectLocalOpLifecycle('commit failed', entry.op || { opId }, {
       source: entry.source,
       status: entry.status,
@@ -55963,6 +56200,10 @@
         });
         return;
       }
+      markSharedProjectLocalOpProvisionalApplied(opRecord, {
+        source: reason,
+        opType: entry.opType || '',
+      });
       replayed += 1;
     });
     return replayed;
@@ -55988,7 +56229,7 @@
     const canvasId = typeof payload.canvasId === 'string' ? payload.canvasId.trim() : '';
     const layerId = typeof payload.layerId === 'string' ? payload.layerId.trim() : '';
     const frameIndex = Math.max(0, Math.round(Number(payload.frameIndex) || 0));
-    return {
+    const op = {
       opId: generateSharedProjectOpId(),
       projectKey: resolvedProjectKey,
       clientId: multiState.clientId || ensureMultiClientId(),
@@ -56004,6 +56245,15 @@
       createdAt: new Date().toISOString(),
       payload,
     };
+    console.info('[shared-sync]', {
+      event: 'op-created',
+      opId: op.opId,
+      kind: op.kind,
+      baseRevision: op.baseRevision,
+      baseStructureRevision: op.baseStructureRevision,
+      projectKey: op.projectKey,
+    });
+    return op;
   }
 
   // Shared project realtime drawing:
@@ -56012,6 +56262,11 @@
   // - structure mismatch is the only reason to fall back to refresh
   function inspectIncomingSharedProjectDrawOp(opRecord) {
     const payload = extractSharedProjectOpPayload(opRecord);
+    const opId = normalizeSharedProjectOpId(opRecord);
+    const revision = getSharedProjectOpSeq(opRecord);
+    const kind = typeof opRecord?.kind === 'string'
+      ? opRecord.kind.trim()
+      : (typeof payload?.kind === 'string' ? payload.kind.trim() : '');
     const canvasId = typeof payload?.canvasId === 'string' ? payload.canvasId.trim() : '';
     const layerId = typeof payload?.layerId === 'string' ? payload.layerId.trim() : '';
     const frameIndex = Math.max(0, Math.round(Number(payload?.frameIndex) || 0));
@@ -56037,18 +56292,30 @@
     if (drawCommandType === 'stroke') {
       const points = normalizeSharedProjectStrokePoints(payload?.points);
       if (!canvasId || !layerId || !points.length) {
+        logSharedProjectResolveEvent('canvas-resolve-failed', {
+          opId, revision, kind, canvasId, layerId, structureRevision, result: 'skip', skipReason: 'missing-stroke-fields',
+        });
         return { ok: false, reason: 'missing-stroke-fields', canvasId, layerId, frameIndex, pixelCount: 0 };
       }
     } else if (drawCommandType === 'shape') {
       if (!canvasId || !layerId || !payload?.start || !payload?.end) {
+        logSharedProjectResolveEvent('canvas-resolve-failed', {
+          opId, revision, kind, canvasId, layerId, structureRevision, result: 'skip', skipReason: 'missing-shape-fields',
+        });
         return { ok: false, reason: 'missing-shape-fields', canvasId, layerId, frameIndex, pixelCount: 0 };
       }
     } else if (drawCommandType === 'fill') {
       if (!canvasId || !layerId || !payload?.point) {
+        logSharedProjectResolveEvent('canvas-resolve-failed', {
+          opId, revision, kind, canvasId, layerId, structureRevision, result: 'skip', skipReason: 'missing-fill-fields',
+        });
         return { ok: false, reason: 'missing-fill-fields', canvasId, layerId, frameIndex, pixelCount: 0 };
       }
     } else if (drawCommandType === 'curve') {
       if (!canvasId || !layerId || !payload?.start || !payload?.control1 || !payload?.control2 || !payload?.end) {
+        logSharedProjectResolveEvent('canvas-resolve-failed', {
+          opId, revision, kind, canvasId, layerId, structureRevision, result: 'skip', skipReason: 'missing-curve-fields',
+        });
         return { ok: false, reason: 'missing-curve-fields', canvasId, layerId, frameIndex, pixelCount: 0 };
       }
     } else if (drawCommandType === 'region') {
@@ -56059,12 +56326,21 @@
         || !Number.isFinite(Number(payload?.width))
         || !Number.isFinite(Number(payload?.height))
       ) {
+        logSharedProjectResolveEvent('canvas-resolve-failed', {
+          opId, revision, kind, canvasId, layerId, structureRevision, result: 'skip', skipReason: 'missing-region-fields',
+        });
         return { ok: false, reason: 'missing-region-fields', canvasId, layerId, frameIndex, pixelCount: 0 };
       }
     } else if (!canvasId || !layerId || !pixelCount || !patch) {
+      logSharedProjectResolveEvent('canvas-resolve-failed', {
+        opId, revision, kind, canvasId, layerId, structureRevision, result: 'skip', skipReason: 'missing-patch-fields',
+      });
       return { ok: false, reason: 'missing-patch-fields', canvasId, layerId, frameIndex, pixelCount };
     }
     if (structureRevision !== activeSharedProjectStructureRevision) {
+      logSharedProjectResolveEvent('structure-revision-mismatch', {
+        opId, revision, kind, canvasId, layerId, structureRevision, result: 'skip', skipReason: 'structure-revision-mismatch',
+      });
       return {
         ok: false,
         reason: 'structure-revision-mismatch',
@@ -56078,15 +56354,36 @@
     }
     const targetCanvas = getProjectCanvasDocumentById(canvasId) || adoptSingleProjectCanvasId(canvasId);
     if (!targetCanvas || !Array.isArray(targetCanvas.frames) || frameIndex >= targetCanvas.frames.length) {
+      logSharedProjectResolveEvent('canvas-resolve-failed', {
+        opId, revision, kind, canvasId, resolvedCanvasId: targetCanvas?.id || '', layerId, structureRevision, result: 'skip', skipReason: 'missing-canvas-or-frame',
+      });
       return { ok: false, reason: 'missing-canvas-or-frame', canvasId, layerId, frameIndex, pixelCount };
     }
     const frame = targetCanvas.frames[frameIndex];
     if (!frame || !Array.isArray(frame.layers)) {
+      logSharedProjectResolveEvent('frame-resolve-failed', {
+        opId, revision, kind, canvasId, resolvedCanvasId: targetCanvas?.id || '', layerId, structureRevision, result: 'skip', skipReason: 'missing-frame-layers',
+      });
       return { ok: false, reason: 'missing-frame-layers', canvasId, layerId, frameIndex, pixelCount };
     }
     if (!frame.layers.find(entry => entry?.id === layerId)) {
+      logSharedProjectResolveEvent('layer-resolve-failed', {
+        opId, revision, kind, canvasId, resolvedCanvasId: targetCanvas?.id || '', resolvedFrameId: frame?.id || '', layerId, structureRevision, result: 'skip', skipReason: 'missing-target-layer',
+      });
       return { ok: false, reason: 'missing-target-layer', canvasId, layerId, frameIndex, pixelCount };
     }
+    logSharedProjectResolveEvent('canvas-resolve-ok', {
+      opId,
+      revision,
+      kind,
+      canvasId,
+      resolvedCanvasId: targetCanvas?.id || '',
+      resolvedFrameId: frame?.id || '',
+      layerId,
+      resolvedLayerId: layerId,
+      structureRevision,
+      result: 'ok',
+    });
     return {
       ok: true,
       reason: 'ok',
@@ -56373,14 +56670,36 @@
     const frameIndex = Math.max(0, Math.round(Number(payload?.frameIndex) || 0));
     const targetCanvas = getProjectCanvasDocumentById(canvasId) || adoptSingleProjectCanvasId(canvasId);
     if (!targetCanvas || !Array.isArray(targetCanvas.frames) || frameIndex >= targetCanvas.frames.length) {
+      logSharedProjectResolveEvent('canvas-resolve-failed', {
+        canvasId,
+        resolvedCanvasId: targetCanvas?.id || '',
+        layerId,
+        result: 'skip',
+        skipReason: 'resolve-target-missing-canvas-or-frame',
+      });
       return null;
     }
     const frame = targetCanvas.frames[frameIndex];
     if (!frame || !Array.isArray(frame.layers)) {
+      logSharedProjectResolveEvent('frame-resolve-failed', {
+        canvasId,
+        resolvedCanvasId: targetCanvas?.id || '',
+        layerId,
+        result: 'skip',
+        skipReason: 'resolve-target-missing-frame-layers',
+      });
       return null;
     }
     const layer = frame.layers.find(entry => entry?.id === layerId) || null;
     if (!layer) {
+      logSharedProjectResolveEvent('layer-resolve-failed', {
+        canvasId,
+        resolvedCanvasId: targetCanvas?.id || '',
+        resolvedFrameId: frame?.id || '',
+        layerId,
+        result: 'skip',
+        skipReason: 'resolve-target-missing-layer',
+      });
       return null;
     }
     return { targetCanvas, frame, layer, canvasId, layerId, frameIndex };
@@ -56831,6 +57150,12 @@
     if (!provisional && opId && sharedProjectSeenOpIds.has(opId)) {
       const seenSeq = Math.max(0, Math.round(Number(sharedProjectSeenOpSeqById.get(opId)) || 0));
       if ((seq && seenSeq >= seq) || (!seq && seenSeq >= 0)) {
+        console.info('[shared-sync]', {
+          event: 'duplicate-op-skipped',
+          opId,
+          revision: seq,
+          source: fromRemote ? 'remote' : 'local',
+        });
         return true;
       }
     }
@@ -56881,6 +57206,13 @@
       }
     }
     if (applied && opId && !provisional) {
+      console.info('[shared-sync]', {
+        event: fromRemote ? 'remote-op-applied' : 'local-op-applied',
+        opId,
+        revision: seq,
+        kind,
+        provisional,
+      });
       sharedProjectSeenOpIds.add(opId);
       sharedProjectSeenOpSeqById.set(
         opId,
@@ -56899,6 +57231,15 @@
           sharedProjectSeenOpSeqById.set(id, Math.max(0, Math.round(Number(seenSeq) || 0)));
         });
       }
+    }
+    if (!applied && fromRemote) {
+      console.info('[shared-sync]', {
+        event: 'remote-op-skipped',
+        opId,
+        revision: seq,
+        kind,
+        provisional,
+      });
     }
     return applied;
   }
@@ -57520,6 +57861,15 @@
     if (!op || typeof op !== 'object' || !op.projectKey) {
       return;
     }
+    rememberSharedProjectLocalInFlightOp(op, {
+      source: 'local',
+      status: 'created',
+      opType: classifySharedProjectOpType(op.historyLabel || ''),
+    });
+    markSharedProjectLocalOpProvisionalApplied(op, {
+      source: 'local',
+      opType: classifySharedProjectOpType(op.historyLabel || ''),
+    });
     // shared_project_ops is the source of truth; local journal is a durability buffer.
     appendSharedLocalOpJournal(op, { status: 'pending' }).catch(error => {
       console.warn('Failed to append shared local op journal entry', error);
@@ -57585,9 +57935,16 @@
     }).catch(error => {
       console.warn('Failed to mark shared local op journal entry pending for retry', error);
     });
+    if (opId && sharedProjectLocalInFlightOps.has(opId)) {
+      const entry = sharedProjectLocalInFlightOps.get(opId);
+      entry.status = 'retrying';
+      entry.updatedAtMs = Date.now();
+      entry.retryCount = Math.max(0, Math.round(Number(entry.retryCount) || 0)) + 1;
+      sharedProjectLocalInFlightOps.set(opId, entry);
+    }
     logSharedProjectLocalOpLifecycle('requeued after commit failure', op, {
       source,
-      status: 'pending',
+      status: 'retrying',
       opType: classifySharedProjectOpType(op.historyLabel || ''),
     });
     if (prioritize) {
@@ -58151,12 +58508,24 @@
     const baseRevision = Math.max(0, Math.round(Number(afterRevision) || 0));
     sharedProjectLastAppliedSeq = Math.max(sharedProjectLastAppliedSeq, baseRevision);
     while (sharedProjectLastAppliedSeq < targetRevision) {
+      console.info('[shared-sync]', {
+        event: 'refresh-ops-fetched',
+        projectKey,
+        afterRevision: sharedProjectLastAppliedSeq,
+        targetRevision,
+      });
       const ops = await fetchMissingOps(
         projectKey,
         sharedProjectLastAppliedSeq,
         Math.max(SHARED_PROJECT_MAX_MISSING_OP_FETCH, targetRevision - sharedProjectLastAppliedSeq + 8)
       );
       if (!ops.length) {
+        console.info('[shared-sync]', {
+          event: 'replay-gap-fallback',
+          projectKey,
+          afterRevision: sharedProjectLastAppliedSeq,
+          targetRevision,
+        });
         return false;
       }
       confirmSharedProjectLocalOpsFromServerOps(ops, { source: 'refresh' });
@@ -58164,7 +58533,19 @@
       if (!replayed) {
         return false;
       }
+      console.info('[shared-sync]', {
+        event: 'refresh-ops-replayed',
+        projectKey,
+        activeRevision: sharedProjectLastAppliedSeq,
+        fetchedCount: ops.length,
+      });
       if (sharedProjectPendingRemoteOps.size && sharedProjectLastAppliedSeq < targetRevision) {
+        console.info('[shared-sync]', {
+          event: 'replay-gap-detected',
+          projectKey,
+          activeRevision: sharedProjectLastAppliedSeq,
+          pendingRemoteCount: sharedProjectPendingRemoteOps.size,
+        });
         break;
       }
     }
@@ -58412,6 +58793,15 @@
   }
 
   async function refreshActiveSharedProjectSnapshot({ force = false, reason = '' } = {}) {
+    console.info('[shared-sync]', {
+      event: reason && reason.includes('canonical') ? 'canonical-resync-start' : 'refresh-start',
+      reason,
+      force,
+      projectKey: activeSharedProjectKey || '',
+      activeRevision: activeSharedProjectRevision,
+      snapshotRevision: activeSharedProjectSnapshotRevision,
+    });
+    sharedProjectRecoveryInProgress = Boolean(reason && (reason.includes('canonical') || reason.includes('recovery')));
     if ((!canUseSharedProjectsBackend() && !await ensureSharedProjectBackendSession()) || !activeSharedProjectKey) {
       logSharedProjectRealtimeChannelLifecycle('refresh-skip', {
         caller: 'refreshActiveSharedProjectSnapshot',
@@ -58461,6 +58851,13 @@
       }
       const nextRevision = Math.max(0, Math.round(Number(project.latest_revision) || 0));
       const nextStructureRevision = Math.max(0, Math.round(Number(project.latest_structure_revision) || 0));
+      console.info('[shared-sync]', {
+        event: 'refresh-fetched-project',
+        reason: reason || 'refresh',
+        projectKey: activeSharedProjectKey || '',
+        latestRevision: nextRevision,
+        latestSnapshotRevision: Math.max(0, Math.round(Number(project.latest_snapshot_revision) || 0)),
+      });
       const normalizedReason = String(reason || '');
       const prefersOpReplayRecovery = (
         normalizedReason === 'poll-recovery'
@@ -58683,6 +59080,11 @@
       sharedProjectRemoteApplyFailureKeys.clear();
       markDocumentDurablySaved();
       markActiveSharedProjectDocumentLoaded(activeSharedProjectKey);
+      setActiveSharedProjectSnapshotState(snapshotRevision, {
+        structureRevision: Math.max(0, Math.round(Number(project.latest_snapshot_structure_revision) || Number(project.latest_structure_revision) || 0)),
+        synced: false,
+        canonicalLoadedAt: Date.now(),
+      });
       setSharedProjectDeferRealtimeUntilSynced(true);
       setActiveSharedProjectSession(
         activeSharedProjectKey,
@@ -58715,8 +59117,20 @@
       });
       if (replayedAfterSnapshot || snapshotRevision >= nextRevision) {
         setSharedProjectDeferRealtimeUntilSynced(false);
+        setActiveSharedProjectSnapshotState(snapshotRevision, {
+          structureRevision: Math.max(0, Math.round(Number(project.latest_snapshot_structure_revision) || Number(project.latest_structure_revision) || 0)),
+          synced: true,
+          canonicalLoadedAt: Date.now(),
+        });
         ensureActiveSharedProjectRealtimeChannel().catch(error => {
           reportSharedProjectRealtimeSubscribeFailure(error);
+        });
+        console.info('[shared-sync]', {
+          event: reason && reason.includes('canonical') ? 'canonical-resync-done' : 'refresh-ops-replayed',
+          reason,
+          projectKey: activeSharedProjectKey || '',
+          revision: activeSharedProjectRevision,
+          snapshotRevision,
         });
       }
       await syncSharedProjectMembers(activeSharedProjectKey, project.id || '');
@@ -58772,6 +59186,7 @@
       return false;
     } finally {
       sharedProjectRefreshInFlight = false;
+      sharedProjectRecoveryInProgress = false;
     }
   }
 
@@ -58984,10 +59399,29 @@
         }
         return null;
       }
+      if (result.commit_status === 'duplicate') {
+        setActiveSharedProjectSession(
+          normalizedProjectKey,
+          Math.max(0, Math.round(Number(result.latest_revision ?? result.committed_revision) || activeSharedProjectRevision)),
+          Math.max(0, Math.round(Number(result.latest_structure_revision ?? result.committed_structure_revision) || activeSharedProjectStructureRevision)),
+          result.id || activeSharedProjectId
+        );
+        markSharedProjectLocalOpCommitConfirmed(resolvedOp, {
+          source: 'db-duplicate',
+          revision: Math.max(0, Math.round(Number(result.committed_revision || result.latest_revision) || 0)),
+        });
+        console.info('[shared-sync]', {
+          event: 'commit-confirmed',
+          status: 'duplicate',
+          opId: resolvedOp.opId || '',
+          revision: Math.max(0, Math.round(Number(result.committed_revision || result.latest_revision) || 0)),
+        });
+        return result;
+      }
       setActiveSharedProjectSession(
         normalizedProjectKey,
-        Math.max(0, Math.round(Number(result.latest_revision) || activeSharedProjectRevision)),
-        Math.max(0, Math.round(Number(result.latest_structure_revision) || activeSharedProjectStructureRevision)),
+        Math.max(0, Math.round(Number(result.latest_revision ?? result.committed_revision) || activeSharedProjectRevision)),
+        Math.max(0, Math.round(Number(result.latest_structure_revision ?? result.committed_structure_revision) || activeSharedProjectStructureRevision)),
         result.id || activeSharedProjectId
       );
       updateSharedLocalOpJournalStatus(resolvedOp, {
@@ -58999,7 +59433,13 @@
       });
       markSharedProjectLocalOpCommitConfirmed(resolvedOp, {
         source: 'db',
-        revision: Math.max(0, Math.round(Number(result.latest_revision) || 0)),
+        revision: Math.max(0, Math.round(Number(result.committed_revision || result.latest_revision) || 0)),
+      });
+      console.info('[shared-sync]', {
+        event: 'commit-confirmed',
+        status: result.commit_status || 'committed',
+        opId: resolvedOp.opId || '',
+        revision: Math.max(0, Math.round(Number(result.committed_revision || result.latest_revision) || 0)),
       });
       markDocumentDurablySaved();
       noteSharedProjectOperationApplied({ opType: resolvedOpType, fromRemote: false });
@@ -60447,12 +60887,12 @@
       if (!accountState.isLoggedIn || !accountState.userId || accountState.isAnonymous) {
         return false;
       }
-      const opened = await openSharedProjectAccess({
+      const opened = await openSharedProjectCanonical({
         inviteToken: pendingInvite.inviteToken || '',
         projectKey: pendingInvite.projectKey || '',
         requestedRole: pendingInvite.requestedRole || 'guest',
         autoJoin: pendingInvite.autoJoin !== false,
-      }, {
+        reason: 'resume-pending-invite',
         hideStartup: true,
         silent: true,
       });
