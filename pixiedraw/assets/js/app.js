@@ -54941,15 +54941,26 @@
     if (!isSharedProjectCollaborativeMode(normalizedProjectKey)) {
       return true;
     }
-    if (isSharedProjectAwaitingReady(normalizedProjectKey)) {
+    const hasCanonicalDocument = Boolean(
+      normalizedProjectKey
+      && normalizedProjectKey === activeSharedProjectKey
+      && (
+        activeSharedProjectDocumentLoaded
+        || hasUsableActiveSharedProjectDocumentState()
+        || activeSharedProjectSnapshotRevision > 0
+      )
+    );
+    const allowingRecoveryEditing = Boolean(
+      hasCanonicalDocument
+      && (sharedProjectRefreshInFlight || sharedProjectRecoveryInProgress)
+    );
+    if (isSharedProjectAwaitingReady(normalizedProjectKey) && !allowingRecoveryEditing) {
       return false;
     }
-    return Boolean(
-      activeSharedProjectChannel
-      && activeSharedProjectChannelKey === normalizedProjectKey
-      && sharedProjectRealtimeStatus === 'subscribed'
-      && !sharedProjectRealtimeConnectPromise
-    );
+    if (!hasCanonicalDocument) {
+      return false;
+    }
+    return true;
   }
 
   function isSharedProjectsBlockedByRuntime() {
