@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.28-shared-reconnect-op-retry-fix1';
+  const APP_BUILD_VERSION = '2026.04.28-shared-strict-fifo-queue-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -20473,7 +20473,6 @@
       if (!opId || queuedIds.has(opId) || sharedProjectSeenOpIds.has(opId)) {
         return;
       }
-      const sharedOpType = classifySharedProjectOpType(queuedOp.historyLabel || '');
       const queuedEntry = {
         projectKey: normalizedProjectKey,
         historyLabel: queuedOp.historyLabel || '',
@@ -20481,11 +20480,7 @@
         opPayload: queuedOp.payload || null,
         retryOnConflict: true,
       };
-      if (sharedOpType === 'draw') {
-        sharedProjectPendingLocalOps.unshift(queuedEntry);
-      } else {
-        sharedProjectPendingLocalOps.push(queuedEntry);
-      }
+      sharedProjectPendingLocalOps.push(queuedEntry);
       queuedIds.add(opId);
       resumedCount += 1;
     });
@@ -57466,13 +57461,6 @@
       opPayload: op.payload || null,
       retryOnConflict,
     };
-    const opType = classifySharedProjectOpType(op.historyLabel || '');
-    if (opType === 'draw') {
-      // draw transport is latency-first
-      sharedProjectPendingLocalOps.unshift(queuedOp);
-      flushSharedProjectPendingLocalOps();
-      return;
-    }
     sharedProjectPendingLocalOps.push(queuedOp);
     flushSharedProjectPendingLocalOps();
   }
@@ -57512,7 +57500,7 @@
       status: 'pending',
       opType: classifySharedProjectOpType(op.historyLabel || ''),
     });
-    if (prioritize || classifySharedProjectOpType(op.historyLabel || '') === 'draw') {
+    if (prioritize) {
       sharedProjectPendingLocalOps.unshift(queuedOp);
     } else {
       sharedProjectPendingLocalOps.push(queuedOp);
@@ -58938,16 +58926,7 @@
     if (sharedProjectOpCommitInFlight || !sharedProjectPendingLocalOps.length) {
       return;
     }
-    let nextOpIndex = 0;
-    const prioritizedDrawIndex = sharedProjectPendingLocalOps.findIndex(candidate => (
-      classifySharedProjectOpType(candidate?.historyLabel || '') === 'draw'
-    ));
-    if (prioritizedDrawIndex > 0) {
-      nextOpIndex = prioritizedDrawIndex;
-    }
-    const nextOp = nextOpIndex === 0
-      ? sharedProjectPendingLocalOps.shift()
-      : sharedProjectPendingLocalOps.splice(nextOpIndex, 1)[0];
+    const nextOp = sharedProjectPendingLocalOps.shift();
     if (!nextOp) {
       return;
     }
