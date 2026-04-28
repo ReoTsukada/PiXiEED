@@ -19670,7 +19670,17 @@
     if (!countOwned) {
       return true;
     }
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
     const existingEntries = await loadRecentProjectsMetadata();
+    if (normalizedProjectKey) {
+      const existingOwnedEntry = existingEntries.find(entry => (
+        isOwnedSharedRecentProjectEntry(entry)
+        && normalizeMultiProjectKey(entry?.sharedProjectKey || '') === normalizedProjectKey
+      )) || null;
+      if (existingOwnedEntry) {
+        return true;
+      }
+    }
     const { ownedProjectCount, effectiveLimit } = getSharedProjectOwnershipStatus(existingEntries);
     if (ownedProjectCount < effectiveLimit) {
       return true;
