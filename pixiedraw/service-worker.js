@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'pixiedraw-v2026.04.28-shared-noisy-preflight-fix1';
+const CACHE_VERSION = 'pixiedraw-v2026.04.28-shared-confirmed-only-remote-fix1';
 const CORE_ASSETS = [
   '/pixiedraw/',
   '/pixiedraw/index.html',
