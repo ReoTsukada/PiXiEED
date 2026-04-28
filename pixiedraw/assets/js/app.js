@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.28-shared-local-retry-unblock-fix1';
+  const APP_BUILD_VERSION = '2026.04.28-shared-ready-gate-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -55906,46 +55906,9 @@
     });
   }
 
-  function requeueSharedProjectLocalOpForRetry(entry, reason = 'retry') {
-    const opRecord = entry?.op || null;
-    const opId = normalizeSharedProjectOpId(opRecord);
-    const projectKey = normalizeMultiProjectKey(entry?.projectKey || opRecord?.projectKey || activeSharedProjectKey || '');
-    if (!opRecord || !opId || !projectKey) {
-      return false;
-    }
-    const alreadyQueued = sharedProjectPendingLocalOps.some(candidate => (
-      normalizeSharedProjectOpId(candidate?.op || null) === opId
-    ));
-    if (!alreadyQueued) {
-      const queuedEntry = {
-        projectKey,
-        historyLabel: opRecord.historyLabel || '',
-        op: opRecord,
-        opPayload: opRecord.payload || null,
-        retryOnConflict: true,
-      };
-      if (classifySharedProjectOpType(opRecord.historyLabel || '') === 'draw') {
-        sharedProjectPendingLocalOps.unshift(queuedEntry);
-      } else {
-        sharedProjectPendingLocalOps.push(queuedEntry);
-      }
-    }
-    sharedProjectLocalInFlightOps.delete(opId);
-    logSharedProjectLocalOpLifecycle('requeued after local replay failure', opRecord, {
-      source: reason,
-      status: 'requeued',
-      opType: entry?.opType || '',
-    });
-    window.setTimeout(() => {
-      flushSharedProjectPendingLocalOps();
-    }, 0);
-    return true;
-  }
-
   function replaySharedProjectLocalInFlightOps(reason = 'refresh') {
     const inflightOps = getSharedProjectLocalInFlightOps();
     let replayed = 0;
-    let requeued = 0;
     inflightOps.forEach(entry => {
       const opRecord = entry?.op || null;
       if (!opRecord) {
@@ -55958,14 +55921,11 @@
           status: entry.status || '',
           opType: entry.opType || '',
         });
-        if (requeueSharedProjectLocalOpForRetry(entry, reason)) {
-          requeued += 1;
-        }
         return;
       }
       replayed += 1;
     });
-    return { replayed, requeued };
+    return replayed;
   }
 
   function deferSharedProjectSnapshotApplyIfLocalOpsInFlight(reason = 'snapshot-refresh') {
@@ -55977,14 +55937,7 @@
       status: 'deferred',
       opType: 'snapshot',
     });
-    const { requeued = 0 } = replaySharedProjectLocalInFlightOps(reason) || {};
-    if (hasSharedProjectLocalInFlightOps()) {
-      queueSharedProjectRefresh({ immediate: false, reason, force: true });
-      return true;
-    }
-    if (requeued > 0) {
-      return false;
-    }
+    replaySharedProjectLocalInFlightOps(reason);
     queueSharedProjectRefresh({ immediate: false, reason, force: true });
     return true;
   }
