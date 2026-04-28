@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.28-shared-reconnect-broader-doc-gate-fix1';
+  const APP_BUILD_VERSION = '2026.04.28-shared-reconnect-op-retry-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -57477,6 +57477,52 @@
     flushSharedProjectPendingLocalOps();
   }
 
+  function requeueSharedProjectOperationCommit(op, {
+    retryOnConflict = true,
+    prioritize = false,
+    source = 'retry',
+  } = {}) {
+    if (!op || typeof op !== 'object' || !op.projectKey) {
+      return false;
+    }
+    const opId = getSharedProjectOpId(op);
+    if (!opId || sharedProjectSeenOpIds.has(opId)) {
+      return false;
+    }
+    const alreadyQueued = sharedProjectPendingLocalOps.some(entry => (
+      getSharedProjectOpId(entry?.op || entry) === opId
+    ));
+    if (alreadyQueued) {
+      return false;
+    }
+    const queuedOp = {
+      projectKey: op.projectKey,
+      historyLabel: op.historyLabel || '',
+      op,
+      opPayload: op.payload || null,
+      retryOnConflict,
+    };
+    updateSharedLocalOpJournalStatus(op, {
+      status: 'pending',
+    }).catch(error => {
+      console.warn('Failed to mark shared local op journal entry pending for retry', error);
+    });
+    logSharedProjectLocalOpLifecycle('requeued after commit failure', op, {
+      source,
+      status: 'pending',
+      opType: classifySharedProjectOpType(op.historyLabel || ''),
+    });
+    if (prioritize || classifySharedProjectOpType(op.historyLabel || '') === 'draw') {
+      sharedProjectPendingLocalOps.unshift(queuedOp);
+    } else {
+      sharedProjectPendingLocalOps.push(queuedOp);
+    }
+    window.setTimeout(() => {
+      flushSharedProjectPendingLocalOps();
+    }, 0);
+    return true;
+  }
+
   function resetLocalHistoryForSharedCollaborativeRemoteChange() {
     if (!isSharedProjectCollaborativeMode()) {
       return;
@@ -58732,6 +58778,11 @@
       markSharedProjectLocalOpCommitStarted(resolvedOp, { source: 'db' });
       const supabase = await ensurePixieedAccountClient();
       if (!supabase) {
+        requeueSharedProjectOperationCommit(resolvedOp, {
+          retryOnConflict,
+          prioritize: resolvedOpType === 'draw',
+          source: 'missing-db-client',
+        });
         return null;
       }
       const previousRevision = Math.max(0, Math.round(Number(activeSharedProjectRevision) || 0));
@@ -58756,6 +58807,11 @@
       });
       if (error) {
         markSharedProjectLocalOpCommitFailed(resolvedOp, error, { source: 'db' });
+        requeueSharedProjectOperationCommit(resolvedOp, {
+          retryOnConflict,
+          prioritize: resolvedOpType === 'draw',
+          source: isRecoverableSharedBackendPreflightError(error) ? 'recoverable-commit-failure' : 'commit-failure',
+        });
         if (resolvedOpType === 'draw' || resolvedOpType === 'palette' || resolvedOpType === 'structure') {
           queueSharedProjectRefresh({ immediate: true, reason: 'commit-failed', force: true });
         }
@@ -58765,6 +58821,11 @@
       const result = Array.isArray(data) ? (data[0] || null) : (data || null);
       if (!result) {
         markSharedProjectLocalOpCommitFailed(resolvedOp, new Error('Missing commit result'), { source: 'db' });
+        requeueSharedProjectOperationCommit(resolvedOp, {
+          retryOnConflict,
+          prioritize: resolvedOpType === 'draw',
+          source: 'missing-commit-result',
+        });
         if (resolvedOpType === 'draw' || resolvedOpType === 'palette' || resolvedOpType === 'structure') {
           queueSharedProjectRefresh({ immediate: true, reason: 'commit-failed', force: true });
         }
@@ -58859,6 +58920,12 @@
       });
       return result;
     } catch (error) {
+      markSharedProjectLocalOpCommitFailed(resolvedOp, error, { source: 'db-exception' });
+      requeueSharedProjectOperationCommit(resolvedOp, {
+        retryOnConflict,
+        prioritize: resolvedOpType === 'draw',
+        source: 'commit-exception',
+      });
       if (resolvedOpType === 'draw' || resolvedOpType === 'palette' || resolvedOpType === 'structure') {
         queueSharedProjectRefresh({ immediate: true, reason: 'commit-failed', force: true });
       }
