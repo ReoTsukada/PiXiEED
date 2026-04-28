@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.28-shared-local-open-separation-fix1';
+  const APP_BUILD_VERSION = '2026.04.28-shared-structure-recovery-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -54879,10 +54879,20 @@
             }
             return;
           }
-          queueSharedProjectRefresh({
-            immediate: false,
-            reason: 'canonical-resync-structure-mismatch',
-            force: true,
+          triggerImmediateSharedProjectRecovery('canonical-resync-structure-mismatch').then(refreshed => {
+            if (!refreshed) {
+              queueSharedProjectRefresh({
+                immediate: true,
+                reason: 'canonical-resync-structure-mismatch',
+                force: true,
+              });
+            }
+          }).catch(() => {
+            queueSharedProjectRefresh({
+              immediate: true,
+              reason: 'canonical-resync-structure-mismatch',
+              force: true,
+            });
           });
         })
         .catch(() => {
@@ -54890,7 +54900,7 @@
             return;
           }
           queueSharedProjectRefresh({
-            immediate: false,
+            immediate: true,
             reason: 'canonical-resync-structure-mismatch',
             force: true,
           });
@@ -57596,6 +57606,21 @@
           sharedProjectRemoteApplyFailureKeys.add(failureKey);
           if (diagnostics.reason === 'structure-revision-mismatch') {
             scheduleSharedProjectStructureMismatchRecovery();
+            triggerImmediateSharedProjectRecovery('structure-revision-mismatch').then(recovered => {
+              if (!recovered) {
+                queueSharedProjectRefresh({
+                  immediate: true,
+                  reason: 'structure-revision-mismatch',
+                  force: true,
+                });
+              }
+            }).catch(() => {
+              queueSharedProjectRefresh({
+                immediate: true,
+                reason: 'structure-revision-mismatch',
+                force: true,
+              });
+            });
           } else {
             const recoveryReason = `provisional-apply-skip-${diagnostics.reason}`;
             triggerImmediateSharedProjectRecovery(recoveryReason).then(recovered => {
