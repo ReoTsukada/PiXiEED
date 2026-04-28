@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.28-shared-provisional-recovery-fix1';
+  const APP_BUILD_VERSION = '2026.04.28-shared-local-open-separation-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -19040,8 +19040,7 @@
       ? normalizeMultiProjectKey(activeEntryAfterLoad.sharedProjectKey || '')
       : '';
     const derivedSharedProjectKey = requestedSharedProjectKey
-      || cachedSharedProjectKey
-      || normalizeMultiProjectKey(activeSharedProjectKey || '');
+      || cachedSharedProjectKey;
     const derivedSharedProjectId = typeof activeEntryAfterLoad?.sharedProjectBackendId === 'string'
       ? activeEntryAfterLoad.sharedProjectBackendId
       : '';
