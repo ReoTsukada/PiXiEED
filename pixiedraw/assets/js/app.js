@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.28-shared-reconnect-draw-unblock-fix1';
+  const APP_BUILD_VERSION = '2026.04.28-shared-ready-gate-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -54777,29 +54777,9 @@
       && (
         sharedProjectDeferRealtimeUntilSynced
         || !activeSharedProjectDocumentLoaded
+        || isSharedProjectCatchingUp(projectKey)
       )
     );
-  }
-
-  function markSharedProjectReadyIfCaughtUp(projectKey = activeSharedProjectKey) {
-    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || activeSharedProjectKey);
-    if (!normalizedProjectKey || normalizedProjectKey !== activeSharedProjectKey) {
-      return false;
-    }
-    if (!activeSharedProjectDocumentLoaded) {
-      return false;
-    }
-    if (sharedProjectPendingRemoteOps.size) {
-      return false;
-    }
-    if (sharedProjectLastAppliedSeq < activeSharedProjectRevision) {
-      return false;
-    }
-    setActiveSharedProjectSyncState('synced');
-    if (sharedProjectDeferRealtimeUntilSynced) {
-      setSharedProjectDeferRealtimeUntilSynced(false);
-    }
-    return true;
   }
 
   function isSharedProjectsBlockedByRuntime() {
@@ -57977,13 +57957,6 @@
         durationMs: Math.max(0, Date.now() - startedAt),
         opCount: result.length,
       });
-      if (
-        !result.length
-        && normalizedProjectKey === activeSharedProjectKey
-        && sharedProjectDeferRealtimeUntilSynced
-      ) {
-        markSharedProjectReadyIfCaughtUp(normalizedProjectKey);
-      }
       return result;
     } catch (error) {
       if (isRecoverableSharedBackendPreflightError(error)) {
@@ -59781,16 +59754,6 @@
       activeSharedProjectChannel = channel;
       activeSharedProjectChannelKey = projectKey;
       activeSharedProjectChannelSignature = channelSignature;
-      if (sharedProjectDeferRealtimeUntilSynced) {
-        fetchMissingOps(projectKey, activeSharedProjectRevision, 32)
-          .then(ops => {
-            if (!Array.isArray(ops) || ops.length) {
-              return;
-            }
-            markSharedProjectReadyIfCaughtUp(projectKey);
-          })
-          .catch(() => {});
-      }
       return channel;
     })();
     try {
