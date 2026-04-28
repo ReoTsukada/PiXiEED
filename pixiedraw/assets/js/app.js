@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.28-shared-strict-fifo-queue-fix1';
+  const APP_BUILD_VERSION = '2026.04.28-shared-createdat-fifo-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -20485,6 +20485,7 @@
       resumedCount += 1;
     });
     if (resumedCount) {
+      sortSharedProjectPendingLocalOps();
       flushSharedProjectPendingLocalOps();
     }
     return resumedCount;
@@ -57462,7 +57463,25 @@
       retryOnConflict,
     };
     sharedProjectPendingLocalOps.push(queuedOp);
+    sortSharedProjectPendingLocalOps();
     flushSharedProjectPendingLocalOps();
+  }
+
+  function sortSharedProjectPendingLocalOps() {
+    if (!Array.isArray(sharedProjectPendingLocalOps) || sharedProjectPendingLocalOps.length < 2) {
+      return;
+    }
+    sharedProjectPendingLocalOps.sort((left, right) => {
+      const leftOp = left?.op || left || null;
+      const rightOp = right?.op || right || null;
+      const leftCreatedAt = String(leftOp?.createdAt || '');
+      const rightCreatedAt = String(rightOp?.createdAt || '');
+      const createdAtCompare = leftCreatedAt.localeCompare(rightCreatedAt);
+      if (createdAtCompare !== 0) {
+        return createdAtCompare;
+      }
+      return String(getSharedProjectOpId(leftOp)).localeCompare(String(getSharedProjectOpId(rightOp)));
+    });
   }
 
   function requeueSharedProjectOperationCommit(op, {
@@ -57505,6 +57524,7 @@
     } else {
       sharedProjectPendingLocalOps.push(queuedOp);
     }
+    sortSharedProjectPendingLocalOps();
     window.setTimeout(() => {
       flushSharedProjectPendingLocalOps();
     }, 0);
@@ -58926,6 +58946,7 @@
     if (sharedProjectOpCommitInFlight || !sharedProjectPendingLocalOps.length) {
       return;
     }
+    sortSharedProjectPendingLocalOps();
     const nextOp = sharedProjectPendingLocalOps.shift();
     if (!nextOp) {
       return;
