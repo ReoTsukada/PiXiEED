@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.28-shared-structure-recovery-fix1';
+  const APP_BUILD_VERSION = '2026.04.28-shared-noisy-preflight-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -59103,6 +59103,17 @@
         .select('project_key, role, updated_at, joined_at')
         .eq('user_id', accountState.userId);
       if (membershipResponse.error) {
+        if (isRecoverableSharedBackendPreflightError(membershipResponse.error)) {
+          console.debug('[shared-backend] list-memberships skipped after recoverable preflight failure', {
+            context: 'list-memberships',
+            status: Number(membershipResponse.error?.status || 0),
+            code: String(membershipResponse.error?.code || ''),
+            message: String(membershipResponse.error?.message || ''),
+            online: typeof navigator !== 'undefined' ? Boolean(navigator.onLine) : null,
+            visibilityState: typeof document !== 'undefined' ? String(document.visibilityState || '') : '',
+          });
+          return [];
+        }
         handleSharedProjectsBackendError(membershipResponse.error, 'list-memberships');
         return [];
       }
