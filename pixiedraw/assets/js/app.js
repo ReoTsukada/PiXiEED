@@ -21573,6 +21573,15 @@
           revision: activeSharedProjectRevision,
           snapshotRevision: activeSharedProjectSnapshotRevision,
         });
+      } else {
+        console.info('[shared-sync]', {
+          event: 'skip-realtime-subscribe',
+          reason: 'canonical-open-not-synced',
+          projectKey: normalizedProjectKey,
+          projectId: activeSharedProjectId || '',
+          activeSharedProjectRevision,
+          activeSharedProjectSynced,
+        });
       }
       console.info('[shared-sync]', {
         event: 'shared-open-singleflight-done',
@@ -21767,28 +21776,22 @@
       });
       if (identityCheck.mismatch) {
         console.warn('[shared-sync]', {
-          event: 'shared-open-readonly-failed',
-          reason: 'canonical-open',
+          event: 'shared-document-identity-mismatch-warning',
           projectKey: resolvedProjectKey,
-          error: identityCheck.mismatchReasons.join(',') || 'identity-mismatch',
+          projectId: freshestProject.id || '',
+          snapshotRevision: freshestSnapshotRevision,
+          latestRevision: freshestLatestRevision,
+          mismatchReason: identityCheck.mismatchReasons,
+          fallback: 'single-canvas-adopt',
         });
-        if (!silent) {
-          setMultiStatus(
-            localizeText(
-              '共有プロジェクトの内部IDが一致しないため安全に開けませんでした。',
-              'Shared project IDs did not match, so the project was not opened safely.'
-            ),
-            'error'
-          );
-        }
-        return false;
+      } else {
+        console.info('[shared-sync]', {
+          event: 'shared-open-identity-check-passed',
+          projectKey: resolvedProjectKey,
+          snapshotRevision: freshestSnapshotRevision,
+          latestRevision: freshestLatestRevision,
+        });
       }
-      console.info('[shared-sync]', {
-        event: 'shared-open-identity-check-passed',
-        projectKey: resolvedProjectKey,
-        snapshotRevision: freshestSnapshotRevision,
-        latestRevision: freshestLatestRevision,
-      });
     }
     markActiveSharedProjectDocumentLoaded(resolvedProjectKey);
     setActiveAutosaveProjectId(buildSharedRecentProjectId(resolvedProjectKey));
@@ -21829,6 +21832,15 @@
     markActiveSharedProjectDocumentLoaded(resolvedProjectKey);
     const sharedSnapshotRevision = baseRevision;
     const sharedLatestRevision = freshestLatestRevision;
+    activeSharedProjectRevision = sharedSnapshotRevision;
+    activeSharedProjectSnapshotRevision = sharedSnapshotRevision;
+    sharedProjectLastAppliedSeq = sharedSnapshotRevision;
+    console.info('[shared-sync]', {
+      event: 'shared-open-revision-initialized',
+      projectKey: resolvedProjectKey,
+      snapshotRevision: sharedSnapshotRevision,
+      activeSharedProjectRevision,
+    });
     setActiveSharedProjectSnapshotState(sharedSnapshotRevision, {
       structureRevision: baseStructureRevision,
       synced: false,
@@ -21853,7 +21865,7 @@
         sharedSnapshotRevision
       );
       console.info('[shared-sync]', {
-        event: 'shared-open-readonly-ops-replayed',
+        event: 'shared-open-ops-replay-done',
         reason: 'canonical-open',
         projectKey: resolvedProjectKey,
         replayedToLatest,
@@ -58338,6 +58350,7 @@
         const op = list[index];
         const opId = normalizeSharedProjectOpId(op);
         const seq = getSharedProjectOpSeq(op);
+        const expectedRevision = sharedProjectLastAppliedSeq + 1;
         if (!seq) {
           continue;
         }
@@ -58375,27 +58388,59 @@
           }
           continue;
         }
-        if (seq > sharedProjectLastAppliedSeq + 1) {
+        if (seq > expectedRevision) {
           console.info('[shared-sync]', {
             event: 'replay-gap-detected',
             opId,
             revision: seq,
             activeRevision: sharedProjectLastAppliedSeq,
+            expectedRevision,
           });
           sharedProjectPendingRemoteOps.set(seq, op);
-          continue;
+          console.info('[shared-sync]', {
+            event: 'replay-batch-stopped',
+            projectKey: activeSharedProjectKey || '',
+            expectedRevision,
+            opRevision: seq,
+            opId,
+            stopReason: 'revision-gap',
+          });
+          return false;
         }
         if (fromRemote && shouldDeferIncomingSharedProjectRemoteApply()) {
           sharedProjectPendingRemoteOps.set(seq, op);
           scheduleDeferredSharedProjectRemoteOpsDrain();
-          continue;
+          console.info('[shared-sync]', {
+            event: 'replay-batch-stopped',
+            projectKey: activeSharedProjectKey || '',
+            expectedRevision,
+            opRevision: seq,
+            opId,
+            stopReason: 'deferred-remote-apply',
+          });
+          return false;
         }
         if (!applyOp(op, { fromRemote, provisional: false })) {
+          console.info('[shared-sync]', {
+            event: 'replay-batch-stopped',
+            projectKey: activeSharedProjectKey || '',
+            expectedRevision,
+            opRevision: seq,
+            opId,
+            stopReason: 'apply-op-failed',
+          });
           return false;
         }
         const beforeRevision = activeSharedProjectRevision;
         sharedProjectLastAppliedSeq = seq;
         activeSharedProjectRevision = Math.max(activeSharedProjectRevision, seq);
+        console.info('[shared-sync]', {
+          event: 'replay-batch-op-applied',
+          projectKey: activeSharedProjectKey || '',
+          expectedRevision,
+          opRevision: seq,
+          opId,
+        });
         console.info('[shared-sync]', {
           event: 'remote-confirmed-revision-advanced',
           beforeRevision,
@@ -59110,6 +59155,7 @@
   }
 
   async function fetchSharedProjectOpsSince(projectKey, afterRevision = 0, limit = 256) {
+    const readonlyEligible = Boolean(normalizeMultiProjectKey(projectKey));
     if (!canUseSharedProjectsBackend() && !await ensureSharedProjectBackendSession()) {
       return [];
     }
@@ -59142,7 +59188,7 @@
       });
       if (error) {
         if (isRecoverableSharedBackendPreflightError(error)) {
-          console.debug('[shared-backend] fetch-ops-since skipped after recoverable preflight failure', rpcDebugInfo);
+          console.debug('[shared-backend] fetch-ops-since-continues-after-membership-preflight-failure', rpcDebugInfo);
           return [];
         }
         console.warn('[shared-backend] fetch-ops-since failed', rpcDebugInfo);
@@ -59159,7 +59205,7 @@
       return result;
     } catch (error) {
       if (isRecoverableSharedBackendPreflightError(error)) {
-        console.debug('[shared-backend] fetch-ops-since exception skipped after recoverable preflight failure', {
+        console.debug('[shared-backend] fetch-ops-since-continues-after-membership-preflight-failure', {
           context: 'fetch-ops-since',
           projectKey: normalizedProjectKey,
           afterRevision: Math.max(0, Math.round(Number(afterRevision) || 0)),
@@ -59203,6 +59249,7 @@
     setActiveSharedProjectSyncState('catching-up', { announce: true });
     const baseRevision = Math.max(0, Math.round(Number(afterRevision) || 0));
     sharedProjectLastAppliedSeq = Math.max(sharedProjectLastAppliedSeq, baseRevision);
+    activeSharedProjectRevision = Math.max(activeSharedProjectRevision, baseRevision);
     while (sharedProjectLastAppliedSeq < targetRevision) {
       console.info('[shared-sync]', {
         event: 'refresh-ops-fetched',
@@ -59237,8 +59284,20 @@
         return false;
       }
       confirmSharedProjectLocalOpsFromServerOps(ops, { source: 'refresh' });
+      console.info('[shared-sync]', {
+        event: 'replay-batch-start',
+        projectKey,
+        expectedRevision: sharedProjectLastAppliedSeq + 1,
+        fetchedCount: ops.length,
+      });
       const replayed = await replayOps(ops, { fromRemote: true });
       if (!replayed) {
+        console.info('[shared-sync]', {
+          event: 'replay-batch-stopped',
+          projectKey,
+          expectedRevision: sharedProjectLastAppliedSeq + 1,
+          stopReason: 'apply-failed',
+        });
         return false;
       }
       console.info('[shared-sync]', {
@@ -59388,6 +59447,17 @@
         target_create_if_missing: Boolean(createIfMissing),
       });
       if (error) {
+        if (
+          !createIfMissing
+          && isRecoverableSharedBackendPreflightError(error)
+        ) {
+          console.debug('[shared-backend] ensure-membership-rpc-recoverable-readonly', {
+            projectKey: normalizedProjectKey,
+            createIfMissing: false,
+            message: String(error?.message || ''),
+          });
+          return await fetchSharedProjectRecordViaRpc(supabase, normalizedProjectKey, 'ensure-membership-rpc-readonly-fallback');
+        }
         handleSharedProjectsBackendError(error, 'ensure-membership-rpc');
         return null;
       }
@@ -59397,6 +59467,24 @@
       }
       return project;
     } catch (error) {
+      if (
+        !createIfMissing
+        && isRecoverableSharedBackendPreflightError(error)
+      ) {
+        try {
+          const supabase = await ensurePixieedAccountClient();
+          if (supabase) {
+            console.debug('[shared-backend] ensure-membership-rpc-recoverable-readonly', {
+              projectKey: normalizedProjectKey,
+              createIfMissing: false,
+              message: String(error?.message || ''),
+            });
+            return await fetchSharedProjectRecordViaRpc(supabase, normalizedProjectKey, 'ensure-membership-exception-readonly-fallback');
+          }
+        } catch (_fallbackError) {
+          // ignore fallback failure
+        }
+      }
       handleSharedProjectsBackendError(error, 'ensure-membership-exception');
       return null;
     }
