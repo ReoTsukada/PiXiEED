@@ -7348,7 +7348,12 @@
 
   function applyHistorySnapshot(
     snapshot,
-    { preserveView = false, forcePalettePresetSync = false, preservePersonalPreferences = true } = {}
+    {
+      preserveView = false,
+      forcePalettePresetSync = false,
+      preservePersonalPreferences = true,
+      preserveDocumentIds = false,
+    } = {}
   ) {
     const previousProjectCanvasCount = getProjectCanvasCount();
     const previousVoxelModeEnabled = isVoxelExtensionModeEnabled();
@@ -7359,20 +7364,28 @@
       ? state.palette.map(color => normalizeColorValue(color))
       : null;
     if (Array.isArray(snapshot?.canvases) && snapshot.canvases.length) {
-      replaceProjectCanvasDocuments(snapshot.canvases, typeof snapshot.activeCanvasId === 'string' ? snapshot.activeCanvasId : '');
+      replaceProjectCanvasDocuments(
+        snapshot.canvases,
+        typeof snapshot.activeCanvasId === 'string' ? snapshot.activeCanvasId : '',
+        { preserveIncomingIds: preserveDocumentIds }
+      );
     } else {
-      replaceProjectCanvasDocuments([{
-        id: typeof snapshot?.activeCanvasId === 'string' ? snapshot.activeCanvasId : '',
-        name: getDefaultProjectCanvasName(1),
-        width: snapshot.width,
-        height: snapshot.height,
-        frames: snapshot.frames,
-        activeFrame: snapshot.activeFrame,
-        activeLayer: snapshot.activeLayer,
-        selectionMask: snapshot.selectionMask,
-        selectionContentMask: snapshot.selectionContentMask,
-        selectionBounds: snapshot.selectionBounds,
-      }], typeof snapshot?.activeCanvasId === 'string' ? snapshot.activeCanvasId : '');
+      replaceProjectCanvasDocuments(
+        [{
+          id: typeof snapshot?.activeCanvasId === 'string' ? snapshot.activeCanvasId : '',
+          name: getDefaultProjectCanvasName(1),
+          width: snapshot.width,
+          height: snapshot.height,
+          frames: snapshot.frames,
+          activeFrame: snapshot.activeFrame,
+          activeLayer: snapshot.activeLayer,
+          selectionMask: snapshot.selectionMask,
+          selectionContentMask: snapshot.selectionContentMask,
+          selectionBounds: snapshot.selectionBounds,
+        }],
+        typeof snapshot?.activeCanvasId === 'string' ? snapshot.activeCanvasId : '',
+        { preserveIncomingIds: preserveDocumentIds }
+      );
     }
     const nextProjectCanvasCount = Array.isArray(snapshot?.canvases) && snapshot.canvases.length
       ? snapshot.canvases.length
@@ -19029,6 +19042,12 @@
       applyHistorySnapshot(snapshot, {
         forcePalettePresetSync: true,
         preserveView: Boolean(options?.preserveView),
+        preserveDocumentIds: Boolean(
+          options?.preserveDocumentIds
+          || options?.preserveCanvasIds
+          || options?.preserveFrameIds
+          || options?.preserveLayerIds
+        ),
       });
       history.pending = null;
       if (projectSession) {
@@ -21453,6 +21472,31 @@
     const normalizedRequestedRole = requestedRole === 'master' || requestedRole === 'guest' || requestedRole === 'spectator'
       ? requestedRole
       : 'guest';
+    const pendingInvite = readPendingSharedInvite();
+    const pendingInviteProjectKey = normalizeMultiProjectKey(pendingInvite?.projectKey || '');
+    if (
+      reason === 'recent-open'
+      && pendingInvite
+      && (!pendingInviteProjectKey || pendingInviteProjectKey === normalizedProjectKey)
+    ) {
+      console.info('[shared-sync]', {
+        event: 'shared-open-singleflight-suppressed',
+        projectKey: normalizedProjectKey,
+        currentReason: activeSharedProjectCanonicalOpenReasons[0] || '',
+        incomingReason: reason,
+        inviteToken: normalizedInviteToken ? 'present' : 'absent',
+        recentProjectId: buildSharedRecentProjectId(normalizedProjectKey),
+        activeSharedProjectKey: activeSharedProjectKey || '',
+        activeSharedProjectId: activeSharedProjectId || '',
+      });
+      console.info('[shared-sync]', {
+        event: 'shared-open-source-suppressed',
+        source: 'recent-open',
+        reason: 'pending-invite-present',
+        projectKey: normalizedProjectKey,
+      });
+      return false;
+    }
     if (
       normalizedProjectKey
       && activeSharedProjectCanonicalOpenPromise
@@ -21696,6 +21740,10 @@
         suppressAutosaveStatus: true,
         openedFromRecent: true,
         preserveDotStats: true,
+        preserveDocumentIds: true,
+        preserveCanvasIds: true,
+        preserveFrameIds: true,
+        preserveLayerIds: true,
         sharedProjectKey: resolvedProjectKey,
         sharedProjectRevision: freshestSnapshotRevision,
       });
@@ -21711,6 +21759,36 @@
         }
         return false;
       }
+      const identityCheck = compareSharedProjectSnapshotIdentity(sharedSnapshot?.document || sharedSnapshot, {
+        projectKey: resolvedProjectKey,
+        projectId: freshestProject.id || '',
+        snapshotRevision: freshestSnapshotRevision,
+        latestRevision: freshestLatestRevision,
+      });
+      if (identityCheck.mismatch) {
+        console.warn('[shared-sync]', {
+          event: 'shared-open-readonly-failed',
+          reason: 'canonical-open',
+          projectKey: resolvedProjectKey,
+          error: identityCheck.mismatchReasons.join(',') || 'identity-mismatch',
+        });
+        if (!silent) {
+          setMultiStatus(
+            localizeText(
+              '共有プロジェクトの内部IDが一致しないため安全に開けませんでした。',
+              'Shared project IDs did not match, so the project was not opened safely.'
+            ),
+            'error'
+          );
+        }
+        return false;
+      }
+      console.info('[shared-sync]', {
+        event: 'shared-open-identity-check-passed',
+        projectKey: resolvedProjectKey,
+        snapshotRevision: freshestSnapshotRevision,
+        latestRevision: freshestLatestRevision,
+      });
     }
     markActiveSharedProjectDocumentLoaded(resolvedProjectKey);
     setActiveAutosaveProjectId(buildSharedRecentProjectId(resolvedProjectKey));
@@ -21858,6 +21936,24 @@
   async function openSharedRecentProject(entry, { hideStartup = true, silent = false, skipLatestRefresh = true } = {}) {
     let normalizedEntry = normalizeSharedRecentProjectEntry(entry);
     if (!normalizedEntry) {
+      return false;
+    }
+    const pendingInvite = readPendingSharedInvite();
+    const pendingInviteProjectKey = normalizeMultiProjectKey(pendingInvite?.projectKey || '');
+    if (
+      pendingInvite
+      && (
+        !pendingInviteProjectKey
+        || pendingInviteProjectKey === normalizeMultiProjectKey(normalizedEntry.sharedProjectKey || '')
+      )
+    ) {
+      console.info('[shared-sync]', {
+        event: 'shared-open-source-suppressed',
+        source: 'recent-open',
+        reason: 'pending-invite-present',
+        projectKey: normalizeMultiProjectKey(normalizedEntry.sharedProjectKey || ''),
+      });
+      maybeApplyInviteAutoJoin();
       return false;
     }
     const closeBlockingLoading = beginBlockingGlobalLoading(localizeText(
@@ -38449,12 +38545,13 @@
       return soleCanvas;
     }
     if (isSharedProjectCollaborativeMode() && canvases.length === 1) {
-      console.info('[shared-sync]', {
-        event: 'adopted-single-canvas-id',
+      console.warn('[shared-sync]', {
+        event: 'adopted-single-canvas-id-fallback',
         requestedCanvasId: normalizedCanvasId,
         resolvedCanvasId: soleCanvas.id || '',
         projectKey: activeSharedProjectKey || '',
         mutation: false,
+        unsafeFallback: true,
       });
       return soleCanvas;
     }
@@ -38470,13 +38567,14 @@
       hoveredProjectCanvasId = normalizedCanvasId;
     }
     syncProjectCanvasSurfaceDocumentRefs();
-    console.info('[shared-sync]', {
-      event: 'adopted-single-canvas-id',
+    console.warn('[shared-sync]', {
+      event: 'adopted-single-canvas-id-fallback',
       previousCanvasId,
       requestedCanvasId: normalizedCanvasId,
       resolvedCanvasId: normalizedCanvasId,
       projectKey: activeSharedProjectKey || '',
       mutation: true,
+      unsafeFallback: true,
     });
     return soleCanvas;
   }
@@ -38518,11 +38616,12 @@
     storeProjectCanvasViewScale(getActiveProjectCanvasDocument(), state.scale);
   }
 
-  function replaceProjectCanvasDocuments(canvases, activeCanvasId = '') {
+  function replaceProjectCanvasDocuments(canvases, activeCanvasId = '', { preserveIncomingIds = false } = {}) {
     const sourceCanvases = collapseToSingleProjectCanvasSource(canvases, activeCanvasId);
     const currentCanvases = Array.isArray(projectCanvasStore.canvases) ? projectCanvasStore.canvases : [];
     const sharedStableSingleCanvasId = (
       isSharedProjectCollaborativeMode()
+      && !preserveIncomingIds
       && currentCanvases.length === 1
       && sourceCanvases.length === 1
       && typeof currentCanvases[0]?.id === 'string'
@@ -38570,6 +38669,87 @@
     invalidateFillPreviewCache();
     invalidateOnionSkinCache();
     clearPlaybackFrameCache();
+  }
+
+  function collectCanvasDocumentIdentitySummary(canvases = []) {
+    const canvasIds = [];
+    const frameIds = [];
+    const layerIds = [];
+    (Array.isArray(canvases) ? canvases : []).forEach(canvas => {
+      if (canvas?.id) {
+        canvasIds.push(canvas.id);
+      }
+      (Array.isArray(canvas?.frames) ? canvas.frames : []).forEach(frame => {
+        if (frame?.id) {
+          frameIds.push(frame.id);
+        }
+        (Array.isArray(frame?.layers) ? frame.layers : []).forEach(layer => {
+          if (layer?.id) {
+            layerIds.push(layer.id);
+          }
+        });
+      });
+    });
+    return { canvasIds, frameIds, layerIds };
+  }
+
+  function compareSharedProjectSnapshotIdentity(snapshot, { projectKey = '', projectId = '', snapshotRevision = 0, latestRevision = 0 } = {}) {
+    const snapshotCanvases = Array.isArray(snapshot?.canvases) && snapshot.canvases.length
+      ? snapshot.canvases
+      : [{
+        id: typeof snapshot?.activeCanvasId === 'string' ? snapshot.activeCanvasId : '',
+        frames: Array.isArray(snapshot?.frames) ? snapshot.frames : [],
+      }];
+    const snapshotIdentity = collectCanvasDocumentIdentitySummary(snapshotCanvases);
+    const localIdentity = collectCanvasDocumentIdentitySummary(getProjectCanvasDocuments());
+    const mismatchReasons = [];
+    if (snapshotIdentity.canvasIds.length !== localIdentity.canvasIds.length) {
+      mismatchReasons.push('canvas-count-mismatch');
+    }
+    if (snapshotIdentity.frameIds.length !== localIdentity.frameIds.length) {
+      mismatchReasons.push('frame-count-mismatch');
+    }
+    if (snapshotIdentity.layerIds.length !== localIdentity.layerIds.length) {
+      mismatchReasons.push('layer-count-mismatch');
+    }
+    snapshotIdentity.canvasIds.forEach(canvasId => {
+      if (!localIdentity.canvasIds.includes(canvasId)) {
+        mismatchReasons.push('canvas-id-regenerated');
+      }
+    });
+    snapshotIdentity.frameIds.forEach(frameId => {
+      if (!localIdentity.frameIds.includes(frameId)) {
+        mismatchReasons.push('frame-id-regenerated');
+      }
+    });
+    snapshotIdentity.layerIds.forEach(layerId => {
+      if (!localIdentity.layerIds.includes(layerId)) {
+        mismatchReasons.push('layer-id-regenerated');
+      }
+    });
+    const mismatch = mismatchReasons.length > 0;
+    console.info('[shared-sync]', {
+      event: mismatch ? 'shared-document-identity-mismatch' : 'shared-project-identity-check',
+      projectKey: projectKey || activeSharedProjectKey || '',
+      projectId: projectId || activeSharedProjectId || '',
+      snapshotRevision: Math.max(0, Math.round(Number(snapshotRevision) || 0)),
+      latestRevision: Math.max(0, Math.round(Number(latestRevision) || 0)),
+      snapshotCanvasIds: snapshotIdentity.canvasIds,
+      localCanvasIds: localIdentity.canvasIds,
+      activeCanvasId: getActiveProjectCanvasDocument()?.id || '',
+      snapshotFrameIds: snapshotIdentity.frameIds,
+      localFrameIds: localIdentity.frameIds,
+      snapshotLayerIds: snapshotIdentity.layerIds,
+      localLayerIds: localIdentity.layerIds,
+      mismatch,
+      mismatchReason: mismatchReasons,
+    });
+    return {
+      mismatch,
+      mismatchReasons,
+      snapshotIdentity,
+      localIdentity,
+    };
   }
 
   function createBlankProjectCanvasDocument(sourceCanvas = getActiveProjectCanvasDocument(), index = getProjectCanvasCount() + 1) {
@@ -56655,6 +56835,30 @@
         activeStructureRevision: activeSharedProjectStructureRevision,
       };
     }
+    const localCanvasIds = getProjectCanvasDocuments()
+      .map(canvas => (typeof canvas?.id === 'string' ? canvas.id.trim() : ''))
+      .filter(Boolean);
+    if (canvasId && localCanvasIds.includes(canvasId)) {
+      console.info('[shared-sync]', {
+        event: 'op-canvas-identity-ok',
+        opId,
+        revision,
+        payloadCanvasId: canvasId,
+        localCanvasIds,
+        activeCanvasId: getActiveProjectCanvasDocument()?.id || '',
+        projectKey: activeSharedProjectKey || '',
+      });
+    } else {
+      console.warn('[shared-sync]', {
+        event: 'op-canvas-identity-mismatch',
+        opId,
+        revision,
+        payloadCanvasId: canvasId,
+        localCanvasIds,
+        activeCanvasId: getActiveProjectCanvasDocument()?.id || '',
+        projectKey: activeSharedProjectKey || '',
+      });
+    }
     const targetCanvas = getProjectCanvasDocumentById(canvasId) || adoptSingleProjectCanvasId(canvasId);
     if (!targetCanvas || !Array.isArray(targetCanvas.frames) || frameIndex >= targetCanvas.frames.length) {
       logSharedProjectResolveEvent('canvas-resolve-failed', {
@@ -59588,6 +59792,10 @@
         openedFromRecent: true,
         preserveView: true,
         preserveDotStats: true,
+        preserveDocumentIds: true,
+        preserveCanvasIds: true,
+        preserveFrameIds: true,
+        preserveLayerIds: true,
         sharedProjectKey: activeSharedProjectKey,
         sharedProjectRevision: snapshotRevision,
       });
@@ -59617,6 +59825,12 @@
             Math.round(Number(project.latest_snapshot_structure_revision) || Number(project.latest_structure_revision) || 0)
           ),
         },
+      });
+      compareSharedProjectSnapshotIdentity(sharedSnapshot?.document || sharedSnapshot, {
+        projectKey: activeSharedProjectKey,
+        projectId: project.id || '',
+        snapshotRevision,
+        latestRevision: nextRevision,
       });
       sharedProjectRemoteApplyFailureKeys.clear();
       markDocumentDurablySaved();
