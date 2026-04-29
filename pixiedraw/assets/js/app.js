@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.28-shared-broadcast-gap-only-fix1';
+  const APP_BUILD_VERSION = '2026.04.30-shared-canonical-op-sync';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
@@ -21573,15 +21573,6 @@
           revision: activeSharedProjectRevision,
           snapshotRevision: activeSharedProjectSnapshotRevision,
         });
-      } else {
-        console.info('[shared-sync]', {
-          event: 'skip-realtime-subscribe',
-          reason: 'canonical-open-not-synced',
-          projectKey: normalizedProjectKey,
-          projectId: activeSharedProjectId || '',
-          activeSharedProjectRevision,
-          activeSharedProjectSynced,
-        });
       }
       console.info('[shared-sync]', {
         event: 'shared-open-singleflight-done',
@@ -21671,6 +21662,10 @@
     ) {
       storeMultiProjectKey(resolvedProjectKey);
       syncMultiProjectKeyInputValues(resolvedProjectKey, { preserveFocused: false });
+      await refreshActiveSharedProjectSnapshot({
+        force: true,
+        reason: 'open-already-active-latest',
+      });
       if (hideStartup) {
         hideStartupScreen();
       }
@@ -21714,16 +21709,7 @@
     );
     const freshestLatestRevision = Math.max(0, Math.round(Number(freshestProject.latest_revision) || 0));
     const sharedSnapshot = freshestProject.latest_snapshot;
-    const canReuseReloadBase = Boolean(
-      reloadSnapshotRestored
-      && isCurrentProjectSharedEntry()
-      && normalizeMultiProjectKey(activeSharedProjectKey || '') === resolvedProjectKey
-      && normalizeMultiProjectKey(startupSharedReloadProjectKey || '') === resolvedProjectKey
-      && activeSharedProjectRevision > freshestSnapshotRevision
-      && activeSharedProjectRevision <= freshestLatestRevision
-      && Array.isArray(state.frames)
-      && state.frames.length
-    );
+    const canReuseReloadBase = false;
     if (!sharedSnapshot || typeof sharedSnapshot !== 'object') {
       if (!silent) {
         setMultiStatus(
@@ -21835,6 +21821,7 @@
     activeSharedProjectRevision = sharedSnapshotRevision;
     activeSharedProjectSnapshotRevision = sharedSnapshotRevision;
     sharedProjectLastAppliedSeq = sharedSnapshotRevision;
+    pruneSharedProjectConfirmedOpStateAfterRevision(sharedSnapshotRevision);
     console.info('[shared-sync]', {
       event: 'shared-open-revision-initialized',
       projectKey: resolvedProjectKey,
@@ -21978,6 +21965,10 @@
     ) {
       storeMultiProjectKey(normalizedEntry.sharedProjectKey || '');
       syncMultiProjectKeyInputValues(normalizedEntry.sharedProjectKey || '', { preserveFocused: false });
+      await refreshActiveSharedProjectSnapshot({
+        force: true,
+        reason: 'recent-open-already-active-latest',
+      });
       if (hideStartup) {
         hideStartupScreen();
       }
@@ -55239,6 +55230,9 @@
     if (!hasCanonicalDocument) {
       return false;
     }
+    if (activeSharedProjectSyncState === 'catching-up') {
+      return false;
+    }
     return true;
   }
 
@@ -55303,6 +55297,17 @@
     if (sharedProjectPendingProvisionalOps.size) {
       sharedProjectPendingProvisionalOps.clear();
     }
+  }
+
+  function pruneSharedProjectConfirmedOpStateAfterRevision(revision = 0) {
+    const normalizedRevision = Math.max(0, Math.round(Number(revision) || 0));
+    Array.from(sharedProjectSeenOpSeqById.entries()).forEach(([opId, seq]) => {
+      if (Math.max(0, Math.round(Number(seq) || 0)) > normalizedRevision) {
+        sharedProjectSeenOpSeqById.delete(opId);
+        sharedProjectSeenOpIds.delete(opId);
+      }
+    });
+    sharedProjectAppliedProvisionalOpIds.clear();
   }
 
   function clearSharedProjectStructureMismatchRecovery() {
@@ -58350,7 +58355,6 @@
         const op = list[index];
         const opId = normalizeSharedProjectOpId(op);
         const seq = getSharedProjectOpSeq(op);
-        const expectedRevision = sharedProjectLastAppliedSeq + 1;
         if (!seq) {
           continue;
         }
@@ -58388,59 +58392,27 @@
           }
           continue;
         }
-        if (seq > expectedRevision) {
+        if (seq > sharedProjectLastAppliedSeq + 1) {
           console.info('[shared-sync]', {
             event: 'replay-gap-detected',
             opId,
             revision: seq,
             activeRevision: sharedProjectLastAppliedSeq,
-            expectedRevision,
           });
           sharedProjectPendingRemoteOps.set(seq, op);
-          console.info('[shared-sync]', {
-            event: 'replay-batch-stopped',
-            projectKey: activeSharedProjectKey || '',
-            expectedRevision,
-            opRevision: seq,
-            opId,
-            stopReason: 'revision-gap',
-          });
-          return false;
+          continue;
         }
         if (fromRemote && shouldDeferIncomingSharedProjectRemoteApply()) {
           sharedProjectPendingRemoteOps.set(seq, op);
           scheduleDeferredSharedProjectRemoteOpsDrain();
-          console.info('[shared-sync]', {
-            event: 'replay-batch-stopped',
-            projectKey: activeSharedProjectKey || '',
-            expectedRevision,
-            opRevision: seq,
-            opId,
-            stopReason: 'deferred-remote-apply',
-          });
-          return false;
+          continue;
         }
         if (!applyOp(op, { fromRemote, provisional: false })) {
-          console.info('[shared-sync]', {
-            event: 'replay-batch-stopped',
-            projectKey: activeSharedProjectKey || '',
-            expectedRevision,
-            opRevision: seq,
-            opId,
-            stopReason: 'apply-op-failed',
-          });
           return false;
         }
         const beforeRevision = activeSharedProjectRevision;
         sharedProjectLastAppliedSeq = seq;
         activeSharedProjectRevision = Math.max(activeSharedProjectRevision, seq);
-        console.info('[shared-sync]', {
-          event: 'replay-batch-op-applied',
-          projectKey: activeSharedProjectKey || '',
-          expectedRevision,
-          opRevision: seq,
-          opId,
-        });
         console.info('[shared-sync]', {
           event: 'remote-confirmed-revision-advanced',
           beforeRevision,
@@ -59155,7 +59127,6 @@
   }
 
   async function fetchSharedProjectOpsSince(projectKey, afterRevision = 0, limit = 256) {
-    const readonlyEligible = Boolean(normalizeMultiProjectKey(projectKey));
     if (!canUseSharedProjectsBackend() && !await ensureSharedProjectBackendSession()) {
       return [];
     }
@@ -59188,7 +59159,7 @@
       });
       if (error) {
         if (isRecoverableSharedBackendPreflightError(error)) {
-          console.debug('[shared-backend] fetch-ops-since-continues-after-membership-preflight-failure', rpcDebugInfo);
+          console.debug('[shared-backend] fetch-ops-since skipped after recoverable preflight failure', rpcDebugInfo);
           return [];
         }
         console.warn('[shared-backend] fetch-ops-since failed', rpcDebugInfo);
@@ -59205,7 +59176,7 @@
       return result;
     } catch (error) {
       if (isRecoverableSharedBackendPreflightError(error)) {
-        console.debug('[shared-backend] fetch-ops-since-continues-after-membership-preflight-failure', {
+        console.debug('[shared-backend] fetch-ops-since exception skipped after recoverable preflight failure', {
           context: 'fetch-ops-since',
           projectKey: normalizedProjectKey,
           afterRevision: Math.max(0, Math.round(Number(afterRevision) || 0)),
@@ -59249,7 +59220,6 @@
     setActiveSharedProjectSyncState('catching-up', { announce: true });
     const baseRevision = Math.max(0, Math.round(Number(afterRevision) || 0));
     sharedProjectLastAppliedSeq = Math.max(sharedProjectLastAppliedSeq, baseRevision);
-    activeSharedProjectRevision = Math.max(activeSharedProjectRevision, baseRevision);
     while (sharedProjectLastAppliedSeq < targetRevision) {
       console.info('[shared-sync]', {
         event: 'refresh-ops-fetched',
@@ -59284,20 +59254,8 @@
         return false;
       }
       confirmSharedProjectLocalOpsFromServerOps(ops, { source: 'refresh' });
-      console.info('[shared-sync]', {
-        event: 'replay-batch-start',
-        projectKey,
-        expectedRevision: sharedProjectLastAppliedSeq + 1,
-        fetchedCount: ops.length,
-      });
       const replayed = await replayOps(ops, { fromRemote: true });
       if (!replayed) {
-        console.info('[shared-sync]', {
-          event: 'replay-batch-stopped',
-          projectKey,
-          expectedRevision: sharedProjectLastAppliedSeq + 1,
-          stopReason: 'apply-failed',
-        });
         return false;
       }
       console.info('[shared-sync]', {
@@ -59447,17 +59405,6 @@
         target_create_if_missing: Boolean(createIfMissing),
       });
       if (error) {
-        if (
-          !createIfMissing
-          && isRecoverableSharedBackendPreflightError(error)
-        ) {
-          console.debug('[shared-backend] ensure-membership-rpc-recoverable-readonly', {
-            projectKey: normalizedProjectKey,
-            createIfMissing: false,
-            message: String(error?.message || ''),
-          });
-          return await fetchSharedProjectRecordViaRpc(supabase, normalizedProjectKey, 'ensure-membership-rpc-readonly-fallback');
-        }
         handleSharedProjectsBackendError(error, 'ensure-membership-rpc');
         return null;
       }
@@ -59467,24 +59414,6 @@
       }
       return project;
     } catch (error) {
-      if (
-        !createIfMissing
-        && isRecoverableSharedBackendPreflightError(error)
-      ) {
-        try {
-          const supabase = await ensurePixieedAccountClient();
-          if (supabase) {
-            console.debug('[shared-backend] ensure-membership-rpc-recoverable-readonly', {
-              projectKey: normalizedProjectKey,
-              createIfMissing: false,
-              message: String(error?.message || ''),
-            });
-            return await fetchSharedProjectRecordViaRpc(supabase, normalizedProjectKey, 'ensure-membership-exception-readonly-fallback');
-          }
-        } catch (_fallbackError) {
-          // ignore fallback failure
-        }
-      }
       handleSharedProjectsBackendError(error, 'ensure-membership-exception');
       return null;
     }
@@ -59823,7 +59752,6 @@
         if (hadLoadedDocument) {
           markActiveSharedProjectDocumentLoaded(activeSharedProjectKey);
         }
-        activeSharedProjectRevision = nextRevision;
         logSharedProjectRealtimeChannelLifecycle('refresh-result', {
           caller: 'refreshActiveSharedProjectSnapshot',
           reason: reason || 'refresh',
@@ -59965,7 +59893,8 @@
       let replayedAfterSnapshot = false;
       if (trustedSnapshotRevision) {
         sharedProjectLastAppliedSeq = Math.max(0, snapshotRevision);
-        activeSharedProjectRevision = Math.max(activeSharedProjectRevision, sharedProjectLastAppliedSeq);
+        activeSharedProjectRevision = sharedProjectLastAppliedSeq;
+        pruneSharedProjectConfirmedOpStateAfterRevision(sharedProjectLastAppliedSeq);
         sharedProjectSnapshotReplayInFlight = true;
         try {
           replayedAfterSnapshot = await applySharedProjectOpsSinceRevision(project, snapshotRevision);
@@ -60001,6 +59930,25 @@
           revision: activeSharedProjectRevision,
           snapshotRevision,
         });
+      }
+      if (snapshotRevision < nextRevision && !replayedAfterSnapshot) {
+        setActiveSharedProjectSyncState('catching-up', { announce: true });
+        queueSharedProjectRefresh({
+          immediate: false,
+          reason: `${reason || 'refresh'}-post-snapshot-replay-incomplete`,
+          force: true,
+        });
+        logSharedProjectRealtimeChannelLifecycle('refresh-result', {
+          caller: 'refreshActiveSharedProjectSnapshot',
+          reason: reason || 'refresh',
+          extra: {
+            force,
+            result: 'post-snapshot-replay-incomplete',
+            snapshotRevision,
+            nextRevision,
+          },
+        });
+        return false;
       }
       await syncSharedProjectMembers(activeSharedProjectKey, project.id || '');
       await upsertSharedRecentProjectEntry({
@@ -60139,8 +60087,7 @@
             historyLabel: String(packagedPayload?.sharedHistoryLabel || ''),
           };
         }
-        activeSharedProjectRevision = Math.max(0, Math.round(Number(result.conflict_revision) || activeSharedProjectRevision));
-        activeSharedProjectStructureRevision = Math.max(0, Math.round(Number(result.conflict_structure_revision) || activeSharedProjectStructureRevision));
+        setActiveSharedProjectSyncState('catching-up', { announce: true });
         queueSharedProjectRefresh({ immediate: true, reason: 'commit-conflict', force: true });
         setMultiStatus(
           localizeText('共有プロジェクトの更新競合が発生したため最新状態へ再同期します', 'Shared project conflict detected. Refreshing to latest state.'),
@@ -60160,6 +60107,53 @@
       handleSharedProjectsBackendError(error, 'persist-exception');
       return null;
     }
+  }
+
+  function markSharedProjectLocalCommitRevision(result, resolvedOp, { source = 'db' } = {}) {
+    const committedRevision = Math.max(0, Math.round(Number(result?.committed_revision || result?.latest_revision) || 0));
+    const committedStructureRevision = Math.max(0, Math.round(Number(result?.committed_structure_revision || result?.latest_structure_revision) || 0));
+    markSharedProjectLocalOpCommitConfirmed(resolvedOp, {
+      source,
+      revision: committedRevision,
+      structureRevision: committedStructureRevision,
+    });
+    return { committedRevision, committedStructureRevision };
+  }
+
+  function advanceSharedProjectAfterLocalCommit(projectKey, result, resolvedOp) {
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey);
+    const { committedRevision, committedStructureRevision } = markSharedProjectLocalCommitRevision(result, resolvedOp, {
+      source: result?.commit_status === 'duplicate' ? 'db-duplicate' : 'db',
+    });
+    const latestRevision = Math.max(0, Math.round(Number(result?.latest_revision ?? committedRevision) || 0));
+    const canAdvanceContiguously = committedRevision > 0 && committedRevision <= sharedProjectLastAppliedSeq + 1;
+    if (canAdvanceContiguously) {
+      setActiveSharedProjectSession(
+        normalizedProjectKey,
+        Math.max(activeSharedProjectRevision, committedRevision),
+        Math.max(activeSharedProjectStructureRevision, committedStructureRevision),
+        result?.id || activeSharedProjectId
+      );
+      drainPendingSharedProjectRemoteOps();
+      return true;
+    }
+    setActiveSharedProjectSyncState('catching-up', { announce: true });
+    console.info('[shared-sync]', {
+      event: 'local-commit-confirmed-with-gap',
+      projectKey: normalizedProjectKey,
+      opId: getSharedProjectOpId(resolvedOp),
+      committedRevision,
+      latestRevision,
+      appliedRevision: sharedProjectLastAppliedSeq,
+    });
+    triggerImmediateSharedProjectRecovery('local-commit-gap').then(recovered => {
+      if (!recovered) {
+        queueSharedProjectRefresh({ immediate: true, reason: 'local-commit-gap', force: true });
+      }
+    }).catch(() => {
+      queueSharedProjectRefresh({ immediate: true, reason: 'local-commit-gap', force: true });
+    });
+    return false;
   }
 
   async function commitSharedProjectOperation(projectKey, {
@@ -60283,8 +60277,7 @@
               'info'
             );
           } else {
-            activeSharedProjectRevision = Math.max(0, Math.round(Number(result.conflict_revision) || activeSharedProjectRevision));
-            activeSharedProjectStructureRevision = Math.max(0, Math.round(Number(result.conflict_structure_revision) || activeSharedProjectStructureRevision));
+            setActiveSharedProjectSyncState('catching-up', { announce: true });
             queueSharedProjectRefresh({ immediate: true, reason: 'op-conflict', force: true });
           }
         } else if (resolvedOpType === 'draw') {
@@ -60293,16 +60286,7 @@
         return null;
       }
       if (result.commit_status === 'duplicate') {
-        setActiveSharedProjectSession(
-          normalizedProjectKey,
-          Math.max(0, Math.round(Number(result.latest_revision ?? result.committed_revision) || activeSharedProjectRevision)),
-          Math.max(0, Math.round(Number(result.latest_structure_revision ?? result.committed_structure_revision) || activeSharedProjectStructureRevision)),
-          result.id || activeSharedProjectId
-        );
-        markSharedProjectLocalOpCommitConfirmed(resolvedOp, {
-          source: 'db-duplicate',
-          revision: Math.max(0, Math.round(Number(result.committed_revision || result.latest_revision) || 0)),
-        });
+        advanceSharedProjectAfterLocalCommit(normalizedProjectKey, result, resolvedOp);
         console.info('[shared-sync]', {
           event: 'commit-confirmed',
           status: 'duplicate',
@@ -60311,23 +60295,14 @@
         });
         return result;
       }
-      setActiveSharedProjectSession(
-        normalizedProjectKey,
-        Math.max(0, Math.round(Number(result.latest_revision ?? result.committed_revision) || activeSharedProjectRevision)),
-        Math.max(0, Math.round(Number(result.latest_structure_revision ?? result.committed_structure_revision) || activeSharedProjectStructureRevision)),
-        result.id || activeSharedProjectId
-      );
       updateSharedLocalOpJournalStatus(resolvedOp, {
         status: 'confirmed',
-        committedRevision: Math.max(0, Math.round(Number(result.latest_revision) || 0)),
-        committedStructureRevision: Math.max(0, Math.round(Number(result.latest_structure_revision) || 0)),
+        committedRevision: Math.max(0, Math.round(Number(result.committed_revision || result.latest_revision) || 0)),
+        committedStructureRevision: Math.max(0, Math.round(Number(result.committed_structure_revision || result.latest_structure_revision) || 0)),
       }).catch(error => {
         console.warn('Failed to mark shared local op journal entry confirmed', error);
       });
-      markSharedProjectLocalOpCommitConfirmed(resolvedOp, {
-        source: 'db',
-        revision: Math.max(0, Math.round(Number(result.committed_revision || result.latest_revision) || 0)),
-      });
+      advanceSharedProjectAfterLocalCommit(normalizedProjectKey, result, resolvedOp);
       console.info('[shared-sync]', {
         event: 'commit-confirmed',
         status: result.commit_status || 'committed',
