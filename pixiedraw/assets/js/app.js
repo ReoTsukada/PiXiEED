@@ -55221,11 +55221,7 @@
         || activeSharedProjectSnapshotRevision > 0
       )
     );
-    const allowingRecoveryEditing = Boolean(
-      hasCanonicalDocument
-      && (sharedProjectRefreshInFlight || sharedProjectRecoveryInProgress)
-    );
-    if (isSharedProjectAwaitingReady(normalizedProjectKey) && !allowingRecoveryEditing) {
+    if (activeSharedProjectOpenInProgress && !hasCanonicalDocument) {
       return false;
     }
     if (!hasCanonicalDocument) {
@@ -56820,20 +56816,23 @@
       });
       return { ok: false, reason: 'missing-patch-fields', canvasId, layerId, frameIndex, pixelCount };
     }
-    if (structureRevision !== activeSharedProjectStructureRevision) {
+    const structureRevisionMismatch = (
+      structureRevision > 0
+      && activeSharedProjectStructureRevision > 0
+      && structureRevision !== activeSharedProjectStructureRevision
+    );
+    if (structureRevisionMismatch) {
       logSharedProjectResolveEvent('structure-revision-mismatch', {
-        opId, revision, kind, canvasId, layerId, structureRevision, result: 'skip', skipReason: 'structure-revision-mismatch',
-      });
-      return {
-        ok: false,
-        reason: 'structure-revision-mismatch',
+        opId,
+        revision,
+        kind,
         canvasId,
         layerId,
-        frameIndex,
-        pixelCount,
         structureRevision,
         activeStructureRevision: activeSharedProjectStructureRevision,
-      };
+        result: 'warn',
+        skipReason: 'structure-revision-mismatch',
+      });
     }
     const localCanvasIds = getProjectCanvasDocuments()
       .map(canvas => (typeof canvas?.id === 'string' ? canvas.id.trim() : ''))
@@ -56864,20 +56863,47 @@
       logSharedProjectResolveEvent('canvas-resolve-failed', {
         opId, revision, kind, canvasId, resolvedCanvasId: targetCanvas?.id || '', layerId, structureRevision, result: 'skip', skipReason: 'missing-canvas-or-frame',
       });
-      return { ok: false, reason: 'missing-canvas-or-frame', canvasId, layerId, frameIndex, pixelCount };
+      return {
+        ok: false,
+        reason: structureRevisionMismatch ? 'structure-revision-mismatch' : 'missing-canvas-or-frame',
+        canvasId,
+        layerId,
+        frameIndex,
+        pixelCount,
+        structureRevision,
+        activeStructureRevision: activeSharedProjectStructureRevision,
+      };
     }
     const frame = targetCanvas.frames[frameIndex];
     if (!frame || !Array.isArray(frame.layers)) {
       logSharedProjectResolveEvent('frame-resolve-failed', {
         opId, revision, kind, canvasId, resolvedCanvasId: targetCanvas?.id || '', layerId, structureRevision, result: 'skip', skipReason: 'missing-frame-layers',
       });
-      return { ok: false, reason: 'missing-frame-layers', canvasId, layerId, frameIndex, pixelCount };
+      return {
+        ok: false,
+        reason: structureRevisionMismatch ? 'structure-revision-mismatch' : 'missing-frame-layers',
+        canvasId,
+        layerId,
+        frameIndex,
+        pixelCount,
+        structureRevision,
+        activeStructureRevision: activeSharedProjectStructureRevision,
+      };
     }
     if (!frame.layers.find(entry => entry?.id === layerId)) {
       logSharedProjectResolveEvent('layer-resolve-failed', {
         opId, revision, kind, canvasId, resolvedCanvasId: targetCanvas?.id || '', resolvedFrameId: frame?.id || '', layerId, structureRevision, result: 'skip', skipReason: 'missing-target-layer',
       });
-      return { ok: false, reason: 'missing-target-layer', canvasId, layerId, frameIndex, pixelCount };
+      return {
+        ok: false,
+        reason: structureRevisionMismatch ? 'structure-revision-mismatch' : 'missing-target-layer',
+        canvasId,
+        layerId,
+        frameIndex,
+        pixelCount,
+        structureRevision,
+        activeStructureRevision: activeSharedProjectStructureRevision,
+      };
     }
     logSharedProjectResolveEvent('canvas-resolve-ok', {
       opId,
