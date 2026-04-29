@@ -3256,6 +3256,9 @@
   let sharedProjectMembersSyncPromise = null;
   let sharedProjectImmediateRecoveryPromise = null;
   let sharedProjectLastCanonicalLoadAt = 0;
+  let activeSharedProjectCanonicalOpenPromise = null;
+  let activeSharedProjectCanonicalOpenKey = '';
+  let activeSharedProjectCanonicalOpenReasons = [];
   let multiSupabaseClientPromise = null;
   let recentProjectsWritePromise = Promise.resolve();
   let sharedLocalOpJournalWritePromise = Promise.resolve();
@@ -21450,6 +21453,29 @@
     const normalizedRequestedRole = requestedRole === 'master' || requestedRole === 'guest' || requestedRole === 'spectator'
       ? requestedRole
       : 'guest';
+    if (
+      normalizedProjectKey
+      && activeSharedProjectCanonicalOpenPromise
+      && activeSharedProjectCanonicalOpenKey === normalizedProjectKey
+    ) {
+      if (!activeSharedProjectCanonicalOpenReasons.includes(reason)) {
+        activeSharedProjectCanonicalOpenReasons.push(reason);
+      }
+      console.info('[shared-sync]', {
+        event: 'shared-open-singleflight-reused',
+        projectKey: normalizedProjectKey,
+        reasons: activeSharedProjectCanonicalOpenReasons.slice(),
+      });
+      return await activeSharedProjectCanonicalOpenPromise;
+    }
+    activeSharedProjectCanonicalOpenKey = normalizedProjectKey;
+    activeSharedProjectCanonicalOpenReasons = [reason];
+    console.info('[shared-sync]', {
+      event: 'shared-open-singleflight-start',
+      projectKey: normalizedProjectKey,
+      reasons: activeSharedProjectCanonicalOpenReasons.slice(),
+    });
+    activeSharedProjectCanonicalOpenPromise = (async () => {
     activeSharedProjectOpenInProgress = true;
     activeSharedProjectOpenReadOnly = true;
     activeSharedProjectSynced = false;
@@ -21504,6 +21530,12 @@
           snapshotRevision: activeSharedProjectSnapshotRevision,
         });
       }
+      console.info('[shared-sync]', {
+        event: 'shared-open-singleflight-done',
+        projectKey: normalizedProjectKey,
+        reasons: activeSharedProjectCanonicalOpenReasons.slice(),
+        opened,
+      });
       return opened;
     } catch (error) {
       console.info('[shared-sync]', {
@@ -21512,11 +21544,22 @@
         projectKey: normalizedProjectKey,
         error: String(error?.message || error || ''),
       });
+      console.info('[shared-sync]', {
+        event: 'shared-open-singleflight-failed',
+        projectKey: normalizedProjectKey,
+        reasons: activeSharedProjectCanonicalOpenReasons.slice(),
+        error: String(error?.message || error || ''),
+      });
       throw error;
     } finally {
       activeSharedProjectOpenInProgress = false;
       activeSharedProjectOpenReadOnly = false;
+      activeSharedProjectCanonicalOpenPromise = null;
+      activeSharedProjectCanonicalOpenKey = '';
+      activeSharedProjectCanonicalOpenReasons = [];
     }
+    })();
+    return await activeSharedProjectCanonicalOpenPromise;
   }
 
   async function openSharedProjectAccess(access, {
@@ -21758,6 +21801,17 @@
       canonicalLoadedAt: Date.now(),
     });
     setSharedProjectDeferRealtimeUntilSynced(false);
+    console.info('[shared-sync]', {
+      event: 'shared-open-synced',
+      reason: 'canonical-open',
+      projectKey: resolvedProjectKey,
+      revision: activeSharedProjectRevision,
+    });
+    console.info('[shared-sync]', {
+      event: 'shared-open-realtime-subscribe-start',
+      reason: 'canonical-open',
+      projectKey: resolvedProjectKey,
+    });
     ensureActiveSharedProjectRealtimeChannel().catch(error => {
       reportSharedProjectRealtimeSubscribeFailure(error);
     });
@@ -55728,10 +55782,24 @@
         }),
       };
     });
+    const preservedCanvasId = typeof canvasSnapshot?.id === 'string' && canvasSnapshot.id.trim()
+      ? canvasSnapshot.id.trim()
+      : '';
+    if (preservedCanvasId) {
+      console.info('[shared-sync]', {
+        event: 'shared-snapshot-id-preserved',
+        canvasId: preservedCanvasId,
+      });
+    } else {
+      console.warn('[shared-sync]', {
+        event: 'shared-snapshot-id-regenerated-warning',
+        fallbackIndex,
+        existingCanvasId: existingCanvas?.id || '',
+      });
+    }
     return createProjectCanvasDocument({
-      id: typeof canvasSnapshot?.id === 'string' && canvasSnapshot.id.trim()
-        ? canvasSnapshot.id.trim()
-        : (existingCanvas?.id || (crypto.randomUUID ? crypto.randomUUID() : `canvas-${Math.random().toString(36).slice(2)}`)),
+      id: preservedCanvasId
+        || (existingCanvas?.id || (crypto.randomUUID ? crypto.randomUUID() : `canvas-${Math.random().toString(36).slice(2)}`)),
       name: typeof canvasSnapshot?.name === 'string' && canvasSnapshot.name.trim()
         ? canvasSnapshot.name.trim()
         : (existingCanvas?.name || getDefaultProjectCanvasName(fallbackIndex)),
@@ -56611,7 +56679,10 @@
       ok: true,
       reason: 'ok',
       canvasId,
+      resolvedCanvasId: targetCanvas?.id || '',
+      resolvedFrameId: frame?.id || '',
       layerId,
+      resolvedLayerId: layerId,
       frameIndex,
       pixelCount: drawCommandType ? 0 : pixelCount,
       command: drawCommandType || 'patch',
@@ -57565,6 +57636,51 @@
     requestOverlayRender();
   }
 
+  function logRemoteSharedDrawVisibility(opRecord, diagnostics = {}) {
+    const payload = extractSharedProjectOpPayload(opRecord);
+    const resolvedCanvasId = diagnostics.resolvedCanvasId || diagnostics.canvasId || (typeof payload?.canvasId === 'string' ? payload.canvasId.trim() : '');
+    const activeCanvasId = getActiveProjectCanvasDocument()?.id || '';
+    const frameIndex = Math.max(0, Math.round(Number(payload?.frameIndex) || 0));
+    const activeFrameIndex = Math.max(0, Math.round(Number(state.activeFrame) || 0));
+    const targetCanvas = resolvedCanvasId ? getProjectCanvasDocumentById(resolvedCanvasId) : null;
+    const frame = Array.isArray(targetCanvas?.frames) ? targetCanvas.frames[frameIndex] : null;
+    const layerId = typeof payload?.layerId === 'string' ? payload.layerId.trim() : '';
+    const layer = Array.isArray(frame?.layers) ? frame.layers.find(entry => entry?.id === layerId) || null : null;
+    const targetIsActiveCanvas = Boolean(resolvedCanvasId) && resolvedCanvasId === activeCanvasId;
+    const targetIsActiveFrame = targetIsActiveCanvas && frameIndex === activeFrameIndex;
+    const layerVisible = layer?.visible !== false;
+    const layerOpacity = normalizeLayerOpacity(layer?.opacity);
+    const shouldBeVisible = targetIsActiveCanvas && targetIsActiveFrame && Boolean(layer) && layerVisible && layerOpacity > 0;
+    console.info('[shared-sync]', {
+      event: 'remote-draw-visibility-check',
+      opId: normalizeSharedProjectOpId(opRecord),
+      resolvedCanvasId,
+      activeCanvasId,
+      targetIsActiveCanvas,
+      frameIndex,
+      activeFrameIndex,
+      targetIsActiveFrame,
+      layerId,
+      layerExists: Boolean(layer),
+      layerVisible,
+      layerOpacity,
+      shouldBeVisible,
+    });
+    console.info('[shared-sync]', {
+      event: shouldBeVisible ? 'remote-draw-target-visible' : 'remote-draw-target-not-visible',
+      opId: normalizeSharedProjectOpId(opRecord),
+      revision: getSharedProjectOpSeq(opRecord),
+      resolvedCanvasId,
+      frameIndex,
+      activeFrameIndex,
+      layerId,
+      layerVisible,
+      targetIsActiveCanvas,
+      targetIsVisibleFrame: targetIsActiveFrame,
+      renderScheduled: true,
+    });
+  }
+
   function noteSharedProjectOperationApplied({ opType = 'draw', fromRemote = false } = {}) {
     if (!isSharedProjectCollaborativeMode()) {
       return;
@@ -58035,8 +58151,15 @@
         if (!applyOp(op, { fromRemote, provisional: false })) {
           return false;
         }
+        const beforeRevision = activeSharedProjectRevision;
         sharedProjectLastAppliedSeq = seq;
         activeSharedProjectRevision = Math.max(activeSharedProjectRevision, seq);
+        console.info('[shared-sync]', {
+          event: 'remote-confirmed-revision-advanced',
+          beforeRevision,
+          opRevision: seq,
+          afterRevision: activeSharedProjectRevision,
+        });
         activeSharedProjectStructureRevision = Math.max(
           activeSharedProjectStructureRevision,
           Math.max(0, Math.round(Number(op?.structure_revision) || 0))
@@ -58436,6 +58559,27 @@
         mode: 'local-provisional',
         diagnostics,
       });
+    }
+    if (fromRemote && !provisional) {
+      console.info('[shared-sync]', {
+        event: 'remote-draw-render-invalidated',
+        opId: getSharedProjectOpId(opRecord),
+        revision: getSharedProjectOpSeq(opRecord),
+        resolvedCanvasId: diagnostics.resolvedCanvasId || diagnostics.canvasId || '',
+        frameIndex: diagnostics.frameIndex,
+        layerId: diagnostics.resolvedLayerId || diagnostics.layerId || '',
+      });
+      console.info('[shared-sync]', {
+        event: 'remote-draw-render-scheduled',
+        opId: getSharedProjectOpId(opRecord),
+        revision: getSharedProjectOpSeq(opRecord),
+        resolvedCanvasId: diagnostics.resolvedCanvasId || diagnostics.canvasId || '',
+        frameIndex: diagnostics.frameIndex,
+        activeFrameIndex: Math.max(0, Math.round(Number(state.activeFrame) || 0)),
+        layerId: diagnostics.resolvedLayerId || diagnostics.layerId || '',
+        renderScheduled: true,
+      });
+      logRemoteSharedDrawVisibility(opRecord, diagnostics);
     }
     if (fromRemote && provisional) {
       const provisionalOpId = getSharedProjectOpId(opRecord);
