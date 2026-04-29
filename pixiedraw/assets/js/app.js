@@ -21889,13 +21889,15 @@
       setStartupProgressLabel(localizeText('共有プロジェクトの接続を確認中…', 'Checking shared project connection...'));
       const refreshedEntry = await refreshSharedRecentProjectEntryFromBackend(normalizedEntry);
       normalizedEntry = normalizeSharedRecentProjectEntry(refreshedEntry || normalizedEntry) || normalizedEntry;
-      storePendingSharedInvite({
-        inviteToken: normalizedEntry.sharedProjectInviteToken || '',
-        projectKey: normalizedEntry.sharedProjectKey || '',
-        requestedRole: normalizedEntry.sharedRoleHint || 'guest',
-        autoJoin: normalizedEntry.sharedAutoJoin !== false,
-        source: 'recent-open',
-      });
+      if (!accountState.isLoggedIn || accountState.isAnonymous) {
+        storePendingSharedInvite({
+          inviteToken: normalizedEntry.sharedProjectInviteToken || '',
+          projectKey: normalizedEntry.sharedProjectKey || '',
+          requestedRole: normalizedEntry.sharedRoleHint || 'guest',
+          autoJoin: normalizedEntry.sharedAutoJoin !== false,
+          source: 'recent-open',
+        });
+      }
       if (!(await ensureSharedProjectAuthenticatedStart({ requireLogin: true }))) {
         return false;
       }
@@ -53377,6 +53379,16 @@
       'info'
     );
     const openSharedInviteProject = async () => {
+      if (
+        normalizedInviteProjectKey
+        && (
+          activeSharedProjectCanonicalOpenKey === normalizedInviteProjectKey
+          || normalizeMultiProjectKey(activeSharedProjectKey || '') === normalizedInviteProjectKey
+        )
+      ) {
+        clearPendingSharedInvite();
+        return true;
+      }
       if ((!accountState.isLoggedIn || accountState.isAnonymous) && invite.inviteToken) {
         const inviteProject = await fetchSharedProjectRecordByInviteToken(invite.inviteToken);
         if (inviteProject?.project_key && !isBrokenSharedInviteBinding(inviteProject, {
