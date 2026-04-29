@@ -21693,7 +21693,7 @@
       return false;
     }
     setStartupProgressLabel(localizeText('共有プロジェクトを読込中…', 'Loading shared project...'));
-    const freshestProject = await awaitFreshSharedProjectSnapshot(sharedProject, {
+    let freshestProject = await awaitFreshSharedProjectSnapshot(sharedProject, {
       inviteToken: normalizedInviteToken,
       minRevision: Math.max(0, Math.round(Number(sharedProject.latest_revision) || 0)),
       requireExactLatest: true,
@@ -21703,13 +21703,38 @@
     if (!(await claimSharedProjectSessionLock(resolvedProjectKey, freshestProject.id || ''))) {
       return false;
     }
-    const freshestSnapshotRevision = Math.max(
+    let freshestSnapshotRevision = Math.max(
       0,
       Math.round(Number(freshestProject.latest_snapshot_revision) || Number(freshestProject.latest_revision) || 0)
     );
-    const freshestLatestRevision = Math.max(0, Math.round(Number(freshestProject.latest_revision) || 0));
-    const sharedSnapshot = freshestProject.latest_snapshot;
+    let freshestLatestRevision = Math.max(0, Math.round(Number(freshestProject.latest_revision) || 0));
+    let sharedSnapshot = freshestProject.latest_snapshot;
     const canReuseReloadBase = false;
+    if (!sharedSnapshot || typeof sharedSnapshot !== 'object') {
+      const canRepairEmptyOwnedProject = Boolean(
+        openingOwnedSharedProject
+        && freshestLatestRevision === 0
+        && Math.max(0, Math.round(Number(freshestProject.latest_snapshot_revision) || 0)) === 0
+      );
+      if (canRepairEmptyOwnedProject) {
+        const repairSnapshot = makeHistorySnapshot({ clonePixelData: true });
+        const repairPackaged = buildPackagedProjectPayload(repairSnapshot);
+        repairPackaged.sharedHistoryLabel = 'sharedProjectCreate';
+        const repairedProject = await persistSharedProjectSnapshot(resolvedProjectKey, repairPackaged, {
+          title: createSharedProjectSnapshotTitle(freshestProject.title || state.documentName || DEFAULT_DOCUMENT_NAME),
+          reason: 'sharedProjectCreate',
+        });
+        if (repairedProject?.latest_snapshot && typeof repairedProject.latest_snapshot === 'object') {
+          freshestProject = repairedProject;
+          freshestSnapshotRevision = Math.max(
+            0,
+            Math.round(Number(freshestProject.latest_snapshot_revision) || Number(freshestProject.latest_revision) || 0)
+          );
+          freshestLatestRevision = Math.max(0, Math.round(Number(freshestProject.latest_revision) || 0));
+          sharedSnapshot = freshestProject.latest_snapshot;
+        }
+      }
+    }
     if (!sharedSnapshot || typeof sharedSnapshot !== 'object') {
       if (!silent) {
         setMultiStatus(
@@ -56602,24 +56627,25 @@
     const normalizedSnapshotRevision = Math.max(0, Math.round(Number(snapshotRevision) || 0));
     const inFlightOpCount = getSharedProjectLocalInFlightOps().length;
     const failedOpCount = getSharedProjectFailedLocalOpCount();
+    const isCreateSnapshot = normalizedReason === 'sharedProjectCreate';
     let blockReason = '';
-    if (!activeSharedProjectKey) {
+    if (!activeSharedProjectKey && !isCreateSnapshot) {
       blockReason = 'missing-project-key';
-    } else if (activeSharedProjectOpenInProgress) {
+    } else if (activeSharedProjectOpenInProgress && !isCreateSnapshot) {
       blockReason = 'open-in-progress';
-    } else if (activeSharedProjectOpenReadOnly) {
+    } else if (activeSharedProjectOpenReadOnly && !isCreateSnapshot) {
       blockReason = 'open-readonly';
-    } else if (sharedProjectRefreshInFlight) {
+    } else if (sharedProjectRefreshInFlight && !isCreateSnapshot) {
       blockReason = 'refresh-in-flight';
-    } else if (sharedProjectRecoveryInProgress) {
+    } else if (sharedProjectRecoveryInProgress && !isCreateSnapshot) {
       blockReason = 'recovery-in-progress';
     } else if (inFlightOpCount > 0) {
       blockReason = 'local-in-flight-ops';
     } else if (failedOpCount > 0) {
       blockReason = 'failed-local-ops';
-    } else if (!activeSharedProjectSynced) {
+    } else if (!activeSharedProjectSynced && !isCreateSnapshot) {
       blockReason = 'not-synced';
-    } else if (activeSharedProjectRevision !== normalizedLatestRevision) {
+    } else if (activeSharedProjectRevision !== normalizedLatestRevision && !isCreateSnapshot) {
       blockReason = 'active-revision-not-latest';
     } else if (normalizedSnapshotRevision !== normalizedLatestRevision) {
       blockReason = 'snapshot-revision-not-latest';
@@ -60031,9 +60057,13 @@
       const opType = classifySharedProjectOpType(packagedPayload?.sharedHistoryLabel || '');
       const baseRevision = Math.max(0, Math.round(Number(project.latest_revision) || 0));
       const baseStructureRevision = Math.max(0, Math.round(Number(project.latest_structure_revision) || 0));
-      const nextRevision = Number.isFinite(Number(revision))
+      const snapshotReason = String(reason || packagedPayload?.sharedHistoryLabel || '').trim();
+      const isCreateSnapshot = snapshotReason === 'sharedProjectCreate';
+      const nextRevision = isCreateSnapshot
+        ? baseRevision
+        : (Number.isFinite(Number(revision))
         ? Math.max(baseRevision + 1, Math.round(Number(revision)))
-        : baseRevision + 1;
+        : baseRevision + 1);
       const nextStructureRevision = opType === 'structure'
         ? Math.max(baseStructureRevision + 1, Math.round(baseStructureRevision + 1))
         : baseStructureRevision;
@@ -60042,7 +60072,6 @@
         : (opType === 'structure'
           ? buildSharedProjectStructureOpPayload(packagedPayload?.sharedHistoryLabel || '')
           : null);
-      const snapshotReason = String(reason || packagedPayload?.sharedHistoryLabel || '').trim();
       const snapshotGate = canWriteSharedProjectCanonicalSnapshot({
         reason: snapshotReason,
         snapshotRevision: nextRevision,
