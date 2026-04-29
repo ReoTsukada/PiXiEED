@@ -7812,6 +7812,38 @@
     return changed;
   }
 
+  function retargetAutosaveProjectId(previousProjectId, nextProjectId) {
+    const previous = normalizeAutosaveProjectId(previousProjectId || '');
+    const next = normalizeAutosaveProjectId(nextProjectId || '');
+    if (!previous || !next || previous === next) {
+      return false;
+    }
+    let changed = false;
+    openProjectTabs.forEach((tab, index) => {
+      if (!tab || normalizeAutosaveProjectId(tab.projectId || '') !== previous) {
+        return;
+      }
+      openProjectTabs[index] = {
+        ...tab,
+        projectId: next,
+        source: isSharedRecentProjectEntry(recentProjectsCache.get(next) || null) ? 'shared' : (tab.source || 'working'),
+      };
+      changed = true;
+    });
+    if (normalizeAutosaveProjectId(autosaveProjectId || '') === previous) {
+      setActiveAutosaveProjectId(next);
+      changed = true;
+    }
+    if (startupAutosaveRestoreProjectId === previous) {
+      startupAutosaveRestoreProjectId = next;
+      changed = true;
+    }
+    if (changed) {
+      renderOpenProjectTabs();
+    }
+    return changed;
+  }
+
   function clearDeletedSharedProjectLocalState(projectKey = '', projectId = '') {
     const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
     const normalizedProjectId = normalizeAutosaveProjectId(projectId || '');
@@ -53704,6 +53736,12 @@
       && isCurrentProjectSharedEntry()
       && currentTrackedSharedEntry
     );
+    const originalLocalProjectId = normalizeAutosaveProjectId(autosaveProjectId || '');
+    const shouldConvertLocalProjectToShared = Boolean(
+      !currentProjectIsShared
+      && originalLocalProjectId
+      && !originalLocalProjectId.startsWith(SHARED_PROJECT_ID_PREFIX)
+    );
     const projectKey = normalizeMultiProjectKey(
       currentProjectIsShared ? activeSharedProjectKey : generateMultiProjectKey()
     );
@@ -53719,6 +53757,7 @@
     packaged.sharedHistoryLabel = 'sharedProjectCreate';
     const project = await persistSharedProjectSnapshot(projectKey, packaged, {
       title: createSharedProjectSnapshotTitle(state.documentName || DEFAULT_DOCUMENT_NAME),
+      reason: 'sharedProjectCreate',
     });
     if (!project) {
       setMultiStatus(localizeText('共有プロジェクトの作成に失敗しました', 'Failed to create shared project'), 'error');
@@ -53749,9 +53788,15 @@
     });
     const sharedRecentProjectId = buildSharedRecentProjectId(projectKey);
     setActiveAutosaveProjectId(sharedRecentProjectId);
+    retargetAutosaveProjectId(originalLocalProjectId, sharedRecentProjectId);
     await recordRecentProjectSnapshot(snapshot, packaged, {
       projectId: sharedRecentProjectId,
     });
+    if (shouldConvertLocalProjectToShared) {
+      await removeRecentProjectEntry(originalLocalProjectId, {
+        reason: 'converted-to-shared',
+      });
+    }
     syncMultiControls();
     setMultiStatus(
       localizeText(
@@ -60081,7 +60126,7 @@
       if (!snapshotGate.allowed) {
         return null;
       }
-      const { data, error } = await supabase.rpc('pixieed_commit_shared_project_snapshot', {
+      const snapshotRpcArgs = {
         target_project_key: normalizedProjectKey,
         next_title: createSharedProjectSnapshotTitle(title || state.documentName || DEFAULT_DOCUMENT_NAME),
         next_snapshot: packagedPayload,
@@ -60093,7 +60138,21 @@
         history_label: String(packagedPayload?.sharedHistoryLabel || ''),
         snapshot_reason: snapshotReason,
         op_payload: opPayload || {},
-      });
+      };
+      let { data, error } = await supabase.rpc('pixieed_commit_shared_project_snapshot', snapshotRpcArgs);
+      if (error && isMissingRpcFunction(error, 'pixieed_commit_shared_project_snapshot')) {
+        console.info('[shared-sync]', {
+          event: 'snapshot-rpc-legacy-fallback',
+          reason: snapshotReason,
+          projectKey: normalizedProjectKey,
+          error: String(error?.message || error || ''),
+        });
+        const {
+          snapshot_reason: _snapshotReason,
+          ...legacySnapshotRpcArgs
+        } = snapshotRpcArgs;
+        ({ data, error } = await supabase.rpc('pixieed_commit_shared_project_snapshot', legacySnapshotRpcArgs));
+      }
       if (error) {
         console.info('[shared-sync]', {
           event: 'snapshot-write-rejected-by-server',
