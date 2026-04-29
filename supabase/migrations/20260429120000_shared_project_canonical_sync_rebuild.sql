@@ -50,6 +50,25 @@ alter table public.shared_project_ops
 alter table public.shared_project_ops
   alter column user_id set not null;
 
+with duplicate_ops as (
+  select
+    id,
+    project_id,
+    op_id,
+    row_number() over (
+      partition by project_id, op_id
+      order by coalesce(seq, revision), created_at, id
+    ) as duplicate_rank
+  from public.shared_project_ops
+  where op_id is not null
+    and op_id <> ''
+)
+update public.shared_project_ops as ops
+set op_id = duplicate_ops.op_id || '#duplicate-' || duplicate_ops.duplicate_rank || '-' || left(ops.id::text, 8)
+from duplicate_ops
+where ops.id = duplicate_ops.id
+  and duplicate_ops.duplicate_rank > 1;
+
 create unique index if not exists shared_project_ops_project_op_id_uidx
   on public.shared_project_ops (project_id, op_id);
 

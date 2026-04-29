@@ -60139,19 +60139,21 @@
         snapshot_reason: snapshotReason,
         op_payload: opPayload || {},
       };
-      let { data, error } = await supabase.rpc('pixieed_commit_shared_project_snapshot', snapshotRpcArgs);
+      const {
+        snapshot_reason: _snapshotReason,
+        ...legacySnapshotRpcArgs
+      } = snapshotRpcArgs;
+      let usedSnapshotRpcSignature = 'legacy';
+      let { data, error } = await supabase.rpc('pixieed_commit_shared_project_snapshot', legacySnapshotRpcArgs);
       if (error && isMissingRpcFunction(error, 'pixieed_commit_shared_project_snapshot')) {
+        usedSnapshotRpcSignature = 'modern';
         console.info('[shared-sync]', {
-          event: 'snapshot-rpc-legacy-fallback',
+          event: 'snapshot-rpc-modern-fallback',
           reason: snapshotReason,
           projectKey: normalizedProjectKey,
           error: String(error?.message || error || ''),
         });
-        const {
-          snapshot_reason: _snapshotReason,
-          ...legacySnapshotRpcArgs
-        } = snapshotRpcArgs;
-        ({ data, error } = await supabase.rpc('pixieed_commit_shared_project_snapshot', legacySnapshotRpcArgs));
+        ({ data, error } = await supabase.rpc('pixieed_commit_shared_project_snapshot', snapshotRpcArgs));
       }
       if (error) {
         console.info('[shared-sync]', {
@@ -60163,7 +60165,38 @@
         handleSharedProjectsBackendError(error, 'persist-rpc');
         return null;
       }
-      const result = Array.isArray(data) ? (data[0] || null) : (data || null);
+      let result = Array.isArray(data) ? (data[0] || null) : (data || null);
+      if (
+        result
+        && result.commit_status === 'rejected'
+        && snapshotReason
+        && usedSnapshotRpcSignature === 'legacy'
+      ) {
+        console.info('[shared-sync]', {
+          event: 'snapshot-rpc-modern-retry-after-legacy-rejected',
+          reason: snapshotReason,
+          projectKey: normalizedProjectKey,
+        });
+        const modernResponse = await supabase.rpc('pixieed_commit_shared_project_snapshot', snapshotRpcArgs);
+        if (!modernResponse.error) {
+          usedSnapshotRpcSignature = 'modern';
+          data = modernResponse.data;
+          result = Array.isArray(data) ? (data[0] || null) : (data || null);
+        } else if (!isMissingRpcFunction(modernResponse.error, 'pixieed_commit_shared_project_snapshot')) {
+          usedSnapshotRpcSignature = 'modern';
+          error = modernResponse.error;
+        }
+      }
+      if (error) {
+        console.info('[shared-sync]', {
+          event: 'snapshot-write-rejected-by-server',
+          reason: snapshotReason,
+          projectKey: normalizedProjectKey,
+          error: String(error?.message || error || ''),
+        });
+        handleSharedProjectsBackendError(error, 'persist-rpc');
+        return null;
+      }
       if (!result) {
         return null;
       }
