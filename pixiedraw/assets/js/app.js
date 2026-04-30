@@ -21725,21 +21725,21 @@
       return false;
     }
     setStartupProgressLabel(localizeText('共有プロジェクトを読込中…', 'Loading shared project...'));
-    let freshestProject = await awaitFreshSharedProjectSnapshot(sharedProject, {
-      inviteToken: normalizedInviteToken,
-      minRevision: Math.max(0, Math.round(Number(sharedProject.latest_revision) || 0)),
-      requireExactLatest: true,
-      timeoutMs: 4000,
-      pollIntervalMs: 180,
-    }) || sharedProject;
+    let freshestProject = sharedProject;
+    if (!freshestProject.latest_snapshot || typeof freshestProject.latest_snapshot !== 'object') {
+      freshestProject = await awaitFreshSharedProjectSnapshot(sharedProject, {
+        inviteToken: normalizedInviteToken,
+        minRevision: 0,
+        requireExactLatest: false,
+        timeoutMs: 4000,
+        pollIntervalMs: 180,
+      }) || sharedProject;
+    }
     if (!(await claimSharedProjectSessionLock(resolvedProjectKey, freshestProject.id || ''))) {
       return false;
     }
-    let freshestSnapshotRevision = Math.max(
-      0,
-      Math.round(Number(freshestProject.latest_snapshot_revision) || Number(freshestProject.latest_revision) || 0)
-    );
-    let freshestLatestRevision = Math.max(0, Math.round(Number(freshestProject.latest_revision) || 0));
+    let freshestSnapshotRevision = getSharedProjectSnapshotRevision(freshestProject);
+    let freshestLatestRevision = getSharedProjectLatestRevision(freshestProject);
     let sharedSnapshot = freshestProject.latest_snapshot;
     const canReuseReloadBase = false;
     if (!sharedSnapshot || typeof sharedSnapshot !== 'object') {
@@ -21758,11 +21758,8 @@
         });
         if (repairedProject?.latest_snapshot && typeof repairedProject.latest_snapshot === 'object') {
           freshestProject = repairedProject;
-          freshestSnapshotRevision = Math.max(
-            0,
-            Math.round(Number(freshestProject.latest_snapshot_revision) || Number(freshestProject.latest_revision) || 0)
-          );
-          freshestLatestRevision = Math.max(0, Math.round(Number(freshestProject.latest_revision) || 0));
+          freshestSnapshotRevision = getSharedProjectSnapshotRevision(freshestProject);
+          freshestLatestRevision = getSharedProjectLatestRevision(freshestProject);
           sharedSnapshot = freshestProject.latest_snapshot;
         }
       }
@@ -21861,10 +21858,10 @@
     setSharedProjectDeferRealtimeUntilSynced(true);
     const baseRevision = canReuseReloadBase
       ? Math.max(0, Math.round(Number(activeSharedProjectRevision) || 0))
-      : Math.max(0, Math.round(Number(freshestProject.latest_snapshot_revision) || Number(freshestProject.latest_revision) || 0));
+      : getSharedProjectSnapshotRevision(freshestProject);
     const baseStructureRevision = canReuseReloadBase
       ? Math.max(0, Math.round(Number(activeSharedProjectStructureRevision) || 0))
-      : Math.max(0, Math.round(Number(freshestProject.latest_snapshot_structure_revision) || Number(freshestProject.latest_structure_revision) || 0));
+      : getSharedProjectSnapshotStructureRevision(freshestProject);
     setActiveSharedProjectSession(
       resolvedProjectKey,
       baseRevision,
@@ -58216,6 +58213,7 @@
       delayMs: immediate ? 0 : SHARED_PROJECT_CHECKPOINT_DELAY,
       projectKey: activeSharedProjectKey,
       historyLabel,
+      force: true,
     });
   }
 
@@ -59398,6 +59396,35 @@
     return normalizedSnapshotRevision <= normalizedLatestRevision;
   }
 
+  function readSharedProjectRevisionNumber(projectRecord, fieldName, fallbackValue = 0) {
+    if (projectRecord && Object.prototype.hasOwnProperty.call(projectRecord, fieldName)) {
+      const rawValue = projectRecord[fieldName];
+      if (rawValue !== null && rawValue !== undefined && rawValue !== '') {
+        const numericValue = Number(rawValue);
+        if (Number.isFinite(numericValue)) {
+          return Math.max(0, Math.round(numericValue));
+        }
+      }
+    }
+    return Math.max(0, Math.round(Number(fallbackValue) || 0));
+  }
+
+  function getSharedProjectLatestRevision(projectRecord) {
+    return readSharedProjectRevisionNumber(projectRecord, 'latest_revision', 0);
+  }
+
+  function getSharedProjectLatestStructureRevision(projectRecord) {
+    return readSharedProjectRevisionNumber(projectRecord, 'latest_structure_revision', 0);
+  }
+
+  function getSharedProjectSnapshotRevision(projectRecord) {
+    return readSharedProjectRevisionNumber(projectRecord, 'latest_snapshot_revision', 0);
+  }
+
+  function getSharedProjectSnapshotStructureRevision(projectRecord) {
+    return readSharedProjectRevisionNumber(projectRecord, 'latest_snapshot_structure_revision', 0);
+  }
+
   async function awaitFreshSharedProjectSnapshot(projectRecord, {
     inviteToken = '',
     minRevision = 0,
@@ -59417,11 +59444,7 @@
       Math.round(Number(initialProject.latest_revision) || 0)
     );
     let candidate = initialProject;
-    let candidateSnapshotRevision = Math.max(0, Math.round(
-      Number(candidate.latest_snapshot_revision)
-      || Number(candidate.latest_revision)
-      || 0
-    ));
+    let candidateSnapshotRevision = getSharedProjectSnapshotRevision(candidate);
     if (candidateSnapshotRevision >= requiredRevision && (!requireExactLatest || candidateSnapshotRevision === requiredRevision)) {
       return candidate;
     }
@@ -59443,11 +59466,7 @@
         continue;
       }
       candidate = nextProject;
-      candidateSnapshotRevision = Math.max(0, Math.round(
-        Number(candidate.latest_snapshot_revision)
-        || Number(candidate.latest_revision)
-        || 0
-      ));
+      candidateSnapshotRevision = getSharedProjectSnapshotRevision(candidate);
       if (candidateSnapshotRevision >= requiredRevision && (!requireExactLatest || candidateSnapshotRevision === requiredRevision)) {
         return candidate;
       }
@@ -59634,12 +59653,19 @@
     sharedProjectRefreshInFlight = true;
     try {
       const fetchedProject = await fetchSharedProjectRecord(activeSharedProjectKey);
-      const project = await awaitFreshSharedProjectSnapshot(fetchedProject, {
-        minRevision: Math.max(0, Math.round(Number(fetchedProject?.latest_revision) || 0)),
-        requireExactLatest: true,
-        timeoutMs: force ? 2400 : 1400,
-        pollIntervalMs: 180,
-      }) || fetchedProject;
+      let project = fetchedProject;
+      const requiresFreshSnapshot = Boolean(
+        fetchedProject
+        && (!fetchedProject.latest_snapshot || typeof fetchedProject.latest_snapshot !== 'object')
+      );
+      if (requiresFreshSnapshot) {
+        project = await awaitFreshSharedProjectSnapshot(fetchedProject, {
+          minRevision: 0,
+          requireExactLatest: false,
+          timeoutMs: force ? 2400 : 1400,
+          pollIntervalMs: 180,
+        }) || fetchedProject;
+      }
       if (!project) {
         logSharedProjectRealtimeChannelLifecycle('refresh-result', {
           caller: 'refreshActiveSharedProjectSnapshot',
@@ -59651,12 +59677,10 @@
         });
         return false;
       }
-      const nextRevision = Math.max(0, Math.round(Number(project.latest_revision) || 0));
-      const nextStructureRevision = Math.max(0, Math.round(Number(project.latest_structure_revision) || 0));
-      const snapshotRevision = Math.max(
-        0,
-        Math.round(Number(project.latest_snapshot_revision) || Number(project.latest_revision) || 0)
-      );
+      const nextRevision = getSharedProjectLatestRevision(project);
+      const nextStructureRevision = getSharedProjectLatestStructureRevision(project);
+      const snapshotRevision = getSharedProjectSnapshotRevision(project);
+      const snapshotStructureRevision = getSharedProjectSnapshotStructureRevision(project);
       console.info('[shared-sync]', {
         event: 'refresh-fetched-project',
         reason: reason || 'refresh',
@@ -59694,10 +59718,7 @@
           nextRevision,
           nextStructureRevision,
           snapshotRevision,
-          snapshotStructureRevision: Math.max(
-            0,
-            Math.round(Number(project.latest_snapshot_structure_revision) || Number(project.latest_structure_revision) || 0)
-          ),
+          snapshotStructureRevision,
         },
       });
       if (
@@ -59933,10 +59954,7 @@
         extra: {
           force,
           snapshotRevision,
-          snapshotStructureRevision: Math.max(
-            0,
-            Math.round(Number(project.latest_snapshot_structure_revision) || Number(project.latest_structure_revision) || 0)
-          ),
+          snapshotStructureRevision,
         },
       });
       compareSharedProjectSnapshotIdentity(sharedSnapshot?.document || sharedSnapshot, {
@@ -59949,7 +59967,7 @@
       markDocumentDurablySaved();
       markActiveSharedProjectDocumentLoaded(activeSharedProjectKey);
       setActiveSharedProjectSnapshotState(snapshotRevision, {
-        structureRevision: Math.max(0, Math.round(Number(project.latest_snapshot_structure_revision) || Number(project.latest_structure_revision) || 0)),
+        structureRevision: snapshotStructureRevision,
         synced: false,
         canonicalLoadedAt: Date.now(),
       });
@@ -59957,7 +59975,7 @@
       setActiveSharedProjectSession(
         activeSharedProjectKey,
         trustedSnapshotRevision ? snapshotRevision : nextRevision,
-        Math.max(0, Math.round(Number(project.latest_snapshot_structure_revision) || Number(project.latest_structure_revision) || 0)),
+        trustedSnapshotRevision ? snapshotStructureRevision : nextStructureRevision,
         project.id || ''
       );
       resetPendingSharedProjectRemoteState();
@@ -59987,7 +60005,7 @@
       if (replayedAfterSnapshot || snapshotRevision >= nextRevision) {
         setSharedProjectDeferRealtimeUntilSynced(false);
         setActiveSharedProjectSnapshotState(snapshotRevision, {
-          structureRevision: Math.max(0, Math.round(Number(project.latest_snapshot_structure_revision) || Number(project.latest_structure_revision) || 0)),
+          structureRevision: snapshotStructureRevision,
           synced: true,
           canonicalLoadedAt: Date.now(),
         });
