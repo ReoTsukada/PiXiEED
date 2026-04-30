@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.30-shared-reload-resume';
+  const APP_BUILD_VERSION = '2026.04.30-shared-reload-latest';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
@@ -21787,8 +21787,14 @@
     ) {
       storeMultiProjectKey(resolvedProjectKey);
       syncMultiProjectKeyInputValues(resolvedProjectKey, { preserveFocused: false });
+      setActiveSharedProjectSession(
+        resolvedProjectKey,
+        activeSharedProjectRevision,
+        activeSharedProjectStructureRevision,
+        sharedProject.id || activeSharedProjectId
+      );
       await refreshActiveSharedProjectSnapshot({
-        force: true,
+        force: false,
         reason: 'open-already-active-latest',
       });
       if (hideStartup) {
@@ -22112,8 +22118,22 @@
     ) {
       storeMultiProjectKey(normalizedEntry.sharedProjectKey || '');
       syncMultiProjectKeyInputValues(normalizedEntry.sharedProjectKey || '', { preserveFocused: false });
+      try {
+        const refreshedEntry = await refreshSharedRecentProjectEntryFromBackend(normalizedEntry);
+        normalizedEntry = normalizeSharedRecentProjectEntry(refreshedEntry || normalizedEntry) || normalizedEntry;
+      } catch (error) {
+        console.warn('Failed to refresh active shared recent project entry', error);
+      }
+      if (normalizedEntry.sharedProjectBackendId) {
+        setActiveSharedProjectSession(
+          normalizedEntry.sharedProjectKey || activeSharedProjectKey,
+          activeSharedProjectRevision,
+          activeSharedProjectStructureRevision,
+          normalizedEntry.sharedProjectBackendId
+        );
+      }
       await refreshActiveSharedProjectSnapshot({
-        force: true,
+        force: false,
         reason: 'recent-open-already-active-latest',
       });
       if (hideStartup) {
@@ -59721,6 +59741,100 @@
     return sharedProjectMembersSyncPromise;
   }
 
+  async function retainActiveSharedProjectDocumentDuringRefresh(projectRecord, {
+    force = false,
+    reason = 'refresh',
+    result = 'active-document-retained',
+    nextRevision = activeSharedProjectRevision,
+    nextStructureRevision = activeSharedProjectStructureRevision,
+    snapshotRevision = activeSharedProjectSnapshotRevision,
+    snapshotStructureRevision = activeSharedProjectStructureRevision,
+  } = {}) {
+    const projectKey = normalizeMultiProjectKey(projectRecord?.project_key || activeSharedProjectKey);
+    if (!projectKey || !hasUsableActiveSharedProjectDocumentState()) {
+      return false;
+    }
+    const retainedRevision = Math.max(
+      activeSharedProjectRevision,
+      Math.max(0, Math.round(Number(nextRevision) || 0))
+    );
+    const retainedStructureRevision = Math.max(
+      activeSharedProjectStructureRevision,
+      Math.max(0, Math.round(Number(nextStructureRevision) || 0))
+    );
+    const retainedSnapshotRevision = Math.max(
+      activeSharedProjectSnapshotRevision,
+      retainedRevision,
+      Math.max(0, Math.round(Number(snapshotRevision) || 0))
+    );
+    const retainedSnapshotStructureRevision = Math.max(
+      retainedStructureRevision,
+      Math.max(0, Math.round(Number(snapshotStructureRevision) || 0))
+    );
+    const projectId = typeof projectRecord?.id === 'string' && projectRecord.id.trim()
+      ? projectRecord.id.trim()
+      : activeSharedProjectId;
+    markDocumentDurablySaved();
+    markActiveSharedProjectDocumentLoaded(projectKey);
+    setSharedProjectDeferRealtimeUntilSynced(false);
+    setActiveSharedProjectSession(
+      projectKey,
+      retainedRevision,
+      retainedStructureRevision,
+      projectId
+    );
+    setActiveSharedProjectSnapshotState(retainedSnapshotRevision, {
+      structureRevision: retainedSnapshotStructureRevision,
+      synced: true,
+      canonicalLoadedAt: Date.now(),
+    });
+    setActiveSharedProjectSyncState('synced');
+    try {
+      await syncSharedProjectMembers(projectKey, projectId || '');
+      await upsertSharedRecentProjectEntry({
+        projectKey,
+        projectId: projectId || '',
+        inviteToken: projectRecord?.invite_token || '',
+        visibility: projectRecord?.visibility || 'private',
+        name: createSharedProjectSnapshotTitle(projectRecord?.title || projectKey),
+        roleHint: normalizeMultiDesiredRole(multiState.role || multiState.desiredRole || 'spectator'),
+        autoJoin: false,
+        revision: retainedRevision,
+        structureRevision: retainedStructureRevision,
+      });
+    } catch (error) {
+      console.warn('Failed to update retained shared project metadata', error);
+    }
+    try {
+      await restorePendingSharedLocalOps(projectKey, {
+        announce: false,
+        refreshReason: `${reason || 'refresh'}-resume-pending-local-ops`,
+      });
+      pendingSharedProjectConflictReplay = null;
+      maybeReplayPendingSharedProjectConflictAfterRefresh(projectKey);
+    } catch (error) {
+      console.warn('Failed to restore retained shared project local ops', error);
+    }
+    ensureActiveSharedProjectRealtimeChannel().catch(error => {
+      reportSharedProjectRealtimeSubscribeFailure(error);
+    });
+    logSharedProjectRealtimeChannelLifecycle('refresh-result', {
+      caller: 'refreshActiveSharedProjectSnapshot',
+      reason: reason || 'refresh',
+      projectKey,
+      projectId,
+      extra: {
+        force,
+        result,
+        retainedRevision,
+        retainedStructureRevision,
+        snapshotRevision,
+        nextRevision,
+      },
+    });
+    return true;
+  }
+
   async function refreshActiveSharedProjectSnapshot({ force = false, reason = '' } = {}) {
     console.info('[shared-sync]', {
       event: reason && reason.includes('canonical') ? 'canonical-resync-start' : 'refresh-start',
@@ -59818,6 +59932,11 @@
         normalizedReason === 'canonical-resync'
         || normalizedReason.includes('canonical-resync-')
       );
+      const activeAlreadyAtLatest = (
+        nextRevision <= activeSharedProjectRevision
+        && nextStructureRevision <= activeSharedProjectStructureRevision
+      );
+      const snapshotBehindActiveRevision = snapshotRevision < activeSharedProjectRevision;
       logSharedProjectRealtimeChannelLifecycle('refresh-fetched-project', {
         caller: 'refreshActiveSharedProjectSnapshot',
         reason: reason || 'refresh',
@@ -59829,11 +59948,89 @@
           snapshotStructureRevision,
         },
       });
+      if (snapshotBehindActiveRevision) {
+        if (nextRevision > activeSharedProjectRevision && !hasSharedProjectHardLocalWorkInFlight()) {
+          console.info('[shared-sync]', {
+            event: 'stale-snapshot-op-replay-start',
+            reason: reason || 'refresh',
+            projectKey: activeSharedProjectKey || '',
+            snapshotRevision,
+            activeRevision: activeSharedProjectRevision,
+            latestRevision: nextRevision,
+          });
+          const replayedAhead = await applySharedProjectOpsSinceRevision(project, activeSharedProjectRevision);
+          if (replayedAhead) {
+            console.info('[shared-sync]', {
+              event: 'stale-snapshot-op-replay-done',
+              reason: reason || 'refresh',
+              projectKey: activeSharedProjectKey || '',
+              activeRevision: activeSharedProjectRevision,
+              latestRevision: nextRevision,
+            });
+            return true;
+          }
+        }
+        if (activeAlreadyAtLatest && !hasSharedProjectHardLocalWorkInFlight()) {
+          const retained = await retainActiveSharedProjectDocumentDuringRefresh(project, {
+            force,
+            reason: reason || 'refresh',
+            result: 'active-document-newer-than-canonical-snapshot',
+            nextRevision,
+            nextStructureRevision,
+            snapshotRevision,
+            snapshotStructureRevision,
+          });
+          if (retained) {
+            return true;
+          }
+        }
+        console.info('[shared-sync]', {
+          event: 'stale-snapshot-ignored',
+          reason: reason || 'refresh',
+          projectKey: activeSharedProjectKey || '',
+          snapshotRevision,
+          activeRevision: activeSharedProjectRevision,
+          latestRevision: nextRevision,
+        });
+        if (nextRevision > activeSharedProjectRevision) {
+          setActiveSharedProjectSyncState('catching-up', { announce: true });
+          queueSharedProjectRefresh({
+            immediate: false,
+            reason: `${reason || 'refresh'}-stale-snapshot-op-retry`,
+            force: true,
+          });
+        }
+        logSharedProjectRealtimeChannelLifecycle('refresh-result', {
+          caller: 'refreshActiveSharedProjectSnapshot',
+          reason: reason || 'refresh',
+          extra: {
+            force,
+            result: 'stale-snapshot-skipped',
+            snapshotRevision,
+            activeRevision: activeSharedProjectRevision,
+            nextRevision,
+          },
+        });
+        return false;
+      }
       if (
         !force
-        && nextRevision <= activeSharedProjectRevision
-        && nextStructureRevision <= activeSharedProjectStructureRevision
+        && activeAlreadyAtLatest
       ) {
+        if ((project?.id && !activeSharedProjectId) || sharedProjectDeferRealtimeUntilSynced) {
+          const retained = await retainActiveSharedProjectDocumentDuringRefresh(project, {
+            force,
+            reason: reason || 'refresh',
+            result: 'already-current-active-document',
+            nextRevision,
+            nextStructureRevision,
+            snapshotRevision,
+            snapshotStructureRevision,
+          });
+          if (retained) {
+            return true;
+          }
+        }
         logSharedProjectRealtimeChannelLifecycle('refresh-result', {
           caller: 'refreshActiveSharedProjectSnapshot',
           reason: reason || 'refresh',
