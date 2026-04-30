@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.30-shared-offline-sync';
+  const APP_BUILD_VERSION = '2026.04.30-shared-idempotent-replay';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
@@ -59061,6 +59061,25 @@
           frameIndex: diagnostics.frameIndex,
           structureRevision: diagnostics.structureRevision,
           activeStructureRevision: diagnostics.activeStructureRevision,
+        });
+        return true;
+      }
+      if (fromRemote && !provisional && diagnostics.ok) {
+        console.info('[shared-sync]', {
+          event: 'remote-confirmed-op-noop',
+          opId,
+          revision: getSharedProjectOpSeq(opRecord),
+          kind: typeof opRecord?.kind === 'string' ? opRecord.kind : '',
+          canvasId: diagnostics.canvasId || '',
+          resolvedCanvasId: diagnostics.resolvedCanvasId || '',
+          layerId: diagnostics.layerId || '',
+          frameIndex: diagnostics.frameIndex,
+          reason: 'already-applied-or-no-pixel-change',
+        });
+        logSharedProjectDrawLifecycle('remote-confirmed-op-noop', opRecord, {
+          mode: isSharedProjectRemoteOpFromCurrentSession(opRecord) ? 'self-confirmed-ack' : 'remote-confirmed',
+          diagnostics,
+          skipReason: 'already-applied-or-no-pixel-change',
         });
         return true;
       }
