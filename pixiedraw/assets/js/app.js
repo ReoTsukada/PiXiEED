@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.30-shared-op-replay-cache-bust';
+  const APP_BUILD_VERSION = '2026.04.30-shared-reload-resume';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
@@ -18731,6 +18731,83 @@
     return false;
   }
 
+  async function maybeRestoreSharedProjectOnStartup() {
+    const restoredProjectKey = normalizeMultiProjectKey(startupSharedReloadProjectKey || '');
+    if (!restoredProjectKey || readMultiInviteFromUrl()) {
+      return false;
+    }
+    setStartupProgressLabel(localizeText('共有プロジェクトへ復帰中…', 'Reopening shared project...'));
+    try {
+      const entries = await loadRecentProjectsMetadata();
+      const limitedEntries = enforceSharedRecentProjectLimit(entries);
+      setRecentProjectsCache(limitedEntries);
+      let sharedEntry = getCurrentSharedRecentProjectEntry(restoredProjectKey);
+      if (!sharedEntry) {
+        sharedEntry = normalizeSharedRecentProjectEntry(
+          limitedEntries.find(entry => (
+            isSharedRecentProjectEntry(entry)
+            && normalizeMultiProjectKey(entry?.sharedProjectKey || '') === restoredProjectKey
+          )) || {
+            sharedProjectKey: restoredProjectKey,
+            sharedProjectId: buildSharedRecentProjectId(restoredProjectKey),
+            id: buildSharedRecentProjectId(restoredProjectKey),
+            name: restoredProjectKey,
+            sharedRoleHint: 'guest',
+            sharedAutoJoin: false,
+            sharedProjectRevision: startupSharedReloadRevision,
+            sharedProjectStructureRevision: startupSharedReloadStructureRevision,
+          }
+        );
+      }
+      if (!accountState.isLoggedIn || accountState.isAnonymous) {
+        storePendingSharedInvite({
+          inviteToken: sharedEntry?.sharedProjectInviteToken || '',
+          projectKey: restoredProjectKey,
+          requestedRole: sharedEntry?.sharedRoleHint || 'guest',
+          autoJoin: sharedEntry?.sharedAutoJoin !== false,
+          source: 'reload-shared',
+        });
+      }
+      if (!(await ensureSharedProjectAuthenticatedStart({ requireLogin: true }))) {
+        return false;
+      }
+      await initPixieedAccount();
+      if (!await ensureSharedProjectBackendSession()) {
+        return false;
+      }
+      await ensureNoLegacyMultiSessionForSharedProject();
+      const opened = sharedEntry
+        ? await openSharedRecentProject(sharedEntry, {
+            hideStartup: true,
+            silent: true,
+            skipLatestRefresh: true,
+          })
+        : await openSharedProjectCanonical({
+            projectKey: restoredProjectKey,
+            requestedRole: 'guest',
+            autoJoin: false,
+            reason: 'reload-shared',
+            hideStartup: true,
+            silent: true,
+          });
+      if (opened) {
+        clearReloadTargetProjectId();
+        startupSharedReloadProjectKey = '';
+        startupSharedReloadRevision = 0;
+        startupSharedReloadStructureRevision = 0;
+        startupAutosaveRestoreProjectId = '';
+        updateAutosaveStatus(
+          localizeText('共有プロジェクト: 再読み込み前のプロジェクトへ復帰しました', 'Shared project: reopened the project from before reload'),
+          'success'
+        );
+        return true;
+      }
+    } catch (error) {
+      console.warn('Failed to reopen shared project after reload', error);
+    }
+    return false;
+  }
+
   function hasSeenUpdateToast(updateId = '') {
     if (!canUseSessionStorage) {
       return false;
@@ -28019,15 +28096,23 @@
       if (lensImportRequested || skipStartup) {
         hideStartupScreen();
       }
-      let restoredAutosaveProject = Boolean(reloadSnapshotRestored);
-      if (!lensImportRequested && !skipStartup && !reloadSnapshotRestored) {
+      let restoredAutosaveProject = false;
+      if (!lensImportRequested && !skipStartup) {
         try {
           await accountInitTask;
           setStartupProgressLabel(localizeText('前回の作業を確認中…', 'Checking your previous work...'));
-          restoredAutosaveProject = await maybeRestoreAutosaveProjectOnStartup();
+          if (startupSharedReloadProjectKey) {
+            restoredAutosaveProject = await maybeRestoreSharedProjectOnStartup();
+          }
+          if (!restoredAutosaveProject) {
+            restoredAutosaveProject = Boolean(reloadSnapshotRestored);
+          }
+          if (!restoredAutosaveProject && !reloadSnapshotRestored) {
+            restoredAutosaveProject = await maybeRestoreAutosaveProjectOnStartup();
+          }
         } catch (error) {
           console.warn('Startup autosave restore failed', error);
-          restoredAutosaveProject = false;
+          restoredAutosaveProject = Boolean(reloadSnapshotRestored);
         }
       }
       let importedFromLens = false;
@@ -52053,7 +52138,7 @@
     if (!canUseSessionStorage) {
       return;
     }
-    if (multiState.connected || multiState.connecting) {
+    if ((multiState.connected || multiState.connecting) && !activeSharedProjectKey) {
       return;
     }
     if (!Array.isArray(state.frames) || !state.frames.length) {
@@ -52281,6 +52366,9 @@
     const future = normalizeReloadHistoryList(parsed.future, historyLimit);
     return {
       projectId: normalizeAutosaveProjectId(parsed.projectId || ''),
+      sharedProjectKey: normalizeMultiProjectKey(parsed.sharedProjectKey || ''),
+      sharedProjectRevision: Math.max(0, Math.round(Number(parsed.sharedProjectRevision) || 0)),
+      sharedProjectStructureRevision: Math.max(0, Math.round(Number(parsed.sharedProjectStructureRevision) || 0)),
       currentSnapshot,
       past,
       future,
@@ -52327,11 +52415,15 @@
     const resolvedProjectId = normalizeAutosaveProjectId(
       restoredProjectId || readReloadTargetProjectId() || autosaveProjectId || ''
     );
-    if (resolvedProjectId) {
-      startupAutosaveRestoreProjectId = resolvedProjectId;
-      setActiveAutosaveProjectId(resolvedProjectId, { persist: false });
+    const resolvedSharedProjectId = restoredSharedProjectKey
+      ? buildSharedRecentProjectId(restoredSharedProjectKey)
+      : '';
+    const startupProjectId = resolvedSharedProjectId || resolvedProjectId;
+    if (startupProjectId) {
+      startupAutosaveRestoreProjectId = startupProjectId;
+      setActiveAutosaveProjectId(startupProjectId, { persist: false });
     }
-    if (restoredProjectId.startsWith(SHARED_PROJECT_ID_PREFIX) && restoredSharedProjectKey) {
+    if (restoredSharedProjectKey) {
       startupSharedReloadProjectKey = restoredSharedProjectKey;
       startupSharedReloadRevision = restoredSharedProjectRevision;
       startupSharedReloadStructureRevision = restoredSharedStructureRevision;
