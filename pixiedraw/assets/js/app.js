@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.30-shared-canonical-op-sync';
+  const APP_BUILD_VERSION = '2026.04.30-shared-op-replay-cache-bust';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
@@ -21594,6 +21594,7 @@
         hideStartup,
         silent,
         successMessage,
+        prefetchedProject: sharedProject,
       });
       if (opened) {
         activeSharedProjectSynced = activeSharedProjectSyncState === 'synced';
@@ -21642,13 +21643,28 @@
     hideStartup = true,
     silent = false,
     successMessage = '',
+    prefetchedProject = null,
   } = {}) {
     const normalizedProjectKey = normalizeMultiProjectKey(access?.projectKey || '');
     const normalizedInviteToken = typeof access?.inviteToken === 'string' ? access.inviteToken.trim() : '';
     const requestedRole = access?.requestedRole === 'master' || access?.requestedRole === 'guest' || access?.requestedRole === 'spectator'
       ? access.requestedRole
       : 'guest';
-    const sharedProject = normalizedInviteToken
+    const prefetchedProjectKey = normalizeMultiProjectKey(prefetchedProject?.project_key || '');
+    const canUsePrefetchedProject = Boolean(
+      prefetchedProject?.project_key
+      && (
+        !normalizedProjectKey
+        || prefetchedProjectKey === normalizedProjectKey
+      )
+      && (
+        !normalizedInviteToken
+        || String(prefetchedProject?.invite_token || '').trim() === normalizedInviteToken
+      )
+    );
+    const sharedProject = canUsePrefetchedProject
+      ? prefetchedProject
+      : (normalizedInviteToken
       ? await loadSharedProjectSnapshotRecordByInvite(normalizedInviteToken, {
           createIfMissing: false,
           title: createSharedProjectSnapshotTitle(state.documentName || DEFAULT_DOCUMENT_NAME),
@@ -21656,7 +21672,7 @@
       : await loadSharedProjectSnapshotRecord(normalizedProjectKey, {
           createIfMissing: false,
           title: createSharedProjectSnapshotTitle(state.documentName || DEFAULT_DOCUMENT_NAME),
-        });
+        }));
     if (!sharedProject?.project_key) {
       if (!silent) {
         setMultiStatus(
