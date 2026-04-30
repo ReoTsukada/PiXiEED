@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.30-shared-idempotent-replay';
+  const APP_BUILD_VERSION = '2026.04.30-shared-canvas-identity';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
@@ -38741,6 +38741,60 @@
     return getProjectCanvasDocuments().find(canvas => canvas?.id === canvasId) || null;
   }
 
+  function remapSharedProjectLayerSnapshotCanvasId(previousCanvasId = '', nextCanvasId = '') {
+    const previousId = typeof previousCanvasId === 'string' ? previousCanvasId.trim() : '';
+    const nextId = typeof nextCanvasId === 'string' ? nextCanvasId.trim() : '';
+    if (!previousId || !nextId || previousId === nextId || !sharedProjectLayerSnapshots.size) {
+      return false;
+    }
+    const previousPrefix = `${previousId}\u0000`;
+    const nextPrefix = `${nextId}\u0000`;
+    const remappedSnapshots = new Map();
+    let changed = false;
+    sharedProjectLayerSnapshots.forEach((snapshot, key) => {
+      if (typeof key === 'string' && key.startsWith(previousPrefix)) {
+        remappedSnapshots.set(`${nextPrefix}${key.slice(previousPrefix.length)}`, snapshot);
+        changed = true;
+      } else {
+        remappedSnapshots.set(key, snapshot);
+      }
+    });
+    if (!changed) {
+      return false;
+    }
+    sharedProjectLayerSnapshots.clear();
+    remappedSnapshots.forEach((snapshot, key) => {
+      sharedProjectLayerSnapshots.set(key, snapshot);
+    });
+    return true;
+  }
+
+  function remapTimelapseSingleCanvasId(previousCanvasId = '', nextCanvasId = '') {
+    const previousId = typeof previousCanvasId === 'string' ? previousCanvasId.trim() : '';
+    const nextId = typeof nextCanvasId === 'string' ? nextCanvasId.trim() : '';
+    if (!previousId || !nextId || previousId === nextId) {
+      return false;
+    }
+    let changed = false;
+    const previousTrack = timelapseState.tracksByCanvasId?.[previousId] || null;
+    if (previousTrack) {
+      const nextTrack = timelapseState.tracksByCanvasId?.[nextId] || null;
+      const previousCount = Array.isArray(previousTrack.snapshots) ? previousTrack.snapshots.length : 0;
+      const nextCount = Array.isArray(nextTrack?.snapshots) ? nextTrack.snapshots.length : 0;
+      if (!nextTrack || previousCount > nextCount) {
+        timelapseState.tracksByCanvasId[nextId] = previousTrack;
+      }
+      delete timelapseState.tracksByCanvasId[previousId];
+      changed = true;
+    }
+    if (timelapseQueuedCanvasIds.has(previousId)) {
+      timelapseQueuedCanvasIds.delete(previousId);
+      timelapseQueuedCanvasIds.add(nextId);
+      changed = true;
+    }
+    return changed;
+  }
+
   function adoptSingleProjectCanvasId(requestedCanvasId = '') {
     const normalizedCanvasId = typeof requestedCanvasId === 'string' ? requestedCanvasId.trim() : '';
     if (!normalizedCanvasId) {
@@ -38757,17 +38811,6 @@
     if (soleCanvas.id === normalizedCanvasId) {
       return soleCanvas;
     }
-    if (isSharedProjectCollaborativeMode() && canvases.length === 1) {
-      console.warn('[shared-sync]', {
-        event: 'adopted-single-canvas-id-fallback',
-        requestedCanvasId: normalizedCanvasId,
-        resolvedCanvasId: soleCanvas.id || '',
-        projectKey: activeSharedProjectKey || '',
-        mutation: false,
-        unsafeFallback: true,
-      });
-      return soleCanvas;
-    }
     const previousCanvasId = typeof soleCanvas.id === 'string' ? soleCanvas.id : '';
     soleCanvas.id = normalizedCanvasId;
     if (projectCanvasStore.activeCanvasId === previousCanvasId || !projectCanvasStore.activeCanvasId) {
@@ -38779,15 +38822,36 @@
     if (hoveredProjectCanvasId === previousCanvasId) {
       hoveredProjectCanvasId = normalizedCanvasId;
     }
+    const layerSnapshotsRemapped = remapSharedProjectLayerSnapshotCanvasId(previousCanvasId, normalizedCanvasId);
+    const timelapseRemapped = remapTimelapseSingleCanvasId(previousCanvasId, normalizedCanvasId);
     syncProjectCanvasSurfaceDocumentRefs();
-    console.warn('[shared-sync]', {
-      event: 'adopted-single-canvas-id-fallback',
+    normalizeMultiAssignmentsForCurrentDocument();
+    prunePendingMultiAssignmentMoveRequests();
+    pruneMultiHistoryCanvases();
+    pruneTimelapseTracksToExistingCanvases();
+    clearCanvasScreenMetricsCache();
+    invalidateFillPreviewCache();
+    invalidateOnionSkinCache();
+    clearPlaybackFrameCache();
+    if (isSharedProjectCollaborativeMode()) {
+      resetLocalHistoryForSharedCollaborativeRemoteChange();
+      scheduleSessionPersist({ includeSnapshots: false });
+      requestRender();
+      requestOverlayRender();
+    }
+    const eventName = isSharedProjectCollaborativeMode()
+      ? 'shared-canvas-id-canonicalized'
+      : 'adopted-single-canvas-id-fallback';
+    console.info('[shared-sync]', {
+      event: eventName,
       previousCanvasId,
       requestedCanvasId: normalizedCanvasId,
       resolvedCanvasId: normalizedCanvasId,
       projectKey: activeSharedProjectKey || '',
       mutation: true,
-      unsafeFallback: true,
+      unsafeFallback: false,
+      layerSnapshotsRemapped,
+      timelapseRemapped,
     });
     return soleCanvas;
   }
@@ -38832,15 +38896,17 @@
   function replaceProjectCanvasDocuments(canvases, activeCanvasId = '', { preserveIncomingIds = false } = {}) {
     const sourceCanvases = collapseToSingleProjectCanvasSource(canvases, activeCanvasId);
     const currentCanvases = Array.isArray(projectCanvasStore.canvases) ? projectCanvasStore.canvases : [];
+    const currentSingleCanvasId = typeof currentCanvases[0]?.id === 'string' ? currentCanvases[0].id.trim() : '';
+    const incomingSingleCanvasId = typeof sourceCanvases[0]?.id === 'string' ? sourceCanvases[0].id.trim() : '';
     const sharedStableSingleCanvasId = (
       isSharedProjectCollaborativeMode()
       && !preserveIncomingIds
       && currentCanvases.length === 1
       && sourceCanvases.length === 1
-      && typeof currentCanvases[0]?.id === 'string'
-      && currentCanvases[0].id.trim()
+      && currentSingleCanvasId
+      && !incomingSingleCanvasId
     )
-      ? currentCanvases[0].id.trim()
+      ? currentSingleCanvasId
       : '';
     const normalizedSourceCanvases = sharedStableSingleCanvasId
       ? sourceCanvases.map((canvas, index) => (

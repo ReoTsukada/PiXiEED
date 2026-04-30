@@ -1,11 +1,11 @@
-const CACHE_VERSION = 'pixiedraw-v2026.04.30-shared-idempotent-replay';
+const CACHE_VERSION = 'pixiedraw-v2026.04.30-shared-canvas-identity';
 const CORE_ASSETS = [
   '/pixiedraw/',
   '/pixiedraw/index.html',
   '/pixiedraw/manifest.webmanifest',
   '/pixiedraw/assets/css/style.css',
   '/pixiedraw/assets/css/local-extension-runtime.css',
-  '/pixiedraw/assets/js/app.js?v=2026.04.30-shared-idempotent-replay',
+  '/pixiedraw/assets/js/app.js?v=2026.04.30-shared-canvas-identity',
   '/icon/icon-192-4.png',
   '/icon/icon-512-4.png',
 ];
