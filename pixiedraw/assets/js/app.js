@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.05.06-shared-durable-reconnect';
+  const APP_BUILD_VERSION = '2026.05.06-shared-recovery-reload';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
@@ -2546,8 +2546,12 @@
   const SHARED_PROJECT_OP_RESCUE_POLL_INTERVAL_MS = 350;
   const SHARED_PROJECT_REFRESH_IDLE_GRACE_MS = 6000;
   const SHARED_PROJECT_REALTIME_SUBSCRIBE_TIMEOUT_MS = 30000;
-  const SHARED_PROJECT_SLEEP_WAKE_GAP_MS = 10000;
+  const SHARED_PROJECT_SLEEP_WAKE_GAP_MS = 2500;
+  const SHARED_PROJECT_AUTO_RELOAD_AFTER_CATCHUP_MS = 8000;
+  const SHARED_PROJECT_FIRST_INPUT_RELOAD_AFTER_CATCHUP_MS = 1200;
+  const SHARED_PROJECT_RECOVERY_RELOAD_COOLDOWN_MS = 45000;
   const SHARED_PROJECT_BROADCAST_EVENT = 'shared-op';
+  const SHARED_PROJECT_RECOVERY_RELOAD_STORAGE_KEY = 'pixieedraw:shared-recovery-reload-at';
   const SHARED_LOCAL_OP_JOURNAL_MAX_CONFIRMED_PER_PROJECT = 160;
   const SHARED_LOCAL_OP_JOURNAL_PRUNE_BATCH = 320;
   const MULTI_GUEST_MOVE_PREVIEW_DEBOUNCE_MS = 140;
@@ -3048,6 +3052,8 @@
   let sharedProjectReconnectRecoveryTimer = null;
   let sharedProjectReconnectRecoveryPromise = null;
   let sharedProjectWatchdogLastTickAt = 0;
+  let sharedProjectCatchingUpStartedAt = 0;
+  let sharedProjectRecoveryReloadTimer = null;
   let sharedProjectSnapshotReplayInFlight = false;
   let sharedProjectRecoveryInProgress = false;
   let sharedProjectDeferRealtimeUntilSynced = false;
@@ -3830,6 +3836,7 @@
   window.addEventListener('offline', handleMultiOffline);
   window.addEventListener('pageshow', handleMultiPageShow);
   document.addEventListener('resume', handleMultiDocumentResume);
+  window.addEventListener('pointerdown', handleSharedProjectRecoveryFirstInput, true);
   installMobileBackButtonGuard();
   if (RELOAD_SNAPSHOT_ENABLED) {
     window.addEventListener('pagehide', persistReloadSessionSnapshot);
@@ -8479,6 +8486,10 @@
     }
     sharedProjectReconnectRecoveryPromise = null;
     clearSharedProjectStructureMismatchRecovery();
+    if (sharedProjectRecoveryReloadTimer !== null) {
+      window.clearTimeout(sharedProjectRecoveryReloadTimer);
+      sharedProjectRecoveryReloadTimer = null;
+    }
     sharedProjectRecoveryInProgress = false;
     sharedProjectLastCanonicalLoadAt = 0;
     sharedProjectLastRefreshQueuedAt = 0;
@@ -8489,6 +8500,7 @@
       sharedProjectPollingTimer = null;
     }
     sharedProjectWatchdogLastTickAt = 0;
+    sharedProjectCatchingUpStartedAt = 0;
     disconnectActiveSharedProjectRealtimeChannel({
       reason,
       caller: 'clearActiveSharedProjectSession',
@@ -8962,6 +8974,19 @@
     );
   }
 
+  function canBufferSharedProjectLocalDrawDuringRecovery(projectKey = activeSharedProjectKey) {
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || activeSharedProjectKey || '');
+    return Boolean(
+      normalizedProjectKey
+      && normalizedProjectKey === activeSharedProjectKey
+      && activeSharedProjectDocumentLoaded
+      && hasUsableActiveSharedProjectDocumentState()
+      && !activeSharedProjectOpenInProgress
+      && !activeSharedProjectOpenReadOnly
+      && !sharedProjectDeferRealtimeUntilSynced
+    );
+  }
+
   function canPersistActiveSharedProjectDocument(projectKey = activeSharedProjectKey, historyLabel = '') {
     const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
     if (!normalizedProjectKey) {
@@ -9032,6 +9057,85 @@
         window.location.href = window.location.href;
       }
     }, 120);
+  }
+
+  function readSharedProjectRecoveryReloadAt() {
+    if (!canUseSessionStorage) {
+      return 0;
+    }
+    try {
+      return Math.max(
+        0,
+        Math.round(Number(window.sessionStorage.getItem(getScopedStorageKey(SHARED_PROJECT_RECOVERY_RELOAD_STORAGE_KEY)) || 0) || 0)
+      );
+    } catch (error) {
+      return 0;
+    }
+  }
+
+  function markSharedProjectRecoveryReloadAt() {
+    if (!canUseSessionStorage) {
+      return;
+    }
+    try {
+      window.sessionStorage.setItem(
+        getScopedStorageKey(SHARED_PROJECT_RECOVERY_RELOAD_STORAGE_KEY),
+        String(Date.now())
+      );
+    } catch (error) {
+      // Ignore storage failures; reload recovery is still allowed in-memory.
+    }
+  }
+
+  function clearSharedProjectRecoveryReloadTimer() {
+    if (sharedProjectRecoveryReloadTimer !== null) {
+      window.clearTimeout(sharedProjectRecoveryReloadTimer);
+      sharedProjectRecoveryReloadTimer = null;
+    }
+  }
+
+  function canScheduleSharedProjectRecoveryReload() {
+    if (!activeSharedProjectKey || appReloadInProgress || document.visibilityState === 'hidden') {
+      return false;
+    }
+    const lastReloadAt = readSharedProjectRecoveryReloadAt();
+    return !lastReloadAt || (Date.now() - lastReloadAt) > SHARED_PROJECT_RECOVERY_RELOAD_COOLDOWN_MS;
+  }
+
+  function scheduleSharedProjectRecoveryReload(reason = 'shared-recovery-stalled', delayMs = 0) {
+    if (!canScheduleSharedProjectRecoveryReload()) {
+      return false;
+    }
+    const safeDelayMs = Math.max(0, Math.round(Number(delayMs) || 0));
+    clearSharedProjectRecoveryReloadTimer();
+    sharedProjectRecoveryReloadTimer = window.setTimeout(() => {
+      sharedProjectRecoveryReloadTimer = null;
+      if (!canScheduleSharedProjectRecoveryReload()) {
+        return;
+      }
+      if (hasSharedProjectHardLocalWorkInFlight()) {
+        scheduleSharedProjectRecoveryReload(`${reason}-local-work-wait`, 1200);
+        return;
+      }
+      console.warn('[shared-sync]', {
+        event: 'shared-recovery-auto-reload',
+        reason,
+        projectKey: activeSharedProjectKey || '',
+        activeRevision: activeSharedProjectRevision,
+        syncState: activeSharedProjectSyncState,
+        realtimeStatus: sharedProjectRealtimeStatus,
+      });
+      markSharedProjectRecoveryReloadAt();
+      setMultiStatus(
+        localizeText(
+          '共有モード: 復帰が停滞したため、最新状態へ戻すため再読み込みします',
+          'Shared mode: recovery stalled. Reloading to restore the latest state.'
+        ),
+        'warn'
+      );
+      scheduleAppReload(`shared-${reason}`);
+    }, safeDelayMs);
+    return true;
   }
 
   function registerPwaServiceWorker() {
@@ -9275,6 +9379,30 @@
       return;
     }
     requestMultiResync('document-resume');
+  }
+
+  function handleSharedProjectRecoveryFirstInput() {
+    if (!activeSharedProjectKey || appReloadInProgress || canAcceptSharedProjectLocalDrawOps()) {
+      return;
+    }
+    if (activeSharedProjectOpenInProgress || document.visibilityState === 'hidden') {
+      return;
+    }
+    const catchingUpForMs = sharedProjectCatchingUpStartedAt > 0
+      ? Date.now() - sharedProjectCatchingUpStartedAt
+      : 0;
+    const shouldReload = Boolean(
+      activeSharedProjectSyncState === 'catching-up'
+      && (
+        catchingUpForMs >= SHARED_PROJECT_FIRST_INPUT_RELOAD_AFTER_CATCHUP_MS
+        || hasUsableActiveSharedProjectDocumentState()
+      )
+    );
+    if (!shouldReload) {
+      queueSharedProjectReconnectRecovery('first-input-recovery', { immediate: true }).catch(() => {});
+      return;
+    }
+    scheduleSharedProjectRecoveryReload('first-input-stalled', 0);
   }
 
   function persistCriticalSessionStateForNavigation() {
@@ -55901,6 +56029,18 @@
     const normalizedState = nextState === 'catching-up' || nextState === 'synced' ? nextState : 'idle';
     activeSharedProjectSyncState = normalizedState;
     activeSharedProjectSynced = normalizedState === 'synced';
+    if (normalizedState === 'catching-up') {
+      if (!sharedProjectCatchingUpStartedAt) {
+        sharedProjectCatchingUpStartedAt = Date.now();
+      }
+      scheduleSharedProjectRecoveryReload(
+        'catching-up-stalled',
+        SHARED_PROJECT_AUTO_RELOAD_AFTER_CATCHUP_MS
+      );
+    } else {
+      sharedProjectCatchingUpStartedAt = 0;
+      clearSharedProjectRecoveryReloadTimer();
+    }
     if (!announce || !isSharedProjectCollaborativeMode()) {
       return;
     }
@@ -55961,9 +56101,12 @@
       return false;
     }
     if (activeSharedProjectSyncState === 'catching-up') {
-      return false;
+      return canBufferSharedProjectLocalDrawDuringRecovery(normalizedProjectKey);
     }
-    if (!canResumeSharedProjectEditingFromDurableHistory(normalizedProjectKey)) {
+    if (
+      !canResumeSharedProjectEditingFromDurableHistory(normalizedProjectKey)
+      && !canBufferSharedProjectLocalDrawDuringRecovery(normalizedProjectKey)
+    ) {
       return false;
     }
     return true;

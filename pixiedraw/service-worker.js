@@ -1,11 +1,11 @@
-const CACHE_VERSION = 'pixiedraw-v2026.05.06-shared-durable-reconnect';
+const CACHE_VERSION = 'pixiedraw-v2026.05.06-shared-recovery-reload';
 const CORE_ASSETS = [
   '/pixiedraw/',
   '/pixiedraw/index.html',
   '/pixiedraw/manifest.webmanifest',
   '/pixiedraw/assets/css/style.css',
   '/pixiedraw/assets/css/local-extension-runtime.css',
-  '/pixiedraw/assets/js/app.js?v=2026.05.06-shared-durable-reconnect',
+  '/pixiedraw/assets/js/app.js?v=2026.05.06-shared-recovery-reload',
   '/icon/icon-192-4.png',
   '/icon/icon-512-4.png',
 ];
