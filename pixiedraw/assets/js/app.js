@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.05.06-shared-reconnect-alias';
+  const APP_BUILD_VERSION = '2026.05.06-shared-reconnect-local-view';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
@@ -9017,6 +9017,28 @@
       window.clearTimeout(sharedProjectReconnectRecoveryTimer);
       sharedProjectReconnectRecoveryTimer = null;
     }
+    const scheduleRecoveryRetry = (retryReason = `${normalizedReason}-retry`, retryDelayMs = 1600) => {
+      if (!activeSharedProjectKey) {
+        return;
+      }
+      const retryBlockedDelay = Date.now() < sharedProjectRealtimeRetryBlockedUntil
+        ? Math.max(500, Math.min(30000, sharedProjectRealtimeRetryBlockedUntil - Date.now() + 80))
+        : 0;
+      const offlineDelay = typeof navigator !== 'undefined' && navigator.onLine === false ? 5000 : 0;
+      const delayMs = Math.max(
+        500,
+        Math.round(Number(retryDelayMs) || 1600),
+        retryBlockedDelay,
+        offlineDelay
+      );
+      if (sharedProjectReconnectRecoveryTimer !== null) {
+        window.clearTimeout(sharedProjectReconnectRecoveryTimer);
+      }
+      sharedProjectReconnectRecoveryTimer = window.setTimeout(() => {
+        sharedProjectReconnectRecoveryTimer = null;
+        queueSharedProjectReconnectRecovery(retryReason, { immediate: true }).catch(() => {});
+      }, delayMs);
+    };
     const runRecovery = () => {
       if (!activeSharedProjectKey) {
         return Promise.resolve(false);
@@ -9034,6 +9056,7 @@
         try {
           await ensurePixieedAccountReady({ forceRefresh: true, silent: true });
           if (!await ensureSharedProjectBackendSession()) {
+            scheduleRecoveryRetry(`${normalizedReason}-backend-retry`, 1800);
             return false;
           }
           if (recoveryProjectKey !== activeSharedProjectKey) {
@@ -9056,25 +9079,20 @@
             reason: `${normalizedReason}-post-reconnect-gap`,
           });
           const recovered = Boolean(
-            refreshed
-            || recoveredGap
-            || realtimeChannel
-            || activeSharedProjectSyncState === 'synced'
+            realtimeChannel
+            && (
+              refreshed
+              || recoveredGap
+              || activeSharedProjectSyncState === 'synced'
+              || activeSharedProjectDocumentLoaded
+              || hasUsableActiveSharedProjectDocumentState()
+            )
           );
           if (recovered && activeSharedProjectKey === recoveryProjectKey) {
             setActiveSharedProjectSyncState('synced', { announce: true });
             resumeSharedProjectLocalOpsAfterConnectivityChange(normalizedReason);
           } else if (activeSharedProjectKey === recoveryProjectKey) {
-            const retryDelayMs = Date.now() < sharedProjectRealtimeRetryBlockedUntil
-              ? Math.max(500, Math.min(30000, sharedProjectRealtimeRetryBlockedUntil - Date.now() + 80))
-              : 1600;
-            if (sharedProjectReconnectRecoveryTimer !== null) {
-              window.clearTimeout(sharedProjectReconnectRecoveryTimer);
-            }
-            sharedProjectReconnectRecoveryTimer = window.setTimeout(() => {
-              sharedProjectReconnectRecoveryTimer = null;
-              queueSharedProjectReconnectRecovery(`${normalizedReason}-retry`, { immediate: true }).catch(() => {});
-            }, retryDelayMs);
+            scheduleRecoveryRetry(`${normalizedReason}-retry`, 1600);
             scheduleSharedProjectOpsRescueRetry();
           }
           logSharedProjectRealtimeChannelLifecycle('reconnect-recovery-done', {
@@ -9095,6 +9113,7 @@
             projectKey: recoveryProjectKey,
             error: String(error?.message || error || ''),
           });
+          scheduleRecoveryRetry(`${normalizedReason}-exception-retry`, 2400);
           scheduleSharedProjectOpsRescueRetry();
           return false;
         } finally {
@@ -56550,7 +56569,12 @@
     return nextLayer;
   }
 
-  function rebuildSharedProjectCanvasFromStructureSnapshot(canvasSnapshot, existingCanvas = null, fallbackIndex = 1) {
+  function rebuildSharedProjectCanvasFromStructureSnapshot(
+    canvasSnapshot,
+    existingCanvas = null,
+    fallbackIndex = 1,
+    { preserveLocalSelection = true } = {}
+  ) {
     const width = clamp(Math.round(Number(canvasSnapshot?.width) || DEFAULT_CANVAS_SIZE), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
     const height = clamp(Math.round(Number(canvasSnapshot?.height) || DEFAULT_CANVAS_SIZE), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
     const existingFrames = Array.isArray(existingCanvas?.frames) ? existingCanvas.frames : [];
@@ -56606,6 +56630,51 @@
         existingCanvasId: existingCanvas?.id || '',
       });
     }
+    const existingActiveFrameIndex = clamp(
+      Math.round(Number(existingCanvas?.activeFrame) || 0),
+      0,
+      Math.max(0, existingFrames.length - 1)
+    );
+    const existingActiveFrameId = typeof existingFrames[existingActiveFrameIndex]?.id === 'string'
+      ? existingFrames[existingActiveFrameIndex].id.trim()
+      : '';
+    const snapshotActiveFrameIndex = clamp(
+      Math.round(Number(canvasSnapshot?.activeFrame) || 0),
+      0,
+      Math.max(0, nextFrames.length - 1)
+    );
+    let nextActiveFrameIndex = snapshotActiveFrameIndex;
+    if (preserveLocalSelection && existingFrames.length) {
+      const frameIndexById = existingActiveFrameId
+        ? nextFrames.findIndex(frame => frame?.id === existingActiveFrameId)
+        : -1;
+      nextActiveFrameIndex = frameIndexById >= 0
+        ? frameIndexById
+        : clamp(existingActiveFrameIndex, 0, Math.max(0, nextFrames.length - 1));
+    }
+    const nextActiveFrame = nextFrames[nextActiveFrameIndex] || nextFrames[0] || null;
+    const existingActiveLayerId = typeof existingCanvas?.activeLayer === 'string'
+      ? existingCanvas.activeLayer.trim()
+      : '';
+    const snapshotActiveLayerId = typeof canvasSnapshot?.activeLayer === 'string'
+      ? canvasSnapshot.activeLayer.trim()
+      : '';
+    const localLayerStillExists = Boolean(
+      preserveLocalSelection
+      && existingActiveLayerId
+      && Array.isArray(nextActiveFrame?.layers)
+      && nextActiveFrame.layers.some(layer => layer?.id === existingActiveLayerId)
+    );
+    const snapshotLayerExists = Boolean(
+      snapshotActiveLayerId
+      && Array.isArray(nextActiveFrame?.layers)
+      && nextActiveFrame.layers.some(layer => layer?.id === snapshotActiveLayerId)
+    );
+    const nextActiveLayerId = localLayerStillExists
+      ? existingActiveLayerId
+      : (!preserveLocalSelection && snapshotLayerExists
+        ? snapshotActiveLayerId
+        : (nextActiveFrame?.layers?.[nextActiveFrame.layers.length - 1]?.id || nextActiveFrame?.layers?.[0]?.id || ''));
     return createProjectCanvasDocument({
       id: preservedCanvasId
         || (existingCanvas?.id || (crypto.randomUUID ? crypto.randomUUID() : `canvas-${Math.random().toString(36).slice(2)}`)),
@@ -56615,12 +56684,8 @@
       width,
       height,
       frames: nextFrames,
-      activeFrame: clamp(
-        Math.round(Number(canvasSnapshot?.activeFrame) || 0),
-        0,
-        Math.max(0, nextFrames.length - 1)
-      ),
-      activeLayer: typeof canvasSnapshot?.activeLayer === 'string' ? canvasSnapshot.activeLayer : '',
+      activeFrame: nextActiveFrameIndex,
+      activeLayer: nextActiveLayerId,
       mirror: normalizeMirrorAxisState(canvasSnapshot?.mirror, width, height),
     }, { clonePixelData: true, fallbackIndex });
   }
@@ -56632,6 +56697,8 @@
       return false;
     }
     const currentCanvases = getProjectCanvasDocuments();
+    const previousActiveCanvasId = getActiveProjectCanvasDocument()?.id || projectCanvasStore.activeCanvasId || '';
+    const previousActiveCanvasIndex = getActiveProjectCanvasIndex();
     const currentCanvasesById = new Map(
       currentCanvases
         .filter(canvas => canvas && typeof canvas.id === 'string' && canvas.id.trim())
@@ -56642,7 +56709,8 @@
       return rebuildSharedProjectCanvasFromStructureSnapshot(
         canvasSnapshot,
         currentCanvasesById.get(canvasId) || null,
-        index + 1
+        index + 1,
+        { preserveLocalSelection: fromRemote }
       );
     });
     if (!nextCanvases.length) {
@@ -56653,11 +56721,20 @@
       Math.round(Number(opRecord?.structure_revision ?? payload?.structureRevision ?? payload?.structure_revision) || 0)
     );
     projectCanvasStore.canvases = nextCanvases;
-    projectCanvasStore.activeCanvasId = typeof payload?.activeCanvasId === 'string' && nextCanvases.some(canvas => canvas?.id === payload.activeCanvasId)
-      ? payload.activeCanvasId
-      : (nextCanvases[0]?.id || '');
+    const preservedActiveCanvas = previousActiveCanvasId
+      ? nextCanvases.find(canvas => canvas?.id === previousActiveCanvasId)
+      : null;
+    const fallbackActiveCanvas = nextCanvases[
+      clamp(previousActiveCanvasIndex, 0, Math.max(0, nextCanvases.length - 1))
+    ] || nextCanvases[0] || null;
+    projectCanvasStore.activeCanvasId = fromRemote
+      ? (preservedActiveCanvas?.id || fallbackActiveCanvas?.id || '')
+      : (typeof payload?.activeCanvasId === 'string' && nextCanvases.some(canvas => canvas?.id === payload.activeCanvasId)
+        ? payload.activeCanvasId
+        : (nextCanvases[0]?.id || ''));
     activeSharedProjectStructureRevision = nextStructureRevision;
     syncProjectCanvasSurfaceDocumentRefs();
+    bindActiveCanvasSurface(getProjectCanvasSurfaceForIndex(getActiveProjectCanvasIndex()) || mainViewportCanvasSurface);
     clearPendingMultiAssignmentMoveRequests();
     normalizeMultiAssignmentsForCurrentDocument();
     markCanvasDirty();
