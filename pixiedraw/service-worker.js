@@ -1,11 +1,11 @@
-const CACHE_VERSION = 'pixiedraw-v2026.05.06-shared-reconnect-local-view';
+const CACHE_VERSION = 'pixiedraw-v2026.05.06-shared-wake-watchdog';
 const CORE_ASSETS = [
   '/pixiedraw/',
   '/pixiedraw/index.html',
   '/pixiedraw/manifest.webmanifest',
   '/pixiedraw/assets/css/style.css',
   '/pixiedraw/assets/css/local-extension-runtime.css',
-  '/pixiedraw/assets/js/app.js?v=2026.05.06-shared-reconnect-local-view',
+  '/pixiedraw/assets/js/app.js?v=2026.05.06-shared-wake-watchdog',
   '/icon/icon-192-4.png',
   '/icon/icon-512-4.png',
 ];

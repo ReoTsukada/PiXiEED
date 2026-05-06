@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.05.06-shared-reconnect-local-view';
+  const APP_BUILD_VERSION = '2026.05.06-shared-wake-watchdog';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
@@ -2546,6 +2546,7 @@
   const SHARED_PROJECT_OP_RESCUE_POLL_INTERVAL_MS = 350;
   const SHARED_PROJECT_REFRESH_IDLE_GRACE_MS = 6000;
   const SHARED_PROJECT_REALTIME_SUBSCRIBE_TIMEOUT_MS = 30000;
+  const SHARED_PROJECT_SLEEP_WAKE_GAP_MS = 10000;
   const SHARED_PROJECT_BROADCAST_EVENT = 'shared-op';
   const SHARED_LOCAL_OP_JOURNAL_MAX_CONFIRMED_PER_PROJECT = 160;
   const SHARED_LOCAL_OP_JOURNAL_PRUNE_BATCH = 320;
@@ -3046,6 +3047,7 @@
   let sharedProjectRefreshInFlight = false;
   let sharedProjectReconnectRecoveryTimer = null;
   let sharedProjectReconnectRecoveryPromise = null;
+  let sharedProjectWatchdogLastTickAt = 0;
   let sharedProjectSnapshotReplayInFlight = false;
   let sharedProjectRecoveryInProgress = false;
   let sharedProjectDeferRealtimeUntilSynced = false;
@@ -3825,6 +3827,9 @@
   document.addEventListener('visibilitychange', handleMultiVisibilityChange);
   window.addEventListener('focus', handleMultiWindowFocus);
   window.addEventListener('online', handleMultiOnline);
+  window.addEventListener('offline', handleMultiOffline);
+  window.addEventListener('pageshow', handleMultiPageShow);
+  document.addEventListener('resume', handleMultiDocumentResume);
   installMobileBackButtonGuard();
   if (RELOAD_SNAPSHOT_ENABLED) {
     window.addEventListener('pagehide', persistReloadSessionSnapshot);
@@ -8483,6 +8488,7 @@
       window.clearInterval(sharedProjectPollingTimer);
       sharedProjectPollingTimer = null;
     }
+    sharedProjectWatchdogLastTickAt = 0;
     disconnectActiveSharedProjectRealtimeChannel({
       reason,
       caller: 'clearActiveSharedProjectSession',
@@ -8512,17 +8518,54 @@
     if (!canUseSharedProjectsBackend() || !activeSharedProjectKey) {
       return;
     }
+    sharedProjectWatchdogLastTickAt = Date.now();
     sharedProjectPollingTimer = window.setInterval(() => {
       if (!canUseSharedProjectsBackend() || !activeSharedProjectKey) {
         return;
       }
+      const now = Date.now();
+      const previousWatchdogTickAt = sharedProjectWatchdogLastTickAt;
+      const watchdogGapMs = previousWatchdogTickAt > 0 ? (now - previousWatchdogTickAt) : 0;
+      sharedProjectWatchdogLastTickAt = now;
       if (document.visibilityState === 'hidden') {
+        return;
+      }
+      if (watchdogGapMs >= SHARED_PROJECT_SLEEP_WAKE_GAP_MS) {
+        logSharedProjectRealtimeChannelLifecycle('watchdog-sleep-gap', {
+          caller: 'ensureSharedProjectRefreshLoop',
+          reason: 'timer-gap-detected',
+          extra: {
+            watchdogGapMs,
+            realtimeStatus: sharedProjectRealtimeStatus,
+            syncState: activeSharedProjectSyncState,
+            channelState: typeof activeSharedProjectChannel?.state === 'string' ? activeSharedProjectChannel.state : '',
+            joinState: typeof activeSharedProjectChannel?.joinPush?.state === 'string' ? activeSharedProjectChannel.joinPush.state : '',
+          },
+        });
+        queueSharedProjectReconnectRecovery('watchdog-sleep-gap', { immediate: true }).catch(() => {});
+        return;
+      }
+      if (
+        activeSharedProjectSyncState === 'catching-up'
+        && !sharedProjectReconnectRecoveryPromise
+        && sharedProjectReconnectRecoveryTimer === null
+        && !sharedProjectRefreshInFlight
+      ) {
+        logSharedProjectRealtimeChannelLifecycle('watchdog-catchup-stalled', {
+          caller: 'ensureSharedProjectRefreshLoop',
+          reason: 'catching-up-without-recovery',
+          extra: {
+            realtimeStatus: sharedProjectRealtimeStatus,
+            channelState: typeof activeSharedProjectChannel?.state === 'string' ? activeSharedProjectChannel.state : '',
+            joinState: typeof activeSharedProjectChannel?.joinPush?.state === 'string' ? activeSharedProjectChannel.joinPush.state : '',
+          },
+        });
+        queueSharedProjectReconnectRecovery('watchdog-catchup-stalled', { immediate: true }).catch(() => {});
         return;
       }
       if (autosaveWriteInFlight || multiState.applyRemoteInProgress) {
         return;
       }
-      const now = Date.now();
       const realtimeSubscribed = sharedProjectRealtimeStatus === 'subscribed';
       if (sharedProjectRealtimeRetryBlockedUntil > now) {
         logSharedProjectRealtimeChannelLifecycle('skip-poll-refresh', {
@@ -8576,11 +8619,15 @@
 
   function reportSharedProjectRealtimeSubscribeFailure(error) {
     const now = Date.now();
+    const reason = typeof error?.message === 'string' ? error.message : String(error || '');
+    if (activeSharedProjectKey) {
+      setActiveSharedProjectSyncState('catching-up', { announce: true });
+      queueSharedProjectReconnectRecovery('realtime-subscribe-failure', { immediate: false }).catch(() => {});
+    }
     if ((now - sharedProjectRealtimeWarnedAt) < 30000) {
       return;
     }
     sharedProjectRealtimeWarnedAt = now;
-    const reason = typeof error?.message === 'string' ? error.message : String(error || '');
     console.warn('Failed to subscribe shared project realtime channel', {
       reason,
       accountLoggedIn: Boolean(accountState.isLoggedIn),
@@ -8611,10 +8658,6 @@
       ),
       'warn'
     );
-    if (activeSharedProjectKey) {
-      setActiveSharedProjectSyncState('catching-up', { announce: true });
-      queueSharedProjectReconnectRecovery('realtime-subscribe-failure', { immediate: false }).catch(() => {});
-    }
   }
 
   function getSharedProjectRealtimeClientType(supabase) {
@@ -9156,6 +9199,30 @@
       return;
     }
     requestMultiResync('online');
+  }
+
+  function handleMultiOffline() {
+    if (!activeSharedProjectKey) {
+      return;
+    }
+    setActiveSharedProjectSyncState('catching-up', { announce: true });
+    queueSharedProjectReconnectRecovery('offline-wait', { immediate: false }).catch(() => {});
+  }
+
+  function handleMultiPageShow(event = null) {
+    if (activeSharedProjectKey) {
+      queueSharedProjectReconnectRecovery(event?.persisted ? 'pageshow-bfcache' : 'pageshow', { immediate: true }).catch(() => {});
+      return;
+    }
+    requestMultiResync('pageshow');
+  }
+
+  function handleMultiDocumentResume() {
+    if (activeSharedProjectKey) {
+      queueSharedProjectReconnectRecovery('document-resume', { immediate: true }).catch(() => {});
+      return;
+    }
+    requestMultiResync('document-resume');
   }
 
   function persistCriticalSessionStateForNavigation() {
