@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.05.06-shared-stable-open';
+  const APP_BUILD_VERSION = '2026.05.06-shared-strong-connect';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
@@ -8580,16 +8580,44 @@
       }
       const realtimeSubscribed = sharedProjectRealtimeStatus === 'subscribed';
       if (sharedProjectRealtimeRetryBlockedUntil > now) {
-        logSharedProjectRealtimeChannelLifecycle('skip-poll-refresh', {
+        logSharedProjectRealtimeChannelLifecycle('poll-during-realtime-retry-block', {
           caller: 'ensureSharedProjectRefreshLoop',
           reason: 'retry-block-active',
+        });
+        pollSharedProjectRealtimeOpsRescue({
+          reason: 'retry-block-op-poll',
+        }).then(recovered => {
+          if (recovered) {
+            return;
+          }
+          if (!sharedProjectRefreshInFlight && sharedProjectRefreshTimer === null) {
+            queueSharedProjectRefresh({ immediate: false, reason: 'retry-block-poll-recovery', force: true });
+          }
+        }).catch(() => {
+          if (!sharedProjectRefreshInFlight && sharedProjectRefreshTimer === null) {
+            queueSharedProjectRefresh({ immediate: false, reason: 'retry-block-poll-recovery', force: true });
+          }
         });
         return;
       }
       if (sharedProjectRealtimeConnectPromise) {
-        logSharedProjectRealtimeChannelLifecycle('skip-poll-refresh', {
+        logSharedProjectRealtimeChannelLifecycle('poll-during-realtime-connect', {
           caller: 'ensureSharedProjectRefreshLoop',
           reason: 'realtime-connect-in-flight',
+        });
+        pollSharedProjectRealtimeOpsRescue({
+          reason: 'connect-in-flight-op-poll',
+        }).then(recovered => {
+          if (recovered) {
+            return;
+          }
+          if (!sharedProjectRefreshInFlight && sharedProjectRefreshTimer === null) {
+            queueSharedProjectRefresh({ immediate: false, reason: 'connect-in-flight-poll-recovery', force: true });
+          }
+        }).catch(() => {
+          if (!sharedProjectRefreshInFlight && sharedProjectRefreshTimer === null) {
+            queueSharedProjectRefresh({ immediate: false, reason: 'connect-in-flight-poll-recovery', force: true });
+          }
         });
         return;
       }
@@ -8777,14 +8805,15 @@
     channelKey = activeSharedProjectChannelKey || '',
     extra = null,
   } = {}) {
+    const sessionDebug = getSharedProjectRealtimeSessionDebugState();
     console.debug(`[shared-realtime] ${action}`, {
+      ...sessionDebug,
       caller,
       reason,
       projectKey,
       projectId,
       channelSignature,
       channelKey,
-      ...getSharedProjectRealtimeSessionDebugState(),
       ...(extra && typeof extra === 'object' ? { extra } : {}),
     });
   }
@@ -9335,10 +9364,6 @@
           if (recoveryProjectKey !== activeSharedProjectKey) {
             return false;
           }
-          await disconnectActiveSharedProjectRealtimeChannel({
-            reason: `${normalizedReason}-reconnect`,
-            caller: 'queueSharedProjectReconnectRecovery',
-          });
           const refreshed = await refreshActiveSharedProjectSnapshot({
             force: true,
             reason: `${normalizedReason}-reconnect`,
@@ -62322,7 +62347,18 @@
     const projectKey = activeSharedProjectKey;
     const projectId = activeSharedProjectId || '';
     const channelSignature = `${projectKey}::${projectId}`;
-    sharedProjectRealtimeStatus = 'subscribing';
+    const supabase = await ensurePixieedAccountClient();
+    if (!supabase) {
+      console.debug('[shared-realtime] subscribe aborted: missing authenticated supabase client', {
+        accountLoggedIn: Boolean(accountState.isLoggedIn),
+        accountUserId: accountState.userId || '',
+        accountAnonymous: Boolean(accountState.isAnonymous),
+      });
+      return null;
+    }
+    const realtimeSocketOpen = typeof supabase.realtime?.isConnected === 'function'
+      ? supabase.realtime.isConnected()
+      : true;
     if (sharedProjectRealtimeConnectPromise && sharedProjectRealtimeConnectSignature === channelSignature) {
       logSharedProjectRealtimeChannelLifecycle('reuse-connect-promise', {
         caller: 'ensureActiveSharedProjectRealtimeChannel',
@@ -62337,12 +62373,47 @@
       activeSharedProjectChannel
       && activeSharedProjectChannelSignature === channelSignature
     ) {
-      console.debug('[shared-realtime] reusing active channel', {
+      const channelState = typeof activeSharedProjectChannel.state === 'string' ? activeSharedProjectChannel.state : '';
+      const joinState = typeof activeSharedProjectChannel.joinPush?.state === 'string' ? activeSharedProjectChannel.joinPush.state : '';
+      const channelJoined = (
+        channelState === 'joined'
+        || channelState === 'subscribed'
+        || (
+          sharedProjectRealtimeStatus === 'subscribed'
+          && channelState !== 'closed'
+          && channelState !== 'errored'
+        )
+      );
+      if (channelJoined && realtimeSocketOpen) {
+        sharedProjectRealtimeStatus = 'subscribed';
+        console.debug('[shared-realtime] reusing active channel', {
+          channelSignature,
+          topic: `shared-project:${projectKey}`,
+          channelState,
+          joinState,
+          socketOpen: realtimeSocketOpen,
+        });
+        return activeSharedProjectChannel;
+      }
+      logSharedProjectRealtimeChannelLifecycle('stale-channel-reconnect', {
+        caller: 'ensureActiveSharedProjectRealtimeChannel',
+        reason: 'active-channel-not-healthy',
+        projectKey,
+        projectId,
         channelSignature,
-        topic: `shared-project:${projectKey}`,
+        extra: {
+          channelState,
+          joinState,
+          socketOpen: realtimeSocketOpen,
+          realtimeStatus: sharedProjectRealtimeStatus,
+        },
       });
-      return activeSharedProjectChannel;
+      await disconnectActiveSharedProjectRealtimeChannel({
+        reason: 'stale-channel-before-subscribe',
+        caller: 'ensureActiveSharedProjectRealtimeChannel',
+      });
     }
+    sharedProjectRealtimeStatus = 'subscribing';
     activeSharedProjectChannelSignature = channelSignature;
     sharedProjectRealtimeConnectSignature = channelSignature;
     sharedProjectRealtimeConnectPromise = (async () => {
@@ -62350,15 +62421,6 @@
         reason: 'recreate-before-subscribe',
         caller: 'ensureActiveSharedProjectRealtimeChannel',
       });
-      const supabase = await ensurePixieedAccountClient();
-      if (!supabase) {
-        console.debug('[shared-realtime] subscribe aborted: missing authenticated supabase client', {
-          accountLoggedIn: Boolean(accountState.isLoggedIn),
-          accountUserId: accountState.userId || '',
-          accountAnonymous: Boolean(accountState.isAnonymous),
-        });
-        return null;
-      }
       const sessionAccessToken = typeof accountState.session?.access_token === 'string'
         ? accountState.session.access_token.trim()
         : '';

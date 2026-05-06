@@ -1,11 +1,11 @@
-const CACHE_VERSION = 'pixiedraw-v2026.05.06-shared-stable-open';
+const CACHE_VERSION = 'pixiedraw-v2026.05.06-shared-strong-connect';
 const CORE_ASSETS = [
   '/pixiedraw/',
   '/pixiedraw/index.html',
   '/pixiedraw/manifest.webmanifest',
   '/pixiedraw/assets/css/style.css',
   '/pixiedraw/assets/css/local-extension-runtime.css',
-  '/pixiedraw/assets/js/app.js?v=2026.05.06-shared-stable-open',
+  '/pixiedraw/assets/js/app.js?v=2026.05.06-shared-strong-connect',
   '/icon/icon-192-4.png',
   '/icon/icon-512-4.png',
 ];
