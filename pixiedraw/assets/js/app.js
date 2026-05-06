@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.05.06-shared-strong-connect';
+  const APP_BUILD_VERSION = '2026.05.07-shared-server-primary';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
@@ -2544,6 +2544,8 @@
   const SHARED_PROJECT_MAX_MISSING_OP_FETCH = 512;
   const SHARED_PROJECT_REFRESH_LOOP_INTERVAL_MS = 2500;
   const SHARED_PROJECT_OP_RESCUE_POLL_INTERVAL_MS = 350;
+  const SHARED_PROJECT_SERVER_OP_POLL_INTERVAL_MS = 900;
+  const SHARED_PROJECT_SERVER_OP_REFRESH_BACKSTOP_MS = 7000;
   const SHARED_PROJECT_REFRESH_IDLE_GRACE_MS = 6000;
   const SHARED_PROJECT_REALTIME_SUBSCRIBE_TIMEOUT_MS = 30000;
   const SHARED_PROJECT_SLEEP_WAKE_GAP_MS = 2500;
@@ -3235,6 +3237,8 @@
   let sharedProjectStructureMismatchTimer = null;
   let sharedProjectLastRefreshQueuedAt = 0;
   let sharedProjectLastRefreshQueuedReason = '';
+  let sharedProjectLastServerOpPollAt = 0;
+  let sharedProjectLastServerOpRefreshBackstopAt = 0;
   let pendingSharedProjectConflictReplay = null;
   let sharedProjectOpsSinceCheckpoint = 0;
   let sharedProjectLastCheckpointAt = 0;
@@ -8494,6 +8498,8 @@
     sharedProjectLastCanonicalLoadAt = 0;
     sharedProjectLastRefreshQueuedAt = 0;
     sharedProjectLastRefreshQueuedReason = '';
+    sharedProjectLastServerOpPollAt = 0;
+    sharedProjectLastServerOpRefreshBackstopAt = 0;
     clearDeferredSharedProjectRemoteOpsDrain();
     if (sharedProjectPollingTimer !== null) {
       window.clearInterval(sharedProjectPollingTimer);
@@ -8520,6 +8526,85 @@
     multiState.role = 'none';
     clearStoredMultiResumeSession();
     syncMultiControls();
+  }
+
+  function maybePollSharedProjectServerOps({
+    reason = 'server-primary-op-poll',
+    realtimeLikelyHealthy = false,
+    realtimeSubscribed = false,
+    force = false,
+    allowRefreshBackstop = true,
+  } = {}) {
+    if (!activeSharedProjectKey || !canUseSharedProjectsBackend()) {
+      return false;
+    }
+    if (document.visibilityState === 'hidden') {
+      return false;
+    }
+    if (
+      sharedProjectOpPollInFlight
+      || sharedProjectGapRecoveryPromise
+      || sharedProjectRefreshInFlight
+      || (sharedProjectOpCommitInFlight && !force)
+    ) {
+      return false;
+    }
+    const now = Date.now();
+    const normalizedReason = String(reason || 'server-primary-op-poll');
+    const pollIntervalMs = (!realtimeSubscribed || !realtimeLikelyHealthy || activeSharedProjectSyncState === 'catching-up')
+      ? SHARED_PROJECT_OP_RESCUE_POLL_INTERVAL_MS
+      : SHARED_PROJECT_SERVER_OP_POLL_INTERVAL_MS;
+    if (!force && (now - sharedProjectLastServerOpPollAt) < pollIntervalMs) {
+      return false;
+    }
+    sharedProjectLastServerOpPollAt = now;
+    pollSharedProjectRealtimeOpsRescue({
+      reason: normalizedReason,
+    }).then(recovered => {
+      if (recovered) {
+        return;
+      }
+      if (!allowRefreshBackstop || sharedProjectRefreshInFlight || sharedProjectRefreshTimer !== null) {
+        return;
+      }
+      if (hasSharedProjectHardLocalWorkInFlight()) {
+        return;
+      }
+      const refreshIntervalMs = (realtimeSubscribed && realtimeLikelyHealthy)
+        ? SHARED_PROJECT_SERVER_OP_REFRESH_BACKSTOP_MS
+        : SHARED_PROJECT_REFRESH_LOOP_INTERVAL_MS;
+      const refreshNow = Date.now();
+      if ((refreshNow - sharedProjectLastServerOpRefreshBackstopAt) < refreshIntervalMs) {
+        return;
+      }
+      sharedProjectLastServerOpRefreshBackstopAt = refreshNow;
+      queueSharedProjectRefresh({
+        immediate: false,
+        reason: `${normalizedReason}-latest-check`,
+        force: true,
+      });
+    }).catch(() => {
+      if (
+        !allowRefreshBackstop
+        || realtimeLikelyHealthy
+        || sharedProjectRefreshInFlight
+        || sharedProjectRefreshTimer !== null
+        || hasSharedProjectHardLocalWorkInFlight()
+      ) {
+        return;
+      }
+      const refreshNow = Date.now();
+      if ((refreshNow - sharedProjectLastServerOpRefreshBackstopAt) < SHARED_PROJECT_REFRESH_LOOP_INTERVAL_MS) {
+        return;
+      }
+      sharedProjectLastServerOpRefreshBackstopAt = refreshNow;
+      queueSharedProjectRefresh({
+        immediate: false,
+        reason: `${normalizedReason}-latest-check`,
+        force: true,
+      });
+    });
+    return true;
   }
 
   function ensureSharedProjectRefreshLoop() {
@@ -8627,12 +8712,21 @@
       );
       const recentlyAppliedRealtime = (now - sharedProjectLastRealtimeActivityAt) < SHARED_PROJECT_REFRESH_IDLE_GRACE_MS;
       if (realtimeSubscribed && realtimeLikelyHealthy) {
-        // While the realtime channel is subscribed and healthy, keep draw sync event-driven.
-        // The sender side may not receive inbound realtime traffic for a while, which would
-        // otherwise incorrectly look "idle" and trigger repeated rescue polling.
+        // shared_project_ops is the source of truth. Realtime is only a wake-up path;
+        // a bounded server poll closes gaps when a browser misses an event after reload/sleep.
+        maybePollSharedProjectServerOps({
+          reason: 'server-primary-healthy-op-poll',
+          realtimeLikelyHealthy,
+          realtimeSubscribed,
+        });
         return;
       }
       if (realtimeLikelyHealthy && recentlyAppliedRealtime) {
+        maybePollSharedProjectServerOps({
+          reason: 'server-primary-recent-op-poll',
+          realtimeLikelyHealthy,
+          realtimeSubscribed,
+        });
         return;
       }
       pollSharedProjectRealtimeOpsRescue({
@@ -59643,7 +59737,7 @@
     appendSharedLocalOpJournal(op, { status: 'pending' }).catch(error => {
       console.warn('Failed to append shared local op journal entry', error);
     });
-    // draw transport is latency-first
+    // Broadcast is only a wake-up signal; peers render after reading confirmed server ops.
     sendSharedProjectBroadcastOp(op);
     const queuedOp = {
       projectKey: op.projectKey,
