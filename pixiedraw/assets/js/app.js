@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.05.06-shared-recovery-reload';
+  const APP_BUILD_VERSION = '2026.05.06-shared-stable-open';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
@@ -2547,9 +2547,9 @@
   const SHARED_PROJECT_REFRESH_IDLE_GRACE_MS = 6000;
   const SHARED_PROJECT_REALTIME_SUBSCRIBE_TIMEOUT_MS = 30000;
   const SHARED_PROJECT_SLEEP_WAKE_GAP_MS = 2500;
-  const SHARED_PROJECT_AUTO_RELOAD_AFTER_CATCHUP_MS = 8000;
-  const SHARED_PROJECT_FIRST_INPUT_RELOAD_AFTER_CATCHUP_MS = 1200;
-  const SHARED_PROJECT_RECOVERY_RELOAD_COOLDOWN_MS = 45000;
+  const SHARED_PROJECT_AUTO_RELOAD_AFTER_CATCHUP_MS = 45000;
+  const SHARED_PROJECT_FIRST_INPUT_RECONNECT_AFTER_CATCHUP_MS = 1200;
+  const SHARED_PROJECT_RECOVERY_RELOAD_COOLDOWN_MS = 90000;
   const SHARED_PROJECT_BROADCAST_EVENT = 'shared-op';
   const SHARED_PROJECT_RECOVERY_RELOAD_STORAGE_KEY = 'pixieedraw:shared-recovery-reload-at';
   const SHARED_LOCAL_OP_JOURNAL_MAX_CONFIRMED_PER_PROJECT = 160;
@@ -8633,7 +8633,10 @@
     const now = Date.now();
     const reason = typeof error?.message === 'string' ? error.message : String(error || '');
     if (activeSharedProjectKey) {
-      const canContinueFromSavedHistory = canResumeSharedProjectEditingFromDurableHistory(activeSharedProjectKey);
+      const canContinueFromSavedHistory = (
+        canResumeSharedProjectEditingFromDurableHistory(activeSharedProjectKey)
+        || hasStableSharedProjectDurableState(activeSharedProjectKey)
+      );
       if (!canContinueFromSavedHistory) {
         setActiveSharedProjectSyncState('catching-up', { announce: true });
       }
@@ -8960,6 +8963,16 @@
   }
 
   function canResumeSharedProjectEditingFromDurableHistory(projectKey = activeSharedProjectKey) {
+    if (
+      activeSharedProjectOpenInProgress
+      || activeSharedProjectOpenReadOnly
+    ) {
+      return false;
+    }
+    return hasStableSharedProjectDurableState(projectKey);
+  }
+
+  function hasStableSharedProjectDurableState(projectKey = activeSharedProjectKey) {
     const normalizedProjectKey = normalizeMultiProjectKey(projectKey || activeSharedProjectKey || '');
     return Boolean(
       normalizedProjectKey
@@ -8968,21 +8981,6 @@
       && hasUsableActiveSharedProjectDocumentState()
       && activeSharedProjectSynced
       && activeSharedProjectSyncState === 'synced'
-      && !activeSharedProjectOpenInProgress
-      && !activeSharedProjectOpenReadOnly
-      && !sharedProjectDeferRealtimeUntilSynced
-    );
-  }
-
-  function canBufferSharedProjectLocalDrawDuringRecovery(projectKey = activeSharedProjectKey) {
-    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || activeSharedProjectKey || '');
-    return Boolean(
-      normalizedProjectKey
-      && normalizedProjectKey === activeSharedProjectKey
-      && activeSharedProjectDocumentLoaded
-      && hasUsableActiveSharedProjectDocumentState()
-      && !activeSharedProjectOpenInProgress
-      && !activeSharedProjectOpenReadOnly
       && !sharedProjectDeferRealtimeUntilSynced
     );
   }
@@ -9178,6 +9176,104 @@
     });
   }
 
+  async function stabilizeActiveSharedProjectConnection(projectRecord = null, {
+    reason = 'connection-stabilize',
+    announce = false,
+  } = {}) {
+    const projectKey = normalizeMultiProjectKey(projectRecord?.project_key || activeSharedProjectKey || '');
+    if (!projectKey || projectKey !== activeSharedProjectKey) {
+      return false;
+    }
+    setActiveSharedProjectSyncState('catching-up', { announce });
+    if (!await ensureSharedProjectBackendSession()) {
+      return false;
+    }
+    const resolveLatestProject = async (candidate = null) => {
+      if (candidate?.project_key && normalizeMultiProjectKey(candidate.project_key) === projectKey) {
+        return candidate;
+      }
+      return await fetchSharedProjectRecord(projectKey);
+    };
+    const syncToProjectRevision = async (candidate) => {
+      if (!candidate?.project_key) {
+        return false;
+      }
+      const latestRevision = getSharedProjectLatestRevision(candidate);
+      if (latestRevision > activeSharedProjectRevision) {
+        const replayed = await applySharedProjectOpsSinceRevision(candidate, activeSharedProjectRevision);
+        if (!replayed) {
+          return false;
+        }
+      }
+      return activeSharedProjectRevision >= latestRevision;
+    };
+    let latestProject = await resolveLatestProject(projectRecord);
+    if (!latestProject?.project_key) {
+      return false;
+    }
+    if (!await syncToProjectRevision(latestProject)) {
+      return false;
+    }
+    latestProject = await resolveLatestProject(null);
+    if (!latestProject?.project_key) {
+      return false;
+    }
+    if (!await syncToProjectRevision(latestProject)) {
+      return false;
+    }
+    const latestRevision = getSharedProjectLatestRevision(latestProject);
+    const latestStructureRevision = getSharedProjectLatestStructureRevision(latestProject);
+    if (
+      activeSharedProjectRevision < latestRevision
+      || activeSharedProjectStructureRevision < latestStructureRevision
+    ) {
+      return false;
+    }
+    const projectId = typeof latestProject.id === 'string' && latestProject.id.trim()
+      ? latestProject.id.trim()
+      : activeSharedProjectId;
+    setActiveSharedProjectSession(
+      projectKey,
+      activeSharedProjectRevision,
+      activeSharedProjectStructureRevision,
+      projectId
+    );
+    markActiveSharedProjectDocumentLoaded(projectKey);
+    setSharedProjectDeferRealtimeUntilSynced(false);
+    setActiveSharedProjectSnapshotState(
+      Math.max(activeSharedProjectSnapshotRevision, Math.min(activeSharedProjectRevision, latestRevision)),
+      {
+        structureRevision: Math.max(activeSharedProjectStructureRevision, latestStructureRevision),
+        synced: true,
+        canonicalLoadedAt: Date.now(),
+      }
+    );
+    setActiveSharedProjectSyncState('synced', { announce });
+    ensureSharedProjectRefreshLoop();
+    ensureActiveSharedProjectRealtimeChannel().catch(error => {
+      reportSharedProjectRealtimeSubscribeFailure(error);
+    });
+    scheduleSharedProjectOpsRescueRetry();
+    try {
+      await restorePendingSharedLocalOps(projectKey, {
+        announce: false,
+        refreshReason: `${reason || 'connection-stabilize'}-resume-pending-local-ops`,
+      });
+      flushSharedProjectPendingLocalOps();
+    } catch (error) {
+      console.warn('Failed to restore pending shared local ops after connection stabilization', error);
+    }
+    console.info('[shared-sync]', {
+      event: 'shared-connection-stable',
+      reason,
+      projectKey,
+      revision: activeSharedProjectRevision,
+      structureRevision: activeSharedProjectStructureRevision,
+      realtimeStatus: sharedProjectRealtimeStatus,
+    });
+    return true;
+  }
+
   function queueSharedProjectReconnectRecovery(reason = 'connectivity', { immediate = false, blockEditing = true } = {}) {
     if (!activeSharedProjectKey) {
       return Promise.resolve(false);
@@ -9250,6 +9346,13 @@
           if (recoveryProjectKey !== activeSharedProjectKey) {
             return false;
           }
+          const stabilized = await stabilizeActiveSharedProjectConnection(null, {
+            reason: `${normalizedReason}-reconnect`,
+            announce: shouldBlockEditing,
+          });
+          if (recoveryProjectKey !== activeSharedProjectKey) {
+            return false;
+          }
           let realtimeChannel = null;
           let realtimeErrorMessage = '';
           try {
@@ -9269,6 +9372,7 @@
           });
           const backendRecovered = Boolean(
             refreshed
+            || stabilized
             || recoveredGap
             || canResumeSharedProjectEditingFromDurableHistory(recoveryProjectKey)
           );
@@ -9298,6 +9402,7 @@
             projectKey: recoveryProjectKey,
             extra: {
               refreshed,
+              stabilized,
               backendRecovered,
               realtimeConnected: Boolean(realtimeChannel),
               realtimeError: realtimeErrorMessage,
@@ -9391,18 +9496,13 @@
     const catchingUpForMs = sharedProjectCatchingUpStartedAt > 0
       ? Date.now() - sharedProjectCatchingUpStartedAt
       : 0;
-    const shouldReload = Boolean(
+    const shouldReconnect = Boolean(
       activeSharedProjectSyncState === 'catching-up'
-      && (
-        catchingUpForMs >= SHARED_PROJECT_FIRST_INPUT_RELOAD_AFTER_CATCHUP_MS
-        || hasUsableActiveSharedProjectDocumentState()
-      )
+      && catchingUpForMs >= SHARED_PROJECT_FIRST_INPUT_RECONNECT_AFTER_CATCHUP_MS
     );
-    if (!shouldReload) {
+    if (shouldReconnect) {
       queueSharedProjectReconnectRecovery('first-input-recovery', { immediate: true }).catch(() => {});
-      return;
     }
-    scheduleSharedProjectRecoveryReload('first-input-stalled', 0);
   }
 
   function persistCriticalSessionStateForNavigation() {
@@ -22229,6 +22329,23 @@
         force: false,
         reason: 'open-already-active-latest',
       });
+      const stabilized = await stabilizeActiveSharedProjectConnection(sharedProject, {
+        reason: 'open-already-active-latest',
+        announce: !silent,
+      });
+      if (!stabilized) {
+        if (!silent) {
+          setMultiStatus(
+            localizeText(
+              '共有プロジェクトの最新状態へ接続できませんでした。再接続を続けます。',
+              'Could not stabilize the shared project connection. Reconnection will continue.'
+            ),
+            'warn'
+          );
+        }
+        queueSharedProjectReconnectRecovery('open-already-active-stabilize-failed', { immediate: false }).catch(() => {});
+        return false;
+      }
       if (hideStartup) {
         hideStartupScreen();
       }
@@ -22456,37 +22573,33 @@
         return false;
       }
     }
-    setActiveSharedProjectSyncState('synced');
-    setActiveSharedProjectSnapshotState(sharedSnapshotRevision, {
-      structureRevision: baseStructureRevision,
+    const connectionStable = await stabilizeActiveSharedProjectConnection(freshestProject, {
+      reason: 'canonical-open',
+      announce: !silent,
+    });
+    if (!connectionStable) {
+      if (!silent) {
+        setMultiStatus(
+          localizeText(
+            '共有プロジェクトの最新状態へ接続できませんでした。古い状態では開きません。',
+            'Could not stabilize the shared project connection. The project will not open in a stale state.'
+          ),
+          'error'
+        );
+      }
+      queueSharedProjectReconnectRecovery('canonical-open-stabilize-failed', { immediate: false }).catch(() => {});
+      return false;
+    }
+    setActiveSharedProjectSnapshotState(Math.max(sharedSnapshotRevision, activeSharedProjectSnapshotRevision), {
+      structureRevision: Math.max(baseStructureRevision, activeSharedProjectStructureRevision),
       synced: true,
       canonicalLoadedAt: Date.now(),
     });
-    setSharedProjectDeferRealtimeUntilSynced(false);
     console.info('[shared-sync]', {
       event: 'shared-open-synced',
       reason: 'canonical-open',
       projectKey: resolvedProjectKey,
       revision: activeSharedProjectRevision,
-    });
-    console.info('[shared-sync]', {
-      event: 'shared-open-realtime-subscribe-start',
-      reason: 'canonical-open',
-      projectKey: resolvedProjectKey,
-    });
-    ensureActiveSharedProjectRealtimeChannel().catch(error => {
-      reportSharedProjectRealtimeSubscribeFailure(error);
-    });
-    console.info('[shared-sync]', {
-      event: 'shared-open-realtime-subscribed',
-      reason: 'canonical-open',
-      projectKey: resolvedProjectKey,
-    });
-    restorePendingSharedLocalOps(resolvedProjectKey, {
-      announce: true,
-      refreshReason: 'open-shared-resume-pending-local-ops',
-    }).catch(error => {
-      console.warn('Failed to restore pending shared local op journal after opening shared project', error);
     });
     await upsertSharedRecentProjectEntry({
       projectKey: resolvedProjectKey,
@@ -56101,12 +56214,9 @@
       return false;
     }
     if (activeSharedProjectSyncState === 'catching-up') {
-      return canBufferSharedProjectLocalDrawDuringRecovery(normalizedProjectKey);
+      return false;
     }
-    if (
-      !canResumeSharedProjectEditingFromDurableHistory(normalizedProjectKey)
-      && !canBufferSharedProjectLocalDrawDuringRecovery(normalizedProjectKey)
-    ) {
+    if (!canResumeSharedProjectEditingFromDurableHistory(normalizedProjectKey)) {
       return false;
     }
     return true;
