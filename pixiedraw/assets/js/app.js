@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.05.06-shared-wake-watchdog';
+  const APP_BUILD_VERSION = '2026.05.06-shared-durable-reconnect';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
@@ -8621,8 +8621,17 @@
     const now = Date.now();
     const reason = typeof error?.message === 'string' ? error.message : String(error || '');
     if (activeSharedProjectKey) {
-      setActiveSharedProjectSyncState('catching-up', { announce: true });
-      queueSharedProjectReconnectRecovery('realtime-subscribe-failure', { immediate: false }).catch(() => {});
+      const canContinueFromSavedHistory = canResumeSharedProjectEditingFromDurableHistory(activeSharedProjectKey);
+      if (!canContinueFromSavedHistory) {
+        setActiveSharedProjectSyncState('catching-up', { announce: true });
+      }
+      queueSharedProjectReconnectRecovery('realtime-subscribe-failure', {
+        immediate: false,
+        blockEditing: !canContinueFromSavedHistory,
+      }).catch(() => {});
+      if (canContinueFromSavedHistory) {
+        scheduleSharedProjectOpsRescueRetry();
+      }
     }
     if ((now - sharedProjectRealtimeWarnedAt) < 30000) {
       return;
@@ -8938,6 +8947,21 @@
     return canvasDoc.frames.some(frame => Array.isArray(frame?.layers) && frame.layers.length > 0);
   }
 
+  function canResumeSharedProjectEditingFromDurableHistory(projectKey = activeSharedProjectKey) {
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || activeSharedProjectKey || '');
+    return Boolean(
+      normalizedProjectKey
+      && normalizedProjectKey === activeSharedProjectKey
+      && activeSharedProjectDocumentLoaded
+      && hasUsableActiveSharedProjectDocumentState()
+      && activeSharedProjectSynced
+      && activeSharedProjectSyncState === 'synced'
+      && !activeSharedProjectOpenInProgress
+      && !activeSharedProjectOpenReadOnly
+      && !sharedProjectDeferRealtimeUntilSynced
+    );
+  }
+
   function canPersistActiveSharedProjectDocument(projectKey = activeSharedProjectKey, historyLabel = '') {
     const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
     if (!normalizedProjectKey) {
@@ -9050,12 +9074,15 @@
     });
   }
 
-  function queueSharedProjectReconnectRecovery(reason = 'connectivity', { immediate = false } = {}) {
+  function queueSharedProjectReconnectRecovery(reason = 'connectivity', { immediate = false, blockEditing = true } = {}) {
     if (!activeSharedProjectKey) {
       return Promise.resolve(false);
     }
     const normalizedReason = String(reason || 'connectivity');
-    setActiveSharedProjectSyncState('catching-up', { announce: true });
+    const shouldBlockEditing = blockEditing !== false;
+    if (shouldBlockEditing) {
+      setActiveSharedProjectSyncState('catching-up', { announce: true });
+    }
     if (sharedProjectReconnectRecoveryTimer !== null) {
       window.clearTimeout(sharedProjectReconnectRecoveryTimer);
       sharedProjectReconnectRecoveryTimer = null;
@@ -9079,7 +9106,10 @@
       }
       sharedProjectReconnectRecoveryTimer = window.setTimeout(() => {
         sharedProjectReconnectRecoveryTimer = null;
-        queueSharedProjectReconnectRecovery(retryReason, { immediate: true }).catch(() => {});
+        queueSharedProjectReconnectRecovery(retryReason, {
+          immediate: true,
+          blockEditing: shouldBlockEditing,
+        }).catch(() => {});
       }, delayMs);
     };
     const runRecovery = () => {
@@ -9116,27 +9146,47 @@
           if (recoveryProjectKey !== activeSharedProjectKey) {
             return false;
           }
-          const realtimeChannel = await ensureActiveSharedProjectRealtimeChannel();
+          let realtimeChannel = null;
+          let realtimeErrorMessage = '';
+          try {
+            realtimeChannel = await ensureActiveSharedProjectRealtimeChannel();
+          } catch (error) {
+            realtimeErrorMessage = String(error?.message || error || '');
+            logSharedProjectRealtimeChannelLifecycle('reconnect-realtime-failed', {
+              caller: 'queueSharedProjectReconnectRecovery',
+              reason: normalizedReason,
+              projectKey: recoveryProjectKey,
+              extra: { error: realtimeErrorMessage },
+            });
+          }
           const recoveredGap = await recoverSharedProjectRealtimeGap(recoveryProjectKey, {
             afterSeq: sharedProjectLastAppliedSeq,
             reason: `${normalizedReason}-post-reconnect-gap`,
           });
+          const backendRecovered = Boolean(
+            refreshed
+            || recoveredGap
+            || canResumeSharedProjectEditingFromDurableHistory(recoveryProjectKey)
+          );
           const recovered = Boolean(
-            realtimeChannel
+            backendRecovered
             && (
-              refreshed
-              || recoveredGap
-              || activeSharedProjectSyncState === 'synced'
-              || activeSharedProjectDocumentLoaded
-              || hasUsableActiveSharedProjectDocumentState()
+              activeSharedProjectSyncState === 'synced'
+              || canResumeSharedProjectEditingFromDurableHistory(recoveryProjectKey)
             )
           );
           if (recovered && activeSharedProjectKey === recoveryProjectKey) {
             setActiveSharedProjectSyncState('synced', { announce: true });
             resumeSharedProjectLocalOpsAfterConnectivityChange(normalizedReason);
+            if (!realtimeChannel) {
+              scheduleSharedProjectOpsRescueRetry();
+            }
           } else if (activeSharedProjectKey === recoveryProjectKey) {
-            scheduleRecoveryRetry(`${normalizedReason}-retry`, 1600);
-            scheduleSharedProjectOpsRescueRetry();
+            if (shouldBlockEditing) {
+              scheduleRecoveryRetry(`${normalizedReason}-retry`, 1600);
+            } else {
+              scheduleSharedProjectOpsRescueRetry();
+            }
           }
           logSharedProjectRealtimeChannelLifecycle('reconnect-recovery-done', {
             caller: 'queueSharedProjectReconnectRecovery',
@@ -9144,7 +9194,9 @@
             projectKey: recoveryProjectKey,
             extra: {
               refreshed,
+              backendRecovered,
               realtimeConnected: Boolean(realtimeChannel),
+              realtimeError: realtimeErrorMessage,
               recoveredGap,
               recovered,
             },
@@ -55911,12 +55963,7 @@
     if (activeSharedProjectSyncState === 'catching-up') {
       return false;
     }
-    if (
-      sharedProjectReconnectRecoveryPromise
-      || sharedProjectReconnectRecoveryTimer !== null
-      || sharedProjectRealtimeConnectPromise
-      || sharedProjectRealtimeStatus === 'subscribing'
-    ) {
+    if (!canResumeSharedProjectEditingFromDurableHistory(normalizedProjectKey)) {
       return false;
     }
     return true;
@@ -60962,6 +61009,7 @@
           synced: true,
           canonicalLoadedAt: Date.now(),
         });
+        setActiveSharedProjectSyncState('synced');
         ensureActiveSharedProjectRealtimeChannel().catch(error => {
           reportSharedProjectRealtimeSubscribeFailure(error);
         });
