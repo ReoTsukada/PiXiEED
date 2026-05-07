@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.05.07-shared-server-primary';
+  const APP_BUILD_VERSION = '2026.05.07-shared-authoritative-open';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
@@ -9108,6 +9108,75 @@
     );
   }
 
+  function getSharedProjectLocalDrawBlockReason(projectKey = activeSharedProjectKey) {
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || activeSharedProjectKey || '');
+    if (!isSharedProjectCollaborativeMode(normalizedProjectKey)) {
+      return '';
+    }
+    if (!canUseSharedProjectsBackend()) {
+      return 'backend-unavailable';
+    }
+    if (activeSharedProjectOpenInProgress || activeSharedProjectOpenReadOnly) {
+      return 'open-in-progress';
+    }
+    if (!activeSharedProjectDocumentLoaded) {
+      return 'server-document-not-loaded';
+    }
+    if (!hasUsableActiveSharedProjectDocumentState()) {
+      return 'missing-document-state';
+    }
+    if (activeSharedProjectSyncState === 'catching-up' || !activeSharedProjectSynced || sharedProjectDeferRealtimeUntilSynced) {
+      return 'catching-up';
+    }
+    if (sharedProjectRefreshInFlight || sharedProjectRecoveryInProgress || sharedProjectReconnectRecoveryPromise) {
+      return 'recovery-in-progress';
+    }
+    if (sharedProjectRealtimeConnectPromise) {
+      return 'realtime-connecting';
+    }
+    if (activeSharedProjectRevision !== sharedProjectLastAppliedSeq) {
+      return 'revision-gap';
+    }
+    if (hasSharedProjectFailedLocalOps()) {
+      return 'failed-local-ops';
+    }
+    if (hasSharedProjectLocalInFlightOps() || sharedProjectPendingLocalOps.length > 0 || sharedProjectOpCommitInFlight) {
+      return 'local-op-pending';
+    }
+    if (!hasStableSharedProjectDurableState(normalizedProjectKey)) {
+      return 'not-stable';
+    }
+    return '';
+  }
+
+  function getSharedProjectDrawBlockStatus(reason = '') {
+    const normalizedReason = String(reason || '').trim();
+    const needsReload = new Set([
+      'backend-unavailable',
+      'server-document-not-loaded',
+      'missing-document-state',
+      'failed-local-ops',
+      'revision-gap',
+      'not-stable',
+    ]).has(normalizedReason);
+    if (needsReload) {
+      return {
+        level: 'error',
+        message: localizeText(
+          '共有プロジェクトを最新状態として確認できません。差異防止のため描画を停止しています。再読み込みしてください。',
+          'The shared project cannot be verified as current. Drawing is blocked to prevent divergence. Please reload.'
+        ),
+      };
+    }
+    return {
+      level: 'warn',
+      message: localizeText(
+        '共有プロジェクトを最新状態へ同期中です。完了まで描画を停止しています。',
+        'The shared project is syncing to the latest state. Drawing is blocked until it completes.'
+      ),
+    };
+  }
+
   function canPersistActiveSharedProjectDocument(projectKey = activeSharedProjectKey, historyLabel = '') {
     const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
     if (!normalizedProjectKey) {
@@ -9317,15 +9386,18 @@
       }
       return await fetchSharedProjectRecord(projectKey);
     };
-    const syncToProjectRevision = async (candidate) => {
-      if (!candidate?.project_key) {
-        return false;
-      }
-      const latestRevision = getSharedProjectLatestRevision(candidate);
-      if (latestRevision > activeSharedProjectRevision) {
-        const replayed = await applySharedProjectOpsSinceRevision(candidate, activeSharedProjectRevision);
-        if (!replayed) {
+      const syncToProjectRevision = async (candidate) => {
+        if (!candidate?.project_key) {
           return false;
+        }
+        const latestRevision = getSharedProjectLatestRevision(candidate);
+        if (latestRevision <= activeSharedProjectRevision && !activeSharedProjectDocumentLoaded) {
+          return false;
+        }
+        if (latestRevision > activeSharedProjectRevision) {
+          const replayed = await applySharedProjectOpsSinceRevision(candidate, activeSharedProjectRevision);
+          if (!replayed) {
+            return false;
         }
       }
       return activeSharedProjectRevision >= latestRevision;
@@ -22435,6 +22507,10 @@
     if (
       resolvedProjectKey === normalizeMultiProjectKey(activeSharedProjectKey || '')
       && isCurrentProjectSharedEntry()
+      && activeSharedProjectDocumentLoaded
+      && activeSharedProjectSyncState === 'synced'
+      && !sharedProjectDeferRealtimeUntilSynced
+      && startupSharedReloadProjectKey !== resolvedProjectKey
     ) {
       storeMultiProjectKey(resolvedProjectKey);
       syncMultiProjectKeyInputValues(resolvedProjectKey, { preserveFocused: false });
@@ -45594,19 +45670,19 @@
       // Non-spectator: existing restrictions for drawing guests
       if (HISTORY_DRAW_TOOLS.has(activeTool)) {
         if (!canAcceptSharedProjectLocalDrawOps()) {
+          const sharedDrawBlockReason = getSharedProjectLocalDrawBlockReason();
+          const sharedDrawBlockStatus = getSharedProjectDrawBlockStatus(sharedDrawBlockReason);
           logSharedProjectDrawBlock(
-            isSharedProjectAwaitingReady()
+            sharedDrawBlockReason || (isSharedProjectAwaitingReady()
               ? (sharedProjectDeferRealtimeUntilSynced
                 ? 'shared-sync-awaiting-ready'
                 : 'shared-sync-catching-up')
-              : 'shared-realtime-not-ready'
+              : 'shared-realtime-not-ready')
           );
+          setMultiStatus(sharedDrawBlockStatus.message, sharedDrawBlockStatus.level);
           updateAutosaveStatus(
-            localizeText(
-              '共有プロジェクトの接続が安定するまでお待ちください',
-              'Please wait until the shared project connection is stable.'
-            ),
-            'warn'
+            sharedDrawBlockStatus.message,
+            sharedDrawBlockStatus.level
           );
           return;
         }
@@ -53324,6 +53400,7 @@
       startupSharedReloadProjectKey = restoredSharedProjectKey;
       startupSharedReloadRevision = restoredSharedProjectRevision;
       startupSharedReloadStructureRevision = restoredSharedStructureRevision;
+      activeSharedProjectDocumentLoaded = false;
       setActiveSharedProjectSession(
         restoredSharedProjectKey,
         restoredSharedProjectRevision,
@@ -53336,9 +53413,9 @@
         canonicalLoadedAt: 0,
       });
       activeSharedProjectSynced = false;
-      markActiveSharedProjectDocumentLoaded(restoredSharedProjectKey);
+      setActiveSharedProjectSyncState('catching-up');
       setMultiStatus(
-        localizeText('共有モード: 再読み込み復元ベースを適用しました', 'Shared mode: restored reload base'),
+        localizeText('共有モード: サーバーの最新状態を確認中…', 'Shared mode: verifying the latest server state...'),
         'info'
       );
     } else {
@@ -56317,28 +56394,7 @@
     if (!isSharedProjectCollaborativeMode(normalizedProjectKey)) {
       return true;
     }
-    const hasCanonicalDocument = Boolean(
-      normalizedProjectKey
-      && normalizedProjectKey === activeSharedProjectKey
-      && (
-        activeSharedProjectDocumentLoaded
-        || hasUsableActiveSharedProjectDocumentState()
-        || activeSharedProjectSnapshotRevision > 0
-      )
-    );
-    if (activeSharedProjectOpenInProgress && !hasCanonicalDocument) {
-      return false;
-    }
-    if (!hasCanonicalDocument) {
-      return false;
-    }
-    if (activeSharedProjectSyncState === 'catching-up') {
-      return false;
-    }
-    if (!canResumeSharedProjectEditingFromDurableHistory(normalizedProjectKey)) {
-      return false;
-    }
-    return true;
+    return !getSharedProjectLocalDrawBlockReason(normalizedProjectKey);
   }
 
   function isSharedProjectsBlockedByRuntime() {
@@ -60474,6 +60530,9 @@
     const targetRevision = Math.max(0, Math.round(Number(projectRecord?.latest_revision) || 0));
     const targetStructureRevision = Math.max(0, Math.round(Number(projectRecord?.latest_structure_revision) || 0));
     if (targetRevision <= afterRevision) {
+      if (!activeSharedProjectDocumentLoaded) {
+        return false;
+      }
       setActiveSharedProjectSyncState('synced');
       return true;
     }
@@ -60818,7 +60877,7 @@
     snapshotStructureRevision = activeSharedProjectStructureRevision,
   } = {}) {
     const projectKey = normalizeMultiProjectKey(projectRecord?.project_key || activeSharedProjectKey);
-    if (!projectKey || !hasUsableActiveSharedProjectDocumentState()) {
+    if (!projectKey || !activeSharedProjectDocumentLoaded || !hasUsableActiveSharedProjectDocumentState()) {
       return false;
     }
     const retainedRevision = Math.max(
@@ -71169,12 +71228,16 @@
       return;
     }
     if (sharedCollaborative && !canAcceptSharedProjectLocalDrawOps()) {
+      const sharedDrawBlockReason = getSharedProjectLocalDrawBlockReason();
+      const sharedDrawBlockStatus = getSharedProjectDrawBlockStatus(sharedDrawBlockReason);
       logSharedProjectDrawBlock(
-        activeSharedProjectSyncState === 'catching-up'
+        sharedDrawBlockReason || (activeSharedProjectSyncState === 'catching-up'
           ? 'shared-reconnect-required-before-local-commit'
-          : 'shared-document-not-ready-before-local-commit',
+          : 'shared-document-not-ready-before-local-commit'),
         { historyLabel: _label }
       );
+      setMultiStatus(sharedDrawBlockStatus.message, sharedDrawBlockStatus.level);
+      updateAutosaveStatus(sharedDrawBlockStatus.message, sharedDrawBlockStatus.level);
       queueSharedProjectReconnectRecovery('local-commit-blocked', { immediate: true }).catch(() => {});
       return;
     }
