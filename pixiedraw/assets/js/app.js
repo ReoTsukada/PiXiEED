@@ -61136,6 +61136,13 @@
         && nextStructureRevision <= activeSharedProjectStructureRevision
       );
       const snapshotBehindActiveRevision = snapshotRevision < activeSharedProjectRevision;
+      const canReloadStaleSnapshotForUnloadedDocument = Boolean(
+        snapshotBehindActiveRevision
+        && !activeSharedProjectDocumentLoaded
+        && project.latest_snapshot
+        && typeof project.latest_snapshot === 'object'
+        && !hasSharedProjectHardLocalWorkInFlight()
+      );
       logSharedProjectRealtimeChannelLifecycle('refresh-fetched-project', {
         caller: 'refreshActiveSharedProjectSnapshot',
         reason: reason || 'refresh',
@@ -61147,7 +61154,7 @@
           snapshotStructureRevision,
         },
       });
-      if (snapshotBehindActiveRevision) {
+      if (snapshotBehindActiveRevision && !canReloadStaleSnapshotForUnloadedDocument) {
         if (nextRevision > activeSharedProjectRevision && !hasSharedProjectHardLocalWorkInFlight()) {
           console.info('[shared-sync]', {
             event: 'stale-snapshot-op-replay-start',
@@ -61212,9 +61219,20 @@
         });
         return false;
       }
+      if (canReloadStaleSnapshotForUnloadedDocument) {
+        console.info('[shared-sync]', {
+          event: 'stale-snapshot-reload-for-unloaded-document',
+          reason: reason || 'refresh',
+          projectKey: activeSharedProjectKey || '',
+          snapshotRevision,
+          activeRevision: activeSharedProjectRevision,
+          latestRevision: nextRevision,
+        });
+      }
       if (
         !force
         && activeAlreadyAtLatest
+        && activeSharedProjectDocumentLoaded
       ) {
         if ((project?.id && !activeSharedProjectId) || sharedProjectDeferRealtimeUntilSynced) {
           const retained = await retainActiveSharedProjectDocumentDuringRefresh(project, {
@@ -61395,6 +61413,10 @@
         });
       }
       const trustedSnapshotRevision = shouldTrustSharedProjectSnapshotRevision(snapshotRevision, nextRevision);
+      const shouldReplayFromSnapshotAfterLoad = Boolean(
+        trustedSnapshotRevision
+        || (!hadLoadedDocument && snapshotRevision < nextRevision)
+      );
       const prefersFreshCanonicalSnapshot = (
         force
         && (
@@ -61478,13 +61500,13 @@
       setSharedProjectDeferRealtimeUntilSynced(true);
       setActiveSharedProjectSession(
         activeSharedProjectKey,
-        trustedSnapshotRevision ? snapshotRevision : nextRevision,
-        trustedSnapshotRevision ? snapshotStructureRevision : nextStructureRevision,
+        shouldReplayFromSnapshotAfterLoad ? snapshotRevision : nextRevision,
+        shouldReplayFromSnapshotAfterLoad ? snapshotStructureRevision : nextStructureRevision,
         project.id || ''
       );
       resetPendingSharedProjectRemoteState();
       let replayedAfterSnapshot = false;
-      if (trustedSnapshotRevision) {
+      if (shouldReplayFromSnapshotAfterLoad) {
         sharedProjectLastAppliedSeq = Math.max(0, snapshotRevision);
         activeSharedProjectRevision = sharedProjectLastAppliedSeq;
         pruneSharedProjectConfirmedOpStateAfterRevision(sharedProjectLastAppliedSeq);
