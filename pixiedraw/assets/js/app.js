@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.05.07-shared-authoritative-open';
+  const APP_BUILD_VERSION = '2026.05.07-shared-op-revision-gate';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
@@ -21179,6 +21179,39 @@
         };
       });
       return entry;
+    };
+    const nextWrite = sharedLocalOpJournalWritePromise
+      .catch(() => {})
+      .then(writeTask);
+    sharedLocalOpJournalWritePromise = nextWrite.catch(() => {});
+    return await nextWrite;
+  }
+
+  async function deleteSharedLocalOpJournalEntry(opOrOpId) {
+    if (!AUTOSAVE_SUPPORTED) {
+      return false;
+    }
+    const opId = typeof opOrOpId === 'string' ? opOrOpId.trim() : getSharedProjectOpId(opOrOpId);
+    if (!opId) {
+      return false;
+    }
+    const writeTask = async () => {
+      const db = await openAutosaveDatabase();
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction([SHARED_LOCAL_OP_JOURNAL_STORE], 'readwrite');
+        const store = tx.objectStore(SHARED_LOCAL_OP_JOURNAL_STORE);
+        store.delete(opId);
+        tx.oncomplete = () => {
+          db.close();
+          resolve();
+        };
+        tx.onerror = () => {
+          const error = tx.error;
+          db.close();
+          reject(error);
+        };
+      });
+      return true;
     };
     const nextWrite = sharedLocalOpJournalWritePromise
       .catch(() => {})
@@ -57736,6 +57769,24 @@
     });
   }
 
+  function discardSharedProjectRejectedLocalOp(opOrOpId, { source = 'rejected' } = {}) {
+    const opId = typeof opOrOpId === 'string' ? opOrOpId.trim() : normalizeSharedProjectOpId(opOrOpId);
+    if (!opId) {
+      return false;
+    }
+    const entry = sharedProjectLocalInFlightOps.get(opId) || null;
+    sharedProjectLocalInFlightOps.delete(opId);
+    deleteSharedLocalOpJournalEntry(opId).catch(error => {
+      console.warn('Failed to delete rejected shared local op journal entry', error);
+    });
+    logSharedProjectLocalOpLifecycle('discarded rejected op', entry?.op || (typeof opOrOpId === 'string' ? { opId } : opOrOpId), {
+      source,
+      status: 'discarded',
+      opType: entry?.opType || '',
+    });
+    return true;
+  }
+
   function pruneSharedProjectLocalInFlightOps() {
     const now = Date.now();
     Array.from(sharedProjectLocalInFlightOps.entries()).forEach(([opId, entry]) => {
@@ -61650,6 +61701,15 @@
       if (!result) {
         return null;
       }
+      if (result.commit_status === 'rejected' || result.commit_status === 'failed') {
+        console.info('[shared-sync]', {
+          event: 'snapshot-write-rejected-by-server',
+          reason: snapshotReason,
+          projectKey: normalizedProjectKey,
+          status: result.commit_status,
+        });
+        return null;
+      }
       if (result.commit_status === 'conflict') {
         if (opType === 'draw' && opPayload) {
           pendingSharedProjectConflictReplay = {
@@ -61834,6 +61894,9 @@
       }
       if (result.commit_status === 'conflict') {
         markSharedProjectLocalOpCommitFailed(resolvedOp, new Error('commit conflict'), { source: 'db' });
+        discardSharedProjectRejectedLocalOp(resolvedOp, {
+          source: result.conflict_reason || 'commit-conflict',
+        });
         queueSharedProjectRefresh({ immediate: true, reason: 'commit-failed', force: true });
         if (retryOnConflict && (resolvedOpType === 'draw' || resolvedOpType === 'palette')) {
           pendingSharedProjectConflictReplay = {
@@ -61880,6 +61943,33 @@
           revision: Math.max(0, Math.round(Number(result.committed_revision || result.latest_revision) || 0)),
         });
         return result;
+      }
+      if (result.commit_status && result.commit_status !== 'committed') {
+        markSharedProjectLocalOpCommitFailed(
+          resolvedOp,
+          new Error(`commit ${result.commit_status}${result.conflict_reason ? `: ${result.conflict_reason}` : ''}`),
+          { source: 'db' }
+        );
+        if (result.conflict_reason === 'not-editor') {
+          discardSharedProjectRejectedLocalOp(resolvedOp, {
+            source: result.conflict_reason,
+          });
+          setMultiStatus(
+            localizeText(
+              'この共有プロジェクトの編集権限がないため、変更を送信できませんでした',
+              'You do not have edit permission for this shared project.'
+            ),
+            'error'
+          );
+        } else {
+          requeueSharedProjectOperationCommit(resolvedOp, {
+            retryOnConflict,
+            prioritize: resolvedOpType === 'draw',
+            source: `commit-${result.commit_status}`,
+            retryDelayMs: SHARED_PROJECT_LOCAL_OP_RETRY_DELAY_MS,
+          });
+        }
+        return null;
       }
       updateSharedLocalOpJournalStatus(resolvedOp, {
         status: 'confirmed',
