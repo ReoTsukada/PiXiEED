@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.05.08-shared-canonical-origin';
+  const APP_BUILD_VERSION = '2026.05.08-shared-owner-delete-brush-size';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
@@ -12910,7 +12910,7 @@
   }
 
   function syncBrushSizeFieldVisibility() {
-    const shouldShow = BRUSH_SIZE_TOOLS.has(state.tool);
+    const shouldShow = true;
     if (dom.controls.brushSizeField instanceof HTMLElement) {
       dom.controls.brushSizeField.hidden = !shouldShow;
       dom.controls.brushSizeField.setAttribute('aria-hidden', String(!shouldShow));
@@ -18792,20 +18792,22 @@
     });
   }
 
-  function openRecentProjectDeleteConfirmDialog(entry = null) {
+  async function openRecentProjectDeleteConfirmDialog(entry = null, { deletesOwnedSharedProject = null } = {}) {
+    const resolvedDeletesOwnedSharedProject = deletesOwnedSharedProject === null
+      ? await resolveSharedRecentProjectOwnedByCurrentUser(entry)
+      : Boolean(deletesOwnedSharedProject);
     return new Promise(resolve => {
       const config = dom.recentProjectDeleteConfirm;
       const dialog = config?.dialog;
       const isSharedEntry = isSharedRecentProjectEntry(entry);
-      const sharedRoleHint = typeof entry?.sharedRoleHint === 'string' ? entry.sharedRoleHint.trim() : '';
-      const deletesOwnedSharedProject = isSharedEntry && sharedRoleHint === 'master';
+      const willDeleteOwnedSharedProject = isSharedEntry && resolvedDeletesOwnedSharedProject;
       const displayLabel = extractDocumentBaseName(entry?.fileName || entry?.name || DEFAULT_DOCUMENT_NAME);
       const message = isSharedEntry
         ? localizeText(
-          deletesOwnedSharedProject
+          willDeleteOwnedSharedProject
             ? `共有プロジェクト「${displayLabel}」を削除しますか？`
             : `共有プロジェクト「${displayLabel}」を一覧から外しますか？`,
-          deletesOwnedSharedProject
+          willDeleteOwnedSharedProject
             ? `Delete shared project "${displayLabel}"?`
             : `Remove shared project "${displayLabel}" from your list?`
         )
@@ -18815,10 +18817,10 @@
         );
       const detail = isSharedEntry
         ? localizeText(
-          deletesOwnedSharedProject
+          willDeleteOwnedSharedProject
             ? 'あなたが所有している共有プロジェクト本体を削除します。この操作は取り消せません。'
             : '共有一覧から外します。共有自体には影響しません。',
-          deletesOwnedSharedProject
+          willDeleteOwnedSharedProject
             ? 'This permanently deletes the shared project you own. This action cannot be undone.'
             : 'This removes it from your shared project list only. The shared project itself remains available.'
         )
@@ -19699,7 +19701,13 @@
         }
         const entry = recentProjectsCache.get(projectId) || null;
         const displayLabel = extractDocumentBaseName(entry?.fileName || entry?.name || DEFAULT_DOCUMENT_NAME);
-        const accepted = await openRecentProjectDeleteConfirmDialog(entry);
+        const isSharedEntry = isSharedRecentProjectEntry(entry);
+        const ownsSharedProject = isSharedEntry
+          ? await resolveSharedRecentProjectOwnedByCurrentUser(entry)
+          : false;
+        const accepted = await openRecentProjectDeleteConfirmDialog(entry, {
+          deletesOwnedSharedProject: ownsSharedProject,
+        });
         if (!accepted) {
           return;
         }
@@ -19712,12 +19720,10 @@
           openButton.disabled = true;
         }
         try {
-          const isSharedEntry = isSharedRecentProjectEntry(entry);
-          const sharedRoleHint = typeof entry?.sharedRoleHint === 'string' ? entry.sharedRoleHint.trim() : '';
           let deletedSharedProjectBackend = false;
-          if (isSharedEntry) {
+          if (isSharedEntry && ownsSharedProject) {
             deletedSharedProjectBackend = await deleteOwnedSharedProjectFromBackend(entry);
-            if (!deletedSharedProjectBackend && sharedRoleHint === 'master') {
+            if (!deletedSharedProjectBackend) {
               updateAutosaveStatus(
                 localizeText(
                   '共有プロジェクト本体を削除できませんでした。ログイン状態とネットワークを確認して再試行してください。',
@@ -20279,8 +20285,72 @@
     if (!isSharedRecentProjectEntry(entry)) {
       return false;
     }
+    const ownerUserId = typeof entry?.sharedProjectOwnerUserId === 'string'
+      ? entry.sharedProjectOwnerUserId.trim()
+      : '';
+    const currentUserId = typeof accountState?.userId === 'string'
+      ? accountState.userId.trim()
+      : '';
+    if (ownerUserId && currentUserId) {
+      return ownerUserId === currentUserId;
+    }
+    if (currentUserId) {
+      return false;
+    }
     const roleHint = typeof entry?.sharedRoleHint === 'string' ? entry.sharedRoleHint.trim() : '';
     return roleHint === 'master';
+  }
+
+  async function resolveSharedRecentProjectOwnedByCurrentUser(entry = null) {
+    if (!isSharedRecentProjectEntry(entry)) {
+      return false;
+    }
+    const currentUserId = typeof accountState?.userId === 'string' ? accountState.userId.trim() : '';
+    if (!currentUserId) {
+      return false;
+    }
+    const entryOwnerUserId = typeof entry?.sharedProjectOwnerUserId === 'string'
+      ? entry.sharedProjectOwnerUserId.trim()
+      : '';
+    if (entryOwnerUserId) {
+      return entryOwnerUserId === currentUserId;
+    }
+    const projectKey = normalizeMultiProjectKey(entry?.sharedProjectKey || '');
+    if (!projectKey) {
+      return false;
+    }
+    let project = null;
+    if (entry?.sharedProjectInviteToken) {
+      project = await fetchSharedProjectRecordByInviteToken(entry.sharedProjectInviteToken);
+    }
+    if (!project?.project_key) {
+      project = await loadSharedProjectSnapshotRecord(projectKey, {
+        createIfMissing: false,
+        title: createSharedProjectSnapshotTitle(entry?.name || state.documentName || DEFAULT_DOCUMENT_NAME),
+      });
+    }
+    if (!project?.project_key) {
+      return false;
+    }
+    await upsertSharedRecentProjectEntry({
+      projectKey,
+      projectId: project.id || entry.sharedProjectBackendId || '',
+      inviteToken: project.invite_token || entry.sharedProjectInviteToken || '',
+      visibility: project.visibility || entry.sharedProjectVisibility || 'private',
+      name: createSharedProjectSnapshotTitle(project.title || entry.name || state.documentName || DEFAULT_DOCUMENT_NAME),
+      fileName: entry.fileName || normalizeDocumentName(`${entry.name || DEFAULT_DOCUMENT_NAME}.pixiedraw`),
+      thumbnail: entry.thumbnail || null,
+      roleHint: project.owner_user_id === currentUserId ? 'master' : 'guest',
+      membershipRole: project.membership_role || entry.sharedProjectMembershipRole || '',
+      ownerUserId: project.owner_user_id || '',
+      autoJoin: entry.sharedAutoJoin !== false,
+      revision: Math.max(0, Math.round(Number(project.latest_revision) || 0)),
+      structureRevision: Math.max(0, Math.round(Number(project.latest_structure_revision) || 0)),
+      project: project.latest_snapshot && typeof project.latest_snapshot === 'object'
+        ? project.latest_snapshot
+        : entry.project,
+    });
+    return project.owner_user_id === currentUserId;
   }
 
   function getHiddenSharedProjectsStorageKey() {
@@ -20478,6 +20548,11 @@
     if (!normalizedProjectKey) {
       return false;
     }
+    const currentUserId = typeof accountState?.userId === 'string' ? accountState.userId.trim() : '';
+    const ownerUserId = typeof entry?.sharedProjectOwnerUserId === 'string' ? entry.sharedProjectOwnerUserId.trim() : '';
+    if (!currentUserId || (ownerUserId && ownerUserId !== currentUserId)) {
+      return false;
+    }
     if (!canUseSharedProjectsBackend() && !await ensureSharedProjectBackendSession()) {
       return false;
     }
@@ -20572,6 +20647,12 @@
       : new Date().toISOString();
     const sharedProjectRevision = Math.max(0, Math.round(Number(entry.sharedProjectRevision) || 0));
     const sharedProjectStructureRevision = Math.max(0, Math.round(Number(entry.sharedProjectStructureRevision) || 0));
+    const sharedProjectMembershipRole = typeof entry.sharedProjectMembershipRole === 'string' && entry.sharedProjectMembershipRole.trim()
+      ? entry.sharedProjectMembershipRole.trim()
+      : '';
+    const sharedProjectOwnerUserId = typeof entry.sharedProjectOwnerUserId === 'string' && entry.sharedProjectOwnerUserId.trim()
+      ? entry.sharedProjectOwnerUserId.trim()
+      : '';
     const cachedProjectPayload = entry.project && typeof entry.project === 'object'
       ? entry.project
       : null;
@@ -20592,6 +20673,8 @@
         : 'private',
       sharedProjectRevision,
       sharedProjectStructureRevision,
+      sharedProjectMembershipRole,
+      sharedProjectOwnerUserId,
       sharedRoleHint,
       sharedAutoJoin: entry.sharedAutoJoin !== false,
       name,
@@ -21645,6 +21728,8 @@
     projectKey = '',
     name = '',
     roleHint = 'guest',
+    membershipRole = '',
+    ownerUserId = '',
     autoJoin = false,
     revision = 0,
     structureRevision = 0,
@@ -21671,6 +21756,8 @@
       sharedAutoJoin: autoJoin,
       sharedProjectRevision: Math.max(0, Math.round(Number(revision) || 0)),
       sharedProjectStructureRevision: Math.max(0, Math.round(Number(structureRevision) || 0)),
+      sharedProjectMembershipRole: membershipRole,
+      sharedProjectOwnerUserId: ownerUserId,
       thumbnail: typeof thumbnail === 'string' && thumbnail.length > 0 ? thumbnail : null,
       project: project && typeof project === 'object' ? project : null,
       updatedAt: new Date().toISOString(),
@@ -21725,7 +21812,9 @@
       name: createSharedProjectSnapshotTitle(project.title || normalizedEntry.name || state.documentName || DEFAULT_DOCUMENT_NAME),
       fileName: normalizedEntry.fileName || normalizeDocumentName(`${normalizedEntry.name || DEFAULT_DOCUMENT_NAME}.pixiedraw`),
       thumbnail,
-      roleHint: project?.membership_role === 'owner' ? 'master' : 'guest',
+      roleHint: project?.owner_user_id === accountState.userId ? 'master' : 'guest',
+      membershipRole: project?.membership_role || normalizedEntry.sharedProjectMembershipRole || '',
+      ownerUserId: project?.owner_user_id || normalizedEntry.sharedProjectOwnerUserId || '',
       autoJoin: normalizedEntry.sharedAutoJoin !== false,
       revision: Math.max(0, Math.round(Number(project.latest_revision) || 0)),
       structureRevision: Math.max(0, Math.round(Number(project.latest_structure_revision) || 0)),
@@ -22835,7 +22924,9 @@
       inviteToken: freshestProject.invite_token || normalizedInviteToken || '',
       visibility: freshestProject.visibility || 'shared',
       name: createSharedProjectSnapshotTitle(freshestProject.title || state.documentName || resolvedProjectKey),
-      roleHint: openingOwnedSharedProject ? 'master' : requestedRole,
+      roleHint: openingOwnedSharedProject ? 'master' : 'guest',
+      membershipRole: freshestProject.membership_role || '',
+      ownerUserId: freshestProject.owner_user_id || '',
       autoJoin: access?.autoJoin !== false,
       revision: Math.max(0, Math.round(Number(freshestProject.latest_revision) || 0)),
       structureRevision: Math.max(0, Math.round(Number(freshestProject.latest_structure_revision) || 0)),
@@ -54765,6 +54856,8 @@
             fileName: normalizeDocumentName(`${createSharedProjectSnapshotTitle(inviteProject.title || normalizedInviteProjectKey || DEFAULT_DOCUMENT_NAME)}.pixiedraw`),
             thumbnail,
             roleHint: 'guest',
+            membershipRole: inviteProject.membership_role || '',
+            ownerUserId: inviteProject.owner_user_id || '',
             autoJoin: invite.autoJoin !== false,
             revision: Math.max(0, Math.round(Number(inviteProject.latest_revision) || 0)),
             structureRevision: Math.max(0, Math.round(Number(inviteProject.latest_structure_revision) || 0)),
@@ -54895,6 +54988,8 @@
       visibility: project.visibility || 'shared',
       name: createSharedProjectSnapshotTitle(project.title || state.documentName || projectKey),
       roleHint: 'master',
+      membershipRole: project.membership_role || 'owner',
+      ownerUserId: project.owner_user_id || accountState.userId || '',
       autoJoin: false,
       revision: Math.max(0, Math.round(Number(project.latest_revision) || 0)),
       structureRevision: Math.max(0, Math.round(Number(project.latest_structure_revision) || 0)),
@@ -54962,6 +55057,8 @@
           fileName: normalizeDocumentName(`${createSharedProjectSnapshotTitle(inviteProject.title || access.projectKey || DEFAULT_DOCUMENT_NAME)}.pixiedraw`),
           thumbnail,
           roleHint: 'guest',
+          membershipRole: inviteProject.membership_role || '',
+          ownerUserId: inviteProject.owner_user_id || '',
           autoJoin: false,
           revision: Math.max(0, Math.round(Number(inviteProject.latest_revision) || 0)),
           structureRevision: Math.max(0, Math.round(Number(inviteProject.latest_structure_revision) || 0)),
@@ -60984,7 +61081,9 @@
         inviteToken: projectRecord?.invite_token || '',
         visibility: projectRecord?.visibility || 'private',
         name: createSharedProjectSnapshotTitle(projectRecord?.title || projectKey),
-        roleHint: normalizeMultiDesiredRole(multiState.role || multiState.desiredRole || 'spectator'),
+        roleHint: projectRecord?.owner_user_id === accountState.userId ? 'master' : 'guest',
+        membershipRole: projectRecord?.membership_role || '',
+        ownerUserId: projectRecord?.owner_user_id || '',
         autoJoin: false,
         revision: retainedRevision,
         structureRevision: retainedStructureRevision,
@@ -61573,7 +61672,9 @@
         inviteToken: project.invite_token || '',
         visibility: project.visibility || 'private',
         name: createSharedProjectSnapshotTitle(project.title || activeSharedProjectKey),
-        roleHint: normalizeMultiDesiredRole(multiState.role || multiState.desiredRole || 'spectator'),
+        roleHint: project.owner_user_id === accountState.userId ? 'master' : 'guest',
+        membershipRole: project.membership_role || '',
+        ownerUserId: project.owner_user_id || '',
         autoJoin: false,
         revision: nextRevision,
         structureRevision: Math.max(0, Math.round(Number(project.latest_structure_revision) || 0)),
@@ -62245,7 +62346,9 @@
           visibility: project?.visibility || 'private',
           name: createSharedProjectSnapshotTitle(project?.title || projectKey),
           thumbnail,
-          roleHint: membership?.role === 'owner' ? 'master' : 'guest',
+          roleHint: project?.owner_user_id === accountState.userId ? 'master' : 'guest',
+          membershipRole: membership?.role || project?.membership_role || '',
+          ownerUserId: project?.owner_user_id || '',
           autoJoin: false,
           revision: Math.max(0, Math.round(Number(project?.latest_revision) || 0)),
           structureRevision: Math.max(0, Math.round(Number(project?.latest_structure_revision) || 0)),
@@ -62325,7 +62428,9 @@
             inviteToken: saved.invite_token || '',
             visibility: saved.visibility || 'private',
             name: createSharedProjectSnapshotTitle(saved.title || nextPayload.title),
-            roleHint: resolveSharedRecentProjectRoleHint(nextPayload.projectKey, 'master'),
+            roleHint: saved.owner_user_id === accountState.userId ? 'master' : 'guest',
+            membershipRole: saved.membership_role || '',
+            ownerUserId: saved.owner_user_id || accountState.userId || '',
             autoJoin: false,
             revision: Math.max(0, Math.round(Number(saved.latest_revision) || 0)),
             structureRevision: nextStructureRevision,
@@ -65963,7 +66068,9 @@
           inviteToken,
           visibility: project.visibility || 'shared',
           name: createSharedProjectSnapshotTitle(project.title || state.documentName || resolvedProjectKey),
-          roleHint: normalizeMultiDesiredRole(multiState.role || multiState.desiredRole || 'guest'),
+          roleHint: project.owner_user_id === accountState.userId ? 'master' : 'guest',
+          membershipRole: project.membership_role || '',
+          ownerUserId: project.owner_user_id || '',
           autoJoin: false,
           revision: Math.max(0, Math.round(Number(project.latest_revision) || 0)),
           structureRevision: Math.max(0, Math.round(Number(project.latest_structure_revision) || 0)),
@@ -66008,7 +66115,9 @@
           inviteToken,
           visibility: project.visibility || 'shared',
           name: createSharedProjectSnapshotTitle(project.title || state.documentName || resolvedProjectKey),
-          roleHint: normalizeMultiDesiredRole(multiState.role || multiState.desiredRole || 'guest'),
+          roleHint: project.owner_user_id === accountState.userId ? 'master' : 'guest',
+          membershipRole: project.membership_role || '',
+          ownerUserId: project.owner_user_id || '',
           autoJoin: false,
           revision: Math.max(0, Math.round(Number(project.latest_revision) || 0)),
           structureRevision: Math.max(0, Math.round(Number(project.latest_structure_revision) || 0)),
@@ -71297,10 +71406,16 @@
         }
       }
       storePendingMultiResumeSession();
+      const trackedSharedEntry = getTrackedSharedRecentProjectEntry(projectKey);
+      const trackedOwnerUserId = typeof trackedSharedEntry?.sharedProjectOwnerUserId === 'string'
+        ? trackedSharedEntry.sharedProjectOwnerUserId.trim()
+        : '';
       upsertSharedRecentProjectEntry({
         projectKey,
         name: extractDocumentBaseName(state.documentName || DEFAULT_DOCUMENT_NAME),
-        roleHint: normalizedRole,
+        roleHint: trackedOwnerUserId && trackedOwnerUserId === accountState.userId ? 'master' : 'guest',
+        membershipRole: trackedSharedEntry?.sharedProjectMembershipRole || '',
+        ownerUserId: trackedOwnerUserId,
         autoJoin: false,
         revision: activeSharedProjectKey === projectKey ? activeSharedProjectRevision : 0,
       }).catch(error => {
