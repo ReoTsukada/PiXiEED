@@ -2082,6 +2082,43 @@ body.is-startup-active #virtualCursorCanvas {
   gap: 8px;
 }
 
+.canvas-reload-action {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.canvas-brush-size-field {
+  width: min(280px, 34vw);
+  min-width: 190px;
+  margin: 0;
+  padding: 6px 8px;
+  gap: 6px;
+  border: 2px solid var(--border);
+  background:
+    linear-gradient(0deg, rgba(var(--ui-rgb), 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--ui-rgb), 0.06) 1px, transparent 1px),
+    rgba(6, 12, 18, 0.88);
+  background-size: 4px 4px;
+  box-shadow: var(--shadow);
+}
+
+.canvas-brush-size-field[hidden] {
+  display: flex !important;
+}
+
+.canvas-brush-size-field > span {
+  white-space: nowrap;
+}
+
+.canvas-brush-size-field input[type='range'] {
+  min-width: 78px;
+}
+
+.canvas-brush-size-field output {
+  min-width: 36px;
+  text-align: right;
+}
+
 .canvas-controls[data-mobile='true'] .canvas-control-buttons {
   display: inline-flex;
   align-items: center;
@@ -2090,12 +2127,20 @@ body.is-startup-active #virtualCursorCanvas {
 }
 
 .canvas-controls[data-mobile='true'] .canvas-controls__history,
-.canvas-controls[data-mobile='true'] .canvas-control-buttons {
+.canvas-controls[data-mobile='true'] .canvas-control-buttons,
+.canvas-controls[data-mobile='true'] .canvas-brush-size-field {
   gap: 6px;
 }
 
 .canvas-controls[data-mobile='true'] .canvas-controls__history {
   order: 2;
+}
+
+.canvas-controls[data-mobile='true'] .canvas-brush-size-field {
+  order: 3;
+  width: min(52vw, 260px);
+  min-width: 160px;
+  padding: 4px 6px;
 }
 
 #canvasControlButtons {
@@ -3195,6 +3240,14 @@ body:not(.show-inline-guides) .ui-guide-text {
 
 #brushSizeField {
   order: -1;
+}
+
+.canvas-controls #brushSizeField {
+  order: 0;
+}
+
+.canvas-controls[data-mobile='true'] #brushSizeField {
+  order: 3;
 }
 
 .field-group--tools {

@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.05.13-shared-poll-stability';
+  const APP_BUILD_VERSION = '2026.05.13-shared-reload-control';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
@@ -103,6 +103,7 @@
       toggleUiTheme: document.getElementById('toggleUiTheme'),
       undoAction: document.getElementById('undoAction'),
       redoAction: document.getElementById('redoAction'),
+      appReloadAction: document.getElementById('appReloadAction'),
       canvasControlButtons: document.getElementById('canvasControlButtons'),
       canvasControlPrimary: document.getElementById('canvasControlPrimary'),
       canvasControlSecondary: document.getElementById('canvasControlSecondary'),
@@ -9248,6 +9249,16 @@
         window.location.href = window.location.href;
       }
     }, 120);
+  }
+
+  function requestManualAppReload(reason = 'manual-reload') {
+    try {
+      persistCriticalSessionStateForNavigation();
+      flushAutosaveSnapshotOnLifecycle({ force: true });
+    } catch (error) {
+      console.warn('Failed to persist state before manual reload', error);
+    }
+    scheduleAppReload(reason);
   }
 
   function readSharedProjectRecoveryReloadAt() {
@@ -31829,6 +31840,11 @@
     }
     if (dom.controls.redoAction) {
       dom.controls.redoAction.replaceChildren(makeIcon('action-redo', '↻', { width: 20, height: 20 }));
+    }
+    if (dom.controls.appReloadAction instanceof HTMLButtonElement) {
+      dom.controls.appReloadAction.addEventListener('click', () => {
+        requestManualAppReload('manual-toolbar-reload');
+      });
     }
 
     updateCanvasControlButtons();
