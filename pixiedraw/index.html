@@ -230,8 +230,19 @@
 </div>
 <div class="canvas-controls">
 <div aria-label="履歴操作" class="canvas-controls__history" role="group">
+<button aria-label="アプリを再読み込み" class="chip canvas-reload-action" id="appReloadAction" title="再読み込み" type="button"><img alt="" aria-hidden="true" height="20" src="assets/icons/action-reload.png" width="20"/></button>
 <button aria-label="元に戻す" class="chip" disabled="" id="undoAction" type="button"></button>
 <button aria-label="やり直す" class="chip" disabled="" id="redoAction" type="button"></button>
+</div>
+<div aria-live="polite" class="shared-status-indicator" hidden id="sharedStatusIndicator" role="status">
+<span class="sr-only" id="sharedStatusIndicatorText">最新</span>
+<div aria-hidden="true" class="shared-status-indicator__lamps">
+<span class="shared-status-indicator__lamp shared-status-indicator__lamp--tx" id="sharedStatusLampTx" title="送信"></span>
+<span class="shared-status-indicator__lamp shared-status-indicator__lamp--rx" id="sharedStatusLampRx" title="受信"></span>
+<span class="shared-status-indicator__lamp shared-status-indicator__lamp--ok" id="sharedStatusLampOk" title="最新"></span>
+<span class="shared-status-indicator__lamp shared-status-indicator__lamp--off" id="sharedStatusLampOffline" title="切断"></span>
+</div>
+<button class="chip shared-status-indicator__recover" hidden id="sharedStatusRecoverAction" type="button">再読込</button>
 </div>
 <div aria-label="ズーム操作" class="canvas-control-buttons" id="canvasControlButtons" role="group">
 <button aria-label="ズームアウト" class="chip" id="canvasControlPrimary" type="button"></button>
