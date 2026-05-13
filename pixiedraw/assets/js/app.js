@@ -72,6 +72,7 @@
     canvasResizeHandleStart: document.getElementById('canvasResizeHandleStart'),
     canvasResizeHandleCorner: document.getElementById('canvasResizeHandleCorner'),
     projectTabsBar: document.getElementById('projectTabsBar'),
+    projectTabsStatusSlot: document.getElementById('projectTabsStatusSlot'),
     projectTabsList: document.getElementById('projectTabsList'),
     mirrorToolPopover: document.getElementById('mirrorToolPopover'),
     mirrorGuides: document.getElementById('mirrorGuides'),
@@ -106,11 +107,12 @@
       appReloadAction: document.getElementById('appReloadAction'),
       sharedStatusIndicator: document.getElementById('sharedStatusIndicator'),
       sharedStatusIndicatorText: document.getElementById('sharedStatusIndicatorText'),
-      sharedStatusLampTx: document.getElementById('sharedStatusLampTx'),
-      sharedStatusLampRx: document.getElementById('sharedStatusLampRx'),
-      sharedStatusLampOk: document.getElementById('sharedStatusLampOk'),
-      sharedStatusLampOffline: document.getElementById('sharedStatusLampOffline'),
+      sharedStatusLamp: document.getElementById('sharedStatusLamp'),
       sharedStatusRecoverAction: document.getElementById('sharedStatusRecoverAction'),
+      canvasClipboardButtons: document.getElementById('canvasClipboardButtons'),
+      canvasClipboardCopy: document.getElementById('canvasClipboardCopy'),
+      canvasClipboardPaste: document.getElementById('canvasClipboardPaste'),
+      canvasClipboardCut: document.getElementById('canvasClipboardCut'),
       canvasControlButtons: document.getElementById('canvasControlButtons'),
       canvasControlPrimary: document.getElementById('canvasControlPrimary'),
       canvasControlSecondary: document.getElementById('canvasControlSecondary'),
@@ -3775,8 +3777,12 @@
   let mirrorToolPopoverListenersBound = false;
   /* solidShape tool removed */
   const toolIconCache = new Map();
+  const STARTUP_SCREEN_MODE_DEFAULT = 'default';
+  const STARTUP_SCREEN_MODE_APPEND_TAB = 'append-tab';
   let startupVisible = false;
+  let startupScreenMode = STARTUP_SCREEN_MODE_DEFAULT;
   let startupVirtualCursorState = null;
+  let pendingNewProjectAppendAsTab = false;
   let layoutMode = null;
   let multiEntryJoinPanelOpen = false;
   function bindClickHandlerOnce(element, datasetKey, handler) {
@@ -3792,7 +3798,10 @@
 
   function bindCoreProjectActionButtons() {
     bindClickHandlerOnce(dom.startup?.newButton, 'coreProjectActionBound', () => {
-      openNewProjectDialog({ dismissStartup: true });
+      openNewProjectDialog({
+        dismissStartup: true,
+        appendAsTab: isStartupScreenAppendTabMode(),
+      });
     });
     bindClickHandlerOnce(dom.startup?.openButton, 'coreProjectActionBound', async () => {
       const opened = await openDocumentDialog();
@@ -8130,6 +8139,21 @@
 
       list.appendChild(item);
     });
+    const addItem = document.createElement('div');
+    addItem.className = 'project-tab-item project-tab-item--add';
+    addItem.setAttribute('role', 'presentation');
+    const addButton = document.createElement('button');
+    addButton.type = 'button';
+    addButton.className = 'project-tab-item__add';
+    addButton.dataset.projectTabAdd = 'true';
+    addButton.textContent = '+';
+    addButton.setAttribute(
+      'aria-label',
+      localizeText('端末内プロジェクトをタブへ追加', 'Add local project to tabs')
+    );
+    addButton.disabled = openProjectTabBusy || openProjectTabs.length >= MAX_OPEN_PROJECT_TABS;
+    addItem.appendChild(addButton);
+    list.appendChild(addItem);
   }
 
   function ensureOpenProjectTabsInitialized() {
@@ -8410,6 +8434,13 @@
     return true;
   }
 
+  function openProjectTabAddPicker() {
+    if (openProjectTabBusy) {
+      return;
+    }
+    showStartupScreen({ mode: 'append-tab' });
+  }
+
   function setupOpenProjectTabs() {
     const list = dom.projectTabsList;
     if (!(list instanceof HTMLElement)) {
@@ -8429,6 +8460,11 @@
       if (closeButton instanceof HTMLButtonElement) {
         const tabId = closeButton.dataset.projectTabCloseId || '';
         void closeOpenProjectTab(tabId);
+        return;
+      }
+      const addButton = target.closest('button[data-project-tab-add]');
+      if (addButton instanceof HTMLButtonElement) {
+        openProjectTabAddPicker();
         return;
       }
       const selectButton = target.closest('button[data-project-tab-id]');
@@ -9448,6 +9484,32 @@
     };
   }
 
+  function resolveSharedProjectLampState(status) {
+    if (!status?.visible) {
+      return 'offline';
+    }
+    if (status.state === 'offline' || status.state === 'blocked') {
+      return 'offline';
+    }
+    const sending = Boolean(status.sending);
+    const receiving = Boolean(status.receiving);
+    if (sending && receiving) {
+      return sharedProjectLastRxActivityAt >= sharedProjectLastTxActivityAt
+        ? 'receiving'
+        : 'sending';
+    }
+    if (receiving) {
+      return 'receiving';
+    }
+    if (sending) {
+      return 'sending';
+    }
+    if (status.state === 'recovering' || status.state === 'syncing') {
+      return 'receiving';
+    }
+    return 'synced';
+  }
+
   function ensureSharedProjectAutoRecovery(status) {
     if (!status?.visible || !activeSharedProjectKey || appReloadInProgress) {
       return;
@@ -9503,10 +9565,11 @@
     indicator.hidden = !status.visible;
     indicator.setAttribute('aria-hidden', String(!status.visible));
     indicator.dataset.state = status.state;
-    indicator.dataset.tx = status.sending ? 'on' : 'off';
-    indicator.dataset.rx = status.receiving ? 'on' : 'off';
-    indicator.dataset.ok = status.state === 'synced' ? 'on' : 'off';
-    indicator.dataset.offline = (status.state === 'offline' || status.state === 'blocked') ? 'on' : 'off';
+    indicator.dataset.lamp = resolveSharedProjectLampState(status);
+    if (dom.projectTabsStatusSlot instanceof HTMLElement) {
+      dom.projectTabsStatusSlot.hidden = !status.visible;
+      dom.projectTabsStatusSlot.setAttribute('aria-hidden', String(!status.visible));
+    }
     if (dom.controls.sharedStatusIndicatorText instanceof HTMLElement) {
       dom.controls.sharedStatusIndicatorText.textContent = status.label;
     }
@@ -11214,6 +11277,7 @@
     const movePending = Boolean(moveState && moveState.hasCleared);
     const hasSelection = selectionMaskHasPixels(state.selectionMask);
     const hasClipboard = Boolean(internalClipboard.selection);
+    const isSelectionToolActive = TOOL_TO_GROUP[state.tool] === 'selection';
     const disableOutline = (
       !hasSelection
       || state.playback.isPlaying
@@ -11229,7 +11293,7 @@
     const isMobilePortraitLayout = layoutMode === 'mobilePortrait';
     const nextMode = movePending
       ? 'selectionMove'
-      : (isMobilePortraitLayout ? 'clipboard' : ((hasSelection || hasClipboard) ? 'clipboard' : 'zoom'));
+      : ((hasSelection || hasClipboard) ? 'clipboard' : 'zoom');
     const isZoomMode = nextMode === 'zoom';
     if (canvasControlMode !== nextMode) {
       canvasControlMode = nextMode;
@@ -11264,9 +11328,8 @@
     }
     if (dom.controls.canvasControlButtons instanceof HTMLElement) {
       dom.controls.canvasControlButtons.classList.toggle('is-clipboard-mode', !isZoomMode);
-      const isSelectionToolActive = TOOL_TO_GROUP[state.tool] === 'selection';
       const showFloatingSelectionActions = isMobilePortraitLayout
-        ? true
+        ? (canvasControlMode === 'selectionMove')
         : (
           isSelectionToolActive
           && (canvasControlMode === 'clipboard' || canvasControlMode === 'selectionMove')
@@ -11284,6 +11347,20 @@
         'aria-hidden',
         String(!showFloatingSelectionActions)
       );
+    }
+    const canUseClipboardStrip = isSelectionToolActive && hasSelection;
+    if (dom.controls.canvasClipboardButtons instanceof HTMLElement) {
+      dom.controls.canvasClipboardButtons.classList.toggle('is-visible', canUseClipboardStrip);
+      dom.controls.canvasClipboardButtons.setAttribute('aria-hidden', String(!canUseClipboardStrip));
+    }
+    if (dom.controls.canvasClipboardCopy instanceof HTMLButtonElement) {
+      dom.controls.canvasClipboardCopy.disabled = false;
+    }
+    if (dom.controls.canvasClipboardPaste instanceof HTMLButtonElement) {
+      dom.controls.canvasClipboardPaste.disabled = false;
+    }
+    if (dom.controls.canvasClipboardCut instanceof HTMLButtonElement) {
+      dom.controls.canvasClipboardCut.disabled = false;
     }
     if (dom.controls.zoomInput instanceof HTMLInputElement) {
       dom.controls.zoomInput.disabled = !isZoomMode;
@@ -15740,7 +15817,59 @@
     }
   }
 
-  async function openRecentProjectAsTab(entry, { hideStartup = true } = {}) {
+  async function createNewProjectAsTab({
+    name,
+    width,
+    height,
+    palettePreset = newProjectPalettePresetId,
+    promptExportDirectory = false,
+  }) {
+    if (openProjectTabBusy) {
+      return false;
+    }
+    ensureOpenProjectTabsInitialized();
+    if (openProjectTabs.length >= MAX_OPEN_PROJECT_TABS) {
+      updateAutosaveStatus(
+        localizeText(
+          `同時に開けるプロジェクトは最大 ${MAX_OPEN_PROJECT_TABS} 件です`,
+          `You can open up to ${MAX_OPEN_PROJECT_TABS} projects at once`
+        ),
+        'warn'
+      );
+      return false;
+    }
+    openProjectTabBusy = true;
+    try {
+      await persistActiveOpenProjectTab({ flushAutosave: true });
+      const created = await createNewProject({
+        name,
+        width,
+        height,
+        palettePreset,
+        promptExportDirectory,
+      });
+      if (!created) {
+        return false;
+      }
+      const appended = appendOpenProjectTabFromCurrentState({
+        activate: true,
+        source: 'new-project',
+        projectId: autosaveProjectId,
+      });
+      if (!appended) {
+        return false;
+      }
+      updateAutosaveStatus(
+        localizeText('新規プロジェクトをタブ追加しました', 'Added new project tab'),
+        'success'
+      );
+      return true;
+    } finally {
+      openProjectTabBusy = false;
+    }
+  }
+
+  async function openRecentProjectAsTab(entry, { hideStartup = true, appendOnly = false } = {}) {
     if (!entry || typeof entry !== 'object') {
       return false;
     }
@@ -15748,9 +15877,6 @@
       ? beginStartupProgress(localizeText('プロジェクトを開いています…', 'Opening project...'))
       : null;
     try {
-      if (isSharedRecentProjectEntry(entry)) {
-        return await openRecentProject(entry, { hideStartup, silent: true });
-      }
       if (!ensureCurrentClientCanReplaceActiveProject()) {
         return false;
       }
@@ -15778,7 +15904,8 @@
         );
         return false;
       }
-      const shouldReuseActiveTab = canReuseActiveOpenProjectTabForRecentEntry(entry);
+      const shouldReuseActiveTab = !appendOnly && canReuseActiveOpenProjectTabForRecentEntry(entry);
+      const source = isSharedRecentProjectEntry(entry) ? 'shared-recent' : 'local-recent';
       openProjectTabBusy = true;
       try {
         await persistActiveOpenProjectTab({ flushAutosave: true });
@@ -15791,12 +15918,12 @@
         }
         const nextTab = shouldReuseActiveTab
           ? replaceActiveOpenProjectTabFromCurrentState({
-              source: 'local-recent',
+              source,
               projectId: projectId || autosaveProjectId,
             })
           : appendOpenProjectTabFromCurrentState({
               activate: true,
-              source: 'local-recent',
+              source,
               projectId: projectId || autosaveProjectId,
             });
         if (!nextTab) {
@@ -15805,7 +15932,12 @@
         if (hideStartup) {
           hideStartupScreen();
         }
-        updateAutosaveStatus('自動保存: 端末内プロジェクトを開きました', 'success');
+        updateAutosaveStatus(
+          isSharedRecentProjectEntry(entry)
+            ? localizeText('共有プロジェクトをタブ追加しました', 'Added shared project tab')
+            : localizeText('端末内プロジェクトをタブ追加しました', 'Added local project tab'),
+          'success'
+        );
         return true;
       } finally {
         openProjectTabBusy = false;
@@ -18728,13 +18860,15 @@
     return Boolean(state.playback.isPlaying);
   }
 
-  function openNewProjectDialog({ dismissStartup = false } = {}) {
+  function openNewProjectDialog({ dismissStartup = false, appendAsTab = false } = {}) {
     if (!ensureCurrentClientCanReplaceActiveProject()) {
       return;
     }
     const config = dom.newProject;
     if (!config) {
-      void promptNewProjectFallback();
+      void promptNewProjectFallback({
+        appendAsTab: Boolean(appendAsTab),
+      });
       return;
     }
     const dialog = config.dialog;
@@ -18760,6 +18894,7 @@
           renderNewProjectPalettePresetPicker(normalizedPreset);
           setNewProjectPalettePresetPickerOpen(false);
         }
+        pendingNewProjectAppendAsTab = Boolean(appendAsTab);
         dialog.showModal();
         if (dismissStartup) {
           hideStartupScreen();
@@ -18774,10 +18909,13 @@
         console.warn('Failed to open new project dialog', error);
       }
     }
+    pendingNewProjectAppendAsTab = false;
     if (dismissStartup) {
       hideStartupScreen();
     }
-    void promptNewProjectFallback();
+    void promptNewProjectFallback({
+      appendAsTab: Boolean(appendAsTab),
+    });
   }
 
   function queueNewProjectAdRender() {
@@ -19079,6 +19217,7 @@
 
   function closeNewProjectDialog() {
     setNewProjectPalettePresetPickerOpen(false);
+    pendingNewProjectAppendAsTab = false;
     const dialog = dom.newProject?.dialog;
     if (dialog && dialog.open) {
       dialog.close();
@@ -19374,13 +19513,21 @@
     const palettePresetValue = config?.palettePreset?.value;
     const width = Number(widthValue);
     const height = Number(heightValue);
-    const created = await createNewProject({
+    const created = pendingNewProjectAppendAsTab
+      ? await createNewProjectAsTab({
+        name,
+        width,
+        height,
+        palettePreset: palettePresetValue,
+        promptExportDirectory: false,
+      })
+      : await createNewProject({
       name,
       width,
       height,
       palettePreset: palettePresetValue,
       promptExportDirectory: false,
-    });
+      });
     if (created) {
       if (config?.nameInput) {
         config.nameInput.value = extractDocumentBaseName(name);
@@ -19391,7 +19538,7 @@
     }
   }
 
-  async function promptNewProjectFallback() {
+  async function promptNewProjectFallback({ appendAsTab = false } = {}) {
     if (!ensureCurrentClientCanReplaceActiveProject()) {
       return;
     }
@@ -19403,12 +19550,20 @@
     if (heightRaw === null) return;
     const width = Number(widthRaw);
     const height = Number(heightRaw);
-    if (!(await createNewProject({
+    const created = appendAsTab
+      ? await createNewProjectAsTab({
+        name,
+        width,
+        height,
+        promptExportDirectory: false,
+      })
+      : await createNewProject({
       name,
       width,
       height,
       promptExportDirectory: false,
-    }))) {
+      });
+    if (!created) {
       window.alert(`キャンバスサイズは${MIN_CANVAS_SIZE}〜${MAX_CANVAS_SIZE}の数値で入力してください。`);
     }
   }
@@ -19607,11 +19762,31 @@
     }
   }
 
-  function showStartupScreen() {
+  function normalizeStartupScreenMode(mode) {
+    return mode === STARTUP_SCREEN_MODE_APPEND_TAB
+      ? STARTUP_SCREEN_MODE_APPEND_TAB
+      : STARTUP_SCREEN_MODE_DEFAULT;
+  }
+
+  function setStartupScreenMode(mode) {
+    startupScreenMode = normalizeStartupScreenMode(mode);
+    const container = dom.startup?.screen;
+    if (container instanceof HTMLElement) {
+      container.dataset.mode = startupScreenMode;
+    }
+  }
+
+  function isStartupScreenAppendTabMode() {
+    return startupScreenMode === STARTUP_SCREEN_MODE_APPEND_TAB;
+  }
+
+  function showStartupScreen(options = {}) {
     const container = dom.startup?.screen;
     if (!container) {
       return;
     }
+    const nextMode = normalizeStartupScreenMode(options?.mode);
+    setStartupScreenMode(nextMode);
     if (AUTOSAVE_SUPPORTED) {
       refreshRecentProjectsUI().catch(error => {
         console.warn('Failed to refresh recent projects', error);
@@ -19721,6 +19896,7 @@
       window.history.replaceState({}, document.title, window.location.href);
       lensImportRequested = false;
     }
+    setStartupScreenMode(STARTUP_SCREEN_MODE_DEFAULT);
   }
 
   async function maybeRestoreAutosaveProjectOnStartup() {
@@ -19996,7 +20172,9 @@
         );
         return;
       }
-      const opened = await openRecentProject(firstEntry, { hideStartup: true, silent: true });
+      const opened = isStartupScreenAppendTabMode()
+        ? await openRecentProjectAsTab(firstEntry, { hideStartup: true, appendOnly: true })
+        : await openRecentProject(firstEntry, { hideStartup: true, silent: true });
       if (!opened) {
         refreshRecentProjectsUI().catch(error => {
           console.warn('Failed to refresh recent projects', error);
@@ -20131,7 +20309,9 @@
         return;
       }
       openButton.disabled = true;
-      const success = await openRecentProject(entry, { hideStartup: true, silent: true });
+      const success = isStartupScreenAppendTabMode()
+        ? await openRecentProjectAsTab(entry, { hideStartup: true, appendOnly: true })
+        : await openRecentProject(entry, { hideStartup: true, silent: true });
       if (!success) {
         openButton.disabled = false;
       }
@@ -22206,10 +22386,17 @@
     if (!section || !list) {
       return;
     }
+    const titleNode = section.querySelector('.startup-screen__recent-title');
+    const appendTabMode = isStartupScreenAppendTabMode();
     list.innerHTML = '';
     if (!AUTOSAVE_SUPPORTED || !entries || entries.length === 0) {
       section.hidden = true;
       return;
+    }
+    if (titleNode instanceof HTMLElement) {
+      titleNode.textContent = appendTabMode
+        ? localizeText('プロジェクト一覧', 'Projects')
+        : localizeText('端末内プロジェクト（自動保存）', 'Local Projects (Autosave)');
     }
     section.hidden = false;
     entries.forEach(entry => {
@@ -32172,6 +32359,8 @@
         performCopyAction();
       } else if (action === 'paste') {
         performPasteAction();
+      } else if (action === 'cut') {
+        performCutAction();
       } else if (action === 'cancelSelectionMove') {
         cancelPendingSelectionMove();
       } else if (action === 'confirmSelectionMove') {
@@ -32182,6 +32371,9 @@
 
     dom.controls.canvasControlPrimary?.addEventListener('click', handleCanvasControlClick);
     dom.controls.canvasControlSecondary?.addEventListener('click', handleCanvasControlClick);
+    dom.controls.canvasClipboardCopy?.addEventListener('click', handleCanvasControlClick);
+    dom.controls.canvasClipboardPaste?.addEventListener('click', handleCanvasControlClick);
+    dom.controls.canvasClipboardCut?.addEventListener('click', handleCanvasControlClick);
 
     if (dom.controls.undoAction) {
       dom.controls.undoAction.replaceChildren(makeIcon('action-undo', '↺', { width: 20, height: 20 }));
@@ -48999,7 +49191,7 @@
       }
       storeSelectionInClipboard(clipboardMoveState);
       beginHistory('selectionCut');
-      clearSelectionSourcePixels(finalizedMoveState);
+      clearSelectionSourcePixels(finalizedMoveState, { useSelectionMask: true });
       captureSharedProjectRegionCommand(finalizedMoveState.bounds, pointerState.surface || null, 'selectionCut');
       commitHistory();
       clearSelection();
@@ -49014,7 +49206,7 @@
     storeSelectionInClipboard(moveState);
     state.pendingPasteMoveState = null;
     beginHistory('selectionCut');
-    clearSelectionSourcePixels(moveState);
+    clearSelectionSourcePixels(moveState, { useSelectionMask: true });
     captureSharedProjectRegionCommand(moveState.bounds, pointerState.surface || null, 'selectionCut');
     commitHistory();
     clearSelection();
@@ -49165,10 +49357,16 @@
     return true;
   }
 
-  function clearSelectionSourcePixels(moveState) {
+  function clearSelectionSourcePixels(moveState, options = {}) {
     const { layer, bounds, width, height } = moveState;
-    const mask = getSelectionMoveContentMask(moveState) || moveState.mask;
+    const useSelectionMask = Boolean(options && options.useSelectionMask);
+    const mask = useSelectionMask
+      ? moveState.mask
+      : (getSelectionMoveContentMask(moveState) || moveState.mask);
     if (!layer) {
+      return;
+    }
+    if (!(mask instanceof Uint8Array) || mask.length !== (width * height)) {
       return;
     }
     const restoreIndices = moveState.restoreIndices instanceof Int16Array ? moveState.restoreIndices : null;
