@@ -106,6 +106,10 @@
       appReloadAction: document.getElementById('appReloadAction'),
       sharedStatusIndicator: document.getElementById('sharedStatusIndicator'),
       sharedStatusIndicatorText: document.getElementById('sharedStatusIndicatorText'),
+      sharedStatusLampTx: document.getElementById('sharedStatusLampTx'),
+      sharedStatusLampRx: document.getElementById('sharedStatusLampRx'),
+      sharedStatusLampOk: document.getElementById('sharedStatusLampOk'),
+      sharedStatusLampOffline: document.getElementById('sharedStatusLampOffline'),
       sharedStatusRecoverAction: document.getElementById('sharedStatusRecoverAction'),
       canvasControlButtons: document.getElementById('canvasControlButtons'),
       canvasControlPrimary: document.getElementById('canvasControlPrimary'),
@@ -2558,6 +2562,7 @@
   const SHARED_PROJECT_AUTO_RELOAD_AFTER_CATCHUP_MS = 45000;
   const SHARED_PROJECT_FIRST_INPUT_RECONNECT_AFTER_CATCHUP_MS = 1200;
   const SHARED_PROJECT_VISIBLE_RECOVER_AFTER_SYNC_MS = 6000;
+  const SHARED_PROJECT_STATUS_TRAFFIC_LAMP_MS = 1200;
   const SHARED_PROJECT_RECOVERY_RELOAD_COOLDOWN_MS = 90000;
   const SHARED_PROJECT_BROADCAST_EVENT = 'shared-op';
   const SHARED_PROJECT_RECOVERY_RELOAD_STORAGE_KEY = 'pixieedraw:shared-recovery-reload-at';
@@ -3070,6 +3075,8 @@
   let sharedProjectRecoveryInProgress = false;
   let sharedProjectDeferRealtimeUntilSynced = false;
   let sharedProjectLastEmptyOpsFetchLogAt = 0;
+  let sharedProjectLastTxActivityAt = 0;
+  let sharedProjectLastRxActivityAt = 0;
   function getCurrentAccountStorageNamespace() {
     const userId = typeof accountState.userId === 'string' ? accountState.userId.trim() : '';
     return userId || 'anonymous';
@@ -9311,7 +9318,34 @@
     scheduleAppReload(reason);
   }
 
+  function markSharedProjectTrafficActivity(direction = 'tx') {
+    if (!isSharedProjectCollaborativeMode()) {
+      return;
+    }
+    if (direction === 'rx') {
+      sharedProjectLastRxActivityAt = Date.now();
+    } else {
+      sharedProjectLastTxActivityAt = Date.now();
+    }
+    syncSharedProjectVisibleStatus();
+  }
+
   function getSharedProjectVisibleStatus() {
+    const now = Date.now();
+    const sending = (
+      sharedProjectOpCommitInFlight
+      || sharedProjectSyncInFlight
+      || sharedProjectPendingLocalOps.length > 0
+      || ((now - sharedProjectLastTxActivityAt) <= SHARED_PROJECT_STATUS_TRAFFIC_LAMP_MS)
+    );
+    const receiving = (
+      sharedProjectRefreshInFlight
+      || sharedProjectRecoveryInProgress
+      || Boolean(sharedProjectReconnectRecoveryPromise)
+      || sharedProjectSnapshotReplayInFlight
+      || sharedProjectPendingRemoteOps.size > 0
+      || ((now - sharedProjectLastRxActivityAt) <= SHARED_PROJECT_STATUS_TRAFFIC_LAMP_MS)
+    );
     const statusBase = {
       visible: true,
       state: 'idle',
@@ -9319,6 +9353,8 @@
       recoverable: false,
       reloadable: false,
       autoRecoverReason: '',
+      sending,
+      receiving,
     };
     if (!isSharedProjectCollaborativeMode()) {
       return {
@@ -9332,6 +9368,8 @@
         state: 'offline',
         label: localizeText('オフライン', 'Offline'),
         autoRecoverReason: 'offline-wait',
+        sending: false,
+        receiving: false,
       };
     }
     if (
@@ -9465,6 +9503,10 @@
     indicator.hidden = !status.visible;
     indicator.setAttribute('aria-hidden', String(!status.visible));
     indicator.dataset.state = status.state;
+    indicator.dataset.tx = status.sending ? 'on' : 'off';
+    indicator.dataset.rx = status.receiving ? 'on' : 'off';
+    indicator.dataset.ok = status.state === 'synced' ? 'on' : 'off';
+    indicator.dataset.offline = (status.state === 'offline' || status.state === 'blocked') ? 'on' : 'off';
     if (dom.controls.sharedStatusIndicatorText instanceof HTMLElement) {
       dom.controls.sharedStatusIndicatorText.textContent = status.label;
     }
@@ -32148,7 +32190,11 @@
       dom.controls.redoAction.replaceChildren(makeIcon('action-redo', '↻', { width: 20, height: 20 }));
     }
     if (dom.controls.appReloadAction instanceof HTMLButtonElement) {
-      dom.controls.appReloadAction.replaceChildren(makeIcon('action-reload', '⟳', { width: 20, height: 20, extension: 'png' }));
+      const reloadIcon = makeIcon('action-reload', '⟳', { width: 20, height: 20, extension: 'png' });
+      reloadIcon.addEventListener('error', () => {
+        dom.controls.appReloadAction.textContent = '⟳';
+      }, { once: true });
+      dom.controls.appReloadAction.replaceChildren(reloadIcon);
       dom.controls.appReloadAction.addEventListener('click', () => {
         requestManualAppReload('manual-toolbar-reload');
       });
@@ -60089,6 +60135,9 @@
     if (!list.length) {
       return true;
     }
+    if (fromRemote) {
+      markSharedProjectTrafficActivity('rx');
+    }
     list.sort(compareSharedProjectOpsForReplay);
     beginSharedProjectReplayRenderBatch();
     try {
@@ -60244,6 +60293,7 @@
     if (!op || typeof op !== 'object' || !op.projectKey) {
       return;
     }
+    markSharedProjectTrafficActivity('tx');
     const opType = classifySharedProjectOpType(op.historyLabel || '');
     rememberSharedProjectLocalInFlightOp(op, {
       source: 'local',
@@ -60983,6 +61033,9 @@
           durationMs: Math.max(0, Date.now() - startedAt),
           opCount: result.length,
         });
+      }
+      if (result.length > 0) {
+        markSharedProjectTrafficActivity('rx');
       }
       return result;
     } catch (error) {
