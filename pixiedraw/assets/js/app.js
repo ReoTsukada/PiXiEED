@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.05.08-shared-owner-delete-brush-size';
+  const APP_BUILD_VERSION = '2026.05.13-shared-poll-stability';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
@@ -3059,6 +3059,7 @@
   let sharedProjectSnapshotReplayInFlight = false;
   let sharedProjectRecoveryInProgress = false;
   let sharedProjectDeferRealtimeUntilSynced = false;
+  let sharedProjectLastEmptyOpsFetchLogAt = 0;
   function getCurrentAccountStorageNamespace() {
     const userId = typeof accountState.userId === 'string' ? accountState.userId.trim() : '';
     return userId || 'anonymous';
@@ -59418,7 +59419,14 @@
         Math.min(128, SHARED_PROJECT_MAX_MISSING_OP_FETCH)
       );
       if (!ops.length) {
-        return false;
+        sharedProjectLastRescueAfterSeq = afterSeq;
+        sharedProjectLastRescueOpCount = 0;
+        sharedProjectRescueStallCount = 0;
+        return Boolean(
+          activeSharedProjectDocumentLoaded
+          && hasUsableActiveSharedProjectDocumentState()
+          && activeSharedProjectSyncState === 'synced'
+        );
       }
       console.debug('[shared-realtime] rescue-op-poll', {
         reason,
@@ -59443,7 +59451,11 @@
           afterSeq,
           opCount: ops.length,
         });
-        return false;
+        return Boolean(
+          activeSharedProjectDocumentLoaded
+          && hasUsableActiveSharedProjectDocumentState()
+          && activeSharedProjectSyncState === 'synced'
+        );
       }
       if (!advanced) {
         const repeatedSameWindow = (
@@ -60615,7 +60627,10 @@
         visibilityState: typeof document !== 'undefined' ? String(document.visibilityState || '') : '',
         online: typeof navigator !== 'undefined' ? Boolean(navigator.onLine) : null,
       };
-      console.debug('[shared-backend] fetch-ops-since start', rpcDebugInfo);
+      const shouldLogFetchStart = (Date.now() - sharedProjectLastEmptyOpsFetchLogAt) > 30000;
+      if (shouldLogFetchStart) {
+        console.debug('[shared-backend] fetch-ops-since start', rpcDebugInfo);
+      }
       const { data, error } = await supabase.rpc('pixieed_get_shared_project_ops_since', {
         target_project_key: normalizedProjectKey,
         after_revision: Math.max(0, Math.round(Number(afterRevision) || 0)),
@@ -60632,11 +60647,17 @@
       }
       const result = Array.isArray(data) ? data : [];
       confirmSharedProjectLocalOpsFromServerOps(result, { source: 'refresh' });
-      console.debug('[shared-backend] fetch-ops-since result', {
-        ...rpcDebugInfo,
-        durationMs: Math.max(0, Date.now() - startedAt),
-        opCount: result.length,
-      });
+      const shouldLogEmptyResult = result.length > 0 || (Date.now() - sharedProjectLastEmptyOpsFetchLogAt) > 30000;
+      if (shouldLogEmptyResult) {
+        if (!result.length) {
+          sharedProjectLastEmptyOpsFetchLogAt = Date.now();
+        }
+        console.debug('[shared-backend] fetch-ops-since result', {
+          ...rpcDebugInfo,
+          durationMs: Math.max(0, Date.now() - startedAt),
+          opCount: result.length,
+        });
+      }
       return result;
     } catch (error) {
       if (isRecoverableSharedBackendPreflightError(error)) {
@@ -61327,6 +61348,28 @@
           activeRevision: activeSharedProjectRevision,
           latestRevision: nextRevision,
         });
+      }
+      if (
+        force
+        && activeAlreadyAtLatest
+        && activeSharedProjectDocumentLoaded
+        && activeSharedProjectSynced
+        && !sharedProjectDeferRealtimeUntilSynced
+        && !requiresCanonicalSnapshot
+        && !hasSharedProjectHardLocalWorkInFlight()
+      ) {
+        logSharedProjectRealtimeChannelLifecycle('refresh-result', {
+          caller: 'refreshActiveSharedProjectSnapshot',
+          reason: reason || 'refresh',
+          extra: {
+            force,
+            result: 'already-current-forced-skip',
+            nextRevision,
+            nextStructureRevision,
+            snapshotRevision,
+          },
+        });
+        return true;
       }
       if (
         !force

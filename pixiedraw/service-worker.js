@@ -1,11 +1,11 @@
-const CACHE_VERSION = 'pixiedraw-v2026.05.08-shared-owner-delete-brush-size';
+const CACHE_VERSION = 'pixiedraw-v2026.05.13-shared-poll-stability';
 const CORE_ASSETS = [
   '/pixiedraw/',
   '/pixiedraw/index.html',
   '/pixiedraw/manifest.webmanifest',
   '/pixiedraw/assets/css/style.css',
   '/pixiedraw/assets/css/local-extension-runtime.css',
-  '/pixiedraw/assets/js/app.js?v=2026.05.08-shared-owner-delete-brush-size',
+  '/pixiedraw/assets/js/app.js?v=2026.05.13-shared-poll-stability',
   '/icon/icon-192-4.png',
   '/icon/icon-512-4.png',
 ];
