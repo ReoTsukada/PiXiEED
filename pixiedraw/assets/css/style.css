@@ -2087,34 +2087,72 @@ body.is-startup-active #virtualCursorCanvas {
   font-weight: 700;
 }
 
-.canvas-brush-size-field {
-  width: min(280px, 34vw);
-  min-width: 190px;
-  margin: 0;
-  padding: 6px 8px;
+.shared-status-indicator {
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
+  min-height: var(--canvas-control-current-size);
+  max-width: min(260px, 34vw);
+  padding: 0 8px;
   border: 2px solid var(--border);
-  background:
-    linear-gradient(0deg, rgba(var(--ui-rgb), 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(var(--ui-rgb), 0.06) 1px, transparent 1px),
-    rgba(6, 12, 18, 0.88);
-  background-size: 4px 4px;
+  background: rgba(6, 12, 18, 0.88);
+  color: var(--text);
   box-shadow: var(--shadow);
-}
-
-.canvas-brush-size-field[hidden] {
-  display: flex !important;
-}
-
-.canvas-brush-size-field > span {
+  font-size: 0.84rem;
+  line-height: 1;
   white-space: nowrap;
 }
 
-.canvas-brush-size-field input[type='range'] {
+.shared-status-indicator[hidden] {
+  display: none !important;
+}
+
+.shared-status-indicator__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(76, 201, 143, 0.95);
+  box-shadow: 0 0 0 2px rgba(76, 201, 143, 0.18);
+  flex: 0 0 auto;
+}
+
+.shared-status-indicator__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shared-status-indicator__recover {
+  min-width: 46px;
+  height: 28px;
+  padding: 0 8px;
+  font-size: 0.82rem;
+}
+
+.shared-status-indicator[data-state='syncing'] .shared-status-indicator__dot {
+  background: rgba(var(--ui-rgb-focus), 0.95);
+  box-shadow: 0 0 0 2px rgba(var(--ui-rgb-focus), 0.18);
+}
+
+.shared-status-indicator[data-state='recovering'] .shared-status-indicator__dot,
+.shared-status-indicator[data-state='blocked'] .shared-status-indicator__dot,
+.shared-status-indicator[data-state='offline'] .shared-status-indicator__dot {
+  background: rgba(242, 193, 92, 0.95);
+  box-shadow: 0 0 0 2px rgba(242, 193, 92, 0.2);
+}
+
+#brushSizeField[hidden] {
+  display: flex !important;
+}
+
+#brushSizeField > span {
+  white-space: nowrap;
+}
+
+#brushSizeField input[type='range'] {
   min-width: 78px;
 }
 
-.canvas-brush-size-field output {
+#brushSizeField output {
   min-width: 36px;
   text-align: right;
 }
@@ -2128,7 +2166,7 @@ body.is-startup-active #virtualCursorCanvas {
 
 .canvas-controls[data-mobile='true'] .canvas-controls__history,
 .canvas-controls[data-mobile='true'] .canvas-control-buttons,
-.canvas-controls[data-mobile='true'] .canvas-brush-size-field {
+.canvas-controls[data-mobile='true'] .shared-status-indicator {
   gap: 6px;
 }
 
@@ -2136,10 +2174,9 @@ body.is-startup-active #virtualCursorCanvas {
   order: 2;
 }
 
-.canvas-controls[data-mobile='true'] .canvas-brush-size-field {
+.canvas-controls[data-mobile='true'] .shared-status-indicator {
   order: 3;
-  width: min(52vw, 260px);
-  min-width: 160px;
+  max-width: min(50vw, 240px);
   padding: 4px 6px;
 }
 
@@ -3240,14 +3277,6 @@ body:not(.show-inline-guides) .ui-guide-text {
 
 #brushSizeField {
   order: -1;
-}
-
-.canvas-controls #brushSizeField {
-  order: 0;
-}
-
-.canvas-controls[data-mobile='true'] #brushSizeField {
-  order: 3;
 }
 
 .field-group--tools {

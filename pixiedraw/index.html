@@ -234,11 +234,11 @@
 <button aria-label="やり直す" class="chip" disabled="" id="redoAction" type="button"></button>
 <button aria-label="アプリを再読み込み" class="chip canvas-reload-action" id="appReloadAction" title="再読み込み" type="button">⟳</button>
 </div>
-<label class="field field--slider-row canvas-brush-size-field" id="brushSizeField">
-<span>ブラシサイズ</span>
-<input id="brushSize" max="12" min="1" type="range" value="1"/>
-<output for="brushSize" id="brushSizeValue">1px</output>
-</label>
+<div aria-live="polite" class="shared-status-indicator" hidden id="sharedStatusIndicator" role="status">
+<span aria-hidden="true" class="shared-status-indicator__dot"></span>
+<span class="shared-status-indicator__text" id="sharedStatusIndicatorText">最新</span>
+<button class="chip shared-status-indicator__recover" hidden id="sharedStatusRecoverAction" type="button">復帰</button>
+</div>
 <div aria-label="ズーム操作" class="canvas-control-buttons" id="canvasControlButtons" role="group">
 <button aria-label="ズームアウト" class="chip" id="canvasControlPrimary" type="button"></button>
 <label class="canvas-zoom-field" for="zoomInput">
@@ -490,6 +490,11 @@
 <span>アウトライン幅</span>
 <input id="outlineSize" max="8" min="1" type="range" value="1"/>
 <output for="outlineSize" id="outlineSizeValue">1マス</output>
+</label>
+<label class="field field--slider-row" id="brushSizeField">
+<span>ブラシサイズ</span>
+<input id="brushSize" max="12" min="1" type="range" value="1"/>
+<output for="brushSize" id="brushSizeValue">1px</output>
 </label>
 <label class="field">
 <span>ブラシ形状</span>

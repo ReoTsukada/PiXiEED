@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.05.13-shared-reload-control';
+  const APP_BUILD_VERSION = '2026.05.13-shared-visible-status';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
@@ -104,6 +104,9 @@
       undoAction: document.getElementById('undoAction'),
       redoAction: document.getElementById('redoAction'),
       appReloadAction: document.getElementById('appReloadAction'),
+      sharedStatusIndicator: document.getElementById('sharedStatusIndicator'),
+      sharedStatusIndicatorText: document.getElementById('sharedStatusIndicatorText'),
+      sharedStatusRecoverAction: document.getElementById('sharedStatusRecoverAction'),
       canvasControlButtons: document.getElementById('canvasControlButtons'),
       canvasControlPrimary: document.getElementById('canvasControlPrimary'),
       canvasControlSecondary: document.getElementById('canvasControlSecondary'),
@@ -2552,6 +2555,7 @@
   const SHARED_PROJECT_SLEEP_WAKE_GAP_MS = 2500;
   const SHARED_PROJECT_AUTO_RELOAD_AFTER_CATCHUP_MS = 45000;
   const SHARED_PROJECT_FIRST_INPUT_RECONNECT_AFTER_CATCHUP_MS = 1200;
+  const SHARED_PROJECT_VISIBLE_RECOVER_AFTER_SYNC_MS = 6000;
   const SHARED_PROJECT_RECOVERY_RELOAD_COOLDOWN_MS = 90000;
   const SHARED_PROJECT_BROADCAST_EVENT = 'shared-op';
   const SHARED_PROJECT_RECOVERY_RELOAD_STORAGE_KEY = 'pixieedraw:shared-recovery-reload-at';
@@ -3057,6 +3061,7 @@
   let sharedProjectWatchdogLastTickAt = 0;
   let sharedProjectCatchingUpStartedAt = 0;
   let sharedProjectRecoveryReloadTimer = null;
+  let sharedProjectVisibleStatusTimer = null;
   let sharedProjectSnapshotReplayInFlight = false;
   let sharedProjectRecoveryInProgress = false;
   let sharedProjectDeferRealtimeUntilSynced = false;
@@ -8502,6 +8507,7 @@
     sharedProjectLastRefreshQueuedReason = '';
     sharedProjectLastServerOpPollAt = 0;
     sharedProjectLastServerOpRefreshBackstopAt = 0;
+    syncSharedProjectVisibleStatus();
     clearDeferredSharedProjectRemoteOpsDrain();
     if (sharedProjectPollingTimer !== null) {
       window.clearInterval(sharedProjectPollingTimer);
@@ -9050,6 +9056,7 @@
     syncSharedProjectMembers(normalizedProjectKey, activeSharedProjectId).catch(error => {
       console.warn('Failed to load shared project members', error);
     });
+    syncSharedProjectVisibleStatus();
   }
 
   function setActiveSharedProjectSnapshotState(snapshotRevision = 0, {
@@ -9073,6 +9080,7 @@
     }
     if (normalizedProjectKey === activeSharedProjectKey) {
       activeSharedProjectDocumentLoaded = true;
+      syncSharedProjectVisibleStatus();
     }
   }
 
@@ -9259,6 +9267,146 @@
       console.warn('Failed to persist state before manual reload', error);
     }
     scheduleAppReload(reason);
+  }
+
+  function getSharedProjectVisibleStatus() {
+    if (!isSharedProjectCollaborativeMode()) {
+      return {
+        visible: false,
+        state: 'idle',
+        label: '',
+        recoverable: false,
+      };
+    }
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      return {
+        visible: true,
+        state: 'offline',
+        label: localizeText('オフライン', 'Offline'),
+        recoverable: true,
+      };
+    }
+    if (
+      sharedProjectRecoveryInProgress
+      || sharedProjectReconnectRecoveryPromise
+      || sharedProjectRefreshInFlight
+    ) {
+      return {
+        visible: true,
+        state: 'recovering',
+        label: localizeText('復帰中', 'Recovering'),
+        recoverable: false,
+      };
+    }
+    if (
+      activeSharedProjectSyncState === 'catching-up'
+      || !activeSharedProjectSynced
+      || sharedProjectDeferRealtimeUntilSynced
+    ) {
+      const catchingUpForMs = sharedProjectCatchingUpStartedAt > 0
+        ? Date.now() - sharedProjectCatchingUpStartedAt
+        : 0;
+      return {
+        visible: true,
+        state: 'syncing',
+        label: localizeText('同期中', 'Syncing'),
+        recoverable: catchingUpForMs >= SHARED_PROJECT_VISIBLE_RECOVER_AFTER_SYNC_MS,
+      };
+    }
+    const blockReason = getSharedProjectLocalDrawBlockReason(activeSharedProjectKey);
+    if (blockReason) {
+      return {
+        visible: true,
+        state: 'blocked',
+        label: localizeText('描画停止中', 'Drawing paused'),
+        recoverable: true,
+      };
+    }
+    if (hasSharedProjectLocalInFlightOps() || sharedProjectPendingLocalOps.length > 0 || sharedProjectOpCommitInFlight) {
+      return {
+        visible: true,
+        state: 'syncing',
+        label: localizeText('同期中', 'Syncing'),
+        recoverable: false,
+      };
+    }
+    return {
+      visible: true,
+      state: 'synced',
+      label: localizeText('最新', 'Up to date'),
+      recoverable: false,
+    };
+  }
+
+  function scheduleSharedProjectVisibleStatusRefresh(status) {
+    if (sharedProjectVisibleStatusTimer !== null) {
+      window.clearTimeout(sharedProjectVisibleStatusTimer);
+      sharedProjectVisibleStatusTimer = null;
+    }
+    if (
+      !status
+      || status.state !== 'syncing'
+      || status.recoverable
+      || sharedProjectCatchingUpStartedAt <= 0
+    ) {
+      return;
+    }
+    const elapsed = Date.now() - sharedProjectCatchingUpStartedAt;
+    const delay = Math.max(250, SHARED_PROJECT_VISIBLE_RECOVER_AFTER_SYNC_MS - elapsed + 50);
+    sharedProjectVisibleStatusTimer = window.setTimeout(() => {
+      sharedProjectVisibleStatusTimer = null;
+      syncSharedProjectVisibleStatus();
+    }, delay);
+  }
+
+  function syncSharedProjectVisibleStatus() {
+    const indicator = dom.controls.sharedStatusIndicator;
+    if (!(indicator instanceof HTMLElement)) {
+      return;
+    }
+    const status = getSharedProjectVisibleStatus();
+    indicator.hidden = !status.visible;
+    indicator.setAttribute('aria-hidden', String(!status.visible));
+    indicator.dataset.state = status.state;
+    if (dom.controls.sharedStatusIndicatorText instanceof HTMLElement) {
+      dom.controls.sharedStatusIndicatorText.textContent = status.label;
+    }
+    if (dom.controls.sharedStatusRecoverAction instanceof HTMLButtonElement) {
+      dom.controls.sharedStatusRecoverAction.hidden = !status.recoverable;
+      dom.controls.sharedStatusRecoverAction.disabled = status.state === 'recovering';
+      dom.controls.sharedStatusRecoverAction.setAttribute('aria-hidden', String(!status.recoverable));
+    }
+    scheduleSharedProjectVisibleStatusRefresh(status);
+  }
+
+  async function recoverSharedProjectFromStatusIndicator() {
+    syncSharedProjectVisibleStatus();
+    if (!activeSharedProjectKey) {
+      requestManualAppReload('manual-status-reload');
+      return;
+    }
+    setActiveSharedProjectSyncState('catching-up', { announce: true });
+    syncSharedProjectVisibleStatus();
+    let recovered = false;
+    try {
+      recovered = await triggerImmediateSharedProjectRecovery('manual-status-recover');
+    } catch (_error) {
+      recovered = false;
+    }
+    if (!recovered) {
+      try {
+        recovered = await queueSharedProjectReconnectRecovery('manual-status-recover', {
+          immediate: true,
+          blockEditing: true,
+        });
+      } catch (_error) {
+        recovered = false;
+      }
+    }
+    syncSharedProjectVisibleStatus();
+    if (!recovered && !hasSharedProjectHardLocalWorkInFlight()) {
+      requestManualAppReload('manual-status-recover-reload');
+    }
   }
 
   function readSharedProjectRecoveryReloadAt() {
@@ -9640,6 +9788,7 @@
   }
 
   function handleMultiVisibilityChange() {
+    syncSharedProjectVisibleStatus();
     if (document.visibilityState === 'visible') {
       if (activeSharedProjectKey) {
         queueSharedProjectReconnectRecovery('visibility', { immediate: true }).catch(() => {});
@@ -9650,6 +9799,7 @@
   }
 
   function handleMultiWindowFocus() {
+    syncSharedProjectVisibleStatus();
     if (activeSharedProjectKey) {
       queueSharedProjectReconnectRecovery('focus', { immediate: true }).catch(() => {});
       return;
@@ -9658,6 +9808,7 @@
   }
 
   function handleMultiOnline() {
+    syncSharedProjectVisibleStatus();
     if (activeSharedProjectKey) {
       queueSharedProjectReconnectRecovery('online', { immediate: true }).catch(() => {});
       return;
@@ -9666,6 +9817,7 @@
   }
 
   function handleMultiOffline() {
+    syncSharedProjectVisibleStatus();
     if (!activeSharedProjectKey) {
       return;
     }
@@ -31844,6 +31996,14 @@
     if (dom.controls.appReloadAction instanceof HTMLButtonElement) {
       dom.controls.appReloadAction.addEventListener('click', () => {
         requestManualAppReload('manual-toolbar-reload');
+      });
+    }
+    if (dom.controls.sharedStatusRecoverAction instanceof HTMLButtonElement) {
+      dom.controls.sharedStatusRecoverAction.addEventListener('click', () => {
+        recoverSharedProjectFromStatusIndicator().catch(error => {
+          console.warn('Failed to recover shared project from status indicator', error);
+          requestManualAppReload('manual-status-recover-error');
+        });
       });
     }
 
@@ -56497,6 +56657,7 @@
       sharedProjectCatchingUpStartedAt = 0;
       clearSharedProjectRecoveryReloadTimer();
     }
+    syncSharedProjectVisibleStatus();
     if (!announce || !isSharedProjectCollaborativeMode()) {
       return;
     }
@@ -58049,6 +58210,7 @@
 
   function setSharedProjectDeferRealtimeUntilSynced(nextValue = false) {
     sharedProjectDeferRealtimeUntilSynced = Boolean(nextValue);
+    syncSharedProjectVisibleStatus();
   }
 
   function confirmSharedProjectLocalOpsFromServerOps(ops, meta = {}) {
@@ -61780,6 +61942,7 @@
     } finally {
       sharedProjectRefreshInFlight = false;
       sharedProjectRecoveryInProgress = false;
+      syncSharedProjectVisibleStatus();
     }
   }
 
@@ -72295,10 +72458,11 @@
       setMultiStatus(localizeText('共有モード: OFF', 'Collab mode: OFF'), 'info');
     }
     setMultiHelpPanelVisible(false);
-  syncMultiControls();
-  syncSharedModeStatusDisplay();
-  // sync danmaku UI state
-  syncDanmakuControls();
+    syncMultiControls();
+    syncSharedModeStatusDisplay();
+    syncSharedProjectVisibleStatus();
+    // sync danmaku UI state
+    syncDanmakuControls();
     renderMultiParticipantsList();
     renderMultiComments();
     applyMultiRoleUiLocks();

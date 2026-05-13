@@ -1,11 +1,11 @@
-const CACHE_VERSION = 'pixiedraw-v2026.05.13-shared-reload-control';
+const CACHE_VERSION = 'pixiedraw-v2026.05.13-shared-visible-status';
 const CORE_ASSETS = [
   '/pixiedraw/',
   '/pixiedraw/index.html',
   '/pixiedraw/manifest.webmanifest',
   '/pixiedraw/assets/css/style.css',
   '/pixiedraw/assets/css/local-extension-runtime.css',
-  '/pixiedraw/assets/js/app.js?v=2026.05.13-shared-reload-control',
+  '/pixiedraw/assets/js/app.js?v=2026.05.13-shared-visible-status',
   '/icon/icon-192-4.png',
   '/icon/icon-512-4.png',
 ];
