@@ -2089,40 +2089,65 @@ body.is-startup-active #virtualCursorCanvas {
 
 .shared-status-indicator {
   display: inline-grid;
-  grid-template-columns: 8px minmax(0, 1fr) 46px;
+  grid-template-columns: minmax(0, 1fr) 46px;
   align-items: center;
   gap: 6px;
   min-height: var(--canvas-control-current-size);
-  width: 194px;
-  min-width: 194px;
-  max-width: 194px;
+  width: 156px;
+  min-width: 156px;
+  max-width: 156px;
   padding: 0 8px;
   border: 2px solid var(--border);
   background: rgba(6, 12, 18, 0.88);
   color: var(--text);
   box-shadow: var(--shadow);
-  font-size: 0.84rem;
   line-height: 1;
-  white-space: nowrap;
 }
 
 .shared-status-indicator[hidden] {
   display: none !important;
 }
 
-.shared-status-indicator__dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: rgba(76, 201, 143, 0.95);
-  box-shadow: 0 0 0 2px rgba(76, 201, 143, 0.18);
-  flex: 0 0 auto;
+.shared-status-indicator__lamps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: center;
+  justify-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 
-.shared-status-indicator__text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-align: center;
+.shared-status-indicator__lamp {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: rgba(124, 133, 146, 0.48);
+  box-shadow: inset 0 0 0 1px rgba(18, 22, 28, 0.7);
+  transition: background-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+}
+
+.shared-status-indicator[data-tx='on'] .shared-status-indicator__lamp--tx {
+  background: rgba(var(--ui-rgb-focus), 0.95);
+  box-shadow: 0 0 0 2px rgba(var(--ui-rgb-focus), 0.2);
+  transform: scale(1.04);
+}
+
+.shared-status-indicator[data-rx='on'] .shared-status-indicator__lamp--rx {
+  background: rgba(84, 174, 255, 0.95);
+  box-shadow: 0 0 0 2px rgba(84, 174, 255, 0.22);
+  transform: scale(1.04);
+}
+
+.shared-status-indicator[data-ok='on'] .shared-status-indicator__lamp--ok {
+  background: rgba(76, 201, 143, 0.95);
+  box-shadow: 0 0 0 2px rgba(76, 201, 143, 0.2);
+  transform: scale(1.04);
+}
+
+.shared-status-indicator[data-offline='on'] .shared-status-indicator__lamp--off {
+  background: rgba(235, 92, 92, 0.96);
+  box-shadow: 0 0 0 2px rgba(235, 92, 92, 0.2);
+  transform: scale(1.04);
 }
 
 .shared-status-indicator__recover {
@@ -2136,18 +2161,6 @@ body.is-startup-active #virtualCursorCanvas {
   display: inline-flex !important;
   visibility: hidden;
   pointer-events: none;
-}
-
-.shared-status-indicator[data-state='syncing'] .shared-status-indicator__dot {
-  background: rgba(var(--ui-rgb-focus), 0.95);
-  box-shadow: 0 0 0 2px rgba(var(--ui-rgb-focus), 0.18);
-}
-
-.shared-status-indicator[data-state='recovering'] .shared-status-indicator__dot,
-.shared-status-indicator[data-state='blocked'] .shared-status-indicator__dot,
-.shared-status-indicator[data-state='offline'] .shared-status-indicator__dot {
-  background: rgba(242, 193, 92, 0.95);
-  box-shadow: 0 0 0 2px rgba(242, 193, 92, 0.2);
 }
 
 #brushSizeField[hidden] {
@@ -2187,9 +2200,9 @@ body.is-startup-active #virtualCursorCanvas {
 
 .canvas-controls[data-mobile='true'] .shared-status-indicator {
   order: 3;
-  width: 176px;
-  min-width: 176px;
-  max-width: 176px;
+  width: 150px;
+  min-width: 150px;
+  max-width: 150px;
   padding: 4px 6px;
 }
 
