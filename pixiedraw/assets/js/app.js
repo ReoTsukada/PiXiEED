@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.05.13-shared-visible-status';
+  const APP_BUILD_VERSION = '2026.05.13-shared-status-polish';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
@@ -9315,6 +9315,22 @@
     }
     const blockReason = getSharedProjectLocalDrawBlockReason(activeSharedProjectKey);
     if (blockReason) {
+      const transientBlockReason = new Set([
+        'open-in-progress',
+        'recovery-in-progress',
+        'realtime-connecting',
+        'revision-gap',
+        'local-op-pending',
+        'not-stable',
+      ]);
+      if (transientBlockReason.has(blockReason)) {
+        return {
+          visible: true,
+          state: 'syncing',
+          label: localizeText('同期中', 'Syncing'),
+          recoverable: true,
+        };
+      }
       return {
         visible: true,
         state: 'blocked',
@@ -11362,8 +11378,8 @@
       }
       const toolsFieldGroup = toolsSection?.querySelector('.field-group--tools');
       if (toolsFieldGroup instanceof HTMLElement) {
-        toolsFieldGroup.hidden = colorFocused;
-        toolsFieldGroup.setAttribute('aria-hidden', String(colorFocused));
+        toolsFieldGroup.hidden = false;
+        toolsFieldGroup.setAttribute('aria-hidden', 'false');
       }
       const toolsQuickPalette = toolsSection?.querySelector('.tool-quick-color');
       if (toolsQuickPalette instanceof HTMLElement) {
@@ -13078,6 +13094,10 @@
     if (dom.controls.brushSizeField instanceof HTMLElement) {
       dom.controls.brushSizeField.hidden = !shouldShow;
       dom.controls.brushSizeField.setAttribute('aria-hidden', String(!shouldShow));
+    }
+    if (dom.controls.brushSize instanceof HTMLInputElement) {
+      dom.controls.brushSize.disabled = false;
+      dom.controls.brushSize.setAttribute('aria-disabled', 'false');
     }
   }
 

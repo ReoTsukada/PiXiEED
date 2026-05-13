@@ -2088,11 +2088,14 @@ body.is-startup-active #virtualCursorCanvas {
 }
 
 .shared-status-indicator {
-  display: inline-flex;
+  display: inline-grid;
+  grid-template-columns: 8px minmax(0, 1fr) 46px;
   align-items: center;
   gap: 6px;
   min-height: var(--canvas-control-current-size);
-  max-width: min(260px, 34vw);
+  width: 194px;
+  min-width: 194px;
+  max-width: 194px;
   padding: 0 8px;
   border: 2px solid var(--border);
   background: rgba(6, 12, 18, 0.88);
@@ -2119,6 +2122,7 @@ body.is-startup-active #virtualCursorCanvas {
 .shared-status-indicator__text {
   overflow: hidden;
   text-overflow: ellipsis;
+  text-align: center;
 }
 
 .shared-status-indicator__recover {
@@ -2126,6 +2130,12 @@ body.is-startup-active #virtualCursorCanvas {
   height: 28px;
   padding: 0 8px;
   font-size: 0.82rem;
+}
+
+.shared-status-indicator__recover[hidden] {
+  display: inline-flex !important;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .shared-status-indicator[data-state='syncing'] .shared-status-indicator__dot {
@@ -2161,7 +2171,7 @@ body.is-startup-active #virtualCursorCanvas {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  order: 1;
+  order: 2;
 }
 
 .canvas-controls[data-mobile='true'] .canvas-controls__history,
@@ -2171,12 +2181,15 @@ body.is-startup-active #virtualCursorCanvas {
 }
 
 .canvas-controls[data-mobile='true'] .canvas-controls__history {
-  order: 2;
+  order: 1;
+  margin-right: auto;
 }
 
 .canvas-controls[data-mobile='true'] .shared-status-indicator {
   order: 3;
-  max-width: min(50vw, 240px);
+  width: 176px;
+  min-width: 176px;
+  max-width: 176px;
   padding: 4px 6px;
 }
 
@@ -8160,11 +8173,12 @@ body.is-startup-active {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    order: 1;
+    order: 2;
   }
   .canvas-controls[data-mobile='true'] .canvas-controls__history {
     gap: 4px;
-    order: 2;
+    order: 1;
+    margin-right: auto;
   }
   .canvas-controls[data-mobile='true'] .chip {
     width: 44px;
