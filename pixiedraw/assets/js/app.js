@@ -3062,6 +3062,7 @@
   let sharedProjectCatchingUpStartedAt = 0;
   let sharedProjectRecoveryReloadTimer = null;
   let sharedProjectVisibleStatusTimer = null;
+  let sharedProjectAutoRecoveryLastAttemptAt = 0;
   let sharedProjectSnapshotReplayInFlight = false;
   let sharedProjectRecoveryInProgress = false;
   let sharedProjectDeferRealtimeUntilSynced = false;
@@ -9270,20 +9271,26 @@
   }
 
   function getSharedProjectVisibleStatus() {
+    const statusBase = {
+      visible: true,
+      state: 'idle',
+      label: '',
+      recoverable: false,
+      reloadable: false,
+      autoRecoverReason: '',
+    };
     if (!isSharedProjectCollaborativeMode()) {
       return {
+        ...statusBase,
         visible: false,
-        state: 'idle',
-        label: '',
-        recoverable: false,
       };
     }
     if (typeof navigator !== 'undefined' && navigator.onLine === false) {
       return {
-        visible: true,
+        ...statusBase,
         state: 'offline',
         label: localizeText('オフライン', 'Offline'),
-        recoverable: true,
+        autoRecoverReason: 'offline-wait',
       };
     }
     if (
@@ -9292,10 +9299,10 @@
       || sharedProjectRefreshInFlight
     ) {
       return {
-        visible: true,
+        ...statusBase,
         state: 'recovering',
         label: localizeText('復帰中', 'Recovering'),
-        recoverable: false,
+        autoRecoverReason: 'recovery-in-progress',
       };
     }
     if (
@@ -9306,11 +9313,14 @@
       const catchingUpForMs = sharedProjectCatchingUpStartedAt > 0
         ? Date.now() - sharedProjectCatchingUpStartedAt
         : 0;
+      const reloadable = catchingUpForMs >= SHARED_PROJECT_VISIBLE_RECOVER_AFTER_SYNC_MS;
       return {
-        visible: true,
+        ...statusBase,
         state: 'syncing',
         label: localizeText('同期中', 'Syncing'),
-        recoverable: catchingUpForMs >= SHARED_PROJECT_VISIBLE_RECOVER_AFTER_SYNC_MS,
+        recoverable: reloadable,
+        reloadable,
+        autoRecoverReason: 'syncing',
       };
     }
     const blockReason = getSharedProjectLocalDrawBlockReason(activeSharedProjectKey);
@@ -9325,33 +9335,63 @@
       ]);
       if (transientBlockReason.has(blockReason)) {
         return {
-          visible: true,
+          ...statusBase,
           state: 'syncing',
           label: localizeText('同期中', 'Syncing'),
-          recoverable: true,
+          autoRecoverReason: `sync-${blockReason}`,
         };
       }
+      const reloadRequiredBlockReason = new Set([
+        'backend-unavailable',
+        'server-document-not-loaded',
+        'missing-document-state',
+        'failed-local-ops',
+      ]);
       return {
-        visible: true,
+        ...statusBase,
         state: 'blocked',
         label: localizeText('描画停止中', 'Drawing paused'),
-        recoverable: true,
+        reloadable: reloadRequiredBlockReason.has(blockReason),
       };
     }
     if (hasSharedProjectLocalInFlightOps() || sharedProjectPendingLocalOps.length > 0 || sharedProjectOpCommitInFlight) {
       return {
-        visible: true,
+        ...statusBase,
         state: 'syncing',
         label: localizeText('同期中', 'Syncing'),
-        recoverable: false,
+        autoRecoverReason: 'local-op-pending',
       };
     }
     return {
-      visible: true,
+      ...statusBase,
       state: 'synced',
       label: localizeText('最新', 'Up to date'),
-      recoverable: false,
     };
+  }
+
+  function ensureSharedProjectAutoRecovery(status) {
+    if (!status?.visible || !activeSharedProjectKey || appReloadInProgress) {
+      return;
+    }
+    const reason = String(status.autoRecoverReason || '').trim();
+    if (!reason || status.reloadable) {
+      return;
+    }
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      return;
+    }
+    if (sharedProjectReconnectRecoveryPromise || sharedProjectRefreshInFlight || sharedProjectRecoveryInProgress) {
+      return;
+    }
+    const now = Date.now();
+    if ((now - sharedProjectAutoRecoveryLastAttemptAt) < 1800) {
+      return;
+    }
+    sharedProjectAutoRecoveryLastAttemptAt = now;
+    queueSharedProjectReconnectRecovery(`status-auto-${reason}`, {
+      immediate: true,
+      blockEditing: true,
+    }).catch(() => {});
   }
 
   function scheduleSharedProjectVisibleStatusRefresh(status) {
@@ -9388,41 +9428,14 @@
       dom.controls.sharedStatusIndicatorText.textContent = status.label;
     }
     if (dom.controls.sharedStatusRecoverAction instanceof HTMLButtonElement) {
-      dom.controls.sharedStatusRecoverAction.hidden = !status.recoverable;
-      dom.controls.sharedStatusRecoverAction.disabled = status.state === 'recovering';
-      dom.controls.sharedStatusRecoverAction.setAttribute('aria-hidden', String(!status.recoverable));
+      const showReloadAction = Boolean(status.reloadable);
+      dom.controls.sharedStatusRecoverAction.textContent = localizeText('再読込', 'Reload');
+      dom.controls.sharedStatusRecoverAction.hidden = !showReloadAction;
+      dom.controls.sharedStatusRecoverAction.disabled = false;
+      dom.controls.sharedStatusRecoverAction.setAttribute('aria-hidden', String(!showReloadAction));
     }
     scheduleSharedProjectVisibleStatusRefresh(status);
-  }
-
-  async function recoverSharedProjectFromStatusIndicator() {
-    syncSharedProjectVisibleStatus();
-    if (!activeSharedProjectKey) {
-      requestManualAppReload('manual-status-reload');
-      return;
-    }
-    setActiveSharedProjectSyncState('catching-up', { announce: true });
-    syncSharedProjectVisibleStatus();
-    let recovered = false;
-    try {
-      recovered = await triggerImmediateSharedProjectRecovery('manual-status-recover');
-    } catch (_error) {
-      recovered = false;
-    }
-    if (!recovered) {
-      try {
-        recovered = await queueSharedProjectReconnectRecovery('manual-status-recover', {
-          immediate: true,
-          blockEditing: true,
-        });
-      } catch (_error) {
-        recovered = false;
-      }
-    }
-    syncSharedProjectVisibleStatus();
-    if (!recovered && !hasSharedProjectHardLocalWorkInFlight()) {
-      requestManualAppReload('manual-status-recover-reload');
-    }
+    ensureSharedProjectAutoRecovery(status);
   }
 
   function readSharedProjectRecoveryReloadAt() {
@@ -32020,10 +32033,7 @@
     }
     if (dom.controls.sharedStatusRecoverAction instanceof HTMLButtonElement) {
       dom.controls.sharedStatusRecoverAction.addEventListener('click', () => {
-        recoverSharedProjectFromStatusIndicator().catch(error => {
-          console.warn('Failed to recover shared project from status indicator', error);
-          requestManualAppReload('manual-status-recover-error');
-        });
+        requestManualAppReload('manual-status-reload');
       });
     }
 
@@ -56669,10 +56679,6 @@
       if (!sharedProjectCatchingUpStartedAt) {
         sharedProjectCatchingUpStartedAt = Date.now();
       }
-      scheduleSharedProjectRecoveryReload(
-        'catching-up-stalled',
-        SHARED_PROJECT_AUTO_RELOAD_AFTER_CATCHUP_MS
-      );
     } else {
       sharedProjectCatchingUpStartedAt = 0;
       clearSharedProjectRecoveryReloadTimer();
