@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.05.13-shared-status-polish';
+  const APP_BUILD_VERSION = '2026.05.13-export-name-seq';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
@@ -425,6 +425,7 @@
       form: document.getElementById('exportDialogForm'),
       confirm: document.getElementById('confirmExport'),
       format: document.getElementById('exportFormat'),
+      fileNameInput: document.getElementById('exportFileNameBase'),
       cancel: document.getElementById('cancelExport'),
       scaleControls: document.getElementById('exportScaleControls'),
       scaleSlider: document.getElementById('exportScaleSlider'),
@@ -442,6 +443,7 @@
       pixelWidthInput: document.getElementById('exportPixelWidth'),
       pixelHeightInput: document.getElementById('exportPixelHeight'),
       scaleHint: document.getElementById('exportScaleHint'),
+      fileNameHint: document.getElementById('exportFileNameHint'),
       destinationLabel: document.getElementById('exportDialogDestinationLabel'),
       adContainer: document.getElementById('exportAdContainer'),
       adSlot: document.getElementById('exportAdSlot'),
@@ -2871,6 +2873,7 @@
   let exportSheetInfo = null;
   let exportMaxScale = 1;
   let exportScaleUserOverride = false;
+  let exportFileNameBase = '';
   let exportIncludeOriginalSize = false;
   let exportSaveProjectCompanion = false;
   let exportContestPostAfterSave = false;
@@ -4048,7 +4051,10 @@
 
   function makeIcon(name, fallback, opts = {}) {
     const img = new Image(opts.width || 24, opts.height || 24);
-    img.src = `assets/icons/${name}.svg`;
+    const extension = typeof opts.extension === 'string' && opts.extension.trim()
+      ? opts.extension.trim().replace(/^\.+/, '')
+      : 'svg';
+    img.src = `assets/icons/${name}.${extension}`;
     img.alt = fallback;
     img.width = opts.width || 24;
     img.height = opts.height || 24;
@@ -7684,13 +7690,48 @@
     return `${sanitizedBase}${PROJECT_FILE_EXTENSION}`;
   }
 
+  function resolveExportFileBaseName(raw = '') {
+    const source = typeof raw === 'string' && raw.trim() ? raw : exportFileNameBase || state.documentName;
+    return extractDocumentBaseName(source);
+  }
+
+  function setExportFileBaseName(raw = '') {
+    const normalizedBase = resolveExportFileBaseName(raw);
+    exportFileNameBase = normalizedBase;
+    const input = dom.exportDialog?.fileNameInput;
+    if (input instanceof HTMLInputElement) {
+      input.value = normalizedBase;
+    }
+    return normalizedBase;
+  }
+
   function createExportFileName(extension, suffix = '') {
-    const sanitized = sanitizeDocumentFileBase(state.documentName);
+    const sanitized = sanitizeDocumentFileBase(resolveExportFileBaseName());
     const safeBase =
       sanitized || DEFAULT_DOCUMENT_BASENAME.replace(/\s+/g, '_');
     const safeSuffix = suffix ? `_${suffix}` : '';
     const normalizedExt = extension ? extension.replace(/^\.+/, '') : '';
     return normalizedExt ? `${safeBase}${safeSuffix}.${normalizedExt}` : `${safeBase}${safeSuffix}`;
+  }
+
+  function splitFilenameStemAndExtension(filename, fallback = 'export.bin') {
+    const safeFilename = sanitizeNativeFilename(filename, fallback);
+    const match = safeFilename.match(/^(.*?)(\.[^.]*)?$/);
+    const stem = match?.[1] || safeFilename;
+    const extension = match?.[2] || '';
+    return {
+      stem: stem || 'export',
+      extension,
+    };
+  }
+
+  function buildNumberedFilename(filename, sequence = 0) {
+    const normalizedSequence = Math.max(0, Math.floor(Number(sequence) || 0));
+    const { stem, extension } = splitFilenameStemAndExtension(filename);
+    if (normalizedSequence <= 0) {
+      return `${stem}${extension}`;
+    }
+    return `${stem}.${normalizedSequence}${extension}`;
   }
 
   let zipCrc32Table = null;
@@ -14036,6 +14077,9 @@
     setLocalizedSelectOption(dom.exportDialog?.format, 'timelapse', 'タイムラプスGIF（記録）', 'Timelapse GIF');
     setLocalizedSelectOption(dom.exportDialog?.format, 'pixfind', 'PiXFiNDへ送る', 'Send to PiXFiND');
     setLocalizedSelectOption(dom.exportDialog?.format, 'project', 'プロジェクト（.pixieedraw）', 'Project (.pixieedraw)');
+    setLocalizedTextContent('label[for="exportFileNameBase"] > span', '出力名', 'Export Name');
+    setLocalizedAttribute('#exportFileNameBase', 'placeholder', '例: my_artwork', 'e.g. my_artwork');
+    setLocalizedTextContent('#exportFileNameHint', '拡張子は自動で付きます。同名がある場合は .1 .2 ... を付けて保存します。', 'Extension is added automatically. If the same name exists, .1 .2 ... will be appended.');
     setLocalizedTextContent('#exportScaleControls > span', '出力倍率', 'Output Scale');
     setLocalizedTextContent('label[for="exportScaleSlider"]', '倍率 (×)', 'Scale (×)');
     setLocalizedTextContent('#exportOriginalOptionRow span', '拡大出力時に原寸も追加で出力する', 'Also export original size when scaled');
@@ -15111,6 +15155,33 @@
       console.warn('Failed to create/open file in export directory', error);
       return null;
     }
+  }
+
+  async function resolveUniqueExportDirectoryFilename(filename, { requestPermission = true, maxSequence = 256 } = {}) {
+    if (!exportDirectoryHandle || typeof exportDirectoryHandle.getFileHandle !== 'function') {
+      return null;
+    }
+    const granted = await ensureHandlePermission(exportDirectoryHandle, { request: requestPermission });
+    if (!granted) {
+      if (requestPermission) {
+        schedulePendingExportDirectoryPermission(exportDirectoryHandle);
+      }
+      return null;
+    }
+    const baseFilename = sanitizeNativeFilename(filename, 'export.bin');
+    for (let sequence = 0; sequence <= maxSequence; sequence += 1) {
+      const candidate = buildNumberedFilename(baseFilename, sequence);
+      try {
+        await exportDirectoryHandle.getFileHandle(candidate, { create: false });
+      } catch (error) {
+        if (error && error.name === 'NotFoundError') {
+          return candidate;
+        }
+        console.warn('Failed to inspect existing export filename', error);
+        return candidate;
+      }
+    }
+    return buildNumberedFilename(baseFilename, maxSequence + 1);
   }
 
   async function requestAutosaveBinding(options = {}) {
@@ -16982,6 +17053,7 @@
       exportProjectWithFallback();
       return;
     }
+    setExportFileBaseName(exportFileNameBase || state.documentName);
     if (EXPORT_DIRECTORY_SUPPORTED) {
       if (pendingExportDirectoryHandle && !exportDirectoryHandle) {
         await attemptExportDirectoryReauthorization();
@@ -17749,7 +17821,9 @@
     } else if (normalized === 'pixfind') {
       exportProjectToPixfind();
     } else if (normalized === 'project') {
-      const result = await saveProjectAsPixieedraw();
+      const result = await saveProjectAsPixieedraw({
+        fileNameBase: exportFileNameBase || state.documentName,
+      });
       if (result?.saved) {
         showLoginPromptAfterExport();
       }
@@ -18735,6 +18809,10 @@
       }
     };
     bind(config.confirm, () => {
+      const inputBaseName = config.fileNameInput instanceof HTMLInputElement
+        ? config.fileNameInput.value
+        : '';
+      setExportFileBaseName(inputBaseName || state.documentName);
       const mode = normalizeExportFormat(config.format?.value || 'png');
       if (!ensureCurrentClientCanExportProject({ announce: true, format: mode })) {
         updateExportFormatAvailability();
@@ -18768,6 +18846,12 @@
         refreshExportScaleControls();
         updateExportFormatAvailability();
         updateExportOriginalToggleUI();
+      });
+    }
+    if (config.fileNameInput instanceof HTMLInputElement && config.fileNameInput.dataset.bound !== 'true') {
+      config.fileNameInput.dataset.bound = 'true';
+      config.fileNameInput.addEventListener('change', event => {
+        setExportFileBaseName(event.target.value || state.documentName);
       });
     }
     if (config.includeOriginalToggle instanceof HTMLInputElement && config.includeOriginalToggle.dataset.bound !== 'true') {
@@ -26620,6 +26704,19 @@
       .join('/');
   }
 
+  function isLikelyFileAlreadyExistsError(error) {
+    const code = String(error?.code || '').toLowerCase();
+    const message = String(error?.message || error || '').toLowerCase();
+    return (
+      code.includes('exist')
+      || code.includes('already')
+      || message.includes('eexist')
+      || message.includes('already exists')
+      || message.includes('file exists')
+      || message.includes('exists')
+    );
+  }
+
   async function blobToBase64Payload(blob) {
     const dataUrl = await blobToDataUrl(blob);
     if (typeof dataUrl !== 'string' || !dataUrl) {
@@ -26674,7 +26771,6 @@
     const subdirectory = normalizeNativeSubdirectory(
       options.subdirectory || NATIVE_EXPORTS_SUBDIRECTORY
     );
-    const targetPath = subdirectory ? `${subdirectory}/${safeFilename}` : safeFilename;
     const preferredDirectory = typeof options.directory === 'string' && options.directory
       ? options.directory
       : NATIVE_FILESYSTEM_DIRECTORY_DOCUMENTS;
@@ -26696,22 +26792,34 @@
         if (base64Data === null) {
           base64Data = await blobToBase64Payload(blob);
         }
-        const result = await filesystem.writeFile({
-          path: targetPath,
-          data: base64Data,
-          directory,
-          recursive: true,
-        });
-        let uri = typeof result?.uri === 'string' ? result.uri : '';
-        if (!uri && typeof filesystem.getUri === 'function') {
+        for (let sequence = 0; sequence <= 256; sequence += 1) {
+          const resolvedFilename = buildNumberedFilename(safeFilename, sequence);
+          const targetPath = subdirectory ? `${subdirectory}/${resolvedFilename}` : resolvedFilename;
           try {
-            const uriResult = await filesystem.getUri({ path: targetPath, directory });
-            uri = typeof uriResult?.uri === 'string' ? uriResult.uri : '';
-          } catch (uriError) {
-            console.warn('Failed to resolve native file URI', uriError);
+            const result = await filesystem.writeFile({
+              path: targetPath,
+              data: base64Data,
+              directory,
+              recursive: true,
+            });
+            let uri = typeof result?.uri === 'string' ? result.uri : '';
+            if (!uri && typeof filesystem.getUri === 'function') {
+              try {
+                const uriResult = await filesystem.getUri({ path: targetPath, directory });
+                uri = typeof uriResult?.uri === 'string' ? uriResult.uri : '';
+              } catch (uriError) {
+                console.warn('Failed to resolve native file URI', uriError);
+              }
+            }
+            return { directory, path: targetPath, uri };
+          } catch (writeError) {
+            lastError = writeError;
+            if (isLikelyFileAlreadyExistsError(writeError) && sequence < 256) {
+              continue;
+            }
+            throw writeError;
           }
         }
-        return { directory, path: targetPath, uri };
       } catch (error) {
         lastError = error;
         console.warn(`Native file save failed (${directory})`, error);
@@ -26781,7 +26889,13 @@
     if (!blob || !filename) {
       return null;
     }
-    const fileHandle = await getFileHandleInExportDirectory(filename, {
+    const resolvedFilename = await resolveUniqueExportDirectoryFilename(filename, {
+      requestPermission: true,
+    });
+    if (!resolvedFilename) {
+      return null;
+    }
+    const fileHandle = await getFileHandleInExportDirectory(resolvedFilename, {
       create: true,
       requestPermission: true,
     });
@@ -26799,7 +26913,7 @@
       // Best-effort cleanup prevents an extra "broken" file from being left behind.
       try {
         if (exportDirectoryHandle && typeof exportDirectoryHandle.removeEntry === 'function') {
-          await exportDirectoryHandle.removeEntry(filename, { recursive: false });
+          await exportDirectoryHandle.removeEntry(resolvedFilename, { recursive: false });
         }
       } catch (cleanupError) {
         console.warn('Failed to cleanup partial export file', cleanupError);
@@ -26985,14 +27099,14 @@
     }
   }
 
-  function buildProjectExportBundle() {
+  function buildProjectExportBundle(fileNameBase = state.documentName) {
     commitHistory();
     const snapshot = makeHistorySnapshot();
     const session = buildProjectSessionPayload();
     const packaged = buildPackagedProjectPayload(snapshot, { session });
     const json = JSON.stringify(packaged);
     const blob = new Blob([json], { type: PROJECT_FILE_MIME_TYPE });
-    const filename = createAutosaveFileName();
+    const filename = createAutosaveFileName(fileNameBase || state.documentName);
     return {
       snapshot,
       session,
@@ -27013,7 +27127,7 @@
         packaged,
         blob,
         filename,
-      } = buildProjectExportBundle();
+      } = buildProjectExportBundle(options?.fileNameBase || exportFileNameBase || state.documentName);
 
       const boundHandle = autosaveHandle || pendingAutosaveHandle;
       if (!DISABLE_FILE_SYSTEM_ACCESS_SAVE && boundHandle) {
@@ -27027,17 +27141,24 @@
       }
 
       let selectedHandle = null;
+      let resolvedProjectFilename = filename;
       if (!DISABLE_FILE_SYSTEM_ACCESS_SAVE) {
-        selectedHandle = await getFileHandleInExportDirectory(filename, {
-          create: true,
+        const uniqueFilename = await resolveUniqueExportDirectoryFilename(filename, {
           requestPermission: true,
         });
+        if (uniqueFilename) {
+          resolvedProjectFilename = uniqueFilename;
+          selectedHandle = await getFileHandleInExportDirectory(uniqueFilename, {
+            create: true,
+            requestPermission: true,
+          });
+        }
       }
       let pickerCancelled = false;
       if (!DISABLE_FILE_SYSTEM_ACCESS_SAVE && !selectedHandle && typeof window.showSaveFilePicker === 'function') {
         try {
           selectedHandle = await window.showSaveFilePicker({
-            suggestedName: filename,
+            suggestedName: resolvedProjectFilename,
             types: getProjectFilePickerTypes(),
           });
         } catch (error) {
@@ -27062,7 +27183,7 @@
         return { saved: false, cancelled: true };
       }
 
-      const result = await triggerDownloadFromBlob(blob, filename, {
+      const result = await triggerDownloadFromBlob(blob, resolvedProjectFilename, {
         mimeType: PROJECT_FILE_MIME_TYPE,
         fileExtensions: [PROJECT_FILE_EXTENSION],
         shareTitle: state.documentName,
@@ -32027,6 +32148,7 @@
       dom.controls.redoAction.replaceChildren(makeIcon('action-redo', '↻', { width: 20, height: 20 }));
     }
     if (dom.controls.appReloadAction instanceof HTMLButtonElement) {
+      dom.controls.appReloadAction.replaceChildren(makeIcon('action-reload', '⟳', { width: 20, height: 20, extension: 'png' }));
       dom.controls.appReloadAction.addEventListener('click', () => {
         requestManualAppReload('manual-toolbar-reload');
       });
