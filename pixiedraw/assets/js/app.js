@@ -2575,6 +2575,7 @@
   const SHARED_PROJECT_VISIBLE_RECOVER_AFTER_SYNC_MS = 6000;
   const SHARED_PROJECT_STATUS_TRAFFIC_LAMP_MS = 1200;
   const SHARED_PROJECT_RECOVERY_RELOAD_COOLDOWN_MS = 90000;
+  const SHARED_RECENT_PROJECTS_ACCOUNT_SYNC_COOLDOWN_MS = 12000;
   const SHARED_PROJECT_BROADCAST_EVENT = 'shared-op';
   const SHARED_PROJECT_RECOVERY_RELOAD_STORAGE_KEY = 'pixieedraw:shared-recovery-reload-at';
   const SHARED_LOCAL_OP_JOURNAL_MAX_CONFIRMED_PER_PROJECT = 160;
@@ -3048,6 +3049,8 @@
   let sharedProjectSyncTimer = null;
   let sharedProjectSyncInFlight = false;
   let sharedProjectSyncQueuedPayload = null;
+  let sharedRecentProjectsAccountSyncPromise = null;
+  let sharedRecentProjectsLastAccountSyncAt = 0;
   let sharedProjectCaptureTimer = null;
   let activeSharedProjectId = '';
   let activeSharedProjectKey = '';
@@ -9787,6 +9790,12 @@
 
   function queueSharedProjectReconnectRecovery(reason = 'connectivity', { immediate = false, blockEditing = true } = {}) {
     if (!activeSharedProjectKey) {
+      return Promise.resolve(false);
+    }
+    if (sharedProjectReconnectRecoveryPromise) {
+      return sharedProjectReconnectRecoveryPromise;
+    }
+    if (!immediate && sharedProjectReconnectRecoveryTimer !== null) {
       return Promise.resolve(false);
     }
     const normalizedReason = String(reason || 'connectivity');
@@ -22709,6 +22718,35 @@
     }
   }
 
+  async function ensureSharedRecentProjectsAccountSynced({ force = false } = {}) {
+    if (!AUTOSAVE_SUPPORTED || !accountState.isLoggedIn || accountState.isAnonymous) {
+      return [];
+    }
+    const now = Date.now();
+    if (!force && sharedRecentProjectsAccountSyncPromise) {
+      return sharedRecentProjectsAccountSyncPromise;
+    }
+    if (
+      !force
+      && sharedRecentProjectsLastAccountSyncAt > 0
+      && (now - sharedRecentProjectsLastAccountSyncAt) < SHARED_RECENT_PROJECTS_ACCOUNT_SYNC_COOLDOWN_MS
+    ) {
+      return [];
+    }
+    if (sharedRecentProjectsAccountSyncPromise) {
+      return sharedRecentProjectsAccountSyncPromise;
+    }
+    sharedRecentProjectsAccountSyncPromise = (async () => {
+      try {
+        return await syncSharedRecentProjectsFromAccount();
+      } finally {
+        sharedRecentProjectsLastAccountSyncAt = Date.now();
+        sharedRecentProjectsAccountSyncPromise = null;
+      }
+    })();
+    return sharedRecentProjectsAccountSyncPromise;
+  }
+
   async function refreshRecentProjectsUI(options = {}) {
     const section = dom.startup?.recentSection;
     const list = dom.startup?.recentList;
@@ -22720,6 +22758,13 @@
       list.innerHTML = '';
       section.hidden = true;
       return;
+    }
+    if (options?.syncSharedFromAccount !== false) {
+      try {
+        await ensureSharedRecentProjectsAccountSynced({ force: Boolean(options?.forceSharedAccountSync) });
+      } catch (error) {
+        console.warn('Failed to sync shared recent projects from account', error);
+      }
     }
     const shouldSanitize = options?.sanitize !== false;
     if (shouldSanitize) {
@@ -23693,6 +23738,29 @@
     let normalizedEntry = normalizeSharedRecentProjectEntry(entry);
     if (!normalizedEntry) {
       return false;
+    }
+    if (accountState.isLoggedIn && !accountState.isAnonymous) {
+      try {
+        await ensureSharedRecentProjectsAccountSynced({ force: true });
+        const syncedEntry = getSharedRecentProjectEntry(normalizedEntry.sharedProjectKey || '');
+        if (syncedEntry) {
+          normalizedEntry = syncedEntry;
+        } else if (normalizedEntry.id) {
+          await removeRecentProjectEntry(normalizedEntry.id);
+          if (!silent) {
+            setMultiStatus(
+              localizeText(
+                '共有一覧が更新され、このプロジェクトは現在アクセスできないため一覧から外しました。',
+                'Shared list was refreshed and this project is currently unavailable, so it was removed from your list.'
+              ),
+              'warn'
+            );
+          }
+          return false;
+        }
+      } catch (error) {
+        console.warn('Failed to force shared recent account sync before opening', error);
+      }
     }
     const pendingInvite = readPendingSharedInvite();
     const pendingInviteProjectKey = normalizeMultiProjectKey(pendingInvite?.projectKey || '');
@@ -29732,11 +29800,9 @@
       } catch (error) {
         console.warn('Autosave bootstrap failed', error);
       }
-      try {
-        await initializeExportDirectoryBinding();
-      } catch (error) {
+      initializeExportDirectoryBinding().catch(error => {
         console.warn('Export directory bootstrap failed', error);
-      }
+      });
       setupOpenProjectTabs();
       ensureOpenProjectTabsInitialized();
       setupLeftTabs();
@@ -29746,7 +29812,6 @@
       setupGlobalFocusDismiss();
       initPwaInstallSupport();
       setupControls();
-      void initPixieedAccount();
       setupExportDialog();
       setupExportInterstitialDialog();
       setupLoginPromptDialog();
@@ -60334,9 +60399,22 @@
         sharedProjectLastRescueAfterSeq = afterSeq;
         sharedProjectLastRescueOpCount = 0;
         sharedProjectRescueStallCount = 0;
-        return Boolean(
+        const hasUsableLoadedDocument = Boolean(
           activeSharedProjectDocumentLoaded
           && hasUsableActiveSharedProjectDocumentState()
+        );
+        // Self-heal: when server has no newer ops and a usable document is loaded,
+        // do not keep the client stuck in "catching-up".
+        if (
+          hasUsableLoadedDocument
+          && !activeSharedProjectOpenInProgress
+          && !sharedProjectDeferRealtimeUntilSynced
+          && activeSharedProjectSyncState !== 'synced'
+        ) {
+          setActiveSharedProjectSyncState('synced');
+        }
+        return Boolean(
+          hasUsableLoadedDocument
           && activeSharedProjectSyncState === 'synced'
         );
       }
@@ -63237,16 +63315,26 @@
     if (!canUseSharedProjectsBackend() && !await ensureSharedProjectBackendSession()) {
       return [];
     }
+    if (!accountState.userId || accountState.isAnonymous) {
+      return [];
+    }
     try {
       await enforceSharedProjectOwnershipLimit();
       const supabase = await ensurePixieedAccountClient();
       if (!supabase) {
         return [];
       }
-      const membershipResponse = await supabase
-        .from('shared_project_members')
-        .select('project_key, role, updated_at, joined_at')
-        .eq('user_id', accountState.userId);
+      const [membershipResponse, ownerProjectsResponse] = await Promise.all([
+        supabase
+          .from('shared_project_members')
+          .select('project_key, role, updated_at, joined_at')
+          .eq('user_id', accountState.userId),
+        supabase
+          .from('shared_projects')
+          .select('project_key')
+          .eq('owner_user_id', accountState.userId),
+      ]);
+
       if (membershipResponse.error) {
         if (isRecoverableSharedBackendPreflightError(membershipResponse.error)) {
           console.debug('[shared-backend] list-memberships skipped after recoverable preflight failure', {
@@ -63262,21 +63350,45 @@
         handleSharedProjectsBackendError(membershipResponse.error, 'list-memberships');
         return [];
       }
+
       const memberships = Array.isArray(membershipResponse.data) ? membershipResponse.data : [];
-      if (!memberships.length) {
-        await pruneSharedRecentEntriesToKnownProjects([]);
-        return [];
-      }
-      const projectKeys = memberships
+      const membershipProjectKeys = memberships
         .map(entry => normalizeMultiProjectKey(entry?.project_key || ''))
         .filter(Boolean);
-      if (!projectKeys.length) {
+
+      let ownerProjectKeys = [];
+      if (ownerProjectsResponse.error) {
+        if (!isRecoverableSharedBackendPreflightError(ownerProjectsResponse.error)) {
+          // Owner key listing is a best-effort fallback to catch projects created on other devices.
+          console.debug('[shared-backend] list-owned-project-keys failed', {
+            context: 'list-owned-project-keys',
+            status: Number(ownerProjectsResponse.error?.status || 0),
+            code: String(ownerProjectsResponse.error?.code || ''),
+            message: String(ownerProjectsResponse.error?.message || ''),
+          });
+        }
+      } else {
+        ownerProjectKeys = (Array.isArray(ownerProjectsResponse.data) ? ownerProjectsResponse.data : [])
+          .map(entry => normalizeMultiProjectKey(entry?.project_key || ''))
+          .filter(Boolean);
+      }
+
+      const uniqueProjectKeys = [...new Set([
+        ...membershipProjectKeys,
+        ...ownerProjectKeys,
+      ])];
+      if (!uniqueProjectKeys.length) {
         await pruneSharedRecentEntriesToKnownProjects([]);
         return [];
       }
-      const uniqueProjectKeys = [...new Set(projectKeys)];
+
       const hiddenProjectKeys = readHiddenSharedProjectKeys();
       const visibleProjectKeys = uniqueProjectKeys.filter(projectKey => !hiddenProjectKeys.has(projectKey));
+      if (!visibleProjectKeys.length) {
+        await pruneSharedRecentEntriesToKnownProjects(visibleProjectKeys);
+        return [];
+      }
+
       const projectEntries = await Promise.all(
         visibleProjectKeys.map(projectKey => fetchSharedProjectRecordViaRpc(supabase, projectKey, 'list-projects'))
       );
@@ -63288,14 +63400,33 @@
         }
         projectsByKey.set(normalizedProjectKey, entry);
       });
+
+      const membershipByProjectKey = new Map();
+      memberships.forEach(entry => {
+        const projectKey = normalizeMultiProjectKey(entry?.project_key || '');
+        if (!projectKey) {
+          return;
+        }
+        const existing = membershipByProjectKey.get(projectKey);
+        if (!existing) {
+          membershipByProjectKey.set(projectKey, entry);
+          return;
+        }
+        const existingTime = Date.parse(existing?.updated_at || existing?.joined_at || '') || 0;
+        const nextTime = Date.parse(entry?.updated_at || entry?.joined_at || '') || 0;
+        if (nextTime >= existingTime) {
+          membershipByProjectKey.set(projectKey, entry);
+        }
+      });
+
       const normalizedEntries = [];
-      for (let index = 0; index < memberships.length; index += 1) {
-        const membership = memberships[index];
-        const projectKey = normalizeMultiProjectKey(membership?.project_key || '');
-        if (!projectKey || hiddenProjectKeys.has(projectKey)) {
+      for (let index = 0; index < visibleProjectKeys.length; index += 1) {
+        const projectKey = visibleProjectKeys[index];
+        const project = projectsByKey.get(projectKey) || null;
+        if (!project?.project_key) {
           continue;
         }
-        const project = projectsByKey.get(projectKey) || null;
+        const membership = membershipByProjectKey.get(projectKey) || null;
         const existingSharedEntry = getSharedRecentProjectEntry(projectKey);
         let thumbnail = existingSharedEntry?.thumbnail || null;
         if (!thumbnail && project?.latest_snapshot && typeof project.latest_snapshot === 'object') {
@@ -63328,6 +63459,8 @@
     } catch (error) {
       handleSharedProjectsBackendError(error, 'sync-recent-projects-exception');
       return [];
+    } finally {
+      sharedRecentProjectsLastAccountSyncAt = Date.now();
     }
   }
 
