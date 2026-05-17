@@ -760,11 +760,11 @@ body.is-mobile-layout.is-unified-left-tools-color:not(.is-unified-left-color-foc
   padding: 4px 0 0;
   border: 0;
   background: transparent;
-  max-height: clamp(220px, 58vh, 560px);
+  max-height: none;
   overflow-x: hidden;
-  overflow-y: auto;
-  scrollbar-width: none;
-  overscroll-behavior-y: auto;
+  overflow-y: visible;
+  scrollbar-width: auto;
+  overscroll-behavior-y: contain;
 }
 
 .rail--left[data-compact="true"] #panelTools .tool-group-tabs::-webkit-scrollbar {
@@ -795,11 +795,21 @@ body.is-mobile-layout.is-unified-left-tools-color:not(.is-unified-left-color-foc
 
 .rail--left[data-compact="true"] #panelTools .tool-grid,
 .rail--left[data-compact="true"] #panelTools .tool-grid[data-active-group] {
-  display: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(var(--ui-control-tile-size), var(--ui-control-tile-size)));
+  grid-auto-rows: var(--ui-control-tile-size);
+  justify-content: center;
+  align-content: start;
+  gap: 4px;
+  margin-bottom: 0;
+  padding: 4px 0 0;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+  overflow-y: visible;
+  overscroll-behavior-y: contain;
 }
 
-.rail--left[data-compact="true"] #panelTools[data-compact-flyout-open="true"] .tool-grid,
-.rail--left[data-compact="true"] #panelTools[data-compact-flyout-open="true"] .tool-grid[data-active-group],
 .tool-grid.is-compact-flyout-portal,
 .tool-grid.is-compact-flyout-portal[data-active-group] {
   display: grid;
@@ -827,7 +837,7 @@ body.is-mobile-layout.is-unified-left-tools-color:not(.is-unified-left-color-foc
   overscroll-behavior: contain;
 }
 
-.rail--left[data-compact="true"] #panelTools[data-compact-flyout-open="true"] .tool-button {
+.rail--left[data-compact="true"] #panelTools .tool-button {
   width: var(--ui-compact-tool-flyout-size);
   min-width: var(--ui-compact-tool-flyout-size);
   max-width: var(--ui-compact-tool-flyout-size);
@@ -1110,6 +1120,45 @@ body.is-unified-left-tools-color:not(.is-mobile-layout) .rail--left[data-compact
 .tool-group-button:focus-visible {
   outline: 2px solid rgba(var(--ui-rgb-focus), 0.75);
   outline-offset: 2px;
+}
+
+/* Desktop opened left rail: render parent tool groups as width-fit chips (no inner viewport). */
+body:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelTools .tool-group-tabs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--ui-control-tile-size), var(--ui-control-tile-size)));
+  grid-auto-rows: var(--ui-control-tile-size);
+  justify-content: start;
+  align-content: start;
+  gap: 4px;
+  margin-bottom: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  max-height: none;
+  min-height: calc((var(--ui-control-tile-size) * 3 / 2) + 2px);
+  overflow-x: hidden;
+  overflow-y: visible;
+}
+
+body:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelTools .tool-group-button {
+  width: var(--ui-control-tile-size);
+  min-width: var(--ui-control-tile-size);
+  max-width: var(--ui-control-tile-size);
+  height: var(--ui-control-tile-size);
+  min-height: var(--ui-control-tile-size);
+  max-height: var(--ui-control-tile-size);
+  padding: 0;
+  gap: 0;
+  justify-content: center;
+}
+
+body:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelTools .tool-group-button .tool-group-label {
+  display: none;
+}
+
+body:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelTools .tool-group-icon {
+  width: 24px;
+  height: 24px;
 }
 
 .tool-grid[data-active-group] {
@@ -2106,11 +2155,13 @@ body.is-startup-active #virtualCursorCanvas {
 .canvas-controls {
   --canvas-control-current-size: var(--canvas-control-size);
   position: absolute;
-  top: calc(12px + var(--project-tabs-height));
-  right: var(--right-toggle-offset);
+  top: calc(2px + var(--project-tabs-height));
+  left: max(calc(var(--safe-area-left) + 2px), calc(var(--left-toggle-offset) - 10px));
+  right: max(calc(var(--safe-area-right) + 2px), calc(var(--right-toggle-offset) - 10px));
   display: flex;
   gap: 8px;
   align-items: center;
+  justify-content: flex-start;
   background: transparent;
   padding: 0;
   border-radius: 0;
@@ -2136,6 +2187,7 @@ body.is-startup-active #virtualCursorCanvas {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  margin-left: auto;
 }
 
 .canvas-reload-action {
@@ -2263,7 +2315,7 @@ body.is-startup-active #virtualCursorCanvas {
 
 .canvas-controls[data-mobile='true'] .canvas-controls__history {
   order: 3;
-  margin-left: 0;
+  margin-left: auto;
 }
 
 .canvas-controls[data-mobile='true'] #appReloadAction {
@@ -7842,7 +7894,7 @@ body.is-startup-active {
 }
 
 .mobile-topbar__inner {
-  padding: 4px 12px;
+  padding: 4px 12px 4px 0;
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -8235,7 +8287,7 @@ body.is-startup-active {
   }
   .mobile-topbar__inner {
     min-height: calc(var(--mobile-topbar-height) - var(--mobile-safe-area-top));
-    padding: 6px 10px 8px;
+    padding: 4px 10px 6px var(--mobile-safe-area-left);
     gap: 8px;
     justify-content: flex-start;
   }
@@ -8274,7 +8326,7 @@ body.is-startup-active {
   .canvas-controls[data-mobile='true'] .canvas-controls__history {
     gap: 4px;
     order: 3;
-    margin-left: 0;
+    margin-left: auto;
   }
   .canvas-controls[data-mobile='true'] .canvas-clipboard-buttons {
     gap: 4px;
@@ -9317,14 +9369,14 @@ body *::-webkit-scrollbar {
     justify-content: start;
     align-content: start;
     gap: var(--left-button-grid-gap);
-    margin-bottom: 8px;
-    padding-top: 4px;
+    margin-bottom: 0;
+    padding-top: 0;
     box-sizing: border-box;
-    max-height: clamp(120px, 26vh, 300px);
-    min-height: var(--left-tool-group-tile-size);
+    max-height: none;
+    min-height: calc((var(--left-tool-group-tile-size) * 3 / 2) + (var(--left-button-grid-gap) / 2));
     overflow-x: hidden;
-    overflow-y: auto;
-    overscroll-behavior-y: auto;
+    overflow-y: visible;
+    overscroll-behavior-y: contain;
   }
 
   body:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelTools .tool-group-button {
@@ -9359,11 +9411,11 @@ body *::-webkit-scrollbar {
     margin-bottom: 8px;
     padding-top: 4px;
     box-sizing: border-box;
-    max-height: clamp(120px, 30vh, 360px);
+    max-height: none;
     min-height: var(--left-tool-tile-size);
     overflow-x: hidden;
-    overflow-y: auto;
-    overscroll-behavior-y: auto;
+    overflow-y: visible;
+    overscroll-behavior-y: contain;
   }
 
   body:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelTools .tool-button {
