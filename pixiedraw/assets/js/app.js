@@ -9970,6 +9970,7 @@
         queueSharedProjectReconnectRecovery('visibility', { immediate: true }).catch(() => {});
         return;
       }
+      ensureSharedRecentProjectsAccountSynced({ force: true }).catch(() => {});
       requestMultiResync('visibility');
     }
   }
@@ -9987,6 +9988,7 @@
       queueSharedProjectReconnectRecovery('focus', { immediate: true }).catch(() => {});
       return;
     }
+    ensureSharedRecentProjectsAccountSynced({ force: true }).catch(() => {});
     requestMultiResync('focus');
   }
 
@@ -9996,6 +9998,7 @@
       queueSharedProjectReconnectRecovery('online', { immediate: true }).catch(() => {});
       return;
     }
+    ensureSharedRecentProjectsAccountSynced({ force: true }).catch(() => {});
     requestMultiResync('online');
   }
 
@@ -10020,6 +10023,7 @@
       queueSharedProjectReconnectRecovery(event?.persisted ? 'pageshow-bfcache' : 'pageshow', { immediate: true }).catch(() => {});
       return;
     }
+    ensureSharedRecentProjectsAccountSynced({ force: true }).catch(() => {});
     requestMultiResync('pageshow');
   }
 
@@ -10035,6 +10039,7 @@
       queueSharedProjectReconnectRecovery('document-resume', { immediate: true }).catch(() => {});
       return;
     }
+    ensureSharedRecentProjectsAccountSynced({ force: true }).catch(() => {});
     requestMultiResync('document-resume');
   }
 
@@ -21055,9 +21060,6 @@
     const existingEntries = await loadRecentProjectsMetadata();
     const nextEntries = existingEntries.filter(entry => {
       if (!isSharedRecentProjectEntry(entry)) {
-        return true;
-      }
-      if (isRecentProjectEntryInheritedAnonymous(entry)) {
         return true;
       }
       const projectKey = normalizeMultiProjectKey(entry.sharedProjectKey || '');
@@ -61455,12 +61457,12 @@
       if (result?.conflict_reason === 'same-account-active-elsewhere') {
         setMultiStatus(
           localizeText(
-            '同じPiXiEEDアカウントで別端末からこの共有プロジェクトを開いています。同時利用はできません。',
-            'This shared project is already open on another device with the same PiXiEED account.'
+            '同じPiXiEEDアカウントの別端末でもこの共有プロジェクトを開いています。続行します。',
+            'This shared project is already open on another device with the same PiXiEED account. Continuing.'
           ),
-          'error'
+          'info'
         );
-        return false;
+        return true;
       }
       return false;
     } catch (error) {
