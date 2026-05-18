@@ -20352,7 +20352,7 @@
         ? await openSharedRecentProject(sharedEntry, {
             hideStartup: true,
             silent: true,
-            skipLatestRefresh: true,
+            skipLatestRefresh: false,
           })
         : await openSharedProjectCanonical({
             projectKey: restoredProjectKey,
@@ -62625,6 +62625,18 @@
     return true;
   }
 
+  function isSharedProjectAuthoritativeRefreshReason(reason = '') {
+    const normalizedReason = String(reason || '');
+    return Boolean(
+      normalizedReason.includes('manual')
+      || normalizedReason.includes('reload')
+      || normalizedReason.includes('open-shared')
+      || normalizedReason.includes('canonical-resync')
+      || normalizedReason.includes('apply-skip')
+      || normalizedReason.includes('missing-target')
+    );
+  }
+
   async function refreshActiveSharedProjectSnapshot({ force = false, reason = '' } = {}) {
     console.info('[shared-sync]', {
       event: reason && reason.includes('canonical') ? 'canonical-resync-start' : 'refresh-start',
@@ -62711,6 +62723,9 @@
         });
       }
       const normalizedReason = String(reason || '');
+      const requiresAuthoritativeServerRead = Boolean(
+        force && isSharedProjectAuthoritativeRefreshReason(normalizedReason)
+      );
       const prefersOpReplayRecovery = (
         normalizedReason === 'poll-recovery'
         || normalizedReason === 'focus'
@@ -62834,6 +62849,7 @@
         && activeSharedProjectDocumentLoaded
         && !sharedProjectDeferRealtimeUntilSynced
         && !requiresCanonicalSnapshot
+        && !requiresAuthoritativeServerRead
         && !hasSharedProjectHardLocalWorkInFlight()
       ) {
         setActiveSharedProjectSyncState('synced');
@@ -62854,6 +62870,7 @@
         !force
         && activeAlreadyAtLatest
         && activeSharedProjectDocumentLoaded
+        && !requiresAuthoritativeServerRead
       ) {
         if (!sharedProjectDeferRealtimeUntilSynced) {
           setActiveSharedProjectSyncState('synced');
