@@ -3082,6 +3082,7 @@
   let sharedProjectRefreshInFlight = false;
   let sharedProjectReconnectRecoveryTimer = null;
   let sharedProjectReconnectRecoveryPromise = null;
+  let sharedProjectWakeRecoveryPromise = null;
   let sharedProjectWatchdogLastTickAt = 0;
   let sharedProjectCatchingUpStartedAt = 0;
   let sharedProjectRecoveryReloadTimer = null;
@@ -8737,7 +8738,10 @@
             joinState: typeof activeSharedProjectChannel?.joinPush?.state === 'string' ? activeSharedProjectChannel.joinPush.state : '',
           },
         });
-        queueSharedProjectReconnectRecovery('watchdog-sleep-gap', { immediate: true }).catch(() => {});
+        recoverSharedProjectAfterWake('watchdog-sleep-gap', {
+          hiddenGapMs: watchdogGapMs,
+          immediate: true,
+        }).catch(() => {});
         return;
       }
       if (
@@ -9220,6 +9224,7 @@
     if (
       sharedProjectRecoveryInProgress
       || sharedProjectReconnectRecoveryPromise
+      || sharedProjectWakeRecoveryPromise
       || sharedProjectRefreshInFlight
       || sharedProjectSnapshotReplayInFlight
       || sharedProjectDeferRealtimeUntilSynced
@@ -9382,6 +9387,7 @@
       sharedProjectRefreshInFlight
       || sharedProjectRecoveryInProgress
       || Boolean(sharedProjectReconnectRecoveryPromise)
+      || Boolean(sharedProjectWakeRecoveryPromise)
       || sharedProjectSnapshotReplayInFlight
       || sharedProjectPendingRemoteOps.size > 0
       || ((now - sharedProjectLastRxActivityAt) <= SHARED_PROJECT_STATUS_TRAFFIC_LAMP_MS)
@@ -9415,6 +9421,7 @@
     if (
       sharedProjectRecoveryInProgress
       || sharedProjectReconnectRecoveryPromise
+      || sharedProjectWakeRecoveryPromise
       || sharedProjectRefreshInFlight
     ) {
       return {
@@ -9519,7 +9526,7 @@
     if (typeof navigator !== 'undefined' && navigator.onLine === false) {
       return;
     }
-    if (sharedProjectReconnectRecoveryPromise || sharedProjectRefreshInFlight || sharedProjectRecoveryInProgress) {
+    if (sharedProjectReconnectRecoveryPromise || sharedProjectWakeRecoveryPromise || sharedProjectRefreshInFlight || sharedProjectRecoveryInProgress) {
       return;
     }
     const now = Date.now();
@@ -9806,6 +9813,9 @@
     if (!activeSharedProjectKey) {
       return Promise.resolve(false);
     }
+    if (sharedProjectWakeRecoveryPromise) {
+      return sharedProjectWakeRecoveryPromise;
+    }
     if (sharedProjectReconnectRecoveryPromise) {
       return sharedProjectReconnectRecoveryPromise;
     }
@@ -9966,6 +9976,171 @@
     return Promise.resolve(false);
   }
 
+  function recoverSharedProjectAfterWake(reason = 'wake', { hiddenGapMs = 0, immediate = true } = {}) {
+    if (!activeSharedProjectKey) {
+      return Promise.resolve(false);
+    }
+    if (sharedProjectWakeRecoveryPromise) {
+      return sharedProjectWakeRecoveryPromise;
+    }
+    const normalizedReason = String(reason || 'wake');
+    const recoveryProjectKey = activeSharedProjectKey;
+    const runWakeRecovery = async () => {
+      if (!activeSharedProjectKey || recoveryProjectKey !== activeSharedProjectKey) {
+        return false;
+      }
+      if (sharedProjectRefreshTimer !== null) {
+        window.clearTimeout(sharedProjectRefreshTimer);
+        sharedProjectRefreshTimer = null;
+      }
+      if (sharedProjectReconnectRecoveryTimer !== null) {
+        window.clearTimeout(sharedProjectReconnectRecoveryTimer);
+        sharedProjectReconnectRecoveryTimer = null;
+      }
+      setActiveSharedProjectSyncState('catching-up', { announce: true });
+      logSharedProjectRealtimeChannelLifecycle('wake-recovery-start', {
+        caller: 'recoverSharedProjectAfterWake',
+        reason: normalizedReason,
+        projectKey: recoveryProjectKey,
+        extra: {
+          hiddenGapMs: Math.max(0, Math.round(Number(hiddenGapMs) || 0)),
+          activeRevision: activeSharedProjectRevision,
+          activeStructureRevision: activeSharedProjectStructureRevision,
+          channelKey: activeSharedProjectChannelKey || '',
+          realtimeStatus: sharedProjectRealtimeStatus,
+        },
+      });
+      try {
+        await ensurePixieedAccountReady({ forceRefresh: true, silent: true });
+        if (!await ensureSharedProjectBackendSession()) {
+          return false;
+        }
+        if (recoveryProjectKey !== activeSharedProjectKey) {
+          return false;
+        }
+        const syncToLatestRecord = async (stage = 'wake-sync') => {
+          const latestProject = await fetchSharedProjectRecord(recoveryProjectKey);
+          if (!latestProject?.project_key || recoveryProjectKey !== activeSharedProjectKey) {
+            return false;
+          }
+          const latestRevision = getSharedProjectLatestRevision(latestProject);
+          const latestStructureRevision = getSharedProjectLatestStructureRevision(latestProject);
+          console.info('[shared-sync]', {
+            event: 'wake-latest-fetched',
+            reason: normalizedReason,
+            stage,
+            projectKey: recoveryProjectKey,
+            activeRevision: activeSharedProjectRevision,
+            latestRevision,
+            activeStructureRevision: activeSharedProjectStructureRevision,
+            latestStructureRevision,
+          });
+          if (!activeSharedProjectDocumentLoaded || !hasUsableActiveSharedProjectDocumentState()) {
+            return await refreshActiveSharedProjectSnapshot({
+              force: true,
+              reason: `${normalizedReason}-${stage}-snapshot-load`,
+            });
+          }
+          if (
+            latestRevision > activeSharedProjectRevision
+            || latestStructureRevision > activeSharedProjectStructureRevision
+          ) {
+            const replayed = await applySharedProjectOpsSinceRevision(latestProject, activeSharedProjectRevision);
+            if (!replayed) {
+              return await refreshActiveSharedProjectSnapshot({
+                force: true,
+                reason: `${normalizedReason}-${stage}-canonical-fallback`,
+              });
+            }
+          }
+          return (
+            activeSharedProjectRevision >= latestRevision
+            && activeSharedProjectStructureRevision >= latestStructureRevision
+          );
+        };
+        const syncedBeforeSubscribe = await syncToLatestRecord('before-subscribe');
+        if (recoveryProjectKey !== activeSharedProjectKey) {
+          return false;
+        }
+        await disconnectActiveSharedProjectRealtimeChannel({
+          reason: `${normalizedReason}-wake-reconnect`,
+          caller: 'recoverSharedProjectAfterWake',
+        });
+        const realtimeChannel = await ensureActiveSharedProjectRealtimeChannel();
+        if (recoveryProjectKey !== activeSharedProjectKey) {
+          return false;
+        }
+        const syncedAfterSubscribe = await syncToLatestRecord('after-subscribe');
+        const recoveredGap = await recoverSharedProjectRealtimeGap(recoveryProjectKey, {
+          afterSeq: sharedProjectLastAppliedSeq,
+          reason: `${normalizedReason}-post-subscribe-gap`,
+        });
+        const finalSynced = await syncToLatestRecord('final-check');
+        const recovered = Boolean(
+          activeSharedProjectKey === recoveryProjectKey
+          && (syncedBeforeSubscribe || syncedAfterSubscribe || recoveredGap || finalSynced)
+          && finalSynced
+          && !sharedProjectPendingRemoteOps.size
+        );
+        if (recovered) {
+          setSharedProjectDeferRealtimeUntilSynced(false);
+          setActiveSharedProjectSyncState('synced', { announce: true });
+          resumeSharedProjectLocalOpsAfterConnectivityChange(normalizedReason);
+          ensureSharedProjectRefreshLoop();
+        } else if (activeSharedProjectKey === recoveryProjectKey) {
+          window.setTimeout(() => {
+            queueSharedProjectReconnectRecovery(`${normalizedReason}-fallback`, {
+              immediate: false,
+              blockEditing: true,
+            }).catch(() => {});
+          }, 0);
+          scheduleSharedProjectOpsRescueRetry();
+        }
+        logSharedProjectRealtimeChannelLifecycle('wake-recovery-done', {
+          caller: 'recoverSharedProjectAfterWake',
+          reason: normalizedReason,
+          projectKey: recoveryProjectKey,
+          extra: {
+            syncedBeforeSubscribe,
+            syncedAfterSubscribe,
+            recoveredGap,
+            finalSynced,
+            recovered,
+            realtimeConnected: Boolean(realtimeChannel),
+            activeRevision: activeSharedProjectRevision,
+            pendingRemoteOps: sharedProjectPendingRemoteOps.size,
+          },
+        });
+        return recovered;
+      } catch (error) {
+        console.warn('[shared-realtime] wake recovery failed', {
+          reason: normalizedReason,
+          projectKey: recoveryProjectKey,
+          error: String(error?.message || error || ''),
+        });
+        window.setTimeout(() => {
+          queueSharedProjectReconnectRecovery(`${normalizedReason}-exception`, {
+            immediate: false,
+            blockEditing: true,
+          }).catch(() => {});
+        }, 0);
+        scheduleSharedProjectOpsRescueRetry();
+        return false;
+      }
+    };
+    sharedProjectWakeRecoveryPromise = (immediate
+      ? Promise.resolve().then(runWakeRecovery)
+      : new Promise(resolve => {
+          window.setTimeout(() => {
+            runWakeRecovery().then(resolve).catch(() => resolve(false));
+          }, 180);
+        })
+    ).finally(() => {
+      sharedProjectWakeRecoveryPromise = null;
+    });
+    return sharedProjectWakeRecoveryPromise;
+  }
+
   function handleMultiVisibilityChange() {
     syncSharedProjectVisibleStatus();
     if (document.visibilityState === 'hidden') {
@@ -9981,7 +10156,7 @@
         if (maybeForceSharedProjectReloadAfterSleep('sleep-wake-visibility', hiddenGapMs)) {
           return;
         }
-        queueSharedProjectReconnectRecovery('visibility', { immediate: true }).catch(() => {});
+        recoverSharedProjectAfterWake('visibility', { hiddenGapMs, immediate: true }).catch(() => {});
         return;
       }
       ensureSharedRecentProjectsAccountSynced({ force: true }).catch(() => {});
@@ -9999,7 +10174,7 @@
       if (maybeForceSharedProjectReloadAfterSleep('sleep-wake-focus', hiddenGapMs)) {
         return;
       }
-      queueSharedProjectReconnectRecovery('focus', { immediate: true }).catch(() => {});
+      recoverSharedProjectAfterWake('focus', { hiddenGapMs, immediate: true }).catch(() => {});
       return;
     }
     ensureSharedRecentProjectsAccountSynced({ force: true }).catch(() => {});
@@ -10009,7 +10184,7 @@
   function handleMultiOnline() {
     syncSharedProjectVisibleStatus();
     if (activeSharedProjectKey) {
-      queueSharedProjectReconnectRecovery('online', { immediate: true }).catch(() => {});
+      recoverSharedProjectAfterWake('online', { hiddenGapMs: 0, immediate: true }).catch(() => {});
       return;
     }
     ensureSharedRecentProjectsAccountSynced({ force: true }).catch(() => {});
@@ -10034,7 +10209,7 @@
       if (maybeForceSharedProjectReloadAfterSleep('sleep-wake-pageshow', hiddenGapMs)) {
         return;
       }
-      queueSharedProjectReconnectRecovery(event?.persisted ? 'pageshow-bfcache' : 'pageshow', { immediate: true }).catch(() => {});
+      recoverSharedProjectAfterWake(event?.persisted ? 'pageshow-bfcache' : 'pageshow', { hiddenGapMs, immediate: true }).catch(() => {});
       return;
     }
     ensureSharedRecentProjectsAccountSynced({ force: true }).catch(() => {});
@@ -10050,7 +10225,7 @@
       if (maybeForceSharedProjectReloadAfterSleep('sleep-wake-resume', hiddenGapMs)) {
         return;
       }
-      queueSharedProjectReconnectRecovery('document-resume', { immediate: true }).catch(() => {});
+      recoverSharedProjectAfterWake('document-resume', { hiddenGapMs, immediate: true }).catch(() => {});
       return;
     }
     ensureSharedRecentProjectsAccountSynced({ force: true }).catch(() => {});
@@ -59016,6 +59191,8 @@
       blockReason = 'open-readonly';
     } else if (sharedProjectRefreshInFlight && !isCreateSnapshot) {
       blockReason = 'refresh-in-flight';
+    } else if (sharedProjectWakeRecoveryPromise && !isCreateSnapshot) {
+      blockReason = 'wake-recovery-in-progress';
     } else if (sharedProjectRecoveryInProgress && !isCreateSnapshot) {
       blockReason = 'recovery-in-progress';
     } else if (inFlightOpCount > 0) {
@@ -60435,6 +60612,7 @@
     if (
       sharedProjectOpPollInFlight
       || sharedProjectGapRecoveryPromise
+      || sharedProjectWakeRecoveryPromise
       || sharedProjectRefreshInFlight
       || sharedProjectOpCommitInFlight
     ) {
@@ -63365,6 +63543,7 @@
       && (
         sharedProjectRecoveryInProgress
         || sharedProjectReconnectRecoveryPromise
+        || sharedProjectWakeRecoveryPromise
         || sharedProjectRefreshInFlight
         || sharedProjectSnapshotReplayInFlight
         || sharedProjectDeferRealtimeUntilSynced
@@ -63985,6 +64164,7 @@
     if (!snapshotGate.allowed) {
       const transientBlockReasons = new Set([
         'refresh-in-flight',
+        'wake-recovery-in-progress',
         'recovery-in-progress',
         'local-in-flight-ops',
         'not-synced',
