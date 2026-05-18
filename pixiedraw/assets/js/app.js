@@ -8738,10 +8738,12 @@
             joinState: typeof activeSharedProjectChannel?.joinPush?.state === 'string' ? activeSharedProjectChannel.joinPush.state : '',
           },
         });
-        recoverSharedProjectAfterWake('watchdog-sleep-gap', {
-          hiddenGapMs: watchdogGapMs,
-          immediate: true,
-        }).catch(() => {});
+        if (!maybeForceSharedProjectReloadAfterSleep('watchdog-sleep-gap', watchdogGapMs)) {
+          recoverSharedProjectAfterWake('watchdog-sleep-gap', {
+            hiddenGapMs: watchdogGapMs,
+            immediate: true,
+          }).catch(() => {});
+        }
         return;
       }
       if (
@@ -10206,7 +10208,7 @@
       : 0;
     sharedProjectVisibilityHiddenAt = 0;
     if (activeSharedProjectKey) {
-      if (maybeForceSharedProjectReloadAfterSleep('sleep-wake-pageshow', hiddenGapMs)) {
+      if (maybeForceSharedProjectReloadAfterSleep('sleep-wake-pageshow', hiddenGapMs, { force: Boolean(event?.persisted) })) {
         return;
       }
       recoverSharedProjectAfterWake(event?.persisted ? 'pageshow-bfcache' : 'pageshow', { hiddenGapMs, immediate: true }).catch(() => {});
@@ -10222,7 +10224,7 @@
       : 0;
     sharedProjectVisibilityHiddenAt = 0;
     if (activeSharedProjectKey) {
-      if (maybeForceSharedProjectReloadAfterSleep('sleep-wake-resume', hiddenGapMs)) {
+      if (maybeForceSharedProjectReloadAfterSleep('sleep-wake-resume', hiddenGapMs, { force: true })) {
         return;
       }
       recoverSharedProjectAfterWake('document-resume', { hiddenGapMs, immediate: true }).catch(() => {});
@@ -10232,12 +10234,12 @@
     requestMultiResync('document-resume');
   }
 
-  function maybeForceSharedProjectReloadAfterSleep(reason = 'sleep-wake', hiddenGapMs = 0) {
+  function maybeForceSharedProjectReloadAfterSleep(reason = 'sleep-wake', hiddenGapMs = 0, { force = false } = {}) {
     if (!activeSharedProjectKey || appReloadInProgress) {
       return false;
     }
     const normalizedGapMs = Math.max(0, Math.round(Number(hiddenGapMs) || 0));
-    if (normalizedGapMs < SHARED_PROJECT_SLEEP_WAKE_FORCE_RELOAD_AFTER_MS) {
+    if (!force && normalizedGapMs < SHARED_PROJECT_SLEEP_WAKE_FORCE_RELOAD_AFTER_MS) {
       return false;
     }
     if (!canScheduleSharedProjectRecoveryReload()) {
@@ -10248,6 +10250,7 @@
       reason,
       projectKey: activeSharedProjectKey || '',
       hiddenGapMs: normalizedGapMs,
+      force: Boolean(force),
       activeRevision: activeSharedProjectRevision,
       syncState: activeSharedProjectSyncState,
     });
