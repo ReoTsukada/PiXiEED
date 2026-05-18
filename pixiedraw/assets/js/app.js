@@ -2865,6 +2865,7 @@
   let sharedProjectLastRescueOpCount = -1;
   let sharedProjectRescueStallCount = 0;
   let sharedProjectOpsRescueRetryTimer = null;
+  let sharedProjectBroadcastCatchupTimer = null;
   let projectDotBaselineSnapshot = null;
   let projectDotCumulativeStats = null;
   let autosaveLifecycleFlushAt = 0;
@@ -9077,6 +9078,10 @@
       sharedProjectSeenOpSeqById.clear();
       sharedProjectRemoteApplyFailureKeys.clear();
       sharedProjectPendingLocalOps = [];
+      if (sharedProjectBroadcastCatchupTimer !== null) {
+        window.clearTimeout(sharedProjectBroadcastCatchupTimer);
+        sharedProjectBroadcastCatchupTimer = null;
+      }
       if (sharedProjectPendingLocalOpsRetryTimer !== null) {
         window.clearTimeout(sharedProjectPendingLocalOpsRetryTimer);
         sharedProjectPendingLocalOpsRetryTimer = null;
@@ -9238,19 +9243,14 @@
     if (!isSharedProjectCollaborativeMode(normalizedProjectKey)) {
       return '';
     }
-    if (
-      sharedProjectRecoveryInProgress
-      || sharedProjectReconnectRecoveryPromise
-      || sharedProjectWakeRecoveryPromise
-      || sharedProjectRefreshInFlight
-      || sharedProjectSnapshotReplayInFlight
-      || sharedProjectDeferRealtimeUntilSynced
-      || activeSharedProjectSyncState === 'catching-up'
-    ) {
-      return 'sync-in-progress';
-    }
     if (activeSharedProjectOpenInProgress || activeSharedProjectOpenReadOnly) {
       return 'open-in-progress';
+    }
+    if (
+      sharedProjectSnapshotReplayInFlight
+      || sharedProjectDeferRealtimeUntilSynced
+    ) {
+      return 'sync-in-progress';
     }
     if (!activeSharedProjectDocumentLoaded) {
       return 'server-document-not-loaded';
@@ -9592,10 +9592,30 @@
       return;
     }
     const status = getSharedProjectVisibleStatus();
+    const reloadAction = dom.controls.appReloadAction instanceof HTMLButtonElement
+      ? dom.controls.appReloadAction
+      : null;
     indicator.hidden = !status.visible;
     indicator.setAttribute('aria-hidden', String(!status.visible));
     indicator.dataset.state = status.state;
     indicator.dataset.lamp = resolveSharedProjectLampState(status);
+    if (reloadAction) {
+      const showReloadLamp = Boolean(
+        status.visible
+        && (
+          status.state === 'recovering'
+          || status.state === 'syncing'
+          || status.state === 'blocked'
+          || status.reloadable
+          || status.recoverable
+        )
+      );
+      reloadAction.dataset.sharedSyncLamp = showReloadLamp ? resolveSharedProjectLampState(status) : '';
+      reloadAction.classList.toggle('canvas-reload-action--shared-notice', showReloadLamp);
+      reloadAction.title = showReloadLamp
+        ? localizeText('共有プロジェクトを最新確認中。必要なら再読み込み', 'Shared project is checking for updates. Reload if needed.')
+        : localizeText('再読み込み', 'Reload');
+    }
     if (dom.projectTabsStatusSlot instanceof HTMLElement) {
       dom.projectTabsStatusSlot.hidden = !status.visible;
       dom.projectTabsStatusSlot.setAttribute('aria-hidden', String(!status.visible));
@@ -60931,6 +60951,48 @@
     }, Math.max(32, Math.round(Number(delayMs) || SHARED_PROJECT_OP_RESCUE_POLL_INTERVAL_MS)));
   }
 
+  function scheduleSharedProjectBroadcastCatchupRetry({
+    reason = 'broadcast-catchup',
+    attempt = 0,
+    delays = [96, 240, 600, 1200],
+  } = {}) {
+    if (!activeSharedProjectKey || sharedProjectBroadcastCatchupTimer !== null) {
+      return;
+    }
+    const normalizedAttempt = Math.max(0, Math.round(Number(attempt) || 0));
+    const retryDelays = Array.isArray(delays) && delays.length ? delays : [96, 240, 600, 1200];
+    if (normalizedAttempt >= retryDelays.length) {
+      return;
+    }
+    const delayMs = Math.max(32, Math.round(Number(retryDelays[normalizedAttempt]) || 96));
+    sharedProjectBroadcastCatchupTimer = window.setTimeout(() => {
+      sharedProjectBroadcastCatchupTimer = null;
+      if (!activeSharedProjectKey || sharedProjectRefreshInFlight) {
+        scheduleSharedProjectBroadcastCatchupRetry({
+          reason,
+          attempt: normalizedAttempt + 1,
+          delays: retryDelays,
+        });
+        return;
+      }
+      pollSharedProjectRealtimeOpsRescue({ reason }).then(recovered => {
+        if (!recovered) {
+          scheduleSharedProjectBroadcastCatchupRetry({
+            reason,
+            attempt: normalizedAttempt + 1,
+            delays: retryDelays,
+          });
+        }
+      }).catch(() => {
+        scheduleSharedProjectBroadcastCatchupRetry({
+          reason,
+          attempt: normalizedAttempt + 1,
+          delays: retryDelays,
+        });
+      });
+    }, delayMs);
+  }
+
   function drainPendingSharedProjectRemoteOps() {
     while (sharedProjectPendingRemoteOps.has(sharedProjectLastAppliedSeq + 1)) {
       const nextSeq = sharedProjectLastAppliedSeq + 1;
@@ -62668,11 +62730,11 @@
         force
         && activeAlreadyAtLatest
         && activeSharedProjectDocumentLoaded
-        && activeSharedProjectSynced
         && !sharedProjectDeferRealtimeUntilSynced
         && !requiresCanonicalSnapshot
         && !hasSharedProjectHardLocalWorkInFlight()
       ) {
+        setActiveSharedProjectSyncState('synced');
         logSharedProjectRealtimeChannelLifecycle('refresh-result', {
           caller: 'refreshActiveSharedProjectSnapshot',
           reason: reason || 'refresh',
@@ -62691,6 +62753,9 @@
         && activeAlreadyAtLatest
         && activeSharedProjectDocumentLoaded
       ) {
+        if (!sharedProjectDeferRealtimeUntilSynced) {
+          setActiveSharedProjectSyncState('synced');
+        }
         if ((project?.id && !activeSharedProjectId) || sharedProjectDeferRealtimeUntilSynced) {
           const retained = await retainActiveSharedProjectDocumentDuringRefresh(project, {
             force,
@@ -64450,15 +64515,25 @@
         const recoveryReason = SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY && isSharedProjectDrawKind(drawKind)
           ? 'broadcast-draw-gap'
           : 'broadcast-op-gap';
+        scheduleSharedProjectBroadcastCatchupRetry({
+          reason: recoveryReason,
+          delays: [120, 280, 640, 1200],
+        });
         recoverSharedProjectRealtimeGap(projectKey, {
           afterSeq: sharedProjectLastAppliedSeq,
           reason: recoveryReason,
         }).then(recovered => {
           if (!recovered) {
-            scheduleSharedProjectOpsRescueRetry(96);
+            scheduleSharedProjectBroadcastCatchupRetry({
+              reason: recoveryReason,
+              delays: [180, 360, 800, 1500],
+            });
           }
         }).catch(() => {
-          scheduleSharedProjectOpsRescueRetry(96);
+          scheduleSharedProjectBroadcastCatchupRetry({
+            reason: recoveryReason,
+            delays: [180, 360, 800, 1500],
+          });
         });
       }
     );
