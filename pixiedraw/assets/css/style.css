@@ -2193,6 +2193,45 @@ body.is-startup-active #virtualCursorCanvas {
 .canvas-reload-action {
   font-size: 1.05rem;
   font-weight: 700;
+  position: relative;
+}
+
+.canvas-reload-action::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1px solid rgba(6, 12, 18, 0.92);
+  background: transparent;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.24);
+  opacity: 0;
+  transform: scale(0.8);
+  transition: opacity 0.16s ease, transform 0.16s ease, background-color 0.16s ease;
+  pointer-events: none;
+}
+
+.canvas-reload-action--shared-notice::after {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.canvas-reload-action[data-shared-sync-lamp="synced"]::after {
+  background: #45d483;
+}
+
+.canvas-reload-action[data-shared-sync-lamp="sending"]::after {
+  background: #f4c542;
+}
+
+.canvas-reload-action[data-shared-sync-lamp="receiving"]::after {
+  background: #48a8ff;
+}
+
+.canvas-reload-action[data-shared-sync-lamp="offline"]::after {
+  background: #ff5d5d;
 }
 
 .shared-status-indicator {
