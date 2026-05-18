@@ -59266,7 +59266,6 @@
       'structure-checkpoint',
       'recovery-verified-checkpoint',
       'checkpoint',
-      'sharedRemoteDrawCheckpoint',
       'sharedForceResync',
       'sharedConflictReplay',
       'sharedProjectCreate',
@@ -60842,17 +60841,16 @@
 
   function shouldCreateSharedProjectCheckpoint(opType = 'draw') {
     // Checkpoints are supplemental durability for shared projects.
-    // Draw operations should stay op-first and only snapshot periodically.
+    // Draw operations must stay op-first. Letting arbitrary clients rewrite
+    // the canonical snapshot after draw replay can preserve a divergent local
+    // document as the server read base.
     if (!isSharedProjectCollaborativeMode()) {
       return false;
     }
     if (opType === 'structure' || opType === 'create' || opType === 'snapshot') {
       return true;
     }
-    if (sharedProjectOpsSinceCheckpoint >= SHARED_PROJECT_CHECKPOINT_OP_COUNT) {
-      return true;
-    }
-    return (Date.now() - sharedProjectLastCheckpointAt) >= SHARED_PROJECT_CHECKPOINT_INTERVAL_MS;
+    return false;
   }
 
   function isSharedProjectCheckpointHistoryLabel(historyLabel = '') {
@@ -60862,7 +60860,6 @@
     }
     return (
       normalizedLabel === 'checkpoint'
-      || normalizedLabel === 'sharedRemoteDrawCheckpoint'
       || normalizedLabel === 'sharedConflictReplay'
       || normalizedLabel === 'sharedForceResync'
       || normalizedLabel === 'sharedProjectCreate'
@@ -61740,10 +61737,6 @@
       }
       sharedProjectLastProvisionalRemoteAt = Date.now();
     }
-    if (!provisional && shouldCreateSharedProjectCheckpoint('draw')) {
-      // snapshot is recovery/checkpoint only
-      scheduleSharedProjectCheckpoint({ historyLabel: 'sharedRemoteDrawCheckpoint' });
-    }
     return applied;
   }
 
@@ -62214,21 +62207,14 @@
       Math.max(targetStructureRevision, activeSharedProjectStructureRevision),
       projectRecord?.id || activeSharedProjectId
     );
-      if (sharedProjectLastAppliedSeq >= targetRevision) {
-        setActiveSharedProjectSyncState('synced');
-        queueSharedProjectCurrentSnapshotCapture({
-          delayMs: 0,
-          projectKey,
-          historyLabel: 'sharedRemoteDrawCheckpoint',
-          force: true,
-          revision: targetRevision,
-        });
-        if (sharedProjectDeferRealtimeUntilSynced) {
-          setSharedProjectDeferRealtimeUntilSynced(false);
-        ensureActiveSharedProjectRealtimeChannel().catch(error => {
-          reportSharedProjectRealtimeSubscribeFailure(error);
-        });
+    if (sharedProjectLastAppliedSeq >= targetRevision) {
+      setActiveSharedProjectSyncState('synced');
+      if (sharedProjectDeferRealtimeUntilSynced) {
+        setSharedProjectDeferRealtimeUntilSynced(false);
       }
+      ensureActiveSharedProjectRealtimeChannel().catch(error => {
+        reportSharedProjectRealtimeSubscribeFailure(error);
+      });
     }
     return sharedProjectLastAppliedSeq >= targetRevision;
   }
