@@ -2569,7 +2569,6 @@
   const SHARED_PROJECT_SEEN_OP_KEEP = 2048;
   const SHARED_PROJECT_REALTIME_SUBSCRIBE_TIMEOUT_MS = 30000;
   const SHARED_PROJECT_SLEEP_WAKE_GAP_MS = 2500;
-  const SHARED_PROJECT_SLEEP_WAKE_FORCE_RELOAD_AFTER_MS = 45000;
   const SHARED_PROJECT_AUTO_RELOAD_AFTER_CATCHUP_MS = 45000;
   const SHARED_PROJECT_FIRST_INPUT_RECONNECT_AFTER_CATCHUP_MS = 1200;
   const SHARED_PROJECT_VISIBLE_RECOVER_AFTER_SYNC_MS = 6000;
@@ -8738,12 +8737,10 @@
             joinState: typeof activeSharedProjectChannel?.joinPush?.state === 'string' ? activeSharedProjectChannel.joinPush.state : '',
           },
         });
-        if (!maybeForceSharedProjectReloadAfterSleep('watchdog-sleep-gap', watchdogGapMs)) {
-          recoverSharedProjectAfterWake('watchdog-sleep-gap', {
-            hiddenGapMs: watchdogGapMs,
-            immediate: true,
-          }).catch(() => {});
-        }
+        recoverSharedProjectAfterWake('watchdog-sleep-gap', {
+          hiddenGapMs: watchdogGapMs,
+          immediate: true,
+        }).catch(() => {});
         return;
       }
       if (
@@ -8752,16 +8749,34 @@
         && sharedProjectReconnectRecoveryTimer === null
         && !sharedProjectRefreshInFlight
       ) {
+        const catchingUpForMs = sharedProjectCatchingUpStartedAt > 0
+          ? Math.max(0, now - sharedProjectCatchingUpStartedAt)
+          : 0;
         logSharedProjectRealtimeChannelLifecycle('watchdog-catchup-stalled', {
           caller: 'ensureSharedProjectRefreshLoop',
           reason: 'catching-up-without-recovery',
           extra: {
+            catchingUpForMs,
             realtimeStatus: sharedProjectRealtimeStatus,
             channelState: typeof activeSharedProjectChannel?.state === 'string' ? activeSharedProjectChannel.state : '',
             joinState: typeof activeSharedProjectChannel?.joinPush?.state === 'string' ? activeSharedProjectChannel.joinPush.state : '',
           },
         });
-        queueSharedProjectReconnectRecovery('watchdog-catchup-stalled', { immediate: true }).catch(() => {});
+        maybePollSharedProjectServerOps({
+          reason: 'watchdog-catchup-stalled',
+          force: true,
+          allowRefreshBackstop: true,
+        });
+        if (catchingUpForMs >= SHARED_PROJECT_VISIBLE_RECOVER_AFTER_SYNC_MS && sharedProjectRefreshTimer === null) {
+          queueSharedProjectRefresh({
+            immediate: false,
+            reason: 'watchdog-catchup-backstop',
+            force: true,
+          });
+        }
+        if (catchingUpForMs >= SHARED_PROJECT_AUTO_RELOAD_AFTER_CATCHUP_MS) {
+          scheduleSharedProjectRecoveryReload('watchdog-catchup-stalled', 0);
+        }
         return;
       }
       if (autosaveWriteInFlight || multiState.applyRemoteInProgress) {
@@ -9536,6 +9551,14 @@
       return;
     }
     sharedProjectAutoRecoveryLastAttemptAt = now;
+    if (reason === 'syncing' || reason.startsWith('sync-')) {
+      maybePollSharedProjectServerOps({
+        reason: `status-auto-${reason}`,
+        force: true,
+        allowRefreshBackstop: true,
+      });
+      return;
+    }
     queueSharedProjectReconnectRecovery(`status-auto-${reason}`, {
       immediate: true,
       blockEditing: true,
@@ -10155,9 +10178,6 @@
         : 0;
       sharedProjectVisibilityHiddenAt = 0;
       if (activeSharedProjectKey) {
-        if (maybeForceSharedProjectReloadAfterSleep('sleep-wake-visibility', hiddenGapMs)) {
-          return;
-        }
         recoverSharedProjectAfterWake('visibility', { hiddenGapMs, immediate: true }).catch(() => {});
         return;
       }
@@ -10173,9 +10193,6 @@
       : 0;
     sharedProjectVisibilityHiddenAt = 0;
     if (activeSharedProjectKey) {
-      if (maybeForceSharedProjectReloadAfterSleep('sleep-wake-focus', hiddenGapMs)) {
-        return;
-      }
       recoverSharedProjectAfterWake('focus', { hiddenGapMs, immediate: true }).catch(() => {});
       return;
     }
@@ -10208,9 +10225,6 @@
       : 0;
     sharedProjectVisibilityHiddenAt = 0;
     if (activeSharedProjectKey) {
-      if (maybeForceSharedProjectReloadAfterSleep('sleep-wake-pageshow', hiddenGapMs, { force: Boolean(event?.persisted) })) {
-        return;
-      }
       recoverSharedProjectAfterWake(event?.persisted ? 'pageshow-bfcache' : 'pageshow', { hiddenGapMs, immediate: true }).catch(() => {});
       return;
     }
@@ -10224,39 +10238,11 @@
       : 0;
     sharedProjectVisibilityHiddenAt = 0;
     if (activeSharedProjectKey) {
-      if (maybeForceSharedProjectReloadAfterSleep('sleep-wake-resume', hiddenGapMs, { force: true })) {
-        return;
-      }
       recoverSharedProjectAfterWake('document-resume', { hiddenGapMs, immediate: true }).catch(() => {});
       return;
     }
     ensureSharedRecentProjectsAccountSynced({ force: true }).catch(() => {});
     requestMultiResync('document-resume');
-  }
-
-  function maybeForceSharedProjectReloadAfterSleep(reason = 'sleep-wake', hiddenGapMs = 0, { force = false } = {}) {
-    if (!activeSharedProjectKey || appReloadInProgress) {
-      return false;
-    }
-    const normalizedGapMs = Math.max(0, Math.round(Number(hiddenGapMs) || 0));
-    if (!force && normalizedGapMs < SHARED_PROJECT_SLEEP_WAKE_FORCE_RELOAD_AFTER_MS) {
-      return false;
-    }
-    if (!canScheduleSharedProjectRecoveryReload()) {
-      return false;
-    }
-    console.warn('[shared-sync]', {
-      event: 'sleep-wake-force-reload',
-      reason,
-      projectKey: activeSharedProjectKey || '',
-      hiddenGapMs: normalizedGapMs,
-      force: Boolean(force),
-      activeRevision: activeSharedProjectRevision,
-      syncState: activeSharedProjectSyncState,
-    });
-    markSharedProjectRecoveryReloadAt();
-    scheduleAppReload(`shared-${reason}`);
-    return true;
   }
 
   function handleSharedProjectRecoveryFirstInput() {
@@ -64499,10 +64485,10 @@
               queueSharedProjectRefresh({ immediate: false, reason: 'realtime-structure', force: true });
               return;
             }
-            if (!projectId && nextRevision > sharedProjectLastAppliedSeq + 1) {
+            if (nextRevision > sharedProjectLastAppliedSeq) {
               recoverSharedProjectRealtimeGap(projectKey, {
                 afterSeq: sharedProjectLastAppliedSeq,
-                reason: 'project-update-gap',
+                reason: 'project-update-canonical-fetch',
               }).then(recovered => {
                 if (!recovered) {
                   scheduleSharedProjectOpsRescueRetry();
@@ -64570,50 +64556,23 @@
               return;
             }
             const opType = typeof payload?.new?.op_type === 'string' ? payload.new.op_type.trim() : '';
-            if (nextRevision > sharedProjectLastAppliedSeq + 1) {
-              rememberPendingSharedProjectRemoteOp(nextRevision, payload.new, 'insert-gap');
-              recoverSharedProjectRealtimeGap(projectKey, {
-                afterSeq: sharedProjectLastAppliedSeq,
-                reason: 'insert-gap',
-              }).then(recovered => {
-                if (!recovered) {
-                  scheduleSharedProjectOpsRescueRetry();
-                }
-              }).catch(() => {
-                scheduleSharedProjectOpsRescueRetry();
-              });
-              return;
-            }
-            if (nextRevision === sharedProjectLastAppliedSeq + 1) {
-              if (shouldDeferIncomingSharedProjectRemoteApply()) {
-                rememberPendingSharedProjectRemoteOp(nextRevision, payload.new, 'realtime-deferred');
-                scheduleDeferredSharedProjectRemoteOpsDrain();
-                return;
-              }
-              const applied = applyOp(payload.new, { fromRemote: true, provisional: false });
-              if (applied) {
-                sharedProjectLastAppliedSeq = nextRevision;
-                activeSharedProjectRevision = nextRevision;
-                activeSharedProjectStructureRevision = Math.max(activeSharedProjectStructureRevision, nextStructureRevision);
-                sharedProjectLastRealtimeActivityAt = Date.now();
-                if (drainPendingSharedProjectRemoteOps()) {
-                  return;
-                }
-              }
-            }
-            if (opType === 'structure') {
-              queueSharedProjectRefresh({ immediate: true, reason: 'structure-op' });
-              return;
-            }
             recoverSharedProjectRealtimeGap(projectKey, {
               afterSeq: sharedProjectLastAppliedSeq,
-              reason: 'op-realtime',
+              reason: opType === 'structure' ? 'structure-op-canonical-fetch' : 'op-realtime-canonical-fetch',
             }).then(recovered => {
               if (!recovered) {
-                scheduleSharedProjectOpsRescueRetry();
+                if (opType === 'structure') {
+                  queueSharedProjectRefresh({ immediate: true, reason: 'structure-op', force: true });
+                } else {
+                  scheduleSharedProjectOpsRescueRetry();
+                }
               }
             }).catch(() => {
-              scheduleSharedProjectOpsRescueRetry();
+              if (opType === 'structure') {
+                queueSharedProjectRefresh({ immediate: true, reason: 'structure-op', force: true });
+              } else {
+                scheduleSharedProjectOpsRescueRetry();
+              }
             });
           }
         );
