@@ -57380,6 +57380,14 @@
     );
   }
 
+  function hasSharedProjectRemoteApplyBlockingWork() {
+    return (
+      pointerState.active
+      || sharedProjectOpCommitInFlight
+      || sharedProjectSyncInFlight
+    );
+  }
+
   function setActiveSharedProjectSyncState(nextState = 'idle', { announce = false } = {}) {
     const normalizedState = nextState === 'catching-up' || nextState === 'synced' ? nextState : 'idle';
     activeSharedProjectSyncState = normalizedState;
@@ -57466,7 +57474,7 @@
   function shouldDeferIncomingSharedProjectRemoteApply() {
     return (
       (!activeSharedProjectDocumentLoaded && !hasUsableActiveSharedProjectDocumentState())
-      || hasSharedProjectHardLocalWorkInFlight()
+      || hasSharedProjectRemoteApplyBlockingWork()
       || autosaveWriteInFlight
       || multiState.applyRemoteInProgress
       || multiState.connecting
