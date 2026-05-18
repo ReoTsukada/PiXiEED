@@ -7435,6 +7435,96 @@
     });
   }
 
+  function remapSharedProjectHistorySnapshotIdentity(snapshot) {
+    if (!snapshot || typeof snapshot !== 'object' || !isSharedProjectCollaborativeMode()) {
+      return snapshot;
+    }
+    const currentCanvases = getProjectCanvasDocuments();
+    const snapshotCanvases = Array.isArray(snapshot.canvases) && snapshot.canvases.length
+      ? snapshot.canvases
+      : (Array.isArray(snapshot.frames) ? [{
+        id: typeof snapshot.activeCanvasId === 'string' ? snapshot.activeCanvasId : '',
+        width: snapshot.width,
+        height: snapshot.height,
+        frames: snapshot.frames,
+        activeFrame: snapshot.activeFrame,
+        activeLayer: snapshot.activeLayer,
+        selectionMask: snapshot.selectionMask,
+        selectionContentMask: snapshot.selectionContentMask,
+        selectionBounds: snapshot.selectionBounds,
+      }] : []);
+    if (!currentCanvases.length || !snapshotCanvases.length || currentCanvases.length !== snapshotCanvases.length) {
+      return snapshot;
+    }
+    const activeCurrentCanvas = getActiveProjectCanvasDocument() || currentCanvases[0] || null;
+    let changed = false;
+    snapshotCanvases.forEach((snapshotCanvas, canvasIndex) => {
+      const currentCanvas = currentCanvases[canvasIndex] || null;
+      if (!snapshotCanvas || !currentCanvas) {
+        return;
+      }
+      const previousCanvasId = typeof snapshotCanvas.id === 'string' ? snapshotCanvas.id : '';
+      if (currentCanvas.id && previousCanvasId !== currentCanvas.id) {
+        snapshotCanvas.id = currentCanvas.id;
+        changed = true;
+      }
+      const snapshotFrames = Array.isArray(snapshotCanvas.frames) ? snapshotCanvas.frames : [];
+      const currentFrames = Array.isArray(currentCanvas.frames) ? currentCanvas.frames : [];
+      snapshotFrames.forEach((snapshotFrame, frameIndex) => {
+        const currentFrame = currentFrames[frameIndex] || null;
+        if (!snapshotFrame || !currentFrame) {
+          return;
+        }
+        if (currentFrame.id && snapshotFrame.id !== currentFrame.id) {
+          snapshotFrame.id = currentFrame.id;
+          changed = true;
+        }
+        const snapshotLayers = Array.isArray(snapshotFrame.layers) ? snapshotFrame.layers : [];
+        const currentLayers = Array.isArray(currentFrame.layers) ? currentFrame.layers : [];
+        snapshotLayers.forEach((snapshotLayer, layerIndex) => {
+          const currentLayer = currentLayers[layerIndex] || null;
+          if (!snapshotLayer || !currentLayer?.id || snapshotLayer.id === currentLayer.id) {
+            return;
+          }
+          if (snapshotCanvas.activeLayer === snapshotLayer.id) {
+            snapshotCanvas.activeLayer = currentLayer.id;
+          }
+          if (snapshot.activeLayer === snapshotLayer.id) {
+            snapshot.activeLayer = currentLayer.id;
+          }
+          snapshotLayer.id = currentLayer.id;
+          changed = true;
+        });
+      });
+      if (activeCurrentCanvas && currentCanvas.id === activeCurrentCanvas.id) {
+        snapshot.activeCanvasId = currentCanvas.id || snapshot.activeCanvasId || '';
+        snapshot.frames = snapshotCanvas.frames;
+        snapshot.width = snapshotCanvas.width;
+        snapshot.height = snapshotCanvas.height;
+        snapshot.activeFrame = snapshotCanvas.activeFrame;
+        snapshot.activeLayer = snapshotCanvas.activeLayer;
+        if (Object.prototype.hasOwnProperty.call(snapshotCanvas, 'selectionMask')) {
+          snapshot.selectionMask = snapshotCanvas.selectionMask;
+        }
+        if (Object.prototype.hasOwnProperty.call(snapshotCanvas, 'selectionContentMask')) {
+          snapshot.selectionContentMask = snapshotCanvas.selectionContentMask;
+        }
+        if (Object.prototype.hasOwnProperty.call(snapshotCanvas, 'selectionBounds')) {
+          snapshot.selectionBounds = snapshotCanvas.selectionBounds;
+        }
+      }
+    });
+    if (changed) {
+      console.info('[shared-sync]', {
+        event: 'shared-history-identity-remapped',
+        projectKey: activeSharedProjectKey || '',
+        activeCanvasId: getActiveProjectCanvasDocument()?.id || '',
+        canvasCount: snapshotCanvases.length,
+      });
+    }
+    return snapshot;
+  }
+
   function applyHistorySnapshot(
     snapshot,
     {
@@ -7442,8 +7532,12 @@
       forcePalettePresetSync = false,
       preservePersonalPreferences = true,
       preserveDocumentIds = false,
+      preserveSharedProjectDocumentIdentity = false,
     } = {}
   ) {
+    snapshot = preserveSharedProjectDocumentIdentity
+      ? remapSharedProjectHistorySnapshotIdentity(snapshot)
+      : snapshot;
     const previousProjectCanvasCount = getProjectCanvasCount();
     const previousVoxelModeEnabled = isVoxelExtensionModeEnabled();
     const personalPreferences = preservePersonalPreferences
@@ -11040,14 +11134,18 @@
     if (history.future.length > history.limit) {
       history.future.shift();
     }
-    applyHistorySnapshot(decompressHistorySnapshot(previous), { preserveView: true });
+    const sharedUndoOpType = classifySharedProjectOpType(historyLabel);
+    applyHistorySnapshot(decompressHistorySnapshot(previous), {
+      preserveView: true,
+      preserveSharedProjectDocumentIdentity: isSharedProjectCollaborativeMode() && sharedUndoOpType !== 'structure',
+    });
     updateHistoryButtons();
     markAutosaveDirty();
     markDocumentUnsavedChange();
     scheduleAutosaveSnapshot();
     if (isSharedProjectCollaborativeMode()) {
       handleMultiLocalCommit(historyLabel);
-      const sharedOpType = classifySharedProjectOpType(historyLabel);
+      const sharedOpType = sharedUndoOpType;
       if (shouldPersistSharedProjectSnapshotForHistoryLabel(historyLabel, sharedOpType)) {
         queueSharedProjectCurrentSnapshotCapture({
           delayMs: sharedOpType === 'structure'
@@ -11143,14 +11241,18 @@
     if (history.past.length > history.limit) {
       history.past.shift();
     }
-    applyHistorySnapshot(decompressHistorySnapshot(next), { preserveView: true });
+    const sharedRedoOpType = classifySharedProjectOpType(historyLabel);
+    applyHistorySnapshot(decompressHistorySnapshot(next), {
+      preserveView: true,
+      preserveSharedProjectDocumentIdentity: isSharedProjectCollaborativeMode() && sharedRedoOpType !== 'structure',
+    });
     updateHistoryButtons();
     markAutosaveDirty();
     markDocumentUnsavedChange();
     scheduleAutosaveSnapshot();
     if (isSharedProjectCollaborativeMode()) {
       handleMultiLocalCommit(historyLabel);
-      const sharedOpType = classifySharedProjectOpType(historyLabel);
+      const sharedOpType = sharedRedoOpType;
       if (shouldPersistSharedProjectSnapshotForHistoryLabel(historyLabel, sharedOpType)) {
         queueSharedProjectCurrentSnapshotCapture({
           delayMs: sharedOpType === 'structure'
