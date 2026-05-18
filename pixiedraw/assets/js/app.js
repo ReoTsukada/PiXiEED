@@ -3325,6 +3325,10 @@
   let sharedProjectLastCanonicalRefreshQueuedAt = 0;
   let sharedProjectLastForceRefreshQueuedAt = 0;
   let sharedProjectLastForceRefreshQueuedReason = '';
+  let sharedProjectLastVerifiedLatestAt = 0;
+  let sharedProjectLastVerifiedLatestKey = '';
+  let sharedProjectLastVerifiedLatestRevision = 0;
+  let sharedProjectLastVerifiedLatestStructureRevision = 0;
   let sharedProjectDeferredRemoteOpsDelayMs = 0;
   let activeSharedProjectCanonicalOpenPromise = null;
   let activeSharedProjectCanonicalOpenKey = '';
@@ -22221,6 +22225,11 @@
         .map(entry => getSharedProjectOpId(entry?.op || entry))
         .filter(Boolean)
     );
+    sharedProjectLocalInFlightOps.forEach((_entry, opId) => {
+      if (opId) {
+        queuedIds.add(opId);
+      }
+    });
     let resumedCount = 0;
     entries.forEach(entry => {
       if (entry?.status !== 'pending') {
@@ -58781,6 +58790,18 @@
     });
   }
 
+  function removeSharedProjectQueuedLocalOp(opOrOpId) {
+    const opId = typeof opOrOpId === 'string' ? opOrOpId.trim() : normalizeSharedProjectOpId(opOrOpId);
+    if (!opId || !Array.isArray(sharedProjectPendingLocalOps) || !sharedProjectPendingLocalOps.length) {
+      return 0;
+    }
+    const beforeLength = sharedProjectPendingLocalOps.length;
+    sharedProjectPendingLocalOps = sharedProjectPendingLocalOps.filter(entry => (
+      getSharedProjectOpId(entry?.op || entry) !== opId
+    ));
+    return beforeLength - sharedProjectPendingLocalOps.length;
+  }
+
   function markSharedProjectLocalOpCommitConfirmed(opOrOpId, meta = {}) {
     const opId = typeof opOrOpId === 'string' ? opOrOpId.trim() : normalizeSharedProjectOpId(opOrOpId);
     if (!opId) {
@@ -58789,6 +58810,7 @@
     const entry = sharedProjectLocalInFlightOps.get(opId) || null;
     const opRecord = typeof opOrOpId === 'string' ? (entry?.op || null) : opOrOpId;
     sharedProjectLocalInFlightOps.delete(opId);
+    const removedQueuedCount = removeSharedProjectQueuedLocalOp(opId);
     rememberSharedProjectSeenOp(opId, Math.round(Number(meta.revision) || getSharedProjectOpSeq(opRecord) || 0));
     if (entry) {
       entry.committedRevision = Math.max(0, Math.round(Number(meta.revision) || getSharedProjectOpSeq(opRecord) || 0));
@@ -58801,6 +58823,17 @@
           revision: entry.committedRevision,
         });
       }
+    }
+    deleteSharedLocalOpJournalEntry(opId).catch(error => {
+      console.warn('Failed to delete confirmed shared local op journal entry', error);
+    });
+    if (removedQueuedCount > 0) {
+      console.info('[shared-sync]', {
+        event: 'confirmed-local-op-queue-pruned',
+        opId,
+        projectKey: entry?.projectKey || activeSharedProjectKey || '',
+        removedQueuedCount,
+      });
     }
     logSharedProjectLocalOpLifecycle('commit confirmed', opRecord || { opId }, {
       source: meta.source || entry?.source || 'db',
@@ -60913,6 +60946,34 @@
     if (!op || typeof op !== 'object' || !op.projectKey) {
       return;
     }
+    const opId = getSharedProjectOpId(op);
+    if (opId && sharedProjectSeenOpIds.has(opId)) {
+      console.info('[shared-sync]', {
+        event: 'local-op-send-skipped-confirmed',
+        opId,
+        projectKey: op.projectKey || '',
+      });
+      deleteSharedLocalOpJournalEntry(opId).catch(error => {
+        console.warn('Failed to delete already-confirmed shared local op journal entry', error);
+      });
+      return;
+    }
+    if (
+      opId
+      && (
+        sharedProjectPendingLocalOps.some(entry => getSharedProjectOpId(entry?.op || entry) === opId)
+        || sharedProjectLocalInFlightOps.has(opId)
+      )
+    ) {
+      console.info('[shared-sync]', {
+        event: 'local-op-send-skipped-active',
+        opId,
+        projectKey: op.projectKey || '',
+        queueLength: sharedProjectPendingLocalOps.length,
+      });
+      flushSharedProjectPendingLocalOps();
+      return;
+    }
     markSharedProjectTrafficActivity('tx');
     const opType = classifySharedProjectOpType(op.historyLabel || '');
     rememberSharedProjectLocalInFlightOp(op, {
@@ -60958,9 +61019,22 @@
       opPayload: op.payload || null,
       retryOnConflict,
     };
+    const alreadyQueued = Boolean(opId) && sharedProjectPendingLocalOps.some(entry => (
+      getSharedProjectOpId(entry?.op || entry) === opId
+    ));
+    if (alreadyQueued) {
+      console.info('[shared-sync]', {
+        event: 'commit-queue-add-skipped-duplicate',
+        opId,
+        projectKey: op.projectKey,
+        queueLength: sharedProjectPendingLocalOps.length,
+      });
+      flushSharedProjectPendingLocalOps();
+      return;
+    }
     console.info('[shared-sync]', {
       event: 'commit-queue-add',
-      opId: getSharedProjectOpId(op),
+      opId,
       projectKey: op.projectKey,
       queueLengthBefore: sharedProjectPendingLocalOps.length,
     });
@@ -62242,6 +62316,8 @@
         || normalizedReason === 'focus'
         || normalizedReason === 'visibility'
         || normalizedReason === 'online'
+        || normalizedReason.includes('reconnect')
+        || normalizedReason.includes('resume-pending-local-ops')
         || normalizedReason.includes('poll-recovery-')
       );
       const requiresCanonicalSnapshot = (
@@ -62252,6 +62328,12 @@
         nextRevision <= activeSharedProjectRevision
         && nextStructureRevision <= activeSharedProjectStructureRevision
       );
+      if (activeAlreadyAtLatest && activeSharedProjectKey) {
+        sharedProjectLastVerifiedLatestAt = Date.now();
+        sharedProjectLastVerifiedLatestKey = activeSharedProjectKey;
+        sharedProjectLastVerifiedLatestRevision = activeSharedProjectRevision;
+        sharedProjectLastVerifiedLatestStructureRevision = activeSharedProjectStructureRevision;
+      }
       const snapshotBehindActiveRevision = snapshotRevision < activeSharedProjectRevision;
       const canReloadStaleSnapshotForUnloadedDocument = Boolean(
         snapshotBehindActiveRevision
@@ -63155,13 +63237,6 @@
         }
         return null;
       }
-      updateSharedLocalOpJournalStatus(resolvedOp, {
-        status: 'confirmed',
-        committedRevision: Math.max(0, Math.round(Number(result.committed_revision || result.latest_revision) || 0)),
-        committedStructureRevision: Math.max(0, Math.round(Number(result.committed_structure_revision || result.latest_structure_revision) || 0)),
-      }).catch(error => {
-        console.warn('Failed to mark shared local op journal entry confirmed', error);
-      });
       advanceSharedProjectAfterLocalCommit(normalizedProjectKey, result, resolvedOp);
       console.info('[shared-sync]', {
         event: 'commit-confirmed',
@@ -63226,15 +63301,31 @@
     if (!nextOp) {
       return;
     }
+    const nextOpId = getSharedProjectOpId(nextOp.op || nextOp);
+    if (nextOpId && sharedProjectSeenOpIds.has(nextOpId)) {
+      console.info('[shared-sync]', {
+        event: 'commit-queue-drain-skipped-confirmed',
+        opId: nextOpId,
+        projectKey: nextOp.projectKey || '',
+        remainingQueueLength: sharedProjectPendingLocalOps.length,
+      });
+      deleteSharedLocalOpJournalEntry(nextOpId).catch(error => {
+        console.warn('Failed to delete confirmed queued shared local op journal entry', error);
+      });
+      window.setTimeout(() => {
+        flushSharedProjectPendingLocalOps();
+      }, 0);
+      return;
+    }
     console.info('[shared-sync]', {
       event: 'commit-queue-drain-start',
-      opId: getSharedProjectOpId(nextOp.op || nextOp),
+      opId: nextOpId,
       projectKey: nextOp.projectKey || '',
       remainingQueueLength: sharedProjectPendingLocalOps.length,
     });
     console.info('[shared-sync]', {
       event: 'local-op-retry-start',
-      opId: getSharedProjectOpId(nextOp.op || nextOp),
+      opId: nextOpId,
       projectKey: nextOp.projectKey || '',
     });
     sharedProjectOpCommitInFlight = true;
@@ -63574,6 +63665,21 @@
       || normalizedReason === 'visibility'
       || normalizedReason === 'online'
     );
+    const isReconnectRecoveryReason = (
+      normalizedReason.includes('reconnect')
+      || normalizedReason.includes('resume-pending-local-ops')
+    );
+    const recentlyVerifiedLatest = Boolean(
+      activeSharedProjectKey
+      && sharedProjectLastVerifiedLatestKey === activeSharedProjectKey
+      && sharedProjectLastVerifiedLatestRevision >= activeSharedProjectRevision
+      && sharedProjectLastVerifiedLatestStructureRevision >= activeSharedProjectStructureRevision
+      && activeSharedProjectDocumentLoaded
+      && activeSharedProjectSynced
+      && !sharedProjectDeferRealtimeUntilSynced
+      && !hasSharedProjectHardLocalWorkInFlight()
+      && (now - sharedProjectLastVerifiedLatestAt) < SHARED_PROJECT_FORCE_REFRESH_DEDUPE_MS
+    );
     if (
       !force
       && realtimeSubscribed
@@ -63658,6 +63764,25 @@
           requestedReason: normalizedReason,
           immediate,
           force,
+        },
+      });
+      return;
+    }
+    if (
+      force
+      && recentlyVerifiedLatest
+      && refreshAlreadyQueuedOrRunning
+      && (isReconnectRecoveryReason || normalizedReason === sharedProjectLastForceRefreshQueuedReason)
+    ) {
+      logSharedProjectRealtimeChannelLifecycle('skip-queue-refresh', {
+        caller: 'queueSharedProjectRefresh',
+        reason: 'recent-latest-verification-suppressed',
+        extra: {
+          requestedReason: normalizedReason,
+          immediate,
+          force,
+          activeRevision: activeSharedProjectRevision,
+          activeStructureRevision: activeSharedProjectStructureRevision,
         },
       });
       return;
@@ -63775,6 +63900,30 @@
       structureRevision: activeSharedProjectStructureRevision,
     });
     if (!snapshotGate.allowed) {
+      const transientBlockReasons = new Set([
+        'refresh-in-flight',
+        'recovery-in-progress',
+        'local-in-flight-ops',
+        'not-synced',
+        'active-revision-not-latest',
+      ]);
+      if (force && transientBlockReasons.has(snapshotGate.blockReason)) {
+        if (sharedProjectCaptureTimer !== null) {
+          window.clearTimeout(sharedProjectCaptureTimer);
+          sharedProjectCaptureTimer = null;
+        }
+        sharedProjectCaptureTimer = window.setTimeout(() => {
+          sharedProjectCaptureTimer = null;
+          queueSharedProjectCurrentSnapshotCapture({
+            delayMs,
+            projectKey: resolvedProjectKey,
+            title,
+            historyLabel,
+            force,
+            revision,
+          });
+        }, Math.max(800, Math.round(Number(delayMs) || 0), 1200));
+      }
       return;
     }
     if (sharedProjectCaptureTimer !== null) {
