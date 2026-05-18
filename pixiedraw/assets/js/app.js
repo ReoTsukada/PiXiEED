@@ -9217,6 +9217,16 @@
     if (!isSharedProjectCollaborativeMode(normalizedProjectKey)) {
       return '';
     }
+    if (
+      sharedProjectRecoveryInProgress
+      || sharedProjectReconnectRecoveryPromise
+      || sharedProjectRefreshInFlight
+      || sharedProjectSnapshotReplayInFlight
+      || sharedProjectDeferRealtimeUntilSynced
+      || activeSharedProjectSyncState === 'catching-up'
+    ) {
+      return 'sync-in-progress';
+    }
     if (activeSharedProjectOpenInProgress || activeSharedProjectOpenReadOnly) {
       return 'open-in-progress';
     }
@@ -9234,12 +9244,12 @@
 
   function getSharedProjectDrawBlockStatus(reason = '') {
     const normalizedReason = String(reason || '').trim();
-    if (normalizedReason === 'open-in-progress') {
+    if (normalizedReason === 'open-in-progress' || normalizedReason === 'sync-in-progress') {
       return {
         level: 'warn',
         message: localizeText(
-          '共有プロジェクトを復帰中です。完了後に描画できます。',
-          'The shared project is recovering. Drawing will be available once recovery completes.'
+          '共有プロジェクトを最新状態へ確認中です。差異防止のため完了まで描画を停止しています。',
+          'The shared project is being verified as current. Drawing is paused until verification completes to prevent divergence.'
         ),
       };
     }
@@ -9260,8 +9270,8 @@
     return {
       level: 'warn',
       message: localizeText(
-        '共有プロジェクトを最新状態へ同期中です。描画は続けられます。',
-        'The shared project is syncing to the latest state. You can keep drawing.'
+        '共有プロジェクトを最新状態へ同期中です。完了後に描画できます。',
+        'The shared project is syncing to the latest state. Drawing will resume after it completes.'
       ),
     };
   }
@@ -62053,6 +62063,52 @@
     return project;
   }
 
+  async function fetchSharedProjectMemberProfileNicknames(userIds = []) {
+    const normalizedUserIds = Array.from(new Set(
+      (Array.isArray(userIds) ? userIds : [])
+        .map(value => (typeof value === 'string' ? value.trim() : ''))
+        .filter(Boolean)
+    ));
+    const nicknames = new Map();
+    if (!normalizedUserIds.length || !canUseSharedProjectsBackend()) {
+      return nicknames;
+    }
+    if (accountState.userId) {
+      const selfNickname = readPixieedAccountNickname();
+      if (selfNickname) {
+        nicknames.set(accountState.userId, selfNickname);
+      }
+    }
+    try {
+      const supabase = await ensurePixieedAccountClient();
+      if (!supabase) {
+        return nicknames;
+      }
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('id, nickname')
+        .in('id', normalizedUserIds);
+      if (shouldIgnorePixieedProfileError(error)) {
+        return nicknames;
+      }
+      if (error) {
+        throw error;
+      }
+      (Array.isArray(data) ? data : []).forEach(profile => {
+        const userId = typeof profile?.id === 'string' ? profile.id.trim() : '';
+        const nickname = normalizeMultiParticipantName(profile?.nickname || '', '');
+        if (userId && nickname) {
+          nicknames.set(userId, nickname);
+        }
+      });
+    } catch (error) {
+      if (!shouldIgnorePixieedProfileError(error)) {
+        console.warn('Failed to load shared project member profiles', error);
+      }
+    }
+    return nicknames;
+  }
+
   async function syncSharedProjectMembers(projectKey = activeSharedProjectKey, projectId = activeSharedProjectId) {
     if ((!canUseSharedProjectsBackend() && !await ensureSharedProjectBackendSession()) || !accountState.userId) {
       sharedProjectMembers = [];
@@ -62087,15 +62143,20 @@
           return [];
         }
         const rows = Array.isArray(data) ? data : [];
+        const userIds = rows
+          .map(entry => (typeof entry?.user_id === 'string' ? entry.user_id.trim() : ''))
+          .filter(Boolean);
+        const profileNicknames = await fetchSharedProjectMemberProfileNicknames(userIds);
         sharedProjectMembers = rows.map(entry => {
           const userId = typeof entry?.user_id === 'string' ? entry.user_id.trim() : '';
           const isSelf = Boolean(userId) && userId === accountState.userId;
+          const profileName = userId ? normalizeMultiParticipantName(profileNicknames.get(userId) || '', '') : '';
           return {
             clientId: userId || `${entry?.project_key || normalizedProjectKey}:${entry?.joined_at || entry?.updated_at || Date.now()}`,
-            role: 'guest',
+            role: entry?.role === 'owner' ? 'master' : (entry?.role === 'viewer' ? 'spectator' : 'guest'),
             name: isSelf
               ? (readPixieedAccountNickname() || DEFAULT_MULTI_PARTICIPANT_NAME)
-              : (userId ? `user:${userId.slice(0, 8)}` : DEFAULT_MULTI_PARTICIPANT_NAME),
+              : (profileName || DEFAULT_MULTI_PARTICIPANT_NAME),
             online: true,
             joinedAt: Date.parse(entry?.joined_at || entry?.updated_at || entry?.last_opened_at || '') || Date.now(),
             locked: false,
@@ -63289,6 +63350,20 @@
 
   function flushSharedProjectPendingLocalOps() {
     if (sharedProjectOpCommitInFlight || !sharedProjectPendingLocalOps.length) {
+      return;
+    }
+    if (
+      activeSharedProjectKey
+      && (
+        sharedProjectRecoveryInProgress
+        || sharedProjectReconnectRecoveryPromise
+        || sharedProjectRefreshInFlight
+        || sharedProjectSnapshotReplayInFlight
+        || sharedProjectDeferRealtimeUntilSynced
+        || activeSharedProjectSyncState === 'catching-up'
+      )
+    ) {
+      scheduleSharedProjectPendingLocalOpsRetry(700, 'wait-for-latest-verification');
       return;
     }
     const retryDelayRemaining = Math.max(0, sharedProjectPendingLocalRetryBlockedUntil - Date.now());
