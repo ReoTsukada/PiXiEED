@@ -20,15 +20,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
-  <script>
-    if (window.location.protocol !== 'file:') {
-      const script = document.createElement('script');
-      script.async = true;
-      script.crossOrigin = 'anonymous';
-      script.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253';
-      document.head.appendChild(script);
-    }
-  </script>
 <link rel="stylesheet" href="site/landing.css">
   <script type="application/ld+json">
   {
@@ -131,14 +122,7 @@
           </a>
           <div class="home-hero-slide home-hero-slide--ad" data-hero-slide aria-label="広告">
             <div class="home-hero-ad">
-              <div class="home-hero-ad__frame">
-                <ins class="adsbygoogle"
-                     style="display:block"
-                     data-ad-client="ca-pub-9801602250480253"
-                     data-ad-slot="2141591954"
-                     data-ad-format="rectangle"
-                     data-full-width-responsive="false"></ins>
-              </div>
+              <div class="home-hero-ad__frame" data-hero-ad-mount></div>
             </div>
           </div>
         </div>
@@ -293,8 +277,8 @@
   <script src="scripts/home-updates.js"></script>
   <script src="scripts/shared-profile-header.js"></script>
   <script src="scripts/pixieed-dot-stats.js"></script>
-  <script src="scripts/bottom-nav-footer-ad.js"></script>
   <script src="scripts/ads-lazy.js"></script>
+  <script src="scripts/bottom-nav-footer-ad.js"></script>
   <script>
     (() => {
       const slides = Array.from(document.querySelectorAll('[data-hero-slide]'));
@@ -339,6 +323,17 @@
         activeIndex = index;
         const activeSlide = slides[index];
         if (activeSlide?.classList.contains('home-hero-slide--ad')) {
+          const mount = activeSlide.querySelector('[data-hero-ad-mount]');
+          if (mount && !mount.querySelector('ins.adsbygoogle')) {
+            const adSlot = document.createElement('ins');
+            adSlot.className = 'adsbygoogle';
+            adSlot.style.display = 'block';
+            adSlot.dataset.adClient = 'ca-pub-9801602250480253';
+            adSlot.dataset.adSlot = 'rotate';
+            adSlot.dataset.adFormat = 'auto';
+            adSlot.dataset.fullWidthResponsive = 'false';
+            mount.appendChild(adSlot);
+          }
           window.pixieedObserveAds?.(activeSlide);
           window.setTimeout(() => {
             window.pixieedObserveAds?.(activeSlide);
