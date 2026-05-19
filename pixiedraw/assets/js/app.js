@@ -22950,17 +22950,40 @@
         return;
       }
       const isSharedEntry = isSharedRecentProjectEntry(entry);
+      const sharedRoleHint = typeof entry.sharedRoleHint === 'string' ? entry.sharedRoleHint.trim() : '';
+      const sharedMembershipRole = typeof entry.sharedProjectMembershipRole === 'string'
+        ? entry.sharedProjectMembershipRole.trim()
+        : '';
+      const isOwnedSharedEntry = isSharedEntry && (
+        isOwnedSharedRecentProjectEntry(entry)
+        || sharedRoleHint === 'master'
+        || sharedMembershipRole === 'owner'
+      );
+      const projectKind = isSharedEntry
+        ? (isOwnedSharedEntry ? 'shared-owned' : 'shared-joined')
+        : 'local';
+      const projectKindLabel = projectKind === 'shared-owned'
+        ? localizeText('自分の共有プロジェクト', 'Shared project you own')
+        : projectKind === 'shared-joined'
+          ? localizeText('参加した共有プロジェクト', 'Joined shared project')
+          : localizeText('端末内プロジェクト', 'Local project');
       const displayLabel = extractDocumentBaseName(entry.fileName || entry.name || DEFAULT_DOCUMENT_NAME);
       const card = document.createElement('article');
       card.className = 'startup-recent-card';
       card.dataset.projectId = entry.id;
       card.dataset.projectStorageKind = getRecentProjectStorageKind(entry);
+      card.dataset.projectKind = projectKind;
       card.setAttribute('role', 'listitem');
       const openButton = document.createElement('button');
       openButton.type = 'button';
       openButton.className = 'startup-recent-card__open';
       openButton.dataset.startupRecentOpenId = entry.id;
+      openButton.dataset.projectKind = projectKind;
       openButton.setAttribute('aria-label', localizeText(`${displayLabel} を開く`, `Open ${displayLabel}`));
+      const kindBadge = document.createElement('span');
+      kindBadge.className = 'startup-recent-card__kind';
+      kindBadge.title = projectKindLabel;
+      kindBadge.setAttribute('aria-label', projectKindLabel);
       const thumb = document.createElement('div');
       thumb.className = 'startup-recent-card__thumb';
       if (entry.thumbnail) {
@@ -22988,15 +23011,7 @@
       const updatedLabel = Number.isFinite(updatedAt)
         ? formatUpdateHistoryDate(updatedAt, localizeText('保存時刻不明', 'Saved time unavailable'))
         : localizeText('保存時刻不明', 'Saved time unavailable');
-      if (isSharedEntry) {
-        const roleHint = typeof entry.sharedRoleHint === 'string' ? entry.sharedRoleHint.trim() : '';
-        const sharedTypeLabel = roleHint === 'master'
-          ? localizeText('共有（自分・マスター）', 'Shared (Owned / Master)')
-          : localizeText('共有（参加・他ユーザー）', 'Shared (Joined / Other Owner)');
-        metaNode.textContent = `${sharedTypeLabel} / ${updatedLabel}`;
-      } else {
-        metaNode.textContent = localizeText(`端末内 / ${updatedLabel}`, `Local / ${updatedLabel}`);
-      }
+      metaNode.textContent = updatedLabel;
       const deleteButton = document.createElement('button');
       deleteButton.type = 'button';
       deleteButton.className = 'startup-recent-card__delete';
@@ -23011,6 +23026,7 @@
           ? localizeText(`${displayLabel} を一覧から外す`, `Remove ${displayLabel} from list`)
           : localizeText(`${displayLabel} を削除`, `Delete ${displayLabel}`)
       );
+      openButton.appendChild(kindBadge);
       openButton.appendChild(thumb);
       openButton.appendChild(nameNode);
       openButton.appendChild(metaNode);
