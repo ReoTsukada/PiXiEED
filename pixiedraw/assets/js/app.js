@@ -29647,24 +29647,16 @@
     const drawHeight = Math.max(1, Math.round(Number(canvasDoc?.height) || 1)) * getProjectCanvasDisplayScale(canvasDoc);
     const panelLeft = parseLocalViewportCanvasAxis(panel.style.left, panel.offsetLeft) || 0;
     const panelTop = parseLocalViewportCanvasAxis(panel.style.top, panel.offsetTop) || 0;
-    const minVisibleX = Math.max(12, Math.min(48, Math.round(viewportWidth / 4), Math.round(drawWidth)));
-    const minVisibleY = Math.max(12, Math.min(48, Math.round(viewportHeight / 4), Math.round(drawHeight)));
     let nextPanX = Math.round(Number(state.pan.x) || 0);
     let nextPanY = Math.round(Number(state.pan.y) || 0);
-    const visibleLeft = panelLeft + nextPanX;
-    const visibleTop = panelTop + nextPanY;
-    const visibleRight = visibleLeft + drawWidth;
-    const visibleBottom = visibleTop + drawHeight;
-    if (visibleRight < minVisibleX || visibleLeft > viewportWidth - minVisibleX) {
-      const minPanX = Math.round(minVisibleX - panelLeft - drawWidth);
-      const maxPanX = Math.round((viewportWidth - minVisibleX) - panelLeft);
-      nextPanX = clamp(nextPanX, minPanX, maxPanX);
-    }
-    if (visibleBottom < minVisibleY || visibleTop > viewportHeight - minVisibleY) {
-      const minPanY = Math.round(minVisibleY - panelTop - drawHeight);
-      const maxPanY = Math.round((viewportHeight - minVisibleY) - panelTop);
-      nextPanY = clamp(nextPanY, minPanY, maxPanY);
-    }
+    const halfWidth = Math.max(1, Math.round(drawWidth / 2));
+    const halfHeight = Math.max(1, Math.round(drawHeight / 2));
+    const minPanX = Math.round(-panelLeft - halfWidth);
+    const maxPanX = Math.round(viewportWidth - panelLeft - halfWidth);
+    const minPanY = Math.round(-panelTop - halfHeight);
+    const maxPanY = Math.round(viewportHeight - panelTop - halfHeight);
+    nextPanX = clamp(nextPanX, minPanX, maxPanX);
+    nextPanY = clamp(nextPanY, minPanY, maxPanY);
     if (nextPanX !== state.pan.x) {
       state.pan.x = nextPanX;
     }
@@ -29732,6 +29724,22 @@
     state.pan.y = 0;
     requestLocalViewportCanvasLayoutReset({ clearStored: true });
     syncLocalViewportCanvasDockLayout();
+    const viewport = dom.canvasViewport;
+    const targetSurface = getViewportVisibilityTargetSurface();
+    const panel = targetSurface?.panel instanceof HTMLElement ? targetSurface.panel : null;
+    const canvasDoc = targetSurface?.canvasDoc
+      || getProjectCanvasDocumentById(targetSurface?.canvasDocId)
+      || (targetSurface?.kind === 'local' ? getProjectCanvasDocumentForEntry(targetSurface) : getProjectCanvasDocumentAt(0));
+    if (viewport instanceof HTMLElement && panel instanceof HTMLElement && canvasDoc) {
+      const viewportWidth = Math.max(1, Math.round(viewport.clientWidth || viewport.getBoundingClientRect().width || 1));
+      const viewportHeight = Math.max(1, Math.round(viewport.clientHeight || viewport.getBoundingClientRect().height || 1));
+      const drawWidth = Math.max(1, Math.round(Number(canvasDoc?.width) || 1)) * getProjectCanvasDisplayScale(canvasDoc);
+      const drawHeight = Math.max(1, Math.round(Number(canvasDoc?.height) || 1)) * getProjectCanvasDisplayScale(canvasDoc);
+      const panelLeft = parseLocalViewportCanvasAxis(panel.style.left, panel.offsetLeft) || 0;
+      const panelTop = parseLocalViewportCanvasAxis(panel.style.top, panel.offsetTop) || 0;
+      state.pan.x = Math.round((viewportWidth / 2) - panelLeft - (drawWidth / 2));
+      state.pan.y = Math.round((viewportHeight / 2) - panelTop - (drawHeight / 2));
+    }
     applyViewportTransform();
     if (persist) {
       scheduleSessionPersist({ includeSnapshots: false });
@@ -29740,7 +29748,6 @@
 
   function applyViewportTransform() {
     if (!(dom.viewportWorkspace instanceof HTMLElement)) return;
-    clampPanToViewportAtMinZoom();
     clampPanToKeepVisibleCanvas();
     const panX = Math.round(Number(state.pan.x) || 0);
     const panY = Math.round(Number(state.pan.y) || 0);
