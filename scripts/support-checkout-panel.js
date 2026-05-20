@@ -12,6 +12,7 @@
   const PIXIEDRAW_SUPPORT_URL = 'https://buy.stripe.com/aFadRaeo8ekv5L44MM2VG01';
   const PIXIEED_TIP_500_URL = 'https://buy.stripe.com/cNi28s93OgsDc9sdji2VG02';
   const PIXIEED_TIP_1000_URL = 'https://buy.stripe.com/5kQcN6eo87W78Xg7YY2VG03';
+  const MONTHLY_SUPPORT_GOAL_YEN = 5000;
   const OPTIONS = [
     {
       key: 'pixieed_support_monthly',
@@ -125,6 +126,52 @@
         grid-template-columns:repeat(2, minmax(0, 1fr));
         gap:12px;
       }
+      .support-checkout-progress{
+        border:1px solid rgba(255,255,255,0.1);
+        border-radius:18px;
+        background:rgba(255,255,255,0.045);
+        padding:14px;
+        display:grid;
+        gap:10px;
+      }
+      .support-checkout-progress__header{
+        display:flex;
+        align-items:flex-start;
+        justify-content:space-between;
+        gap:12px;
+      }
+      .support-checkout-progress__title{
+        margin:0;
+        font-size:13px;
+        font-weight:800;
+        color:#eef2ff;
+      }
+      .support-checkout-progress__amount{
+        margin:0;
+        color:#fcd34d;
+        font-size:18px;
+        font-weight:900;
+        white-space:nowrap;
+      }
+      .support-checkout-progress__bar{
+        overflow:hidden;
+        height:10px;
+        border-radius:999px;
+        background:rgba(15,23,42,0.72);
+      }
+      .support-checkout-progress__fill{
+        display:block;
+        width:0%;
+        height:100%;
+        border-radius:inherit;
+        background:linear-gradient(90deg, #facc15, #fb923c);
+      }
+      .support-checkout-progress__note{
+        margin:0;
+        color:#cbd5f5;
+        font-size:13px;
+        line-height:1.65;
+      }
       .support-checkout-option{
         border:1px solid rgba(255,255,255,0.1);
         border-radius:18px;
@@ -210,6 +257,16 @@
           </div>
           <button class="support-checkout-panel__close" type="button" aria-label="課金パネルを閉じる">×</button>
         </div>
+        <section class="support-checkout-progress" aria-label="今月のサポート">
+          <div class="support-checkout-progress__header">
+            <p class="support-checkout-progress__title">今月のサポート</p>
+            <p class="support-checkout-progress__amount" id="supportCheckoutMonthlyAmount">0円 / 5,000円</p>
+          </div>
+          <div class="support-checkout-progress__bar" aria-hidden="true">
+            <span class="support-checkout-progress__fill" id="supportCheckoutMonthlyFill"></span>
+          </div>
+          <p class="support-checkout-progress__note">サポートはPiXiEEDの運営強化に使われます。目標を達成すると、広告削減や共有プロジェクト機能をより安定して提供できます。</p>
+        </section>
         <div class="support-checkout-panel__list" id="supportCheckoutList"></div>
         <p class="support-checkout-panel__status" id="supportCheckoutStatus" aria-live="polite"></p>
       </form>
@@ -228,7 +285,36 @@
       }
     });
     renderOptions();
+    renderMonthlySupportProgress();
     return panel;
+  }
+
+  function formatYen(value) {
+    const amount = Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
+    return `${amount.toLocaleString('ja-JP')}円`;
+  }
+
+  function readMonthlySupportAmount() {
+    const value = Number(window.pixieedMonthlySupportAmountYen);
+    return Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
+  }
+
+  function renderMonthlySupportProgress() {
+    if (!panel) {
+      return;
+    }
+    const amount = readMonthlySupportAmount();
+    const amountNode = panel.querySelector('#supportCheckoutMonthlyAmount');
+    const fill = panel.querySelector('#supportCheckoutMonthlyFill');
+    if (amountNode) {
+      amountNode.textContent = `${formatYen(amount)} / ${formatYen(MONTHLY_SUPPORT_GOAL_YEN)}`;
+    }
+    if (fill instanceof HTMLElement) {
+      const progress = MONTHLY_SUPPORT_GOAL_YEN > 0
+        ? Math.min(100, Math.round((amount / MONTHLY_SUPPORT_GOAL_YEN) * 100))
+        : 0;
+      fill.style.width = `${progress}%`;
+    }
   }
 
   function getOption(optionKey) {
@@ -359,6 +445,7 @@
       ? options.preferredProduct
       : resolvePreferredOption(activeTrigger);
     renderOptions(preferredKey);
+    renderMonthlySupportProgress();
     setStatus('');
     if (title) {
       const option = getOption(preferredKey);
@@ -402,6 +489,11 @@
     open,
     close,
     bindTriggers,
+    setMonthlySupportAmount(amountYen) {
+      const amount = Number(amountYen);
+      window.pixieedMonthlySupportAmountYen = Number.isFinite(amount) ? Math.max(0, Math.floor(amount)) : 0;
+      renderMonthlySupportProgress();
+    },
   };
 
   if (document.readyState === 'loading') {
