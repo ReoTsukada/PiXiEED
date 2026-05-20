@@ -1094,6 +1094,28 @@ footer{
   text-align:center;
   font-size:clamp(12px, 1.6vh, 14px);
 }
+.auth-social-grid{
+  display:grid;
+  gap:8px;
+}
+.auth-btn--google,
+.auth-btn--email{
+  background:rgba(255,255,255,0.08);
+  box-shadow:none;
+}
+.auth-btn--google{
+  border-color:rgba(255,255,255,0.28);
+  color:#f8fafc;
+}
+.auth-btn--email{
+  border-color:rgba(255,255,255,0.2);
+  color:#dbeafe;
+}
+.auth-btn:hover,
+.auth-btn:focus-visible{
+  filter:brightness(1.05);
+  transform:translateY(-1px);
+}
 .auth-status{
   font-size:12px;
   color:#cbd5e1;
