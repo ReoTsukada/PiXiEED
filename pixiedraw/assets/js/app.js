@@ -23904,6 +23904,43 @@
       && typeof sharedProject.owner_user_id === 'string'
       && sharedProject.owner_user_id === accountState.userId
     );
+    const membershipRole = typeof sharedProject.membership_role === 'string'
+      ? sharedProject.membership_role.trim()
+      : '';
+    if (!openingOwnedSharedProject && membershipRole === 'pending') {
+      multiState.joinPolicy = normalizeMultiJoinPolicy(
+        sharedProject.join_policy || MULTI_JOIN_POLICY_APPROVAL,
+        MULTI_JOIN_POLICY_APPROVAL
+      );
+      await upsertSharedRecentProjectEntry({
+        projectKey: resolvedProjectKey,
+        projectId: sharedProject.id || '',
+        inviteToken: sharedProject.invite_token || normalizedInviteToken || '',
+        visibility: sharedProject.visibility || 'shared',
+        name: createSharedProjectSnapshotTitle(sharedProject.title || state.documentName || resolvedProjectKey),
+        roleHint: 'guest',
+        membershipRole,
+        ownerUserId: sharedProject.owner_user_id || '',
+        autoJoin: false,
+        revision: Math.max(0, Math.round(Number(sharedProject.latest_revision) || 0)),
+        structureRevision: Math.max(0, Math.round(Number(sharedProject.latest_structure_revision) || 0)),
+      });
+      storeMultiProjectKey(resolvedProjectKey);
+      syncMultiProjectKeyInputValues(resolvedProjectKey, { preserveFocused: false });
+      if (hideStartup) {
+        hideStartupScreen();
+      }
+      setMultiStatus(
+        localizeText(
+          '参加申請を送信しました。主催者が承認するまでプロジェクトは読み込まれません。',
+          'Join request sent. The project will not load until the host approves you.'
+        ),
+        'warn'
+      );
+      syncMultiControls();
+      renderMultiParticipantsList();
+      return false;
+    }
     if (!(await ensureSharedProjectCapacity(resolvedProjectKey, {
       announce: !silent,
       countOwned: openingOwnedSharedProject,
@@ -62074,11 +62111,32 @@
         handleSharedProjectsBackendError(error, errorContext);
         return null;
       }
-      return Array.isArray(data) ? (data[0] || null) : (data || null);
+      const project = Array.isArray(data) ? (data[0] || null) : (data || null);
+      applySharedProjectJoinPolicyFromRecord(project);
+      return project;
     } catch (error) {
       handleSharedProjectsBackendError(error, `${errorContext}-exception`);
       return null;
     }
+  }
+
+  function applySharedProjectJoinPolicyFromRecord(projectRecord = null) {
+    const normalizedPolicy = normalizeMultiJoinPolicy(projectRecord?.join_policy || '', '');
+    if (normalizedPolicy) {
+      multiState.joinPolicy = normalizedPolicy;
+    }
+  }
+
+  function canCurrentUserManageSharedProject(projectKey = '') {
+    const resolvedProjectKey = resolveSharedProjectKeyForCurrentState(projectKey);
+    const entry = getCurrentSharedRecentProjectEntry(resolvedProjectKey);
+    if (isOwnedSharedRecentProjectEntry(entry)) {
+      return true;
+    }
+    const ownerUserId = typeof entry?.sharedProjectOwnerUserId === 'string'
+      ? entry.sharedProjectOwnerUserId.trim()
+      : '';
+    return Boolean(ownerUserId && accountState.userId && ownerUserId === accountState.userId);
   }
 
   async function fetchSharedProjectRecord(projectKey) {
@@ -62319,7 +62377,9 @@
         handleSharedProjectsBackendError(error, 'fetch-by-token');
         return null;
       }
-      return Array.isArray(data) ? (data[0] || null) : (data || null);
+      const project = Array.isArray(data) ? (data[0] || null) : (data || null);
+      applySharedProjectJoinPolicyFromRecord(project);
+      return project;
     } catch (error) {
       handleSharedProjectsBackendError(error, 'fetch-by-token-exception');
       return null;
@@ -62651,6 +62711,7 @@
       if (!project) {
         return null;
       }
+      applySharedProjectJoinPolicyFromRecord(project);
       return project;
     } catch (error) {
       handleSharedProjectsBackendError(error, 'ensure-membership-exception');
@@ -62692,6 +62753,7 @@
         return null;
       }
       project = Array.isArray(joined.data) ? (joined.data[0] || null) : (joined.data || null);
+      applySharedProjectJoinPolicyFromRecord(project);
     } catch (error) {
       handleSharedProjectsBackendError(error, 'join-by-token-exception');
       return null;
@@ -62790,15 +62852,19 @@
           const userId = typeof entry?.user_id === 'string' ? entry.user_id.trim() : '';
           const isSelf = Boolean(userId) && userId === accountState.userId;
           const profileName = userId ? normalizeMultiParticipantName(profileNicknames.get(userId) || '', '') : '';
+          const membershipRole = typeof entry?.role === 'string' ? entry.role.trim() : '';
           return {
             clientId: userId || `${entry?.project_key || normalizedProjectKey}:${entry?.joined_at || entry?.updated_at || Date.now()}`,
-            role: entry?.role === 'owner' ? 'master' : (entry?.role === 'viewer' ? 'spectator' : 'guest'),
+            userId,
+            membershipRole,
+            role: membershipRole === 'owner' ? 'master' : (membershipRole === 'viewer' || membershipRole === 'pending' ? 'spectator' : 'guest'),
             name: isSelf
               ? (readPixieedAccountNickname() || DEFAULT_MULTI_PARTICIPANT_NAME)
               : (profileName || DEFAULT_MULTI_PARTICIPANT_NAME),
-            online: true,
+            online: membershipRole !== 'pending',
             joinedAt: Date.parse(entry?.joined_at || entry?.updated_at || entry?.last_opened_at || '') || Date.now(),
             locked: false,
+            pendingJoinRequest: membershipRole === 'pending',
           };
         });
         renderMultiParticipantsList();
@@ -62815,6 +62881,82 @@
       }
     })();
     return sharedProjectMembersSyncPromise;
+  }
+
+  async function updateSharedProjectJoinPolicy(projectKey = activeSharedProjectKey, joinPolicy = multiState.joinPolicy) {
+    if ((!canUseSharedProjectsBackend() && !await ensureSharedProjectBackendSession()) || !accountState.userId) {
+      return false;
+    }
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
+    const normalizedPolicy = normalizeMultiJoinPolicy(joinPolicy, MULTI_DEFAULT_JOIN_POLICY);
+    if (!normalizedProjectKey || !canCurrentUserManageSharedProject(normalizedProjectKey)) {
+      setMultiStatus(localizeText('参加方式は主催者のみ変更できます', 'Only the host can change the join policy'), 'warn');
+      return false;
+    }
+    try {
+      const supabase = await ensurePixieedAccountClient();
+      if (!supabase) {
+        return false;
+      }
+      const { data, error } = await supabase.rpc('pixieed_update_shared_project_join_policy', {
+        target_project_key: normalizedProjectKey,
+        next_join_policy: normalizedPolicy,
+      });
+      if (error) {
+        handleSharedProjectsBackendError(error, 'update-join-policy');
+        return false;
+      }
+      const result = Array.isArray(data) ? (data[0] || null) : (data || null);
+      multiState.joinPolicy = normalizeMultiJoinPolicy(result?.join_policy || normalizedPolicy, normalizedPolicy);
+      setMultiStatus(
+        multiState.joinPolicy === MULTI_JOIN_POLICY_APPROVAL
+          ? localizeText('参加方式を承認制に変更しました', 'Join policy changed to approval')
+          : localizeText('参加方式を自由参加に変更しました', 'Join policy changed to open'),
+        'success'
+      );
+      return true;
+    } catch (error) {
+      handleSharedProjectsBackendError(error, 'update-join-policy-exception');
+      return false;
+    }
+  }
+
+  async function approveSharedProjectMember(userId = '', projectKey = activeSharedProjectKey) {
+    if ((!canUseSharedProjectsBackend() && !await ensureSharedProjectBackendSession()) || !accountState.userId) {
+      return false;
+    }
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
+    const targetUserId = typeof userId === 'string' ? userId.trim() : '';
+    if (!normalizedProjectKey || !targetUserId || !canCurrentUserManageSharedProject(normalizedProjectKey)) {
+      setMultiStatus(localizeText('メンバー承認は主催者のみ操作できます', 'Only the host can approve members'), 'warn');
+      return false;
+    }
+    try {
+      const supabase = await ensurePixieedAccountClient();
+      if (!supabase) {
+        return false;
+      }
+      const { data, error } = await supabase.rpc('pixieed_approve_shared_project_member', {
+        target_project_key: normalizedProjectKey,
+        target_user_id: targetUserId,
+      });
+      if (error) {
+        handleSharedProjectsBackendError(error, 'approve-member');
+        return false;
+      }
+      const approved = Array.isArray(data) ? data.length > 0 : Boolean(data);
+      if (!approved) {
+        setMultiStatus(localizeText('承認対象が見つかりませんでした', 'No pending member was found'), 'warn');
+        await syncSharedProjectMembers(normalizedProjectKey, activeSharedProjectId);
+        return false;
+      }
+      setMultiStatus(localizeText('参加を承認しました', 'Member approved'), 'success');
+      await syncSharedProjectMembers(normalizedProjectKey, activeSharedProjectId);
+      return true;
+    } catch (error) {
+      handleSharedProjectsBackendError(error, 'approve-member-exception');
+      return false;
+    }
   }
 
   async function retainActiveSharedProjectDocumentDuringRefresh(projectRecord, {
@@ -69212,6 +69354,7 @@
     list.innerHTML = '';
     const rows = buildMultiParticipantRows().map(row => ({ ...row }));
     if (prefersSharedProjectFlow()) {
+      const canManageSharedMembers = canCurrentUserManageSharedProject(resolveSharedProjectKeyForCurrentState());
       if (resolveSharedProjectKeyForCurrentState() && sharedProjectMembers.length) {
         rows.length = 0;
         rows.push(...sharedProjectMembers.map(row => ({ ...row })));
@@ -69242,8 +69385,12 @@
       rows.forEach(row => {
         const li = document.createElement('li');
         li.className = 'multi-participant-item';
+        const pendingJoinRequest = Boolean(row.pendingJoinRequest || row.membershipRole === 'pending');
         const plain = document.createElement('div');
         plain.className = 'multi-participant-item__details is-static';
+        if (pendingJoinRequest) {
+          plain.classList.add('is-pending-request');
+        }
         if (row.clientId === multiState.clientId) {
           plain.classList.add('is-self');
         }
@@ -69266,11 +69413,27 @@
           selfTag.textContent = localizeText('あなた', 'You');
           nameLine.appendChild(selfTag);
         }
+        if (pendingJoinRequest) {
+          const requestTag = document.createElement('span');
+          requestTag.className = 'multi-participant-item__tag multi-participant-item__tag--request';
+          requestTag.textContent = localizeText('承認待ち', 'Pending');
+          nameLine.appendChild(requestTag);
+          if (canManageSharedMembers) {
+            nameLine.appendChild(createMultiParticipantsActionButton(
+              localizeText('承認', 'Approve'),
+              () => {
+                approveSharedProjectMember(row.userId || row.clientId).catch(() => {});
+              }
+            ));
+          }
+        }
         const cell = document.createElement('span');
         cell.className = 'multi-participant-item__cell';
-        cell.textContent = row.online
-          ? localizeText('オンライン', 'Online')
-          : localizeText('オフライン', 'Offline');
+        cell.textContent = pendingJoinRequest
+          ? localizeText('参加申請中', 'Join request pending')
+          : (row.online
+            ? localizeText('オンライン', 'Online')
+            : localizeText('オフライン', 'Offline'));
         main.append(nameLine, cell);
         summary.appendChild(main);
         plain.appendChild(summary);
@@ -70032,6 +70195,7 @@
     const currentProjectIsShared = sharedProjectFlowPreferred && isCurrentProjectSharedEntry();
     const hasCurrentProjectLocator = Boolean(currentProjectKey || currentAccess.inviteToken);
     const sharedModeEnabled = sharedProjectFlowPreferred && currentProjectIsShared && Boolean(resolvedSharedProjectKey);
+    const canManageSharedProject = sharedProjectFlowPreferred && canCurrentUserManageSharedProject(resolvedSharedProjectKey);
     const isEntryView = normalizeMultiUiView(multiState.uiView) === 'entry'
       && !multiState.connected
       && !multiState.connecting;
@@ -70235,7 +70399,11 @@
       setLocalizedSelectOption(dom.controls.multiJoinPolicy, 'open', '自動参加（友達向け）', 'Auto Join (Friends)');
       setLocalizedSelectOption(dom.controls.multiJoinPolicy, 'approval', '承認制（配信向け）', 'Approval (Streaming)');
       dom.controls.multiJoinPolicy.value = multiState.joinPolicy;
-      dom.controls.multiJoinPolicy.disabled = sharedProjectFlowPreferred || multiState.connecting || !inMasterConfigMode;
+      dom.controls.multiJoinPolicy.disabled = multiState.connecting || (
+        sharedProjectFlowPreferred
+          ? !canManageSharedProject
+          : !inMasterConfigMode
+      );
     }
     const canUseParticipantFreeCellMove = inMasterConfigMode;
     if (dom.controls.multiParticipantFreeCellMove instanceof HTMLInputElement) {
@@ -70334,10 +70502,15 @@
     if (dom.controls.multiJoinPolicyHint instanceof HTMLElement) {
       const joinPolicy = normalizeMultiJoinPolicy(multiState.joinPolicy, MULTI_DEFAULT_JOIN_POLICY);
       if (sharedProjectFlowPreferred) {
-        dom.controls.multiJoinPolicyHint.textContent = localizeText(
-          '接続や承認より、共有プロジェクト自体を開いて同時編集する流れを優先します。',
-          'The flow prioritizes opening the shared project itself and editing together over room-style join/approval.'
-        );
+        dom.controls.multiJoinPolicyHint.textContent = joinPolicy === MULTI_JOIN_POLICY_OPEN
+          ? localizeText(
+            '自由参加: 共有URLを開いた人はそのままプロジェクトを読み込んで描画できます。',
+            'Open: people who open the shared URL can load and draw immediately.'
+          )
+          : localizeText(
+            '承認制: 共有URLを開いた人は承認待ちになり、承認されるまでプロジェクトは読み込まれません。',
+            'Approval: people who open the shared URL wait for approval before the project loads.'
+          );
       } else if (!multiState.connected) {
         dom.controls.multiJoinPolicyHint.textContent = joinPolicy === MULTI_JOIN_POLICY_OPEN
           ? localizeText(
@@ -73913,6 +74086,25 @@
       dom.controls.multiJoinPolicy.dataset.bound = 'true';
       dom.controls.multiJoinPolicy.addEventListener('change', event => {
         if (!(event.target instanceof HTMLSelectElement)) {
+          return;
+        }
+        if (prefersSharedProjectFlow()) {
+          const projectKey = resolveSharedProjectKeyForCurrentState();
+          const nextPolicy = normalizeMultiJoinPolicy(event.target.value, multiState.joinPolicy);
+          const previousPolicy = normalizeMultiJoinPolicy(multiState.joinPolicy, MULTI_DEFAULT_JOIN_POLICY);
+          multiState.joinPolicy = nextPolicy;
+          event.target.value = nextPolicy;
+          if (nextPolicy === previousPolicy) {
+            syncMultiControls();
+            return;
+          }
+          updateSharedProjectJoinPolicy(projectKey, nextPolicy).then(updated => {
+            if (!updated) {
+              multiState.joinPolicy = previousPolicy;
+            }
+            syncMultiControls();
+          });
+          syncMultiControls();
           return;
         }
         if (!isMultiMasterConfigMode()) {
