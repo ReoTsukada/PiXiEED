@@ -846,6 +846,14 @@
 <button class="chip" id="multiInviteCopy" type="button">共有URLをコピー</button>
 <button class="button" hidden id="multiLeaveSession" type="button">切断</button>
 </div>
+<label class="field field--compact" id="multiJoinPolicyField">
+<span>参加方式</span>
+<select id="multiJoinPolicy">
+<option value="open">自由参加</option>
+<option value="approval">承認制</option>
+</select>
+</label>
+<p class="help-text ui-guide-text" id="multiJoinPolicyHint">自由参加: 共有URLを開いた人はそのまま参加できます。</p>
 </div>
 <details class="field field--list multi-participants-panel" open>
 <summary>共有中のメンバー <span class="multi-participants-count" id="multiParticipantsCount">0</span></summary>
