@@ -61,7 +61,7 @@ begin
             entitlements.expires_at is null
             or entitlements.expires_at > now_utc
           )
-      ) then 3
+      ) then 4
       else 1
     end
     into current_limit;
