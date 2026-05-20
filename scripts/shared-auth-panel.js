@@ -120,6 +120,16 @@
     return String(error?.message || '').toLowerCase().includes(String(columnName || '').toLowerCase());
   }
 
+  function getOAuthRedirectUrl() {
+    try {
+      const url = new URL(window.location.href);
+      url.hash = '';
+      return url.toString();
+    } catch (_error) {
+      return window.location.href;
+    }
+  }
+
   function updateHeaderLabel() {
     const brandUser = document.getElementById('brandUser');
     if (!brandUser) return;
@@ -230,6 +240,8 @@
     const loginBtn = document.getElementById('authLoginBtn');
     const logoutBtn = document.getElementById('logoutBtn');
     const authInputs = document.getElementById('authInputs');
+    const emailToggle = document.getElementById('authEmailToggle');
+    const socialButtons = document.getElementById('authSocialButtons');
     const emailInput = document.getElementById('authEmail');
     const passInput = document.getElementById('authPasscode');
     const linkedEmail = document.getElementById('linkedEmail');
@@ -239,6 +251,8 @@
       if (loginBtn) loginBtn.style.display = 'none';
       if (logoutBtn) logoutBtn.style.display = 'block';
       if (authInputs) authInputs.style.display = 'none';
+      if (emailToggle) emailToggle.style.display = 'none';
+      if (socialButtons) socialButtons.style.display = 'none';
       if (emailInput) {
         emailInput.value = supabaseUser.email || emailInput.value;
         emailInput.disabled = true;
@@ -255,7 +269,9 @@
     } else {
       if (loginBtn) loginBtn.style.display = '';
       if (logoutBtn) logoutBtn.style.display = 'none';
-      if (authInputs) authInputs.style.display = 'grid';
+      if (authInputs) authInputs.style.display = authInputs.dataset.expanded === 'true' ? 'grid' : 'none';
+      if (emailToggle) emailToggle.style.display = '';
+      if (socialButtons) socialButtons.style.display = 'grid';
       if (emailInput) emailInput.disabled = false;
       if (passInput) passInput.disabled = false;
       if (linkedEmail) {
@@ -265,6 +281,29 @@
       setStatus(nickname ? `ニックネーム: ${nickname}` : '');
     }
     updateHeaderLabel();
+  }
+
+  async function signInWithProvider(provider, label) {
+    if (!supabaseClient) {
+      setStatus('オンラインでログインしてください');
+      return;
+    }
+    if (window.location.protocol === 'file:') {
+      setStatus('Googleログインは公開URLまたはローカルサーバーで利用してください');
+      return;
+    }
+    setStatus(`${label}へ移動しています...`);
+    try {
+      const { error } = await supabaseClient.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: getOAuthRedirectUrl(),
+        },
+      });
+      if (error) throw error;
+    } catch (_error) {
+      setStatus(`${label}ログインを開始できませんでした。Supabase側のプロバイダ設定を確認してください`);
+    }
   }
 
   async function sendLoginLink(email) {
@@ -339,7 +378,39 @@
   function bindControls() {
     const loginBtn = document.getElementById('authLoginBtn');
     const logoutBtn = document.getElementById('logoutBtn');
+    const emailToggle = document.getElementById('authEmailToggle');
     const saveBtn = document.getElementById('saveProfile');
+    document.querySelectorAll('[data-auth-provider]').forEach(button => {
+      if (!(button instanceof HTMLButtonElement) || button.dataset.bound === 'true') {
+        return;
+      }
+      button.dataset.bound = 'true';
+      button.addEventListener('click', async () => {
+        const provider = button.dataset.authProvider || '';
+        const label = button.dataset.authLabel || button.textContent || '外部アカウント';
+        if (provider !== 'google') {
+          setStatus('未対応のログイン方法です');
+          return;
+        }
+        await signInWithProvider(provider, label);
+      });
+    });
+
+    if (emailToggle && emailToggle.dataset.bound !== 'true') {
+      emailToggle.dataset.bound = 'true';
+      emailToggle.addEventListener('click', () => {
+        const authInputs = document.getElementById('authInputs');
+        if (!authInputs) return;
+        const expanded = authInputs.dataset.expanded === 'true';
+        authInputs.dataset.expanded = expanded ? 'false' : 'true';
+        authInputs.style.display = expanded ? 'none' : 'grid';
+        emailToggle.textContent = expanded ? 'メールアドレスで続ける' : 'メール入力を閉じる';
+        if (!expanded) {
+          document.getElementById('authEmail')?.focus();
+        }
+      });
+    }
+
     if (loginBtn && loginBtn.dataset.bound !== 'true') {
       loginBtn.dataset.bound = 'true';
       loginBtn.addEventListener('click', async () => {
@@ -415,8 +486,13 @@
     block.className = 'profile-block';
     block.id = AUTH_BLOCK_ID;
     block.innerHTML = `
-      <p class="helper" style="margin:0;">アカウントの保存（メール）</p>
-      <div id="authInputs" style="display:grid; gap:8px;">
+      <p class="helper" style="margin:0;">共有プロジェクト用アカウント</p>
+      <p class="helper" style="margin:0;">無料アカウントで共有プロジェクトに参加できます。</p>
+      <div class="auth-social-grid" id="authSocialButtons">
+        <button class="auth-btn auth-btn--google" data-auth-provider="google" data-auth-label="Google" type="button">Googleで続ける</button>
+      </div>
+      <button class="auth-btn auth-btn--email" id="authEmailToggle" type="button">メールアドレスで続ける</button>
+      <div id="authInputs" style="display:none; gap:8px;" data-expanded="false">
         <input class="auth-input" id="authEmail" type="email" placeholder="メールアドレス" autocomplete="email">
         <input class="auth-input" id="authPasscode" type="password" placeholder="パスコード（6〜20文字）" autocomplete="current-password">
       </div>
