@@ -791,6 +791,27 @@
 <p class="help-text ui-guide-text" id="multiEntryJoinHint">共有リンクを貼ってから上の「共有」を押すと、そのプロジェクトが自分の一覧にも追加されます。</p>
 </div>
 <p class="help-text ui-guide-text" id="multiEntryHint">このまま「共有」を押すと共有プロジェクトを作成します。既存の共有を開く時はリンクを入力してください。</p>
+<section class="multi-account-card" id="multiEntryAccountCard">
+<div class="multi-account-card__head">
+<span>共有プロジェクトを作成</span>
+<small id="multiEntryAccountStatus">無料枠 0/1</small>
+</div>
+<p class="help-text" id="multiEntryAccountHint">ログインすると、同じ絵をオンラインで共同編集できます。サポーター特典で追加3件、合計4件まで作成できます。</p>
+<a class="chip" href="../index.html#auth" id="multiEntryAccountLogin" rel="noopener">ログインして共有を作成</a>
+</section>
+<div class="field field--list settings-account-field" id="pixieedAdFreeField">
+<span>サポーター特典</span>
+<p class="help-text" id="pixieedAdFreeStatus">ログイン後に購入番号または購入コードを適用できます。広告非表示と共有プロジェクト作成枠を利用できます。</p>
+<div class="field field--inline">
+<a class="chip" data-support-panel-trigger="true" data-support-preferred-product="pixiedraw_ad_free" id="pixieedAdFreePurchase" href="https://buy.stripe.com/aFadRaeo8ekv5L44MM2VG01" rel="noopener">サポーター特典を見る</a>
+</div>
+<div class="field field--inline">
+<input autocomplete="off" id="pixieedAdFreeOrderId" maxlength="64" placeholder="購入番号 / 購入コード" type="text"/>
+<button class="chip" id="pixieedAdFreeClaim" type="button">適用</button>
+</div>
+<p class="help-text">購入時と同じメールアドレスでログインしてください。購入後は自動反映され、うまくいかない場合は購入番号または購入コードを入力して適用できます。</p>
+<p class="help-text">広告を消さずに支援したい場合は <a class="chip" data-support-panel-trigger="true" data-support-preferred-product="pixiedraw_ad_free" href="https://buy.stripe.com/aFadRaeo8ekv5L44MM2VG01" id="supportTipLink" target="_blank" rel="noopener noreferrer" aria-label="サポーター特典を見る">応援チップ</a> も利用できます。</p>
+</div>
 </div>
 <div class="multi-flow-panel" hidden id="multiFlowPanel">
 <div aria-labelledby="multiFlowTabCollab" class="multi-flow-tabpanel multi-flow-tabpanel--collab" id="multiFlowCollabPanel" role="tabpanel">
@@ -803,6 +824,21 @@
 </div>
 <p class="help-text ui-guide-text" id="multiOverviewSummary">接続状態に応じて、できることがここに表示されます。</p>
 <p class="help-text ui-guide-text" id="multiOverviewHint">共有モードをONにすると、このプロジェクトの共有URLをコピーできます。</p>
+</section>
+<section class="multi-account-card" id="multiFlowAccountCard">
+<div class="multi-account-card__head">
+<span>共有プロジェクトを作成</span>
+<small id="multiFlowAccountStatus">無料枠 0/1</small>
+</div>
+<p class="help-text" id="multiFlowAccountHint">ログインすると、同じ絵をオンラインで共同編集できます。サポーター特典で追加3件、合計4件まで作成できます。</p>
+<a class="chip" href="../index.html#auth" id="multiFlowAccountLogin" rel="noopener">ログインして共有を作成</a>
+</section>
+<section class="multi-support-card" id="multiSupportCard">
+<div class="multi-support-card__head">
+<span>サポーター特典</span>
+<small id="multiSupportStatus">サポーター特典で追加3件、合計4件まで作成できます。サポーター枠 0/4。</small>
+</div>
+<a class="chip" data-support-panel-trigger="true" data-support-preferred-product="pixiedraw_ad_free" href="https://buy.stripe.com/aFadRaeo8ekv5L44MM2VG01" id="multiSupportPurchase" rel="noopener">サポーター特典を見る</a>
 </section>
 <div class="field-group">
 <div class="multi-session-actions multi-session-actions--single">
@@ -1027,19 +1063,6 @@
 <a class="chip" id="pixieedAccountLogin" href="../index.html#auth" target="_blank" rel="noopener">ログイン</a>
 <button class="chip" id="pixieedAccountLogout" type="button" hidden>ログアウト</button>
 </div>
-</div>
-<div class="field field--list settings-account-field" id="pixieedAdFreeField">
-<span>PiXiEEDraw広告非表示</span>
-<p class="help-text" id="pixieedAdFreeStatus">ログイン後に購入番号または購入コードを適用できます。PiXiEEDraw内の広告だけを非表示にします。</p>
-<div class="field field--inline">
-<a class="chip" data-support-panel-trigger="true" data-support-preferred-product="pixiedraw_ad_free" id="pixieedAdFreePurchase" href="https://buy.stripe.com/aFadRaeo8ekv5L44MM2VG01" rel="noopener">PiXiEEDraw継続サポートを購入</a>
-</div>
-<div class="field field--inline">
-<input autocomplete="off" id="pixieedAdFreeOrderId" maxlength="64" placeholder="購入番号 / 購入コード" type="text"/>
-<button class="chip" id="pixieedAdFreeClaim" type="button">適用</button>
-</div>
-<p class="help-text">購入時と同じメールアドレスでログインしてください。購入後は自動反映され、うまくいかない場合は購入番号または購入コードを入力して適用できます。</p>
-<p class="help-text">広告を消さずに支援したい場合は <a class="chip" data-support-panel-trigger="true" data-support-preferred-product="pixiedraw_ad_free" href="https://buy.stripe.com/aFadRaeo8ekv5L44MM2VG01" id="supportTipLink" target="_blank" rel="noopener noreferrer" aria-label="PiXiEEDraw継続サポートを購入">応援チップ</a> も利用できます。</p>
 </div>
 <div class="field field--list settings-account-field" id="pixieedPwaInstallField">
 <span>アプリとして使う</span>
