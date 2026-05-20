@@ -23716,15 +23716,29 @@
       inviteToken: normalizedInviteToken ? 'present' : '',
     });
     try {
-      const sharedProject = normalizedInviteToken
-        ? await loadSharedProjectSnapshotRecordByInvite(normalizedInviteToken, {
-            createIfMissing: false,
-            title: createSharedProjectSnapshotTitle(state.documentName || DEFAULT_DOCUMENT_NAME),
-          })
-        : await loadSharedProjectSnapshotRecord(normalizedProjectKey, {
-            createIfMissing: false,
-            title: createSharedProjectSnapshotTitle(state.documentName || DEFAULT_DOCUMENT_NAME),
-          });
+      let sharedProject = null;
+      let inviteTokenForOpen = normalizedInviteToken;
+      if (normalizedInviteToken) {
+        sharedProject = await loadSharedProjectSnapshotRecordByInvite(normalizedInviteToken, {
+          createIfMissing: false,
+          title: createSharedProjectSnapshotTitle(state.documentName || DEFAULT_DOCUMENT_NAME),
+        });
+      }
+      if (!sharedProject?.project_key && normalizedProjectKey) {
+        console.info('[shared-sync]', {
+          event: 'shared-open-invite-fallback-project-key',
+          reason,
+          projectKey: normalizedProjectKey,
+          inviteToken: normalizedInviteToken ? 'present' : '',
+        });
+        sharedProject = await loadSharedProjectSnapshotRecord(normalizedProjectKey, {
+          createIfMissing: false,
+          title: createSharedProjectSnapshotTitle(state.documentName || DEFAULT_DOCUMENT_NAME),
+        });
+        if (sharedProject?.project_key) {
+          inviteTokenForOpen = '';
+        }
+      }
       if (!sharedProject?.project_key) {
         if (!silent) {
           setMultiStatus(localizeText('共有プロジェクトが見つかりませんでした', 'Shared project not found'), 'error');
@@ -23740,7 +23754,7 @@
         latestSnapshotRevision: Math.max(0, Math.round(Number(sharedProject.latest_snapshot_revision) || 0)),
       });
       const opened = await openSharedProjectAccess({
-        inviteToken: normalizedInviteToken,
+        inviteToken: inviteTokenForOpen,
         projectKey: sharedProject.project_key || normalizedProjectKey,
         requestedRole: normalizedRequestedRole,
         autoJoin,
@@ -23816,17 +23830,28 @@
         || String(prefetchedProject?.invite_token || '').trim() === normalizedInviteToken
       )
     );
-    const sharedProject = canUsePrefetchedProject
-      ? prefetchedProject
-      : (normalizedInviteToken
-      ? await loadSharedProjectSnapshotRecordByInvite(normalizedInviteToken, {
-          createIfMissing: false,
-          title: createSharedProjectSnapshotTitle(state.documentName || DEFAULT_DOCUMENT_NAME),
-        })
-      : await loadSharedProjectSnapshotRecord(normalizedProjectKey, {
-          createIfMissing: false,
-          title: createSharedProjectSnapshotTitle(state.documentName || DEFAULT_DOCUMENT_NAME),
-        }));
+    let inviteTokenForBindingCheck = normalizedInviteToken;
+    let sharedProject = canUsePrefetchedProject ? prefetchedProject : null;
+    if (!sharedProject?.project_key && normalizedInviteToken) {
+      sharedProject = await loadSharedProjectSnapshotRecordByInvite(normalizedInviteToken, {
+        createIfMissing: false,
+        title: createSharedProjectSnapshotTitle(state.documentName || DEFAULT_DOCUMENT_NAME),
+      });
+    }
+    if (!sharedProject?.project_key && normalizedProjectKey) {
+      console.info('[shared-sync]', {
+        event: 'shared-open-access-invite-fallback-project-key',
+        projectKey: normalizedProjectKey,
+        inviteToken: normalizedInviteToken ? 'present' : '',
+      });
+      sharedProject = await loadSharedProjectSnapshotRecord(normalizedProjectKey, {
+        createIfMissing: false,
+        title: createSharedProjectSnapshotTitle(state.documentName || DEFAULT_DOCUMENT_NAME),
+      });
+      if (sharedProject?.project_key) {
+        inviteTokenForBindingCheck = '';
+      }
+    }
     if (!sharedProject?.project_key) {
       if (!silent) {
         setMultiStatus(
@@ -23836,8 +23861,8 @@
       }
       return false;
     }
-    if (normalizedInviteToken && isBrokenSharedInviteBinding(sharedProject, {
-      expectedInviteToken: normalizedInviteToken,
+    if (inviteTokenForBindingCheck && isBrokenSharedInviteBinding(sharedProject, {
+      expectedInviteToken: inviteTokenForBindingCheck,
       expectedProjectKey: normalizedProjectKey,
     })) {
       if (!silent) {
