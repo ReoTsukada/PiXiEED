@@ -336,6 +336,15 @@
       multiOverviewSummary: document.getElementById('multiOverviewSummary'),
       multiOverviewHint: document.getElementById('multiOverviewHint'),
       multiOverviewChips: document.getElementById('multiOverviewChips'),
+      multiEntryAccountStatus: document.getElementById('multiEntryAccountStatus'),
+      multiEntryAccountHint: document.getElementById('multiEntryAccountHint'),
+      multiEntryAccountLogin: document.getElementById('multiEntryAccountLogin'),
+      multiFlowAccountStatus: document.getElementById('multiFlowAccountStatus'),
+      multiFlowAccountHint: document.getElementById('multiFlowAccountHint'),
+      multiFlowAccountLogin: document.getElementById('multiFlowAccountLogin'),
+      multiSupportCard: document.getElementById('multiSupportCard'),
+      multiSupportStatus: document.getElementById('multiSupportStatus'),
+      multiSupportPurchase: document.getElementById('multiSupportPurchase'),
       multiHelpToggle: document.getElementById('multiHelpToggle'),
       multiHelpPanel: document.getElementById('multiHelpPanel'),
       multiHelpClose: document.getElementById('multiHelpClose'),
@@ -2861,6 +2870,7 @@
   let startupSharedReloadProjectKey = '';
   let startupSharedReloadRevision = 0;
   let startupSharedReloadStructureRevision = 0;
+  let openedDocumentViewportResetRaf = null;
   let sharedProjectLastRescueAfterSeq = -1;
   let sharedProjectLastRescueOpCount = -1;
   let sharedProjectRescueStallCount = 0;
@@ -3031,6 +3041,7 @@
     profile: { nickname: '', avatarId: '', xUrl: '' },
     session: null,
     supabase: null,
+    restoringFromLocalCache: false,
   };
   const PIXIEED_AUTH_STORAGE_KEY = 'sb-kyyiuakrqomzlikfaire-auth-token';
   const PIXIEED_AUTH_SESSION_CACHE_KEY = 'pixieed:auth-session-cache:v1';
@@ -3350,7 +3361,7 @@
   const GLOBAL_LOADING_INDICATOR_SHOW_DELAY = 180;
   const GLOBAL_LOADING_INDICATOR_MIN_VISIBLE_MS = 320;
   const SHARED_PROJECT_LIMIT_DEFAULT = 1;
-  const SHARED_PROJECT_LIMIT_AD_FREE = 3;
+  const SHARED_PROJECT_LIMIT_AD_FREE = 4;
 
   const RAIL_DEFAULT_WIDTH = Object.freeze({ left: 78, right: 78 });
   const RAIL_MIN_WIDTH = 68;
@@ -4765,7 +4776,7 @@
     return {
       width: initialWidth,
       height: initialHeight,
-      scale: normalizeZoomScale(8, 8),
+      scale: MIN_ZOOM_SCALE,
       pan: { x: 0, y: 0 },
       tool: 'pen',
       brushSize: 1,
@@ -6937,8 +6948,8 @@
     const compressed = {
       width: snapshot.width,
       height: snapshot.height,
-      scale: snapshot.scale,
-      pan: { x: snapshot.pan.x, y: snapshot.pan.y },
+      scale: MIN_ZOOM_SCALE,
+      pan: { x: 0, y: 0 },
       palette: snapshot.palette.map(color => ({ ...color })),
       activePaletteIndex: snapshot.activePaletteIndex,
       secondaryPaletteIndex: snapshot.secondaryPaletteIndex,
@@ -7105,8 +7116,11 @@
     const decompressed = {
       width: snapshot.width,
       height: snapshot.height,
-      scale: snapshot.scale,
-      pan: { x: snapshot.pan.x, y: snapshot.pan.y },
+      scale: MIN_ZOOM_SCALE,
+      pan: {
+        x: Math.round(Number(snapshot.pan?.x) || 0),
+        y: Math.round(Number(snapshot.pan?.y) || 0),
+      },
       palette: snapshot.palette.map(color => ({ ...color })),
       activePaletteIndex: snapshot.activePaletteIndex,
       secondaryPaletteIndex: snapshot.secondaryPaletteIndex,
@@ -14417,8 +14431,17 @@
 
     setLocalizedTextContent('#goHomeButton', 'ホームに戻る', 'Back to Home');
     setLocalizedTextContent('#goContestButton', '広場を見る', 'View Plaza');
+    setLocalizedTextContent('#pixieedAdFreeField > span', 'サポーター特典', 'Supporter Benefits');
+    setLocalizedTextContent('#pixieedAdFreeStatus', 'ログイン後に購入番号または購入コードを適用できます。広告非表示と共有プロジェクト作成枠を利用できます。', 'After signing in, apply your purchase number or support code to remove ads and unlock shared project creation slots.');
+    setLocalizedTextContent('#pixieedAdFreePurchase', 'サポーター特典を見る', 'View Supporter Benefits');
+    setLocalizedTextContent('#multiEntryAccountCard .multi-account-card__head > span', '共有プロジェクトを作成', 'Create Shared Project');
+    setLocalizedTextContent('#multiFlowAccountCard .multi-account-card__head > span', '共有プロジェクトを作成', 'Create Shared Project');
+    setLocalizedTextContent('#multiEntryAccountLogin', 'ログインして共有を作成', 'Sign In to Create Shared Project');
+    setLocalizedTextContent('#multiFlowAccountLogin', 'ログインして共有を作成', 'Sign In to Create Shared Project');
+    setLocalizedTextContent('#multiSupportCard .multi-support-card__head > span', 'サポーター特典', 'Supporter Benefits');
+    setLocalizedTextContent('#multiSupportPurchase', 'サポーター特典を見る', 'View Supporter Benefits');
     setLocalizedTextContent('#supportTipLink', '応援チップ', 'Support Tip');
-    setLocalizedAttribute('#supportTipLink', 'aria-label', 'PiXiEEDの応援チップを購入（外部サイト）', 'Buy a PiXiEED support tip (external site)');
+    setLocalizedAttribute('#supportTipLink', 'aria-label', 'サポーター特典を見る（外部サイト）', 'View supporter benefits (external site)');
     setLocalizedTextContent('#openOperationHelpPanel', '使い方ヘルプ', 'Help');
     setLocalizedTextContent('#openShortcutHelp', 'ショートカット一覧', 'Keyboard Shortcuts');
     setLocalizedTextContent('#openUpdateHistory', '更新情報', 'Updates');
@@ -15599,6 +15622,7 @@
       syncPixfindSnapshotAfterDocumentReset();
       updateMemoryStatus();
       setTrackedProjectDotBaseline(snapshot, dotStats);
+      resetOpenedDocumentViewport({ defer: true });
       return true;
     } catch (error) {
       autosaveRestoring = false;
@@ -16993,7 +17017,7 @@
     const snapshot = {
       width,
       height,
-      scale: normalizeZoomScale(state.scale, state.scale || MIN_ZOOM_SCALE),
+      scale: MIN_ZOOM_SCALE,
       pan: { x: 0, y: 0 },
       tool: state.tool,
       brushSize: state.brushSize,
@@ -17037,7 +17061,7 @@
     resetExportScaleDefaults();
     syncPixfindSnapshotAfterDocumentReset();
     setTrackedProjectDotBaseline(snapshot, null);
-    centerProjectCanvasInViewport();
+    resetOpenedDocumentViewport({ defer: true });
 
     autosaveHandle = null;
     pendingAutosaveHandle = null;
@@ -20001,7 +20025,7 @@
     resetExportScaleDefaults();
     syncPixfindSnapshotAfterDocumentReset();
     setTrackedProjectDotBaseline(snapshot, null);
-    centerProjectCanvasInViewport();
+    resetOpenedDocumentViewport({ defer: true });
 
     autosaveHandle = null;
     pendingAutosaveHandle = null;
@@ -20775,7 +20799,7 @@
     resetExportScaleDefaults();
     syncPixfindSnapshotAfterDocumentReset();
     setTrackedProjectDotBaseline(snapshot, dotStats);
-    centerProjectCanvasInViewport();
+    resetOpenedDocumentViewport({ defer: true });
 
     const requestedProjectId = normalizeAutosaveProjectId(options?.projectId || '');
     setActiveAutosaveProjectId(requestedProjectId || createAutosaveProjectId());
@@ -21122,6 +21146,65 @@
     return Boolean(entitlements.pixiedraw_ad_free || entitlements.browser_ad_free);
   }
 
+  function getPixieedAdFreeStateSnapshot() {
+    return window.pixieedAdFree?.state || null;
+  }
+
+  function getPixieedAdFreeRemainingDays(adFreeState = getPixieedAdFreeStateSnapshot()) {
+    const raw = typeof adFreeState?.expiresAt === 'string' ? adFreeState.expiresAt : '';
+    if (!raw) {
+      return null;
+    }
+    const timestamp = Date.parse(raw);
+    if (!Number.isFinite(timestamp)) {
+      return null;
+    }
+    return Math.max(0, Math.ceil((timestamp - Date.now()) / 86400000));
+  }
+
+  function buildPixieedSupportStatusText(adFreeState = getPixieedAdFreeStateSnapshot()) {
+    const { ownedProjectCount, effectiveLimit } = getSharedProjectOwnershipStatus();
+    const usageLabel = buildSharedProjectUsageLabel({ ownedProjectCount, effectiveLimit });
+    const supporterUsageLabel = buildSharedProjectUsageLabel({
+      ownedProjectCount,
+      effectiveLimit: SHARED_PROJECT_LIMIT_AD_FREE,
+    });
+    if (adFreeState?.isActive === true || hasPixieedrawAdFreeSupport()) {
+      const days = getPixieedAdFreeRemainingDays(adFreeState);
+      if (days === null) {
+        return localizeText(
+          `サポーター特典が適用中です。作成枠 ${usageLabel}。広告非表示と共有プロジェクト作成枠を利用できます。`,
+          `Supporter benefits are active. Creation slots: ${usageLabel}. Ads are hidden and shared project creation slots are available.`
+        );
+      }
+      return localizeText(
+        `サポーター特典が適用中です。作成枠 ${usageLabel}、残り ${days} 日です。`,
+        `Supporter benefits are active. Creation slots: ${usageLabel}. ${days} days remaining.`
+      );
+    }
+    return localizeText(
+      `サポーター特典で追加3件、合計4件まで作成できます。サポーター枠 ${supporterUsageLabel}。`,
+      `Supporter benefits add 3 extra slots, for 4 total. Supporter slots: ${supporterUsageLabel}.`
+    );
+  }
+
+  function syncPixieedSupportBenefitUi(adFreeState = getPixieedAdFreeStateSnapshot()) {
+    const message = buildPixieedSupportStatusText(adFreeState);
+    const status = document.getElementById('pixieedAdFreeStatus');
+    if (status instanceof HTMLElement && !window.pixieedAdFree?.state?.lastError) {
+      status.textContent = message;
+    }
+    if (dom.controls.multiSupportStatus instanceof HTMLElement) {
+      dom.controls.multiSupportStatus.textContent = message;
+    }
+    const active = adFreeState?.isActive === true || hasPixieedrawAdFreeSupport();
+    if (dom.controls.multiSupportPurchase instanceof HTMLElement) {
+      dom.controls.multiSupportPurchase.textContent = active
+        ? localizeText('特典を確認', 'View Benefits')
+        : localizeText('サポーター特典を見る', 'View Supporter Benefits');
+    }
+  }
+
   function getMaxSharedProjectCount() {
     return hasPixieedrawAdFreeSupport()
       ? SHARED_PROJECT_LIMIT_AD_FREE
@@ -21291,8 +21374,8 @@
       );
     }
     return localizeText(
-      '自分が作成した共有プロジェクトは同時に 1 件までです。PiXiEEDraw継続サポート(広告非表示)で 3 件まで増やせます。',
-      'You can own 1 shared project at a time. PiXiEEDraw ad-free support increases this to 3.'
+      '自分が作成した共有プロジェクトは同時に 1 件までです。PiXiEEDraw継続サポートで追加3件、合計4件まで増やせます。',
+      'You can own 1 shared project at a time. PiXiEEDraw support adds 3 extra slots, for 4 total.'
     );
   }
 
@@ -21346,6 +21429,15 @@
       ownedProjectCount,
       excessCount: Math.max(0, Math.round(Number(ownedProjectCount) || 0) - Math.max(1, Math.round(Number(effectiveLimit) || getMaxSharedProjectCount()))),
     });
+  }
+
+  function buildSharedProjectUsageLabel({
+    ownedProjectCount = 0,
+    effectiveLimit = getMaxSharedProjectCount(),
+  } = {}) {
+    const normalizedOwnedProjectCount = Math.max(0, Math.round(Number(ownedProjectCount) || 0));
+    const normalizedEffectiveLimit = Math.max(1, Math.round(Number(effectiveLimit) || getMaxSharedProjectCount()));
+    return `${normalizedOwnedProjectCount}/${normalizedEffectiveLimit}`;
   }
 
   async function pruneSharedRecentEntriesToKnownProjects(knownProjectKeys = []) {
@@ -22937,6 +23029,8 @@
     list.innerHTML = '';
     if (!AUTOSAVE_SUPPORTED || !entries || entries.length === 0) {
       section.hidden = true;
+      updatePixieedAccountUi();
+      syncPixieedSupportBenefitUi();
       return;
     }
     if (titleNode instanceof HTMLElement) {
@@ -23034,6 +23128,8 @@
       card.appendChild(deleteButton);
       list.appendChild(card);
     });
+    updatePixieedAccountUi();
+    syncPixieedSupportBenefitUi();
     if (startupVisible) {
       window.requestAnimationFrame(() => {
         queueStartupRecentAdRender();
@@ -24542,7 +24638,7 @@
     const activeCanvasSnapshot = {
       width,
       height,
-      scale: normalizeZoomScale(payload.scale, state.scale || MIN_ZOOM_SCALE),
+      scale: MIN_ZOOM_SCALE,
       pan: {
         x: Math.round(Number(payload.pan?.x) || 0),
         y: Math.round(Number(payload.pan?.y) || 0),
@@ -29746,7 +29842,7 @@
     const canvasDoc = targetSurface?.canvasDoc
       || getProjectCanvasDocumentById(targetSurface?.canvasDocId)
       || (targetSurface?.kind === 'local' ? getProjectCanvasDocumentForEntry(targetSurface) : getProjectCanvasDocumentAt(0));
-    if (viewport instanceof HTMLElement && panel instanceof HTMLElement && canvasDoc) {
+    if (!isMainCanvasPanelCssCentered() && viewport instanceof HTMLElement && panel instanceof HTMLElement && canvasDoc) {
       const viewportWidth = Math.max(1, Math.round(viewport.clientWidth || viewport.getBoundingClientRect().width || 1));
       const viewportHeight = Math.max(1, Math.round(viewport.clientHeight || viewport.getBoundingClientRect().height || 1));
       const drawWidth = Math.max(1, Math.round(Number(canvasDoc?.width) || 1)) * getProjectCanvasDisplayScale(canvasDoc);
@@ -29760,6 +29856,43 @@
     if (persist) {
       scheduleSessionPersist({ includeSnapshots: false });
     }
+  }
+
+  function isMainCanvasPanelCssCentered() {
+    return (
+      layoutMode === 'mobilePortrait'
+      && getProjectCanvasCount() <= 1
+      && document.body.classList.contains('is-mobile-layout')
+    );
+  }
+
+  function resetOpenedDocumentViewport({ defer = false } = {}) {
+    if (openedDocumentViewportResetRaf !== null) {
+      window.cancelAnimationFrame(openedDocumentViewportResetRaf);
+      openedDocumentViewportResetRaf = null;
+    }
+    const run = () => {
+      openedDocumentViewportResetRaf = null;
+      state.scale = MIN_ZOOM_SCALE;
+      state.pan.x = 0;
+      state.pan.y = 0;
+      requestLocalViewportCanvasLayoutReset({ clearStored: true });
+      resizeCanvases({
+        forceRender: false,
+        applyTransform: false,
+        syncControls: true,
+        updateScaleLimits: false,
+      });
+      centerProjectCanvasInViewport({ persist: false });
+      requestOverlayRender();
+    };
+    if (!defer) {
+      run();
+      return;
+    }
+    openedDocumentViewportResetRaf = window.requestAnimationFrame(() => {
+      openedDocumentViewportResetRaf = window.requestAnimationFrame(run);
+    });
   }
 
   function applyViewportTransform() {
@@ -30162,7 +30295,11 @@
       setupKeyboard();
       updateDocumentMetadata();
       setupStartupScreen();
-      const accountInitTask = initPixieedAccount();
+      hydratePixieedAccountFromLocalCache();
+      const accountInitTask = initPixieedAccount().catch(error => {
+        console.warn('Account bootstrap failed', error);
+        return false;
+      });
       const skipStartup = EMBED_CONFIG.skipStartup === true;
       if (lensImportRequested || skipStartup) {
         hideStartupScreen();
@@ -30170,9 +30307,9 @@
       let restoredAutosaveProject = false;
       if (!lensImportRequested && !skipStartup) {
         try {
-          await accountInitTask;
           setStartupProgressLabel(localizeText('前回の作業を確認中…', 'Checking your previous work...'));
           if (startupSharedReloadProjectKey) {
+            await accountInitTask;
             restoredAutosaveProject = await maybeRestoreSharedProjectOnStartup();
           }
           if (!restoredAutosaveProject) {
@@ -30196,6 +30333,7 @@
       }
       setStartupProgressLabel(localizeText('起動を完了しています…', 'Finalizing startup...'));
       renderEverything();
+      resetOpenedDocumentViewport({ defer: true });
       refreshLocalizedUi();
       scheduleDeferredUiSetup();
       if (!lensImportRequested && !importedFromLens && !skipStartup && !restoredAutosaveProject && !reloadSnapshotRestored && !hasDismissedStartupScreen()) {
@@ -32874,6 +33012,19 @@
         startPixieedAccountLoginFlow();
       });
     }
+    [
+      dom.controls.multiEntryAccountLogin,
+      dom.controls.multiFlowAccountLogin,
+    ].forEach(loginAnchor => {
+      if (!(loginAnchor instanceof HTMLAnchorElement) || loginAnchor.dataset.bound === 'true') {
+        return;
+      }
+      loginAnchor.dataset.bound = 'true';
+      loginAnchor.addEventListener('click', event => {
+        event.preventDefault();
+        startPixieedAccountLoginFlow();
+      });
+    });
     if (dom.controls.pixieedAccountLogout instanceof HTMLButtonElement && dom.controls.pixieedAccountLogout.dataset.bound !== 'true') {
       dom.controls.pixieedAccountLogout.dataset.bound = 'true';
       dom.controls.pixieedAccountLogout.addEventListener('click', async () => {
@@ -42171,14 +42322,18 @@
     const anchorLeft = shouldReset ? defaults.main.left : (storedAnchorLeft ?? defaults.main.left);
     const anchorTop = shouldReset ? defaults.main.top : (storedAnchorTop ?? defaults.main.top);
     const totalCanvases = Math.max(1, getProjectCanvasCount());
+    const useCenteredMainPanel = isMainCanvasPanelCssCentered();
     workspace.dataset.localCanvasLayout = totalCanvases > 1 ? 'free' : 'single';
     workspace.style.setProperty('--workspace-canvas-columns', '1');
     workspace.style.setProperty('--workspace-canvas-rows', '1');
     if (mainPanel) {
-      mainPanel.style.left = `${anchorLeft}px`;
-      mainPanel.style.top = `${anchorTop}px`;
+      mainPanel.style.left = useCenteredMainPanel ? '0px' : `${anchorLeft}px`;
+      mainPanel.style.top = useCenteredMainPanel ? '0px' : `${anchorTop}px`;
     }
-    setLocalViewportCanvasLayoutAnchor(anchorLeft, anchorTop);
+    setLocalViewportCanvasLayoutAnchor(
+      useCenteredMainPanel ? 0 : anchorLeft,
+      useCenteredMainPanel ? 0 : anchorTop
+    );
     localViewportCanvasEntries.forEach((entry, index) => {
       if (!(entry.panel instanceof HTMLElement)) {
         return;
@@ -54822,19 +54977,14 @@
       syncLocalLayerVisibilityMapFromState();
       syncLocalLayerPreviewOpacityMapFromState();
       const snapshot = {
-        scale: normalizeZoomScale(state.scale, MIN_ZOOM_SCALE),
-      pan: {
-        x: Math.round(Number(state.pan?.x) || 0),
-        y: Math.round(Number(state.pan?.y) || 0),
-      },
-	      tool: state.tool,
-	      brushSize: clamp(Math.round(state.brushSize || 1), 1, 32),
-	      outlineSize: clamp(Math.round(state.outlineSize || 1), 1, 8),
-	      selectSameMode: normalizeSelectSameMode(state.selectSameMode, SELECT_SAME_MODE_CONNECTED),
-	      selectionShapeMode: normalizeSelectionShapeMode(state.selectionShapeMode, SELECTION_SHAPE_MODE_CONTENT),
-	      brushShape: normalizeBrushShape(state.brushShape, BRUSH_SHAPE_SQUARE),
-      customBrush: serializeCustomBrushPayload(state.customBrush),
-      showGrid: Boolean(state.showGrid),
+        tool: state.tool,
+        brushSize: clamp(Math.round(state.brushSize || 1), 1, 32),
+        outlineSize: clamp(Math.round(state.outlineSize || 1), 1, 8),
+        selectSameMode: normalizeSelectSameMode(state.selectSameMode, SELECT_SAME_MODE_CONNECTED),
+        selectionShapeMode: normalizeSelectionShapeMode(state.selectionShapeMode, SELECTION_SHAPE_MODE_CONTENT),
+        brushShape: normalizeBrushShape(state.brushShape, BRUSH_SHAPE_SQUARE),
+        customBrush: serializeCustomBrushPayload(state.customBrush),
+        showGrid: Boolean(state.showGrid),
         gridScreenStep: clamp(Math.round(state.gridScreenStep || 16), 1, 256),
         showMajorGrid: Boolean(state.showMajorGrid),
         majorGridSpacing: clamp(Math.round(state.majorGridSpacing || 16), 2, 512),
@@ -54920,13 +55070,6 @@
       return;
     }
 
-    if (Number.isFinite(payload.scale)) {
-      state.scale = normalizeZoomScale(payload.scale, state.scale || MIN_ZOOM_SCALE);
-    }
-    if (payload.pan && Number.isFinite(payload.pan.x) && Number.isFinite(payload.pan.y)) {
-      state.pan.x = Math.round(payload.pan.x);
-      state.pan.y = Math.round(payload.pan.y);
-    }
     if (typeof payload.tool === 'string') {
       state.tool = normalizeToolId(payload.tool, state.tool);
     }
@@ -64961,6 +65104,54 @@
     }
   }
 
+  function readPixieedStoredAuthSessionSnapshot() {
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return null;
+    }
+    try {
+      const raw = window.localStorage.getItem(PIXIEED_AUTH_STORAGE_KEY);
+      if (!raw) {
+        return null;
+      }
+      const parsed = JSON.parse(raw);
+      const session = parsed?.currentSession || parsed?.session || parsed;
+      if (!session || typeof session !== 'object') {
+        return null;
+      }
+      const userId = typeof session?.user?.id === 'string' ? session.user.id.trim() : '';
+      const accessToken = typeof session.access_token === 'string' ? session.access_token.trim() : '';
+      const refreshToken = typeof session.refresh_token === 'string' ? session.refresh_token.trim() : '';
+      if (!userId || !accessToken || !refreshToken) {
+        return null;
+      }
+      return session;
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function hydratePixieedAccountFromLocalCache() {
+    if (accountState.isLoggedIn) {
+      return false;
+    }
+    const session = readPixieedStoredAuthSessionSnapshot();
+    if (!session) {
+      return false;
+    }
+    accountState.session = session;
+    accountState.userId = session.user.id;
+    accountState.isLoggedIn = true;
+    accountState.isAnonymous = Boolean(
+      session?.user?.is_anonymous
+      || session?.user?.app_metadata?.provider === 'anonymous'
+      || session?.user?.user_metadata?.provider === 'anonymous'
+    );
+    accountState.restoringFromLocalCache = true;
+    accountState.profile = getPixieedAccountProfileFallback();
+    updatePixieedAccountUi();
+    return true;
+  }
+
   function writePixieedCachedAuthSession(session) {
     if (typeof window === 'undefined' || !window.localStorage) {
       return;
@@ -65023,34 +65214,28 @@
     }
   }
 
+  function syncPixieedAccountLoginAnchor(anchor) {
+    if (!(anchor instanceof HTMLAnchorElement)) {
+      return;
+    }
+    anchor.href = buildPixieedAccountLoginHref();
+    if (isStandaloneAppDisplayMode()) {
+      anchor.target = '_self';
+      anchor.rel = 'noopener';
+      return;
+    }
+    anchor.target = '_blank';
+    anchor.rel = 'noopener';
+  }
+
   function syncPixieedAccountLoginLink() {
     const loginLink = dom.controls.pixieedAccountLogin;
-    if (!(loginLink instanceof HTMLAnchorElement)) {
-      return;
-    }
-    loginLink.href = buildPixieedAccountLoginHref();
-    if (isStandaloneAppDisplayMode()) {
-      loginLink.target = '_self';
-      loginLink.rel = 'noopener';
-      return;
-    }
-    loginLink.target = '_blank';
-    loginLink.rel = 'noopener';
+    syncPixieedAccountLoginAnchor(loginLink);
   }
 
   function syncPixieedAccountLoginPromptLink() {
     const goHome = dom.loginPrompt?.goHome;
-    if (!(goHome instanceof HTMLAnchorElement)) {
-      return;
-    }
-    goHome.href = buildPixieedAccountLoginHref();
-    if (isStandaloneAppDisplayMode()) {
-      goHome.target = '_self';
-      goHome.rel = 'noopener';
-      return;
-    }
-    goHome.target = '_blank';
-    goHome.rel = 'noopener';
+    syncPixieedAccountLoginAnchor(goHome);
   }
 
   function ensurePwaInstallDialog() {
@@ -65279,6 +65464,7 @@
       || session?.user?.app_metadata?.provider === 'anonymous'
       || session?.user?.user_metadata?.provider === 'anonymous'
     );
+    accountState.restoringFromLocalCache = false;
     if (!accountState.isLoggedIn) {
       accountState.isAnonymous = false;
       accountState.profile = { nickname: '', avatarId: '', xUrl: '' };
@@ -65553,15 +65739,81 @@
     }
   }
 
+  function updatePixieedShareAccountCard(statusNode, hintNode, loginAnchor) {
+    const nickname = readPixieedAccountNickname();
+    const isSignedInAccount = accountState.isLoggedIn && !accountState.isAnonymous;
+    const { ownedProjectCount, effectiveLimit } = getSharedProjectOwnershipStatus();
+    const maxSharedProjects = Math.max(1, effectiveLimit);
+    const usageLabel = buildSharedProjectUsageLabel({ ownedProjectCount, effectiveLimit });
+    if (statusNode instanceof HTMLElement) {
+      if (isSignedInAccount) {
+        const email = accountState.session?.user?.email || '';
+        const label = nickname || email;
+        const slotLabel = maxSharedProjects > SHARED_PROJECT_LIMIT_DEFAULT
+          ? localizeText(`作成枠 ${usageLabel}`, `Slots ${usageLabel}`)
+          : localizeText(`無料枠 ${usageLabel}`, `Free slot ${usageLabel}`);
+        statusNode.textContent = label
+          ? `${slotLabel} / ${label}`
+          : slotLabel;
+      } else {
+        statusNode.textContent = localizeText(
+          `無料枠 ${usageLabel}`,
+          `Free slot ${usageLabel}`
+        );
+      }
+    }
+    if (hintNode instanceof HTMLElement) {
+      if (isSignedInAccount) {
+        hintNode.textContent = maxSharedProjects > SHARED_PROJECT_LIMIT_DEFAULT
+          ? localizeText(
+            `このアカウントで共有プロジェクトを最大${maxSharedProjects}件まで作成できます。共有URLでメンバーを招待できます。`,
+            `This account can create up to ${maxSharedProjects} shared projects. Invite members with a shared URL.`
+          )
+          : localizeText(
+            'このアカウントで共有プロジェクトを1件作成できます。サポーター特典で追加3件、合計4件まで作成できます。',
+            'This account can create 1 shared project. Supporter benefits add 3 extra slots, for 4 total.'
+          );
+      } else {
+        hintNode.textContent = localizeText(
+          'ログインすると、同じ絵をオンラインで共同編集できます。サポーター特典で追加3件、合計4件まで作成できます。',
+          'Sign in to edit the same artwork together online. Supporter benefits add 3 extra slots, for 4 total.'
+        );
+      }
+    }
+    if (loginAnchor instanceof HTMLAnchorElement) {
+      syncPixieedAccountLoginAnchor(loginAnchor);
+      loginAnchor.textContent = localizeText('ログインして共有を作成', 'Sign In to Create Shared Project');
+      loginAnchor.hidden = isSignedInAccount;
+      loginAnchor.setAttribute('aria-hidden', String(isSignedInAccount));
+    }
+  }
+
   function updatePixieedAccountUi() {
     const status = dom.controls.pixieedAccountStatus;
     const loginLink = dom.controls.pixieedAccountLogin;
     const logoutButton = dom.controls.pixieedAccountLogout;
     const dock = dom.controls.pixieedAccountDock;
+    const isRestoringCachedAccount = Boolean(accountState.restoringFromLocalCache && accountState.isLoggedIn);
     syncPixieedAccountLoginPromptLink();
+    updatePixieedShareAccountCard(
+      dom.controls.multiEntryAccountStatus,
+      dom.controls.multiEntryAccountHint,
+      dom.controls.multiEntryAccountLogin
+    );
+    updatePixieedShareAccountCard(
+      dom.controls.multiFlowAccountStatus,
+      dom.controls.multiFlowAccountHint,
+      dom.controls.multiFlowAccountLogin
+    );
     if (status instanceof HTMLElement) {
       const nickname = readPixieedAccountNickname();
-      if (accountState.isLoggedIn && !accountState.isAnonymous) {
+      if (isRestoringCachedAccount && !accountState.isAnonymous) {
+        const email = accountState.session?.user?.email || '';
+        const label = nickname || email;
+        status.textContent = label
+          ? localizeText(`ログイン確認中: ${label}`, `Checking sign-in: ${label}`)
+          : localizeText('ログイン確認中', 'Checking sign-in');
+      } else if (accountState.isLoggedIn && !accountState.isAnonymous) {
         const email = accountState.session?.user?.email || '';
         const label = nickname || email;
         status.textContent = label
@@ -65589,7 +65841,12 @@
       const nickname = readPixieedAccountNickname()
         || accountState.profile?.nickname
         || '';
-      if (accountState.isLoggedIn && !accountState.isAnonymous) {
+      if (isRestoringCachedAccount && !accountState.isAnonymous) {
+        dock.textContent = localizeText('確認中', 'Checking');
+        const email = accountState.session?.user?.email || '';
+        const label = nickname || email || localizeText('ログイン確認中', 'Checking sign-in');
+        dock.setAttribute('title', label);
+      } else if (accountState.isLoggedIn && !accountState.isAnonymous) {
         dock.textContent = localizeText('アカウント', 'Account');
         const email = accountState.session?.user?.email || '';
         const label = nickname || email || localizeText('ログイン中', 'Signed in');
@@ -65617,6 +65874,7 @@
         if (!pixieedAdFreeSharedLimitBound && window.pixieedAdFree?.subscribe) {
           pixieedAdFreeSharedLimitBound = true;
           window.pixieedAdFree.subscribe(nextState => {
+            syncPixieedSupportBenefitUi(nextState);
             if (!accountState.isLoggedIn || accountState.isAnonymous) {
               return;
             }
@@ -65628,6 +65886,7 @@
             });
           });
         }
+        syncPixieedSupportBenefitUi();
         const supabase = await ensurePixieedAccountClient();
         if (!supabase) {
           updatePixieedAccountUi();
