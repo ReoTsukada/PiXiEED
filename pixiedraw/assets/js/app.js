@@ -23649,9 +23649,20 @@
       : 'guest';
     const pendingInvite = readPendingSharedInvite();
     const pendingInviteProjectKey = normalizeMultiProjectKey(pendingInvite?.projectKey || '');
+    const pendingInviteSource = typeof pendingInvite?.source === 'string' ? pendingInvite.source.trim() : '';
     if (
       reason === 'recent-open'
       && pendingInvite
+      && (multiInviteAutoJoinHandled || pendingInviteSource === 'recent-open')
+      && (!pendingInviteProjectKey || pendingInviteProjectKey === normalizedProjectKey)
+    ) {
+      clearPendingSharedInvite();
+    }
+    if (
+      reason === 'recent-open'
+      && pendingInvite
+      && !multiInviteAutoJoinHandled
+      && pendingInviteSource !== 'recent-open'
       && (!pendingInviteProjectKey || pendingInviteProjectKey === normalizedProjectKey)
     ) {
       console.info('[shared-sync]', {
@@ -23939,6 +23950,11 @@
       );
       syncMultiControls();
       renderMultiParticipantsList();
+      if (reason === 'url-invite') {
+        clearPendingSharedInvite();
+        clearMultiInviteQueryParamsFromUrl();
+        return true;
+      }
       return false;
     }
     if (!(await ensureSharedProjectCapacity(resolvedProjectKey, {
@@ -24237,8 +24253,21 @@
     }
     const pendingInvite = readPendingSharedInvite();
     const pendingInviteProjectKey = normalizeMultiProjectKey(pendingInvite?.projectKey || '');
+    const pendingInviteSource = typeof pendingInvite?.source === 'string' ? pendingInvite.source.trim() : '';
     if (
       pendingInvite
+      && (multiInviteAutoJoinHandled || pendingInviteSource === 'recent-open')
+      && (
+        !pendingInviteProjectKey
+        || pendingInviteProjectKey === normalizeMultiProjectKey(normalizedEntry.sharedProjectKey || '')
+      )
+    ) {
+      clearPendingSharedInvite();
+    }
+    if (
+      pendingInvite
+      && !multiInviteAutoJoinHandled
+      && pendingInviteSource !== 'recent-open'
       && (
         !pendingInviteProjectKey
         || pendingInviteProjectKey === normalizeMultiProjectKey(normalizedEntry.sharedProjectKey || '')
