@@ -389,7 +389,7 @@
       return;
     }
     if (readQueryParam(AUTO_APPLY_STATUS_KEY) === 'cancelled' && !state.isActive) {
-      updateStatusElement('購入はキャンセルされました。再度購入する場合は「広告非表示を購入」を押してください。');
+      updateStatusElement('購入はキャンセルされました。再度購入する場合は「サポーター特典を見る」を押してください。');
       return;
     }
     if (!state.isLoggedIn && readQueryParam(AUTO_APPLY_QUERY_KEY)) {
@@ -397,12 +397,16 @@
       return;
     }
     if (!state.isLoggedIn) {
-      updateStatusElement('ログイン後に購入番号または購入コードを適用できます。');
+      updateStatusElement('ログイン後に購入番号または購入コードを適用できます。広告非表示と共有プロジェクト作成枠を利用できます。');
       return;
     }
     if (state.isActive) {
       const expiry = formatExpiryLabel(state.expiresAt);
-      updateStatusElement(expiry ? `広告非表示が有効です (${expiry} まで)` : '広告非表示が有効です。');
+      const timestamp = Date.parse(state.expiresAt || '');
+      const days = Number.isFinite(timestamp) ? Math.max(0, Math.ceil((timestamp - Date.now()) / 86400000)) : null;
+      updateStatusElement(expiry
+        ? `サポーター特典が適用中です。残り ${days} 日です。(${expiry} まで)`
+        : 'サポーター特典が適用中です。広告非表示と共有プロジェクト作成枠を利用できます。');
       return;
     }
     updateStatusElement('未購入です。購入後は自動反映されます。うまくいかない場合は購入番号または購入コードを入力してください。');
