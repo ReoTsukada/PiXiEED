@@ -3973,7 +3973,9 @@ body.is-mobile-layout .mobile-draw-help {
     'participants'
     'session'
     'master-actions'
-    'advanced';
+    'advanced'
+    'account'
+    'support';
 }
 
 #panelMulti .multi-flow-tabpanel--comments {
@@ -4073,6 +4075,81 @@ body.is-mobile-layout .mobile-draw-help {
 #panelMulti .multi-overview__summary,
 #panelMulti .multi-overview__hint {
   margin: 0;
+}
+
+#panelMulti .multi-account-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(var(--ui-rgb-focus), 0.24);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(8, 18, 26, 0.86), rgba(6, 14, 20, 0.78));
+}
+
+#panelMulti #multiFlowAccountCard {
+  grid-area: account;
+}
+
+#panelMulti #multiEntryAccountCard {
+  margin-top: 14px;
+}
+
+#panelMulti .multi-account-card__head {
+  display: grid;
+  gap: 4px;
+}
+
+#panelMulti .multi-account-card__head > span {
+  color: rgba(232, 244, 255, 0.98);
+  font-weight: 700;
+}
+
+#panelMulti .multi-account-card__head > small {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+#panelMulti .multi-account-card > .help-text {
+  margin: 0;
+}
+
+#panelMulti .multi-account-card > .chip {
+  width: 100%;
+}
+
+#panelMulti .multi-support-card {
+  grid-area: support;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(var(--premium-rgb), 0.5);
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(53, 35, 13, 0.9), rgba(22, 15, 8, 0.92)),
+    rgba(22, 15, 8, 0.92);
+}
+
+#panelMulti .multi-support-card__head {
+  display: grid;
+  gap: 4px;
+}
+
+#panelMulti .multi-support-card__head > span {
+  color: rgba(255, 236, 188, 0.98);
+  font-weight: 700;
+}
+
+#panelMulti .multi-support-card__head > small {
+  color: rgba(255, 231, 190, 0.78);
+  line-height: 1.55;
+}
+
+#panelMulti .multi-support-card > .chip {
+  width: 100%;
+  border-color: rgba(var(--premium-rgb-strong), 0.62);
+  background: linear-gradient(180deg, rgba(118, 78, 26, 0.98), rgba(76, 49, 18, 0.98));
+  color: #fff4d4;
 }
 
 #panelMulti .multi-project-key-field--flow {
@@ -4756,7 +4833,8 @@ body.is-mobile-layout .mobile-draw-help {
       'overview key'
       'participants participants'
       'session master-actions'
-      'advanced advanced';
+      'advanced advanced'
+      'account support';
     align-items: start;
   }
 
@@ -6509,15 +6587,29 @@ body.is-mobile-layout .mobile-draw-help {
   min-width: 0;
 }
 
-#panelSettings #pixieedAdFreeField .field--inline:last-of-type {
-  grid-template-columns: minmax(0, 1fr) auto;
+#pixieedAdFreeField .field--inline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  align-items: stretch;
 }
 
-#panelSettings #pixieedAdFreeField #pixieedAdFreeOrderId {
+#pixieedAdFreeField .field--inline > .chip,
+#pixieedAdFreeField .field--inline > .button,
+#pixieedAdFreeField .field--inline > input {
+  width: 100%;
   min-width: 0;
 }
 
-#panelSettings #pixieedAdFreeField #pixieedAdFreeClaim {
+#pixieedAdFreeField .field--inline:last-of-type {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+#pixieedAdFreeField #pixieedAdFreeOrderId {
+  min-width: 0;
+}
+
+#pixieedAdFreeField #pixieedAdFreeClaim {
   min-width: 92px;
 }
 
@@ -7101,15 +7193,15 @@ body.is-startup-active {
 }
 
 .startup-recent-card__open[data-project-kind='local'] {
-  border-left-color: rgba(112, 226, 166, 0.78);
+  border-left-color: rgba(255, 255, 255, 0.88);
 }
 
 .startup-recent-card__open[data-project-kind='shared-owned'] {
-  border-left-color: rgba(107, 182, 255, 0.86);
+  border-left-color: rgba(255, 167, 72, 0.9);
 }
 
 .startup-recent-card__open[data-project-kind='shared-joined'] {
-  border-left-color: rgba(210, 155, 255, 0.84);
+  border-left-color: rgba(72, 158, 255, 0.9);
 }
 
 .startup-recent-card__open:hover,
@@ -7156,13 +7248,13 @@ body.is-startup-active {
   height: 16px;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.22);
-  background: rgba(112, 226, 166, 0.82);
+  background: rgba(255, 255, 255, 0.92);
   box-shadow: 0 0 0 2px rgba(5, 12, 20, 0.72);
   pointer-events: none;
 }
 
 .startup-recent-card__open[data-project-kind='shared-owned'] .startup-recent-card__kind {
-  background: rgba(107, 182, 255, 0.92);
+  background: rgba(255, 167, 72, 0.94);
 }
 
 .startup-recent-card__open[data-project-kind='shared-owned'] .startup-recent-card__kind::after {
@@ -7174,7 +7266,7 @@ body.is-startup-active {
 }
 
 .startup-recent-card__open[data-project-kind='shared-joined'] .startup-recent-card__kind {
-  background: rgba(210, 155, 255, 0.92);
+  background: rgba(72, 158, 255, 0.94);
 }
 
 .startup-recent-card__open[data-project-kind='shared-joined'] .startup-recent-card__kind::before,
@@ -7318,7 +7410,7 @@ body.is-startup-active {
   max-height: inherit;
 }
 
-#panelSettings #pixieedAdFreeField {
+#pixieedAdFreeField {
   position: relative;
   border-color: rgba(var(--premium-rgb), 0.52);
   background:
@@ -7326,7 +7418,7 @@ body.is-startup-active {
     rgba(22, 15, 8, 0.98);
 }
 
-#panelSettings #pixieedAdFreeField::before {
+#pixieedAdFreeField::before {
   content: "SUPPORT";
   display: inline-flex;
   align-items: center;
@@ -7341,37 +7433,37 @@ body.is-startup-active {
   letter-spacing: 0.16em;
 }
 
-#panelSettings #pixieedAdFreeField > span {
+#pixieedAdFreeField > span {
   color: rgba(255, 236, 188, 0.98);
 }
 
-#panelSettings #pixieedAdFreeField #pixieedAdFreeStatus,
-#panelSettings #pixieedAdFreeField .help-text {
+#pixieedAdFreeField #pixieedAdFreeStatus,
+#pixieedAdFreeField .help-text {
   color: rgba(255, 231, 190, 0.78);
 }
 
-#panelSettings #pixieedAdFreeField #pixieedAdFreePurchase,
-#panelSettings #pixieedAdFreeField #supportTipLink {
+#pixieedAdFreeField #pixieedAdFreePurchase,
+#pixieedAdFreeField #supportTipLink {
   border-color: rgba(var(--premium-rgb-strong), 0.62);
   background: linear-gradient(180deg, rgba(118, 78, 26, 0.98), rgba(76, 49, 18, 0.98));
   color: #fff4d4;
 }
 
-#panelSettings #pixieedAdFreeField #pixieedAdFreePurchase:hover,
-#panelSettings #pixieedAdFreeField #supportTipLink:hover,
-#panelSettings #pixieedAdFreeField #pixieedAdFreePurchase:focus-visible,
-#panelSettings #pixieedAdFreeField #supportTipLink:focus-visible {
+#pixieedAdFreeField #pixieedAdFreePurchase:hover,
+#pixieedAdFreeField #supportTipLink:hover,
+#pixieedAdFreeField #pixieedAdFreePurchase:focus-visible,
+#pixieedAdFreeField #supportTipLink:focus-visible {
   border-color: rgba(var(--premium-rgb-strong), 0.9);
   background: linear-gradient(180deg, rgba(146, 96, 30, 0.98), rgba(92, 59, 20, 0.98));
 }
 
-#panelSettings #pixieedAdFreeField #pixieedAdFreeClaim {
+#pixieedAdFreeField #pixieedAdFreeClaim {
   border-color: rgba(var(--premium-rgb), 0.44);
   background: rgba(67, 43, 17, 0.96);
   color: #ffeab8;
 }
 
-#panelSettings #pixieedAdFreeField #pixieedAdFreeOrderId {
+#pixieedAdFreeField #pixieedAdFreeOrderId {
   border-color: rgba(var(--premium-rgb), 0.24);
   background: rgba(18, 12, 8, 0.92);
 }
