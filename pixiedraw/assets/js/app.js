@@ -9729,17 +9729,16 @@
       const showReloadLamp = Boolean(
         status.visible
         && (
-          status.state === 'recovering'
-          || status.state === 'syncing'
-          || status.state === 'blocked'
-          || status.reloadable
+          status.reloadable
           || status.recoverable
+          || status.state === 'blocked'
+          || status.state === 'offline'
         )
       );
       reloadAction.dataset.sharedSyncLamp = showReloadLamp ? resolveSharedProjectLampState(status) : '';
       reloadAction.classList.toggle('canvas-reload-action--shared-notice', showReloadLamp);
       reloadAction.title = showReloadLamp
-        ? localizeText('共有プロジェクトを最新確認中。必要なら再読み込み', 'Shared project is checking for updates. Reload if needed.')
+        ? localizeText('共有プロジェクトの更新が滞っています。必要なら再読み込み', 'Shared project updates are stalled. Reload if needed.')
         : localizeText('再読み込み', 'Reload');
     }
     if (dom.projectTabsStatusSlot instanceof HTMLElement) {
