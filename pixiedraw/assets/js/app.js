@@ -9174,10 +9174,26 @@
       return;
     }
     const normalizedProjectId = typeof projectId === 'string' ? projectId.trim() : '';
+    const incomingRevision = Math.max(0, Math.round(Number(revision) || 0));
+    const incomingStructureRevision = Math.max(0, Math.round(Number(structureRevision) || 0));
     const projectChanged = Boolean(
       (activeSharedProjectKey && activeSharedProjectKey !== normalizedProjectKey)
       || (activeSharedProjectId && normalizedProjectId && activeSharedProjectId !== normalizedProjectId)
     );
+    const previousRevision = projectChanged ? 0 : Math.max(0, Math.round(Number(activeSharedProjectRevision) || 0));
+    const previousStructureRevision = projectChanged ? 0 : Math.max(0, Math.round(Number(activeSharedProjectStructureRevision) || 0));
+    const nextSessionRevision = projectChanged ? incomingRevision : Math.max(previousRevision, incomingRevision);
+    const nextSessionStructureRevision = projectChanged
+      ? incomingStructureRevision
+      : Math.max(previousStructureRevision, incomingStructureRevision);
+    if (!projectChanged && incomingRevision < previousRevision) {
+      console.debug('[shared-realtime] skip-stale-session', {
+        projectKey: normalizedProjectKey,
+        projectId: normalizedProjectId || activeSharedProjectId || '',
+        incomingRevision,
+        retainedRevision: previousRevision,
+      });
+    }
     if (projectChanged) {
       activeSharedProjectDocumentLoaded = false;
       sharedProjectPendingRemoteOps.clear();
@@ -9218,14 +9234,16 @@
       projectId: activeSharedProjectId,
       channelSignature: `${normalizedProjectKey}::${activeSharedProjectId || ''}`,
       extra: {
-        incomingRevision: Math.max(0, Math.round(Number(revision) || 0)),
-        incomingStructureRevision: Math.max(0, Math.round(Number(structureRevision) || 0)),
+        incomingRevision,
+        incomingStructureRevision,
+        appliedRevision: nextSessionRevision,
+        appliedStructureRevision: nextSessionStructureRevision,
         projectChanged,
       },
     });
     activeSharedProjectKey = normalizedProjectKey;
-    activeSharedProjectRevision = Math.max(0, Math.round(Number(revision) || 0));
-    activeSharedProjectStructureRevision = Math.max(0, Math.round(Number(structureRevision) || 0));
+    activeSharedProjectRevision = nextSessionRevision;
+    activeSharedProjectStructureRevision = nextSessionStructureRevision;
     sharedProjectLastAppliedSeq = Math.max(sharedProjectLastAppliedSeq, activeSharedProjectRevision);
     ensureSharedProjectSessionHeartbeat();
     const nextChannelSignature = `${normalizedProjectKey}::${activeSharedProjectId || ''}`;
@@ -58291,6 +58309,9 @@
       colorMode,
       paletteIndex,
       rgba,
+      palette: colorMode === 'palette' && Array.isArray(state.palette)
+        ? state.palette.map(color => normalizeColorValue(color))
+        : null,
       mirror: normalizeMirrorAxisState(canvasDoc?.mirror || state.mirror, canvasDoc?.width || state.width, canvasDoc?.height || state.height),
       paletteIsolation: Boolean(isMultiPaletteIsolationEnabled()),
     };
@@ -58497,6 +58518,9 @@
       colorMode: drawCommand.colorMode === 'rgb' ? 'rgb' : 'palette',
       paletteIndex: normalizePaletteIndex(drawCommand.paletteIndex, state.activePaletteIndex),
       rgba: normalizeColorValue(drawCommand.rgba),
+      palette: Array.isArray(drawCommand.palette)
+        ? drawCommand.palette.slice(0, MAX_IMPORTED_PALETTE_COLORS).map(color => normalizeColorValue(color))
+        : null,
       mirror: normalizeMirrorAxisState(drawCommand.mirror, state.width, state.height),
       paletteIsolation: Boolean(drawCommand.paletteIsolation),
     };
@@ -58602,6 +58626,9 @@
       layerId: layer.id,
       pixelCount,
       patch: diffPayload,
+      palette: Array.isArray(state.palette)
+        ? state.palette.slice(0, MAX_IMPORTED_PALETTE_COLORS).map(color => normalizeColorValue(color))
+        : null,
     };
   }
 
@@ -59900,6 +59927,100 @@
     return result;
   }
 
+  function normalizeSharedProjectPalettePayload(palette) {
+    if (!Array.isArray(palette) || !palette.length) {
+      return null;
+    }
+    return palette
+      .slice(0, MAX_IMPORTED_PALETTE_COLORS)
+      .map(color => normalizeColorValue(color));
+  }
+
+  function syncSharedProjectPaletteFromPayload(palette, { source = 'draw-op' } = {}) {
+    const normalizedPalette = normalizeSharedProjectPalettePayload(palette);
+    if (!normalizedPalette || !normalizedPalette.length) {
+      return false;
+    }
+    const currentPalette = Array.isArray(state.palette)
+      ? state.palette.map(color => normalizeColorValue(color))
+      : [];
+    if (palettesMatch(currentPalette, normalizedPalette)) {
+      return false;
+    }
+    state.palette = normalizedPalette.map(color => normalizeColorValue(color));
+    state.activePaletteIndex = clamp(
+      normalizePaletteIndex(state.activePaletteIndex, 0),
+      0,
+      Math.max(0, state.palette.length - 1)
+    );
+    state.secondaryPaletteIndex = clamp(
+      normalizePaletteIndex(state.secondaryPaletteIndex, state.activePaletteIndex),
+      0,
+      Math.max(0, state.palette.length - 1)
+    );
+    if (isIndexColorMode()) {
+      const activeColor = state.palette[state.activePaletteIndex] || state.palette[0] || state.activeRgb;
+      state.activeRgb = normalizeColorValue(activeColor || { r: 255, g: 255, b: 255, a: 255 });
+    }
+    syncCurrentPalettePresetFromPalette(state.palette, { syncControl: true });
+    renderPalette();
+    syncPaletteInputs();
+    scheduleSessionPersist({ includeSnapshots: false });
+    console.debug('[shared-realtime] palette-synced-from-draw', {
+      source,
+      paletteSize: state.palette.length,
+    });
+    return true;
+  }
+
+  function prepareSharedProjectDrawCommandPalette(command, { source = 'draw-op' } = {}) {
+    if (!command || command.tool === 'eraser' || command.colorMode !== 'palette' || command.paletteIsolation) {
+      return command;
+    }
+    syncSharedProjectPaletteFromPayload(command.palette, { source });
+    const requestedIndex = Math.round(Number(command.paletteIndex));
+    const paletteIndex = Number.isFinite(requestedIndex) && requestedIndex >= 0
+      ? requestedIndex
+      : normalizePaletteIndex(command.paletteIndex, state.activePaletteIndex);
+    const rgba = normalizeColorValue(command.rgba);
+    if (paletteIndex >= MAX_IMPORTED_PALETTE_COLORS) {
+      return {
+        ...command,
+        colorMode: 'rgb',
+        paletteIsolation: true,
+        rgba,
+      };
+    }
+    if (!Array.isArray(state.palette)) {
+      state.palette = [];
+    }
+    let changed = false;
+    while (state.palette.length <= paletteIndex) {
+      state.palette.push({ r: 0, g: 0, b: 0, a: 0 });
+      changed = true;
+    }
+    if (!colorsMatchRgba(state.palette[paletteIndex], rgba)) {
+      state.palette[paletteIndex] = rgba;
+      changed = true;
+    }
+    if (changed) {
+      syncCurrentPalettePresetFromPalette(state.palette, { syncControl: true });
+      renderPalette();
+      syncPaletteInputs();
+      scheduleSessionPersist({ includeSnapshots: false });
+      console.debug('[shared-realtime] palette-index-color-synced', {
+        source,
+        paletteIndex,
+        rgba,
+      });
+    }
+    return {
+      ...command,
+      paletteIndex,
+      rgba,
+    };
+  }
+
   function applySharedProjectStrokePixel(layer, canvasDoc, command, x, y) {
     if (!layer || !canvasDoc) {
       return false;
@@ -60014,12 +60135,13 @@
     if (!points.length) {
       return false;
     }
-    const command = {
+    let command = {
       ...payload,
       brushShape: normalizeBrushShape(payload?.brushShape, BRUSH_SHAPE_SQUARE),
       brushSize: clamp(Math.round(Number(payload?.brushSize) || 1), 1, 64),
       mirror: normalizeMirrorAxisState(payload?.mirror, targetCanvas.width, targetCanvas.height),
     };
+    command = prepareSharedProjectDrawCommandPalette(command, { source: 'stroke-command' });
     const brushOffsets = Array.isArray(payload?.customBrushOffsets) && payload.customBrushOffsets.length
       ? payload.customBrushOffsets.map(offset => ({
         dx: Math.round(Number(offset?.dx) || 0),
@@ -60145,12 +60267,13 @@
     if (!target) {
       return false;
     }
-    const command = {
+    let command = {
       ...payload,
       brushShape: normalizeBrushShape(payload?.brushShape, BRUSH_SHAPE_SQUARE),
       brushSize: clamp(Math.round(Number(payload?.brushSize) || 1), 1, 64),
       mirror: normalizeMirrorAxisState(payload?.mirror, target.targetCanvas.width, target.targetCanvas.height),
     };
+    command = prepareSharedProjectDrawCommandPalette(command, { source: 'shape-command' });
     const brushOffsets = Array.isArray(payload?.customBrushOffsets) && payload.customBrushOffsets.length
       ? payload.customBrushOffsets.map(offset => ({
         dx: Math.round(Number(offset?.dx) || 0),
@@ -60236,11 +60359,12 @@
     if (!target || !payload?.point) {
       return false;
     }
-    const command = {
+    let command = {
       ...payload,
       mirror: normalizeMirrorAxisState(payload?.mirror, target.targetCanvas.width, target.targetCanvas.height),
       fillMode: normalizeSelectSameMode(payload?.fillMode, SELECT_SAME_MODE_CONNECTED),
     };
+    command = prepareSharedProjectDrawCommandPalette(command, { source: 'fill-command' });
     const width = Math.max(1, Number(target.targetCanvas.width) || 1);
     const height = Math.max(1, Number(target.targetCanvas.height) || 1);
     const x = clamp(Math.round(Number(payload.point.x) || 0), 0, width - 1);
@@ -60350,12 +60474,13 @@
     if (!target || !payload?.start || !payload?.control1 || !payload?.control2 || !payload?.end) {
       return false;
     }
-    const command = {
+    let command = {
       ...payload,
       brushShape: normalizeBrushShape(payload?.brushShape, BRUSH_SHAPE_SQUARE),
       brushSize: clamp(Math.round(Number(payload?.brushSize) || 1), 1, 64),
       mirror: normalizeMirrorAxisState(payload?.mirror, target.targetCanvas.width, target.targetCanvas.height),
     };
+    command = prepareSharedProjectDrawCommandPalette(command, { source: 'curve-command' });
     const brushOffsets = Array.isArray(payload?.customBrushOffsets) && payload.customBrushOffsets.length
       ? payload.customBrushOffsets.map(offset => ({
         dx: Math.round(Number(offset?.dx) || 0),
@@ -60511,6 +60636,7 @@
     if (!canvasId || !layerId || !pixelCount || !patch) {
       return false;
     }
+    syncSharedProjectPaletteFromPayload(payload?.palette, { source: 'layer-patch' });
     const targetCanvas = getProjectCanvasDocumentById(canvasId) || adoptSingleProjectCanvasId(canvasId);
     if (!targetCanvas || !Array.isArray(targetCanvas.frames) || frameIndex >= targetCanvas.frames.length) {
       return false;
@@ -61338,8 +61464,31 @@
           }
           continue;
         }
+        if (
+          fromRemote
+          && seq <= activeSharedProjectRevision
+          && seq <= sharedProjectLastAppliedSeq
+        ) {
+          if (opId) {
+            rememberSharedProjectSeenOp(opId, seq);
+          }
+          logSharedProjectDrawLifecycle('remote-confirmed-op-skipped', op, {
+            mode: isSharedProjectRemoteOpFromCurrentSession(op) ? 'self-confirmed-ack' : 'remote-confirmed',
+            skipReason: 'active-revision-too-old',
+          });
+          console.info('[shared-sync]', {
+            event: 'stale-op-skipped',
+            opId,
+            revision: seq,
+            activeRevision: activeSharedProjectRevision,
+          });
+          continue;
+        }
         if (seq <= sharedProjectLastAppliedSeq) {
           if (fromRemote) {
+            if (opId) {
+              rememberSharedProjectSeenOp(opId, seq);
+            }
             logSharedProjectDrawLifecycle('remote-confirmed-op-skipped', op, {
               mode: isSharedProjectRemoteOpFromCurrentSession(op) ? 'self-confirmed-ack' : 'remote-confirmed',
               skipReason: 'revision-too-old',
@@ -63182,6 +63331,50 @@
       });
       if (deferSharedProjectSnapshotApplyIfLocalOpsInFlight(reason || 'snapshot-refresh')) {
         restoreLoadedDocumentStateAfterSnapshotAbort();
+        return false;
+      }
+      const snapshotWouldRollbackActiveRevision = Boolean(
+        snapshotRevision < activeSharedProjectRevision
+        && (
+          activeSharedProjectDocumentLoaded
+          || hadLoadedDocument
+          || hasUsableActiveSharedProjectDocumentState()
+        )
+      );
+      if (snapshotWouldRollbackActiveRevision) {
+        restoreLoadedDocumentStateAfterSnapshotAbort();
+        console.debug('[shared-realtime] skip-stale-snapshot', {
+          reason: reason || 'refresh',
+          projectKey: activeSharedProjectKey || '',
+          snapshotRevision,
+          activeRevision: activeSharedProjectRevision,
+          latestRevision: nextRevision,
+        });
+        logSharedProjectRealtimeChannelLifecycle('skip-stale-snapshot', {
+          caller: 'refreshActiveSharedProjectSnapshot',
+          reason: reason || 'refresh',
+          extra: {
+            force,
+            snapshotRevision,
+            activeRevision: activeSharedProjectRevision,
+            nextRevision,
+          },
+        });
+        if (nextRevision > activeSharedProjectRevision && !hasSharedProjectHardLocalWorkInFlight()) {
+          const replayedAhead = await applySharedProjectOpsSinceRevision(project, activeSharedProjectRevision);
+          if (replayedAhead) {
+            return true;
+          }
+          setActiveSharedProjectSyncState('catching-up', { announce: true });
+          queueSharedProjectRefresh({
+            immediate: false,
+            reason: `${reason || 'refresh'}-stale-snapshot-op-retry`,
+            force: true,
+          });
+        } else if (nextRevision <= activeSharedProjectRevision) {
+          setActiveSharedProjectSyncState('synced');
+          return true;
+        }
         return false;
       }
       if (snapshotRevision < activeSharedProjectRevision && nextRevision > activeSharedProjectRevision) {
