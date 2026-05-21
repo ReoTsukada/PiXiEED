@@ -14369,6 +14369,7 @@
     setLocalizedTextContent('#startupActionOpen', 'ファイルを開く', 'Open File');
     setLocalizedTextContent('#startupActionSkip', 'この画面を閉じる', 'Close');
     setLocalizedTextContent('#globalLoadingIndicatorCancel', 'キャンセル', 'Cancel');
+    setLocalizedTextContent('#multiInviteShare', '共有', 'Share');
     setLocalizedAttribute('#projectTabsBar', 'aria-label', '開いているプロジェクト', 'Open Projects');
     setLocalizedAttribute('#projectTabsList', 'aria-label', 'プロジェクトタブ', 'Project Tabs');
     setLocalizedTextContent('#startupRecentProjects .startup-screen__recent-title', 'プロジェクト一覧', 'Projects');
@@ -70709,7 +70710,7 @@
     if (dom.controls.multiInviteShare instanceof HTMLButtonElement) {
       dom.controls.multiInviteShare.disabled = multiState.connecting
         || !(sharedProjectFlowPreferred ? Boolean(resolvedSharedProjectKey || currentProjectKey) : (inMasterConfigMode && currentProjectKey));
-      dom.controls.multiInviteShare.hidden = true;
+      dom.controls.multiInviteShare.hidden = sharedProjectFlowPreferred ? !Boolean(resolvedSharedProjectKey) : false;
     }
     const participantsPanel = document.querySelector('#panelMulti .multi-participants-panel');
     if (participantsPanel instanceof HTMLElement) {
