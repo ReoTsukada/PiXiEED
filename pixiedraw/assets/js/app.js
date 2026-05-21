@@ -12,6 +12,7 @@
     appRoot: document.getElementById('appRoot'),
     globalLoadingIndicator: document.getElementById('globalLoadingIndicator'),
     globalLoadingIndicatorLabel: document.getElementById('globalLoadingIndicatorLabel'),
+    globalLoadingIndicatorCancel: document.getElementById('globalLoadingIndicatorCancel'),
     layout: document.getElementById('appLayout'),
     stage: document.getElementById('stage'),
     leftRail: document.getElementById('leftRail'),
@@ -3360,6 +3361,8 @@
   let globalLoadingIndicatorBlockingDepth = 0;
   let startupProgressDepth = 0;
   let startupProgressClose = null;
+  let startupRestoreCancelRequested = false;
+  const startupRestoreCancelResolvers = new Set();
   const GLOBAL_LOADING_INDICATOR_SHOW_DELAY = 180;
   const GLOBAL_LOADING_INDICATOR_MIN_VISIBLE_MS = 320;
   const SHARED_PROJECT_LIMIT_DEFAULT = 1;
@@ -14365,6 +14368,7 @@
     setLocalizedTextContent('#startupActionNew', '新規作成', 'New Project');
     setLocalizedTextContent('#startupActionOpen', 'ファイルを開く', 'Open File');
     setLocalizedTextContent('#startupActionSkip', 'この画面を閉じる', 'Close');
+    setLocalizedTextContent('#globalLoadingIndicatorCancel', 'キャンセル', 'Cancel');
     setLocalizedAttribute('#projectTabsBar', 'aria-label', '開いているプロジェクト', 'Open Projects');
     setLocalizedAttribute('#projectTabsList', 'aria-label', 'プロジェクトタブ', 'Project Tabs');
     setLocalizedTextContent('#startupRecentProjects .startup-screen__recent-title', 'プロジェクト一覧', 'Projects');
@@ -20416,12 +20420,15 @@
 
   async function maybeRestoreSharedProjectOnStartup() {
     const restoredProjectKey = normalizeMultiProjectKey(startupSharedReloadProjectKey || '');
-    if (!restoredProjectKey || readMultiInviteFromUrl()) {
+    if (startupRestoreCancelRequested || !restoredProjectKey || readMultiInviteFromUrl()) {
       return false;
     }
     setStartupProgressLabel(localizeText('共有プロジェクトへ復帰中…', 'Reopening shared project...'));
     try {
       const entries = await loadRecentProjectsMetadata();
+      if (startupRestoreCancelRequested) {
+        return false;
+      }
       const limitedEntries = enforceSharedRecentProjectLimit(entries);
       setRecentProjectsCache(limitedEntries);
       let sharedEntry = getCurrentSharedRecentProjectEntry(restoredProjectKey);
@@ -20454,11 +20461,20 @@
       if (!(await ensureSharedProjectAuthenticatedStart({ requireLogin: true }))) {
         return false;
       }
+      if (startupRestoreCancelRequested) {
+        return false;
+      }
       await initPixieedAccount();
       if (!await ensureSharedProjectBackendSession()) {
         return false;
       }
+      if (startupRestoreCancelRequested) {
+        return false;
+      }
       await ensureNoLegacyMultiSessionForSharedProject();
+      if (startupRestoreCancelRequested) {
+        return false;
+      }
       const opened = sharedEntry
         ? await openSharedRecentProject(sharedEntry, {
             hideStartup: true,
@@ -20648,6 +20664,9 @@
     });
     dom.startup?.skipButton?.addEventListener('click', () => {
       hideStartupScreen();
+    });
+    dom.globalLoadingIndicatorCancel?.addEventListener('click', () => {
+      cancelStartupRestoreProgress('loading-indicator-cancel');
     });
     dom.startup?.recentList?.addEventListener('click', async event => {
       const target = event.target instanceof Element ? event.target : null;
@@ -24329,7 +24348,13 @@
     }
     try {
       setStartupProgressLabel(localizeText('共有プロジェクトの接続を確認中…', 'Checking shared project connection...'));
+      if (startupRestoreCancelRequested) {
+        return false;
+      }
       const refreshedEntry = await refreshSharedRecentProjectEntryFromBackend(normalizedEntry);
+      if (startupRestoreCancelRequested) {
+        return false;
+      }
       normalizedEntry = normalizeSharedRecentProjectEntry(refreshedEntry || normalizedEntry) || normalizedEntry;
       if (!accountState.isLoggedIn || accountState.isAnonymous) {
         storePendingSharedInvite({
@@ -24343,8 +24368,17 @@
       if (!(await ensureSharedProjectAuthenticatedStart({ requireLogin: true }))) {
         return false;
       }
+      if (startupRestoreCancelRequested) {
+        return false;
+      }
       await initPixieedAccount();
+      if (startupRestoreCancelRequested) {
+        return false;
+      }
       await ensureNoLegacyMultiSessionForSharedProject();
+      if (startupRestoreCancelRequested) {
+        return false;
+      }
       if (!await ensureSharedProjectBackendSession()) {
         if (!silent) {
           setMultiStatus(
@@ -24360,11 +24394,20 @@
       let latestEntryForFallback = normalizedEntry;
       const openAttempts = skipLatestRefresh ? 5 : 6;
       for (let attempt = 0; attempt < openAttempts; attempt += 1) {
+        if (startupRestoreCancelRequested) {
+          return false;
+        }
         if (attempt > 0) {
           setStartupProgressLabel(localizeText('共有プロジェクトの最新内容を再確認中…', 'Retrying the latest shared project state...'));
           await waitForSharedOpenRetry(220 + (attempt * 180));
+          if (startupRestoreCancelRequested) {
+            return false;
+          }
         }
         const refreshedEntry = await refreshSharedRecentProjectEntryFromBackend(latestEntryForFallback);
+        if (startupRestoreCancelRequested) {
+          return false;
+        }
         latestEntryForFallback = normalizeSharedRecentProjectEntry(refreshedEntry || latestEntryForFallback) || latestEntryForFallback;
         setStartupProgressLabel(localizeText('共有プロジェクトを読み込み中…', 'Loading shared project...'));
         opened = await openSharedProjectCanonical({
@@ -24380,6 +24423,9 @@
             'Opened shared project'
           ),
         });
+        if (startupRestoreCancelRequested) {
+          return false;
+        }
         if (opened) {
           normalizedEntry = latestEntryForFallback;
           break;
@@ -30326,6 +30372,9 @@
     label = 'startup-task',
     clearLoadingOnTimeout = false,
   } = {}) {
+    if (startupRestoreCancelRequested) {
+      return fallbackValue;
+    }
     const normalizedTimeout = Math.max(0, Math.round(Number(timeoutMs) || 0));
     const taskPromise = Promise.resolve().then(() => (
       typeof task === 'function' ? task() : task
@@ -30334,6 +30383,11 @@
       return await taskPromise;
     }
     let timeoutId = null;
+    let cancelResolver = null;
+    const cancelPromise = new Promise(resolve => {
+      cancelResolver = () => resolve(fallbackValue);
+      startupRestoreCancelResolvers.add(cancelResolver);
+    });
     const timeoutPromise = new Promise(resolve => {
       timeoutId = window.setTimeout(() => {
         console.warn('[startup] task-timeout', {
@@ -30341,33 +30395,25 @@
           timeoutMs: normalizedTimeout,
         });
         if (clearLoadingOnTimeout) {
-          if (typeof startupProgressClose === 'function') {
-            const closeStartupProgress = startupProgressClose;
-            startupProgressClose = null;
-            try {
-              closeStartupProgress();
-            } catch (_error) {
-              // Ignore stale loading cleanup failures.
-            }
-          }
-          startupProgressDepth = 0;
-          globalLoadingIndicatorDepth = 0;
-          globalLoadingIndicatorBlockingDepth = 0;
-          syncGlobalLoadingIndicator(localizeText('起動を続行します…', 'Continuing startup...'));
+          cancelStartupRestoreProgress(`${label}-timeout`);
         }
         resolve(fallbackValue);
       }, normalizedTimeout);
     });
     try {
-      return await Promise.race([taskPromise, timeoutPromise]);
+      return await Promise.race([taskPromise, timeoutPromise, cancelPromise]);
     } finally {
       if (timeoutId !== null) {
         window.clearTimeout(timeoutId);
+      }
+      if (cancelResolver) {
+        startupRestoreCancelResolvers.delete(cancelResolver);
       }
     }
   }
 
   async function init() {
+    startupRestoreCancelRequested = false;
     const endStartupProgress = beginStartupProgress(localizeText('起動準備中…', 'Preparing startup...'));
     try {
       try {
@@ -68253,6 +68299,7 @@
   function syncGlobalLoadingIndicator(label = '') {
     const container = dom.globalLoadingIndicator;
     const labelNode = dom.globalLoadingIndicatorLabel;
+    const cancelButton = dom.globalLoadingIndicatorCancel;
     if (!(container instanceof HTMLElement)) {
       return;
     }
@@ -68266,6 +68313,11 @@
       labelNode.textContent = globalLoadingIndicatorLabel;
     }
     container.classList.toggle('global-loading-indicator--blocking', globalLoadingIndicatorBlockingDepth > 0);
+    if (cancelButton instanceof HTMLButtonElement) {
+      const canCancelStartupProgress = globalLoadingIndicatorBlockingDepth > 0;
+      cancelButton.hidden = !canCancelStartupProgress;
+      cancelButton.disabled = !canCancelStartupProgress;
+    }
     if (globalLoadingIndicatorHideTimer !== null) {
       window.clearTimeout(globalLoadingIndicatorHideTimer);
       globalLoadingIndicatorHideTimer = null;
@@ -68394,6 +68446,71 @@
         close();
       }
     };
+  }
+
+  function cancelStartupRestoreProgress(reason = 'user-cancel') {
+    startupRestoreCancelRequested = true;
+    startupSharedReloadProjectKey = '';
+    startupSharedReloadRevision = 0;
+    startupSharedReloadStructureRevision = 0;
+    startupAutosaveRestoreProjectId = '';
+    activeSharedProjectOpenInProgress = false;
+    activeSharedProjectOpenReadOnly = false;
+    activeSharedProjectCanonicalOpenPromise = null;
+    activeSharedProjectCanonicalOpenKey = '';
+    activeSharedProjectCanonicalOpenReasons = [];
+    sharedProjectRecoveryInProgress = false;
+    sharedProjectRefreshInFlight = false;
+    sharedProjectReconnectRecoveryPromise = null;
+    sharedProjectWakeRecoveryPromise = null;
+    setSharedProjectDeferRealtimeUntilSynced(false);
+    if (typeof startupProgressClose === 'function') {
+      const close = startupProgressClose;
+      startupProgressClose = null;
+      try {
+        close();
+      } catch (_error) {
+        // Ignore stale loading cleanup failures.
+      }
+    }
+    startupProgressDepth = 0;
+    globalLoadingIndicatorDepth = 0;
+    globalLoadingIndicatorBlockingDepth = 0;
+    if (globalLoadingIndicatorShowTimer !== null) {
+      window.clearTimeout(globalLoadingIndicatorShowTimer);
+      globalLoadingIndicatorShowTimer = null;
+    }
+    if (globalLoadingIndicatorHideTimer !== null) {
+      window.clearTimeout(globalLoadingIndicatorHideTimer);
+      globalLoadingIndicatorHideTimer = null;
+    }
+    globalLoadingIndicatorVisible = false;
+    globalLoadingIndicatorShownAt = 0;
+    if (dom.globalLoadingIndicator instanceof HTMLElement) {
+      dom.globalLoadingIndicator.hidden = true;
+      dom.globalLoadingIndicator.setAttribute('aria-hidden', 'true');
+    }
+    syncGlobalLoadingIndicator(localizeText('復帰をキャンセルしました', 'Restore canceled'));
+    startupRestoreCancelResolvers.forEach(resolve => {
+      try {
+        resolve(false);
+      } catch (_error) {
+        // Ignore stale cancel listeners.
+      }
+    });
+    startupRestoreCancelResolvers.clear();
+    showStartupScreen();
+    if (dom.startup?.resumeHint instanceof HTMLElement) {
+      dom.startup.resumeHint.textContent = localizeText(
+        '前回の共有プロジェクト確認をキャンセルしました。プロジェクト一覧から開き直せます。',
+        'Canceled the previous shared project check. You can reopen it from the project list.'
+      );
+      dom.startup.resumeHint.dataset.tone = 'warn';
+    }
+    console.info('[startup]', {
+      event: 'restore-cancelled',
+      reason,
+    });
   }
 
   function setStartupProgressLabel(label = '') {
