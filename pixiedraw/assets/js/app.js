@@ -68578,7 +68578,7 @@
       return false;
     }
     const inviteRole = resolveMultiInviteDefaultRole();
-    const resolvedProjectKey = resolveSharedProjectKeyForCurrentState();
+    const resolvedProjectKey = resolveSharedProjectKeyForCurrentState() || normalizeMultiProjectKey(activeSharedProjectKey || '');
     let inviteToken = getCurrentSharedRecentProjectEntry(resolvedProjectKey)?.sharedProjectInviteToken || '';
     if (!inviteToken && resolvedProjectKey && canUseSharedProjectsBackend()) {
       const project = await fetchSharedProjectRecord(resolvedProjectKey);
@@ -68625,7 +68625,7 @@
       return false;
     }
     const inviteRole = resolveMultiInviteDefaultRole();
-    const resolvedProjectKey = resolveSharedProjectKeyForCurrentState();
+    const resolvedProjectKey = resolveSharedProjectKeyForCurrentState() || normalizeMultiProjectKey(activeSharedProjectKey || '');
     let inviteToken = getCurrentSharedRecentProjectEntry(resolvedProjectKey)?.sharedProjectInviteToken || '';
     if (!inviteToken && resolvedProjectKey && canUseSharedProjectsBackend()) {
       const project = await fetchSharedProjectRecord(resolvedProjectKey);
@@ -70366,9 +70366,19 @@
     const resolvedSharedProjectKey = sharedProjectFlowPreferred
       ? resolveSharedProjectKeyForCurrentState()
       : '';
+    const activeSharedProjectKeyForUi = sharedProjectFlowPreferred
+      ? normalizeMultiProjectKey(activeSharedProjectKey || '')
+      : '';
     const currentProjectIsShared = sharedProjectFlowPreferred && isCurrentProjectSharedEntry();
+    const visibleSharedProjectKey = resolvedSharedProjectKey || (
+      currentProjectIsShared ? activeSharedProjectKeyForUi : ''
+    );
     const hasCurrentProjectLocator = Boolean(currentProjectKey || currentAccess.inviteToken);
-    const sharedModeEnabled = sharedProjectFlowPreferred && currentProjectIsShared && Boolean(resolvedSharedProjectKey);
+    const sharedModeEnabled = sharedProjectFlowPreferred && Boolean(visibleSharedProjectKey) && (
+      currentProjectIsShared
+      || activeSharedProjectDocumentLoaded
+      || activeSharedProjectKeyForUi === visibleSharedProjectKey
+    );
     const isEntryView = normalizeMultiUiView(multiState.uiView) === 'entry'
       && !multiState.connected
       && !multiState.connecting;
@@ -70490,7 +70500,7 @@
       dom.controls.multiStartSession.disabled = sharedProjectFlowPreferred
         ? (!canStartSharedFlow || sharedCreationBlocked)
         : (multiState.connecting || multiState.connected || !currentProjectKey || isEntryView);
-      dom.controls.multiStartSession.hidden = false;
+      dom.controls.multiStartSession.hidden = sharedProjectFlowPreferred && sharedModeEnabled;
       dom.controls.multiStartSession.textContent = sharedProjectFlowPreferred
         ? (sharedModeEnabled
           ? localizeText('共有中', 'Shared')
@@ -70704,13 +70714,13 @@
     }
     if (dom.controls.multiInviteCopy instanceof HTMLButtonElement) {
       dom.controls.multiInviteCopy.disabled = multiState.connecting
-        || !(sharedProjectFlowPreferred ? Boolean(resolvedSharedProjectKey) : (inMasterConfigMode && currentProjectKey));
-      dom.controls.multiInviteCopy.hidden = sharedProjectFlowPreferred ? !Boolean(resolvedSharedProjectKey) : false;
+        || !(sharedProjectFlowPreferred ? Boolean(visibleSharedProjectKey) : (inMasterConfigMode && currentProjectKey));
+      dom.controls.multiInviteCopy.hidden = sharedProjectFlowPreferred ? !Boolean(visibleSharedProjectKey) : false;
     }
     if (dom.controls.multiInviteShare instanceof HTMLButtonElement) {
       dom.controls.multiInviteShare.disabled = multiState.connecting
-        || !(sharedProjectFlowPreferred ? Boolean(resolvedSharedProjectKey || currentProjectKey) : (inMasterConfigMode && currentProjectKey));
-      dom.controls.multiInviteShare.hidden = sharedProjectFlowPreferred ? !Boolean(resolvedSharedProjectKey) : false;
+        || !(sharedProjectFlowPreferred ? Boolean(visibleSharedProjectKey) : (inMasterConfigMode && currentProjectKey));
+      dom.controls.multiInviteShare.hidden = sharedProjectFlowPreferred ? !Boolean(visibleSharedProjectKey) : false;
     }
     const participantsPanel = document.querySelector('#panelMulti .multi-participants-panel');
     if (participantsPanel instanceof HTMLElement) {
