@@ -1050,6 +1050,8 @@
   const RELOAD_SNAPSHOT_MAX_HISTORY_ITEMS = 160;
   const RELOAD_SNAPSHOT_COMPRESS_THRESHOLD = 4096;
   const STARTUP_SCREEN_DISMISSED_KEY = 'pixieedraw:startupScreenDismissed';
+  const STARTUP_ACCOUNT_INIT_TIMEOUT_MS = 5000;
+  const STARTUP_RESTORE_TIMEOUT_MS = 8000;
   const UPDATE_TOAST_SEEN_PREFIX = 'pixieedraw:update-toast-seen:';
   const STARTUP_UPDATE_TOAST_HIDDEN_KEY = 'pixieedraw:update-toast-hidden';
   const HIDDEN_SHARED_PROJECT_KEYS_STORAGE_PREFIX = 'pixieedraw:hidden-shared-projects:';
@@ -30211,6 +30213,53 @@
     window.setTimeout(run, 120);
   }
 
+  async function runStartupTaskWithTimeout(task, {
+    timeoutMs = STARTUP_RESTORE_TIMEOUT_MS,
+    fallbackValue = false,
+    label = 'startup-task',
+    clearLoadingOnTimeout = false,
+  } = {}) {
+    const normalizedTimeout = Math.max(0, Math.round(Number(timeoutMs) || 0));
+    const taskPromise = Promise.resolve().then(() => (
+      typeof task === 'function' ? task() : task
+    ));
+    if (normalizedTimeout <= 0) {
+      return await taskPromise;
+    }
+    let timeoutId = null;
+    const timeoutPromise = new Promise(resolve => {
+      timeoutId = window.setTimeout(() => {
+        console.warn('[startup] task-timeout', {
+          label,
+          timeoutMs: normalizedTimeout,
+        });
+        if (clearLoadingOnTimeout) {
+          if (typeof startupProgressClose === 'function') {
+            const closeStartupProgress = startupProgressClose;
+            startupProgressClose = null;
+            try {
+              closeStartupProgress();
+            } catch (_error) {
+              // Ignore stale loading cleanup failures.
+            }
+          }
+          startupProgressDepth = 0;
+          globalLoadingIndicatorDepth = 0;
+          globalLoadingIndicatorBlockingDepth = 0;
+          syncGlobalLoadingIndicator(localizeText('起動を続行します…', 'Continuing startup...'));
+        }
+        resolve(fallbackValue);
+      }, normalizedTimeout);
+    });
+    try {
+      return await Promise.race([taskPromise, timeoutPromise]);
+    } finally {
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+    }
+  }
+
   async function init() {
     const endStartupProgress = beginStartupProgress(localizeText('起動準備中…', 'Preparing startup...'));
     try {
@@ -30285,14 +30334,34 @@
         try {
           setStartupProgressLabel(localizeText('前回の作業を確認中…', 'Checking your previous work...'));
           if (startupSharedReloadProjectKey) {
-            await accountInitTask;
-            restoredAutosaveProject = await maybeRestoreSharedProjectOnStartup();
+            await runStartupTaskWithTimeout(accountInitTask, {
+              timeoutMs: STARTUP_ACCOUNT_INIT_TIMEOUT_MS,
+              fallbackValue: false,
+              label: 'account-bootstrap',
+            });
+            restoredAutosaveProject = await runStartupTaskWithTimeout(
+              () => maybeRestoreSharedProjectOnStartup(),
+              {
+                timeoutMs: STARTUP_RESTORE_TIMEOUT_MS,
+                fallbackValue: false,
+                label: 'restore-shared-project',
+                clearLoadingOnTimeout: true,
+              }
+            );
           }
           if (!restoredAutosaveProject) {
             restoredAutosaveProject = Boolean(reloadSnapshotRestored);
           }
           if (!restoredAutosaveProject && !reloadSnapshotRestored) {
-            restoredAutosaveProject = await maybeRestoreAutosaveProjectOnStartup();
+            restoredAutosaveProject = await runStartupTaskWithTimeout(
+              () => maybeRestoreAutosaveProjectOnStartup(),
+              {
+                timeoutMs: STARTUP_RESTORE_TIMEOUT_MS,
+                fallbackValue: false,
+                label: 'restore-autosave-project',
+                clearLoadingOnTimeout: true,
+              }
+            );
           }
         } catch (error) {
           console.warn('Startup autosave restore failed', error);
