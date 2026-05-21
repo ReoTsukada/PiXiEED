@@ -9981,6 +9981,74 @@
     return true;
   }
 
+  function markSharedProjectOpenWithReconnectFallback(projectKey = activeSharedProjectKey, {
+    projectRecord = null,
+    snapshotRevision = activeSharedProjectSnapshotRevision,
+    structureRevision = activeSharedProjectStructureRevision,
+    reason = 'open-reconnect-fallback',
+    announce = false,
+  } = {}) {
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || activeSharedProjectKey || projectRecord?.project_key || '');
+    if (!normalizedProjectKey || normalizedProjectKey !== activeSharedProjectKey) {
+      return false;
+    }
+    const latestRevision = Math.max(
+      activeSharedProjectRevision,
+      getSharedProjectLatestRevision(projectRecord || {}),
+      Math.max(0, Math.round(Number(snapshotRevision) || 0))
+    );
+    const latestStructureRevision = Math.max(
+      activeSharedProjectStructureRevision,
+      getSharedProjectLatestStructureRevision(projectRecord || {}),
+      Math.max(0, Math.round(Number(structureRevision) || 0))
+    );
+    const projectId = typeof projectRecord?.id === 'string' && projectRecord.id.trim()
+      ? projectRecord.id.trim()
+      : activeSharedProjectId;
+    setActiveSharedProjectSession(
+      normalizedProjectKey,
+      latestRevision,
+      latestStructureRevision,
+      projectId
+    );
+    markActiveSharedProjectDocumentLoaded(normalizedProjectKey);
+    setSharedProjectDeferRealtimeUntilSynced(false);
+    setActiveSharedProjectSnapshotState(
+      Math.max(
+        activeSharedProjectSnapshotRevision,
+        Math.min(activeSharedProjectRevision, latestRevision || activeSharedProjectRevision)
+      ),
+      {
+        structureRevision: latestStructureRevision,
+        synced: true,
+        canonicalLoadedAt: Date.now(),
+      }
+    );
+    setActiveSharedProjectSyncState('synced', { announce });
+    ensureSharedProjectRefreshLoop();
+    ensureActiveSharedProjectRealtimeChannel().catch(error => {
+      reportSharedProjectRealtimeSubscribeFailure(error);
+    });
+    scheduleSharedProjectOpsRescueRetry();
+    restorePendingSharedLocalOps(normalizedProjectKey, {
+      announce: false,
+      refreshReason: `${reason || 'open-reconnect-fallback'}-resume-pending-local-ops`,
+    }).catch(error => {
+      console.warn('Failed to restore pending shared local ops after open fallback', error);
+    }).finally(() => {
+      flushSharedProjectPendingLocalOps();
+    });
+    console.info('[shared-sync]', {
+      event: 'shared-open-reconnect-fallback',
+      reason,
+      projectKey: normalizedProjectKey,
+      revision: activeSharedProjectRevision,
+      structureRevision: activeSharedProjectStructureRevision,
+      realtimeStatus: sharedProjectRealtimeStatus,
+    });
+    return true;
+  }
+
   function queueSharedProjectReconnectRecovery(reason = 'connectivity', { immediate = false, blockEditing = true } = {}) {
     if (!activeSharedProjectKey) {
       return Promise.resolve(false);
@@ -23850,17 +23918,35 @@
         announce: !silent,
       });
       if (!stabilized) {
+        const openedWithFallback = markSharedProjectOpenWithReconnectFallback(resolvedProjectKey, {
+          projectRecord: sharedProject,
+          reason: 'open-already-active-stabilize-failed',
+          announce: !silent,
+        });
         if (!silent) {
           setMultiStatus(
             localizeText(
-              '共有プロジェクトの最新状態へ接続できませんでした。再接続を続けます。',
-              'Could not stabilize the shared project connection. Reconnection will continue.'
+              openedWithFallback
+                ? '共有リアルタイム接続が不安定です。保存済み履歴から同期を継続します。'
+                : '共有プロジェクトの最新状態へ接続できませんでした。再接続を続けます。',
+              openedWithFallback
+                ? 'Shared realtime is unstable. Sync continues from saved history.'
+                : 'Could not stabilize the shared project connection. Reconnection will continue.'
             ),
             'warn'
           );
         }
-        queueSharedProjectReconnectRecovery('open-already-active-stabilize-failed', { immediate: false }).catch(() => {});
-        return false;
+        queueSharedProjectReconnectRecovery('open-already-active-stabilize-failed', {
+          immediate: false,
+          blockEditing: !openedWithFallback,
+        }).catch(() => {});
+        if (!openedWithFallback) {
+          return false;
+        }
+        if (hideStartup) {
+          hideStartupScreen();
+        }
+        return true;
       }
       if (hideStartup) {
         hideStartupScreen();
@@ -24094,17 +24180,33 @@
       announce: !silent,
     });
     if (!connectionStable) {
+      const openedWithFallback = markSharedProjectOpenWithReconnectFallback(resolvedProjectKey, {
+        projectRecord: freshestProject,
+        snapshotRevision: Math.max(sharedSnapshotRevision, activeSharedProjectSnapshotRevision),
+        structureRevision: Math.max(baseStructureRevision, activeSharedProjectStructureRevision),
+        reason: 'canonical-open-stabilize-failed',
+        announce: !silent,
+      });
       if (!silent) {
         setMultiStatus(
           localizeText(
-            '共有プロジェクトの最新状態へ接続できませんでした。古い状態では開きません。',
-            'Could not stabilize the shared project connection. The project will not open in a stale state.'
+            openedWithFallback
+              ? '共有リアルタイム接続が不安定です。保存済み履歴から同期を継続します。'
+              : '共有プロジェクトの最新状態へ接続できませんでした。古い状態では開きません。',
+            openedWithFallback
+              ? 'Shared realtime is unstable. Sync continues from saved history.'
+              : 'Could not stabilize the shared project connection. The project will not open in a stale state.'
           ),
-          'error'
+          openedWithFallback ? 'warn' : 'error'
         );
       }
-      queueSharedProjectReconnectRecovery('canonical-open-stabilize-failed', { immediate: false }).catch(() => {});
-      return false;
+      queueSharedProjectReconnectRecovery('canonical-open-stabilize-failed', {
+        immediate: false,
+        blockEditing: !openedWithFallback,
+      }).catch(() => {});
+      if (!openedWithFallback) {
+        return false;
+      }
     }
     setActiveSharedProjectSnapshotState(Math.max(sharedSnapshotRevision, activeSharedProjectSnapshotRevision), {
       structureRevision: Math.max(baseStructureRevision, activeSharedProjectStructureRevision),
@@ -24135,11 +24237,16 @@
     renderMultiParticipantsList();
     if (!silent) {
       setMultiStatus(
-        successMessage || localizeText(
-          '共有プロジェクトを開きました。編集内容は自動で共有されます。',
-          'Opened shared project. Your edits will sync automatically.'
-        ),
-        'success'
+        connectionStable
+          ? (successMessage || localizeText(
+            '共有プロジェクトを開きました。編集内容は自動で共有されます。',
+            'Opened shared project. Your edits will sync automatically.'
+          ))
+          : localizeText(
+            '共有プロジェクトを開きました。リアルタイム接続は復旧を続けます。',
+            'Opened shared project. Realtime reconnection will continue.'
+          ),
+        connectionStable ? 'success' : 'warn'
       );
     }
     if (hideStartup) {
