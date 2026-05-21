@@ -56389,7 +56389,11 @@
         normalizedInviteProjectKey
         && (
           activeSharedProjectCanonicalOpenKey === normalizedInviteProjectKey
-          || normalizeMultiProjectKey(activeSharedProjectKey || '') === normalizedInviteProjectKey
+          || (
+            normalizeMultiProjectKey(activeSharedProjectKey || '') === normalizedInviteProjectKey
+            && activeSharedProjectDocumentLoaded
+            && isCurrentProjectSharedEntry()
+          )
         )
       ) {
         clearPendingSharedInvite();
