@@ -847,6 +847,14 @@
 <button class="button" hidden id="multiLeaveSession" type="button">切断</button>
 </div>
 </div>
+<div class="field field--inline shared-approval-field" hidden id="sharedApprovalField">
+<span>参加承認</span>
+<label class="toggle-option" for="sharedApprovalRequired">
+<input id="sharedApprovalRequired" type="checkbox"/>
+<span id="sharedApprovalLabel">承認制</span>
+</label>
+<p class="help-text" id="sharedApprovalHint">ON にすると、新しい参加者は承認されるまで読み込みと描画ができません。</p>
+</div>
 <details class="field field--list multi-participants-panel" open>
 <summary>共有中のメンバー <span class="multi-participants-count" id="multiParticipantsCount">0</span></summary>
 <div class="multi-participants-scroll">
