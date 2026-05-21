@@ -2555,6 +2555,7 @@
   const MULTI_INVITE_QUERY_AUTO_JOIN = 'multiAutoJoin';
   const MULTI_INVITE_QUERY_ROLE = 'multiRole';
   const MULTI_PENDING_INVITE_STORAGE_KEY = 'pixiedraw:pending-shared-invite:v1';
+  const MULTI_PENDING_INVITE_TTL_MS = 10 * 60 * 1000;
   const SHARED_PROJECT_ID_PREFIX = 'shared-';
   const SHARED_PROJECT_SYNC_DELAY = 1400;
   const SHARED_PROJECT_DRAW_COMMIT_DELAY = 30;
@@ -56182,7 +56183,7 @@
     try {
       const url = getSharedInviteBaseUrl();
       url.searchParams.set(MULTI_INVITE_QUERY_FLAG, '1');
-      if (normalizedKey && !inviteToken) {
+      if (normalizedKey) {
         url.searchParams.set(MULTI_INVITE_QUERY_KEY, normalizedKey);
       } else {
         url.searchParams.delete(MULTI_INVITE_QUERY_KEY);
@@ -56202,7 +56203,7 @@
     } catch (error) {
       const origin = 'https://pixieed.jp';
       const path = '/pixiedraw/';
-      const keyPart = normalizedKey && !inviteToken
+      const keyPart = normalizedKey
         ? `&${MULTI_INVITE_QUERY_KEY}=${encodeURIComponent(normalizedKey)}`
         : '';
       const tokenPart = inviteToken ? `&${MULTI_INVITE_QUERY_TOKEN}=${encodeURIComponent(inviteToken)}` : '';
@@ -56249,13 +56250,65 @@
   }
 
   function storePendingSharedInvite(invite) {
-    // Pending invites are intentionally not persisted; stale invite state can block startup restore.
-    clearPendingSharedInvite();
+    if (!canUseSessionStorage || !invite || typeof invite !== 'object') {
+      clearPendingSharedInvite();
+      return;
+    }
+    const normalizedInvite = {
+      inviteToken: typeof invite.inviteToken === 'string' ? invite.inviteToken.trim() : '',
+      projectKey: normalizeMultiProjectKey(invite.projectKey || ''),
+      requestedRole: invite.requestedRole === 'master' || invite.requestedRole === 'guest' || invite.requestedRole === 'spectator'
+        ? invite.requestedRole
+        : 'guest',
+      autoJoin: invite.autoJoin !== false,
+      source: typeof invite.source === 'string' ? invite.source.trim() : '',
+      createdAt: Date.now(),
+    };
+    if (!normalizedInvite.inviteToken && !normalizedInvite.projectKey) {
+      clearPendingSharedInvite();
+      return;
+    }
+    try {
+      window.sessionStorage.setItem(MULTI_PENDING_INVITE_STORAGE_KEY, JSON.stringify(normalizedInvite));
+    } catch (_error) {
+      // If storage is unavailable, keep the previous behavior and avoid stale invites.
+      clearPendingSharedInvite();
+    }
   }
 
   function readPendingSharedInvite() {
-    clearPendingSharedInvite();
-    return null;
+    if (!canUseSessionStorage) {
+      return null;
+    }
+    try {
+      const raw = window.sessionStorage.getItem(MULTI_PENDING_INVITE_STORAGE_KEY);
+      if (!raw) {
+        return null;
+      }
+      const parsed = JSON.parse(raw);
+      const createdAt = Math.max(0, Math.round(Number(parsed?.createdAt) || 0));
+      if (!createdAt || (Date.now() - createdAt) > MULTI_PENDING_INVITE_TTL_MS) {
+        clearPendingSharedInvite();
+        return null;
+      }
+      const invite = {
+        inviteToken: typeof parsed?.inviteToken === 'string' ? parsed.inviteToken.trim() : '',
+        projectKey: normalizeMultiProjectKey(parsed?.projectKey || ''),
+        requestedRole: parsed?.requestedRole === 'master' || parsed?.requestedRole === 'guest' || parsed?.requestedRole === 'spectator'
+          ? parsed.requestedRole
+          : 'guest',
+        autoJoin: parsed?.autoJoin !== false,
+        source: typeof parsed?.source === 'string' ? parsed.source.trim() : '',
+      };
+      if (!invite.inviteToken && !invite.projectKey) {
+        clearPendingSharedInvite();
+        return null;
+      }
+      return invite;
+    } catch (_error) {
+      clearPendingSharedInvite();
+      return null;
+    }
   }
 
   function storePendingMultiInvite(invite) {
