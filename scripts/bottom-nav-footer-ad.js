@@ -547,10 +547,10 @@
         body.has-footer-ad > .page > header,
         body.has-footer-ad > .page > .top-nav,
         body.has-footer-ad > .page > [aria-label="top-nav"]{
-          width:calc(100% + (var(--pixieed-page-gutter) * 2));
-          max-width:none !important;
-          margin-left:calc(var(--pixieed-page-gutter) * -1) !important;
-          margin-right:calc(var(--pixieed-page-gutter) * -1) !important;
+          width:100%;
+          max-width:100% !important;
+          margin-left:0 !important;
+          margin-right:0 !important;
         }
         body.has-footer-ad .bottom-nav{
           bottom:var(--pixieed-footer-ad-offset) !important;
