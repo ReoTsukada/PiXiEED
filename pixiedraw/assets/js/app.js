@@ -8139,18 +8139,8 @@
     if (isSharedRecentProjectEntry(directEntry)) {
       return normalizeSharedRecentProjectEntry(directEntry);
     }
-    const tabLooksShared = Boolean(
-      tabProjectId.startsWith(SHARED_PROJECT_ID_PREFIX)
-      || tab?.source === 'shared'
-      || tab?.source === 'shared-owned'
-      || tab?.source === 'shared-joined'
-    );
-    const tabProjectKey = tabLooksShared
-      ? (
-        normalizeMultiProjectKey(tab.sharedProjectKey || '')
-        || getSharedProjectKeyFromProjectId(tabProjectId)
-      )
-      : '';
+    const tabProjectKey = normalizeMultiProjectKey(tab.sharedProjectKey || '')
+      || getSharedProjectKeyFromProjectId(tabProjectId);
     if (!tabProjectKey) {
       return null;
     }
@@ -8352,10 +8342,15 @@
     const sharedEntry = isSharedRecentProjectEntry(recentProjectsCache.get(normalizedProjectId) || null)
       ? normalizeSharedRecentProjectEntry(recentProjectsCache.get(normalizedProjectId))
       : null;
+    const activeSharedRecentProjectId = activeSharedProjectKey ? buildSharedRecentProjectId(activeSharedProjectKey) : '';
     const currentProjectIsShared = Boolean(
       normalizedProjectId.startsWith(SHARED_PROJECT_ID_PREFIX)
       || sharedEntry
-      || isCurrentProjectSharedEntry()
+      || (
+        activeSharedProjectKey
+        && activeSharedRecentProjectId
+        && normalizedProjectId === activeSharedRecentProjectId
+      )
     );
     const currentSharedProjectKey = currentProjectIsShared
       ? normalizeMultiProjectKey(options.sharedProjectKey || sharedEntry?.sharedProjectKey || activeSharedProjectKey || '')
@@ -62559,20 +62554,8 @@
         );
         continue;
       }
-      const nextKind = typeof nextOp?.kind === 'string'
-        ? nextOp.kind.trim()
-        : (typeof nextOp?.op_type === 'string' ? nextOp.op_type.trim() : '');
-      if (isSharedProjectDrawKind(nextKind) || nextKind === 'draw' || nextKind === 'stroke-command') {
-        const preflight = inspectIncomingSharedProjectDrawOp(nextOp);
-        if (!preflight.ok && shouldRefreshForSharedProjectApplySkip(preflight.reason)) {
-          scheduleSharedProjectOpsRescueRetry();
-          if (preflight.reason === 'structure-revision-mismatch' || preflight.reason === 'missing-target-layer') {
-            queueSharedProjectRefresh({ immediate: true, reason: preflight.reason, force: true });
-          }
-          return false;
-        }
-      }
       if (!applyOp(nextOp, { fromRemote: true })) {
+        rememberPendingSharedProjectRemoteOp(nextSeq, nextOp, 'drain-apply-failed');
         scheduleSharedProjectOpsRescueRetry();
         const replayType = typeof nextOp?.op_type === 'string' ? nextOp.op_type.trim() : '';
         if (replayType === 'structure') {
