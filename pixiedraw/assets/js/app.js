@@ -75,6 +75,11 @@
     projectTabsBar: document.getElementById('projectTabsBar'),
     projectTabsStatusSlot: document.getElementById('projectTabsStatusSlot'),
     projectTabsList: document.getElementById('projectTabsList'),
+    projectHomeScreen: document.getElementById('projectHomeScreen'),
+    projectHomeNew: document.getElementById('projectHomeNew'),
+    projectHomeOpen: document.getElementById('projectHomeOpen'),
+    projectHomeRecentSection: document.getElementById('projectHomeRecentProjects'),
+    projectHomeRecentList: document.getElementById('projectHomeRecentList'),
     mirrorToolPopover: document.getElementById('mirrorToolPopover'),
     mirrorGuides: document.getElementById('mirrorGuides'),
     mirrorGuideLines: Array.from(document.querySelectorAll('.mirror-guide[data-mirror-axis]')),
@@ -3832,6 +3837,7 @@
   const STARTUP_SCREEN_MODE_DEFAULT = 'default';
   const STARTUP_SCREEN_MODE_APPEND_TAB = 'append-tab';
   let startupVisible = false;
+  let projectHomeVisible = false;
   let startupScreenMode = STARTUP_SCREEN_MODE_DEFAULT;
   let startupVirtualCursorState = null;
   let pendingNewProjectAppendAsTab = false;
@@ -3865,7 +3871,7 @@
       openDocumentDialog();
     });
     bindClickHandlerOnce(dom.controls.showLocalProjects, 'coreProjectActionBound', () => {
-      showStartupScreen();
+      showProjectHomeScreen({ refresh: true });
     });
     bindClickHandlerOnce(dom.newProject?.button, 'coreProjectActionBound', () => {
       openNewProjectDialog();
@@ -3946,6 +3952,7 @@
   let activeOpenProjectTabId = '';
   let openProjectTabSequence = 0;
   let openProjectTabBusy = false;
+  let projectTabViewportResetToken = 0;
   const SELECTION_DASH_SPEED = 40;
   let selectionDashScreenOffset = 0;
   let lastSelectionDashTime = 0;
@@ -5665,6 +5672,41 @@
     selection: null,
     timeline: null,
   };
+
+  function cloneSelectionClipboardPayload(clip) {
+    if (!clip || typeof clip !== 'object') {
+      return null;
+    }
+    const width = Math.max(0, Math.floor(Number(clip.width) || 0));
+    const height = Math.max(0, Math.floor(Number(clip.height) || 0));
+    const size = width * height;
+    if (width <= 0 || height <= 0) {
+      return null;
+    }
+    return {
+      width,
+      height,
+      mask: clip.mask instanceof Uint8Array ? new Uint8Array(clip.mask) : new Uint8Array(size),
+      contentMask: clip.contentMask instanceof Uint8Array ? new Uint8Array(clip.contentMask) : null,
+      indices: clip.indices instanceof Int16Array ? new Int16Array(clip.indices) : new Int16Array(size),
+      direct: clip.direct instanceof Uint8ClampedArray ? new Uint8ClampedArray(clip.direct) : new Uint8ClampedArray(size * 4),
+      palette: Array.isArray(clip.palette) ? clip.palette.map(color => normalizeColorValue(color)) : [],
+      bounds: clip.bounds ? { ...clip.bounds } : { x0: 0, y0: 0, x1: width - 1, y1: height - 1 },
+      imageData: clip.imageData ? cloneImageData(clip.imageData) : null,
+    };
+  }
+
+  function preserveCanvasSelectionClipboard() {
+    return cloneSelectionClipboardPayload(internalClipboard.selection);
+  }
+
+  function restoreCanvasSelectionClipboard(clip) {
+    const restored = cloneSelectionClipboardPayload(clip);
+    if (restored) {
+      internalClipboard.selection = restored;
+    }
+  }
+
 
   const TOUCH_PAN_MIN_POINTERS = 2;
   const TOUCH_PINCH_SENSITIVITY = 1.45;
@@ -8024,6 +8066,63 @@
     return openProjectTabs.findIndex(tab => normalizeAutosaveProjectId(tab?.projectId || '') === normalized);
   }
 
+  function queueProjectTabViewportReset(tabId = activeOpenProjectTabId) {
+    const expectedTabId = typeof tabId === 'string' ? tabId : '';
+    const token = ++projectTabViewportResetToken;
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        if (token !== projectTabViewportResetToken) {
+          return;
+        }
+        if (expectedTabId && expectedTabId !== activeOpenProjectTabId) {
+          return;
+        }
+        resetOpenedDocumentViewport({ defer: false });
+      });
+    });
+  }
+
+  function getSharedProjectKeyFromProjectId(projectId = '') {
+    const normalizedProjectId = normalizeAutosaveProjectId(projectId || '');
+    if (!normalizedProjectId || !normalizedProjectId.startsWith(SHARED_PROJECT_ID_PREFIX)) {
+      return '';
+    }
+    return normalizeMultiProjectKey(normalizedProjectId.slice(SHARED_PROJECT_ID_PREFIX.length));
+  }
+
+  function getSharedRecentProjectEntryForTab(tab = null) {
+    if (!tab || typeof tab !== 'object') {
+      return null;
+    }
+    const tabProjectId = normalizeAutosaveProjectId(tab.projectId || '');
+    const directEntry = tabProjectId ? recentProjectsCache.get(tabProjectId) : null;
+    if (isSharedRecentProjectEntry(directEntry)) {
+      return normalizeSharedRecentProjectEntry(directEntry);
+    }
+    const tabProjectKey = normalizeMultiProjectKey(tab.sharedProjectKey || '')
+      || getSharedProjectKeyFromProjectId(tabProjectId);
+    if (!tabProjectKey) {
+      return null;
+    }
+    const sharedRecentProjectId = buildSharedRecentProjectId(tabProjectKey);
+    const canonicalEntry = recentProjectsCache.get(sharedRecentProjectId) || null;
+    if (isSharedRecentProjectEntry(canonicalEntry)) {
+      return normalizeSharedRecentProjectEntry(canonicalEntry);
+    }
+    return normalizeSharedRecentProjectEntry({
+      id: sharedRecentProjectId,
+      sharedProjectKey: tabProjectKey,
+      sharedProjectBackendId: typeof tab.sharedProjectBackendId === 'string' ? tab.sharedProjectBackendId : '',
+      sharedProjectRevision: Math.max(0, Math.round(Number(tab.sharedProjectRevision) || 0)),
+      sharedProjectStructureRevision: Math.max(0, Math.round(Number(tab.sharedProjectStructureRevision) || 0)),
+      name: tab.label || tab.fileName || tabProjectKey,
+      fileName: tab.fileName || `${tabProjectKey}.pixiedraw`,
+      sharedRoleHint: tab.sharedRoleHint || 'guest',
+      sharedAutoJoin: tab.sharedAutoJoin !== false,
+      project: tab.project && typeof tab.project === 'object' ? tab.project : null,
+    });
+  }
+
   function releaseAutosaveProjectId(projectId) {
     const normalized = normalizeAutosaveProjectId(projectId || '');
     if (!normalized) {
@@ -8200,6 +8299,22 @@
     const normalizedProjectId = normalizeAutosaveProjectId(options.projectId || autosaveProjectId)
       || createAutosaveProjectId();
     const fileName = normalizeDocumentName(options.fileName || payload.fileName || DEFAULT_DOCUMENT_NAME);
+    const sharedEntry = isSharedRecentProjectEntry(recentProjectsCache.get(normalizedProjectId) || null)
+      ? normalizeSharedRecentProjectEntry(recentProjectsCache.get(normalizedProjectId))
+      : null;
+    const activeSharedRecentProjectId = activeSharedProjectKey ? buildSharedRecentProjectId(activeSharedProjectKey) : '';
+    const currentProjectIsShared = Boolean(
+      normalizedProjectId.startsWith(SHARED_PROJECT_ID_PREFIX)
+      || sharedEntry
+      || (
+        activeSharedProjectKey
+        && activeSharedRecentProjectId
+        && normalizedProjectId === activeSharedRecentProjectId
+      )
+    );
+    const currentSharedProjectKey = currentProjectIsShared
+      ? normalizeMultiProjectKey(options.sharedProjectKey || sharedEntry?.sharedProjectKey || activeSharedProjectKey || '')
+      : '';
     return {
       id: options.tabId || createOpenProjectTabId(),
       projectId: normalizedProjectId,
@@ -8207,8 +8322,28 @@
       label: extractDocumentBaseName(fileName),
       project: payload.project,
       unsaved: Boolean(payload.unsaved),
-      source: options.source || 'working',
+      source: options.source || (currentProjectIsShared ? 'shared' : 'working'),
       updatedAt: payload.project?.updatedAt || new Date().toISOString(),
+      ...(currentProjectIsShared ? {
+        sharedProjectKey: currentSharedProjectKey || getSharedProjectKeyFromProjectId(normalizedProjectId),
+        sharedProjectBackendId: typeof options.sharedProjectBackendId === 'string'
+          ? options.sharedProjectBackendId
+          : (sharedEntry?.sharedProjectBackendId || activeSharedProjectId || ''),
+        sharedProjectRevision: Math.max(
+          0,
+          Math.round(Number(options.sharedProjectRevision) || 0),
+          Math.round(Number(sharedEntry?.sharedProjectRevision) || 0),
+          Math.round(Number(activeSharedProjectRevision) || 0)
+        ),
+        sharedProjectStructureRevision: Math.max(
+          0,
+          Math.round(Number(options.sharedProjectStructureRevision) || 0),
+          Math.round(Number(sharedEntry?.sharedProjectStructureRevision) || 0),
+          Math.round(Number(activeSharedProjectStructureRevision) || 0)
+        ),
+        sharedRoleHint: options.sharedRoleHint || sharedEntry?.sharedRoleHint || 'guest',
+        sharedAutoJoin: options.sharedAutoJoin !== false && sharedEntry?.sharedAutoJoin !== false,
+      } : {}),
     };
   }
 
@@ -8225,18 +8360,30 @@
     if (!(list instanceof HTMLElement) || !(bar instanceof HTMLElement)) {
       return;
     }
-    if (!openProjectTabs.length) {
-      list.innerHTML = '';
-      bar.hidden = true;
-      return;
-    }
     bar.hidden = false;
     list.innerHTML = '';
+    const homeItem = document.createElement('div');
+    homeItem.className = `project-tab-item project-tab-item--home${projectHomeVisible ? ' is-active' : ''}`;
+    homeItem.setAttribute('role', 'presentation');
+    const homeButton = document.createElement('button');
+    homeButton.type = 'button';
+    homeButton.className = 'project-tab-item__button project-tab-item__button--home';
+    homeButton.dataset.projectHomeTab = 'true';
+    homeButton.setAttribute('role', 'tab');
+    homeButton.setAttribute('aria-selected', projectHomeVisible ? 'true' : 'false');
+    homeButton.setAttribute('tabindex', projectHomeVisible ? '0' : '-1');
+    homeButton.setAttribute('aria-label', localizeText('ホーム: プロジェクト一覧', 'Home: Projects'));
+    const homeName = document.createElement('span');
+    homeName.className = 'project-tab-item__name';
+    homeName.textContent = localizeText('ホーム', 'Home');
+    homeButton.appendChild(homeName);
+    homeItem.appendChild(homeButton);
+    list.appendChild(homeItem);
     openProjectTabs.forEach((tab, index) => {
       if (!tab || !tab.id) {
         return;
       }
-      const isActive = tab.id === activeOpenProjectTabId;
+      const isActive = !projectHomeVisible && tab.id === activeOpenProjectTabId;
       const item = document.createElement('div');
       item.className = `project-tab-item${isActive ? ' is-active' : ''}`;
       item.dataset.projectTabItemId = tab.id;
@@ -8321,6 +8468,45 @@
     renderOpenProjectTabs();
   }
 
+  function setProjectHomeVisible(nextVisible = true, { refresh = false } = {}) {
+    const screen = dom.projectHomeScreen;
+    projectHomeVisible = Boolean(nextVisible);
+    if (screen instanceof HTMLElement) {
+      screen.hidden = !projectHomeVisible;
+      screen.setAttribute('aria-hidden', projectHomeVisible ? 'false' : 'true');
+    }
+    document.body.classList.toggle('is-project-home-active', projectHomeVisible);
+    renderOpenProjectTabs();
+    if (!projectHomeVisible) {
+      return;
+    }
+    renderRecentProjectsList(Array.from(recentProjectsCache.values()));
+    if (refresh && AUTOSAVE_SUPPORTED) {
+      refreshRecentProjectsUI().catch(error => {
+        console.warn('Failed to refresh project home list', error);
+      });
+    }
+    window.requestAnimationFrame(() => {
+      screen?.focus?.({ preventScroll: true });
+    });
+  }
+
+  function showProjectHomeScreen(options = {}) {
+    if (startupVisible) {
+      hideStartupScreen();
+    }
+    setProjectHomeVisible(true, {
+      refresh: options?.refresh !== false,
+    });
+  }
+
+  function hideProjectHomeScreen() {
+    if (!projectHomeVisible) {
+      return;
+    }
+    setProjectHomeVisible(false);
+  }
+
   function appendOpenProjectTabFromCurrentState(options = {}) {
     ensureOpenProjectTabsInitialized();
     if (openProjectTabs.length >= MAX_OPEN_PROJECT_TABS) {
@@ -8329,6 +8515,12 @@
     const tab = createOpenProjectTabFromCurrentState({
       source: options.source || 'open',
       projectId: options.projectId,
+      sharedProjectKey: options.sharedProjectKey,
+      sharedProjectBackendId: options.sharedProjectBackendId,
+      sharedProjectRevision: options.sharedProjectRevision,
+      sharedProjectStructureRevision: options.sharedProjectStructureRevision,
+      sharedRoleHint: options.sharedRoleHint,
+      sharedAutoJoin: options.sharedAutoJoin,
     });
     openProjectTabs.push(tab);
     if (options.activate !== false) {
@@ -8350,6 +8542,12 @@
       source: options.source || current?.source || 'working',
       projectId: normalizeAutosaveProjectId(options.projectId || autosaveProjectId) || current?.projectId || '',
       fileName: options.fileName || current?.fileName || '',
+      sharedProjectKey: options.sharedProjectKey ?? current?.sharedProjectKey,
+      sharedProjectBackendId: options.sharedProjectBackendId ?? current?.sharedProjectBackendId,
+      sharedProjectRevision: options.sharedProjectRevision ?? current?.sharedProjectRevision,
+      sharedProjectStructureRevision: options.sharedProjectStructureRevision ?? current?.sharedProjectStructureRevision,
+      sharedRoleHint: options.sharedRoleHint ?? current?.sharedRoleHint,
+      sharedAutoJoin: options.sharedAutoJoin ?? current?.sharedAutoJoin,
     });
     openProjectTabs[index] = updated;
     activeOpenProjectTabId = updated.id;
@@ -8400,6 +8598,12 @@
       tabId: current?.id || activeOpenProjectTabId,
       source: current?.source || 'working',
       projectId: normalizeAutosaveProjectId(autosaveProjectId) || current?.projectId || '',
+      sharedProjectKey: current?.sharedProjectKey,
+      sharedProjectBackendId: current?.sharedProjectBackendId,
+      sharedProjectRevision: current?.sharedProjectRevision,
+      sharedProjectStructureRevision: current?.sharedProjectStructureRevision,
+      sharedRoleHint: current?.sharedRoleHint,
+      sharedAutoJoin: current?.sharedAutoJoin,
     });
     openProjectTabs[index] = updated;
     activeOpenProjectTabId = updated.id;
@@ -8427,10 +8631,19 @@
       return false;
     }
     const target = openProjectTabs[targetIndex];
-    const targetRecentEntry = normalizeSharedRecentProjectEntry(
-      recentProjectsCache.get(normalizeAutosaveProjectId(target?.projectId || '')) || null
-    );
+    const targetRecentEntry = getSharedRecentProjectEntryForTab(target);
     const targetIsShared = Boolean(targetRecentEntry && isSharedRecentProjectEntry(targetRecentEntry));
+    const targetProjectId = normalizeAutosaveProjectId(target?.projectId || '');
+    if (!targetIsShared && targetProjectId.startsWith(SHARED_PROJECT_ID_PREFIX)) {
+      updateAutosaveStatus(
+        localizeText(
+          '共有プロジェクト情報を確認できないため、通常プロジェクトとしては開きませんでした。',
+          'Shared project metadata is unavailable, so it was not opened as a local project.'
+        ),
+        'warn'
+      );
+      return false;
+    }
     if (!targetIsShared && (!target?.project || typeof target.project !== 'object')) {
       return false;
     }
@@ -8461,6 +8674,7 @@
         updateAutosaveStatus(localizeText('プロジェクトタブの切替に失敗しました', 'Failed to switch project tab'), 'error');
         return false;
       }
+      queueProjectTabViewportReset(target.id);
       if (target.unsaved) {
         markDocumentUnsavedChange();
       } else {
@@ -8553,7 +8767,7 @@
     if (openProjectTabBusy) {
       return;
     }
-    showStartupScreen({ mode: 'append-tab' });
+    showProjectHomeScreen({ refresh: true });
   }
 
   function setupOpenProjectTabs() {
@@ -8571,6 +8785,11 @@
       if (!target) {
         return;
       }
+      const homeButton = target.closest('button[data-project-home-tab]');
+      if (homeButton instanceof HTMLButtonElement) {
+        showProjectHomeScreen({ refresh: true });
+        return;
+      }
       const closeButton = target.closest('button[data-project-tab-close-id]');
       if (closeButton instanceof HTMLButtonElement) {
         const tabId = closeButton.dataset.projectTabCloseId || '';
@@ -8585,6 +8804,7 @@
       const selectButton = target.closest('button[data-project-tab-id]');
       if (selectButton instanceof HTMLButtonElement) {
         const tabId = selectButton.dataset.projectTabId || '';
+        hideProjectHomeScreen();
         void activateOpenProjectTab(tabId);
       }
     });
@@ -14373,6 +14593,10 @@
     setLocalizedTextContent('#multiInviteShare', '共有', 'Share');
     setLocalizedAttribute('#projectTabsBar', 'aria-label', '開いているプロジェクト', 'Open Projects');
     setLocalizedAttribute('#projectTabsList', 'aria-label', 'プロジェクトタブ', 'Project Tabs');
+    setLocalizedTextContent('#projectHomeTitle', 'プロジェクト一覧', 'Projects');
+    setLocalizedTextContent('#projectHomeNew', '新規作成', 'New Project');
+    setLocalizedTextContent('#projectHomeOpen', 'ファイルを開く', 'Open File');
+    setLocalizedTextContent('#projectHomeRecentProjects .project-home-screen__section-title', 'プロジェクト', 'Projects');
     setLocalizedTextContent('#startupRecentProjects .startup-screen__recent-title', 'プロジェクト一覧', 'Projects');
     setLocalizedTextContent('#startupRecentAdContainer .export-ad__label', '広告', 'Ad');
     setLocalizedTextContent(
@@ -16348,7 +16572,10 @@
       if (!ensureCurrentClientCanReplaceActiveProject()) {
         return false;
       }
-      const projectId = normalizeAutosaveProjectId(entry.id || '');
+      const sharedEntryForTab = normalizeSharedRecentProjectEntry(entry);
+      const projectId = sharedEntryForTab
+        ? buildSharedRecentProjectId(sharedEntryForTab.sharedProjectKey || '')
+        : normalizeAutosaveProjectId(entry.id || '');
       if (openProjectTabBusy) {
         return false;
       }
@@ -16373,7 +16600,7 @@
         return false;
       }
       const shouldReuseActiveTab = !appendOnly && canReuseActiveOpenProjectTabForRecentEntry(entry);
-      const source = isSharedRecentProjectEntry(entry) ? 'shared-recent' : 'local-recent';
+      const source = sharedEntryForTab ? 'shared-recent' : 'local-recent';
       openProjectTabBusy = true;
       try {
         await persistActiveOpenProjectTab({ flushAutosave: true });
@@ -16388,20 +16615,33 @@
           ? replaceActiveOpenProjectTabFromCurrentState({
               source,
               projectId: projectId || autosaveProjectId,
+              sharedProjectKey: sharedEntryForTab?.sharedProjectKey || '',
+              sharedProjectBackendId: sharedEntryForTab?.sharedProjectBackendId || '',
+              sharedProjectRevision: sharedEntryForTab?.sharedProjectRevision || 0,
+              sharedProjectStructureRevision: sharedEntryForTab?.sharedProjectStructureRevision || 0,
+              sharedRoleHint: sharedEntryForTab?.sharedRoleHint || 'guest',
+              sharedAutoJoin: sharedEntryForTab?.sharedAutoJoin !== false,
             })
           : appendOpenProjectTabFromCurrentState({
               activate: true,
               source,
               projectId: projectId || autosaveProjectId,
+              sharedProjectKey: sharedEntryForTab?.sharedProjectKey || '',
+              sharedProjectBackendId: sharedEntryForTab?.sharedProjectBackendId || '',
+              sharedProjectRevision: sharedEntryForTab?.sharedProjectRevision || 0,
+              sharedProjectStructureRevision: sharedEntryForTab?.sharedProjectStructureRevision || 0,
+              sharedRoleHint: sharedEntryForTab?.sharedRoleHint || 'guest',
+              sharedAutoJoin: sharedEntryForTab?.sharedAutoJoin !== false,
             });
         if (!nextTab) {
           return false;
         }
+        queueProjectTabViewportReset(nextTab.id);
         if (hideStartup) {
           hideStartupScreen();
         }
         updateAutosaveStatus(
-          isSharedRecentProjectEntry(entry)
+          Boolean(sharedEntryForTab)
             ? localizeText('共有プロジェクトをタブ追加しました', 'Added shared project tab')
             : localizeText('端末内プロジェクトをタブ追加しました', 'Added local project tab'),
           'success'
@@ -20253,6 +20493,7 @@
     if (!container) {
       return;
     }
+    hideProjectHomeScreen();
     const nextMode = normalizeStartupScreenMode(options?.mode);
     setStartupScreenMode(nextMode);
     if (AUTOSAVE_SUPPORTED) {
@@ -20365,6 +20606,153 @@
       lensImportRequested = false;
     }
     setStartupScreenMode(STARTUP_SCREEN_MODE_DEFAULT);
+  }
+
+  function setupProjectHomeScreen() {
+    const screen = dom.projectHomeScreen;
+    if (!(screen instanceof HTMLElement) || screen.dataset.bound === 'true') {
+      return;
+    }
+    screen.dataset.bound = 'true';
+    dom.projectHomeNew?.addEventListener('click', () => {
+      openNewProjectDialog({ dismissStartup: false, appendAsTab: false });
+      hideProjectHomeScreen();
+    });
+    dom.projectHomeOpen?.addEventListener('click', async () => {
+      const opened = await openDocumentDialog();
+      if (opened) {
+        hideProjectHomeScreen();
+      }
+    });
+    dom.projectHomeRecentList?.addEventListener('click', async event => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (!target) {
+        return;
+      }
+      const deleteButton = target.closest('button[data-startup-recent-delete-id]');
+      if (deleteButton instanceof HTMLButtonElement) {
+        event.preventDefault();
+        event.stopPropagation();
+        const projectId = deleteButton.dataset.startupRecentDeleteId || '';
+        if (!projectId) {
+          return;
+        }
+        const entry = recentProjectsCache.get(projectId) || null;
+        const displayLabel = extractDocumentBaseName(entry?.fileName || entry?.name || DEFAULT_DOCUMENT_NAME);
+        const isSharedEntry = isSharedRecentProjectEntry(entry);
+        const ownsSharedProject = isSharedEntry
+          ? await resolveSharedRecentProjectOwnedByCurrentUser(entry)
+          : false;
+        const accepted = await openRecentProjectDeleteConfirmDialog(entry, {
+          deletesOwnedSharedProject: ownsSharedProject,
+        });
+        if (!accepted) {
+          return;
+        }
+        const card = deleteButton.closest('.startup-recent-card');
+        const openButton = card instanceof HTMLElement
+          ? card.querySelector('button[data-startup-recent-open-id]')
+          : null;
+        deleteButton.disabled = true;
+        if (openButton instanceof HTMLButtonElement) {
+          openButton.disabled = true;
+        }
+        try {
+          let deletedSharedProjectBackend = false;
+          if (isSharedEntry && ownsSharedProject) {
+            deletedSharedProjectBackend = await deleteOwnedSharedProjectFromBackend(entry);
+            if (!deletedSharedProjectBackend) {
+              updateAutosaveStatus(
+                localizeText(
+                  '共有プロジェクト本体を削除できませんでした。ログイン状態とネットワークを確認して再試行してください。',
+                  'Failed to delete the shared project itself. Check sign-in state and network, then try again.'
+                ),
+                'error'
+              );
+              deleteButton.disabled = false;
+              if (openButton instanceof HTMLButtonElement) {
+                openButton.disabled = false;
+              }
+              return;
+            }
+          }
+          const deletesOwnedSharedProject = isSharedEntry && deletedSharedProjectBackend;
+          if (isSharedEntry && !deletesOwnedSharedProject) {
+            hideSharedProjectFromRecentSync(entry?.sharedProjectKey || '');
+          }
+          const removed = await removeRecentProjectEntry(projectId);
+          if (removed) {
+            if (deletesOwnedSharedProject && isSharedEntry) {
+              await purgeDeletedSharedProjectLocalReferences(entry?.sharedProjectKey || '', projectId);
+            }
+            releaseAutosaveProjectId(projectId);
+            updateAutosaveStatus(
+              deletesOwnedSharedProject
+                ? localizeText(
+                  `共有プロジェクトを削除しました (${displayLabel})`,
+                  `Deleted shared project (${displayLabel})`
+                )
+                : isSharedEntry
+                  ? localizeText(
+                    `共有プロジェクトを一覧から外しました (${displayLabel})`,
+                    `Removed shared project from list (${displayLabel})`
+                  )
+                  : localizeText(
+                    `端末内プロジェクトを削除しました (${displayLabel})`,
+                    `Deleted local project (${displayLabel})`
+                  ),
+              'info'
+            );
+            if (deletesOwnedSharedProject) {
+              await enforceSharedProjectOwnershipLimit();
+            }
+          } else if (deletesOwnedSharedProject && isSharedEntry) {
+            await purgeDeletedSharedProjectLocalReferences(entry?.sharedProjectKey || '', projectId);
+            await enforceSharedProjectOwnershipLimit();
+          } else if (AUTOSAVE_SUPPORTED) {
+            refreshRecentProjectsUI().catch(error => {
+              console.warn('Failed to refresh recent projects', error);
+            });
+          }
+        } catch (error) {
+          console.warn('Failed to remove recent project', error);
+          updateAutosaveStatus(
+            localizeText(
+              '端末内プロジェクトを削除できませんでした',
+              'Failed to delete local project'
+            ),
+            'error'
+          );
+          deleteButton.disabled = false;
+          if (openButton instanceof HTMLButtonElement) {
+            openButton.disabled = false;
+          }
+        }
+        return;
+      }
+
+      const openButton = target.closest('button[data-startup-recent-open-id]');
+      if (!(openButton instanceof HTMLButtonElement)) {
+        return;
+      }
+      const projectId = openButton.dataset.startupRecentOpenId || '';
+      const entry = projectId ? recentProjectsCache.get(projectId) : null;
+      if (!entry) {
+        if (AUTOSAVE_SUPPORTED) {
+          refreshRecentProjectsUI().catch(error => {
+            console.warn('Failed to refresh recent projects', error);
+          });
+        }
+        return;
+      }
+      openButton.disabled = true;
+      const success = await openRecentProjectAsTab(entry, { hideStartup: false, appendOnly: false });
+      if (success) {
+        hideProjectHomeScreen();
+      } else {
+        openButton.disabled = false;
+      }
+    });
   }
 
   async function maybeRestoreAutosaveProjectOnStartup() {
@@ -20840,6 +21228,7 @@
     if (!ensureCurrentClientCanReplaceActiveProject({ announce: !options?.suppressAutosaveStatus })) {
       return false;
     }
+    const preservedSelectionClipboard = preserveCanvasSelectionClipboard();
     let parsedDocument = null;
     try {
       parsedDocument = snapshotFromDocumentText(text);
@@ -20903,6 +21292,7 @@
     syncTimelapseControls();
     updateHistoryButtons();
     updateMemoryStatus();
+    restoreCanvasSelectionClipboard(preservedSelectionClipboard);
     resetDocumentUnsavedChanges();
     resetExportScaleDefaults();
     syncPixfindSnapshotAfterDocumentReset();
@@ -20938,6 +21328,8 @@
         localizeText('共有モード: ON', 'Shared mode: ON'),
         'info'
       );
+    } else if (requestedSharedProjectId) {
+      clearActiveSharedProjectSession('shared-project-id-without-entry');
     } else if (!requestedSharedProjectId) {
       clearActiveSharedProjectSession();
     }
@@ -23127,29 +23519,46 @@
   }
 
   function renderRecentProjectsList(entries) {
-    const section = dom.startup?.recentSection;
-    const list = dom.startup?.recentList;
-    if (!section || !list) {
+    const targets = [
+      {
+        section: dom.startup?.recentSection,
+        list: dom.startup?.recentList,
+        titleSelector: '.startup-screen__recent-title',
+        title: isStartupScreenAppendTabMode()
+          ? localizeText('プロジェクト一覧', 'Projects')
+          : localizeText('端末内プロジェクト（自動保存）', 'Local Projects (Autosave)'),
+      },
+      {
+        section: dom.projectHomeRecentSection,
+        list: dom.projectHomeRecentList,
+        titleSelector: '.project-home-screen__section-title',
+        title: localizeText('プロジェクト', 'Projects'),
+      },
+    ].filter(target => target.section instanceof HTMLElement && target.list instanceof HTMLElement);
+    if (!targets.length) {
       return;
     }
-    const titleNode = section.querySelector('.startup-screen__recent-title');
-    const appendTabMode = isStartupScreenAppendTabMode();
-    list.innerHTML = '';
+    targets.forEach(target => {
+      target.list.innerHTML = '';
+    });
     if (!AUTOSAVE_SUPPORTED || !entries || entries.length === 0) {
-      section.hidden = true;
+      targets.forEach(target => {
+        target.section.hidden = true;
+      });
       updatePixieedAccountUi();
       syncPixieedSupportBenefitUi();
       return;
     }
-    if (titleNode instanceof HTMLElement) {
-      titleNode.textContent = appendTabMode
-        ? localizeText('プロジェクト一覧', 'Projects')
-        : localizeText('端末内プロジェクト（自動保存）', 'Local Projects (Autosave)');
-    }
-    section.hidden = false;
-    entries.forEach(entry => {
+    targets.forEach(target => {
+      const titleNode = target.section.querySelector(target.titleSelector);
+      if (titleNode instanceof HTMLElement) {
+        titleNode.textContent = target.title;
+      }
+      target.section.hidden = false;
+    });
+    const createRecentProjectCard = entry => {
       if (!entry || !entry.id) {
-        return;
+        return null;
       }
       const isSharedEntry = isSharedRecentProjectEntry(entry);
       const sharedRoleHint = typeof entry.sharedRoleHint === 'string' ? entry.sharedRoleHint.trim() : '';
@@ -23234,7 +23643,15 @@
       openButton.appendChild(metaNode);
       card.appendChild(openButton);
       card.appendChild(deleteButton);
-      list.appendChild(card);
+      return card;
+    };
+    entries.forEach(entry => {
+      targets.forEach(target => {
+        const card = createRecentProjectCard(entry);
+        if (card) {
+          target.list.appendChild(card);
+        }
+      });
     });
     updatePixieedAccountUi();
     syncPixieedSupportBenefitUi();
@@ -23275,15 +23692,25 @@
   }
 
   async function refreshRecentProjectsUI(options = {}) {
-    const section = dom.startup?.recentSection;
-    const list = dom.startup?.recentList;
-    if (!section || !list) {
+    const hasRecentList = (
+      (dom.startup?.recentSection instanceof HTMLElement && dom.startup?.recentList instanceof HTMLElement)
+      || (dom.projectHomeRecentSection instanceof HTMLElement && dom.projectHomeRecentList instanceof HTMLElement)
+    );
+    if (!hasRecentList) {
       return;
     }
     if (!AUTOSAVE_SUPPORTED) {
       recentProjectsCache.clear();
-      list.innerHTML = '';
-      section.hidden = true;
+      [dom.startup?.recentList, dom.projectHomeRecentList].forEach(list => {
+        if (list instanceof HTMLElement) {
+          list.innerHTML = '';
+        }
+      });
+      [dom.startup?.recentSection, dom.projectHomeRecentSection].forEach(section => {
+        if (section instanceof HTMLElement) {
+          section.hidden = true;
+        }
+      });
       return;
     }
     if (options?.syncSharedFromAccount !== false) {
@@ -24442,7 +24869,7 @@
           });
         }
         clearPendingSharedInvite();
-        setActiveAutosaveProjectId(normalizedEntry.id);
+        setActiveAutosaveProjectId(buildSharedRecentProjectId(normalizedEntry.sharedProjectKey || '') || normalizedEntry.id);
         closeBlockingLoading();
         return true;
       }
@@ -29876,7 +30303,7 @@
   function clampPanToKeepVisibleCanvas() {
     const viewport = dom.canvasViewport;
     if (!(viewport instanceof HTMLElement)) {
-      return;
+      return { clampedX: false, clampedY: false };
     }
     const targetSurface = getViewportVisibilityTargetSurface();
     const panel = targetSurface?.panel instanceof HTMLElement ? targetSurface.panel : null;
@@ -29884,7 +30311,7 @@
       || getProjectCanvasDocumentById(targetSurface?.canvasDocId)
       || (targetSurface?.kind === 'local' ? getProjectCanvasDocumentForEntry(targetSurface) : getProjectCanvasDocumentAt(0));
     if (!(panel instanceof HTMLElement) || !canvasDoc) {
-      return;
+      return { clampedX: false, clampedY: false };
     }
     const viewportWidth = Math.max(1, Math.round(viewport.clientWidth || viewport.getBoundingClientRect().width || 1));
     const viewportHeight = Math.max(1, Math.round(viewport.clientHeight || viewport.getBoundingClientRect().height || 1));
@@ -29894,20 +30321,23 @@
     const panelTop = parseLocalViewportCanvasAxis(panel.style.top, panel.offsetTop) || 0;
     let nextPanX = Math.round(Number(state.pan.x) || 0);
     let nextPanY = Math.round(Number(state.pan.y) || 0);
-    const halfWidth = Math.max(1, Math.round(drawWidth / 2));
-    const halfHeight = Math.max(1, Math.round(drawHeight / 2));
-    const minPanX = Math.round(-panelLeft - halfWidth);
-    const maxPanX = Math.round(viewportWidth - panelLeft - halfWidth);
-    const minPanY = Math.round(-panelTop - halfHeight);
-    const maxPanY = Math.round(viewportHeight - panelTop - halfHeight);
+    const minVisibleX = Math.max(1, Math.round(Math.min(viewportWidth * 0.12, drawWidth * 0.5)));
+    const minVisibleY = Math.max(1, Math.round(Math.min(viewportHeight * 0.12, drawHeight * 0.5)));
+    const minPanX = Math.round(minVisibleX - panelLeft - drawWidth);
+    const maxPanX = Math.round(viewportWidth - minVisibleX - panelLeft);
+    const minPanY = Math.round(minVisibleY - panelTop - drawHeight);
+    const maxPanY = Math.round(viewportHeight - minVisibleY - panelTop);
     nextPanX = clamp(nextPanX, minPanX, maxPanX);
     nextPanY = clamp(nextPanY, minPanY, maxPanY);
+    const clampedX = nextPanX !== Math.round(Number(state.pan.x) || 0);
+    const clampedY = nextPanY !== Math.round(Number(state.pan.y) || 0);
     if (nextPanX !== state.pan.x) {
       state.pan.x = nextPanX;
     }
     if (nextPanY !== state.pan.y) {
       state.pan.y = nextPanY;
     }
+    return { clampedX, clampedY };
   }
 
   function isProjectCanvasPanelVisibleInViewport(panel, viewportRect) {
@@ -30030,7 +30460,7 @@
 
   function applyViewportTransform() {
     if (!(dom.viewportWorkspace instanceof HTMLElement)) return;
-    clampPanToKeepVisibleCanvas();
+    const clampResult = clampPanToKeepVisibleCanvas();
     const panX = Math.round(Number(state.pan.x) || 0);
     const panY = Math.round(Number(state.pan.y) || 0);
     if (panX !== state.pan.x) {
@@ -30044,7 +30474,7 @@
     updateMirrorGuideHandles();
     updateCanvasResizeHandlePosition();
     syncCanvasResizeHandleVisibility();
-    ensureProjectCanvasVisibleInViewport({ persist: false });
+    return clampResult;
   }
 
 
@@ -30475,6 +30905,7 @@
       setupKeyboard();
       updateDocumentMetadata();
       setupStartupScreen();
+      setupProjectHomeScreen();
       hydratePixieedAccountFromLocalCache();
       const accountInitTask = initPixieedAccount().catch(error => {
         console.warn('Account bootstrap failed', error);
@@ -30536,8 +30967,8 @@
       resetOpenedDocumentViewport({ defer: true });
       refreshLocalizedUi();
       scheduleDeferredUiSetup();
-      if (!lensImportRequested && !importedFromLens && !skipStartup && !restoredAutosaveProject && !reloadSnapshotRestored && !hasDismissedStartupScreen()) {
-        showStartupScreen();
+      if (!lensImportRequested && !importedFromLens && !skipStartup && !restoredAutosaveProject && !reloadSnapshotRestored) {
+        showProjectHomeScreen({ refresh: true });
       }
     } finally {
       endStartupProgress();
@@ -47396,7 +47827,7 @@
 
     if (activeTool === 'pan') {
       if (isTouch) {
-        // On mobile, one-finger pan is disabled; wait for two-finger gesture.
+        // On mobile, wait for the two-finger pan/zoom branch above.
         return;
       }
       pointerState.surface = interactionSurface;
@@ -47800,7 +48231,10 @@
         }
         state.pan.x = Math.round((baselinePan.x || 0) + dx);
         state.pan.y = Math.round((baselinePan.y || 0) + dy);
-        applyViewportTransform();
+        const clampResult = applyViewportTransform();
+        if (clampResult?.clampedX || clampResult?.clampedY) {
+          refreshTouchPanBaseline({ resetPinchFocus: false });
+        }
         return;
       }
       if (event.pointerId !== pointerState.pointerId) return;
@@ -47810,7 +48244,11 @@
       const originY = pointerState.panOrigin?.y || 0;
       state.pan.x = Math.round(originX + dx);
       state.pan.y = Math.round(originY + dy);
-      applyViewportTransform();
+      const clampResult = applyViewportTransform();
+      if (clampResult?.clampedX || clampResult?.clampedY) {
+        pointerState.panOrigin = { x: state.pan.x, y: state.pan.y };
+        pointerState.startClient = { x: event.clientX, y: event.clientY };
+      }
       updateVirtualCursorFromEvent(event);
       return;
     }
@@ -49853,19 +50291,19 @@
       internalClipboard.selection = null;
       return;
     }
-    internalClipboard.selection = {
+    internalClipboard.selection = cloneSelectionClipboardPayload({
       width: moveState.width,
       height: moveState.height,
-      mask: new Uint8Array(moveState.mask),
+      mask: moveState.mask,
       contentMask: getSelectionMoveContentMask(moveState) instanceof Uint8Array
-        ? new Uint8Array(getSelectionMoveContentMask(moveState))
+        ? getSelectionMoveContentMask(moveState)
         : null,
-      indices: new Int16Array(moveState.indices),
-      direct: new Uint8ClampedArray(moveState.direct),
+      indices: moveState.indices,
+      direct: moveState.direct,
       palette: state.palette.map(color => normalizeColorValue(color)),
       bounds: { ...moveState.bounds },
       imageData: moveState.imageData ? cloneImageData(moveState.imageData) : null,
-    };
+    });
   }
 
   function copySelection() {
