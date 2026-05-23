@@ -916,6 +916,7 @@
 <div class="qr-actions" id="qrActions">
 <button class="btn" id="downloadBtn" type="button">PNGを保存</button>
 <button class="btn secondary" id="copyDataBtn" type="button">テキストをコピー</button>
+<button class="btn secondary" id="openInDrawBtn" type="button">PiXiEEDrawで編集</button>
 </div>
 </section>
 </main>
@@ -949,6 +950,7 @@
   const colorLight = document.getElementById('qrLight');
   const downloadBtn = document.getElementById('downloadBtn');
   const copyBtn = document.getElementById('copyDataBtn');
+  const openInDrawBtn = document.getElementById('openInDrawBtn');
   const qrActions = document.getElementById('qrActions');
   const qrControls = document.getElementById('qrControls');
 
@@ -956,6 +958,10 @@
   const TEXT_LIMIT = 900;
   const DISPLAY_SIZE = qrCanvas.width || 280;
   const DOWNLOAD_OBJECT_URL_REVOKE_DELAY_MS = 10000;
+  const DRAW_IMPORT_STORAGE_KEY = 'pixiee-qr:pending-draw-import';
+  const DRAW_RETURN_QUERY_KEY = 'draw_return';
+  const DRAW_URL_QUERY_KEY = 'draw_url';
+  const DRAW_RETURN_MODE_SELF = 'self';
   let downloadCanvas = null;
 
   const clamp = (val, min, max) => Math.min(Math.max(val, min), max);
@@ -1178,6 +1184,60 @@
     });
   }
 
+  function buildDrawReturnTargetUrl() {
+    const fallback = new URL('../pixiedraw/index.html', window.location.href);
+    const params = new URLSearchParams(window.location.search || '');
+    const returnMode = params.get(DRAW_RETURN_QUERY_KEY) || DRAW_RETURN_MODE_SELF;
+    const drawUrlRaw = params.get(DRAW_URL_QUERY_KEY);
+    let target = fallback;
+    if (drawUrlRaw) {
+      try {
+        target = new URL(drawUrlRaw);
+      } catch (error) {
+        target = fallback;
+      }
+    }
+    if (returnMode === DRAW_RETURN_MODE_SELF) {
+      target.searchParams.set('qr', '1');
+    }
+    return target.toString();
+  }
+
+  async function openInPixieeDraw() {
+    const sourceCanvas = downloadCanvas || qrCanvas;
+    if (!sourceCanvas) {
+      qrStatus.textContent = 'QRコードが未生成です';
+      qrStatus.style.color = '#ffa95c';
+      return;
+    }
+    let dataUrl = '';
+    try {
+      dataUrl = sourceCanvas.toDataURL('image/png');
+    } catch (error) {
+      dataUrl = '';
+    }
+    if (!dataUrl || !dataUrl.startsWith('data:image')) {
+      qrStatus.textContent = 'PiXiEEDrawへ送信できませんでした';
+      qrStatus.style.color = '#ffa95c';
+      return;
+    }
+    const payload = {
+      source: 'qrmaker',
+      filename: 'pixiee-qr.png',
+      createdAt: Date.now(),
+      expiresAt: Date.now() + (5 * 60 * 1000),
+      dataUrl
+    };
+    try {
+      window.localStorage.setItem(DRAW_IMPORT_STORAGE_KEY, JSON.stringify(payload));
+    } catch (error) {
+      qrStatus.textContent = '端末保存が使えないため送信できませんでした';
+      qrStatus.style.color = '#ffa95c';
+      return;
+    }
+    window.location.assign(buildDrawReturnTargetUrl());
+  }
+
   input.addEventListener('input', () => {
     syncLabels();
     renderQRCode();
@@ -1191,6 +1251,7 @@
   // 初期描画
   downloadBtn.addEventListener('click', downloadPNG);
   copyBtn.addEventListener('click', copyData);
+  openInDrawBtn.addEventListener('click', openInPixieeDraw);
 
   syncLabels();
   renderQRCode();

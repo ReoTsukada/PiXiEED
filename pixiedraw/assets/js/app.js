@@ -598,7 +598,9 @@
   const TOP_UI_ACTION_MIRROR_POPUP = TOOL_ACTION_MIRROR_POPUP;
   const TOP_UI_ACTION_VIRTUAL_CURSOR_TOGGLE = TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE;
   const TOP_UI_ACTION_OPEN_LENS_CAMERA = 'openLensCamera';
+  const TOP_UI_ACTION_OPEN_QR_EDITOR = 'openQrEditor';
   const EXTERNAL_TOOL_PIXIEELENS_ID = 'pixieelens';
+  const EXTERNAL_TOOL_QR_MAKER_ID = 'qrmaker';
   const TOOL_ACTIONS = new Set([
     TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE,
     TOOL_ACTION_MIRROR_POPUP,
@@ -2469,9 +2471,11 @@
   const MOBILE_BACK_GUARD_BEFOREUNLOAD_BYPASS_MS = 1500;
   const textCompression = createTextCompression();
   const LENS_IMPORT_SESSION_FLAG = 'pixiee-lens:import-request';
+  const QR_IMPORT_SESSION_FLAG = 'pixiee-qr:import-request';
   const LENS_CAMERA_RETURN_QUERY_KEY = 'draw_return';
   const LENS_CAMERA_DRAW_URL_QUERY_KEY = 'draw_url';
   const LENS_CAMERA_RETURN_MODE_SELF = 'self';
+  const QR_IMPORT_QUERY_KEY = 'qr';
   const EXTERNAL_TOOLS = Object.freeze({
     [EXTERNAL_TOOL_PIXIEELENS_ID]: Object.freeze({
       id: EXTERNAL_TOOL_PIXIEELENS_ID,
@@ -2480,6 +2484,19 @@
       iconSrc: 'assets/icons/pixieelensicon_frame_01.png',
       displayName: Object.freeze({ ja: 'PiXiEELENS', en: 'PiXiEELENS' }),
       actionLabel: Object.freeze({ ja: 'カメラ', en: 'Camera' }),
+      protocol: Object.freeze({
+        returnQueryKey: LENS_CAMERA_RETURN_QUERY_KEY,
+        drawUrlQueryKey: LENS_CAMERA_DRAW_URL_QUERY_KEY,
+        defaultReturnMode: LENS_CAMERA_RETURN_MODE_SELF,
+      }),
+    }),
+    [EXTERNAL_TOOL_QR_MAKER_ID]: Object.freeze({
+      id: EXTERNAL_TOOL_QR_MAKER_ID,
+      action: TOP_UI_ACTION_OPEN_QR_EDITOR,
+      launchUrl: 'https://pixieed.jp/qr-maker/index.html',
+      iconSrc: 'assets/icons/tool-qr-edit.svg',
+      displayName: Object.freeze({ ja: 'QRコードリーダー', en: 'QR Code Reader' }),
+      actionLabel: Object.freeze({ ja: 'QR編集', en: 'QR Edit' }),
       protocol: Object.freeze({
         returnQueryKey: LENS_CAMERA_RETURN_QUERY_KEY,
         drawUrlQueryKey: LENS_CAMERA_DRAW_URL_QUERY_KEY,
@@ -2503,6 +2520,28 @@
     if (canUseSessionStorage) {
       try {
         return window.sessionStorage.getItem(LENS_IMPORT_SESSION_FLAG) === '1';
+      } catch (error) {
+        return false;
+      }
+    }
+    return false;
+  })();
+  let qrImportRequested = (() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get(QR_IMPORT_QUERY_KEY) === '1') {
+        setQrImportSessionFlag();
+        return true;
+      }
+    } catch (error) {
+      return false;
+    }
+    if (canUseSessionStorage) {
+      try {
+        return window.sessionStorage.getItem(QR_IMPORT_SESSION_FLAG) === '1';
       } catch (error) {
         return false;
       }
@@ -2825,6 +2864,7 @@
   const MULTI_REPLICA_AUTOSAVE_BLOCKED_STATUS = '自動保存: マルチ中はマスターのみ端末保存します';
   const DOCUMENT_FILE_VERSION = 1;
   const LENS_IMPORT_STORAGE_KEY = 'pixiee-lens:pending-draw-import';
+  const QR_IMPORT_STORAGE_KEY = 'pixiee-qr:pending-draw-import';
   const PIXFIND_UPLOAD_KEY = 'pixfind_creator_upload_v1';
   function upgradeAutosaveDatabase(db) {
     if (!db) return;
@@ -11830,6 +11870,33 @@
     }
   }
 
+  function buildQrEditorModeUrl({ returnMode = LENS_CAMERA_RETURN_MODE_SELF } = {}) {
+    const qrTool = getExternalToolDefinition(EXTERNAL_TOOL_QR_MAKER_ID);
+    const nativeRuntime = isNativeAppRuntime();
+    const fallbackPath = nativeRuntime
+      ? '../qr-maker/index.html'
+      : (qrTool?.launchUrl || 'https://pixieed.jp/qr-maker/index.html');
+    const protocol = qrTool?.protocol || {};
+    const returnQueryKey = protocol.returnQueryKey || LENS_CAMERA_RETURN_QUERY_KEY;
+    const drawUrlQueryKey = protocol.drawUrlQueryKey || LENS_CAMERA_DRAW_URL_QUERY_KEY;
+    try {
+      const qrTarget = nativeRuntime
+        ? new URL('../qr-maker/index.html', window.location.href)
+        : new URL(qrTool?.launchUrl || fallbackPath);
+      const qrUrl = new URL(qrTarget.toString());
+      if (typeof returnMode === 'string' && returnMode) {
+        qrUrl.searchParams.set(returnQueryKey, returnMode);
+      }
+      const drawUrl = buildLensCameraReturnDrawUrl();
+      if (drawUrl) {
+        qrUrl.searchParams.set(drawUrlQueryKey, drawUrl);
+      }
+      return qrUrl.toString();
+    } catch (error) {
+      return fallbackPath;
+    }
+  }
+
   async function launchLensCameraMode() {
     const lensTool = getExternalToolDefinition(EXTERNAL_TOOL_PIXIEELENS_ID);
     const lensToolName = getExternalToolLocalizedName(lensTool) || 'PiXiEELENS';
@@ -11874,6 +11941,50 @@
     }
   }
 
+  async function launchQrEditorMode() {
+    const qrTool = getExternalToolDefinition(EXTERNAL_TOOL_QR_MAKER_ID);
+    const qrToolName = getExternalToolLocalizedName(qrTool) || 'QRコードリーダー';
+    const fallbackGroup = TOOL_TO_GROUP[state.tool] || 'pen';
+    if (TOOL_GROUPS[fallbackGroup] && state.activeToolGroup !== fallbackGroup) {
+      state.activeToolGroup = fallbackGroup;
+      updateToolGroupButtons();
+      updateToolVisibility();
+    }
+    if (!AUTOSAVE_SUPPORTED && hasDocumentUnsavedChanges()) {
+      const accepted = window.confirm(
+        localizeText(
+          'このブラウザでは自動保存が使えません。現在の内容を保存せずにQR編集モードへ移動しますか？',
+          'Autosave is unavailable in this browser. Leave for QR Edit Mode without saving the current project?'
+        )
+      );
+      if (!accepted) {
+        return false;
+      }
+    } else if (AUTOSAVE_SUPPORTED) {
+      try {
+        if (!autosaveProjectId) {
+          setActiveAutosaveProjectId(createAutosaveProjectId());
+        }
+        markAutosaveDirty();
+        await writeAutosaveSnapshot(true);
+      } catch (error) {
+        console.warn(`Failed to save project before launching ${qrToolName}`, error);
+      }
+    }
+    const qrUrl = buildQrEditorModeUrl();
+    try {
+      window.location.assign(qrUrl);
+      return true;
+    } catch (error) {
+      console.warn(`Failed to open ${qrToolName}`, error);
+      updateAutosaveStatus(
+        localizeText(`${qrToolName} を開けませんでした`, `Failed to open ${qrToolName}`),
+        'error'
+      );
+      return false;
+    }
+  }
+
   function runToolAction(tool, options = {}) {
     if (tool === TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE) {
       setVirtualCursorEnabled(!state.showVirtualCursor);
@@ -11901,6 +12012,10 @@
     }
     if (action === TOP_UI_ACTION_OPEN_LENS_CAMERA) {
       return runToolAction(TOOL_ACTION_CAMERA_MODE, options);
+    }
+    if (action === TOP_UI_ACTION_OPEN_QR_EDITOR) {
+      void launchQrEditorMode();
+      return true;
     }
     return false;
   }
@@ -17444,16 +17559,43 @@
     }
   }
 
+  async function fallbackRestoreAutosaveAfterQrFailure() {
+    if (!qrImportRequested) {
+      return;
+    }
+    if (!AUTOSAVE_SUPPORTED) {
+      return;
+    }
+    try {
+      const entries = await loadRecentProjectsMetadata();
+      if (!entries.length) {
+        return;
+      }
+      const target = autosaveProjectId
+        ? (entries.find(entry => entry?.id === autosaveProjectId) || entries[0])
+        : entries[0];
+      const restored = await openRecentProject(target, { hideStartup: false, silent: true });
+      if (restored) {
+        updateAutosaveStatus('自動保存: 端末内データを復元しました', 'info');
+      }
+    } catch (error) {
+      console.warn('Failed to restore autosave after QR import failure', error);
+    }
+  }
+
   function clearLensImportRequestParam() {
     if (typeof window === 'undefined' || typeof window.location === 'undefined') {
       return;
     }
     try {
       const currentUrl = new URL(window.location.href);
-      if (!currentUrl.searchParams.has('lens')) {
+      const hadLens = currentUrl.searchParams.has('lens');
+      const hadQr = currentUrl.searchParams.has(QR_IMPORT_QUERY_KEY);
+      if (!hadLens && !hadQr) {
         return;
       }
       currentUrl.searchParams.delete('lens');
+      currentUrl.searchParams.delete(QR_IMPORT_QUERY_KEY);
       window.history.replaceState({}, document.title, currentUrl.toString());
     } catch (error) {
       // Ignore URL manipulation errors.
@@ -17471,6 +17613,17 @@
     }
   }
 
+  function setQrImportSessionFlag() {
+    if (!canUseSessionStorage) {
+      return;
+    }
+    try {
+      window.sessionStorage.setItem(QR_IMPORT_SESSION_FLAG, '1');
+    } catch (error) {
+      // ignore
+    }
+  }
+
   function clearLensImportSessionFlag() {
     if (canUseSessionStorage) {
       try {
@@ -17482,9 +17635,28 @@
     lensImportRequested = false;
   }
 
+  function clearQrImportSessionFlag() {
+    if (canUseSessionStorage) {
+      try {
+        window.sessionStorage.removeItem(QR_IMPORT_SESSION_FLAG);
+      } catch (error) {
+        // ignore
+      }
+    }
+    qrImportRequested = false;
+  }
+
   function removeLensImportPayload() {
     try {
       window.localStorage.removeItem(LENS_IMPORT_STORAGE_KEY);
+    } catch (error) {
+      // ignore
+    }
+  }
+
+  function removeQrImportPayload() {
+    try {
+      window.localStorage.removeItem(QR_IMPORT_STORAGE_KEY);
     } catch (error) {
       // ignore
     }
@@ -17495,6 +17667,13 @@
       removeLensImportPayload();
     }
     clearLensImportSessionFlag();
+  }
+
+  function finalizeQrImportAttempt({ clearPayload = false } = {}) {
+    if (clearPayload) {
+      removeQrImportPayload();
+    }
+    clearQrImportSessionFlag();
   }
 
   async function maybeImportLensCapture() {
@@ -17602,6 +17781,115 @@
       updateAutosaveStatus('PiXiEELENS の取り込みに失敗しました', 'error');
       await fallbackRestoreAutosaveAfterLensFailure();
       finalizeLensImportAttempt();
+      return false;
+    }
+  }
+
+  async function maybeImportQrCapture() {
+    let shouldImport = false;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      shouldImport = params.get(QR_IMPORT_QUERY_KEY) === '1';
+    } catch (error) {
+      shouldImport = false;
+    }
+    if (!shouldImport && qrImportRequested) {
+      shouldImport = true;
+    }
+    if (!shouldImport) {
+      return false;
+    }
+
+    let rawPayload = null;
+    try {
+      rawPayload = window.localStorage.getItem(QR_IMPORT_STORAGE_KEY);
+    } catch (error) {
+      console.warn('QR transfer storage is not available', error);
+    }
+
+    let payload = null;
+    if (rawPayload) {
+      try {
+        payload = JSON.parse(rawPayload);
+      } catch (error) {
+        console.warn('Failed to parse QR transfer payload', error);
+      }
+    }
+
+    clearLensImportRequestParam();
+
+    if (!payload || typeof payload !== 'object' || typeof payload.dataUrl !== 'string') {
+      updateAutosaveStatus('QR編集モードからのデータが見つかりませんでした', 'warn');
+      await fallbackRestoreAutosaveAfterQrFailure();
+      finalizeQrImportAttempt({ clearPayload: true });
+      return false;
+    }
+
+    if (payload.expiresAt && Number.isFinite(payload.expiresAt) && Date.now() > payload.expiresAt) {
+      updateAutosaveStatus('QR編集モードからのデータが期限切れです。再度送信してください。', 'warn');
+      await fallbackRestoreAutosaveAfterQrFailure();
+      finalizeQrImportAttempt({ clearPayload: true });
+      return false;
+    }
+
+    const blob = dataUrlToBlob(payload.dataUrl);
+    if (!blob) {
+      updateAutosaveStatus('QR画像データを読み込めませんでした', 'error');
+      await fallbackRestoreAutosaveAfterQrFailure();
+      finalizeQrImportAttempt({ clearPayload: true });
+      return false;
+    }
+
+    const inferredName = typeof payload.filename === 'string' && payload.filename
+      ? payload.filename
+      : 'pixiee-qr.png';
+    let file;
+    try {
+      file = new File([blob], inferredName, { type: blob.type || 'image/png' });
+    } catch (error) {
+      file = blob;
+      file.name = inferredName;
+    }
+
+    try {
+      const imported = await openDocumentsAsProjectTabs(
+        [file],
+        async qrFile => {
+          const loaded = await loadDocumentFromImageFile(qrFile);
+          if (!loaded) {
+            return false;
+          }
+          await ensureAutosaveForLensImport();
+          return true;
+        },
+        { source: 'qrmaker' }
+      );
+      if (!imported) {
+        finalizeQrImportAttempt({ clearPayload: true });
+        return false;
+      }
+      hideStartupScreen();
+      if (AUTOSAVE_SUPPORTED) {
+        try {
+          await writeAutosaveSnapshot(true);
+        } catch (error) {
+          console.warn('Immediate autosave after QR import failed', error);
+        }
+      }
+      updateAutosaveStatus(
+        localizeText(
+          'QRコードを別プロジェクトタブで開きました',
+          'Opened QR code in a separate project tab'
+        ),
+        'success'
+      );
+      finalizeQrImportAttempt({ clearPayload: true });
+      return true;
+    } catch (error) {
+      console.warn('Failed to import QR capture', error);
+      updateAutosaveStatus('QRコードの取り込みに失敗しました', 'error');
+      await fallbackRestoreAutosaveAfterQrFailure();
+      finalizeQrImportAttempt();
       return false;
     }
   }
@@ -30901,11 +31189,11 @@
         return false;
       });
       const skipStartup = EMBED_CONFIG.skipStartup === true;
-      if (lensImportRequested || skipStartup) {
+    if (lensImportRequested || qrImportRequested || skipStartup) {
         hideStartupScreen();
       }
       let restoredAutosaveProject = false;
-      if (!lensImportRequested && !skipStartup) {
+      if (!lensImportRequested && !qrImportRequested && !skipStartup) {
         try {
           setStartupProgressLabel(localizeText('前回の作業を確認中…', 'Checking your previous work...'));
           if (startupSharedReloadProjectKey) {
@@ -30951,12 +31239,19 @@
         console.warn('Lens capture bootstrap failed', error);
         importedFromLens = false;
       }
+      let importedFromQr = false;
+      try {
+        importedFromQr = await maybeImportQrCapture();
+      } catch (error) {
+        console.warn('QR import bootstrap failed', error);
+        importedFromQr = false;
+      }
       setStartupProgressLabel(localizeText('起動を完了しています…', 'Finalizing startup...'));
       renderEverything();
       resetOpenedDocumentViewport({ defer: true });
       refreshLocalizedUi();
       scheduleDeferredUiSetup();
-      if (!lensImportRequested && !importedFromLens && !skipStartup && !restoredAutosaveProject && !reloadSnapshotRestored) {
+      if (!lensImportRequested && !qrImportRequested && !importedFromLens && !importedFromQr && !skipStartup && !restoredAutosaveProject && !reloadSnapshotRestored) {
         showProjectHomeScreen({ refresh: true });
       }
     } finally {
