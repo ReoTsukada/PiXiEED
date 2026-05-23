@@ -30,45 +30,14 @@
             '開発ノートまとめページを追加',
             'プロジェクト紹介ページに更新メモを追加',
             'ホームの最近更新を直近5件表示に変更',
-            'フッターの空き枠にPiXiEELENSボタンを配置',
-            'maoituのゲームオーバー画面に他ゲーム導線を追加'
-          ]
-        }
-      ]
-    },
-    {
-      id: 'maou-war',
-      name: '魔王様奪還',
-      url: '../maou-war/index.html',
-      entries: [
-        {
-          date: '2026-02-11',
-          items: [
-            'UIレイアウトを再調整し、縦画面でマップ表示を最大化',
-            '下部広告を小バナーサイズで統一し、表示崩れを修正',
-            'ステータスシートをタブ間で同サイズ化し、スキル一覧を6列表示に変更',
-            'ログを1文字ずつ表示する演出に変更',
-            'HP路の上昇量を強化し、優勢色ボーナス（パラメータ加算）を追加',
-            'ground-sprite-14の4コマPNGアニメーションをミミックタイルに適用',
-            '固定マップの拠点周辺タイル・ショップ配置を調整（宿を右下端へ移動）'
-          ]
-        },
-        {
-          date: '2026-02-05',
-          items: [
-            '宝箱のチャリン報酬を運依存の10〜1000に変更',
-            '宝箱が到達判定で消える挙動を修正',
-            '地面/魔王スプライトのファイル名をASCII化'
+            'フッターの空き枠にPiXiEELENSボタンを配置'
           ]
         }
       ]
     },
     { id: 'pixiedraw', name: 'PiXiEEDraw', url: '../pixiedraw/index.html', entries: [] },
-    { id: 'pixiedraw-lite', name: 'PiXiEEDraw Lite', url: '../jerin-maker/index.html', entries: [] },
     { id: 'pixiee-lens', name: 'PiXiEELENS', url: '../pixiee-lens/index.html', entries: [] },
-    { id: 'pixfind', name: 'PiXFiND', url: '../pixfind/index.html', entries: [] },
-    { id: 'qr-maker', name: 'QRコードメーカー', url: '../qr-maker/index.html', entries: [] },
-    { id: 'maoitu', name: 'maoitu', url: '../maoitu/index.html', entries: [] }
+    { id: 'qr-maker', name: 'QRコードメーカー', url: '../qr-maker/index.html', entries: [] }
   ];
 
   // file:// 直開きなど fetch が失敗する環境でも主要ツールだけは空欄にしない
@@ -99,14 +68,6 @@
         ]
       }
     ],
-    'pixiedraw-lite': [
-      {
-        date: '2026-02-11',
-        items: [
-          '「描く」導線の初心者向けとして案内を強化'
-        ]
-      }
-    ],
     'pixiee-lens': [
       {
         date: '2026-02-16',
@@ -123,25 +84,14 @@
     'contest/index.html': 'site',
     'glossary/index.html': 'site',
     'portfolio/index.html': 'site',
-    'pixel-art-editor/index.html': 'site',
-    'pixel-art-animation/index.html': 'site',
-    'pixel-art-maker/index.html': 'site',
-    'pixel-art-online/index.html': 'site',
     'pixiedraw/index.html': 'pixiedraw',
-    'jerin-maker/index.html': 'pixiedraw-lite',
     'pixiee-lens/index.html': 'pixiee-lens',
-    'pixfind/index.html': 'pixfind',
-    'qr-maker/index.html': 'qr-maker',
-    'maoitu/index.html': 'maoitu',
-    'maou-war/index.html': 'maou-war',
-    'projects/maou-war/index.html': 'maou-war'
+    'qr-maker/index.html': 'qr-maker'
   });
 
   const readmeSources = Object.freeze({
     pixiedraw: '../pixiedraw/README.md',
-    'pixiedraw-lite': '../jerin-maker/README.md',
     'pixiee-lens': '../pixiee-lens/README.md',
-    pixfind: '../pixfind/README.md',
     'qr-maker': '../qr-maker/README.md'
   });
 
@@ -322,10 +272,8 @@
   function resolveNoteId(link, title) {
     if (indexLinkToNoteId[link]) return indexLinkToNoteId[link];
     if (!title) return '';
-    if (/PiXiEEDraw Lite/i.test(title)) return 'pixiedraw-lite';
     if (/PiXiEEDraw/i.test(title)) return 'pixiedraw';
     if (/PiXiEELENS/i.test(title)) return 'pixiee-lens';
-    if (/PiXFiND/i.test(title)) return 'pixfind';
     return '';
   }
 

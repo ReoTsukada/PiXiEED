@@ -71,5 +71,4 @@ const server = http.createServer((req, res) => {
 
 server.listen(port, () => {
   console.log(`Static server running at http://localhost:${port}/`);
-  console.log(`maou-war: http://localhost:${port}/maou-war/`);
 });

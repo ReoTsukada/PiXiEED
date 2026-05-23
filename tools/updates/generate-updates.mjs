@@ -26,12 +26,6 @@ const PROJECTS = [
     paths: ['pixiedraw']
   },
   {
-    id: 'pixiedraw-lite',
-    name: 'PiXiEEDraw Lite',
-    url: '/projects/jerin-maker/',
-    paths: ['jerin-maker']
-  },
-  {
     id: 'pixiee-lens',
     name: 'PiXiEELENS',
     url: '/projects/pixiee-lens/',
@@ -42,24 +36,6 @@ const PROJECTS = [
     name: 'QRコードメーカー',
     url: '/projects/qr-maker/',
     paths: ['qr-maker']
-  },
-  {
-    id: 'pixfind',
-    name: 'PiXFiND',
-    url: '/projects/pixfind/',
-    paths: ['pixfind']
-  },
-  {
-    id: 'maoitu',
-    name: '魔王様!!いつまでよければいいですか!?',
-    url: '/projects/maoitu/',
-    paths: ['maoitu']
-  },
-  {
-    id: 'maou-war',
-    name: '魔王奪還戦',
-    url: '/projects/maou-war/',
-    paths: ['maou-war']
   }
 ];
 

@@ -14823,7 +14823,6 @@
     setLocalizedToggleLabel('toggleTimelapse', 'タイムラプス記録', 'Timelapse Recording');
     setLocalizedToggleLabel('toggleOnionSkin', 'オニオンスキン', 'Onion Skin');
     setLocalizedToggleLabel('toggleMirrorMode', 'ミラーモード', 'Mirror Mode');
-    setLocalizedToggleLabel('togglePixfindMode', '間違い探しモード', 'PiXFiND Mode');
     setLocalizedToggleLabel('mirrorAxisVertical', '左右対称', 'Vertical Mirror');
     setLocalizedToggleLabel('mirrorAxisHorizontal', '上下対称', 'Horizontal Mirror');
     setLocalizedToggleLabel('mirrorAxisDiagonalA', '斜め対称 (＼)', 'Diagonal Mirror (\\)');
@@ -14885,7 +14884,6 @@
     setLocalizedSelectOption(dom.exportDialog?.format, 'gridpng', 'PNG（グリッド分割）', 'PNG (Grid Split)');
     setLocalizedSelectOption(dom.exportDialog?.format, 'gif', 'GIF（アニメーション）', 'GIF (Animation)');
     setLocalizedSelectOption(dom.exportDialog?.format, 'timelapse', 'タイムラプスGIF（記録）', 'Timelapse GIF');
-    setLocalizedSelectOption(dom.exportDialog?.format, 'pixfind', 'PiXFiNDへ送る', 'Send to PiXFiND');
     setLocalizedSelectOption(dom.exportDialog?.format, 'project', 'プロジェクト（.pixieedraw）', 'Project (.pixieedraw)');
     setLocalizedTextContent('label[for="exportFileNameBase"] > span', '出力名', 'Export Name');
     setLocalizedAttribute('#exportFileNameBase', 'placeholder', '例: my_artwork', 'e.g. my_artwork');
@@ -14943,10 +14941,6 @@
     setLocalizedTextContent('#closeUpdateHistory', '閉じる', 'Close');
     setLocalizedTextContent('#toolSpotlightTitle', '他ツールの紹介', 'More Tools');
     setLocalizedTextContent('#toolSpotlightLead', '出力ありがとうございます。次に遊べる・使えるツールです。', 'Thanks for exporting. Here are tools you can try next.');
-    setLocalizedTextContent('#toolSpotlightMaoituTitle', 'まおいつ', 'Maoitu');
-    setLocalizedTextContent('#toolSpotlightMaoituDesc', '避け続けるアクションゲーム。短時間でスコアアタックできます。', 'An action game focused on dodging. Great for quick score attacks.');
-    setLocalizedTextContent('#toolSpotlightPixfindTitle', 'PiXFiND', 'PiXFiND');
-    setLocalizedTextContent('#toolSpotlightPixfindDesc', 'ドット絵専用の間違い探しゲーム。作った絵の活用にも最適です。', 'A spot-the-difference game for pixel art. Great for reusing your drawings.');
     setLocalizedTextContent('#toolSpotlightLensTitle', 'PiXiEELENS', 'PiXiEELENS');
     setLocalizedTextContent('#toolSpotlightLensDesc', 'カメラ画像をドット化できるツール。撮影してそのまま編集導線につなげられます。', 'Turn camera images into pixel art and continue straight into editing.');
     setLocalizedTextContent('#toolSpotlightContestTitle', 'PiXiEEDコンテスト', 'PiXiEED Contest');
@@ -18646,7 +18640,7 @@
       return;
     }
     const choice = window.prompt(
-      '出力形式を入力してください (png / jpeg / svg / glb / grid / gif / timelapse / pixfind / project)',
+      '出力形式を入力してください (png / jpeg / svg / glb / grid / gif / timelapse / project)',
       'png'
     );
     if (!choice) {
@@ -18669,10 +18663,9 @@
       && inputMode !== 'spritesheet'
       && inputMode !== 'gif'
       && inputMode !== 'timelapse'
-      && inputMode !== 'pixfind'
       && inputMode !== 'project'
     ) {
-      window.alert('png / jpeg / svg / glb / spritemap / grid / gif / timelapse / pixfind / project のいずれかを入力してください。');
+      window.alert('png / jpeg / svg / glb / spritemap / grid / gif / timelapse / project のいずれかを入力してください。');
       return;
     }
     const normalized = normalizeExportFormat(inputMode);
@@ -18700,8 +18693,6 @@
       await exportTimelapseGif();
     } else if (normalized === 'contest') {
       updateAutosaveStatus('コンテスト投稿は現在停止中です', 'warn');
-    } else if (normalized === 'pixfind') {
-      exportProjectToPixfind();
     } else if (normalized === 'project') {
       const result = await saveProjectAsPixieedraw({
         fileNameBase: exportFileNameBase || state.documentName,
@@ -27190,7 +27181,6 @@
     if (normalized === 'spritemap' || normalized === 'sprite-map' || normalized === 'spritesheet' || normalized === 'sprite-sheet') return 'spritemap';
     if (normalized === 'png') return 'png';
     if (normalized === 'gridpng' || normalized === 'grid') return 'gridpng';
-    if (normalized === 'pixfind') return 'pixfind';
     if (normalized === 'project') return 'project';
     return 'png';
   }
@@ -27205,7 +27195,6 @@
     if (normalized === 'gridpng') return localizeText('PNG（グリッド分割）', 'PNG (Grid Split)');
     if (normalized === 'gif') return 'GIF';
     if (normalized === 'timelapse') return localizeText('タイムラプスGIF', 'Timelapse GIF');
-    if (normalized === 'pixfind') return localizeText('PiXFiND送信', 'Send to PiXFiND');
     if (normalized === 'project') return localizeText('プロジェクト保存', 'Project Save');
     return 'PNG';
   }

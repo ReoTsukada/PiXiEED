@@ -24,7 +24,7 @@
       <div class="header-inner">
         <${brandTag} class="brand" ${brandAttrs}>
           <span class="brand-icon" id="brandAvatar">
-            <img src="${asset('../character-dots/mao1.png')}" alt="logo">
+            <img src="${asset('../icon/icon-512-4.png')}" alt="logo">
           </span>
           <div class="brand-text">
             <p class="brand-title">PiXiEED</p>
@@ -61,7 +61,7 @@
   }
 
   const AVATARS = [
-    { id: 'mao', src: asset('../character-dots/mao1.png') },
+    { id: 'pixiedraw', src: asset('../icon/icon-512-4.png') },
     { id: 'jerin1', src: asset('../character-dots/Jerin1.png') },
     { id: 'jerin2', src: asset('../character-dots/Jerin2.png') },
     { id: 'jerin3', src: asset('../character-dots/Jerin3.png') },
@@ -108,15 +108,15 @@
 
   function loadAvatar() {
     try {
-      return localStorage.getItem('pixieed_avatar') || 'mao';
+      return localStorage.getItem('pixieed_avatar') || 'pixiedraw';
     } catch (_error) {
-      return 'mao';
+      return 'pixiedraw';
     }
   }
 
   function saveAvatar(value) {
     try {
-      localStorage.setItem('pixieed_avatar', value || 'mao');
+      localStorage.setItem('pixieed_avatar', value || 'pixiedraw');
     } catch (_error) {}
   }
 

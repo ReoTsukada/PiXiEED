@@ -29,10 +29,10 @@
     if (!entries.length) {
       entries = [
         {
-          file: 'icon/icon-192-3.png',
-          label: 'Maoitu',
+          file: 'icon/icon-192-4.png',
+          label: 'PiXiEEDraw',
           date: new Date().toISOString().slice(0, 10),
-          alt: '魔王様!!いつまでよければいいですか!? のタイトル背景'
+          alt: 'PiXiEEDraw'
         }
       ];
     }

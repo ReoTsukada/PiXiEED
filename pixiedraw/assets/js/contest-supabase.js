@@ -1,4 +1,4 @@
-// Supabase client for PiXiEEDraw Lite contest
+// Supabase client for PiXiEEDraw contest
 export const SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
 export const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
 

@@ -200,11 +200,6 @@
             desc: 'Capture and convert photos into pixel art instantly, then export PNG/GIF for sharing.'
           },
           {
-            title: 'PiXiEEDraw Lite',
-            link: 'jerin-maker/index.html',
-            desc: 'Guided 16x16 starter so beginners can complete their first pixel piece in minutes.'
-          },
-          {
             title: 'Tools / Games Hub',
             link: 'tools.html',
             desc: 'Compare drawing tools, converters, and games in one place and jump straight into use.'
@@ -220,11 +215,6 @@
             title: 'PiXiEELENS',
             link: 'pixiee-lens/index.html',
             desc: '撮ってすぐドット化。PNG/GIFの保存と共有までブラウザだけで完了できます。'
-          },
-          {
-            title: 'PiXiEEDraw Lite',
-            link: 'jerin-maker/index.html',
-            desc: '16×16のガイド付きで迷わず開始。短時間で1枚完成しやすい入門ツールです。'
           },
           {
             title: 'ツール/ゲーム一覧',
