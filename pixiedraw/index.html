@@ -208,6 +208,23 @@
 </div>
 <div aria-label="プロジェクトタブ" class="project-tabs__list" id="projectTabsList" role="tablist"></div>
 </div>
+<section aria-labelledby="projectHomeTitle" class="project-home-screen" hidden id="projectHomeScreen" tabindex="-1">
+<div class="project-home-screen__inner">
+<header class="project-home-screen__header">
+<div>
+<h1 class="project-home-screen__title" id="projectHomeTitle">プロジェクト一覧</h1>
+</div>
+<div aria-label="ホーム操作" class="project-home-screen__actions" role="group">
+<button class="button button--primary" id="projectHomeNew" type="button">新規作成</button>
+<button class="button" id="projectHomeOpen" type="button">ファイルを開く</button>
+</div>
+</header>
+<div class="project-home-screen__recent" id="projectHomeRecentProjects">
+<h2 class="project-home-screen__section-title">プロジェクト</h2>
+<div class="startup-recent-list project-home-screen__list" id="projectHomeRecentList" role="list"></div>
+</div>
+</div>
+</section>
 <div class="stage__canvas" id="canvasViewport">
 <div class="stage__workspace" data-local-canvas-layout="single" id="viewportWorkspace">
 <div class="stage__main-canvas" id="mainCanvasArea">
