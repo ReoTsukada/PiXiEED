@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-23T06:35:28.756Z",
+  "generatedAt": "2026-05-23T10:24:51.219Z",
   "projects": [
     {
       "id": "site",
@@ -64,7 +64,7 @@
         {
           "date": "2026-05-23",
           "items": [
-            "機能 / 画面 / スタイルを更新"
+            "画像 / 機能 / 画面 / スタイルを更新"
           ]
         },
         {
@@ -172,6 +172,12 @@
       "url": "/projects/qr-maker/",
       "entries": [
         {
+          "date": "2026-05-23",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
           "date": "2026-04-03",
           "items": [
             "画面を更新"
@@ -212,12 +218,6 @@
           "items": [
             "画面を更新"
           ]
-        },
-        {
-          "date": "2026-02-12",
-          "items": [
-            "画面を更新"
-          ]
         }
       ]
     }
@@ -236,12 +236,18 @@
           "id": "pixiedraw",
           "name": "PiXiEEDraw",
           "url": "/projects/pixiedraw/",
-          "summary": "機能 / 画面 / スタイルを更新"
+          "summary": "画像 / 機能 / 画面 / スタイルを更新"
         },
         {
           "id": "pixiee-lens",
           "name": "PiXiEELENS",
           "url": "/projects/pixiee-lens/",
+          "summary": "画面を更新"
+        },
+        {
+          "id": "qr-maker",
+          "name": "QRコードメーカー",
+          "url": "/projects/qr-maker/",
           "summary": "画面を更新"
         }
       ]
