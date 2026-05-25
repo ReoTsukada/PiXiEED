@@ -8355,6 +8355,11 @@
     const currentSharedProjectKey = currentProjectIsShared
       ? normalizeMultiProjectKey(options.sharedProjectKey || sharedEntry?.sharedProjectKey || activeSharedProjectKey || '')
       : '';
+    const activeSharedProjectAppliesToTab = Boolean(
+      currentProjectIsShared
+      && activeSharedRecentProjectId
+      && normalizedProjectId === activeSharedRecentProjectId
+    );
     return {
       id: options.tabId || createOpenProjectTabId(),
       projectId: normalizedProjectId,
@@ -8373,13 +8378,13 @@
           0,
           Math.round(Number(options.sharedProjectRevision) || 0),
           Math.round(Number(sharedEntry?.sharedProjectRevision) || 0),
-          Math.round(Number(activeSharedProjectRevision) || 0)
+          activeSharedProjectAppliesToTab ? Math.round(Number(activeSharedProjectRevision) || 0) : 0
         ),
         sharedProjectStructureRevision: Math.max(
           0,
           Math.round(Number(options.sharedProjectStructureRevision) || 0),
           Math.round(Number(sharedEntry?.sharedProjectStructureRevision) || 0),
-          Math.round(Number(activeSharedProjectStructureRevision) || 0)
+          activeSharedProjectAppliesToTab ? Math.round(Number(activeSharedProjectStructureRevision) || 0) : 0
         ),
         sharedRoleHint: options.sharedRoleHint || sharedEntry?.sharedRoleHint || 'guest',
         sharedAutoJoin: options.sharedAutoJoin !== false && sharedEntry?.sharedAutoJoin !== false,
@@ -8634,16 +8639,17 @@
       }
     }
     const current = openProjectTabs[index];
+    const preserveSharedMetadata = current?.source === 'shared';
     const updated = createOpenProjectTabFromCurrentState({
       tabId: current?.id || activeOpenProjectTabId,
       source: current?.source || 'working',
       projectId: normalizeAutosaveProjectId(autosaveProjectId) || current?.projectId || '',
-      sharedProjectKey: current?.sharedProjectKey,
-      sharedProjectBackendId: current?.sharedProjectBackendId,
-      sharedProjectRevision: current?.sharedProjectRevision,
-      sharedProjectStructureRevision: current?.sharedProjectStructureRevision,
-      sharedRoleHint: current?.sharedRoleHint,
-      sharedAutoJoin: current?.sharedAutoJoin,
+      sharedProjectKey: preserveSharedMetadata ? current?.sharedProjectKey : '',
+      sharedProjectBackendId: preserveSharedMetadata ? current?.sharedProjectBackendId : '',
+      sharedProjectRevision: preserveSharedMetadata ? current?.sharedProjectRevision : 0,
+      sharedProjectStructureRevision: preserveSharedMetadata ? current?.sharedProjectStructureRevision : 0,
+      sharedRoleHint: preserveSharedMetadata ? current?.sharedRoleHint : '',
+      sharedAutoJoin: preserveSharedMetadata ? current?.sharedAutoJoin : false,
     });
     openProjectTabs[index] = updated;
     activeOpenProjectTabId = updated.id;
@@ -23687,15 +23693,68 @@
     }
     const existingEntries = await loadRecentProjectsMetadata();
     const previousEntry = existingEntries.find(entry => entry?.id === normalizedEntry.id) || null;
-    const workingEntries = existingEntries.filter(entry => entry && entry.id && entry.id !== normalizedEntry.id);
-    workingEntries.unshift({
+    const preferIncomingText = (incoming, existing) => {
+      const normalizedIncoming = typeof incoming === 'string' ? incoming.trim() : '';
+      if (normalizedIncoming) {
+        return normalizedIncoming;
+      }
+      return typeof existing === 'string' ? existing : '';
+    };
+    const preferIncomingNumber = (incoming, existing) => {
+      const normalizedIncoming = Math.max(0, Math.round(Number(incoming) || 0));
+      const normalizedExisting = Math.max(0, Math.round(Number(existing) || 0));
+      if (normalizedIncoming > 0) {
+        return normalizedIncoming;
+      }
+      return normalizedExisting;
+    };
+    const mergedEntry = {
       ...(previousEntry || {}),
       ...normalizedEntry,
-    });
+    };
+    if (previousEntry && typeof previousEntry === 'object') {
+      mergedEntry.sharedProjectBackendId = preferIncomingText(
+        normalizedEntry.sharedProjectBackendId,
+        previousEntry.sharedProjectBackendId
+      );
+      mergedEntry.sharedProjectInviteToken = preferIncomingText(
+        normalizedEntry.sharedProjectInviteToken,
+        previousEntry.sharedProjectInviteToken
+      );
+      mergedEntry.sharedProjectVisibility = preferIncomingText(
+        normalizedEntry.sharedProjectVisibility,
+        previousEntry.sharedProjectVisibility
+      ) || 'shared';
+      mergedEntry.sharedProjectRevision = preferIncomingNumber(
+        normalizedEntry.sharedProjectRevision,
+        previousEntry.sharedProjectRevision
+      );
+      mergedEntry.sharedProjectStructureRevision = preferIncomingNumber(
+        normalizedEntry.sharedProjectStructureRevision,
+        previousEntry.sharedProjectStructureRevision
+      );
+      mergedEntry.name = preferIncomingText(
+        normalizedEntry.name,
+        previousEntry.name
+      ) || extractDocumentBaseName(state.documentName || DEFAULT_DOCUMENT_NAME);
+      mergedEntry.fileName = preferIncomingText(
+        normalizedEntry.fileName,
+        previousEntry.fileName
+      ) || normalizeDocumentName(`${mergedEntry.name}.pixiedraw`);
+      if (
+        !normalizedEntry.thumbnail
+        && typeof previousEntry.thumbnail === 'string'
+        && previousEntry.thumbnail.length > 0
+      ) {
+        mergedEntry.thumbnail = previousEntry.thumbnail;
+      }
+    }
+    const workingEntries = existingEntries.filter(entry => entry && entry.id && entry.id !== normalizedEntry.id);
+    workingEntries.unshift(mergedEntry);
     const normalizedEntries = enforceSharedRecentProjectLimit(workingEntries);
     await saveRecentProjectsList(existingEntries, normalizedEntries);
     setRecentProjectsCache(normalizedEntries);
-    return normalizedEntry;
+    return normalizeSharedRecentProjectEntry(mergedEntry) || normalizedEntry;
   }
 
   async function refreshSharedRecentProjectEntryFromBackend(entry = null) {
@@ -59081,7 +59140,7 @@
     if (MULTI_LAYER_PATCH_HISTORY_LABELS.has(normalizedLabel)) {
       return 'draw';
     }
-    return 'session';
+    return 'draw';
   }
 
   function isSharedProjectDrawKind(kind = '') {
@@ -59110,7 +59169,7 @@
     if (!opId) {
       return false;
     }
-    return sharedProjectSeenOpIds.has(opId) || sharedProjectAppliedProvisionalOpIds.has(opId);
+    return sharedProjectSeenOpIds.has(opId);
   }
 
   function buildSharedProjectLayerSnapshotKey(canvasId, frameIndex, layerId) {
@@ -62440,9 +62499,8 @@
       sharedProjectPendingRemoteOps.delete(nextSeq);
       if (
         nextOpId
-        && (sharedProjectSeenOpIds.has(nextOpId) || sharedProjectAppliedProvisionalOpIds.has(nextOpId))
+        && sharedProjectSeenOpIds.has(nextOpId)
       ) {
-        sharedProjectAppliedProvisionalOpIds.delete(nextOpId);
         sharedProjectLastAppliedSeq = nextSeq;
         activeSharedProjectRevision = Math.max(activeSharedProjectRevision, nextSeq);
         activeSharedProjectStructureRevision = Math.max(
@@ -62486,7 +62544,7 @@
         if (
           fromRemote
           && opId
-          && (sharedProjectSeenOpIds.has(opId) || sharedProjectAppliedProvisionalOpIds.has(opId))
+          && sharedProjectSeenOpIds.has(opId)
         ) {
           if (isSharedProjectRemoteOpFromCurrentSession(op)) {
             logSharedProjectDrawLifecycle('remote-confirmed-op-applied', op, {
@@ -62494,7 +62552,6 @@
               reason: 'self-ack-without-reapply',
             });
           }
-          sharedProjectAppliedProvisionalOpIds.delete(opId);
           if (seq === sharedProjectLastAppliedSeq + 1) {
             sharedProjectLastAppliedSeq = seq;
             activeSharedProjectRevision = Math.max(activeSharedProjectRevision, seq);
@@ -65861,7 +65918,28 @@
       return null;
     }
     const projectKey = activeSharedProjectKey;
-    const projectId = activeSharedProjectId || '';
+    let projectId = activeSharedProjectId || '';
+    if (!projectId) {
+      try {
+        const recoveredProject = await fetchSharedProjectRecord(projectKey);
+        const recoveredProjectId = typeof recoveredProject?.id === 'string' ? recoveredProject.id.trim() : '';
+        if (recoveredProjectId) {
+          setActiveSharedProjectSession(
+            projectKey,
+            activeSharedProjectRevision,
+            activeSharedProjectStructureRevision,
+            recoveredProjectId
+          );
+          projectId = recoveredProjectId;
+          console.debug('[shared-realtime] missing projectId recovered', {
+            projectKey,
+            projectId: recoveredProjectId,
+          });
+        }
+      } catch (_error) {
+        // Keep fallback behavior below.
+      }
+    }
     const channelSignature = `${projectKey}::${projectId}`;
     const supabase = await ensurePixieedAccountClient();
     if (!supabase) {
