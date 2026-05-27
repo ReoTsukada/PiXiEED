@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.05.13-export-name-seq';
+  const APP_BUILD_VERSION = '2026.05.27-shared-op-codec';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
@@ -4049,6 +4049,11 @@
     'removeCanvas',
     'reorderCanvas',
   ]);
+  const sharedProjectOpCodec = window.PiXiEEDrawModules?.sharedProjectOpCodec?.createSharedProjectOpCodec?.({
+    structureHistoryLabels: SHARED_PROJECT_STRUCTURE_HISTORY_LABELS,
+    paletteHistoryLabels: MULTI_PALETTE_HISTORY_LABELS,
+    layerPatchHistoryLabels: MULTI_LAYER_PATCH_HISTORY_LABELS,
+  }) || null;
   const globalHistoryConfirmState = {
     resolve: null,
     closing: false,
@@ -59127,6 +59132,9 @@
   }
 
   function classifySharedProjectOpType(historyLabel = '') {
+    if (sharedProjectOpCodec) {
+      return sharedProjectOpCodec.classifySharedProjectOpType(historyLabel);
+    }
     const normalizedLabel = String(historyLabel || '').trim();
     if (!normalizedLabel) {
       return 'snapshot';
@@ -59845,6 +59853,27 @@
     }
     noteSharedProjectOperationApplied({ opType: 'structure', fromRemote });
     replayDeferredSharedProjectProvisionalOps();
+    if (fromRemote && activeSharedProjectKey) {
+      const appliedStructureSeq = getSharedProjectOpSeq(opRecord);
+      recoverSharedProjectRealtimeGap(activeSharedProjectKey, {
+        afterSeq: Math.max(0, sharedProjectLastAppliedSeq, appliedStructureSeq),
+        reason: 'structure-post-apply-catchup',
+      }).then(recovered => {
+        if (!recovered) {
+          queueSharedProjectRefresh({
+            immediate: false,
+            reason: 'structure-post-apply-catchup',
+            force: true,
+          });
+        }
+      }).catch(() => {
+        queueSharedProjectRefresh({
+          immediate: false,
+          reason: 'structure-post-apply-catchup',
+          force: true,
+        });
+      });
+    }
     return true;
   }
 
@@ -59910,6 +59939,9 @@
   }
 
   function normalizeSharedProjectOpKind(historyLabel = '', opPayload = null) {
+    if (sharedProjectOpCodec) {
+      return sharedProjectOpCodec.normalizeSharedProjectOpKind(historyLabel, opPayload);
+    }
     const normalizedLabel = String(historyLabel || '').trim();
     const normalizedType = classifySharedProjectOpType(normalizedLabel);
     if (normalizedType === 'draw') {
@@ -59984,6 +60016,9 @@
   }
 
   function getSharedProjectOpSeq(opRecord) {
+    if (sharedProjectOpCodec) {
+      return sharedProjectOpCodec.getSharedProjectOpSeq(opRecord);
+    }
     return Math.max(
       0,
       Math.round(
@@ -59995,6 +60030,9 @@
   }
 
   function extractSharedProjectOpPayload(opRecord) {
+    if (sharedProjectOpCodec) {
+      return sharedProjectOpCodec.extractSharedProjectOpPayload(opRecord);
+    }
     if (opRecord?.payload && typeof opRecord.payload === 'object') {
       if (opRecord.payload.op && typeof opRecord.payload.op === 'object') {
         return {
@@ -60017,6 +60055,9 @@
   }
 
   function getSharedProjectOpId(opRecord) {
+    if (sharedProjectOpCodec) {
+      return sharedProjectOpCodec.getSharedProjectOpId(opRecord);
+    }
     const payload = extractSharedProjectOpPayload(opRecord);
     if (typeof payload?.opId === 'string' && payload.opId.trim()) {
       return payload.opId.trim();
@@ -60031,6 +60072,9 @@
   }
 
   function normalizeSharedProjectOpId(opRecord) {
+    if (sharedProjectOpCodec) {
+      return sharedProjectOpCodec.normalizeSharedProjectOpId(opRecord);
+    }
     const payload = extractSharedProjectOpPayload(opRecord);
     if (typeof payload?.opId === 'string' && payload.opId.trim()) {
       return payload.opId.trim();
