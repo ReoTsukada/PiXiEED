@@ -59664,7 +59664,7 @@
     canvasSnapshot,
     existingCanvas = null,
     fallbackIndex = 1,
-    { preserveLocalSelection = true } = {}
+    { preserveLocalSelection = true, preserveByOrder = false } = {}
   ) {
     const width = clamp(Math.round(Number(canvasSnapshot?.width) || DEFAULT_CANVAS_SIZE), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
     const height = clamp(Math.round(Number(canvasSnapshot?.height) || DEFAULT_CANVAS_SIZE), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
@@ -59678,7 +59678,8 @@
       const frameId = typeof frameSnapshot?.id === 'string' && frameSnapshot.id.trim()
         ? frameSnapshot.id.trim()
         : `frame-${fallbackIndex}-${frameIndex}`;
-      const existingFrame = existingFramesById.get(frameId) || null;
+      const existingFrame = existingFramesById.get(frameId)
+        || (preserveByOrder ? (existingFrames[frameIndex] || null) : null);
       const existingLayers = Array.isArray(existingFrame?.layers) ? existingFrame.layers : [];
       const existingLayersById = new Map(
         existingLayers
@@ -59697,11 +59698,12 @@
           const layerId = typeof layerSnapshot?.id === 'string' && layerSnapshot.id.trim()
             ? layerSnapshot.id.trim()
             : `layer-${fallbackIndex}-${frameIndex}-${layerIndex}`;
+          const existingLayerByOrder = preserveByOrder ? (existingLayers[layerIndex] || null) : null;
           return createSharedProjectLayerFromStructureSnapshot(
             { ...layerSnapshot, id: layerId },
             width,
             height,
-            existingLayersById.get(layerId) || null
+            existingLayersById.get(layerId) || existingLayerByOrder || null
           );
         }),
       };
@@ -59795,13 +59797,16 @@
         .filter(canvas => canvas && typeof canvas.id === 'string' && canvas.id.trim())
         .map(canvas => [canvas.id.trim(), canvas])
     );
+    const historyLabel = typeof payload?.historyLabel === 'string' ? payload.historyLabel.trim() : '';
+    const normalizedKind = typeof opRecord?.kind === 'string' ? opRecord.kind.trim() : '';
+    const preserveByOrder = historyLabel === 'resizeCanvas' || normalizedKind === 'resize-canvas';
     const nextCanvases = canvasSnapshots.map((canvasSnapshot, index) => {
       const canvasId = typeof canvasSnapshot?.id === 'string' ? canvasSnapshot.id.trim() : '';
       return rebuildSharedProjectCanvasFromStructureSnapshot(
         canvasSnapshot,
         currentCanvasesById.get(canvasId) || null,
         index + 1,
-        { preserveLocalSelection: fromRemote }
+        { preserveLocalSelection: fromRemote, preserveByOrder }
       );
     });
     if (!nextCanvases.length) {
