@@ -1,11 +1,11 @@
-const CACHE_VERSION = 'pixiedraw-v2026.05.14-project-safety-cut';
+const APP_BUILD_VERSION = '2026.05.27-shared-op-codec';
+const CACHE_VERSION = `pixiedraw-v${APP_BUILD_VERSION}`;
 const CORE_ASSETS = [
   '/pixiedraw/',
   '/pixiedraw/index.html',
   '/pixiedraw/manifest.webmanifest',
   '/pixiedraw/assets/css/style.css',
   '/pixiedraw/assets/css/local-extension-runtime.css',
-  '/pixiedraw/assets/js/app.js?v=2026.05.14-project-safety-cut',
   '/icon/icon-192-4.png',
   '/icon/icon-512-4.png',
 ];
@@ -60,8 +60,10 @@ self.addEventListener('fetch', event => {
   if (isNetworkFirstRequest(request, url)) {
     event.respondWith(
       fetch(request).then(response => {
-        const copy = response.clone();
-        caches.open(CACHE_VERSION).then(cache => cache.put(request, copy)).catch(() => {});
+        if (!url.pathname.endsWith('/assets/js/app.js')) {
+          const copy = response.clone();
+          caches.open(CACHE_VERSION).then(cache => cache.put(request, copy)).catch(() => {});
+        }
         return response;
       }).catch(() => caches.match(request))
     );
