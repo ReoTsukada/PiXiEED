@@ -64152,6 +64152,31 @@
         });
         return false;
       }
+      if (!activeSharedProjectId) {
+        const fetchedProjectId = typeof project?.id === 'string' ? project.id.trim() : '';
+        let recoveredProjectId = fetchedProjectId;
+        if (!recoveredProjectId) {
+          const membershipProject = await ensureSharedProjectMembership(activeSharedProjectKey, { createIfMissing: false });
+          recoveredProjectId = typeof membershipProject?.id === 'string' ? membershipProject.id.trim() : '';
+          if (membershipProject?.project_key && !project?.project_key) {
+            project = membershipProject;
+          }
+        }
+        if (recoveredProjectId) {
+          setActiveSharedProjectSession(
+            activeSharedProjectKey,
+            activeSharedProjectRevision,
+            activeSharedProjectStructureRevision,
+            recoveredProjectId
+          );
+          logSharedProjectRealtimeChannelLifecycle('refresh-project-id-recovered', {
+            caller: 'refreshActiveSharedProjectSnapshot',
+            reason: reason || 'refresh',
+            projectKey: activeSharedProjectKey,
+            projectId: recoveredProjectId,
+          });
+        }
+      }
       const nextRevision = getSharedProjectLatestRevision(project);
       const nextStructureRevision = getSharedProjectLatestStructureRevision(project);
       const snapshotRevision = getSharedProjectSnapshotRevision(project);
@@ -65967,27 +65992,43 @@
       return null;
     }
     const projectKey = activeSharedProjectKey;
+    const recoverActiveSharedProjectId = async (targetProjectKey) => {
+      const normalizedProjectKey = normalizeMultiProjectKey(targetProjectKey || '');
+      if (!normalizedProjectKey) {
+        return '';
+      }
+      let recoveredProject = null;
+      try {
+        recoveredProject = await fetchSharedProjectRecord(normalizedProjectKey);
+      } catch (_error) {
+        recoveredProject = null;
+      }
+      let recoveredProjectId = typeof recoveredProject?.id === 'string' ? recoveredProject.id.trim() : '';
+      if (!recoveredProjectId) {
+        try {
+          const membershipProject = await ensureSharedProjectMembership(normalizedProjectKey, { createIfMissing: false });
+          recoveredProjectId = typeof membershipProject?.id === 'string' ? membershipProject.id.trim() : '';
+        } catch (_error) {
+          recoveredProjectId = '';
+        }
+      }
+      if (recoveredProjectId) {
+        setActiveSharedProjectSession(
+          normalizedProjectKey,
+          activeSharedProjectRevision,
+          activeSharedProjectStructureRevision,
+          recoveredProjectId
+        );
+        console.debug('[shared-realtime] missing projectId recovered', {
+          projectKey: normalizedProjectKey,
+          projectId: recoveredProjectId,
+        });
+      }
+      return recoveredProjectId;
+    };
     let projectId = activeSharedProjectId || '';
     if (!projectId) {
-      try {
-        const recoveredProject = await fetchSharedProjectRecord(projectKey);
-        const recoveredProjectId = typeof recoveredProject?.id === 'string' ? recoveredProject.id.trim() : '';
-        if (recoveredProjectId) {
-          setActiveSharedProjectSession(
-            projectKey,
-            activeSharedProjectRevision,
-            activeSharedProjectStructureRevision,
-            recoveredProjectId
-          );
-          projectId = recoveredProjectId;
-          console.debug('[shared-realtime] missing projectId recovered', {
-            projectKey,
-            projectId: recoveredProjectId,
-          });
-        }
-      } catch (_error) {
-        // Keep fallback behavior below.
-      }
+      projectId = await recoverActiveSharedProjectId(projectKey);
     }
     const channelSignature = `${projectKey}::${projectId}`;
     const supabase = await ensurePixieedAccountClient();
@@ -66016,6 +66057,19 @@
       activeSharedProjectChannel
       && activeSharedProjectChannelSignature === channelSignature
     ) {
+      if (!projectId) {
+        logSharedProjectRealtimeChannelLifecycle('stale-channel-reconnect', {
+          caller: 'ensureActiveSharedProjectRealtimeChannel',
+          reason: 'missing-project-id-rebind-required',
+          projectKey,
+          projectId,
+          channelSignature,
+        });
+        await disconnectActiveSharedProjectRealtimeChannel({
+          reason: 'missing-project-id-rebind-required',
+          caller: 'ensureActiveSharedProjectRealtimeChannel',
+        });
+      } else {
       const channelState = typeof activeSharedProjectChannel.state === 'string' ? activeSharedProjectChannel.state : '';
       const joinState = typeof activeSharedProjectChannel.joinPush?.state === 'string' ? activeSharedProjectChannel.joinPush.state : '';
       const channelJoined = (
@@ -66055,6 +66109,7 @@
         reason: 'stale-channel-before-subscribe',
         caller: 'ensureActiveSharedProjectRealtimeChannel',
       });
+      }
     }
     sharedProjectRealtimeStatus = 'subscribing';
     activeSharedProjectChannelSignature = channelSignature;
