@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.05.29-shared-open-gap-barrier';
+  const APP_BUILD_VERSION = '2026.05.29-project-tab-delete-home';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
@@ -78,6 +78,7 @@
     projectHomeScreen: document.getElementById('projectHomeScreen'),
     projectHomeNew: document.getElementById('projectHomeNew'),
     projectHomeOpen: document.getElementById('projectHomeOpen'),
+    projectHomeCreateShared: document.getElementById('projectHomeCreateShared'),
     projectHomeRecentSection: document.getElementById('projectHomeRecentProjects'),
     projectHomeRecentList: document.getElementById('projectHomeRecentList'),
     mirrorToolPopover: document.getElementById('mirrorToolPopover'),
@@ -3990,6 +3991,7 @@
   const recentProjectsCache = new Map();
   const openProjectTabs = [];
   let activeOpenProjectTabId = '';
+  let suppressOpenProjectTabAutoInitialize = false;
   let openProjectTabSequence = 0;
   let openProjectTabBusy = false;
   let projectTabViewportResetToken = 0;
@@ -8194,6 +8196,116 @@
     return changed;
   }
 
+  function getOpenProjectTabSharedKey(tab = null) {
+    if (!tab || typeof tab !== 'object') {
+      return '';
+    }
+    return normalizeMultiProjectKey(tab.sharedProjectKey || '')
+      || getSharedProjectKeyFromProjectId(tab.projectId || '');
+  }
+
+  function matchesDeletedProjectOpenTab(tab = null, {
+    projectId = '',
+    projectKey = '',
+    backendId = '',
+  } = {}) {
+    if (!tab || typeof tab !== 'object') {
+      return false;
+    }
+    const normalizedProjectId = normalizeAutosaveProjectId(projectId || '');
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '')
+      || getSharedProjectKeyFromProjectId(normalizedProjectId);
+    const normalizedBackendId = typeof backendId === 'string' ? backendId.trim() : '';
+    const sharedRecentProjectId = normalizedProjectKey
+      ? buildSharedRecentProjectId(normalizedProjectKey)
+      : '';
+    const tabProjectId = normalizeAutosaveProjectId(tab.projectId || '');
+    const tabSharedKey = getOpenProjectTabSharedKey(tab);
+    const tabBackendId = typeof tab.sharedProjectBackendId === 'string'
+      ? tab.sharedProjectBackendId.trim()
+      : '';
+    return Boolean(
+      (normalizedProjectId && tabProjectId === normalizedProjectId)
+      || (sharedRecentProjectId && tabProjectId === sharedRecentProjectId)
+      || (normalizedProjectKey && tabSharedKey === normalizedProjectKey)
+      || (normalizedBackendId && tabBackendId && tabBackendId === normalizedBackendId)
+    );
+  }
+
+  function closeOpenProjectTabsForDeletedProject({
+    projectId = '',
+    projectKey = '',
+    backendId = '',
+    reason = 'deleted-project',
+    showHome = true,
+  } = {}) {
+    if (!openProjectTabs.length) {
+      return false;
+    }
+    const normalizedProjectId = normalizeAutosaveProjectId(projectId || '');
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '')
+      || getSharedProjectKeyFromProjectId(normalizedProjectId);
+    const sharedRecentProjectId = normalizedProjectKey
+      ? buildSharedRecentProjectId(normalizedProjectKey)
+      : '';
+    const removedTabs = [];
+    for (let index = openProjectTabs.length - 1; index >= 0; index -= 1) {
+      const tab = openProjectTabs[index];
+      if (!matchesDeletedProjectOpenTab(tab, {
+        projectId: normalizedProjectId,
+        projectKey: normalizedProjectKey,
+        backendId,
+      })) {
+        continue;
+      }
+      removedTabs.push(tab);
+      openProjectTabs.splice(index, 1);
+    }
+    if (!removedTabs.length) {
+      return false;
+    }
+    const removedActiveTab = removedTabs.some(tab => tab?.id && tab.id === activeOpenProjectTabId);
+    const removedSharedKeys = new Set(
+      removedTabs
+        .map(tab => getOpenProjectTabSharedKey(tab))
+        .filter(Boolean)
+    );
+    const activeSharedKey = normalizeMultiProjectKey(activeSharedProjectKey || '');
+    const currentProjectId = normalizeAutosaveProjectId(autosaveProjectId || '');
+    const currentProjectRemoved = Boolean(
+      (normalizedProjectId && currentProjectId === normalizedProjectId)
+      || (sharedRecentProjectId && currentProjectId === sharedRecentProjectId)
+    );
+    if (removedActiveTab) {
+      activeOpenProjectTabId = '';
+      suppressOpenProjectTabAutoInitialize = true;
+    }
+    if (
+      activeSharedKey
+      && (
+        removedSharedKeys.has(activeSharedKey)
+        || (normalizedProjectKey && activeSharedKey === normalizedProjectKey)
+      )
+    ) {
+      clearActiveSharedProjectSession(reason);
+    }
+    if (currentProjectRemoved) {
+      setActiveAutosaveProjectId(createAutosaveProjectId());
+    }
+    if (normalizedProjectId && startupAutosaveRestoreProjectId === normalizedProjectId) {
+      startupAutosaveRestoreProjectId = '';
+    }
+    if (sharedRecentProjectId && startupAutosaveRestoreProjectId === sharedRecentProjectId) {
+      startupAutosaveRestoreProjectId = '';
+    }
+    if (showHome) {
+      setProjectHomeVisible(true, { refresh: true });
+    } else {
+      renderOpenProjectTabs();
+    }
+    return true;
+  }
+
   function retargetAutosaveProjectId(previousProjectId, nextProjectId) {
     const previous = normalizeAutosaveProjectId(previousProjectId || '');
     const next = normalizeAutosaveProjectId(nextProjectId || '');
@@ -8302,6 +8414,13 @@
     await saveRecentProjectsList(existingEntries, nextEntries);
     setRecentProjectsCache(nextEntries);
     idsToRemove.forEach(id => {
+      closeOpenProjectTabsForDeletedProject({
+        projectId: id,
+        projectKey: normalizedProjectKey,
+        backendId: normalizedProjectId,
+        reason: 'deleted-shared-project-tab',
+        showHome: true,
+      });
       releaseAutosaveProjectId(id);
       if (startupAutosaveRestoreProjectId === id) {
         startupAutosaveRestoreProjectId = '';
@@ -8493,8 +8612,16 @@
   function ensureOpenProjectTabsInitialized() {
     if (openProjectTabs.length > 0) {
       if (!activeOpenProjectTabId || findOpenProjectTabIndex(activeOpenProjectTabId) < 0) {
+        if (suppressOpenProjectTabAutoInitialize && projectHomeVisible) {
+          renderOpenProjectTabs();
+          return;
+        }
         activeOpenProjectTabId = openProjectTabs[0]?.id || '';
       }
+      renderOpenProjectTabs();
+      return;
+    }
+    if (suppressOpenProjectTabAutoInitialize && projectHomeVisible) {
       renderOpenProjectTabs();
       return;
     }
@@ -8515,6 +8642,7 @@
     });
     openProjectTabs.push(initialTab);
     activeOpenProjectTabId = initialTab.id;
+    suppressOpenProjectTabAutoInitialize = false;
     renderOpenProjectTabs();
   }
 
@@ -8575,6 +8703,7 @@
     openProjectTabs.push(tab);
     if (options.activate !== false) {
       activeOpenProjectTabId = tab.id;
+      suppressOpenProjectTabAutoInitialize = false;
     }
     renderOpenProjectTabs();
     return tab;
@@ -8601,6 +8730,7 @@
     });
     openProjectTabs[index] = updated;
     activeOpenProjectTabId = updated.id;
+    suppressOpenProjectTabAutoInitialize = false;
     renderOpenProjectTabs();
     return updated;
   }
@@ -8673,8 +8803,11 @@
     if (openProjectTabBusy) {
       return false;
     }
-    ensureOpenProjectTabsInitialized();
-    if (targetId === activeOpenProjectTabId) {
+    if (!openProjectTabs.length) {
+      ensureOpenProjectTabsInitialized();
+    }
+    const previousActiveId = activeOpenProjectTabId;
+    if (targetId === previousActiveId) {
       return true;
     }
     const targetIndex = findOpenProjectTabIndex(targetId);
@@ -8698,11 +8831,11 @@
     if (!targetIsShared && (!target?.project || typeof target.project !== 'object')) {
       return false;
     }
-    if (!skipPersistCurrent) {
+    if (!skipPersistCurrent && previousActiveId && findOpenProjectTabIndex(previousActiveId) >= 0) {
       await persistActiveOpenProjectTab({ flushAutosave: true });
     }
-    const previousActiveId = activeOpenProjectTabId;
     activeOpenProjectTabId = target.id;
+    suppressOpenProjectTabAutoInitialize = false;
     renderOpenProjectTabs();
     openProjectTabBusy = true;
     try {
@@ -8855,8 +8988,11 @@
       const selectButton = target.closest('button[data-project-tab-id]');
       if (selectButton instanceof HTMLButtonElement) {
         const tabId = selectButton.dataset.projectTabId || '';
-        hideProjectHomeScreen();
-        void activateOpenProjectTab(tabId);
+        void activateOpenProjectTab(tabId).then(switched => {
+          if (switched) {
+            hideProjectHomeScreen();
+          }
+        });
       }
     });
     ensureOpenProjectTabsInitialized();
@@ -14763,6 +14899,7 @@
     setLocalizedTextContent('#projectHomeTitle', 'プロジェクト一覧', 'Projects');
     setLocalizedTextContent('#projectHomeNew', '新規作成', 'New Project');
     setLocalizedTextContent('#projectHomeOpen', 'ファイルを開く', 'Open File');
+    setLocalizedTextContent('#projectHomeCreateShared', '共有プロジェクト作成', 'Create Shared Project');
     setLocalizedTextContent('#projectHomeRecentProjects .project-home-screen__section-title', 'プロジェクト', 'Projects');
     setLocalizedTextContent('#startupRecentProjects .startup-screen__recent-title', 'プロジェクト一覧', 'Projects');
     setLocalizedTextContent('#startupRecentAdContainer .export-ad__label', '広告', 'Ad');
@@ -16700,6 +16837,7 @@
         height,
         palettePreset,
         promptExportDirectory,
+        ensureTab: false,
       });
       if (!created) {
         return false;
@@ -20576,6 +20714,9 @@
         config.nameInput.value = extractDocumentBaseName(name);
       }
       closeNewProjectDialog();
+      if (projectHomeVisible) {
+        hideProjectHomeScreen();
+      }
     } else {
       window.alert(`キャンバスサイズは${MIN_CANVAS_SIZE}〜${MAX_CANVAS_SIZE}の数値で入力してください。`);
     }
@@ -20608,6 +20749,8 @@
       });
     if (!created) {
       window.alert(`キャンバスサイズは${MIN_CANVAS_SIZE}〜${MAX_CANVAS_SIZE}の数値で入力してください。`);
+    } else if (projectHomeVisible) {
+      hideProjectHomeScreen();
     }
   }
 
@@ -20650,6 +20793,7 @@
     height,
     palettePreset = newProjectPalettePresetId,
     promptExportDirectory = false,
+    ensureTab = true,
   }) {
     if (!ensureCurrentClientCanReplaceActiveProject()) {
       return false;
@@ -20725,6 +20869,26 @@
       updateAutosaveStatus('自動保存: 新規プロジェクトの即時保存に失敗したため再試行します', 'warn');
     } else {
       updateAutosaveStatus('自動保存: このブラウザでは利用できません', 'warn');
+    }
+    if (ensureTab && (!activeOpenProjectTabId || findOpenProjectTabIndex(activeOpenProjectTabId) < 0)) {
+      if (openProjectTabs.length < MAX_OPEN_PROJECT_TABS) {
+        const tab = createOpenProjectTabFromCurrentState({
+          source: 'new-project',
+          projectId: autosaveProjectId,
+        });
+        openProjectTabs.push(tab);
+        activeOpenProjectTabId = tab.id;
+        suppressOpenProjectTabAutoInitialize = false;
+        renderOpenProjectTabs();
+      } else {
+        updateAutosaveStatus(
+          localizeText(
+            `同時に開けるプロジェクトは最大 ${MAX_OPEN_PROJECT_TABS} 件です`,
+            `You can open up to ${MAX_OPEN_PROJECT_TABS} projects at once`
+          ),
+          'warn'
+        );
+      }
     }
     scheduleSessionPersist();
     return true;
@@ -20951,11 +21115,36 @@
     screen.dataset.bound = 'true';
     dom.projectHomeNew?.addEventListener('click', () => {
       openNewProjectDialog({ dismissStartup: false, appendAsTab: false });
-      hideProjectHomeScreen();
     });
     dom.projectHomeOpen?.addEventListener('click', async () => {
       const opened = await openDocumentDialog();
       if (opened) {
+        hideProjectHomeScreen();
+      }
+    });
+    dom.projectHomeCreateShared?.addEventListener('click', async () => {
+      if (openProjectTabBusy) {
+        return;
+      }
+      const activeTab = getActiveOpenProjectTab();
+      if (!activeTab || activeTab.id !== activeOpenProjectTabId) {
+        updateAutosaveStatus(
+          localizeText(
+            '共有プロジェクトにするプロジェクトを先に開いてください。',
+            'Open a project before creating a shared project.'
+          ),
+          'warn'
+        );
+        return;
+      }
+      if (!isCurrentProjectSharedEntry()) {
+        const accepted = await openShareStartConfirmDialog();
+        if (!accepted) {
+          return;
+        }
+      }
+      const created = await createSharedProjectFromCurrentDocument();
+      if (created) {
         hideProjectHomeScreen();
       }
     });
@@ -23687,12 +23876,24 @@
     const normalizedId = normalizeAutosaveProjectId(projectId || '');
     if (!normalizedId) return false;
     const existingEntries = await loadRecentProjectsMetadata();
+    const removedEntry = existingEntries.find(entry => entry?.id === normalizedId) || null;
     const nextEntries = existingEntries.filter(entry => entry?.id !== normalizedId);
     if (nextEntries.length === existingEntries.length) {
       return false;
     }
     await saveRecentProjectsList(existingEntries, nextEntries);
     setRecentProjectsCache(nextEntries);
+    closeOpenProjectTabsForDeletedProject({
+      projectId: normalizedId,
+      projectKey: isSharedRecentProjectEntry(removedEntry)
+        ? removedEntry.sharedProjectKey || ''
+        : getSharedProjectKeyFromProjectId(normalizedId),
+      backendId: typeof removedEntry?.sharedProjectBackendId === 'string'
+        ? removedEntry.sharedProjectBackendId
+        : '',
+      reason: 'recent-project-delete-tab',
+      showHome: true,
+    });
     if (announce) {
       const reasonSuffix = reason ? `（${reason}）` : '';
       updateAutosaveStatus(`読込できない端末内プロジェクトを除外しました${reasonSuffix}`, 'warn');
