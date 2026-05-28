@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.05.29-project-tab-delete-home';
+  const APP_BUILD_VERSION = '2026.05.29-new-shared-project-button';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
@@ -428,6 +428,7 @@
       button: document.getElementById('newProject'),
       dialog: /** @type {HTMLDialogElement|null} */ (document.getElementById('newProjectDialog')),
       form: document.getElementById('newProjectForm'),
+      title: document.getElementById('newProjectTitle'),
       nameInput: document.getElementById('newProjectName'),
       widthInput: document.getElementById('newProjectWidth'),
       heightInput: document.getElementById('newProjectHeight'),
@@ -3882,6 +3883,7 @@
   let startupScreenMode = STARTUP_SCREEN_MODE_DEFAULT;
   let startupVirtualCursorState = null;
   let pendingNewProjectAppendAsTab = false;
+  let pendingNewProjectCreateShared = false;
   let layoutMode = null;
   let multiEntryJoinPanelOpen = false;
   function bindClickHandlerOnce(element, datasetKey, handler) {
@@ -15209,7 +15211,7 @@
     setLocalizedTextContent('#closeExportInterstitial', '閉じる', 'Close');
     setLocalizedTextContent('.export-interstitial__lead', '広告を閉じると出力を開始します。', 'Close the ad to start export.');
 
-    setLocalizedTextContent('#newProjectTitle', '新規プロジェクト', 'New Project');
+    syncNewProjectDialogModeText();
     setLocalizedTextContent('.new-project__name-field > span', 'ファイル名', 'File Name');
     setLocalizedTextContent('.new-project__name-field .help-text', 'ファイル名のみ入力してください。拡張子 .pixieedraw は自動で付きます。', 'Enter only the file name. The .pixieedraw extension is added automatically.');
     setLocalizedTextContent('.new-project__size-fields > span', 'キャンバスサイズ', 'Canvas Size');
@@ -15229,7 +15231,6 @@
       'Set an export folder only when needed. If you skip it, the current setting (including unset) will be used.'
     );
     setLocalizedTextContent('#cancelNewProject', 'キャンセル', 'Cancel');
-    setLocalizedTextContent('#confirmNewProject', '作成', 'Create');
     setLocalizedTextContent('#globalHistoryConfirmTitle', '全体Undo', 'Shared Undo');
     setLocalizedTextContent('#globalHistoryConfirmMessage', 'この操作は共有ドキュメント全体に反映されます。', 'This action updates the shared document for everyone.');
     setLocalizedTextContent('#globalHistoryConfirmDetail', '参加者全員の表示が更新されます。続ける前に内容を確認してください。', 'All participant views will be refreshed. Review the action before continuing.');
@@ -20041,7 +20042,21 @@
     return Boolean(state.playback.isPlaying);
   }
 
-  function openNewProjectDialog({ dismissStartup = false, appendAsTab = false } = {}) {
+  function syncNewProjectDialogModeText() {
+    const createShared = Boolean(pendingNewProjectCreateShared);
+    if (dom.newProject?.title instanceof HTMLElement) {
+      dom.newProject.title.textContent = createShared
+        ? localizeText('共有プロジェクト作成', 'Create Shared Project')
+        : localizeText('新規プロジェクト', 'New Project');
+    }
+    if (dom.newProject?.confirm instanceof HTMLElement) {
+      dom.newProject.confirm.textContent = createShared
+        ? localizeText('作成して共有', 'Create and Share')
+        : localizeText('作成', 'Create');
+    }
+  }
+
+  function openNewProjectDialog({ dismissStartup = false, appendAsTab = false, createShared = false } = {}) {
     if (!ensureCurrentClientCanReplaceActiveProject()) {
       return;
     }
@@ -20049,6 +20064,7 @@
     if (!config) {
       void promptNewProjectFallback({
         appendAsTab: Boolean(appendAsTab),
+        createShared: Boolean(createShared),
       });
       return;
     }
@@ -20075,7 +20091,9 @@
           renderNewProjectPalettePresetPicker(normalizedPreset);
           setNewProjectPalettePresetPickerOpen(false);
         }
-        pendingNewProjectAppendAsTab = Boolean(appendAsTab);
+        pendingNewProjectCreateShared = Boolean(createShared);
+        pendingNewProjectAppendAsTab = Boolean(appendAsTab) && !pendingNewProjectCreateShared;
+        syncNewProjectDialogModeText();
         dialog.showModal();
         if (dismissStartup) {
           hideStartupScreen();
@@ -20091,11 +20109,14 @@
       }
     }
     pendingNewProjectAppendAsTab = false;
+    pendingNewProjectCreateShared = false;
+    syncNewProjectDialogModeText();
     if (dismissStartup) {
       hideStartupScreen();
     }
     void promptNewProjectFallback({
       appendAsTab: Boolean(appendAsTab),
+      createShared: Boolean(createShared),
     });
   }
 
@@ -20399,6 +20420,8 @@
   function closeNewProjectDialog() {
     setNewProjectPalettePresetPickerOpen(false);
     pendingNewProjectAppendAsTab = false;
+    pendingNewProjectCreateShared = false;
+    syncNewProjectDialogModeText();
     const dialog = dom.newProject?.dialog;
     if (dialog && dialog.open) {
       dialog.close();
@@ -20680,6 +20703,33 @@
     });
   }
 
+  async function createSharedProjectFromNewProject({
+    name,
+    width,
+    height,
+    palettePreset = newProjectPalettePresetId,
+    promptExportDirectory = false,
+  } = {}) {
+    const localCreated = await createNewProjectAsTab({
+      name,
+      width,
+      height,
+      palettePreset,
+      promptExportDirectory,
+    });
+    if (!localCreated) {
+      return {
+        localCreated: false,
+        sharedCreated: false,
+      };
+    }
+    const sharedCreated = await createSharedProjectFromCurrentDocument();
+    return {
+      localCreated: true,
+      sharedCreated: Boolean(sharedCreated),
+    };
+  }
+
   async function handleNewProjectSubmit() {
     const config = dom.newProject;
     if (config?.form && typeof config.form.reportValidity === 'function') {
@@ -20694,22 +20744,38 @@
     const palettePresetValue = config?.palettePreset?.value;
     const width = Number(widthValue);
     const height = Number(heightValue);
-    const created = pendingNewProjectAppendAsTab
-      ? await createNewProjectAsTab({
+    const shouldCreateShared = Boolean(pendingNewProjectCreateShared);
+    const shouldAppendAsTab = Boolean(pendingNewProjectAppendAsTab);
+    let created = false;
+    let createdLocalProject = false;
+    if (shouldCreateShared) {
+      const result = await createSharedProjectFromNewProject({
         name,
         width,
         height,
         palettePreset: palettePresetValue,
         promptExportDirectory: false,
-      })
-      : await createNewProject({
-      name,
-      width,
-      height,
-      palettePreset: palettePresetValue,
-      promptExportDirectory: false,
       });
-    if (created) {
+      created = Boolean(result?.sharedCreated);
+      createdLocalProject = Boolean(result?.localCreated);
+    } else if (shouldAppendAsTab) {
+      created = await createNewProjectAsTab({
+        name,
+        width,
+        height,
+        palettePreset: palettePresetValue,
+        promptExportDirectory: false,
+      });
+    } else {
+      created = await createNewProject({
+        name,
+        width,
+        height,
+        palettePreset: palettePresetValue,
+        promptExportDirectory: false,
+      });
+    }
+    if (created || createdLocalProject) {
       if (config?.nameInput) {
         config.nameInput.value = extractDocumentBaseName(name);
       }
@@ -20717,12 +20783,12 @@
       if (projectHomeVisible) {
         hideProjectHomeScreen();
       }
-    } else {
+    } else if (!shouldCreateShared) {
       window.alert(`キャンバスサイズは${MIN_CANVAS_SIZE}〜${MAX_CANVAS_SIZE}の数値で入力してください。`);
     }
   }
 
-  async function promptNewProjectFallback({ appendAsTab = false } = {}) {
+  async function promptNewProjectFallback({ appendAsTab = false, createShared = false } = {}) {
     if (!ensureCurrentClientCanReplaceActiveProject()) {
       return;
     }
@@ -20734,22 +20800,35 @@
     if (heightRaw === null) return;
     const width = Number(widthRaw);
     const height = Number(heightRaw);
-    const created = appendAsTab
-      ? await createNewProjectAsTab({
+    let created = false;
+    let createdLocalProject = false;
+    if (createShared) {
+      const result = await createSharedProjectFromNewProject({
         name,
         width,
         height,
         promptExportDirectory: false,
-      })
-      : await createNewProject({
-      name,
-      width,
-      height,
-      promptExportDirectory: false,
       });
-    if (!created) {
+      created = Boolean(result?.sharedCreated);
+      createdLocalProject = Boolean(result?.localCreated);
+    } else if (appendAsTab) {
+      created = await createNewProjectAsTab({
+        name,
+        width,
+        height,
+        promptExportDirectory: false,
+      });
+    } else {
+      created = await createNewProject({
+        name,
+        width,
+        height,
+        promptExportDirectory: false,
+      });
+    }
+    if (!created && !createShared) {
       window.alert(`キャンバスサイズは${MIN_CANVAS_SIZE}〜${MAX_CANVAS_SIZE}の数値で入力してください。`);
-    } else if (projectHomeVisible) {
+    } else if ((created || createdLocalProject) && projectHomeVisible) {
       hideProjectHomeScreen();
     }
   }
@@ -21126,27 +21205,11 @@
       if (openProjectTabBusy) {
         return;
       }
-      const activeTab = getActiveOpenProjectTab();
-      if (!activeTab || activeTab.id !== activeOpenProjectTabId) {
-        updateAutosaveStatus(
-          localizeText(
-            '共有プロジェクトにするプロジェクトを先に開いてください。',
-            'Open a project before creating a shared project.'
-          ),
-          'warn'
-        );
-        return;
-      }
-      if (!isCurrentProjectSharedEntry()) {
-        const accepted = await openShareStartConfirmDialog();
-        if (!accepted) {
-          return;
-        }
-      }
-      const created = await createSharedProjectFromCurrentDocument();
-      if (created) {
-        hideProjectHomeScreen();
-      }
+      openNewProjectDialog({
+        dismissStartup: false,
+        appendAsTab: true,
+        createShared: true,
+      });
     });
     dom.projectHomeRecentList?.addEventListener('click', async event => {
       const target = event.target instanceof Element ? event.target : null;
