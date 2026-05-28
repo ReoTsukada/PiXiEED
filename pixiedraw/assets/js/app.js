@@ -9521,7 +9521,6 @@
     activeSharedProjectKey = normalizedProjectKey;
     activeSharedProjectRevision = nextSessionRevision;
     activeSharedProjectStructureRevision = nextSessionStructureRevision;
-    sharedProjectLastAppliedSeq = Math.max(sharedProjectLastAppliedSeq, activeSharedProjectRevision);
     ensureSharedProjectSessionHeartbeat();
     const nextChannelSignature = `${normalizedProjectKey}::${activeSharedProjectId || ''}`;
     const sharedRecentProjectId = buildSharedRecentProjectId(normalizedProjectKey);
@@ -63594,7 +63593,21 @@
       return true;
     }
     setActiveSharedProjectSyncState('catching-up', { announce: true });
-    const baseRevision = Math.max(0, Math.round(Number(afterRevision) || 0));
+    const requestedBaseRevision = Math.max(0, Math.round(Number(afterRevision) || 0));
+    const appliedBaseRevision = Math.max(0, Math.round(Number(sharedProjectLastAppliedSeq) || 0));
+    const baseRevision = appliedBaseRevision > 0
+      ? Math.min(requestedBaseRevision, appliedBaseRevision)
+      : requestedBaseRevision;
+    if (baseRevision < requestedBaseRevision) {
+      console.info('[shared-sync]', {
+        event: 'replay-base-clamped-to-applied-revision',
+        projectKey,
+        requestedBaseRevision,
+        appliedBaseRevision,
+        baseRevision,
+        targetRevision,
+      });
+    }
     sharedProjectLastAppliedSeq = Math.max(sharedProjectLastAppliedSeq, baseRevision);
     while (sharedProjectLastAppliedSeq < targetRevision) {
       console.info('[shared-sync]', {
@@ -64965,6 +64978,7 @@
     const latestRevision = Math.max(0, Math.round(Number(result?.latest_revision ?? committedRevision) || 0));
     const canAdvanceContiguously = committedRevision > 0 && committedRevision <= sharedProjectLastAppliedSeq + 1;
     if (canAdvanceContiguously) {
+      sharedProjectLastAppliedSeq = Math.max(sharedProjectLastAppliedSeq, committedRevision);
       setActiveSharedProjectSession(
         normalizedProjectKey,
         Math.max(activeSharedProjectRevision, committedRevision),
