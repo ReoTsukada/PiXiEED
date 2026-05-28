@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.05.28-shared-structure-safety';
+  const APP_BUILD_VERSION = '2026.05.29-shared-open-gap-barrier';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
@@ -10163,18 +10163,18 @@
       }
       return await fetchSharedProjectRecord(projectKey);
     };
-      const syncToProjectRevision = async (candidate) => {
-        if (!candidate?.project_key) {
+    const syncToProjectRevision = async (candidate) => {
+      if (!candidate?.project_key) {
+        return false;
+      }
+      const latestRevision = getSharedProjectLatestRevision(candidate);
+      if (latestRevision <= activeSharedProjectRevision && !activeSharedProjectDocumentLoaded) {
+        return false;
+      }
+      if (latestRevision > activeSharedProjectRevision) {
+        const replayed = await applySharedProjectOpsSinceRevision(candidate, activeSharedProjectRevision);
+        if (!replayed) {
           return false;
-        }
-        const latestRevision = getSharedProjectLatestRevision(candidate);
-        if (latestRevision <= activeSharedProjectRevision && !activeSharedProjectDocumentLoaded) {
-          return false;
-        }
-        if (latestRevision > activeSharedProjectRevision) {
-          const replayed = await applySharedProjectOpsSinceRevision(candidate, activeSharedProjectRevision);
-          if (!replayed) {
-            return false;
         }
       }
       return activeSharedProjectRevision >= latestRevision;
@@ -10212,19 +10212,43 @@
     );
     markActiveSharedProjectDocumentLoaded(projectKey);
     setSharedProjectDeferRealtimeUntilSynced(false);
+    let realtimeChannel = null;
+    try {
+      realtimeChannel = await ensureActiveSharedProjectRealtimeChannel();
+    } catch (error) {
+      reportSharedProjectRealtimeSubscribeFailure(error);
+      return false;
+    }
+    if (!realtimeChannel) {
+      return false;
+    }
+    latestProject = await resolveLatestProject(null);
+    if (!latestProject?.project_key || !await syncToProjectRevision(latestProject)) {
+      return false;
+    }
+    await waitForSharedOpenRetry(90);
+    latestProject = await resolveLatestProject(null);
+    if (!latestProject?.project_key || !await syncToProjectRevision(latestProject)) {
+      return false;
+    }
+    const verifiedLatestRevision = getSharedProjectLatestRevision(latestProject);
+    const verifiedLatestStructureRevision = getSharedProjectLatestStructureRevision(latestProject);
+    if (
+      activeSharedProjectRevision < verifiedLatestRevision
+      || activeSharedProjectStructureRevision < verifiedLatestStructureRevision
+    ) {
+      return false;
+    }
     setActiveSharedProjectSnapshotState(
-      Math.max(activeSharedProjectSnapshotRevision, Math.min(activeSharedProjectRevision, latestRevision)),
+      Math.max(activeSharedProjectSnapshotRevision, Math.min(activeSharedProjectRevision, verifiedLatestRevision)),
       {
-        structureRevision: Math.max(activeSharedProjectStructureRevision, latestStructureRevision),
+        structureRevision: Math.max(activeSharedProjectStructureRevision, verifiedLatestStructureRevision),
         synced: true,
         canonicalLoadedAt: Date.now(),
       }
     );
     setActiveSharedProjectSyncState('synced', { announce });
     ensureSharedProjectRefreshLoop();
-    ensureActiveSharedProjectRealtimeChannel().catch(error => {
-      reportSharedProjectRealtimeSubscribeFailure(error);
-    });
     scheduleSharedProjectOpsRescueRetry();
     try {
       await restorePendingSharedLocalOps(projectKey, {
@@ -57371,6 +57395,27 @@
     if (!(await ensureSharedProjectCapacity(projectKey, { countOwned: true }))) {
       return false;
     }
+    if (pointerState.active) {
+      setMultiStatus(
+        localizeText(
+          '現在の描画を確定してから共有プロジェクトを作成してください。',
+          'Finish the current stroke before creating the shared project.'
+        ),
+        'warn'
+      );
+      return false;
+    }
+    if (!pointerState.active && history.pending?.dirty) {
+      commitHistory();
+    }
+    if (
+      currentProjectIsShared
+      && !await ensureSharedProjectInviteIncludesCommittedLocalOps(projectKey, {
+        reason: 'share-project-create',
+      })
+    ) {
+      return false;
+    }
     const snapshot = makeHistorySnapshot({ clonePixelData: true });
     const localBackupPackaged = buildPackagedProjectPayload(snapshot);
     if (shouldConvertLocalProjectToShared) {
@@ -69755,6 +69800,102 @@
     }
   }
 
+  function hasSharedProjectLocalCommitWorkPending() {
+    return Boolean(
+      sharedProjectPendingLocalOps.length > 0
+      || sharedProjectOpCommitInFlight
+      || hasSharedProjectLocalInFlightOps()
+    );
+  }
+
+  async function ensureSharedProjectInviteIncludesCommittedLocalOps(projectKey = activeSharedProjectKey, {
+    reason = 'invite-link',
+    timeoutMs = 10000,
+  } = {}) {
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || activeSharedProjectKey || '');
+    if (
+      !normalizedProjectKey
+      || normalizedProjectKey !== normalizeMultiProjectKey(activeSharedProjectKey || '')
+      || !isSharedProjectCollaborativeMode(normalizedProjectKey)
+    ) {
+      return true;
+    }
+    if (pointerState.active) {
+      setMultiStatus(
+        localizeText(
+          '現在の描画を確定してから共有URLを発行してください。',
+          'Finish the current stroke before creating the shared URL.'
+        ),
+        'warn'
+      );
+      return false;
+    }
+    if (history.pending?.dirty) {
+      commitHistory();
+    }
+    const startedAt = Date.now();
+    const safeTimeoutMs = Math.max(1200, Math.round(Number(timeoutMs) || 10000));
+    let announced = false;
+    while ((Date.now() - startedAt) < safeTimeoutMs) {
+      if (hasSharedProjectFailedLocalOps()) {
+        queueSharedProjectRefresh({ immediate: true, reason: `${reason}-failed-local-op`, force: true });
+        setMultiStatus(
+          localizeText(
+            '未送信の描画を確認できないため、共有URLはまだ発行していません。同期後にもう一度お試しください。',
+            'The shared URL was not created because a local draw has not been confirmed. Try again after sync completes.'
+          ),
+          'warn'
+        );
+        return false;
+      }
+      sharedProjectPendingLocalRetryBlockedUntil = 0;
+      if (sharedProjectPendingLocalOpsRetryTimer !== null) {
+        window.clearTimeout(sharedProjectPendingLocalOpsRetryTimer);
+        sharedProjectPendingLocalOpsRetryTimer = null;
+      }
+      flushSharedProjectPendingLocalOps();
+      if (!hasSharedProjectLocalCommitWorkPending()) {
+        const latestProject = await fetchSharedProjectRecord(normalizedProjectKey);
+        if (latestProject?.project_key) {
+          if (getSharedProjectLatestRevision(latestProject) > activeSharedProjectRevision) {
+            const replayed = await applySharedProjectOpsSinceRevision(latestProject, activeSharedProjectRevision);
+            if (!replayed) {
+              await waitForSharedOpenRetry(180);
+              continue;
+            }
+          }
+          const stable = await stabilizeActiveSharedProjectConnection(latestProject, {
+            reason,
+            announce: false,
+          });
+          if (stable && !hasSharedProjectLocalCommitWorkPending() && !hasSharedProjectFailedLocalOps()) {
+            return true;
+          }
+        }
+      }
+      if (!announced) {
+        announced = true;
+        setMultiStatus(
+          localizeText(
+            '共有URL発行前に未送信の描画を保存しています…',
+            'Saving pending shared draw operations before creating the shared URL...'
+          ),
+          'info'
+        );
+      }
+      await waitForSharedOpenRetry(180);
+    }
+    queueSharedProjectRefresh({ immediate: true, reason: `${reason}-timeout`, force: true });
+    setMultiStatus(
+      localizeText(
+        '未送信の描画がサーバーで確定していないため、共有URLはまだ発行していません。同期後にもう一度お試しください。',
+        'The shared URL was not created because pending drawing has not been confirmed by the server. Try again after sync completes.'
+      ),
+      'warn'
+    );
+    return false;
+  }
+
   async function copyMultiInviteLink() {
     if (isSharedProjectsBlockedByRuntime()) {
       showSharedRuntimeBlockedStatus();
@@ -69762,6 +69903,9 @@
     }
     const inviteRole = resolveMultiInviteDefaultRole();
     const resolvedProjectKey = resolveSharedProjectKeyForCurrentState() || normalizeMultiProjectKey(activeSharedProjectKey || '');
+    if (!await ensureSharedProjectInviteIncludesCommittedLocalOps(resolvedProjectKey, { reason: 'copy-invite-link' })) {
+      return false;
+    }
     let inviteToken = getCurrentSharedRecentProjectEntry(resolvedProjectKey)?.sharedProjectInviteToken || '';
     if (!inviteToken && resolvedProjectKey && canUseSharedProjectsBackend()) {
       const project = await fetchSharedProjectRecord(resolvedProjectKey);
@@ -69809,6 +69953,9 @@
     }
     const inviteRole = resolveMultiInviteDefaultRole();
     const resolvedProjectKey = resolveSharedProjectKeyForCurrentState() || normalizeMultiProjectKey(activeSharedProjectKey || '');
+    if (!await ensureSharedProjectInviteIncludesCommittedLocalOps(resolvedProjectKey, { reason: 'share-invite-link' })) {
+      return false;
+    }
     let inviteToken = getCurrentSharedRecentProjectEntry(resolvedProjectKey)?.sharedProjectInviteToken || '';
     if (!inviteToken && resolvedProjectKey && canUseSharedProjectsBackend()) {
       const project = await fetchSharedProjectRecord(resolvedProjectKey);
