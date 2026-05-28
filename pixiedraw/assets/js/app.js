@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.05.27-shared-op-codec';
+  const APP_BUILD_VERSION = '2026.05.28-shared-structure-safety';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
@@ -9648,20 +9648,11 @@
     if (activeSharedProjectOpenInProgress || activeSharedProjectOpenReadOnly) {
       return 'open-in-progress';
     }
-    if (
-      sharedProjectSnapshotReplayInFlight
-      || sharedProjectDeferRealtimeUntilSynced
-    ) {
-      return 'sync-in-progress';
-    }
     if (!activeSharedProjectDocumentLoaded) {
       return 'server-document-not-loaded';
     }
     if (!hasUsableActiveSharedProjectDocumentState()) {
       return 'missing-document-state';
-    }
-    if (hasSharedProjectFailedLocalOps()) {
-      return 'failed-local-ops';
     }
     return '';
   }
@@ -11444,6 +11435,17 @@
       return;
     }
     commitHistory();
+    if (isSharedProjectCollaborativeMode()) {
+      setMultiStatus(
+        localizeText(
+          '共有プロジェクト中のUndoは同期差異防止のため現在無効です。描画内容はDB確定順で同期されます。',
+          'Undo is disabled while editing shared projects to prevent sync divergence. Drawing is synced in DB commit order.'
+        ),
+        'warn'
+      );
+      updateHistoryButtons();
+      return;
+    }
     const activeCanvasId = getActiveProjectCanvasDocument()?.id || '';
     const bucket = getMultiHistoryBucket(multiState.clientId || '', activeCanvasId);
     const shouldUseScopedHistory = multiState.connected
@@ -11551,6 +11553,17 @@
       return;
     }
     commitHistory();
+    if (isSharedProjectCollaborativeMode()) {
+      setMultiStatus(
+        localizeText(
+          '共有プロジェクト中のRedoは同期差異防止のため現在無効です。描画内容はDB確定順で同期されます。',
+          'Redo is disabled while editing shared projects to prevent sync divergence. Drawing is synced in DB commit order.'
+        ),
+        'warn'
+      );
+      updateHistoryButtons();
+      return;
+    }
     const activeCanvasId = getActiveProjectCanvasDocument()?.id || '';
     const bucket = getMultiHistoryBucket(multiState.clientId || '', activeCanvasId);
     const shouldUseScopedHistory = multiState.connected
@@ -11673,6 +11686,11 @@
 
   function updateHistoryButtons() {
     try {
+      if (isSharedProjectCollaborativeMode()) {
+        if (dom.controls.undoAction) dom.controls.undoAction.disabled = true;
+        if (dom.controls.redoAction) dom.controls.redoAction.disabled = true;
+        return;
+      }
       if (!multiState.connected) {
         if (dom.controls.undoAction) dom.controls.undoAction.disabled = history.past.length === 0;
         if (dom.controls.redoAction) dom.controls.redoAction.disabled = history.future.length === 0;
@@ -19564,8 +19582,10 @@
   }
 
   function applyFpsToAllFrames(fpsValue) {
-    if (!canCurrentClientEditProjectStructure()) {
-      setMultiStatus(localizeText('参加/視聴モードではfps設定はマスターのみ変更できます', 'In participant/viewer mode, only the master can change FPS'), 'warn');
+    if (!canCurrentClientEditProjectStructure({ announce: true })) {
+      if (!isSharedProjectCollaborativeMode()) {
+        setMultiStatus(localizeText('参加/視聴モードではfps設定はマスターのみ変更できます', 'In participant/viewer mode, only the master can change FPS'), 'warn');
+      }
       return;
     }
     const frames = state.frames;
@@ -19758,18 +19778,20 @@
     if (state.playback.isPlaying) {
       return false;
     }
-    if (!canCurrentClientEditProjectStructure()) {
-      setMultiStatus(
-        localizeText(
-          duplicate
-            ? '参加/視聴モードではフレーム複製はマスターのみ操作できます'
-            : '参加/視聴モードではフレーム追加はマスターのみ操作できます',
-          duplicate
-            ? 'In participant/viewer mode, only the master can duplicate frames'
-            : 'In participant/viewer mode, only the master can add frames'
-        ),
-        'warn'
-      );
+    if (!canCurrentClientEditProjectStructure({ announce: true })) {
+      if (!isSharedProjectCollaborativeMode()) {
+        setMultiStatus(
+          localizeText(
+            duplicate
+              ? '参加/視聴モードではフレーム複製はマスターのみ操作できます'
+              : '参加/視聴モードではフレーム追加はマスターのみ操作できます',
+            duplicate
+              ? 'In participant/viewer mode, only the master can duplicate frames'
+              : 'In participant/viewer mode, only the master can add frames'
+          ),
+          'warn'
+        );
+      }
       return false;
     }
     const baseFrame = getActiveFrame();
@@ -25009,6 +25031,12 @@
       projectKey: resolvedProjectKey,
       revision: activeSharedProjectRevision,
     });
+    scheduleSharedProjectVerifiedSnapshotCheckpoint({
+      reason: 'recovery-verified-checkpoint',
+      delayMs: 1000,
+      snapshotRevision: sharedSnapshotRevision,
+      latestRevision: activeSharedProjectRevision,
+    });
     await upsertSharedRecentProjectEntry({
       projectKey: resolvedProjectKey,
       projectId: freshestProject.id || '',
@@ -25872,8 +25900,10 @@
   }
 
   function setPixfindModeEnabled(enabled, { confirmFirst = true, confirmOverwrite = true, quiet = false } = {}) {
-    if (!canCurrentClientEditProjectStructure()) {
-      setMultiStatus(localizeText('参加/視聴モードでは間違い探し設定はマスターのみ変更できます', 'In participant/viewer mode, only the master can change PiXFiND settings'), 'warn');
+    if (!canCurrentClientEditProjectStructure({ announce: true })) {
+      if (!isSharedProjectCollaborativeMode()) {
+        setMultiStatus(localizeText('参加/視聴モードでは間違い探し設定はマスターのみ変更できます', 'In participant/viewer mode, only the master can change PiXFiND settings'), 'warn');
+      }
       return false;
     }
     const next = Boolean(enabled);
@@ -34374,9 +34404,11 @@
         setLocalViewportCanvasCount(0, { persist: true, announce: false });
         return;
       }
-      if (!canCurrentClientEditProjectStructure()) {
+      if (!canCurrentClientEditProjectStructure({ announce: true })) {
         event.target.checked = getLocalViewportCanvasCount() > 0;
-        announceMultiCanvasEditRestriction();
+        if (!isSharedProjectCollaborativeMode()) {
+          announceMultiCanvasEditRestriction();
+        }
         syncControlsWithState();
         return;
       }
@@ -34408,9 +34440,11 @@
         syncVoxelExtensionModeUi();
         return;
       }
-      if (!canCurrentClientEditProjectStructure()) {
+      if (!canCurrentClientEditProjectStructure({ announce: true })) {
         event.target.checked = isVoxelExtensionModeEnabled();
-        announceMultiCanvasEditRestriction();
+        if (!isSharedProjectCollaborativeMode()) {
+          announceMultiCanvasEditRestriction();
+        }
         syncVoxelExtensionModeUi();
         return;
       }
@@ -34652,8 +34686,10 @@
     });
 
     dom.controls.clearCanvas?.addEventListener('click', () => {
-      if (!canCurrentClientEditProjectStructure()) {
-        setMultiStatus(localizeText('参加/視聴モードではキャンバスクリアはマスターのみ操作できます', 'In participant/viewer mode, only the master can clear the canvas'), 'warn');
+      if (!canCurrentClientEditProjectStructure({ announce: true })) {
+        if (!isSharedProjectCollaborativeMode()) {
+          setMultiStatus(localizeText('参加/視聴モードではキャンバスクリアはマスターのみ操作できます', 'In participant/viewer mode, only the master can clear the canvas'), 'warn');
+        }
         return;
       }
       if (!confirm(localizeText('すべてのフレームをクリアしますか？', 'Clear all frames?'))) {
@@ -34910,8 +34946,10 @@
       });
     };
 
-    if (!canCurrentClientEditProjectStructure()) {
-      setMultiStatus(localizeText('参加/視聴モードではキャンバスサイズはマスターのみ変更できます', 'In participant/viewer mode, only the master can change canvas size'), 'warn');
+    if (!canCurrentClientEditProjectStructure({ announce: true })) {
+      if (!isSharedProjectCollaborativeMode()) {
+        setMultiStatus(localizeText('参加/視聴モードではキャンバスサイズはマスターのみ変更できます', 'In participant/viewer mode, only the master can change canvas size'), 'warn');
+      }
       updateCanvasResizeControls({ normalizeValues: true });
       restoreFocus();
       return;
@@ -35062,8 +35100,10 @@
   }
 
   function applySpriteScaleMultiplier(rawValue) {
-    if (!canCurrentClientEditProjectStructure()) {
-      setMultiStatus(localizeText('参加/視聴モードではスプライト倍率はマスターのみ変更できます', 'In participant/viewer mode, only the master can change sprite scale'), 'warn');
+    if (!canCurrentClientEditProjectStructure({ announce: true })) {
+      if (!isSharedProjectCollaborativeMode()) {
+        setMultiStatus(localizeText('参加/視聴モードではスプライト倍率はマスターのみ変更できます', 'In participant/viewer mode, only the master can change sprite scale'), 'warn');
+      }
       return;
     }
     const input = dom.controls.spriteScaleInput;
@@ -37652,14 +37692,16 @@
     if (state.playback.isPlaying) {
       return false;
     }
-    if (!canCurrentClientEditProjectStructure()) {
-      setMultiStatus(
-        localizeText(
-          '参加/視聴モードではフレーム / レイヤー貼り付けはマスターのみ操作できます',
-          'In participant/viewer mode, only the master can paste frames or layers'
-        ),
-        'warn'
-      );
+    if (!canCurrentClientEditProjectStructure({ announce: true })) {
+      if (!isSharedProjectCollaborativeMode()) {
+        setMultiStatus(
+          localizeText(
+            '参加/視聴モードではフレーム / レイヤー貼り付けはマスターのみ操作できます',
+            'In participant/viewer mode, only the master can paste frames or layers'
+          ),
+          'warn'
+        );
+      }
       return false;
     }
     if (!validateTimelineClipboardDimensions(clip)) {
@@ -37773,14 +37815,16 @@
     if (state.playback.isPlaying) {
       return false;
     }
-    if (!canCurrentClientEditProjectStructure()) {
-      setMultiStatus(
-        localizeText(
-          '参加/視聴モードではフレーム複製はマスターのみ操作できます',
-          'In participant/viewer mode, only the master can duplicate frames'
-        ),
-        'warn'
-      );
+    if (!canCurrentClientEditProjectStructure({ announce: true })) {
+      if (!isSharedProjectCollaborativeMode()) {
+        setMultiStatus(
+          localizeText(
+            '参加/視聴モードではフレーム複製はマスターのみ操作できます',
+            'In participant/viewer mode, only the master can duplicate frames'
+          ),
+          'warn'
+        );
+      }
       return false;
     }
     const insertIndex = selectedFrameIndexes[selectedFrameIndexes.length - 1] + 1;
@@ -37834,14 +37878,16 @@
     if (!selectedLayerIndexes.length) {
       return false;
     }
-    if (!canCurrentClientEditProjectStructure()) {
-      setMultiStatus(
-        localizeText(
-          '参加/視聴モードではレイヤー複製はマスターのみ操作できます',
-          'In participant/viewer mode, only the master can duplicate layers'
-        ),
-        'warn'
-      );
+    if (!canCurrentClientEditProjectStructure({ announce: true })) {
+      if (!isSharedProjectCollaborativeMode()) {
+        setMultiStatus(
+          localizeText(
+            '参加/視聴モードではレイヤー複製はマスターのみ操作できます',
+            'In participant/viewer mode, only the master can duplicate layers'
+          ),
+          'warn'
+        );
+      }
       return false;
     }
     const insertIndex = selectedLayerIndexes[selectedLayerIndexes.length - 1] + 1;
@@ -38182,8 +38228,10 @@
   }
 
   function moveActiveLayer(offset) {
-    if (!canCurrentClientEditProjectStructure()) {
-      setMultiStatus(localizeText('参加/視聴モードではレイヤー移動はマスターのみ操作できます', 'In participant/viewer mode, only the master can move layers'), 'warn');
+    if (!canCurrentClientEditProjectStructure({ announce: true })) {
+      if (!isSharedProjectCollaborativeMode()) {
+        setMultiStatus(localizeText('参加/視聴モードではレイヤー移動はマスターのみ操作できます', 'In participant/viewer mode, only the master can move layers'), 'warn');
+      }
       return;
     }
     if (!Number.isInteger(offset) || offset === 0) return;
@@ -38267,8 +38315,10 @@
   }
 
   function moveActiveFrame(offset) {
-    if (!canCurrentClientEditProjectStructure()) {
-      setMultiStatus(localizeText('参加/視聴モードではフレーム移動はマスターのみ操作できます', 'In participant/viewer mode, only the master can move frames'), 'warn');
+    if (!canCurrentClientEditProjectStructure({ announce: true })) {
+      if (!isSharedProjectCollaborativeMode()) {
+        setMultiStatus(localizeText('参加/視聴モードではフレーム移動はマスターのみ操作できます', 'In participant/viewer mode, only the master can move frames'), 'warn');
+      }
       return;
     }
     if (!Number.isInteger(offset) || offset === 0) return;
@@ -38330,8 +38380,10 @@
         duplicateSelectedTimelineLayers();
         return;
       }
-      if (!canCurrentClientEditProjectStructure()) {
-        setMultiStatus(localizeText('参加/視聴モードではレイヤー追加はマスターのみ操作できます', 'In participant/viewer mode, only the master can add layers'), 'warn');
+      if (!canCurrentClientEditProjectStructure({ announce: true })) {
+        if (!isSharedProjectCollaborativeMode()) {
+          setMultiStatus(localizeText('参加/視聴モードではレイヤー追加はマスターのみ操作できます', 'In participant/viewer mode, only the master can add layers'), 'warn');
+        }
         return;
       }
       const activeFrame = getActiveFrame();
@@ -38359,8 +38411,10 @@
     });
 
     dom.controls.addSimulationLayer?.addEventListener('click', () => {
-      if (!canCurrentClientEditProjectStructure()) {
-        setMultiStatus(localizeText('参加/視聴モードではレイヤー追加はマスターのみ操作できます', 'In participant/viewer mode, only the master can add layers'), 'warn');
+      if (!canCurrentClientEditProjectStructure({ announce: true })) {
+        if (!isSharedProjectCollaborativeMode()) {
+          setMultiStatus(localizeText('参加/視聴モードではレイヤー追加はマスターのみ操作できます', 'In participant/viewer mode, only the master can add layers'), 'warn');
+        }
         return;
       }
       const activeFrame = getActiveFrame();
@@ -38387,8 +38441,10 @@
     });
 
     dom.controls.removeLayer?.addEventListener('click', () => {
-      if (!canCurrentClientEditProjectStructure()) {
-        setMultiStatus(localizeText('参加/視聴モードではレイヤー削除はマスターのみ操作できます', 'In participant/viewer mode, only the master can delete layers'), 'warn');
+      if (!canCurrentClientEditProjectStructure({ announce: true })) {
+        if (!isSharedProjectCollaborativeMode()) {
+          setMultiStatus(localizeText('参加/視聴モードではレイヤー削除はマスターのみ操作できます', 'In participant/viewer mode, only the master can delete layers'), 'warn');
+        }
         return;
       }
       if (!state.frames.every(frame => frame.layers.length > 1)) {
@@ -38552,8 +38608,10 @@
     });
 
     dom.controls.removeFrame?.addEventListener('click', () => {
-      if (!canCurrentClientEditProjectStructure()) {
-        setMultiStatus(localizeText('参加/視聴モードではフレーム削除はマスターのみ操作できます', 'In participant/viewer mode, only the master can delete frames'), 'warn');
+      if (!canCurrentClientEditProjectStructure({ announce: true })) {
+        if (!isSharedProjectCollaborativeMode()) {
+          setMultiStatus(localizeText('参加/視聴モードではフレーム削除はマスターのみ操作できます', 'In participant/viewer mode, only the master can delete frames'), 'warn');
+        }
         return;
       }
       if (state.frames.length <= 1) return;
@@ -39062,7 +39120,7 @@
   }
 
   function setActiveLayerTrackBlendMode(blendMode) {
-    if (!canCurrentClientEditProjectStructure()) {
+    if (!canCurrentClientEditProjectStructure({ announce: true })) {
       return false;
     }
     const layerIndex = getActiveLayerTrackIndex();
@@ -46101,8 +46159,10 @@
     if (dom.controls.addLocalCanvas instanceof HTMLButtonElement) {
       dom.controls.addLocalCanvas.addEventListener('click', event => {
         event.preventDefault();
-        if (!canCurrentClientEditProjectStructure()) {
-          announceMultiCanvasEditRestriction();
+        if (!canCurrentClientEditProjectStructure({ announce: true })) {
+          if (!isSharedProjectCollaborativeMode()) {
+            announceMultiCanvasEditRestriction();
+          }
           syncControlsWithState();
           return;
         }
@@ -46112,8 +46172,10 @@
     if (dom.controls.removeLocalCanvas instanceof HTMLButtonElement) {
       dom.controls.removeLocalCanvas.addEventListener('click', event => {
         event.preventDefault();
-        if (!canCurrentClientEditProjectStructure()) {
-          announceMultiCanvasEditRestriction();
+        if (!canCurrentClientEditProjectStructure({ announce: true })) {
+          if (!isSharedProjectCollaborativeMode()) {
+            announceMultiCanvasEditRestriction();
+          }
           syncControlsWithState();
           return;
         }
@@ -58258,6 +58320,11 @@
   }
 
   function announceMultiCanvasEditRestriction() {
+    const sharedStructureBlockReason = getSharedProjectStructureChangeBlockReason();
+    if (sharedStructureBlockReason) {
+      announceSharedProjectStructureChangeBlocked(sharedStructureBlockReason);
+      return;
+    }
     setMultiStatus(
       localizeText(
         '参加/視聴モードではマルチキャンバスの変更はマスターのみ操作できます',
@@ -58267,8 +58334,52 @@
     );
   }
 
-  function canCurrentClientEditProjectStructure() {
+  function getSharedProjectStructureChangeBlockReason() {
+    if (!isSharedProjectCollaborativeMode()) {
+      return '';
+    }
+    if (activeSharedProjectOpenInProgress) return 'open-in-progress';
+    if (activeSharedProjectOpenReadOnly) return 'read-only';
+    if (!activeSharedProjectDocumentLoaded || !hasUsableActiveSharedProjectDocumentState()) return 'document-not-ready';
+    if (pointerState.active) return 'local-pointer-active';
+    if (typeof hasPendingSelectionMove === 'function' && hasPendingSelectionMove()) return 'selection-move-pending';
+    if (history.pending?.dirty) return 'history-pending';
+    if (sharedProjectOpCommitInFlight || hasSharedProjectLocalInFlightOps() || sharedProjectPendingLocalOps.length > 0 || sharedProjectSyncInFlight) return 'local-op-in-flight';
+    if (sharedProjectPendingRemoteOps.size > 0) return 'remote-op-pending';
+    if (sharedProjectRefreshInFlight || sharedProjectSnapshotReplayInFlight || sharedProjectRecoveryInProgress) return 'remote-sync-in-flight';
+    if (sharedProjectReconnectRecoveryPromise || sharedProjectWakeRecoveryPromise || sharedProjectImmediateRecoveryPromise) return 'remote-sync-in-flight';
+    if (sharedProjectDeferRealtimeUntilSynced || activeSharedProjectSyncState !== 'synced' || !activeSharedProjectSynced) return 'not-synced';
+    return '';
+  }
+
+  function announceSharedProjectStructureChangeBlocked(reason = '') {
+    const normalizedReason = String(reason || '').trim();
+    const drawingReason = normalizedReason === 'local-pointer-active'
+      || normalizedReason === 'selection-move-pending'
+      || normalizedReason === 'history-pending';
+    setMultiStatus(
+      drawingReason
+        ? localizeText(
+          '共有プロジェクトの構造変更は現在の操作を確定してから実行してください。描画は継続できます。',
+          'Shared structure changes are available after the current local action is committed. You can continue drawing.'
+        )
+        : localizeText(
+          '共有プロジェクトの構造変更は同期が完了してから実行してください。描画は継続できます。',
+          'Shared structure changes are available after sync settles. You can continue drawing.'
+        ),
+      'warn'
+    );
+  }
+
+  function canCurrentClientEditProjectStructure({ announce = false } = {}) {
     if (isSharedProjectCollaborativeMode()) {
+      const blockReason = getSharedProjectStructureChangeBlockReason();
+      if (blockReason) {
+        if (announce) {
+          announceSharedProjectStructureChangeBlocked(blockReason);
+        }
+        return false;
+      }
       return true;
     }
     return !isMultiReadOnlyMode();
@@ -60319,7 +60430,9 @@
     const opRecord = typeof opOrOpId === 'string' ? (entry?.op || null) : opOrOpId;
     sharedProjectLocalInFlightOps.delete(opId);
     const removedQueuedCount = removeSharedProjectQueuedLocalOp(opId);
-    rememberSharedProjectSeenOp(opId, Math.round(Number(meta.revision) || getSharedProjectOpSeq(opRecord) || 0));
+    if (meta.rememberSeen !== false) {
+      rememberSharedProjectSeenOp(opId, Math.round(Number(meta.revision) || getSharedProjectOpSeq(opRecord) || 0));
+    }
     if (entry) {
       entry.committedRevision = Math.max(0, Math.round(Number(meta.revision) || getSharedProjectOpSeq(opRecord) || 0));
       entry.committedStructureRevision = Math.max(0, Math.round(Number(meta.structureRevision) || 0));
@@ -60560,9 +60673,18 @@
       if (!opId || !sharedProjectLocalInFlightOps.has(opId)) {
         return;
       }
+      const seq = getSharedProjectOpSeq(opRecord);
+      const opType = typeof opRecord?.op_type === 'string' && opRecord.op_type.trim()
+        ? opRecord.op_type.trim()
+        : classifySharedProjectOpType(String(opRecord?.payload?.historyLabel || opRecord?.historyLabel || ''));
+      const shouldReplayInRevisionOrder = (
+        (opType === 'draw' || opType === 'palette')
+        && seq > sharedProjectLastAppliedSeq
+      );
       markSharedProjectLocalOpCommitConfirmed(opRecord, {
         source: meta.source || 'refresh',
-        revision: getSharedProjectOpSeq(opRecord),
+        revision: seq,
+        rememberSeen: !shouldReplayInRevisionOrder,
       });
     });
   }
@@ -62334,6 +62456,46 @@
     });
   }
 
+  function scheduleSharedProjectVerifiedSnapshotCheckpoint({
+    reason = 'recovery-verified-checkpoint',
+    delayMs = 900,
+    snapshotRevision = activeSharedProjectSnapshotRevision,
+    latestRevision = activeSharedProjectRevision,
+  } = {}) {
+    if (!activeSharedProjectKey || !canUseSharedProjectsBackend()) {
+      return false;
+    }
+    const normalizedSnapshotRevision = Math.max(0, Math.round(Number(snapshotRevision) || 0));
+    const normalizedLatestRevision = Math.max(0, Math.round(Number(latestRevision) || 0));
+    if (
+      normalizedLatestRevision <= 0
+      || normalizedSnapshotRevision >= normalizedLatestRevision
+      || !activeSharedProjectDocumentLoaded
+      || !hasUsableActiveSharedProjectDocumentState()
+    ) {
+      return false;
+    }
+    window.setTimeout(() => {
+      if (
+        !activeSharedProjectKey
+        || !activeSharedProjectSynced
+        || activeSharedProjectRevision < normalizedLatestRevision
+        || hasSharedProjectLocalInFlightOps()
+        || hasSharedProjectFailedLocalOps()
+      ) {
+        return;
+      }
+      queueSharedProjectCurrentSnapshotCapture({
+        delayMs: 0,
+        projectKey: activeSharedProjectKey,
+        historyLabel: reason,
+        force: true,
+        revision: activeSharedProjectRevision,
+      });
+    }, Math.max(0, Math.round(Number(delayMs) || 0)));
+    return true;
+  }
+
   function replaySharedProjectDrawOpPayload(opPayload, { historyLabel = '' } = {}) {
     const payload = opPayload && typeof opPayload === 'object' ? opPayload : null;
     if (payload?.command === 'stroke') {
@@ -62981,6 +63143,20 @@
     history.future = [];
     clearMultiHistory();
     updateHistoryButtons();
+  }
+
+  function canFlushSharedProjectLocalOpDuringCatchup(queuedOp = null) {
+    const opRecord = queuedOp?.op || queuedOp || null;
+    const opType = classifySharedProjectOpType(String(queuedOp?.historyLabel || opRecord?.historyLabel || ''));
+    return Boolean(
+      (opType === 'draw' || opType === 'palette')
+      && activeSharedProjectKey
+      && activeSharedProjectDocumentLoaded
+      && hasUsableActiveSharedProjectDocumentState()
+      && !activeSharedProjectOpenInProgress
+      && !activeSharedProjectOpenReadOnly
+      && !sharedProjectSnapshotReplayInFlight
+    );
   }
 
   function applyIncomingSharedProjectDrawOp(opRecord, { fromRemote = true, provisional = false } = {}) {
@@ -64603,9 +64779,7 @@
       const prefersFreshCanonicalSnapshot = (
         force
         && (
-          normalizedReason.includes('draw-op')
-          || normalizedReason.includes('apply-skip-missing-canvas-or-frame')
-          || normalizedReason.includes('open-shared')
+          normalizedReason.includes('apply-skip-missing-canvas-or-frame')
         )
       );
       if (prefersFreshCanonicalSnapshot && snapshotRevision < nextRevision) {
@@ -64724,6 +64898,12 @@
           projectKey: activeSharedProjectKey || '',
           revision: activeSharedProjectRevision,
           snapshotRevision,
+        });
+        scheduleSharedProjectVerifiedSnapshotCheckpoint({
+          reason: 'recovery-verified-checkpoint',
+          delayMs: 1200,
+          snapshotRevision,
+          latestRevision: activeSharedProjectRevision,
         });
       }
       if (snapshotRevision < nextRevision && !replayedAfterSnapshot) {
@@ -64959,24 +65139,29 @@
     }
   }
 
-  function markSharedProjectLocalCommitRevision(result, resolvedOp, { source = 'db' } = {}) {
+  function markSharedProjectLocalCommitRevision(result, resolvedOp, { source = 'db', rememberSeen = true } = {}) {
     const committedRevision = Math.max(0, Math.round(Number(result?.committed_revision || result?.latest_revision) || 0));
     const committedStructureRevision = Math.max(0, Math.round(Number(result?.committed_structure_revision || result?.latest_structure_revision) || 0));
     markSharedProjectLocalOpCommitConfirmed(resolvedOp, {
       source,
       revision: committedRevision,
       structureRevision: committedStructureRevision,
+      rememberSeen,
     });
     return { committedRevision, committedStructureRevision };
   }
 
   function advanceSharedProjectAfterLocalCommit(projectKey, result, resolvedOp) {
     const normalizedProjectKey = normalizeMultiProjectKey(projectKey);
-    const { committedRevision, committedStructureRevision } = markSharedProjectLocalCommitRevision(result, resolvedOp, {
-      source: result?.commit_status === 'duplicate' ? 'db-duplicate' : 'db',
-    });
+    const committedRevision = Math.max(0, Math.round(Number(result?.committed_revision || result?.latest_revision) || 0));
+    const committedStructureRevision = Math.max(0, Math.round(Number(result?.committed_structure_revision || result?.latest_structure_revision) || 0));
     const latestRevision = Math.max(0, Math.round(Number(result?.latest_revision ?? committedRevision) || 0));
     const canAdvanceContiguously = committedRevision > 0 && committedRevision <= sharedProjectLastAppliedSeq + 1;
+    const resolvedOpType = classifySharedProjectOpType(String(resolvedOp?.historyLabel || ''));
+    markSharedProjectLocalCommitRevision(result, resolvedOp, {
+      source: result?.commit_status === 'duplicate' ? 'db-duplicate' : 'db',
+      rememberSeen: canAdvanceContiguously || !(resolvedOpType === 'draw' || resolvedOpType === 'palette'),
+    });
     if (canAdvanceContiguously) {
       sharedProjectLastAppliedSeq = Math.max(sharedProjectLastAppliedSeq, committedRevision);
       setActiveSharedProjectSession(
@@ -65118,6 +65303,21 @@
           source: result.conflict_reason || 'commit-conflict',
         });
         queueSharedProjectRefresh({ immediate: true, reason: 'commit-failed', force: true });
+        if (
+          result.conflict_reason === 'stale-structure-revision'
+          && (resolvedOpType === 'draw' || resolvedOpType === 'palette')
+        ) {
+          setActiveSharedProjectSyncState('catching-up', { announce: true });
+          setMultiStatus(
+            localizeText(
+              '共有プロジェクトの構造変更と重なったため、この描画は最新構造へ再同期します',
+              'This draw overlapped a shared structure change, so the document will resync to the latest structure.'
+            ),
+            'warn'
+          );
+          queueSharedProjectRefresh({ immediate: true, reason: 'stale-structure-draw-conflict', force: true });
+          return null;
+        }
         if (retryOnConflict && (resolvedOpType === 'draw' || resolvedOpType === 'palette')) {
           pendingSharedProjectConflictReplay = {
             projectKey: normalizedProjectKey,
@@ -65245,6 +65445,8 @@
     if (sharedProjectOpCommitInFlight || !sharedProjectPendingLocalOps.length) {
       return;
     }
+    sortSharedProjectPendingLocalOps();
+    const nextQueuedOp = sharedProjectPendingLocalOps[0] || null;
     if (
       activeSharedProjectKey
       && (
@@ -65256,6 +65458,7 @@
         || sharedProjectDeferRealtimeUntilSynced
         || activeSharedProjectSyncState === 'catching-up'
       )
+      && !canFlushSharedProjectLocalOpDuringCatchup(nextQueuedOp)
     ) {
       scheduleSharedProjectPendingLocalOpsRetry(700, 'wait-for-latest-verification');
       return;
@@ -65265,7 +65468,6 @@
       scheduleSharedProjectPendingLocalOpsRetry(retryDelayRemaining, 'retry-backoff');
       return;
     }
-    sortSharedProjectPendingLocalOps();
     const nextOp = sharedProjectPendingLocalOps.shift();
     if (!nextOp) {
       return;
@@ -65939,7 +66141,13 @@
   }
 
   function flushActiveSharedProjectFinalSnapshot({ historyLabel = 'sharedFinalSnapshot' } = {}) {
-    if (!canUseSharedProjectsBackend() || !activeSharedProjectKey || !hasDocumentUnsavedChanges()) {
+    const activeRevision = Math.max(0, Math.round(Number(activeSharedProjectRevision) || 0));
+    const snapshotRevision = Math.max(0, Math.round(Number(activeSharedProjectSnapshotRevision) || 0));
+    const snapshotBehind = activeRevision > snapshotRevision;
+    if (!canUseSharedProjectsBackend() || !activeSharedProjectKey || (!hasDocumentUnsavedChanges() && !snapshotBehind)) {
+      return false;
+    }
+    if (snapshotBehind && !activeSharedProjectSynced) {
       return false;
     }
     if (sharedProjectCaptureTimer !== null) {
