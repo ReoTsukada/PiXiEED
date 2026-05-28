@@ -1,4 +1,4 @@
-const APP_BUILD_VERSION = '2026.05.28-shared-draw-order';
+const APP_BUILD_VERSION = '2026.05.28-shared-structure-safety';
 const CACHE_VERSION = `pixiedraw-v${APP_BUILD_VERSION}`;
 const CORE_ASSETS = [
   '/pixiedraw/',
