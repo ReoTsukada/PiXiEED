@@ -1,4 +1,4 @@
-const APP_BUILD_VERSION = '2026.05.29-shared-open-gap-barrier';
+const APP_BUILD_VERSION = '2026.05.29-project-tab-delete-home';
 const CACHE_VERSION = `pixiedraw-v${APP_BUILD_VERSION}`;
 const CORE_ASSETS = [
   '/pixiedraw/',
