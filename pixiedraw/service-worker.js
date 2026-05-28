@@ -1,4 +1,4 @@
-const APP_BUILD_VERSION = '2026.05.29-project-tab-delete-home';
+const APP_BUILD_VERSION = '2026.05.29-new-shared-project-button';
 const CACHE_VERSION = `pixiedraw-v${APP_BUILD_VERSION}`;
 const CORE_ASSETS = [
   '/pixiedraw/',
