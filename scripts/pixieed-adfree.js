@@ -27,6 +27,7 @@
   let uiMessage = '';
   let autoApplyStarted = false;
   let reloadPromptOpen = false;
+  let lastPassiveRefreshAt = 0;
 
   const state = {
     isReady: false,
@@ -178,16 +179,44 @@
     return `${y}/${m}/${day}`;
   }
 
-  function getAccessInput() {
-    const input = document.getElementById('pixieedAdFreeOrderId');
-    return input instanceof HTMLInputElement ? input : null;
+  function getAccessInputs() {
+    return [
+      document.getElementById('pixieedAdFreeOrderId'),
+      document.getElementById('projectHomeSupporterCode'),
+    ].filter(input => input instanceof HTMLInputElement);
+  }
+
+  function getAccessInput(preferredId = '') {
+    if (preferredId) {
+      const preferred = document.getElementById(preferredId);
+      if (preferred instanceof HTMLInputElement) {
+        return preferred;
+      }
+    }
+    return getAccessInputs()[0] || null;
   }
 
   function setAccessInputValue(value) {
-    const input = getAccessInput();
-    if (input) {
+    getAccessInputs().forEach((input) => {
       input.value = value;
-    }
+    });
+  }
+
+  function getClaimButtons() {
+    return [
+      document.getElementById('pixieedAdFreeClaim'),
+      document.getElementById('projectHomeSupporterApply'),
+    ].filter(button => button instanceof HTMLButtonElement);
+  }
+
+  function getPurchaseLinks() {
+    return Array.from(document.querySelectorAll([
+      'a#pixieedAdFreePurchase',
+      'a#supportTipLink',
+      'a#toolSpotlightSupportTip',
+      'a#multiSupportPurchase',
+      'a#projectHomeSupporterPurchase',
+    ].join(','))).filter(link => link instanceof HTMLAnchorElement);
   }
 
   function readQueryParam(name) {
@@ -340,36 +369,23 @@
   }
 
   function updateStatusElement(message, isError = false) {
-    const status = document.getElementById('pixieedAdFreeStatus');
-    if (!(status instanceof HTMLElement)) {
-      return;
-    }
-    status.textContent = message;
-    status.style.color = isError ? '#fca5a5' : '';
+    [
+      document.getElementById('pixieedAdFreeStatus'),
+      document.getElementById('projectHomeSupporterStatus'),
+    ].forEach((status) => {
+      if (!(status instanceof HTMLElement)) {
+        return;
+      }
+      status.textContent = message;
+      status.style.color = isError ? '#fca5a5' : '';
+    });
   }
 
   function syncUi() {
-    const purchaseLink = document.getElementById('pixieedAdFreePurchase');
-    const supportTipLinks = Array.from(document.querySelectorAll('a#supportTipLink'));
-    const spotlightTipLinks = Array.from(document.querySelectorAll('a#toolSpotlightSupportTip'));
-    const claimInput = document.getElementById('pixieedAdFreeOrderId');
-    const claimButton = document.getElementById('pixieedAdFreeClaim');
+    const claimInputs = getAccessInputs();
+    const claimButtons = getClaimButtons();
 
-    if (purchaseLink instanceof HTMLAnchorElement) {
-      purchaseLink.href = PIXIEDRAW_SUPPORT_URL;
-      purchaseLink.target = '_self';
-      purchaseLink.rel = 'noopener';
-      purchaseLink.dataset.supportPanelTrigger = 'true';
-      purchaseLink.dataset.supportPreferredProduct = 'pixiedraw_ad_free';
-    }
-    supportTipLinks.forEach((link) => {
-      link.href = PIXIEDRAW_SUPPORT_URL;
-      link.target = '_self';
-      link.rel = 'noopener';
-      link.dataset.supportPanelTrigger = 'true';
-      link.dataset.supportPreferredProduct = 'pixiedraw_ad_free';
-    });
-    spotlightTipLinks.forEach((link) => {
+    getPurchaseLinks().forEach((link) => {
       link.href = PIXIEDRAW_SUPPORT_URL;
       link.target = '_self';
       link.rel = 'noopener';
@@ -377,12 +393,12 @@
       link.dataset.supportPreferredProduct = 'pixiedraw_ad_free';
     });
 
-    if (claimInput instanceof HTMLInputElement) {
-      claimInput.disabled = !state.isLoggedIn || state.isLoading;
-    }
-    if (claimButton instanceof HTMLButtonElement) {
-      claimButton.disabled = !state.isLoggedIn || state.isLoading;
-    }
+    claimInputs.forEach((input) => {
+      input.disabled = !state.isLoggedIn || state.isLoading;
+    });
+    claimButtons.forEach((button) => {
+      button.disabled = !state.isLoggedIn || state.isLoading;
+    });
 
     if (uiMessage) {
       updateStatusElement(uiMessage, Boolean(state.lastError));
@@ -589,6 +605,15 @@
     return refreshPromise;
   }
 
+  function refreshEntitlementIfStale() {
+    const now = Date.now();
+    if (now - lastPassiveRefreshAt < 60000) {
+      return;
+    }
+    lastPassiveRefreshAt = now;
+    refresh();
+  }
+
   async function redeemCode(rawCode) {
     const code = String(rawCode || '').trim();
     if (!code) {
@@ -726,14 +751,36 @@
     injectStyle();
     applyDomState();
     syncUi();
-    const claimButton = document.getElementById('pixieedAdFreeClaim');
-    if (claimButton instanceof HTMLButtonElement) {
+    getClaimButtons().forEach((claimButton) => {
       claimButton.addEventListener('click', async () => {
-        const input = document.getElementById('pixieedAdFreeOrderId');
+        const inputId = claimButton.id === 'projectHomeSupporterApply'
+          ? 'projectHomeSupporterCode'
+          : 'pixieedAdFreeOrderId';
+        const input = getAccessInput(inputId);
         const orderId = input instanceof HTMLInputElement ? input.value : '';
         await applyAccessValue(orderId);
       });
-    }
+    });
+    getAccessInputs().forEach((input) => {
+      input.addEventListener('keydown', async (event) => {
+        if (event.key !== 'Enter') {
+          return;
+        }
+        event.preventDefault();
+        await applyAccessValue(input.value);
+      });
+    });
+    window.addEventListener('focus', refreshEntitlementIfStale);
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        refreshEntitlementIfStale();
+      }
+    });
+    window.setInterval(() => {
+      if (!document.hidden) {
+        refreshEntitlementIfStale();
+      }
+    }, 300000);
   }
 
   function subscribe(listener) {
