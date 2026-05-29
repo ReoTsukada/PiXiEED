@@ -220,6 +220,17 @@
 <button class="button" id="projectHomeCreateShared" type="button">共有プロジェクト作成</button>
 </div>
 </header>
+<section aria-label="サポーター特典" class="project-home-supporter" id="projectHomeSupporter">
+<div class="project-home-supporter__body">
+<h2 class="project-home-supporter__title" id="projectHomeSupporterTitle">サポーター特典</h2>
+<p class="project-home-supporter__status" id="projectHomeSupporterStatus">ログイン後に購入番号またはシリアルコードを適用できます。</p>
+</div>
+<div class="project-home-supporter__actions">
+<input autocomplete="off" class="project-home-supporter__input" id="projectHomeSupporterCode" maxlength="64" placeholder="購入番号 / シリアルコード" type="text"/>
+<button class="button" id="projectHomeSupporterApply" type="button">適用</button>
+<a class="button button--primary" data-support-panel-trigger="true" data-support-preferred-product="pixiedraw_ad_free" href="https://buy.stripe.com/aFadRaeo8ekv5L44MM2VG01" id="projectHomeSupporterPurchase" rel="noopener">サポーター特典を見る</a>
+</div>
+</section>
 <div class="project-home-screen__recent" id="projectHomeRecentProjects">
 <h2 class="project-home-screen__section-title">プロジェクト</h2>
 <div class="startup-recent-list project-home-screen__list" id="projectHomeRecentList" role="list"></div>
@@ -1326,6 +1337,20 @@
 </footer>
 </form>
 </dialog>
+<dialog aria-labelledby="sharedProjectCreateFailureTitle" class="modal" id="sharedProjectCreateFailureDialog">
+<form class="modal__form" method="dialog">
+<header class="modal__header">
+<h2 class="modal__title" id="sharedProjectCreateFailureTitle">共有プロジェクト作成失敗</h2>
+</header>
+<div class="modal__body">
+<p id="sharedProjectCreateFailureMessage">共有プロジェクトとして作成できませんでした。</p>
+<p class="help-text" id="sharedProjectCreateFailureDetail">ローカルプロジェクトとして作成済みです。</p>
+</div>
+<footer class="modal__footer">
+<button class="button button--primary" id="sharedProjectCreateFailureClose" type="button">閉じる</button>
+</footer>
+</form>
+</dialog>
 <dialog aria-labelledby="globalHistoryConfirmTitle" class="modal" id="globalHistoryConfirmDialog">
 <form class="modal__form" method="dialog">
 <header class="modal__header">
@@ -1505,10 +1530,10 @@
       })();
     </script>
 <script defer="" src="../scripts/pixieed-dot-stats.js"></script>
-<script src="../scripts/pixieed-adfree.js"></script>
-<script src="../scripts/support-checkout-panel.js"></script>
-	<script defer="" src="assets/js/shared-project-op-codec.js?v=2026.05.29-new-shared-project-button"></script>
-	<script defer="" src="assets/js/app.js?v=2026.05.29-new-shared-project-button"></script>
+	<script src="../scripts/pixieed-adfree.js?v=2026.05.29-supporter-serial-home"></script>
+	<script src="../scripts/support-checkout-panel.js?v=2026.05.29-supporter-serial-home"></script>
+	<script defer="" src="assets/js/shared-project-op-codec.js?v=2026.05.29-supporter-serial-home"></script>
+	<script defer="" src="assets/js/app.js?v=2026.05.29-supporter-serial-home"></script>
   <!-- Mobile bottom ad placeholder (visible in portrait / small screens) -->
   <div id="mobileBottomAd" aria-hidden="false">
     <div class="mobile-ad-box" id="mobileBottomAdSlot">
