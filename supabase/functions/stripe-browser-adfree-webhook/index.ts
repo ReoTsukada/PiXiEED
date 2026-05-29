@@ -8,6 +8,7 @@ const HANDLED_EVENT_TYPES = new Set([
   "checkout.session.async_payment_succeeded",
   "checkout.session.async_payment_failed",
   "invoice.paid",
+  "invoice.payment_failed",
   "customer.subscription.updated",
   "customer.subscription.deleted",
 ]);
@@ -15,7 +16,10 @@ const PAID_STATUSES = new Set(["paid", "completed", "confirmed", "fulfilled"]);
 const ENTITLEMENT_BY_PRODUCT: Record<string, string> = {
   browser_ad_free: "browser_ad_free",
   pixiedraw_ad_free: "pixiedraw_ad_free",
+  pixieed_support_monthly: "browser_ad_free",
 };
+const DEFAULT_PURCHASE_HELP_URL = "https://pixieed.jp/pixiedraw/";
+type SupabaseAdminClient = any;
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -25,6 +29,13 @@ function json(data: unknown, status = 200) {
       "cache-control": "no-store",
     },
   });
+}
+
+function errorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error || fallback);
 }
 
 function normalizeEmail(value: string): string {
@@ -45,7 +56,7 @@ function generateCodeBody(length: number): string {
   return output;
 }
 
-async function generateUniqueCode(supabase: ReturnType<typeof createClient>): Promise<string> {
+async function generateUniqueCode(supabase: SupabaseAdminClient): Promise<string> {
   for (let attempt = 0; attempt < 8; attempt += 1) {
     const candidate = `PXA${generateCodeBody(12)}`;
     const { data, error } = await supabase
@@ -61,6 +72,70 @@ async function generateUniqueCode(supabase: ReturnType<typeof createClient>): Pr
     }
   }
   throw new Error("code generation failed");
+}
+
+function getPurchaseEmailProductLabel(productKey: string): string {
+  if (productKey === "pixiedraw_ad_free") {
+    return "PiXiEEDraw継続サポート";
+  }
+  if (productKey === "pixieed_support_monthly") {
+    return "PiXiEED継続サポート";
+  }
+  return "PiXiEEDサポーター特典";
+}
+
+async function sendPurchaseIdEmail({
+  buyerEmail,
+  orderId,
+  productKey,
+}: {
+  buyerEmail: string;
+  orderId: string;
+  productKey: string;
+}): Promise<{ sent: boolean; provider?: string; reason?: string }> {
+  const apiKey = Deno.env.get("PIXIEED_RESEND_API_KEY") || Deno.env.get("RESEND_API_KEY") || "";
+  const from = Deno.env.get("PIXIEED_PURCHASE_EMAIL_FROM") || Deno.env.get("PIXIEED_SUPPORT_EMAIL_FROM") || "";
+  if (!apiKey || !from) {
+    return { sent: false, reason: "email env missing" };
+  }
+  const replyTo = Deno.env.get("PIXIEED_PURCHASE_EMAIL_REPLY_TO") || "";
+  const helpUrl = Deno.env.get("PIXIEED_PURCHASE_HELP_URL") || DEFAULT_PURCHASE_HELP_URL;
+  const productLabel = getPurchaseEmailProductLabel(productKey);
+  const text = [
+    "PiXiEEDのサポートありがとうございます。",
+    "",
+    `対象: ${productLabel}`,
+    `購入番号: ${orderId}`,
+    "",
+    "PiXiEEDrawのホームまたは設定にある「購入番号 / シリアルコード」欄へ、この購入番号を入力できます。",
+    "購入時と同じメールアドレスでログインしてから適用してください。",
+    "",
+    `PiXiEEDraw: ${helpUrl}`,
+    "",
+    "このメールに心当たりがない場合は、このメールを破棄してください。",
+  ].join("\n");
+  const body: Record<string, unknown> = {
+    from,
+    to: [buyerEmail],
+    subject: "PiXiEED サポーター特典の購入番号",
+    text,
+  };
+  if (replyTo) {
+    body.reply_to = replyTo;
+  }
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${apiKey}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const responseText = await response.text().catch(() => "");
+    throw new Error(`purchase id email failed (${response.status}) ${responseText}`.trim());
+  }
+  return { sent: true, provider: "resend" };
 }
 
 function pickProductKey(session: Stripe.Checkout.Session): string {
@@ -101,10 +176,21 @@ function isoFromUnix(value: unknown): string {
 }
 
 function pickSubscriptionId(payload: Stripe.Checkout.Session | Stripe.Invoice | Stripe.Subscription): string {
-  const raw = payload && typeof payload === "object" ? (
-    "subscription" in payload ? payload.subscription : ""
-  ) : "";
-  return typeof raw === "string" ? raw.trim() : "";
+  if (!payload || typeof payload !== "object") {
+    return "";
+  }
+  const directId = "object" in payload && payload.object === "subscription"
+    ? (payload as Stripe.Subscription).id
+    : "";
+  if (typeof directId === "string" && directId.trim()) {
+    return directId.trim();
+  }
+  const raw = "subscription" in payload ? payload.subscription : "";
+  if (typeof raw === "string") {
+    return raw.trim();
+  }
+  const expandedId = raw && typeof raw === "object" && "id" in raw ? raw.id : "";
+  return typeof expandedId === "string" ? expandedId.trim() : "";
 }
 
 function pickInvoicePeriodEnd(invoice: Stripe.Invoice): string {
@@ -123,7 +209,7 @@ function pickSubscriptionPeriodEnd(subscription: Stripe.Subscription): string {
 }
 
 async function findPurchaseBySubscriptionId(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseAdminClient,
   subscriptionId: string,
   productKey?: string,
 ) {
@@ -143,8 +229,48 @@ async function findPurchaseBySubscriptionId(
   return await query.maybeSingle();
 }
 
+async function grantPurchaseEntitlementByEmail(
+  supabase: SupabaseAdminClient,
+  {
+    code,
+    buyerEmail,
+    entitlementKey,
+    expiresAt,
+    orderId,
+    subscriptionId,
+  }: {
+    code: string;
+    buyerEmail: string;
+    entitlementKey: string;
+    expiresAt?: string;
+    orderId?: string;
+    subscriptionId?: string;
+  },
+): Promise<{ ok: boolean; userId: string; reason: string; expiresAt: string }> {
+  if (!code || !buyerEmail || !entitlementKey) {
+    return { ok: false, userId: "", reason: "missing_input", expiresAt: "" };
+  }
+  const { data, error } = await supabase.rpc("pixieed_grant_purchase_entitlement_by_email", {
+    input_code: code,
+    input_buyer_email: buyerEmail,
+    input_entitlement_key: entitlementKey,
+    input_expires_at: expiresAt || null,
+    input_order_id: orderId || null,
+    input_subscription_id: subscriptionId || null,
+  });
+  if (error) {
+    throw error;
+  }
+  return {
+    ok: data?.ok === true,
+    userId: typeof data?.user_id === "string" ? data.user_id : "",
+    reason: typeof data?.reason === "string" ? data.reason : "",
+    expiresAt: typeof data?.expires_at === "string" ? data.expires_at : "",
+  };
+}
+
 async function syncEntitlementWindowByCode(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseAdminClient,
   code: string,
   entitlementKey: string,
   expiresAt: string,
@@ -274,14 +400,13 @@ serve(async (request) => {
       cryptoProvider,
     );
   } catch (error) {
-    return json({ ok: false, error: String(error?.message || error || "invalid signature") }, 401);
+    return json({ ok: false, error: errorMessage(error, "invalid signature") }, 401);
   }
 
   if (!HANDLED_EVENT_TYPES.has(event.type)) {
     return json({ ok: true, ignored: true, eventType: event.type });
   }
 
-  const session = event.data.object as Stripe.Checkout.Session;
   const supabase = createClient(supabaseUrl, serviceRoleKey, {
     auth: {
       persistSession: false,
@@ -289,8 +414,9 @@ serve(async (request) => {
     },
   });
 
-  if (event.type === "invoice.paid") {
+  if (event.type === "invoice.paid" || event.type === "invoice.payment_failed") {
     const invoice = event.data.object as Stripe.Invoice;
+    const isPaymentFailed = event.type === "invoice.payment_failed";
     const subscriptionId = pickSubscriptionId(invoice);
     if (!subscriptionId) {
       return json({ ok: true, ignored: true, reason: "subscription missing", eventType: event.type });
@@ -309,31 +435,57 @@ serve(async (request) => {
     const expiresAt = pickInvoicePeriodEnd(invoice);
     try {
       await syncEntitlementWindowByCode(supabase, purchase.code, entitlementKey, expiresAt, {
+        revoke: isPaymentFailed,
         buyerEmail: purchase.buyer_email,
         orderId: purchase.provider_order_id,
         subscriptionId,
       });
     } catch (error) {
-      return json({ ok: false, error: String(error?.message || error || "invoice sync failed") }, 500);
+      return json({ ok: false, error: errorMessage(error, "invoice sync failed") }, 500);
     }
     const purchaseMetadata = {
       ...(purchase.metadata && typeof purchase.metadata === "object" ? purchase.metadata : {}),
       subscription_id: subscriptionId,
       current_period_end: expiresAt,
-      last_invoice_paid_at: new Date().toISOString(),
+      ...(isPaymentFailed
+        ? { last_invoice_payment_failed_at: new Date().toISOString() }
+        : { last_invoice_paid_at: new Date().toISOString() }),
     };
+    const purchaseUpdate: Record<string, unknown> = {
+      payment_status: isPaymentFailed ? "failed" : "paid",
+      metadata: purchaseMetadata,
+      updated_at: new Date().toISOString(),
+    };
+    if (!isPaymentFailed && !purchase.claimed_by) {
+      try {
+        const autoGrant = await grantPurchaseEntitlementByEmail(supabase, {
+          code: purchase.code,
+          buyerEmail: purchase.buyer_email,
+          entitlementKey,
+          expiresAt,
+          orderId: purchase.provider_order_id,
+          subscriptionId,
+        });
+        if (autoGrant.ok && autoGrant.userId) {
+          purchaseUpdate.claimed_by = autoGrant.userId;
+          purchaseUpdate.claimed_at = new Date().toISOString();
+          purchaseMetadata.auto_entitlement_granted_at = new Date().toISOString();
+          purchaseMetadata.auto_entitlement_user_id = autoGrant.userId;
+        } else if (autoGrant.reason) {
+          purchaseMetadata.auto_entitlement_grant_skipped = autoGrant.reason;
+        }
+      } catch (error) {
+        purchaseMetadata.auto_entitlement_grant_error = errorMessage(error, "auto entitlement grant failed");
+      }
+    }
     const { error: purchaseUpdateError } = await supabase
       .from("browser_adfree_purchase_orders")
-      .update({
-        payment_status: "paid",
-        metadata: purchaseMetadata,
-        updated_at: new Date().toISOString(),
-      })
+      .update(purchaseUpdate)
       .eq("id", purchase.id);
     if (purchaseUpdateError) {
       return json({ ok: false, error: purchaseUpdateError.message }, 500);
     }
-    return json({ ok: true, subscriptionId, eventType: event.type, synced: true });
+    return json({ ok: true, subscriptionId, eventType: event.type, synced: true, revoked: isPaymentFailed });
   }
 
   if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
@@ -374,7 +526,7 @@ serve(async (request) => {
         });
       }
     } catch (error) {
-      return json({ ok: false, error: String(error?.message || error || "subscription sync failed") }, 500);
+      return json({ ok: false, error: errorMessage(error, "subscription sync failed") }, 500);
     }
     const purchaseMetadata = {
       ...(purchase.metadata && typeof purchase.metadata === "object" ? purchase.metadata : {}),
@@ -384,13 +536,36 @@ serve(async (request) => {
       subscription_status: subscriptionStatus,
       last_subscription_event_at: new Date().toISOString(),
     };
+    const purchaseUpdate: Record<string, unknown> = {
+      payment_status: shouldRevokeNow ? "cancelled" : purchase.payment_status,
+      metadata: purchaseMetadata,
+      updated_at: new Date().toISOString(),
+    };
+    if (!shouldRevokeNow && currentPeriodEnd && !purchase.claimed_by) {
+      try {
+        const autoGrant = await grantPurchaseEntitlementByEmail(supabase, {
+          code: purchase.code,
+          buyerEmail: purchase.buyer_email,
+          entitlementKey,
+          expiresAt: currentPeriodEnd,
+          orderId: purchase.provider_order_id,
+          subscriptionId,
+        });
+        if (autoGrant.ok && autoGrant.userId) {
+          purchaseUpdate.claimed_by = autoGrant.userId;
+          purchaseUpdate.claimed_at = new Date().toISOString();
+          purchaseMetadata.auto_entitlement_granted_at = new Date().toISOString();
+          purchaseMetadata.auto_entitlement_user_id = autoGrant.userId;
+        } else if (autoGrant.reason) {
+          purchaseMetadata.auto_entitlement_grant_skipped = autoGrant.reason;
+        }
+      } catch (error) {
+        purchaseMetadata.auto_entitlement_grant_error = errorMessage(error, "auto entitlement grant failed");
+      }
+    }
     const { error: purchaseUpdateError } = await supabase
       .from("browser_adfree_purchase_orders")
-      .update({
-        payment_status: shouldRevokeNow ? "cancelled" : purchase.payment_status,
-        metadata: purchaseMetadata,
-        updated_at: new Date().toISOString(),
-      })
+      .update(purchaseUpdate)
       .eq("id", purchase.id);
     if (purchaseUpdateError) {
       return json({ ok: false, error: purchaseUpdateError.message }, 500);
@@ -415,7 +590,7 @@ serve(async (request) => {
 
   const { data: existingPurchase, error: existingError } = await supabase
     .from("browser_adfree_purchase_orders")
-    .select("id, code, payment_status")
+    .select("id, code, payment_status, metadata")
     .eq("provider", "stripe")
     .eq("provider_order_id", orderId)
     .eq("product_key", productKey)
@@ -424,7 +599,11 @@ serve(async (request) => {
     return json({ ok: false, error: existingError.message }, 500);
   }
 
+  const existingPurchaseMetadata = existingPurchase?.metadata && typeof existingPurchase.metadata === "object"
+    ? existingPurchase.metadata
+    : {};
   const metadata = {
+    ...existingPurchaseMetadata,
     source: "stripe_browser_adfree_webhook",
     event_type: event.type,
     payment_link_id: typeof session.payment_link === "string" ? session.payment_link : "",
@@ -458,7 +637,7 @@ serve(async (request) => {
     try {
       code = await generateUniqueCode(supabase);
     } catch (error) {
-      return json({ ok: false, error: String(error?.message || error || "code generation failed") }, 500);
+      return json({ ok: false, error: errorMessage(error, "code generation failed") }, 500);
     }
     const durationEnv = productKey === "pixiedraw_ad_free"
       ? "PIXIEED_STRIPE_PIXIEDRAW_ADFREE_DURATION_DAYS"
@@ -488,7 +667,7 @@ serve(async (request) => {
     }
   }
 
-  const { error: purchaseError } = await supabase
+  const { data: savedPurchase, error: purchaseError } = await supabase
     .from("browser_adfree_purchase_orders")
     .upsert({
       provider: "stripe",
@@ -502,9 +681,73 @@ serve(async (request) => {
       metadata,
     }, {
       onConflict: "provider,provider_order_id,product_key",
-    });
+    })
+    .select("id, metadata")
+    .maybeSingle();
   if (purchaseError) {
     return json({ ok: false, error: purchaseError.message }, 500);
+  }
+
+  const savedMetadata = savedPurchase?.metadata && typeof savedPurchase.metadata === "object"
+    ? savedPurchase.metadata
+    : metadata;
+  const nextSavedMetadata: Record<string, unknown> = { ...(savedMetadata as Record<string, unknown>) };
+  const purchasePostUpdate: Record<string, unknown> = {};
+  let autoEntitlementGranted = false;
+  let autoEntitlementGrantReason = "";
+  let autoEntitlementGrantError = "";
+  try {
+    const autoGrant = await grantPurchaseEntitlementByEmail(supabase, {
+      code,
+      buyerEmail,
+      entitlementKey,
+      orderId,
+      subscriptionId,
+    });
+    autoEntitlementGranted = Boolean(autoGrant.ok && autoGrant.userId);
+    autoEntitlementGrantReason = autoGrant.reason || "";
+    if (autoEntitlementGranted) {
+      const nowIso = new Date().toISOString();
+      purchasePostUpdate.claimed_by = autoGrant.userId;
+      purchasePostUpdate.claimed_at = nowIso;
+      nextSavedMetadata.auto_entitlement_granted_at = nowIso;
+      nextSavedMetadata.auto_entitlement_user_id = autoGrant.userId;
+    } else if (autoEntitlementGrantReason) {
+      nextSavedMetadata.auto_entitlement_grant_skipped = autoEntitlementGrantReason;
+    }
+  } catch (error) {
+    autoEntitlementGrantError = errorMessage(error, "auto entitlement grant failed");
+    nextSavedMetadata.auto_entitlement_grant_error = autoEntitlementGrantError;
+  }
+
+  let purchaseIdEmailSent = Boolean((savedMetadata as Record<string, unknown>).purchase_id_email_sent_at);
+  let purchaseIdEmailError = "";
+  if (!purchaseIdEmailSent) {
+    try {
+      const emailResult = await sendPurchaseIdEmail({ buyerEmail, orderId, productKey });
+      if (emailResult.sent && savedPurchase?.id) {
+        purchaseIdEmailSent = true;
+        const nowIso = new Date().toISOString();
+        nextSavedMetadata.purchase_id_email_sent_at = nowIso;
+        nextSavedMetadata.purchase_id_email_provider = emailResult.provider || "unknown";
+      }
+    } catch (error) {
+      purchaseIdEmailError = errorMessage(error, "purchase id email failed");
+      nextSavedMetadata.purchase_id_email_error = purchaseIdEmailError;
+    }
+  }
+  if (savedPurchase?.id) {
+    const { error: postUpdateError } = await supabase
+      .from("browser_adfree_purchase_orders")
+      .update({
+        ...purchasePostUpdate,
+        metadata: nextSavedMetadata,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", savedPurchase.id);
+    if (postUpdateError && !purchaseIdEmailError) {
+      purchaseIdEmailError = postUpdateError.message;
+    }
   }
 
   return json({
@@ -513,5 +756,10 @@ serve(async (request) => {
     codeIssued: true,
     code,
     eventType: event.type,
+    autoEntitlementGranted,
+    autoEntitlementGrantReason,
+    autoEntitlementGrantError,
+    purchaseIdEmailSent,
+    purchaseIdEmailError,
   });
 });
