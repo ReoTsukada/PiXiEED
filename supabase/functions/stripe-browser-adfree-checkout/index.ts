@@ -21,6 +21,12 @@ const PRODUCTS: Record<string, {
     appendSessionParams: true,
     mode: "subscription",
   },
+  pixieed_support_monthly: {
+    priceEnv: "PIXIEED_STRIPE_PIXIEED_SUPPORT_MONTHLY_PRICE_ID",
+    source: "pixieed_support_monthly",
+    appendSessionParams: true,
+    mode: "subscription",
+  },
   support_tip: {
     priceEnv: "PIXIEED_STRIPE_SUPPORT_TIP_PRICE_ID",
     source: "pixieed_support_tip",
@@ -112,6 +118,13 @@ function json(data: unknown, status = 200) {
   });
 }
 
+function errorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error || fallback);
+}
+
 serve(async (request) => {
   if (request.method !== "GET" && request.method !== "POST") {
     return json({ ok: false, error: "method not allowed" }, 405);
@@ -162,7 +175,7 @@ serve(async (request) => {
           quantity: 1,
         },
       ],
-      payment_method_types: ["card", "paypay"],
+      payment_method_types: ["card", "paypay"] as Stripe.Checkout.SessionCreateParams.PaymentMethodType[],
       customer_email: email || undefined,
       billing_address_collection: "auto",
       allow_promotion_codes: true,
@@ -189,6 +202,6 @@ serve(async (request) => {
 
     return Response.redirect(session.url, 303);
   } catch (error) {
-    return json({ ok: false, error: String(error?.message || error || "stripe checkout failed") }, 500);
+    return json({ ok: false, error: errorMessage(error, "stripe checkout failed") }, 500);
   }
 });
