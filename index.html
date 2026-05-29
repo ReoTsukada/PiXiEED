@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="site/landing.css">
+<link rel="stylesheet" href="site/landing.css?v=2026.05.30-ad-layout-guard">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -276,10 +276,14 @@
             const adSlot = document.createElement('ins');
             adSlot.className = 'adsbygoogle';
             adSlot.style.display = 'block';
+            adSlot.style.width = '100%';
+            adSlot.style.maxWidth = '100%';
+            adSlot.style.minWidth = '0';
+            adSlot.style.overflow = 'hidden';
             adSlot.dataset.adClient = 'ca-pub-9801602250480253';
             adSlot.dataset.adSlot = 'rotate';
             adSlot.dataset.adFormat = 'auto';
-            adSlot.dataset.fullWidthResponsive = 'true';
+            adSlot.dataset.fullWidthResponsive = 'false';
             mount.appendChild(adSlot);
           }
           window.pixieedObserveAds?.(activeSlide);
