@@ -18,9 +18,10 @@
       key: 'pixieed_support_monthly',
       title: 'PiXiEED継続サポート',
       price: '月額サポート',
-      description: 'PiXiEED全体の開発と運営を継続的に支援します。',
+      description: 'PiXiEED全体の開発と運営を継続的に支援し、サポーター特典を自動適用します。',
       webUrl: PIXIEED_SUPPORT_URL,
       nativeProductId: 'pixieed_support_monthly',
+      checkoutProductKey: 'pixieed_support_monthly',
       cta: '継続サポートを購入',
     },
     {
@@ -253,7 +254,7 @@
         <div class="support-checkout-panel__header">
           <div>
             <h2 class="support-checkout-panel__title" id="supportCheckoutTitle">PiXiEEDの支援メニュー</h2>
-            <p class="support-checkout-panel__lead">継続サポートまたは応援チップを選べます。PiXiEEDraw継続サポートのみ、PiXiEEDraw内広告の非表示に対応します。</p>
+            <p class="support-checkout-panel__lead">継続サポートは支払い状況に合わせてサポーター特典を自動更新します。応援チップはワンタイム支援です。</p>
           </div>
           <button class="support-checkout-panel__close" type="button" aria-label="課金パネルを閉じる">×</button>
         </div>
@@ -416,7 +417,7 @@
     } catch (error) {
       const fallbackUrl = option.webUrl;
       setStatus(String(error?.message || error || '購入ページを開けませんでした。'), true);
-      if (fallbackUrl) {
+      if (fallbackUrl && !option.checkoutProductKey) {
         window.location.href = fallbackUrl;
       }
     } finally {
