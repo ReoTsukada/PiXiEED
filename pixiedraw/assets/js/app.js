@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.05.29-new-shared-project-button';
+  const APP_BUILD_VERSION = '2026.05.29-supporter-serial-home';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
@@ -511,6 +511,13 @@
       detail: document.getElementById('shareStartConfirmDetail'),
       cancel: document.getElementById('shareStartConfirmCancel'),
       confirm: document.getElementById('shareStartConfirmConfirm'),
+    },
+    sharedProjectCreateFailure: {
+      dialog: /** @type {HTMLDialogElement|null} */ (document.getElementById('sharedProjectCreateFailureDialog')),
+      title: document.getElementById('sharedProjectCreateFailureTitle'),
+      message: document.getElementById('sharedProjectCreateFailureMessage'),
+      detail: document.getElementById('sharedProjectCreateFailureDetail'),
+      close: document.getElementById('sharedProjectCreateFailureClose'),
     },
     sharedProjectLimit: {
       dialog: /** @type {HTMLDialogElement|null} */ (document.getElementById('sharedProjectLimitDialog')),
@@ -3884,6 +3891,8 @@
   let startupVirtualCursorState = null;
   let pendingNewProjectAppendAsTab = false;
   let pendingNewProjectCreateShared = false;
+  let lastSharedProjectCreationFailureReason = '';
+  let lastSharedProjectCreationFailureDetail = '';
   let layoutMode = null;
   let multiEntryJoinPanelOpen = false;
   function bindClickHandlerOnce(element, datasetKey, handler) {
@@ -14902,9 +14911,16 @@
     setLocalizedTextContent('#projectHomeNew', '新規作成', 'New Project');
     setLocalizedTextContent('#projectHomeOpen', 'ファイルを開く', 'Open File');
     setLocalizedTextContent('#projectHomeCreateShared', '共有プロジェクト作成', 'Create Shared Project');
+    setLocalizedTextContent('#projectHomeSupporterTitle', 'サポーター特典', 'Supporter Benefits');
+    setLocalizedTextContent('#projectHomeSupporterStatus', 'ログイン後に購入番号またはシリアルコードを適用できます。', 'Log in to apply a purchase number or serial code.');
+    setLocalizedTextContent('#projectHomeSupporterApply', '適用', 'Apply');
+    setLocalizedTextContent('#projectHomeSupporterPurchase', 'サポーター特典を見る', 'View Supporter Benefits');
+    setLocalizedAttribute('#projectHomeSupporterCode', 'placeholder', '購入番号 / シリアルコード', 'Purchase number / serial code');
     setLocalizedTextContent('#projectHomeRecentProjects .project-home-screen__section-title', 'プロジェクト', 'Projects');
     setLocalizedTextContent('#startupRecentProjects .startup-screen__recent-title', 'プロジェクト一覧', 'Projects');
     setLocalizedTextContent('#startupRecentAdContainer .export-ad__label', '広告', 'Ad');
+    setLocalizedTextContent('#sharedProjectCreateFailureTitle', '共有プロジェクト作成失敗', 'Shared Project Creation Failed');
+    setLocalizedTextContent('#sharedProjectCreateFailureClose', '閉じる', 'Close');
     setLocalizedTextContent(
       '#startupScreenHint',
       AUTOSAVE_SUPPORTED
@@ -20703,6 +20719,71 @@
     });
   }
 
+  function setSharedProjectCreationFailureReason(reason = '', detail = '') {
+    lastSharedProjectCreationFailureReason = String(reason || '').trim();
+    lastSharedProjectCreationFailureDetail = String(detail || '').trim();
+  }
+
+  function clearSharedProjectCreationFailureReason() {
+    setSharedProjectCreationFailureReason('', '');
+  }
+
+  function getSharedProjectCreationFailureReason(fallbackReason = '', fallbackDetail = '') {
+    return {
+      reason: lastSharedProjectCreationFailureReason || String(fallbackReason || '').trim(),
+      detail: lastSharedProjectCreationFailureDetail || String(fallbackDetail || '').trim(),
+    };
+  }
+
+  function openSharedProjectCreateFailureDialog({
+    reason = '',
+    detail = '',
+    localCreated = true,
+  } = {}) {
+    const resolvedReason = String(reason || '').trim() || localizeText(
+      '共有プロジェクトとして作成できませんでした。',
+      'The project could not be created as a shared project.'
+    );
+    const localStateText = localCreated
+      ? localizeText('ローカルプロジェクトとして作成済みです。', 'It was created as a local project.')
+      : localizeText('ローカルプロジェクトの作成も完了していません。', 'The local project was not created either.');
+    const resolvedDetail = String(detail || '').trim()
+      ? `${localStateText}\n${String(detail).trim()}`
+      : localStateText;
+    const config = dom.sharedProjectCreateFailure;
+    const dialog = config?.dialog;
+    const messageText = `${resolvedReason}\n${resolvedDetail}`;
+    if (!(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== 'function' || dom.newProject?.dialog?.open) {
+      window.alert(messageText);
+      return;
+    }
+    if (config?.message instanceof HTMLElement) {
+      config.message.textContent = resolvedReason;
+    }
+    if (config?.detail instanceof HTMLElement) {
+      config.detail.textContent = resolvedDetail;
+    }
+    if (config?.close instanceof HTMLButtonElement) {
+      config.close.onclick = () => {
+        if (dialog.open) {
+          dialog.close();
+        }
+      };
+    }
+    dialog.oncancel = event => {
+      event.preventDefault();
+      if (dialog.open) {
+        dialog.close();
+      }
+    };
+    if (!dialog.open) {
+      dialog.showModal();
+    }
+    window.requestAnimationFrame(() => {
+      config?.close?.focus?.({ preventScroll: true });
+    });
+  }
+
   async function createSharedProjectFromNewProject({
     name,
     width,
@@ -20710,6 +20791,7 @@
     palettePreset = newProjectPalettePresetId,
     promptExportDirectory = false,
   } = {}) {
+    clearSharedProjectCreationFailureReason();
     const localCreated = await createNewProjectAsTab({
       name,
       width,
@@ -20721,12 +20803,39 @@
       return {
         localCreated: false,
         sharedCreated: false,
+        failureReason: localizeText(
+          'ローカルプロジェクトを作成できませんでした。',
+          'The local project could not be created.'
+        ),
+        failureDetail: localizeText(
+          `キャンバスサイズは${MIN_CANVAS_SIZE}〜${MAX_CANVAS_SIZE}の範囲で指定してください。`,
+          `Set the canvas size between ${MIN_CANVAS_SIZE} and ${MAX_CANVAS_SIZE}.`
+        ),
       };
     }
-    const sharedCreated = await createSharedProjectFromCurrentDocument();
+    let sharedCreated = false;
+    try {
+      sharedCreated = await createSharedProjectFromCurrentDocument();
+    } catch (error) {
+      setSharedProjectCreationFailureReason(
+        localizeText('共有プロジェクト作成中にエラーが発生しました。', 'An error occurred while creating the shared project.'),
+        String(error?.message || error || '')
+      );
+    }
+    const failure = sharedCreated
+      ? { reason: '', detail: '' }
+      : getSharedProjectCreationFailureReason(
+        localizeText('共有プロジェクトとして作成できませんでした。', 'The project could not be created as a shared project.'),
+        localizeText(
+          'ログイン状態、ネットワーク、共有プロジェクト上限、Supabase設定を確認してください。',
+          'Check sign-in state, network, shared project limit, and Supabase settings.'
+        )
+      );
     return {
       localCreated: true,
       sharedCreated: Boolean(sharedCreated),
+      failureReason: failure.reason,
+      failureDetail: failure.detail,
     };
   }
 
@@ -20748,6 +20857,7 @@
     const shouldAppendAsTab = Boolean(pendingNewProjectAppendAsTab);
     let created = false;
     let createdLocalProject = false;
+    let sharedCreationFailure = null;
     if (shouldCreateShared) {
       const result = await createSharedProjectFromNewProject({
         name,
@@ -20758,6 +20868,13 @@
       });
       created = Boolean(result?.sharedCreated);
       createdLocalProject = Boolean(result?.localCreated);
+      if (!created) {
+        sharedCreationFailure = {
+          reason: result?.failureReason || '',
+          detail: result?.failureDetail || '',
+          localCreated: createdLocalProject,
+        };
+      }
     } else if (shouldAppendAsTab) {
       created = await createNewProjectAsTab({
         name,
@@ -20783,8 +20900,13 @@
       if (projectHomeVisible) {
         hideProjectHomeScreen();
       }
+      if (sharedCreationFailure) {
+        openSharedProjectCreateFailureDialog(sharedCreationFailure);
+      }
     } else if (!shouldCreateShared) {
       window.alert(`キャンバスサイズは${MIN_CANVAS_SIZE}〜${MAX_CANVAS_SIZE}の数値で入力してください。`);
+    } else if (sharedCreationFailure) {
+      openSharedProjectCreateFailureDialog(sharedCreationFailure);
     }
   }
 
@@ -20802,6 +20924,7 @@
     const height = Number(heightRaw);
     let created = false;
     let createdLocalProject = false;
+    let sharedCreationFailure = null;
     if (createShared) {
       const result = await createSharedProjectFromNewProject({
         name,
@@ -20811,6 +20934,13 @@
       });
       created = Boolean(result?.sharedCreated);
       createdLocalProject = Boolean(result?.localCreated);
+      if (!created) {
+        sharedCreationFailure = {
+          reason: result?.failureReason || '',
+          detail: result?.failureDetail || '',
+          localCreated: createdLocalProject,
+        };
+      }
     } else if (appendAsTab) {
       created = await createNewProjectAsTab({
         name,
@@ -20830,6 +20960,9 @@
       window.alert(`キャンバスサイズは${MIN_CANVAS_SIZE}〜${MAX_CANVAS_SIZE}の数値で入力してください。`);
     } else if ((created || createdLocalProject) && projectHomeVisible) {
       hideProjectHomeScreen();
+    }
+    if (sharedCreationFailure) {
+      openSharedProjectCreateFailureDialog(sharedCreationFailure);
     }
   }
 
@@ -57622,18 +57755,36 @@
   }
 
   async function createSharedProjectFromCurrentDocument() {
+    clearSharedProjectCreationFailureReason();
     if (!ensureInternetConnectedForAction('共有プロジェクトの作成', 'Creating a shared project')) {
+      setSharedProjectCreationFailureReason(
+        localizeText('ネットワーク接続を確認できませんでした。', 'Network connection could not be confirmed.'),
+        localizeText('共有プロジェクトの作成にはインターネット接続が必要です。', 'Creating a shared project requires an internet connection.')
+      );
       return false;
     }
     if (isSharedProjectsBlockedByRuntime()) {
       showSharedRuntimeBlockedStatus();
+      setSharedProjectCreationFailureReason(
+        localizeText('この環境では共有プロジェクト機能を利用できません。', 'Shared projects are unavailable in this environment.'),
+        localizeText('ブラウザの機能制限または実行環境の制限により、共有機能がブロックされています。', 'Browser or runtime restrictions are blocking shared-project features.')
+      );
       return false;
     }
     if (!(await ensureSharedProjectAuthenticatedStart({ requireLogin: true }))) {
+      setSharedProjectCreationFailureReason(
+        localizeText('ログインが完了していません。', 'Sign-in is not complete.'),
+        localizeText('共有プロジェクトを作成するにはPiXiEEDアカウントへのログインが必要です。', 'Creating a shared project requires signing in to a PiXiEED account.')
+      );
       return false;
     }
     if (!await ensureSharedProjectBackendSession()) {
-      setMultiStatus(localizeText('共有プロジェクト用のセッションを開始できませんでした', 'Failed to initialize a shared-project session'), 'warn');
+      const message = localizeText('共有プロジェクト用のセッションを開始できませんでした', 'Failed to initialize a shared-project session');
+      setMultiStatus(message, 'warn');
+      setSharedProjectCreationFailureReason(
+        message,
+        localizeText('Supabase接続またはログイン状態を確認してください。', 'Check the Supabase connection or sign-in state.')
+      );
       return false;
     }
     await ensureNoLegacyMultiSessionForSharedProject();
@@ -57653,19 +57804,30 @@
       currentProjectIsShared ? activeSharedProjectKey : generateMultiProjectKey()
     );
     if (!projectKey) {
-      setMultiStatus(localizeText('共有プロジェクトを作成できませんでした', 'Failed to create shared project'), 'error');
+      const message = localizeText('共有プロジェクトを作成できませんでした', 'Failed to create shared project');
+      setMultiStatus(message, 'error');
+      setSharedProjectCreationFailureReason(
+        message,
+        localizeText('共有プロジェクトキーを生成できませんでした。', 'A shared project key could not be generated.')
+      );
       return false;
     }
     if (!(await ensureSharedProjectCapacity(projectKey, { countOwned: true }))) {
+      setSharedProjectCreationFailureReason(
+        localizeText('共有プロジェクトの作成上限に達しています。', 'The shared project creation limit has been reached.'),
+        localizeText('不要な共有プロジェクトを削除するか、共有プロジェクト作成枠を増やしてください。', 'Delete an unused shared project or increase your shared project creation slots.')
+      );
       return false;
     }
     if (pointerState.active) {
-      setMultiStatus(
-        localizeText(
-          '現在の描画を確定してから共有プロジェクトを作成してください。',
-          'Finish the current stroke before creating the shared project.'
-        ),
-        'warn'
+      const message = localizeText(
+        '現在の描画を確定してから共有プロジェクトを作成してください。',
+        'Finish the current stroke before creating the shared project.'
+      );
+      setMultiStatus(message, 'warn');
+      setSharedProjectCreationFailureReason(
+        message,
+        localizeText('描画中のストロークがまだ確定していません。', 'The current stroke has not been committed yet.')
       );
       return false;
     }
@@ -57678,6 +57840,10 @@
         reason: 'share-project-create',
       })
     ) {
+      setSharedProjectCreationFailureReason(
+        localizeText('未確定の共有描画をサーバーへ確定できませんでした。', 'Pending shared drawing could not be committed to the server.'),
+        localizeText('ネットワーク状態を確認してからもう一度共有リンクを作成してください。', 'Check the network state and try creating the shared link again.')
+      );
       return false;
     }
     const snapshot = makeHistorySnapshot({ clonePixelData: true });
@@ -57694,7 +57860,16 @@
       reason: 'sharedProjectCreate',
     });
     if (!project) {
-      setMultiStatus(localizeText('共有プロジェクトの作成に失敗しました', 'Failed to create shared project'), 'error');
+      const fallback = localizeText('共有プロジェクトの作成に失敗しました', 'Failed to create shared project');
+      setMultiStatus(fallback, 'error');
+      const failure = getSharedProjectCreationFailureReason(
+        fallback,
+        localizeText(
+          'Supabaseへのスナップショット保存に失敗しました。ログイン状態、ネットワーク、SQL/RPCの適用状況を確認してください。',
+          'Saving the snapshot to Supabase failed. Check sign-in state, network, and SQL/RPC deployment.'
+        )
+      );
+      setSharedProjectCreationFailureReason(failure.reason, failure.detail);
       return false;
     }
     storeMultiProjectKey(projectKey);
@@ -65299,20 +65474,43 @@
     // - project creation
     // - checkpoints
     // - structure-heavy fallback / refresh recovery
+    const snapshotReasonForFailure = String(reason || packagedPayload?.sharedHistoryLabel || '').trim();
+    const recordCreationSnapshotFailure = (failureReason = '', failureDetail = '') => {
+      if (snapshotReasonForFailure !== 'sharedProjectCreate') {
+        return;
+      }
+      setSharedProjectCreationFailureReason(failureReason, failureDetail);
+    };
     if (!canUseSharedProjectsBackend() && !await ensureSharedProjectBackendSession()) {
+      recordCreationSnapshotFailure(
+        localizeText('Supabase共有セッションを開始できませんでした。', 'Could not start the Supabase shared session.'),
+        localizeText('ログイン状態とネットワークを確認してください。', 'Check sign-in state and network.')
+      );
       return null;
     }
     const normalizedProjectKey = normalizeMultiProjectKey(projectKey);
     if (!normalizedProjectKey || !packagedPayload || typeof packagedPayload !== 'object') {
+      recordCreationSnapshotFailure(
+        localizeText('共有プロジェクトの保存データが不正です。', 'The shared project save payload is invalid.'),
+        localizeText('プロジェクトキーまたはスナップショットを作成できませんでした。', 'The project key or snapshot could not be created.')
+      );
       return null;
     }
     const project = await ensureSharedProjectMembership(normalizedProjectKey, { createIfMissing: true, title });
     if (!project) {
+      recordCreationSnapshotFailure(
+        localizeText('共有プロジェクトの作成権限を確認できませんでした。', 'Shared project creation permission could not be verified.'),
+        localizeText('Supabaseのプロジェクト作成またはメンバー登録に失敗しました。', 'Creating the Supabase project or member record failed.')
+      );
       return null;
     }
     try {
       const supabase = await ensurePixieedAccountClient();
       if (!supabase) {
+        recordCreationSnapshotFailure(
+          localizeText('Supabaseクライアントを初期化できませんでした。', 'Could not initialize the Supabase client.'),
+          localizeText('ログイン状態とネットワークを確認してください。', 'Check sign-in state and network.')
+        );
         return null;
       }
       const opType = classifySharedProjectOpType(packagedPayload?.sharedHistoryLabel || '');
@@ -65333,6 +65531,10 @@
         structureRevision: nextStructureRevision,
       });
       if (!snapshotGate.allowed) {
+        recordCreationSnapshotFailure(
+          localizeText('共有スナップショットを書き込めませんでした。', 'The shared snapshot could not be written.'),
+          localizeText('安全な書き込み条件を満たしていません。少し待ってから再試行してください。', 'The safe write condition was not met. Wait briefly and retry.')
+        );
         return null;
       }
       const snapshotRpcArgs = {
@@ -65372,6 +65574,10 @@
           error: String(error?.message || error || ''),
         });
         handleSharedProjectsBackendError(error, 'persist-rpc');
+        recordCreationSnapshotFailure(
+          localizeText('Supabase RPCで共有プロジェクト作成に失敗しました。', 'Shared project creation failed in the Supabase RPC.'),
+          String(error?.message || error || '')
+        );
         return null;
       }
       let result = Array.isArray(data) ? (data[0] || null) : (data || null);
@@ -65404,9 +65610,17 @@
           error: String(error?.message || error || ''),
         });
         handleSharedProjectsBackendError(error, 'persist-rpc');
+        recordCreationSnapshotFailure(
+          localizeText('Supabase RPCで共有プロジェクト作成に失敗しました。', 'Shared project creation failed in the Supabase RPC.'),
+          String(error?.message || error || '')
+        );
         return null;
       }
       if (!result) {
+        recordCreationSnapshotFailure(
+          localizeText('Supabaseから共有プロジェクト作成結果を取得できませんでした。', 'No shared project creation result was returned from Supabase.'),
+          localizeText('RPCの戻り値または通信状態を確認してください。', 'Check the RPC return value or network state.')
+        );
         return null;
       }
       if (result.commit_status === 'rejected' || result.commit_status === 'failed') {
@@ -65416,6 +65630,10 @@
           projectKey: normalizedProjectKey,
           status: result.commit_status,
         });
+        recordCreationSnapshotFailure(
+          localizeText('Supabaseが共有プロジェクト作成を拒否しました。', 'Supabase rejected the shared project creation.'),
+          localizeText(`commit_status: ${result.commit_status}`, `commit_status: ${result.commit_status}`)
+        );
         return null;
       }
       if (result.commit_status === 'conflict') {
@@ -65432,6 +65650,10 @@
           localizeText('共有プロジェクトの更新競合が発生したため最新状態へ再同期します', 'Shared project conflict detected. Refreshing to latest state.'),
           'warn'
         );
+        recordCreationSnapshotFailure(
+          localizeText('共有プロジェクト作成中に更新競合が発生しました。', 'A revision conflict occurred while creating the shared project.'),
+          localizeText('最新状態へ再同期してからもう一度試してください。', 'Resync to the latest state and try again.')
+        );
         return null;
       }
       sharedProjectLastCheckpointAt = Date.now();
@@ -65444,6 +65666,10 @@
       return result;
     } catch (error) {
       handleSharedProjectsBackendError(error, 'persist-exception');
+      recordCreationSnapshotFailure(
+        localizeText('共有プロジェクト保存中に例外が発生しました。', 'An exception occurred while saving the shared project.'),
+        String(error?.message || error || '')
+      );
       return null;
     }
   }
