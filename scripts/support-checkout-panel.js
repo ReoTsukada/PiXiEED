@@ -390,11 +390,61 @@
     return bridge;
   }
 
+  function openPendingCheckoutWindow() {
+    let targetWindow = null;
+    try {
+      targetWindow = window.open('about:blank', '_blank');
+      if (targetWindow) {
+        targetWindow.opener = null;
+        targetWindow.document.title = 'PiXiEED Checkout';
+        targetWindow.document.body.style.margin = '0';
+        targetWindow.document.body.style.fontFamily = 'system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
+        targetWindow.document.body.style.background = '#0f172a';
+        targetWindow.document.body.style.color = '#f8fafc';
+        targetWindow.document.body.style.display = 'grid';
+        targetWindow.document.body.style.placeItems = 'center';
+        targetWindow.document.body.style.minHeight = '100vh';
+        targetWindow.document.body.textContent = '購入ページを準備しています...';
+      }
+    } catch (_error) {
+      targetWindow = null;
+    }
+    return targetWindow;
+  }
+
+  function navigateToPurchaseUrl(url, targetWindow = null) {
+    if (!url) {
+      return;
+    }
+    try {
+      if (targetWindow && !targetWindow.closed) {
+        targetWindow.location.replace(url);
+        return;
+      }
+    } catch (_error) {
+      // Fall back to same-tab navigation below.
+    }
+    window.location.href = url;
+  }
+
+  function closePendingCheckoutWindow(targetWindow) {
+    try {
+      if (targetWindow && !targetWindow.closed) {
+        targetWindow.close();
+      }
+    } catch (_error) {
+      // ignore popup close failures
+    }
+  }
+
   async function handlePurchase(option, button) {
     if (!(button instanceof HTMLButtonElement)) {
       return;
     }
     const nativeBilling = getNativeBillingBridge();
+    const pendingWindow = !nativeBilling && option.checkoutProductKey
+      ? openPendingCheckoutWindow()
+      : null;
     button.setAttribute('aria-busy', 'true');
     setStatus('購入ページを準備しています...');
     try {
@@ -410,15 +460,19 @@
       }
       if (option.checkoutProductKey) {
         const checkoutUrl = await createScopedCheckout(option);
-        window.location.href = checkoutUrl;
+        navigateToPurchaseUrl(checkoutUrl, pendingWindow);
         return;
       }
-      window.location.href = option.webUrl;
+      navigateToPurchaseUrl(option.webUrl);
     } catch (error) {
       const fallbackUrl = option.webUrl;
-      setStatus(String(error?.message || error || '購入ページを開けませんでした。'), true);
-      if (fallbackUrl && !option.checkoutProductKey) {
-        window.location.href = fallbackUrl;
+      const message = String(error?.message || error || '購入ページを開けませんでした。');
+      if (fallbackUrl) {
+        setStatus(`${message} 既存のStripe購入ページを開きます。`, true);
+        navigateToPurchaseUrl(fallbackUrl, pendingWindow);
+      } else {
+        closePendingCheckoutWindow(pendingWindow);
+        setStatus(message, true);
       }
     } finally {
       button.removeAttribute('aria-busy');
