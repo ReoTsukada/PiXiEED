@@ -58815,6 +58815,129 @@
     return true;
   }
 
+  function formatSharedProjectPayloadSize(bytes) {
+    const safeBytes = Math.max(0, Math.round(Number(bytes) || 0));
+    if (safeBytes >= 1024 * 1024) {
+      const mb = safeBytes / (1024 * 1024);
+      return `${mb >= 10 ? Math.round(mb) : mb.toFixed(1)}MB`;
+    }
+    if (safeBytes >= 1024) {
+      return `${Math.max(1, Math.round(safeBytes / 1024))}KB`;
+    }
+    return `${safeBytes}B`;
+  }
+
+  function getSharedProjectTypedArrayByteLength(value) {
+    if (!value) {
+      return 0;
+    }
+    if (ArrayBuffer.isView(value)) {
+      return Math.max(0, value.byteLength || 0);
+    }
+    if (value instanceof ArrayBuffer) {
+      return Math.max(0, value.byteLength || 0);
+    }
+    return 0;
+  }
+
+  function estimateSharedProjectLayerPayloadBytes(layer) {
+    if (!layer || typeof layer !== 'object') {
+      return 0;
+    }
+    if (isSimulationLayer(layer) || layer.type === SIM_LAYER_TYPE) {
+      return [
+        'elementMap',
+        'sourceColorMap',
+        'velXMap',
+        'velYMap',
+        'lifeMap',
+        'tempMap',
+        'lightMap',
+        'depthMap',
+        'airMap',
+        'auxMap',
+        'activeMap',
+      ].reduce((total, key) => total + getSharedProjectTypedArrayByteLength(layer[key]), 0);
+    }
+    return getSharedProjectTypedArrayByteLength(layer.indices)
+      + getSharedProjectTypedArrayByteLength(layer.direct);
+  }
+
+  function estimateSharedProjectSnapshotUpload(snapshot) {
+    const metrics = {
+      rawPixelBytes: 0,
+      estimatedUploadBytes: 0,
+      canvasCount: 0,
+      frameCount: 0,
+      layerCount: 0,
+      simulationLayerCount: 0,
+    };
+    const visitFrames = (frames) => {
+      if (!Array.isArray(frames)) {
+        return;
+      }
+      metrics.frameCount += frames.length;
+      frames.forEach(frame => {
+        if (!frame || !Array.isArray(frame.layers)) {
+          return;
+        }
+        metrics.layerCount += frame.layers.length;
+        frame.layers.forEach(layer => {
+          if (isSimulationLayer(layer) || layer?.type === SIM_LAYER_TYPE) {
+            metrics.simulationLayerCount += 1;
+          }
+          metrics.rawPixelBytes += estimateSharedProjectLayerPayloadBytes(layer);
+        });
+      });
+    };
+    if (snapshot && typeof snapshot === 'object') {
+      metrics.canvasCount = 1;
+      visitFrames(snapshot.frames);
+      if (Array.isArray(snapshot.canvases) && snapshot.canvases.length > 1) {
+        metrics.canvasCount += snapshot.canvases.length;
+        snapshot.canvases.forEach(canvas => {
+          visitFrames(canvas?.frames);
+        });
+      }
+    }
+    metrics.estimatedUploadBytes = Math.ceil(metrics.rawPixelBytes * 1.4);
+    return metrics;
+  }
+
+  function buildSharedProjectCreateProgressLabel(phase, metrics = null) {
+    const normalizedPhase = String(phase || '').trim();
+    const sizeLabel = metrics?.estimatedUploadBytes
+      ? formatSharedProjectPayloadSize(metrics.estimatedUploadBytes)
+      : '';
+    if (!metrics || !sizeLabel) {
+      return normalizedPhase;
+    }
+    const detail = localizeText(
+      `推定 ${sizeLabel} / ${metrics.frameCount}フレーム・${metrics.layerCount}レイヤー`,
+      `estimated ${sizeLabel} / ${metrics.frameCount} frames, ${metrics.layerCount} layers`
+    );
+    return `${normalizedPhase} (${detail})`;
+  }
+
+  function setSharedProjectCreateProgress(phase, { metrics = null, tone = 'info' } = {}) {
+    const message = buildSharedProjectCreateProgressLabel(phase, metrics);
+    if (!message) {
+      return;
+    }
+    setMultiStatus(message, tone);
+    updateAutosaveStatus(message, tone);
+  }
+
+  function waitForSharedProjectProgressPaint() {
+    return new Promise(resolve => {
+      if (typeof window.requestAnimationFrame === 'function') {
+        window.requestAnimationFrame(() => resolve());
+        return;
+      }
+      window.setTimeout(resolve, 0);
+    });
+  }
+
   async function createSharedProjectFromCurrentDocument() {
     clearSharedProjectCreationFailureReason();
     if (!ensureInternetConnectedForAction('共有プロジェクトの作成', 'Creating a shared project')) {
@@ -58907,13 +59030,40 @@
       );
       return false;
     }
+    const createStartedAt = performance.now();
+    setSharedProjectCreateProgress(
+      localizeText('共有プロジェクトのデータを確認中…', 'Checking shared project data...')
+    );
+    await waitForSharedProjectProgressPaint();
     const snapshot = makeHistorySnapshot({ clonePixelData: true });
+    const uploadMetrics = estimateSharedProjectSnapshotUpload(snapshot);
+    const isLargeSharedProjectPayload = uploadMetrics.estimatedUploadBytes >= 8 * 1024 * 1024;
+    setSharedProjectCreateProgress(
+      isLargeSharedProjectPayload
+        ? localizeText(
+          '共有データが大きいため作成に時間がかかります',
+          'This shared project is large, so creation may take time'
+        )
+        : localizeText('共有データを準備中…', 'Preparing shared project data...'),
+      { metrics: uploadMetrics, tone: isLargeSharedProjectPayload ? 'warn' : 'info' }
+    );
+    await waitForSharedProjectProgressPaint();
     const localBackupPackaged = buildPackagedProjectPayload(snapshot);
     if (shouldConvertLocalProjectToShared) {
+      setSharedProjectCreateProgress(
+        localizeText('元のローカルプロジェクトを端末内に退避中…', 'Keeping a local backup...'),
+        { metrics: uploadMetrics }
+      );
+      await waitForSharedProjectProgressPaint();
       await recordRecentProjectSnapshot(snapshot, localBackupPackaged, {
         projectId: originalLocalProjectId,
       });
     }
+    setSharedProjectCreateProgress(
+      localizeText('共有プロジェクトをSupabaseへ保存中…', 'Saving the shared project to Supabase...'),
+      { metrics: uploadMetrics, tone: isLargeSharedProjectPayload ? 'warn' : 'info' }
+    );
+    await waitForSharedProjectProgressPaint();
     const packaged = buildPackagedProjectPayload(snapshot);
     packaged.sharedHistoryLabel = 'sharedProjectCreate';
     const project = await persistSharedProjectSnapshot(projectKey, packaged, {
@@ -58933,6 +59083,10 @@
       setSharedProjectCreationFailureReason(failure.reason, failure.detail);
       return false;
     }
+    setSharedProjectCreateProgress(
+      localizeText('共有URLを準備中…', 'Preparing the share URL...'),
+      { metrics: uploadMetrics }
+    );
     storeMultiProjectKey(projectKey);
     syncMultiProjectKeyInputValues(projectKey, { preserveFocused: false });
     setMultiDesiredRole('guest');
@@ -58972,6 +59126,14 @@
       ),
       'success'
     );
+    console.info('[shared-sync]', {
+      event: 'shared-project-create-finished',
+      projectKey,
+      estimatedUploadBytes: uploadMetrics.estimatedUploadBytes,
+      frameCount: uploadMetrics.frameCount,
+      layerCount: uploadMetrics.layerCount,
+      elapsedMs: Math.round(performance.now() - createStartedAt),
+    });
     return true;
   }
 
