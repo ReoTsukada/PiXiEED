@@ -896,6 +896,12 @@
 </div>
 <a class="chip" data-support-panel-trigger="true" data-support-preferred-product="pixiedraw_ad_free" href="https://buy.stripe.com/aFadRaeo8ekv5L44MM2VG01" id="multiSupportPurchase" rel="noopener">サポーター特典を見る</a>
 </section>
+<div aria-label="広告" class="export-ad multi-support__ad" id="multiSupportAdContainer">
+<div class="export-ad__slot">
+<ins class="ad-seed multi-support-ad-ins" data-ad-client="ca-pub-9801602250480253" data-ad-format="auto" data-ad-slot="2141591954" data-full-width-responsive="true" id="multiSupportAdSlot" style="display:block"></ins>
+</div>
+<small class="export-ad__label">広告</small>
+</div>
 <div class="field-group">
 <div class="multi-session-actions multi-session-actions--single">
 <button class="button" id="multiStartSession" type="button">共有モードをON</button>
@@ -1827,9 +1833,10 @@
       const SLOTS = [
         { containerId: 'leftPanelAdSlot', slot: '3806415737' },
         { containerId: 'rightPanelAdSlot', slot: '1180252398' },
+        { containerId: 'multiSupportAdSlot', slot: '2141591954' },
         { containerId: 'mobileBottomAdSlot', slot: '6568310446' }
       ];
-      const SIDE_SLOT_IDS = ['leftPanelAdSlot', 'rightPanelAdSlot'];
+      const SIDE_SLOT_IDS = ['leftPanelAdSlot', 'rightPanelAdSlot', 'multiSupportAdSlot'];
       const MIN_SIDE_AD_WIDTH = 140;
       const RETRY_FRAMES = 96;
       const slotByContainerId = new Map(SLOTS.map(item => [item.containerId, item]));
