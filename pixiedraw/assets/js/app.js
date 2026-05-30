@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.05.31-shared-burst-catchup';
+  const APP_BUILD_VERSION = '2026.05.31-shared-visible-catchup';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
@@ -60660,7 +60660,6 @@
   function hasSharedProjectRemoteApplyBlockingWork() {
     return (
       pointerState.active
-      || sharedProjectOpCommitInFlight
       || sharedProjectSyncInFlight
     );
   }
@@ -62448,6 +62447,46 @@
     return replayed;
   }
 
+  function replaySharedProjectLocalProvisionalAfterRemoteOps(reason = 'remote-op-ordered-before-local') {
+    if (!activeSharedProjectKey || pointerState.active) {
+      return 0;
+    }
+    const inflightOps = getSharedProjectLocalInFlightOps();
+    let replayed = 0;
+    inflightOps.forEach(entry => {
+      const opRecord = entry?.op || null;
+      if (!opRecord) {
+        return;
+      }
+      const opType = entry.opType || classifySharedProjectOpType(String(opRecord?.historyLabel || opRecord?.payload?.historyLabel || ''));
+      if (opType !== 'draw' && opType !== 'palette') {
+        return;
+      }
+      const applied = applyOp(opRecord, { fromRemote: false, provisional: true });
+      if (!applied) {
+        logSharedProjectLocalOpLifecycle('local replay failed', opRecord, {
+          source: reason,
+          status: entry.status || '',
+          opType,
+        });
+        return;
+      }
+      markSharedProjectLocalOpProvisionalApplied(opRecord, {
+        source: reason,
+        opType,
+      });
+      replayed += 1;
+    });
+    if (replayed > 0) {
+      console.debug('[shared-realtime] replayed-local-provisional-after-remote', {
+        reason,
+        projectKey: activeSharedProjectKey || '',
+        replayed,
+      });
+    }
+    return replayed;
+  }
+
   function deferSharedProjectSnapshotApplyIfLocalOpsInFlight(reason = 'snapshot-refresh') {
     if (!hasSharedProjectLocalInFlightOps() && !hasSharedProjectFailedLocalOps()) {
       return false;
@@ -64029,15 +64068,11 @@
     if (!activeSharedProjectKey || !canUseSharedProjectsBackend()) {
       return false;
     }
-    if ((Date.now() - sharedProjectLastProvisionalRemoteAt) < 900) {
-      return false;
-    }
     if (
       sharedProjectOpPollInFlight
       || sharedProjectGapRecoveryPromise
       || sharedProjectWakeRecoveryPromise
       || sharedProjectRefreshInFlight
-      || sharedProjectOpCommitInFlight
     ) {
       return false;
     }
@@ -64381,6 +64416,7 @@
     }
     let recovered = false;
     let totalFetched = 0;
+    let lastFetchCount = 0;
     const normalizedLimit = Math.max(1, Math.min(
       SHARED_PROJECT_MAX_MISSING_OP_FETCH,
       Math.round(Number(limit) || 128)
@@ -64399,6 +64435,7 @@
       }
       const afterSeq = sharedProjectLastAppliedSeq;
       const ops = await fetchMissingOps(normalizedProjectKey, afterSeq, normalizedLimit);
+      lastFetchCount = ops.length;
       if (!ops.length) {
         maybeMarkSharedProjectOpCatchupSynced(reason);
         break;
@@ -64417,15 +64454,15 @@
         break;
       }
       if (ops.length < normalizedLimit && !sharedProjectPendingRemoteOps.size) {
-        if (round === 0) {
-          scheduleSharedProjectOpsRescueRetry(96, `${reason || 'op-burst'}-tail-check`);
-        }
+        scheduleSharedProjectOpsRescueRetry(96, `${reason || 'op-burst'}-tail-check`);
         maybeMarkSharedProjectOpCatchupSynced(reason);
         break;
       }
     }
     if (recovered && sharedProjectPendingRemoteOps.size) {
       scheduleSharedProjectOpsRescueRetry(48, `${reason || 'op-burst'}-pending-drain`);
+    } else if (recovered && lastFetchCount >= normalizedLimit) {
+      scheduleSharedProjectOpsRescueRetry(48, `${reason || 'op-burst'}-continue`);
     }
     if (recovered) {
       console.debug('[shared-realtime] op-burst-catchup-done', {
@@ -64455,7 +64492,14 @@
     sharedProjectOpsRescueRetryTimer = window.setTimeout(() => {
       sharedProjectOpsRescueRetryTimer = null;
       sharedProjectOpsRescueRetryDueAt = 0;
-      if (!activeSharedProjectKey || sharedProjectRefreshInFlight || sharedProjectGapRecoveryPromise) {
+      if (!activeSharedProjectKey) {
+        return;
+      }
+      if (sharedProjectRefreshInFlight) {
+        scheduleSharedProjectOpsRescueRetry(180, `${reason || 'retry-op-poll'}-after-refresh`);
+        return;
+      }
+      if (sharedProjectGapRecoveryPromise) {
         if (sharedProjectGapRecoveryPromise) {
           sharedProjectGapRecoveryRerunRequested = true;
         }
@@ -64489,14 +64533,22 @@
         });
         return;
       }
+      const beforeSeq = sharedProjectLastAppliedSeq;
       pollSharedProjectRealtimeOpsRescue({ reason }).then(recovered => {
-        if (!recovered) {
-          scheduleSharedProjectBroadcastCatchupRetry({
-            reason,
-            attempt: normalizedAttempt + 1,
-            delays: retryDelays,
-          });
-        }
+        const advanced = sharedProjectLastAppliedSeq > beforeSeq;
+        console.debug('[shared-realtime] broadcast-catchup-attempt', {
+          reason,
+          attempt: normalizedAttempt,
+          beforeSeq,
+          afterSeq: sharedProjectLastAppliedSeq,
+          advanced,
+          recovered,
+        });
+        scheduleSharedProjectBroadcastCatchupRetry({
+          reason,
+          attempt: normalizedAttempt + 1,
+          delays: retryDelays,
+        });
       }).catch(() => {
         scheduleSharedProjectBroadcastCatchupRetry({
           reason,
@@ -64519,6 +64571,7 @@
   }
 
   function drainPendingSharedProjectRemoteOps() {
+    let appliedAny = false;
     while (sharedProjectPendingRemoteOps.has(sharedProjectLastAppliedSeq + 1)) {
       const nextSeq = sharedProjectLastAppliedSeq + 1;
       if (shouldDeferIncomingSharedProjectRemoteApply()) {
@@ -64538,6 +64591,7 @@
           activeSharedProjectStructureRevision,
           Math.max(0, Math.round(Number(nextOp?.structure_revision) || 0))
         );
+        appliedAny = true;
         continue;
       }
       if (!applyOp(nextOp, { fromRemote: true })) {
@@ -64551,6 +64605,10 @@
         activeSharedProjectStructureRevision,
         Math.max(0, Math.round(Number(nextOp?.structure_revision) || 0))
       );
+      appliedAny = true;
+    }
+    if (appliedAny && sharedProjectReplayRenderBatchDepth <= 0) {
+      replaySharedProjectLocalProvisionalAfterRemoteOps('pending-remote-drained-before-local');
     }
     return true;
   }
@@ -64665,6 +64723,9 @@
         if (!drainPendingSharedProjectRemoteOps()) {
           return false;
         }
+      }
+      if (fromRemote) {
+        replaySharedProjectLocalProvisionalAfterRemoteOps('remote-op-ordered-before-local');
       }
     } finally {
       endSharedProjectReplayRenderBatch();
@@ -68318,7 +68379,7 @@
         );
         scheduleSharedProjectBroadcastCatchupRetry({
           reason: recoveryReason,
-          delays: [140, 300, 680, 1300],
+          delays: [140, 300, 680, 1300, 2600],
         });
       }
     );
