@@ -77686,12 +77686,21 @@
   function createPixelFrameImage(color, { borderColor = '#C8C8C8' } = {}) {
     const colorCss = toCssColor(color);
     const borderCss = toCssColor(borderColor);
+    const checkerA = '#111827';
+    const checkerB = '#334155';
     const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='21' height='21' shape-rendering='crispEdges'>` +
       `<rect x='1' y='0' width='19' height='1' fill='${borderCss}' />` +
       `<rect x='0' y='1' width='2' height='1' fill='${borderCss}' />` +
+      // checker base (so fully transparent colors remain visible)
+      `<rect x='2' y='1' width='17' height='19' fill='${checkerA}' />` +
+      `<rect x='2' y='1' width='9' height='10' fill='${checkerB}' />` +
+      `<rect x='11' y='10' width='8' height='10' fill='${checkerB}' />` +
+      // selected color overlay (may include alpha)
       `<rect x='2' y='1' width='17' height='19' fill='${colorCss}' />` +
       `<rect x='19' y='1' width='2' height='1' fill='${borderCss}' />` +
       `<rect x='0' y='2' width='1' height='18' fill='${borderCss}' />` +
+      `<rect x='1' y='2' width='1' height='17' fill='${checkerB}' />` +
+      `<rect x='19' y='2' width='1' height='17' fill='${checkerB}' />` +
       `<rect x='1' y='2' width='1' height='17' fill='${colorCss}' />` +
       `<rect x='19' y='2' width='1' height='17' fill='${colorCss}' />` +
       `<rect x='20' y='2' width='1' height='18' fill='${borderCss}' />` +
