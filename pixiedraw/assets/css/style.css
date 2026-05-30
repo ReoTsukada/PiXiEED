@@ -1766,11 +1766,15 @@ body.is-bottom-timeline-docked:not(.is-mobile-layout) .tool-button {
 
 body.is-bottom-timeline-docked:not(.is-mobile-layout) .tool-group-button.is-active,
 body.is-bottom-timeline-docked:not(.is-mobile-layout) .tool-group-button--action[aria-pressed="true"],
-body.is-bottom-timeline-docked:not(.is-mobile-layout) .tool-button.is-active,
+body.is-bottom-timeline-docked:not(.is-mobile-layout) .tool-button.is-active {
+  border-color: rgba(var(--ui-rgb-focus), 0.55);
+  background: rgba(20, 42, 58, 0.66);
+}
+
 body.is-bottom-timeline-docked:not(.is-mobile-layout) .palette-swatch.is-active,
 body.is-bottom-timeline-docked:not(.is-mobile-layout) .palette-swatch.is-secondary {
   border-color: rgba(var(--ui-rgb-focus), 0.55);
-  background: rgba(20, 42, 58, 0.66);
+  background-color: transparent;
 }
 
 body.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .timeline-frame-settings {
@@ -5702,23 +5706,30 @@ body.is-mobile-layout .mobile-draw-help {
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
+  z-index: 1;
   min-height: 40px;
   border: 1px solid rgba(var(--ui-rgb), 0.24);
   background: var(--surface-1);
   color: var(--fg-muted);
+  opacity: 1;
+  visibility: visible;
   font-size: 0.72rem;
   letter-spacing: 0.06em;
   line-height: 1.2;
   text-align: center;
   padding: 6px 8px;
-  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
+  transition: border-color 120ms ease, color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
   clip-path: none;
 }
 
 #panelSettings .color-mode-switch__option input[type='radio']:checked + span {
-  border-color: rgba(156, 234, 241, 0.86);
-  background: var(--surface-accent);
+  border-color: rgba(126, 220, 236, 0.95);
+  background-color: rgba(28, 78, 112, 0.92);
   color: #f3fbff;
+  opacity: 1;
+  visibility: visible;
+  box-shadow: inset 0 0 0 1px rgba(126, 220, 236, 0.24);
 }
 
 #panelSettings .color-mode-switch__option input[type='radio']:focus-visible + span {
