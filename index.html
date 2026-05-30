@@ -36,6 +36,27 @@
         "name": "PiXiEED",
         "url": "https://pixieed.jp/",
         "logo": "https://pixieed.jp/icon/icon-512-4.png"
+      },
+      {
+        "@type": "SoftwareApplication",
+        "name": "PiXiEEDraw",
+        "applicationCategory": "GraphicsApplication",
+        "operatingSystem": "Web",
+        "url": "https://pixieed.jp/pixiedraw/index.html"
+      },
+      {
+        "@type": "SoftwareApplication",
+        "name": "QRコードリーダー",
+        "applicationCategory": "UtilitiesApplication",
+        "operatingSystem": "Web",
+        "url": "https://pixieed.jp/qr-maker/index.html"
+      },
+      {
+        "@type": "SoftwareApplication",
+        "name": "PiXiEELENS",
+        "applicationCategory": "MultimediaApplication",
+        "operatingSystem": "Web",
+        "url": "https://pixieed.jp/pixiee-lens/index.html"
       }
     ]
   }
@@ -64,28 +85,28 @@
     <div class="home-screen">
       <section class="home-hero-card home-hero-card--image" aria-label="ヒーロー">
         <div class="home-hero-carousel" aria-label="注目パネル">
-          <a class="home-hero-slide is-active" href="projects/pixiedraw/index.html" data-hero-slide>
-            <img src="assets/screenshots/pixieedraw-ui.png" alt="PiXiEEDraw" data-pixel-art-fit="off">
+          <a class="home-hero-slide is-active" href="pixiedraw/index.html" data-hero-slide>
+            <img src="assets/screenshots/generated/pixiedraw-app.png" alt="PiXiEEDrawの編集・レイヤー・アニメ制作画面" data-pixel-art-fit="off">
             <div class="home-hero-slide__content">
               <p class="home-hero-slide__eyebrow">featured tool</p>
-              <h1 class="home-hero-slide__title">PiXiEEDrawをすぐ使う</h1>
-              <p class="home-hero-slide__copy">PiXiEEDの中心となるドット絵エディターをすぐ確認して、そのまま始められます。</p>
+              <h1 class="home-hero-slide__title">PiXiEEDrawで制作を始める</h1>
+              <p class="home-hero-slide__copy">レイヤー管理、フレーム編集、共有編集まで1つで進められる制作環境をそのまま開けます。</p>
             </div>
           </a>
-          <a class="home-hero-slide" href="projects/pixiee-lens/index.html" data-hero-slide>
-            <img src="pixiee-lens/ogp.png" alt="PiXiEELENS" data-pixel-art-fit="off">
+          <a class="home-hero-slide" href="pixiee-lens/index.html" data-hero-slide>
+            <img src="assets/screenshots/generated/pixiee-lens-app.png" alt="PiXiEELENSのカメラ入力とドット変換プレビュー画面" data-pixel-art-fit="off">
             <div class="home-hero-slide__content">
               <p class="home-hero-slide__eyebrow">tool</p>
-              <h2 class="home-hero-slide__title">PiXiEELENSを見る</h2>
-              <p class="home-hero-slide__copy">写真やカメラ映像をドット絵調に寄せるツールを、そのまま紹介ページから確認できます。</p>
+              <h2 class="home-hero-slide__title">PiXiEELENSを開く</h2>
+              <p class="home-hero-slide__copy">写真やカメラ映像をリアルタイムでドット表現に変換し、作品素材づくりに使えます。</p>
             </div>
           </a>
-          <a class="home-hero-slide" href="projects/qr-maker/index.html" data-hero-slide>
-            <img src="qr-maker/qrogp.png" alt="QR作成" data-pixel-art-fit="off">
+          <a class="home-hero-slide" href="qr-maker/index.html" data-hero-slide>
+            <img src="assets/screenshots/generated/qr-maker-app.png" alt="QRコードリーダーの入力・調整・生成画面" data-pixel-art-fit="off">
             <div class="home-hero-slide__content">
               <p class="home-hero-slide__eyebrow">utility</p>
-              <h2 class="home-hero-slide__title">QR作成ツールを見る</h2>
-              <p class="home-hero-slide__copy">登録不要で使えるQR作成ツールを、そのまま紹介ページから確認できます。</p>
+              <h2 class="home-hero-slide__title">QRコードリーダーを開く</h2>
+              <p class="home-hero-slide__copy">文字列入力、色や余白の調整、PNG保存までを1画面で完結できます。</p>
             </div>
           </a>
           <div class="home-hero-slide home-hero-slide--ad" data-hero-slide aria-label="広告">
@@ -102,19 +123,47 @@
           <a class="home-panel__link" href="#projects">一覧</a>
         </div>
         <div class="home-app-grid">
-          <a class="home-app-tile" href="projects/pixiedraw/index.html">
+          <a class="home-app-tile" href="pixiedraw/index.html">
             <span class="home-app-tile__icon"><img src="icon/icon-192-4.png" alt="PiXiEEDraw"></span>
             <span class="home-app-tile__label">PiXiEEDraw</span>
           </a>
-          <a class="home-app-tile" href="projects/qr-maker/index.html">
+          <a class="home-app-tile" href="qr-maker/index.html">
             <span class="home-app-tile__icon"><img src="icon/icon-192-6.png" alt="QRコードリーダー"></span>
             <span class="home-app-tile__label">QRコードリーダー</span>
           </a>
-          <a class="home-app-tile" href="projects/pixiee-lens/index.html">
+          <a class="home-app-tile" href="pixiee-lens/index.html">
             <span class="home-app-tile__icon"><img src="icon/icon-192-1.png" alt="PiXiEELENS"></span>
             <span class="home-app-tile__label">PiXiEELENS</span>
           </a>
         </div>
+      </section>
+
+      <section class="home-panel" id="project-intros">
+        <div class="home-panel__header">
+          <h2 class="home-panel__title">プロジェクト紹介</h2>
+          <a class="home-panel__link" href="#project-intros">一覧</a>
+        </div>
+        <div class="home-intro-grid">
+          <a class="home-intro-link" href="projects/pixiedraw/index.html">PiXiEEDraw 紹介</a>
+          <a class="home-intro-link" href="projects/qr-maker/index.html">QRコードリーダー 紹介</a>
+          <a class="home-intro-link" href="projects/pixiee-lens/index.html">PiXiEELENS 紹介</a>
+        </div>
+      </section>
+
+      <section class="home-panel" id="shared-canvas">
+        <div class="home-panel__header">
+          <h2 class="home-panel__title">共有キャンバス</h2>
+          <a class="home-panel__link" href="pixiedraw/index.html">開く</a>
+        </div>
+        <a class="home-shared-card" href="pixiedraw/index.html" aria-label="共有キャンバスを開く">
+          <img src="assets/screenshots/generated/pixiedraw-editor.png" alt="PiXiEEDrawの共有キャンバス編集画面" data-pixel-art-fit="off">
+          <div class="home-shared-card__content">
+            <p class="home-shared-card__eyebrow">real-time collab</p>
+            <h2 class="home-shared-card__title">URL共有ですぐ同時編集</h2>
+            <p class="home-shared-card__copy">離れたメンバーと同じキャンバスを開き、描画・確認・修正をリアルタイムで進められます。</p>
+            <span class="home-shared-card__cta">PiXiEEDrawで共有制作を始める</span>
+          </div>
+        </a>
       </section>
 
       <section class="home-panel">
@@ -247,7 +296,8 @@
       if (activeIndex < 0) activeIndex = 0;
       const CONTENT_DELAY_MS = 5000;
       const AD_DELAY_MS = 9000;
-      let rotationCount = 0;
+      const AD_INSERT_AFTER_CONTENT = 2;
+      let contentSlidesSinceAd = 0;
       let rotationTimer = null;
       const clearRotationTimer = () => {
         if (rotationTimer) {
@@ -305,10 +355,16 @@
         return nextIndex;
       };
       const pickNextIndex = () => {
-        rotationCount += 1;
-        if (adIndex >= 0 && rotationCount % 3 === 0) {
+        const activeSlide = slides[activeIndex];
+        const activeIsAd = Boolean(activeSlide?.classList.contains('home-hero-slide--ad'));
+        if (activeIsAd) {
+          contentSlidesSinceAd = 0;
+          return pickRandomContentIndex();
+        }
+        if (adIndex >= 0 && contentSlidesSinceAd >= AD_INSERT_AFTER_CONTENT) {
           return adIndex;
         }
+        contentSlidesSinceAd += 1;
         return pickRandomContentIndex();
       };
       showSlide(activeIndex);
