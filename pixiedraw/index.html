@@ -83,7 +83,7 @@
 
 
 
-<link href="assets/css/style.css" rel="stylesheet"/>
+<link href="assets/css/style.css?v=2026.05.30-rail-min-ad" rel="stylesheet"/>
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-4.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-4.png"/>
   <style id="interaction-guard">
@@ -288,27 +288,45 @@
 <div aria-hidden="true" aria-live="polite" class="zoom-indicator" id="zoomIndicator" role="status"></div>
 <div aria-label="小窓プレビュー" aria-hidden="true" class="floating-preview-panel is-hidden" hidden="" id="floatingPreviewPanel" role="region">
 <div class="floating-preview-panel__header" id="floatingPreviewHeader">
-<span class="floating-preview-panel__title" id="floatingPreviewTitle">小窓プレビュー</span>
+<div aria-label="小窓プレビュー切り替え" class="floating-preview-panel__tabs" id="floatingPreviewTabs" role="tablist">
+<button aria-controls="floatingPreviewPaneCanvas" aria-selected="true" class="floating-preview-panel__tab is-active" data-floating-preview-tab="preview" id="floatingPreviewTabPreview" role="tab" type="button">プレビュー</button>
+<button aria-controls="floatingPreviewPaneReference" aria-selected="false" class="floating-preview-panel__tab" data-floating-preview-tab="reference" id="floatingPreviewTabReference" role="tab" tabindex="-1" type="button">参考画像</button>
+</div>
 <div class="floating-preview-panel__actions">
 <button aria-label="再生" class="pixel-button pixel-frame floating-preview-panel__btn" id="floatingPreviewPlay" type="button">▶</button>
 <button aria-label="停止" class="pixel-button pixel-frame floating-preview-panel__btn" id="floatingPreviewStop" type="button">■</button>
 </div>
 </div>
 <div class="floating-preview-panel__body" id="floatingPreviewBody">
+<div class="floating-preview-panel__pane is-active" data-floating-preview-pane="preview" id="floatingPreviewPaneCanvas" role="tabpanel">
 <canvas aria-label="小窓プレビューキャンバス" class="floating-preview-panel__canvas" height="32" id="floatingPreviewCanvas" width="32"></canvas>
 <canvas aria-hidden="true" class="floating-preview-panel__gizmo" height="84" id="floatingPreviewGizmo" width="84"></canvas>
 </div>
+<div class="floating-preview-panel__pane" data-floating-preview-pane="reference" hidden="" id="floatingPreviewPaneReference" role="tabpanel">
+<img alt="参考画像プレビュー" class="floating-preview-panel__reference-image" hidden="" id="floatingPreviewReferenceImage"/>
+<video aria-label="参考動画プレビュー" class="floating-preview-panel__reference-video" hidden="" id="floatingPreviewReferenceVideo" playsinline preload="metadata"></video>
+<audio aria-label="参考音声プレビュー" class="floating-preview-panel__reference-audio" hidden="" id="floatingPreviewReferenceAudio" preload="metadata"></audio>
+<p class="floating-preview-panel__reference-empty" id="floatingPreviewReferenceEmpty">＋で参考画像を追加</p>
+<div aria-label="参考画像スロット" class="floating-preview-panel__reference-slots" id="floatingPreviewReferenceSlots"></div>
+</div>
+</div>
+<div class="floating-preview-panel__zoom-row" id="floatingPreviewZoomRow">
+<input aria-label="プレビュー拡大率" id="floatingPreviewZoom" max="400" min="25" step="1" type="range" value="100"/>
+<output aria-live="polite" class="floating-preview-panel__zoom-value" for="floatingPreviewZoom" id="floatingPreviewZoomValue">100%</output>
+<button aria-label="プレビュー位置をリセット" class="pixel-button pixel-frame floating-preview-panel__zoom-reset" id="floatingPreviewPanReset" title="位置リセット" type="button">↺</button>
+</div>
+<input accept="image/*,video/*,audio/*,.svg,.svgz,.gif,.mp4,.mp3" hidden="" id="floatingPreviewReferenceInput" type="file"/>
 <button aria-label="プレビューパネルのサイズを変更" class="floating-preview-panel__resize-handle" id="floatingPreviewResize" type="button"></button>
 </div>
 </div>
 </main>
+<section aria-label="フレームとレイヤー" class="bottom-timeline-dock" hidden="" id="bottomTimelineDock" tabindex="-1">
+<button aria-label="フレームとレイヤーの高さを変更" class="bottom-timeline-dock__resizer" id="resizeBottomTimelineDock" type="button"></button>
+<div class="bottom-timeline-dock__panes" id="bottomTimelinePanes"></div>
+</section>
 <aside aria-label="フレーム、レイヤー、設定、拡張、ファイル、共有" class="rail rail--right" data-collapsed="false" data-compact="true" id="rightRail">
 <div aria-label="右パネル切り替え" class="rail-tabs" id="rightRailTabs" role="tablist">
-<button aria-controls="panelFrames" aria-label="フレームとレイヤー" aria-selected="true" class="rail-tab is-active" data-right-tab="frames" role="tab" title="フレームとレイヤー" type="button">
-<img alt="" class="tab-icon" src="assets/icons/menu-frame.png"/>
-<span class="sr-only">フレームとレイヤー</span>
-</button>
-<button aria-controls="panelSettings" aria-label="設定" aria-selected="false" class="rail-tab" data-right-tab="settings" role="tab" tabindex="-1" title="設定" type="button">
+<button aria-controls="panelSettings" aria-label="設定" aria-selected="true" class="rail-tab is-active" data-right-tab="settings" role="tab" title="設定" type="button">
 <img alt="" class="tab-icon" src="assets/icons/menu-settings.svg"/>
 <span class="sr-only">設定</span>
 </button>
@@ -894,9 +912,9 @@
 </ul>
 </div>
 </details>
+</div>
+</div>
 <div class="panel-ad-mount" data-panel-ad-mount="right"></div>
-</div>
-</div>
 </section>
 <section class="panel-section" data-section="settings" id="panelSettings">
 <div class="panel-section__body">
@@ -1533,7 +1551,7 @@
 	<script src="../scripts/pixieed-adfree.js?v=2026.05.30-support-checkout-mobile"></script>
 	<script src="../scripts/support-checkout-panel.js?v=2026.05.30-support-checkout-sametab"></script>
 	<script defer="" src="assets/js/shared-project-op-codec.js?v=2026.05.29-supporter-serial-home"></script>
-	<script defer="" src="assets/js/app.js?v=2026.05.29-supporter-serial-home"></script>
+	<script defer="" src="assets/js/app.js?v=2026.05.30-rail-min-ad"></script>
   <!-- Mobile bottom ad placeholder (visible in portrait / small screens) -->
   <div id="mobileBottomAd" aria-hidden="false">
     <div class="mobile-ad-box" id="mobileBottomAdSlot">
