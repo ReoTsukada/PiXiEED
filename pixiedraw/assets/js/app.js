@@ -71509,6 +71509,17 @@
       document.body.removeChild(textarea);
       return Boolean(copied);
     } catch (error) {
+      // continue to prompt fallback
+    }
+    try {
+      // Last-resort fallback for environments where clipboard APIs are blocked.
+      // Users can manually copy from the prompt field.
+      window.prompt(
+        localizeText('共有URLを手動でコピーしてください', 'Copy the shared URL manually'),
+        value
+      );
+      return true;
+    } catch (error) {
       return false;
     }
   }
