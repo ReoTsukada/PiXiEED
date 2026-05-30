@@ -1,4 +1,4 @@
-const APP_BUILD_VERSION = '2026.05.30-rail-min-ad';
+const APP_BUILD_VERSION = '2026.05.30-shared-create-progress';
 const CACHE_VERSION = `pixiedraw-v${APP_BUILD_VERSION}`;
 const CORE_ASSETS = [
   '/pixiedraw/',
