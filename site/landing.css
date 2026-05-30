@@ -821,6 +821,89 @@ body > .adsbygoogle {
   line-height: 1.45;
   color: var(--muted);
 }
+.home-intro-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+.home-intro-link {
+  min-height: 38px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.04);
+  color: #e5e7eb;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 700;
+}
+.home-intro-link::after {
+  content: '紹介';
+  font-size: 11px;
+  color: var(--accent);
+}
+.home-shared-card {
+  display: grid;
+  gap: 10px;
+  color: inherit;
+  text-decoration: none;
+  padding: 10px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.05);
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+.home-shared-card:hover,
+.home-shared-card:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.08);
+}
+.home-shared-card img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 12px;
+}
+.home-shared-card__content {
+  display: grid;
+  gap: 6px;
+}
+.home-shared-card__eyebrow {
+  margin: 0;
+  font-size: 11px;
+  color: var(--accent-2);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.home-shared-card__title {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.45;
+}
+.home-shared-card__copy {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.65;
+}
+.home-shared-card__cta {
+  margin-top: 2px;
+  min-height: 30px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(121,192,255,0.28);
+  background: rgba(121,192,255,0.12);
+  color: #eaf6ff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+}
 .home-feed {
   display: grid;
   gap: 10px;
