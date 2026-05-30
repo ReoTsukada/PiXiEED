@@ -1,4 +1,12 @@
 (function () {
+  const PIXIEED_ADFREE_SCRIPT_VERSION = '2026.05.30-support-email-claim';
+
+  function buildPixieedAdFreeScriptUrl(baseUrl) {
+    const url = new URL(baseUrl, window.location.href);
+    url.searchParams.set('v', PIXIEED_ADFREE_SCRIPT_VERSION);
+    return url.href;
+  }
+
   function isPixieedrawPageForAds() {
     try {
       const pathname = String(window.location.pathname || '').toLowerCase();
@@ -41,7 +49,7 @@
     const script = document.createElement('script');
     script.defer = true;
     script.dataset.pixieedAdfree = 'true';
-    script.src = new URL('/scripts/pixieed-adfree.js', window.location.href).href;
+    script.src = buildPixieedAdFreeScriptUrl('/scripts/pixieed-adfree.js');
     document.head.appendChild(script);
   }
 
