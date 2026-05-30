@@ -180,10 +180,32 @@
         padding:14px;
         display:grid;
         gap:10px;
+        position:relative;
+        overflow:hidden;
       }
       .support-checkout-option.is-featured{
         border-color:rgba(251,191,36,0.42);
         background:linear-gradient(180deg, rgba(251,191,36,0.13), rgba(255,255,255,0.05));
+      }
+      .support-checkout-option.is-global-support{
+        border-color:rgba(250,204,21,0.52);
+        background:
+          radial-gradient(110% 70% at 0% 0%, rgba(250,204,21,0.22), transparent 60%),
+          linear-gradient(180deg, rgba(15,23,42,0.7), rgba(30,41,59,0.72));
+        box-shadow:0 12px 32px rgba(250,204,21,0.2);
+      }
+      .support-checkout-option.is-global-support::after{
+        content:'PREMIUM';
+        position:absolute;
+        top:10px;
+        right:10px;
+        font-size:10px;
+        font-weight:900;
+        letter-spacing:0.08em;
+        color:#0f172a;
+        background:#facc15;
+        border-radius:999px;
+        padding:3px 8px;
       }
       .support-checkout-option__eyebrow{
         margin:0;
@@ -218,6 +240,18 @@
         font-size:13px;
         padding:12px 14px;
         cursor:pointer;
+      }
+      .support-checkout-option.is-global-support .support-checkout-option__title{
+        color:#fef08a;
+      }
+      .support-checkout-option.is-global-support .support-checkout-option__price{
+        color:#fde68a;
+        font-size:14px;
+      }
+      .support-checkout-option.is-global-support .support-checkout-option__button{
+        background:linear-gradient(135deg, #facc15, #fb923c);
+        color:#111827;
+        box-shadow:0 8px 18px rgba(251,146,60,0.35);
       }
       .support-checkout-option__button[aria-busy="true"]{
         opacity:0.72;
@@ -337,10 +371,20 @@
     list.innerHTML = '';
     OPTIONS.forEach((option) => {
       const article = document.createElement('article');
-      article.className = `support-checkout-option${option.key === preferredKey ? ' is-featured' : ''}`;
+      const classNames = ['support-checkout-option'];
+      if (option.key === preferredKey) {
+        classNames.push('is-featured');
+      }
+      if (option.key === 'pixieed_support_monthly') {
+        classNames.push('is-global-support');
+      }
+      article.className = classNames.join(' ');
       article.dataset.supportOption = option.key;
+      const eyebrowText = option.key === 'pixieed_support_monthly'
+        ? 'subscription · all PiXiEED'
+        : (option.checkoutProductKey ? 'subscription' : 'support');
       article.innerHTML = `
-        <p class="support-checkout-option__eyebrow">${option.checkoutProductKey ? 'subscription' : 'support'}</p>
+        <p class="support-checkout-option__eyebrow">${eyebrowText}</p>
         <h3 class="support-checkout-option__title">${option.title}</h3>
         <p class="support-checkout-option__price">${option.price}</p>
         <p class="support-checkout-option__description">${option.description}</p>
