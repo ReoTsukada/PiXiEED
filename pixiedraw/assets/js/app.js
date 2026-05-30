@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.05.31-shared-reliable-op-flow';
+  const APP_BUILD_VERSION = '2026.05.31-shared-burst-catchup';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
@@ -2644,6 +2644,7 @@
   const SHARED_PROJECT_REFRESH_LOOP_INTERVAL_MS = 2500;
   const SHARED_PROJECT_OP_RESCUE_POLL_INTERVAL_MS = 240;
   const SHARED_PROJECT_SERVER_OP_POLL_INTERVAL_MS = 650;
+  const SHARED_PROJECT_BURST_CATCHUP_MAX_ROUNDS = 4;
   const SHARED_PROJECT_SERVER_OP_REFRESH_BACKSTOP_MS = 7000;
   const SHARED_PROJECT_REFRESH_IDLE_GRACE_MS = 6000;
   const SHARED_PROJECT_FORCE_REFRESH_DEDUPE_MS = 1200;
@@ -63979,25 +63980,30 @@
     if (!normalizedProjectKey || !canUseSharedProjectsBackend()) {
       return false;
     }
+    if (sharedProjectOpPollInFlight) {
+      sharedProjectGapRecoveryRerunRequested = true;
+      scheduleSharedProjectOpsRescueRetry(32, `${reason || 'gap'}-after-poll`);
+      return false;
+    }
     if (sharedProjectGapRecoveryPromise) {
       sharedProjectGapRecoveryRerunRequested = true;
       return sharedProjectGapRecoveryPromise;
     }
     sharedProjectGapRecoveryPromise = (async () => {
-      const ops = await fetchMissingOps(normalizedProjectKey, afterSeq, SHARED_PROJECT_MAX_MISSING_OP_FETCH);
-      if (!ops.length) {
-        return false;
+      const baseSeq = Math.max(0, Math.round(Number(afterSeq) || 0));
+      if (baseSeq > 0 && baseSeq < sharedProjectLastAppliedSeq - 1) {
+        console.debug('[shared-realtime] gap-recovery-base-stale', {
+          reason,
+          projectKey: normalizedProjectKey,
+          requestedAfterSeq: baseSeq,
+          activeAfterSeq: sharedProjectLastAppliedSeq,
+        });
       }
-      const replayed = await replayOps(ops, { fromRemote: true });
-      if (!replayed) {
-        scheduleSharedProjectOpsRescueRetry(120, `${reason || 'gap'}-apply-retry`);
-        return false;
-      }
-      sharedProjectLastRealtimeActivityAt = Date.now();
-      if (ops.length >= SHARED_PROJECT_MAX_MISSING_OP_FETCH || sharedProjectPendingRemoteOps.size > 0) {
-        scheduleSharedProjectOpsRescueRetry(48, `${reason || 'gap'}-continue`);
-      }
-      return true;
+      return await fetchAndReplaySharedProjectOpsBurst(normalizedProjectKey, {
+        reason,
+        limit: SHARED_PROJECT_MAX_MISSING_OP_FETCH,
+        maxRounds: SHARED_PROJECT_BURST_CATCHUP_MAX_ROUNDS,
+      });
     })();
     try {
       return await sharedProjectGapRecoveryPromise;
@@ -64038,60 +64044,23 @@
     sharedProjectOpPollInFlight = true;
     try {
       const afterSeq = sharedProjectLastAppliedSeq;
-      const ops = await fetchMissingOps(
-        activeSharedProjectKey,
-        afterSeq,
-        Math.min(128, SHARED_PROJECT_MAX_MISSING_OP_FETCH)
-      );
-      if (!ops.length) {
-        sharedProjectLastRescueAfterSeq = afterSeq;
-        sharedProjectLastRescueOpCount = 0;
-        sharedProjectRescueStallCount = 0;
-        const hasUsableLoadedDocument = Boolean(
-          activeSharedProjectDocumentLoaded
-          && hasUsableActiveSharedProjectDocumentState()
-        );
-        // Self-heal: when server has no newer ops and a usable document is loaded,
-        // do not keep the client stuck in "catching-up".
-        if (
-          hasUsableLoadedDocument
-          && !activeSharedProjectOpenInProgress
-          && !sharedProjectDeferRealtimeUntilSynced
-          && activeSharedProjectSyncState !== 'synced'
-        ) {
-          setActiveSharedProjectSyncState('synced');
-        }
-        return Boolean(
-          hasUsableLoadedDocument
-          && activeSharedProjectSyncState === 'synced'
-        );
-      }
+      const recovered = await fetchAndReplaySharedProjectOpsBurst(activeSharedProjectKey, {
+        reason,
+        limit: Math.min(128, SHARED_PROJECT_MAX_MISSING_OP_FETCH),
+        maxRounds: SHARED_PROJECT_BURST_CATCHUP_MAX_ROUNDS,
+      });
+      const advanced = sharedProjectLastAppliedSeq > afterSeq;
       console.debug('[shared-realtime] rescue-op-poll', {
         reason,
         projectKey: activeSharedProjectKey || '',
         afterSeq,
-        opCount: ops.length,
+        afterRevision: sharedProjectLastAppliedSeq,
+        recovered,
       });
-      const replayed = await replayOps(ops, { fromRemote: true });
-      const advanced = sharedProjectLastAppliedSeq > afterSeq;
-      if (replayed) {
-        sharedProjectLastRealtimeActivityAt = Date.now();
-        if (ops.length >= Math.min(128, SHARED_PROJECT_MAX_MISSING_OP_FETCH) || sharedProjectPendingRemoteOps.size > 0) {
-          scheduleSharedProjectOpsRescueRetry(48, `${reason || 'poll'}-continue`);
-        }
-      }
-      const fetchedOnlySettledOps = Array.isArray(ops) && ops.length > 0
-        && ops.every(op => isSharedProjectOpAlreadySettled(op, afterSeq));
-      if (!advanced && fetchedOnlySettledOps) {
+      if (!recovered) {
         sharedProjectLastRescueAfterSeq = sharedProjectLastAppliedSeq;
         sharedProjectLastRescueOpCount = 0;
         sharedProjectRescueStallCount = 0;
-        console.debug('[shared-realtime] rescue-op-poll-settled-window', {
-          reason,
-          projectKey: activeSharedProjectKey || '',
-          afterSeq,
-          opCount: ops.length,
-        });
         return Boolean(
           activeSharedProjectDocumentLoaded
           && hasUsableActiveSharedProjectDocumentState()
@@ -64101,10 +64070,10 @@
       if (!advanced) {
         const repeatedSameWindow = (
           sharedProjectLastRescueAfterSeq === afterSeq
-          && sharedProjectLastRescueOpCount === ops.length
+          && sharedProjectLastRescueOpCount === 0
         );
         sharedProjectLastRescueAfterSeq = afterSeq;
-        sharedProjectLastRescueOpCount = ops.length;
+        sharedProjectLastRescueOpCount = 0;
         sharedProjectRescueStallCount = repeatedSameWindow
           ? (sharedProjectRescueStallCount + 1)
           : 1;
@@ -64112,7 +64081,6 @@
           reason,
           projectKey: activeSharedProjectKey || '',
           afterSeq,
-          opCount: ops.length,
           pendingRemoteOps: sharedProjectPendingRemoteOps.size,
           stallCount: sharedProjectRescueStallCount,
         });
@@ -64135,7 +64103,8 @@
       sharedProjectLastRescueAfterSeq = sharedProjectLastAppliedSeq;
       sharedProjectLastRescueOpCount = 0;
       sharedProjectRescueStallCount = 0;
-      return replayed;
+      maybeMarkSharedProjectOpCatchupSynced(reason);
+      return recovered;
     } catch (error) {
       console.warn('[shared-realtime] rescue-op-poll-failed', {
         reason,
@@ -64381,6 +64350,92 @@
 
   async function fetchMissingOps(projectKey = activeSharedProjectKey, afterSeq = sharedProjectLastAppliedSeq, limit = SHARED_PROJECT_MAX_MISSING_OP_FETCH) {
     return await fetchSharedProjectOpsSince(projectKey, afterSeq, limit);
+  }
+
+  function maybeMarkSharedProjectOpCatchupSynced(reason = 'op-catchup') {
+    if (
+      activeSharedProjectKey
+      && activeSharedProjectDocumentLoaded
+      && hasUsableActiveSharedProjectDocumentState()
+      && !sharedProjectPendingRemoteOps.size
+      && !sharedProjectRefreshInFlight
+      && activeSharedProjectSyncState === 'catching-up'
+    ) {
+      setActiveSharedProjectSyncState('synced');
+      console.debug('[shared-realtime] op-catchup-synced', {
+        reason,
+        projectKey: activeSharedProjectKey || '',
+        revision: sharedProjectLastAppliedSeq,
+      });
+    }
+  }
+
+  async function fetchAndReplaySharedProjectOpsBurst(projectKey = activeSharedProjectKey, {
+    reason = 'op-burst-catchup',
+    limit = 128,
+    maxRounds = SHARED_PROJECT_BURST_CATCHUP_MAX_ROUNDS,
+  } = {}) {
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || activeSharedProjectKey);
+    if (!normalizedProjectKey || normalizedProjectKey !== activeSharedProjectKey || !canUseSharedProjectsBackend()) {
+      return false;
+    }
+    let recovered = false;
+    let totalFetched = 0;
+    const normalizedLimit = Math.max(1, Math.min(
+      SHARED_PROJECT_MAX_MISSING_OP_FETCH,
+      Math.round(Number(limit) || 128)
+    ));
+    const rounds = Math.max(1, Math.min(
+      SHARED_PROJECT_BURST_CATCHUP_MAX_ROUNDS,
+      Math.round(Number(maxRounds) || SHARED_PROJECT_BURST_CATCHUP_MAX_ROUNDS)
+    ));
+    for (let round = 0; round < rounds; round += 1) {
+      if (
+        normalizedProjectKey !== activeSharedProjectKey
+        || sharedProjectRefreshInFlight
+        || sharedProjectSnapshotReplayInFlight
+      ) {
+        break;
+      }
+      const afterSeq = sharedProjectLastAppliedSeq;
+      const ops = await fetchMissingOps(normalizedProjectKey, afterSeq, normalizedLimit);
+      if (!ops.length) {
+        maybeMarkSharedProjectOpCatchupSynced(reason);
+        break;
+      }
+      totalFetched += ops.length;
+      confirmSharedProjectLocalOpsFromServerOps(ops, { source: reason });
+      const beforeSeq = sharedProjectLastAppliedSeq;
+      const replayed = await replayOps(ops, { fromRemote: true });
+      if (!replayed) {
+        scheduleSharedProjectOpsRescueRetry(120, `${reason || 'op-burst'}-apply-retry`);
+        return false;
+      }
+      recovered = true;
+      sharedProjectLastRealtimeActivityAt = Date.now();
+      if (sharedProjectLastAppliedSeq <= beforeSeq && !sharedProjectPendingRemoteOps.size) {
+        break;
+      }
+      if (ops.length < normalizedLimit && !sharedProjectPendingRemoteOps.size) {
+        if (round === 0) {
+          scheduleSharedProjectOpsRescueRetry(96, `${reason || 'op-burst'}-tail-check`);
+        }
+        maybeMarkSharedProjectOpCatchupSynced(reason);
+        break;
+      }
+    }
+    if (recovered && sharedProjectPendingRemoteOps.size) {
+      scheduleSharedProjectOpsRescueRetry(48, `${reason || 'op-burst'}-pending-drain`);
+    }
+    if (recovered) {
+      console.debug('[shared-realtime] op-burst-catchup-done', {
+        reason,
+        projectKey: normalizedProjectKey,
+        revision: sharedProjectLastAppliedSeq,
+        totalFetched,
+      });
+    }
+    return recovered;
   }
 
   function scheduleSharedProjectOpsRescueRetry(delayMs = SHARED_PROJECT_OP_RESCUE_POLL_INTERVAL_MS, reason = 'retry-op-poll') {
@@ -68255,25 +68310,15 @@
         const recoveryReason = SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY && isSharedProjectDrawKind(drawKind)
           ? 'broadcast-draw-gap'
           : 'broadcast-op-gap';
+        // Broadcast can arrive before the sender's RPC commit is visible.
+        // Coalesce a short catch-up window so fast strokes are fetched in revision batches.
+        scheduleSharedProjectOpsRescueRetry(
+          SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY && isSharedProjectDrawKind(drawKind) ? 56 : 72,
+          recoveryReason
+        );
         scheduleSharedProjectBroadcastCatchupRetry({
           reason: recoveryReason,
-          delays: [120, 280, 640, 1200],
-        });
-        recoverSharedProjectRealtimeGap(projectKey, {
-          afterSeq: sharedProjectLastAppliedSeq,
-          reason: recoveryReason,
-        }).then(recovered => {
-          if (!recovered) {
-            scheduleSharedProjectBroadcastCatchupRetry({
-              reason: recoveryReason,
-              delays: [180, 360, 800, 1500],
-            });
-          }
-        }).catch(() => {
-          scheduleSharedProjectBroadcastCatchupRetry({
-            reason: recoveryReason,
-            delays: [180, 360, 800, 1500],
-          });
+          delays: [140, 300, 680, 1300],
         });
       }
     );
