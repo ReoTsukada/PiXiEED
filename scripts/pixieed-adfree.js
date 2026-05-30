@@ -28,6 +28,7 @@
   let autoApplyStarted = false;
   let reloadPromptOpen = false;
   let lastPassiveRefreshAt = 0;
+  let lastEmailPurchaseSyncAt = 0;
 
   const state = {
     isReady: false,
@@ -58,6 +59,12 @@
 
   function getPurchaseEntitlementKey() {
     return isPixieedrawPage() ? PIXIEDRAW_ENTITLEMENT_KEY : GLOBAL_ENTITLEMENT_KEY;
+  }
+
+  function getEmailPurchaseClaimProductKeys() {
+    return isPixieedrawPage()
+      ? [PIXIEDRAW_ENTITLEMENT_KEY, GLOBAL_ENTITLEMENT_KEY]
+      : [GLOBAL_ENTITLEMENT_KEY];
   }
 
   function isActiveByExpiry(expiresAt) {
@@ -394,10 +401,13 @@
     });
 
     claimInputs.forEach((input) => {
-      input.disabled = !state.isLoggedIn || state.isLoading;
+      input.disabled = false;
+      input.readOnly = false;
+      input.setAttribute('aria-disabled', 'false');
     });
     claimButtons.forEach((button) => {
-      button.disabled = !state.isLoggedIn || state.isLoading;
+      button.disabled = false;
+      button.setAttribute('aria-disabled', 'false');
     });
 
     if (uiMessage) {
@@ -577,6 +587,42 @@
     state.expiresAt = typeof activeRow?.expiresAt === 'string' ? activeRow.expiresAt : '';
   }
 
+  async function claimPaidPurchaseByLoginEmail({ silent = false } = {}) {
+    if (!state.isLoggedIn || !state.userEmail) {
+      return { ok: false, error: 'login required' };
+    }
+    const now = Date.now();
+    if (silent && now - lastEmailPurchaseSyncAt < 30000) {
+      return { ok: false, skipped: true };
+    }
+    lastEmailPurchaseSyncAt = now;
+    try {
+      const supabase = await ensureSupabase();
+      let lastError = '';
+      for (const productKey of getEmailPurchaseClaimProductKeys()) {
+        const { data, error } = await supabase.rpc('claim_browser_adfree_purchase_by_email', {
+          input_product_key: productKey,
+        });
+        if (error) {
+          throw error;
+        }
+        if (data?.ok === true) {
+          return { ok: true, data };
+        }
+        lastError = data?.reason || lastError;
+      }
+      return { ok: false, error: lastError || 'purchase not found' };
+    } catch (error) {
+      const message = String(error?.message || error || 'purchase email sync failed');
+      if (!silent && !/purchase not found|not found|no paid purchase/i.test(message)) {
+        state.lastError = message;
+        uiMessage = message;
+        syncUi();
+      }
+      return { ok: false, error: message };
+    }
+  }
+
   async function refresh() {
     if (refreshPromise) {
       return refreshPromise;
@@ -587,6 +633,12 @@
       notify();
       try {
         await fetchEntitlement();
+        if (state.isLoggedIn && !state.isActive) {
+          const emailClaim = await claimPaidPurchaseByLoginEmail({ silent: true });
+          if (emailClaim?.ok) {
+            await fetchEntitlement();
+          }
+        }
       } catch (error) {
         state.isActive = false;
         state.activeEntitlements = {};
@@ -701,6 +753,23 @@
   async function applyAccessValue(rawValue) {
     const value = String(rawValue || '').trim();
     if (!value) {
+      if (state.isLoggedIn) {
+        uiMessage = '購入情報を確認しています...';
+        state.lastError = '';
+        syncUi();
+        const claimed = await claimPaidPurchaseByLoginEmail({ silent: false });
+        if (claimed?.ok) {
+          await refresh();
+          if (state.isActive) {
+            promptReloadAfterApply();
+          }
+          return { ok: true };
+        }
+        state.lastError = 'ログイン中のメールアドレスに一致する購入情報がまだ見つかりません。購入番号またはシリアルコードがある場合は入力してください。';
+        uiMessage = state.lastError;
+        syncUi();
+        return { ok: false, error: state.lastError };
+      }
       state.lastError = '購入番号または購入コードを入力してください。';
       uiMessage = state.lastError;
       syncUi();
