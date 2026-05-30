@@ -1,4 +1,4 @@
-const APP_BUILD_VERSION = '2026.05.30-shared-create-progress';
+const APP_BUILD_VERSION = '2026.05.31-invite-copy-fallback';
 const CACHE_VERSION = `pixiedraw-v${APP_BUILD_VERSION}`;
 const CORE_ASSETS = [
   '/pixiedraw/',
