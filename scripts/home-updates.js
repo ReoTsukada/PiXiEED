@@ -53,7 +53,7 @@
 
         const copy = document.createElement('p');
         copy.className = 'home-update-copy';
-        copy.textContent = entry?.summary || '更新内容を調整';
+        copy.textContent = formatSummary(entry?.summary || '', entry?.name || '', group?.date || '');
 
         item.append(link, copy);
         list.appendChild(item);
@@ -78,6 +78,37 @@
     const normalized = value.startsWith('/') ? `.${value}` : value;
     if (window.location.protocol === 'file:' && /\/$/.test(normalized)) {
       return `${normalized}index.html`;
+    }
+    return normalized;
+  }
+
+  function formatSummary(summary, projectName, date) {
+    const normalized = String(summary || '').trim();
+    if (!normalized) return '更新内容を調整しました。';
+    const isGenericUiOnly = normalized === '画面を更新';
+    const isGenericUiFeature = normalized === '機能 / 画面を更新';
+    const isGenericUiFeatureStyle = normalized === '機能 / 画面 / スタイルを更新';
+    const isGenericSite = normalized === '画面 / 機能 / SEOを更新';
+    if (isGenericUiOnly) {
+      return `${projectName || '各プロジェクト'}のUIレイアウトを調整し、表示崩れと操作導線を改善しました。`;
+    }
+    if (isGenericUiFeature) {
+      return `${projectName || '各プロジェクト'}の機能動作を見直し、画面操作と同期挙動を安定化しました。`;
+    }
+    if (isGenericUiFeatureStyle) {
+      return `${projectName || '各プロジェクト'}の機能改善に加えて、UIスタイルと操作感を調整しました。`;
+    }
+    if (isGenericSite) {
+      return `サイト導線の見直し、主要機能の調整、検索向けメタ情報の更新を行いました。`;
+    }
+    if (normalized === '画面 / 機能 / スタイルを更新') {
+      return `${projectName || '各プロジェクト'}の画面、機能、スタイルを一括調整し、日常利用時の操作性を改善しました。`;
+    }
+    if (normalized === '機能 / ドキュメントを更新') {
+      return `${projectName || '各プロジェクト'}の機能更新と、利用時に参照する説明内容の最新化を行いました。`;
+    }
+    if (normalized === 'ドキュメント / 機能 / 画像 / 画面を更新') {
+      return `${projectName || '各プロジェクト'}の機能・画面・画像素材・説明文をまとめて更新しました。`;
     }
     return normalized;
   }
