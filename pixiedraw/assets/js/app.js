@@ -71481,7 +71481,7 @@
     }
   }
 
-  async function writeTextToClipboard(text) {
+  async function writeTextToClipboard(text, { promptFallback = true } = {}) {
     if (typeof text !== 'string' || !text.trim()) {
       return false;
     }
@@ -71507,9 +71507,14 @@
       textarea.select();
       const copied = typeof document.execCommand === 'function' && document.execCommand('copy');
       document.body.removeChild(textarea);
-      return Boolean(copied);
+      if (copied) {
+        return true;
+      }
     } catch (error) {
       // continue to prompt fallback
+    }
+    if (!promptFallback) {
+      return false;
     }
     try {
       // Last-resort fallback for environments where clipboard APIs are blocked.
@@ -71627,6 +71632,21 @@
     }
     const inviteRole = resolveMultiInviteDefaultRole();
     const resolvedProjectKey = resolveSharedProjectKeyForCurrentState() || normalizeMultiProjectKey(activeSharedProjectKey || '');
+    const initialInviteToken = getCurrentSharedRecentProjectEntry(resolvedProjectKey)?.sharedProjectInviteToken || '';
+    const initialInviteUrl = buildMultiInviteUrl(resolvedProjectKey, {
+      role: inviteRole,
+      autoJoin: false,
+      inviteToken: initialInviteToken,
+    });
+    let copiedInitialInviteUrl = false;
+    if (
+      initialInviteUrl
+      && !pointerState.active
+      && !hasSharedProjectLocalCommitWorkPending()
+      && !hasSharedProjectFailedLocalOps()
+    ) {
+      copiedInitialInviteUrl = await writeTextToClipboard(initialInviteUrl, { promptFallback: false });
+    }
     if (!await ensureSharedProjectInviteIncludesCommittedLocalOps(resolvedProjectKey, { reason: 'copy-invite-link' })) {
       return false;
     }
@@ -71658,6 +71678,11 @@
     if (!inviteUrl) {
       setMultiStatus(localizeText('先に共有モードをONにしてください', 'Turn on shared mode first'), 'warn');
       return false;
+    }
+    if (copiedInitialInviteUrl && inviteUrl === initialInviteUrl) {
+      setMultiStatus(localizeText('招待リンクをコピーしました', 'Invite link copied'), 'success');
+      window.alert(localizeText('共有URLをコピーしました。', 'Shared URL copied.'));
+      return true;
     }
     const copied = await writeTextToClipboard(inviteUrl);
     if (!copied) {
