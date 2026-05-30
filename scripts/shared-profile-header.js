@@ -196,9 +196,9 @@
       const pathname = String(window.location.pathname || '').toLowerCase();
       return /(?:^|\/)pixiedraw(?:\/|\/index\.html)?$/.test(pathname)
         ? 'pixiedraw_ad_free'
-        : 'support_tip';
+        : 'pixieed_support_monthly';
     } catch (_error) {
-      return 'support_tip';
+      return 'pixieed_support_monthly';
     }
   }
 
@@ -208,9 +208,7 @@
     const productKey = getSupportProductKey();
     link.href = productKey === 'pixiedraw_ad_free' ? PIXIEDRAW_SUPPORT_URL : PIXIEED_SUPPORT_URL;
     link.dataset.supportPanelTrigger = 'true';
-    link.dataset.supportPreferredProduct = productKey === 'pixiedraw_ad_free'
-      ? 'pixiedraw_ad_free'
-      : 'pixieed_support_monthly';
+    link.dataset.supportPreferredProduct = productKey;
   }
 
   function setupPanel() {
