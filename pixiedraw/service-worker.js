@@ -1,4 +1,4 @@
-const APP_BUILD_VERSION = '2026.05.31-shared-burst-catchup';
+const APP_BUILD_VERSION = '2026.05.31-shared-visible-catchup';
 const CACHE_VERSION = `pixiedraw-v${APP_BUILD_VERSION}`;
 const CORE_ASSETS = [
   '/pixiedraw/',
