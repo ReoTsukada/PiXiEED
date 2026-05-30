@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.05.30-rail-min-ad';
+  const APP_BUILD_VERSION = '2026.05.31-shared-reliable-op-flow';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
@@ -2642,8 +2642,8 @@
   const SHARED_PROJECT_CHECKPOINT_INTERVAL_MS = 15000;
   const SHARED_PROJECT_MAX_MISSING_OP_FETCH = 512;
   const SHARED_PROJECT_REFRESH_LOOP_INTERVAL_MS = 2500;
-  const SHARED_PROJECT_OP_RESCUE_POLL_INTERVAL_MS = 350;
-  const SHARED_PROJECT_SERVER_OP_POLL_INTERVAL_MS = 900;
+  const SHARED_PROJECT_OP_RESCUE_POLL_INTERVAL_MS = 240;
+  const SHARED_PROJECT_SERVER_OP_POLL_INTERVAL_MS = 650;
   const SHARED_PROJECT_SERVER_OP_REFRESH_BACKSTOP_MS = 7000;
   const SHARED_PROJECT_REFRESH_IDLE_GRACE_MS = 6000;
   const SHARED_PROJECT_FORCE_REFRESH_DEDUPE_MS = 1200;
@@ -2954,6 +2954,7 @@
   let sharedProjectLastRescueOpCount = -1;
   let sharedProjectRescueStallCount = 0;
   let sharedProjectOpsRescueRetryTimer = null;
+  let sharedProjectOpsRescueRetryDueAt = 0;
   let sharedProjectBroadcastCatchupTimer = null;
   let projectDotBaselineSnapshot = null;
   let projectDotCumulativeStats = null;
@@ -3384,6 +3385,7 @@
   let sharedProjectOpCommitInFlight = false;
   let sharedProjectPendingLocalOps = [];
   let sharedProjectPendingLocalOpsRetryTimer = null;
+  let sharedProjectPendingLocalOpsRetryDueAt = 0;
   let sharedProjectPendingLocalRetryBlockedUntil = 0;
   let sharedProjectLastAppliedSeq = 0;
   const sharedProjectPendingRemoteOps = new Map();
@@ -3395,13 +3397,14 @@
   const sharedProjectLocalInFlightOps = new Map();
   const SHARED_PROJECT_LOCAL_OP_ACK_TIMEOUT_MS = 12000;
   const SHARED_PROJECT_LOCAL_OP_EXPIRE_MS = SHARED_PROJECT_LOCAL_OP_ACK_TIMEOUT_MS * 3;
-  const SHARED_PROJECT_LOCAL_OP_RETRY_DELAY_MS = 1500;
+  const SHARED_PROJECT_LOCAL_OP_RETRY_DELAY_MS = 700;
   let sharedProjectReplayRenderBatchDepth = 0;
   let sharedProjectReplayRenderNeedsFull = false;
   let sharedProjectReplayRenderDirtyRect = null;
   const sharedProjectRemoteApplyFailureKeys = new Set();
   let sharedProjectInFlightStroke = null;
   let sharedProjectGapRecoveryPromise = null;
+  let sharedProjectGapRecoveryRerunRequested = false;
   let sharedProjectOpPollInFlight = false;
   const sharedProjectSessionId = (() => {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -9140,6 +9143,16 @@
       window.clearTimeout(sharedProjectPendingLocalOpsRetryTimer);
       sharedProjectPendingLocalOpsRetryTimer = null;
     }
+    sharedProjectPendingLocalOpsRetryDueAt = 0;
+    if (sharedProjectOpsRescueRetryTimer !== null) {
+      window.clearTimeout(sharedProjectOpsRescueRetryTimer);
+      sharedProjectOpsRescueRetryTimer = null;
+    }
+    sharedProjectOpsRescueRetryDueAt = 0;
+    if (sharedProjectBroadcastCatchupTimer !== null) {
+      window.clearTimeout(sharedProjectBroadcastCatchupTimer);
+      sharedProjectBroadcastCatchupTimer = null;
+    }
     sharedProjectPendingLocalRetryBlockedUntil = 0;
     sharedProjectPendingRemoteOps.clear();
     sharedProjectPendingProvisionalOps.clear();
@@ -9150,6 +9163,7 @@
     sharedProjectInFlightStroke = null;
     sharedProjectOpCommitInFlight = false;
     sharedProjectGapRecoveryPromise = null;
+    sharedProjectGapRecoveryRerunRequested = false;
     sharedProjectOpPollInFlight = false;
     sharedProjectRealtimeConnectPromise = null;
     sharedProjectRealtimeConnectSignature = '';
@@ -9689,6 +9703,12 @@
         window.clearTimeout(sharedProjectPendingLocalOpsRetryTimer);
         sharedProjectPendingLocalOpsRetryTimer = null;
       }
+      sharedProjectPendingLocalOpsRetryDueAt = 0;
+      if (sharedProjectOpsRescueRetryTimer !== null) {
+        window.clearTimeout(sharedProjectOpsRescueRetryTimer);
+        sharedProjectOpsRescueRetryTimer = null;
+      }
+      sharedProjectOpsRescueRetryDueAt = 0;
       sharedProjectPendingLocalRetryBlockedUntil = 0;
       sharedProjectLastCanonicalRefreshQueuedAt = 0;
       sharedProjectLastForceRefreshQueuedAt = 0;
@@ -9696,6 +9716,7 @@
       sharedProjectDeferredRemoteOpsDelayMs = 0;
       clearDeferredSharedProjectRemoteOpsDrain();
       sharedProjectInFlightStroke = null;
+      sharedProjectGapRecoveryRerunRequested = false;
       sharedProjectLastAppliedSeq = 0;
       resetSharedProjectCanvasIdentity();
       pendingSharedProjectConflictReplay = null;
@@ -10337,6 +10358,7 @@
       window.clearTimeout(sharedProjectPendingLocalOpsRetryTimer);
       sharedProjectPendingLocalOpsRetryTimer = null;
     }
+    sharedProjectPendingLocalOpsRetryDueAt = 0;
     restorePendingSharedLocalOps(activeSharedProjectKey, {
       announce: reason === 'online',
       refreshReason: `${reason || 'connectivity'}-resume-pending-local-ops`,
@@ -60769,9 +60791,12 @@
       return false;
     }
     sharedProjectPendingRemoteOps.set(normalizedSeq, opRecord);
+    if (normalizedSeq > sharedProjectLastAppliedSeq + 1) {
+      scheduleSharedProjectOpsRescueRetry(48, _reason || 'pending-remote-gap');
+    }
     const prunedCount = trimSharedProjectPendingRemoteOpsCapacity();
     if (prunedCount > 0) {
-      scheduleSharedProjectOpsRescueRetry(1000);
+      scheduleSharedProjectOpsRescueRetry(1000, 'pending-remote-cap-pruned');
     }
     return true;
   }
@@ -63955,6 +63980,7 @@
       return false;
     }
     if (sharedProjectGapRecoveryPromise) {
+      sharedProjectGapRecoveryRerunRequested = true;
       return sharedProjectGapRecoveryPromise;
     }
     sharedProjectGapRecoveryPromise = (async () => {
@@ -63964,9 +63990,13 @@
       }
       const replayed = await replayOps(ops, { fromRemote: true });
       if (!replayed) {
+        scheduleSharedProjectOpsRescueRetry(120, `${reason || 'gap'}-apply-retry`);
         return false;
       }
       sharedProjectLastRealtimeActivityAt = Date.now();
+      if (ops.length >= SHARED_PROJECT_MAX_MISSING_OP_FETCH || sharedProjectPendingRemoteOps.size > 0) {
+        scheduleSharedProjectOpsRescueRetry(48, `${reason || 'gap'}-continue`);
+      }
       return true;
     })();
     try {
@@ -63976,7 +64006,12 @@
     } finally {
       sharedProjectGapRecoveryPromise = null;
       if (!normalizedProjectKey || normalizedProjectKey !== activeSharedProjectKey) {
+        sharedProjectGapRecoveryRerunRequested = false;
         return;
+      }
+      if (sharedProjectGapRecoveryRerunRequested) {
+        sharedProjectGapRecoveryRerunRequested = false;
+        scheduleSharedProjectOpsRescueRetry(32, `${reason || 'gap'}-rerun`);
       }
       if (reason && !sharedProjectPendingRemoteOps.size) {
         sharedProjectLastRealtimeActivityAt = Date.now();
@@ -64041,6 +64076,9 @@
       const advanced = sharedProjectLastAppliedSeq > afterSeq;
       if (replayed) {
         sharedProjectLastRealtimeActivityAt = Date.now();
+        if (ops.length >= Math.min(128, SHARED_PROJECT_MAX_MISSING_OP_FETCH) || sharedProjectPendingRemoteOps.size > 0) {
+          scheduleSharedProjectOpsRescueRetry(48, `${reason || 'poll'}-continue`);
+        }
       }
       const fetchedOnlySettledOps = Array.isArray(ops) && ops.length > 0
         && ops.every(op => isSharedProjectOpAlreadySettled(op, afterSeq));
@@ -64345,21 +64383,31 @@
     return await fetchSharedProjectOpsSince(projectKey, afterSeq, limit);
   }
 
-  function scheduleSharedProjectOpsRescueRetry(delayMs = SHARED_PROJECT_OP_RESCUE_POLL_INTERVAL_MS) {
+  function scheduleSharedProjectOpsRescueRetry(delayMs = SHARED_PROJECT_OP_RESCUE_POLL_INTERVAL_MS, reason = 'retry-op-poll') {
     if (!activeSharedProjectKey) {
       return;
     }
+    const safeDelay = Math.max(32, Math.round(Number(delayMs) || SHARED_PROJECT_OP_RESCUE_POLL_INTERVAL_MS));
+    const dueAt = Date.now() + safeDelay;
     if (sharedProjectOpsRescueRetryTimer !== null) {
+      if (sharedProjectOpsRescueRetryDueAt > 0 && sharedProjectOpsRescueRetryDueAt <= dueAt) {
+        return;
+      }
       window.clearTimeout(sharedProjectOpsRescueRetryTimer);
       sharedProjectOpsRescueRetryTimer = null;
     }
+    sharedProjectOpsRescueRetryDueAt = dueAt;
     sharedProjectOpsRescueRetryTimer = window.setTimeout(() => {
       sharedProjectOpsRescueRetryTimer = null;
+      sharedProjectOpsRescueRetryDueAt = 0;
       if (!activeSharedProjectKey || sharedProjectRefreshInFlight || sharedProjectGapRecoveryPromise) {
+        if (sharedProjectGapRecoveryPromise) {
+          sharedProjectGapRecoveryRerunRequested = true;
+        }
         return;
       }
-      pollSharedProjectRealtimeOpsRescue({ reason: 'retry-op-poll' }).catch(() => {});
-    }, Math.max(32, Math.round(Number(delayMs) || SHARED_PROJECT_OP_RESCUE_POLL_INTERVAL_MS)));
+      pollSharedProjectRealtimeOpsRescue({ reason }).catch(() => {});
+    }, safeDelay);
   }
 
   function scheduleSharedProjectBroadcastCatchupRetry({
@@ -64404,6 +64452,17 @@
     }, delayMs);
   }
 
+  function scheduleSharedProjectPostCommitCatchup(reason = 'local-commit-confirmed') {
+    if (!activeSharedProjectKey) {
+      return;
+    }
+    scheduleSharedProjectOpsRescueRetry(72, reason);
+    scheduleSharedProjectBroadcastCatchupRetry({
+      reason,
+      delays: [160, 360, 800],
+    });
+  }
+
   function drainPendingSharedProjectRemoteOps() {
     while (sharedProjectPendingRemoteOps.has(sharedProjectLastAppliedSeq + 1)) {
       const nextSeq = sharedProjectLastAppliedSeq + 1;
@@ -64428,6 +64487,7 @@
       }
       if (!applyOp(nextOp, { fromRemote: true })) {
         rememberPendingSharedProjectRemoteOp(nextSeq, nextOp, 'drain-apply-failed');
+        scheduleSharedProjectOpsRescueRetry(120, 'drain-apply-failed');
         return false;
       }
       sharedProjectLastAppliedSeq = nextSeq;
@@ -64522,6 +64582,7 @@
             activeRevision: sharedProjectLastAppliedSeq,
           });
           rememberPendingSharedProjectRemoteOp(seq, op, 'replay-gap');
+          scheduleSharedProjectOpsRescueRetry(48, 'replay-gap-detected');
           continue;
         }
         if (fromRemote && shouldDeferIncomingSharedProjectRemoteApply()) {
@@ -64530,6 +64591,7 @@
           continue;
         }
         if (!applyOp(op, { fromRemote, provisional: false })) {
+          scheduleSharedProjectOpsRescueRetry(120, 'replay-apply-failed');
           return false;
         }
         const beforeRevision = activeSharedProjectRevision;
@@ -64744,10 +64806,15 @@
       return;
     }
     const safeDelay = Math.max(120, Math.round(Number(delayMs) || SHARED_PROJECT_LOCAL_OP_RETRY_DELAY_MS));
+    const dueAt = Date.now() + safeDelay;
     if (sharedProjectPendingLocalOpsRetryTimer !== null) {
+      if (sharedProjectPendingLocalOpsRetryDueAt > 0 && sharedProjectPendingLocalOpsRetryDueAt <= dueAt) {
+        return;
+      }
       window.clearTimeout(sharedProjectPendingLocalOpsRetryTimer);
       sharedProjectPendingLocalOpsRetryTimer = null;
     }
+    sharedProjectPendingLocalOpsRetryDueAt = dueAt;
     console.info('[shared-sync]', {
       event: 'local-op-retry-timer-set',
       projectKey: activeSharedProjectKey || '',
@@ -64757,6 +64824,7 @@
     });
     sharedProjectPendingLocalOpsRetryTimer = window.setTimeout(() => {
       sharedProjectPendingLocalOpsRetryTimer = null;
+      sharedProjectPendingLocalOpsRetryDueAt = 0;
       if (!activeSharedProjectKey) {
         return;
       }
@@ -66929,6 +66997,7 @@
         result?.id || activeSharedProjectId
       );
       drainPendingSharedProjectRemoteOps();
+      scheduleSharedProjectPostCommitCatchup('local-commit-confirmed-catchup');
       return true;
     }
     setActiveSharedProjectSyncState('catching-up', { announce: true });
@@ -67265,6 +67334,7 @@
       retryOnConflict: nextOp.retryOnConflict !== false,
     }).finally(() => {
       sharedProjectOpCommitInFlight = false;
+      scheduleSharedProjectPostCommitCatchup('local-commit-finished-catchup');
       if (sharedProjectPendingLocalOps.length) {
         window.setTimeout(() => {
           flushSharedProjectPendingLocalOps();
@@ -71582,6 +71652,7 @@
         window.clearTimeout(sharedProjectPendingLocalOpsRetryTimer);
         sharedProjectPendingLocalOpsRetryTimer = null;
       }
+      sharedProjectPendingLocalOpsRetryDueAt = 0;
       flushSharedProjectPendingLocalOps();
       if (!hasSharedProjectLocalCommitWorkPending()) {
         const latestProject = await fetchSharedProjectRecord(normalizedProjectKey);
