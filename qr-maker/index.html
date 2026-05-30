@@ -223,10 +223,27 @@
     align-items: center;
     gap: 10px;
   }
-  .header-actions .btn {
-    white-space: nowrap;
-    padding: 8px 12px;
-    font-size: 0.88rem;
+  .support-tip-link{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-height:32px;
+    padding:4px 10px;
+    border-radius:999px;
+    border:1px solid rgba(245, 158, 11, 0.75);
+    background:linear-gradient(135deg, rgba(251, 191, 36, 0.98), rgba(249, 115, 22, 0.98));
+    color:#2b1600;
+    text-decoration:none;
+    font-weight:800;
+    font-size:12px;
+    letter-spacing:0.02em;
+    box-shadow:0 8px 18px rgba(249, 115, 22, 0.25);
+  }
+  .support-tip-link:hover,
+  .support-tip-link:focus-visible{
+    background:linear-gradient(135deg, rgba(253, 200, 63, 1), rgba(251, 146, 60, 1));
+    border-color:rgba(251, 191, 36, 0.95);
+    color:#2b1600;
   }
   .btn {
     appearance: none;
@@ -266,12 +283,6 @@
     padding: 16px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.3);
     min-width: 0;
-  }
-  .card.card--ad {
-    padding: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
   }
   [hidden] {
     display: none !important;
@@ -535,7 +546,129 @@
     }
   }
   @media (max-width: 540px) {
-    .header-actions .btn { padding: 8px 10px; font-size: 0.85rem; }
+    .support-tip-link { padding: 4px 9px; font-size: 11px; }
+  }
+  .auth-panel{
+    position:fixed;
+    inset:0;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    background:rgba(0,0,0,0.65);
+    backdrop-filter:blur(4px);
+    padding:calc(12px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom) + 76px) calc(12px + env(safe-area-inset-left));
+    z-index:70;
+  }
+  .auth-panel.is-open{ display:flex; }
+  .auth-card{
+    width:100%;
+    max-width:420px;
+    max-height:calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 84px);
+    background:rgba(15,23,42,0.95);
+    border:1px solid rgba(255,255,255,0.14);
+    border-radius:16px;
+    padding:16px;
+    box-shadow:0 18px 40px rgba(0,0,0,0.45);
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+    overflow:auto;
+  }
+  .profile-block{
+    display:grid;
+    gap:10px;
+  }
+  .profile-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .avatar-toggle{
+    width:56px;
+    height:56px;
+    border-radius:12px;
+    border:1px solid rgba(255,255,255,0.16);
+    background:rgba(255,255,255,0.04);
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    padding:0;
+  }
+  .avatar-toggle__img{
+    width:44px;
+    height:44px;
+    border-radius:10px;
+    overflow:hidden;
+  }
+  .avatar-toggle__img img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    image-rendering:pixelated;
+  }
+  .avatar-panel{
+    border:1px solid rgba(255,255,255,0.12);
+    border-radius:12px;
+    padding:10px;
+    max-height:180px;
+    overflow:auto;
+    background:rgba(0,0,0,0.24);
+  }
+  .avatar-grid{
+    display:grid;
+    grid-template-columns:repeat(5, minmax(0, 1fr));
+    gap:8px;
+  }
+  .avatar-option{
+    border:1px solid rgba(255,255,255,0.14);
+    border-radius:10px;
+    background:rgba(255,255,255,0.05);
+    padding:4px;
+    aspect-ratio:1/1;
+  }
+  .avatar-option img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    image-rendering:pixelated;
+  }
+  .auth-input{
+    width:100%;
+    min-height:38px;
+    border-radius:10px;
+    border:1px solid rgba(255,255,255,0.18);
+    background:rgba(0,0,0,0.35);
+    color:#f9fafb;
+    padding:8px 10px;
+    font:inherit;
+  }
+  .auth-btn{
+    min-height:36px;
+    border-radius:10px;
+    border:1px solid rgba(255,255,255,0.16);
+    background:rgba(255,255,255,0.08);
+    color:#f8fafc;
+    font-weight:700;
+  }
+  .close-btn{
+    min-height:32px;
+    border-radius:8px;
+    border:1px solid rgba(255,255,255,0.16);
+    background:rgba(255,255,255,0.06);
+    color:#f8fafc;
+    font-weight:700;
+    padding:4px 10px;
+  }
+  .profile-name{
+    display:grid;
+    gap:6px;
+    flex:1;
+    margin:0;
+  }
+  .auth-status{
+    margin:0;
+    font-size:12px;
+    color:var(--muted);
   }
 </style>
   <style id="ads-safe">
@@ -570,8 +703,7 @@
   .project-ad,
   .entry-ad-slot,
   .puzzle-ad-slot,
-  .game-ad,
-  .card--ad {
+  .game-ad {
     width: min(100%, 720px) !important;
     max-width: 100% !important;
     min-width: 0 !important;
@@ -822,36 +954,21 @@
 <link rel="apple-touch-icon" href="/icon/PiXiEED.icon512.png"/>
 </head>
 <body>
-<div class="page">
-<header aria-label="top-nav">
-  <div class="header-inner">
-    <a class="brand" href="../index.html">
-      <span class="brand-icon"><img src="../character-dots/mao1.png" alt="logo"></span>
+<header class="site-header" aria-label="top-nav">
+  <div class="header-inner header-inner--app">
+    <button class="brand" id="openProfilePanel" type="button">
+      <span class="brand-icon" id="brandAvatar"><img src="../icon/icon-512-4.png" alt="logo"></span>
       <div class="brand-text">
         <p class="brand-title">PiXiEED</p>
-        <p class="brand-sub">QRコードメーカー</p>
+        <p class="brand-sub" id="brandUser">ユーザー</p>
       </div>
-    </a>
+    </button>
+    <div class="header-actions">
+      <a class="support-tip-link" id="supportTipLink" href="#" target="_blank" rel="noopener noreferrer" aria-label="PiXiEEDの応援チップを購入">応援チップ</a>
+    </div>
   </div>
 </header>
-<section class="card">
-  <h1>QRコードメーカー</h1>
-  <p class="subtitle">登録不要・無料でQR作成。色・余白・誤り訂正を調整してPNG保存できます。</p>
-</section>
-<section class="card card--ad" aria-label="広告">
-  <div class="ad-block">
-    <ins class="adsbygoogle ad-slot"
-         style="display:block"
-         data-ad-client="ca-pub-9801602250480253"
-         data-ad-slot="2141591954"></ins>
-    <small class="ad-label">広告</small>
-  </div>
-  <script>
-    if (window.pixieedObserveAds) {
-      window.pixieedObserveAds();
-    }
-  </script>
-</section>
+<div class="page">
 <main>
 <section class="qr-grid">
 <section class="card">
@@ -920,20 +1037,34 @@
 </div>
 </section>
 </main>
-<section class="card card--ad" aria-label="広告">
-  <div class="ad-block">
-    <ins class="adsbygoogle ad-slot"
-         style="display:block"
-         data-ad-client="ca-pub-9801602250480253"
-         data-ad-slot="2141591954"></ins>
-    <small class="ad-label">広告</small>
+</div>
+<div class="auth-panel" id="authPanel" aria-hidden="true">
+  <div class="auth-card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+      <h3 style="margin:0;font-size:16px;color:#f9fafb;">プロフィール</h3>
+      <button class="close-btn" type="button" id="closeAuthPanel">閉じる</button>
+    </div>
+    <div class="profile-block">
+      <div class="profile-row">
+        <button class="avatar-toggle" id="avatarToggle" type="button" aria-label="アイコンを変更" aria-expanded="false" aria-controls="avatarPanel">
+          <span class="avatar-toggle__img" id="avatarPreview"></span>
+        </button>
+        <label class="profile-name">
+          <span style="font-weight:700; color:#e5e7eb;">ニックネーム</span>
+          <input class="auth-input" id="profileNickname" type="text" placeholder="なまえ" maxlength="32">
+        </label>
+      </div>
+      <div class="avatar-panel" id="avatarPanel" hidden>
+        <div class="avatar-grid" id="avatarGrid"></div>
+      </div>
+      <label class="profile-name">
+        <span style="font-weight:700; color:#e5e7eb;">X (旧Twitter)</span>
+        <input class="auth-input" id="profileX" type="url" placeholder="https://x.com/username" maxlength="200" inputmode="url">
+      </label>
+      <button class="auth-btn" id="saveProfile" type="button">プロフィールを保存</button>
+      <p class="auth-status" id="authStatus"></p>
+    </div>
   </div>
-  <script>
-    if (window.pixieedObserveAds) {
-      window.pixieedObserveAds();
-    }
-  </script>
-</section>
 </div>
 <script src="./qrcode.min.js"></script>
 <script>
@@ -1256,7 +1387,10 @@
   syncLabels();
   renderQRCode();
 </script>
+<script src="../scripts/shared-profile-header.js"></script>
+<script src="../scripts/shared-bottom-nav.js"></script>
+<script src="../scripts/bottom-nav-footer-ad.js"></script>
 <script src="../scripts/pixieed-dot-stats.js"></script>
-  <script src="../scripts/pixel-art-fit.js"></script>
+<script src="../scripts/pixel-art-fit.js"></script>
 </body>
 </html>
