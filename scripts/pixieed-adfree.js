@@ -800,6 +800,12 @@
         clearCheckoutParams();
         return;
       }
+      const emailClaim = await claimPaidPurchaseByLoginEmail({ silent: false });
+      if (emailClaim?.ok) {
+        await refresh();
+        clearCheckoutParams();
+        return;
+      }
       if (!shouldRetryPurchaseClaim(result?.error)) {
         return;
       }
