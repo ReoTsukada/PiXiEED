@@ -20,6 +20,26 @@ const ENTITLEMENT_BY_PRODUCT: Record<string, string> = {
 };
 const DEFAULT_PURCHASE_HELP_URL = "https://pixieed.jp/pixiedraw/";
 type SupabaseAdminClient = any;
+type PurchaseCodeEmailRow = {
+  id: string;
+  provider_order_id: string;
+  product_key: string;
+  buyer_email: string;
+  payment_status: string;
+  code: string;
+  metadata: Record<string, unknown> | null;
+};
+
+type RecoveredStripePurchase = {
+  sessionId: string;
+  buyerEmail: string;
+  productKey: string;
+  paymentStatus: string;
+  paymentIntentId: string;
+  subscriptionId: string;
+  createdAt: string;
+  rawSession: unknown;
+};
 
 function getLinkedEntitlementKeys(productKey: string, primaryEntitlementKey: string): string[] {
   if (String(productKey || "").trim().toLowerCase() !== "pixieed_support_monthly") {
@@ -98,14 +118,44 @@ function getPurchaseEmailProductLabel(productKey: string): string {
   return "PiXiEEDサポーター特典";
 }
 
-async function sendPurchaseIdEmail({
+function getProductKeyByPriceId(priceId: string): string {
+  const normalized = String(priceId || "").trim();
+  if (!normalized) {
+    return "";
+  }
+  const entries: Array<[string, string]> = [
+    ["browser_ad_free", Deno.env.get("PIXIEED_STRIPE_BROWSER_ADFREE_PRICE_ID") || ""],
+    ["pixiedraw_ad_free", Deno.env.get("PIXIEED_STRIPE_PIXIEDRAW_ADFREE_PRICE_ID") || ""],
+    ["pixieed_support_monthly", Deno.env.get("PIXIEED_STRIPE_PIXIEED_SUPPORT_MONTHLY_PRICE_ID") || ""],
+  ];
+  const matched = entries.find(([, envPriceId]) => envPriceId && envPriceId === normalized);
+  return matched?.[0] || "";
+}
+
+function getDurationDaysForProduct(productKey: string): number {
+  const durationEnv = productKey === "pixiedraw_ad_free"
+    ? "PIXIEED_STRIPE_PIXIEDRAW_ADFREE_DURATION_DAYS"
+    : "PIXIEED_BROWSER_ADFREE_DURATION_DAYS";
+  return Math.max(1, Math.min(3650, Number(Deno.env.get(durationEnv) || "31")));
+}
+
+function readStripeSecretKey(): string {
+  return Deno.env.get("STRIPE_SECRET_KEY")
+    || Deno.env.get("PIXIEED_STRIPE_SECRET_KEY")
+    || Deno.env.get("STRIPE_API_KEY")
+    || "";
+}
+
+async function sendPurchaseCodeEmail({
   buyerEmail,
   orderId,
   productKey,
+  code,
 }: {
   buyerEmail: string;
   orderId: string;
   productKey: string;
+  code: string;
 }): Promise<{ sent: boolean; provider?: string; reason?: string }> {
   const apiKey = Deno.env.get("PIXIEED_RESEND_API_KEY") || Deno.env.get("RESEND_API_KEY") || "";
   const from = Deno.env.get("PIXIEED_PURCHASE_EMAIL_FROM") || Deno.env.get("PIXIEED_SUPPORT_EMAIL_FROM") || "";
@@ -119,10 +169,11 @@ async function sendPurchaseIdEmail({
     "PiXiEEDのサポートありがとうございます。",
     "",
     `対象: ${productLabel}`,
+    `シリアルコード: ${code}`,
     `購入番号: ${orderId}`,
     "",
-    "PiXiEEDrawのホームまたは設定にある「購入番号 / シリアルコード」欄へ、この購入番号を入力できます。",
-    "購入時と同じメールアドレスでログインしてから適用してください。",
+    "PiXiEEDrawのホームまたは設定にある「購入番号 / シリアルコード」欄へ、シリアルコードを入力してください。",
+    "シリアルコードは1回だけ使用できます。購入時と違うメールアドレスのアカウントでも、ログイン後に入力できます。",
     "",
     `PiXiEEDraw: ${helpUrl}`,
     "",
@@ -131,7 +182,7 @@ async function sendPurchaseIdEmail({
   const body: Record<string, unknown> = {
     from,
     to: [buyerEmail],
-    subject: "PiXiEED サポーター特典の購入番号",
+    subject: "PiXiEED サポーター特典のシリアルコード",
     text,
   };
   if (replyTo) {
@@ -147,9 +198,333 @@ async function sendPurchaseIdEmail({
   });
   if (!response.ok) {
     const responseText = await response.text().catch(() => "");
-    throw new Error(`purchase id email failed (${response.status}) ${responseText}`.trim());
+    throw new Error(`purchase code email failed (${response.status}) ${responseText}`.trim());
   }
   return { sent: true, provider: "resend" };
+}
+
+async function sendMissingPurchaseCodeEmails(
+  supabase: SupabaseAdminClient,
+  options: { dryRun: boolean; force: boolean; limit: number },
+) {
+  const { data: rows, error } = await supabase
+    .from("browser_adfree_purchase_orders")
+    .select("id, provider_order_id, product_key, buyer_email, payment_status, code, metadata")
+    .order("created_at", { ascending: true })
+    .limit(options.limit);
+  if (error) {
+    throw error;
+  }
+
+  const eligibleProducts = new Set(["browser_ad_free", "pixiedraw_ad_free", "pixieed_support_monthly"]);
+  const candidates = (Array.isArray(rows) ? rows : [])
+    .map((row) => row as PurchaseCodeEmailRow)
+    .filter((row) => {
+      const metadata = row.metadata && typeof row.metadata === "object" ? row.metadata : {};
+      const productKey = String(row.product_key || "").trim();
+      const paymentStatus = String(row.payment_status || "").trim().toLowerCase();
+      const buyerEmail = normalizeEmail(row.buyer_email || "");
+      return eligibleProducts.has(productKey)
+        && PAID_STATUSES.has(paymentStatus)
+        && buyerEmail
+        && String(row.code || "").trim()
+        && (options.force || !metadata.serial_code_email_sent_at);
+    });
+
+  const productCounts = candidates.reduce<Record<string, number>>((acc, row) => {
+    const key = String(row.product_key || "unknown");
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+
+  if (options.dryRun) {
+    return {
+      ok: true,
+      dryRun: true,
+      scanned: Array.isArray(rows) ? rows.length : 0,
+      eligible: candidates.length,
+      sent: 0,
+      failed: 0,
+      productCounts,
+      errors: [],
+    };
+  }
+
+  let sent = 0;
+  let failed = 0;
+  const errors: Array<{ id: string; message: string }> = [];
+  for (const row of candidates) {
+    const metadata = row.metadata && typeof row.metadata === "object" ? row.metadata : {};
+    try {
+      const emailResult = await sendPurchaseCodeEmail({
+        buyerEmail: normalizeEmail(row.buyer_email || ""),
+        orderId: String(row.provider_order_id || ""),
+        productKey: String(row.product_key || ""),
+        code: String(row.code || "").trim(),
+      });
+      if (!emailResult.sent) {
+        throw new Error(emailResult.reason || "email not sent");
+      }
+      sent += 1;
+      const nowIso = new Date().toISOString();
+      const { error: updateError } = await supabase
+        .from("browser_adfree_purchase_orders")
+        .update({
+          metadata: {
+            ...metadata,
+            serial_code_email_sent_at: nowIso,
+            serial_code_email_provider: emailResult.provider || "unknown",
+          },
+          updated_at: nowIso,
+        })
+        .eq("id", row.id);
+      if (updateError) {
+        throw updateError;
+      }
+    } catch (error) {
+      failed += 1;
+      const message = errorMessage(error, "purchase code email failed");
+      errors.push({ id: row.id, message });
+      await supabase
+        .from("browser_adfree_purchase_orders")
+        .update({
+          metadata: {
+            ...metadata,
+            serial_code_email_error: message,
+            serial_code_email_error_at: new Date().toISOString(),
+          },
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", row.id);
+    }
+  }
+
+  return {
+    ok: failed === 0,
+    dryRun: false,
+    scanned: Array.isArray(rows) ? rows.length : 0,
+    eligible: candidates.length,
+    sent,
+    failed,
+    productCounts,
+    errors: errors.slice(0, 10),
+  };
+}
+
+async function resolveCheckoutSessionProductKey(
+  stripe: Stripe,
+  session: Stripe.Checkout.Session,
+): Promise<string> {
+  const metadataProduct = pickProductKey(session);
+  if (ENTITLEMENT_BY_PRODUCT[metadataProduct] && session.metadata?.product_key) {
+    return metadataProduct;
+  }
+  const lineItems = await stripe.checkout.sessions.listLineItems(session.id, { limit: 10 });
+  for (const item of lineItems.data) {
+    const priceId = typeof item.price?.id === "string" ? item.price.id : "";
+    const productKey = getProductKeyByPriceId(priceId);
+    if (productKey) {
+      return productKey;
+    }
+  }
+  return "";
+}
+
+async function recoverPaidStripeCheckoutPurchases(
+  supabase: SupabaseAdminClient,
+  stripe: Stripe,
+  options: { dryRun: boolean; sendEmails: boolean; limit: number },
+) {
+  const sessions = await stripe.checkout.sessions.list({ limit: options.limit });
+  const recovered: RecoveredStripePurchase[] = [];
+  const skipped: Record<string, number> = {};
+  for (const session of sessions.data) {
+    const paymentStatus = pickPaymentStatus("checkout.session.completed", session);
+    if (!PAID_STATUSES.has(paymentStatus)) {
+      skipped.notPaid = (skipped.notPaid || 0) + 1;
+      continue;
+    }
+    const productKey = await resolveCheckoutSessionProductKey(stripe, session);
+    const entitlementKey = ENTITLEMENT_BY_PRODUCT[productKey];
+    if (!productKey || !entitlementKey) {
+      skipped.unsupportedProduct = (skipped.unsupportedProduct || 0) + 1;
+      continue;
+    }
+    const sessionId = normalizeOrderId(session.id || "");
+    const buyerEmail = pickBuyerEmail(session);
+    if (!sessionId || !buyerEmail) {
+      skipped.missingIdentity = (skipped.missingIdentity || 0) + 1;
+      continue;
+    }
+    const { data: existingPurchase, error: existingError } = await supabase
+      .from("browser_adfree_purchase_orders")
+      .select("id, code, metadata")
+      .eq("provider", "stripe")
+      .eq("provider_order_id", sessionId)
+      .eq("product_key", productKey)
+      .maybeSingle();
+    if (existingError) {
+      throw existingError;
+    }
+    const existingMetadata = existingPurchase?.metadata && typeof existingPurchase.metadata === "object"
+      ? existingPurchase.metadata as Record<string, unknown>
+      : {};
+    if (existingPurchase?.code && existingMetadata.serial_code_email_sent_at) {
+      skipped.alreadyEmailed = (skipped.alreadyEmailed || 0) + 1;
+      continue;
+    }
+    recovered.push({
+      sessionId,
+      buyerEmail,
+      productKey,
+      paymentStatus,
+      paymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : "",
+      subscriptionId: typeof session.subscription === "string" ? session.subscription : "",
+      createdAt: new Date(Number(session.created || 0) * 1000).toISOString(),
+      rawSession: session,
+    });
+  }
+
+  const productCounts = recovered.reduce<Record<string, number>>((acc, row) => {
+    acc[row.productKey] = (acc[row.productKey] || 0) + 1;
+    return acc;
+  }, {});
+
+  if (options.dryRun) {
+    return {
+      ok: true,
+      dryRun: true,
+      scanned: sessions.data.length,
+      recoverable: recovered.length,
+      created: 0,
+      emailed: 0,
+      failed: 0,
+      skipped,
+      productCounts,
+    };
+  }
+
+  let created = 0;
+  let emailed = 0;
+  let failed = 0;
+  const errors: Array<{ sessionId: string; message: string }> = [];
+  for (const purchase of recovered) {
+    try {
+      const { data: existingPurchase, error: existingError } = await supabase
+        .from("browser_adfree_purchase_orders")
+        .select("id, code, metadata")
+        .eq("provider", "stripe")
+        .eq("provider_order_id", purchase.sessionId)
+        .eq("product_key", purchase.productKey)
+        .maybeSingle();
+      if (existingError) {
+        throw existingError;
+      }
+      let code = typeof existingPurchase?.code === "string" ? existingPurchase.code : "";
+      if (!code) {
+        code = await generateUniqueCode(supabase);
+        const entitlementKey = ENTITLEMENT_BY_PRODUCT[purchase.productKey];
+        const { error: codeError } = await supabase
+          .from("user_entitlement_codes")
+          .insert({
+            code,
+            entitlement_key: entitlementKey,
+            duration_days: getDurationDaysForProduct(purchase.productKey),
+            max_redemptions: 1,
+            redemption_count: 0,
+            active: true,
+            metadata: {
+              buyer_email: purchase.buyerEmail,
+              provider: "stripe",
+              provider_order_id: purchase.sessionId,
+              product_key: purchase.productKey,
+              payment_intent_id: purchase.paymentIntentId,
+              subscription_id: purchase.subscriptionId,
+              recovered_from_stripe_at: new Date().toISOString(),
+            },
+          });
+        if (codeError) {
+          throw codeError;
+        }
+      }
+      const metadata = {
+        ...(existingPurchase?.metadata && typeof existingPurchase.metadata === "object"
+          ? existingPurchase.metadata as Record<string, unknown>
+          : {}),
+        source: "stripe_recovery",
+        recovered_from_stripe_at: new Date().toISOString(),
+        payment_intent_id: purchase.paymentIntentId,
+        subscription_id: purchase.subscriptionId,
+      };
+      const { data: savedPurchase, error: purchaseError } = await supabase
+        .from("browser_adfree_purchase_orders")
+        .upsert({
+          provider: "stripe",
+          provider_order_id: purchase.sessionId,
+          product_key: purchase.productKey,
+          buyer_email: purchase.buyerEmail,
+          payment_status: purchase.paymentStatus,
+          code,
+          issued_at: purchase.createdAt,
+          raw_payload: purchase.rawSession,
+          metadata,
+        }, {
+          onConflict: "provider,provider_order_id,product_key",
+        })
+        .select("id, metadata")
+        .maybeSingle();
+      if (purchaseError) {
+        throw purchaseError;
+      }
+      created += existingPurchase?.id ? 0 : 1;
+      const savedMetadata: Record<string, unknown> = savedPurchase?.metadata && typeof savedPurchase.metadata === "object"
+        ? savedPurchase.metadata as Record<string, unknown>
+        : metadata;
+      if (options.sendEmails && !savedMetadata.serial_code_email_sent_at) {
+        const emailResult = await sendPurchaseCodeEmail({
+          buyerEmail: purchase.buyerEmail,
+          orderId: purchase.sessionId,
+          productKey: purchase.productKey,
+          code,
+        });
+        if (!emailResult.sent) {
+          throw new Error(emailResult.reason || "email not sent");
+        }
+        emailed += 1;
+        const nowIso = new Date().toISOString();
+        const { error: updateError } = await supabase
+          .from("browser_adfree_purchase_orders")
+          .update({
+            metadata: {
+              ...savedMetadata,
+              serial_code_email_sent_at: nowIso,
+              serial_code_email_provider: emailResult.provider || "unknown",
+            },
+            updated_at: nowIso,
+          })
+          .eq("id", savedPurchase.id);
+        if (updateError) {
+          throw updateError;
+        }
+      }
+    } catch (error) {
+      failed += 1;
+      errors.push({ sessionId: purchase.sessionId, message: errorMessage(error, "recovery failed") });
+    }
+  }
+
+  return {
+    ok: failed === 0,
+    dryRun: false,
+    scanned: sessions.data.length,
+    recoverable: recovered.length,
+    created,
+    emailed,
+    failed,
+    skipped,
+    productCounts,
+    errors: errors.slice(0, 10),
+  };
 }
 
 function pickProductKey(session: Stripe.Checkout.Session): string {
@@ -443,10 +818,56 @@ serve(async (request) => {
     return json({ ok: false, error: "method not allowed" }, 405);
   }
 
-  const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY") || "";
-  const stripeWebhookSecret = Deno.env.get("PIXIEED_STRIPE_WEBHOOK_SECRET") || "";
   const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  const backfillToken = Deno.env.get("PIXIEED_PURCHASE_CODE_BACKFILL_TOKEN") || "";
+  const providedBackfillToken = request.headers.get("x-pixieed-backfill-token") || "";
+  if (providedBackfillToken) {
+    if (!backfillToken || providedBackfillToken !== backfillToken) {
+      return json({ ok: false, error: "unauthorized" }, 401);
+    }
+    if (!supabaseUrl || !serviceRoleKey) {
+      return json({ ok: false, error: "supabase env missing" }, 500);
+    }
+    const bodyJson = await request.json().catch(() => ({}));
+    if (bodyJson?.task !== "send_purchase_code_emails" && bodyJson?.task !== "recover_stripe_purchase_codes") {
+      return json({ ok: false, error: "unknown maintenance task" }, 400);
+    }
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    });
+    try {
+      if (bodyJson?.task === "recover_stripe_purchase_codes") {
+        const stripeSecretKey = readStripeSecretKey();
+        if (!stripeSecretKey) {
+          return json({ ok: false, error: "stripe env missing" }, 500);
+        }
+        const stripe = new Stripe(stripeSecretKey, {
+          httpClient: Stripe.createFetchHttpClient(),
+        });
+        const result = await recoverPaidStripeCheckoutPurchases(supabase, stripe, {
+          dryRun: bodyJson?.dryRun !== false,
+          sendEmails: bodyJson?.sendEmails === true,
+          limit: Math.max(1, Math.min(100, Number(bodyJson?.limit || 100))),
+        });
+        return json(result, result.ok ? 200 : 207);
+      }
+      const result = await sendMissingPurchaseCodeEmails(supabase, {
+        dryRun: bodyJson?.dryRun !== false,
+        force: bodyJson?.force === true,
+        limit: Math.max(1, Math.min(1000, Number(bodyJson?.limit || 500))),
+      });
+      return json(result, result.ok ? 200 : 207);
+    } catch (error) {
+      return json({ ok: false, error: errorMessage(error, "maintenance task failed") }, 500);
+    }
+  }
+
+  const stripeSecretKey = readStripeSecretKey();
+  const stripeWebhookSecret = Deno.env.get("PIXIEED_STRIPE_WEBHOOK_SECRET") || "";
   if (!stripeSecretKey || !stripeWebhookSecret || !supabaseUrl || !serviceRoleKey) {
     return json({ ok: false, error: "env missing" }, 500);
   }
@@ -795,20 +1216,20 @@ serve(async (request) => {
     nextSavedMetadata.auto_entitlement_grant_error = autoEntitlementGrantError;
   }
 
-  let purchaseIdEmailSent = Boolean((savedMetadata as Record<string, unknown>).purchase_id_email_sent_at);
-  let purchaseIdEmailError = "";
-  if (!purchaseIdEmailSent) {
+  let purchaseCodeEmailSent = Boolean((savedMetadata as Record<string, unknown>).serial_code_email_sent_at);
+  let purchaseCodeEmailError = "";
+  if (!purchaseCodeEmailSent) {
     try {
-      const emailResult = await sendPurchaseIdEmail({ buyerEmail, orderId, productKey });
+      const emailResult = await sendPurchaseCodeEmail({ buyerEmail, orderId, productKey, code });
       if (emailResult.sent && savedPurchase?.id) {
-        purchaseIdEmailSent = true;
+        purchaseCodeEmailSent = true;
         const nowIso = new Date().toISOString();
-        nextSavedMetadata.purchase_id_email_sent_at = nowIso;
-        nextSavedMetadata.purchase_id_email_provider = emailResult.provider || "unknown";
+        nextSavedMetadata.serial_code_email_sent_at = nowIso;
+        nextSavedMetadata.serial_code_email_provider = emailResult.provider || "unknown";
       }
     } catch (error) {
-      purchaseIdEmailError = errorMessage(error, "purchase id email failed");
-      nextSavedMetadata.purchase_id_email_error = purchaseIdEmailError;
+      purchaseCodeEmailError = errorMessage(error, "purchase code email failed");
+      nextSavedMetadata.serial_code_email_error = purchaseCodeEmailError;
     }
   }
   if (savedPurchase?.id) {
@@ -820,8 +1241,8 @@ serve(async (request) => {
         updated_at: new Date().toISOString(),
       })
       .eq("id", savedPurchase.id);
-    if (postUpdateError && !purchaseIdEmailError) {
-      purchaseIdEmailError = postUpdateError.message;
+    if (postUpdateError && !purchaseCodeEmailError) {
+      purchaseCodeEmailError = postUpdateError.message;
     }
   }
 
@@ -834,7 +1255,7 @@ serve(async (request) => {
     autoEntitlementGranted,
     autoEntitlementGrantReason,
     autoEntitlementGrantError,
-    purchaseIdEmailSent,
-    purchaseIdEmailError,
+    purchaseCodeEmailSent,
+    purchaseCodeEmailError,
   });
 });

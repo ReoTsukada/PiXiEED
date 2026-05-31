@@ -93,6 +93,13 @@ function readEmail(raw: string): string {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) ? value : "";
 }
 
+function readStripeSecretKey(): string {
+  return Deno.env.get("STRIPE_SECRET_KEY")
+    || Deno.env.get("PIXIEED_STRIPE_SECRET_KEY")
+    || Deno.env.get("STRIPE_API_KEY")
+    || "";
+}
+
 function readPayload(request: Request, url: URL): {
   returnUrl: string;
   cancelUrl: string;
@@ -152,7 +159,7 @@ serve(async (request) => {
     return json({ ok: false, error: "unsupported product" }, 400);
   }
 
-  const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY") || "";
+  const stripeSecretKey = readStripeSecretKey();
   const priceId = Deno.env.get(product.priceEnv) || "";
   if (!stripeSecretKey || !priceId) {
     return json({ ok: false, error: "stripe env missing" }, 500);

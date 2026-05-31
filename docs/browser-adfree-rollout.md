@@ -1,6 +1,6 @@
 # Browser Ad-Free Rollout
 
-PiXiEED のブラウザ版広告非表示を、`Stripe Checkout (PayPay対応) -> webhook -> 自動反映 or 購入番号入力 -> 適用` で本番化する手順です。
+PiXiEED のブラウザ版広告非表示を、`Stripe Checkout (PayPay対応) -> webhook -> シリアルコードメール送信 -> 適用` で本番化する手順です。
 
 以前の `STORES購入 -> webhook -> 注文番号からコード受取` 導線は legacy として残っていますが、現在の購入導線は Stripe 前提です。
 
@@ -27,6 +27,8 @@ Stripe Dashboard で以下を作成または確認します。
 - `STRIPE_SECRET_KEY`
 - `PIXIEED_STRIPE_WEBHOOK_SECRET`
 - `PIXIEED_STRIPE_BROWSER_ADFREE_PRICE_ID`
+- `PIXIEED_STRIPE_PIXIEDRAW_ADFREE_PRICE_ID`
+- `PIXIEED_STRIPE_PIXIEED_SUPPORT_MONTHLY_PRICE_ID`
 - `PIXIEED_STRIPE_SUPPORT_TIP_PRICE_ID`
 
 任意:
@@ -58,6 +60,8 @@ supabase secrets set \
   STRIPE_SECRET_KEY=__STRIPE_SECRET_KEY__ \
   PIXIEED_STRIPE_WEBHOOK_SECRET=__STRIPE_WEBHOOK_SECRET__ \
   PIXIEED_STRIPE_BROWSER_ADFREE_PRICE_ID=price_xxxxxxxxxxxxx \
+  PIXIEED_STRIPE_PIXIEDRAW_ADFREE_PRICE_ID=price_xxxxxxxxxxxxx \
+  PIXIEED_STRIPE_PIXIEED_SUPPORT_MONTHLY_PRICE_ID=price_xxxxxxxxxxxxx \
   PIXIEED_STRIPE_SUPPORT_TIP_PRICE_ID=price_xxxxxxxxxxxxx \
   PIXIEED_STRIPE_ALLOWED_HOSTS=pixieed.jp,www.pixieed.jp,localhost,127.0.0.1 \
   PIXIEED_STRIPE_DEFAULT_RETURN_URL=https://pixieed.jp/pixiedraw/ \
@@ -91,6 +95,8 @@ supabase functions deploy stripe-browser-adfree-webhook \
    - `STRIPE_SECRET_KEY`
    - `PIXIEED_STRIPE_WEBHOOK_SECRET`
    - `PIXIEED_STRIPE_BROWSER_ADFREE_PRICE_ID`
+   - `PIXIEED_STRIPE_PIXIEDRAW_ADFREE_PRICE_ID`
+   - `PIXIEED_STRIPE_PIXIEED_SUPPORT_MONTHLY_PRICE_ID`
    - `PIXIEED_STRIPE_SUPPORT_TIP_PRICE_ID`
    - `PIXIEED_STRIPE_ALLOWED_HOSTS`
    - `PIXIEED_STRIPE_DEFAULT_RETURN_URL`
@@ -120,13 +126,13 @@ listen する event:
 https://kyyiuakrqomzlikfaire.supabase.co/functions/v1/stripe-browser-adfree-checkout
 ```
 
-Function 側で Stripe Checkout Session を作り、購入後は元のページへ戻します。戻り URL には `stripe_checkout_session_id` が付き、ログイン済みなら自動で適用を試みます。
+Function 側で Stripe Checkout Session を作り、購入後は元のページへ戻します。webhook は購入者メールへ `PXA...` のシリアルコードを送信します。戻り URL には `stripe_checkout_session_id` が付き、ログイン済みなら自動で適用も試みます。
 
 `product=support_tip` で開いた場合は、同じ checkout Function を使って応援チップ決済へ進みます。こちらは entitlement を付けず、決済後は元のページへ戻るだけです。
 
 `product=pixieed_support_monthly` の継続サポートは、購入コード上の主権限を `browser_ad_free` としつつ、アカウント同期時に `pixiedraw_ad_free` も同じ期限で補助付与します。これによりPiXiEED側とPiXiEEDraw側のサポーター状態が同じ購入情報で揃います。
 
-自動反映できなかった場合でも、同じ入力欄に以下どちらかを入れて `適用` を押せば反映できます。
+自動反映できなかった場合でも、同じ入力欄に以下を入れて `適用` を押せば反映できます。`PXA...` のシリアルコードはメールアドレスが違うアカウントでも使用できますが、1回使用後は他アカウントでは使用できません。
 
 - 購入番号: Stripe Checkout Session ID (`cs_...`)
 - 決済番号: Stripe PaymentIntent ID (`pi_...`)
@@ -188,7 +194,7 @@ limit 20;
 
 ## 9. 失敗時の確認
 
-- `STRIPE_SECRET_KEY` / `PIXIEED_STRIPE_WEBHOOK_SECRET` / `PIXIEED_STRIPE_BROWSER_ADFREE_PRICE_ID` が未設定
+- `STRIPE_SECRET_KEY` / `PIXIEED_STRIPE_WEBHOOK_SECRET` / 各 `PIXIEED_STRIPE_*_PRICE_ID` が未設定
 - Stripe Webhook が必要 event を送っていない
 - 購入時メールと PiXiEED ログインメールが違う
 - `PIXIEED_STRIPE_ALLOWED_HOSTS` に現在のホストが入っていない
@@ -196,7 +202,7 @@ limit 20;
 
 最後のケースは、同じ入力欄に `cs_...` を入れて `適用` を押せば再試行できます。
 
-メール未着の既存購入者は、購入時と同じメールアドレスのPiXiEEDアカウントでログインすれば、メールや購入番号なしでも同期対象になります。`20260601093000_backfill_existing_purchase_email_claims.sql` は、既存の未claim購入について `buyer_email` とアカウントメールが一致するものを自動付与します。購入時メールとログインメールが違う場合は自動判定できないため、Stripeの購入者メール/購入番号を確認して手動コード発行で対応します。
+メール未着の既存購入者は、Stripe履歴から `browser_adfree_purchase_orders` と `PXA...` シリアルコードを復元し、購入者メールへ再送します。シリアルコードは購入時メールと違うPiXiEEDアカウントでも利用できますが、手動適用は1回だけです。すでに購入者メールへ自動付与済みのコードも、まだ手動適用されていなければ別アカウントへ1回だけ移管できます。
 
 ## 10. 一時的な手動復旧
 

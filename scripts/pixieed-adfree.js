@@ -418,7 +418,7 @@
       return;
     }
     if (!state.isLoggedIn && readQueryParam(AUTO_APPLY_QUERY_KEY)) {
-      updateStatusElement('購入は完了しています。購入時と同じメールアドレスでログインすると自動で反映します。');
+      updateStatusElement('購入は完了しています。メールで届いたシリアルコードをログイン後に適用できます。');
       return;
     }
     if (!state.isLoggedIn) {
@@ -715,12 +715,12 @@
       return { ok: false, error: state.lastError };
     }
     if (!state.isLoggedIn) {
-      state.lastError = '購入時と同じメールアドレスでログインしてください。';
+      state.lastError = 'ログイン後に購入番号またはシリアルコードを適用してください。';
       uiMessage = state.lastError;
       syncUi();
       return { ok: false, error: state.lastError };
     }
-    uiMessage = '購入番号を確認しています...';
+    uiMessage = '購入番号またはシリアルコードを確認しています...';
     syncUi();
     try {
       const supabase = await ensureSupabase();
@@ -812,7 +812,7 @@
         window.setTimeout(resolve, 1200 * (attempt + 1));
       });
     }
-    uiMessage = '購入は完了しています。少し待ってから、同じ入力欄に購入番号を入れて「適用」を押してください。';
+    uiMessage = '購入は完了しています。メールで届いたシリアルコード、または購入番号を入力して「適用」を押してください。';
     state.lastError = '';
     syncUi();
   }
