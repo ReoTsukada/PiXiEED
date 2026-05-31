@@ -3138,6 +3138,7 @@
   let accountAuthListenerBound = false;
   let accountAuthSubscription = null;
   let accountProjectTransferPromptedForUserId = '';
+  let accountProjectTransferPromptInFlight = false;
   let accountProfileSyncPromise = null;
   const accountProfileSyncPromisesByUserId = new Map();
   let supportsPixieedProfileXUrl = true;
@@ -8744,6 +8745,13 @@
       refreshRecentProjectsUI().catch(error => {
         console.warn('Failed to refresh project home list', error);
       });
+    }
+    if (AUTOSAVE_SUPPORTED) {
+      window.setTimeout(() => {
+        maybePromptAndTransferRecentProjectsFromHome().catch(error => {
+          console.warn('Failed to prompt project transfer from home', error);
+        });
+      }, 0);
     }
     window.requestAnimationFrame(() => {
       screen?.focus?.({ preventScroll: true });
@@ -70066,15 +70074,19 @@
   async function maybePromptAndTransferRecentProjectsOnLogin({
     previousUserId = '',
     wasSignedInNonAnonymous = false,
+    forcePrompt = false,
   } = {}) {
+    if (accountProjectTransferPromptInFlight) {
+      return false;
+    }
     const currentUserId = normalizeRecentProjectAccountUserId(accountState.userId || '');
     if (!currentUserId || currentUserId === 'anonymous' || accountState.isAnonymous) {
       return false;
     }
-    if (wasSignedInNonAnonymous && normalizeRecentProjectAccountUserId(previousUserId || '') === currentUserId) {
+    if (!forcePrompt && wasSignedInNonAnonymous && normalizeRecentProjectAccountUserId(previousUserId || '') === currentUserId) {
       return false;
     }
-    if (accountProjectTransferPromptedForUserId === currentUserId) {
+    if (!forcePrompt && accountProjectTransferPromptedForUserId === currentUserId) {
       return false;
     }
     const allEntries = await loadRecentProjectsMetadata({ includeAllAccounts: true });
@@ -70086,15 +70098,29 @@
       accountProjectTransferPromptedForUserId = currentUserId;
       return false;
     }
-    const accepted = window.confirm(localizeText(
-      `この端末にある別アカウント分のプロジェクト ${transferableEntries.length} 件を、現在のアカウントに引き継ぎますか？`,
-      `Transfer ${transferableEntries.length} projects on this device from other accounts to the current account?`
-    ));
-    accountProjectTransferPromptedForUserId = currentUserId;
-    if (!accepted) {
+    accountProjectTransferPromptInFlight = true;
+    try {
+      const accepted = window.confirm(localizeText(
+        `この端末にある別アカウント分のプロジェクト ${transferableEntries.length} 件を、現在のアカウントに引き継ぎますか？`,
+        `Transfer ${transferableEntries.length} projects on this device from other accounts to the current account?`
+      ));
+      accountProjectTransferPromptedForUserId = currentUserId;
+      if (!accepted) {
+        return false;
+      }
+      return await transferRecentProjectsToCurrentAccount(allEntries);
+    } finally {
+      accountProjectTransferPromptInFlight = false;
+    }
+  }
+
+  async function maybePromptAndTransferRecentProjectsFromHome() {
+    if (!accountState.isLoggedIn || accountState.isAnonymous) {
       return false;
     }
-    return await transferRecentProjectsToCurrentAccount(allEntries);
+    return await maybePromptAndTransferRecentProjectsOnLogin({
+      forcePrompt: true,
+    });
   }
 
   async function transferRecentProjectsToCurrentAccount(allEntriesInput = null) {
