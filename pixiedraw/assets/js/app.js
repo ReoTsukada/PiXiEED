@@ -3137,6 +3137,7 @@
   let pendingSharedInviteResumePromise = null;
   let accountAuthListenerBound = false;
   let accountAuthSubscription = null;
+  let accountProjectTransferPromptedForUserId = '';
   let accountProfileSyncPromise = null;
   const accountProfileSyncPromisesByUserId = new Map();
   let supportsPixieedProfileXUrl = true;
@@ -23270,6 +23271,7 @@
       sharedProjectStructureRevision,
       sharedProjectMembershipRole,
       sharedProjectOwnerUserId,
+      sharedProjectTransferLocked: Boolean(entry.sharedProjectTransferLocked),
       sharedRoleHint,
       sharedAutoJoin: entry.sharedAutoJoin !== false,
       name,
@@ -26095,6 +26097,18 @@
   async function openSharedRecentProject(entry, { hideStartup = true, silent = false, skipLatestRefresh = true } = {}) {
     let normalizedEntry = normalizeSharedRecentProjectEntry(entry);
     if (!normalizedEntry) {
+      return false;
+    }
+    if (normalizedEntry.sharedProjectTransferLocked) {
+      if (!silent) {
+        setMultiStatus(
+          localizeText(
+            'この共有プロジェクトはアカウント引き継ぎ時の上限超過分のため、開けません。',
+            'This shared project cannot be opened because it exceeds the shared-project limit after account transfer.'
+          ),
+          'warn'
+        );
+      }
       return false;
     }
     if (accountState.isLoggedIn && !accountState.isAnonymous) {
@@ -69945,6 +69959,8 @@
             session = data?.session || session;
           }
         }
+        const previousUserId = accountState.userId || '';
+        const wasSignedInNonAnonymous = Boolean(accountState.isLoggedIn && !accountState.isAnonymous && previousUserId);
         applyPixieedAccountSession(session);
         if (accountState.isLoggedIn) {
           if (!accountState.isAnonymous) {
@@ -69962,6 +69978,12 @@
             updatePixieedAccountUi();
           }
           await syncSharedRecentProjectsFromAccount();
+          if (!accountState.isAnonymous) {
+            await maybePromptAndTransferRecentProjectsOnLogin({
+              previousUserId,
+              wasSignedInNonAnonymous,
+            });
+          }
           await refreshRecentProjectsUI({ sanitize: false });
           if (!accountState.isAnonymous) {
             window.setTimeout(() => {
@@ -69981,6 +70003,8 @@
           }
           if (!accountAuthSubscription) {
             const authSubscription = supabase.auth.onAuthStateChange(async (_event, session) => {
+              const previousUserId = accountState.userId || '';
+              const wasSignedInNonAnonymous = Boolean(accountState.isLoggedIn && !accountState.isAnonymous && previousUserId);
               applyPixieedAccountSession(session || null);
               if (accountState.isLoggedIn) {
                 if (!accountState.isAnonymous) {
@@ -69998,6 +70022,12 @@
                   updatePixieedAccountUi();
                 }
                 await syncSharedRecentProjectsFromAccount();
+                if (!accountState.isAnonymous) {
+                  await maybePromptAndTransferRecentProjectsOnLogin({
+                    previousUserId,
+                    wasSignedInNonAnonymous,
+                  });
+                }
                 await refreshRecentProjectsUI({ sanitize: false });
                 if (!accountState.isAnonymous) {
                   window.setTimeout(() => {
@@ -70031,6 +70061,88 @@
       }
     })();
     return accountInitPromise;
+  }
+
+  async function maybePromptAndTransferRecentProjectsOnLogin({
+    previousUserId = '',
+    wasSignedInNonAnonymous = false,
+  } = {}) {
+    const currentUserId = normalizeRecentProjectAccountUserId(accountState.userId || '');
+    if (!currentUserId || currentUserId === 'anonymous' || accountState.isAnonymous) {
+      return false;
+    }
+    if (wasSignedInNonAnonymous && normalizeRecentProjectAccountUserId(previousUserId || '') === currentUserId) {
+      return false;
+    }
+    if (accountProjectTransferPromptedForUserId === currentUserId) {
+      return false;
+    }
+    const allEntries = await loadRecentProjectsMetadata({ includeAllAccounts: true });
+    const transferableEntries = allEntries.filter(entry => {
+      const entryUserId = normalizeRecentProjectAccountUserId(entry?.accountUserId || '');
+      return entryUserId !== currentUserId;
+    });
+    if (!transferableEntries.length) {
+      accountProjectTransferPromptedForUserId = currentUserId;
+      return false;
+    }
+    const accepted = window.confirm(localizeText(
+      `この端末にある別アカウント分のプロジェクト ${transferableEntries.length} 件を、現在のアカウントに引き継ぎますか？`,
+      `Transfer ${transferableEntries.length} projects on this device from other accounts to the current account?`
+    ));
+    accountProjectTransferPromptedForUserId = currentUserId;
+    if (!accepted) {
+      return false;
+    }
+    return await transferRecentProjectsToCurrentAccount(allEntries);
+  }
+
+  async function transferRecentProjectsToCurrentAccount(allEntriesInput = null) {
+    const currentUserId = normalizeRecentProjectAccountUserId(accountState.userId || '');
+    if (!currentUserId || currentUserId === 'anonymous') {
+      return false;
+    }
+    const allEntries = Array.isArray(allEntriesInput)
+      ? allEntriesInput.slice()
+      : await loadRecentProjectsMetadata({ includeAllAccounts: true });
+    const existingCurrentOwnedShared = allEntries.filter(entry => {
+      const entryUserId = normalizeRecentProjectAccountUserId(entry?.accountUserId || '');
+      return entryUserId === currentUserId && isOwnedSharedRecentProjectEntry(entry) && !entry?.sharedProjectTransferLocked;
+    });
+    const maxShared = Math.max(1, getMaxSharedProjectCount());
+    const remainingOwnedSlots = Math.max(0, maxShared - existingCurrentOwnedShared.length);
+    let consumedOwnedSlots = 0;
+    const transferred = allEntries.map(entry => {
+      const entryUserId = normalizeRecentProjectAccountUserId(entry?.accountUserId || '');
+      if (entryUserId === currentUserId) {
+        return entry;
+      }
+      const nextEntry = {
+        ...entry,
+        accountUserId: currentUserId,
+      };
+      if (isOwnedSharedRecentProjectEntry(nextEntry)) {
+        if (consumedOwnedSlots < remainingOwnedSlots) {
+          nextEntry.sharedProjectTransferLocked = false;
+          consumedOwnedSlots += 1;
+        } else {
+          nextEntry.sharedProjectTransferLocked = true;
+        }
+      } else if (Object.prototype.hasOwnProperty.call(nextEntry, 'sharedProjectTransferLocked')) {
+        nextEntry.sharedProjectTransferLocked = false;
+      }
+      return nextEntry;
+    });
+    await saveRecentProjectsList(allEntries, transferred);
+    await refreshRecentProjectsUI({ sanitize: false, syncSharedFromAccount: false });
+    updateAutosaveStatus(
+      localizeText(
+        '端末内プロジェクトを現在のアカウントへ引き継ぎました。',
+        'Transferred local projects to the current account.'
+      ),
+      'success'
+    );
+    return true;
   }
 
   function getLocalMultiParticipantName() {
