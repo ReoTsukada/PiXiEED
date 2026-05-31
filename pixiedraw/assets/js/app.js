@@ -3316,6 +3316,9 @@
   }
 
   function isRecentProjectEntryVisibleForCurrentAccount(entry) {
+    if (normalizeRecentProjectStorageKind(entry?.storageKind) === RECENT_PROJECT_STORAGE_LOCAL) {
+      return true;
+    }
     const entryUserId = normalizeRecentProjectAccountUserId(entry?.accountUserId || '');
     const currentUserId = getCurrentRecentProjectAccountUserId();
     return entryUserId === currentUserId || (currentUserId !== 'anonymous' && entryUserId === 'anonymous');
@@ -32366,6 +32369,10 @@
       }
     } finally {
       endStartupProgress();
+      if (typeof document !== 'undefined' && document.body instanceof HTMLElement) {
+        document.body.classList.remove('app-preinit');
+        document.body.classList.add('app-ready');
+      }
     }
   }
 
@@ -71722,7 +71729,6 @@
     };
 
     if (prefersSharedProjectFlow() && !resolvedSharedProjectKey && !multiState.connecting) {
-      pushChip(localizeText('共有モードOFF', 'Shared Mode Off'), 'neutral');
       summaryText = localizeText(
         '共有モードはOFFです。ONにするとこのプロジェクトを共有できます。',
         'Shared mode is off. Turn it on to share this project.'
@@ -74246,9 +74252,11 @@
       dom.controls.multiStartSession.hidden = false;
       dom.controls.multiStartSession.textContent = sharedProjectFlowPreferred
         ? (sharedModeEnabled
-          ? localizeText('共有モードON', 'Shared Mode ON')
+          ? localizeText('共有モードはONです', 'Shared mode is ON')
           : localizeText('共有モードをON', 'Turn Shared Mode On'))
         : localizeText('開始', 'Start');
+      dom.controls.multiStartSession.classList.toggle('multi-shared-mode-toggle', sharedProjectFlowPreferred);
+      dom.controls.multiStartSession.classList.toggle('is-on', sharedProjectFlowPreferred && sharedModeEnabled);
       if (multiState.connected && !sharedProjectFlowPreferred) {
         dom.controls.multiStartSession.title = sharedProjectFlowPreferred
           ? localizeText('共有プロジェクトを開いています', 'A shared project is already open')
