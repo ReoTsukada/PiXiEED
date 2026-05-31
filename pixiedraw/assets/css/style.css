@@ -75,6 +75,36 @@
   --project-tabs-mobile-height: 36px;
 }
 
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  overflow-x: clip;
+}
+
+@supports not (overflow-x: clip) {
+  html,
+  body {
+    overflow-x: hidden;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+img,
+svg,
+video,
+canvas,
+iframe,
+ins {
+  max-width: 100%;
+}
+
 :root[data-ui-theme='emerald'] {
   --ui-rgb: 76, 201, 143;
   --ui-rgb-focus: 150, 241, 196;
@@ -4916,15 +4946,15 @@ body.is-mobile-layout .mobile-draw-help {
 }
 
 #panelMulti .multi-status-row {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 6px;
 }
 
 #panelMulti .multi-status-row #multiStatus {
   margin: 0;
-  flex: 1 1 auto;
+  width: 100%;
+  text-align: center;
   font-size: 0.95rem;
   font-weight: 700;
 }
@@ -7454,6 +7484,9 @@ body.is-mobile-layout #rightPanelAdSlot {
   pointer-events: none;
   overflow: hidden;
   box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   min-height: calc(var(--mobile-bottom-ad-slot-height) + env(safe-area-inset-bottom, 0px));
   height: calc(var(--mobile-bottom-ad-slot-height) + env(safe-area-inset-bottom, 0px));
   max-height: calc(var(--mobile-bottom-ad-slot-height) + env(safe-area-inset-bottom, 0px));
@@ -7471,7 +7504,7 @@ body.is-mobile-layout #rightPanelAdSlot {
   background-size: 6px 6px;
   color: var(--fg-muted);
   width: 100%;
-  max-width: 100%;
+  max-width: 728px;
   min-width: 0;
   min-height: var(--mobile-bottom-ad-slot-height);
   height: var(--mobile-bottom-ad-slot-height);
@@ -7512,6 +7545,7 @@ body.is-mobile-layout #rightPanelAdSlot {
   box-sizing: border-box !important;
   overflow: hidden !important;
   border: 0 !important;
+  contain: layout paint size;
 }
 
 #mobileBottomAd .mobile-ad-box > ins,
@@ -7536,6 +7570,7 @@ body.is-mobile-layout #rightPanelAdSlot {
   border: 0 !important;
   overflow: hidden !important;
   box-sizing: border-box !important;
+  contain: layout paint size;
 }
 
 #mobileBottomAd .mobile-ad-box iframe {
@@ -8053,6 +8088,22 @@ body.is-mobile-layout .project-home-screen__list .startup-recent-card__open {
 
 .startup-recent-card__open[data-project-kind='shared-joined'] {
   border-left-color: rgba(72, 158, 255, 0.9);
+}
+
+.startup-recent-card__open--ad {
+  cursor: default;
+}
+
+.startup-recent-card__thumb--ad {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 14, 22, 0.9);
+}
+
+.startup-recent-card__ad-ins {
+  width: 100%;
+  min-height: 110px;
 }
 
 .startup-recent-card__open:hover,
