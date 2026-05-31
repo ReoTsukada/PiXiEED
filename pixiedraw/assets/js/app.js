@@ -24982,7 +24982,7 @@
       const thumb = document.createElement('div');
       thumb.className = 'startup-recent-card__thumb startup-recent-card__thumb--ad';
       const adIns = document.createElement('ins');
-      adIns.className = 'ad-seed startup-recent-card__ad-ins';
+      adIns.className = 'ad-seed adsbygoogle startup-recent-card__ad-ins';
       adIns.setAttribute('data-ad-client', 'ca-pub-9801602250480253');
       adIns.setAttribute('data-ad-slot', '2141591954');
       adIns.setAttribute('data-ad-format', 'auto');
@@ -25007,6 +25007,9 @@
       const adIns = list.querySelector('.startup-recent-card__ad-ins');
       if (!(adIns instanceof HTMLElement) || adIns.getAttribute('data-adsbygoogle-status') === 'done') {
         return;
+      }
+      if (!adIns.classList.contains('adsbygoogle')) {
+        adIns.classList.add('adsbygoogle');
       }
       try {
         (window.adsbygoogle = window.adsbygoogle || []).push({});
