@@ -470,6 +470,9 @@
       const message = String(error?.message || error || '購入ページを開けませんでした。');
       if (option.checkoutProductKey) {
         setStatus(`${message} 時間をおいてもう一度お試しください。`, true);
+        if (fallbackUrl) {
+          navigateToPurchaseUrl(fallbackUrl);
+        }
         return;
       }
       if (fallbackUrl) {

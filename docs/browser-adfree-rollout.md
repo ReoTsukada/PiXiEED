@@ -36,6 +36,7 @@ Stripe Dashboard で以下を作成または確認します。
 - `PIXIEED_STRIPE_ALLOWED_HOSTS`
 - `PIXIEED_STRIPE_DEFAULT_RETURN_URL`
 - `PIXIEED_BROWSER_ADFREE_DURATION_DAYS`
+- `PIXIEED_STRIPE_PAYMENT_METHOD_TYPES` (`card` が既定。PayPayを有効化した後だけ `card,paypay`)
 
 ## 3. Supabase CLI を使う場合
 
@@ -65,6 +66,7 @@ supabase secrets set \
   PIXIEED_STRIPE_SUPPORT_TIP_PRICE_ID=price_xxxxxxxxxxxxx \
   PIXIEED_STRIPE_ALLOWED_HOSTS=pixieed.jp,www.pixieed.jp,localhost,127.0.0.1 \
   PIXIEED_STRIPE_DEFAULT_RETURN_URL=https://pixieed.jp/pixiedraw/ \
+  PIXIEED_STRIPE_PAYMENT_METHOD_TYPES=card \
   PIXIEED_BROWSER_ADFREE_DURATION_DAYS=31 \
   --project-ref kyyiuakrqomzlikfaire
 ```
@@ -100,6 +102,7 @@ supabase functions deploy stripe-browser-adfree-webhook \
    - `PIXIEED_STRIPE_SUPPORT_TIP_PRICE_ID`
    - `PIXIEED_STRIPE_ALLOWED_HOSTS`
    - `PIXIEED_STRIPE_DEFAULT_RETURN_URL`
+   - `PIXIEED_STRIPE_PAYMENT_METHOD_TYPES`
    - `PIXIEED_BROWSER_ADFREE_DURATION_DAYS`
 
 ## 5. Stripe Webhook 設定

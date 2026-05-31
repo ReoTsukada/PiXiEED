@@ -3,6 +3,7 @@ import Stripe from "npm:stripe@17.7.0";
 
 const DEFAULT_RETURN_URL = "https://pixieed.jp/pixiedraw/";
 const DEFAULT_ALLOWED_HOSTS = ["pixieed.jp", "www.pixieed.jp", "localhost", "127.0.0.1"];
+const DEFAULT_PAYMENT_METHOD_TYPES: Stripe.Checkout.SessionCreateParams.PaymentMethodType[] = ["card"];
 const PRODUCTS: Record<string, {
   priceEnv: string;
   source: string;
@@ -100,6 +101,19 @@ function readStripeSecretKey(): string {
     || "";
 }
 
+function readPaymentMethodTypes(): Stripe.Checkout.SessionCreateParams.PaymentMethodType[] {
+  const raw = (Deno.env.get("PIXIEED_STRIPE_PAYMENT_METHOD_TYPES") || "").trim();
+  if (!raw) {
+    return DEFAULT_PAYMENT_METHOD_TYPES;
+  }
+  const allowed = new Set(["card", "paypay"]);
+  const values = raw
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter((value) => allowed.has(value)) as Stripe.Checkout.SessionCreateParams.PaymentMethodType[];
+  return values.length > 0 ? values : DEFAULT_PAYMENT_METHOD_TYPES;
+}
+
 function readPayload(request: Request, url: URL): {
   returnUrl: string;
   cancelUrl: string;
@@ -115,10 +129,21 @@ function readPayload(request: Request, url: URL): {
   return fallback;
 }
 
+function corsHeaders(): Record<string, string> {
+  return {
+    "access-control-allow-origin": "*",
+    "access-control-allow-methods": "GET, POST, OPTIONS",
+    "access-control-allow-headers": "authorization, apikey, content-type, x-client-info",
+    "access-control-max-age": "86400",
+    "vary": "Origin",
+  };
+}
+
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
+      ...corsHeaders(),
       "content-type": "application/json; charset=utf-8",
       "cache-control": "no-store",
     },
@@ -133,6 +158,13 @@ function errorMessage(error: unknown, fallback: string): string {
 }
 
 serve(async (request) => {
+  if (request.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders(),
+    });
+  }
+
   if (request.method !== "GET" && request.method !== "POST") {
     return json({ ok: false, error: "method not allowed" }, 405);
   }
@@ -162,7 +194,11 @@ serve(async (request) => {
   const stripeSecretKey = readStripeSecretKey();
   const priceId = Deno.env.get(product.priceEnv) || "";
   if (!stripeSecretKey || !priceId) {
-    return json({ ok: false, error: "stripe env missing" }, 500);
+    const missing = [
+      stripeSecretKey ? "" : "STRIPE_SECRET_KEY",
+      priceId ? "" : product.priceEnv,
+    ].filter(Boolean);
+    return json({ ok: false, error: "stripe env missing", missing }, 500);
   }
 
   const stripe = new Stripe(stripeSecretKey, {
@@ -182,7 +218,7 @@ serve(async (request) => {
           quantity: 1,
         },
       ],
-      payment_method_types: ["card", "paypay"] as Stripe.Checkout.SessionCreateParams.PaymentMethodType[],
+      payment_method_types: readPaymentMethodTypes(),
       customer_email: email || undefined,
       billing_address_collection: "auto",
       allow_promotion_codes: true,

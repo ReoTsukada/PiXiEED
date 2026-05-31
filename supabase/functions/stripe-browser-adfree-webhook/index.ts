@@ -530,7 +530,20 @@ async function recoverPaidStripeCheckoutPurchases(
 function pickProductKey(session: Stripe.Checkout.Session): string {
   const metadata = session.metadata || {};
   const productKey = typeof metadata.product_key === "string" ? metadata.product_key.trim() : "";
-  return productKey || "browser_ad_free";
+  if (productKey) {
+    return productKey;
+  }
+  const source = typeof metadata.checkout_source === "string" ? metadata.checkout_source.trim() : "";
+  if (source === "pixieed_support_monthly") {
+    return "pixieed_support_monthly";
+  }
+  if (source === "pixiedraw_adfree_support") {
+    return "pixiedraw_ad_free";
+  }
+  if (source === "pixieed_browser_adfree") {
+    return "browser_ad_free";
+  }
+  return "";
 }
 
 function pickBuyerEmail(session: Stripe.Checkout.Session): string {
@@ -1070,7 +1083,14 @@ serve(async (request) => {
   }
 
   const session = event.data.object as Stripe.Checkout.Session;
-  const productKey = pickProductKey(session);
+  let productKey = pickProductKey(session);
+  if (!productKey) {
+    try {
+      productKey = await resolveCheckoutSessionProductKey(stripe, session);
+    } catch (error) {
+      return json({ ok: false, error: errorMessage(error, "checkout product resolution failed") }, 500);
+    }
+  }
   const entitlementKey = ENTITLEMENT_BY_PRODUCT[productKey];
   if (!entitlementKey) {
     return json({ ok: true, ignored: true, reason: "product mismatch", eventType: event.type });
