@@ -21,6 +21,20 @@ const ENTITLEMENT_BY_PRODUCT: Record<string, string> = {
 const DEFAULT_PURCHASE_HELP_URL = "https://pixieed.jp/pixiedraw/";
 type SupabaseAdminClient = any;
 
+function getLinkedEntitlementKeys(productKey: string, primaryEntitlementKey: string): string[] {
+  if (String(productKey || "").trim().toLowerCase() !== "pixieed_support_monthly") {
+    return [];
+  }
+  const primary = String(primaryEntitlementKey || "").trim().toLowerCase();
+  if (primary === "browser_ad_free") {
+    return ["pixiedraw_ad_free"];
+  }
+  if (primary === "pixiedraw_ad_free") {
+    return ["browser_ad_free"];
+  }
+  return [];
+}
+
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -279,6 +293,7 @@ async function syncEntitlementWindowByCode(
     buyerEmail?: string;
     orderId?: string;
     subscriptionId?: string;
+    productKey?: string;
   } = {},
 ) {
   if (!code || !entitlementKey) {
@@ -364,6 +379,63 @@ async function syncEntitlementWindowByCode(
   if (entitlementUpdateError) {
     throw entitlementUpdateError;
   }
+
+  const linkedEntitlementKeys = getLinkedEntitlementKeys(options.productKey || "", entitlementKey);
+  for (const linkedEntitlementKey of linkedEntitlementKeys) {
+    const linkedMetadataPatch = {
+      ...codeMetadataPatch,
+      entitlement_key: linkedEntitlementKey,
+      linked_primary_entitlement_key: entitlementKey,
+      supplemental_for_product_key: options.productKey || "",
+      last_synced_from_subscription_at: nowIso,
+    };
+    const { data: linkedEntitlementRow, error: linkedEntitlementLookupError } = await supabase
+      .from("user_entitlements")
+      .select("metadata")
+      .eq("user_id", codeRow.redeemed_by)
+      .eq("entitlement_key", linkedEntitlementKey)
+      .maybeSingle();
+    if (linkedEntitlementLookupError) {
+      throw linkedEntitlementLookupError;
+    }
+    if (options.revoke && !linkedEntitlementRow) {
+      continue;
+    }
+    const linkedEntitlementMetadata = {
+      ...(linkedEntitlementRow?.metadata && typeof linkedEntitlementRow.metadata === "object"
+        ? linkedEntitlementRow.metadata
+        : {}),
+      ...linkedMetadataPatch,
+    };
+    const linkedEntitlementPayload: Record<string, unknown> = {
+      user_id: codeRow.redeemed_by,
+      entitlement_key: linkedEntitlementKey,
+      source: "purchase_subscription_sync",
+      redeemed_code: code,
+      metadata: linkedEntitlementMetadata,
+      updated_at: nowIso,
+    };
+    if (options.revoke) {
+      linkedEntitlementPayload.status = "revoked";
+      linkedEntitlementPayload.revoked_at = nowIso;
+      linkedEntitlementPayload.expires_at = nowIso;
+    } else {
+      linkedEntitlementPayload.status = "active";
+      linkedEntitlementPayload.revoked_at = null;
+      linkedEntitlementPayload.granted_at = nowIso;
+      if (expiresAt) {
+        linkedEntitlementPayload.expires_at = expiresAt;
+      }
+    }
+    const { error: linkedEntitlementUpsertError } = await supabase
+      .from("user_entitlements")
+      .upsert(linkedEntitlementPayload, {
+        onConflict: "user_id,entitlement_key",
+      });
+    if (linkedEntitlementUpsertError) {
+      throw linkedEntitlementUpsertError;
+    }
+  }
 }
 
 serve(async (request) => {
@@ -439,6 +511,7 @@ serve(async (request) => {
         buyerEmail: purchase.buyer_email,
         orderId: purchase.provider_order_id,
         subscriptionId,
+        productKey: purchase.product_key,
       });
     } catch (error) {
       return json({ ok: false, error: errorMessage(error, "invoice sync failed") }, 500);
@@ -517,12 +590,14 @@ serve(async (request) => {
           buyerEmail: purchase.buyer_email,
           orderId: purchase.provider_order_id,
           subscriptionId,
+          productKey: purchase.product_key,
         });
       } else if (currentPeriodEnd) {
         await syncEntitlementWindowByCode(supabase, purchase.code, entitlementKey, currentPeriodEnd, {
           buyerEmail: purchase.buyer_email,
           orderId: purchase.provider_order_id,
           subscriptionId,
+          productKey: purchase.product_key,
         });
       }
     } catch (error) {
