@@ -344,6 +344,8 @@
       multiRoleLabel: document.getElementById('multiRoleLabel'),
       multiJoinProjectKeyField: document.getElementById('multiJoinProjectKeyField'),
       multiJoinProjectKey: document.getElementById('multiJoinProjectKey'),
+      multiToggleCodeVisibility: document.getElementById('multiToggleCodeVisibility'),
+      multiCopyAccessCode: document.getElementById('multiCopyAccessCode'),
       multiProjectKeyField: document.getElementById('multiProjectKeyField'),
       multiProjectKey: document.getElementById('multiProjectKey'),
       multiStartSession: document.getElementById('multiStartSession'),
@@ -15378,6 +15380,8 @@
     setLocalizedTextContent('#multiEntryJoinHint', '共有リンクを貼ってから上の「共有」を押すと、そのプロジェクトが自分の一覧にも追加されます。', 'Paste an invite link and press Share to add that project to your list.');
     setLocalizedTextContent('#multiEntryHint', 'このまま「共有」を押すと共有プロジェクトを作成します。既存の共有を開く時はリンクを入力してください。', 'Press Share to create a shared project. Paste a link first if you want to open an existing one.');
     setLocalizedTextContent('#multiJoinProjectKeyHint', '共有リンクはそのまま貼り付けできます。', 'You can paste the full invite link as is.');
+    setLocalizedTextContent('#multiToggleCodeVisibility', '非表示', 'Hide');
+    setLocalizedTextContent('#multiCopyAccessCode', 'コピー', 'Copy');
     setLocalizedToggleLabel('multiDanmakuToggle', 'コメント弾幕', 'Comment Overlay');
     setLocalizedTextContent('#multiCommentSend', '送信', 'Send');
     setLocalizedTextContent('#multiLeaveSession', '切断', 'Disconnect');
@@ -58656,6 +58660,12 @@
         inviteToken = tokenMatch[0].trim();
       }
     }
+    if (!inviteToken) {
+      const genericTokenMatch = raw.match(/\b[a-z]{2,12}_[a-z0-9]{8,}\b/i);
+      if (genericTokenMatch) {
+        inviteToken = genericTokenMatch[0].trim();
+      }
+    }
     return {
       raw,
       projectKey,
@@ -74011,6 +74021,19 @@
         : true;
       dom.controls.multiProjectKey.readOnly = !sharedProjectFlowPreferred;
     }
+    if (dom.controls.multiToggleCodeVisibility instanceof HTMLButtonElement) {
+      const usingHiddenInput = (
+        (dom.controls.multiJoinProjectKey instanceof HTMLInputElement && dom.controls.multiJoinProjectKey.type === 'password')
+        || (dom.controls.multiProjectKey instanceof HTMLInputElement && dom.controls.multiProjectKey.type === 'password')
+      );
+      dom.controls.multiToggleCodeVisibility.textContent = usingHiddenInput
+        ? localizeText('表示', 'Show')
+        : localizeText('非表示', 'Hide');
+      dom.controls.multiToggleCodeVisibility.disabled = multiState.connecting;
+    }
+    if (dom.controls.multiCopyAccessCode instanceof HTMLButtonElement) {
+      dom.controls.multiCopyAccessCode.disabled = multiState.connecting;
+    }
     if (dom.controls.multiEntryMaster instanceof HTMLButtonElement) {
       dom.controls.multiEntryMaster.disabled = sharedProjectFlowPreferred
         ? multiState.connecting
@@ -77767,6 +77790,39 @@
           setMultiStatus(`共有キーをコピーしました: ${projectKey}`, 'success');
         } else {
           setMultiStatus(localizeText('共有キーのコピーに失敗しました', 'Failed to copy project key'), 'error');
+        }
+        syncMultiControls();
+      });
+    }
+    if (dom.controls.multiToggleCodeVisibility instanceof HTMLButtonElement && dom.controls.multiToggleCodeVisibility.dataset.bound !== 'true') {
+      dom.controls.multiToggleCodeVisibility.dataset.bound = 'true';
+      dom.controls.multiToggleCodeVisibility.addEventListener('click', () => {
+        const inputs = getMultiProjectKeyInputElements();
+        const shouldHide = !inputs.some(input => input instanceof HTMLInputElement && input.type === 'password');
+        inputs.forEach(input => {
+          if (!(input instanceof HTMLInputElement)) {
+            return;
+          }
+          input.type = shouldHide ? 'password' : 'text';
+        });
+        syncMultiControls();
+      });
+    }
+    if (dom.controls.multiCopyAccessCode instanceof HTMLButtonElement && dom.controls.multiCopyAccessCode.dataset.bound !== 'true') {
+      dom.controls.multiCopyAccessCode.dataset.bound = 'true';
+      dom.controls.multiCopyAccessCode.addEventListener('click', async () => {
+        const access = readCurrentMultiProjectAccessInput();
+        const code = (access.inviteToken || access.projectKey || '').trim();
+        if (!code) {
+          setMultiStatus(localizeText('コピーできる共有コードがありません', 'No share code available to copy'), 'warn');
+          syncMultiControls();
+          return;
+        }
+        const copied = await writeTextToClipboard(code);
+        if (copied) {
+          setMultiStatus(localizeText('共有コードをコピーしました', 'Share code copied'), 'success');
+        } else {
+          setMultiStatus(localizeText('共有コードのコピーに失敗しました', 'Failed to copy share code'), 'error');
         }
         syncMultiControls();
       });
