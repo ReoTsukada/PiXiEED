@@ -468,6 +468,10 @@
     } catch (error) {
       const fallbackUrl = option.webUrl;
       const message = String(error?.message || error || '購入ページを開けませんでした。');
+      if (option.checkoutProductKey) {
+        setStatus(`${message} 時間をおいてもう一度お試しください。`, true);
+        return;
+      }
       if (fallbackUrl) {
         setStatus(`${message} 既存のStripe購入ページを開きます。`, true);
         navigateToPurchaseUrl(fallbackUrl);

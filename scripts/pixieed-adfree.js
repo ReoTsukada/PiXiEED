@@ -11,7 +11,6 @@
   const GLOBAL_ENTITLEMENT_KEY = 'browser_ad_free';
   const PIXIEDRAW_ENTITLEMENT_KEY = 'pixiedraw_ad_free';
   const CHECKOUT_ENDPOINT = `${SUPABASE_URL}/functions/v1/stripe-browser-adfree-checkout`;
-  const PIXIEDRAW_SUPPORT_URL = 'https://buy.stripe.com/aFadRaeo8ekv5L44MM2VG01';
   const AUTO_APPLY_QUERY_KEY = 'stripe_checkout_session_id';
   const AUTO_APPLY_STATUS_KEY = 'stripe_checkout_status';
   const ACCESS_CODE_PATTERN = /^PXA[A-Z0-9]{6,}$/i;
@@ -393,7 +392,7 @@
     const claimButtons = getClaimButtons();
 
     getPurchaseLinks().forEach((link) => {
-      link.href = PIXIEDRAW_SUPPORT_URL;
+      link.href = buildPurchaseUrl();
       link.target = '_self';
       link.rel = 'noopener';
       link.dataset.supportPanelTrigger = 'true';
