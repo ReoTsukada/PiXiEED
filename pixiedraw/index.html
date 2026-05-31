@@ -787,6 +787,7 @@
 <p aria-live="polite" class="help-text export-destination-label" id="exportDestinationLabel">画像/GIF/SVG出力先: 未固定（保存時に保存先を選択）</p>
 <p aria-live="polite" class="help-text" id="autosaveStatus"></p>
 <p aria-live="polite" class="help-text" id="exportFolderStatus"></p>
+<div class="panel-ad-mount" data-panel-ad-mount="right"></div>
 <div class="field field--list">
 <span id="timelapseSectionTitle">タイムラプス</span>
 <div class="field-group">
@@ -809,7 +810,6 @@
 <button class="button button--danger" id="clearCanvas" type="button">キャンバスをクリア</button>
 </div>
 </details>
-<div class="panel-ad-mount" data-panel-ad-mount="right"></div>
 </div>
 </section>
 <section class="panel-section" data-section="multi" id="panelMulti">
@@ -829,9 +829,9 @@
 <div class="field field--compact multi-project-key-field" id="multiJoinProjectKeyField">
 <span>共有リンク / 招待コード</span>
 <div class="multi-project-key-row">
-<input autocomplete="off" id="multiJoinProjectKey" inputmode="text" maxlength="280" placeholder="共有リンクまたは招待コードを貼り付け" spellcheck="false" type="text"/>
-<button class="chip multi-project-key-copy" id="multiToggleCodeVisibility" type="button">非表示</button>
-<button class="chip multi-project-key-copy" id="multiCopyAccessCode" type="button">コピー</button>
+<input autocomplete="off" id="multiJoinProjectKey" inputmode="text" maxlength="280" placeholder="共有リンクまたは招待コードを貼り付け" spellcheck="false" type="password"/>
+<button class="chip multi-project-key-copy" id="multiToggleCodeVisibility" type="button">表示</button>
+<button class="chip multi-project-key-copy" id="multiApplyAccessCode" type="button">確定</button>
 </div>
 <p class="help-text ui-guide-text" id="multiJoinProjectKeyHint">共有リンクはそのまま貼り付けできます。</p>
 </div>
@@ -876,7 +876,7 @@
 <section class="multi-overview" id="multiOverview">
 <div class="multi-overview__header">
 <div class="multi-status-row">
-<p aria-live="polite" class="help-text" id="multiStatus">共有モード: OFF</p>
+<button aria-live="polite" class="button" id="multiStatus" type="button">共有モード: OFF</button>
 </div>
 <div class="multi-overview__chips" id="multiOverviewChips"></div>
 </div>
@@ -906,7 +906,6 @@
 </div>
 <div class="field-group">
 <div class="multi-session-actions multi-session-actions--single">
-<button class="button" id="multiStartSession" type="button">共有モードをON</button>
 <button class="chip" id="multiInviteCopy" type="button">共有URLをコピー</button>
 <button class="chip" id="multiInviteShare" type="button">共有</button>
 <button class="button" hidden id="multiLeaveSession" type="button">切断</button>
@@ -972,6 +971,7 @@
 </div>
 </div>
 </div>
+<div class="panel-ad-mount" data-panel-ad-mount="right"></div>
 <div class="field field--list settings-color-mode-field">
 <span>カラーモード</span>
 <div aria-label="カラーモード" class="color-mode-switch" id="settingsColorModeSwitch" role="radiogroup">
@@ -1114,7 +1114,6 @@
 </div>
 <p class="help-text ui-guide-text" id="settingsDisplayHint">背景とUI配色を切り替えます（描画色には影響しません）。</p>
 </div>
-<div class="panel-ad-mount" data-panel-ad-mount="right"></div>
 <div class="field field--list settings-account-field">
 <span id="pixieedAccountLabel">アカウント</span>
 <p class="help-text" id="pixieedAccountStatus">未ログイン</p>
