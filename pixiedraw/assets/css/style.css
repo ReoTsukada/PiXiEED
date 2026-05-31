@@ -4408,6 +4408,11 @@ body.is-mobile-layout .mobile-draw-help {
   white-space: nowrap;
 }
 
+#panelMulti #multiToggleCodeVisibility,
+#panelMulti #multiCopyAccessCode {
+  min-width: 68px;
+}
+
 #panelMulti .multi-entry-screen {
   display: flex;
   flex-direction: column;
