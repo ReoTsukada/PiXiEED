@@ -176,6 +176,16 @@ body {
   image-rendering: pixelated;
 }
 
+body.app-preinit .app {
+  visibility: hidden;
+  opacity: 0;
+}
+
+body.app-ready .app {
+  visibility: visible;
+  opacity: 1;
+}
+
 body::after {
   content: "";
   position: fixed;
@@ -4804,6 +4814,28 @@ body.is-mobile-layout .mobile-draw-help {
   color: #fff4d4;
 }
 
+#panelMulti #multiSupportAdContainer {
+  margin-top: 0;
+  padding: 0;
+  min-height: var(--panel-ad-height, 110px);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background:
+    linear-gradient(0deg, rgba(var(--ui-rgb), 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--ui-rgb), 0.035) 1px, transparent 1px),
+    rgba(5, 10, 16, 0.94);
+  background-size: 6px 6px;
+}
+
+#panelMulti #multiSupportAdContainer .export-ad__slot {
+  min-height: var(--panel-ad-height, 110px);
+  height: var(--panel-ad-height, 110px);
+}
+
+#panelMulti #multiSupportAdContainer .export-ad__label {
+  display: none;
+}
+
 #panelMulti .multi-project-key-field--flow {
   grid-area: key;
 }
@@ -4957,6 +4989,24 @@ body.is-mobile-layout .mobile-draw-help {
   text-align: center;
   font-size: 0.95rem;
   font-weight: 700;
+}
+
+#panelMulti .multi-status-row #multiStatus.multi-shared-mode-toggle {
+  min-height: 44px;
+  border-color: rgba(var(--ui-rgb), 0.36);
+  background:
+    linear-gradient(180deg, rgba(10, 18, 28, 0.96), rgba(7, 13, 21, 0.96));
+  transition: border-color 140ms ease, box-shadow 180ms ease, background 180ms ease, color 140ms ease;
+}
+
+#panelMulti .multi-status-row #multiStatus.multi-shared-mode-toggle.is-on {
+  border-color: rgba(var(--ui-rgb-focus), 0.74);
+  color: rgba(224, 249, 236, 0.98);
+  background:
+    linear-gradient(180deg, rgba(13, 33, 31, 0.97), rgba(9, 24, 23, 0.97));
+  box-shadow:
+    0 0 0 1px rgba(var(--ui-rgb-focus), 0.18) inset,
+    0 0 14px rgba(var(--ui-rgb), 0.22);
 }
 
 #panelMulti .multi-help-toggle {
@@ -7417,7 +7467,8 @@ body.is-mobile-layout .panel-ad,
 body.is-mobile-layout #leftPanelAd,
 body.is-mobile-layout #rightPanelAd,
 body.is-mobile-layout #leftPanelAdSlot,
-body.is-mobile-layout #rightPanelAdSlot {
+body.is-mobile-layout #rightPanelAdSlot,
+body.is-mobile-layout #multiSupportAdContainer {
   display: none !important;
   min-height: 0 !important;
   height: 0 !important;
