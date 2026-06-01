@@ -940,8 +940,12 @@
     32,
     40,
   ]);
-  const MIN_ZOOM_SCALE = ZOOM_STEPS[0];
-  const MAX_ZOOM_SCALE = ZOOM_STEPS[ZOOM_STEPS.length - 1];
+  const MIN_ZOOM_RATIO = ZOOM_STEPS[0];
+  const MAX_ZOOM_RATIO = ZOOM_STEPS[ZOOM_STEPS.length - 1];
+  const MIN_ZOOM_SCALE = 0.05;
+  const MAX_ZOOM_SCALE = 4096;
+  const MAX_ZOOM_BASE_SCALE = 128;
+  const SMALL_CANVAS_BASE_VIEWPORT_FILL_RATIO = 0.5;
   const ZOOM_WHEEL_STEP_BASE = 1.25;
   const WHEEL_ZOOM_RAW_RESET_MS = 160;
   const ZOOM_EPSILON = 1e-6;
@@ -3422,7 +3426,7 @@
   const sharedProjectSeenOpSeqById = new Map();
   const sharedProjectLocalInFlightOps = new Map();
   const SHARED_PROJECT_LOCAL_OP_ACK_TIMEOUT_MS = 12000;
-  const SHARED_PROJECT_LOCAL_OP_EXPIRE_MS = SHARED_PROJECT_LOCAL_OP_ACK_TIMEOUT_MS * 3;
+  const SHARED_PROJECT_LOCAL_OP_EXPIRE_MS = 5 * 60 * 1000;
   const SHARED_PROJECT_LOCAL_OP_RETRY_DELAY_MS = 700;
   let sharedProjectReplayRenderBatchDepth = 0;
   let sharedProjectReplayRenderNeedsFull = false;
@@ -3767,12 +3771,9 @@
   let palettePresetPickerRefreshFrame = 0;
   let newProjectPalettePresetId = loadStoredNewProjectPalettePresetId();
   let currentPalettePresetId = normalizeCurrentPalettePreset(newProjectPalettePresetId, CURRENT_PALETTE_PRESET_CUSTOM);
-  const state = createInitialState({ palettePreset: newProjectPalettePresetId });
-  const projectCanvasStore = createProjectCanvasStoreFromState(state);
-  installProjectCanvasStateProxy(state, projectCanvasStore);
+  let viewportZoomRatio = MIN_ZOOM_RATIO;
   let voxelExtensionState = normalizeVoxelExtensionState(null, VOXEL_EXTENSION_DEFAULT_STATE);
   let voxelExtensionRestoreSnapshot = null;
-  let localViewportCanvasState = normalizeLocalViewportCanvasState(null, LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE);
   let localViewportCanvasLayoutResetPending = true;
   let viewportCanvasVisibilityRecoveryActive = false;
   const localViewportCanvasEntries = [];
@@ -3804,6 +3805,10 @@
     dragHandle: null,
   };
   let activeCanvasSurface = mainViewportCanvasSurface;
+  const state = createInitialState({ palettePreset: newProjectPalettePresetId });
+  const projectCanvasStore = createProjectCanvasStoreFromState(state);
+  installProjectCanvasStateProxy(state, projectCanvasStore);
+  let localViewportCanvasState = normalizeLocalViewportCanvasState(null, LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE);
   let voxelExtensionPreviewMeta = null;
   let voxelExtensionPreviewPixels = null;
   let voxelExtensionGuideProjections = null;
@@ -4933,7 +4938,7 @@
     return {
       width: initialWidth,
       height: initialHeight,
-      scale: MIN_ZOOM_SCALE,
+      scale: MIN_ZOOM_RATIO,
       pan: { x: 0, y: 0 },
       tool: 'pen',
       brushSize: 1,
@@ -6634,6 +6639,7 @@
       );
     }
     state.scale = normalizeZoomScale(preferences.scale, state.scale || MIN_ZOOM_SCALE);
+    rememberViewportZoomRatioFromScale(state.scale);
     state.pan = {
       x: Math.round(Number(preferences.pan?.x) || 0),
       y: Math.round(Number(preferences.pan?.y) || 0),
@@ -7140,7 +7146,7 @@
     const compressed = {
       width: snapshot.width,
       height: snapshot.height,
-      scale: MIN_ZOOM_SCALE,
+      scale: MIN_ZOOM_RATIO,
       pan: { x: 0, y: 0 },
       palette: snapshot.palette.map(color => ({ ...color })),
       activePaletteIndex: snapshot.activePaletteIndex,
@@ -7308,7 +7314,7 @@
     const decompressed = {
       width: snapshot.width,
       height: snapshot.height,
-      scale: MIN_ZOOM_SCALE,
+      scale: MIN_ZOOM_RATIO,
       pan: {
         x: Math.round(Number(snapshot.pan?.x) || 0),
         y: Math.round(Number(snapshot.pan?.y) || 0),
@@ -7787,6 +7793,7 @@
     state.height = snapshot.height;
     if (!preserveView) {
       state.scale = normalizeZoomScale(snapshot.scale, state.scale || MIN_ZOOM_SCALE);
+      rememberViewportZoomRatioFromScale(state.scale);
       state.pan = { x: snapshot.pan.x, y: snapshot.pan.y };
     }
     syncActiveProjectCanvasViewScale();
@@ -9936,8 +9943,9 @@
     );
   }
 
-  function getSharedProjectLocalDrawBlockReason(projectKey = activeSharedProjectKey) {
+  function getSharedProjectLocalDrawBlockReason(projectKey = activeSharedProjectKey, options = {}) {
     const normalizedProjectKey = normalizeMultiProjectKey(projectKey || activeSharedProjectKey || '');
+    const allowLocalOpBacklog = Boolean(options?.allowLocalOpBacklog);
     if (!isSharedProjectCollaborativeMode(normalizedProjectKey)) {
       return '';
     }
@@ -9962,19 +9970,15 @@
     if (hasSharedProjectFailedLocalOps()) {
       return 'failed-local-ops';
     }
-    if (
-      sharedProjectOpCommitInFlight
+    const hasLocalOpBacklog = sharedProjectOpCommitInFlight
       || hasSharedProjectLocalInFlightOps()
-      || sharedProjectPendingLocalOps.length > 0
-      || sharedProjectSyncInFlight
-    ) {
+      || sharedProjectPendingLocalOps.length > 0;
+    if (hasLocalOpBacklog && !allowLocalOpBacklog) {
       return 'local-op-in-flight';
     }
-    if (sharedProjectPendingRemoteOps.size > 0) {
-      return 'remote-op-pending';
-    }
     if (
-      sharedProjectRefreshInFlight
+      sharedProjectSyncInFlight
+      || sharedProjectRefreshInFlight
       || sharedProjectSnapshotReplayInFlight
       || sharedProjectRecoveryInProgress
       || sharedProjectReconnectRecoveryPromise
@@ -9982,6 +9986,9 @@
       || sharedProjectImmediateRecoveryPromise
     ) {
       return 'sync-in-progress';
+    }
+    if (sharedProjectPendingRemoteOps.size > 0) {
+      return 'remote-op-pending';
     }
     if (sharedProjectDeferRealtimeUntilSynced || activeSharedProjectSyncState !== 'synced' || !activeSharedProjectSynced) {
       return 'not-synced';
@@ -14719,14 +14726,15 @@
 
   function syncZoomControls(scaleValue = state.scale) {
     const normalizedScale = normalizeZoomScale(scaleValue, MIN_ZOOM_SCALE);
+    const normalizedRatio = getZoomRatioForScale(normalizedScale);
     if (dom.controls.zoomSlider instanceof HTMLInputElement) {
       dom.controls.zoomSlider.value = String(getZoomStepIndex(normalizedScale));
     }
     if (dom.controls.zoomInput instanceof HTMLInputElement) {
-      dom.controls.zoomInput.min = String(Math.round(MIN_ZOOM_SCALE * 100));
-      dom.controls.zoomInput.max = String(Math.round(MAX_ZOOM_SCALE * 100));
+      dom.controls.zoomInput.min = String(Math.round(MIN_ZOOM_RATIO * 100));
+      dom.controls.zoomInput.max = String(Math.round(MAX_ZOOM_RATIO * 100));
       dom.controls.zoomInput.step = '1';
-      dom.controls.zoomInput.value = String(Math.round(normalizedScale * 100));
+      dom.controls.zoomInput.value = String(Math.round(normalizedRatio * 100));
     }
     if (dom.controls.zoomLevel) {
       dom.controls.zoomLevel.textContent = formatZoomLabel(normalizedScale);
@@ -18072,7 +18080,7 @@
     const snapshot = {
       width,
       height,
-      scale: MIN_ZOOM_SCALE,
+      scale: MIN_ZOOM_RATIO,
       pan: { x: 0, y: 0 },
       tool: state.tool,
       brushSize: state.brushSize,
@@ -26645,7 +26653,7 @@
     const activeCanvasSnapshot = {
       width,
       height,
-      scale: MIN_ZOOM_SCALE,
+      scale: MIN_ZOOM_RATIO,
       pan: {
         x: Math.round(Number(payload.pan?.x) || 0),
         y: Math.round(Number(payload.pan?.y) || 0),
@@ -31710,9 +31718,9 @@
     }
     const viewport = getMainCanvasViewportElement();
     const stack = mainViewportCanvasSurface.stack || dom.canvases.stack;
-    const scale = Number(state.scale) || MIN_ZOOM_SCALE;
+    const scale = Number(state.scale) || getViewportZoomBaseScale();
     if (!viewport || !stack) return;
-    if (Math.abs(scale - MIN_ZOOM_SCALE) > ZOOM_EPSILON) return;
+    if (Math.abs(getZoomRatioForScale(scale) - MIN_ZOOM_RATIO) > ZOOM_EPSILON) return;
     const viewportRect = viewport.getBoundingClientRect();
     const stackRect = stack.getBoundingClientRect();
     if (viewportRect.width <= 0 || viewportRect.height <= 0 || stackRect.width <= 0 || stackRect.height <= 0) {
@@ -31747,35 +31755,57 @@
     return mainViewportCanvasSurface;
   }
 
+  function getMinimumVisibleViewportCanvasPixels(targetSize, viewportSize) {
+    const safeTargetSize = Math.max(1, Number(targetSize) || 1);
+    const safeViewportSize = Math.max(1, Number(viewportSize) || 1);
+    return Math.max(
+      1,
+      Math.round(Math.min(
+        safeTargetSize,
+        safeViewportSize,
+        Math.max(24, safeViewportSize * 0.08)
+      ))
+    );
+  }
+
   function clampPanToKeepVisibleCanvas() {
     const viewport = dom.canvasViewport;
     if (!(viewport instanceof HTMLElement)) {
       return { clampedX: false, clampedY: false };
     }
     const targetSurface = getViewportVisibilityTargetSurface();
-    const panel = targetSurface?.panel instanceof HTMLElement ? targetSurface.panel : null;
-    const canvasDoc = targetSurface?.canvasDoc
-      || getProjectCanvasDocumentById(targetSurface?.canvasDocId)
-      || (targetSurface?.kind === 'local' ? getProjectCanvasDocumentForEntry(targetSurface) : getProjectCanvasDocumentAt(0));
-    if (!(panel instanceof HTMLElement) || !canvasDoc) {
+    const targetElement = targetSurface?.stack instanceof HTMLElement
+      ? targetSurface.stack
+      : (targetSurface?.drawing instanceof HTMLElement
+        ? targetSurface.drawing
+        : (targetSurface?.panel instanceof HTMLElement ? targetSurface.panel : null));
+    if (!(targetElement instanceof HTMLElement)) {
       return { clampedX: false, clampedY: false };
     }
-    const viewportWidth = Math.max(1, Math.round(viewport.clientWidth || viewport.getBoundingClientRect().width || 1));
-    const viewportHeight = Math.max(1, Math.round(viewport.clientHeight || viewport.getBoundingClientRect().height || 1));
-    const drawWidth = Math.max(1, Math.round(Number(canvasDoc?.width) || 1)) * getProjectCanvasDisplayScale(canvasDoc);
-    const drawHeight = Math.max(1, Math.round(Number(canvasDoc?.height) || 1)) * getProjectCanvasDisplayScale(canvasDoc);
-    const panelLeft = parseLocalViewportCanvasAxis(panel.style.left, panel.offsetLeft) || 0;
-    const panelTop = parseLocalViewportCanvasAxis(panel.style.top, panel.offsetTop) || 0;
+    const viewportRect = viewport.getBoundingClientRect();
+    const targetRect = targetElement.getBoundingClientRect();
+    if (
+      viewportRect.width <= 0
+      || viewportRect.height <= 0
+      || targetRect.width <= 0
+      || targetRect.height <= 0
+    ) {
+      return { clampedX: false, clampedY: false };
+    }
     let nextPanX = Math.round(Number(state.pan.x) || 0);
     let nextPanY = Math.round(Number(state.pan.y) || 0);
-    const minVisibleX = Math.max(1, Math.round(Math.min(viewportWidth * 0.12, drawWidth * 0.5)));
-    const minVisibleY = Math.max(1, Math.round(Math.min(viewportHeight * 0.12, drawHeight * 0.5)));
-    const minPanX = Math.round(minVisibleX - panelLeft - drawWidth);
-    const maxPanX = Math.round(viewportWidth - minVisibleX - panelLeft);
-    const minPanY = Math.round(minVisibleY - panelTop - drawHeight);
-    const maxPanY = Math.round(viewportHeight - minVisibleY - panelTop);
-    nextPanX = clamp(nextPanX, minPanX, maxPanX);
-    nextPanY = clamp(nextPanY, minPanY, maxPanY);
+    const minVisibleX = getMinimumVisibleViewportCanvasPixels(targetRect.width, viewportRect.width);
+    const minVisibleY = getMinimumVisibleViewportCanvasPixels(targetRect.height, viewportRect.height);
+    if (targetRect.right < viewportRect.left + minVisibleX) {
+      nextPanX += Math.round((viewportRect.left + minVisibleX) - targetRect.right);
+    } else if (targetRect.left > viewportRect.right - minVisibleX) {
+      nextPanX -= Math.round(targetRect.left - (viewportRect.right - minVisibleX));
+    }
+    if (targetRect.bottom < viewportRect.top + minVisibleY) {
+      nextPanY += Math.round((viewportRect.top + minVisibleY) - targetRect.bottom);
+    } else if (targetRect.top > viewportRect.bottom - minVisibleY) {
+      nextPanY -= Math.round(targetRect.top - (viewportRect.bottom - minVisibleY));
+    }
     const clampedX = nextPanX !== Math.round(Number(state.pan.x) || 0);
     const clampedY = nextPanY !== Math.round(Number(state.pan.y) || 0);
     if (nextPanX !== state.pan.x) {
@@ -31883,7 +31913,7 @@
     }
     const run = () => {
       openedDocumentViewportResetRaf = null;
-      state.scale = MIN_ZOOM_SCALE;
+      resetViewportZoomRatio(MIN_ZOOM_RATIO);
       state.pan.x = 0;
       state.pan.y = 0;
       requestLocalViewportCanvasLayoutReset({ clearStored: true });
@@ -31907,7 +31937,6 @@
 
   function applyViewportTransform() {
     if (!(dom.viewportWorkspace instanceof HTMLElement)) return;
-    const clampResult = clampPanToKeepVisibleCanvas();
     const panX = Math.round(Number(state.pan.x) || 0);
     const panY = Math.round(Number(state.pan.y) || 0);
     if (panX !== state.pan.x) {
@@ -31917,6 +31946,10 @@
       state.pan.y = panY;
     }
     dom.viewportWorkspace.style.transform = `translate(${panX}px, ${panY}px)`;
+    const clampResult = clampPanToKeepVisibleCanvas();
+    if (clampResult?.clampedX || clampResult?.clampedY) {
+      dom.viewportWorkspace.style.transform = `translate(${Math.round(Number(state.pan.x) || 0)}px, ${Math.round(Number(state.pan.y) || 0)}px)`;
+    }
     updateGridDecorations();
     updateMirrorGuideHandles();
     updateCanvasResizeHandlePosition();
@@ -48983,6 +49016,7 @@
     syncControls = true,
     updateScaleLimits = true,
   } = {}) {
+    syncViewportZoomScaleToBase({ preserveRatio: true });
     syncActiveProjectCanvasViewScale();
     const { width, height, scale } = state;
     state.mirror = normalizeMirrorAxisState(state.mirror, width, height);
@@ -49121,8 +49155,6 @@
       x: Number(state.pan.x) || 0,
       y: Number(state.pan.y) || 0,
     };
-    const stack = dom.canvases.stack;
-    const stackRectBefore = stack ? stack.getBoundingClientRect() : null;
     let zoomFocus = focus && Number.isFinite(focus.worldX) && Number.isFinite(focus.worldY)
       ? focus
       : null;
@@ -49131,6 +49163,7 @@
     }
 
     state.scale = targetScale;
+    rememberViewportZoomRatioFromScale(targetScale);
     resizeCanvases({
       forceRender: false,
       applyTransform: false,
@@ -49138,22 +49171,52 @@
       updateScaleLimits: false,
     });
 
-    if (zoomFocus && stack && stackRectBefore) {
-      const stackRectAfter = stack.getBoundingClientRect();
-      const layoutShiftX = stackRectAfter.left - stackRectBefore.left;
-      const layoutShiftY = stackRectAfter.top - stackRectBefore.top;
-      const scaleDelta = prevScale - targetScale;
-      const nextPanX = previousPan.x + zoomFocus.worldX * scaleDelta - layoutShiftX;
-      const nextPanY = previousPan.y + zoomFocus.worldY * scaleDelta - layoutShiftY;
-      state.pan.x = Math.round(nextPanX);
-      state.pan.y = Math.round(nextPanY);
+    const focusSurface = zoomFocus?.surface
+      ? getResolvedCanvasInteractionSurface(zoomFocus.surface)
+      : getViewportVisibilityTargetSurface();
+    const focusDrawing = focusSurface?.drawing instanceof HTMLCanvasElement
+      ? focusSurface.drawing
+      : dom.canvases.drawing;
+    if (zoomFocus && focusDrawing instanceof HTMLCanvasElement) {
+      const drawingRectAfterResize = focusDrawing.getBoundingClientRect();
+      const focusClientX = Number.isFinite(zoomFocus.clientX)
+        ? Number(zoomFocus.clientX)
+        : drawingRectAfterResize.left + (zoomFocus.worldX * prevScale);
+      const focusClientY = Number.isFinite(zoomFocus.clientY)
+        ? Number(zoomFocus.clientY)
+        : drawingRectAfterResize.top + (zoomFocus.worldY * prevScale);
+      state.pan.x = Math.round(
+        previousPan.x + focusClientX - (drawingRectAfterResize.left + (zoomFocus.worldX * targetScale))
+      );
+      state.pan.y = Math.round(
+        previousPan.y + focusClientY - (drawingRectAfterResize.top + (zoomFocus.worldY * targetScale))
+      );
     } else {
       const ratio = targetScale / prevScale;
       state.pan.x = Math.round(previousPan.x * ratio);
       state.pan.y = Math.round(previousPan.y * ratio);
     }
 
-    applyViewportTransform();
+    const clampResult = applyViewportTransform();
+    if (
+      zoomFocus
+      && Number.isFinite(zoomFocus.clientX)
+      && Number.isFinite(zoomFocus.clientY)
+      && focusDrawing instanceof HTMLCanvasElement
+    ) {
+      const drawingRectNow = focusDrawing.getBoundingClientRect();
+      const currentClientX = drawingRectNow.left + (zoomFocus.worldX * targetScale);
+      const currentClientY = drawingRectNow.top + (zoomFocus.worldY * targetScale);
+      const anchorErrorX = (Number(zoomFocus.clientX) || 0) - currentClientX;
+      const anchorErrorY = (Number(zoomFocus.clientY) || 0) - currentClientY;
+      const correctionX = !clampResult?.clampedX && Math.abs(anchorErrorX) >= 0.5 ? anchorErrorX : 0;
+      const correctionY = !clampResult?.clampedY && Math.abs(anchorErrorY) >= 0.5 ? anchorErrorY : 0;
+      if (correctionX || correctionY) {
+        state.pan.x = Math.round((Number(state.pan.x) || 0) + correctionX);
+        state.pan.y = Math.round((Number(state.pan.y) || 0) + correctionY);
+        applyViewportTransform();
+      }
+    }
     syncZoomControls(targetScale);
     showZoomIndicator(targetScale);
     requestRender();
@@ -49172,8 +49235,10 @@
   }
 
   function getCanvasFocusAt(clientX, clientY, { clampToCanvas = false, surface = null } = {}) {
-    const drawing = surface?.drawing instanceof HTMLCanvasElement
-      ? surface.drawing
+    const metrics = getCanvasInteractionSurfaceMetrics(surface || null);
+    const resolvedSurface = metrics.surface || null;
+    const drawing = resolvedSurface?.drawing instanceof HTMLCanvasElement
+      ? resolvedSurface.drawing
       : dom.canvases.drawing;
     if (!drawing) {
       return null;
@@ -49189,7 +49254,7 @@
     }
     const clampedClientX = clampToCanvas ? clamp(clientX, rect.left, rect.right) : clientX;
     const clampedClientY = clampToCanvas ? clamp(clientY, rect.top, rect.bottom) : clientY;
-    const canvasDoc = surface?.canvasDoc || getActiveProjectCanvasDocument();
+    const canvasDoc = resolvedSurface?.canvasDoc || getProjectCanvasDocumentById(resolvedSurface?.canvasDocId) || getActiveProjectCanvasDocument();
     const scale = getProjectCanvasDisplayScale(canvasDoc);
     const worldX = (clampedClientX - rect.left) / scale;
     const worldY = (clampedClientY - rect.top) / scale;
@@ -49200,6 +49265,8 @@
       worldY,
       cellX: Math.floor(worldX),
       cellY: Math.floor(worldY),
+      surface: resolvedSurface,
+      canvasDocId: resolvedSurface?.canvasDocId || canvasDoc?.id || '',
     };
   }
 
@@ -49761,10 +49828,14 @@
       return null;
     }
     return {
+      clientX: focus.clientX,
+      clientY: focus.clientY,
       worldX: focus.worldX,
       worldY: focus.worldY,
       cellX: focus.cellX,
       cellY: focus.cellY,
+      surface: focus.surface || null,
+      canvasDocId: focus.canvasDocId || '',
     };
   }
 
@@ -50124,8 +50195,9 @@
       // Non-spectator: existing restrictions for drawing guests
       const isSharedProjectLocalEditTool = HISTORY_DRAW_TOOLS.has(activeTool) || activeTool === 'move';
       if (isSharedProjectLocalEditTool) {
-        if (!canAcceptSharedProjectLocalDrawOps()) {
-          const sharedDrawBlockReason = getSharedProjectLocalDrawBlockReason();
+        const sharedLocalDrawOptions = { allowLocalOpBacklog: true };
+        if (!canAcceptSharedProjectLocalDrawOps('', sharedLocalDrawOptions)) {
+          const sharedDrawBlockReason = getSharedProjectLocalDrawBlockReason('', sharedLocalDrawOptions);
           const sharedDrawBlockStatus = getSharedProjectDrawBlockStatus(sharedDrawBlockReason);
           logSharedProjectDrawBlock(
             sharedDrawBlockReason || (isSharedProjectAwaitingReady()
@@ -61176,12 +61248,12 @@
     );
   }
 
-  function canAcceptSharedProjectLocalDrawOps(projectKey = '') {
+  function canAcceptSharedProjectLocalDrawOps(projectKey = '', options = {}) {
     const normalizedProjectKey = normalizeMultiProjectKey(projectKey || activeSharedProjectKey || '');
     if (!isSharedProjectCollaborativeMode(normalizedProjectKey)) {
       return true;
     }
-    return !getSharedProjectLocalDrawBlockReason(normalizedProjectKey);
+    return !getSharedProjectLocalDrawBlockReason(normalizedProjectKey, options);
   }
 
   function isSharedProjectsBlockedByRuntime() {
@@ -62593,12 +62665,22 @@
     entry.status = 'commit-started';
     entry.source = meta.source || entry.source || 'db';
     entry.updatedAtMs = Date.now();
+    entry.expiresAtMs = Date.now() + SHARED_PROJECT_LOCAL_OP_EXPIRE_MS;
     sharedProjectLocalInFlightOps.set(opId, entry);
     logSharedProjectLocalOpLifecycle('commit started', opRecord, {
       source: entry.source,
       status: entry.status,
       opType: entry.opType,
     });
+  }
+
+  function isSharedProjectQueuedLocalOpId(opId = '') {
+    const normalizedOpId = typeof opId === 'string' ? opId.trim() : '';
+    return Boolean(
+      normalizedOpId
+      && Array.isArray(sharedProjectPendingLocalOps)
+      && sharedProjectPendingLocalOps.some(entry => getSharedProjectOpId(entry?.op || entry) === normalizedOpId)
+    );
   }
 
   function removeSharedProjectQueuedLocalOp(opOrOpId) {
@@ -62634,6 +62716,17 @@
   }
 
   function isSharedProjectLocalOpExpiredForRetry(opOrEntry) {
+    const entry = opOrEntry && typeof opOrEntry === 'object' ? opOrEntry : null;
+    const opRecord = entry?.op && typeof entry.op === 'object' ? entry.op : entry;
+    const opId = typeof opOrEntry === 'string' ? opOrEntry.trim() : normalizeSharedProjectOpId(opRecord);
+    if (opId && isSharedProjectQueuedLocalOpId(opId)) {
+      return false;
+    }
+    const inFlightEntry = opId ? (sharedProjectLocalInFlightOps.get(opId) || null) : null;
+    const expiresAtMs = Math.max(0, Math.round(Number(inFlightEntry?.expiresAtMs) || 0));
+    if (expiresAtMs > 0) {
+      return Date.now() > expiresAtMs;
+    }
     const createdAtMs = getSharedProjectLocalOpCreatedAtMs(opOrEntry);
     return Boolean(
       createdAtMs > 0
@@ -62760,6 +62853,7 @@
     entry.status = 'commit-failed';
     entry.source = meta.source || entry.source || 'db';
     entry.updatedAtMs = Date.now();
+    entry.expiresAtMs = Date.now() + SHARED_PROJECT_LOCAL_OP_EXPIRE_MS;
     entry.lastError = String(error?.message || error || '');
     entry.retryCount = Math.max(0, Math.round(Number(entry.retryCount) || 0)) + 1;
     logSharedProjectLocalOpLifecycle('commit failed', entry.op || { opId }, {
@@ -62805,6 +62899,9 @@
       }
       if (entry.status === 'confirmed') {
         sharedProjectLocalInFlightOps.delete(opId);
+        return;
+      }
+      if (isSharedProjectQueuedLocalOpId(opId)) {
         return;
       }
       if (Number(entry.expiresAtMs || 0) > 0 && Number(entry.expiresAtMs || 0) <= now) {
@@ -65537,6 +65634,7 @@
       const entry = sharedProjectLocalInFlightOps.get(opId);
       entry.status = 'retrying';
       entry.updatedAtMs = Date.now();
+      entry.expiresAtMs = Date.now() + SHARED_PROJECT_LOCAL_OP_EXPIRE_MS;
       entry.retryCount = Math.max(0, Math.round(Number(entry.retryCount) || 0)) + 1;
       sharedProjectLocalInFlightOps.set(opId, entry);
     }
@@ -76482,6 +76580,7 @@
       updateHistoryButtons();
       if (isMultiGuestMode() || isMultiSpectatorMode()) {
         state.scale = normalizeZoomScale(preserved.scale, state.scale);
+        rememberViewportZoomRatioFromScale(state.scale);
         state.pan = { x: preserved.pan.x, y: preserved.pan.y };
         state.tool = normalizeToolId(preserved.tool, state.tool);
         state.activeToolGroup = preserved.activeToolGroup || (TOOL_TO_GROUP[state.tool] || state.activeToolGroup);
@@ -78095,8 +78194,9 @@
     if ((!multiState.connected && !sharedCollaborative) || multiState.applyRemoteInProgress) {
       return;
     }
-    if (sharedCollaborative && !canAcceptSharedProjectLocalDrawOps()) {
-      const sharedDrawBlockReason = getSharedProjectLocalDrawBlockReason();
+    const sharedLocalDrawOptions = { allowLocalOpBacklog: true };
+    if (sharedCollaborative && !canAcceptSharedProjectLocalDrawOps('', sharedLocalDrawOptions)) {
+      const sharedDrawBlockReason = getSharedProjectLocalDrawBlockReason('', sharedLocalDrawOptions);
       const sharedDrawBlockStatus = getSharedProjectDrawBlockStatus(sharedDrawBlockReason);
       logSharedProjectDrawBlock(
         sharedDrawBlockReason || (activeSharedProjectSyncState === 'catching-up'
@@ -79084,14 +79184,103 @@
     return null;
   }
 
-  function getZoomStepIndex(scale) {
-    if (!Number.isFinite(scale)) {
+  function getZoomBaseCanvasDocument(canvasDoc = null) {
+    if (canvasDoc && typeof canvasDoc === 'object') {
+      return canvasDoc;
+    }
+    let targetSurface = null;
+    try {
+      targetSurface = getViewportVisibilityTargetSurface();
+    } catch (error) {
+      targetSurface = null;
+    }
+    let documentById = null;
+    try {
+      documentById = getProjectCanvasDocumentById(targetSurface?.canvasDocId);
+    } catch (error) {
+      documentById = null;
+    }
+    let activeDocument = null;
+    try {
+      activeDocument = getActiveProjectCanvasDocument();
+    } catch (error) {
+      activeDocument = null;
+    }
+    let fallbackWidth = DEFAULT_CANVAS_SIZE;
+    let fallbackHeight = DEFAULT_CANVAS_SIZE;
+    try {
+      fallbackWidth = Number(state?.width) || DEFAULT_CANVAS_SIZE;
+      fallbackHeight = Number(state?.height) || DEFAULT_CANVAS_SIZE;
+    } catch (error) {
+      fallbackWidth = DEFAULT_CANVAS_SIZE;
+      fallbackHeight = DEFAULT_CANVAS_SIZE;
+    }
+    return targetSurface?.canvasDoc
+      || documentById
+      || activeDocument
+      || { width: fallbackWidth, height: fallbackHeight };
+  }
+
+  function getViewportZoomBaseScale(canvasDoc = null) {
+    const doc = getZoomBaseCanvasDocument(canvasDoc);
+    let fallbackWidth = DEFAULT_CANVAS_SIZE;
+    let fallbackHeight = DEFAULT_CANVAS_SIZE;
+    try {
+      fallbackWidth = Number(state?.width) || DEFAULT_CANVAS_SIZE;
+      fallbackHeight = Number(state?.height) || DEFAULT_CANVAS_SIZE;
+    } catch (error) {
+      fallbackWidth = DEFAULT_CANVAS_SIZE;
+      fallbackHeight = DEFAULT_CANVAS_SIZE;
+    }
+    const canvasWidth = Math.max(1, Math.round(Number(doc?.width) || fallbackWidth));
+    const canvasHeight = Math.max(1, Math.round(Number(doc?.height) || fallbackHeight));
+    const viewport = getMainCanvasViewportElement();
+    const viewportRect = viewport instanceof HTMLElement ? viewport.getBoundingClientRect() : null;
+    const viewportWidth = Math.max(
+      1,
+      Math.round(
+        Number(viewport?.clientWidth)
+        || Number(viewportRect?.width)
+        || Number(window.innerWidth)
+        || canvasWidth
+      )
+    );
+    const viewportHeight = Math.max(
+      1,
+      Math.round(
+        Number(viewport?.clientHeight)
+        || Number(viewportRect?.height)
+        || Number(window.innerHeight)
+        || canvasHeight
+      )
+    );
+    const fitScale = Math.min(viewportWidth / canvasWidth, viewportHeight / canvasHeight);
+    if (!Number.isFinite(fitScale) || fitScale <= 0) {
+      return MIN_ZOOM_RATIO;
+    }
+    const baseScale = fitScale < 1
+      ? fitScale
+      : Math.max(MIN_ZOOM_RATIO, Math.min(fitScale, fitScale * SMALL_CANVAS_BASE_VIEWPORT_FILL_RATIO));
+    return clamp(baseScale, MIN_ZOOM_SCALE, MAX_ZOOM_BASE_SCALE);
+  }
+
+  function getZoomRatioForScale(scale, canvasDoc = null) {
+    const baseScale = getViewportZoomBaseScale(canvasDoc);
+    const numericScale = Number(scale);
+    const effectiveScale = Number.isFinite(numericScale) && numericScale > 0
+      ? numericScale
+      : baseScale;
+    return effectiveScale / Math.max(MIN_ZOOM_SCALE, baseScale);
+  }
+
+  function getZoomStepIndexForRatio(ratio) {
+    if (!Number.isFinite(ratio)) {
       return 0;
     }
     let bestIndex = 0;
     let bestDiff = Number.POSITIVE_INFINITY;
     for (let i = 0; i < ZOOM_STEPS.length; i += 1) {
-      const diff = Math.abs(ZOOM_STEPS[i] - scale);
+      const diff = Math.abs(ZOOM_STEPS[i] - ratio);
       if (diff < bestDiff - ZOOM_EPSILON) {
         bestDiff = diff;
         bestIndex = i;
@@ -79100,10 +79289,51 @@
     return bestIndex;
   }
 
+  function normalizeZoomRatio(value, fallback = MIN_ZOOM_RATIO) {
+    const numeric = Number(value);
+    const fallbackNumeric = Number(fallback);
+    const effective = Number.isFinite(numeric)
+      ? numeric
+      : (Number.isFinite(fallbackNumeric) ? fallbackNumeric : MIN_ZOOM_RATIO);
+    const clampedRatio = clamp(effective, MIN_ZOOM_RATIO, MAX_ZOOM_RATIO);
+    return ZOOM_STEPS[getZoomStepIndexForRatio(clampedRatio)] || MIN_ZOOM_RATIO;
+  }
+
+  function getZoomScaleForRatio(ratio, canvasDoc = null) {
+    const normalizedRatio = normalizeZoomRatio(ratio, viewportZoomRatio || MIN_ZOOM_RATIO);
+    const baseScale = getViewportZoomBaseScale(canvasDoc);
+    return clamp(baseScale * normalizedRatio, MIN_ZOOM_SCALE, MAX_ZOOM_SCALE);
+  }
+
+  function syncViewportZoomScaleToBase({ preserveRatio = true, canvasDoc = null } = {}) {
+    const currentScale = Number(state.scale) || getViewportZoomBaseScale(canvasDoc);
+    const nextRatio = preserveRatio && Number.isFinite(viewportZoomRatio)
+      ? normalizeZoomRatio(viewportZoomRatio)
+      : normalizeZoomRatio(getZoomRatioForScale(currentScale, canvasDoc));
+    viewportZoomRatio = nextRatio;
+    state.scale = getZoomScaleForRatio(nextRatio, canvasDoc);
+    return state.scale;
+  }
+
+  function resetViewportZoomRatio(ratio = MIN_ZOOM_RATIO) {
+    viewportZoomRatio = normalizeZoomRatio(ratio, MIN_ZOOM_RATIO);
+    state.scale = getZoomScaleForRatio(viewportZoomRatio);
+    return state.scale;
+  }
+
+  function rememberViewportZoomRatioFromScale(scale = state.scale) {
+    viewportZoomRatio = normalizeZoomRatio(getZoomRatioForScale(scale), viewportZoomRatio || MIN_ZOOM_RATIO);
+    return viewportZoomRatio;
+  }
+
+  function getZoomStepIndex(scale) {
+    return getZoomStepIndexForRatio(getZoomRatioForScale(scale));
+  }
+
   function getZoomScaleAtIndex(index) {
     const numeric = Number(index);
     const clampedIndex = Math.min(Math.max(Number.isFinite(numeric) ? Math.round(numeric) : 0, 0), ZOOM_STEPS.length - 1);
-    return ZOOM_STEPS[clampedIndex];
+    return getZoomScaleForRatio(ZOOM_STEPS[clampedIndex] || MIN_ZOOM_RATIO);
   }
 
   function parseZoomInputScale(value) {
@@ -79111,19 +79341,18 @@
     if (!Number.isFinite(percent)) {
       return null;
     }
-    const normalized = normalizeZoomScale(percent / 100, MIN_ZOOM_SCALE);
-    return getZoomScaleAtIndex(getZoomStepIndex(normalized));
+    return getZoomScaleForRatio(normalizeZoomRatio(percent / 100, viewportZoomRatio || MIN_ZOOM_RATIO));
   }
 
   function normalizeZoomScale(value, fallback = MIN_ZOOM_SCALE) {
     const base = Number.isFinite(value) ? Number(value) : Number(fallback);
-    const effective = Number.isFinite(base) ? base : MIN_ZOOM_SCALE;
+    const effective = Number.isFinite(base) ? base : getViewportZoomBaseScale();
     const clamped = clamp(effective, MIN_ZOOM_SCALE, MAX_ZOOM_SCALE);
     return getZoomScaleAtIndex(getZoomStepIndex(clamped));
   }
 
   function formatZoomLabel(scale) {
-    const percent = normalizeZoomScale(scale, MIN_ZOOM_SCALE) * 100;
+    const percent = normalizeZoomRatio(getZoomRatioForScale(scale), viewportZoomRatio || MIN_ZOOM_RATIO) * 100;
     const roundedTenth = Math.round(percent * 10) / 10;
     const isWhole = Math.abs(roundedTenth - Math.round(roundedTenth)) < 0.05;
     const value = isWhole ? Math.round(roundedTenth) : Number(roundedTenth.toFixed(1));
