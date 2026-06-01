@@ -10,6 +10,10 @@
 
   const dom = {
     appRoot: document.getElementById('appRoot'),
+    startupBootLoading: document.getElementById('startupBootLoading'),
+    startupBootLoadingLabel: document.getElementById('startupBootLoadingLabel'),
+    startupBootLoadingPercent: document.getElementById('startupBootLoadingPercent'),
+    startupBootLoadingFill: document.getElementById('startupBootLoadingFill'),
     globalLoadingIndicator: document.getElementById('globalLoadingIndicator'),
     globalLoadingIndicatorLabel: document.getElementById('globalLoadingIndicatorLabel'),
     globalLoadingIndicatorCancel: document.getElementById('globalLoadingIndicatorCancel'),
@@ -80,7 +84,8 @@
     projectHomeScreen: document.getElementById('projectHomeScreen'),
     projectHomeNew: document.getElementById('projectHomeNew'),
     projectHomeOpen: document.getElementById('projectHomeOpen'),
-    projectHomeCreateShared: document.getElementById('projectHomeCreateShared'),
+    projectHomeJoinProjectKey: document.getElementById('projectHomeJoinProjectKey'),
+    projectHomeApplyAccessCode: document.getElementById('projectHomeApplyAccessCode'),
     projectHomeRecentSection: document.getElementById('projectHomeRecentProjects'),
     projectHomeRecentList: document.getElementById('projectHomeRecentList'),
     mirrorToolPopover: document.getElementById('mirrorToolPopover'),
@@ -346,6 +351,7 @@
       multiJoinProjectKey: document.getElementById('multiJoinProjectKey'),
       multiToggleCodeVisibility: document.getElementById('multiToggleCodeVisibility'),
       multiApplyAccessCode: document.getElementById('multiApplyAccessCode'),
+      multiCopyAccessCode: document.getElementById('multiCopyAccessCode'),
       multiProjectKeyField: document.getElementById('multiProjectKeyField'),
       multiProjectKey: document.getElementById('multiProjectKey'),
       multiStartSession: document.getElementById('multiStartSession') || document.getElementById('multiStatus'),
@@ -367,6 +373,9 @@
       multiFlowAccountStatus: document.getElementById('multiFlowAccountStatus'),
       multiFlowAccountHint: document.getElementById('multiFlowAccountHint'),
       multiFlowAccountLogin: document.getElementById('multiFlowAccountLogin'),
+      projectHomeJoinShared: document.getElementById('projectHomeJoinShared'),
+      projectHomeJoinProjectKey: document.getElementById('projectHomeJoinProjectKey'),
+      projectHomeApplyAccessCode: document.getElementById('projectHomeApplyAccessCode'),
       multiSupportCard: document.getElementById('multiSupportCard'),
       multiSupportStatus: document.getElementById('multiSupportStatus'),
       multiSupportPurchase: document.getElementById('multiSupportPurchase'),
@@ -454,6 +463,10 @@
       palettePresetPicker: document.getElementById('newProjectPalettePresetPicker'),
       palettePresetPickerButton: document.getElementById('newProjectPalettePresetPickerButton'),
       palettePresetPickerMenu: document.getElementById('newProjectPalettePresetPickerMenu'),
+      createMode: document.getElementById('newProjectCreateMode'),
+      modeLocal: document.getElementById('newProjectModeLocal'),
+      modeShared: document.getElementById('newProjectModeShared'),
+      modeButtons: Array.from(document.querySelectorAll('#newProjectDialog [data-create-mode]')),
       bindExportFolder: document.getElementById('newProjectBindExportFolder'),
       exportDestinationLabel: document.getElementById('newProjectExportDestinationLabel'),
       adContainer: document.getElementById('newProjectAdContainer'),
@@ -3453,6 +3466,8 @@
   let globalLoadingIndicatorBlockingDepth = 0;
   let startupProgressDepth = 0;
   let startupProgressClose = null;
+  let startupBootProgressPercent = 0;
+  let startupBootProgressUpdatedAt = 0;
   let startupRestoreCancelRequested = false;
   const startupRestoreCancelResolvers = new Set();
   const GLOBAL_LOADING_INDICATOR_SHOW_DELAY = 180;
@@ -15300,9 +15315,10 @@
     setLocalizedTextContent('#projectHomeTitle', 'プロジェクト一覧', 'Projects');
     setLocalizedTextContent('#projectHomeNew', '新規作成', 'New Project');
     setLocalizedTextContent('#projectHomeOpen', 'ファイルを開く', 'Open File');
-    setLocalizedTextContent('#projectHomeCreateShared', '共有プロジェクト作成', 'Create Shared Project');
-    setLocalizedTextContent('#projectHomeSupporterTitle', 'サポーター特典', 'Supporter Benefits');
-    setLocalizedTextContent('#projectHomeSupporterStatus', 'ログイン後に購入番号またはシリアルコードを適用できます。', 'Log in to apply a purchase number or serial code.');
+    setLocalizedTextContent('#projectHomeAccessTitle', 'コード適用', 'Apply Codes');
+    setLocalizedTextContent('#projectHomeAccessStatus', '特典、参加キー、などのコードを入力してください。', 'Enter your benefit, join key, or other code.');
+    setLocalizedTextContent('#projectHomeApplyAccessCode', '適用', 'Apply');
+    setLocalizedAttribute('#projectHomeJoinProjectKey', 'placeholder', 'コードを入力', 'Enter code');
     setLocalizedTextContent('#projectHomeSupporterApply', '適用', 'Apply');
     setLocalizedTextContent('#projectHomeSupporterPurchase', 'サポーター特典を見る', 'View Supporter Benefits');
     setLocalizedAttribute('#projectHomeSupporterCode', 'placeholder', '購入番号 / シリアルコード', 'Purchase number / serial code');
@@ -15389,11 +15405,11 @@
     setLocalizedTextContent('#multiEntrySpectatorTitle', '視聴で入る', 'Join as Viewer');
     setLocalizedTextContent('#multiEntrySpectatorMeta', '見るだけで入室', 'View-only mode');
     setLocalizedTextContent('#multiEntryJoinBack', '戻る', 'Back');
-    setLocalizedTextContent('#multiEntryJoinHint', '共有リンクを貼ってから上の「共有」を押すと、そのプロジェクトが自分の一覧にも追加されます。', 'Paste an invite link and press Share to add that project to your list.');
-    setLocalizedTextContent('#multiEntryHint', 'このまま「共有」を押すと共有プロジェクトを作成します。既存の共有を開く時はリンクを入力してください。', 'Press Share to create a shared project. Paste a link first if you want to open an existing one.');
-    setLocalizedTextContent('#multiJoinProjectKeyHint', '共有リンクはそのまま貼り付けできます。', 'You can paste the full invite link as is.');
     setLocalizedTextContent('#multiToggleCodeVisibility', '表示', 'Show');
     setLocalizedTextContent('#multiApplyAccessCode', '確定', 'Apply');
+    setLocalizedTextContent('#multiCopyAccessCode', 'コピー', 'Copy');
+    setLocalizedSelectOption(dom.newProject?.createMode, 'local', '通常', 'Normal');
+    setLocalizedSelectOption(dom.newProject?.createMode, 'shared', '共有', 'Shared');
     setLocalizedToggleLabel('multiDanmakuToggle', 'コメント弾幕', 'Comment Overlay');
     setLocalizedTextContent('#multiCommentSend', '送信', 'Send');
     setLocalizedTextContent('#multiLeaveSession', '切断', 'Disconnect');
@@ -15627,23 +15643,15 @@
 
     syncNewProjectDialogModeText();
     setLocalizedTextContent('.new-project__name-field > span', 'ファイル名', 'File Name');
-    setLocalizedTextContent('.new-project__name-field .help-text', 'ファイル名のみ入力してください。拡張子 .pixieedraw は自動で付きます。', 'Enter only the file name. The .pixieedraw extension is added automatically.');
-    setLocalizedTextContent('.new-project__size-fields > span', 'キャンバスサイズ', 'Canvas Size');
     setLocalizedControlLabel('newProjectWidth', '横', 'W');
     setLocalizedControlLabel('newProjectHeight', '縦', 'H');
-    setLocalizedTextContent('.new-project__palette-field > span', 'パレットプリセット', 'Palette Preset');
+    setLocalizedTextContent('.new-project__palette-field > span', 'パレット', 'Palette');
     renderNewProjectPalettePresetOptions(newProjectPalettePresetId);
     renderNewProjectPalettePresetPicker(newProjectPalettePresetId);
-    setLocalizedTextContent('.new-project__export-folder-field > span', '画像/GIF保存先', 'Image/GIF Save Folder');
-    setLocalizedTextContent('#newProjectBindExportFolder', '保存先フォルダを設定', 'Set export folder');
-    setLocalizedAttribute('#newProjectBindExportFolder', 'aria-label', '新規プロジェクトの保存先フォルダを指定', 'Choose folder for new project exports');
-    setLocalizedAttribute('#newProjectExportDestinationLabel', 'aria-label', '新規プロジェクトの現在の保存先', 'Current destination for new project exports');
+    setLocalizedTextContent('.new-project__mode-field > span', '作成モード', 'Create Mode');
+    setLocalizedTextContent('#newProjectModeLocal', '通常', 'Normal');
+    setLocalizedTextContent('#newProjectModeShared', '共有', 'Shared');
     setLocalizedTextContent('#newProjectAdContainer .export-ad__label', '広告', 'Ad');
-    setLocalizedTextContent(
-      '#newProjectExportFolderGuide',
-      '必要な場合のみ保存先フォルダを指定できます。指定しない場合は現在の設定（未設定を含む）を使います。',
-      'Set an export folder only when needed. If you skip it, the current setting (including unset) will be used.'
-    );
     setLocalizedTextContent('#cancelNewProject', 'キャンセル', 'Cancel');
     setLocalizedTextContent('#globalHistoryConfirmTitle', '全体Undo', 'Shared Undo');
     setLocalizedTextContent('#globalHistoryConfirmMessage', 'この操作は共有ドキュメント全体に反映されます。', 'This action updates the shared document for everyone.');
@@ -20470,6 +20478,23 @@
     }
   }
 
+  function syncNewProjectCreateModeButtons(mode = 'local') {
+    const normalized = mode === 'shared' ? 'shared' : 'local';
+    if (dom.newProject?.createMode instanceof HTMLSelectElement) {
+      dom.newProject.createMode.value = normalized;
+    }
+    if (Array.isArray(dom.newProject?.modeButtons)) {
+      dom.newProject.modeButtons.forEach(button => {
+        if (!(button instanceof HTMLButtonElement)) {
+          return;
+        }
+        const active = button.dataset.createMode === normalized;
+        button.classList.toggle('is-active', active);
+        button.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
+    }
+  }
+
   function setupHorizontalOverflowDebug() {
     const debugEnabled = (
       typeof window !== 'undefined'
@@ -20545,6 +20570,7 @@
           renderNewProjectPalettePresetPicker(normalizedPreset);
           setNewProjectPalettePresetPickerOpen(false);
         }
+        syncNewProjectCreateModeButtons(Boolean(createShared) ? 'shared' : 'local');
         pendingNewProjectCreateShared = Boolean(createShared);
         pendingNewProjectAppendAsTab = Boolean(appendAsTab) && !pendingNewProjectCreateShared;
         syncNewProjectDialogModeText();
@@ -21291,7 +21317,10 @@
     const palettePresetValue = config?.palettePreset?.value;
     const width = Number(widthValue);
     const height = Number(heightValue);
-    const shouldCreateShared = Boolean(pendingNewProjectCreateShared);
+    const selectedCreateMode = dom.newProject?.createMode instanceof HTMLSelectElement
+      ? dom.newProject.createMode.value
+      : 'local';
+    const shouldCreateShared = selectedCreateMode === 'shared' || Boolean(pendingNewProjectCreateShared);
     const shouldAppendAsTab = Boolean(pendingNewProjectAppendAsTab);
     let created = false;
     let createdLocalProject = false;
@@ -21772,15 +21801,22 @@
         hideProjectHomeScreen();
       }
     });
-    dom.projectHomeCreateShared?.addEventListener('click', async () => {
-      if (openProjectTabBusy) {
+    dom.controls.projectHomeApplyAccessCode?.addEventListener('click', async () => {
+      const isSignedInAccount = accountState.isLoggedIn && !accountState.isAnonymous;
+      if (!isSignedInAccount) {
+        setMultiStatus(localizeText('ログインしてください', 'Please sign in'), 'warn');
         return;
       }
-      openNewProjectDialog({
-        dismissStartup: false,
-        appendAsTab: true,
-        createShared: true,
-      });
+      const openedShared = await openSharedProjectFromHomeInput();
+      if (openedShared) {
+        return;
+      }
+      const rawCode = dom.controls.projectHomeJoinProjectKey instanceof HTMLInputElement
+        ? dom.controls.projectHomeJoinProjectKey.value
+        : '';
+      if (window.pixieedAdFree?.applyAccessValue) {
+        await window.pixieedAdFree.applyAccessValue(rawCode);
+      }
     });
     dom.projectHomeRecentList?.addEventListener('click', async event => {
       const target = event.target instanceof Element ? event.target : null;
@@ -32257,6 +32293,10 @@
 
   async function init() {
     startupRestoreCancelRequested = false;
+    setStartupBootLoadingProgress(0, {
+      label: localizeText('起動準備中…', 'Preparing startup...'),
+      force: true,
+    });
     const endStartupProgress = beginStartupProgress(localizeText('起動準備中…', 'Preparing startup...'));
     try {
       try {
@@ -32382,6 +32422,9 @@
         importedFromQr = false;
       }
       setStartupProgressLabel(localizeText('起動を完了しています…', 'Finalizing startup...'));
+      setStartupBootLoadingProgress(97, {
+        label: localizeText('起動を完了しています…', 'Finalizing startup...'),
+      });
       renderEverything();
       resetOpenedDocumentViewport({ defer: true });
       refreshLocalizedUi();
@@ -32390,7 +32433,12 @@
         showProjectHomeScreen({ refresh: true });
       }
     } finally {
+      setStartupBootLoadingProgress(100, {
+        label: localizeText('起動完了', 'Ready'),
+        force: true,
+      });
       endStartupProgress();
+      await waitForStartupBootProgressReveal();
       if (typeof document !== 'undefined' && document.body instanceof HTMLElement) {
         document.body.classList.remove('app-preinit');
         document.body.classList.add('app-ready');
@@ -35853,6 +35901,17 @@
       dom.newProject.dialog.addEventListener('cancel', event => {
         event.preventDefault();
         closeNewProjectDialog();
+      });
+    }
+    if (Array.isArray(dom.newProject?.modeButtons)) {
+      dom.newProject.modeButtons.forEach(button => {
+        if (!(button instanceof HTMLButtonElement) || button.dataset.bound === 'true') {
+          return;
+        }
+        button.dataset.bound = 'true';
+        button.addEventListener('click', () => {
+          syncNewProjectCreateModeButtons(button.dataset.createMode || 'local');
+        });
       });
     }
     setupGlobalHistoryConfirmDialog();
@@ -59610,6 +59669,21 @@
     return opened;
   }
 
+  async function openSharedProjectFromHomeInput() {
+    const homeInput = dom.controls.projectHomeJoinProjectKey;
+    const panelInput = dom.controls.multiJoinProjectKey;
+    if (!(homeInput instanceof HTMLInputElement) || !(panelInput instanceof HTMLInputElement)) {
+      return false;
+    }
+    const rawValue = (homeInput.value || '').trim();
+    if (!rawValue) {
+      setMultiStatus(localizeText('コードを入力してください', 'Enter a code'), 'warn');
+      return false;
+    }
+    panelInput.value = rawValue;
+    return await openSharedProjectFromInput();
+  }
+
   async function disableSharedProjectMode() {
     if (multiState.connected || multiState.connecting) {
       disconnectMultiSession({ silent: false });
@@ -69860,6 +69934,7 @@
     const logoutButton = dom.controls.pixieedAccountLogout;
     const dock = dom.controls.pixieedAccountDock;
     const isRestoringCachedAccount = Boolean(accountState.restoringFromLocalCache && accountState.isLoggedIn);
+    const isSignedInAccount = accountState.isLoggedIn && !accountState.isAnonymous;
     syncPixieedAccountLoginPromptLink();
     updatePixieedShareAccountCard(
       dom.controls.multiEntryAccountStatus,
@@ -69871,6 +69946,18 @@
       dom.controls.multiFlowAccountHint,
       dom.controls.multiFlowAccountLogin
     );
+    if (dom.controls.projectHomeJoinProjectKey instanceof HTMLInputElement) {
+      dom.controls.projectHomeJoinProjectKey.disabled = !isSignedInAccount;
+      dom.controls.projectHomeJoinProjectKey.placeholder = isSignedInAccount
+        ? localizeText('特典、参加キー、などのコードを入力してください', 'Enter benefit, join key, or other code')
+        : localizeText('ログインしてください', 'Please sign in');
+    }
+    if (dom.controls.projectHomeApplyAccessCode instanceof HTMLButtonElement) {
+      dom.controls.projectHomeApplyAccessCode.disabled = !isSignedInAccount;
+    }
+    if (dom.controls.projectHomeJoinShared instanceof HTMLElement) {
+      dom.controls.projectHomeJoinShared.hidden = false;
+    }
     if (status instanceof HTMLElement) {
       const nickname = readPixieedAccountNickname();
       if (isRestoringCachedAccount && !accountState.isAnonymous) {
@@ -69879,7 +69966,7 @@
         status.textContent = label
           ? localizeText(`ログイン確認中: ${label}`, `Checking sign-in: ${label}`)
           : localizeText('ログイン確認中', 'Checking sign-in');
-      } else if (accountState.isLoggedIn && !accountState.isAnonymous) {
+      } else if (isSignedInAccount) {
         const email = accountState.session?.user?.email || '';
         const label = nickname || email;
         status.textContent = label
@@ -72021,6 +72108,92 @@
     renderMultiOverview();
   }
 
+  function inferStartupBootProgressPercent(label = '') {
+    const text = typeof label === 'string' ? label : '';
+    if (!text) {
+      return 10;
+    }
+    if (text.includes('起動設定') || text.includes('Checking startup settings')) {
+      return 18;
+    }
+    if (text.includes('前回の作業') || text.includes('previous work')) {
+      return 38;
+    }
+    if (text.includes('共有プロジェクト') || text.includes('shared project')) {
+      return 56;
+    }
+    if (text.includes('起動内容') || text.includes('Loading startup content')) {
+      return 78;
+    }
+    if (text.includes('起動を完了') || text.includes('Finalizing startup')) {
+      return 94;
+    }
+    if (text.includes('起動準備') || text.includes('Preparing startup')) {
+      return 10;
+    }
+    return Math.min(92, startupBootProgressPercent + 6);
+  }
+
+  function getStartupBootProgressNow() {
+    if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
+      return performance.now();
+    }
+    return Date.now();
+  }
+
+  function waitForNextPaint() {
+    return new Promise(resolve => {
+      if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+        window.requestAnimationFrame(() => resolve());
+        return;
+      }
+      window.setTimeout(resolve, 16);
+    });
+  }
+
+  async function waitForStartupBootProgressReveal() {
+    const STARTUP_BOOT_PROGRESS_MIN_VISIBLE_MS = 140;
+    const elapsed = getStartupBootProgressNow() - startupBootProgressUpdatedAt;
+    const waitMs = Math.max(0, STARTUP_BOOT_PROGRESS_MIN_VISIBLE_MS - elapsed);
+    if (waitMs > 0) {
+      await new Promise(resolve => window.setTimeout(resolve, waitMs));
+    }
+    await waitForNextPaint();
+  }
+
+  function setStartupBootLoadingProgress(percent, { label = '', force = false } = {}) {
+    const container = dom.startupBootLoading;
+    const labelNode = dom.startupBootLoadingLabel;
+    const percentNode = dom.startupBootLoadingPercent;
+    const fillNode = dom.startupBootLoadingFill;
+    if (!(container instanceof HTMLElement)) {
+      return;
+    }
+    const numeric = Number.isFinite(Number(percent)) ? Number(percent) : 0;
+    const clamped = Math.max(0, Math.min(100, Math.round(numeric)));
+    const nextPercent = force ? clamped : Math.max(startupBootProgressPercent, clamped);
+    startupBootProgressPercent = nextPercent;
+    startupBootProgressUpdatedAt = getStartupBootProgressNow();
+    if (labelNode instanceof HTMLElement) {
+      const nextLabel = (typeof label === 'string' && label.trim())
+        ? label.trim()
+        : localizeText('起動準備中…', 'Preparing startup...');
+      labelNode.textContent = nextLabel;
+    }
+    if (percentNode instanceof HTMLElement) {
+      percentNode.textContent = `${nextPercent}%`;
+    }
+    if (fillNode instanceof HTMLElement) {
+      fillNode.style.width = `${nextPercent}%`;
+    }
+    container.setAttribute('aria-hidden', String(nextPercent >= 100));
+  }
+
+  function syncStartupBootLoadingWithLabel(label = '') {
+    const nextPercent = inferStartupBootProgressPercent(label);
+    setStartupBootLoadingProgress(nextPercent, { label });
+  }
+
   function syncGlobalLoadingIndicator(label = '') {
     const container = dom.globalLoadingIndicator;
     const labelNode = dom.globalLoadingIndicatorLabel;
@@ -72150,6 +72323,7 @@
   function beginStartupProgress(label = '') {
     startupProgressDepth += 1;
     const nextLabel = label || localizeText('起動準備中…', 'Preparing startup...');
+    syncStartupBootLoadingWithLabel(nextLabel);
     if (startupProgressDepth === 1 || typeof startupProgressClose !== 'function') {
       startupProgressClose = beginBlockingGlobalLoading(nextLabel, { immediate: true });
     } else {
@@ -72211,6 +72385,10 @@
     }
     globalLoadingIndicatorVisible = false;
     globalLoadingIndicatorShownAt = 0;
+    setStartupBootLoadingProgress(0, {
+      label: localizeText('起動準備中…', 'Preparing startup...'),
+      force: true,
+    });
     if (dom.globalLoadingIndicator instanceof HTMLElement) {
       dom.globalLoadingIndicator.hidden = true;
       dom.globalLoadingIndicator.setAttribute('aria-hidden', 'true');
@@ -72242,6 +72420,7 @@
     if (startupProgressDepth <= 0) {
       return;
     }
+    syncStartupBootLoadingWithLabel(label);
     setGlobalLoadingIndicatorLabel(label || localizeText('起動準備中…', 'Preparing startup...'));
   }
 
@@ -73098,8 +73277,8 @@
     );
     multiState.desiredRole = selectedRole;
     if (dom.controls.multiJoinProjectKeyField instanceof HTMLElement) {
-      dom.controls.multiJoinProjectKeyField.hidden = !showJoinProjectKeyField;
-      dom.controls.multiJoinProjectKeyField.setAttribute('aria-hidden', String(!showJoinProjectKeyField));
+      dom.controls.multiJoinProjectKeyField.hidden = false;
+      dom.controls.multiJoinProjectKeyField.setAttribute('aria-hidden', 'false');
     }
     if (dom.controls.multiProjectKeyField instanceof HTMLElement) {
       dom.controls.multiProjectKeyField.hidden = !showFlowProjectKeyField;
@@ -74251,9 +74430,7 @@
     const isFlowKeyFieldVisible = !isEntryView;
     syncMultiProjectKeyInputValues(multiState.projectKey, { preserveFocused: true });
     if (dom.controls.multiJoinProjectKey instanceof HTMLInputElement) {
-      dom.controls.multiJoinProjectKey.disabled = sharedProjectFlowPreferred
-        ? multiState.connecting
-        : (!isJoinPanelVisible || multiState.connecting || multiState.connected);
+      dom.controls.multiJoinProjectKey.disabled = multiState.connecting;
     }
     if (dom.controls.multiProjectKey instanceof HTMLInputElement) {
       dom.controls.multiProjectKey.disabled = sharedProjectFlowPreferred
@@ -74270,21 +74447,35 @@
         ? localizeText('表示', 'Show')
         : localizeText('非表示', 'Hide');
       dom.controls.multiToggleCodeVisibility.disabled = multiState.connecting;
+      dom.controls.multiToggleCodeVisibility.hidden = sharedModeEnabled;
+      dom.controls.multiToggleCodeVisibility.setAttribute('aria-hidden', String(sharedModeEnabled));
     }
     if (dom.controls.multiJoinProjectKey instanceof HTMLInputElement) {
       const codeValue = currentAccess.inviteToken || currentAccess.projectKey || '';
       if (sharedModeEnabled) {
         dom.controls.multiJoinProjectKey.value = codeValue;
         dom.controls.multiJoinProjectKey.readOnly = true;
+        dom.controls.multiJoinProjectKey.type = 'text';
+        dom.controls.multiJoinProjectKey.placeholder = localizeText('共有コード', 'Shared code');
       } else {
         dom.controls.multiJoinProjectKey.readOnly = false;
+        if (dom.controls.multiJoinProjectKey.type !== 'password') {
+          dom.controls.multiJoinProjectKey.type = 'password';
+        }
+        dom.controls.multiJoinProjectKey.placeholder = localizeText('コードを入力してください', 'Enter code');
       }
     }
     if (dom.controls.multiApplyAccessCode instanceof HTMLButtonElement) {
-      dom.controls.multiApplyAccessCode.textContent = sharedModeEnabled
-        ? localizeText('コピー', 'Copy')
-        : localizeText('確定', 'Apply');
+      dom.controls.multiApplyAccessCode.textContent = localizeText('確定', 'Apply');
       dom.controls.multiApplyAccessCode.disabled = multiState.connecting;
+      dom.controls.multiApplyAccessCode.hidden = sharedModeEnabled;
+      dom.controls.multiApplyAccessCode.setAttribute('aria-hidden', String(sharedModeEnabled));
+    }
+    if (dom.controls.multiCopyAccessCode instanceof HTMLButtonElement) {
+      const access = readCurrentMultiProjectAccessInput();
+      dom.controls.multiCopyAccessCode.disabled = multiState.connecting || !(access.inviteToken || access.projectKey);
+      dom.controls.multiCopyAccessCode.hidden = !sharedModeEnabled;
+      dom.controls.multiCopyAccessCode.setAttribute('aria-hidden', String(!sharedModeEnabled));
     }
     if (dom.controls.multiEntryMaster instanceof HTMLButtonElement) {
       dom.controls.multiEntryMaster.disabled = sharedProjectFlowPreferred
@@ -78079,24 +78270,25 @@
     if (dom.controls.multiApplyAccessCode instanceof HTMLButtonElement && dom.controls.multiApplyAccessCode.dataset.bound !== 'true') {
       dom.controls.multiApplyAccessCode.dataset.bound = 'true';
       dom.controls.multiApplyAccessCode.addEventListener('click', async () => {
-        const sharedModeEnabled = prefersSharedProjectFlow() && Boolean(resolveSharedProjectKeyForCurrentState());
-        if (sharedModeEnabled) {
-          const access = readCurrentMultiProjectAccessInput();
-          const code = (access.inviteToken || access.projectKey || '').trim();
-          if (!code) {
-            setMultiStatus(localizeText('コピーできる共有コードがありません', 'No share code available to copy'), 'warn');
-            syncMultiControls();
-            return;
-          }
-          const copied = await writeTextToClipboard(code);
-          setMultiStatus(
-            copied ? localizeText('共有コードをコピーしました', 'Share code copied') : localizeText('共有コードのコピーに失敗しました', 'Failed to copy share code'),
-            copied ? 'success' : 'error'
-          );
+        await openSharedProjectFromInput();
+        syncMultiControls();
+      });
+    }
+    if (dom.controls.multiCopyAccessCode instanceof HTMLButtonElement && dom.controls.multiCopyAccessCode.dataset.bound !== 'true') {
+      dom.controls.multiCopyAccessCode.dataset.bound = 'true';
+      dom.controls.multiCopyAccessCode.addEventListener('click', async () => {
+        const access = readCurrentMultiProjectAccessInput();
+        const code = (access.inviteToken || access.projectKey || '').trim();
+        if (!code) {
+          setMultiStatus(localizeText('コピーできる共有コードがありません', 'No share code available to copy'), 'warn');
           syncMultiControls();
           return;
         }
-        await openSharedProjectFromInput();
+        const copied = await writeTextToClipboard(code);
+        setMultiStatus(
+          copied ? localizeText('共有コードをコピーしました', 'Share code copied') : localizeText('共有コードのコピーに失敗しました', 'Failed to copy share code'),
+          copied ? 'success' : 'error'
+        );
         syncMultiControls();
       });
     }
