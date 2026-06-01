@@ -11,6 +11,7 @@ const HANDLED_EVENT_TYPES = new Set([
   "invoice.payment_failed",
   "customer.subscription.updated",
   "customer.subscription.deleted",
+  "charge.refunded",
 ]);
 const PAID_STATUSES = new Set(["paid", "completed", "confirmed", "fulfilled"]);
 const ENTITLEMENT_BY_PRODUCT: Record<string, string> = {
@@ -631,6 +632,23 @@ async function findPurchaseBySubscriptionId(
   return await query.maybeSingle();
 }
 
+async function findPurchaseByPaymentIntentId(
+  supabase: SupabaseAdminClient,
+  paymentIntentId: string,
+) {
+  if (!paymentIntentId) {
+    return { data: null, error: null };
+  }
+  return await supabase
+    .from("browser_adfree_purchase_orders")
+    .select("id, provider_order_id, product_key, buyer_email, payment_status, code, claimed_by, metadata")
+    .eq("payment_intent_id", paymentIntentId)
+    .order("issued_at", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+}
+
 async function grantPurchaseEntitlementByEmail(
   supabase: SupabaseAdminClient,
   {
@@ -1080,6 +1098,53 @@ serve(async (request) => {
       return json({ ok: false, error: purchaseUpdateError.message }, 500);
     }
     return json({ ok: true, subscriptionId, eventType: event.type, revoked: shouldRevokeNow });
+  }
+
+  if (event.type === "charge.refunded") {
+    const charge = event.data.object as Stripe.Charge;
+    const paymentIntentId = typeof charge.payment_intent === "string" ? charge.payment_intent : "";
+    if (!paymentIntentId) {
+      return json({ ok: true, ignored: true, reason: "payment_intent missing", eventType: event.type });
+    }
+    const { data: purchase, error: purchaseError } = await findPurchaseByPaymentIntentId(supabase, paymentIntentId);
+    if (purchaseError) {
+      return json({ ok: false, error: purchaseError.message }, 500);
+    }
+    if (!purchase?.code) {
+      return json({ ok: true, ignored: true, reason: "purchase missing", eventType: event.type, paymentIntentId });
+    }
+    const entitlementKey = ENTITLEMENT_BY_PRODUCT[purchase.product_key];
+    if (!entitlementKey) {
+      return json({ ok: true, ignored: true, reason: "product mismatch", eventType: event.type, paymentIntentId });
+    }
+    try {
+      await syncEntitlementWindowByCode(supabase, purchase.code, entitlementKey, new Date().toISOString(), {
+        revoke: true,
+        buyerEmail: purchase.buyer_email,
+        orderId: purchase.provider_order_id,
+        productKey: purchase.product_key,
+      });
+    } catch (error) {
+      return json({ ok: false, error: errorMessage(error, "refund sync failed") }, 500);
+    }
+    const purchaseMetadata = {
+      ...(purchase.metadata && typeof purchase.metadata === "object" ? purchase.metadata : {}),
+      payment_intent_id: paymentIntentId,
+      charge_id: charge.id || "",
+      last_refunded_at: new Date().toISOString(),
+    };
+    const { error: purchaseUpdateError } = await supabase
+      .from("browser_adfree_purchase_orders")
+      .update({
+        payment_status: "refunded",
+        metadata: purchaseMetadata,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", purchase.id);
+    if (purchaseUpdateError) {
+      return json({ ok: false, error: purchaseUpdateError.message }, 500);
+    }
+    return json({ ok: true, eventType: event.type, paymentIntentId, revoked: true });
   }
 
   const session = event.data.object as Stripe.Checkout.Session;
