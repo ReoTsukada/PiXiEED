@@ -2436,6 +2436,8 @@ body.is-startup-active .bottom-timeline-dock {
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   display: block;
+  max-width: none;
+  max-height: none;
   pointer-events: none;
 }
 
@@ -2582,6 +2584,8 @@ body.is-startup-active .bottom-timeline-dock {
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   display: block;
+  max-width: none;
+  max-height: none;
   pointer-events: none;
 }
 
