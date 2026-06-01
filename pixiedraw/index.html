@@ -121,6 +121,16 @@
 <link rel="apple-touch-icon" href="/icon/icon-512-4.png"/>
 </head>
 <body class="app-preinit">
+<div aria-atomic="true" aria-live="polite" class="startup-boot-loading" id="startupBootLoading" role="status">
+<div class="startup-boot-loading__panel">
+<p class="startup-boot-loading__title">PiXiEEDraw</p>
+<p class="startup-boot-loading__label" id="startupBootLoadingLabel">起動準備中…</p>
+<p class="startup-boot-loading__percent" id="startupBootLoadingPercent">0%</p>
+<div aria-hidden="true" class="startup-boot-loading__bar">
+<div class="startup-boot-loading__fill" id="startupBootLoadingFill"></div>
+</div>
+</div>
+</div>
 <!-- Mobile ad placeholder: using bottom banner (mobileBottomAd) for PiXiEEDraw lite behavior -->
 <div class="app" id="appRoot">
 <div aria-atomic="true" aria-live="polite" class="global-loading-indicator" hidden="" id="globalLoadingIndicator" role="status">
@@ -217,17 +227,18 @@
 <div aria-label="ホーム操作" class="project-home-screen__actions" role="group">
 <button class="button button--primary" id="projectHomeNew" type="button">新規作成</button>
 <button class="button" id="projectHomeOpen" type="button">ファイルを開く</button>
-<button class="button" id="projectHomeCreateShared" type="button">共有プロジェクト作成</button>
 </div>
 </header>
-<section aria-label="サポーター特典" class="project-home-supporter" id="projectHomeSupporter">
+<section aria-label="コード適用" class="project-home-supporter" id="projectHomeJoinShared">
 <div class="project-home-supporter__body">
-<h2 class="project-home-supporter__title" id="projectHomeSupporterTitle">サポーター特典</h2>
-<p class="project-home-supporter__status" id="projectHomeSupporterStatus">ログイン後に購入番号またはシリアルコードを適用できます。</p>
+<h2 class="project-home-supporter__title" id="projectHomeAccessTitle">コード適用</h2>
+<p class="project-home-supporter__status" id="projectHomeAccessStatus">特典、参加キー、などのコードを入力してください。</p>
+</div>
+<div class="project-home-supporter__actions project-home-supporter__actions--compact">
+<input autocomplete="off" class="project-home-supporter__input" id="projectHomeJoinProjectKey" inputmode="text" maxlength="280" placeholder="コードを入力" spellcheck="false" type="text"/>
+<button class="button" id="projectHomeApplyAccessCode" type="button">適用</button>
 </div>
 <div class="project-home-supporter__actions">
-<input autocomplete="off" class="project-home-supporter__input" id="projectHomeSupporterCode" maxlength="64" placeholder="購入番号 / シリアルコード" type="text"/>
-<button class="button" id="projectHomeSupporterApply" type="button">適用</button>
 <a class="button button--primary" data-support-panel-trigger="true" data-support-preferred-product="pixiedraw_ad_free" href="https://buy.stripe.com/aFadRaeo8ekv5L44MM2VG01" id="projectHomeSupporterPurchase" rel="noopener">サポーター特典を見る</a>
 </div>
 </section>
@@ -826,15 +837,6 @@
 </button>
 </div>
 <div class="multi-entry-join-panel" hidden id="multiEntryJoinPanel">
-<div class="field field--compact multi-project-key-field" id="multiJoinProjectKeyField">
-<span>共有リンク / 招待コード</span>
-<div class="multi-project-key-row">
-<input autocomplete="off" id="multiJoinProjectKey" inputmode="text" maxlength="280" placeholder="共有リンクまたは招待コードを貼り付け" spellcheck="false" type="password"/>
-<button class="chip multi-project-key-copy" id="multiToggleCodeVisibility" type="button">表示</button>
-<button class="chip multi-project-key-copy" id="multiApplyAccessCode" type="button">確定</button>
-</div>
-<p class="help-text ui-guide-text" id="multiJoinProjectKeyHint">共有リンクはそのまま貼り付けできます。</p>
-</div>
 <div class="multi-entry-role-actions">
 <button class="button multi-entry-action" hidden id="multiEntryJoinAsGuest" type="button">
 <span id="multiEntryJoinAsGuestTitle">共有を開く</span>
@@ -846,9 +848,7 @@
 </button>
 </div>
 <button class="chip multi-entry-join-back" hidden id="multiEntryJoinBack" type="button">戻る</button>
-<p class="help-text ui-guide-text" id="multiEntryJoinHint">共有リンクを貼ってから上の「共有」を押すと、そのプロジェクトが自分の一覧にも追加されます。</p>
 </div>
-<p class="help-text ui-guide-text" id="multiEntryHint">このまま「共有」を押すと共有プロジェクトを作成します。既存の共有を開く時はリンクを入力してください。</p>
 <section class="multi-account-card" id="multiEntryAccountCard">
 <div class="multi-account-card__head">
 <span>共有プロジェクトを作成</span>
@@ -869,6 +869,14 @@
 </div>
 <p class="help-text">購入後はメールで届くシリアルコードをログイン後に適用できます。シリアルコードは1回だけ使用でき、購入時と違うメールアドレスのアカウントでも利用できます。</p>
 <p class="help-text">広告を消さずに支援したい場合は <a class="chip" data-support-panel-trigger="true" data-support-preferred-product="pixiedraw_ad_free" href="https://buy.stripe.com/aFadRaeo8ekv5L44MM2VG01" id="supportTipLink" target="_blank" rel="noopener noreferrer" aria-label="サポーター特典を見る">応援チップ</a> も利用できます。</p>
+</div>
+</div>
+<div class="field field--compact multi-project-key-field" id="multiJoinProjectKeyField">
+<div class="multi-project-key-row">
+<button class="chip multi-project-key-copy" id="multiToggleCodeVisibility" type="button">表示</button>
+<input autocomplete="off" id="multiJoinProjectKey" inputmode="text" maxlength="280" placeholder="共有リンクまたは招待コードを貼り付け" spellcheck="false" type="password"/>
+<button class="chip multi-project-key-copy" id="multiApplyAccessCode" type="button">確定</button>
+<button class="chip multi-project-key-copy" id="multiCopyAccessCode" type="button">コピー</button>
 </div>
 </div>
 <div class="multi-flow-panel" hidden id="multiFlowPanel">
@@ -1313,26 +1321,23 @@
 <label class="field new-project__name-field">
 <span>ファイル名</span>
 <div class="new-project__name-input">
-<input id="newProjectName" maxlength="109" placeholder="example" required="" type="text"/>
-<span aria-hidden="true" class="new-project__name-suffix">.pixieedraw</span>
+<input id="newProjectName" maxlength="109" placeholder="ファイル名を入力" required="" type="text"/>
 </div>
-<p class="help-text">ファイル名のみ入力してください。拡張子 .pixieedraw は自動で付きます。</p>
 </label>
-<div class="field field--inline new-project__size-fields">
-<span>キャンバスサイズ</span>
+<section class="field new-project__size-fields">
 <div class="new-project__size-inputs">
-<label class="field field--tiny">
+<label class="field field--tiny new-project__size-cell">
 <span>横</span>
 <input data-stepper="true" id="newProjectWidth" max="512" min="1" required="" type="number" value="32"/>
 </label>
-<label class="field field--tiny">
+<label class="field field--tiny new-project__size-cell">
 <span>縦</span>
 <input data-stepper="true" id="newProjectHeight" max="512" min="1" required="" type="number" value="32"/>
 </label>
 </div>
-</div>
+</section>
 <label class="field field--compact new-project__palette-field">
-<span>パレットプリセット</span>
+<span>パレット</span>
 <div class="new-project__palette-controls">
 <div class="palette-preset-picker new-project__palette-picker" id="newProjectPalettePresetPicker">
 <button aria-expanded="false" aria-haspopup="listbox" class="chip palette-preset-picker__button" id="newProjectPalettePresetPickerButton" type="button"></button>
@@ -1341,14 +1346,17 @@
 <select aria-hidden="true" hidden="" id="newProjectPalettePreset" tabindex="-1"></select>
 </div>
 </label>
-<div class="field field--compact new-project__export-folder-field">
-<span>画像/GIF保存先</span>
-<div class="new-project__export-folder-controls">
-<button class="chip" id="newProjectBindExportFolder" type="button">保存先フォルダを指定</button>
-<p aria-live="polite" class="help-text export-destination-label new-project__export-destination-label" id="newProjectExportDestinationLabel">画像/GIF/SVG出力先: 未固定（保存時に保存先を選択）</p>
+<section class="field field--compact new-project__mode-field">
+<span>作成モード</span>
+<div aria-label="作成モード" class="new-project__mode-switch" role="group">
+<button class="button new-project__mode-button is-active" data-create-mode="local" id="newProjectModeLocal" type="button">通常</button>
+<button class="button new-project__mode-button" data-create-mode="shared" id="newProjectModeShared" type="button">共有</button>
 </div>
-</div>
-<p class="help-text" id="newProjectExportFolderGuide">必要な場合のみ保存先フォルダを指定できます。指定しない場合は現在の設定（未設定を含む）を使います。</p>
+<select aria-hidden="true" hidden="" id="newProjectCreateMode" tabindex="-1">
+<option value="local">通常</option>
+<option value="shared">共有</option>
+</select>
+</section>
 <div aria-label="広告" class="export-ad new-project__ad" id="newProjectAdContainer">
 <div class="export-ad__slot">
 <ins class="new-project-ad-ins" data-ad-client="ca-pub-9801602250480253" data-ad-format="auto" data-ad-slot="2141591954" data-full-width-responsive="true" id="newProjectAdSlot" style="display:block"></ins>
