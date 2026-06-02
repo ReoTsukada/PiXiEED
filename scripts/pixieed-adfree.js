@@ -297,6 +297,8 @@
       body.pixieed-adfree .puzzle-ad-note,
       body.pixieed-adfree .export-ad,
       body.pixieed-adfree .export-ad__label,
+      body.pixieed-adfree #startupRecentAdContainer,
+      body.pixieed-adfree #startupRecentAdSlot,
       body.pixieed-adfree .export-interstitial__slot-wrap,
       body.pixieed-adfree #leftPanelAd,
       body.pixieed-adfree #rightPanelAd,
