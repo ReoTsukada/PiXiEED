@@ -1169,7 +1169,8 @@
 <header class="modal__header">
 <h2 class="modal__title" id="exportDialogTitle">保存/出力形式</h2>
 </header>
-<div class="modal__body">
+<div class="modal__body export-dialog-body">
+<div class="export-dialog-body__settings">
 <div class="field field--list">
 <label class="field field--compact" for="exportFormat">
 <span>形式</span>
@@ -1201,18 +1202,29 @@
 </div>
 </div>
 <p class="help-text" id="exportScaleHint"></p>
-<label class="toggle-option export-original-toggle" for="exportIncludeOriginalToggle" id="exportOriginalOptionRow">
+<div class="export-option-icons" aria-label="追加オプション">
+<span class="export-option-icons__label">追加オプション</span>
+<label class="toggle-option export-original-toggle export-icon-toggle" for="exportIncludeOriginalToggle" id="exportOriginalOptionRow" title="原寸も追加">
 <input id="exportIncludeOriginalToggle" type="checkbox"/>
-<span>拡大出力時に原寸も追加で出力する</span>
+<span aria-hidden="true" class="export-toggle-icon">1:1</span>
+<span>原寸も追加</span>
 </label>
-<label class="toggle-option" for="exportSaveProjectCompanionToggle" id="exportCompanionOptionRow">
+<label class="toggle-option export-icon-toggle" for="exportSaveProjectCompanionToggle" id="exportCompanionOptionRow" title="PiXiEEDファイルも保存">
 <input id="exportSaveProjectCompanionToggle" type="checkbox"/>
-<span>画像/GIF/SVG出力時に PiXiEEDファイルも同時保存する</span>
+<span aria-hidden="true" class="export-toggle-icon">P</span>
+<span>PiXiEEDファイルも保存</span>
 </label>
-<label class="toggle-option" for="exportContestPostToggle" id="exportContestPostOptionRow">
+<label class="toggle-option export-icon-toggle" for="exportContestPostToggle" id="exportContestPostOptionRow" title="コンテスト投稿へ移動">
 <input id="exportContestPostToggle" type="checkbox"/>
-<span>保存完了後にコンテスト投稿画面へ移動する</span>
+<span aria-hidden="true" class="export-toggle-icon">★</span>
+<span>コンテスト投稿へ移動</span>
 </label>
+<label class="toggle-option export-spritemap-option export-icon-toggle" for="exportSpriteMapColorSpritesToggle" id="exportSpriteMapColorSpritesRow" title="カラースプライト生成">
+<input checked id="exportSpriteMapColorSpritesToggle" type="checkbox"/>
+<span aria-hidden="true" class="export-toggle-icon">■</span>
+<span>カラースプライト生成</span>
+</label>
+</div>
 <div class="field field--inline" hidden id="exportGridSettings">
 <span>グリッド分割 (PNG)</span>
 <label class="field field--compact">
@@ -1228,10 +1240,23 @@
 </div>
 <div class="field field--list">
 <p aria-live="polite" class="help-text export-destination-label" id="exportDialogDestinationLabel">画像/GIF/SVG出力先: 未固定（保存時に保存先を選択）</p>
-<div aria-label="出力操作" class="export-actions" role="group">
-<button class="button button--primary" id="confirmExport" type="button">保存/出力</button>
 </div>
 </div>
+<div class="export-dialog-body__preview">
+<section aria-labelledby="exportPreviewTitle" class="export-preview-panel">
+<div class="export-preview-panel__header">
+<h3 id="exportPreviewTitle">プレビュー</h3>
+<div aria-label="プレビュー切り替え" class="export-preview-tabs" role="group">
+<button aria-pressed="true" class="export-preview-tab is-active" data-export-preview-mode="frame" id="exportPreviewModeFrame" title="フレーム" type="button">▦</button>
+<button aria-pressed="false" class="export-preview-tab" data-export-preview-mode="map" id="exportPreviewModeMap" title="SpriteMAP" type="button">▤</button>
+<button aria-pressed="false" class="export-preview-tab" data-export-preview-mode="colors" id="exportPreviewModeColors" title="カラースプライト" type="button">■</button>
+</div>
+</div>
+<div class="export-preview-canvas-wrap">
+<canvas aria-label="出力プレビュー" height="160" id="exportPreviewCanvas" width="240"></canvas>
+</div>
+<p aria-live="polite" class="export-preview-meta" id="exportPreviewMeta">プレビュー準備中</p>
+</section>
 <div aria-label="広告" class="export-ad" id="exportAdContainer">
 <div class="export-ad__slot">
 <ins class="export-ad-ins" data-ad-client="ca-pub-9801602250480253" data-ad-format="auto" data-ad-slot="2141591954" data-full-width-responsive="true" id="exportAdSlot" style="display:block"></ins>
@@ -1239,7 +1264,9 @@
 <small class="export-ad__label">広告</small>
 </div>
 </div>
+</div>
 <footer class="modal__footer">
+<button class="button button--primary" id="confirmExport" type="button">保存/出力</button>
 <button class="button button--ghost" id="cancelExport" type="button">キャンセル</button>
 </footer>
 </form>
