@@ -490,6 +490,11 @@
       saveProjectCompanionRow: document.getElementById('exportCompanionOptionRow'),
       contestPostToggle: document.getElementById('exportContestPostToggle'),
       contestPostRow: document.getElementById('exportContestPostOptionRow'),
+      spriteMapColorSpritesToggle: document.getElementById('exportSpriteMapColorSpritesToggle'),
+      spriteMapColorSpritesRow: document.getElementById('exportSpriteMapColorSpritesRow'),
+      previewCanvas: /** @type {HTMLCanvasElement|null} */ (document.getElementById('exportPreviewCanvas')),
+      previewMeta: document.getElementById('exportPreviewMeta'),
+      previewModeButtons: Array.from(document.querySelectorAll('[data-export-preview-mode]')),
       gridSettings: document.getElementById('exportGridSettings'),
       gridWidthInput: document.getElementById('exportGridWidth'),
       gridHeightInput: document.getElementById('exportGridHeight'),
@@ -3007,6 +3012,8 @@
   let exportIncludeOriginalSize = false;
   let exportSaveProjectCompanion = false;
   let exportContestPostAfterSave = false;
+  let exportSpriteMapIncludeColorSprites = true;
+  let exportPreviewMode = 'frame';
   const EXPORT_GRID_TILE_MIN_SIZE = 1;
   const EXPORT_GRID_TILE_MAX_SIZE = MAX_EXPORT_DIMENSION;
   let exportGridTileWidth = 8;
@@ -15634,9 +15641,10 @@
     setLocalizedTextContent('#exportFileNameHint', '拡張子は自動で付きます。同名がある場合は .1 .2 ... を付けて保存します。', 'Extension is added automatically. If the same name exists, .1 .2 ... will be appended.');
     setLocalizedTextContent('#exportScaleControls > span', '出力倍率', 'Output Scale');
     setLocalizedTextContent('label[for="exportScaleSlider"]', '倍率 (×)', 'Scale (×)');
-    setLocalizedTextContent('#exportOriginalOptionRow span', '拡大出力時に原寸も追加で出力する', 'Also export original size when scaled');
-    setLocalizedTextContent('#exportCompanionOptionRow span', '画像/GIF/SVG出力時に PiXiEEDファイルも同時保存する', 'Save a PiXiEED project file together with image/GIF/SVG');
-    setLocalizedTextContent('#exportContestPostOptionRow span', '保存完了後にコンテスト投稿画面へ移動する', 'Go to contest post screen after save');
+    setLocalizedTextContent('#exportOriginalOptionRow span:not(.export-toggle-icon)', '原寸も追加', 'Original too');
+    setLocalizedTextContent('#exportCompanionOptionRow span:not(.export-toggle-icon)', 'PiXiEEDファイルも保存', 'Save project file');
+    setLocalizedTextContent('#exportContestPostOptionRow span:not(.export-toggle-icon)', 'コンテスト投稿へ移動', 'Go to contest post');
+    setLocalizedTextContent('#exportSpriteMapColorSpritesRow span:not(.export-toggle-icon)', 'カラースプライト生成', 'Color sprites');
     setLocalizedTextContent('#exportGridSettings > span', 'グリッド分割 (PNG)', 'Grid Split (PNG)');
     setLocalizedControlLabel('exportGridWidth', '幅 (px)', 'Width (px)');
     setLocalizedControlLabel('exportGridHeight', '高さ (px)', 'Height (px)');
@@ -18853,6 +18861,7 @@
       updateExportOriginalToggleUI();
       dialog.showModal();
       window.requestAnimationFrame(() => {
+        updateExportPreview();
         queueExportAdRender();
       });
     } else {
@@ -20716,6 +20725,7 @@
         refreshExportScaleControls();
         updateExportFormatAvailability();
         updateExportOriginalToggleUI();
+        updateExportPreview();
       });
     }
     if (config.fileNameInput instanceof HTMLInputElement && config.fileNameInput.dataset.bound !== 'true') {
@@ -20731,6 +20741,7 @@
         exportIncludeOriginalSize = Boolean(event.target.checked);
         scheduleSessionPersist({ includeSnapshots: false });
         updateExportOriginalToggleUI();
+        updateExportPreview();
       });
     }
     if (config.saveProjectCompanionToggle instanceof HTMLInputElement
@@ -20741,6 +20752,7 @@
         exportSaveProjectCompanion = Boolean(event.target.checked);
         scheduleSessionPersist({ includeSnapshots: false });
         updateExportProjectCompanionToggleUI();
+        updateExportPreview();
       });
     }
     if (config.contestPostToggle instanceof HTMLInputElement
@@ -20751,6 +20763,32 @@
         exportContestPostAfterSave = Boolean(event.target.checked);
         scheduleSessionPersist({ includeSnapshots: false });
         updateExportContestPostToggleUI();
+        updateExportPreview();
+      });
+    }
+
+    if (config.spriteMapColorSpritesToggle instanceof HTMLInputElement
+      && config.spriteMapColorSpritesToggle.dataset.bound !== 'true') {
+      config.spriteMapColorSpritesToggle.dataset.bound = 'true';
+      config.spriteMapColorSpritesToggle.checked = exportSpriteMapIncludeColorSprites;
+      config.spriteMapColorSpritesToggle.addEventListener('change', event => {
+        exportSpriteMapIncludeColorSprites = Boolean(event.target.checked);
+        scheduleSessionPersist({ includeSnapshots: false });
+        refreshExportScaleControls();
+        updateExportPreview();
+      });
+    }
+
+    if (Array.isArray(config.previewModeButtons)) {
+      config.previewModeButtons.forEach(button => {
+        if (!(button instanceof HTMLButtonElement) || button.dataset.bound === 'true') {
+          return;
+        }
+        button.dataset.bound = 'true';
+        button.addEventListener('click', () => {
+          exportPreviewMode = button.dataset.exportPreviewMode || 'frame';
+          updateExportPreview();
+        });
       });
     }
 
@@ -20819,6 +20857,7 @@
         exportGridTileWidth = normalizeExportGridTileSize(event.target.value, exportGridTileWidth);
         syncExportGridInputs();
         scheduleSessionPersist({ includeSnapshots: false });
+        updateExportPreview();
       });
     }
 
@@ -20829,6 +20868,7 @@
         exportGridTileHeight = normalizeExportGridTileSize(event.target.value, exportGridTileHeight);
         syncExportGridInputs();
         scheduleSessionPersist({ includeSnapshots: false });
+        updateExportPreview();
       });
     }
 
@@ -21716,6 +21756,9 @@
 
   function queueStartupRecentAdRender() {
     if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) {
+      if (dom.startup?.recentAdContainer instanceof HTMLElement) {
+        dom.startup.recentAdContainer.hidden = true;
+      }
       return;
     }
     const screen = dom.startup?.screen;
@@ -27491,7 +27534,9 @@
       const selectedScale = applyExportScaleConstraints(candidates);
       syncExportScaleInputs();
       const framePixels = compositeDocumentFrames(state.frames, width, height, state.palette);
-      const spriteMapPlan = buildSpriteMapExportPlan(framePixels, width, height, state.palette);
+      const spriteMapPlan = buildSpriteMapExportPlan(framePixels, width, height, state.palette, {
+        includeColorSprites: exportSpriteMapIncludeColorSprites,
+      });
       const includeOriginal = shouldExportOriginalCompanion('spritemap', selectedScale);
       const variants = [{ scale: selectedScale, isOriginal: false }];
       if (includeOriginal) {
@@ -28505,9 +28550,15 @@
       };
     }
 
-    const swatchSize = 1;
-    const columns = Math.max(1, Math.floor(safeFrameWidth / swatchSize));
-    const rows = Math.max(1, Math.floor(safeFrameHeight / swatchSize));
+    const colorCellWidth = Math.max(1, Math.min(16, safeFrameWidth));
+    const colorCellHeight = Math.max(1, Math.min(16, safeFrameHeight));
+    const swatchSize = Math.max(1, Math.min(
+      4,
+      Math.floor(colorCellWidth / 4) || 1,
+      Math.floor(colorCellHeight / 4) || 1
+    ));
+    const columns = Math.max(1, Math.min(4, Math.floor(colorCellWidth / swatchSize)));
+    const rows = Math.max(1, Math.min(4, Math.floor(colorCellHeight / swatchSize)));
     const capacityPerSprite = Math.max(1, columns * rows);
     const framePixels = [];
     let colorIndex = 0;
@@ -28548,13 +28599,24 @@
     };
   }
 
-  function buildSpriteMapExportPlan(framePixels, frameWidth, frameHeight, palette = state.palette) {
+  function buildSpriteMapExportPlan(framePixels, frameWidth, frameHeight, palette = state.palette, options = {}) {
     const sourceFrames = Array.isArray(framePixels) ? framePixels : [];
     const safeFrameWidth = Math.max(1, Math.floor(Number(frameWidth) || 0));
     const safeFrameHeight = Math.max(1, Math.floor(Number(frameHeight) || 0));
     const baseLayout = computeSpriteSheetLayout(sourceFrames.length);
     const usedColors = collectUsedColorsFromFramePixels(sourceFrames, palette);
-    const colorSpriteSet = buildColorSpriteFramesFromColors(usedColors, safeFrameWidth, safeFrameHeight);
+    const includeColorSprites = options.includeColorSprites !== false;
+    const colorSpriteSet = includeColorSprites
+      ? buildColorSpriteFramesFromColors(usedColors, safeFrameWidth, safeFrameHeight)
+      : {
+        framePixels: [],
+        colorCount: usedColors.length,
+        spriteCount: 0,
+        swatchSize: 1,
+        columns: safeFrameWidth,
+        rows: safeFrameHeight,
+        capacityPerSprite: safeFrameWidth * safeFrameHeight,
+      };
     const tiles = [];
     for (let index = 0; index < sourceFrames.length; index += 1) {
       tiles.push({
@@ -28600,7 +28662,8 @@
         compositeDocumentFrames(state.frames, frameWidth, frameHeight, state.palette),
         frameWidth,
         frameHeight,
-        state.palette
+        state.palette,
+        { includeColorSprites: exportSpriteMapIncludeColorSprites }
       )
       : null;
     const { columns, rows } = spriteMapPlan || computeSpriteSheetLayout(frameCount);
@@ -28915,6 +28978,15 @@
     const contestRow = dom.exportDialog?.contestPostRow;
     if (contestRow instanceof HTMLElement) {
       contestRow.hidden = !(format === 'png' || format === 'gif');
+    }
+
+    const spriteMapColorSpritesRow = dom.exportDialog?.spriteMapColorSpritesRow;
+    if (spriteMapColorSpritesRow instanceof HTMLElement) {
+      spriteMapColorSpritesRow.hidden = format !== 'spritemap';
+    }
+    const spriteMapColorSpritesToggle = dom.exportDialog?.spriteMapColorSpritesToggle;
+    if (spriteMapColorSpritesToggle instanceof HTMLInputElement) {
+      spriteMapColorSpritesToggle.checked = exportSpriteMapIncludeColorSprites;
     }
   }
 
@@ -29244,12 +29316,174 @@
     const normalized = clamp(Math.round(Number(value) || exportScale || 1), 1, maxAllowed);
     exportScale = normalized;
     syncExportScaleInputs();
+    updateExportPreview();
   }
 
   function refreshExportScaleControls() {
     const candidates = getExportScaleCandidates(dom.exportDialog?.format?.value || 'png');
     applyExportScaleConstraints(candidates);
     syncExportScaleInputs();
+    updateExportPreview();
+  }
+
+  function setExportPreviewMeta(text = '') {
+    const meta = dom.exportDialog?.previewMeta;
+    if (meta instanceof HTMLElement) {
+      meta.textContent = text;
+    }
+  }
+
+  function syncExportPreviewModeButtons(activeMode = exportPreviewMode) {
+    const normalized = activeMode === 'map' || activeMode === 'colors' ? activeMode : 'frame';
+    const format = normalizeExportFormat(dom.exportDialog?.format?.value || 'png');
+    const spriteOnly = format === 'spritemap';
+    const buttons = Array.isArray(dom.exportDialog?.previewModeButtons)
+      ? dom.exportDialog.previewModeButtons
+      : [];
+    buttons.forEach(button => {
+      if (!(button instanceof HTMLButtonElement)) {
+        return;
+      }
+      const mode = button.dataset.exportPreviewMode || 'frame';
+      const disabled = mode !== 'frame' && !spriteOnly;
+      button.disabled = disabled;
+      const active = !disabled && mode === normalized;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+  }
+
+  function drawExportPreviewCanvas(sourceCanvas, metaText = '') {
+    const preview = dom.exportDialog?.previewCanvas;
+    if (!(preview instanceof HTMLCanvasElement) || !(sourceCanvas instanceof HTMLCanvasElement)) {
+      setExportPreviewMeta(metaText);
+      return;
+    }
+    const cssWidth = Math.max(1, Math.round(preview.clientWidth || 240));
+    const cssHeight = Math.max(1, Math.round(preview.clientHeight || 160));
+    const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+    preview.width = Math.max(1, Math.round(cssWidth * dpr));
+    preview.height = Math.max(1, Math.round(cssHeight * dpr));
+    const ctx = preview.getContext('2d');
+    if (!ctx) {
+      setExportPreviewMeta(metaText);
+      return;
+    }
+    ctx.imageSmoothingEnabled = false;
+    ctx.msImageSmoothingEnabled = false;
+    ctx.webkitImageSmoothingEnabled = false;
+    ctx.clearRect(0, 0, preview.width, preview.height);
+    const tile = Math.max(6, Math.round(8 * dpr));
+    for (let y = 0; y < preview.height; y += tile) {
+      for (let x = 0; x < preview.width; x += tile) {
+        ctx.fillStyle = ((x / tile + y / tile) % 2 === 0)
+          ? 'rgba(230, 244, 255, 0.18)'
+          : 'rgba(10, 16, 26, 0.56)';
+        ctx.fillRect(x, y, tile, tile);
+      }
+    }
+    const scale = Math.max(1, Math.floor(Math.min(
+      preview.width / Math.max(1, sourceCanvas.width),
+      preview.height / Math.max(1, sourceCanvas.height)
+    )));
+    const drawWidth = Math.max(1, sourceCanvas.width * scale);
+    const drawHeight = Math.max(1, sourceCanvas.height * scale);
+    const x = Math.floor((preview.width - drawWidth) / 2);
+    const y = Math.floor((preview.height - drawHeight) / 2);
+    ctx.drawImage(sourceCanvas, x, y, drawWidth, drawHeight);
+    setExportPreviewMeta(metaText);
+  }
+
+  function createBlankExportPreviewCanvas(width = 1, height = 1) {
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.floor(Number(width) || 1));
+    canvas.height = Math.max(1, Math.floor(Number(height) || 1));
+    return canvas;
+  }
+
+  function buildExportPreviewSourceCanvas(format, previewMode) {
+    const frames = Array.isArray(state.frames) ? state.frames : [];
+    const width = Math.max(1, state.width);
+    const height = Math.max(1, state.height);
+    if (!frames.length) {
+      return {
+        canvas: createBlankExportPreviewCanvas(width, height),
+        meta: localizeText('フレームがありません', 'No frames'),
+      };
+    }
+    const normalizedFormat = normalizeExportFormat(format);
+    const mode = normalizedFormat === 'spritemap' ? previewMode : 'frame';
+    const activeFrameIndex = clamp(Math.round(Number(state.activeFrame) || 0), 0, frames.length - 1);
+    const framePixels = compositeDocumentFrames(frames, width, height, state.palette);
+    if (mode === 'map') {
+      const plan = buildSpriteMapExportPlan(framePixels, width, height, state.palette, {
+        includeColorSprites: exportSpriteMapIncludeColorSprites,
+      });
+      const spriteMap = buildSpriteMapCanvas(plan.framePixels, width, height, {
+        scale: Math.max(1, exportScale),
+        columns: plan.columns,
+        rows: plan.rows,
+        placements: plan.placements,
+      });
+      return {
+        canvas: spriteMap.canvas,
+        meta: `SpriteMAP ${plan.columns}x${plan.rows} / ${spriteMap.sheetWidth}x${spriteMap.sheetHeight}px`,
+      };
+    }
+    if (mode === 'colors') {
+      const plan = buildSpriteMapExportPlan(framePixels, width, height, state.palette, {
+        includeColorSprites: true,
+      });
+      const colorFrames = plan.framePixels.slice(plan.sourceFrameCount);
+      if (!exportSpriteMapIncludeColorSprites) {
+        return {
+          canvas: createBlankExportPreviewCanvas(width, height),
+          meta: localizeText('カラースプライト生成はOFFです', 'Color sprite generation is off'),
+        };
+      }
+      if (!colorFrames.length) {
+        return {
+          canvas: createBlankExportPreviewCanvas(width, height),
+          meta: localizeText('使用色がありません', 'No used colors'),
+        };
+      }
+      const colorMap = buildSpriteMapCanvas(colorFrames, width, height, {
+        scale: Math.max(1, exportScale),
+        columns: 1,
+        rows: colorFrames.length,
+      });
+      return {
+        canvas: colorMap.canvas,
+        meta: `Color sprites ${plan.usedColorCount}色 / ${plan.colorSpriteCount}枚`,
+      };
+    }
+    const activePixels = framePixels[activeFrameIndex] || framePixels[0];
+    const frameCanvas = createFrameCanvas(activePixels, width, height);
+    const scaledCanvas = scaleCanvasNearestNeighbor(frameCanvas, Math.max(1, exportScale));
+    const formatLabel = getExportFormatLabel(normalizedFormat);
+    return {
+      canvas: scaledCanvas,
+      meta: `${formatLabel} / Frame ${activeFrameIndex + 1}/${frames.length} / ${scaledCanvas.width}x${scaledCanvas.height}px`,
+    };
+  }
+
+  function updateExportPreview() {
+    const dialog = dom.exportDialog?.dialog;
+    if (dialog instanceof HTMLDialogElement && !dialog.open) {
+      return;
+    }
+    const format = normalizeExportFormat(dom.exportDialog?.format?.value || 'png');
+    if (format !== 'spritemap' && exportPreviewMode !== 'frame') {
+      exportPreviewMode = 'frame';
+    }
+    syncExportPreviewModeButtons(exportPreviewMode);
+    try {
+      const { canvas, meta } = buildExportPreviewSourceCanvas(format, exportPreviewMode);
+      drawExportPreviewCanvas(canvas, meta);
+    } catch (error) {
+      console.warn('Failed to update export preview', error);
+      drawExportPreviewCanvas(createBlankExportPreviewCanvas(1, 1), localizeText('プレビューを更新できませんでした', 'Preview unavailable'));
+    }
   }
 
   function createFrameCanvas(pixels, width, height) {
@@ -42879,6 +43113,8 @@
     }
     host.textContent = '';
     for (let index = 0; index < 5; index += 1) {
+      const slotWrap = document.createElement('div');
+      slotWrap.className = 'floating-preview-panel__reference-slot-wrap';
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'floating-preview-panel__reference-slot';
@@ -42908,19 +43144,60 @@
           dom.floatingPreviewReferenceInput.click();
         }
       });
-      host.appendChild(button);
+      slotWrap.appendChild(button);
+      if (hasImage) {
+        const removeButton = document.createElement('button');
+        removeButton.type = 'button';
+        removeButton.className = 'floating-preview-panel__reference-remove';
+        removeButton.textContent = '×';
+        removeButton.setAttribute('aria-label', localizeText(`参考画像${index + 1}を削除`, `Remove reference ${index + 1}`));
+        removeButton.addEventListener('pointerdown', event => {
+          event.stopPropagation();
+        });
+        removeButton.addEventListener('click', event => {
+          event.preventDefault();
+          event.stopPropagation();
+          removeFloatingPreviewReferenceAtIndex(index);
+        });
+        slotWrap.appendChild(removeButton);
+      }
+      host.appendChild(slotWrap);
     }
   }
 
+  function removeFloatingPreviewReferenceAtIndex(index = -1) {
+    const safeIndex = clamp(Math.round(Number(index) || 0), 0, 4);
+    const previousUrl = floatingPreviewReferenceState.objectUrls[safeIndex];
+    if (previousUrl) {
+      try {
+        URL.revokeObjectURL(previousUrl);
+      } catch (error) {
+        // ignore url revoke errors
+      }
+    }
+    floatingPreviewReferenceState.objectUrls[safeIndex] = '';
+    floatingPreviewReferenceState.blobs[safeIndex] = null;
+    floatingPreviewReferenceState.items[safeIndex] = null;
+    const nextIndex = floatingPreviewReferenceState.objectUrls.findIndex(url => Boolean(url));
+    setFloatingPreviewReferenceActiveIndex(nextIndex);
+    persistFloatingPreviewReferenceMediaForProject().catch(error => {
+      console.warn('Failed to persist floating preview reference media after remove', error);
+    });
+  }
+
   function setFloatingPreviewReferenceActiveIndex(index = -1) {
-    const maxIndex = floatingPreviewReferenceState.objectUrls.length - 1;
-    if (maxIndex < 0) {
+    const hasAnyReference = floatingPreviewReferenceState.objectUrls.some(url => Boolean(url));
+    if (!hasAnyReference) {
       floatingPreviewReferenceState.activeIndex = -1;
       setFloatingPreviewReferenceImageUrl('');
       renderFloatingPreviewReferenceSlots();
       return;
     }
-    const safeIndex = clamp(Math.round(Number(index) || 0), 0, maxIndex);
+    const maxIndex = Math.max(0, floatingPreviewReferenceState.objectUrls.length - 1);
+    let safeIndex = clamp(Math.round(Number(index) || 0), 0, maxIndex);
+    if (!floatingPreviewReferenceState.objectUrls[safeIndex]) {
+      safeIndex = floatingPreviewReferenceState.objectUrls.findIndex(url => Boolean(url));
+    }
     floatingPreviewReferenceState.activeIndex = safeIndex;
     setFloatingPreviewReferenceImageUrl(floatingPreviewReferenceState.objectUrls[safeIndex] || '');
     renderFloatingPreviewReferenceSlots();
@@ -43153,6 +43430,7 @@
   }
 
   function resetFloatingPreviewViewportTransform() {
+    floatingPreviewViewportState.zoom = 1;
     floatingPreviewViewportState.panX = 0;
     floatingPreviewViewportState.panY = 0;
     applyFloatingPreviewMediaTransform();
@@ -58082,6 +58360,7 @@
         exportIncludeOriginalSize: Boolean(exportIncludeOriginalSize),
         exportSaveProjectCompanion: Boolean(exportSaveProjectCompanion),
         exportContestPostAfterSave: Boolean(exportContestPostAfterSave),
+        exportSpriteMapIncludeColorSprites: Boolean(exportSpriteMapIncludeColorSprites),
         exportGridTileWidth: normalizeExportGridTileSize(exportGridTileWidth, 8),
         exportGridTileHeight: normalizeExportGridTileSize(exportGridTileHeight, 8),
         timelapseEnabled: Boolean(timelapseState.enabled),
@@ -58318,6 +58597,9 @@
     }
     if (typeof payload.exportContestPostAfterSave === 'boolean') {
       exportContestPostAfterSave = payload.exportContestPostAfterSave;
+    }
+    if (typeof payload.exportSpriteMapIncludeColorSprites === 'boolean') {
+      exportSpriteMapIncludeColorSprites = payload.exportSpriteMapIncludeColorSprites;
     }
     if (Number.isFinite(payload.exportGridTileWidth)) {
       exportGridTileWidth = normalizeExportGridTileSize(payload.exportGridTileWidth, exportGridTileWidth);
