@@ -883,14 +883,28 @@
 </div>
 </div>
 <div class="multi-overview__chips" hidden id="multiOverviewChips"></div>
-<details class="field field--list multi-participants-panel" open>
-<summary>共有中のメンバー <span class="multi-participants-count" id="multiParticipantsCount">0</span></summary>
+<section class="field field--list multi-participants-panel">
+<div aria-label="参加者とコメント" class="multi-participants-tabs" role="tablist">
+<button aria-controls="multiParticipantsView" aria-selected="true" class="multi-participants-tab is-active" data-multi-panel-tab="participants" id="multiParticipantsPanelTab" role="tab" type="button"><span id="multiParticipantsPanelTabLabel">参加者一覧</span> <span class="multi-participants-count" id="multiParticipantsCount">0</span></button>
+<button aria-controls="multiCommentsView" aria-selected="false" class="multi-participants-tab" data-multi-panel-tab="comments" id="multiCommentsPanelTab" role="tab" tabindex="-1" type="button"><span id="multiCommentsPanelTabLabel">コメント</span></button>
+</div>
+<div class="multi-participants-view is-active" id="multiParticipantsView" role="tabpanel" aria-labelledby="multiParticipantsPanelTab">
 <div class="multi-participants-scroll">
 <ul class="toggle-list multi-participants-list" id="multiParticipants">
 <li class="help-text">共有リンクを作成すると、ここにメンバーが表示されます。</li>
 </ul>
 </div>
-</details>
+</div>
+<div class="multi-participants-view" hidden id="multiCommentsView" role="tabpanel" aria-labelledby="multiCommentsPanelTab">
+<div class="multi-comment-field">
+<div aria-live="polite" class="multi-comment-log" id="multiCommentList"></div>
+<div class="multi-comment-input-row">
+<input autocomplete="off" id="multiCommentInput" maxlength="160" placeholder="コメントを入力" type="text"/>
+<button class="chip" id="multiCommentSend" type="button">送信</button>
+</div>
+</div>
+</div>
+</section>
 <p class="help-text ui-guide-text" id="multiOverviewSummary">接続状態に応じて、できることがここに表示されます。</p>
 <div class="multi-status-row">
 <button aria-live="polite" class="button" id="multiStatus" type="button">共有リンクを作成</button>
