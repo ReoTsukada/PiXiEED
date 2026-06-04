@@ -2699,6 +2699,12 @@
   const SHARED_PROJECT_FINGERPRINT_MISMATCH_COOLDOWN_MS = 3500;
   const SHARED_RECENT_PROJECTS_ACCOUNT_SYNC_COOLDOWN_MS = 12000;
   const SHARED_PROJECT_BROADCAST_EVENT = 'shared-op';
+  const SHARED_PROJECT_CELL_PRESENCE_EVENT = 'shared-cell-presence';
+  const SHARED_PROJECT_CELL_PRESENCE_TTL_MS = 18000;
+  const SHARED_PROJECT_CELL_PRESENCE_HEARTBEAT_MS = 6000;
+  const SHARED_PROJECT_CELL_PRESENCE_BROADCAST_DEBOUNCE_MS = 120;
+  const SHARED_PROJECT_FREE_CELL_ENSURE_DELAY_MS = 220;
+  const SHARED_PROJECT_FREE_CELL_LAYER_ADD_COOLDOWN_MS = 1200;
   const SHARED_PROJECT_RECOVERY_RELOAD_STORAGE_KEY = 'pixieedraw:shared-recovery-reload-at';
   const SHARED_LOCAL_OP_JOURNAL_MAX_CONFIRMED_PER_PROJECT = 160;
   const SHARED_LOCAL_OP_JOURNAL_PRUNE_BATCH = 320;
@@ -3242,6 +3248,12 @@
   let sharedProjectStaleLocalDiscardRefreshQueued = false;
   let sharedProjectVisibilityHiddenAt = 0;
   let sharedProjectLastFingerprintMismatchAt = 0;
+  const sharedProjectCellPresenceByClient = new Map();
+  let sharedProjectCellPresenceBroadcastTimer = null;
+  let sharedProjectCellPresenceHeartbeatTimer = null;
+  let sharedProjectFreeCellEnsureTimer = null;
+  let sharedProjectFreeCellEnsureInFlight = false;
+  let sharedProjectLastAutoLayerAddedAt = 0;
   function getCurrentAccountStorageNamespace() {
     const userId = typeof accountState.userId === 'string' ? accountState.userId.trim() : '';
     return userId || 'anonymous';
@@ -9902,6 +9914,7 @@
     if (normalizedProjectKey === activeSharedProjectKey) {
       activeSharedProjectDocumentLoaded = true;
       syncSharedProjectVisibleStatus();
+      scheduleSharedProjectFreeTimelineCellEnsure('document-loaded');
     }
   }
 
@@ -9974,6 +9987,468 @@
     );
   }
 
+  function pruneSharedProjectCellPresence(now = Date.now()) {
+    let changed = false;
+    sharedProjectCellPresenceByClient.forEach((entry, clientId) => {
+      const updatedAt = Math.max(0, Math.round(Number(entry?.updatedAt) || 0));
+      if (!updatedAt || now - updatedAt > SHARED_PROJECT_CELL_PRESENCE_TTL_MS) {
+        sharedProjectCellPresenceByClient.delete(clientId);
+        changed = true;
+      }
+    });
+    return changed;
+  }
+
+  function getSharedProjectCellPresenceKey(canvasId = '', frameIndex = 0, layerId = '') {
+    const normalizedCanvasId = typeof canvasId === 'string' ? canvasId.trim() : '';
+    const normalizedLayerId = typeof layerId === 'string' ? layerId.trim() : '';
+    const normalizedFrameIndex = Math.max(0, Math.round(Number(frameIndex) || 0));
+    if (!normalizedCanvasId || !normalizedLayerId) {
+      return '';
+    }
+    return `${normalizedCanvasId}:${normalizedFrameIndex}:${normalizedLayerId}`;
+  }
+
+  function normalizeSharedProjectCellPresencePayload(payload) {
+    const raw = payload && typeof payload === 'object' ? payload : {};
+    const projectKey = normalizeMultiProjectKey(raw.projectKey || '');
+    const clientId = typeof raw.clientId === 'string' ? raw.clientId.trim() : '';
+    const userId = typeof raw.userId === 'string' ? raw.userId.trim() : '';
+    const sessionId = typeof raw.sessionId === 'string' ? raw.sessionId.trim() : '';
+    const canvasId = typeof raw.canvasId === 'string' ? raw.canvasId.trim() : '';
+    const layerId = typeof raw.layerId === 'string' ? raw.layerId.trim() : '';
+    const frameIndex = Math.max(0, Math.round(Number(raw.frameIndex) || 0));
+    const name = normalizeMultiParticipantName(raw.name || '', DEFAULT_MULTI_PARTICIPANT_NAME);
+    const updatedAt = Math.max(0, Math.round(Number(raw.updatedAt) || Date.now()));
+    if (!projectKey || !clientId || !canvasId || !layerId) {
+      return null;
+    }
+    return {
+      projectKey,
+      clientId,
+      userId,
+      sessionId,
+      canvasId,
+      frameIndex,
+      layerId,
+      name,
+      updatedAt,
+      key: getSharedProjectCellPresenceKey(canvasId, frameIndex, layerId),
+    };
+  }
+
+  function getCurrentSharedProjectCellPresencePayload(reason = 'selection') {
+    if (!isSharedProjectCollaborativeMode() || !activeSharedProjectKey) {
+      return null;
+    }
+    const canvasDoc = getActiveProjectCanvasDocument();
+    const canvasId = canvasDoc?.id || '';
+    const activeFrameIndex = clamp(Math.round(Number(state.activeFrame) || 0), 0, Math.max(0, (state.frames?.length || 1) - 1));
+    const layerId = typeof state.activeLayer === 'string' ? state.activeLayer.trim() : '';
+    if (!canvasId || !layerId) {
+      return null;
+    }
+    return {
+      projectKey: activeSharedProjectKey,
+      clientId: multiState.clientId || ensureMultiClientId(),
+      userId: accountState.userId || '',
+      sessionId: sharedProjectSessionInstanceId || '',
+      canvasId,
+      frameIndex: activeFrameIndex,
+      layerId,
+      name: getLocalMultiParticipantName(),
+      updatedAt: Date.now(),
+      reason: String(reason || 'selection').slice(0, 32),
+    };
+  }
+
+  function getSharedProjectCellPresenceEntriesForCell({ canvasId = '', frameIndex = 0, layerId = '' } = {}) {
+    pruneSharedProjectCellPresence();
+    const cellKey = getSharedProjectCellPresenceKey(canvasId, frameIndex, layerId);
+    if (!cellKey) {
+      return [];
+    }
+    return Array.from(sharedProjectCellPresenceByClient.values())
+      .filter(entry => (
+        entry?.key === cellKey
+        && entry.projectKey === activeSharedProjectKey
+        && entry.clientId !== multiState.clientId
+      ));
+  }
+
+  function getSharedProjectTimelineCellOccupants(frameIndex = state.activeFrame, layerId = state.activeLayer, canvasId = getActiveProjectCanvasDocument()?.id || '') {
+    return getSharedProjectCellPresenceEntriesForCell({
+      canvasId,
+      frameIndex,
+      layerId,
+    });
+  }
+
+  function getSharedProjectCellPresenceLabel(entry) {
+    if (!entry || typeof entry !== 'object') {
+      return '-';
+    }
+    const frameIndex = Math.max(0, Math.round(Number(entry.frameIndex) || 0));
+    const frame = Array.isArray(state.frames) ? state.frames[frameIndex] : null;
+    const layerId = typeof entry.layerId === 'string' ? entry.layerId.trim() : '';
+    const layerIndex = frame && Array.isArray(frame.layers)
+      ? frame.layers.findIndex(layer => layer?.id === layerId)
+      : -1;
+    return layerIndex >= 0
+      ? `${frameIndex + 1}.${layerIndex + 1}`
+      : `${frameIndex + 1}.-`;
+  }
+
+  function getSharedProjectMemberCellPresence(row = {}) {
+    if (!isSharedProjectCollaborativeMode() && !resolveSharedProjectKeyForCurrentState()) {
+      return null;
+    }
+    const rowUserId = typeof row.userId === 'string' ? row.userId.trim() : '';
+    const rowClientId = typeof row.clientId === 'string' ? row.clientId.trim() : '';
+    if (rowUserId && rowUserId === accountState.userId) {
+      return normalizeSharedProjectCellPresencePayload(getCurrentSharedProjectCellPresencePayload('self'));
+    }
+    pruneSharedProjectCellPresence();
+    return Array.from(sharedProjectCellPresenceByClient.values()).find(entry => (
+      entry?.projectKey === activeSharedProjectKey
+      && (
+        (rowUserId && entry.userId === rowUserId)
+        || (rowClientId && entry.clientId === rowClientId)
+      )
+    )) || null;
+  }
+
+  function announceSharedProjectTimelineCellOccupied(occupants = []) {
+    const names = occupants.map(entry => entry?.name).filter(Boolean).slice(0, 2);
+    const suffix = names.length ? `: ${names.join(', ')}` : '';
+    setMultiStatus(
+      localizeText(
+        `このセルは選択中です${suffix}`,
+        `This cell is already selected${suffix}`
+      ),
+      'info'
+    );
+  }
+
+  function canSelectSharedProjectTimelineCell(frameIndex = state.activeFrame, layerId = state.activeLayer, { announce = true } = {}) {
+    if (!isSharedProjectCollaborativeMode() || !activeSharedProjectKey) {
+      return true;
+    }
+    const occupants = getSharedProjectTimelineCellOccupants(frameIndex, layerId);
+    if (!occupants.length) {
+      return true;
+    }
+    if (announce) {
+      announceSharedProjectTimelineCellOccupied(occupants);
+    }
+    return false;
+  }
+
+  function getSharedProjectOnlineParticipantCount() {
+    let count = 0;
+    const seen = new Set();
+    pruneSharedProjectCellPresence();
+    sharedProjectMembers.forEach(row => {
+      const id = typeof row?.userId === 'string' && row.userId.trim()
+        ? `u:${row.userId.trim()}`
+        : (typeof row?.clientId === 'string' && row.clientId.trim() ? `c:${row.clientId.trim()}` : '');
+      if (!id || !row.online || seen.has(id)) {
+        return;
+      }
+      seen.add(id);
+      count += 1;
+    });
+    if (isCurrentProjectSharedEntry() && accountState.userId && !seen.has(`u:${accountState.userId}`)) {
+      count += 1;
+    }
+    sharedProjectCellPresenceByClient.forEach(entry => {
+      const id = typeof entry?.userId === 'string' && entry.userId.trim()
+        ? `u:${entry.userId.trim()}`
+        : (typeof entry?.clientId === 'string' && entry.clientId.trim() ? `c:${entry.clientId.trim()}` : '');
+      if (!id || seen.has(id)) {
+        return;
+      }
+      seen.add(id);
+      count += 1;
+    });
+    return Math.max(1, count);
+  }
+
+  function getSharedProjectTimelineCellCount() {
+    if (!Array.isArray(state.frames) || !state.frames.length) {
+      return 0;
+    }
+    return state.frames.reduce((total, frame) => (
+      total + (Array.isArray(frame?.layers) ? frame.layers.length : 0)
+    ), 0);
+  }
+
+  function findSharedProjectFreeTimelineCell() {
+    const frames = Array.isArray(state.frames) ? state.frames : [];
+    if (!frames.length) {
+      return null;
+    }
+    const activeCanvasId = getActiveProjectCanvasDocument()?.id || '';
+    if (!activeCanvasId) {
+      return null;
+    }
+    const preferredFrame = clamp(Math.round(Number(state.activeFrame) || 0), 0, frames.length - 1);
+    const activeLayerId = typeof state.activeLayer === 'string' ? state.activeLayer.trim() : '';
+    if (
+      activeLayerId
+      && frames[preferredFrame]?.layers?.some(layer => layer?.id === activeLayerId)
+      && getSharedProjectTimelineCellOccupants(preferredFrame, activeLayerId, activeCanvasId).length === 0
+    ) {
+      return { frameIndex: preferredFrame, layerId: activeLayerId };
+    }
+    for (let frameOffset = 0; frameOffset < frames.length; frameOffset += 1) {
+      const frameIndex = (preferredFrame + frameOffset) % frames.length;
+      const layers = Array.isArray(frames[frameIndex]?.layers) ? frames[frameIndex].layers : [];
+      for (let layerOffset = 0; layerOffset < layers.length; layerOffset += 1) {
+        const layer = layers[layerOffset];
+        const layerId = typeof layer?.id === 'string' ? layer.id : '';
+        if (!layerId) {
+          continue;
+        }
+        if (getSharedProjectTimelineCellOccupants(frameIndex, layerId, activeCanvasId).length === 0) {
+          return { frameIndex, layerId };
+        }
+      }
+    }
+    return null;
+  }
+
+  function selectSharedProjectTimelineCell(frameIndex, layerId, reason = 'auto-free-cell') {
+    const frames = Array.isArray(state.frames) ? state.frames : [];
+    const normalizedFrameIndex = clamp(Math.round(Number(frameIndex) || 0), 0, Math.max(0, frames.length - 1));
+    const targetLayerId = typeof layerId === 'string' ? layerId.trim() : '';
+    const targetFrame = frames[normalizedFrameIndex] || null;
+    if (!targetFrame || !Array.isArray(targetFrame.layers) || !targetFrame.layers.some(layer => layer?.id === targetLayerId)) {
+      return false;
+    }
+    if (!canSelectSharedProjectTimelineCell(normalizedFrameIndex, targetLayerId, { announce: false })) {
+      return false;
+    }
+    const changed = state.activeFrame !== normalizedFrameIndex || state.activeLayer !== targetLayerId;
+    state.activeFrame = normalizedFrameIndex;
+    state.activeLayer = targetLayerId;
+    const activeCanvasDoc = getActiveProjectCanvasDocument();
+    if (activeCanvasDoc) {
+      activeCanvasDoc.activeFrame = normalizedFrameIndex;
+      activeCanvasDoc.activeLayer = targetLayerId;
+    }
+    clearTimelineSelection();
+    scheduleSessionPersist();
+    renderTimelineMatrix();
+    renderLayerList();
+    requestRender();
+    requestOverlayRender();
+    scheduleSharedProjectCellPresenceBroadcast(reason);
+    return changed;
+  }
+
+  function addSharedProjectAutoLayerTrack(reason = 'auto-free-cell') {
+    if (!isSharedProjectCollaborativeMode()) {
+      return false;
+    }
+    const blockReason = getSharedProjectStructureChangeBlockReason();
+    if (blockReason) {
+      return false;
+    }
+    const now = Date.now();
+    if (now - sharedProjectLastAutoLayerAddedAt < SHARED_PROJECT_FREE_CELL_LAYER_ADD_COOLDOWN_MS) {
+      return false;
+    }
+    const activeFrame = getActiveFrame();
+    if (!activeFrame || !Array.isArray(state.frames) || !state.frames.length) {
+      return false;
+    }
+    sharedProjectLastAutoLayerAddedAt = now;
+    clearTimelineSelection();
+    beginHistory('addLayer');
+    const insertIndex = Number.isInteger(getActiveLayerIndex())
+      ? clamp(getActiveLayerIndex() + 1, 0, Number.MAX_SAFE_INTEGER)
+      : Number.MAX_SAFE_INTEGER;
+    let selectedLayerId = '';
+    state.frames.forEach((frame, frameIndex) => {
+      if (!frame || !Array.isArray(frame.layers)) {
+        return;
+      }
+      const targetIndex = Math.min(insertIndex, frame.layers.length);
+      const layer = createLayer(getDefaultLayerName(frame.layers.length + 1), state.width, state.height);
+      frame.layers.splice(targetIndex, 0, layer);
+      if (frameIndex === state.activeFrame) {
+        selectedLayerId = layer.id;
+      }
+    });
+    if (selectedLayerId) {
+      state.activeLayer = selectedLayerId;
+      const activeCanvasDoc = getActiveProjectCanvasDocument();
+      if (activeCanvasDoc) {
+        activeCanvasDoc.activeLayer = selectedLayerId;
+      }
+    }
+    clearPendingMultiAssignmentMoveRequests();
+    markHistoryDirty();
+    scheduleSessionPersist();
+    renderFrameList();
+    renderLayerList();
+    requestRender();
+    requestOverlayRender();
+    commitHistory();
+    setMultiStatus(
+      localizeText('空きセル用にレイヤーを追加しました', 'Added a layer for an open cell'),
+      'info'
+    );
+    scheduleSharedProjectCellPresenceBroadcast(reason);
+    scheduleSharedProjectFreeTimelineCellEnsure(`${reason}-after-add`, SHARED_PROJECT_FREE_CELL_LAYER_ADD_COOLDOWN_MS + 80);
+    return true;
+  }
+
+  function ensureSharedProjectFreeTimelineCell(reason = 'ensure-free-cell') {
+    if (!isSharedProjectCollaborativeMode() || !activeSharedProjectKey || !activeSharedProjectDocumentLoaded) {
+      return false;
+    }
+    const neededCells = getSharedProjectOnlineParticipantCount();
+    let guard = 0;
+    while (
+      getSharedProjectTimelineCellCount() < neededCells
+      && guard < 4
+      && addSharedProjectAutoLayerTrack(`${reason}-capacity`)
+    ) {
+      guard += 1;
+    }
+    let freeCell = findSharedProjectFreeTimelineCell();
+    if (!freeCell) {
+      if (addSharedProjectAutoLayerTrack(`${reason}-occupied`)) {
+        freeCell = findSharedProjectFreeTimelineCell();
+      }
+    }
+    if (freeCell) {
+      selectSharedProjectTimelineCell(freeCell.frameIndex, freeCell.layerId, reason);
+      return true;
+    }
+    return false;
+  }
+
+  function scheduleSharedProjectFreeTimelineCellEnsure(reason = 'ensure-free-cell', delayMs = SHARED_PROJECT_FREE_CELL_ENSURE_DELAY_MS) {
+    if (!isSharedProjectCollaborativeMode()) {
+      return;
+    }
+    if (sharedProjectFreeCellEnsureTimer !== null) {
+      window.clearTimeout(sharedProjectFreeCellEnsureTimer);
+    }
+    sharedProjectFreeCellEnsureTimer = window.setTimeout(() => {
+      sharedProjectFreeCellEnsureTimer = null;
+      if (sharedProjectFreeCellEnsureInFlight) {
+        scheduleSharedProjectFreeTimelineCellEnsure(`${reason}-queued`, SHARED_PROJECT_FREE_CELL_ENSURE_DELAY_MS);
+        return;
+      }
+      sharedProjectFreeCellEnsureInFlight = true;
+      try {
+        ensureSharedProjectFreeTimelineCell(reason);
+      } finally {
+        sharedProjectFreeCellEnsureInFlight = false;
+      }
+    }, Math.max(0, Math.round(Number(delayMs) || 0)));
+  }
+
+  function isSharedProjectCurrentTimelineCellOccupiedByPeer() {
+    if (!isSharedProjectCollaborativeMode() || !activeSharedProjectKey) {
+      return false;
+    }
+    const payload = getCurrentSharedProjectCellPresencePayload('check');
+    if (!payload) {
+      return false;
+    }
+    return getSharedProjectCellPresenceEntriesForCell(payload).length > 0;
+  }
+
+  function renderTimelineMatrixForSharedCellPresence() {
+    timelineMatrixRenderKey = '';
+    renderTimelineMatrix();
+  }
+
+  function handleSharedProjectCellPresenceBroadcast(payload) {
+    const entry = normalizeSharedProjectCellPresencePayload(payload?.payload || payload);
+    if (!entry || entry.projectKey !== activeSharedProjectKey || entry.clientId === multiState.clientId) {
+      return;
+    }
+    sharedProjectCellPresenceByClient.set(entry.clientId, entry);
+    renderTimelineMatrixForSharedCellPresence();
+    renderMultiParticipantsList();
+    scheduleSharedProjectFreeTimelineCellEnsure('presence');
+  }
+
+  function broadcastSharedProjectCellPresence(reason = 'selection') {
+    const payload = getCurrentSharedProjectCellPresencePayload(reason);
+    if (!payload) {
+      return;
+    }
+    renderMultiParticipantsList();
+    if (!activeSharedProjectChannel || typeof activeSharedProjectChannel.send !== 'function') {
+      ensureActiveSharedProjectRealtimeChannel().catch(() => {});
+      return;
+    }
+    activeSharedProjectChannel.send({
+      type: 'broadcast',
+      event: SHARED_PROJECT_CELL_PRESENCE_EVENT,
+      payload,
+    }).catch(() => {
+      // Presence is ephemeral; the heartbeat will retry on the next tick.
+    });
+  }
+
+  function scheduleSharedProjectCellPresenceBroadcast(reason = 'selection') {
+    if (!isSharedProjectCollaborativeMode()) {
+      return;
+    }
+    if (sharedProjectCellPresenceBroadcastTimer !== null) {
+      window.clearTimeout(sharedProjectCellPresenceBroadcastTimer);
+    }
+    sharedProjectCellPresenceBroadcastTimer = window.setTimeout(() => {
+      sharedProjectCellPresenceBroadcastTimer = null;
+      broadcastSharedProjectCellPresence(reason);
+    }, SHARED_PROJECT_CELL_PRESENCE_BROADCAST_DEBOUNCE_MS);
+  }
+
+  function ensureSharedProjectCellPresenceHeartbeat() {
+    if (sharedProjectCellPresenceHeartbeatTimer !== null) {
+      return;
+    }
+    sharedProjectCellPresenceHeartbeatTimer = window.setInterval(() => {
+      if (!isSharedProjectCollaborativeMode() || !activeSharedProjectChannel) {
+        return;
+      }
+      const changed = pruneSharedProjectCellPresence();
+      if (changed) {
+        renderTimelineMatrixForSharedCellPresence();
+        renderMultiParticipantsList();
+      }
+      broadcastSharedProjectCellPresence('heartbeat');
+    }, SHARED_PROJECT_CELL_PRESENCE_HEARTBEAT_MS);
+  }
+
+  function clearSharedProjectCellPresence({ render = true } = {}) {
+    sharedProjectCellPresenceByClient.clear();
+    if (sharedProjectCellPresenceBroadcastTimer !== null) {
+      window.clearTimeout(sharedProjectCellPresenceBroadcastTimer);
+      sharedProjectCellPresenceBroadcastTimer = null;
+    }
+    if (sharedProjectCellPresenceHeartbeatTimer !== null) {
+      window.clearInterval(sharedProjectCellPresenceHeartbeatTimer);
+      sharedProjectCellPresenceHeartbeatTimer = null;
+    }
+    if (sharedProjectFreeCellEnsureTimer !== null) {
+      window.clearTimeout(sharedProjectFreeCellEnsureTimer);
+      sharedProjectFreeCellEnsureTimer = null;
+    }
+    sharedProjectFreeCellEnsureInFlight = false;
+    if (render) {
+      renderTimelineMatrixForSharedCellPresence();
+    }
+  }
+
   function getSharedProjectLocalDrawBlockReason(projectKey = activeSharedProjectKey, options = {}) {
     const normalizedProjectKey = normalizeMultiProjectKey(projectKey || activeSharedProjectKey || '');
     const allowLocalOpBacklog = Boolean(options?.allowLocalOpBacklog);
@@ -10027,6 +10502,9 @@
     if (!isSharedProjectDrawReadinessFresh()) {
       return 'draw-readiness-stale';
     }
+    if (isSharedProjectCurrentTimelineCellOccupiedByPeer()) {
+      return 'timeline-cell-occupied';
+    }
     return '';
   }
 
@@ -10056,6 +10534,15 @@
         message: localizeText(
           '直前の描画を共有へ確定中です。確定後に描画できます。',
           'The previous edit is being confirmed to the shared project. Drawing will resume after it is confirmed.'
+        ),
+      };
+    }
+    if (normalizedReason === 'timeline-cell-occupied') {
+      return {
+        level: 'info',
+        message: localizeText(
+          '他の参加者がこのフレーム/レイヤーを選択中です。別のセルを選んでください。',
+          'Another participant is using this frame/layer. Select another cell to draw.'
         ),
       };
     }
@@ -20313,6 +20800,7 @@
       ? ((Math.round(nextIndex) % length) + length) % length
       : clamp(Math.round(nextIndex), 0, length - 1);
     const previousIndex = state.activeFrame;
+    const previousLayerId = state.activeLayer;
     state.activeFrame = normalizedIndex;
     if (previousIndex !== normalizedIndex) {
       if (pointerState.active) {
@@ -20392,6 +20880,9 @@
     if (syncUi) {
       updatePixfindModeUI();
     }
+    if (previousIndex !== normalizedIndex || previousLayerId !== state.activeLayer) {
+      scheduleSharedProjectCellPresenceBroadcast('frame');
+    }
     return frame;
   }
 
@@ -20405,6 +20896,18 @@
     const render = options.render !== false;
     const syncUi = options.syncUi !== false;
     const nextIndex = state.activeFrame + Number(offset || 0);
+    const normalizedIndex = wrap
+      ? ((Math.round(nextIndex) % frames.length) + frames.length) % frames.length
+      : clamp(Math.round(nextIndex), 0, frames.length - 1);
+    const currentFrame = getActiveFrame();
+    const currentLayers = currentFrame ? currentFrame.layers.slice().reverse() : [];
+    const activeLayerRow = currentLayers.findIndex(layer => layer.id === state.activeLayer);
+    const candidateLayers = frames[normalizedIndex]?.layers?.slice().reverse() || [];
+    const nextLayer = candidateLayers[activeLayerRow] || candidateLayers[candidateLayers.length - 1] || candidateLayers[0];
+    if (nextLayer && !canSelectSharedProjectTimelineCell(normalizedIndex, nextLayer.id)) {
+      renderTimelineMatrix();
+      return;
+    }
     setActiveFrameIndex(nextIndex, { wrap, persist, render, syncUi });
   }
 
@@ -20412,6 +20915,7 @@
     persist = true,
     render = true,
     syncUi = true,
+    respectSharedCellOccupancy = true,
   } = {}) {
     const frame = getActiveFrame();
     if (!frame || !Array.isArray(frame.layers) || !frame.layers.length) {
@@ -20425,6 +20929,10 @@
     const nextLayer = frame.layers[normalizedIndex];
     if (!nextLayer) {
       return null;
+    }
+    if (respectSharedCellOccupancy && !canSelectSharedProjectTimelineCell(state.activeFrame, nextLayer.id)) {
+      renderTimelineMatrix();
+      return getActiveLayer();
     }
     const previousLayerId = state.activeLayer;
     state.activeLayer = nextLayer.id;
@@ -20447,6 +20955,9 @@
     }
     if (syncUi) {
       updatePixfindModeUI();
+    }
+    if (previousLayerId !== nextLayer.id) {
+      scheduleSharedProjectCellPresenceBroadcast('layer');
     }
     return nextLayer;
   }
@@ -41058,12 +41569,17 @@
           requestOverlayRender();
           return;
         }
+        if (!canSelectSharedProjectTimelineCell(state.activeFrame, layerId)) {
+          renderTimelineMatrix();
+          return;
+        }
         state.activeLayer = layerId;
         if (Number.isFinite(layerIndex)) {
           setTimelineLayerSelection(layerIndex, { append: event.shiftKey });
         }
         scheduleSessionPersist();
         renderTimelineMatrix();
+        scheduleSharedProjectCellPresenceBroadcast('layer');
         requestOverlayRender();
         return;
       }
@@ -41094,21 +41610,27 @@
           setActiveFrameIndex(frameIndex, { persist: false, render: false, syncUi: false });
           enforceGuestAssignedLayerSelection({ announce: false });
         } else {
-          setTimelineFrameSelection(frameIndex, { append: event.shiftKey });
-          setActiveFrameIndex(frameIndex, { persist: false, render: false, syncUi: false });
           const candidateLayers = state.frames[frameIndex]?.layers?.slice().reverse() || [];
           const nextLayer = candidateLayers[activeLayerRow] || candidateLayers[candidateLayers.length - 1] || candidateLayers[0];
+          if (nextLayer && !canSelectSharedProjectTimelineCell(frameIndex, nextLayer.id)) {
+            renderTimelineMatrix();
+            return;
+          }
+          setTimelineFrameSelection(frameIndex, { append: event.shiftKey });
+          setActiveFrameIndex(frameIndex, { persist: false, render: false, syncUi: false });
           if (nextLayer) {
             state.activeLayer = nextLayer.id;
           }
           scheduleSessionPersist();
           renderTimelineMatrix();
+          scheduleSharedProjectCellPresenceBroadcast('frame');
           requestRender();
           requestOverlayRender();
           return;
         }
         scheduleSessionPersist();
         renderTimelineMatrix();
+        scheduleSharedProjectCellPresenceBroadcast('frame');
         requestRender();
         requestOverlayRender();
         return;
@@ -41137,6 +41659,10 @@
           requestOverlayRender();
           return;
         }
+        if (!canSelectSharedProjectTimelineCell(frameIndex, layerId)) {
+          renderTimelineMatrix();
+          return;
+        }
         setActiveFrameIndex(frameIndex, { persist: false, render: false, syncUi: false });
         state.activeLayer = layerId;
         if (event.shiftKey) {
@@ -41146,6 +41672,7 @@
         }
         scheduleSessionPersist();
         renderTimelineMatrix();
+        scheduleSharedProjectCellPresenceBroadcast('slot');
         requestRender();
         requestOverlayRender();
       }
@@ -41301,6 +41828,17 @@
       timelineKeyParts.push(`as:${assignmentKey}`);
     } else {
       timelineKeyParts.push('as:');
+    }
+    pruneSharedProjectCellPresence();
+    if (sharedProjectCellPresenceByClient.size) {
+      const presenceKey = Array.from(sharedProjectCellPresenceByClient.values())
+        .filter(entry => entry?.projectKey === activeSharedProjectKey && entry.clientId !== multiState.clientId)
+        .map(entry => `${entry.key}:${entry.clientId}:${entry.name}:${entry.updatedAt}`)
+        .sort()
+        .join(',');
+      timelineKeyParts.push(`sp:${presenceKey}`);
+    } else {
+      timelineKeyParts.push('sp:');
     }
     for (let frameIndex = 0; frameIndex < frameCount; frameIndex += 1) {
       const frame = frames[frameIndex];
@@ -41618,6 +42156,23 @@
             slot.title = assignedUserName
               ? localizeText(`担当: ${assignedUserName}${assignedUserLockLabel}`, `Assignee: ${assignedUserName}${assignedUserLockLabel}`)
               : (assignedUser?.locked ? localizeText('担当セル: ロック中', 'Assigned cell: Locked') : '');
+          }
+          const sharedCellUsers = getSharedProjectCellPresenceEntriesForCell({
+            canvasId: activeCanvasId,
+            frameIndex,
+            layerId: targetLayer.id,
+          });
+          if (sharedCellUsers.length) {
+            const userNames = sharedCellUsers.map(entry => entry.name).filter(Boolean);
+            const userLabel = userNames.join(', ');
+            cell.classList.add('is-shared-cell-occupied');
+            cell.dataset.sharedCellUsers = sharedCellUsers.length > 9 ? '9+' : String(sharedCellUsers.length);
+            slot.classList.add('is-shared-cell-occupied');
+            slot.disabled = true;
+            slot.setAttribute('aria-disabled', 'true');
+            slot.title = userLabel
+              ? localizeText(`選択中: ${userLabel}`, `Selected by: ${userLabel}`)
+              : localizeText('他の参加者が選択中', 'Selected by another participant');
           }
           if (guestMoveMode === 'free') {
             slot.title = localizeText(
@@ -67245,6 +67800,7 @@
           const avatarId = isSelf ? getLocalMultiParticipantAvatarId() : '';
           return {
             clientId: userId || `${entry?.project_key || normalizedProjectKey}:${entry?.joined_at || entry?.updated_at || Date.now()}`,
+            userId,
             role: entry?.role === 'owner' ? 'master' : (entry?.role === 'viewer' ? 'spectator' : 'guest'),
             name: isSelf
               ? (readPixieedAccountNickname() || DEFAULT_MULTI_PARTICIPANT_NAME)
@@ -67257,6 +67813,7 @@
           };
         });
         renderMultiParticipantsList();
+        scheduleSharedProjectFreeTimelineCellEnsure('members-sync');
         return sharedProjectMembers;
       } catch (error) {
         if (isRecoverableSharedBackendPreflightError(error)) {
@@ -69356,6 +69913,7 @@
     activeSharedProjectChannel = null;
     activeSharedProjectChannelKey = '';
     activeSharedProjectChannelSignature = '';
+    clearSharedProjectCellPresence({ render: false });
     if (!channel) {
       return;
     }
@@ -69617,6 +70175,16 @@
         });
       }
     );
+      channel.on(
+      'broadcast',
+      { event: SHARED_PROJECT_CELL_PRESENCE_EVENT },
+      payload => {
+        if (projectKey !== activeSharedProjectKey) {
+          return;
+        }
+        handleSharedProjectCellPresenceBroadcast(payload);
+      }
+    );
       if (shouldEnableSharedProjectRealtimeStage(realtimeStage, 'projects')) {
         channel.on(
           'postgres_changes',
@@ -69811,6 +70379,9 @@
       activeSharedProjectChannel = channel;
       activeSharedProjectChannelKey = projectKey;
       activeSharedProjectChannelSignature = channelSignature;
+      ensureSharedProjectCellPresenceHeartbeat();
+      scheduleSharedProjectCellPresenceBroadcast('subscribe');
+      scheduleSharedProjectFreeTimelineCellEnsure('subscribe');
       recoverSharedProjectRealtimeGap(projectKey, {
         afterSeq: sharedProjectLastAppliedSeq,
         reason: 'post-subscribe-gap-check',
@@ -74288,7 +74859,7 @@
         const li = document.createElement('li');
         li.className = 'multi-participant-item';
         const plain = document.createElement('div');
-        plain.className = 'multi-participant-item__details is-static';
+        plain.className = 'multi-participant-item__details is-static is-shared-member';
         if (row.clientId === multiState.clientId) {
           plain.classList.add('is-self');
         }
@@ -74315,18 +74886,16 @@
         name.className = 'multi-participant-item__name';
         name.textContent = row.name || DEFAULT_MULTI_PARTICIPANT_NAME;
         nameLine.appendChild(name);
-        if (row.clientId === multiState.clientId) {
-          const selfTag = document.createElement('span');
-          selfTag.className = 'multi-participant-item__tag multi-participant-item__tag--self';
-          selfTag.textContent = localizeText('あなた', 'You');
-          nameLine.appendChild(selfTag);
-        }
         const cell = document.createElement('span');
         cell.className = 'multi-participant-item__cell';
-        cell.textContent = row.online
+        const memberPresence = getSharedProjectMemberCellPresence(row);
+        cell.textContent = memberPresence ? getSharedProjectCellPresenceLabel(memberPresence) : '-';
+        const online = document.createElement('span');
+        online.className = 'multi-participant-item__online';
+        online.textContent = row.online
           ? localizeText('オンライン', 'Online')
           : localizeText('オフライン', 'Offline');
-        main.append(nameLine, cell);
+        main.append(nameLine, cell, online);
         summary.append(avatar, main);
         plain.appendChild(summary);
         li.appendChild(plain);
