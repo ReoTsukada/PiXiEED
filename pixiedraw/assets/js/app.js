@@ -59312,6 +59312,17 @@
     };
   }
 
+  function readMultiJoinProjectAccessInputOnly() {
+    if (!(dom.controls.multiJoinProjectKey instanceof HTMLInputElement)) {
+      return {
+        raw: '',
+        projectKey: '',
+        inviteToken: '',
+      };
+    }
+    return parseMultiProjectAccessInput(dom.controls.multiJoinProjectKey.value);
+  }
+
   function getMultiProjectKeyInputElements() {
     const inputs = [];
     if (dom.controls.multiJoinProjectKey instanceof HTMLInputElement) {
@@ -60038,7 +60049,7 @@
     }
     await initPixieedAccount();
     await ensureNoLegacyMultiSessionForSharedProject();
-    const access = readCurrentMultiProjectAccessInput();
+    const access = readMultiJoinProjectAccessInputOnly();
     if (!access.projectKey && !access.inviteToken) {
       setMultiStatus(
         localizeText('共有リンクまたは招待コードを入力してください', 'Paste an invite link or invite code'),
@@ -70406,7 +70417,7 @@
     if (dom.controls.projectHomeJoinProjectKey instanceof HTMLInputElement) {
       dom.controls.projectHomeJoinProjectKey.disabled = !isSignedInAccount;
       dom.controls.projectHomeJoinProjectKey.placeholder = isSignedInAccount
-        ? localizeText('特典、参加キー、などのコードを入力してください', 'Enter benefit, join key, or other code')
+        ? localizeText('参加コードを入力', 'Enter join code')
         : localizeText('ログインしてください', 'Please sign in');
     }
     if (dom.controls.projectHomeApplyAccessCode instanceof HTMLButtonElement) {
@@ -72412,12 +72423,12 @@
 
     if (prefersSharedProjectFlow() && !resolvedSharedProjectKey && !multiState.connecting) {
       summaryText = localizeText(
-        '共有モードはOFFです。ONにするとこのプロジェクトを共有できます。',
-        'Shared mode is off. Turn it on to share this project.'
+        'リンクを送るだけで、みんなと一緒に描けます。',
+        'Share a link to draw together.'
       );
       hintText = localizeText(
-        '共有モードをONにしたあと、共有URLをコピーして他の人に送ってください。',
-        'Turn on shared mode, then copy the share URL and send it to others.'
+        '共有リンクを作成してください。',
+        'Create a shared link.'
       );
     } else if (multiState.connecting) {
       const pendingRole = normalizeMultiDesiredRole(multiState.desiredRole);
@@ -72435,12 +72446,12 @@
       pushChip(localizeText('共有プロジェクト', 'Shared Project'), 'success');
       pushChip(localizeText('全員編集可', 'Collaborative Edit'), 'info');
       summaryText = localizeText(
-        'この共有プロジェクトでは、ソロに近い操作感で全員が編集できます。',
-        'Everyone can edit this shared project with a workflow close to solo editing.'
+        'このリンクをシェアして一緒に描きましょう。',
+        'Share this link to draw together.'
       );
       hintText = localizeText(
-        '描画はリアルタイム反映され、下のメンバー一覧で今だれが共有中か確認できます。',
-        'Drawing updates live, and the member list below shows who is currently sharing.'
+        '共有リンクをコピーできます。',
+        'You can copy the shared link.'
       );
     } else if (isMultiMasterMode()) {
       pushChip(getMultiRoleLabel('master'), 'master');
@@ -74893,7 +74904,9 @@
     updateMultiFlowTabsUi();
     const isJoinPanelVisible = isEntryView && multiEntryJoinPanelOpen;
     const isFlowKeyFieldVisible = !isEntryView;
-    syncMultiProjectKeyInputValues(multiState.projectKey, { preserveFocused: true });
+    if (!(sharedProjectFlowPreferred && !sharedModeEnabled)) {
+      syncMultiProjectKeyInputValues(multiState.projectKey, { preserveFocused: true });
+    }
     if (dom.controls.multiJoinProjectKey instanceof HTMLInputElement) {
       dom.controls.multiJoinProjectKey.disabled = multiState.connecting || requiresSharedLogin;
     }
@@ -74927,6 +74940,13 @@
         dom.controls.multiJoinProjectKey.readOnly = false;
         if (dom.controls.multiJoinProjectKey.type !== 'password') {
           dom.controls.multiJoinProjectKey.type = 'password';
+        }
+        if (sharedProjectFlowPreferred && dom.controls.multiJoinProjectKey !== document.activeElement) {
+          const parsedJoinValue = parseMultiProjectAccessInput(dom.controls.multiJoinProjectKey.value);
+          const storedProjectKey = normalizeMultiProjectKey(multiState.projectKey || '');
+          if (storedProjectKey && parsedJoinValue.projectKey === storedProjectKey && !parsedJoinValue.inviteToken) {
+            dom.controls.multiJoinProjectKey.value = '';
+          }
         }
         dom.controls.multiJoinProjectKey.placeholder = localizeText('コードを入力してください', 'Enter code');
       }
@@ -75049,13 +75069,13 @@
         && !multiState.connecting
         && sharedOwnershipStatus.overLimit;
       dom.controls.multiStartSession.disabled = sharedProjectFlowPreferred
-        ? (!canStartSharedFlow || sharedCreationBlocked)
+        ? (multiState.connecting || (!sharedModeEnabled && (!canStartSharedFlow || sharedCreationBlocked)))
         : (multiState.connecting || multiState.connected || !currentProjectKey || isEntryView);
       dom.controls.multiStartSession.hidden = false;
       dom.controls.multiStartSession.textContent = sharedProjectFlowPreferred
         ? (sharedModeEnabled
-          ? localizeText('共有モードはONです', 'Shared mode is ON')
-          : localizeText('共有モードをON', 'Turn Shared Mode On'))
+          ? localizeText('共有リンクをコピー', 'Copy Shared Link')
+          : localizeText('共有リンクを作成', 'Create Shared Link'))
         : localizeText('開始', 'Start');
       dom.controls.multiStartSession.classList.toggle('multi-shared-mode-toggle', sharedProjectFlowPreferred);
       dom.controls.multiStartSession.classList.toggle('is-on', sharedProjectFlowPreferred && sharedModeEnabled);
@@ -75073,8 +75093,8 @@
         dom.controls.multiStartSession.title = buildSharedProjectCreationBlockedMessage(sharedOwnershipStatus);
       } else if (sharedProjectFlowPreferred) {
         dom.controls.multiStartSession.title = sharedModeEnabled
-          ? localizeText('このプロジェクトは共有モードONです', 'This project is in shared mode')
-          : localizeText('今のプロジェクトを共有プロジェクトにして共有モードを有効にします', 'Create a shared project from the current document and enable shared mode');
+          ? localizeText('共有リンクをコピーします', 'Copy the shared link')
+          : localizeText('今のプロジェクトから共有リンクを作成します', 'Create a shared link from the current project');
       } else if (!currentProjectKey) {
         dom.controls.multiStartSession.title = localizeText('共有リンクまたはプロジェクトキーを入力してください', 'Enter an invite link or project key');
       } else if (isEntryView) {
@@ -75268,16 +75288,17 @@
     if (dom.controls.multiInviteCopy instanceof HTMLButtonElement) {
       dom.controls.multiInviteCopy.disabled = multiState.connecting
         || !(sharedProjectFlowPreferred ? Boolean(visibleSharedProjectKey) : (inMasterConfigMode && currentProjectKey));
-      dom.controls.multiInviteCopy.hidden = sharedProjectFlowPreferred ? !Boolean(visibleSharedProjectKey) : false;
+      dom.controls.multiInviteCopy.hidden = sharedProjectFlowPreferred ? true : false;
     }
     if (dom.controls.multiInviteShare instanceof HTMLButtonElement) {
       dom.controls.multiInviteShare.disabled = multiState.connecting
         || !(sharedProjectFlowPreferred ? Boolean(visibleSharedProjectKey) : (inMasterConfigMode && currentProjectKey));
-      dom.controls.multiInviteShare.hidden = sharedProjectFlowPreferred ? !Boolean(visibleSharedProjectKey) : false;
+      dom.controls.multiInviteShare.hidden = sharedProjectFlowPreferred ? true : false;
     }
     const participantsPanel = document.querySelector('#panelMulti .multi-participants-panel');
     if (participantsPanel instanceof HTMLElement) {
       participantsPanel.hidden = false;
+      participantsPanel.classList.toggle('is-inactive', sharedProjectFlowPreferred && !sharedModeEnabled);
     }
     if (dom.controls.multiCommentList instanceof HTMLElement) {
       const commentsSection = dom.controls.multiCommentList.closest('.multi-flow-tabpanel--comments');
@@ -78754,7 +78775,7 @@
     if (dom.controls.multiCopyAccessCode instanceof HTMLButtonElement && dom.controls.multiCopyAccessCode.dataset.bound !== 'true') {
       dom.controls.multiCopyAccessCode.dataset.bound = 'true';
       dom.controls.multiCopyAccessCode.addEventListener('click', async () => {
-        const access = readCurrentMultiProjectAccessInput();
+        const access = readMultiJoinProjectAccessInputOnly();
         const code = (access.inviteToken || access.projectKey || '').trim();
         if (!code) {
           setMultiStatus(localizeText('コピーできる共有コードがありません', 'No share code available to copy'), 'warn');
@@ -78765,6 +78786,11 @@
         setMultiStatus(
           copied ? localizeText('共有コードをコピーしました', 'Share code copied') : localizeText('共有コードのコピーに失敗しました', 'Failed to copy share code'),
           copied ? 'success' : 'error'
+        );
+        window.alert(
+          copied
+            ? localizeText('共有コードをコピーしました', 'Share code copied')
+            : localizeText('共有コードのコピーに失敗しました', 'Failed to copy share code')
         );
         syncMultiControls();
       });
@@ -79153,6 +79179,10 @@
       dom.controls.multiStartSession.dataset.bound = 'true';
       dom.controls.multiStartSession.addEventListener('click', async () => {
         if (prefersSharedProjectFlow()) {
+          if (isCurrentProjectSharedEntry() || resolveSharedProjectKeyForCurrentState()) {
+            await copyMultiInviteLink();
+            return;
+          }
           if (!(await ensureSharedProjectAuthenticatedStart({ requireLogin: true }))) {
             return;
           }
