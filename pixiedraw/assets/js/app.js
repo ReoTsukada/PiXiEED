@@ -4269,6 +4269,7 @@
   let multiAutoResumeAttempted = false;
   let multiInviteAutoJoinHandled = false;
   let mirrorGuideSyncRaf = null;
+  let canvasResizeHandleLayoutRaf = null;
   let deferredUiSetupScheduled = false;
   let deferredUiSetupDone = false;
   const paletteEditorState = {
@@ -15514,12 +15515,11 @@
     setLocalizedTextContent('#pixieedPwaInstallField > span', 'アプリとして使う', 'Install as App');
     setLocalizedTextContent('#pixieedPwaInstallButton', 'インストール案内を開く', 'Open Install Guide');
 
-    setLocalizedTextContent('#panelSettings .settings-size-row--canvas > span', 'キャンバスサイズ', 'Canvas Size');
+    setLocalizedTextContent('#settingsSizeTitle', 'サイズ', 'Size');
     setLocalizedControlLabel('canvasWidth', 'X', 'X');
     setLocalizedControlLabel('canvasHeight', 'Y', 'Y');
     setLocalizedTextContent('#applyCanvasResize', '確定', 'Apply');
-    setLocalizedTextContent('#canvasSizeHint', 'X/Y を入力して「確定」または Enter で反映します。', 'Enter X/Y and press Apply or Enter.');
-    setLocalizedTextContent('#panelSettings .settings-size-row--sprite > span', 'スプライト倍率', 'Sprite Scale');
+    setLocalizedTextContent('#canvasSizeHint', 'X/Y と倍率をまとめて調整', 'Adjust X/Y and scale together.');
     setLocalizedControlLabel('spriteScaleInput', '倍率', 'Scale');
     setLocalizedTextContent('#applySpriteScale', '適用', 'Apply');
     setLocalizedTextContent('#panelSettings .settings-color-mode-field > span', 'カラーモード', 'Color Mode');
@@ -15768,7 +15768,6 @@
 
   function updateSpriteScaleControlLimits() {
     const input = dom.controls.spriteScaleInput;
-    const button = dom.controls.applySpriteScale;
     const decrementButton = dom.controls.spriteScaleDecrement;
     const incrementButton = dom.controls.spriteScaleIncrement;
     if (!input) return;
@@ -15778,7 +15777,6 @@
       input.max = '1';
       input.value = '1';
       input.disabled = true;
-      if (button) button.setAttribute('disabled', 'true');
       if (decrementButton) decrementButton.setAttribute('disabled', 'true');
       if (incrementButton) incrementButton.setAttribute('disabled', 'true');
     } else {
@@ -15787,10 +15785,6 @@
       const current = Math.max(1, Math.min(maxMultiplier, Math.floor(Number(input.value) || 1)));
       input.value = String(current);
       input.disabled = false;
-      if (button) {
-        if (current > 1) button.removeAttribute('disabled');
-        else button.setAttribute('disabled', 'true');
-      }
       if (decrementButton) {
         if (current <= 1) decrementButton.setAttribute('disabled', 'true');
         else decrementButton.removeAttribute('disabled');
@@ -15800,6 +15794,39 @@
         else incrementButton.removeAttribute('disabled');
       }
     }
+    updateSettingsSizeApplyButtonState();
+  }
+
+  function hasPendingCanvasResizeInputChange() {
+    const widthInput = dom.controls.canvasWidth;
+    const heightInput = dom.controls.canvasHeight;
+    if (!(widthInput instanceof HTMLInputElement) || !(heightInput instanceof HTMLInputElement)) {
+      return false;
+    }
+    const width = getCanvasResizeInputValue(widthInput, state.width);
+    const height = getCanvasResizeInputValue(heightInput, state.height);
+    return width !== state.width || height !== state.height;
+  }
+
+  function hasPendingSpriteScaleInputChange() {
+    const input = dom.controls.spriteScaleInput;
+    if (!(input instanceof HTMLInputElement) || input.disabled) {
+      return false;
+    }
+    const maxMultiplier = getMaxSpriteMultiplier();
+    const current = Math.max(1, Math.min(maxMultiplier, Math.floor(Number(input.value) || 1)));
+    return current > 1;
+  }
+
+  function updateSettingsSizeApplyButtonState() {
+    const button = dom.controls.applySpriteScale;
+    if (!(button instanceof HTMLButtonElement)) {
+      return;
+    }
+    const canEdit = canCurrentClientEditProjectStructure({ announce: false })
+      && lockedCanvasWidth === null
+      && lockedCanvasHeight === null;
+    button.disabled = !canEdit || !(hasPendingCanvasResizeInputChange() || hasPendingSpriteScaleInputChange());
   }
 
   function adjustSpriteScaleInputBy(delta) {
@@ -33700,6 +33727,17 @@
     });
   }
 
+  function scheduleCanvasResizeHandleLayoutRefresh() {
+    if (canvasResizeHandleLayoutRaf !== null) {
+      cancelAnimationFrame(canvasResizeHandleLayoutRaf);
+    }
+    canvasResizeHandleLayoutRaf = requestAnimationFrame(() => {
+      canvasResizeHandleLayoutRaf = null;
+      updateCanvasResizeHandlePosition();
+      syncCanvasResizeHandleVisibility();
+    });
+  }
+
   function applyMobileDrawerHeight(height) {
     const root = document.documentElement;
     if (!(root instanceof HTMLElement)) {
@@ -33711,6 +33749,7 @@
     mobileDrawerState.drag.currentHeight = clampedHeight;
     root.style.setProperty('--mobile-drawer-height', `${clampedHeight}px`);
     scheduleMirrorGuideRefresh();
+    scheduleCanvasResizeHandleLayoutRefresh();
     if (isMirrorToolPopoverOpen()) {
       positionMirrorToolPopover();
     }
@@ -36185,8 +36224,7 @@
 
     if (dom.controls.applySpriteScale) {
       dom.controls.applySpriteScale.addEventListener('click', () => {
-        const value = dom.controls.spriteScaleInput?.value ?? 1;
-        applySpriteScaleMultiplier(value);
+        applySettingsSizeChanges();
       });
     }
     if (dom.controls.spriteScaleInput) {
@@ -36196,7 +36234,7 @@
       dom.controls.spriteScaleInput.addEventListener('keydown', event => {
         if (event.key === 'Enter') {
           event.preventDefault();
-          applySpriteScaleMultiplier(dom.controls.spriteScaleInput.value);
+          applySettingsSizeChanges();
         }
       });
     }
@@ -36239,7 +36277,7 @@
       adjustCanvasResizeInputBy('height', 1);
     });
     dom.controls.applyCanvasResize?.addEventListener('click', () => {
-      handleCanvasResizeRequest();
+      applySettingsSizeChanges();
     });
 
     dom.controls.clearCanvas?.addEventListener('click', () => {
@@ -36382,6 +36420,7 @@
     if (dom.controls.canvasHeightIncrement instanceof HTMLButtonElement) {
       dom.controls.canvasHeightIncrement.disabled = incHeightDisabled;
     }
+    updateSettingsSizeApplyButtonState();
   }
 
   function adjustCanvasResizeInputBy(target, delta) {
@@ -36532,6 +36571,29 @@
       return;
     }
     applyCanvasResizeDimensions(width, height, { restoreFocusInput });
+  }
+
+  function applySettingsSizeChanges() {
+    if (!canCurrentClientEditProjectStructure({ announce: true })) {
+      if (!isSharedProjectCollaborativeMode()) {
+        setMultiStatus(localizeText('参加/視聴モードではサイズ変更はマスターのみ操作できます', 'In participant/viewer mode, only the master can change size settings'), 'warn');
+      }
+      updateCanvasResizeControls({ normalizeValues: true });
+      updateSpriteScaleControlLimits();
+      return;
+    }
+    const shouldResizeCanvas = hasPendingCanvasResizeInputChange();
+    const spriteScaleValue = dom.controls.spriteScaleInput?.value ?? 1;
+    const shouldScaleSprite = hasPendingSpriteScaleInputChange();
+    if (shouldResizeCanvas) {
+      handleCanvasResizeRequest();
+    }
+    if (shouldScaleSprite) {
+      applySpriteScaleMultiplier(spriteScaleValue);
+      return;
+    }
+    updateCanvasResizeControls({ normalizeValues: true });
+    updateSpriteScaleControlLimits();
   }
 
   function setupNumberSteppers() {
@@ -38090,27 +38152,7 @@
       });
     }
     dom.controls.addPaletteColor?.addEventListener('click', () => {
-      if (!canCurrentClientEditPaletteColors()) {
-        return;
-      }
-      beginHistory('paletteAdd');
-      const nextIndex = state.palette.length;
-      const nextColor = isRgbColorMode()
-        ? normalizeColorValue(
-          getPaletteEditorTargetColor()
-          || state.activeRgb
-          || state.palette[state.activePaletteIndex]
-          || state.palette[state.palette.length - 1]
-          || { r: 88, g: 196, b: 255, a: 255 }
-        )
-        : getPresetBasedPaletteAddColor(dom.controls.palettePresetSelect?.value || currentPalettePresetId);
-      state.palette.push({ ...nextColor });
-      state.activePaletteIndex = normalizePaletteIndex(nextIndex, state.activePaletteIndex);
-      state.activeRgb = normalizeColorValue(nextColor);
-      syncPaletteInputs();
-      renderPalette();
-      applyPaletteChange();
-      commitHistory();
+      addPaletteColorFromCurrentEditor();
     });
 
     dom.controls.removePaletteColor?.addEventListener('click', () => {
@@ -38217,6 +38259,30 @@
     renderPalette();
     syncPaletteInputs();
     updateToolTabIcon();
+  }
+
+  function addPaletteColorFromCurrentEditor() {
+    if (!canCurrentClientEditPaletteColors()) {
+      return;
+    }
+    beginHistory('paletteAdd');
+    const nextIndex = state.palette.length;
+    const nextColor = isRgbColorMode()
+      ? normalizeColorValue(
+        getPaletteEditorTargetColor()
+        || state.activeRgb
+        || state.palette[state.activePaletteIndex]
+        || state.palette[state.palette.length - 1]
+        || { r: 88, g: 196, b: 255, a: 255 }
+      )
+      : getPresetBasedPaletteAddColor(dom.controls.palettePresetSelect?.value || currentPalettePresetId);
+    state.palette.push({ ...nextColor });
+    state.activePaletteIndex = normalizePaletteIndex(nextIndex, state.activePaletteIndex);
+    state.activeRgb = normalizeColorValue(nextColor);
+    syncPaletteInputs();
+    renderPalette();
+    applyPaletteChange();
+    commitHistory();
   }
 
   function reorderPalette(currentIndex, targetIndex) {
@@ -38382,6 +38448,17 @@
       });
       container.appendChild(button);
     });
+    const addButton = document.createElement('button');
+    addButton.type = 'button';
+    addButton.className = 'palette-swatch palette-swatch--add pixel-frame';
+    addButton.textContent = '+';
+    addButton.title = localizeText('色を追加', 'Add color');
+    addButton.setAttribute('aria-label', localizeText('色を追加', 'Add color'));
+    addButton.disabled = !canCurrentClientEditPaletteColors();
+    addButton.addEventListener('click', () => {
+      addPaletteColorFromCurrentEditor();
+    });
+    container.appendChild(addButton);
     renderToolQuickPalette();
     updateColorTabSwatch();
     updateFloatingDrawButtonPalettePreview();
@@ -74343,6 +74420,11 @@
       if (hasBody) {
         summary.title = localizeText('開くと操作できます', 'Open to show actions');
       }
+      const avatar = document.createElement('img');
+      avatar.className = 'multi-participant-item__avatar';
+      avatar.src = '../icon/PiXiEED.icon512.png';
+      avatar.alt = '';
+      avatar.loading = 'lazy';
       const main = document.createElement('span');
       main.className = 'multi-participant-item__main';
       const nameLine = document.createElement('span');
@@ -74393,6 +74475,7 @@
       if (hasStateTag) {
         summary.appendChild(state);
       }
+      summary.prepend(avatar);
 
       if (hasBody) {
         const details = document.createElement('details');
@@ -74804,13 +74887,15 @@
       && !multiState.connected
       && !multiState.connecting;
     const inMasterConfigMode = isMultiMasterConfigMode();
+    const isSignedIn = Boolean(accountState.isLoggedIn && !accountState.isAnonymous);
+    const requiresSharedLogin = sharedProjectFlowPreferred && !isSignedIn;
     syncMultiPanelFlowUi();
     updateMultiFlowTabsUi();
     const isJoinPanelVisible = isEntryView && multiEntryJoinPanelOpen;
     const isFlowKeyFieldVisible = !isEntryView;
     syncMultiProjectKeyInputValues(multiState.projectKey, { preserveFocused: true });
     if (dom.controls.multiJoinProjectKey instanceof HTMLInputElement) {
-      dom.controls.multiJoinProjectKey.disabled = multiState.connecting;
+      dom.controls.multiJoinProjectKey.disabled = multiState.connecting || requiresSharedLogin;
     }
     if (dom.controls.multiProjectKey instanceof HTMLInputElement) {
       dom.controls.multiProjectKey.disabled = sharedProjectFlowPreferred
@@ -74832,7 +74917,12 @@
     }
     if (dom.controls.multiJoinProjectKey instanceof HTMLInputElement) {
       const codeValue = currentAccess.inviteToken || currentAccess.projectKey || '';
-      if (sharedModeEnabled) {
+      if (requiresSharedLogin) {
+        dom.controls.multiJoinProjectKey.value = '';
+        dom.controls.multiJoinProjectKey.readOnly = true;
+        dom.controls.multiJoinProjectKey.type = 'text';
+        dom.controls.multiJoinProjectKey.placeholder = localizeText('ログインしてください', 'Sign in required');
+      } else if (sharedModeEnabled) {
         dom.controls.multiJoinProjectKey.value = codeValue;
         dom.controls.multiJoinProjectKey.readOnly = true;
         dom.controls.multiJoinProjectKey.type = 'text';
@@ -74847,13 +74937,13 @@
     }
     if (dom.controls.multiApplyAccessCode instanceof HTMLButtonElement) {
       dom.controls.multiApplyAccessCode.textContent = localizeText('確定', 'Apply');
-      dom.controls.multiApplyAccessCode.disabled = multiState.connecting;
+      dom.controls.multiApplyAccessCode.disabled = multiState.connecting || requiresSharedLogin;
       dom.controls.multiApplyAccessCode.hidden = sharedModeEnabled;
       dom.controls.multiApplyAccessCode.setAttribute('aria-hidden', String(sharedModeEnabled));
     }
     if (dom.controls.multiCopyAccessCode instanceof HTMLButtonElement) {
       const access = readCurrentMultiProjectAccessInput();
-      dom.controls.multiCopyAccessCode.disabled = multiState.connecting || !(access.inviteToken || access.projectKey);
+      dom.controls.multiCopyAccessCode.disabled = multiState.connecting || requiresSharedLogin || !(access.inviteToken || access.projectKey);
       dom.controls.multiCopyAccessCode.hidden = !sharedModeEnabled;
       dom.controls.multiCopyAccessCode.setAttribute('aria-hidden', String(!sharedModeEnabled));
     }
@@ -75210,7 +75300,6 @@
       dom.controls.multiJoinProjectKeyField.hidden = false;
       dom.controls.multiJoinProjectKeyField.setAttribute('aria-hidden', 'false');
     }
-    const isSignedIn = Boolean(accountState.isLoggedIn && !accountState.isAnonymous);
     if (dom.controls.multiEntryAccountCard instanceof HTMLElement) {
       dom.controls.multiEntryAccountCard.hidden = isSignedIn;
     }
