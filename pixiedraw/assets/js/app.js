@@ -74904,16 +74904,9 @@
       dom.controls.multiProjectKey.readOnly = !sharedProjectFlowPreferred;
     }
     if (dom.controls.multiToggleCodeVisibility instanceof HTMLButtonElement) {
-      const usingHiddenInput = (
-        (dom.controls.multiJoinProjectKey instanceof HTMLInputElement && dom.controls.multiJoinProjectKey.type === 'password')
-        || (dom.controls.multiProjectKey instanceof HTMLInputElement && dom.controls.multiProjectKey.type === 'password')
-      );
-      dom.controls.multiToggleCodeVisibility.textContent = usingHiddenInput
-        ? localizeText('表示', 'Show')
-        : localizeText('非表示', 'Hide');
-      dom.controls.multiToggleCodeVisibility.disabled = multiState.connecting;
-      dom.controls.multiToggleCodeVisibility.hidden = sharedModeEnabled;
-      dom.controls.multiToggleCodeVisibility.setAttribute('aria-hidden', String(sharedModeEnabled));
+      dom.controls.multiToggleCodeVisibility.hidden = false;
+      dom.controls.multiToggleCodeVisibility.disabled = multiState.connecting || !sharedModeEnabled;
+      dom.controls.multiToggleCodeVisibility.removeAttribute('aria-hidden');
     }
     if (dom.controls.multiJoinProjectKey instanceof HTMLInputElement) {
       const codeValue = currentAccess.inviteToken || currentAccess.projectKey || '';
@@ -74925,15 +74918,25 @@
       } else if (sharedModeEnabled) {
         dom.controls.multiJoinProjectKey.value = codeValue;
         dom.controls.multiJoinProjectKey.readOnly = true;
-        dom.controls.multiJoinProjectKey.type = 'text';
+        if (dom.controls.multiJoinProjectKey.dataset.visibilityToggled !== 'true') {
+          dom.controls.multiJoinProjectKey.type = 'text';
+        }
         dom.controls.multiJoinProjectKey.placeholder = localizeText('共有コード', 'Shared code');
       } else {
+        delete dom.controls.multiJoinProjectKey.dataset.visibilityToggled;
         dom.controls.multiJoinProjectKey.readOnly = false;
         if (dom.controls.multiJoinProjectKey.type !== 'password') {
           dom.controls.multiJoinProjectKey.type = 'password';
         }
         dom.controls.multiJoinProjectKey.placeholder = localizeText('コードを入力してください', 'Enter code');
       }
+    }
+    if (dom.controls.multiToggleCodeVisibility instanceof HTMLButtonElement) {
+      const usingHiddenInput = dom.controls.multiJoinProjectKey instanceof HTMLInputElement
+        && dom.controls.multiJoinProjectKey.type === 'password';
+      dom.controls.multiToggleCodeVisibility.textContent = usingHiddenInput
+        ? localizeText('表示', 'Show')
+        : localizeText('非表示', 'Hide');
     }
     if (dom.controls.multiApplyAccessCode instanceof HTMLButtonElement) {
       dom.controls.multiApplyAccessCode.textContent = localizeText('確定', 'Apply');
@@ -78734,6 +78737,9 @@
             return;
           }
           input.type = shouldHide ? 'password' : 'text';
+          if (input === dom.controls.multiJoinProjectKey) {
+            input.dataset.visibilityToggled = 'true';
+          }
         });
         syncMultiControls();
       });
