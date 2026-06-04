@@ -383,6 +383,10 @@
       multiHelpPanel: document.getElementById('multiHelpPanel'),
       multiHelpClose: document.getElementById('multiHelpClose'),
       multiParticipants: document.getElementById('multiParticipants'),
+      multiParticipantsPanelTab: document.getElementById('multiParticipantsPanelTab'),
+      multiCommentsPanelTab: document.getElementById('multiCommentsPanelTab'),
+      multiParticipantsView: document.getElementById('multiParticipantsView'),
+      multiCommentsView: document.getElementById('multiCommentsView'),
       multiCommentList: document.getElementById('multiCommentList'),
       multiCommentInput: document.getElementById('multiCommentInput'),
       multiCommentSend: document.getElementById('multiCommentSend'),
@@ -2700,6 +2704,7 @@
   const SHARED_RECENT_PROJECTS_ACCOUNT_SYNC_COOLDOWN_MS = 12000;
   const SHARED_PROJECT_BROADCAST_EVENT = 'shared-op';
   const SHARED_PROJECT_CELL_PRESENCE_EVENT = 'shared-cell-presence';
+  const SHARED_PROJECT_COMMENT_EVENT = 'shared-comment';
   const SHARED_PROJECT_CELL_PRESENCE_TTL_MS = 18000;
   const SHARED_PROJECT_CELL_PRESENCE_HEARTBEAT_MS = 6000;
   const SHARED_PROJECT_CELL_PRESENCE_BROADCAST_DEBOUNCE_MS = 120;
@@ -15993,6 +15998,8 @@
     setLocalizedTextContent('#multiStatus', '共有リンクを作成', 'Create Shared Link');
     setLocalizedTextContent('#multiFlowTabCollabLabel', '共同', 'Collab');
     setLocalizedTextContent('#multiFlowTabCommentsLabel', 'コメント', 'Comments');
+    setLocalizedTextContent('#multiParticipantsPanelTabLabel', '参加者一覧', 'Participants');
+    setLocalizedTextContent('#multiCommentsPanelTabLabel', 'コメント', 'Comments');
     setLocalizedTextContent('#multiOverviewSummary', '共有リンクで開いたプロジェクトを、そのまま共同編集できます。', 'Projects opened from invite links can be edited together immediately.');
     setLocalizedTextContent('#multiOverviewHint', '描画はリアルタイム反映され、共有プロジェクトの最新状態が基準になります。', 'Drawing updates live, and the shared project snapshot stays the source of truth.');
     setLocalizedAttribute('#multiHelpToggle', 'aria-label', 'マルチ説明を表示', 'Show collab help');
@@ -16002,7 +16009,6 @@
     setLocalizedTextContent('#multiHelpPanel .help-text:nth-of-type(3)', '共有プロジェクトは自分のプロジェクト一覧にも残るので、あとから開き直せます。', 'Shared projects stay in your project list so you can reopen them later.');
     setLocalizedTextContent('#multiHelpPanel .help-text:nth-of-type(4)', '上の入力欄には共有リンクをそのまま貼り付けできます。', 'You can paste the full invite link directly into the field above.');
     setLocalizedTextContent('#multiHelpClose', '閉じる', 'Close');
-    setLocalizedTextContent('#panelMulti .multi-participants-panel > summary', '参加者/視聴者一覧', 'Participants / Viewers');
     setLocalizedTextContent('#panelMulti .multi-master-advanced > summary', '部屋設定', 'Room Settings');
     setLocalizedTextContent('#multiParticipants .help-text', '未接続', 'Not connected');
     setLocalizedTextContent('#multiPresetFriends', '友達向け', 'Friends');
@@ -70178,6 +70184,16 @@
         handleSharedProjectCellPresenceBroadcast(payload);
       }
     );
+      channel.on(
+      'broadcast',
+      { event: SHARED_PROJECT_COMMENT_EVENT },
+      payload => {
+        if (projectKey !== activeSharedProjectKey) {
+          return;
+        }
+        handleSharedProjectCommentBroadcast(payload);
+      }
+    );
       if (shouldEnableSharedProjectRealtimeStage(realtimeStage, 'projects')) {
         channel.on(
           'postgres_changes',
@@ -74229,7 +74245,7 @@
   }
 
   function setMultiCommentTabNotification(enabled) {
-    const button = dom.controls.multiFlowTabComments;
+    const button = dom.controls.multiCommentsPanelTab || dom.controls.multiFlowTabComments;
     if (!(button instanceof HTMLButtonElement)) {
       return;
     }
@@ -74243,8 +74259,44 @@
   }
 
   function isMultiCommentsTabVisible() {
+    const commentsView = dom.controls.multiCommentsView;
+    if (commentsView instanceof HTMLElement && !commentsView.hidden && isMultiFlowPanelVisible()) {
+      return true;
+    }
     return normalizeMultiFlowTab(multiState.activeTab) === 'comments'
       && isMultiFlowPanelVisible();
+  }
+
+  function setMultiParticipantsPanelTab(tab = 'participants') {
+    const activeTab = tab === 'comments' ? 'comments' : 'participants';
+    const tabs = [
+      dom.controls.multiParticipantsPanelTab,
+      dom.controls.multiCommentsPanelTab,
+    ].filter(button => button instanceof HTMLButtonElement);
+    const views = {
+      participants: dom.controls.multiParticipantsView,
+      comments: dom.controls.multiCommentsView,
+    };
+    tabs.forEach(button => {
+      const key = button.dataset.multiPanelTab === 'comments' ? 'comments' : 'participants';
+      const isActive = key === activeTab;
+      button.classList.toggle('is-active', isActive);
+      button.setAttribute('aria-selected', String(isActive));
+      button.setAttribute('tabindex', isActive ? '0' : '-1');
+    });
+    Object.entries(views).forEach(([key, view]) => {
+      if (!(view instanceof HTMLElement)) {
+        return;
+      }
+      const isActive = key === activeTab;
+      view.hidden = !isActive;
+      view.classList.toggle('is-active', isActive);
+    });
+    if (activeTab === 'comments') {
+      setMultiCommentTabNotification(false);
+      setMultiTabNotification(false);
+      renderMultiComments();
+    }
   }
 
   function updateMultiFlowTabsUi() {
@@ -75600,8 +75652,33 @@
     }
   }
 
+  function sendSharedProjectCommentBroadcast(payload) {
+    if (!activeSharedProjectChannel || typeof activeSharedProjectChannel.send !== 'function') {
+      ensureActiveSharedProjectRealtimeChannel().catch(() => {});
+      return Promise.resolve(false);
+    }
+    return activeSharedProjectChannel.send({
+      type: 'broadcast',
+      event: SHARED_PROJECT_COMMENT_EVENT,
+      payload,
+    }).then(() => true).catch(error => {
+      console.warn('[shared-realtime] comment-send-failed', error);
+      return false;
+    });
+  }
+
+  function handleSharedProjectCommentBroadcast(payload) {
+    const entry = payload?.payload && typeof payload.payload === 'object' ? payload.payload : payload;
+    if (!entry || entry.projectKey !== activeSharedProjectKey) {
+      return;
+    }
+    appendMultiCommentEntry(entry);
+    renderMultiComments();
+  }
+
   async function sendMultiComment(text) {
-    if (!multiState.connected) {
+    const sharedCommentMode = isSharedProjectCollaborativeMode() && activeSharedProjectKey;
+    if (!sharedCommentMode && !multiState.connected) {
       setMultiStatus(localizeText('コメント送信には接続が必要です', 'Connection is required to send comments'), 'warn');
       return false;
     }
@@ -75611,17 +75688,22 @@
       return false;
     }
     const payload = {
-      projectKey: multiState.projectKey,
+      projectKey: sharedCommentMode ? activeSharedProjectKey : multiState.projectKey,
       clientId: multiState.clientId,
+      userId: accountState.userId || '',
+      sessionId: sharedProjectSessionInstanceId || '',
       role: normalizeMultiRole(multiState.role, 'guest'),
       name: getLocalMultiParticipantName(),
       avatarId: getLocalMultiParticipantAvatarId(),
+      avatarSrc: resolvePixieedAvatarSrcFromId(getLocalMultiParticipantAvatarId()),
       text: normalizedText,
       sentAt: Date.now(),
     };
     appendMultiCommentEntry(payload);
     renderMultiComments();
-    const sent = await sendMultiBroadcast('comment', payload);
+    const sent = sharedCommentMode
+      ? await sendSharedProjectCommentBroadcast(payload)
+      : await sendMultiBroadcast('comment', payload);
     if (!sent) {
       setMultiStatus(localizeText('コメントの送信に失敗しました', 'Failed to send comment'), 'error');
       return false;
@@ -76070,12 +76152,6 @@
       participantsPanel.hidden = false;
       participantsPanel.classList.toggle('is-inactive', sharedProjectFlowPreferred && !sharedModeEnabled);
     }
-    if (dom.controls.multiCommentList instanceof HTMLElement) {
-      const commentsSection = dom.controls.multiCommentList.closest('.multi-flow-tabpanel--comments');
-      if (commentsSection instanceof HTMLElement) {
-        commentsSection.hidden = true;
-      }
-    }
     if (dom.controls.multiMasterAdvanced instanceof HTMLElement) {
       dom.controls.multiMasterAdvanced.hidden = sharedProjectFlowPreferred;
     } else {
@@ -76103,7 +76179,10 @@
     if (dom.controls.multiSupportCard instanceof HTMLElement) {
       dom.controls.multiSupportCard.hidden = !isSignedIn;
     }
-    const canSendComment = multiState.connected && !multiState.connecting;
+    const canSendComment = (
+      (isSharedProjectCollaborativeMode() && Boolean(activeSharedProjectKey))
+      || multiState.connected
+    ) && !multiState.connecting;
     if (dom.controls.multiCommentInput instanceof HTMLInputElement) {
       dom.controls.multiCommentInput.disabled = !canSendComment;
       dom.controls.multiCommentInput.placeholder = canSendComment
@@ -79943,6 +80022,22 @@
       bindTabKeyboardNavigation(button, getMultiFlowTabButtons);
       button.addEventListener('click', () => {
         setMultiFlowTab(button.dataset.multiFlowTab || '');
+      });
+    });
+    [
+      dom.controls.multiParticipantsPanelTab,
+      dom.controls.multiCommentsPanelTab,
+    ].forEach(button => {
+      if (!(button instanceof HTMLButtonElement) || button.dataset.bound === 'true') {
+        return;
+      }
+      button.dataset.bound = 'true';
+      bindTabKeyboardNavigation(button, () => [
+        dom.controls.multiParticipantsPanelTab,
+        dom.controls.multiCommentsPanelTab,
+      ].filter(item => item instanceof HTMLButtonElement));
+      button.addEventListener('click', () => {
+        setMultiParticipantsPanelTab(button.dataset.multiPanelTab || 'participants');
       });
     });
     if (dom.controls.multiStartSession instanceof HTMLButtonElement && dom.controls.multiStartSession.dataset.bound !== 'true') {
