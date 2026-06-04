@@ -882,17 +882,19 @@
 <button class="chip multi-project-key-copy" id="multiCopyAccessCode" type="button">コピー</button>
 </div>
 </div>
-<div class="multi-overview__header">
-<div class="multi-share-card__title">
-<img alt="" aria-hidden="true" class="multi-share-card__icon" src="assets/icons/maltimode.svg"/>
-<strong>共有プロジェクト</strong>
+<div class="multi-overview__chips" hidden id="multiOverviewChips"></div>
+<details class="field field--list multi-participants-panel" open>
+<summary>共有中のメンバー <span class="multi-participants-count" id="multiParticipantsCount">0</span></summary>
+<div class="multi-participants-scroll">
+<ul class="toggle-list multi-participants-list" id="multiParticipants">
+<li class="help-text">共有モードをONにすると、ここにメンバーが表示されます。</li>
+</ul>
 </div>
-<div class="multi-status-row">
-<button aria-live="polite" class="button" id="multiStatus" type="button">共有モード: OFF</button>
-</div>
-<div class="multi-overview__chips" id="multiOverviewChips"></div>
-</div>
+</details>
 <p class="help-text ui-guide-text" id="multiOverviewSummary">接続状態に応じて、できることがここに表示されます。</p>
+<div class="multi-status-row">
+<button aria-live="polite" class="button" id="multiStatus" type="button">共有リンクを作成</button>
+</div>
 <p class="help-text ui-guide-text" id="multiOverviewHint">共有モードをONにすると、このプロジェクトの共有URLをコピーできます。</p>
 </section>
 <section class="multi-account-card" id="multiFlowAccountCard">
@@ -923,14 +925,6 @@
 <button class="button" hidden id="multiLeaveSession" type="button">切断</button>
 </div>
 </div>
-<details class="field field--list multi-participants-panel" open>
-<summary>共有中のメンバー <span class="multi-participants-count" id="multiParticipantsCount">0</span></summary>
-<div class="multi-participants-scroll">
-<ul class="toggle-list multi-participants-list" id="multiParticipants">
-<li class="help-text">共有モードをONにすると、ここにメンバーが表示されます。</li>
-</ul>
-</div>
-</details>
 </div>
 </div>
 <div class="panel-ad-mount" data-panel-ad-mount="right"></div>
