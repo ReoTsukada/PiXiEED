@@ -1832,6 +1832,14 @@
     return hash >>> 0;
   }
 
+  function mixUint32Hash(hash, value) {
+    return Math.imul((hash >>> 0) ^ (Math.round(Number(value) || 0) >>> 0), 16777619) >>> 0;
+  }
+
+  function mixTextHash(hash, value) {
+    return mixUint32Hash(hash, hashTextToUint32(value));
+  }
+
   function hslToRgbColor(h, s, l) {
     const hue = ((Number(h) % 360) + 360) % 360;
     const sat = clamp(Number(s), 0, 100) / 100;
@@ -2681,12 +2689,14 @@
   const SHARED_PROJECT_SEEN_OP_KEEP = 2048;
   const SHARED_PROJECT_REALTIME_SUBSCRIBE_TIMEOUT_MS = 30000;
   const SHARED_PROJECT_SLEEP_WAKE_GAP_MS = 2500;
+  const SHARED_PROJECT_SAFARI_WAKE_RESYNC_DELAY_MS = 1400;
   const SHARED_PROJECT_AUTO_RELOAD_AFTER_CATCHUP_MS = 45000;
   const SHARED_PROJECT_FIRST_INPUT_RECONNECT_AFTER_CATCHUP_MS = 1200;
   const SHARED_PROJECT_VISIBLE_RECOVER_AFTER_SYNC_MS = 6000;
   const SHARED_PROJECT_STATUS_TRAFFIC_LAMP_MS = 1200;
   const SHARED_PROJECT_RECOVERY_RELOAD_COOLDOWN_MS = 90000;
   const SHARED_PROJECT_DRAW_READY_MAX_AGE_MS = 2500;
+  const SHARED_PROJECT_FINGERPRINT_MISMATCH_COOLDOWN_MS = 3500;
   const SHARED_RECENT_PROJECTS_ACCOUNT_SYNC_COOLDOWN_MS = 12000;
   const SHARED_PROJECT_BROADCAST_EVENT = 'shared-op';
   const SHARED_PROJECT_RECOVERY_RELOAD_STORAGE_KEY = 'pixieedraw:shared-recovery-reload-at';
@@ -2694,6 +2704,16 @@
   const SHARED_LOCAL_OP_JOURNAL_PRUNE_BATCH = 320;
   const SHARED_LOCAL_OP_JOURNAL_FALLBACK_STORAGE_KEY = 'pixieedraw:shared-local-op-journal-fallback:v1';
   const SHARED_LOCAL_OP_JOURNAL_FALLBACK_MAX_ENTRIES = 800;
+  const IS_SAFARI_BROWSER = (() => {
+    if (typeof navigator === 'undefined') {
+      return false;
+    }
+    const ua = String(navigator.userAgent || '');
+    const vendor = String(navigator.vendor || '');
+    return /Safari/i.test(ua)
+      && /Apple/i.test(vendor)
+      && !/CriOS|FxiOS|EdgiOS|OPiOS|Chrome|Chromium|Android/i.test(ua);
+  })();
   const MULTI_GUEST_MOVE_PREVIEW_DEBOUNCE_MS = 140;
   const NEW_PROJECT_PALETTE_PRESET_NAMES = Object.freeze([
     'Pixel Core',
@@ -3204,6 +3224,7 @@
   let sharedProjectReconnectRecoveryTimer = null;
   let sharedProjectReconnectRecoveryPromise = null;
   let sharedProjectWakeRecoveryPromise = null;
+  let sharedProjectSafariWakeResyncTimer = null;
   let sharedProjectWatchdogLastTickAt = 0;
   let sharedProjectCatchingUpStartedAt = 0;
   let sharedProjectRecoveryReloadTimer = null;
@@ -3220,6 +3241,7 @@
   let sharedProjectDrawReadinessPromise = null;
   let sharedProjectStaleLocalDiscardRefreshQueued = false;
   let sharedProjectVisibilityHiddenAt = 0;
+  let sharedProjectLastFingerprintMismatchAt = 0;
   function getCurrentAccountStorageNamespace() {
     const userId = typeof accountState.userId === 'string' ? accountState.userId.trim() : '';
     return userId || 'anonymous';
@@ -4056,6 +4078,7 @@
   state.mirror = normalizeMirrorAxisState(state.mirror, state.width, state.height);
   updateGridDecorations();
   const pointerState = createPointerState();
+  window.addEventListener('pagehide', handleMultiPageHide);
   window.addEventListener('pagehide', handleAutosavePageHide);
   window.addEventListener('pagehide', () => {
     flushActiveSharedProjectFinalSnapshot({ historyLabel: 'sharedFinalSnapshotPageHide' });
@@ -11061,6 +11084,27 @@
     return sharedProjectWakeRecoveryPromise;
   }
 
+  function scheduleSafariSharedProjectWakeResync(reason = 'safari-wake', hiddenGapMs = 0) {
+    if (!IS_SAFARI_BROWSER || !activeSharedProjectKey || appReloadInProgress) {
+      return;
+    }
+    if (sharedProjectSafariWakeResyncTimer !== null) {
+      window.clearTimeout(sharedProjectSafariWakeResyncTimer);
+      sharedProjectSafariWakeResyncTimer = null;
+    }
+    const recoveryProjectKey = activeSharedProjectKey;
+    sharedProjectSafariWakeResyncTimer = window.setTimeout(() => {
+      sharedProjectSafariWakeResyncTimer = null;
+      if (!activeSharedProjectKey || activeSharedProjectKey !== recoveryProjectKey || document.visibilityState === 'hidden') {
+        return;
+      }
+      recoverSharedProjectAfterWake(`${reason}-safari-confirm`, {
+        hiddenGapMs,
+        immediate: true,
+      }).catch(() => {});
+    }, SHARED_PROJECT_SAFARI_WAKE_RESYNC_DELAY_MS);
+  }
+
   function requestSharedProjectDrawReadinessRecovery(reason = 'draw-blocked') {
     if (!activeSharedProjectKey || appReloadInProgress || !isSharedProjectCollaborativeMode()) {
       return Promise.resolve(false);
@@ -11161,6 +11205,7 @@
       sharedProjectVisibilityHiddenAt = 0;
       if (activeSharedProjectKey) {
         recoverSharedProjectAfterWake('visibility', { hiddenGapMs, immediate: true }).catch(() => {});
+        scheduleSafariSharedProjectWakeResync('visibility', hiddenGapMs);
         return;
       }
       ensureSharedRecentProjectsAccountSynced({ force: true }).catch(() => {});
@@ -11176,6 +11221,7 @@
     sharedProjectVisibilityHiddenAt = 0;
     if (activeSharedProjectKey) {
       recoverSharedProjectAfterWake('focus', { hiddenGapMs, immediate: true }).catch(() => {});
+      scheduleSafariSharedProjectWakeResync('focus', hiddenGapMs);
       return;
     }
     ensureSharedRecentProjectsAccountSynced({ force: true }).catch(() => {});
@@ -11186,6 +11232,7 @@
     syncSharedProjectVisibleStatus();
     if (activeSharedProjectKey) {
       recoverSharedProjectAfterWake('online', { hiddenGapMs: 0, immediate: true }).catch(() => {});
+      scheduleSafariSharedProjectWakeResync('online', 0);
       return;
     }
     ensureSharedRecentProjectsAccountSynced({ force: true }).catch(() => {});
@@ -11208,6 +11255,7 @@
     sharedProjectVisibilityHiddenAt = 0;
     if (activeSharedProjectKey) {
       recoverSharedProjectAfterWake(event?.persisted ? 'pageshow-bfcache' : 'pageshow', { hiddenGapMs, immediate: true }).catch(() => {});
+      scheduleSafariSharedProjectWakeResync(event?.persisted ? 'pageshow-bfcache' : 'pageshow', hiddenGapMs);
       return;
     }
     ensureSharedRecentProjectsAccountSynced({ force: true }).catch(() => {});
@@ -11221,10 +11269,21 @@
     sharedProjectVisibilityHiddenAt = 0;
     if (activeSharedProjectKey) {
       recoverSharedProjectAfterWake('document-resume', { hiddenGapMs, immediate: true }).catch(() => {});
+      scheduleSafariSharedProjectWakeResync('document-resume', hiddenGapMs);
       return;
     }
     ensureSharedRecentProjectsAccountSynced({ force: true }).catch(() => {});
     requestMultiResync('document-resume');
+  }
+
+  function handleMultiPageHide() {
+    if (activeSharedProjectKey) {
+      sharedProjectVisibilityHiddenAt = Date.now();
+    }
+    if (sharedProjectSafariWakeResyncTimer !== null) {
+      window.clearTimeout(sharedProjectSafariWakeResyncTimer);
+      sharedProjectSafariWakeResyncTimer = null;
+    }
   }
 
   function handleSharedProjectRecoveryFirstInput() {
@@ -15444,7 +15503,7 @@
     setLocalizedTextContent('#multiInviteShare', '招待を共有', 'Share Invite');
     setLocalizedTextContent('#multiRequestGuestRole', 'そのまま編集できます', 'Edit Immediately');
     setLocalizedTextContent('#multiJoinRequestHint', '共有リンクを開いた人は、そのまま編集できます。', 'Anyone who opens the invite link can edit immediately.');
-    setLocalizedTextContent('#multiStatus', '共有モード: OFF', 'Shared mode: OFF');
+    setLocalizedTextContent('#multiStatus', '共有リンクを作成', 'Create Shared Link');
     setLocalizedTextContent('#multiFlowTabCollabLabel', '共同', 'Collab');
     setLocalizedTextContent('#multiFlowTabCommentsLabel', 'コメント', 'Comments');
     setLocalizedTextContent('#multiOverviewSummary', '共有リンクで開いたプロジェクトを、そのまま共同編集できます。', 'Projects opened from invite links can be edited together immediately.');
@@ -22597,7 +22656,7 @@
         source: requestedSharedProjectRevision > 0 ? 'snapshot' : 'document',
       });
       setMultiStatus(
-        localizeText('共有モード: ON', 'Shared mode: ON'),
+        localizeText('共有リンクをコピーできます', 'Shared link is ready to copy'),
         'info'
       );
     } else if (requestedSharedProjectId) {
@@ -63519,6 +63578,7 @@
 
   function createOp(historyLabel = '', opPayload = null, { projectKey = activeSharedProjectKey } = {}) {
     const payload = opPayload && typeof opPayload === 'object' ? { ...opPayload } : {};
+    attachSharedProjectDocumentFingerprint(payload);
     const resolvedProjectKey = normalizeMultiProjectKey(projectKey || activeSharedProjectKey);
     const canvasId = typeof payload.canvasId === 'string' ? payload.canvasId.trim() : '';
     const layerId = typeof payload.layerId === 'string' ? payload.layerId.trim() : '';
@@ -63548,6 +63608,124 @@
       projectKey: op.projectKey,
     });
     return op;
+  }
+
+  function createSharedProjectDocumentFingerprint() {
+    if (!isSharedProjectCollaborativeMode() || !hasUsableActiveSharedProjectDocumentState()) {
+      return null;
+    }
+    let hash = 2166136261;
+    const canvases = getProjectCanvasDocuments();
+    hash = mixUint32Hash(hash, 1);
+    hash = mixUint32Hash(hash, state.width);
+    hash = mixUint32Hash(hash, state.height);
+    hash = mixTextHash(hash, getActiveProjectCanvasDocument()?.id || '');
+    if (Array.isArray(state.palette)) {
+      hash = mixUint32Hash(hash, state.palette.length);
+      state.palette.forEach(color => {
+        const normalized = normalizeColorValue(color);
+        hash = mixUint32Hash(hash, normalized.r);
+        hash = mixUint32Hash(hash, normalized.g);
+        hash = mixUint32Hash(hash, normalized.b);
+        hash = mixUint32Hash(hash, normalized.a);
+      });
+    }
+    canvases.forEach(canvasDoc => {
+      if (!canvasDoc || typeof canvasDoc !== 'object') {
+        return;
+      }
+      const frames = Array.isArray(canvasDoc.frames) ? canvasDoc.frames : [];
+      hash = mixTextHash(hash, canvasDoc.id || '');
+      hash = mixUint32Hash(hash, canvasDoc.width);
+      hash = mixUint32Hash(hash, canvasDoc.height);
+      hash = mixUint32Hash(hash, frames.length);
+      frames.forEach((frame, frameIndex) => {
+        const layers = Array.isArray(frame?.layers) ? frame.layers : [];
+        hash = mixTextHash(hash, frame?.id || '');
+        hash = mixUint32Hash(hash, frameIndex);
+        hash = mixUint32Hash(hash, layers.length);
+        layers.forEach((layer, layerIndex) => {
+          if (!layer || typeof layer !== 'object') {
+            return;
+          }
+          hash = mixTextHash(hash, layer.id || '');
+          hash = mixUint32Hash(hash, layerIndex);
+          hash = mixUint32Hash(hash, layer.visible === false ? 0 : 1);
+          hash = mixUint32Hash(hash, Math.round(normalizeLayerOpacity(layer.opacity) * 1000));
+          hash = mixTextHash(hash, normalizeLayerBlendMode(layer.blendMode));
+          const indices = layer.indices;
+          if (indices && typeof indices.length === 'number' && indices.length > 0) {
+            const length = indices.length;
+            hash = mixUint32Hash(hash, length);
+            const step = Math.max(1, Math.floor(length / 17));
+            for (let offset = 0; offset < length; offset += step) {
+              hash = mixUint32Hash(hash, indices[offset]);
+            }
+            hash = mixUint32Hash(hash, indices[length - 1]);
+          }
+          const direct = layer.direct;
+          if (direct && typeof direct.length === 'number' && direct.length > 0) {
+            const length = direct.length;
+            hash = mixUint32Hash(hash, length);
+            const step = Math.max(4, Math.floor(length / 17));
+            for (let offset = 0; offset < length; offset += step) {
+              hash = mixUint32Hash(hash, direct[offset]);
+            }
+            hash = mixUint32Hash(hash, direct[length - 1]);
+          }
+        });
+      });
+    });
+    return {
+      version: 1,
+      revision: Math.max(0, Math.round(Number(activeSharedProjectRevision) || 0)),
+      structureRevision: Math.max(0, Math.round(Number(activeSharedProjectStructureRevision) || 0)),
+      hash: (hash >>> 0).toString(16).padStart(8, '0'),
+    };
+  }
+
+  function attachSharedProjectDocumentFingerprint(payload) {
+    if (!payload || typeof payload !== 'object' || payload.sharedFingerprint) {
+      return payload;
+    }
+    const fingerprint = createSharedProjectDocumentFingerprint();
+    if (fingerprint) {
+      payload.sharedFingerprint = fingerprint;
+    }
+    return payload;
+  }
+
+  function verifySharedProjectDocumentFingerprint(opRecord, { reason = 'op-applied' } = {}) {
+    const payload = extractSharedProjectOpPayload(opRecord);
+    const expected = payload?.sharedFingerprint;
+    if (!expected || typeof expected !== 'object' || typeof expected.hash !== 'string') {
+      return true;
+    }
+    const actual = createSharedProjectDocumentFingerprint();
+    if (!actual) {
+      return true;
+    }
+    if (actual.hash === expected.hash) {
+      return true;
+    }
+    const now = Date.now();
+    console.warn('[shared-sync] document-fingerprint-mismatch', {
+      reason,
+      opId: getSharedProjectOpId(opRecord),
+      revision: getSharedProjectOpSeq(opRecord),
+      expected,
+      actual,
+    });
+    if ((now - sharedProjectLastFingerprintMismatchAt) >= SHARED_PROJECT_FINGERPRINT_MISMATCH_COOLDOWN_MS) {
+      sharedProjectLastFingerprintMismatchAt = now;
+      setActiveSharedProjectSyncState('catching-up', { announce: true });
+      queueSharedProjectRefresh({
+        immediate: true,
+        reason: `${reason || 'op'}-fingerprint-mismatch`,
+        force: true,
+      });
+    }
+    return false;
   }
 
   // Shared project realtime drawing:
@@ -64842,6 +65020,9 @@
       if (fromRemote) {
         logSharedProjectDrawLifecycle('remote-confirmed-op-applied', opRecord, {
           mode: isSharedProjectRemoteOpFromCurrentSession(opRecord) ? 'self-confirmed-ack' : 'remote-confirmed',
+        });
+        verifySharedProjectDocumentFingerprint(opRecord, {
+          reason: isSharedProjectRemoteOpFromCurrentSession(opRecord) ? 'self-confirmed-op' : 'remote-op',
         });
       }
       rememberSharedProjectSeenOp(opId, seq);
@@ -67024,16 +67205,28 @@
         if (!supabase) {
           return [];
         }
+        const memberColumns = 'project_key, project_id, user_id, role, joined_at, updated_at, last_opened_at';
         let query = supabase
           .from('shared_project_members')
-          .select('project_key, project_id, user_id, role, joined_at, updated_at, last_opened_at');
+          .select(`${memberColumns}, active_session_id, active_heartbeat_at`);
         query = normalizedProjectId
           ? query.eq('project_id', normalizedProjectId)
           : query.eq('project_key', normalizedProjectKey);
-        const { data, error } = await query;
+        let { data, error } = await query;
         if (error) {
-          handleSharedProjectsBackendError(error, 'list-active-members');
-          return [];
+          let fallbackQuery = supabase
+            .from('shared_project_members')
+            .select(memberColumns);
+          fallbackQuery = normalizedProjectId
+            ? fallbackQuery.eq('project_id', normalizedProjectId)
+            : fallbackQuery.eq('project_key', normalizedProjectKey);
+          const fallbackResponse = await fallbackQuery;
+          data = fallbackResponse.data;
+          error = fallbackResponse.error;
+          if (error) {
+            handleSharedProjectsBackendError(error, 'list-active-members');
+            return [];
+          }
         }
         const rows = Array.isArray(data) ? data : [];
         const userIds = rows
@@ -67043,14 +67236,22 @@
         sharedProjectMembers = rows.map(entry => {
           const userId = typeof entry?.user_id === 'string' ? entry.user_id.trim() : '';
           const isSelf = Boolean(userId) && userId === accountState.userId;
+          const activeSessionId = typeof entry?.active_session_id === 'string' ? entry.active_session_id.trim() : '';
+          const activeHeartbeatAt = Date.parse(entry?.active_heartbeat_at || '') || 0;
+          const isCurrentlyPresent = Boolean(activeSessionId)
+            && activeHeartbeatAt > 0
+            && (Date.now() - activeHeartbeatAt) < 70000;
           const profileName = userId ? normalizeMultiParticipantName(profileNicknames.get(userId) || '', '') : '';
+          const avatarId = isSelf ? getLocalMultiParticipantAvatarId() : '';
           return {
             clientId: userId || `${entry?.project_key || normalizedProjectKey}:${entry?.joined_at || entry?.updated_at || Date.now()}`,
             role: entry?.role === 'owner' ? 'master' : (entry?.role === 'viewer' ? 'spectator' : 'guest'),
             name: isSelf
               ? (readPixieedAccountNickname() || DEFAULT_MULTI_PARTICIPANT_NAME)
               : (profileName || DEFAULT_MULTI_PARTICIPANT_NAME),
-            online: true,
+            avatarId,
+            avatarSrc: avatarId ? resolvePixieedAvatarSrcFromId(avatarId) : '../icon/PiXiEED.icon512.png',
+            online: isSelf ? isCurrentProjectSharedEntry() : isCurrentlyPresent,
             joinedAt: Date.parse(entry?.joined_at || entry?.updated_at || entry?.last_opened_at || '') || Date.now(),
             locked: false,
           };
@@ -72551,26 +72752,23 @@
     let text = typeof message === 'string' && message.trim()
       ? message.trim()
       : localizeText('共有モード: OFF', 'Collab mode: OFF');
+    let actionText = '';
     if (prefersSharedProjectFlow()) {
       const currentAccess = readCurrentMultiProjectAccessInput();
       const currentProjectKey = currentAccess.projectKey || readCurrentMultiProjectKey();
       const resolvedSharedProjectKey = resolveSharedProjectKeyForCurrentState();
       const sharedModeEnabled = isCurrentProjectSharedEntry()
         || Boolean(resolvedSharedProjectKey && resolvedSharedProjectKey === currentProjectKey);
-      if (sharedModeEnabled) {
-        text = localizeText('共有モード: ON', 'Shared mode: ON');
-        tone = 'success';
-      } else {
-        text = localizeText('共有モード: OFF', 'Shared mode: OFF');
-        tone = 'info';
-      }
+      actionText = sharedModeEnabled
+        ? localizeText('共有リンクをコピー', 'Copy Shared Link')
+        : localizeText('共有リンクを作成', 'Create Shared Link');
     }
     multiState.status = text;
     const node = dom.controls.multiStatus;
     if (!(node instanceof HTMLElement)) {
       return;
     }
-    node.textContent = text;
+    node.textContent = actionText || text;
     node.style.color = getMultiStatusColor(tone);
     node.dataset.tone = tone;
     renderMultiOverview();
@@ -72903,7 +73101,7 @@
     const resolvedSharedProjectKey = resolveSharedProjectKeyForCurrentState();
     const currentProjectIsShared = isCurrentProjectSharedEntry();
     if (currentProjectIsShared || resolvedSharedProjectKey || isSharedProjectCollaborativeMode()) {
-      setMultiStatus(localizeText('共有モード: ON', 'Shared mode: ON'), 'success');
+      setMultiStatus(localizeText('共有リンクをコピーできます', 'Shared link is ready to copy'), 'success');
       return;
     }
     if (!multiState.connected) {
@@ -73107,7 +73305,7 @@
       inviteToken,
     });
     if (!inviteUrl) {
-      setMultiStatus(localizeText('先に共有モードをONにしてください', 'Turn on shared mode first'), 'warn');
+      setMultiStatus(localizeText('先に共有リンクを作成してください', 'Create a shared link first'), 'warn');
       return false;
     }
     if (copiedInitialInviteUrl && inviteUrl === initialInviteUrl) {
@@ -73162,7 +73360,7 @@
       inviteToken,
     });
     if (!inviteUrl) {
-      setMultiStatus(localizeText('先に共有モードをONにしてください', 'Turn on shared mode first'), 'warn');
+      setMultiStatus(localizeText('先に共有リンクを作成してください', 'Create a shared link first'), 'warn');
       return false;
     }
     if (typeof navigator?.share === 'function') {
@@ -74082,7 +74280,7 @@
         empty.className = 'help-text';
         empty.textContent = resolveSharedProjectKeyForCurrentState()
           ? localizeText('まだ他のメンバーはいません。共有URLを送るとここに表示されます。', 'No other members yet. Share the URL to invite others.')
-          : localizeText('共有モードをONにすると、ここにメンバーが表示されます。', 'Turn on shared mode to show members here.');
+          : localizeText('共有リンクを作成すると、ここにメンバーが表示されます。', 'Create a shared link to show members here.');
         list.appendChild(empty);
         return;
       }
@@ -74099,6 +74297,16 @@
         }
         const summary = document.createElement('div');
         summary.className = 'multi-participant-item__summary';
+        const avatar = document.createElement('img');
+        avatar.className = 'multi-participant-item__avatar';
+        avatar.src = typeof row.avatarSrc === 'string' && row.avatarSrc.trim()
+          ? row.avatarSrc.trim()
+          : '../icon/PiXiEED.icon512.png';
+        avatar.alt = '';
+        avatar.loading = 'lazy';
+        avatar.addEventListener('error', () => {
+          avatar.src = '../icon/PiXiEED.icon512.png';
+        }, { once: true });
         const main = document.createElement('span');
         main.className = 'multi-participant-item__main';
         const nameLine = document.createElement('span');
@@ -74119,7 +74327,7 @@
           ? localizeText('オンライン', 'Online')
           : localizeText('オフライン', 'Offline');
         main.append(nameLine, cell);
-        summary.appendChild(main);
+        summary.append(avatar, main);
         plain.appendChild(summary);
         li.appendChild(plain);
         list.appendChild(li);
@@ -74932,7 +75140,7 @@
         dom.controls.multiJoinProjectKey.value = codeValue;
         dom.controls.multiJoinProjectKey.readOnly = true;
         if (dom.controls.multiJoinProjectKey.dataset.visibilityToggled !== 'true') {
-          dom.controls.multiJoinProjectKey.type = 'text';
+          dom.controls.multiJoinProjectKey.type = 'password';
         }
         dom.controls.multiJoinProjectKey.placeholder = localizeText('共有コード', 'Shared code');
       } else {
