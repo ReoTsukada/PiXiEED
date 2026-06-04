@@ -4644,9 +4644,10 @@ body.is-mobile-layout .mobile-draw-help {
 }
 
 #panelMulti .multi-project-key-field {
+  grid-area: code;
   border: 1px solid rgba(var(--ui-rgb), 0.28);
   border-radius: 10px;
-  padding: 8px;
+  padding: 4px;
   background: rgba(6, 13, 20, 0.82);
 }
 
@@ -4655,10 +4656,11 @@ body.is-mobile-layout .mobile-draw-help {
 }
 
 #panelMulti .multi-project-key-field #multiJoinProjectKey {
-  min-height: 42px;
+  min-height: 46px;
   border-radius: 8px 0 0 8px;
   border-color: rgba(var(--ui-rgb), 0.22);
   background: rgba(4, 10, 16, 0.88);
+  font-weight: 700;
 }
 
 #panelMulti .multi-project-key-field #multiJoinProjectKey:disabled {
@@ -4669,7 +4671,7 @@ body.is-mobile-layout .mobile-draw-help {
 }
 
 #panelMulti .multi-project-key-copy {
-  min-height: 42px;
+  min-height: 46px;
   border-radius: 0;
 }
 
@@ -4885,8 +4887,13 @@ body.is-mobile-layout .mobile-draw-help {
 
 #panelMulti .multi-overview {
   grid-area: overview;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    'code'
+    'head'
+    'summary'
+    'hint';
   gap: 14px;
   border: 1px solid rgba(var(--ui-rgb-focus), 0.72);
   border-radius: 10px;
@@ -4902,6 +4909,7 @@ body.is-mobile-layout .mobile-draw-help {
 }
 
 #panelMulti .multi-overview__header {
+  grid-area: head;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -4988,6 +4996,14 @@ body.is-mobile-layout .mobile-draw-help {
 #panelMulti .multi-overview__summary,
 #panelMulti .multi-overview__hint {
   margin: 0;
+}
+
+#panelMulti .multi-overview__summary {
+  grid-area: summary;
+}
+
+#panelMulti .multi-overview__hint {
+  grid-area: hint;
 }
 
 #panelMulti .multi-account-card {
