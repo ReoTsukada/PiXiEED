@@ -34979,13 +34979,14 @@
       endRailResize({ persist: false });
       dom.leftRail.dataset.collapsed = 'true';
       dom.rightRail.dataset.collapsed = 'true';
-      setMobileDrawerMode(mobileDrawerState.mode, { persist: false });
+      setMobileDrawerMode(MOBILE_DRAWER_DEFAULT_MODE, { persist: false });
     } else {
       endMobileDrawerDrag({ persist: false });
       dom.leftRail.dataset.collapsed = 'false';
       dom.rightRail.dataset.collapsed = 'false';
-      setRailWidth('left', railSizing.left, { persist: false });
-      setRailWidth('right', railSizing.right, { persist: false });
+      setRailWidth('left', RAIL_DEFAULT_WIDTH.left, { persist: false });
+      setRailWidth('right', RAIL_DEFAULT_WIDTH.right, { persist: false });
+      setBottomTimelineHeight(BOTTOM_TIMELINE_MIN_HEIGHT, { persist: false });
     }
 
     Object.entries(layoutMap).forEach(([key, placement]) => {
@@ -59140,18 +59141,10 @@
     if (payload.lastGroupTool && typeof payload.lastGroupTool === 'object') {
       state.lastGroupTool = { ...DEFAULT_GROUP_TOOL, ...payload.lastGroupTool };
     }
-    if (Number.isFinite(payload.leftRailWidth)) {
-      railSizing.left = normalizeRailWidth('left', payload.leftRailWidth);
-    }
-    if (Number.isFinite(payload.rightRailWidth)) {
-      railSizing.right = normalizeRailWidth('right', payload.rightRailWidth);
-    }
-    if (Number.isFinite(payload.bottomTimelineHeight)) {
-      bottomTimelineSizing.height = normalizeBottomTimelineHeight(payload.bottomTimelineHeight);
-    }
-    if (typeof payload.mobileDrawerMode === 'string') {
-      mobileDrawerState.mode = normalizeMobileDrawerMode(payload.mobileDrawerMode);
-    }
+    railSizing.left = RAIL_DEFAULT_WIDTH.left;
+    railSizing.right = RAIL_DEFAULT_WIDTH.right;
+    bottomTimelineSizing.height = BOTTOM_TIMELINE_MIN_HEIGHT;
+    mobileDrawerState.mode = MOBILE_DRAWER_DEFAULT_MODE;
     if (payload.leftTab && LEFT_TAB_KEYS.includes(payload.leftTab)) {
       state.activeLeftTab = payload.leftTab;
     }
