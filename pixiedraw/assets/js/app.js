@@ -2927,7 +2927,8 @@
   const MULTI_LAYER_PATCH_FULL_RATIO = 0.45;
   const MULTI_JOIN_REQUEST_COOLDOWN_MS = 6000;
   const MULTI_COMMENT_MAX_LENGTH = 140;
-  const MULTI_COMMENT_MAX_ITEMS = 80;
+  const MULTI_COMMENT_MAX_ITEMS = 50;
+  const MULTI_COMMENT_STORAGE_KEY = 'pixieedraw:multi-comments:v1';
   const MULTI_ASSIGNMENT_BORDER_COLORS = Object.freeze([
     '#ff8b8b',
     '#ffd47a',
@@ -9836,6 +9837,9 @@
     activeSharedProjectKey = normalizedProjectKey;
     activeSharedProjectRevision = nextSessionRevision;
     activeSharedProjectStructureRevision = nextSessionStructureRevision;
+    if (projectChanged || !Array.isArray(multiState.comments) || multiState.comments.length === 0) {
+      restoreMultiCommentsForProject(normalizedProjectKey);
+    }
     ensureSharedProjectSessionHeartbeat();
     const nextChannelSignature = `${normalizedProjectKey}::${activeSharedProjectId || ''}`;
     const sharedRecentProjectId = buildSharedRecentProjectId(normalizedProjectKey);
@@ -60770,6 +60774,9 @@
   function storeMultiProjectKey(projectKey) {
     const normalized = normalizeMultiProjectKey(projectKey);
     multiState.projectKey = normalized;
+    if (normalized && (!Array.isArray(multiState.comments) || multiState.comments.length === 0)) {
+      restoreMultiCommentsForProject(normalized);
+    }
     if (!canUseSessionStorage) {
       return;
     }
@@ -75403,13 +75410,103 @@
     return normalizeMultiParticipantName(fallbackName, DEFAULT_MULTI_PARTICIPANT_NAME);
   }
 
-  function clearMultiComments() {
+  function resolveMultiCommentProjectKey(projectKey = '') {
+    return normalizeMultiProjectKey(
+      projectKey
+      || activeSharedProjectKey
+      || multiState.projectKey
+      || resolveSharedProjectKeyForCurrentState()
+      || ''
+    );
+  }
+
+  function getMultiCommentStorageKey(projectKey = '') {
+    const normalizedProjectKey = resolveMultiCommentProjectKey(projectKey);
+    return normalizedProjectKey ? getScopedStorageKey(`${MULTI_COMMENT_STORAGE_KEY}:${normalizedProjectKey}`) : '';
+  }
+
+  function serializeMultiCommentEntry(entry) {
+    if (!entry || typeof entry !== 'object') {
+      return null;
+    }
+    const text = normalizeMultiCommentText(entry.text);
+    if (!text) {
+      return null;
+    }
+    return {
+      clientId: typeof entry.clientId === 'string' ? entry.clientId.trim() : '',
+      role: normalizeMultiRole(entry.role, 'guest'),
+      name: normalizeMultiParticipantName(entry.name, DEFAULT_MULTI_PARTICIPANT_NAME),
+      avatarId: normalizePixieedAvatarId(entry.avatarId || entry.avatar || ''),
+      text,
+      sentAt: Number.isFinite(Number(entry.sentAt)) ? Math.round(Number(entry.sentAt)) : Date.now(),
+    };
+  }
+
+  function persistMultiCommentsForProject(projectKey = '') {
+    if (!canUseSessionStorage) {
+      return;
+    }
+    const storageKey = getMultiCommentStorageKey(projectKey);
+    if (!storageKey) {
+      return;
+    }
+    try {
+      const entries = Array.isArray(multiState.comments)
+        ? multiState.comments.slice(-MULTI_COMMENT_MAX_ITEMS).map(serializeMultiCommentEntry).filter(Boolean)
+        : [];
+      if (entries.length) {
+        window.localStorage.setItem(storageKey, JSON.stringify(entries));
+      } else {
+        window.localStorage.removeItem(storageKey);
+      }
+    } catch (error) {
+      // Ignore storage errors.
+    }
+  }
+
+  function restoreMultiCommentsForProject(projectKey = '') {
+    if (!canUseSessionStorage) {
+      return false;
+    }
+    const storageKey = getMultiCommentStorageKey(projectKey);
+    if (!storageKey) {
+      return false;
+    }
+    let entries = [];
+    try {
+      const raw = window.localStorage.getItem(storageKey);
+      const parsed = raw ? JSON.parse(raw) : [];
+      entries = Array.isArray(parsed) ? parsed.slice(-MULTI_COMMENT_MAX_ITEMS) : [];
+    } catch (error) {
+      entries = [];
+    }
     multiState.comments = [];
     multiState.commentIds = new Set();
+    entries.forEach(entry => {
+      appendMultiCommentEntry(entry, {
+        persist: false,
+        notify: false,
+        spawn: false,
+      });
+    });
+    renderMultiComments();
+    return true;
+  }
+
+  function clearMultiComments({ persist = true } = {}) {
+    multiState.comments = [];
+    multiState.commentIds = new Set();
+    if (persist) {
+      persistMultiCommentsForProject();
+    }
     renderMultiComments();
   }
 
-  function appendMultiCommentEntry(entry) {
+  function appendMultiCommentEntry(entry, options = {}) {
+    const shouldPersist = options.persist !== false;
+    const shouldNotify = options.notify !== false;
+    const shouldSpawn = options.spawn !== false;
     if (!entry || typeof entry !== 'object') {
       return false;
     }
@@ -75450,7 +75547,7 @@
     multiState.commentIds.add(id);
     // show as danmaku (floating comment) when enabled
     try {
-      if (state.danmakuEnabled && typeof spawnDanmaku === 'function') {
+      if (shouldSpawn && state.danmakuEnabled && typeof spawnDanmaku === 'function') {
         spawnDanmaku(next);
       }
     } catch (e) {
@@ -75461,7 +75558,7 @@
       const hasDanmaku = Boolean(state.danmakuEnabled);
       const multiPanelVisible = isMultiFlowPanelVisible();
       const commentsTabVisible = isMultiCommentsTabVisible();
-      if (!hasDanmaku && !isSelfComment) {
+      if (shouldNotify && !hasDanmaku && !isSelfComment) {
         if (!multiPanelVisible) {
           setMultiTabNotification(true);
         }
@@ -75480,6 +75577,9 @@
           multiState.commentIds.delete(item.id);
         }
       });
+    }
+    if (shouldPersist) {
+      persistMultiCommentsForProject();
     }
     return true;
   }
@@ -75515,7 +75615,7 @@
     }
     const list = document.createElement('ul');
     list.className = 'multi-comment-thread';
-    entries.forEach(entry => {
+    entries.slice().reverse().forEach(entry => {
       const item = document.createElement('li');
       item.className = 'multi-comment-item';
       const entryClientId = typeof entry.clientId === 'string' ? entry.clientId.trim() : '';
