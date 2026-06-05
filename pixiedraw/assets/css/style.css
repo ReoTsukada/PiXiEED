@@ -5744,8 +5744,8 @@ body.is-mobile-layout .mobile-draw-help {
 #panelMulti .multi-comment-item {
   margin: 0;
   display: grid;
-  grid-template-columns: 38px minmax(0, 1fr);
-  gap: 10px;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 9px;
   align-items: flex-start;
   padding: 12px 0;
   border-bottom: 1px solid rgba(var(--ui-rgb), 0.12);
@@ -5776,19 +5776,19 @@ body.is-mobile-layout .mobile-draw-help {
 }
 
 #panelMulti .multi-comment-avatar {
-  width: 36px;
-  height: 36px;
-  min-width: 36px;
-  max-width: 36px;
-  min-height: 36px;
-  max-height: 36px;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  max-width: 28px;
+  min-height: 28px;
+  max-height: 28px;
   border: 1px solid rgba(var(--ui-rgb), 0.28);
   border-radius: 999px;
   background: rgba(2, 8, 12, 0.7);
   object-fit: contain;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
-  flex: 0 0 36px;
+  flex: 0 0 28px;
 }
 
 #panelMulti .multi-comment-author {
