@@ -67247,13 +67247,20 @@
       if (result?.conflict_reason === 'same-account-active-elsewhere') {
         setMultiStatus(
           localizeText(
-            '同じPiXiEEDアカウントの別端末でもこの共有プロジェクトを開いています。続行します。',
-            'This shared project is already open on another device with the same PiXiEED account. Continuing.'
+            'この共有プロジェクトは同じアカウントの別端末で開かれているため、この端末では開けません。',
+            'This shared project is already open on another device with the same account, so it cannot be opened here.'
           ),
-          'info'
+          'error'
         );
-        return true;
+        return false;
       }
+      setMultiStatus(
+        localizeText(
+          'この共有プロジェクトは現在開けません。別端末で開いている可能性があります。',
+          'This shared project cannot be opened right now. It may already be open on another device.'
+        ),
+        'error'
+      );
       return false;
     } catch (error) {
       if (isRecoverableSharedBackendPreflightError(error)) {
