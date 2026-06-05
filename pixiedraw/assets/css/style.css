@@ -5778,13 +5778,17 @@ body.is-mobile-layout .mobile-draw-help {
 #panelMulti .multi-comment-avatar {
   width: 36px;
   height: 36px;
+  min-width: 36px;
+  max-width: 36px;
+  min-height: 36px;
+  max-height: 36px;
   border: 1px solid rgba(var(--ui-rgb), 0.28);
   border-radius: 999px;
   background: rgba(2, 8, 12, 0.7);
   object-fit: contain;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
-  flex: 0 0 auto;
+  flex: 0 0 36px;
 }
 
 #panelMulti .multi-comment-author {
