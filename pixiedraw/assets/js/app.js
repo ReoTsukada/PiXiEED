@@ -3157,6 +3157,8 @@
     // Shared social data
     comments: [],
     commentIds: new Set(),
+    commentDraft: '',
+    projectKeyDraft: '',
 
     // Local restore state for guest/spectator join/leave
     localSnapshotBeforeReplica: null,
@@ -19782,7 +19784,7 @@
       list.appendChild(empty);
       return;
     }
-    entries.forEach(entry => {
+    entries.slice().reverse().forEach(entry => {
       const item = document.createElement('article');
       item.className = 'update-history-item';
       item.setAttribute('role', 'listitem');
@@ -74269,6 +74271,17 @@
 
   function setMultiParticipantsPanelTab(tab = 'participants') {
     const activeTab = tab === 'comments' ? 'comments' : 'participants';
+    const previousCommentMode = isMultiParticipantsCommentModeActive();
+    const input = dom.controls.multiJoinProjectKey;
+    if (input instanceof HTMLInputElement) {
+      if (activeTab === 'comments' && !previousCommentMode) {
+        multiState.projectKeyDraft = input.value || '';
+        input.value = multiState.commentDraft || '';
+      } else if (activeTab !== 'comments' && previousCommentMode) {
+        multiState.commentDraft = input.value || '';
+        input.value = multiState.projectKeyDraft || input.value || '';
+      }
+    }
     const tabs = [
       dom.controls.multiParticipantsPanelTab,
       dom.controls.multiCommentsPanelTab,
@@ -74297,6 +74310,12 @@
       setMultiTabNotification(false);
       renderMultiComments();
     }
+    syncMultiControls();
+  }
+
+  function isMultiParticipantsCommentModeActive() {
+    return dom.controls.multiCommentsView instanceof HTMLElement
+      && !dom.controls.multiCommentsView.hidden;
   }
 
   function updateMultiFlowTabsUi() {
@@ -75557,7 +75576,7 @@
       list.appendChild(item);
     });
     root.appendChild(list);
-    root.scrollTop = root.scrollHeight;
+    root.scrollTop = 0;
     if (isMultiCommentsTabVisible()) {
       try {
         setMultiCommentTabNotification(false);
@@ -75752,15 +75771,22 @@
     const inMasterConfigMode = isMultiMasterConfigMode();
     const isSignedIn = Boolean(accountState.isLoggedIn && !accountState.isAnonymous);
     const requiresSharedLogin = sharedProjectFlowPreferred && !isSignedIn;
+    const commentsInputMode = isMultiParticipantsCommentModeActive();
+    const canSendComment = (
+      (isSharedProjectCollaborativeMode() && Boolean(activeSharedProjectKey))
+      || multiState.connected
+    ) && !multiState.connecting;
     syncMultiPanelFlowUi();
     updateMultiFlowTabsUi();
     const isJoinPanelVisible = isEntryView && multiEntryJoinPanelOpen;
     const isFlowKeyFieldVisible = !isEntryView;
-    if (!(sharedProjectFlowPreferred && !sharedModeEnabled)) {
+    if (!commentsInputMode && !(sharedProjectFlowPreferred && !sharedModeEnabled)) {
       syncMultiProjectKeyInputValues(multiState.projectKey, { preserveFocused: true });
     }
     if (dom.controls.multiJoinProjectKey instanceof HTMLInputElement) {
-      dom.controls.multiJoinProjectKey.disabled = multiState.connecting || requiresSharedLogin;
+      dom.controls.multiJoinProjectKey.disabled = commentsInputMode
+        ? !canSendComment
+        : (multiState.connecting || requiresSharedLogin);
     }
     if (dom.controls.multiProjectKey instanceof HTMLInputElement) {
       dom.controls.multiProjectKey.disabled = sharedProjectFlowPreferred
@@ -75775,12 +75801,21 @@
     }
     if (dom.controls.multiJoinProjectKey instanceof HTMLInputElement) {
       const codeValue = currentAccess.inviteToken || currentAccess.projectKey || '';
-      if (requiresSharedLogin) {
+      if (commentsInputMode) {
+        dom.controls.multiJoinProjectKey.readOnly = false;
+        dom.controls.multiJoinProjectKey.type = 'text';
+        dom.controls.multiJoinProjectKey.maxLength = 160;
+        dom.controls.multiJoinProjectKey.placeholder = canSendComment
+          ? localizeText('コメントを入力', 'Type a comment')
+          : localizeText('接続するとコメントできます', 'Connect to comment');
+      } else if (requiresSharedLogin) {
+        dom.controls.multiJoinProjectKey.maxLength = 280;
         dom.controls.multiJoinProjectKey.value = '';
         dom.controls.multiJoinProjectKey.readOnly = true;
         dom.controls.multiJoinProjectKey.type = 'text';
         dom.controls.multiJoinProjectKey.placeholder = localizeText('ログインしてください', 'Sign in required');
       } else if (sharedModeEnabled) {
+        dom.controls.multiJoinProjectKey.maxLength = 280;
         dom.controls.multiJoinProjectKey.value = codeValue;
         dom.controls.multiJoinProjectKey.readOnly = true;
         if (dom.controls.multiJoinProjectKey.dataset.visibilityToggled !== 'true') {
@@ -75788,6 +75823,7 @@
         }
         dom.controls.multiJoinProjectKey.placeholder = localizeText('共有コード', 'Shared code');
       } else {
+        dom.controls.multiJoinProjectKey.maxLength = 280;
         delete dom.controls.multiJoinProjectKey.dataset.visibilityToggled;
         dom.controls.multiJoinProjectKey.readOnly = false;
         if (dom.controls.multiJoinProjectKey.type !== 'password') {
@@ -75809,18 +75845,24 @@
       dom.controls.multiToggleCodeVisibility.textContent = usingHiddenInput
         ? localizeText('表示', 'Show')
         : localizeText('非表示', 'Hide');
+      dom.controls.multiToggleCodeVisibility.hidden = commentsInputMode ? true : dom.controls.multiToggleCodeVisibility.hidden;
+      dom.controls.multiToggleCodeVisibility.setAttribute('aria-hidden', String(commentsInputMode));
     }
     if (dom.controls.multiApplyAccessCode instanceof HTMLButtonElement) {
-      dom.controls.multiApplyAccessCode.textContent = localizeText('確定', 'Apply');
-      dom.controls.multiApplyAccessCode.disabled = multiState.connecting || requiresSharedLogin;
-      dom.controls.multiApplyAccessCode.hidden = sharedModeEnabled;
-      dom.controls.multiApplyAccessCode.setAttribute('aria-hidden', String(sharedModeEnabled));
+      dom.controls.multiApplyAccessCode.textContent = commentsInputMode
+        ? localizeText('送信', 'Send')
+        : localizeText('確定', 'Apply');
+      dom.controls.multiApplyAccessCode.disabled = commentsInputMode
+        ? !canSendComment
+        : (multiState.connecting || requiresSharedLogin);
+      dom.controls.multiApplyAccessCode.hidden = commentsInputMode ? false : sharedModeEnabled;
+      dom.controls.multiApplyAccessCode.setAttribute('aria-hidden', String(commentsInputMode ? false : sharedModeEnabled));
     }
     if (dom.controls.multiCopyAccessCode instanceof HTMLButtonElement) {
       const access = readCurrentMultiProjectAccessInput();
       dom.controls.multiCopyAccessCode.disabled = multiState.connecting || requiresSharedLogin || !(access.inviteToken || access.projectKey);
-      dom.controls.multiCopyAccessCode.hidden = !sharedModeEnabled;
-      dom.controls.multiCopyAccessCode.setAttribute('aria-hidden', String(!sharedModeEnabled));
+      dom.controls.multiCopyAccessCode.hidden = commentsInputMode ? true : !sharedModeEnabled;
+      dom.controls.multiCopyAccessCode.setAttribute('aria-hidden', String(commentsInputMode ? true : !sharedModeEnabled));
     }
     if (dom.controls.multiEntryMaster instanceof HTMLButtonElement) {
       dom.controls.multiEntryMaster.disabled = sharedProjectFlowPreferred
@@ -76179,10 +76221,6 @@
     if (dom.controls.multiSupportCard instanceof HTMLElement) {
       dom.controls.multiSupportCard.hidden = !isSignedIn;
     }
-    const canSendComment = (
-      (isSharedProjectCollaborativeMode() && Boolean(activeSharedProjectKey))
-      || multiState.connected
-    ) && !multiState.connecting;
     if (dom.controls.multiCommentInput instanceof HTMLInputElement) {
       dom.controls.multiCommentInput.disabled = !canSendComment;
       dom.controls.multiCommentInput.placeholder = canSendComment
@@ -79617,6 +79655,17 @@
     if (dom.controls.multiApplyAccessCode instanceof HTMLButtonElement && dom.controls.multiApplyAccessCode.dataset.bound !== 'true') {
       dom.controls.multiApplyAccessCode.dataset.bound = 'true';
       dom.controls.multiApplyAccessCode.addEventListener('click', async () => {
+        if (isMultiParticipantsCommentModeActive()) {
+          const input = dom.controls.multiJoinProjectKey;
+          const text = input instanceof HTMLInputElement ? input.value : '';
+          const sent = await sendMultiComment(text);
+          if (sent && input instanceof HTMLInputElement) {
+            input.value = '';
+            multiState.commentDraft = '';
+          }
+          syncMultiControls();
+          return;
+        }
         await openSharedProjectFromInput();
         syncMultiControls();
       });
@@ -79642,6 +79691,31 @@
             : localizeText('共有コードのコピーに失敗しました', 'Failed to copy share code')
         );
         syncMultiControls();
+      });
+    }
+    if (dom.controls.multiJoinProjectKey instanceof HTMLInputElement && dom.controls.multiJoinProjectKey.dataset.commentBound !== 'true') {
+      dom.controls.multiJoinProjectKey.dataset.commentBound = 'true';
+      dom.controls.multiJoinProjectKey.addEventListener('input', event => {
+        if (!isMultiParticipantsCommentModeActive()) {
+          return;
+        }
+        multiState.commentDraft = event.target instanceof HTMLInputElement ? event.target.value : '';
+      });
+      dom.controls.multiJoinProjectKey.addEventListener('keydown', event => {
+        const isComposing = event.isComposing || event.keyCode === 229;
+        if (!isMultiParticipantsCommentModeActive() || event.key !== 'Enter' || isComposing) {
+          return;
+        }
+        event.preventDefault();
+        const input = event.target instanceof HTMLInputElement ? event.target : null;
+        const text = input ? input.value : '';
+        sendMultiComment(text).then(sent => {
+          if (sent && input) {
+            input.value = '';
+            multiState.commentDraft = '';
+          }
+          syncMultiControls();
+        });
       });
     }
     if (dom.controls.multiMaxGuests instanceof HTMLInputElement && dom.controls.multiMaxGuests.dataset.bound !== 'true') {
