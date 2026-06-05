@@ -10487,6 +10487,9 @@
     if (hasSharedProjectFailedLocalOps()) {
       return 'failed-local-ops';
     }
+    if (hasSharedProjectStructureLocalWorkInFlight()) {
+      return 'local-structure-op-in-flight';
+    }
     const hasLocalOpBacklog = sharedProjectOpCommitInFlight
       || hasSharedProjectLocalInFlightOps()
       || sharedProjectPendingLocalOps.length > 0;
@@ -10562,6 +10565,7 @@
       || normalizedReason === 'sync-in-progress'
       || normalizedReason === 'not-synced'
       || normalizedReason === 'draw-readiness-stale'
+      || normalizedReason === 'local-structure-op-in-flight'
       || normalizedReason === 'remote-op-pending'
     ) {
       return {
@@ -62180,6 +62184,27 @@
     );
   }
 
+  function hasSharedProjectStructureLocalWorkInFlight() {
+    if (!isSharedProjectCollaborativeMode()) {
+      return false;
+    }
+    if (sharedProjectLocalInFlightOps instanceof Map) {
+      for (const entry of sharedProjectLocalInFlightOps.values()) {
+        if (entry?.opType === 'structure') {
+          return true;
+        }
+      }
+    }
+    if (Array.isArray(sharedProjectPendingLocalOps)) {
+      return sharedProjectPendingLocalOps.some(entry => {
+        const opRecord = entry?.op || entry || null;
+        const opType = entry?.opType || classifySharedProjectOpType(String(entry?.historyLabel || opRecord?.historyLabel || ''));
+        return opType === 'structure';
+      });
+    }
+    return false;
+  }
+
   function setActiveSharedProjectSyncState(nextState = 'idle', { announce = false } = {}) {
     const normalizedState = nextState === 'catching-up' || nextState === 'synced' ? nextState : 'idle';
     activeSharedProjectSyncState = normalizedState;
@@ -62625,6 +62650,9 @@
     );
     const frame = Array.isArray(canvasDoc?.frames) ? canvasDoc.frames[frameIndex] : null;
     const layerId = canvasDoc?.activeLayer || state.activeLayer || '';
+    const layerIndex = Array.isArray(frame?.layers)
+      ? frame.layers.findIndex(entry => entry?.id === layerId)
+      : -1;
     const layer = Array.isArray(frame?.layers)
       ? (frame.layers.find(entry => entry?.id === layerId) || null)
       : null;
@@ -62638,7 +62666,9 @@
       tool: normalizedTool,
       canvasId,
       frameIndex,
+      frameId: frame?.id || '',
       layerId: layer.id,
+      layerIndex: layerIndex >= 0 ? layerIndex : 0,
       brushSize: clamp(Math.round(Number(state.brushSize) || 1), 1, 64),
       brushShape: getEffectiveBrushShape(),
       customBrushOffsets: hasCustomBrushData() ? getBrushOffsets(state.brushSize, BRUSH_SHAPE_CUSTOM) : null,
@@ -62842,7 +62872,9 @@
         ? (getSharedProjectCanonicalCanvasId() || drawCommand.canvasId)
         : drawCommand.canvasId,
       frameIndex: Math.max(0, Math.round(Number(drawCommand.frameIndex) || 0)),
+      frameId: typeof drawCommand.frameId === 'string' ? drawCommand.frameId : '',
       layerId: drawCommand.layerId,
+      layerIndex: Math.max(-1, Math.round(Number(drawCommand.layerIndex) || -1)),
       brushSize: clamp(Math.round(Number(drawCommand.brushSize) || 1), 1, 64),
       brushShape: normalizeBrushShape(drawCommand.brushShape, BRUSH_SHAPE_SQUARE),
       customBrushOffsets: Array.isArray(drawCommand.customBrushOffsets)
@@ -62939,6 +62971,7 @@
     if (!layer) {
       return null;
     }
+    const layerIndex = frame.layers.findIndex(item => item === layer);
     const pixelCount = Math.max(
       0,
       Math.floor(Number(canvasDoc?.width ?? state.width) || 0) * Math.floor(Number(canvasDoc?.height ?? state.height) || 0)
@@ -62959,7 +62992,9 @@
     return {
       canvasId,
       frameIndex,
+      frameId: frame?.id || '',
       layerId: layer.id,
+      layerIndex,
       pixelCount,
       patch: diffPayload,
       palette: Array.isArray(state.palette)
@@ -64146,6 +64181,8 @@
     const canvasId = typeof payload.canvasId === 'string' ? payload.canvasId.trim() : '';
     const layerId = typeof payload.layerId === 'string' ? payload.layerId.trim() : '';
     const frameIndex = Math.max(0, Math.round(Number(payload.frameIndex) || 0));
+    const frameId = typeof payload.frameId === 'string' ? payload.frameId.trim() : '';
+    const layerIndex = Math.max(-1, Math.round(Number(payload.layerIndex) || -1));
     const op = {
       opId: generateSharedProjectOpId(),
       projectKey: resolvedProjectKey,
@@ -64155,7 +64192,9 @@
       historyLabel: String(historyLabel || ''),
       canvasId,
       frameIndex,
+      frameId,
       layerId,
+      layerIndex,
       baseRevision: Math.max(0, Math.round(Number(activeSharedProjectRevision) || 0)),
       baseStructureRevision: Math.max(0, Math.round(Number(activeSharedProjectStructureRevision) || 0)),
       structureRevision: Math.max(0, Math.round(Number(activeSharedProjectStructureRevision) || 0)),
@@ -64295,6 +64334,33 @@
   // - local commit creates an op immediately
   // - remote draw ops are applied before snapshot refresh
   // - structure mismatch is the only reason to fall back to refresh
+  function resolveSharedProjectLayerForPayload(frame, payload = {}, requestedLayerId = '') {
+    const layers = Array.isArray(frame?.layers) ? frame.layers : [];
+    const layerId = typeof requestedLayerId === 'string' && requestedLayerId.trim()
+      ? requestedLayerId.trim()
+      : (typeof payload?.layerId === 'string' ? payload.layerId.trim() : '');
+    if (!layers.length) {
+      return { layer: null, layerId, resolution: 'missing' };
+    }
+    if (layerId) {
+      const exact = layers.find(entry => entry?.id === layerId) || null;
+      if (exact) {
+        return { layer: exact, layerId: exact.id || layerId, resolution: 'id' };
+      }
+    }
+    const layerIndex = Math.round(Number(payload?.layerIndex));
+    if (Number.isFinite(layerIndex) && layerIndex >= 0 && layerIndex < layers.length) {
+      const byIndex = layers[layerIndex] || null;
+      if (byIndex?.id) {
+        return { layer: byIndex, layerId: byIndex.id, resolution: 'layer-index' };
+      }
+    }
+    if (layers.length === 1 && layers[0]?.id) {
+      return { layer: layers[0], layerId: layers[0].id, resolution: 'single-layer' };
+    }
+    return { layer: null, layerId, resolution: 'missing' };
+  }
+
   function inspectIncomingSharedProjectDrawOp(opRecord) {
     const payload = extractSharedProjectOpPayload(opRecord);
     const opId = normalizeSharedProjectOpId(opRecord);
@@ -64459,7 +64525,8 @@
         activeStructureRevision: activeSharedProjectStructureRevision,
       };
     }
-    if (!frame.layers.find(entry => entry?.id === layerId)) {
+    const resolvedLayer = resolveSharedProjectLayerForPayload(frame, payload, layerId);
+    if (!resolvedLayer.layer) {
       logSharedProjectResolveEvent('layer-resolve-failed', {
         opId, revision, kind, canvasId, resolvedCanvasId: targetCanvas?.id || '', resolvedFrameId: frame?.id || '', layerId, structureRevision, result: 'skip', skipReason: 'missing-target-layer',
       });
@@ -64474,6 +64541,19 @@
         activeStructureRevision: activeSharedProjectStructureRevision,
       };
     }
+    if (resolvedLayer.resolution !== 'id') {
+      console.info('[shared-sync]', {
+        event: 'layer-resolve-fallback',
+        opId,
+        revision,
+        kind,
+        canvasId,
+        frameIndex,
+        payloadLayerId: layerId,
+        resolvedLayerId: resolvedLayer.layerId,
+        resolution: resolvedLayer.resolution,
+      });
+    }
     logSharedProjectResolveEvent('canvas-resolve-ok', {
       opId,
       revision,
@@ -64482,7 +64562,7 @@
       resolvedCanvasId: targetCanvas?.id || '',
       resolvedFrameId: frame?.id || '',
       layerId,
-      resolvedLayerId: layerId,
+      resolvedLayerId: resolvedLayer.layerId,
       structureRevision,
       result: 'ok',
     });
@@ -64493,7 +64573,7 @@
       resolvedCanvasId: targetCanvas?.id || '',
       resolvedFrameId: frame?.id || '',
       layerId,
-      resolvedLayerId: layerId,
+      resolvedLayerId: resolvedLayer.layerId,
       frameIndex,
       pixelCount: drawCommandType ? 0 : pixelCount,
       command: drawCommandType || 'patch',
@@ -64889,7 +64969,8 @@
     if (!frame || !Array.isArray(frame.layers)) {
       return false;
     }
-    const layer = frame.layers.find(entry => entry?.id === layerId) || null;
+    const resolvedLayer = resolveSharedProjectLayerForPayload(frame, payload, layerId);
+    const layer = resolvedLayer.layer;
     if (!layer) {
       return false;
     }
@@ -64960,7 +65041,7 @@
       Math.floor(Number(targetCanvas.width) || 0) * Math.floor(Number(targetCanvas.height) || 0)
     );
     const resolvedCanvasId = targetCanvas?.id || canvasId;
-    const snapshotKey = buildSharedProjectLayerSnapshotKey(resolvedCanvasId, frameIndex, layerId);
+    const snapshotKey = buildSharedProjectLayerSnapshotKey(resolvedCanvasId, frameIndex, resolvedLayer.layerId || layerId);
     const nextSnapshot = captureLayerPatchSnapshot(layer, pixelCount);
     if (snapshotKey && nextSnapshot) {
       sharedProjectLayerSnapshots.set(snapshotKey, nextSnapshot);
@@ -65000,7 +65081,8 @@
       });
       return null;
     }
-    const layer = frame.layers.find(entry => entry?.id === layerId) || null;
+    const resolvedLayer = resolveSharedProjectLayerForPayload(frame, payload, layerId);
+    const layer = resolvedLayer.layer;
     if (!layer) {
       logSharedProjectResolveEvent('layer-resolve-failed', {
         canvasId,
@@ -65018,7 +65100,7 @@
       layer,
       canvasId,
       resolvedCanvasId: targetCanvas?.id || canvasId,
-      layerId,
+      layerId: resolvedLayer.layerId || layerId,
       frameIndex,
     };
   }
@@ -65408,7 +65490,8 @@
     if (!frame || !Array.isArray(frame.layers)) {
       return false;
     }
-    const layer = frame.layers.find(entry => entry?.id === layerId) || null;
+    const resolvedLayer = resolveSharedProjectLayerForPayload(frame, payload, layerId);
+    const layer = resolvedLayer.layer;
     if (!layer) {
       return false;
     }
@@ -65423,7 +65506,7 @@
       resetLocalHistoryForSharedCollaborativeRemoteChange();
     }
     const resolvedCanvasId = targetCanvas?.id || canvasId;
-    const snapshotKey = buildSharedProjectLayerSnapshotKey(resolvedCanvasId, frameIndex, layerId);
+    const snapshotKey = buildSharedProjectLayerSnapshotKey(resolvedCanvasId, frameIndex, resolvedLayer.layerId || layerId);
     const nextSnapshot = captureLayerPatchSnapshot(layer, pixelCount);
     if (snapshotKey && nextSnapshot) {
       sharedProjectLayerSnapshots.set(snapshotKey, nextSnapshot);
@@ -66064,7 +66147,8 @@
     if (!frame || !Array.isArray(frame.layers)) {
       return false;
     }
-    const layer = frame.layers.find(entry => entry?.id === layerId) || null;
+    const resolvedLayer = resolveSharedProjectLayerForPayload(frame, payload, layerId);
+    const layer = resolvedLayer.layer;
     if (!layer) {
       return false;
     }
@@ -66076,7 +66160,7 @@
       return false;
     }
     const resolvedCanvasId = targetCanvas?.id || canvasId;
-    const snapshotKey = buildSharedProjectLayerSnapshotKey(resolvedCanvasId, frameIndex, layerId);
+    const snapshotKey = buildSharedProjectLayerSnapshotKey(resolvedCanvasId, frameIndex, resolvedLayer.layerId || layerId);
     const nextSnapshot = captureLayerPatchSnapshot(layer, pixelCount);
     if (snapshotKey && nextSnapshot) {
       sharedProjectLayerSnapshots.set(snapshotKey, nextSnapshot);
@@ -78882,33 +78966,20 @@
     if (!multiState.awaitingGuestStateRecovery) {
       return;
     }
-    applyMultiSharedRoomConfigFromPayload(payload);
-    if (!isMultiGuestMode() || !canCurrentGuestFreelyMoveAssignedCell()) {
-      clearMultiGuestMovePreview();
+    let recoverySnapshot = null;
+    try {
+      recoverySnapshot = deserializeDocumentPayload(payload.document);
+    } catch (error) {
+      console.warn('Failed to deserialize guest recovery payload', error);
+      return;
     }
-    const applied = applyMultiAuthoritativeDocument(payload.document);
+    const applied = applyHistorySnapshotForClient(recoverySnapshot, senderClientId, {
+      preserveView: true,
+      canvasId: typeof payload.canvasId === 'string' ? payload.canvasId : '',
+    });
     if (!applied) {
       return;
     }
-    applyMultiAssignmentsFromPayload(payload.assignments, multiState.clientId, payload.blockedClientIds);
-    multiState.assignments.forEach((entry, clientId) => {
-      if (!entry || typeof entry !== 'object') {
-        return;
-      }
-      entry.role = clientId === multiState.clientId ? 'master' : 'guest';
-      multiState.assignments.set(clientId, entry);
-    });
-    if (!getMultiAssignment(multiState.clientId)) {
-      ensureMasterLayerAssignment();
-    } else {
-      const currentMaster = getMultiAssignment(multiState.clientId);
-      if (currentMaster) {
-        currentMaster.role = 'master';
-        currentMaster.name = getLocalMultiParticipantName();
-        multiState.assignments.set(multiState.clientId, currentMaster);
-      }
-    }
-    normalizeMultiAssignmentsForCurrentDocument();
     refreshMultiParticipantsFromPresence();
     renderMultiParticipantsList();
     syncMultiAssignmentControls();
