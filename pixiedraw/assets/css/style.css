@@ -5776,12 +5776,15 @@ body.is-mobile-layout .mobile-draw-help {
 }
 
 #panelMulti .multi-comment-avatar {
-  width: 28px;
-  height: 28px;
-  min-width: 28px;
-  max-width: 28px;
-  min-height: 28px;
-  max-height: 28px;
+  display: block;
+  width: 28px !important;
+  height: 28px !important;
+  inline-size: 28px !important;
+  block-size: 28px !important;
+  min-width: 28px !important;
+  max-width: 28px !important;
+  min-height: 28px !important;
+  max-height: 28px !important;
   border: 1px solid rgba(var(--ui-rgb), 0.28);
   border-radius: 999px;
   background: rgba(2, 8, 12, 0.7);
@@ -5789,6 +5792,7 @@ body.is-mobile-layout .mobile-draw-help {
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   flex: 0 0 28px;
+  align-self: flex-start;
 }
 
 #panelMulti .multi-comment-author {
