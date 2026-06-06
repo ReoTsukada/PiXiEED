@@ -42416,7 +42416,7 @@
   }
 
   function setupCanvas() {
-    resizeCanvases();
+    resizeCanvases({ syncViewportScale: true });
     ensureCanvasWheelListener();
     setupFloatingDrawButton();
     setupFloatingMovePad();
@@ -50001,8 +50001,11 @@
     applyTransform = true,
     syncControls = true,
     updateScaleLimits = true,
+    syncViewportScale = false,
   } = {}) {
-    syncViewportZoomScaleToBase({ preserveRatio: true });
+    if (syncViewportScale) {
+      syncViewportZoomScaleToBase({ preserveRatio: true });
+    }
     syncActiveProjectCanvasViewScale();
     const { width, height, scale } = state;
     state.mirror = normalizeMirrorAxisState(state.mirror, width, height);
