@@ -63201,6 +63201,9 @@
     if (!canvasSnapshots.length) {
       return false;
     }
+    const localTimelineSelection = fromRemote
+      ? captureLocalTimelineSelectionSnapshot()
+      : null;
     const currentCanvases = getProjectCanvasDocuments();
     const previousActiveCanvasId = getActiveProjectCanvasDocument()?.id || projectCanvasStore.activeCanvasId || '';
     const previousActiveCanvasIndex = getActiveProjectCanvasIndex();
@@ -63240,6 +63243,9 @@
       : (typeof payload?.activeCanvasId === 'string' && nextCanvases.some(canvas => canvas?.id === payload.activeCanvasId)
         ? payload.activeCanvasId
         : (nextCanvases[0]?.id || ''));
+    if (fromRemote) {
+      restoreLocalTimelineSelectionSnapshot(localTimelineSelection, { preserveCanvas: true });
+    }
     activeSharedProjectStructureRevision = nextStructureRevision;
     syncProjectCanvasSurfaceDocumentRefs();
     bindActiveCanvasSurface(getProjectCanvasSurfaceForIndex(getActiveProjectCanvasIndex()) || mainViewportCanvasSurface);
@@ -78002,6 +78008,81 @@
     }, 80);
   }
 
+  function captureLocalTimelineSelectionSnapshot() {
+    const activeCanvas = getActiveProjectCanvasDocument();
+    const frames = Array.isArray(activeCanvas?.frames) ? activeCanvas.frames : (Array.isArray(state.frames) ? state.frames : []);
+    const frameIndex = clamp(
+      Math.round(Number(state.activeFrame ?? activeCanvas?.activeFrame) || 0),
+      0,
+      Math.max(0, frames.length - 1)
+    );
+    return {
+      canvasId: activeCanvas?.id || '',
+      canvasIndex: getActiveProjectCanvasIndex(),
+      frameIndex,
+      frameId: typeof frames[frameIndex]?.id === 'string' ? frames[frameIndex].id : '',
+      layerId: typeof state.activeLayer === 'string'
+        ? state.activeLayer
+        : (typeof activeCanvas?.activeLayer === 'string' ? activeCanvas.activeLayer : ''),
+    };
+  }
+
+  function restoreLocalTimelineSelectionSnapshot(selectionSnapshot, { preserveCanvas = true } = {}) {
+    if (!selectionSnapshot || typeof selectionSnapshot !== 'object') {
+      return false;
+    }
+    const canvases = getProjectCanvasDocuments();
+    if (!canvases.length) {
+      return false;
+    }
+    let targetCanvas = null;
+    if (preserveCanvas && selectionSnapshot.canvasId) {
+      targetCanvas = getProjectCanvasDocumentById(selectionSnapshot.canvasId);
+    }
+    if (!targetCanvas && preserveCanvas) {
+      targetCanvas = canvases[
+        clamp(Math.round(Number(selectionSnapshot.canvasIndex) || 0), 0, Math.max(0, canvases.length - 1))
+      ] || null;
+    }
+    targetCanvas = targetCanvas || getActiveProjectCanvasDocument() || canvases[0] || null;
+    if (!targetCanvas || !Array.isArray(targetCanvas.frames) || !targetCanvas.frames.length) {
+      return false;
+    }
+    if (preserveCanvas && targetCanvas.id) {
+      projectCanvasStore.activeCanvasId = targetCanvas.id;
+      const activeCanvasIndex = getActiveProjectCanvasIndex();
+      localViewportCanvasState = normalizeLocalViewportCanvasState(
+        {
+          ...localViewportCanvasState,
+          count: Math.max(0, canvases.length - 1),
+          selectedKind: activeCanvasIndex === 0 ? 'main' : 'local',
+          selectedIndex: activeCanvasIndex > 0 ? activeCanvasIndex - 1 : -1,
+        },
+        localViewportCanvasState
+      );
+    }
+    const frames = targetCanvas.frames;
+    const frameIndexById = selectionSnapshot.frameId
+      ? frames.findIndex(frame => frame?.id === selectionSnapshot.frameId)
+      : -1;
+    const frameIndex = frameIndexById >= 0
+      ? frameIndexById
+      : clamp(Math.round(Number(selectionSnapshot.frameIndex) || 0), 0, Math.max(0, frames.length - 1));
+    const targetFrame = frames[frameIndex] || frames[0] || null;
+    if (!targetFrame || !Array.isArray(targetFrame.layers) || !targetFrame.layers.length) {
+      return false;
+    }
+    const preferredLayerId = typeof selectionSnapshot.layerId === 'string' ? selectionSnapshot.layerId : '';
+    const layerId = targetFrame.layers.some(layer => layer?.id === preferredLayerId)
+      ? preferredLayerId
+      : (targetFrame.layers[targetFrame.layers.length - 1]?.id || targetFrame.layers[0]?.id || null);
+    targetCanvas.activeFrame = frameIndex;
+    targetCanvas.activeLayer = layerId;
+    state.activeFrame = frameIndex;
+    state.activeLayer = layerId;
+    return true;
+  }
+
   function applyMultiAuthoritativeDocument(documentPayload) {
     if (!documentPayload || typeof documentPayload !== 'object') {
       return false;
@@ -78022,6 +78103,7 @@
       activeLeftTab: state.activeLeftTab,
       activeRightTab: state.activeRightTab,
       activeFrame: state.activeFrame,
+      timelineSelection: captureLocalTimelineSelectionSnapshot(),
       colorMode: normalizeColorMode(state.colorMode, COLOR_MODE_INDEX),
       activeRgb: normalizeColorValue(state.activeRgb),
     };
@@ -78065,7 +78147,7 @@
         state.activeRightTab = RIGHT_TAB_KEYS.includes(preserved.activeRightTab) ? preserved.activeRightTab : state.activeRightTab;
         state.colorMode = normalizeColorMode(preserved.colorMode, state.colorMode);
         state.activeRgb = normalizeColorValue(preserved.activeRgb);
-        state.activeFrame = clamp(Math.round(Number(preserved.activeFrame) || 0), 0, Math.max(0, state.frames.length - 1));
+        restoreLocalTimelineSelectionSnapshot(preserved.timelineSelection, { preserveCanvas: true });
         // If master added frames, allow guests to freely navigate frames for their assigned layer.
         if (isMultiGuestMode()) {
           const hadFramesAdded = Array.isArray(state.frames) && state.frames.length > prevFrameCount;
