@@ -1,4 +1,4 @@
-const APP_BUILD_VERSION = '2026.05.31-shared-visible-catchup';
+const APP_BUILD_VERSION = '2026.06.07-shared-public-limited';
 const CACHE_VERSION = `pixiedraw-v${APP_BUILD_VERSION}`;
 const CORE_ASSETS = [
   '/pixiedraw/',
@@ -6,6 +6,7 @@ const CORE_ASSETS = [
   '/pixiedraw/manifest.webmanifest',
   '/pixiedraw/assets/css/style.css',
   '/pixiedraw/assets/css/local-extension-runtime.css',
+  '/pixiedraw/assets/js/app.js',
   '/icon/icon-192-4.png',
   '/icon/icon-512-4.png',
 ];
@@ -44,6 +45,22 @@ function isNetworkFirstRequest(request, url) {
   return false;
 }
 
+function offlineFallbackResponse(request) {
+  if (request.mode === 'navigate') {
+    return caches.match('/pixiedraw/index.html').then(cached => (
+      cached || new Response('PiXiEEDraw is offline.', {
+        status: 503,
+        statusText: 'Service Unavailable',
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+      })
+    ));
+  }
+  return new Response('', {
+    status: 503,
+    statusText: 'Service Unavailable',
+  });
+}
+
 self.addEventListener('fetch', event => {
   const request = event.request;
   if (!request || request.method !== 'GET') {
@@ -60,12 +77,10 @@ self.addEventListener('fetch', event => {
   if (isNetworkFirstRequest(request, url)) {
     event.respondWith(
       fetch(request).then(response => {
-        if (!url.pathname.endsWith('/assets/js/app.js')) {
-          const copy = response.clone();
-          caches.open(CACHE_VERSION).then(cache => cache.put(request, copy)).catch(() => {});
-        }
+        const copy = response.clone();
+        caches.open(CACHE_VERSION).then(cache => cache.put(request, copy)).catch(() => {});
         return response;
-      }).catch(() => caches.match(request))
+      }).catch(() => caches.match(request).then(cached => cached || offlineFallbackResponse(request)))
     );
     return;
   }
@@ -79,7 +94,7 @@ self.addEventListener('fetch', event => {
         const copy = response.clone();
         caches.open(CACHE_VERSION).then(cache => cache.put(request, copy)).catch(() => {});
         return response;
-      });
+      }).catch(() => offlineFallbackResponse(request));
     })
   );
 });
