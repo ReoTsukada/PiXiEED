@@ -249,6 +249,7 @@
       stopAnimation: document.getElementById('stopAnimation'),
       rewindAnimation: document.getElementById('rewindAnimation'),
       forwardAnimation: document.getElementById('forwardAnimation'),
+      loopAnimation: document.getElementById('loopAnimation'),
       animationFps: document.getElementById('animationFps'),
       animationFpsMs: document.getElementById('animationFpsMs'),
       applyFpsAll: document.getElementById('applyFpsAll'),
@@ -5032,7 +5033,7 @@
       selectionMask: null,
       selectionBounds: null,
       pendingPasteMoveState: null,
-      playback: { isPlaying: false, lastFrame: 0 },
+      playback: { isPlaying: false, lastFrame: 0, loop: true },
       documentName: normalizeDocumentName(requestedName),
     };
   }
@@ -7965,6 +7966,11 @@
     if (Object.prototype.hasOwnProperty.call(snapshot, 'playback')) {
       state.playback = { ...snapshot.playback };
     }
+    state.playback = {
+      isPlaying: Boolean(state.playback?.isPlaying),
+      lastFrame: Number(state.playback?.lastFrame) || 0,
+      loop: state.playback?.loop !== false,
+    };
     state.documentName = normalizeDocumentName(snapshot.documentName);
     voxelExtensionState = normalizeVoxelExtensionState({
       ...VOXEL_EXTENSION_DEFAULT_STATE,
@@ -15941,10 +15947,11 @@
     setLocalizedAttribute('#removeFrame', 'aria-label', 'フレームを削除', 'Remove frame');
     setLocalizedAttribute('#moveFrameUp', 'aria-label', '選択中のフレームを左に移動', 'Move selected frame left');
     setLocalizedAttribute('#moveFrameDown', 'aria-label', '選択中のフレームを右に移動', 'Move selected frame right');
-    setLocalizedAttribute('#rewindAnimation', 'aria-label', '最初のフレームへ', 'Go to first frame');
+    setLocalizedAttribute('#rewindAnimation', 'aria-label', '現在レイヤーの先頭フレームへ', 'Go to first frame on current layer');
     setLocalizedAttribute('#playAnimation', 'aria-label', '再生', 'Play');
     setLocalizedAttribute('#stopAnimation', 'aria-label', '停止', 'Stop');
-    setLocalizedAttribute('#forwardAnimation', 'aria-label', '次のフレームへ', 'Next frame');
+    setLocalizedAttribute('#forwardAnimation', 'aria-label', '現在レイヤーの末尾フレームへ', 'Go to last frame on current layer');
+    setLocalizedAttribute('#loopAnimation', 'aria-label', 'ループ再生', 'Loop playback');
     setLocalizedAttribute('#selectionTransformMenu', 'aria-label', '範囲選択の反転メニュー', 'Selection Flip Menu');
     setLocalizedAttribute('#selectionFlipHorizontal', 'aria-label', '選択範囲を左右反転', 'Flip selection horizontally');
     setLocalizedAttribute('#selectionFlipVertical', 'aria-label', '選択範囲を上下反転', 'Flip selection vertically');
@@ -20911,6 +20918,7 @@
     const persist = options.persist !== false;
     const render = options.render !== false;
     const syncUi = options.syncUi !== false;
+    const respectSharedCellOccupancy = options.respectSharedCellOccupancy !== false;
     const nextIndex = state.activeFrame + Number(offset || 0);
     const normalizedIndex = wrap
       ? ((Math.round(nextIndex) % frames.length) + frames.length) % frames.length
@@ -20920,11 +20928,96 @@
     const activeLayerRow = currentLayers.findIndex(layer => layer.id === state.activeLayer);
     const candidateLayers = frames[normalizedIndex]?.layers?.slice().reverse() || [];
     const nextLayer = candidateLayers[activeLayerRow] || candidateLayers[candidateLayers.length - 1] || candidateLayers[0];
-    if (nextLayer && !canSelectSharedProjectTimelineCell(normalizedIndex, nextLayer.id)) {
+    if (respectSharedCellOccupancy && nextLayer && !canSelectSharedProjectTimelineCell(normalizedIndex, nextLayer.id)) {
       renderTimelineMatrix();
       return;
     }
     setActiveFrameIndex(nextIndex, { wrap, persist, render, syncUi });
+  }
+
+  function setActiveFrameOnLayerTrack(frameIndex, trackIndex, {
+    persist = true,
+    render = true,
+    syncUi = true,
+  } = {}) {
+    const frames = state.frames;
+    if (!Array.isArray(frames) || !frames.length) {
+      return false;
+    }
+    const normalizedFrameIndex = clamp(Math.round(Number(frameIndex) || 0), 0, frames.length - 1);
+    const targetFrame = frames[normalizedFrameIndex] || null;
+    if (!targetFrame || !Array.isArray(targetFrame.layers) || !targetFrame.layers.length) {
+      return false;
+    }
+    const normalizedTrackIndex = clamp(Math.round(Number(trackIndex) || 0), 0, targetFrame.layers.length - 1);
+    const targetLayer = targetFrame.layers[normalizedTrackIndex] || targetFrame.layers[targetFrame.layers.length - 1] || targetFrame.layers[0];
+    if (!targetLayer?.id) {
+      return false;
+    }
+    const previousFrame = state.activeFrame;
+    const previousLayer = state.activeLayer;
+    setActiveFrameIndex(normalizedFrameIndex, { wrap: false, persist, render, syncUi });
+    state.activeLayer = targetLayer.id;
+    const activeCanvasDoc = getActiveProjectCanvasDocument();
+    if (activeCanvasDoc) {
+      activeCanvasDoc.activeFrame = normalizedFrameIndex;
+      activeCanvasDoc.activeLayer = targetLayer.id;
+    }
+    if (persist) {
+      scheduleSessionPersist();
+    }
+    if (render && (previousFrame !== normalizedFrameIndex || previousLayer !== targetLayer.id)) {
+      renderFrameList();
+      renderLayerList();
+      requestRender();
+      requestOverlayRender();
+    }
+    if (previousFrame !== normalizedFrameIndex || previousLayer !== targetLayer.id) {
+      scheduleSharedProjectCellPresenceBroadcast('frame-track');
+    }
+    return true;
+  }
+
+  function jumpToTimelineEdgeOnActiveLayer(edge = 'start') {
+    const frames = state.frames;
+    if (!Array.isArray(frames) || !frames.length) {
+      return false;
+    }
+    const currentTrackIndex = getActiveLayerTrackIndex();
+    const fallbackTrackIndex = Math.max(0, Math.round(Number(currentTrackIndex) || 0));
+    const firstTarget = edge === 'end' ? frames.length - 1 : 0;
+    const direction = edge === 'end' ? -1 : 1;
+    const candidateIndexes = [];
+    for (let frameIndex = firstTarget; frameIndex >= 0 && frameIndex < frames.length; frameIndex += direction) {
+      candidateIndexes.push(frameIndex);
+    }
+    for (const frameIndex of candidateIndexes) {
+      const frame = frames[frameIndex] || null;
+      const layers = Array.isArray(frame?.layers) ? frame.layers : [];
+      if (!layers.length) {
+        continue;
+      }
+      const trackIndex = clamp(fallbackTrackIndex, 0, layers.length - 1);
+      const layer = layers[trackIndex] || null;
+      if (!layer?.id) {
+        continue;
+      }
+      if (!canSelectSharedProjectTimelineCell(frameIndex, layer.id, { announce: false })) {
+        continue;
+      }
+      return setActiveFrameOnLayerTrack(frameIndex, trackIndex);
+    }
+    const edgeFrame = frames[firstTarget] || null;
+    const edgeLayers = Array.isArray(edgeFrame?.layers) ? edgeFrame.layers : [];
+    const edgeTrackIndex = clamp(fallbackTrackIndex, 0, Math.max(0, edgeLayers.length - 1));
+    const occupiedLayer = edgeLayers[edgeTrackIndex] || null;
+    if (occupiedLayer?.id) {
+      canSelectSharedProjectTimelineCell(firstTarget, occupiedLayer.id, { announce: true });
+    } else {
+      setMultiStatus(localizeText('移動できるフレームがありません', 'No available frame to move to'), 'warn');
+    }
+    renderTimelineMatrix();
+    return false;
   }
 
   function setActiveLayerTrackIndex(nextIndex, {
@@ -27188,6 +27281,7 @@
       serialized.playback = {
         isPlaying: Boolean(snapshot.playback.isPlaying),
         lastFrame: Number(snapshot.playback.lastFrame) || 0,
+        loop: snapshot.playback.loop !== false,
       };
     }
     return serialized;
@@ -27352,8 +27446,9 @@
         ? {
           isPlaying: Boolean(payload.playback.isPlaying),
           lastFrame: Number(payload.playback.lastFrame) || 0,
+          loop: payload.playback.loop !== false,
         }
-        : { isPlaying: false, lastFrame: 0 },
+        : { isPlaying: false, lastFrame: 0, loop: true },
       documentName,
       voxelExtension: normalizeVoxelExtensionState(payload.voxelExtension, VOXEL_EXTENSION_DEFAULT_STATE),
     };
@@ -41055,11 +41150,17 @@
     });
     dom.controls.rewindAnimation?.addEventListener('click', () => {
       stopPlayback();
-      setActiveFrameIndex(0, { wrap: false });
+      jumpToTimelineEdgeOnActiveLayer('start');
     });
     dom.controls.forwardAnimation?.addEventListener('click', () => {
       stopPlayback();
-      stepActiveFrame(1, { wrap: true });
+      jumpToTimelineEdgeOnActiveLayer('end');
+    });
+    dom.controls.loopAnimation?.addEventListener('click', () => {
+      state.playback.loop = state.playback.loop === false;
+      updatePlaybackButtons();
+      applyTimelineToolbarFrames();
+      scheduleSessionPersist();
     });
     dom.controls.animationFps?.addEventListener('change', () => {
       const frame = getActiveFrame();
@@ -41137,7 +41238,19 @@
       if (elapsed < duration) {
         break;
       }
-      stepActiveFrame(1, { wrap: true, persist: false, render: false, syncUi: false });
+      const frameCount = Array.isArray(state.frames) ? state.frames.length : 0;
+      const activeFrameIndex = clamp(Math.round(Number(state.activeFrame) || 0), 0, Math.max(0, frameCount - 1));
+      if (frameCount > 0 && activeFrameIndex >= frameCount - 1 && state.playback.loop === false) {
+        stopPlayback();
+        return;
+      }
+      stepActiveFrame(1, {
+        wrap: true,
+        persist: false,
+        render: false,
+        syncUi: false,
+        respectSharedCellOccupancy: false,
+      });
       lastFrameTime += duration;
       stepped += 1;
     }
@@ -41165,6 +41278,14 @@
       dom.controls.stopAnimation.classList.toggle('is-playback-hidden', !isPlaying);
       dom.controls.stopAnimation.setAttribute('aria-hidden', isPlaying ? 'false' : 'true');
       dom.controls.stopAnimation.disabled = !isPlaying;
+    }
+    if (dom.controls.loopAnimation) {
+      const loopEnabled = state.playback?.loop !== false;
+      dom.controls.loopAnimation.classList.toggle('is-active', loopEnabled);
+      dom.controls.loopAnimation.setAttribute('aria-pressed', loopEnabled ? 'true' : 'false');
+      dom.controls.loopAnimation.title = loopEnabled
+        ? localizeText('ループ再生: ON', 'Loop playback: On')
+        : localizeText('ループ再生: OFF', 'Loop playback: Off');
     }
     const playbackLockedControls = [
       dom.controls.addLayer,
@@ -41203,6 +41324,7 @@
       { element: dom.controls.playAnimation, variant: state.playback.isPlaying ? 'playbackActive' : 'playback' },
       { element: dom.controls.stopAnimation, variant: state.playback.isPlaying ? 'stop' : 'stop' },
       { element: dom.controls.forwardAnimation, variant: 'playback' },
+      { element: dom.controls.loopAnimation, variant: state.playback?.loop !== false ? 'playbackActive' : 'playback' },
     ];
     configs.forEach(({ element, variant }) => {
       if (!element) return;
@@ -75996,7 +76118,7 @@
     }
     if (dom.controls.multiToggleCodeVisibility instanceof HTMLButtonElement) {
       dom.controls.multiToggleCodeVisibility.hidden = false;
-      dom.controls.multiToggleCodeVisibility.disabled = multiState.connecting || !sharedModeEnabled;
+      dom.controls.multiToggleCodeVisibility.disabled = multiState.connecting || requiresSharedLogin || commentsInputMode;
       dom.controls.multiToggleCodeVisibility.removeAttribute('aria-hidden');
     }
     if (dom.controls.multiJoinProjectKey instanceof HTMLInputElement) {
@@ -76024,9 +76146,8 @@
         dom.controls.multiJoinProjectKey.placeholder = localizeText('共有コード', 'Shared code');
       } else {
         dom.controls.multiJoinProjectKey.maxLength = 280;
-        delete dom.controls.multiJoinProjectKey.dataset.visibilityToggled;
         dom.controls.multiJoinProjectKey.readOnly = false;
-        if (dom.controls.multiJoinProjectKey.type !== 'password') {
+        if (dom.controls.multiJoinProjectKey.dataset.visibilityToggled !== 'true') {
           dom.controls.multiJoinProjectKey.type = 'password';
         }
         if (sharedProjectFlowPreferred && dom.controls.multiJoinProjectKey !== document.activeElement) {
@@ -76061,8 +76182,8 @@
     if (dom.controls.multiCopyAccessCode instanceof HTMLButtonElement) {
       const access = readCurrentMultiProjectAccessInput();
       dom.controls.multiCopyAccessCode.disabled = multiState.connecting || requiresSharedLogin || !(access.inviteToken || access.projectKey);
-      dom.controls.multiCopyAccessCode.hidden = commentsInputMode ? true : !sharedModeEnabled;
-      dom.controls.multiCopyAccessCode.setAttribute('aria-hidden', String(commentsInputMode ? true : !sharedModeEnabled));
+      dom.controls.multiCopyAccessCode.hidden = commentsInputMode;
+      dom.controls.multiCopyAccessCode.setAttribute('aria-hidden', String(commentsInputMode));
     }
     if (dom.controls.multiEntryMaster instanceof HTMLButtonElement) {
       dom.controls.multiEntryMaster.disabled = sharedProjectFlowPreferred
