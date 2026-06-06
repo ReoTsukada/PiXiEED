@@ -1040,13 +1040,15 @@ body.is-mobile-layout.is-unified-left-tools-color:not(.is-unified-left-color-foc
 
 .rail--left[data-compact="true"] #panelColor #sortPaletteHue,
 .rail--left[data-compact="true"] #panelColor #sortPaletteSaturation,
-.rail--left[data-compact="true"] #panelColor #sortPaletteValue {
+.rail--left[data-compact="true"] #panelColor #sortPaletteValue,
+.rail--left[data-compact="true"] #panelColor #addPaletteColor {
   display: none;
 }
 
 #panelColor.is-compact-flyout #sortPaletteHue,
 #panelColor.is-compact-flyout #sortPaletteSaturation,
-#panelColor.is-compact-flyout #sortPaletteValue {
+#panelColor.is-compact-flyout #sortPaletteValue,
+#panelColor.is-compact-flyout #addPaletteColor {
   display: none;
 }
 
