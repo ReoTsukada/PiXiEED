@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-06T17:02:12.030Z",
+  "generatedAt": "2026-06-06T17:48:45.588Z",
   "projects": [
     {
       "id": "site",
@@ -9,7 +9,7 @@
         {
           "date": "2026-06-07",
           "items": [
-            "画面を更新"
+            "SEO / 画面を更新"
           ]
         },
         {
@@ -230,7 +230,7 @@
           "id": "site",
           "name": "PiXiEED 全体",
           "url": "/index.html",
-          "summary": "画面を更新"
+          "summary": "SEO / 画面を更新"
         },
         {
           "id": "pixiedraw",

@@ -16088,8 +16088,8 @@
     setLocalizedTextContent('#panelMulti .multi-capacity-field > span', '参加管理', 'Participant Management');
     setLocalizedControlLabel('multiMaxGuests', '参加上限 (1〜15)', 'Participant Limit (1-15)');
     setLocalizedTextContent('#multiGuestCapacityHint', '参加枠: 0 / 5', 'Participant slots: 0 / 5');
-    setLocalizedControlLabel('multiRoomVisibility', '部屋公開（停止中）', 'Room Visibility (Disabled)');
-    setLocalizedTextContent('#multiRoomVisibilityHint', '公開部屋の一覧は停止中です。マルチプレイは非公開で開始され、招待リンクで共有できます。', 'Public room listing is disabled. Multiplayer starts private and can be shared by invite link.');
+    setLocalizedControlLabel('multiRoomVisibility', '作成する共有', 'Shared Project Type');
+    setLocalizedTextContent('#multiRoomVisibilityHint', '限定はログイン後にコードまたはURLで参加できます。公開はURLからログインなしで参加できます。', 'Limited projects require sign-in to join by code or URL. Public projects can be joined from the URL without signing in.');
     setLocalizedControlLabel('multiExportPermission', '出力権限', 'Export Permission');
     setLocalizedControlLabel('multiJoinPolicy', '参加方式', 'Join Policy');
     setLocalizedTextContent('#multiJoinPolicyHint', '自動参加: 招待リンクは参加者入室になります。', 'Auto Join: invite link opens as participant join.');
@@ -59654,7 +59654,16 @@
   }
 
   function normalizeMultiRoomVisibility(value, fallback = MULTI_DEFAULT_ROOM_VISIBILITY) {
-    return MULTI_ROOM_VISIBILITY_PRIVATE;
+    const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+    if (normalized === MULTI_ROOM_VISIBILITY_PUBLIC) {
+      return MULTI_ROOM_VISIBILITY_PUBLIC;
+    }
+    if (normalized === MULTI_ROOM_VISIBILITY_PRIVATE || normalized === 'shared' || normalized === 'limited') {
+      return MULTI_ROOM_VISIBILITY_PRIVATE;
+    }
+    return fallback === MULTI_ROOM_VISIBILITY_PUBLIC
+      ? MULTI_ROOM_VISIBILITY_PUBLIC
+      : MULTI_ROOM_VISIBILITY_PRIVATE;
   }
 
   function getMultiRoomVisibilityLabel(value = multiState.roomVisibility) {
@@ -60431,8 +60440,28 @@
         clearPendingSharedInvite();
         return true;
       }
+      let prefetchedInviteProject = null;
       if ((!accountState.isLoggedIn || accountState.isAnonymous) && invite.inviteToken) {
         const inviteProject = await fetchSharedProjectRecordByInviteToken(invite.inviteToken);
+        prefetchedInviteProject = inviteProject;
+        if (!inviteProject?.project_key || inviteProject.visibility !== MULTI_ROOM_VISIBILITY_PUBLIC) {
+          storePendingSharedInvite({
+            inviteToken: invite.inviteToken || '',
+            projectKey: normalizedInviteProjectKey,
+            requestedRole,
+            autoJoin: invite.autoJoin !== false,
+            source: 'url-invite',
+          });
+          setMultiStatus(
+            localizeText(
+              '限定プロジェクトを開くにはログインしてください。',
+              'Sign in to open this limited project.'
+            ),
+            'warn'
+          );
+          openLoginPromptDialog();
+          return false;
+        }
         if (inviteProject?.project_key && !isBrokenSharedInviteBinding(inviteProject, {
           expectedInviteToken: invite.inviteToken,
           expectedProjectKey: normalizedInviteProjectKey,
@@ -60462,7 +60491,10 @@
           });
         }
       }
-      if (!(await ensureSharedProjectAuthenticatedStart({ requireLogin: true }))) {
+      const sessionReady = (!accountState.isLoggedIn || accountState.isAnonymous)
+        ? await ensurePublicSharedProjectUrlSession(prefetchedInviteProject)
+        : await ensureSharedProjectAuthenticatedStart({ requireLogin: true });
+      if (!sessionReady) {
         storePendingSharedInvite({
           inviteToken: invite.inviteToken || '',
           projectKey: normalizedInviteProjectKey,
@@ -60641,6 +60673,17 @@
     });
   }
 
+  function getSharedProjectCreationVisibility() {
+    return normalizeMultiRoomVisibility(
+      dom.controls.multiRoomVisibility instanceof HTMLSelectElement
+        ? dom.controls.multiRoomVisibility.value
+        : multiState.roomVisibility,
+      MULTI_DEFAULT_ROOM_VISIBILITY
+    ) === MULTI_ROOM_VISIBILITY_PUBLIC
+      ? MULTI_ROOM_VISIBILITY_PUBLIC
+      : 'shared';
+  }
+
   async function createSharedProjectFromCurrentDocument() {
     clearSharedProjectCreationFailureReason();
     if (!ensureInternetConnectedForAction('共有プロジェクトの作成', 'Creating a shared project')) {
@@ -60660,8 +60703,8 @@
     }
     if (!(await ensureSharedProjectAuthenticatedStart({ requireLogin: true }))) {
       setSharedProjectCreationFailureReason(
-        localizeText('ログインが完了していません。', 'Sign-in is not complete.'),
-        localizeText('共有プロジェクトを作成するにはPiXiEEDアカウントへのログインが必要です。', 'Creating a shared project requires signing in to a PiXiEED account.')
+        localizeText('共有用セッションを開始できませんでした。', 'The sharing session could not be started.'),
+        localizeText('通信状態を確認するか、ログインしてからもう一度お試しください。', 'Check your connection or sign in, then try again.')
       );
       return false;
     }
@@ -60670,7 +60713,7 @@
       setMultiStatus(message, 'warn');
       setSharedProjectCreationFailureReason(
         message,
-        localizeText('Supabase接続またはログイン状態を確認してください。', 'Check the Supabase connection or sign-in state.')
+        localizeText('Supabase接続または共有用セッションの状態を確認してください。', 'Check the Supabase connection or sharing session state.')
       );
       return false;
     }
@@ -60769,8 +60812,10 @@
     await waitForSharedProjectProgressPaint();
     const packaged = buildPackagedProjectPayload(snapshot);
     packaged.sharedHistoryLabel = 'sharedProjectCreate';
+    const creationVisibility = getSharedProjectCreationVisibility();
     const project = await persistSharedProjectSnapshot(projectKey, packaged, {
       title: createSharedProjectSnapshotTitle(state.documentName || DEFAULT_DOCUMENT_NAME),
+      visibility: creationVisibility,
       reason: 'sharedProjectCreate',
     });
     if (!project) {
@@ -60779,8 +60824,8 @@
       const failure = getSharedProjectCreationFailureReason(
         fallback,
         localizeText(
-          'Supabaseへのスナップショット保存に失敗しました。ログイン状態、ネットワーク、SQL/RPCの適用状況を確認してください。',
-          'Saving the snapshot to Supabase failed. Check sign-in state, network, and SQL/RPC deployment.'
+          'Supabaseへのスナップショット保存に失敗しました。共有用セッション、ネットワーク、SQL/RPCの適用状況を確認してください。',
+          'Saving the snapshot to Supabase failed. Check sharing session state, network, and SQL/RPC deployment.'
         )
       );
       setSharedProjectCreationFailureReason(failure.reason, failure.detail);
@@ -60823,10 +60868,15 @@
     });
     syncMultiControls();
     setMultiStatus(
-      localizeText(
-        '共有プロジェクトを作成しました。招待リンクを共有してください。',
-        'Shared project created. Share the invite link.'
-      ),
+      creationVisibility === MULTI_ROOM_VISIBILITY_PUBLIC
+        ? localizeText(
+          '公開プロジェクトを作成しました。イベント用リンクを共有してください。',
+          'Public project created. Share the event link.'
+        )
+        : localizeText(
+          '限定プロジェクトを作成しました。招待リンクを共有してください。',
+          'Limited project created. Share the invite link.'
+        ),
       'success'
     );
     console.info('[shared-sync]', {
@@ -60857,37 +60907,6 @@
         'warn'
       );
       return false;
-    }
-    if (!(accountState.isLoggedIn && accountState.userId && !accountState.isAnonymous) && access.inviteToken) {
-      const inviteProject = await fetchSharedProjectRecordByInviteToken(access.inviteToken);
-      if (inviteProject?.project_key && !isBrokenSharedInviteBinding(inviteProject, {
-        expectedInviteToken: access.inviteToken,
-        expectedProjectKey: access.projectKey,
-      })) {
-        let thumbnail = null;
-        if (inviteProject.latest_snapshot && typeof inviteProject.latest_snapshot === 'object') {
-          try {
-            thumbnail = await generateSnapshotThumbnail(inviteProject.latest_snapshot);
-          } catch (_error) {
-            thumbnail = null;
-          }
-        }
-        await upsertSharedRecentProjectEntry({
-          projectKey: normalizeMultiProjectKey(inviteProject.project_key),
-          projectId: inviteProject.id || '',
-          inviteToken: inviteProject.invite_token || access.inviteToken || '',
-          visibility: inviteProject.visibility || 'shared',
-          name: createSharedProjectSnapshotTitle(inviteProject.title || access.projectKey || DEFAULT_DOCUMENT_NAME),
-          fileName: normalizeDocumentName(`${createSharedProjectSnapshotTitle(inviteProject.title || access.projectKey || DEFAULT_DOCUMENT_NAME)}.pixiedraw`),
-          thumbnail,
-          roleHint: 'guest',
-          membershipRole: inviteProject.membership_role || '',
-          ownerUserId: inviteProject.owner_user_id || '',
-          autoJoin: false,
-          revision: Math.max(0, Math.round(Number(inviteProject.latest_revision) || 0)),
-          structureRevision: Math.max(0, Math.round(Number(inviteProject.latest_structure_revision) || 0)),
-        });
-      }
     }
     if (!(await ensureSharedProjectAuthenticatedStart({ requireLogin: true }))) {
       storePendingSharedInvite({
@@ -62230,7 +62249,7 @@
   }
 
   function canUseSharedProjectsBackend() {
-    return supportsSharedProjectsBackend && accountState.isLoggedIn && !accountState.isAnonymous;
+    return supportsSharedProjectsBackend && accountState.isLoggedIn && Boolean(accountState.userId);
   }
 
   function isRecoverableSharedBackendPreflightError(error) {
@@ -68941,7 +68960,7 @@
     }
   }
 
-  async function persistSharedProjectSnapshot(projectKey, packagedPayload, { title = '', revision = null, reason = '' } = {}) {
+  async function persistSharedProjectSnapshot(projectKey, packagedPayload, { title = '', revision = null, visibility = 'shared', reason = '' } = {}) {
     // Full snapshot commit is now reserved for:
     // - project creation
     // - checkpoints
@@ -68968,7 +68987,11 @@
       );
       return null;
     }
-    const project = await ensureSharedProjectMembership(normalizedProjectKey, { createIfMissing: true, title });
+    const project = await ensureSharedProjectMembership(normalizedProjectKey, {
+      createIfMissing: true,
+      title,
+      visibility,
+    });
     if (!project) {
       recordCreationSnapshotFailure(
         localizeText('共有プロジェクトの作成権限を確認できませんでした。', 'Shared project creation permission could not be verified.'),
@@ -71164,7 +71187,40 @@
     }
   }
 
-  async function ensurePixieedAccountReady({ forceRefresh = false, silent = false } = {}) {
+  async function ensurePixieedAnonymousAccount({ silent = false } = {}) {
+    try {
+      const supabase = await ensurePixieedAccountClient();
+      if (!supabase?.auth || typeof supabase.auth.signInAnonymously !== 'function') {
+        return false;
+      }
+      const currentSession = await supabase.auth.getSession();
+      let session = currentSession?.data?.session || null;
+      if (!session) {
+        const signedIn = await supabase.auth.signInAnonymously();
+        if (signedIn?.error) {
+          throw signedIn.error;
+        }
+        session = signedIn?.data?.session || null;
+      }
+      if (!session) {
+        const refreshed = await supabase.auth.getSession();
+        session = refreshed?.data?.session || null;
+      }
+      applyPixieedAccountSession(session || null);
+      if (accountState.isLoggedIn) {
+        accountState.profile = getPixieedAccountProfileFallback();
+        updatePixieedAccountUi();
+        return true;
+      }
+    } catch (error) {
+      if (!silent) {
+        console.warn('Failed to create anonymous PiXiEED sharing session', error);
+      }
+    }
+    return false;
+  }
+
+  async function ensurePixieedAccountReady({ forceRefresh = false, silent = false, allowAnonymous = false } = {}) {
     try {
       await initPixieedAccount();
       if (forceRefresh) {
@@ -71206,14 +71262,14 @@
         console.warn('Failed to ensure PiXiEED account readiness', error);
       }
     }
-    return Boolean(accountState.isLoggedIn && accountState.userId && !accountState.isAnonymous);
+    return Boolean(accountState.isLoggedIn && accountState.userId && (allowAnonymous || !accountState.isAnonymous));
   }
 
   async function ensureSharedProjectAuthenticatedStart({ requireLogin = true } = {}) {
     if (!requireLogin) {
       return true;
     }
-    await ensurePixieedAccountReady({ forceRefresh: true, silent: true });
+    await ensurePixieedAccountReady({ forceRefresh: true, silent: true, allowAnonymous: false });
     if (accountState.isLoggedIn && accountState.userId && !accountState.isAnonymous) {
       return true;
     }
@@ -71225,6 +71281,35 @@
       'error'
     );
     openLoginPromptDialog();
+    return false;
+  }
+
+  async function ensurePublicSharedProjectUrlSession(projectRecord = null) {
+    if (accountState.isLoggedIn && accountState.userId) {
+      return true;
+    }
+    if (projectRecord?.visibility !== MULTI_ROOM_VISIBILITY_PUBLIC) {
+      setMultiStatus(
+        localizeText(
+          '限定プロジェクトを開くにはログインしてください。',
+          'Sign in to open this limited project.'
+        ),
+        'warn'
+      );
+      openLoginPromptDialog();
+      return false;
+    }
+    const started = await ensurePixieedAnonymousAccount({ silent: true });
+    if (started && accountState.isLoggedIn && accountState.userId) {
+      return true;
+    }
+    setMultiStatus(
+      localizeText(
+        '公開プロジェクト用の一時セッションを開始できませんでした。',
+        'Could not start a temporary session for the public project.'
+      ),
+      'error'
+    );
     return false;
   }
 
@@ -71415,6 +71500,7 @@
   function updatePixieedShareAccountCard(statusNode, hintNode, loginAnchor) {
     const nickname = readPixieedAccountNickname();
     const isSignedInAccount = accountState.isLoggedIn && !accountState.isAnonymous;
+    const canUseSharedAccount = canUseSharedProjectsBackend() || supportsSharedProjectsBackend;
     const { ownedProjectCount, effectiveLimit } = getSharedProjectOwnershipStatus();
     const maxSharedProjects = Math.max(1, effectiveLimit);
     const usageLabel = buildSharedProjectUsageLabel({ ownedProjectCount, effectiveLimit });
@@ -71428,6 +71514,9 @@
         statusNode.textContent = label
           ? `${slotLabel} / ${label}`
           : slotLabel;
+      } else if (canUseSharedAccount) {
+        const label = nickname || localizeText('共有ゲスト', 'Shared guest');
+        statusNode.textContent = `${localizeText(`無料枠 ${usageLabel}`, `Free slot ${usageLabel}`)} / ${label}`;
       } else {
         statusNode.textContent = localizeText(
           `無料枠 ${usageLabel}`,
@@ -71439,23 +71528,28 @@
       if (isSignedInAccount) {
         hintNode.textContent = maxSharedProjects > SHARED_PROJECT_LIMIT_DEFAULT
           ? localizeText(
-            `このアカウントで共有プロジェクトを最大${maxSharedProjects}件まで作成できます。共有URLでメンバーを招待できます。`,
-            `This account can create up to ${maxSharedProjects} shared projects. Invite members with a shared URL.`
+            `このアカウントで共有プロジェクトを最大${maxSharedProjects}件まで作成できます。作成時に公開または限定を選べます。`,
+            `This account can create up to ${maxSharedProjects} shared projects. Choose public or limited when creating.`
           )
           : localizeText(
-            'このアカウントで共有プロジェクトを1件作成できます。サポーター特典で追加3件、合計4件まで作成できます。',
-            'This account can create 1 shared project. Supporter benefits add 3 extra slots, for 4 total.'
+            'このアカウントで共有プロジェクトを1件作成できます。作成時に公開または限定を選べます。',
+            'This account can create 1 shared project. Choose public or limited when creating.'
           );
+      } else if (canUseSharedAccount) {
+        hintNode.textContent = localizeText(
+          'ログインなしでは公開プロジェクトのURL参加のみできます。作成やコード参加にはログインが必要です。',
+          'Without signing in, you can only join public projects from a URL. Sign in to create or join by code.'
+        );
       } else {
         hintNode.textContent = localizeText(
-          'ログインすると、同じ絵をオンラインで共同編集できます。サポーター特典で追加3件、合計4件まで作成できます。',
-          'Sign in to edit the same artwork together online. Supporter benefits add 3 extra slots, for 4 total.'
+          '共有プロジェクトの作成とコード参加にはログインが必要です。',
+          'Sign-in is required to create shared projects and join by code.'
         );
       }
     }
     if (loginAnchor instanceof HTMLAnchorElement) {
       syncPixieedAccountLoginAnchor(loginAnchor);
-      loginAnchor.textContent = localizeText('ログインして共有を作成', 'Sign In to Create Shared Project');
+      loginAnchor.textContent = localizeText('ログインして管理', 'Sign In to Manage');
       loginAnchor.hidden = isSignedInAccount;
       loginAnchor.setAttribute('aria-hidden', String(isSignedInAccount));
     }
@@ -76144,8 +76238,8 @@
       && !multiState.connected
       && !multiState.connecting;
     const inMasterConfigMode = isMultiMasterConfigMode();
-    const isSignedIn = Boolean(accountState.isLoggedIn && !accountState.isAnonymous);
-    const requiresSharedLogin = sharedProjectFlowPreferred && !isSignedIn;
+    const isSignedInAccount = Boolean(accountState.isLoggedIn && accountState.userId && !accountState.isAnonymous);
+    const requiresSharedLogin = sharedProjectFlowPreferred && !isSignedInAccount;
     const commentsInputMode = isMultiParticipantsCommentModeActive();
     const canSendComment = (
       (isSharedProjectCollaborativeMode() && Boolean(activeSharedProjectKey))
@@ -76188,7 +76282,7 @@
         dom.controls.multiJoinProjectKey.value = '';
         dom.controls.multiJoinProjectKey.readOnly = true;
         dom.controls.multiJoinProjectKey.type = 'text';
-        dom.controls.multiJoinProjectKey.placeholder = localizeText('ログインしてください', 'Sign in required');
+        dom.controls.multiJoinProjectKey.placeholder = localizeText('ログインしてください', 'Please sign in');
       } else if (sharedModeEnabled) {
         dom.controls.multiJoinProjectKey.maxLength = 280;
         dom.controls.multiJoinProjectKey.value = codeValue;
@@ -76235,8 +76329,8 @@
     if (dom.controls.multiCopyAccessCode instanceof HTMLButtonElement) {
       const access = readCurrentMultiProjectAccessInput();
       dom.controls.multiCopyAccessCode.disabled = multiState.connecting || requiresSharedLogin || !(access.inviteToken || access.projectKey);
-      dom.controls.multiCopyAccessCode.hidden = commentsInputMode;
-      dom.controls.multiCopyAccessCode.setAttribute('aria-hidden', String(commentsInputMode));
+      dom.controls.multiCopyAccessCode.hidden = commentsInputMode || !sharedModeEnabled;
+      dom.controls.multiCopyAccessCode.setAttribute('aria-hidden', String(commentsInputMode || !sharedModeEnabled));
     }
     if (dom.controls.multiEntryMaster instanceof HTMLButtonElement) {
       dom.controls.multiEntryMaster.disabled = sharedProjectFlowPreferred
@@ -76403,14 +76497,22 @@
     }
     if (dom.controls.multiRoomVisibility instanceof HTMLSelectElement) {
       if (
-        dom.controls.multiRoomVisibility.options.length !== 1
+        dom.controls.multiRoomVisibility.options.length !== 2
         || dom.controls.multiRoomVisibility.options[0].value !== MULTI_ROOM_VISIBILITY_PRIVATE
+        || dom.controls.multiRoomVisibility.options[1].value !== MULTI_ROOM_VISIBILITY_PUBLIC
       ) {
-        dom.controls.multiRoomVisibility.innerHTML = '<option value="private">非公開固定</option>';
+        dom.controls.multiRoomVisibility.innerHTML = '<option value="private">限定プロジェクト</option><option value="public">公開プロジェクト</option>';
       }
-      setLocalizedSelectOption(dom.controls.multiRoomVisibility, 'private', '非公開固定', 'Private Only');
-      dom.controls.multiRoomVisibility.value = MULTI_ROOM_VISIBILITY_PRIVATE;
-      dom.controls.multiRoomVisibility.disabled = true;
+      setLocalizedSelectOption(dom.controls.multiRoomVisibility, 'private', '限定プロジェクト', 'Limited Project');
+      setLocalizedSelectOption(dom.controls.multiRoomVisibility, 'public', '公開プロジェクト', 'Public Project');
+      dom.controls.multiRoomVisibility.value = normalizeMultiRoomVisibility(
+        multiState.roomVisibility,
+        MULTI_DEFAULT_ROOM_VISIBILITY
+      );
+      dom.controls.multiRoomVisibility.disabled = !sharedProjectFlowPreferred
+        || !isSignedInAccount
+        || currentProjectIsShared
+        || multiState.connecting;
     }
     if (dom.controls.multiExportPermission instanceof HTMLSelectElement) {
       setLocalizedSelectOption(dom.controls.multiExportPermission, 'master-guest', 'マスター + 参加者', 'Master + Participants');
@@ -76511,8 +76613,8 @@
     if (dom.controls.multiRoomVisibilityHint instanceof HTMLElement) {
       dom.controls.multiRoomVisibilityHint.textContent = sharedProjectFlowPreferred
         ? localizeText(
-          '共有プロジェクトは招待リンクで共有され、同じプロジェクトとして参加者一覧にも残ります。',
-          'Shared projects are distributed by invite link and remain in each member project list.'
+          '限定はログイン後にコードまたはURLで参加できます。公開はURLからログインなしで参加できます。',
+          'Limited projects require sign-in to join by code or URL. Public projects can be joined from the URL without signing in.'
         )
         : localizeText(
           '公開部屋の一覧は停止中です。マルチプレイは非公開で開始され、招待リンクで共有できます。',
@@ -80258,7 +80360,7 @@
         if (!(event.target instanceof HTMLSelectElement)) {
           return;
         }
-        if (!isMultiMasterConfigMode()) {
+        if (!prefersSharedProjectFlow() && !isMultiMasterConfigMode()) {
           event.target.value = normalizeMultiRoomVisibility(
             multiState.roomVisibility,
             MULTI_DEFAULT_ROOM_VISIBILITY
@@ -80285,6 +80387,13 @@
           }
           scheduleMultiPublicLobbyRoomSync({ immediate: true });
           scheduleMultiSessionStateBroadcast({ immediate: true });
+        } else if (prefersSharedProjectFlow() && changed) {
+          setMultiStatus(
+            nextVisibility === MULTI_ROOM_VISIBILITY_PUBLIC
+              ? localizeText('公開プロジェクトとして作成します', 'Will create a public project')
+              : localizeText('限定プロジェクトとして作成します', 'Will create a limited project'),
+            'info'
+          );
         }
         syncMultiControls();
       });
