@@ -1887,6 +1887,7 @@
       ];
       const SIDE_SLOT_IDS = ['leftPanelAdSlot', 'rightPanelAdSlot', 'multiSupportAdSlot'];
       const MIN_SIDE_AD_WIDTH = 140;
+      const MIN_MOBILE_BOTTOM_AD_WIDTH = 250;
       const RETRY_FRAMES = 96;
       const slotByContainerId = new Map(SLOTS.map(item => [item.containerId, item]));
       const resizeObserverByContainer = new WeakMap();
@@ -2058,7 +2059,7 @@
       }
 
       function getRequiredWidth(container) {
-        return isMobileBottomSlot(container) ? 1 : MIN_SIDE_AD_WIDTH;
+        return isMobileBottomSlot(container) ? MIN_MOBILE_BOTTOM_AD_WIDTH : MIN_SIDE_AD_WIDTH;
       }
 
       function isContainerRenderable(container) {
