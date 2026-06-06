@@ -1044,6 +1044,12 @@ body.is-mobile-layout.is-unified-left-tools-color:not(.is-unified-left-color-foc
   display: none;
 }
 
+#panelColor.is-compact-flyout #sortPaletteHue,
+#panelColor.is-compact-flyout #sortPaletteSaturation,
+#panelColor.is-compact-flyout #sortPaletteValue {
+  display: none;
+}
+
 .rail--left[data-compact="true"] #panelColor .palette-grid {
   --panel-palette-swatch-size: var(--ui-control-tile-size);
   grid-template-columns: repeat(1, minmax(var(--panel-palette-swatch-size), var(--panel-palette-swatch-size)));
