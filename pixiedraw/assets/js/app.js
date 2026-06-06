@@ -49323,21 +49323,21 @@
   }
 
   function getCanvasResizeOverlayMetrics() {
-    const area = dom.mainCanvasArea;
+    const overlayHost = dom.viewportWorkspace;
     const drawing = activeCanvasSurface?.drawing instanceof HTMLCanvasElement
       ? activeCanvasSurface.drawing
       : dom.canvases.drawing;
-    if (!(area instanceof HTMLElement) || !(drawing instanceof HTMLCanvasElement)) {
+    if (!(overlayHost instanceof HTMLElement) || !(drawing instanceof HTMLCanvasElement)) {
       return null;
     }
-    const areaRect = area.getBoundingClientRect();
+    const hostRect = overlayHost.getBoundingClientRect();
     const drawingRect = drawing.getBoundingClientRect();
-    if (areaRect.width <= 0 || areaRect.height <= 0 || drawingRect.width <= 0 || drawingRect.height <= 0) {
+    if (hostRect.width <= 0 || hostRect.height <= 0 || drawingRect.width <= 0 || drawingRect.height <= 0) {
       return null;
     }
     return {
-      left: drawingRect.left - areaRect.left,
-      top: drawingRect.top - areaRect.top,
+      left: drawingRect.left - hostRect.left,
+      top: drawingRect.top - hostRect.top,
       width: drawingRect.width,
       height: drawingRect.height,
     };
