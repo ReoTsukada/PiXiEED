@@ -76689,13 +76689,13 @@
       dom.controls.multiJoinProjectKeyField.setAttribute('aria-hidden', 'false');
     }
     if (dom.controls.multiEntryAccountCard instanceof HTMLElement) {
-      dom.controls.multiEntryAccountCard.hidden = isSignedIn;
+      dom.controls.multiEntryAccountCard.hidden = isSignedInAccount;
     }
     if (dom.controls.multiFlowAccountCard instanceof HTMLElement) {
-      dom.controls.multiFlowAccountCard.hidden = isSignedIn;
+      dom.controls.multiFlowAccountCard.hidden = isSignedInAccount;
     }
     if (dom.controls.multiSupportCard instanceof HTMLElement) {
-      dom.controls.multiSupportCard.hidden = !isSignedIn;
+      dom.controls.multiSupportCard.hidden = !isSignedInAccount;
     }
     if (dom.controls.multiCommentInput instanceof HTMLInputElement) {
       dom.controls.multiCommentInput.disabled = !canSendComment;
