@@ -1,4 +1,4 @@
-const APP_BUILD_VERSION = '2026.06.07-shared-public-limited';
+const APP_BUILD_VERSION = '2026.06.07-canvas-resize-handle';
 const CACHE_VERSION = `pixiedraw-v${APP_BUILD_VERSION}`;
 const CORE_ASSETS = [
   '/pixiedraw/',
