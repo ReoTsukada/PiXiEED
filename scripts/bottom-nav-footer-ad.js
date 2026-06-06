@@ -549,8 +549,10 @@
         body.has-footer-ad > main{
           width:100%;
           max-width:min(var(--pixieed-layout-max-width), 100%);
+          min-width:0 !important;
           margin-left:auto !important;
           margin-right:auto !important;
+          overflow-x:clip !important;
         }
         body.has-footer-ad > .page > header,
         body.has-footer-ad > .page > .top-nav,
@@ -585,8 +587,9 @@
           right:0;
           bottom:0;
           z-index:70;
-          width:auto !important;
-          max-width:none !important;
+          width:100vw !important;
+          max-width:100vw !important;
+          min-width:0 !important;
           box-sizing:border-box;
           padding:var(--pixieed-footer-ad-padding-y) env(safe-area-inset-right, 0px) calc(var(--pixieed-footer-ad-padding-y) + var(--pixieed-safe-bottom)) env(safe-area-inset-left, 0px);
           display:flex !important;
@@ -595,25 +598,33 @@
           margin:0 !important;
           margin-left:0 !important;
           margin-right:0 !important;
-          overflow:visible !important;
+          overflow:hidden !important;
           background:var(--pixieed-footer-ad-bg);
           border-top:1px solid rgba(255,255,255,0.08);
           backdrop-filter:blur(8px);
           min-height:var(--pixieed-footer-ad-total-height);
+          contain:layout paint;
         }
         .ad-footer ins{
           display:block !important;
           width:100% !important;
           max-width:min(720px, calc(100vw - 24px)) !important;
+          min-width:0 !important;
           min-height:var(--pixieed-footer-ad-height);
           margin:0 auto !important;
-          overflow:hidden;
+          overflow:hidden !important;
           background:var(--pixieed-footer-ad-bg) !important;
+          box-sizing:border-box !important;
         }
         .ad-footer ins iframe{
           display:block !important;
+          width:100% !important;
+          max-width:100% !important;
+          min-width:0 !important;
           margin:0 auto !important;
+          overflow:hidden !important;
           background:var(--pixieed-footer-ad-bg) !important;
+          box-sizing:border-box !important;
         }
         .ad-footer ins.adsbygoogle[data-ad-status="unfilled"]{
           background:var(--pixieed-footer-ad-bg) !important;
