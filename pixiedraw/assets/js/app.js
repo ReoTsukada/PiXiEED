@@ -34318,9 +34318,11 @@
       cancelAnimationFrame(canvasResizeHandleLayoutRaf);
     }
     canvasResizeHandleLayoutRaf = requestAnimationFrame(() => {
-      canvasResizeHandleLayoutRaf = null;
-      updateCanvasResizeHandlePosition();
-      syncCanvasResizeHandleVisibility();
+      canvasResizeHandleLayoutRaf = requestAnimationFrame(() => {
+        canvasResizeHandleLayoutRaf = null;
+        updateCanvasResizeHandlePosition();
+        syncCanvasResizeHandleVisibility();
+      });
     });
   }
 
@@ -49146,9 +49148,7 @@
   }
 
   function getCanvasResizeOverlayMetrics() {
-    const area = dom.viewportWorkspace instanceof HTMLElement
-      ? dom.viewportWorkspace
-      : dom.mainCanvasArea;
+    const area = dom.mainCanvasArea;
     const drawing = activeCanvasSurface?.drawing instanceof HTMLCanvasElement
       ? activeCanvasSurface.drawing
       : dom.canvases.drawing;
