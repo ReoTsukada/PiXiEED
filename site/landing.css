@@ -574,6 +574,7 @@ footer{
   min-width: 0;
 }
 .home-hero-card--image {
+  margin-top: clamp(6px, 1.8vw, 12px);
   padding: 0;
   aspect-ratio: 1200 / 630;
   overflow: hidden;
