@@ -31,6 +31,7 @@
   const RETRY_DELAY_MS = 2500;
   let slotIndex = 0;
   let adsScriptPromise = null;
+  let clampScheduled = false;
 
   try {
     const stored = sessionStorage.getItem(SLOT_KEY);
@@ -88,6 +89,122 @@
 
   function isUnfilled(ins) {
     return ins.getAttribute('data-ad-status') === 'unfilled';
+  }
+
+  function isHomePage() {
+    return Boolean(document.querySelector('.home-app'));
+  }
+
+  function contentWidth() {
+    const body = document.body;
+    if (!(body instanceof HTMLElement)) return window.innerWidth || 0;
+    const styles = window.getComputedStyle(body);
+    const left = Number.parseFloat(styles.paddingLeft) || 0;
+    const right = Number.parseFloat(styles.paddingRight) || 0;
+    return Math.max(1, Math.floor((window.innerWidth || body.clientWidth || 0) - left - right));
+  }
+
+  function injectHomeAdGuardStyle() {
+    if (!isHomePage() || document.getElementById('pixieed-home-auto-ad-guard')) return;
+    document.body?.classList.add('home-ad-guard');
+    const style = document.createElement('style');
+    style.id = 'pixieed-home-auto-ad-guard';
+    style.textContent = `
+      body.home-ad-guard{
+        max-inline-size:100dvw !important;
+        overflow-x:clip !important;
+      }
+      body.home-ad-guard .page,
+      body.home-ad-guard .page-shell,
+      body.home-ad-guard .home-screen,
+      body.home-ad-guard .home-panel,
+      body.home-ad-guard .home-hero-card{
+        max-inline-size:100% !important;
+        min-inline-size:0 !important;
+        overflow-x:clip !important;
+      }
+      body.home-ad-guard ins.adsbygoogle,
+      body.home-ad-guard .adsbygoogle,
+      body.home-ad-guard .google-auto-placed,
+      body.home-ad-guard iframe[id^="google_ads_iframe"],
+      body.home-ad-guard iframe[name^="google_ads_iframe"],
+      body.home-ad-guard iframe[id^="aswift_"],
+      body.home-ad-guard iframe[name^="aswift_"]{
+        max-inline-size:100% !important;
+        min-inline-size:0 !important;
+        box-sizing:border-box !important;
+        overflow:hidden !important;
+      }
+      body.home-ad-guard > ins.adsbygoogle,
+      body.home-ad-guard > .adsbygoogle,
+      body.home-ad-guard > .google-auto-placed{
+        inline-size:calc(100dvw - 28px) !important;
+        max-inline-size:calc(100dvw - 28px) !important;
+        margin-inline:auto !important;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function isAdNode(node) {
+    if (!(node instanceof HTMLElement)) return false;
+    return node.matches([
+      'ins.adsbygoogle',
+      '.adsbygoogle',
+      '.google-auto-placed',
+      'iframe[id^="google_ads_iframe"]',
+      'iframe[name^="google_ads_iframe"]',
+      'iframe[id^="aswift_"]',
+      'iframe[name^="aswift_"]'
+    ].join(','));
+  }
+
+  function clampElement(el) {
+    if (!(el instanceof HTMLElement)) return;
+    const frame = el.closest('.home-hero-ad__frame, .ad-footer, .page, .home-app, body');
+    const frameRect = frame instanceof HTMLElement ? frame.getBoundingClientRect() : null;
+    const max = Math.max(1, Math.floor(Math.min(frameRect?.width || contentWidth(), contentWidth())));
+    const isFrame = el.tagName === 'IFRAME';
+    const parentIsBody = el.parentElement === document.body;
+    el.style.maxWidth = `${max}px`;
+    el.style.minWidth = '0';
+    el.style.boxSizing = 'border-box';
+    el.style.overflow = 'hidden';
+    if (isFrame) {
+      el.style.width = '100%';
+    } else if (parentIsBody || el.classList.contains('google-auto-placed')) {
+      el.style.width = `${max}px`;
+      el.style.marginLeft = 'auto';
+      el.style.marginRight = 'auto';
+    } else {
+      el.style.width = '100%';
+    }
+  }
+
+  function clampHomeAutoAds(root) {
+    if (!isHomePage()) return;
+    injectHomeAdGuardStyle();
+    const scope = root && typeof root.querySelectorAll === 'function' ? root : document;
+    if (isAdNode(scope)) clampElement(scope);
+    scope.querySelectorAll?.([
+      'ins.adsbygoogle',
+      '.adsbygoogle',
+      '.google-auto-placed',
+      'iframe[id^="google_ads_iframe"]',
+      'iframe[name^="google_ads_iframe"]',
+      'iframe[id^="aswift_"]',
+      'iframe[name^="aswift_"]'
+    ].join(',')).forEach(clampElement);
+  }
+
+  function scheduleClamp(root) {
+    if (!isHomePage()) return;
+    if (clampScheduled) return;
+    clampScheduled = true;
+    window.requestAnimationFrame(() => {
+      clampScheduled = false;
+      clampHomeAutoAds(root || document);
+    });
   }
 
   function isRenderable(ins) {
@@ -176,6 +293,7 @@
 
   function observeAds(root) {
     const scope = root && typeof root.querySelectorAll === 'function' ? root : document;
+    clampHomeAutoAds(scope);
     scope.querySelectorAll('ins.adsbygoogle').forEach(loadAd);
   }
 
@@ -190,13 +308,19 @@
   const observer = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
       if (mutation.type === 'attributes' && mutation.target instanceof HTMLElement && mutation.target.matches('ins.adsbygoogle')) {
+        scheduleClamp(mutation.target);
         if (isUnfilled(mutation.target)) {
           queueRetry(mutation.target);
         }
         return;
       }
+      if (mutation.type === 'attributes' && mutation.target instanceof HTMLElement && isAdNode(mutation.target)) {
+        scheduleClamp(mutation.target);
+        return;
+      }
       mutation.addedNodes.forEach((node) => {
         if (!(node instanceof HTMLElement)) return;
+        scheduleClamp(node);
         if (node.matches('ins.adsbygoogle')) {
           loadAd(node);
           return;
@@ -211,9 +335,14 @@
   if (document.documentElement) {
     observer.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ['data-ad-status', 'data-adsbygoogle-status', 'class'],
+      attributeFilter: ['data-ad-status', 'data-adsbygoogle-status', 'class', 'style', 'id', 'name'],
       childList: true,
       subtree: true
     });
+  }
+
+  window.addEventListener('resize', () => scheduleClamp(document), { passive: true });
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', () => scheduleClamp(document), { passive: true });
   }
 })();
