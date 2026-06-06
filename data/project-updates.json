@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-06T17:01:57.526Z",
+  "generatedAt": "2026-06-06T17:02:05.163Z",
   "projects": [
     {
       "id": "site",
@@ -62,6 +62,12 @@
       "url": "/projects/pixiedraw/",
       "entries": [
         {
+          "date": "2026-06-07",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
           "date": "2026-06-06",
           "items": [
             "機能 / 画面 / スタイルを更新"
@@ -101,12 +107,6 @@
           "date": "2026-05-30",
           "items": [
             "画面 / 機能 / スタイルを更新"
-          ]
-        },
-        {
-          "date": "2026-05-29",
-          "items": [
-            "機能 / 画面 / スタイルを更新"
           ]
         }
       ]
@@ -230,6 +230,12 @@
           "id": "site",
           "name": "PiXiEED 全体",
           "url": "/index.html",
+          "summary": "画面を更新"
+        },
+        {
+          "id": "pixiedraw",
+          "name": "PiXiEEDraw",
+          "url": "/projects/pixiedraw/",
           "summary": "画面を更新"
         }
       ]
