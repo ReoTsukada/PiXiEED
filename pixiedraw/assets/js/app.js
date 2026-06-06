@@ -4283,13 +4283,14 @@
   let playbackHandle = null;
   let lastFrameTime = 0;
   const PLAYBACK_MAX_CATCHUP_STEPS = 6;
-  const PLAYBACK_CACHE_PREBUILD_MAX_BYTES = 96 * 1024 * 1024;
-  const PLAYBACK_CACHE_LAZY_WINDOW_FRAMES = 8;
+  const PLAYBACK_CACHE_MAX_BYTES = 24 * 1024 * 1024;
+  const PLAYBACK_CACHE_MAX_NEARBY_RADIUS = 4;
   const playbackFrameCache = {
     active: false,
     mode: 'lazy',
     width: 0,
     height: 0,
+    radius: 0,
     byFrame: new Map(),
   };
   const simulationRuntime = {
@@ -11988,6 +11989,7 @@
     playbackFrameCache.mode = 'lazy';
     playbackFrameCache.width = 0;
     playbackFrameCache.height = 0;
+    playbackFrameCache.radius = 0;
     playbackFrameCache.byFrame.clear();
   }
 
@@ -12016,16 +12018,65 @@
     return imageData;
   }
 
-  function trimPlaybackLazyCache(centerFrameIndex) {
-    if (playbackFrameCache.mode !== 'lazy') {
-      return;
+  function getPlaybackCacheRadius(width, height) {
+    const bytesPerFrame = Math.max(1, Math.floor(Number(width) || 0) * Math.floor(Number(height) || 0) * 4);
+    const maxFramesByBudget = Math.max(1, Math.floor(PLAYBACK_CACHE_MAX_BYTES / bytesPerFrame));
+    return clamp(
+      Math.floor((maxFramesByBudget - 1) / 2),
+      0,
+      PLAYBACK_CACHE_MAX_NEARBY_RADIUS
+    );
+  }
+
+  function getPlaybackFrameDistance(frameIndex, centerFrameIndex) {
+    const frameCount = Array.isArray(state.frames) ? state.frames.length : 0;
+    if (!frameCount) {
+      return Number.POSITIVE_INFINITY;
     }
+    const a = clamp(Math.round(Number(frameIndex) || 0), 0, frameCount - 1);
+    const b = clamp(Math.round(Number(centerFrameIndex) || 0), 0, frameCount - 1);
+    const direct = Math.abs(a - b);
+    return state.playback?.loop === false ? direct : Math.min(direct, frameCount - direct);
+  }
+
+  function trimPlaybackNearbyCache(centerFrameIndex) {
     const center = Number.isInteger(centerFrameIndex) ? centerFrameIndex : state.activeFrame;
+    const radius = Math.max(0, Math.round(Number(playbackFrameCache.radius) || 0));
     playbackFrameCache.byFrame.forEach((_, frameIndex) => {
-      if (Math.abs(frameIndex - center) > PLAYBACK_CACHE_LAZY_WINDOW_FRAMES) {
+      if (getPlaybackFrameDistance(frameIndex, center) > radius) {
         playbackFrameCache.byFrame.delete(frameIndex);
       }
     });
+  }
+
+  function warmPlaybackNearbyCache(centerFrameIndex) {
+    if (!playbackFrameCache.active || !ctx.drawing) {
+      return;
+    }
+    const frameCount = Array.isArray(state.frames) ? state.frames.length : 0;
+    if (!frameCount) {
+      return;
+    }
+    const center = clamp(Math.round(Number(centerFrameIndex) || 0), 0, frameCount - 1);
+    const radius = Math.max(0, Math.round(Number(playbackFrameCache.radius) || 0));
+    for (let offset = -radius; offset <= radius; offset += 1) {
+      let frameIndex = center + offset;
+      if (state.playback?.loop === false) {
+        if (frameIndex < 0 || frameIndex >= frameCount) {
+          continue;
+        }
+      } else {
+        frameIndex = ((frameIndex % frameCount) + frameCount) % frameCount;
+      }
+      if (playbackFrameCache.byFrame.has(frameIndex)) {
+        continue;
+      }
+      const imageData = buildPlaybackFrameImageData(frameIndex);
+      if (imageData) {
+        playbackFrameCache.byFrame.set(frameIndex, imageData);
+      }
+    }
+    trimPlaybackNearbyCache(center);
   }
 
   function preparePlaybackFrameCache() {
@@ -12039,18 +12090,9 @@
     playbackFrameCache.active = true;
     playbackFrameCache.width = width;
     playbackFrameCache.height = height;
-    const estimatedBytes = width * height * 4 * frameCount;
-    if (estimatedBytes > PLAYBACK_CACHE_PREBUILD_MAX_BYTES) {
-      playbackFrameCache.mode = 'lazy';
-      return;
-    }
-    playbackFrameCache.mode = 'full';
-    for (let frameIndex = 0; frameIndex < frameCount; frameIndex += 1) {
-      const imageData = buildPlaybackFrameImageData(frameIndex);
-      if (imageData) {
-        playbackFrameCache.byFrame.set(frameIndex, imageData);
-      }
-    }
+    playbackFrameCache.radius = getPlaybackCacheRadius(width, height);
+    playbackFrameCache.mode = 'nearby';
+    warmPlaybackNearbyCache(state.activeFrame);
   }
 
   function getPlaybackFrameImageData(frameIndex) {
@@ -12072,8 +12114,8 @@
         return null;
       }
       playbackFrameCache.byFrame.set(frameIndex, imageData);
-      trimPlaybackLazyCache(frameIndex);
     }
+    warmPlaybackNearbyCache(frameIndex);
     return imageData;
   }
 
@@ -12121,6 +12163,20 @@
     const requestedCanvas = getProjectCanvasDocumentById(normalizedCanvasId)
       || (((getActiveProjectCanvasDocument()?.id || '') === normalizedCanvasId) ? getActiveProjectCanvasDocument() : null)
       || null;
+    if (isSharedProjectCollaborativeMode() && requestedCanvas) {
+      const frames = Array.isArray(requestedCanvas.frames) ? requestedCanvas.frames : [];
+      const frameIndex = clamp(Math.round(Number(state.activeFrame ?? requestedCanvas.activeFrame) || 0), 0, Math.max(0, frames.length - 1));
+      const frame = frames[frameIndex] || null;
+      const layerId = typeof state.activeLayer === 'string' && state.activeLayer
+        ? state.activeLayer
+        : (typeof requestedCanvas.activeLayer === 'string' ? requestedCanvas.activeLayer : '');
+      return {
+        clientId: normalizedClientId,
+        canvasId: normalizedCanvasId,
+        frameToken: frame?.id || (frameIndex >= 0 ? `f${frameIndex}` : ''),
+        layerToken: layerId || '',
+      };
+    }
     const assignment = getMultiAssignment(normalizedClientId);
     const assignmentCanvas = getAssignmentCanvasDocument(assignment, requestedCanvas);
     if (!assignment || !assignmentCanvas || (assignmentCanvas.id || '') !== normalizedCanvasId) {
@@ -12443,8 +12499,10 @@
     if (history.pending.dirty) {
       const beforeSnapshot = setHistoryEntryLabel(history.pending.before, pendingLabel);
       const activeCanvasId = getActiveProjectCanvasDocument()?.id || '';
-      const shouldRecordScopedHistory = multiState.connected
-        && isMultiClientScopedHistoryMode()
+      const shouldRecordScopedHistory = (
+          (multiState.connected && isMultiClientScopedHistoryMode())
+          || isSharedProjectCollaborativeMode()
+        )
         && MULTI_SCOPED_HISTORY_LABELS.has(pendingLabel);
       if (shouldRecordScopedHistory) {
         try {
@@ -12509,27 +12567,17 @@
       return;
     }
     commitHistory();
-    if (isSharedProjectCollaborativeMode()) {
-      setMultiStatus(
-        localizeText(
-          '共有プロジェクト中のUndoは同期差異防止のため現在無効です。描画内容はDB確定順で同期されます。',
-          'Undo is disabled while editing shared projects to prevent sync divergence. Drawing is synced in DB commit order.'
-        ),
-        'warn'
-      );
-      updateHistoryButtons();
-      return;
-    }
     const activeCanvasId = getActiveProjectCanvasDocument()?.id || '';
     const bucket = getMultiHistoryBucket(multiState.clientId || '', activeCanvasId);
-    const shouldUseScopedHistory = multiState.connected
-      && (
+    const sharedScopedHistory = isSharedProjectCollaborativeMode();
+    const shouldUseScopedHistory = sharedScopedHistory
+      || (multiState.connected && (
         isMultiClientScopedHistoryMode()
         || Boolean((bucket?.past?.length || 0) || (bucket?.future?.length || 0))
-      );
+      ));
     if (shouldUseScopedHistory) {
       if (!bucket?.past?.length) {
-        if (isMultiClientScopedHistoryMode()) {
+        if (isMultiClientScopedHistoryMode() || sharedScopedHistory) {
           return;
         }
       } else {
@@ -12543,18 +12591,25 @@
           bucket.future.push(currentCompressed);
           if (bucket.future.length > bucket.limit) bucket.future.shift();
           const prev = decompressHistorySnapshot(prevCompressed);
-          const applied = applyHistorySnapshotForClient(prev, multiState.clientId || '', {
-            preserveView: true,
-            canvasId: activeCanvasId,
-            restoreSelection: true,
-          });
+          const applied = sharedScopedHistory
+            ? applyHistorySnapshotForSharedLocalCell(prev, {
+                canvasId: activeCanvasId,
+                restoreSelection: true,
+              })
+            : applyHistorySnapshotForClient(prev, multiState.clientId || '', {
+                preserveView: true,
+                canvasId: activeCanvasId,
+                restoreSelection: true,
+              });
           if (applied) {
             updateHistoryButtons();
             markAutosaveDirty();
             markDocumentUnsavedChange();
             scheduleAutosaveSnapshot();
             try {
-              if (isMultiMasterMode()) {
+              if (sharedScopedHistory) {
+                handleMultiLocalCommit(historyLabel);
+              } else if (isMultiMasterMode()) {
                 scheduleMasterLayerPatchSend({ immediate: true });
                 scheduleMultiPublicLobbyRoomSync({ immediate: false });
               } else {
@@ -12567,7 +12622,7 @@
           return;
         } catch (error) {
           console.warn('Undo failed in per-client/per-canvas history mode', error);
-          if (isMultiClientScopedHistoryMode()) {
+          if (isMultiClientScopedHistoryMode() || sharedScopedHistory) {
             return;
           }
         }
@@ -12627,27 +12682,17 @@
       return;
     }
     commitHistory();
-    if (isSharedProjectCollaborativeMode()) {
-      setMultiStatus(
-        localizeText(
-          '共有プロジェクト中のRedoは同期差異防止のため現在無効です。描画内容はDB確定順で同期されます。',
-          'Redo is disabled while editing shared projects to prevent sync divergence. Drawing is synced in DB commit order.'
-        ),
-        'warn'
-      );
-      updateHistoryButtons();
-      return;
-    }
     const activeCanvasId = getActiveProjectCanvasDocument()?.id || '';
     const bucket = getMultiHistoryBucket(multiState.clientId || '', activeCanvasId);
-    const shouldUseScopedHistory = multiState.connected
-      && (
+    const sharedScopedHistory = isSharedProjectCollaborativeMode();
+    const shouldUseScopedHistory = sharedScopedHistory
+      || (multiState.connected && (
         isMultiClientScopedHistoryMode()
         || Boolean((bucket?.past?.length || 0) || (bucket?.future?.length || 0))
-      );
+      ));
     if (shouldUseScopedHistory) {
       if (!bucket?.future?.length) {
-        if (isMultiClientScopedHistoryMode()) {
+        if (isMultiClientScopedHistoryMode() || sharedScopedHistory) {
           return;
         }
       } else {
@@ -12661,18 +12706,25 @@
           bucket.past.push(currentCompressed);
           if (bucket.past.length > bucket.limit) bucket.past.shift();
           const next = decompressHistorySnapshot(nextCompressed);
-          const applied = applyHistorySnapshotForClient(next, multiState.clientId || '', {
-            preserveView: true,
-            canvasId: activeCanvasId,
-            restoreSelection: true,
-          });
+          const applied = sharedScopedHistory
+            ? applyHistorySnapshotForSharedLocalCell(next, {
+                canvasId: activeCanvasId,
+                restoreSelection: true,
+              })
+            : applyHistorySnapshotForClient(next, multiState.clientId || '', {
+                preserveView: true,
+                canvasId: activeCanvasId,
+                restoreSelection: true,
+              });
           if (applied) {
             updateHistoryButtons();
             markAutosaveDirty();
             markDocumentUnsavedChange();
             scheduleAutosaveSnapshot();
             try {
-              if (isMultiMasterMode()) {
+              if (sharedScopedHistory) {
+                handleMultiLocalCommit(historyLabel);
+              } else if (isMultiMasterMode()) {
                 scheduleMasterLayerPatchSend({ immediate: true });
                 scheduleMultiPublicLobbyRoomSync({ immediate: false });
               } else {
@@ -12685,7 +12737,7 @@
           return;
         } catch (error) {
           console.warn('Redo failed in per-client/per-canvas history mode', error);
-          if (isMultiClientScopedHistoryMode()) {
+          if (isMultiClientScopedHistoryMode() || sharedScopedHistory) {
             return;
           }
         }
@@ -12761,8 +12813,9 @@
   function updateHistoryButtons() {
     try {
       if (isSharedProjectCollaborativeMode()) {
-        if (dom.controls.undoAction) dom.controls.undoAction.disabled = true;
-        if (dom.controls.redoAction) dom.controls.redoAction.disabled = true;
+        const bucket = getMultiHistoryBucket(multiState.clientId || '', getActiveProjectCanvasDocument()?.id || '');
+        if (dom.controls.undoAction) dom.controls.undoAction.disabled = !bucket?.past?.length;
+        if (dom.controls.redoAction) dom.controls.redoAction.disabled = !bucket?.future?.length;
         return;
       }
       if (!multiState.connected) {
@@ -78362,6 +78415,76 @@
       }
       return true;
     } catch (e) {
+      return false;
+    }
+  }
+
+  function applyHistorySnapshotForSharedLocalCell(snapshot, { canvasId = '', restoreSelection = false } = {}) {
+    if (!snapshot || typeof snapshot !== 'object') return false;
+    const resolvedCanvasId = normalizeMultiHistoryCanvasId(
+      canvasId
+      || (typeof snapshot.activeCanvasId === 'string' ? snapshot.activeCanvasId : '')
+      || getActiveProjectCanvasDocument()?.id
+      || ''
+    );
+    const targetCanvas = getProjectCanvasDocumentById(resolvedCanvasId) || getActiveProjectCanvasDocument();
+    if (!targetCanvas || !Array.isArray(targetCanvas.frames) || !targetCanvas.frames.length) return false;
+    const snapshotCanvas = Array.isArray(snapshot.canvases) && snapshot.canvases.length
+      ? (snapshot.canvases.find(canvas => canvas?.id === resolvedCanvasId) || null)
+      : snapshot;
+    if (!snapshotCanvas || !Array.isArray(snapshotCanvas.frames) || !snapshotCanvas.frames.length) return false;
+    const frameIndex = clamp(
+      Math.round(Number(snapshotCanvas.activeFrame ?? snapshot.activeFrame ?? state.activeFrame) || 0),
+      0,
+      Math.max(0, targetCanvas.frames.length - 1)
+    );
+    const srcFrame = snapshotCanvas.frames[frameIndex] || null;
+    const targetFrame = targetCanvas.frames[frameIndex] || null;
+    if (!srcFrame || !targetFrame || !Array.isArray(srcFrame.layers) || !Array.isArray(targetFrame.layers)) return false;
+    const requestedLayerId = typeof snapshotCanvas.activeLayer === 'string'
+      ? snapshotCanvas.activeLayer
+      : (typeof snapshot.activeLayer === 'string' ? snapshot.activeLayer : state.activeLayer);
+    const srcLayerIndex = srcFrame.layers.findIndex(layer => layer?.id === requestedLayerId);
+    const targetLayerIndexById = targetFrame.layers.findIndex(layer => layer?.id === requestedLayerId);
+    const layerIndex = targetLayerIndexById >= 0
+      ? targetLayerIndexById
+      : clamp(srcLayerIndex, 0, Math.max(0, targetFrame.layers.length - 1));
+    const srcLayer = srcFrame.layers[srcLayerIndex >= 0 ? srcLayerIndex : layerIndex] || null;
+    const targetLayer = targetFrame.layers[layerIndex] || null;
+    if (!srcLayer || !targetLayer) return false;
+    try {
+      if (srcLayer.indices instanceof Int16Array || Array.isArray(srcLayer.indices)) {
+        targetLayer.indices = new Int16Array(srcLayer.indices);
+      }
+      if (srcLayer.direct instanceof Uint8ClampedArray || Array.isArray(srcLayer.direct)) {
+        targetLayer.direct = new Uint8ClampedArray(srcLayer.direct);
+      } else {
+        targetLayer.direct = null;
+      }
+      targetCanvas.activeFrame = frameIndex;
+      targetCanvas.activeLayer = targetLayer.id;
+      if (targetCanvas.id === (getActiveProjectCanvasDocument()?.id || '')) {
+        state.activeFrame = frameIndex;
+        state.activeLayer = targetLayer.id;
+        if (restoreSelection) {
+          state.selectionMask = snapshotCanvas.selectionMask ? new Uint8Array(snapshotCanvas.selectionMask) : null;
+          state.selectionContentMask = snapshotCanvas.selectionContentMask ? new Uint8Array(snapshotCanvas.selectionContentMask) : null;
+          state.selectionBounds = snapshotCanvas.selectionBounds ? { ...snapshotCanvas.selectionBounds } : null;
+          state.pendingPasteMoveState = null;
+          pointerState.selectionMove = null;
+          selectionTransformUi.interaction = null;
+          hideSelectionTransformMenu();
+        }
+      }
+      markRemoteMultiStateDirty();
+      markCanvasDirty();
+      syncControlsWithState();
+      renderFrameList();
+      renderLayerList();
+      requestRender();
+      requestOverlayRender();
+      return true;
+    } catch (error) {
       return false;
     }
   }
