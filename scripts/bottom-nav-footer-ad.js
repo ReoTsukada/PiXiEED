@@ -587,8 +587,8 @@
           right:0;
           bottom:0;
           z-index:70;
-          width:100vw !important;
-          max-width:100vw !important;
+          width:auto !important;
+          max-width:none !important;
           min-width:0 !important;
           box-sizing:border-box;
           padding:var(--pixieed-footer-ad-padding-y) env(safe-area-inset-right, 0px) calc(var(--pixieed-footer-ad-padding-y) + var(--pixieed-safe-bottom)) env(safe-area-inset-left, 0px);
