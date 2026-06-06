@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="site/landing.css?v=2026.05.30-ad-layout-guard">
+<link rel="stylesheet" href="site/landing.css?v=2026.06.06-home-ad-width-guard">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -299,6 +299,23 @@
       const AD_INSERT_AFTER_CONTENT = 2;
       let contentSlidesSinceAd = 0;
       let rotationTimer = null;
+      const clampHeroAdWidth = mount => {
+        if (!(mount instanceof HTMLElement)) return;
+        const frame = mount.getBoundingClientRect();
+        const width = Math.max(1, Math.floor(Math.min(frame.width || 0, window.innerWidth || frame.width || 0)));
+        if (!width) return;
+        mount.style.width = `${width}px`;
+        mount.style.maxWidth = '100%';
+        mount.style.minWidth = '0';
+        mount.querySelectorAll('ins.adsbygoogle, ins.adsbygoogle iframe').forEach(node => {
+          if (!(node instanceof HTMLElement)) return;
+          node.style.width = '100%';
+          node.style.maxWidth = `${width}px`;
+          node.style.minWidth = '0';
+          node.style.boxSizing = 'border-box';
+          node.style.overflow = 'hidden';
+        });
+      };
       const clearRotationTimer = () => {
         if (rotationTimer) {
           window.clearTimeout(rotationTimer);
@@ -329,18 +346,23 @@
             adSlot.style.width = '100%';
             adSlot.style.maxWidth = '100%';
             adSlot.style.minWidth = '0';
+            adSlot.style.boxSizing = 'border-box';
             adSlot.style.overflow = 'hidden';
+            adSlot.style.contain = 'size layout paint';
             adSlot.dataset.adClient = 'ca-pub-9801602250480253';
             adSlot.dataset.adSlot = 'rotate';
             adSlot.dataset.adFormat = 'auto';
             adSlot.dataset.fullWidthResponsive = 'false';
             mount.appendChild(adSlot);
           }
+          clampHeroAdWidth(mount);
           window.pixieedObserveAds?.(activeSlide);
           window.setTimeout(() => {
+            clampHeroAdWidth(mount);
             window.pixieedObserveAds?.(activeSlide);
           }, 1200);
           window.setTimeout(() => {
+            clampHeroAdWidth(mount);
             window.pixieedObserveAds?.(activeSlide);
           }, 3200);
         }
