@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.05.31-shared-pre-draw-sync';
+  const APP_BUILD_VERSION = '2026.06.07-stable-shared-ui';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
@@ -3244,6 +3244,7 @@
   let sharedProjectCatchingUpStartedAt = 0;
   let sharedProjectRecoveryReloadTimer = null;
   let sharedProjectVisibleStatusTimer = null;
+  let sharedProjectVisibleStatusSignature = '';
   let sharedProjectAutoRecoveryLastAttemptAt = 0;
   let sharedProjectSnapshotReplayInFlight = false;
   let sharedProjectRecoveryInProgress = false;
@@ -3922,6 +3923,7 @@
     previewHeight: 0,
     previewOffsetX: 0,
     previewOffsetY: 0,
+    layoutReady: false,
     active: false,
   };
   let floatingPreviewCtx = null;
@@ -9974,15 +9976,19 @@
     if (!isSharedProjectCollaborativeMode()) {
       return;
     }
+    const normalizedReason = String(reason || 'verified');
+    const wasFresh = isSharedProjectDrawReadinessFresh();
     sharedProjectLastDrawReadinessVerifiedAt = Date.now();
-    console.debug('[shared-sync]', {
-      event: 'draw-readiness-verified',
-      reason: String(reason || 'verified'),
-      projectKey: activeSharedProjectKey || '',
-      revision: activeSharedProjectRevision,
-      structureRevision: activeSharedProjectStructureRevision,
-    });
-    syncSharedProjectVisibleStatus();
+    if (!wasFresh || normalizedReason !== 'ops-fetch-empty') {
+      console.debug('[shared-sync]', {
+        event: 'draw-readiness-verified',
+        reason: normalizedReason,
+        projectKey: activeSharedProjectKey || '',
+        revision: activeSharedProjectRevision,
+        structureRevision: activeSharedProjectStructureRevision,
+      });
+      syncSharedProjectVisibleStatus();
+    }
   }
 
   function clearSharedProjectDrawReadinessVerification() {
@@ -10907,24 +10913,42 @@
       return;
     }
     const status = getSharedProjectVisibleStatus();
+    const lamp = resolveSharedProjectLampState(status);
     const reloadAction = dom.controls.appReloadAction instanceof HTMLButtonElement
       ? dom.controls.appReloadAction
       : null;
+    const showReloadLamp = Boolean(
+      status.visible
+      && (
+        status.reloadable
+        || status.recoverable
+        || status.state === 'blocked'
+        || status.state === 'offline'
+      )
+    );
+    const showReloadAction = Boolean(status.reloadable);
+    const signature = [
+      status.visible ? '1' : '0',
+      status.state,
+      status.label,
+      status.recoverable ? '1' : '0',
+      status.reloadable ? '1' : '0',
+      status.sending ? '1' : '0',
+      status.receiving ? '1' : '0',
+      lamp,
+      showReloadLamp ? '1' : '0',
+      showReloadAction ? '1' : '0',
+    ].join('|');
+    if (signature === sharedProjectVisibleStatusSignature) {
+      return;
+    }
+    sharedProjectVisibleStatusSignature = signature;
     indicator.hidden = !status.visible;
     indicator.setAttribute('aria-hidden', String(!status.visible));
     indicator.dataset.state = status.state;
-    indicator.dataset.lamp = resolveSharedProjectLampState(status);
+    indicator.dataset.lamp = lamp;
     if (reloadAction) {
-      const showReloadLamp = Boolean(
-        status.visible
-        && (
-          status.reloadable
-          || status.recoverable
-          || status.state === 'blocked'
-          || status.state === 'offline'
-        )
-      );
-      reloadAction.dataset.sharedSyncLamp = showReloadLamp ? resolveSharedProjectLampState(status) : '';
+      reloadAction.dataset.sharedSyncLamp = showReloadLamp ? lamp : '';
       reloadAction.classList.toggle('canvas-reload-action--shared-notice', showReloadLamp);
       reloadAction.title = showReloadLamp
         ? localizeText('共有プロジェクトの更新が滞っています。必要なら再読み込み', 'Shared project updates are stalled. Reload if needed.')
@@ -10938,7 +10962,6 @@
       dom.controls.sharedStatusIndicatorText.textContent = status.label;
     }
     if (dom.controls.sharedStatusRecoverAction instanceof HTMLButtonElement) {
-      const showReloadAction = Boolean(status.reloadable);
       dom.controls.sharedStatusRecoverAction.textContent = localizeText('再読込', 'Reload');
       dom.controls.sharedStatusRecoverAction.hidden = !showReloadAction;
       dom.controls.sharedStatusRecoverAction.disabled = false;
@@ -49315,8 +49338,8 @@
     syncLocalViewportCanvasDockVisibility({ persist: false, render: true });
   }
 
-  function canUseCanvasResizeHandle() {
-    return canCurrentClientEditProjectStructure()
+  function canUseCanvasResizeHandle({ ignoreLocalInteraction = false } = {}) {
+    return canCurrentClientEditProjectStructure({ ignoreLocalInteraction })
       && Boolean(state.showCanvasResizeHandles ?? true)
       && lockedCanvasWidth === null
       && lockedCanvasHeight === null;
@@ -49358,9 +49381,15 @@
   function syncCanvasResizeHandleVisibility() {
     const handles = [dom.canvasResizeHandleStart, dom.canvasResizeHandleCorner];
     const preview = dom.canvasResizePreview;
-    const enabled = canUseCanvasResizeHandle();
+    const enabled = canUseCanvasResizeHandle({ ignoreLocalInteraction: true });
     const metrics = getCanvasResizeOverlayMetrics();
-    const visible = Boolean(enabled && metrics && !state.playback.isPlaying);
+    const visible = Boolean(enabled && !state.playback.isPlaying && (metrics || canvasResizeHandleState.layoutReady));
+    if (enabled && !state.playback.isPlaying && !metrics && canvasResizeHandleState.layoutReady) {
+      scheduleCanvasResizeHandleLayoutRefresh();
+    }
+    if (!enabled || state.playback.isPlaying) {
+      canvasResizeHandleState.layoutReady = false;
+    }
     handles.forEach(handle => {
       if (!(handle instanceof HTMLElement)) {
         return;
@@ -49383,10 +49412,11 @@
     const metrics = getCanvasResizeOverlayMetrics();
     const startHandle = dom.canvasResizeHandleStart;
     const endHandle = dom.canvasResizeHandleCorner;
-    if (!(startHandle instanceof HTMLElement) || !(endHandle instanceof HTMLElement) || !metrics || !canUseCanvasResizeHandle()) {
+    if (!(startHandle instanceof HTMLElement) || !(endHandle instanceof HTMLElement) || !metrics || !canUseCanvasResizeHandle({ ignoreLocalInteraction: true })) {
       syncCanvasResizeHandleVisibility();
       return;
     }
+    canvasResizeHandleState.layoutReady = true;
     const selectionHandleClearance = (SELECTION_TRANSFORM_HANDLE_DRAW_RADIUS_PX * 2) + 6;
     const handleGap = Math.max(CANVAS_RESIZE_HANDLE_GAP, selectionHandleClearance);
     const startX = metrics.left - CANVAS_RESIZE_HANDLE_SIZE - handleGap;
@@ -61781,16 +61811,18 @@
     );
   }
 
-  function getSharedProjectStructureChangeBlockReason() {
+  function getSharedProjectStructureChangeBlockReason({ ignoreLocalInteraction = false } = {}) {
     if (!isSharedProjectCollaborativeMode()) {
       return '';
     }
     if (activeSharedProjectOpenInProgress) return 'open-in-progress';
     if (activeSharedProjectOpenReadOnly) return 'read-only';
     if (!activeSharedProjectDocumentLoaded || !hasUsableActiveSharedProjectDocumentState()) return 'document-not-ready';
-    if (pointerState.active) return 'local-pointer-active';
-    if (typeof hasPendingSelectionMove === 'function' && hasPendingSelectionMove()) return 'selection-move-pending';
-    if (history.pending?.dirty) return 'history-pending';
+    if (!ignoreLocalInteraction) {
+      if (pointerState.active) return 'local-pointer-active';
+      if (typeof hasPendingSelectionMove === 'function' && hasPendingSelectionMove()) return 'selection-move-pending';
+      if (history.pending?.dirty) return 'history-pending';
+    }
     if (sharedProjectOpCommitInFlight || hasSharedProjectLocalInFlightOps() || sharedProjectPendingLocalOps.length > 0 || sharedProjectSyncInFlight) return 'local-op-in-flight';
     if (sharedProjectPendingRemoteOps.size > 0) return 'remote-op-pending';
     if (sharedProjectRefreshInFlight || sharedProjectSnapshotReplayInFlight || sharedProjectRecoveryInProgress) return 'remote-sync-in-flight';
@@ -61818,9 +61850,9 @@
     );
   }
 
-  function canCurrentClientEditProjectStructure({ announce = false } = {}) {
+  function canCurrentClientEditProjectStructure({ announce = false, ignoreLocalInteraction = false } = {}) {
     if (isSharedProjectCollaborativeMode()) {
-      const blockReason = getSharedProjectStructureChangeBlockReason();
+      const blockReason = getSharedProjectStructureChangeBlockReason({ ignoreLocalInteraction });
       if (blockReason) {
         if (announce) {
           announceSharedProjectStructureChangeBlocked(blockReason);
