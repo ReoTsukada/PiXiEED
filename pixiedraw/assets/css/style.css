@@ -1028,12 +1028,17 @@ body.is-mobile-layout.is-unified-left-tools-color:not(.is-unified-left-color-foc
   display: grid;
   grid-template-columns: 1fr;
   gap: 4px;
-  width: 100%;
+  width: var(--panel-palette-swatch-size, var(--ui-control-tile-size));
   min-width: 0;
+  justify-content: center;
+  justify-self: center;
+  align-self: center;
 }
 
 .rail--left[data-compact="true"] #panelColor .palette-actions .chip {
   width: 100%;
+  min-width: 0;
+  height: var(--panel-palette-swatch-size, var(--ui-control-tile-size));
   padding-left: 0;
   padding-right: 0;
 }
