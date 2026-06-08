@@ -1,4 +1,4 @@
-const APP_BUILD_VERSION = '2026.06.08-rail-layout-sync';
+const APP_BUILD_VERSION = '2026.06.08-tabs-rails-fast-color';
 const CACHE_VERSION = `pixiedraw-v${APP_BUILD_VERSION}`;
 const CORE_ASSETS = [
   '/pixiedraw/',
