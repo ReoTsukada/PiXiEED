@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.06.07-stable-shared-ui';
+  const APP_BUILD_VERSION = '2026.06.08-rail-layout-sync';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
@@ -1115,6 +1115,7 @@
   const RELOAD_SNAPSHOT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
   const RELOAD_SNAPSHOT_MAX_HISTORY_ITEMS = 160;
   const RELOAD_SNAPSHOT_COMPRESS_THRESHOLD = 4096;
+  const RELOAD_SNAPSHOT_MAX_SYNC_CHARS = 2 * 1024 * 1024;
   const STARTUP_SCREEN_DISMISSED_KEY = 'pixieedraw:startupScreenDismissed';
   const STARTUP_ACCOUNT_INIT_TIMEOUT_MS = 5000;
   const STARTUP_RESTORE_TIMEOUT_MS = 8000;
@@ -1918,6 +1919,27 @@
     const generated = generateNewProjectPaletteColors(definition);
     newProjectPalettePresetColorCache.set(definition.id, generated);
     return generated.map(color => normalizeColorValue(color));
+  }
+
+  function createRgbModeDefaultPalette() {
+    return [
+      { r: 0, g: 0, b: 0, a: 0 },
+      { r: 0, g: 0, b: 0, a: 255 },
+      { r: 255, g: 255, b: 255, a: 255 },
+      { r: 255, g: 0, b: 0, a: 255 },
+      { r: 255, g: 128, b: 0, a: 255 },
+      { r: 255, g: 255, b: 0, a: 255 },
+      { r: 128, g: 255, b: 0, a: 255 },
+      { r: 0, g: 255, b: 0, a: 255 },
+      { r: 0, g: 255, b: 255, a: 255 },
+      { r: 0, g: 128, b: 255, a: 255 },
+      { r: 0, g: 0, b: 255, a: 255 },
+      { r: 128, g: 0, b: 255, a: 255 },
+      { r: 255, g: 0, b: 255, a: 255 },
+      { r: 255, g: 128, b: 192, a: 255 },
+      { r: 128, g: 128, b: 128, a: 255 },
+      { r: 192, g: 192, b: 192, a: 255 },
+    ].map(color => normalizeColorValue(color));
   }
 
   function getPalettePresetDisplayName(definition, language = (uiLanguage === UI_LANGUAGE_JA ? UI_LANGUAGE_JA : UI_LANGUAGE_EN)) {
@@ -4134,6 +4156,7 @@
   let hoverPixel = null;
   let appReloadInProgress = false;
   let zoomIndicatorTimeoutId = null;
+  let zoomSettledViewportRefreshHandle = null;
   let wheelZoomRaf = null;
   let wheelZoomApplying = false;
   let wheelZoomPendingScale = null;
@@ -4280,12 +4303,16 @@
   let memoryMonitorHandle = null;
   let timelineMatrixInteractionBound = false;
   let timelineMatrixRenderKey = '';
+  let timelineMatrixDeferredRenderHandle = null;
+  let secondaryCanvasRefreshHandle = null;
   let toolButtons = [];
   let renderScheduled = false;
   let playbackHandle = null;
+  let playbackUiRefreshHandle = null;
   let lastFrameTime = 0;
   const PLAYBACK_MAX_CATCHUP_STEPS = 6;
   const PLAYBACK_CACHE_MAX_BYTES = 24 * 1024 * 1024;
+  const PLAYBACK_LARGE_FRAME_BYTES = 512 * 512 * 4;
   const PLAYBACK_CACHE_MAX_NEARBY_RADIUS = 4;
   const playbackFrameCache = {
     active: false,
@@ -4313,6 +4340,7 @@
   let mirrorGuideResizeObserver = null;
   let multiEntryMetricsResizeObserver = null;
   let multiEntryMetricsRaf = null;
+  let railLayoutRefreshHandle = null;
   let multiAutoResumeAttempted = false;
   let multiInviteAutoJoinHandled = false;
   let mirrorGuideSyncRaf = null;
@@ -5252,6 +5280,7 @@
       blendMode: normalizeLayerBlendMode(baseLayer.blendMode),
       indices: new Int16Array(size).fill(-1),
       direct: null,
+      directOnly: Boolean(baseLayer.directOnly),
     };
     if (copyPixels && baseLayer.indices instanceof Int16Array) {
       layer.indices.set(baseLayer.indices);
@@ -5422,6 +5451,7 @@
       blendMode: normalizeLayerBlendMode(layer.blendMode),
       indices,
       direct,
+      directOnly: Boolean(layer.directOnly),
     };
   }
 
@@ -5442,6 +5472,7 @@
     if (snapshot?.direct instanceof Uint8ClampedArray) {
       const direct = ensureLayerDirect(layer, width, height);
       direct.set(snapshot.direct.subarray(0, Math.min(direct.length, snapshot.direct.length)));
+      layer.directOnly = inferDirectOnlyLayer(snapshot, snapshot.indices, direct);
     }
     return layer;
   }
@@ -5503,9 +5534,10 @@
           if (isSimulationLayer(layer)) {
             return cloneSimulationLayer(layer, width, height, { copyPixels: clonePixelData });
           }
-          nextLayer.visible = layer?.visible !== false;
-          nextLayer.opacity = normalizeLayerOpacity(layer?.opacity);
-          nextLayer.blendMode = normalizeLayerBlendMode(layer?.blendMode);
+	          nextLayer.visible = layer?.visible !== false;
+	          nextLayer.opacity = normalizeLayerOpacity(layer?.opacity);
+	          nextLayer.blendMode = normalizeLayerBlendMode(layer?.blendMode);
+	          nextLayer.directOnly = Boolean(layer?.directOnly);
           if (clonePixelData && layer?.indices instanceof Int16Array) {
             nextLayer.indices.set(layer.indices.subarray(0, Math.min(nextLayer.indices.length, layer.indices.length)));
           } else if (!clonePixelData && layer?.indices instanceof Int16Array) {
@@ -5536,9 +5568,10 @@
       name: layer.name,
       visible: layer.visible,
       opacity: normalizeLayerOpacity(layer.opacity),
-      blendMode: normalizeLayerBlendMode(layer.blendMode),
-      indices: clonePixelData ? new Int16Array(layer.indices) : layer.indices,
-      direct: null,
+	      blendMode: normalizeLayerBlendMode(layer.blendMode),
+	      indices: clonePixelData ? new Int16Array(layer.indices) : layer.indices,
+	      direct: null,
+	      directOnly: Boolean(layer.directOnly),
     };
     if (layer.direct instanceof Uint8ClampedArray) {
       clonedLayer.direct = clonePixelData ? new Uint8ClampedArray(layer.direct) : layer.direct;
@@ -5562,6 +5595,33 @@
     } catch (error) {
       return normalizeSimulationStyle(element);
     }
+  }
+
+  function hasOnlyEmptyLayerIndices(indices) {
+    if (!(indices instanceof Int16Array)) {
+      return false;
+    }
+    for (let i = 0; i < indices.length; i += 1) {
+      if (indices[i] >= 0) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function inferDirectOnlyLayer(layer, indices, direct) {
+    return direct instanceof Uint8ClampedArray
+      && direct.length > 0
+      && hasOnlyEmptyLayerIndices(indices);
+  }
+
+  function frameListHasDirectPixelData(frames) {
+    if (!Array.isArray(frames)) {
+      return false;
+    }
+    return frames.some(frame => Array.isArray(frame?.layers) && frame.layers.some(layer => (
+      layer?.direct instanceof Uint8ClampedArray && layer.direct.length > 0
+    )));
   }
 
   function serializeLayerForDocument(layer) {
@@ -5600,6 +5660,7 @@
       blendMode: normalizeLayerBlendMode(layer.blendMode),
       indices: encodeTypedArray(layer.indices),
       direct: encodeTypedArray(layer.direct),
+      directOnly: Boolean(layer.directOnly),
     };
   }
 
@@ -5674,6 +5735,7 @@
       blendMode: normalizeLayerBlendMode(layer.blendMode),
       indices,
       direct,
+      directOnly: inferDirectOnlyLayer(layer, indices, direct),
     };
   }
 
@@ -6275,11 +6337,12 @@
           visible: layer.visible,
           opacity: normalizeLayerOpacity(layer.opacity),
           blendMode: normalizeLayerBlendMode(layer.blendMode),
-          indices: clonePixelData ? new Int16Array(layer.indices) : layer.indices,
-          direct: layer.direct instanceof Uint8ClampedArray
-            ? (clonePixelData ? new Uint8ClampedArray(layer.direct) : layer.direct)
-            : null,
-        })),
+	          indices: clonePixelData ? new Int16Array(layer.indices) : layer.indices,
+	          direct: layer.direct instanceof Uint8ClampedArray
+	            ? (clonePixelData ? new Uint8ClampedArray(layer.direct) : layer.direct)
+	            : null,
+	          directOnly: Boolean(layer.directOnly),
+	        })),
       })),
       activeFrame: resolved.activeFrame,
       activeLayer: resolved.activeLayer,
@@ -7191,10 +7254,11 @@
               name: layer.name,
               visible: layer.visible,
               opacity: normalizeLayerOpacity(layer.opacity),
-              blendMode: normalizeLayerBlendMode(layer.blendMode),
-              indices: compressInt16Array(layer.indices),
-              direct: layer.direct ? compressUint8Array(layer.direct, { clamped: true }) : null,
-            }),
+	              blendMode: normalizeLayerBlendMode(layer.blendMode),
+	              indices: compressInt16Array(layer.indices),
+	              direct: layer.direct ? compressUint8Array(layer.direct, { clamped: true }) : null,
+	              directOnly: inferDirectOnlyLayer(layer, layer.indices, layer.direct),
+	            }),
         })),
       }))
       : null;
@@ -7240,10 +7304,11 @@
             name: layer.name,
             visible: layer.visible,
             opacity: normalizeLayerOpacity(layer.opacity),
-            blendMode: normalizeLayerBlendMode(layer.blendMode),
-            indices: compressInt16Array(layer.indices),
-            direct: layer.direct ? compressUint8Array(layer.direct, { clamped: true }) : null,
-          }),
+	            blendMode: normalizeLayerBlendMode(layer.blendMode),
+	            indices: compressInt16Array(layer.indices),
+	            direct: layer.direct ? compressUint8Array(layer.direct, { clamped: true }) : null,
+	            directOnly: inferDirectOnlyLayer(layer, layer.indices, layer.direct),
+	          }),
       })),
       showGrid: snapshot.showGrid,
       showMajorGrid: snapshot.showMajorGrid,
@@ -7358,10 +7423,11 @@
               name: layer.name,
               visible: layer.visible,
               opacity: normalizeLayerOpacity(layer.opacity),
-              blendMode: normalizeLayerBlendMode(layer.blendMode),
-              indices: decodeInt16Data(layer.indices),
-              direct: layer.direct ? decodeUint8Data(layer.direct, { clamped: true }) : null,
-            };
+	              blendMode: normalizeLayerBlendMode(layer.blendMode),
+	              indices: decodeInt16Data(layer.indices),
+	              direct: layer.direct ? decodeUint8Data(layer.direct, { clamped: true }) : null,
+	              directOnly: inferDirectOnlyLayer(layer, decodeInt16Data(layer.indices), layer.direct ? decodeUint8Data(layer.direct, { clamped: true }) : null),
+	            };
           }),
         })),
       }))
@@ -7411,10 +7477,11 @@
             name: layer.name,
             visible: layer.visible,
             opacity: normalizeLayerOpacity(layer.opacity),
-            blendMode: normalizeLayerBlendMode(layer.blendMode),
-            indices: decodeInt16Data(layer.indices),
-            direct: layer.direct ? decodeUint8Data(layer.direct, { clamped: true }) : null,
-          };
+	            blendMode: normalizeLayerBlendMode(layer.blendMode),
+	            indices: decodeInt16Data(layer.indices),
+	            direct: layer.direct ? decodeUint8Data(layer.direct, { clamped: true }) : null,
+	            directOnly: inferDirectOnlyLayer(layer, decodeInt16Data(layer.indices), layer.direct ? decodeUint8Data(layer.direct, { clamped: true }) : null),
+	          };
         }),
       })),
       showGrid: snapshot.showGrid,
@@ -8011,9 +8078,13 @@
 
     resizeCanvases();
     renderAllProjectCanvasSurfaces();
-    renderFrameList();
+    if (shouldDeferTimelineMatrixRender(state.frames)) {
+      timelineMatrixRenderKey = '';
+      scheduleDeferredTimelineMatrixRender();
+    } else {
+      renderFrameList();
+    }
     renderLayerList();
-    renderTimelineMatrix();
     renderPalette();
     syncPaletteInputs();
     applyUiTheme(state.uiTheme, { persist: false, syncControl: false });
@@ -11843,10 +11914,18 @@
   }
 
   function persistCriticalSessionStateForNavigation() {
-    flushPendingTimelapseCapture({ force: true });
-    flushAutosaveSnapshotOnLifecycle({ force: true });
+    const largeDocumentMode = isLargeDocumentPerformanceMode();
+    if (!largeDocumentMode) {
+      flushPendingTimelapseCapture({ force: true });
+      flushAutosaveSnapshotOnLifecycle({ force: true });
+    } else {
+      persistReloadTargetProjectId();
+      scheduleAutosaveSnapshot();
+    }
     try {
-      persistReloadSessionSnapshot();
+      if (!largeDocumentMode) {
+        persistReloadSessionSnapshot();
+      }
     } catch (error) {
       // Ignore reload snapshot persistence errors during navigation.
     }
@@ -11860,7 +11939,7 @@
     } catch (error) {
       // Ignore multi resume persistence errors during navigation.
     }
-    if (IOS_SNAPSHOT_SUPPORTED) {
+    if (IOS_SNAPSHOT_SUPPORTED && !largeDocumentMode) {
       persistIosSnapshot(true).catch(error => {
         console.warn('Failed to persist iOS snapshot during navigation', error);
       });
@@ -12029,6 +12108,24 @@
     if (!frame) {
       return null;
     }
+    const visibleLayers = Array.isArray(frame.layers)
+      ? frame.layers.filter(layer => (
+        layer
+        && getDisplayedLayerVisibility(layer, true)
+        && getDisplayedLayerPreviewOpacity(layer, 1) > 0
+      ))
+      : [];
+    if (visibleLayers.length === 1) {
+      const layer = visibleLayers[0];
+      const direct = layer.direct instanceof Uint8ClampedArray && layer.direct.length >= width * height * 4 ? layer.direct : null;
+      if (direct
+        && layer.directOnly === true
+        && getDisplayedLayerPreviewOpacity(layer, 1) >= 1
+        && normalizeLayerBlendMode(layer.blendMode) === DEFAULT_LAYER_BLEND_MODE
+        && !isSimulationLayer(layer)) {
+        return new ImageData(new Uint8ClampedArray(direct.subarray(0, width * height * 4)), width, height);
+      }
+    }
     const pixels = compositeFramePixels(frame, width, height, state.palette, {
       useLocalLayerPreviewVisibility: true,
       useLocalLayerPreviewOpacity: true,
@@ -12043,6 +12140,9 @@
 
   function getPlaybackCacheRadius(width, height) {
     const bytesPerFrame = Math.max(1, Math.floor(Number(width) || 0) * Math.floor(Number(height) || 0) * 4);
+    if (bytesPerFrame >= PLAYBACK_LARGE_FRAME_BYTES) {
+      return 0;
+    }
     const maxFramesByBudget = Math.max(1, Math.floor(PLAYBACK_CACHE_MAX_BYTES / bytesPerFrame));
     return clamp(
       Math.floor((maxFramesByBudget - 1) / 2),
@@ -12115,7 +12215,6 @@
     playbackFrameCache.height = height;
     playbackFrameCache.radius = getPlaybackCacheRadius(width, height);
     playbackFrameCache.mode = 'nearby';
-    warmPlaybackNearbyCache(state.activeFrame);
   }
 
   function getPlaybackFrameImageData(frameIndex) {
@@ -12138,7 +12237,14 @@
       }
       playbackFrameCache.byFrame.set(frameIndex, imageData);
     }
-    warmPlaybackNearbyCache(frameIndex);
+    if (playbackFrameCache.radius > 0) {
+      const warm = () => warmPlaybackNearbyCache(frameIndex);
+      if (typeof window.requestIdleCallback === 'function') {
+        window.requestIdleCallback(warm, { timeout: 250 });
+      } else {
+        window.setTimeout(warm, 0);
+      }
+    }
     return imageData;
   }
 
@@ -12572,7 +12678,11 @@
         history.past.shift();
       }
       history.future.length = 0;
-      requestImmediateAutosaveSnapshot();
+      if (isLargeDocumentPerformanceMode()) {
+        scheduleAutosaveSnapshot();
+      } else {
+        requestImmediateAutosaveSnapshot();
+      }
       handleMultiLocalCommit(pendingLabel);
     }
     history.pending = null;
@@ -17079,7 +17189,8 @@
       return;
     }
     if (!autosaveDirty) return;
-    const safeDelayMs = Math.max(120, Math.round(Number(delayMs) || AUTOSAVE_WRITE_DELAY));
+    const largeDocumentDelay = isLargeDocumentPerformanceMode() ? 4200 : 120;
+    const safeDelayMs = Math.max(largeDocumentDelay, Math.round(Number(delayMs) || AUTOSAVE_WRITE_DELAY));
     const deadline = Date.now() + safeDelayMs;
     if (
       autosaveWriteTimer !== null
@@ -17153,6 +17264,10 @@
       return;
     }
     if (!hasPendingAutosaveWork()) {
+      return;
+    }
+    if (isLargeDocumentPerformanceMode()) {
+      scheduleAutosaveSnapshot();
       return;
     }
     const blockedStatus = getAutosaveBlockedStatusMessage();
@@ -18646,117 +18761,77 @@
     if (!ensureCurrentClientCanReplaceActiveProject()) {
       return false;
     }
+    const closeLoading = beginBlockingGlobalLoading(
+      localizeText('画像を読み込み中…', 'Loading image...'),
+      { immediate: true }
+    );
     let importResult;
     try {
-      importResult = await decodeImageFileToFrames(file);
-    } catch (error) {
-      throw createImageImportError('画像を読み込めませんでした', error);
-    }
+      setGlobalLoadingIndicatorLabel(localizeText('画像をデコード中…', 'Decoding image...'));
+      try {
+        importResult = await decodeImageFileToFrames(file);
+      } catch (error) {
+        throw createImageImportError('画像を読み込めませんでした', error);
+      }
 
-    const framesData = Array.isArray(importResult?.frames) ? importResult.frames : [];
-    if (!framesData.length) {
-      throw createImageImportError('画像を読み込めませんでした');
-    }
+      const framesData = Array.isArray(importResult?.frames) ? importResult.frames : [];
+      if (!framesData.length) {
+        throw createImageImportError('画像を読み込めませんでした');
+      }
 
-    const inferredWidth = Number(importResult?.width ?? framesData[0]?.imageData?.width ?? 0);
-    const inferredHeight = Number(importResult?.height ?? framesData[0]?.imageData?.height ?? 0);
-    if (!Number.isFinite(inferredWidth) || !Number.isFinite(inferredHeight) || inferredWidth <= 0 || inferredHeight <= 0) {
-      throw createImageImportError('画像サイズが不正です');
-    }
+      const inferredWidth = Number(importResult?.width ?? framesData[0]?.imageData?.width ?? 0);
+      const inferredHeight = Number(importResult?.height ?? framesData[0]?.imageData?.height ?? 0);
+      if (!Number.isFinite(inferredWidth) || !Number.isFinite(inferredHeight) || inferredWidth <= 0 || inferredHeight <= 0) {
+        throw createImageImportError('画像サイズが不正です');
+      }
 
-    const integerScaleFactor = detectNearestNeighborIntegerScaleForFrames(framesData, inferredWidth, inferredHeight);
-    const importSize = resolveImageImportTargetSize(inferredWidth, inferredHeight, { integerScaleFactor });
-    const width = importSize.width;
-    const height = importSize.height;
-    const normalizedFramesData = importSize.scaled
-      ? resizeImportFrames(framesData, width, height)
-      : framesData;
-
-    const paletteSource = state.palette && state.palette.length
-      ? state.palette
-      : createInitialState({ width, height }).palette;
+      const integerScaleFactor = detectNearestNeighborIntegerScaleForFrames(framesData, inferredWidth, inferredHeight);
+      const importSize = resolveImageImportTargetSize(inferredWidth, inferredHeight, { integerScaleFactor });
+      const width = importSize.width;
+      const height = importSize.height;
+      setGlobalLoadingIndicatorLabel(localizeText('フルカラー画像を準備中…', 'Preparing full-color frames...'));
+      const normalizedFramesData = importSize.scaled
+        ? resizeImportFrames(framesData, width, height)
+        : framesData;
 
     const frames = [];
-    let palette = [];
-    let activePaletteIndex = 0;
-    let secondaryPaletteIndex = 0;
-    let activeRgb = { r: 255, g: 255, b: 255, a: 255 };
+    const palette = createRgbModeDefaultPalette();
+    const activePaletteIndex = clamp(2, 0, Math.max(0, palette.length - 1));
+    const secondaryPaletteIndex = clamp(1, 0, Math.max(0, palette.length - 1));
+    const activeRgb = state.activeRgb
+      ? { ...state.activeRgb }
+      : (palette[activePaletteIndex] ? { ...palette[activePaletteIndex] } : { r: 255, g: 255, b: 255, a: 255 });
 
-    const extractedFrameData = normalizedFramesData.map((frameInfo) => (
-      frameInfo?.imageData?.data instanceof Uint8ClampedArray
-        ? frameInfo.imageData.data
-        : null
-    ));
-    const extraction = buildIndexedPaletteFromFrameDataList(extractedFrameData);
-    const canUseImportedPalette = (
-      !extraction.overflow
-      && Array.isArray(extraction.frameIndices)
-      && extraction.frameIndices.length === normalizedFramesData.length
-    );
-
-    if (canUseImportedPalette) {
-      palette = extraction.palette.length
-        ? extraction.palette.map(color => ({ ...color }))
-        : [{ r: 0, g: 0, b: 0, a: 0 }];
-      activePaletteIndex = 0;
-      secondaryPaletteIndex = Math.min(1, Math.max(0, palette.length - 1));
-      activeRgb = { ...palette[activePaletteIndex] };
-      normalizedFramesData.forEach((frameInfo, index) => {
-        const layer = createLayer(localizeText('画像レイヤー', 'Image Layer'), width, height);
-        const frameIndices = extraction.frameIndices[index];
-        if (frameIndices instanceof Int16Array && frameIndices.length === layer.indices.length) {
-          layer.indices = new Int16Array(frameIndices);
-        } else {
-          layer.indices.fill(-1);
-        }
-        layer.direct = null;
-        frames.push({
-          id: crypto.randomUUID ? crypto.randomUUID() : `frame-${Date.now().toString(36)}-${index}`,
-          name: getDefaultFrameName(index + 1),
-          duration: normalizeImportFrameDuration(frameInfo?.duration),
-          layers: [layer],
-        });
+    normalizedFramesData.forEach((frameInfo, index) => {
+      const layer = createLayer(localizeText('画像レイヤー', 'Image Layer'), width, height);
+      layer.indices.fill(-1);
+      layer.directOnly = true;
+      const direct = ensureLayerDirect(layer, width, height);
+      if (frameInfo?.imageData?.data instanceof Uint8ClampedArray
+        && frameInfo.imageData.width === width
+        && frameInfo.imageData.height === height) {
+        direct.set(frameInfo.imageData.data);
+      } else {
+        direct.fill(0);
+      }
+      frames.push({
+        id: crypto.randomUUID ? crypto.randomUUID() : `frame-${Date.now().toString(36)}-${index}`,
+        name: getDefaultFrameName(index + 1),
+        duration: normalizeImportFrameDuration(frameInfo?.duration),
+        layers: [layer],
       });
-    } else {
-      palette = paletteSource.map(color => ({ ...color }));
-      activePaletteIndex = palette.length
-        ? clamp(state.activePaletteIndex ?? 0, 0, palette.length - 1)
-        : 0;
-      secondaryPaletteIndex = palette.length
-        ? clamp(state.secondaryPaletteIndex ?? activePaletteIndex, 0, palette.length - 1)
-        : activePaletteIndex;
-      activeRgb = state.activeRgb
-        ? { ...state.activeRgb }
-        : (palette[activePaletteIndex] ? { ...palette[activePaletteIndex] } : { r: 255, g: 255, b: 255, a: 255 });
-
-      normalizedFramesData.forEach((frameInfo, index) => {
-        const layer = createLayer(localizeText('画像レイヤー', 'Image Layer'), width, height);
-        layer.indices.fill(-1);
-        const direct = ensureLayerDirect(layer, width, height);
-        if (frameInfo?.imageData?.data instanceof Uint8ClampedArray
-          && frameInfo.imageData.width === width
-          && frameInfo.imageData.height === height) {
-          direct.set(frameInfo.imageData.data);
-        } else {
-          direct.fill(0);
-        }
-        frames.push({
-          id: crypto.randomUUID ? crypto.randomUUID() : `frame-${Date.now().toString(36)}-${index}`,
-          name: getDefaultFrameName(index + 1),
-          duration: normalizeImportFrameDuration(frameInfo?.duration),
-          layers: [layer],
-        });
-      });
-    }
+    });
 
     const activeLayerId = frames[0]?.layers[0]?.id;
     if (!activeLayerId) {
       throw createImageImportError('画像を読み込めませんでした');
     }
+    const isLargeImportedDocument = width * height * Math.max(1, frames.length) >= 256 * 256 * 48;
 
     const documentName = normalizeDocumentName(typeof file?.name === 'string' ? file.name : state.documentName);
     const activeToolGroup = TOOL_GROUPS[state.activeToolGroup] ? state.activeToolGroup : (TOOL_TO_GROUP[state.tool] || 'pen');
 
+    setGlobalLoadingIndicatorLabel(localizeText('プロジェクトへ反映中…', 'Applying project...'));
     const snapshot = {
       width,
       height,
@@ -18769,6 +18844,7 @@
       activePaletteIndex,
       secondaryPaletteIndex,
       activeRgb,
+      colorMode: COLOR_MODE_RGB,
       frames,
       activeFrame: 0,
       activeLayer: activeLayerId,
@@ -18781,7 +18857,7 @@
       backgroundMode: state.backgroundMode ?? 'dark',
       uiTheme: normalizeUiTheme(state.uiTheme, DEFAULT_UI_THEME),
       documentName,
-      showPixelGuides: state.showPixelGuides ?? true,
+      showPixelGuides: isLargeImportedDocument ? false : (state.showPixelGuides ?? true),
       mirror: normalizeMirrorAxisState(state.mirror, width, height),
       showVirtualCursor: state.showVirtualCursor ?? false,
       showCanvasResizeHandles: state.showCanvasResizeHandles ?? true,
@@ -18815,25 +18891,22 @@
     syncMultiProjectKeyInputValues('', { preserveFocused: false });
     markAutosaveDirty();
     scheduleAutosaveSnapshot();
-    const paletteReductionLabel = extraction.reduced
-      ? localizeText(
-        ` / 減色 ${extraction.sourceColorCount}色→${palette.length}色`,
-        ` / Reduced ${extraction.sourceColorCount} colors to ${palette.length}`
-      )
-      : '';
     if (importSize.scaled) {
       const integerScaleLabel = importSize.integerScaleFactor > 1
         ? ` / 整数倍縮小 x${importSize.integerScaleFactor}`
         : '';
       updateAutosaveStatus(
-        `画像を読み込みました (${importSize.sourceWidth}x${importSize.sourceHeight} → ${width}x${height}${integerScaleLabel})${paletteReductionLabel} / 端末内へ自動保存します`,
+        `画像をRGBカラーで読み込みました (${importSize.sourceWidth}x${importSize.sourceHeight} → ${width}x${height}${integerScaleLabel}) / 端末内へ自動保存します`,
         'success'
       );
     } else {
-      updateAutosaveStatus(`画像を読み込みました${paletteReductionLabel} / 端末内へ自動保存します`, 'success');
+      updateAutosaveStatus('画像をRGBカラーで読み込みました / 端末内へ自動保存します', 'success');
     }
     scheduleSessionPersist();
     return true;
+    } finally {
+      closeLoading();
+    }
   }
 
   async function fallbackRestoreAutosaveAfterLensFailure() {
@@ -19230,35 +19303,7 @@
     }
 
     const bytes = new Uint8Array(buffer);
-    const mimeType = typeof file.type === 'string' && file.type ? file.type : 'image/gif';
-    if (typeof window !== 'undefined' && typeof window.ImageDecoder === 'function') {
-      try {
-        const decoded = await decodeGifWithImageDecoder(bytes, mimeType);
-        if (decoded && Array.isArray(decoded.frames) && decoded.frames.length >= 1) {
-          return decoded;
-        }
-      } catch (error) {
-        console.warn('ImageDecoder GIF decode failed, falling back to JavaScript decoder', error);
-      }
-    }
-    const decodedByReader = decodeGifWithReader(bytes);
-    // If a static GIF decodes oddly in the JS reader path, fall back to browser image decode.
-    if (decodedByReader && Array.isArray(decodedByReader.frames) && decodedByReader.frames.length === 1) {
-      try {
-        const fallbackImageData = await decodeImageFileToImageData(file);
-        if (fallbackImageData
-          && fallbackImageData.width === decodedByReader.width
-          && fallbackImageData.height === decodedByReader.height) {
-          decodedByReader.frames[0] = {
-            imageData: fallbackImageData,
-            duration: decodedByReader.frames[0]?.duration ?? DEFAULT_IMPORT_FRAME_DURATION,
-          };
-        }
-      } catch (error) {
-        console.warn('Static GIF fallback decode failed', error);
-      }
-    }
-    return decodedByReader;
+    return decodeGifWithReader(bytes);
   }
 
   async function decodeGifWithImageDecoder(buffer, mimeType) {
@@ -27441,7 +27486,8 @@
     const brushShape = requestedBrushShape === BRUSH_SHAPE_CUSTOM && !customBrush
       ? BRUSH_SHAPE_SQUARE
       : requestedBrushShape;
-    const colorMode = normalizeColorMode(payload.colorMode, state.colorMode);
+    const inferredColorMode = frameListHasDirectPixelData(frames) ? COLOR_MODE_RGB : state.colorMode;
+    const colorMode = normalizeColorMode(payload.colorMode, inferredColorMode);
     const fallbackActivePaletteIndex = clamp(
       Number.isFinite(state.activePaletteIndex) ? Math.round(state.activePaletteIndex) : 0,
       0,
@@ -29199,6 +29245,45 @@
     const pixelCount = width * height;
     const output = new Uint8ClampedArray(pixelCount * 4);
     if (!frame || !Array.isArray(frame.layers)) {
+      return output;
+    }
+    let singleDirectLayer = null;
+    let drawableLayerCount = 0;
+    for (let layerIndex = 0; layerIndex < frame.layers.length; layerIndex += 1) {
+      const layer = frame.layers[layerIndex];
+      const layerVisible = useLocalLayerPreviewVisibility
+        ? getDisplayedLayerVisibility(layer, true)
+        : (layer?.visible !== false);
+      const layerOpacity = useLocalLayerPreviewOpacity
+        ? getDisplayedLayerPreviewOpacity(layer, 1)
+        : normalizeLayerOpacity(layer?.opacity);
+      if (!layer || (!includeHiddenLayers && !layerVisible) || layerOpacity <= 0) {
+        continue;
+      }
+      drawableLayerCount += 1;
+      if (drawableLayerCount > 1 || isSimulationLayer(layer)) {
+        singleDirectLayer = null;
+        break;
+      }
+      const direct = layer.direct instanceof Uint8ClampedArray && layer.direct.length >= pixelCount * 4 ? layer.direct : null;
+      if (!direct || layerOpacity < 1 || normalizeLayerBlendMode(layer.blendMode) !== DEFAULT_LAYER_BLEND_MODE) {
+        singleDirectLayer = null;
+        continue;
+      }
+      const indices = layer.indices instanceof Int16Array && layer.indices.length >= pixelCount ? layer.indices : null;
+      let hasIndexedPixels = false;
+      if (indices && layer.directOnly !== true) {
+        for (let i = 0; i < pixelCount; i += 1) {
+          if (indices[i] >= 0) {
+            hasIndexedPixels = true;
+            break;
+          }
+        }
+      }
+      singleDirectLayer = hasIndexedPixels ? null : direct;
+    }
+    if (drawableLayerCount === 1 && singleDirectLayer) {
+      output.set(singleDirectLayer.subarray(0, pixelCount * 4));
       return output;
     }
     frame.layers.forEach(layer => {
@@ -32953,7 +33038,7 @@
     });
   }
 
-  function applyViewportTransform() {
+  function applyViewportTransform({ updateDecorations = true } = {}) {
     if (!(dom.viewportWorkspace instanceof HTMLElement)) return;
     const panX = Math.round(Number(state.pan.x) || 0);
     const panY = Math.round(Number(state.pan.y) || 0);
@@ -32968,10 +33053,12 @@
     if (clampResult?.clampedX || clampResult?.clampedY) {
       dom.viewportWorkspace.style.transform = `translate(${Math.round(Number(state.pan.x) || 0)}px, ${Math.round(Number(state.pan.y) || 0)}px)`;
     }
-    updateGridDecorations();
-    updateMirrorGuideHandles();
-    updateCanvasResizeHandlePosition();
-    syncCanvasResizeHandleVisibility();
+    if (updateDecorations) {
+      updateGridDecorations();
+      updateMirrorGuideHandles();
+      updateCanvasResizeHandlePosition();
+      syncCanvasResizeHandleVisibility();
+    }
     return clampResult;
   }
 
@@ -33796,6 +33883,27 @@
     updateToolVisibility();
   }
 
+  function scheduleRailLayoutRefresh() {
+    if (railLayoutRefreshHandle !== null) {
+      window.cancelAnimationFrame(railLayoutRefreshHandle);
+    }
+    railLayoutRefreshHandle = window.requestAnimationFrame(() => {
+      railLayoutRefreshHandle = null;
+      updateRailMetrics();
+      resizeCanvases({
+        forceRender: false,
+        syncControls: false,
+        updateScaleLimits: false,
+        renderLocalViewports: false,
+      });
+      applyViewportTransform();
+      clampFloatingDrawButtonPosition();
+      if (isBottomTimelineDockEnabled()) {
+        renderLayerList();
+      }
+    });
+  }
+
   function setRailWidth(side, width, { persist = true } = {}) {
     if (side !== 'left' && side !== 'right') {
       return;
@@ -33807,8 +33915,14 @@
     const cssVar = getRailCssVarName(side);
     if (dom.layout) {
       dom.layout.style.setProperty(cssVar, `${normalized}px`);
+      if (side === 'left') {
+        dom.layout.style.setProperty('--pixiedraw-tool-rail-width', `${normalized}px`);
+      }
     } else {
       document.documentElement.style.setProperty(cssVar, `${normalized}px`);
+      if (side === 'left') {
+        document.documentElement.style.setProperty('--pixiedraw-tool-rail-width', `${normalized}px`);
+      }
     }
     updateRailCompactState(side);
     if (side === 'left') {
@@ -33820,7 +33934,9 @@
       if (!isCompactToolRailMode()) {
         setCompactToolFlyoutOpen(false);
       }
-      updateToolVisibility();
+      if (isCompactLeftRail !== wasCompactLeftRail) {
+        updateToolVisibility();
+      }
     } else {
       const isCompactRightRail = isCompactRightRailMode();
       if (isCompactRightRail && !wasCompactRightRail) {
@@ -33829,12 +33945,15 @@
       if (!isCompactRightRail && isCompactRightFlyoutOpen()) {
         setCompactRightFlyoutOpen(false);
       }
-      updateRightTabVisibility();
+      if (isCompactRightRail !== wasCompactRightRail) {
+        updateRightTabVisibility();
+      }
     }
     if (!isRailCompactMode(side) && railSizing.expandedWidth && typeof railSizing.expandedWidth === 'object') {
       railSizing.expandedWidth[side] = normalized;
     }
     updateRailMetrics();
+    scheduleRailLayoutRefresh();
     if (persist) {
       scheduleSessionPersist();
     }
@@ -34931,8 +35050,8 @@
     const layoutNode = dom.layout;
     if (!layoutNode) return;
     const isMobile = layoutMode === 'mobilePortrait';
-    const leftWidth = isMobile ? 0 : (dom.leftRail ? dom.leftRail.offsetWidth : 0);
-    const rightWidth = isMobile ? 0 : (dom.rightRail ? dom.rightRail.offsetWidth : 0);
+    const leftWidth = isMobile ? 0 : normalizeRailWidth('left', railSizing.left);
+    const rightWidth = isMobile ? 0 : normalizeRailWidth('right', railSizing.right);
     const leftCompactVisible = !isMobile
       && dom.leftRail instanceof HTMLElement
       && dom.leftRail.dataset.compact === 'true'
@@ -37966,6 +38085,7 @@
         layerTouched = true;
       }
       if (layerTouched) {
+        layer.directOnly = inferDirectOnlyLayer(layer, indices, direct);
         touchedLayers += 1;
       }
       layer.direct = null;
@@ -38555,8 +38675,12 @@
       }
       if (mode === COLOR_MODE_INDEX) {
         layer.direct = null;
+        layer.directOnly = false;
       }
       if (layerTouched) {
+        if (mode === COLOR_MODE_RGB) {
+          layer.directOnly = inferDirectOnlyLayer(layer, indices, nextDirect);
+        }
         touchedLayers += 1;
       }
     });
@@ -41286,6 +41410,24 @@
     playbackHandle = requestAnimationFrame(stepPlayback);
   }
 
+  function schedulePlaybackUiRefresh() {
+    if (playbackUiRefreshHandle !== null) {
+      window.cancelAnimationFrame(playbackUiRefreshHandle);
+    }
+    playbackUiRefreshHandle = window.requestAnimationFrame(() => {
+      playbackUiRefreshHandle = null;
+      const refresh = () => {
+        renderFrameList();
+        renderLayerList();
+      };
+      if (typeof window.requestIdleCallback === 'function') {
+        window.requestIdleCallback(refresh, { timeout: 500 });
+      } else {
+        window.setTimeout(refresh, 0);
+      }
+    });
+  }
+
   function stopPlayback() {
     state.playback.isPlaying = false;
     if (playbackHandle != null) {
@@ -41295,8 +41437,7 @@
     clearPlaybackFrameCache();
     clearPlaybackTimelineCursorIndicators();
     updatePlaybackButtons();
-    renderFrameList();
-    renderLayerList();
+    schedulePlaybackUiRefresh();
     requestRender();
     requestOverlayRender();
   }
@@ -41968,6 +42109,86 @@
     }
   }
 
+  function getTimelineRenderCellCount(frames = state.frames) {
+    if (!Array.isArray(frames) || !frames.length) {
+      return 0;
+    }
+    const frameCount = frames.length;
+    const maxLayerCount = frames.reduce((max, frame) => (
+      Math.max(max, Array.isArray(frame?.layers) ? frame.layers.length : 0)
+    ), 0);
+    return frameCount * Math.max(1, maxLayerCount);
+  }
+
+  function shouldDeferTimelineMatrixRender(frames = state.frames) {
+    const frameCount = Array.isArray(frames) ? frames.length : 0;
+    if (frameCount < 48) {
+      return false;
+    }
+    const pixelCount = Math.max(1, Math.round(Number(state.width) || 1)) * Math.max(1, Math.round(Number(state.height) || 1));
+    return pixelCount >= 256 * 256 || getTimelineRenderCellCount(frames) >= 384;
+  }
+
+  function isLargeDocumentPerformanceMode() {
+    const frameCount = Array.isArray(state.frames) ? state.frames.length : 0;
+    const width = Math.max(1, Math.round(Number(state.width) || 1));
+    const height = Math.max(1, Math.round(Number(state.height) || 1));
+    const pixelCount = width * height;
+    return pixelCount * Math.max(1, frameCount) >= 256 * 256 * 48
+      || getTimelineRenderCellCount(state.frames) >= 384;
+  }
+
+  function scheduleSecondaryCanvasRefresh() {
+    if (secondaryCanvasRefreshHandle !== null) {
+      return;
+    }
+    const run = () => {
+      secondaryCanvasRefreshHandle = null;
+      if (isLargeDocumentPerformanceMode() && isAutosaveInteractionBusy()) {
+        scheduleSecondaryCanvasRefresh();
+        return;
+      }
+      renderFloatingPreviewPanel();
+      if (getLocalViewportCanvasCount() > 0) {
+        renderInactiveProjectCanvasSurfaces();
+      }
+    };
+    const requestIdle = () => {
+      if (typeof window.requestIdleCallback === 'function') {
+        secondaryCanvasRefreshHandle = window.requestIdleCallback(run, { timeout: 600 });
+      } else {
+        secondaryCanvasRefreshHandle = window.setTimeout(run, 120);
+      }
+    };
+    secondaryCanvasRefreshHandle = window.requestAnimationFrame(requestIdle);
+  }
+
+  function refreshSecondaryCanvasSurfaces() {
+    if (isLargeDocumentPerformanceMode()) {
+      scheduleSecondaryCanvasRefresh();
+      return;
+    }
+    renderFloatingPreviewPanel();
+    renderInactiveProjectCanvasSurfaces();
+  }
+
+  function scheduleDeferredTimelineMatrixRender() {
+    if (timelineMatrixDeferredRenderHandle !== null) {
+      return;
+    }
+    timelineMatrixDeferredRenderHandle = window.requestAnimationFrame(() => {
+      const render = () => {
+        timelineMatrixDeferredRenderHandle = null;
+        renderTimelineMatrix();
+      };
+      if (typeof window.requestIdleCallback === 'function') {
+        timelineMatrixDeferredRenderHandle = window.requestIdleCallback(render, { timeout: 700 });
+      } else {
+        timelineMatrixDeferredRenderHandle = window.setTimeout(render, 0);
+      }
+    });
+  }
+
   function renderTimelineMatrix() {
     const container = dom.controls.timelineMatrix;
     if (!container) return;
@@ -42457,7 +42678,11 @@
     }
   }
 
-  function renderFrameList() {
+  function renderFrameList({ immediate = false } = {}) {
+    if (!immediate && shouldDeferTimelineMatrixRender(state.frames)) {
+      scheduleDeferredTimelineMatrixRender();
+      return;
+    }
     renderTimelineMatrix();
   }
 
@@ -46115,6 +46340,7 @@
       applyTransform: false,
       syncControls: false,
       updateScaleLimits: false,
+      renderLocalViewports: false,
     });
     renderFrameList();
     renderLayerList();
@@ -50207,6 +50433,8 @@
     syncControls = true,
     updateScaleLimits = true,
     syncViewportScale = false,
+    renderLocalViewports = true,
+    renderOverlay = true,
   } = {}) {
     if (syncViewportScale) {
       syncViewportZoomScaleToBase({ preserveRatio: true });
@@ -50285,14 +50513,32 @@
     if (forceRender || drawingReset || overlayReset) {
       markCanvasDirty();
       renderCanvas();
-    } else if (getLocalViewportCanvasCount() > 0) {
+    } else if (renderLocalViewports && getLocalViewportCanvasCount() > 0) {
       renderLocalViewportCanvases();
     }
-    requestOverlayRender();
+    if (renderOverlay) {
+      requestOverlayRender();
+    }
   }
 
   function showZoomIndicator(scale) {
     showViewportIndicator(formatZoomLabel(scale), { autoHideMs: ZOOM_INDICATOR_TIMEOUT });
+  }
+
+  function scheduleZoomSettledViewportRefresh() {
+    if (zoomSettledViewportRefreshHandle !== null) {
+      window.clearTimeout(zoomSettledViewportRefreshHandle);
+      zoomSettledViewportRefreshHandle = null;
+    }
+    const delayMs = isLargeDocumentPerformanceMode() ? 180 : 90;
+    zoomSettledViewportRefreshHandle = window.setTimeout(() => {
+      zoomSettledViewportRefreshHandle = null;
+      updateGridDecorations();
+      updateMirrorGuideHandles();
+      updateCanvasResizeHandlePosition();
+      syncCanvasResizeHandleVisibility();
+      requestOverlayRender();
+    }, delayMs);
   }
 
   function getVirtualCursorZoomFocus() {
@@ -50363,6 +50609,8 @@
       applyTransform: false,
       syncControls: false,
       updateScaleLimits: false,
+      renderLocalViewports: false,
+      renderOverlay: false,
     });
 
     const focusSurface = zoomFocus?.surface
@@ -50391,7 +50639,7 @@
       state.pan.y = Math.round(previousPan.y * ratio);
     }
 
-    const clampResult = applyViewportTransform();
+    const clampResult = applyViewportTransform({ updateDecorations: false });
     if (
       zoomFocus
       && Number.isFinite(zoomFocus.clientX)
@@ -50408,13 +50656,12 @@
       if (correctionX || correctionY) {
         state.pan.x = Math.round((Number(state.pan.x) || 0) + correctionX);
         state.pan.y = Math.round((Number(state.pan.y) || 0) + correctionY);
-        applyViewportTransform();
+        applyViewportTransform({ updateDecorations: false });
       }
     }
     syncZoomControls(targetScale);
     showZoomIndicator(targetScale);
-    requestRender();
-    requestOverlayRender();
+    scheduleZoomSettledViewportRefresh();
     scheduleSessionPersist({ includeSnapshots: false });
   }
 
@@ -53768,6 +54015,7 @@
       }
       if (colorMode === COLOR_MODE_INDEX && convertedLayer) {
         layer.direct = null;
+        layer.directOnly = false;
       }
     });
 
@@ -55807,6 +56055,7 @@
       return;
     }
     layer.indices[index] = paletteIndex;
+    layer.directOnly = false;
     if (direct) {
       direct[base] = 0;
       direct[base + 1] = 0;
@@ -56936,9 +57185,32 @@
       const frameImage = getPlaybackFrameImageData(state.activeFrame);
       if (frameImage) {
         ctx.drawing.putImageData(frameImage, 0, 0);
-        renderFloatingPreviewPanel();
-        renderInactiveProjectCanvasSurfaces();
+        refreshSecondaryCanvasSurfaces();
         return;
+      }
+    }
+    const fullCanvasPending = pending.x0 <= 0
+      && pending.y0 <= 0
+      && pending.x1 >= width - 1
+      && pending.y1 >= height - 1;
+    if (fullCanvasPending) {
+      const visibleLayers = (getActiveFrame()?.layers || []).filter(layer => (
+        layer
+        && getDisplayedLayerVisibility(layer, true)
+        && getDisplayedLayerPreviewOpacity(layer, 1) > 0
+      ));
+      if (visibleLayers.length === 1) {
+        const layer = visibleLayers[0];
+        const direct = layer.direct instanceof Uint8ClampedArray && layer.direct.length >= width * height * 4 ? layer.direct : null;
+        if (direct
+          && layer.directOnly === true
+          && getDisplayedLayerPreviewOpacity(layer, 1) >= 1
+          && normalizeLayerBlendMode(layer.blendMode) === DEFAULT_LAYER_BLEND_MODE
+          && !isSimulationLayer(layer)) {
+          ctx.drawing.putImageData(new ImageData(new Uint8ClampedArray(direct.subarray(0, width * height * 4)), width, height), 0, 0);
+          refreshSecondaryCanvasSurfaces();
+          return;
+        }
       }
     }
     const x0 = clamp(pending.x0, 0, width - 1);
@@ -57001,8 +57273,7 @@
     }
 
     ctx.drawing.putImageData(image, x0, y0);
-    renderFloatingPreviewPanel();
-    renderInactiveProjectCanvasSurfaces();
+    refreshSecondaryCanvasSurfaces();
   }
 
   function requestOverlayRender() {
@@ -58865,6 +59136,12 @@
     if (!Array.isArray(state.frames) || !state.frames.length) {
       return;
     }
+    if (isLargeDocumentPerformanceMode()) {
+      persistReloadTargetProjectId();
+      clearLocalRestoreStorage(RELOAD_SNAPSHOT_STORAGE_KEY);
+      clearLocalRestoreStorage(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY);
+      return;
+    }
     const maxAvailable = Math.max(
       Array.isArray(history.past) ? history.past.length : 0,
       Array.isArray(history.future) ? history.future.length : 0
@@ -58905,6 +59182,11 @@
 
   function persistReloadProjectFallback() {
     if (!canUseSessionStorage) {
+      return;
+    }
+    if (isLargeDocumentPerformanceMode()) {
+      persistReloadTargetProjectId();
+      clearLocalRestoreStorage(RELOAD_PROJECT_FALLBACK_STORAGE_KEY);
       return;
     }
     try {
@@ -59033,6 +59315,11 @@
     if (!canUseSessionStorage) {
       return null;
     }
+    if (isLargeDocumentPerformanceMode()) {
+      clearLocalRestoreStorage(RELOAD_SNAPSHOT_STORAGE_KEY);
+      clearLocalRestoreStorage(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY);
+      return null;
+    }
     try {
       const multiResumeRaw = window.sessionStorage.getItem(getScopedStorageKey(MULTI_RESUME_STORAGE_KEY));
       if (typeof multiResumeRaw === 'string' && multiResumeRaw.length) {
@@ -59055,6 +59342,11 @@
       }
     }
     if (!raw) {
+      return null;
+    }
+    if (raw.length > RELOAD_SNAPSHOT_MAX_SYNC_CHARS) {
+      clearLocalRestoreStorage(RELOAD_SNAPSHOT_STORAGE_KEY);
+      clearLocalRestoreStorage(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY);
       return null;
     }
     const parsed = decodeReloadSnapshotPayload(raw);
