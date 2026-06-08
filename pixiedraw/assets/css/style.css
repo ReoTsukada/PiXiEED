@@ -1519,6 +1519,12 @@ body:not(.is-mobile-layout) .layout {
   --workbench-line-soft: rgba(var(--ui-rgb), 0.1);
 }
 
+body:not(.is-mobile-layout) .stage {
+  left: calc(var(--left-width) + var(--left-flyout-reserve, 0px));
+  right: calc(var(--right-width) + var(--right-flyout-reserve, 0px));
+  padding: 0;
+}
+
 body:not(.is-mobile-layout) .rail-resizer {
   width: 16px;
   opacity: 1;
@@ -1610,8 +1616,8 @@ body.is-bottom-timeline-docked:not(.is-mobile-layout) .rail--right .panel-sectio
 
 body.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock:not([hidden]) {
   position: absolute;
-  left: var(--pixiedraw-tool-rail-width);
-  right: var(--right-width);
+  left: calc(var(--pixiedraw-tool-rail-width) + var(--left-flyout-reserve, 0px));
+  right: calc(var(--right-width) + var(--right-flyout-reserve, 0px));
   bottom: 0;
   z-index: 18;
   display: flex;
@@ -1809,8 +1815,8 @@ body:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .timeline-layer-s
 }
 
 body.is-bottom-timeline-docked:not(.is-mobile-layout) .stage {
-  left: var(--pixiedraw-tool-rail-width);
-  right: var(--right-width);
+  left: calc(var(--pixiedraw-tool-rail-width) + var(--left-flyout-reserve, 0px));
+  right: calc(var(--right-width) + var(--right-flyout-reserve, 0px));
   bottom: var(--bottom-rail-height);
   padding: 0;
 }
