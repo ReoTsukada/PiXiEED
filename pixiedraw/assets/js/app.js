@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.06.08-rail-layout-sync';
+  const APP_BUILD_VERSION = '2026.06.08-tabs-rails-fast-color';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
@@ -5087,6 +5087,7 @@
       blendMode: DEFAULT_LAYER_BLEND_MODE,
       indices: new Int16Array(size).fill(-1),
       direct: null,
+      importSourceDirect: null,
     };
   }
 
@@ -5444,6 +5445,11 @@
       direct = new Uint8ClampedArray(size * 4);
       direct.set(layer.direct.subarray(0, Math.min(direct.length, layer.direct.length)));
     }
+    let importSourceDirect = null;
+    if (layer.importSourceDirect instanceof Uint8ClampedArray) {
+      importSourceDirect = new Uint8ClampedArray(size * 4);
+      importSourceDirect.set(layer.importSourceDirect.subarray(0, Math.min(importSourceDirect.length, layer.importSourceDirect.length)));
+    }
     return {
       name: typeof layer.name === 'string' ? layer.name : getDefaultLayerName(1),
       visible: layer.visible !== false,
@@ -5451,6 +5457,7 @@
       blendMode: normalizeLayerBlendMode(layer.blendMode),
       indices,
       direct,
+      importSourceDirect,
       directOnly: Boolean(layer.directOnly),
     };
   }
@@ -5473,6 +5480,10 @@
       const direct = ensureLayerDirect(layer, width, height);
       direct.set(snapshot.direct.subarray(0, Math.min(direct.length, snapshot.direct.length)));
       layer.directOnly = inferDirectOnlyLayer(snapshot, snapshot.indices, direct);
+    }
+    if (snapshot?.importSourceDirect instanceof Uint8ClampedArray) {
+      layer.importSourceDirect = new Uint8ClampedArray(width * height * 4);
+      layer.importSourceDirect.set(snapshot.importSourceDirect.subarray(0, Math.min(layer.importSourceDirect.length, snapshot.importSourceDirect.length)));
     }
     return layer;
   }
@@ -5553,6 +5564,12 @@
           } else if (!clonePixelData && Array.isArray(layer?.direct)) {
             nextLayer.direct = new Uint8ClampedArray(layer.direct);
           }
+          if (clonePixelData && layer?.importSourceDirect instanceof Uint8ClampedArray) {
+            nextLayer.importSourceDirect = new Uint8ClampedArray(width * height * 4);
+            nextLayer.importSourceDirect.set(layer.importSourceDirect.subarray(0, Math.min(nextLayer.importSourceDirect.length, layer.importSourceDirect.length)));
+          } else if (!clonePixelData && layer?.importSourceDirect instanceof Uint8ClampedArray) {
+            nextLayer.importSourceDirect = layer.importSourceDirect;
+          }
           return nextLayer;
         })
         : [createLayer(getDefaultLayerName(1), width, height)],
@@ -5577,6 +5594,9 @@
       clonedLayer.direct = clonePixelData ? new Uint8ClampedArray(layer.direct) : layer.direct;
     } else if (ArrayBuffer.isView(layer.direct)) {
       clonedLayer.direct = new Uint8ClampedArray(layer.direct.buffer.slice(0));
+    }
+    if (layer.importSourceDirect instanceof Uint8ClampedArray) {
+      clonedLayer.importSourceDirect = clonePixelData ? new Uint8ClampedArray(layer.importSourceDirect) : layer.importSourceDirect;
     }
     return clonedLayer;
   }
@@ -5660,6 +5680,7 @@
       blendMode: normalizeLayerBlendMode(layer.blendMode),
       indices: encodeTypedArray(layer.indices),
       direct: encodeTypedArray(layer.direct),
+      importSourceDirect: encodeTypedArray(layer.importSourceDirect),
       directOnly: Boolean(layer.directOnly),
     };
   }
@@ -5727,6 +5748,14 @@
       direct = new Uint8ClampedArray(directBytes.length);
       direct.set(directBytes);
     }
+    let importSourceDirect = null;
+    if (typeof layer.importSourceDirect === 'string' && layer.importSourceDirect.length > 0) {
+      const sourceBytes = decodeBase64(layer.importSourceDirect);
+      if (sourceBytes.length === pixelCount * 4) {
+        importSourceDirect = new Uint8ClampedArray(sourceBytes.length);
+        importSourceDirect.set(sourceBytes);
+      }
+    }
     return {
       id: typeof layer.id === 'string' ? layer.id : fallbackId,
       name: typeof layer.name === 'string' ? layer.name : fallbackName,
@@ -5735,6 +5764,7 @@
       blendMode: normalizeLayerBlendMode(layer.blendMode),
       indices,
       direct,
+      importSourceDirect,
       directOnly: inferDirectOnlyLayer(layer, indices, direct),
     };
   }
@@ -6779,7 +6809,6 @@
     if (!TOOL_GROUPS[state.activeToolGroup]?.tools?.includes(state.tool)) {
       state.activeToolGroup = TOOL_TO_GROUP[state.tool] || 'pen';
     }
-    state.colorMode = normalizeColorMode(preferences.colorMode, state.colorMode);
     const paletteLength = Math.max(1, Array.isArray(state.palette) ? state.palette.length : 0);
     state.activePaletteIndex = clamp(
       normalizePaletteIndex(preferences.activePaletteIndex, state.activePaletteIndex),
@@ -7257,6 +7286,7 @@
 	              blendMode: normalizeLayerBlendMode(layer.blendMode),
 	              indices: compressInt16Array(layer.indices),
 	              direct: layer.direct ? compressUint8Array(layer.direct, { clamped: true }) : null,
+	              importSourceDirect: layer.importSourceDirect ? compressUint8Array(layer.importSourceDirect, { clamped: true }) : null,
 	              directOnly: inferDirectOnlyLayer(layer, layer.indices, layer.direct),
 	            }),
         })),
@@ -7307,6 +7337,7 @@
 	            blendMode: normalizeLayerBlendMode(layer.blendMode),
 	            indices: compressInt16Array(layer.indices),
 	            direct: layer.direct ? compressUint8Array(layer.direct, { clamped: true }) : null,
+	            importSourceDirect: layer.importSourceDirect ? compressUint8Array(layer.importSourceDirect, { clamped: true }) : null,
 	            directOnly: inferDirectOnlyLayer(layer, layer.indices, layer.direct),
 	          }),
       })),
@@ -7426,6 +7457,7 @@
 	              blendMode: normalizeLayerBlendMode(layer.blendMode),
 	              indices: decodeInt16Data(layer.indices),
 	              direct: layer.direct ? decodeUint8Data(layer.direct, { clamped: true }) : null,
+	              importSourceDirect: layer.importSourceDirect ? decodeUint8Data(layer.importSourceDirect, { clamped: true }) : null,
 	              directOnly: inferDirectOnlyLayer(layer, decodeInt16Data(layer.indices), layer.direct ? decodeUint8Data(layer.direct, { clamped: true }) : null),
 	            };
           }),
@@ -7480,6 +7512,7 @@
 	            blendMode: normalizeLayerBlendMode(layer.blendMode),
 	            indices: decodeInt16Data(layer.indices),
 	            direct: layer.direct ? decodeUint8Data(layer.direct, { clamped: true }) : null,
+	            importSourceDirect: layer.importSourceDirect ? decodeUint8Data(layer.importSourceDirect, { clamped: true }) : null,
 	            directOnly: inferDirectOnlyLayer(layer, decodeInt16Data(layer.indices), layer.direct ? decodeUint8Data(layer.direct, { clamped: true }) : null),
 	          };
         }),
@@ -8484,9 +8517,16 @@
       ? buildSharedRecentProjectId(normalizedProjectKey)
       : '';
     const removedTabs = [];
+    const currentProjectId = normalizeAutosaveProjectId(autosaveProjectId || '');
     for (let index = openProjectTabs.length - 1; index >= 0; index -= 1) {
       const tab = openProjectTabs[index];
-      if (!matchesDeletedProjectOpenTab(tab, {
+      const activeTabMatchesCurrentDeletedProject = Boolean(
+        tab?.id
+        && tab.id === activeOpenProjectTabId
+        && normalizedProjectId
+        && currentProjectId === normalizedProjectId
+      );
+      if (!activeTabMatchesCurrentDeletedProject && !matchesDeletedProjectOpenTab(tab, {
         projectId: normalizedProjectId,
         projectKey: normalizedProjectKey,
         backendId,
@@ -8506,7 +8546,6 @@
         .filter(Boolean)
     );
     const activeSharedKey = normalizeMultiProjectKey(activeSharedProjectKey || '');
-    const currentProjectId = normalizeAutosaveProjectId(autosaveProjectId || '');
     const currentProjectRemoved = Boolean(
       (normalizedProjectId && currentProjectId === normalizedProjectId)
       || (sharedRecentProjectId && currentProjectId === sharedRecentProjectId)
@@ -8812,18 +8851,16 @@
       selectButton.appendChild(name);
       item.appendChild(selectButton);
 
-      if (openProjectTabs.length > 1) {
-        const closeButton = document.createElement('button');
-        closeButton.type = 'button';
-        closeButton.className = 'project-tab-item__close';
-        closeButton.dataset.projectTabCloseId = tab.id;
-        closeButton.textContent = '×';
-        closeButton.setAttribute(
-          'aria-label',
-          localizeText(`${displayLabel} を閉じる`, `Close ${displayLabel}`)
-        );
-        item.appendChild(closeButton);
-      }
+      const closeButton = document.createElement('button');
+      closeButton.type = 'button';
+      closeButton.className = 'project-tab-item__close';
+      closeButton.dataset.projectTabCloseId = tab.id;
+      closeButton.textContent = '×';
+      closeButton.setAttribute(
+        'aria-label',
+        localizeText(`${displayLabel} を閉じる`, `Close ${displayLabel}`)
+      );
+      item.appendChild(closeButton);
 
       list.appendChild(item);
     });
@@ -9134,13 +9171,6 @@
       return false;
     }
     ensureOpenProjectTabsInitialized();
-    if (openProjectTabs.length <= 1) {
-      updateAutosaveStatus(
-        localizeText('最後のプロジェクトタブは閉じられません', 'Cannot close the last project tab'),
-        'warn'
-      );
-      return false;
-    }
     const index = findOpenProjectTabIndex(targetId);
     if (index < 0) {
       return false;
@@ -9181,7 +9211,19 @@
     if (removalIndex >= 0) {
       openProjectTabs.splice(removalIndex, 1);
     }
-    renderOpenProjectTabs();
+    if (wasActive && !fallback) {
+      activeOpenProjectTabId = '';
+      suppressOpenProjectTabAutoInitialize = true;
+      if (targetProjectId && normalizeAutosaveProjectId(autosaveProjectId || '') === targetProjectId) {
+        setActiveAutosaveProjectId(createAutosaveProjectId());
+      }
+      if (activeSharedProjectKey) {
+        clearActiveSharedProjectSession('project-tab-close');
+      }
+      setProjectHomeVisible(true, { refresh: true });
+    } else {
+      renderOpenProjectTabs();
+    }
     updateAutosaveStatus(
       localizeText('プロジェクトタブを閉じました（端末内保存は保持）', 'Closed project tab (local save kept)'),
       'info'
@@ -13785,6 +13827,7 @@
     compactRightFlyoutLockedLeft = null;
     clearCompactRightFlyoutStyles();
     ensureCompactRightFlyoutPortal(false);
+    scheduleRailLayoutRefresh();
   }
 
   function updateCompactRightFlyoutPosition() {
@@ -13865,6 +13908,7 @@
     section.style.maxHeight = `${maxHeight}px`;
     section.style.zIndex = '14000';
     section.style.overflow = 'auto';
+    scheduleRailLayoutRefresh();
   }
 
   function setCompactRightFlyoutOpen(open) {
@@ -14401,6 +14445,7 @@
     dom.toolGrid.style.removeProperty('z-index');
     dom.toolGrid.style.removeProperty('display');
     ensureMobileToolGridPortal(false);
+    scheduleRailLayoutRefresh();
   }
 
   function updateCompactToolFlyoutPosition() {
@@ -14542,6 +14587,7 @@
     dom.toolGrid.style.width = `${flyoutWidth}px`;
     dom.toolGrid.style.maxHeight = `${maxHeight}px`;
     dom.toolGrid.style.zIndex = '14000';
+    scheduleRailLayoutRefresh();
     if (isMirrorToolPopoverOpen()) {
       positionMirrorToolPopover();
     }
@@ -18672,29 +18718,42 @@
       }
     }
     const sourceColorCount = orderedColors.length;
-    let palette = sourceColorCount <= normalizedMaxColors
-      ? orderedColors.map(color => normalizeColorValue(color))
-      : quantizeRgbaColors(orderedColors, normalizedMaxColors);
+    const quantized = sourceColorCount <= normalizedMaxColors
+      ? null
+      : quantizeRgbaColorEntriesWithMapping(orderedColors, normalizedMaxColors);
+    let palette = quantized
+      ? quantized.palette
+      : orderedColors.map(color => normalizeColorValue(color));
     if (!palette.length) {
       palette = [{ r: 0, g: 0, b: 0, a: 0 }];
     }
     const dedupedPalette = [];
     const dedupedLookup = new Map();
-    palette.forEach((color) => {
+    const paletteIndexRemap = [];
+    palette.forEach((color, paletteIndex) => {
       const normalized = normalizeColorValue(color);
       const key = getPaletteColorKey(normalized);
-      if (!dedupedLookup.has(key)) {
-        dedupedLookup.set(key, dedupedPalette.length);
+      let dedupedIndex = dedupedLookup.get(key);
+      if (!Number.isInteger(dedupedIndex) || dedupedIndex < 0) {
+        dedupedIndex = dedupedPalette.length;
+        dedupedLookup.set(key, dedupedIndex);
         dedupedPalette.push(normalized);
       }
+      paletteIndexRemap[paletteIndex] = dedupedIndex;
     });
     palette = dedupedPalette.length ? dedupedPalette : [{ r: 0, g: 0, b: 0, a: 0 }];
     const colorMap = new Map();
-    orderedColors.forEach((entry) => {
+    orderedColors.forEach((entry, sourceIndex) => {
       const key = getPaletteColorKey(entry);
       const exactIndex = dedupedLookup.get(key);
       if (Number.isInteger(exactIndex) && exactIndex >= 0) {
         colorMap.set(key, exactIndex);
+        return;
+      }
+      const mappedIndex = quantized?.sourceIndexToPaletteIndex?.[sourceIndex];
+      if (Number.isInteger(mappedIndex) && mappedIndex >= 0 && mappedIndex < palette.length) {
+        const remappedIndex = paletteIndexRemap[mappedIndex];
+        colorMap.set(key, Number.isInteger(remappedIndex) && remappedIndex >= 0 ? remappedIndex : mappedIndex);
         return;
       }
       colorMap.set(key, findNearestPaletteColorIndexByRgba(entry, palette, 0));
@@ -18798,9 +18857,9 @@
     const palette = createRgbModeDefaultPalette();
     const activePaletteIndex = clamp(2, 0, Math.max(0, palette.length - 1));
     const secondaryPaletteIndex = clamp(1, 0, Math.max(0, palette.length - 1));
-    const activeRgb = state.activeRgb
-      ? { ...state.activeRgb }
-      : (palette[activePaletteIndex] ? { ...palette[activePaletteIndex] } : { r: 255, g: 255, b: 255, a: 255 });
+    const activeRgb = palette[activePaletteIndex]
+      ? { ...palette[activePaletteIndex] }
+      : { r: 255, g: 255, b: 255, a: 255 };
 
     normalizedFramesData.forEach((frameInfo, index) => {
       const layer = createLayer(localizeText('画像レイヤー', 'Image Layer'), width, height);
@@ -18811,8 +18870,10 @@
         && frameInfo.imageData.width === width
         && frameInfo.imageData.height === height) {
         direct.set(frameInfo.imageData.data);
+        layer.importSourceDirect = new Uint8ClampedArray(frameInfo.imageData.data);
       } else {
         direct.fill(0);
+        layer.importSourceDirect = new Uint8ClampedArray(direct);
       }
       frames.push({
         id: crypto.randomUUID ? crypto.randomUUID() : `frame-${Date.now().toString(36)}-${index}`,
@@ -18870,7 +18931,7 @@
       activeRightTab: state.activeRightTab ?? 'frames',
     };
 
-    applyHistorySnapshot(snapshot, { forcePalettePresetSync: true });
+    applyHistorySnapshot(snapshot, { forcePalettePresetSync: true, preservePersonalPreferences: false });
     history.past = [];
     history.future = [];
     history.pending = null;
@@ -31476,10 +31537,42 @@
       return [];
     }
     const normalizedMaxColors = clamp(Math.round(Number(maxColors) || 0), 1, MAX_IMPORTED_PALETTE_COLORS);
-    if (colors.length <= normalizedMaxColors) {
-      return colors.map(color => normalizeColorValue(color));
+    return quantizeRgbaColorEntriesWithMapping(colors, normalizedMaxColors).palette;
+  }
+
+  function normalizeRgbaQuantizeEntries(colors) {
+    return Array.isArray(colors)
+      ? colors.map((color, index) => ({
+        ...normalizeColorValue(color),
+        count: Math.max(1, Math.round(Number(color?.count) || 1)),
+        sourceIndex: Number.isInteger(color?.sourceIndex) && color.sourceIndex >= 0 ? color.sourceIndex : index,
+        sourceIndices: Array.isArray(color?.sourceIndices) && color.sourceIndices.length
+          ? color.sourceIndices.slice()
+          : [Number.isInteger(color?.sourceIndex) && color.sourceIndex >= 0 ? color.sourceIndex : index],
+      }))
+      : [];
+  }
+
+  function quantizeRgbaColorEntriesWithMapping(colors, maxColors) {
+    const normalizedMaxColors = clamp(Math.round(Number(maxColors) || 0), 1, MAX_IMPORTED_PALETTE_COLORS);
+    const entries = normalizeRgbaQuantizeEntries(colors).filter(color => color.a > 0);
+    const sourceIndexToPaletteIndex = [];
+    if (!entries.length) {
+      return { palette: [], sourceIndexToPaletteIndex };
     }
-    const boxes = [createRgbaColorBox(colors)];
+    if (entries.length <= normalizedMaxColors) {
+      const palette = entries.map(color => normalizeColorValue(color));
+      entries.forEach((entry, paletteIndex) => {
+        (entry.sourceIndices || [entry.sourceIndex]).forEach(sourceIndex => {
+          sourceIndexToPaletteIndex[sourceIndex] = paletteIndex;
+        });
+      });
+      return { palette, sourceIndexToPaletteIndex };
+    }
+    if (entries.length <= 8192) {
+      return quantizeRgbaColorEntriesWithWeightedKMeans(entries, normalizedMaxColors);
+    }
+    const boxes = [createRgbaColorBox(entries)];
     while (boxes.length < normalizedMaxColors) {
       boxes.sort((a, b) => {
         if (b.range === a.range) {
@@ -31501,7 +31594,235 @@
       }
       boxes.push(split[0], split[1]);
     }
-    return boxes.map(box => averageRgbaColorFromBox(box.colors));
+    const palette = boxes.map(box => averageRgbaColorFromBox(box.colors));
+    boxes.forEach((box, paletteIndex) => {
+      box.colors.forEach(color => {
+        (color.sourceIndices || [color.sourceIndex]).forEach(sourceIndex => {
+          sourceIndexToPaletteIndex[sourceIndex] = paletteIndex;
+        });
+      });
+    });
+    return { palette, sourceIndexToPaletteIndex };
+  }
+
+  function quantizeRgbaColorEntriesWithWeightedKMeans(colors, maxColors) {
+    const entries = normalizeRgbaQuantizeEntries(colors).filter(color => color.a > 0);
+    const targetCount = Math.min(
+      entries.length,
+      clamp(Math.round(Number(maxColors) || 0), 1, MAX_IMPORTED_PALETTE_COLORS)
+    );
+    const sourceIndexToPaletteIndex = [];
+    if (!entries.length || targetCount <= 0) {
+      return { palette: [], sourceIndexToPaletteIndex };
+    }
+    if (entries.length <= targetCount) {
+      const palette = entries.map(color => normalizeColorValue(color));
+      entries.forEach((entry, paletteIndex) => {
+        (entry.sourceIndices || [entry.sourceIndex]).forEach(sourceIndex => {
+          sourceIndexToPaletteIndex[sourceIndex] = paletteIndex;
+        });
+      });
+      return { palette, sourceIndexToPaletteIndex };
+    }
+
+    const centers = [];
+    const selected = new Set();
+    let firstIndex = 0;
+    for (let index = 1; index < entries.length; index += 1) {
+      if ((entries[index].count || 1) > (entries[firstIndex].count || 1)) {
+        firstIndex = index;
+      }
+    }
+    centers.push(normalizeColorValue(entries[firstIndex]));
+    selected.add(firstIndex);
+    const nearestDistances = new Array(entries.length).fill(Number.POSITIVE_INFINITY);
+    while (centers.length < targetCount) {
+      const lastCenter = centers[centers.length - 1];
+      let bestIndex = -1;
+      let bestScore = -1;
+      for (let index = 0; index < entries.length; index += 1) {
+        const distance = getRgbaMergeDistance(entries[index], lastCenter);
+        if (distance < nearestDistances[index]) {
+          nearestDistances[index] = distance;
+        }
+        if (selected.has(index)) {
+          continue;
+        }
+        const score = nearestDistances[index] * Math.sqrt(Math.max(1, entries[index].count || 1));
+        if (score > bestScore) {
+          bestScore = score;
+          bestIndex = index;
+        }
+      }
+      if (bestIndex < 0) {
+        break;
+      }
+      centers.push(normalizeColorValue(entries[bestIndex]));
+      selected.add(bestIndex);
+    }
+
+    const assignments = new Int16Array(entries.length).fill(-1);
+    const iterationCount = entries.length > 4096 ? 5 : 8;
+    for (let iteration = 0; iteration < iterationCount; iteration += 1) {
+      const totals = centers.map(() => ({ r: 0, g: 0, b: 0, a: 0, count: 0 }));
+      let changed = false;
+      for (let entryIndex = 0; entryIndex < entries.length; entryIndex += 1) {
+        const entry = entries[entryIndex];
+        let bestIndex = 0;
+        let bestDistance = Number.POSITIVE_INFINITY;
+        for (let centerIndex = 0; centerIndex < centers.length; centerIndex += 1) {
+          const distance = getRgbaMergeDistance(entry, centers[centerIndex]);
+          if (distance < bestDistance) {
+            bestDistance = distance;
+            bestIndex = centerIndex;
+            if (distance === 0) {
+              break;
+            }
+          }
+        }
+        if (assignments[entryIndex] !== bestIndex) {
+          assignments[entryIndex] = bestIndex;
+          changed = true;
+        }
+        const weight = Math.max(1, entry.count || 1);
+        const total = totals[bestIndex];
+        total.r += entry.r * weight;
+        total.g += entry.g * weight;
+        total.b += entry.b * weight;
+        total.a += entry.a * weight;
+        total.count += weight;
+      }
+      totals.forEach((total, centerIndex) => {
+        if (total.count > 0) {
+          centers[centerIndex] = normalizeColorValue({
+            r: Math.round(total.r / total.count),
+            g: Math.round(total.g / total.count),
+            b: Math.round(total.b / total.count),
+            a: Math.round(total.a / total.count),
+          });
+        }
+      });
+      if (!changed && iteration > 0) {
+        break;
+      }
+    }
+
+    const usedCenterIndices = new Set();
+    for (let entryIndex = 0; entryIndex < entries.length; entryIndex += 1) {
+      const entry = entries[entryIndex];
+      let bestIndex = 0;
+      let bestDistance = Number.POSITIVE_INFINITY;
+      for (let centerIndex = 0; centerIndex < centers.length; centerIndex += 1) {
+        const distance = getRgbaMergeDistance(entry, centers[centerIndex]);
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          bestIndex = centerIndex;
+          if (distance === 0) {
+            break;
+          }
+        }
+      }
+      assignments[entryIndex] = bestIndex;
+      usedCenterIndices.add(bestIndex);
+    }
+
+    const centerIndexRemap = new Map();
+    const palette = [];
+    centers.forEach((center, centerIndex) => {
+      if (!usedCenterIndices.has(centerIndex)) {
+        return;
+      }
+      centerIndexRemap.set(centerIndex, palette.length);
+      palette.push(normalizeColorValue(center));
+    });
+    for (let entryIndex = 0; entryIndex < entries.length; entryIndex += 1) {
+      const entry = entries[entryIndex];
+      const remappedIndex = centerIndexRemap.get(assignments[entryIndex]);
+      if (!Number.isInteger(remappedIndex) || remappedIndex < 0) {
+        continue;
+      }
+      (entry.sourceIndices || [entry.sourceIndex]).forEach(sourceIndex => {
+        sourceIndexToPaletteIndex[sourceIndex] = remappedIndex;
+      });
+    }
+    return { palette, sourceIndexToPaletteIndex };
+  }
+
+  function getRgbaMergeDistance(leftColor, rightColor) {
+    const left = normalizeColorValue(leftColor);
+    const right = normalizeColorValue(rightColor);
+    const dr = left.r - right.r;
+    const dg = left.g - right.g;
+    const db = left.b - right.b;
+    const da = left.a - right.a;
+    return (dr * dr * 3) + (dg * dg * 4) + (db * db * 2) + (da * da * 8);
+  }
+
+  function mergeWeightedRgbaColors(leftColor, rightColor) {
+    const left = normalizeColorValue(leftColor);
+    const right = normalizeColorValue(rightColor);
+    const leftWeight = Math.max(1, Math.round(Number(leftColor?.count) || 1));
+    const rightWeight = Math.max(1, Math.round(Number(rightColor?.count) || 1));
+    const total = leftWeight + rightWeight;
+    return {
+      r: Math.round(((left.r * leftWeight) + (right.r * rightWeight)) / total),
+      g: Math.round(((left.g * leftWeight) + (right.g * rightWeight)) / total),
+      b: Math.round(((left.b * leftWeight) + (right.b * rightWeight)) / total),
+      a: Math.round(((left.a * leftWeight) + (right.a * rightWeight)) / total),
+      count: total,
+    };
+  }
+
+  function reduceRgbaColorsByClosestPairs(colors, maxColors) {
+    return reduceRgbaColorEntriesByClosestPairsWithMapping(colors, maxColors).palette;
+  }
+
+  function reduceRgbaColorEntriesByClosestPairsWithMapping(colors, maxColors) {
+    const targetCount = clamp(Math.round(Number(maxColors) || 0), 1, MAX_IMPORTED_PALETTE_COLORS);
+    const reduced = normalizeRgbaQuantizeEntries(colors).filter(color => color.a > 0);
+    while (reduced.length > targetCount) {
+      let bestLeft = -1;
+      let bestRight = -1;
+      let bestDistance = Number.POSITIVE_INFINITY;
+      for (let left = 0; left < reduced.length - 1; left += 1) {
+        for (let right = left + 1; right < reduced.length; right += 1) {
+          const distance = getRgbaMergeDistance(reduced[left], reduced[right]);
+          if (distance < bestDistance) {
+            bestDistance = distance;
+            bestLeft = left;
+            bestRight = right;
+            if (distance === 0) {
+              break;
+            }
+          }
+        }
+        if (bestDistance === 0) {
+          break;
+        }
+      }
+      if (bestLeft < 0 || bestRight < 0) {
+        break;
+      }
+      const merged = mergeWeightedRgbaColors(reduced[bestLeft], reduced[bestRight]);
+      reduced[bestLeft] = {
+        ...merged,
+        sourceIndices: [
+          ...(Array.isArray(reduced[bestLeft].sourceIndices) ? reduced[bestLeft].sourceIndices : [reduced[bestLeft].sourceIndex]),
+          ...(Array.isArray(reduced[bestRight].sourceIndices) ? reduced[bestRight].sourceIndices : [reduced[bestRight].sourceIndex]),
+        ],
+      };
+      reduced.splice(bestRight, 1);
+    }
+    const sourceIndexToPaletteIndex = [];
+    reduced.forEach((entry, paletteIndex) => {
+      (entry.sourceIndices || [entry.sourceIndex]).forEach(sourceIndex => {
+        sourceIndexToPaletteIndex[sourceIndex] = paletteIndex;
+      });
+    });
+    return {
+      palette: reduced.map(color => normalizeColorValue(color)),
+      sourceIndexToPaletteIndex,
+    };
   }
 
   function createRgbaColorBox(colors) {
@@ -34575,6 +34896,61 @@
     };
   }
 
+  function getVisibleElementRect(element) {
+    if (!(element instanceof HTMLElement) || !element.isConnected) {
+      return null;
+    }
+    const rect = element.getBoundingClientRect();
+    if (!Number.isFinite(rect.width) || !Number.isFinite(rect.height) || rect.width <= 0 || rect.height <= 0) {
+      return null;
+    }
+    return rect;
+  }
+
+  function getFloatingRailReserveLimit() {
+    const viewportWidth = Math.max(0, Math.round(Number(window.innerWidth) || 0));
+    return Math.max(0, Math.floor(viewportWidth * 0.5));
+  }
+
+  function getLeftFloatingRailReserveWidth(leftWidth) {
+    if (layoutMode === 'mobilePortrait' || !isCompactToolFlyoutOpen()) {
+      return 0;
+    }
+    const railRect = getVisibleElementRect(dom.leftRail);
+    const railRight = railRect
+      ? Math.round(railRect.right)
+      : Math.max(0, Math.round(Number(leftWidth) || 0));
+    const flyoutRect = getVisibleElementRect(dom.toolGrid);
+    if (!flyoutRect || flyoutRect.right <= railRight) {
+      return 0;
+    }
+    return clamp(Math.ceil(flyoutRect.right - railRight), 0, getFloatingRailReserveLimit());
+  }
+
+  function getActiveCompactRightFlyoutElement() {
+    if (compactRightFlyoutPortal.section instanceof HTMLElement) {
+      return compactRightFlyoutPortal.section;
+    }
+    const section = dom.sections[state.activeRightTab];
+    return section instanceof HTMLElement && section.classList.contains('is-compact-flyout') ? section : null;
+  }
+
+  function getRightFloatingRailReserveWidth(rightWidth) {
+    if (layoutMode === 'mobilePortrait' || !isCompactRightFlyoutOpen()) {
+      return 0;
+    }
+    const railRect = getVisibleElementRect(dom.rightRail);
+    const viewportWidth = Math.max(0, Math.round(Number(window.innerWidth) || 0));
+    const railLeft = railRect
+      ? Math.round(railRect.left)
+      : Math.max(0, viewportWidth - Math.max(0, Math.round(Number(rightWidth) || 0)));
+    const flyoutRect = getVisibleElementRect(getActiveCompactRightFlyoutElement());
+    if (!flyoutRect || flyoutRect.left >= railLeft) {
+      return 0;
+    }
+    return clamp(Math.ceil(railLeft - flyoutRect.left), 0, getFloatingRailReserveLimit());
+  }
+
   function updateMobileViewportHeightVar() {
     const root = document.documentElement;
     if (!(root instanceof HTMLElement)) {
@@ -35052,19 +35428,15 @@
     const isMobile = layoutMode === 'mobilePortrait';
     const leftWidth = isMobile ? 0 : normalizeRailWidth('left', railSizing.left);
     const rightWidth = isMobile ? 0 : normalizeRailWidth('right', railSizing.right);
-    const leftCompactVisible = !isMobile
-      && dom.leftRail instanceof HTMLElement
-      && dom.leftRail.dataset.compact === 'true'
-      && dom.leftRail.dataset.collapsed !== 'true';
-    const rightCompactVisible = !isMobile
-      && dom.rightRail instanceof HTMLElement
-      && dom.rightRail.dataset.compact === 'true'
-      && dom.rightRail.dataset.collapsed !== 'true';
+    const leftFlyoutReserve = isMobile ? 0 : getLeftFloatingRailReserveWidth(leftWidth);
+    const rightFlyoutReserve = isMobile ? 0 : getRightFloatingRailReserveWidth(rightWidth);
     const toggleMargin = 12;
     layoutNode.style.setProperty('--left-toggle-offset', `${leftWidth ? leftWidth + toggleMargin : toggleMargin}px`);
     layoutNode.style.setProperty('--right-toggle-offset', `${rightWidth ? rightWidth + toggleMargin : toggleMargin}px`);
-    layoutNode.style.setProperty('--project-tabs-inset-left', `${leftCompactVisible ? leftWidth : 0}px`);
-    layoutNode.style.setProperty('--project-tabs-inset-right', `${rightCompactVisible ? rightWidth : 0}px`);
+    layoutNode.style.setProperty('--left-flyout-reserve', `${leftFlyoutReserve}px`);
+    layoutNode.style.setProperty('--right-flyout-reserve', `${rightFlyoutReserve}px`);
+    layoutNode.style.setProperty('--project-tabs-inset-left', '0px');
+    layoutNode.style.setProperty('--project-tabs-inset-right', '0px');
   }
 
   function isCoarsePointerDevice() {
@@ -37902,6 +38274,11 @@
 
   function syncPaletteReindexControlState() {
     const allowPaletteReindex = isIndexColorMode() && canCurrentClientReindexPalette();
+    const canAddPaletteColor = canCurrentClientEditPaletteColors()
+      && (!isIndexColorMode() || state.palette.length < MAX_IMPORTED_PALETTE_COLORS);
+    if (dom.controls.addPaletteColor instanceof HTMLButtonElement) {
+      dom.controls.addPaletteColor.disabled = !canAddPaletteColor;
+    }
     if (dom.controls.removePaletteColor instanceof HTMLButtonElement) {
       const canRemove = state.palette.length > 1;
       dom.controls.removePaletteColor.disabled = !allowPaletteReindex || !canRemove;
@@ -38089,8 +38466,277 @@
         touchedLayers += 1;
       }
       layer.direct = null;
+      layer.importSourceDirect = null;
     });
     return { convertedPixels, addedCount, touchedLayers, paletteLookup };
+  }
+
+  function convertCurrentDocumentRgbPixelsToIndexedPalette() {
+    const layerEntries = [];
+    forEachProjectCanvasLayer(({ layer }) => {
+      if (!(layer?.indices instanceof Int16Array)) {
+        return;
+      }
+      const colorData = buildLayerColorDataPreferDirect(layer, state.palette);
+      if (colorData instanceof Uint8ClampedArray) {
+        layerEntries.push({ layer, colorData });
+      }
+    });
+    if (!layerEntries.length) {
+      state.palette = [
+        { r: 0, g: 0, b: 0, a: 0 },
+        { r: 0, g: 0, b: 0, a: 255 },
+      ];
+      state.activePaletteIndex = 1;
+      state.secondaryPaletteIndex = 0;
+      state.activeRgb = normalizeColorValue(state.palette[1]);
+      return { convertedPixels: 0, addedCount: 0, touchedLayers: 0, reduced: false, sourceColorCount: 0, paletteSize: state.palette.length };
+    }
+    const previousActiveColor = normalizeColorValue(state.activeRgb || state.palette?.[state.activePaletteIndex] || { r: 0, g: 0, b: 0, a: 255 });
+    const previousSecondaryColor = normalizeColorValue(state.palette?.[state.secondaryPaletteIndex] || { r: 0, g: 0, b: 0, a: 0 });
+    const maxOpaqueColors = MAX_IMPORTED_PALETTE_COLORS - 1;
+    const extraction = buildIndexedPaletteFromFrameDataList(
+      layerEntries.map(entry => entry.colorData),
+      maxOpaqueColors
+    );
+    const opaquePalette = Array.isArray(extraction.palette)
+      ? extraction.palette.map(color => normalizeColorValue(color)).filter(color => color.a > 0).slice(0, maxOpaqueColors)
+      : [];
+    state.palette = [
+      { r: 0, g: 0, b: 0, a: 0 },
+      ...(opaquePalette.length ? opaquePalette : [{ r: 0, g: 0, b: 0, a: 255 }]),
+    ];
+    let convertedPixels = 0;
+    let touchedLayers = 0;
+    const usedPaletteIndices = new Set();
+    layerEntries.forEach((entry, entryIndex) => {
+      const layer = entry.layer;
+      const extractedIndices = Array.isArray(extraction.frameIndices)
+        ? extraction.frameIndices[entryIndex]
+        : null;
+      if (!(extractedIndices instanceof Int16Array) || extractedIndices.length !== layer.indices.length) {
+        return;
+      }
+      const nextIndices = new Int16Array(layer.indices.length).fill(-1);
+      let touchedLayer = false;
+      for (let i = 0; i < nextIndices.length; i += 1) {
+        const sourceIndex = extractedIndices[i];
+        if (sourceIndex < 0) {
+          continue;
+        }
+        const nextIndex = clamp(sourceIndex + 1, 1, Math.max(1, state.palette.length - 1));
+        nextIndices[i] = nextIndex;
+        usedPaletteIndices.add(nextIndex);
+        convertedPixels += 1;
+        touchedLayer = true;
+      }
+      layer.indices = nextIndices;
+      layer.direct = null;
+      layer.importSourceDirect = null;
+      layer.directOnly = false;
+      if (touchedLayer) {
+        touchedLayers += 1;
+      }
+    });
+    const sourceColorCount = Math.max(0, Math.round(Number(extraction.sourceColorCount) || 0));
+    padIndexedPaletteToMaxColors(state.palette, MAX_IMPORTED_PALETTE_COLORS);
+    state.activePaletteIndex = findNearestPaletteColorIndexByRgba(previousActiveColor, state.palette, Math.min(1, state.palette.length - 1));
+    state.secondaryPaletteIndex = findNearestPaletteColorIndexByRgba(previousSecondaryColor, state.palette, 0);
+    state.activeRgb = normalizeColorValue(state.palette[state.activePaletteIndex] || previousActiveColor);
+    return {
+      convertedPixels,
+      addedCount: sourceColorCount,
+      touchedLayers,
+      reduced: Boolean(extraction.reduced) || sourceColorCount > maxOpaqueColors,
+      sourceColorCount,
+      usedColorCount: usedPaletteIndices.size,
+      opaquePaletteSize: Math.max(0, state.palette.length - 1),
+      paletteSize: state.palette.length,
+    };
+  }
+
+  function reduceIndexedPaletteByClosestClusters(palette, counts, maxColors = MAX_IMPORTED_PALETTE_COLORS) {
+    const normalizedMaxColors = clamp(
+      Math.round(Number(maxColors) || MAX_IMPORTED_PALETTE_COLORS),
+      2,
+      MAX_IMPORTED_PALETTE_COLORS
+    );
+    const maxOpaqueColors = normalizedMaxColors - 1;
+    const sourcePalette = Array.isArray(palette) ? palette.map(color => normalizeColorValue(color)) : [];
+    if (sourcePalette.length <= normalizedMaxColors) {
+      return {
+        palette: sourcePalette,
+        mapping: sourcePalette.map((_, index) => index),
+      };
+    }
+    let clusters = [];
+    for (let index = 1; index < sourcePalette.length; index += 1) {
+      const color = normalizeColorValue(sourcePalette[index]);
+      if (color.a <= 0) {
+        continue;
+      }
+      clusters.push({
+        ...color,
+        count: Math.max(1, Math.round(Number(counts?.[index]) || 1)),
+        sourceIndices: [index],
+      });
+    }
+    if (clusters.length > 2048) {
+      const quantized = quantizeRgbaColorEntriesWithMapping(
+        clusters.map(cluster => ({
+          ...cluster,
+          sourceIndex: Array.isArray(cluster.sourceIndices) ? cluster.sourceIndices[0] : -1,
+          sourceIndices: Array.isArray(cluster.sourceIndices) ? cluster.sourceIndices.slice() : [],
+        })),
+        maxOpaqueColors
+      );
+      const reducedPalette = [
+        normalizeColorValue({ ...(sourcePalette[0] || { r: 0, g: 0, b: 0, a: 0 }), a: 0 }),
+        ...quantized.palette.slice(0, maxOpaqueColors),
+      ];
+      const mapping = new Array(sourcePalette.length).fill(-1);
+      mapping[0] = 0;
+      quantized.sourceIndexToPaletteIndex.forEach((paletteIndex, sourceIndex) => {
+        if (Number.isInteger(sourceIndex) && sourceIndex > 0 && Number.isInteger(paletteIndex) && paletteIndex >= 0) {
+          mapping[sourceIndex] = paletteIndex + 1;
+        }
+      });
+      for (let index = 1; index < mapping.length; index += 1) {
+        if (!Number.isInteger(mapping[index]) || mapping[index] < 0) {
+          mapping[index] = findNearestPaletteColorIndexByRgba(sourcePalette[index], reducedPalette, 1);
+        }
+      }
+      return { palette: reducedPalette, mapping };
+    }
+    while (clusters.length > maxOpaqueColors) {
+      let bestLeft = -1;
+      let bestRight = -1;
+      let bestDistance = Number.POSITIVE_INFINITY;
+      for (let left = 0; left < clusters.length - 1; left += 1) {
+        for (let right = left + 1; right < clusters.length; right += 1) {
+          const distance = getRgbaMergeDistance(clusters[left], clusters[right]);
+          if (distance < bestDistance) {
+            bestDistance = distance;
+            bestLeft = left;
+            bestRight = right;
+            if (distance === 0) {
+              break;
+            }
+          }
+        }
+        if (bestDistance === 0) {
+          break;
+        }
+      }
+      if (bestLeft < 0 || bestRight < 0) {
+        break;
+      }
+      const merged = mergeWeightedRgbaColors(clusters[bestLeft], clusters[bestRight]);
+      clusters[bestLeft] = {
+        ...merged,
+        sourceIndices: [
+          ...(Array.isArray(clusters[bestLeft].sourceIndices) ? clusters[bestLeft].sourceIndices : []),
+          ...(Array.isArray(clusters[bestRight].sourceIndices) ? clusters[bestRight].sourceIndices : []),
+        ],
+      };
+      clusters.splice(bestRight, 1);
+    }
+    const nextPalette = [
+      normalizeColorValue({ ...(sourcePalette[0] || { r: 0, g: 0, b: 0, a: 0 }), a: 0 }),
+      ...clusters.map(color => normalizeColorValue(color)).slice(0, maxOpaqueColors),
+    ];
+    const mapping = new Array(sourcePalette.length).fill(-1);
+    mapping[0] = 0;
+    clusters.forEach((cluster, clusterIndex) => {
+      const nextIndex = clusterIndex + 1;
+      (cluster.sourceIndices || []).forEach((sourceIndex) => {
+        mapping[sourceIndex] = nextIndex;
+      });
+    });
+    return { palette: nextPalette, mapping };
+  }
+
+  function buildLayerColorDataPreferDirect(layer, palette) {
+    if (!(layer?.indices instanceof Int16Array)) {
+      return null;
+    }
+    const pixelCount = layer.indices.length;
+    const data = new Uint8ClampedArray(pixelCount * 4);
+    const sourceDirect = layer.importSourceDirect instanceof Uint8ClampedArray && layer.importSourceDirect.length === pixelCount * 4
+      ? layer.importSourceDirect
+      : null;
+    const direct = sourceDirect || (layer.direct instanceof Uint8ClampedArray && layer.direct.length === pixelCount * 4
+      ? layer.direct
+      : null);
+    for (let i = 0; i < pixelCount; i += 1) {
+      const base = i * 4;
+      if (direct) {
+        data[base] = direct[base];
+        data[base + 1] = direct[base + 1];
+        data[base + 2] = direct[base + 2];
+        data[base + 3] = direct[base + 3];
+        continue;
+      }
+      const paletteIndex = layer.indices[i];
+      if (paletteIndex >= 0 && Array.isArray(palette) && palette[paletteIndex]) {
+        const color = normalizeColorValue(palette[paletteIndex]);
+        data[base] = color.r;
+        data[base + 1] = color.g;
+        data[base + 2] = color.b;
+        data[base + 3] = color.a;
+      }
+    }
+    return data;
+  }
+
+  function padIndexedPaletteToMaxColors(palette, maxColors = MAX_IMPORTED_PALETTE_COLORS) {
+    if (!Array.isArray(palette)) {
+      return palette;
+    }
+    const targetLength = clamp(
+      Math.round(Number(maxColors) || MAX_IMPORTED_PALETTE_COLORS),
+      2,
+      MAX_IMPORTED_PALETTE_COLORS
+    );
+    if (!palette.length || normalizeColorValue(palette[0]).a > 0) {
+      palette.unshift({ r: 0, g: 0, b: 0, a: 0 });
+    } else {
+      palette[0] = normalizeColorValue({ ...palette[0], a: 0 });
+    }
+    const usedKeys = new Set(palette.map(color => getPaletteColorKey(color)));
+    let seed = 0;
+    while (palette.length < targetLength && seed < targetLength * 16) {
+      const hue = (seed * 137.508) % 360;
+      const sat = 62 + ((seed % 5) * 7);
+      const light = 18 + ((seed * 11) % 68);
+      const candidate = normalizeColorValue(hslToRgbColor(hue, sat, light));
+      candidate.a = 255;
+      const key = getPaletteColorKey(candidate);
+      if (!usedKeys.has(key)) {
+        usedKeys.add(key);
+        palette.push(candidate);
+      }
+      seed += 1;
+    }
+    while (palette.length < targetLength) {
+      const fallback = normalizeColorValue({
+        r: (palette.length * 47) % 256,
+        g: (palette.length * 89) % 256,
+        b: (palette.length * 131) % 256,
+        a: 255,
+      });
+      const key = getPaletteColorKey(fallback);
+      if (!usedKeys.has(key)) {
+        usedKeys.add(key);
+        palette.push(fallback);
+      } else {
+        palette.push({ r: palette.length % 256, g: (palette.length * 3) % 256, b: (palette.length * 7) % 256, a: 255 });
+      }
+    }
+    if (palette.length > targetLength) {
+      palette.length = targetLength;
+    }
+    return palette;
   }
 
   function remapDocumentIndexedPixelsToDirect() {
@@ -38385,23 +39031,21 @@
     let remapToRgbResult = null;
     let activeColorMapResult = null;
     let paletteDedupeResult = null;
+    let paletteLimitResult = null;
     let remapMutated = false;
     if (shouldRemapToIndex) {
       beginHistory('colorModeConvert');
-      remapResult = remapDocumentDirectPixelsToCurrentPalette();
-      activeColorMapResult = mapActiveRgbToIndexedPalette(remapResult.paletteLookup);
-      paletteDedupeResult = dedupeIndexedPaletteColors();
+      remapResult = convertCurrentDocumentRgbPixelsToIndexedPalette();
+      activeColorMapResult = { addedCount: 0, activePaletteIndex: state.activePaletteIndex };
+      paletteDedupeResult = { removedCount: 0 };
+      paletteLimitResult = { reduced: Boolean(remapResult?.reduced), paletteSize: remapResult?.paletteSize || state.palette.length };
       remapMutated = (
         (remapResult?.convertedPixels || 0) > 0
-        || (remapResult?.addedCount || 0) > 0
-        || (activeColorMapResult?.addedCount || 0) > 0
-        || (paletteDedupeResult?.removedCount || 0) > 0
+        || Boolean(paletteLimitResult?.reduced)
       );
       if (
         remapResult.convertedPixels > 0
-        || remapResult.addedCount > 0
-        || activeColorMapResult.addedCount > 0
-        || (paletteDedupeResult?.removedCount || 0) > 0
+        || Boolean(paletteLimitResult?.reduced)
       ) {
         applyPaletteChange();
       }
@@ -38438,15 +39082,22 @@
         if (shouldRemapToIndex) {
           const paletteAddedCount = (remapResult?.addedCount || 0) + (activeColorMapResult?.addedCount || 0);
           const paletteRemovedCount = paletteDedupeResult?.removedCount || 0;
-          if (paletteAddedCount > 0 || paletteRemovedCount > 0) {
-            const messageJa = paletteAddedCount > 0 && paletteRemovedCount > 0
-              ? `RGB色 ${paletteAddedCount} 色を追加し、重複色 ${paletteRemovedCount} 色を統合してインデックス化しました`
-              : paletteAddedCount > 0
+          const paletteLimited = Boolean(paletteLimitResult?.reduced);
+          if (paletteAddedCount > 0 || paletteRemovedCount > 0 || paletteLimited) {
+            const usedColorCount = Math.max(0, Math.round(Number(remapResult?.usedColorCount) || 0));
+            const sourceColorCount = Math.max(0, Math.round(Number(remapResult?.sourceColorCount) || paletteAddedCount || 0));
+            const messageJa = paletteLimited
+              ? `元RGB ${sourceColorCount} 色を透明1色 + 不透明 ${usedColorCount} 色に減色してインデックス化しました`
+              : paletteAddedCount > 0 && paletteRemovedCount > 0
+                ? `RGB色 ${paletteAddedCount} 色を追加し、重複色 ${paletteRemovedCount} 色を統合してインデックス化しました`
+                : paletteAddedCount > 0
                 ? `RGB色 ${paletteAddedCount} 色をパレットに追加してインデックス化しました`
                 : `重複色 ${paletteRemovedCount} 色を統合してインデックス化しました`;
-            const messageEn = paletteAddedCount > 0 && paletteRemovedCount > 0
-              ? `Added ${paletteAddedCount} RGB color${paletteAddedCount === 1 ? '' : 's'} and merged ${paletteRemovedCount} duplicate palette color${paletteRemovedCount === 1 ? '' : 's'} while converting to indexed mode`
-              : paletteAddedCount > 0
+            const messageEn = paletteLimited
+              ? `Reduced ${sourceColorCount} source RGB color${sourceColorCount === 1 ? '' : 's'} to 1 transparent + ${usedColorCount} used opaque indexed color${usedColorCount === 1 ? '' : 's'}`
+              : paletteAddedCount > 0 && paletteRemovedCount > 0
+                ? `Added ${paletteAddedCount} RGB color${paletteAddedCount === 1 ? '' : 's'} and merged ${paletteRemovedCount} duplicate palette color${paletteRemovedCount === 1 ? '' : 's'} while converting to indexed mode`
+                : paletteAddedCount > 0
                 ? `Added ${paletteAddedCount} RGB color${paletteAddedCount === 1 ? '' : 's'} to the palette while converting to indexed mode`
                 : `Merged ${paletteRemovedCount} duplicate palette color${paletteRemovedCount === 1 ? '' : 's'} while converting to indexed mode`;
             updateAutosaveStatus(
@@ -39149,6 +39800,17 @@
     if (!canCurrentClientEditPaletteColors()) {
       return;
     }
+    if (isIndexColorMode() && state.palette.length >= MAX_IMPORTED_PALETTE_COLORS) {
+      updateAutosaveStatus(
+        localizeText(
+          'インデックスカラーは透明を含めて256色までです',
+          'Indexed color supports up to 256 colors including transparency'
+        ),
+        'warn'
+      );
+      syncPaletteReindexControlState();
+      return;
+    }
     beginHistory('paletteAdd');
     const nextIndex = state.palette.length;
     const nextColor = isRgbColorMode()
@@ -39192,17 +39854,19 @@
   }
 
   function setActivePaletteIndex(index) {
+    const previousActivePaletteIndex = state.activePaletteIndex;
     state.activePaletteIndex = normalizePaletteIndex(index, state.activePaletteIndex);
     syncPaletteInputs();
-    renderPalette();
+    updatePaletteSelectionState(previousActivePaletteIndex, state.secondaryPaletteIndex);
     focusUnifiedLeftContext('color', { persist: false });
     scheduleSessionPersist();
   }
 
   function setSecondaryPaletteIndex(index, { render = true, persist = true } = {}) {
+    const previousSecondaryPaletteIndex = state.secondaryPaletteIndex;
     state.secondaryPaletteIndex = normalizePaletteIndex(index, state.activePaletteIndex);
     if (render) {
-      renderPalette();
+      updatePaletteSelectionState(state.activePaletteIndex, previousSecondaryPaletteIndex);
     }
     if (persist) {
       scheduleSessionPersist();
@@ -39249,8 +39913,10 @@
       applyPixelFrameBackground(button, color);
       button.addEventListener('click', () => {
         if (rgbMode) {
+          const previousActiveIndex = state.activePaletteIndex;
           state.activePaletteIndex = normalizePaletteIndex(index, state.activePaletteIndex);
-          setActiveRgbColor(normalizedColor, { syncInputs: true, render: true, persist: true });
+          setActiveRgbColor(normalizedColor, { syncInputs: true, render: false, persist: true });
+          updatePaletteSelectionState(previousActiveIndex, state.secondaryPaletteIndex);
           return;
         }
         setActivePaletteIndex(index);
@@ -39315,13 +39981,16 @@
         : index === state.activePaletteIndex;
       const isSecondary = index === state.secondaryPaletteIndex;
       button.title = `${index}: ${rgbaToHex(color)}`;
+      button.setAttribute('aria-selected', String(isActive));
       button.classList.toggle('is-active', isActive);
       button.classList.toggle('is-secondary', isSecondary);
       applyPixelFrameBackground(button, color);
       button.addEventListener('click', () => {
         if (rgbMode) {
+          const previousActiveIndex = state.activePaletteIndex;
           state.activePaletteIndex = normalizePaletteIndex(index, state.activePaletteIndex);
-          setActiveRgbColor(normalizedColor, { syncInputs: true, render: true, persist: true });
+          setActiveRgbColor(normalizedColor, { syncInputs: true, render: false, persist: true });
+          updatePaletteSelectionState(previousActiveIndex, state.secondaryPaletteIndex);
           return;
         }
         setActivePaletteIndex(index);
@@ -39338,7 +40007,8 @@
     addButton.textContent = '+';
     addButton.title = localizeText('色を追加', 'Add color');
     addButton.setAttribute('aria-label', localizeText('色を追加', 'Add color'));
-    addButton.disabled = !canCurrentClientEditPaletteColors();
+    addButton.disabled = !canCurrentClientEditPaletteColors()
+      || (isIndexColorMode() && state.palette.length >= MAX_IMPORTED_PALETTE_COLORS);
     addButton.addEventListener('click', () => {
       addPaletteColorFromCurrentEditor();
     });
@@ -39347,6 +40017,44 @@
     updateColorTabSwatch();
     updateFloatingDrawButtonPalettePreview();
     syncPaletteReindexControlState();
+  }
+
+  function updatePaletteSelectionState(previousActiveIndex = state.activePaletteIndex, previousSecondaryIndex = state.secondaryPaletteIndex) {
+    const activePaletteIndex = normalizePaletteIndex(state.activePaletteIndex, state.activePaletteIndex);
+    const secondaryPaletteIndex = normalizePaletteIndex(state.secondaryPaletteIndex, activePaletteIndex);
+    const indexes = new Set([
+      previousActiveIndex,
+      previousSecondaryIndex,
+      activePaletteIndex,
+      secondaryPaletteIndex,
+    ].map(value => Number.isFinite(value) ? Math.round(value) : -1));
+    const rgbMode = isRgbColorMode();
+    const updateContainer = (container) => {
+      if (!(container instanceof HTMLElement)) {
+        return;
+      }
+      indexes.forEach(index => {
+        if (index < 0) {
+          return;
+        }
+        const button = container.querySelector(`button[data-index="${index}"]`);
+        if (!(button instanceof HTMLElement)) {
+          return;
+        }
+        const isActive = rgbMode
+          ? index === activePaletteIndex
+          : index === state.activePaletteIndex;
+        const isSecondary = index === secondaryPaletteIndex;
+        button.classList.toggle('is-active', isActive);
+        button.classList.toggle('is-secondary', isSecondary);
+        button.setAttribute('aria-selected', String(isActive));
+      });
+    };
+    updateContainer(dom.controls.paletteList);
+    updateContainer(dom.controls.toolQuickPalette);
+    syncPaletteReindexControlState();
+    updateColorTabSwatch();
+    updateFloatingDrawButtonPalettePreview();
   }
 
   function removePaletteColor(index) {
@@ -53871,12 +54579,19 @@
     if (!snapshot || typeof snapshot !== 'object') {
       return { reduced: false, sourceColorCount: 0, paletteSize: 0 };
     }
+    const normalizedMaxColors = clamp(
+      Math.round(Number(maxColors) || MAX_IMPORTED_PALETTE_COLORS),
+      2,
+      MAX_IMPORTED_PALETTE_COLORS
+    );
     const palette = Array.isArray(snapshot.palette)
       ? snapshot.palette.map(color => normalizeColorValue(color))
       : [];
-    if (palette.length <= maxColors) {
+    if (palette.length <= normalizedMaxColors) {
       return { reduced: false, sourceColorCount: palette.length, paletteSize: palette.length };
     }
+    const transparentColor = palette.find(color => normalizeColorValue(color).a <= 0) || { r: 0, g: 0, b: 0, a: 0 };
+    const maxOpaqueColors = normalizedMaxColors - 1;
     const layerEntries = [];
     forEachSnapshotCanvasLayer(snapshot, ({ layer }) => {
       if (!(layer?.indices instanceof Int16Array)) {
@@ -53888,7 +54603,16 @@
       }
     });
     if (!layerEntries.length) {
-      snapshot.palette = palette.slice(0, maxColors).map(color => normalizeColorValue(color));
+      const opaqueColors = palette
+        .map((color, index) => ({ ...normalizeColorValue(color), count: 1, sourceIndex: index }))
+        .filter(color => color.a > 0);
+      const reducedOpaqueColors = opaqueColors.length > maxOpaqueColors
+        ? quantizeRgbaColors(opaqueColors, maxOpaqueColors)
+        : opaqueColors.map(color => normalizeColorValue(color));
+      snapshot.palette = [
+        normalizeColorValue({ ...transparentColor, a: 0 }),
+        ...reducedOpaqueColors.slice(0, maxOpaqueColors).map(color => normalizeColorValue({ ...color, a: color.a <= 0 ? 255 : color.a })),
+      ];
       return {
         reduced: palette.length > snapshot.palette.length,
         sourceColorCount: palette.length,
@@ -53897,11 +54621,18 @@
     }
     const extraction = buildIndexedPaletteFromFrameDataList(
       layerEntries.map(entry => entry.colorData),
-      maxColors
+      maxOpaqueColors
     );
-    const nextPalette = Array.isArray(extraction.palette) && extraction.palette.length
-      ? extraction.palette.map(color => normalizeColorValue(color))
-      : [{ r: 0, g: 0, b: 0, a: 0 }];
+    const extractedOpaquePalette = Array.isArray(extraction.palette) && extraction.palette.length
+      ? extraction.palette.map(color => normalizeColorValue(color)).filter(color => color.a > 0)
+      : [];
+    const nextPalette = [
+      normalizeColorValue({ ...transparentColor, a: 0 }),
+      ...extractedOpaquePalette.slice(0, maxOpaqueColors),
+    ];
+    if (nextPalette.length < 2) {
+      nextPalette.push({ r: 0, g: 0, b: 0, a: 255 });
+    }
     const colorMode = normalizeColorMode(snapshot.colorMode, COLOR_MODE_INDEX);
     let layerEntryIndex = 0;
     forEachSnapshotCanvasLayer(snapshot, ({ layer }) => {
@@ -53916,21 +54647,31 @@
         return;
       }
       if (colorMode === COLOR_MODE_INDEX) {
-        layer.indices = new Int16Array(extractedIndices);
+        const remapped = new Int16Array(extractedIndices.length).fill(-1);
+        for (let i = 0; i < extractedIndices.length; i += 1) {
+          remapped[i] = extractedIndices[i] >= 0 ? extractedIndices[i] + 1 : -1;
+        }
+        layer.indices = remapped;
         layer.direct = null;
+        layer.directOnly = false;
         return;
       }
       const direct = layer.direct instanceof Uint8ClampedArray && layer.direct.length === layer.indices.length * 4
         ? layer.direct
         : null;
       if (!direct) {
-        layer.indices = new Int16Array(extractedIndices);
+        const remapped = new Int16Array(extractedIndices.length).fill(-1);
+        for (let i = 0; i < extractedIndices.length; i += 1) {
+          remapped[i] = extractedIndices[i] >= 0 ? extractedIndices[i] + 1 : -1;
+        }
+        layer.indices = remapped;
         layer.direct = null;
+        layer.directOnly = false;
         return;
       }
       const remappedIndices = new Int16Array(layer.indices);
       for (let i = 0; i < remappedIndices.length; i += 1) {
-        remappedIndices[i] = layer.indices[i] >= 0 ? extractedIndices[i] : -1;
+        remappedIndices[i] = layer.indices[i] >= 0 && extractedIndices[i] >= 0 ? extractedIndices[i] + 1 : -1;
       }
       layer.indices = remappedIndices;
     });
@@ -53957,6 +54698,34 @@
       sourceColorCount: extraction.sourceColorCount || palette.length,
       paletteSize: nextPalette.length,
     };
+  }
+
+  function limitCurrentDocumentPaletteColors(maxColors = MAX_IMPORTED_PALETTE_COLORS, { colorMode = state.colorMode } = {}) {
+    if (!Array.isArray(state.palette) || state.palette.length <= maxColors) {
+      return { reduced: false, sourceColorCount: state.palette?.length || 0, paletteSize: state.palette?.length || 0 };
+    }
+    const snapshot = {
+      palette: state.palette,
+      colorMode,
+      activePaletteIndex: state.activePaletteIndex,
+      secondaryPaletteIndex: state.secondaryPaletteIndex,
+      activeRgb: state.activeRgb,
+      canvases: getProjectCanvasDocuments().map(canvasDoc => ({
+        id: canvasDoc?.id || '',
+        width: canvasDoc?.width || state.width,
+        height: canvasDoc?.height || state.height,
+        frames: canvasDoc?.frames || [],
+      })),
+    };
+    const result = limitSnapshotPaletteColors(snapshot, maxColors);
+    state.palette = Array.isArray(snapshot.palette)
+      ? snapshot.palette.map(color => normalizeColorValue(color))
+      : [{ r: 0, g: 0, b: 0, a: 0 }];
+    padIndexedPaletteToMaxColors(state.palette, maxColors);
+    state.activePaletteIndex = normalizePaletteIndex(snapshot.activePaletteIndex, state.activePaletteIndex);
+    state.secondaryPaletteIndex = normalizePaletteIndex(snapshot.secondaryPaletteIndex, state.activePaletteIndex);
+    state.activeRgb = normalizeColorValue(snapshot.activeRgb || state.palette[state.activePaletteIndex] || state.palette[0]);
+    return result;
   }
 
   function synchronizeImportedSnapshotPalette(snapshot) {
@@ -55998,6 +56767,12 @@
         direct[base + 2] = 0;
         direct[base + 3] = 0;
       }
+      if (layer.importSourceDirect instanceof Uint8ClampedArray && layer.importSourceDirect.length >= base + 4) {
+        layer.importSourceDirect[base] = 0;
+        layer.importSourceDirect[base + 1] = 0;
+        layer.importSourceDirect[base + 2] = 0;
+        layer.importSourceDirect[base + 3] = 0;
+      }
       markHistoryDirty();
       markDirtyPixel(x, y);
       return;
@@ -56023,6 +56798,14 @@
       direct[base + 1] = rgbColor.g;
       direct[base + 2] = rgbColor.b;
       direct[base + 3] = rgbColor.a;
+      if (!(layer.importSourceDirect instanceof Uint8ClampedArray) || layer.importSourceDirect.length !== direct.length) {
+        layer.importSourceDirect = new Uint8ClampedArray(direct);
+      } else {
+        layer.importSourceDirect[base] = rgbColor.r;
+        layer.importSourceDirect[base + 1] = rgbColor.g;
+        layer.importSourceDirect[base + 2] = rgbColor.b;
+        layer.importSourceDirect[base + 3] = rgbColor.a;
+      }
       markHistoryDirty();
       markDirtyPixel(x, y);
       return;
@@ -56455,10 +57238,12 @@
       setActivePaletteIndex(index);
       state.activeRgb = normalized;
     } else {
+      const previousActiveIndex = state.activePaletteIndex;
       if (typeof index === 'number' && index >= 0) {
         state.activePaletteIndex = normalizePaletteIndex(index, state.activePaletteIndex);
       }
-      setActiveRgbColor(normalized, { syncInputs: true, render: true, persist: true });
+      setActiveRgbColor(normalized, { syncInputs: true, render: false, persist: true });
+      updatePaletteSelectionState(previousActiveIndex, state.secondaryPaletteIndex);
     }
     updateColorTabSwatch();
   }
