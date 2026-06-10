@@ -9113,6 +9113,27 @@
     if (!skipPersistCurrent && previousActiveId && findOpenProjectTabIndex(previousActiveId) >= 0) {
       await persistActiveOpenProjectTab({ flushAutosave: true });
     }
+    // If there is an active shared project session for a different project/tab,
+    // clear it before loading the target. This prevents incoming shared-project
+    // remote ops or refreshes from being applied to the wrong tab while
+    // switching tabs.
+    try {
+      const previousTab = previousActiveId ? openProjectTabs[findOpenProjectTabIndex(previousActiveId)] : null;
+      const previousSharedKey = getOpenProjectTabSharedKey(previousTab);
+      const targetSharedKey = getOpenProjectTabSharedKey(target);
+      if (activeSharedProjectKey) {
+        // If the target does not map to the same shared project key, clear the
+        // current shared session to stop background sync from affecting the
+        // newly active document.
+        if (!targetSharedKey || normalizeMultiProjectKey(targetSharedKey) !== normalizeMultiProjectKey(activeSharedProjectKey)) {
+          clearActiveSharedProjectSession('tab-switch');
+        }
+      }
+    } catch (e) {
+      // Non-fatal: if anything goes wrong here, continue with tab activation.
+      console.warn('Error while checking/clearing shared project session on tab switch', e);
+    }
+
     activeOpenProjectTabId = target.id;
     suppressOpenProjectTabAutoInitialize = false;
     renderOpenProjectTabs();
@@ -39998,6 +40019,34 @@
     const activePaletteIndex = normalizePaletteIndex(state.activePaletteIndex, state.activePaletteIndex);
     state.palette.forEach((color, index) => {
       const button = document.createElement('button');
+      // enable drag and drop reordering attributes
+      button.draggable = true;
+      button.addEventListener('dragstart', (ev) => {
+        try {
+          const dt = ev.dataTransfer;
+          if (dt) dt.setData('text/plain', String(index));
+        } catch (_) {}
+        if (ev.dataTransfer) ev.dataTransfer.effectAllowed = 'move';
+        button.classList.add('dragging');
+      });
+      button.addEventListener('dragend', () => {
+        button.classList.remove('dragging');
+      });
+      button.addEventListener('dragover', (ev) => {
+        ev.preventDefault();
+        if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'move';
+      });
+      button.addEventListener('drop', (ev) => {
+        ev.preventDefault();
+        const dt = ev.dataTransfer;
+        const src = dt ? dt.getData('text/plain') : null;
+        if (!src) return;
+        const srcIndex = Number(src);
+        const dstIndex = Number(button.dataset.index);
+        if (Number.isFinite(srcIndex) && Number.isFinite(dstIndex)) {
+          reorderPalette(srcIndex, dstIndex, { setActive: true });
+        }
+      });
       button.type = 'button';
       button.className = 'palette-swatch pixel-frame';
       button.dataset.index = String(index);
@@ -40040,6 +40089,66 @@
       addPaletteColorFromCurrentEditor();
     });
     container.appendChild(addButton);
+    // wire up import/export UI handlers (idempotent)
+    try {
+      const exportBtn = document.getElementById('exportPaletteJson');
+      const importBtn = document.getElementById('importPaletteJson');
+      const importInput = document.getElementById('importPaletteFile');
+      if (exportBtn instanceof HTMLElement) {
+        exportBtn.addEventListener('click', () => {
+          try {
+            const data = JSON.stringify(state.palette || []);
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'palette.json';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+          } catch (err) {
+            console.error('export palette failed', err);
+          }
+        });
+      }
+      if (importBtn instanceof HTMLElement && importInput instanceof HTMLInputElement) {
+        importBtn.addEventListener('click', () => importInput.click());
+        importInput.addEventListener('change', (ev) => {
+          const target = ev.target;
+          const files = target && target.files ? target.files : null;
+          if (!files || !files.length) return;
+          const file = files[0];
+          const reader = new FileReader();
+          reader.onload = () => {
+            try {
+              const raw = String(reader.result || '');
+              const parsed = JSON.parse(raw);
+              if (Array.isArray(parsed)) {
+                beginHistory('paletteImport');
+                state.palette = parsed.map(entry => normalizeColorValue(entry));
+                state.activePaletteIndex = normalizePaletteIndex(0, 0);
+                state.secondaryPaletteIndex = normalizePaletteIndex(1, 0);
+                renderPalette();
+                syncPaletteInputs();
+                applyPaletteChange();
+                commitHistory();
+              } else {
+                updateAutosaveStatus(localizeText('無効なパレットファイルです', 'Invalid palette file'), 'error');
+              }
+            } catch (err) {
+              console.error('import palette failed', err);
+              updateAutosaveStatus(localizeText('パレットの読み込みに失敗しました', 'Failed to load palette'), 'error');
+            }
+          };
+          reader.readAsText(file);
+          // reset input so same file can be selected again
+          importInput.value = '';
+        });
+      }
+    } catch (err) {
+      // ignore wiring failures
+    }
     renderToolQuickPalette();
     updateColorTabSwatch();
     updateFloatingDrawButtonPalettePreview();
