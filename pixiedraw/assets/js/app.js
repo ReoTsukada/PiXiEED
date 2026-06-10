@@ -3232,6 +3232,7 @@
   let sharedProjectCaptureTimer = null;
   let activeSharedProjectId = '';
   let activeSharedProjectKey = '';
+  let activeSharedProjectSessionToken = 0;
   let activeSharedProjectRevision = 0;
   let activeSharedProjectStructureRevision = 0;
   let activeSharedProjectSnapshotRevision = 0;
@@ -9409,8 +9410,10 @@
       caller: 'clearActiveSharedProjectSession',
       reason,
     });
-    activeSharedProjectId = '';
-    activeSharedProjectKey = '';
+  activeSharedProjectId = '';
+  activeSharedProjectKey = '';
+  // bump token to invalidate in-flight operations
+  activeSharedProjectSessionToken += 1;
     activeSharedProjectRevision = 0;
     activeSharedProjectStructureRevision = 0;
     activeSharedProjectSnapshotRevision = 0;
@@ -10031,7 +10034,9 @@
         projectChanged,
       },
     });
-    activeSharedProjectKey = normalizedProjectKey;
+  // bump session token so in-flight async tasks can detect session changes
+  activeSharedProjectKey = normalizedProjectKey;
+  activeSharedProjectSessionToken += 1;
     activeSharedProjectRevision = nextSessionRevision;
     activeSharedProjectStructureRevision = nextSessionStructureRevision;
     if (projectChanged || !Array.isArray(multiState.comments) || multiState.comments.length === 0) {
@@ -11637,6 +11642,141 @@
       runRecovery().catch(() => {});
     }, 180);
     return Promise.resolve(false);
+  }
+
+  // Wake recovery controller -------------------------------------------------
+  let _wakeRecoveryInterval = null;
+  let _wakeRecoveryLastNow = Date.now();
+  let _wakeRecoveryInFlight = false;
+
+  function startWakeRecoveryListener() {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+    // guard to avoid double install
+    if (window.__pixieedWakeRecoveryInstalled) return;
+    window.__pixieedWakeRecoveryInstalled = true;
+
+    const tryWake = (reason = 'event') => {
+      if (!activeSharedProjectKey) return;
+      if (_wakeRecoveryInFlight) return;
+      performWakeRecovery(reason).catch(() => {});
+    };
+
+    window.addEventListener('online', () => tryWake('online'));
+    window.addEventListener('focus', () => tryWake('focus'));
+    window.addEventListener('pageshow', (ev) => {
+      if (ev && ev.persisted) {
+        tryWake('pageshow-persisted');
+      } else {
+        tryWake('pageshow');
+      }
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        tryWake('visibility-visible');
+      }
+    });
+
+    // Detect large time jumps which usually indicate sleep/resume
+    _wakeRecoveryLastNow = Date.now();
+    _wakeRecoveryInterval = window.setInterval(() => {
+      const now = Date.now();
+      const gap = now - _wakeRecoveryLastNow;
+      _wakeRecoveryLastNow = now;
+      // treat gaps > 2sec + 2x interval as a wake (interval default 2s)
+      if (gap > 3000) {
+        tryWake('time-jump');
+      }
+    }, 2000);
+  }
+
+  async function performWakeRecovery(reason = 'manual-wake') {
+    if (!activeSharedProjectKey) return false;
+    if (_wakeRecoveryInFlight) return false;
+    _wakeRecoveryInFlight = true;
+    const sessionTokenAtStart = activeSharedProjectSessionToken;
+    const projectKey = activeSharedProjectKey;
+    logSharedProjectRealtimeChannelLifecycle('wake-recovery-start', { caller: 'performWakeRecovery', reason, projectKey });
+    try {
+      // Ensure account and backend session
+      await ensurePixieedAccountReady({ forceRefresh: true, silent: true });
+      if (sessionTokenAtStart !== activeSharedProjectSessionToken) {
+        console.info('[shared-sync] abort-wake-recovery-due-to-session-change-before-backend', { projectKey });
+        return false;
+      }
+      if (!await ensureSharedProjectBackendSession()) {
+        console.info('[shared-sync] wake-recovery-backend-session-failed', { projectKey });
+        setMultiStatus(localizeText('共有セッションの再初期化に失敗しました。再接続を試してください。', 'Failed to reinitialize shared session. Please reconnect.'), 'warn');
+        return false;
+      }
+      if (sessionTokenAtStart !== activeSharedProjectSessionToken) {
+        console.info('[shared-sync] abort-wake-recovery-due-to-session-change-after-backend', { projectKey });
+        return false;
+      }
+
+      // Don't trust existing realtime channel on some browsers (Safari)
+      try {
+        await disconnectActiveSharedProjectRealtimeChannel({ reason: 'wake-recovery-unbind', caller: 'performWakeRecovery' });
+      } catch (e) {
+        // ignore
+      }
+      if (sessionTokenAtStart !== activeSharedProjectSessionToken) {
+        console.info('[shared-sync] abort-wake-recovery-due-to-session-change-after-disconnect', { projectKey });
+        return false;
+      }
+
+      // Try a fresh snapshot refresh (may be no-op if up-to-date)
+      const refreshed = await refreshActiveSharedProjectSnapshot({ force: false, reason: `wake-recovery:${reason}` });
+      if (sessionTokenAtStart !== activeSharedProjectSessionToken) {
+        console.info('[shared-sync] abort-wake-recovery-due-to-session-change-after-refresh', { projectKey });
+        return false;
+      }
+
+      // Resubscribe realtime channel
+      let channel = null;
+      try {
+        channel = await ensureActiveSharedProjectRealtimeChannel();
+      } catch (error) {
+        console.info('[shared-sync] wake-recovery-channel-subscribe-failed', { projectKey, error: String(error?.message || error || '') });
+      }
+      if (sessionTokenAtStart !== activeSharedProjectSessionToken) {
+        console.info('[shared-sync] abort-wake-recovery-due-to-session-change-after-channel', { projectKey });
+        return false;
+      }
+
+      // Try to recover gap after channel resubscribe
+      const gapRecovered = await recoverSharedProjectRealtimeGap(projectKey, { afterSeq: sharedProjectLastAppliedSeq, reason: `wake-recovery:${reason}` });
+      if (sessionTokenAtStart !== activeSharedProjectSessionToken) {
+        console.info('[shared-sync] abort-wake-recovery-due-to-session-change-after-gap', { projectKey });
+        return false;
+      }
+
+      // If nothing recovered, queue full reconnect recovery which may block editing
+      if (!refreshed && !gapRecovered) {
+        // Prefer lighter recovery: queue reconnect but don't force reload
+        queueSharedProjectReconnectRecovery('wake-fallback', { immediate: true, blockEditing: false }).catch(() => {});
+        setMultiStatus(localizeText('共有接続が不安定です。再接続を試みています…', 'Shared connection unstable, attempting reconnect...'), 'info');
+        return false;
+      }
+
+      // resume pending local ops and finalize
+      resumeSharedProjectLocalOpsAfterConnectivityChange(`wake-recovery:${reason}`);
+      setActiveSharedProjectSyncState('synced', { announce: true });
+      logSharedProjectRealtimeChannelLifecycle('wake-recovery-done', { caller: 'performWakeRecovery', reason, projectKey, refreshed, gapRecovered, channelConnected: Boolean(channel) });
+      return true;
+    } catch (error) {
+      console.warn('[shared-sync] wake-recovery-exception', { projectKey, error: String(error?.message || error || '') });
+      setMultiStatus(localizeText('復帰処理中にエラーが発生しました。再接続をお試しください。', 'Error occurred during recovery. Please try reconnect.'), 'warn');
+      return false;
+    } finally {
+      _wakeRecoveryInFlight = false;
+    }
+  }
+
+  // start listener on module init
+  try {
+    startWakeRecoveryListener();
+  } catch (e) {
+    // ignore startup failures
   }
 
   function recoverSharedProjectAfterWake(reason = 'wake', { hiddenGapMs = 0, immediate = true } = {}) {
@@ -25562,11 +25702,16 @@
     announce = false,
     refreshReason = 'resume-pending-local-ops',
   } = {}) {
+    const sessionTokenAtStart = activeSharedProjectSessionToken;
     const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
     if (!normalizedProjectKey) {
       return 0;
     }
     const resumedCount = await resumeSharedLocalOpJournal(normalizedProjectKey);
+    if (sessionTokenAtStart !== activeSharedProjectSessionToken) {
+      console.info('[shared-sync] abort-resume-pending-local-ops-due-to-session-change', { projectKey: normalizedProjectKey });
+      return 0;
+    }
     if (!resumedCount) {
       return 0;
     }
@@ -27239,6 +27384,7 @@
   }
 
   async function openSharedRecentProject(entry, { hideStartup = true, silent = false, skipLatestRefresh = true } = {}) {
+    const sessionTokenAtStart = activeSharedProjectSessionToken;
     let normalizedEntry = normalizeSharedRecentProjectEntry(entry);
     if (!normalizedEntry) {
       return false;
@@ -27327,7 +27473,15 @@
       if (startupRestoreCancelRequested) {
         return false;
       }
+      if (sessionTokenAtStart !== activeSharedProjectSessionToken) {
+        console.info('[shared-sync] abort-open-shared-recent-due-to-session-change-before-open', { entry: normalizedEntry });
+        return false;
+      }
       const refreshedEntry = await refreshSharedRecentProjectEntryFromBackend(normalizedEntry);
+      if (sessionTokenAtStart !== activeSharedProjectSessionToken) {
+        console.info('[shared-sync] abort-open-shared-recent-due-to-session-change-after-refresh', { entry: normalizedEntry });
+        return false;
+      }
       if (startupRestoreCancelRequested) {
         return false;
       }
@@ -68390,6 +68544,17 @@
       return;
     }
     // shared_project_ops is the source of truth; local journal is a durability buffer.
+    // Write a synchronous fallback entry to session/local storage immediately so
+    // that user edits are not lost if IndexedDB writes are delayed or the
+    // browser is closed before async persistence completes.
+    try {
+      const fallbackEntry = buildSharedLocalOpJournalEntry(op, { status: 'pending' });
+      if (fallbackEntry) {
+        upsertSharedLocalOpJournalFallbackEntry(fallbackEntry);
+      }
+    } catch (e) {
+      // ignore fallback write failures
+    }
     appendSharedLocalOpJournal(op, { status: 'pending' }).catch(error => {
       console.warn('Failed to append shared local op journal entry', error);
     });
@@ -68447,7 +68612,11 @@
     if (!activeSharedProjectKey) {
       return;
     }
-    const safeDelay = Math.max(120, Math.round(Number(delayMs) || SHARED_PROJECT_LOCAL_OP_RETRY_DELAY_MS));
+  // Add a small random jitter to the retry delay to avoid many clients retrying
+  // simultaneously (thundering herd) when a shared project reconnects.
+  const baseDelay = Math.max(120, Math.round(Number(delayMs) || SHARED_PROJECT_LOCAL_OP_RETRY_DELAY_MS));
+  const jitter = Math.round(Math.random() * Math.min(300, Math.floor(baseDelay / 2)));
+  const safeDelay = baseDelay + jitter;
     const dueAt = Date.now() + safeDelay;
     if (sharedProjectPendingLocalOpsRetryTimer !== null) {
       if (sharedProjectPendingLocalOpsRetryDueAt > 0 && sharedProjectPendingLocalOpsRetryDueAt <= dueAt) {
@@ -69176,6 +69345,7 @@
   }
 
   async function applySharedProjectOpsSinceRevision(projectRecord, afterRevision = 0) {
+    const sessionTokenAtStart = activeSharedProjectSessionToken;
     // Shared project reopen / reconnect path:
     // load canonical snapshot first, then replay ordered ops since the snapshot revision.
     const projectKey = normalizeMultiProjectKey(projectRecord?.project_key || activeSharedProjectKey);
@@ -69199,6 +69369,11 @@
         return false;
       }
       setActiveSharedProjectSyncState('synced');
+      // abort if session changed while we prepared
+      if (sessionTokenAtStart !== activeSharedProjectSessionToken) {
+        console.info('[shared-sync] abort-apply-ops-due-to-session-change', { projectKey });
+        return false;
+      }
       return true;
     }
     setActiveSharedProjectSyncState('catching-up', { announce: true });
@@ -69216,6 +69391,11 @@
         baseRevision,
         targetRevision,
       });
+    }
+    // If session changed during setup, abort early
+    if (sessionTokenAtStart !== activeSharedProjectSessionToken) {
+      console.info('[shared-sync] abort-apply-ops-due-to-session-change-before-fetch', { projectKey });
+      return false;
     }
     sharedProjectLastAppliedSeq = Math.max(sharedProjectLastAppliedSeq, baseRevision);
     while (sharedProjectLastAppliedSeq < targetRevision) {
@@ -69236,6 +69416,11 @@
         sharedProjectLastAppliedSeq,
         Math.max(SHARED_PROJECT_MAX_MISSING_OP_FETCH, targetRevision - sharedProjectLastAppliedSeq + 8)
       );
+      // abort if session changed while waiting for missing ops
+      if (sessionTokenAtStart !== activeSharedProjectSessionToken) {
+        console.info('[shared-sync] abort-apply-ops-due-to-session-change-after-fetch', { projectKey, afterRevision: sharedProjectLastAppliedSeq });
+        return false;
+      }
       console.info('[shared-sync]', {
         event: 'missing-ops-fetch-done',
         projectKey,
@@ -69253,6 +69438,11 @@
       }
       confirmSharedProjectLocalOpsFromServerOps(ops, { source: 'refresh' });
       const replayed = await replayOps(ops, { fromRemote: true });
+      // abort if session changed while replaying ops
+      if (sessionTokenAtStart !== activeSharedProjectSessionToken) {
+        console.info('[shared-sync] abort-apply-ops-due-to-session-change-after-replay', { projectKey, afterRevision: sharedProjectLastAppliedSeq });
+        return false;
+      }
       if (!replayed) {
         return false;
       }
@@ -77281,7 +77471,6 @@
       || activeSharedProjectKey
       || multiState.projectKey
       || resolveSharedProjectKeyForCurrentState()
-      || ''
     );
   }
 
