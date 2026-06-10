@@ -39699,6 +39699,7 @@
         return;
       }
       if (state.palette.length <= 1) return;
+      // 移動ボタンと同様に、削除はアクティブ（主選択）を対象にする
       const index = clamp(state.activePaletteIndex, 0, state.palette.length - 1);
       removePaletteColor(index);
     });
@@ -39831,17 +39832,32 @@
     commitHistory();
   }
 
-  function reorderPalette(currentIndex, targetIndex) {
+  function reorderPalette(currentIndex, targetIndex, { setActive = true, setSecondary = false } = {}) {
     if (!isIndexColorMode() || !canCurrentClientReindexPalette()) return;
     if (currentIndex === targetIndex) return;
     beginHistory('paletteReorder');
     const previousOrder = state.palette.slice();
     const color = state.palette.splice(currentIndex, 1)[0];
     state.palette.splice(targetIndex, 0, color);
+    const previousActive = state.activePaletteIndex;
+    const previousSecondary = state.secondaryPaletteIndex;
     const mapping = previousOrder.map(entry => state.palette.indexOf(entry));
     remapPaletteIndices(mapping);
     const newIndex = state.palette.indexOf(color);
-    setActivePaletteIndex(newIndex);
+    // 表示を即時に反映させるため、state を直接更新してから再レンダリングする
+    if (setActive) {
+      state.activePaletteIndex = normalizePaletteIndex(newIndex, previousActive);
+    } else if (setSecondary) {
+      // 呼び出し側がアクティブを維持してセカンダリを更新したい場合
+      state.secondaryPaletteIndex = normalizePaletteIndex(newIndex, previousActive);
+    }
+    // DOM を再構築して選択表示を更新
+    renderPalette();
+    syncPaletteInputs();
+    updatePaletteSelectionState(previousActive, previousSecondary);
+    if (setActive) {
+      focusUnifiedLeftContext('color', { persist: false });
+    }
     applyPaletteChange();
     commitHistory();
   }
@@ -39882,11 +39898,14 @@
     if (isUnifiedLeftToolsColorMode() && layoutMode !== 'mobilePortrait') {
       container.hidden = true;
       container.setAttribute('aria-hidden', 'true');
+      // clear contents when hiding; no scroll preservation needed
       container.innerHTML = '';
       return;
     }
     container.hidden = false;
     container.setAttribute('aria-hidden', 'false');
+    // preserve scroll position across full redraws to avoid jumping
+    const _prevToolQuickPaletteScroll = container.scrollTop || 0;
     container.innerHTML = '';
     if (!Array.isArray(state.palette) || !state.palette.length) {
       return;
@@ -39928,6 +39947,11 @@
       fragment.appendChild(button);
     });
     container.appendChild(fragment);
+    try {
+      container.scrollTop = _prevToolQuickPaletteScroll;
+    } catch (err) {
+      // ignore on unexpected containers
+    }
   }
 
   function syncPaletteInputs() {
@@ -39966,6 +39990,9 @@
   function renderPalette() {
     const container = dom.controls.paletteList;
     if (!container) return;
+    // preserve scroll position so switching/refreshing the palette doesn't
+    // reset the user's scroll to the top of the list
+    const _prevPaletteListScroll = container.scrollTop || 0;
     container.innerHTML = '';
     const rgbMode = isRgbColorMode();
     const activePaletteIndex = normalizePaletteIndex(state.activePaletteIndex, state.activePaletteIndex);
@@ -40017,6 +40044,11 @@
     updateColorTabSwatch();
     updateFloatingDrawButtonPalettePreview();
     syncPaletteReindexControlState();
+    try {
+      container.scrollTop = _prevPaletteListScroll;
+    } catch (_) {
+      // no-op if not applicable
+    }
   }
 
   function updatePaletteSelectionState(previousActiveIndex = state.activePaletteIndex, previousSecondaryIndex = state.secondaryPaletteIndex) {
