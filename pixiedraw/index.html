@@ -624,6 +624,10 @@
 <button aria-label="色を追加" class="chip" id="addPaletteColor" type="button">+</button>
 <button aria-label="選択した色を前へ移動" class="chip palette-action--move" id="movePaletteBackward" type="button">◀</button>
 <button aria-label="選択した色を後ろへ移動" class="chip palette-action--move" id="movePaletteForward" type="button">▶</button>
+<!-- Palette import/export -->
+<button aria-label="パレットをエクスポート" class="chip" id="exportPaletteJson" type="button">Export</button>
+<button aria-label="パレットをインポート" class="chip" id="importPaletteJson" type="button">Import</button>
+<input id="importPaletteFile" type="file" accept="application/json" hidden />
 </div>
 </div>
 <div aria-label="カラーパレット" class="palette-grid" id="paletteList" role="listbox"></div>
