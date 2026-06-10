@@ -6811,6 +6811,8 @@
         return;
       }
       paletteDisplayKey = key;
+      // preserve scroll position of paletteDisplay when rebuilding markup
+      const _prevPaletteDisplayScroll = paletteDisplay.scrollTop || 0;
       const swatchesHtml = displayEntries.map((entry, displayIndex) => {
         const color = entry.color;
         const index = entry.index;
@@ -6838,6 +6840,11 @@
       paletteDisplay.classList.add('is-visible');
       paletteDisplay.setAttribute('aria-hidden', 'false');
       setupPaletteDisplayInteractions();
+      try {
+        paletteDisplay.scrollTop = _prevPaletteDisplayScroll;
+      } catch (_) {
+        // ignore
+      }
     }
 
     function setPaletteDisplayEnabled(enabled) {
