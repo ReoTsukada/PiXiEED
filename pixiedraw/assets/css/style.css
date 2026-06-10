@@ -10914,6 +10914,33 @@ body.is-mobile-layout #newProjectDialog .modal__body {
   body.is-mobile-layout #panelFile .panel-section__body {
     padding-top: 8px;
   }
+
+/* Mobile: reduce unnecessary vertical gap between tool area and color panel.
+   This trims padding that can create large empty space on narrow screens.
+   Keep rules scoped to mobile layout to avoid desktop regressions. */
+body.is-mobile-layout #panelTools .panel-section__body {
+  padding-bottom: 8px !important;
+}
+
+body.is-mobile-layout #panelColor .panel-section__body {
+  padding-top: 8px !important;
+}
+
+/* Slightly tighten the quick-color block spacing on mobile. */
+body.is-mobile-layout #panelTools .tool-quick-color {
+  margin-top: 4px !important;
+}
+
+/* Extra safety: ensure any (empty) ad mounts don't reserve height on mobile. */
+body.is-mobile-layout .panel-ad-mount,
+body.is-mobile-layout .panel-ad-mount[hidden] {
+  display: none !important;
+  min-height: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
   body.is-mobile-layout #panelFile .field-group--file-actions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 6px;
