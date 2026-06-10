@@ -8849,6 +8849,13 @@
       name.className = 'project-tab-item__name';
       name.textContent = displayLabel;
       selectButton.appendChild(name);
+      // Show a small badge when this tab holds a deferred restore or a remote update
+      if (tab?.deferredRestore || tab?.remoteUpdateAvailable) {
+        const badge = document.createElement('span');
+        badge.className = 'project-tab-item__badge';
+        badge.textContent = tab?.deferredRestore ? localizeText('復元あり', 'Restored') : localizeText('更新あり', 'Update');
+        selectButton.appendChild(badge);
+      }
       item.appendChild(selectButton);
 
       const closeButton = document.createElement('button');
@@ -8971,7 +8978,12 @@
     }
     const tab = createOpenProjectTabFromCurrentState({
       source: options.source || 'open',
-      projectId: options.projectId,
+      // For explicit 'open' (file picker / importer) and 'recent' sources,
+      // create a fresh projectId so each opened file becomes an independent
+      // project rather than sharing the current autosaveProjectId.
+      projectId: (typeof options.projectId !== 'undefined')
+        ? options.projectId
+        : ((options.source === 'open' || options.source === 'recent') ? createAutosaveProjectId() : undefined),
       sharedProjectKey: options.sharedProjectKey,
       sharedProjectBackendId: options.sharedProjectBackendId,
       sharedProjectRevision: options.sharedProjectRevision,
@@ -8979,6 +8991,20 @@
       sharedRoleHint: options.sharedRoleHint,
       sharedAutoJoin: options.sharedAutoJoin,
     });
+    // Prevent duplicate tabs for the same normalized projectId.
+    const normalizedTabProjectId = normalizeAutosaveProjectId(tab.projectId || '');
+    if (normalizedTabProjectId) {
+      const existingIndex = findOpenProjectTabIndexByProjectId(normalizedTabProjectId);
+      if (existingIndex >= 0) {
+        // Activate existing tab instead of creating a duplicate
+        if (options.activate !== false) {
+          activeOpenProjectTabId = openProjectTabs[existingIndex].id;
+          suppressOpenProjectTabAutoInitialize = false;
+        }
+        renderOpenProjectTabs();
+        return openProjectTabs[existingIndex];
+      }
+    }
     openProjectTabs.push(tab);
     if (options.activate !== false) {
       activeOpenProjectTabId = tab.id;
@@ -9151,6 +9177,34 @@
           projectId: target.projectId || '',
           suppressAutosaveStatus: true,
         });
+      }
+      // If loadDocumentFromText returned the 'deferred' sentinel, it means
+      // the snapshot targets a different project/tab and should not be
+      // applied into the currently active document. Mark the tab as having
+      // a deferred restore / remote update available and keep the previous
+      // active document visible (avoid blank canvas).
+      if (loaded === 'deferred') {
+        try {
+          openProjectTabs[targetIndex] = Object.assign({}, target, {
+            deferredRestore: true,
+            remoteUpdateAvailable: true,
+          });
+          // Revert active tab to the previous one so the document state
+          // that was visible remains active.
+          activeOpenProjectTabId = previousActiveId;
+          renderOpenProjectTabs();
+          updateAutosaveStatus(
+            localizeText(
+              'このプロジェクトは別タブで復元が必要なため保留されました。',
+              'This project requires restore into a different tab and has been deferred.'
+            ),
+            'info'
+          );
+          return true;
+        } catch (e) {
+          console.warn('Failed to mark deferred project tab', e);
+          // Fall through to the existing error path below.
+        }
       }
       if (!loaded) {
         activeOpenProjectTabId = previousActiveId;
@@ -18053,6 +18107,62 @@
         const item = targets[index];
         try {
           const loaded = await loader(item);
+          if (loaded === 'deferred') {
+            // Loader declined to apply into the active document because the
+            // payload targets a different project/tab. Create a new tab from
+            // the original item so the user's explicit open action still
+            // produces a separate project tab.
+            try {
+              let packaged = null;
+              // If item looks like a File/Blob with a text() method, read it
+              if (item && typeof item.text === 'function') {
+                try {
+                  const text = await item.text();
+                  packaged = tryParseJsonSafe(text);
+                } catch (e) {
+                  packaged = null;
+                }
+              } else if (item && typeof item.getFile === 'function') {
+                // FileSystemFileHandle
+                try {
+                  const f = await item.getFile();
+                  const text = await f.text();
+                  packaged = tryParseJsonSafe(text);
+                } catch (e) {
+                  packaged = null;
+                }
+              } else if (item && typeof item === 'object' && item.project) {
+                packaged = item.project;
+              }
+              if (packaged && typeof packaged === 'object') {
+                ensureOpenProjectTabsInitialized();
+                const newTabId = createOpenProjectTabId();
+                const newTab = {
+                  id: newTabId,
+                  projectId: normalizeAutosaveProjectId(options && options.projectId) || createAutosaveProjectId(),
+                  fileName: normalizeDocumentName(packaged.documentName || DEFAULT_DOCUMENT_NAME),
+                  label: extractDocumentBaseName(packaged.documentName || DEFAULT_DOCUMENT_NAME),
+                  project: packaged,
+                  unsaved: false,
+                  source: source || 'open',
+                  updatedAt: (packaged.updatedAt || new Date().toISOString()),
+                };
+                openProjectTabs.push(newTab);
+                activeOpenProjectTabId = newTabId;
+                suppressOpenProjectTabAutoInitialize = false;
+                renderOpenProjectTabs();
+                openedCount += 1;
+                continue;
+              }
+            } catch (e) {
+              console.warn('Failed to create tab from deferred loader item', e);
+              failedCount += 1;
+              continue;
+            }
+            // If we couldn't construct a tab, fall through to treat as failure
+            failedCount += 1;
+            continue;
+          }
           if (!loaded) {
             failedCount += 1;
             continue;
@@ -18097,6 +18207,15 @@
       return true;
     } finally {
       openProjectTabBusy = false;
+    }
+  }
+
+  function tryParseJsonSafe(text) {
+    if (typeof text !== 'string') return null;
+    try {
+      return JSON.parse(text);
+    } catch (e) {
+      return null;
     }
   }
 
@@ -23382,6 +23501,27 @@
     if (!ensureCurrentClientCanReplaceActiveProject({ announce: !options?.suppressAutosaveStatus })) {
       return false;
     }
+    // Safety: when loading snapshots that came from "recent/opened" flows
+    // (or explicitly include a sharedProjectKey), avoid silently applying a
+    // snapshot intended for a different project/tab. In those cases return
+    // a sentinel 'deferred' so callers can create a new tab instead.
+    if (options?.openedFromRecent || options?.sharedProjectKey) {
+      try {
+        const requestedProjectId = normalizeAutosaveProjectId(String(options?.projectId || '') || '');
+        const requestedSharedKey = String(options?.sharedProjectKey || '').trim() || '';
+        const activeTab = getActiveOpenProjectTab();
+        const activeProjectId = normalizeAutosaveProjectId(activeTab?.projectId || autosaveProjectId || '');
+        const activeSharedKey = String(getOpenProjectTabSharedKey(activeTab) || '').trim() || '';
+        if (requestedProjectId && activeProjectId && requestedProjectId !== activeProjectId) {
+          return 'deferred';
+        }
+        if (requestedSharedKey && activeSharedKey && requestedSharedKey !== activeSharedKey) {
+          return 'deferred';
+        }
+      } catch (err) {
+        // Ignore guarding errors and proceed to load (safer to load than to fail)
+      }
+    }
     const preservedSelectionClipboard = preserveCanvasSelectionClipboard();
     let parsedDocument = null;
     try {
@@ -27360,6 +27500,38 @@
           suppressAutosaveStatus: true,
           openedFromRecent: true,
         });
+        if (loaded === 'deferred') {
+          // The snapshot targets a different project/tab: create a new tab
+          // containing the packaged project and activate it so the project
+          // becomes visible without overwriting the current document.
+          try {
+            ensureOpenProjectTabsInitialized();
+            const newTabId = createOpenProjectTabId();
+            const newTab = {
+              id: newTabId,
+              projectId: normalizeAutosaveProjectId(latestEntry.id || '') || createAutosaveProjectId(),
+              fileName: normalizeDocumentName(latestEntry.name || DEFAULT_DOCUMENT_NAME),
+              label: extractDocumentBaseName(latestEntry.name || DEFAULT_DOCUMENT_NAME),
+              project: latestEntry.project || null,
+              unsaved: Boolean(latestEntry.unsaved) || false,
+              source: 'recent',
+              updatedAt: (latestEntry.updatedAt || new Date().toISOString()),
+            };
+            openProjectTabs.push(newTab);
+            activeOpenProjectTabId = newTabId;
+            suppressOpenProjectTabAutoInitialize = false;
+            renderOpenProjectTabs();
+            // Now activate the new tab to actually apply the snapshot into
+            // the active document (activateOpenProjectTab will attempt to
+            // load from the tab.project and should succeed because the
+            // active tab now matches the requested projectId).
+            await activateOpenProjectTab(newTabId, { skipPersistCurrent: true, announce: !silent });
+            return finishRecentProjectOpen('自動保存: プロジェクトを開きました');
+          } catch (e) {
+            console.warn('Failed to create/activate deferred recent project tab', e);
+            // fall through to error handling below
+          }
+        }
         if (!loaded) {
           if (await tryOpenRecentProjectHandle()) {
             return true;
@@ -35104,6 +35276,9 @@
       return false;
     }
     let activated = false;
+    const prevActiveKey = Array.isArray(dom.mobileTabs)
+      ? (dom.mobileTabs.find(b => b.classList.contains('is-active'))?.dataset.mobileTab || '')
+      : '';
     dom.mobileTabs.forEach(btn => {
       const key = btn.dataset.mobileTab;
       const panel = key ? dom.mobilePanels[key] : null;
@@ -35136,15 +35311,21 @@
     }
     if (activated) {
       if (layoutMode === 'mobilePortrait') {
-        if (dom.mobilePanelsContainer instanceof HTMLElement) {
-          dom.mobilePanelsContainer.scrollTop = 0;
-        }
-        const activePanel = dom.mobilePanels[normalizedTarget];
-        if (activePanel instanceof HTMLElement) {
-          activePanel.scrollTop = 0;
-          const activeBody = activePanel.querySelector('.panel-section__body');
-          if (activeBody instanceof HTMLElement) {
-            activeBody.scrollTop = 0;
+        // Only reset scroll when switching from a different panel.
+        // Avoid forcing scrollTop = 0 if the panel was already active
+        // (for example, when interacting with controls inside the same panel
+        // such as color swatches) which caused an unwanted jump.
+        if (prevActiveKey !== normalizedTarget) {
+          if (dom.mobilePanelsContainer instanceof HTMLElement) {
+            dom.mobilePanelsContainer.scrollTop = 0;
+          }
+          const activePanel = dom.mobilePanels[normalizedTarget];
+          if (activePanel instanceof HTMLElement) {
+            activePanel.scrollTop = 0;
+            const activeBody = activePanel.querySelector('.panel-section__body');
+            if (activeBody instanceof HTMLElement) {
+              activeBody.scrollTop = 0;
+            }
           }
         }
       }
@@ -40094,57 +40275,66 @@
       const exportBtn = document.getElementById('exportPaletteJson');
       const importBtn = document.getElementById('importPaletteJson');
       const importInput = document.getElementById('importPaletteFile');
+      // Hide import/export only when the left rail is in compact mode. When the
+      // palette panel is opened (data-compact != "true") show the buttons.
+      const isCompactRail = Boolean(dom.leftRail && String(dom.leftRail.getAttribute('data-compact') || '') === 'true');
       if (exportBtn instanceof HTMLElement) {
-        exportBtn.addEventListener('click', () => {
-          try {
-            const data = JSON.stringify(state.palette || []);
-            const blob = new Blob([data], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'palette.json';
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            URL.revokeObjectURL(url);
-          } catch (err) {
-            console.error('export palette failed', err);
-          }
-        });
+        exportBtn.hidden = isCompactRail;
+        if (!isCompactRail) {
+          exportBtn.addEventListener('click', () => {
+            try {
+              const data = JSON.stringify(state.palette || []);
+              const blob = new Blob([data], { type: 'application/json' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = 'palette.json';
+              document.body.appendChild(a);
+              a.click();
+              a.remove();
+              URL.revokeObjectURL(url);
+            } catch (err) {
+              console.error('export palette failed', err);
+            }
+          });
+        }
       }
       if (importBtn instanceof HTMLElement && importInput instanceof HTMLInputElement) {
-        importBtn.addEventListener('click', () => importInput.click());
-        importInput.addEventListener('change', (ev) => {
-          const target = ev.target;
-          const files = target && target.files ? target.files : null;
-          if (!files || !files.length) return;
-          const file = files[0];
-          const reader = new FileReader();
-          reader.onload = () => {
-            try {
-              const raw = String(reader.result || '');
-              const parsed = JSON.parse(raw);
-              if (Array.isArray(parsed)) {
-                beginHistory('paletteImport');
-                state.palette = parsed.map(entry => normalizeColorValue(entry));
-                state.activePaletteIndex = normalizePaletteIndex(0, 0);
-                state.secondaryPaletteIndex = normalizePaletteIndex(1, 0);
-                renderPalette();
-                syncPaletteInputs();
-                applyPaletteChange();
-                commitHistory();
-              } else {
-                updateAutosaveStatus(localizeText('無効なパレットファイルです', 'Invalid palette file'), 'error');
+        importBtn.hidden = isCompactRail;
+        if (!isCompactRail) {
+          importBtn.addEventListener('click', () => importInput.click());
+          importInput.addEventListener('change', (ev) => {
+            const target = ev.target;
+            const files = target && target.files ? target.files : null;
+            if (!files || !files.length) return;
+            const file = files[0];
+            const reader = new FileReader();
+            reader.onload = () => {
+              try {
+                const raw = String(reader.result || '');
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) {
+                  beginHistory('paletteImport');
+                  state.palette = parsed.map(entry => normalizeColorValue(entry));
+                  state.activePaletteIndex = normalizePaletteIndex(0, 0);
+                  state.secondaryPaletteIndex = normalizePaletteIndex(1, 0);
+                  renderPalette();
+                  syncPaletteInputs();
+                  applyPaletteChange();
+                  commitHistory();
+                } else {
+                  updateAutosaveStatus(localizeText('無効なパレットファイルです', 'Invalid palette file'), 'error');
+                }
+              } catch (err) {
+                console.error('import palette failed', err);
+                updateAutosaveStatus(localizeText('パレットの読み込みに失敗しました', 'Failed to load palette'), 'error');
               }
-            } catch (err) {
-              console.error('import palette failed', err);
-              updateAutosaveStatus(localizeText('パレットの読み込みに失敗しました', 'Failed to load palette'), 'error');
-            }
-          };
-          reader.readAsText(file);
-          // reset input so same file can be selected again
-          importInput.value = '';
-        });
+            };
+            reader.readAsText(file);
+            // reset input so same file can be selected again
+            importInput.value = '';
+          });
+        }
       }
     } catch (err) {
       // ignore wiring failures
@@ -60215,13 +60405,54 @@
       if (!snapshot || isTinyStartupSnapshot(snapshot)) {
         return false;
       }
-      applyHistorySnapshot(snapshot);
+      // Only apply the restored snapshot immediately if it is intended for the
+      // currently-active project/tab. If the restored project targets a
+      // different project ID (e.g. another tab/window), create a deferred tab
+      // so the user can switch to it explicitly instead of being overwritten.
       const restoredProjectId = normalizeAutosaveProjectId(
         wrappedProjectId || readReloadTargetProjectId() || autosaveProjectId || ''
       );
-      if (restoredProjectId) {
-        startupAutosaveRestoreProjectId = restoredProjectId;
-        setActiveAutosaveProjectId(restoredProjectId, { persist: false });
+      const activeTab = getActiveOpenProjectTab();
+      const activeTabProjectId = normalizeAutosaveProjectId(activeTab?.projectId || autosaveProjectId || '');
+      if (restoredProjectId && activeTabProjectId && restoredProjectId !== activeTabProjectId) {
+        try {
+          // Build a packaged project payload for storing in a deferred tab.
+          const packaged = buildPackagedProjectPayload(snapshot, { session: buildAutosaveSessionPayload() });
+          const fileName = normalizeDocumentName(snapshot.documentName || `${extractDocumentBaseName(packaged?.name || '') || DEFAULT_DOCUMENT_BASENAME}${PROJECT_FILE_EXTENSION}`);
+          const tab = {
+            id: createOpenProjectTabId(),
+            projectId: restoredProjectId,
+            fileName,
+            label: extractDocumentBaseName(fileName),
+            project: packaged,
+            unsaved: true,
+            source: 'restore',
+            updatedAt: packaged?.updatedAt || new Date().toISOString(),
+            deferredRestore: true,
+            remoteUpdateAvailable: true,
+          };
+          // Append without activating so user isn't disrupted.
+          openProjectTabs.push(tab);
+          renderOpenProjectTabs();
+          // Keep a marker so other logic can detect a pending startup restore.
+          startupAutosaveRestoreProjectId = restoredProjectId;
+        } catch (error) {
+          // If packaging fails, fall back to applying the snapshot to avoid
+          // leaving the user with no state.
+          console.warn('Failed to defer restore into a tab, applying snapshot instead', error);
+          applyHistorySnapshot(snapshot);
+          if (restoredProjectId) {
+            startupAutosaveRestoreProjectId = restoredProjectId;
+            setActiveAutosaveProjectId(restoredProjectId, { persist: false });
+          }
+        }
+      } else {
+        // Safe to apply directly to the current document.
+        applyHistorySnapshot(snapshot);
+        if (restoredProjectId) {
+          startupAutosaveRestoreProjectId = restoredProjectId;
+          setActiveAutosaveProjectId(restoredProjectId, { persist: false });
+        }
       }
       history.pending = null;
       history.past = [];
@@ -70038,6 +70269,21 @@
         sharedProjectKey: activeSharedProjectKey,
         sharedProjectRevision: snapshotRevision,
       });
+      if (loaded === 'deferred') {
+        // The incoming snapshot targets a different tab/project in this
+        // window. Abort applying and leave active document state intact.
+        restoreLoadedDocumentStateAfterSnapshotAbort();
+        logSharedProjectRealtimeChannelLifecycle('refresh-result', {
+          caller: 'refreshActiveSharedProjectSnapshot',
+          reason: reason || 'refresh',
+          extra: {
+            force,
+            result: 'snapshot-deferred-different-tab',
+            snapshotRevision,
+          },
+        });
+        return false;
+      }
       if (!loaded) {
         restoreLoadedDocumentStateAfterSnapshotAbort();
         logSharedProjectRealtimeChannelLifecycle('refresh-result', {
