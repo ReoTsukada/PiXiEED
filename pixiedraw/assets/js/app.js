@@ -1118,7 +1118,7 @@
   const RELOAD_SNAPSHOT_MAX_SYNC_CHARS = 2 * 1024 * 1024;
   const STARTUP_SCREEN_DISMISSED_KEY = 'pixieedraw:startupScreenDismissed';
   const STARTUP_ACCOUNT_INIT_TIMEOUT_MS = 5000;
-  const STARTUP_RESTORE_TIMEOUT_MS = 8000;
+  const STARTUP_RESTORE_TIMEOUT_MS = 15000;
   const UPDATE_TOAST_SEEN_PREFIX = 'pixieedraw:update-toast-seen:';
   const STARTUP_UPDATE_TOAST_HIDDEN_KEY = 'pixieedraw:update-toast-hidden';
   const HIDDEN_SHARED_PROJECT_KEYS_STORAGE_PREFIX = 'pixieedraw:hidden-shared-projects:';
@@ -3259,6 +3259,7 @@
   let sharedProjectPollingTimer = null;
   let sharedProjectRefreshTimer = null;
   let sharedProjectRefreshInFlight = false;
+  let sharedProjectInitialRestoreInProgress = false;
   let sharedProjectReconnectRecoveryTimer = null;
   let sharedProjectReconnectRecoveryPromise = null;
   let sharedProjectWakeRecoveryPromise = null;
@@ -9638,6 +9639,13 @@
         }).catch(() => {});
         return;
       }
+      if (sharedProjectInitialRestoreInProgress) {
+        logSharedProjectRealtimeChannelLifecycle('watchdog-skip', {
+          caller: 'ensureSharedProjectRefreshLoop',
+          reason: 'restore-in-progress',
+        });
+        return;
+      }
       if (
         activeSharedProjectSyncState === 'catching-up'
         && !sharedProjectReconnectRecoveryPromise
@@ -10180,6 +10188,7 @@
         revision: activeSharedProjectRevision,
         structureRevision: activeSharedProjectStructureRevision,
       });
+      console.info('[shared-sync]', { event: 'ops-fetch start', projectKey: activeSharedProjectKey || '', afterRevision: sharedProjectLastAppliedSeq });
       syncSharedProjectVisibleStatus();
     }
   }
@@ -10190,6 +10199,7 @@
 
   function isSharedProjectDrawReadinessFresh() {
     if (!isSharedProjectCollaborativeMode()) {
+      console.info('[shared-sync]', { event: 'ops-fetch done', projectKey, count: ops.length });
       return true;
     }
     const latestVerifiedAt = Math.max(
@@ -11657,7 +11667,15 @@
 
     const tryWake = (reason = 'event') => {
       if (!activeSharedProjectKey) return;
+      if (!activeSharedProjectId) {
+        console.info('[shared-sync]', { event: 'wake-recovery skipped', reason: 'missing-project-id', projectKey: activeSharedProjectKey });
+        return;
+      }
       if (_wakeRecoveryInFlight) return;
+      if (sharedProjectInitialRestoreInProgress) {
+        console.info('[shared-sync]', { event: 'wake-recovery skipped', reason: 'restore-in-progress', projectKey: activeSharedProjectKey });
+        return;
+      }
       performWakeRecovery(reason).catch(() => {});
     };
 
@@ -11781,6 +11799,15 @@
 
   function recoverSharedProjectAfterWake(reason = 'wake', { hiddenGapMs = 0, immediate = true } = {}) {
     if (!activeSharedProjectKey) {
+      return Promise.resolve(false);
+    }
+    if (!activeSharedProjectId) {
+      logSharedProjectRealtimeChannelLifecycle('wake-recovery-skip', {
+        caller: 'recoverSharedProjectAfterWake',
+        reason,
+        extra: { reason: 'missing-project-id' },
+      });
+      console.info('[shared-sync]', { event: 'wake-recovery skipped', reason: 'missing-project-id', projectKey: activeSharedProjectKey || '' });
       return Promise.resolve(false);
     }
     if (sharedProjectWakeRecoveryPromise) {
@@ -23222,15 +23249,22 @@
   }
 
   async function maybeRestoreSharedProjectOnStartup() {
+    sharedProjectInitialRestoreInProgress = true;
+    console.info('[shared-sync]', { event: 'restore-shared-project start', projectKeyHint: startupSharedReloadProjectKey || '' });
     const restoredProjectKey = normalizeMultiProjectKey(startupSharedReloadProjectKey || '');
     if (startupRestoreCancelRequested || !restoredProjectKey || readMultiInviteFromUrl()) {
+      sharedProjectInitialRestoreInProgress = false;
+      console.info('[shared-sync]', { event: 'restore-shared-project failed', reason: 'cancelled-or-missing-key' });
       return false;
     }
     setStartupProgressLabel(localizeText('共有プロジェクトへ復帰中…', 'Reopening shared project...'));
     try {
+        console.info('[shared-sync]', { event: 'project-key resolved', projectKey: restoredProjectKey });
       const entries = await loadRecentProjectsMetadata();
       if (startupRestoreCancelRequested) {
-        return false;
+          sharedProjectInitialRestoreInProgress = false;
+          console.info('[shared-sync]', { event: 'restore-shared-project failed', reason: 'cancelled-after-metadata' });
+          return false;
       }
       const limitedEntries = enforceSharedRecentProjectLimit(entries);
       setRecentProjectsCache(limitedEntries);
@@ -23302,10 +23336,14 @@
           localizeText('共有プロジェクト: 再読み込み前のプロジェクトへ復帰しました', 'Shared project: reopened the project from before reload'),
           'success'
         );
+        sharedProjectInitialRestoreInProgress = false;
+        console.info('[shared-sync]', { event: 'restore-shared-project done', projectKey: restoredProjectKey });
         return true;
       }
     } catch (error) {
       console.warn('Failed to reopen shared project after reload', error);
+      sharedProjectInitialRestoreInProgress = false;
+      console.info('[shared-sync]', { event: 'restore-shared-project failed', reason: String(error?.message || error || '') });
     }
     return false;
   }
@@ -68123,7 +68161,9 @@
       totalFetched += ops.length;
       confirmSharedProjectLocalOpsFromServerOps(ops, { source: reason });
       const beforeSeq = sharedProjectLastAppliedSeq;
-      const replayed = await replayOps(ops, { fromRemote: true });
+  console.info('[shared-sync]', { event: 'ops-apply start', projectKey, count: ops.length });
+  const replayed = await replayOps(ops, { fromRemote: true });
+  console.info('[shared-sync]', { event: 'ops-apply done', projectKey, applied: Boolean(replayed), latestRevision: sharedProjectLastAppliedSeq });
       if (!replayed) {
         scheduleSharedProjectOpsRescueRetry(120, `${reason || 'op-burst'}-apply-retry`);
         return false;
@@ -69931,6 +69971,7 @@
       activeRevision: activeSharedProjectRevision,
       snapshotRevision: activeSharedProjectSnapshotRevision,
     });
+    console.info('[shared-sync]', { event: 'snapshot-fetch start', reason, projectKey: activeSharedProjectKey || '' });
     sharedProjectRecoveryInProgress = Boolean(reason && (reason.includes('canonical') || reason.includes('recovery')));
     if ((!canUseSharedProjectsBackend() && !await ensureSharedProjectBackendSession()) || !activeSharedProjectKey) {
       logSharedProjectRealtimeChannelLifecycle('refresh-skip', {
@@ -69941,6 +69982,7 @@
           blockedBy: 'missing-backend-session-or-project-key',
         },
       });
+      console.info('[shared-sync]', { event: 'snapshot-fetch skipped', reason: 'missing-backend-session-or-project-key', projectKey: activeSharedProjectKey || '' });
       return false;
     }
     logSharedProjectRealtimeChannelLifecycle('refresh-start', {
@@ -69957,6 +69999,7 @@
           blockedBy: 'refresh-in-flight',
         },
       });
+      console.info('[shared-sync]', { event: 'snapshot-fetch skipped', reason: 'refresh-in-flight', projectKey: activeSharedProjectKey || '' });
       return false;
     }
     sharedProjectRefreshInFlight = true;
@@ -69984,6 +70027,7 @@
             result: 'missing-project-record',
           },
         });
+        console.info('[shared-sync]', { event: 'snapshot-fetch skipped', reason: 'missing-project-record', projectKey: activeSharedProjectKey || '' });
         return false;
       }
       if (!activeSharedProjectId) {
@@ -70333,6 +70377,7 @@
             nextRevision,
           },
         });
+        console.info('[shared-sync]', { event: 'snapshot-fetch skipped', reason: 'missing-shared-snapshot', projectKey: activeSharedProjectKey || '' });
         return false;
       }
       confirmSharedProjectLocalOpsFromServerOps(await fetchMissingOps(activeSharedProjectKey, Math.max(0, snapshotRevision - 1), Math.min(64, SHARED_PROJECT_MAX_MISSING_OP_FETCH)), {
@@ -70340,6 +70385,7 @@
       });
       if (deferSharedProjectSnapshotApplyIfLocalOpsInFlight(reason || 'snapshot-refresh')) {
         restoreLoadedDocumentStateAfterSnapshotAbort();
+        console.info('[shared-sync]', { event: 'snapshot-fetch skipped', reason: 'deferred-local-ops-in-flight', projectKey: activeSharedProjectKey || '' });
         return false;
       }
       const snapshotWouldRollbackActiveRevision = Boolean(
@@ -70384,6 +70430,7 @@
           setActiveSharedProjectSyncState('synced');
           return true;
         }
+        console.info('[shared-sync]', { event: 'snapshot-fetch skipped', reason: 'stale-snapshot-ignored', projectKey: activeSharedProjectKey || '' });
         return false;
       }
       if (snapshotRevision < activeSharedProjectRevision && nextRevision > activeSharedProjectRevision) {
@@ -70472,6 +70519,7 @@
             snapshotRevision,
           },
         });
+        console.info('[shared-sync]', { event: 'snapshot-fetch skipped', reason: 'snapshot-deferred-different-tab', projectKey: activeSharedProjectKey || '' });
         return false;
       }
       if (!loaded) {
@@ -70485,6 +70533,7 @@
             snapshotRevision,
           },
         });
+        console.info('[shared-sync]', { event: 'snapshot-fetch skipped', reason: 'snapshot-load-failed', projectKey: activeSharedProjectKey || '' });
         return false;
       }
       logSharedProjectRealtimeChannelLifecycle('refresh-snapshot-loaded', {
@@ -70496,6 +70545,7 @@
           snapshotStructureRevision,
         },
       });
+  console.info('[shared-sync]', { event: 'snapshot-fetch done', projectKey: activeSharedProjectKey || '', snapshotRevision });
       compareSharedProjectSnapshotIdentity(sharedSnapshot?.document || sharedSnapshot, {
         projectKey: activeSharedProjectKey,
         projectId: project.id || '',
@@ -75659,6 +75709,7 @@
 
   function cancelStartupRestoreProgress(reason = 'user-cancel') {
     startupRestoreCancelRequested = true;
+    sharedProjectInitialRestoreInProgress = false;
     startupSharedReloadProjectKey = '';
     startupSharedReloadRevision = 0;
     startupSharedReloadStructureRevision = 0;
