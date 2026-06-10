@@ -40238,11 +40238,13 @@
     const mapping = previousOrder.map(entry => state.palette.indexOf(entry));
     remapPaletteIndices(mapping);
     const newIndex = state.palette.indexOf(color);
-    // 表示を即時に反映させるため、state を直接更新してから再レンダリングする
+    // 表示を即時に反映させるため、state を直接
+    // 更新してから再レンダリングする
     if (setActive) {
       state.activePaletteIndex = normalizePaletteIndex(newIndex, previousActive);
     } else if (setSecondary) {
-      // 呼び出し側がアクティブを維持してセカンダリを更新したい場合
+      // 呼び出し側がアクティブを維持してセカンダリ
+      // を更新したい場合
       state.secondaryPaletteIndex = normalizePaletteIndex(newIndex, previousActive);
     }
     // DOM を再構築して選択表示を更新
