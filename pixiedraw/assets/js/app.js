@@ -18353,6 +18353,7 @@
         const loaded = await openRecentProject(entry, {
           hideStartup: false,
           silent: true,
+          allowProjectMismatchLoad: true,
         });
         if (!loaded) {
           return false;
@@ -23540,7 +23541,7 @@
     // (or explicitly include a sharedProjectKey), avoid silently applying a
     // snapshot intended for a different project/tab. In those cases return
     // a sentinel 'deferred' so callers can create a new tab instead.
-    if (options?.openedFromRecent || options?.sharedProjectKey) {
+    if ((options?.openedFromRecent || options?.sharedProjectKey) && !options?.allowProjectMismatchLoad) {
       try {
         const requestedProjectId = normalizeAutosaveProjectId(String(options?.projectId || '') || '');
         const requestedSharedKey = String(options?.sharedProjectKey || '').trim() || '';
@@ -26621,6 +26622,7 @@
       projectId = '',
       skipThumbnail = false,
       thumbnailIntervalMs = LOCAL_PROJECT_THUMBNAIL_UPDATE_INTERVAL_MS,
+      activateProject = true,
     } = {}
   ) {
     if (!AUTOSAVE_SUPPORTED) {
@@ -26630,7 +26632,9 @@
       return null;
     }
     try {
-      const resolvedProjectId = setActiveAutosaveProjectId(projectId || autosaveProjectId || createAutosaveProjectId());
+      const resolvedProjectId = activateProject
+        ? setActiveAutosaveProjectId(projectId || autosaveProjectId || createAutosaveProjectId())
+        : (normalizeAutosaveProjectId(projectId || autosaveProjectId || '') || createAutosaveProjectId());
       const packaged = packagedPayload && typeof packagedPayload === 'object'
         ? packagedPayload
         : buildPackagedProjectPayload(snapshot);
@@ -27537,6 +27541,7 @@
           projectId: latestEntry.id || '',
           suppressAutosaveStatus: true,
           openedFromRecent: true,
+          allowProjectMismatchLoad: Boolean(options.allowProjectMismatchLoad),
         });
         return loaded ? finishRecentProjectOpen('自動保存: プロジェクトを開きました') : false;
       };
@@ -27548,6 +27553,7 @@
           projectId: latestEntry.id || '',
           suppressAutosaveStatus: true,
           openedFromRecent: true,
+          allowProjectMismatchLoad: Boolean(options.allowProjectMismatchLoad),
         });
         if (loaded === 'deferred') {
           // The snapshot targets a different project/tab: create a new tab
@@ -62433,6 +62439,7 @@
       await waitForSharedProjectProgressPaint();
       await recordRecentProjectSnapshot(snapshot, localBackupPackaged, {
         projectId: originalLocalProjectId,
+        activateProject: false,
       });
     }
     setSharedProjectCreateProgress(
@@ -62489,13 +62496,19 @@
       autoJoin: false,
       revision: Math.max(0, Math.round(Number(project.latest_revision) || 0)),
       structureRevision: Math.max(0, Math.round(Number(project.latest_structure_revision) || 0)),
+      project: packaged,
     });
     const sharedRecentProjectId = buildSharedRecentProjectId(projectKey);
     setActiveAutosaveProjectId(sharedRecentProjectId);
     retargetAutosaveProjectId(originalLocalProjectId, sharedRecentProjectId);
-    await recordRecentProjectSnapshot(snapshot, packaged, {
-      projectId: sharedRecentProjectId,
-    });
+    window.setTimeout(() => {
+      recordRecentProjectSnapshot(snapshot, packaged, {
+        projectId: sharedRecentProjectId,
+        activateProject: false,
+      }).catch(error => {
+        console.warn('Failed to cache shared project locally after creation', error);
+      });
+    }, 0);
     syncMultiControls();
     setMultiStatus(
       creationVisibility === MULTI_ROOM_VISIBILITY_PUBLIC
@@ -75908,14 +75921,19 @@
       autoJoin: false,
       inviteToken: initialInviteToken,
     });
-    let copiedInitialInviteUrl = false;
     if (
       initialInviteUrl
       && !pointerState.active
-      && !hasSharedProjectLocalCommitWorkPending()
-      && !hasSharedProjectFailedLocalOps()
     ) {
-      copiedInitialInviteUrl = await writeTextToClipboard(initialInviteUrl, { promptFallback: false });
+      const copiedInitialInviteUrl = await writeTextToClipboard(initialInviteUrl, { promptFallback: false });
+      if (copiedInitialInviteUrl) {
+        ensureSharedProjectInviteIncludesCommittedLocalOps(resolvedProjectKey, { reason: 'copy-invite-link-background' }).catch(error => {
+          console.warn('Failed to finish shared invite sync after copy', error);
+        });
+        setMultiStatus(localizeText('招待リンクをコピーしました', 'Invite link copied'), 'success');
+        window.alert(localizeText('共有URLをコピーしました。', 'Shared URL copied.'));
+        return true;
+      }
     }
     if (!await ensureSharedProjectInviteIncludesCommittedLocalOps(resolvedProjectKey, { reason: 'copy-invite-link' })) {
       return false;
@@ -75949,11 +75967,6 @@
       setMultiStatus(localizeText('先に共有リンクを作成してください', 'Create a shared link first'), 'warn');
       return false;
     }
-    if (copiedInitialInviteUrl && inviteUrl === initialInviteUrl) {
-      setMultiStatus(localizeText('招待リンクをコピーしました', 'Invite link copied'), 'success');
-      window.alert(localizeText('共有URLをコピーしました。', 'Shared URL copied.'));
-      return true;
-    }
     const copied = await writeTextToClipboard(inviteUrl);
     if (!copied) {
       setMultiStatus(localizeText('招待リンクのコピーに失敗しました', 'Failed to copy invite link'), 'error');
@@ -75972,6 +75985,40 @@
     }
     const inviteRole = resolveMultiInviteDefaultRole();
     const resolvedProjectKey = resolveSharedProjectKeyForCurrentState() || normalizeMultiProjectKey(activeSharedProjectKey || '');
+    const initialInviteToken = getCurrentSharedRecentProjectEntry(resolvedProjectKey)?.sharedProjectInviteToken || '';
+    const initialInviteUrl = buildMultiInviteUrl(resolvedProjectKey, {
+      role: inviteRole,
+      autoJoin: false,
+      inviteToken: initialInviteToken,
+    });
+    if (initialInviteUrl && !pointerState.active) {
+      const finishBackgroundSync = () => {
+        ensureSharedProjectInviteIncludesCommittedLocalOps(resolvedProjectKey, { reason: 'share-invite-link-background' }).catch(error => {
+          console.warn('Failed to finish shared invite sync after share', error);
+        });
+      };
+      if (typeof navigator?.share === 'function') {
+        try {
+          await navigator.share({
+            title: 'PiXiEEDraw 参加招待',
+            text: 'PiXiEEDraw の参加招待リンクです',
+            url: initialInviteUrl,
+          });
+          finishBackgroundSync();
+          setMultiStatus(localizeText('招待リンクを共有しました', 'Invite link shared'), 'success');
+          return true;
+        } catch (error) {
+          // Fallback to clipboard below when share is canceled/failed.
+        }
+      }
+      const copied = await writeTextToClipboard(initialInviteUrl, { promptFallback: false });
+      if (copied) {
+        finishBackgroundSync();
+        setMultiStatus(localizeText('招待リンクをコピーしました', 'Invite link copied'), 'success');
+        window.alert(localizeText('共有URLをコピーしました。', 'Shared URL copied.'));
+        return true;
+      }
+    }
     if (!await ensureSharedProjectInviteIncludesCommittedLocalOps(resolvedProjectKey, { reason: 'share-invite-link' })) {
       return false;
     }
