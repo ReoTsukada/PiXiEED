@@ -1,4 +1,4 @@
-const APP_BUILD_VERSION = '2026.06.08-tabs-rails-fast-color';
+const APP_BUILD_VERSION = '2026.06.12-compact-export-dialog';
 const CACHE_VERSION = `pixiedraw-v${APP_BUILD_VERSION}`;
 const CORE_ASSETS = [
   '/pixiedraw/',
@@ -9,6 +9,11 @@ const CORE_ASSETS = [
   '/pixiedraw/assets/js/app.js',
   '/icon/icon-192-4.png',
   '/icon/icon-512-4.png',
+  '/icon-e1_frame_01.png',
+  '/icon-e1_frame_02.png',
+  '/icon-e1_frame_03.png',
+  '/icon-e1_frame_04.png',
+  '/icon-e1_frame_05.png',
 ];
 
 self.addEventListener('install', event => {
