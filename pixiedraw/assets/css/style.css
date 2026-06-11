@@ -9322,9 +9322,65 @@ body.is-mobile-layout #newProjectDialog .modal__body {
   gap: 10px;
 }
 
+.export-dialog-body__settings > .field--list {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(150px, 0.7fr);
+  gap: 12px;
+  margin: 0;
+}
+
 .export-dialog-body__settings > .field,
 .export-dialog-body__preview > .export-ad {
   margin: 0;
+}
+
+#exportDialog .export-format-field,
+#exportDialog .export-name-field {
+  margin: 0;
+  min-width: 0;
+}
+
+#exportDialog .export-format-field select,
+#exportDialog .export-name-field input {
+  width: 100%;
+  min-height: 48px;
+  font-size: 1rem;
+}
+
+#exportScaleControls,
+#exportGridSettings,
+.export-option-icons {
+  grid-column: 1 / -1;
+}
+
+#exportScaleControls {
+  min-width: 0;
+}
+
+#exportDialog .scale-controls {
+  display: grid;
+  gap: 8px;
+}
+
+#exportDialog .scale-control--wide {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) 76px;
+  align-items: center;
+  gap: 10px;
+}
+
+#exportDialog #exportScaleSlider {
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+}
+
+#exportDialog #exportScaleInput,
+#exportDialog #exportGridWidth,
+#exportDialog #exportGridHeight {
+  min-height: 48px;
+  text-align: center;
+  font-size: 1rem;
 }
 
 .export-preview-panel {
@@ -9353,41 +9409,25 @@ body.is-mobile-layout #newProjectDialog .modal__body {
   text-transform: uppercase;
 }
 
-.export-preview-tabs {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.export-preview-tab,
 .export-toggle-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
-  min-width: 34px;
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
   border: 1px solid rgba(var(--ui-rgb), 0.36);
   background: rgba(6, 12, 20, 0.78);
   color: rgba(223, 247, 255, 0.95);
   font: 700 0.72rem/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
 }
 
-.export-preview-tab {
-  cursor: pointer;
-}
-
-.export-preview-tab:hover,
-.export-preview-tab:focus-visible,
-.export-preview-tab.is-active {
-  border-color: rgba(var(--ui-rgb), 0.9);
-  background: rgba(var(--ui-rgb), 0.18);
-  outline: none;
-}
-
-.export-preview-tab:disabled {
-  opacity: 0.42;
-  cursor: default;
+.export-toggle-icon img {
+  display: block;
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  image-rendering: pixelated;
 }
 
 .export-preview-canvas-wrap {
@@ -9458,9 +9498,11 @@ body.is-mobile-layout #newProjectDialog .modal__body {
 .export-option-icons {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 10px;
   margin-top: 2px;
-  padding: 8px;
+  padding: 10px;
   border: 1px solid rgba(var(--ui-rgb), 0.18);
   background: rgba(6, 12, 20, 0.74);
 }
@@ -9476,12 +9518,12 @@ body.is-mobile-layout #newProjectDialog .modal__body {
 }
 
 #exportDialog .export-icon-toggle {
-  width: 42px;
-  height: 42px;
-  min-height: 42px;
+  width: 50px;
+  height: 50px;
+  min-height: 50px;
   padding: 0;
   justify-content: center;
-  flex: 0 0 42px;
+  flex: 0 0 50px;
 }
 
 #exportDialog .export-icon-toggle span:not(.export-toggle-icon) {
@@ -9907,6 +9949,43 @@ body.is-mobile-layout #newProjectDialog .modal__body {
     grid-template-columns: 1fr;
   }
 
+  .export-dialog-body__settings > .field--list {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  #exportDialog .export-format-field select,
+  #exportDialog .export-name-field input {
+    min-height: 46px;
+  }
+
+  #exportDialog .scale-control--wide {
+    grid-template-columns: minmax(120px, 1fr) 70px;
+    gap: 8px;
+  }
+
+  #exportDialog .export-icon-toggle {
+    width: 48px;
+    height: 48px;
+    min-height: 48px;
+    flex-basis: 48px;
+  }
+
+  #exportDialog .export-icon-toggle .export-toggle-icon {
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+  }
+
+  #exportDialog .field--inline {
+    gap: 8px;
+  }
+
+  #exportDialog .field--inline .field {
+    flex: 1 1 110px;
+    margin: 0;
+  }
+
   .export-preview-canvas-wrap {
     min-height: 150px;
     max-height: 260px;
@@ -9917,14 +9996,6 @@ body.is-mobile-layout #newProjectDialog .modal__body {
     flex-direction: column;
   }
 
-  .export-preview-tabs {
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  .export-preview-tab {
-    flex: 1 1 0;
-  }
 }
 
 .mobile-topbar {
