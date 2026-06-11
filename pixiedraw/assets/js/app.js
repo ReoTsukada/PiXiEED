@@ -1118,7 +1118,7 @@
   const RELOAD_SNAPSHOT_MAX_SYNC_CHARS = 2 * 1024 * 1024;
   const STARTUP_SCREEN_DISMISSED_KEY = 'pixieedraw:startupScreenDismissed';
   const STARTUP_ACCOUNT_INIT_TIMEOUT_MS = 5000;
-  const STARTUP_RESTORE_TIMEOUT_MS = 15000;
+  const STARTUP_RESTORE_TIMEOUT_MS = 8000;
   const UPDATE_TOAST_SEEN_PREFIX = 'pixieedraw:update-toast-seen:';
   const STARTUP_UPDATE_TOAST_HIDDEN_KEY = 'pixieedraw:update-toast-hidden';
   const HIDDEN_SHARED_PROJECT_KEYS_STORAGE_PREFIX = 'pixieedraw:hidden-shared-projects:';
@@ -3259,7 +3259,6 @@
   let sharedProjectPollingTimer = null;
   let sharedProjectRefreshTimer = null;
   let sharedProjectRefreshInFlight = false;
-  let sharedProjectInitialRestoreInProgress = false;
   let sharedProjectReconnectRecoveryTimer = null;
   let sharedProjectReconnectRecoveryPromise = null;
   let sharedProjectWakeRecoveryPromise = null;
@@ -3318,6 +3317,12 @@
     return keys;
   }
 
+  function isTabLocalRestoreOnlyKey(baseKey) {
+    return baseKey === AUTOSAVE_ACTIVE_PROJECT_SYNC_KEY
+      || baseKey === RELOAD_TARGET_PROJECT_ID_KEY
+      || baseKey === RELOAD_PROJECT_FALLBACK_STORAGE_KEY;
+  }
+
   function writeSessionStorageForLocalRestore(baseKey, value) {
     if (!canUseSessionStorage) {
       return;
@@ -3333,6 +3338,9 @@
 
   function writeLocalStorageForLocalRestore(baseKey, value) {
     if (!canUseSessionStorage) {
+      return;
+    }
+    if (isTabLocalRestoreOnlyKey(baseKey)) {
       return;
     }
     getLocalRestoreStorageKeys(baseKey).forEach(key => {
@@ -3367,6 +3375,9 @@
     if (!canUseSessionStorage) {
       return '';
     }
+    if (isTabLocalRestoreOnlyKey(baseKey)) {
+      return '';
+    }
     const keys = getLocalRestoreStorageKeys(baseKey);
     for (let index = 0; index < keys.length; index += 1) {
       const key = keys[index];
@@ -3391,6 +3402,9 @@
         window.sessionStorage.removeItem(key);
       } catch (error) {
         // Ignore sessionStorage cleanup failures.
+      }
+      if (isTabLocalRestoreOnlyKey(baseKey)) {
+        return;
       }
       try {
         window.localStorage.removeItem(key);
@@ -9639,13 +9653,6 @@
         }).catch(() => {});
         return;
       }
-      if (sharedProjectInitialRestoreInProgress) {
-        logSharedProjectRealtimeChannelLifecycle('watchdog-skip', {
-          caller: 'ensureSharedProjectRefreshLoop',
-          reason: 'restore-in-progress',
-        });
-        return;
-      }
       if (
         activeSharedProjectSyncState === 'catching-up'
         && !sharedProjectReconnectRecoveryPromise
@@ -10188,7 +10195,6 @@
         revision: activeSharedProjectRevision,
         structureRevision: activeSharedProjectStructureRevision,
       });
-      console.info('[shared-sync]', { event: 'ops-fetch start', projectKey: activeSharedProjectKey || '', afterRevision: sharedProjectLastAppliedSeq });
       syncSharedProjectVisibleStatus();
     }
   }
@@ -10199,7 +10205,6 @@
 
   function isSharedProjectDrawReadinessFresh() {
     if (!isSharedProjectCollaborativeMode()) {
-      console.info('[shared-sync]', { event: 'ops-fetch done', projectKey, count: ops.length });
       return true;
     }
     const latestVerifiedAt = Math.max(
@@ -11654,160 +11659,8 @@
     return Promise.resolve(false);
   }
 
-  // Wake recovery controller -------------------------------------------------
-  let _wakeRecoveryInterval = null;
-  let _wakeRecoveryLastNow = Date.now();
-  let _wakeRecoveryInFlight = false;
-
-  function startWakeRecoveryListener() {
-    if (typeof window === 'undefined' || typeof document === 'undefined') return;
-    // guard to avoid double install
-    if (window.__pixieedWakeRecoveryInstalled) return;
-    window.__pixieedWakeRecoveryInstalled = true;
-
-    const tryWake = (reason = 'event') => {
-      if (!activeSharedProjectKey) return;
-      if (!activeSharedProjectId) {
-        console.info('[shared-sync]', { event: 'wake-recovery skipped', reason: 'missing-project-id', projectKey: activeSharedProjectKey });
-        return;
-      }
-      if (_wakeRecoveryInFlight) return;
-      if (sharedProjectInitialRestoreInProgress) {
-        console.info('[shared-sync]', { event: 'wake-recovery skipped', reason: 'restore-in-progress', projectKey: activeSharedProjectKey });
-        return;
-      }
-      performWakeRecovery(reason).catch(() => {});
-    };
-
-    window.addEventListener('online', () => tryWake('online'));
-    window.addEventListener('focus', () => tryWake('focus'));
-    window.addEventListener('pageshow', (ev) => {
-      if (ev && ev.persisted) {
-        tryWake('pageshow-persisted');
-      } else {
-        tryWake('pageshow');
-      }
-    });
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') {
-        tryWake('visibility-visible');
-      }
-    });
-
-    // Detect large time jumps which usually indicate sleep/resume
-    _wakeRecoveryLastNow = Date.now();
-    _wakeRecoveryInterval = window.setInterval(() => {
-      const now = Date.now();
-      const gap = now - _wakeRecoveryLastNow;
-      _wakeRecoveryLastNow = now;
-      // treat gaps > 2sec + 2x interval as a wake (interval default 2s)
-      if (gap > 3000) {
-        tryWake('time-jump');
-      }
-    }, 2000);
-  }
-
-  async function performWakeRecovery(reason = 'manual-wake') {
-    if (!activeSharedProjectKey) return false;
-    if (_wakeRecoveryInFlight) return false;
-    _wakeRecoveryInFlight = true;
-    const sessionTokenAtStart = activeSharedProjectSessionToken;
-    const projectKey = activeSharedProjectKey;
-    logSharedProjectRealtimeChannelLifecycle('wake-recovery-start', { caller: 'performWakeRecovery', reason, projectKey });
-    try {
-      // Ensure account and backend session
-      await ensurePixieedAccountReady({ forceRefresh: true, silent: true });
-      if (sessionTokenAtStart !== activeSharedProjectSessionToken) {
-        console.info('[shared-sync] abort-wake-recovery-due-to-session-change-before-backend', { projectKey });
-        return false;
-      }
-      if (!await ensureSharedProjectBackendSession()) {
-        console.info('[shared-sync] wake-recovery-backend-session-failed', { projectKey });
-        setMultiStatus(localizeText('共有セッションの再初期化に失敗しました。再接続を試してください。', 'Failed to reinitialize shared session. Please reconnect.'), 'warn');
-        return false;
-      }
-      if (sessionTokenAtStart !== activeSharedProjectSessionToken) {
-        console.info('[shared-sync] abort-wake-recovery-due-to-session-change-after-backend', { projectKey });
-        return false;
-      }
-
-      // Don't trust existing realtime channel on some browsers (Safari)
-      try {
-        await disconnectActiveSharedProjectRealtimeChannel({ reason: 'wake-recovery-unbind', caller: 'performWakeRecovery' });
-      } catch (e) {
-        // ignore
-      }
-      if (sessionTokenAtStart !== activeSharedProjectSessionToken) {
-        console.info('[shared-sync] abort-wake-recovery-due-to-session-change-after-disconnect', { projectKey });
-        return false;
-      }
-
-      // Try a fresh snapshot refresh (may be no-op if up-to-date)
-      const refreshed = await refreshActiveSharedProjectSnapshot({ force: false, reason: `wake-recovery:${reason}` });
-      if (sessionTokenAtStart !== activeSharedProjectSessionToken) {
-        console.info('[shared-sync] abort-wake-recovery-due-to-session-change-after-refresh', { projectKey });
-        return false;
-      }
-
-      // Resubscribe realtime channel
-      let channel = null;
-      try {
-        channel = await ensureActiveSharedProjectRealtimeChannel();
-      } catch (error) {
-        console.info('[shared-sync] wake-recovery-channel-subscribe-failed', { projectKey, error: String(error?.message || error || '') });
-      }
-      if (sessionTokenAtStart !== activeSharedProjectSessionToken) {
-        console.info('[shared-sync] abort-wake-recovery-due-to-session-change-after-channel', { projectKey });
-        return false;
-      }
-
-      // Try to recover gap after channel resubscribe
-      const gapRecovered = await recoverSharedProjectRealtimeGap(projectKey, { afterSeq: sharedProjectLastAppliedSeq, reason: `wake-recovery:${reason}` });
-      if (sessionTokenAtStart !== activeSharedProjectSessionToken) {
-        console.info('[shared-sync] abort-wake-recovery-due-to-session-change-after-gap', { projectKey });
-        return false;
-      }
-
-      // If nothing recovered, queue full reconnect recovery which may block editing
-      if (!refreshed && !gapRecovered) {
-        // Prefer lighter recovery: queue reconnect but don't force reload
-        queueSharedProjectReconnectRecovery('wake-fallback', { immediate: true, blockEditing: false }).catch(() => {});
-        setMultiStatus(localizeText('共有接続が不安定です。再接続を試みています…', 'Shared connection unstable, attempting reconnect...'), 'info');
-        return false;
-      }
-
-      // resume pending local ops and finalize
-      resumeSharedProjectLocalOpsAfterConnectivityChange(`wake-recovery:${reason}`);
-      setActiveSharedProjectSyncState('synced', { announce: true });
-      logSharedProjectRealtimeChannelLifecycle('wake-recovery-done', { caller: 'performWakeRecovery', reason, projectKey, refreshed, gapRecovered, channelConnected: Boolean(channel) });
-      return true;
-    } catch (error) {
-      console.warn('[shared-sync] wake-recovery-exception', { projectKey, error: String(error?.message || error || '') });
-      setMultiStatus(localizeText('復帰処理中にエラーが発生しました。再接続をお試しください。', 'Error occurred during recovery. Please try reconnect.'), 'warn');
-      return false;
-    } finally {
-      _wakeRecoveryInFlight = false;
-    }
-  }
-
-  // start listener on module init
-  try {
-    startWakeRecoveryListener();
-  } catch (e) {
-    // ignore startup failures
-  }
-
   function recoverSharedProjectAfterWake(reason = 'wake', { hiddenGapMs = 0, immediate = true } = {}) {
     if (!activeSharedProjectKey) {
-      return Promise.resolve(false);
-    }
-    if (!activeSharedProjectId) {
-      logSharedProjectRealtimeChannelLifecycle('wake-recovery-skip', {
-        caller: 'recoverSharedProjectAfterWake',
-        reason,
-        extra: { reason: 'missing-project-id' },
-      });
-      console.info('[shared-sync]', { event: 'wake-recovery skipped', reason: 'missing-project-id', projectKey: activeSharedProjectKey || '' });
       return Promise.resolve(false);
     }
     if (sharedProjectWakeRecoveryPromise) {
@@ -16924,6 +16777,7 @@
       return {
         owner,
         expiresAt: Math.round(expiresAt),
+        projectId: normalizeAutosaveProjectId(parsed.projectId || ''),
       };
     } catch (error) {
       return null;
@@ -16973,22 +16827,30 @@
       return true;
     }
     const now = Date.now();
+    const projectId = normalizeAutosaveProjectId(autosaveProjectId || '');
     const current = readAutosaveTabLock();
     if (
       current
       && current.owner !== autosaveTabInstanceId
       && current.expiresAt > now
+      && (!current.projectId || !projectId || current.projectId === projectId)
     ) {
       return false;
     }
     const nextLock = {
       owner: autosaveTabInstanceId,
       expiresAt: now + AUTOSAVE_TAB_LOCK_TTL_MS,
+      projectId,
     };
     try {
       window.localStorage.setItem(AUTOSAVE_TAB_LOCK_KEY, JSON.stringify(nextLock));
       const verified = readAutosaveTabLock();
-      return Boolean(verified && verified.owner === autosaveTabInstanceId && verified.expiresAt === nextLock.expiresAt);
+      return Boolean(
+        verified
+        && verified.owner === autosaveTabInstanceId
+        && verified.expiresAt === nextLock.expiresAt
+        && normalizeAutosaveProjectId(verified.projectId || '') === projectId
+      );
     } catch (error) {
       return true;
     }
@@ -17039,7 +16901,13 @@
       return;
     }
     const nextLock = parseAutosaveTabLockPayload(event.newValue);
-    if (!nextLock || nextLock.owner === autosaveTabInstanceId || nextLock.expiresAt <= Date.now()) {
+    const currentProjectId = normalizeAutosaveProjectId(autosaveProjectId || '');
+    if (
+      !nextLock
+      || nextLock.owner === autosaveTabInstanceId
+      || nextLock.expiresAt <= Date.now()
+      || (nextLock.projectId && currentProjectId && nextLock.projectId !== currentProjectId)
+    ) {
       scheduleAutosaveSnapshot();
     }
   }
@@ -17629,6 +17497,7 @@
       scheduleAutosaveSnapshot();
       return false;
     }
+    const projectId = await ensureActiveAutosaveProjectId();
     if (!tryAcquireAutosaveTabLock()) {
       autosaveWriteQueued = true;
       scheduleAutosaveSnapshot();
@@ -17650,7 +17519,6 @@
       const snapshot = makeHistorySnapshot({ clonePixelData: false });
       const session = buildAutosaveSessionPayload();
       const packaged = buildPackagedProjectPayload(snapshot, { session });
-      const projectId = await ensureActiveAutosaveProjectId();
       const dirtyGenerationAtStart = autosaveDirtyGeneration;
       const unsavedTokenAtStart = unsavedChangeToken;
       const savedEntry = await recordRecentProjectSnapshot(snapshot, packaged, {
@@ -17661,7 +17529,7 @@
         throw new Error('Failed to record autosave snapshot');
       }
       const stillCurrentWrite = (
-        autosaveProjectId === projectId
+        normalizeAutosaveProjectId(autosaveProjectId || '') === projectId
         && autosaveDirtyGeneration === dirtyGenerationAtStart
         && unsavedChangeToken === unsavedTokenAtStart
       );
@@ -18306,7 +18174,7 @@
                 const newTabId = createOpenProjectTabId();
                 const newTab = {
                   id: newTabId,
-                  projectId: normalizeAutosaveProjectId(options && options.projectId) || createAutosaveProjectId(),
+                  projectId: createAutosaveProjectId(),
                   fileName: normalizeDocumentName(packaged.documentName || DEFAULT_DOCUMENT_NAME),
                   label: extractDocumentBaseName(packaged.documentName || DEFAULT_DOCUMENT_NAME),
                   project: packaged,
@@ -23249,22 +23117,15 @@
   }
 
   async function maybeRestoreSharedProjectOnStartup() {
-    sharedProjectInitialRestoreInProgress = true;
-    console.info('[shared-sync]', { event: 'restore-shared-project start', projectKeyHint: startupSharedReloadProjectKey || '' });
     const restoredProjectKey = normalizeMultiProjectKey(startupSharedReloadProjectKey || '');
     if (startupRestoreCancelRequested || !restoredProjectKey || readMultiInviteFromUrl()) {
-      sharedProjectInitialRestoreInProgress = false;
-      console.info('[shared-sync]', { event: 'restore-shared-project failed', reason: 'cancelled-or-missing-key' });
       return false;
     }
     setStartupProgressLabel(localizeText('共有プロジェクトへ復帰中…', 'Reopening shared project...'));
     try {
-        console.info('[shared-sync]', { event: 'project-key resolved', projectKey: restoredProjectKey });
       const entries = await loadRecentProjectsMetadata();
       if (startupRestoreCancelRequested) {
-          sharedProjectInitialRestoreInProgress = false;
-          console.info('[shared-sync]', { event: 'restore-shared-project failed', reason: 'cancelled-after-metadata' });
-          return false;
+        return false;
       }
       const limitedEntries = enforceSharedRecentProjectLimit(entries);
       setRecentProjectsCache(limitedEntries);
@@ -23336,14 +23197,10 @@
           localizeText('共有プロジェクト: 再読み込み前のプロジェクトへ復帰しました', 'Shared project: reopened the project from before reload'),
           'success'
         );
-        sharedProjectInitialRestoreInProgress = false;
-        console.info('[shared-sync]', { event: 'restore-shared-project done', projectKey: restoredProjectKey });
         return true;
       }
     } catch (error) {
       console.warn('Failed to reopen shared project after reload', error);
-      sharedProjectInitialRestoreInProgress = false;
-      console.info('[shared-sync]', { event: 'restore-shared-project failed', reason: String(error?.message || error || '') });
     }
     return false;
   }
@@ -27698,10 +27555,20 @@
           // becomes visible without overwriting the current document.
           try {
             ensureOpenProjectTabsInitialized();
+            const deferredProjectId = normalizeAutosaveProjectId(latestEntry.id || '') || createAutosaveProjectId();
+            const existingDeferredIndex = findOpenProjectTabIndexByProjectId(deferredProjectId);
+            if (existingDeferredIndex >= 0) {
+              const existingTab = openProjectTabs[existingDeferredIndex];
+              const switched = await activateOpenProjectTab(existingTab?.id || '', {
+                skipPersistCurrent: true,
+                announce: !silent,
+              });
+              return switched ? finishRecentProjectOpen('自動保存: プロジェクトを開きました') : false;
+            }
             const newTabId = createOpenProjectTabId();
             const newTab = {
               id: newTabId,
-              projectId: normalizeAutosaveProjectId(latestEntry.id || '') || createAutosaveProjectId(),
+              projectId: deferredProjectId,
               fileName: normalizeDocumentName(latestEntry.name || DEFAULT_DOCUMENT_NAME),
               label: extractDocumentBaseName(latestEntry.name || DEFAULT_DOCUMENT_NAME),
               project: latestEntry.project || null,
@@ -35453,6 +35320,66 @@
     });
   }
 
+  function getActiveMobilePanelKey() {
+    if (!Array.isArray(dom.mobileTabs)) {
+      return '';
+    }
+    const activeTab = dom.mobileTabs.find(tab => tab instanceof HTMLElement && tab.classList.contains('is-active'));
+    return activeTab?.dataset?.mobileTab || '';
+  }
+
+  function getMobilePanelScrollBody(panel) {
+    if (!(panel instanceof HTMLElement)) {
+      return null;
+    }
+    const body = panel.querySelector('.panel-section__body');
+    return body instanceof HTMLElement ? body : null;
+  }
+
+  function captureMobilePanelScrollState(panelKey = getActiveMobilePanelKey()) {
+    if (layoutMode !== 'mobilePortrait') {
+      return null;
+    }
+    const normalizedKey = isUnifiedLeftToolsColorMode() && panelKey === 'color' ? 'tools' : panelKey;
+    const panel = normalizedKey ? dom.mobilePanels[normalizedKey] : null;
+    if (!(panel instanceof HTMLElement)) {
+      return null;
+    }
+    const body = getMobilePanelScrollBody(panel);
+    return {
+      key: normalizedKey,
+      containerTop: dom.mobilePanelsContainer instanceof HTMLElement ? dom.mobilePanelsContainer.scrollTop : 0,
+      panelTop: panel.scrollTop,
+      bodyTop: body instanceof HTMLElement ? body.scrollTop : 0,
+    };
+  }
+
+  function restoreMobilePanelScrollState(scrollState, { defer = true } = {}) {
+    if (!scrollState || layoutMode !== 'mobilePortrait') {
+      return;
+    }
+    const restore = () => {
+      if (!scrollState || getActiveMobilePanelKey() !== scrollState.key) {
+        return;
+      }
+      const panel = dom.mobilePanels[scrollState.key];
+      if (dom.mobilePanelsContainer instanceof HTMLElement) {
+        dom.mobilePanelsContainer.scrollTop = scrollState.containerTop || 0;
+      }
+      if (panel instanceof HTMLElement) {
+        panel.scrollTop = scrollState.panelTop || 0;
+        const body = getMobilePanelScrollBody(panel);
+        if (body instanceof HTMLElement) {
+          body.scrollTop = scrollState.bodyTop || 0;
+        }
+      }
+    };
+    restore();
+    if (defer && typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(restore);
+    }
+  }
+
   function activateMobileTab(target, { ensureDrawer = false } = {}) {
     const normalizedTarget = isUnifiedLeftToolsColorMode() && target === 'color'
       ? 'tools'
@@ -35782,6 +35709,28 @@
         activateMobileTab(target, { ensureDrawer: true });
       });
     });
+    if (dom.mobilePanelsContainer instanceof HTMLElement && dom.mobilePanelsContainer.dataset.scrollPreserveBound !== 'true') {
+      dom.mobilePanelsContainer.dataset.scrollPreserveBound = 'true';
+      let pendingMobilePanelScrollState = null;
+      dom.mobilePanelsContainer.addEventListener('pointerdown', event => {
+        if (layoutMode !== 'mobilePortrait') {
+          pendingMobilePanelScrollState = null;
+          return;
+        }
+        const target = event.target instanceof Element ? event.target : null;
+        pendingMobilePanelScrollState = target?.closest('button, [role="button"]')
+          ? captureMobilePanelScrollState()
+          : null;
+      }, { passive: true });
+      dom.mobilePanelsContainer.addEventListener('click', () => {
+        if (!pendingMobilePanelScrollState) {
+          return;
+        }
+        const scrollState = pendingMobilePanelScrollState;
+        pendingMobilePanelScrollState = null;
+        restoreMobilePanelScrollState(scrollState);
+      }, true);
+    }
     setupRailResizers();
     setupMobileDrawerInteractions();
     updateLayoutMode();
@@ -40238,13 +40187,11 @@
     const mapping = previousOrder.map(entry => state.palette.indexOf(entry));
     remapPaletteIndices(mapping);
     const newIndex = state.palette.indexOf(color);
-    // 表示を即時に反映させるため、state を直接
-    // 更新してから再レンダリングする
+    // 表示を即時に反映させるため、state を直接更新してから再レンダリングする
     if (setActive) {
       state.activePaletteIndex = normalizePaletteIndex(newIndex, previousActive);
     } else if (setSecondary) {
-      // 呼び出し側がアクティブを維持してセカンダリ
-      // を更新したい場合
+      // 呼び出し側がアクティブを維持してセカンダリを更新したい場合
       state.secondaryPaletteIndex = normalizePaletteIndex(newIndex, previousActive);
     }
     // DOM を再構築して選択表示を更新
@@ -40301,9 +40248,11 @@
     container.hidden = false;
     container.setAttribute('aria-hidden', 'false');
     // preserve scroll position across full redraws to avoid jumping
+    const mobileScrollState = captureMobilePanelScrollState('tools');
     const _prevToolQuickPaletteScroll = container.scrollTop || 0;
     container.innerHTML = '';
     if (!Array.isArray(state.palette) || !state.palette.length) {
+      restoreMobilePanelScrollState(mobileScrollState);
       return;
     }
     const fragment = document.createDocumentFragment();
@@ -40348,6 +40297,7 @@
     } catch (err) {
       // ignore on unexpected containers
     }
+    restoreMobilePanelScrollState(mobileScrollState);
   }
 
   function syncPaletteInputs() {
@@ -40388,6 +40338,7 @@
     if (!container) return;
     // preserve scroll position so switching/refreshing the palette doesn't
     // reset the user's scroll to the top of the list
+    const mobileScrollState = captureMobilePanelScrollState('tools');
     const _prevPaletteListScroll = container.scrollTop || 0;
     container.innerHTML = '';
     const rgbMode = isRgbColorMode();
@@ -40474,7 +40425,8 @@
       const isCompactRail = Boolean(dom.leftRail && String(dom.leftRail.getAttribute('data-compact') || '') === 'true');
       if (exportBtn instanceof HTMLElement) {
         exportBtn.hidden = isCompactRail;
-        if (!isCompactRail) {
+        if (!isCompactRail && exportBtn.dataset.paletteExportBound !== 'true') {
+          exportBtn.dataset.paletteExportBound = 'true';
           exportBtn.addEventListener('click', () => {
             try {
               const data = JSON.stringify(state.palette || []);
@@ -40495,8 +40447,12 @@
       }
       if (importBtn instanceof HTMLElement && importInput instanceof HTMLInputElement) {
         importBtn.hidden = isCompactRail;
-        if (!isCompactRail) {
+        if (!isCompactRail && importBtn.dataset.paletteImportBound !== 'true') {
+          importBtn.dataset.paletteImportBound = 'true';
           importBtn.addEventListener('click', () => importInput.click());
+        }
+        if (!isCompactRail && importInput.dataset.paletteImportChangeBound !== 'true') {
+          importInput.dataset.paletteImportChangeBound = 'true';
           importInput.addEventListener('change', (ev) => {
             const target = ev.target;
             const files = target && target.files ? target.files : null;
@@ -40542,6 +40498,7 @@
     } catch (_) {
       // no-op if not applicable
     }
+    restoreMobilePanelScrollState(mobileScrollState);
   }
 
   function updatePaletteSelectionState(previousActiveIndex = state.activePaletteIndex, previousSecondaryIndex = state.secondaryPaletteIndex) {
@@ -68163,9 +68120,7 @@
       totalFetched += ops.length;
       confirmSharedProjectLocalOpsFromServerOps(ops, { source: reason });
       const beforeSeq = sharedProjectLastAppliedSeq;
-  console.info('[shared-sync]', { event: 'ops-apply start', projectKey, count: ops.length });
-  const replayed = await replayOps(ops, { fromRemote: true });
-  console.info('[shared-sync]', { event: 'ops-apply done', projectKey, applied: Boolean(replayed), latestRevision: sharedProjectLastAppliedSeq });
+      const replayed = await replayOps(ops, { fromRemote: true });
       if (!replayed) {
         scheduleSharedProjectOpsRescueRetry(120, `${reason || 'op-burst'}-apply-retry`);
         return false;
@@ -69973,7 +69928,6 @@
       activeRevision: activeSharedProjectRevision,
       snapshotRevision: activeSharedProjectSnapshotRevision,
     });
-    console.info('[shared-sync]', { event: 'snapshot-fetch start', reason, projectKey: activeSharedProjectKey || '' });
     sharedProjectRecoveryInProgress = Boolean(reason && (reason.includes('canonical') || reason.includes('recovery')));
     if ((!canUseSharedProjectsBackend() && !await ensureSharedProjectBackendSession()) || !activeSharedProjectKey) {
       logSharedProjectRealtimeChannelLifecycle('refresh-skip', {
@@ -69984,7 +69938,6 @@
           blockedBy: 'missing-backend-session-or-project-key',
         },
       });
-      console.info('[shared-sync]', { event: 'snapshot-fetch skipped', reason: 'missing-backend-session-or-project-key', projectKey: activeSharedProjectKey || '' });
       return false;
     }
     logSharedProjectRealtimeChannelLifecycle('refresh-start', {
@@ -70001,7 +69954,6 @@
           blockedBy: 'refresh-in-flight',
         },
       });
-      console.info('[shared-sync]', { event: 'snapshot-fetch skipped', reason: 'refresh-in-flight', projectKey: activeSharedProjectKey || '' });
       return false;
     }
     sharedProjectRefreshInFlight = true;
@@ -70029,7 +69981,6 @@
             result: 'missing-project-record',
           },
         });
-        console.info('[shared-sync]', { event: 'snapshot-fetch skipped', reason: 'missing-project-record', projectKey: activeSharedProjectKey || '' });
         return false;
       }
       if (!activeSharedProjectId) {
@@ -70379,7 +70330,6 @@
             nextRevision,
           },
         });
-        console.info('[shared-sync]', { event: 'snapshot-fetch skipped', reason: 'missing-shared-snapshot', projectKey: activeSharedProjectKey || '' });
         return false;
       }
       confirmSharedProjectLocalOpsFromServerOps(await fetchMissingOps(activeSharedProjectKey, Math.max(0, snapshotRevision - 1), Math.min(64, SHARED_PROJECT_MAX_MISSING_OP_FETCH)), {
@@ -70387,7 +70337,6 @@
       });
       if (deferSharedProjectSnapshotApplyIfLocalOpsInFlight(reason || 'snapshot-refresh')) {
         restoreLoadedDocumentStateAfterSnapshotAbort();
-        console.info('[shared-sync]', { event: 'snapshot-fetch skipped', reason: 'deferred-local-ops-in-flight', projectKey: activeSharedProjectKey || '' });
         return false;
       }
       const snapshotWouldRollbackActiveRevision = Boolean(
@@ -70432,7 +70381,6 @@
           setActiveSharedProjectSyncState('synced');
           return true;
         }
-        console.info('[shared-sync]', { event: 'snapshot-fetch skipped', reason: 'stale-snapshot-ignored', projectKey: activeSharedProjectKey || '' });
         return false;
       }
       if (snapshotRevision < activeSharedProjectRevision && nextRevision > activeSharedProjectRevision) {
@@ -70521,7 +70469,6 @@
             snapshotRevision,
           },
         });
-        console.info('[shared-sync]', { event: 'snapshot-fetch skipped', reason: 'snapshot-deferred-different-tab', projectKey: activeSharedProjectKey || '' });
         return false;
       }
       if (!loaded) {
@@ -70535,7 +70482,6 @@
             snapshotRevision,
           },
         });
-        console.info('[shared-sync]', { event: 'snapshot-fetch skipped', reason: 'snapshot-load-failed', projectKey: activeSharedProjectKey || '' });
         return false;
       }
       logSharedProjectRealtimeChannelLifecycle('refresh-snapshot-loaded', {
@@ -70547,7 +70493,6 @@
           snapshotStructureRevision,
         },
       });
-  console.info('[shared-sync]', { event: 'snapshot-fetch done', projectKey: activeSharedProjectKey || '', snapshotRevision });
       compareSharedProjectSnapshotIdentity(sharedSnapshot?.document || sharedSnapshot, {
         projectKey: activeSharedProjectKey,
         projectId: project.id || '',
@@ -75711,7 +75656,6 @@
 
   function cancelStartupRestoreProgress(reason = 'user-cancel') {
     startupRestoreCancelRequested = true;
-    sharedProjectInitialRestoreInProgress = false;
     startupSharedReloadProjectKey = '';
     startupSharedReloadRevision = 0;
     startupSharedReloadStructureRevision = 0;
