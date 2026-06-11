@@ -493,13 +493,14 @@
       includeOriginalRow: document.getElementById('exportOriginalOptionRow'),
       saveProjectCompanionToggle: document.getElementById('exportSaveProjectCompanionToggle'),
       saveProjectCompanionRow: document.getElementById('exportCompanionOptionRow'),
+      saveSpriteMapCompanionToggle: document.getElementById('exportSpriteMapCompanionToggle'),
+      saveSpriteMapCompanionRow: document.getElementById('exportSpriteMapCompanionOptionRow'),
       contestPostToggle: document.getElementById('exportContestPostToggle'),
       contestPostRow: document.getElementById('exportContestPostOptionRow'),
       spriteMapColorSpritesToggle: document.getElementById('exportSpriteMapColorSpritesToggle'),
       spriteMapColorSpritesRow: document.getElementById('exportSpriteMapColorSpritesRow'),
       previewCanvas: /** @type {HTMLCanvasElement|null} */ (document.getElementById('exportPreviewCanvas')),
       previewMeta: document.getElementById('exportPreviewMeta'),
-      previewModeButtons: Array.from(document.querySelectorAll('[data-export-preview-mode]')),
       gridSettings: document.getElementById('exportGridSettings'),
       gridWidthInput: document.getElementById('exportGridWidth'),
       gridHeightInput: document.getElementById('exportGridHeight'),
@@ -3067,8 +3068,8 @@
   let exportIncludeOriginalSize = false;
   let exportSaveProjectCompanion = false;
   let exportContestPostAfterSave = false;
-  let exportSpriteMapIncludeColorSprites = true;
-  let exportPreviewMode = 'frame';
+  let exportSaveSpriteMapCompanion = false;
+  let exportColorSpritesEnabled = false;
   const EXPORT_GRID_TILE_MIN_SIZE = 1;
   const EXPORT_GRID_TILE_MAX_SIZE = MAX_EXPORT_DIMENSION;
   let exportGridTileWidth = 8;
@@ -8516,6 +8517,61 @@
     );
   }
 
+  function getRecentProjectOpenTabProjectId(entry = null) {
+    if (!entry || typeof entry !== 'object') {
+      return '';
+    }
+    const sharedEntry = normalizeSharedRecentProjectEntry(entry);
+    if (sharedEntry) {
+      return buildSharedRecentProjectId(sharedEntry.sharedProjectKey || '');
+    }
+    return normalizeAutosaveProjectId(entry.id || '');
+  }
+
+  function findOpenProjectTabIndexForRecentProjectEntry(entry = null) {
+    if (!entry || typeof entry !== 'object') {
+      return -1;
+    }
+    const sharedEntry = normalizeSharedRecentProjectEntry(entry);
+    const projectId = getRecentProjectOpenTabProjectId(entry);
+    const exactIndex = projectId ? findOpenProjectTabIndexByProjectId(projectId) : -1;
+    if (exactIndex >= 0) {
+      return exactIndex;
+    }
+    if (!sharedEntry) {
+      return -1;
+    }
+    return openProjectTabs.findIndex(tab => matchesDeletedProjectOpenTab(tab, {
+      projectId,
+      projectKey: sharedEntry.sharedProjectKey || '',
+      backendId: sharedEntry.sharedProjectBackendId || '',
+    }));
+  }
+
+  async function switchToOpenProjectTabForRecentProjectEntry(entry = null, {
+    hideStartup = false,
+    silent = false,
+  } = {}) {
+    const existingIndex = findOpenProjectTabIndexForRecentProjectEntry(entry);
+    if (existingIndex < 0) {
+      return { found: false, switched: false };
+    }
+    const existingTab = openProjectTabs[existingIndex];
+    const switched = await activateOpenProjectTab(existingTab?.id || '', {
+      announce: !silent,
+    });
+    if (!switched) {
+      return { found: true, switched: false };
+    }
+    if (hideStartup) {
+      hideStartupScreen();
+    }
+    if (projectHomeVisible) {
+      hideProjectHomeScreen();
+    }
+    return { found: true, switched: true };
+  }
+
   function closeOpenProjectTabsForDeletedProject({
     projectId = '',
     projectKey = '',
@@ -8666,7 +8722,13 @@
       setActiveAutosaveProjectId(createAutosaveProjectId());
     }
     if (sharedRecentProjectId) {
-      releaseAutosaveProjectId(sharedRecentProjectId);
+      closeOpenProjectTabsForDeletedProject({
+        projectId: sharedRecentProjectId,
+        projectKey: normalizedProjectKey,
+        backendId: normalizedProjectId,
+        reason: 'deleted-shared-project-tab',
+        showHome: true,
+      });
     }
     if (sharedRecentProjectId && startupAutosaveRestoreProjectId === sharedRecentProjectId) {
       startupAutosaveRestoreProjectId = '';
@@ -8711,7 +8773,6 @@
         reason: 'deleted-shared-project-tab',
         showHome: true,
       });
-      releaseAutosaveProjectId(id);
       if (startupAutosaveRestoreProjectId === id) {
         startupAutosaveRestoreProjectId = '';
       }
@@ -8757,23 +8818,25 @@
       ? normalizeSharedRecentProjectEntry(recentProjectsCache.get(normalizedProjectId))
       : null;
     const activeSharedRecentProjectId = activeSharedProjectKey ? buildSharedRecentProjectId(activeSharedProjectKey) : '';
+    const projectIdSharedKey = getSharedProjectKeyFromProjectId(normalizedProjectId);
+    const activeSharedProjectAppliesToTab = Boolean(
+      activeSharedRecentProjectId
+      && normalizedProjectId === activeSharedRecentProjectId
+    );
     const currentProjectIsShared = Boolean(
       normalizedProjectId.startsWith(SHARED_PROJECT_ID_PREFIX)
       || sharedEntry
-      || (
-        activeSharedProjectKey
-        && activeSharedRecentProjectId
-        && normalizedProjectId === activeSharedRecentProjectId
-      )
+      || activeSharedProjectAppliesToTab
     );
     const currentSharedProjectKey = currentProjectIsShared
-      ? normalizeMultiProjectKey(options.sharedProjectKey || sharedEntry?.sharedProjectKey || activeSharedProjectKey || '')
+      ? normalizeMultiProjectKey(
+        options.sharedProjectKey
+        || sharedEntry?.sharedProjectKey
+        || projectIdSharedKey
+        || (activeSharedProjectAppliesToTab ? activeSharedProjectKey : '')
+        || ''
+      )
       : '';
-    const activeSharedProjectAppliesToTab = Boolean(
-      currentProjectIsShared
-      && activeSharedRecentProjectId
-      && normalizedProjectId === activeSharedRecentProjectId
-    );
     return {
       id: options.tabId || createOpenProjectTabId(),
       projectId: normalizedProjectId,
@@ -8787,7 +8850,7 @@
         sharedProjectKey: currentSharedProjectKey || getSharedProjectKeyFromProjectId(normalizedProjectId),
         sharedProjectBackendId: typeof options.sharedProjectBackendId === 'string'
           ? options.sharedProjectBackendId
-          : (sharedEntry?.sharedProjectBackendId || activeSharedProjectId || ''),
+          : (sharedEntry?.sharedProjectBackendId || (activeSharedProjectAppliesToTab ? activeSharedProjectId : '') || ''),
         sharedProjectRevision: Math.max(
           0,
           Math.round(Number(options.sharedProjectRevision) || 0),
@@ -8807,10 +8870,23 @@
   }
 
   function getOpenProjectTabDisplayLabel(tab, { active = false } = {}) {
-    if (active) {
+    const tabProjectId = normalizeAutosaveProjectId(tab?.projectId || '');
+    const activeProjectId = normalizeAutosaveProjectId(autosaveProjectId || '');
+    if (active && tabProjectId && activeProjectId && tabProjectId === activeProjectId) {
       return extractDocumentBaseName(state.documentName || tab?.fileName || DEFAULT_DOCUMENT_NAME);
     }
     return extractDocumentBaseName(tab?.fileName || DEFAULT_DOCUMENT_NAME);
+  }
+
+  function getOpenProjectTabRenderLabel(tab, labelCounts, labelOrdinals, { active = false } = {}) {
+    const baseLabel = getOpenProjectTabDisplayLabel(tab, { active });
+    const duplicateCount = labelCounts instanceof Map ? (labelCounts.get(baseLabel) || 0) : 0;
+    if (duplicateCount <= 1) {
+      return baseLabel;
+    }
+    const nextOrdinal = (labelOrdinals.get(baseLabel) || 0) + 1;
+    labelOrdinals.set(baseLabel, nextOrdinal);
+    return `${baseLabel} (${nextOrdinal})`;
   }
 
   function renderOpenProjectTabs() {
@@ -8838,6 +8914,16 @@
     homeButton.appendChild(homeName);
     homeItem.appendChild(homeButton);
     list.appendChild(homeItem);
+    const labelCounts = new Map();
+    openProjectTabs.forEach(tab => {
+      if (!tab || !tab.id) {
+        return;
+      }
+      const isActive = !projectHomeVisible && tab.id === activeOpenProjectTabId;
+      const label = getOpenProjectTabDisplayLabel(tab, { active: isActive });
+      labelCounts.set(label, (labelCounts.get(label) || 0) + 1);
+    });
+    const labelOrdinals = new Map();
     openProjectTabs.forEach((tab, index) => {
       if (!tab || !tab.id) {
         return;
@@ -8854,7 +8940,7 @@
       selectButton.setAttribute('role', 'tab');
       selectButton.setAttribute('aria-selected', isActive ? 'true' : 'false');
       selectButton.setAttribute('tabindex', isActive ? '0' : '-1');
-      const displayLabel = getOpenProjectTabDisplayLabel(tab, { active: isActive });
+      const displayLabel = getOpenProjectTabRenderLabel(tab, labelCounts, labelOrdinals, { active: isActive });
       const slotPrefix = `${index + 1}/${MAX_OPEN_PROJECT_TABS}`;
       selectButton.setAttribute(
         'aria-label',
@@ -9040,7 +9126,7 @@
     const updated = createOpenProjectTabFromCurrentState({
       tabId: current?.id || activeOpenProjectTabId,
       source: options.source || current?.source || 'working',
-      projectId: normalizeAutosaveProjectId(options.projectId || autosaveProjectId) || current?.projectId || '',
+      projectId: normalizeAutosaveProjectId(options.projectId || current?.projectId || autosaveProjectId) || '',
       fileName: options.fileName || current?.fileName || '',
       sharedProjectKey: options.sharedProjectKey ?? current?.sharedProjectKey,
       sharedProjectBackendId: options.sharedProjectBackendId ?? current?.sharedProjectBackendId,
@@ -9087,6 +9173,12 @@
     if (index < 0) {
       return false;
     }
+    const current = openProjectTabs[index];
+    const currentProjectId = normalizeAutosaveProjectId(current?.projectId || autosaveProjectId || '')
+      || createAutosaveProjectId();
+    if (currentProjectId && normalizeAutosaveProjectId(autosaveProjectId || '') !== currentProjectId) {
+      setActiveAutosaveProjectId(currentProjectId, { persist: false });
+    }
     if (flushAutosave && AUTOSAVE_SUPPORTED) {
       try {
         await writeAutosaveSnapshot(true);
@@ -9094,12 +9186,18 @@
         console.warn('Failed to flush autosave before switching project tab', error);
       }
     }
-    const current = openProjectTabs[index];
-    const preserveSharedMetadata = current?.source === 'shared';
+    const currentRecentEntry = recentProjectsCache.get(currentProjectId) || null;
+    const preserveSharedMetadata = Boolean(
+      current?.sharedProjectKey
+      || current?.source === 'shared'
+      || current?.source === 'shared-recent'
+      || currentProjectId.startsWith(SHARED_PROJECT_ID_PREFIX)
+      || isSharedRecentProjectEntry(currentRecentEntry)
+    );
     const updated = createOpenProjectTabFromCurrentState({
       tabId: current?.id || activeOpenProjectTabId,
       source: current?.source || 'working',
-      projectId: normalizeAutosaveProjectId(autosaveProjectId) || current?.projectId || '',
+      projectId: currentProjectId,
       sharedProjectKey: preserveSharedMetadata ? current?.sharedProjectKey : '',
       sharedProjectBackendId: preserveSharedMetadata ? current?.sharedProjectBackendId : '',
       sharedProjectRevision: preserveSharedMetadata ? current?.sharedProjectRevision : 0,
@@ -16522,12 +16620,11 @@
     setLocalizedTextContent('#memoryClear', 'メモリ削除', 'Clear Memory');
 
     setLocalizedTextContent('#exportDialogTitle', '保存/出力形式', 'Save / Export');
-    setLocalizedTextContent('label[for="exportFormat"] > span', '形式', 'Format');
+    setLocalizedTextContent('label[for="exportFormat"] > .export-format-label', '形式', 'Format');
     setLocalizedSelectOption(dom.exportDialog?.format, 'png', 'PNG（画像）', 'PNG (Image)');
     setLocalizedSelectOption(dom.exportDialog?.format, 'jpeg', 'JPEG（画像）', 'JPEG (Image)');
     setLocalizedSelectOption(dom.exportDialog?.format, 'svg', 'SVG（画像）', 'SVG (Image)');
     setLocalizedSelectOption(dom.exportDialog?.format, 'glb', 'GLB（推奨 / 3Dボクセル）', 'GLB (Recommended / 3D Voxel)');
-    setLocalizedSelectOption(dom.exportDialog?.format, 'spritemap', 'SpriteMAP（全フレーム1枚）', 'SpriteMAP (All Frames)');
     setLocalizedSelectOption(dom.exportDialog?.format, 'gridpng', 'PNG（グリッド分割）', 'PNG (Grid Split)');
     setLocalizedSelectOption(dom.exportDialog?.format, 'gif', 'GIF（アニメーション）', 'GIF (Animation)');
     setLocalizedSelectOption(dom.exportDialog?.format, 'timelapse', 'タイムラプスGIF（記録）', 'Timelapse GIF');
@@ -16539,8 +16636,9 @@
     setLocalizedTextContent('label[for="exportScaleSlider"]', '倍率 (×)', 'Scale (×)');
     setLocalizedTextContent('#exportOriginalOptionRow span:not(.export-toggle-icon)', '原寸も追加', 'Original too');
     setLocalizedTextContent('#exportCompanionOptionRow span:not(.export-toggle-icon)', 'PiXiEEDファイルも保存', 'Save project file');
+    setLocalizedTextContent('#exportSpriteMapCompanionOptionRow span:not(.export-toggle-icon)', 'SpriteMAP出力', 'SpriteMAP export');
     setLocalizedTextContent('#exportContestPostOptionRow span:not(.export-toggle-icon)', 'コンテスト投稿へ移動', 'Go to contest post');
-    setLocalizedTextContent('#exportSpriteMapColorSpritesRow span:not(.export-toggle-icon)', 'カラースプライト生成', 'Color sprites');
+    setLocalizedTextContent('#exportSpriteMapColorSpritesRow span:not(.export-toggle-icon)', 'カラースプライト出力', 'Color sprite export');
     setLocalizedTextContent('#exportGridSettings > span', 'グリッド分割 (PNG)', 'Grid Split (PNG)');
     setLocalizedControlLabel('exportGridWidth', '幅 (px)', 'Width (px)');
     setLocalizedControlLabel('exportGridHeight', '高さ (px)', 'Height (px)');
@@ -18326,14 +18424,12 @@
         return false;
       }
       ensureOpenProjectTabsInitialized();
-      const existingIndex = projectId ? findOpenProjectTabIndexByProjectId(projectId) : -1;
-      if (existingIndex >= 0) {
-        const existingTab = openProjectTabs[existingIndex];
-        const switched = await activateOpenProjectTab(existingTab?.id || '');
-        if (switched && hideStartup) {
-          hideStartupScreen();
-        }
-        return switched;
+      const existingSwitch = await switchToOpenProjectTabForRecentProjectEntry(entry, {
+        hideStartup,
+        silent: false,
+      });
+      if (existingSwitch.found) {
+        return existingSwitch.switched;
       }
       if (openProjectTabs.length >= MAX_OPEN_PROJECT_TABS) {
         updateAutosaveStatus(
@@ -20531,13 +20627,11 @@
       && inputMode !== 'glb'
       && inputMode !== 'grid'
       && inputMode !== 'gridpng'
-      && inputMode !== 'spritemap'
-      && inputMode !== 'spritesheet'
       && inputMode !== 'gif'
       && inputMode !== 'timelapse'
       && inputMode !== 'project'
     ) {
-      window.alert('png / jpeg / svg / glb / spritemap / grid / gif / timelapse / project のいずれかを入力してください。');
+      window.alert('png / jpeg / svg / glb / grid / gif / timelapse / project のいずれかを入力してください。');
       return;
     }
     const normalized = normalizeExportFormat(inputMode);
@@ -20549,14 +20643,14 @@
 
   async function performExportByMode(mode) {
     const normalized = normalizeExportFormat(mode || 'png');
-    if (normalized === 'gif') {
+    if (normalized !== 'spritemap' && shouldSaveSpriteMapCompanion(normalized)) {
+      await exportProjectAsSpriteMap();
+    } else if (normalized === 'gif') {
       await exportProjectAsGif();
     } else if (normalized === 'jpeg') {
       await exportProjectAsJpeg();
     } else if (normalized === 'svg') {
       await exportProjectAsSvg();
-    } else if (normalized === 'spritemap') {
-      await exportProjectAsSpriteMap();
     } else if (normalized === 'glb') {
       await exportProjectAsGlb();
     } else if (normalized === 'gridpng') {
@@ -21044,7 +21138,20 @@
       timelapseState.fps = fps;
       const frameDuration = clamp(Math.round(1000 / fps), 16, 2000);
       const frameDurations = new Array(framePixels.length).fill(frameDuration);
-      const scaledSet = scaleFrameSetNearestNeighbor(framePixels, targetWidth, targetHeight, selectedScale);
+      const timelapseFrameSet = appendColorSpriteAreaToFrameSet({
+        framePixels,
+        frameDurations,
+        width: targetWidth,
+        height: targetHeight,
+        frameCount: framePixels.length,
+        isVoxelComposite: false,
+      }, 'timelapse');
+      const scaledSet = scaleFrameSetNearestNeighbor(
+        timelapseFrameSet.framePixels,
+        timelapseFrameSet.width,
+        timelapseFrameSet.height,
+        selectedScale
+      );
       const gifBytes = buildGifFromPixels(
         scaledSet.framePixels,
         frameDurations,
@@ -21072,6 +21179,9 @@
       const detailParts = [`${framePixels.length}ステップ`];
       if (selectedScale > 1) {
         detailParts.push(`×${selectedScale}`);
+      }
+      if (timelapseFrameSet.colorSpriteCount > 0) {
+        detailParts.push(`カラースプライト ${timelapseFrameSet.usedColorCount}色`);
       }
       const skipped = skippedSizeMismatch + skippedInvalid;
       if (skipped > 0) {
@@ -21819,6 +21929,18 @@
         updateExportPreview();
       });
     }
+    if (config.saveSpriteMapCompanionToggle instanceof HTMLInputElement
+      && config.saveSpriteMapCompanionToggle.dataset.bound !== 'true') {
+      config.saveSpriteMapCompanionToggle.dataset.bound = 'true';
+      config.saveSpriteMapCompanionToggle.checked = exportSaveSpriteMapCompanion;
+      config.saveSpriteMapCompanionToggle.addEventListener('change', event => {
+        exportSaveSpriteMapCompanion = Boolean(event.target.checked);
+        scheduleSessionPersist({ includeSnapshots: false });
+        refreshExportScaleControls();
+        updateExportOptionVisibility(config.format?.value || 'png');
+        updateExportPreview();
+      });
+    }
     if (config.contestPostToggle instanceof HTMLInputElement
       && config.contestPostToggle.dataset.bound !== 'true') {
       config.contestPostToggle.dataset.bound = 'true';
@@ -21834,25 +21956,13 @@
     if (config.spriteMapColorSpritesToggle instanceof HTMLInputElement
       && config.spriteMapColorSpritesToggle.dataset.bound !== 'true') {
       config.spriteMapColorSpritesToggle.dataset.bound = 'true';
-      config.spriteMapColorSpritesToggle.checked = exportSpriteMapIncludeColorSprites;
+      config.spriteMapColorSpritesToggle.checked = exportColorSpritesEnabled;
       config.spriteMapColorSpritesToggle.addEventListener('change', event => {
-        exportSpriteMapIncludeColorSprites = Boolean(event.target.checked);
+        exportColorSpritesEnabled = Boolean(event.target.checked);
         scheduleSessionPersist({ includeSnapshots: false });
         refreshExportScaleControls();
+        updateExportOptionVisibility(config.format?.value || 'png');
         updateExportPreview();
-      });
-    }
-
-    if (Array.isArray(config.previewModeButtons)) {
-      config.previewModeButtons.forEach(button => {
-        if (!(button instanceof HTMLButtonElement) || button.dataset.bound === 'true') {
-          return;
-        }
-        button.dataset.bound = 'true';
-        button.addEventListener('click', () => {
-          exportPreviewMode = button.dataset.exportPreviewMode || 'frame';
-          updateExportPreview();
-        });
       });
     }
 
@@ -22994,7 +23104,6 @@
             if (deletesOwnedSharedProject && isSharedEntry) {
               await purgeDeletedSharedProjectLocalReferences(entry?.sharedProjectKey || '', projectId);
             }
-            releaseAutosaveProjectId(projectId);
             updateAutosaveStatus(
               deletesOwnedSharedProject
                 ? localizeText(
@@ -23428,7 +23537,6 @@
             if (deletesOwnedSharedProject && isSharedEntry) {
               await purgeDeletedSharedProjectLocalReferences(entry?.sharedProjectKey || '', projectId);
             }
-            releaseAutosaveProjectId(projectId);
             updateAutosaveStatus(
               deletesOwnedSharedProject
                 ? localizeText(
@@ -27518,6 +27626,15 @@
       const latestEntry = projectId
         ? ((await loadRecentProjectsMetadata()).find(candidate => candidate?.id === projectId) || entry)
         : entry;
+      if (!options.allowProjectMismatchLoad && !openProjectTabBusy && openProjectTabs.length) {
+        const existingSwitch = await switchToOpenProjectTabForRecentProjectEntry(latestEntry, {
+          hideStartup: hideStartupOnSuccess,
+          silent,
+        });
+        if (existingSwitch.found) {
+          return existingSwitch.switched;
+        }
+      }
       if (isSharedRecentProjectEntry(latestEntry)) {
         return await openSharedRecentProject(latestEntry, {
           hideStartup: hideStartupOnSuccess,
@@ -28321,13 +28438,19 @@
       const candidates = getExportScaleCandidates();
       const selectedScale = applyExportScaleConstraints(candidates);
       syncExportScaleInputs();
+      const colorSpriteArea = buildColorSpriteAppendAreaForCurrentExport('gridpng');
       exportGridTileWidth = normalizeExportGridTileSize(exportGridTileWidth, 8);
       exportGridTileHeight = normalizeExportGridTileSize(exportGridTileHeight, 8);
       syncExportGridInputs();
+      const firstStillFrame = appendColorSpriteAreaToStillFrameSet(
+        buildStillExportFrameSet(selectedFrameIndex),
+        'gridpng',
+        colorSpriteArea
+      );
       // Grid split size is defined in source pixels, then mapped to export scale.
       // This keeps tile count stable even when export scale is > 1.
-      const rowSegments = buildGridRowSegmentsTopToBottom(height, exportGridTileHeight);
-      const columnSegments = buildGridColumnSegmentsRightToLeft(width, exportGridTileWidth);
+      const rowSegments = buildGridRowSegmentsTopToBottom(firstStillFrame.height, exportGridTileHeight);
+      const columnSegments = buildGridColumnSegmentsRightToLeft(firstStillFrame.width, exportGridTileWidth);
       const tileCountPerFrame = rowSegments.length * columnSegments.length;
       if (!tileCountPerFrame) {
         updateAutosaveStatus('分割サイズの設定が無効です', 'warn');
@@ -28339,7 +28462,11 @@
       const tasks = [];
 
       for (let frameIndex = 0; frameIndex < frameCount; frameIndex += 1) {
-        const stillFrame = buildStillExportFrameSet(frameIndex);
+        const stillFrame = appendColorSpriteAreaToStillFrameSet(
+          buildStillExportFrameSet(frameIndex),
+          'gridpng',
+          colorSpriteArea
+        );
         const { width, height, pixels } = stillFrame;
         const frameCanvas = createFrameCanvas(pixels, width, height);
         const outputCanvas = scaleCanvasNearestNeighbor(frameCanvas, selectedScale);
@@ -28404,6 +28531,9 @@
       if (selectedScale > 1) {
         detailParts.push(`倍率 ×${selectedScale}`);
       }
+      if (colorSpriteArea) {
+        detailParts.push(`カラースプライト ${colorSpriteArea.colorCount}色`);
+      }
       detailParts.push(`右上→左 / 上→下`);
       const detail = detailParts.length ? ` (${detailParts.join(' / ')})` : '';
 
@@ -28454,9 +28584,14 @@
       const selectedScale = applyExportScaleConstraints(candidates);
       syncExportScaleInputs();
       const includeOriginal = shouldExportOriginalCompanion('png', selectedScale);
+      const colorSpriteArea = buildColorSpriteAppendAreaForCurrentExport('png');
       const tasks = [];
       for (let frameIndex = 0; frameIndex < frameCount; frameIndex += 1) {
-        const stillFrame = buildStillExportFrameSet(frameIndex);
+        const stillFrame = appendColorSpriteAreaToStillFrameSet(
+          buildStillExportFrameSet(frameIndex),
+          'png',
+          colorSpriteArea
+        );
         const { width, height, pixels } = stillFrame;
         const baseCanvas = createFrameCanvas(pixels, width, height);
         const variants = [{ scale: selectedScale, isOriginal: false }];
@@ -28506,6 +28641,9 @@
       }
       if (includeOriginal) {
         detailParts.push('原寸も追加');
+      }
+      if (colorSpriteArea) {
+        detailParts.push(`カラースプライト ${colorSpriteArea.colorCount}色`);
       }
       const detail = detailParts.length ? ` (${detailParts.join(' / ')})` : '';
 
@@ -28578,6 +28716,7 @@
         fileExtensions: ['.png'],
         shareTitle: state.documentName || 'PiXiEEDraw',
         shareText: localizeText('立体プレビューPNGを書き出しました', 'Exported voxel preview PNG'),
+        mode: 'voxelpreview',
       });
       if (result.exportedCount > 0) {
         updateAutosaveStatus(
@@ -28668,6 +28807,206 @@
     };
   }
 
+  async function buildSpriteMapExportTasks({
+    scale = exportScale,
+    includeOriginal = shouldExportOriginalCompanion('spritemap', scale),
+  } = {}) {
+    const frameCount = state.frames.length;
+    if (!frameCount) {
+      return {
+        tasks: [],
+        frameCount: 0,
+        layoutLabel: '',
+        selectedScale: Math.max(1, Math.floor(Number(scale) || 1)),
+        includeOriginal: false,
+        spriteMapPlan: null,
+      };
+    }
+    const { width, height } = state;
+    const selectedScale = Math.max(1, Math.floor(Number(scale) || 1));
+    const framePixels = compositeDocumentFrames(state.frames, width, height, state.palette);
+    const spriteMapPlan = buildSpriteMapExportPlan(framePixels, width, height, state.palette, {
+      includeColorSprites: exportColorSpritesEnabled,
+    });
+    const variants = [{ scale: selectedScale, isOriginal: false }];
+    if (includeOriginal) {
+      variants.push({ scale: 1, isOriginal: true });
+    }
+    const tasks = [];
+    const layoutLabel = `${spriteMapPlan.columns}x${spriteMapPlan.rows}`;
+    for (let variantIndex = 0; variantIndex < variants.length; variantIndex += 1) {
+      const variant = variants[variantIndex];
+      const spriteMap = buildSpriteMapCanvas(spriteMapPlan.framePixels, width, height, {
+        scale: variant.scale,
+        columns: spriteMapPlan.columns,
+        rows: spriteMapPlan.rows,
+        placements: spriteMapPlan.placements,
+      });
+      const blob = await canvasToBlob(spriteMap.canvas, 'image/png');
+      if (!blob) {
+        throw new Error('Failed to create SpriteMAP blob');
+      }
+      let suffix = 'spritemap';
+      if (variant.scale > 1 || includeOriginal) {
+        suffix += `_x${variant.scale}`;
+      }
+      tasks.push({
+        blob,
+        filename: createExportFileName('png', suffix),
+        mimeType: 'image/png',
+        fileExtensions: ['.png'],
+        shareText: `SpriteMAPを書き出しました (${layoutLabel}${spriteMapPlan.colorSpriteCount > 0 ? ` / 色${spriteMapPlan.usedColorCount}` : ''}${variant.scale > 1 ? ` / ×${variant.scale}` : ''})`,
+      });
+    }
+    return {
+      tasks,
+      frameCount,
+      layoutLabel,
+      selectedScale,
+      includeOriginal,
+      spriteMapPlan,
+    };
+  }
+
+  function buildColorSpriteExportPlanFromFramePixels(framePixels, width, height, palette = state.palette) {
+    const usedColors = collectUsedColorsFromFramePixels(framePixels, palette);
+    const colorSpriteSet = buildColorSpriteFramesFromColors(usedColors, width, height);
+    return {
+      framePixels: colorSpriteSet.framePixels,
+      colorCount: colorSpriteSet.colorCount,
+      spriteCount: colorSpriteSet.spriteCount,
+      columns: 1,
+      rows: Math.max(1, colorSpriteSet.spriteCount),
+      sheetWidth: Math.max(1, width),
+      sheetHeight: Math.max(1, height) * Math.max(1, colorSpriteSet.spriteCount),
+    };
+  }
+
+  function copyPixelBlockToBuffer(sourcePixels, sourceWidth, sourceHeight, targetPixels, targetWidth, offsetX = 0, offsetY = 0) {
+    const safeSourceWidth = Math.max(1, Math.floor(Number(sourceWidth) || 0));
+    const safeSourceHeight = Math.max(1, Math.floor(Number(sourceHeight) || 0));
+    const safeTargetWidth = Math.max(1, Math.floor(Number(targetWidth) || 0));
+    const startX = Math.max(0, Math.floor(Number(offsetX) || 0));
+    const startY = Math.max(0, Math.floor(Number(offsetY) || 0));
+    if (!(sourcePixels instanceof Uint8ClampedArray) || !(targetPixels instanceof Uint8ClampedArray)) {
+      return;
+    }
+    for (let y = 0; y < safeSourceHeight; y += 1) {
+      const sourceStart = y * safeSourceWidth * 4;
+      const targetStart = ((startY + y) * safeTargetWidth * 4) + (startX * 4);
+      targetPixels.set(sourcePixels.subarray(sourceStart, sourceStart + (safeSourceWidth * 4)), targetStart);
+    }
+  }
+
+  function buildColorSpriteAppendAreaFromFramePixels(framePixels, width, height, palette = state.palette) {
+    const safeWidth = Math.max(1, Math.floor(Number(width) || 0));
+    const safeHeight = Math.max(1, Math.floor(Number(height) || 0));
+    const plan = buildColorSpriteExportPlanFromFramePixels(framePixels, safeWidth, safeHeight, palette);
+    if (!plan.spriteCount || !plan.framePixels.length) {
+      return null;
+    }
+    const areaWidth = Math.max(1, plan.sheetWidth);
+    const areaHeight = Math.max(1, plan.sheetHeight);
+    const pixels = new Uint8ClampedArray(areaWidth * areaHeight * 4);
+    plan.framePixels.forEach((spritePixels, spriteIndex) => {
+      copyPixelBlockToBuffer(spritePixels, safeWidth, safeHeight, pixels, areaWidth, 0, spriteIndex * safeHeight);
+    });
+    return {
+      pixels,
+      width: areaWidth,
+      height: areaHeight,
+      colorCount: plan.colorCount,
+      spriteCount: plan.spriteCount,
+    };
+  }
+
+  function appendColorSpriteAreaToFramePixels(basePixels, width, height, colorSpriteArea) {
+    const safeWidth = Math.max(1, Math.floor(Number(width) || 0));
+    const safeHeight = Math.max(1, Math.floor(Number(height) || 0));
+    if (!(basePixels instanceof Uint8ClampedArray) || !colorSpriteArea?.pixels) {
+      return {
+        pixels: basePixels instanceof Uint8ClampedArray ? basePixels : new Uint8ClampedArray(safeWidth * safeHeight * 4),
+        width: safeWidth,
+        height: safeHeight,
+      };
+    }
+    const areaWidth = Math.max(1, Math.floor(Number(colorSpriteArea.width) || 0));
+    const areaHeight = Math.max(1, Math.floor(Number(colorSpriteArea.height) || 0));
+    const outputWidth = safeWidth + areaWidth;
+    const outputHeight = Math.max(safeHeight, areaHeight);
+    const outputPixels = new Uint8ClampedArray(outputWidth * outputHeight * 4);
+    copyPixelBlockToBuffer(basePixels, safeWidth, safeHeight, outputPixels, outputWidth, 0, 0);
+    copyPixelBlockToBuffer(colorSpriteArea.pixels, areaWidth, areaHeight, outputPixels, outputWidth, safeWidth, 0);
+    return {
+      pixels: outputPixels,
+      width: outputWidth,
+      height: outputHeight,
+    };
+  }
+
+  function buildColorSpriteAppendAreaForCurrentExport(mode) {
+    if (!shouldAppendColorSpritesToPrimaryExport(mode)) {
+      return null;
+    }
+    const exportFrameSet = buildExportFrameSet();
+    if (!exportFrameSet?.frameCount || !Array.isArray(exportFrameSet.framePixels) || !exportFrameSet.framePixels.length) {
+      return null;
+    }
+    return buildColorSpriteAppendAreaFromFramePixels(
+      exportFrameSet.framePixels,
+      exportFrameSet.width,
+      exportFrameSet.height,
+      state.palette
+    );
+  }
+
+  function appendColorSpriteAreaToStillFrameSet(stillFrame, mode, colorSpriteArea = null) {
+    if (!stillFrame || !shouldAppendColorSpritesToPrimaryExport(mode)) {
+      return stillFrame;
+    }
+    const area = colorSpriteArea || buildColorSpriteAppendAreaForCurrentExport(mode);
+    if (!area) {
+      return stillFrame;
+    }
+    const appended = appendColorSpriteAreaToFramePixels(stillFrame.pixels, stillFrame.width, stillFrame.height, area);
+    return {
+      ...stillFrame,
+      pixels: appended.pixels,
+      width: appended.width,
+      height: appended.height,
+      colorSpriteCount: area.spriteCount,
+      usedColorCount: area.colorCount,
+    };
+  }
+
+  function appendColorSpriteAreaToFrameSet(frameSet, mode) {
+    if (!frameSet || !shouldAppendColorSpritesToPrimaryExport(mode)) {
+      return frameSet;
+    }
+    const framePixels = Array.isArray(frameSet.framePixels) ? frameSet.framePixels : [];
+    if (!framePixels.length) {
+      return frameSet;
+    }
+    const area = buildColorSpriteAppendAreaFromFramePixels(framePixels, frameSet.width, frameSet.height, state.palette);
+    if (!area) {
+      return frameSet;
+    }
+    const appendedFrames = framePixels.map(pixels => appendColorSpriteAreaToFramePixels(
+      pixels,
+      frameSet.width,
+      frameSet.height,
+      area
+    ).pixels);
+    return {
+      ...frameSet,
+      width: Math.max(1, Math.floor(Number(frameSet.width) || 0)) + area.width,
+      height: Math.max(Math.max(1, Math.floor(Number(frameSet.height) || 0)), area.height),
+      framePixels: appendedFrames,
+      colorSpriteCount: area.spriteCount,
+      usedColorCount: area.colorCount,
+    };
+  }
+
   async function exportProjectAsSpriteMap() {
     if (!ensureCurrentClientCanExportProject({ announce: true, format: 'spritemap' })) {
       return;
@@ -28678,43 +29017,15 @@
       return;
     }
     try {
-      const { width, height } = state;
       const candidates = getExportScaleCandidates('spritemap');
       const selectedScale = applyExportScaleConstraints(candidates);
       syncExportScaleInputs();
-      const framePixels = compositeDocumentFrames(state.frames, width, height, state.palette);
-      const spriteMapPlan = buildSpriteMapExportPlan(framePixels, width, height, state.palette, {
-        includeColorSprites: exportSpriteMapIncludeColorSprites,
-      });
       const includeOriginal = shouldExportOriginalCompanion('spritemap', selectedScale);
-      const variants = [{ scale: selectedScale, isOriginal: false }];
-      if (includeOriginal) {
-        variants.push({ scale: 1, isOriginal: true });
-      }
-      const tasks = [];
-      const layoutLabel = `${spriteMapPlan.columns}x${spriteMapPlan.rows}`;
-      for (let variantIndex = 0; variantIndex < variants.length; variantIndex += 1) {
-        const variant = variants[variantIndex];
-        const spriteMap = buildSpriteMapCanvas(spriteMapPlan.framePixels, width, height, {
-          scale: variant.scale,
-          columns: spriteMapPlan.columns,
-          rows: spriteMapPlan.rows,
-          placements: spriteMapPlan.placements,
-        });
-        const blob = await canvasToBlob(spriteMap.canvas, 'image/png');
-        if (!blob) {
-          throw new Error('Failed to create SpriteMAP blob');
-        }
-        let suffix = 'spritemap';
-        if (variant.scale > 1 || includeOriginal) {
-          suffix += `_x${variant.scale}`;
-        }
-        tasks.push({
-          blob,
-          filename: createExportFileName('png', suffix),
-          shareText: `SpriteMAPを書き出しました (${layoutLabel}${spriteMapPlan.colorSpriteCount > 0 ? ` / 色${spriteMapPlan.usedColorCount}` : ''}${variant.scale > 1 ? ` / ×${variant.scale}` : ''})`,
-        });
-      }
+      const spriteMapExport = await buildSpriteMapExportTasks({
+        scale: selectedScale,
+        includeOriginal,
+      });
+      const { tasks, layoutLabel, spriteMapPlan } = spriteMapExport;
 
       const result = await deliverExportTasks(tasks, {
         mimeType: 'image/png',
@@ -28883,9 +29194,14 @@
       const selectedScale = applyExportScaleConstraints(candidates);
       syncExportScaleInputs();
       const includeOriginal = shouldExportOriginalCompanion('jpeg', selectedScale);
+      const colorSpriteArea = buildColorSpriteAppendAreaForCurrentExport('jpeg');
       const tasks = [];
       for (let frameIndex = 0; frameIndex < frameCount; frameIndex += 1) {
-        const stillFrame = buildStillExportFrameSet(frameIndex);
+        const stillFrame = appendColorSpriteAreaToStillFrameSet(
+          buildStillExportFrameSet(frameIndex),
+          'jpeg',
+          colorSpriteArea
+        );
         const { width, height, pixels } = stillFrame;
         const frameNumber = String(frameIndex + 1).padStart(2, '0');
         const baseCanvas = createFrameCanvas(pixels, width, height);
@@ -28935,6 +29251,9 @@
       if (includeOriginal) {
         detailParts.push('原寸も追加');
       }
+      if (colorSpriteArea) {
+        detailParts.push(`カラースプライト ${colorSpriteArea.colorCount}色`);
+      }
       detailParts.push('透明部分は白背景');
       const detail = detailParts.length ? ` (${detailParts.join(' / ')})` : '';
 
@@ -28983,9 +29302,14 @@
       const selectedScale = applyExportScaleConstraints(candidates);
       syncExportScaleInputs();
       const includeOriginal = shouldExportOriginalCompanion('svg', selectedScale);
+      const colorSpriteArea = buildColorSpriteAppendAreaForCurrentExport('svg');
       const tasks = [];
       for (let frameIndex = 0; frameIndex < frameCount; frameIndex += 1) {
-        const stillFrame = buildStillExportFrameSet(frameIndex);
+        const stillFrame = appendColorSpriteAreaToStillFrameSet(
+          buildStillExportFrameSet(frameIndex),
+          'svg',
+          colorSpriteArea
+        );
         const { width, height, pixels } = stillFrame;
         const frameNumber = String(frameIndex + 1).padStart(2, '0');
         const variants = [{ scale: selectedScale, isOriginal: false }];
@@ -29028,6 +29352,9 @@
       }
       if (includeOriginal) {
         detailParts.push('原寸も追加');
+      }
+      if (colorSpriteArea) {
+        detailParts.push(`カラースプライト ${colorSpriteArea.colorCount}色`);
       }
       const detail = detailParts.length ? ` (${detailParts.join(' / ')})` : '';
 
@@ -29099,6 +29426,7 @@
         fileExtensions: ['.glb'],
         shareTitle: state.documentName || 'PiXiEEDraw',
         shareText: localizeText('GLBを書き出しました', 'Exported GLB'),
+        mode: 'glb',
         allowNativePhotoLibrary: false,
       });
       if (result.exportedCount === result.total) {
@@ -29128,7 +29456,7 @@
     if (!ensureCurrentClientCanExportProject({ announce: true, format: 'gif' })) {
       return;
     }
-    const exportFrameSet = buildExportFrameSet();
+    const exportFrameSet = appendColorSpriteAreaToFrameSet(buildExportFrameSet(), 'gif');
     const frameCount = exportFrameSet.frameCount;
     if (!frameCount) {
       updateAutosaveStatus('GIFを書き出すフレームがありません', 'warn');
@@ -29189,6 +29517,9 @@
       }
       if (includeOriginal) {
         detailParts.push('原寸も追加');
+      }
+      if (exportFrameSet.colorSpriteCount > 0) {
+        detailParts.push(`カラースプライト ${exportFrameSet.usedColorCount}色`);
       }
       const detail = detailParts.length ? ` (${detailParts.join(' / ')})` : '';
       if (result.exportedCount === result.total) {
@@ -29845,18 +30176,31 @@
     const frameCount = Array.isArray(state.frames) ? state.frames.length : 0;
     const frameWidth = Math.max(1, state.width);
     const frameHeight = Math.max(1, state.height);
-    const spriteMapPlan = format === 'spritemap' && frameCount > 0
+    const includeSpriteMapSheet = (format === 'spritemap' || shouldSaveSpriteMapCompanion(format)) && frameCount > 0;
+    const includeColorSpriteSheet = !includeSpriteMapSheet && shouldAppendColorSpritesToPrimaryExport(format) && frameCount > 0;
+    const sourceFramePixels = (includeSpriteMapSheet || includeColorSpriteSheet)
+      ? compositeDocumentFrames(state.frames, frameWidth, frameHeight, state.palette)
+      : null;
+    const spriteMapPlan = includeSpriteMapSheet
       ? buildSpriteMapExportPlan(
-        compositeDocumentFrames(state.frames, frameWidth, frameHeight, state.palette),
+        sourceFramePixels,
         frameWidth,
         frameHeight,
         state.palette,
-        { includeColorSprites: exportSpriteMapIncludeColorSprites }
+        { includeColorSprites: exportColorSpritesEnabled }
       )
       : null;
-    const { columns, rows } = spriteMapPlan || computeSpriteSheetLayout(frameCount);
-    const sheetWidth = spriteMapPlan ? spriteMapPlan.sheetWidth : frameWidth;
-    const sheetHeight = spriteMapPlan ? spriteMapPlan.sheetHeight : frameHeight;
+    const colorSpritePlan = includeColorSpriteSheet
+      ? buildColorSpriteExportPlanFromFramePixels(sourceFramePixels, frameWidth, frameHeight, state.palette)
+      : null;
+    const hasColorSpriteAppend = Boolean(colorSpritePlan?.spriteCount && colorSpritePlan.framePixels.length);
+    const { columns, rows } = spriteMapPlan || colorSpritePlan || computeSpriteSheetLayout(frameCount);
+    const sheetWidth = spriteMapPlan
+      ? Math.max(frameWidth, spriteMapPlan.sheetWidth)
+      : (hasColorSpriteAppend ? frameWidth + colorSpritePlan.sheetWidth : frameWidth);
+    const sheetHeight = spriteMapPlan
+      ? Math.max(frameHeight, spriteMapPlan.sheetHeight)
+      : (hasColorSpriteAppend ? Math.max(frameHeight, colorSpritePlan.sheetHeight) : frameHeight);
     const maxScaleWidth = Math.floor(MAX_EXPORT_DIMENSION / sheetWidth);
     const maxScaleHeight = Math.floor(MAX_EXPORT_DIMENSION / sheetHeight);
     const maxScale = Math.max(1, Math.min(
@@ -30029,6 +30373,38 @@
     return exportSaveProjectCompanion && canOfferProjectCompanionExport(mode);
   }
 
+  function canOfferSpriteMapCompanionExport(mode) {
+    const format = normalizeExportFormat(mode);
+    if (format === 'project') {
+      return false;
+    }
+    if (!canCurrentClientExportProject('spritemap')) {
+      return false;
+    }
+    return Array.isArray(state.frames) && state.frames.length > 0;
+  }
+
+  function shouldSaveSpriteMapCompanion(mode) {
+    return exportSaveSpriteMapCompanion && canOfferSpriteMapCompanionExport(mode);
+  }
+
+  function canOfferColorSpriteExport(mode) {
+    const format = normalizeExportFormat(mode);
+    if (format === 'project') {
+      return false;
+    }
+    if (!canCurrentClientExportProject('spritemap')) {
+      return false;
+    }
+    return Array.isArray(state.frames) && state.frames.length > 0;
+  }
+
+  function shouldAppendColorSpritesToPrimaryExport(mode) {
+    return exportColorSpritesEnabled
+      && !shouldSaveSpriteMapCompanion(mode)
+      && canOfferColorSpriteExport(mode);
+  }
+
   function updateExportProjectCompanionToggleUI() {
     const toggle = dom.exportDialog?.saveProjectCompanionToggle;
     const mode = normalizeExportFormat(dom.exportDialog?.format?.value || 'png');
@@ -30039,6 +30415,33 @@
     toggle.checked = canOffer ? exportSaveProjectCompanion : false;
     toggle.disabled = !canOffer;
     const reason = canOffer ? '' : getMultiExportDisabledReason('project');
+    if (reason) {
+      toggle.title = reason;
+    } else {
+      toggle.removeAttribute('title');
+    }
+  }
+
+  function updateExportSpriteMapCompanionToggleUI() {
+    const toggle = dom.exportDialog?.saveSpriteMapCompanionToggle;
+    const row = dom.exportDialog?.saveSpriteMapCompanionRow;
+    const mode = normalizeExportFormat(dom.exportDialog?.format?.value || 'png');
+    const canOffer = canOfferSpriteMapCompanionExport(mode);
+    if (row instanceof HTMLElement) {
+      row.hidden = false;
+    }
+    if (!(toggle instanceof HTMLInputElement)) {
+      return;
+    }
+    if (!canOffer) {
+      toggle.checked = false;
+    } else {
+      toggle.checked = exportSaveSpriteMapCompanion;
+    }
+    toggle.disabled = !canOffer;
+    const reason = canOffer ? '' : (
+      getMultiExportDisabledReason('spritemap') || localizeText('SpriteMAPにまとめるフレームがありません', 'No frames available for SpriteMAP')
+    );
     if (reason) {
       toggle.title = reason;
     } else {
@@ -30162,6 +30565,7 @@
     if (companionRow instanceof HTMLElement) {
       companionRow.hidden = !doesExportFormatSupportProjectCompanion(format);
     }
+    updateExportSpriteMapCompanionToggleUI();
 
     const contestRow = dom.exportDialog?.contestPostRow;
     if (contestRow instanceof HTMLElement) {
@@ -30170,11 +30574,19 @@
 
     const spriteMapColorSpritesRow = dom.exportDialog?.spriteMapColorSpritesRow;
     if (spriteMapColorSpritesRow instanceof HTMLElement) {
-      spriteMapColorSpritesRow.hidden = format !== 'spritemap';
+      spriteMapColorSpritesRow.hidden = format === 'project';
     }
     const spriteMapColorSpritesToggle = dom.exportDialog?.spriteMapColorSpritesToggle;
     if (spriteMapColorSpritesToggle instanceof HTMLInputElement) {
-      spriteMapColorSpritesToggle.checked = exportSpriteMapIncludeColorSprites;
+      const canOffer = canOfferColorSpriteExport(format);
+      spriteMapColorSpritesToggle.checked = canOffer ? exportColorSpritesEnabled : false;
+      spriteMapColorSpritesToggle.disabled = !canOffer;
+      const reason = canOffer ? '' : (getMultiExportDisabledReason('spritemap') || localizeText('カラースプライトにまとめるフレームがありません', 'No frames available for color sprites'));
+      if (reason) {
+        spriteMapColorSpritesToggle.title = reason;
+      } else {
+        spriteMapColorSpritesToggle.removeAttribute('title');
+      }
     }
   }
 
@@ -30521,26 +30933,6 @@
     }
   }
 
-  function syncExportPreviewModeButtons(activeMode = exportPreviewMode) {
-    const normalized = activeMode === 'map' || activeMode === 'colors' ? activeMode : 'frame';
-    const format = normalizeExportFormat(dom.exportDialog?.format?.value || 'png');
-    const spriteOnly = format === 'spritemap';
-    const buttons = Array.isArray(dom.exportDialog?.previewModeButtons)
-      ? dom.exportDialog.previewModeButtons
-      : [];
-    buttons.forEach(button => {
-      if (!(button instanceof HTMLButtonElement)) {
-        return;
-      }
-      const mode = button.dataset.exportPreviewMode || 'frame';
-      const disabled = mode !== 'frame' && !spriteOnly;
-      button.disabled = disabled;
-      const active = !disabled && mode === normalized;
-      button.classList.toggle('is-active', active);
-      button.setAttribute('aria-pressed', active ? 'true' : 'false');
-    });
-  }
-
   function drawExportPreviewCanvas(sourceCanvas, metaText = '') {
     const preview = dom.exportDialog?.previewCanvas;
     if (!(preview instanceof HTMLCanvasElement) || !(sourceCanvas instanceof HTMLCanvasElement)) {
@@ -30570,12 +30962,13 @@
         ctx.fillRect(x, y, tile, tile);
       }
     }
-    const scale = Math.max(1, Math.floor(Math.min(
+    const fitScale = Math.min(
       preview.width / Math.max(1, sourceCanvas.width),
       preview.height / Math.max(1, sourceCanvas.height)
-    )));
-    const drawWidth = Math.max(1, sourceCanvas.width * scale);
-    const drawHeight = Math.max(1, sourceCanvas.height * scale);
+    );
+    const scale = fitScale >= 1 ? Math.max(1, Math.floor(fitScale)) : Math.max(0.01, fitScale);
+    const drawWidth = Math.max(1, Math.floor(sourceCanvas.width * scale));
+    const drawHeight = Math.max(1, Math.floor(sourceCanvas.height * scale));
     const x = Math.floor((preview.width - drawWidth) / 2);
     const y = Math.floor((preview.height - drawHeight) / 2);
     ctx.drawImage(sourceCanvas, x, y, drawWidth, drawHeight);
@@ -30589,7 +30982,7 @@
     return canvas;
   }
 
-  function buildExportPreviewSourceCanvas(format, previewMode) {
+  function buildExportPreviewSourceCanvas(format) {
     const frames = Array.isArray(state.frames) ? state.frames : [];
     const width = Math.max(1, state.width);
     const height = Math.max(1, state.height);
@@ -30600,58 +30993,52 @@
       };
     }
     const normalizedFormat = normalizeExportFormat(format);
-    const mode = normalizedFormat === 'spritemap' ? previewMode : 'frame';
+    const outputScale = Math.max(1, Math.floor(Number(exportScale) || 1));
     const activeFrameIndex = clamp(Math.round(Number(state.activeFrame) || 0), 0, frames.length - 1);
     const framePixels = compositeDocumentFrames(frames, width, height, state.palette);
-    if (mode === 'map') {
+    if (normalizedFormat === 'spritemap' || shouldSaveSpriteMapCompanion(normalizedFormat)) {
       const plan = buildSpriteMapExportPlan(framePixels, width, height, state.palette, {
-        includeColorSprites: exportSpriteMapIncludeColorSprites,
+        includeColorSprites: exportColorSpritesEnabled,
       });
       const spriteMap = buildSpriteMapCanvas(plan.framePixels, width, height, {
-        scale: Math.max(1, exportScale),
+        scale: 1,
         columns: plan.columns,
         rows: plan.rows,
         placements: plan.placements,
       });
+      const outputWidth = spriteMap.sheetWidth * outputScale;
+      const outputHeight = spriteMap.sheetHeight * outputScale;
       return {
         canvas: spriteMap.canvas,
-        meta: `SpriteMAP ${plan.columns}x${plan.rows} / ${spriteMap.sheetWidth}x${spriteMap.sheetHeight}px`,
+        meta: `SpriteMAP ${plan.columns}x${plan.rows} / ${outputWidth}x${outputHeight}px${plan.colorSpriteCount > 0 ? ` / 色${plan.usedColorCount}` : ''}`,
       };
     }
-    if (mode === 'colors') {
-      const plan = buildSpriteMapExportPlan(framePixels, width, height, state.palette, {
-        includeColorSprites: true,
-      });
-      const colorFrames = plan.framePixels.slice(plan.sourceFrameCount);
-      if (!exportSpriteMapIncludeColorSprites) {
-        return {
-          canvas: createBlankExportPreviewCanvas(width, height),
-          meta: localizeText('カラースプライト生成はOFFです', 'Color sprite generation is off'),
-        };
-      }
-      if (!colorFrames.length) {
+    if (shouldAppendColorSpritesToPrimaryExport(normalizedFormat)) {
+      const colorSpriteArea = buildColorSpriteAppendAreaFromFramePixels(framePixels, width, height, state.palette);
+      if (!colorSpriteArea) {
         return {
           canvas: createBlankExportPreviewCanvas(width, height),
           meta: localizeText('使用色がありません', 'No used colors'),
         };
       }
-      const colorMap = buildSpriteMapCanvas(colorFrames, width, height, {
-        scale: Math.max(1, exportScale),
-        columns: 1,
-        rows: colorFrames.length,
-      });
+      const activePixels = framePixels[activeFrameIndex] || framePixels[0];
+      const appended = appendColorSpriteAreaToFramePixels(activePixels, width, height, colorSpriteArea);
+      const frameCanvas = createFrameCanvas(appended.pixels, appended.width, appended.height);
+      const outputWidth = appended.width * outputScale;
+      const outputHeight = appended.height * outputScale;
       return {
-        canvas: colorMap.canvas,
-        meta: `Color sprites ${plan.usedColorCount}色 / ${plan.colorSpriteCount}枚`,
+        canvas: frameCanvas,
+        meta: `${getExportFormatLabel(normalizedFormat)} + Color sprites ${colorSpriteArea.colorCount}色 / ${outputWidth}x${outputHeight}px`,
       };
     }
     const activePixels = framePixels[activeFrameIndex] || framePixels[0];
     const frameCanvas = createFrameCanvas(activePixels, width, height);
-    const scaledCanvas = scaleCanvasNearestNeighbor(frameCanvas, Math.max(1, exportScale));
     const formatLabel = getExportFormatLabel(normalizedFormat);
+    const outputWidth = width * outputScale;
+    const outputHeight = height * outputScale;
     return {
-      canvas: scaledCanvas,
-      meta: `${formatLabel} / Frame ${activeFrameIndex + 1}/${frames.length} / ${scaledCanvas.width}x${scaledCanvas.height}px`,
+      canvas: frameCanvas,
+      meta: `${formatLabel} / Frame ${activeFrameIndex + 1}/${frames.length} / ${outputWidth}x${outputHeight}px`,
     };
   }
 
@@ -30661,12 +31048,8 @@
       return;
     }
     const format = normalizeExportFormat(dom.exportDialog?.format?.value || 'png');
-    if (format !== 'spritemap' && exportPreviewMode !== 'frame') {
-      exportPreviewMode = 'frame';
-    }
-    syncExportPreviewModeButtons(exportPreviewMode);
     try {
-      const { canvas, meta } = buildExportPreviewSourceCanvas(format, exportPreviewMode);
+      const { canvas, meta } = buildExportPreviewSourceCanvas(format);
       drawExportPreviewCanvas(canvas, meta);
     } catch (error) {
       console.warn('Failed to update export preview', error);
@@ -60882,7 +61265,8 @@
         exportIncludeOriginalSize: Boolean(exportIncludeOriginalSize),
         exportSaveProjectCompanion: Boolean(exportSaveProjectCompanion),
         exportContestPostAfterSave: Boolean(exportContestPostAfterSave),
-        exportSpriteMapIncludeColorSprites: Boolean(exportSpriteMapIncludeColorSprites),
+        exportSaveSpriteMapCompanion: Boolean(exportSaveSpriteMapCompanion),
+        exportColorSpritesEnabled: Boolean(exportColorSpritesEnabled),
         exportGridTileWidth: normalizeExportGridTileSize(exportGridTileWidth, 8),
         exportGridTileHeight: normalizeExportGridTileSize(exportGridTileHeight, 8),
         timelapseEnabled: Boolean(timelapseState.enabled),
@@ -61112,8 +61496,11 @@
     if (typeof payload.exportContestPostAfterSave === 'boolean') {
       exportContestPostAfterSave = payload.exportContestPostAfterSave;
     }
-    if (typeof payload.exportSpriteMapIncludeColorSprites === 'boolean') {
-      exportSpriteMapIncludeColorSprites = payload.exportSpriteMapIncludeColorSprites;
+    if (typeof payload.exportSaveSpriteMapCompanion === 'boolean') {
+      exportSaveSpriteMapCompanion = payload.exportSaveSpriteMapCompanion;
+    }
+    if (typeof payload.exportColorSpritesEnabled === 'boolean') {
+      exportColorSpritesEnabled = payload.exportColorSpritesEnabled;
     }
     if (Number.isFinite(payload.exportGridTileWidth)) {
       exportGridTileWidth = normalizeExportGridTileSize(payload.exportGridTileWidth, exportGridTileWidth);
