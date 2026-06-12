@@ -97,12 +97,33 @@
 
   function fitImage(img) {
     if (!img) return;
-    img.style.transform = 'none';
-    img.style.width = '100%';
-    img.style.height = '100%';
-    img.style.maxWidth = 'none';
-    img.style.maxHeight = 'none';
+    const frame = img.parentElement;
+    const isMobile = window.matchMedia('(max-width: 720px)').matches;
+
+    img.dataset.pixelArtFit = 'off';
+    if (frame) {
+      frame.style.position = 'relative';
+      frame.style.overflow = 'hidden';
+    }
+    img.style.position = 'absolute';
+    img.style.inset = 'auto';
+    img.style.top = '50%';
+    img.style.left = '50%';
+    img.style.right = 'auto';
+    img.style.bottom = 'auto';
+    img.style.margin = '0';
+    img.style.transform = 'translate(-50%, -50%)';
+    img.style.maxWidth = '100%';
+    img.style.maxHeight = '100%';
     img.style.objectFit = 'contain';
+    img.style.objectPosition = 'center';
+    if (isMobile) {
+      img.style.width = '100%';
+      img.style.height = '100%';
+      return;
+    }
+    img.style.width = 'auto';
+    img.style.height = '100%';
   }
 
   function normalizeBasePath(value) {
