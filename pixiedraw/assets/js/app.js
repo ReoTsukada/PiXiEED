@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.06.08-tabs-rails-fast-color';
+  const APP_BUILD_VERSION = '2026.06.12-soft-resume-resync';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
@@ -3263,6 +3263,7 @@
   let sharedProjectReconnectRecoveryTimer = null;
   let sharedProjectReconnectRecoveryPromise = null;
   let sharedProjectWakeRecoveryPromise = null;
+  let sharedProjectSoftResumePromise = null;
   let sharedProjectSafariWakeResyncTimer = null;
   let sharedProjectWatchdogLastTickAt = 0;
   let sharedProjectCatchingUpStartedAt = 0;
@@ -3539,6 +3540,9 @@
   let sharedProjectLastCanonicalRefreshQueuedAt = 0;
   let sharedProjectLastForceRefreshQueuedAt = 0;
   let sharedProjectLastForceRefreshQueuedReason = '';
+  let sharedProjectConvergenceResyncPromise = null;
+  let sharedProjectConvergenceResyncTimer = null;
+  let sharedProjectLastConvergenceResyncAt = 0;
   let sharedProjectLastVerifiedLatestAt = 0;
   let sharedProjectLastVerifiedLatestKey = '';
   let sharedProjectLastVerifiedLatestRevision = 0;
@@ -4155,8 +4159,20 @@
   });
   document.addEventListener('visibilitychange', handleAutosaveVisibilityChange);
   document.addEventListener('visibilitychange', handleMultiVisibilityChange);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      if (sharedProjectPendingLocalOps.length && activeSharedProjectKey) {
+        flushSharedProjectPendingLocalOps();
+      }
+      scheduleSharedProjectCheckpoint({ immediate: true, historyLabel: 'checkpoint' });
+    }
+  });
   window.addEventListener('focus', handleMultiWindowFocus);
   window.addEventListener('online', handleMultiOnline);
+  window.addEventListener('online', () => {
+    scheduleSharedProjectCheckpoint({ immediate: false, historyLabel: 'checkpoint' });
+    scheduleSharedProjectConvergenceResync('online-reconnect', 320);
+  });
   window.addEventListener('offline', handleMultiOffline);
   window.addEventListener('pageshow', handleMultiPageShow);
   document.addEventListener('resume', handleMultiDocumentResume);
@@ -9783,7 +9799,16 @@
           });
         }
         if (catchingUpForMs >= SHARED_PROJECT_AUTO_RELOAD_AFTER_CATCHUP_MS) {
-          scheduleSharedProjectRecoveryReload('watchdog-catchup-stalled', 0);
+          softResumeSharedProjectAfterSleep('watchdog-catchup-stalled', {
+            hiddenGapMs: catchingUpForMs,
+            intensity: 'canonical',
+          }).then(recovered => {
+            if (!recovered) {
+              scheduleSharedProjectRecoveryReload('watchdog-catchup-stalled', 1200);
+            }
+          }).catch(() => {
+            scheduleSharedProjectRecoveryReload('watchdog-catchup-stalled', 1200);
+          });
         }
         return;
       }
@@ -10791,9 +10816,6 @@
     if (activeSharedProjectOpenReadOnly) {
       return 'read-only';
     }
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-      return 'offline';
-    }
     if (!canUseSharedProjectsBackend()) {
       return 'backend-unavailable';
     }
@@ -10816,23 +10838,29 @@
       return 'local-op-in-flight';
     }
     if (
-      sharedProjectSyncInFlight
-      || sharedProjectRefreshInFlight
-      || sharedProjectSnapshotReplayInFlight
-      || sharedProjectRecoveryInProgress
-      || sharedProjectReconnectRecoveryPromise
-      || sharedProjectWakeRecoveryPromise
-      || sharedProjectImmediateRecoveryPromise
+      !allowLocalOpBacklog
+      && (
+        sharedProjectSyncInFlight
+        || sharedProjectRefreshInFlight
+        || sharedProjectSnapshotReplayInFlight
+        || sharedProjectRecoveryInProgress
+        || sharedProjectReconnectRecoveryPromise
+        || sharedProjectWakeRecoveryPromise
+        || sharedProjectImmediateRecoveryPromise
+      )
     ) {
       return 'sync-in-progress';
     }
-    if (sharedProjectPendingRemoteOps.size > 0) {
+    if (sharedProjectPendingRemoteOps.size > 0 && !allowLocalOpBacklog) {
       return 'remote-op-pending';
     }
-    if (sharedProjectDeferRealtimeUntilSynced || activeSharedProjectSyncState !== 'synced' || !activeSharedProjectSynced) {
+    if (
+      !allowLocalOpBacklog
+      && (sharedProjectDeferRealtimeUntilSynced || activeSharedProjectSyncState !== 'synced' || !activeSharedProjectSynced)
+    ) {
       return 'not-synced';
     }
-    if (!isSharedProjectDrawReadinessFresh()) {
+    if (!isSharedProjectDrawReadinessFresh() && !allowLocalOpBacklog) {
       return 'draw-readiness-stale';
     }
     if (isSharedProjectCurrentTimelineCellOccupiedByPeer()) {
@@ -10847,8 +10875,8 @@
       return {
         level: 'warn',
         message: localizeText(
-          'オフライン中は共有プロジェクトに描画できません。接続復帰後に最新状態へ同期します。',
-          'You cannot draw in a shared project while offline. Drawing will resume after reconnecting and syncing.'
+          'オフライン中です。描画内容は端末内に保護し、接続復帰後に共有へ送信します。',
+          'You are offline. Edits are protected on this device and will be sent after reconnecting.'
         ),
       };
     }
@@ -10865,8 +10893,8 @@
       return {
         level: 'info',
         message: localizeText(
-          '直前の描画を共有へ確定中です。確定後に描画できます。',
-          'The previous edit is being confirmed to the shared project. Drawing will resume after it is confirmed.'
+          '直前の描画を共有へ確定中です。続きの描画は送信待ちとして保護します。',
+          'The previous edit is being confirmed to the shared project. Additional edits are protected while waiting to send.'
         ),
       };
     }
@@ -10890,8 +10918,8 @@
       return {
         level: 'info',
         message: localizeText(
-          '共有プロジェクトを最新状態へ確認中です。差異防止のため完了まで描画を停止しています。',
-          'The shared project is being verified as current. Drawing is paused until verification completes to prevent divergence.'
+          '共有プロジェクトを最新状態へ確認中です。描画内容は端末内に保護して送信待ちにします。',
+          'The shared project is being verified. Edits are protected on this device and queued for sending.'
         ),
       };
     }
@@ -10905,16 +10933,16 @@
       return {
         level: 'error',
         message: localizeText(
-          '共有プロジェクトを最新状態として確認できません。差異防止のため描画を停止しています。再読み込みしてください。',
-          'The shared project cannot be verified as current. Drawing is blocked to prevent divergence. Please reload.'
+          '共有プロジェクトを端末内で安全に保持できません。再読み込みしてください。',
+          'The shared project cannot be safely kept on this device. Please reload.'
         ),
       };
     }
     return {
       level: 'warn',
       message: localizeText(
-        '共有プロジェクトを最新状態へ同期中です。完了後に描画できます。',
-        'The shared project is syncing to the latest state. Drawing will resume after it completes.'
+        '共有プロジェクトを最新状態へ同期中です。描画内容は送信待ちとして保護します。',
+        'The shared project is syncing to the latest state. Edits are protected while waiting to send.'
       ),
     };
   }
@@ -11336,13 +11364,36 @@
         return;
       }
       console.warn('[shared-sync]', {
-        event: 'shared-recovery-auto-reload',
+        event: 'soft-resume-reload-suggested',
         reason,
         projectKey: activeSharedProjectKey || '',
         activeRevision: activeSharedProjectRevision,
         syncState: activeSharedProjectSyncState,
         realtimeStatus: sharedProjectRealtimeStatus,
       });
+      updateAutosaveStatus(
+        localizeText(
+          '復帰に失敗しました。再読み込みで復旧できます',
+          'Recovery failed. Reloading can restore the latest state.'
+        ),
+        'warn'
+      );
+      setMultiStatus(
+        localizeText(
+          '復帰に失敗しました。再読み込みで復旧できます',
+          'Recovery failed. Reloading can restore the latest state.'
+        ),
+        'warn'
+      );
+      const confirmReload = typeof window.confirm === 'function'
+        ? window.confirm(localizeText(
+          '同期復帰に失敗しました。最新状態で開き直しますか？',
+          'Sync recovery failed. Reopen the latest state?'
+        ))
+        : false;
+      if (!confirmReload) {
+        return;
+      }
       markSharedProjectRecoveryReloadAt();
       setMultiStatus(
         localizeText(
@@ -11757,7 +11808,243 @@
     return Promise.resolve(false);
   }
 
+  function getSharedProjectSoftResumeIntensity(hiddenGapMs = 0) {
+    const gap = Math.max(0, Math.round(Number(hiddenGapMs) || 0));
+    if (gap >= 300000 || IS_SAFARI_BROWSER || IS_IOS_DEVICE) {
+      return 'canonical';
+    }
+    if (gap >= 60000) {
+      return 'reconnect';
+    }
+    if (gap >= 5000) {
+      return 'catchup';
+    }
+    return 'light';
+  }
+
+  function getSharedProjectSoftResumeBrowserInfo() {
+    return {
+      safari: Boolean(IS_SAFARI_BROWSER),
+      ios: Boolean(IS_IOS_DEVICE),
+      userAgent: USER_AGENT_LOWER.slice(0, 180),
+      visibilityState: document.visibilityState || '',
+      online: typeof navigator === 'undefined' ? true : navigator.onLine !== false,
+    };
+  }
+
+  async function softResumeSharedProjectAfterSleep(reason = 'soft-resume', options = {}) {
+    if (!activeSharedProjectKey || appReloadInProgress) {
+      return false;
+    }
+    if (sharedProjectSoftResumePromise) {
+      return sharedProjectSoftResumePromise;
+    }
+    const hiddenGapMs = Math.max(0, Math.round(Number(options?.hiddenGapMs) || 0));
+    const intensity = options?.intensity || getSharedProjectSoftResumeIntensity(hiddenGapMs);
+    const resumeProjectKey = activeSharedProjectKey;
+    const startedAt = Date.now();
+    sharedProjectSoftResumePromise = (async () => {
+      console.info('[shared-sync]', {
+        event: 'soft-resume-start',
+        reason,
+        projectKey: resumeProjectKey,
+        hiddenGapMs,
+        intensity,
+        browser: getSharedProjectSoftResumeBrowserInfo(),
+        activeRevision: activeSharedProjectRevision,
+        activeStructureRevision: activeSharedProjectStructureRevision,
+        realtimeStatus: sharedProjectRealtimeStatus,
+      });
+      setActiveSharedProjectSyncState('catching-up', { announce: true });
+      setMultiStatus(localizeText('同期を確認中…', 'Checking sync...'), 'info');
+      try {
+        await ensurePixieedAccountReady({ forceRefresh: true, silent: true });
+        console.info('[shared-sync]', {
+          event: 'soft-resume-auth-refreshed',
+          reason,
+          projectKey: resumeProjectKey,
+        });
+        if (!await ensureSharedProjectBackendSession()) {
+          throw new Error('backend session unavailable');
+        }
+        if (resumeProjectKey !== activeSharedProjectKey) {
+          return false;
+        }
+        await restorePendingSharedLocalOps(resumeProjectKey, {
+          announce: false,
+          refreshReason: `${reason || 'soft-resume'}-restore-pending-local-ops`,
+        });
+        let realtimeChannel = null;
+        if (intensity === 'catchup' || intensity === 'reconnect' || intensity === 'canonical') {
+          await disconnectActiveSharedProjectRealtimeChannel({
+            reason: `${reason || 'soft-resume'}-soft-resume-reconnect`,
+            caller: 'softResumeSharedProjectAfterSleep',
+          });
+          realtimeChannel = await ensureActiveSharedProjectRealtimeChannel();
+          console.info('[shared-sync]', {
+            event: 'soft-resume-realtime-reconnected',
+            reason,
+            projectKey: resumeProjectKey,
+            connected: Boolean(realtimeChannel),
+            realtimeStatus: sharedProjectRealtimeStatus,
+          });
+        }
+        const latestProject = await fetchSharedProjectRecord(resumeProjectKey);
+        if (!latestProject?.project_key || resumeProjectKey !== activeSharedProjectKey) {
+          throw new Error('latest shared project record unavailable');
+        }
+        const latestRevision = getSharedProjectLatestRevision(latestProject);
+        const latestStructureRevision = getSharedProjectLatestStructureRevision(latestProject);
+        console.info('[shared-sync]', {
+          event: 'soft-resume-latest-fetched',
+          reason,
+          projectKey: resumeProjectKey,
+          activeRevision: activeSharedProjectRevision,
+          latestRevision,
+          activeStructureRevision: activeSharedProjectStructureRevision,
+          latestStructureRevision,
+        });
+        let replayed = false;
+        if (latestRevision > activeSharedProjectRevision || latestStructureRevision > activeSharedProjectStructureRevision) {
+          replayed = await applySharedProjectOpsSinceRevision(latestProject, activeSharedProjectRevision);
+          if (!replayed) {
+            replayed = await fetchAndReplaySharedProjectOpsBurst(resumeProjectKey, {
+              reason: `${reason || 'soft-resume'}-ops-burst`,
+              limit: SHARED_PROJECT_MAX_MISSING_OP_FETCH,
+              maxRounds: SHARED_PROJECT_BURST_CATCHUP_MAX_ROUNDS,
+            });
+          }
+        } else if (intensity !== 'light') {
+          replayed = await fetchAndReplaySharedProjectOpsBurst(resumeProjectKey, {
+            reason: `${reason || 'soft-resume'}-tail-check`,
+            limit: 96,
+            maxRounds: 2,
+          });
+        }
+        console.info('[shared-sync]', {
+          event: 'soft-resume-ops-replayed',
+          reason,
+          projectKey: resumeProjectKey,
+          replayed,
+          revision: activeSharedProjectRevision,
+          appliedSeq: sharedProjectLastAppliedSeq,
+        });
+        const gapRecovered = await recoverSharedProjectRealtimeGap(resumeProjectKey, {
+          afterSeq: sharedProjectLastAppliedSeq,
+          reason: `${reason || 'soft-resume'}-gap-check`,
+        });
+        console.info('[shared-sync]', {
+          event: 'soft-resume-gap-recovered',
+          reason,
+          projectKey: resumeProjectKey,
+          recovered: gapRecovered,
+          pendingRemoteOps: sharedProjectPendingRemoteOps.size,
+          appliedSeq: sharedProjectLastAppliedSeq,
+        });
+        if (sharedProjectPendingRemoteOps.size) {
+          drainPendingSharedProjectRemoteOps();
+        }
+        let canonicalRefreshed = false;
+        if (
+          intensity === 'canonical'
+          && (
+            sharedProjectPendingRemoteOps.size
+            || activeSharedProjectRevision < latestRevision
+            || activeSharedProjectStructureRevision < latestStructureRevision
+          )
+        ) {
+          console.info('[shared-sync]', {
+            event: 'soft-resume-shadow-swap-start',
+            reason,
+            projectKey: resumeProjectKey,
+            latestRevision,
+            latestStructureRevision,
+          });
+          canonicalRefreshed = await refreshActiveSharedProjectSnapshot({
+            force: true,
+            reason: `${reason || 'soft-resume'}-shadow-snapshot`,
+          });
+          console.info('[shared-sync]', {
+            event: 'soft-resume-shadow-swap-complete',
+            reason,
+            projectKey: resumeProjectKey,
+            refreshed: canonicalRefreshed,
+            revision: activeSharedProjectRevision,
+          });
+        }
+        const fingerprint = createSharedProjectDocumentFingerprint();
+        const synced = Boolean(
+          resumeProjectKey === activeSharedProjectKey
+          && activeSharedProjectDocumentLoaded
+          && hasUsableActiveSharedProjectDocumentState()
+          && !sharedProjectPendingRemoteOps.size
+          && activeSharedProjectRevision >= latestRevision
+          && activeSharedProjectStructureRevision >= latestStructureRevision
+        );
+        console[synced ? 'info' : 'warn']('[shared-sync]', {
+          event: synced ? 'soft-resume-fingerprint-ok' : 'soft-resume-fingerprint-mismatch',
+          reason,
+          projectKey: resumeProjectKey,
+          hash: fingerprint?.hash || '',
+          revision: activeSharedProjectRevision,
+          latestRevision,
+          pendingRemoteOps: sharedProjectPendingRemoteOps.size,
+          canonicalRefreshed,
+        });
+        if (!synced) {
+          const converged = await runSharedProjectConvergenceResync(`${reason || 'soft-resume'}-convergence`);
+          if (!converged) {
+            throw new Error('soft resume convergence failed');
+          }
+        }
+        setSharedProjectDeferRealtimeUntilSynced(false);
+        setActiveSharedProjectSyncState('synced', { announce: true });
+        flushSharedProjectPendingLocalOps();
+        console.info('[shared-sync]', {
+          event: 'soft-resume-local-pending-flushed',
+          reason,
+          projectKey: resumeProjectKey,
+          pendingLocalOps: sharedProjectPendingLocalOps.length,
+        });
+        ensureSharedProjectRefreshLoop();
+        updateAutosaveStatus(localizeText('最新状態に同期しました', 'Synced to the latest state'), 'success');
+        console.info('[shared-sync]', {
+          event: 'soft-resume-complete',
+          reason,
+          projectKey: resumeProjectKey,
+          elapsedMs: Date.now() - startedAt,
+          revision: activeSharedProjectRevision,
+          realtimeConnected: Boolean(realtimeChannel) || sharedProjectRealtimeStatus === 'subscribed',
+        });
+        return true;
+      } catch (error) {
+        console.warn('[shared-sync]', {
+          event: 'soft-resume-failed',
+          reason,
+          projectKey: resumeProjectKey,
+          hiddenGapMs,
+          intensity,
+          error: String(error?.message || error || ''),
+        });
+        setActiveSharedProjectSyncState('catching-up', { announce: true });
+        updateAutosaveStatus(localizeText('通信が不安定です。描画内容を保護しています', 'Connection is unstable. Your edits are protected.'), 'warn');
+        scheduleSharedProjectConvergenceResync(`${reason || 'soft-resume'}-failed`, 900);
+        return false;
+      }
+    })().finally(() => {
+      sharedProjectSoftResumePromise = null;
+    });
+    return sharedProjectSoftResumePromise;
+  }
+
   function recoverSharedProjectAfterWake(reason = 'wake', { hiddenGapMs = 0, immediate = true } = {}) {
+    if (!activeSharedProjectKey) {
+      return Promise.resolve(false);
+    }
+    return softResumeSharedProjectAfterSleep(reason, { hiddenGapMs, immediate });
+  }
+
+  function recoverSharedProjectAfterWakeLegacy(reason = 'wake', { hiddenGapMs = 0, immediate = true } = {}) {
     if (!activeSharedProjectKey) {
       return Promise.resolve(false);
     }
@@ -12124,17 +12411,44 @@
     }
   }
 
-  function handleSharedProjectRecoveryFirstInput() {
+  function handleSharedProjectRecoveryFirstInput(event = null) {
     if (!activeSharedProjectKey || appReloadInProgress) {
       return;
     }
-    const blockReason = getSharedProjectLocalDrawBlockReason(activeSharedProjectKey);
+    const target = event?.target instanceof Element ? event.target : null;
+    const isCanvasPointer = Boolean(
+      target
+      && (
+        (dom.canvasViewport && dom.canvasViewport.contains(target))
+        || (dom.stage && dom.stage.contains(target))
+      )
+    );
+    if (!isCanvasPointer) {
+      return;
+    }
+    const blockReason = getSharedProjectLocalDrawBlockReason(activeSharedProjectKey, {
+      allowLocalOpBacklog: true,
+    });
     if (!blockReason) {
+      if (activeSharedProjectSyncState === 'catching-up' || sharedProjectPendingRemoteOps.size > 0) {
+        softResumeSharedProjectAfterSleep('first-input-background-sync', {
+          hiddenGapMs: 0,
+          intensity: 'reconnect',
+        }).catch(() => {});
+      }
       return;
     }
     if (activeSharedProjectOpenInProgress || document.visibilityState === 'hidden') {
       return;
     }
+    softResumeSharedProjectAfterSleep(`first-input-${blockReason}`, {
+      hiddenGapMs: 0,
+      intensity: 'reconnect',
+    }).then(recovered => {
+      if (recovered) {
+        markSharedProjectDrawReadinessVerified(`first-input-${blockReason}`);
+      }
+    }).catch(() => {});
     requestSharedProjectDrawReadinessRecovery(`first-input-${blockReason}`).catch(() => {});
     const catchingUpForMs = sharedProjectCatchingUpStartedAt > 0
       ? Date.now() - sharedProjectCatchingUpStartedAt
@@ -64461,8 +64775,8 @@
     if (normalizedState === 'catching-up') {
       setMultiStatus(
         localizeText(
-          '共有モード: 最新状態へ同期中… 完了まで描画を停止しています',
-          'Shared mode: syncing to the latest state... drawing is paused until it completes.'
+          '共有モード: 最新状態へ同期中… 描画内容は送信待ちとして保護しています',
+          'Shared mode: syncing to the latest state... edits are protected while waiting to send.'
         ),
         'info'
       );
@@ -64810,6 +65124,47 @@
     return `${normalizedCanvasId}\u0000${normalizedFrameIndex}\u0000${normalizedLayerId}`;
   }
 
+  function appendSharedProjectResultPatchToDrawPayload(payload) {
+    if (!payload || typeof payload !== 'object' || payload.patch) {
+      return payload;
+    }
+    const command = typeof payload.command === 'string' ? payload.command.trim() : '';
+    if (command !== 'fill' && command !== 'region' && command !== 'selection-transform') {
+      return payload;
+    }
+    const canvasId = typeof payload.canvasId === 'string' ? payload.canvasId.trim() : '';
+    const layerId = typeof payload.layerId === 'string' ? payload.layerId.trim() : '';
+    const frameIndex = Math.max(0, Math.round(Number(payload.frameIndex) || 0));
+    if (!canvasId || !layerId) {
+      return payload;
+    }
+    const canvasDoc = getProjectCanvasDocumentById(canvasId) || adoptSingleProjectCanvasId(canvasId);
+    const frame = Array.isArray(canvasDoc?.frames) ? canvasDoc.frames[frameIndex] : null;
+    const layer = Array.isArray(frame?.layers) ? (frame.layers.find(item => item?.id === layerId) || null) : null;
+    const pixelCount = Math.max(
+      0,
+      Math.floor(Number(canvasDoc?.width ?? state.width) || 0) * Math.floor(Number(canvasDoc?.height ?? state.height) || 0)
+    );
+    if (!layer || !pixelCount) {
+      return payload;
+    }
+    const snapshotKey = buildSharedProjectLayerSnapshotKey(canvasId, frameIndex, layerId);
+    const previousSnapshot = snapshotKey ? (sharedProjectLayerSnapshots.get(snapshotKey) || null) : null;
+    const diffPayload = buildLayerDiffPayload(layer, previousSnapshot, pixelCount);
+    if (!diffPayload) {
+      return payload;
+    }
+    const currentSnapshot = captureLayerPatchSnapshot(layer, pixelCount);
+    if (snapshotKey && currentSnapshot) {
+      sharedProjectLayerSnapshots.set(snapshotKey, currentSnapshot);
+    }
+    return {
+      ...payload,
+      pixelCount,
+      patch: diffPayload,
+    };
+  }
+
   function logSharedProjectResolveEvent(event, {
     opId = '',
     revision = 0,
@@ -65144,7 +65499,7 @@
       }
       payload.point = { x: Math.round(Number(drawCommand.point.x) || 0), y: Math.round(Number(drawCommand.point.y) || 0) };
       payload.fillMode = normalizeSelectSameMode(drawCommand.fillMode, SELECT_SAME_MODE_CONNECTED);
-      return payload;
+      return appendSharedProjectResultPatchToDrawPayload(payload);
     }
     if (drawCommand.command === 'curve') {
       if (!drawCommand.start || !drawCommand.control1 || !drawCommand.control2 || !drawCommand.end) {
@@ -65170,7 +65525,7 @@
       payload.height = Math.max(1, Math.round(Number(drawCommand.height) || 1));
       payload.indices = Array.isArray(drawCommand.indices) ? drawCommand.indices.map(value => Math.round(Number(value) || -1)) : [];
       payload.direct = Array.isArray(drawCommand.direct) ? drawCommand.direct.map(value => clamp(Math.round(Number(value) || 0), 0, 255)) : [];
-      return payload;
+      return appendSharedProjectResultPatchToDrawPayload(payload);
     }
     return null;
   }
@@ -65537,6 +65892,12 @@
       })) {
         sharedProjectPendingProvisionalOps.delete(opId);
         replayedCount += 1;
+        console.info('[shared-sync]', {
+          event: 'draw-op-replayed-after-structure-sync',
+          opId,
+          revision: getSharedProjectOpSeq(pending.opRecord),
+          provisional: true,
+        });
       }
     });
     if (replayedCount > 0) {
@@ -66521,6 +66882,70 @@
     };
   }
 
+  function createSharedProjectExactLayerHashForPayload(payload = {}) {
+    if (!payload || typeof payload !== 'object') {
+      return null;
+    }
+    const canvasId = typeof payload.canvasId === 'string' ? payload.canvasId.trim() : '';
+    const layerId = typeof payload.layerId === 'string' ? payload.layerId.trim() : '';
+    const frameIndex = Math.max(0, Math.round(Number(payload.frameIndex) || 0));
+    const targetCanvas = getProjectCanvasDocumentById(canvasId) || adoptSingleProjectCanvasId(canvasId);
+    const frame = Array.isArray(targetCanvas?.frames) ? targetCanvas.frames[frameIndex] : null;
+    const layer = Array.isArray(frame?.layers) ? (frame.layers.find(entry => entry?.id === layerId) || null) : null;
+    if (!targetCanvas || !frame || !layer) {
+      return null;
+    }
+    let hash = 2166136261;
+    hash = mixTextHash(hash, targetCanvas.id || canvasId);
+    hash = mixTextHash(hash, frame.id || '');
+    hash = mixTextHash(hash, layer.id || layerId);
+    hash = mixUint32Hash(hash, Math.max(1, Math.round(Number(targetCanvas.width) || 1)));
+    hash = mixUint32Hash(hash, Math.max(1, Math.round(Number(targetCanvas.height) || 1)));
+    hash = mixUint32Hash(hash, layer.visible === false ? 0 : 1);
+    hash = mixUint32Hash(hash, Math.round(normalizeLayerOpacity(layer.opacity) * 1000));
+    hash = mixTextHash(hash, normalizeLayerBlendMode(layer.blendMode));
+    const indices = layer.indices instanceof Int16Array ? layer.indices : null;
+    const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
+    if (indices) {
+      hash = mixUint32Hash(hash, indices.length);
+      for (let index = 0; index < indices.length; index += 1) {
+        hash = mixUint32Hash(hash, indices[index]);
+      }
+    }
+    if (direct) {
+      hash = mixUint32Hash(hash, direct.length);
+      for (let index = 0; index < direct.length; index += 1) {
+        hash = mixUint32Hash(hash, direct[index]);
+      }
+    }
+    return {
+      version: 1,
+      scope: 'layer',
+      canvasId: targetCanvas.id || canvasId,
+      frameId: frame.id || '',
+      frameIndex,
+      layerId: layer.id || layerId,
+      hash: (hash >>> 0).toString(16).padStart(8, '0'),
+    };
+  }
+
+  function createSharedProjectExactHashForOp(opRecord, { reason = 'exact-hash' } = {}) {
+    const payload = extractSharedProjectOpPayload(opRecord);
+    const layerHash = createSharedProjectExactLayerHashForPayload(payload);
+    const result = layerHash || createSharedProjectDocumentFingerprint();
+    if (result) {
+      console.info('[shared-sync]', {
+        event: 'convergence-resync-hash-ok',
+        reason,
+        opId: getSharedProjectOpId(opRecord),
+        revision: getSharedProjectOpSeq(opRecord),
+        hash: result.hash,
+        scope: result.scope || 'document',
+      });
+    }
+    return result;
+  }
+
   function attachSharedProjectDocumentFingerprint(payload) {
     if (!payload || typeof payload !== 'object' || payload.sharedFingerprint) {
       return payload;
@@ -66553,14 +66978,20 @@
       expected,
       actual,
     });
+    const exactHash = createSharedProjectExactHashForOp(opRecord, { reason: `${reason || 'op'}-fingerprint-mismatch` });
+    console.warn('[shared-sync]', {
+      event: 'convergence-resync-hash-mismatch',
+      reason,
+      opId: getSharedProjectOpId(opRecord),
+      revision: getSharedProjectOpSeq(opRecord),
+      expected,
+      actual,
+      exactHash,
+    });
     if ((now - sharedProjectLastFingerprintMismatchAt) >= SHARED_PROJECT_FINGERPRINT_MISMATCH_COOLDOWN_MS) {
       sharedProjectLastFingerprintMismatchAt = now;
       setActiveSharedProjectSyncState('catching-up', { announce: true });
-      queueSharedProjectRefresh({
-        immediate: true,
-        reason: `${reason || 'op'}-fingerprint-mismatch`,
-        force: true,
-      });
+      runSharedProjectConvergenceResync(`${reason || 'op'}-fingerprint-mismatch`).catch(() => {});
     }
     return false;
   }
@@ -66582,6 +67013,11 @@
       if (exact) {
         return { layer: exact, layerId: exact.id || layerId, resolution: 'id' };
       }
+      if (isSharedProjectCollaborativeMode()) {
+        return { layer: null, layerId, resolution: 'missing-id' };
+      }
+    } else if (isSharedProjectCollaborativeMode()) {
+      return { layer: null, layerId, resolution: 'missing-id' };
     }
     const layerIndex = Math.round(Number(payload?.layerIndex));
     if (Number.isFinite(layerIndex) && layerIndex >= 0 && layerIndex < layers.length) {
@@ -66641,7 +67077,7 @@
         return { ok: false, reason: 'missing-shape-fields', canvasId, layerId, frameIndex, pixelCount: 0 };
       }
     } else if (drawCommandType === 'fill') {
-      if (!canvasId || !layerId || !payload?.point) {
+      if (!canvasId || !layerId || (!payload?.point && (!patch || !pixelCount))) {
         logSharedProjectResolveEvent('canvas-resolve-failed', {
           opId, revision, kind, canvasId, layerId, structureRevision, result: 'skip', skipReason: 'missing-fill-fields',
         });
@@ -66658,9 +67094,14 @@
       if (
         !canvasId
         || !layerId
-        || !payload?.bounds
-        || !Number.isFinite(Number(payload?.width))
-        || !Number.isFinite(Number(payload?.height))
+        || (
+          (!patch || !pixelCount)
+          && (
+            !payload?.bounds
+            || !Number.isFinite(Number(payload?.width))
+            || !Number.isFinite(Number(payload?.height))
+          )
+        )
       ) {
         logSharedProjectResolveEvent('canvas-resolve-failed', {
           opId, revision, kind, canvasId, layerId, structureRevision, result: 'skip', skipReason: 'missing-region-fields',
@@ -67434,6 +67875,9 @@
 
   function applySharedProjectFillCommand(opRecord, { fromRemote = true } = {}) {
     const payload = extractSharedProjectOpPayload(opRecord);
+    if (payload?.patch && typeof payload.patch === 'object' && Math.max(0, Math.floor(Number(payload?.pixelCount) || 0)) > 0) {
+      return applyLayerPatch(opRecord, { fromRemote });
+    }
     const target = resolveSharedProjectDrawCommandTarget(payload);
     if (!target || !payload?.point) {
       return false;
@@ -67611,6 +68055,9 @@
 
   function applySharedProjectRegionCommand(opRecord, { fromRemote = true } = {}) {
     const payload = extractSharedProjectOpPayload(opRecord);
+    if (payload?.patch && typeof payload.patch === 'object' && Math.max(0, Math.floor(Number(payload?.pixelCount) || 0)) > 0) {
+      return applyLayerPatch(opRecord, { fromRemote });
+    }
     const target = resolveSharedProjectDrawCommandTarget(payload);
     const bounds = payload?.bounds && typeof payload.bounds === 'object' ? payload.bounds : null;
     const width = Math.max(1, Math.round(Number(payload?.width) || 0));
@@ -68189,10 +68636,12 @@
           stallCount: sharedProjectRescueStallCount,
         });
         if (sharedProjectRescueStallCount >= 3) {
-          queueSharedProjectRefresh({
-            immediate: false,
-            reason: 'canonical-resync',
-            force: true,
+          runSharedProjectConvergenceResync(`rescue-stalled-${reason || 'poll'}`).catch(() => {
+            queueSharedProjectRefresh({
+              immediate: false,
+              reason: 'canonical-resync',
+              force: true,
+            });
           });
           scheduleSharedProjectOpsRescueRetry(
             Math.min(4000, SHARED_PROJECT_OP_RESCUE_POLL_INTERVAL_MS * Math.max(2, sharedProjectRescueStallCount))
@@ -68231,6 +68680,9 @@
       return false;
     }
     if (opType === 'structure' || opType === 'create' || opType === 'snapshot') {
+      return true;
+    }
+    if ((opType === 'draw' || opType === 'palette') && sharedProjectOpsSinceCheckpoint >= SHARED_PROJECT_CHECKPOINT_OP_COUNT) {
       return true;
     }
     return false;
@@ -68523,6 +68975,7 @@
       const replayed = await replayOps(ops, { fromRemote: true });
       if (!replayed) {
         scheduleSharedProjectOpsRescueRetry(120, `${reason || 'op-burst'}-apply-retry`);
+        scheduleSharedProjectConvergenceResync(`${reason || 'op-burst'}-apply-retry`, 420);
         return false;
       }
       recovered = true;
@@ -68676,6 +69129,12 @@
         scheduleSharedProjectOpsRescueRetry(120, 'drain-apply-failed');
         return false;
       }
+      console.info('[shared-sync]', {
+        event: 'draw-op-replayed-after-structure-sync',
+        opId: nextOpId || getSharedProjectOpId(nextOp),
+        revision: nextSeq,
+        provisional: false,
+      });
       sharedProjectLastAppliedSeq = nextSeq;
       activeSharedProjectRevision = Math.max(activeSharedProjectRevision, nextSeq);
       activeSharedProjectStructureRevision = Math.max(
@@ -69172,6 +69631,26 @@
       });
       if (
         fromRemote
+        && !provisional
+        && seq > sharedProjectLastAppliedSeq
+        && shouldRefreshForSharedProjectApplySkip(diagnostics.reason)
+      ) {
+        rememberPendingSharedProjectRemoteOp(seq, opRecord, `held-${diagnostics.reason}`);
+        console.warn('[shared-sync]', {
+          event: 'draw-op-held-for-structure-sync',
+          reason: diagnostics.reason,
+          opId,
+          revision: seq,
+          canvasId: diagnostics.canvasId || '',
+          frameIndex: diagnostics.frameIndex,
+          layerId: diagnostics.layerId || '',
+          structureRevision: diagnostics.structureRevision,
+          activeStructureRevision: diagnostics.activeStructureRevision,
+        });
+        createSharedProjectExactHashForOp(opRecord, { reason: `apply-skip-${diagnostics.reason}` });
+      }
+      if (
+        fromRemote
         && provisional
         && shouldRefreshForSharedProjectApplySkip(diagnostics.reason)
       ) {
@@ -69226,20 +69705,8 @@
         && rememberSharedProjectRemoteApplyFailureKey(failureKey)
       ) {
         const recoveryReason = `apply-skip-${diagnostics.reason}`;
-        triggerImmediateSharedProjectRecovery(recoveryReason).then(recovered => {
-          if (!recovered) {
-            queueSharedProjectRefresh({
-              immediate: true,
-              reason: recoveryReason,
-              force: true,
-            });
-          }
-        }).catch(() => {
-          queueSharedProjectRefresh({
-            immediate: true,
-            reason: recoveryReason,
-            force: true,
-          });
+        runSharedProjectConvergenceResync(recoveryReason).catch(() => {
+          queueSharedProjectRefresh({ immediate: true, reason: recoveryReason, force: true });
         });
       }
       return false;
@@ -72154,6 +72621,132 @@
     return sharedProjectImmediateRecoveryPromise;
   }
 
+  function scheduleSharedProjectConvergenceResync(reason = 'convergence-resync', delayMs = 240) {
+    if (!activeSharedProjectKey) {
+      return;
+    }
+    if (sharedProjectConvergenceResyncTimer !== null) {
+      return;
+    }
+    sharedProjectConvergenceResyncTimer = window.setTimeout(() => {
+      sharedProjectConvergenceResyncTimer = null;
+      runSharedProjectConvergenceResync(reason).catch(() => {});
+    }, Math.max(32, Math.round(Number(delayMs) || 240)));
+  }
+
+  async function runSharedProjectConvergenceResync(reason = 'convergence-resync') {
+    if (!activeSharedProjectKey || !canUseSharedProjectsBackend()) {
+      return false;
+    }
+    if (sharedProjectConvergenceResyncPromise) {
+      return sharedProjectConvergenceResyncPromise;
+    }
+    sharedProjectConvergenceResyncPromise = (async () => {
+      const projectKey = activeSharedProjectKey;
+      const startedAt = Date.now();
+      const pendingLocalCount = sharedProjectPendingLocalOps.length
+        + sharedProjectLocalInFlightOps.size
+        + (sharedProjectOpCommitInFlight ? 1 : 0);
+      sharedProjectLastConvergenceResyncAt = startedAt;
+      console.info('[shared-sync]', {
+        event: 'convergence-resync-start',
+        reason,
+        projectKey,
+        appliedRevision: sharedProjectLastAppliedSeq,
+        activeRevision: activeSharedProjectRevision,
+        pendingRemoteOps: sharedProjectPendingRemoteOps.size,
+        pendingLocalOps: pendingLocalCount,
+      });
+      setActiveSharedProjectSyncState('catching-up', { announce: true });
+      try {
+        const beforeRevision = sharedProjectLastAppliedSeq;
+        const project = await fetchSharedProjectRecord(projectKey);
+        if (!project || projectKey !== activeSharedProjectKey) {
+          throw new Error('missing shared project checkpoint');
+        }
+        const snapshotRevision = Math.max(0, Math.round(Number(project.checkpoint_seq ?? project.latest_revision) || 0));
+        console.info('[shared-sync]', {
+          event: 'convergence-resync-loaded-checkpoint',
+          reason,
+          projectKey,
+          snapshotRevision,
+          latestRevision: Math.max(0, Math.round(Number(project.latest_revision) || 0)),
+        });
+        const refreshed = await refreshActiveSharedProjectSnapshot({
+          reason: `convergence-resync-${reason || 'recovery'}`,
+          force: true,
+        });
+        console.info('[shared-sync]', {
+          event: 'convergence-resync-replayed-confirmed-ops',
+          reason,
+          projectKey,
+          replayed: Math.max(0, sharedProjectLastAppliedSeq - beforeRevision),
+          revision: sharedProjectLastAppliedSeq,
+        });
+        const replayedLocal = replaySharedProjectLocalProvisionalAfterRemoteOps('convergence-resync');
+        console.info('[shared-sync]', {
+          event: 'convergence-resync-replayed-local-pending',
+          reason,
+          projectKey,
+          replayed: replayedLocal,
+          pendingLocalOps: sharedProjectPendingLocalOps.length + sharedProjectLocalInFlightOps.size,
+        });
+        const hash = createSharedProjectDocumentFingerprint();
+        if (!refreshed || sharedProjectPendingRemoteOps.size > 0) {
+          console.warn('[shared-sync]', {
+            event: 'convergence-resync-hash-mismatch',
+            reason,
+            projectKey,
+            refreshed,
+            pendingRemoteOps: sharedProjectPendingRemoteOps.size,
+            hash: hash?.hash || '',
+          });
+          throw new Error('convergence resync incomplete');
+        }
+        console.info('[shared-sync]', {
+          event: 'convergence-resync-hash-ok',
+          reason,
+          projectKey,
+          hash: hash?.hash || '',
+          revision: sharedProjectLastAppliedSeq,
+        });
+        setSharedProjectDeferRealtimeUntilSynced(false);
+        setActiveSharedProjectSyncState('synced');
+        updateAutosaveStatus(
+          localizeText('共有プロジェクトを最新状態に補正しました', 'Shared project corrected to the latest state'),
+          'info'
+        );
+        console.info('[shared-sync]', {
+          event: 'convergence-resync-complete',
+          reason,
+          projectKey,
+          revision: sharedProjectLastAppliedSeq,
+          elapsedMs: Date.now() - startedAt,
+        });
+        return true;
+      } catch (error) {
+        console.warn('[shared-sync]', {
+          event: 'convergence-resync-failed',
+          reason,
+          projectKey,
+          error: String(error?.message || error || ''),
+        });
+        setActiveSharedProjectSyncState('catching-up', { announce: true });
+        updateAutosaveStatus(
+          localizeText('通信不安定。ローカル変更を保護中です', 'Connection unstable. Local changes are protected.'),
+          'warn'
+        );
+        scheduleSharedProjectConvergenceResync(`${reason || 'convergence'}-retry`, 1200);
+        return false;
+      }
+    })();
+    try {
+      return await sharedProjectConvergenceResyncPromise;
+    } finally {
+      sharedProjectConvergenceResyncPromise = null;
+    }
+  }
+
   function queueSharedProjectCurrentSnapshotCapture({
     delayMs = SHARED_PROJECT_DEFERRED_PERSIST_DELAY,
     projectKey = '',
@@ -72549,6 +73142,9 @@
           sessionId: typeof op?.sessionId === 'string' ? op.sessionId : '',
         });
         const drawKind = typeof op?.kind === 'string' ? op.kind : '';
+        if (isSharedProjectDrawKind(drawKind) && !shouldDeferIncomingSharedProjectRemoteApply()) {
+          applyOp(op, { fromRemote: true, provisional: true });
+        }
         const recoveryReason = SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY && isSharedProjectDrawKind(drawKind)
           ? 'broadcast-draw-gap'
           : 'broadcast-op-gap';
