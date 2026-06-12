@@ -2726,6 +2726,7 @@
   const SHARED_PROJECT_DRAW_READY_MAX_AGE_MS = 2500;
   const SHARED_PROJECT_FINGERPRINT_MISMATCH_COOLDOWN_MS = 3500;
   const SHARED_RECENT_PROJECTS_ACCOUNT_SYNC_COOLDOWN_MS = 12000;
+  const SHARED_RECENT_PROJECTS_FORCE_SYNC_COOLDOWN_MS = 2000;
   const SHARED_PROJECT_BROADCAST_EVENT = 'shared-op';
   const SHARED_PROJECT_CELL_PRESENCE_EVENT = 'shared-cell-presence';
   const SHARED_PROJECT_COMMENT_EVENT = 'shared-comment';
@@ -3230,6 +3231,9 @@
   let sharedProjectSyncQueuedPayload = null;
   let sharedRecentProjectsAccountSyncPromise = null;
   let sharedRecentProjectsLastAccountSyncAt = 0;
+  let recentProjectsRenderTimer = null;
+  let recentProjectsPendingRenderEntries = null;
+  let recentProjectsLastRenderSignature = '';
   let sharedProjectCaptureTimer = null;
   let activeSharedProjectId = '';
   let activeSharedProjectKey = '';
@@ -4205,6 +4209,7 @@
   let suppressOpenProjectTabAutoInitialize = false;
   let openProjectTabSequence = 0;
   let openProjectTabBusy = false;
+  let openProjectTabsLastRenderSignature = '';
   let projectTabViewportResetToken = 0;
   const SELECTION_DASH_SPEED = 40;
   let selectionDashScreenOffset = 0;
@@ -8911,6 +8916,26 @@
     if (!(list instanceof HTMLElement) || !(bar instanceof HTMLElement)) {
       return;
     }
+    const renderSignature = JSON.stringify({
+      activeOpenProjectTabId,
+      projectHomeVisible,
+      openProjectTabBusy,
+      maxTabs: MAX_OPEN_PROJECT_TABS,
+      tabs: openProjectTabs.map(tab => ({
+        id: tab?.id || '',
+        projectId: tab?.projectId || '',
+        source: tab?.source || '',
+        name: tab?.name || '',
+        fileName: tab?.fileName || '',
+        sharedProjectKey: tab?.sharedProjectKey || '',
+        deferredRestore: Boolean(tab?.deferredRestore),
+        remoteUpdateAvailable: Boolean(tab?.remoteUpdateAvailable),
+      })),
+    });
+    if (renderSignature === openProjectTabsLastRenderSignature) {
+      return;
+    }
+    openProjectTabsLastRenderSignature = renderSignature;
     bar.hidden = false;
     list.innerHTML = '';
     const homeItem = document.createElement('div');
@@ -9055,7 +9080,7 @@
     if (!projectHomeVisible) {
       return;
     }
-    renderRecentProjectsList(Array.from(recentProjectsCache.values()));
+    scheduleRecentProjectsListRender(Array.from(recentProjectsCache.values()), { immediate: true });
     if (refresh && AUTOSAVE_SUPPORTED) {
       refreshRecentProjectsUI().catch(error => {
         console.warn('Failed to refresh project home list', error);
@@ -17034,7 +17059,7 @@
     renderNewProjectPalettePresetPicker(newProjectPalettePresetId);
     const cachedEntries = Array.from(recentProjectsCache.values());
     syncStartupResumeState(cachedEntries);
-    renderRecentProjectsList(cachedEntries);
+    scheduleRecentProjectsListRender(cachedEntries, { immediate: true, force: true });
   }
 
   function setUiLanguage(nextLanguage, { persist = true } = {}) {
@@ -17161,8 +17186,13 @@
   function updateAutosaveStatus(message, tone = 'info') {
     const statusNode = dom.controls.autosaveStatus;
     if (!statusNode) return;
-    statusNode.textContent = message;
-    statusNode.dataset.tone = tone;
+    const nextText = typeof message === 'string' ? message : String(message || '');
+    const nextTone = typeof tone === 'string' ? tone : 'info';
+    if (statusNode.textContent === nextText && statusNode.dataset.tone === nextTone) {
+      return;
+    }
+    statusNode.textContent = nextText;
+    statusNode.dataset.tone = nextTone;
   }
 
   function getAutosaveBlockedStatusMessage() {
@@ -26348,6 +26378,12 @@
         mergedEntry.thumbnail = previousEntry.thumbnail;
       }
     }
+    if (
+      previousEntry
+      && getRecentProjectMeaningfulSignature(previousEntry) === getRecentProjectMeaningfulSignature(mergedEntry)
+    ) {
+      return normalizeSharedRecentProjectEntry(previousEntry) || normalizedEntry;
+    }
     const workingEntries = existingEntries.filter(entry => entry && entry.id && entry.id !== normalizedEntry.id);
     workingEntries.unshift(mergedEntry);
     const normalizedEntries = enforceSharedRecentProjectLimit(workingEntries);
@@ -26402,6 +26438,75 @@
     }) || normalizedEntry;
   }
 
+  function getRecentProjectMeaningfulSignature(entry = null) {
+    if (!entry || typeof entry !== 'object') {
+      return '';
+    }
+    const isShared = isSharedRecentProjectEntry(entry);
+    const signature = {
+      id: normalizeAutosaveProjectId(entry.id || ''),
+      accountUserId: normalizeRecentProjectAccountUserId(entry.accountUserId || ''),
+      storageKind: getRecentProjectStorageKind(entry),
+      name: String(entry.name || ''),
+      fileName: String(entry.fileName || ''),
+      thumbnail: typeof entry.thumbnail === 'string' ? entry.thumbnail : '',
+    };
+    if (isShared) {
+      signature.sharedProjectKey = normalizeMultiProjectKey(entry.sharedProjectKey || '');
+      signature.sharedProjectBackendId = String(entry.sharedProjectBackendId || '');
+      signature.sharedProjectInviteToken = String(entry.sharedProjectInviteToken || '');
+      signature.sharedProjectVisibility = String(entry.sharedProjectVisibility || '');
+      signature.sharedRoleHint = String(entry.sharedRoleHint || '');
+      signature.sharedAutoJoin = entry.sharedAutoJoin !== false;
+      signature.sharedProjectRevision = Math.max(0, Math.round(Number(entry.sharedProjectRevision) || 0));
+      signature.sharedProjectStructureRevision = Math.max(0, Math.round(Number(entry.sharedProjectStructureRevision) || 0));
+      signature.sharedProjectMembershipRole = String(entry.sharedProjectMembershipRole || '');
+      signature.sharedProjectOwnerUserId = String(entry.sharedProjectOwnerUserId || '');
+    } else {
+      signature.updatedAt = String(entry.updatedAt || '');
+      signature.projectId = normalizeAutosaveProjectId(entry.projectId || entry.id || '');
+    }
+    return JSON.stringify(signature);
+  }
+
+  function getRecentProjectsUiSignature(entries = []) {
+    if (!Array.isArray(entries) || !entries.length) {
+      return '[]';
+    }
+    return JSON.stringify(entries.map(entry => getRecentProjectMeaningfulSignature(entry)));
+  }
+
+  function scheduleRecentProjectsListRender(entries = [], { immediate = false, force = false } = {}) {
+    const normalizedEntries = Array.isArray(entries) ? entries.slice() : [];
+    const signature = getRecentProjectsUiSignature(normalizedEntries);
+    if (!force && signature === recentProjectsLastRenderSignature && !recentProjectsRenderTimer) {
+      return;
+    }
+    recentProjectsPendingRenderEntries = normalizedEntries;
+    if (recentProjectsRenderTimer !== null) {
+      window.clearTimeout(recentProjectsRenderTimer);
+      recentProjectsRenderTimer = null;
+    }
+    const render = () => {
+      recentProjectsRenderTimer = null;
+      const nextEntries = Array.isArray(recentProjectsPendingRenderEntries)
+        ? recentProjectsPendingRenderEntries
+        : [];
+      recentProjectsPendingRenderEntries = null;
+      const nextSignature = getRecentProjectsUiSignature(nextEntries);
+      if (!force && nextSignature === recentProjectsLastRenderSignature) {
+        return;
+      }
+      recentProjectsLastRenderSignature = nextSignature;
+      renderRecentProjectsList(nextEntries);
+    };
+    if (immediate || !recentProjectsLastRenderSignature) {
+      render();
+      return;
+    }
+    recentProjectsRenderTimer = window.setTimeout(render, 120);
+  }
+
   function setRecentProjectsCache(entries) {
     recentProjectsCache.clear();
     const sortedEntries = Array.isArray(entries)
@@ -26419,7 +26524,7 @@
       });
     }
     syncStartupResumeState(sortedEntries);
-    renderRecentProjectsList(sortedEntries);
+    scheduleRecentProjectsListRender(sortedEntries);
   }
 
   function syncStartupResumeState(entries = []) {
@@ -26661,6 +26766,13 @@
     const now = Date.now();
     if (!force && sharedRecentProjectsAccountSyncPromise) {
       return sharedRecentProjectsAccountSyncPromise;
+    }
+    if (
+      force
+      && sharedRecentProjectsLastAccountSyncAt > 0
+      && (now - sharedRecentProjectsLastAccountSyncAt) < SHARED_RECENT_PROJECTS_FORCE_SYNC_COOLDOWN_MS
+    ) {
+      return [];
     }
     if (
       !force
@@ -65154,15 +65266,43 @@
     if (!diffPayload) {
       return payload;
     }
-    const currentSnapshot = captureLayerPatchSnapshot(layer, pixelCount);
-    if (snapshotKey && currentSnapshot) {
-      sharedProjectLayerSnapshots.set(snapshotKey, currentSnapshot);
-    }
     return {
       ...payload,
       pixelCount,
       patch: diffPayload,
     };
+  }
+
+  function refreshSharedProjectLayerSnapshotForPayload(payload = {}) {
+    if (!payload || typeof payload !== 'object') {
+      return false;
+    }
+    const canvasId = typeof payload.canvasId === 'string' ? payload.canvasId.trim() : '';
+    const layerId = typeof payload.layerId === 'string' ? payload.layerId.trim() : '';
+    const frameIndex = Math.max(0, Math.round(Number(payload.frameIndex) || 0));
+    if (!canvasId || !layerId) {
+      return false;
+    }
+    const canvasDoc = getProjectCanvasDocumentById(canvasId) || adoptSingleProjectCanvasId(canvasId);
+    const frame = Array.isArray(canvasDoc?.frames) ? canvasDoc.frames[frameIndex] : null;
+    const layer = Array.isArray(frame?.layers) ? (frame.layers.find(item => item?.id === layerId) || null) : null;
+    const pixelCount = Math.max(
+      0,
+      Math.floor(Number(canvasDoc?.width ?? state.width) || 0) * Math.floor(Number(canvasDoc?.height ?? state.height) || 0)
+    );
+    if (!layer || !pixelCount) {
+      return false;
+    }
+    const snapshot = captureLayerPatchSnapshot(layer, pixelCount);
+    if (!snapshot) {
+      return false;
+    }
+    const snapshotKey = buildSharedProjectLayerSnapshotKey(canvasId, frameIndex, layerId);
+    if (!snapshotKey) {
+      return false;
+    }
+    sharedProjectLayerSnapshots.set(snapshotKey, snapshot);
+    return true;
   }
 
   function logSharedProjectResolveEvent(event, {
@@ -65568,10 +65708,6 @@
     const diffPayload = buildLayerDiffPayload(layer, previousSnapshot, pixelCount);
     if (!diffPayload) {
       return null;
-    }
-    const currentSnapshot = captureLayerPatchSnapshot(layer, pixelCount);
-    if (snapshotKey && currentSnapshot) {
-      sharedProjectLayerSnapshots.set(snapshotKey, currentSnapshot);
     }
     return {
       canvasId,
@@ -71982,11 +72118,13 @@
       markDocumentDurablySaved();
       noteSharedProjectOperationApplied({ opType: resolvedOpType, fromRemote: false });
       if (resolvedOpType === 'draw') {
+        const snapshotRefreshed = refreshSharedProjectLayerSnapshotForPayload(extractSharedProjectOpPayload(resolvedOp));
         console.debug('[shared-realtime] draw-commit-confirmed', {
           projectKey: normalizedProjectKey,
           opId: resolvedOp.opId || '',
           latestRevision: Math.max(0, Math.round(Number(result.latest_revision) || 0)),
           latestStructureRevision: Math.max(0, Math.round(Number(result.latest_structure_revision) || 0)),
+          snapshotRefreshed,
         });
       }
       if (shouldCreateSharedProjectCheckpoint(resolvedOpType)) {
@@ -76405,8 +76543,17 @@
     if (!(node instanceof HTMLElement)) {
       return;
     }
-    node.textContent = actionText || text;
-    node.style.color = getMultiStatusColor(tone);
+    const nextText = actionText || text;
+    const nextColor = getMultiStatusColor(tone);
+    if (
+      node.textContent === nextText
+      && node.style.color === nextColor
+      && node.dataset.tone === tone
+    ) {
+      return;
+    }
+    node.textContent = nextText;
+    node.style.color = nextColor;
     node.dataset.tone = tone;
     renderMultiOverview();
   }
@@ -82829,6 +82976,22 @@
         }
         return;
       }
+      console.warn('[shared-sync]', {
+        event: 'local-draw-op-payload-missing',
+        historyLabel: _label,
+        projectKey: activeSharedProjectKey || '',
+        hasInFlightStroke: Boolean(sharedProjectInFlightStroke),
+        inFlightHistoryLabel: String(sharedProjectInFlightStroke?.historyLabel || ''),
+        activeCanvasId: getActiveProjectCanvasDocument()?.id || '',
+        activeFrame: Math.max(0, Math.round(Number(getActiveProjectCanvasDocument()?.activeFrame ?? state.activeFrame) || 0)),
+        activeLayer: getActiveProjectCanvasDocument()?.activeLayer || state.activeLayer || '',
+        pendingLocalOps: sharedProjectPendingLocalOps.length,
+        inFlightLocalOps: sharedProjectLocalInFlightOps.size,
+      });
+      scheduleSharedProjectCheckpoint({
+        historyLabel: 'local-draw-op-payload-missing',
+        force: true,
+      });
     }
     if (useSharedProjectRealtimePrimary && sharedOpType === 'palette') {
       const paletteOpPayload = buildSharedProjectPaletteOpPayload(_label);
