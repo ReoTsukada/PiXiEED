@@ -149,6 +149,8 @@
     return;
   }
 
+  viewer.dataset.pixelArtFit = 'off';
+
   const initialCharacterId = getInitialCharacterId();
   let seenCharacters = loadSeenCharacterState();
   let secretUnlocks = loadSecretUnlockState();
