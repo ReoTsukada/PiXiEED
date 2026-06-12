@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="site/landing.css?v=2026.06.06-home-ad-width-guard">
+<link rel="stylesheet" href="site/landing.css?v=2026.06.12-home-gallery">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -149,16 +149,49 @@
         </div>
       </section>
 
-      <section class="home-panel" id="project-intros">
+      <section class="home-panel home-showcase" id="home-showcase">
         <div class="home-panel__header">
-          <h2 class="home-panel__title">プロジェクト紹介</h2>
-          <a class="home-panel__link" href="#project-intros">一覧</a>
+          <h2 class="home-panel__title">ドット絵ギャラリー</h2>
+          <a class="home-panel__link" href="portfolio/index.html#dot-gallery">企業ページ</a>
         </div>
-        <div class="home-intro-grid">
-          <a class="home-intro-link" href="projects/pixiedraw/index.html">PiXiEEDraw 紹介</a>
-          <a class="home-intro-link" href="projects/qr-maker/index.html">QRコードリーダー 紹介</a>
-          <a class="home-intro-link" href="projects/pixiee-lens/index.html">PiXiEELENS 紹介</a>
-          <a class="home-intro-link" href="projects/maoitu/index.html">まおいつ 紹介</a>
+        <div class="home-showcase__tabs" role="tablist" aria-label="ギャラリー表示切り替え">
+          <button class="home-showcase__tab is-active" type="button" role="tab" aria-selected="true" aria-controls="homeDotPanel" id="homeDotTab" data-home-showcase-tab="dots">ドット絵</button>
+          <button class="home-showcase__tab" type="button" role="tab" aria-selected="false" aria-controls="homeCharacterPanel" id="homeCharacterTab" data-home-showcase-tab="characters">キャラクター</button>
+        </div>
+        <div class="home-showcase__panel" id="homeDotPanel" role="tabpanel" aria-labelledby="homeDotTab" data-home-showcase-panel="dots">
+          <div class="home-showcase__stage">
+            <div class="dot-gallery__viewer">
+              <img alt="" id="dotGalleryMain" loading="lazy" src="">
+            </div>
+          </div>
+          <div aria-label="ドット絵一覧" class="dot-gallery__buttons" data-asset-base="portfolio/dots/" data-manifest-path="portfolio/dots/manifest.json" id="dotGalleryButtons"></div>
+        </div>
+        <div class="home-showcase__panel" id="homeCharacterPanel" role="tabpanel" aria-labelledby="homeCharacterTab" data-home-showcase-panel="characters" hidden>
+          <div class="home-showcase__stage">
+            <div aria-live="polite" class="character-preview">
+              <div class="character-preview__frame">
+                <img alt="" data-pixel-art-max-scale="20" hidden id="characterGalleryMain" loading="lazy" src="">
+                <div class="character-preview__placeholder" id="characterGalleryPlaceholder">
+                  <small id="characterPlaceholderMeta">差し替え待ち</small>
+                </div>
+              </div>
+              <div class="character-preview__details" id="characterPreviewDetails">
+                <h3 class="character-preview__name" id="characterGalleryName">キャラクター</h3>
+                <p class="character-preview__weight" id="characterGalleryWeight">Weight: 調整中</p>
+                <div class="character-preview__traits">
+                  <h4>特徴</h4>
+                  <ul id="characterTraits">
+                    <li>特徴メモ</li>
+                  </ul>
+                </div>
+                <div class="character-preview__detail">
+                  <h4>詳細</h4>
+                  <p id="characterGalleryDetail">選択したキャラクターの詳細がここに表示されます。</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div aria-label="キャラクター一覧" class="character-preview__buttons" data-asset-base="character-dots/" data-reveal-all="true" id="characterGalleryButtons" role="listbox"></div>
         </div>
       </section>
 
@@ -283,11 +316,38 @@
       </a>
   </nav>
 
+  <script src="portfolio/dots/manifest.js"></script>
+  <script src="scripts/gallery.js"></script>
+  <script src="character-dots/manifest.js"></script>
+  <script src="scripts/character-gallery.js"></script>
   <script src="scripts/home-updates.js"></script>
   <script src="scripts/shared-profile-header.js"></script>
   <script src="scripts/pixieed-dot-stats.js"></script>
   <script src="scripts/ads-lazy.js"></script>
   <script src="scripts/bottom-nav-footer-ad.js"></script>
+  <script>
+    (() => {
+      const tabs = Array.from(document.querySelectorAll('[data-home-showcase-tab]'));
+      const panels = Array.from(document.querySelectorAll('[data-home-showcase-panel]'));
+      if (!tabs.length || !panels.length) return;
+
+      const showPanel = panelName => {
+        tabs.forEach(tab => {
+          const isActive = tab.dataset.homeShowcaseTab === panelName;
+          tab.classList.toggle('is-active', isActive);
+          tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+        });
+        panels.forEach(panel => {
+          panel.hidden = panel.dataset.homeShowcasePanel !== panelName;
+        });
+        window.dispatchEvent(new Event('resize'));
+      };
+
+      tabs.forEach(tab => {
+        tab.addEventListener('click', () => showPanel(tab.dataset.homeShowcaseTab));
+      });
+    })();
+  </script>
   <script>
     (() => {
       const slides = Array.from(document.querySelectorAll('[data-hero-slide]'));
