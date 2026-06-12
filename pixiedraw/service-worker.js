@@ -1,4 +1,4 @@
-const APP_BUILD_VERSION = '2026.06.12-compact-export-dialog';
+const APP_BUILD_VERSION = '2026.06.12-soft-resume-resync';
 const CACHE_VERSION = `pixiedraw-v${APP_BUILD_VERSION}`;
 const CORE_ASSETS = [
   '/pixiedraw/',
