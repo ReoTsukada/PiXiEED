@@ -1331,7 +1331,7 @@
       title: '共有モード/出力/操作性を大幅改善',
       details: Object.freeze([
         '共有モードの参加導線を再設計: 「入室」は自由、描画参加はマスター承認制へ統一。',
-        '最大参加人数（1〜15）を追加。参加上限を超えた入室は視聴者として接続。',
+        '最大参加人数（4人）を追加。参加上限を超えた入室は視聴者として接続。',
         '出力権限設定を追加（マスターのみ / マスター+参加者 / 全員）。初期値はマスター+参加者。',
         '招待機能を追加: 招待リンクのコピー/共有に対応。リンク経由でキーを自動入力して接続可能に。',
         '参加リクエスト機能を追加: 視聴者が参加申請でき、マスターは承認/却下を即時操作可能に。',
@@ -2669,8 +2669,8 @@
   const MULTI_RESUME_STORAGE_KEY = 'pixieedraw:multi-resume';
   const MULTI_RESUME_MAX_AGE_MS = 90 * 1000;
   const MULTI_GUEST_LIMIT_MIN = 1;
-  const MULTI_GUEST_LIMIT_MAX = 15;
-  const MULTI_DEFAULT_GUEST_LIMIT = 5;
+  const MULTI_GUEST_LIMIT_MAX = 3;
+  const MULTI_DEFAULT_GUEST_LIMIT = 3;
   const MULTI_EXPORT_PERMISSION_MASTER = 'master';
   const MULTI_EXPORT_PERMISSION_MASTER_AND_GUEST = 'master-guest';
   const MULTI_EXPORT_PERMISSION_ALL = 'all';
@@ -2692,7 +2692,7 @@
   const MULTI_PENDING_INVITE_TTL_MS = 10 * 60 * 1000;
   const SHARED_PROJECT_ID_PREFIX = 'shared-';
   const SHARED_PROJECT_SYNC_DELAY = 1400;
-  const SHARED_PROJECT_DRAW_COMMIT_DELAY = 30;
+  const SHARED_PROJECT_DRAW_COMMIT_DELAY = 120;
   const SHARED_PROJECT_CHECKPOINT_DELAY = 1200;
   const SHARED_PROJECT_DEFERRED_PERSIST_DELAY = Math.max(
     SHARED_PROJECT_CHECKPOINT_DELAY,
@@ -2702,9 +2702,12 @@
   const SHARED_PROJECT_CHECKPOINT_INTERVAL_MS = 15000;
   const SHARED_PROJECT_MAX_MISSING_OP_FETCH = 512;
   const SHARED_PROJECT_REFRESH_LOOP_INTERVAL_MS = 2500;
-  const SHARED_PROJECT_OP_RESCUE_POLL_INTERVAL_MS = 240;
-  const SHARED_PROJECT_SERVER_OP_POLL_INTERVAL_MS = 650;
-  const SHARED_PROJECT_BURST_CATCHUP_MAX_ROUNDS = 4;
+  const SHARED_PROJECT_OP_RESCUE_POLL_INTERVAL_MS = 420;
+  const SHARED_PROJECT_SERVER_OP_POLL_INTERVAL_MS = 900;
+  const SHARED_PROJECT_BURST_CATCHUP_MAX_ROUNDS = 3;
+  const SHARED_PROJECT_LOCAL_OP_BATCH_DELAY_MS = SHARED_PROJECT_DRAW_COMMIT_DELAY;
+  const SHARED_PROJECT_ROOM_COMMIT_MIN_INTERVAL_MS = 140;
+  const SHARED_PROJECT_ROOM_BROADCAST_MIN_INTERVAL_MS = 120;
   const SHARED_PROJECT_SERVER_OP_REFRESH_BACKSTOP_MS = 7000;
   const SHARED_PROJECT_REFRESH_IDLE_GRACE_MS = 6000;
   const SHARED_PROJECT_FORCE_REFRESH_DEDUPE_MS = 1200;
@@ -3511,6 +3514,8 @@
   let sharedProjectPendingLocalOps = [];
   let sharedProjectPendingLocalOpsRetryTimer = null;
   let sharedProjectPendingLocalOpsRetryDueAt = 0;
+  let sharedProjectPendingLocalOpsFlushTimer = null;
+  let sharedProjectPendingLocalOpsFlushDueAt = 0;
   let sharedProjectPendingLocalRetryBlockedUntil = 0;
   let sharedProjectLastAppliedSeq = 0;
   const sharedProjectPendingRemoteOps = new Map();
@@ -3520,6 +3525,8 @@
   const sharedProjectSeenOpIds = new Set();
   const sharedProjectSeenOpSeqById = new Map();
   const sharedProjectLocalInFlightOps = new Map();
+  const sharedProjectRoomCommitSentAt = new Map();
+  const sharedProjectRoomBroadcastSlotAt = new Map();
   const SHARED_PROJECT_LOCAL_OP_ACK_TIMEOUT_MS = 12000;
   const SHARED_PROJECT_LOCAL_OP_EXPIRE_MS = 5 * 60 * 1000;
   const SHARED_PROJECT_LOCAL_OP_RETRY_DELAY_MS = 700;
@@ -9655,6 +9662,7 @@
     sharedProjectLastCheckpointAt = 0;
     sharedProjectLastRealtimeActivityAt = 0;
     sharedProjectPendingLocalOps = [];
+    clearSharedProjectPendingLocalOpsFlushTimer();
     if (sharedProjectPendingLocalOpsRetryTimer !== null) {
       window.clearTimeout(sharedProjectPendingLocalOpsRetryTimer);
       sharedProjectPendingLocalOpsRetryTimer = null;
@@ -9673,6 +9681,8 @@
     sharedProjectPendingRemoteOps.clear();
     sharedProjectPendingProvisionalOps.clear();
     sharedProjectPendingBroadcastOps.clear();
+    sharedProjectRoomCommitSentAt.clear();
+    sharedProjectRoomBroadcastSlotAt.clear();
     sharedProjectAppliedProvisionalOpIds.clear();
     sharedProjectSeenOpIds.clear();
     sharedProjectSeenOpSeqById.clear();
@@ -10220,6 +10230,9 @@
       sharedProjectSeenOpSeqById.clear();
       sharedProjectRemoteApplyFailureKeys.clear();
       sharedProjectPendingLocalOps = [];
+      clearSharedProjectPendingLocalOpsFlushTimer();
+      sharedProjectRoomCommitSentAt.clear();
+      sharedProjectRoomBroadcastSlotAt.clear();
       if (sharedProjectBroadcastCatchupTimer !== null) {
         window.clearTimeout(sharedProjectBroadcastCatchupTimer);
         sharedProjectBroadcastCatchupTimer = null;
@@ -16883,8 +16896,8 @@
     setLocalizedTextContent('#multiPresetHint', '友達向け: 自動参加 / 配信向け: 承認制', 'Friends: auto join / Streaming: approval');
     setLocalizedTextContent('#multiMasterAdvanced > summary', '詳細設定（必要なときだけ）', 'Advanced (Only When Needed)');
     setLocalizedTextContent('#panelMulti .multi-capacity-field > span', '参加管理', 'Participant Management');
-    setLocalizedControlLabel('multiMaxGuests', '参加上限 (1〜15)', 'Participant Limit (1-15)');
-    setLocalizedTextContent('#multiGuestCapacityHint', '参加枠: 0 / 5', 'Participant slots: 0 / 5');
+    setLocalizedControlLabel('multiMaxGuests', '参加枠 (1〜3)', 'Participant Slots (1-3)');
+    setLocalizedTextContent('#multiGuestCapacityHint', '参加枠: 0 / 3（最大4人）', 'Participant slots: 0 / 3 (4 people max)');
     setLocalizedControlLabel('multiRoomVisibility', '作成する共有', 'Shared Project Type');
     setLocalizedTextContent('#multiRoomVisibilityHint', '限定はログイン後にコードまたはURLで参加できます。公開はURLからログインなしで参加できます。', 'Limited projects require sign-in to join by code or URL. Public projects can be joined from the URL without signing in.');
     setLocalizedControlLabel('multiExportPermission', '出力権限', 'Export Permission');
@@ -69294,7 +69307,10 @@
     if (!activeSharedProjectKey) {
       return;
     }
-    const safeDelay = Math.max(32, Math.round(Number(delayMs) || SHARED_PROJECT_OP_RESCUE_POLL_INTERVAL_MS));
+    const safeDelay = Math.max(
+      SHARED_PROJECT_OP_RESCUE_POLL_INTERVAL_MS,
+      Math.round(Number(delayMs) || SHARED_PROJECT_OP_RESCUE_POLL_INTERVAL_MS)
+    );
     const dueAt = Date.now() + safeDelay;
     if (sharedProjectOpsRescueRetryTimer !== null) {
       if (sharedProjectOpsRescueRetryDueAt > 0 && sharedProjectOpsRescueRetryDueAt <= dueAt) {
@@ -69327,17 +69343,17 @@
   function scheduleSharedProjectBroadcastCatchupRetry({
     reason = 'broadcast-catchup',
     attempt = 0,
-    delays = [96, 240, 600, 1200],
+    delays = [320, 900, 1900, 3600],
   } = {}) {
     if (!activeSharedProjectKey || sharedProjectBroadcastCatchupTimer !== null) {
       return;
     }
     const normalizedAttempt = Math.max(0, Math.round(Number(attempt) || 0));
-    const retryDelays = Array.isArray(delays) && delays.length ? delays : [96, 240, 600, 1200];
+    const retryDelays = Array.isArray(delays) && delays.length ? delays : [320, 900, 1900, 3600];
     if (normalizedAttempt >= retryDelays.length) {
       return;
     }
-    const delayMs = Math.max(32, Math.round(Number(retryDelays[normalizedAttempt]) || 96));
+    const delayMs = Math.max(120, Math.round(Number(retryDelays[normalizedAttempt]) || 320));
     sharedProjectBroadcastCatchupTimer = window.setTimeout(() => {
       sharedProjectBroadcastCatchupTimer = null;
       if (!activeSharedProjectKey || sharedProjectRefreshInFlight) {
@@ -69378,10 +69394,10 @@
     if (!activeSharedProjectKey) {
       return;
     }
-    scheduleSharedProjectOpsRescueRetry(72, reason);
+    scheduleSharedProjectOpsRescueRetry(SHARED_PROJECT_OP_RESCUE_POLL_INTERVAL_MS, reason);
     scheduleSharedProjectBroadcastCatchupRetry({
       reason,
-      delays: [160, 360, 800],
+      delays: [420, 1100, 2400],
     });
   }
 
@@ -69554,7 +69570,35 @@
     return true;
   }
 
-  function scheduleSharedProjectBroadcastRetry(op, delayMs = 120) {
+  function reserveSharedProjectRoomRateSlot(slotMap, projectKey, minIntervalMs) {
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || activeSharedProjectKey || '');
+    if (!normalizedProjectKey) {
+      return 0;
+    }
+    const now = Date.now();
+    const lastSlotAt = Math.max(0, Math.round(Number(slotMap.get(normalizedProjectKey)) || 0));
+    const nextSlotAt = Math.max(now, lastSlotAt + Math.max(0, Math.round(Number(minIntervalMs) || 0)));
+    slotMap.set(normalizedProjectKey, nextSlotAt);
+    return Math.max(0, nextSlotAt - now);
+  }
+
+  function getSharedProjectRoomCommitDelay(projectKey) {
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || activeSharedProjectKey || '');
+    if (!normalizedProjectKey) {
+      return 0;
+    }
+    const lastSentAt = Math.max(0, Math.round(Number(sharedProjectRoomCommitSentAt.get(normalizedProjectKey)) || 0));
+    return Math.max(0, lastSentAt + SHARED_PROJECT_ROOM_COMMIT_MIN_INTERVAL_MS - Date.now());
+  }
+
+  function markSharedProjectRoomCommitSent(projectKey) {
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || activeSharedProjectKey || '');
+    if (normalizedProjectKey) {
+      sharedProjectRoomCommitSentAt.set(normalizedProjectKey, Date.now());
+    }
+  }
+
+  function scheduleSharedProjectBroadcastRetry(op, delayMs = 120, { rateLimited = false } = {}) {
     const opId = getSharedProjectOpId(op);
     if (!op || !opId) {
       return;
@@ -69566,11 +69610,11 @@
         sharedProjectPendingBroadcastOps.delete(opId);
         return;
       }
-      sendSharedProjectBroadcastOp(queued, { allowRetry: false });
+      sendSharedProjectBroadcastOp(queued, { allowRetry: false, rateLimited });
     }, Math.max(32, Math.round(Number(delayMs) || 120)));
   }
 
-  function sendSharedProjectBroadcastOp(op, { allowRetry = true } = {}) {
+  function sendSharedProjectBroadcastOp(op, { allowRetry = true, rateLimited = false } = {}) {
     const opId = getSharedProjectOpId(op);
     if (!activeSharedProjectChannel || typeof activeSharedProjectChannel.send !== 'function') {
       console.debug('[shared-realtime] broadcast-send-skipped', {
@@ -69582,7 +69626,7 @@
       ensureActiveSharedProjectRealtimeChannel()
         .then(() => {
           if (allowRetry) {
-            scheduleSharedProjectBroadcastRetry(op, 48);
+            scheduleSharedProjectBroadcastRetry(op, 160);
           }
         })
         .catch(() => {
@@ -69591,6 +69635,21 @@
           }
         });
       return;
+    }
+    if (!rateLimited) {
+      const rateDelay = reserveSharedProjectRoomRateSlot(
+        sharedProjectRoomBroadcastSlotAt,
+        op?.projectKey || activeSharedProjectKey,
+        SHARED_PROJECT_ROOM_BROADCAST_MIN_INTERVAL_MS
+      );
+      if (rateDelay > 0) {
+        scheduleSharedProjectBroadcastRetry(op, rateDelay, { rateLimited: true });
+        return;
+      }
+    }
+    const broadcastProjectKey = normalizeMultiProjectKey(op?.projectKey || activeSharedProjectKey || '');
+    if (broadcastProjectKey) {
+      sharedProjectRoomBroadcastSlotAt.set(broadcastProjectKey, Date.now());
     }
     markSharedProjectLocalOpBroadcastSent(op, { source: 'realtime' });
     activeSharedProjectChannel.send({
@@ -69649,7 +69708,7 @@
         projectKey: op.projectKey || '',
         queueLength: sharedProjectPendingLocalOps.length,
       });
-      flushSharedProjectPendingLocalOps();
+      scheduleSharedProjectPendingLocalOpsFlush(0, 'duplicate-active-op');
       return;
     }
     markSharedProjectTrafficActivity('tx');
@@ -69718,7 +69777,7 @@
         projectKey: op.projectKey,
         queueLength: sharedProjectPendingLocalOps.length,
       });
-      flushSharedProjectPendingLocalOps();
+      scheduleSharedProjectPendingLocalOpsFlush(0, 'duplicate-queued-op');
       return;
     }
     console.info('[shared-sync]', {
@@ -69729,7 +69788,7 @@
     });
     sharedProjectPendingLocalOps.push(queuedOp);
     sortSharedProjectPendingLocalOps();
-    flushSharedProjectPendingLocalOps();
+    scheduleSharedProjectPendingLocalOpsFlush(SHARED_PROJECT_LOCAL_OP_BATCH_DELAY_MS, 'local-op-batch');
   }
 
   function sortSharedProjectPendingLocalOps() {
@@ -69749,15 +69808,51 @@
     });
   }
 
+  function scheduleSharedProjectPendingLocalOpsFlush(delayMs = SHARED_PROJECT_LOCAL_OP_BATCH_DELAY_MS, reason = 'batch') {
+    if (!activeSharedProjectKey || !sharedProjectPendingLocalOps.length) {
+      return;
+    }
+    const safeDelay = Math.max(0, Math.round(Number(delayMs) || 0));
+    const dueAt = Date.now() + safeDelay;
+    if (sharedProjectPendingLocalOpsFlushTimer !== null) {
+      if (sharedProjectPendingLocalOpsFlushDueAt > 0 && sharedProjectPendingLocalOpsFlushDueAt <= dueAt) {
+        return;
+      }
+      window.clearTimeout(sharedProjectPendingLocalOpsFlushTimer);
+      sharedProjectPendingLocalOpsFlushTimer = null;
+    }
+    sharedProjectPendingLocalOpsFlushDueAt = dueAt;
+    console.info('[shared-sync]', {
+      event: 'local-op-flush-timer-set',
+      projectKey: activeSharedProjectKey || '',
+      reason,
+      delayMs: safeDelay,
+      queueLength: sharedProjectPendingLocalOps.length,
+    });
+    sharedProjectPendingLocalOpsFlushTimer = window.setTimeout(() => {
+      sharedProjectPendingLocalOpsFlushTimer = null;
+      sharedProjectPendingLocalOpsFlushDueAt = 0;
+      flushSharedProjectPendingLocalOps();
+    }, safeDelay);
+  }
+
+  function clearSharedProjectPendingLocalOpsFlushTimer() {
+    if (sharedProjectPendingLocalOpsFlushTimer !== null) {
+      window.clearTimeout(sharedProjectPendingLocalOpsFlushTimer);
+      sharedProjectPendingLocalOpsFlushTimer = null;
+    }
+    sharedProjectPendingLocalOpsFlushDueAt = 0;
+  }
+
   function scheduleSharedProjectPendingLocalOpsRetry(delayMs = SHARED_PROJECT_LOCAL_OP_RETRY_DELAY_MS, reason = 'retry') {
     if (!activeSharedProjectKey) {
       return;
     }
-  // Add a small random jitter to the retry delay to avoid many clients retrying
-  // simultaneously (thundering herd) when a shared project reconnects.
-  const baseDelay = Math.max(120, Math.round(Number(delayMs) || SHARED_PROJECT_LOCAL_OP_RETRY_DELAY_MS));
-  const jitter = Math.round(Math.random() * Math.min(300, Math.floor(baseDelay / 2)));
-  const safeDelay = baseDelay + jitter;
+    // Add a small random jitter to the retry delay to avoid many clients retrying
+    // simultaneously (thundering herd) when a shared project reconnects.
+    const baseDelay = Math.max(120, Math.round(Number(delayMs) || SHARED_PROJECT_LOCAL_OP_RETRY_DELAY_MS));
+    const jitter = Math.round(Math.random() * Math.min(300, Math.floor(baseDelay / 2)));
+    const safeDelay = baseDelay + jitter;
     const dueAt = Date.now() + safeDelay;
     if (sharedProjectPendingLocalOpsRetryTimer !== null) {
       if (sharedProjectPendingLocalOpsRetryDueAt > 0 && sharedProjectPendingLocalOpsRetryDueAt <= dueAt) {
@@ -69786,7 +69881,7 @@
       }).catch(error => {
         console.warn('Failed to restore pending shared local ops before retry', error);
       }).finally(() => {
-        flushSharedProjectPendingLocalOps();
+        scheduleSharedProjectPendingLocalOpsFlush(0, `${reason || 'retry'}-after-restore`);
       });
     }, safeDelay);
   }
@@ -69855,9 +69950,7 @@
       );
       scheduleSharedProjectPendingLocalOpsRetry(delayMs, source);
     } else {
-      window.setTimeout(() => {
-        flushSharedProjectPendingLocalOps();
-      }, 0);
+      scheduleSharedProjectPendingLocalOpsFlush(0, source);
     }
     return true;
   }
@@ -72334,15 +72427,18 @@
     if (isSharedProjectLocalOpExpiredForRetry(nextQueuedOp)) {
       discardSharedProjectExpiredLocalOp(nextQueuedOp, { source: 'commit-queue-expired' });
       if (sharedProjectPendingLocalOps.length) {
-        window.setTimeout(() => {
-          flushSharedProjectPendingLocalOps();
-        }, 0);
+        scheduleSharedProjectPendingLocalOpsFlush(0, 'skip-expired-op');
       }
       return;
     }
     const retryDelayRemaining = Math.max(0, sharedProjectPendingLocalRetryBlockedUntil - Date.now());
     if (retryDelayRemaining > 0) {
       scheduleSharedProjectPendingLocalOpsRetry(retryDelayRemaining, 'retry-backoff');
+      return;
+    }
+    const roomCommitDelay = getSharedProjectRoomCommitDelay(nextQueuedOp?.projectKey || activeSharedProjectKey);
+    if (roomCommitDelay > 0) {
+      scheduleSharedProjectPendingLocalOpsFlush(roomCommitDelay, 'room-commit-rate-limit');
       return;
     }
     const nextOp = sharedProjectPendingLocalOps.shift();
@@ -72360,9 +72456,7 @@
       deleteSharedLocalOpJournalEntry(nextOpId).catch(error => {
         console.warn('Failed to delete confirmed queued shared local op journal entry', error);
       });
-      window.setTimeout(() => {
-        flushSharedProjectPendingLocalOps();
-      }, 0);
+      scheduleSharedProjectPendingLocalOpsFlush(0, 'skip-confirmed-op');
       return;
     }
     console.info('[shared-sync]', {
@@ -72377,6 +72471,7 @@
       projectKey: nextOp.projectKey || '',
     });
     sharedProjectOpCommitInFlight = true;
+    markSharedProjectRoomCommitSent(nextOp.projectKey);
     commitSharedProjectOperation(nextOp.projectKey, {
       historyLabel: nextOp.historyLabel,
       op: nextOp.op || null,
@@ -72386,9 +72481,10 @@
       sharedProjectOpCommitInFlight = false;
       scheduleSharedProjectPostCommitCatchup('local-commit-finished-catchup');
       if (sharedProjectPendingLocalOps.length) {
-        window.setTimeout(() => {
-          flushSharedProjectPendingLocalOps();
-        }, 0);
+        scheduleSharedProjectPendingLocalOpsFlush(
+          getSharedProjectRoomCommitDelay(sharedProjectPendingLocalOps[0]?.projectKey || activeSharedProjectKey),
+          'continue-commit-queue'
+        );
       }
     });
   }
@@ -73438,12 +73534,12 @@
         // Broadcast can arrive before the sender's RPC commit is visible.
         // Coalesce a short catch-up window so fast strokes are fetched in revision batches.
         scheduleSharedProjectOpsRescueRetry(
-          SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY && isSharedProjectDrawKind(drawKind) ? 56 : 72,
+          SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY && isSharedProjectDrawKind(drawKind) ? 180 : 220,
           recoveryReason
         );
         scheduleSharedProjectBroadcastCatchupRetry({
           reason: recoveryReason,
-          delays: [140, 300, 680, 1300, 2600],
+          delays: [420, 1100, 2400, 4200],
         });
       }
     );
