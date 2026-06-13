@@ -4298,6 +4298,10 @@
   const SELECTION_TRANSFORM_HANDLE_HIT_RADIUS_PX = 7;
   const SELECTION_TRANSFORM_HANDLE_DRAW_RADIUS_PX = 7;
   const SELECTION_TRANSFORM_PREVIEW_CACHE_MAX_PIXELS = 131072;
+  const SELECTION_TRANSFORM_LARGE_PREVIEW_MAX_PIXELS = 262144;
+  const SELECTION_TRANSFORM_SCALE_MIN = 0.125;
+  const SELECTION_TRANSFORM_SCALE_MAX = 8;
+  const SELECTION_TRANSFORM_SCALE_EPSILON = 0.001;
   const MULTI_LAYER_PATCH_DEBOUNCE_MS = 40;
   const TIMELINE_CELL_SIZE = 32;
   const TIMELINE_CELL_VARIANTS = {
@@ -53876,10 +53880,6 @@
         : normalizePaletteIndex(state.activePaletteIndex, state.activePaletteIndex))
       : null;
 
-    if (!position) {
-      pointerState.active = false;
-      return;
-    }
     const isSelectionToolForTransform = activeTool === 'selectRect'
       || activeTool === 'selectLasso'
       || activeTool === 'selectSame'
@@ -53888,11 +53888,16 @@
       ? getSelectionTransformHandleHit(event.clientX, event.clientY)
       : null;
     if (transformHandle) {
-      const startedTransform = beginSelectionTransformInteraction(event, position, transformHandle, interactionSurface);
+      const transformStartPosition = position || getPointerPosition(event, { clampToCanvas: true, surface: interactionSurface });
+      const startedTransform = beginSelectionTransformInteraction(event, transformStartPosition, transformHandle, interactionSurface);
       if (startedTransform) {
         updateCanvasControlButtons();
         return;
       }
+    }
+    if (!position) {
+      pointerState.active = false;
+      return;
     }
     const selectRectGridGesture = activeTool === 'selectRect'
       ? detectSelectRectGridDoubleTap(position)
@@ -54484,7 +54489,12 @@
             cellSize: pointerState.selectionPreview.gridCellSize || SELECT_RECT_GRID_CELL_SIZE,
           }
         );
-      } else if (!(pointerState.selectionClearedOnDown && pointerState.path.length <= 1)) {
+      } else if (
+        !(pointerState.selectionClearedOnDown && pointerState.path.length <= 1)
+        && pointerState.start
+        && pointerState.current
+        && (pointerState.start.x !== pointerState.current.x || pointerState.start.y !== pointerState.current.y)
+      ) {
         createSelectionRect(pointerState.start, pointerState.current, {
           append: pointerState.selectionExtendOnDown,
         });
@@ -54910,6 +54920,11 @@
     return moveState.contentMask;
   }
 
+  function shouldCreateSelectionMoveBitmapPreview(width, height) {
+    const pixelCount = Math.max(0, Math.floor(Number(width) || 0)) * Math.max(0, Math.floor(Number(height) || 0));
+    return pixelCount > 0 && pixelCount <= SELECTION_TRANSFORM_LARGE_PREVIEW_MAX_PIXELS;
+  }
+
   function createSelectionMoveState(layer, bounds, mask, sourceContentMask = null) {
     if (!layer || !bounds || !mask) {
       return null;
@@ -54925,7 +54940,8 @@
     const localContentMask = new Uint8Array(size);
     const localIndices = new Int16Array(size);
     const localDirect = new Uint8ClampedArray(size * 4);
-    const imageData = createBlankImageData(width, height);
+    const shouldCreatePreviewBitmap = shouldCreateSelectionMoveBitmapPreview(width, height);
+    const imageData = shouldCreatePreviewBitmap ? createBlankImageData(width, height) : null;
 
     const layerDirect = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
     const hasSourceContentMask = sourceContentMask instanceof Uint8Array && sourceContentMask.length === mask.length;
@@ -54997,8 +55013,10 @@
       }
     }
 
-    const previewCanvas = createMovePreviewCanvasFromImageData(imageData)
-      || createMovePreviewCanvasFromPixels(width, height, localMask, localIndices, localDirect);
+    const previewCanvas = shouldCreatePreviewBitmap
+      ? (createMovePreviewCanvasFromImageData(imageData)
+        || createMovePreviewCanvasFromPixels(width, height, localMask, localIndices, localDirect))
+      : null;
     return {
       layer,
       bounds: { ...bounds },
@@ -55017,6 +55035,8 @@
       transformRotationDeg: 0,
       transformFlipHorizontal: false,
       transformFlipVertical: false,
+      transformScaleX: 1,
+      transformScaleY: 1,
       transformedEntryCache: null,
       transformedContentEntryCache: null,
       transformedPreviewRenderCache: null,
@@ -55038,7 +55058,8 @@
     const localIndices = new Int16Array(size);
     localIndices.fill(-1);
     const localDirect = new Uint8ClampedArray(size * 4);
-    const localImageData = createBlankImageData(width, height);
+    const shouldCreatePreviewBitmap = shouldCreateSelectionMoveBitmapPreview(width, height);
+    const localImageData = shouldCreatePreviewBitmap ? createBlankImageData(width, height) : null;
     const sourceData = imageData.data;
     const imageWidth = Math.max(1, Math.round(Number(imageData.width) || state.width || 1));
     for (let y = 0; y < height; y += 1) {
@@ -55074,8 +55095,10 @@
     if (!selectionMaskHasPixels(localMask)) {
       return null;
     }
-    const previewCanvas = createMovePreviewCanvasFromImageData(localImageData)
-      || createMovePreviewCanvasFromPixels(width, height, localMask, localIndices, localDirect);
+    const previewCanvas = shouldCreatePreviewBitmap
+      ? (createMovePreviewCanvasFromImageData(localImageData)
+        || createMovePreviewCanvasFromPixels(width, height, localMask, localIndices, localDirect))
+      : null;
     return {
       layer: getActiveLayer(),
       layerId: getActiveLayer()?.id || null,
@@ -55095,6 +55118,8 @@
       transformRotationDeg: 0,
       transformFlipHorizontal: false,
       transformFlipVertical: false,
+      transformScaleX: 1,
+      transformScaleY: 1,
       transformedEntryCache: null,
       transformedContentEntryCache: null,
       transformedPreviewRenderCache: null,
@@ -55180,12 +55205,29 @@
       rotationDeg: normalizeSelectionMoveRotationDeg(moveState.transformRotationDeg),
       flipHorizontal: Boolean(moveState.transformFlipHorizontal),
       flipVertical: Boolean(moveState.transformFlipVertical),
+      scaleX: normalizeSelectionMoveScale(moveState.transformScaleX),
+      scaleY: normalizeSelectionMoveScale(moveState.transformScaleY),
     };
   }
 
   function hasSelectionMoveTransform(moveState) {
     const transform = getSelectionMoveTransformState(moveState);
-    return transform.rotationDeg !== 0 || transform.flipHorizontal || transform.flipVertical;
+    return transform.rotationDeg !== 0
+      || transform.flipHorizontal
+      || transform.flipVertical
+      || Math.abs(transform.scaleX - 1) > SELECTION_TRANSFORM_SCALE_EPSILON
+      || Math.abs(transform.scaleY - 1) > SELECTION_TRANSFORM_SCALE_EPSILON;
+  }
+
+  function normalizeSelectionMoveScale(value, fallback = 1) {
+    const numeric = Number(value);
+    const safeFallback = Number.isFinite(Number(fallback)) && Number(fallback) > 0
+      ? Number(fallback)
+      : 1;
+    if (!Number.isFinite(numeric) || numeric <= 0) {
+      return clamp(safeFallback, SELECTION_TRANSFORM_SCALE_MIN, SELECTION_TRANSFORM_SCALE_MAX);
+    }
+    return clamp(numeric, SELECTION_TRANSFORM_SCALE_MIN, SELECTION_TRANSFORM_SCALE_MAX);
   }
 
   function transformSelectionMoveLocalPixel(x, y, width, height, transform) {
@@ -55206,6 +55248,10 @@
     if (transform.flipVertical) {
       dy = -dy;
     }
+    const scaleX = normalizeSelectionMoveScale(transform.scaleX);
+    const scaleY = normalizeSelectionMoveScale(transform.scaleY);
+    dx *= scaleX;
+    dy *= scaleY;
     const rotationDeg = normalizeSelectionMoveRotationDeg(transform.rotationDeg);
     if (rotationDeg !== 0) {
       const rad = (rotationDeg * Math.PI) / 180;
@@ -55219,6 +55265,230 @@
     const mappedX = dx + cx;
     const mappedY = dy + cy;
     return { x: mappedX, y: mappedY };
+  }
+
+  function inverseTransformSelectionMoveLocalPoint(x, y, width, height, transform) {
+    const cx = width / 2;
+    const cy = height / 2;
+    let dx = x - cx;
+    let dy = y - cy;
+    const rotationDeg = normalizeSelectionMoveRotationDeg(transform.rotationDeg);
+    if (rotationDeg !== 0) {
+      const rad = (-rotationDeg * Math.PI) / 180;
+      const cos = Math.cos(rad);
+      const sin = Math.sin(rad);
+      const nextDx = (dx * cos) - (dy * sin);
+      const nextDy = (dx * sin) + (dy * cos);
+      dx = nextDx;
+      dy = nextDy;
+    }
+    dx /= normalizeSelectionMoveScale(transform.scaleX);
+    dy /= normalizeSelectionMoveScale(transform.scaleY);
+    if (transform.flipHorizontal) {
+      dx = -dx;
+    }
+    if (transform.flipVertical) {
+      dy = -dy;
+    }
+    return { x: dx + cx, y: dy + cy };
+  }
+
+  function shouldResampleSelectionMoveTransform(transform) {
+    const rotation = normalizeSelectionMoveRotationDeg(transform.rotationDeg);
+    return Math.abs(normalizeSelectionMoveScale(transform.scaleX) - 1) > SELECTION_TRANSFORM_SCALE_EPSILON
+      || Math.abs(normalizeSelectionMoveScale(transform.scaleY) - 1) > SELECTION_TRANSFORM_SCALE_EPSILON
+      || (rotation % 90) !== 0;
+  }
+
+  function getMoveStateSourceRgba(moveState, sourceIndex) {
+    if (!moveState || !Number.isInteger(sourceIndex) || sourceIndex < 0) {
+      return [0, 0, 0, 0];
+    }
+    const imageData = moveState.imageData?.data instanceof Uint8ClampedArray ? moveState.imageData.data : null;
+    const sourceBase = sourceIndex * 4;
+    if (imageData && sourceBase + 3 < imageData.length) {
+      return [
+        imageData[sourceBase],
+        imageData[sourceBase + 1],
+        imageData[sourceBase + 2],
+        imageData[sourceBase + 3],
+      ];
+    }
+    const direct = moveState.direct instanceof Uint8ClampedArray ? moveState.direct : null;
+    if (direct && sourceBase + 3 < direct.length && direct[sourceBase + 3] > 0) {
+      return [
+        direct[sourceBase],
+        direct[sourceBase + 1],
+        direct[sourceBase + 2],
+        direct[sourceBase + 3],
+      ];
+    }
+    const indices = moveState.indices instanceof Int16Array ? moveState.indices : null;
+    const paletteIndex = indices && sourceIndex < indices.length ? indices[sourceIndex] : -1;
+    const color = paletteIndex >= 0 ? state.palette[paletteIndex] : null;
+    return color ? [color.r, color.g, color.b, color.a] : [0, 0, 0, 0];
+  }
+
+  function sampleMoveStateBilinearRgba(moveState, sourceX, sourceY, sourceMask) {
+    const width = Math.max(0, Math.floor(Number(moveState?.width) || 0));
+    const height = Math.max(0, Math.floor(Number(moveState?.height) || 0));
+    if (width <= 0 || height <= 0 || sourceX < 0 || sourceY < 0 || sourceX >= width || sourceY >= height) {
+      return [0, 0, 0, 0];
+    }
+    const x0 = clamp(Math.floor(sourceX), 0, width - 1);
+    const y0 = clamp(Math.floor(sourceY), 0, height - 1);
+    const x1 = clamp(x0 + 1, 0, width - 1);
+    const y1 = clamp(y0 + 1, 0, height - 1);
+    const tx = clamp(sourceX - x0, 0, 1);
+    const ty = clamp(sourceY - y0, 0, 1);
+    const samples = [
+      { x: x0, y: y0, w: (1 - tx) * (1 - ty) },
+      { x: x1, y: y0, w: tx * (1 - ty) },
+      { x: x0, y: y1, w: (1 - tx) * ty },
+      { x: x1, y: y1, w: tx * ty },
+    ];
+    let alphaWeight = 0;
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    let a = 0;
+    for (let i = 0; i < samples.length; i += 1) {
+      const sample = samples[i];
+      if (sample.w <= 0) {
+        continue;
+      }
+      const index = (sample.y * width) + sample.x;
+      if (sourceMask instanceof Uint8Array && sourceMask[index] !== 1) {
+        continue;
+      }
+      const rgba = getMoveStateSourceRgba(moveState, index);
+      const alpha = clamp(Number(rgba[3]) || 0, 0, 255);
+      if (alpha <= 0) {
+        continue;
+      }
+      const weightedAlpha = sample.w * alpha;
+      alphaWeight += weightedAlpha;
+      r += (Number(rgba[0]) || 0) * weightedAlpha;
+      g += (Number(rgba[1]) || 0) * weightedAlpha;
+      b += (Number(rgba[2]) || 0) * weightedAlpha;
+      a += weightedAlpha;
+    }
+    if (alphaWeight <= 0) {
+      return [0, 0, 0, 0];
+    }
+    return [
+      clamp(Math.round(r / alphaWeight), 0, 255),
+      clamp(Math.round(g / alphaWeight), 0, 255),
+      clamp(Math.round(b / alphaWeight), 0, 255),
+      clamp(Math.round(a), 0, 255),
+    ];
+  }
+
+  function buildSelectionMoveResampledEntries(moveState, sourceMask, transform, key) {
+    const sourceWidth = Math.max(0, Math.floor(Number(moveState?.width) || 0));
+    const sourceHeight = Math.max(0, Math.floor(Number(moveState?.height) || 0));
+    if (!(sourceMask instanceof Uint8Array) || sourceWidth <= 0 || sourceHeight <= 0 || sourceMask.length !== sourceWidth * sourceHeight) {
+      return {
+        key,
+        entries: [],
+        bounds: null,
+        mask: null,
+        width: 0,
+        height: 0,
+      };
+    }
+    const localCorners = [
+      transformSelectionMoveLocalPoint(0, 0, sourceWidth, sourceHeight, transform),
+      transformSelectionMoveLocalPoint(sourceWidth, 0, sourceWidth, sourceHeight, transform),
+      transformSelectionMoveLocalPoint(sourceWidth, sourceHeight, sourceWidth, sourceHeight, transform),
+      transformSelectionMoveLocalPoint(0, sourceHeight, sourceWidth, sourceHeight, transform),
+    ];
+    let minX = Number.POSITIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+    localCorners.forEach(point => {
+      if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) {
+        return;
+      }
+      if (point.x < minX) minX = point.x;
+      if (point.y < minY) minY = point.y;
+      if (point.x > maxX) maxX = point.x;
+      if (point.y > maxY) maxY = point.y;
+    });
+    if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+      return {
+        key,
+        entries: [],
+        bounds: null,
+        mask: null,
+        width: 0,
+        height: 0,
+      };
+    }
+    const bounds = {
+      x0: Math.floor(minX),
+      y0: Math.floor(minY),
+      x1: Math.ceil(maxX) - 1,
+      y1: Math.ceil(maxY) - 1,
+    };
+    const outputWidth = Math.max(0, (bounds.x1 - bounds.x0) + 1);
+    const outputHeight = Math.max(0, (bounds.y1 - bounds.y0) + 1);
+    if (outputWidth <= 0 || outputHeight <= 0) {
+      return {
+        key,
+        entries: [],
+        bounds: null,
+        mask: null,
+        width: 0,
+        height: 0,
+      };
+    }
+    const entries = [];
+    const transformedMask = new Uint8Array(outputWidth * outputHeight);
+    for (let y = bounds.y0; y <= bounds.y1; y += 1) {
+      for (let x = bounds.x0; x <= bounds.x1; x += 1) {
+        const sourcePoint = inverseTransformSelectionMoveLocalPoint(x + 0.5, y + 0.5, sourceWidth, sourceHeight, transform);
+        if (sourcePoint.x < 0 || sourcePoint.y < 0 || sourcePoint.x >= sourceWidth || sourcePoint.y >= sourceHeight) {
+          continue;
+        }
+        const nearestX = clamp(Math.floor(sourcePoint.x), 0, sourceWidth - 1);
+        const nearestY = clamp(Math.floor(sourcePoint.y), 0, sourceHeight - 1);
+        const sourceIndex = (nearestY * sourceWidth) + nearestX;
+        if (sourceMask[sourceIndex] !== 1) {
+          continue;
+        }
+        const localX = x - bounds.x0;
+        const localY = y - bounds.y0;
+        const localIndex = (localY * outputWidth) + localX;
+        const rgba = sampleMoveStateBilinearRgba(moveState, sourcePoint.x, sourcePoint.y, sourceMask);
+        transformedMask[localIndex] = 1;
+        entries.push({
+          x,
+          y,
+          sourceIndex,
+          rgba: rgba[3] > 0 ? rgba : null,
+        });
+      }
+    }
+    if (!entries.length) {
+      return {
+        key,
+        entries: [],
+        bounds: null,
+        mask: null,
+        width: 0,
+        height: 0,
+      };
+    }
+    return {
+      key,
+      entries,
+      bounds,
+      mask: transformedMask,
+      width: outputWidth,
+      height: outputHeight,
+    };
   }
 
   function buildSelectionMoveTransformedEntries(moveState, options = {}) {
@@ -55253,13 +55523,19 @@
       };
     }
     const transform = getSelectionMoveTransformState(moveState);
-    const key = `${cacheScope}:${transform.rotationDeg}:${transform.flipHorizontal ? 1 : 0}:${transform.flipVertical ? 1 : 0}`;
+    const key = `${cacheScope}:${transform.rotationDeg}:${transform.flipHorizontal ? 1 : 0}:${transform.flipVertical ? 1 : 0}:${Math.round(transform.scaleX * 1000)}:${Math.round(transform.scaleY * 1000)}`;
     if (
       moveState[cacheProperty]
       && moveState[cacheProperty].key === key
       && Array.isArray(moveState[cacheProperty].entries)
     ) {
       return moveState[cacheProperty];
+    }
+
+    if (shouldResampleSelectionMoveTransform(transform)) {
+      const result = buildSelectionMoveResampledEntries(moveState, sourceMask, transform, key);
+      moveState[cacheProperty] = result;
+      return result;
     }
 
     const entries = [];
@@ -55652,6 +55928,20 @@
       const localIndex = (outY * width) + outX;
       const localBase = localIndex * 4;
       const sourceBase = sourceIndex * 4;
+      if (Array.isArray(entry.rgba) && entry.rgba.length >= 4) {
+        indices[localIndex] = -1;
+        direct[localBase] = clamp(Math.round(Number(entry.rgba[0]) || 0), 0, 255);
+        direct[localBase + 1] = clamp(Math.round(Number(entry.rgba[1]) || 0), 0, 255);
+        direct[localBase + 2] = clamp(Math.round(Number(entry.rgba[2]) || 0), 0, 255);
+        direct[localBase + 3] = clamp(Math.round(Number(entry.rgba[3]) || 0), 0, 255);
+        if (outputData) {
+          outputData[localBase] = direct[localBase];
+          outputData[localBase + 1] = direct[localBase + 1];
+          outputData[localBase + 2] = direct[localBase + 2];
+          outputData[localBase + 3] = direct[localBase + 3];
+        }
+        continue;
+      }
       if (sourceIndices && sourceIndex < sourceIndices.length) {
         indices[localIndex] = sourceIndices[sourceIndex];
       }
@@ -56489,16 +56779,19 @@
       paletteAddedCount = remapResult.addedCount;
     }
     let imageData = null;
-    if (clip.imageData) {
+    const shouldCreatePreviewBitmap = shouldCreateSelectionMoveBitmapPreview(width, height);
+    if (clip.imageData && shouldCreatePreviewBitmap) {
       imageData = cloneImageData(clip.imageData);
-    } else {
+    } else if (shouldCreatePreviewBitmap) {
       imageData = createBlankImageData(width, height);
       if (imageData) {
         populateImageDataFromPixels(imageData, indices, direct, mask);
       }
     }
-    const previewCanvas = createMovePreviewCanvasFromImageData(imageData)
-      || createMovePreviewCanvasFromPixels(width, height, mask, indices, direct);
+    const previewCanvas = shouldCreatePreviewBitmap
+      ? (createMovePreviewCanvasFromImageData(imageData)
+        || createMovePreviewCanvasFromPixels(width, height, mask, indices, direct))
+      : null;
     return {
       layer,
       layerId: layer?.id || null,
@@ -56522,6 +56815,8 @@
       transformRotationDeg: 0,
       transformFlipHorizontal: false,
       transformFlipVertical: false,
+      transformScaleX: 1,
+      transformScaleY: 1,
       transformedEntryCache: null,
       transformedContentEntryCache: null,
       transformedPreviewRenderCache: null,
@@ -56615,7 +56910,8 @@
     const mask = new Uint8Array(size);
     const indices = new Int16Array(size);
     const direct = new Uint8ClampedArray(size * 4);
-    const imageData = createBlankImageData(moveWidth, moveHeight);
+    const shouldCreatePreviewBitmap = shouldCreateSelectionMoveBitmapPreview(moveWidth, moveHeight);
+    const imageData = shouldCreatePreviewBitmap ? createBlankImageData(moveWidth, moveHeight) : null;
 
     for (let y = 0; y < moveHeight; y += 1) {
       for (let x = 0; x < moveWidth; x += 1) {
@@ -56676,8 +56972,10 @@
       }
     }
 
-    const previewCanvas = createMovePreviewCanvasFromImageData(imageData)
-      || createMovePreviewCanvasFromPixels(moveWidth, moveHeight, mask, indices, direct);
+    const previewCanvas = shouldCreatePreviewBitmap
+      ? (createMovePreviewCanvasFromImageData(imageData)
+        || createMovePreviewCanvasFromPixels(moveWidth, moveHeight, mask, indices, direct))
+      : null;
     return {
       layer,
       layerId: layer.id,
@@ -56698,6 +56996,8 @@
       transformRotationDeg: 0,
       transformFlipHorizontal: false,
       transformFlipVertical: false,
+      transformScaleX: 1,
+      transformScaleY: 1,
       transformedEntryCache: null,
       transformedPreviewRenderCache: null,
     };
@@ -57060,7 +57360,11 @@
     captureSharedProjectRegionCommand(
       unionBounds,
       pointerState.surface || null,
-      moveState.transformRotationDeg || moveState.transformFlipHorizontal || moveState.transformFlipVertical
+      moveState.transformRotationDeg
+        || moveState.transformFlipHorizontal
+        || moveState.transformFlipVertical
+        || Math.abs(normalizeSelectionMoveScale(moveState.transformScaleX) - 1) > SELECTION_TRANSFORM_SCALE_EPSILON
+        || Math.abs(normalizeSelectionMoveScale(moveState.transformScaleY) - 1) > SELECTION_TRANSFORM_SCALE_EPSILON
         ? 'selectionTransform'
         : 'selectionMove'
     );
@@ -57176,12 +57480,20 @@
       if (targetY > newBounds.y1) newBounds.y1 = targetY;
     }
 
-    const targetDirect = direct ? ensureLayerDirect(layer) : null;
+    let contentHasDirectPixels = false;
+    for (let i = 0; i < contentEntries.length; i += 1) {
+      if (Array.isArray(contentEntries[i]?.rgba) && contentEntries[i].rgba.length >= 4) {
+        contentHasDirectPixels = true;
+        break;
+      }
+    }
+    const targetDirect = (direct || contentHasDirectPixels) ? ensureLayerDirect(layer) : null;
 
     for (let i = 0; i < contentEntries.length; i += 1) {
       const entry = contentEntries[i];
       const sourceIndex = Number(entry?.sourceIndex);
-      if (!Number.isInteger(sourceIndex) || sourceIndex < 0 || sourceIndex >= indices.length) {
+      const hasEntryRgba = Array.isArray(entry?.rgba) && entry.rgba.length >= 4;
+      if ((!Number.isInteger(sourceIndex) || sourceIndex < 0 || sourceIndex >= indices.length) && !hasEntryRgba) {
         continue;
       }
       const targetX = (Number(bounds?.x0) || 0) + (Number(entry.x) || 0) + offsetX;
@@ -57193,13 +57505,20 @@
       const targetIndex = (targetY * state.width) + targetX;
       const targetBase = targetIndex * 4;
       const sourceBase = sourceIndex * 4;
-      layer.indices[targetIndex] = indices[sourceIndex];
+      layer.indices[targetIndex] = hasEntryRgba ? -1 : indices[sourceIndex];
       newContentMask[targetIndex] = 1;
       if (targetDirect) {
-        targetDirect[targetBase] = direct[sourceBase];
-        targetDirect[targetBase + 1] = direct[sourceBase + 1];
-        targetDirect[targetBase + 2] = direct[sourceBase + 2];
-        targetDirect[targetBase + 3] = direct[sourceBase + 3];
+        if (hasEntryRgba) {
+          targetDirect[targetBase] = clamp(Math.round(Number(entry.rgba[0]) || 0), 0, 255);
+          targetDirect[targetBase + 1] = clamp(Math.round(Number(entry.rgba[1]) || 0), 0, 255);
+          targetDirect[targetBase + 2] = clamp(Math.round(Number(entry.rgba[2]) || 0), 0, 255);
+          targetDirect[targetBase + 3] = clamp(Math.round(Number(entry.rgba[3]) || 0), 0, 255);
+        } else if (direct) {
+          targetDirect[targetBase] = direct[sourceBase];
+          targetDirect[targetBase + 1] = direct[sourceBase + 1];
+          targetDirect[targetBase + 2] = direct[sourceBase + 2];
+          targetDirect[targetBase + 3] = direct[sourceBase + 3];
+        }
       }
       if (!placed) {
         placed = true;
@@ -57317,7 +57636,7 @@
           }
         }
       }
-      if (!rendered && !transformedRender) {
+      if (!rendered && !transformedRender && shouldCreateSelectionMoveBitmapPreview(moveState.width, moveState.height)) {
         const fallbackCanvas = createMovePreviewCanvasFromPixels(
           moveState.width,
           moveState.height,
@@ -57364,13 +57683,29 @@
     if (
       moveState.transformedPreviewRenderCache
       && moveState.transformedPreviewRenderCache.key === cacheKey
-      && moveState.transformedPreviewRenderCache.previewCanvas
     ) {
       return moveState.transformedPreviewRenderCache;
     }
 
     const outputWidth = transformed.width;
     const outputHeight = transformed.height;
+    const pixelCount = outputWidth * outputHeight;
+    if (pixelCount > SELECTION_TRANSFORM_LARGE_PREVIEW_MAX_PIXELS) {
+      const result = {
+        key: cacheKey,
+        previewCanvas: null,
+        imageData: null,
+        directPixels: null,
+        mask: null,
+        width: outputWidth,
+        height: outputHeight,
+        originOffsetX: transformed.bounds.x0,
+        originOffsetY: transformed.bounds.y0,
+        outlineSegments: buildSelectionMoveOutlineSegments(transformed.mask, outputWidth, outputHeight),
+      };
+      moveState.transformedPreviewRenderCache = result;
+      return result;
+    }
     const imageData = createBlankImageData(outputWidth, outputHeight);
     const sourceImageData = moveState.imageData && moveState.imageData.data instanceof Uint8ClampedArray
       ? moveState.imageData.data
@@ -57395,6 +57730,13 @@
         continue;
       }
       const outputBase = ((outY * outputWidth) + outX) * 4;
+      if (Array.isArray(entry.rgba) && entry.rgba.length >= 4) {
+        outputData[outputBase] = clamp(Math.round(Number(entry.rgba[0]) || 0), 0, 255);
+        outputData[outputBase + 1] = clamp(Math.round(Number(entry.rgba[1]) || 0), 0, 255);
+        outputData[outputBase + 2] = clamp(Math.round(Number(entry.rgba[2]) || 0), 0, 255);
+        outputData[outputBase + 3] = clamp(Math.round(Number(entry.rgba[3]) || 0), 0, 255);
+        continue;
+      }
       const sourceBase = sourceIndex * 4;
       if (sourceImageData && sourceBase + 3 < sourceImageData.length) {
         outputData[outputBase] = sourceImageData[sourceBase];
@@ -57443,7 +57785,6 @@
       originOffsetY: transformed.bounds.y0,
       outlineSegments,
     };
-    const pixelCount = outputWidth * outputHeight;
     if (previewCanvas && pixelCount > SELECTION_TRANSFORM_PREVIEW_CACHE_MAX_PIXELS) {
       // Keep only drawImage path for large transformed previews to reduce cache memory.
       result.imageData = null;
@@ -57470,6 +57811,14 @@
   function buildSelectionMoveOutlineSegments(mask, width, height) {
     if (!(mask instanceof Uint8Array) || width <= 0 || height <= 0 || mask.length !== width * height) {
       return [];
+    }
+    if (width * height > SELECTION_TRANSFORM_LARGE_PREVIEW_MAX_PIXELS) {
+      return [
+        0, 0, width, 0,
+        width, 0, width, height,
+        width, height, 0, height,
+        0, height, 0, 0,
+      ];
     }
     const segments = [];
     for (let y = 0; y < height; y += 1) {
@@ -58049,19 +58398,107 @@
     const startAngleDeg = raw && center
       ? (Math.atan2(raw.y - center.y, raw.x - center.x) * 180 / Math.PI)
       : 0;
+    const startDistance = raw && center ? Math.hypot(raw.x - center.x, raw.y - center.y) : 0;
+    const startLocal = raw && center
+      ? getSelectionTransformPointerLocalVector(raw, center, transform)
+      : { x: 0, y: 0 };
     selectionTransformUi.interaction = {
       handleId: handle.id,
       startClientX: event.clientX,
       startClientY: event.clientY,
       startRotationDeg: transform.rotationDeg,
+      startScaleX: transform.scaleX,
+      startScaleY: transform.scaleY,
       accumulatedDeg: 0,
       lastAngleDeg: startAngleDeg,
+      startAngleDeg,
+      startDistance,
+      startLocalX: startLocal.x,
+      startLocalY: startLocal.y,
+      mode: event.altKey ? 'rotate' : 'pending',
       moved: false,
     };
     showSelectionTransformMenu(handle.id);
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', handlePointerUp);
     requestOverlayRender();
+    return true;
+  }
+
+  function getSelectionTransformPointerLocalVector(raw, center, transform) {
+    if (!raw || !center) {
+      return { x: 0, y: 0 };
+    }
+    let dx = (Number(raw.x) || 0) - (Number(center.x) || 0);
+    let dy = (Number(raw.y) || 0) - (Number(center.y) || 0);
+    const rotationDeg = normalizeSelectionMoveRotationDeg(transform?.rotationDeg);
+    if (rotationDeg !== 0) {
+      const rad = (-rotationDeg * Math.PI) / 180;
+      const cos = Math.cos(rad);
+      const sin = Math.sin(rad);
+      const nextDx = (dx * cos) - (dy * sin);
+      const nextDy = (dx * sin) + (dy * cos);
+      dx = nextDx;
+      dy = nextDy;
+    }
+    if (transform?.flipHorizontal) {
+      dx = -dx;
+    }
+    if (transform?.flipVertical) {
+      dy = -dy;
+    }
+    return { x: dx, y: dy };
+  }
+
+  function resolveSelectionTransformInteractionMode(interaction, raw, center) {
+    if (!interaction || !raw || !center) {
+      return 'rotate';
+    }
+    if (interaction.mode === 'rotate' || interaction.mode === 'resize') {
+      return interaction.mode;
+    }
+    const currentDistance = Math.hypot(raw.x - center.x, raw.y - center.y);
+    const radialDelta = Math.abs(currentDistance - (Number(interaction.startDistance) || 0));
+    const angleDelta = Math.abs(normalizeSignedAngleDeg(
+      (Math.atan2(raw.y - center.y, raw.x - center.x) * 180 / Math.PI)
+      - (Number(interaction.startAngleDeg) || 0)
+    ));
+    const angularPixels = currentDistance * Math.sin(Math.min(Math.PI / 2, angleDelta * Math.PI / 180));
+    if (radialDelta >= SELECTION_TRANSFORM_DRAG_THRESHOLD_PX || angularPixels >= SELECTION_TRANSFORM_DRAG_THRESHOLD_PX) {
+      interaction.mode = angularPixels > radialDelta * 1.25 ? 'rotate' : 'resize';
+    }
+    return interaction.mode;
+  }
+
+  function updateSelectionTransformResizeFromPointer(moveState, interaction, raw, center, event) {
+    if (!moveState || !interaction || !raw || !center) {
+      return false;
+    }
+    const transform = getSelectionMoveTransformState(moveState);
+    const local = getSelectionTransformPointerLocalVector(raw, center, transform);
+    const startLocalX = Number(interaction.startLocalX) || 0;
+    const startLocalY = Number(interaction.startLocalY) || 0;
+    let nextScaleX = normalizeSelectionMoveScale(interaction.startScaleX);
+    let nextScaleY = normalizeSelectionMoveScale(interaction.startScaleY);
+    if (Math.abs(startLocalX) >= 0.5) {
+      nextScaleX = normalizeSelectionMoveScale(nextScaleX * (Math.abs(local.x) / Math.abs(startLocalX)));
+    }
+    if (Math.abs(startLocalY) >= 0.5) {
+      nextScaleY = normalizeSelectionMoveScale(nextScaleY * (Math.abs(local.y) / Math.abs(startLocalY)));
+    }
+    if (event?.shiftKey) {
+      const uniform = normalizeSelectionMoveScale(Math.max(nextScaleX, nextScaleY));
+      nextScaleX = uniform;
+      nextScaleY = uniform;
+    }
+    const changed = Math.abs(nextScaleX - normalizeSelectionMoveScale(moveState.transformScaleX)) > SELECTION_TRANSFORM_SCALE_EPSILON
+      || Math.abs(nextScaleY - normalizeSelectionMoveScale(moveState.transformScaleY)) > SELECTION_TRANSFORM_SCALE_EPSILON;
+    if (!changed) {
+      return false;
+    }
+    moveState.transformScaleX = nextScaleX;
+    moveState.transformScaleY = nextScaleY;
+    invalidateSelectionMoveTransformCache(moveState);
     return true;
   }
 
@@ -58075,14 +58512,27 @@
     const center = getSelectionMoveTransformCenter(moveState);
     if (raw && center) {
       const angleDeg = Math.atan2(raw.y - center.y, raw.x - center.x) * 180 / Math.PI;
-      const delta = normalizeSignedAngleDeg(angleDeg - interaction.lastAngleDeg);
-      interaction.accumulatedDeg += delta;
-      interaction.lastAngleDeg = angleDeg;
-      const snappedDelta = Math.round(interaction.accumulatedDeg / SELECTION_TRANSFORM_ROTATION_STEP_DEG) * SELECTION_TRANSFORM_ROTATION_STEP_DEG;
-      const nextRotation = normalizeSelectionMoveRotationDeg(interaction.startRotationDeg + snappedDelta);
-      if (nextRotation !== normalizeSelectionMoveRotationDeg(moveState.transformRotationDeg)) {
-        moveState.transformRotationDeg = nextRotation;
-        invalidateSelectionMoveTransformCache(moveState);
+      const mode = event.altKey ? 'rotate' : resolveSelectionTransformInteractionMode(interaction, raw, center);
+      if (mode === 'resize') {
+        if (updateSelectionTransformResizeFromPointer(moveState, interaction, raw, center, event)) {
+          requestOverlayRender();
+        }
+      } else if (mode === 'rotate') {
+        const delta = normalizeSignedAngleDeg(angleDeg - interaction.lastAngleDeg);
+        interaction.accumulatedDeg += delta;
+        interaction.lastAngleDeg = angleDeg;
+        const snappedDelta = Math.round(interaction.accumulatedDeg / SELECTION_TRANSFORM_ROTATION_STEP_DEG) * SELECTION_TRANSFORM_ROTATION_STEP_DEG;
+        const nextRotation = normalizeSelectionMoveRotationDeg(interaction.startRotationDeg + snappedDelta);
+        if (nextRotation !== normalizeSelectionMoveRotationDeg(moveState.transformRotationDeg)) {
+          moveState.transformRotationDeg = nextRotation;
+          invalidateSelectionMoveTransformCache(moveState);
+          requestOverlayRender();
+        }
+      }
+      if (mode !== 'rotate') {
+        interaction.lastAngleDeg = angleDeg;
+      }
+      if (mode === 'resize' && (selectionTransformUi.menuVisible || !interaction.moved)) {
         requestOverlayRender();
       }
       pointerState.current = { x: Math.floor(raw.x), y: Math.floor(raw.y) };
@@ -59812,7 +60262,7 @@
         : null;
       if (transformHandle) {
         const interactionSurface = getResolvedCanvasInteractionSurface(targetElement);
-        const position = getPointerPosition(event, { surface: interactionSurface });
+        const position = getPointerPosition(event, { clampToCanvas: true, surface: interactionSurface });
         if (position) {
           event.preventDefault();
           clearTimelineSelectionForCanvasInteraction();
@@ -60803,8 +61253,13 @@
     const mask = state.selectionMask;
     if (!mask) return;
     const { width, height } = state;
+    const bounds = state.selectionBounds;
     strokeSelectionPath((pathCtx, scale) => {
-      traceSelectionOutline(pathCtx, mask, width, height, scale);
+      if (width * height > SELECTION_TRANSFORM_LARGE_PREVIEW_MAX_PIXELS && bounds) {
+        traceSelectionBoundsOutline(pathCtx, bounds, scale);
+      } else {
+        traceSelectionOutline(pathCtx, mask, width, height, scale);
+      }
     }, { translateHalf: true, ensureResolution: false });
   }
 
@@ -60938,6 +61393,21 @@
         }
       }
     }
+  }
+
+  function traceSelectionBoundsOutline(pathCtx, bounds, scale) {
+    if (!bounds) {
+      return;
+    }
+    const x0 = (Number(bounds.x0) || 0) * scale;
+    const y0 = (Number(bounds.y0) || 0) * scale;
+    const x1 = ((Number(bounds.x1) || 0) + 1) * scale;
+    const y1 = ((Number(bounds.y1) || 0) + 1) * scale;
+    pathCtx.moveTo(x0, y0);
+    pathCtx.lineTo(x1, y0);
+    pathCtx.lineTo(x1, y1);
+    pathCtx.lineTo(x0, y1);
+    pathCtx.lineTo(x0, y0);
   }
 
   function drawPreviewShape(previewState) {
