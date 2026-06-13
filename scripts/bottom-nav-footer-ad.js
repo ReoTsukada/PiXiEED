@@ -672,19 +672,40 @@
     }
   }
 
+  function removeFooterAd() {
+    document.querySelectorAll('.ad-footer').forEach(node => node.remove());
+    if (document.body) {
+      document.body.classList.remove('has-footer-ad');
+      if (document.body.dataset.footerAdPaddingApplied === 'true') {
+        document.body.style.paddingBottom = '';
+        delete document.body.dataset.footerAdPaddingApplied;
+      }
+    }
+  }
+
+  function syncFooterAd() {
+    if (arePixieedAdsDisabled()) {
+      removeFooterAd();
+      return;
+    }
+    injectFooterAd();
+  }
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
       bootstrapPixieedAdFree();
       injectMinimalSiteChrome();
       setupHomeBackGuard();
       setupMobileInputViewportGuard();
-      injectFooterAd();
+      syncFooterAd();
     }, { once: true });
   } else {
     bootstrapPixieedAdFree();
     injectMinimalSiteChrome();
     setupHomeBackGuard();
     setupMobileInputViewportGuard();
-    injectFooterAd();
+    syncFooterAd();
   }
+
+  window.addEventListener('pixieed:adfreechange', syncFooterAd);
 })();
