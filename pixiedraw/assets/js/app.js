@@ -5997,6 +5997,7 @@
       touchPinchStartScale: null,
       touchPinchFocus: null,
       touchGestureMode: null,
+      touchGestureStartPointers: null,
       curveHandle: null,
       panCaptureElement: null,
     };
@@ -6043,13 +6044,15 @@
 
 
   const TOUCH_PAN_MIN_POINTERS = 2;
-  const TOUCH_PINCH_SENSITIVITY = 1.45;
-  const TOUCH_PINCH_DEADZONE_RATIO = 0.005;
-  const TOUCH_PAN_DEADZONE_PX = 2;
-  const TOUCH_PINCH_DEADZONE_PX = 3;
+  const TOUCH_PINCH_SENSITIVITY = 1.55;
+  const TOUCH_PINCH_DEADZONE_RATIO = 0.004;
+  const TOUCH_PAN_DEADZONE_PX = 4;
+  const TOUCH_PINCH_DEADZONE_PX = 2;
   const TOUCH_PINCH_MAX_GESTURE_RATIO = 6;
   const TOUCH_PINCH_MIN_RATIO = 0.05;
-  const TOUCH_PINCH_MODE_PRIORITY_RATIO = 1.15;
+  const TOUCH_PINCH_MODE_PRIORITY_RATIO = 0.95;
+  const TOUCH_PAN_DIRECTION_DOT_MIN = 0.52;
+  const TOUCH_PAN_VECTOR_BALANCE_MIN = 0.32;
   const INACTIVE_CANVAS_SWITCH_DRAG_THRESHOLD_PX = 4;
   const VOXEL_PREVIEW_DRAG_TURN_DEGREES = 180;
   const VOXEL_PREVIEW_DRAG_TILT_DEGREES = 140;
@@ -8198,6 +8201,7 @@
     pointerState.touchPinchStartScale = null;
     pointerState.touchPinchFocus = null;
     pointerState.touchGestureMode = null;
+    pointerState.touchGestureStartPointers = null;
     hoverPixel = null;
     if (state.showVirtualCursor && !virtualCursor) {
       virtualCursor = createInitialVirtualCursor();
@@ -53173,6 +53177,7 @@
     pointerState.touchPinchStartScale = null;
     pointerState.touchPinchFocus = null;
     pointerState.touchGestureMode = null;
+    pointerState.touchGestureStartPointers = null;
     pointerState.curveHandle = null;
     pointerState.panCaptureElement = null;
     document.body.classList.remove('is-pan-dragging');
@@ -53210,6 +53215,7 @@
     pointerState.touchPinchStartScale = null;
     pointerState.touchPinchFocus = null;
     pointerState.touchGestureMode = null;
+    pointerState.touchGestureStartPointers = null;
     pointerState.curveHandle = null;
     pointerState.panOrigin = { x: state.pan.x, y: state.pan.y };
     pointerState.panCaptureElement = null;
@@ -53348,6 +53354,59 @@
     return Math.hypot(first.x - second.x, first.y - second.y);
   }
 
+  function captureTouchGestureStartPointers() {
+    if (activeTouchPointers.size < TOUCH_PAN_MIN_POINTERS) {
+      return null;
+    }
+    return Array.from(activeTouchPointers.entries())
+      .slice(0, 2)
+      .map(([id, point]) => ({
+        id,
+        x: Number(point?.x) || 0,
+        y: Number(point?.y) || 0,
+      }));
+  }
+
+  function getTouchGestureMovementAnalysis() {
+    const startPointers = Array.isArray(pointerState.touchGestureStartPointers)
+      ? pointerState.touchGestureStartPointers
+      : null;
+    if (!startPointers || startPointers.length < 2) {
+      return null;
+    }
+    const firstStart = startPointers[0];
+    const secondStart = startPointers[1];
+    const firstCurrent = activeTouchPointers.get(firstStart.id);
+    const secondCurrent = activeTouchPointers.get(secondStart.id);
+    if (!firstCurrent || !secondCurrent) {
+      return null;
+    }
+    const firstVector = {
+      x: (Number(firstCurrent.x) || 0) - (Number(firstStart.x) || 0),
+      y: (Number(firstCurrent.y) || 0) - (Number(firstStart.y) || 0),
+    };
+    const secondVector = {
+      x: (Number(secondCurrent.x) || 0) - (Number(secondStart.x) || 0),
+      y: (Number(secondCurrent.y) || 0) - (Number(secondStart.y) || 0),
+    };
+    const firstDistance = Math.hypot(firstVector.x, firstVector.y);
+    const secondDistance = Math.hypot(secondVector.x, secondVector.y);
+    const smallerDistance = Math.min(firstDistance, secondDistance);
+    const largerDistance = Math.max(firstDistance, secondDistance);
+    const dot = (firstVector.x * secondVector.x) + (firstVector.y * secondVector.y);
+    const normalizedDot = firstDistance > 0 && secondDistance > 0
+      ? dot / (firstDistance * secondDistance)
+      : -1;
+    const balance = largerDistance > 0 ? smallerDistance / largerDistance : 0;
+    return {
+      firstDistance,
+      secondDistance,
+      averageDistance: (firstDistance + secondDistance) / 2,
+      normalizedDot,
+      balance,
+    };
+  }
+
   function getTouchPinchFocusForCentroid(centroid) {
     const nextCentroid = centroid || getTouchCentroid();
     if (!nextCentroid) {
@@ -53375,6 +53434,7 @@
     pointerState.panOrigin = { x: state.pan.x, y: state.pan.y };
     pointerState.touchPinchStartDistance = getTouchPointerDistance();
     pointerState.touchPinchStartScale = Number(state.scale) || MIN_ZOOM_SCALE;
+    pointerState.touchGestureStartPointers = captureTouchGestureStartPointers();
     if (resetPinchFocus) {
       pointerState.touchPinchFocus = getTouchPinchFocusForCentroid(centroid);
     }
@@ -53541,6 +53601,7 @@
       pointerState.pointerId = null;
       pointerState.startClient = null;
       pointerState.touchGestureMode = null;
+      pointerState.touchGestureStartPointers = captureTouchGestureStartPointers();
       refreshTouchPanBaseline({ resetPinchFocus: true });
       if (!pointerState.touchPanStart) {
         pointerState.touchPanStart = { x: event.clientX, y: event.clientY };
@@ -53557,6 +53618,7 @@
       pointerState.touchPinchStartScale = null;
       pointerState.touchPinchFocus = null;
       pointerState.touchGestureMode = null;
+      pointerState.touchGestureStartPointers = null;
       const captureTarget = captureElement && typeof captureElement.setPointerCapture === 'function'
         ? captureElement
         : dom.canvases.drawing;
@@ -53596,6 +53658,7 @@
     pointerState.touchPinchStartScale = null;
     pointerState.touchPinchFocus = null;
     pointerState.touchGestureMode = null;
+    pointerState.touchGestureStartPointers = null;
     pointerState.startClient = null;
     pointerState.path = [];
     pointerState.drawPaletteIndex = null;
@@ -54093,6 +54156,7 @@
     }
     if (pointerState.tool === 'pan') {
       if (pointerState.panMode === 'multiTouch') {
+        event.preventDefault();
         if (activeTouchPointers.size < TOUCH_PAN_MIN_POINTERS) {
           return;
         }
@@ -54110,8 +54174,16 @@
         const baselinePan = pointerState.panOrigin || { x: state.pan.x, y: state.pan.y };
         const dx = centroid.x - baselineCentroid.x;
         const dy = centroid.y - baselineCentroid.y;
-        const panDistance = Math.hypot(dx, dy);
-        const panGestureActive = panDistance >= TOUCH_PAN_DEADZONE_PX;
+        const movementAnalysis = getTouchGestureMovementAnalysis();
+        const panDistance = movementAnalysis
+          ? movementAnalysis.averageDistance
+          : Math.hypot(dx, dy);
+        const panGestureActive = Boolean(
+          movementAnalysis
+          && panDistance >= TOUCH_PAN_DEADZONE_PX
+          && movementAnalysis.normalizedDot >= TOUCH_PAN_DIRECTION_DOT_MIN
+          && movementAnalysis.balance >= TOUCH_PAN_VECTOR_BALANCE_MIN
+        );
         let pinchGestureActive = false;
         let pinchTargetScale = Number(state.scale) || MIN_ZOOM_SCALE;
         let pinchFocus = pointerState.touchPinchFocus || getTouchPinchFocusForCentroid(baselineCentroid);
@@ -54167,7 +54239,7 @@
           if (pinchFocus) {
             pointerState.touchPinchFocus = pinchFocus;
           }
-          if (pinchGestureActive && Math.abs(pinchTargetScale - (Number(state.scale) || MIN_ZOOM_SCALE)) >= ZOOM_EPSILON) {
+          if (Math.abs(pinchTargetScale - (Number(state.scale) || MIN_ZOOM_SCALE)) >= ZOOM_EPSILON) {
             setZoom(pinchTargetScale, pinchFocus || undefined);
           }
           return;
