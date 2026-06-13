@@ -6175,6 +6175,72 @@
     return null;
   }
 
+  function getScrollableMaxTop(element) {
+    if (!(element instanceof HTMLElement)) {
+      return 0;
+    }
+    return Math.max(0, element.scrollHeight - element.clientHeight);
+  }
+
+  function canScrollElementByDeltaY(element, deltaY) {
+    if (!(element instanceof HTMLElement) || !Number.isFinite(deltaY) || Math.abs(deltaY) < 0.01) {
+      return false;
+    }
+    const maxScrollTop = getScrollableMaxTop(element);
+    if (maxScrollTop <= 1) {
+      return false;
+    }
+    if (deltaY > 0) {
+      return element.scrollTop < maxScrollTop - 1;
+    }
+    return element.scrollTop > 1;
+  }
+
+  function scrollElementByDeltaY(element, deltaY) {
+    if (!(element instanceof HTMLElement) || !Number.isFinite(deltaY) || Math.abs(deltaY) < 0.01) {
+      return false;
+    }
+    const maxScrollTop = getScrollableMaxTop(element);
+    if (maxScrollTop <= 0) {
+      return false;
+    }
+    const previous = element.scrollTop;
+    const next = Math.min(Math.max(previous + deltaY, 0), maxScrollTop);
+    if (Math.abs(next - previous) < 0.5) {
+      return false;
+    }
+    element.scrollTop = next;
+    return true;
+  }
+
+  function getScrollableAncestorForDeltaY(node, deltaY) {
+    let current = node instanceof Element ? node : null;
+    while (current && current !== document.body) {
+      const style = window.getComputedStyle(current);
+      const canScrollY = (style.overflowY === 'auto' || style.overflowY === 'scroll')
+        && current.scrollHeight > current.clientHeight + 1;
+      if (canScrollY && canScrollElementByDeltaY(current, deltaY)) {
+        return current;
+      }
+      current = current.parentElement;
+    }
+    return null;
+  }
+
+  function normalizeWheelDeltaY(event) {
+    if (!(event instanceof WheelEvent)) {
+      return 0;
+    }
+    if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) {
+      return event.deltaY * 16;
+    }
+    if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
+      const target = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+      return event.deltaY * Math.max(1, target?.clientHeight || window.innerHeight || 1);
+    }
+    return event.deltaY;
+  }
+
   function getDirectionalScrollableAncestor(node, deltaY = 0) {
     let current = node instanceof Element ? node : null;
     let fallback = null;
@@ -78933,6 +78999,87 @@
     }
   }
 
+  function findMultiCommentPanelScrollTarget(deltaY) {
+    const root = dom.controls.multiCommentList;
+    if (!(root instanceof HTMLElement)) {
+      return null;
+    }
+    const directAncestor = getScrollableAncestorForDeltaY(root.parentElement, deltaY);
+    if (directAncestor instanceof HTMLElement) {
+      return directAncestor;
+    }
+    const panelBody = root.closest('.panel-section__body');
+    if (canScrollElementByDeltaY(panelBody, deltaY)) {
+      return panelBody;
+    }
+    const panel = root.closest('.panel-section, .mobile-panel, .mobile-panels');
+    if (canScrollElementByDeltaY(panel, deltaY)) {
+      return panel;
+    }
+    return null;
+  }
+
+  function handOffMultiCommentScroll(deltaY) {
+    const root = dom.controls.multiCommentList;
+    if (!(root instanceof HTMLElement) || !Number.isFinite(deltaY) || Math.abs(deltaY) < 0.5) {
+      return false;
+    }
+    if (canScrollElementByDeltaY(root, deltaY)) {
+      return false;
+    }
+    const target = findMultiCommentPanelScrollTarget(deltaY);
+    return scrollElementByDeltaY(target, deltaY);
+  }
+
+  function bindMultiCommentScrollHandoff() {
+    const root = dom.controls.multiCommentList;
+    if (!(root instanceof HTMLElement) || root.dataset.scrollHandoffBound === 'true') {
+      return;
+    }
+    root.dataset.scrollHandoffBound = 'true';
+    let lastTouchY = null;
+    root.addEventListener('wheel', event => {
+      if (event.ctrlKey || event.metaKey) {
+        return;
+      }
+      const deltaY = normalizeWheelDeltaY(event);
+      if (!handOffMultiCommentScroll(deltaY)) {
+        return;
+      }
+      event.preventDefault();
+    }, { passive: false });
+    root.addEventListener('touchstart', event => {
+      if (!event.touches || event.touches.length !== 1) {
+        lastTouchY = null;
+        return;
+      }
+      const touch = event.touches[0];
+      lastTouchY = touch ? touch.clientY : null;
+    }, { passive: true });
+    root.addEventListener('touchmove', event => {
+      if (!event.touches || event.touches.length !== 1 || !Number.isFinite(lastTouchY)) {
+        lastTouchY = null;
+        return;
+      }
+      const touch = event.touches[0];
+      const currentY = touch ? touch.clientY : null;
+      if (!Number.isFinite(currentY)) {
+        lastTouchY = null;
+        return;
+      }
+      const deltaY = lastTouchY - currentY;
+      if (handOffMultiCommentScroll(deltaY)) {
+        event.preventDefault();
+      }
+      lastTouchY = currentY;
+    }, { passive: false });
+    const clearTouchState = () => {
+      lastTouchY = null;
+    };
+    root.addEventListener('touchend', clearTouchState, { passive: true });
+    root.addEventListener('touchcancel', clearTouchState, { passive: true });
+  }
+
   // --- Danmaku (コメント弾幕) support ---
   function syncDanmakuControls() {
     const enabled = Boolean(state.danmakuEnabled);
@@ -83083,6 +83230,7 @@
   }
 
   function setupMultiModeControls() {
+    bindMultiCommentScrollHandoff();
     syncMultiProjectKeyInputValues(multiState.projectKey, { preserveFocused: false });
     getMultiProjectKeyInputElements().forEach(input => {
       if (!(input instanceof HTMLInputElement) || input.dataset.bound === 'true') {
