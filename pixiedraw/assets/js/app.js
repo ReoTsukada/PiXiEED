@@ -2669,8 +2669,9 @@
   const MULTI_RESUME_STORAGE_KEY = 'pixieedraw:multi-resume';
   const MULTI_RESUME_MAX_AGE_MS = 90 * 1000;
   const MULTI_GUEST_LIMIT_MIN = 1;
+  const MULTI_GUEST_LIMIT_FREE = 1;
   const MULTI_GUEST_LIMIT_MAX = 3;
-  const MULTI_DEFAULT_GUEST_LIMIT = 3;
+  const MULTI_DEFAULT_GUEST_LIMIT = MULTI_GUEST_LIMIT_FREE;
   const MULTI_EXPORT_PERMISSION_MASTER = 'master';
   const MULTI_EXPORT_PERMISSION_MASTER_AND_GUEST = 'master-guest';
   const MULTI_EXPORT_PERMISSION_ALL = 'all';
@@ -3583,6 +3584,8 @@
   const GLOBAL_LOADING_INDICATOR_MIN_VISIBLE_MS = 320;
   const SHARED_PROJECT_LIMIT_DEFAULT = 1;
   const SHARED_PROJECT_LIMIT_AD_FREE = 4;
+  const SHARED_PROJECT_MEMBER_LIMIT_DEFAULT = 2;
+  const SHARED_PROJECT_MEMBER_LIMIT_AD_FREE = 4;
 
   const RAIL_DEFAULT_WIDTH = Object.freeze({ left: 78, right: 78 });
   const RAIL_MIN_WIDTH = 68;
@@ -16897,7 +16900,7 @@
     setLocalizedTextContent('#multiMasterAdvanced > summary', '詳細設定（必要なときだけ）', 'Advanced (Only When Needed)');
     setLocalizedTextContent('#panelMulti .multi-capacity-field > span', '参加管理', 'Participant Management');
     setLocalizedControlLabel('multiMaxGuests', '参加枠 (1〜3)', 'Participant Slots (1-3)');
-    setLocalizedTextContent('#multiGuestCapacityHint', '参加枠: 0 / 3（最大4人）', 'Participant slots: 0 / 3 (4 people max)');
+    setLocalizedTextContent('#multiGuestCapacityHint', '参加枠: 0 / 1（無料は最大2人）', 'Participant slots: 0 / 1 (2 people max on free)');
     setLocalizedControlLabel('multiRoomVisibility', '作成する共有', 'Shared Project Type');
     setLocalizedTextContent('#multiRoomVisibilityHint', '限定はログイン後にコードまたはURLで参加できます。公開はURLからログインなしで参加できます。', 'Limited projects require sign-in to join by code or URL. Public projects can be joined from the URL without signing in.');
     setLocalizedControlLabel('multiExportPermission', '出力権限', 'Export Permission');
@@ -16927,7 +16930,7 @@
     setLocalizedTextContent('#goHomeButton', 'ホームに戻る', 'Back to Home');
     setLocalizedTextContent('#goContestButton', '広場を見る', 'View Plaza');
     setLocalizedTextContent('#pixieedAdFreeField > span', 'サポーター特典', 'Supporter Benefits');
-    setLocalizedTextContent('#pixieedAdFreeStatus', 'ログイン後に購入番号または購入コードを適用できます。広告非表示と共有プロジェクト作成枠を利用できます。', 'After signing in, apply your purchase number or support code to remove ads and unlock shared project creation slots.');
+    setLocalizedTextContent('#pixieedAdFreeStatus', 'ログイン後に購入番号または購入コードを適用できます。広告非表示、共有プロジェクト作成枠、最大人数の拡張を利用できます。', 'After signing in, apply your purchase number or support code to remove ads and unlock shared project slots and higher member limits.');
     setLocalizedTextContent('#pixieedAdFreePurchase', 'サポーター特典を見る', 'View Supporter Benefits');
     setLocalizedTextContent('#multiEntryAccountCard .multi-account-card__head > span', '共有プロジェクトを作成', 'Create Shared Project');
     setLocalizedTextContent('#multiFlowAccountCard .multi-account-card__head > span', '共有プロジェクトを作成', 'Create Shared Project');
@@ -24527,6 +24530,19 @@
     return Boolean(entitlements.pixiedraw_ad_free || entitlements.browser_ad_free);
   }
 
+  function getSharedProjectMemberLimitForCurrentPlan() {
+    return hasPixieedrawAdFreeSupport()
+      ? SHARED_PROJECT_MEMBER_LIMIT_AD_FREE
+      : SHARED_PROJECT_MEMBER_LIMIT_DEFAULT;
+  }
+
+  function getMultiGuestLimitForCurrentPlan() {
+    return Math.max(
+      MULTI_GUEST_LIMIT_MIN,
+      getSharedProjectMemberLimitForCurrentPlan() - 1
+    );
+  }
+
   function getPixieedAdFreeStateSnapshot() {
     return window.pixieedAdFree?.state || null;
   }
@@ -24550,22 +24566,23 @@
       ownedProjectCount,
       effectiveLimit: SHARED_PROJECT_LIMIT_AD_FREE,
     });
+    const memberLimit = getSharedProjectMemberLimitForCurrentPlan();
     if (adFreeState?.isActive === true || hasPixieedrawAdFreeSupport()) {
       const days = getPixieedAdFreeRemainingDays(adFreeState);
       if (days === null) {
         return localizeText(
-          `サポーター特典が適用中です。作成枠 ${usageLabel}。広告非表示と共有プロジェクト作成枠を利用できます。`,
-          `Supporter benefits are active. Creation slots: ${usageLabel}. Ads are hidden and shared project creation slots are available.`
+          `サポーター特典が適用中です。作成枠 ${usageLabel}、共有プロジェクトは最大 ${memberLimit} 人（参加者 ${memberLimit - 1} 人）で編集できます。広告非表示も利用できます。`,
+          `Supporter benefits are active. Creation slots: ${usageLabel}. Shared projects support up to ${memberLimit} people (${memberLimit - 1} participants). Ads are hidden.`
         );
       }
       return localizeText(
-        `サポーター特典が適用中です。作成枠 ${usageLabel}、残り ${days} 日です。`,
-        `Supporter benefits are active. Creation slots: ${usageLabel}. ${days} days remaining.`
+        `サポーター特典が適用中です。作成枠 ${usageLabel}、共有プロジェクト最大 ${memberLimit} 人（参加者 ${memberLimit - 1} 人）、残り ${days} 日です。`,
+        `Supporter benefits are active. Creation slots: ${usageLabel}. Shared project limit: ${memberLimit} people (${memberLimit - 1} participants). ${days} days remaining.`
       );
     }
     return localizeText(
-      `サポーター特典で追加3件、合計4件まで作成できます。サポーター枠 ${supporterUsageLabel}。`,
-      `Supporter benefits add 3 extra slots, for 4 total. Supporter slots: ${supporterUsageLabel}.`
+      `無料枠は共有プロジェクト1件、作業人数は最大2人（マスターと参加者1人）です。500円サポートで作成枠は合計4件、人数は最大4人（参加者3人）に増えます。サポーター枠 ${supporterUsageLabel}。`,
+      `The free tier includes 1 shared project for up to 2 people (master plus 1 participant). The 500 yen support plan raises this to 4 projects and up to 4 people (3 participants). Supporter slots: ${supporterUsageLabel}.`
     );
   }
 
@@ -24755,8 +24772,8 @@
       );
     }
     return localizeText(
-      '自分が作成した共有プロジェクトは同時に 1 件までです。PiXiEEDraw継続サポートで追加3件、合計4件まで増やせます。',
-      'You can own 1 shared project at a time. PiXiEEDraw support adds 3 extra slots, for 4 total.'
+      '無料枠では自分が作成した共有プロジェクトは同時に1件、作業人数は最大2人（マスターと参加者1人）です。500円サポートで作成枠は合計4件、人数は最大4人（参加者3人）まで増やせます。',
+      'The free tier allows 1 owned shared project for up to 2 people (master plus 1 participant). The 500 yen support plan raises this to 4 projects and up to 4 people (3 participants).'
     );
   }
 
@@ -62140,16 +62157,21 @@
     refreshViewportCursorStyle();
   }
 
-  function normalizeMultiMaxGuests(value, fallback = MULTI_DEFAULT_GUEST_LIMIT) {
+  function normalizeMultiMaxGuests(value, fallback = MULTI_DEFAULT_GUEST_LIMIT, maxLimit = MULTI_GUEST_LIMIT_MAX) {
+    const safeMaxLimit = clamp(
+      Math.round(Number(maxLimit) || MULTI_GUEST_LIMIT_MAX),
+      MULTI_GUEST_LIMIT_MIN,
+      MULTI_GUEST_LIMIT_MAX
+    );
     const numeric = Math.round(Number(value));
     if (Number.isFinite(numeric)) {
-      return clamp(numeric, MULTI_GUEST_LIMIT_MIN, MULTI_GUEST_LIMIT_MAX);
+      return clamp(numeric, MULTI_GUEST_LIMIT_MIN, safeMaxLimit);
     }
     const fallbackNumeric = Math.round(Number(fallback));
     if (Number.isFinite(fallbackNumeric)) {
-      return clamp(fallbackNumeric, MULTI_GUEST_LIMIT_MIN, MULTI_GUEST_LIMIT_MAX);
+      return clamp(fallbackNumeric, MULTI_GUEST_LIMIT_MIN, safeMaxLimit);
     }
-    return MULTI_DEFAULT_GUEST_LIMIT;
+    return clamp(MULTI_DEFAULT_GUEST_LIMIT, MULTI_GUEST_LIMIT_MIN, safeMaxLimit);
   }
 
   function normalizeMultiParticipantFreeCellMove(value, fallback = MULTI_DEFAULT_PARTICIPANT_FREE_CELL_MOVE) {
@@ -64809,6 +64831,14 @@
             'Shared mode is not available yet because the production database is missing the shared project migration.'
           ),
           'error'
+        );
+      } else if (message.includes('shared_project_member_limit_reached')) {
+        setMultiStatus(
+          localizeText(
+            'この共有プロジェクトは参加人数の上限に達しています。無料枠はマスターと参加者1人の最大2人までです。',
+            'This shared project has reached its member limit. The free tier allows up to 2 people: master plus 1 participant.'
+          ),
+          'warn'
         );
       } else if (status >= 500) {
         setMultiStatus(
@@ -79388,7 +79418,6 @@
   }
 
   function syncMultiControls() {
-    multiState.maxGuests = normalizeMultiMaxGuests(multiState.maxGuests, MULTI_DEFAULT_GUEST_LIMIT);
     multiState.roomVisibility = normalizeMultiRoomVisibility(
       multiState.roomVisibility,
       MULTI_DEFAULT_ROOM_VISIBILITY
@@ -79419,6 +79448,15 @@
       currentProjectIsShared
       || Boolean(visibleSharedProjectKey && visibleSharedProjectKey === currentProjectKey)
     );
+    if (sharedProjectFlowPreferred && !sharedModeEnabled && !multiState.connected) {
+      multiState.maxGuests = normalizeMultiMaxGuests(
+        getMultiGuestLimitForCurrentPlan(),
+        MULTI_DEFAULT_GUEST_LIMIT,
+        getMultiGuestLimitForCurrentPlan()
+      );
+    } else {
+      multiState.maxGuests = normalizeMultiMaxGuests(multiState.maxGuests, MULTI_DEFAULT_GUEST_LIMIT);
+    }
     const isEntryView = normalizeMultiUiView(multiState.uiView) === 'entry'
       && !multiState.connected
       && !multiState.connecting;
@@ -79783,9 +79821,10 @@
     }
     if (dom.controls.multiGuestCapacityHint instanceof HTMLElement) {
       if (sharedProjectFlowPreferred) {
+        const memberLimit = getSharedProjectMemberLimitForCurrentPlan();
         dom.controls.multiGuestCapacityHint.textContent = localizeText(
-          '共有プロジェクトでは全員が対等に編集できます。',
-          'Everyone edits as an equal in shared projects.'
+          `共有プロジェクトでは全員が対等に編集できます。現在の上限は最大 ${memberLimit} 人（参加者 ${memberLimit - 1} 人）です。`,
+          `Everyone edits as an equal in shared projects. Current limit: up to ${memberLimit} people (${memberLimit - 1} participants).`
         );
       } else {
         const assignedGuestCount = getAssignedGuestCount();
