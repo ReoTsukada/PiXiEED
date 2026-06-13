@@ -927,6 +927,7 @@
   ]);
 
   const ZOOM_STEPS = Object.freeze([
+    0.5,
     1,
     1.25,
     1.5,
@@ -969,6 +970,14 @@
   const DEFAULT_CANVAS_SIZE = 32;
   const MIN_CANVAS_SIZE = 1;
   const MAX_CANVAS_SIZE = 512;
+  const SPRITE_SCALE_MIN = 0.2;
+  const SPRITE_SCALE_EPSILON = 1e-6;
+  const SPRITE_SCALE_DOWN_PRESETS = Object.freeze([
+    { value: 0.2, label: '0.2', numerator: 1, denominator: 5 },
+    { value: 0.25, label: '0.25', numerator: 1, denominator: 4 },
+    { value: 1 / 3, label: '0.33', numerator: 1, denominator: 3 },
+    { value: 0.5, label: '0.5', numerator: 1, denominator: 2 },
+  ]);
   const MAX_IMAGE_IMPORT_SOURCE_SIZE = 2000;
   const PROJECT_FILE_EXTENSION = '.pixieedraw';
   const PROJECT_FILE_MIME_TYPE = 'application/x-pixieedraw';
@@ -17205,33 +17214,64 @@
     return Math.max(1, Math.floor(MAX_CANVAS_SIZE / largest));
   }
 
+  function getSpriteScaleOptions(maxMultiplier = getMaxSpriteMultiplier()) {
+    const max = Math.max(1, Math.floor(Number(maxMultiplier) || 1));
+    const options = SPRITE_SCALE_DOWN_PRESETS.map(option => ({ ...option }));
+    for (let value = 1; value <= max; value += 1) {
+      options.push({
+        value,
+        label: String(value),
+        numerator: value,
+        denominator: 1,
+      });
+    }
+    return options;
+  }
+
+  function getNearestSpriteScaleOption(value, maxMultiplier = getMaxSpriteMultiplier()) {
+    const options = getSpriteScaleOptions(maxMultiplier);
+    const numeric = Number(value);
+    const target = Number.isFinite(numeric) && numeric > 0 ? numeric : 1;
+    let best = options.find(option => Math.abs(option.value - 1) <= SPRITE_SCALE_EPSILON) || options[0];
+    let bestDiff = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < options.length; i += 1) {
+      const option = options[i];
+      const diff = Math.abs(option.value - target);
+      if (diff < bestDiff - SPRITE_SCALE_EPSILON) {
+        best = option;
+        bestDiff = diff;
+      }
+    }
+    return best;
+  }
+
+  function getSpriteScaleOptionIndex(value, maxMultiplier = getMaxSpriteMultiplier()) {
+    const options = getSpriteScaleOptions(maxMultiplier);
+    const nearest = getNearestSpriteScaleOption(value, maxMultiplier);
+    return Math.max(0, options.findIndex(option => Math.abs(option.value - nearest.value) <= SPRITE_SCALE_EPSILON));
+  }
+
   function updateSpriteScaleControlLimits() {
     const input = dom.controls.spriteScaleInput;
     const decrementButton = dom.controls.spriteScaleDecrement;
     const incrementButton = dom.controls.spriteScaleIncrement;
     if (!input) return;
     const maxMultiplier = getMaxSpriteMultiplier();
-    if (maxMultiplier <= 1) {
-      input.min = '1';
-      input.max = '1';
-      input.value = '1';
-      input.disabled = true;
-      if (decrementButton) decrementButton.setAttribute('disabled', 'true');
-      if (incrementButton) incrementButton.setAttribute('disabled', 'true');
-    } else {
-      input.min = '1';
-      input.max = String(maxMultiplier);
-      const current = Math.max(1, Math.min(maxMultiplier, Math.floor(Number(input.value) || 1)));
-      input.value = String(current);
-      input.disabled = false;
-      if (decrementButton) {
-        if (current <= 1) decrementButton.setAttribute('disabled', 'true');
-        else decrementButton.removeAttribute('disabled');
-      }
-      if (incrementButton) {
-        if (current >= maxMultiplier) incrementButton.setAttribute('disabled', 'true');
-        else incrementButton.removeAttribute('disabled');
-      }
+    const options = getSpriteScaleOptions(maxMultiplier);
+    const currentOption = getNearestSpriteScaleOption(input.value, maxMultiplier);
+    const currentIndex = getSpriteScaleOptionIndex(currentOption.value, maxMultiplier);
+    input.min = String(SPRITE_SCALE_MIN);
+    input.max = String(maxMultiplier);
+    input.step = '0.01';
+    input.value = currentOption.label;
+    input.disabled = options.length <= 1;
+    if (decrementButton) {
+      if (input.disabled || currentIndex <= 0) decrementButton.setAttribute('disabled', 'true');
+      else decrementButton.removeAttribute('disabled');
+    }
+    if (incrementButton) {
+      if (input.disabled || currentIndex >= options.length - 1) incrementButton.setAttribute('disabled', 'true');
+      else incrementButton.removeAttribute('disabled');
     }
     updateSettingsSizeApplyButtonState();
   }
@@ -17253,8 +17293,8 @@
       return false;
     }
     const maxMultiplier = getMaxSpriteMultiplier();
-    const current = Math.max(1, Math.min(maxMultiplier, Math.floor(Number(input.value) || 1)));
-    return current > 1;
+    const current = getNearestSpriteScaleOption(input.value, maxMultiplier);
+    return Math.abs(current.value - 1) > SPRITE_SCALE_EPSILON;
   }
 
   function updateSettingsSizeApplyButtonState() {
@@ -17273,15 +17313,15 @@
     if (!input || input.disabled) {
       return;
     }
-    const min = Math.max(1, Math.floor(Number(input.min) || 1));
-    const max = Math.max(min, Math.floor(Number(input.max) || getMaxSpriteMultiplier()));
-    const current = clamp(Math.floor(Number(input.value) || min), min, max);
-    const next = clamp(current + Math.round(Number(delta) || 0), min, max);
-    if (next === current) {
+    const maxMultiplier = getMaxSpriteMultiplier();
+    const options = getSpriteScaleOptions(maxMultiplier);
+    const currentIndex = getSpriteScaleOptionIndex(input.value, maxMultiplier);
+    const nextIndex = clamp(currentIndex + Math.round(Number(delta) || 0), 0, options.length - 1);
+    if (nextIndex === currentIndex) {
       updateSpriteScaleControlLimits();
       return;
     }
-    input.value = String(next);
+    input.value = options[nextIndex].label;
     updateSpriteScaleControlLimits();
   }
 
@@ -39185,13 +39225,8 @@
     }
     const originalWidth = state.width;
     const originalHeight = state.height;
-    const newWidthRaw = (originalWidth * num) / den;
-    const newHeightRaw = (originalHeight * num) / den;
-    if (!Number.isInteger(newWidthRaw) || !Number.isInteger(newHeightRaw)) {
-      return false;
-    }
-    const newWidth = newWidthRaw | 0;
-    const newHeight = newHeightRaw | 0;
+    const newWidth = Math.round((originalWidth * num) / den);
+    const newHeight = Math.round((originalHeight * num) / den);
     if (newWidth < 1 || newHeight < 1 || newWidth > MAX_CANVAS_SIZE || newHeight > MAX_CANVAS_SIZE) {
       return false;
     }
@@ -39243,8 +39278,32 @@
     state.pan.x = Math.round((state.pan.x || 0) * ratio);
     state.pan.y = Math.round((state.pan.y || 0) * ratio);
     state.selectionMask = null;
+    state.selectionContentMask = null;
     state.selectionBounds = null;
     return true;
+  }
+
+  function getSpriteScaleRatioForValue(rawValue) {
+    const option = getNearestSpriteScaleOption(rawValue);
+    const preset = SPRITE_SCALE_DOWN_PRESETS.find(item => (
+      Math.abs(item.value - option.value) <= SPRITE_SCALE_EPSILON
+      || item.label === option.label
+    ));
+    if (preset) {
+      return {
+        value: preset.value,
+        label: preset.label,
+        numerator: preset.numerator,
+        denominator: preset.denominator,
+      };
+    }
+    const multiplier = Math.max(1, Math.floor(Number(option.value) || 1));
+    return {
+      value: multiplier,
+      label: String(multiplier),
+      numerator: multiplier,
+      denominator: 1,
+    };
   }
 
   function applySpriteScaleMultiplier(rawValue) {
@@ -39255,15 +39314,14 @@
       return;
     }
     const input = dom.controls.spriteScaleInput;
-    let factor = Number(rawValue);
-    if (!Number.isFinite(factor)) factor = 1;
-    factor = Math.max(1, Math.floor(factor));
+    const scaleRatio = getSpriteScaleRatioForValue(rawValue);
+    const factor = scaleRatio.value;
     if (input) {
-      input.value = String(factor);
+      input.value = scaleRatio.label;
     }
 
     const maxMultiplier = getMaxSpriteMultiplier();
-    if (factor === 1) {
+    if (Math.abs(factor - 1) <= SPRITE_SCALE_EPSILON) {
       updateSpriteScaleControlLimits();
       return;
     }
@@ -39274,7 +39332,7 @@
     }
 
     beginHistory('scaleSprite');
-    const success = scaleDocumentByRatio(factor, 1);
+    const success = scaleDocumentByRatio(scaleRatio.numerator, scaleRatio.denominator);
     if (!success) {
       rollbackPendingHistory({ reRender: false });
       updateAutosaveStatus('スプライト倍率を適用できませんでした', 'warn');
@@ -39294,7 +39352,7 @@
       input.value = '1';
     }
     updateSpriteScaleControlLimits();
-    updateAutosaveStatus(`スプライト倍率 ×${factor} を適用しました`, 'info');
+    updateAutosaveStatus(`スプライト倍率 ×${scaleRatio.label} を適用しました`, 'info');
   }
 
   function setupTools() {

@@ -291,7 +291,7 @@
 <button aria-label="ズームアウト" class="chip" id="canvasControlPrimary" type="button"></button>
 <label class="canvas-zoom-field" for="zoomInput">
 <span class="sr-only">ズーム倍率(%)</span>
-<input data-stepper="true" id="zoomInput" inputmode="numeric" min="100" step="1" type="number" value="100"/>
+<input data-stepper="true" id="zoomInput" inputmode="numeric" min="50" step="1" type="number" value="100"/>
 </label>
 <button aria-label="ズームイン" class="chip" id="canvasControlSecondary" type="button"></button>
 </div>
@@ -984,7 +984,7 @@
 <span>倍率</span>
 <div class="sprite-scale-stepper">
 <button aria-label="倍率を1下げる" class="number-stepper__btn" id="spriteScaleDecrement" type="button">−</button>
-<input data-stepper="true" id="spriteScaleInput" inputmode="numeric" min="1" step="1" type="number" value="1"/>
+<input data-stepper="true" id="spriteScaleInput" inputmode="decimal" min="0.2" step="0.01" type="number" value="1"/>
 <button aria-label="倍率を1上げる" class="number-stepper__btn" id="spriteScaleIncrement" type="button">＋</button>
 </div>
 </label>
