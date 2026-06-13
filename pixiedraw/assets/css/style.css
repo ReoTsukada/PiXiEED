@@ -2507,6 +2507,8 @@ body.is-startup-active .bottom-timeline-dock {
   --grid-major-offset-y: 0px;
   --grid-color: rgba(255, 255, 255, 0.18);
   --grid-major-color: rgba(255, 255, 255, 0.35);
+  --grid-opacity: 1;
+  --grid-major-opacity: 1;
   --grid-line-width: 1px;
   --grid-major-line-width: 1px;
   background-color: var(--tile-color-b);
@@ -2604,11 +2606,11 @@ body.is-startup-active .bottom-timeline-dock {
 }
 
 .canvas-stack[data-grid='true']::before {
-  opacity: 1;
+  opacity: var(--grid-opacity, 1);
 }
 
 .canvas-stack[data-major-grid='true']::after {
-  opacity: 1;
+  opacity: var(--grid-major-opacity, 1);
 }
 
 .canvas-stack canvas {

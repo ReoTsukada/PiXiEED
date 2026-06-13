@@ -1,11 +1,17 @@
 {
-  "generatedAt": "2026-06-13T00:34:54.433Z",
+  "generatedAt": "2026-06-13T00:45:03.221Z",
   "projects": [
     {
       "id": "site",
       "name": "PiXiEED 全体",
       "url": "/index.html",
       "entries": [
+        {
+          "date": "2026-06-13",
+          "items": [
+            "画面を更新"
+          ]
+        },
         {
           "date": "2026-06-12",
           "items": [
@@ -46,12 +52,6 @@
           "date": "2026-04-20",
           "items": [
             "画面を更新"
-          ]
-        },
-        {
-          "date": "2026-04-18",
-          "items": [
-            "機能 / 画面を更新"
           ]
         }
       ]
@@ -224,6 +224,17 @@
   ],
   "recentByDate": [
     {
+      "date": "2026-06-13",
+      "updates": [
+        {
+          "id": "site",
+          "name": "PiXiEED 全体",
+          "url": "/index.html",
+          "summary": "画面を更新"
+        }
+      ]
+    },
+    {
       "date": "2026-06-12",
       "updates": [
         {
@@ -327,17 +338,6 @@
           "name": "PiXiEEDraw",
           "url": "/projects/pixiedraw/",
           "summary": "スタイル / 機能 / 画面を更新"
-        }
-      ]
-    },
-    {
-      "date": "2026-06-04",
-      "updates": [
-        {
-          "id": "pixiedraw",
-          "name": "PiXiEEDraw",
-          "url": "/projects/pixiedraw/",
-          "summary": "画面 / 機能 / スタイルを更新"
         }
       ]
     }
