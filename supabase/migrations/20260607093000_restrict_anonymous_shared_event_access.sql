@@ -92,7 +92,9 @@ with check (
   )
 );
 
-create or replace function public.pixieed_get_shared_project_by_invite_token(
+drop function if exists public.pixieed_get_shared_project_by_invite_token(text);
+
+create function public.pixieed_get_shared_project_by_invite_token(
   target_invite_token text
 )
 returns table (
@@ -172,7 +174,9 @@ $$;
 revoke all on function public.pixieed_get_shared_project_by_invite_token(text) from public;
 grant execute on function public.pixieed_get_shared_project_by_invite_token(text) to anon, authenticated;
 
-create or replace function public.pixieed_ensure_shared_project_membership(
+drop function if exists public.pixieed_ensure_shared_project_membership(text, text, text, text, boolean);
+
+create function public.pixieed_ensure_shared_project_membership(
   target_project_key text,
   target_title text default '',
   target_invite_token text default '',
@@ -316,7 +320,9 @@ begin
 end;
 $$;
 
-create or replace function public.pixieed_join_shared_project_by_invite_token(
+drop function if exists public.pixieed_join_shared_project_by_invite_token(text);
+
+create function public.pixieed_join_shared_project_by_invite_token(
   target_invite_token text
 )
 returns table (
