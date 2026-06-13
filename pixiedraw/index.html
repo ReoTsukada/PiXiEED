@@ -371,7 +371,13 @@
 </aside>
 </div>
 <div aria-hidden="true" id="panelAdPreloadHost" style="position:fixed;left:-20000px;top:-20000px;width:320px;height:320px;overflow:hidden;opacity:0;pointer-events:none;z-index:-1;">
-  <div id="leftPanelAdPreloadMount" style="width:320px;min-width:320px;max-width:320px;height:320px;min-height:320px;max-height:320px;overflow:hidden;"></div>
+  <div id="leftPanelAdPreloadMount" style="width:320px;min-width:320px;max-width:320px;height:320px;min-height:320px;max-height:320px;overflow:hidden;">
+    <div aria-label="広告" class="panel-ad" id="leftPanelAd">
+    <div class="ad-box" id="leftPanelAdSlot">
+    <ins class="ad-seed" data-ad-client="ca-pub-9801602250480253" data-ad-format="auto" data-ad-slot="3806415737" data-full-width-responsive="true" style="display:block"></ins>
+    </div>
+    </div>
+  </div>
   <div id="rightPanelAdPreloadMount" style="width:320px;min-width:320px;max-width:320px;height:320px;min-height:320px;max-height:320px;overflow:hidden;"></div>
 </div>
 <button aria-label="描画ボタン（左=主色 / 右=副色）" class="floating-draw-button" id="floatingDrawButton" type="button">描画</button>
@@ -602,13 +608,6 @@
 </div>
 </label>
 <output class="brush-custom-info" id="customBrushInfo">カスタム: 未作成</output>
-</div>
-<div class="panel-ad-mount" data-panel-ad-mount="left">
-<div aria-label="広告" class="panel-ad" id="leftPanelAd">
-<div class="ad-box" id="leftPanelAdSlot">
-<ins class="ad-seed" data-ad-client="ca-pub-9801602250480253" data-ad-format="auto" data-ad-slot="3806415737" data-full-width-responsive="true" style="display:block"></ins>
-</div>
-</div>
 </div>
 </div>
 </section>
@@ -1792,7 +1791,7 @@
         right: document.getElementById('rightPanelAdPreloadMount'),
       };
       const sideSections = {
-        left: ['panelTools', 'panelColor'],
+        left: ['panelColor'],
         right: ['panelHelp', 'panelFile', 'panelSettings', 'panelExtensions'],
       };
       if (!(ads.left instanceof HTMLElement) && !(ads.right instanceof HTMLElement)) return;
