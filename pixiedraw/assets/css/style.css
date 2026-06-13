@@ -5740,7 +5740,7 @@ body.is-mobile-layout .mobile-draw-help {
   max-height: none;
   overflow-y: auto;
   overflow-x: hidden;
-  overscroll-behavior: contain;
+  overscroll-behavior-y: auto;
   border: 1px solid rgba(var(--ui-rgb), 0.22);
   border-radius: 12px;
   background: rgba(6, 14, 20, 0.64);
@@ -11151,17 +11151,19 @@ body.is-mobile-layout .panel-ad-mount[hidden] {
     padding-top: 6px;
   }
   body.is-mobile-layout.is-unified-left-tools-color .mobile-drawer[data-mode='half'] #panelColor {
-    margin-top: 4px;
-    padding-top: 4px;
+    display: none !important;
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
   }
   body.is-mobile-layout.is-unified-left-tools-color .mobile-drawer[data-mode='half'] #panelColor .palette-grid {
-    display: flex;
+    display: none;
     order: 1;
     padding-top: 0;
     padding-bottom: 4px;
   }
   body.is-mobile-layout.is-unified-left-tools-color .mobile-drawer[data-mode='half'] #panelColor .palette-editor {
-    order: 2;
+    display: none;
   }
   body.is-mobile-layout.is-unified-left-tools-color .mobile-drawer[data-mode='half'] #panelTools .tool-quick-color {
     display: block;
