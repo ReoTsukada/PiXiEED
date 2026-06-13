@@ -10992,7 +10992,7 @@ body.is-mobile-layout #newProjectDialog .modal__body {
    This trims padding that can create large empty space on narrow screens.
    Keep rules scoped to mobile layout to avoid desktop regressions. */
 body.is-mobile-layout #panelTools .panel-section__body {
-  padding-bottom: 8px !important;
+  padding-bottom: 0 !important;
 }
 
 body.is-mobile-layout #panelColor .panel-section__body {
@@ -11002,6 +11002,7 @@ body.is-mobile-layout #panelColor .panel-section__body {
 /* Slightly tighten the quick-color block spacing on mobile. */
 body.is-mobile-layout #panelTools .tool-quick-color {
   margin-top: 4px !important;
+  margin-bottom: 0 !important;
 }
 
 /* Extra safety: ensure any (empty) ad mounts don't reserve height on mobile. */
@@ -11167,6 +11168,24 @@ body.is-mobile-layout .panel-ad-mount[hidden] {
   }
   body.is-mobile-layout.is-unified-left-tools-color .mobile-drawer[data-mode='half'] #panelTools .tool-quick-color {
     display: block;
+  }
+  body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelSettings .panel-section__body {
+    padding-top: 4px;
+    padding-bottom: 12px;
+  }
+  body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelSettings .settings-nav-wrap {
+    display: none;
+  }
+  body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelSettings .settings-size-row--combined {
+    gap: 5px;
+    padding: 6px;
+  }
+  body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelSettings .settings-size-controls--canvas {
+    gap: 4px;
+  }
+  body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelSettings .settings-size-row--combined .settings-size-apply-row .button {
+    min-height: 38px;
+    padding: 6px 10px;
   }
   body.is-mobile-layout.is-unified-left-tools-color .mobile-drawer[data-mode='full'] #panelTools .tool-quick-color {
     display: none;
