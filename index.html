@@ -371,6 +371,7 @@
       const AD_INSERT_AFTER_CONTENT = 2;
       let contentSlidesSinceAd = 0;
       let rotationTimer = null;
+      const areAdsDisabled = () => Boolean(window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive);
       const clampHeroAdWidth = mount => {
         if (!(mount instanceof HTMLElement)) return;
         const frame = mount.getBoundingClientRect();
@@ -404,12 +405,15 @@
         }, delay);
       };
       const showSlide = index => {
+        if (index === adIndex && areAdsDisabled()) {
+          index = pickRandomContentIndex();
+        }
         slides.forEach((slide, slideIndex) => {
           slide.classList.toggle('is-active', slideIndex === index);
         });
         activeIndex = index;
         const activeSlide = slides[index];
-        if (activeSlide?.classList.contains('home-hero-slide--ad')) {
+        if (activeSlide?.classList.contains('home-hero-slide--ad') && !areAdsDisabled()) {
           const mount = activeSlide.querySelector('[data-hero-ad-mount]');
           if (mount && !mount.querySelector('ins.adsbygoogle')) {
             const adSlot = document.createElement('ins');
@@ -455,7 +459,7 @@
           contentSlidesSinceAd = 0;
           return pickRandomContentIndex();
         }
-        if (adIndex >= 0 && contentSlidesSinceAd >= AD_INSERT_AFTER_CONTENT) {
+        if (!areAdsDisabled() && adIndex >= 0 && contentSlidesSinceAd >= AD_INSERT_AFTER_CONTENT) {
           return adIndex;
         }
         contentSlidesSinceAd += 1;
@@ -463,6 +467,12 @@
       };
       showSlide(activeIndex);
       scheduleNextRotation();
+      window.addEventListener('pixieed:adfreechange', () => {
+        if (slides[activeIndex]?.classList.contains('home-hero-slide--ad')) {
+          showSlide(pickRandomContentIndex());
+        }
+        scheduleNextRotation();
+      });
       window.pixieedObserveAds?.(document);
     })();
   </script>
