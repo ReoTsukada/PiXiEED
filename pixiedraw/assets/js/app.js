@@ -15581,6 +15581,22 @@
     }
   }
 
+  function getGridOpacityForScale(scale, { major = false } = {}) {
+    const normalizedScale = Math.max(Number(scale) || MIN_ZOOM_SCALE, MIN_ZOOM_SCALE);
+    const progress = clamp((normalizedScale - 3) / 13, 0, 1);
+    const eased = progress * progress * (3 - 2 * progress);
+    const minimum = major ? 0.12 : 0.04;
+    return minimum + (1 - minimum) * eased;
+  }
+
+  function updateStackGridOpacity(stack, scale) {
+    if (!(stack instanceof HTMLElement)) {
+      return;
+    }
+    stack.style.setProperty('--grid-opacity', getGridOpacityForScale(scale).toFixed(3));
+    stack.style.setProperty('--grid-major-opacity', getGridOpacityForScale(scale, { major: true }).toFixed(3));
+  }
+
   function updateGridDecorations() {
     const stack = dom.canvases.stack;
     if (!stack) return;
@@ -15606,6 +15622,7 @@
     stack.style.setProperty('--tile-screen-size', `${tileScreenSize}px`);
     stack.style.setProperty('--tile-offset-x', '0px');
     stack.style.setProperty('--tile-offset-y', '0px');
+    updateStackGridOpacity(stack, minorStep);
     stack.dataset.background = state.backgroundMode;
   }
 
@@ -48599,6 +48616,7 @@
     surface.stack.style.setProperty('--tile-screen-size', `${16 * scale}px`);
     surface.stack.style.setProperty('--tile-offset-x', '0px');
     surface.stack.style.setProperty('--tile-offset-y', '0px');
+    updateStackGridOpacity(surface.stack, scale);
   }
 
   function ensureLocalViewportCanvasEntries() {
