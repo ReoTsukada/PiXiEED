@@ -6044,15 +6044,14 @@
 
 
   const TOUCH_PAN_MIN_POINTERS = 2;
-  const TOUCH_PINCH_SENSITIVITY = 1.55;
-  const TOUCH_PINCH_DEADZONE_RATIO = 0.004;
-  const TOUCH_PAN_DEADZONE_PX = 4;
-  const TOUCH_PINCH_DEADZONE_PX = 2;
+  const TOUCH_PINCH_SENSITIVITY = 1.35;
+  const TOUCH_PINCH_DEADZONE_RATIO = 0.006;
+  const TOUCH_PAN_DEADZONE_PX = 3;
+  const TOUCH_PINCH_DEADZONE_PX = 3;
   const TOUCH_PINCH_MAX_GESTURE_RATIO = 6;
   const TOUCH_PINCH_MIN_RATIO = 0.05;
-  const TOUCH_PINCH_MODE_PRIORITY_RATIO = 0.95;
-  const TOUCH_PAN_DIRECTION_DOT_MIN = 0.52;
-  const TOUCH_PAN_VECTOR_BALANCE_MIN = 0.32;
+  const TOUCH_PAN_DIRECTION_DOT_MIN = 0.45;
+  const TOUCH_PAN_VECTOR_BALANCE_MIN = 0.25;
   const INACTIVE_CANVAS_SWITCH_DRAG_THRESHOLD_PX = 4;
   const VOXEL_PREVIEW_DRAG_TURN_DEGREES = 180;
   const VOXEL_PREVIEW_DRAG_TILT_DEGREES = 140;
@@ -54216,13 +54215,7 @@
         }
 
         if (!pointerState.touchGestureMode) {
-          const panStrength = panDistance / Math.max(TOUCH_PAN_DEADZONE_PX, Number.EPSILON);
-          if (
-            pinchGestureActive
-            && (!panGestureActive || pinchStrength >= (panStrength * TOUCH_PINCH_MODE_PRIORITY_RATIO))
-          ) {
-            pointerState.touchGestureMode = 'pinch';
-          } else if (panGestureActive) {
+          if (panGestureActive) {
             pointerState.touchGestureMode = 'pan';
           } else if (pinchGestureActive) {
             pointerState.touchGestureMode = 'pinch';
