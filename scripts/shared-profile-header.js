@@ -1,6 +1,6 @@
 (function () {
   const PIXIEED_SUPPORT_URL = 'https://buy.stripe.com/28E3cw5RC4JVehAenm2VG00';
-  const PIXIEDRAW_SUPPORT_URL = 'https://buy.stripe.com/aFadRaeo8ekv5L44MM2VG01';
+  const PIXIEDRAW_SUPPORT_URL = '#';
   const currentScript = document.currentScript;
   const asset = (relativePath) => {
     try {

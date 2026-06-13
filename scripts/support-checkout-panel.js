@@ -9,7 +9,7 @@
   const PANEL_ID = 'pixieedSupportCheckoutPanel';
   const STYLE_ID = 'pixieed-support-checkout-style';
   const PIXIEED_SUPPORT_URL = 'https://buy.stripe.com/28E3cw5RC4JVehAenm2VG00';
-  const PIXIEDRAW_SUPPORT_URL = 'https://buy.stripe.com/aFadRaeo8ekv5L44MM2VG01';
+  const PIXIEDRAW_SUPPORT_URL = '#';
   const PIXIEED_TIP_500_URL = 'https://buy.stripe.com/cNi28s93OgsDc9sdji2VG02';
   const PIXIEED_TIP_1000_URL = 'https://buy.stripe.com/5kQcN6eo87W78Xg7YY2VG03';
   const MONTHLY_SUPPORT_GOAL_YEN = 5000;
@@ -27,7 +27,7 @@
     {
       key: 'pixiedraw_ad_free',
       title: 'PiXiEEDraw継続サポート',
-      price: '月額サポート',
+      price: '月額500円',
       description: 'PiXiEEDraw内の広告だけを非表示にする継続サポートです。',
       webUrl: PIXIEDRAW_SUPPORT_URL,
       nativeProductId: 'pixiedraw_ad_free',
@@ -470,9 +470,6 @@
       const message = String(error?.message || error || '購入ページを開けませんでした。');
       if (option.checkoutProductKey) {
         setStatus(`${message} 時間をおいてもう一度お試しください。`, true);
-        if (fallbackUrl) {
-          navigateToPurchaseUrl(fallbackUrl);
-        }
         return;
       }
       if (fallbackUrl) {
