@@ -16318,9 +16318,11 @@
     ).count;
     const canEditProjectStructure = canCurrentClientEditProjectStructure();
     const voxelModeEnabled = isVoxelExtensionModeEnabled();
+    const hasExistingMultiCanvas = localCanvasCount > 0 || getProjectCanvasCount() > 1;
+    const canAccessMultiCanvas = hasPixieedrawMultiCanvasSupport() || hasExistingMultiCanvas;
     if (dom.controls.toggleLocalCanvas instanceof HTMLInputElement) {
       dom.controls.toggleLocalCanvas.checked = MULTI_CANVAS_FEATURE_ENABLED && localCanvasCount > 0;
-      dom.controls.toggleLocalCanvas.disabled = !MULTI_CANVAS_FEATURE_ENABLED || !canEditProjectStructure || voxelModeEnabled;
+      dom.controls.toggleLocalCanvas.disabled = !MULTI_CANVAS_FEATURE_ENABLED || !canAccessMultiCanvas || !canEditProjectStructure || voxelModeEnabled;
     }
     if (dom.controls.localCanvasCountControls instanceof HTMLElement) {
       const showControls = MULTI_CANVAS_FEATURE_ENABLED && localCanvasCount > 0;
@@ -24603,6 +24605,10 @@
       return true;
     }
     return Boolean(entitlements.pixiedraw_ad_free || entitlements.browser_ad_free);
+  }
+
+  function hasPixieedrawMultiCanvasSupport() {
+    return hasPixieedrawAdFreeSupport();
   }
 
   function getSharedProjectMemberLimitForCurrentPlan() {
@@ -38589,6 +38595,18 @@
         setLocalViewportCanvasCount(0, { persist: true, announce: false });
         return;
       }
+      if (!hasPixieedrawMultiCanvasSupport() && getLocalViewportCanvasCount() <= 0 && getProjectCanvasCount() <= 1) {
+        event.target.checked = false;
+        updateAutosaveStatus(
+          localizeText(
+            'マルチキャンバスはサポーター特典です。既に複数キャンバスを含むプロジェクトはそのまま使用できます。',
+            'Multi Canvas is a supporter benefit. Projects that already contain multiple canvases can still use them.'
+          ),
+          'info'
+        );
+        syncControlsWithState();
+        return;
+      }
       if (!canCurrentClientEditProjectStructure({ announce: true })) {
         event.target.checked = getLocalViewportCanvasCount() > 0;
         if (!isSharedProjectCollaborativeMode()) {
@@ -39641,6 +39659,7 @@
 
   function syncPaletteReindexControlState() {
     const allowPaletteReindex = isIndexColorMode() && canCurrentClientReindexPalette();
+    const allowPaletteOrdering = canCurrentClientEditPaletteColors();
     const canAddPaletteColor = canCurrentClientEditPaletteColors()
       && (!isIndexColorMode() || state.palette.length < MAX_IMPORTED_PALETTE_COLORS);
     if (dom.controls.addPaletteColor instanceof HTMLButtonElement) {
@@ -39652,11 +39671,11 @@
     }
     if (dom.controls.movePaletteBackward instanceof HTMLButtonElement) {
       const canMoveBackward = state.palette.length > 1 && state.activePaletteIndex > 0;
-      dom.controls.movePaletteBackward.disabled = !allowPaletteReindex || !canMoveBackward;
+      dom.controls.movePaletteBackward.disabled = !allowPaletteOrdering || !canMoveBackward;
     }
     if (dom.controls.movePaletteForward instanceof HTMLButtonElement) {
       const canMoveForward = state.palette.length > 1 && state.activePaletteIndex < (state.palette.length - 1);
-      dom.controls.movePaletteForward.disabled = !allowPaletteReindex || !canMoveForward;
+      dom.controls.movePaletteForward.disabled = !allowPaletteOrdering || !canMoveForward;
     }
     if (dom.controls.paletteIndex instanceof HTMLInputElement) {
       dom.controls.paletteIndex.disabled = !allowPaletteReindex;
@@ -39719,7 +39738,7 @@
     const allowColorPicking = canCurrentClientEditPaletteColors();
     const allowPaletteColorEditing = allowColorPicking;
     const allowPaletteReindex = isIndexMode && canCurrentClientReindexPalette();
-    const allowPaletteSorting = canCurrentClientReindexPalette();
+    const allowPaletteSorting = canCurrentClientEditPaletteColors();
     if (dom.controls.addPaletteColor instanceof HTMLButtonElement) {
       dom.controls.addPaletteColor.disabled = !allowPaletteColorEditing;
     }
@@ -40747,7 +40766,11 @@
       }
       return false;
     }
-    if (isMultiPaletteIsolationEnabled()) {
+    const applyPresetToRgbSwatchesOnly = isRgbColorMode() && !isMultiPaletteIsolationEnabled();
+    if (isMultiPaletteIsolationEnabled() || applyPresetToRgbSwatchesOnly) {
+      if (applyPresetToRgbSwatchesOnly) {
+        beginHistory('paletteApplyPreset');
+      }
       state.palette = nextPalette.map(color => normalizeColorValue(color));
       state.activePaletteIndex = findNearestPaletteColorIndexByRgba(
         previousActiveColor || state.activeRgb || state.palette[0],
@@ -40765,16 +40788,25 @@
       }
       syncPaletteInputs();
       renderPalette();
+      if (applyPresetToRgbSwatchesOnly) {
+        applyPaletteChange({ preserveCurrentPalettePreset: true, renderSurfaces: false });
+        commitHistory();
+      } else {
       requestRender();
       requestOverlayRender();
       scheduleSessionPersist();
       setCurrentPalettePresetId(normalizedPresetId, { syncControl: true });
+      }
       if (announce) {
         const label = getPalettePresetDisplayName(definition);
         updateAutosaveStatus(
           localizeText(
-            `プリセット「${label}」をローカルパレットへ適用しました`,
-            `Applied preset "${label}" to your local palette`
+            isRgbColorMode()
+              ? `プリセット「${label}」をRGBの色候補へ適用しました`
+              : `プリセット「${label}」をローカルパレットへ適用しました`,
+            isRgbColorMode()
+              ? `Applied preset "${label}" to RGB color swatches`
+              : `Applied preset "${label}" to your local palette`
           ),
           'success'
         );
@@ -40861,7 +40893,7 @@
   }
 
   function sortPaletteBy(mode = 'hue') {
-    if (!canCurrentClientReindexPalette()) {
+    if (!canCurrentClientEditPaletteColors()) {
       return false;
     }
     if (!Array.isArray(state.palette) || state.palette.length < 2) {
@@ -40882,10 +40914,19 @@
     ordered.forEach((entry, newIndex) => {
       mapping[entry.index] = newIndex;
     });
-    remapPaletteIndices(mapping);
+    if (isIndexColorMode()) {
+      remapPaletteIndices(mapping);
+    } else {
+      state.activePaletteIndex = normalizePaletteIndex(mapping[state.activePaletteIndex], state.activePaletteIndex);
+      state.secondaryPaletteIndex = normalizePaletteIndex(mapping[state.secondaryPaletteIndex], state.activePaletteIndex);
+      const activeColor = state.palette[state.activePaletteIndex] || state.palette[0];
+      if (activeColor) {
+        state.activeRgb = normalizeColorValue(activeColor);
+      }
+    }
     renderPalette();
     syncPaletteInputs();
-    applyPaletteChange();
+    applyPaletteChange({ renderSurfaces: isIndexColorMode() });
     commitHistory();
     const modeLabel = mode === 'value'
       ? localizeText('明度順', 'Value')
@@ -40897,10 +40938,7 @@
   }
 
   function moveActivePaletteBy(delta) {
-    if (!isIndexColorMode()) {
-      return false;
-    }
-    if (!canCurrentClientReindexPalette()) {
+    if (!canCurrentClientEditPaletteColors() || (isIndexColorMode() && !canCurrentClientReindexPalette())) {
       announcePaletteReindexRestriction();
       return false;
     }
@@ -41200,7 +41238,7 @@
   }
 
   function reorderPalette(currentIndex, targetIndex, { setActive = true, setSecondary = false } = {}) {
-    if (!isIndexColorMode() || !canCurrentClientReindexPalette()) return;
+    if (!canCurrentClientEditPaletteColors() || (isIndexColorMode() && !canCurrentClientReindexPalette())) return;
     const paletteLength = Array.isArray(state.palette) ? state.palette.length : 0;
     if (paletteLength < 2) return;
     const sourceIndex = clamp(Math.round(Number(currentIndex) || 0), 0, paletteLength - 1);
@@ -41218,7 +41256,9 @@
     state.palette.splice(destinationIndex, 0, color);
     const previousActive = state.activePaletteIndex;
     const previousSecondary = state.secondaryPaletteIndex;
-    remapPaletteIndices(mapping);
+    if (isIndexColorMode()) {
+      remapPaletteIndices(mapping);
+    }
     const newIndex = mapping[sourceIndex];
     // 表示を即時に反映させるため、state を直接更新してから再レンダリングする
     if (setActive) {
@@ -41226,6 +41266,15 @@
     } else if (setSecondary) {
       // 呼び出し側がアクティブを維持してセカンダリを更新したい場合
       state.secondaryPaletteIndex = normalizePaletteIndex(newIndex, previousActive);
+    } else if (!isIndexColorMode()) {
+      state.activePaletteIndex = normalizePaletteIndex(mapping[previousActive], previousActive);
+      state.secondaryPaletteIndex = normalizePaletteIndex(mapping[previousSecondary], state.activePaletteIndex);
+    }
+    if (!isIndexColorMode()) {
+      const activeColor = state.palette[state.activePaletteIndex] || state.palette[0];
+      if (activeColor) {
+        state.activeRgb = normalizeColorValue(activeColor);
+      }
     }
     // DOM を再構築して選択表示を更新
     renderPalette();
@@ -41233,7 +41282,7 @@
     if (setActive) {
       focusUnifiedLeftContext('color', { persist: false });
     }
-    applyPaletteChange({ renderSurfaces: false });
+    applyPaletteChange({ renderSurfaces: isIndexColorMode() });
     commitHistory();
   }
 
@@ -49468,6 +49517,17 @@
     const previous = getLocalViewportCanvasCount();
     const currentCanvases = getProjectCanvasDocuments();
     const targetCount = clamp(Math.round(Number(nextCount) || 0), 0, getLocalViewportCanvasMaxCount());
+    if (!hasPixieedrawMultiCanvasSupport() && targetCount > previous) {
+      updateAutosaveStatus(
+        localizeText(
+          'マルチキャンバスの追加はサポーター特典です',
+          'Adding multi canvases is a supporter benefit'
+        ),
+        'info'
+      );
+      syncControlsWithState();
+      return false;
+    }
     if (targetCount === previous) {
       if (persist) {
         scheduleSessionPersist({ includeSnapshots: false });
@@ -49552,6 +49612,9 @@
     const currentProjectCanvasCount = Array.isArray(projectCanvasStore?.canvases)
       ? Math.max(0, projectCanvasStore.canvases.length - 1)
       : 0;
+    if (!hasPixieedrawMultiCanvasSupport()) {
+      return currentProjectCanvasCount;
+    }
     const modeLimit = isVoxelExtensionModeEnabled()
       ? VOXEL_EXTENSION_LOCAL_CANVAS_MAX_COUNT
       : LOCAL_VIEWPORT_CANVAS_STANDARD_MAX_COUNT;
@@ -53044,9 +53107,7 @@
     flushActiveProjectCanvasUiSync({ persist: false });
     const resolvedSurface = getResolvedCanvasInteractionSurface(targetSurface);
     const pointerFocus = getCanvasFocusAt(event.clientX, event.clientY, { surface: resolvedSurface });
-    const focus = state.showVirtualCursor
-      ? (getVirtualCursorZoomFocus() || pointerFocus)
-      : pointerFocus;
+    const focus = pointerFocus || (state.showVirtualCursor ? getVirtualCursorZoomFocus() : null);
     if (!focus) {
       return;
     }
@@ -53065,8 +53126,11 @@
     if (!Number.isFinite(zoomFactor) || zoomFactor <= 0) {
       return;
     }
-    focus.cellX = clamp(focus.cellX, 0, state.width - 1);
-    focus.cellY = clamp(focus.cellY, 0, state.height - 1);
+    const focusCanvasDoc = focus.canvasDocId
+      ? (getProjectCanvasDocumentById(focus.canvasDocId) || targetSurface.canvasDoc || getActiveProjectCanvasDocument())
+      : (targetSurface.canvasDoc || getActiveProjectCanvasDocument());
+    focus.cellX = clamp(focus.cellX, 0, Math.max(0, Math.round(Number(focusCanvasDoc?.width) || state.width || 1) - 1));
+    focus.cellY = clamp(focus.cellY, 0, Math.max(0, Math.round(Number(focusCanvasDoc?.height) || state.height || 1) - 1));
     const currentScale = Number.isFinite(wheelZoomPendingScale)
       ? wheelZoomPendingScale
       : (Number(state.scale) || MIN_ZOOM_SCALE);
