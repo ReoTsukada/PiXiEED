@@ -2517,7 +2517,9 @@
   setDocumentLanguage();
   let sessionPersistHandle = null;
   let sessionPersistIdleHandle = null;
+  let sessionPersistIncludeReloadSnapshot = false;
   let lastSaveInteractionAt = 0;
+  let lastViewportInteractionAt = 0;
   const USER_AGENT = typeof navigator !== 'undefined' ? (navigator.userAgent || '') : '';
   const USER_AGENT_LOWER = USER_AGENT.toLowerCase();
   const IS_IOS_DEVICE = /iphone|ipod|ipad/i.test(USER_AGENT_LOWER);
@@ -2560,6 +2562,7 @@
   const IOS_SNAPSHOT_COMPRESSION_THRESHOLD = 32 * 1024;
   const SESSION_PERSIST_DELAY = 120;
   const SAVE_INTERACTION_GRACE_MS = 1300;
+  const VIEWPORT_INTERACTION_GRACE_MS = 420;
   const AUTOSAVE_LIFECYCLE_FLUSH_THROTTLE_MS = 240;
   const NEW_PROJECT_IMMEDIATE_AUTOSAVE_ATTEMPTS = 2;
   const MAX_OPEN_PROJECT_TABS = 5;
@@ -15695,10 +15698,20 @@
     stack.style.setProperty('--grid-major-opacity', getGridOpacityForScale(scale, { major: true }).toFixed(3));
   }
 
+  function getPixelAlignedCanvasDisplayScale(scale = state.scale) {
+    const normalizedScale = Math.max(Number(scale) || MIN_ZOOM_SCALE, MIN_ZOOM_SCALE);
+    const dpr = Math.max(1, Number(window.devicePixelRatio) || 1);
+    const aligned = Math.round(normalizedScale * dpr);
+    if (aligned <= 0) {
+      return normalizedScale;
+    }
+    return aligned / dpr;
+  }
+
   function updateGridDecorations() {
     const stack = dom.canvases.stack;
     if (!stack) return;
-    const scale = Math.max(Number(state.scale) || MIN_ZOOM_SCALE, MIN_ZOOM_SCALE);
+    const scale = getPixelAlignedCanvasDisplayScale(state.scale);
     const width = Math.max(1, Math.round(Number(state.width) || 1));
     const height = Math.max(1, Math.round(Number(state.height) || 1));
     const tileScreenSize = 16 * scale;
@@ -17981,11 +17994,22 @@
     lastSaveInteractionAt = Date.now();
   }
 
+  function markViewportInteractionActivity() {
+    lastViewportInteractionAt = Date.now();
+  }
+
   function hasRecentSaveInteraction() {
     if (!Number.isFinite(lastSaveInteractionAt) || lastSaveInteractionAt <= 0) {
       return false;
     }
     return (Date.now() - lastSaveInteractionAt) < SAVE_INTERACTION_GRACE_MS;
+  }
+
+  function hasRecentViewportInteraction() {
+    if (!Number.isFinite(lastViewportInteractionAt) || lastViewportInteractionAt <= 0) {
+      return false;
+    }
+    return (Date.now() - lastViewportInteractionAt) < VIEWPORT_INTERACTION_GRACE_MS;
   }
 
   function hasPendingAutosaveWork() {
@@ -39029,7 +39053,7 @@
 
     const previousWidth = state.width;
     const previousHeight = state.height;
-    const scale = Number(state.scale) || MIN_ZOOM_SCALE;
+    const scale = getPixelAlignedCanvasDisplayScale(state.scale);
     beginHistory('resizeCanvas');
     resizeAllLayers(nextWidth, nextHeight, {
       offsetX: Math.round(Number(contentOffsetX) || 0),
@@ -47782,7 +47806,9 @@
   }
 
   function getProjectCanvasDisplayScale(canvasDoc) {
-    return normalizeProjectCanvasViewScale(state.scale, getProjectCanvasViewScale(canvasDoc, state.scale || 8));
+    return getPixelAlignedCanvasDisplayScale(
+      normalizeProjectCanvasViewScale(state.scale, getProjectCanvasViewScale(canvasDoc, state.scale || 8))
+    );
   }
 
   function storeProjectCanvasViewScale(canvasDoc, scale = state.scale) {
@@ -51844,7 +51870,7 @@
     endHandle.hidden = false;
     endHandle.setAttribute('aria-hidden', 'false');
     if (canvasResizeHandleState.active) {
-      const scale = Number(state.scale) || MIN_ZOOM_SCALE;
+      const scale = getPixelAlignedCanvasDisplayScale(state.scale);
       setCanvasResizePreviewRect(
         canvasResizeHandleState.previewWidth * scale,
         canvasResizeHandleState.previewHeight * scale,
@@ -51982,7 +52008,7 @@
       preview.classList.remove('is-hidden');
       preview.hidden = false;
       preview.setAttribute('aria-hidden', 'false');
-      const scale = Number(state.scale) || MIN_ZOOM_SCALE;
+      const scale = getPixelAlignedCanvasDisplayScale(state.scale);
       setCanvasResizePreviewRect(
         canvasResizeHandleState.previewWidth * scale,
         canvasResizeHandleState.previewHeight * scale,
@@ -52010,7 +52036,7 @@
     }
     event.preventDefault();
     event.stopPropagation();
-    const scale = Math.max(Number(state.scale) || MIN_ZOOM_SCALE, MIN_ZOOM_SCALE);
+    const scale = getPixelAlignedCanvasDisplayScale(state.scale);
     const dx = event.clientX - canvasResizeHandleState.startClientX;
     const dy = event.clientY - canvasResizeHandleState.startClientY;
     const deltaWidth = Math.round(dx / scale);
@@ -52619,12 +52645,15 @@
     syncViewportScale = false,
     renderLocalViewports = true,
     renderOverlay = true,
+    syncLocalViewportDock = true,
+    resizeVirtualCursor = true,
   } = {}) {
     if (syncViewportScale) {
       syncViewportZoomScaleToBase({ preserveRatio: true });
     }
     syncActiveProjectCanvasViewScale();
-    const { width, height, scale } = state;
+    const { width, height } = state;
+    const scale = getPixelAlignedCanvasDisplayScale(state.scale);
     state.mirror = normalizeMirrorAxisState(state.mirror, width, height);
     const drawingCanvas = dom.canvases.drawing;
     const overlayCanvas = dom.canvases.overlay;
@@ -52682,8 +52711,12 @@
       }
     }
     updateGridDecorations();
-    resizeVirtualCursorCanvas();
-    syncLocalViewportCanvasDockVisibility({ persist: false, render: false });
+    if (resizeVirtualCursor) {
+      resizeVirtualCursorCanvas();
+    }
+    if (syncLocalViewportDock) {
+      syncLocalViewportCanvasDockVisibility({ persist: false, render: false });
+    }
     if (applyTransform) {
       applyViewportTransform();
     }
@@ -52718,6 +52751,8 @@
     zoomSettledViewportRefreshHandle = window.setTimeout(() => {
       zoomSettledViewportRefreshHandle = null;
       updateGridDecorations();
+      resizeVirtualCursorCanvas();
+      syncLocalViewportCanvasDockVisibility({ persist: false, render: true });
       updateMirrorGuideHandles();
       updateCanvasResizeHandlePosition();
       syncCanvasResizeHandleVisibility();
@@ -52733,7 +52768,7 @@
     const height = Math.max(1, Number(state.height) || 1);
     const worldX = clamp(Number(virtualCursor.x), 0, width - 1);
     const worldY = clamp(Number(virtualCursor.y), 0, height - 1);
-    const scale = Number(state.scale) || MIN_ZOOM_SCALE;
+    const scale = getPixelAlignedCanvasDisplayScale(state.scale);
     const drawing = dom.canvases.drawing;
     if (!drawing) {
       return {
@@ -52755,6 +52790,7 @@
   }
 
   function setZoom(nextScale, focus) {
+    markViewportInteractionActivity();
     if (!wheelZoomApplying) {
       wheelZoomPendingRawScale = null;
       if (wheelZoomRawResetTimer !== null) {
@@ -52769,7 +52805,9 @@
       wheelZoomPendingFocus = null;
     }
     const prevScale = Number(state.scale) || MIN_ZOOM_SCALE;
+    const prevDisplayScale = getPixelAlignedCanvasDisplayScale(prevScale);
     const targetScale = normalizeZoomScale(nextScale, prevScale);
+    const targetDisplayScale = getPixelAlignedCanvasDisplayScale(targetScale);
     if (Math.abs(targetScale - prevScale) < ZOOM_EPSILON) {
       syncControlsWithState();
       return;
@@ -52795,6 +52833,8 @@
       updateScaleLimits: false,
       renderLocalViewports: false,
       renderOverlay: false,
+      syncLocalViewportDock: false,
+      resizeVirtualCursor: false,
     });
 
     const focusSurface = zoomFocus?.surface
@@ -52807,18 +52847,18 @@
       const drawingRectAfterResize = focusDrawing.getBoundingClientRect();
       const focusClientX = Number.isFinite(zoomFocus.clientX)
         ? Number(zoomFocus.clientX)
-        : drawingRectAfterResize.left + (zoomFocus.worldX * prevScale);
+        : drawingRectAfterResize.left + (zoomFocus.worldX * prevDisplayScale);
       const focusClientY = Number.isFinite(zoomFocus.clientY)
         ? Number(zoomFocus.clientY)
-        : drawingRectAfterResize.top + (zoomFocus.worldY * prevScale);
+        : drawingRectAfterResize.top + (zoomFocus.worldY * prevDisplayScale);
       state.pan.x = Math.round(
-        previousPan.x + focusClientX - (drawingRectAfterResize.left + (zoomFocus.worldX * targetScale))
+        previousPan.x + focusClientX - (drawingRectAfterResize.left + (zoomFocus.worldX * targetDisplayScale))
       );
       state.pan.y = Math.round(
-        previousPan.y + focusClientY - (drawingRectAfterResize.top + (zoomFocus.worldY * targetScale))
+        previousPan.y + focusClientY - (drawingRectAfterResize.top + (zoomFocus.worldY * targetDisplayScale))
       );
     } else {
-      const ratio = targetScale / prevScale;
+      const ratio = targetDisplayScale / Math.max(prevDisplayScale, MIN_ZOOM_SCALE);
       state.pan.x = Math.round(previousPan.x * ratio);
       state.pan.y = Math.round(previousPan.y * ratio);
     }
@@ -52831,8 +52871,8 @@
       && focusDrawing instanceof HTMLCanvasElement
     ) {
       const drawingRectNow = focusDrawing.getBoundingClientRect();
-      const currentClientX = drawingRectNow.left + (zoomFocus.worldX * targetScale);
-      const currentClientY = drawingRectNow.top + (zoomFocus.worldY * targetScale);
+      const currentClientX = drawingRectNow.left + (zoomFocus.worldX * targetDisplayScale);
+      const currentClientY = drawingRectNow.top + (zoomFocus.worldY * targetDisplayScale);
       const anchorErrorX = (Number(zoomFocus.clientX) || 0) - currentClientX;
       const anchorErrorY = (Number(zoomFocus.clientY) || 0) - currentClientY;
       const correctionX = !clampResult?.clampedX && Math.abs(anchorErrorX) >= 0.5 ? anchorErrorX : 0;
@@ -52846,7 +52886,7 @@
     syncZoomControls(targetScale);
     showZoomIndicator(targetScale);
     scheduleZoomSettledViewportRefresh();
-    scheduleSessionPersist({ includeSnapshots: false });
+    scheduleSessionPersist({ includeSnapshots: false, includeReloadSnapshot: false });
   }
 
   function adjustZoomBySteps(delta, focus) {
@@ -60207,7 +60247,7 @@
 
     const clampedX = clamp(position.x, -2, state.width + 2);
     const clampedY = clamp(position.y, -2, state.height + 2);
-    const viewportScale = Math.max(Number(state.scale) || MIN_ZOOM_SCALE, MIN_ZOOM_SCALE);
+    const viewportScale = getPixelAlignedCanvasDisplayScale(state.scale);
     const activeTool = getActiveTool();
     const iconEntry = getToolIconEntry(activeTool);
     if (iconEntry && iconEntry.ready) {
@@ -60878,7 +60918,7 @@
     ctx.overlay.fillStyle = rgbaToCss(previewColor);
     ctx.overlay.fillRect(center.x, center.y, 1, 1);
     // Keep the outline inside the sampled pixel so eyedropper preview stays visually 1x1.
-    const scale = Math.max(Number(state.scale) || MIN_ZOOM_SCALE, MIN_ZOOM_SCALE);
+    const scale = getPixelAlignedCanvasDisplayScale(state.scale);
     const inset = clamp(1 / scale, 0.06, 0.22);
     const innerSize = Math.max(0, 1 - (inset * 2));
     if (innerSize > 0) {
@@ -62302,22 +62342,28 @@
     return true;
   }
 
-  function scheduleSessionPersist({ includeSnapshots = true } = {}) {
+  function scheduleSessionPersist({ includeSnapshots = true, includeReloadSnapshot = includeSnapshots } = {}) {
     if (includeSnapshots) {
       scheduleAutosaveSnapshot();
       scheduleIosSnapshotPersist();
     }
+    sessionPersistIncludeReloadSnapshot = sessionPersistIncludeReloadSnapshot || Boolean(includeReloadSnapshot);
     if (!canUseSessionStorage) return;
     if (sessionPersistHandle !== null || sessionPersistIdleHandle !== null) return;
     sessionPersistHandle = window.setTimeout(() => {
       sessionPersistHandle = null;
       const runPersist = () => {
         sessionPersistIdleHandle = null;
-        if (isAutosaveInteractionBusy() || hasRecentSaveInteraction()) {
-          scheduleSessionPersist({ includeSnapshots: false });
+        const shouldPersistReloadSnapshot = sessionPersistIncludeReloadSnapshot;
+        sessionPersistIncludeReloadSnapshot = false;
+        if (isAutosaveInteractionBusy() || hasRecentSaveInteraction() || hasRecentViewportInteraction()) {
+          scheduleSessionPersist({
+            includeSnapshots: false,
+            includeReloadSnapshot: shouldPersistReloadSnapshot,
+          });
           return;
         }
-        if (RELOAD_SNAPSHOT_ENABLED) {
+        if (RELOAD_SNAPSHOT_ENABLED && shouldPersistReloadSnapshot) {
           persistReloadSessionSnapshot();
         }
         persistSessionState();
