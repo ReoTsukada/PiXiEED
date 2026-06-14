@@ -1123,7 +1123,7 @@
   const RELOAD_TARGET_PROJECT_ID_KEY = 'pixieedraw:reload-target-project-id-v1';
   const RELOAD_SNAPSHOT_VERSION = 1;
   const RELOAD_SNAPSHOT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
-  const RELOAD_SNAPSHOT_MAX_HISTORY_ITEMS = 160;
+  const RELOAD_SNAPSHOT_MAX_HISTORY_ITEMS = 24;
   const RELOAD_SNAPSHOT_COMPRESS_THRESHOLD = 4096;
   const RELOAD_SNAPSHOT_MAX_SYNC_CHARS = 2 * 1024 * 1024;
   const STARTUP_SCREEN_DISMISSED_KEY = 'pixieedraw:startupScreenDismissed';
@@ -4367,6 +4367,7 @@
   let memoryMonitorHandle = null;
   let timelineMatrixInteractionBound = false;
   let timelineMatrixRenderKey = '';
+  let timelineMatrixRafRenderHandle = null;
   let timelineMatrixDeferredRenderHandle = null;
   let secondaryCanvasRefreshHandle = null;
   let toolButtons = [];
@@ -4401,6 +4402,7 @@
   let curveBuilder = null;
   let paletteWheelCtx = null;
   let paletteWheelResizeObserver = null;
+  let paletteWheelRenderKey = '';
   let mirrorGuideResizeObserver = null;
   let multiEntryMetricsResizeObserver = null;
   let multiEntryMetricsRaf = null;
@@ -10719,8 +10721,8 @@
       activeCanvasDoc.activeLayer = targetLayerId;
     }
     clearTimelineSelection();
-    scheduleSessionPersist();
-    renderTimelineMatrix();
+    scheduleSessionPersist({ includeSnapshots: false, includeReloadSnapshot: false });
+    scheduleTimelineMatrixRenderSoon();
     renderLayerList();
     requestRender();
     requestOverlayRender();
@@ -14239,7 +14241,7 @@
     updateLeftTabVisibility();
     updateToolVisibility();
     if (persist) {
-      scheduleSessionPersist();
+      scheduleSessionPersist({ includeSnapshots: false, includeReloadSnapshot: false });
     }
   }
 
@@ -14718,7 +14720,7 @@
     if (tab === 'multi') {
       setMultiTabNotification(false);
     }
-    scheduleSessionPersist();
+    scheduleSessionPersist({ includeSnapshots: false, includeReloadSnapshot: false });
   }
 
   function updateRightTabUI() {
@@ -15261,7 +15263,7 @@
     const tools = TOOL_GROUPS[group].tools;
     const hasSelectableTool = tools.some(tool => !TOOL_ACTIONS.has(tool));
     if (!hasSelectableTool) {
-      if (persist) scheduleSessionPersist();
+      if (persist) scheduleSessionPersist({ includeSnapshots: false, includeReloadSnapshot: false });
       return;
     }
     const desired = state.lastGroupTool[group] && tools.includes(state.lastGroupTool[group])
@@ -15271,7 +15273,7 @@
       setActiveTool(desired, toolButtons, { persist, skipGroupUpdate: true });
     } else {
       state.lastGroupTool[group] = state.tool;
-      if (persist) scheduleSessionPersist();
+      if (persist) scheduleSessionPersist({ includeSnapshots: false, includeReloadSnapshot: false });
     }
   }
 
@@ -18105,6 +18107,11 @@
       return false;
     }
     if (!force && hasRecentSaveInteraction()) {
+      autosaveWriteQueued = true;
+      scheduleAutosaveSnapshot();
+      return false;
+    }
+    if (!force && hasRecentViewportInteraction()) {
       autosaveWriteQueued = true;
       scheduleAutosaveSnapshot();
       return false;
@@ -21865,7 +21872,7 @@
       enforceGuestAssignedLayerSelection({ announce: false });
     }
     if (persist) {
-      scheduleSessionPersist();
+      scheduleSessionPersist({ includeSnapshots: false, includeReloadSnapshot: false });
     }
     if (render) {
       if (previousIndex !== normalizedIndex) {
@@ -21911,7 +21918,7 @@
     const candidateLayers = frames[normalizedIndex]?.layers?.slice().reverse() || [];
     const nextLayer = candidateLayers[activeLayerRow] || candidateLayers[candidateLayers.length - 1] || candidateLayers[0];
     if (respectSharedCellOccupancy && nextLayer && !canSelectSharedProjectTimelineCell(normalizedIndex, nextLayer.id)) {
-      renderTimelineMatrix();
+      scheduleTimelineMatrixRenderSoon();
       return;
     }
     setActiveFrameIndex(nextIndex, { wrap, persist, render, syncUi });
@@ -21946,7 +21953,7 @@
       activeCanvasDoc.activeLayer = targetLayer.id;
     }
     if (persist) {
-      scheduleSessionPersist();
+      scheduleSessionPersist({ includeSnapshots: false, includeReloadSnapshot: false });
     }
     if (render && (previousFrame !== normalizedFrameIndex || previousLayer !== targetLayer.id)) {
       renderFrameList();
@@ -21998,7 +22005,7 @@
     } else {
       setMultiStatus(localizeText('移動できるフレームがありません', 'No available frame to move to'), 'warn');
     }
-    renderTimelineMatrix();
+    scheduleTimelineMatrixRenderSoon();
     return false;
   }
 
@@ -22022,7 +22029,7 @@
       return null;
     }
     if (respectSharedCellOccupancy && !canSelectSharedProjectTimelineCell(state.activeFrame, nextLayer.id)) {
-      renderTimelineMatrix();
+      scheduleTimelineMatrixRenderSoon();
       return getActiveLayer();
     }
     const previousLayerId = state.activeLayer;
@@ -22032,7 +22039,7 @@
       activeCanvasDoc.activeLayer = nextLayer.id;
     }
     if (persist) {
-      scheduleSessionPersist();
+      scheduleSessionPersist({ includeSnapshots: false, includeReloadSnapshot: false });
     }
     if (render) {
       if (previousLayerId !== nextLayer.id) {
@@ -35527,7 +35534,7 @@
     updateRailMetrics();
     scheduleRailLayoutRefresh();
     if (persist) {
-      scheduleSessionPersist();
+      scheduleSessionPersist({ includeSnapshots: false, includeReloadSnapshot: false });
     }
   }
 
@@ -36001,7 +36008,7 @@
     window.removeEventListener('pointerup', handleRailResizePointerUp);
     window.removeEventListener('pointercancel', handleRailResizePointerUp);
     if (persist) {
-      scheduleSessionPersist();
+      scheduleSessionPersist({ includeSnapshots: false, includeReloadSnapshot: false });
     }
   }
 
@@ -37097,7 +37104,7 @@
     syncVirtualCursorControlVisibility({ syncToggle: updateControl });
     requestOverlayRender();
     if (persist) {
-      scheduleSessionPersist();
+      scheduleUiStatePersist();
     }
     updateFloatingDrawButtonEnabledState();
     refreshViewportCursorStyle();
@@ -38258,7 +38265,7 @@
         state.showGrid = dom.controls.toggleGrid.checked;
         updateGridDecorations();
         requestOverlayRender();
-        scheduleSessionPersist();
+        scheduleUiStatePersist();
       });
     }
 
@@ -38267,7 +38274,7 @@
         state.showMajorGrid = dom.controls.toggleMajorGrid.checked;
         updateGridDecorations();
         requestOverlayRender();
-        scheduleSessionPersist();
+        scheduleUiStatePersist();
       });
     }
 
@@ -38277,7 +38284,7 @@
       state.backgroundMode = modes[nextIndex];
       updateGridDecorations();
       syncControlsWithState();
-      scheduleSessionPersist();
+      scheduleUiStatePersist();
     });
 
     dom.controls.toggleUiTheme?.addEventListener('click', () => {
@@ -38381,7 +38388,7 @@
       if (dom.controls.brushSizeValue) {
         dom.controls.brushSizeValue.textContent = `${state.brushSize}px`;
       }
-      scheduleSessionPersist();
+      scheduleUiStatePersist();
     });
 
     if (Array.isArray(dom.controls.brushShapeButtons)) {
@@ -38412,7 +38419,7 @@
                 localizeText('範囲選択中にカスタムを押すとブラシ化できます', 'Select an area and press Custom to create a brush'),
                 'info'
               );
-              scheduleSessionPersist();
+              scheduleUiStatePersist();
               return;
             }
             createCustomBrushFromSelection();
@@ -38421,7 +38428,7 @@
           state.brushShape = next;
           syncBrushControls();
           requestOverlayRender();
-          scheduleSessionPersist();
+          scheduleUiStatePersist();
         });
       });
     }
@@ -38442,7 +38449,7 @@
           }
           state.selectSameMode = next;
           syncSelectSameModeControls();
-          scheduleSessionPersist();
+          scheduleUiStatePersist();
         });
       });
       syncSelectSameModeControls();
@@ -38464,7 +38471,7 @@
           }
           state.selectionShapeMode = next;
           syncSelectionShapeModeControls();
-          scheduleSessionPersist();
+          scheduleUiStatePersist();
         });
       });
       syncSelectionShapeModeControls();
@@ -38485,19 +38492,19 @@
       if (dom.controls.outlineSizeValue) {
         dom.controls.outlineSizeValue.textContent = localizeText(`${state.outlineSize}マス`, `${state.outlineSize} cells`);
       }
-      scheduleSessionPersist();
+      scheduleUiStatePersist();
     });
 
     dom.controls.toggleChecker?.addEventListener('change', event => {
       state.showChecker = Boolean(event.target.checked);
       dom.canvases.stack.classList.toggle('is-flat', !state.showChecker);
-      scheduleSessionPersist();
+      scheduleUiStatePersist();
     });
 
     dom.controls.togglePixelPreview?.addEventListener('change', event => {
       state.showPixelGuides = Boolean(event.target.checked);
       requestOverlayRender();
-      scheduleSessionPersist();
+      scheduleUiStatePersist();
     });
 
     dom.controls.toggleMirrorMode?.addEventListener('change', event => {
@@ -39498,7 +39505,7 @@
       updateToolVisibility();
     }
     if (persist) {
-      scheduleSessionPersist();
+      scheduleSessionPersist({ includeSnapshots: false, includeReloadSnapshot: false });
     }
   }
 
@@ -41194,16 +41201,25 @@
 
   function reorderPalette(currentIndex, targetIndex, { setActive = true, setSecondary = false } = {}) {
     if (!isIndexColorMode() || !canCurrentClientReindexPalette()) return;
-    if (currentIndex === targetIndex) return;
+    const paletteLength = Array.isArray(state.palette) ? state.palette.length : 0;
+    if (paletteLength < 2) return;
+    const sourceIndex = clamp(Math.round(Number(currentIndex) || 0), 0, paletteLength - 1);
+    const destinationIndex = clamp(Math.round(Number(targetIndex) || 0), 0, paletteLength - 1);
+    if (sourceIndex === destinationIndex) return;
     beginHistory('paletteReorder');
-    const previousOrder = state.palette.slice();
-    const color = state.palette.splice(currentIndex, 1)[0];
-    state.palette.splice(targetIndex, 0, color);
+    const order = state.palette.map((_, index) => index);
+    const [movedOriginalIndex] = order.splice(sourceIndex, 1);
+    order.splice(destinationIndex, 0, movedOriginalIndex);
+    const mapping = new Array(order.length);
+    order.forEach((oldIndex, newIndex) => {
+      mapping[oldIndex] = newIndex;
+    });
+    const color = state.palette.splice(sourceIndex, 1)[0];
+    state.palette.splice(destinationIndex, 0, color);
     const previousActive = state.activePaletteIndex;
     const previousSecondary = state.secondaryPaletteIndex;
-    const mapping = previousOrder.map(entry => state.palette.indexOf(entry));
     remapPaletteIndices(mapping);
-    const newIndex = state.palette.indexOf(color);
+    const newIndex = mapping[sourceIndex];
     // 表示を即時に反映させるため、state を直接更新してから再レンダリングする
     if (setActive) {
       state.activePaletteIndex = normalizePaletteIndex(newIndex, previousActive);
@@ -41214,11 +41230,10 @@
     // DOM を再構築して選択表示を更新
     renderPalette();
     syncPaletteInputs();
-    updatePaletteSelectionState(previousActive, previousSecondary);
     if (setActive) {
       focusUnifiedLeftContext('color', { persist: false });
     }
-    applyPaletteChange();
+    applyPaletteChange({ renderSurfaces: false });
     commitHistory();
   }
 
@@ -41231,11 +41246,17 @@
 
   function setActivePaletteIndex(index) {
     const previousActivePaletteIndex = state.activePaletteIndex;
-    state.activePaletteIndex = normalizePaletteIndex(index, state.activePaletteIndex);
+    const nextActivePaletteIndex = normalizePaletteIndex(index, state.activePaletteIndex);
+    if (nextActivePaletteIndex === previousActivePaletteIndex) {
+      focusUnifiedLeftContext('color', { persist: false });
+      scheduleSessionPersist({ includeSnapshots: false, includeReloadSnapshot: false });
+      return;
+    }
+    state.activePaletteIndex = nextActivePaletteIndex;
     syncPaletteInputs();
     updatePaletteSelectionState(previousActivePaletteIndex, state.secondaryPaletteIndex);
     focusUnifiedLeftContext('color', { persist: false });
-    scheduleSessionPersist();
+    scheduleSessionPersist({ includeSnapshots: false, includeReloadSnapshot: false });
   }
 
   function setSecondaryPaletteIndex(index, { render = true, persist = true } = {}) {
@@ -41245,7 +41266,7 @@
       updatePaletteSelectionState(state.activePaletteIndex, previousSecondaryPaletteIndex);
     }
     if (persist) {
-      scheduleSessionPersist();
+      scheduleSessionPersist({ includeSnapshots: false, includeReloadSnapshot: false });
     }
     focusUnifiedLeftContext('color', { persist: false });
   }
@@ -41558,10 +41579,15 @@
 
   function removePaletteColor(index) {
     if (!isIndexColorMode() || !canCurrentClientReindexPalette()) return;
+    const paletteLength = Array.isArray(state.palette) ? state.palette.length : 0;
+    const targetIndex = Math.round(Number(index));
+    if (!Number.isFinite(targetIndex) || targetIndex < 0 || targetIndex >= paletteLength) return;
     beginHistory('paletteRemove');
-    const previousOrder = state.palette.slice();
-    state.palette.splice(index, 1);
-    const mapping = previousOrder.map(entry => state.palette.indexOf(entry));
+    const mapping = state.palette.map((_, oldIndex) => {
+      if (oldIndex === targetIndex) return -1;
+      return oldIndex > targetIndex ? oldIndex - 1 : oldIndex;
+    });
+    state.palette.splice(targetIndex, 1);
     remapPaletteIndices(mapping);
     state.activePaletteIndex = normalizePaletteIndex(state.activePaletteIndex, state.activePaletteIndex);
     state.secondaryPaletteIndex = normalizePaletteIndex(state.secondaryPaletteIndex, state.activePaletteIndex);
@@ -41592,7 +41618,7 @@
     );
   }
 
-  function applyPaletteChange({ preserveCurrentPalettePreset = false } = {}) {
+  function applyPaletteChange({ preserveCurrentPalettePreset = false, renderSurfaces = true } = {}) {
     if (preserveCurrentPalettePreset) {
       setCurrentPalettePresetId(currentPalettePresetId, { syncControl: true });
     } else {
@@ -41600,7 +41626,11 @@
     }
     markHistoryDirty();
     requestRender();
-    renderAllProjectCanvasSurfaces();
+    if (renderSurfaces) {
+      renderAllProjectCanvasSurfaces();
+    } else {
+      scheduleSecondaryCanvasRefresh();
+    }
     requestOverlayRender();
     scheduleSessionPersist();
     updateColorTabSwatch();
@@ -41736,6 +41766,7 @@
     if (canvas.width !== size || canvas.height !== size) {
       canvas.width = size;
       canvas.height = size;
+      paletteWheelRenderKey = '';
     }
   }
 
@@ -41816,10 +41847,14 @@
     configurePaletteCanvas(canvas, displaySize);
     const size = canvas.width;
     if (!size) return;
+    const selectedHue = clamp(paletteEditorState.hsv.h, 0, 360);
+    const renderKey = `${size}:${Math.round(displaySize * 1000)}:${Math.round(selectedHue * 100)}`;
+    if (paletteWheelRenderKey === renderKey) {
+      return;
+    }
     const scale = size / displaySize;
     const displayMetrics = getPaletteWheelMetrics(displaySize);
     const metrics = scalePaletteWheelMetrics(displayMetrics, scale);
-    const selectedHue = clamp(paletteEditorState.hsv.h, 0, 360);
     const imageData = paletteWheelCtx.createImageData(size, size);
     const data = imageData.data;
     for (let y = 0; y < size; y += 1) {
@@ -41851,6 +41886,7 @@
       }
     }
     paletteWheelCtx.putImageData(imageData, 0, 0);
+    paletteWheelRenderKey = renderKey;
   }
 
   function updatePaletteWheelCursor() {
@@ -44142,8 +44178,8 @@
         if (Number.isFinite(layerIndex)) {
           setTimelineLayerSelection(layerIndex, { append: event.shiftKey });
         }
-        scheduleSessionPersist();
-        renderTimelineMatrix();
+        scheduleSessionPersist({ includeSnapshots: false, includeReloadSnapshot: false });
+        scheduleTimelineMatrixRenderSoon();
         scheduleSharedProjectCellPresenceBroadcast('layer');
         requestOverlayRender();
         return;
@@ -44186,15 +44222,15 @@
           if (nextLayer) {
             state.activeLayer = nextLayer.id;
           }
-          scheduleSessionPersist();
-          renderTimelineMatrix();
+          scheduleSessionPersist({ includeSnapshots: false, includeReloadSnapshot: false });
+          scheduleTimelineMatrixRenderSoon();
           scheduleSharedProjectCellPresenceBroadcast('frame');
           requestRender();
           requestOverlayRender();
           return;
         }
-        scheduleSessionPersist();
-        renderTimelineMatrix();
+        scheduleSessionPersist({ includeSnapshots: false, includeReloadSnapshot: false });
+        scheduleTimelineMatrixRenderSoon();
         scheduleSharedProjectCellPresenceBroadcast('frame');
         requestRender();
         requestOverlayRender();
@@ -44235,8 +44271,8 @@
         } else {
           clearTimelineSelection();
         }
-        scheduleSessionPersist();
-        renderTimelineMatrix();
+        scheduleSessionPersist({ includeSnapshots: false, includeReloadSnapshot: false });
+        scheduleTimelineMatrixRenderSoon();
         scheduleSharedProjectCellPresenceBroadcast('slot');
         requestRender();
         requestOverlayRender();
@@ -44351,7 +44387,7 @@
     }
     const run = () => {
       secondaryCanvasRefreshHandle = null;
-      if (isLargeDocumentPerformanceMode() && isAutosaveInteractionBusy()) {
+      if ((isLargeDocumentPerformanceMode() && isAutosaveInteractionBusy()) || hasRecentViewportInteraction()) {
         scheduleSecondaryCanvasRefresh();
         return;
       }
@@ -44379,6 +44415,20 @@
     renderInactiveProjectCanvasSurfaces();
   }
 
+  function scheduleTimelineMatrixRenderSoon() {
+    if (timelineMatrixRafRenderHandle !== null) {
+      return;
+    }
+    timelineMatrixRafRenderHandle = window.requestAnimationFrame(() => {
+      timelineMatrixRafRenderHandle = null;
+      if (hasRecentViewportInteraction()) {
+        scheduleDeferredTimelineMatrixRender();
+        return;
+      }
+      renderTimelineMatrix();
+    });
+  }
+
   function scheduleDeferredTimelineMatrixRender() {
     if (timelineMatrixDeferredRenderHandle !== null) {
       return;
@@ -44386,6 +44436,10 @@
     timelineMatrixDeferredRenderHandle = window.requestAnimationFrame(() => {
       const render = () => {
         timelineMatrixDeferredRenderHandle = null;
+        if (hasRecentViewportInteraction()) {
+          scheduleDeferredTimelineMatrixRender();
+          return;
+        }
         renderTimelineMatrix();
       };
       if (typeof window.requestIdleCallback === 'function') {
@@ -48559,7 +48613,7 @@
     syncMultiCanvasSelectionUi();
     updateHistoryButtons();
     if (persist) {
-      scheduleSessionPersist();
+      scheduleSessionPersist({ includeSnapshots: false, includeReloadSnapshot: false });
     }
   }
 
@@ -54372,6 +54426,7 @@
         }
         state.pan.x = Math.round((baselinePan.x || 0) + dx);
         state.pan.y = Math.round((baselinePan.y || 0) + dy);
+        markViewportInteractionActivity();
         const clampResult = applyViewportTransform();
         if (clampResult?.clampedX || clampResult?.clampedY) {
           refreshTouchPanBaseline({ resetPinchFocus: false });
@@ -54385,6 +54440,7 @@
       const originY = pointerState.panOrigin?.y || 0;
       state.pan.x = Math.round(originX + dx);
       state.pan.y = Math.round(originY + dy);
+      markViewportInteractionActivity();
       const clampResult = applyViewportTransform();
       if (clampResult?.clampedX || clampResult?.clampedY) {
         pointerState.panOrigin = { x: state.pan.x, y: state.pan.y };
@@ -62374,6 +62430,10 @@
         runPersist();
       }
     }, SESSION_PERSIST_DELAY);
+  }
+
+  function scheduleUiStatePersist() {
+    scheduleSessionPersist({ includeSnapshots: false, includeReloadSnapshot: false });
   }
 
   function persistSessionState() {
