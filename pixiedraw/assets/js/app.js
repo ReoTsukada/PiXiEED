@@ -4310,6 +4310,9 @@
   const MOVE_PAD_REPEAT_INTERVAL_MS = 80;
   const SELECTION_TRANSFORM_ROTATION_STEP_DEG = 15;
   const SELECTION_TRANSFORM_DRAG_THRESHOLD_PX = 6;
+  const SELECTION_TRANSFORM_MODE_DEADZONE_PX = 2;
+  const SELECTION_TRANSFORM_MODE_DEADZONE_CELLS = 0.5;
+  const SELECTION_TRANSFORM_MODE_DIRECTION_BIAS = 1.15;
   const SELECTION_TRANSFORM_HANDLE_HIT_RADIUS_PX = 7;
   const SELECTION_TRANSFORM_HANDLE_DRAW_RADIUS_PX = 7;
   const SELECTION_TRANSFORM_PREVIEW_CACHE_MAX_PIXELS = 131072;
@@ -6014,6 +6017,7 @@
       lastSelectionMove: null,
       drawPaletteIndex: null,
       selectionClearedOnDown: false,
+      selectionRestartedOnDown: false,
       selectionExtendOnDown: false,
       startClient: null,
       voxelPreviewYawStart: null,
@@ -45500,6 +45504,7 @@
       ? normalizePaletteIndex(drawPaletteIndex, state.activePaletteIndex)
       : null;
     pointerState.selectionClearedOnDown = false;
+    pointerState.selectionRestartedOnDown = false;
     pointerState.curveHandle = null;
 
     if (HISTORY_DRAW_TOOLS.has(sessionTool)) {
@@ -52028,16 +52033,16 @@
     if (!(stack instanceof HTMLElement) || !(drawing instanceof HTMLCanvasElement)) {
       return null;
     }
-    const stackRect = stack.getBoundingClientRect();
-    const drawingRect = drawing.getBoundingClientRect();
-    if (stackRect.width <= 0 || stackRect.height <= 0 || drawingRect.width <= 0 || drawingRect.height <= 0) {
+    const width = parseLocalViewportCanvasAxis(drawing.style.width, drawing.offsetWidth);
+    const height = parseLocalViewportCanvasAxis(drawing.style.height, drawing.offsetHeight);
+    if (!(width > 0) || !(height > 0)) {
       return null;
     }
     return {
-      left: drawingRect.left - stackRect.left,
-      top: drawingRect.top - stackRect.top,
-      width: drawingRect.width,
-      height: drawingRect.height,
+      left: 0,
+      top: 0,
+      width,
+      height,
     };
   }
 
@@ -53567,6 +53572,7 @@
     pointerState.selectionMove = null;
     pointerState.drawPaletteIndex = null;
     pointerState.selectionClearedOnDown = false;
+    pointerState.selectionRestartedOnDown = false;
     pointerState.selectionExtendOnDown = false;
     pointerState.startClient = null;
     pointerState.voxelPreviewYawStart = null;
@@ -54432,6 +54438,7 @@
     ) {
       clearSelection();
       pointerState.selectionClearedOnDown = true;
+      pointerState.selectionRestartedOnDown = true;
     }
     if (
       activeTool === 'selectRect'
@@ -54441,6 +54448,7 @@
     ) {
       clearSelection();
       pointerState.selectionClearedOnDown = true;
+      pointerState.selectionRestartedOnDown = true;
     }
 
     if (activeTool === 'curve') {
@@ -54873,7 +54881,7 @@
           }
         );
       } else if (
-        !(pointerState.selectionClearedOnDown && pointerState.path.length <= 1)
+        !(!pointerState.selectionRestartedOnDown && pointerState.selectionClearedOnDown && pointerState.path.length <= 1)
         && pointerState.start
         && pointerState.current
         && (
@@ -54888,7 +54896,7 @@
       }
     } else if (tool === 'selectLasso') {
       const pointCount = pointerState.selectionPreview?.points?.length || 0;
-      if (!(pointerState.selectionClearedOnDown && pointCount <= 1)) {
+      if (!(!pointerState.selectionRestartedOnDown && pointerState.selectionClearedOnDown && pointCount <= 1)) {
         createSelectionLasso(pointerState.selectionPreview.points, {
           append: pointerState.selectionExtendOnDown,
         });
@@ -55716,59 +55724,19 @@
     return color ? [color.r, color.g, color.b, color.a] : [0, 0, 0, 0];
   }
 
-  function sampleMoveStateBilinearRgba(moveState, sourceX, sourceY, sourceMask) {
+  function sampleMoveStateNearestRgba(moveState, sourceX, sourceY, sourceMask) {
     const width = Math.max(0, Math.floor(Number(moveState?.width) || 0));
     const height = Math.max(0, Math.floor(Number(moveState?.height) || 0));
     if (width <= 0 || height <= 0 || sourceX < 0 || sourceY < 0 || sourceX >= width || sourceY >= height) {
       return [0, 0, 0, 0];
     }
-    const x0 = clamp(Math.floor(sourceX), 0, width - 1);
-    const y0 = clamp(Math.floor(sourceY), 0, height - 1);
-    const x1 = clamp(x0 + 1, 0, width - 1);
-    const y1 = clamp(y0 + 1, 0, height - 1);
-    const tx = clamp(sourceX - x0, 0, 1);
-    const ty = clamp(sourceY - y0, 0, 1);
-    const samples = [
-      { x: x0, y: y0, w: (1 - tx) * (1 - ty) },
-      { x: x1, y: y0, w: tx * (1 - ty) },
-      { x: x0, y: y1, w: (1 - tx) * ty },
-      { x: x1, y: y1, w: tx * ty },
-    ];
-    let alphaWeight = 0;
-    let r = 0;
-    let g = 0;
-    let b = 0;
-    let a = 0;
-    for (let i = 0; i < samples.length; i += 1) {
-      const sample = samples[i];
-      if (sample.w <= 0) {
-        continue;
-      }
-      const index = (sample.y * width) + sample.x;
-      if (sourceMask instanceof Uint8Array && sourceMask[index] !== 1) {
-        continue;
-      }
-      const rgba = getMoveStateSourceRgba(moveState, index);
-      const alpha = clamp(Number(rgba[3]) || 0, 0, 255);
-      if (alpha <= 0) {
-        continue;
-      }
-      const weightedAlpha = sample.w * alpha;
-      alphaWeight += weightedAlpha;
-      r += (Number(rgba[0]) || 0) * weightedAlpha;
-      g += (Number(rgba[1]) || 0) * weightedAlpha;
-      b += (Number(rgba[2]) || 0) * weightedAlpha;
-      a += weightedAlpha;
-    }
-    if (alphaWeight <= 0) {
+    const x = clamp(Math.floor(sourceX), 0, width - 1);
+    const y = clamp(Math.floor(sourceY), 0, height - 1);
+    const index = (y * width) + x;
+    if (sourceMask instanceof Uint8Array && sourceMask[index] !== 1) {
       return [0, 0, 0, 0];
     }
-    return [
-      clamp(Math.round(r / alphaWeight), 0, 255),
-      clamp(Math.round(g / alphaWeight), 0, 255),
-      clamp(Math.round(b / alphaWeight), 0, 255),
-      clamp(Math.round(a), 0, 255),
-    ];
+    return getMoveStateSourceRgba(moveState, index);
   }
 
   function buildSelectionMoveResampledEntries(moveState, sourceMask, transform, key) {
@@ -55848,7 +55816,7 @@
         const localX = x - bounds.x0;
         const localY = y - bounds.y0;
         const localIndex = (localY * outputWidth) + localX;
-        const rgba = sampleMoveStateBilinearRgba(moveState, sourcePoint.x, sourcePoint.y, sourceMask);
+        const rgba = sampleMoveStateNearestRgba(moveState, sourcePoint.x, sourcePoint.y, sourceMask);
         transformedMask[localIndex] = 1;
         entries.push({
           x,
@@ -58837,22 +58805,68 @@
     return { x: dx, y: dy };
   }
 
-  function resolveSelectionTransformInteractionMode(interaction, raw, center) {
+  function resolveSelectionTransformInteractionMode(interaction, raw, center, event = null) {
     if (!interaction || !raw || !center) {
       return 'rotate';
     }
     if (interaction.mode === 'rotate' || interaction.mode === 'resize') {
       return interaction.mode;
     }
-    const currentDistance = Math.hypot(raw.x - center.x, raw.y - center.y);
-    const radialDelta = Math.abs(currentDistance - (Number(interaction.startDistance) || 0));
-    const angleDelta = Math.abs(normalizeSignedAngleDeg(
-      (Math.atan2(raw.y - center.y, raw.x - center.x) * 180 / Math.PI)
-      - (Number(interaction.startAngleDeg) || 0)
-    ));
-    const angularPixels = currentDistance * Math.sin(Math.min(Math.PI / 2, angleDelta * Math.PI / 180));
-    if (radialDelta >= SELECTION_TRANSFORM_DRAG_THRESHOLD_PX || angularPixels >= SELECTION_TRANSFORM_DRAG_THRESHOLD_PX) {
-      interaction.mode = angularPixels > radialDelta * 1.25 ? 'rotate' : 'resize';
+    let radialDelta = 0;
+    let angularPixels = 0;
+    let deadzone = SELECTION_TRANSFORM_MODE_DEADZONE_CELLS;
+    let useDirectionalProjection = false;
+    let resizeProjection = 0;
+    let rotateProjection = 0;
+    const metrics = event ? getCanvasScreenMetrics() : null;
+    if (metrics && Number.isFinite(event.clientX) && Number.isFinite(event.clientY)) {
+      const unitX = metrics.width / Math.max(1, Number(state.width) || 1);
+      const unitY = metrics.height / Math.max(1, Number(state.height) || 1);
+      const centerClientX = metrics.viewportRect.left + metrics.left + ((Number(center.x) || 0) * unitX);
+      const centerClientY = metrics.viewportRect.top + metrics.top + ((Number(center.y) || 0) * unitY);
+      const startDx = (Number(interaction.startClientX) || 0) - centerClientX;
+      const startDy = (Number(interaction.startClientY) || 0) - centerClientY;
+      const currentDx = event.clientX - centerClientX;
+      const currentDy = event.clientY - centerClientY;
+      const startDistance = Math.hypot(startDx, startDy);
+      const currentDistance = Math.hypot(currentDx, currentDy);
+      radialDelta = Math.abs(currentDistance - startDistance);
+      const angleDelta = Math.abs(normalizeSignedAngleDeg(
+        (Math.atan2(currentDy, currentDx) * 180 / Math.PI)
+        - (Math.atan2(startDy, startDx) * 180 / Math.PI)
+      ));
+      angularPixels = currentDistance * Math.sin(Math.min(Math.PI / 2, angleDelta * Math.PI / 180));
+      if (startDistance > 0.001) {
+        const resizeUnitX = startDx / startDistance;
+        const resizeUnitY = startDy / startDistance;
+        const rotateUnitX = -resizeUnitY;
+        const rotateUnitY = resizeUnitX;
+        const deltaX = event.clientX - (Number(interaction.startClientX) || 0);
+        const deltaY = event.clientY - (Number(interaction.startClientY) || 0);
+        resizeProjection = Math.abs((deltaX * resizeUnitX) + (deltaY * resizeUnitY));
+        rotateProjection = Math.abs((deltaX * rotateUnitX) + (deltaY * rotateUnitY));
+        radialDelta = resizeProjection;
+        angularPixels = rotateProjection;
+        useDirectionalProjection = true;
+      }
+      deadzone = SELECTION_TRANSFORM_MODE_DEADZONE_PX;
+    } else {
+      const currentDistance = Math.hypot(raw.x - center.x, raw.y - center.y);
+      radialDelta = Math.abs(currentDistance - (Number(interaction.startDistance) || 0));
+      const angleDelta = Math.abs(normalizeSignedAngleDeg(
+        (Math.atan2(raw.y - center.y, raw.x - center.x) * 180 / Math.PI)
+        - (Number(interaction.startAngleDeg) || 0)
+      ));
+      angularPixels = currentDistance * Math.sin(Math.min(Math.PI / 2, angleDelta * Math.PI / 180));
+    }
+    if (radialDelta >= deadzone || angularPixels >= deadzone) {
+      if (useDirectionalProjection) {
+        interaction.mode = rotateProjection > resizeProjection * SELECTION_TRANSFORM_MODE_DIRECTION_BIAS
+          ? 'rotate'
+          : 'resize';
+      } else {
+        interaction.mode = angularPixels > radialDelta * 1.25 ? 'rotate' : 'resize';
+      }
     }
     return interaction.mode;
   }
@@ -58899,7 +58913,7 @@
     const center = getSelectionMoveTransformCenter(moveState);
     if (raw && center) {
       const angleDeg = Math.atan2(raw.y - center.y, raw.x - center.x) * 180 / Math.PI;
-      const mode = event.altKey ? 'rotate' : resolveSelectionTransformInteractionMode(interaction, raw, center);
+      const mode = event.altKey ? 'rotate' : resolveSelectionTransformInteractionMode(interaction, raw, center, event);
       if (mode === 'resize') {
         if (updateSelectionTransformResizeFromPointer(moveState, interaction, raw, center, event)) {
           requestOverlayRender();
@@ -61739,6 +61753,22 @@
       },
       lineTo(x, y) {
         commands.push(`L${format(x)} ${format(y)}`);
+      },
+      rect(x, y, width, height) {
+        const x0 = Number(x) || 0;
+        const y0 = Number(y) || 0;
+        const x1 = x0 + (Number(width) || 0);
+        const y1 = y0 + (Number(height) || 0);
+        commands.push(
+          `M${format(x0)} ${format(y0)}`,
+          `L${format(x1)} ${format(y0)}`,
+          `L${format(x1)} ${format(y1)}`,
+          `L${format(x0)} ${format(y1)}`,
+          'Z'
+        );
+      },
+      closePath() {
+        commands.push('Z');
       },
       toString() {
         return commands.join(' ');
