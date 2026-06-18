@@ -1101,6 +1101,9 @@
 
   let selectionDisplayScale = MIN_ZOOM_SCALE;
   let selectionRenderScale = MIN_ZOOM_SCALE;
+  let selectionOutlineSvg = null;
+  let selectionOutlinePathDark = null;
+  let selectionOutlinePathLight = null;
 
   if (ctx.drawing) {
     ctx.drawing.imageSmoothingEnabled = false;
@@ -3895,7 +3898,6 @@
   let voxelExtensionState = normalizeVoxelExtensionState(null, VOXEL_EXTENSION_DEFAULT_STATE);
   let voxelExtensionRestoreSnapshot = null;
   let localViewportCanvasLayoutResetPending = true;
-  let viewportCanvasVisibilityRecoveryActive = false;
   const localViewportCanvasEntries = [];
   const canvasSurfacePanelDragState = {
     pointerId: null,
@@ -34442,7 +34444,6 @@
     };
   }
 
-  // Keep the entire canvas visible when the zoom level is at the minimum (100%).
   function getMainCanvasViewportElement() {
     if (dom.canvasViewport instanceof HTMLElement) {
       return dom.canvasViewport;
@@ -34453,42 +34454,6 @@
     return activeCanvasSurface?.body instanceof HTMLElement ? activeCanvasSurface.body : null;
   }
 
-  function clampPanToViewportAtMinZoom() {
-    if (getProjectCanvasCount() > 1) {
-      return;
-    }
-    const viewport = getMainCanvasViewportElement();
-    const stack = mainViewportCanvasSurface.stack || dom.canvases.stack;
-    const scale = Number(state.scale) || getViewportZoomBaseScale();
-    if (!viewport || !stack) return;
-    if (Math.abs(getZoomRatioForScale(scale) - MIN_ZOOM_RATIO) > ZOOM_EPSILON) return;
-    const viewportRect = viewport.getBoundingClientRect();
-    const stackRect = stack.getBoundingClientRect();
-    if (viewportRect.width <= 0 || viewportRect.height <= 0 || stackRect.width <= 0 || stackRect.height <= 0) {
-      return;
-    }
-    let panAdjusted = false;
-    if (stackRect.width <= viewportRect.width) {
-      const horizontalLimit = (viewportRect.width - stackRect.width) / 2;
-      const clampedX = clamp(Number(state.pan.x) || 0, -horizontalLimit, horizontalLimit);
-      if (clampedX !== state.pan.x) {
-        state.pan.x = clampedX;
-        panAdjusted = true;
-      }
-    }
-    if (stackRect.height <= viewportRect.height) {
-      const verticalLimit = (viewportRect.height - stackRect.height) / 2;
-      const clampedY = clamp(Number(state.pan.y) || 0, -verticalLimit, verticalLimit);
-      if (clampedY !== state.pan.y) {
-        state.pan.y = clampedY;
-        panAdjusted = true;
-      }
-    }
-    if (panAdjusted) {
-      scheduleSessionPersist({ includeSnapshots: false });
-    }
-  }
-
   function getViewportVisibilityTargetSurface() {
     if (activeCanvasSurface?.panel instanceof HTMLElement) {
       return activeCanvasSurface;
@@ -34496,27 +34461,34 @@
     return mainViewportCanvasSurface;
   }
 
-  function getMinimumVisibleViewportCanvasPixels(targetSize, viewportSize) {
-    const safeTargetSize = Math.max(1, Number(targetSize) || 1);
-    const safeViewportSize = Math.max(1, Number(viewportSize) || 1);
-    return Math.max(
-      1,
-      Math.round(Math.min(
-        safeTargetSize,
-        safeViewportSize,
-        Math.max(24, safeViewportSize * 0.08)
-      ))
-    );
+  function getViewportPanelBoundsRect() {
+    const panels = getProjectCanvasSurfaceEntries()
+      .map(surface => (surface?.panel instanceof HTMLElement ? surface.panel : null))
+      .filter(panel => panel instanceof HTMLElement);
+    if (!panels.length) {
+      return null;
+    }
+    let left = Number.POSITIVE_INFINITY;
+    let top = Number.POSITIVE_INFINITY;
+    let right = Number.NEGATIVE_INFINITY;
+    let bottom = Number.NEGATIVE_INFINITY;
+    panels.forEach(panel => {
+      const rect = panel.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) {
+        return;
+      }
+      left = Math.min(left, rect.left);
+      top = Math.min(top, rect.top);
+      right = Math.max(right, rect.right);
+      bottom = Math.max(bottom, rect.bottom);
+    });
+    if (![left, top, right, bottom].every(Number.isFinite) || right <= left || bottom <= top) {
+      return null;
+    }
+    return { left, top, right, bottom, width: right - left, height: bottom - top };
   }
 
-  function clampPanToKeepVisibleCanvas() {
-    if (isMultiCanvasWorldLayoutActive()) {
-      return { clampedX: false, clampedY: false };
-    }
-    const viewport = dom.canvasViewport;
-    if (!(viewport instanceof HTMLElement)) {
-      return { clampedX: false, clampedY: false };
-    }
+  function getPrimaryViewportCanvasRect() {
     const targetSurface = getViewportVisibilityTargetSurface();
     const targetElement = targetSurface?.stack instanceof HTMLElement
       ? targetSurface.stack
@@ -34524,31 +34496,30 @@
         ? targetSurface.drawing
         : (targetSurface?.panel instanceof HTMLElement ? targetSurface.panel : null));
     if (!(targetElement instanceof HTMLElement)) {
-      return { clampedX: false, clampedY: false };
+      return null;
     }
-    const viewportRect = viewport.getBoundingClientRect();
-    const targetRect = targetElement.getBoundingClientRect();
-    if (
-      viewportRect.width <= 0
-      || viewportRect.height <= 0
-      || targetRect.width <= 0
-      || targetRect.height <= 0
-    ) {
+    const rect = targetElement.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) {
+      return null;
+    }
+    return rect;
+  }
+
+  function clampPanToKeepRectIntersectingViewport(targetRect, viewportRect) {
+    if (!targetRect || !viewportRect) {
       return { clampedX: false, clampedY: false };
     }
     let nextPanX = Math.round(Number(state.pan.x) || 0);
     let nextPanY = Math.round(Number(state.pan.y) || 0);
-    const minVisibleX = getMinimumVisibleViewportCanvasPixels(targetRect.width, viewportRect.width);
-    const minVisibleY = getMinimumVisibleViewportCanvasPixels(targetRect.height, viewportRect.height);
-    if (targetRect.right < viewportRect.left + minVisibleX) {
-      nextPanX += Math.round((viewportRect.left + minVisibleX) - targetRect.right);
-    } else if (targetRect.left > viewportRect.right - minVisibleX) {
-      nextPanX -= Math.round(targetRect.left - (viewportRect.right - minVisibleX));
+    if (targetRect.right <= viewportRect.left) {
+      nextPanX += Math.round(viewportRect.left - targetRect.right + 1);
+    } else if (targetRect.left >= viewportRect.right) {
+      nextPanX -= Math.round(targetRect.left - viewportRect.right + 1);
     }
-    if (targetRect.bottom < viewportRect.top + minVisibleY) {
-      nextPanY += Math.round((viewportRect.top + minVisibleY) - targetRect.bottom);
-    } else if (targetRect.top > viewportRect.bottom - minVisibleY) {
-      nextPanY -= Math.round(targetRect.top - (viewportRect.bottom - minVisibleY));
+    if (targetRect.bottom <= viewportRect.top) {
+      nextPanY += Math.round(viewportRect.top - targetRect.bottom + 1);
+    } else if (targetRect.top >= viewportRect.bottom) {
+      nextPanY -= Math.round(targetRect.top - viewportRect.bottom + 1);
     }
     const clampedX = nextPanX !== Math.round(Number(state.pan.x) || 0);
     const clampedY = nextPanY !== Math.round(Number(state.pan.y) || 0);
@@ -34561,61 +34532,23 @@
     return { clampedX, clampedY };
   }
 
-  function isProjectCanvasPanelVisibleInViewport(panel, viewportRect) {
-    if (!(panel instanceof HTMLElement) || !viewportRect) {
-      return false;
-    }
-    const rect = panel.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) {
-      return false;
-    }
-    const minVisibleX = 8;
-    const minVisibleY = 8;
-    return (
-      rect.right > viewportRect.left + minVisibleX
-      && rect.left < viewportRect.right - minVisibleX
-      && rect.bottom > viewportRect.top + minVisibleY
-      && rect.top < viewportRect.bottom - minVisibleY
-    );
-  }
-
-  function ensureProjectCanvasVisibleInViewport({ persist = false } = {}) {
-    if (isMultiCanvasWorldLayoutActive()) {
-      return false;
-    }
-    if (viewportCanvasVisibilityRecoveryActive) {
-      return false;
-    }
+  function clampPanToKeepAnyCanvasVisible() {
     const viewport = dom.canvasViewport;
     if (!(viewport instanceof HTMLElement)) {
-      return false;
+      return { clampedX: false, clampedY: false };
     }
     const viewportRect = viewport.getBoundingClientRect();
     if (viewportRect.width <= 0 || viewportRect.height <= 0) {
-      return false;
+      return { clampedX: false, clampedY: false };
     }
-    const surfaces = getProjectCanvasSurfaceEntries().filter(surface => surface?.panel instanceof HTMLElement);
-    if (!surfaces.length) {
-      return false;
+    if (!isMultiCanvasWorldLayoutActive()) {
+      return clampPanToKeepRectIntersectingViewport(getPrimaryViewportCanvasRect(), viewportRect);
     }
-    const hasVisibleSurface = surfaces.some(surface => isProjectCanvasPanelVisibleInViewport(surface.panel, viewportRect));
-    if (hasVisibleSurface) {
-      return false;
+    const panelBounds = getViewportPanelBoundsRect();
+    if (!panelBounds || panelBounds.width <= 0 || panelBounds.height <= 0) {
+      return { clampedX: false, clampedY: false };
     }
-    viewportCanvasVisibilityRecoveryActive = true;
-    try {
-      state.pan.x = 0;
-      state.pan.y = 0;
-      requestLocalViewportCanvasLayoutReset({ clearStored: true });
-      syncLocalViewportCanvasDockLayout();
-      applyViewportTransform();
-      if (persist) {
-        scheduleSessionPersist({ includeSnapshots: false });
-      }
-      return true;
-    } finally {
-      viewportCanvasVisibilityRecoveryActive = false;
-    }
+    return clampPanToKeepRectIntersectingViewport(panelBounds, viewportRect);
   }
 
   function centerProjectCanvasInViewport({ persist = false } = {}) {
@@ -34708,7 +34641,7 @@
       state.pan.y = panY;
     }
     dom.viewportWorkspace.style.transform = `translate(${panX}px, ${panY}px)`;
-    const clampResult = clampPanToKeepVisibleCanvas();
+    const clampResult = clampPanToKeepAnyCanvasVisible();
     if (clampResult?.clampedX || clampResult?.clampedY) {
       dom.viewportWorkspace.style.transform = `translate(${Math.round(Number(state.pan.x) || 0)}px, ${Math.round(Number(state.pan.y) || 0)}px)`;
     }
@@ -49136,6 +49069,32 @@
     };
   }
 
+  function getViewportPanelZoomFocus(focus, displayScale = getPixelAlignedCanvasDisplayScale(state.scale)) {
+    if (!focus) {
+      return null;
+    }
+    const surface = focus.surface
+      ? getResolvedCanvasInteractionSurface(focus.surface)
+      : (focus.canvasDocId ? getProjectCanvasSurfaceByCanvasId(focus.canvasDocId) : getViewportVisibilityTargetSurface());
+    const panel = surface?.panel instanceof HTMLElement ? surface.panel : null;
+    if (!(panel instanceof HTMLElement)) {
+      return null;
+    }
+    const anchorLeft = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorLeft, 0) || 0;
+    const anchorTop = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorTop, 0) || 0;
+    const panelLeft = parseLocalViewportCanvasAxis(panel.style.left, panel.offsetLeft) || 0;
+    const panelTop = parseLocalViewportCanvasAxis(panel.style.top, panel.offsetTop) || 0;
+    const safeScale = Math.max(Number(displayScale) || MIN_ZOOM_SCALE, Number.EPSILON);
+    return {
+      clientX: Number.isFinite(focus.clientX) ? Number(focus.clientX) : null,
+      clientY: Number.isFinite(focus.clientY) ? Number(focus.clientY) : null,
+      worldX: ((panelLeft - anchorLeft) / safeScale) + (Number(focus.worldX) || 0),
+      worldY: ((panelTop - anchorTop) / safeScale) + (Number(focus.worldY) || 0),
+      anchorLeft,
+      anchorTop,
+    };
+  }
+
   function syncLocalViewportCanvasDockLayout() {
     const workspace = dom.viewportWorkspace;
     if (!(workspace instanceof HTMLElement)) {
@@ -49404,6 +49363,16 @@
       renderProjectCanvasSurface(surface, canvasDoc);
     });
     syncMultiCanvasSelectionUi();
+  }
+
+  function syncAllProjectCanvasSurfaceDimensions() {
+    const documents = getProjectCanvasDocuments();
+    getProjectCanvasSurfaceEntries().forEach((surface, index) => {
+      const canvasDoc = documents[index] || null;
+      if (surface && canvasDoc) {
+        syncProjectCanvasSurfaceDimensions(surface, canvasDoc);
+      }
+    });
   }
 
   function renderInactiveProjectCanvasSurfaces() {
@@ -52034,22 +52003,39 @@
       && lockedCanvasHeight === null;
   }
 
+  function syncCanvasResizeOverlayHost() {
+    const stack = activeCanvasSurface?.stack instanceof HTMLElement
+      ? activeCanvasSurface.stack
+      : dom.canvases.stack;
+    if (!(stack instanceof HTMLElement)) {
+      return false;
+    }
+    [dom.canvasResizePreview, dom.canvasResizeHandleStart, dom.canvasResizeHandleCorner].forEach(element => {
+      if (element instanceof HTMLElement && element.parentElement !== stack) {
+        stack.appendChild(element);
+      }
+    });
+    return true;
+  }
+
   function getCanvasResizeOverlayMetrics() {
-    const overlayHost = dom.viewportWorkspace;
     const drawing = activeCanvasSurface?.drawing instanceof HTMLCanvasElement
       ? activeCanvasSurface.drawing
       : dom.canvases.drawing;
-    if (!(overlayHost instanceof HTMLElement) || !(drawing instanceof HTMLCanvasElement)) {
+    const stack = activeCanvasSurface?.stack instanceof HTMLElement
+      ? activeCanvasSurface.stack
+      : dom.canvases.stack;
+    if (!(stack instanceof HTMLElement) || !(drawing instanceof HTMLCanvasElement)) {
       return null;
     }
-    const hostRect = overlayHost.getBoundingClientRect();
+    const stackRect = stack.getBoundingClientRect();
     const drawingRect = drawing.getBoundingClientRect();
-    if (hostRect.width <= 0 || hostRect.height <= 0 || drawingRect.width <= 0 || drawingRect.height <= 0) {
+    if (stackRect.width <= 0 || stackRect.height <= 0 || drawingRect.width <= 0 || drawingRect.height <= 0) {
       return null;
     }
     return {
-      left: drawingRect.left - hostRect.left,
-      top: drawingRect.top - hostRect.top,
+      left: drawingRect.left - stackRect.left,
+      top: drawingRect.top - stackRect.top,
       width: drawingRect.width,
       height: drawingRect.height,
     };
@@ -52068,6 +52054,7 @@
   }
 
   function syncCanvasResizeHandleVisibility() {
+    syncCanvasResizeOverlayHost();
     const handles = [dom.canvasResizeHandleStart, dom.canvasResizeHandleCorner];
     const preview = dom.canvasResizePreview;
     const enabled = canUseCanvasResizeHandle({ ignoreLocalInteraction: true });
@@ -52098,6 +52085,7 @@
   }
 
   function updateCanvasResizeHandlePosition() {
+    syncCanvasResizeOverlayHost();
     const metrics = getCanvasResizeOverlayMetrics();
     const startHandle = dom.canvasResizeHandleStart;
     const endHandle = dom.canvasResizeHandleCorner;
@@ -52238,6 +52226,7 @@
     }
     event.preventDefault();
     event.stopPropagation();
+    syncCanvasResizeOverlayHost();
     canvasResizeHandleState.pointerId = event.pointerId ?? -1;
     canvasResizeHandleState.handle = handle;
     canvasResizeHandleState.anchor = handle.dataset.resizeAnchor === 'start' ? 'start' : 'end';
@@ -53076,6 +53065,8 @@
     if (!zoomFocus && state.showVirtualCursor) {
       zoomFocus = getVirtualCursorZoomFocus();
     }
+    const multiCanvasWorldLayoutActive = isMultiCanvasWorldLayoutActive();
+    const viewportPanelFocus = getViewportPanelZoomFocus(zoomFocus, prevDisplayScale);
 
     state.scale = targetScale;
     rememberViewportZoomRatioFromScale(targetScale);
@@ -53089,6 +53080,10 @@
       syncLocalViewportDock: false,
       resizeVirtualCursor: false,
     });
+    if (multiCanvasWorldLayoutActive) {
+      syncAllProjectCanvasSurfaceDimensions();
+      syncLocalViewportCanvasDockLayout();
+    }
 
     const focusSurface = zoomFocus?.surface
       ? getResolvedCanvasInteractionSurface(zoomFocus.surface)
@@ -53096,7 +53091,24 @@
     const focusDrawing = focusSurface?.drawing instanceof HTMLCanvasElement
       ? focusSurface.drawing
       : dom.canvases.drawing;
-    if (zoomFocus && focusDrawing instanceof HTMLCanvasElement) {
+    if (
+      viewportPanelFocus
+      && Number.isFinite(viewportPanelFocus.clientX)
+      && Number.isFinite(viewportPanelFocus.clientY)
+      && dom.viewportWorkspace instanceof HTMLElement
+    ) {
+      const workspaceRectAfterResize = dom.viewportWorkspace.getBoundingClientRect();
+      state.pan.x = Math.round(
+        previousPan.x
+        + viewportPanelFocus.clientX
+        - (workspaceRectAfterResize.left + viewportPanelFocus.anchorLeft + (viewportPanelFocus.worldX * targetDisplayScale))
+      );
+      state.pan.y = Math.round(
+        previousPan.y
+        + viewportPanelFocus.clientY
+        - (workspaceRectAfterResize.top + viewportPanelFocus.anchorTop + (viewportPanelFocus.worldY * targetDisplayScale))
+      );
+    } else if (zoomFocus && focusDrawing instanceof HTMLCanvasElement) {
       const drawingRectAfterResize = focusDrawing.getBoundingClientRect();
       const focusClientX = Number.isFinite(zoomFocus.clientX)
         ? Number(zoomFocus.clientX)
@@ -53123,9 +53135,16 @@
       && Number.isFinite(zoomFocus.clientY)
       && focusDrawing instanceof HTMLCanvasElement
     ) {
-      const drawingRectNow = focusDrawing.getBoundingClientRect();
-      const currentClientX = drawingRectNow.left + (zoomFocus.worldX * targetDisplayScale);
-      const currentClientY = drawingRectNow.top + (zoomFocus.worldY * targetDisplayScale);
+      const worldRectNow = viewportPanelFocus && dom.viewportWorkspace instanceof HTMLElement
+        ? dom.viewportWorkspace.getBoundingClientRect()
+        : null;
+      const drawingRectNow = worldRectNow ? null : focusDrawing.getBoundingClientRect();
+      const currentClientX = worldRectNow
+        ? worldRectNow.left + viewportPanelFocus.anchorLeft + (viewportPanelFocus.worldX * targetDisplayScale)
+        : drawingRectNow.left + (zoomFocus.worldX * targetDisplayScale);
+      const currentClientY = worldRectNow
+        ? worldRectNow.top + viewportPanelFocus.anchorTop + (viewportPanelFocus.worldY * targetDisplayScale)
+        : drawingRectNow.top + (zoomFocus.worldY * targetDisplayScale);
       const anchorErrorX = (Number(zoomFocus.clientX) || 0) - currentClientX;
       const anchorErrorY = (Number(zoomFocus.clientY) || 0) - currentClientY;
       const correctionX = !clampResult?.clampedX && Math.abs(anchorErrorX) >= 0.5 ? anchorErrorX : 0;
@@ -53797,7 +53816,11 @@
     if (!nextCentroid) {
       return null;
     }
-    const focus = getCanvasFocusAt(nextCentroid.x, nextCentroid.y, { clampToCanvas: true });
+    let surface = null;
+    if (isMultiCanvasWorldLayoutActive() && typeof document.elementFromPoint === 'function') {
+      surface = getCanvasInteractionSurfaceFromTarget(document.elementFromPoint(nextCentroid.x, nextCentroid.y));
+    }
+    const focus = getCanvasFocusAt(nextCentroid.x, nextCentroid.y, { clampToCanvas: true, surface });
     if (!focus) {
       return null;
     }
@@ -60894,6 +60917,7 @@
         const clearHeight = selectionCanvas ? selectionCanvas.height : height;
         ctx.selection.clearRect(0, 0, clearWidth, clearHeight);
       }
+      clearSelectionOutlineSvg();
       return;
     }
     const now = Number.isFinite(timestamp) ? timestamp : performance.now();
@@ -60937,6 +60961,7 @@
       updateSelectionDashAnimation(now);
     } else {
       resetSelectionDashAnimation();
+      clearSelectionOutlineSvg();
     }
     if (moveState && moveState.hasCleared) {
       drawSelectionMovePreview(moveState);
@@ -61663,6 +61688,64 @@
     lastSelectionDashTime = 0;
   }
 
+  function getSelectionOutlineSvg() {
+    const stack = activeCanvasSurface?.stack instanceof HTMLElement
+      ? activeCanvasSurface.stack
+      : dom.canvases.stack;
+    if (!(stack instanceof HTMLElement)) {
+      return null;
+    }
+    if (!(selectionOutlineSvg instanceof SVGSVGElement)) {
+      selectionOutlineSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      selectionOutlineSvg.classList.add('selection-outline-svg');
+      selectionOutlineSvg.setAttribute('aria-hidden', 'true');
+      selectionOutlineSvg.setAttribute('focusable', 'false');
+      selectionOutlinePathDark = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      selectionOutlinePathLight = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      selectionOutlinePathDark.classList.add('selection-outline-svg__path', 'selection-outline-svg__path--dark');
+      selectionOutlinePathLight.classList.add('selection-outline-svg__path', 'selection-outline-svg__path--light');
+      selectionOutlineSvg.append(selectionOutlinePathDark, selectionOutlinePathLight);
+    }
+    if (selectionOutlineSvg.parentElement !== stack) {
+      stack.appendChild(selectionOutlineSvg);
+    }
+    return selectionOutlineSvg;
+  }
+
+  function clearSelectionOutlineSvg() {
+    if (selectionOutlinePathDark instanceof SVGPathElement) {
+      selectionOutlinePathDark.setAttribute('d', '');
+    }
+    if (selectionOutlinePathLight instanceof SVGPathElement) {
+      selectionOutlinePathLight.setAttribute('d', '');
+    }
+    if (selectionOutlineSvg instanceof SVGSVGElement) {
+      selectionOutlineSvg.classList.add('is-hidden');
+    }
+  }
+
+  function createSvgPathTraceBuilder() {
+    const commands = [];
+    const format = value => {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) {
+        return '0';
+      }
+      return Number(numeric.toFixed(3)).toString();
+    };
+    return {
+      moveTo(x, y) {
+        commands.push(`M${format(x)} ${format(y)}`);
+      },
+      lineTo(x, y) {
+        commands.push(`L${format(x)} ${format(y)}`);
+      },
+      toString() {
+        return commands.join(' ');
+      },
+    };
+  }
+
   function ensureSelectionCanvasResolution(scale) {
     const canvas = dom.canvases.selection;
     if (!canvas) return;
@@ -61699,6 +61782,36 @@
 
   function strokeSelectionPath(trace, options = {}) {
     if (typeof trace !== 'function') return;
+    const svg = getSelectionOutlineSvg();
+    if (
+      svg instanceof SVGSVGElement
+      && selectionOutlinePathDark instanceof SVGPathElement
+      && selectionOutlinePathLight instanceof SVGPathElement
+    ) {
+      const displayScale = getPixelAlignedCanvasDisplayScale(state.scale);
+      const svgWidth = Math.max(1, state.width * displayScale);
+      const svgHeight = Math.max(1, state.height * displayScale);
+      svg.setAttribute('viewBox', `0 0 ${svgWidth} ${svgHeight}`);
+      svg.style.width = `${svgWidth}px`;
+      svg.style.height = `${svgHeight}px`;
+      const pathBuilder = createSvgPathTraceBuilder();
+      trace(pathBuilder, displayScale);
+      const pathData = pathBuilder.toString();
+      const dashPattern = options.dashPattern || [4, 4];
+      const dashCycle = dashPattern.reduce((sum, value) => sum + value, 0) || 8;
+      const dashOffset = ((selectionDashScreenOffset) % dashCycle + dashCycle) % dashCycle;
+      const firstDash = dashPattern[0] || dashCycle;
+      const dashArray = dashPattern.map(value => Math.max(0.001, Number(value) || 0)).join(' ');
+      selectionOutlinePathDark.setAttribute('d', pathData);
+      selectionOutlinePathLight.setAttribute('d', pathData);
+      selectionOutlinePathDark.setAttribute('stroke-dasharray', dashArray);
+      selectionOutlinePathLight.setAttribute('stroke-dasharray', dashArray);
+      selectionOutlinePathDark.setAttribute('stroke-dashoffset', String(dashOffset));
+      selectionOutlinePathLight.setAttribute('stroke-dashoffset', String(dashOffset + firstDash));
+      svg.classList.toggle('is-hidden', !pathData);
+      return;
+    }
+
     const targetCtx = ctx.selection;
     if (!targetCtx || typeof targetCtx.setLineDash !== 'function') {
       return;
