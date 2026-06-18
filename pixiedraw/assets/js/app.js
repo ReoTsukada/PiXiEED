@@ -34510,6 +34510,9 @@
   }
 
   function clampPanToKeepVisibleCanvas() {
+    if (isMultiCanvasWorldLayoutActive()) {
+      return { clampedX: false, clampedY: false };
+    }
     const viewport = dom.canvasViewport;
     if (!(viewport instanceof HTMLElement)) {
       return { clampedX: false, clampedY: false };
@@ -34577,6 +34580,9 @@
   }
 
   function ensureProjectCanvasVisibleInViewport({ persist = false } = {}) {
+    if (isMultiCanvasWorldLayoutActive()) {
+      return false;
+    }
     if (viewportCanvasVisibilityRecoveryActive) {
       return false;
     }
@@ -34613,6 +34619,13 @@
   }
 
   function centerProjectCanvasInViewport({ persist = false } = {}) {
+    if (isMultiCanvasWorldLayoutActive()) {
+      applyViewportTransform();
+      if (persist) {
+        scheduleSessionPersist({ includeSnapshots: false });
+      }
+      return;
+    }
     state.pan.x = 0;
     state.pan.y = 0;
     requestLocalViewportCanvasLayoutReset({ clearStored: true });
@@ -34654,17 +34667,25 @@
     }
     const run = () => {
       openedDocumentViewportResetRaf = null;
-      resetViewportZoomRatio(MIN_ZOOM_RATIO);
-      state.pan.x = 0;
-      state.pan.y = 0;
-      requestLocalViewportCanvasLayoutReset({ clearStored: true });
+      const multiCanvasWorldLayoutActive = isMultiCanvasWorldLayoutActive();
+      if (!multiCanvasWorldLayoutActive) {
+        resetViewportZoomRatio(MIN_ZOOM_RATIO);
+        state.pan.x = 0;
+        state.pan.y = 0;
+        requestLocalViewportCanvasLayoutReset({ clearStored: true });
+      }
       resizeCanvases({
         forceRender: false,
         applyTransform: false,
         syncControls: true,
         updateScaleLimits: false,
       });
-      centerProjectCanvasInViewport({ persist: false });
+      if (multiCanvasWorldLayoutActive) {
+        syncLocalViewportCanvasDockVisibility({ persist: false, render: true });
+        applyViewportTransform();
+      } else {
+        centerProjectCanvasInViewport({ persist: false });
+      }
       requestOverlayRender();
     };
     if (!defer) {
@@ -47538,6 +47559,10 @@
     return count;
   }
 
+  function isMultiCanvasWorldLayoutActive() {
+    return MULTI_CANVAS_FEATURE_ENABLED && getProjectCanvasCount() > 1;
+  }
+
   function setLocalViewportCanvasLayoutAnchor(left, top) {
     const nextState = normalizeLocalViewportCanvasState(
       {
@@ -47635,6 +47660,23 @@
   }
 
   function requestLocalViewportCanvasLayoutReset({ clearStored = true } = {}) {
+    if (isMultiCanvasWorldLayoutActive()) {
+      localViewportCanvasLayoutResetPending = false;
+      if (!clearStored) {
+        return false;
+      }
+      const nextState = normalizeLocalViewportCanvasState(
+        {
+          ...localViewportCanvasState,
+          layoutScale: getCurrentLocalViewportCanvasLayoutScale(),
+          positionsRelative: true,
+        },
+        localViewportCanvasState
+      );
+      const changed = JSON.stringify(nextState) !== JSON.stringify(localViewportCanvasState);
+      localViewportCanvasState = nextState;
+      return changed;
+    }
     localViewportCanvasLayoutResetPending = true;
     if (!clearStored) {
       return false;
@@ -49078,25 +49120,70 @@
     };
   }
 
+  function computeDefaultLocalViewportCanvasWorldPosition(index, anchorLeft = 0, anchorTop = 0) {
+    const safeIndex = Math.max(0, Math.round(Number(index) || 0));
+    const gap = MULTI_CANVAS_SURFACE_GAP;
+    let left = Number(anchorLeft) || 0;
+    for (let canvasIndex = 0; canvasIndex <= safeIndex; canvasIndex += 1) {
+      const canvasDoc = getProjectCanvasDocumentAt(canvasIndex);
+      const displayScale = getProjectCanvasDisplayScale(canvasDoc);
+      left += Math.max(1, Math.round(Number(canvasDoc?.width) || Number(state.width) || 1)) * displayScale;
+      left += gap;
+    }
+    return {
+      left: Math.round(left),
+      top: Math.round(Number(anchorTop) || 0),
+    };
+  }
+
   function syncLocalViewportCanvasDockLayout() {
     const workspace = dom.viewportWorkspace;
     if (!(workspace instanceof HTMLElement)) {
       return;
     }
-    const defaults = computeDefaultLocalViewportCanvasPositions();
     const mainPanel = mainViewportCanvasSurface?.panel instanceof HTMLElement
       ? mainViewportCanvasSurface.panel
       : null;
+    const totalCanvases = Math.max(1, getProjectCanvasCount());
+    const multiCanvasWorldLayoutActive = isMultiCanvasWorldLayoutActive();
+    const useCenteredMainPanel = isMainCanvasPanelCssCentered();
+    workspace.dataset.localCanvasLayout = totalCanvases > 1 ? 'free' : 'single';
+    workspace.style.setProperty('--workspace-canvas-columns', '1');
+    workspace.style.setProperty('--workspace-canvas-rows', '1');
+    if (multiCanvasWorldLayoutActive) {
+      const anchorLeft = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorLeft, 0) || 0;
+      const anchorTop = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorTop, 0) || 0;
+      if (mainPanel) {
+        mainPanel.style.left = `${anchorLeft}px`;
+        mainPanel.style.top = `${anchorTop}px`;
+      }
+      setLocalViewportCanvasLayoutAnchor(anchorLeft, anchorTop);
+      localViewportCanvasEntries.forEach((entry, index) => {
+        if (!(entry.panel instanceof HTMLElement)) {
+          return;
+        }
+        const storedPosition = getDisplayLocalViewportCanvasPosition(index, anchorLeft, anchorTop);
+        const fallbackPosition = computeDefaultLocalViewportCanvasWorldPosition(index, anchorLeft, anchorTop);
+        const left = storedPosition.left ?? fallbackPosition.left;
+        const top = storedPosition.top ?? fallbackPosition.top;
+        entry.panel.style.left = `${left}px`;
+        entry.panel.style.top = `${top}px`;
+        if (
+          storedPosition.left !== left
+          || storedPosition.top !== top
+        ) {
+          setLocalViewportCanvasPosition(index, left, top);
+        }
+      });
+      localViewportCanvasLayoutResetPending = false;
+      return;
+    }
+    const defaults = computeDefaultLocalViewportCanvasPositions();
     const shouldReset = Boolean(localViewportCanvasLayoutResetPending);
     const storedAnchorLeft = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorLeft, null);
     const storedAnchorTop = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorTop, null);
     const anchorLeft = shouldReset ? defaults.main.left : (storedAnchorLeft ?? defaults.main.left);
     const anchorTop = shouldReset ? defaults.main.top : (storedAnchorTop ?? defaults.main.top);
-    const totalCanvases = Math.max(1, getProjectCanvasCount());
-    const useCenteredMainPanel = isMainCanvasPanelCssCentered();
-    workspace.dataset.localCanvasLayout = totalCanvases > 1 ? 'free' : 'single';
-    workspace.style.setProperty('--workspace-canvas-columns', '1');
-    workspace.style.setProperty('--workspace-canvas-rows', '1');
     if (mainPanel) {
       mainPanel.style.left = useCenteredMainPanel ? '0px' : `${anchorLeft}px`;
       mainPanel.style.top = useCenteredMainPanel ? '0px' : `${anchorTop}px`;
