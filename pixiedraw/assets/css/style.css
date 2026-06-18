@@ -2215,7 +2215,7 @@ body.is-startup-active .bottom-timeline-dock {
   border: 1px solid rgba(255, 218, 120, 0.92);
   box-shadow: 0 0 0 1px rgba(18, 10, 2, 0.92) inset;
   pointer-events: none;
-  z-index: 8;
+  z-index: 18;
 }
 
 .canvas-resize-preview.is-hidden {
@@ -2232,7 +2232,7 @@ body.is-startup-active .bottom-timeline-dock {
   pointer-events: auto;
   touch-action: none;
   cursor: nwse-resize;
-  z-index: 9;
+  z-index: 19;
 }
 
 .canvas-resize-handle::before,
@@ -2652,6 +2652,36 @@ body.is-pan-dragging #selectionCanvas {
   left: 0;
   z-index: 3;
   pointer-events: none;
+}
+
+.selection-outline-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.selection-outline-svg.is-hidden {
+  display: none;
+}
+
+.selection-outline-svg__path {
+  fill: none;
+  stroke-width: 1;
+  stroke-linecap: butt;
+  stroke-linejoin: miter;
+  vector-effect: non-scaling-stroke;
+  shape-rendering: geometricPrecision;
+}
+
+.selection-outline-svg__path--dark {
+  stroke: rgba(0, 0, 0, 0.85);
+}
+
+.selection-outline-svg__path--light {
+  stroke: rgba(255, 255, 255, 0.9);
 }
 
 #virtualCursorCanvas {
