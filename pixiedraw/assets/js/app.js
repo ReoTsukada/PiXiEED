@@ -5087,7 +5087,7 @@
     const brushShape = requestedShape === BRUSH_SHAPE_CUSTOM && !customBrush
       ? BRUSH_SHAPE_SQUARE
       : requestedShape;
-    const layers = [createLayer(getDefaultLayerName(1), initialWidth, initialHeight)];
+    const layers = [createLayer(getDefaultLayerName(1), initialWidth, initialHeight, palette)];
     const frames = [createFrame(getDefaultFrameName(1), layers, initialWidth, initialHeight)];
 
     return {
@@ -5149,15 +5149,27 @@
     return { x: centerX, y: centerY };
   }
 
-  function createLayer(name, width, height) {
+  function getLayerCreationPalette(paletteOverride = null) {
+    if (Array.isArray(paletteOverride)) {
+      return paletteOverride;
+    }
+    try {
+      return Array.isArray(state?.palette) ? state.palette : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function createLayer(name, width, height, paletteOverride = null) {
     const size = width * height;
+    const transparentIndex = getTransparentPaletteIndex(getLayerCreationPalette(paletteOverride));
     return {
       id: crypto.randomUUID ? crypto.randomUUID() : `layer-${Math.random().toString(36).slice(2)}`,
       name,
       visible: true,
       opacity: 1,
       blendMode: DEFAULT_LAYER_BLEND_MODE,
-      indices: new Int16Array(size).fill(-1),
+      indices: new Int16Array(size).fill(transparentIndex >= 0 ? transparentIndex : -1),
       direct: null,
       importSourceDirect: null,
     };
@@ -15011,15 +15023,13 @@
           if (isMirrorToolPopoverOpen() && target instanceof Element && isMirrorPopoverPersistentTarget(target)) {
             return;
           }
-          if (!shouldKeepRailPanelsPinned()) {
-            setCompactToolFlyoutOpen(false);
-            updateToolVisibility();
-          }
+          setCompactToolFlyoutOpen(false);
+          updateToolVisibility();
         },
         true
       );
       document.addEventListener('keydown', event => {
-        if (event.key !== 'Escape' || !isCompactToolFlyoutOpen() || shouldKeepRailPanelsPinned()) {
+        if (event.key !== 'Escape' || !isCompactToolFlyoutOpen()) {
           return;
         }
         setCompactToolFlyoutOpen(false);
@@ -19618,7 +19628,7 @@
         return new Int16Array(0);
       }
       const pixelCount = Math.floor(data.length / 4);
-      const indices = new Int16Array(pixelCount).fill(-1);
+      const indices = new Int16Array(pixelCount).fill(resolveTransparentStoragePaletteIndex(palette));
       for (let i = 0; i < pixelCount; i += 1) {
         const base = i * 4;
         const a = data[base + 3];
@@ -36191,15 +36201,7 @@
     if (layoutMode === 'mobilePortrait' || !isCompactToolFlyoutOpen()) {
       return 0;
     }
-    const railRect = getVisibleElementRect(dom.leftRail);
-    const railRight = railRect
-      ? Math.round(railRect.right)
-      : Math.max(0, Math.round(Number(leftWidth) || 0));
-    const flyoutRect = getVisibleElementRect(dom.toolGrid);
-    if (!flyoutRect || flyoutRect.right <= railRight) {
-      return 0;
-    }
-    return clamp(Math.ceil(flyoutRect.right - railRight), 0, getFloatingRailReserveLimit());
+    return 0;
   }
 
   function getActiveCompactRightFlyoutElement() {
@@ -40611,6 +40613,11 @@
     return -1;
   }
 
+  function resolveTransparentStoragePaletteIndex(palette = state.palette) {
+    const transparentIndex = getTransparentPaletteIndex(palette);
+    return transparentIndex >= 0 ? transparentIndex : -1;
+  }
+
   function findNearestPaletteColorIndexByRgba(color, palette = state.palette, fallbackIndex = 0) {
     if (!Array.isArray(palette) || !palette.length) {
       return 0;
@@ -44475,6 +44482,14 @@
       return;
     }
     renderFloatingPreviewPanel();
+    renderInactiveProjectCanvasSurfaces();
+  }
+
+  function refreshInactiveProjectCanvasSurfacesSoon() {
+    if (isLargeDocumentPerformanceMode()) {
+      scheduleSecondaryCanvasRefresh();
+      return;
+    }
     renderInactiveProjectCanvasSurfaces();
   }
 
@@ -49393,7 +49408,7 @@
   }
 
   function renderLocalViewportCanvases() {
-    renderInactiveProjectCanvasSurfaces();
+    refreshInactiveProjectCanvasSurfacesSoon();
   }
 
   function drawVoxelGuideOverlayOnSurface(surface, guide) {
@@ -49590,7 +49605,7 @@
     ensureLocalViewportCanvasEntries();
     syncLocalViewportCanvasDockLayout();
     if (render) {
-      renderInactiveProjectCanvasSurfaces();
+      refreshInactiveProjectCanvasSurfacesSoon();
       renderLocalViewportCanvasOverlays();
     } else {
       syncMultiCanvasSelectionUi();
@@ -52999,7 +53014,9 @@
       zoomSettledViewportRefreshHandle = null;
       updateGridDecorations();
       resizeVirtualCursorCanvas();
-      syncLocalViewportCanvasDockVisibility({ persist: false, render: true });
+      // Zoom changes viewport sizing/placement, but does not change local canvas pixel data.
+      // Skip expensive inactive-canvas re-compositing here and keep the existing surfaces.
+      syncLocalViewportCanvasDockVisibility({ persist: false, render: false });
       updateMirrorGuideHandles();
       updateCanvasResizeHandlePosition();
       syncCanvasResizeHandleVisibility();
@@ -55335,6 +55352,8 @@
     const localContentMask = new Uint8Array(size);
     const localIndices = new Int16Array(size);
     const localDirect = new Uint8ClampedArray(size * 4);
+    const selectedSourceIndices = [];
+    const contentSourceIndices = [];
     const shouldCreatePreviewBitmap = shouldCreateSelectionMoveBitmapPreview(width, height);
     const imageData = shouldCreatePreviewBitmap ? createBlankImageData(width, height) : null;
 
@@ -55395,7 +55414,9 @@
           }
           if (hasContent) {
             localContentMask[localIndex] = 1;
+            contentSourceIndices.push(localIndex);
           }
+          selectedSourceIndices.push(localIndex);
         } else {
           localIndices[localIndex] = -1;
           if (imageData) {
@@ -55423,6 +55444,8 @@
       direct: localDirect,
       imageData,
       previewCanvas,
+      selectedSourceIndices,
+      contentSourceIndices,
       offset: { x: 0, y: 0 },
       hasCleared: false,
       committed: false,
@@ -55453,6 +55476,8 @@
     const localIndices = new Int16Array(size);
     localIndices.fill(-1);
     const localDirect = new Uint8ClampedArray(size * 4);
+    const selectedSourceIndices = [];
+    const contentSourceIndices = [];
     const shouldCreatePreviewBitmap = shouldCreateSelectionMoveBitmapPreview(width, height);
     const localImageData = shouldCreatePreviewBitmap ? createBlankImageData(width, height) : null;
     const sourceData = imageData.data;
@@ -55472,6 +55497,7 @@
         const sourceBase = ((canvasY * imageWidth) + canvasX) * 4;
         const localBase = localIndex * 4;
         localMask[localIndex] = 1;
+        selectedSourceIndices.push(localIndex);
         localDirect[localBase] = sourceData[sourceBase];
         localDirect[localBase + 1] = sourceData[sourceBase + 1];
         localDirect[localBase + 2] = sourceData[sourceBase + 2];
@@ -55484,6 +55510,7 @@
         }
         if (sourceData[sourceBase + 3] > 0) {
           localContentMask[localIndex] = 1;
+          contentSourceIndices.push(localIndex);
         }
       }
     }
@@ -55506,6 +55533,8 @@
       direct: localDirect,
       imageData: localImageData,
       previewCanvas,
+      selectedSourceIndices,
+      contentSourceIndices,
       offset: { x: 0, y: 0 },
       hasCleared: false,
       committed: false,
@@ -55846,6 +55875,19 @@
     };
   }
 
+  function getSelectionMoveSourceIndices(moveState, sourceMask) {
+    if (!moveState || !(sourceMask instanceof Uint8Array)) {
+      return null;
+    }
+    if (sourceMask === moveState.mask && Array.isArray(moveState.selectedSourceIndices)) {
+      return moveState.selectedSourceIndices;
+    }
+    if (sourceMask === moveState.contentMask && Array.isArray(moveState.contentSourceIndices)) {
+      return moveState.contentSourceIndices;
+    }
+    return null;
+  }
+
   function buildSelectionMoveTransformedEntries(moveState, options = {}) {
     const sourceMask = options?.sourceMask instanceof Uint8Array
       ? options.sourceMask
@@ -55900,29 +55942,39 @@
     let maxX = Number.NEGATIVE_INFINITY;
     let maxY = Number.NEGATIVE_INFINITY;
 
-    for (let y = 0; y < sourceHeight; y += 1) {
-      for (let x = 0; x < sourceWidth; x += 1) {
-        const sourceIndex = (y * sourceWidth) + x;
-        if (sourceMask[sourceIndex] !== 1) {
-          continue;
-        }
-        const mapped = transformSelectionMoveLocalPixel(x, y, sourceWidth, sourceHeight, transform);
-        const mapKey = `${mapped.x},${mapped.y}`;
-        const existing = localIndexByKey.get(mapKey);
-        if (Number.isInteger(existing) && existing >= 0) {
-          entries[existing].sourceIndex = sourceIndex;
-        } else {
-          localIndexByKey.set(mapKey, entries.length);
-          entries.push({
-            x: mapped.x,
-            y: mapped.y,
-            sourceIndex,
-          });
-        }
-        if (mapped.x < minX) minX = mapped.x;
-        if (mapped.y < minY) minY = mapped.y;
-        if (mapped.x > maxX) maxX = mapped.x;
-        if (mapped.y > maxY) maxY = mapped.y;
+    const sourceIndices = getSelectionMoveSourceIndices(moveState, sourceMask);
+    const visitSourceIndex = (sourceIndex) => {
+      if (!Number.isInteger(sourceIndex) || sourceIndex < 0 || sourceIndex >= sourceSize || sourceMask[sourceIndex] !== 1) {
+        return;
+      }
+      const x = sourceIndex % sourceWidth;
+      const y = Math.floor(sourceIndex / sourceWidth);
+      const mapped = transformSelectionMoveLocalPixel(x, y, sourceWidth, sourceHeight, transform);
+      const mapKey = `${mapped.x},${mapped.y}`;
+      const existing = localIndexByKey.get(mapKey);
+      if (Number.isInteger(existing) && existing >= 0) {
+        entries[existing].sourceIndex = sourceIndex;
+      } else {
+        localIndexByKey.set(mapKey, entries.length);
+        entries.push({
+          x: mapped.x,
+          y: mapped.y,
+          sourceIndex,
+        });
+      }
+      if (mapped.x < minX) minX = mapped.x;
+      if (mapped.y < minY) minY = mapped.y;
+      if (mapped.x > maxX) maxX = mapped.x;
+      if (mapped.y > maxY) maxY = mapped.y;
+    };
+
+    if (Array.isArray(sourceIndices)) {
+      for (let i = 0; i < sourceIndices.length; i += 1) {
+        visitSourceIndex(sourceIndices[i]);
+      }
+    } else {
+      for (let sourceIndex = 0; sourceIndex < sourceSize; sourceIndex += 1) {
+        visitSourceIndex(sourceIndex);
       }
     }
 
@@ -59082,12 +59134,13 @@
     const index = y * canvasWidth + x;
     const base = index * 4;
     let direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
+    const transparentStorageIndex = resolveTransparentStoragePaletteIndex();
 
     if (pointerState.tool === 'eraser') {
-      if (layer.indices[index] === -1 && (!direct || direct[base + 3] === 0)) {
+      if (layer.indices[index] === transparentStorageIndex && (!direct || direct[base + 3] === 0)) {
         return;
       }
-      layer.indices[index] = -1;
+      layer.indices[index] = transparentStorageIndex;
       if (direct) {
         direct[base] = 0;
         direct[base + 1] = 0;
@@ -59107,6 +59160,27 @@
 
     if (isRgbColorMode()) {
       const rgbColor = normalizeColorValue(getActiveDrawColor(undefined, paletteIndexOverride));
+      if (rgbColor.a <= 0 && transparentStorageIndex >= 0) {
+        if (layer.indices[index] === transparentStorageIndex && (!direct || direct[base + 3] === 0)) {
+          return;
+        }
+        layer.indices[index] = transparentStorageIndex;
+        if (direct) {
+          direct[base] = 0;
+          direct[base + 1] = 0;
+          direct[base + 2] = 0;
+          direct[base + 3] = 0;
+        }
+        if (layer.importSourceDirect instanceof Uint8ClampedArray && layer.importSourceDirect.length >= base + 4) {
+          layer.importSourceDirect[base] = 0;
+          layer.importSourceDirect[base + 1] = 0;
+          layer.importSourceDirect[base + 2] = 0;
+          layer.importSourceDirect[base + 3] = 0;
+        }
+        markHistoryDirty();
+        markDirtyPixel(x, y);
+        return;
+      }
       const hasSameIndex = layer.indices[index] === -1;
       if (hasSameIndex && direct) {
         const sameColor = direct[base] === rgbColor.r
@@ -59141,6 +59215,21 @@
     const paletteIndex = resolveDrawPaletteIndex(paletteIndexOverride);
     if (isMultiPaletteIsolationEnabled()) {
       const drawColor = normalizeColorValue(getActiveDrawColor(undefined, paletteIndex));
+      if (drawColor.a <= 0 && transparentStorageIndex >= 0) {
+        if (layer.indices[index] === transparentStorageIndex && (!direct || direct[base + 3] === 0)) {
+          return;
+        }
+        layer.indices[index] = transparentStorageIndex;
+        if (direct) {
+          direct[base] = 0;
+          direct[base + 1] = 0;
+          direct[base + 2] = 0;
+          direct[base + 3] = 0;
+        }
+        markHistoryDirty();
+        markDirtyPixel(x, y);
+        return;
+      }
       if (!direct) {
         direct = ensureLayerDirect(layer);
       }
@@ -59477,49 +59566,27 @@
     const paletteIndex = indexMode ? resolveDrawPaletteIndex(paletteIndexOverride) : -1;
     const drawRgbColor = indexMode ? null : normalizeColorValue(getActiveDrawColor(undefined, paletteIndexOverride));
     const indices = layer.indices instanceof Int16Array ? layer.indices : null;
-    const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
     const startIdx = y * width + x;
+    const matchState = getLayerPixelMatchState(layer, startIdx);
+    if (!matchState) {
+      return;
+    }
     const targetIndex = indices ? indices[startIdx] : -1;
     if (indexMode && targetIndex >= 0 && targetIndex === paletteIndex) {
       return;
     }
-    const startBase = startIdx * 4;
-    const targetR = targetIndex < 0 ? (direct ? direct[startBase] : 0) : 0;
-    const targetG = targetIndex < 0 ? (direct ? direct[startBase + 1] : 0) : 0;
-    const targetB = targetIndex < 0 ? (direct ? direct[startBase + 2] : 0) : 0;
-    const targetA = targetIndex < 0 ? (direct ? direct[startBase + 3] : 0) : 0;
     if (!indexMode && drawRgbColor) {
-      let sourceColor = null;
-      if (targetIndex >= 0) {
-        sourceColor = normalizeColorValue(state.palette[targetIndex] || { r: 0, g: 0, b: 0, a: 0 });
-      } else {
-        sourceColor = {
-          r: targetR,
-          g: targetG,
-          b: targetB,
-          a: targetA,
-        };
-      }
+      const sourceColor = {
+        r: matchState.r,
+        g: matchState.g,
+        b: matchState.b,
+        a: matchState.a,
+      };
       if (colorsMatchRgba(sourceColor, drawRgbColor)) {
         return;
       }
     }
     const selectionMask = state.selectionMask;
-    const matchesTarget = (idx) => {
-      const currentIndex = indices ? indices[idx] : -1;
-      if (targetIndex >= 0) {
-        return currentIndex === targetIndex;
-      }
-      if (currentIndex >= 0) {
-        return false;
-      }
-      const base = idx * 4;
-      const r = direct ? direct[base] : 0;
-      const g = direct ? direct[base + 1] : 0;
-      const b = direct ? direct[base + 2] : 0;
-      const a = direct ? direct[base + 3] : 0;
-      return r === targetR && g === targetG && b === targetB && a === targetA;
-    };
 
     const visited = new Uint8Array(width * height);
     const stack = [x, y];
@@ -59530,7 +59597,7 @@
         for (let px = 0; px < width; px += 1) {
           const idx = rowOffset + px;
           if (selectionMask && selectionMask[idx] !== 1) continue;
-          if (!matchesTarget(idx)) continue;
+          if (!layerPixelMatchesMatchState(matchState, idx)) continue;
           setPixel(layer, px, py, indexMode ? paletteIndex : undefined);
         }
       }
@@ -59547,7 +59614,7 @@
       if (visited[idx]) continue;
       visited[idx] = 1;
       if (selectionMask && selectionMask[idx] !== 1) continue;
-      if (!matchesTarget(idx)) continue;
+      if (!layerPixelMatchesMatchState(matchState, idx)) continue;
       setPixel(layer, px, py, indexMode ? paletteIndex : undefined);
       stack.push(px + 1, py);
       stack.push(px - 1, py);
@@ -60035,37 +60102,105 @@
     return direct ? direct[base + 3] > 0 : false;
   }
 
-  function layerPixelMatchesColorAtIndex(layer, idx, target) {
-    if (!layer || !target) {
+  function getLayerPixelMatchState(layer, idx) {
+    if (!layer || !Number.isInteger(idx) || idx < 0) {
+      return null;
+    }
+    const indices = layer.indices instanceof Int16Array ? layer.indices : null;
+    const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
+    const transparentStorageIndex = resolveTransparentStoragePaletteIndex();
+    const paletteIndex = indices ? indices[idx] : -1;
+    if (paletteIndex >= 0) {
+      const color = state.palette[paletteIndex];
+      if (!color) {
+        return null;
+      }
+      if (color.a <= 0) {
+        return {
+          indices,
+          direct,
+          transparent: true,
+          transparentIndex: paletteIndex,
+        };
+      }
+      return {
+        indices,
+        direct,
+        r: color.r,
+        g: color.g,
+        b: color.b,
+        a: color.a,
+      };
+    }
+    if (!(direct instanceof Uint8ClampedArray)) {
+      return transparentStorageIndex >= 0 || paletteIndex < 0
+        ? {
+          indices,
+          direct,
+          transparent: true,
+          transparentIndex: transparentStorageIndex,
+        }
+        : null;
+    }
+    const base = idx * 4;
+    const alpha = direct[base + 3];
+    if (alpha <= 0) {
+      return {
+        indices,
+        direct,
+        transparent: true,
+        transparentIndex: transparentStorageIndex,
+      };
+    }
+    return {
+      indices,
+      direct,
+      r: direct[base],
+      g: direct[base + 1],
+      b: direct[base + 2],
+      a: alpha,
+    };
+  }
+
+  function layerPixelMatchesMatchState(matchState, idx) {
+    if (!matchState || !Number.isInteger(idx) || idx < 0) {
       return false;
     }
-    const paletteIndex = layer.indices[idx];
+    const paletteIndex = matchState.indices ? matchState.indices[idx] : -1;
+    if (matchState.transparent) {
+      if (paletteIndex >= 0) {
+        const color = state.palette[paletteIndex];
+        return Boolean(color && color.a <= 0);
+      }
+      const direct = matchState.direct;
+      if (!(direct instanceof Uint8ClampedArray)) {
+        return true;
+      }
+      const base = idx * 4;
+      return direct[base + 3] <= 0;
+    }
     if (paletteIndex >= 0) {
       const color = state.palette[paletteIndex];
       return Boolean(
         color
         && color.a > 0
-        && color.r === target.r
-        && color.g === target.g
-        && color.b === target.b
-        && color.a === target.a
+        && color.r === matchState.r
+        && color.g === matchState.g
+        && color.b === matchState.b
+        && color.a === matchState.a
       );
     }
-    const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
-    if (!direct) {
+    const direct = matchState.direct;
+    if (!(direct instanceof Uint8ClampedArray)) {
       return false;
     }
     const base = idx * 4;
     const alpha = direct[base + 3];
-    if (alpha <= 0) {
-      return false;
-    }
-    return (
-      direct[base] === target.r
-      && direct[base + 1] === target.g
-      && direct[base + 2] === target.b
-      && alpha === target.a
-    );
+    return alpha > 0
+      && direct[base] === matchState.r
+      && direct[base + 1] === matchState.g
+      && direct[base + 2] === matchState.b
+      && alpha === matchState.a;
   }
 
   function createSelectionByColor(x, y, options = {}) {
@@ -60082,9 +60217,10 @@
     const selectionMode = normalizeSelectSameMode(mode, state.selectSameMode);
     const seedX = clamp(Math.round(Number(x) || 0), 0, width - 1);
     const seedY = clamp(Math.round(Number(y) || 0), 0, height - 1);
+    const seedIndex = (seedY * width) + seedX;
     const { mask, bounds, hasBaseSelection } = createSelectionAccumulator({ append });
-    const targetSample = getLayerPixelColor(layer, seedX, seedY);
-    if (!targetSample || targetSample.a === 0) {
+    const matchState = getLayerPixelMatchState(layer, seedIndex);
+    if (!matchState) {
       if (!hasBaseSelection) {
         clearSelection();
       }
@@ -60096,7 +60232,7 @@
         const rowOffset = py * width;
         for (let px = 0; px < width; px += 1) {
           const idx = rowOffset + px;
-          if (!layerPixelMatchesColorAtIndex(layer, idx, targetSample)) {
+          if (!layerPixelMatchesMatchState(matchState, idx)) {
             continue;
           }
           mask[idx] = 1;
@@ -60116,7 +60252,7 @@
         const idx = py * width + px;
         if (visited[idx]) continue;
         visited[idx] = 1;
-        if (!layerPixelMatchesColorAtIndex(layer, idx, targetSample)) continue;
+        if (!layerPixelMatchesMatchState(matchState, idx)) continue;
         mask[idx] = 1;
         bounds.x0 = Math.min(bounds.x0, px);
         bounds.y0 = Math.min(bounds.y0, py);
@@ -60152,33 +60288,6 @@
       return a.index === b.index;
     }
     return a.color.r === b.color.r && a.color.g === b.color.g && a.color.b === b.color.b && a.color.a === b.color.a;
-  }
-
-  function getLayerPixelColor(layer, x, y) {
-    if (!layer) return null;
-    if (x < 0 || y < 0 || x >= state.width || y >= state.height) return null;
-    const idx = y * state.width + x;
-    const paletteIndex = layer.indices[idx];
-    if (paletteIndex >= 0) {
-      const color = state.palette[paletteIndex];
-      if (color) {
-        return { r: color.r, g: color.g, b: color.b, a: color.a };
-      }
-    }
-    const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
-    if (direct) {
-      const base = idx * 4;
-      const a = direct[base + 3];
-      if (a > 0) {
-        return {
-          r: direct[base],
-          g: direct[base + 1],
-          b: direct[base + 2],
-          a,
-        };
-      }
-    }
-    return null;
   }
 
   function clearSelection() {
@@ -60297,7 +60406,7 @@
     if (isVoxelPreviewCanvasId(activeCanvasDoc?.id || '')) {
       renderProjectCanvasSurface(activeCanvasSurface || mainViewportCanvasSurface, activeCanvasDoc);
       renderFloatingPreviewPanel();
-      renderInactiveProjectCanvasSurfaces();
+      refreshInactiveProjectCanvasSurfacesSoon();
       return;
     }
     const { width, height } = state;
@@ -61487,8 +61596,11 @@
     if (selectionMask && selectionMask[startIdx] !== 1) {
       return [];
     }
+    const matchState = getLayerPixelMatchState(layer, startIdx);
+    if (!matchState) {
+      return [];
+    }
     const indices = layer.indices instanceof Int16Array ? layer.indices : null;
-    const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
     const indexMode = isIndexColorMode();
     const fillMode = normalizeSelectSameMode(state.selectSameMode, SELECT_SAME_MODE_CONNECTED);
     const paletteIndex = indexMode
@@ -61499,42 +61611,17 @@
     if (indexMode && targetIndex >= 0 && targetIndex === paletteIndex) {
       return [];
     }
-    const startBase = startIdx * 4;
-    const targetR = targetIndex < 0 ? (direct ? direct[startBase] : 0) : 0;
-    const targetG = targetIndex < 0 ? (direct ? direct[startBase + 1] : 0) : 0;
-    const targetB = targetIndex < 0 ? (direct ? direct[startBase + 2] : 0) : 0;
-    const targetA = targetIndex < 0 ? (direct ? direct[startBase + 3] : 0) : 0;
     if (!indexMode && drawRgbColor) {
-      let sourceColor = null;
-      if (targetIndex >= 0) {
-        sourceColor = normalizeColorValue(state.palette[targetIndex] || { r: 0, g: 0, b: 0, a: 0 });
-      } else {
-        sourceColor = {
-          r: targetR,
-          g: targetG,
-          b: targetB,
-          a: targetA,
-        };
-      }
+      const sourceColor = {
+        r: matchState.r,
+        g: matchState.g,
+        b: matchState.b,
+        a: matchState.a,
+      };
       if (colorsMatchRgba(sourceColor, drawRgbColor)) {
         return [];
       }
     }
-    const matchesTarget = (idx) => {
-      const currentIndex = indices ? indices[idx] : -1;
-      if (targetIndex >= 0) {
-        return currentIndex === targetIndex;
-      }
-      if (currentIndex >= 0) {
-        return false;
-      }
-      const base = idx * 4;
-      const r = direct ? direct[base] : 0;
-      const g = direct ? direct[base + 1] : 0;
-      const b = direct ? direct[base + 2] : 0;
-      const a = direct ? direct[base + 3] : 0;
-      return r === targetR && g === targetG && b === targetB && a === targetA;
-    };
     const visited = new Uint8Array(width * height);
     const stack = [x, y];
     const pixels = [];
@@ -61544,7 +61631,7 @@
         for (let px = 0; px < width; px += 1) {
           const idx = rowOffset + px;
           if (selectionMask && selectionMask[idx] !== 1) continue;
-          if (!matchesTarget(idx)) continue;
+          if (!layerPixelMatchesMatchState(matchState, idx)) continue;
           pixels.push(idx);
           if (pixels.length >= FILL_PREVIEW_MAX_PIXELS) {
             markFillPreviewPixelsTruncated(pixels);
@@ -61563,7 +61650,7 @@
       if (visited[idx]) continue;
       visited[idx] = 1;
       if (selectionMask && selectionMask[idx] !== 1) continue;
-      if (!matchesTarget(idx)) continue;
+      if (!layerPixelMatchesMatchState(matchState, idx)) continue;
       pixels.push(idx);
       if (pixels.length >= FILL_PREVIEW_MAX_PIXELS) {
         markFillPreviewPixelsTruncated(pixels);
@@ -68886,11 +68973,12 @@
     const base = index * 4;
     let direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
     const tool = typeof command?.tool === 'string' ? command.tool : 'pen';
+    const transparentStorageIndex = resolveTransparentStoragePaletteIndex();
     if (tool === 'eraser') {
-      if (layer.indices[index] === -1 && (!direct || direct[base + 3] === 0)) {
+      if (layer.indices[index] === transparentStorageIndex && (!direct || direct[base + 3] === 0)) {
         return false;
       }
-      layer.indices[index] = -1;
+      layer.indices[index] = transparentStorageIndex;
       if (direct) {
         direct[base] = 0;
         direct[base + 1] = 0;
@@ -68902,6 +68990,19 @@
     const rgba = normalizeColorValue(command?.rgba);
     const paletteIsolation = Boolean(command?.paletteIsolation);
     if (command?.colorMode === 'rgb' || paletteIsolation) {
+      if (rgba.a <= 0 && transparentStorageIndex >= 0) {
+        if (layer.indices[index] === transparentStorageIndex && (!direct || direct[base + 3] === 0)) {
+          return false;
+        }
+        layer.indices[index] = transparentStorageIndex;
+        if (direct) {
+          direct[base] = 0;
+          direct[base + 1] = 0;
+          direct[base + 2] = 0;
+          direct[base + 3] = 0;
+        }
+        return true;
+      }
       if (!direct) {
         direct = ensureLayerDirect(layer);
       }
