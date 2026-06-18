@@ -4232,6 +4232,7 @@
   let openProjectTabSequence = 0;
   let openProjectTabBusy = false;
   let openProjectTabsLastRenderSignature = '';
+  let openProjectTabsLastStructureSignature = '';
   let projectTabViewportResetToken = 0;
   const SELECTION_DASH_SPEED = 40;
   let selectionDashScreenOffset = 0;
@@ -9007,16 +9008,8 @@
     return `${baseLabel} (${nextOrdinal})`;
   }
 
-  function renderOpenProjectTabs() {
-    const list = dom.projectTabsList;
-    const bar = dom.projectTabsBar;
-    if (!(list instanceof HTMLElement) || !(bar instanceof HTMLElement)) {
-      return;
-    }
-    const renderSignature = JSON.stringify({
-      activeOpenProjectTabId,
-      projectHomeVisible,
-      openProjectTabBusy,
+  function buildOpenProjectTabsStructureSignature() {
+    return JSON.stringify({
       maxTabs: MAX_OPEN_PROJECT_TABS,
       tabs: openProjectTabs.map(tab => ({
         id: tab?.id || '',
@@ -9029,10 +9022,70 @@
         remoteUpdateAvailable: Boolean(tab?.remoteUpdateAvailable),
       })),
     });
+  }
+
+  function syncOpenProjectTabActiveState() {
+    const list = dom.projectTabsList;
+    const bar = dom.projectTabsBar;
+    if (!(list instanceof HTMLElement) || !(bar instanceof HTMLElement)) {
+      return false;
+    }
+    bar.hidden = false;
+    const homeActive = Boolean(projectHomeVisible);
+    const homeItem = list.querySelector('.project-tab-item--home');
+    const homeButton = list.querySelector('[data-project-home-tab="true"]');
+    if (homeItem instanceof HTMLElement) {
+      homeItem.classList.toggle('is-active', homeActive);
+    }
+    if (homeButton instanceof HTMLButtonElement) {
+      homeButton.setAttribute('aria-selected', String(homeActive));
+      homeButton.setAttribute('tabindex', homeActive ? '0' : '-1');
+    }
+    list.querySelectorAll('[data-project-tab-item-id]').forEach(item => {
+      if (!(item instanceof HTMLElement)) return;
+      const tabId = item.dataset.projectTabItemId || '';
+      item.classList.toggle('is-active', !homeActive && tabId === activeOpenProjectTabId);
+    });
+    list.querySelectorAll('[data-project-tab-id]').forEach(button => {
+      if (!(button instanceof HTMLButtonElement)) return;
+      const tabId = button.dataset.projectTabId || '';
+      const isActive = !homeActive && tabId === activeOpenProjectTabId;
+      button.setAttribute('aria-selected', String(isActive));
+      button.setAttribute('tabindex', isActive ? '0' : '-1');
+    });
+    const addButton = list.querySelector('[data-project-tab-add="true"]');
+    if (addButton instanceof HTMLButtonElement) {
+      addButton.disabled = openProjectTabBusy || openProjectTabs.length >= MAX_OPEN_PROJECT_TABS;
+    }
+    return true;
+  }
+
+  function renderOpenProjectTabs() {
+    const list = dom.projectTabsList;
+    const bar = dom.projectTabsBar;
+    if (!(list instanceof HTMLElement) || !(bar instanceof HTMLElement)) {
+      return;
+    }
+    const structureSignature = buildOpenProjectTabsStructureSignature();
+    const renderSignature = JSON.stringify({
+      activeOpenProjectTabId,
+      projectHomeVisible,
+      openProjectTabBusy,
+      structureSignature,
+    });
     if (renderSignature === openProjectTabsLastRenderSignature) {
       return;
     }
+    if (
+      structureSignature === openProjectTabsLastStructureSignature
+      && list.childElementCount > 0
+      && syncOpenProjectTabActiveState()
+    ) {
+      openProjectTabsLastRenderSignature = renderSignature;
+      return;
+    }
     openProjectTabsLastRenderSignature = renderSignature;
+    openProjectTabsLastStructureSignature = structureSignature;
     bar.hidden = false;
     list.innerHTML = '';
     const homeItem = document.createElement('div');
@@ -9389,7 +9442,7 @@
       return false;
     }
     if (!skipPersistCurrent && previousActiveId && findOpenProjectTabIndex(previousActiveId) >= 0) {
-      await persistActiveOpenProjectTab({ flushAutosave: true });
+      await persistActiveOpenProjectTab({ flushAutosave: false });
     }
     // If there is an active shared project session for a different project/tab,
     // clear it before loading the target. This prevents incoming shared-project
@@ -36410,6 +36463,9 @@
     const prevActiveKey = Array.isArray(dom.mobileTabs)
       ? (dom.mobileTabs.find(b => b.classList.contains('is-active'))?.dataset.mobileTab || '')
       : '';
+    if (prevActiveKey === normalizedTarget && !ensureDrawer) {
+      return true;
+    }
     dom.mobileTabs.forEach(btn => {
       const key = btn.dataset.mobileTab;
       const panel = key ? dom.mobilePanels[key] : null;
@@ -45750,18 +45806,11 @@
         actionPerformed = false;
       } else if (commit) {
         if (moveState.hasCleared) {
-          if (moveState.fromPastePlacement) {
-            const finalized = finalizeSelectionMove();
-            if (finalized) {
-              clearSelection();
-            }
-          } else {
-            // Keep virtual-cursor move behavior aligned with pointer drag:
-            // stay in pending preview state until explicit confirm/cancel.
-            promotePendingSelectionMove(moveState, {
-              hover: virtualCursorDrawState.currentPosition || pointerState.current || getVirtualCursorCellPosition(),
-            });
-          }
+          // Keep virtual-cursor move behavior aligned with pointer drag:
+          // stay in pending preview state until explicit confirm/cancel or outside click.
+          promotePendingSelectionMove(moveState, {
+            hover: virtualCursorDrawState.currentPosition || pointerState.current || getVirtualCursorCellPosition(),
+          });
         } else {
           pointerState.selectionMove = null;
           pointerState.tool = state.tool;
@@ -54355,7 +54404,14 @@
     }
 
     if (activeTool === 'selectRect' || activeTool === 'selectLasso') {
+      const rawStart = activeTool === 'selectRect'
+        ? getPointerPositionRaw(event, { clampToCanvas: true, surface: interactionSurface })
+        : null;
       pointerState.selectionPreview = { start: position, points: [position] };
+      if (rawStart) {
+        pointerState.selectionPreview.rawStart = rawStart;
+        pointerState.selectionPreview.rawCurrent = rawStart;
+      }
       if (activeTool === 'selectRect' && selectRectGridGesture.enabled) {
         const startCell = selectRectGridGesture.cell || getSelectionGridCellFromPosition(position, SELECT_RECT_GRID_CELL_SIZE);
         if (startCell) {
@@ -54562,6 +54618,12 @@
           }
         }
       } else {
+        if (pointerState.tool === 'selectRect' && pointerState.selectionPreview) {
+          const rawCurrent = getPointerPositionRaw(event, { clampToCanvas: true, surface: pointerState.surface });
+          if (rawCurrent) {
+            pointerState.selectionPreview.rawCurrent = rawCurrent;
+          }
+        }
         pointerState.selectionPreview.points = [pointerState.selectionPreview.start, position];
         pointerState.selectionPreview.end = position;
       }
@@ -54657,16 +54719,9 @@
 
     if ((tool === 'selectionMove' || tool === 'layerMove') && moveState) {
       if (movePending) {
-        if (moveState.fromPastePlacement) {
-          const finalized = finalizeSelectionMove();
-          if (finalized) {
-            clearSelection();
-          }
-        } else {
-          promotePendingSelectionMove(moveState, {
-            hover: hoverPixel || pointerState.current,
-          });
-        }
+        promotePendingSelectionMove(moveState, {
+          hover: hoverPixel || pointerState.current,
+        });
         pointerState.surface = null;
         return;
       }
@@ -54711,7 +54766,11 @@
         !(pointerState.selectionClearedOnDown && pointerState.path.length <= 1)
         && pointerState.start
         && pointerState.current
-        && (pointerState.start.x !== pointerState.current.x || pointerState.start.y !== pointerState.current.y)
+        && (
+          pointerState.start.x !== pointerState.current.x
+          || pointerState.start.y !== pointerState.current.y
+          || hasSelectRectHalfCellDrag(pointerState.selectionPreview)
+        )
       ) {
         createSelectionRect(pointerState.start, pointerState.current, {
           append: pointerState.selectionExtendOnDown,
@@ -57886,7 +57945,7 @@
     }
     strokeSelectionPath((pathCtx, scale) => {
       traceSelectionMoveOutline(pathCtx, outlineSegments, originX, originY, scale);
-    }, { translateHalf: true, ensureResolution: false });
+    }, { ensureResolution: false });
   }
 
   function getSelectionMoveTransformedPreviewRenderData(moveState) {
@@ -59773,6 +59832,22 @@
     requestOverlayRender();
   }
 
+  function hasSelectRectHalfCellDrag(preview) {
+    const rawStart = preview?.rawStart;
+    const rawCurrent = preview?.rawCurrent;
+    if (
+      !rawStart
+      || !rawCurrent
+      || !Number.isFinite(rawStart.x)
+      || !Number.isFinite(rawStart.y)
+      || !Number.isFinite(rawCurrent.x)
+      || !Number.isFinite(rawCurrent.y)
+    ) {
+      return false;
+    }
+    return Math.max(Math.abs(rawCurrent.x - rawStart.x), Math.abs(rawCurrent.y - rawStart.y)) >= 0.5;
+  }
+
   function createSelectionLasso(points, options = {}) {
     if (!points || points.length < 3) return;
     const { append = false, selectionShapeMode = state.selectionShapeMode } = options || {};
@@ -61478,7 +61553,7 @@
       } else {
         traceSelectionOutline(pathCtx, mask, width, height, scale);
       }
-    }, { translateHalf: true, ensureResolution: false });
+    }, { ensureResolution: false });
   }
 
   function updateSelectionDashAnimation(timestamp) {
@@ -61758,7 +61833,7 @@
         pathCtx.lineTo(point.x * scale, point.y * scale);
       }
       pathCtx.closePath();
-    }, { translateHalf: true });
+    });
   }
 
   function drawRectanglePreview(start, end) {
@@ -61769,7 +61844,7 @@
     const h = Math.abs(end.y - start.y) + 1;
     strokeSelectionPath((pathCtx, scale) => {
       pathCtx.rect(x * scale, y * scale, w * scale, h * scale);
-    }, { translateHalf: true });
+    });
   }
 
   function blendColors(target, source, opacity) {
