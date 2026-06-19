@@ -321,6 +321,26 @@
 </div>
 </div>
 <div aria-hidden="true" aria-live="polite" class="zoom-indicator" id="zoomIndicator" role="status"></div>
+<section aria-live="polite" aria-hidden="true" class="qr-edit-panel" hidden="" id="qrEditPanel" role="status">
+<div class="qr-edit-panel__header">
+<div class="qr-edit-panel__titles">
+<span class="qr-edit-panel__eyebrow">QR EDIT CHECK</span>
+<strong class="qr-edit-panel__title">リアルタイム判定</strong>
+</div>
+<button aria-label="QR判定モードを終了" class="qr-edit-panel__close" id="qrEditPanelClose" type="button">×</button>
+</div>
+<div class="qr-edit-panel__body">
+<div class="qr-edit-panel__status-row">
+<span class="qr-edit-panel__status" data-tone="idle" id="qrEditPanelStatus">待機中</span>
+<span class="qr-edit-panel__match" hidden="" id="qrEditPanelMatch">内容一致</span>
+</div>
+<p class="qr-edit-panel__message" id="qrEditPanelMessage">QRメーカーから開いたときだけ有効になる判定モードです。</p>
+<div class="qr-edit-panel__preview-wrap">
+<canvas aria-hidden="true" class="qr-edit-panel__preview" height="96" id="qrEditPanelPreview" width="96"></canvas>
+<div class="qr-edit-panel__decoded" id="qrEditPanelDecoded">未判定</div>
+</div>
+</div>
+</section>
 <div aria-label="小窓プレビュー" aria-hidden="true" class="floating-preview-panel is-hidden" hidden="" id="floatingPreviewPanel" role="region">
 <div class="floating-preview-panel__header" id="floatingPreviewHeader">
 <div aria-label="小窓プレビュー切り替え" class="floating-preview-panel__tabs" id="floatingPreviewTabs" role="tablist">
@@ -1088,6 +1108,12 @@
 <label class="toggle-option" for="toggleFloatingPreview">
 <input id="toggleFloatingPreview" type="checkbox"/>
 <span>小窓プレビュー</span>
+</label>
+</li>
+<li hidden="" id="qrModeToggleField">
+<label class="toggle-option" for="toggleQrMode">
+<input id="toggleQrMode" type="checkbox"/>
+<span id="toggleQrModeLabel">QRモード</span>
 </label>
 </li>
 <li>
