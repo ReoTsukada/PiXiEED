@@ -2579,6 +2579,7 @@
   const AUTOSAVE_LIFECYCLE_FLUSH_THROTTLE_MS = 240;
   const NEW_PROJECT_IMMEDIATE_AUTOSAVE_ATTEMPTS = 2;
   const MAX_OPEN_PROJECT_TABS = 5;
+  const MAX_PROJECT_SHEETS = 3;
   const ALWAYS_CONFIRM_BEFORE_CLOSE = true;
   const MOBILE_BACK_BUTTON_CONFIRM_ENABLED = true;
   const MOBILE_BACK_GUARD_STATE_KEY = '__pixieed_back_guard_v1';
@@ -8988,16 +8989,56 @@
     const displayLabel = getOpenProjectTabDisplayLabel(tab, { active });
     return window.confirm(
       localizeText(
-        `プロジェクト「${displayLabel}」のタブを閉じますか？\n端末内プロジェクトは削除されません。`,
-        `Close the tab for "${displayLabel}"?\nThe local project will not be deleted.`
+        `シート「${displayLabel}」を閉じますか？\n端末内プロジェクトは削除されません。`,
+        `Close the sheet "${displayLabel}"?\nThe local project will not be deleted.`
       )
     );
+  }
+
+  function resetOpenProjectTabsToCurrentProject(options = {}) {
+    const tab = createOpenProjectTabFromCurrentState({
+      source: options.source || 'working',
+      projectId: options.projectId || autosaveProjectId,
+      sharedProjectKey: options.sharedProjectKey,
+      sharedProjectBackendId: options.sharedProjectBackendId,
+      sharedProjectRevision: options.sharedProjectRevision,
+      sharedProjectStructureRevision: options.sharedProjectStructureRevision,
+      sharedRoleHint: options.sharedRoleHint,
+      sharedAutoJoin: options.sharedAutoJoin,
+      qrEditPayload: options.qrEditPayload,
+    });
+    openProjectTabs.splice(0, openProjectTabs.length, tab);
+    activeOpenProjectTabId = tab.id;
+    suppressOpenProjectTabAutoInitialize = false;
+    renderOpenProjectTabs();
+    return tab;
+  }
+
+  async function closeAllOpenProjectTabsForProjectReplacement({ flushAutosave = false, showHome = false } = {}) {
+    if (openProjectTabBusy) {
+      return false;
+    }
+    if (openProjectTabs.length && activeOpenProjectTabId) {
+      await persistActiveOpenProjectTab({ flushAutosave });
+    }
+    openProjectTabs.splice(0, openProjectTabs.length);
+    activeOpenProjectTabId = '';
+    suppressOpenProjectTabAutoInitialize = true;
+    if (activeSharedProjectKey) {
+      clearActiveSharedProjectSession('project-replace');
+    }
+    if (showHome) {
+      setProjectHomeVisible(true, { refresh: true });
+    } else {
+      renderOpenProjectTabs();
+    }
+    return true;
   }
 
   function buildOpenProjectTabPayloadFromCurrentState() {
     const snapshot = makeHistorySnapshot();
     const session = buildProjectSessionPayload();
-    const packaged = buildPackagedProjectPayload(snapshot, { session });
+    const packaged = buildPackagedProjectPayload(snapshot, { session, includeSheets: false });
     return {
       fileName: normalizeDocumentName(snapshot.documentName || state.documentName || DEFAULT_DOCUMENT_NAME),
       project: packaged,
@@ -9530,6 +9571,72 @@
     };
   }
 
+  function createOpenProjectSheetTabFromPackagedProject({
+    id = '',
+    project = null,
+    projectId = '',
+    fileName = DEFAULT_DOCUMENT_NAME,
+    label = '',
+    source = 'sheet',
+    unsaved = false,
+    updatedAt = '',
+    qrEditPayload = null,
+  } = {}) {
+    if (!project || typeof project !== 'object') {
+      return null;
+    }
+    const normalizedFileName = normalizeDocumentName(fileName || project?.documentName || project?.document?.documentName || DEFAULT_DOCUMENT_NAME);
+    return {
+      id: typeof id === 'string' && id ? id : createOpenProjectTabId(),
+      projectId: normalizeAutosaveProjectId(projectId || autosaveProjectId || '') || createAutosaveProjectId(),
+      fileName: normalizedFileName,
+      label: label || extractDocumentBaseName(normalizedFileName),
+      project,
+      unsaved: Boolean(unsaved),
+      source,
+      updatedAt: updatedAt || project?.updatedAt || new Date().toISOString(),
+      qrEditPayload: normalizeQrEditPayload(qrEditPayload, projectId || autosaveProjectId || ''),
+    };
+  }
+
+  function normalizePackagedProjectSheets(sheets = [], activeSheetId = '') {
+    if (!Array.isArray(sheets)) {
+      return [];
+    }
+    const normalized = [];
+    const seenIds = new Set();
+    for (const sheet of sheets) {
+      if (!sheet || typeof sheet !== 'object' || !sheet.project || typeof sheet.project !== 'object') {
+        continue;
+      }
+      const id = typeof sheet.id === 'string' && sheet.id ? sheet.id : createOpenProjectTabId();
+      const uniqueId = seenIds.has(id) ? createOpenProjectTabId() : id;
+      seenIds.add(uniqueId);
+      const fileName = normalizeDocumentName(sheet.fileName || sheet.name || sheet.project?.documentName || sheet.project?.document?.documentName || DEFAULT_DOCUMENT_NAME);
+      normalized.push({
+        id: uniqueId,
+        fileName,
+        label: typeof sheet.label === 'string' && sheet.label ? sheet.label : extractDocumentBaseName(fileName),
+        project: sheet.project,
+        unsaved: Boolean(sheet.unsaved),
+        source: typeof sheet.source === 'string' && sheet.source ? sheet.source : 'sheet',
+        updatedAt: sheet.updatedAt || sheet.project?.updatedAt || new Date().toISOString(),
+        qrEditPayload: normalizeQrEditPayload(sheet.qrEditPayload, autosaveProjectId || ''),
+      });
+      if (normalized.length >= MAX_PROJECT_SHEETS) {
+        break;
+      }
+    }
+    if (!normalized.length) {
+      return [];
+    }
+    const hasActive = activeSheetId && normalized.some(sheet => sheet.id === activeSheetId);
+    if (!hasActive) {
+      normalized[0].active = true;
+    }
+    return normalized;
+  }
+
   function getOpenProjectTabDisplayLabel(tab, { active = false } = {}) {
     const tabProjectId = normalizeAutosaveProjectId(tab?.projectId || '');
     const activeProjectId = normalizeAutosaveProjectId(autosaveProjectId || '');
@@ -9552,7 +9659,7 @@
 
   function buildOpenProjectTabsStructureSignature() {
     return JSON.stringify({
-      maxTabs: MAX_OPEN_PROJECT_TABS,
+      maxTabs: MAX_PROJECT_SHEETS,
       tabs: openProjectTabs.map(tab => ({
         id: tab?.id || '',
         projectId: tab?.projectId || '',
@@ -9597,7 +9704,7 @@
     });
     const addButton = list.querySelector('[data-project-tab-add="true"]');
     if (addButton instanceof HTMLButtonElement) {
-      addButton.disabled = openProjectTabBusy || openProjectTabs.length >= MAX_OPEN_PROJECT_TABS;
+      addButton.disabled = openProjectTabBusy || openProjectTabs.length >= MAX_PROJECT_SHEETS;
     }
     return true;
   }
@@ -9674,23 +9781,16 @@
       selectButton.setAttribute('aria-selected', isActive ? 'true' : 'false');
       selectButton.setAttribute('tabindex', isActive ? '0' : '-1');
       const displayLabel = getOpenProjectTabRenderLabel(tab, labelCounts, labelOrdinals, { active: isActive });
-      const slotPrefix = `${index + 1}/${MAX_OPEN_PROJECT_TABS}`;
+      const slotPrefix = `${index + 1}/${MAX_PROJECT_SHEETS}`;
       selectButton.setAttribute(
         'aria-label',
-        localizeText(`プロジェクト ${slotPrefix}: ${displayLabel}`, `Project ${slotPrefix}: ${displayLabel}`)
+        localizeText(`シート ${slotPrefix}: ${displayLabel}`, `Sheet ${slotPrefix}: ${displayLabel}`)
       );
 
       const name = document.createElement('span');
       name.className = 'project-tab-item__name';
       name.textContent = displayLabel;
       selectButton.appendChild(name);
-      // Show a small badge when this tab holds a deferred restore or a remote update
-      if (tab?.deferredRestore || tab?.remoteUpdateAvailable) {
-        const badge = document.createElement('span');
-        badge.className = 'project-tab-item__badge';
-        badge.textContent = tab?.deferredRestore ? localizeText('復元あり', 'Restored') : localizeText('更新あり', 'Update');
-        selectButton.appendChild(badge);
-      }
       item.appendChild(selectButton);
 
       const closeButton = document.createElement('button');
@@ -9716,9 +9816,9 @@
     addButton.textContent = '+';
     addButton.setAttribute(
       'aria-label',
-      localizeText('端末内プロジェクトをタブへ追加', 'Add local project to tabs')
+      localizeText('新規シートを追加', 'Add new sheet')
     );
-    addButton.disabled = openProjectTabBusy || openProjectTabs.length >= MAX_OPEN_PROJECT_TABS;
+    addButton.disabled = openProjectTabBusy || openProjectTabs.length >= MAX_PROJECT_SHEETS;
     addItem.appendChild(addButton);
     list.appendChild(addItem);
   }
@@ -9809,17 +9909,14 @@
 
   function appendOpenProjectTabFromCurrentState(options = {}) {
     ensureOpenProjectTabsInitialized();
-    if (openProjectTabs.length >= MAX_OPEN_PROJECT_TABS) {
+    if (openProjectTabs.length >= MAX_PROJECT_SHEETS) {
       return null;
     }
     const tab = createOpenProjectTabFromCurrentState({
       source: options.source || 'open',
-      // For explicit 'open' (file picker / importer) and 'recent' sources,
-      // create a fresh projectId so each opened file becomes an independent
-      // project rather than sharing the current autosaveProjectId.
       projectId: (typeof options.projectId !== 'undefined')
         ? options.projectId
-        : ((options.source === 'open' || options.source === 'recent') ? createAutosaveProjectId() : undefined),
+        : autosaveProjectId,
       sharedProjectKey: options.sharedProjectKey,
       sharedProjectBackendId: options.sharedProjectBackendId,
       sharedProjectRevision: options.sharedProjectRevision,
@@ -9830,7 +9927,7 @@
     });
     // Prevent duplicate tabs for the same normalized projectId.
     const normalizedTabProjectId = normalizeAutosaveProjectId(tab.projectId || '');
-    if (normalizedTabProjectId) {
+    if (options.dedupeByProjectId === true && normalizedTabProjectId) {
       const existingIndex = findOpenProjectTabIndexByProjectId(normalizedTabProjectId);
       if (existingIndex >= 0) {
         // Activate existing tab instead of creating a duplicate
@@ -10027,13 +10124,14 @@
           projectId: target.projectId || '',
           suppressAutosaveStatus: true,
           qrEditPayload: target?.qrEditPayload || null,
+          suppressProjectSheetsRestore: true,
         });
       }
       // If loadDocumentFromText returned the 'deferred' sentinel, it means
-      // the snapshot targets a different project/tab and should not be
-      // applied into the currently active document. Mark the tab as having
+      // the snapshot targets a different project/sheet and should not be
+      // applied into the currently active sheet. Mark the sheet as having
       // a deferred restore / remote update available and keep the previous
-      // active document visible (avoid blank canvas).
+      // active sheet visible (avoid blank canvas).
       if (loaded === 'deferred') {
         try {
           openProjectTabs[targetIndex] = Object.assign({}, target, {
@@ -10060,7 +10158,7 @@
       if (!loaded) {
         activeOpenProjectTabId = previousActiveId;
         renderOpenProjectTabs();
-        updateAutosaveStatus(localizeText('プロジェクトタブの切替に失敗しました', 'Failed to switch project tab'), 'error');
+        updateAutosaveStatus(localizeText('シートの切替に失敗しました', 'Failed to switch sheet'), 'error');
         return false;
       }
       queueProjectTabViewportReset(target.id);
@@ -10084,7 +10182,7 @@
       console.warn('Failed to activate project tab', error);
       activeOpenProjectTabId = previousActiveId;
       renderOpenProjectTabs();
-      updateAutosaveStatus(localizeText('プロジェクトタブの切替に失敗しました', 'Failed to switch project tab'), 'error');
+      updateAutosaveStatus(localizeText('シートの切替に失敗しました', 'Failed to switch sheet'), 'error');
       return false;
     } finally {
       openProjectTabBusy = false;
@@ -10126,7 +10224,7 @@
         announce: false,
       });
       if (!switched) {
-        updateAutosaveStatus(localizeText('プロジェクトタブの切替に失敗しました', 'Failed to switch project tab'), 'warn');
+        updateAutosaveStatus(localizeText('シートの切替に失敗しました', 'Failed to switch sheet'), 'warn');
         return false;
       }
     }
@@ -10151,17 +10249,94 @@
       renderOpenProjectTabs();
     }
     updateAutosaveStatus(
-      localizeText('プロジェクトタブを閉じました（端末内保存は保持）', 'Closed project tab (local save kept)'),
+      localizeText('シートを閉じました（端末内保存は保持）', 'Closed sheet (local save kept)'),
       'info'
     );
     return true;
+  }
+
+  function createBlankSheetPackagedProject(index = openProjectTabs.length + 1) {
+    const sheetName = normalizeDocumentName(localizeText(`シート ${index}`, `Sheet ${index}`));
+    const snapshot = createInitialState({
+      width: DEFAULT_CANVAS_SIZE,
+      height: DEFAULT_CANVAS_SIZE,
+      name: sheetName,
+      uiTheme: state.uiTheme,
+      palettePreset: newProjectPalettePresetId || NEW_PROJECT_PALETTE_PRESET_DEFAULT,
+    });
+    return buildPackagedProjectPayload(snapshot, {
+      session: null,
+      includeSheets: false,
+    });
+  }
+
+  async function createNewSheetTab() {
+    if (openProjectTabBusy) {
+      return false;
+    }
+    ensureOpenProjectTabsInitialized();
+    if (openProjectTabs.length >= MAX_PROJECT_SHEETS) {
+      updateAutosaveStatus(
+        localizeText(
+          `シートは最大 ${MAX_PROJECT_SHEETS} 枚です`,
+          `You can add up to ${MAX_PROJECT_SHEETS} sheets`
+        ),
+        'warn'
+      );
+      return false;
+    }
+    openProjectTabBusy = true;
+    try {
+      await persistActiveOpenProjectTab({ flushAutosave: false });
+      const sheetIndex = openProjectTabs.length + 1;
+      const packaged = createBlankSheetPackagedProject(sheetIndex);
+      const fileName = normalizeDocumentName(packaged?.document?.documentName || localizeText(`シート ${sheetIndex}`, `Sheet ${sheetIndex}`));
+      const nextTab = createOpenProjectSheetTabFromPackagedProject({
+        project: packaged,
+        projectId: autosaveProjectId,
+        fileName,
+        label: extractDocumentBaseName(fileName),
+        source: 'sheet',
+      });
+      if (!nextTab) {
+        return false;
+      }
+      openProjectTabs.push(nextTab);
+      activeOpenProjectTabId = nextTab.id;
+      suppressOpenProjectTabAutoInitialize = false;
+      renderOpenProjectTabs();
+      const loaded = await loadDocumentFromProjectPayload(packaged, {
+        projectId: autosaveProjectId,
+        suppressAutosaveStatus: true,
+        suppressProjectSheetsRestore: true,
+      });
+      if (!loaded) {
+        const insertedIndex = findOpenProjectTabIndex(nextTab.id);
+        if (insertedIndex >= 0) {
+          openProjectTabs.splice(insertedIndex, 1);
+        }
+        renderOpenProjectTabs();
+        return false;
+      }
+      markAutosaveDirty();
+      markDocumentUnsavedChange();
+      scheduleSessionPersist({ includeSnapshots: true });
+      scheduleAutosaveSnapshot();
+      updateAutosaveStatus(
+        localizeText('新規シートを追加しました', 'Added a new sheet'),
+        'success'
+      );
+      return true;
+    } finally {
+      openProjectTabBusy = false;
+    }
   }
 
   function openProjectTabAddPicker() {
     if (openProjectTabBusy) {
       return;
     }
-    showProjectHomeScreen({ refresh: true });
+    void createNewSheetTab();
   }
 
   function setupOpenProjectTabs() {
@@ -17401,8 +17576,8 @@
     setLocalizedTextContent('#startupActionSkip', 'この画面を閉じる', 'Close');
     setLocalizedTextContent('#globalLoadingIndicatorCancel', 'キャンセル', 'Cancel');
     setLocalizedTextContent('#multiInviteShare', '共有', 'Share');
-    setLocalizedAttribute('#projectTabsBar', 'aria-label', '開いているプロジェクト', 'Open Projects');
-    setLocalizedAttribute('#projectTabsList', 'aria-label', 'プロジェクトタブ', 'Project Tabs');
+    setLocalizedAttribute('#projectTabsBar', 'aria-label', 'プロジェクト内シート', 'Project Sheets');
+    setLocalizedAttribute('#projectTabsList', 'aria-label', 'シートタブ', 'Sheet Tabs');
     setLocalizedTextContent('#projectHomeTitle', 'プロジェクト一覧', 'Projects');
     setLocalizedTextContent('#projectHomeNew', '新規作成', 'New Project');
     setLocalizedTextContent('#projectHomeOpen', 'ファイルを開く', 'Open File');
@@ -19354,12 +19529,12 @@
       return false;
     }
     ensureOpenProjectTabsInitialized();
-    const availableSlots = Math.max(0, MAX_OPEN_PROJECT_TABS - openProjectTabs.length);
+    const availableSlots = Math.max(0, MAX_PROJECT_SHEETS - openProjectTabs.length);
     if (availableSlots <= 0) {
       updateAutosaveStatus(
         localizeText(
-          `同時に開けるプロジェクトは最大 ${MAX_OPEN_PROJECT_TABS} 件です`,
-          `You can open up to ${MAX_OPEN_PROJECT_TABS} projects at once`
+          `シートは最大 ${MAX_PROJECT_SHEETS} 枚です`,
+          `You can add up to ${MAX_PROJECT_SHEETS} sheets`
         ),
         'warn'
       );
@@ -19370,6 +19545,8 @@
       const targets = queue.slice(0, availableSlots);
       const truncatedCount = Math.max(0, queue.length - targets.length);
       await persistActiveOpenProjectTab({ flushAutosave: true });
+      const parentProjectId = normalizeAutosaveProjectId(autosaveProjectId || '') || createAutosaveProjectId();
+      setActiveAutosaveProjectId(parentProjectId, { persist: false });
       let openedCount = 0;
       let failedCount = 0;
       for (let index = 0; index < targets.length; index += 1) {
@@ -19378,9 +19555,9 @@
           const loaded = await loader(item);
           if (loaded === 'deferred') {
             // Loader declined to apply into the active document because the
-            // payload targets a different project/tab. Create a new tab from
+            // payload targets a different project/sheet. Create a new sheet from
             // the original item so the user's explicit open action still
-            // produces a separate project tab.
+            // produces a separate sheet.
             try {
               let packaged = null;
               let deferredProjectId = '';
@@ -19414,7 +19591,7 @@
               if (packaged && typeof packaged === 'object') {
                 const appended = await appendPackagedProjectTab({
                   project: packaged,
-                  projectId: deferredProjectId,
+                  projectId: parentProjectId,
                   fileName: deferredFileName,
                   unsaved: deferredUnsaved,
                   source: source || 'open',
@@ -19440,9 +19617,13 @@
             failedCount += 1;
             continue;
           }
+          if (normalizeAutosaveProjectId(autosaveProjectId || '') !== parentProjectId) {
+            setActiveAutosaveProjectId(parentProjectId, { persist: false });
+          }
           const appended = appendOpenProjectTabFromCurrentState({
             activate: true,
             source,
+            projectId: parentProjectId,
             ...(tabOptions && typeof tabOptions === 'object' ? tabOptions : {}),
           });
           if (!appended) {
@@ -19475,10 +19656,10 @@
       }
       const summaryJa = `複数読み込み: 開いた ${openedCount}件`
         + (failedCount > 0 ? ` / 失敗 ${failedCount}件` : '')
-        + (truncatedCount > 0 ? ` / 上限で未追加 ${truncatedCount}件（最大${MAX_OPEN_PROJECT_TABS}）` : '');
+        + (truncatedCount > 0 ? ` / 上限で未追加 ${truncatedCount}件（最大${MAX_PROJECT_SHEETS}）` : '');
       const summaryEn = `Opened ${openedCount} project tab(s)`
         + (failedCount > 0 ? ` / Failed ${failedCount}` : '')
-        + (truncatedCount > 0 ? ` / Skipped by limit ${truncatedCount} (max ${MAX_OPEN_PROJECT_TABS})` : '');
+        + (truncatedCount > 0 ? ` / Skipped by limit ${truncatedCount} (max ${MAX_PROJECT_SHEETS})` : '');
       updateAutosaveStatus(
         localizeText(summaryJa, summaryEn),
         (failedCount > 0 || truncatedCount > 0) ? 'warn' : 'success'
@@ -19548,7 +19729,7 @@
         return activated ? existingTab : null;
       }
     }
-    if (openProjectTabs.length >= MAX_OPEN_PROJECT_TABS) {
+    if (openProjectTabs.length >= MAX_PROJECT_SHEETS) {
       return null;
     }
     const normalizedFileName = normalizeDocumentName(fileName || project?.documentName || DEFAULT_DOCUMENT_NAME);
@@ -19596,19 +19777,9 @@
       return false;
     }
     ensureOpenProjectTabsInitialized();
-    if (openProjectTabs.length >= MAX_OPEN_PROJECT_TABS) {
-      updateAutosaveStatus(
-        localizeText(
-          `同時に開けるプロジェクトは最大 ${MAX_OPEN_PROJECT_TABS} 件です`,
-          `You can open up to ${MAX_OPEN_PROJECT_TABS} projects at once`
-        ),
-        'warn'
-      );
-      return false;
-    }
+    await closeAllOpenProjectTabsForProjectReplacement({ flushAutosave: true, showHome: false });
     openProjectTabBusy = true;
     try {
-      await persistActiveOpenProjectTab({ flushAutosave: true });
       const created = await createNewProject({
         name,
         width,
@@ -19620,16 +19791,12 @@
       if (!created) {
         return false;
       }
-      const appended = appendOpenProjectTabFromCurrentState({
-        activate: true,
+      resetOpenProjectTabsToCurrentProject({
         source: 'new-project',
         projectId: autosaveProjectId,
       });
-      if (!appended) {
-        return false;
-      }
       updateAutosaveStatus(
-        localizeText('新規プロジェクトをタブ追加しました', 'Added new project tab'),
+        localizeText('新規プロジェクトを作成しました', 'Created new project'),
         'success'
       );
       return true;
@@ -19668,11 +19835,11 @@
       if (existingSwitch.found) {
         return existingSwitch.switched;
       }
-      if (openProjectTabs.length >= MAX_OPEN_PROJECT_TABS) {
+      if (openProjectTabs.length >= MAX_PROJECT_SHEETS) {
         updateAutosaveStatus(
           localizeText(
-            `同時に開けるプロジェクトは最大 ${MAX_OPEN_PROJECT_TABS} 件です`,
-            `You can open up to ${MAX_OPEN_PROJECT_TABS} projects at once`
+            `シートは最大 ${MAX_PROJECT_SHEETS} 枚です`,
+            `You can add up to ${MAX_PROJECT_SHEETS} sheets`
           ),
           'warn'
         );
@@ -19721,8 +19888,8 @@
           }
           updateAutosaveStatus(
             Boolean(sharedEntryForTab)
-              ? localizeText('共有プロジェクトをタブ追加しました', 'Added shared project tab')
-              : localizeText('端末内プロジェクトをタブ追加しました', 'Added local project tab'),
+              ? localizeText('共有プロジェクトをシートとして追加しました', 'Added shared project as a sheet')
+              : localizeText('端末内プロジェクトをシートとして追加しました', 'Added local project as a sheet'),
             'success'
           );
           return true;
@@ -19766,8 +19933,8 @@
         }
         updateAutosaveStatus(
           Boolean(sharedEntryForTab)
-            ? localizeText('共有プロジェクトをタブ追加しました', 'Added shared project tab')
-            : localizeText('端末内プロジェクトをタブ追加しました', 'Added local project tab'),
+            ? localizeText('共有プロジェクトをシートとして追加しました', 'Added shared project as a sheet')
+            : localizeText('端末内プロジェクトをシートとして追加しました', 'Added local project as a sheet'),
           'success'
         );
         return true;
@@ -20758,8 +20925,8 @@
       }
       updateAutosaveStatus(
         localizeText(
-          'PiXiEELENS の画像を別プロジェクトタブで開きました',
-          'Opened PiXiEELENS capture in a separate project tab'
+          'PiXiEELENS の画像を別シートで開きました',
+          'Opened PiXiEELENS capture in a separate sheet'
         ),
         'success'
       );
@@ -20876,8 +21043,8 @@
       }
       updateAutosaveStatus(
         localizeText(
-          'QRコードを別プロジェクトタブで開きました',
-          'Opened QR code in a separate project tab'
+          'QRコードを別シートで開きました',
+          'Opened QR code in a separate sheet'
         ),
         'success'
       );
@@ -24010,6 +24177,9 @@
         console.warn('Failed to prepare export directory during new project creation', error);
       }
     }
+    if (ensureTab) {
+      await closeAllOpenProjectTabsForProjectReplacement({ flushAutosave: true, showHome: false });
+    }
     const clampedWidth = clamp(Math.round(widthNumber), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
     const clampedHeight = clamp(Math.round(heightNumber), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
     const normalizedPalettePreset = normalizeNewProjectPalettePreset(
@@ -24070,25 +24240,11 @@
     } else {
       updateAutosaveStatus('自動保存: このブラウザでは利用できません', 'warn');
     }
-    if (ensureTab && (!activeOpenProjectTabId || findOpenProjectTabIndex(activeOpenProjectTabId) < 0)) {
-      if (openProjectTabs.length < MAX_OPEN_PROJECT_TABS) {
-        const tab = createOpenProjectTabFromCurrentState({
-          source: 'new-project',
-          projectId: autosaveProjectId,
-        });
-        openProjectTabs.push(tab);
-        activeOpenProjectTabId = tab.id;
-        suppressOpenProjectTabAutoInitialize = false;
-        renderOpenProjectTabs();
-      } else {
-        updateAutosaveStatus(
-          localizeText(
-            `同時に開けるプロジェクトは最大 ${MAX_OPEN_PROJECT_TABS} 件です`,
-            `You can open up to ${MAX_OPEN_PROJECT_TABS} projects at once`
-          ),
-          'warn'
-        );
-      }
+    if (ensureTab) {
+      resetOpenProjectTabsToCurrentProject({
+        source: 'new-project',
+        projectId: autosaveProjectId,
+      });
     }
     scheduleSessionPersist();
     return true;
@@ -24463,11 +24619,16 @@
         return;
       }
       openButton.disabled = true;
-      const success = await openRecentProjectAsTab(entry, { hideStartup: false, appendOnly: false });
+      await closeAllOpenProjectTabsForProjectReplacement({ flushAutosave: true, showHome: false });
+      const success = await openRecentProject(entry, {
+        hideStartup: false,
+        replaceOpenProjectTabs: true,
+      });
       if (success) {
         hideProjectHomeScreen();
       } else {
         openButton.disabled = false;
+        setProjectHomeVisible(true, { refresh: false });
       }
     });
   }
@@ -25010,6 +25171,40 @@
     return await applyLoadedDocumentSnapshot(parsedDocument, options);
   }
 
+  function restoreOpenProjectSheetsFromParsedDocument(parsedDocument = null, { projectId = '', source = 'sheet' } = {}) {
+    const sheets = Array.isArray(parsedDocument?.sheets) ? parsedDocument.sheets : [];
+    const normalizedProjectId = normalizeAutosaveProjectId(projectId || autosaveProjectId || '') || createAutosaveProjectId();
+    if (!sheets.length) {
+      resetOpenProjectTabsToCurrentProject({
+        source,
+        projectId: normalizedProjectId,
+      });
+      return false;
+    }
+    const nextTabs = sheets
+      .slice(0, MAX_PROJECT_SHEETS)
+      .map(sheet => createOpenProjectSheetTabFromPackagedProject({
+        ...sheet,
+        projectId: normalizedProjectId,
+        source: sheet.source || source,
+      }))
+      .filter(Boolean);
+    if (!nextTabs.length) {
+      resetOpenProjectTabsToCurrentProject({
+        source,
+        projectId: normalizedProjectId,
+      });
+      return false;
+    }
+    const activeSheetId = typeof parsedDocument?.activeSheetId === 'string' ? parsedDocument.activeSheetId : '';
+    const activeTab = nextTabs.find(tab => tab.id === activeSheetId) || nextTabs[0];
+    openProjectTabs.splice(0, openProjectTabs.length, ...nextTabs);
+    activeOpenProjectTabId = activeTab?.id || nextTabs[0]?.id || '';
+    suppressOpenProjectTabAutoInitialize = false;
+    renderOpenProjectTabs();
+    return true;
+  }
+
   async function applyLoadedDocumentSnapshot(parsedDocument, options = {}) {
     const preservedSelectionClipboard = preserveCanvasSelectionClipboard();
     const snapshot = parsedDocument?.snapshot || null;
@@ -25078,6 +25273,12 @@
 
     const requestedProjectId = normalizeAutosaveProjectId(options?.projectId || '');
     setActiveAutosaveProjectId(requestedProjectId || createAutosaveProjectId());
+    if (!options?.suppressProjectSheetsRestore) {
+      restoreOpenProjectSheetsFromParsedDocument(parsedDocument, {
+        projectId: requestedProjectId || autosaveProjectId,
+        source: options?.sharedProjectKey ? 'shared-sheet' : 'sheet',
+      });
+    }
     activateQrEditMode(options?.qrEditPayload || null);
     const requestedSharedProjectKey = normalizeMultiProjectKey(options?.sharedProjectKey || '');
     const requestedSharedProjectRevision = Math.max(0, Math.round(Number(options?.sharedProjectRevision) || 0));
@@ -25379,10 +25580,15 @@
     const dotStats = hasPackagedDocument
       ? resolvePackagedProjectDotStats(parsed)
       : null;
+    const sheets = hasPackagedDocument
+      ? normalizePackagedProjectSheets(parsed.sheets, typeof parsed.activeSheetId === 'string' ? parsed.activeSheetId : '')
+      : [];
     return {
       snapshot,
       projectSession,
       dotStats,
+      sheets,
+      activeSheetId: hasPackagedDocument && typeof parsed.activeSheetId === 'string' ? parsed.activeSheetId : '',
     };
   }
 
@@ -28117,7 +28323,51 @@
     return dotStatsApi.normalizeDotStats(deltaStats) || deltaStats;
   }
 
-  function buildPackagedProjectPayload(snapshot, { session = null, updatedAt = '' } = {}) {
+  function buildProjectSheetsPayload(activePackagedProject = null) {
+    const sheets = [];
+    const activeId = activeOpenProjectTabId || '';
+    const activeProjectId = normalizeAutosaveProjectId(autosaveProjectId || '') || createAutosaveProjectId();
+    const sourceTabs = openProjectTabs.length
+      ? openProjectTabs
+      : [{
+        id: activeId || createOpenProjectTabId(),
+        projectId: activeProjectId,
+        fileName: state.documentName || DEFAULT_DOCUMENT_NAME,
+        label: extractDocumentBaseName(state.documentName || DEFAULT_DOCUMENT_NAME),
+        source: 'working',
+      }];
+    sourceTabs.slice(0, MAX_PROJECT_SHEETS).forEach((tab, index) => {
+      const isActive = tab?.id && tab.id === activeId;
+      const project = isActive && activePackagedProject
+        ? activePackagedProject
+        : (tab?.project && typeof tab.project === 'object' ? tab.project : null);
+      if (!project) {
+        return;
+      }
+      const fileName = normalizeDocumentName(
+        (isActive ? state.documentName : tab?.fileName)
+        || tab?.fileName
+        || project?.document?.documentName
+        || DEFAULT_DOCUMENT_NAME
+      );
+      sheets.push({
+        id: tab?.id || createOpenProjectTabId(),
+        fileName,
+        label: tab?.label || extractDocumentBaseName(fileName),
+        project,
+        unsaved: Boolean(isActive ? hasDocumentUnsavedChanges() : tab?.unsaved),
+        source: tab?.source || 'sheet',
+        updatedAt: project?.updatedAt || tab?.updatedAt || new Date().toISOString(),
+        qrEditPayload: normalizeQrEditPayload(tab?.qrEditPayload, activeProjectId),
+      });
+    });
+    return {
+      activeSheetId: activeId || sheets[0]?.id || '',
+      sheets,
+    };
+  }
+
+  function buildPackagedProjectPayload(snapshot, { session = null, updatedAt = '', includeSheets = true } = {}) {
     const resolvedDotStats = resolveTrackedProjectDotStats(snapshot);
     const payload = serializeDocumentSnapshot(snapshot);
     const packagedSession = session && typeof session === 'object'
@@ -28133,6 +28383,17 @@
     };
     if (resolvedDotStats) {
       packaged.dotStats = resolvedDotStats;
+    }
+    if (includeSheets) {
+      const projectSheets = buildProjectSheetsPayload(buildPackagedProjectPayload(snapshot, {
+        session: packagedSession,
+        updatedAt: packaged.updatedAt,
+        includeSheets: false,
+      }));
+      if (projectSheets.sheets.length > 0) {
+        packaged.sheets = projectSheets.sheets;
+        packaged.activeSheetId = projectSheets.activeSheetId;
+      }
     }
     return packaged;
   }
@@ -29070,12 +29331,6 @@
       const latestEntry = projectId
         ? ((await loadRecentProjectsMetadata()).find(candidate => candidate?.id === projectId) || entry)
         : entry;
-      if (!options.allowProjectMismatchLoad && !openProjectTabBusy && openProjectTabs.length) {
-        return await openRecentProjectAsTab(latestEntry, {
-          hideStartup: hideStartupOnSuccess,
-          appendOnly: true,
-        });
-      }
       if (isSharedRecentProjectEntry(latestEntry)) {
         return await openSharedRecentProject(latestEntry, {
           hideStartup: hideStartupOnSuccess,
@@ -48357,6 +48612,75 @@
     return true;
   }
 
+  function assignAdjacentPositionForNewLocalViewportCanvases(previousLocalCount = 0) {
+    const targetLocalCount = Math.max(0, getLocalViewportCanvasCount());
+    const previousCount = clamp(Math.round(Number(previousLocalCount) || 0), 0, targetLocalCount);
+    if (targetLocalCount <= previousCount) {
+      return false;
+    }
+    const anchorLeft = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorLeft, 0) || 0;
+    const anchorTop = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorTop, 0) || 0;
+    const currentScale = getCurrentLocalViewportCanvasLayoutScale();
+    const nextPositions = normalizeLocalViewportCanvasPositions(
+      localViewportCanvasState?.positions,
+      localViewportCanvasState?.positions,
+      targetLocalCount,
+      {
+        relative: true,
+        fallbackRelative: true,
+      }
+    );
+    const getCanvasDisplayWidth = canvasIndex => {
+      const canvasDoc = getProjectCanvasDocumentAt(canvasIndex);
+      const displayWidth = Math.max(1, Math.round(Number(canvasDoc?.width) || Number(state.width) || 1))
+        * getProjectCanvasDisplayScale(canvasDoc);
+      return displayWidth / Math.max(currentScale, Number.EPSILON);
+    };
+    let maxRight = getCanvasDisplayWidth(0);
+    let baseTop = 0;
+    for (let localIndex = 0; localIndex < previousCount; localIndex += 1) {
+      const position = nextPositions[localIndex] || normalizeLocalViewportCanvasPosition(null, null);
+      const fallback = computeDefaultLocalViewportCanvasWorldPosition(localIndex, anchorLeft, anchorTop);
+      const left = position.left === null
+        ? ((fallback.left - anchorLeft) / Math.max(currentScale, Number.EPSILON))
+        : position.left;
+      const top = position.top === null
+        ? ((fallback.top - anchorTop) / Math.max(currentScale, Number.EPSILON))
+        : position.top;
+      maxRight = Math.max(maxRight, left + getCanvasDisplayWidth(localIndex + 1));
+      if (localIndex === previousCount - 1) {
+        baseTop = top;
+      }
+    }
+    let cursorLeft = maxRight + (MULTI_CANVAS_SURFACE_GAP / Math.max(currentScale, Number.EPSILON));
+    for (let localIndex = previousCount; localIndex < targetLocalCount; localIndex += 1) {
+      nextPositions[localIndex] = normalizeLocalViewportCanvasPosition(
+        {
+          left: cursorLeft,
+          top: baseTop,
+        },
+        nextPositions[localIndex],
+        {
+          relative: true,
+          fallbackRelative: true,
+        }
+      );
+      cursorLeft += getCanvasDisplayWidth(localIndex + 1)
+        + (MULTI_CANVAS_SURFACE_GAP / Math.max(currentScale, Number.EPSILON));
+    }
+    localViewportCanvasState = normalizeLocalViewportCanvasState(
+      {
+        ...localViewportCanvasState,
+        layoutScale: currentScale,
+        positionsRelative: true,
+        positions: nextPositions,
+      },
+      localViewportCanvasState
+    );
+    localViewportCanvasLayoutResetPending = false;
+    return true;
+  }
+
   function requestLocalViewportCanvasLayoutReset({ clearStored = true } = {}) {
     if (isMultiCanvasWorldLayoutActive()) {
       localViewportCanvasLayoutResetPending = false;
@@ -50434,6 +50758,9 @@
       : (nextCanvases[Math.min(activeCanvasIndex, nextCanvases.length - 1)]?.id || nextCanvases[0]?.id || '');
     replaceProjectCanvasDocuments(nextCanvases, resolvedActiveCanvasId);
     requestLocalViewportCanvasLayoutReset({ clearStored: true });
+    if (targetCount > previous) {
+      assignAdjacentPositionForNewLocalViewportCanvases(previous);
+    }
     ensureLocalViewportCanvasEntries();
     bindActiveCanvasSurface(getProjectCanvasSurfaceForIndex(getActiveProjectCanvasIndex()) || mainViewportCanvasSurface);
     syncLocalViewportCanvasDockVisibility({ persist, render: true });
@@ -70903,6 +71230,28 @@
     return false;
   }
 
+  function getSharedProjectSnapshotComplexityMultiplier() {
+    const sheetCount = Math.max(1, openProjectTabs.length || 1);
+    const canvasCount = Math.max(1, getProjectCanvasCount());
+    let multiplier = 1;
+    if (sheetCount > 1) {
+      multiplier += Math.min(2, (sheetCount - 1) * 0.35);
+    }
+    if (canvasCount > 1) {
+      multiplier += Math.min(2.5, (canvasCount - 1) * 0.45);
+    }
+    return Math.max(1, multiplier);
+  }
+
+  function getSharedProjectEffectiveSnapshotDelay(delayMs = SHARED_PROJECT_DEFERRED_PERSIST_DELAY, { force = false } = {}) {
+    const requestedDelay = Math.max(0, Math.round(Number(delayMs) || 0));
+    if (force) {
+      return requestedDelay;
+    }
+    const complexDelay = Math.round(SHARED_PROJECT_DEFERRED_PERSIST_DELAY * getSharedProjectSnapshotComplexityMultiplier());
+    return Math.max(requestedDelay, complexDelay);
+  }
+
   function scheduleSharedProjectCheckpoint({ immediate = false, historyLabel = 'checkpoint' } = {}) {
     if (!activeSharedProjectKey || !canUseSharedProjectsBackend()) {
       return;
@@ -75094,6 +75443,7 @@
       window.clearTimeout(sharedProjectCaptureTimer);
       sharedProjectCaptureTimer = null;
     }
+    const effectiveDelayMs = getSharedProjectEffectiveSnapshotDelay(delayMs, { force });
     sharedProjectCaptureTimer = window.setTimeout(() => {
       sharedProjectCaptureTimer = null;
       if (!canUseSharedProjectsBackend() || (!force && !hasDocumentUnsavedChanges())) {
@@ -75129,7 +75479,7 @@
         historyLabel,
         revision,
       });
-    }, Math.max(0, Math.round(Number(delayMs) || 0)));
+    }, effectiveDelayMs);
   }
 
   function flushActiveSharedProjectFinalSnapshot({ historyLabel = 'sharedFinalSnapshot' } = {}) {

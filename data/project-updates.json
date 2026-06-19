@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-19T10:00:23.608Z",
+  "generatedAt": "2026-06-19T12:32:42.437Z",
   "projects": [
     {
       "id": "site",
@@ -64,7 +64,7 @@
         {
           "date": "2026-06-19",
           "items": [
-            "画面 / 構成 / 機能 / スタイルを更新"
+            "機能 / 画面 / 構成 / スタイルを更新"
           ]
         },
         {
@@ -230,7 +230,7 @@
           "id": "pixiedraw",
           "name": "PiXiEEDraw",
           "url": "/projects/pixiedraw/",
-          "summary": "画面 / 構成 / 機能 / スタイルを更新"
+          "summary": "機能 / 画面 / 構成 / スタイルを更新"
         },
         {
           "id": "qr-maker",
