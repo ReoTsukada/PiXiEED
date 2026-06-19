@@ -9947,7 +9947,7 @@
     return true;
   }
 
-  async function activateOpenProjectTab(tabId, { skipPersistCurrent = false, announce = true } = {}) {
+  async function activateOpenProjectTab(tabId, { skipPersistCurrent = false, announce = true, skipBusyGuard = false } = {}) {
     const targetId = typeof tabId === 'string' ? tabId : '';
     if (!targetId) {
       return false;
@@ -9955,7 +9955,7 @@
     if (!ensureCurrentClientCanReplaceActiveProject({ announce })) {
       return false;
     }
-    if (openProjectTabBusy) {
+    if (openProjectTabBusy && !skipBusyGuard) {
       return false;
     }
     if (!openProjectTabs.length) {
@@ -19419,6 +19419,7 @@
                   unsaved: deferredUnsaved,
                   source: source || 'open',
                   updatedAt: packaged.updatedAt || new Date().toISOString(),
+                  skipBusyGuardOnActivate: true,
                 });
                 if (appended) {
                   queueProjectTabViewportReset(appended.id);
@@ -19526,6 +19527,7 @@
     source = 'open',
     updatedAt = '',
     activateOptions = {},
+    skipBusyGuardOnActivate = false,
     ...extraTabFields
   } = {}) {
     if (!project || typeof project !== 'object') {
@@ -19540,6 +19542,7 @@
         const activated = await activateOpenProjectTab(existingTab?.id || '', {
           skipPersistCurrent: true,
           announce: false,
+          skipBusyGuard: skipBusyGuardOnActivate,
           ...activateOptions,
         });
         return activated ? existingTab : null;
@@ -19567,6 +19570,7 @@
     const activated = await activateOpenProjectTab(newTabId, {
       skipPersistCurrent: true,
       announce: false,
+      skipBusyGuard: skipBusyGuardOnActivate,
       ...activateOptions,
     });
     if (!activated) {
@@ -19588,6 +19592,7 @@
     promptExportDirectory = false,
   }) {
     if (openProjectTabBusy) {
+      updateAutosaveStatus(localizeText('プロジェクト切替の完了を待ってください', 'Wait for the current project switch to finish'), 'info');
       return false;
     }
     ensureOpenProjectTabsInitialized();
@@ -19652,6 +19657,7 @@
         ? ((await loadRecentProjectsMetadata()).find(candidate => candidate?.id === projectId) || entry)
         : entry;
       if (openProjectTabBusy) {
+        updateAutosaveStatus(localizeText('プロジェクト切替の完了を待ってください', 'Wait for the current project switch to finish'), 'info');
         return false;
       }
       ensureOpenProjectTabsInitialized();
@@ -19692,6 +19698,7 @@
             unsaved: Boolean(latestEntry?.unsaved),
             source,
             updatedAt: latestEntry?.updatedAt || packaged?.updatedAt || new Date().toISOString(),
+            skipBusyGuardOnActivate: true,
             activateOptions: {
               skipPersistCurrent: true,
               announce: false,
