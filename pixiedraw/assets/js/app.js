@@ -116,6 +116,13 @@
     floatingPreviewGizmo: /** @type {HTMLCanvasElement|null} */ (document.getElementById('floatingPreviewGizmo')),
     floatingPreviewResizeHandle: document.getElementById('floatingPreviewResize'),
     zoomIndicator: document.getElementById('zoomIndicator'),
+    qrEditPanel: document.getElementById('qrEditPanel'),
+    qrEditPanelClose: document.getElementById('qrEditPanelClose'),
+    qrEditPanelStatus: document.getElementById('qrEditPanelStatus'),
+    qrEditPanelMatch: document.getElementById('qrEditPanelMatch'),
+    qrEditPanelMessage: document.getElementById('qrEditPanelMessage'),
+    qrEditPanelPreview: /** @type {HTMLCanvasElement|null} */ (document.getElementById('qrEditPanelPreview')),
+    qrEditPanelDecoded: document.getElementById('qrEditPanelDecoded'),
     resizeHandles: {
       left: document.getElementById('resizeLeftRail'),
       leftInner: document.getElementById('resizeLeftRailInner'),
@@ -130,6 +137,9 @@
       toggleMajorGrid: document.getElementById('toggleMajorGrid'),
       toggleBackgroundMode: document.getElementById('toggleBackgroundMode'),
       toggleUiTheme: document.getElementById('toggleUiTheme'),
+      qrModeToggleField: document.getElementById('qrModeToggleField'),
+      toggleQrMode: document.getElementById('toggleQrMode'),
+      toggleQrModeLabel: document.getElementById('toggleQrModeLabel'),
       undoAction: document.getElementById('undoAction'),
       redoAction: document.getElementById('redoAction'),
       appReloadAction: document.getElementById('appReloadAction'),
@@ -2997,6 +3007,9 @@
   const DOCUMENT_FILE_VERSION = 1;
   const LENS_IMPORT_STORAGE_KEY = 'pixiee-lens:pending-draw-import';
   const QR_IMPORT_STORAGE_KEY = 'pixiee-qr:pending-draw-import';
+  const QR_EDIT_MODE_TARGET_SOURCE = 'qrmaker';
+  const QR_EDIT_CHECK_DELAY_MS = 90;
+  const QR_EDIT_SCAN_CANVAS_SIZE = 320;
   const PIXFIND_UPLOAD_KEY = 'pixfind_creator_upload_v1';
   function upgradeAutosaveDatabase(db) {
     if (!db) return;
@@ -3036,6 +3049,38 @@
   let autosaveWriteDeadline = 0;
   let autosaveWriteInFlight = false;
   let autosaveWriteQueued = false;
+  let qrEditBarcodeDetector = null;
+  let qrEditBarcodeSupport = null;
+  const qrEditModeState = {
+    active: false,
+    source: '',
+    expectedText: '',
+    projectId: '',
+    panelVisible: true,
+    lastDecodedText: '',
+    readable: null,
+    exactMatch: null,
+    detectorAvailable: null,
+    checking: false,
+    pendingTimer: null,
+    checkToken: 0,
+  };
+  const qrEditPanelDragState = {
+    pointerId: null,
+    startClientX: 0,
+    startClientY: 0,
+    startX: 0,
+    startY: 0,
+    hasCustomPosition: false,
+    x: 0,
+    y: 0,
+  };
+  const qrEditScanCanvas = document.createElement('canvas');
+  qrEditScanCanvas.width = QR_EDIT_SCAN_CANVAS_SIZE;
+  qrEditScanCanvas.height = QR_EDIT_SCAN_CANVAS_SIZE;
+  const qrEditScanCtx = qrEditScanCanvas.getContext
+    ? (qrEditScanCanvas.getContext('2d', { willReadFrequently: true }) || qrEditScanCanvas.getContext('2d'))
+    : null;
   const autosaveTabInstanceId = (() => {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
       return `tab-${crypto.randomUUID()}`;
@@ -8960,6 +9005,435 @@
     };
   }
 
+  function normalizeQrEditPayload(payload = null, fallbackProjectId = '') {
+    if (!payload || typeof payload !== 'object') {
+      return null;
+    }
+    const source = typeof payload.source === 'string' ? payload.source.trim() : '';
+    if (source !== QR_EDIT_MODE_TARGET_SOURCE) {
+      return null;
+    }
+    const projectId = normalizeAutosaveProjectId(
+      typeof payload.projectId === 'string' ? payload.projectId : fallbackProjectId
+    ) || normalizeAutosaveProjectId(fallbackProjectId || '');
+    const expectedText = typeof payload.rawValue === 'string' ? payload.rawValue.trim() : '';
+    const editSize = Math.max(1, Math.round(Number(payload.editSize) || 0));
+    const panelVisible = payload.panelVisible !== false;
+    return {
+      source,
+      projectId,
+      rawValue: expectedText,
+      editSize,
+      panelVisible,
+    };
+  }
+
+  function getActiveQrEditPayload() {
+    const activeTab = getActiveOpenProjectTab();
+    return normalizeQrEditPayload(activeTab?.qrEditPayload || null, autosaveProjectId || '');
+  }
+
+  function setQrEditPanelVisibility(visible) {
+    const panel = dom.qrEditPanel;
+    if (!(panel instanceof HTMLElement)) {
+      return;
+    }
+    const nextVisible = Boolean(visible) && qrEditModeState.panelVisible !== false && !projectHomeVisible;
+    panel.hidden = !nextVisible;
+    panel.setAttribute('aria-hidden', nextVisible ? 'false' : 'true');
+  }
+
+  function clampQrEditPanelPosition(x, y) {
+    const panel = dom.qrEditPanel;
+    if (!(panel instanceof HTMLElement)) {
+      return { x: 0, y: 0 };
+    }
+    const viewportBounds = getViewportBounds();
+    const safeArea = getSafeAreaInsets();
+    const margin = 8;
+    const panelWidth = Math.max(1, panel.offsetWidth || panel.clientWidth || 1);
+    const panelHeight = Math.max(1, panel.offsetHeight || panel.clientHeight || 1);
+    const minX = Math.round(viewportBounds.left + safeArea.left + margin);
+    const minY = Math.round(viewportBounds.top + safeArea.top + margin);
+    const maxX = Math.max(minX, Math.round(viewportBounds.right - safeArea.right - panelWidth - margin));
+    const maxY = Math.max(minY, Math.round(viewportBounds.bottom - safeArea.bottom - panelHeight - margin));
+    return {
+      x: clamp(Math.round(Number(x) || 0), minX, maxX),
+      y: clamp(Math.round(Number(y) || 0), minY, maxY),
+    };
+  }
+
+  function applyQrEditPanelPosition() {
+    const panel = dom.qrEditPanel;
+    if (!(panel instanceof HTMLElement)) {
+      return;
+    }
+    if (!qrEditPanelDragState.hasCustomPosition) {
+      panel.style.left = '';
+      panel.style.top = '';
+      panel.style.right = '';
+      return;
+    }
+    const next = clampQrEditPanelPosition(qrEditPanelDragState.x, qrEditPanelDragState.y);
+    qrEditPanelDragState.x = next.x;
+    qrEditPanelDragState.y = next.y;
+    panel.style.left = `${next.x}px`;
+    panel.style.top = `${next.y}px`;
+    panel.style.right = 'auto';
+  }
+
+  function updateQrEditPanel() {
+    const active = Boolean(qrEditModeState.active);
+    setQrEditPanelVisibility(active);
+    if (!active) {
+      return;
+    }
+    applyQrEditPanelPosition();
+    if (dom.qrEditPanelStatus) {
+      let label = '待機中';
+      let tone = 'idle';
+      if (qrEditModeState.checking) {
+        label = '判定中';
+      } else if (qrEditModeState.readable === true) {
+        label = '読取OK';
+        tone = 'ok';
+      } else if (qrEditModeState.readable === false) {
+        label = '読取NG';
+        tone = 'error';
+      } else if (qrEditModeState.detectorAvailable === false) {
+        label = '未対応';
+        tone = 'warn';
+      }
+      dom.qrEditPanelStatus.textContent = label;
+      dom.qrEditPanelStatus.dataset.tone = tone;
+    }
+    if (dom.qrEditPanelMatch) {
+      const showMatch = qrEditModeState.expectedText.length > 0 && qrEditModeState.exactMatch !== null;
+      dom.qrEditPanelMatch.hidden = !showMatch;
+      if (showMatch) {
+        dom.qrEditPanelMatch.textContent = qrEditModeState.exactMatch ? '内容一致' : '内容差分';
+      }
+    }
+    if (dom.qrEditPanelMessage) {
+      let message = '1操作ごとに今の見た目から読取判定します。';
+      if (qrEditModeState.checking) {
+        message = '現在の描画結果からQRを再判定しています。';
+      } else if (qrEditModeState.detectorAvailable === false) {
+        message = 'この端末ではリアルタイムQR判定に未対応です。';
+      } else if (qrEditModeState.readable === true && qrEditModeState.exactMatch === false) {
+        message = 'QR自体は読めますが、元テキストとは異なる内容です。';
+      } else if (qrEditModeState.readable === true) {
+        message = '今の状態なら読み取れます。';
+      } else if (qrEditModeState.readable === false) {
+        message = '今の状態では読取に失敗しています。';
+      }
+      dom.qrEditPanelMessage.textContent = message;
+    }
+    if (dom.qrEditPanelDecoded) {
+      dom.qrEditPanelDecoded.textContent = qrEditModeState.lastDecodedText || '未判定';
+    }
+  }
+
+  function clearQrEditPreviewCanvas() {
+    const preview = dom.qrEditPanelPreview;
+    if (!(preview instanceof HTMLCanvasElement)) {
+      return;
+    }
+    const previewCtx = preview.getContext('2d');
+    if (!previewCtx) {
+      return;
+    }
+    previewCtx.clearRect(0, 0, preview.width, preview.height);
+  }
+
+  function syncQrEditPreviewCanvas(sourceCanvas = null) {
+    const preview = dom.qrEditPanelPreview;
+    if (!(preview instanceof HTMLCanvasElement)) {
+      return;
+    }
+    const previewCtx = preview.getContext('2d');
+    if (!previewCtx) {
+      return;
+    }
+    previewCtx.clearRect(0, 0, preview.width, preview.height);
+    previewCtx.fillStyle = '#ffffff';
+    previewCtx.fillRect(0, 0, preview.width, preview.height);
+    if (!(sourceCanvas instanceof HTMLCanvasElement) || sourceCanvas.width <= 0 || sourceCanvas.height <= 0) {
+      return;
+    }
+    previewCtx.imageSmoothingEnabled = false;
+    previewCtx.drawImage(sourceCanvas, 0, 0, preview.width, preview.height);
+  }
+
+  async function ensureQrEditBarcodeDetector() {
+    if (qrEditBarcodeDetector) {
+      qrEditBarcodeSupport = true;
+      return qrEditBarcodeDetector;
+    }
+    if (qrEditBarcodeSupport === false) {
+      return null;
+    }
+    if (!('BarcodeDetector' in window)) {
+      qrEditBarcodeSupport = false;
+      return null;
+    }
+    try {
+      if (typeof window.BarcodeDetector.getSupportedFormats === 'function') {
+        const supported = await window.BarcodeDetector.getSupportedFormats();
+        if (Array.isArray(supported) && !supported.includes('qr_code')) {
+          qrEditBarcodeSupport = false;
+          return null;
+        }
+      }
+      qrEditBarcodeDetector = new window.BarcodeDetector({ formats: ['qr_code'] });
+      qrEditBarcodeSupport = true;
+      return qrEditBarcodeDetector;
+    } catch (error) {
+      qrEditBarcodeSupport = false;
+      console.warn('QR edit mode detector unavailable', error);
+      return null;
+    }
+  }
+
+  function updateActiveOpenProjectTabQrEditPayload(payload = null) {
+    const normalized = normalizeQrEditPayload(payload, autosaveProjectId || '');
+    const index = findOpenProjectTabIndex(activeOpenProjectTabId);
+    if (index < 0 || !openProjectTabs[index]) {
+      return;
+    }
+    openProjectTabs[index] = {
+      ...openProjectTabs[index],
+      qrEditPayload: normalized,
+    };
+    renderOpenProjectTabs();
+  }
+
+  function setQrEditPanelVisibleForActiveProject(visible) {
+    const payload = getActiveQrEditPayload();
+    if (!payload) {
+      return;
+    }
+    const nextPayload = {
+      ...payload,
+      panelVisible: Boolean(visible),
+    };
+    qrEditModeState.panelVisible = nextPayload.panelVisible;
+    updateActiveOpenProjectTabQrEditPayload(nextPayload);
+    updateQrEditPanel();
+  }
+
+  function deactivateQrEditMode({ clearTab = false } = {}) {
+    if (qrEditModeState.pendingTimer !== null) {
+      window.clearTimeout(qrEditModeState.pendingTimer);
+      qrEditModeState.pendingTimer = null;
+    }
+    qrEditModeState.active = false;
+    qrEditModeState.source = '';
+    qrEditModeState.expectedText = '';
+    qrEditModeState.projectId = '';
+    qrEditModeState.panelVisible = true;
+    qrEditModeState.lastDecodedText = '';
+    qrEditModeState.readable = null;
+    qrEditModeState.exactMatch = null;
+    qrEditModeState.detectorAvailable = qrEditBarcodeSupport;
+    qrEditModeState.checking = false;
+    qrEditModeState.checkToken += 1;
+    clearQrEditPreviewCanvas();
+    updateQrEditPanel();
+    if (clearTab) {
+      updateActiveOpenProjectTabQrEditPayload(null);
+    }
+  }
+
+  function activateQrEditMode(payload = null) {
+    const normalized = normalizeQrEditPayload(payload, autosaveProjectId || '');
+    if (!normalized) {
+      deactivateQrEditMode();
+      return;
+    }
+    qrEditModeState.active = true;
+    qrEditModeState.source = normalized.source;
+    qrEditModeState.expectedText = normalized.rawValue || '';
+    qrEditModeState.projectId = normalized.projectId || normalizeAutosaveProjectId(autosaveProjectId || '');
+    qrEditModeState.panelVisible = normalized.panelVisible !== false;
+    qrEditModeState.lastDecodedText = '';
+    qrEditModeState.readable = null;
+    qrEditModeState.exactMatch = null;
+    qrEditModeState.detectorAvailable = qrEditBarcodeSupport;
+    qrEditModeState.checking = false;
+    clearQrEditPreviewCanvas();
+    updateQrEditPanel();
+    scheduleQrEditReadabilityCheck({ immediate: true });
+  }
+
+  function renderQrEditScanSource() {
+    if (!qrEditScanCtx) {
+      return null;
+    }
+    const drawingCanvas = activeCanvasSurface?.drawing instanceof HTMLCanvasElement
+      ? activeCanvasSurface.drawing
+      : (dom.canvases?.drawing instanceof HTMLCanvasElement ? dom.canvases.drawing : null);
+    if (!(drawingCanvas instanceof HTMLCanvasElement) || drawingCanvas.width <= 0 || drawingCanvas.height <= 0) {
+      return null;
+    }
+    qrEditScanCanvas.width = QR_EDIT_SCAN_CANVAS_SIZE;
+    qrEditScanCanvas.height = QR_EDIT_SCAN_CANVAS_SIZE;
+    qrEditScanCtx.clearRect(0, 0, qrEditScanCanvas.width, qrEditScanCanvas.height);
+    qrEditScanCtx.fillStyle = '#ffffff';
+    qrEditScanCtx.fillRect(0, 0, qrEditScanCanvas.width, qrEditScanCanvas.height);
+    qrEditScanCtx.imageSmoothingEnabled = false;
+    qrEditScanCtx.drawImage(drawingCanvas, 0, 0, qrEditScanCanvas.width, qrEditScanCanvas.height);
+    syncQrEditPreviewCanvas(qrEditScanCanvas);
+    return qrEditScanCanvas;
+  }
+
+  async function runQrEditReadabilityCheck() {
+    if (!qrEditModeState.active) {
+      return;
+    }
+    const token = ++qrEditModeState.checkToken;
+    qrEditModeState.checking = true;
+    updateQrEditPanel();
+    const detector = await ensureQrEditBarcodeDetector();
+    if (token !== qrEditModeState.checkToken || !qrEditModeState.active) {
+      return;
+    }
+    if (!detector) {
+      qrEditModeState.detectorAvailable = false;
+      qrEditModeState.checking = false;
+      qrEditModeState.readable = null;
+      qrEditModeState.exactMatch = null;
+      updateQrEditPanel();
+      return;
+    }
+    qrEditModeState.detectorAvailable = true;
+    const scanCanvas = renderQrEditScanSource();
+    if (!scanCanvas) {
+      qrEditModeState.checking = false;
+      qrEditModeState.readable = false;
+      qrEditModeState.exactMatch = null;
+      qrEditModeState.lastDecodedText = '';
+      updateQrEditPanel();
+      return;
+    }
+    try {
+      const results = await detector.detect(scanCanvas);
+      if (token !== qrEditModeState.checkToken || !qrEditModeState.active) {
+        return;
+      }
+      const decoded = Array.isArray(results)
+        ? results.find(item => typeof item?.rawValue === 'string' && item.rawValue.trim())
+        : null;
+      const decodedText = decoded?.rawValue?.trim() || '';
+      qrEditModeState.lastDecodedText = decodedText;
+      qrEditModeState.readable = Boolean(decodedText);
+      qrEditModeState.exactMatch = qrEditModeState.expectedText
+        ? decodedText === qrEditModeState.expectedText
+        : null;
+    } catch (error) {
+      console.warn('QR edit mode detect failed', error);
+      qrEditModeState.lastDecodedText = '';
+      qrEditModeState.readable = false;
+      qrEditModeState.exactMatch = null;
+    } finally {
+      if (token === qrEditModeState.checkToken) {
+        qrEditModeState.checking = false;
+        updateQrEditPanel();
+      }
+    }
+  }
+
+  function scheduleQrEditReadabilityCheck({ immediate = false } = {}) {
+    if (!qrEditModeState.active) {
+      return;
+    }
+    if (qrEditModeState.pendingTimer !== null) {
+      window.clearTimeout(qrEditModeState.pendingTimer);
+      qrEditModeState.pendingTimer = null;
+    }
+    const run = () => {
+      qrEditModeState.pendingTimer = null;
+      window.requestAnimationFrame(() => {
+        void runQrEditReadabilityCheck();
+      });
+    };
+    if (immediate) {
+      run();
+      return;
+    }
+    qrEditModeState.pendingTimer = window.setTimeout(run, QR_EDIT_CHECK_DELAY_MS);
+  }
+
+  function stopQrEditPanelDrag(event = null) {
+    const panel = dom.qrEditPanel;
+    if (!(panel instanceof HTMLElement)) {
+      return;
+    }
+    const activePointerId = qrEditPanelDragState.pointerId;
+    if (event && activePointerId !== null && (event.pointerId ?? null) !== activePointerId) {
+      return;
+    }
+    try {
+      panel.releasePointerCapture?.(activePointerId);
+    } catch (_error) {
+      // ignore pointer capture release errors
+    }
+    qrEditPanelDragState.pointerId = null;
+    panel.classList.remove('is-dragging');
+    window.removeEventListener('pointermove', handleQrEditPanelPointerMove);
+    window.removeEventListener('pointerup', handleQrEditPanelPointerUp);
+    window.removeEventListener('pointercancel', handleQrEditPanelPointerCancel);
+  }
+
+  function handleQrEditPanelPointerMove(event) {
+    if (qrEditPanelDragState.pointerId === null || qrEditPanelDragState.pointerId !== (event.pointerId ?? null)) {
+      return;
+    }
+    event.preventDefault();
+    const dx = (Number(event.clientX) || 0) - qrEditPanelDragState.startClientX;
+    const dy = (Number(event.clientY) || 0) - qrEditPanelDragState.startClientY;
+    qrEditPanelDragState.hasCustomPosition = true;
+    qrEditPanelDragState.x = qrEditPanelDragState.startX + dx;
+    qrEditPanelDragState.y = qrEditPanelDragState.startY + dy;
+    applyQrEditPanelPosition();
+  }
+
+  function handleQrEditPanelPointerUp(event) {
+    stopQrEditPanelDrag(event);
+  }
+
+  function handleQrEditPanelPointerCancel(event) {
+    stopQrEditPanelDrag(event);
+  }
+
+  function beginQrEditPanelDrag(event) {
+    const panel = dom.qrEditPanel;
+    if (!(panel instanceof HTMLElement) || event.button !== undefined && event.button !== 0) {
+      return;
+    }
+    if (event.target instanceof Element && event.target.closest('#qrEditPanelClose')) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    const rect = panel.getBoundingClientRect();
+    qrEditPanelDragState.pointerId = event.pointerId ?? -1;
+    qrEditPanelDragState.startClientX = Number(event.clientX) || 0;
+    qrEditPanelDragState.startClientY = Number(event.clientY) || 0;
+    qrEditPanelDragState.startX = qrEditPanelDragState.hasCustomPosition ? qrEditPanelDragState.x : Math.round(rect.left);
+    qrEditPanelDragState.startY = qrEditPanelDragState.hasCustomPosition ? qrEditPanelDragState.y : Math.round(rect.top);
+    qrEditPanelDragState.hasCustomPosition = true;
+    panel.classList.add('is-dragging');
+    try {
+      panel.setPointerCapture?.(event.pointerId);
+    } catch (_error) {
+      // ignore pointer capture errors
+    }
+    window.addEventListener('pointermove', handleQrEditPanelPointerMove, { passive: false });
+    window.addEventListener('pointerup', handleQrEditPanelPointerUp);
+    window.addEventListener('pointercancel', handleQrEditPanelPointerCancel);
+  }
+
   function createOpenProjectTabFromCurrentState(options = {}) {
     const payload = buildOpenProjectTabPayloadFromCurrentState();
     const normalizedProjectId = normalizeAutosaveProjectId(options.projectId || autosaveProjectId)
@@ -8997,6 +9471,7 @@
       unsaved: Boolean(payload.unsaved),
       source: options.source || (currentProjectIsShared ? 'shared' : 'working'),
       updatedAt: payload.project?.updatedAt || new Date().toISOString(),
+      qrEditPayload: normalizeQrEditPayload(options.qrEditPayload, normalizedProjectId),
       ...(currentProjectIsShared ? {
         sharedProjectKey: currentSharedProjectKey || getSharedProjectKeyFromProjectId(normalizedProjectId),
         sharedProjectBackendId: typeof options.sharedProjectBackendId === 'string'
@@ -9051,6 +9526,7 @@
       sharedAutoJoin: false,
       deferredRestore: false,
       remoteUpdateAvailable: false,
+      qrEditPayload: normalizeQrEditPayload(options.qrEditPayload || currentTab?.qrEditPayload, normalizedProjectId),
     };
   }
 
@@ -9293,6 +9769,7 @@
     }
     document.body.classList.toggle('is-project-home-active', projectHomeVisible);
     renderOpenProjectTabs();
+    updateQrEditPanel();
     if (!projectHomeVisible) {
       return;
     }
@@ -9349,6 +9826,7 @@
       sharedProjectStructureRevision: options.sharedProjectStructureRevision,
       sharedRoleHint: options.sharedRoleHint,
       sharedAutoJoin: options.sharedAutoJoin,
+      qrEditPayload: options.qrEditPayload,
     });
     // Prevent duplicate tabs for the same normalized projectId.
     const normalizedTabProjectId = normalizeAutosaveProjectId(tab.projectId || '');
@@ -9391,6 +9869,7 @@
       sharedProjectStructureRevision: options.sharedProjectStructureRevision ?? current?.sharedProjectStructureRevision,
       sharedRoleHint: options.sharedRoleHint ?? current?.sharedRoleHint,
       sharedAutoJoin: options.sharedAutoJoin ?? current?.sharedAutoJoin,
+      qrEditPayload: typeof options.qrEditPayload !== 'undefined' ? options.qrEditPayload : current?.qrEditPayload,
     });
     openProjectTabs[index] = updated;
     activeOpenProjectTabId = updated.id;
@@ -9454,11 +9933,13 @@
           sharedProjectStructureRevision: current?.sharedProjectStructureRevision || 0,
           sharedRoleHint: current?.sharedRoleHint || '',
           sharedAutoJoin: current?.sharedAutoJoin !== false,
+          qrEditPayload: current?.qrEditPayload,
         })
       : createLocalOpenProjectTabFromCurrentState(current, {
           tabId: current?.id || activeOpenProjectTabId,
           source: current?.source || 'working',
           projectId: currentProjectId,
+          qrEditPayload: current?.qrEditPayload,
         });
     openProjectTabs[index] = updated;
     activeOpenProjectTabId = updated.id;
@@ -9545,6 +10026,7 @@
         loaded = await loadDocumentFromProjectPayload(target.project, {
           projectId: target.projectId || '',
           suppressAutosaveStatus: true,
+          qrEditPayload: target?.qrEditPayload || null,
         });
       }
       // If loadDocumentFromText returned the 'deferred' sentinel, it means
@@ -13483,6 +13965,7 @@
     updateHistoryButtons();
     scheduleSessionPersist({ includeSnapshots: false });
     updateMemoryStatus();
+    scheduleQrEditReadabilityCheck();
   }
 
   function undo() {
@@ -13533,6 +14016,7 @@
             markAutosaveDirty();
             markDocumentUnsavedChange();
             scheduleAutosaveSnapshot();
+            scheduleQrEditReadabilityCheck();
             try {
               if (sharedScopedHistory) {
                 handleMultiLocalCommit(historyLabel);
@@ -13576,6 +14060,7 @@
     markAutosaveDirty();
     markDocumentUnsavedChange();
     scheduleAutosaveSnapshot();
+    scheduleQrEditReadabilityCheck();
     if (isSharedProjectCollaborativeMode()) {
       handleMultiLocalCommit(historyLabel);
       const sharedOpType = sharedUndoOpType;
@@ -13648,6 +14133,7 @@
             markAutosaveDirty();
             markDocumentUnsavedChange();
             scheduleAutosaveSnapshot();
+            scheduleQrEditReadabilityCheck();
             try {
               if (sharedScopedHistory) {
                 handleMultiLocalCommit(historyLabel);
@@ -13691,6 +14177,7 @@
     markAutosaveDirty();
     markDocumentUnsavedChange();
     scheduleAutosaveSnapshot();
+    scheduleQrEditReadabilityCheck();
     if (isSharedProjectCollaborativeMode()) {
       handleMultiLocalCommit(historyLabel);
       const sharedOpType = sharedRedoOpType;
@@ -16424,6 +16911,16 @@
       dom.controls.toggleFloatingPreview.checked = Boolean(state.floatingPreview?.enabled) || isVoxelExtensionModeEnabled();
       dom.controls.toggleFloatingPreview.disabled = isVoxelExtensionModeEnabled();
     }
+    const qrEditPayload = getActiveQrEditPayload();
+    if (dom.controls.qrModeToggleField instanceof HTMLElement) {
+      const visible = Boolean(qrEditPayload);
+      dom.controls.qrModeToggleField.hidden = !visible;
+      dom.controls.qrModeToggleField.setAttribute('aria-hidden', String(!visible));
+    }
+    if (dom.controls.toggleQrMode instanceof HTMLInputElement) {
+      dom.controls.toggleQrMode.checked = qrEditPayload ? qrEditPayload.panelVisible !== false : false;
+      dom.controls.toggleQrMode.disabled = !qrEditPayload;
+    }
     if (dom.controls.toggleCanvasResizeHandles instanceof HTMLInputElement) {
       dom.controls.toggleCanvasResizeHandles.checked = Boolean(state.showCanvasResizeHandles ?? true);
     }
@@ -17107,6 +17604,7 @@
     setLocalizedTextContent('#colorModeIndexLabel', 'インデックスカラー', 'Indexed Color');
     setLocalizedTextContent('#colorModeRgbLabel', 'RGBカラー', 'RGB Color');
     setLocalizedTextContent('#settingsColorModeHint', 'インデックスカラーとRGBカラーを切り替えます。', 'Switch between Indexed Color and RGB Color.');
+    setLocalizedTextContent('#toggleQrModeLabel', 'QRモード', 'QR Mode');
     setLocalizedTextContent('#sortPaletteHue', '色相', 'H');
     setLocalizedTextContent('#sortPaletteSaturation', '彩度', 'S');
     setLocalizedTextContent('#sortPaletteValue', '明度', 'V');
@@ -18844,7 +19342,7 @@
     return true;
   }
 
-  async function openDocumentsAsProjectTabs(items, loader, { source = 'open' } = {}) {
+  async function openDocumentsAsProjectTabs(items, loader, { source = 'open', tabOptions = null } = {}) {
     if (!ensureCurrentClientCanReplaceActiveProject()) {
       return false;
     }
@@ -18944,10 +19442,17 @@
           const appended = appendOpenProjectTabFromCurrentState({
             activate: true,
             source,
+            ...(tabOptions && typeof tabOptions === 'object' ? tabOptions : {}),
           });
           if (!appended) {
             failedCount += 1;
             break;
+          }
+          if (tabOptions?.qrEditPayload) {
+            activateQrEditMode({
+              ...tabOptions.qrEditPayload,
+              projectId: appended.projectId || '',
+            });
           }
           openedCount += 1;
         } catch (error) {
@@ -19861,6 +20366,7 @@
     if (!ensureCurrentClientCanReplaceActiveProject()) {
       return false;
     }
+    deactivateQrEditMode();
     const closeLoading = beginBlockingGlobalLoading(
       localizeText('画像を読み込み中…', 'Loading image...'),
       { immediate: true }
@@ -20338,7 +20844,16 @@
           await ensureAutosaveForLensImport();
           return true;
         },
-        { source: 'qrmaker' }
+        {
+          source: 'qrmaker',
+          tabOptions: {
+            qrEditPayload: {
+              source: payload.source,
+              rawValue: typeof payload.rawValue === 'string' ? payload.rawValue : '',
+              editSize: payload.editSize,
+            },
+          },
+        }
       );
       if (!imported) {
         finalizeQrImportAttempt({ clearPayload: true });
@@ -24556,6 +25071,7 @@
 
     const requestedProjectId = normalizeAutosaveProjectId(options?.projectId || '');
     setActiveAutosaveProjectId(requestedProjectId || createAutosaveProjectId());
+    activateQrEditMode(options?.qrEditPayload || null);
     const requestedSharedProjectKey = normalizeMultiProjectKey(options?.sharedProjectKey || '');
     const requestedSharedProjectRevision = Math.max(0, Math.round(Number(options?.sharedProjectRevision) || 0));
     const activeEntryAfterLoad = recentProjectsCache.get(normalizeAutosaveProjectId(requestedProjectId || '')) || null;
@@ -35293,6 +35809,7 @@
       setupLayout();
       setupHorizontalOverflowDebug();
       setupGlobalFocusDismiss();
+      setupQrEditModeControls();
       initPwaInstallSupport();
       setupControls();
       setupExportDialog();
@@ -38511,6 +39028,13 @@
         updateGridDecorations();
         requestOverlayRender();
         scheduleUiStatePersist();
+      });
+    }
+
+    if (dom.controls.toggleQrMode instanceof HTMLInputElement && dom.controls.toggleQrMode.dataset.bound !== 'true') {
+      dom.controls.toggleQrMode.dataset.bound = 'true';
+      dom.controls.toggleQrMode.addEventListener('change', () => {
+        setQrEditPanelVisibleForActiveProject(dom.controls.toggleQrMode.checked);
       });
     }
 
@@ -85964,6 +86488,28 @@
       },
       true
     );
+  }
+
+  function setupQrEditModeControls() {
+    if (dom.qrEditPanel instanceof HTMLElement) {
+      dom.qrEditPanel.addEventListener('pointerdown', beginQrEditPanelDrag, { passive: false });
+      ['pointerdown', 'click', 'dblclick'].forEach(type => {
+        dom.qrEditPanel.addEventListener(type, event => {
+          event.stopPropagation();
+        }, { passive: false });
+      });
+    }
+    if (dom.qrEditPanelClose instanceof HTMLButtonElement) {
+      dom.qrEditPanelClose.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setQrEditPanelVisibleForActiveProject(false);
+        if (dom.controls.toggleQrMode instanceof HTMLInputElement) {
+          dom.controls.toggleQrMode.checked = false;
+        }
+        updateAutosaveStatus('QRパネルを非表示にしました', 'info');
+      });
+    }
   }
 
   init();
