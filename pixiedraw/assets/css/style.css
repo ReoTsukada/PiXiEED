@@ -3129,6 +3129,159 @@ body.is-startup-active #virtualCursorCanvas {
   transform: translateY(0);
 }
 
+.qr-edit-panel {
+  position: absolute;
+  top: 52px;
+  right: calc(var(--right-toggle-offset) + 4px);
+  width: min(300px, calc(100vw - 28px));
+  padding: 12px;
+  border: 1px solid rgba(120, 232, 217, 0.34);
+  background:
+    linear-gradient(180deg, rgba(10, 17, 24, 0.97), rgba(5, 10, 15, 0.95)),
+    rgba(7, 12, 18, 0.94);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(12px);
+  color: rgba(240, 248, 252, 0.96);
+  z-index: 5;
+  cursor: grab;
+  touch-action: none;
+}
+
+.qr-edit-panel[hidden] {
+  display: none !important;
+}
+
+.qr-edit-panel.is-dragging {
+  cursor: grabbing;
+}
+
+.qr-edit-panel__header,
+.qr-edit-panel__status-row,
+.qr-edit-panel__preview-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.qr-edit-panel__titles {
+  display: grid;
+  gap: 2px;
+}
+
+.qr-edit-panel__eyebrow {
+  color: rgba(128, 231, 219, 0.82);
+  font-size: 0.66rem;
+  letter-spacing: 0.16em;
+}
+
+.qr-edit-panel__title {
+  font-size: 0.98rem;
+  letter-spacing: 0.02em;
+}
+
+.qr-edit-panel__close {
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(239, 246, 250, 0.92);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.qr-edit-panel__close:hover,
+.qr-edit-panel__close:focus-visible {
+  border-color: rgba(128, 231, 219, 0.5);
+  background: rgba(128, 231, 219, 0.08);
+  outline: none;
+}
+
+.qr-edit-panel__body {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.qr-edit-panel__status,
+.qr-edit-panel__match {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  font-size: 0.76rem;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.qr-edit-panel__status[data-tone='ok'] {
+  border-color: rgba(87, 229, 154, 0.48);
+  color: rgba(189, 255, 218, 0.98);
+  background: rgba(35, 118, 71, 0.3);
+}
+
+.qr-edit-panel__status[data-tone='warn'] {
+  border-color: rgba(255, 176, 84, 0.46);
+  color: rgba(255, 223, 179, 0.98);
+  background: rgba(129, 74, 23, 0.28);
+}
+
+.qr-edit-panel__status[data-tone='error'] {
+  border-color: rgba(255, 113, 113, 0.46);
+  color: rgba(255, 214, 214, 0.98);
+  background: rgba(124, 37, 37, 0.3);
+}
+
+.qr-edit-panel__status[data-tone='idle'] {
+  border-color: rgba(130, 210, 255, 0.22);
+  color: rgba(213, 233, 247, 0.9);
+  background: rgba(38, 70, 93, 0.24);
+}
+
+.qr-edit-panel__match {
+  color: rgba(210, 236, 248, 0.88);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.qr-edit-panel__message,
+.qr-edit-panel__decoded {
+  margin: 0;
+  color: rgba(216, 229, 238, 0.8);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.qr-edit-panel__preview-wrap {
+  align-items: stretch;
+}
+
+.qr-edit-panel__preview {
+  width: 96px;
+  height: 96px;
+  flex: none;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background:
+    linear-gradient(45deg, rgba(255, 255, 255, 0.06) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.06) 75%),
+    linear-gradient(45deg, rgba(255, 255, 255, 0.06) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.06) 75%),
+    rgba(255, 255, 255, 0.02);
+  background-position: 0 0, 6px 6px;
+  background-size: 12px 12px;
+  image-rendering: pixelated;
+}
+
+.qr-edit-panel__decoded {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-height: 96px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  overflow: auto;
+  word-break: break-word;
+}
+
 .floating-draw-button {
   --floating-draw-button-scale: 2;
   --floating-draw-button-x: 16px;
@@ -3174,6 +3327,16 @@ body.is-startup-active #virtualCursorCanvas {
   overflow: hidden;
   z-index: 2000;
   text-shadow: none;
+}
+
+body.is-mobile-layout .qr-edit-panel {
+  top: calc(var(--mobile-safe-area-top) + var(--mobile-topbar-height) + var(--project-tabs-mobile-height) + 58px);
+  right: calc(var(--mobile-safe-area-right) + 8px);
+  width: min(280px, calc(100vw - var(--mobile-safe-area-left) - var(--mobile-safe-area-right) - 16px));
+}
+
+body.is-mobile-layout .qr-edit-panel__preview-wrap {
+  align-items: flex-start;
 }
 
 .floating-draw-button::before {
