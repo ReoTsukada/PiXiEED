@@ -57,7 +57,31 @@
   }
 }
 </script>
-<script async="" crossorigin="anonymous" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253"></script>
+<script>
+  (function configurePixieedAds() {
+    const isLocalDebug = (() => {
+      try {
+        const protocol = window.location?.protocol || '';
+        const host = window.location?.hostname || '';
+        return protocol === 'file:'
+          || host === 'localhost'
+          || host === '127.0.0.1'
+          || host === '::1';
+      } catch (error) {
+        return false;
+      }
+    })();
+    window.__PIXIEED_ADS_DISABLED__ = Boolean(window.__PIXIEED_ADS_DISABLED__ || isLocalDebug);
+    if (window.__PIXIEED_ADS_DISABLED__) {
+      return;
+    }
+    const script = document.createElement('script');
+    script.async = true;
+    script.crossOrigin = 'anonymous';
+    script.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253';
+    document.head.appendChild(script);
+  })();
+</script>
 <!-- Google tag (gtag.js) -->
 <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-SZPVXMX85G"></script>
 <script>
@@ -1887,15 +1911,6 @@
       const RETRY_FRAMES = 96;
       const slotByContainerId = new Map(SLOTS.map(item => [item.containerId, item]));
       const resizeObserverByContainer = new WeakMap();
-      const localHost = (() => {
-        try {
-          const host = location && location.hostname ? location.hostname : '';
-          return host === 'localhost' || host === '127.0.0.1' || host === '::1';
-        } catch (error) {
-          return false;
-        }
-      })();
-
       let rerenderQueued = false;
       let lastAdLayoutMode = null;
       let activeModeReloadTimer = null;
@@ -2109,9 +2124,7 @@
           ins.setAttribute('data-full-width-responsive', 'true');
         }
 
-        if (localHost) {
-          ins.setAttribute('data-adtest', 'on');
-        } else if (ins.hasAttribute('data-adtest')) {
+        if (ins.hasAttribute('data-adtest')) {
           ins.removeAttribute('data-adtest');
         }
 
