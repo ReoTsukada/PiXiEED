@@ -971,9 +971,23 @@
 <div class="page">
 <main>
 <section class="qr-grid">
+<section class="card qr-preview">
+<div>
+<h2>1. プレビュー</h2>
+<p class="small">QRコードのプレビューです。</p>
+</div>
+<div class="qr-canvas">
+<canvas height="280" id="qrCanvas" width="280"></canvas>
+</div>
+<div class="qr-actions" id="qrActions">
+<button class="btn" id="downloadBtn" type="button">PNGを保存</button>
+<button class="btn secondary" id="copyDataBtn" type="button">テキストをコピー</button>
+<button class="btn secondary" id="openInDrawBtn" type="button">PiXiEEDrawで編集</button>
+</div>
+</section>
 <section class="card">
 <div class="panel-head">
-<h2>1. 内容を設定</h2>
+<h2>2. 内容を設定</h2>
 </div>
 <div class="mode-section" id="qrControls">
 <label for="qrInput">エンコードする内容</label>
@@ -1020,20 +1034,6 @@
 </div>
 </div>
 </div>
-</div>
-</section>
-<section class="card qr-preview">
-<div>
-<h2>2. プレビュー</h2>
-<p class="small">QRコードのプレビューです。</p>
-</div>
-<div class="qr-canvas">
-<canvas height="280" id="qrCanvas" width="280"></canvas>
-</div>
-<div class="qr-actions" id="qrActions">
-<button class="btn" id="downloadBtn" type="button">PNGを保存</button>
-<button class="btn secondary" id="copyDataBtn" type="button">テキストをコピー</button>
-<button class="btn secondary" id="openInDrawBtn" type="button">PiXiEEDrawで編集</button>
 </div>
 </section>
 </main>
@@ -1318,26 +1318,65 @@
   function buildDrawReturnTargetUrl() {
     const fallback = new URL('../pixiedraw/index.html', window.location.href);
     const params = new URLSearchParams(window.location.search || '');
-    const returnMode = params.get(DRAW_RETURN_QUERY_KEY) || DRAW_RETURN_MODE_SELF;
     const drawUrlRaw = params.get(DRAW_URL_QUERY_KEY);
     let target = fallback;
     if (drawUrlRaw) {
       try {
-        target = new URL(drawUrlRaw);
+        const candidate = new URL(drawUrlRaw, window.location.href);
+        const candidatePath = `${candidate.pathname || ''}`.toLowerCase();
+        if (candidatePath.includes('/pixiedraw/')) {
+          target = candidate;
+        }
       } catch (error) {
         target = fallback;
       }
     }
-    if (returnMode === DRAW_RETURN_MODE_SELF) {
-      target.searchParams.set('qr', '1');
-    }
+    target.searchParams.set('qr', '1');
     return target.toString();
   }
 
   async function openInPixieeDraw() {
-    const sourceCanvas = downloadCanvas || qrCanvas;
-    if (!sourceCanvas) {
+    if (!qrCanvas) {
       qrStatus.textContent = 'QRコードが未生成です';
+      qrStatus.style.color = '#ffa95c';
+      return;
+    }
+    const text = (input.value.trim() || DEFAULT_TEXT).slice(0, TEXT_LIMIT);
+    const margin = clamp(parseInt(marginInput.value || '4', 10), 0, 24);
+    const qrOptions = {
+      errorCorrectionLevel: levelSelect.value,
+      margin,
+      color: {
+        dark: colorDark.value || '#0f172a',
+        light: colorLight.value || '#ffffff'
+      }
+    };
+    let qrModel = null;
+    try {
+      if (window.QRCode && typeof window.QRCode.create === 'function') {
+        qrModel = window.QRCode.create(text, qrOptions);
+      }
+    } catch (error) {
+      qrModel = null;
+    }
+    const moduleSize = Math.max(1, Math.floor(Number(qrModel?.modules?.size) || 0));
+    const drawEditSize = Math.max(21, moduleSize + (margin * 2));
+    const sourceCanvas = document.createElement('canvas');
+    sourceCanvas.width = drawEditSize;
+    sourceCanvas.height = drawEditSize;
+    const sourceCtx = sourceCanvas.getContext('2d', { alpha: false });
+    if (!sourceCtx) {
+      qrStatus.textContent = 'PiXiEEDrawへ送信できませんでした';
+      qrStatus.style.color = '#ffa95c';
+      return;
+    }
+    try {
+      await QRCode.toCanvas(sourceCanvas, text, {
+        ...qrOptions,
+        width: drawEditSize,
+      });
+    } catch (error) {
+      qrStatus.textContent = 'PiXiEEDrawへ送信できませんでした';
       qrStatus.style.color = '#ffa95c';
       return;
     }
@@ -1355,6 +1394,8 @@
     const payload = {
       source: 'qrmaker',
       filename: 'pixiee-qr.png',
+      rawValue: text,
+      editSize: drawEditSize,
       createdAt: Date.now(),
       expiresAt: Date.now() + (5 * 60 * 1000),
       dataUrl
@@ -1366,7 +1407,10 @@
       qrStatus.style.color = '#ffa95c';
       return;
     }
-    window.location.assign(buildDrawReturnTargetUrl());
+    const targetUrl = buildDrawReturnTargetUrl();
+    qrStatus.textContent = 'PiXiEEDrawへ移動中…';
+    qrStatus.style.color = '#7bcfff';
+    window.location.href = targetUrl;
   }
 
   input.addEventListener('input', () => {
