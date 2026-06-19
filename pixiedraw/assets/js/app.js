@@ -24918,9 +24918,8 @@
         );
         return;
       }
-      const opened = isStartupScreenAppendTabMode()
-        ? await openRecentProjectAsTab(firstEntry, { hideStartup: true, appendOnly: true })
-        : await openRecentProject(firstEntry, { hideStartup: true, silent: true });
+      await closeAllOpenProjectTabsForProjectReplacement({ flushAutosave: true, showHome: false });
+      const opened = await openRecentProject(firstEntry, { hideStartup: true, silent: true });
       if (!opened) {
         refreshRecentProjectsUI().catch(error => {
           console.warn('Failed to refresh recent projects', error);
@@ -25057,9 +25056,8 @@
         return;
       }
       openButton.disabled = true;
-      const success = isStartupScreenAppendTabMode()
-        ? await openRecentProjectAsTab(entry, { hideStartup: true, appendOnly: true })
-        : await openRecentProject(entry, { hideStartup: true, silent: true });
+      await closeAllOpenProjectTabsForProjectReplacement({ flushAutosave: true, showHome: false });
+      const success = await openRecentProject(entry, { hideStartup: true, silent: true });
       if (!success) {
         openButton.disabled = false;
       }
