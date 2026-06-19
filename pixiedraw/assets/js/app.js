@@ -34858,7 +34858,7 @@
     });
   }
 
-  function applyViewportTransform({ updateDecorations = true } = {}) {
+  function applyViewportTransform({ updateDecorations = true, clampVisibility = true } = {}) {
     if (!(dom.viewportWorkspace instanceof HTMLElement)) return;
     const panX = Math.round(Number(state.pan.x) || 0);
     const panY = Math.round(Number(state.pan.y) || 0);
@@ -34869,8 +34869,8 @@
       state.pan.y = panY;
     }
     dom.viewportWorkspace.style.transform = `translate(${panX}px, ${panY}px)`;
-    const clampResult = clampPanToKeepAnyCanvasVisible();
-    if (clampResult?.clampedX || clampResult?.clampedY) {
+    const clampResult = clampVisibility ? clampPanToKeepAnyCanvasVisible() : { clampedX: false, clampedY: false };
+    if (clampVisibility && (clampResult?.clampedX || clampResult?.clampedY)) {
       dom.viewportWorkspace.style.transform = `translate(${Math.round(Number(state.pan.x) || 0)}px, ${Math.round(Number(state.pan.y) || 0)}px)`;
     }
     if (updateDecorations) {
@@ -53302,7 +53302,10 @@
       zoomFocus = getVirtualCursorZoomFocus();
     }
     const multiCanvasWorldLayoutActive = isMultiCanvasWorldLayoutActive();
-    const viewportPanelFocus = getViewportPanelZoomFocus(zoomFocus, prevDisplayScale);
+    const useViewportPanelFocus = multiCanvasWorldLayoutActive || !isMainCanvasPanelCssCentered();
+    const viewportPanelFocus = useViewportPanelFocus
+      ? getViewportPanelZoomFocus(zoomFocus, prevDisplayScale)
+      : null;
 
     state.scale = targetScale;
     rememberViewportZoomRatioFromScale(targetScale);
@@ -53335,13 +53338,11 @@
     ) {
       const workspaceRectAfterResize = dom.viewportWorkspace.getBoundingClientRect();
       state.pan.x = Math.round(
-        previousPan.x
-        + viewportPanelFocus.clientX
+        viewportPanelFocus.clientX
         - (workspaceRectAfterResize.left + viewportPanelFocus.anchorLeft + (viewportPanelFocus.worldX * targetDisplayScale))
       );
       state.pan.y = Math.round(
-        previousPan.y
-        + viewportPanelFocus.clientY
+        viewportPanelFocus.clientY
         - (workspaceRectAfterResize.top + viewportPanelFocus.anchorTop + (viewportPanelFocus.worldY * targetDisplayScale))
       );
     } else if (zoomFocus && focusDrawing instanceof HTMLCanvasElement) {
@@ -53353,10 +53354,10 @@
         ? Number(zoomFocus.clientY)
         : drawingRectAfterResize.top + (zoomFocus.worldY * prevDisplayScale);
       state.pan.x = Math.round(
-        previousPan.x + focusClientX - (drawingRectAfterResize.left + (zoomFocus.worldX * targetDisplayScale))
+        focusClientX - (drawingRectAfterResize.left + (zoomFocus.worldX * targetDisplayScale))
       );
       state.pan.y = Math.round(
-        previousPan.y + focusClientY - (drawingRectAfterResize.top + (zoomFocus.worldY * targetDisplayScale))
+        focusClientY - (drawingRectAfterResize.top + (zoomFocus.worldY * targetDisplayScale))
       );
     } else {
       const ratio = targetDisplayScale / Math.max(prevDisplayScale, MIN_ZOOM_SCALE);
@@ -53364,7 +53365,10 @@
       state.pan.y = Math.round(previousPan.y * ratio);
     }
 
-    const clampResult = applyViewportTransform({ updateDecorations: false });
+    const clampResult = applyViewportTransform({
+      updateDecorations: false,
+      clampVisibility: !zoomFocus,
+    });
     if (
       zoomFocus
       && Number.isFinite(zoomFocus.clientX)
@@ -53388,7 +53392,10 @@
       if (correctionX || correctionY) {
         state.pan.x = Math.round((Number(state.pan.x) || 0) + correctionX);
         state.pan.y = Math.round((Number(state.pan.y) || 0) + correctionY);
-        applyViewportTransform({ updateDecorations: false });
+        applyViewportTransform({
+          updateDecorations: false,
+          clampVisibility: false,
+        });
       }
     }
     syncZoomControls(targetScale);
