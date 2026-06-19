@@ -4103,6 +4103,7 @@
   let startupVirtualCursorState = null;
   let pendingNewProjectAppendAsTab = false;
   let pendingNewProjectCreateShared = false;
+  let newProjectSubmitBusy = false;
   let lastSharedProjectCreationFailureReason = '';
   let lastSharedProjectCreationFailureDetail = '';
   let layoutMode = null;
@@ -8925,6 +8926,19 @@
     return index >= 0 ? openProjectTabs[index] : null;
   }
 
+  function isSharedOpenProjectTab(tab = null) {
+    if (!tab || typeof tab !== 'object') {
+      return false;
+    }
+    const tabProjectId = normalizeAutosaveProjectId(tab.projectId || '');
+    return Boolean(
+      getOpenProjectTabSharedKey(tab)
+      || tabProjectId.startsWith(SHARED_PROJECT_ID_PREFIX)
+      || tab.source === 'shared'
+      || tab.source === 'shared-recent'
+    );
+  }
+
   function confirmCloseOpenProjectTab(tab, { active = false } = {}) {
     const displayLabel = getOpenProjectTabDisplayLabel(tab, { active });
     return window.confirm(
@@ -9003,6 +9017,40 @@
         sharedRoleHint: options.sharedRoleHint || sharedEntry?.sharedRoleHint || 'guest',
         sharedAutoJoin: options.sharedAutoJoin !== false && sharedEntry?.sharedAutoJoin !== false,
       } : {}),
+    };
+  }
+
+  function createLocalOpenProjectTabFromCurrentState(currentTab = null, options = {}) {
+    const payload = buildOpenProjectTabPayloadFromCurrentState();
+    const normalizedProjectId = normalizeAutosaveProjectId(
+      options.projectId
+      || currentTab?.projectId
+      || autosaveProjectId
+    ) || createAutosaveProjectId();
+    const fileName = normalizeDocumentName(
+      options.fileName
+      || currentTab?.fileName
+      || payload.fileName
+      || DEFAULT_DOCUMENT_NAME
+    );
+    return {
+      ...(currentTab && typeof currentTab === 'object' ? currentTab : {}),
+      id: options.tabId || currentTab?.id || createOpenProjectTabId(),
+      projectId: normalizedProjectId,
+      fileName,
+      label: extractDocumentBaseName(fileName),
+      project: payload.project,
+      unsaved: Boolean(payload.unsaved),
+      source: options.source || currentTab?.source || 'working',
+      updatedAt: payload.project?.updatedAt || new Date().toISOString(),
+      sharedProjectKey: '',
+      sharedProjectBackendId: '',
+      sharedProjectRevision: 0,
+      sharedProjectStructureRevision: 0,
+      sharedRoleHint: '',
+      sharedAutoJoin: false,
+      deferredRestore: false,
+      remoteUpdateAvailable: false,
     };
   }
 
@@ -9395,25 +9443,23 @@
         console.warn('Failed to flush autosave before switching project tab', error);
       }
     }
-    const currentRecentEntry = recentProjectsCache.get(currentProjectId) || null;
-    const preserveSharedMetadata = Boolean(
-      current?.sharedProjectKey
-      || current?.source === 'shared'
-      || current?.source === 'shared-recent'
-      || currentProjectId.startsWith(SHARED_PROJECT_ID_PREFIX)
-      || isSharedRecentProjectEntry(currentRecentEntry)
-    );
-    const updated = createOpenProjectTabFromCurrentState({
-      tabId: current?.id || activeOpenProjectTabId,
-      source: current?.source || 'working',
-      projectId: currentProjectId,
-      sharedProjectKey: preserveSharedMetadata ? current?.sharedProjectKey : '',
-      sharedProjectBackendId: preserveSharedMetadata ? current?.sharedProjectBackendId : '',
-      sharedProjectRevision: preserveSharedMetadata ? current?.sharedProjectRevision : 0,
-      sharedProjectStructureRevision: preserveSharedMetadata ? current?.sharedProjectStructureRevision : 0,
-      sharedRoleHint: preserveSharedMetadata ? current?.sharedRoleHint : '',
-      sharedAutoJoin: preserveSharedMetadata ? current?.sharedAutoJoin : false,
-    });
+    const updated = isSharedOpenProjectTab(current)
+      ? createOpenProjectTabFromCurrentState({
+          tabId: current?.id || activeOpenProjectTabId,
+          source: current?.source || 'working',
+          projectId: currentProjectId,
+          sharedProjectKey: current?.sharedProjectKey || '',
+          sharedProjectBackendId: current?.sharedProjectBackendId || '',
+          sharedProjectRevision: current?.sharedProjectRevision || 0,
+          sharedProjectStructureRevision: current?.sharedProjectStructureRevision || 0,
+          sharedRoleHint: current?.sharedRoleHint || '',
+          sharedAutoJoin: current?.sharedAutoJoin !== false,
+        })
+      : createLocalOpenProjectTabFromCurrentState(current, {
+          tabId: current?.id || activeOpenProjectTabId,
+          source: current?.source || 'working',
+          projectId: currentProjectId,
+        });
     openProjectTabs[index] = updated;
     activeOpenProjectTabId = updated.id;
     renderOpenProjectTabs();
@@ -9496,7 +9542,7 @@
           skipLatestRefresh: true,
         });
       } else {
-        loaded = await loadDocumentFromText(JSON.stringify(target.project), null, {
+        loaded = await loadDocumentFromProjectPayload(target.project, {
           projectId: target.projectId || '',
           suppressAutosaveStatus: true,
         });
@@ -18839,11 +18885,15 @@
             // produces a separate project tab.
             try {
               let packaged = null;
+              let deferredProjectId = '';
+              let deferredFileName = DEFAULT_DOCUMENT_NAME;
+              let deferredUnsaved = false;
               // If item looks like a File/Blob with a text() method, read it
               if (item && typeof item.text === 'function') {
                 try {
                   const text = await item.text();
                   packaged = tryParseJsonSafe(text);
+                  deferredFileName = normalizeDocumentName(item.name || packaged?.documentName || DEFAULT_DOCUMENT_NAME);
                 } catch (e) {
                   packaged = null;
                 }
@@ -18853,31 +18903,30 @@
                   const f = await item.getFile();
                   const text = await f.text();
                   packaged = tryParseJsonSafe(text);
+                  deferredFileName = normalizeDocumentName(f?.name || item.name || packaged?.documentName || DEFAULT_DOCUMENT_NAME);
                 } catch (e) {
                   packaged = null;
                 }
               } else if (item && typeof item === 'object' && item.project) {
                 packaged = item.project;
+                deferredProjectId = normalizeAutosaveProjectId(item.id || '');
+                deferredFileName = normalizeDocumentName(item.name || packaged?.documentName || DEFAULT_DOCUMENT_NAME);
+                deferredUnsaved = Boolean(item.unsaved);
               }
               if (packaged && typeof packaged === 'object') {
-                ensureOpenProjectTabsInitialized();
-                const newTabId = createOpenProjectTabId();
-                const newTab = {
-                  id: newTabId,
-                  projectId: createAutosaveProjectId(),
-                  fileName: normalizeDocumentName(packaged.documentName || DEFAULT_DOCUMENT_NAME),
-                  label: extractDocumentBaseName(packaged.documentName || DEFAULT_DOCUMENT_NAME),
+                const appended = await appendPackagedProjectTab({
                   project: packaged,
-                  unsaved: false,
+                  projectId: deferredProjectId,
+                  fileName: deferredFileName,
+                  unsaved: deferredUnsaved,
                   source: source || 'open',
-                  updatedAt: (packaged.updatedAt || new Date().toISOString()),
-                };
-                openProjectTabs.push(newTab);
-                activeOpenProjectTabId = newTabId;
-                suppressOpenProjectTabAutoInitialize = false;
-                renderOpenProjectTabs();
-                openedCount += 1;
-                continue;
+                  updatedAt: packaged.updatedAt || new Date().toISOString(),
+                });
+                if (appended) {
+                  queueProjectTabViewportReset(appended.id);
+                  openedCount += 1;
+                  continue;
+                }
               }
             } catch (e) {
               console.warn('Failed to create tab from deferred loader item', e);
@@ -18942,6 +18991,88 @@
     } catch (e) {
       return null;
     }
+  }
+
+  async function loadRecentProjectPackagedPayload(entry) {
+    if (!entry || typeof entry !== 'object') {
+      return null;
+    }
+    if (entry.project && typeof entry.project === 'object') {
+      return entry.project;
+    }
+    if (!entry.handle || typeof entry.handle.getFile !== 'function') {
+      return null;
+    }
+    try {
+      const file = await entry.handle.getFile();
+      const text = await file.text();
+      return tryParseJsonSafe(text);
+    } catch (error) {
+      console.warn('Failed to read recent project payload for tab open', error);
+      return null;
+    }
+  }
+
+  async function appendPackagedProjectTab({
+    project = null,
+    projectId = '',
+    fileName = DEFAULT_DOCUMENT_NAME,
+    unsaved = false,
+    source = 'open',
+    updatedAt = '',
+    activateOptions = {},
+    ...extraTabFields
+  } = {}) {
+    if (!project || typeof project !== 'object') {
+      return null;
+    }
+    ensureOpenProjectTabsInitialized();
+    const normalizedProjectId = normalizeAutosaveProjectId(projectId || '');
+    if (normalizedProjectId) {
+      const existingIndex = findOpenProjectTabIndexByProjectId(normalizedProjectId);
+      if (existingIndex >= 0) {
+        const existingTab = openProjectTabs[existingIndex];
+        const activated = await activateOpenProjectTab(existingTab?.id || '', {
+          skipPersistCurrent: true,
+          announce: false,
+          ...activateOptions,
+        });
+        return activated ? existingTab : null;
+      }
+    }
+    if (openProjectTabs.length >= MAX_OPEN_PROJECT_TABS) {
+      return null;
+    }
+    const normalizedFileName = normalizeDocumentName(fileName || project?.documentName || DEFAULT_DOCUMENT_NAME);
+    const newTabId = createOpenProjectTabId();
+    const nextTab = {
+      id: newTabId,
+      projectId: normalizedProjectId || createAutosaveProjectId(),
+      fileName: normalizedFileName,
+      label: extractDocumentBaseName(normalizedFileName),
+      project,
+      unsaved: Boolean(unsaved),
+      source,
+      updatedAt: updatedAt || project?.updatedAt || new Date().toISOString(),
+      ...extraTabFields,
+    };
+    openProjectTabs.push(nextTab);
+    suppressOpenProjectTabAutoInitialize = false;
+    renderOpenProjectTabs();
+    const activated = await activateOpenProjectTab(newTabId, {
+      skipPersistCurrent: true,
+      announce: false,
+      ...activateOptions,
+    });
+    if (!activated) {
+      const insertedIndex = findOpenProjectTabIndex(newTabId);
+      if (insertedIndex >= 0) {
+        openProjectTabs.splice(insertedIndex, 1);
+      }
+      renderOpenProjectTabs();
+      return null;
+    }
+    return openProjectTabs[findOpenProjectTabIndex(newTabId)] || nextTab;
   }
 
   async function createNewProjectAsTab({
@@ -19012,11 +19143,14 @@
       const projectId = sharedEntryForTab
         ? buildSharedRecentProjectId(sharedEntryForTab.sharedProjectKey || '')
         : normalizeAutosaveProjectId(entry.id || '');
+      const latestEntry = projectId && !sharedEntryForTab
+        ? ((await loadRecentProjectsMetadata()).find(candidate => candidate?.id === projectId) || entry)
+        : entry;
       if (openProjectTabBusy) {
         return false;
       }
       ensureOpenProjectTabsInitialized();
-      const existingSwitch = await switchToOpenProjectTabForRecentProjectEntry(entry, {
+      const existingSwitch = await switchToOpenProjectTabForRecentProjectEntry(latestEntry, {
         hideStartup,
         silent: false,
       });
@@ -19038,6 +19172,49 @@
       openProjectTabBusy = true;
       try {
         await persistActiveOpenProjectTab({ flushAutosave: true });
+        const packaged = await loadRecentProjectPackagedPayload(latestEntry);
+        if (packaged && typeof packaged === 'object') {
+          const fileName = normalizeDocumentName(
+            latestEntry?.name
+            || packaged?.documentName
+            || packaged?.document?.documentName
+            || DEFAULT_DOCUMENT_NAME
+          );
+          const nextTab = await appendPackagedProjectTab({
+            project: packaged,
+            projectId: projectId || createAutosaveProjectId(),
+            fileName,
+            unsaved: Boolean(latestEntry?.unsaved),
+            source,
+            updatedAt: latestEntry?.updatedAt || packaged?.updatedAt || new Date().toISOString(),
+            activateOptions: {
+              skipPersistCurrent: true,
+              announce: false,
+            },
+            ...(sharedEntryForTab ? {
+              sharedProjectKey: sharedEntryForTab.sharedProjectKey || '',
+              sharedProjectBackendId: sharedEntryForTab.sharedProjectBackendId || '',
+              sharedProjectRevision: sharedEntryForTab.sharedProjectRevision || 0,
+              sharedProjectStructureRevision: sharedEntryForTab.sharedProjectStructureRevision || 0,
+              sharedRoleHint: sharedEntryForTab.sharedRoleHint || 'guest',
+              sharedAutoJoin: sharedEntryForTab.sharedAutoJoin !== false,
+            } : {}),
+          });
+          if (!nextTab) {
+            return false;
+          }
+          queueProjectTabViewportReset(nextTab.id);
+          if (hideStartup) {
+            hideStartupScreen();
+          }
+          updateAutosaveStatus(
+            Boolean(sharedEntryForTab)
+              ? localizeText('共有プロジェクトをタブ追加しました', 'Added shared project tab')
+              : localizeText('端末内プロジェクトをタブ追加しました', 'Added local project tab'),
+            'success'
+          );
+          return true;
+        }
         const loaded = await openRecentProject(entry, {
           hideStartup: false,
           silent: true,
@@ -23118,76 +23295,84 @@
   }
 
   async function handleNewProjectSubmit() {
+    if (newProjectSubmitBusy) {
+      return;
+    }
     const config = dom.newProject;
     if (config?.form && typeof config.form.reportValidity === 'function') {
       if (!config.form.reportValidity()) {
         return;
       }
     }
-    const rawName = config?.nameInput?.value ?? state.documentName;
-    const name = normalizeDocumentName(rawName);
-    const widthValue = config?.widthInput?.value;
-    const heightValue = config?.heightInput?.value;
-    const palettePresetValue = config?.palettePreset?.value;
-    const width = Number(widthValue);
-    const height = Number(heightValue);
-    const selectedCreateMode = dom.newProject?.createMode instanceof HTMLSelectElement
-      ? dom.newProject.createMode.value
-      : 'local';
-    const shouldCreateShared = selectedCreateMode === 'shared' || Boolean(pendingNewProjectCreateShared);
-    const shouldAppendAsTab = Boolean(pendingNewProjectAppendAsTab);
-    let created = false;
-    let createdLocalProject = false;
-    let sharedCreationFailure = null;
-    if (shouldCreateShared) {
-      const result = await createSharedProjectFromNewProject({
-        name,
-        width,
-        height,
-        palettePreset: palettePresetValue,
-        promptExportDirectory: false,
-      });
-      created = Boolean(result?.sharedCreated);
-      createdLocalProject = Boolean(result?.localCreated);
-      if (!created) {
-        sharedCreationFailure = {
-          reason: result?.failureReason || '',
-          detail: result?.failureDetail || '',
-          localCreated: createdLocalProject,
-        };
+    newProjectSubmitBusy = true;
+    try {
+      const rawName = config?.nameInput?.value ?? state.documentName;
+      const name = normalizeDocumentName(rawName);
+      const widthValue = config?.widthInput?.value;
+      const heightValue = config?.heightInput?.value;
+      const palettePresetValue = config?.palettePreset?.value;
+      const width = Number(widthValue);
+      const height = Number(heightValue);
+      const selectedCreateMode = dom.newProject?.createMode instanceof HTMLSelectElement
+        ? dom.newProject.createMode.value
+        : 'local';
+      const shouldCreateShared = selectedCreateMode === 'shared' || Boolean(pendingNewProjectCreateShared);
+      const shouldAppendAsTab = Boolean(pendingNewProjectAppendAsTab);
+      let created = false;
+      let createdLocalProject = false;
+      let sharedCreationFailure = null;
+      if (shouldCreateShared) {
+        const result = await createSharedProjectFromNewProject({
+          name,
+          width,
+          height,
+          palettePreset: palettePresetValue,
+          promptExportDirectory: false,
+        });
+        created = Boolean(result?.sharedCreated);
+        createdLocalProject = Boolean(result?.localCreated);
+        if (!created) {
+          sharedCreationFailure = {
+            reason: result?.failureReason || '',
+            detail: result?.failureDetail || '',
+            localCreated: createdLocalProject,
+          };
+        }
+      } else if (shouldAppendAsTab) {
+        created = await createNewProjectAsTab({
+          name,
+          width,
+          height,
+          palettePreset: palettePresetValue,
+          promptExportDirectory: false,
+        });
+      } else {
+        created = await createNewProject({
+          name,
+          width,
+          height,
+          palettePreset: palettePresetValue,
+          promptExportDirectory: false,
+        });
       }
-    } else if (shouldAppendAsTab) {
-      created = await createNewProjectAsTab({
-        name,
-        width,
-        height,
-        palettePreset: palettePresetValue,
-        promptExportDirectory: false,
-      });
-    } else {
-      created = await createNewProject({
-        name,
-        width,
-        height,
-        palettePreset: palettePresetValue,
-        promptExportDirectory: false,
-      });
-    }
-    if (created || createdLocalProject) {
-      if (config?.nameInput) {
-        config.nameInput.value = extractDocumentBaseName(name);
-      }
-      closeNewProjectDialog();
-      if (projectHomeVisible) {
-        hideProjectHomeScreen();
-      }
-      if (sharedCreationFailure) {
+      if (created || createdLocalProject) {
+        if (config?.nameInput) {
+          config.nameInput.value = extractDocumentBaseName(name);
+        }
+        closeNewProjectDialog();
+        if (projectHomeVisible) {
+          hideProjectHomeScreen();
+        }
+        if (sharedCreationFailure) {
+          openSharedProjectCreateFailureDialog(sharedCreationFailure);
+        }
+      } else if (!shouldCreateShared) {
+        window.alert(`キャンバスサイズは${MIN_CANVAS_SIZE}〜${MAX_CANVAS_SIZE}の数値で入力してください。`);
+      } else if (sharedCreationFailure) {
         openSharedProjectCreateFailureDialog(sharedCreationFailure);
       }
-    } else if (!shouldCreateShared) {
-      window.alert(`キャンバスサイズは${MIN_CANVAS_SIZE}〜${MAX_CANVAS_SIZE}の数値で入力してください。`);
-    } else if (sharedCreationFailure) {
-      openSharedProjectCreateFailureDialog(sharedCreationFailure);
+    } finally {
+      newProjectSubmitBusy = false;
     }
   }
 
@@ -24258,7 +24443,6 @@
         // Ignore guarding errors and proceed to load (safer to load than to fail)
       }
     }
-    const preservedSelectionClipboard = preserveCanvasSelectionClipboard();
     let parsedDocument = null;
     try {
       parsedDocument = snapshotFromDocumentText(text);
@@ -24267,12 +24451,53 @@
       updateAutosaveStatus('ドキュメントの読み込みに失敗しました', 'error');
       return false;
     }
+    return await applyLoadedDocumentSnapshot(parsedDocument, options);
+  }
+
+  async function loadDocumentFromProjectPayload(projectPayload, options = {}) {
+    if (!ensureCurrentClientCanReplaceActiveProject({ announce: !options?.suppressAutosaveStatus })) {
+      return false;
+    }
+    if ((options?.openedFromRecent || options?.sharedProjectKey) && !options?.allowProjectMismatchLoad) {
+      try {
+        const requestedProjectId = normalizeAutosaveProjectId(String(options?.projectId || '') || '');
+        const requestedSharedKey = String(options?.sharedProjectKey || '').trim() || '';
+        const activeTab = getActiveOpenProjectTab();
+        const activeProjectId = normalizeAutosaveProjectId(activeTab?.projectId || autosaveProjectId || '');
+        const activeSharedKey = String(getOpenProjectTabSharedKey(activeTab) || '').trim() || '';
+        if (requestedProjectId && activeProjectId && requestedProjectId !== activeProjectId) {
+          return 'deferred';
+        }
+        if (requestedSharedKey && activeSharedKey && requestedSharedKey !== activeSharedKey) {
+          return 'deferred';
+        }
+      } catch (_error) {
+        // Ignore guard failures and continue to load.
+      }
+    }
+    let parsedDocument = null;
+    try {
+      parsedDocument = snapshotFromParsedDocumentValue(projectPayload);
+    } catch (error) {
+      console.warn('Failed to parse in-memory project payload', error);
+      if (!options?.suppressAutosaveStatus) {
+        updateAutosaveStatus('ドキュメントの読み込みに失敗しました', 'error');
+      }
+      return false;
+    }
+    return await applyLoadedDocumentSnapshot(parsedDocument, options);
+  }
+
+  async function applyLoadedDocumentSnapshot(parsedDocument, options = {}) {
+    const preservedSelectionClipboard = preserveCanvasSelectionClipboard();
     const snapshot = parsedDocument?.snapshot || null;
     const projectSession = parsedDocument?.projectSession || null;
     const preserveDotStats = Boolean(options?.projectId || options?.openedFromRecent || options?.preserveDotStats);
     const dotStats = preserveDotStats ? (parsedDocument?.dotStats || null) : null;
     if (!snapshot) {
-      updateAutosaveStatus('ドキュメントの読み込みに失敗しました', 'error');
+      if (!options?.suppressAutosaveStatus) {
+        updateAutosaveStatus('ドキュメントの読み込みに失敗しました', 'error');
+      }
       return false;
     }
     synchronizeImportedSnapshotPalette(snapshot);
@@ -24618,6 +24843,10 @@
       throw new Error('Document text is empty');
     }
     const parsed = JSON.parse(text);
+    return snapshotFromParsedDocumentValue(parsed);
+  }
+
+  function snapshotFromParsedDocumentValue(parsed) {
     const hasPackagedDocument = Boolean(parsed && typeof parsed === 'object' && parsed.document && typeof parsed.document === 'object');
     const payload = hasPackagedDocument ? parsed.document : parsed;
     const snapshot = deserializeDocumentPayload(payload);
@@ -28319,13 +28548,10 @@
         ? ((await loadRecentProjectsMetadata()).find(candidate => candidate?.id === projectId) || entry)
         : entry;
       if (!options.allowProjectMismatchLoad && !openProjectTabBusy && openProjectTabs.length) {
-        const existingSwitch = await switchToOpenProjectTabForRecentProjectEntry(latestEntry, {
+        return await openRecentProjectAsTab(latestEntry, {
           hideStartup: hideStartupOnSuccess,
-          silent,
+          appendOnly: true,
         });
-        if (existingSwitch.found) {
-          return existingSwitch.switched;
-        }
       }
       if (isSharedRecentProjectEntry(latestEntry)) {
         return await openSharedRecentProject(latestEntry, {
@@ -28352,6 +28578,9 @@
           openedFromRecent: true,
           allowProjectMismatchLoad: Boolean(options.allowProjectMismatchLoad),
         });
+        if (loaded === 'deferred') {
+          return false;
+        }
         return loaded ? finishRecentProjectOpen('自動保存: プロジェクトを開きました') : false;
       };
       if (latestEntry.project && typeof latestEntry.project === 'object') {
@@ -28369,37 +28598,22 @@
           // containing the packaged project and activate it so the project
           // becomes visible without overwriting the current document.
           try {
-            ensureOpenProjectTabsInitialized();
             const deferredProjectId = normalizeAutosaveProjectId(latestEntry.id || '') || createAutosaveProjectId();
-            const existingDeferredIndex = findOpenProjectTabIndexByProjectId(deferredProjectId);
-            if (existingDeferredIndex >= 0) {
-              const existingTab = openProjectTabs[existingDeferredIndex];
-              const switched = await activateOpenProjectTab(existingTab?.id || '', {
-                skipPersistCurrent: true,
-                announce: !silent,
-              });
-              return switched ? finishRecentProjectOpen('自動保存: プロジェクトを開きました') : false;
-            }
-            const newTabId = createOpenProjectTabId();
-            const newTab = {
-              id: newTabId,
+            const appended = await appendPackagedProjectTab({
+              project: latestEntry.project || null,
               projectId: deferredProjectId,
               fileName: normalizeDocumentName(latestEntry.name || DEFAULT_DOCUMENT_NAME),
-              label: extractDocumentBaseName(latestEntry.name || DEFAULT_DOCUMENT_NAME),
-              project: latestEntry.project || null,
               unsaved: Boolean(latestEntry.unsaved) || false,
               source: 'recent',
-              updatedAt: (latestEntry.updatedAt || new Date().toISOString()),
-            };
-            openProjectTabs.push(newTab);
-            activeOpenProjectTabId = newTabId;
-            suppressOpenProjectTabAutoInitialize = false;
-            renderOpenProjectTabs();
-            // Now activate the new tab to actually apply the snapshot into
-            // the active document (activateOpenProjectTab will attempt to
-            // load from the tab.project and should succeed because the
-            // active tab now matches the requested projectId).
-            await activateOpenProjectTab(newTabId, { skipPersistCurrent: true, announce: !silent });
+              updatedAt: latestEntry.updatedAt || new Date().toISOString(),
+              activateOptions: {
+                skipPersistCurrent: true,
+                announce: !silent,
+              },
+            });
+            if (!appended) {
+              return false;
+            }
             return finishRecentProjectOpen('自動保存: プロジェクトを開きました');
           } catch (e) {
             console.warn('Failed to create/activate deferred recent project tab', e);
@@ -62641,6 +62855,12 @@
       const activeTabProjectId = normalizeAutosaveProjectId(activeTab?.projectId || autosaveProjectId || '');
       if (restoredProjectId && activeTabProjectId && restoredProjectId !== activeTabProjectId) {
         try {
+          const existingRestoreTabIndex = findOpenProjectTabIndexByProjectId(restoredProjectId);
+          if (existingRestoreTabIndex >= 0) {
+            startupAutosaveRestoreProjectId = restoredProjectId;
+            renderOpenProjectTabs();
+            return true;
+          }
           // Build a packaged project payload for storing in a deferred tab.
           const packaged = buildPackagedProjectPayload(snapshot, { session: buildAutosaveSessionPayload() });
           const fileName = normalizeDocumentName(snapshot.documentName || `${extractDocumentBaseName(packaged?.name || '') || DEFAULT_DOCUMENT_BASENAME}${PROJECT_FILE_EXTENSION}`);
