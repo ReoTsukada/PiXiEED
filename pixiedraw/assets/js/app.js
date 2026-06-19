@@ -26134,6 +26134,7 @@
       fileName,
       updatedAt,
       thumbnail: typeof entry.thumbnail === 'string' && entry.thumbnail.length > 0 ? entry.thumbnail : null,
+      thumbnailSheetId: typeof entry.thumbnailSheetId === 'string' ? entry.thumbnailSheetId : '',
       project: cachedProjectPayload,
     };
   }
@@ -28325,16 +28326,18 @@
 
   function buildProjectSheetsPayload(activePackagedProject = null) {
     const sheets = [];
-    const activeId = activeOpenProjectTabId || '';
+    const fallbackId = activeOpenProjectTabId || openProjectTabs[0]?.id || createOpenProjectTabId();
+    const activeId = activeOpenProjectTabId || fallbackId;
     const activeProjectId = normalizeAutosaveProjectId(autosaveProjectId || '') || createAutosaveProjectId();
     const sourceTabs = openProjectTabs.length
       ? openProjectTabs
       : [{
-        id: activeId || createOpenProjectTabId(),
+        id: fallbackId,
         projectId: activeProjectId,
         fileName: state.documentName || DEFAULT_DOCUMENT_NAME,
         label: extractDocumentBaseName(state.documentName || DEFAULT_DOCUMENT_NAME),
         source: 'working',
+        project: activePackagedProject,
       }];
     sourceTabs.slice(0, MAX_PROJECT_SHEETS).forEach((tab, index) => {
       const isActive = tab?.id && tab.id === activeId;
@@ -28406,6 +28409,34 @@
     return dotStatsApi.normalizeDotStats(packagedPayload?.dotStats || null);
   }
 
+  function getPackagedProjectFirstSheet(packagedPayload = null) {
+    const sheets = Array.isArray(packagedPayload?.sheets) ? packagedPayload.sheets : [];
+    return sheets.find(sheet => sheet && typeof sheet === 'object' && sheet.project && typeof sheet.project === 'object') || null;
+  }
+
+  function getRecentProjectListSnapshot(packagedPayload = null, fallbackSnapshot = null) {
+    const firstSheet = getPackagedProjectFirstSheet(packagedPayload);
+    if (!firstSheet?.project) {
+      return fallbackSnapshot;
+    }
+    try {
+      return snapshotFromParsedDocumentValue(firstSheet.project)?.snapshot || fallbackSnapshot;
+    } catch (error) {
+      console.warn('Failed to resolve first sheet snapshot for project list', error);
+      return fallbackSnapshot;
+    }
+  }
+
+  function getRecentProjectListFileName(packagedPayload = null, fallbackSnapshot = null) {
+    const firstSheet = getPackagedProjectFirstSheet(packagedPayload);
+    return normalizeDocumentName(
+      firstSheet?.fileName
+      || firstSheet?.project?.document?.documentName
+      || fallbackSnapshot?.documentName
+      || DEFAULT_DOCUMENT_NAME
+    );
+  }
+
   function schedulePackagedProjectDotSync(projectId, dotStats) {
     const resolvedProjectId = normalizeAutosaveProjectId(projectId || '');
     if (!resolvedProjectId || !dotStats || dotStats.totalDots <= 0) {
@@ -28453,7 +28484,10 @@
         : buildPackagedProjectPayload(snapshot);
       const initialEntries = await loadRecentProjectsMetadata();
       const previousEntry = initialEntries.find(entry => entry?.id === resolvedProjectId) || null;
-      const fileName = normalizeDocumentName(snapshot?.documentName || DEFAULT_DOCUMENT_NAME);
+      const listSnapshot = getRecentProjectListSnapshot(packaged, snapshot);
+      const listSheet = getPackagedProjectFirstSheet(packaged);
+      const listThumbnailSheetId = typeof listSheet?.id === 'string' ? listSheet.id : '';
+      const fileName = getRecentProjectListFileName(packaged, listSnapshot || snapshot);
       const displayName = extractDocumentBaseName(fileName);
       const nowTs = Date.now();
       const previousUpdatedAt = previousEntry?.updatedAt ? Date.parse(previousEntry.updatedAt) : NaN;
@@ -28465,11 +28499,12 @@
         !skipThumbnail
         && (
           !previousEntry?.thumbnail
+          || (listThumbnailSheetId && previousEntry?.thumbnailSheetId !== listThumbnailSheetId)
           || !Number.isFinite(previousUpdatedAt)
           || (nowTs - previousUpdatedAt >= safeThumbnailInterval)
         );
       const thumbnail = shouldRefreshThumbnail
-        ? (await generateSnapshotThumbnail(snapshot))
+        ? (await generateSnapshotThumbnail(listSnapshot || snapshot))
         : previousEntry.thumbnail;
       const dotStats = resolvePackagedProjectDotStats(packaged, snapshot);
       const sharedEntrySeed = isSharedRecentProjectEntry(previousEntry)
@@ -28485,6 +28520,7 @@
               fileName,
               updatedAt: packaged.updatedAt || new Date().toISOString(),
               thumbnail: thumbnail || null,
+              thumbnailSheetId: listThumbnailSheetId || '',
               project: packaged,
             }),
           }
@@ -28495,6 +28531,7 @@
             fileName,
             updatedAt: packaged.updatedAt || new Date().toISOString(),
             thumbnail: thumbnail || null,
+            thumbnailSheetId: listThumbnailSheetId || '',
             project: packaged,
           };
       if (dotStats) {
