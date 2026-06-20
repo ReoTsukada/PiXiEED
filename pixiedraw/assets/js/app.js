@@ -55909,8 +55909,7 @@
     const selectionMask = state.selectionMask;
     const hasSelection = Boolean(selectionMask && selectionMaskHasPixels(selectionMask));
     const selectionHit = hasSelection && isPositionInCurrentSelection(position);
-    const selectionBoundsHit = hasSelection && isPositionInCurrentSelectionBounds(position);
-    const selectionInteractionHit = selectionHit || selectionBoundsHit;
+    const selectionInteractionHit = selectionHit;
     const isSelectionTool = activeTool === 'selectRect' || activeTool === 'selectLasso' || activeTool === 'selectSame' || activeTool === 'move';
     const pendingMoveState = !pointerState.active
       ? (getPendingSelectionMoveState() || state.pendingPasteMoveState)
@@ -55919,11 +55918,9 @@
       pointerState.selectionMove = null;
     }
     const pendingSelectionHit = Boolean(pendingMoveState && isPositionInMoveState(position, pendingMoveState));
-    const pendingSelectionBoundsHit = Boolean(pendingMoveState && isPositionInMoveVisualBounds(position, pendingMoveState));
-
     if (pendingMoveState) {
       // Keep dragging when touching the moved selection preview; confirm when touching outside.
-      if (isSelectionTool && (selectionHit || pendingSelectionHit || pendingSelectionBoundsHit)) {
+      if (isSelectionTool && (selectionHit || pendingSelectionHit)) {
         const moved = beginSelectionMove(event, position, { reuseOffset: true });
         if (moved) {
           updateCanvasControlButtons();
@@ -56759,7 +56756,7 @@
   }
 
   function isPositionInCurrentSelectionInteractionArea(position) {
-    return isPositionInCurrentSelection(position) || isPositionInCurrentSelectionBounds(position);
+    return isPositionInCurrentSelection(position);
   }
 
   function isPositionInMoveState(position, moveState) {
@@ -61480,7 +61477,6 @@
     const {
       append = false,
       cellSize = SELECT_RECT_GRID_CELL_SIZE,
-      selectionShapeMode = state.selectionShapeMode,
     } = options || {};
     const boundsRect = getSelectionGridRectPixelBounds(startCell, endCell, cellSize);
     if (!boundsRect) {
@@ -61499,7 +61495,6 @@
     const { mask, bounds, hasBaseSelection } = createSelectionAccumulator({ append });
     for (let y = boundsRect.y0; y <= boundsRect.y1; y += 1) {
       for (let x = boundsRect.x0; x <= boundsRect.x1; x += 1) {
-        if (!shouldIncludeShapeSelectionPixel(layer, x, y, selectionShapeMode)) continue;
         markSelectionMaskPixel(mask, bounds, x, y);
       }
     }
@@ -61520,7 +61515,7 @@
   }
 
   function createSelectionRect(start, end, options = {}) {
-    const { append = false, selectionShapeMode = state.selectionShapeMode } = options || {};
+    const { append = false } = options || {};
     const layer = getActiveLayer();
     if (!layer) {
       if (!append) {
@@ -61536,7 +61531,6 @@
 
     for (let y = y0; y <= y1; y += 1) {
       for (let x = x0; x <= x1; x += 1) {
-        if (!shouldIncludeShapeSelectionPixel(layer, x, y, selectionShapeMode)) continue;
         markSelectionMaskPixel(mask, bounds, x, y);
       }
     }
@@ -61627,8 +61621,12 @@
     if (!layer) return false;
     if (x < 0 || y < 0 || x >= state.width || y >= state.height) return false;
     const idx = y * state.width + x;
-    if (layer.indices[idx] >= 0) {
-      return true;
+    const paletteIndex = layer.indices instanceof Int16Array ? layer.indices[idx] : -1;
+    if (paletteIndex >= 0) {
+      const paletteColor = Array.isArray(state.palette) ? state.palette[paletteIndex] : null;
+      if (paletteColor && (Number(paletteColor.a) || 0) > 0) {
+        return true;
+      }
     }
     const base = idx * 4;
     const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
