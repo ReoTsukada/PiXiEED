@@ -956,14 +956,11 @@
     16,
     18,
     20,
-    24,
-    28,
-    30,
-    32,
-    40,
   ]);
   const MIN_ZOOM_RATIO = ZOOM_STEPS[0];
   const MAX_ZOOM_RATIO = ZOOM_STEPS[ZOOM_STEPS.length - 1];
+  const ZOOM_SLIDER_MIN = Math.round(MIN_ZOOM_RATIO * 100);
+  const ZOOM_SLIDER_MAX = Math.round(MAX_ZOOM_RATIO * 100);
   const MIN_ZOOM_SCALE = 0.05;
   const MAX_ZOOM_SCALE = 4096;
   const MAX_ZOOM_BASE_SCALE = 128;
@@ -4741,7 +4738,7 @@
   function getCurrentLocalViewportCanvasLayoutScale() {
     const numericScale = Number(state?.scale);
     if (Number.isFinite(numericScale) && numericScale > 0) {
-      return numericScale;
+      return getPixelAlignedCanvasDisplayScale(numericScale);
     }
     return 1;
   }
@@ -5958,7 +5955,6 @@
     const pixelCount = width * height;
     const selectionMask = normalizeCanvasSelectionMask(source?.selectionMask, pixelCount);
     const selectionContentMask = normalizeCanvasSelectionMask(source?.selectionContentMask, pixelCount);
-    const defaultViewScale = getDefaultCanvasViewportScale({ width, height });
     return {
       id: typeof source?.id === 'string' && source.id
         ? source.id
@@ -5970,7 +5966,7 @@
       height,
       viewScale: normalizeProjectCanvasViewScale(
         source?.viewScale,
-        normalizeProjectCanvasViewScale(source?.scale, defaultViewScale)
+        normalizeProjectCanvasViewScale(source?.scale, 8)
       ),
       frames,
       activeFrame,
@@ -6573,10 +6569,7 @@
       name: resolved.name,
       width: resolved.width,
       height: resolved.height,
-      viewScale: normalizeProjectCanvasViewScale(
-        resolved.viewScale,
-        getDefaultCanvasViewportScale(resolved)
-      ),
+      viewScale: normalizeProjectCanvasViewScale(state.scale, resolved.viewScale || 8),
       frames: resolved.frames.map(frame => ({
         id: frame.id,
         name: frame.name,
@@ -7517,7 +7510,7 @@
     const compressed = {
       width: snapshot.width,
       height: snapshot.height,
-      scale: getDefaultCanvasViewportScale({ width: snapshot.width, height: snapshot.height }),
+      scale: MIN_ZOOM_RATIO,
       pan: { x: 0, y: 0 },
       palette: snapshot.palette.map(color => ({ ...color })),
       activePaletteIndex: snapshot.activePaletteIndex,
@@ -7689,7 +7682,7 @@
     const decompressed = {
       width: snapshot.width,
       height: snapshot.height,
-      scale: getDefaultCanvasViewportScale({ width: snapshot.width, height: snapshot.height }),
+      scale: MIN_ZOOM_RATIO,
       pan: {
         x: Math.round(Number(snapshot.pan?.x) || 0),
         y: Math.round(Number(snapshot.pan?.y) || 0),
@@ -16699,12 +16692,7 @@
 
   function getPixelAlignedCanvasDisplayScale(scale = state.scale) {
     const normalizedScale = Math.max(Number(scale) || MIN_ZOOM_SCALE, MIN_ZOOM_SCALE);
-    const dpr = Math.max(1, Number(window.devicePixelRatio) || 1);
-    const aligned = Math.round(normalizedScale * dpr);
-    if (aligned <= 0) {
-      return normalizedScale;
-    }
-    return aligned / dpr;
+    return normalizedScale;
   }
 
   function updateGridDecorations() {
@@ -17194,11 +17182,11 @@
     const normalizedScale = normalizeZoomScale(scaleValue, MIN_ZOOM_SCALE);
     const normalizedRatio = getZoomRatioForScale(normalizedScale);
     if (dom.controls.zoomSlider instanceof HTMLInputElement) {
-      dom.controls.zoomSlider.value = String(getZoomStepIndex(normalizedScale));
+      dom.controls.zoomSlider.value = String(Math.round(normalizedRatio * 100));
     }
     if (dom.controls.zoomInput instanceof HTMLInputElement) {
-      dom.controls.zoomInput.min = String(Math.round(MIN_ZOOM_RATIO * 100));
-      dom.controls.zoomInput.max = String(Math.round(MAX_ZOOM_RATIO * 100));
+      dom.controls.zoomInput.min = String(ZOOM_SLIDER_MIN);
+      dom.controls.zoomInput.max = String(ZOOM_SLIDER_MAX);
       dom.controls.zoomInput.step = '1';
       dom.controls.zoomInput.value = String(Math.round(normalizedRatio * 100));
     }
@@ -20840,7 +20828,7 @@
     const snapshot = {
       width,
       height,
-      scale: getDefaultCanvasViewportScale({ width, height }),
+      scale: MIN_ZOOM_RATIO,
       pan: { x: 0, y: 0 },
       tool: state.tool,
       brushSize: state.brushSize,
@@ -30106,7 +30094,7 @@
     const activeCanvasSnapshot = {
       width,
       height,
-      scale: getDefaultCanvasViewportScale({ width, height }),
+      scale: MIN_ZOOM_RATIO,
       pan: {
         x: Math.round(Number(payload.pan?.x) || 0),
         y: Math.round(Number(payload.pan?.y) || 0),
@@ -36064,10 +36052,12 @@
     const run = () => {
       openedDocumentViewportResetRaf = null;
       const multiCanvasWorldLayoutActive = isMultiCanvasWorldLayoutActive();
-      resetAllProjectCanvasViewScalesToDefault();
-      state.pan.x = 0;
-      state.pan.y = 0;
-      requestLocalViewportCanvasLayoutReset({ clearStored: true });
+      if (!multiCanvasWorldLayoutActive) {
+        resetViewportZoomRatio(MIN_ZOOM_RATIO);
+        state.pan.x = 0;
+        state.pan.y = 0;
+        requestLocalViewportCanvasLayoutReset({ clearStored: true });
+      }
       resizeCanvases({
         forceRender: false,
         applyTransform: false,
@@ -36093,8 +36083,8 @@
 
   function applyViewportTransform({ updateDecorations = true, clampVisibility = true } = {}) {
     if (!(dom.viewportWorkspace instanceof HTMLElement)) return;
-    const panX = Math.round(Number(state.pan.x) || 0);
-    const panY = Math.round(Number(state.pan.y) || 0);
+    const panX = Number(state.pan.x) || 0;
+    const panY = Number(state.pan.y) || 0;
     if (panX !== state.pan.x) {
       state.pan.x = panX;
     }
@@ -36104,7 +36094,7 @@
     dom.viewportWorkspace.style.transform = `translate(${panX}px, ${panY}px)`;
     const clampResult = clampVisibility ? clampPanToKeepAnyCanvasVisible() : { clampedX: false, clampedY: false };
     if (clampVisibility && (clampResult?.clampedX || clampResult?.clampedY)) {
-      dom.viewportWorkspace.style.transform = `translate(${Math.round(Number(state.pan.x) || 0)}px, ${Math.round(Number(state.pan.y) || 0)}px)`;
+      dom.viewportWorkspace.style.transform = `translate(${Number(state.pan.x) || 0}px, ${Number(state.pan.y) || 0}px)`;
     }
     if (updateDecorations) {
       updateGridDecorations();
@@ -39774,13 +39764,16 @@
 
     const zoomSlider = dom.controls.zoomSlider;
     if (zoomSlider) {
-      zoomSlider.min = '0';
-      zoomSlider.max = String(ZOOM_STEPS.length - 1);
+      zoomSlider.min = String(ZOOM_SLIDER_MIN);
+      zoomSlider.max = String(ZOOM_SLIDER_MAX);
       zoomSlider.step = '1';
-      zoomSlider.value = String(getZoomStepIndex(state.scale));
+      zoomSlider.value = String(Math.round(getZoomRatioForScale(state.scale) * 100));
       zoomSlider.addEventListener('input', event => {
-        const index = Number(event.target.value);
-        setZoom(getZoomScaleAtIndex(index));
+        const ratioPercent = Number(event.target.value);
+        if (!Number.isFinite(ratioPercent)) {
+          return;
+        }
+        setZoom(getZoomScaleForRatio(ratioPercent / 100));
       });
     }
     const zoomInput = dom.controls.zoomInput;
@@ -49464,20 +49457,6 @@
     return getProjectCanvasDocumentById(projectCanvasStore.activeCanvasId) || getProjectCanvasDocumentAt(0);
   }
 
-  function resetAllProjectCanvasViewScalesToDefault() {
-    getProjectCanvasDocuments().forEach(canvasDoc => {
-      if (canvasDoc) {
-        canvasDoc.viewScale = getDefaultCanvasViewportScale(canvasDoc);
-      }
-    });
-    const activeCanvas = getActiveProjectCanvasDocument();
-    state.scale = normalizeProjectCanvasViewScale(
-      activeCanvas?.viewScale,
-      getDefaultCanvasViewportScale(activeCanvas)
-    );
-    rememberViewportZoomRatioFromScale(state.scale);
-  }
-
   function getActiveProjectCanvasIndex() {
     const activeId = getActiveProjectCanvasDocument()?.id || '';
     return Math.max(0, getProjectCanvasDocuments().findIndex(canvas => canvas?.id === activeId));
@@ -49486,25 +49465,27 @@
   function getProjectCanvasViewScale(canvasDoc, fallback = null) {
     const safeFallback = Number.isFinite(Number(fallback))
       ? Number(fallback)
-      : getDefaultCanvasViewportScale(canvasDoc);
+      : (Number(state.scale) || 8);
     return normalizeProjectCanvasViewScale(canvasDoc?.viewScale, safeFallback);
   }
 
   function getProjectCanvasDisplayScale(canvasDoc) {
     return getPixelAlignedCanvasDisplayScale(
-      getProjectCanvasViewScale(canvasDoc, getDefaultCanvasViewportScale(canvasDoc))
+      normalizeProjectCanvasViewScale(state.scale, getProjectCanvasViewScale(canvasDoc, state.scale || 8))
     );
   }
 
   function storeProjectCanvasViewScale(canvasDoc, scale = state.scale) {
-    if (!canvasDoc) {
+    const normalizedScale = normalizeProjectCanvasViewScale(scale, state.scale || 8);
+    const canvases = getProjectCanvasDocuments();
+    if (!canvases.length) {
       return;
     }
-    const normalizedScale = normalizeProjectCanvasViewScale(
-      scale,
-      getDefaultCanvasViewportScale(canvasDoc)
-    );
-    canvasDoc.viewScale = normalizedScale;
+    canvases.forEach(doc => {
+      if (doc) {
+        doc.viewScale = normalizedScale;
+      }
+    });
   }
 
   function syncActiveProjectCanvasViewScale() {
@@ -49566,6 +49547,12 @@
       },
       localViewportCanvasState
     );
+    const sharedScale = normalizeProjectCanvasViewScale(nextActive?.viewScale, state.scale || MIN_ZOOM_SCALE);
+    projectCanvasStore.canvases.forEach(canvas => {
+      if (canvas) {
+        canvas.viewScale = sharedScale;
+      }
+    });
     normalizeMultiAssignmentsForCurrentDocument();
     prunePendingMultiAssignmentMoveRequests();
     pruneMultiHistoryCanvases();
@@ -49668,10 +49655,7 @@
       name: getDefaultProjectCanvasName(index),
       width,
       height,
-      viewScale: normalizeProjectCanvasViewScale(
-        sourceCanvas?.viewScale,
-        getDefaultCanvasViewportScale({ width, height })
-      ),
+      viewScale: normalizeProjectCanvasViewScale(state.scale, state.scale || 8),
       frames: [frame],
       activeFrame: 0,
       activeLayer: frame.layers[frame.layers.length - 1]?.id || null,
@@ -50180,11 +50164,6 @@
     const previousId = projectCanvasStore.activeCanvasId;
     const changed = previousId !== targetCanvas.id;
     projectCanvasStore.activeCanvasId = targetCanvas.id;
-    state.scale = normalizeProjectCanvasViewScale(
-      targetCanvas.viewScale,
-      getDefaultCanvasViewportScale(targetCanvas)
-    );
-    rememberViewportZoomRatioFromScale(state.scale);
     localViewportCanvasState = normalizeLocalViewportCanvasState(
       {
         ...localViewportCanvasState,
@@ -50563,22 +50542,12 @@
         locals: [],
       };
     }
-    const layout = computeLocalViewportCanvasLayout();
     const gap = MULTI_CANVAS_SURFACE_GAP;
-    const columns = Math.max(1, layout.columns || 1);
     const sizes = surfaces.map(item => ({
       ...item,
       drawWidth: Math.max(1, Math.round(Number(item.canvas?.width) || 1)) * getProjectCanvasDisplayScale(item.canvas),
       drawHeight: Math.max(1, Math.round(Number(item.canvas?.height) || 1)) * getProjectCanvasDisplayScale(item.canvas),
     }));
-    const columnWidths = new Array(columns).fill(0);
-    const rowHeights = new Array(Math.ceil(sizes.length / columns)).fill(0);
-    sizes.forEach((item, itemIndex) => {
-      const columnIndex = itemIndex % columns;
-      const rowIndex = Math.floor(itemIndex / columns);
-      columnWidths[columnIndex] = Math.max(columnWidths[columnIndex], item.drawWidth);
-      rowHeights[rowIndex] = Math.max(rowHeights[rowIndex], item.drawHeight);
-    });
     const mainSize = sizes[0] || null;
     const anchorLeft = Math.max(
       padding,
@@ -50588,22 +50557,44 @@
       padding,
       Math.round((viewportHeight - Math.max(1, Math.round(Number(mainSize?.drawHeight) || 1))) / 2)
     );
-    const columnOffsets = new Array(columns).fill(anchorLeft);
-    const rowOffsets = new Array(rowHeights.length).fill(anchorTop);
-    for (let columnIndex = 1; columnIndex < columns; columnIndex += 1) {
-      columnOffsets[columnIndex] = columnOffsets[columnIndex - 1] + columnWidths[columnIndex - 1] + gap;
-    }
-    for (let rowIndex = 1; rowIndex < rowHeights.length; rowIndex += 1) {
-      rowOffsets[rowIndex] = rowOffsets[rowIndex - 1] + rowHeights[rowIndex - 1] + gap;
-    }
+    const maxDrawWidth = Math.max(...sizes.map(item => item.drawWidth));
+    const maxDrawHeight = Math.max(...sizes.map(item => item.drawHeight));
+    const slotWidth = maxDrawWidth + gap;
+    const slotHeight = maxDrawHeight + gap;
+    const mainCenterX = anchorLeft + (Math.round(Number(mainSize?.drawWidth) || 1) / 2);
+    const mainCenterY = anchorTop + (Math.round(Number(mainSize?.drawHeight) || 1) / 2);
+    const slotOffsets = [
+      { x: 1, y: 0 },
+      { x: -1, y: 0 },
+      { x: 0, y: 1 },
+      { x: 0, y: -1 },
+      { x: 2, y: 0 },
+      { x: -2, y: 0 },
+      { x: 0, y: 2 },
+      { x: 0, y: -2 },
+      { x: 1, y: 1 },
+      { x: 1, y: -1 },
+      { x: -1, y: 1 },
+      { x: -1, y: -1 },
+      { x: 2, y: 1 },
+      { x: 2, y: -1 },
+      { x: -2, y: 1 },
+      { x: -2, y: -1 },
+      { x: 1, y: 2 },
+      { x: -1, y: 2 },
+      { x: 1, y: -2 },
+      { x: -1, y: -2 },
+    ];
     const positions = sizes.map((item, itemIndex) => {
-      const columnIndex = itemIndex % columns;
-      const rowIndex = Math.floor(itemIndex / columns);
-      const left = columnOffsets[columnIndex] ?? anchorLeft;
-      const top = rowOffsets[rowIndex] ?? anchorTop;
+      if (itemIndex === 0) {
+        return { left: anchorLeft, top: anchorTop };
+      }
+      const offset = slotOffsets[itemIndex - 1] || { x: itemIndex, y: 0 };
+      const centerX = mainCenterX + (offset.x * slotWidth);
+      const centerY = mainCenterY + (offset.y * slotHeight);
       return {
-        left: Math.round(left),
-        top: Math.round(top),
+        left: Math.round(centerX - (item.drawWidth / 2)),
+        top: Math.round(centerY - (item.drawHeight / 2)),
       };
     });
     return {
@@ -50699,24 +50690,22 @@
       return null;
     }
     const workspace = dom.viewportWorkspace instanceof HTMLElement ? dom.viewportWorkspace : null;
-    const anchorLeft = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorLeft, 0) || 0;
-    const anchorTop = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorTop, 0) || 0;
     const panelRect = panel.getBoundingClientRect();
     const workspaceRect = workspace?.getBoundingClientRect?.() || null;
-    const panelLeft = workspaceRect
+    const panelOffsetX = workspaceRect
       ? Math.round(panelRect.left - workspaceRect.left)
       : (parseLocalViewportCanvasAxis(panel.style.left, panel.offsetLeft) || 0);
-    const panelTop = workspaceRect
+    const panelOffsetY = workspaceRect
       ? Math.round(panelRect.top - workspaceRect.top)
       : (parseLocalViewportCanvasAxis(panel.style.top, panel.offsetTop) || 0);
-    const safeScale = Math.max(Number(displayScale) || MIN_ZOOM_SCALE, Number.EPSILON);
     return {
       clientX: Number.isFinite(focus.clientX) ? Number(focus.clientX) : null,
       clientY: Number.isFinite(focus.clientY) ? Number(focus.clientY) : null,
-      worldX: ((panelLeft - anchorLeft) / safeScale) + (Number(focus.worldX) || 0),
-      worldY: ((panelTop - anchorTop) / safeScale) + (Number(focus.worldY) || 0),
-      anchorLeft,
-      anchorTop,
+      panelOffsetX,
+      panelOffsetY,
+      worldX: Number(focus.worldX) || 0,
+      worldY: Number(focus.worldY) || 0,
+      canvasDocId: surface?.canvasDocId || focus.canvasDocId || '',
     };
   }
 
@@ -50735,12 +50724,22 @@
     workspace.style.setProperty('--workspace-canvas-columns', '1');
     workspace.style.setProperty('--workspace-canvas-rows', '1');
     if (multiCanvasWorldLayoutActive) {
-      const resolvedLayout = computeResolvedMultiCanvasWorldLayoutPositions(
-        parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorLeft, null) ?? 0,
-        parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorTop, null) ?? 0
-      );
-      const anchorLeft = resolvedLayout.main.left;
-      const anchorTop = resolvedLayout.main.top;
+      const shouldReset = Boolean(localViewportCanvasLayoutResetPending);
+      const resolvedLayout = shouldReset
+        ? computeResolvedMultiCanvasWorldLayoutPositions(
+          parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorLeft, null) ?? 0,
+          parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorTop, null) ?? 0
+        )
+        : null;
+      const defaults = resolvedLayout || computeDefaultLocalViewportCanvasPositions();
+      const storedAnchorLeft = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorLeft, null);
+      const storedAnchorTop = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorTop, null);
+      const anchorLeft = shouldReset
+        ? resolvedLayout.main.left
+        : (storedAnchorLeft ?? defaults.main.left);
+      const anchorTop = shouldReset
+        ? resolvedLayout.main.top
+        : (storedAnchorTop ?? defaults.main.top);
       if (mainPanel) {
         mainPanel.style.left = `${anchorLeft}px`;
         mainPanel.style.top = `${anchorTop}px`;
@@ -50751,12 +50750,14 @@
           return;
         }
         const storedPosition = getDisplayLocalViewportCanvasPosition(index, anchorLeft, anchorTop);
-        const resolvedPosition = resolvedLayout.locals[index] || computeDefaultLocalViewportCanvasWorldPosition(index, anchorLeft, anchorTop);
-        const left = resolvedPosition.left;
-        const top = resolvedPosition.top;
+        const defaultPosition = shouldReset
+          ? (resolvedLayout.locals[index] || computeDefaultLocalViewportCanvasWorldPosition(index, anchorLeft, anchorTop))
+          : (defaults.locals[index] || computeDefaultLocalViewportCanvasWorldPosition(index, anchorLeft, anchorTop));
+        const left = storedPosition.left ?? defaultPosition.left;
+        const top = storedPosition.top ?? defaultPosition.top;
         entry.panel.style.left = `${left}px`;
         entry.panel.style.top = `${top}px`;
-        if (storedPosition.left !== left || storedPosition.top !== top) {
+        if (shouldReset && (storedPosition.left !== left || storedPosition.top !== top)) {
           setLocalViewportCanvasPosition(index, left, top);
         }
       });
@@ -54624,8 +54625,14 @@
       updateGridDecorations();
       resizeVirtualCursorCanvas();
       // Zoom changes viewport sizing/placement, but does not change local canvas pixel data.
-      // Skip expensive inactive-canvas re-compositing here and keep the existing surfaces.
-      syncLocalViewportCanvasDockVisibility({ persist: false, render: false });
+      // In multi-canvas mode, keep local panels in the same shared 2D zoom space.
+      if (isMultiCanvasWorldLayoutActive()) {
+        syncAllProjectCanvasSurfaceDimensions();
+        syncLocalViewportCanvasDockLayout();
+        syncMultiCanvasSelectionUi();
+      } else {
+        syncLocalViewportCanvasDockVisibility({ persist: false, render: false });
+      }
       updateMirrorGuideHandles();
       updateCanvasResizeHandlePosition();
       syncCanvasResizeHandleVisibility();
@@ -54662,6 +54669,91 @@
     };
   }
 
+  function getCanvasSurfacePanelLayoutOffset(surface, fallback = { x: 0, y: 0 }) {
+    const panel = surface?.panel instanceof HTMLElement ? surface.panel : null;
+    if (!panel) {
+      return {
+        x: Number(fallback?.x) || 0,
+        y: Number(fallback?.y) || 0,
+      };
+    }
+    const workspace = dom.viewportWorkspace instanceof HTMLElement ? dom.viewportWorkspace : null;
+    const panelRect = panel.getBoundingClientRect?.();
+    const workspaceRect = workspace?.getBoundingClientRect?.();
+    if (
+      panelRect
+      && workspaceRect
+      && Number.isFinite(panelRect.left)
+      && Number.isFinite(panelRect.top)
+      && Number.isFinite(workspaceRect.left)
+      && Number.isFinite(workspaceRect.top)
+    ) {
+      return {
+        x: panelRect.left - workspaceRect.left,
+        y: panelRect.top - workspaceRect.top,
+      };
+    }
+    return {
+      x: parseLocalViewportCanvasAxis(panel.style.left, panel.offsetLeft) ?? (Number(fallback?.x) || 0),
+      y: parseLocalViewportCanvasAxis(panel.style.top, panel.offsetTop) ?? (Number(fallback?.y) || 0),
+    };
+  }
+
+  function getCanvasSurfaceDrawingLocalOffset(surface) {
+    const panel = surface?.panel instanceof HTMLElement ? surface.panel : null;
+    const drawing = surface?.drawing instanceof HTMLCanvasElement ? surface.drawing : null;
+    if (!panel || !drawing) {
+      return { x: 0, y: 0 };
+    }
+    const panelRect = panel.getBoundingClientRect?.();
+    const drawingRect = drawing.getBoundingClientRect?.();
+    if (
+      !panelRect
+      || !drawingRect
+      || !Number.isFinite(panelRect.left)
+      || !Number.isFinite(panelRect.top)
+      || !Number.isFinite(drawingRect.left)
+      || !Number.isFinite(drawingRect.top)
+    ) {
+      return { x: 0, y: 0 };
+    }
+    return {
+      x: drawingRect.left - panelRect.left,
+      y: drawingRect.top - panelRect.top,
+    };
+  }
+
+  function getCanvasSurfaceDrawingDisplayScale(surface, canvasDoc, fallbackScale) {
+    const drawing = surface?.drawing instanceof HTMLCanvasElement ? surface.drawing : null;
+    const rect = drawing?.getBoundingClientRect?.();
+    const width = Math.max(1, Math.round(Number(canvasDoc?.width) || Number(state.width) || 1));
+    const height = Math.max(1, Math.round(Number(canvasDoc?.height) || Number(state.height) || 1));
+    const safeFallback = Math.max(Number(fallbackScale) || MIN_ZOOM_SCALE, Number.EPSILON);
+    return {
+      x: rect && rect.width > 0 ? rect.width / width : safeFallback,
+      y: rect && rect.height > 0 ? rect.height / height : safeFallback,
+    };
+  }
+
+  function getViewportCenterZoomFocus() {
+    const viewport = dom.canvasViewport instanceof HTMLElement ? dom.canvasViewport : null;
+    const viewportRect = viewport?.getBoundingClientRect?.();
+    if (!viewportRect || viewportRect.width <= 0 || viewportRect.height <= 0) {
+      return null;
+    }
+    const centerX = viewportRect.left + (viewportRect.width / 2);
+    const centerY = viewportRect.top + (viewportRect.height / 2);
+    let surface = null;
+    if (isMultiCanvasWorldLayoutActive() && typeof document.elementFromPoint === 'function') {
+      surface = getCanvasInteractionSurfaceFromTarget(document.elementFromPoint(centerX, centerY));
+    }
+    surface = surface || getViewportVisibilityTargetSurface();
+    return getCanvasFocusAt(centerX, centerY, {
+      clampToCanvas: true,
+      surface,
+    });
+  }
+
   function setZoom(nextScale, focus) {
     markViewportInteractionActivity();
     if (!wheelZoomApplying) {
@@ -54696,11 +54788,29 @@
     if (!zoomFocus && state.showVirtualCursor) {
       zoomFocus = getVirtualCursorZoomFocus();
     }
+    if (!zoomFocus) {
+      zoomFocus = getViewportCenterZoomFocus();
+    }
     const multiCanvasWorldLayoutActive = isMultiCanvasWorldLayoutActive();
-    const useViewportPanelFocus = multiCanvasWorldLayoutActive || !isMainCanvasPanelCssCentered();
-    const viewportPanelFocus = useViewportPanelFocus
-      ? getViewportPanelZoomFocus(zoomFocus, prevDisplayScale)
-      : null;
+    const focusSurface = zoomFocus?.surface
+      ? getResolvedCanvasInteractionSurface(zoomFocus.surface)
+      : getViewportVisibilityTargetSurface();
+    const focusCanvasId = zoomFocus?.canvasDocId || focusSurface?.canvasDocId || focusSurface?.canvasDoc?.id || '';
+    const viewportRectBeforeResize = dom.canvasViewport?.getBoundingClientRect?.() || null;
+    const focusCanvasDocBefore = focusSurface?.canvasDoc || getProjectCanvasDocumentById(focusSurface?.canvasDocId) || getActiveProjectCanvasDocument();
+    const panelOffsetBefore = getCanvasSurfacePanelLayoutOffset(focusSurface);
+    const drawingOffsetBefore = getCanvasSurfaceDrawingLocalOffset(focusSurface);
+    const previousDrawingScale = getCanvasSurfaceDrawingDisplayScale(focusSurface, focusCanvasDocBefore, prevDisplayScale);
+    const focusViewportOffsetX = zoomFocus && viewportRectBeforeResize && Number.isFinite(zoomFocus.clientX)
+      ? (Number(zoomFocus.clientX) - viewportRectBeforeResize.left)
+      : (zoomFocus
+        ? previousPan.x + panelOffsetBefore.x + drawingOffsetBefore.x + ((Number(zoomFocus.worldX) || 0) * previousDrawingScale.x)
+        : null);
+    const focusViewportOffsetY = zoomFocus && viewportRectBeforeResize && Number.isFinite(zoomFocus.clientY)
+      ? (Number(zoomFocus.clientY) - viewportRectBeforeResize.top)
+      : (zoomFocus
+        ? previousPan.y + panelOffsetBefore.y + drawingOffsetBefore.y + ((Number(zoomFocus.worldY) || 0) * previousDrawingScale.y)
+        : null);
 
     state.scale = targetScale;
     rememberViewportZoomRatioFromScale(targetScale);
@@ -54719,74 +54829,58 @@
       syncLocalViewportCanvasDockLayout();
     }
 
-    const focusSurface = zoomFocus?.surface
-      ? getResolvedCanvasInteractionSurface(zoomFocus.surface)
-      : getViewportVisibilityTargetSurface();
-    const focusDrawing = focusSurface?.drawing instanceof HTMLCanvasElement
-      ? focusSurface.drawing
-      : dom.canvases.drawing;
+    let anchorCorrectionSurface = null;
+    let anchorCorrectionCanvasDoc = null;
     if (
-      viewportPanelFocus
-      && Number.isFinite(viewportPanelFocus.clientX)
-      && Number.isFinite(viewportPanelFocus.clientY)
-      && dom.viewportWorkspace instanceof HTMLElement
+      zoomFocus
+      && Number.isFinite(focusViewportOffsetX)
+      && Number.isFinite(focusViewportOffsetY)
     ) {
-      const workspaceRectAfterResize = dom.viewportWorkspace.getBoundingClientRect();
-      state.pan.x = Math.round(
-        viewportPanelFocus.clientX
-        - (workspaceRectAfterResize.left + viewportPanelFocus.anchorLeft + (viewportPanelFocus.worldX * targetDisplayScale))
+      const focusedSurface = focusCanvasId
+        ? getProjectCanvasSurfaceByCanvasId(focusCanvasId)
+        : focusSurface;
+      const panelOffset = getCanvasSurfacePanelLayoutOffset(focusedSurface, panelOffsetBefore);
+      const drawingOffset = getCanvasSurfaceDrawingLocalOffset(focusedSurface);
+      const focusedCanvasDoc = focusedSurface?.canvasDoc || getProjectCanvasDocumentById(focusedSurface?.canvasDocId) || getActiveProjectCanvasDocument();
+      const actualTargetScale = getCanvasSurfaceDrawingDisplayScale(focusedSurface, focusedCanvasDoc, targetDisplayScale);
+      state.pan.x = (
+        focusViewportOffsetX
+        - (panelOffset.x + drawingOffset.x + ((Number(zoomFocus.worldX) || 0) * actualTargetScale.x))
       );
-      state.pan.y = Math.round(
-        viewportPanelFocus.clientY
-        - (workspaceRectAfterResize.top + viewportPanelFocus.anchorTop + (viewportPanelFocus.worldY * targetDisplayScale))
+      state.pan.y = (
+        focusViewportOffsetY
+        - (panelOffset.y + drawingOffset.y + ((Number(zoomFocus.worldY) || 0) * actualTargetScale.y))
       );
-    } else if (zoomFocus && focusDrawing instanceof HTMLCanvasElement) {
-      const drawingRectAfterResize = focusDrawing.getBoundingClientRect();
-      const focusClientX = Number.isFinite(zoomFocus.clientX)
-        ? Number(zoomFocus.clientX)
-        : drawingRectAfterResize.left + (zoomFocus.worldX * prevDisplayScale);
-      const focusClientY = Number.isFinite(zoomFocus.clientY)
-        ? Number(zoomFocus.clientY)
-        : drawingRectAfterResize.top + (zoomFocus.worldY * prevDisplayScale);
-      state.pan.x = Math.round(
-        focusClientX - (drawingRectAfterResize.left + (zoomFocus.worldX * targetDisplayScale))
-      );
-      state.pan.y = Math.round(
-        focusClientY - (drawingRectAfterResize.top + (zoomFocus.worldY * targetDisplayScale))
-      );
+      anchorCorrectionSurface = focusedSurface;
+      anchorCorrectionCanvasDoc = focusedCanvasDoc;
     } else {
       const ratio = targetDisplayScale / Math.max(prevDisplayScale, MIN_ZOOM_SCALE);
-      state.pan.x = Math.round(previousPan.x * ratio);
-      state.pan.y = Math.round(previousPan.y * ratio);
+      state.pan.x = previousPan.x * ratio;
+      state.pan.y = previousPan.y * ratio;
     }
 
-    const clampResult = applyViewportTransform({
+    applyViewportTransform({
       updateDecorations: false,
-      clampVisibility: !multiCanvasWorldLayoutActive && !zoomFocus,
+      clampVisibility: false,
     });
     if (
       zoomFocus
-      && Number.isFinite(zoomFocus.clientX)
-      && Number.isFinite(zoomFocus.clientY)
-      && focusDrawing instanceof HTMLCanvasElement
+      && anchorCorrectionSurface
+      && dom.canvasViewport instanceof HTMLElement
+      && anchorCorrectionSurface.drawing instanceof HTMLCanvasElement
+      && Number.isFinite(focusViewportOffsetX)
+      && Number.isFinite(focusViewportOffsetY)
     ) {
-      const worldRectNow = viewportPanelFocus && dom.viewportWorkspace instanceof HTMLElement
-        ? dom.viewportWorkspace.getBoundingClientRect()
-        : null;
-      const drawingRectNow = worldRectNow ? null : focusDrawing.getBoundingClientRect();
-      const currentClientX = worldRectNow
-        ? worldRectNow.left + viewportPanelFocus.anchorLeft + (viewportPanelFocus.worldX * targetDisplayScale)
-        : drawingRectNow.left + (zoomFocus.worldX * targetDisplayScale);
-      const currentClientY = worldRectNow
-        ? worldRectNow.top + viewportPanelFocus.anchorTop + (viewportPanelFocus.worldY * targetDisplayScale)
-        : drawingRectNow.top + (zoomFocus.worldY * targetDisplayScale);
-      const anchorErrorX = (Number(zoomFocus.clientX) || 0) - currentClientX;
-      const anchorErrorY = (Number(zoomFocus.clientY) || 0) - currentClientY;
-      const correctionX = !clampResult?.clampedX && Math.abs(anchorErrorX) >= 0.5 ? anchorErrorX : 0;
-      const correctionY = !clampResult?.clampedY && Math.abs(anchorErrorY) >= 0.5 ? anchorErrorY : 0;
-      if (correctionX || correctionY) {
-        state.pan.x = Math.round((Number(state.pan.x) || 0) + correctionX);
-        state.pan.y = Math.round((Number(state.pan.y) || 0) + correctionY);
+      const viewportRectNow = dom.canvasViewport.getBoundingClientRect();
+      const drawingRectNow = anchorCorrectionSurface.drawing.getBoundingClientRect();
+      const actualScaleNow = getCanvasSurfaceDrawingDisplayScale(anchorCorrectionSurface, anchorCorrectionCanvasDoc, targetDisplayScale);
+      const anchorViewportX = (drawingRectNow.left - viewportRectNow.left) + ((Number(zoomFocus.worldX) || 0) * actualScaleNow.x);
+      const anchorViewportY = (drawingRectNow.top - viewportRectNow.top) + ((Number(zoomFocus.worldY) || 0) * actualScaleNow.y);
+      const correctionX = focusViewportOffsetX - anchorViewportX;
+      const correctionY = focusViewportOffsetY - anchorViewportY;
+      if (Math.abs(correctionX) > 0.01 || Math.abs(correctionY) > 0.01) {
+        state.pan.x = (Number(state.pan.x) || 0) + correctionX;
+        state.pan.y = (Number(state.pan.y) || 0) + correctionY;
         applyViewportTransform({
           updateDecorations: false,
           clampVisibility: false,
@@ -54800,13 +54894,18 @@
   }
 
   function adjustZoomBySteps(delta, focus) {
-    const currentIndex = getZoomStepIndex(state.scale);
-    const nextIndex = clamp(currentIndex + Math.round(delta || 0), 0, ZOOM_STEPS.length - 1);
-    if (nextIndex === currentIndex) {
+    const direction = Math.sign(Number(delta) || 0);
+    if (!direction) {
       syncControlsWithState();
       return;
     }
-    setZoom(getZoomScaleAtIndex(nextIndex), focus);
+    const currentRatio = getZoomRatioForScale(state.scale);
+    const nextRatio = clamp(
+      currentRatio * (direction > 0 ? 1.1 : (1 / 1.1)),
+      MIN_ZOOM_RATIO,
+      MAX_ZOOM_RATIO
+    );
+    setZoom(getZoomScaleForRatio(nextRatio), focus);
   }
 
   function getCanvasFocusAt(clientX, clientY, { clampToCanvas = false, surface = null } = {}) {
@@ -54830,9 +54929,13 @@
     const clampedClientX = clampToCanvas ? clamp(clientX, rect.left, rect.right) : clientX;
     const clampedClientY = clampToCanvas ? clamp(clientY, rect.top, rect.bottom) : clientY;
     const canvasDoc = resolvedSurface?.canvasDoc || getProjectCanvasDocumentById(resolvedSurface?.canvasDocId) || getActiveProjectCanvasDocument();
-    const scale = getProjectCanvasDisplayScale(canvasDoc);
-    const worldX = (clampedClientX - rect.left) / scale;
-    const worldY = (clampedClientY - rect.top) / scale;
+    const width = Math.max(1, Math.round(Number(canvasDoc?.width) || Number(metrics.width) || 1));
+    const height = Math.max(1, Math.round(Number(canvasDoc?.height) || Number(metrics.height) || 1));
+    const scaleX = rect.width / width;
+    const scaleY = rect.height / height;
+    const fallbackScale = getProjectCanvasDisplayScale(canvasDoc);
+    const worldX = (clampedClientX - rect.left) / Math.max(Number(scaleX) || fallbackScale, Number.EPSILON);
+    const worldY = (clampedClientY - rect.top) / Math.max(Number(scaleY) || fallbackScale, Number.EPSILON);
     return {
       clientX: clampedClientX,
       clientY: clampedClientY,
@@ -54927,10 +55030,13 @@
     const currentScale = Number.isFinite(wheelZoomPendingScale)
       ? wheelZoomPendingScale
       : (Number(state.scale) || MIN_ZOOM_SCALE);
-    const currentRawScale = Number.isFinite(wheelZoomPendingRawScale)
-      ? wheelZoomPendingRawScale
-      : currentScale;
-    const nextRawScale = clamp(currentRawScale * zoomFactor, MIN_ZOOM_SCALE, MAX_ZOOM_SCALE);
+    const currentRawScale = normalizeZoomScale(
+      Number.isFinite(wheelZoomPendingRawScale)
+        ? wheelZoomPendingRawScale
+        : currentScale,
+      currentScale
+    );
+    const nextRawScale = normalizeZoomScale(currentRawScale * zoomFactor, currentRawScale);
     if (!Number.isFinite(nextRawScale) || nextRawScale <= 0) {
       return;
     }
@@ -56242,7 +56348,9 @@
         );
         let pinchGestureActive = false;
         let pinchTargetScale = Number(state.scale) || MIN_ZOOM_SCALE;
-        let pinchFocus = pointerState.touchPinchFocus || getTouchPinchFocusForCentroid(baselineCentroid);
+        let pinchFocus = getTouchPinchFocusForCentroid(centroid)
+          || pointerState.touchPinchFocus
+          || getTouchPinchFocusForCentroid(baselineCentroid);
         let pinchStrength = 0;
 
         const baselineDistance = Number(pointerState.touchPinchStartDistance);
@@ -87286,8 +87394,7 @@
     const effective = Number.isFinite(numeric)
       ? numeric
       : (Number.isFinite(fallbackNumeric) ? fallbackNumeric : MIN_ZOOM_RATIO);
-    const clampedRatio = clamp(effective, MIN_ZOOM_RATIO, MAX_ZOOM_RATIO);
-    return ZOOM_STEPS[getZoomStepIndexForRatio(clampedRatio)] || MIN_ZOOM_RATIO;
+    return clamp(effective, MIN_ZOOM_RATIO, MAX_ZOOM_RATIO);
   }
 
   function getZoomScaleForRatio(ratio, canvasDoc = null) {
@@ -87338,8 +87445,7 @@
   function normalizeZoomScale(value, fallback = MIN_ZOOM_SCALE) {
     const base = Number.isFinite(value) ? Number(value) : Number(fallback);
     const effective = Number.isFinite(base) ? base : getViewportZoomBaseScale();
-    const clamped = clamp(effective, MIN_ZOOM_SCALE, MAX_ZOOM_SCALE);
-    return getZoomScaleAtIndex(getZoomStepIndex(clamped));
+    return getZoomScaleForRatio(normalizeZoomRatio(getZoomRatioForScale(effective)));
   }
 
   function formatZoomLabel(scale) {
