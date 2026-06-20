@@ -9020,7 +9020,10 @@
       return false;
     }
     if (openProjectTabs.length && activeOpenProjectTabId) {
-      await persistActiveOpenProjectTab({ flushAutosave });
+      const persisted = await persistActiveOpenProjectTab({ flushAutosave });
+      if (!persisted) {
+        return false;
+      }
     }
     openProjectTabs.splice(0, openProjectTabs.length);
     activeOpenProjectTabId = '';
@@ -10044,10 +10047,19 @@
     activeOpenProjectTabId = updated.id;
     renderOpenProjectTabs();
     if (flushAutosave && AUTOSAVE_SUPPORTED) {
+      let saved = false;
       try {
-        await writeAutosaveSnapshot(true);
+        saved = await writeAutosaveSnapshot(true);
       } catch (error) {
         console.warn('Failed to flush autosave before switching project tab', error);
+        saved = false;
+      }
+      if (!saved) {
+        updateAutosaveStatus(
+          localizeText('現在のプロジェクトを保存できませんでした', 'Could not save the current project'),
+          'error'
+        );
+        return false;
       }
     }
     return true;
@@ -10093,7 +10105,11 @@
       return false;
     }
     if (!skipPersistCurrent && previousActiveId && findOpenProjectTabIndex(previousActiveId) >= 0) {
-      await persistActiveOpenProjectTab({ flushAutosave: false });
+      const persistedCurrentSheet = await persistActiveOpenProjectTab({ flushAutosave: false });
+      if (!persistedCurrentSheet) {
+        updateAutosaveStatus(localizeText('現在のシートを保持できなかったため、切替を中止しました', 'Sheet switch was canceled because the current sheet could not be preserved'), 'error');
+        return false;
+      }
     }
     // If there is an active shared project session for a different project/tab,
     // clear it before loading the target. This prevents incoming shared-project
@@ -19786,7 +19802,10 @@
       return false;
     }
     ensureOpenProjectTabsInitialized();
-    await closeAllOpenProjectTabsForProjectReplacement({ flushAutosave: true, showHome: false });
+    const closedCurrentProject = await closeAllOpenProjectTabsForProjectReplacement({ flushAutosave: true, showHome: false });
+    if (!closedCurrentProject) {
+      return false;
+    }
     openProjectTabBusy = true;
     try {
       const created = await createNewProject({
@@ -24187,7 +24206,10 @@
       }
     }
     if (ensureTab) {
-      await closeAllOpenProjectTabsForProjectReplacement({ flushAutosave: true, showHome: false });
+      const closedCurrentProject = await closeAllOpenProjectTabsForProjectReplacement({ flushAutosave: true, showHome: false });
+      if (!closedCurrentProject) {
+        return false;
+      }
     }
     const clampedWidth = clamp(Math.round(widthNumber), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
     const clampedHeight = clamp(Math.round(heightNumber), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
@@ -24628,7 +24650,15 @@
         return;
       }
       openButton.disabled = true;
-      await closeAllOpenProjectTabsForProjectReplacement({ flushAutosave: true, showHome: false });
+      const closedCurrentProject = await closeAllOpenProjectTabsForProjectReplacement({ flushAutosave: true, showHome: false });
+      if (!closedCurrentProject) {
+        openButton.disabled = false;
+        updateAutosaveStatus(
+          localizeText('現在のプロジェクトを保存できなかったため、切り替えを中止しました', 'Project switch was canceled because the current project could not be saved'),
+          'error'
+        );
+        return;
+      }
       const success = await openRecentProject(entry, {
         hideStartup: false,
         replaceOpenProjectTabs: true,
@@ -24927,7 +24957,14 @@
         );
         return;
       }
-      await closeAllOpenProjectTabsForProjectReplacement({ flushAutosave: true, showHome: false });
+      const closedCurrentProject = await closeAllOpenProjectTabsForProjectReplacement({ flushAutosave: true, showHome: false });
+      if (!closedCurrentProject) {
+        updateAutosaveStatus(
+          localizeText('現在のプロジェクトを保存できなかったため、切り替えを中止しました', 'Project switch was canceled because the current project could not be saved'),
+          'error'
+        );
+        return;
+      }
       const opened = await openRecentProject(firstEntry, { hideStartup: true, silent: true });
       if (!opened) {
         refreshRecentProjectsUI().catch(error => {
@@ -25065,7 +25102,15 @@
         return;
       }
       openButton.disabled = true;
-      await closeAllOpenProjectTabsForProjectReplacement({ flushAutosave: true, showHome: false });
+      const closedCurrentProject = await closeAllOpenProjectTabsForProjectReplacement({ flushAutosave: true, showHome: false });
+      if (!closedCurrentProject) {
+        openButton.disabled = false;
+        updateAutosaveStatus(
+          localizeText('現在のプロジェクトを保存できなかったため、切り替えを中止しました', 'Project switch was canceled because the current project could not be saved'),
+          'error'
+        );
+        return;
+      }
       const success = await openRecentProject(entry, { hideStartup: true, silent: true });
       if (!success) {
         openButton.disabled = false;
@@ -28467,6 +28512,44 @@
     return packagedPayload;
   }
 
+  function preserveExistingProjectSheetsForSave(packagedPayload = null, previousProject = null) {
+    if (!packagedPayload || typeof packagedPayload !== 'object' || !previousProject || typeof previousProject !== 'object') {
+      return packagedPayload;
+    }
+    const previousSheets = Array.isArray(previousProject.sheets)
+      ? previousProject.sheets.filter(sheet => sheet && typeof sheet === 'object' && sheet.project && typeof sheet.project === 'object')
+      : [];
+    const nextSheets = Array.isArray(packagedPayload.sheets)
+      ? packagedPayload.sheets.filter(sheet => sheet && typeof sheet === 'object' && sheet.project && typeof sheet.project === 'object')
+      : [];
+    if (previousSheets.length <= nextSheets.length || previousSheets.length <= 1) {
+      return packagedPayload;
+    }
+    const mergedSheets = previousSheets.slice(0, MAX_PROJECT_SHEETS).map(sheet => ({ ...sheet }));
+    const preferredActiveId = typeof packagedPayload.activeSheetId === 'string' ? packagedPayload.activeSheetId : '';
+    nextSheets.slice(0, MAX_PROJECT_SHEETS).forEach((sheet, index) => {
+      const sheetId = typeof sheet.id === 'string' ? sheet.id : '';
+      let replaceIndex = sheetId ? mergedSheets.findIndex(candidate => candidate?.id === sheetId) : -1;
+      if (replaceIndex < 0 && preferredActiveId) {
+        replaceIndex = mergedSheets.findIndex(candidate => candidate?.id === preferredActiveId);
+      }
+      if (replaceIndex < 0) {
+        replaceIndex = Math.min(index, mergedSheets.length - 1);
+      }
+      mergedSheets[replaceIndex] = {
+        ...mergedSheets[replaceIndex],
+        ...sheet,
+        id: mergedSheets[replaceIndex]?.id || sheet.id || createOpenProjectTabId(),
+      };
+    });
+    packagedPayload.sheets = mergedSheets;
+    packagedPayload.activeSheetId = preferredActiveId
+      || (typeof previousProject.activeSheetId === 'string' ? previousProject.activeSheetId : '')
+      || mergedSheets[0]?.id
+      || '';
+    return packagedPayload;
+  }
+
   function resolvePackagedProjectDotStats(packagedPayload, snapshot = null) {
     const dotStatsApi = getDotStatsApi();
     if (!dotStatsApi || typeof dotStatsApi.normalizeDotStats !== 'function') {
@@ -28558,9 +28641,10 @@
       const packaged = packagedPayload && typeof packagedPayload === 'object'
         ? packagedPayload
         : buildPackagedProjectPayload(snapshot);
-      ensurePackagedProjectSheetsForSave(packaged, snapshot);
       const initialEntries = await loadRecentProjectsMetadata();
       const previousEntry = initialEntries.find(entry => entry?.id === resolvedProjectId) || null;
+      ensurePackagedProjectSheetsForSave(packaged, snapshot);
+      preserveExistingProjectSheetsForSave(packaged, previousEntry?.project || null);
       const listSnapshot = getRecentProjectListSnapshot(packaged, snapshot);
       const listSheet = getPackagedProjectFirstSheet(packaged);
       const listThumbnailSheetId = typeof listSheet?.id === 'string' ? listSheet.id : '';
@@ -63460,7 +63544,10 @@
   }
 
   function buildReloadSnapshotPayload(maxHistoryItems = 0) {
-    const currentSnapshot = compressHistorySnapshot(makeHistorySnapshot({ clonePixelData: false }));
+    const rawCurrentSnapshot = makeHistorySnapshot({ clonePixelData: false });
+    const currentSnapshot = compressHistorySnapshot(rawCurrentSnapshot);
+    const projectSession = buildAutosaveSessionPayload();
+    const packagedProject = buildPackagedProjectPayload(rawCurrentSnapshot, { session: projectSession });
     const activeProjectTab = getActiveOpenProjectTab();
     const activeProjectId = normalizeAutosaveProjectId(activeProjectTab?.projectId || '');
     const activeSharedEntry = isCurrentProjectSharedEntry()
@@ -63508,6 +63595,7 @@
         )
       ),
       current: currentSnapshot,
+      project: packagedProject,
       past,
       future,
       historyLimit: normalizedHistoryLimit,
@@ -63879,6 +63967,12 @@
           startupAutosaveRestoreProjectId = restoredProjectId;
           setActiveAutosaveProjectId(restoredProjectId, { persist: false });
         }
+        if (parsedDocument?.sheets?.length) {
+          restoreOpenProjectSheetsFromParsedDocument(parsedDocument, {
+            projectId: restoredProjectId || autosaveProjectId,
+            source: 'sheet',
+          });
+        }
       }
       history.pending = null;
       history.past = [];
@@ -63966,6 +64060,7 @@
       sharedProjectRevision: Math.max(0, Math.round(Number(parsed.sharedProjectRevision) || 0)),
       sharedProjectStructureRevision: Math.max(0, Math.round(Number(parsed.sharedProjectStructureRevision) || 0)),
       currentSnapshot,
+      project: parsed.project && typeof parsed.project === 'object' ? parsed.project : null,
       past,
       future,
       historyLimit,
@@ -63993,7 +64088,26 @@
     if (isTinyStartupSnapshot(payload.currentSnapshot)) {
       return false;
     }
+    if (!payload.project || typeof payload.project !== 'object') {
+      const restoredFromFallback = restoreReloadProjectFallback();
+      if (restoredFromFallback) {
+        reloadSnapshotRestored = true;
+        updateAutosaveStatus('再読み込み復元: 直前のプロジェクトを復元しました', 'success');
+        return true;
+      }
+      clearLocalRestoreStorage(RELOAD_SNAPSHOT_STORAGE_KEY);
+      clearLocalRestoreStorage(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY);
+      return false;
+    }
     reloadSnapshotRestored = true;
+    let parsedProjectDocument = null;
+    if (payload.project && typeof payload.project === 'object') {
+      try {
+        parsedProjectDocument = snapshotFromParsedDocumentValue(payload.project);
+      } catch (error) {
+        parsedProjectDocument = null;
+      }
+    }
     applyHistorySnapshot(payload.currentSnapshot);
     history.limit = payload.historyLimit;
     history.past = payload.past;
@@ -64018,6 +64132,12 @@
     if (startupProjectId) {
       startupAutosaveRestoreProjectId = startupProjectId;
       setActiveAutosaveProjectId(startupProjectId, { persist: false });
+    }
+    if (parsedProjectDocument?.sheets?.length) {
+      restoreOpenProjectSheetsFromParsedDocument(parsedProjectDocument, {
+        projectId: startupProjectId || autosaveProjectId,
+        source: restoredSharedProjectKey ? 'shared-sheet' : 'sheet',
+      });
     }
     if (restoredSharedProjectKey) {
       startupSharedReloadProjectKey = restoredSharedProjectKey;
@@ -64050,7 +64170,9 @@
     clearLocalRestoreStorage(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY);
     updateHistoryButtons();
     markAutosaveDirty();
-    scheduleAutosaveSnapshot();
+    if (parsedProjectDocument?.sheets?.length) {
+      scheduleAutosaveSnapshot();
+    }
     updateAutosaveStatus('再読み込み復元: 直前の作業状態を復元しました', 'success');
     return true;
   }
