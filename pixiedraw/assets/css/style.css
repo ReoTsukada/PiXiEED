@@ -2490,6 +2490,14 @@ body.is-startup-active .bottom-timeline-dock {
   inset: 0;
 }
 
+.local-canvas-surface__overlay {
+  z-index: 2;
+}
+
+.local-canvas-surface__selection {
+  z-index: 3;
+}
+
 .canvas-stack {
   position: relative;
   display: inline-flex;
@@ -2611,6 +2619,43 @@ body.is-startup-active .bottom-timeline-dock {
 
 .canvas-stack[data-major-grid='true']::after {
   opacity: var(--grid-major-opacity, 1);
+}
+
+.canvas-stack[data-grid-renderer='svg']::before,
+.canvas-stack[data-grid-renderer='svg']::after {
+  display: none;
+}
+
+.canvas-grid-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.canvas-grid-svg[hidden] {
+  display: none;
+}
+
+.canvas-grid-svg__path {
+  fill: none;
+  stroke-linecap: butt;
+  stroke-linejoin: miter;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  shape-rendering: geometricPrecision;
+}
+
+.canvas-grid-svg__path--minor {
+  opacity: var(--grid-opacity, 1);
+  stroke: var(--grid-color);
+}
+
+.canvas-grid-svg__path--major {
+  opacity: var(--grid-major-opacity, 1);
+  stroke: var(--grid-major-color);
 }
 
 .canvas-stack canvas {
