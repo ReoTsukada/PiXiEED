@@ -55912,7 +55912,9 @@
     const selectionBoundsHit = hasSelection && isPositionInCurrentSelectionBounds(position);
     const selectionInteractionHit = selectionHit || selectionBoundsHit;
     const isSelectionTool = activeTool === 'selectRect' || activeTool === 'selectLasso' || activeTool === 'selectSame' || activeTool === 'move';
-    const pendingMoveState = !pointerState.active ? getPendingSelectionMoveState() : null;
+    const pendingMoveState = !pointerState.active
+      ? (getPendingSelectionMoveState() || state.pendingPasteMoveState)
+      : null;
     if (!pendingMoveState) {
       pointerState.selectionMove = null;
     }
@@ -59225,7 +59227,8 @@
       pointerState.tool = state.tool;
       return false;
     }
-    if (!moveState.hasCleared) {
+    const isPendingPastePlacement = state.pendingPasteMoveState === moveState && !moveState.committed;
+    if (!moveState.hasCleared && !isPendingPastePlacement) {
       pointerState.tool = state.tool;
       pointerState.selectionMove = null;
       state.pendingPasteMoveState = null;
@@ -59314,7 +59317,7 @@
   }
 
   function hasPendingSelectionMove() {
-    return Boolean(getPendingSelectionMoveState());
+    return Boolean(getPendingSelectionMoveState() || state.pendingPasteMoveState);
   }
 
   function getPendingSelectionMoveState() {
@@ -61821,7 +61824,7 @@
   }
 
   function clearSelection() {
-    const pendingMoveState = getPendingSelectionMoveState();
+    const pendingMoveState = getPendingSelectionMoveState() || state.pendingPasteMoveState;
     if (pendingMoveState) {
       // Clicking away should commit the visible portion even if the selection is partially out of bounds.
       pointerState.selectionMove = pendingMoveState;
