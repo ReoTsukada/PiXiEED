@@ -4283,6 +4283,18 @@
   let openProjectTabsLastRenderSignature = '';
   let openProjectTabsLastStructureSignature = '';
   let projectTabViewportResetToken = 0;
+  const OPEN_PROJECT_TAB_LONG_PRESS_MS = 420;
+  const OPEN_PROJECT_TAB_LONG_PRESS_MOVE_TOLERANCE_PX = 12;
+  const openProjectTabLongPressState = {
+    pointerId: null,
+    tabId: '',
+    startX: 0,
+    startY: 0,
+    timerId: null,
+    fired: false,
+    suppressClickTabId: '',
+    suppressClickUntil: 0,
+  };
   const SELECTION_DASH_SPEED = 40;
   let selectionDashScreenOffset = 0;
   let lastSelectionDashTime = 0;
@@ -8995,6 +9007,130 @@
     );
   }
 
+  function renameOpenProjectTab(tabId) {
+    const targetId = typeof tabId === 'string' ? tabId : '';
+    if (!targetId || openProjectTabBusy) {
+      return false;
+    }
+    const index = findOpenProjectTabIndex(targetId);
+    if (index < 0 || !openProjectTabs[index]) {
+      return false;
+    }
+    const targetTab = openProjectTabs[index];
+    const fallbackLabel = localizeText(`シート ${index + 1}`, `Sheet ${index + 1}`);
+    const currentLabel = getOpenProjectTabDisplayLabel(
+      targetTab,
+      { active: !projectHomeVisible && targetId === activeOpenProjectTabId }
+    ) || fallbackLabel;
+    const nextLabel = window.prompt(
+      localizeText('シート名を入力してください', 'Enter the sheet name'),
+      currentLabel
+    );
+    if (nextLabel === null) {
+      return false;
+    }
+    const normalizedLabel = String(nextLabel).trim() || fallbackLabel;
+    if (normalizedLabel === (targetTab.label || '').trim()) {
+      return false;
+    }
+    openProjectTabs[index] = {
+      ...targetTab,
+      label: normalizedLabel,
+      updatedAt: new Date().toISOString(),
+    };
+    renderOpenProjectTabs();
+    markDocumentUnsavedChange();
+    scheduleSessionPersist({ includeSnapshots: true });
+    scheduleAutosaveSnapshot();
+    updateAutosaveStatus(
+      localizeText(`シート名を変更しました (${normalizedLabel})`, `Renamed sheet (${normalizedLabel})`),
+      'success'
+    );
+    return true;
+  }
+
+  function clearOpenProjectTabLongPressTimer() {
+    if (openProjectTabLongPressState.timerId !== null) {
+      window.clearTimeout(openProjectTabLongPressState.timerId);
+      openProjectTabLongPressState.timerId = null;
+    }
+  }
+
+  function cleanupOpenProjectTabLongPressTracking() {
+    clearOpenProjectTabLongPressTimer();
+    openProjectTabLongPressState.pointerId = null;
+    openProjectTabLongPressState.tabId = '';
+    openProjectTabLongPressState.startX = 0;
+    openProjectTabLongPressState.startY = 0;
+    openProjectTabLongPressState.fired = false;
+  }
+
+  function suppressNextOpenProjectTabClick(tabId = '') {
+    openProjectTabLongPressState.suppressClickTabId = typeof tabId === 'string' ? tabId : '';
+    openProjectTabLongPressState.suppressClickUntil = Date.now() + 900;
+  }
+
+  function shouldSuppressOpenProjectTabClick(tabId = '') {
+    const targetId = typeof tabId === 'string' ? tabId : '';
+    if (!targetId) {
+      return false;
+    }
+    if (Date.now() > openProjectTabLongPressState.suppressClickUntil) {
+      openProjectTabLongPressState.suppressClickTabId = '';
+      openProjectTabLongPressState.suppressClickUntil = 0;
+      return false;
+    }
+    return openProjectTabLongPressState.suppressClickTabId === targetId;
+  }
+
+  function beginOpenProjectTabLongPress(event, tabId = '') {
+    if (!event || openProjectTabBusy || !tabId) {
+      return;
+    }
+    const pointerType = typeof event.pointerType === 'string' ? event.pointerType : '';
+    if (pointerType !== 'touch' && pointerType !== 'pen') {
+      return;
+    }
+    cleanupOpenProjectTabLongPressTracking();
+    openProjectTabLongPressState.pointerId = event.pointerId ?? null;
+    openProjectTabLongPressState.tabId = tabId;
+    openProjectTabLongPressState.startX = Number(event.clientX) || 0;
+    openProjectTabLongPressState.startY = Number(event.clientY) || 0;
+    openProjectTabLongPressState.timerId = window.setTimeout(() => {
+      openProjectTabLongPressState.timerId = null;
+      if (!openProjectTabLongPressState.tabId) {
+        return;
+      }
+      openProjectTabLongPressState.fired = true;
+      suppressNextOpenProjectTabClick(openProjectTabLongPressState.tabId);
+      renameOpenProjectTab(openProjectTabLongPressState.tabId);
+    }, OPEN_PROJECT_TAB_LONG_PRESS_MS);
+  }
+
+  function updateOpenProjectTabLongPress(event) {
+    if (openProjectTabLongPressState.pointerId === null) {
+      return;
+    }
+    if ((event.pointerId ?? null) !== openProjectTabLongPressState.pointerId) {
+      return;
+    }
+    const dx = (Number(event.clientX) || 0) - openProjectTabLongPressState.startX;
+    const dy = (Number(event.clientY) || 0) - openProjectTabLongPressState.startY;
+    if (Math.hypot(dx, dy) > OPEN_PROJECT_TAB_LONG_PRESS_MOVE_TOLERANCE_PX) {
+      cleanupOpenProjectTabLongPressTracking();
+    }
+  }
+
+  function endOpenProjectTabLongPress(event) {
+    if (openProjectTabLongPressState.pointerId === null) {
+      return;
+    }
+    if (event && (event.pointerId ?? null) !== openProjectTabLongPressState.pointerId) {
+      return;
+    }
+    cleanupOpenProjectTabLongPressTracking();
+  }
+
   function resetOpenProjectTabsToCurrentProject(options = {}) {
     const tab = createOpenProjectTabFromCurrentState({
       source: options.source || 'working',
@@ -10354,6 +10490,7 @@
       return true;
     } finally {
       openProjectTabBusy = false;
+      renderOpenProjectTabs();
     }
   }
 
@@ -10374,6 +10511,24 @@
       return;
     }
     list.dataset.bound = 'true';
+    list.addEventListener('pointerdown', event => {
+      const target = event.target instanceof Element ? event.target : null;
+      const selectButton = target?.closest('button[data-project-tab-id]');
+      if (!(selectButton instanceof HTMLButtonElement)) {
+        return;
+      }
+      const tabId = selectButton.dataset.projectTabId || '';
+      beginOpenProjectTabLongPress(event, tabId);
+    }, { passive: true });
+    list.addEventListener('pointermove', event => {
+      updateOpenProjectTabLongPress(event);
+    }, { passive: true });
+    list.addEventListener('pointerup', event => {
+      endOpenProjectTabLongPress(event);
+    }, { passive: true });
+    list.addEventListener('pointercancel', event => {
+      endOpenProjectTabLongPress(event);
+    }, { passive: true });
     list.addEventListener('click', event => {
       const target = event.target instanceof Element ? event.target : null;
       if (!target) {
@@ -10398,12 +10553,42 @@
       const selectButton = target.closest('button[data-project-tab-id]');
       if (selectButton instanceof HTMLButtonElement) {
         const tabId = selectButton.dataset.projectTabId || '';
+        if (shouldSuppressOpenProjectTabClick(tabId)) {
+          event.preventDefault();
+          return;
+        }
         void activateOpenProjectTab(tabId).then(switched => {
           if (switched) {
             hideProjectHomeScreen();
           }
         });
       }
+    });
+    list.addEventListener('dblclick', event => {
+      const target = event.target instanceof Element ? event.target : null;
+      const selectButton = target?.closest('button[data-project-tab-id]');
+      if (!(selectButton instanceof HTMLButtonElement)) {
+        return;
+      }
+      const tabId = selectButton.dataset.projectTabId || '';
+      if (!tabId) {
+        return;
+      }
+      event.preventDefault();
+      renameOpenProjectTab(tabId);
+    });
+    list.addEventListener('contextmenu', event => {
+      const target = event.target instanceof Element ? event.target : null;
+      const selectButton = target?.closest('button[data-project-tab-id]');
+      if (!(selectButton instanceof HTMLButtonElement)) {
+        return;
+      }
+      const tabId = selectButton.dataset.projectTabId || '';
+      if (!tabId) {
+        return;
+      }
+      event.preventDefault();
+      renameOpenProjectTab(tabId);
     });
     ensureOpenProjectTabsInitialized();
   }
@@ -25238,7 +25423,9 @@
       .map((sheet, index) => createOpenProjectSheetTabFromPackagedProject({
         ...sheet,
         projectId: normalizedProjectId,
-        label: localizeText(`シート ${index + 1}`, `Sheet ${index + 1}`),
+        label: typeof sheet?.label === 'string' && sheet.label.trim()
+          ? sheet.label.trim()
+          : localizeText(`シート ${index + 1}`, `Sheet ${index + 1}`),
         source: sheet.source || source,
       }))
       .filter(Boolean);
@@ -28405,7 +28592,9 @@
       sheets.push({
         id: tab?.id || createOpenProjectTabId(),
         fileName,
-        label: localizeText(`シート ${index + 1}`, `Sheet ${index + 1}`),
+        label: typeof tab?.label === 'string' && tab.label.trim()
+          ? tab.label.trim()
+          : localizeText(`シート ${index + 1}`, `Sheet ${index + 1}`),
         project,
         unsaved: Boolean(isActive ? hasDocumentUnsavedChanges() : tab?.unsaved),
         source: tab?.source || 'sheet',
