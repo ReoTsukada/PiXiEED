@@ -3940,7 +3940,7 @@
   let palettePresetPickerRefreshFrame = 0;
   let newProjectPalettePresetId = loadStoredNewProjectPalettePresetId();
   let currentPalettePresetId = normalizeCurrentPalettePreset(newProjectPalettePresetId, CURRENT_PALETTE_PRESET_CUSTOM);
-  let viewportZoomRatio = MIN_ZOOM_RATIO;
+  let viewportZoomRatio = 1;
   let voxelExtensionState = normalizeVoxelExtensionState(null, VOXEL_EXTENSION_DEFAULT_STATE);
   let voxelExtensionRestoreSnapshot = null;
   let localViewportCanvasLayoutResetPending = true;
@@ -4954,6 +4954,12 @@
     return normalizeZoomScale(value, fallback);
   }
 
+  function getDefaultCanvasViewportScale(canvasDoc = null) {
+    const width = Math.max(1, Math.round(Number(canvasDoc?.width) || DEFAULT_CANVAS_SIZE));
+    const height = Math.max(1, Math.round(Number(canvasDoc?.height) || DEFAULT_CANVAS_SIZE));
+    return getZoomScaleForRatio(1, { width, height });
+  }
+
   function normalizeBrushShape(value, fallback = BRUSH_SHAPE_SQUARE) {
     const normalizedValue = typeof value === 'string' ? value.trim().toLowerCase() : '';
     if (BRUSH_SHAPE_SET.has(normalizedValue)) {
@@ -5152,7 +5158,7 @@
     return {
       width: initialWidth,
       height: initialHeight,
-      scale: MIN_ZOOM_RATIO,
+      scale: getDefaultCanvasViewportScale({ width: initialWidth, height: initialHeight }),
       pan: { x: 0, y: 0 },
       tool: 'pen',
       brushSize: 1,
@@ -5952,6 +5958,7 @@
     const pixelCount = width * height;
     const selectionMask = normalizeCanvasSelectionMask(source?.selectionMask, pixelCount);
     const selectionContentMask = normalizeCanvasSelectionMask(source?.selectionContentMask, pixelCount);
+    const defaultViewScale = getDefaultCanvasViewportScale({ width, height });
     return {
       id: typeof source?.id === 'string' && source.id
         ? source.id
@@ -5963,7 +5970,7 @@
       height,
       viewScale: normalizeProjectCanvasViewScale(
         source?.viewScale,
-        normalizeProjectCanvasViewScale(source?.scale, 8)
+        normalizeProjectCanvasViewScale(source?.scale, defaultViewScale)
       ),
       frames,
       activeFrame,
@@ -6566,7 +6573,10 @@
       name: resolved.name,
       width: resolved.width,
       height: resolved.height,
-      viewScale: normalizeProjectCanvasViewScale(state.scale, resolved.viewScale || 8),
+      viewScale: normalizeProjectCanvasViewScale(
+        resolved.viewScale,
+        getDefaultCanvasViewportScale(resolved)
+      ),
       frames: resolved.frames.map(frame => ({
         id: frame.id,
         name: frame.name,
@@ -7507,7 +7517,7 @@
     const compressed = {
       width: snapshot.width,
       height: snapshot.height,
-      scale: MIN_ZOOM_RATIO,
+      scale: getDefaultCanvasViewportScale({ width: snapshot.width, height: snapshot.height }),
       pan: { x: 0, y: 0 },
       palette: snapshot.palette.map(color => ({ ...color })),
       activePaletteIndex: snapshot.activePaletteIndex,
@@ -7679,7 +7689,7 @@
     const decompressed = {
       width: snapshot.width,
       height: snapshot.height,
-      scale: MIN_ZOOM_RATIO,
+      scale: getDefaultCanvasViewportScale({ width: snapshot.width, height: snapshot.height }),
       pan: {
         x: Math.round(Number(snapshot.pan?.x) || 0),
         y: Math.round(Number(snapshot.pan?.y) || 0),
@@ -20830,7 +20840,7 @@
     const snapshot = {
       width,
       height,
-      scale: MIN_ZOOM_RATIO,
+      scale: getDefaultCanvasViewportScale({ width, height }),
       pan: { x: 0, y: 0 },
       tool: state.tool,
       brushSize: state.brushSize,
@@ -30096,7 +30106,7 @@
     const activeCanvasSnapshot = {
       width,
       height,
-      scale: MIN_ZOOM_RATIO,
+      scale: getDefaultCanvasViewportScale({ width, height }),
       pan: {
         x: Math.round(Number(payload.pan?.x) || 0),
         y: Math.round(Number(payload.pan?.y) || 0),
@@ -36054,12 +36064,10 @@
     const run = () => {
       openedDocumentViewportResetRaf = null;
       const multiCanvasWorldLayoutActive = isMultiCanvasWorldLayoutActive();
-      if (!multiCanvasWorldLayoutActive) {
-        resetViewportZoomRatio(MIN_ZOOM_RATIO);
-        state.pan.x = 0;
-        state.pan.y = 0;
-        requestLocalViewportCanvasLayoutReset({ clearStored: true });
-      }
+      resetAllProjectCanvasViewScalesToDefault();
+      state.pan.x = 0;
+      state.pan.y = 0;
+      requestLocalViewportCanvasLayoutReset({ clearStored: true });
       resizeCanvases({
         forceRender: false,
         applyTransform: false,
@@ -49456,6 +49464,20 @@
     return getProjectCanvasDocumentById(projectCanvasStore.activeCanvasId) || getProjectCanvasDocumentAt(0);
   }
 
+  function resetAllProjectCanvasViewScalesToDefault() {
+    getProjectCanvasDocuments().forEach(canvasDoc => {
+      if (canvasDoc) {
+        canvasDoc.viewScale = getDefaultCanvasViewportScale(canvasDoc);
+      }
+    });
+    const activeCanvas = getActiveProjectCanvasDocument();
+    state.scale = normalizeProjectCanvasViewScale(
+      activeCanvas?.viewScale,
+      getDefaultCanvasViewportScale(activeCanvas)
+    );
+    rememberViewportZoomRatioFromScale(state.scale);
+  }
+
   function getActiveProjectCanvasIndex() {
     const activeId = getActiveProjectCanvasDocument()?.id || '';
     return Math.max(0, getProjectCanvasDocuments().findIndex(canvas => canvas?.id === activeId));
@@ -49464,27 +49486,25 @@
   function getProjectCanvasViewScale(canvasDoc, fallback = null) {
     const safeFallback = Number.isFinite(Number(fallback))
       ? Number(fallback)
-      : (Number(state.scale) || 8);
+      : getDefaultCanvasViewportScale(canvasDoc);
     return normalizeProjectCanvasViewScale(canvasDoc?.viewScale, safeFallback);
   }
 
   function getProjectCanvasDisplayScale(canvasDoc) {
     return getPixelAlignedCanvasDisplayScale(
-      normalizeProjectCanvasViewScale(state.scale, getProjectCanvasViewScale(canvasDoc, state.scale || 8))
+      getProjectCanvasViewScale(canvasDoc, getDefaultCanvasViewportScale(canvasDoc))
     );
   }
 
   function storeProjectCanvasViewScale(canvasDoc, scale = state.scale) {
-    const normalizedScale = normalizeProjectCanvasViewScale(scale, state.scale || 8);
-    const canvases = getProjectCanvasDocuments();
-    if (!canvases.length) {
+    if (!canvasDoc) {
       return;
     }
-    canvases.forEach(doc => {
-      if (doc) {
-        doc.viewScale = normalizedScale;
-      }
-    });
+    const normalizedScale = normalizeProjectCanvasViewScale(
+      scale,
+      getDefaultCanvasViewportScale(canvasDoc)
+    );
+    canvasDoc.viewScale = normalizedScale;
   }
 
   function syncActiveProjectCanvasViewScale() {
@@ -49546,12 +49566,6 @@
       },
       localViewportCanvasState
     );
-    const sharedScale = normalizeProjectCanvasViewScale(nextActive?.viewScale, state.scale || MIN_ZOOM_SCALE);
-    projectCanvasStore.canvases.forEach(canvas => {
-      if (canvas) {
-        canvas.viewScale = sharedScale;
-      }
-    });
     normalizeMultiAssignmentsForCurrentDocument();
     prunePendingMultiAssignmentMoveRequests();
     pruneMultiHistoryCanvases();
@@ -49654,7 +49668,10 @@
       name: getDefaultProjectCanvasName(index),
       width,
       height,
-      viewScale: normalizeProjectCanvasViewScale(state.scale, state.scale || 8),
+      viewScale: normalizeProjectCanvasViewScale(
+        sourceCanvas?.viewScale,
+        getDefaultCanvasViewportScale({ width, height })
+      ),
       frames: [frame],
       activeFrame: 0,
       activeLayer: frame.layers[frame.layers.length - 1]?.id || null,
@@ -50163,6 +50180,11 @@
     const previousId = projectCanvasStore.activeCanvasId;
     const changed = previousId !== targetCanvas.id;
     projectCanvasStore.activeCanvasId = targetCanvas.id;
+    state.scale = normalizeProjectCanvasViewScale(
+      targetCanvas.viewScale,
+      getDefaultCanvasViewportScale(targetCanvas)
+    );
+    rememberViewportZoomRatioFromScale(state.scale);
     localViewportCanvasState = normalizeLocalViewportCanvasState(
       {
         ...localViewportCanvasState,
