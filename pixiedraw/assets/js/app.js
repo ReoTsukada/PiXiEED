@@ -26738,6 +26738,7 @@
         });
       } catch (error) {
         console.warn('Failed to update recent projects', error);
+        throw error;
       }
     };
     const nextWrite = recentProjectsWritePromise
@@ -28512,6 +28513,21 @@
     return packagedPayload;
   }
 
+  function validatePackagedProjectSheetCountForSave(packagedPayload = null) {
+    const openSheetCount = Math.min(MAX_PROJECT_SHEETS, Math.max(1, openProjectTabs.length || 1));
+    const packagedSheetCount = countPackagedProjectSheets(packagedPayload);
+    if (openSheetCount > 1 && packagedSheetCount < openSheetCount) {
+      console.warn('[project-sheets] refusing incomplete sheet save', {
+        openSheetCount,
+        packagedSheetCount,
+        activeOpenProjectTabId,
+        tabIds: openProjectTabs.map(tab => tab?.id || ''),
+      });
+      return false;
+    }
+    return true;
+  }
+
   function preserveExistingProjectSheetsForSave(packagedPayload = null, previousProject = null) {
     if (!packagedPayload || typeof packagedPayload !== 'object' || !previousProject || typeof previousProject !== 'object') {
       return packagedPayload;
@@ -28561,6 +28577,32 @@
   function getPackagedProjectFirstSheet(packagedPayload = null) {
     const sheets = Array.isArray(packagedPayload?.sheets) ? packagedPayload.sheets : [];
     return sheets.find(sheet => sheet && typeof sheet === 'object' && sheet.project && typeof sheet.project === 'object') || null;
+  }
+
+  function countPackagedProjectSheets(packagedPayload = null) {
+    return Array.isArray(packagedPayload?.sheets)
+      ? packagedPayload.sheets.filter(sheet => sheet && typeof sheet === 'object' && sheet.project && typeof sheet.project === 'object').length
+      : 0;
+  }
+
+  async function verifyRecentProjectSheetSave(projectId = '', expectedSheetCount = 0) {
+    const normalizedProjectId = normalizeAutosaveProjectId(projectId || '');
+    const safeExpectedCount = Math.max(0, Math.round(Number(expectedSheetCount) || 0));
+    if (!AUTOSAVE_SUPPORTED || !normalizedProjectId || safeExpectedCount <= 1) {
+      return true;
+    }
+    const entries = await loadRecentProjectsMetadata({ includeAllAccounts: true });
+    const savedEntry = entries.find(entry => normalizeAutosaveProjectId(entry?.id || '') === normalizedProjectId) || null;
+    const savedSheetCount = countPackagedProjectSheets(savedEntry?.project || null);
+    if (savedSheetCount < safeExpectedCount) {
+      console.warn('[project-sheets] saved sheet count mismatch', {
+        projectId: normalizedProjectId,
+        expectedSheetCount: safeExpectedCount,
+        savedSheetCount,
+      });
+      return false;
+    }
+    return true;
   }
 
   function getRecentProjectListSnapshot(packagedPayload = null, fallbackSnapshot = null) {
@@ -28645,6 +28687,9 @@
       const previousEntry = initialEntries.find(entry => entry?.id === resolvedProjectId) || null;
       ensurePackagedProjectSheetsForSave(packaged, snapshot);
       preserveExistingProjectSheetsForSave(packaged, previousEntry?.project || null);
+      if (!validatePackagedProjectSheetCountForSave(packaged)) {
+        throw new Error('Refusing to save incomplete project sheets');
+      }
       const listSnapshot = getRecentProjectListSnapshot(packaged, snapshot);
       const listSheet = getPackagedProjectFirstSheet(packaged);
       const listThumbnailSheetId = typeof listSheet?.id === 'string' ? listSheet.id : '';
@@ -28713,6 +28758,10 @@
         return bTime.localeCompare(aTime);
       });
       await saveRecentProjectsList(latestEntries, workingEntries);
+      const expectedSavedSheetCount = countPackagedProjectSheets(packaged);
+      if (!await verifyRecentProjectSheetSave(resolvedProjectId, expectedSavedSheetCount)) {
+        throw new Error(`Recent project sheet save verification failed (${expectedSavedSheetCount})`);
+      }
       setRecentProjectsCache(workingEntries);
       if (
         sharedEntrySeed
@@ -29527,6 +29576,8 @@
       return false;
     }
     try {
+      const replaceOpenProjectTabs = options.replaceOpenProjectTabs === true || openProjectTabs.length === 0;
+      const allowProjectMismatchLoad = Boolean(options.allowProjectMismatchLoad || replaceOpenProjectTabs);
       const projectId = normalizeAutosaveProjectId(entry.id || '');
       const latestEntry = projectId
         ? ((await loadRecentProjectsMetadata()).find(candidate => candidate?.id === projectId) || entry)
@@ -29554,7 +29605,7 @@
           projectId: latestEntry.id || '',
           suppressAutosaveStatus: true,
           openedFromRecent: true,
-          allowProjectMismatchLoad: Boolean(options.allowProjectMismatchLoad),
+          allowProjectMismatchLoad,
         });
         if (loaded === 'deferred') {
           return false;
@@ -29569,9 +29620,20 @@
           projectId: latestEntry.id || '',
           suppressAutosaveStatus: true,
           openedFromRecent: true,
-          allowProjectMismatchLoad: Boolean(options.allowProjectMismatchLoad),
+          allowProjectMismatchLoad,
         });
         if (loaded === 'deferred') {
+          if (Array.isArray(latestEntry.project?.sheets) && latestEntry.project.sheets.length > 0) {
+            const retryLoaded = await loadDocumentFromProjectPayload(latestEntry.project, {
+              projectId: latestEntry.id || '',
+              suppressAutosaveStatus: true,
+              openedFromRecent: true,
+              allowProjectMismatchLoad: true,
+            });
+            if (retryLoaded && retryLoaded !== 'deferred') {
+              return finishRecentProjectOpen();
+            }
+          }
           // The snapshot targets a different project/tab: create a new tab
           // containing the packaged project and activate it so the project
           // becomes visible without overwriting the current document.
