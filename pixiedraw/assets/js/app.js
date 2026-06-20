@@ -16690,6 +16690,100 @@
     stack.style.setProperty('--grid-major-opacity', getGridOpacityForScale(scale, { major: true }).toFixed(3));
   }
 
+  function formatGridSvgCoord(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      return '0';
+    }
+    return Number(numeric.toFixed(3)).toString();
+  }
+
+  function buildCanvasGridSvgPath(width, height, displayWidth, displayHeight, step = 1) {
+    const safeWidth = Math.max(1, Math.round(Number(width) || 1));
+    const safeHeight = Math.max(1, Math.round(Number(height) || 1));
+    const safeDisplayWidth = Math.max(1, Number(displayWidth) || safeWidth);
+    const safeDisplayHeight = Math.max(1, Number(displayHeight) || safeHeight);
+    const safeStep = Math.max(1, Math.round(Number(step) || 1));
+    const cellWidth = safeDisplayWidth / safeWidth;
+    const cellHeight = safeDisplayHeight / safeHeight;
+    const lineOffset = 0.5;
+    const commands = [];
+    for (let x = 0; x <= safeWidth; x += safeStep) {
+      const screenX = (x * cellWidth) + lineOffset;
+      commands.push(
+        `M${formatGridSvgCoord(screenX)} 0`,
+        `V${formatGridSvgCoord(safeDisplayHeight)}`
+      );
+    }
+    for (let y = 0; y <= safeHeight; y += safeStep) {
+      const screenY = (y * cellHeight) + lineOffset;
+      commands.push(
+        `M0 ${formatGridSvgCoord(screenY)}`,
+        `H${formatGridSvgCoord(safeDisplayWidth)}`
+      );
+    }
+    return commands.join(' ');
+  }
+
+  function ensureCanvasGridSvg(stack) {
+    if (!(stack instanceof HTMLElement)) {
+      return null;
+    }
+    let svg = Array.from(stack.children).find(child => child instanceof SVGSVGElement && child.classList.contains('canvas-grid-svg'));
+    if (!(svg instanceof SVGSVGElement)) {
+      svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.classList.add('canvas-grid-svg');
+      svg.setAttribute('aria-hidden', 'true');
+      svg.setAttribute('focusable', 'false');
+      const minorPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      minorPath.classList.add('canvas-grid-svg__path', 'canvas-grid-svg__path--minor');
+      minorPath.dataset.gridPath = 'minor';
+      const majorPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      majorPath.classList.add('canvas-grid-svg__path', 'canvas-grid-svg__path--major');
+      majorPath.dataset.gridPath = 'major';
+      svg.append(minorPath, majorPath);
+      stack.appendChild(svg);
+    }
+    return svg;
+  }
+
+  function updateCanvasSurfaceGridSvg(surface, canvasDoc, displayScale) {
+    const stack = surface?.stack instanceof HTMLElement ? surface.stack : null;
+    if (!stack) {
+      return;
+    }
+    const width = Math.max(1, Math.round(Number(canvasDoc?.width) || Number(state.width) || 1));
+    const height = Math.max(1, Math.round(Number(canvasDoc?.height) || Number(state.height) || 1));
+    const scale = Math.max(Number(displayScale) || getProjectCanvasDisplayScale(canvasDoc), MIN_ZOOM_SCALE);
+    const drawingRect = surface?.drawing instanceof HTMLCanvasElement
+      ? surface.drawing.getBoundingClientRect?.()
+      : null;
+    const displayWidth = drawingRect && drawingRect.width > 0 ? drawingRect.width : (width * scale);
+    const displayHeight = drawingRect && drawingRect.height > 0 ? drawingRect.height : (height * scale);
+    const svg = ensureCanvasGridSvg(stack);
+    if (!svg) {
+      return;
+    }
+    stack.dataset.gridRenderer = 'svg';
+    svg.hidden = !(state.showGrid || state.showMajorGrid);
+    svg.setAttribute('viewBox', `0 0 ${formatGridSvgCoord(displayWidth)} ${formatGridSvgCoord(displayHeight)}`);
+    svg.style.width = `${displayWidth}px`;
+    svg.style.height = `${displayHeight}px`;
+    const minorPath = svg.querySelector('[data-grid-path="minor"]');
+    const majorPath = svg.querySelector('[data-grid-path="major"]');
+    if (minorPath instanceof SVGPathElement) {
+      minorPath.setAttribute('d', state.showGrid
+        ? buildCanvasGridSvgPath(width, height, displayWidth, displayHeight, 1)
+        : '');
+    }
+    if (majorPath instanceof SVGPathElement) {
+      const majorStep = Math.max(1, Math.round(Number(state.majorGridSpacing) || 16));
+      majorPath.setAttribute('d', state.showMajorGrid
+        ? buildCanvasGridSvgPath(width, height, displayWidth, displayHeight, majorStep)
+        : '');
+    }
+  }
+
   function getPixelAlignedCanvasDisplayScale(scale = state.scale) {
     const normalizedScale = Math.max(Number(scale) || MIN_ZOOM_SCALE, MIN_ZOOM_SCALE);
     return normalizedScale;
@@ -16721,6 +16815,7 @@
     stack.style.setProperty('--tile-offset-x', '0px');
     stack.style.setProperty('--tile-offset-y', '0px');
     updateStackGridOpacity(stack, minorStep);
+    updateCanvasSurfaceGridSvg(activeCanvasSurface || mainViewportCanvasSurface, getActiveProjectCanvasDocument(), scale);
     stack.dataset.background = state.backgroundMode;
   }
 
@@ -50469,6 +50564,7 @@
     surface.stack.style.setProperty('--tile-offset-x', '0px');
     surface.stack.style.setProperty('--tile-offset-y', '0px');
     updateStackGridOpacity(surface.stack, scale);
+    updateCanvasSurfaceGridSvg(surface, canvasDoc, scale);
   }
 
   function ensureLocalViewportCanvasEntries() {

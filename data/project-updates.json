@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-20T22:45:08.535Z",
+  "generatedAt": "2026-06-20T23:25:19.105Z",
   "projects": [
     {
       "id": "site",
@@ -62,6 +62,12 @@
       "url": "/projects/pixiedraw/",
       "entries": [
         {
+          "date": "2026-06-21",
+          "items": [
+            "機能を更新"
+          ]
+        },
+        {
           "date": "2026-06-20",
           "items": [
             "機能 / 画面を更新"
@@ -101,12 +107,6 @@
           "date": "2026-06-11",
           "items": [
             "機能を更新"
-          ]
-        },
-        {
-          "date": "2026-06-10",
-          "items": [
-            "機能 / 画面 / スタイルを更新"
           ]
         }
       ]
@@ -224,6 +224,17 @@
   ],
   "recentByDate": [
     {
+      "date": "2026-06-21",
+      "updates": [
+        {
+          "id": "pixiedraw",
+          "name": "PiXiEEDraw",
+          "url": "/projects/pixiedraw/",
+          "summary": "機能を更新"
+        }
+      ]
+    },
+    {
       "date": "2026-06-20",
       "updates": [
         {
@@ -315,23 +326,6 @@
           "name": "PiXiEEDraw",
           "url": "/projects/pixiedraw/",
           "summary": "機能を更新"
-        }
-      ]
-    },
-    {
-      "date": "2026-06-10",
-      "updates": [
-        {
-          "id": "pixiedraw",
-          "name": "PiXiEEDraw",
-          "url": "/projects/pixiedraw/",
-          "summary": "機能 / 画面 / スタイルを更新"
-        },
-        {
-          "id": "pixiee-lens",
-          "name": "PiXiEELENS",
-          "url": "/projects/pixiee-lens/",
-          "summary": "画面を更新"
         }
       ]
     }
