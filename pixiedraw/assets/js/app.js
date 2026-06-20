@@ -35998,14 +35998,10 @@
     if (viewportRect.width <= 0 || viewportRect.height <= 0) {
       return { clampedX: false, clampedY: false };
     }
-    if (!isMultiCanvasWorldLayoutActive()) {
-      return clampPanToKeepRectIntersectingViewport(getPrimaryViewportCanvasRect(), viewportRect);
-    }
-    const panelBounds = getViewportPanelBoundsRect();
-    if (!panelBounds || panelBounds.width <= 0 || panelBounds.height <= 0) {
+    if (isMultiCanvasWorldLayoutActive()) {
       return { clampedX: false, clampedY: false };
     }
-    return clampPanToKeepRectIntersectingViewport(panelBounds, viewportRect);
+    return clampPanToKeepRectIntersectingViewport(getPrimaryViewportCanvasRect(), viewportRect);
   }
 
   function centerProjectCanvasInViewport({ persist = false } = {}) {
