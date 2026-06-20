@@ -49916,6 +49916,7 @@
     panel.style.top = `${nextTop}px`;
     if (canvasSurfacePanelDragState.surfaceKind === 'main') {
       setLocalViewportCanvasLayoutAnchor(nextLeft, nextTop);
+      syncLocalViewportCanvasDockLayout();
       return;
     }
     setLocalViewportCanvasPosition(canvasSurfacePanelDragState.surfaceIndex, nextLeft, nextTop);
@@ -50605,6 +50606,65 @@
     };
   }
 
+  function rectsOverlapWithGap(left, top, width, height, occupied, gap = MULTI_CANVAS_SURFACE_GAP) {
+    const safeGap = Math.max(0, Math.round(Number(gap) || 0));
+    const right = left + width;
+    const bottom = top + height;
+    return occupied.some(rect => !(
+      right + safeGap <= rect.left
+      || left >= rect.right + safeGap
+      || bottom + safeGap <= rect.top
+      || top >= rect.bottom + safeGap
+    ));
+  }
+
+  function computeResolvedMultiCanvasWorldLayoutPositions(anchorLeft = 0, anchorTop = 0) {
+    const defaults = computeDefaultLocalViewportCanvasPositions();
+    const occupied = [];
+    const mainCanvasDoc = getProjectCanvasDocumentAt(0);
+    const mainScale = getProjectCanvasDisplayScale(mainCanvasDoc);
+    const mainWidth = Math.max(1, Math.round(Number(mainCanvasDoc?.width) || Number(state.width) || 1)) * mainScale;
+    const mainHeight = Math.max(1, Math.round(Number(mainCanvasDoc?.height) || Number(state.height) || 1)) * mainScale;
+    const resolvedMain = {
+      left: Math.round(Number(anchorLeft) || Number(defaults.main?.left) || 0),
+      top: Math.round(Number(anchorTop) || Number(defaults.main?.top) || 0),
+    };
+    occupied.push({
+      left: resolvedMain.left,
+      top: resolvedMain.top,
+      right: resolvedMain.left + mainWidth,
+      bottom: resolvedMain.top + mainHeight,
+    });
+    const locals = [];
+    let maxRight = resolvedMain.left + mainWidth;
+    for (let index = 0; index < getLocalViewportCanvasCount(); index += 1) {
+      const canvasDoc = getProjectCanvasDocumentAt(index + 1);
+      const displayScale = getProjectCanvasDisplayScale(canvasDoc);
+      const width = Math.max(1, Math.round(Number(canvasDoc?.width) || Number(state.width) || 1)) * displayScale;
+      const height = Math.max(1, Math.round(Number(canvasDoc?.height) || Number(state.height) || 1)) * displayScale;
+      const storedPosition = getDisplayLocalViewportCanvasPosition(index, resolvedMain.left, resolvedMain.top);
+      const defaultPosition = defaults.locals[index] || computeDefaultLocalViewportCanvasWorldPosition(index, resolvedMain.left, resolvedMain.top);
+      let nextLeft = storedPosition.left ?? defaultPosition.left ?? resolvedMain.left;
+      let nextTop = storedPosition.top ?? defaultPosition.top ?? resolvedMain.top;
+      if (rectsOverlapWithGap(nextLeft, nextTop, width, height, occupied)) {
+        nextLeft = Math.round(maxRight + MULTI_CANVAS_SURFACE_GAP);
+        nextTop = Math.round(defaultPosition.top ?? resolvedMain.top);
+      }
+      occupied.push({
+        left: nextLeft,
+        top: nextTop,
+        right: nextLeft + width,
+        bottom: nextTop + height,
+      });
+      maxRight = Math.max(maxRight, nextLeft + width);
+      locals.push({ left: nextLeft, top: nextTop });
+    }
+    return {
+      main: resolvedMain,
+      locals,
+    };
+  }
+
   function getViewportPanelZoomFocus(focus, displayScale = getPixelAlignedCanvasDisplayScale(state.scale)) {
     if (!focus) {
       return null;
@@ -50616,10 +50676,17 @@
     if (!(panel instanceof HTMLElement)) {
       return null;
     }
+    const workspace = dom.viewportWorkspace instanceof HTMLElement ? dom.viewportWorkspace : null;
     const anchorLeft = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorLeft, 0) || 0;
     const anchorTop = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorTop, 0) || 0;
-    const panelLeft = parseLocalViewportCanvasAxis(panel.style.left, panel.offsetLeft) || 0;
-    const panelTop = parseLocalViewportCanvasAxis(panel.style.top, panel.offsetTop) || 0;
+    const panelRect = panel.getBoundingClientRect();
+    const workspaceRect = workspace?.getBoundingClientRect?.() || null;
+    const panelLeft = workspaceRect
+      ? Math.round(panelRect.left - workspaceRect.left)
+      : (parseLocalViewportCanvasAxis(panel.style.left, panel.offsetLeft) || 0);
+    const panelTop = workspaceRect
+      ? Math.round(panelRect.top - workspaceRect.top)
+      : (parseLocalViewportCanvasAxis(panel.style.top, panel.offsetTop) || 0);
     const safeScale = Math.max(Number(displayScale) || MIN_ZOOM_SCALE, Number.EPSILON);
     return {
       clientX: Number.isFinite(focus.clientX) ? Number(focus.clientX) : null,
@@ -50646,8 +50713,12 @@
     workspace.style.setProperty('--workspace-canvas-columns', '1');
     workspace.style.setProperty('--workspace-canvas-rows', '1');
     if (multiCanvasWorldLayoutActive) {
-      const anchorLeft = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorLeft, 0) || 0;
-      const anchorTop = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorTop, 0) || 0;
+      const resolvedLayout = computeResolvedMultiCanvasWorldLayoutPositions(
+        parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorLeft, null) ?? 0,
+        parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorTop, null) ?? 0
+      );
+      const anchorLeft = resolvedLayout.main.left;
+      const anchorTop = resolvedLayout.main.top;
       if (mainPanel) {
         mainPanel.style.left = `${anchorLeft}px`;
         mainPanel.style.top = `${anchorTop}px`;
@@ -50658,15 +50729,12 @@
           return;
         }
         const storedPosition = getDisplayLocalViewportCanvasPosition(index, anchorLeft, anchorTop);
-        const fallbackPosition = computeDefaultLocalViewportCanvasWorldPosition(index, anchorLeft, anchorTop);
-        const left = storedPosition.left ?? fallbackPosition.left;
-        const top = storedPosition.top ?? fallbackPosition.top;
+        const resolvedPosition = resolvedLayout.locals[index] || computeDefaultLocalViewportCanvasWorldPosition(index, anchorLeft, anchorTop);
+        const left = resolvedPosition.left;
+        const top = resolvedPosition.top;
         entry.panel.style.left = `${left}px`;
         entry.panel.style.top = `${top}px`;
-        if (
-          storedPosition.left !== left
-          || storedPosition.top !== top
-        ) {
+        if (storedPosition.left !== left || storedPosition.top !== top) {
           setLocalViewportCanvasPosition(index, left, top);
         }
       });
@@ -54672,7 +54740,7 @@
 
     const clampResult = applyViewportTransform({
       updateDecorations: false,
-      clampVisibility: !zoomFocus,
+      clampVisibility: !multiCanvasWorldLayoutActive && !zoomFocus,
     });
     if (
       zoomFocus
