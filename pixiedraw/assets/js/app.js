@@ -3009,7 +3009,7 @@
   const QR_IMPORT_STORAGE_KEY = 'pixiee-qr:pending-draw-import';
   const QR_EDIT_MODE_TARGET_SOURCE = 'qrmaker';
   const QR_EDIT_CHECK_DELAY_MS = 90;
-  const QR_EDIT_SCAN_CANVAS_SIZE = 320;
+  const QR_EDIT_SCAN_CANVAS_SIZE = 640;
   const PIXFIND_UPLOAD_KEY = 'pixfind_creator_upload_v1';
   function upgradeAutosaveDatabase(db) {
     if (!db) return;
@@ -3080,6 +3080,10 @@
   qrEditScanCanvas.height = QR_EDIT_SCAN_CANVAS_SIZE;
   const qrEditScanCtx = qrEditScanCanvas.getContext
     ? (qrEditScanCanvas.getContext('2d', { willReadFrequently: true }) || qrEditScanCanvas.getContext('2d'))
+    : null;
+  const qrEditSourceCanvas = document.createElement('canvas');
+  const qrEditSourceCtx = qrEditSourceCanvas.getContext
+    ? (qrEditSourceCanvas.getContext('2d', { willReadFrequently: true }) || qrEditSourceCanvas.getContext('2d'))
     : null;
   const autosaveTabInstanceId = (() => {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -9352,6 +9356,10 @@
     previewCtx.drawImage(sourceCanvas, 0, 0, preview.width, preview.height);
   }
 
+  function canUseQrEditJsQrDecoder() {
+    return typeof window !== 'undefined' && typeof window.jsQR === 'function';
+  }
+
   async function ensureQrEditBarcodeDetector() {
     if (qrEditBarcodeDetector) {
       qrEditBarcodeSupport = true;
@@ -9380,6 +9388,41 @@
       console.warn('QR edit mode detector unavailable', error);
       return null;
     }
+  }
+
+  function buildQrEditSourceImageData() {
+    const width = Math.max(1, Math.round(Number(state.width) || 1));
+    const height = Math.max(1, Math.round(Number(state.height) || 1));
+    const frame = getActiveFrame();
+    if (!frame || width <= 0 || height <= 0 || !qrEditSourceCtx) {
+      return null;
+    }
+    const pixels = compositeFramePixels(frame, width, height, state.palette);
+    if (!(pixels instanceof Uint8ClampedArray) || pixels.length < width * height * 4) {
+      return null;
+    }
+    const imageData = qrEditSourceCtx.createImageData(width, height);
+    const data = imageData.data;
+    for (let i = 0; i < width * height; i += 1) {
+      const base = i * 4;
+      const alpha = pixels[base + 3];
+      if (alpha >= 255) {
+        data[base] = pixels[base];
+        data[base + 1] = pixels[base + 1];
+        data[base + 2] = pixels[base + 2];
+      } else if (alpha > 0) {
+        const inverse = 255 - alpha;
+        data[base] = Math.round(((pixels[base] * alpha) + (255 * inverse)) / 255);
+        data[base + 1] = Math.round(((pixels[base + 1] * alpha) + (255 * inverse)) / 255);
+        data[base + 2] = Math.round(((pixels[base + 2] * alpha) + (255 * inverse)) / 255);
+      } else {
+        data[base] = 255;
+        data[base + 1] = 255;
+        data[base + 2] = 255;
+      }
+      data[base + 3] = 255;
+    }
+    return imageData;
   }
 
   function updateActiveOpenProjectTabQrEditPayload(payload = null) {
@@ -9454,24 +9497,87 @@
   }
 
   function renderQrEditScanSource() {
-    if (!qrEditScanCtx) {
+    if (!qrEditScanCtx || !qrEditSourceCtx) {
       return null;
     }
-    const drawingCanvas = activeCanvasSurface?.drawing instanceof HTMLCanvasElement
-      ? activeCanvasSurface.drawing
-      : (dom.canvases?.drawing instanceof HTMLCanvasElement ? dom.canvases.drawing : null);
-    if (!(drawingCanvas instanceof HTMLCanvasElement) || drawingCanvas.width <= 0 || drawingCanvas.height <= 0) {
+    const sourceImage = buildQrEditSourceImageData();
+    if (!sourceImage || sourceImage.width <= 0 || sourceImage.height <= 0) {
       return null;
     }
-    qrEditScanCanvas.width = QR_EDIT_SCAN_CANVAS_SIZE;
-    qrEditScanCanvas.height = QR_EDIT_SCAN_CANVAS_SIZE;
+    const sourceWidth = Math.max(1, Math.round(sourceImage.width));
+    const sourceHeight = Math.max(1, Math.round(sourceImage.height));
+    if (qrEditSourceCanvas.width !== sourceWidth) {
+      qrEditSourceCanvas.width = sourceWidth;
+    }
+    if (qrEditSourceCanvas.height !== sourceHeight) {
+      qrEditSourceCanvas.height = sourceHeight;
+    }
+    qrEditSourceCtx.putImageData(sourceImage, 0, 0);
+    const maxSourceSize = Math.max(sourceWidth, sourceHeight);
+    const scale = Math.max(1, Math.floor(QR_EDIT_SCAN_CANVAS_SIZE / maxSourceSize));
+    const targetWidth = sourceWidth * scale;
+    const targetHeight = sourceHeight * scale;
+    if (qrEditScanCanvas.width !== targetWidth) {
+      qrEditScanCanvas.width = targetWidth;
+    }
+    if (qrEditScanCanvas.height !== targetHeight) {
+      qrEditScanCanvas.height = targetHeight;
+    }
     qrEditScanCtx.clearRect(0, 0, qrEditScanCanvas.width, qrEditScanCanvas.height);
     qrEditScanCtx.fillStyle = '#ffffff';
     qrEditScanCtx.fillRect(0, 0, qrEditScanCanvas.width, qrEditScanCanvas.height);
     qrEditScanCtx.imageSmoothingEnabled = false;
-    qrEditScanCtx.drawImage(drawingCanvas, 0, 0, qrEditScanCanvas.width, qrEditScanCanvas.height);
+    qrEditScanCtx.drawImage(qrEditSourceCanvas, 0, 0, targetWidth, targetHeight);
     syncQrEditPreviewCanvas(qrEditScanCanvas);
     return qrEditScanCanvas;
+  }
+
+  async function decodeQrEditWithBarcodeDetector(scanCanvas) {
+    const detector = await ensureQrEditBarcodeDetector();
+    if (!detector) {
+      return null;
+    }
+    const results = await detector.detect(scanCanvas);
+    const decoded = Array.isArray(results)
+      ? results.find(item => typeof item?.rawValue === 'string' && item.rawValue.length > 0)
+      : null;
+    return typeof decoded?.rawValue === 'string' ? decoded.rawValue : '';
+  }
+
+  function decodeQrEditWithJsQr(scanCanvas) {
+    if (!canUseQrEditJsQrDecoder() || !qrEditScanCtx || !(scanCanvas instanceof HTMLCanvasElement)) {
+      return null;
+    }
+    try {
+      const image = qrEditScanCtx.getImageData(0, 0, scanCanvas.width, scanCanvas.height);
+      const decoded = window.jsQR(image.data, image.width, image.height, {
+        inversionAttempts: 'attemptBoth',
+      });
+      return typeof decoded?.data === 'string' ? decoded.data : '';
+    } catch (error) {
+      console.warn('QR edit mode jsQR detect failed', error);
+      return '';
+    }
+  }
+
+  async function decodeQrEditScanCanvas(scanCanvas) {
+    let detectorTried = false;
+    try {
+      const decodedByDetector = await decodeQrEditWithBarcodeDetector(scanCanvas);
+      detectorTried = decodedByDetector !== null;
+      if (typeof decodedByDetector === 'string' && decodedByDetector.length > 0) {
+        return { supported: true, text: decodedByDetector, method: 'barcode-detector' };
+      }
+    } catch (error) {
+      detectorTried = true;
+      console.warn('QR edit mode BarcodeDetector failed', error);
+    }
+
+    const decodedByJsQr = decodeQrEditWithJsQr(scanCanvas);
+    if (typeof decodedByJsQr === 'string') {
+      return { supported: true, text: decodedByJsQr, method: 'jsqr' };
+    }
+    return { supported: detectorTried, text: '', method: detectorTried ? 'barcode-detector' : '' };
   }
 
   async function runQrEditReadabilityCheck() {
@@ -9481,19 +9587,6 @@
     const token = ++qrEditModeState.checkToken;
     qrEditModeState.checking = true;
     updateQrEditPanel();
-    const detector = await ensureQrEditBarcodeDetector();
-    if (token !== qrEditModeState.checkToken || !qrEditModeState.active) {
-      return;
-    }
-    if (!detector) {
-      qrEditModeState.detectorAvailable = false;
-      qrEditModeState.checking = false;
-      qrEditModeState.readable = null;
-      qrEditModeState.exactMatch = null;
-      updateQrEditPanel();
-      return;
-    }
-    qrEditModeState.detectorAvailable = true;
     const scanCanvas = renderQrEditScanSource();
     if (!scanCanvas) {
       qrEditModeState.checking = false;
@@ -9504,14 +9597,19 @@
       return;
     }
     try {
-      const results = await detector.detect(scanCanvas);
+      const result = await decodeQrEditScanCanvas(scanCanvas);
       if (token !== qrEditModeState.checkToken || !qrEditModeState.active) {
         return;
       }
-      const decoded = Array.isArray(results)
-        ? results.find(item => typeof item?.rawValue === 'string' && item.rawValue.trim())
-        : null;
-      const decodedText = decoded?.rawValue?.trim() || '';
+      if (!result.supported) {
+        qrEditModeState.detectorAvailable = false;
+        qrEditModeState.lastDecodedText = '';
+        qrEditModeState.readable = null;
+        qrEditModeState.exactMatch = null;
+        return;
+      }
+      qrEditModeState.detectorAvailable = true;
+      const decodedText = typeof result.text === 'string' ? result.text.trim() : '';
       qrEditModeState.lastDecodedText = decodedText;
       qrEditModeState.readable = Boolean(decodedText);
       qrEditModeState.exactMatch = qrEditModeState.expectedText
@@ -60727,6 +60825,95 @@
     };
   }
 
+  function getSelectionTransformOppositeCornerId(handleId = '') {
+    switch (String(handleId || '').toLowerCase()) {
+      case 'nw':
+        return 'se';
+      case 'ne':
+        return 'sw';
+      case 'se':
+        return 'nw';
+      case 'sw':
+        return 'ne';
+      default:
+        return '';
+    }
+  }
+
+  function getSelectionTransformCornerLocalPoint(cornerId, width, height) {
+    const safeWidth = Math.max(1, Number(width) || 1);
+    const safeHeight = Math.max(1, Number(height) || 1);
+    switch (String(cornerId || '').toLowerCase()) {
+      case 'nw':
+        return { x: 0, y: 0 };
+      case 'ne':
+        return { x: safeWidth, y: 0 };
+      case 'se':
+        return { x: safeWidth, y: safeHeight };
+      case 'sw':
+        return { x: 0, y: safeHeight };
+      default:
+        return null;
+    }
+  }
+
+  function getSelectionTransformVectorInResizeSpace(vectorX, vectorY, transform) {
+    let dx = Number(vectorX) || 0;
+    let dy = Number(vectorY) || 0;
+    const rotationDeg = normalizeSelectionMoveRotationDeg(transform?.rotationDeg);
+    if (rotationDeg !== 0) {
+      const rad = (-rotationDeg * Math.PI) / 180;
+      const cos = Math.cos(rad);
+      const sin = Math.sin(rad);
+      const nextDx = (dx * cos) - (dy * sin);
+      const nextDy = (dx * sin) + (dy * cos);
+      dx = nextDx;
+      dy = nextDy;
+    }
+    if (transform?.flipHorizontal) {
+      dx = -dx;
+    }
+    if (transform?.flipVertical) {
+      dy = -dy;
+    }
+    return { x: dx, y: dy };
+  }
+
+  function getSelectionTransformResizeAnchorSnapshot(moveState, handleId, raw, transform) {
+    if (!moveState || !moveState.bounds || !raw) {
+      return null;
+    }
+    const fixedCornerId = getSelectionTransformOppositeCornerId(handleId);
+    if (!fixedCornerId) {
+      return null;
+    }
+    const width = Math.max(1, Number(moveState.width) || 1);
+    const height = Math.max(1, Number(moveState.height) || 1);
+    const fixedLocal = getSelectionTransformCornerLocalPoint(fixedCornerId, width, height);
+    if (!fixedLocal) {
+      return null;
+    }
+    const originX = (Number(moveState.bounds.x0) || 0) + (Number(moveState.offset?.x) || 0);
+    const originY = (Number(moveState.bounds.y0) || 0) + (Number(moveState.offset?.y) || 0);
+    const mappedFixed = transformSelectionMoveLocalPoint(fixedLocal.x, fixedLocal.y, width, height, transform);
+    const fixedWorldX = originX + mappedFixed.x;
+    const fixedWorldY = originY + mappedFixed.y;
+    const startVector = getSelectionTransformVectorInResizeSpace(
+      (Number(raw.x) || 0) - fixedWorldX,
+      (Number(raw.y) || 0) - fixedWorldY,
+      transform
+    );
+    return {
+      fixedCornerId,
+      fixedLocalX: fixedLocal.x,
+      fixedLocalY: fixedLocal.y,
+      fixedWorldX,
+      fixedWorldY,
+      startVectorX: startVector.x,
+      startVectorY: startVector.y,
+    };
+  }
+
   function ensureSelectionMoveForTransform() {
     const pendingMove = getPendingSelectionMoveState();
     if (pendingMove && pendingMove.hasCleared) {
@@ -60787,6 +60974,7 @@
     const startLocal = raw && center
       ? getSelectionTransformPointerLocalVector(raw, center, transform)
       : { x: 0, y: 0 };
+    const resizeAnchor = getSelectionTransformResizeAnchorSnapshot(moveState, handle.id, raw, transform);
     selectionTransformUi.interaction = {
       handleId: handle.id,
       startClientX: event.clientX,
@@ -60800,6 +60988,13 @@
       startDistance,
       startLocalX: startLocal.x,
       startLocalY: startLocal.y,
+      resizeFixedCornerId: resizeAnchor?.fixedCornerId || '',
+      resizeFixedLocalX: resizeAnchor?.fixedLocalX ?? null,
+      resizeFixedLocalY: resizeAnchor?.fixedLocalY ?? null,
+      resizeFixedWorldX: resizeAnchor?.fixedWorldX ?? null,
+      resizeFixedWorldY: resizeAnchor?.fixedWorldY ?? null,
+      resizeStartVectorX: resizeAnchor?.startVectorX ?? null,
+      resizeStartVectorY: resizeAnchor?.startVectorY ?? null,
       mode: event.altKey ? 'rotate' : 'pending',
       moved: false,
     };
@@ -60906,29 +61101,98 @@
       return false;
     }
     const transform = getSelectionMoveTransformState(moveState);
-    const local = getSelectionTransformPointerLocalVector(raw, center, transform);
-    const startLocalX = Number(interaction.startLocalX) || 0;
-    const startLocalY = Number(interaction.startLocalY) || 0;
     let nextScaleX = normalizeSelectionMoveScale(interaction.startScaleX);
     let nextScaleY = normalizeSelectionMoveScale(interaction.startScaleY);
-    if (Math.abs(startLocalX) >= 0.5) {
-      nextScaleX = normalizeSelectionMoveScale(nextScaleX * (Math.abs(local.x) / Math.abs(startLocalX)));
+    let anchoredResize = false;
+    const fixedWorldX = Number(interaction.resizeFixedWorldX);
+    const fixedWorldY = Number(interaction.resizeFixedWorldY);
+    const startVectorX = Number(interaction.resizeStartVectorX);
+    const startVectorY = Number(interaction.resizeStartVectorY);
+    if (
+      Number.isFinite(fixedWorldX)
+      && Number.isFinite(fixedWorldY)
+      && Number.isFinite(startVectorX)
+      && Number.isFinite(startVectorY)
+    ) {
+      const vector = getSelectionTransformVectorInResizeSpace(
+        (Number(raw.x) || 0) - fixedWorldX,
+        (Number(raw.y) || 0) - fixedWorldY,
+        {
+          rotationDeg: interaction.startRotationDeg,
+          flipHorizontal: transform.flipHorizontal,
+          flipVertical: transform.flipVertical,
+        }
+      );
+      if (Math.abs(startVectorX) >= 0.5) {
+        nextScaleX = normalizeSelectionMoveScale(
+          normalizeSelectionMoveScale(interaction.startScaleX) * (Math.abs(vector.x) / Math.abs(startVectorX))
+        );
+        anchoredResize = true;
+      }
+      if (Math.abs(startVectorY) >= 0.5) {
+        nextScaleY = normalizeSelectionMoveScale(
+          normalizeSelectionMoveScale(interaction.startScaleY) * (Math.abs(vector.y) / Math.abs(startVectorY))
+        );
+        anchoredResize = true;
+      }
     }
-    if (Math.abs(startLocalY) >= 0.5) {
-      nextScaleY = normalizeSelectionMoveScale(nextScaleY * (Math.abs(local.y) / Math.abs(startLocalY)));
+    if (!anchoredResize) {
+      const local = getSelectionTransformPointerLocalVector(raw, center, transform);
+      const startLocalX = Number(interaction.startLocalX) || 0;
+      const startLocalY = Number(interaction.startLocalY) || 0;
+      if (Math.abs(startLocalX) >= 0.5) {
+        nextScaleX = normalizeSelectionMoveScale(nextScaleX * (Math.abs(local.x) / Math.abs(startLocalX)));
+      }
+      if (Math.abs(startLocalY) >= 0.5) {
+        nextScaleY = normalizeSelectionMoveScale(nextScaleY * (Math.abs(local.y) / Math.abs(startLocalY)));
+      }
     }
     if (event?.shiftKey) {
       const uniform = normalizeSelectionMoveScale(Math.max(nextScaleX, nextScaleY));
       nextScaleX = uniform;
       nextScaleY = uniform;
     }
+    let nextOffsetX = Number(moveState.offset?.x) || 0;
+    let nextOffsetY = Number(moveState.offset?.y) || 0;
+    if (anchoredResize) {
+      const fixedLocalX = Number(interaction.resizeFixedLocalX);
+      const fixedLocalY = Number(interaction.resizeFixedLocalY);
+      if (Number.isFinite(fixedLocalX) && Number.isFinite(fixedLocalY)) {
+        const width = Math.max(1, Number(moveState.width) || 1);
+        const height = Math.max(1, Number(moveState.height) || 1);
+        const mappedFixed = transformSelectionMoveLocalPoint(
+          fixedLocalX,
+          fixedLocalY,
+          width,
+          height,
+          {
+            rotationDeg: transform.rotationDeg,
+            flipHorizontal: transform.flipHorizontal,
+            flipVertical: transform.flipVertical,
+            scaleX: nextScaleX,
+            scaleY: nextScaleY,
+          }
+        );
+        nextOffsetX = Math.round(fixedWorldX - (Number(moveState.bounds?.x0) || 0) - mappedFixed.x);
+        nextOffsetY = Math.round(fixedWorldY - (Number(moveState.bounds?.y0) || 0) - mappedFixed.y);
+      }
+    }
+    const currentOffsetX = Number(moveState.offset?.x) || 0;
+    const currentOffsetY = Number(moveState.offset?.y) || 0;
     const changed = Math.abs(nextScaleX - normalizeSelectionMoveScale(moveState.transformScaleX)) > SELECTION_TRANSFORM_SCALE_EPSILON
-      || Math.abs(nextScaleY - normalizeSelectionMoveScale(moveState.transformScaleY)) > SELECTION_TRANSFORM_SCALE_EPSILON;
+      || Math.abs(nextScaleY - normalizeSelectionMoveScale(moveState.transformScaleY)) > SELECTION_TRANSFORM_SCALE_EPSILON
+      || nextOffsetX !== currentOffsetX
+      || nextOffsetY !== currentOffsetY;
     if (!changed) {
       return false;
     }
     moveState.transformScaleX = nextScaleX;
     moveState.transformScaleY = nextScaleY;
+    if (!moveState.offset || typeof moveState.offset !== 'object') {
+      moveState.offset = { x: 0, y: 0 };
+    }
+    moveState.offset.x = nextOffsetX;
+    moveState.offset.y = nextOffsetY;
     invalidateSelectionMoveTransformCache(moveState);
     return true;
   }
@@ -62365,6 +62629,9 @@
     requestAnimationFrame(() => {
       renderScheduled = false;
       renderCanvas();
+      if (qrEditModeState.active && !state.playback.isPlaying) {
+        scheduleQrEditReadabilityCheck();
+      }
       if (shouldSyncMultiPublicLobbyRoom() && multiState.publicLobbyThumbnailDirty) {
         scheduleMultiPublicLobbyRoomSync({ immediate: false });
       }
