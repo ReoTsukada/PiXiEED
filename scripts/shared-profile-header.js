@@ -45,7 +45,7 @@
     const script = document.createElement('script');
     script.defer = true;
     script.dataset.pixieedSupportCheckout = 'true';
-    script.src = asset('./support-checkout-panel.js');
+    script.src = asset('./support-checkout-panel.js?v=2026.06.22-active-supporters');
     document.head.appendChild(script);
   }
 
