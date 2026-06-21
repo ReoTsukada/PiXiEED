@@ -590,6 +590,8 @@
     },
     loginPrompt: {
       dialog: /** @type {HTMLDialogElement|null} */ (document.getElementById('loginPromptDialog')),
+      title: document.getElementById('loginPromptTitle'),
+      lead: document.getElementById('loginPromptLead'),
       close: document.getElementById('closeLoginPrompt'),
       goHome: document.getElementById('loginPromptGoHome'),
     },
@@ -3875,6 +3877,7 @@
     height: 220,
   });
   const MULTI_CANVAS_FEATURE_ENABLED = true;
+  const LOCAL_VIEWPORT_CANVAS_SIGNED_IN_MAX_COUNT = 1;
   const LOCAL_VIEWPORT_CANVAS_STANDARD_MAX_COUNT = 3;
   const LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE = Object.freeze({
     count: 0,
@@ -17429,11 +17432,9 @@
     ).count;
     const canEditProjectStructure = canCurrentClientEditProjectStructure();
     const voxelModeEnabled = isVoxelExtensionModeEnabled();
-    const hasExistingMultiCanvas = localCanvasCount > 0 || getProjectCanvasCount() > 1;
-    const canAccessMultiCanvas = hasPixieedrawMultiCanvasSupport() || hasExistingMultiCanvas;
     if (dom.controls.toggleLocalCanvas instanceof HTMLInputElement) {
       dom.controls.toggleLocalCanvas.checked = MULTI_CANVAS_FEATURE_ENABLED && localCanvasCount > 0;
-      dom.controls.toggleLocalCanvas.disabled = !MULTI_CANVAS_FEATURE_ENABLED || !canAccessMultiCanvas || !canEditProjectStructure || voxelModeEnabled;
+      dom.controls.toggleLocalCanvas.disabled = !MULTI_CANVAS_FEATURE_ENABLED || !canEditProjectStructure || voxelModeEnabled;
     }
     if (dom.controls.localCanvasCountControls instanceof HTMLElement) {
       const showControls = MULTI_CANVAS_FEATURE_ENABLED && localCanvasCount > 0;
@@ -18071,7 +18072,7 @@
     setLocalizedTextContent('#goHomeButton', 'ホームに戻る', 'Back to Home');
     setLocalizedTextContent('#goContestButton', '広場を見る', 'View Plaza');
     setLocalizedTextContent('#pixieedAdFreeField > span', 'サポーター特典', 'Supporter Benefits');
-    setLocalizedTextContent('#pixieedAdFreeStatus', 'ログイン後に購入番号または購入コードを適用できます。広告非表示、共有プロジェクト作成枠、最大人数の拡張を利用できます。', 'After signing in, apply your purchase number or support code to remove ads and unlock shared project slots and higher member limits.');
+    setLocalizedTextContent('#pixieedAdFreeStatus', 'サポーター特典は500円です。広告非表示、共有プロジェクト4件、共同編集最大4人、マルチキャンバス追加3つまで利用できます。', 'Supporter benefits are 500 yen: remove ads, unlock 4 shared projects, edit with up to 4 people, and add up to 3 multi canvases.');
     setLocalizedTextContent('#pixieedAdFreePurchase', 'サポーター特典を見る', 'View Supporter Benefits');
     setLocalizedTextContent('#multiEntryAccountCard .multi-account-card__head > span', '共有プロジェクトを作成', 'Create Shared Project');
     setLocalizedTextContent('#multiFlowAccountCard .multi-account-card__head > span', '共有プロジェクトを作成', 'Create Shared Project');
@@ -18270,7 +18271,7 @@
     setLocalizedTextContent('#toolSpotlightGoHome', 'ホームへ戻る', 'Back to Home');
     setLocalizedTextContent('#toolSpotlightOpenContest', '広場を見る', 'View Plaza');
     setLocalizedTextContent('#loginPromptTitle', 'ログイン', 'Sign In');
-    setLocalizedTextContent('#loginPromptLead', 'ログインすると、プロフィール共有や引き継ぎができます。', 'Sign in to sync your profile and carry it to other devices.');
+    setLocalizedTextContent('#loginPromptLead', 'ログインすると、プロフィール共有、端末間の引き継ぎ、ログイン限定機能を利用できます。', 'Sign in to sync your profile, carry it to other devices, and use account-only features.');
     setLocalizedTextContent('#loginPromptGoHome', 'ホームでログイン', 'Open Home Login');
     setLocalizedTextContent('#closeLoginPrompt', '閉じる', 'Close');
     setLocalizedTextContent('#closeToolSpotlight', '閉じる', 'Close');
@@ -21143,6 +21144,11 @@
     } catch (error) {
       // ignore
     }
+    try {
+      window.sessionStorage.removeItem(QR_IMPORT_STORAGE_KEY);
+    } catch (error) {
+      // ignore
+    }
   }
 
   function finalizeLensImportAttempt({ clearPayload = false } = {}) {
@@ -21288,6 +21294,13 @@
       rawPayload = window.localStorage.getItem(QR_IMPORT_STORAGE_KEY);
     } catch (error) {
       console.warn('QR transfer storage is not available', error);
+    }
+    if (!rawPayload) {
+      try {
+        rawPayload = window.sessionStorage.getItem(QR_IMPORT_STORAGE_KEY);
+      } catch (error) {
+        console.warn('QR transfer session storage is not available', error);
+      }
     }
 
     let payload = null;
@@ -22169,7 +22182,40 @@
     }
   }
 
-  function openLoginPromptDialog() {
+  function getDefaultLoginPromptCopy() {
+    return {
+      title: localizeText('ログイン', 'Sign In'),
+      lead: localizeText(
+        'ログインすると、プロフィール共有、端末間の引き継ぎ、ログイン限定機能を利用できます。',
+        'Sign in to sync your profile, carry it to other devices, and use account-only features.'
+      ),
+      actionLabel: localizeText('ホームでログイン', 'Open Home Login'),
+    };
+  }
+
+  function applyLoginPromptCopy(options = {}) {
+    const defaults = getDefaultLoginPromptCopy();
+    const title = typeof options.title === 'string' && options.title.trim()
+      ? options.title.trim()
+      : defaults.title;
+    const lead = typeof options.lead === 'string' && options.lead.trim()
+      ? options.lead.trim()
+      : defaults.lead;
+    const actionLabel = typeof options.actionLabel === 'string' && options.actionLabel.trim()
+      ? options.actionLabel.trim()
+      : defaults.actionLabel;
+    if (dom.loginPrompt?.title instanceof HTMLElement) {
+      dom.loginPrompt.title.textContent = title;
+    }
+    if (dom.loginPrompt?.lead instanceof HTMLElement) {
+      dom.loginPrompt.lead.textContent = lead;
+    }
+    if (dom.loginPrompt?.goHome instanceof HTMLElement) {
+      dom.loginPrompt.goHome.textContent = actionLabel;
+    }
+  }
+
+  function openLoginPromptDialog(options = {}) {
     if (accountState.isLoggedIn && !accountState.isAnonymous) {
       return;
     }
@@ -22177,6 +22223,7 @@
     if (!(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== 'function') {
       return;
     }
+    applyLoginPromptCopy(options);
     if (dialog.open) {
       return;
     }
@@ -25992,6 +26039,20 @@
     return hasPixieedrawAdFreeSupport();
   }
 
+  function hasPixieedrawSignedInAccount() {
+    return Boolean(accountState.isLoggedIn && accountState.userId && !accountState.isAnonymous);
+  }
+
+  function getLocalViewportCanvasAccountLimit() {
+    if (hasPixieedrawMultiCanvasSupport()) {
+      return LOCAL_VIEWPORT_CANVAS_STANDARD_MAX_COUNT;
+    }
+    if (hasPixieedrawSignedInAccount()) {
+      return LOCAL_VIEWPORT_CANVAS_SIGNED_IN_MAX_COUNT;
+    }
+    return 0;
+  }
+
   function getSharedProjectMemberLimitForCurrentPlan() {
     return hasPixieedrawAdFreeSupport()
       ? SHARED_PROJECT_MEMBER_LIMIT_AD_FREE
@@ -26033,18 +26094,18 @@
       const days = getPixieedAdFreeRemainingDays(adFreeState);
       if (days === null) {
         return localizeText(
-          `サポーター特典が適用中です。作成枠 ${usageLabel}、共有プロジェクトは最大 ${memberLimit} 人（参加者 ${memberLimit - 1} 人）で編集できます。広告非表示も利用できます。`,
-          `Supporter benefits are active. Creation slots: ${usageLabel}. Shared projects support up to ${memberLimit} people (${memberLimit - 1} participants). Ads are hidden.`
+          `サポーター特典（500円）が適用中です。広告非表示、共有プロジェクト作成枠 ${usageLabel}、共同編集最大 ${memberLimit} 人、マルチキャンバスは追加3つ（メイン含め最大4つ）まで利用できます。`,
+          `Supporter benefits (500 yen) are active. Ads are hidden, shared project slots are ${usageLabel}, shared editing supports up to ${memberLimit} people, and Multi Canvas supports 3 extra canvases (4 total including the main canvas).`
         );
       }
       return localizeText(
-        `サポーター特典が適用中です。作成枠 ${usageLabel}、共有プロジェクト最大 ${memberLimit} 人（参加者 ${memberLimit - 1} 人）、残り ${days} 日です。`,
-        `Supporter benefits are active. Creation slots: ${usageLabel}. Shared project limit: ${memberLimit} people (${memberLimit - 1} participants). ${days} days remaining.`
+        `サポーター特典（500円）が適用中です。広告非表示、共有プロジェクト作成枠 ${usageLabel}、共同編集最大 ${memberLimit} 人、マルチキャンバス追加3つまで利用できます。残り ${days} 日です。`,
+        `Supporter benefits (500 yen) are active. Ads are hidden, shared project slots are ${usageLabel}, shared editing supports up to ${memberLimit} people, and Multi Canvas supports 3 extra canvases. ${days} days remaining.`
       );
     }
     return localizeText(
-      `無料枠は共有プロジェクト1件、作業人数は最大2人（マスターと参加者1人）です。500円サポートで作成枠は合計4件、人数は最大4人（参加者3人）に増えます。サポーター枠 ${supporterUsageLabel}。`,
-      `The free tier includes 1 shared project for up to 2 people (master plus 1 participant). The 500 yen support plan raises this to 4 projects and up to 4 people (3 participants). Supporter slots: ${supporterUsageLabel}.`
+      `通常ログインでは共有プロジェクト1件、共同編集最大2人、マルチキャンバス追加1つまで利用できます。サポーター特典は500円で、共有プロジェクト4件、共同編集最大4人、マルチキャンバス追加3つ、広告非表示になります。サポーター枠 ${supporterUsageLabel}。`,
+      `With a standard signed-in account, you get 1 shared project, shared editing for up to 2 people, and 1 extra Multi Canvas. Supporter benefits are 500 yen and unlock 4 shared projects, shared editing for up to 4 people, 3 extra Multi Canvases, and ad removal. Supporter slots: ${supporterUsageLabel}.`
     );
   }
 
@@ -40177,12 +40238,20 @@
         setLocalViewportCanvasCount(0, { persist: true, announce: false });
         return;
       }
-      if (!hasPixieedrawMultiCanvasSupport() && getLocalViewportCanvasCount() <= 0 && getProjectCanvasCount() <= 1) {
+      if (getLocalViewportCanvasAccountLimit() <= 0 && getLocalViewportCanvasCount() <= 0 && getProjectCanvasCount() <= 1) {
         event.target.checked = false;
+        openLoginPromptDialog({
+          title: localizeText('ログインでマルチキャンバス解放', 'Sign In to Unlock Multi Canvas'),
+          lead: localizeText(
+            'マルチキャンバスはログインすると追加キャンバスを1つ使えます。サポーター特典（500円）では追加キャンバスを3つまで使えます。',
+            'Sign in to use 1 extra Multi Canvas. Supporter benefits (500 yen) unlock up to 3 extra canvases.'
+          ),
+          actionLabel: localizeText('ログインして使う', 'Sign In to Use It'),
+        });
         updateAutosaveStatus(
           localizeText(
-            'マルチキャンバスはサポーター特典です。既に複数キャンバスを含むプロジェクトはそのまま使用できます。',
-            'Multi Canvas is a supporter benefit. Projects that already contain multiple canvases can still use them.'
+            'マルチキャンバスはログインすると1つ追加できます。サポーターは3つまで追加できます。',
+            'Sign in to add 1 multi canvas. Supporters can add up to 3.'
           ),
           'info'
         );
@@ -51342,12 +51411,19 @@
     const previous = getLocalViewportCanvasCount();
     const currentCanvases = getProjectCanvasDocuments();
     const targetCount = clamp(Math.round(Number(nextCount) || 0), 0, getLocalViewportCanvasMaxCount());
-    if (!hasPixieedrawMultiCanvasSupport() && targetCount > previous) {
+    const accountLimit = getLocalViewportCanvasAccountLimit();
+    if (targetCount > previous && targetCount > accountLimit) {
+      const needsLogin = accountLimit <= 0;
       updateAutosaveStatus(
-        localizeText(
-          'マルチキャンバスの追加はサポーター特典です',
-          'Adding multi canvases is a supporter benefit'
-        ),
+        needsLogin
+          ? localizeText(
+            'マルチキャンバスはログインすると1つ追加できます。ログインしてください。',
+            'Sign in to add 1 multi canvas.'
+          )
+          : localizeText(
+            'マルチキャンバスはサポーターになると3つまで追加できます。',
+            'Supporters can add up to 3 multi canvases.'
+          ),
         'info'
       );
       syncControlsWithState();
@@ -51440,13 +51516,11 @@
     const currentProjectCanvasCount = Array.isArray(projectCanvasStore?.canvases)
       ? Math.max(0, projectCanvasStore.canvases.length - 1)
       : 0;
-    if (!hasPixieedrawMultiCanvasSupport()) {
-      return currentProjectCanvasCount;
-    }
+    const accountLimit = getLocalViewportCanvasAccountLimit();
     const modeLimit = isVoxelExtensionModeEnabled()
       ? VOXEL_EXTENSION_LOCAL_CANVAS_MAX_COUNT
-      : LOCAL_VIEWPORT_CANVAS_STANDARD_MAX_COUNT;
-    return Math.max(LOCAL_VIEWPORT_CANVAS_STANDARD_MAX_COUNT, currentProjectCanvasCount, modeLimit);
+      : 0;
+    return Math.max(accountLimit, currentProjectCanvasCount, modeLimit);
   }
 
   function canUseVoxelExtensionMode() {
@@ -77725,22 +77799,22 @@
       if (isSignedInAccount) {
         hintNode.textContent = maxSharedProjects > SHARED_PROJECT_LIMIT_DEFAULT
           ? localizeText(
-            `このアカウントで共有プロジェクトを最大${maxSharedProjects}件まで作成できます。作成時に公開または限定を選べます。`,
-            `This account can create up to ${maxSharedProjects} shared projects. Choose public or limited when creating.`
+            `サポーター特典（500円）が適用中です。このアカウントで共有プロジェクトを最大${maxSharedProjects}件、共同編集最大4人、マルチキャンバス追加3つまで利用できます。`,
+            `Supporter benefits (500 yen) are active. This account can create up to ${maxSharedProjects} shared projects, edit with up to 4 people, and add up to 3 Multi Canvases.`
           )
           : localizeText(
-            'このアカウントで共有プロジェクトを1件作成できます。作成時に公開または限定を選べます。',
-            'This account can create 1 shared project. Choose public or limited when creating.'
+            'このアカウントで共有プロジェクトを1件作成できます。サポーター特典（500円）で4件、共同編集最大4人、マルチキャンバス追加3つまで拡張できます。',
+            'This account can create 1 shared project. Supporter benefits (500 yen) expand this to 4 projects, shared editing for up to 4 people, and up to 3 extra Multi Canvases.'
           );
       } else if (canUseSharedAccount) {
         hintNode.textContent = localizeText(
-          'ログインなしでは公開プロジェクトのURL参加のみできます。作成やコード参加にはログインが必要です。',
-          'Without signing in, you can only join public projects from a URL. Sign in to create or join by code.'
+          'ログインすると共有プロジェクトを1件作成できます。サポーター特典（500円）で4件、共同編集最大4人まで拡張できます。',
+          'Sign in to create 1 shared project. Supporter benefits (500 yen) expand this to 4 projects and shared editing for up to 4 people.'
         );
       } else {
         hintNode.textContent = localizeText(
-          '共有プロジェクトの作成とコード参加にはログインが必要です。',
-          'Sign-in is required to create shared projects and join by code.'
+          '共有プロジェクトの作成とコード参加にはログインが必要です。サポーター特典は500円で共有枠と共同編集人数を拡張できます。',
+          'Sign-in is required to create shared projects and join by code. Supporter benefits are 500 yen and expand shared slots and member limits.'
         );
       }
     }
