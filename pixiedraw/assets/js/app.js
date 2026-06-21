@@ -16725,6 +16725,29 @@
     return commands.join(' ');
   }
 
+  function getCanvasSurfaceDisplayMetrics(surface, canvasDoc, fallbackScale = state.scale) {
+    const width = Math.max(1, Math.round(Number(canvasDoc?.width) || Number(state.width) || 1));
+    const height = Math.max(1, Math.round(Number(canvasDoc?.height) || Number(state.height) || 1));
+    const scale = Math.max(
+      Number(fallbackScale) || getProjectCanvasDisplayScale(canvasDoc) || MIN_ZOOM_SCALE,
+      MIN_ZOOM_SCALE
+    );
+    const drawingRect = surface?.drawing instanceof HTMLCanvasElement
+      ? surface.drawing.getBoundingClientRect?.()
+      : null;
+    const displayWidth = drawingRect && drawingRect.width > 0 ? drawingRect.width : (width * scale);
+    const displayHeight = drawingRect && drawingRect.height > 0 ? drawingRect.height : (height * scale);
+    return {
+      width,
+      height,
+      displayWidth,
+      displayHeight,
+      scaleX: displayWidth / width,
+      scaleY: displayHeight / height,
+      scale,
+    };
+  }
+
   function ensureCanvasGridSvg(stack) {
     if (!(stack instanceof HTMLElement)) {
       return null;
@@ -16752,14 +16775,12 @@
     if (!stack) {
       return;
     }
-    const width = Math.max(1, Math.round(Number(canvasDoc?.width) || Number(state.width) || 1));
-    const height = Math.max(1, Math.round(Number(canvasDoc?.height) || Number(state.height) || 1));
-    const scale = Math.max(Number(displayScale) || getProjectCanvasDisplayScale(canvasDoc), MIN_ZOOM_SCALE);
-    const drawingRect = surface?.drawing instanceof HTMLCanvasElement
-      ? surface.drawing.getBoundingClientRect?.()
-      : null;
-    const displayWidth = drawingRect && drawingRect.width > 0 ? drawingRect.width : (width * scale);
-    const displayHeight = drawingRect && drawingRect.height > 0 ? drawingRect.height : (height * scale);
+    const {
+      width,
+      height,
+      displayWidth,
+      displayHeight,
+    } = getCanvasSurfaceDisplayMetrics(surface, canvasDoc, displayScale);
     const svg = ensureCanvasGridSvg(stack);
     if (!svg) {
       return;
@@ -57120,6 +57141,67 @@
     return 0;
   }
 
+  function selectionDirectHasVisiblePixels(direct, mask = null) {
+    if (!(direct instanceof Uint8ClampedArray)) {
+      return false;
+    }
+    if (mask instanceof Uint8Array && mask.length * 4 <= direct.length) {
+      for (let i = 0; i < mask.length; i += 1) {
+        if (mask[i] !== 1) {
+          continue;
+        }
+        const base = i * 4;
+        if (direct[base + 3] > 0) {
+          return true;
+        }
+      }
+      return false;
+    }
+    for (let i = 3; i < direct.length; i += 4) {
+      if (direct[i] > 0) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function clearDirectPixel(direct, base) {
+    if (!(direct instanceof Uint8ClampedArray) || base < 0 || base + 3 >= direct.length) {
+      return;
+    }
+    direct[base] = 0;
+    direct[base + 1] = 0;
+    direct[base + 2] = 0;
+    direct[base + 3] = 0;
+  }
+
+  function writePaletteColorToDirectPixel(direct, base, paletteIndex) {
+    if (!(direct instanceof Uint8ClampedArray) || base < 0 || base + 3 >= direct.length) {
+      return 0;
+    }
+    const color = Number.isInteger(paletteIndex) && paletteIndex >= 0
+      ? state.palette[paletteIndex]
+      : null;
+    if (!color) {
+      clearDirectPixel(direct, base);
+      return 0;
+    }
+    direct[base] = clamp(Math.round(Number(color.r) || 0), 0, 255);
+    direct[base + 1] = clamp(Math.round(Number(color.g) || 0), 0, 255);
+    direct[base + 2] = clamp(Math.round(Number(color.b) || 0), 0, 255);
+    direct[base + 3] = clamp(Math.round(Number(color.a) || 0), 0, 255);
+    return direct[base + 3];
+  }
+
+  function refreshLayerDirectOnlyFlag(layer) {
+    if (!layer) {
+      return;
+    }
+    layer.directOnly = layer.direct instanceof Uint8ClampedArray
+      ? inferDirectOnlyLayer(layer, layer.indices, layer.direct)
+      : false;
+  }
+
   function buildSelectionMoveContentMask(mask, moveStateLike) {
     if (!(mask instanceof Uint8Array)) {
       return null;
@@ -59453,10 +59535,10 @@
         const base = canvasIndex * 4;
         const previousIndex = layer.indices[canvasIndex];
         let previousAlpha = 0;
-        if (layerDirect) {
-          previousAlpha = layerDirect[base + 3];
-        } else if (previousIndex >= 0 && state.palette[previousIndex]) {
+        if (previousIndex >= 0 && state.palette[previousIndex]) {
           previousAlpha = state.palette[previousIndex].a;
+        } else if (layerDirect) {
+          previousAlpha = layerDirect[base + 3];
         }
         let nextIndex = -1;
         let nextAlpha = 0;
@@ -59473,13 +59555,18 @@
             layerDirect[base + 1] = restoreDirect[localBase + 1];
             layerDirect[base + 2] = restoreDirect[localBase + 2];
             layerDirect[base + 3] = restoreDirect[localBase + 3];
-            nextAlpha = restoreDirect[localBase + 3];
+            if (nextIndex >= 0 && state.palette[nextIndex]) {
+              nextAlpha = writePaletteColorToDirectPixel(layerDirect, base, nextIndex);
+            } else {
+              nextAlpha = restoreDirect[localBase + 3];
+            }
           } else {
-            layerDirect[base] = 0;
-            layerDirect[base + 1] = 0;
-            layerDirect[base + 2] = 0;
-            layerDirect[base + 3] = 0;
-            nextAlpha = 0;
+            nextAlpha = nextIndex >= 0
+              ? writePaletteColorToDirectPixel(layerDirect, base, nextIndex)
+              : 0;
+            if (nextIndex < 0) {
+              clearDirectPixel(layerDirect, base);
+            }
           }
         } else {
           if (nextIndex >= 0 && state.palette[nextIndex]) {
@@ -59494,6 +59581,7 @@
       }
     }
     if (modified) {
+      refreshLayerDirectOnlyFlag(layer);
       markHistoryDirty();
       markDirtyRect(bounds.x0, bounds.y0, bounds.x1, bounds.y1);
     }
@@ -59714,7 +59802,14 @@
         break;
       }
     }
-    const targetDirect = (direct || contentHasDirectPixels) ? ensureLayerDirect(layer) : null;
+    const sourceDirectHasVisiblePixels = selectionDirectHasVisiblePixels(
+      direct,
+      getSelectionMoveContentMask(moveState) || moveState.mask
+    );
+    const existingTargetDirect = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
+    const targetDirect = (sourceDirectHasVisiblePixels || contentHasDirectPixels || existingTargetDirect)
+      ? (existingTargetDirect || ensureLayerDirect(layer))
+      : null;
 
     for (let i = 0; i < contentEntries.length; i += 1) {
       const entry = contentEntries[i];
@@ -59732,7 +59827,8 @@
       const targetIndex = (targetY * state.width) + targetX;
       const targetBase = targetIndex * 4;
       const sourceBase = sourceIndex * 4;
-      layer.indices[targetIndex] = hasEntryRgba ? -1 : indices[sourceIndex];
+      const nextPaletteIndex = hasEntryRgba ? -1 : indices[sourceIndex];
+      layer.indices[targetIndex] = nextPaletteIndex;
       newContentMask[targetIndex] = 1;
       if (targetDirect) {
         if (hasEntryRgba) {
@@ -59740,16 +59836,28 @@
           targetDirect[targetBase + 1] = clamp(Math.round(Number(entry.rgba[1]) || 0), 0, 255);
           targetDirect[targetBase + 2] = clamp(Math.round(Number(entry.rgba[2]) || 0), 0, 255);
           targetDirect[targetBase + 3] = clamp(Math.round(Number(entry.rgba[3]) || 0), 0, 255);
-        } else if (direct) {
+        } else if (
+          sourceDirectHasVisiblePixels
+          && direct instanceof Uint8ClampedArray
+          && sourceBase + 3 < direct.length
+          && direct[sourceBase + 3] > 0
+        ) {
           targetDirect[targetBase] = direct[sourceBase];
           targetDirect[targetBase + 1] = direct[sourceBase + 1];
           targetDirect[targetBase + 2] = direct[sourceBase + 2];
           targetDirect[targetBase + 3] = direct[sourceBase + 3];
+        } else if (nextPaletteIndex >= 0) {
+          writePaletteColorToDirectPixel(targetDirect, targetBase, nextPaletteIndex);
+        } else {
+          clearDirectPixel(targetDirect, targetBase);
         }
       }
       if (!placed) {
         placed = true;
       }
+    }
+    if (placed) {
+      refreshLayerDirectOnlyFlag(layer);
     }
 
     if (newBounds.x0 > newBounds.x1 || newBounds.y0 > newBounds.y1) {
@@ -60083,8 +60191,8 @@
       const y0 = originY + outlineSegments[i + 1];
       const x1 = originX + outlineSegments[i + 2];
       const y1 = originY + outlineSegments[i + 3];
-      pathCtx.moveTo(x0 * scale, y0 * scale);
-      pathCtx.lineTo(x1 * scale, y1 * scale);
+      pathCtx.moveTo(scaleSelectionPathX(x0, scale), scaleSelectionPathY(y0, scale));
+      pathCtx.lineTo(scaleSelectionPathX(x1, scale), scaleSelectionPathY(y1, scale));
     }
   }
 
@@ -63718,6 +63826,22 @@
     }
   }
 
+  function getSelectionPathScaleAxis(scale, axis) {
+    if (scale && typeof scale === 'object') {
+      const value = axis === 'y' ? scale.y : scale.x;
+      return Math.max(Number(value) || MIN_ZOOM_SCALE, MIN_ZOOM_SCALE);
+    }
+    return Math.max(Number(scale) || MIN_ZOOM_SCALE, MIN_ZOOM_SCALE);
+  }
+
+  function scaleSelectionPathX(value, scale) {
+    return (Number(value) || 0) * getSelectionPathScaleAxis(scale, 'x');
+  }
+
+  function scaleSelectionPathY(value, scale) {
+    return (Number(value) || 0) * getSelectionPathScaleAxis(scale, 'y');
+  }
+
   function strokeSelectionPath(trace, options = {}) {
     if (typeof trace !== 'function') return;
     const svg = getSelectionOutlineSvg();
@@ -63726,14 +63850,20 @@
       && selectionOutlinePathDark instanceof SVGPathElement
       && selectionOutlinePathLight instanceof SVGPathElement
     ) {
-      const displayScale = getPixelAlignedCanvasDisplayScale(state.scale);
-      const svgWidth = Math.max(1, state.width * displayScale);
-      const svgHeight = Math.max(1, state.height * displayScale);
+      const canvasDoc = getActiveProjectCanvasDocument();
+      const surface = activeCanvasSurface || mainViewportCanvasSurface || null;
+      const metrics = getCanvasSurfaceDisplayMetrics(
+        surface,
+        canvasDoc,
+        getProjectCanvasDisplayScale(canvasDoc)
+      );
+      const svgWidth = Math.max(1, metrics.displayWidth);
+      const svgHeight = Math.max(1, metrics.displayHeight);
       svg.setAttribute('viewBox', `0 0 ${svgWidth} ${svgHeight}`);
       svg.style.width = `${svgWidth}px`;
       svg.style.height = `${svgHeight}px`;
       const pathBuilder = createSvgPathTraceBuilder();
-      trace(pathBuilder, displayScale);
+      trace(pathBuilder, { x: metrics.scaleX, y: metrics.scaleY });
       const pathData = pathBuilder.toString();
       const dashPattern = options.dashPattern || [4, 4];
       const dashCycle = dashPattern.reduce((sum, value) => sum + value, 0) || 8;
@@ -63791,6 +63921,8 @@
   }
 
   function traceSelectionOutline(pathCtx, mask, width, height, scale) {
+    const scaleX = getSelectionPathScaleAxis(scale, 'x');
+    const scaleY = getSelectionPathScaleAxis(scale, 'y');
     for (let y = 0; y < height; y += 1) {
       const rowOffset = y * width;
       for (let x = 0; x < width; x += 1) {
@@ -63801,10 +63933,10 @@
         const leftFilled = x > 0 && mask[idx - 1] === 1;
         const rightFilled = x < width - 1 && mask[idx + 1] === 1;
 
-        const sx = x * scale;
-        const sy = y * scale;
-        const ex = sx + scale;
-        const ey = sy + scale;
+        const sx = x * scaleX;
+        const sy = y * scaleY;
+        const ex = sx + scaleX;
+        const ey = sy + scaleY;
 
         if (!topFilled) {
           pathCtx.moveTo(sx, sy);
@@ -63830,10 +63962,10 @@
     if (!bounds) {
       return;
     }
-    const x0 = (Number(bounds.x0) || 0) * scale;
-    const y0 = (Number(bounds.y0) || 0) * scale;
-    const x1 = ((Number(bounds.x1) || 0) + 1) * scale;
-    const y1 = ((Number(bounds.y1) || 0) + 1) * scale;
+    const x0 = scaleSelectionPathX(bounds.x0, scale);
+    const y0 = scaleSelectionPathY(bounds.y0, scale);
+    const x1 = scaleSelectionPathX((Number(bounds.x1) || 0) + 1, scale);
+    const y1 = scaleSelectionPathY((Number(bounds.y1) || 0) + 1, scale);
     pathCtx.moveTo(x0, y0);
     pathCtx.lineTo(x1, y0);
     pathCtx.lineTo(x1, y1);
@@ -63965,10 +64097,10 @@
   function drawLassoPreview(points) {
     if (!points || points.length < 2) return;
     strokeSelectionPath((pathCtx, scale) => {
-      pathCtx.moveTo(points[0].x * scale, points[0].y * scale);
+      pathCtx.moveTo(scaleSelectionPathX(points[0].x, scale), scaleSelectionPathY(points[0].y, scale));
       for (let i = 1; i < points.length; i += 1) {
         const point = points[i];
-        pathCtx.lineTo(point.x * scale, point.y * scale);
+        pathCtx.lineTo(scaleSelectionPathX(point.x, scale), scaleSelectionPathY(point.y, scale));
       }
       pathCtx.closePath();
     });
@@ -63981,7 +64113,12 @@
     const w = Math.abs(end.x - start.x) + 1;
     const h = Math.abs(end.y - start.y) + 1;
     strokeSelectionPath((pathCtx, scale) => {
-      pathCtx.rect(x * scale, y * scale, w * scale, h * scale);
+      pathCtx.rect(
+        scaleSelectionPathX(x, scale),
+        scaleSelectionPathY(y, scale),
+        w * getSelectionPathScaleAxis(scale, 'x'),
+        h * getSelectionPathScaleAxis(scale, 'y')
+      );
     });
   }
 
