@@ -3178,7 +3178,7 @@ body.is-startup-active #virtualCursorCanvas {
 }
 
 .qr-edit-panel {
-  position: absolute;
+  position: fixed;
   top: 52px;
   right: calc(var(--right-toggle-offset) + 4px);
   width: min(300px, calc(100vw - 28px));
