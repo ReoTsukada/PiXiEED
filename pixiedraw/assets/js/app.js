@@ -3071,6 +3071,8 @@
     startClientY: 0,
     startX: 0,
     startY: 0,
+    pointerOffsetX: 0,
+    pointerOffsetY: 0,
     hasCustomPosition: false,
     x: 0,
     y: 0,
@@ -9224,6 +9226,36 @@
     return normalizeQrEditPayload(activeTab?.qrEditPayload || null, autosaveProjectId || '');
   }
 
+  function doesQrEditModeMatchPayload(payload = null) {
+    const normalized = normalizeQrEditPayload(payload, autosaveProjectId || '');
+    if (!normalized || !qrEditModeState.active) {
+      return false;
+    }
+    return qrEditModeState.source === normalized.source
+      && qrEditModeState.projectId === (normalized.projectId || normalizeAutosaveProjectId(autosaveProjectId || ''))
+      && qrEditModeState.expectedText === (normalized.rawValue || '')
+      && qrEditModeState.panelVisible === (normalized.panelVisible !== false);
+  }
+
+  function syncQrEditModeWithActivePayload({ scheduleCheck = false } = {}) {
+    const payload = getActiveQrEditPayload();
+    if (!payload) {
+      if (qrEditModeState.active) {
+        deactivateQrEditMode();
+      }
+      return null;
+    }
+    if (!doesQrEditModeMatchPayload(payload)) {
+      activateQrEditMode(payload);
+      return payload;
+    }
+    updateQrEditPanel();
+    if (scheduleCheck && payload.panelVisible !== false) {
+      scheduleQrEditReadabilityCheck();
+    }
+    return payload;
+  }
+
   function setQrEditPanelVisibility(visible) {
     const panel = dom.qrEditPanel;
     if (!(panel instanceof HTMLElement)) {
@@ -9449,7 +9481,11 @@
     };
     qrEditModeState.panelVisible = nextPayload.panelVisible;
     updateActiveOpenProjectTabQrEditPayload(nextPayload);
-    updateQrEditPanel();
+    if (nextPayload.panelVisible) {
+      activateQrEditMode(nextPayload);
+    } else {
+      updateQrEditPanel();
+    }
   }
 
   function deactivateQrEditMode({ clearTab = false } = {}) {
@@ -9675,11 +9711,11 @@
       return;
     }
     event.preventDefault();
-    const dx = (Number(event.clientX) || 0) - qrEditPanelDragState.startClientX;
-    const dy = (Number(event.clientY) || 0) - qrEditPanelDragState.startClientY;
+    const clientX = Number(event.clientX) || 0;
+    const clientY = Number(event.clientY) || 0;
     qrEditPanelDragState.hasCustomPosition = true;
-    qrEditPanelDragState.x = qrEditPanelDragState.startX + dx;
-    qrEditPanelDragState.y = qrEditPanelDragState.startY + dy;
+    qrEditPanelDragState.x = clientX - qrEditPanelDragState.pointerOffsetX;
+    qrEditPanelDragState.y = clientY - qrEditPanelDragState.pointerOffsetY;
     applyQrEditPanelPosition();
   }
 
@@ -9702,11 +9738,17 @@
     event.preventDefault();
     event.stopPropagation();
     const rect = panel.getBoundingClientRect();
+    const clientX = Number(event.clientX) || 0;
+    const clientY = Number(event.clientY) || 0;
     qrEditPanelDragState.pointerId = event.pointerId ?? -1;
-    qrEditPanelDragState.startClientX = Number(event.clientX) || 0;
-    qrEditPanelDragState.startClientY = Number(event.clientY) || 0;
-    qrEditPanelDragState.startX = qrEditPanelDragState.hasCustomPosition ? qrEditPanelDragState.x : Math.round(rect.left);
-    qrEditPanelDragState.startY = qrEditPanelDragState.hasCustomPosition ? qrEditPanelDragState.y : Math.round(rect.top);
+    qrEditPanelDragState.startClientX = clientX;
+    qrEditPanelDragState.startClientY = clientY;
+    qrEditPanelDragState.startX = Math.round(rect.left);
+    qrEditPanelDragState.startY = Math.round(rect.top);
+    qrEditPanelDragState.pointerOffsetX = clamp(clientX - rect.left, 0, Math.max(1, rect.width || panel.offsetWidth || 1));
+    qrEditPanelDragState.pointerOffsetY = clamp(clientY - rect.top, 0, Math.max(1, rect.height || panel.offsetHeight || 1));
+    qrEditPanelDragState.x = Math.round(rect.left);
+    qrEditPanelDragState.y = Math.round(rect.top);
     qrEditPanelDragState.hasCustomPosition = true;
     panel.classList.add('is-dragging');
     try {
@@ -9717,6 +9759,13 @@
     window.addEventListener('pointermove', handleQrEditPanelPointerMove, { passive: false });
     window.addEventListener('pointerup', handleQrEditPanelPointerUp);
     window.addEventListener('pointercancel', handleQrEditPanelPointerCancel);
+  }
+
+  function refreshQrEditPanelViewportPosition() {
+    if (!qrEditModeState.active) {
+      return;
+    }
+    applyQrEditPanelPosition();
   }
 
   function createOpenProjectTabFromCurrentState(options = {}) {
@@ -10121,7 +10170,11 @@
     }
     document.body.classList.toggle('is-project-home-active', projectHomeVisible);
     renderOpenProjectTabs();
-    updateQrEditPanel();
+    if (projectHomeVisible) {
+      updateQrEditPanel();
+    } else {
+      syncQrEditModeWithActivePayload();
+    }
     if (!projectHomeVisible) {
       return;
     }
@@ -17511,7 +17564,7 @@
       dom.controls.toggleFloatingPreview.checked = Boolean(state.floatingPreview?.enabled) || isVoxelExtensionModeEnabled();
       dom.controls.toggleFloatingPreview.disabled = isVoxelExtensionModeEnabled();
     }
-    const qrEditPayload = getActiveQrEditPayload();
+    const qrEditPayload = syncQrEditModeWithActivePayload();
     if (dom.controls.qrModeToggleField instanceof HTMLElement) {
       const visible = Boolean(qrEditPayload);
       dom.controls.qrModeToggleField.hidden = !visible;
@@ -25778,7 +25831,10 @@
         source: options?.sharedProjectKey ? 'shared-sheet' : 'sheet',
       });
     }
-    activateQrEditMode(options?.qrEditPayload || null);
+    const loadedQrEditPayload = Object.prototype.hasOwnProperty.call(options || {}, 'qrEditPayload')
+      ? options.qrEditPayload
+      : getActiveQrEditPayload();
+    activateQrEditMode(loadedQrEditPayload || null);
     const requestedSharedProjectKey = normalizeMultiProjectKey(options?.sharedProjectKey || '');
     const requestedSharedProjectRevision = Math.max(0, Math.round(Number(options?.sharedProjectRevision) || 0));
     const activeEntryAfterLoad = recentProjectsCache.get(normalizeAutosaveProjectId(requestedProjectId || '')) || null;
@@ -88098,6 +88154,12 @@
         }
         updateAutosaveStatus('QRパネルを非表示にしました', 'info');
       });
+    }
+    window.addEventListener('resize', refreshQrEditPanelViewportPosition, { passive: true });
+    window.addEventListener('orientationchange', refreshQrEditPanelViewportPosition, { passive: true });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', refreshQrEditPanelViewportPosition, { passive: true });
+      window.visualViewport.addEventListener('scroll', refreshQrEditPanelViewportPosition, { passive: true });
     }
   }
 
