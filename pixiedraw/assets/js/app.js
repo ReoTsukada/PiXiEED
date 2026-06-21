@@ -36173,6 +36173,8 @@
         state.pan.x = 0;
         state.pan.y = 0;
         requestLocalViewportCanvasLayoutReset({ clearStored: true });
+      } else {
+        requestLocalViewportCanvasLayoutReset({ clearStored: true });
       }
       resizeCanvases({
         forceRender: false,
@@ -49182,72 +49184,21 @@
     if (targetLocalCount <= previousCount) {
       return false;
     }
-    const anchorLeft = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorLeft, 0) || 0;
-    const anchorTop = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorTop, 0) || 0;
-    const currentScale = getCurrentLocalViewportCanvasLayoutScale();
-    const nextPositions = normalizeLocalViewportCanvasPositions(
-      localViewportCanvasState?.positions,
-      localViewportCanvasState?.positions,
-      targetLocalCount,
-      {
-        relative: true,
-        fallbackRelative: true,
-      }
-    );
-    const getCanvasDisplayWidth = canvasIndex => {
-      const canvasDoc = getProjectCanvasDocumentAt(canvasIndex);
-      const displayWidth = Math.max(1, Math.round(Number(canvasDoc?.width) || Number(state.width) || 1))
-        * getProjectCanvasDisplayScale(canvasDoc);
-      return displayWidth / Math.max(currentScale, Number.EPSILON);
-    };
-    let maxRight = getCanvasDisplayWidth(0);
-    let baseTop = 0;
-    for (let localIndex = 0; localIndex < previousCount; localIndex += 1) {
-      const position = nextPositions[localIndex] || normalizeLocalViewportCanvasPosition(null, null);
-      const fallback = computeDefaultLocalViewportCanvasWorldPosition(localIndex, anchorLeft, anchorTop);
-      const left = position.left === null
-        ? ((fallback.left - anchorLeft) / Math.max(currentScale, Number.EPSILON))
-        : position.left;
-      const top = position.top === null
-        ? ((fallback.top - anchorTop) / Math.max(currentScale, Number.EPSILON))
-        : position.top;
-      maxRight = Math.max(maxRight, left + getCanvasDisplayWidth(localIndex + 1));
-      if (localIndex === previousCount - 1) {
-        baseTop = top;
-      }
-    }
-    let cursorLeft = maxRight + (MULTI_CANVAS_SURFACE_GAP / Math.max(currentScale, Number.EPSILON));
-    for (let localIndex = previousCount; localIndex < targetLocalCount; localIndex += 1) {
-      nextPositions[localIndex] = normalizeLocalViewportCanvasPosition(
-        {
-          left: cursorLeft,
-          top: baseTop,
-        },
-        nextPositions[localIndex],
-        {
-          relative: true,
-          fallbackRelative: true,
-        }
-      );
-      cursorLeft += getCanvasDisplayWidth(localIndex + 1)
-        + (MULTI_CANVAS_SURFACE_GAP / Math.max(currentScale, Number.EPSILON));
-    }
-    localViewportCanvasState = normalizeLocalViewportCanvasState(
-      {
-        ...localViewportCanvasState,
-        layoutScale: currentScale,
-        positionsRelative: true,
-        positions: nextPositions,
-      },
-      localViewportCanvasState
-    );
+    const defaults = computeDefaultLocalViewportCanvasPositions();
+    const anchorLeft = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorLeft, null) ?? defaults.main.left;
+    const anchorTop = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorTop, null) ?? defaults.main.top;
+    const resolvedLayout = computeResolvedMultiCanvasWorldLayoutPositions(anchorLeft, anchorTop);
+    setLocalViewportCanvasLayoutAnchor(resolvedLayout.main.left, resolvedLayout.main.top);
+    resolvedLayout.locals.forEach((position, index) => {
+      setLocalViewportCanvasPosition(index, position.left, position.top);
+    });
     localViewportCanvasLayoutResetPending = false;
     return true;
   }
 
   function requestLocalViewportCanvasLayoutReset({ clearStored = true } = {}) {
     if (isMultiCanvasWorldLayoutActive()) {
-      localViewportCanvasLayoutResetPending = false;
+      localViewportCanvasLayoutResetPending = true;
       if (!clearStored) {
         return false;
       }
@@ -49256,10 +49207,25 @@
           ...localViewportCanvasState,
           layoutScale: getCurrentLocalViewportCanvasLayoutScale(),
           positionsRelative: true,
+          anchorLeft: null,
+          anchorTop: null,
+          positions: [],
         },
         localViewportCanvasState
       );
-      const changed = JSON.stringify(nextState) !== JSON.stringify(localViewportCanvasState);
+      nextState.anchorLeft = null;
+      nextState.anchorTop = null;
+      nextState.positions = normalizeLocalViewportCanvasPositions(
+        [],
+        [],
+        nextState.count,
+        { relative: true, fallbackRelative: true }
+      );
+      const changed = (
+        nextState.anchorLeft !== localViewportCanvasState.anchorLeft
+        || nextState.anchorTop !== localViewportCanvasState.anchorTop
+        || JSON.stringify(nextState.positions) !== JSON.stringify(localViewportCanvasState.positions)
+      );
       localViewportCanvasState = nextState;
       return changed;
     }
@@ -49277,6 +49243,14 @@
         positions: [],
       },
       localViewportCanvasState
+    );
+    nextState.anchorLeft = null;
+    nextState.anchorTop = null;
+    nextState.positions = normalizeLocalViewportCanvasPositions(
+      [],
+      [],
+      nextState.count,
+      { relative: true, fallbackRelative: true }
     );
     const changed = (
       nextState.anchorLeft !== localViewportCanvasState.anchorLeft
@@ -50866,7 +50840,9 @@
         if (!(entry.panel instanceof HTMLElement)) {
           return;
         }
-        const storedPosition = getDisplayLocalViewportCanvasPosition(index, anchorLeft, anchorTop);
+        const storedPosition = shouldReset
+          ? { left: null, top: null }
+          : getDisplayLocalViewportCanvasPosition(index, anchorLeft, anchorTop);
         const defaultPosition = shouldReset
           ? (resolvedLayout.locals[index] || computeDefaultLocalViewportCanvasWorldPosition(index, anchorLeft, anchorTop))
           : (defaults.locals[index] || computeDefaultLocalViewportCanvasWorldPosition(index, anchorLeft, anchorTop));
