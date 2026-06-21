@@ -12,7 +12,8 @@
   const PIXIEDRAW_SUPPORT_URL = '#';
   const PIXIEED_TIP_500_URL = 'https://buy.stripe.com/cNi28s93OgsDc9sdji2VG02';
   const PIXIEED_TIP_1000_URL = 'https://buy.stripe.com/5kQcN6eo87W78Xg7YY2VG03';
-  const MONTHLY_SUPPORT_GOAL_YEN = 5000;
+  const SUPPORTER_COUNT_GOAL = 50;
+  const ACTIVE_SUPPORTER_COUNT_ENDPOINT = `${SUPABASE_URL}/rest/v1/rpc/get_active_supporter_count`;
   const OPTIONS = [
     {
       key: 'pixieed_support_monthly',
@@ -59,6 +60,9 @@
   let status = null;
   let title = null;
   let activeTrigger = null;
+  let activeSupporterCount = null;
+  let activeSupporterGoal = SUPPORTER_COUNT_GOAL;
+  let supporterCountRequestToken = 0;
 
   function isPixieedrawPage() {
     try {
@@ -292,15 +296,15 @@
           </div>
           <button class="support-checkout-panel__close" type="button" aria-label="課金パネルを閉じる">×</button>
         </div>
-        <section class="support-checkout-progress" aria-label="今月のサポート">
+        <section class="support-checkout-progress" aria-label="現在のサポーター">
           <div class="support-checkout-progress__header">
-            <p class="support-checkout-progress__title">今月のサポート</p>
-            <p class="support-checkout-progress__amount" id="supportCheckoutMonthlyAmount">0円 / 5,000円</p>
+            <p class="support-checkout-progress__title">現在のサポーター</p>
+            <p class="support-checkout-progress__amount" id="supportCheckoutSupporterCount">確認中 / 50人</p>
           </div>
           <div class="support-checkout-progress__bar" aria-hidden="true">
-            <span class="support-checkout-progress__fill" id="supportCheckoutMonthlyFill"></span>
+            <span class="support-checkout-progress__fill" id="supportCheckoutSupporterFill"></span>
           </div>
-          <p class="support-checkout-progress__note">サポートはPiXiEEDの運営強化に使われます。目標を達成すると、広告削減や共有プロジェクト機能をより安定して提供できます。</p>
+          <p class="support-checkout-progress__note">コード適用・プロモーションコード適用を含む、現在サポーター特典が有効な人数です。目標は50人です。</p>
         </section>
         <div class="support-checkout-panel__list" id="supportCheckoutList"></div>
         <p class="support-checkout-panel__status" id="supportCheckoutStatus" aria-live="polite"></p>
@@ -320,36 +324,108 @@
       }
     });
     renderOptions();
-    renderMonthlySupportProgress();
+    renderSupporterCountProgress();
     return panel;
   }
 
-  function formatYen(value) {
-    const amount = Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
-    return `${amount.toLocaleString('ja-JP')}円`;
+  function normalizeSupporterCount(value) {
+    const count = Number(value);
+    return Number.isFinite(count) ? Math.max(0, Math.floor(count)) : null;
   }
 
-  function readMonthlySupportAmount() {
-    const value = Number(window.pixieedMonthlySupportAmountYen);
-    return Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
+  function normalizeSupporterGoal(value) {
+    const goal = Number(value);
+    return Number.isFinite(goal) && goal > 0 ? Math.max(1, Math.floor(goal)) : SUPPORTER_COUNT_GOAL;
   }
 
-  function renderMonthlySupportProgress() {
+  function formatSupporterCount(value) {
+    const count = normalizeSupporterCount(value) || 0;
+    return `${count.toLocaleString('ja-JP')}人`;
+  }
+
+  function readCachedSupporterCount() {
+    if (activeSupporterCount !== null) {
+      return activeSupporterCount;
+    }
+    return normalizeSupporterCount(window.pixieedActiveSupporterCount);
+  }
+
+  function renderSupporterCountProgress(options = {}) {
     if (!panel) {
       return;
     }
-    const amount = readMonthlySupportAmount();
-    const amountNode = panel.querySelector('#supportCheckoutMonthlyAmount');
-    const fill = panel.querySelector('#supportCheckoutMonthlyFill');
+    const count = readCachedSupporterCount();
+    const goal = normalizeSupporterGoal(activeSupporterGoal);
+    const amountNode = panel.querySelector('#supportCheckoutSupporterCount');
+    const fill = panel.querySelector('#supportCheckoutSupporterFill');
     if (amountNode) {
-      amountNode.textContent = `${formatYen(amount)} / ${formatYen(MONTHLY_SUPPORT_GOAL_YEN)}`;
+      if (count === null) {
+        amountNode.textContent = `${options.error ? '取得失敗' : '確認中'} / ${formatSupporterCount(goal)}`;
+      } else {
+        amountNode.textContent = `${formatSupporterCount(count)} / ${formatSupporterCount(goal)}`;
+      }
     }
     if (fill instanceof HTMLElement) {
-      const progress = MONTHLY_SUPPORT_GOAL_YEN > 0
-        ? Math.min(100, Math.round((amount / MONTHLY_SUPPORT_GOAL_YEN) * 100))
+      const progress = count !== null && goal > 0
+        ? Math.min(100, Math.round((count / goal) * 100))
         : 0;
       fill.style.width = `${progress}%`;
     }
+  }
+
+  async function fetchActiveSupporterCount() {
+    const response = await fetch(ACTIVE_SUPPORTER_COUNT_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+      body: '{}',
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data) {
+      throw new Error(data?.error || `supporter count request failed (${response.status})`);
+    }
+    return data;
+  }
+
+  async function refreshSupporterCount() {
+    const requestToken = ++supporterCountRequestToken;
+    renderSupporterCountProgress({ loading: true });
+    try {
+      const data = await fetchActiveSupporterCount();
+      if (requestToken !== supporterCountRequestToken) {
+        return;
+      }
+      const nextCount = normalizeSupporterCount(data?.count);
+      if (nextCount === null) {
+        throw new Error('supporter count response missing count');
+      }
+      activeSupporterCount = nextCount;
+      activeSupporterGoal = normalizeSupporterGoal(data?.goal);
+      window.pixieedActiveSupporterCount = activeSupporterCount;
+      window.pixieedActiveSupporterGoal = activeSupporterGoal;
+      renderSupporterCountProgress();
+    } catch (error) {
+      if (requestToken !== supporterCountRequestToken) {
+        return;
+      }
+      console.warn('[support-checkout] supporter count failed', error);
+      renderSupporterCountProgress({ error: true });
+    }
+  }
+
+  function setActiveSupporterCount(count, goal = activeSupporterGoal) {
+    const nextCount = normalizeSupporterCount(count);
+    if (nextCount === null) {
+      return;
+    }
+    activeSupporterCount = nextCount;
+    activeSupporterGoal = normalizeSupporterGoal(goal);
+    window.pixieedActiveSupporterCount = activeSupporterCount;
+    window.pixieedActiveSupporterGoal = activeSupporterGoal;
+    renderSupporterCountProgress();
   }
 
   function getOption(optionKey) {
@@ -504,7 +580,8 @@
       ? options.preferredProduct
       : resolvePreferredOption(activeTrigger);
     renderOptions(preferredKey);
-    renderMonthlySupportProgress();
+    renderSupporterCountProgress({ loading: true });
+    void refreshSupporterCount();
     setStatus('');
     if (title) {
       const option = getOption(preferredKey);
@@ -548,10 +625,9 @@
     open,
     close,
     bindTriggers,
+    setActiveSupporterCount,
     setMonthlySupportAmount(amountYen) {
-      const amount = Number(amountYen);
-      window.pixieedMonthlySupportAmountYen = Number.isFinite(amount) ? Math.max(0, Math.floor(amount)) : 0;
-      renderMonthlySupportProgress();
+      setActiveSupporterCount(amountYen);
     },
   };
 
