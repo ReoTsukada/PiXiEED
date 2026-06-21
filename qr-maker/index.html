@@ -1092,7 +1092,6 @@
   const DRAW_IMPORT_STORAGE_KEY = 'pixiee-qr:pending-draw-import';
   const DRAW_RETURN_QUERY_KEY = 'draw_return';
   const DRAW_URL_QUERY_KEY = 'draw_url';
-  const DRAW_RETURN_MODE_SELF = 'self';
   let downloadCanvas = null;
 
   const clamp = (val, min, max) => Math.min(Math.max(val, min), max);
@@ -1315,24 +1314,63 @@
     });
   }
 
-  function buildDrawReturnTargetUrl() {
-    const fallback = new URL('../pixiedraw/index.html', window.location.href);
-    const params = new URLSearchParams(window.location.search || '');
-    const drawUrlRaw = params.get(DRAW_URL_QUERY_KEY);
-    let target = fallback;
-    if (drawUrlRaw) {
-      try {
-        const candidate = new URL(drawUrlRaw, window.location.href);
-        const candidatePath = `${candidate.pathname || ''}`.toLowerCase();
-        if (candidatePath.includes('/pixiedraw/')) {
-          target = candidate;
-        }
-      } catch (error) {
-        target = fallback;
-      }
+  function isDrawTargetUrl(url) {
+    if (!(url instanceof URL)) {
+      return false;
     }
+    if (!/^(https?:|file:)$/i.test(url.protocol || '')) {
+      return false;
+    }
+    const path = `${url.pathname || ''}`.toLowerCase();
+    return path.includes('/pixiedraw/');
+  }
+
+  function getRequestedDrawUrl() {
+    try {
+      const currentUrl = new URL(window.location.href);
+      const rawValue = currentUrl.searchParams.get(DRAW_URL_QUERY_KEY);
+      if (!rawValue) {
+        return null;
+      }
+      const targetUrl = new URL(rawValue, currentUrl);
+      return isDrawTargetUrl(targetUrl) ? targetUrl : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function getDefaultDrawUrl() {
+    const currentUrl = new URL(window.location.href);
+    if (/^https?:$/i.test(currentUrl.protocol || '')) {
+      return new URL('/pixiedraw/', currentUrl.origin);
+    }
+    return new URL('../pixiedraw/', new URL('./', currentUrl));
+  }
+
+  function buildDrawReturnTargetUrl() {
+    const target = getRequestedDrawUrl() || getDefaultDrawUrl();
     target.searchParams.set('qr', '1');
+    target.searchParams.delete(DRAW_RETURN_QUERY_KEY);
+    target.searchParams.delete(DRAW_URL_QUERY_KEY);
     return target.toString();
+  }
+
+  function storeDrawImportPayload(payload) {
+    const serialized = JSON.stringify(payload);
+    let stored = false;
+    try {
+      window.localStorage.setItem(DRAW_IMPORT_STORAGE_KEY, serialized);
+      stored = true;
+    } catch (error) {
+      console.warn('QR transfer localStorage unavailable', error);
+    }
+    try {
+      window.sessionStorage.setItem(DRAW_IMPORT_STORAGE_KEY, serialized);
+      stored = true;
+    } catch (error) {
+      console.warn('QR transfer sessionStorage unavailable', error);
+    }
+    return stored;
   }
 
   async function openInPixieeDraw() {
@@ -1400,9 +1438,7 @@
       expiresAt: Date.now() + (5 * 60 * 1000),
       dataUrl
     };
-    try {
-      window.localStorage.setItem(DRAW_IMPORT_STORAGE_KEY, JSON.stringify(payload));
-    } catch (error) {
+    if (!storeDrawImportPayload(payload)) {
       qrStatus.textContent = '端末保存が使えないため送信できませんでした';
       qrStatus.style.color = '#ffa95c';
       return;
@@ -1410,7 +1446,13 @@
     const targetUrl = buildDrawReturnTargetUrl();
     qrStatus.textContent = 'PiXiEEDrawへ移動中…';
     qrStatus.style.color = '#7bcfff';
-    window.location.href = targetUrl;
+    try {
+      window.location.assign(targetUrl);
+    } catch (error) {
+      qrStatus.textContent = 'PiXiEEDrawを開けませんでした';
+      qrStatus.style.color = '#ffa95c';
+      console.warn('Failed to open PiXiEEDraw', error);
+    }
   }
 
   input.addEventListener('input', () => {
