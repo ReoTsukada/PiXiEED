@@ -11128,6 +11128,11 @@ body.is-mobile-layout #newProjectDialog .modal__body {
     align-items: center;
     justify-content: center;
   }
+  .stage__workspace[data-local-canvas-layout='free'] .stage__main-canvas {
+    display: block;
+    width: auto;
+    height: auto;
+  }
   .canvas-stack {
     max-width: none;
     max-height: none;
