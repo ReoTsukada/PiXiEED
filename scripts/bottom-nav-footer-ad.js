@@ -1,4 +1,9 @@
 (function () {
+  if (window.__PIXIEED_FOOTER_AD_CONTROLLER__) {
+    return;
+  }
+  window.__PIXIEED_FOOTER_AD_CONTROLLER__ = true;
+
   const PIXIEED_ADFREE_SCRIPT_VERSION = '2026.05.30-support-email-claim';
 
   function buildPixieedAdFreeScriptUrl(baseUrl) {
@@ -58,6 +63,15 @@
 
   function arePixieedAdsDisabled() {
     return Boolean(window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive);
+  }
+
+  function shouldReserveFooterAdOnly() {
+    try {
+      const path = String(window.location.pathname || '').toLowerCase();
+      return /(?:^|\/)(portfolio|terms|privacy|account|account-deletion|contact)(?:\/|\/index\.html)?$/.test(path);
+    } catch (_error) {
+      return false;
+    }
   }
 
   function injectMinimalSiteChrome() {
@@ -497,8 +511,8 @@
     document.head.appendChild(script);
   }
 
-  function injectFooterAd() {
-    if (arePixieedAdsDisabled()) return;
+  function injectFooterAd({ reservedOnly = false } = {}) {
+    if (arePixieedAdsDisabled() && !reservedOnly) return;
     const bottomNav = document.querySelector('.bottom-nav');
     if (!bottomNav) return;
     if (document.querySelector('.ad-footer')) return;
@@ -569,6 +583,7 @@
           padding:var(--pixieed-bottom-nav-padding-y) max(10px, env(safe-area-inset-right, 0px)) calc(var(--pixieed-bottom-nav-padding-y) + var(--pixieed-safe-bottom)) max(10px, env(safe-area-inset-left, 0px)) !important;
         }
         body.has-footer-ad .bottom-nav__item{
+          min-width:0 !important;
           padding:4px 0 !important;
           gap:3px !important;
           font-size:11px !important;
@@ -580,6 +595,19 @@
           display:inline-flex;
           align-items:center;
           justify-content:center;
+        }
+        body.has-footer-ad .bottom-nav__item--primary{
+          transform:translateY(-8px) !important;
+          color:#fff !important;
+        }
+        body.has-footer-ad .bottom-nav__item--primary .icon{
+          width:42px !important;
+          height:42px !important;
+          border-radius:16px !important;
+          padding:7px !important;
+          background:linear-gradient(135deg,#2563eb,#7c3aed) !important;
+          border:1px solid rgba(255,255,255,0.24) !important;
+          box-shadow:0 10px 20px rgba(37,99,235,0.3), inset 0 1px 0 rgba(255,255,255,0.2) !important;
         }
         .ad-footer{
           position:fixed;
@@ -629,6 +657,18 @@
         .ad-footer ins.adsbygoogle[data-ad-status="unfilled"]{
           background:var(--pixieed-footer-ad-bg) !important;
         }
+        .ad-footer--reserved{
+          pointer-events:none;
+        }
+        .ad-footer--reserved::before{
+          content:"";
+          display:block;
+          width:100%;
+          max-width:min(720px, calc(100vw - 24px));
+          min-height:var(--pixieed-footer-ad-height);
+          margin:0 auto;
+          background:var(--pixieed-footer-ad-bg);
+        }
       `;
       document.head.appendChild(style);
     }
@@ -649,16 +689,22 @@
     }
 
     const footer = document.createElement('div');
-    footer.className = 'ad-footer';
-    footer.setAttribute('aria-label', '広告');
-    footer.innerHTML = `
-      <ins class="adsbygoogle"
-           style="display:block"
-           data-ad-client="ca-pub-9801602250480253"
-           data-ad-slot="rotate"></ins>
-    `;
+    footer.className = reservedOnly ? 'ad-footer ad-footer--reserved' : 'ad-footer';
+    footer.setAttribute('aria-label', reservedOnly ? '広告枠' : '広告');
+    footer.setAttribute('aria-hidden', reservedOnly ? 'true' : 'false');
+    if (!reservedOnly) {
+      footer.innerHTML = `
+        <ins class="adsbygoogle"
+             style="display:block"
+             data-ad-client="ca-pub-9801602250480253"
+             data-ad-slot="rotate"></ins>
+      `;
+    }
     document.body.appendChild(footer);
 
+    if (reservedOnly) {
+      return;
+    }
     ensureAdsScript();
     if (window.pixieedObserveAds) {
       window.pixieedObserveAds();
@@ -684,6 +730,11 @@
   }
 
   function syncFooterAd() {
+    if (shouldReserveFooterAdOnly()) {
+      removeFooterAd();
+      injectFooterAd({ reservedOnly: true });
+      return;
+    }
     if (arePixieedAdsDisabled()) {
       removeFooterAd();
       return;
