@@ -4447,6 +4447,7 @@
   let playbackHandle = null;
   let playbackUiRefreshHandle = null;
   let lastFrameTime = 0;
+  let playbackStartSelectionSnapshot = null;
   const PLAYBACK_MAX_CATCHUP_STEPS = 6;
   const PLAYBACK_CACHE_MAX_BYTES = 24 * 1024 * 1024;
   const PLAYBACK_LARGE_FRAME_BYTES = 512 * 512 * 4;
@@ -10237,6 +10238,14 @@
       return;
     }
     setProjectHomeVisible(false);
+  }
+
+  function revealActiveProjectAfterOpen({ hideStartup = true } = {}) {
+    if (hideStartup) {
+      hideStartupScreen();
+    }
+    hideProjectHomeScreen();
+    renderOpenProjectTabs();
   }
 
   function appendOpenProjectTabFromCurrentState(options = {}) {
@@ -23307,6 +23316,7 @@
     persist = true,
     render = true,
     syncUi = true,
+    broadcastPresence = true,
   } = {}) {
     const frames = state.frames;
     if (!Array.isArray(frames) || !frames.length) {
@@ -23397,7 +23407,7 @@
     if (syncUi) {
       updatePixfindModeUI();
     }
-    if (previousIndex !== normalizedIndex || previousLayerId !== state.activeLayer) {
+    if (broadcastPresence && (previousIndex !== normalizedIndex || previousLayerId !== state.activeLayer)) {
       scheduleSharedProjectCellPresenceBroadcast('frame');
     }
     return frame;
@@ -23412,6 +23422,7 @@
     const persist = options.persist !== false;
     const render = options.render !== false;
     const syncUi = options.syncUi !== false;
+    const broadcastPresence = options.broadcastPresence !== false;
     const respectSharedCellOccupancy = options.respectSharedCellOccupancy !== false;
     const nextIndex = state.activeFrame + Number(offset || 0);
     const normalizedIndex = wrap
@@ -23426,7 +23437,7 @@
       scheduleTimelineMatrixRenderSoon();
       return;
     }
-    setActiveFrameIndex(nextIndex, { wrap, persist, render, syncUi });
+    setActiveFrameIndex(nextIndex, { wrap, persist, render, syncUi, broadcastPresence });
   }
 
   function setActiveFrameOnLayerTrack(frameIndex, trackIndex, {
@@ -29802,14 +29813,10 @@
         if (!openedWithFallback) {
           return false;
         }
-        if (hideStartup) {
-          hideStartupScreen();
-        }
+        revealActiveProjectAfterOpen({ hideStartup });
         return true;
       }
-      if (hideStartup) {
-        hideStartupScreen();
-      }
+      revealActiveProjectAfterOpen({ hideStartup });
       if (!silent) {
         setMultiStatus(
           successMessage || localizeText(
@@ -30150,9 +30157,7 @@
         connectionStable ? 'success' : 'warn'
       );
     }
-    if (hideStartup) {
-      hideStartupScreen();
-    }
+    revealActiveProjectAfterOpen({ hideStartup });
     return true;
   }
 
@@ -30226,9 +30231,7 @@
         force: false,
         reason: 'recent-open-already-active-latest',
       });
-      if (hideStartup) {
-        hideStartupScreen();
-      }
+      revealActiveProjectAfterOpen({ hideStartup });
       if (!silent) {
         setMultiStatus(
           localizeText(
@@ -30344,6 +30347,7 @@
         }
         clearPendingSharedInvite();
         setActiveAutosaveProjectId(buildSharedRecentProjectId(normalizedEntry.sharedProjectKey || '') || normalizedEntry.id);
+        revealActiveProjectAfterOpen({ hideStartup });
         closeBlockingLoading();
         return true;
       }
@@ -45795,6 +45799,7 @@
       cancelVirtualCursorDrawSession();
     }
     releaseVirtualCursorPointer();
+    playbackStartSelectionSnapshot = captureLocalTimelineSelectionSnapshot();
     state.playback.isPlaying = true;
     preparePlaybackFrameCache();
     lastFrameTime = performance.now();
@@ -45825,15 +45830,28 @@
   }
 
   function stopPlayback() {
+    const wasPlaying = Boolean(state.playback.isPlaying);
     state.playback.isPlaying = false;
     if (playbackHandle != null) {
       cancelAnimationFrame(playbackHandle);
       playbackHandle = null;
     }
+    let restoredStartSelection = false;
+    if (wasPlaying && playbackStartSelectionSnapshot) {
+      restoredStartSelection = restoreLocalTimelineSelectionSnapshot(playbackStartSelectionSnapshot, { preserveCanvas: true });
+      playbackStartSelectionSnapshot = null;
+    }
     clearPlaybackFrameCache();
     clearPlaybackTimelineCursorIndicators();
     updatePlaybackButtons();
     schedulePlaybackUiRefresh();
+    if (restoredStartSelection) {
+      syncAnimationFpsDisplayFromState();
+      syncActiveLayerSettingsUI();
+      syncActiveFrameSettingsUI();
+      scheduleSharedProjectCellPresenceBroadcast('playback-stop');
+      markCanvasDirty();
+    }
     requestRender();
     requestOverlayRender();
   }
@@ -45862,6 +45880,7 @@
         persist: false,
         render: false,
         syncUi: false,
+        broadcastPresence: false,
         respectSharedCellOccupancy: false,
       });
       lastFrameTime += duration;
@@ -87295,7 +87314,7 @@
           historyLabel: _label,
           opPayload: structureOpPayload,
         });
-        checkpoint({ immediate: true, historyLabel: _label });
+        scheduleSharedProjectCheckpoint({ immediate: false, historyLabel: _label });
         return;
       }
     }
