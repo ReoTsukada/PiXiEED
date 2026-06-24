@@ -3662,7 +3662,7 @@
   const RAIL_RESIZE_DRAG_THRESHOLD = 6;
   const RIGHT_TRANSIENT_PANEL_WIDTH = RAIL_MAX_WIDTH;
   const BOTTOM_TIMELINE_DEFAULT_HEIGHT = 188;
-  const BOTTOM_TIMELINE_MIN_HEIGHT = 96;
+  const BOTTOM_TIMELINE_MIN_HEIGHT = 128;
   const BOTTOM_TIMELINE_MAX_HEIGHT = 360;
   const LEFT_DUAL_GAP = 8;
   const LEFT_DUAL_MIN_COLUMN_WIDTH = Math.max(132, RAIL_DEFAULT_WIDTH.left, RAIL_MIN_WIDTH);
@@ -4287,6 +4287,7 @@
   let suppressOpenProjectTabAutoInitialize = false;
   let openProjectTabSequence = 0;
   let openProjectTabBusy = false;
+  const openProjectTabProjectWriteGuards = new Map();
   let openProjectTabsLastRenderSignature = '';
   let openProjectTabsLastStructureSignature = '';
   let projectTabViewportResetToken = 0;
@@ -4340,6 +4341,7 @@
   const MULTI_LAYER_PATCH_HISTORY_LABELS = new Set(MULTI_SCOPED_HISTORY_LABELS);
   const MULTI_PALETTE_HISTORY_LABELS = new Set(['paletteAdd', 'paletteRemove', 'paletteReorder', 'paletteColor', 'paletteApplyPreset']);
   const SHARED_PROJECT_STRUCTURE_HISTORY_LABELS = new Set([
+    'addSheet',
     'addLayer',
     'addSimulationLayer',
     'duplicateLayer',
@@ -4439,8 +4441,21 @@
   let memoryMonitorHandle = null;
   let timelineMatrixInteractionBound = false;
   let timelineMatrixRenderKey = '';
+  let timelineMatrixRenderDirty = false;
   let timelineMatrixRafRenderHandle = null;
   let timelineMatrixDeferredRenderHandle = null;
+  const timelineMatrixViewportPan = {
+    active: false,
+    moved: false,
+    axis: '',
+    pointerId: null,
+    startX: 0,
+    startY: 0,
+    startScrollLeft: 0,
+    startScrollTop: 0,
+    captureTarget: null,
+    suppressClickUntil: 0,
+  };
   let secondaryCanvasRefreshHandle = null;
   let toolButtons = [];
   let renderScheduled = false;
@@ -8699,6 +8714,83 @@
       || getSharedProjectKeyFromProjectId(tab.projectId || '');
   }
 
+  function retainOpenProjectTabProjectWriteGuard(tabId = '') {
+    const normalizedTabId = typeof tabId === 'string' ? tabId : '';
+    if (!normalizedTabId) {
+      return;
+    }
+    openProjectTabProjectWriteGuards.set(
+      normalizedTabId,
+      Math.max(0, Math.round(Number(openProjectTabProjectWriteGuards.get(normalizedTabId)) || 0)) + 1
+    );
+  }
+
+  function releaseOpenProjectTabProjectWriteGuard(tabId = '') {
+    const normalizedTabId = typeof tabId === 'string' ? tabId : '';
+    if (!normalizedTabId || !openProjectTabProjectWriteGuards.has(normalizedTabId)) {
+      return;
+    }
+    const nextCount = Math.max(0, Math.round(Number(openProjectTabProjectWriteGuards.get(normalizedTabId)) || 0) - 1);
+    if (nextCount > 0) {
+      openProjectTabProjectWriteGuards.set(normalizedTabId, nextCount);
+    } else {
+      openProjectTabProjectWriteGuards.delete(normalizedTabId);
+    }
+  }
+
+  function isOpenProjectTabProjectWriteGuarded(tabId = '') {
+    const normalizedTabId = typeof tabId === 'string' ? tabId : '';
+    return Boolean(normalizedTabId && openProjectTabProjectWriteGuards.has(normalizedTabId));
+  }
+
+  function buildActiveSharedProjectSheetTabFields(projectId = autosaveProjectId) {
+    const normalizedProjectId = normalizeAutosaveProjectId(projectId || autosaveProjectId || '');
+    const sharedProjectKey = normalizeMultiProjectKey(activeSharedProjectKey || '')
+      || getSharedProjectKeyFromProjectId(normalizedProjectId);
+    if (!sharedProjectKey || !isCurrentProjectSharedEntry()) {
+      return null;
+    }
+    const sharedEntry = getCurrentSharedRecentProjectEntry(sharedProjectKey);
+    return {
+      projectId: buildSharedRecentProjectId(sharedProjectKey) || normalizedProjectId || createAutosaveProjectId(),
+      sharedProjectKey,
+      sharedProjectBackendId: activeSharedProjectId || sharedEntry?.sharedProjectBackendId || '',
+      sharedProjectRevision: Math.max(
+        0,
+        Math.round(Number(activeSharedProjectRevision) || 0),
+        Math.round(Number(sharedEntry?.sharedProjectRevision) || 0)
+      ),
+      sharedProjectStructureRevision: Math.max(
+        0,
+        Math.round(Number(activeSharedProjectStructureRevision) || 0),
+        Math.round(Number(sharedEntry?.sharedProjectStructureRevision) || 0)
+      ),
+      sharedRoleHint: sharedEntry?.sharedRoleHint || mapSharedProjectMembershipRoleToUiRole(activeSharedProjectMembershipRole) || 'guest',
+      sharedAutoJoin: sharedEntry?.sharedAutoJoin !== false,
+    };
+  }
+
+  function queueSharedProjectSheetsSnapshot(historyLabel = 'addSheet') {
+    if (!activeSharedProjectKey || !isCurrentProjectSharedEntry()) {
+      return false;
+    }
+    markAutosaveDirty();
+    markDocumentUnsavedChange();
+    scheduleSessionPersist({ includeSnapshots: true });
+    scheduleAutosaveSnapshot();
+    if (isSharedProjectRealtimePrimaryActive(activeSharedProjectKey)) {
+      handleMultiLocalCommit('addSheet');
+      return true;
+    }
+    queueSharedProjectCurrentSnapshotCapture({
+      delayMs: 0,
+      projectKey: activeSharedProjectKey,
+      historyLabel: historyLabel === 'addSheet' ? 'structure-checkpoint' : historyLabel,
+      force: true,
+    });
+    return true;
+  }
+
   function matchesDeletedProjectOpenTab(tab = null, {
     projectId = '',
     projectKey = '',
@@ -10420,6 +10512,16 @@
     const targetRecentEntry = getSharedRecentProjectEntryForTab(target);
     const targetIsShared = Boolean(targetRecentEntry && isSharedRecentProjectEntry(targetRecentEntry));
     const targetProjectId = normalizeAutosaveProjectId(target?.projectId || '');
+    const targetSharedKey = getOpenProjectTabSharedKey(target);
+    const canLoadActiveSharedSheetFromTab = Boolean(
+      targetIsShared
+      && target?.project
+      && typeof target.project === 'object'
+      && activeSharedProjectKey
+      && targetSharedKey
+      && normalizeMultiProjectKey(targetSharedKey) === normalizeMultiProjectKey(activeSharedProjectKey)
+      && isCurrentProjectSharedEntry()
+    );
     if (!targetIsShared && targetProjectId.startsWith(SHARED_PROJECT_ID_PREFIX)) {
       updateAutosaveStatus(
         localizeText(
@@ -10433,10 +10535,13 @@
     if (!targetIsShared && (!target?.project || typeof target.project !== 'object')) {
       return false;
     }
+    const guardedProjectTabIds = Array.from(new Set([previousActiveId, target.id].filter(Boolean)));
+    guardedProjectTabIds.forEach(retainOpenProjectTabProjectWriteGuard);
     if (!skipPersistCurrent && previousActiveId && findOpenProjectTabIndex(previousActiveId) >= 0) {
       const persistedCurrentSheet = await persistActiveOpenProjectTab({ flushAutosave: false });
       if (!persistedCurrentSheet) {
         updateAutosaveStatus(localizeText('現在のシートを保持できなかったため、切替を中止しました', 'Sheet switch was canceled because the current sheet could not be preserved'), 'error');
+        guardedProjectTabIds.forEach(releaseOpenProjectTabProjectWriteGuard);
         return false;
       }
     }
@@ -10447,7 +10552,6 @@
     try {
       const previousTab = previousActiveId ? openProjectTabs[findOpenProjectTabIndex(previousActiveId)] : null;
       const previousSharedKey = getOpenProjectTabSharedKey(previousTab);
-      const targetSharedKey = getOpenProjectTabSharedKey(target);
       if (activeSharedProjectKey) {
         // If the target does not map to the same shared project key, clear the
         // current shared session to stop background sync from affecting the
@@ -10468,11 +10572,40 @@
     try {
       let loaded = false;
       if (targetIsShared) {
-        loaded = await openSharedRecentProject(targetRecentEntry, {
-          hideStartup: false,
-          silent: true,
-          skipLatestRefresh: true,
-        });
+        if (canLoadActiveSharedSheetFromTab) {
+          loaded = await loadDocumentFromProjectPayload(target.project, {
+            projectId: target.projectId || buildSharedRecentProjectId(targetSharedKey),
+            suppressAutosaveStatus: true,
+            qrEditPayload: target?.qrEditPayload || null,
+            suppressProjectSheetsRestore: true,
+            preserveDocumentIds: true,
+            preserveCanvasIds: true,
+            preserveFrameIds: true,
+            preserveLayerIds: true,
+            sharedProjectKey: targetSharedKey,
+            sharedProjectBackendId: target.sharedProjectBackendId || targetRecentEntry?.sharedProjectBackendId || activeSharedProjectId || '',
+            sharedProjectRevision: Math.max(
+              0,
+              Math.round(Number(target.sharedProjectRevision) || 0),
+              Math.round(Number(targetRecentEntry?.sharedProjectRevision) || 0),
+              Math.round(Number(activeSharedProjectRevision) || 0)
+            ),
+            sharedProjectStructureRevision: Math.max(
+              0,
+              Math.round(Number(target.sharedProjectStructureRevision) || 0),
+              Math.round(Number(targetRecentEntry?.sharedProjectStructureRevision) || 0),
+              Math.round(Number(activeSharedProjectStructureRevision) || 0)
+            ),
+            sharedRoleHint: target.sharedRoleHint || targetRecentEntry?.sharedRoleHint || 'guest',
+            sharedAutoJoin: target.sharedAutoJoin !== false && targetRecentEntry?.sharedAutoJoin !== false,
+          });
+        } else {
+          loaded = await openSharedRecentProject(targetRecentEntry, {
+            hideStartup: false,
+            silent: true,
+            skipLatestRefresh: true,
+          });
+        }
       } else {
         loaded = await loadDocumentFromProjectPayload(target.project, {
           projectId: target.projectId || '',
@@ -10539,6 +10672,7 @@
       updateAutosaveStatus(localizeText('シートの切替に失敗しました', 'Failed to switch sheet'), 'error');
       return false;
     } finally {
+      guardedProjectTabIds.forEach(releaseOpenProjectTabProjectWriteGuard);
       openProjectTabBusy = false;
     }
   }
@@ -10645,12 +10779,14 @@
       const sheetIndex = openProjectTabs.length + 1;
       const packaged = createBlankSheetPackagedProject(sheetIndex);
       const fileName = normalizeDocumentName(packaged?.document?.documentName || localizeText(`シート ${sheetIndex}`, `Sheet ${sheetIndex}`));
+      const sharedFields = buildActiveSharedProjectSheetTabFields(autosaveProjectId);
       const nextTab = createOpenProjectSheetTabFromPackagedProject({
         project: packaged,
-        projectId: autosaveProjectId,
+        projectId: sharedFields?.projectId || autosaveProjectId,
         fileName,
         label: extractDocumentBaseName(fileName),
-        source: 'sheet',
+        source: sharedFields ? 'shared-sheet' : 'sheet',
+        ...(sharedFields || {}),
       });
       if (!nextTab) {
         return false;
@@ -10660,9 +10796,21 @@
       suppressOpenProjectTabAutoInitialize = false;
       renderOpenProjectTabs();
       const loaded = await loadDocumentFromProjectPayload(packaged, {
-        projectId: autosaveProjectId,
+        projectId: nextTab.projectId || autosaveProjectId,
         suppressAutosaveStatus: true,
         suppressProjectSheetsRestore: true,
+        ...(sharedFields ? {
+          sharedProjectKey: sharedFields.sharedProjectKey,
+          sharedProjectBackendId: sharedFields.sharedProjectBackendId,
+          sharedProjectRevision: sharedFields.sharedProjectRevision,
+          sharedProjectStructureRevision: sharedFields.sharedProjectStructureRevision,
+          sharedRoleHint: sharedFields.sharedRoleHint,
+          sharedAutoJoin: sharedFields.sharedAutoJoin,
+          preserveDocumentIds: true,
+          preserveCanvasIds: true,
+          preserveFrameIds: true,
+          preserveLayerIds: true,
+        } : {}),
       });
       if (!loaded) {
         const insertedIndex = findOpenProjectTabIndex(nextTab.id);
@@ -10672,10 +10820,12 @@
         renderOpenProjectTabs();
         return false;
       }
-      markAutosaveDirty();
-      markDocumentUnsavedChange();
-      scheduleSessionPersist({ includeSnapshots: true });
-      scheduleAutosaveSnapshot();
+      if (!queueSharedProjectSheetsSnapshot('addSheet')) {
+        markAutosaveDirty();
+        markDocumentUnsavedChange();
+        scheduleSessionPersist({ includeSnapshots: true });
+        scheduleAutosaveSnapshot();
+      }
       updateAutosaveStatus(
         localizeText('新規シートを追加しました', 'Added a new sheet'),
         'success'
@@ -15909,6 +16059,9 @@
     state.activeRightTab = tab;
     updateRightTabUI();
     updateRightTabVisibility();
+    if (tab === 'frames') {
+      flushTimelineMatrixRenderIfVisible({ immediate: true });
+    }
     // Clear multi tab notification when user opens the multi tab
     if (tab === 'multi') {
       setMultiTabNotification(false);
@@ -15963,6 +16116,7 @@
         section.classList.add('is-active');
         section.classList.remove('is-bottom-docked');
       });
+      flushTimelineMatrixRenderIfVisible({ immediate: true });
       return;
     }
     const compactMode = isCompactRightRailMode();
@@ -15991,6 +16145,7 @@
     if (!isMobile && state.activeRightTab === 'multi') {
       scheduleMultiEntryScreenMetricsUpdate();
     }
+    flushTimelineMatrixRenderIfVisible({ immediate: true });
   }
 
   function resetCurveBuilder() {
@@ -20074,12 +20229,28 @@
       const truncatedCount = Math.max(0, queue.length - targets.length);
       await persistActiveOpenProjectTab({ flushAutosave: true });
       const parentProjectId = normalizeAutosaveProjectId(autosaveProjectId || '') || createAutosaveProjectId();
+      const parentSharedFields = buildActiveSharedProjectSheetTabFields(parentProjectId);
       setActiveAutosaveProjectId(parentProjectId, { persist: false });
       let openedCount = 0;
       let failedCount = 0;
       for (let index = 0; index < targets.length; index += 1) {
         const item = targets[index];
         try {
+          const directPayload = await readProjectPayloadFromOpenItem(item);
+          if (directPayload?.project && typeof directPayload.project === 'object') {
+            const directTab = await appendProjectPayloadAsOpenTab({
+              project: directPayload.project,
+              parentProjectId,
+              fileName: directPayload.fileName,
+              unsaved: directPayload.unsaved,
+              source: source || 'open',
+              tabOptions,
+            });
+            if (directTab) {
+              openedCount += 1;
+              continue;
+            }
+          }
           const loaded = await loader(item);
           if (loaded === 'deferred') {
             // Loader declined to apply into the active document because the
@@ -20117,14 +20288,13 @@
                 deferredUnsaved = Boolean(item.unsaved);
               }
               if (packaged && typeof packaged === 'object') {
-                const appended = await appendPackagedProjectTab({
+                const appended = await appendProjectPayloadAsOpenTab({
                   project: packaged,
-                  projectId: parentProjectId,
+                  parentProjectId,
                   fileName: deferredFileName,
                   unsaved: deferredUnsaved,
                   source: source || 'open',
-                  updatedAt: packaged.updatedAt || new Date().toISOString(),
-                  skipBusyGuardOnActivate: true,
+                  tabOptions,
                 });
                 if (appended) {
                   queueProjectTabViewportReset(appended.id);
@@ -20150,8 +20320,9 @@
           }
           const appended = appendOpenProjectTabFromCurrentState({
             activate: true,
-            source,
-            projectId: parentProjectId,
+            source: parentSharedFields ? 'shared-sheet' : source,
+            projectId: parentSharedFields?.projectId || parentProjectId,
+            ...(parentSharedFields || {}),
             ...(tabOptions && typeof tabOptions === 'object' ? tabOptions : {}),
           });
           if (!appended) {
@@ -20163,6 +20334,15 @@
               ...tabOptions.qrEditPayload,
               projectId: appended.projectId || '',
             });
+          }
+          if (parentSharedFields) {
+            setActiveSharedProjectSession(
+              parentSharedFields.sharedProjectKey,
+              parentSharedFields.sharedProjectRevision,
+              parentSharedFields.sharedProjectStructureRevision,
+              parentSharedFields.sharedProjectBackendId
+            );
+            queueSharedProjectSheetsSnapshot('addSheet');
           }
           openedCount += 1;
         } catch (error) {
@@ -20206,6 +20386,130 @@
     } catch (e) {
       return null;
     }
+  }
+
+  function resolveOpenProjectPayloadFileName(project = null, fallbackName = DEFAULT_DOCUMENT_NAME) {
+    return normalizeDocumentName(
+      fallbackName
+      || project?.documentName
+      || project?.document?.documentName
+      || DEFAULT_DOCUMENT_NAME
+    );
+  }
+
+  async function readProjectPayloadFromOpenItem(item) {
+    if (!item) {
+      return null;
+    }
+    if (item && typeof item === 'object' && item.project && typeof item.project === 'object') {
+      return {
+        project: item.project,
+        fileName: resolveOpenProjectPayloadFileName(item.project, item.name || item.fileName || DEFAULT_DOCUMENT_NAME),
+        unsaved: Boolean(item.unsaved),
+      };
+    }
+    let file = null;
+    let fallbackName = DEFAULT_DOCUMENT_NAME;
+    if (item && typeof item.getFile === 'function') {
+      try {
+        file = await item.getFile();
+        fallbackName = file?.name || item.name || DEFAULT_DOCUMENT_NAME;
+      } catch (_error) {
+        return null;
+      }
+    } else if (item && typeof item.text === 'function') {
+      file = item;
+      fallbackName = item.name || DEFAULT_DOCUMENT_NAME;
+    }
+    if (!file || isImportableImageFile(file) || typeof file.text !== 'function') {
+      return null;
+    }
+    let parsed = null;
+    try {
+      parsed = tryParseJsonSafe(await file.text());
+    } catch (_error) {
+      return null;
+    }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return null;
+    }
+    return {
+      project: parsed,
+      fileName: resolveOpenProjectPayloadFileName(parsed, fallbackName),
+      unsaved: false,
+    };
+  }
+
+  async function appendProjectPayloadAsOpenTab({
+    project = null,
+    parentProjectId = '',
+    fileName = DEFAULT_DOCUMENT_NAME,
+    unsaved = false,
+    source = 'open',
+    tabOptions = null,
+  } = {}) {
+    if (!project || typeof project !== 'object') {
+      return null;
+    }
+    const sharedFields = buildActiveSharedProjectSheetTabFields(parentProjectId);
+    const normalizedParentProjectId = normalizeAutosaveProjectId(parentProjectId || autosaveProjectId || '')
+      || createAutosaveProjectId();
+    const tabProjectId = sharedFields?.projectId || normalizedParentProjectId;
+    const previousActiveId = activeOpenProjectTabId;
+    const nextTab = createOpenProjectSheetTabFromPackagedProject({
+      project,
+      projectId: tabProjectId,
+      fileName,
+      label: extractDocumentBaseName(fileName),
+      unsaved,
+      source: sharedFields ? 'shared-sheet' : source,
+      updatedAt: project?.updatedAt || new Date().toISOString(),
+      qrEditPayload: tabOptions?.qrEditPayload || null,
+      ...(sharedFields || {}),
+    });
+    if (!nextTab) {
+      return null;
+    }
+    openProjectTabs.push(nextTab);
+    activeOpenProjectTabId = nextTab.id;
+    suppressOpenProjectTabAutoInitialize = false;
+    renderOpenProjectTabs();
+    const sharedLoadOptions = sharedFields
+      ? {
+        sharedProjectKey: sharedFields.sharedProjectKey,
+        sharedProjectBackendId: sharedFields.sharedProjectBackendId,
+        sharedProjectRevision: sharedFields.sharedProjectRevision,
+        sharedProjectStructureRevision: sharedFields.sharedProjectStructureRevision,
+        sharedRoleHint: sharedFields.sharedRoleHint,
+        sharedAutoJoin: sharedFields.sharedAutoJoin,
+        preserveDocumentIds: true,
+        preserveCanvasIds: true,
+        preserveFrameIds: true,
+        preserveLayerIds: true,
+      }
+      : {};
+    const loaded = await loadDocumentFromProjectPayload(project, {
+      projectId: tabProjectId,
+      suppressAutosaveStatus: true,
+      qrEditPayload: tabOptions?.qrEditPayload || null,
+      suppressProjectSheetsRestore: true,
+      ...sharedLoadOptions,
+    });
+    if (!loaded || loaded === 'deferred') {
+      const insertedIndex = findOpenProjectTabIndex(nextTab.id);
+      if (insertedIndex >= 0) {
+        openProjectTabs.splice(insertedIndex, 1);
+      }
+      activeOpenProjectTabId = previousActiveId;
+      suppressOpenProjectTabAutoInitialize = false;
+      renderOpenProjectTabs();
+      return null;
+    }
+    queueProjectTabViewportReset(nextTab.id);
+    if (sharedFields) {
+      queueSharedProjectSheetsSnapshot('addSheet');
+    }
+    return openProjectTabs[findOpenProjectTabIndex(nextTab.id)] || nextTab;
   }
 
   async function loadRecentProjectPackagedPayload(entry) {
@@ -25371,10 +25675,10 @@
       }
       const opened = sharedEntry
         ? await openSharedRecentProject(sharedEntry, {
-            hideStartup: true,
-            silent: true,
-            skipLatestRefresh: false,
-          })
+          hideStartup: true,
+          silent: true,
+          skipLatestRefresh: true,
+        })
         : await openSharedProjectCanonical({
             projectKey: restoredProjectKey,
             requestedRole: 'guest',
@@ -37656,6 +37960,11 @@
   function setBottomTimelineHeight(height, { persist = true } = {}) {
     const normalized = normalizeBottomTimelineHeight(height);
     bottomTimelineSizing.height = normalized;
+    const isCompact = normalized <= BOTTOM_TIMELINE_MIN_HEIGHT + 4;
+    document.body.classList.toggle('is-bottom-timeline-compact', isCompact && isBottomTimelineDockEnabled());
+    if (dom.bottomTimelineDock instanceof HTMLElement) {
+      dom.bottomTimelineDock.dataset.compact = String(isCompact);
+    }
     if (dom.layout instanceof HTMLElement) {
       dom.layout.style.setProperty('--bottom-rail-height', `${normalized}px`);
     } else {
@@ -37677,6 +37986,8 @@
     dock.setAttribute('aria-hidden', String(!enabled));
     if (!enabled) {
       endBottomTimelineResize({ persist: false });
+      document.body.classList.remove('is-bottom-timeline-compact');
+      delete dock.dataset.compact;
       return;
     }
     setBottomTimelineHeight(bottomTimelineSizing.height, { persist: false });
@@ -46302,12 +46613,245 @@
     updateOnionSkinOpacityOutput(opacityPercent);
   }
 
+  function getTimelineMatrixViewport() {
+    const container = dom.controls.timelineMatrix;
+    if (!(container instanceof HTMLElement)) {
+      return null;
+    }
+    const viewport = container.closest('.timeline-matrix-wrapper');
+    return viewport instanceof HTMLElement ? viewport : null;
+  }
+
+  function getTimelineMatrixViewportMaxScroll(viewport, axis = 'x') {
+    if (!(viewport instanceof HTMLElement)) {
+      return 0;
+    }
+    if (axis === 'y') {
+      return Math.max(0, viewport.scrollHeight - viewport.clientHeight);
+    }
+    return Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+  }
+
+  function normalizeTimelineMatrixWheelDelta(event, axis = 'y') {
+    if (!(event instanceof WheelEvent)) {
+      return 0;
+    }
+    const raw = axis === 'x' ? event.deltaX : event.deltaY;
+    if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) {
+      return raw * 16;
+    }
+    if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
+      const viewport = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+      const size = axis === 'x'
+        ? Math.max(1, viewport?.clientWidth || window.innerWidth || 1)
+        : Math.max(1, viewport?.clientHeight || window.innerHeight || 1);
+      return raw * size;
+    }
+    return raw;
+  }
+
+  function scrollTimelineMatrixViewport(viewport, axis, delta) {
+    if (!(viewport instanceof HTMLElement) || !Number.isFinite(delta) || Math.abs(delta) < 0.5) {
+      return false;
+    }
+    const normalizedAxis = axis === 'y' ? 'y' : 'x';
+    const maxScroll = getTimelineMatrixViewportMaxScroll(viewport, normalizedAxis);
+    if (maxScroll <= 0) {
+      return false;
+    }
+    if (normalizedAxis === 'y') {
+      const previous = viewport.scrollTop;
+      const next = clamp(previous + delta, 0, maxScroll);
+      if (Math.abs(next - previous) < 0.5) {
+        return false;
+      }
+      viewport.scrollTop = next;
+      return true;
+    }
+    const previous = viewport.scrollLeft;
+    const next = clamp(previous + delta, 0, maxScroll);
+    if (Math.abs(next - previous) < 0.5) {
+      return false;
+    }
+    viewport.scrollLeft = next;
+    return true;
+  }
+
+  function clearTimelineMatrixViewportPan({ suppressClick = false } = {}) {
+    const viewport = timelineMatrixViewportPan.captureTarget;
+    if (viewport instanceof HTMLElement) {
+      viewport.classList.remove('is-viewport-panning');
+      if (timelineMatrixViewportPan.pointerId !== null && typeof viewport.releasePointerCapture === 'function') {
+        try {
+          viewport.releasePointerCapture(timelineMatrixViewportPan.pointerId);
+        } catch (error) {
+          // Ignore pointer capture release failures.
+        }
+      }
+    }
+    if (suppressClick) {
+      timelineMatrixViewportPan.suppressClickUntil = Date.now() + 250;
+    }
+    timelineMatrixViewportPan.active = false;
+    timelineMatrixViewportPan.moved = false;
+    timelineMatrixViewportPan.axis = '';
+    timelineMatrixViewportPan.pointerId = null;
+    timelineMatrixViewportPan.startX = 0;
+    timelineMatrixViewportPan.startY = 0;
+    timelineMatrixViewportPan.startScrollLeft = 0;
+    timelineMatrixViewportPan.startScrollTop = 0;
+    timelineMatrixViewportPan.captureTarget = null;
+  }
+
+  function handleTimelineMatrixViewportPointerDown(event) {
+    const viewport = event.currentTarget instanceof HTMLElement ? event.currentTarget : getTimelineMatrixViewport();
+    if (!(viewport instanceof HTMLElement) || event.isPrimary === false) {
+      return;
+    }
+    if (event.pointerType === 'mouse' && event.button !== 0) {
+      return;
+    }
+    if (
+      getTimelineMatrixViewportMaxScroll(viewport, 'x') <= 0
+      && getTimelineMatrixViewportMaxScroll(viewport, 'y') <= 0
+    ) {
+      return;
+    }
+    clearTimelineMatrixViewportPan();
+    timelineMatrixViewportPan.active = true;
+    timelineMatrixViewportPan.pointerId = Number.isFinite(event.pointerId) ? event.pointerId : null;
+    timelineMatrixViewportPan.startX = Number(event.clientX) || 0;
+    timelineMatrixViewportPan.startY = Number(event.clientY) || 0;
+    timelineMatrixViewportPan.startScrollLeft = viewport.scrollLeft;
+    timelineMatrixViewportPan.startScrollTop = viewport.scrollTop;
+    timelineMatrixViewportPan.captureTarget = viewport;
+  }
+
+  function handleTimelineMatrixViewportPointerMove(event) {
+    if (!timelineMatrixViewportPan.active) {
+      return;
+    }
+    if (
+      timelineMatrixViewportPan.pointerId !== null
+      && Number.isFinite(event.pointerId)
+      && event.pointerId !== timelineMatrixViewportPan.pointerId
+    ) {
+      return;
+    }
+    const viewport = timelineMatrixViewportPan.captureTarget;
+    if (!(viewport instanceof HTMLElement)) {
+      clearTimelineMatrixViewportPan();
+      return;
+    }
+    const deltaX = (Number(event.clientX) || 0) - timelineMatrixViewportPan.startX;
+    const deltaY = (Number(event.clientY) || 0) - timelineMatrixViewportPan.startY;
+    const absX = Math.abs(deltaX);
+    const absY = Math.abs(deltaY);
+    if (!timelineMatrixViewportPan.axis) {
+      if (Math.max(absX, absY) < 6) {
+        return;
+      }
+      timelineMatrixViewportPan.axis = absX >= absY ? 'x' : 'y';
+      timelineMatrixViewportPan.moved = true;
+      viewport.classList.add('is-viewport-panning');
+      if (timelineMatrixViewportPan.pointerId !== null && typeof viewport.setPointerCapture === 'function') {
+        try {
+          viewport.setPointerCapture(timelineMatrixViewportPan.pointerId);
+        } catch (error) {
+          // Ignore pointer capture failures.
+        }
+      }
+    }
+    const axis = timelineMatrixViewportPan.axis;
+    if (axis === 'y') {
+      const maxScrollTop = getTimelineMatrixViewportMaxScroll(viewport, 'y');
+      viewport.scrollTop = clamp(timelineMatrixViewportPan.startScrollTop - deltaY, 0, maxScrollTop);
+    } else {
+      const maxScrollLeft = getTimelineMatrixViewportMaxScroll(viewport, 'x');
+      viewport.scrollLeft = clamp(timelineMatrixViewportPan.startScrollLeft - deltaX, 0, maxScrollLeft);
+    }
+    event.preventDefault();
+  }
+
+  function handleTimelineMatrixViewportPointerUp(event) {
+    if (!timelineMatrixViewportPan.active) {
+      return;
+    }
+    if (
+      timelineMatrixViewportPan.pointerId !== null
+      && Number.isFinite(event.pointerId)
+      && event.pointerId !== timelineMatrixViewportPan.pointerId
+    ) {
+      return;
+    }
+    clearTimelineMatrixViewportPan({ suppressClick: timelineMatrixViewportPan.moved });
+  }
+
+  function handleTimelineMatrixViewportWheel(event) {
+    if (event.ctrlKey || event.metaKey) {
+      return;
+    }
+    const viewport = event.currentTarget instanceof HTMLElement ? event.currentTarget : getTimelineMatrixViewport();
+    if (!(viewport instanceof HTMLElement)) {
+      return;
+    }
+    const deltaX = normalizeTimelineMatrixWheelDelta(event, 'x');
+    const deltaY = normalizeTimelineMatrixWheelDelta(event, 'y');
+    const absX = Math.abs(deltaX);
+    const absY = Math.abs(deltaY);
+    if (Math.max(absX, absY) < 0.5) {
+      return;
+    }
+    let axis = absX > absY ? 'x' : 'y';
+    let delta = axis === 'x' ? deltaX : deltaY;
+    if (event.shiftKey && absX < 0.5 && absY >= 0.5) {
+      axis = 'x';
+      delta = deltaY;
+    }
+    if (!scrollTimelineMatrixViewport(viewport, axis, delta)) {
+      return;
+    }
+    event.preventDefault();
+  }
+
+  function setActiveTimelineLayerId(layerId) {
+    const normalizedLayerId = typeof layerId === 'string' ? layerId : '';
+    if (!normalizedLayerId) {
+      return false;
+    }
+    const frame = getActiveFrame();
+    if (!frame || !Array.isArray(frame.layers) || !frame.layers.some(layer => layer?.id === normalizedLayerId)) {
+      return false;
+    }
+    state.activeLayer = normalizedLayerId;
+    const activeCanvasDoc = getActiveProjectCanvasDocument();
+    if (activeCanvasDoc) {
+      activeCanvasDoc.activeLayer = normalizedLayerId;
+    }
+    return true;
+  }
+
   function bindTimelineMatrixInteractions() {
     const container = dom.controls.timelineMatrix;
     if (!container || timelineMatrixInteractionBound) {
       return;
     }
     timelineMatrixInteractionBound = true;
+    const viewport = getTimelineMatrixViewport();
+    if (viewport instanceof HTMLElement) {
+      viewport.addEventListener('wheel', handleTimelineMatrixViewportWheel, { passive: false });
+      viewport.addEventListener('pointerdown', handleTimelineMatrixViewportPointerDown, { passive: true });
+      viewport.addEventListener('pointermove', handleTimelineMatrixViewportPointerMove, { passive: false });
+      viewport.addEventListener('pointerup', handleTimelineMatrixViewportPointerUp, { passive: true });
+      viewport.addEventListener('pointercancel', handleTimelineMatrixViewportPointerUp, { passive: true });
+    }
+    container.addEventListener('click', event => {
+      if (Date.now() > timelineMatrixViewportPan.suppressClickUntil) {
+        return;
+      }
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }, true);
     container.addEventListener('click', event => {
       const target = event.target instanceof Element ? event.target.closest('button') : null;
       if (!(target instanceof HTMLButtonElement) || !container.contains(target)) {
@@ -46346,7 +46890,7 @@
           renderTimelineMatrix();
           return;
         }
-        state.activeLayer = layerId;
+        setActiveTimelineLayerId(layerId);
         if (Number.isFinite(layerIndex)) {
           setTimelineLayerSelection(layerIndex, { append: event.shiftKey });
         }
@@ -46392,7 +46936,7 @@
           setTimelineFrameSelection(frameIndex, { append: event.shiftKey });
           setActiveFrameIndex(frameIndex, { persist: false, render: false, syncUi: false });
           if (nextLayer) {
-            state.activeLayer = nextLayer.id;
+            setActiveTimelineLayerId(nextLayer.id);
           }
           scheduleSessionPersist({ includeSnapshots: false, includeReloadSnapshot: false });
           scheduleTimelineMatrixRenderSoon();
@@ -46437,7 +46981,7 @@
           return;
         }
         setActiveFrameIndex(frameIndex, { persist: false, render: false, syncUi: false });
-        state.activeLayer = layerId;
+        setActiveTimelineLayerId(layerId);
         if (event.shiftKey) {
           setTimelineSlotSelection(frameIndex, layerIndex, { append: true });
         } else {
@@ -46595,12 +47139,50 @@
     renderInactiveProjectCanvasSurfaces();
   }
 
+  function isTimelineMatrixPanelVisible() {
+    if (layoutMode === 'mobilePortrait') {
+      return true;
+    }
+    if (isBottomTimelineDockEnabled()) {
+      return true;
+    }
+    if (state.activeRightTab !== 'frames') {
+      return false;
+    }
+    if (!isCompactRightRailMode()) {
+      return true;
+    }
+    return isCompactRightFlyoutOpen();
+  }
+
+  function markTimelineMatrixRenderDirty() {
+    timelineMatrixRenderDirty = true;
+    timelineMatrixRenderKey = '';
+  }
+
+  function flushTimelineMatrixRenderIfVisible({ immediate = false } = {}) {
+    if (!timelineMatrixRenderDirty || !isTimelineMatrixPanelVisible()) {
+      return false;
+    }
+    timelineMatrixRenderDirty = false;
+    renderFrameList({ immediate });
+    return true;
+  }
+
   function scheduleTimelineMatrixRenderSoon() {
+    if (!isTimelineMatrixPanelVisible()) {
+      markTimelineMatrixRenderDirty();
+      return;
+    }
     if (timelineMatrixRafRenderHandle !== null) {
       return;
     }
     timelineMatrixRafRenderHandle = window.requestAnimationFrame(() => {
       timelineMatrixRafRenderHandle = null;
+      if (!isTimelineMatrixPanelVisible()) {
+        markTimelineMatrixRenderDirty();
+        return;
+      }
       if (hasRecentViewportInteraction()) {
         scheduleDeferredTimelineMatrixRender();
         return;
@@ -46610,12 +47192,20 @@
   }
 
   function scheduleDeferredTimelineMatrixRender() {
+    if (!isTimelineMatrixPanelVisible()) {
+      markTimelineMatrixRenderDirty();
+      return;
+    }
     if (timelineMatrixDeferredRenderHandle !== null) {
       return;
     }
     timelineMatrixDeferredRenderHandle = window.requestAnimationFrame(() => {
       const render = () => {
         timelineMatrixDeferredRenderHandle = null;
+        if (!isTimelineMatrixPanelVisible()) {
+          markTimelineMatrixRenderDirty();
+          return;
+        }
         if (hasRecentViewportInteraction()) {
           scheduleDeferredTimelineMatrixRender();
           return;
@@ -46633,6 +47223,11 @@
   function renderTimelineMatrix() {
     const container = dom.controls.timelineMatrix;
     if (!container) return;
+    if (!isTimelineMatrixPanelVisible()) {
+      markTimelineMatrixRenderDirty();
+      return;
+    }
+    timelineMatrixRenderDirty = false;
     bindTimelineMatrixInteractions();
 
     const frames = state.frames;
@@ -47120,6 +47715,10 @@
   }
 
   function renderFrameList({ immediate = false } = {}) {
+    if (!isTimelineMatrixPanelVisible()) {
+      markTimelineMatrixRenderDirty();
+      return;
+    }
     if (!immediate && shouldDeferTimelineMatrixRender(state.frames)) {
       scheduleDeferredTimelineMatrixRender();
       return;
@@ -69748,12 +70347,22 @@
     if (classifySharedProjectOpType(historyLabel) !== 'structure') {
       return null;
     }
+    const normalizedHistoryLabel = String(historyLabel || '');
     const canvases = getProjectCanvasDocuments();
     const activeCanvas = getActiveProjectCanvasDocument() || null;
     const activeCanvasId = activeCanvas?.id || '';
+    let sheetSyncPayload = null;
+    if (normalizedHistoryLabel === 'addSheet') {
+      const snapshot = makeHistorySnapshot({ clonePixelData: false });
+      const activePackagedProject = buildPackagedProjectPayload(snapshot, {
+        session: buildAutosaveSessionPayload(),
+        includeSheets: false,
+      });
+      sheetSyncPayload = buildProjectSheetsPayload(activePackagedProject);
+    }
     return {
       kind: 'structure-sync',
-      historyLabel: String(historyLabel || ''),
+      historyLabel: normalizedHistoryLabel,
       activeCanvasId,
       canvasCount: canvases.length,
       canvases: canvases.map((canvas, canvasIndex) => ({
@@ -69789,7 +70398,99 @@
           }))
           : [],
       })),
+      ...(sheetSyncPayload?.sheets?.length ? {
+        activeSheetId: sheetSyncPayload.activeSheetId || '',
+        sheets: sheetSyncPayload.sheets,
+      } : {}),
     };
+  }
+
+  function mergeSharedProjectSheetsFromStructurePayload(payload = null, { fromRemote = true } = {}) {
+    const sheets = Array.isArray(payload?.sheets)
+      ? payload.sheets.filter(sheet => sheet && typeof sheet === 'object' && sheet.project && typeof sheet.project === 'object')
+      : [];
+    if (!sheets.length || !activeSharedProjectKey) {
+      return false;
+    }
+    const projectKey = normalizeMultiProjectKey(activeSharedProjectKey);
+    const sharedProjectId = buildSharedRecentProjectId(projectKey);
+    const sharedEntry = getCurrentSharedRecentProjectEntry(projectKey);
+    const previousActiveTabId = activeOpenProjectTabId;
+    let changed = false;
+    sheets.slice(0, MAX_PROJECT_SHEETS).forEach((sheet, index) => {
+      const tab = createOpenProjectSheetTabFromPackagedProject({
+        ...sheet,
+        projectId: sharedProjectId,
+        label: typeof sheet?.label === 'string' && sheet.label.trim()
+          ? sheet.label.trim()
+          : localizeText(`シート ${index + 1}`, `Sheet ${index + 1}`),
+        source: sheet.source || 'shared-sheet',
+        sharedProjectKey: projectKey,
+        sharedProjectBackendId: sheet.sharedProjectBackendId || sharedEntry?.sharedProjectBackendId || activeSharedProjectId || '',
+        sharedProjectRevision: Math.max(
+          0,
+          Math.round(Number(sheet.sharedProjectRevision) || 0),
+          Math.round(Number(sharedEntry?.sharedProjectRevision) || 0),
+          Math.round(Number(activeSharedProjectRevision) || 0)
+        ),
+        sharedProjectStructureRevision: Math.max(
+          0,
+          Math.round(Number(sheet.sharedProjectStructureRevision) || 0),
+          Math.round(Number(sharedEntry?.sharedProjectStructureRevision) || 0),
+          Math.round(Number(activeSharedProjectStructureRevision) || 0)
+        ),
+        sharedRoleHint: sheet.sharedRoleHint || sharedEntry?.sharedRoleHint || 'guest',
+        sharedAutoJoin: Object.prototype.hasOwnProperty.call(sheet, 'sharedAutoJoin')
+          ? sheet.sharedAutoJoin
+          : sharedEntry?.sharedAutoJoin !== false,
+      });
+      if (!tab) {
+        return;
+      }
+      const existingIndex = findOpenProjectTabIndex(tab.id);
+      if (existingIndex >= 0) {
+        const existing = openProjectTabs[existingIndex];
+        const preserveExistingProject = Boolean(
+          fromRemote
+          && existing?.id
+          && (
+            existing.id === previousActiveTabId
+            || isOpenProjectTabProjectWriteGuarded(existing.id)
+          )
+        );
+        openProjectTabs[existingIndex] = preserveExistingProject
+          ? {
+            ...tab,
+            project: existing.project && typeof existing.project === 'object' ? existing.project : tab.project,
+            unsaved: Boolean(existing.unsaved),
+            qrEditPayload: existing.qrEditPayload || tab.qrEditPayload || null,
+          }
+          : {
+            ...existing,
+            ...tab,
+          };
+        changed = true;
+        return;
+      }
+      if (openProjectTabs.length < MAX_PROJECT_SHEETS) {
+        openProjectTabs.push(tab);
+        changed = true;
+      }
+    });
+    if (!openProjectTabs.length) {
+      return false;
+    }
+    if (!activeOpenProjectTabId || findOpenProjectTabIndex(activeOpenProjectTabId) < 0) {
+      const requestedActiveId = typeof payload?.activeSheetId === 'string' ? payload.activeSheetId : '';
+      const activeTab = openProjectTabs.find(tab => tab?.id === requestedActiveId) || openProjectTabs[0] || null;
+      activeOpenProjectTabId = activeTab?.id || '';
+      changed = true;
+    }
+    suppressOpenProjectTabAutoInitialize = false;
+    if (changed) {
+      renderOpenProjectTabs();
+    }
+    return changed;
   }
 
   function createSharedProjectLayerFromStructureSnapshot(layerSnapshot, width, height, existingLayer = null) {
@@ -69984,6 +70685,7 @@
     if (fromRemote) {
       restoreLocalTimelineSelectionSnapshot(localTimelineSelection, { preserveCanvas: true });
     }
+    mergeSharedProjectSheetsFromStructurePayload(payload, { fromRemote });
     activeSharedProjectStructureRevision = nextStructureRevision;
     syncProjectCanvasSurfaceDocumentRefs();
     bindActiveCanvasSurface(getProjectCanvasSurfaceForIndex(getActiveProjectCanvasIndex()) || mainViewportCanvasSurface);
@@ -72868,6 +73570,7 @@
     }
     return (
       normalizedLabel === 'checkpoint'
+      || normalizedLabel === 'structure-checkpoint'
       || normalizedLabel === 'sharedConflictReplay'
       || normalizedLabel === 'sharedForceResync'
       || normalizedLabel === 'sharedProjectCreate'
@@ -72901,8 +73604,8 @@
 
   function getSharedProjectEffectiveSnapshotDelay(delayMs = SHARED_PROJECT_DEFERRED_PERSIST_DELAY, { force = false } = {}) {
     const requestedDelay = Math.max(0, Math.round(Number(delayMs) || 0));
-    if (force) {
-      return requestedDelay;
+    if (force && requestedDelay <= 0) {
+      return 0;
     }
     const complexDelay = Math.round(SHARED_PROJECT_DEFERRED_PERSIST_DELAY * getSharedProjectSnapshotComplexityMultiplier());
     return Math.max(requestedDelay, complexDelay);
@@ -76633,6 +77336,7 @@
     projectKey = '',
     title = '',
     historyLabel = '',
+    delayMs = SHARED_PROJECT_SYNC_DELAY,
   } = {}) {
     if (!canUseSharedProjectsBackend()) {
       return;
@@ -76658,9 +77362,20 @@
     if (sharedProjectSyncTimer !== null) {
       window.clearTimeout(sharedProjectSyncTimer);
     }
+    const persistDelayMs = Math.max(0, Math.round(Number(delayMs) || 0));
     sharedProjectSyncTimer = window.setTimeout(async () => {
       sharedProjectSyncTimer = null;
-      if (sharedProjectSyncInFlight || !sharedProjectSyncQueuedPayload) {
+      if (!sharedProjectSyncQueuedPayload) {
+        return;
+      }
+      if (sharedProjectSyncInFlight) {
+        const queuedPayload = sharedProjectSyncQueuedPayload;
+        queueSharedProjectSnapshotPersist(queuedPayload.packagedPayload, {
+          projectKey: queuedPayload.projectKey,
+          title: queuedPayload.title,
+          historyLabel: queuedPayload.historyLabel,
+          delayMs: Math.max(120, persistDelayMs),
+        });
         return;
       }
       const nextPayload = sharedProjectSyncQueuedPayload;
@@ -76709,11 +77424,12 @@
               projectKey: sharedProjectSyncQueuedPayload.projectKey,
               title: sharedProjectSyncQueuedPayload.title,
               historyLabel: sharedProjectSyncQueuedPayload.historyLabel,
+              delayMs: persistDelayMs,
             }
           );
         }
       }
-    }, SHARED_PROJECT_SYNC_DELAY);
+    }, persistDelayMs);
   }
 
   function queueSharedProjectRefresh({ immediate = false, reason = '', force = false } = {}) {
@@ -77107,6 +77823,7 @@
         'active-revision-not-latest',
       ]);
       if (force && transientBlockReasons.has(snapshotGate.blockReason)) {
+        const retryDelayMs = getSharedProjectEffectiveSnapshotDelay(delayMs, { force });
         if (sharedProjectCaptureTimer !== null) {
           window.clearTimeout(sharedProjectCaptureTimer);
           sharedProjectCaptureTimer = null;
@@ -77121,7 +77838,7 @@
             force,
             revision,
           });
-        }, Math.max(800, Math.round(Number(delayMs) || 0), 1200));
+        }, Math.max(800, retryDelayMs, 1200));
       }
       return;
     }
@@ -77164,6 +77881,7 @@
         title: createSharedProjectSnapshotTitle(title || state.documentName || DEFAULT_DOCUMENT_NAME),
         historyLabel,
         revision,
+        delayMs: force ? 0 : SHARED_PROJECT_SYNC_DELAY,
       });
     }, effectiveDelayMs);
   }
@@ -87314,7 +88032,10 @@
           historyLabel: _label,
           opPayload: structureOpPayload,
         });
-        scheduleSharedProjectCheckpoint({ immediate: false, historyLabel: _label });
+        scheduleSharedProjectCheckpoint({
+          immediate: false,
+          historyLabel: _label === 'addSheet' ? 'structure-checkpoint' : _label,
+        });
         return;
       }
     }
