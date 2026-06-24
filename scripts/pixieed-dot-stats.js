@@ -1,4 +1,11 @@
 (() => {
+  if (typeof window !== 'undefined') {
+    if (window.__PIXIEED_DOT_STATS_SCRIPT_LOADED__) {
+      return;
+    }
+    window.__PIXIEED_DOT_STATS_SCRIPT_LOADED__ = true;
+  }
+
   const PIXIEED_ADFREE_SCRIPT_VERSION = '2026.05.30-support-email-claim';
 
   function buildPixieedAdFreeScriptUrl(baseUrl) {
