@@ -155,7 +155,7 @@
 </div>
 </div>
 </div>
-<!-- Mobile ad placeholder: using bottom banner (mobileBottomAd) for PiXiEEDraw lite behavior -->
+<!-- Mobile ad placeholder: using bottom banner (mobileBottomAd) for PiXiEEDraw mobile layout -->
 <div class="app" id="appRoot">
 <div aria-atomic="true" aria-live="polite" class="global-loading-indicator" hidden="" id="globalLoadingIndicator" role="status">
 <div class="global-loading-indicator__label" id="globalLoadingIndicatorLabel">読み込み中…</div>
@@ -911,7 +911,7 @@
 </select>
 <p class="help-text" id="multiRoomVisibilityHint">限定はログイン後にコードまたはURLで参加できます。公開はURLからログインなしで参加できます。</p>
 </div>
-<a class="chip" href="../index.html#auth" id="multiEntryAccountLogin" rel="noopener">ログインして共有を作成</a>
+<a class="chip" href="../account/index.html" id="multiEntryAccountLogin" rel="noopener">ログインして共有を作成</a>
 </section>
 <div class="field field--list settings-account-field" id="pixieedAdFreeField">
 <span>サポーター特典</span>
@@ -924,7 +924,7 @@
 <button class="chip" id="pixieedAdFreeClaim" type="button">適用</button>
 </div>
 <p class="help-text">購入後はメールで届くシリアルコードをログイン後に適用できます。シリアルコードは1回だけ使用でき、購入時と違うメールアドレスのアカウントでも利用できます。</p>
-<p class="help-text">広告を消さずに支援したい場合は <a class="chip" data-support-panel-trigger="true" data-support-preferred-product="pixiedraw_ad_free" href="#" id="supportTipLink" target="_blank" rel="noopener noreferrer" aria-label="サポーター特典を見る">応援チップ</a> も利用できます。</p>
+<p class="help-text">広告を消さずに支援したい場合は <a class="chip" data-support-panel-trigger="true" data-support-preferred-product="pixiedraw_ad_free" href="#" id="supportTipLink" target="_blank" rel="noopener noreferrer" aria-label="サポーター特典を見る">サポート</a> も利用できます。</p>
 </div>
 </div>
 <div class="multi-flow-panel" hidden id="multiFlowPanel">
@@ -933,7 +933,7 @@
 <div class="field field--compact multi-project-key-field" id="multiJoinProjectKeyField">
 <div class="multi-project-key-row">
 <button class="chip multi-project-key-copy" id="multiToggleCodeVisibility" type="button">表示</button>
-<input autocomplete="off" id="multiJoinProjectKey" inputmode="text" maxlength="280" placeholder="共有リンクまたは招待コードを貼り付け" spellcheck="false" type="password"/>
+<input autocomplete="off" autocapitalize="none" autocorrect="off" id="multiJoinProjectKey" inputmode="text" maxlength="280" placeholder="共有リンクまたは招待コードを貼り付け" spellcheck="false" type="text"/>
 <button class="chip multi-project-key-copy" id="multiApplyAccessCode" type="button">確定</button>
 <button class="chip multi-project-key-copy" id="multiCopyAccessCode" type="button">コピー</button>
 </div>
@@ -969,7 +969,7 @@
 <small id="multiFlowAccountStatus">無料枠 0/1</small>
 </div>
 <p class="help-text" id="multiFlowAccountHint">ログインすると共有プロジェクトを1件作成できます。サポーター特典（500円）で4件、共同編集最大4人まで拡張できます。</p>
-<a class="chip" href="../index.html#auth" id="multiFlowAccountLogin" rel="noopener">ログインして共有を作成</a>
+<a class="chip" href="../account/index.html" id="multiFlowAccountLogin" rel="noopener">ログインして共有を作成</a>
 </section>
 <section class="multi-support-card" id="multiSupportCard">
 <div class="multi-support-card__head">
@@ -1192,7 +1192,7 @@
 <span id="pixieedAccountLabel">アカウント</span>
 <p class="help-text" id="pixieedAccountStatus">未ログイン</p>
 <div class="field field--inline">
-<a class="chip" id="pixieedAccountLogin" href="../index.html#auth" target="_blank" rel="noopener">ログイン</a>
+<a class="chip" id="pixieedAccountLogin" href="../account/index.html" target="_blank" rel="noopener">ログイン</a>
 <button class="chip" id="pixieedAccountLogout" type="button" hidden>ログアウト</button>
 </div>
 </div>
@@ -1369,9 +1369,9 @@
 </div>
 </a>
 <a aria-hidden="true" class="tool-spotlight-card" data-support-panel-trigger="true" data-support-preferred-product="pixiedraw_ad_free" href="#" hidden="" id="toolSpotlightSupportTip" rel="noopener" role="listitem" target="_blank">
-<img alt="応援チップ" class="tool-spotlight-card__icon" src="../icon/PiXiEED.icon512.png"/>
+<img alt="サポート" class="tool-spotlight-card__icon" src="../icon/PiXiEED.icon512.png"/>
 <div class="tool-spotlight-card__content">
-<h3 class="tool-spotlight-card__title" id="toolSpotlightTipTitle">応援チップ</h3>
+<h3 class="tool-spotlight-card__title" id="toolSpotlightTipTitle">サポート</h3>
 <p class="tool-spotlight-card__description" id="toolSpotlightTipDesc">みんなの応援でPiXiEEDは成長することができます。</p>
 </div>
 </a>
@@ -1393,7 +1393,7 @@
 <p class="help-text" id="loginPromptLead">ログインすると、プロフィール共有、端末間の引き継ぎ、ログイン限定機能を利用できます。</p>
 </div>
 <footer class="modal__footer">
-<a class="button button--primary" href="../index.html#auth" id="loginPromptGoHome">ホームでログイン</a>
+<a class="button button--primary" href="../account/index.html" id="loginPromptGoHome">マイページでログイン</a>
 <button class="button button--ghost" id="closeLoginPrompt" type="button">閉じる</button>
 </footer>
 </form>
