@@ -32,7 +32,8 @@
 
   function loadAvatar() {
     try {
-      return localStorage.getItem('pixieed_avatar') || 'mao';
+      const avatar = localStorage.getItem('pixieed_avatar') || 'mao';
+      return avatar === 'pixiedraw' ? 'mao' : avatar;
     } catch (_error) {
       return 'mao';
     }
@@ -40,7 +41,7 @@
 
   function saveAvatar(value) {
     try {
-      localStorage.setItem('pixieed_avatar', value || 'mao');
+      localStorage.setItem('pixieed_avatar', value === 'pixiedraw' ? 'mao' : value || 'mao');
     } catch (_error) {}
   }
 
@@ -267,9 +268,10 @@
       }
       setStatus(`ログイン中${supabaseUser.email ? `: ${supabaseUser.email}` : ''}${nickname ? ` / ${nickname}` : ''}`);
     } else {
-      if (loginBtn) loginBtn.style.display = '';
+      const emailExpanded = authInputs?.dataset.expanded === 'true';
+      if (loginBtn) loginBtn.style.display = emailExpanded ? '' : 'none';
       if (logoutBtn) logoutBtn.style.display = 'none';
-      if (authInputs) authInputs.style.display = authInputs.dataset.expanded === 'true' ? 'grid' : 'none';
+      if (authInputs) authInputs.style.display = emailExpanded ? 'grid' : 'none';
       if (emailToggle) emailToggle.style.display = '';
       if (socialButtons) socialButtons.style.display = 'grid';
       if (emailInput) emailInput.disabled = false;
@@ -298,6 +300,12 @@
         provider,
         options: {
           redirectTo: getOAuthRedirectUrl(),
+          queryParams: provider === 'google'
+            ? {
+                access_type: 'offline',
+                prompt: 'select_account',
+              }
+            : undefined,
         },
       });
       if (error) throw error;
@@ -404,7 +412,10 @@
         const expanded = authInputs.dataset.expanded === 'true';
         authInputs.dataset.expanded = expanded ? 'false' : 'true';
         authInputs.style.display = expanded ? 'none' : 'grid';
-        emailToggle.textContent = expanded ? 'メールアドレスで続ける' : 'メール入力を閉じる';
+        emailToggle.textContent = expanded ? 'メールログインを開く' : 'メール入力を閉じる';
+        if (loginBtn) {
+          loginBtn.style.display = expanded ? 'none' : '';
+        }
         if (!expanded) {
           document.getElementById('authEmail')?.focus();
         }
@@ -483,15 +494,28 @@
     const card = panel.querySelector('.auth-card');
     const statusNode = card?.querySelector('#authStatus');
     const block = document.createElement('div');
-    block.className = 'profile-block';
+    block.className = 'profile-block profile-block--login';
     block.id = AUTH_BLOCK_ID;
     block.innerHTML = `
-      <p class="helper" style="margin:0;">共有プロジェクト用アカウント</p>
-      <p class="helper" style="margin:0;">無料アカウントで共有プロジェクトに参加できます。</p>
-      <div class="auth-social-grid" id="authSocialButtons">
-        <button class="auth-btn auth-btn--google" data-auth-provider="google" data-auth-label="Google" type="button">Googleで続ける</button>
+      <div class="auth-section-head">
+        <strong>ログイン</strong>
+        <span>Googleアカウントで同期</span>
       </div>
-      <button class="auth-btn auth-btn--email" id="authEmailToggle" type="button">メールアドレスで続ける</button>
+      <p class="auth-login-copy">Googleのアカウント選択画面へ移動します。ログインすると別端末でも同じプロフィールを使えます。</p>
+      <div class="auth-social-grid" id="authSocialButtons">
+        <button class="auth-btn auth-btn--google" data-auth-provider="google" data-auth-label="Google" type="button">
+          <span class="auth-google-icon" aria-hidden="true">
+            <svg viewBox="0 0 18 18" focusable="false">
+              <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/>
+              <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.33-1.58-5.04-3.7H.94v2.34A9 9 0 0 0 9 18z"/>
+              <path fill="#FBBC05" d="M3.96 10.72A5.4 5.4 0 0 1 3.68 9c0-.6.1-1.18.28-1.72V4.94H.94A9 9 0 0 0 0 9c0 1.45.34 2.82.94 4.06l3.02-2.34z"/>
+              <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.34l2.58-2.58C13.46.9 11.42 0 9 0A9 9 0 0 0 .94 4.94l3.02 2.34C4.67 5.16 6.66 3.58 9 3.58z"/>
+            </svg>
+          </span>
+          <span>Googleでログイン</span>
+        </button>
+      </div>
+      <button class="auth-btn auth-btn--email" id="authEmailToggle" type="button">メールログインを開く</button>
       <div id="authInputs" style="display:none; gap:8px;" data-expanded="false">
         <input class="auth-input" id="authEmail" type="email" placeholder="メールアドレス" autocomplete="email">
         <input class="auth-input" id="authPasscode" type="password" placeholder="パスコード（6〜20文字）" autocomplete="current-password">
@@ -501,11 +525,13 @@
       </div>
       <button class="auth-btn logout" id="logoutBtn" type="button" style="display:none;">ログアウト</button>
       <span class="helper" id="linkedEmail" style="display:none;"></span>
-      <p class="helper" style="margin:0;">別端末でも同じアカウントで利用できます。</p>
       <p class="helper" id="authAccountStatus" style="margin:0;"></p>
     `;
     if (card) {
-      if (statusNode) {
+      const profileBlock = statusNode?.closest('.profile-block');
+      if (profileBlock && profileBlock.parentElement === card) {
+        profileBlock.insertAdjacentElement('afterend', block);
+      } else if (statusNode) {
         statusNode.insertAdjacentElement('beforebegin', block);
       } else {
         card.appendChild(block);
