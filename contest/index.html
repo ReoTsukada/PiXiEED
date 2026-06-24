@@ -40,7 +40,7 @@
     ]
   }
   </script>
-  <link rel="icon" type="image/png" href="../character-dots/mao1.png"/>
+  <link rel="icon" type="image/png" href="../character-dots/maousama.png"/>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preconnect" href="https://kyyiuakrqomzlikfaire.supabase.co" crossorigin>
@@ -1528,7 +1528,7 @@
       <div class="header-inner">
         <button class="brand" id="openProfilePanel" type="button" style="background:none;border:0;cursor:pointer;padding:0;">
           <span class="brand-icon" id="brandAvatar">
-            <img src="../character-dots/mao1.png" alt="logo">
+            <img src="../character-dots/maousama.png" alt="avatar">
           </span>
           <div class="brand-text">
             <p class="brand-title">PiXiEED</p>
@@ -1536,7 +1536,7 @@
           </div>
         </button>
         <div class="header-actions">
-          <a class="support-tip-link" data-support-panel-trigger="true" data-support-preferred-product="pixieed_support_monthly" href="https://buy.stripe.com/28E3cw5RC4JVehAenm2VG00" target="_blank" rel="noopener noreferrer" aria-label="PiXiEED継続サポートを購入">応援チップ</a>
+          <a class="support-tip-link" data-support-panel-trigger="true" data-support-preferred-product="pixieed_support_monthly" href="https://buy.stripe.com/28E3cw5RC4JVehAenm2VG00" target="_blank" rel="noopener noreferrer" aria-label="PiXiEED継続サポートを購入">サポート</a>
         </div>
       </div>
     </header>
@@ -1999,7 +1999,7 @@
     }
 
     const AVATARS = [
-      { id:'mao', type:'img', src:'../character-dots/mao1.png' },
+      { id:'mao', type:'img', src:'../character-dots/maousama.png' },
       { id:'jerin1', type:'img', src:'../character-dots/Jerin1.png' },
       { id:'jerin2', type:'img', src:'../character-dots/Jerin2.png' },
       { id:'jerin3', type:'img', src:'../character-dots/Jerin3.png' },
@@ -2166,7 +2166,8 @@
 
     function loadAvatar(){
       try{
-        return localStorage.getItem('pixieed_avatar') || 'mao';
+        const avatar = localStorage.getItem('pixieed_avatar') || 'mao';
+        return avatar === 'pixiedraw' ? 'mao' : avatar;
       }catch(_){
         return 'mao';
       }
@@ -2174,7 +2175,7 @@
 
     function saveAvatar(id){
       try{
-        localStorage.setItem('pixieed_avatar', id);
+        localStorage.setItem('pixieed_avatar', id === 'pixiedraw' ? 'mao' : id || 'mao');
       }catch(_){}
     }
 
@@ -2816,14 +2817,14 @@
           brand.innerHTML = '';
         }else{
           brand.style = 'border:1px solid rgba(255,255,255,0.25); background:rgba(255,255,255,0.08);';
-          brand.innerHTML = `<img src="../character-dots/mao1.png" alt="logo">`;
+          brand.innerHTML = `<img src="../character-dots/maousama.png" alt="avatar">`;
         }
       }
       if(preview){
         if(found && found.type === 'img'){
           preview.innerHTML = `<img src="${found.src}" alt="avatar">`;
         }else{
-          preview.innerHTML = `<img src="../character-dots/mao1.png" alt="avatar">`;
+          preview.innerHTML = `<img src="../character-dots/maousama.png" alt="avatar">`;
         }
       }
       if(brandUser){
@@ -5257,6 +5258,7 @@
   </script>
   <script src="../scripts/pixieed-dot-stats.js"></script>
   <script src="../scripts/support-checkout-panel.js?v=2026.06.22-active-supporters"></script>
+  <script src="../scripts/shared-profile-header.js"></script>
   <script src="../scripts/shared-bottom-nav.js"></script>
   <script src="../scripts/bottom-nav-footer-ad.js"></script>
   <script src="../scripts/pixel-art-fit.js"></script>
