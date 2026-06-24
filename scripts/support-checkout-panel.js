@@ -37,7 +37,7 @@
     },
     {
       key: 'pixieed_tip_500',
-      title: 'PiXiEED応援チップ500円',
+      title: 'PiXiEEDサポート500円',
       price: '500円',
       description: '気軽にPiXiEEDを応援したい時向けのワンタイム支援です。',
       webUrl: PIXIEED_TIP_500_URL,
@@ -46,7 +46,7 @@
     },
     {
       key: 'pixieed_tip_1000',
-      title: 'PiXiEED応援チップ1000円',
+      title: 'PiXiEEDサポート1000円',
       price: '1000円',
       description: 'より大きくPiXiEEDを応援したい時向けのワンタイム支援です。',
       webUrl: PIXIEED_TIP_1000_URL,
@@ -292,7 +292,7 @@
         <div class="support-checkout-panel__header">
           <div>
             <h2 class="support-checkout-panel__title" id="supportCheckoutTitle">PiXiEEDの支援メニュー</h2>
-            <p class="support-checkout-panel__lead">継続サポートは支払い状況に合わせてサポーター特典を自動更新します。応援チップはワンタイム支援です。</p>
+            <p class="support-checkout-panel__lead">継続サポートは支払い状況に合わせてサポーター特典を自動更新します。サポートはワンタイム支援です。</p>
           </div>
           <button class="support-checkout-panel__close" type="button" aria-label="課金パネルを閉じる">×</button>
         </div>
