@@ -27,9 +27,20 @@
     :root {
       color-scheme: dark;
     }
+    * {
+      box-sizing: border-box;
+    }
+    html {
+      width: 100%;
+      max-width: 100%;
+      overflow-x: hidden;
+    }
     body {
       margin: 0;
       min-height: 100vh;
+      width: 100%;
+      max-width: 100%;
+      overflow-x: hidden;
       background: linear-gradient(180deg, #060608 0%, #0d0f1c 45%, #07080f 100%);
       color: #f7f8fd;
       font-family: "Noto Sans JP", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
@@ -53,8 +64,15 @@
       color: #c1c6f4;
       font-size: 0.95rem;
     }
+    main h1 {
+      margin: 0 0 1rem;
+      font-family: "Montserrat", "Noto Sans JP", sans-serif;
+      font-size: clamp(2rem, 5vw, 2.8rem);
+      letter-spacing: 0.08em;
+    }
     main {
-      width: min(960px, 92vw);
+      width: min(960px, calc(100% - 32px));
+      max-width: 960px;
       margin: 0 auto 4rem;
       background: rgba(13, 16, 36, 0.78);
       border: 1px solid rgba(140, 140, 255, 0.18);
@@ -68,9 +86,6 @@
       font-family: "Montserrat", "Noto Sans JP", sans-serif;
       font-size: clamp(1.4rem, 4vw, 1.8rem);
       letter-spacing: 0.05em;
-    }
-    h2:first-of-type {
-      margin-top: 0;
     }
     ul {
       margin: 0.8rem 0 0 1.2rem;
@@ -125,6 +140,10 @@
 <p>PiXiEED（代表：塚田玲音〈アルタ〉）は、以下の方針に基づき個人情報を取り扱います。</p>
 </header>
 <main>
+<section>
+<h1>プライバシーポリシー</h1>
+<p>PiXiEED（代表：塚田玲音〈アルタ〉）は、以下の方針に基づき個人情報を取り扱います。</p>
+</section>
 <section>
 <p>PiXiEED（代表：塚田玲音（アルタ）、以下「当方」）は、当方が提供するウェブサイトおよびアプリ（以下「本サービス」）における利用者の個人情報の取り扱いについて、以下の通りプライバシーポリシー（以下「本ポリシー」）を定めます。</p>
 </section>
@@ -196,6 +215,7 @@
 <footer>
 <a href="../index.html">← PiXiEED ホームへ戻る</a>
 </footer>
+  <script src="../scripts/shared-profile-header.js"></script>
   <script src="../scripts/shared-bottom-nav.js"></script>
   <script src="../scripts/pixel-art-fit.js"></script>
 </body>
