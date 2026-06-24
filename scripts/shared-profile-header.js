@@ -11,31 +11,133 @@
   };
 
   function renderSharedHeader() {
-    const header = document.querySelector('.site-header') || document.querySelector('header[aria-label="top-nav"]');
+    const header = document.querySelector('.site-header') || document.querySelector('header[aria-label="top-nav"]') || document.querySelector('body > header');
     if (!header || header.dataset.sharedHeaderReady === 'true') return;
-    const hasAuthPanel = !!document.getElementById('authPanel');
-    const brandTag = hasAuthPanel ? 'button' : 'a';
-    const brandAttrs = hasAuthPanel
-      ? 'id="openProfilePanel" type="button"'
-      : `id="openProfilePanel" href="${asset('../index.html')}"`;
+    ensureSharedHeaderStyles();
     header.dataset.sharedHeaderReady = 'true';
+    header.className = 'site-header';
     header.setAttribute('aria-label', 'top-nav');
     header.innerHTML = `
       <div class="header-inner">
-        <${brandTag} class="brand" ${brandAttrs}>
+        <a class="brand" id="openProfilePanel" href="${asset('../account/index.html')}">
           <span class="brand-icon" id="brandAvatar">
-            <img src="${asset('../icon/icon-512-4.png')}" alt="logo">
+            <img src="${asset('../character-dots/maousama.png')}" alt="avatar">
           </span>
           <div class="brand-text">
             <p class="brand-title">PiXiEED</p>
             <p class="brand-sub" id="brandUser">ユーザー</p>
           </div>
-        </${brandTag}>
+        </a>
         <div class="header-actions">
-          <a class="support-tip-link" id="supportTipLink" href="#" target="_blank" rel="noopener noreferrer" aria-label="PiXiEEDの応援チップを購入">応援チップ</a>
+          <a class="support-tip-link" id="supportTipLink" href="#" target="_blank" rel="noopener noreferrer" aria-label="PiXiEEDをサポート">サポート</a>
         </div>
       </div>
     `;
+  }
+
+  function ensureSharedHeaderStyles() {
+    if (document.getElementById('pixieed-shared-profile-header-style')) {
+      return;
+    }
+    const style = document.createElement('style');
+    style.id = 'pixieed-shared-profile-header-style';
+    style.textContent = `
+      .site-header{
+        position:sticky;
+        top:0;
+        z-index:50;
+        width:100vw;
+        margin-inline:calc(50% - 50vw);
+        box-sizing:border-box;
+        background:rgba(7, 11, 24, 0.88);
+        border-bottom:1px solid rgba(255,255,255,0.08);
+        backdrop-filter:blur(14px);
+      }
+      .site-header .header-inner{
+        width:min(1120px, calc(100% - 24px));
+        min-height:64px;
+        margin:0 auto;
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:12px;
+      }
+      .site-header .brand{
+        min-width:0;
+        display:inline-flex;
+        align-items:center;
+        gap:10px;
+        color:#f9fafb;
+        text-decoration:none;
+        border:0;
+        background:transparent;
+        padding:0;
+        cursor:pointer;
+        font:inherit;
+      }
+      .site-header .brand-icon{
+        width:40px;
+        height:40px;
+        flex:0 0 auto;
+        display:grid;
+        place-items:center;
+        overflow:hidden;
+        border-radius:12px;
+        background:rgba(255,255,255,0.08);
+        border:1px solid rgba(255,255,255,0.14);
+      }
+      .site-header .brand-icon img{
+        width:100%;
+        height:100%;
+        object-fit:contain;
+        image-rendering:pixelated;
+      }
+      .site-header .brand-text{
+        min-width:0;
+        display:grid;
+        gap:2px;
+      }
+      .site-header .brand-title{
+        margin:0;
+        color:#f9fafb;
+        font-size:16px;
+        font-weight:900;
+        line-height:1.1;
+      }
+      .site-header .brand-sub{
+        margin:0;
+        color:#cbd5e1;
+        font-size:12px;
+        line-height:1.2;
+      }
+      .site-header .header-actions{
+        margin-left:auto;
+        display:flex;
+        align-items:center;
+        gap:8px;
+      }
+      .site-header .support-tip-link{
+        min-height:38px;
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        padding:8px 14px;
+        border-radius:999px;
+        background:linear-gradient(135deg,#fbbf24,#f97316);
+        color:#1f1300;
+        font-size:13px;
+        font-weight:900;
+        line-height:1;
+        text-decoration:none;
+        box-shadow:0 10px 22px rgba(249,115,22,0.24);
+      }
+      .site-header .support-tip-link:hover,
+      .site-header .support-tip-link:focus-visible{
+        filter:brightness(1.06);
+        outline:none;
+      }
+    `;
+    document.head.appendChild(style);
   }
 
   function ensureSupportCheckoutPanelScript() {
@@ -60,8 +162,35 @@
     document.head.appendChild(script);
   }
 
+  function ensureHeaderDotTotalScript() {
+    if (window.PiXiEEDDotStats?.mountHeaderDotTotal) {
+      window.PiXiEEDDotStats.mountHeaderDotTotal();
+      return;
+    }
+    if (
+      window.__PIXIEED_DOT_STATS_SCRIPT_LOADING__
+      || document.querySelector('script[data-pixieed-dot-stats="true"]')
+      || Array.from(document.scripts).some((script) => String(script.src || '').includes('/pixieed-dot-stats.js'))
+    ) {
+      return;
+    }
+    window.__PIXIEED_DOT_STATS_SCRIPT_LOADING__ = true;
+    const script = document.createElement('script');
+    script.defer = true;
+    script.dataset.pixieedDotStats = 'true';
+    script.src = asset('./pixieed-dot-stats.js');
+    script.addEventListener('load', () => {
+      window.__PIXIEED_DOT_STATS_SCRIPT_LOADING__ = false;
+      window.PiXiEEDDotStats?.mountHeaderDotTotal?.();
+    }, { once: true });
+    script.addEventListener('error', () => {
+      window.__PIXIEED_DOT_STATS_SCRIPT_LOADING__ = false;
+    }, { once: true });
+    document.head.appendChild(script);
+  }
+
   const AVATARS = [
-    { id: 'pixiedraw', src: asset('../icon/icon-512-4.png') },
+    { id: 'mao', src: asset('../character-dots/maousama.png') },
     { id: 'jerin1', src: asset('../character-dots/Jerin1.png') },
     { id: 'jerin2', src: asset('../character-dots/Jerin2.png') },
     { id: 'jerin3', src: asset('../character-dots/Jerin3.png') },
@@ -108,15 +237,16 @@
 
   function loadAvatar() {
     try {
-      return localStorage.getItem('pixieed_avatar') || 'pixiedraw';
+      const avatar = localStorage.getItem('pixieed_avatar') || 'mao';
+      return avatar === 'pixiedraw' ? 'mao' : avatar;
     } catch (_error) {
-      return 'pixiedraw';
+      return 'mao';
     }
   }
 
   function saveAvatar(value) {
     try {
-      localStorage.setItem('pixieed_avatar', value || 'pixiedraw');
+      localStorage.setItem('pixieed_avatar', value === 'pixiedraw' ? 'mao' : value || 'mao');
     } catch (_error) {}
   }
 
@@ -158,6 +288,7 @@
     if (brandUser) {
       brandUser.textContent = loadNickname() || 'ユーザー';
     }
+    window.dispatchEvent(new CustomEvent('pixieed:profile-updated'));
   }
 
   function renderAvatarChoices() {
@@ -231,7 +362,7 @@
       }
     };
 
-    if (openBtn) openBtn.addEventListener('click', () => toggle(true));
+    if (openBtn && openBtn.tagName !== 'A') openBtn.addEventListener('click', () => toggle(true));
     if (closeBtn) closeBtn.addEventListener('click', () => toggle(false));
       panel.addEventListener('click', (event) => {
       if (event.target === panel) toggle(false);
@@ -269,6 +400,7 @@
     renderSharedHeader();
     ensureSupportCheckoutPanelScript();
     ensureSharedAuthPanelScript();
+    ensureHeaderDotTotalScript();
     setupSupportTipLink();
     applyAvatarToBrand();
     renderAvatarChoices();
