@@ -12,18 +12,31 @@
   injectStyles();
   replaceFooter();
   replaceBottomNav();
+  ensureFooterAdController();
 
   function resolveCurrentTab(pathname) {
     const path = String(pathname || '').toLowerCase();
-    if (path.includes('/contest/')) return 'contest';
-    if (path.includes('/portfolio/')) return 'portfolio';
-    if (path.includes('/talk/')) return 'talk';
+    if (path.includes('/pixiedraw/')) return 'draw';
+    if (path.includes('/contest/') || path.includes('/talk/')) return 'plaza';
+    if (path.includes('/pixiee-lens/')) return 'camera';
+    if (/(?:^|\/)account(?:\/|\/index\.html)?$/.test(path)) return 'profile';
     return 'home';
   }
 
   function relHref(targetPath) {
     const targetUrl = new URL(targetPath, rootUrl);
     return toRelativeHref(pageDirUrl, targetUrl);
+  }
+
+  function ensureFooterAdController() {
+    if (window.__PIXIEED_FOOTER_AD_CONTROLLER__ || doc.querySelector('script[data-pixieed-footer-ad-controller="true"]')) {
+      return;
+    }
+    const controller = doc.createElement('script');
+    controller.defer = true;
+    controller.dataset.pixieedFooterAdController = 'true';
+    controller.src = relHref('scripts/bottom-nav-footer-ad.js');
+    doc.body.appendChild(controller);
   }
 
   function replaceFooter() {
@@ -78,7 +91,7 @@
 
     getNavItems().forEach((entry) => {
       const item = doc.createElement(entry.disabled ? 'span' : 'a');
-      item.className = `bottom-nav__item${entry.key === currentTab ? ' is-active' : ''}`;
+      item.className = `bottom-nav__item${entry.primary ? ' bottom-nav__item--primary' : ''}${entry.key === currentTab ? ' is-active' : ''}`;
       item.dataset.tab = entry.key;
       if (entry.disabled) {
         item.setAttribute('aria-disabled', 'true');
@@ -88,10 +101,18 @@
 
       const icon = doc.createElement('span');
       icon.className = 'icon';
-      const img = doc.createElement('img');
-      img.alt = '';
-      img.src = relHref(entry.icon);
-      icon.appendChild(img);
+      if (entry.useAvatar) {
+        const img = doc.createElement('img');
+        img.alt = '';
+        img.src = getProfileNavAvatarSrc();
+        img.dataset.profileNavAvatar = 'true';
+        icon.appendChild(img);
+      } else {
+        const img = doc.createElement('img');
+        img.alt = '';
+        img.src = relHref(entry.icon);
+        icon.appendChild(img);
+      }
 
       const label = doc.createElement('span');
       label.textContent = entry.label;
@@ -101,6 +122,7 @@
     });
 
     body.appendChild(nav);
+    syncProfileNavAvatar();
   }
 
   function getFooterLinks() {
@@ -115,10 +137,26 @@
   function getNavItems() {
     return [
       { key: 'home', label: 'ホーム', path: 'index.html', icon: 'FooterIcon1.png' },
-      { key: 'contest', label: '広場', path: 'contest/index.html', icon: 'FooterIcon2.png' },
-      { key: 'talk', label: '会話', disabled: true, icon: 'pixiedraw/assets/icons/talk.png' },
-      { key: 'portfolio', label: '企業', path: 'portfolio/index.html', icon: 'FooterIcon4.png' }
+      { key: 'plaza', label: '広場', path: 'contest/index.html', icon: 'FooterIcon2.png' },
+      { key: 'draw', label: 'PiXiEEDraw', path: 'pixiedraw/index.html', icon: 'icon/icon-192-4.png', primary: true },
+      { key: 'camera', label: 'カメラ', path: 'pixiee-lens/index.html', icon: 'pixiedraw/assets/icons/pixieelensicon_frame_01.png' },
+      { key: 'profile', label: 'マイページ', path: 'account/index.html', icon: 'character-dots/maousama.png', useAvatar: true }
     ];
+  }
+
+  function getProfileNavAvatarSrc() {
+    const brandAvatar = doc.querySelector('#brandAvatar img');
+    if (brandAvatar?.getAttribute('src')) {
+      return brandAvatar.getAttribute('src');
+    }
+    return relHref('character-dots/maousama.png');
+  }
+
+  function syncProfileNavAvatar() {
+    const src = getProfileNavAvatarSrc();
+    doc.querySelectorAll('[data-profile-nav-avatar="true"]').forEach((img) => {
+      img.setAttribute('src', src);
+    });
   }
 
   function injectStyles() {
@@ -192,17 +230,25 @@
         backdrop-filter:blur(8px);
       }
       .bottom-nav__item{
+        appearance:none;
+        border:0;
+        background:transparent;
         flex:1;
+        min-width:0;
         text-align:center;
         color:#cbd5e1;
         text-decoration:none;
         font-weight:700;
+        font-family:inherit;
         display:flex;
         flex-direction:column;
         align-items:center;
+        justify-content:center;
         gap:4px;
-        font-size:12px;
-        padding:8px 0;
+        font-size:10px;
+        line-height:1.2;
+        padding:7px 2px;
+        cursor:pointer;
       }
       .bottom-nav__item .icon{
         width:22px;
@@ -220,9 +266,44 @@
       .bottom-nav__item.is-active{
         color:#f9fafb;
       }
+      .bottom-nav__item--primary{
+        color:#fff;
+        transform:translateY(-8px);
+      }
+      .bottom-nav__item--primary .icon{
+        width:46px;
+        height:46px;
+        border-radius:17px;
+        padding:8px;
+        background:linear-gradient(135deg,#2563eb,#7c3aed);
+        border:1px solid rgba(255,255,255,0.24);
+        box-shadow:0 10px 22px rgba(37,99,235,0.34), inset 0 1px 0 rgba(255,255,255,0.2);
+      }
+      .bottom-nav__item--primary .icon img{
+        width:100%;
+        height:100%;
+        object-fit:contain;
+      }
+      .bottom-nav__item:focus-visible{
+        outline:2px solid #79c0ff;
+        outline-offset:-2px;
+      }
+      .bottom-nav__item[data-tab="profile"] .icon{
+        border-radius:999px;
+        overflow:hidden;
+        background:rgba(255,255,255,0.08);
+        border:1px solid rgba(255,255,255,0.16);
+        padding:2px;
+      }
     `;
     doc.head.appendChild(style);
   }
+
+  window.addEventListener('storage', (event) => {
+    if (!event.key || !event.key.startsWith('pixieed_')) return;
+    syncProfileNavAvatar();
+  });
+  window.addEventListener('pixieed:profile-updated', syncProfileNavAvatar);
 
   function toRelativeHref(fromDirUrl, targetUrl) {
     if (fromDirUrl.origin !== targetUrl.origin) return targetUrl.href;
@@ -241,6 +322,7 @@
     const up = fromParts.map(() => '..');
     const down = targetParts;
     const relative = [...up, ...down].join('/');
-    return relative || './';
+    const path = relative || './';
+    return `${path}${targetUrl.search}${targetUrl.hash}`;
   }
 })();
