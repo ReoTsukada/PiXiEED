@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>マイページ | PiXiEED</title>
+  <meta name="description" content="PiXiEEDのマイページです。Googleログイン、プロフィール、アイコン、Xアカウントを管理できます。">
+  <link rel="canonical" href="https://pixieed.jp/account/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="PiXiEED">
+  <meta property="og:title" content="マイページ | PiXiEED">
+  <meta property="og:description" content="PiXiEEDのマイページです。Googleログイン、プロフィール、アイコン、Xアカウントを管理できます。">
+  <meta property="og:url" content="https://pixieed.jp/account/">
+  <meta property="og:image" content="https://pixieed.jp/PiXiEEDogp.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="マイページ | PiXiEED">
+  <meta name="twitter:description" content="PiXiEEDのマイページです。Googleログイン、プロフィール、アイコン、Xアカウントを管理できます。">
+  <meta name="twitter:image" content="https://pixieed.jp/PiXiEEDogp.png">
+  <link rel="icon" type="image/png" href="../character-dots/maousama.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../site/landing.css?v=2026.06.23-account">
+</head>
+<body>
+  <header class="site-header" aria-label="top-nav">
+    <div class="header-inner header-inner--app">
+      <a class="brand" id="openProfilePanel" href="./">
+        <span class="brand-icon" id="brandAvatar">
+          <img src="../character-dots/maousama.png" alt="avatar">
+        </span>
+        <div class="brand-text">
+          <p class="brand-title">PiXiEED</p>
+          <p class="brand-sub" id="brandUser">ユーザー</p>
+        </div>
+      </a>
+      <div class="header-actions">
+        <a class="support-tip-link" id="supportTipLink" href="#" target="_blank" rel="noopener noreferrer" aria-label="PiXiEEDのサポートを購入">サポート</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="page">
+    <main class="page-shell account-page">
+      <section class="account-hero" aria-labelledby="accountTitle">
+        <p class="eyebrow">my page</p>
+        <h1 class="section-title" id="accountTitle">マイページ</h1>
+        <p class="section-copy">プロフィールとログインをここで管理します。PiXiEEDrawや広場からも同じアカウントを使えます。</p>
+      </section>
+
+      <section class="auth-panel auth-panel--page is-open" id="authPanel" aria-hidden="false" aria-label="マイページ">
+        <div class="auth-card">
+          <div class="auth-card__header">
+            <div>
+              <p class="auth-card__eyebrow">Account</p>
+              <h2 class="auth-card__title">プロフィール管理</h2>
+            </div>
+          </div>
+          <div class="profile-block profile-block--profile">
+            <div class="auth-section-head">
+              <strong>プロフィール</strong>
+              <span>表示名とアイコン</span>
+            </div>
+            <div class="profile-row">
+              <button class="avatar-toggle" id="avatarToggle" type="button" aria-label="アイコンを変更" aria-expanded="false" aria-controls="avatarPanel">
+                <span class="avatar-toggle__img" id="avatarPreview"></span>
+              </button>
+              <label class="profile-name">
+                <span style="font-weight:700; color:#e5e7eb;">ニックネーム</span>
+                <input class="auth-input" id="profileNickname" type="text" placeholder="なまえ" maxlength="32">
+              </label>
+            </div>
+            <div class="avatar-panel" id="avatarPanel" hidden>
+              <div class="avatar-grid" id="avatarGrid"></div>
+            </div>
+            <label class="profile-name">
+              <span style="font-weight:700; color:#e5e7eb;">X (旧Twitter)</span>
+              <input class="auth-input" id="profileX" type="url" placeholder="https://x.com/username" maxlength="200" inputmode="url">
+            </label>
+            <button class="auth-btn" id="saveProfile" type="button">プロフィールを保存</button>
+            <p class="auth-status" id="authStatus"></p>
+          </div>
+        </div>
+      </section>
+
+      <section class="home-panel account-note">
+        <div class="home-panel__header">
+          <h2 class="home-panel__title">PiXiEEDrawとの関係</h2>
+        </div>
+        <p class="card-copy">共有プロジェクト作成、サポーター特典、プロフィール同期はこのマイページのログイン状態を使います。</p>
+        <a class="button" href="../pixiedraw/">PiXiEEDrawへ戻る</a>
+      </section>
+    </main>
+  </div>
+
+  <script src="../scripts/shared-profile-header.js"></script>
+  <script src="../scripts/shared-bottom-nav.js"></script>
+  <script src="../scripts/pixel-art-fit.js"></script>
+</body>
+</html>
