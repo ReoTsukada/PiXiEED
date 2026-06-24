@@ -46,6 +46,13 @@
         const item = document.createElement('article');
         item.className = 'home-update-item';
 
+        const meta = document.createElement('div');
+        meta.className = 'home-update-meta';
+
+        const type = document.createElement('span');
+        type.className = 'home-update-type';
+        type.textContent = formatType(entry?.id || '');
+
         const link = document.createElement('a');
         link.className = 'home-update-link';
         link.href = normalizeUrl(entry?.url || '/');
@@ -55,7 +62,8 @@
         copy.className = 'home-update-copy';
         copy.textContent = formatSummary(entry?.summary || '', entry?.name || '', group?.date || '');
 
-        item.append(link, copy);
+        meta.appendChild(type);
+        item.append(meta, link, copy);
         list.appendChild(item);
       });
 
@@ -70,6 +78,14 @@
     const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if (!match) return value || '';
     return `${match[1]}/${match[2]}/${match[3]}`;
+  }
+
+  function formatType(value) {
+    const key = String(value || '').toLowerCase();
+    if (key === 'site') return 'Home';
+    if (key === 'maoitu') return 'Game';
+    if (key.includes('lens') || key.includes('draw') || key.includes('qr')) return 'Tool';
+    return 'Update';
   }
 
   function normalizeUrl(value) {
