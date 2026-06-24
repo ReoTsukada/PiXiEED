@@ -1623,7 +1623,7 @@ body.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock:not(
   display: flex;
   min-width: 0;
   height: var(--bottom-rail-height);
-  min-height: 96px;
+  min-height: 128px;
   border-top: 1px solid var(--workbench-line);
   border-right: 0;
   border-left: 0;
@@ -1700,12 +1700,12 @@ body:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .timeline-card {
   height: 100%;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(184px, 24%);
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-columns: max-content minmax(0, 1fr) max-content minmax(184px, 24%);
+  grid-template-rows: auto minmax(0, 1fr);
   grid-template-areas:
-    "toolbar settings"
-    "matrix settings"
-    "footer settings";
+    ". frame playback settings"
+    "layer matrix matrix settings";
+  align-items: stretch;
   gap: 4px 6px;
   padding: 4px;
   border: 0;
@@ -1713,13 +1713,7 @@ body:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .timeline-card {
 }
 
 body:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .timeline-toolbar {
-  grid-area: toolbar;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 4px;
-  min-width: 0;
+  display: contents;
 }
 
 body:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .timeline-toolbar__group {
@@ -1730,30 +1724,37 @@ body:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .timeline-toolbar
 }
 
 body:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .timeline-toolbar__group--layer {
-  grid-area: auto;
-  display: inline-flex;
-  align-items: center;
+  grid-area: layer;
+  display: grid;
+  grid-auto-flow: row;
+  align-content: start;
   justify-items: stretch;
-  gap: 3px;
+  gap: 1px;
+  align-self: start;
   margin-top: 0;
-  padding-right: 4px;
+  padding-right: 6px;
   border-right: 1px solid var(--workbench-line-soft);
 }
 
 body:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .timeline-toolbar__group--frame {
-  grid-area: auto;
+  grid-area: frame;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-self: start;
+  justify-self: start;
+  min-width: 0;
 }
 
 body:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .timeline-toolbar__group--layer .timeline-toolbar__label {
-  writing-mode: horizontal-tb;
-  text-orientation: initial;
-  margin-top: 0;
+  display: none;
 }
 
 body:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .timeline-matrix-wrapper {
   grid-area: matrix;
+  align-self: stretch;
+  height: 100%;
   min-height: 0;
-  max-height: none;
+  max-height: 100%;
   overflow: auto;
   border-color: var(--workbench-line-soft);
   background: rgba(4, 8, 13, 0.64);
@@ -1761,17 +1762,18 @@ body:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .timeline-matrix-
 
 body:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .timeline-footer {
   grid-area: footer;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px;
-  min-width: 0;
+  display: contents;
 }
 
 body:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .timeline-playback {
+  grid-area: playback;
   width: auto;
+  justify-self: end;
   margin: 0;
+}
+
+body:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .timeline-fps {
+  display: none;
 }
 
 body:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .timeline-layer-settings {
@@ -1957,7 +1959,10 @@ body.is-startup-active .bottom-timeline-dock {
   }
 
   body:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .timeline-card {
-    grid-template-columns: minmax(0, 1fr) minmax(164px, 22%);
+    grid-template-columns: max-content minmax(0, 1fr) max-content minmax(164px, 22%);
+    grid-template-areas:
+      ". frame playback settings"
+      "layer matrix matrix settings";
     gap: 5px 6px;
     padding: 6px;
   }
@@ -1969,12 +1974,11 @@ body.is-startup-active .bottom-timeline-dock {
 
 @media (max-width: 900px) {
   body:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .timeline-card {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-columns: max-content minmax(0, 1fr) max-content;
+    grid-template-rows: auto minmax(0, 1fr);
     grid-template-areas:
-      "toolbar"
-      "matrix"
-      "footer";
+      ". frame playback"
+      "layer matrix matrix";
   }
 
   body:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .timeline-layer-settings {
@@ -6925,13 +6929,14 @@ body.is-mobile-layout .mobile-draw-help {
 
 .timeline-card {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
   grid-template-areas:
-    "layer frame"
-    "layer matrix"
-    "footer footer"
-    "settings settings";
-  gap: 12px 14px;
+    ". frame playback"
+    "layer matrix matrix"
+    "settings settings settings"
+    "footer footer footer";
+  align-items: start;
+  gap: 10px 12px;
   padding: 12px;
   border-radius: 0;
   background: rgba(7, 12, 18, 0.94);
@@ -6957,9 +6962,13 @@ body.is-mobile-layout .mobile-draw-help {
   gap: 6px;
   align-content: start;
   justify-items: center;
+  align-self: start;
+  position: relative;
+  z-index: 2;
   margin-top: 0;
   padding-right: 10px;
   border-right: 1px solid var(--border);
+  background: rgba(7, 12, 18, 0.94);
 }
 
 .timeline-toolbar__group--layer .timeline-toolbar__label {
@@ -6971,10 +6980,16 @@ body.is-mobile-layout .mobile-draw-help {
 
 .timeline-toolbar__group--frame {
   grid-area: frame;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-self: start;
+  align-items: center;
   justify-self: start;
+  min-width: 0;
 }
 
 .timeline-toolbar__label {
+  display: none;
   font-size: 0.72rem;
   color: var(--fg-muted);
   letter-spacing: 0.08em;
@@ -6984,6 +6999,8 @@ body.is-mobile-layout .mobile-draw-help {
   grid-area: matrix;
   --timeline-cell-size: 32px;
   overflow: auto;
+  overscroll-behavior: contain;
+  touch-action: none;
   border-radius: 0;
   border: 1px solid var(--border);
   background: rgba(4, 8, 13, 0.96);
@@ -7477,43 +7494,68 @@ body.is-mobile-layout .mobile-draw-help {
 
 .timeline-footer {
   grid-area: footer;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  display: contents;
 }
 
 #panelFrames.is-compact-flyout .timeline-card,
 .rail--right #panelFrames .timeline-card {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  grid-template-areas:
+    ". frame"
+    "layer matrix"
+    "playback playback"
+    "footer footer"
+    "settings settings";
+  align-items: start;
+  gap: 8px 10px;
 }
 
 #panelFrames.is-compact-flyout .timeline-toolbar,
 .rail--right #panelFrames .timeline-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  display: contents;
 }
 
 #panelFrames.is-compact-flyout .timeline-toolbar__group--layer,
 .rail--right #panelFrames .timeline-toolbar__group--layer {
-  display: inline-flex;
-  align-items: center;
+  grid-area: layer;
+  display: grid;
+  grid-auto-flow: row;
+  align-content: start;
+  justify-items: center;
   gap: 4px;
+  align-self: start;
   margin-top: 0;
-  padding-right: 0;
-  border-right: 0;
+  padding-right: 6px;
+  border-right: 1px solid var(--border);
 }
 
 #panelFrames.is-compact-flyout .timeline-toolbar__group--layer .timeline-toolbar__label,
 .rail--right #panelFrames .timeline-toolbar__group--layer .timeline-toolbar__label {
-  writing-mode: horizontal-tb;
-  text-orientation: initial;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
   margin-top: 0;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
+}
+
+#panelFrames.is-compact-flyout .timeline-toolbar__group--frame,
+.rail--right #panelFrames .timeline-toolbar__group--frame {
+  grid-area: frame;
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-self: start;
+  min-width: 0;
+}
+
+#panelFrames.is-compact-flyout .timeline-playback,
+.rail--right #panelFrames .timeline-playback {
+  grid-area: playback;
+  justify-self: start;
+}
+
+body.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data-compact="true"] #panelFrames #moveLayerUp,
+body.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data-compact="true"] #panelFrames #moveLayerDown {
+  display: none;
 }
 
 #panelFrames.is-compact-flyout .timeline-matrix-wrapper,
@@ -7556,30 +7598,43 @@ body.is-mobile-layout .mobile-draw-help {
 
 @media (max-width: 980px) {
   .timeline-card {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    grid-template-areas:
+      ". frame"
+      "layer matrix"
+      "playback playback"
+      "settings settings"
+      "footer footer";
+    align-items: start;
+    gap: 8px 10px;
   }
   .timeline-toolbar {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
+    display: contents;
   }
   .timeline-toolbar__group--layer {
-    display: inline-flex;
-    align-items: center;
+    display: grid;
+    grid-auto-flow: row;
+    align-content: start;
+    justify-items: center;
     gap: 4px;
     margin-top: 0;
-    padding-right: 0;
-    border-right: 0;
+    padding-right: 6px;
+    border-right: 1px solid var(--border);
   }
   .timeline-toolbar__group--layer .timeline-toolbar__label {
-    writing-mode: horizontal-tb;
-    text-orientation: initial;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
     margin-top: 0;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.04em;
+  }
+  .timeline-toolbar__group--frame {
+    display: inline-flex;
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+  .timeline-playback {
+    justify-self: start;
   }
   .timeline-layer-settings {
     width: 100%;
@@ -7597,15 +7652,18 @@ body.is-mobile-layout .mobile-draw-help {
 }
 
 .timeline-playback {
+  grid-area: playback;
   display: grid;
   grid-template-columns: repeat(5, 36px);
   grid-auto-rows: 36px;
   align-items: center;
-  justify-content: center;
+  justify-content: end;
+  justify-self: end;
+  align-self: start;
   gap: 2px;
   width: 100%;
   max-width: 188px;
-  margin: 0 auto;
+  margin: 0;
 }
 
 .timeline-playback .pixel-button {
@@ -7640,10 +7698,13 @@ body.is-mobile-layout .mobile-draw-help {
 }
 
 .timeline-fps {
+  grid-area: footer;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-start;
   gap: 8px 12px;
+  min-width: 0;
 }
 
 .timeline-fps-control {
@@ -11490,6 +11551,11 @@ body.is-mobile-layout .panel-ad-mount[hidden] {
   }
   .mobile-panel.is-active #panelFrames .timeline-card {
     padding: 0 4px 6px;
+  }
+
+  body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFrames #moveLayerUp,
+  body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFrames #moveLayerDown {
+    display: none;
   }
 
   .mobile-panel.is-active > .panel-section .panel-section__body::-webkit-scrollbar {
