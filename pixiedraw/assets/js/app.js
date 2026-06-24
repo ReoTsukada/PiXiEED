@@ -51367,7 +51367,7 @@
         const top = storedPosition.top ?? defaultPosition.top;
         entry.panel.style.left = `${left}px`;
         entry.panel.style.top = `${top}px`;
-        if (shouldReset && (storedPosition.left !== left || storedPosition.top !== top)) {
+        if (shouldReset || storedPosition.left === null || storedPosition.top === null) {
           setLocalViewportCanvasPosition(index, left, top);
         }
       });
@@ -54176,6 +54176,17 @@
     applyViewportTransform();
   }
 
+  function handleLocalViewportCanvasVisualViewportChange() {
+    if (!isMultiCanvasWorldLayoutActive()) {
+      handleLocalViewportCanvasViewportChange();
+      return;
+    }
+    syncAllProjectCanvasSurfaceDimensions();
+    renderLocalViewportCanvasOverlays();
+    syncMultiCanvasSelectionUi();
+    applyViewportTransform();
+  }
+
   function reconcileProjectCanvasesFromLocalViewportState() {
     const desiredCount = getLocalViewportCanvasCount();
     const currentCanvases = getProjectCanvasDocuments();
@@ -54235,8 +54246,8 @@
     window.addEventListener('resize', handleLocalViewportCanvasViewportChange);
     window.addEventListener('orientationchange', handleLocalViewportCanvasViewportChange);
     if (window.visualViewport && typeof window.visualViewport.addEventListener === 'function') {
-      window.visualViewport.addEventListener('resize', handleLocalViewportCanvasViewportChange);
-      window.visualViewport.addEventListener('scroll', handleLocalViewportCanvasViewportChange);
+      window.visualViewport.addEventListener('resize', handleLocalViewportCanvasVisualViewportChange);
+      window.visualViewport.addEventListener('scroll', handleLocalViewportCanvasVisualViewportChange);
     }
     syncLocalViewportCanvasDockVisibility({ persist: false, render: true });
   }
@@ -55229,6 +55240,14 @@
     showViewportIndicator(formatZoomLabel(scale), { autoHideMs: ZOOM_INDICATOR_TIMEOUT });
   }
 
+  function syncZoomFollowerUi() {
+    clearCanvasScreenMetricsCache();
+    updateMirrorGuideHandles();
+    updateCanvasResizeHandlePosition();
+    syncCanvasResizeHandleVisibility();
+    requestOverlayRender();
+  }
+
   function scheduleZoomSettledViewportRefresh() {
     if (zoomSettledViewportRefreshHandle !== null) {
       window.clearTimeout(zoomSettledViewportRefreshHandle);
@@ -55502,6 +55521,7 @@
         });
       }
     }
+    syncZoomFollowerUi();
     syncZoomControls(targetScale);
     showZoomIndicator(targetScale);
     scheduleZoomSettledViewportRefresh();
