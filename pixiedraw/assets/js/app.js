@@ -674,7 +674,7 @@
     eyedropper: { label: 'スポイト', tools: ['eyedropper'] },
     eraser: { label: '消しゴム', tools: ['eraser'] },
     shape: { label: '図形', tools: ['line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill'] },
-    fill: { label: '塗りつぶし', tools: ['fill'] },
+    fill: { label: '塗りつぶし', tools: ['fill', 'fillDither', 'fillGradient'] },
   };
   const DEFAULT_GROUP_TOOL = {
     selection: 'selectRect',
@@ -693,6 +693,8 @@
   const LEGACY_TOOL_ALIASES = Object.freeze({
     virtualCursorCenter: TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE,
     pan: 'move',
+    fillRgbGradient: 'fillGradient',
+    fillDitherGradient: 'fillDither',
   });
   const TOOL_SHORTCUT_SHAPE_GROUP = '__shapeGroup__';
   const TOOL_SHORTCUT_CREATE_CUSTOM_BRUSH = '__createCustomBrush__';
@@ -786,12 +788,12 @@
       points: {
         ja: [
           '図形ツールはプレビュー表示後、確定で描画されます。',
-          '塗りつぶしは「連結のみ / 全体」の同色モードを切り替えて実行できます。',
+          '塗りつぶしグループから単色塗り/ディザ塗り/グラデーション塗りを選べます。',
           '広範囲操作時はプレビュー最適化が入り、描画負荷を抑えます。',
         ],
         en: [
           'Shape tools render after preview and commit.',
-          'Fill supports Same Color modes: Connected / Global.',
+          'The Fill group provides Solid, Dither, and Gradient fill tools.',
           'Large areas use preview optimization to reduce load.',
         ],
       },
@@ -3760,7 +3762,11 @@
   const CANVAS_RESIZE_HANDLE_SIZE = 18;
   const MULTI_CANVAS_SURFACE_GAP = 48;
   const MIRROR_HANDLE_DRAG_THRESHOLD = 4;
-  const MIRROR_DRAW_TOOLS = new Set(['pen', 'eraser', 'line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill', 'fill']);
+  const FILL_TOOL_SOLID = 'fill';
+  const FILL_TOOL_DITHER = 'fillDither';
+  const FILL_TOOL_GRADIENT = 'fillGradient';
+  const FILL_TOOL_SET = new Set([FILL_TOOL_SOLID, FILL_TOOL_DITHER, FILL_TOOL_GRADIENT]);
+  const MIRROR_DRAW_TOOLS = new Set(['pen', 'eraser', 'line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill', ...FILL_TOOL_SET]);
   const MIRROR_TOOL_SECTION_SPLIT_THRESHOLD = 8;
   const MIRROR_TOOL_ITEMS = Object.freeze([
     Object.freeze({
@@ -3805,6 +3811,10 @@
   const SELECT_SAME_MODE_CONNECTED = 'connected';
   const SELECT_SAME_MODE_GLOBAL = 'global';
   const SELECT_SAME_MODE_SET = new Set([SELECT_SAME_MODE_CONNECTED, SELECT_SAME_MODE_GLOBAL]);
+  const FILL_STYLE_SOLID = 'solid';
+  const FILL_STYLE_RGB_GRADIENT = 'rgb-gradient';
+  const FILL_STYLE_DITHER_GRADIENT = 'dither-gradient';
+  const FILL_STYLE_SET = new Set([FILL_STYLE_SOLID, FILL_STYLE_RGB_GRADIENT, FILL_STYLE_DITHER_GRADIENT]);
   const SELECTION_SHAPE_MODE_CONTENT = 'content';
   const SELECTION_SHAPE_MODE_SHAPE = 'shape';
   const SELECTION_SHAPE_MODE_SET = new Set([SELECTION_SHAPE_MODE_CONTENT, SELECTION_SHAPE_MODE_SHAPE]);
@@ -3825,7 +3835,7 @@
   const VIRTUAL_CURSOR_SHAPE_TOOLS = new Set(['line', 'rect', 'rectFill', 'ellipse', 'ellipseFill']);
   const VIRTUAL_CURSOR_SELECTION_TOOLS = new Set(['selectRect', 'selectLasso']);
   const VIRTUAL_CURSOR_MOVE_TOOLS = new Set(['move']);
-  const FILL_TOOLS = new Set(['fill']);
+  const FILL_TOOLS = FILL_TOOL_SET;
   const SHAPE_TOOLS = new Set(['line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill']);
   const BRUSH_SIZE_TOOLS = new Set([...BRUSH_TOOLS, ...SHAPE_TOOLS]);
   const SELECT_RECT_GRID_CELL_SIZE = 16;
@@ -3842,6 +3852,9 @@
     rectFill: '▣',
     ellipse: '◯',
     ellipseFill: '⬤',
+    fill: '▣',
+    fillDither: '░',
+    fillGradient: '▥',
   };
   const FLOATING_DRAW_BUTTON_SCALE_MIN = 1;
   const FLOATING_DRAW_BUTTON_SCALE_MAX = 2;
@@ -4328,7 +4341,7 @@
   let onionSkinCacheRevision = 0;
   const selectionMaskCacheIds = new WeakMap();
   let selectionMaskCacheIdCounter = 1;
-  const HISTORY_DRAW_TOOLS = new Set(['pen', 'eraser', 'line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill', 'fill']);
+  const HISTORY_DRAW_TOOLS = new Set(['pen', 'eraser', 'line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill', ...FILL_TOOL_SET]);
   const MULTI_SCOPED_HISTORY_LABELS = new Set([
     ...HISTORY_DRAW_TOOLS,
     'selectionCut',
@@ -5007,6 +5020,55 @@
     return SELECT_SAME_MODE_CONNECTED;
   }
 
+  function normalizeFillStyle(value, fallback = FILL_STYLE_SOLID) {
+    const normalizedValue = typeof value === 'string' ? value.trim().toLowerCase() : '';
+    if (FILL_STYLE_SET.has(normalizedValue)) {
+      return normalizedValue;
+    }
+    const normalizedFallback = typeof fallback === 'string' ? fallback.trim().toLowerCase() : '';
+    if (FILL_STYLE_SET.has(normalizedFallback)) {
+      return normalizedFallback;
+    }
+    return FILL_STYLE_SOLID;
+  }
+
+  function isGradientFillStyle(value = state.fillStyle) {
+    const normalized = normalizeFillStyle(value, FILL_STYLE_SOLID);
+    return normalized === FILL_STYLE_RGB_GRADIENT || normalized === FILL_STYLE_DITHER_GRADIENT;
+  }
+
+  function getFillStyleForTool(tool = state.tool) {
+    if (tool === FILL_TOOL_DITHER) {
+      return FILL_STYLE_DITHER_GRADIENT;
+    }
+    if (tool === FILL_TOOL_GRADIENT) {
+      return FILL_STYLE_RGB_GRADIENT;
+    }
+    return FILL_STYLE_SOLID;
+  }
+
+  function hasFillDrag(start, end) {
+    if (!start || !end) {
+      return false;
+    }
+    return Math.round(Number(start.x) || 0) !== Math.round(Number(end.x) || 0)
+      || Math.round(Number(start.y) || 0) !== Math.round(Number(end.y) || 0);
+  }
+
+  function getFillStyleForInteraction(tool = state.tool, start = null, end = null) {
+    const baseStyle = getFillStyleForTool(tool);
+    if (tool === FILL_TOOL_SOLID && hasFillDrag(start, end)) {
+      return FILL_STYLE_RGB_GRADIENT;
+    }
+    return baseStyle;
+  }
+
+  function getActiveFillStyle(tool = state.tool) {
+    return FILL_TOOLS.has(tool)
+      ? getFillStyleForTool(tool)
+      : normalizeFillStyle(state.fillStyle, FILL_STYLE_SOLID);
+  }
+
   function normalizeSelectionShapeMode(value, fallback = SELECTION_SHAPE_MODE_CONTENT) {
     const normalizedValue = typeof value === 'string' ? value.trim().toLowerCase() : '';
     if (SELECTION_SHAPE_MODE_SET.has(normalizedValue)) {
@@ -5139,6 +5201,7 @@
       onionSkin: requestedOnionSkin = DEFAULT_ONION_SKIN,
       uiTheme: requestedUiTheme = DEFAULT_UI_THEME,
       selectSameMode: requestedSelectSameMode = SELECT_SAME_MODE_CONNECTED,
+      fillStyle: requestedFillStyle = FILL_STYLE_SOLID,
       selectionShapeMode: requestedSelectionShapeMode = SELECTION_SHAPE_MODE_CONTENT,
       brushShape: requestedBrushShape = BRUSH_SHAPE_SQUARE,
       customBrush: requestedCustomBrush = null,
@@ -5188,6 +5251,7 @@
       outlineSize: 1,
       brushShape,
       selectSameMode: normalizeSelectSameMode(requestedSelectSameMode, SELECT_SAME_MODE_CONNECTED),
+      fillStyle: normalizeFillStyle(requestedFillStyle, FILL_STYLE_SOLID),
       selectionShapeMode: normalizeSelectionShapeMode(requestedSelectionShapeMode, SELECTION_SHAPE_MODE_CONTENT),
       customBrush,
       showGrid: true,
@@ -6729,6 +6793,7 @@
       snapshot.brushSize = state.brushSize;
       snapshot.outlineSize = state.outlineSize;
       snapshot.selectSameMode = normalizeSelectSameMode(state.selectSameMode, SELECT_SAME_MODE_CONNECTED);
+      snapshot.fillStyle = normalizeFillStyle(state.fillStyle, FILL_STYLE_SOLID);
       snapshot.selectionShapeMode = normalizeSelectionShapeMode(state.selectionShapeMode, SELECTION_SHAPE_MODE_CONTENT);
       snapshot.activeToolGroup = state.activeToolGroup;
       snapshot.lastGroupTool = { ...(state.lastGroupTool || DEFAULT_GROUP_TOOL) };
@@ -6973,6 +7038,7 @@
       outlineSize: clamp(Math.round(Number(source?.outlineSize) || state.outlineSize || 1), 1, 64),
       brushShape: normalizeBrushShape(source?.brushShape, state.brushShape || BRUSH_SHAPE_SQUARE),
       selectSameMode: normalizeSelectSameMode(source?.selectSameMode, state.selectSameMode || SELECT_SAME_MODE_CONNECTED),
+      fillStyle: normalizeFillStyle(source?.fillStyle, state.fillStyle || FILL_STYLE_SOLID),
       selectionShapeMode: normalizeSelectionShapeMode(source?.selectionShapeMode, state.selectionShapeMode || SELECTION_SHAPE_MODE_CONTENT),
       customBrush: normalizeCustomBrushData(source?.customBrush),
       activeToolGroup: TOOL_GROUPS[source?.activeToolGroup]
@@ -7037,6 +7103,7 @@
     state.brushSize = clamp(Math.round(Number(preferences.brushSize) || state.brushSize || 1), 1, 64);
     state.outlineSize = clamp(Math.round(Number(preferences.outlineSize) || state.outlineSize || 1), 1, 64);
     state.selectSameMode = normalizeSelectSameMode(preferences.selectSameMode, state.selectSameMode);
+    state.fillStyle = normalizeFillStyle(preferences.fillStyle, state.fillStyle);
     state.selectionShapeMode = normalizeSelectionShapeMode(preferences.selectionShapeMode, state.selectionShapeMode);
     state.customBrush = normalizeCustomBrushData(preferences.customBrush);
     state.brushShape = normalizeBrushShape(preferences.brushShape, state.brushShape);
@@ -7622,6 +7689,9 @@
     if (Object.prototype.hasOwnProperty.call(snapshot, 'outlineSize')) {
       compressed.outlineSize = snapshot.outlineSize;
     }
+    if (Object.prototype.hasOwnProperty.call(snapshot, 'fillStyle')) {
+      compressed.fillStyle = normalizeFillStyle(snapshot.fillStyle, FILL_STYLE_SOLID);
+    }
     if (Object.prototype.hasOwnProperty.call(snapshot, 'colorMode')) {
       compressed.colorMode = snapshot.colorMode;
     }
@@ -7797,6 +7867,9 @@
     }
     if (Object.prototype.hasOwnProperty.call(snapshot, 'outlineSize')) {
       decompressed.outlineSize = snapshot.outlineSize;
+    }
+    if (Object.prototype.hasOwnProperty.call(snapshot, 'fillStyle')) {
+      decompressed.fillStyle = normalizeFillStyle(snapshot.fillStyle, FILL_STYLE_SOLID);
     }
     if (Object.prototype.hasOwnProperty.call(snapshot, 'colorMode')) {
       decompressed.colorMode = snapshot.colorMode;
@@ -8204,6 +8277,9 @@
     }
     if (Object.prototype.hasOwnProperty.call(snapshot, 'selectSameMode')) {
       state.selectSameMode = normalizeSelectSameMode(snapshot.selectSameMode, state.selectSameMode);
+    }
+    if (Object.prototype.hasOwnProperty.call(snapshot, 'fillStyle')) {
+      state.fillStyle = normalizeFillStyle(snapshot.fillStyle, state.fillStyle);
     }
     if (Object.prototype.hasOwnProperty.call(snapshot, 'selectionShapeMode')) {
       state.selectionShapeMode = normalizeSelectionShapeMode(snapshot.selectionShapeMode, state.selectionShapeMode);
@@ -17607,7 +17683,7 @@
     if (state.selectSameMode !== activeMode) {
       state.selectSameMode = activeMode;
     }
-    const shouldShow = state.tool === 'selectSame' || state.tool === 'fill';
+    const shouldShow = state.tool === 'selectSame' || FILL_TOOLS.has(state.tool);
     if (dom.controls.selectSameModeField instanceof HTMLElement) {
       dom.controls.selectSameModeField.hidden = !shouldShow;
       dom.controls.selectSameModeField.setAttribute('aria-hidden', String(!shouldShow));
@@ -17624,6 +17700,13 @@
       button.classList.toggle('is-active', pressed);
       button.setAttribute('aria-pressed', String(pressed));
     });
+  }
+
+  function syncFillStyleControls() {
+    const activeStyle = getActiveFillStyle(state.tool);
+    if (state.fillStyle !== activeStyle) {
+      state.fillStyle = activeStyle;
+    }
   }
 
   function syncSelectionShapeModeControls() {
@@ -17683,6 +17766,7 @@
     syncBrushControls();
     syncBrushSizeFieldVisibility();
     syncSelectSameModeControls();
+    syncFillStyleControls();
     syncSelectionShapeModeControls();
     if (dom.controls.canvasWidth instanceof HTMLInputElement) {
       if (document.activeElement !== dom.controls.canvasWidth) {
@@ -18186,7 +18270,9 @@
       rectFill: { ja: '塗り四角', en: 'Filled Rect' },
       ellipse: { ja: '丸', en: 'Ellipse' },
       ellipseFill: { ja: '塗り丸', en: 'Filled Ellipse' },
-      fill: { ja: '塗りつぶし', en: 'Fill' },
+      fill: { ja: '単色塗り', en: 'Solid Fill' },
+      fillDither: { ja: 'ディザ塗り', en: 'Dither Fill' },
+      fillGradient: { ja: 'グラデーション塗り', en: 'Gradient Fill' },
       move: { ja: '移動', en: 'Move' },
       selectRect: { ja: '矩形選択', en: 'Rect Select' },
       selectLasso: { ja: '投げ縄', en: 'Lasso' },
@@ -30982,6 +31068,7 @@
     const selectionBounds = validateBoundsObject(payload.selectionBounds);
     const activeTool = normalizeToolId(payload.tool, state.tool);
     const selectSameMode = normalizeSelectSameMode(payload.selectSameMode, state.selectSameMode);
+    const fillStyle = normalizeFillStyle(payload.fillStyle, state.fillStyle);
     const selectionShapeMode = normalizeSelectionShapeMode(payload.selectionShapeMode, state.selectionShapeMode);
     const customBrush = deserializeCustomBrushPayload(payload.customBrush);
     const requestedBrushShape = normalizeBrushShape(payload.brushShape, BRUSH_SHAPE_SQUARE);
@@ -31036,6 +31123,7 @@
       brushSize: clamp(Math.round(Number(payload.brushSize) || state.brushSize || 1), 1, 64),
       brushShape,
       selectSameMode,
+      fillStyle,
       selectionShapeMode,
       customBrush,
       colorMode,
@@ -41883,6 +41971,9 @@
       return;
     }
     state.tool = tool;
+    if (FILL_TOOLS.has(tool)) {
+      state.fillStyle = getFillStyleForTool(tool);
+    }
     buttons.forEach(btn => {
       const isActive = btn.dataset.tool === tool;
       btn.classList.toggle('is-active', isActive);
@@ -41927,6 +42018,7 @@
     }
     syncBrushSizeFieldVisibility();
     syncSelectSameModeControls();
+    syncFillStyleControls();
     syncSelectionShapeModeControls();
     updateCanvasControlButtons();
     updateToolTabIcon();
@@ -57484,31 +57576,10 @@
       return;
     }
 
-    if (activeTool === 'fill') {
-      if (isTouch) {
-        // Touch fill commits on release; keep showing preview while holding.
-        requestOverlayRender();
-        window.addEventListener('pointermove', handlePointerMove);
-        window.addEventListener('pointerup', handlePointerUp);
-        return;
-      }
-      captureSharedProjectFillCommand(position, interactionSurface);
-      floodFill(position.x, position.y, pointerState.drawPaletteIndex);
-      commitHistory();
-      clearSharedProjectInFlightStroke();
+    if (FILL_TOOLS.has(activeTool)) {
       requestOverlayRender();
-      pointerState.active = false;
-      pointerState.tool = state.tool;
-      pointerState.pointerId = null;
-      pointerState.drawPaletteIndex = null;
-      if (interactionSurface?.drawing instanceof HTMLCanvasElement) {
-        try {
-          interactionSurface.drawing.releasePointerCapture(event.pointerId);
-        } catch (error) {
-          // Ignore capture release issues.
-        }
-      }
-      flushActiveProjectCanvasUiSync();
+      window.addEventListener('pointermove', handlePointerMove);
+      window.addEventListener('pointerup', handlePointerUp);
       return;
     }
 
@@ -57696,7 +57767,7 @@
       appendSharedProjectStrokePoint(position);
       applyBrushStroke(pointerState.last.x, pointerState.last.y, position.x, position.y);
       pointerState.last = position;
-    } else if (pointerState.tool === 'fill') {
+    } else if (FILL_TOOLS.has(pointerState.tool)) {
       const last = pointerState.last;
       if (!last || last.x !== position.x || last.y !== position.y) {
         pointerState.last = position;
@@ -57855,11 +57926,26 @@
     } else if (tool === 'ellipseFill') {
       captureSharedProjectShapeCommand(tool, pointerState.start, pointerState.current, pointerState.surface);
       drawEllipse(pointerState.start, pointerState.current, true);
-    } else if (tool === 'fill') {
-      const fillTarget = pointerState.current || pointerState.start;
+    } else if (FILL_TOOLS.has(tool)) {
+      const fillStyle = normalizeFillStyle(
+        getFillStyleForInteraction(tool, pointerState.start, pointerState.current),
+        FILL_STYLE_SOLID
+      );
+      const gradientFill = isGradientFillStyle(fillStyle);
+      const fillTarget = gradientFill
+        ? pointerState.start
+        : (pointerState.current || pointerState.start);
+      const fillEnd = pointerState.current || pointerState.start || fillTarget;
       if (fillTarget) {
-        captureSharedProjectFillCommand(fillTarget, pointerState.surface);
-        floodFill(fillTarget.x, fillTarget.y, pointerState.drawPaletteIndex);
+        captureSharedProjectFillCommand(fillTarget, pointerState.surface, {
+          end: fillEnd,
+          fillStyle,
+        });
+        floodFill(fillTarget.x, fillTarget.y, pointerState.drawPaletteIndex, {
+          start: fillTarget,
+          end: fillEnd,
+          fillStyle,
+        });
       }
     } else if (tool === 'selectionMove' || tool === 'layerMove') {
       finalizeSelectionMove();
@@ -57974,7 +58060,7 @@
         completeSelectionTransformInteraction(event, { cancel: true });
         return;
       }
-      if (pointerState.tool === 'fill') {
+      if (FILL_TOOLS.has(pointerState.tool)) {
         abortActivePointerInteraction({ commitHistory: false });
         rollbackPendingHistory({ reRender: false });
         clearSharedProjectInFlightStroke();
@@ -62495,6 +62581,89 @@
     markDirtyPixel(x, y);
   }
 
+  function setLayerPixelDirectColorSingle(layer, x, y, color, { canvasDoc = null, respectSelection = true, markDirty = true } = {}) {
+    if (!layer) {
+      return false;
+    }
+    const sourceCanvasDoc = canvasDoc || getActiveProjectCanvasDocument();
+    const canvasWidth = Math.max(1, Math.round(Number(sourceCanvasDoc?.width) || Number(state.width) || 1));
+    const canvasHeight = Math.max(1, Math.round(Number(sourceCanvasDoc?.height) || Number(state.height) || 1));
+    if (x < 0 || y < 0 || x >= canvasWidth || y >= canvasHeight) {
+      return false;
+    }
+    const index = y * canvasWidth + x;
+    if (
+      respectSelection
+      && state.selectionMask instanceof Uint8Array
+      && index >= 0
+      && index < state.selectionMask.length
+      && state.selectionMask[index] !== 1
+    ) {
+      return false;
+    }
+    if (isSimulationLayer(layer)) {
+      setSimulationPixelSingle(layer, x, y);
+      return true;
+    }
+    const rgba = normalizeColorValue(color);
+    const base = index * 4;
+    let direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
+    const transparentStorageIndex = resolveTransparentStoragePaletteIndex();
+    if (rgba.a <= 0 && transparentStorageIndex >= 0) {
+      const alreadyTransparent = layer.indices[index] === transparentStorageIndex && (!direct || direct[base + 3] === 0);
+      if (alreadyTransparent) {
+        return false;
+      }
+      layer.indices[index] = transparentStorageIndex;
+      if (direct) {
+        direct[base] = 0;
+        direct[base + 1] = 0;
+        direct[base + 2] = 0;
+        direct[base + 3] = 0;
+      }
+      if (layer.importSourceDirect instanceof Uint8ClampedArray && layer.importSourceDirect.length >= base + 4) {
+        layer.importSourceDirect[base] = 0;
+        layer.importSourceDirect[base + 1] = 0;
+        layer.importSourceDirect[base + 2] = 0;
+        layer.importSourceDirect[base + 3] = 0;
+      }
+      if (markDirty) {
+        markHistoryDirty();
+        markDirtyPixel(x, y);
+      }
+      return true;
+    }
+    if (!direct) {
+      direct = ensureLayerDirect(layer, canvasWidth, canvasHeight);
+    }
+    const sameColor = layer.indices[index] === -1
+      && direct[base] === rgba.r
+      && direct[base + 1] === rgba.g
+      && direct[base + 2] === rgba.b
+      && direct[base + 3] === rgba.a;
+    if (sameColor) {
+      return false;
+    }
+    layer.indices[index] = -1;
+    direct[base] = rgba.r;
+    direct[base + 1] = rgba.g;
+    direct[base + 2] = rgba.b;
+    direct[base + 3] = rgba.a;
+    if (!(layer.importSourceDirect instanceof Uint8ClampedArray) || layer.importSourceDirect.length !== direct.length) {
+      layer.importSourceDirect = new Uint8ClampedArray(direct);
+    } else {
+      layer.importSourceDirect[base] = rgba.r;
+      layer.importSourceDirect[base + 1] = rgba.g;
+      layer.importSourceDirect[base + 2] = rgba.b;
+      layer.importSourceDirect[base + 3] = rgba.a;
+    }
+    if (markDirty) {
+      markHistoryDirty();
+      markDirtyPixel(x, y);
+    }
+    return true;
+  }
+
   function activateSimulationCell(layer, index) {
     if (!isSimulationLayer(layer) || !Number.isInteger(index) || index < 0 || index >= layer.activeMap.length) {
       return;
@@ -62783,7 +62952,179 @@
     }
   }
 
-  function floodFill(x, y, paletteIndexOverride) {
+  const FILL_DITHER_BAYER_4 = Object.freeze([
+    0, 8, 2, 10,
+    12, 4, 14, 6,
+    3, 11, 1, 9,
+    15, 7, 13, 5,
+  ]);
+
+  function getFillGradientColors(paletteIndexOverride) {
+    const activePaletteIndex = normalizePaletteIndex(state.activePaletteIndex, state.activePaletteIndex);
+    const secondaryPaletteIndex = normalizePaletteIndex(state.secondaryPaletteIndex, activePaletteIndex);
+    const primaryPaletteIndex = Number.isFinite(paletteIndexOverride)
+      ? normalizePaletteIndex(paletteIndexOverride, activePaletteIndex)
+      : activePaletteIndex;
+    const gradientEndPaletteIndex = primaryPaletteIndex === secondaryPaletteIndex
+      ? activePaletteIndex
+      : secondaryPaletteIndex;
+    return {
+      primaryPaletteIndex,
+      secondaryPaletteIndex: gradientEndPaletteIndex,
+      primaryColor: normalizeColorValue(getActiveDrawColor(undefined, primaryPaletteIndex)),
+      secondaryColor: normalizeColorValue(
+        state.palette[gradientEndPaletteIndex]
+        || state.palette[secondaryPaletteIndex]
+        || state.activeRgb
+        || { r: 0, g: 0, b: 0, a: 255 }
+      ),
+    };
+  }
+
+  function normalizeFillGradientPoint(point, fallback) {
+    const source = point && typeof point === 'object' ? point : fallback;
+    return {
+      x: Math.round(Number(source?.x) || 0),
+      y: Math.round(Number(source?.y) || 0),
+    };
+  }
+
+  function getFillGradientT(x, y, start, end) {
+    const sx = Math.round(Number(start?.x) || 0);
+    const sy = Math.round(Number(start?.y) || 0);
+    const dx = Math.round(Number(end?.x) || sx) - sx;
+    const dy = Math.round(Number(end?.y) || sy) - sy;
+    const lengthSq = (dx * dx) + (dy * dy);
+    if (lengthSq <= 0) {
+      return 0;
+    }
+    return clamp((((x - sx) * dx) + ((y - sy) * dy)) / lengthSq, 0, 1);
+  }
+
+  function interpolateFillGradientColor(primaryColor, secondaryColor, t) {
+    const amount = clamp(Number(t) || 0, 0, 1);
+    const from = normalizeColorValue(primaryColor);
+    const to = normalizeColorValue(secondaryColor);
+    const mix = (a, b) => clamp(Math.round(a + ((b - a) * amount)), 0, 255);
+    return {
+      r: mix(from.r, to.r),
+      g: mix(from.g, to.g),
+      b: mix(from.b, to.b),
+      a: mix(from.a, to.a),
+    };
+  }
+
+  function resolveFillGradientPixel(x, y, context) {
+    const style = normalizeFillStyle(context?.fillStyle, state.fillStyle);
+    const colors = context?.colors || getFillGradientColors(context?.paletteIndexOverride);
+    const start = context?.start || { x, y };
+    const end = context?.end || start;
+    const t = getFillGradientT(x, y, start, end);
+    if (style === FILL_STYLE_DITHER_GRADIENT) {
+      const thresholdIndex = ((y & 3) * 4) + (x & 3);
+      const threshold = ((FILL_DITHER_BAYER_4[thresholdIndex] || 0) + 0.5) / 16;
+      const useSecondary = t >= threshold;
+      return {
+        color: useSecondary ? colors.secondaryColor : colors.primaryColor,
+        paletteIndex: useSecondary ? colors.secondaryPaletteIndex : colors.primaryPaletteIndex,
+      };
+    }
+    const interpolated = interpolateFillGradientColor(colors.primaryColor, colors.secondaryColor, t);
+    if (context?.paletteGradient) {
+      const fallbackIndex = normalizePaletteIndex(colors.primaryPaletteIndex, state.activePaletteIndex);
+      const paletteIndex = findNearestPaletteIndexForColor(interpolated, state.palette, fallbackIndex);
+      if (paletteIndex >= 0 && state.palette[paletteIndex]) {
+        return {
+          color: normalizeColorValue(state.palette[paletteIndex]),
+          paletteIndex,
+        };
+      }
+    }
+    return {
+      color: interpolated,
+      paletteIndex: -1,
+    };
+  }
+
+  function collectFillTargetPixels(layer, x, y, { fillMode = state.selectSameMode, selectionMask = state.selectionMask, limit = Number.POSITIVE_INFINITY } = {}) {
+    if (!layer) return null;
+    const width = state.width;
+    const height = state.height;
+    if (x < 0 || y < 0 || x >= width || y >= height) {
+      return [];
+    }
+    const startIdx = y * width + x;
+    if (selectionMask && selectionMask[startIdx] !== 1) {
+      return [];
+    }
+    const matchState = getLayerPixelMatchState(layer, startIdx);
+    if (!matchState) {
+      return [];
+    }
+    const normalizedFillMode = normalizeSelectSameMode(fillMode, SELECT_SAME_MODE_CONNECTED);
+    const maxPixels = Number.isFinite(limit) ? Math.max(0, Math.floor(limit)) : Number.POSITIVE_INFINITY;
+    const pixels = [];
+    const pushPixel = (idx) => {
+      pixels.push(idx);
+      return pixels.length >= maxPixels;
+    };
+
+    if (normalizedFillMode === SELECT_SAME_MODE_GLOBAL) {
+      for (let py = 0; py < height; py += 1) {
+        const rowOffset = py * width;
+        for (let px = 0; px < width; px += 1) {
+          const idx = rowOffset + px;
+          if (selectionMask && selectionMask[idx] !== 1) continue;
+          if (!layerPixelMatchesMatchState(matchState, idx)) continue;
+          if (pushPixel(idx)) {
+            markFillPreviewPixelsTruncated(pixels);
+            return pixels;
+          }
+        }
+      }
+      return pixels;
+    }
+
+    const visited = new Uint8Array(width * height);
+    const stack = [x, y];
+    while (stack.length > 0) {
+      const py = stack.pop();
+      const px = stack.pop();
+      if (!Number.isFinite(px) || !Number.isFinite(py)) continue;
+      if (px < 0 || py < 0 || px >= width || py >= height) continue;
+      const idx = py * width + px;
+      if (visited[idx]) continue;
+      visited[idx] = 1;
+      if (selectionMask && selectionMask[idx] !== 1) continue;
+      if (!layerPixelMatchesMatchState(matchState, idx)) continue;
+      if (pushPixel(idx)) {
+        markFillPreviewPixelsTruncated(pixels);
+        return pixels;
+      }
+      stack.push(px + 1, py);
+      stack.push(px - 1, py);
+      stack.push(px, py + 1);
+      stack.push(px, py - 1);
+    }
+    return pixels;
+  }
+
+  function applyGradientFillPixel(layer, x, y, context) {
+    const style = normalizeFillStyle(context?.fillStyle, state.fillStyle);
+    const pixel = resolveFillGradientPixel(x, y, context);
+    if (
+      isIndexColorMode()
+      && !isMultiPaletteIsolationEnabled()
+      && Number.isFinite(pixel.paletteIndex)
+      && pixel.paletteIndex >= 0
+    ) {
+      setPixelSingle(layer, x, y, pixel.paletteIndex);
+      return true;
+    }
+    return setLayerPixelDirectColorSingle(layer, x, y, pixel.color);
+  }
+
+  function floodFill(x, y, paletteIndexOverride, options = {}) {
     const layer = getActiveLayer();
     if (!layer) return;
     const width = state.width;
@@ -62791,6 +63132,8 @@
     if (x < 0 || y < 0 || x >= width || y >= height) {
       return;
     }
+    const fillStyle = normalizeFillStyle(options.fillStyle, state.fillStyle);
+    const gradientFill = isGradientFillStyle(fillStyle);
     const indexMode = isIndexColorMode();
     const fillMode = normalizeSelectSameMode(state.selectSameMode, SELECT_SAME_MODE_CONNECTED);
     const paletteIndex = indexMode ? resolveDrawPaletteIndex(paletteIndexOverride) : -1;
@@ -62802,10 +63145,10 @@
       return;
     }
     const targetIndex = indices ? indices[startIdx] : -1;
-    if (indexMode && targetIndex >= 0 && targetIndex === paletteIndex) {
+    if (!gradientFill && indexMode && targetIndex >= 0 && targetIndex === paletteIndex) {
       return;
     }
-    if (!indexMode && drawRgbColor) {
+    if (!gradientFill && !indexMode && drawRgbColor) {
       const sourceColor = {
         r: matchState.r,
         g: matchState.g,
@@ -62818,8 +63161,52 @@
     }
     const selectionMask = state.selectionMask;
 
-    const visited = new Uint8Array(width * height);
-    const stack = [x, y];
+    if (gradientFill) {
+      const start = normalizeFillGradientPoint(options.start, { x, y });
+      const end = normalizeFillGradientPoint(options.end, start);
+      const colors = getFillGradientColors(paletteIndexOverride);
+      const pixels = collectFillTargetPixels(layer, x, y, { fillMode, selectionMask, limit: Number.POSITIVE_INFINITY });
+      if (!pixels || !pixels.length) {
+        return;
+      }
+      const context = {
+        fillStyle,
+        start,
+        end,
+        colors,
+        paletteIndexOverride,
+        paletteGradient: indexMode && !isMultiPaletteIsolationEnabled(),
+      };
+      const mirrorEnabled = isMirrorEnabledForTool('fill');
+      const painted = mirrorEnabled ? new Set() : null;
+      for (let i = 0; i < pixels.length; i += 1) {
+        const idx = pixels[i];
+        const px = idx % width;
+        const py = Math.floor(idx / width);
+        if (!mirrorEnabled) {
+          applyGradientFillPixel(layer, px, py, context);
+          continue;
+        }
+        forEachMirroredPoint(px, py, 'fill', (mx, my) => {
+          if (mx < 0 || my < 0 || mx >= width || my >= height) {
+            return;
+          }
+          const maskIndex = my * width + mx;
+          if (selectionMask && selectionMask[maskIndex] !== 1) {
+            return;
+          }
+          if (painted && painted.has(maskIndex)) {
+            return;
+          }
+          if (painted) {
+            painted.add(maskIndex);
+          }
+          applyGradientFillPixel(layer, mx, my, context);
+        });
+      }
+      requestRender();
+      return;
+    }
 
     if (fillMode === SELECT_SAME_MODE_GLOBAL) {
       for (let py = 0; py < height; py += 1) {
@@ -62835,6 +63222,8 @@
       return;
     }
 
+    const visited = new Uint8Array(width * height);
+    const stack = [x, y];
     while (stack.length > 0) {
       const py = stack.pop();
       const px = stack.pop();
@@ -64344,14 +64733,14 @@
       : getActiveTool();
     const shouldShowGuidePreview = state.showPixelGuides || state.showVirtualCursor;
     if (shouldShowGuidePreview && focusPixel) {
-      const overrideSize = activeTool === 'fill' ? 1 : undefined;
+      const overrideSize = FILL_TOOLS.has(activeTool) ? 1 : undefined;
       drawBrushPreview(focusPixel, activeTool, overrideSize);
     }
 
-    const isTouchFillHoldPreview = pointerState.active && pointerState.tool === 'fill';
+    const isTouchFillHoldPreview = pointerState.active && FILL_TOOLS.has(pointerState.tool);
     if (
       ctx.overlay
-      && activeTool === 'fill'
+      && FILL_TOOLS.has(activeTool)
       && focusPixel
       && (!pointerState.active || isTouchFillHoldPreview)
       // Fill preview is already rendered in drawBrushPreview when guides are visible.
@@ -64359,33 +64748,19 @@
       && !shouldShowGuidePreview
       && (state.showPixelGuides || isTouchFillHoldPreview)
     ) {
-      const previewPixels = getFillPreviewPixels(focusPixel.x, focusPixel.y);
+      const interactionFillStyle = pointerState.active
+        ? getFillStyleForInteraction(pointerState.tool, pointerState.start, pointerState.current || focusPixel)
+        : getActiveFillStyle(activeTool);
+      const gradientPreview = pointerState.active
+        && FILL_TOOLS.has(pointerState.tool)
+        && isGradientFillStyle(interactionFillStyle)
+        && pointerState.start;
+      const seed = gradientPreview ? pointerState.start : focusPixel;
+      const endpoint = gradientPreview ? (pointerState.current || focusPixel) : focusPixel;
+      const previewPixels = getFillPreviewPixels(seed.x, seed.y, { fillStyle: interactionFillStyle });
       if (previewPixels && previewPixels.length) {
         ctx.overlay.save();
-        ctx.overlay.fillStyle = rgbaToCss(getActiveDrawColor());
-        const previewSelectionMask = state.selectionMask;
-        const useMirrorDedup = previewPixels.length <= FILL_PREVIEW_MIRROR_DEDUP_MAX_PIXELS;
-        const painted = useMirrorDedup ? new Set() : null;
-        previewPixels.forEach(idx => {
-          const px = idx % state.width;
-          const py = Math.floor(idx / state.width);
-          forEachMirroredPoint(px, py, activeTool, (mx, my) => {
-            if (mx < 0 || my < 0 || mx >= state.width || my >= state.height) {
-              return;
-            }
-            const maskIndex = my * state.width + mx;
-            if (previewSelectionMask && previewSelectionMask[maskIndex] !== 1) {
-              return;
-            }
-            if (painted && painted.has(maskIndex)) {
-              return;
-            }
-            if (painted) {
-              painted.add(maskIndex);
-            }
-            ctx.overlay.fillRect(mx, my, 1, 1);
-          });
-        });
+        drawFillPreviewPixels(previewPixels, seed, endpoint, activeTool, { fillStyle: interactionFillStyle });
         ctx.overlay.restore();
       }
     }
@@ -64640,6 +65015,72 @@
     overlayCtx.restore();
   }
 
+  function drawFillPreviewPixels(pixels, seed, end, tool = FILL_TOOL_SOLID, options = {}) {
+    if (!ctx.overlay || !Array.isArray(pixels) || !pixels.length) {
+      return;
+    }
+    const { width, height } = state;
+    const selectionMask = state.selectionMask;
+    const fillStyle = normalizeFillStyle(options.fillStyle, getActiveFillStyle(tool));
+    const gradientPreview = isGradientFillStyle(fillStyle) && seed && end;
+    const paletteIndexOverride = Number.isFinite(pointerState.drawPaletteIndex)
+      ? pointerState.drawPaletteIndex
+      : undefined;
+    const gradientContext = gradientPreview
+      ? {
+        fillStyle,
+        start: normalizeFillGradientPoint(seed, seed),
+        end: normalizeFillGradientPoint(end, seed),
+        colors: getFillGradientColors(paletteIndexOverride),
+        paletteIndexOverride,
+        paletteGradient: isIndexColorMode() && !isMultiPaletteIsolationEnabled(),
+      }
+      : null;
+    const solidColor = gradientPreview ? null : normalizeColorValue(getActiveDrawColor(undefined, paletteIndexOverride));
+    const useMirrorDedup = pixels.length <= FILL_PREVIEW_MIRROR_DEDUP_MAX_PIXELS;
+    const mirrorEnabled = isMirrorEnabledForTool(tool);
+    const painted = mirrorEnabled && useMirrorDedup ? new Set() : null;
+    let lastColorKey = '';
+    const paintPoint = (px, py) => {
+      if (px < 0 || py < 0 || px >= width || py >= height) {
+        return;
+      }
+      const maskIndex = py * width + px;
+      if (selectionMask && selectionMask[maskIndex] !== 1) {
+        return;
+      }
+      if (painted && painted.has(maskIndex)) {
+        return;
+      }
+      if (painted) {
+        painted.add(maskIndex);
+      }
+      const color = gradientContext
+        ? resolveFillGradientPixel(px, py, gradientContext).color
+        : solidColor;
+      if (!color) {
+        return;
+      }
+      const colorKey = `${color.r}-${color.g}-${color.b}-${color.a}`;
+      if (colorKey !== lastColorKey) {
+        ctx.overlay.fillStyle = rgbaToCss(color);
+        lastColorKey = colorKey;
+      }
+      ctx.overlay.fillRect(px, py, 1, 1);
+    };
+
+    for (let i = 0; i < pixels.length; i += 1) {
+      const idx = pixels[i];
+      const px = idx % width;
+      const py = Math.floor(idx / width);
+      if (!mirrorEnabled) {
+        paintPoint(px, py);
+        continue;
+      }
+      forEachMirroredPoint(px, py, tool, paintPoint);
+    }
+  }
+
   function drawBrushPreview(center, tool = getActiveTool(), sizeOverride) {
     if (!center || !ctx.overlay) return;
     const { width, height } = state;
@@ -64670,46 +65111,18 @@
     }
 
     if (FILL_TOOLS.has(tool)) {
-      const pixels = getFillPreviewPixels(center.x, center.y);
+      const interactionFillStyle = pointerState.active
+        ? getFillStyleForInteraction(pointerState.tool, pointerState.start, pointerState.current || center)
+        : getActiveFillStyle(tool);
+      const gradientPreview = pointerState.active
+        && FILL_TOOLS.has(pointerState.tool)
+        && isGradientFillStyle(interactionFillStyle)
+        && pointerState.start;
+      const seed = gradientPreview ? pointerState.start : center;
+      const endpoint = gradientPreview ? (pointerState.current || center) : center;
+      const pixels = getFillPreviewPixels(seed.x, seed.y, { fillStyle: interactionFillStyle });
       if (pixels && pixels.length) {
-        const fillColor = rgbaToCss(getActiveDrawColor());
-        ctx.overlay.fillStyle = fillColor;
-        if (!isMirrorEnabledForTool(tool)) {
-          for (let i = 0; i < pixels.length; i += 1) {
-            const idx = pixels[i];
-            const px = idx % width;
-            const py = Math.floor(idx / width);
-            const maskIndex = py * width + px;
-            if (selectionMask && selectionMask[maskIndex] !== 1) {
-              continue;
-            }
-            ctx.overlay.fillRect(px, py, 1, 1);
-          }
-          ctx.overlay.restore();
-          return;
-        }
-        const useMirrorDedup = pixels.length <= FILL_PREVIEW_MIRROR_DEDUP_MAX_PIXELS;
-        const painted = useMirrorDedup ? new Set() : null;
-        pixels.forEach(idx => {
-          const px = idx % width;
-          const py = Math.floor(idx / width);
-          forEachMirroredPoint(px, py, tool, (mx, my) => {
-            if (mx < 0 || my < 0 || mx >= width || my >= height) {
-              return;
-            }
-            const maskIndex = my * width + mx;
-            if (selectionMask && selectionMask[maskIndex] !== 1) {
-              return;
-            }
-            if (painted && painted.has(maskIndex)) {
-              return;
-            }
-            if (painted) {
-              painted.add(maskIndex);
-            }
-            ctx.overlay.fillRect(mx, my, 1, 1);
-          });
-        });
+        drawFillPreviewPixels(pixels, seed, endpoint, tool, { fillStyle: interactionFillStyle });
         if (isFillPreviewPixelsTruncated(pixels)) {
           drawBrushCrosshair(center, 1, selectionMask);
         }
@@ -64817,7 +65230,7 @@
     }
   }
 
-  function computeFillPreview(x, y) {
+  function computeFillPreview(x, y, options = {}) {
     const layer = getActiveLayer();
     if (!layer) return null;
     const width = state.width;
@@ -64837,15 +65250,17 @@
     const indices = layer.indices instanceof Int16Array ? layer.indices : null;
     const indexMode = isIndexColorMode();
     const fillMode = normalizeSelectSameMode(state.selectSameMode, SELECT_SAME_MODE_CONNECTED);
+    const fillStyle = normalizeFillStyle(options.fillStyle, getActiveFillStyle());
+    const gradientFill = isGradientFillStyle(fillStyle);
     const paletteIndex = indexMode
       ? normalizePaletteIndex(state.activePaletteIndex, state.activePaletteIndex)
       : -1;
     const drawRgbColor = indexMode ? null : normalizeColorValue(getActiveDrawColor());
     const targetIndex = indices ? indices[startIdx] : -1;
-    if (indexMode && targetIndex >= 0 && targetIndex === paletteIndex) {
+    if (!gradientFill && indexMode && targetIndex >= 0 && targetIndex === paletteIndex) {
       return [];
     }
-    if (!indexMode && drawRgbColor) {
+    if (!gradientFill && !indexMode && drawRgbColor) {
       const sourceColor = {
         r: matchState.r,
         g: matchState.g,
@@ -64856,46 +65271,7 @@
         return [];
       }
     }
-    const visited = new Uint8Array(width * height);
-    const stack = [x, y];
-    const pixels = [];
-    if (fillMode === SELECT_SAME_MODE_GLOBAL) {
-      for (let py = 0; py < height; py += 1) {
-        const rowOffset = py * width;
-        for (let px = 0; px < width; px += 1) {
-          const idx = rowOffset + px;
-          if (selectionMask && selectionMask[idx] !== 1) continue;
-          if (!layerPixelMatchesMatchState(matchState, idx)) continue;
-          pixels.push(idx);
-          if (pixels.length >= FILL_PREVIEW_MAX_PIXELS) {
-            markFillPreviewPixelsTruncated(pixels);
-            return pixels;
-          }
-        }
-      }
-      return pixels;
-    }
-    while (stack.length > 0) {
-      const py = stack.pop();
-      const px = stack.pop();
-      if (!Number.isFinite(px) || !Number.isFinite(py)) continue;
-      if (px < 0 || py < 0 || px >= width || py >= height) continue;
-      const idx = py * width + px;
-      if (visited[idx]) continue;
-      visited[idx] = 1;
-      if (selectionMask && selectionMask[idx] !== 1) continue;
-      if (!layerPixelMatchesMatchState(matchState, idx)) continue;
-      pixels.push(idx);
-      if (pixels.length >= FILL_PREVIEW_MAX_PIXELS) {
-        markFillPreviewPixelsTruncated(pixels);
-        return pixels;
-      }
-      stack.push(px + 1, py);
-      stack.push(px - 1, py);
-      stack.push(px, py + 1);
-      stack.push(px, py - 1);
-    }
-    return pixels;
+    return collectFillTargetPixels(layer, x, y, { fillMode, selectionMask, limit: FILL_PREVIEW_MAX_PIXELS });
   }
 
   function markFillPreviewPixelsTruncated(pixels) {
@@ -64917,7 +65293,7 @@
     );
   }
 
-  function getFillPreviewContextKey() {
+  function getFillPreviewContextKey(options = {}) {
     const frame = getActiveFrame();
     const layer = getActiveLayer();
     if (!frame || !layer) return null;
@@ -64929,8 +65305,10 @@
       : 'none';
     const fillMode = normalizeSelectSameMode(state.selectSameMode, SELECT_SAME_MODE_CONNECTED);
     const activeColor = normalizeColorValue(getActiveDrawColor());
-    const colorKey = `${normalizeColorMode(state.colorMode, COLOR_MODE_INDEX)}-${state.activePaletteIndex}-${activeColor.r},${activeColor.g},${activeColor.b},${activeColor.a}`;
-    return `${frame.id}|${layer.id}|${state.width}x${state.height}|${selectionKey}|fill-mode-${fillMode}|${colorKey}`;
+    const secondaryColor = normalizeColorValue(state.palette[state.secondaryPaletteIndex] || state.activeRgb);
+    const fillStyle = normalizeFillStyle(options.fillStyle, getActiveFillStyle());
+    const colorKey = `${normalizeColorMode(state.colorMode, COLOR_MODE_INDEX)}-${state.activePaletteIndex}-${state.secondaryPaletteIndex}-${activeColor.r},${activeColor.g},${activeColor.b},${activeColor.a}-${secondaryColor.r},${secondaryColor.g},${secondaryColor.b},${secondaryColor.a}`;
+    return `${frame.id}|${layer.id}|${state.width}x${state.height}|${selectionKey}|fill-mode-${fillMode}|fill-style-${fillStyle}|${colorKey}`;
   }
 
   function ensureFillPreviewLookup(contextKey) {
@@ -64944,8 +65322,9 @@
     return fillPreviewCache.byPixel;
   }
 
-  function getFillPreviewPixels(x, y) {
-    const contextKey = getFillPreviewContextKey();
+  function getFillPreviewPixels(x, y, options = {}) {
+    const fillStyle = normalizeFillStyle(options.fillStyle, getActiveFillStyle());
+    const contextKey = getFillPreviewContextKey({ fillStyle });
     if (!contextKey) {
       return null;
     }
@@ -64956,7 +65335,7 @@
     if (cached !== undefined) {
       return cached;
     }
-    const pixels = computeFillPreview(x, y) || EMPTY_FILL_PREVIEW_PIXELS;
+    const pixels = computeFillPreview(x, y, { fillStyle }) || EMPTY_FILL_PREVIEW_PIXELS;
     if (!pixels.length) {
       lookup[cacheIndex] = EMPTY_FILL_PREVIEW_PIXELS;
       return EMPTY_FILL_PREVIEW_PIXELS;
@@ -66223,6 +66602,7 @@
         brushSize: clamp(Math.round(state.brushSize || 1), 1, 32),
         outlineSize: clamp(Math.round(state.outlineSize || 1), 1, 8),
         selectSameMode: normalizeSelectSameMode(state.selectSameMode, SELECT_SAME_MODE_CONNECTED),
+        fillStyle: normalizeFillStyle(state.fillStyle, FILL_STYLE_SOLID),
         selectionShapeMode: normalizeSelectionShapeMode(state.selectionShapeMode, SELECTION_SHAPE_MODE_CONTENT),
         brushShape: normalizeBrushShape(state.brushShape, BRUSH_SHAPE_SQUARE),
         customBrush: serializeCustomBrushPayload(state.customBrush),
@@ -66327,6 +66707,9 @@
 	    if (typeof payload.selectSameMode === 'string') {
 	      state.selectSameMode = normalizeSelectSameMode(payload.selectSameMode, state.selectSameMode);
 	    }
+    if (typeof payload.fillStyle === 'string') {
+      state.fillStyle = normalizeFillStyle(payload.fillStyle, state.fillStyle);
+    }
 	    if (typeof payload.selectionShapeMode === 'string') {
 	      state.selectionShapeMode = normalizeSelectionShapeMode(payload.selectionShapeMode, state.selectionShapeMode);
 	    }
@@ -70073,7 +70456,7 @@
     };
   }
 
-  function captureSharedProjectFillCommand(position, interactionSurface = null) {
+  function captureSharedProjectFillCommand(position, interactionSurface = null, options = {}) {
     if (!position) {
       clearSharedProjectInFlightStroke();
       return;
@@ -70083,6 +70466,7 @@
       clearSharedProjectInFlightStroke();
       return;
     }
+    const gradientColors = getFillGradientColors(pointerState.drawPaletteIndex);
     sharedProjectInFlightStroke = {
       ...baseCommand,
       command: 'fill',
@@ -70091,7 +70475,19 @@
         x: Math.round(Number(position.x) || 0),
         y: Math.round(Number(position.y) || 0),
       },
+      end: options?.end
+        ? {
+          x: Math.round(Number(options.end.x) || 0),
+          y: Math.round(Number(options.end.y) || 0),
+        }
+        : {
+          x: Math.round(Number(position.x) || 0),
+          y: Math.round(Number(position.y) || 0),
+      },
       fillMode: normalizeSelectSameMode(state.selectSameMode, SELECT_SAME_MODE_CONNECTED),
+      fillStyle: normalizeFillStyle(options?.fillStyle, state.fillStyle),
+      secondaryPaletteIndex: gradientColors.secondaryPaletteIndex,
+      secondaryRgba: gradientColors.secondaryColor,
     };
   }
 
@@ -70258,7 +70654,13 @@
         return null;
       }
       payload.point = { x: Math.round(Number(drawCommand.point.x) || 0), y: Math.round(Number(drawCommand.point.y) || 0) };
+      payload.end = drawCommand.end
+        ? { x: Math.round(Number(drawCommand.end.x) || 0), y: Math.round(Number(drawCommand.end.y) || 0) }
+        : { ...payload.point };
       payload.fillMode = normalizeSelectSameMode(drawCommand.fillMode, SELECT_SAME_MODE_CONNECTED);
+      payload.fillStyle = normalizeFillStyle(drawCommand.fillStyle, FILL_STYLE_SOLID);
+      payload.secondaryPaletteIndex = normalizePaletteIndex(drawCommand.secondaryPaletteIndex, payload.paletteIndex);
+      payload.secondaryRgba = normalizeColorValue(drawCommand.secondaryRgba || state.palette[payload.secondaryPaletteIndex] || payload.rgba);
       return appendSharedProjectResultPatchToDrawPayload(payload);
     }
     if (drawCommand.command === 'curve') {
@@ -72761,12 +73163,20 @@
       ...payload,
       mirror: normalizeMirrorAxisState(payload?.mirror, target.targetCanvas.width, target.targetCanvas.height),
       fillMode: normalizeSelectSameMode(payload?.fillMode, SELECT_SAME_MODE_CONNECTED),
+      fillStyle: normalizeFillStyle(payload?.fillStyle, FILL_STYLE_SOLID),
     };
     command = prepareSharedProjectDrawCommandPalette(command, { source: 'fill-command' });
     const width = Math.max(1, Number(target.targetCanvas.width) || 1);
     const height = Math.max(1, Number(target.targetCanvas.height) || 1);
     const x = clamp(Math.round(Number(payload.point.x) || 0), 0, width - 1);
     const y = clamp(Math.round(Number(payload.point.y) || 0), 0, height - 1);
+    const end = payload?.end
+      ? {
+        x: clamp(Math.round(Number(payload.end.x) || x), 0, width - 1),
+        y: clamp(Math.round(Number(payload.end.y) || y), 0, height - 1),
+      }
+      : { x, y };
+    const gradientFill = isGradientFillStyle(command.fillStyle);
     const indices = target.layer.indices instanceof Int16Array ? target.layer.indices : null;
     const direct = target.layer.direct instanceof Uint8ClampedArray ? target.layer.direct : null;
     const paletteIndex = command.colorMode === 'palette'
@@ -72782,10 +73192,10 @@
     const targetG = targetIndex < 0 ? (direct ? direct[startBase + 1] : 0) : 0;
     const targetB = targetIndex < 0 ? (direct ? direct[startBase + 2] : 0) : 0;
     const targetA = targetIndex < 0 ? (direct ? direct[startBase + 3] : 0) : 0;
-    if (command.colorMode === 'palette' && targetIndex >= 0 && targetIndex === paletteIndex) {
+    if (!gradientFill && command.colorMode === 'palette' && targetIndex >= 0 && targetIndex === paletteIndex) {
       return false;
     }
-    if (drawRgbColor) {
+    if (!gradientFill && drawRgbColor) {
       const sourceColor = targetIndex >= 0
         ? normalizeColorValue(state.palette[targetIndex] || { r: 0, g: 0, b: 0, a: 0 })
         : { r: targetR, g: targetG, b: targetB, a: targetA };
@@ -72815,8 +73225,42 @@
       y1: Number.NEGATIVE_INFINITY,
     };
     let changed = false;
+    const gradientContext = gradientFill
+      ? {
+        fillStyle: command.fillStyle,
+        start: { x, y },
+        end,
+        colors: {
+          primaryPaletteIndex: paletteIndex >= 0 ? paletteIndex : normalizePaletteIndex(command.paletteIndex, state.activePaletteIndex),
+          secondaryPaletteIndex: normalizePaletteIndex(command.secondaryPaletteIndex, command.paletteIndex),
+          primaryColor: normalizeColorValue(command.rgba),
+          secondaryColor: normalizeColorValue(
+            command.secondaryRgba
+            || state.palette[normalizePaletteIndex(command.secondaryPaletteIndex, command.paletteIndex)]
+            || command.rgba
+          ),
+        },
+        paletteGradient: command.colorMode === 'palette' && !command.paletteIsolation,
+      }
+      : null;
     const applyPoint = (px, py) => {
-      if (applySharedProjectBrushPoint(target.layer, target.targetCanvas, command, px, py, [{ dx: 0, dy: 0 }])) {
+      let pointCommand = command;
+      if (gradientContext) {
+        const pixel = resolveFillGradientPixel(px, py, gradientContext);
+        const canUsePaletteIndex = command.colorMode === 'palette'
+          && !command.paletteIsolation
+          && Number.isFinite(pixel.paletteIndex)
+          && pixel.paletteIndex >= 0
+          && pixel.paletteIndex < MAX_IMPORTED_PALETTE_COLORS;
+        pointCommand = {
+          ...command,
+          colorMode: canUsePaletteIndex ? 'palette' : 'rgb',
+          paletteIsolation: canUsePaletteIndex ? Boolean(command.paletteIsolation) : true,
+          paletteIndex: canUsePaletteIndex ? pixel.paletteIndex : command.paletteIndex,
+          rgba: normalizeColorValue(pixel.color),
+        };
+      }
+      if (applySharedProjectBrushPoint(target.layer, target.targetCanvas, pointCommand, px, py, [{ dx: 0, dy: 0 }])) {
         changed = true;
         dirtyRect.x0 = Math.min(dirtyRect.x0, px);
         dirtyRect.y0 = Math.min(dirtyRect.y0, py);
