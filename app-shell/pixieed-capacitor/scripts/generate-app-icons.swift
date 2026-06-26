@@ -43,13 +43,7 @@ private func color(hex: String?) -> NSColor {
   return NSColor(calibratedRed: red, green: green, blue: blue, alpha: 1)
 }
 
-private func writePNG(from image: NSImage, to destination: URL) throws {
-  guard let tiff = image.tiffRepresentation else {
-    throw IconGeneratorError.representationMissing(destination.path)
-  }
-  guard let bitmap = NSBitmapImageRep(data: tiff) else {
-    throw IconGeneratorError.bitmapConversionFailed(destination.path)
-  }
+private func writePNG(from bitmap: NSBitmapImageRep, to destination: URL) throws {
   guard let pngData = bitmap.representation(using: .png, properties: [:]) else {
     throw IconGeneratorError.pngEncodingFailed(destination.path)
   }
@@ -63,16 +57,32 @@ private func renderIcon(
   size: CGFloat,
   iconScale: CGFloat,
   backgroundHex: String?
-) throws -> NSImage {
-  let canvasSize = NSSize(width: size, height: size)
-  let image = NSImage(size: canvasSize)
-  image.lockFocus()
-  defer { image.unlockFocus() }
+) throws -> NSBitmapImageRep {
+  let pixelSize = Int(size.rounded())
+  guard let bitmap = NSBitmapImageRep(
+    bitmapDataPlanes: nil,
+    pixelsWide: pixelSize,
+    pixelsHigh: pixelSize,
+    bitsPerSample: 8,
+    samplesPerPixel: 4,
+    hasAlpha: true,
+    isPlanar: false,
+    colorSpaceName: .deviceRGB,
+    bytesPerRow: 0,
+    bitsPerPixel: 0
+  ) else {
+    throw IconGeneratorError.bitmapConversionFailed("Icon \(pixelSize)x\(pixelSize)")
+  }
+  bitmap.size = NSSize(width: pixelSize, height: pixelSize)
 
-  let context = NSGraphicsContext.current
+  NSGraphicsContext.saveGraphicsState()
+  defer { NSGraphicsContext.restoreGraphicsState() }
+
+  let context = NSGraphicsContext(bitmapImageRep: bitmap)
+  NSGraphicsContext.current = context
   context?.imageInterpolation = .none
 
-  let canvasRect = NSRect(origin: .zero, size: canvasSize)
+  let canvasRect = NSRect(origin: .zero, size: bitmap.size)
   color(hex: backgroundHex).setFill()
   canvasRect.fill()
 
@@ -93,7 +103,7 @@ private func renderIcon(
     operation: .sourceOver,
     fraction: 1
   )
-  return image
+  return bitmap
 }
 
 let repoRoot = repositoryRoot()

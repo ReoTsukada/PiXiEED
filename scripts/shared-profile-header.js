@@ -158,7 +158,7 @@
     const script = document.createElement('script');
     script.defer = true;
     script.dataset.pixieedSharedAuth = 'true';
-    script.src = asset('./shared-auth-panel.js');
+    script.src = asset('./shared-auth-panel.js?v=2026.06.26-auth-persist');
     document.head.appendChild(script);
   }
 

@@ -9,6 +9,21 @@
   const PANEL_SELECTOR = '#authPanel';
   const AUTH_BLOCK_ID = 'sharedAuthBlock';
   const AUTH_STORAGE_KEY = 'sb-kyyiuakrqomzlikfaire-auth-token';
+  const AUTH_SESSION_CACHE_KEY = 'pixieed:auth-session-cache:v1';
+  const AUTH_URL_PARAM_KEYS = [
+    'code',
+    'error',
+    'error_code',
+    'error_description',
+    'access_token',
+    'refresh_token',
+    'expires_at',
+    'expires_in',
+    'provider_refresh_token',
+    'provider_token',
+    'token_type',
+    'type',
+  ];
 
   let supabaseClient = null;
   let supabaseUser = null;
@@ -139,6 +154,109 @@
       return;
     }
     brandUser.textContent = loadNickname() || 'ユーザー';
+  }
+
+  function readCachedAuthSession() {
+    try {
+      const raw = localStorage.getItem(AUTH_SESSION_CACHE_KEY);
+      if (!raw) {
+        return null;
+      }
+      const parsed = JSON.parse(raw);
+      const accessToken = typeof parsed?.access_token === 'string' ? parsed.access_token.trim() : '';
+      const refreshToken = typeof parsed?.refresh_token === 'string' ? parsed.refresh_token.trim() : '';
+      if (!accessToken || !refreshToken) {
+        return null;
+      }
+      return {
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      };
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function writeCachedAuthSession(session) {
+    try {
+      if (!session?.access_token || !session?.refresh_token) {
+        localStorage.removeItem(AUTH_SESSION_CACHE_KEY);
+        return;
+      }
+      localStorage.setItem(AUTH_SESSION_CACHE_KEY, JSON.stringify({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+        savedAt: Date.now(),
+      }));
+    } catch (_error) {}
+  }
+
+  async function restoreAuthSessionFromCache(supabase) {
+    if (!supabase?.auth) {
+      return null;
+    }
+    const cachedSession = readCachedAuthSession();
+    if (!cachedSession) {
+      return null;
+    }
+    try {
+      const { data, error } = await supabase.auth.setSession(cachedSession);
+      if (error) {
+        writeCachedAuthSession(null);
+        return null;
+      }
+      return data?.session || null;
+    } catch (_error) {
+      writeCachedAuthSession(null);
+      return null;
+    }
+  }
+
+  function hasOAuthParamsInUrl() {
+    try {
+      const url = new URL(window.location.href);
+      if (AUTH_URL_PARAM_KEYS.some((key) => url.searchParams.has(key))) {
+        return true;
+      }
+      const hash = String(url.hash || '').replace(/^#/, '');
+      if (!hash) {
+        return false;
+      }
+      const hashParams = new URLSearchParams(hash);
+      return AUTH_URL_PARAM_KEYS.some((key) => hashParams.has(key));
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  function maybeClearOAuthParamsFromUrl() {
+    try {
+      if (!window.history?.replaceState) {
+        return;
+      }
+      const url = new URL(window.location.href);
+      let changed = false;
+      AUTH_URL_PARAM_KEYS.forEach((key) => {
+        if (url.searchParams.has(key)) {
+          url.searchParams.delete(key);
+          changed = true;
+        }
+      });
+      const hash = String(url.hash || '').replace(/^#/, '');
+      if (hash) {
+        const hashParams = new URLSearchParams(hash);
+        const hasAuthHash = AUTH_URL_PARAM_KEYS.some((key) => hashParams.has(key));
+        if (hasAuthHash) {
+          AUTH_URL_PARAM_KEYS.forEach((key) => hashParams.delete(key));
+          const nextHash = hashParams.toString();
+          url.hash = nextHash ? `#${nextHash}` : '';
+          changed = true;
+        }
+      }
+      if (changed) {
+        window.history.replaceState(window.history.state, document.title, url.toString());
+      }
+    } catch (_error) {}
   }
 
   async function ensureSupabase() {
@@ -467,6 +585,7 @@
         try {
           await supabaseClient.auth.signOut();
         } catch (_error) {}
+        writeCachedAuthSession(null);
         supabaseUser = null;
         updateAuthUi();
       });
@@ -549,10 +668,24 @@
     try {
       const supabase = await ensureSupabase();
       const { data } = await supabase.auth.getSession();
-      supabaseUser = data?.session?.user || null;
+      let session = data?.session || null;
+      if (!session && !hasOAuthParamsInUrl()) {
+        session = await restoreAuthSessionFromCache(supabase);
+      }
+      supabaseUser = session?.user || null;
+      if (session) {
+        writeCachedAuthSession(session);
+        maybeClearOAuthParamsFromUrl();
+      }
       if (!authListenerBound) {
         authListenerBound = true;
-        supabase.auth.onAuthStateChange(async (_event, session) => {
+        supabase.auth.onAuthStateChange(async (event, session) => {
+          if (session) {
+            writeCachedAuthSession(session);
+            maybeClearOAuthParamsFromUrl();
+          } else if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
+            writeCachedAuthSession(null);
+          }
           supabaseUser = session?.user || null;
           await syncProfileFromServer();
           updateAuthUi();
