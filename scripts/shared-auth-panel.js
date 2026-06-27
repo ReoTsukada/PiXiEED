@@ -108,6 +108,20 @@
     } catch (_error) {}
   }
 
+  function getClientId() {
+    try {
+      let clientId = localStorage.getItem('pixieed_client_id') || window.PIXIEED_CLIENT_ID || '';
+      if (!clientId) {
+        clientId = `guest-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+        localStorage.setItem('pixieed_client_id', clientId);
+      }
+      window.PIXIEED_CLIENT_ID = clientId;
+      return clientId;
+    } catch (_error) {
+      return window.PIXIEED_CLIENT_ID || '';
+    }
+  }
+
   function setStatus(message) {
     const status = document.getElementById('authAccountStatus');
     if (status) {
@@ -279,6 +293,9 @@
           autoRefreshToken: true,
           detectSessionInUrl: true,
           storageKey: AUTH_STORAGE_KEY,
+        },
+        global: {
+          headers: { 'x-client-id': getClientId() },
         },
       });
     })();

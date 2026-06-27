@@ -13,6 +13,10 @@ const ARTWORK_SLOT_COUNT = 10;
 const ARTWORK_ROTATION_INTERVAL_MS = 10000;
 const BUBBLE_DURATION_MS = 6500;
 const ARTWORK_REPLY_BUBBLE_MS = 30000;
+const PRESENCE_TTL_MS = 18000;
+const PRESENCE_POLL_MS = 2000;
+const PRESENCE_DB_WRITE_MS = 2500;
+const REMOTE_AVATAR_STALE_MS = 30000;
 const ARTWORK_RETENTION_MS = 24 * 60 * 60 * 1000;
 const WORLD_WIDTH = 4400;
 const WORLD_HEIGHT = 820;
@@ -124,6 +128,7 @@ const state = {
     bubble: '',
     bubbleMode: 'world',
     bubbleTargetName: '',
+    bubbleTargetArtworkId: '',
     bubbleUntil: 0,
     walking: false
   },
@@ -144,9 +149,11 @@ const state = {
   lastFrameAt: 0,
   lastPresenceAt: 0,
   lastAvatarBroadcastAt: 0,
+  lastPresenceDbWriteAt: 0,
   lastPresenceSnapshot: '',
   sceneNoticeTimer: 0,
-  optionMenuOpen: false
+  optionMenuOpen: false,
+  presenceDbAvailable: true
 };
 
 function $(id) {
@@ -388,6 +395,10 @@ function normalizeTargetName(value) {
     .slice(0, 32);
 }
 
+function normalizeBubbleMode(value) {
+  return value === 'image' ? 'image' : value === 'direct' ? 'direct' : 'world';
+}
+
 function getReplyLabel(artwork = state.currentArtwork) {
   if (state.messageMode === 'image' && artwork?.id) {
     const author = normalizeTargetName(artwork.display_name) || '投稿者';
@@ -455,6 +466,9 @@ async function ensureSupabase() {
       },
       realtime: {
         params: { eventsPerSecond: 10 }
+      },
+      global: {
+        headers: { 'x-client-id': getClientId() }
       }
     });
     window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT__ = state.supabase;
@@ -1172,14 +1186,12 @@ async function subscribeCurrentArtworkComments() {
 }
 
 function syncPresenceState(presenceState) {
-  const next = new Map();
   Object.values(presenceState || {}).forEach(entries => {
     (Array.isArray(entries) ? entries : []).forEach(entry => {
       const avatar = normalizeRemoteAvatar(entry);
-      if (avatar) next.set(avatar.clientId, avatar);
+      if (avatar) state.remoteAvatars.set(avatar.clientId, avatar);
     });
   });
-  state.remoteAvatars = next;
   updateParticipantCount();
   renderAvatars();
 }
@@ -1197,8 +1209,9 @@ function normalizeRemoteAvatar(payload) {
     x: clampWorldX(Number(payload.x) || WORLD_WIDTH / 2),
     y: clampWorldY(Number(payload.y) || WORLD_HEIGHT / 2),
     bubble: String(payload.bubble || '').slice(0, 120),
-    bubbleMode: payload.bubbleMode === 'direct' ? 'direct' : 'world',
+    bubbleMode: normalizeBubbleMode(payload.bubbleMode),
     bubbleTargetName: normalizeTargetName(payload.bubbleTargetName),
+    bubbleTargetArtworkId: String(payload.bubbleTargetArtworkId || payload.targetArtworkId || ''),
     bubbleUntil: Number(payload.bubbleUntil) || 0,
     walking: Boolean(payload.walking),
     updatedAt: Number(payload.updatedAt) || Date.now()
@@ -1217,16 +1230,46 @@ function handleAvatarStateBroadcast(payload) {
   upsertRemoteAvatar(payload);
 }
 
+function pruneRemoteAvatars() {
+  const now = Date.now();
+  state.remoteAvatars.forEach((avatar, id) => {
+    const updatedAt = Number(avatar.updatedAt) || 0;
+    const hasLiveBubble = avatar.bubble && avatar.bubbleUntil > now;
+    if (!hasLiveBubble && updatedAt && now - updatedAt > REMOTE_AVATAR_STALE_MS) {
+      state.remoteAvatars.delete(id);
+      state.avatarElements.get(id)?.remove();
+      state.avatarElements.delete(id);
+    }
+  });
+}
+
 function updateParticipantCount() {
+  pruneRemoteAvatars();
   const count = Math.max(1, state.remoteAvatars.size + 1);
   setText('participantCount', String(count));
 }
 
 async function trackPresence(force = false) {
-  if (!state.realtimeChannel) return;
   const now = Date.now();
   if (!force && now - state.lastPresenceAt < 180) return;
-  const payload = {
+  const payload = buildLocalPresencePayload(now);
+  const snapshot = JSON.stringify(payload);
+  if (!force && snapshot === state.lastPresenceSnapshot && now - state.lastPresenceAt < 1200) return;
+  state.lastPresenceSnapshot = snapshot;
+  state.lastPresenceAt = now;
+  if (state.realtimeChannel) {
+    try {
+      await state.realtimeChannel.track(payload);
+    } catch (error) {
+      console.warn('[plaza] presence track failed', error);
+    }
+    await broadcastAvatarState(payload, force);
+  }
+  await upsertPresenceRow(payload, force);
+}
+
+function buildLocalPresencePayload(now = Date.now()) {
+  return {
     presenceId: state.presenceId,
     clientId: state.clientId,
     userId: state.authUser?.id || '',
@@ -1237,20 +1280,11 @@ async function trackPresence(force = false) {
     bubble: state.localAvatar.bubbleUntil > now ? state.localAvatar.bubble : '',
     bubbleMode: state.localAvatar.bubbleMode,
     bubbleTargetName: state.localAvatar.bubbleTargetName,
+    bubbleTargetArtworkId: state.localAvatar.bubbleTargetArtworkId,
     bubbleUntil: state.localAvatar.bubbleUntil,
     walking: state.localAvatar.walking,
     updatedAt: now
   };
-  const snapshot = JSON.stringify(payload);
-  if (!force && snapshot === state.lastPresenceSnapshot && now - state.lastPresenceAt < 1200) return;
-  state.lastPresenceSnapshot = snapshot;
-  state.lastPresenceAt = now;
-  try {
-    await state.realtimeChannel.track(payload);
-  } catch (error) {
-    console.warn('[plaza] presence track failed', error);
-  }
-  await broadcastAvatarState(payload, force);
 }
 
 async function broadcastAvatarState(payload, force = false) {
@@ -1269,6 +1303,94 @@ async function broadcastAvatarState(payload, force = false) {
   }
 }
 
+async function upsertPresenceRow(payload, force = false) {
+  if (!state.presenceDbAvailable) return;
+  const now = Date.now();
+  if (!force && now - state.lastPresenceDbWriteAt < PRESENCE_DB_WRITE_MS) return;
+  state.lastPresenceDbWriteAt = now;
+  try {
+    const supabase = await ensureSupabase();
+    const { error } = await supabase
+      .from('plaza_presence')
+      .upsert({
+        room_id: ROOM_ID,
+        presence_id: payload.presenceId,
+        client_id: payload.clientId,
+        user_id: payload.userId || null,
+        display_name: payload.name,
+        avatar: payload.avatar,
+        x: payload.x,
+        y: payload.y,
+        bubble: payload.bubble || null,
+        bubble_mode: normalizeBubbleMode(payload.bubbleMode),
+        bubble_target_name: payload.bubbleTargetName || null,
+        bubble_target_artwork_id: payload.bubbleTargetArtworkId || null,
+        bubble_until: payload.bubbleUntil ? new Date(payload.bubbleUntil).toISOString() : null,
+        walking: Boolean(payload.walking),
+        updated_at: new Date(now).toISOString(),
+        expires_at: new Date(now + PRESENCE_TTL_MS).toISOString()
+      }, { onConflict: 'room_id,presence_id' });
+    if (error) throw error;
+  } catch (error) {
+    state.presenceDbAvailable = false;
+    console.warn('[plaza] presence db fallback disabled', error);
+  }
+}
+
+function normalizePresenceRow(row) {
+  if (!row) return null;
+  const bubbleUntil = Date.parse(row.bubble_until || '');
+  return normalizeRemoteAvatar({
+    presenceId: row.presence_id,
+    clientId: row.client_id,
+    userId: row.user_id,
+    name: row.display_name,
+    avatar: row.avatar,
+    x: row.x,
+    y: row.y,
+    bubble: row.bubble,
+    bubbleMode: row.bubble_mode,
+    bubbleTargetName: row.bubble_target_name,
+    bubbleTargetArtworkId: row.bubble_target_artwork_id,
+    bubbleUntil: Number.isFinite(bubbleUntil) ? bubbleUntil : 0,
+    walking: row.walking,
+    updatedAt: Date.parse(row.updated_at || '') || Date.now()
+  });
+}
+
+async function pollPresenceRows() {
+  if (!state.presenceDbAvailable) return;
+  try {
+    const supabase = await ensureSupabase();
+    const { data, error } = await supabase
+      .from('plaza_presence')
+      .select('room_id,presence_id,client_id,user_id,display_name,avatar,x,y,bubble,bubble_mode,bubble_target_name,bubble_target_artwork_id,bubble_until,walking,updated_at,expires_at')
+      .eq('room_id', ROOM_ID)
+      .gt('expires_at', nowIso())
+      .order('updated_at', { ascending: false })
+      .limit(80);
+    if (error) throw error;
+    (data || []).forEach(row => {
+      const avatar = normalizePresenceRow(row);
+      if (!avatar) return;
+      state.remoteAvatars.set(avatar.clientId, avatar);
+      if (avatar.bubbleMode === 'image' && avatar.bubbleTargetArtworkId && avatar.bubble && avatar.bubbleUntil > Date.now()) {
+        addArtworkBubble(avatar.bubbleTargetArtworkId, {
+          id: `presence-${avatar.clientId}-${avatar.bubbleUntil}`,
+          body: avatar.bubble,
+          displayName: avatar.name,
+          createdAt: avatar.updatedAt ? new Date(avatar.updatedAt).toISOString() : nowIso()
+        });
+      }
+    });
+    updateParticipantCount();
+    renderAvatars();
+  } catch (error) {
+    state.presenceDbAvailable = false;
+    console.warn('[plaza] presence db poll disabled', error);
+  }
+}
+
 function handleBubbleBroadcast(payload) {
   if (!payload || payload.presenceId === state.presenceId) return;
   const peerId = String(payload.presenceId || payload.clientId || '');
@@ -1283,7 +1405,7 @@ function handleBubbleBroadcast(payload) {
     name: 'ゲスト'
   };
   existing.bubble = String(payload.body || '').slice(0, 120);
-  existing.bubbleMode = payload.mode === 'direct' ? 'direct' : 'world';
+  existing.bubbleMode = normalizeBubbleMode(payload.mode);
   existing.bubbleTargetName = normalizeTargetName(payload.targetName);
   existing.bubbleUntil = Date.now() + BUBBLE_DURATION_MS;
   existing.name = String(payload.name || existing.name || 'ゲスト').slice(0, 32);
@@ -1407,8 +1529,9 @@ function formatBubbleText(avatar) {
 
 function setLocalBubble(body, options = {}) {
   state.localAvatar.bubble = String(body || '').slice(0, 120);
-  state.localAvatar.bubbleMode = options.mode === 'direct' ? 'direct' : 'world';
+  state.localAvatar.bubbleMode = normalizeBubbleMode(options.mode);
   state.localAvatar.bubbleTargetName = normalizeTargetName(options.targetName);
+  state.localAvatar.bubbleTargetArtworkId = String(options.targetArtworkId || '');
   state.localAvatar.bubbleUntil = Date.now() + BUBBLE_DURATION_MS;
   renderAvatars();
   trackPresence(true);
@@ -1431,7 +1554,7 @@ async function broadcastBubble(body, options = {}) {
         y: Math.round(state.localAvatar.y * 10) / 10,
         walking: state.localAvatar.walking,
         body,
-        mode: options.mode === 'image' ? 'image' : options.mode === 'direct' ? 'direct' : 'world',
+        mode: normalizeBubbleMode(options.mode),
         targetName: normalizeTargetName(options.targetName),
         targetArtworkId: String(options.targetArtworkId || ''),
         created_at: nowIso()
@@ -2483,9 +2606,14 @@ async function init() {
   await subscribeRealtime();
   await subscribeArtworkChanges();
   updateParticipantCount();
+  await trackPresence(true);
+  await pollPresenceRows();
   window.setInterval(() => {
     trackPresence(true);
   }, 3000);
+  window.setInterval(() => {
+    pollPresenceRows();
+  }, PRESENCE_POLL_MS);
   window.setInterval(() => {
     rotateArtworkSlots();
   }, ARTWORK_ROTATION_INTERVAL_MS);
