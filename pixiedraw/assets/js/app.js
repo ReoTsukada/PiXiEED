@@ -52,6 +52,7 @@
       color: document.getElementById('mobilePanelColor'),
       frames: document.getElementById('mobilePanelFrames'),
       settings: document.getElementById('mobilePanelSettings'),
+      details: document.getElementById('mobilePanelDetails'),
       extensions: document.getElementById('mobilePanelExtensions'),
       help: document.getElementById('mobilePanelHelp'),
       file: document.getElementById('mobilePanelFile'),
@@ -1108,7 +1109,7 @@
       mobile: UNIFIED_LEFT_TOOLS_COLOR_MODE ? dom.mobilePanels.tools : dom.mobilePanels.color,
     },
     frames: { desktop: dom.bottomTimelinePanes || dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.frames },
-    details: { desktop: dom.rightTabPanes || dom.rightRail, mobile: null },
+    details: { desktop: dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.details },
     settings: { desktop: dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.settings },
     extensions: { desktop: dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.extensions },
     help: { desktop: dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.help },
@@ -16532,12 +16533,6 @@
       RIGHT_TAB_KEYS.forEach(key => {
         const section = dom.sections[key];
         if (!section) return;
-        if (key === 'details') {
-          section.hidden = true;
-          section.setAttribute('aria-hidden', 'true');
-          section.classList.remove('is-active', 'is-bottom-docked');
-          return;
-        }
         section.hidden = false;
         section.setAttribute('aria-hidden', 'false');
         section.classList.add('is-active');
@@ -39313,6 +39308,12 @@
   }
 
   function getActiveMobilePanelKey() {
+    const activePanelEntry = Object.entries(dom.mobilePanels || {}).find(([, panel]) => (
+      panel instanceof HTMLElement && panel.classList.contains('is-active') && !panel.hidden
+    ));
+    if (activePanelEntry) {
+      return activePanelEntry[0] || '';
+    }
     if (!Array.isArray(dom.mobileTabs)) {
       return '';
     }
@@ -39387,28 +39388,30 @@
       return false;
     }
     let activated = false;
-    const prevActiveKey = Array.isArray(dom.mobileTabs)
-      ? (dom.mobileTabs.find(b => b.classList.contains('is-active'))?.dataset.mobileTab || '')
-      : '';
+    const prevActiveKey = getActiveMobilePanelKey();
     if (prevActiveKey === normalizedTarget && !ensureDrawer) {
       return true;
     }
+    const hasVisibleTab = Array.isArray(dom.mobileTabs)
+      && dom.mobileTabs.some(btn => btn?.dataset?.mobileTab === normalizedTarget);
     dom.mobileTabs.forEach(btn => {
       const key = btn.dataset.mobileTab;
-      const panel = key ? dom.mobilePanels[key] : null;
-      if (!panel) {
-        return;
-      }
-      const isActive = key === normalizedTarget;
-      if (isActive) {
-        activated = true;
-      }
+      const isActive = hasVisibleTab && key === normalizedTarget;
       btn.classList.toggle('is-active', isActive);
       btn.setAttribute('aria-selected', String(isActive));
       if (isActive) {
         btn.removeAttribute('tabindex');
       } else {
         btn.setAttribute('tabindex', '-1');
+      }
+    });
+    Object.entries(dom.mobilePanels).forEach(([key, panel]) => {
+      if (!(panel instanceof HTMLElement)) {
+        return;
+      }
+      const isActive = key === normalizedTarget;
+      if (isActive) {
+        activated = true;
       }
       panel.classList.toggle('is-active', isActive);
       panel.toggleAttribute('hidden', !isActive);
