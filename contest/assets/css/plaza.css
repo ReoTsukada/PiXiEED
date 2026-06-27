@@ -726,7 +726,8 @@ img {
 
 .plaza-avatar__bubble {
   order: 1;
-  max-width: 150px;
+  width: fit-content;
+  max-width: calc(10ch + 16px);
   min-height: 26px;
   padding: 5px 8px;
   border: 1px solid #c9d5e4;
@@ -737,6 +738,7 @@ img {
   line-height: 1.35;
   box-shadow: 0 8px 18px rgba(42, 63, 92, 0.12);
   overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 .plaza-avatar__bubble.is-direct {
