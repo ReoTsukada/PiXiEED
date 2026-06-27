@@ -866,6 +866,18 @@ body.is-mobile-layout.is-unified-left-tools-color:not(.is-unified-left-color-foc
   display: none;
 }
 
+.rail--left[data-compact="true"] #panelTools .field-group--tools,
+.rail--left[data-compact="true"] #panelTools .field-group--tools > .field,
+.rail--left[data-compact="true"] #panelTools #brushSizeField,
+.rail--left[data-compact="true"] #panelTools #outlineSizeField,
+.rail--left[data-compact="true"] #panelTools #selectionShapeModeField,
+.rail--left[data-compact="true"] #panelTools #selectionOutlineField,
+.rail--left[data-compact="true"] #panelTools #selectSameModeField,
+.rail--left[data-compact="true"] #panelTools .brush-shape-buttons,
+.rail--left[data-compact="true"] #panelTools #customBrushInfo {
+  display: none !important;
+}
+
 .rail--left[data-compact="true"] #panelTools .tool-group-tabs {
   display: grid;
   grid-template-columns: repeat(1, minmax(var(--ui-control-tile-size), var(--ui-control-tile-size)));
