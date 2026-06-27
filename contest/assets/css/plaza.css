@@ -729,6 +729,13 @@ img {
   overflow-wrap: anywhere;
 }
 
+.plaza-avatar__bubble.is-direct {
+  border-color: #00b894;
+  background: #00d7a7;
+  color: #003f34;
+  box-shadow: 0 10px 22px rgba(0, 184, 148, 0.24);
+}
+
 .plaza-avatar__bubble[hidden] {
   display: none;
 }
@@ -1859,6 +1866,49 @@ body[data-page="plaza"] .plaza-commandbar__group {
   display: none;
 }
 
+.plaza-artwork-replies {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.plaza-artwork-reply {
+  position: absolute;
+  left: var(--reply-x);
+  top: var(--reply-y);
+  z-index: 3;
+  min-width: 92px;
+  max-width: 168px;
+  display: grid;
+  gap: 2px;
+  padding: 6px 8px;
+  border: 1px solid #9eead7;
+  border-radius: 14px;
+  background: rgba(236, 253, 245, 0.96);
+  color: #064e3b;
+  box-shadow: 0 10px 20px rgba(6, 78, 59, 0.12);
+  text-align: left;
+}
+
+.plaza-artwork-reply__name,
+.plaza-artwork-reply__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.plaza-artwork-reply__name {
+  font-size: 10px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.plaza-artwork-reply__text {
+  font-size: 11px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
 .plaza-artwork-tile__title,
 .plaza-artwork-tile__sub {
   min-width: 0;
@@ -1928,6 +1978,13 @@ body[data-page="plaza"] .plaza-avatar__bubble {
   border-color: #e4e7ec;
   border-radius: 14px;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+}
+
+body[data-page="plaza"] .plaza-avatar__bubble.is-direct {
+  border-color: #00b894;
+  background: #00d7a7;
+  color: #003f34;
+  box-shadow: 0 10px 24px rgba(0, 184, 148, 0.22);
 }
 
 body[data-page="plaza"] .move-target-marker {
