@@ -706,12 +706,22 @@ img {
   position: absolute;
   width: 78px;
   transform: translate(-50%, -100%);
-  transition: left 120ms linear, top 120ms linear;
+  transition: left 80ms linear, top 80ms linear;
+  opacity: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-end;
   gap: 3px;
+}
+
+.plaza-avatar.is-fading-in {
+  opacity: 0;
+}
+
+.plaza-avatar.is-fading-out {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .plaza-avatar__bubble {
@@ -747,22 +757,6 @@ img {
   object-fit: contain;
   image-rendering: pixelated;
   filter: drop-shadow(0 7px 3px rgba(40, 60, 85, 0.18));
-}
-
-.plaza-avatar.is-walking .plaza-avatar__sprite {
-  animation: avatarStep 420ms steps(2, end) infinite;
-}
-
-@keyframes avatarStep {
-  0% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-2px);
-  }
-  100% {
-    transform: translateY(0);
-  }
 }
 
 .plaza-avatar__name {

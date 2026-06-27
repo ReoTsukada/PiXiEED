@@ -17,6 +17,12 @@ const PRESENCE_TTL_MS = 18000;
 const PRESENCE_POLL_MS = 2000;
 const PRESENCE_DB_WRITE_MS = 2500;
 const REMOTE_AVATAR_STALE_MS = 30000;
+const REMOTE_AVATAR_SEND_MS = 240;
+const REMOTE_AVATAR_SEND_STEP = 6;
+const REMOTE_AVATAR_LERP = 0.2;
+const REMOTE_AVATAR_WARP_DISTANCE = 520;
+const REMOTE_AVATAR_INTEREST_PADDING = 360;
+const REMOTE_AVATAR_FADE_MS = 180;
 const ARTWORK_RETENTION_MS = 24 * 60 * 60 * 1000;
 const WORLD_WIDTH = 4400;
 const WORLD_HEIGHT = 820;
@@ -119,6 +125,7 @@ const state = {
   commentIds: new Set(),
   remoteAvatars: new Map(),
   avatarElements: new Map(),
+  avatarFadeTimers: new Map(),
   localAvatar: {
     x: 1200,
     y: PLAYER_LANE_Y,
@@ -201,8 +208,8 @@ function screenToWorld(clientX, clientY) {
 }
 
 function isAvatarInViewport(avatar, padding = AVATAR_ACTIVE_PADDING) {
-  const x = Number(avatar?.x) || 0;
-  const y = Number(avatar?.y) || 0;
+  const x = Number(avatar?.renderX ?? avatar?.targetX ?? avatar?.x) || 0;
+  const y = Number(avatar?.renderY ?? avatar?.targetY ?? avatar?.y) || 0;
   const visibleWidth = state.camera.width / state.camera.scale;
   const visibleHeight = state.camera.height / state.camera.scale;
   return (
@@ -211,6 +218,57 @@ function isAvatarInViewport(avatar, padding = AVATAR_ACTIVE_PADDING) {
     && y >= state.camera.y - padding
     && y <= state.camera.y + visibleHeight + padding
   );
+}
+
+function getRemoteInterestBounds(padding = REMOTE_AVATAR_INTEREST_PADDING) {
+  const visible = getVisibleWorldSize();
+  return {
+    minX: clampWorldX(state.localAvatar.x - visible.width / 2 - padding),
+    maxX: clampWorldX(state.localAvatar.x + visible.width / 2 + padding)
+  };
+}
+
+function isAvatarWithinInterestRange(avatar, padding = REMOTE_AVATAR_INTEREST_PADDING) {
+  const x = Number(avatar?.targetX ?? avatar?.x ?? avatar?.renderX) || 0;
+  const { minX, maxX } = getRemoteInterestBounds(padding);
+  return x >= minX && x <= maxX;
+}
+
+function clearAvatarFadeTimer(clientId) {
+  const timer = state.avatarFadeTimers.get(clientId);
+  if (!timer) return;
+  window.clearTimeout(timer);
+  state.avatarFadeTimers.delete(clientId);
+}
+
+function removeAvatarElement(clientId) {
+  clearAvatarFadeTimer(clientId);
+  state.avatarElements.get(clientId)?.remove();
+  state.avatarElements.delete(clientId);
+}
+
+function ensureAvatarVisible(clientId, el) {
+  clearAvatarFadeTimer(clientId);
+  if (!el.dataset.visible || el.classList.contains('is-fading-out')) {
+    el.classList.remove('is-fading-out');
+    el.classList.add('is-fading-in');
+    el.dataset.visible = '1';
+    window.requestAnimationFrame(() => {
+      el.classList.remove('is-fading-in');
+    });
+  }
+}
+
+function fadeOutAvatar(clientId, el) {
+  if (!el || clientId === state.clientId) return;
+  if (state.avatarFadeTimers.has(clientId)) return;
+  el.classList.remove('is-fading-in');
+  el.classList.add('is-fading-out');
+  el.dataset.visible = '';
+  const timer = window.setTimeout(() => {
+    removeAvatarElement(clientId);
+  }, REMOTE_AVATAR_FADE_MS);
+  state.avatarFadeTimers.set(clientId, timer);
 }
 
 function nowIso() {
@@ -397,6 +455,10 @@ function normalizeTargetName(value) {
 
 function normalizeBubbleMode(value) {
   return value === 'image' ? 'image' : value === 'direct' ? 'direct' : 'world';
+}
+
+function quantizeAvatarX(value) {
+  return Math.round((Number(value) || 0) / REMOTE_AVATAR_SEND_STEP) * REMOTE_AVATAR_SEND_STEP;
 }
 
 function getReplyLabel(artwork = state.currentArtwork) {
@@ -1186,11 +1248,22 @@ async function subscribeCurrentArtworkComments() {
 }
 
 function syncPresenceState(presenceState) {
+  const livePresenceIds = new Set();
   Object.values(presenceState || {}).forEach(entries => {
     (Array.isArray(entries) ? entries : []).forEach(entry => {
       const avatar = normalizeRemoteAvatar(entry);
-      if (avatar) state.remoteAvatars.set(avatar.clientId, avatar);
+      if (!avatar) return;
+      livePresenceIds.add(avatar.clientId);
+      if (isAvatarWithinInterestRange(avatar, REMOTE_AVATAR_INTEREST_PADDING * 1.5)) {
+        upsertRemoteAvatar(avatar, { render: false });
+      }
     });
+  });
+  state.remoteAvatars.forEach((_avatar, id) => {
+    if (livePresenceIds.size && !livePresenceIds.has(id)) {
+      state.remoteAvatars.delete(id);
+      fadeOutAvatar(id, state.avatarElements.get(id));
+    }
   });
   updateParticipantCount();
   renderAvatars();
@@ -1200,14 +1273,20 @@ function normalizeRemoteAvatar(payload) {
   if (!payload || payload.presenceId === state.presenceId) return null;
   const peerId = String(payload.presenceId || payload.clientId || '');
   if (!peerId) return null;
+  const targetX = clampWorldX(Number(payload.x) || WORLD_WIDTH / 2);
+  const targetY = clampWorldY(Number(payload.y) || WORLD_HEIGHT / 2);
   return {
     clientId: peerId,
     guestClientId: String(payload.clientId || ''),
     presenceId: peerId,
     name: String(payload.name || 'ゲスト').slice(0, 32),
     avatar: String(payload.avatar || 'mao'),
-    x: clampWorldX(Number(payload.x) || WORLD_WIDTH / 2),
-    y: clampWorldY(Number(payload.y) || WORLD_HEIGHT / 2),
+    x: targetX,
+    y: targetY,
+    targetX,
+    targetY,
+    renderX: targetX,
+    renderY: targetY,
     bubble: String(payload.bubble || '').slice(0, 120),
     bubbleMode: normalizeBubbleMode(payload.bubbleMode),
     bubbleTargetName: normalizeTargetName(payload.bubbleTargetName),
@@ -1218,16 +1297,37 @@ function normalizeRemoteAvatar(payload) {
   };
 }
 
-function upsertRemoteAvatar(payload) {
+function upsertRemoteAvatar(payload, options = {}) {
+  const shouldRender = options.render !== false;
   const avatar = normalizeRemoteAvatar(payload);
   if (!avatar) return;
-  state.remoteAvatars.set(avatar.clientId, avatar);
-  updateParticipantCount();
-  renderAvatars();
+  const existing = state.remoteAvatars.get(avatar.clientId);
+  if (existing) {
+    const previousRenderX = Number(existing.renderX ?? existing.x ?? avatar.x);
+    const previousRenderY = Number(existing.renderY ?? existing.y ?? avatar.y);
+    const shouldWarp = Math.abs(avatar.x - previousRenderX) > REMOTE_AVATAR_WARP_DISTANCE;
+    avatar.renderX = shouldWarp ? avatar.x : previousRenderX;
+    avatar.renderY = shouldWarp ? avatar.y : previousRenderY;
+  }
+  state.remoteAvatars.set(avatar.clientId, {
+    ...existing,
+    ...avatar
+  });
+  if (shouldRender) {
+    updateParticipantCount();
+    renderAvatars();
+  }
 }
 
 function handleAvatarStateBroadcast(payload) {
-  upsertRemoteAvatar(payload);
+  const avatar = normalizeRemoteAvatar(payload);
+  if (!avatar) return;
+  if (!isAvatarWithinInterestRange(avatar, REMOTE_AVATAR_INTEREST_PADDING * 1.5)) {
+    state.remoteAvatars.delete(avatar.clientId);
+    fadeOutAvatar(avatar.clientId, state.avatarElements.get(avatar.clientId));
+    return;
+  }
+  upsertRemoteAvatar(avatar);
 }
 
 function pruneRemoteAvatars() {
@@ -1237,8 +1337,7 @@ function pruneRemoteAvatars() {
     const hasLiveBubble = avatar.bubble && avatar.bubbleUntil > now;
     if (!hasLiveBubble && updatedAt && now - updatedAt > REMOTE_AVATAR_STALE_MS) {
       state.remoteAvatars.delete(id);
-      state.avatarElements.get(id)?.remove();
-      state.avatarElements.delete(id);
+      removeAvatarElement(id);
     }
   });
 }
@@ -1251,7 +1350,7 @@ function updateParticipantCount() {
 
 async function trackPresence(force = false) {
   const now = Date.now();
-  if (!force && now - state.lastPresenceAt < 180) return;
+  if (!force && now - state.lastPresenceAt < REMOTE_AVATAR_SEND_MS) return;
   const payload = buildLocalPresencePayload(now);
   const snapshot = JSON.stringify(payload);
   if (!force && snapshot === state.lastPresenceSnapshot && now - state.lastPresenceAt < 1200) return;
@@ -1275,7 +1374,7 @@ function buildLocalPresencePayload(now = Date.now()) {
     userId: state.authUser?.id || '',
     name: getDisplayName(),
     avatar: getAvatarId(),
-    x: Math.round(state.localAvatar.x * 10) / 10,
+    x: quantizeAvatarX(state.localAvatar.x),
     y: Math.round(state.localAvatar.y * 10) / 10,
     bubble: state.localAvatar.bubbleUntil > now ? state.localAvatar.bubble : '',
     bubbleMode: state.localAvatar.bubbleMode,
@@ -1362,18 +1461,21 @@ async function pollPresenceRows() {
   if (!state.presenceDbAvailable) return;
   try {
     const supabase = await ensureSupabase();
+    const { minX, maxX } = getRemoteInterestBounds(REMOTE_AVATAR_INTEREST_PADDING * 1.5);
     const { data, error } = await supabase
       .from('plaza_presence')
       .select('room_id,presence_id,client_id,user_id,display_name,avatar,x,y,bubble,bubble_mode,bubble_target_name,bubble_target_artwork_id,bubble_until,walking,updated_at,expires_at')
       .eq('room_id', ROOM_ID)
       .gt('expires_at', nowIso())
+      .gte('x', minX)
+      .lte('x', maxX)
       .order('updated_at', { ascending: false })
       .limit(80);
     if (error) throw error;
     (data || []).forEach(row => {
       const avatar = normalizePresenceRow(row);
       if (!avatar) return;
-      state.remoteAvatars.set(avatar.clientId, avatar);
+      upsertRemoteAvatar(avatar, { render: false });
       if (avatar.bubbleMode === 'image' && avatar.bubbleTargetArtworkId && avatar.bubble && avatar.bubbleUntil > Date.now()) {
         addArtworkBubble(avatar.bubbleTargetArtworkId, {
           id: `presence-${avatar.clientId}-${avatar.bubbleUntil}`,
@@ -1410,11 +1512,24 @@ function handleBubbleBroadcast(payload) {
   existing.bubbleUntil = Date.now() + BUBBLE_DURATION_MS;
   existing.name = String(payload.name || existing.name || 'ゲスト').slice(0, 32);
   existing.avatar = String(payload.avatar || existing.avatar || 'mao');
-  existing.x = clampWorldX(Number(payload.x) || existing.x || WORLD_WIDTH / 2);
-  existing.y = clampWorldY(Number(payload.y) || existing.y || WORLD_HEIGHT / 2);
+  const targetX = clampWorldX(Number(payload.x) || existing.targetX || existing.x || WORLD_WIDTH / 2);
+  const targetY = clampWorldY(Number(payload.y) || existing.targetY || existing.y || WORLD_HEIGHT / 2);
+  const currentRenderX = Number(existing.renderX ?? existing.x ?? targetX);
+  const shouldWarp = Math.abs(targetX - currentRenderX) > REMOTE_AVATAR_WARP_DISTANCE;
+  existing.x = targetX;
+  existing.y = targetY;
+  existing.targetX = targetX;
+  existing.targetY = targetY;
+  existing.renderX = shouldWarp ? targetX : currentRenderX;
+  existing.renderY = shouldWarp ? targetY : Number(existing.renderY ?? existing.y ?? targetY);
   existing.walking = Boolean(payload.walking);
   existing.updatedAt = Date.now();
-  state.remoteAvatars.set(peerId, existing);
+  if (isAvatarWithinInterestRange(existing, REMOTE_AVATAR_INTEREST_PADDING * 1.25)) {
+    state.remoteAvatars.set(peerId, existing);
+  } else {
+    state.remoteAvatars.delete(peerId);
+    fadeOutAvatar(peerId, state.avatarElements.get(peerId));
+  }
   addComment({
     id: payload.commentId || makeId('live'),
     display_name: existing.name,
@@ -1438,6 +1553,22 @@ function handleBubbleBroadcast(payload) {
   renderAvatars();
 }
 
+function updateRemoteAvatarMotion() {
+  state.remoteAvatars.forEach((avatar, id) => {
+    const targetX = Number(avatar.targetX ?? avatar.x ?? WORLD_WIDTH / 2);
+    const targetY = Number(avatar.targetY ?? avatar.y ?? PLAYER_LANE_Y);
+    const currentX = Number(avatar.renderX ?? avatar.x ?? targetX);
+    const currentY = Number(avatar.renderY ?? avatar.y ?? targetY);
+    const dx = targetX - currentX;
+    const dy = targetY - currentY;
+    const shouldWarp = Math.abs(dx) > REMOTE_AVATAR_WARP_DISTANCE;
+    avatar.renderX = shouldWarp ? targetX : currentX + dx * REMOTE_AVATAR_LERP;
+    avatar.renderY = shouldWarp ? targetY : currentY + dy * REMOTE_AVATAR_LERP;
+    avatar.walking = Math.abs(dx) > 1.5;
+    state.remoteAvatars.set(id, avatar);
+  });
+}
+
 function handleNewArtworkBroadcast(payload) {
   const artwork = normalizeArtwork(payload?.artwork);
   if (!artwork?.id) return;
@@ -1459,7 +1590,12 @@ function upsertArtwork(artwork, prioritize = false) {
 function renderAvatars() {
   const layer = $('avatarLayer');
   if (!layer) return;
-  const avatars = new Map(state.remoteAvatars);
+  const avatars = new Map();
+  state.remoteAvatars.forEach((avatar, id) => {
+    if (isAvatarWithinInterestRange(avatar) || isAvatarInViewport(avatar, REMOTE_AVATAR_INTEREST_PADDING)) {
+      avatars.set(id, avatar);
+    }
+  });
   avatars.set(state.clientId, {
     clientId: state.clientId,
     name: getDisplayName(),
@@ -1475,10 +1611,8 @@ function renderAvatars() {
   });
   const liveIds = new Set(avatars.keys());
   Array.from(state.avatarElements.keys()).forEach(id => {
-    if (!liveIds.has(id)) {
-      state.avatarElements.get(id)?.remove();
-      state.avatarElements.delete(id);
-    }
+    if (id === state.clientId) return;
+    if (!liveIds.has(id)) fadeOutAvatar(id, state.avatarElements.get(id));
   });
   avatars.forEach(avatar => {
     let el = state.avatarElements.get(avatar.clientId);
@@ -1487,10 +1621,13 @@ function renderAvatars() {
       state.avatarElements.set(avatar.clientId, el);
       layer.appendChild(el);
     }
-    el.style.left = `${avatar.x}px`;
-    el.style.top = `${avatar.y}px`;
+    ensureAvatarVisible(avatar.clientId, el);
+    const renderX = avatar.isSelf ? avatar.x : Number(avatar.renderX ?? avatar.x ?? 0);
+    const renderY = avatar.isSelf ? avatar.y : Number(avatar.renderY ?? avatar.y ?? PLAYER_LANE_Y);
+    el.style.left = `${renderX}px`;
+    el.style.top = `${renderY}px`;
     el.classList.toggle('is-self', Boolean(avatar.isSelf));
-    el.classList.toggle('is-walking', Boolean(avatar.walking));
+    el.classList.toggle('is-walking', false);
     const img = el.querySelector('.plaza-avatar__sprite');
     if (img) img.src = getAvatarSrc(avatar.avatar);
     const name = el.querySelector('.plaza-avatar__name');
@@ -1550,7 +1687,7 @@ async function broadcastBubble(body, options = {}) {
         commentId: options.commentId || '',
         name: getDisplayName(),
         avatar: getAvatarId(),
-        x: Math.round(state.localAvatar.x * 10) / 10,
+        x: quantizeAvatarX(state.localAvatar.x),
         y: Math.round(state.localAvatar.y * 10) / 10,
         walking: state.localAvatar.walking,
         body,
@@ -1854,6 +1991,7 @@ function animationLoop(timestamp) {
   state.lastFrameAt = timestamp;
   updateLocalMovement(dt);
   updateCamera();
+  updateRemoteAvatarMotion();
   renderAvatars();
   trackPresence(false);
   window.requestAnimationFrame(animationLoop);
