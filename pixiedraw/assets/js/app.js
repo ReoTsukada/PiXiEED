@@ -23427,6 +23427,7 @@
 
   function setupTopActionButtons() {
     dom.topActionButtons = Array.from(document.querySelectorAll('[data-ui-action]'));
+    dom.mobileQuickPanelButtons = Array.from(document.querySelectorAll('[data-mobile-quick-open-panel]'));
     const quickRightTabButtons = Array.from(document.querySelectorAll('[data-quick-right-tab]'));
     const detailActionButtons = Array.from(document.querySelectorAll('[data-detail-action]'));
     syncExternalToolActionButtons();
@@ -23485,6 +23486,19 @@
             dom.controls.pixieedAccountLogin?.focus?.({ preventScroll: true });
           });
         }
+      });
+    });
+    dom.mobileQuickPanelButtons.forEach(button => {
+      if (!(button instanceof HTMLButtonElement) || button.dataset.mobileQuickPanelBound === 'true') {
+        return;
+      }
+      button.dataset.mobileQuickPanelBound = 'true';
+      button.addEventListener('click', () => {
+        const target = button.dataset.mobileQuickOpenPanel || '';
+        if (!target) {
+          return;
+        }
+        activateMobileTab(target, { ensureDrawer: true });
       });
     });
   }
@@ -39695,10 +39709,12 @@
         activateMobileTab(target, { ensureDrawer: false });
       });
     });
+    dom.mobileQuickPanelButtons = Array.from(document.querySelectorAll('[data-mobile-quick-open-panel]'));
     dom.mobileQuickPanelButtons.forEach(button => {
-      if (!(button instanceof HTMLButtonElement)) {
+      if (!(button instanceof HTMLButtonElement) || button.dataset.mobileQuickPanelBound === 'true') {
         return;
       }
+      button.dataset.mobileQuickPanelBound = 'true';
       button.addEventListener('click', () => {
         const target = button.dataset.mobileQuickOpenPanel || '';
         if (!target) {
