@@ -12,6 +12,7 @@ const THUMB_EDGE = 256;
 const ARTWORK_SLOT_COUNT = 10;
 const ARTWORK_ROTATION_INTERVAL_MS = 10000;
 const BUBBLE_DURATION_MS = 6500;
+const ARTWORK_REPLY_BUBBLE_MS = 30000;
 const ARTWORK_RETENTION_MS = 24 * 60 * 60 * 1000;
 const WORLD_WIDTH = 4400;
 const WORLD_HEIGHT = 820;
@@ -26,9 +27,7 @@ const ZOOM_STEP = 0.16;
 const WORLD_OBJECTS = [];
 
 const SPAWN_ZONES = [
-  { x: 320, y: PLAYER_LANE_Y, width: 1040, height: 1 },
-  { x: 1660, y: PLAYER_LANE_Y, width: 1160, height: 1 },
-  { x: 3180, y: PLAYER_LANE_Y, width: 820, height: 1 }
+  { x: 720, y: PLAYER_LANE_Y, width: 760, height: 1 }
 ];
 
 const AVATARS = [
@@ -97,6 +96,7 @@ const state = {
   supabasePromise: null,
   authUser: null,
   clientId: '',
+  presenceId: '',
   realtimeChannel: null,
   commentsChannel: null,
   artworksChannel: null,
@@ -107,6 +107,10 @@ const state = {
   artworkDeckSignature: '',
   currentArtwork: null,
   currentArtworkId: '',
+  messageMode: 'world',
+  directTargetName: '',
+  directTargetArtworkId: '',
+  artworkBubbles: new Map(),
   comments: [],
   commentIds: new Set(),
   remoteAvatars: new Map(),
@@ -118,6 +122,8 @@ const state = {
     targetY: PLAYER_LANE_Y,
     path: [],
     bubble: '',
+    bubbleMode: 'world',
+    bubbleTargetName: '',
     bubbleUntil: 0,
     walking: false
   },
@@ -137,6 +143,7 @@ const state = {
   moveMarkerTimer: 0,
   lastFrameAt: 0,
   lastPresenceAt: 0,
+  lastAvatarBroadcastAt: 0,
   lastPresenceSnapshot: '',
   sceneNoticeTimer: 0,
   optionMenuOpen: false
@@ -373,10 +380,23 @@ function getArtworkRemainingLabel(artwork) {
   return `残り${minutes}分`;
 }
 
+function normalizeTargetName(value) {
+  return String(value || '')
+    .trim()
+    .replace(/^@+/, '')
+    .replace(/\s+/g, '_')
+    .slice(0, 32);
+}
+
 function getReplyLabel(artwork = state.currentArtwork) {
-  if (!artwork?.id) return '画像を選ぶとリプライできます';
-  const author = artwork.display_name ? `@${artwork.display_name}` : '投稿者';
-  return `返信先: ${author} / ${artwork.title || '無題'}`;
+  if (state.messageMode === 'image' && artwork?.id) {
+    const author = normalizeTargetName(artwork.display_name) || '投稿者';
+    return `画像リプライ: @${author} / ${artwork.title || '無題'}`;
+  }
+  if (state.messageMode === 'direct' && state.directTargetName) {
+    return `宛先: @${state.directTargetName} / エメラルド`;
+  }
+  return 'ワールド発言';
 }
 
 function setStatus(message) {
@@ -611,8 +631,14 @@ async function loadArtworks() {
 
 function updateArtworkRotation(force = false) {
   const pool = syncArtworkSlots({ advance: force });
-  const displayed = getDisplayedArtworks();
-  const next = pool.find(item => item.id === state.currentArtworkId) || displayed[0] || pool[0] || null;
+  const next = state.messageMode === 'image' && state.currentArtworkId
+    ? pool.find(item => item.id === state.currentArtworkId) || null
+    : null;
+  if (state.messageMode === 'image' && state.currentArtworkId && !next) {
+    setWorldMessageMode({ clearArtwork: true });
+    renderArtworkWall();
+    return;
+  }
   const nextId = next?.id || '';
   const changed = nextId !== state.currentArtworkId;
   if (!force && !changed) {
@@ -660,7 +686,11 @@ function updateReplyTargetUi() {
   const text = getReplyLabel(artwork);
   if (label) label.textContent = text;
   if (input) {
-    input.placeholder = artwork?.id ? 'この画像にリプライ' : 'コメントを入力';
+    input.placeholder = state.messageMode === 'image'
+      ? 'この画像にリプライ'
+      : state.messageMode === 'direct'
+        ? 'エメラルドグリーンで宛て発言'
+        : '/to 名前 本文 または コメント';
   }
 }
 
@@ -704,6 +734,76 @@ function getArtworkTilePosition(index) {
   };
 }
 
+function getArtworkBubblePosition(index) {
+  const positions = [
+    { x: -42, y: -28 },
+    { x: 148, y: -38 },
+    { x: 232, y: 42 },
+    { x: 178, y: 228 },
+    { x: -34, y: 202 },
+    { x: -70, y: 78 }
+  ];
+  return positions[index % positions.length];
+}
+
+function pruneArtworkBubbles() {
+  const now = Date.now();
+  state.artworkBubbles.forEach((items, artworkId) => {
+    const next = items.filter(item => item.until > now);
+    if (next.length) {
+      state.artworkBubbles.set(artworkId, next);
+    } else {
+      state.artworkBubbles.delete(artworkId);
+    }
+  });
+}
+
+function getArtworkBubbles(artworkId) {
+  pruneArtworkBubbles();
+  return (state.artworkBubbles.get(String(artworkId || '')) || []).slice(-4);
+}
+
+function addArtworkBubble(artworkId, bubble = {}) {
+  const id = String(artworkId || '');
+  const body = String(bubble.body || '').trim().slice(0, 120);
+  if (!id || !body) return;
+  const items = state.artworkBubbles.get(id) || [];
+  const next = items
+    .filter(item => item.id !== bubble.id)
+    .concat({
+      id: bubble.id || makeId('art-bubble'),
+      body,
+      displayName: String(bubble.displayName || bubble.display_name || 'ゲスト').slice(0, 32),
+      createdAt: bubble.createdAt || bubble.created_at || nowIso(),
+      until: Date.now() + ARTWORK_REPLY_BUBBLE_MS
+    })
+    .slice(-8);
+  state.artworkBubbles.set(id, next);
+}
+
+function renderArtworkReplyBubbles(tile, artwork) {
+  const bubbles = getArtworkBubbles(artwork.id);
+  if (!bubbles.length) return;
+  const layer = document.createElement('span');
+  layer.className = 'plaza-artwork-replies';
+  bubbles.forEach((bubble, index) => {
+    const position = getArtworkBubblePosition(index);
+    const item = document.createElement('span');
+    item.className = 'plaza-artwork-reply';
+    item.style.setProperty('--reply-x', `${position.x}px`);
+    item.style.setProperty('--reply-y', `${position.y}px`);
+    const name = document.createElement('span');
+    name.className = 'plaza-artwork-reply__name';
+    name.textContent = bubble.displayName || 'ゲスト';
+    const text = document.createElement('span');
+    text.className = 'plaza-artwork-reply__text';
+    text.textContent = bubble.body;
+    item.append(name, text);
+    layer.appendChild(item);
+  });
+  tile.appendChild(layer);
+}
+
 function renderArtworkWall() {
   const wall = $('artworkWall');
   const empty = $('emptyArtworkWall');
@@ -715,12 +815,13 @@ function renderArtworkWall() {
   items.forEach((artwork, index) => {
     const position = getArtworkTilePosition(index);
     const button = document.createElement('button');
-    button.className = `plaza-artwork-tile${artwork.id === state.currentArtworkId ? ' is-selected' : ''}`;
+    const isSelected = state.messageMode === 'image' && artwork.id === state.currentArtworkId;
+    button.className = `plaza-artwork-tile${isSelected ? ' is-selected' : ''}`;
     button.type = 'button';
     button.style.left = `${position.x}px`;
     button.style.top = `${position.y}px`;
     button.setAttribute('aria-label', `${artwork.title || '無題'}にリプライ`);
-    button.setAttribute('aria-pressed', String(artwork.id === state.currentArtworkId));
+    button.setAttribute('aria-pressed', String(isSelected));
 
     const imageWrap = document.createElement('span');
     imageWrap.className = 'plaza-artwork-tile__image';
@@ -740,6 +841,7 @@ function renderArtworkWall() {
     meta.append(title, sub);
 
     button.append(imageWrap, meta);
+    renderArtworkReplyBubbles(button, artwork);
     button.addEventListener('click', () => {
       selectArtwork(artwork.id, { focusInput: true, announce: true });
     });
@@ -748,20 +850,76 @@ function renderArtworkWall() {
   wall.appendChild(fragment);
 }
 
+function setWorldMessageMode({ clearArtwork = false, announce = false } = {}) {
+  state.messageMode = 'world';
+  state.directTargetName = '';
+  state.directTargetArtworkId = '';
+  if (clearArtwork) {
+    state.currentArtwork = null;
+    state.currentArtworkId = '';
+    state.comments = [];
+    state.commentIds.clear();
+    renderArtwork();
+    renderComments();
+    subscribeCurrentArtworkComments();
+  }
+  updateReplyTargetUi();
+  renderArtworkWall();
+  if (announce) showSceneNotice('ワールド発言に切り替えました');
+}
+
+function setDirectMessageMode(target = {}, options = {}) {
+  const name = normalizeTargetName(target.name || target.display_name || target.displayName);
+  if (!name) {
+    showSceneNotice('宛て先のユーザーがありません');
+    return false;
+  }
+  state.messageMode = 'direct';
+  state.directTargetName = name;
+  state.directTargetArtworkId = String(target.artworkId || target.artwork_id || '');
+  if (options.clearArtwork) {
+    state.currentArtwork = null;
+    state.currentArtworkId = '';
+    state.comments = [];
+    state.commentIds.clear();
+    renderArtwork();
+    renderComments();
+    subscribeCurrentArtworkComments();
+  }
+  updateReplyTargetUi();
+  renderArtworkWall();
+  if (options.announce) showSceneNotice(`@${name} へエメラルド発言します`);
+  return true;
+}
+
+function setImageReplyMode(artwork, options = {}) {
+  if (!artwork?.id) {
+    showSceneNotice('リプライする画像がありません');
+    return false;
+  }
+  state.currentArtwork = artwork;
+  state.currentArtworkId = artwork.id;
+  state.messageMode = 'image';
+  state.directTargetName = normalizeTargetName(artwork.display_name);
+  state.directTargetArtworkId = artwork.id;
+  updateReplyTargetUi();
+  renderArtworkWall();
+  if (options.announce) showSceneNotice(`「${artwork.title || '無題'}」へ画像リプライします`);
+  return true;
+}
+
 function rotateArtworkSlots() {
   syncArtworkSlots({ advance: true });
   if (state.currentArtworkId) {
     const current = state.artworks.find(item => item.id === state.currentArtworkId) || null;
     if (!current) {
-      state.currentArtwork = null;
-      state.currentArtworkId = '';
-      state.comments = [];
-      state.commentIds.clear();
+      setWorldMessageMode({ clearArtwork: true });
       renderArtwork();
-      renderComments();
-      subscribeCurrentArtworkComments();
     } else {
       state.currentArtwork = current;
+      if (state.messageMode === 'image' && state.directTargetArtworkId === current.id) {
+        state.directTargetName = normalizeTargetName(current.display_name);
+      }
       updateReplyTargetUi();
     }
   }
@@ -772,15 +930,14 @@ function selectArtwork(artworkId, options = {}) {
   const artwork = state.artworks.find(item => item.id === artworkId);
   if (!artwork) return;
   const changed = artwork.id !== state.currentArtworkId;
-  state.currentArtwork = artwork;
-  state.currentArtworkId = artwork.id;
+  setImageReplyMode(artwork);
   renderArtwork();
   renderArtworkWall();
   if (changed) {
     loadCommentsForCurrentArtwork();
     subscribeCurrentArtworkComments();
   }
-  if (options.announce) showSceneNotice(`「${artwork.title || '無題'}」へリプライします`);
+  if (options.announce) showSceneNotice(`「${artwork.title || '無題'}」へ画像リプライします`);
   if (options.focusInput) {
     window.setTimeout(() => $('chatInput')?.focus({ preventScroll: true }), 40);
   }
@@ -804,7 +961,15 @@ async function loadCommentsForCurrentArtwork() {
       .order('created_at', { ascending: true })
       .limit(80);
     if (error) throw error;
-    (data || []).forEach(addComment);
+    (data || []).forEach(comment => {
+      addComment(comment);
+      addArtworkBubble(artwork.id, {
+        id: comment.id,
+        body: comment.body,
+        displayName: comment.display_name,
+        createdAt: comment.created_at
+      });
+    });
   } catch (error) {
     console.warn('[plaza] comments load skipped', error);
   }
@@ -820,6 +985,8 @@ function addComment(comment) {
     avatar: String(comment.avatar || 'mao'),
     body: String(comment.body || '').slice(0, 280),
     comment_type: comment.comment_type || 'comment',
+    chat_mode: comment.chat_mode === 'direct' ? 'direct' : 'world',
+    target_name: normalizeTargetName(comment.target_name),
     is_paid: Boolean(comment.is_paid),
     created_at: comment.created_at || nowIso(),
     is_live: Boolean(comment.is_live)
@@ -882,13 +1049,16 @@ async function subscribeRealtime() {
     const supabase = await ensureSupabase();
     const channel = supabase.channel(`plaza-room-${ROOM_ID}`, {
       config: {
-        presence: { key: state.clientId },
+        presence: { key: state.presenceId },
         broadcast: { self: false }
       }
     });
     channel
       .on('presence', { event: 'sync' }, () => {
         syncPresenceState(channel.presenceState());
+      })
+      .on('broadcast', { event: 'avatar:state' }, ({ payload }) => {
+        handleAvatarStateBroadcast(payload);
       })
       .on('broadcast', { event: 'bubble' }, ({ payload }) => {
         handleBubbleBroadcast(payload);
@@ -958,10 +1128,7 @@ function removeArtworkById(artworkId) {
   const wasCurrent = state.currentArtworkId === id;
   state.artworks = state.artworks.filter(item => item.id !== id);
   if (wasCurrent) {
-    state.currentArtwork = null;
-    state.currentArtworkId = '';
-    state.comments = [];
-    state.commentIds.clear();
+    setWorldMessageMode({ clearArtwork: true });
   }
   updateArtworkRotation(true);
   renderArtworkWall();
@@ -988,7 +1155,14 @@ async function subscribeCurrentArtworkComments() {
         filter: `artwork_id=eq.${artwork.id}`
       }, payload => {
         addComment(payload.new);
+        addArtworkBubble(artwork.id, {
+          id: payload.new?.id,
+          body: payload.new?.body,
+          displayName: payload.new?.display_name,
+          createdAt: payload.new?.created_at
+        });
         renderComments();
+        renderArtworkWall();
       })
       .subscribe();
     state.commentsChannel = channel;
@@ -1001,25 +1175,46 @@ function syncPresenceState(presenceState) {
   const next = new Map();
   Object.values(presenceState || {}).forEach(entries => {
     (Array.isArray(entries) ? entries : []).forEach(entry => {
-      if (!entry || entry.clientId === state.clientId) return;
-      const clientId = String(entry.clientId || '');
-      if (!clientId) return;
-      next.set(clientId, {
-        clientId,
-        name: String(entry.name || 'ゲスト').slice(0, 32),
-        avatar: String(entry.avatar || 'mao'),
-        x: clampWorldX(Number(entry.x) || WORLD_WIDTH / 2),
-        y: clampWorldY(Number(entry.y) || WORLD_HEIGHT / 2),
-        bubble: String(entry.bubble || '').slice(0, 120),
-        bubbleUntil: Number(entry.bubbleUntil) || 0,
-        walking: Boolean(entry.walking),
-        updatedAt: Number(entry.updatedAt) || Date.now()
-      });
+      const avatar = normalizeRemoteAvatar(entry);
+      if (avatar) next.set(avatar.clientId, avatar);
     });
   });
   state.remoteAvatars = next;
   updateParticipantCount();
   renderAvatars();
+}
+
+function normalizeRemoteAvatar(payload) {
+  if (!payload || payload.presenceId === state.presenceId) return null;
+  const peerId = String(payload.presenceId || payload.clientId || '');
+  if (!peerId) return null;
+  return {
+    clientId: peerId,
+    guestClientId: String(payload.clientId || ''),
+    presenceId: peerId,
+    name: String(payload.name || 'ゲスト').slice(0, 32),
+    avatar: String(payload.avatar || 'mao'),
+    x: clampWorldX(Number(payload.x) || WORLD_WIDTH / 2),
+    y: clampWorldY(Number(payload.y) || WORLD_HEIGHT / 2),
+    bubble: String(payload.bubble || '').slice(0, 120),
+    bubbleMode: payload.bubbleMode === 'direct' ? 'direct' : 'world',
+    bubbleTargetName: normalizeTargetName(payload.bubbleTargetName),
+    bubbleUntil: Number(payload.bubbleUntil) || 0,
+    walking: Boolean(payload.walking),
+    updatedAt: Number(payload.updatedAt) || Date.now()
+  };
+}
+
+function upsertRemoteAvatar(payload) {
+  const avatar = normalizeRemoteAvatar(payload);
+  if (!avatar) return;
+  state.remoteAvatars.set(avatar.clientId, avatar);
+  updateParticipantCount();
+  renderAvatars();
+}
+
+function handleAvatarStateBroadcast(payload) {
+  upsertRemoteAvatar(payload);
 }
 
 function updateParticipantCount() {
@@ -1032,6 +1227,7 @@ async function trackPresence(force = false) {
   const now = Date.now();
   if (!force && now - state.lastPresenceAt < 180) return;
   const payload = {
+    presenceId: state.presenceId,
     clientId: state.clientId,
     userId: state.authUser?.id || '',
     name: getDisplayName(),
@@ -1039,6 +1235,8 @@ async function trackPresence(force = false) {
     x: Math.round(state.localAvatar.x * 10) / 10,
     y: Math.round(state.localAvatar.y * 10) / 10,
     bubble: state.localAvatar.bubbleUntil > now ? state.localAvatar.bubble : '',
+    bubbleMode: state.localAvatar.bubbleMode,
+    bubbleTargetName: state.localAvatar.bubbleTargetName,
     bubbleUntil: state.localAvatar.bubbleUntil,
     walking: state.localAvatar.walking,
     updatedAt: now
@@ -1052,33 +1250,69 @@ async function trackPresence(force = false) {
   } catch (error) {
     console.warn('[plaza] presence track failed', error);
   }
+  await broadcastAvatarState(payload, force);
+}
+
+async function broadcastAvatarState(payload, force = false) {
+  const now = Date.now();
+  if (!state.realtimeChannel) return;
+  if (!force && now - state.lastAvatarBroadcastAt < 1000) return;
+  state.lastAvatarBroadcastAt = now;
+  try {
+    await state.realtimeChannel.send({
+      type: 'broadcast',
+      event: 'avatar:state',
+      payload
+    });
+  } catch (error) {
+    console.warn('[plaza] avatar broadcast failed', error);
+  }
 }
 
 function handleBubbleBroadcast(payload) {
-  if (!payload || payload.clientId === state.clientId) return;
-  const clientId = String(payload.clientId || '');
-  if (!clientId) return;
-  const existing = state.remoteAvatars.get(clientId) || {
-    clientId,
+  if (!payload || payload.presenceId === state.presenceId) return;
+  const peerId = String(payload.presenceId || payload.clientId || '');
+  if (!peerId) return;
+  const existing = state.remoteAvatars.get(peerId) || {
+    clientId: peerId,
+    guestClientId: String(payload.clientId || ''),
+    presenceId: peerId,
     x: WORLD_WIDTH / 2,
     y: WORLD_HEIGHT / 2,
     avatar: 'mao',
     name: 'ゲスト'
   };
   existing.bubble = String(payload.body || '').slice(0, 120);
+  existing.bubbleMode = payload.mode === 'direct' ? 'direct' : 'world';
+  existing.bubbleTargetName = normalizeTargetName(payload.targetName);
   existing.bubbleUntil = Date.now() + BUBBLE_DURATION_MS;
   existing.name = String(payload.name || existing.name || 'ゲスト').slice(0, 32);
   existing.avatar = String(payload.avatar || existing.avatar || 'mao');
-  state.remoteAvatars.set(clientId, existing);
+  existing.x = clampWorldX(Number(payload.x) || existing.x || WORLD_WIDTH / 2);
+  existing.y = clampWorldY(Number(payload.y) || existing.y || WORLD_HEIGHT / 2);
+  existing.walking = Boolean(payload.walking);
+  existing.updatedAt = Date.now();
+  state.remoteAvatars.set(peerId, existing);
   addComment({
     id: payload.commentId || makeId('live'),
     display_name: existing.name,
     avatar: existing.avatar,
     body: existing.bubble,
+    chat_mode: existing.bubbleMode,
+    target_name: existing.bubbleTargetName,
     created_at: payload.created_at || nowIso(),
     is_live: true
   });
+  if (payload.mode === 'image' && payload.targetArtworkId) {
+    addArtworkBubble(payload.targetArtworkId, {
+      id: payload.commentId || makeId('remote-art-bubble'),
+      body: existing.bubble,
+      displayName: existing.name,
+      createdAt: payload.created_at || nowIso()
+    });
+  }
   renderComments();
+  renderArtworkWall();
   renderAvatars();
 }
 
@@ -1111,20 +1345,20 @@ function renderAvatars() {
     x: state.localAvatar.x,
     y: state.localAvatar.y,
     bubble: state.localAvatar.bubbleUntil > Date.now() ? state.localAvatar.bubble : '',
+    bubbleMode: state.localAvatar.bubbleMode,
+    bubbleTargetName: state.localAvatar.bubbleTargetName,
     bubbleUntil: state.localAvatar.bubbleUntil,
     walking: state.localAvatar.walking,
     isSelf: true
   });
   const liveIds = new Set(avatars.keys());
   Array.from(state.avatarElements.keys()).forEach(id => {
-    const avatar = avatars.get(id);
-    if (!liveIds.has(id) || (!avatar?.isSelf && !isAvatarInViewport(avatar))) {
+    if (!liveIds.has(id)) {
       state.avatarElements.get(id)?.remove();
       state.avatarElements.delete(id);
     }
   });
   avatars.forEach(avatar => {
-    if (!avatar.isSelf && !isAvatarInViewport(avatar)) return;
     let el = state.avatarElements.get(avatar.clientId);
     if (!el) {
       el = createAvatarElement();
@@ -1143,7 +1377,8 @@ function renderAvatars() {
     if (bubble) {
       const visible = avatar.bubble && avatar.bubbleUntil > Date.now();
       bubble.hidden = !visible;
-      bubble.textContent = visible ? avatar.bubble : '';
+      bubble.classList.toggle('is-direct', visible && avatar.bubbleMode === 'direct');
+      bubble.textContent = visible ? formatBubbleText(avatar) : '';
     }
   });
 }
@@ -1163,26 +1398,42 @@ function createAvatarElement() {
   return el;
 }
 
-function setLocalBubble(body) {
+function formatBubbleText(avatar) {
+  const body = String(avatar?.bubble || '').slice(0, 120);
+  if (avatar?.bubbleMode !== 'direct') return body;
+  const targetName = normalizeTargetName(avatar.bubbleTargetName);
+  return targetName ? `@${targetName} ${body}` : body;
+}
+
+function setLocalBubble(body, options = {}) {
   state.localAvatar.bubble = String(body || '').slice(0, 120);
+  state.localAvatar.bubbleMode = options.mode === 'direct' ? 'direct' : 'world';
+  state.localAvatar.bubbleTargetName = normalizeTargetName(options.targetName);
   state.localAvatar.bubbleUntil = Date.now() + BUBBLE_DURATION_MS;
   renderAvatars();
   trackPresence(true);
 }
 
-async function broadcastBubble(body, commentId = '') {
-  setLocalBubble(body);
+async function broadcastBubble(body, options = {}) {
+  setLocalBubble(body, options);
   if (!state.realtimeChannel) return;
   try {
     await state.realtimeChannel.send({
       type: 'broadcast',
       event: 'bubble',
       payload: {
+        presenceId: state.presenceId,
         clientId: state.clientId,
-        commentId,
+        commentId: options.commentId || '',
         name: getDisplayName(),
         avatar: getAvatarId(),
+        x: Math.round(state.localAvatar.x * 10) / 10,
+        y: Math.round(state.localAvatar.y * 10) / 10,
+        walking: state.localAvatar.walking,
         body,
+        mode: options.mode === 'image' ? 'image' : options.mode === 'direct' ? 'direct' : 'world',
+        targetName: normalizeTargetName(options.targetName),
+        targetArtworkId: String(options.targetArtworkId || ''),
         created_at: nowIso()
       }
     });
@@ -1220,6 +1471,7 @@ function bindMovement() {
         return;
       }
       const target = screenToWorld(event.clientX, event.clientY);
+      setWorldMessageMode({ clearArtwork: true });
       setPathTarget(target.x, target.y);
       scene.focus({ preventScroll: true });
     });
@@ -1273,6 +1525,7 @@ function finishTouchTap(event) {
   state.pendingTap = null;
   if (tap.moved || state.pinchStart || state.activePointers.size > 1) return;
   const target = screenToWorld(tap.x, tap.y);
+  setWorldMessageMode({ clearArtwork: true });
   setPathTarget(target.x, target.y);
 }
 
@@ -1537,14 +1790,68 @@ function updateCamera() {
   }
 }
 
+function parseChatCommand(rawBody) {
+  const raw = String(rawBody || '').trim();
+  const worldMatch = raw.match(/^\/world(?:\s+(.+))?$/i);
+  if (worldMatch) {
+    return {
+      body: String(worldMatch[1] || '').trim(),
+      mode: 'world',
+      targetName: '',
+      targetArtworkId: '',
+      switchOnly: !worldMatch[1]
+    };
+  }
+  const clearMatch = raw.match(/^\/(?:clear|replyoff|off)$/i);
+  if (clearMatch) {
+    return {
+      body: '',
+      mode: 'world',
+      targetName: '',
+      targetArtworkId: '',
+      switchOnly: true
+    };
+  }
+  const toMatch = raw.match(/^\/to\s+(@?\S+)\s+(.+)$/i);
+  if (toMatch) {
+    return {
+      body: String(toMatch[2] || '').trim(),
+      mode: 'direct',
+      targetName: normalizeTargetName(toMatch[1]),
+      targetArtworkId: ''
+    };
+  }
+  const mentionMatch = raw.match(/^@(\S+)\s+(.+)$/);
+  if (mentionMatch) {
+    return {
+      body: String(mentionMatch[2] || '').trim(),
+      mode: 'direct',
+      targetName: normalizeTargetName(mentionMatch[1]),
+      targetArtworkId: ''
+    };
+  }
+  return {
+    body: raw,
+    mode: state.messageMode,
+    targetName: state.directTargetName,
+    targetArtworkId: state.directTargetArtworkId
+  };
+}
+
 function bindChat() {
   $('chatForm')?.addEventListener('submit', async event => {
     event.preventDefault();
     const input = $('chatInput');
-    const body = String(input?.value || '').trim();
-    if (!body) return;
+    const command = parseChatCommand(input?.value || '');
+    if (command.switchOnly) {
+      if (command.mode === 'world') setWorldMessageMode({ clearArtwork: true, announce: true });
+      if (input) input.value = '';
+      window.setTimeout(() => input?.focus({ preventScroll: true }), 40);
+      return;
+    }
+    if (!command.body) return;
     if (input) input.value = '';
-    await sendComment(body);
+    await sendComment(command);
   });
 }
 
@@ -1574,25 +1881,18 @@ function insertTextIntoChat(text) {
 
 function insertCurrentMention() {
   const artwork = state.currentArtwork;
-  const name = String(artwork?.display_name || '').trim();
-  if (!artwork?.id || !name) {
+  const name = state.directTargetName || normalizeTargetName(artwork?.display_name);
+  if (!name) {
     showSceneNotice('メンションする画像を選んでください');
     window.setTimeout(() => $('chatInput')?.focus({ preventScroll: true }), 40);
     return;
   }
-  insertTextIntoChat(`@${name.replace(/\s+/g, '_')} `);
+  insertTextIntoChat(`@${name} `);
 }
 
 function clearReplyTarget() {
-  state.currentArtwork = null;
-  state.currentArtworkId = '';
-  state.comments = [];
-  state.commentIds.clear();
+  setWorldMessageMode({ clearArtwork: true, announce: true });
   renderArtwork();
-  renderArtworkWall();
-  renderComments();
-  subscribeCurrentArtworkComments();
-  showSceneNotice('リプライ先を解除しました');
   window.setTimeout(() => $('chatInput')?.focus({ preventScroll: true }), 40);
 }
 
@@ -1602,12 +1902,19 @@ function handleOptionAction(action) {
     openModal('postPanel');
     return;
   }
-  if (action === 'reply') {
+  if (action === 'world') {
+    clearReplyTarget();
+    return;
+  }
+  if (action === 'direct') {
     if (state.currentArtwork?.id) {
-      showSceneNotice(getReplyLabel());
+      setDirectMessageMode({
+        name: state.currentArtwork.display_name,
+        artworkId: state.currentArtwork.id
+      }, { announce: true });
       window.setTimeout(() => $('chatInput')?.focus({ preventScroll: true }), 40);
     } else {
-      showSceneNotice('リプライする画像を選んでください');
+      showSceneNotice('宛て発言する画像を選んでください');
     }
     return;
   }
@@ -1647,19 +1954,55 @@ function openChatPanel() {
   window.setTimeout(() => $('chatInput')?.focus({ preventScroll: true }), 60);
 }
 
-async function sendComment(body) {
-  const artwork = state.currentArtwork;
+async function sendComment(command) {
+  const message = typeof command === 'string' ? parseChatCommand(command) : command;
+  const body = String(message?.body || '').trim();
+  if (!body) return;
+  const requestedMode = message?.mode === 'image' || message?.mode === 'direct' ? message.mode : 'world';
+  const targetArtworkId = requestedMode === 'image' ? String(message.targetArtworkId || '') : '';
+  const targetName = requestedMode === 'direct' || requestedMode === 'image'
+    ? normalizeTargetName(message.targetName)
+    : '';
+  const artwork = requestedMode === 'image' && targetArtworkId
+    ? state.artworks.find(item => item.id === targetArtworkId) || null
+    : null;
+  const mode = artwork ? 'image' : requestedMode === 'direct' && targetName ? 'direct' : 'world';
+  if (mode === 'image') {
+    setImageReplyMode(artwork);
+  } else if (mode === 'direct') {
+    setDirectMessageMode({
+      name: targetName,
+      artworkId: ''
+    }, { clearArtwork: true });
+  } else {
+    setWorldMessageMode({ clearArtwork: true });
+  }
+  const bubbleOptions = {
+    mode,
+    targetName,
+    targetArtworkId: artwork?.id || ''
+  };
   if (!artwork || artwork.is_sample) {
     addComment({
       id: makeId('live'),
       display_name: getDisplayName(),
       avatar: getAvatarId(),
       body,
+      chat_mode: mode,
+      target_name: targetName,
       created_at: nowIso(),
       is_live: true
     });
     renderComments();
-    await broadcastBubble(body);
+    if (artwork?.id) {
+      addArtworkBubble(artwork.id, {
+        id: makeId('local-art-bubble'),
+        body,
+        displayName: getDisplayName()
+      });
+      renderArtworkWall();
+    }
+    await broadcastBubble(body, bubbleOptions);
     return;
   }
   if (!state.authUser?.id) {
@@ -1668,11 +2011,21 @@ async function sendComment(body) {
       display_name: getDisplayName(),
       avatar: getAvatarId(),
       body,
+      chat_mode: mode,
+      target_name: targetName,
       created_at: nowIso(),
       is_live: true
     });
     renderComments();
-    await broadcastBubble(body);
+    if (artwork?.id) {
+      addArtworkBubble(artwork.id, {
+        id: makeId('guest-art-bubble'),
+        body,
+        displayName: getDisplayName()
+      });
+      renderArtworkWall();
+    }
+    await broadcastBubble(body, bubbleOptions);
     showSceneNotice('ログインすると作品コメントとして保存されます');
     return;
   }
@@ -1695,7 +2048,17 @@ async function sendComment(body) {
     if (error) throw error;
     addComment(data);
     renderComments();
-    await broadcastBubble(body, data.id);
+    addArtworkBubble(artwork.id, {
+      id: data.id,
+      body,
+      displayName: getDisplayName(),
+      createdAt: data.created_at
+    });
+    renderArtworkWall();
+    await broadcastBubble(body, {
+      ...bubbleOptions,
+      commentId: data.id
+    });
   } catch (error) {
     console.warn('[plaza] comment insert failed', error);
     addComment({
@@ -1703,11 +2066,21 @@ async function sendComment(body) {
       display_name: getDisplayName(),
       avatar: getAvatarId(),
       body,
+      chat_mode: mode,
+      target_name: targetName,
       created_at: nowIso(),
       is_live: true
     });
     renderComments();
-    await broadcastBubble(body);
+    if (artwork?.id) {
+      addArtworkBubble(artwork.id, {
+        id: makeId('failed-art-bubble'),
+        body,
+        displayName: getDisplayName()
+      });
+      renderArtworkWall();
+    }
+    await broadcastBubble(body, bubbleOptions);
     showSceneNotice('コメント保存に失敗しました');
   }
 }
@@ -2092,6 +2465,7 @@ function bindVisibility() {
 
 async function init() {
   state.clientId = getClientId();
+  state.presenceId = makeId('presence');
   updateCamera();
   applyRandomSpawn();
   updateCamera();
@@ -2109,6 +2483,9 @@ async function init() {
   await subscribeRealtime();
   await subscribeArtworkChanges();
   updateParticipantCount();
+  window.setInterval(() => {
+    trackPresence(true);
+  }, 3000);
   window.setInterval(() => {
     rotateArtworkSlots();
   }, ARTWORK_ROTATION_INTERVAL_MS);
