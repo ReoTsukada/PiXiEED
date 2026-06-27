@@ -673,6 +673,7 @@
   const TOP_UI_ACTION_FLOATING_PREVIEW_TOGGLE = TOOL_ACTION_FLOATING_PREVIEW_TOGGLE;
   const TOP_UI_ACTION_OPEN_LENS_CAMERA = 'openLensCamera';
   const TOP_UI_ACTION_OPEN_QR_EDITOR = 'openQrEditor';
+  const TOP_UI_ACTION_OPEN_DETAILS_PANEL = 'openDetailsPanel';
   const EXTERNAL_TOOL_PIXIEELENS_ID = 'pixieelens';
   const EXTERNAL_TOOL_QR_MAKER_ID = 'qrmaker';
   const TOOL_ACTIONS = new Set([
@@ -736,6 +737,7 @@
     tools: 'half',
     color: 'half',
     frames: 'full',
+    details: 'full',
     settings: 'full',
     extensions: 'full',
     help: 'full',
@@ -15534,6 +15536,18 @@
       void launchQrEditorMode();
       return true;
     }
+    if (action === TOP_UI_ACTION_OPEN_DETAILS_PANEL) {
+      if (layoutMode === 'mobilePortrait') {
+        return activateMobileTab('details', { ensureDrawer: true });
+      }
+      setRightTab('details');
+      if (isDesktopRightToolRailMode()) {
+        setCompactRightFlyoutOpen(true);
+        updateRightTabVisibility();
+        setRightUtilityMenuOpen(false);
+      }
+      return true;
+    }
     return false;
   }
 
@@ -15656,19 +15670,24 @@
         String(!showFloatingSelectionActions)
       );
     }
-    const canUseClipboardStrip = isSelectionToolActive && hasSelection;
+    const showClipboardCopyCut = isSelectionToolActive && hasSelection;
+    const showClipboardPaste = hasClipboard;
+    const canUseClipboardStrip = showClipboardCopyCut || showClipboardPaste;
     if (dom.controls.canvasClipboardButtons instanceof HTMLElement) {
       dom.controls.canvasClipboardButtons.classList.toggle('is-visible', canUseClipboardStrip);
       dom.controls.canvasClipboardButtons.setAttribute('aria-hidden', String(!canUseClipboardStrip));
     }
     if (dom.controls.canvasClipboardCopy instanceof HTMLButtonElement) {
-      dom.controls.canvasClipboardCopy.disabled = false;
+      dom.controls.canvasClipboardCopy.hidden = !showClipboardCopyCut;
+      dom.controls.canvasClipboardCopy.disabled = !showClipboardCopyCut;
     }
     if (dom.controls.canvasClipboardPaste instanceof HTMLButtonElement) {
-      dom.controls.canvasClipboardPaste.disabled = false;
+      dom.controls.canvasClipboardPaste.hidden = !showClipboardPaste;
+      dom.controls.canvasClipboardPaste.disabled = !showClipboardPaste;
     }
     if (dom.controls.canvasClipboardCut instanceof HTMLButtonElement) {
-      dom.controls.canvasClipboardCut.disabled = false;
+      dom.controls.canvasClipboardCut.hidden = !showClipboardCopyCut;
+      dom.controls.canvasClipboardCut.disabled = !showClipboardCopyCut;
     }
     if (dom.controls.zoomInput instanceof HTMLInputElement) {
       dom.controls.zoomInput.disabled = !isZoomMode;
@@ -18590,6 +18609,7 @@
       [TOP_UI_ACTION_VIRTUAL_CURSOR_TOGGLE]: { ja: '仮想カーソル', en: 'Virtual Cursor' },
       [TOP_UI_ACTION_LOCAL_CANVAS_TOGGLE]: { ja: 'マルチキャンバス', en: 'Multi Canvas' },
       [TOP_UI_ACTION_FLOATING_PREVIEW_TOGGLE]: { ja: '小窓プレビュー', en: 'Floating Preview' },
+      [TOP_UI_ACTION_OPEN_DETAILS_PANEL]: { ja: '詳細', en: 'Details' },
     };
     const detailActionLabels = {
       account: { ja: 'ログイン', en: 'Sign In' },
