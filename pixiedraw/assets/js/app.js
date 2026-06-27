@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.06.12-soft-resume-resync';
+  const APP_BUILD_VERSION = '2026.06.27-frame-playback-tool-flyouts';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
@@ -27,6 +27,10 @@
     rightTabsBar: document.getElementById('rightRailTabs'),
     rightTabButtons: Array.from(document.querySelectorAll('[data-right-tab]')),
     rightTabPanes: document.getElementById('rightRailPanes'),
+    rightToolPanes: document.getElementById('rightToolPanes'),
+    rightUtilityMenu: document.getElementById('rightUtilityMenu'),
+    rightUtilityMenuButton: document.getElementById('rightUtilityMenuButton'),
+    rightUtilityMenuPopover: document.getElementById('rightUtilityMenuPopover'),
     bottomTimelineDock: document.getElementById('bottomTimelineDock'),
     bottomTimelinePanes: document.getElementById('bottomTimelinePanes'),
     topActionButtons: Array.from(document.querySelectorAll('[data-ui-action]')),
@@ -58,6 +62,7 @@
       color: document.getElementById('panelColor'),
       frames: document.getElementById('panelFrames'),
       settings: document.getElementById('panelSettings'),
+      details: document.getElementById('panelDetails'),
       extensions: document.getElementById('panelExtensions'),
       help: document.getElementById('panelHelp'),
       file: document.getElementById('panelFile'),
@@ -81,6 +86,7 @@
     projectTabsBar: document.getElementById('projectTabsBar'),
     projectTabsStatusSlot: document.getElementById('projectTabsStatusSlot'),
     projectTabsList: document.getElementById('projectTabsList'),
+    projectTabsActions: document.getElementById('projectTabsActions'),
     projectHomeScreen: document.getElementById('projectHomeScreen'),
     projectHomeNew: document.getElementById('projectHomeNew'),
     projectHomeOpen: document.getElementById('projectHomeOpen'),
@@ -654,12 +660,16 @@
   };
 
   const LEFT_TAB_KEYS = ['tools', 'color'];
-  const RIGHT_TAB_KEYS = ['frames', 'settings', 'extensions', 'help', 'file', 'multi'];
+  const RIGHT_TAB_KEYS = ['frames', 'details', 'settings', 'extensions', 'help', 'file', 'multi'];
   const TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE = 'virtualCursorToggle';
   const TOOL_ACTION_MIRROR_POPUP = 'mirrorPopup';
   const TOOL_ACTION_CAMERA_MODE = 'cameraMode';
+  const TOOL_ACTION_LOCAL_CANVAS_TOGGLE = 'localCanvasToggle';
+  const TOOL_ACTION_FLOATING_PREVIEW_TOGGLE = 'floatingPreviewToggle';
   const TOP_UI_ACTION_MIRROR_POPUP = TOOL_ACTION_MIRROR_POPUP;
   const TOP_UI_ACTION_VIRTUAL_CURSOR_TOGGLE = TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE;
+  const TOP_UI_ACTION_LOCAL_CANVAS_TOGGLE = TOOL_ACTION_LOCAL_CANVAS_TOGGLE;
+  const TOP_UI_ACTION_FLOATING_PREVIEW_TOGGLE = TOOL_ACTION_FLOATING_PREVIEW_TOGGLE;
   const TOP_UI_ACTION_OPEN_LENS_CAMERA = 'openLensCamera';
   const TOP_UI_ACTION_OPEN_QR_EDITOR = 'openQrEditor';
   const EXTERNAL_TOOL_PIXIEELENS_ID = 'pixieelens';
@@ -667,6 +677,8 @@
   const TOOL_ACTIONS = new Set([
     TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE,
     TOOL_ACTION_MIRROR_POPUP,
+    TOOL_ACTION_LOCAL_CANVAS_TOGGLE,
+    TOOL_ACTION_FLOATING_PREVIEW_TOGGLE,
   ]);
   const TOOL_GROUPS = {
     selection: { label: '範囲選択', tools: ['move', 'selectRect', 'selectLasso', 'selectSame'] },
@@ -692,6 +704,8 @@
   }, {});
   const LEGACY_TOOL_ALIASES = Object.freeze({
     virtualCursorCenter: TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE,
+    localCanvasToggle: TOOL_ACTION_LOCAL_CANVAS_TOGGLE,
+    floatingPreviewToggle: TOOL_ACTION_FLOATING_PREVIEW_TOGGLE,
     pan: 'move',
     fillRgbGradient: 'fillGradient',
     fillDitherGradient: 'fillDither',
@@ -728,6 +742,7 @@
     multi: 'full',
   });
   const UNIFIED_LEFT_TOOLS_COLOR_MODE = true;
+  const DESKTOP_RIGHT_TOOL_RAIL_MODE = true;
   const INLINE_GUIDES_STORAGE_KEY = 'pixieedraw:inline-guides-visible-v1';
   const HELP_GUIDE_ITEMS = Object.freeze([
     Object.freeze({
@@ -1087,12 +1102,13 @@
   }
 
   const layoutMap = {
-    tools: { desktop: dom.leftTabPanes || dom.leftRail, mobile: dom.mobilePanels.tools },
+    tools: { desktop: dom.rightToolPanes || dom.rightRail, mobile: dom.mobilePanels.tools },
     color: {
       desktop: dom.leftTabPanes || dom.leftRail,
       mobile: UNIFIED_LEFT_TOOLS_COLOR_MODE ? dom.mobilePanels.tools : dom.mobilePanels.color,
     },
     frames: { desktop: dom.bottomTimelinePanes || dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.frames },
+    details: { desktop: dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.settings },
     settings: { desktop: dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.settings },
     extensions: { desktop: dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.extensions },
     help: { desktop: dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.help },
@@ -1102,6 +1118,8 @@
 
   const canvasControlsDefaultParent = dom.canvasControls?.parentElement || null;
   const canvasControlsDefaultNextSibling = dom.canvasControls?.nextSibling || null;
+  const rightUtilityMenuDefaultParent = dom.rightUtilityMenu?.parentElement || null;
+  const rightUtilityMenuDefaultNextSibling = dom.rightUtilityMenu?.nextSibling || null;
 
   const ctx = {
     drawing: dom.canvases.drawing?.getContext('2d', { willReadFrequently: true }) || null,
@@ -3656,15 +3674,18 @@
   const SHARED_PROJECT_MEMBER_LIMIT_DEFAULT = 2;
   const SHARED_PROJECT_MEMBER_LIMIT_AD_FREE = 4;
 
-  const RAIL_DEFAULT_WIDTH = Object.freeze({ left: 78, right: 78 });
+  const RAIL_DEFAULT_WIDTH = Object.freeze({ left: 320, right: 128 });
   const RAIL_MIN_WIDTH = 68;
   const RAIL_MAX_WIDTH = 440;
-  const RAIL_COMPACT_THRESHOLD = Object.freeze({ left: 132, right: 168 });
-  const RAIL_CLICK_OPEN_WIDTH = Object.freeze({ left: 220, right: 256 });
+  const LEFT_PALETTE_COMPACT_WIDTH = 104;
+  const LEFT_RAIL_MAX_WIDTH = RAIL_DEFAULT_WIDTH.left;
+  const RAIL_COMPACT_THRESHOLD = Object.freeze({ left: 150, right: 96 });
+  const RAIL_CLICK_OPEN_WIDTH = Object.freeze({ left: 236, right: 320 });
   const RAIL_RESIZE_DRAG_THRESHOLD = 6;
   const RIGHT_TRANSIENT_PANEL_WIDTH = RAIL_MAX_WIDTH;
   const BOTTOM_TIMELINE_DEFAULT_HEIGHT = 188;
-  const BOTTOM_TIMELINE_MIN_HEIGHT = 128;
+  const BOTTOM_TIMELINE_MIN_HEIGHT = 64;
+  const BOTTOM_TIMELINE_COMPACT_HEIGHT = 96;
   const BOTTOM_TIMELINE_MAX_HEIGHT = 360;
   const LEFT_DUAL_GAP = 8;
   const LEFT_DUAL_MIN_COLUMN_WIDTH = Math.max(132, RAIL_DEFAULT_WIDTH.left, RAIL_MIN_WIDTH);
@@ -4122,6 +4143,7 @@
   let compactRightFlyoutDismissBound = false;
   let compactRightFlyoutPositionBound = false;
   let compactToolFlyoutLockedLeft = null;
+  let compactToolFlyoutAnchorButton = null;
   let compactRightFlyoutLockedLeft = null;
   const mobileToolGridPortal = {
     active: false,
@@ -15069,8 +15091,8 @@
   }
 
   function updateVirtualCursorActionToolButtons() {
-    const available = layoutMode === 'mobilePortrait';
-    const enabled = available && Boolean(state.showVirtualCursor);
+    const available = true;
+    const enabled = Boolean(state.showVirtualCursor);
     const toggleButtons = Array.from(document.querySelectorAll(`.tool-button[data-tool="${TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE}"], [data-ui-action="${TOP_UI_ACTION_VIRTUAL_CURSOR_TOGGLE}"]`));
     toggleButtons.forEach(button => {
       if (button instanceof HTMLButtonElement) {
@@ -15103,6 +15125,80 @@
       }
       if (label) {
         label.textContent = visibleLabel;
+      }
+    });
+  }
+
+  function updateLocalCanvasActionToolButtons() {
+    const localCanvasCount = normalizeLocalViewportCanvasState(
+      localViewportCanvasState,
+      LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE
+    ).count;
+    const canEditProjectStructure = canCurrentClientEditProjectStructure();
+    const voxelModeEnabled = isVoxelExtensionModeEnabled();
+    const available = MULTI_CANVAS_FEATURE_ENABLED && !voxelModeEnabled;
+    const enabled = available && localCanvasCount > 0;
+    const disabled = !available || !canEditProjectStructure;
+    const toggleButtons = Array.from(document.querySelectorAll(
+      `.tool-button[data-tool="${TOOL_ACTION_LOCAL_CANVAS_TOGGLE}"], [data-ui-action="${TOP_UI_ACTION_LOCAL_CANVAS_TOGGLE}"]`
+    ));
+    toggleButtons.forEach(button => {
+      if (!(button instanceof HTMLElement)) {
+        return;
+      }
+      button.hidden = !MULTI_CANVAS_FEATURE_ENABLED;
+      button.setAttribute('aria-hidden', String(!MULTI_CANVAS_FEATURE_ENABLED));
+      if (button instanceof HTMLButtonElement) {
+        button.disabled = disabled;
+      }
+      button.classList.toggle('is-active', enabled);
+      button.setAttribute('aria-pressed', String(enabled));
+      const controlLabel = localizeText(
+        enabled ? 'マルチキャンバスをオフ' : 'マルチキャンバスをオン',
+        enabled ? 'Turn Multi Canvas Off' : 'Turn Multi Canvas On'
+      );
+      button.setAttribute('aria-label', controlLabel);
+      button.setAttribute('title', controlLabel);
+      const srOnly = button.querySelector('.sr-only');
+      const groupLabel = button.querySelector('.tool-group-label');
+      const label = srOnly instanceof HTMLElement
+        ? srOnly
+        : (groupLabel instanceof HTMLElement ? groupLabel : button.querySelector('span'));
+      if (label instanceof HTMLElement) {
+        label.textContent = localizeText('マルチキャンバス', 'Multi Canvas');
+      }
+    });
+  }
+
+  function updateFloatingPreviewActionToolButtons() {
+    const voxelModeEnabled = isVoxelExtensionModeEnabled();
+    const enabled = Boolean(state.floatingPreview?.enabled) || voxelModeEnabled;
+    const disabled = voxelModeEnabled;
+    const toggleButtons = Array.from(document.querySelectorAll(
+      `.tool-button[data-tool="${TOOL_ACTION_FLOATING_PREVIEW_TOGGLE}"], [data-ui-action="${TOP_UI_ACTION_FLOATING_PREVIEW_TOGGLE}"]`
+    ));
+    toggleButtons.forEach(button => {
+      if (!(button instanceof HTMLElement)) {
+        return;
+      }
+      if (button instanceof HTMLButtonElement) {
+        button.disabled = disabled;
+      }
+      button.classList.toggle('is-active', enabled);
+      button.setAttribute('aria-pressed', String(enabled));
+      const controlLabel = localizeText(
+        enabled ? '小窓プレビューを非表示' : '小窓プレビューを表示',
+        enabled ? 'Hide Floating Preview' : 'Show Floating Preview'
+      );
+      button.setAttribute('aria-label', controlLabel);
+      button.setAttribute('title', controlLabel);
+      const srOnly = button.querySelector('.sr-only');
+      const groupLabel = button.querySelector('.tool-group-label');
+      const label = srOnly instanceof HTMLElement
+        ? srOnly
+        : (groupLabel instanceof HTMLElement ? groupLabel : button.querySelector('span'));
+      if (label instanceof HTMLElement) {
+        label.textContent = localizeText('小窓プレビュー', 'Floating Preview');
       }
     });
   }
@@ -15383,6 +15479,36 @@
       void launchLensCameraMode();
       return true;
     }
+    if (tool === TOOL_ACTION_LOCAL_CANVAS_TOGGLE) {
+      if (!MULTI_CANVAS_FEATURE_ENABLED || isVoxelExtensionModeEnabled()) {
+        updateLocalCanvasActionToolButtons();
+        return true;
+      }
+      if (!canCurrentClientEditProjectStructure({ announce: true })) {
+        if (!isSharedProjectCollaborativeMode()) {
+          announceMultiCanvasEditRestriction();
+        }
+        updateLocalCanvasActionToolButtons();
+        return true;
+      }
+      const currentCount = normalizeLocalViewportCanvasState(
+        localViewportCanvasState,
+        LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE
+      ).count;
+      const nextCount = currentCount > 0 ? 0 : 1;
+      setLocalViewportCanvasCount(nextCount, { persist: true, announce: false, recordHistory: true });
+      updateLocalCanvasActionToolButtons();
+      return true;
+    }
+    if (tool === TOOL_ACTION_FLOATING_PREVIEW_TOGGLE) {
+      if (isVoxelExtensionModeEnabled()) {
+        updateFloatingPreviewActionToolButtons();
+        return true;
+      }
+      setFloatingPreviewEnabled(!Boolean(state.floatingPreview?.enabled));
+      updateFloatingPreviewActionToolButtons();
+      return true;
+    }
     
     return false;
   }
@@ -15393,6 +15519,12 @@
     }
     if (action === TOP_UI_ACTION_VIRTUAL_CURSOR_TOGGLE) {
       return runToolAction(TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE, options);
+    }
+    if (action === TOP_UI_ACTION_LOCAL_CANVAS_TOGGLE) {
+      return runToolAction(TOOL_ACTION_LOCAL_CANVAS_TOGGLE, options);
+    }
+    if (action === TOP_UI_ACTION_FLOATING_PREVIEW_TOGGLE) {
+      return runToolAction(TOOL_ACTION_FLOATING_PREVIEW_TOGGLE, options);
     }
     if (action === TOP_UI_ACTION_OPEN_LENS_CAMERA) {
       return runToolAction(TOOL_ACTION_CAMERA_MODE, options);
@@ -15645,8 +15777,12 @@
     updateLeftTabUI();
   }
 
+  function isDesktopRightToolRailMode() {
+    return DESKTOP_RIGHT_TOOL_RAIL_MODE && layoutMode !== 'mobilePortrait';
+  }
+
   function isUnifiedLeftToolsColorMode() {
-    return UNIFIED_LEFT_TOOLS_COLOR_MODE;
+    return UNIFIED_LEFT_TOOLS_COLOR_MODE && !isDesktopRightToolRailMode();
   }
 
   function setLeftTab(tab, { persist = true } = {}) {
@@ -15693,6 +15829,7 @@
 
   function updateLeftTabVisibility() {
     const isMobile = layoutMode === 'mobilePortrait';
+    const desktopRightTools = isDesktopRightToolRailMode();
     const dualLeft = isDualLeftRailEnabled();
     const unified = isUnifiedLeftToolsColorMode();
     const colorFocused = unified && state.activeLeftTab === 'color';
@@ -15702,6 +15839,7 @@
     document.body.classList.toggle('is-dual-left-rail', dualLeft);
     document.body.classList.toggle('is-unified-left-tools-color', unified);
     document.body.classList.toggle('is-unified-left-color-focus', colorFocused);
+    document.body.classList.toggle('is-right-tool-rail', desktopRightTools && !isMobile);
     if (!dualLeft) {
       clearLeftDualRailLayout();
     } else {
@@ -15724,7 +15862,39 @@
       dom.mobilePanels.color.setAttribute('aria-hidden', 'true');
     }
     if (dom.leftTabsBar) {
-      dom.leftTabsBar.toggleAttribute('hidden', isMobile || dualLeft || unified);
+      dom.leftTabsBar.toggleAttribute('hidden', isMobile || dualLeft || unified || desktopRightTools);
+    }
+    if (desktopRightTools && !isMobile) {
+      clearLeftDualRailLayout();
+      const toolsSection = dom.sections.tools;
+      const colorSection = dom.sections.color;
+      if (toolsSection) {
+        toolsSection.hidden = false;
+        toolsSection.setAttribute('aria-hidden', 'false');
+        toolsSection.classList.add('is-active');
+        const toolsFieldGroup = toolsSection.querySelector('.field-group--tools');
+        if (toolsFieldGroup instanceof HTMLElement) {
+          toolsFieldGroup.hidden = false;
+          toolsFieldGroup.setAttribute('aria-hidden', 'false');
+        }
+        const toolsQuickPalette = toolsSection.querySelector('.tool-quick-color');
+        if (toolsQuickPalette instanceof HTMLElement) {
+          toolsQuickPalette.hidden = true;
+          toolsQuickPalette.setAttribute('aria-hidden', 'true');
+        }
+      }
+      if (colorSection) {
+        colorSection.hidden = false;
+        colorSection.setAttribute('aria-hidden', 'false');
+        colorSection.classList.add('is-active');
+      }
+      if (state.activeLeftTab !== 'color') {
+        state.activeLeftTab = 'color';
+        updateLeftTabUI();
+      }
+      setCompactToolFlyoutOpen(false);
+      syncLeftUnifiedSplitLayout();
+      return;
     }
     if (unified) {
       const toolsSection = dom.sections.tools;
@@ -15817,7 +15987,7 @@
   }
 
   function shouldKeepRailPanelsPinned() {
-    return true;
+    return !isDesktopRightToolRailMode();
   }
 
   function updateCompactFlyoutBackdropState() {
@@ -15885,7 +16055,7 @@
   }
 
   function updateCompactRightFlyoutPosition() {
-    const compactMode = isCompactRightRailMode();
+    const compactMode = isCompactRightRailMode() || isDesktopRightToolRailMode();
     const open = isCompactRightFlyoutOpen();
     if (
       !compactMode
@@ -15917,9 +16087,9 @@
     const safeBottom = viewportBounds.bottom - safeArea.bottom;
     const safeWidth = Math.max(1, safeRight - safeLeft);
     const isWideFlyout = state.activeRightTab === 'frames' || state.activeRightTab === 'help';
-    const widthRatio = isWideFlyout ? 0.34 : 0.28;
-    const minWidth = isWideFlyout ? 300 : 220;
-    const maxWidth = isWideFlyout ? 460 : 340;
+    const widthRatio = isWideFlyout ? 0.4 : 0.34;
+    const minWidth = isWideFlyout ? 360 : 320;
+    const maxWidth = isWideFlyout ? 520 : 440;
     const minLeft = safeLeft + edgePadding;
     const maxAvailableWidth = Math.max(160, Math.round(safeRight - minLeft - edgePadding));
     const maxAvailableWidthByRail = Math.max(1, Math.round(railRect.left - minLeft - railGap));
@@ -15969,7 +16139,7 @@
     if (!(dom.rightRail instanceof HTMLElement)) {
       return;
     }
-    const shouldOpen = Boolean(open) && isCompactRightRailMode();
+    const shouldOpen = Boolean(open) && (isCompactRightRailMode() || isDesktopRightToolRailMode());
     dom.rightRail.dataset.compactFlyoutOpen = shouldOpen ? 'true' : 'false';
     if (!shouldOpen) {
       clearCompactRightFlyoutPosition();
@@ -15984,6 +16154,9 @@
   }
 
   function isRightTransientPanelOpen() {
+    if (isDesktopRightToolRailMode()) {
+      return false;
+    }
     return layoutMode !== 'mobilePortrait'
       && dom.rightRail instanceof HTMLElement
       && dom.rightRail.dataset.collapsed !== 'true'
@@ -15995,12 +16168,25 @@
     if (layoutMode === 'mobilePortrait') {
       return;
     }
+    if (isDesktopRightToolRailMode()) {
+      setCompactRightFlyoutOpen(false);
+      updateRightTabVisibility();
+      return;
+    }
     setCompactRightFlyoutOpen(false);
     setRailWidth('right', RAIL_MIN_WIDTH, { persist });
   }
 
   function openRightTransientPanel(tab = '') {
     if (layoutMode === 'mobilePortrait') {
+      return;
+    }
+    if (isDesktopRightToolRailMode()) {
+      if (RIGHT_TAB_KEYS.includes(tab)) {
+        setRightTab(tab);
+      }
+      setCompactRightFlyoutOpen(true);
+      updateRightTabVisibility();
       return;
     }
     setCompactRightFlyoutOpen(false);
@@ -16025,6 +16211,151 @@
     return true;
   }
 
+  function setRightUtilityMenuOpen(open) {
+    const button = dom.rightUtilityMenuButton;
+    const popover = dom.rightUtilityMenuPopover;
+    if (!(button instanceof HTMLButtonElement) || !(popover instanceof HTMLElement)) {
+      return;
+    }
+    const shouldOpen = Boolean(open) && layoutMode !== 'mobilePortrait';
+    popover.hidden = !shouldOpen;
+    popover.setAttribute('aria-hidden', String(!shouldOpen));
+    button.setAttribute('aria-expanded', String(shouldOpen));
+  }
+
+  function isRightUtilityMenuOpen() {
+    return dom.rightUtilityMenuPopover instanceof HTMLElement && !dom.rightUtilityMenuPopover.hidden;
+  }
+
+  function setupRightUtilityMenu() {
+    const button = dom.rightUtilityMenuButton;
+    const popover = dom.rightUtilityMenuPopover;
+    if (!(button instanceof HTMLButtonElement) || !(popover instanceof HTMLElement)) {
+      return;
+    }
+    if (button.dataset.bound !== 'true') {
+      button.dataset.bound = 'true';
+      button.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        setRightUtilityMenuOpen(!isRightUtilityMenuOpen());
+      });
+    }
+    if (popover.dataset.bound !== 'true') {
+      popover.dataset.bound = 'true';
+      popover.addEventListener('click', event => {
+        const target = event.target instanceof Element ? event.target : null;
+        if (!target) {
+          return;
+        }
+        const utilityButton = target.closest('[data-utility-action]');
+        if (utilityButton instanceof HTMLElement) {
+          const action = utilityButton.dataset.utilityAction || '';
+          if (action === 'account') {
+            setRightTab('settings');
+            setCompactRightFlyoutOpen(true);
+            updateRightTabVisibility();
+            window.requestAnimationFrame(() => {
+              const accountField = document.getElementById('pixieedAccountLabel')?.closest('.settings-account-field');
+              if (accountField instanceof HTMLElement) {
+                accountField.scrollIntoView({ block: 'nearest' });
+              }
+              dom.controls.pixieedAccountLogin?.focus?.({ preventScroll: true });
+            });
+          } else if (action === 'shortcuts') {
+            openShortcutHelpDialog();
+          }
+          setRightUtilityMenuOpen(false);
+          return;
+        }
+        if (target.closest('[data-right-tab], [data-ui-action]')) {
+          setRightUtilityMenuOpen(false);
+        }
+      });
+    }
+    if (dom.rightUtilityMenu instanceof HTMLElement && dom.rightUtilityMenu.dataset.dismissBound !== 'true') {
+      dom.rightUtilityMenu.dataset.dismissBound = 'true';
+      document.addEventListener('pointerdown', event => {
+        if (!isRightUtilityMenuOpen()) {
+          return;
+        }
+        const target = event.target;
+        if (target instanceof Node && dom.rightUtilityMenu instanceof HTMLElement && dom.rightUtilityMenu.contains(target)) {
+          return;
+        }
+        setRightUtilityMenuOpen(false);
+      }, true);
+      document.addEventListener('keydown', event => {
+        if (event.key !== 'Escape') {
+          return;
+        }
+        if (isRightUtilityMenuOpen()) {
+          setRightUtilityMenuOpen(false);
+          return;
+        }
+        if (isCompactRightFlyoutOpen() && isDesktopRightToolRailMode()) {
+          setCompactRightFlyoutOpen(false);
+          updateRightTabVisibility();
+        }
+      });
+    }
+  }
+
+  function setupPaletteActionMenus() {
+    const menus = Array.from(document.querySelectorAll('#panelColor .palette-action-menu'))
+      .filter(menu => menu instanceof HTMLDetailsElement);
+    if (!menus.length) {
+      return;
+    }
+    menus.forEach(menu => {
+      if (menu.dataset.paletteActionMenuBound === 'true') {
+        return;
+      }
+      menu.dataset.paletteActionMenuBound = 'true';
+      menu.addEventListener('toggle', () => {
+        if (!menu.open) {
+          return;
+        }
+        menus.forEach(other => {
+          if (other !== menu) {
+            other.open = false;
+          }
+        });
+      });
+      menu.addEventListener('click', event => {
+        const target = event.target instanceof Element ? event.target : null;
+        if (target?.closest('.palette-action-menu__content .chip')) {
+          window.setTimeout(() => {
+            menu.open = false;
+          }, 0);
+        }
+      });
+    });
+    if (document.body.dataset.paletteActionMenusDismissBound !== 'true') {
+      document.body.dataset.paletteActionMenusDismissBound = 'true';
+      document.addEventListener('pointerdown', event => {
+        const target = event.target instanceof Node ? event.target : null;
+        if (!target) {
+          return;
+        }
+        if (menus.some(menu => menu.contains(target))) {
+          return;
+        }
+        menus.forEach(menu => {
+          menu.open = false;
+        });
+      }, true);
+      document.addEventListener('keydown', event => {
+        if (event.key !== 'Escape') {
+          return;
+        }
+        menus.forEach(menu => {
+          menu.open = false;
+        });
+      });
+    }
+  }
+
   function setupRightTabs() {
     dom.rightTabButtons = Array.from(document.querySelectorAll('[data-right-tab]'));
     if (!RIGHT_TAB_KEYS.includes(state.activeRightTab) || state.activeRightTab === 'extensions') {
@@ -16033,32 +16364,46 @@
     if (!RIGHT_TAB_KEYS.includes(state.activeRightTab)) {
       state.activeRightTab = 'frames';
     }
-    if (!dom.rightTabButtons || !dom.rightTabButtons.length) return;
-    dom.rightTabButtons.forEach(button => {
-      bindTabKeyboardNavigation(button, () => dom.rightTabButtons);
-      if (button.dataset.bound === 'true') return;
-      button.dataset.bound = 'true';
-      button.addEventListener('click', () => {
-        if (layoutMode === 'mobilePortrait') return;
-        const target = button.dataset.rightTab;
-        if (!target) return;
-        if (target === 'extensions') {
-          notifyExtensionsUnavailable();
-          return;
-        }
-        if (target === 'frames' && isBottomTimelineDockEnabled()) {
-          setRightTab('frames');
-          dom.bottomTimelineDock?.focus?.({ preventScroll: true });
-          return;
-        }
-        const compactMode = isCompactRightRailMode();
-        if (compactMode) {
-          openRightTransientPanel(target);
-          return;
-        }
-        setRightTab(target);
+    if (dom.rightTabButtons && dom.rightTabButtons.length) {
+      dom.rightTabButtons.forEach(button => {
+        bindTabKeyboardNavigation(button, () => dom.rightTabButtons);
+        if (button.dataset.bound === 'true') return;
+        button.dataset.bound = 'true';
+        button.addEventListener('click', () => {
+          if (layoutMode === 'mobilePortrait') return;
+          const target = button.dataset.rightTab;
+          if (!target) return;
+          if (target === 'extensions') {
+            notifyExtensionsUnavailable();
+            return;
+          }
+          if (isDesktopRightToolRailMode()) {
+            if (target === 'frames') {
+              setRightTab('frames');
+              setCompactRightFlyoutOpen(false);
+              dom.bottomTimelineDock?.focus?.({ preventScroll: true });
+              return;
+            }
+            setRightTab(target);
+            setCompactRightFlyoutOpen(true);
+            updateRightTabVisibility();
+            setRightUtilityMenuOpen(false);
+            return;
+          }
+          if (target === 'frames' && isBottomTimelineDockEnabled()) {
+            setRightTab('frames');
+            dom.bottomTimelineDock?.focus?.({ preventScroll: true });
+            return;
+          }
+          const compactMode = isCompactRightRailMode();
+          if (compactMode) {
+            openRightTransientPanel(target);
+            return;
+          }
+          setRightTab(target);
+        });
       });
-    });
+    }
     if (!compactRightFlyoutDismissBound) {
       compactRightFlyoutDismissBound = true;
       const dismissCompactRightFlyout = event => {
@@ -16195,11 +16540,15 @@
       flushTimelineMatrixRenderIfVisible({ immediate: true });
       return;
     }
+    const desktopRightTools = isDesktopRightToolRailMode();
     const compactMode = isCompactRightRailMode();
     if (!compactMode && isCompactRightFlyoutOpen()) {
-      setCompactRightFlyoutOpen(false);
+      if (!desktopRightTools) {
+        setCompactRightFlyoutOpen(false);
+      }
     }
-    const showCompactFlyout = compactMode && isCompactRightFlyoutOpen();
+    const flyoutMode = compactMode || desktopRightTools;
+    const showCompactFlyout = flyoutMode && isCompactRightFlyoutOpen();
     const framesDocked = isBottomTimelineDockEnabled();
     RIGHT_TAB_KEYS.forEach(key => {
       const section = dom.sections[key];
@@ -16212,7 +16561,7 @@
       }
       section.classList.remove('is-bottom-docked');
       const isActive = state.activeRightTab === key;
-      const visible = compactMode ? (isActive && showCompactFlyout) : isActive;
+      const visible = flyoutMode ? (isActive && showCompactFlyout) : isActive;
       section.hidden = !visible;
       section.setAttribute('aria-hidden', String(!visible));
       section.classList.toggle('is-active', visible);
@@ -16287,6 +16636,7 @@
     if (dom.toolGroupButtons && dom.toolGroupButtons.length) {
       dom.toolGroupButtons.forEach(button => {
         button.addEventListener('click', () => {
+          compactToolFlyoutAnchorButton = button;
           const target = button.dataset.toolGroup;
           if (!target) return;
           const targetTools = TOOL_GROUPS[target]?.tools || [];
@@ -16312,6 +16662,9 @@
             if (singleTool) {
               if (TOOL_ACTIONS.has(singleTool)) {
                 runToolAction(singleTool, { sourceButton: button });
+                setCompactToolFlyoutOpen(false);
+                updateToolVisibility();
+                return;
               } else {
                 setActiveTool(singleTool);
               }
@@ -16324,6 +16677,11 @@
             setToolGroup(target);
             if (TOOL_ACTIONS.has(singleTool)) {
               runToolAction(singleTool, { sourceButton: button });
+              setCompactToolFlyoutOpen(false, {
+                force: mobilePeekMode,
+              });
+              updateToolVisibility();
+              return;
             } else {
               setActiveTool(singleTool);
             }
@@ -16346,6 +16704,7 @@
         });
         button.addEventListener('dblclick', event => {
           if (layoutMode === 'mobilePortrait') return;
+          if (isDesktopRightToolRailMode()) return;
           if (!isCompactToolRailMode()) return;
           if (isMobilePeekToolFlyoutMode()) return;
           event.preventDefault();
@@ -16394,6 +16753,7 @@
       window.addEventListener('resize', updateCompactToolFlyoutPosition, { passive: true });
       window.addEventListener('scroll', updateCompactToolFlyoutPosition, true);
       dom.leftRail?.addEventListener('scroll', updateCompactToolFlyoutPosition, { passive: true });
+      dom.rightRail?.addEventListener('scroll', updateCompactToolFlyoutPosition, { passive: true });
       if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', updateCompactToolFlyoutPosition, { passive: true });
         window.visualViewport.addEventListener('scroll', updateCompactToolFlyoutPosition, { passive: true });
@@ -16430,6 +16790,9 @@
       const toolsPanel = dom.mobilePanels.tools;
       const toolsTabActive = toolsPanel instanceof HTMLElement && toolsPanel.classList.contains('is-active') && !toolsPanel.hidden;
       return isPeek && toolsTabActive;
+    }
+    if (isDesktopRightToolRailMode()) {
+      return true;
     }
     if (!(dom.leftRail instanceof HTMLElement) || dom.leftRail.dataset.compact !== 'true') {
       return false;
@@ -16493,6 +16856,7 @@
       return;
     }
     compactToolFlyoutLockedLeft = null;
+    compactToolFlyoutAnchorButton = null;
     dom.toolGrid.style.removeProperty('position');
     dom.toolGrid.style.removeProperty('left');
     dom.toolGrid.style.removeProperty('top');
@@ -16516,7 +16880,9 @@
       return;
     }
     const toolsPanel = dom.sections.tools;
-    const activeGroupButton = toolsPanel?.querySelector(`.tool-group-button[data-tool-group="${state.activeToolGroup}"]`);
+    const activeGroupButton = compactToolFlyoutAnchorButton instanceof HTMLElement
+      ? compactToolFlyoutAnchorButton
+      : toolsPanel?.querySelector(`.tool-group-button[data-tool-group="${state.activeToolGroup}"]`);
     const anchor = activeGroupButton instanceof HTMLElement ? activeGroupButton : (toolsPanel?.querySelector('.panel-section__body') || toolsPanel);
     if (!(anchor instanceof HTMLElement)) {
       clearCompactToolFlyoutPosition();
@@ -16582,18 +16948,17 @@
       const compactItemSize = 44;
       const compactGap = 8;
       const compactPadding = 16;
-      const railRect = dom.leftRail instanceof HTMLElement ? dom.leftRail.getBoundingClientRect() : null;
-      const railWidth = Math.max(68, dom.leftRail?.offsetWidth || 78);
+      const desktopRightTools = isDesktopRightToolRailMode();
+      const railNode = desktopRightTools ? dom.rightRail : dom.leftRail;
+      const railRect = railNode instanceof HTMLElement ? railNode.getBoundingClientRect() : null;
+      const railWidth = Math.max(68, railNode?.offsetWidth || 78);
       const maxAllowedWidth = Math.max(96, Math.round(safeRight - safeLeft - (edgePadding * 2)));
       const compactTwoColumnMinWidth = (2 * compactItemSize) + compactGap + compactPadding;
       const maxColumnsByWidth = Math.max(
         1,
         Math.floor((maxAllowedWidth - compactPadding + compactGap) / (compactItemSize + compactGap))
       );
-      const preferSingleColumn =
-        railWidth <= (RAIL_DEFAULT_WIDTH.left + 10)
-        || maxAllowedWidth < compactTwoColumnMinWidth;
-      const requestedColumns = preferSingleColumn ? 1 : 2;
+      const requestedColumns = toolCount >= 2 && maxAllowedWidth >= compactTwoColumnMinWidth ? 2 : 1;
       const compactColumns = clamp(
         Math.min(toolCount, requestedColumns),
         1,
@@ -16609,10 +16974,14 @@
       );
       const minAllowedWidth = Math.min(compactColumns === 1 ? 88 : 120, maxAllowedWidth);
       flyoutWidth = clamp(Math.round(desiredCompactWidth), minAllowedWidth, maxAllowedWidth);
-      let computedLeft = railRect ? Math.round(railRect.right + 8) : Math.round(anchorRect.right + 10);
+      let computedLeft = desktopRightTools
+        ? Math.round((railRect ? railRect.left : anchorRect.left) - 8 - flyoutWidth)
+        : (railRect ? Math.round(railRect.right + 8) : Math.round(anchorRect.right + 10));
       const minLeft = Math.round(safeLeft + edgePadding);
       const maxRight = Math.round(safeRight - edgePadding);
-      if (computedLeft + flyoutWidth > maxRight) {
+      if (desktopRightTools && computedLeft < minLeft) {
+        computedLeft = Math.max(minLeft, Math.round(anchorRect.left - flyoutWidth - 10));
+      } else if (!desktopRightTools && computedLeft + flyoutWidth > maxRight) {
         const fallbackAnchorLeft = railRect ? railRect.left : anchorRect.left;
         computedLeft = Math.max(minLeft, Math.round(fallbackAnchorLeft - 10 - flyoutWidth));
       }
@@ -16622,12 +16991,13 @@
         : computedLeft;
       left = clamp(Math.round(preferredLeft), minLeft, maxLeft);
       compactToolFlyoutLockedLeft = left;
+      const preferredTop = Math.round(anchorRect.top + ((anchorRect.height - compactItemSize) * 0.5) - 8);
       top = clamp(
-        Math.round(anchorRect.top),
+        preferredTop,
         Math.round(safeTop + edgePadding),
         Math.max(Math.round(safeTop + edgePadding), Math.round(safeBottom - 64))
       );
-      maxHeight = Math.max(120, Math.round(safeBottom - top - 12));
+      maxHeight = Math.max(160, Math.round(safeBottom - top - 12));
       if (maxHeight < 220) {
         top = Math.max(Math.round(safeTop + edgePadding), Math.round(safeBottom - 220 - edgePadding));
         maxHeight = Math.max(120, Math.round(safeBottom - top - edgePadding));
@@ -16769,8 +17139,12 @@
     const compactMode = isCompactToolRailMode() || mobilePeekMode;
     const compactFlyoutOpen = compactMode && isCompactToolFlyoutOpen();
     toolButtons.forEach(button => {
+      const tool = button.dataset.tool || '';
       const group = button.dataset.toolGroup || TOOL_TO_GROUP[button.dataset.tool];
-      const show = compactMode ? (compactFlyoutOpen && (!group || group === activeGroup)) : (!group || group === activeGroup);
+      const isActionTool = TOOL_ACTIONS.has(tool);
+      const show = compactMode
+        ? (compactFlyoutOpen && !isActionTool && group === activeGroup)
+        : (!isActionTool && (!group || group === activeGroup));
       button.hidden = !show;
       button.setAttribute('aria-hidden', String(!show));
     });
@@ -17414,8 +17788,9 @@
 
   function syncVirtualCursorControlVisibility(options = {}) {
     const { syncToggle = true } = options;
-    const available = layoutMode === 'mobilePortrait';
-    const showVirtualCursorOptions = available && Boolean(state.showVirtualCursor);
+    const available = true;
+    const showVirtualCursorOptions = Boolean(state.showVirtualCursor);
+    const showMobileVirtualCursorOptions = layoutMode === 'mobilePortrait' && showVirtualCursorOptions;
     if (syncToggle && dom.controls.toggleVirtualCursor instanceof HTMLInputElement) {
       dom.controls.toggleVirtualCursor.checked = showVirtualCursorOptions;
     }
@@ -17427,12 +17802,12 @@
       toggleOption.setAttribute('aria-hidden', String(!available));
     }
     if (dom.controls.virtualCursorScale instanceof HTMLElement) {
-      dom.controls.virtualCursorScale.hidden = !showVirtualCursorOptions;
-      dom.controls.virtualCursorScale.setAttribute('aria-hidden', String(!showVirtualCursorOptions));
+      dom.controls.virtualCursorScale.hidden = !showMobileVirtualCursorOptions;
+      dom.controls.virtualCursorScale.setAttribute('aria-hidden', String(!showMobileVirtualCursorOptions));
     }
     if (dom.controls.mobileDrawHelp instanceof HTMLElement) {
-      dom.controls.mobileDrawHelp.hidden = !showVirtualCursorOptions;
-      dom.controls.mobileDrawHelp.setAttribute('aria-hidden', String(!showVirtualCursorOptions));
+      dom.controls.mobileDrawHelp.hidden = !showMobileVirtualCursorOptions;
+      dom.controls.mobileDrawHelp.setAttribute('aria-hidden', String(!showMobileVirtualCursorOptions));
     }
     updateFloatingDrawButtonScaleControl();
     updateFloatingMovePadVisibility();
@@ -17845,6 +18220,8 @@
     syncMirrorToolPopoverControls(mirrorState);
     updateMirrorActionButtons();
     updateVirtualCursorActionToolButtons();
+    updateLocalCanvasActionToolButtons();
+    updateFloatingPreviewActionToolButtons();
     syncVirtualCursorControlVisibility({ syncToggle: true });
     if (dom.controls.toggleFloatingPreview instanceof HTMLInputElement) {
       dom.controls.toggleFloatingPreview.checked = Boolean(state.floatingPreview?.enabled) || isVoxelExtensionModeEnabled();
@@ -18174,6 +18551,12 @@
       if (srOnly instanceof HTMLElement) {
         srOnly.textContent = label;
       }
+      const textLabel = button.classList.contains('detail-panel__action')
+        ? button.querySelector('span:last-child')
+        : null;
+      if (textLabel instanceof HTMLElement) {
+        textLabel.textContent = label;
+      }
     });
 
     const railButtons = Array.from(document.querySelectorAll('.rail-tab[data-left-tab], .rail-tab[data-right-tab]'));
@@ -18204,6 +18587,17 @@
     const actionLabels = {
       [TOP_UI_ACTION_MIRROR_POPUP]: { ja: '対称', en: 'Mirror' },
       [TOP_UI_ACTION_VIRTUAL_CURSOR_TOGGLE]: { ja: '仮想カーソル', en: 'Virtual Cursor' },
+      [TOP_UI_ACTION_LOCAL_CANVAS_TOGGLE]: { ja: 'マルチキャンバス', en: 'Multi Canvas' },
+      [TOP_UI_ACTION_FLOATING_PREVIEW_TOGGLE]: { ja: '小窓プレビュー', en: 'Floating Preview' },
+    };
+    const detailActionLabels = {
+      account: { ja: 'ログイン', en: 'Sign In' },
+    };
+    const quickRightTabLabels = {
+      details: { ja: '詳細', en: 'Details' },
+      settings: { ja: '設定', en: 'Settings' },
+      file: { ja: 'ファイル', en: 'File' },
+      multi: { ja: '共有モード', en: 'Share Mode' },
     };
 
     dom.topActionButtons.forEach(button => {
@@ -18228,9 +18622,49 @@
         srOnly.textContent = label;
       }
     });
+    Array.from(document.querySelectorAll('[data-detail-action]')).forEach(button => {
+      if (!(button instanceof HTMLButtonElement)) {
+        return;
+      }
+      const entry = detailActionLabels[button.dataset.detailAction || ''];
+      if (!entry) {
+        return;
+      }
+      const label = localizeText(entry.ja, entry.en);
+      button.setAttribute('aria-label', label);
+      button.setAttribute('title', label);
+      const srOnly = button.querySelector('.sr-only');
+      if (srOnly instanceof HTMLElement) {
+        srOnly.textContent = label;
+      }
+    });
+    Array.from(document.querySelectorAll('[data-quick-right-tab]')).forEach(button => {
+      if (!(button instanceof HTMLButtonElement)) {
+        return;
+      }
+      const entry = quickRightTabLabels[button.dataset.quickRightTab || ''];
+      if (!entry) {
+        return;
+      }
+      const label = localizeText(entry.ja, entry.en);
+      button.setAttribute('aria-label', label);
+      button.setAttribute('title', label);
+      const srOnly = button.querySelector('.sr-only');
+      if (srOnly instanceof HTMLElement) {
+        srOnly.textContent = label;
+      }
+      const textLabel = button.classList.contains('detail-panel__action')
+        ? button.querySelector('span:last-child')
+        : null;
+      if (textLabel instanceof HTMLElement) {
+        textLabel.textContent = label;
+      }
+    });
     syncExternalToolActionButtons();
     updateMirrorActionButtons();
     updateVirtualCursorActionToolButtons();
+    updateLocalCanvasActionToolButtons();
+    updateFloatingPreviewActionToolButtons();
   }
 
   function applyToolLocalization() {
@@ -18326,7 +18760,10 @@
 
     if (dom.controls.toggleLanguageMode instanceof HTMLButtonElement) {
       const switchLabel = 'あ/A/中';
-      dom.controls.toggleLanguageMode.textContent = switchLabel;
+      const languageIcon = dom.controls.toggleLanguageMode.querySelector('.detail-panel__text-icon');
+      if (languageIcon instanceof HTMLElement) {
+        languageIcon.textContent = switchLabel;
+      }
       dom.controls.toggleLanguageMode.setAttribute(
         'aria-label',
         localizeText('言語を切り替え（あ/A/中）', 'Switch language (あ/A/中)', '切换语言（あ/A/中）')
@@ -18508,8 +18945,8 @@
     setLocalizedTextContent('#multiAssignKick', 'キック', 'Kick');
     setLocalizedTextContent('#multiAssignBan', 'BAN', 'Ban');
 
-    setLocalizedTextContent('#goHomeButton', 'ホームに戻る', 'Back to Home');
-    setLocalizedTextContent('#goContestButton', '広場を見る', 'View Plaza');
+    setLocalizedTextContent('#goHomeButton span:last-child', 'ホーム', 'Home');
+    setLocalizedTextContent('#goContestButton span:last-child', '広場', 'Plaza');
     setLocalizedTextContent('#pixieedAdFreeField > span', 'サポーター特典', 'Supporter Benefits');
     setLocalizedTextContent('#pixieedAdFreeStatus', 'サポーター特典は500円です。広告非表示、共有プロジェクト4件、共同編集最大4人、マルチキャンバス追加3つまで利用できます。', 'Supporter benefits are 500 yen: remove ads, unlock 4 shared projects, edit with up to 4 people, and add up to 3 multi canvases.');
     setLocalizedTextContent('#pixieedAdFreePurchase', 'サポーター特典を見る', 'View Supporter Benefits');
@@ -18519,11 +18956,12 @@
     setLocalizedTextContent('#multiFlowAccountLogin', 'ログインして共有を作成', 'Sign In to Create Shared Project');
     setLocalizedTextContent('#multiSupportCard .multi-support-card__head > span', 'サポーター特典', 'Supporter Benefits');
     setLocalizedTextContent('#multiSupportPurchase', 'サポーター特典を見る', 'View Supporter Benefits');
+    setLocalizedTextContent('#detailSupportPurchase span:last-child', 'サポーター特典', 'Supporter Benefits');
     setLocalizedTextContent('#supportTipLink', 'サポート', 'Support');
     setLocalizedAttribute('#supportTipLink', 'aria-label', 'サポーター特典を見る（外部サイト）', 'View supporter benefits (external site)');
-    setLocalizedTextContent('#openOperationHelpPanel', '使い方ヘルプ', 'Help');
-    setLocalizedTextContent('#openShortcutHelp', 'ショートカット一覧', 'Keyboard Shortcuts');
-    setLocalizedTextContent('#openUpdateHistory', '更新情報', 'Updates');
+    setLocalizedTextContent('#openOperationHelpPanel span:last-child', '使い方ヘルプ', 'Help');
+    setLocalizedTextContent('#openShortcutHelp span:last-child', 'ショートカット一覧', 'Keyboard Shortcuts');
+    setLocalizedTextContent('#openUpdateHistory span:last-child', '更新情報', 'Updates');
     setLocalizedTextContent('#pixieedAccountLabel', 'アカウント', 'Account');
     setLocalizedTextContent('#pixieedAccountLogin', 'ログイン', 'Sign In');
     setLocalizedTextContent('#pixieedAccountLogout', 'ログアウト', 'Sign Out');
@@ -22988,9 +23426,8 @@
 
   function setupTopActionButtons() {
     dom.topActionButtons = Array.from(document.querySelectorAll('[data-ui-action]'));
-    if (!Array.isArray(dom.topActionButtons) || !dom.topActionButtons.length) {
-      return;
-    }
+    const quickRightTabButtons = Array.from(document.querySelectorAll('[data-quick-right-tab]'));
+    const detailActionButtons = Array.from(document.querySelectorAll('[data-detail-action]'));
     syncExternalToolActionButtons();
     dom.topActionButtons.forEach(button => {
       if (!(button instanceof HTMLButtonElement) || button.dataset.actionBound === 'true') {
@@ -23003,6 +23440,50 @@
           return;
         }
         runUiAction(action, { sourceButton: button });
+      });
+    });
+    quickRightTabButtons.forEach(button => {
+      if (!(button instanceof HTMLButtonElement) || button.dataset.quickRightTabBound === 'true') {
+        return;
+      }
+      button.dataset.quickRightTabBound = 'true';
+      button.addEventListener('click', () => {
+        if (layoutMode === 'mobilePortrait') {
+          return;
+        }
+        const target = button.dataset.quickRightTab || '';
+        if (!target || !RIGHT_TAB_KEYS.includes(target)) {
+          return;
+        }
+        setRightTab(target);
+        if (isDesktopRightToolRailMode()) {
+          setCompactRightFlyoutOpen(true);
+          updateRightTabVisibility();
+          setRightUtilityMenuOpen(false);
+        }
+      });
+    });
+    detailActionButtons.forEach(button => {
+      if (!(button instanceof HTMLButtonElement) || button.dataset.detailActionBound === 'true') {
+        return;
+      }
+      button.dataset.detailActionBound = 'true';
+      button.addEventListener('click', () => {
+        const action = button.dataset.detailAction || '';
+        if (action === 'account') {
+          setRightTab('details');
+          if (isDesktopRightToolRailMode()) {
+            setCompactRightFlyoutOpen(true);
+            updateRightTabVisibility();
+          }
+          window.requestAnimationFrame(() => {
+            const accountField = document.getElementById('pixieedAccountLabel')?.closest('.settings-account-field');
+            if (accountField instanceof HTMLElement) {
+              accountField.scrollIntoView({ block: 'nearest' });
+            }
+            dom.controls.pixieedAccountLogin?.focus?.({ preventScroll: true });
+          });
+        }
       });
     });
   }
@@ -37121,6 +37602,7 @@
     }
     if (updateDecorations) {
       updateGridDecorations();
+      syncSelectionOutlineToViewportTransform();
       updateMirrorGuideHandles();
       updateCanvasResizeHandlePosition();
       syncCanvasResizeHandleVisibility();
@@ -37535,6 +38017,8 @@
       ensureOpenProjectTabsInitialized();
       setupLeftTabs();
       setupRightTabs();
+      setupRightUtilityMenu();
+      setupPaletteActionMenus();
       setupTopActionButtons();
       setupLayout();
       setupHorizontalOverflowDebug();
@@ -37902,9 +38386,12 @@
     const fallback = Number(railSizing[side]) || RAIL_DEFAULT_WIDTH[side];
     const numeric = Math.round(Number(value));
     const base = Number.isFinite(numeric) ? numeric : fallback;
-    const minWidth = RAIL_MIN_WIDTH;
+    const minWidth = side === 'left' && isDesktopRightToolRailMode()
+      ? LEFT_PALETTE_COMPACT_WIDTH
+      : RAIL_MIN_WIDTH;
     const viewportLimit = Math.max(RAIL_MIN_WIDTH, Math.floor((window.innerWidth || 0) * 0.45));
-    const maxWidth = Math.max(minWidth, Math.min(RAIL_MAX_WIDTH, viewportLimit));
+    const sideMaxWidth = side === 'left' ? LEFT_RAIL_MAX_WIDTH : RAIL_MAX_WIDTH;
+    const maxWidth = Math.max(minWidth, Math.min(sideMaxWidth, viewportLimit));
     return clamp(base, minWidth, maxWidth);
   }
 
@@ -38048,7 +38535,7 @@
   function setBottomTimelineHeight(height, { persist = true } = {}) {
     const normalized = normalizeBottomTimelineHeight(height);
     bottomTimelineSizing.height = normalized;
-    const isCompact = normalized <= BOTTOM_TIMELINE_MIN_HEIGHT + 4;
+    const isCompact = normalized <= BOTTOM_TIMELINE_COMPACT_HEIGHT;
     document.body.classList.toggle('is-bottom-timeline-compact', isCompact && isBottomTimelineDockEnabled());
     if (dom.bottomTimelineDock instanceof HTMLElement) {
       dom.bottomTimelineDock.dataset.compact = String(isCompact);
@@ -38172,7 +38659,7 @@
     endBottomTimelineResize({ persist: moved });
     if (!moved && isBottomTimelineDockEnabled()) {
       const currentHeight = normalizeBottomTimelineHeight(bottomTimelineSizing.height);
-      const targetHeight = currentHeight <= BOTTOM_TIMELINE_MIN_HEIGHT + 4
+      const targetHeight = currentHeight <= BOTTOM_TIMELINE_COMPACT_HEIGHT
         ? BOTTOM_TIMELINE_DEFAULT_HEIGHT
         : BOTTOM_TIMELINE_MIN_HEIGHT;
       setBottomTimelineHeight(targetHeight, { persist: true });
@@ -38195,7 +38682,10 @@
         setCompactRightFlyoutOpen(false);
         updateRightTabVisibility();
       }
-      setRailWidth(side, RAIL_MIN_WIDTH, { persist: true });
+      const compactTargetWidth = side === 'left' && isDesktopRightToolRailMode()
+        ? LEFT_PALETTE_COMPACT_WIDTH
+        : RAIL_MIN_WIDTH;
+      setRailWidth(side, compactTargetWidth, { persist: true });
       return;
     }
     setRailWidth(side, side === 'right' ? getRightTransientPanelOpenWidth() : getRailExpandedToggleWidth(side), { persist: true });
@@ -38682,6 +39172,9 @@
 
   function getRightFloatingRailReserveWidth(rightWidth) {
     if (layoutMode === 'mobilePortrait' || !isCompactRightFlyoutOpen()) {
+      return 0;
+    }
+    if (isDesktopRightToolRailMode()) {
       return 0;
     }
     const railRect = getVisibleElementRect(dom.rightRail);
@@ -39456,6 +39949,7 @@
 
   function applyLayoutMode() {
     const isMobile = layoutMode === 'mobilePortrait';
+    const desktopRightTools = !isMobile && isDesktopRightToolRailMode();
     if (isMobile || !isDualLeftRailEnabled()) {
       endLeftDualSplitResize({ persist: false });
     }
@@ -39468,7 +39962,9 @@
     // Reset compact right flyout portal before sections are re-mounted by layout map.
     // Without this, orientation changes can return the section to the old desktop parent.
     setCompactRightFlyoutOpen(false);
+    setRightUtilityMenuOpen(false);
     document.body.classList.toggle('is-mobile-layout', isMobile);
+    document.body.classList.toggle('is-right-tool-rail', !isMobile && isDesktopRightToolRailMode());
     try {
       document.dispatchEvent(new CustomEvent('pixiedraw:ad-layout-change', {
         detail: { layoutMode, isMobileLayout: isMobile }
@@ -39485,12 +39981,29 @@
       if (isMobile && dom.mobileShortcutsMount) {
         dom.canvasControls.dataset.mobile = 'true';
         dom.mobileShortcutsMount.appendChild(dom.canvasControls);
+      } else if (desktopRightTools && dom.projectTabsActions instanceof HTMLElement) {
+        delete dom.canvasControls.dataset.mobile;
+        dom.projectTabsActions.appendChild(dom.canvasControls);
       } else if (!isMobile && canvasControlsDefaultParent) {
         delete dom.canvasControls.dataset.mobile;
         if (canvasControlsDefaultNextSibling && canvasControlsDefaultNextSibling.parentNode === canvasControlsDefaultParent) {
           canvasControlsDefaultParent.insertBefore(dom.canvasControls, canvasControlsDefaultNextSibling);
         } else {
           canvasControlsDefaultParent.appendChild(dom.canvasControls);
+        }
+      }
+    }
+    if (dom.rightUtilityMenu instanceof HTMLElement) {
+      if (desktopRightTools && dom.projectTabsActions instanceof HTMLElement) {
+        dom.projectTabsActions.appendChild(dom.rightUtilityMenu);
+      } else if (rightUtilityMenuDefaultParent instanceof HTMLElement) {
+        if (
+          rightUtilityMenuDefaultNextSibling
+          && rightUtilityMenuDefaultNextSibling.parentNode === rightUtilityMenuDefaultParent
+        ) {
+          rightUtilityMenuDefaultParent.insertBefore(dom.rightUtilityMenu, rightUtilityMenuDefaultNextSibling);
+        } else {
+          rightUtilityMenuDefaultParent.appendChild(dom.rightUtilityMenu);
         }
       }
     }
@@ -39505,7 +40018,7 @@
       dom.rightRail.dataset.collapsed = 'false';
       setRailWidth('left', RAIL_DEFAULT_WIDTH.left, { persist: false });
       setRailWidth('right', RAIL_DEFAULT_WIDTH.right, { persist: false });
-      setBottomTimelineHeight(BOTTOM_TIMELINE_MIN_HEIGHT, { persist: false });
+      setBottomTimelineHeight(BOTTOM_TIMELINE_DEFAULT_HEIGHT, { persist: false });
     }
 
     Object.entries(layoutMap).forEach(([key, placement]) => {
@@ -39536,12 +40049,8 @@
 
     updateRailToggleVisibility();
     updateToolVisibility();
-    if (!isMobile && state.showVirtualCursor) {
-      setVirtualCursorEnabled(false, { persist: false });
-    } else {
-      syncVirtualCursorControlVisibility({ syncToggle: true });
-      updateFloatingDrawButtonEnabledState();
-    }
+    syncVirtualCursorControlVisibility({ syncToggle: true });
+    updateFloatingDrawButtonEnabledState();
     updateCanvasControlButtons();
     applyViewportTransform();
     clampFloatingDrawButtonPosition();
@@ -39555,13 +40064,14 @@
 
   function updateRailToggleVisibility() {
     const isMobile = layoutMode === 'mobilePortrait';
+    const fixedDesktopSideRails = isDesktopRightToolRailMode();
     updateRailCompactState();
     updateRailMetrics();
     if (dom.resizeHandles.left) {
       dom.resizeHandles.left.hidden = isMobile;
     }
     if (dom.resizeHandles.right) {
-      dom.resizeHandles.right.hidden = isMobile;
+      dom.resizeHandles.right.hidden = isMobile || fixedDesktopSideRails;
     }
     if (dom.resizeHandles.bottomTimeline) {
       dom.resizeHandles.bottomTimeline.hidden = isMobile || !isBottomTimelineDockEnabled();
@@ -39570,7 +40080,7 @@
 
   function setVirtualCursorEnabled(enabled, options = {}) {
     const { persist = true, updateControl = true } = options;
-    const next = layoutMode === 'mobilePortrait' && Boolean(enabled);
+    const next = Boolean(enabled);
     const prev = state.showVirtualCursor;
 
     if (updateControl && dom.controls.toggleVirtualCursor instanceof HTMLInputElement) {
@@ -41924,10 +42434,25 @@
         }
         if (TOOL_ACTIONS.has(tool)) {
           focusUnifiedLeftContext('tools', { persist: false });
+          if (isCompactToolRailMode() || isMobilePeekToolFlyoutMode()) {
+            const actionAnchor = document.querySelector(`.tool-group-button[data-ui-action="${tool}"]`);
+            compactToolFlyoutAnchorButton = actionAnchor instanceof HTMLElement ? actionAnchor : button;
+            setCompactToolFlyoutOpen(true, { force: isMobilePeekToolFlyoutMode() });
+            updateToolVisibility();
+          }
           runToolAction(tool, { sourceButton: button });
           return;
         }
         setActiveTool(tool);
+        if (isCompactToolRailMode() || isMobilePeekToolFlyoutMode()) {
+          const group = TOOL_TO_GROUP[tool];
+          const groupButton = group
+            ? document.querySelector(`.tool-group-button[data-tool-group="${group}"]`)
+            : null;
+          compactToolFlyoutAnchorButton = groupButton instanceof HTMLElement ? groupButton : button;
+          setCompactToolFlyoutOpen(true, { force: isMobilePeekToolFlyoutMode() });
+          updateToolVisibility();
+        }
       });
     });
     setActiveTool(state.tool, toolButtons, { persist: false });
@@ -42024,9 +42549,13 @@
     updateToolTabIcon();
     focusUnifiedLeftContext('tools', { persist: false });
     const mobilePeekMode = isMobilePeekToolFlyoutMode();
-    if ((isCompactToolRailMode() || mobilePeekMode) && isCompactToolFlyoutOpen()) {
+    const desktopCompactMode = isCompactToolRailMode() && layoutMode !== 'mobilePortrait';
+    if (mobilePeekMode && isCompactToolFlyoutOpen()) {
       setCompactToolFlyoutOpen(false);
       updateToolVisibility();
+    } else if (desktopCompactMode && isCompactToolFlyoutOpen()) {
+      updateToolVisibility();
+      updateCompactToolFlyoutPosition();
     }
     if (persist) {
       scheduleSessionPersist({ includeSnapshots: false, includeReloadSnapshot: false });
@@ -49967,6 +50496,7 @@
     state.floatingPreview = normalizeFloatingPreviewState(state.floatingPreview, FLOATING_PREVIEW_DEFAULT_STATE);
     state.floatingPreview.enabled = next;
     syncFloatingPreviewPanelVisibility({ persist });
+    updateFloatingPreviewActionToolButtons();
     if (next && !previous) {
       updateAutosaveStatus(localizeText('小窓プレビューを表示しました', 'Floating preview enabled'), 'info');
     } else if (!next && previous) {
@@ -55919,6 +56449,7 @@
       }
     }
     updateGridDecorations();
+    syncSelectionOutlineToViewportTransform();
     if (resizeVirtualCursor) {
       resizeVirtualCursorCanvas();
     }
@@ -57957,6 +58488,7 @@
           {
             append: pointerState.selectionExtendOnDown,
             cellSize: pointerState.selectionPreview.gridCellSize || SELECT_RECT_GRID_CELL_SIZE,
+            selectionShapeMode: state.selectionShapeMode,
           }
         );
       } else if (
@@ -57971,6 +58503,7 @@
       ) {
         createSelectionRect(pointerState.start, pointerState.current, {
           append: pointerState.selectionExtendOnDown,
+          selectionShapeMode: state.selectionShapeMode,
         });
       }
     } else if (tool === 'selectLasso') {
@@ -57978,6 +58511,7 @@
       if (!(!pointerState.selectionRestartedOnDown && pointerState.selectionClearedOnDown && pointCount <= 1)) {
         createSelectionLasso(pointerState.selectionPreview.points, {
           append: pointerState.selectionExtendOnDown,
+          selectionShapeMode: state.selectionShapeMode,
         });
       }
     } else if (tool === POINTER_TOOL_CUSTOM_BRUSH_RECT) {
@@ -63566,6 +64100,7 @@
     const {
       append = false,
       cellSize = SELECT_RECT_GRID_CELL_SIZE,
+      selectionShapeMode = state.selectionShapeMode,
     } = options || {};
     const boundsRect = getSelectionGridRectPixelBounds(startCell, endCell, cellSize);
     if (!boundsRect) {
@@ -63584,6 +64119,7 @@
     const { mask, bounds, hasBaseSelection } = createSelectionAccumulator({ append });
     for (let y = boundsRect.y0; y <= boundsRect.y1; y += 1) {
       for (let x = boundsRect.x0; x <= boundsRect.x1; x += 1) {
+        if (!shouldIncludeShapeSelectionPixel(layer, x, y, selectionShapeMode)) continue;
         markSelectionMaskPixel(mask, bounds, x, y);
       }
     }
@@ -63604,7 +64140,7 @@
   }
 
   function createSelectionRect(start, end, options = {}) {
-    const { append = false } = options || {};
+    const { append = false, selectionShapeMode = state.selectionShapeMode } = options || {};
     const layer = getActiveLayer();
     if (!layer) {
       if (!append) {
@@ -63620,6 +64156,7 @@
 
     for (let y = y0; y <= y1; y += 1) {
       for (let x = x0; x <= x1; x += 1) {
+        if (!shouldIncludeShapeSelectionPixel(layer, x, y, selectionShapeMode)) continue;
         markSelectionMaskPixel(mask, bounds, x, y);
       }
     }
@@ -65382,6 +65919,29 @@
     }, { ensureResolution: false });
   }
 
+  function syncSelectionOutlineToViewportTransform() {
+    const preview = pointerState.selectionPreview;
+    if (preview && pointerState.tool === 'selectLasso') {
+      drawLassoPreview(preview.points);
+      return;
+    }
+    if (
+      preview
+      && (
+        pointerState.tool === 'selectRect'
+        || pointerState.tool === POINTER_TOOL_CUSTOM_BRUSH_RECT
+      )
+    ) {
+      drawRectanglePreview(preview.start, preview.end);
+      return;
+    }
+    if (state.selectionMask) {
+      drawSelectionOverlay();
+      return;
+    }
+    clearSelectionOutlineSvg();
+  }
+
   function updateSelectionDashAnimation(timestamp) {
     if (!Number.isFinite(timestamp)) {
       timestamp = performance.now();
@@ -65535,21 +66095,18 @@
       && selectionOutlinePathLight instanceof SVGPathElement
     ) {
       const canvasDoc = getActiveProjectCanvasDocument();
-      const surface = activeCanvasSurface || mainViewportCanvasSurface || null;
-      const metrics = getCanvasSurfaceDisplayMetrics(
-        surface,
-        canvasDoc,
-        getProjectCanvasDisplayScale(canvasDoc)
-      );
-      const svgWidth = Math.max(1, metrics.displayWidth);
-      const svgHeight = Math.max(1, metrics.displayHeight);
-      svg.setAttribute('viewBox', `0 0 ${svgWidth} ${svgHeight}`);
-      svg.style.width = `${svgWidth}px`;
-      svg.style.height = `${svgHeight}px`;
+      const logicalWidth = Math.max(1, Math.round(Number(canvasDoc?.width) || Number(state.width) || 1));
+      const logicalHeight = Math.max(1, Math.round(Number(canvasDoc?.height) || Number(state.height) || 1));
+      const displayScale = getProjectCanvasDisplayScale(canvasDoc);
+      const displayWidth = logicalWidth * displayScale;
+      const displayHeight = logicalHeight * displayScale;
+      svg.setAttribute('viewBox', `0 0 ${logicalWidth} ${logicalHeight}`);
+      svg.style.width = `${displayWidth}px`;
+      svg.style.height = `${displayHeight}px`;
       const pathBuilder = createSvgPathTraceBuilder();
-      trace(pathBuilder, { x: metrics.scaleX, y: metrics.scaleY });
+      trace(pathBuilder, { x: 1, y: 1 });
       const pathData = pathBuilder.toString();
-      const dashPattern = options.dashPattern || [4, 4];
+      const dashPattern = options.dashPattern || [8, 5];
       const dashCycle = dashPattern.reduce((sum, value) => sum + value, 0) || 8;
       const dashOffset = ((selectionDashScreenOffset) % dashCycle + dashCycle) % dashCycle;
       const firstDash = dashPattern[0] || dashCycle;
@@ -65574,7 +66131,7 @@
     }
     const renderScale = selectionRenderScale;
     const scaleRatio = renderScale / selectionDisplayScale;
-    const dashPatternScreen = options.dashPattern || [4, 4];
+    const dashPatternScreen = options.dashPattern || [8, 5];
     const dashPatternRender = dashPatternScreen.map(value => value * scaleRatio);
     const dashCycleScreen = dashPatternScreen.reduce((sum, value) => sum + value, 0) || 8;
     const dashOffsetScreen = ((selectionDashScreenOffset) % dashCycleScreen + dashCycleScreen) % dashCycleScreen;
