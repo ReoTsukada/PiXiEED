@@ -1108,7 +1108,7 @@
       mobile: UNIFIED_LEFT_TOOLS_COLOR_MODE ? dom.mobilePanels.tools : dom.mobilePanels.color,
     },
     frames: { desktop: dom.bottomTimelinePanes || dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.frames },
-    details: { desktop: dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.settings },
+    details: { desktop: dom.rightTabPanes || dom.rightRail, mobile: null },
     settings: { desktop: dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.settings },
     extensions: { desktop: dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.extensions },
     help: { desktop: dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.help },
@@ -16532,6 +16532,12 @@
       RIGHT_TAB_KEYS.forEach(key => {
         const section = dom.sections[key];
         if (!section) return;
+        if (key === 'details') {
+          section.hidden = true;
+          section.setAttribute('aria-hidden', 'true');
+          section.classList.remove('is-active', 'is-bottom-docked');
+          return;
+        }
         section.hidden = false;
         section.setAttribute('aria-hidden', 'false');
         section.classList.add('is-active');
@@ -40025,7 +40031,14 @@
       const section = dom.sections[key];
       if (!section) return;
       const target = isMobile ? placement.mobile : placement.desktop;
-      if (!target) return;
+      if (!target) {
+        if (isMobile) {
+          section.hidden = true;
+          section.setAttribute('aria-hidden', 'true');
+          section.classList.remove('is-active', 'is-bottom-docked', 'panel-section--mobile');
+        }
+        return;
+      }
       target.appendChild(section);
       section.classList.add('panel-section');
       section.classList.toggle('panel-section--mobile', isMobile);
