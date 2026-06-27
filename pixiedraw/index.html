@@ -107,7 +107,7 @@
 
 
 
-<link href="assets/css/style.css?v=2026.05.30-rail-min-ad" rel="stylesheet"/>
+<link href="assets/css/style.css?v=2026.06.27-frame-playback-tool-flyouts" rel="stylesheet"/>
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-4.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-4.png"/>
   <style id="interaction-guard">
@@ -217,19 +217,15 @@
 </div>
 </div>
 <div class="layout" id="appLayout">
-<aside aria-label="ツールとカラー設定" class="rail rail--left" data-collapsed="true" data-compact="true" id="leftRail">
-<div aria-label="左パネル切替" class="rail-tabs" id="leftRailTabs" role="tablist">
-<button aria-controls="panelTools" aria-label="ツール" aria-selected="true" class="rail-tab is-active" data-left-tab="tools" role="tab" title="ツール" type="button">
-<span class="tab-icon-container" id="toolTabIcon"></span>
-<span class="sr-only">ツール</span>
-</button>
-<button aria-controls="panelColor" aria-label="カラー" aria-selected="false" class="rail-tab" data-left-tab="color" id="leftTabColorButton" role="tab" tabindex="-1" title="カラー" type="button">
+<aside aria-label="カラー設定" class="rail rail--left rail--color" data-collapsed="true" data-compact="true" id="leftRail">
+<div aria-label="左パネル切替" class="rail-tabs" hidden="" id="leftRailTabs" role="tablist">
+<button aria-controls="panelColor" aria-label="カラー" aria-selected="true" class="rail-tab is-active" data-left-tab="color" id="leftTabColorButton" role="tab" title="カラー" type="button">
 <span class="tab-swatch pixel-frame" id="colorTabSwatch"></span>
 <span class="sr-only">カラー</span>
 </button>
 </div>
   <div class="rail-tabpanes" id="leftRailPanes"></div>
-<button aria-label="左パネルを開く / 幅を変更" class="rail-resizer rail-resizer--left" id="resizeLeftRail" type="button"></button>
+<button aria-label="左パネルを開く / 幅を変更" class="rail-resizer rail-resizer--left" hidden="" id="resizeLeftRail" type="button"></button>
 </aside>
 <main aria-label="ドットキャンバス" class="stage" id="stage">
 <div aria-label="プロジェクト内シート" class="project-tabs" hidden="" id="projectTabsBar" role="region">
@@ -241,6 +237,7 @@
 </div>
 </div>
 <div aria-label="シートタブ" class="project-tabs__list" id="projectTabsList" role="tablist"></div>
+<div aria-label="上部操作" class="project-tabs__actions" id="projectTabsActions"></div>
 </div>
 <section aria-labelledby="projectHomeTitle" class="project-home-screen" hidden id="projectHomeScreen" tabindex="-1">
 <div class="project-home-screen__inner">
@@ -302,6 +299,28 @@
 </div>
 <div class="canvas-controls">
 <button aria-label="アプリを再読み込み" class="chip canvas-reload-action" id="appReloadAction" title="再読み込み" type="button"><img alt="" aria-hidden="true" height="20" src="assets/icons/action-reload.png" width="20"/></button>
+<div aria-label="ファイルと外部ツール" class="canvas-controls__quick-actions" role="group">
+<button aria-controls="panelSettings" aria-label="設定" class="chip canvas-quick-action" data-quick-right-tab="settings" title="設定" type="button">
+<img alt="" aria-hidden="true" height="20" src="assets/icons/menu-settings.svg" width="20"/>
+<span class="sr-only">設定</span>
+</button>
+<button aria-controls="panelMulti" aria-label="共有モード" class="chip canvas-quick-action" data-quick-right-tab="multi" title="共有モード" type="button">
+<img alt="" aria-hidden="true" height="20" src="assets/icons/maltimode.svg" width="20"/>
+<span class="sr-only">共有モード</span>
+</button>
+<button aria-controls="panelFile" aria-label="ファイル" class="chip canvas-quick-action" data-quick-right-tab="file" title="ファイル" type="button">
+<img alt="" aria-hidden="true" height="20" src="assets/icons/menu-file.svg" width="20"/>
+<span class="sr-only">ファイル</span>
+</button>
+<button aria-label="カメラ" class="chip canvas-quick-action" data-external-tool="pixieelens" data-ui-action="openLensCamera" title="カメラ" type="button">
+<img alt="" aria-hidden="true" height="20" src="assets/icons/pixieelensicon_frame_01.png" width="20"/>
+<span class="sr-only">カメラ</span>
+</button>
+<button aria-label="QR編集" class="chip canvas-quick-action" data-external-tool="qrmaker" data-ui-action="openQrEditor" title="QR編集" type="button">
+<img alt="" aria-hidden="true" height="20" src="assets/icons/tool-qr-edit.svg" width="20"/>
+<span class="sr-only">QR編集</span>
+</button>
+</div>
 <div aria-label="コピー・ペースト・カット" aria-hidden="true" class="canvas-clipboard-buttons" id="canvasClipboardButtons" role="group">
 <button aria-label="コピー" class="chip" data-action="copy" id="canvasClipboardCopy" type="button">C</button>
 <button aria-label="ペースト" class="chip" data-action="paste" id="canvasClipboardPaste" type="button">P</button>
@@ -379,39 +398,16 @@
 <button aria-label="フレームとレイヤーの高さを変更" class="bottom-timeline-dock__resizer" id="resizeBottomTimelineDock" type="button"></button>
 <div class="bottom-timeline-dock__panes" id="bottomTimelinePanes"></div>
 </section>
-<aside aria-label="フレーム、レイヤー、設定、拡張、ファイル、共有" class="rail rail--right" data-collapsed="true" data-compact="true" id="rightRail">
-<div aria-label="右パネル切り替え" class="rail-tabs" id="rightRailTabs" role="tablist">
-<button aria-controls="panelSettings" aria-label="設定" aria-selected="true" class="rail-tab is-active" data-right-tab="settings" role="tab" title="設定" type="button">
-<img alt="" class="tab-icon" src="assets/icons/menu-settings.svg"/>
-<span class="sr-only">設定</span>
-</button>
-<button aria-controls="panelExtensions" aria-hidden="true" aria-label="拡張" aria-selected="false" class="rail-tab" data-right-tab="extensions" hidden="" role="tab" tabindex="-1" title="拡張" type="button">
-<img alt="" class="tab-icon" src="assets/icons/EXicon.png"/>
-<span class="sr-only">拡張</span>
-</button>
-<button aria-controls="panelHelp" aria-hidden="true" aria-label="使い方ヘルプ" aria-selected="false" class="rail-tab" data-right-tab="help" hidden="" role="tab" tabindex="-1" title="使い方ヘルプ" type="button">
-<img alt="" class="tab-icon" src="assets/icons/menu-help.svg"/>
-<span class="sr-only">使い方ヘルプ</span>
-</button>
-<button aria-controls="panelFile" aria-label="ファイル" aria-selected="false" class="rail-tab" data-right-tab="file" role="tab" tabindex="-1" title="ファイル" type="button">
-<img alt="" class="tab-icon" src="assets/icons/menu-file.svg"/>
-<span class="sr-only">ファイル</span>
-</button>
-<button aria-controls="panelMulti" aria-label="共有モード" aria-selected="false" class="rail-tab" data-right-tab="multi" role="tab" tabindex="-1" title="共有モード" type="button">
-<img alt="" class="tab-icon" src="assets/icons/maltimode.svg"/>
-<span class="sr-only">共有モード</span>
-</button>
-<button aria-label="カメラ" class="rail-tab rail-tab--action" data-external-tool="pixieelens" data-ui-action="openLensCamera" title="カメラ" type="button">
-<img alt="" class="tab-icon" src="assets/icons/pixieelensicon_frame_01.png"/>
-<span class="sr-only">カメラ</span>
-</button>
-<button aria-label="QR編集" class="rail-tab rail-tab--action" data-external-tool="qrmaker" data-ui-action="openQrEditor" title="QR編集" type="button">
-<img alt="" class="tab-icon" src="assets/icons/tool-qr-edit.svg"/>
-<span class="sr-only">QR編集</span>
+<aside aria-label="ツールと詳細メニュー" class="rail rail--right rail--tools" data-collapsed="true" data-compact="true" id="rightRail">
+<div class="right-utility-menu" id="rightUtilityMenu">
+<button aria-controls="panelDetails" aria-label="詳細" class="rail-tab right-utility-menu__trigger" data-quick-right-tab="details" id="rightUtilityMenuButton" title="詳細" type="button">
+<img alt="" class="tab-icon" src="assets/icons/action-more-menu.svg"/>
+<span class="sr-only">詳細</span>
 </button>
 </div>
-  <div class="rail-tabpanes" id="rightRailPanes"></div>
-<button aria-label="右パネルを開く / 幅を変更" class="rail-resizer rail-resizer--right" id="resizeRightRail" type="button"></button>
+  <div class="rail-tabpanes rail-tabpanes--right-tools" id="rightToolPanes"></div>
+  <div class="rail-tabpanes rail-tabpanes--right-flyouts" id="rightRailPanes"></div>
+<button aria-label="右パネルを開く / 幅を変更" class="rail-resizer rail-resizer--right" hidden="" id="resizeRightRail" type="button"></button>
 </aside>
 </div>
 <div aria-hidden="true" id="panelAdPreloadHost" style="position:fixed;left:-20000px;top:-20000px;width:320px;height:320px;overflow:hidden;opacity:0;pointer-events:none;z-index:-1;">
@@ -538,6 +534,14 @@
 <button aria-label="仮想カーソル" aria-pressed="false" class="tool-group-button tool-group-button--action" data-ui-action="virtualCursorToggle" title="仮想カーソル" type="button">
 <img alt="" aria-hidden="true" class="tool-group-icon" height="20" src="assets/icons/tool-cursor.png" width="20"/>
 <span class="tool-group-label">仮想カーソル</span>
+</button>
+<button aria-label="マルチキャンバス" aria-pressed="false" class="tool-group-button tool-group-button--action" data-ui-action="localCanvasToggle" title="マルチキャンバス" type="button">
+<img alt="" aria-hidden="true" class="tool-group-icon" height="20" src="assets/icons/menu-canvas.png" width="20"/>
+<span class="tool-group-label">マルチキャンバス</span>
+</button>
+<button aria-label="小窓プレビュー" aria-pressed="false" class="tool-group-button tool-group-button--action" data-ui-action="floatingPreviewToggle" title="小窓プレビュー" type="button">
+<img alt="" aria-hidden="true" class="tool-group-icon" height="20" src="assets/icons/action-preview.svg" width="20"/>
+<span class="tool-group-label">小窓プレビュー</span>
 </button>
 </div>
 <div aria-label="描画ツール" class="tool-grid" id="toolGrid" role="toolbar">
@@ -668,16 +672,26 @@
 <div class="color-mode color-mode--index" id="colorModeIndex">
 <div class="palette-header">
 <div class="palette-actions">
+<details class="palette-action-menu">
+<summary aria-label="色ソートメニュー" class="chip palette-action-menu__trigger">並替</summary>
+<div class="palette-action-menu__content">
 <button aria-label="色相順でソート" class="chip" id="sortPaletteHue" type="button">色相</button>
 <button aria-label="彩度順でソート" class="chip" id="sortPaletteSaturation" type="button">彩度</button>
 <button aria-label="明度順でソート" class="chip" id="sortPaletteValue" type="button">明度</button>
+</div>
+</details>
 <button aria-label="選択した色を削除" class="chip" id="removePaletteColor" type="button">-</button>
 <button aria-label="色を追加" class="chip" id="addPaletteColor" type="button">+</button>
 <button aria-label="選択した色を前へ移動" class="chip palette-action--move" id="movePaletteBackward" type="button">◀</button>
 <button aria-label="選択した色を後ろへ移動" class="chip palette-action--move" id="movePaletteForward" type="button">▶</button>
 <!-- Palette import/export -->
+<details class="palette-action-menu">
+<summary aria-label="パレット入出力メニュー" class="chip palette-action-menu__trigger">入出力</summary>
+<div class="palette-action-menu__content">
 <button aria-label="パレットをエクスポート" class="chip" id="exportPaletteJson" type="button">Export</button>
 <button aria-label="パレットをインポート" class="chip" id="importPaletteJson" type="button">Import</button>
+</div>
+</details>
 <input id="importPaletteFile" type="file" accept="application/json" hidden />
 </div>
 </div>
@@ -1003,19 +1017,71 @@
 </div>
 <div class="panel-ad-mount" data-panel-ad-mount="right"></div>
 </section>
+<section class="panel-section" data-section="details" id="panelDetails">
+<div class="panel-section__body">
+<div class="detail-panel">
+<div class="detail-panel__grid" aria-label="詳細操作">
+<button aria-controls="panelSettings" class="button detail-panel__action" data-quick-right-tab="settings" type="button">
+<span aria-hidden="true" class="detail-panel__icon"><img alt="" src="assets/icons/menu-settings.svg"/></span>
+<span>設定</span>
+</button>
+<button aria-controls="panelMulti" class="button detail-panel__action" data-quick-right-tab="multi" type="button">
+<span aria-hidden="true" class="detail-panel__icon"><img alt="" src="assets/icons/maltimode.svg"/></span>
+<span>共有モード</span>
+</button>
+<button class="button detail-panel__action" data-detail-action="account" type="button">
+<span aria-hidden="true" class="detail-panel__icon"><img alt="" src="assets/icons/ecticon_frame_01.png"/></span>
+<span>ログイン</span>
+</button>
+<a class="button detail-panel__action" data-support-panel-trigger="true" data-support-preferred-product="pixiedraw_ad_free" href="#" id="detailSupportPurchase" rel="noopener">
+<span aria-hidden="true" class="detail-panel__icon"><img alt="" src="assets/icons/ecticon_frame_06.png"/></span>
+<span>サポーター特典</span>
+</a>
+<button aria-haspopup="dialog" class="button detail-panel__action" id="openShortcutHelp" type="button">
+<span aria-hidden="true" class="detail-panel__icon"><img alt="" src="assets/icons/ecticon_frame_02.png"/></span>
+<span>ショートカット一覧</span>
+</button>
+<button class="button detail-panel__action" id="openOperationHelpPanel" type="button">
+<span aria-hidden="true" class="detail-panel__icon"><img alt="" src="assets/icons/ecticon_frame_03.png"/></span>
+<span>使い方ヘルプ</span>
+</button>
+<button aria-haspopup="dialog" class="button detail-panel__action" id="openUpdateHistory" type="button">
+<span aria-hidden="true" class="detail-panel__icon"><img alt="" src="assets/icons/ecticon_frame_04.png"/></span>
+<span>更新情報</span>
+</button>
+<button class="button detail-panel__action" id="toggleLanguageMode" type="button">
+<span aria-hidden="true" class="detail-panel__icon"><img alt="" src="assets/icons/ecticon_frame_05.png"/></span>
+<span>言語</span>
+</button>
+<a class="button detail-panel__action" href="../index.html" id="goHomeButton">
+<span aria-hidden="true" class="detail-panel__icon"><img alt="" src="assets/icons/ecticon_frame_07.png"/></span>
+<span>ホーム</span>
+</a>
+<a class="button detail-panel__action" href="../contest/index.html" id="goContestButton">
+<span aria-hidden="true" class="detail-panel__icon"><img alt="" src="assets/icons/ecticon_frame_08.png"/></span>
+<span>広場</span>
+</a>
+</div>
+<div class="field field--list settings-account-field">
+<span id="pixieedAccountLabel">アカウント</span>
+<p class="help-text" id="pixieedAccountStatus">未ログイン</p>
+<div class="field field--inline">
+<a class="chip" id="pixieedAccountLogin" href="../account/index.html" target="_blank" rel="noopener">ログイン</a>
+<button class="chip" id="pixieedAccountLogout" type="button" hidden>ログアウト</button>
+</div>
+</div>
+<div class="field field--list settings-account-field" id="pixieedPwaInstallField">
+<span>アプリとして使う</span>
+<p class="help-text" id="pixieedPwaInstallStatus">ホーム画面やデスクトップに追加すると、PiXiEEDrawをアプリのように開けます。</p>
+<div class="field field--inline">
+<button class="chip" id="pixieedPwaInstallButton" type="button">インストール案内を開く</button>
+</div>
+</div>
+</div>
+</div>
+</section>
 <section class="panel-section" data-section="settings" id="panelSettings">
 <div class="panel-section__body">
-  <details class="settings-nav-wrap">
-    <summary class="settings-nav-wrap__summary">その他のメニュー</summary>
-    <div class="settings-nav">
-    <a class="button settings-nav__action settings-nav__action--primary" href="../index.html" id="goHomeButton">ホームに戻る</a>
-    <a class="button settings-nav__action settings-nav__action--primary" href="../contest/index.html" id="goContestButton">広場を見る</a>
-    <button class="chip settings-nav__action settings-nav__quick settings-nav__close" id="toggleLanguageMode" type="button">あ/A</button>
-    <button class="chip settings-nav__action settings-nav__quick settings-nav__close" id="openOperationHelpPanel" type="button">使い方ヘルプ</button>
-    <button aria-haspopup="dialog" class="chip settings-nav__action settings-nav__quick settings-nav__close" id="openShortcutHelp" type="button">ショートカット一覧</button>
-    <button aria-haspopup="dialog" class="chip settings-nav__action settings-nav__quick settings-nav__close" id="openUpdateHistory" type="button">更新情報</button>
-    </div>
-  </details>
 <div class="settings-size-grid">
 <div class="field settings-size-row settings-size-row--canvas settings-size-row--combined">
 <span id="settingsSizeTitle">サイズ</span>
@@ -1195,21 +1261,6 @@
 <button aria-pressed="false" class="chip" id="toggleUiTheme" type="button">UI:緑色</button>
 </div>
 <p class="help-text ui-guide-text" id="settingsDisplayHint">背景とUI配色を切り替えます（描画色には影響しません）。</p>
-</div>
-<div class="field field--list settings-account-field">
-<span id="pixieedAccountLabel">アカウント</span>
-<p class="help-text" id="pixieedAccountStatus">未ログイン</p>
-<div class="field field--inline">
-<a class="chip" id="pixieedAccountLogin" href="../account/index.html" target="_blank" rel="noopener">ログイン</a>
-<button class="chip" id="pixieedAccountLogout" type="button" hidden>ログアウト</button>
-</div>
-</div>
-<div class="field field--list settings-account-field" id="pixieedPwaInstallField">
-<span>アプリとして使う</span>
-<p class="help-text" id="pixieedPwaInstallStatus">ホーム画面やデスクトップに追加すると、PiXiEEDrawをアプリのように開けます。</p>
-<div class="field field--inline">
-<button class="chip" id="pixieedPwaInstallButton" type="button">インストール案内を開く</button>
-</div>
 </div>
 </div>
 </section>
