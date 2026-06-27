@@ -3687,7 +3687,7 @@
   const LEFT_RAIL_MAX_WIDTH = RAIL_DEFAULT_WIDTH.left;
   const RAIL_COMPACT_THRESHOLD = Object.freeze({ left: 150, right: 96 });
   const RAIL_CLICK_OPEN_WIDTH = Object.freeze({ left: 236, right: 320 });
-  const RAIL_INITIAL_WIDTH = Object.freeze({ left: LEFT_PALETTE_COMPACT_WIDTH, right: RAIL_MIN_WIDTH });
+  const RAIL_INITIAL_WIDTH = Object.freeze({ left: LEFT_PALETTE_COMPACT_WIDTH, right: RAIL_DEFAULT_WIDTH.right });
   const RAIL_RESIZE_DRAG_THRESHOLD = 6;
   const RIGHT_TRANSIENT_PANEL_WIDTH = RAIL_MAX_WIDTH;
   const BOTTOM_TIMELINE_DEFAULT_HEIGHT = 188;
