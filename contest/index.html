@@ -47,7 +47,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link rel="preconnect" href="https://kyyiuakrqomzlikfaire.supabase.co" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600;700&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="./assets/css/plaza.css?v=2026.06.26-slot-rotation"/>
+  <link rel="stylesheet" href="./assets/css/plaza.css?v=2026.06.26-realtime-replies"/>
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253" crossorigin="anonymous"></script>
   <script defer src="../scripts/pixieed-adfree.js?v=2026.06.01-serial-code-email"></script>
 </head>
@@ -105,14 +105,15 @@
                 <button class="plaza-plus-button" id="plazaPlusButton" type="button" aria-label="オプションを開く" aria-haspopup="menu" aria-expanded="false" aria-controls="plazaOptionMenu">+</button>
                 <div class="plaza-option-menu" id="plazaOptionMenu" role="menu" hidden>
                   <button class="plaza-option-button" data-option-action="post" type="button" role="menuitem">画像投稿</button>
-                  <button class="plaza-option-button" data-option-action="reply" type="button" role="menuitem">リプライ先</button>
+                  <button class="plaza-option-button" data-option-action="world" type="button" role="menuitem">ワールド発言</button>
+                  <button class="plaza-option-button" data-option-action="direct" type="button" role="menuitem">ユーザー宛て</button>
                   <button class="plaza-option-button" data-option-action="mention" type="button" role="menuitem">メンション</button>
-                  <button class="plaza-option-button" data-option-action="clear" type="button" role="menuitem">解除</button>
+                  <button class="plaza-option-button" data-option-action="clear" type="button" role="menuitem">リプライ解除</button>
                 </div>
               </div>
               <label class="plaza-message-field">
-                <span id="replyTargetLabel">画像を選ぶとリプライできます</span>
-                <input id="chatInput" type="text" maxlength="180" autocomplete="off" placeholder="コメントを入力"/>
+                <span id="replyTargetLabel">ワールド発言</span>
+                <input id="chatInput" type="text" maxlength="180" autocomplete="off" placeholder="/to 名前 本文 または コメント"/>
               </label>
               <button class="plaza-send-button" type="submit">送信</button>
             </form>
@@ -201,6 +202,6 @@
   <script defer src="../scripts/shared-auth-panel.js?v=2026.06.26-auth-persist"></script>
   <script defer src="../scripts/shared-bottom-nav.js?v=2026.06.25-chat-mvp"></script>
   <script defer src="../scripts/bottom-nav-footer-ad.js"></script>
-  <script defer src="./assets/js/plaza.js?v=2026.06.26-slot-rotation"></script>
+  <script defer src="./assets/js/plaza.js?v=2026.06.26-realtime-replies"></script>
 </body>
 </html>
