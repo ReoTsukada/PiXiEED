@@ -3597,6 +3597,10 @@ body.is-startup-active #virtualCursorCanvas {
   margin-left: auto;
 }
 
+.canvas-history-action--mobile-only {
+  display: none;
+}
+
 .canvas-reload-action {
   font-size: 1.05rem;
   font-weight: 700;
@@ -3762,6 +3766,10 @@ body.is-startup-active #virtualCursorCanvas {
 .canvas-controls[data-mobile='true'] .canvas-controls__history {
   order: 3;
   margin-left: auto;
+}
+
+.canvas-controls[data-mobile='true'] .canvas-history-action--mobile-only {
+  display: inline-flex;
 }
 
 .canvas-controls[data-mobile='true'] #appReloadAction {
