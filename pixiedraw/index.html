@@ -1026,10 +1026,10 @@
 <div class="panel-section__body">
 <div class="detail-panel">
 <div class="detail-panel__grid" aria-label="詳細操作">
-<button class="button detail-panel__action" data-detail-action="account" type="button">
+<a class="button detail-panel__action" href="../account/index.html" id="detailAccountAction" rel="noopener" target="_blank">
 <span aria-hidden="true" class="detail-panel__icon"><img alt="" src="assets/icons/ecticon_frame_01.png"/></span>
-<span>ログイン</span>
-</button>
+<span id="detailAccountActionLabel">ログイン</span>
+</a>
 <a class="button detail-panel__action" data-support-panel-trigger="true" data-support-preferred-product="pixiedraw_ad_free" href="#" id="detailSupportPurchase" rel="noopener">
 <span aria-hidden="true" class="detail-panel__icon"><img alt="" src="assets/icons/ecticon_frame_06.png"/></span>
 <span>サポーター特典</span>
@@ -1058,14 +1058,6 @@
 <span aria-hidden="true" class="detail-panel__icon"><img alt="" src="assets/icons/ecticon_frame_08.png"/></span>
 <span>広場</span>
 </a>
-</div>
-<div class="field field--list settings-account-field">
-<span id="pixieedAccountLabel">アカウント</span>
-<p class="help-text" id="pixieedAccountStatus">未ログイン</p>
-<div class="field field--inline">
-<a class="chip" id="pixieedAccountLogin" href="../account/index.html" target="_blank" rel="noopener">ログイン</a>
-<button class="chip" id="pixieedAccountLogout" type="button" hidden>ログアウト</button>
-</div>
 </div>
 <div class="field field--list settings-account-field" id="pixieedPwaInstallField">
 <span>アプリとして使う</span>
