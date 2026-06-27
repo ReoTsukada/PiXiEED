@@ -31,6 +31,7 @@
     rightUtilityMenu: document.getElementById('rightUtilityMenu'),
     rightUtilityMenuButton: document.getElementById('rightUtilityMenuButton'),
     rightUtilityMenuPopover: document.getElementById('rightUtilityMenuPopover'),
+    mobileDetailsAction: document.querySelector('.canvas-history-action--mobile-only'),
     bottomTimelineDock: document.getElementById('bottomTimelineDock'),
     bottomTimelinePanes: document.getElementById('bottomTimelinePanes'),
     topActionButtons: Array.from(document.querySelectorAll('[data-ui-action]')),
@@ -452,6 +453,8 @@
       pixieedAccountStatus: document.getElementById('pixieedAccountStatus'),
       pixieedAccountLogin: document.getElementById('pixieedAccountLogin'),
       pixieedAccountLogout: document.getElementById('pixieedAccountLogout'),
+      detailAccountAction: document.getElementById('detailAccountAction'),
+      detailAccountActionLabel: document.getElementById('detailAccountActionLabel'),
       pixieedAccountDock: document.getElementById('pixieedAccountDock'),
       multiMasterOnlyGroups: Array.from(document.querySelectorAll('[data-multi-master-only]')),
       multiMasterOpsGroups: Array.from(document.querySelectorAll('[data-multi-master-ops]')),
@@ -3684,11 +3687,13 @@
   const LEFT_RAIL_MAX_WIDTH = RAIL_DEFAULT_WIDTH.left;
   const RAIL_COMPACT_THRESHOLD = Object.freeze({ left: 150, right: 96 });
   const RAIL_CLICK_OPEN_WIDTH = Object.freeze({ left: 236, right: 320 });
+  const RAIL_INITIAL_WIDTH = Object.freeze({ left: LEFT_PALETTE_COMPACT_WIDTH, right: RAIL_MIN_WIDTH });
   const RAIL_RESIZE_DRAG_THRESHOLD = 6;
   const RIGHT_TRANSIENT_PANEL_WIDTH = RAIL_MAX_WIDTH;
   const BOTTOM_TIMELINE_DEFAULT_HEIGHT = 188;
   const BOTTOM_TIMELINE_MIN_HEIGHT = 64;
   const BOTTOM_TIMELINE_COMPACT_HEIGHT = 96;
+  const BOTTOM_TIMELINE_INITIAL_HEIGHT = BOTTOM_TIMELINE_MIN_HEIGHT;
   const BOTTOM_TIMELINE_MAX_HEIGHT = 360;
   const LEFT_DUAL_GAP = 8;
   const LEFT_DUAL_MIN_COLUMN_WIDTH = Math.max(132, RAIL_DEFAULT_WIDTH.left, RAIL_MIN_WIDTH);
@@ -3698,8 +3703,8 @@
   const LEFT_UNIFIED_TOOLS_MIN_HEIGHT_FALLBACK = 122;
   const LEFT_UNIFIED_COLOR_MIN_HEIGHT_FALLBACK = 168;
   const railSizing = {
-    left: RAIL_DEFAULT_WIDTH.left,
-    right: RAIL_DEFAULT_WIDTH.right,
+    left: RAIL_INITIAL_WIDTH.left,
+    right: RAIL_INITIAL_WIDTH.right,
     expandedWidth: {
       left: RAIL_CLICK_OPEN_WIDTH.left,
       right: RAIL_CLICK_OPEN_WIDTH.right,
@@ -3732,11 +3737,11 @@
     captureTarget: null,
   };
   const bottomTimelineSizing = {
-    height: BOTTOM_TIMELINE_DEFAULT_HEIGHT,
+    height: BOTTOM_TIMELINE_INITIAL_HEIGHT,
     active: false,
     pointerId: null,
     startClientY: 0,
-    startHeight: BOTTOM_TIMELINE_DEFAULT_HEIGHT,
+    startHeight: BOTTOM_TIMELINE_INITIAL_HEIGHT,
     moved: false,
     captureTarget: null,
   };
@@ -18986,6 +18991,7 @@
     setLocalizedTextContent('#pixieedAccountLabel', 'アカウント', 'Account');
     setLocalizedTextContent('#pixieedAccountLogin', 'ログイン', 'Sign In');
     setLocalizedTextContent('#pixieedAccountLogout', 'ログアウト', 'Sign Out');
+    setLocalizedTextContent('#detailAccountActionLabel', 'ログイン', 'Sign In');
     setLocalizedTextContent('#pixieedAccountDock', 'ログイン', 'Sign In');
     setLocalizedTextContent('#pixieedPwaInstallField > span', 'アプリとして使う', 'Install as App');
     setLocalizedTextContent('#pixieedPwaInstallButton', 'インストール案内を開く', 'Open Install Guide');
@@ -40022,6 +40028,10 @@
     if (dom.mobileTopBar) {
       dom.mobileTopBar.hidden = !isMobile;
     }
+    if (dom.mobileDetailsAction instanceof HTMLElement) {
+      dom.mobileDetailsAction.hidden = !isMobile;
+      dom.mobileDetailsAction.setAttribute('aria-hidden', String(!isMobile));
+    }
     if (dom.canvasControls) {
       if (isMobile && dom.mobileShortcutsMount) {
         dom.canvasControls.dataset.mobile = 'true';
@@ -40061,9 +40071,9 @@
       endMobileDrawerDrag({ persist: false });
       dom.leftRail.dataset.collapsed = 'false';
       dom.rightRail.dataset.collapsed = 'false';
-      setRailWidth('left', RAIL_DEFAULT_WIDTH.left, { persist: false });
-      setRailWidth('right', RAIL_DEFAULT_WIDTH.right, { persist: false });
-      setBottomTimelineHeight(BOTTOM_TIMELINE_DEFAULT_HEIGHT, { persist: false });
+      setRailWidth('left', RAIL_INITIAL_WIDTH.left, { persist: false });
+      setRailWidth('right', RAIL_INITIAL_WIDTH.right, { persist: false });
+      setBottomTimelineHeight(BOTTOM_TIMELINE_INITIAL_HEIGHT, { persist: false });
     }
 
     Object.entries(layoutMap).forEach(([key, placement]) => {
@@ -67355,9 +67365,9 @@
     if (payload.lastGroupTool && typeof payload.lastGroupTool === 'object') {
       state.lastGroupTool = { ...DEFAULT_GROUP_TOOL, ...payload.lastGroupTool };
     }
-    railSizing.left = RAIL_DEFAULT_WIDTH.left;
-    railSizing.right = RAIL_DEFAULT_WIDTH.right;
-    bottomTimelineSizing.height = BOTTOM_TIMELINE_MIN_HEIGHT;
+    railSizing.left = RAIL_INITIAL_WIDTH.left;
+    railSizing.right = RAIL_INITIAL_WIDTH.right;
+    bottomTimelineSizing.height = BOTTOM_TIMELINE_INITIAL_HEIGHT;
     mobileDrawerState.mode = MOBILE_DRAWER_DEFAULT_MODE;
     if (payload.leftTab && LEFT_TAB_KEYS.includes(payload.leftTab)) {
       state.activeLeftTab = payload.leftTab;
@@ -80319,10 +80329,16 @@
     const status = dom.controls.pixieedAccountStatus;
     const loginLink = dom.controls.pixieedAccountLogin;
     const logoutButton = dom.controls.pixieedAccountLogout;
+    const detailAccountAction = dom.controls.detailAccountAction;
+    const detailAccountActionLabel = dom.controls.detailAccountActionLabel;
     const dock = dom.controls.pixieedAccountDock;
     const isRestoringCachedAccount = Boolean(accountState.restoringFromLocalCache && accountState.isLoggedIn);
     const isSignedInAccount = accountState.isLoggedIn && !accountState.isAnonymous;
+    const nickname = readPixieedAccountNickname();
+    const email = accountState.session?.user?.email || '';
+    const accountLabel = nickname || email || localizeText('ログイン', 'Sign In');
     syncPixieedAccountLoginPromptLink();
+    syncPixieedAccountLoginAnchor(detailAccountAction);
     updatePixieedShareAccountCard(
       dom.controls.multiEntryAccountStatus,
       dom.controls.multiEntryAccountHint,
@@ -80345,10 +80361,20 @@
     if (dom.controls.projectHomeJoinShared instanceof HTMLElement) {
       dom.controls.projectHomeJoinShared.hidden = false;
     }
+    if (detailAccountActionLabel instanceof HTMLElement) {
+      detailAccountActionLabel.textContent = isSignedInAccount
+        ? accountLabel
+        : localizeText('ログイン', 'Sign In');
+    }
+    if (detailAccountAction instanceof HTMLElement) {
+      const actionLabel = isSignedInAccount
+        ? localizeText(`${accountLabel} のアカウントページを開く`, `Open account page for ${accountLabel}`)
+        : localizeText('ログイン', 'Sign In');
+      detailAccountAction.setAttribute('aria-label', actionLabel);
+      detailAccountAction.setAttribute('title', actionLabel);
+    }
     if (status instanceof HTMLElement) {
-      const nickname = readPixieedAccountNickname();
       if (isRestoringCachedAccount && !accountState.isAnonymous) {
-        const email = accountState.session?.user?.email || '';
         const label = nickname || email;
         status.textContent = label
           ? localizeText(`ログイン確認中: ${label}`, `Checking sign-in: ${label}`)
