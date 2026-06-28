@@ -1025,6 +1025,15 @@
     ? String(EMBED_CONFIG.documentName).trim()
     : '新規ドキュメント';
   const DEFAULT_DOCUMENT_NAME = `${DEFAULT_DOCUMENT_BASENAME}${PROJECT_FILE_EXTENSION}`;
+  const documentUtils = window.PiXiEEDrawModules?.documentUtils?.createDocumentUtils?.({
+    DEFAULT_DOCUMENT_BASENAME,
+    PROJECT_FILE_EXTENSION,
+  }) || {};
+  const {
+    extractDocumentBaseName,
+    normalizeDocumentName,
+    sanitizeDocumentFileBase,
+  } = documentUtils;
   const MAX_IMPORTED_PALETTE_COLORS = 256;
   const MAX_EXPORT_DIMENSION = 2000;
   const MAX_EXPORT_SCALE_OPTIONS = MAX_EXPORT_DIMENSION;
@@ -3486,132 +3495,24 @@
   let sharedProjectFreeCellEnsureTimer = null;
   let sharedProjectFreeCellEnsureInFlight = false;
   let sharedProjectLastAutoLayerAddedAt = 0;
-  function getCurrentAccountStorageNamespace() {
-    const userId = typeof accountState.userId === 'string' ? accountState.userId.trim() : '';
-    return userId || 'anonymous';
-  }
-
-  function getScopedStorageKey(baseKey, namespace = getCurrentAccountStorageNamespace()) {
-    const normalizedBaseKey = typeof baseKey === 'string' ? baseKey.trim() : '';
-    const normalizedNamespace = typeof namespace === 'string' ? namespace.trim() : '';
-    if (!normalizedBaseKey) {
-      return '';
-    }
-    if (!normalizedNamespace) {
-      return normalizedBaseKey;
-    }
-    return `${normalizedBaseKey}:${normalizedNamespace}`;
-  }
-
-  function getLocalRestoreStorageKeys(baseKey) {
-    const normalizedBaseKey = typeof baseKey === 'string' ? baseKey.trim() : '';
-    if (!normalizedBaseKey) {
-      return [];
-    }
-    const keys = [normalizedBaseKey];
-    const scopedKey = getScopedStorageKey(normalizedBaseKey);
-    if (scopedKey && scopedKey !== normalizedBaseKey) {
-      keys.push(scopedKey);
-    }
-    return keys;
-  }
-
-  function isTabLocalRestoreOnlyKey(baseKey) {
-    return baseKey === AUTOSAVE_ACTIVE_PROJECT_SYNC_KEY
-      || baseKey === RELOAD_TARGET_PROJECT_ID_KEY
-      || baseKey === RELOAD_PROJECT_FALLBACK_STORAGE_KEY;
-  }
-
-  function writeSessionStorageForLocalRestore(baseKey, value) {
-    if (!canUseSessionStorage) {
-      return;
-    }
-    getLocalRestoreStorageKeys(baseKey).forEach(key => {
-      try {
-        window.sessionStorage.setItem(key, value);
-      } catch (error) {
-        // Ignore storage write failures.
-      }
-    });
-  }
-
-  function writeLocalStorageForLocalRestore(baseKey, value) {
-    if (!canUseSessionStorage) {
-      return;
-    }
-    if (isTabLocalRestoreOnlyKey(baseKey)) {
-      return;
-    }
-    getLocalRestoreStorageKeys(baseKey).forEach(key => {
-      try {
-        window.localStorage.setItem(key, value);
-      } catch (error) {
-        // Ignore storage write failures.
-      }
-    });
-  }
-
-  function readSessionStorageForLocalRestore(baseKey) {
-    if (!canUseSessionStorage) {
-      return '';
-    }
-    const keys = getLocalRestoreStorageKeys(baseKey);
-    for (let index = 0; index < keys.length; index += 1) {
-      const key = keys[index];
-      try {
-        const value = window.sessionStorage.getItem(key) || '';
-        if (value) {
-          return value;
-        }
-      } catch (error) {
-        // Ignore storage read failures.
-      }
-    }
-    return '';
-  }
-
-  function readLocalStorageForLocalRestore(baseKey) {
-    if (!canUseSessionStorage) {
-      return '';
-    }
-    if (isTabLocalRestoreOnlyKey(baseKey)) {
-      return '';
-    }
-    const keys = getLocalRestoreStorageKeys(baseKey);
-    for (let index = 0; index < keys.length; index += 1) {
-      const key = keys[index];
-      try {
-        const value = window.localStorage.getItem(key) || '';
-        if (value) {
-          return value;
-        }
-      } catch (error) {
-        // Ignore storage read failures.
-      }
-    }
-    return '';
-  }
-
-  function clearLocalRestoreStorage(baseKey) {
-    if (!canUseSessionStorage) {
-      return;
-    }
-    getLocalRestoreStorageKeys(baseKey).forEach(key => {
-      try {
-        window.sessionStorage.removeItem(key);
-      } catch (error) {
-        // Ignore sessionStorage cleanup failures.
-      }
-      if (isTabLocalRestoreOnlyKey(baseKey)) {
-        return;
-      }
-      try {
-        window.localStorage.removeItem(key);
-      } catch (error) {
-        // Ignore localStorage cleanup failures.
-      }
-    });
-  }
+  const localRestoreStorageUtils = window.PiXiEEDrawModules?.storageUtils?.createLocalRestoreStorageUtils?.({
+    accountState,
+    canUseSessionStorage,
+    AUTOSAVE_ACTIVE_PROJECT_SYNC_KEY,
+    RELOAD_TARGET_PROJECT_ID_KEY,
+    RELOAD_PROJECT_FALLBACK_STORAGE_KEY,
+  }) || {};
+  const {
+    getCurrentAccountStorageNamespace,
+    getScopedStorageKey,
+    getLocalRestoreStorageKeys,
+    isTabLocalRestoreOnlyKey,
+    writeSessionStorageForLocalRestore,
+    writeLocalStorageForLocalRestore,
+    readSessionStorageForLocalRestore,
+    readLocalStorageForLocalRestore,
+    clearLocalRestoreStorage,
+  } = localRestoreStorageUtils;
 
   function normalizeRecentProjectAccountUserId(value = '') {
     const normalized = typeof value === 'string' ? value.trim() : '';
@@ -8460,53 +8361,6 @@
     }
   }
 
-  function extractDocumentBaseName(value) {
-    if (typeof value !== 'string') {
-      return DEFAULT_DOCUMENT_BASENAME;
-    }
-    let base = value.trim();
-    if (!base) {
-      return DEFAULT_DOCUMENT_BASENAME;
-    }
-    const removableExtensions = [
-      PROJECT_FILE_EXTENSION,
-      '.pxdraw',
-      '.json',
-      '.txt',
-      '.png',
-      '.gif',
-      '.jpg',
-      '.jpeg',
-      '.webp',
-      '.bmp',
-      '.svg',
-      '.avif',
-    ];
-    let changed = true;
-    while (changed && base) {
-      changed = false;
-      const lowerBase = base.toLowerCase();
-      for (let index = 0; index < removableExtensions.length; index += 1) {
-        const extension = removableExtensions[index];
-        if (!lowerBase.endsWith(extension)) {
-          continue;
-        }
-        base = base.slice(0, -extension.length).trim();
-        changed = true;
-        break;
-      }
-    }
-    base = base.replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, ' ').trim();
-    return base || DEFAULT_DOCUMENT_BASENAME;
-  }
-
-  function normalizeDocumentName(value) {
-    const base = extractDocumentBaseName(value);
-    const maxBaseLength = Math.max(1, 120 - PROJECT_FILE_EXTENSION.length);
-    const limitedBase = base.slice(0, maxBaseLength);
-    return `${limitedBase}${PROJECT_FILE_EXTENSION}`;
-  }
-
   function updateDocumentMetadata() {
     const name = normalizeDocumentName(state.documentName);
     if (state.documentName !== name) {
@@ -8515,15 +8369,6 @@
     const baseTitle = 'PiXiEEDraw';
     document.title = `${name} • ${baseTitle}`;
     renderOpenProjectTabs();
-  }
-
-  function sanitizeDocumentFileBase(name) {
-    const base = extractDocumentBaseName(name);
-    return base
-      .replace(/[\\/:*?"<>|]/g, '_')
-      .replace(/\s+/g, '_')
-      .replace(/_+/g, '_')
-      .replace(/^_+|_+$/g, '') || DEFAULT_DOCUMENT_BASENAME.replace(/\s+/g, '_');
   }
 
   function createAutosaveFileName(name = state.documentName) {
@@ -8555,25 +8400,15 @@
     return normalizedExt ? `${safeBase}${safeSuffix}.${normalizedExt}` : `${safeBase}${safeSuffix}`;
   }
 
-  function splitFilenameStemAndExtension(filename, fallback = 'export.bin') {
-    const safeFilename = sanitizeNativeFilename(filename, fallback);
-    const match = safeFilename.match(/^(.*?)(\.[^.]*)?$/);
-    const stem = match?.[1] || safeFilename;
-    const extension = match?.[2] || '';
-    return {
-      stem: stem || 'export',
-      extension,
-    };
-  }
-
-  function buildNumberedFilename(filename, sequence = 0) {
-    const normalizedSequence = Math.max(0, Math.floor(Number(sequence) || 0));
-    const { stem, extension } = splitFilenameStemAndExtension(filename);
-    if (normalizedSequence <= 0) {
-      return `${stem}${extension}`;
-    }
-    return `${stem}.${normalizedSequence}${extension}`;
-  }
+  const exportUtils = window.PiXiEEDrawModules?.exportUtils || {};
+  const {
+    sanitizeNativeFilename,
+    normalizeNativeSubdirectory,
+    isLikelyFileAlreadyExistsError,
+    isNativePhotoLibraryExportMimeType,
+    splitFilenameStemAndExtension,
+    buildNumberedFilename,
+  } = exportUtils;
 
   const exportCodecs = window.PiXiEEDrawModules?.exportCodecs?.createExportCodecs?.({
     clamp,
@@ -36070,39 +35905,6 @@
     return nativeMediaPlugin || null;
   }
 
-  function sanitizeNativeFilename(filename, fallback = 'export.bin') {
-    const raw = typeof filename === 'string' ? filename : '';
-    const basename = raw.split(/[\\/]/).pop() || '';
-    const cleaned = basename
-      .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_')
-      .replace(/\s+/g, ' ')
-      .trim();
-    return cleaned || fallback;
-  }
-
-  function normalizeNativeSubdirectory(path) {
-    const raw = typeof path === 'string' ? path : '';
-    return raw
-      .split('/')
-      .map(segment => segment.trim())
-      .filter(Boolean)
-      .map(segment => segment.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_'))
-      .join('/');
-  }
-
-  function isLikelyFileAlreadyExistsError(error) {
-    const code = String(error?.code || '').toLowerCase();
-    const message = String(error?.message || error || '').toLowerCase();
-    return (
-      code.includes('exist')
-      || code.includes('already')
-      || message.includes('eexist')
-      || message.includes('already exists')
-      || message.includes('file exists')
-      || message.includes('exists')
-    );
-  }
-
   async function blobToBase64Payload(blob) {
     const dataUrl = await blobToDataUrl(blob);
     if (typeof dataUrl !== 'string' || !dataUrl) {
@@ -36215,11 +36017,6 @@
       console.warn('All native file save attempts failed', lastError);
     }
     return null;
-  }
-
-  function isNativePhotoLibraryExportMimeType(mimeType) {
-    const normalized = String(mimeType || '').trim().toLowerCase();
-    return normalized.startsWith('image/') && normalized !== 'image/svg+xml';
   }
 
   async function writeBlobToNativePhotoLibrary(blob, filename, mimeType) {
