@@ -1430,7 +1430,7 @@
       align-items: center;
       justify-content: center;
       padding: 0;
-      border-radius: 12px;
+      border-radius: 0;
       background: rgba(26, 30, 38, 0.95);
       border: 1px solid rgba(86, 104, 140, 0.65);
       box-shadow: 0 10px 24px rgba(5, 8, 18, 0.45);
@@ -1458,7 +1458,7 @@
     .stamp-button__preview {
       width: 100%;
       height: 100%;
-      border-radius: inherit;
+      border-radius: 0;
       background: radial-gradient(circle at 30% 30%, rgba(72, 82, 104, 0.9), rgba(32, 36, 46, 0.9));
       display: flex;
       align-items: center;
@@ -1470,6 +1470,7 @@
       width: 100%;
       height: 100%;
       object-fit: contain;
+      border-radius: 0;
       image-rendering: pixelated;
       display: block;
       pointer-events: none;
@@ -1830,14 +1831,14 @@
       width: 100%;
       height: auto;
       image-rendering: pixelated;
-      border-radius: 12px;
+      border-radius: 0;
       background: transparent;
       z-index: 1;
     }
     .pixel-canvas--tint {
       position: absolute;
       inset: 0;
-      border-radius: 12px;
+      border-radius: 0;
       background: transparent;
       pointer-events: none;
       image-rendering: pixelated;
@@ -1863,7 +1864,7 @@
       position: absolute;
       inset: -6px;
       border: 2px dashed rgba(123, 207, 255, 0.6);
-      border-radius: 10px;
+      border-radius: 0;
       opacity: 0;
       transition: opacity 0.15s ease;
       pointer-events: none;
@@ -2706,13 +2707,15 @@
 <div class="menu-panel dot-settings-panel" hidden="" id="dotSettingsPanel">
 <div class="dot-settings-panel__row">
 <label class="select-control" for="dotScaleSelect">
-<span class="select-control__label">ドット拡大率</span>
+<span class="select-control__label">撮影サイズ（基準）</span>
 <select id="dotScaleSelect" name="dotScale">
-<option value="1">x1</option>
-<option value="2">x2</option>
-<option value="3">x3</option>
-<option value="4">x4</option>
-<option value="5">x5</option>
+<option value="16">16*16 PX</option>
+<option value="32">32*32 PX</option>
+<option selected="" value="64">64*64 PX</option>
+<option value="96">96*96 PX</option>
+<option value="128">128*128 PX</option>
+<option value="160">160*160 PX</option>
+<option value="256">256*256 PX</option>
 </select>
 </label>
 </div>
@@ -2837,12 +2840,15 @@
 </div>
 </div>
 </div>
-<div class="update-toast" id="updateToast" role="status" aria-live="polite" data-update-id="2026-02-16">
+<div class="update-toast" id="updateToast" role="status" aria-live="polite" data-update-id="2026-06-27-dot-size">
   <div class="update-toast__body">
     <p class="update-toast__message">
+      <strong>更新情報 (2026/06/27)</strong><br/>
+      ・撮影サイズを選択できるようにし、撮影枠を正方形表示に固定しました（例: 32*32 PX）<br/>
+      ・スタンプ画像の角丸をなくしました<br/>
       <strong>更新情報 (2026/02/16)</strong><br/>
       ・GIF撮影を最大5秒に拡張、FPS設定を追加（5 / 8 / 10 / 20 / 30）<br/>
-      ・PNG保存をドット倍率保存に対応（x1→3倍 / x2→5倍 / x3→10倍 / x4→20倍 / x5→40倍）<br/>
+      ・PNG保存をドットサイズに応じた整数倍保存に対応<br/>
       ・保存サイズ最適化を追加（GIFは600x600目安・5MB制御、PNGは5MB超過時に倍率自動調整＋最終2倍保存）<br/>
       <strong>更新情報 (2026/02/15)</strong><br/>
       ・ボタン長押しでGIF撮影を追加（最大2秒 / 6FPS）<br/>
@@ -2958,14 +2964,25 @@
     const GIF_CAPTURE_MAX_FRAME_STRIDE = 8;
     const GIF_CAPTURE_MAX_OPTIMIZE_ATTEMPTS = 14;
     const GIF_CAPTURE_PIXEL_RATIO_CAP = 1;
-    const DOT_SCALE_CAPTURE_MULTIPLIERS = Object.freeze({
-      1: 3,
-      2: 5,
-      3: 10,
-      4: 20,
-      5: 40
+    const DOT_SIZE_PRESETS = Object.freeze([16, 32, 64, 96, 128, 160, 256]);
+    const DOT_SIZE_DEFAULT = 64;
+    const LEGACY_DOT_SCALE_TO_SIZE = Object.freeze({
+      1: 256,
+      2: 128,
+      3: 64,
+      4: 32,
+      5: 16
     });
-    const DOT_SCALE_CAPTURE_MULTIPLIER_STEPS = Object.freeze([3, 5, 10, 20, 40]);
+    const DOT_SCALE_CAPTURE_MULTIPLIERS = Object.freeze({
+      16: 40,
+      32: 20,
+      64: 10,
+      96: 8,
+      128: 5,
+      160: 4,
+      256: 3
+    });
+    const DOT_SCALE_CAPTURE_MULTIPLIER_STEPS = Object.freeze([2, 3, 4, 5, 8, 10, 20, 40]);
     const GIF_DEFAULT_PALETTE = createGif332Palette();
     let zoomScaleItems = [];
     let zoomScaleMarks = [];
@@ -3342,7 +3359,7 @@
       restarting: false,
       aspectMode: '1:1',
       dotMode: true,
-      dotScale: 1,
+      dotScale: DOT_SIZE_DEFAULT,
       gifCaptureFps: GIF_CAPTURE_DEFAULT_FPS,
       colorDepth: '4',
       gradientMode: 'dither',
@@ -5065,15 +5082,8 @@
     }
 
     function getViewportOrientationKey() {
-      const viewportWidth = Math.max(
-        1,
-        Number((window.visualViewport && window.visualViewport.width) || window.innerWidth || 0)
-      );
-      const viewportHeight = Math.max(
-        1,
-        Number((window.visualViewport && window.visualViewport.height) || window.innerHeight || 0)
-      );
-      return viewportWidth > viewportHeight ? 'landscape' : 'portrait';
+      const { width, height } = getWindowViewportSize();
+      return width > height ? 'landscape' : 'portrait';
     }
 
     function getLensAdSizeKey() {
@@ -6226,7 +6236,7 @@
         } else {
           depthLabel = `${state.colorDepth}色`;
         }
-        setStatus(`ドットモード: ${dotState.width}×${dotState.height}px (${dotCount.toLocaleString()} ドット) / x${state.dotScale} / ${depthLabel}`);
+        setStatus(`ドットモード: ${dotState.width}×${dotState.height}px (${dotCount.toLocaleString()} ドット) / ${depthLabel}`);
       } else if (cameraStatusMessage) {
         setStatus(cameraStatusMessage);
       }
@@ -6271,6 +6281,13 @@
     const DRAW_IMPORT_STORAGE_KEY = 'pixiee-lens:pending-draw-import';
     const DRAW_IMPORT_STORAGE_VERSION = 1;
     const DRAW_IMPORT_EXPIRY_MS = 1000 * 60 * 5;
+    const DRAW_IMPORT_WINDOW_NAME_TYPE = 'pixiee-lens:draw-import-window-name';
+    const DRAW_IMPORT_MESSAGE_TYPE = 'pixiee-lens:draw-import';
+    const DRAW_IMPORT_READY_MESSAGE_TYPE = 'pixieedraw:lens-import-ready';
+    const DRAW_IMPORT_POSTMESSAGE_INTERVAL_MS = 250;
+    const DRAW_IMPORT_POSTMESSAGE_ATTEMPTS = 24;
+    const DRAW_IMPORT_MODE_APPEND_TAB = 'append-tab';
+    const DRAW_IMPORT_MODE_NEW_PROJECT = 'new-project';
     const DRAW_RETURN_QUERY_KEY = 'draw_return';
     const DRAW_TARGET_URL_QUERY_KEY = 'draw_url';
     const DRAW_RETURN_MODE_SELF = 'self';
@@ -6308,6 +6325,12 @@
       }
     }
 
+    function getDrawImportMode() {
+      return shouldReturnToDrawInSameTab() || Boolean(getRequestedDrawUrl())
+        ? DRAW_IMPORT_MODE_APPEND_TAB
+        : DRAW_IMPORT_MODE_NEW_PROJECT;
+    }
+
     function updateAspectLayout() {
       if (!aspectOverlay || !aspectCenter || !aspectFrame || !aspectShadeTop || !aspectShadeBottom || !aspectShadeLeft || !aspectShadeRight) {
         return;
@@ -6320,7 +6343,22 @@
       const viewportRight = viewportLeft + viewportWidth;
       const viewportBottom = viewportTop + viewportHeight;
       const ratioEntry = ASPECT_RATIOS[state.aspectMode];
-      const ratio = typeof ratioEntry === 'function' ? ratioEntry() : ratioEntry;
+      const reservedInsets = getAspectReservedInsets(metrics);
+      const availableTop = Math.max(viewportTop, viewportTop + reservedInsets.topInset);
+      const availableBottom = Math.min(viewportBottom, viewportBottom - reservedInsets.bottomInset);
+      const availableHeightBase = availableBottom - availableTop;
+      const availableHeight = Math.max(
+        1,
+        Math.min(
+          viewportHeight,
+          Number.isFinite(availableHeightBase) && availableHeightBase > 0
+            ? availableHeightBase
+            : viewportHeight
+        )
+      );
+      const ratio = typeof ratioEntry === 'function'
+        ? ratioEntry({ metrics, viewportWidth, viewportHeight, availableHeight })
+        : ratioEntry;
       if (!ratio) {
         aspectOverlay.hidden = true;
         aspectFrame.style.width = '';
@@ -6346,28 +6384,20 @@
       aspectOverlay.hidden = false;
       const ratioWidth = Math.max(1, ratio.width);
       const ratioHeight = Math.max(1, ratio.height);
-      const reservedInsets = getAspectReservedInsets(metrics);
-      const availableTop = Math.max(viewportTop, viewportTop + reservedInsets.topInset);
-      const availableBottom = Math.min(viewportBottom, viewportBottom - reservedInsets.bottomInset);
-      const availableHeightBase = availableBottom - availableTop;
-      const availableHeight = Math.max(
-        1,
-        Math.min(
-          viewportHeight,
-          Number.isFinite(availableHeightBase) && availableHeightBase > 0
-            ? availableHeightBase
-            : viewportHeight
-        )
-      );
+      const fitHeight = ratioWidth === ratioHeight
+        ? viewportHeight
+        : availableHeight;
       const scaleBase = Math.min(
         viewportWidth / ratioWidth,
-        availableHeight / ratioHeight
+        fitHeight / ratioHeight
       );
       const scale = Number.isFinite(scaleBase) && scaleBase > 0 ? scaleBase : 1;
       const targetWidth = Math.max(1, Math.round(ratioWidth * scale));
       const targetHeight = Math.max(1, Math.round(ratioHeight * scale));
       const frameLeft = Math.max(viewportLeft, Math.round(viewportLeft + (viewportWidth - targetWidth) / 2));
-      const frameTop = Math.max(availableTop, Math.round(availableTop + (availableHeight - targetHeight) / 2));
+      const frameTop = ratioWidth === ratioHeight
+        ? Math.max(viewportTop, Math.round(viewportTop + (viewportHeight - targetHeight) / 2))
+        : Math.max(availableTop, Math.round(availableTop + (availableHeight - targetHeight) / 2));
       const shadeTop = Math.max(0, frameTop - viewportTop);
       const shadeBottom = Math.max(0, viewportBottom - (frameTop + targetHeight));
       const shadeLeft = Math.max(0, frameLeft - viewportLeft);
@@ -6400,19 +6430,33 @@
     }
   }
 
+    function normalizeDotSize(value = state.dotScale) {
+      const numeric = Math.round(Number(value) || DOT_SIZE_DEFAULT);
+      if (Object.prototype.hasOwnProperty.call(LEGACY_DOT_SCALE_TO_SIZE, numeric)) {
+        return LEGACY_DOT_SCALE_TO_SIZE[numeric];
+      }
+      if (DOT_SIZE_PRESETS.includes(numeric)) {
+        return numeric;
+      }
+      let nearest = DOT_SIZE_DEFAULT;
+      let nearestDistance = Number.POSITIVE_INFINITY;
+      DOT_SIZE_PRESETS.forEach((preset) => {
+        const distance = Math.abs(preset - numeric);
+        if (distance < nearestDistance) {
+          nearest = preset;
+          nearestDistance = distance;
+        }
+      });
+      return nearest;
+    }
+
     function getDotResolution() {
-      const scaleMap = {
-        1: 256,
-        2: 128,
-        3: 64,
-        4: 32,
-        5: 16
-      };
-      const basePixels = scaleMap[state.dotScale] || 64;
+      const basisPixels = normalizeDotSize(state.dotScale);
       const minPixels = 16;
+      const pixels = Math.max(minPixels, basisPixels);
       return {
-        width: Math.max(minPixels, basePixels),
-        height: Math.max(minPixels, basePixels)
+        width: pixels,
+        height: pixels
       };
     }
 
@@ -6441,33 +6485,38 @@
       return { width, height, offsetX, offsetY };
     }
 
+    function getWindowViewportSize() {
+      const docEl = document.documentElement || null;
+      const width = Math.max(
+        1,
+        Math.round(
+          Number(window.innerWidth)
+          || Number(docEl?.clientWidth)
+          || 0
+        )
+      );
+      const height = Math.max(
+        1,
+        Math.round(
+          Number(window.innerHeight)
+          || Number(docEl?.clientHeight)
+          || 0
+        )
+      );
+      return { width, height };
+    }
+
     function updateViewportOffsetVariables() {
       const docEl = document.documentElement || null;
       const rootStyle = docEl ? docEl.style : null;
       if (!rootStyle) {
         return;
       }
-      const fallbackWidth = Math.max(1, Number(window.innerWidth) || 0);
-      const fallbackHeight = Math.max(1, Number(window.innerHeight) || 0);
-      const layoutWidth = Math.max(fallbackWidth, Math.max(1, Number(docEl.clientWidth) || 0));
-      const layoutHeight = Math.max(fallbackHeight, Math.max(1, Number(docEl.clientHeight) || 0));
-      let viewportWidth = fallbackWidth;
-      let viewportHeight = fallbackHeight;
-      let top = 0;
-      let right = 0;
-      let bottom = 0;
-      let left = 0;
-      if (window.visualViewport) {
-        const vv = window.visualViewport;
-        const vvWidth = Math.max(1, Number(vv.width) || fallbackWidth);
-        const vvHeight = Math.max(1, Number(vv.height) || fallbackHeight);
-        viewportWidth = vvWidth;
-        viewportHeight = vvHeight;
-        left = Math.max(0, Number(vv.offsetLeft) || 0);
-        top = Math.max(0, Number(vv.offsetTop) || 0);
-        right = Math.max(0, layoutWidth - (left + vvWidth));
-        bottom = Math.max(0, layoutHeight - (top + vvHeight));
-      }
+      const { width: viewportWidth, height: viewportHeight } = getWindowViewportSize();
+      const top = 0;
+      const right = 0;
+      const bottom = 0;
+      const left = 0;
       rootStyle.setProperty('--viewport-width', `${Math.round(viewportWidth)}px`);
       rootStyle.setProperty('--viewport-height', `${Math.round(viewportHeight)}px`);
       rootStyle.setProperty('--vv-offset-top', `${Math.round(top)}px`);
@@ -6531,19 +6580,7 @@
 
     function getViewportMetrics() {
       updateViewportOffsetVariables();
-      const viewportWidth = Math.max(1, Math.round(window.innerWidth || 0));
-      const viewportHeight = Math.max(1, Math.round(window.innerHeight || 0));
-      if (window.visualViewport) {
-        const vv = window.visualViewport;
-        return {
-          width: Math.max(1, Math.round(vv.width)),
-          height: Math.max(1, Math.round(vv.height)),
-          offsetLeft: Math.round(vv.offsetLeft || 0),
-          offsetTop: Math.round(vv.offsetTop || 0),
-          pageWidth: viewportWidth,
-          pageHeight: viewportHeight
-        };
-      }
+      const { width: viewportWidth, height: viewportHeight } = getWindowViewportSize();
       return {
         width: viewportWidth,
         height: viewportHeight,
@@ -7827,7 +7864,7 @@
       }
       setDotSettingsOpen(dotScalePanelOpen && state.dotMode);
       if (dotScaleSelect) {
-        const value = String(state.dotScale);
+        const value = String(normalizeDotSize(state.dotScale));
         if (dotScaleSelect.value !== value) {
           dotScaleSelect.value = value;
         }
@@ -10027,22 +10064,29 @@
         filename: typeof filename === 'string' && filename ? filename : 'pixiee-lens.png',
         width,
         height,
-        dotScale: state.dotScale,
+        dotScale: normalizeDotSize(state.dotScale),
         colorDepth: state.colorDepth,
         dataUrl
       };
       return payload;
     }
 
-    function storeDrawImportPayload(payload) {
+    function prepareDrawImportTransferPayload(payload) {
       if (!payload || typeof payload !== 'object') {
+        return null;
+      }
+      return {
+        ...payload,
+        expiresAt: Date.now() + DRAW_IMPORT_EXPIRY_MS
+      };
+    }
+
+    function storeDrawImportPayload(payload) {
+      const enriched = prepareDrawImportTransferPayload(payload);
+      if (!enriched) {
         return false;
       }
       try {
-        const enriched = {
-          ...payload,
-          expiresAt: Date.now() + DRAW_IMPORT_EXPIRY_MS
-        };
         localStorage.setItem(DRAW_IMPORT_STORAGE_KEY, JSON.stringify(enriched));
         return true;
       } catch (error) {
@@ -10051,38 +10095,128 @@
       }
     }
 
+    function writeDrawImportWindowNamePayload(payload) {
+      const enriched = prepareDrawImportTransferPayload(payload);
+      if (!enriched || typeof window === 'undefined') {
+        return false;
+      }
+      try {
+        window.name = JSON.stringify({
+          type: DRAW_IMPORT_WINDOW_NAME_TYPE,
+          version: DRAW_IMPORT_STORAGE_VERSION,
+          payload: enriched
+        });
+        return true;
+      } catch (error) {
+        console.warn('Failed to prepare PiXiEEDraw same-tab transfer payload', error);
+        return false;
+      }
+    }
+
+    function getDrawImportTargetOrigin(drawUrl) {
+      try {
+        const url = drawUrl instanceof URL ? drawUrl : new URL(String(drawUrl || ''), window.location.href);
+        return /^https?:$/i.test(url.protocol) ? url.origin : '*';
+      } catch (error) {
+        return '*';
+      }
+    }
+
+    function postDrawImportPayloadToWindow(drawWindow, drawUrl, payload) {
+      if (!drawWindow || !payload) {
+        return;
+      }
+      const enriched = prepareDrawImportTransferPayload(payload);
+      if (!enriched) {
+        return;
+      }
+      const targetOrigin = getDrawImportTargetOrigin(drawUrl);
+      const transferId = `lens-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      let attempts = 0;
+      let timer = null;
+      let readyListener = null;
+      const message = {
+        type: DRAW_IMPORT_MESSAGE_TYPE,
+        transferId,
+        payload: enriched
+      };
+      const cleanup = () => {
+        if (timer != null) {
+          clearInterval(timer);
+          timer = null;
+        }
+        if (readyListener) {
+          window.removeEventListener('message', readyListener);
+          readyListener = null;
+        }
+      };
+      const send = () => {
+        attempts += 1;
+        try {
+          if (drawWindow.closed) {
+            cleanup();
+            return;
+          }
+          drawWindow.postMessage(message, targetOrigin);
+        } catch (error) {
+          console.debug('PiXiEEDraw postMessage transfer failed', error);
+        }
+        if (attempts >= DRAW_IMPORT_POSTMESSAGE_ATTEMPTS) {
+          cleanup();
+        }
+      };
+      readyListener = (event) => {
+        if (event.source !== drawWindow) {
+          return;
+        }
+        const data = event.data;
+        if (!data || data.type !== DRAW_IMPORT_READY_MESSAGE_TYPE) {
+          return;
+        }
+        send();
+      };
+      window.addEventListener('message', readyListener);
+      timer = window.setInterval(send, DRAW_IMPORT_POSTMESSAGE_INTERVAL_MS);
+      window.setTimeout(send, 60);
+    }
+
     function openCaptureInDraw() {
       if (!capturePreviewEditPayload || typeof capturePreviewEditPayload.dataUrl !== 'string') {
         setStatus('PiXiEEDraw に送信できるデータがありません');
         return;
       }
-      const stored = storeDrawImportPayload(capturePreviewEditPayload);
+      const transferPayload = {
+        ...capturePreviewEditPayload,
+        importMode: getDrawImportMode()
+      };
+      const stored = storeDrawImportPayload(transferPayload);
       if (!stored) {
-        setStatus('PiXiEEDraw への送信に失敗しました');
-        return;
+        setStatus('端末内保存での送信に失敗しました。別の転送方法で開きます。');
       }
       const baseUrl = new URL('./', window.location.href);
       const drawUrl = getRequestedDrawUrl() || new URL('../pixiedraw/', baseUrl);
       drawUrl.searchParams.set('lens', '1');
       if (shouldReturnToDrawInSameTab()) {
+        writeDrawImportWindowNamePayload(transferPayload);
         closeCapturePreview();
         window.location.assign(drawUrl.toString());
         return;
       }
-      const opened = window.open(drawUrl.toString(), '_blank', 'noopener');
+      const opened = window.open(drawUrl.toString(), '_blank');
       if (!opened) {
         setStatus('PiXiEEDraw を開けませんでした。ポップアップがブロックされていないか確認してください。');
         return;
       }
+      postDrawImportPayloadToWindow(opened, drawUrl, transferPayload);
       setStatus('PiXiEEDraw を新しいタブで開きました');
       closeCapturePreview();
     }
 
     function getDotScaleCaptureMultiplier(scale = state.dotScale) {
-      const key = Math.max(1, Math.min(5, Math.round(Number(scale) || 1)));
+      const key = normalizeDotSize(scale);
       const multiplier = Number(DOT_SCALE_CAPTURE_MULTIPLIERS[key]);
       if (!Number.isFinite(multiplier) || multiplier <= 0) {
-        return 1;
+        return Math.max(1, Math.round(640 / Math.max(1, key)));
       }
       return multiplier;
     }
@@ -11601,14 +11735,14 @@
         });
       });
       dotScaleSelect.addEventListener('change', () => {
-        const value = Number(dotScaleSelect.value);
+        const value = normalizeDotSize(dotScaleSelect.value);
         if (!Number.isFinite(value)) {
           return;
         }
-        if (value === state.dotScale) {
+        if (value === normalizeDotSize(state.dotScale)) {
           return;
         }
-        state.dotScale = Math.max(1, Math.min(5, Math.round(value)));
+        state.dotScale = value;
         ensureDotResolution();
         if (state.dotMode) {
           refreshOverlayStatus();
