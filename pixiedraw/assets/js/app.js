@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.06.27-frame-playback-tool-flyouts';
+  const APP_BUILD_VERSION = '2026.06.28-file-split-cache-fix';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
@@ -21,7 +21,22 @@
     rgbaToHsv,
     hsvToRgba,
     hexToRgba,
+    normalizeHelpSearchQuery,
   } = coreUtils;
+  const paletteBaseUtils = window.PiXiEEDrawModules?.paletteUtils?.createPaletteBaseUtils?.({
+    clamp,
+  }) || {};
+  const {
+    toKebabCase,
+    splitPalettePresetNameTokens,
+    localizePalettePresetNameJa,
+    normalizePalettePresetDisplayName,
+    resolveNewProjectPaletteColorCount,
+    hashTextToUint32,
+    mixUint32Hash,
+    mixTextHash,
+    hslToRgbColor,
+  } = paletteBaseUtils;
   const domUtils = window.PiXiEEDrawModules?.domUtils || {};
   const {
     disableImageLongPress,
@@ -1551,407 +1566,6 @@
     storeInlineGuidesVisibility,
   } = storageUtils;
 
-  function toKebabCase(value) {
-    return String(value || '')
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
-  }
-
-  function splitPalettePresetNameTokens(value) {
-    return String(value || '')
-      .replace(/([a-z])([A-Z])/g, '$1 $2')
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean);
-  }
-
-  function localizePalettePresetNameJa(name) {
-    const tokenMap = Object.freeze({
-      Pixel: '',
-      Pixels: '',
-      Core: 'コア',
-      Retro: 'レトロ',
-      Bits: 'ビッツ',
-      Soft: 'ソフト',
-      Neon: 'ネオン',
-      Pastel: 'パステル',
-      Vintage: 'ヴィンテージ',
-      Arcade: 'アーケード',
-      Glow: 'グロー',
-      CRT: 'CRT',
-      Dream: 'ドリーム',
-      Old: 'オールド',
-      Screen: 'スクリーン',
-      Classic: 'クラシック',
-      Dawn: 'ドーン',
-      Dusk: 'ダスク',
-      Night: 'ナイト',
-      Horizon: 'ホライズン',
-      Sunrise: 'サンライズ',
-      Sunset: 'サンセット',
-      Moonlight: 'ムーンライト',
-      Galaxy: 'ギャラクシー',
-      Cosmos: 'コスモス',
-      Nebula: 'ネビュラ',
-      Aurora: 'オーロラ',
-      Ocean: 'オーシャン',
-      Lagoon: 'ラグーン',
-      Deep: 'ディープ',
-      Sea: 'シー',
-      Reef: 'リーフ',
-      Forest: 'フォレスト',
-      Meadow: 'メドウ',
-      Jungle: 'ジャングル',
-      Desert: 'デザート',
-      Canyon: 'キャニオン',
-      Mountain: 'マウンテン',
-      Snow: 'スノー',
-      Glacier: 'グレイシャー',
-      Volcano: 'ボルケーノ',
-      Storm: 'ストーム',
-      Thunder: 'サンダー',
-      Lightning: 'ライトニング',
-      Rain: 'レイン',
-      Mist: 'ミスト',
-      Fog: 'フォグ',
-      Frost: 'フロスト',
-      Ember: 'エンバー',
-      Flame: 'フレイム',
-      Lava: 'ラヴァ',
-      Sand: 'サンド',
-      Clay: 'クレイ',
-      Stone: 'ストーン',
-      Marble: 'マーブル',
-      Bronze: 'ブロンズ',
-      Copper: 'コッパー',
-      Iron: 'アイアン',
-      Silver: 'シルバー',
-      Gold: 'ゴールド',
-      Crystal: 'クリスタル',
-      Prism: 'プリズム',
-      Candy: 'キャンディ',
-      Bubblegum: 'バブルガム',
-      Cotton: 'コットン',
-      Mint: 'ミント',
-      Lemon: 'レモン',
-      Peach: 'ピーチ',
-      Berry: 'ベリー',
-      Cherry: 'チェリー',
-      Plum: 'プラム',
-      Sakura: 'サクラ',
-      Indigo: 'インディゴ',
-      Yamabuki: 'ヤマブキ',
-      Wakakusa: 'ワカクサ',
-      Shikon: 'シコン',
-      Ink: 'インク',
-      Shadow: 'シャドウ',
-      Eclipse: 'エクリプス',
-      Cyber: 'サイバー',
-      Circuit: 'サーキット',
-      Matrix: 'マトリクス',
-      Digital: 'デジタル',
-      Hologram: 'ホログラム',
-      Vapor: 'ベイパー',
-      Fantasy: 'ファンタジー',
-      Storybook: 'ストーリーブック',
-      Adventure: 'アドベンチャー',
-      Dungeon: 'ダンジョン',
-      Castle: 'キャッスル',
-      Kingdom: 'キングダム',
-      Hero: 'ヒーロー',
-      Villain: 'ヴィラン',
-      Monster: 'モンスター',
-      Slime: 'スライム',
-      Dragon: 'ドラゴン',
-      Treasure: 'トレジャー',
-      Magic: 'マジック',
-      Potion: 'ポーション',
-      Rune: 'ルーン',
-      Relic: 'レリック',
-      Artifact: 'アーティファクト',
-      Portal: 'ポータル',
-      Temple: 'テンプル',
-      Shrine: 'シュライン',
-      Arena: 'アリーナ',
-      Battle: 'バトル',
-      Victory: 'ビクトリー',
-      Quest: 'クエスト',
-      Journey: 'ジャーニー',
-      Frontier: 'フロンティア',
-      Island: 'アイランド',
-      Harbor: 'ハーバー',
-      City: 'シティ',
-      Metro: 'メトロ',
-      Skyline: 'スカイライン',
-      Alley: 'アレイ',
-      Lantern: 'ランタン',
-      Festival: 'フェスティバル',
-      Carnival: 'カーニバル',
-      Fireworks: 'ファイアワークス',
-      Stardust: 'スターダスト',
-      Comet: 'コメット',
-      Orbit: 'オービット',
-      Satellite: 'サテライト',
-      Signal: 'シグナル',
-      Spectrum: 'スペクトラム',
-      Gradient: 'グラデーション',
-      Harmony: 'ハーモニー',
-      Balance: 'バランス',
-      Contrast: 'コントラスト',
-      Echo: 'エコー',
-      Pulse: 'パルス',
-      Wave: 'ウェーブ',
-      Flux: 'フラックス',
-      Spark: 'スパーク',
-      Radiance: 'レイディアンス',
-      Bloom: 'ブルーム',
-      Garden: 'ガーデン',
-      Orchard: 'オーチャード',
-      Vineyard: 'ヴィンヤード',
-      River: 'リバー',
-      Waterfall: 'ウォーターフォール',
-      Cliff: 'クリフ',
-      Valley: 'バレー',
-      Prairie: 'プレーリー',
-      Savannah: 'サバンナ',
-      Tundra: 'ツンドラ',
-      Solar: 'ソーラー',
-      Wind: 'ウィンド',
-      Lunar: 'ルナー',
-      Dust: 'ダスト',
-      Stellar: 'ステラ',
-    });
-    const tokens = splitPalettePresetNameTokens(name);
-    if (!tokens.length) {
-      return String(name || '');
-    }
-    return tokens
-      .map(token => (Object.prototype.hasOwnProperty.call(tokenMap, token) ? tokenMap[token] : token))
-      .join('')
-      .replace(/pixel/gi, '')
-      .trim();
-  }
-
-  function normalizePalettePresetDisplayName(name) {
-    return String(name || '')
-      .replace(/\bpixel\b/gi, '')
-      .replace(/\s{2,}/g, ' ')
-      .trim();
-  }
-
-  function resolveNewProjectPaletteColorCount(name) {
-    const normalized = String(name || '').trim().toLowerCase();
-    if (!normalized) {
-      return 16;
-    }
-    if (
-      normalized === 'pixel core'
-      || normalized === 'pixel ink'
-      || normalized === 'pixel shadow'
-      || normalized === 'old screen'
-    ) {
-      return 4;
-    }
-    if (
-      normalized.includes('bits')
-      || normalized.includes('mist')
-      || normalized.includes('fog')
-      || normalized.includes('frost')
-      || normalized.includes('stone')
-      || normalized.includes('iron')
-      || normalized.includes('slime')
-      || normalized.includes('dungeon')
-    ) {
-      return 8;
-    }
-    if (
-      normalized.includes('neon')
-      || normalized.includes('galaxy')
-      || normalized.includes('cosmos')
-      || normalized.includes('nebula')
-      || normalized.includes('aurora')
-      || normalized.includes('cyber')
-      || normalized.includes('circuit')
-      || normalized.includes('matrix')
-      || normalized.includes('digital')
-      || normalized.includes('hologram')
-      || normalized.includes('spectrum')
-      || normalized.includes('gradient')
-      || normalized.includes('fireworks')
-      || normalized.includes('stardust')
-      || normalized.includes('comet')
-      || normalized.includes('orbit')
-      || normalized.includes('satellite')
-      || normalized.includes('solarwind')
-      || normalized.includes('stellarwind')
-    ) {
-      return 32;
-    }
-    if (
-      normalized.includes('classic')
-      || normalized.includes('vintage')
-      || normalized.includes('pastel')
-      || normalized.includes('forest')
-      || normalized.includes('meadow')
-      || normalized.includes('desert')
-      || normalized.includes('mountain')
-      || normalized.includes('snow')
-      || normalized.includes('clay')
-      || normalized.includes('bronze')
-      || normalized.includes('silver')
-      || normalized.includes('gold')
-      || normalized.includes('castle')
-      || normalized.includes('kingdom')
-    ) {
-      return 16;
-    }
-    return 24;
-  }
-
-  function getNewProjectPalettePresetDefinition(presetId, fallbackPresetId = NEW_PROJECT_PALETTE_PRESET_DEFAULT) {
-    const normalized = normalizeNewProjectPalettePreset(presetId, fallbackPresetId);
-    return NEW_PROJECT_PALETTE_PRESET_MAP.get(normalized)
-      || NEW_PROJECT_PALETTE_PRESET_MAP.get(NEW_PROJECT_PALETTE_PRESET_DEFAULT)
-      || null;
-  }
-
-  function normalizeNewProjectPalettePreset(value, fallback = NEW_PROJECT_PALETTE_PRESET_DEFAULT) {
-    const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
-    if (NEW_PROJECT_PALETTE_PRESET_SET.has(normalized)) {
-      return normalized;
-    }
-    return NEW_PROJECT_PALETTE_PRESET_SET.has(fallback)
-      ? fallback
-      : NEW_PROJECT_PALETTE_PRESET_DEFAULT;
-  }
-
-  function normalizeCurrentPalettePreset(value, fallback = CURRENT_PALETTE_PRESET_CUSTOM) {
-    const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
-    if (normalized === CURRENT_PALETTE_PRESET_CUSTOM || NEW_PROJECT_PALETTE_PRESET_SET.has(normalized)) {
-      return normalized;
-    }
-    if (fallback === CURRENT_PALETTE_PRESET_CUSTOM || NEW_PROJECT_PALETTE_PRESET_SET.has(fallback)) {
-      return fallback;
-    }
-    return CURRENT_PALETTE_PRESET_CUSTOM;
-  }
-
-  function hashTextToUint32(value) {
-    const text = String(value || '');
-    let hash = 2166136261;
-    for (let index = 0; index < text.length; index += 1) {
-      hash ^= text.charCodeAt(index);
-      hash = Math.imul(hash, 16777619);
-    }
-    return hash >>> 0;
-  }
-
-  function mixUint32Hash(hash, value) {
-    return Math.imul((hash >>> 0) ^ (Math.round(Number(value) || 0) >>> 0), 16777619) >>> 0;
-  }
-
-  function mixTextHash(hash, value) {
-    return mixUint32Hash(hash, hashTextToUint32(value));
-  }
-
-  function hslToRgbColor(h, s, l) {
-    const hue = ((Number(h) % 360) + 360) % 360;
-    const sat = clamp(Number(s), 0, 100) / 100;
-    const lig = clamp(Number(l), 0, 100) / 100;
-    if (sat <= 0) {
-      const gray = clamp(Math.round(lig * 255), 0, 255);
-      return { r: gray, g: gray, b: gray, a: 255 };
-    }
-    const c = (1 - Math.abs(2 * lig - 1)) * sat;
-    const hPrime = hue / 60;
-    const x = c * (1 - Math.abs((hPrime % 2) - 1));
-    let r1 = 0;
-    let g1 = 0;
-    let b1 = 0;
-    if (hPrime >= 0 && hPrime < 1) {
-      r1 = c;
-      g1 = x;
-    } else if (hPrime < 2) {
-      r1 = x;
-      g1 = c;
-    } else if (hPrime < 3) {
-      g1 = c;
-      b1 = x;
-    } else if (hPrime < 4) {
-      g1 = x;
-      b1 = c;
-    } else if (hPrime < 5) {
-      r1 = x;
-      b1 = c;
-    } else {
-      r1 = c;
-      b1 = x;
-    }
-    const m = lig - (c / 2);
-    return {
-      r: clamp(Math.round((r1 + m) * 255), 0, 255),
-      g: clamp(Math.round((g1 + m) * 255), 0, 255),
-      b: clamp(Math.round((b1 + m) * 255), 0, 255),
-      a: 255,
-    };
-  }
-
-  function generateNewProjectPaletteColors(definition) {
-    const count = clamp(Math.round(Number(definition?.colorCount) || 16), 4, 32);
-    const colorSlots = Math.max(1, count - 1);
-    const seed = hashTextToUint32(definition?.id || definition?.name || 'pixel-core');
-    const baseHue = seed % 360;
-    const baseSaturation = 42 + (seed % 36);
-    const colors = [{ r: 0, g: 0, b: 0, a: 0 }];
-    for (let index = 0; index < colorSlots; index += 1) {
-      const t = colorSlots > 1 ? index / (colorSlots - 1) : 0;
-      const band = index % 4;
-      const hue = (baseHue + (t * 248) + (band * 11)) % 360;
-      const saturation = clamp(baseSaturation + ((index % 5) - 2) * 6, 30, 90);
-      const lightnessBase = 14 + (t * 72);
-      const lightness = clamp(lightnessBase + (band === 0 ? -6 : band === 3 ? 6 : 0), 8, 94);
-      colors.push(hslToRgbColor(hue, saturation, lightness));
-    }
-    return colors.map(color => normalizeColorValue(color));
-  }
-
-  function getNewProjectPalettePresetColors(presetId, fallbackPresetId = NEW_PROJECT_PALETTE_PRESET_DEFAULT) {
-    const definition = getNewProjectPalettePresetDefinition(presetId, fallbackPresetId);
-    if (!definition) {
-      return [{ r: 0, g: 0, b: 0, a: 0 }];
-    }
-    const cached = newProjectPalettePresetColorCache.get(definition.id);
-    if (Array.isArray(cached) && cached.length) {
-      return cached.map(color => normalizeColorValue(color));
-    }
-    const generated = generateNewProjectPaletteColors(definition);
-    newProjectPalettePresetColorCache.set(definition.id, generated);
-    return generated.map(color => normalizeColorValue(color));
-  }
-
-  function createRgbModeDefaultPalette() {
-    return [
-      { r: 0, g: 0, b: 0, a: 0 },
-      { r: 0, g: 0, b: 0, a: 255 },
-      { r: 255, g: 255, b: 255, a: 255 },
-      { r: 255, g: 0, b: 0, a: 255 },
-      { r: 255, g: 128, b: 0, a: 255 },
-      { r: 255, g: 255, b: 0, a: 255 },
-      { r: 128, g: 255, b: 0, a: 255 },
-      { r: 0, g: 255, b: 0, a: 255 },
-      { r: 0, g: 255, b: 255, a: 255 },
-      { r: 0, g: 128, b: 255, a: 255 },
-      { r: 0, g: 0, b: 255, a: 255 },
-      { r: 128, g: 0, b: 255, a: 255 },
-      { r: 255, g: 0, b: 255, a: 255 },
-      { r: 255, g: 128, b: 192, a: 255 },
-      { r: 128, g: 128, b: 128, a: 255 },
-      { r: 192, g: 192, b: 192, a: 255 },
-    ].map(color => normalizeColorValue(color));
-  }
-
   function getPalettePresetDisplayName(definition, language = (uiLanguage === UI_LANGUAGE_JA ? UI_LANGUAGE_JA : UI_LANGUAGE_EN)) {
     if (!definition || typeof definition !== 'object') {
       return '';
@@ -2375,30 +1989,6 @@
     menu.appendChild(fragment);
   }
 
-  function loadStoredNewProjectPalettePresetId() {
-    if (!canUseSessionStorage) {
-      return NEW_PROJECT_PALETTE_PRESET_DEFAULT;
-    }
-    try {
-      const stored = window.localStorage.getItem(NEW_PROJECT_PALETTE_PRESET_STORAGE_KEY) || '';
-      return normalizeNewProjectPalettePreset(stored, NEW_PROJECT_PALETTE_PRESET_DEFAULT);
-    } catch (error) {
-      return NEW_PROJECT_PALETTE_PRESET_DEFAULT;
-    }
-  }
-
-  function storeNewProjectPalettePresetId(presetId) {
-    if (!canUseSessionStorage) {
-      return;
-    }
-    const normalized = normalizeNewProjectPalettePreset(presetId, NEW_PROJECT_PALETTE_PRESET_DEFAULT);
-    try {
-      window.localStorage.setItem(NEW_PROJECT_PALETTE_PRESET_STORAGE_KEY, normalized);
-    } catch (error) {
-      // Ignore localStorage errors.
-    }
-  }
-
   function setNewProjectPalettePresetId(presetId, { persist = true, syncControl = true } = {}) {
     const normalized = normalizeNewProjectPalettePreset(presetId, newProjectPalettePresetId || NEW_PROJECT_PALETTE_PRESET_DEFAULT);
     newProjectPalettePresetId = normalized;
@@ -2624,6 +2214,7 @@
     buildLensCameraModeUrl,
     buildLensCameraReturnDrawUrl,
     buildQrEditorModeUrl,
+    buildPixieedAccountLoginHref,
   } = navigationUtils;
   let lensImportRequested = (() => {
     if (typeof window === 'undefined') {
@@ -2677,6 +2268,17 @@
   const SHARED_LOCAL_OP_JOURNAL_STORE = 'sharedLocalOpJournal';
   const RECENT_PROJECT_STORAGE_LOCAL = 'local';
   const RECENT_PROJECT_STORAGE_SHARED = 'shared';
+  const projectStorageUtils = window.PiXiEEDrawModules?.projectStorageUtils?.createProjectStorageUtils?.({
+    RECENT_PROJECT_STORAGE_LOCAL,
+    RECENT_PROJECT_STORAGE_SHARED,
+  }) || {};
+  const {
+    normalizeAutosaveProjectId,
+    normalizeRecentProjectStorageKind,
+    getRecentProjectStorageKind,
+    normalizeRecentProjectAccountUserId,
+    parseAutosaveTabLockPayload,
+  } = projectStorageUtils;
   const AUTOSAVE_HANDLE_KEY = 'document';
   const AUTOSAVE_ACTIVE_PROJECT_KEY = 'activeProjectId';
   const AUTOSAVE_ACTIVE_PROJECT_SYNC_KEY = 'pixieedraw:active-project-sync';
@@ -2954,6 +2556,35 @@
   );
   const CURRENT_PALETTE_PRESET_CUSTOM = 'custom';
   const newProjectPalettePresetColorCache = new Map();
+  const palettePresetUtils = window.PiXiEEDrawModules?.paletteUtils?.createPalettePresetUtils?.({
+    clamp,
+    normalizeColorValue,
+    NEW_PROJECT_PALETTE_PRESET_DEFAULT,
+    NEW_PROJECT_PALETTE_PRESET_SET,
+    NEW_PROJECT_PALETTE_PRESET_MAP,
+    CURRENT_PALETTE_PRESET_CUSTOM,
+    newProjectPalettePresetColorCache,
+    hashTextToUint32,
+    hslToRgbColor,
+  }) || {};
+  const {
+    getNewProjectPalettePresetDefinition,
+    normalizeNewProjectPalettePreset,
+    normalizeCurrentPalettePreset,
+    generateNewProjectPaletteColors,
+    getNewProjectPalettePresetColors,
+    createRgbModeDefaultPalette,
+  } = palettePresetUtils;
+  const newProjectPaletteStorageUtils = window.PiXiEEDrawModules?.storageUtils?.createNewProjectPaletteStorageUtils?.({
+    canUseSessionStorage,
+    NEW_PROJECT_PALETTE_PRESET_STORAGE_KEY,
+    NEW_PROJECT_PALETTE_PRESET_DEFAULT,
+    normalizeNewProjectPalettePreset,
+  }) || {};
+  const {
+    loadStoredNewProjectPalettePresetId,
+    storeNewProjectPalettePresetId,
+  } = newProjectPaletteStorageUtils;
   const RESIDENT_MULTI_ROOM_PROFILES = Object.freeze({});
   const MULTI_SUPABASE_MODULE_URL = 'https://esm.sh/@supabase/supabase-js@2.46.1?bundle';
   const MULTI_SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
@@ -3023,6 +2654,15 @@
   const QR_EDIT_MODE_TARGET_SOURCE = 'qrmaker';
   const QR_EDIT_CHECK_DELAY_MS = 90;
   const QR_EDIT_SCAN_CANVAS_SIZE = 640;
+  const importUtils = window.PiXiEEDrawModules?.importUtils?.createImportUtils?.({
+    EXTERNAL_IMPORT_MODE_APPEND_TAB,
+    EXTERNAL_IMPORT_MODE_NEW_PROJECT,
+  }) || {};
+  const {
+    normalizeExternalImportMode,
+    shouldAppendExternalImportToProject,
+    isLensImportPayload,
+  } = importUtils;
   const qrUtils = window.PiXiEEDrawModules?.qrUtils?.createQrUtils?.({
     QR_EDIT_MODE_TARGET_SOURCE,
     normalizeAutosaveProjectId,
@@ -3034,25 +2674,6 @@
   const PIXFIND_UPLOAD_KEY = 'pixfind_creator_upload_v1';
   let pendingLensImportMessagePayload = null;
   let pendingLensImportMessageResolvers = [];
-
-  function normalizeExternalImportMode(value) {
-    return value === EXTERNAL_IMPORT_MODE_APPEND_TAB
-      ? EXTERNAL_IMPORT_MODE_APPEND_TAB
-      : EXTERNAL_IMPORT_MODE_NEW_PROJECT;
-  }
-
-  function shouldAppendExternalImportToProject(payload) {
-    return normalizeExternalImportMode(payload?.importMode) === EXTERNAL_IMPORT_MODE_APPEND_TAB;
-  }
-
-  function isLensImportPayload(payload) {
-    return Boolean(
-      payload
-      && typeof payload === 'object'
-      && typeof payload.dataUrl === 'string'
-      && payload.dataUrl.startsWith('data:image/')
-    );
-  }
 
   function acceptLensImportPayloadFromMessage(payload) {
     if (!isLensImportPayload(payload)) {
@@ -3288,6 +2909,19 @@
   const TIMELAPSE_MAX_FPS = 60;
   const TIMELAPSE_MAX_STEPS = 120;
   const TIMELAPSE_CAPTURE_DEBOUNCE_MS = isLightweightPersistenceMode() ? 1000 : 48;
+  const timelapseUtils = window.PiXiEEDrawModules?.timelapseUtils?.createTimelapseUtils?.({
+    TIMELAPSE_DEFAULT_FPS,
+    TIMELAPSE_MIN_FPS,
+    TIMELAPSE_MAX_FPS,
+    clamp,
+  }) || {};
+  const {
+    normalizeTimelapseFps,
+    createEmptyTimelapseTrack,
+    createEmptyTimelapseOperationLog,
+    normalizeFpsValue,
+    getDurationFromFps,
+  } = timelapseUtils;
   const timelapseState = {
     enabled: false,
     tracksByCanvasId: Object.create(null),
@@ -3513,11 +3147,6 @@
     readLocalStorageForLocalRestore,
     clearLocalRestoreStorage,
   } = localRestoreStorageUtils;
-
-  function normalizeRecentProjectAccountUserId(value = '') {
-    const normalized = typeof value === 'string' ? value.trim() : '';
-    return normalized || 'anonymous';
-  }
 
   function getCurrentRecentProjectAccountUserId() {
     return normalizeRecentProjectAccountUserId(accountState.userId || '');
@@ -3913,6 +3542,37 @@
   const ONION_SKIN_TINT_NEXT = Object.freeze({ r: 255, g: 170, b: 112 });
   const COLOR_MODE_INDEX = 'index';
   const COLOR_MODE_RGB = 'rgb';
+  const stateNormalizers = window.PiXiEEDrawModules?.stateNormalizers?.createStateNormalizers?.({
+    clamp,
+    DEFAULT_LAYER_BLEND_MODE,
+    LAYER_BLEND_MODE_SET,
+    ONION_SKIN_MAX_FRAMES,
+    DEFAULT_ONION_SKIN,
+    DEFAULT_UI_THEME,
+    UI_THEME_SET,
+    BRUSH_SHAPE_SQUARE,
+    BRUSH_SHAPE_SET,
+    SELECT_SAME_MODE_CONNECTED,
+    SELECT_SAME_MODE_SET,
+    FILL_STYLE_SOLID,
+    FILL_STYLE_SET,
+    SELECTION_SHAPE_MODE_CONTENT,
+    SELECTION_SHAPE_MODE_SET,
+    CUSTOM_BRUSH_MAX_PIXELS,
+  }) || {};
+  const {
+    normalizeLayerBlendMode,
+    normalizeLayerOpacity,
+    normalizeOnionFrameCount,
+    normalizeOnionOpacity,
+    normalizeOnionSkinState,
+    normalizeUiTheme,
+    normalizeBrushShape,
+    normalizeSelectSameMode,
+    normalizeFillStyle,
+    normalizeSelectionShapeMode,
+    normalizeCustomBrushData,
+  } = stateNormalizers;
   const FLOATING_PREVIEW_MIN_SIZE = 120;
   const FLOATING_PREVIEW_MAX_SIZE = 640;
   const FLOATING_PREVIEW_DEFAULT_STATE = Object.freeze({
@@ -4642,74 +4302,6 @@
     mirrorState.axisY = centered.axisY;
   }
 
-  function normalizeLayerBlendMode(value) {
-    if (typeof value !== 'string') {
-      return DEFAULT_LAYER_BLEND_MODE;
-    }
-    const normalized = value.trim().toLowerCase();
-    if (normalized === 'softlight') {
-      return 'soft-light';
-    }
-    if (normalized === 'hardlight') {
-      return 'hard-light';
-    }
-    if (normalized === 'colordodge') {
-      return 'color-dodge';
-    }
-    if (normalized === 'colorburn') {
-      return 'color-burn';
-    }
-    return LAYER_BLEND_MODE_SET.has(normalized) ? normalized : DEFAULT_LAYER_BLEND_MODE;
-  }
-
-  function normalizeLayerOpacity(value) {
-    const parsed = Number(value);
-    if (!Number.isFinite(parsed)) {
-      return 1;
-    }
-    return clamp(parsed, 0, 1);
-  }
-
-  function normalizeOnionFrameCount(value, fallback = 0) {
-    const parsed = Number(value);
-    const safeFallback = clamp(Math.round(Number(fallback) || 0), 0, ONION_SKIN_MAX_FRAMES);
-    if (!Number.isFinite(parsed)) {
-      return safeFallback;
-    }
-    return clamp(Math.round(parsed), 0, ONION_SKIN_MAX_FRAMES);
-  }
-
-  function normalizeOnionOpacity(value, fallback = DEFAULT_ONION_SKIN.opacity) {
-    const parsed = Number(value);
-    const safeFallback = clamp(Number(fallback) || 0, 0, 1);
-    if (!Number.isFinite(parsed)) {
-      return safeFallback;
-    }
-    return clamp(parsed, 0, 1);
-  }
-
-  function normalizeOnionSkinState(source) {
-    const settings = source && typeof source === 'object' ? source : {};
-    return {
-      enabled: Boolean(settings.enabled),
-      prevFrames: normalizeOnionFrameCount(settings.prevFrames, DEFAULT_ONION_SKIN.prevFrames),
-      nextFrames: normalizeOnionFrameCount(settings.nextFrames, DEFAULT_ONION_SKIN.nextFrames),
-      opacity: normalizeOnionOpacity(settings.opacity, DEFAULT_ONION_SKIN.opacity),
-    };
-  }
-
-  function normalizeUiTheme(value, fallback = DEFAULT_UI_THEME) {
-    const normalizedValue = typeof value === 'string' ? value.trim().toLowerCase() : '';
-    if (UI_THEME_SET.has(normalizedValue)) {
-      return normalizedValue;
-    }
-    const normalizedFallback = typeof fallback === 'string' ? fallback.trim().toLowerCase() : '';
-    if (UI_THEME_SET.has(normalizedFallback)) {
-      return normalizedFallback;
-    }
-    return DEFAULT_UI_THEME;
-  }
-
   function normalizeFloatingPreviewState(source, fallback = FLOATING_PREVIEW_DEFAULT_STATE) {
     const settings = source && typeof source === 'object' ? source : {};
     const safeFallback = fallback && typeof fallback === 'object'
@@ -5033,42 +4625,6 @@
     return getZoomScaleForRatio(1, { width, height });
   }
 
-  function normalizeBrushShape(value, fallback = BRUSH_SHAPE_SQUARE) {
-    const normalizedValue = typeof value === 'string' ? value.trim().toLowerCase() : '';
-    if (BRUSH_SHAPE_SET.has(normalizedValue)) {
-      return normalizedValue;
-    }
-    const normalizedFallback = typeof fallback === 'string' ? fallback.trim().toLowerCase() : '';
-    if (BRUSH_SHAPE_SET.has(normalizedFallback)) {
-      return normalizedFallback;
-    }
-    return BRUSH_SHAPE_SQUARE;
-  }
-
-  function normalizeSelectSameMode(value, fallback = SELECT_SAME_MODE_CONNECTED) {
-    const normalizedValue = typeof value === 'string' ? value.trim().toLowerCase() : '';
-    if (SELECT_SAME_MODE_SET.has(normalizedValue)) {
-      return normalizedValue;
-    }
-    const normalizedFallback = typeof fallback === 'string' ? fallback.trim().toLowerCase() : '';
-    if (SELECT_SAME_MODE_SET.has(normalizedFallback)) {
-      return normalizedFallback;
-    }
-    return SELECT_SAME_MODE_CONNECTED;
-  }
-
-  function normalizeFillStyle(value, fallback = FILL_STYLE_SOLID) {
-    const normalizedValue = typeof value === 'string' ? value.trim().toLowerCase() : '';
-    if (FILL_STYLE_SET.has(normalizedValue)) {
-      return normalizedValue;
-    }
-    const normalizedFallback = typeof fallback === 'string' ? fallback.trim().toLowerCase() : '';
-    if (FILL_STYLE_SET.has(normalizedFallback)) {
-      return normalizedFallback;
-    }
-    return FILL_STYLE_SOLID;
-  }
-
   function isGradientFillStyle(value = state.fillStyle) {
     const normalized = normalizeFillStyle(value, FILL_STYLE_SOLID);
     return normalized === FILL_STYLE_RGB_GRADIENT || normalized === FILL_STYLE_DITHER_GRADIENT;
@@ -5104,51 +4660,6 @@
     return FILL_TOOLS.has(tool)
       ? getFillStyleForTool(tool)
       : normalizeFillStyle(state.fillStyle, FILL_STYLE_SOLID);
-  }
-
-  function normalizeSelectionShapeMode(value, fallback = SELECTION_SHAPE_MODE_CONTENT) {
-    const normalizedValue = typeof value === 'string' ? value.trim().toLowerCase() : '';
-    if (SELECTION_SHAPE_MODE_SET.has(normalizedValue)) {
-      return normalizedValue;
-    }
-    const normalizedFallback = typeof fallback === 'string' ? fallback.trim().toLowerCase() : '';
-    if (SELECTION_SHAPE_MODE_SET.has(normalizedFallback)) {
-      return normalizedFallback;
-    }
-    return SELECTION_SHAPE_MODE_CONTENT;
-  }
-
-  function normalizeCustomBrushData(source) {
-    if (!source || typeof source !== 'object' || !Array.isArray(source.offsets)) {
-      return null;
-    }
-    const offsets = [];
-    for (let i = 0; i < source.offsets.length; i += 1) {
-      if (offsets.length >= CUSTOM_BRUSH_MAX_PIXELS) {
-        break;
-      }
-      const entry = source.offsets[i];
-      if (!entry || typeof entry !== 'object') {
-        continue;
-      }
-      const dx = Number(entry.dx);
-      const dy = Number(entry.dy);
-      if (!Number.isFinite(dx) || !Number.isFinite(dy)) {
-        continue;
-      }
-      offsets.push({ dx: clamp(Math.round(dx), -8192, 8192), dy: clamp(Math.round(dy), -8192, 8192) });
-    }
-    if (!offsets.length) {
-      return null;
-    }
-    const width = clamp(Math.round(Number(source.width) || 1), 1, 4096);
-    const height = clamp(Math.round(Number(source.height) || 1), 1, 4096);
-    return {
-      offsets,
-      pixelCount: offsets.length,
-      width,
-      height,
-    };
   }
 
   function isCustomBrushData(brush) {
@@ -8408,7 +7919,19 @@
     isNativePhotoLibraryExportMimeType,
     splitFilenameStemAndExtension,
     buildNumberedFilename,
+    createExportDirectoryStorageUtils,
   } = exportUtils;
+  const exportDirectoryStorageUtils = createExportDirectoryStorageUtils?.({
+    canUseSessionStorage,
+    EXPORT_DIRECTORY_DISPLAY_LABEL_KEY,
+  }) || {};
+  const {
+    sanitizeExportDirectoryDisplayLabel,
+    buildExportDirectoryDisplayLabel,
+    loadStoredExportDirectoryDisplayLabel,
+    storeExportDirectoryDisplayLabel,
+    clearStoredExportDirectoryDisplayLabel,
+  } = exportDirectoryStorageUtils;
 
   const exportCodecs = window.PiXiEEDrawModules?.exportCodecs?.createExportCodecs?.({
     clamp,
@@ -18379,13 +17902,6 @@
     }
   }
 
-  function normalizeHelpSearchQuery(value) {
-    return String(value || '')
-      .toLowerCase()
-      .replace(/\s+/g, ' ')
-      .trim();
-  }
-
   function renderHelpGuideEntries() {
     const container = dom.controls.helpArticleList;
     if (!(container instanceof HTMLElement)) {
@@ -19366,30 +18882,6 @@
     return '';
   }
 
-  function parseAutosaveTabLockPayload(raw) {
-    if (typeof raw !== 'string' || !raw.trim()) {
-      return null;
-    }
-    try {
-      const parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== 'object') {
-        return null;
-      }
-      const owner = typeof parsed.owner === 'string' ? parsed.owner : '';
-      const expiresAt = Number(parsed.expiresAt);
-      if (!owner || !Number.isFinite(expiresAt)) {
-        return null;
-      }
-      return {
-        owner,
-        expiresAt: Math.round(expiresAt),
-        projectId: normalizeAutosaveProjectId(parsed.projectId || ''),
-      };
-    } catch (error) {
-      return null;
-    }
-  }
-
   function ensureInternetConnectedForAction(actionLabelJa = 'この機能', actionLabelEn = 'this feature') {
     const online = typeof navigator !== 'undefined' ? navigator.onLine !== false : true;
     if (online) {
@@ -19523,61 +19015,6 @@
     if (!button) return;
     button.textContent = localizeText('ローカル自動保存（常時ON）', 'Local Autosave (Always ON)');
     button.disabled = true;
-  }
-
-  function sanitizeExportDirectoryDisplayLabel(value) {
-    return typeof value === 'string' ? value.trim() : '';
-  }
-
-  function buildExportDirectoryDisplayLabel({ rootHandle = null, workspaceHandle = null, fallback = '' } = {}) {
-    const rootName = sanitizeExportDirectoryDisplayLabel(rootHandle?.name || '');
-    const workspaceName = sanitizeExportDirectoryDisplayLabel(workspaceHandle?.name || '');
-    const fallbackName = sanitizeExportDirectoryDisplayLabel(fallback);
-    if (rootName && workspaceName) {
-      if (rootName === workspaceName) {
-        return workspaceName;
-      }
-      return `${rootName}/${workspaceName}`;
-    }
-    return workspaceName || rootName || fallbackName;
-  }
-
-  function loadStoredExportDirectoryDisplayLabel() {
-    if (!canUseSessionStorage) {
-      return '';
-    }
-    try {
-      return sanitizeExportDirectoryDisplayLabel(window.localStorage.getItem(EXPORT_DIRECTORY_DISPLAY_LABEL_KEY) || '');
-    } catch (error) {
-      return '';
-    }
-  }
-
-  function storeExportDirectoryDisplayLabel(label) {
-    if (!canUseSessionStorage) {
-      return;
-    }
-    const normalized = sanitizeExportDirectoryDisplayLabel(label);
-    try {
-      if (normalized) {
-        window.localStorage.setItem(EXPORT_DIRECTORY_DISPLAY_LABEL_KEY, normalized);
-      } else {
-        window.localStorage.removeItem(EXPORT_DIRECTORY_DISPLAY_LABEL_KEY);
-      }
-    } catch (error) {
-      // Ignore localStorage errors.
-    }
-  }
-
-  function clearStoredExportDirectoryDisplayLabel() {
-    if (!canUseSessionStorage) {
-      return;
-    }
-    try {
-      window.localStorage.removeItem(EXPORT_DIRECTORY_DISPLAY_LABEL_KEY);
-    } catch (error) {
-      // Ignore localStorage errors.
-    }
   }
 
   function setExportDirectoryDisplayLabel(label, { persist = true } = {}) {
@@ -23051,121 +22488,21 @@
     window.requestAnimationFrame(renderWhenReady);
   }
 
-  function parseUpdateHistoryTimestamp(value) {
-    const timestamp = Date.parse(value);
-    return Number.isFinite(timestamp) ? timestamp : 0;
-  }
-
-  function normalizeUpdateHistoryEntry(entry) {
-    if (!entry || typeof entry !== 'object') {
-      return null;
-    }
-    const at = typeof entry.at === 'string' ? entry.at : '';
-    const timestamp = parseUpdateHistoryTimestamp(at);
-    if (!timestamp) {
-      return null;
-    }
-    const title = typeof entry.title === 'string' ? entry.title.trim() : '';
-    if (!title) {
-      return null;
-    }
-    const detailsSource = Array.isArray(entry.details) ? entry.details : [];
-    const details = detailsSource
-      .map(detail => (typeof detail === 'string' ? detail.trim() : ''))
-      .filter(Boolean);
-    const idSource = typeof entry.id === 'string' ? entry.id.trim() : '';
-    const id = idSource || `${at}:${title}`;
-    return {
-      id,
-      at,
-      timestamp,
-      title,
-      details,
-    };
-  }
-
-  function loadStoredUpdateHistoryEntries() {
-    if (!canUseSessionStorage) {
-      return [];
-    }
-    try {
-      const raw = window.localStorage.getItem(UPDATE_HISTORY_STORAGE_KEY);
-      if (!raw) {
-        return [];
-      }
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) {
-        return [];
-      }
-      return parsed;
-    } catch (error) {
-      return [];
-    }
-  }
-
-  function saveStoredUpdateHistoryEntries(entries) {
-    if (!canUseSessionStorage) {
-      return;
-    }
-    try {
-      const payload = Array.isArray(entries)
-        ? entries.map(entry => ({
-          id: entry.id,
-          at: entry.at,
-          title: entry.title,
-          details: Array.isArray(entry.details) ? entry.details : [],
-        }))
-        : [];
-      window.localStorage.setItem(UPDATE_HISTORY_STORAGE_KEY, JSON.stringify(payload));
-    } catch (error) {
-      // Ignore localStorage errors.
-    }
-  }
-
-  function getUpdateHistoryEntries() {
-    const cutoff = Date.now() - UPDATE_HISTORY_RETENTION_MS;
-    const mergedById = new Map();
-    const source = [
-      ...loadStoredUpdateHistoryEntries(),
-      ...BUILTIN_UPDATE_HISTORY_ENTRIES,
-    ];
-    source.forEach(entry => {
-      if (!entry || typeof entry !== 'object') {
-        return;
-      }
-      const entryId = typeof entry.id === 'string' ? entry.id.trim() : '';
-      if ((entry.published === false) || (entryId && SUPPRESSED_UPDATE_HISTORY_IDS.has(entryId))) {
-        return;
-      }
-      const normalized = normalizeUpdateHistoryEntry(entry);
-      if (!normalized) {
-        return;
-      }
-      if (normalized.timestamp < cutoff) {
-        return;
-      }
-      const previous = mergedById.get(normalized.id);
-      if (!previous || normalized.timestamp >= previous.timestamp) {
-        mergedById.set(normalized.id, normalized);
-      }
-    });
-    const merged = Array.from(mergedById.values()).sort((a, b) => b.timestamp - a.timestamp);
-    saveStoredUpdateHistoryEntries(merged);
-    return merged;
-  }
-
-  function formatUpdateHistoryDate(timestamp, fallback = '') {
-    if (!Number.isFinite(timestamp) || timestamp <= 0) {
-      return fallback;
-    }
-    const d = new Date(timestamp);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    const hh = String(d.getHours()).padStart(2, '0');
-    const mm = String(d.getMinutes()).padStart(2, '0');
-    return `${y}/${m}/${day} ${hh}:${mm}`;
-  }
+  const updateHistoryUtils = window.PiXiEEDrawModules?.updateHistoryUtils?.createUpdateHistoryUtils?.({
+    canUseSessionStorage,
+    UPDATE_HISTORY_STORAGE_KEY,
+    UPDATE_HISTORY_RETENTION_MS,
+    BUILTIN_UPDATE_HISTORY_ENTRIES,
+    SUPPRESSED_UPDATE_HISTORY_IDS,
+  }) || {};
+  const {
+    parseUpdateHistoryTimestamp,
+    normalizeUpdateHistoryEntry,
+    formatUpdateHistoryDate,
+    loadStoredUpdateHistoryEntries,
+    saveStoredUpdateHistoryEntries,
+    getUpdateHistoryEntries,
+  } = updateHistoryUtils;
 
   function renderUpdateHistoryPanel() {
     const list = dom.updateHistory?.list;
@@ -23688,32 +23025,6 @@
     } else {
       await exportProjectAsPng();
     }
-  }
-
-  function normalizeTimelapseFps(value) {
-    const parsed = Number(value);
-    if (!Number.isFinite(parsed)) {
-      return TIMELAPSE_DEFAULT_FPS;
-    }
-    return clamp(Math.round(parsed), TIMELAPSE_MIN_FPS, TIMELAPSE_MAX_FPS);
-  }
-
-  function createEmptyTimelapseTrack() {
-    return {
-      snapshots: [],
-      operationLog: null,
-      warningShown: false,
-      sampleStep: 1,
-      lastCaptureToken: -1,
-    };
-  }
-
-  function createEmptyTimelapseOperationLog() {
-    return {
-      version: 1,
-      baseSnapshot: null,
-      entries: [],
-    };
   }
 
   function shouldRecordLocalTimelapseOperationLog() {
@@ -24695,17 +24006,6 @@
       console.error('Timelapse export failed', error);
       updateAutosaveStatus('タイムラプスGIFの書き出しに失敗しました', 'error');
     }
-  }
-
-  function normalizeFpsValue(value) {
-    return clamp(Math.round(Number(value) || 0), 1, 60);
-  }
-
-  function getDurationFromFps(fps) {
-    if (!Number.isFinite(fps) || fps <= 0) {
-      return 1000 / 12;
-    }
-    return 1000 / fps;
   }
 
   function updateAnimationFpsDisplay(fps, durationMs) {
@@ -27846,27 +27146,9 @@
     };
   }
 
-  function normalizeAutosaveProjectId(value) {
-    if (typeof value !== 'string') {
-      return '';
-    }
-    const trimmed = value.trim();
-    return trimmed || '';
-  }
-
-  function normalizeRecentProjectStorageKind(value) {
-    return value === RECENT_PROJECT_STORAGE_SHARED
-      ? RECENT_PROJECT_STORAGE_SHARED
-      : RECENT_PROJECT_STORAGE_LOCAL;
-  }
-
   function buildSharedRecentProjectId(projectKey) {
     const normalizedKey = normalizeMultiProjectKey(projectKey);
     return normalizedKey ? `${SHARED_PROJECT_ID_PREFIX}${normalizedKey}` : '';
-  }
-
-  function getRecentProjectStorageKind(entry) {
-    return normalizeRecentProjectStorageKind(entry?.storageKind);
   }
 
   function isSharedRecentProjectEntry(entry) {
@@ -80409,28 +79691,6 @@
     } catch (_error) {
       writePixieedCachedAuthSession(null);
       return null;
-    }
-  }
-
-  function buildPixieedAccountLoginHref() {
-    if (typeof window === 'undefined') {
-      return 'https://pixieed.jp/account/';
-    }
-    try {
-      const runtimeUrl = new URL(window.location.href);
-      const usingFileRuntime = runtimeUrl.protocol === 'file:';
-      const url = usingFileRuntime
-        ? new URL('https://pixieed.jp/account/')
-        : new URL('../account/index.html', runtimeUrl.href);
-      url.searchParams.set(
-        'returnTo',
-        usingFileRuntime
-          ? 'https://pixieed.jp/pixiedraw/'
-          : runtimeUrl.href
-      );
-      return url.toString();
-    } catch (_error) {
-      return 'https://pixieed.jp/account/?returnTo=https%3A%2F%2Fpixieed.jp%2Fpixiedraw%2F';
     }
   }
 
