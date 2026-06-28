@@ -3022,21 +3022,137 @@
     '#c9ff8c',
   ]);
   // Keep autosave slightly delayed so heavy serialization does not block drawing per stroke.
-  const AUTOSAVE_WRITE_DELAY = 900;
-  const AUTOSAVE_REMOTE_MULTI_WRITE_DELAY = 2200;
-  const AUTOSAVE_THUMBNAIL_UPDATE_INTERVAL_MS = 12000;
+  const AUTOSAVE_WRITE_DELAY = isLightweightPersistenceMode() ? 2400 : 900;
+  const AUTOSAVE_REMOTE_MULTI_WRITE_DELAY = isLightweightPersistenceMode() ? 3600 : 2200;
+  const AUTOSAVE_THUMBNAIL_UPDATE_INTERVAL_MS = isLightweightPersistenceMode() ? 60000 : 12000;
   const RECENT_PROJECT_LIMIT = 12;
   const THUMBNAIL_MAX_EDGE = 144;
   const THUMBNAIL_CANVAS_SIZE = 160;
-  const LOCAL_PROJECT_THUMBNAIL_UPDATE_INTERVAL_MS = 1500;
+  const LOCAL_PROJECT_THUMBNAIL_UPDATE_INTERVAL_MS = isLightweightPersistenceMode() ? 30000 : 1500;
   const MULTI_REPLICA_AUTOSAVE_BLOCKED_STATUS = '自動保存: マルチ中はマスターのみ端末保存します';
   const DOCUMENT_FILE_VERSION = 1;
   const LENS_IMPORT_STORAGE_KEY = 'pixiee-lens:pending-draw-import';
+  const LENS_IMPORT_WINDOW_NAME_TYPE = 'pixiee-lens:draw-import-window-name';
+  const LENS_IMPORT_MESSAGE_TYPE = 'pixiee-lens:draw-import';
+  const LENS_IMPORT_READY_MESSAGE_TYPE = 'pixieedraw:lens-import-ready';
+  const LENS_IMPORT_MESSAGE_WAIT_MS = 2200;
   const QR_IMPORT_STORAGE_KEY = 'pixiee-qr:pending-draw-import';
+  const EXTERNAL_IMPORT_MODE_APPEND_TAB = 'append-tab';
+  const EXTERNAL_IMPORT_MODE_NEW_PROJECT = 'new-project';
   const QR_EDIT_MODE_TARGET_SOURCE = 'qrmaker';
   const QR_EDIT_CHECK_DELAY_MS = 90;
   const QR_EDIT_SCAN_CANVAS_SIZE = 640;
   const PIXFIND_UPLOAD_KEY = 'pixfind_creator_upload_v1';
+  let pendingLensImportMessagePayload = null;
+  let pendingLensImportMessageResolvers = [];
+
+  function normalizeExternalImportMode(value) {
+    return value === EXTERNAL_IMPORT_MODE_APPEND_TAB
+      ? EXTERNAL_IMPORT_MODE_APPEND_TAB
+      : EXTERNAL_IMPORT_MODE_NEW_PROJECT;
+  }
+
+  function shouldAppendExternalImportToProject(payload) {
+    return normalizeExternalImportMode(payload?.importMode) === EXTERNAL_IMPORT_MODE_APPEND_TAB;
+  }
+
+  function isLensImportPayload(payload) {
+    return Boolean(
+      payload
+      && typeof payload === 'object'
+      && typeof payload.dataUrl === 'string'
+      && payload.dataUrl.startsWith('data:image/')
+    );
+  }
+
+  function acceptLensImportPayloadFromMessage(payload) {
+    if (!isLensImportPayload(payload)) {
+      return false;
+    }
+    pendingLensImportMessagePayload = payload;
+    try {
+      window.localStorage.setItem(LENS_IMPORT_STORAGE_KEY, JSON.stringify(payload));
+    } catch (error) {
+      // The message payload is enough for this import attempt.
+    }
+    const resolvers = pendingLensImportMessageResolvers.splice(0);
+    resolvers.forEach(resolve => resolve(payload));
+    return true;
+  }
+
+  function readLensImportWindowNamePayload() {
+    if (typeof window === 'undefined' || typeof window.name !== 'string' || !window.name) {
+      return null;
+    }
+    let envelope = null;
+    try {
+      envelope = JSON.parse(window.name);
+    } catch (error) {
+      return null;
+    }
+    if (!envelope || envelope.type !== LENS_IMPORT_WINDOW_NAME_TYPE || !isLensImportPayload(envelope.payload)) {
+      return null;
+    }
+    try {
+      window.name = '';
+    } catch (error) {
+      // ignore
+    }
+    return envelope.payload;
+  }
+
+  function notifyLensImportReady() {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const message = { type: LENS_IMPORT_READY_MESSAGE_TYPE };
+    try {
+      if (window.opener && !window.opener.closed) {
+        window.opener.postMessage(message, '*');
+      }
+    } catch (error) {
+      // ignore
+    }
+    try {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage(message, '*');
+      }
+    } catch (error) {
+      // ignore
+    }
+  }
+
+  function waitForLensImportPayloadMessage(timeoutMs = LENS_IMPORT_MESSAGE_WAIT_MS) {
+    if (pendingLensImportMessagePayload) {
+      return Promise.resolve(pendingLensImportMessagePayload);
+    }
+    notifyLensImportReady();
+    return new Promise(resolve => {
+      const timeout = window.setTimeout(() => {
+        const index = pendingLensImportMessageResolvers.indexOf(done);
+        if (index >= 0) {
+          pendingLensImportMessageResolvers.splice(index, 1);
+        }
+        resolve(null);
+      }, Math.max(0, Number(timeoutMs) || LENS_IMPORT_MESSAGE_WAIT_MS));
+      const done = payload => {
+        window.clearTimeout(timeout);
+        resolve(payload || null);
+      };
+      pendingLensImportMessageResolvers.push(done);
+    });
+  }
+
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    window.addEventListener('message', event => {
+      const data = event && event.data;
+      if (!data || data.type !== LENS_IMPORT_MESSAGE_TYPE) {
+        return;
+      }
+      acceptLensImportPayloadFromMessage(data.payload);
+    });
+  }
+
   function upgradeAutosaveDatabase(db) {
     if (!db) return;
     if (!db.objectStoreNames.contains(AUTOSAVE_STORE_NAME)) {
@@ -3182,7 +3298,7 @@
   const TIMELAPSE_MIN_FPS = 1;
   const TIMELAPSE_MAX_FPS = 60;
   const TIMELAPSE_MAX_STEPS = 120;
-  const TIMELAPSE_CAPTURE_DEBOUNCE_MS = 48;
+  const TIMELAPSE_CAPTURE_DEBOUNCE_MS = isLightweightPersistenceMode() ? 1000 : 48;
   const timelapseState = {
     enabled: true,
     tracksByCanvasId: Object.create(null),
@@ -3694,7 +3810,7 @@
   const BOTTOM_TIMELINE_MIN_HEIGHT = 64;
   const BOTTOM_TIMELINE_COMPACT_HEIGHT = 96;
   const BOTTOM_TIMELINE_INITIAL_HEIGHT = BOTTOM_TIMELINE_MIN_HEIGHT;
-  const BOTTOM_TIMELINE_MAX_HEIGHT = 360;
+  const BOTTOM_TIMELINE_MAX_HEIGHT = 320;
   const LEFT_DUAL_GAP = 8;
   const LEFT_DUAL_MIN_COLUMN_WIDTH = Math.max(132, RAIL_DEFAULT_WIDTH.left, RAIL_MIN_WIDTH);
   const LEFT_UNIFIED_TOOLS_RATIO_DEFAULT = 0.5;
@@ -4225,13 +4341,17 @@
       });
     });
     bindClickHandlerOnce(dom.startup?.openButton, 'coreProjectActionBound', async () => {
-      const opened = await openDocumentDialog();
+      const opened = await openDocumentDialog({
+        mode: isStartupScreenAppendTabMode()
+          ? EXTERNAL_IMPORT_MODE_APPEND_TAB
+          : EXTERNAL_IMPORT_MODE_NEW_PROJECT,
+      });
       if (opened) {
         hideStartupScreen();
       }
     });
     bindClickHandlerOnce(dom.controls.openDocument, 'coreProjectActionBound', () => {
-      openDocumentDialog();
+      openDocumentDialog({ mode: EXTERNAL_IMPORT_MODE_APPEND_TAB });
     });
     bindClickHandlerOnce(dom.controls.showLocalProjects, 'coreProjectActionBound', () => {
       showProjectHomeScreen({ refresh: true });
@@ -4349,7 +4469,11 @@
   const SELECTION_DASH_SPEED = 40;
   let selectionDashScreenOffset = 0;
   let lastSelectionDashTime = 0;
-  const DEFAULT_HISTORY_LIMIT = 80;
+  const DESKTOP_HISTORY_LIMIT = 80;
+  const LIGHTWEIGHT_HISTORY_LIMIT = 30;
+  const DEFAULT_HISTORY_LIMIT = isLightweightPersistenceMode()
+    ? LIGHTWEIGHT_HISTORY_LIMIT
+    : DESKTOP_HISTORY_LIMIT;
   const history = { past: [], future: [], pending: null, limit: DEFAULT_HISTORY_LIMIT };
   // Per-client/per-canvas history for multi-session participants.
   // Key format: `${clientId}\u0000${canvasId}`
@@ -4372,6 +4496,8 @@
   const selectionMaskCacheIds = new WeakMap();
   let selectionMaskCacheIdCounter = 1;
   const HISTORY_DRAW_TOOLS = new Set(['pen', 'eraser', 'line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill', ...FILL_TOOL_SET]);
+  const HISTORY_ENTRY_TYPE_PIXEL_PATCH = 'pixelPatch';
+  const PIXEL_PATCH_HISTORY_LABELS = new Set(['pen', 'eraser', 'line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill', ...FILL_TOOL_SET]);
   const MULTI_SCOPED_HISTORY_LABELS = new Set([
     ...HISTORY_DRAW_TOOLS,
     'selectionCut',
@@ -7955,6 +8081,10 @@
 
   function estimateSnapshotBytes(snapshot) {
     if (!snapshot || typeof snapshot !== 'object') return 0;
+    if (isPixelPatchHistoryEntry(snapshot)) {
+      const changes = Array.isArray(snapshot.changes) ? snapshot.changes.length : 0;
+      return changes * 40;
+    }
     let total = 0;
     if (Array.isArray(snapshot.frames)) {
       snapshot.frames.forEach(frame => {
@@ -7992,6 +8122,23 @@
         total += estimateEncodedByteLength(entry.pixels, 1);
         total += 16;
       });
+      const log = track?.operationLog && typeof track.operationLog === 'object' ? track.operationLog : null;
+      if (log?.baseSnapshot) {
+        try {
+          total += JSON.stringify(log.baseSnapshot).length * 2;
+        } catch (error) {
+          total += 0;
+        }
+      }
+      if (Array.isArray(log?.entries)) {
+        log.entries.forEach(entry => {
+          try {
+            total += JSON.stringify(entry).length * 2;
+          } catch (error) {
+            total += 0;
+          }
+        });
+      }
     });
     return total;
   }
@@ -8000,7 +8147,9 @@
     const current = estimateStateBytes();
     const past = estimateHistoryBytes(history.past);
     const future = estimateHistoryBytes(history.future);
-    const pending = history.pending && history.pending.before ? estimateSnapshotBytes(history.pending.before) : 0;
+    const pending = isPixelPatchHistoryEntry(history.pending)
+      ? estimateSnapshotBytes(finalizePixelPatchHistoryEntry(history.pending))
+      : (history.pending && history.pending.before ? estimateSnapshotBytes(history.pending.before) : 0);
     const timelapse = estimateTimelapseBytes();
     return { current, past, future, pending, timelapse, total: current + past + future + pending + timelapse };
   }
@@ -8119,6 +8268,17 @@
     markAutosaveDirty();
     updateMemoryStatus();
     scheduleAutosaveSnapshot();
+  }
+
+  function trimHistoryStacksToLimit() {
+    const limit = normalizeProjectHistoryLimit(history.limit, DEFAULT_HISTORY_LIMIT);
+    history.limit = limit;
+    while (history.past.length > limit) {
+      history.past.shift();
+    }
+    while (history.future.length > limit) {
+      history.future.shift();
+    }
   }
 
   function initMemoryMonitor() {
@@ -11042,8 +11202,297 @@
     ensureOpenProjectTabsInitialized();
   }
 
+  function isPixelPatchHistoryEntry(entry) {
+    return Boolean(entry && typeof entry === 'object' && entry.__historyEntryType === HISTORY_ENTRY_TYPE_PIXEL_PATCH);
+  }
+
+  function canUsePixelPatchHistory(label) {
+    if (!PIXEL_PATCH_HISTORY_LABELS.has(String(label || ''))) {
+      return false;
+    }
+    if (multiState.connected || activeSharedProjectKey || isSharedProjectCollaborativeMode()) {
+      return false;
+    }
+    if (isVoxelExtensionModeEnabled()) {
+      return false;
+    }
+    const layer = getActiveLayer();
+    return Boolean(layer && !isSimulationLayer(layer) && layer.indices instanceof Int16Array);
+  }
+
+  function createPixelPatchHistoryPending(label) {
+    const canvasDoc = getActiveProjectCanvasDocument();
+    const frame = getActiveFrame();
+    const layer = getActiveLayer();
+    const width = Math.max(1, Math.round(Number(canvasDoc?.width) || Number(state.width) || 1));
+    const height = Math.max(1, Math.round(Number(canvasDoc?.height) || Number(state.height) || 1));
+    if (!canvasDoc?.id || !frame?.id || !layer?.id || !(layer.indices instanceof Int16Array)) {
+      return null;
+    }
+    return {
+      __historyEntryType: HISTORY_ENTRY_TYPE_PIXEL_PATCH,
+      dirty: false,
+      label,
+      canvasId: canvasDoc.id,
+      frameId: frame.id,
+      layerId: layer.id,
+      width,
+      height,
+      changesByIndex: new Map(),
+    };
+  }
+
+  function captureLayerPixelPatchValue(layer, index) {
+    const safeIndex = Math.max(0, Math.round(Number(index) || 0));
+    const base = safeIndex * 4;
+    const direct = layer?.direct instanceof Uint8ClampedArray && base + 3 < layer.direct.length
+      ? [
+          layer.direct[base],
+          layer.direct[base + 1],
+          layer.direct[base + 2],
+          layer.direct[base + 3],
+        ]
+      : null;
+    const importSourceDirect = layer?.importSourceDirect instanceof Uint8ClampedArray && base + 3 < layer.importSourceDirect.length
+      ? [
+          layer.importSourceDirect[base],
+          layer.importSourceDirect[base + 1],
+          layer.importSourceDirect[base + 2],
+          layer.importSourceDirect[base + 3],
+        ]
+      : null;
+    return {
+      paletteIndex: layer?.indices instanceof Int16Array && safeIndex < layer.indices.length
+        ? Math.round(Number(layer.indices[safeIndex]) || 0)
+        : -1,
+      direct,
+      importSourceDirect,
+    };
+  }
+
+  function pixelPatchValuesEqual(a, b) {
+    if (!a || !b) {
+      return false;
+    }
+    if (a.paletteIndex !== b.paletteIndex) {
+      return false;
+    }
+    const compareRgba = (left, right) => {
+      if (!left && !right) return true;
+      if (!Array.isArray(left) || !Array.isArray(right) || left.length !== 4 || right.length !== 4) {
+        return false;
+      }
+      return left[0] === right[0]
+        && left[1] === right[1]
+        && left[2] === right[2]
+        && left[3] === right[3];
+    };
+    return compareRgba(a.direct, b.direct)
+      && compareRgba(a.importSourceDirect, b.importSourceDirect);
+  }
+
+  function getPendingPixelPatchChange(layer, index, { create = false } = {}) {
+    const pending = history.pending;
+    if (!isPixelPatchHistoryEntry(pending) || !layer || isSimulationLayer(layer)) {
+      return null;
+    }
+    const canvasDoc = getActiveProjectCanvasDocument();
+    const frame = getActiveFrame();
+    if (
+      pending.canvasId !== (canvasDoc?.id || '')
+      || pending.frameId !== (frame?.id || '')
+      || pending.layerId !== (layer.id || '')
+    ) {
+      return null;
+    }
+    const safeIndex = Math.max(0, Math.round(Number(index) || 0));
+    if (!pending.changesByIndex.has(safeIndex) && create) {
+      pending.changesByIndex.set(safeIndex, {
+        index: safeIndex,
+        before: captureLayerPixelPatchValue(layer, safeIndex),
+        after: null,
+      });
+    }
+    return pending.changesByIndex.get(safeIndex) || null;
+  }
+
+  function recordPendingPixelPatchBefore(layer, index) {
+    getPendingPixelPatchChange(layer, index, { create: true });
+  }
+
+  function recordPendingPixelPatchAfter(layer, index) {
+    const change = getPendingPixelPatchChange(layer, index, { create: true });
+    if (!change) {
+      return;
+    }
+    change.after = captureLayerPixelPatchValue(layer, change.index);
+  }
+
+  function finalizePixelPatchHistoryEntry(pending) {
+    if (!isPixelPatchHistoryEntry(pending) || !(pending.changesByIndex instanceof Map)) {
+      return null;
+    }
+    const changes = [];
+    pending.changesByIndex.forEach(change => {
+      if (!change || !change.before || !change.after || pixelPatchValuesEqual(change.before, change.after)) {
+        return;
+      }
+      changes.push({
+        index: change.index,
+        before: change.before,
+        after: change.after,
+      });
+    });
+    if (!changes.length) {
+      return null;
+    }
+    changes.sort((left, right) => left.index - right.index);
+    return {
+      __historyEntryType: HISTORY_ENTRY_TYPE_PIXEL_PATCH,
+      version: 1,
+      historyLabel: pending.label,
+      canvasId: pending.canvasId,
+      frameId: pending.frameId,
+      layerId: pending.layerId,
+      width: pending.width,
+      height: pending.height,
+      changes,
+    };
+  }
+
+  function resolvePixelPatchHistoryTarget(entry) {
+    if (!isPixelPatchHistoryEntry(entry)) {
+      return null;
+    }
+    const canvasDoc = getProjectCanvasDocumentById(entry.canvasId) || getActiveProjectCanvasDocument();
+    const frames = Array.isArray(canvasDoc?.frames) ? canvasDoc.frames : [];
+    const frame = frames.find(item => item?.id === entry.frameId) || null;
+    const layer = Array.isArray(frame?.layers)
+      ? (frame.layers.find(item => item?.id === entry.layerId) || null)
+      : null;
+    if (!canvasDoc || !frame || !layer || isSimulationLayer(layer) || !(layer.indices instanceof Int16Array)) {
+      return null;
+    }
+    const width = Math.max(1, Math.round(Number(canvasDoc.width) || Number(entry.width) || 1));
+    const height = Math.max(1, Math.round(Number(canvasDoc.height) || Number(entry.height) || 1));
+    if (width !== Math.max(1, Math.round(Number(entry.width) || 1)) || height !== Math.max(1, Math.round(Number(entry.height) || 1))) {
+      return null;
+    }
+    return { canvasDoc, frame, layer, width, height };
+  }
+
+  function writeLayerPixelPatchValue(layer, index, value, width, height) {
+    if (!layer || !(layer.indices instanceof Int16Array) || !value) {
+      return false;
+    }
+    const safeIndex = Math.max(0, Math.round(Number(index) || 0));
+    if (safeIndex >= layer.indices.length) {
+      return false;
+    }
+    const base = safeIndex * 4;
+    layer.indices[safeIndex] = Math.round(Number(value.paletteIndex) || 0);
+    if (Array.isArray(value.direct) && value.direct.length === 4) {
+      const direct = ensureLayerDirect(layer, width, height);
+      direct[base] = clamp(Math.round(Number(value.direct[0]) || 0), 0, 255);
+      direct[base + 1] = clamp(Math.round(Number(value.direct[1]) || 0), 0, 255);
+      direct[base + 2] = clamp(Math.round(Number(value.direct[2]) || 0), 0, 255);
+      direct[base + 3] = clamp(Math.round(Number(value.direct[3]) || 0), 0, 255);
+    } else if (layer.direct instanceof Uint8ClampedArray && base + 3 < layer.direct.length) {
+      layer.direct[base] = 0;
+      layer.direct[base + 1] = 0;
+      layer.direct[base + 2] = 0;
+      layer.direct[base + 3] = 0;
+    }
+    if (Array.isArray(value.importSourceDirect) && value.importSourceDirect.length === 4) {
+      const length = Math.max(1, width * height) * 4;
+      if (!(layer.importSourceDirect instanceof Uint8ClampedArray) || layer.importSourceDirect.length !== length) {
+        layer.importSourceDirect = new Uint8ClampedArray(length);
+      }
+      layer.importSourceDirect[base] = clamp(Math.round(Number(value.importSourceDirect[0]) || 0), 0, 255);
+      layer.importSourceDirect[base + 1] = clamp(Math.round(Number(value.importSourceDirect[1]) || 0), 0, 255);
+      layer.importSourceDirect[base + 2] = clamp(Math.round(Number(value.importSourceDirect[2]) || 0), 0, 255);
+      layer.importSourceDirect[base + 3] = clamp(Math.round(Number(value.importSourceDirect[3]) || 0), 0, 255);
+    } else if (layer.importSourceDirect instanceof Uint8ClampedArray && base + 3 < layer.importSourceDirect.length) {
+      layer.importSourceDirect[base] = 0;
+      layer.importSourceDirect[base + 1] = 0;
+      layer.importSourceDirect[base + 2] = 0;
+      layer.importSourceDirect[base + 3] = 0;
+    }
+    refreshLayerDirectOnlyFlag(layer);
+    return true;
+  }
+
+  function applyPixelPatchHistoryEntry(entry, direction = 'undo') {
+    const target = resolvePixelPatchHistoryTarget(entry);
+    const changes = Array.isArray(entry?.changes) ? entry.changes : [];
+    if (!target || !changes.length) {
+      return false;
+    }
+    const useAfter = direction === 'redo';
+    let applied = false;
+    for (let index = 0; index < changes.length; index += 1) {
+      const change = changes[index];
+      const value = useAfter ? change?.after : change?.before;
+      if (!value) {
+        continue;
+      }
+      applied = writeLayerPixelPatchValue(target.layer, change.index, value, target.width, target.height) || applied;
+    }
+    if (!applied) {
+      return false;
+    }
+    invalidateFillPreviewCache();
+    invalidateOnionSkinCache();
+    clearPlaybackFrameCache();
+    requestRender();
+    requestOverlayRender();
+    renderAllProjectCanvasSurfaces();
+    return true;
+  }
+
+  function rollbackPixelPatchHistoryPending(pending) {
+    if (!isPixelPatchHistoryEntry(pending) || !(pending.changesByIndex instanceof Map)) {
+      return false;
+    }
+    const changes = [];
+    pending.changesByIndex.forEach(change => {
+      if (!change?.before) {
+        return;
+      }
+      changes.push({
+        index: change.index,
+        before: change.before,
+        after: change.after || change.before,
+      });
+    });
+    if (!changes.length) {
+      return false;
+    }
+    return applyPixelPatchHistoryEntry({
+      __historyEntryType: HISTORY_ENTRY_TYPE_PIXEL_PATCH,
+      version: 1,
+      historyLabel: pending.label,
+      canvasId: pending.canvasId,
+      frameId: pending.frameId,
+      layerId: pending.layerId,
+      width: pending.width,
+      height: pending.height,
+      changes,
+    }, 'undo');
+  }
+
   function beginHistory(label) {
     if (history.pending) return;
+    if (shouldRecordLocalTimelapseOperationLog()) {
+      ensureTimelapseOperationLogBase(getActiveProjectCanvasDocument()?.id || '');
+    }
+    const pixelPatchPending = canUsePixelPatchHistory(label)
+      ? createPixelPatchHistoryPending(label)
+      : null;
+    if (pixelPatchPending) {
+      history.pending = pixelPatchPending;
+      return;
+    }
     history.pending = {
       before: compressHistorySnapshot(makeHistorySnapshot({ clonePixelData: false })),
       dirty: false,
@@ -14472,7 +14921,7 @@
     return {
       past: [],
       future: [],
-      limit: Math.max(MIN_HISTORY_LIMIT, Math.round(Number(limit) || DEFAULT_HISTORY_LIMIT)),
+      limit: normalizeProjectHistoryLimit(limit, DEFAULT_HISTORY_LIMIT),
     };
   }
 
@@ -14495,7 +14944,7 @@
     if (!Array.isArray(bucket.future)) {
       bucket.future = [];
     }
-    bucket.limit = Math.max(MIN_HISTORY_LIMIT, Math.round(Number(history.limit) || bucket.limit || DEFAULT_HISTORY_LIMIT));
+    bucket.limit = normalizeProjectHistoryLimit(history.limit || bucket.limit, bucket.limit || DEFAULT_HISTORY_LIMIT);
     return bucket;
   }
 
@@ -14747,7 +15196,15 @@
     if (!history.pending) return;
     const pendingLabel = history.pending.label;
     if (history.pending.dirty) {
-      const beforeSnapshot = setHistoryEntryLabel(history.pending.before, pendingLabel);
+      const historyEntry = isPixelPatchHistoryEntry(history.pending)
+        ? finalizePixelPatchHistoryEntry(history.pending)
+        : setHistoryEntryLabel(history.pending.before, pendingLabel);
+      if (!historyEntry) {
+        history.pending = null;
+        updateHistoryButtons();
+        updateMemoryStatus();
+        return;
+      }
       const activeCanvasId = getActiveProjectCanvasDocument()?.id || '';
       const shouldRecordScopedHistory = (
           (multiState.connected && isMultiClientScopedHistoryMode())
@@ -14758,31 +15215,40 @@
         try {
           const bucket = getMultiHistoryBucket(multiState.clientId || '', activeCanvasId, { create: true });
           if (bucket) {
-            bucket.past.push(beforeSnapshot);
+            bucket.past.push(historyEntry);
             if (bucket.past.length > bucket.limit) bucket.past.shift();
             bucket.future.length = 0;
           } else if (!isMultiClientScopedHistoryMode()) {
-            history.past.push(beforeSnapshot);
+            history.past.push(historyEntry);
           }
         } catch (error) {
           console.warn('Failed to record per-client/per-canvas history. Falling back to global history.', error);
           if (!isMultiClientScopedHistoryMode()) {
-            history.past.push(beforeSnapshot);
+            history.past.push(historyEntry);
           }
         }
       } else {
-        history.past.push(beforeSnapshot);
+        history.past.push(historyEntry);
       }
+      const recordedTimelapseOperation = recordTimelapseOperationLogEntry(historyEntry, pendingLabel);
       const activeTimelapseTrack = getActiveTimelapseTrack();
-      if (timelapseState.enabled && (!activeTimelapseTrack || activeTimelapseTrack.snapshots.length === 0)) {
-        const startEntry = createTimelapseFrameEntryFromSnapshot(beforeSnapshot);
+      if (
+        !recordedTimelapseOperation
+        &&
+        !isPixelPatchHistoryEntry(historyEntry)
+        && timelapseState.enabled
+        && (!activeTimelapseTrack || activeTimelapseTrack.snapshots.length === 0)
+      ) {
+        const startEntry = createTimelapseFrameEntryFromSnapshot(historyEntry);
         if (startEntry) {
           const track = getActiveTimelapseTrack({ create: true });
           track.snapshots.push(startEntry);
           thinTimelapseSnapshotsIfNeeded(track);
         }
       }
-      scheduleTimelapseCaptureFromState();
+      if (!recordedTimelapseOperation) {
+        scheduleTimelapseCaptureFromState();
+      }
       if (activeSharedProjectKey) {
         const sharedOpType = classifySharedProjectOpType(pendingLabel);
         if (shouldPersistSharedProjectSnapshotForHistoryLabel(pendingLabel, sharedOpType)) {
@@ -14888,6 +15354,45 @@
     if (!history.past.length) return;
     const previous = history.past.pop();
     const historyLabel = getHistoryEntryLabel(previous);
+    if (isPixelPatchHistoryEntry(previous)) {
+      history.future.push(previous);
+      if (history.future.length > history.limit) {
+        history.future.shift();
+      }
+      if (!applyPixelPatchHistoryEntry(previous, 'undo')) {
+        history.future.pop();
+        history.past.push(previous);
+        return;
+      }
+      updateHistoryButtons();
+      markAutosaveDirty();
+      markDocumentUnsavedChange();
+      scheduleAutosaveSnapshot();
+      scheduleQrEditReadabilityCheck();
+      if (isSharedProjectCollaborativeMode()) {
+        handleMultiLocalCommit(historyLabel);
+        const sharedOpType = classifySharedProjectOpType(historyLabel);
+        if (shouldPersistSharedProjectSnapshotForHistoryLabel(historyLabel, sharedOpType)) {
+          queueSharedProjectCurrentSnapshotCapture({
+            delayMs: sharedOpType === 'structure'
+              ? Math.min(120, SHARED_PROJECT_CHECKPOINT_DELAY)
+              : SHARED_PROJECT_DEFERRED_PERSIST_DELAY,
+            projectKey: activeSharedProjectKey,
+            historyLabel,
+          });
+        }
+        return;
+      }
+      if (multiState.connected && isMultiMasterMode()) {
+        if (MULTI_LAYER_PATCH_HISTORY_LABELS.has(historyLabel)) {
+          scheduleMasterLayerPatchSend({ immediate: true });
+          scheduleMultiPublicLobbyRoomSync({ immediate: false });
+        } else if (!isLocalOnlyMultiHistoryLabel(historyLabel)) {
+          scheduleMultiSessionStateBroadcast({ immediate: true });
+        }
+      }
+      return;
+    }
     const snapshot = setHistoryEntryLabel(
       compressHistorySnapshot(makeHistorySnapshot({ clonePixelData: false })),
       historyLabel
@@ -15005,6 +15510,45 @@
     if (!history.future.length) return;
     const next = history.future.pop();
     const historyLabel = getHistoryEntryLabel(next);
+    if (isPixelPatchHistoryEntry(next)) {
+      history.past.push(next);
+      if (history.past.length > history.limit) {
+        history.past.shift();
+      }
+      if (!applyPixelPatchHistoryEntry(next, 'redo')) {
+        history.past.pop();
+        history.future.push(next);
+        return;
+      }
+      updateHistoryButtons();
+      markAutosaveDirty();
+      markDocumentUnsavedChange();
+      scheduleAutosaveSnapshot();
+      scheduleQrEditReadabilityCheck();
+      if (isSharedProjectCollaborativeMode()) {
+        handleMultiLocalCommit(historyLabel);
+        const sharedOpType = classifySharedProjectOpType(historyLabel);
+        if (shouldPersistSharedProjectSnapshotForHistoryLabel(historyLabel, sharedOpType)) {
+          queueSharedProjectCurrentSnapshotCapture({
+            delayMs: sharedOpType === 'structure'
+              ? Math.min(120, SHARED_PROJECT_CHECKPOINT_DELAY)
+              : SHARED_PROJECT_DEFERRED_PERSIST_DELAY,
+            projectKey: activeSharedProjectKey,
+            historyLabel,
+          });
+        }
+        return;
+      }
+      if (multiState.connected && isMultiMasterMode()) {
+        if (MULTI_LAYER_PATCH_HISTORY_LABELS.has(historyLabel)) {
+          scheduleMasterLayerPatchSend({ immediate: true });
+          scheduleMultiPublicLobbyRoomSync({ immediate: false });
+        } else if (!isLocalOnlyMultiHistoryLabel(historyLabel)) {
+          scheduleMultiSessionStateBroadcast({ immediate: true });
+        }
+      }
+      return;
+    }
     const snapshot = setHistoryEntryLabel(
       compressHistorySnapshot(makeHistorySnapshot({ clonePixelData: false })),
       historyLabel
@@ -15048,6 +15592,20 @@
   }
 
   function rollbackPendingHistory({ reRender = true } = {}) {
+    if (isPixelPatchHistoryEntry(history.pending)) {
+      const rolledBack = rollbackPixelPatchHistoryPending(history.pending);
+      history.pending = null;
+      updateHistoryButtons();
+      markAutosaveDirty();
+      markDocumentUnsavedChange();
+      if (reRender) {
+        renderEverything();
+        requestOverlayRender();
+      } else {
+        requestRender();
+      }
+      return rolledBack;
+    }
     if (!history.pending || !history.pending.before) {
       history.pending = null;
       return false;
@@ -19376,7 +19934,7 @@
   }
 
   function getAutosaveBlockedStatusMessage() {
-    if (multiState.connected && !isMultiMasterMode()) {
+    if (multiState.connected && !isMultiMasterMode() && !isCurrentProjectSharedEntry()) {
       return MULTI_REPLICA_AUTOSAVE_BLOCKED_STATUS;
     }
     return '';
@@ -19996,6 +20554,11 @@
     if (!AUTOSAVE_SUPPORTED || autosaveRestoring || !autosaveDirty) {
       return;
     }
+    if (isLightweightPersistenceMode()) {
+      autosaveWriteQueued = true;
+      scheduleAutosaveSnapshot();
+      return;
+    }
     writeAutosaveSnapshot(true).catch(error => {
       console.warn('Immediate autosave failed', error);
       updateAutosaveStatus('自動保存: 保存に失敗しました', 'error');
@@ -20153,6 +20716,28 @@
     autosaveWriteInFlight = true;
     autosaveWriteQueued = false;
     try {
+      if (shouldUseLightweightSharedProjectLocalSave(projectId)) {
+        updateAutosaveStatus('自動保存: 共有プロジェクトの復帰情報を保存中…');
+        const dirtyGenerationAtStart = autosaveDirtyGeneration;
+        const unsavedTokenAtStart = unsavedChangeToken;
+        const savedEntry = await recordSharedProjectLightweightLocalSave({ projectId });
+        if (!savedEntry) {
+          throw new Error('Failed to record shared project restore metadata');
+        }
+        const stillCurrentWrite = (
+          normalizeAutosaveProjectId(autosaveProjectId || '') === projectId
+          && autosaveDirtyGeneration === dirtyGenerationAtStart
+          && unsavedChangeToken === unsavedTokenAtStart
+        );
+        if (!stillCurrentWrite) {
+          autosaveWriteQueued = true;
+          updateAutosaveStatus('自動保存: 追加変更を保存します', 'info');
+          return false;
+        }
+        autosaveDirty = false;
+        updateAutosaveStatus('自動保存: 共有プロジェクトの復帰情報を保存済み', 'success');
+        return true;
+      }
       updateAutosaveStatus('自動保存: 端末内に保存中…');
       const snapshot = makeHistorySnapshot({ clonePixelData: false });
       const session = buildAutosaveSessionPayload();
@@ -20227,10 +20812,22 @@
           history.limit = projectSession.historyLimit;
           history.past = projectSession.historyPast;
           history.future = projectSession.historyFuture;
+          trimHistoryStacksToLimit();
           timelapseState.tracksByCanvasId = Object.create(null);
           Object.entries(projectSession.timelapse.tracksByCanvasId || {}).forEach(([canvasId, track]) => {
             timelapseState.tracksByCanvasId[canvasId] = {
               snapshots: Array.isArray(track?.snapshots) ? track.snapshots.slice() : [],
+              operationLog: track?.operationLog && typeof track.operationLog === 'object'
+                ? {
+                    version: 1,
+                    baseSnapshot: track.operationLog.baseSnapshot || null,
+                    entries: Array.isArray(track.operationLog.entries)
+                      ? track.operationLog.entries
+                        .map(entry => normalizeSerializedTimelapseOperationEntry(entry))
+                        .filter(Boolean)
+                      : [],
+                  }
+                : null,
               warningShown: Boolean(track?.warningShown),
               sampleStep: Math.max(1, Math.round(Number(track?.sampleStep) || 1)),
               lastCaptureToken: Number.isFinite(Number(track?.lastCaptureToken))
@@ -20930,6 +21527,105 @@
     }
   }
 
+  async function openImageFileAsNewProject(file, { source = 'import', qrEditPayload = null } = {}) {
+    if (!ensureCurrentClientCanReplaceActiveProject()) {
+      return false;
+    }
+    if (openProjectTabBusy) {
+      return false;
+    }
+    if (openProjectTabs.length && activeOpenProjectTabId) {
+      const persistedCurrentProject = await persistActiveOpenProjectTab({ flushAutosave: true });
+      if (!persistedCurrentProject) {
+        return false;
+      }
+    }
+    const loaded = await loadDocumentFromImageFile(file);
+    if (!loaded) {
+      return false;
+    }
+    const tab = resetOpenProjectTabsToCurrentProject({
+      source,
+      projectId: autosaveProjectId,
+      qrEditPayload,
+    });
+    if (qrEditPayload) {
+      activateQrEditMode({
+        ...qrEditPayload,
+        projectId: tab?.projectId || autosaveProjectId || '',
+      });
+    }
+    renderOpenProjectTabs();
+    return true;
+  }
+
+  async function openDocumentAsNewProject(item, { source = 'open' } = {}) {
+    if (!ensureCurrentClientCanReplaceActiveProject()) {
+      return false;
+    }
+    if (!canCurrentClientImportExternalData()) {
+      setMultiStatus(localizeText('参加/視聴モードでは読み込み/インポートはマスターのみ操作できます', 'In participant/viewer mode, only the master can open/import files'), 'warn');
+      return false;
+    }
+    if (openProjectTabBusy) {
+      return false;
+    }
+
+    let file = null;
+    let handle = null;
+    try {
+      if (item && typeof item.getFile === 'function') {
+        handle = item;
+        file = await item.getFile();
+      } else if (item && typeof item.text === 'function') {
+        file = item;
+      }
+    } catch (error) {
+      console.warn('Document open failed', error);
+      updateAutosaveStatus('ドキュメントを開けませんでした', 'error');
+      return false;
+    }
+
+    if (file && isImportableImageFile(file)) {
+      return await openImageFileAsNewProject(file, { source });
+    }
+    if (!file || typeof file.text !== 'function') {
+      updateAutosaveStatus('ドキュメントを開けませんでした', 'error');
+      return false;
+    }
+
+    try {
+      const text = await file.text();
+      try {
+        snapshotFromDocumentText(text);
+      } catch (parseError) {
+        console.warn('Failed to parse document', parseError);
+        updateAutosaveStatus('ドキュメントの読み込みに失敗しました', 'error');
+        return false;
+      }
+      if (openProjectTabs.length && activeOpenProjectTabId) {
+        const persistedCurrentProject = await persistActiveOpenProjectTab({ flushAutosave: true });
+        if (!persistedCurrentProject) {
+          return false;
+        }
+      }
+      const loaded = await loadDocumentFromText(text, handle, { suppressAutosaveStatus: true });
+      if (!loaded || loaded === 'deferred') {
+        return false;
+      }
+      updateAutosaveStatus(
+        localizeText('ファイルを新規プロジェクトとして開きました', 'Opened file as a new project'),
+        'success'
+      );
+      renderOpenProjectTabs();
+      return true;
+    } catch (error) {
+      console.warn('Document load failed', error);
+      updateAutosaveStatus('ドキュメントを開けませんでした', 'error');
+      return false;
+    }
+  }
+
   function tryParseJsonSafe(text) {
     if (typeof text !== 'string') return null;
     try {
@@ -21334,7 +22030,7 @@
     }
   }
 
-  async function openDocumentDialog() {
+  async function openDocumentDialog(options = {}) {
     if (!ensureCurrentClientCanReplaceActiveProject()) {
       return false;
     }
@@ -21342,10 +22038,11 @@
       setMultiStatus(localizeText('参加/視聴モードでは読み込み/インポートはマスターのみ操作できます', 'In participant/viewer mode, only the master can open/import files'), 'warn');
       return false;
     }
+    const mode = normalizeExternalImportMode(options?.mode);
     if (typeof window.showOpenFilePicker === 'function') {
       try {
         const handles = await window.showOpenFilePicker({
-          multiple: true,
+          multiple: mode !== EXTERNAL_IMPORT_MODE_NEW_PROJECT,
           excludeAcceptAllOption: false,
           types: [
             {
@@ -21362,6 +22059,9 @@
         if (!Array.isArray(handles) || !handles.length) {
           return false;
         }
+        if (mode === EXTERNAL_IMPORT_MODE_NEW_PROJECT) {
+          return await openDocumentAsNewProject(handles[0], { source: 'open-picker' });
+        }
         return await openDocumentsAsProjectTabs(
           handles,
           async handle => loadDocumentFromHandle(handle, { suppressAutosaveStatus: true }),
@@ -21372,17 +22072,18 @@
           return false;
         }
         console.warn('Document open failed', error);
-        return openDocumentViaInput();
+        return openDocumentViaInput({ mode });
       }
     }
-    return openDocumentViaInput();
+    return openDocumentViaInput({ mode });
   }
 
-  function openDocumentViaInput() {
+  function openDocumentViaInput(options = {}) {
+    const mode = normalizeExternalImportMode(options?.mode);
     return new Promise(resolve => {
       const input = document.createElement('input');
       input.type = 'file';
-      input.multiple = true;
+      input.multiple = mode !== EXTERNAL_IMPORT_MODE_NEW_PROJECT;
       const acceptTypes = [
         '.json',
         '.pxdraw',
@@ -21417,6 +22118,11 @@
           return;
         }
         try {
+          if (mode === EXTERNAL_IMPORT_MODE_NEW_PROJECT) {
+            const opened = await openDocumentAsNewProject(files[0], { source: 'open-input' });
+            finish(opened);
+            return;
+          }
           const opened = await openDocumentsAsProjectTabs(
             files,
             async file => {
@@ -22254,9 +22960,17 @@
       }
     }
 
+    if (!isLensImportPayload(payload)) {
+      payload = readLensImportWindowNamePayload();
+    }
+
+    if (!isLensImportPayload(payload)) {
+      payload = await waitForLensImportPayloadMessage();
+    }
+
     clearLensImportRequestParam();
 
-    if (!payload || typeof payload !== 'object' || typeof payload.dataUrl !== 'string') {
+    if (!isLensImportPayload(payload)) {
       updateAutosaveStatus('PiXiEELENS からのデータが見つかりませんでした', 'warn');
       await fallbackRestoreAutosaveAfterLensFailure();
       finalizeLensImportAttempt({ clearPayload: true });
@@ -22290,23 +23004,27 @@
     }
 
     try {
-      const imported = await openDocumentsAsProjectTabs(
-        [file],
-        async lensFile => {
-          const loaded = await loadDocumentFromImageFile(lensFile);
-          if (!loaded) {
-            return false;
-          }
-          await ensureAutosaveForLensImport();
-          return true;
-        },
-        { source: 'lens' }
-      );
+      const appendToProject = shouldAppendExternalImportToProject(payload);
+      const imported = appendToProject
+        ? await openDocumentsAsProjectTabs(
+          [file],
+          async lensFile => {
+            const loaded = await loadDocumentFromImageFile(lensFile);
+            if (!loaded) {
+              return false;
+            }
+            await ensureAutosaveForLensImport();
+            return true;
+          },
+          { source: 'lens' }
+        )
+        : await openImageFileAsNewProject(file, { source: 'lens' });
       if (!imported) {
         finalizeLensImportAttempt({ clearPayload: true });
         return false;
       }
       hideStartupScreen();
+      hideProjectHomeScreen();
       if (AUTOSAVE_SUPPORTED) {
         try {
           await writeAutosaveSnapshot(true);
@@ -22315,10 +23033,15 @@
         }
       }
       updateAutosaveStatus(
-        localizeText(
-          'PiXiEELENS の画像を別シートで開きました',
-          'Opened PiXiEELENS capture in a separate sheet'
-        ),
+        appendToProject
+          ? localizeText(
+            'PiXiEELENS の画像を別シートで開きました',
+            'Opened PiXiEELENS capture in a separate sheet'
+          )
+          : localizeText(
+            'PiXiEELENS の画像を新規プロジェクトとして開きました',
+            'Opened PiXiEELENS capture as a new project'
+          ),
         'success'
       );
       finalizeLensImportAttempt({ clearPayload: true });
@@ -22406,32 +23129,40 @@
     }
 
     try {
-      const imported = await openDocumentsAsProjectTabs(
-        [file],
-        async qrFile => {
-          const loaded = await loadDocumentFromImageFile(qrFile);
-          if (!loaded) {
-            return false;
-          }
-          await ensureAutosaveForLensImport();
-          return true;
-        },
-        {
-          source: 'qrmaker',
-          tabOptions: {
-            qrEditPayload: {
-              source: payload.source,
-              rawValue: typeof payload.rawValue === 'string' ? payload.rawValue : '',
-              editSize: payload.editSize,
-            },
+      const qrEditPayload = {
+        source: payload.source,
+        rawValue: typeof payload.rawValue === 'string' ? payload.rawValue : '',
+        editSize: payload.editSize,
+      };
+      const appendToProject = shouldAppendExternalImportToProject(payload);
+      const imported = appendToProject
+        ? await openDocumentsAsProjectTabs(
+          [file],
+          async qrFile => {
+            const loaded = await loadDocumentFromImageFile(qrFile);
+            if (!loaded) {
+              return false;
+            }
+            await ensureAutosaveForLensImport();
+            return true;
           },
-        }
-      );
+          {
+            source: 'qrmaker',
+            tabOptions: {
+              qrEditPayload,
+            },
+          }
+        )
+        : await openImageFileAsNewProject(file, {
+          source: 'qrmaker',
+          qrEditPayload,
+        });
       if (!imported) {
         finalizeQrImportAttempt({ clearPayload: true });
         return false;
       }
       hideStartupScreen();
+      hideProjectHomeScreen();
       if (AUTOSAVE_SUPPORTED) {
         try {
           await writeAutosaveSnapshot(true);
@@ -22440,10 +23171,15 @@
         }
       }
       updateAutosaveStatus(
-        localizeText(
-          'QRコードを別シートで開きました',
-          'Opened QR code in a separate sheet'
-        ),
+        appendToProject
+          ? localizeText(
+            'QRコードを別シートで開きました',
+            'Opened QR code in a separate sheet'
+          )
+          : localizeText(
+            'QRコードを新規プロジェクトとして開きました',
+            'Opened QR code as a new project'
+          ),
         'success'
       );
       finalizeQrImportAttempt({ clearPayload: true });
@@ -23629,10 +24365,36 @@
   function createEmptyTimelapseTrack() {
     return {
       snapshots: [],
+      operationLog: null,
       warningShown: false,
       sampleStep: 1,
       lastCaptureToken: -1,
     };
+  }
+
+  function createEmptyTimelapseOperationLog() {
+    return {
+      version: 1,
+      baseSnapshot: null,
+      entries: [],
+    };
+  }
+
+  function shouldRecordLocalTimelapseOperationLog() {
+    return Boolean(
+      timelapseState.enabled
+      && !activeSharedProjectKey
+      && !multiState.connected
+      && !isSharedProjectCollaborativeMode()
+    );
+  }
+
+  function shouldCaptureTimelapseSnapshotsFromState() {
+    return Boolean(
+      timelapseState.enabled
+      && !shouldRecordLocalTimelapseOperationLog()
+      && !activeSharedProjectKey
+    );
   }
 
   function normalizeTimelapseCanvasId(value, fallback = '') {
@@ -23671,13 +24433,140 @@
   }
 
   function getActiveTimelapseStepCount() {
-    return getActiveTimelapseTrack()?.snapshots?.length || 0;
+    return getTimelapseTrackStepCount(getActiveTimelapseTrack());
   }
 
   function getAllTimelapseStepCount() {
     return Object.values(getAllTimelapseTracks()).reduce((sum, track) => {
-      return sum + (Array.isArray(track?.snapshots) ? track.snapshots.length : 0);
+      const snapshotCount = Array.isArray(track?.snapshots) ? track.snapshots.length : 0;
+      const operationCount = Array.isArray(track?.operationLog?.entries)
+        ? track.operationLog.entries.length + (track.operationLog.baseSnapshot ? 1 : 0)
+        : 0;
+      return sum + Math.max(snapshotCount, operationCount);
     }, 0);
+  }
+
+  function getTimelapseTrackStepCount(track = null) {
+    const snapshotCount = Array.isArray(track?.snapshots) ? track.snapshots.length : 0;
+    const operationCount = Array.isArray(track?.operationLog?.entries)
+      ? track.operationLog.entries.length + (track.operationLog.baseSnapshot ? 1 : 0)
+      : 0;
+    return Math.max(snapshotCount, operationCount);
+  }
+
+  function createTimelapseBaseSnapshotPayload() {
+    try {
+      return serializeDocumentSnapshot(makeHistorySnapshot({
+        includeUiState: false,
+        includeSelection: true,
+        clonePixelData: true,
+      }));
+    } catch (error) {
+      console.warn('Failed to create timelapse base snapshot', error);
+      return null;
+    }
+  }
+
+  function ensureTimelapseOperationLogBase(canvasId = getActiveProjectCanvasDocument()?.id || '') {
+    if (!shouldRecordLocalTimelapseOperationLog()) {
+      return null;
+    }
+    const resolvedCanvasId = normalizeTimelapseCanvasId(canvasId);
+    if (!resolvedCanvasId) {
+      return null;
+    }
+    const track = getTimelapseTrack(resolvedCanvasId, { create: true });
+    if (!track) {
+      return null;
+    }
+    if (!track.operationLog || typeof track.operationLog !== 'object') {
+      track.operationLog = createEmptyTimelapseOperationLog();
+    }
+    if (!track.operationLog.baseSnapshot) {
+      track.operationLog.baseSnapshot = createTimelapseBaseSnapshotPayload();
+    }
+    return track.operationLog.baseSnapshot ? track.operationLog : null;
+  }
+
+  function cloneTimelapsePixelPatchValue(value = null) {
+    if (!value || typeof value !== 'object') {
+      return null;
+    }
+    const cloneRgba = source => Array.isArray(source) && source.length === 4
+      ? [
+          clamp(Math.round(Number(source[0]) || 0), 0, 255),
+          clamp(Math.round(Number(source[1]) || 0), 0, 255),
+          clamp(Math.round(Number(source[2]) || 0), 0, 255),
+          clamp(Math.round(Number(source[3]) || 0), 0, 255),
+        ]
+      : null;
+    return {
+      paletteIndex: Math.round(Number(value.paletteIndex) || 0),
+      direct: cloneRgba(value.direct),
+      importSourceDirect: cloneRgba(value.importSourceDirect),
+    };
+  }
+
+  function createTimelapseOperationEntryFromPixelPatch(entry, historyLabel = '') {
+    if (!isPixelPatchHistoryEntry(entry) || !Array.isArray(entry.changes) || !entry.changes.length) {
+      return null;
+    }
+    const changes = entry.changes
+      .map(change => ({
+        index: Math.max(0, Math.round(Number(change?.index) || 0)),
+        after: cloneTimelapsePixelPatchValue(change?.after),
+      }))
+      .filter(change => change.after);
+    if (!changes.length) {
+      return null;
+    }
+    return {
+      type: 'pixelPatch',
+      at: Date.now(),
+      historyLabel: String(historyLabel || entry.historyLabel || ''),
+      canvasId: typeof entry.canvasId === 'string' ? entry.canvasId : '',
+      frameId: typeof entry.frameId === 'string' ? entry.frameId : '',
+      layerId: typeof entry.layerId === 'string' ? entry.layerId : '',
+      width: Math.max(1, Math.round(Number(entry.width) || 1)),
+      height: Math.max(1, Math.round(Number(entry.height) || 1)),
+      changes,
+    };
+  }
+
+  function createTimelapseOperationKeyframeEntry(historyLabel = '') {
+    const snapshot = createTimelapseBaseSnapshotPayload();
+    if (!snapshot) {
+      return null;
+    }
+    return {
+      type: 'keyframe',
+      at: Date.now(),
+      historyLabel: String(historyLabel || ''),
+      snapshot,
+    };
+  }
+
+  function recordTimelapseOperationLogEntry(historyEntry, historyLabel = '') {
+    if (!shouldRecordLocalTimelapseOperationLog()) {
+      return false;
+    }
+    const canvasId = isPixelPatchHistoryEntry(historyEntry)
+      ? historyEntry.canvasId
+      : getActiveProjectCanvasDocument()?.id || '';
+    const log = ensureTimelapseOperationLogBase(canvasId);
+    if (!log || !Array.isArray(log.entries)) {
+      return false;
+    }
+    const entry = isPixelPatchHistoryEntry(historyEntry)
+      ? createTimelapseOperationEntryFromPixelPatch(historyEntry, historyLabel)
+      : createTimelapseOperationKeyframeEntry(historyLabel);
+    if (!entry) {
+      return false;
+    }
+    log.entries.push(entry);
+    syncTimelapseControls();
+    updateMemoryStatus();
+    return true;
   }
 
   function reconcileTimelapseTracksForSingleCanvas() {
@@ -23685,28 +24574,42 @@
     if (!activeCanvasId || getProjectCanvasCount() !== 1) {
       return false;
     }
-    if (timelapseState.tracksByCanvasId[activeCanvasId]) {
-      return false;
-    }
     const entries = Object.entries(timelapseState.tracksByCanvasId);
     if (!entries.length) {
       return false;
     }
+    const currentTrack = timelapseState.tracksByCanvasId[activeCanvasId] || null;
     let bestTrack = null;
+    let bestCanvasId = '';
     let bestCount = -1;
-    entries.forEach(([, track]) => {
-      const count = Array.isArray(track?.snapshots) ? track.snapshots.length : 0;
-      if (count > bestCount) {
+    entries.forEach(([canvasId, track]) => {
+      const count = getTimelapseTrackStepCount(track);
+      if (count > bestCount || (count === bestCount && canvasId === activeCanvasId)) {
         bestCount = count;
         bestTrack = track;
+        bestCanvasId = canvasId;
       }
     });
     if (!bestTrack || bestCount <= 0) {
       return false;
     }
+    if (bestCanvasId === activeCanvasId && entries.length === 1 && currentTrack === bestTrack) {
+      return false;
+    }
     timelapseState.tracksByCanvasId = {
       [activeCanvasId]: {
         snapshots: Array.isArray(bestTrack.snapshots) ? bestTrack.snapshots.slice() : [],
+        operationLog: bestTrack.operationLog && typeof bestTrack.operationLog === 'object'
+          ? {
+              version: 1,
+              baseSnapshot: bestTrack.operationLog.baseSnapshot || null,
+              entries: Array.isArray(bestTrack.operationLog.entries)
+                ? bestTrack.operationLog.entries
+                  .map(entry => normalizeSerializedTimelapseOperationEntry(entry))
+                  .filter(Boolean)
+                : [],
+            }
+          : null,
         warningShown: Boolean(bestTrack.warningShown),
         sampleStep: Math.max(1, Math.round(Number(bestTrack.sampleStep) || 1)),
         lastCaptureToken: Number.isFinite(Number(bestTrack.lastCaptureToken))
@@ -23825,7 +24728,7 @@
   }
 
   function captureTimelapseFrameFromState(canvasId = getActiveProjectCanvasDocument()?.id || '') {
-    if (!timelapseState.enabled) {
+    if (!shouldCaptureTimelapseSnapshotsFromState()) {
       return false;
     }
     const resolvedCanvasId = normalizeTimelapseCanvasId(canvasId);
@@ -23863,6 +24766,16 @@
     if (!timelapseState.enabled) {
       return false;
     }
+    if (shouldRecordLocalTimelapseOperationLog()) {
+      const initialized = Boolean(ensureTimelapseOperationLogBase(canvasId));
+      if (initialized) {
+        syncTimelapseControls();
+      }
+      return initialized;
+    }
+    if (!shouldCaptureTimelapseSnapshotsFromState()) {
+      return false;
+    }
     const resolvedCanvasId = normalizeTimelapseCanvasId(canvasId);
     if (!resolvedCanvasId) {
       return false;
@@ -23884,7 +24797,7 @@
       return false;
     }
     timelapseQueuedCanvasIds.clear();
-    if (!timelapseState.enabled) {
+    if (!shouldCaptureTimelapseSnapshotsFromState()) {
       return false;
     }
     let captured = false;
@@ -23895,7 +24808,7 @@
   }
 
   function scheduleTimelapseCaptureFromState({ immediate = false, canvasId = getActiveProjectCanvasDocument()?.id || '' } = {}) {
-    if (!timelapseState.enabled) {
+    if (!shouldCaptureTimelapseSnapshotsFromState()) {
       return;
     }
     const resolvedCanvasId = normalizeTimelapseCanvasId(canvasId);
@@ -23918,7 +24831,7 @@
 
   function syncTimelapseControls() {
     const track = getActiveTimelapseTrack();
-    const stepCount = Array.isArray(track?.snapshots) ? track.snapshots.length : 0;
+    const stepCount = getTimelapseTrackStepCount(track);
     const fps = normalizeTimelapseFps(timelapseState.fps);
     const sampleStep = Math.max(1, Math.round(Number(track?.sampleStep) || 1));
     const sampleInfo = sampleStep > 1
@@ -23958,6 +24871,7 @@
       const track = getTimelapseTrack(activeCanvasId);
       if (track) {
         track.snapshots.length = 0;
+        track.operationLog = null;
         track.warningShown = false;
         track.sampleStep = 1;
         track.lastCaptureToken = -1;
@@ -23983,7 +24897,7 @@
     }
     timelapseState.enabled = next;
     if (next) {
-      scheduleTimelapseCaptureFromState({ immediate: true });
+      ensureTimelapseStartCapture();
     } else if (timelapseCaptureTimer !== null) {
       window.clearTimeout(timelapseCaptureTimer);
       timelapseCaptureTimer = null;
@@ -24022,9 +24936,296 @@
     };
   }
 
-  function buildTimelapseExportEntries() {
+  function getSnapshotCanvasForTimelapse(snapshot = null, canvasId = '') {
+    if (!snapshot || typeof snapshot !== 'object') {
+      return null;
+    }
+    const normalizedCanvasId = typeof canvasId === 'string' ? canvasId.trim() : '';
+    if (Array.isArray(snapshot.canvases) && snapshot.canvases.length) {
+      return snapshot.canvases.find(canvas => (
+        normalizedCanvasId && typeof canvas?.id === 'string' && canvas.id === normalizedCanvasId
+      )) || snapshot.canvases.find(canvas => canvas?.id === snapshot.activeCanvasId) || snapshot.canvases[0] || null;
+    }
+    return {
+      id: typeof snapshot.activeCanvasId === 'string' ? snapshot.activeCanvasId : normalizedCanvasId,
+      width: snapshot.width,
+      height: snapshot.height,
+      frames: snapshot.frames,
+      activeFrame: snapshot.activeFrame,
+      activeLayer: snapshot.activeLayer,
+    };
+  }
+
+  function createTimelapseFrameEntryFromSnapshotCanvas(snapshot = null, canvasId = '') {
+    const canvas = getSnapshotCanvasForTimelapse(snapshot, canvasId);
+    if (!canvas || !Array.isArray(canvas.frames) || !canvas.frames.length) {
+      return null;
+    }
+    const width = Math.max(1, Math.round(Number(canvas.width) || Number(snapshot?.width) || 1));
+    const height = Math.max(1, Math.round(Number(canvas.height) || Number(snapshot?.height) || 1));
+    const frameIndex = clamp(Math.round(Number(canvas.activeFrame ?? snapshot?.activeFrame) || 0), 0, canvas.frames.length - 1);
+    const frame = canvas.frames[frameIndex] || canvas.frames[0];
+    if (!frame || !Array.isArray(frame.layers)) {
+      return null;
+    }
+    const palette = Array.isArray(snapshot?.palette) ? snapshot.palette : state.palette;
+    const pixels = compositeFramePixels(frame, width, height, palette);
+    return {
+      width,
+      height,
+      pixels: compressUint8Array(pixels, { clamped: true }),
+    };
+  }
+
+  function resolveTimelapsePixelPatchTarget(snapshot = null, entry = null, fallbackCanvasId = '') {
+    const canvasId = typeof entry?.canvasId === 'string' && entry.canvasId.trim()
+      ? entry.canvasId.trim()
+      : fallbackCanvasId;
+    const canvas = getSnapshotCanvasForTimelapse(snapshot, canvasId);
+    if (!canvas || !Array.isArray(canvas.frames) || !canvas.frames.length) {
+      return null;
+    }
+    const frame = canvas.frames.find(item => (
+      typeof entry?.frameId === 'string'
+      && entry.frameId
+      && item?.id === entry.frameId
+    )) || canvas.frames[clamp(Math.round(Number(canvas.activeFrame) || 0), 0, canvas.frames.length - 1)] || canvas.frames[0];
+    const layer = Array.isArray(frame?.layers)
+      ? frame.layers.find(item => typeof entry?.layerId === 'string' && item?.id === entry.layerId) || null
+      : null;
+    if (!layer || !(layer.indices instanceof Int16Array)) {
+      return null;
+    }
+    const width = Math.max(1, Math.round(Number(canvas.width) || Number(entry?.width) || 1));
+    const height = Math.max(1, Math.round(Number(canvas.height) || Number(entry?.height) || 1));
+    return { canvas, frame, layer, width, height };
+  }
+
+  function applyTimelapsePixelPatchEntry(snapshot = null, entry = null, fallbackCanvasId = '') {
+    const target = resolveTimelapsePixelPatchTarget(snapshot, entry, fallbackCanvasId);
+    const changes = Array.isArray(entry?.changes) ? entry.changes : [];
+    if (!target || !changes.length) {
+      return false;
+    }
+    let applied = false;
+    changes.forEach(change => {
+      if (!change?.after) {
+        return;
+      }
+      applied = writeLayerPixelPatchValue(
+        target.layer,
+        change.index,
+        change.after,
+        target.width,
+        target.height
+      ) || applied;
+    });
+    return applied;
+  }
+
+  function deserializeTimelapseBaseSnapshot(payload = null) {
+    if (!payload || typeof payload !== 'object') {
+      return null;
+    }
+    try {
+      return deserializeDocumentPayload(payload);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function buildTimelapseExportEntriesFromOperationLog(canvasId = getActiveProjectCanvasDocument()?.id || '') {
+    const track = getTimelapseTrack(canvasId);
+    const log = track?.operationLog && typeof track.operationLog === 'object' ? track.operationLog : null;
+    if (!log?.baseSnapshot || !Array.isArray(log.entries)) {
+      return [];
+    }
+    let workingSnapshot = deserializeTimelapseBaseSnapshot(log.baseSnapshot);
+    if (!workingSnapshot) {
+      return [];
+    }
+    const snapshots = [];
+    const pushCurrent = () => {
+      const entry = createTimelapseFrameEntryFromSnapshotCanvas(workingSnapshot, canvasId);
+      const last = snapshots[snapshots.length - 1] || null;
+      if (entry && (!last || !areTimelapseFrameEntriesEqual(last, entry))) {
+        snapshots.push(entry);
+      }
+    };
+    pushCurrent();
+    log.entries.forEach(entry => {
+      if (!entry || typeof entry !== 'object') {
+        return;
+      }
+      if (entry.type === 'keyframe') {
+        const nextSnapshot = deserializeTimelapseBaseSnapshot(entry.snapshot);
+        if (nextSnapshot) {
+          workingSnapshot = nextSnapshot;
+          pushCurrent();
+        }
+        return;
+      }
+      if (entry.type === 'pixelPatch' && applyTimelapsePixelPatchEntry(workingSnapshot, entry, canvasId)) {
+        pushCurrent();
+      }
+    });
+    return snapshots;
+  }
+
+  function deserializeSharedTimelapseBaseSnapshotPayload(payload = null) {
+    if (!payload || typeof payload !== 'object') {
+      return null;
+    }
+    try {
+      const parsed = snapshotFromParsedDocumentValue(payload);
+      if (parsed?.snapshot) {
+        return parsed.snapshot;
+      }
+    } catch (error) {
+      // Fall through to plain document payload parsing.
+    }
+    return deserializeTimelapseBaseSnapshot(payload);
+  }
+
+  async function fetchSharedProjectOpsForTimelapse(projectKey = activeSharedProjectKey) {
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
+    if (!normalizedProjectKey) {
+      return [];
+    }
+    const allOps = [];
+    let afterRevision = 0;
+    const batchSize = 1000;
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      const ops = await fetchSharedProjectOpsSince(normalizedProjectKey, afterRevision, batchSize);
+      if (!Array.isArray(ops) || !ops.length) {
+        break;
+      }
+      ops.sort((left, right) => getSharedProjectOpSeq(left) - getSharedProjectOpSeq(right));
+      ops.forEach(op => {
+        const seq = getSharedProjectOpSeq(op);
+        if (seq > afterRevision) {
+          allOps.push(op);
+          afterRevision = seq;
+        }
+      });
+      if (ops.length < batchSize) {
+        break;
+      }
+    }
+    return allOps;
+  }
+
+  function resolveSharedTimelapsePatchTarget(snapshot = null, payload = null, fallbackCanvasId = '') {
+    const canvasId = typeof payload?.canvasId === 'string' && payload.canvasId.trim()
+      ? payload.canvasId.trim()
+      : fallbackCanvasId;
+    const canvas = getSnapshotCanvasForTimelapse(snapshot, canvasId);
+    if (!canvas || !Array.isArray(canvas.frames) || !canvas.frames.length) {
+      return null;
+    }
+    const frameIndex = clamp(
+      Math.round(Number(payload?.frameIndex ?? canvas.activeFrame) || 0),
+      0,
+      canvas.frames.length - 1
+    );
+    const frame = canvas.frames[frameIndex] || canvas.frames[0];
+    const layerId = typeof payload?.layerId === 'string' ? payload.layerId.trim() : '';
+    const layer = Array.isArray(frame?.layers)
+      ? frame.layers.find(item => item?.id === layerId) || null
+      : null;
+    if (!layer) {
+      return null;
+    }
+    canvas.activeFrame = frameIndex;
+    const width = Math.max(1, Math.round(Number(canvas.width) || Number(snapshot?.width) || 1));
+    const height = Math.max(1, Math.round(Number(canvas.height) || Number(snapshot?.height) || 1));
+    return { canvas, frame, layer, width, height };
+  }
+
+  function applySharedTimelapseOpToSnapshot(snapshot = null, opRecord = null, fallbackCanvasId = '') {
+    const payload = extractSharedProjectOpPayload(opRecord);
+    if (!snapshot || !payload || typeof payload !== 'object') {
+      return false;
+    }
+    if (Array.isArray(payload.palette) && payload.palette.length) {
+      snapshot.palette = payload.palette
+        .slice(0, MAX_IMPORTED_PALETTE_COLORS)
+        .map(color => normalizeColorValue(color));
+    }
+    if (!payload.patch || typeof payload.patch !== 'object') {
+      return false;
+    }
+    const target = resolveSharedTimelapsePatchTarget(snapshot, payload, fallbackCanvasId);
+    const pixelCount = Math.max(0, Math.round(Number(payload.pixelCount) || 0));
+    if (!target || !pixelCount) {
+      return false;
+    }
+    return Boolean(applyLayerPatchPayloadToLayer(target.layer, payload.patch, pixelCount, {
+      width: target.width,
+      height: target.height,
+    }));
+  }
+
+  async function buildSharedProjectTimelapseExportEntries(canvasId = getActiveProjectCanvasDocument()?.id || '') {
+    const projectKey = normalizeMultiProjectKey(activeSharedProjectKey || '');
+    if (!projectKey) {
+      return [];
+    }
+    const ops = await fetchSharedProjectOpsForTimelapse(projectKey);
+    if (!ops.length) {
+      return [];
+    }
+    let basePayload = null;
+    for (let index = 0; index < ops.length; index += 1) {
+      const payload = extractSharedProjectOpPayload(ops[index]);
+      if (payload?.timelapseBaseSnapshot && typeof payload.timelapseBaseSnapshot === 'object') {
+        basePayload = payload.timelapseBaseSnapshot;
+        break;
+      }
+    }
+    if (!basePayload) {
+      return [];
+    }
+    let workingSnapshot = deserializeSharedTimelapseBaseSnapshotPayload(basePayload);
+    if (!workingSnapshot) {
+      return [];
+    }
+    const snapshots = [];
+    const pushCurrent = () => {
+      const entry = createTimelapseFrameEntryFromSnapshotCanvas(workingSnapshot, canvasId);
+      const last = snapshots[snapshots.length - 1] || null;
+      if (entry && (!last || !areTimelapseFrameEntriesEqual(last, entry))) {
+        snapshots.push(entry);
+      }
+    };
+    pushCurrent();
+    ops.forEach(op => {
+      const payload = extractSharedProjectOpPayload(op);
+      if (payload?.timelapseBaseSnapshot) {
+        return;
+      }
+      if (applySharedTimelapseOpToSnapshot(workingSnapshot, op, canvasId)) {
+        pushCurrent();
+      }
+    });
+    return snapshots;
+  }
+
+  async function buildTimelapseExportEntries() {
+    if (activeSharedProjectKey) {
+      const sharedSnapshots = await buildSharedProjectTimelapseExportEntries(
+        getActiveProjectCanvasDocument()?.id || ''
+      );
+      if (sharedSnapshots.length) {
+        return sharedSnapshots;
+      }
+    }
     flushPendingTimelapseCapture();
     const activeCanvasId = normalizeTimelapseCanvasId(getActiveProjectCanvasDocument()?.id || '');
+    const operationLogSnapshots = buildTimelapseExportEntriesFromOperationLog(activeCanvasId);
+    if (operationLogSnapshots.length) {
+      return operationLogSnapshots;
+    }
     const track = getTimelapseTrack(activeCanvasId);
     const snapshots = Array.isArray(track?.snapshots) ? track.snapshots.slice() : [];
     if (timelapseState.enabled) {
@@ -24040,13 +25241,9 @@
     if (!ensureCurrentClientCanExportProject({ announce: true, format: 'timelapse' })) {
       return;
     }
-    if (getActiveTimelapseStepCount() <= 0) {
-      updateAutosaveStatus('タイムラプス記録がありません。設定でONにして描画してください。', 'warn');
-      return;
-    }
-    const snapshots = buildTimelapseExportEntries();
+    const snapshots = await buildTimelapseExportEntries();
     if (!snapshots.length) {
-      updateAutosaveStatus('タイムラプス記録がありません', 'warn');
+      updateAutosaveStatus('タイムラプス記録がありません。設定でONにして描画してください。', 'warn');
       return;
     }
 
@@ -26006,7 +27203,7 @@
       openNewProjectDialog({ dismissStartup: false, appendAsTab: false });
     });
     dom.projectHomeOpen?.addEventListener('click', async () => {
-      const opened = await openDocumentDialog();
+      const opened = await openDocumentDialog({ mode: EXTERNAL_IMPORT_MODE_NEW_PROJECT });
       if (opened) {
         hideProjectHomeScreen();
       }
@@ -26815,11 +28012,23 @@
         history.limit = projectSession.historyLimit;
         history.past = projectSession.historyPast;
         history.future = projectSession.historyFuture;
+        trimHistoryStacksToLimit();
 
         timelapseState.tracksByCanvasId = Object.create(null);
         Object.entries(projectSession.timelapse.tracksByCanvasId || {}).forEach(([canvasId, track]) => {
           timelapseState.tracksByCanvasId[canvasId] = {
             snapshots: Array.isArray(track?.snapshots) ? track.snapshots.slice() : [],
+            operationLog: track?.operationLog && typeof track.operationLog === 'object'
+              ? {
+                  version: 1,
+                  baseSnapshot: track.operationLog.baseSnapshot || null,
+                  entries: Array.isArray(track.operationLog.entries)
+                    ? track.operationLog.entries
+                      .map(entry => normalizeSerializedTimelapseOperationEntry(entry))
+                      .filter(Boolean)
+                    : [],
+                }
+              : null,
             warningShown: Boolean(track?.warningShown),
             sampleStep: Math.max(1, Math.round(Number(track?.sampleStep) || 1)),
             lastCaptureToken: Number.isFinite(Number(track?.lastCaptureToken))
@@ -26915,15 +28124,17 @@
   }
 
   function normalizeProjectHistoryLimit(value, fallback = history.limit) {
-    const fallbackLimit = Math.max(
+    const maxLimit = Math.max(MIN_HISTORY_LIMIT, DEFAULT_HISTORY_LIMIT);
+    const fallbackLimit = clamp(
+      Math.round(Number(fallback) || DEFAULT_HISTORY_LIMIT),
       MIN_HISTORY_LIMIT,
-      Math.round(Number(fallback) || DEFAULT_HISTORY_LIMIT)
+      maxLimit
     );
     const parsed = Math.round(Number(value));
     if (!Number.isFinite(parsed)) {
       return fallbackLimit;
     }
-    return Math.max(MIN_HISTORY_LIMIT, parsed);
+    return clamp(parsed, MIN_HISTORY_LIMIT, maxLimit);
   }
 
   function serializeProjectHistorySnapshot(entry) {
@@ -26980,10 +28191,15 @@
     return snapshots;
   }
 
-  function serializeProjectTimelapseTracks() {
-    flushPendingTimelapseCapture({ force: true });
+  function serializeProjectTimelapseTracks({ flushPending = true } = {}) {
+    if (flushPending) {
+      flushPendingTimelapseCapture({ force: true });
+    }
     const payload = {};
     Object.entries(getAllTimelapseTracks()).forEach(([canvasId, track]) => {
+      if (track?.operationLog?.baseSnapshot) {
+        return;
+      }
       const snapshots = serializeProjectTimelapseSnapshotList(track?.snapshots || []);
       if (!snapshots.length) {
         return;
@@ -27000,6 +28216,67 @@
     return payload;
   }
 
+  function normalizeSerializedTimelapseOperationEntry(entry = null) {
+    if (!entry || typeof entry !== 'object') {
+      return null;
+    }
+    if (entry.type === 'keyframe') {
+      return entry.snapshot && typeof entry.snapshot === 'object'
+        ? {
+            type: 'keyframe',
+            at: Math.max(0, Math.round(Number(entry.at) || 0)),
+            historyLabel: String(entry.historyLabel || ''),
+            snapshot: entry.snapshot,
+          }
+        : null;
+    }
+    if (entry.type !== 'pixelPatch' || !Array.isArray(entry.changes) || !entry.changes.length) {
+      return null;
+    }
+    const changes = entry.changes
+      .map(change => ({
+        index: Math.max(0, Math.round(Number(change?.index) || 0)),
+        after: cloneTimelapsePixelPatchValue(change?.after),
+      }))
+      .filter(change => change.after);
+    if (!changes.length) {
+      return null;
+    }
+    return {
+      type: 'pixelPatch',
+      at: Math.max(0, Math.round(Number(entry.at) || 0)),
+      historyLabel: String(entry.historyLabel || ''),
+      canvasId: typeof entry.canvasId === 'string' ? entry.canvasId : '',
+      frameId: typeof entry.frameId === 'string' ? entry.frameId : '',
+      layerId: typeof entry.layerId === 'string' ? entry.layerId : '',
+      width: Math.max(1, Math.round(Number(entry.width) || 1)),
+      height: Math.max(1, Math.round(Number(entry.height) || 1)),
+      changes,
+    };
+  }
+
+  function serializeProjectTimelapseOperationLogs({ flushPending = true } = {}) {
+    if (flushPending) {
+      flushPendingTimelapseCapture({ force: true });
+    }
+    const payload = {};
+    Object.entries(getAllTimelapseTracks()).forEach(([canvasId, track]) => {
+      const log = track?.operationLog && typeof track.operationLog === 'object' ? track.operationLog : null;
+      if (!log?.baseSnapshot || !Array.isArray(log.entries)) {
+        return;
+      }
+      const entries = log.entries
+        .map(entry => normalizeSerializedTimelapseOperationEntry(entry))
+        .filter(Boolean);
+      payload[canvasId] = {
+        version: 1,
+        baseSnapshot: log.baseSnapshot,
+        entries,
+      };
+    });
+    return payload;
+  }
+
   function buildProjectSessionPayload() {
     const historyLimit = normalizeProjectHistoryLimit(history.limit, DEFAULT_HISTORY_LIMIT);
     return {
@@ -27010,11 +28287,13 @@
         enabled: Boolean(timelapseState.enabled),
         fps: normalizeTimelapseFps(timelapseState.fps),
         byCanvas: serializeProjectTimelapseTracks(),
+        operationLogsByCanvas: serializeProjectTimelapseOperationLogs({ flushPending: false }),
       },
     };
   }
 
-  function buildAutosaveSessionPayload() {
+  function buildAutosaveSessionPayload({ includeTimelapse = !isLightweightPersistenceMode() } = {}) {
+    const shouldIncludeTimelapse = Boolean(includeTimelapse);
     return {
       historyLimit: normalizeProjectHistoryLimit(history.limit, DEFAULT_HISTORY_LIMIT),
       historyPast: [],
@@ -27022,9 +28301,13 @@
       timelapse: {
         enabled: Boolean(timelapseState.enabled),
         fps: normalizeTimelapseFps(timelapseState.fps),
-        byCanvas: serializeProjectTimelapseTracks(),
-        // Persist timelapse frames in autosave as well so reopening can export
-        // from the original drawing start, not just after reopening.
+        byCanvas: shouldIncludeTimelapse
+          ? serializeProjectTimelapseTracks()
+          : {},
+        operationLogsByCanvas: serializeProjectTimelapseOperationLogs({ flushPending: false }),
+        deferredInAutosave: !shouldIncludeTimelapse,
+        // Lightweight devices keep autosave focused on the recoverable project
+        // state; full timelapse persistence remains part of explicit project saves.
       },
     };
   }
@@ -27114,6 +28397,30 @@
     return restored;
   }
 
+  function deserializeProjectTimelapseOperationLogs(byCanvas, fallbackCanvasId = '') {
+    const restored = Object.create(null);
+    if (!byCanvas || typeof byCanvas !== 'object' || Array.isArray(byCanvas)) {
+      return restored;
+    }
+    Object.entries(byCanvas).forEach(([canvasId, logPayload]) => {
+      const resolvedCanvasId = normalizeTimelapseCanvasId(canvasId, fallbackCanvasId);
+      if (!resolvedCanvasId || !logPayload || typeof logPayload !== 'object' || !logPayload.baseSnapshot) {
+        return;
+      }
+      const entries = Array.isArray(logPayload.entries)
+        ? logPayload.entries
+          .map(entry => normalizeSerializedTimelapseOperationEntry(entry))
+          .filter(Boolean)
+        : [];
+      restored[resolvedCanvasId] = {
+        version: 1,
+        baseSnapshot: logPayload.baseSnapshot,
+        entries,
+      };
+    });
+    return restored;
+  }
+
   function parseProjectSessionPayload(payload, fallbackCanvasId = '') {
     if (!payload || typeof payload !== 'object') {
       return null;
@@ -27125,6 +28432,16 @@
       ? payload.timelapse
       : {};
     const timelapseTracksByCanvasId = deserializeProjectTimelapseTracks(timelapsePayload.byCanvas, fallbackCanvasId);
+    const timelapseOperationLogsByCanvasId = deserializeProjectTimelapseOperationLogs(
+      timelapsePayload.operationLogsByCanvas,
+      fallbackCanvasId
+    );
+    Object.entries(timelapseOperationLogsByCanvasId).forEach(([canvasId, operationLog]) => {
+      if (!timelapseTracksByCanvasId[canvasId]) {
+        timelapseTracksByCanvasId[canvasId] = createEmptyTimelapseTrack();
+      }
+      timelapseTracksByCanvasId[canvasId].operationLog = operationLog;
+    });
     if (!Object.keys(timelapseTracksByCanvasId).length) {
       const legacySnapshots = deserializeProjectTimelapseSnapshots(timelapsePayload.snapshots);
       const resolvedCanvasId = normalizeTimelapseCanvasId(fallbackCanvasId);
@@ -27392,9 +28709,7 @@
       autoJoin: entry.sharedAutoJoin !== false,
       revision: Math.max(0, Math.round(Number(project.latest_revision) || 0)),
       structureRevision: Math.max(0, Math.round(Number(project.latest_structure_revision) || 0)),
-      project: project.latest_snapshot && typeof project.latest_snapshot === 'object'
-        ? project.latest_snapshot
-        : entry.project,
+      project: null,
     });
     return project.owner_user_id === currentUserId;
   }
@@ -27851,6 +29166,97 @@
     return isSharedRecentProjectEntry(entry) ? normalizeSharedRecentProjectEntry(entry) : null;
   }
 
+  function resolveSharedProjectKeyForLightweightLocalSave(projectId = '') {
+    const normalizedProjectId = normalizeAutosaveProjectId(projectId || autosaveProjectId || '');
+    const directEntry = normalizedProjectId ? recentProjectsCache.get(normalizedProjectId) : null;
+    if (isSharedRecentProjectEntry(directEntry)) {
+      return normalizeMultiProjectKey(directEntry.sharedProjectKey || '');
+    }
+    const projectKeyFromId = getSharedProjectKeyFromProjectId(normalizedProjectId);
+    if (projectKeyFromId) {
+      return projectKeyFromId;
+    }
+    const currentSharedProjectKey = normalizeMultiProjectKey(activeSharedProjectKey || '');
+    if (
+      currentSharedProjectKey
+      && (
+        !normalizedProjectId
+        || normalizedProjectId === buildSharedRecentProjectId(currentSharedProjectKey)
+        || isCurrentProjectSharedEntry()
+      )
+    ) {
+      return currentSharedProjectKey;
+    }
+    return '';
+  }
+
+  function shouldUseLightweightSharedProjectLocalSave(projectId = '') {
+    return Boolean(resolveSharedProjectKeyForLightweightLocalSave(projectId));
+  }
+
+  async function recordSharedProjectLightweightLocalSave({
+    projectId = '',
+    projectKey = '',
+    name = '',
+    fileName = '',
+    thumbnail = null,
+  } = {}) {
+    if (!AUTOSAVE_SUPPORTED) {
+      return null;
+    }
+    const resolvedProjectKey = normalizeMultiProjectKey(
+      projectKey || resolveSharedProjectKeyForLightweightLocalSave(projectId)
+    );
+    if (!resolvedProjectKey) {
+      return null;
+    }
+    const existingEntry =
+      getTrackedSharedRecentProjectEntry(resolvedProjectKey)
+      || getCurrentSharedRecentProjectEntry(resolvedProjectKey)
+      || null;
+    const resolvedName = extractDocumentBaseName(
+      name
+      || existingEntry?.name
+      || state.documentName
+      || DEFAULT_DOCUMENT_NAME
+    );
+    const resolvedFileName = normalizeDocumentName(
+      fileName
+      || existingEntry?.fileName
+      || `${resolvedName || DEFAULT_DOCUMENT_BASENAME}${PROJECT_FILE_EXTENSION}`
+    );
+    const isActiveSharedProject = normalizeMultiProjectKey(activeSharedProjectKey || '') === resolvedProjectKey;
+    const backendProjectId = isActiveSharedProject && activeSharedProjectId
+      ? activeSharedProjectId
+      : (existingEntry?.sharedProjectBackendId || '');
+    const revision = isActiveSharedProject
+      ? activeSharedProjectRevision
+      : existingEntry?.sharedProjectRevision;
+    const structureRevision = isActiveSharedProject
+      ? activeSharedProjectStructureRevision
+      : existingEntry?.sharedProjectStructureRevision;
+    return await upsertSharedRecentProjectEntry({
+      projectKey: resolvedProjectKey,
+      projectId: backendProjectId,
+      inviteToken: existingEntry?.sharedProjectInviteToken || '',
+      visibility: existingEntry?.sharedProjectVisibility || 'shared',
+      name: resolvedName,
+      fileName: resolvedFileName,
+      thumbnail: typeof thumbnail === 'string' && thumbnail.length > 0
+        ? thumbnail
+        : existingEntry?.thumbnail || null,
+      roleHint: existingEntry?.sharedRoleHint || getCurrentSharedProjectUiRole(resolvedProjectKey) || 'guest',
+      membershipRole: isActiveSharedProject
+        ? (activeSharedProjectMembershipRole || existingEntry?.sharedProjectMembershipRole || '')
+        : (existingEntry?.sharedProjectMembershipRole || ''),
+      ownerUserId: existingEntry?.sharedProjectOwnerUserId || '',
+      autoJoin: existingEntry?.sharedAutoJoin !== false,
+      revision: Math.max(0, Math.round(Number(revision) || 0)),
+      structureRevision: Math.max(0, Math.round(Number(structureRevision) || 0)),
+      project: null,
+    });
+  }
+
   function getCurrentSharedProjectMembershipRole(projectKey = activeSharedProjectKey) {
     const resolvedProjectKey = resolveSharedProjectKeyForCurrentState(projectKey);
     const currentUserId = typeof accountState.userId === 'string' ? accountState.userId.trim() : '';
@@ -28031,6 +29437,29 @@
     if (!AUTOSAVE_SUPPORTED) return;
     const storageKey = createFloatingPreviewReferenceMediaStorageKey(projectId);
     if (!storageKey) return;
+    if (shouldUseLightweightSharedProjectLocalSave(projectId)) {
+      try {
+        const db = await openAutosaveDatabase();
+        await new Promise((resolve, reject) => {
+          const tx = db.transaction([AUTOSAVE_STORE_NAME], 'readwrite');
+          const store = tx.objectStore(AUTOSAVE_STORE_NAME);
+          const request = store.delete(storageKey);
+          request.onerror = () => reject(request.error);
+          tx.oncomplete = () => {
+            db.close();
+            resolve();
+          };
+          tx.onerror = () => {
+            const error = tx.error;
+            db.close();
+            reject(error);
+          };
+        });
+      } catch (error) {
+        console.warn('Failed to clear shared project reference media', error);
+      }
+      return;
+    }
     const entries = [];
     for (let index = 0; index < 5; index += 1) {
       const item = floatingPreviewReferenceState.items[index] || null;
@@ -28078,6 +29507,9 @@
     if (!AUTOSAVE_SUPPORTED) return null;
     const storageKey = createFloatingPreviewReferenceMediaStorageKey(projectId);
     if (!storageKey) return null;
+    if (shouldUseLightweightSharedProjectLocalSave(projectId)) {
+      return null;
+    }
     try {
       const db = await openAutosaveDatabase();
       return await new Promise((resolve, reject) => {
@@ -29087,7 +30519,7 @@
       }
 
       if (isSharedRecentProjectEntry(original)) {
-        const normalizedShared = normalizeSharedRecentProjectEntry({ ...original, id: normalizedId });
+        const normalizedShared = normalizeSharedRecentProjectEntry({ ...original, id: normalizedId, project: null });
         if (!normalizedShared) {
           changed = true;
           removedCount += 1;
@@ -29372,14 +30804,7 @@
     if (!project?.project_key) {
       return normalizedEntry;
     }
-    let thumbnail = normalizedEntry.thumbnail || null;
-    if ((!thumbnail || typeof thumbnail !== 'string') && project.latest_snapshot && typeof project.latest_snapshot === 'object') {
-      try {
-        thumbnail = await generateSnapshotThumbnail(project.latest_snapshot);
-      } catch (error) {
-        thumbnail = normalizedEntry.thumbnail || null;
-      }
-    }
+    const thumbnail = normalizedEntry.thumbnail || null;
     return await upsertSharedRecentProjectEntry({
       projectKey: normalizeMultiProjectKey(project.project_key),
       projectId: project.id || '',
@@ -29394,9 +30819,7 @@
       autoJoin: normalizedEntry.sharedAutoJoin !== false,
       revision: Math.max(0, Math.round(Number(project.latest_revision) || 0)),
       structureRevision: Math.max(0, Math.round(Number(project.latest_structure_revision) || 0)),
-      project: project.latest_snapshot && typeof project.latest_snapshot === 'object'
-        ? project.latest_snapshot
-        : normalizedEntry.project,
+      project: null,
     }) || normalizedEntry;
   }
 
@@ -29424,6 +30847,7 @@
       signature.sharedProjectStructureRevision = Math.max(0, Math.round(Number(entry.sharedProjectStructureRevision) || 0));
       signature.sharedProjectMembershipRole = String(entry.sharedProjectMembershipRole || '');
       signature.sharedProjectOwnerUserId = String(entry.sharedProjectOwnerUserId || '');
+      signature.hasProject = Boolean(entry.project && typeof entry.project === 'object');
     } else {
       signature.updatedAt = String(entry.updatedAt || '');
       signature.projectId = normalizeAutosaveProjectId(entry.projectId || entry.id || '');
@@ -30379,11 +31803,27 @@
       const resolvedProjectId = activateProject
         ? setActiveAutosaveProjectId(projectId || autosaveProjectId || createAutosaveProjectId())
         : (normalizeAutosaveProjectId(projectId || autosaveProjectId || '') || createAutosaveProjectId());
+      const initialEntries = await loadRecentProjectsMetadata();
+      const previousEntry = initialEntries.find(entry => entry?.id === resolvedProjectId) || null;
+      const sharedProjectKey = isSharedRecentProjectEntry(previousEntry)
+        ? normalizeMultiProjectKey(previousEntry.sharedProjectKey || '')
+        : getSharedProjectKeyFromProjectId(resolvedProjectId);
+      if (sharedProjectKey) {
+        const fileName = getRecentProjectEntryFileName(previousEntry, packagedPayload, snapshot);
+        const displayName = previousEntry?.name
+          ? extractDocumentBaseName(previousEntry.name)
+          : extractDocumentBaseName(fileName);
+        return await recordSharedProjectLightweightLocalSave({
+          projectId: resolvedProjectId,
+          projectKey: sharedProjectKey,
+          name: displayName,
+          fileName,
+          thumbnail: previousEntry?.thumbnail || null,
+        });
+      }
       const packaged = packagedPayload && typeof packagedPayload === 'object'
         ? packagedPayload
         : buildPackagedProjectPayload(snapshot);
-      const initialEntries = await loadRecentProjectsMetadata();
-      const previousEntry = initialEntries.find(entry => entry?.id === resolvedProjectId) || null;
       ensurePackagedProjectSheetsForSave(packaged, snapshot);
       preserveExistingProjectSheetsForSave(packaged, previousEntry?.project || null);
       if (!validatePackagedProjectSheetCountForSave(packaged)) {
@@ -30414,33 +31854,16 @@
         ? (await generateSnapshotThumbnail(listSnapshot || snapshot))
         : previousEntry.thumbnail;
       const dotStats = resolvePackagedProjectDotStats(packaged, snapshot);
-      const sharedEntrySeed = isSharedRecentProjectEntry(previousEntry)
-        ? previousEntry
-        : (resolvedProjectId.startsWith(SHARED_PROJECT_ID_PREFIX) ? getCurrentSharedRecentProjectEntry() : null);
-      const updatedEntry = sharedEntrySeed
-        ? {
-            ...normalizeSharedRecentProjectEntry({
-              ...sharedEntrySeed,
-              accountUserId: getCurrentRecentProjectAccountUserId(),
-              id: resolvedProjectId,
-              name: displayName,
-              fileName,
-              updatedAt: packaged.updatedAt || new Date().toISOString(),
-              thumbnail: thumbnail || null,
-              thumbnailSheetId: listThumbnailSheetId || '',
-              project: packaged,
-            }),
-          }
-        : {
-            id: resolvedProjectId,
-            accountUserId: getCurrentRecentProjectAccountUserId(),
-            name: displayName,
-            fileName,
-            updatedAt: packaged.updatedAt || new Date().toISOString(),
-            thumbnail: thumbnail || null,
-            thumbnailSheetId: listThumbnailSheetId || '',
-            project: packaged,
-          };
+      const updatedEntry = {
+        id: resolvedProjectId,
+        accountUserId: getCurrentRecentProjectAccountUserId(),
+        name: displayName,
+        fileName,
+        updatedAt: packaged.updatedAt || new Date().toISOString(),
+        thumbnail: thumbnail || null,
+        thumbnailSheetId: listThumbnailSheetId || '',
+        project: packaged,
+      };
       if (dotStats) {
         updatedEntry.dotStats = dotStats;
       }
@@ -30462,17 +31885,6 @@
         throw new Error(`Recent project sheet save verification failed (${expectedSavedSheetCount})`);
       }
       setRecentProjectsCache(workingEntries);
-      if (
-        sharedEntrySeed
-        && hasDocumentUnsavedChanges()
-        && canPersistActiveSharedProjectDocument(sharedEntrySeed.sharedProjectKey)
-        && !isSharedProjectRealtimePrimaryActive(sharedEntrySeed.sharedProjectKey)
-      ) {
-        queueSharedProjectSnapshotPersist(packaged, {
-          projectKey: sharedEntrySeed.sharedProjectKey,
-          title: displayName,
-        });
-      }
       if (dotStats) {
         setTrackedProjectDotBaseline(snapshot, dotStats);
         schedulePackagedProjectDotSync(resolvedProjectId, dotStats);
@@ -35095,6 +36507,10 @@
     return typeof navigator !== 'undefined' && navigator.standalone === true;
   }
 
+  function isLightweightPersistenceMode() {
+    return Boolean(IS_IOS_DEVICE || IS_ANDROID_DEVICE || isStandaloneAppDisplayMode());
+  }
+
   let nativeFilesystemPlugin = undefined;
   let nativeMediaPlugin = undefined;
 
@@ -38465,6 +39881,9 @@
     if (side !== 'left' && side !== 'right') {
       return RAIL_CLICK_OPEN_WIDTH.left;
     }
+    if (side === 'left') {
+      return normalizeRailWidth('left', LEFT_RAIL_MAX_WIDTH);
+    }
     const remembered = Math.round(Number(railSizing.expandedWidth?.[side]) || 0);
     const minimum = side === 'left' && isDualLeftRailEnabled()
       ? getLeftDualMinTotalWidth()
@@ -38700,9 +40119,10 @@
     endBottomTimelineResize({ persist: moved });
     if (!moved && isBottomTimelineDockEnabled()) {
       const currentHeight = normalizeBottomTimelineHeight(bottomTimelineSizing.height);
-      const targetHeight = currentHeight <= BOTTOM_TIMELINE_COMPACT_HEIGHT
-        ? BOTTOM_TIMELINE_DEFAULT_HEIGHT
-        : BOTTOM_TIMELINE_MIN_HEIGHT;
+      const fullHeight = normalizeBottomTimelineHeight(BOTTOM_TIMELINE_MAX_HEIGHT);
+      const targetHeight = currentHeight >= fullHeight - 1
+        ? BOTTOM_TIMELINE_MIN_HEIGHT
+        : fullHeight;
       setBottomTimelineHeight(targetHeight, { persist: true });
     }
   }
@@ -38715,34 +40135,34 @@
       return;
     }
     const compactMode = isRailCompactMode(side);
-    if (!compactMode) {
-      if (side === 'left') {
+    if (side === 'left') {
+      const currentWidth = normalizeRailWidth('left', railSizing.left);
+      const fullWidth = normalizeRailWidth('left', LEFT_RAIL_MAX_WIDTH);
+      if (!compactMode && currentWidth >= fullWidth - 1) {
         setCompactToolFlyoutOpen(false);
         updateToolVisibility();
-      } else {
-        setCompactRightFlyoutOpen(false);
-        updateRightTabVisibility();
+        const compactTargetWidth = isDesktopRightToolRailMode()
+          ? LEFT_PALETTE_COMPACT_WIDTH
+          : RAIL_MIN_WIDTH;
+        setRailWidth('left', compactTargetWidth, { persist: true });
+        return;
       }
-      const compactTargetWidth = side === 'left' && isDesktopRightToolRailMode()
-        ? LEFT_PALETTE_COMPACT_WIDTH
-        : RAIL_MIN_WIDTH;
+      setCompactToolFlyoutOpen(false);
+      updateToolVisibility();
+      setRailWidth('left', fullWidth, { persist: true });
+      return;
+    }
+    if (!compactMode) {
+      setCompactRightFlyoutOpen(false);
+      updateRightTabVisibility();
+      const compactTargetWidth = RAIL_MIN_WIDTH;
       setRailWidth(side, compactTargetWidth, { persist: true });
       return;
     }
-    setRailWidth(side, side === 'right' ? getRightTransientPanelOpenWidth() : getRailExpandedToggleWidth(side), { persist: true });
+    setRailWidth(side, getRightTransientPanelOpenWidth(), { persist: true });
     if (!isRailCompactMode(side)) {
-      if (side === 'left') {
-        setCompactToolFlyoutOpen(false);
-        updateToolVisibility();
-      } else {
-        setCompactRightFlyoutOpen(false);
-        updateRightTabVisibility();
-      }
-      return;
-    }
-    if (side === 'left') {
-      setCompactToolFlyoutOpen(false);
-      updateToolVisibility();
+      setCompactRightFlyoutOpen(false);
+      updateRightTabVisibility();
       return;
     }
     setCompactRightFlyoutOpen(false);
@@ -51230,8 +52650,8 @@
     const previousTrack = timelapseState.tracksByCanvasId?.[previousId] || null;
     if (previousTrack) {
       const nextTrack = timelapseState.tracksByCanvasId?.[nextId] || null;
-      const previousCount = Array.isArray(previousTrack.snapshots) ? previousTrack.snapshots.length : 0;
-      const nextCount = Array.isArray(nextTrack?.snapshots) ? nextTrack.snapshots.length : 0;
+      const previousCount = getTimelapseTrackStepCount(previousTrack);
+      const nextCount = getTimelapseTrackStepCount(nextTrack);
       if (!nextTrack || previousCount > nextCount) {
         timelapseState.tracksByCanvasId[nextId] = previousTrack;
       }
@@ -63047,6 +64467,7 @@
     const base = index * 4;
     let direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
     const transparentStorageIndex = resolveTransparentStoragePaletteIndex();
+    recordPendingPixelPatchBefore(layer, index);
 
     if (pointerState.tool === 'eraser') {
       if (layer.indices[index] === transparentStorageIndex && (!direct || direct[base + 3] === 0)) {
@@ -63065,6 +64486,7 @@
         layer.importSourceDirect[base + 2] = 0;
         layer.importSourceDirect[base + 3] = 0;
       }
+      recordPendingPixelPatchAfter(layer, index);
       markHistoryDirty();
       markDirtyPixel(x, y);
       return;
@@ -63089,6 +64511,7 @@
           layer.importSourceDirect[base + 2] = 0;
           layer.importSourceDirect[base + 3] = 0;
         }
+        recordPendingPixelPatchAfter(layer, index);
         markHistoryDirty();
         markDirtyPixel(x, y);
         return;
@@ -63119,6 +64542,7 @@
         layer.importSourceDirect[base + 2] = rgbColor.b;
         layer.importSourceDirect[base + 3] = rgbColor.a;
       }
+      recordPendingPixelPatchAfter(layer, index);
       markHistoryDirty();
       markDirtyPixel(x, y);
       return;
@@ -63138,6 +64562,7 @@
           direct[base + 2] = 0;
           direct[base + 3] = 0;
         }
+        recordPendingPixelPatchAfter(layer, index);
         markHistoryDirty();
         markDirtyPixel(x, y);
         return;
@@ -63158,6 +64583,7 @@
       direct[base + 1] = drawColor.g;
       direct[base + 2] = drawColor.b;
       direct[base + 3] = drawColor.a;
+      recordPendingPixelPatchAfter(layer, index);
       markHistoryDirty();
       markDirtyPixel(x, y);
       return;
@@ -63173,6 +64599,7 @@
       direct[base + 2] = 0;
       direct[base + 3] = 0;
     }
+    recordPendingPixelPatchAfter(layer, index);
     markHistoryDirty();
     markDirtyPixel(x, y);
   }
@@ -63205,6 +64632,7 @@
     const base = index * 4;
     let direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
     const transparentStorageIndex = resolveTransparentStoragePaletteIndex();
+    recordPendingPixelPatchBefore(layer, index);
     if (rgba.a <= 0 && transparentStorageIndex >= 0) {
       const alreadyTransparent = layer.indices[index] === transparentStorageIndex && (!direct || direct[base + 3] === 0);
       if (alreadyTransparent) {
@@ -63224,6 +64652,7 @@
         layer.importSourceDirect[base + 3] = 0;
       }
       if (markDirty) {
+        recordPendingPixelPatchAfter(layer, index);
         markHistoryDirty();
         markDirtyPixel(x, y);
       }
@@ -63254,6 +64683,7 @@
       layer.importSourceDirect[base + 3] = rgba.a;
     }
     if (markDirty) {
+      recordPendingPixelPatchAfter(layer, index);
       markHistoryDirty();
       markDirtyPixel(x, y);
     }
@@ -66535,7 +67965,7 @@
     const activeSharedEntry = isCurrentProjectSharedEntry()
       ? getCurrentSharedRecentProjectEntry()
       : null;
-    const normalizedHistoryLimit = Math.max(MIN_HISTORY_LIMIT, Math.round(Number(history.limit) || DEFAULT_HISTORY_LIMIT));
+    const normalizedHistoryLimit = normalizeProjectHistoryLimit(history.limit, DEFAULT_HISTORY_LIMIT);
     const maxAvailable = Math.max(
       Array.isArray(history.past) ? history.past.length : 0,
       Array.isArray(history.future) ? history.future.length : 0
@@ -66722,7 +68152,7 @@
       }
       normalized.push(item);
     }
-    const safeLimit = Math.max(MIN_HISTORY_LIMIT, Math.round(Number(historyLimit) || DEFAULT_HISTORY_LIMIT));
+    const safeLimit = normalizeProjectHistoryLimit(historyLimit, DEFAULT_HISTORY_LIMIT);
     if (normalized.length <= safeLimit) {
       return normalized;
     }
@@ -66742,6 +68172,12 @@
     if (!Array.isArray(state.frames) || !state.frames.length) {
       return;
     }
+    if (isCurrentProjectSharedEntry()) {
+      persistReloadTargetProjectId();
+      clearLocalRestoreStorage(RELOAD_SNAPSHOT_STORAGE_KEY);
+      clearLocalRestoreStorage(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY);
+      return;
+    }
     if (isLargeDocumentPerformanceMode()) {
       persistReloadTargetProjectId();
       clearLocalRestoreStorage(RELOAD_SNAPSHOT_STORAGE_KEY);
@@ -66754,7 +68190,7 @@
     );
     let maxItems = Math.min(
       RELOAD_SNAPSHOT_MAX_HISTORY_ITEMS,
-      Math.max(0, Math.round(Number(history.limit) || DEFAULT_HISTORY_LIMIT)),
+      normalizeProjectHistoryLimit(history.limit, DEFAULT_HISTORY_LIMIT),
       maxAvailable
     );
     let attempt = 0;
@@ -66788,6 +68224,11 @@
 
   function persistReloadProjectFallback() {
     if (!canUseSessionStorage) {
+      return;
+    }
+    if (isCurrentProjectSharedEntry()) {
+      persistReloadTargetProjectId();
+      clearLocalRestoreStorage(RELOAD_PROJECT_FALLBACK_STORAGE_KEY);
       return;
     }
     if (isLargeDocumentPerformanceMode()) {
@@ -67033,10 +68474,7 @@
     if (!currentSnapshot || !Array.isArray(currentSnapshot.frames) || !currentSnapshot.frames.length) {
       return null;
     }
-    const historyLimit = Math.max(
-      MIN_HISTORY_LIMIT,
-      Math.round(Number(parsed.historyLimit) || DEFAULT_HISTORY_LIMIT)
-    );
+    const historyLimit = normalizeProjectHistoryLimit(parsed.historyLimit, DEFAULT_HISTORY_LIMIT);
     const past = normalizeReloadHistoryList(parsed.past, historyLimit);
     const future = normalizeReloadHistoryList(parsed.future, historyLimit);
     return {
@@ -67101,6 +68539,7 @@
     history.past = payload.past;
     history.future = payload.future;
     history.pending = null;
+    trimHistoryStacksToLimit();
     if (payload.unsaved) {
       markDocumentUnsavedChange();
     } else {
@@ -68504,14 +69943,6 @@
           expectedInviteToken: invite.inviteToken,
           expectedProjectKey: normalizedInviteProjectKey,
         })) {
-          let thumbnail = null;
-          if (inviteProject.latest_snapshot && typeof inviteProject.latest_snapshot === 'object') {
-            try {
-              thumbnail = await generateSnapshotThumbnail(inviteProject.latest_snapshot);
-            } catch (_error) {
-              thumbnail = null;
-            }
-          }
           await upsertSharedRecentProjectEntry({
             projectKey: normalizeMultiProjectKey(inviteProject.project_key),
             projectId: inviteProject.id || '',
@@ -68519,7 +69950,7 @@
             visibility: inviteProject.visibility || 'shared',
             name: createSharedProjectSnapshotTitle(inviteProject.title || normalizedInviteProjectKey || DEFAULT_DOCUMENT_NAME),
             fileName: normalizeDocumentName(`${createSharedProjectSnapshotTitle(inviteProject.title || normalizedInviteProjectKey || DEFAULT_DOCUMENT_NAME)}.pixiedraw`),
-            thumbnail,
+            thumbnail: null,
             roleHint: 'guest',
             membershipRole: inviteProject.membership_role || '',
             ownerUserId: inviteProject.owner_user_id || '',
@@ -68778,7 +70209,7 @@
       && currentTrackedSharedEntry
     );
     const originalLocalProjectId = normalizeAutosaveProjectId(autosaveProjectId || '');
-    const shouldConvertLocalProjectToShared = Boolean(
+    const shouldRemoveOriginalLocalProjectAfterShare = Boolean(
       !currentProjectIsShared
       && originalLocalProjectId
       && !originalLocalProjectId.startsWith(SHARED_PROJECT_ID_PREFIX)
@@ -68847,18 +70278,6 @@
       { metrics: uploadMetrics, tone: isLargeSharedProjectPayload ? 'warn' : 'info' }
     );
     await waitForSharedProjectProgressPaint();
-    const localBackupPackaged = buildPackagedProjectPayload(snapshot);
-    if (shouldConvertLocalProjectToShared) {
-      setSharedProjectCreateProgress(
-        localizeText('元のローカルプロジェクトを端末内に退避中…', 'Keeping a local backup...'),
-        { metrics: uploadMetrics }
-      );
-      await waitForSharedProjectProgressPaint();
-      await recordRecentProjectSnapshot(snapshot, localBackupPackaged, {
-        projectId: originalLocalProjectId,
-        activateProject: false,
-      });
-    }
     setSharedProjectCreateProgress(
       localizeText('共有プロジェクトをSupabaseへ保存中…', 'Saving the shared project to Supabase...'),
       { metrics: uploadMetrics, tone: isLargeSharedProjectPayload ? 'warn' : 'info' }
@@ -68914,19 +70333,17 @@
       autoJoin: false,
       revision: Math.max(0, Math.round(Number(project.latest_revision) || 0)),
       structureRevision: Math.max(0, Math.round(Number(project.latest_structure_revision) || 0)),
-      project: packaged,
+      project: null,
     });
     const sharedRecentProjectId = buildSharedRecentProjectId(projectKey);
     setActiveAutosaveProjectId(sharedRecentProjectId);
     retargetAutosaveProjectId(originalLocalProjectId, sharedRecentProjectId);
-    window.setTimeout(() => {
-      recordRecentProjectSnapshot(snapshot, packaged, {
-        projectId: sharedRecentProjectId,
-        activateProject: false,
-      }).catch(error => {
-        console.warn('Failed to cache shared project locally after creation', error);
+    if (shouldRemoveOriginalLocalProjectAfterShare) {
+      await removeRecentProjectEntry(originalLocalProjectId, {
+        announce: false,
+        reason: 'shared-project-converted',
       });
-    }, 0);
+    }
     syncMultiControls();
     setMultiStatus(
       creationVisibility === MULTI_ROOM_VISIBILITY_PUBLIC
@@ -77635,11 +79052,18 @@
       const snapshotReason = String(reason || packagedPayload?.sharedHistoryLabel || '').trim();
       const nextRevision = baseRevision;
       const nextStructureRevision = baseStructureRevision;
-      const opPayload = opType === 'draw'
+      let opPayload = opType === 'draw'
         ? buildSharedProjectDrawOpPayload(packagedPayload?.sharedHistoryLabel || '')
         : (opType === 'structure'
           ? buildSharedProjectStructureOpPayload(packagedPayload?.sharedHistoryLabel || '')
           : null);
+      if (snapshotReason === 'sharedProjectCreate') {
+        opPayload = {
+          timelapseBaseSnapshot: packagedPayload,
+          documentName: state.documentName || DEFAULT_DOCUMENT_NAME,
+          createdAt: new Date().toISOString(),
+        };
+      }
       const snapshotGate = canWriteSharedProjectCanonicalSnapshot({
         reason: snapshotReason,
         snapshotRevision: nextRevision,
@@ -78359,14 +79783,7 @@
         }
         const membership = membershipByProjectKey.get(projectKey) || null;
         const existingSharedEntry = getSharedRecentProjectEntry(projectKey);
-        let thumbnail = existingSharedEntry?.thumbnail || null;
-        if (!thumbnail && project?.latest_snapshot && typeof project.latest_snapshot === 'object') {
-          try {
-            thumbnail = await generateSnapshotThumbnail(project.latest_snapshot);
-          } catch (error) {
-            console.warn('Failed to generate shared recent thumbnail', error);
-          }
-        }
+        const thumbnail = existingSharedEntry?.thumbnail || null;
         const sharedEntry = await upsertSharedRecentProjectEntry({
           projectKey,
           projectId: project?.id || '',
