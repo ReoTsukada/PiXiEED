@@ -123,6 +123,28 @@
       }
     }
 
+    function buildPixieedAccountLoginHref() {
+      if (typeof window === 'undefined') {
+        return 'https://pixieed.jp/account/';
+      }
+      try {
+        const runtimeUrl = new URL(window.location.href);
+        const usingFileRuntime = runtimeUrl.protocol === 'file:';
+        const url = usingFileRuntime
+          ? new URL('https://pixieed.jp/account/')
+          : new URL('../account/index.html', runtimeUrl.href);
+        url.searchParams.set(
+          'returnTo',
+          usingFileRuntime
+            ? 'https://pixieed.jp/pixiedraw/'
+            : runtimeUrl.href
+        );
+        return url.toString();
+      } catch (_error) {
+        return 'https://pixieed.jp/account/?returnTo=https%3A%2F%2Fpixieed.jp%2Fpixiedraw%2F';
+      }
+    }
+
     return Object.freeze({
       getExternalToolDefinition,
       getExternalToolDefinitionByAction,
@@ -132,6 +154,7 @@
       buildLensCameraModeUrl,
       buildLensCameraReturnDrawUrl,
       buildQrEditorModeUrl,
+      buildPixieedAccountLoginHref,
     });
   }
 
