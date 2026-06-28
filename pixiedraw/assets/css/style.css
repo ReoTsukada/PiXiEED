@@ -32,6 +32,9 @@
   --rail-resizer-offset: -11px;
   --rail-resizer-grip-top: 74px;
   --rail-resizer-grip-height: 92px;
+  --rail-resizer-button-size: 40px;
+  --bottom-rail-resizer-button-size: 40px;
+  --mobile-drawer-handle-button-size: 40px;
   --mobile-banner-height: 0px;
   --mobile-drawer-peek-height: 188px;
   --mobile-drawer-half-height: clamp(188px, 36vh, 420px);
@@ -779,6 +782,10 @@ body.is-mobile-layout.is-unified-left-tools-color:not(.is-unified-left-color-foc
   overflow-x: hidden;
 }
 
+.rail--left[data-compact="true"] {
+  overflow: visible;
+}
+
 /* Let bottom ads use full rail width by canceling rail inner side padding. */
 .rail .rail-ad {
   width: 100%;
@@ -1322,7 +1329,7 @@ body:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelTools .tool-
   box-shadow: none;
   backdrop-filter: none;
   transform: none;
-  overflow-x: hidden;
+  overflow: visible;
   overscroll-behavior-x: none;
   --rail-pad-inline: 8px;
   --rail-pad-block: 10px;
@@ -1586,6 +1593,47 @@ body:not(.is-mobile-layout) .rail-resizer.is-active::after {
   background: rgba(var(--ui-rgb-focus), 1);
 }
 
+body:not(.is-mobile-layout) .rail-resizer--left {
+  top: 0;
+  right: calc(var(--rail-resizer-button-size) * -1);
+  bottom: auto;
+  width: var(--rail-resizer-button-size);
+  height: var(--rail-resizer-button-size);
+  border: 1px solid rgba(var(--ui-rgb-focus), 0.5);
+  border-left: 0;
+  border-radius: 0 6px 6px 0;
+  background: rgba(7, 13, 20, 0.96);
+  box-shadow: none;
+}
+
+body:not(.is-mobile-layout) .rail-resizer--left::before {
+  display: none;
+}
+
+body:not(.is-mobile-layout) .rail-resizer--left::after {
+  left: 50%;
+  top: 50%;
+  right: auto;
+  width: 14px;
+  height: 18px;
+  transform: translate(-50%, -50%);
+  border-radius: 0;
+  background:
+    linear-gradient(90deg,
+      rgba(var(--ui-rgb-focus), 0.92) 0 3px,
+      transparent 3px 6px,
+      rgba(var(--ui-rgb-focus), 0.92) 6px 9px,
+      transparent 9px 12px,
+      rgba(var(--ui-rgb-focus), 0.92) 12px 14px);
+}
+
+body:not(.is-mobile-layout) .rail-resizer--left:hover,
+body:not(.is-mobile-layout) .rail-resizer--left:focus-visible,
+body:not(.is-mobile-layout) .rail-resizer--left.is-active {
+  border-color: rgba(var(--ui-rgb-focus), 0.86);
+  background: rgba(12, 24, 34, 0.98);
+}
+
 body:not(.is-mobile-layout) .rail {
   --rail-pad-inline: 4px;
   --rail-pad-block: 6px;
@@ -1645,21 +1693,26 @@ body.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock:not(
   border-right: 0;
   border-left: 0;
   background: rgba(4, 8, 13, 0.96);
-  overflow: hidden;
+  overflow: visible;
 }
 
 body:not(.is-mobile-layout) .bottom-timeline-dock__resizer {
   position: absolute;
-  top: 0;
-  left: 0;
+  top: calc(var(--bottom-rail-resizer-button-size) * -1);
+  left: auto;
   right: 0;
-  height: 14px;
+  width: var(--bottom-rail-resizer-button-size);
+  height: var(--bottom-rail-resizer-button-size);
   padding: 0;
-  border: 0;
-  background: transparent;
+  border: 1px solid rgba(var(--ui-rgb-focus), 0.5);
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  background: rgba(7, 13, 20, 0.96);
+  box-shadow: none;
   cursor: row-resize;
   touch-action: none;
-  z-index: 4;
+  z-index: 42;
+  transform: none;
 }
 
 body:not(.is-mobile-layout) .bottom-timeline-dock__resizer::before {
@@ -1667,17 +1720,29 @@ body:not(.is-mobile-layout) .bottom-timeline-dock__resizer::before {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: min(124px, calc(100% - 12px));
-  height: 4px;
+  width: 18px;
+  height: 14px;
   transform: translate(-50%, -50%);
-  border-radius: 999px;
-  background: rgba(var(--ui-rgb-focus), 0.84);
+  border-radius: 0;
+  background:
+    linear-gradient(0deg,
+      rgba(var(--ui-rgb-focus), 0.92) 0 3px,
+      transparent 3px 6px,
+      rgba(var(--ui-rgb-focus), 0.92) 6px 9px,
+      transparent 9px 12px,
+      rgba(var(--ui-rgb-focus), 0.92) 12px 14px);
 }
 
 body:not(.is-mobile-layout) .bottom-timeline-dock__resizer:hover::before,
 body:not(.is-mobile-layout) .bottom-timeline-dock__resizer:focus-visible::before,
 body:not(.is-mobile-layout) .bottom-timeline-dock__resizer.is-active::before {
-  background: rgba(var(--ui-rgb-focus), 0.9);
+  background:
+    linear-gradient(0deg,
+      rgba(var(--ui-rgb-focus), 1) 0 3px,
+      transparent 3px 6px,
+      rgba(var(--ui-rgb-focus), 1) 6px 9px,
+      transparent 9px 12px,
+      rgba(var(--ui-rgb-focus), 1) 12px 14px);
 }
 
 body:not(.is-mobile-layout) .bottom-timeline-dock__resizer:focus-visible {
@@ -2650,23 +2715,26 @@ body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom
   border-top: 1px solid var(--workbench-line);
   border-right: 0;
   border-left: 0;
+  overflow: visible;
 }
 
 body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock__resizer {
-  top: 0;
-  left: 0;
+  top: calc(var(--bottom-rail-resizer-button-size) * -1);
+  left: auto;
   right: 0;
   bottom: auto;
-  width: auto;
-  height: 14px;
+  width: var(--bottom-rail-resizer-button-size);
+  height: var(--bottom-rail-resizer-button-size);
   cursor: row-resize;
+  transform: none;
+  z-index: 42;
 }
 
 body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock__resizer::before {
   left: 50%;
   top: 50%;
-  width: min(124px, calc(100% - 12px));
-  height: 4px;
+  width: 18px;
+  height: 14px;
   transform: translate(-50%, -50%);
 }
 
@@ -11191,6 +11259,7 @@ body.is-mobile-layout #newProjectDialog .modal__body {
   border-top: 0;
   backdrop-filter: none;
   transition: height 180ms ease;
+  z-index: 70;
 }
 
 .mobile-drawer.is-dragging {
@@ -11206,44 +11275,51 @@ body.is-mobile-layout #newProjectDialog .modal__body {
 }
 
 .mobile-drawer__handle {
-  position: relative;
+  position: absolute;
+  top: calc(var(--mobile-drawer-handle-button-size) * -1);
+  right: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 var(--mobile-drawer-handle-height);
-  width: 100%;
-  height: var(--mobile-drawer-handle-height);
-  margin-bottom: var(--mobile-drawer-panel-gap);
+  flex: none;
+  width: var(--mobile-drawer-handle-button-size);
+  height: var(--mobile-drawer-handle-button-size);
+  margin: 0;
   padding: 0;
-  border: 0;
-  border-bottom: 1px solid var(--border);
-  background: rgba(6, 10, 16, 0.96);
+  border: 1px solid rgba(var(--ui-rgb-focus), 0.78);
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  background: rgba(8, 18, 25, 0.99);
   cursor: ns-resize;
   touch-action: none;
   overflow: visible;
+  z-index: 80;
 }
 
 .mobile-drawer__handle::before {
   content: "";
   position: absolute;
-  left: -8px;
-  right: -8px;
-  top: -18px;
-  bottom: -10px;
+  inset: -8px;
 }
 
 .mobile-drawer__grip {
   position: absolute;
   left: 50%;
-  top: -8px;
-  transform: translateX(-50%);
-  width: 84px;
-  height: 6px;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 18px;
+  height: 14px;
   border-radius: 0;
-  border: 1px solid rgba(var(--ui-rgb-focus), 0.45);
-  background: rgba(14, 24, 32, 0.98);
+  border: 0;
+  background:
+    linear-gradient(0deg,
+      rgba(var(--ui-rgb-focus), 0.92) 0 3px,
+      transparent 3px 6px,
+      rgba(var(--ui-rgb-focus), 0.92) 6px 9px,
+      transparent 9px 12px,
+      rgba(var(--ui-rgb-focus), 0.92) 12px 14px);
   box-shadow: none;
-  clip-path: polygon(var(--cut-sm) 0, 100% 0, 100% 100%, var(--cut-sm) 100%, 0 calc(100% - var(--cut-sm)), 0 0);
+  clip-path: none;
 }
 
 .mobile-drawer__handle:focus-visible {
@@ -11254,8 +11330,13 @@ body.is-mobile-layout #newProjectDialog .modal__body {
 .mobile-drawer__handle:hover .mobile-drawer__grip,
 .mobile-drawer__handle:focus-visible .mobile-drawer__grip,
 .mobile-drawer.is-dragging .mobile-drawer__grip {
-  border-color: rgba(var(--ui-rgb-focus), 0.8);
-  background: rgba(18, 34, 42, 0.98);
+  background:
+    linear-gradient(0deg,
+      rgba(var(--ui-rgb-focus), 1) 0 3px,
+      transparent 3px 6px,
+      rgba(var(--ui-rgb-focus), 1) 6px 9px,
+      transparent 9px 12px,
+      rgba(var(--ui-rgb-focus), 1) 12px 14px);
 }
 
 .mobile-tabs {
@@ -11465,20 +11546,17 @@ body.is-mobile-layout #newProjectDialog .modal__body {
     --mobile-safe-area-left: env(safe-area-inset-left, 0px);
   }
   .mobile-drawer__handle {
-    min-height: var(--mobile-drawer-handle-height);
+    min-height: 0;
   }
   .mobile-drawer__handle::before {
-    left: -14px;
-    right: -14px;
-    top: -8px;
-    bottom: -22px;
+    inset: -10px;
   }
   .mobile-drawer__grip {
     top: 50%;
     transform: translate(-50%, -50%);
-    width: 108px;
-    height: 8px;
-    border-width: 2px;
+    width: 18px;
+    height: 14px;
+    border-width: 0;
   }
   body {
     min-height: var(--mobile-viewport-height);
@@ -12001,7 +12079,7 @@ body.is-mobile-layout #newProjectDialog .modal__body {
     height: var(--mobile-drawer-height);
     min-height: var(--mobile-drawer-peek-height);
     max-height: var(--mobile-drawer-full-height);
-    overflow: hidden;
+    overflow: visible;
     border-top: 1px solid rgba(var(--ui-rgb), 0.1);
     border-radius: 18px 18px 0 0;
     background: linear-gradient(180deg, rgba(7, 11, 17, 0.96), rgba(5, 8, 14, 0.985));
@@ -13081,7 +13159,7 @@ body.is-right-tool-rail:not(.is-mobile-layout) .rail--left[data-compact="false"]
 }
 
 body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data-compact="true"] .bottom-timeline-dock__panes {
-  padding: 14px 4px 3px;
+  padding: 3px 4px;
 }
 
 body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data-compact="true"] #panelFrames .timeline-card {
