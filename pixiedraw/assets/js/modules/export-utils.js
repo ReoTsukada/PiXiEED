@@ -63,6 +63,74 @@
     return `${stem}.${normalizedSequence}${extension}`;
   }
 
+  function createExportDirectoryStorageUtils({
+    canUseSessionStorage,
+    EXPORT_DIRECTORY_DISPLAY_LABEL_KEY,
+  } = {}) {
+    function sanitizeExportDirectoryDisplayLabel(value) {
+      return typeof value === 'string' ? value.trim() : '';
+    }
+
+    function buildExportDirectoryDisplayLabel({ rootHandle = null, workspaceHandle = null, fallback = '' } = {}) {
+      const rootName = sanitizeExportDirectoryDisplayLabel(rootHandle?.name || '');
+      const workspaceName = sanitizeExportDirectoryDisplayLabel(workspaceHandle?.name || '');
+      const fallbackName = sanitizeExportDirectoryDisplayLabel(fallback);
+      if (rootName && workspaceName) {
+        if (rootName === workspaceName) {
+          return workspaceName;
+        }
+        return `${rootName}/${workspaceName}`;
+      }
+      return workspaceName || rootName || fallbackName;
+    }
+
+    function loadStoredExportDirectoryDisplayLabel() {
+      if (!canUseSessionStorage) {
+        return '';
+      }
+      try {
+        return sanitizeExportDirectoryDisplayLabel(window.localStorage.getItem(EXPORT_DIRECTORY_DISPLAY_LABEL_KEY) || '');
+      } catch (error) {
+        return '';
+      }
+    }
+
+    function storeExportDirectoryDisplayLabel(label) {
+      if (!canUseSessionStorage) {
+        return;
+      }
+      const normalized = sanitizeExportDirectoryDisplayLabel(label);
+      try {
+        if (normalized) {
+          window.localStorage.setItem(EXPORT_DIRECTORY_DISPLAY_LABEL_KEY, normalized);
+        } else {
+          window.localStorage.removeItem(EXPORT_DIRECTORY_DISPLAY_LABEL_KEY);
+        }
+      } catch (error) {
+        // Ignore localStorage errors.
+      }
+    }
+
+    function clearStoredExportDirectoryDisplayLabel() {
+      if (!canUseSessionStorage) {
+        return;
+      }
+      try {
+        window.localStorage.removeItem(EXPORT_DIRECTORY_DISPLAY_LABEL_KEY);
+      } catch (error) {
+        // Ignore localStorage errors.
+      }
+    }
+
+    return Object.freeze({
+      sanitizeExportDirectoryDisplayLabel,
+      buildExportDirectoryDisplayLabel,
+      loadStoredExportDirectoryDisplayLabel,
+      storeExportDirectoryDisplayLabel,
+      clearStoredExportDirectoryDisplayLabel,
+    });
+  }
+
   root.exportUtils = Object.freeze({
     sanitizeNativeFilename,
     normalizeNativeSubdirectory,
@@ -70,5 +138,6 @@
     isNativePhotoLibraryExportMimeType,
     splitFilenameStemAndExtension,
     buildNumberedFilename,
+    createExportDirectoryStorageUtils,
   });
 })();
