@@ -1092,6 +1092,8 @@
   const DRAW_IMPORT_STORAGE_KEY = 'pixiee-qr:pending-draw-import';
   const DRAW_RETURN_QUERY_KEY = 'draw_return';
   const DRAW_URL_QUERY_KEY = 'draw_url';
+  const DRAW_IMPORT_MODE_APPEND_TAB = 'append-tab';
+  const DRAW_IMPORT_MODE_NEW_PROJECT = 'new-project';
   let downloadCanvas = null;
 
   const clamp = (val, min, max) => Math.min(Math.max(val, min), max);
@@ -1325,6 +1327,15 @@
     return path.includes('/pixiedraw/');
   }
 
+  function shouldReturnToDrawInSameTab() {
+    try {
+      const currentUrl = new URL(window.location.href);
+      return currentUrl.searchParams.get(DRAW_RETURN_QUERY_KEY) === 'self';
+    } catch (error) {
+      return false;
+    }
+  }
+
   function getRequestedDrawUrl() {
     try {
       const currentUrl = new URL(window.location.href);
@@ -1337,6 +1348,12 @@
     } catch (error) {
       return null;
     }
+  }
+
+  function getDrawImportMode() {
+    return shouldReturnToDrawInSameTab() || Boolean(getRequestedDrawUrl())
+      ? DRAW_IMPORT_MODE_APPEND_TAB
+      : DRAW_IMPORT_MODE_NEW_PROJECT;
   }
 
   function getDefaultDrawUrl() {
@@ -1432,6 +1449,7 @@
     const payload = {
       source: 'qrmaker',
       filename: 'pixiee-qr.png',
+      importMode: getDrawImportMode(),
       rawValue: text,
       editSize: drawEditSize,
       createdAt: Date.now(),
