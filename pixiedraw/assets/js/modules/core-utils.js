@@ -162,6 +162,13 @@
     };
   }
 
+  function normalizeHelpSearchQuery(value) {
+    return String(value || '')
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
   root.coreUtils = Object.freeze({
     formatBytes,
     rgbaToHex,
@@ -174,5 +181,6 @@
     hexToRgba,
     clamp,
     debounce,
+    normalizeHelpSearchQuery,
   });
 })();
