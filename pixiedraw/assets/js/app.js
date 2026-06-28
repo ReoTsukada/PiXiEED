@@ -3559,6 +3559,8 @@
     SELECTION_SHAPE_MODE_CONTENT,
     SELECTION_SHAPE_MODE_SET,
     CUSTOM_BRUSH_MAX_PIXELS,
+    encodeTypedArray,
+    decodeBase64,
   }) || {};
   const {
     normalizeLayerBlendMode,
@@ -3572,6 +3574,9 @@
     normalizeFillStyle,
     normalizeSelectionShapeMode,
     normalizeCustomBrushData,
+    isCustomBrushData,
+    serializeCustomBrushPayload,
+    deserializeCustomBrushPayload,
   } = stateNormalizers;
   const FLOATING_PREVIEW_MIN_SIZE = 120;
   const FLOATING_PREVIEW_MAX_SIZE = 640;
@@ -4660,61 +4665,6 @@
     return FILL_TOOLS.has(tool)
       ? getFillStyleForTool(tool)
       : normalizeFillStyle(state.fillStyle, FILL_STYLE_SOLID);
-  }
-
-  function isCustomBrushData(brush) {
-    return Boolean(
-      brush
-      && typeof brush === 'object'
-      && Array.isArray(brush.offsets)
-      && brush.offsets.length > 0
-      && Number.isFinite(brush.pixelCount)
-      && brush.pixelCount > 0
-    );
-  }
-
-  function serializeCustomBrushPayload(brush) {
-    const normalized = normalizeCustomBrushData(brush);
-    if (!normalized) {
-      return null;
-    }
-    const packed = new Int16Array(normalized.offsets.length * 2);
-    for (let i = 0; i < normalized.offsets.length; i += 1) {
-      const offset = normalized.offsets[i];
-      packed[i * 2] = offset.dx;
-      packed[(i * 2) + 1] = offset.dy;
-    }
-    return {
-      width: normalized.width,
-      height: normalized.height,
-      offsets: encodeTypedArray(packed),
-    };
-  }
-
-  function deserializeCustomBrushPayload(payload) {
-    if (!payload || typeof payload !== 'object' || typeof payload.offsets !== 'string') {
-      return null;
-    }
-    const bytes = decodeBase64(payload.offsets);
-    if (!bytes.length || bytes.length % 2 !== 0) {
-      return null;
-    }
-    const source = new Int16Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 2);
-    if (source.length % 2 !== 0) {
-      return null;
-    }
-    const offsets = [];
-    for (let i = 0; i < source.length; i += 2) {
-      if (offsets.length >= CUSTOM_BRUSH_MAX_PIXELS) {
-        break;
-      }
-      offsets.push({ dx: source[i], dy: source[i + 1] });
-    }
-    return normalizeCustomBrushData({
-      width: payload.width,
-      height: payload.height,
-      offsets,
-    });
   }
 
   function getCustomBrushPixelCount(brush = state.customBrush) {
