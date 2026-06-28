@@ -3300,7 +3300,7 @@
   const TIMELAPSE_MAX_STEPS = 120;
   const TIMELAPSE_CAPTURE_DEBOUNCE_MS = isLightweightPersistenceMode() ? 1000 : 48;
   const timelapseState = {
-    enabled: true,
+    enabled: false,
     tracksByCanvasId: Object.create(null),
     fps: TIMELAPSE_DEFAULT_FPS,
   };
@@ -14665,6 +14665,16 @@
     playbackFrameCache.byFrame.clear();
   }
 
+  function invalidateActiveCanvasCompositeRenderState({ clearHover = true } = {}) {
+    invalidateFillPreviewCache();
+    invalidateOnionSkinCache();
+    clearPlaybackFrameCache();
+    markCanvasDirty();
+    if (clearHover) {
+      hoverPixel = null;
+    }
+  }
+
   function buildPlaybackFrameImageData(frameIndex) {
     if (!ctx.drawing) {
       return null;
@@ -25450,6 +25460,7 @@
         virtualCursorDrawState.lastPosition = null;
         virtualCursorDrawState.currentPosition = null;
       }
+      invalidateActiveCanvasCompositeRenderState({ clearHover: false });
     }
     getProjectCanvasDocuments().forEach(canvasDoc => {
       if (!canvasDoc || !Array.isArray(canvasDoc.frames) || !canvasDoc.frames.length) {
@@ -25500,7 +25511,6 @@
     }
     if (render) {
       if (previousIndex !== normalizedIndex) {
-        markCanvasDirty();
         if (isVoxelExtensionModeEnabled()) {
           syncVoxelExtensionPreviewFromSource({ updateViewport: false });
         }
@@ -25570,23 +25580,35 @@
     }
     const previousFrame = state.activeFrame;
     const previousLayer = state.activeLayer;
-    setActiveFrameIndex(normalizedFrameIndex, { wrap: false, persist, render, syncUi });
+    setActiveFrameIndex(normalizedFrameIndex, {
+      wrap: false,
+      persist: false,
+      render: false,
+      syncUi: false,
+      broadcastPresence: false,
+    });
     state.activeLayer = targetLayer.id;
     const activeCanvasDoc = getActiveProjectCanvasDocument();
     if (activeCanvasDoc) {
       activeCanvasDoc.activeFrame = normalizedFrameIndex;
       activeCanvasDoc.activeLayer = targetLayer.id;
     }
+    const changed = previousFrame !== normalizedFrameIndex || previousLayer !== targetLayer.id;
+    if (changed) {
+      invalidateActiveCanvasCompositeRenderState();
+    }
     if (persist) {
       scheduleSessionPersist({ includeSnapshots: false, includeReloadSnapshot: false });
     }
-    if (render && (previousFrame !== normalizedFrameIndex || previousLayer !== targetLayer.id)) {
+    if (render && changed) {
       renderFrameList();
       renderLayerList();
       requestRender();
       requestOverlayRender();
+    } else if (syncUi) {
+      updatePixfindModeUI();
     }
-    if (previousFrame !== normalizedFrameIndex || previousLayer !== targetLayer.id) {
+    if (changed) {
       scheduleSharedProjectCellPresenceBroadcast('frame-track');
     }
     return true;
@@ -28292,7 +28314,7 @@
     };
   }
 
-  function buildAutosaveSessionPayload({ includeTimelapse = !isLightweightPersistenceMode() } = {}) {
+  function buildAutosaveSessionPayload({ includeTimelapse = getAllTimelapseStepCount() > 0 } = {}) {
     const shouldIncludeTimelapse = Boolean(includeTimelapse);
     return {
       historyLimit: normalizeProjectHistoryLimit(history.limit, DEFAULT_HISTORY_LIMIT),
@@ -28306,8 +28328,8 @@
           : {},
         operationLogsByCanvas: serializeProjectTimelapseOperationLogs({ flushPending: false }),
         deferredInAutosave: !shouldIncludeTimelapse,
-        // Lightweight devices keep autosave focused on the recoverable project
-        // state; full timelapse persistence remains part of explicit project saves.
+        // Timelapse is opt-in, so autosave writes track data only after a
+        // recording exists. This preserves restore counts without penalizing default sessions.
       },
     };
   }
@@ -46110,6 +46132,27 @@
     restoreMobilePanelScrollState(mobileScrollState);
   }
 
+  function updatePaletteSwatchColor(index, color) {
+    const safeIndex = Math.round(Number(index));
+    if (!Number.isFinite(safeIndex) || safeIndex < 0) {
+      return;
+    }
+    const normalizedColor = normalizeColorValue(color);
+    [dom.controls.paletteList, dom.controls.toolQuickPalette].forEach(container => {
+      if (!(container instanceof HTMLElement)) {
+        return;
+      }
+      const button = container.querySelector(`button[data-index="${safeIndex}"]`);
+      if (!(button instanceof HTMLElement)) {
+        return;
+      }
+      button.title = `${safeIndex}: ${rgbaToHex(normalizedColor)}`;
+      applyPixelFrameBackground(button, normalizedColor);
+    });
+    updateColorTabSwatch();
+    updateFloatingDrawButtonPalettePreview();
+  }
+
   function updatePaletteSelectionState(previousActiveIndex = state.activePaletteIndex, previousSecondaryIndex = state.secondaryPaletteIndex) {
     const activePaletteIndex = normalizePaletteIndex(state.activePaletteIndex, state.activePaletteIndex);
     const secondaryPaletteIndex = normalizePaletteIndex(state.secondaryPaletteIndex, activePaletteIndex);
@@ -46209,7 +46252,7 @@
 
   function applyPalettePreviewChange() {
     requestRender();
-    renderAllProjectCanvasSurfaces();
+    scheduleSecondaryCanvasRefresh();
     requestOverlayRender();
     scheduleSessionPersist();
   }
@@ -46512,9 +46555,7 @@
       } else {
         scheduleSessionPersist();
       }
-      updateColorTabSwatch();
-      updateFloatingDrawButtonPalettePreview();
-      renderPalette();
+      updatePaletteSwatchColor(activeIndex, normalized);
       return;
     }
     const active = state.palette[state.activePaletteIndex];
@@ -46522,7 +46563,7 @@
     Object.assign(active, rgba);
     markPaletteColorHistoryDirty();
     applyPalettePreviewChange();
-    renderPalette();
+    updatePaletteSwatchColor(state.activePaletteIndex, active);
   }
 
   function handlePaletteWheelPointerDown(event) {
@@ -48993,14 +49034,23 @@
           renderTimelineMatrix();
           return;
         }
-        setActiveTimelineLayerId(layerId);
+        if (Number.isFinite(layerIndex)) {
+          setActiveLayerTrackIndex(layerIndex, {
+            persist: false,
+            render: true,
+            syncUi: true,
+            respectSharedCellOccupancy: false,
+          });
+        } else {
+          setActiveTimelineLayerId(layerId);
+          requestOverlayRender();
+        }
         if (Number.isFinite(layerIndex)) {
           setTimelineLayerSelection(layerIndex, { append: event.shiftKey });
         }
         scheduleSessionPersist({ includeSnapshots: false, includeReloadSnapshot: false });
         scheduleTimelineMatrixRenderSoon();
         scheduleSharedProjectCellPresenceBroadcast('layer');
-        requestOverlayRender();
         return;
       }
 
@@ -49037,15 +49087,19 @@
             return;
           }
           setTimelineFrameSelection(frameIndex, { append: event.shiftKey });
-          setActiveFrameIndex(frameIndex, { persist: false, render: false, syncUi: false });
           if (nextLayer) {
-            setActiveTimelineLayerId(nextLayer.id);
+            const nextTrackIndex = state.frames[frameIndex]?.layers?.findIndex(layer => layer?.id === nextLayer.id) ?? -1;
+            if (nextTrackIndex >= 0) {
+              setActiveFrameOnLayerTrack(frameIndex, nextTrackIndex, { persist: false, render: true, syncUi: true });
+            } else {
+              setActiveFrameIndex(frameIndex, { persist: false, render: true, syncUi: true, broadcastPresence: false });
+            }
+          } else {
+            setActiveFrameIndex(frameIndex, { persist: false, render: true, syncUi: true, broadcastPresence: false });
           }
           scheduleSessionPersist({ includeSnapshots: false, includeReloadSnapshot: false });
           scheduleTimelineMatrixRenderSoon();
           scheduleSharedProjectCellPresenceBroadcast('frame');
-          requestRender();
-          requestOverlayRender();
           return;
         }
         scheduleSessionPersist({ includeSnapshots: false, includeReloadSnapshot: false });
@@ -49083,8 +49137,7 @@
           renderTimelineMatrix();
           return;
         }
-        setActiveFrameIndex(frameIndex, { persist: false, render: false, syncUi: false });
-        setActiveTimelineLayerId(layerId);
+        setActiveFrameOnLayerTrack(frameIndex, layerIndex, { persist: false, render: true, syncUi: true });
         if (event.shiftKey) {
           setTimelineSlotSelection(frameIndex, layerIndex, { append: true });
         } else {
@@ -49093,8 +49146,6 @@
         scheduleSessionPersist({ includeSnapshots: false, includeReloadSnapshot: false });
         scheduleTimelineMatrixRenderSoon();
         scheduleSharedProjectCellPresenceBroadcast('slot');
-        requestRender();
-        requestOverlayRender();
       }
     });
   }
@@ -54554,6 +54605,25 @@
     }
   }
 
+  function resetTransientInteractionForCanvasStructureChange() {
+    if (cancelPendingCurveInteraction()) {
+      // Curve cancellation handles its own overlay refresh.
+    }
+    if (hasPendingSelectionMove()) {
+      cancelPendingSelectionMove();
+    }
+    if (pointerState.active) {
+      abortActivePointerInteraction({ commitHistory: false });
+    }
+    clearPendingCanvasSwitchPointer({ detachListeners: true });
+    pointerState.selectionMove = null;
+    pointerState.lastSelectionMove = null;
+    state.pendingPasteMoveState = null;
+    hoverPixel = null;
+    invalidateActiveCanvasCompositeRenderState();
+    requestOverlayRender();
+  }
+
   function setLocalViewportCanvasCount(nextCount, { persist = true, announce = true, recordHistory = false } = {}) {
     if (!MULTI_CANVAS_FEATURE_ENABLED) {
       const currentCanvases = getProjectCanvasDocuments();
@@ -54605,6 +54675,7 @@
       }
       return false;
     }
+    resetTransientInteractionForCanvasStructureChange();
     const historyLabel = targetCount > previous ? 'addCanvas' : 'removeCanvas';
     if (recordHistory) {
       beginHistory(historyLabel);
@@ -68957,9 +69028,9 @@
     if (Number.isFinite(payload.exportGridTileHeight)) {
       exportGridTileHeight = normalizeExportGridTileSize(payload.exportGridTileHeight, exportGridTileHeight);
     }
-    // Keep timelapse enabled by default on startup.
-    // The toggle still works at runtime, but disabled state is not restored.
-    timelapseState.enabled = true;
+    if (typeof payload.timelapseEnabled === 'boolean') {
+      timelapseState.enabled = payload.timelapseEnabled;
+    }
     if (Number.isFinite(payload.timelapseFps)) {
       timelapseState.fps = normalizeTimelapseFps(payload.timelapseFps);
     }
