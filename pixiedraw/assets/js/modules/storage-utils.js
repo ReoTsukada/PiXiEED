@@ -94,8 +94,45 @@
 
   root.storageUtils = Object.freeze({
     createStorageUtils,
+    createNewProjectPaletteStorageUtils,
     createLocalRestoreStorageUtils,
   });
+
+  function createNewProjectPaletteStorageUtils({
+    canUseSessionStorage,
+    NEW_PROJECT_PALETTE_PRESET_STORAGE_KEY,
+    NEW_PROJECT_PALETTE_PRESET_DEFAULT,
+    normalizeNewProjectPalettePreset,
+  } = {}) {
+    function loadStoredNewProjectPalettePresetId() {
+      if (!canUseSessionStorage) {
+        return NEW_PROJECT_PALETTE_PRESET_DEFAULT;
+      }
+      try {
+        const stored = window.localStorage.getItem(NEW_PROJECT_PALETTE_PRESET_STORAGE_KEY) || '';
+        return normalizeNewProjectPalettePreset(stored, NEW_PROJECT_PALETTE_PRESET_DEFAULT);
+      } catch (error) {
+        return NEW_PROJECT_PALETTE_PRESET_DEFAULT;
+      }
+    }
+
+    function storeNewProjectPalettePresetId(presetId) {
+      if (!canUseSessionStorage) {
+        return;
+      }
+      const normalized = normalizeNewProjectPalettePreset(presetId, NEW_PROJECT_PALETTE_PRESET_DEFAULT);
+      try {
+        window.localStorage.setItem(NEW_PROJECT_PALETTE_PRESET_STORAGE_KEY, normalized);
+      } catch (error) {
+        // Ignore localStorage errors.
+      }
+    }
+
+    return Object.freeze({
+      loadStoredNewProjectPalettePresetId,
+      storeNewProjectPalettePresetId,
+    });
+  }
 
   function createLocalRestoreStorageUtils({
     accountState,
