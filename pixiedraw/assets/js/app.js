@@ -8,6 +8,27 @@
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
+  const coreUtils = window.PiXiEEDrawModules?.coreUtils || {};
+  const {
+    clamp,
+    debounce,
+    formatBytes,
+    rgbaToHex,
+    rgbaToCss,
+    toCssColor,
+    createPixelFrameImage,
+    applyPixelFrameBackground,
+    rgbaToHsv,
+    hsvToRgba,
+    hexToRgba,
+  } = coreUtils;
+  const domUtils = window.PiXiEEDrawModules?.domUtils || {};
+  const {
+    disableImageLongPress,
+    isInputControlElement,
+    isLabelForElement,
+  } = domUtils;
+
   const dom = {
     appRoot: document.getElementById('appRoot'),
     startupBootLoading: document.getElementById('startupBootLoading'),
@@ -634,22 +655,6 @@
       event.preventDefault();
     }
   });
-
-  function disableImageLongPress(element) {
-    if (!element || !(element instanceof HTMLElement)) {
-      return;
-    }
-    element.setAttribute('draggable', 'false');
-    ['pointerdown', 'touchstart', 'mousedown'].forEach((type) => {
-      element.addEventListener(type, (event) => {
-        event.stopPropagation();
-      }, { passive: false });
-    });
-    element.addEventListener('contextmenu', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-    }, { passive: false });
-  }
 
   document.querySelectorAll('img, svg, [data-longpress-block="true"]').forEach(disableImageLongPress);
 
@@ -1520,74 +1525,22 @@
     'BG: Pink': '背景：粉',
   });
 
-  function normalizeUiLanguage(value, fallback = UI_LANGUAGE_JA) {
-    const normalized = String(value || '').trim().toLowerCase();
-    if (UI_LANGUAGE_SET.has(normalized)) {
-      return normalized;
-    }
-    return UI_LANGUAGE_SET.has(fallback) ? fallback : UI_LANGUAGE_JA;
-  }
-
-  function getUiLanguageFromQuery() {
-    if (typeof window === 'undefined') {
-      return '';
-    }
-    try {
-      const params = new URLSearchParams(window.location.search);
-      return normalizeUiLanguage(params.get('lang') || params.get('language') || '', '');
-    } catch (error) {
-      return '';
-    }
-  }
-
-  function loadStoredUiLanguage() {
-    if (!canUseSessionStorage) {
-      return '';
-    }
-    try {
-      return normalizeUiLanguage(window.localStorage.getItem(UI_LANGUAGE_STORAGE_KEY) || '', '');
-    } catch (error) {
-      return '';
-    }
-  }
-
-  function resolveInitialUiLanguage() {
-    return normalizeUiLanguage(getUiLanguageFromQuery() || loadStoredUiLanguage() || UI_LANGUAGE_JA, UI_LANGUAGE_JA);
-  }
-
-  function storeUiLanguage(language) {
-    if (!canUseSessionStorage) {
-      return;
-    }
-    const normalized = normalizeUiLanguage(language, UI_LANGUAGE_JA);
-    try {
-      window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, normalized);
-    } catch (error) {
-      // Ignore localStorage errors.
-    }
-  }
-
-  function loadInlineGuidesVisibility() {
-    if (!canUseSessionStorage) {
-      return false;
-    }
-    try {
-      return window.localStorage.getItem(INLINE_GUIDES_STORAGE_KEY) === '1';
-    } catch (error) {
-      return false;
-    }
-  }
-
-  function storeInlineGuidesVisibility(visible) {
-    if (!canUseSessionStorage) {
-      return;
-    }
-    try {
-      window.localStorage.setItem(INLINE_GUIDES_STORAGE_KEY, visible ? '1' : '0');
-    } catch (error) {
-      // Ignore localStorage errors.
-    }
-  }
+  const storageUtils = window.PiXiEEDrawModules?.storageUtils?.createStorageUtils?.({
+    canUseSessionStorage,
+    UI_LANGUAGE_STORAGE_KEY,
+    UI_LANGUAGE_JA,
+    UI_LANGUAGE_SET,
+    INLINE_GUIDES_STORAGE_KEY,
+  }) || {};
+  const {
+    normalizeUiLanguage,
+    getUiLanguageFromQuery,
+    loadStoredUiLanguage,
+    resolveInitialUiLanguage,
+    storeUiLanguage,
+    loadInlineGuidesVisibility,
+    storeInlineGuidesVisibility,
+  } = storageUtils;
 
   function toKebabCase(value) {
     return String(value || '')
@@ -2644,6 +2597,25 @@
       }),
     }),
   });
+  const navigationUtils = window.PiXiEEDrawModules?.navigation?.createNavigation?.({
+    EXTERNAL_TOOLS,
+    EXTERNAL_TOOL_PIXIEELENS_ID,
+    EXTERNAL_TOOL_QR_MAKER_ID,
+    LENS_CAMERA_RETURN_MODE_SELF,
+    LENS_CAMERA_RETURN_QUERY_KEY,
+    LENS_CAMERA_DRAW_URL_QUERY_KEY,
+    localizeText,
+  }) || {};
+  const {
+    getExternalToolDefinition,
+    getExternalToolDefinitionByAction,
+    getExternalToolLocalizedName,
+    getExternalToolLocalizedActionLabel,
+    isNativeAppRuntime,
+    buildLensCameraModeUrl,
+    buildLensCameraReturnDrawUrl,
+    buildQrEditorModeUrl,
+  } = navigationUtils;
   let lensImportRequested = (() => {
     if (typeof window === 'undefined') {
       return false;
@@ -3042,6 +3014,14 @@
   const QR_EDIT_MODE_TARGET_SOURCE = 'qrmaker';
   const QR_EDIT_CHECK_DELAY_MS = 90;
   const QR_EDIT_SCAN_CANVAS_SIZE = 640;
+  const qrUtils = window.PiXiEEDrawModules?.qrUtils?.createQrUtils?.({
+    QR_EDIT_MODE_TARGET_SOURCE,
+    normalizeAutosaveProjectId,
+  }) || {};
+  const {
+    normalizeQrEditPayload,
+    canUseQrEditJsQrDecoder,
+  } = qrUtils;
   const PIXFIND_UPLOAD_KEY = 'pixfind_creator_upload_v1';
   let pendingLensImportMessagePayload = null;
   let pendingLensImportMessageResolvers = [];
@@ -7528,176 +7508,18 @@
     }
   }
 
-  function encodeInt16Rle(view) {
-    const length = view.length;
-    if (length === 0) {
-      return { type: 'int16-rle', length: 0, values: new Int16Array(0), counts: new Uint32Array(0) };
-    }
-    const values = [];
-    const counts = [];
-    let current = view[0];
-    let count = 1;
-    for (let i = 1; i < length; i += 1) {
-      const value = view[i];
-      if (value === current) {
-        count += 1;
-      } else {
-        values.push(current);
-        counts.push(count);
-        current = value;
-        count = 1;
-      }
-    }
-    values.push(current);
-    counts.push(count);
-    const valueArray = new Int16Array(values.length);
-    for (let i = 0; i < values.length; i += 1) {
-      valueArray[i] = values[i];
-    }
-    const countArray = new Uint32Array(counts.length);
-    for (let i = 0; i < counts.length; i += 1) {
-      countArray[i] = counts[i];
-    }
-    return { type: 'int16-rle', length, values: valueArray, counts: countArray };
-  }
-
-  function decodeInt16Data(source) {
-    if (!source) {
-      return new Int16Array(0);
-    }
-    if (source instanceof Int16Array) {
-      return new Int16Array(source);
-    }
-    if (ArrayBuffer.isView(source) && source.BYTES_PER_ELEMENT === 2) {
-      return new Int16Array(source.buffer.slice(source.byteOffset, source.byteOffset + source.byteLength));
-    }
-    if (typeof source === 'object' && source.type === 'int16-rle') {
-      const { length, values, counts } = source;
-      const output = new Int16Array(length);
-      let offset = 0;
-      for (let i = 0; i < values.length; i += 1) {
-        const runValue = values[i];
-        const runLength = counts[i];
-        output.fill(runValue, offset, offset + runLength);
-        offset += runLength;
-      }
-      return output;
-    }
-    throw new Error('Unsupported Int16 encoding');
-  }
-
-  function encodeUint8Rle(view) {
-    const length = view.length;
-    if (length === 0) {
-      return { type: 'uint8-rle', length: 0, values: new Uint8Array(0), counts: new Uint32Array(0) };
-    }
-    const values = [];
-    const counts = [];
-    let current = view[0];
-    let count = 1;
-    for (let i = 1; i < length; i += 1) {
-      const value = view[i];
-      if (value === current) {
-        count += 1;
-      } else {
-        values.push(current);
-        counts.push(count);
-        current = value;
-        count = 1;
-      }
-    }
-    values.push(current);
-    counts.push(count);
-    const valueArray = new Uint8Array(values.length);
-    for (let i = 0; i < values.length; i += 1) {
-      valueArray[i] = values[i];
-    }
-    const countArray = new Uint32Array(counts.length);
-    for (let i = 0; i < counts.length; i += 1) {
-      countArray[i] = counts[i];
-    }
-    return { type: 'uint8-rle', length, values: valueArray, counts: countArray };
-  }
-
-  function decodeUint8Data(source, { clamped = false } = {}) {
-    if (!source) {
-      return clamped ? new Uint8ClampedArray(0) : new Uint8Array(0);
-    }
-    if (ArrayBuffer.isView(source) && source.BYTES_PER_ELEMENT === 1 && source.constructor !== Uint32Array) {
-      const buffer = source.buffer.slice(source.byteOffset, source.byteOffset + source.byteLength);
-      return clamped ? new Uint8ClampedArray(buffer) : new Uint8Array(buffer);
-    }
-    if (typeof source === 'object' && source.type === 'uint8-rle') {
-      const { length, values, counts } = source;
-      const shouldClamp = Object.prototype.hasOwnProperty.call(source, 'clamped') ? Boolean(source.clamped) : clamped;
-      const output = shouldClamp ? new Uint8ClampedArray(length) : new Uint8Array(length);
-      let offset = 0;
-      for (let i = 0; i < values.length; i += 1) {
-        const runValue = values[i];
-        const runLength = counts[i];
-        output.fill(runValue, offset, offset + runLength);
-        offset += runLength;
-      }
-      return output;
-    }
-    throw new Error('Unsupported Uint8 encoding');
-  }
-
-  function compressInt16Array(view) {
-    if (!view) {
-      return new Int16Array(0);
-    }
-    if (!(view instanceof Int16Array)) {
-      view = new Int16Array(view);
-    }
-    const encoded = encodeInt16Rle(view);
-    const encodedBytes = encoded.values.byteLength + encoded.counts.byteLength;
-    if (encodedBytes >= view.byteLength) {
-      return view.slice();
-    }
-    return encoded;
-  }
-
-  function compressUint8Array(view, { clamped = false } = {}) {
-    if (!view) {
-      return clamped ? new Uint8ClampedArray(0) : new Uint8Array(0);
-    }
-    const source = clamped && view instanceof Uint8ClampedArray ? view : new Uint8Array(view);
-    const encoded = encodeUint8Rle(source);
-    const encodedBytes = encoded.values.byteLength + encoded.counts.byteLength;
-    const originalBytes = source.byteLength;
-    if (encodedBytes >= originalBytes) {
-      if (clamped) {
-        return view instanceof Uint8ClampedArray ? view.slice() : new Uint8ClampedArray(source);
-      }
-      return source.slice ? source.slice() : new Uint8Array(source);
-    }
-    return { ...encoded, clamped: Boolean(clamped) };
-  }
-
-  function estimateEncodedByteLength(data, elementSize) {
-    if (!data) return 0;
-    if (ArrayBuffer.isView(data)) {
-      return data.byteLength;
-    }
-    if (typeof data === 'object') {
-      if (data.type === 'int16-rle' || data.type === 'uint8-rle') {
-        const valuesBytes = data.values?.byteLength || 0;
-        const countsBytes = data.counts?.byteLength || 0;
-        return valuesBytes + countsBytes;
-      }
-      if (typeof data.length === 'number' && data.BYTES_PER_ELEMENT) {
-        return data.length * data.BYTES_PER_ELEMENT;
-      }
-    }
-    if (typeof data.length === 'number' && Number.isFinite(elementSize)) {
-      return data.length * elementSize;
-    }
-    if (typeof data === 'string') {
-      return data.length;
-    }
-    return 0;
-  }
+  const binaryCodecs = window.PiXiEEDrawModules?.binaryCodecs?.createBinaryCodecs?.() || {};
+  const {
+    encodeInt16Rle,
+    decodeInt16Data,
+    encodeUint8Rle,
+    decodeUint8Data,
+    compressInt16Array,
+    compressUint8Array,
+    estimateEncodedByteLength,
+    encodeTypedArray: encodeTypedArrayBinary,
+    decodeBase64: decodeBase64Binary,
+  } = binaryCodecs;
 
   function compressHistorySnapshot(snapshot) {
     if (!snapshot) return snapshot;
@@ -8205,17 +8027,6 @@
   }
 
   const memoryThresholds = computeMemoryThresholds();
-
-  function formatBytes(bytes) {
-    if (!Number.isFinite(bytes) || bytes < 0) return '0 B';
-    const KB = 1024;
-    const MB = KB * 1024;
-    const GB = MB * 1024;
-    if (bytes >= GB) return `${(bytes / GB).toFixed(1)} GB`;
-    if (bytes >= MB) return `${(bytes / MB).toFixed(1)} MB`;
-    if (bytes >= KB) return `${(bytes / KB).toFixed(1)} KB`;
-    return `${bytes} B`;
-  }
 
   function updateMemoryStatus() {
     const usageNode = dom.controls.memoryUsage || document.getElementById('memoryUsage');
@@ -8764,110 +8575,16 @@
     return `${stem}.${normalizedSequence}${extension}`;
   }
 
-  let zipCrc32Table = null;
-
-  function getZipCrc32Table() {
-    if (zipCrc32Table) {
-      return zipCrc32Table;
-    }
-    zipCrc32Table = new Uint32Array(256);
-    for (let index = 0; index < 256; index += 1) {
-      let value = index;
-      for (let bit = 0; bit < 8; bit += 1) {
-        value = (value & 1) ? (0xEDB88320 ^ (value >>> 1)) : (value >>> 1);
-      }
-      zipCrc32Table[index] = value >>> 0;
-    }
-    return zipCrc32Table;
-  }
-
-  function computeCrc32(bytes) {
-    const table = getZipCrc32Table();
-    let crc = 0xFFFFFFFF;
-    for (let index = 0; index < bytes.length; index += 1) {
-      crc = table[(crc ^ bytes[index]) & 0xFF] ^ (crc >>> 8);
-    }
-    return (crc ^ 0xFFFFFFFF) >>> 0;
-  }
-
-  function createZipDosDateTime(date = new Date()) {
-    const year = Math.max(1980, date.getFullYear());
-    const month = clamp(date.getMonth() + 1, 1, 12);
-    const day = clamp(date.getDate(), 1, 31);
-    const hours = clamp(date.getHours(), 0, 23);
-    const minutes = clamp(date.getMinutes(), 0, 59);
-    const seconds = clamp(Math.floor(date.getSeconds() / 2), 0, 29);
-    return {
-      time: ((hours & 0x1F) << 11) | ((minutes & 0x3F) << 5) | (seconds & 0x1F),
-      date: (((year - 1980) & 0x7F) << 9) | ((month & 0x0F) << 5) | (day & 0x1F),
-    };
-  }
-
-  async function buildZipBlobFromTasks(tasks) {
-    const encoder = new TextEncoder();
-    const now = createZipDosDateTime(new Date());
-    const localParts = [];
-    const centralParts = [];
-    let localSize = 0;
-    for (let index = 0; index < tasks.length; index += 1) {
-      const task = tasks[index];
-      const filename = sanitizeNativeFilename(task.filename || `export_${index + 1}.bin`);
-      const filenameBytes = encoder.encode(filename);
-      const dataBytes = new Uint8Array(await task.blob.arrayBuffer());
-      const crc32 = computeCrc32(dataBytes);
-      const localHeader = new Uint8Array(30 + filenameBytes.length);
-      const localView = new DataView(localHeader.buffer);
-      localView.setUint32(0, 0x04034B50, true);
-      localView.setUint16(4, 20, true);
-      localView.setUint16(6, 0, true);
-      localView.setUint16(8, 0, true);
-      localView.setUint16(10, now.time, true);
-      localView.setUint16(12, now.date, true);
-      localView.setUint32(14, crc32, true);
-      localView.setUint32(18, dataBytes.length, true);
-      localView.setUint32(22, dataBytes.length, true);
-      localView.setUint16(26, filenameBytes.length, true);
-      localView.setUint16(28, 0, true);
-      localHeader.set(filenameBytes, 30);
-      localParts.push(localHeader, dataBytes);
-
-      const centralHeader = new Uint8Array(46 + filenameBytes.length);
-      const centralView = new DataView(centralHeader.buffer);
-      centralView.setUint32(0, 0x02014B50, true);
-      centralView.setUint16(4, 20, true);
-      centralView.setUint16(6, 20, true);
-      centralView.setUint16(8, 0, true);
-      centralView.setUint16(10, 0, true);
-      centralView.setUint16(12, now.time, true);
-      centralView.setUint16(14, now.date, true);
-      centralView.setUint32(16, crc32, true);
-      centralView.setUint32(20, dataBytes.length, true);
-      centralView.setUint32(24, dataBytes.length, true);
-      centralView.setUint16(28, filenameBytes.length, true);
-      centralView.setUint16(30, 0, true);
-      centralView.setUint16(32, 0, true);
-      centralView.setUint16(34, 0, true);
-      centralView.setUint16(36, 0, true);
-      centralView.setUint32(38, 0, true);
-      centralView.setUint32(42, localSize, true);
-      centralHeader.set(filenameBytes, 46);
-      centralParts.push(centralHeader);
-
-      localSize += localHeader.length + dataBytes.length;
-    }
-    const centralSize = centralParts.reduce((sum, part) => sum + part.length, 0);
-    const endRecord = new Uint8Array(22);
-    const endView = new DataView(endRecord.buffer);
-    endView.setUint32(0, 0x06054B50, true);
-    endView.setUint16(4, 0, true);
-    endView.setUint16(6, 0, true);
-    endView.setUint16(8, tasks.length, true);
-    endView.setUint16(10, tasks.length, true);
-    endView.setUint32(12, centralSize, true);
-    endView.setUint32(16, localSize, true);
-    endView.setUint16(20, 0, true);
-    return new Blob([...localParts, ...centralParts, endRecord], { type: 'application/zip' });
-  }
+  const exportCodecs = window.PiXiEEDrawModules?.exportCodecs?.createExportCodecs?.({
+    clamp,
+    sanitizeFilename: sanitizeNativeFilename,
+  }) || {};
+  const {
+    getZipCrc32Table,
+    computeCrc32,
+    createZipDosDateTime,
+    buildZipBlobFromTasks,
+  } = exportCodecs;
 
   function createOpenProjectTabId() {
     openProjectTabSequence += 1;
@@ -9558,29 +9275,6 @@
     };
   }
 
-  function normalizeQrEditPayload(payload = null, fallbackProjectId = '') {
-    if (!payload || typeof payload !== 'object') {
-      return null;
-    }
-    const source = typeof payload.source === 'string' ? payload.source.trim() : '';
-    if (source !== QR_EDIT_MODE_TARGET_SOURCE) {
-      return null;
-    }
-    const projectId = normalizeAutosaveProjectId(
-      typeof payload.projectId === 'string' ? payload.projectId : fallbackProjectId
-    ) || normalizeAutosaveProjectId(fallbackProjectId || '');
-    const expectedText = typeof payload.rawValue === 'string' ? payload.rawValue.trim() : '';
-    const editSize = Math.max(1, Math.round(Number(payload.editSize) || 0));
-    const panelVisible = payload.panelVisible !== false;
-    return {
-      source,
-      projectId,
-      rawValue: expectedText,
-      editSize,
-      panelVisible,
-    };
-  }
-
   function getActiveQrEditPayload() {
     const activeTab = getActiveOpenProjectTab();
     return normalizeQrEditPayload(activeTab?.qrEditPayload || null, autosaveProjectId || '');
@@ -9746,10 +9440,6 @@
     }
     previewCtx.imageSmoothingEnabled = false;
     previewCtx.drawImage(sourceCanvas, 0, 0, preview.width, preview.height);
-  }
-
-  function canUseQrEditJsQrDecoder() {
-    return typeof window !== 'undefined' && typeof window.jsQR === 'function';
   }
 
   async function ensureQrEditBarcodeDetector() {
@@ -15825,32 +15515,6 @@
     });
   }
 
-  function getExternalToolDefinition(toolId = '') {
-    if (!toolId || typeof toolId !== 'string') {
-      return null;
-    }
-    return EXTERNAL_TOOLS[toolId] || null;
-  }
-
-  function getExternalToolDefinitionByAction(action = '') {
-    const tools = Object.values(EXTERNAL_TOOLS);
-    return tools.find(tool => tool?.action === action) || null;
-  }
-
-  function getExternalToolLocalizedName(tool) {
-    if (!tool?.displayName) {
-      return '';
-    }
-    return localizeText(tool.displayName.ja, tool.displayName.en);
-  }
-
-  function getExternalToolLocalizedActionLabel(tool) {
-    if (!tool?.actionLabel) {
-      return '';
-    }
-    return localizeText(tool.actionLabel.ja, tool.actionLabel.en);
-  }
-
   function syncExternalToolActionButtons() {
     dom.topActionButtons.forEach(button => {
       if (!(button instanceof HTMLButtonElement)) {
@@ -15868,89 +15532,6 @@
         icon.alt = '';
       }
     });
-  }
-
-  function isNativeAppRuntime() {
-    if (typeof window === 'undefined') {
-      return false;
-    }
-    const capacitor = window.Capacitor || globalThis.Capacitor;
-    try {
-      if (capacitor && typeof capacitor.isNativePlatform === 'function' && capacitor.isNativePlatform()) {
-        return true;
-      }
-    } catch (error) {
-      // Ignore native runtime detection failures and continue with fallback checks.
-    }
-    const protocol = String(window.location?.protocol || '');
-    return protocol === 'capacitor:' || protocol === 'ionic:' || protocol === 'app:';
-  }
-
-  function buildLensCameraModeUrl({ returnMode = LENS_CAMERA_RETURN_MODE_SELF } = {}) {
-    const lensTool = getExternalToolDefinition(EXTERNAL_TOOL_PIXIEELENS_ID);
-    const nativeRuntime = isNativeAppRuntime();
-    const fallbackPath = nativeRuntime
-      ? '../pixiee-lens/index.html'
-      : (lensTool?.launchUrl || 'https://pixieed.jp/pixiee-lens/index.html');
-    const protocol = lensTool?.protocol || {};
-    const returnQueryKey = protocol.returnQueryKey || LENS_CAMERA_RETURN_QUERY_KEY;
-    const drawUrlQueryKey = protocol.drawUrlQueryKey || LENS_CAMERA_DRAW_URL_QUERY_KEY;
-    try {
-      const lensTarget = nativeRuntime
-        ? new URL('../pixiee-lens/index.html', window.location.href)
-        : new URL(lensTool?.launchUrl || fallbackPath);
-      const lensUrl = new URL(lensTarget.toString());
-      if (typeof returnMode === 'string' && returnMode) {
-        lensUrl.searchParams.set(returnQueryKey, returnMode);
-      }
-      const drawUrl = buildLensCameraReturnDrawUrl();
-      if (drawUrl) {
-        lensUrl.searchParams.set(drawUrlQueryKey, drawUrl);
-      }
-      return lensUrl.toString();
-    } catch (error) {
-      return fallbackPath;
-    }
-  }
-
-  function buildLensCameraReturnDrawUrl() {
-    if (typeof window === 'undefined' || !window.location) {
-      return '';
-    }
-    try {
-      const drawUrl = new URL(window.location.href);
-      drawUrl.searchParams.delete('lens');
-      return drawUrl.toString();
-    } catch (error) {
-      return '';
-    }
-  }
-
-  function buildQrEditorModeUrl({ returnMode = LENS_CAMERA_RETURN_MODE_SELF } = {}) {
-    const qrTool = getExternalToolDefinition(EXTERNAL_TOOL_QR_MAKER_ID);
-    const nativeRuntime = isNativeAppRuntime();
-    const fallbackPath = nativeRuntime
-      ? '../qr-maker/index.html'
-      : (qrTool?.launchUrl || 'https://pixieed.jp/qr-maker/index.html');
-    const protocol = qrTool?.protocol || {};
-    const returnQueryKey = protocol.returnQueryKey || LENS_CAMERA_RETURN_QUERY_KEY;
-    const drawUrlQueryKey = protocol.drawUrlQueryKey || LENS_CAMERA_DRAW_URL_QUERY_KEY;
-    try {
-      const qrTarget = nativeRuntime
-        ? new URL('../qr-maker/index.html', window.location.href)
-        : new URL(qrTool?.launchUrl || fallbackPath);
-      const qrUrl = new URL(qrTarget.toString());
-      if (typeof returnMode === 'string' && returnMode) {
-        qrUrl.searchParams.set(returnQueryKey, returnMode);
-      }
-      const drawUrl = buildLensCameraReturnDrawUrl();
-      if (drawUrl) {
-        qrUrl.searchParams.set(drawUrlQueryKey, drawUrl);
-      }
-      return qrUrl.toString();
-    } catch (error) {
-      return fallbackPath;
-    }
   }
 
   async function launchLensCameraMode() {
@@ -22179,112 +21760,22 @@
     return name.endsWith('.gif');
   }
 
-  function isImportableImageFile(file) {
-    if (!file) return false;
-    const type = typeof file.type === 'string' ? file.type.toLowerCase() : '';
-    if (type === 'image/png' || type === 'image/gif') {
-      return true;
-    }
-    const name = typeof file.name === 'string' ? file.name.toLowerCase() : '';
-    return name.endsWith('.png') || name.endsWith('.gif');
-  }
-
-  function createImageImportError(message, cause) {
-    const error = new Error(message);
-    error.source = 'image-import';
-    if (cause) {
-      error.cause = cause;
-    }
-    return error;
-  }
-
-  function normalizeImportFrameDuration(durationMs) {
-    const numeric = Number(durationMs);
-    if (!Number.isFinite(numeric) || numeric <= 0) {
-      return DEFAULT_IMPORT_FRAME_DURATION;
-    }
-    return clamp(Math.round(numeric), IMPORT_FRAME_DURATION_MIN_MS, IMPORT_FRAME_DURATION_MAX_MS);
-  }
-
-  function resolveImageImportTargetSize(width, height, { integerScaleFactor = 1 } = {}) {
-    const sourceWidth = Math.max(1, Math.floor(Number(width) || 0));
-    const sourceHeight = Math.max(1, Math.floor(Number(height) || 0));
-    if (!sourceWidth || !sourceHeight) {
-      throw createImageImportError('画像サイズが不正です');
-    }
-    if (sourceWidth > MAX_IMAGE_IMPORT_SOURCE_SIZE || sourceHeight > MAX_IMAGE_IMPORT_SOURCE_SIZE) {
-      throw createImageImportError(`読み込み元画像は最大 ${MAX_IMAGE_IMPORT_SOURCE_SIZE}px までです`);
-    }
-    const normalizedScaleFactor = Math.max(1, Math.floor(Number(integerScaleFactor) || 1));
-    const autoIntegerScaled = normalizedScaleFactor > 1
-      && sourceWidth % normalizedScaleFactor === 0
-      && sourceHeight % normalizedScaleFactor === 0;
-    const effectiveSourceWidth = autoIntegerScaled
-      ? Math.max(1, Math.floor(sourceWidth / normalizedScaleFactor))
-      : sourceWidth;
-    const effectiveSourceHeight = autoIntegerScaled
-      ? Math.max(1, Math.floor(sourceHeight / normalizedScaleFactor))
-      : sourceHeight;
-    if (effectiveSourceWidth <= MAX_CANVAS_SIZE && effectiveSourceHeight <= MAX_CANVAS_SIZE) {
-      return {
-        sourceWidth,
-        sourceHeight,
-        width: effectiveSourceWidth,
-        height: effectiveSourceHeight,
-        scaled: autoIntegerScaled,
-        integerScaleFactor: autoIntegerScaled ? normalizedScaleFactor : 1,
-      };
-    }
-    const ratio = Math.min(MAX_CANVAS_SIZE / effectiveSourceWidth, MAX_CANVAS_SIZE / effectiveSourceHeight);
-    const widthScaled = clamp(Math.floor(effectiveSourceWidth * ratio), 1, MAX_CANVAS_SIZE);
-    const heightScaled = clamp(Math.floor(effectiveSourceHeight * ratio), 1, MAX_CANVAS_SIZE);
-    return {
-      sourceWidth,
-      sourceHeight,
-      width: widthScaled,
-      height: heightScaled,
-      scaled: widthScaled !== sourceWidth
-        || heightScaled !== sourceHeight
-        || autoIntegerScaled,
-      integerScaleFactor: autoIntegerScaled ? normalizedScaleFactor : 1,
-    };
-  }
-
-  function getImageImportCheckFrameIndexes(frameCount) {
-    const total = Math.max(0, Math.floor(Number(frameCount) || 0));
-    if (total <= 0) {
-      return [];
-    }
-    if (total === 1) {
-      return [0];
-    }
-    const indexes = [0, Math.floor((total - 1) / 2), total - 1];
-    const seen = new Set();
-    const output = [];
-    for (let i = 0; i < indexes.length; i += 1) {
-      const index = indexes[i];
-      if (seen.has(index)) {
-        continue;
-      }
-      seen.add(index);
-      output.push(index);
-    }
-    return output;
-  }
-
-  function getGreatestCommonDivisor(a, b) {
-    let x = Math.abs(Math.floor(Number(a) || 0));
-    let y = Math.abs(Math.floor(Number(b) || 0));
-    if (!x || !y) {
-      return 0;
-    }
-    while (y !== 0) {
-      const next = x % y;
-      x = y;
-      y = next;
-    }
-    return x;
-  }
+  const imageUtils = window.PiXiEEDrawModules?.imageUtils?.createImageUtils?.({
+    DEFAULT_IMPORT_FRAME_DURATION,
+    IMPORT_FRAME_DURATION_MIN_MS,
+    IMPORT_FRAME_DURATION_MAX_MS,
+    MAX_IMAGE_IMPORT_SOURCE_SIZE,
+    MAX_CANVAS_SIZE,
+    clamp,
+  }) || {};
+  const {
+    isImportableImageFile,
+    createImageImportError,
+    normalizeImportFrameDuration,
+    resolveImageImportTargetSize,
+    getImageImportCheckFrameIndexes,
+    getGreatestCommonDivisor,
+  } = imageUtils;
 
   function quickCheckImageDataNearestUpscale(imageData, factor) {
     if (!imageData || !(imageData.data instanceof Uint8ClampedArray)) {
@@ -38784,33 +38275,11 @@
   }
 
   function encodeTypedArray(view) {
-    if (!view) return '';
-    const bytes = view instanceof Uint8Array
-      ? view
-      : new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
-    let binary = '';
-    const chunkSize = 0x8000;
-    for (let i = 0; i < bytes.length; i += chunkSize) {
-      binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
-    }
-    return window.btoa(binary);
+    return encodeTypedArrayBinary(view);
   }
 
   function decodeBase64(value) {
-    if (typeof value !== 'string' || value.length === 0) {
-      return new Uint8Array(0);
-    }
-    try {
-      const binary = window.atob(value);
-      const length = binary.length;
-      const bytes = new Uint8Array(length);
-      for (let i = 0; i < length; i += 1) {
-        bytes[i] = binary.charCodeAt(i);
-      }
-      return bytes;
-    } catch (error) {
-      return new Uint8Array(0);
-    }
+    return decodeBase64Binary(value);
   }
 
   function normalizeColorValue(input) {
@@ -91441,127 +90910,11 @@
     }
   }
 
-  function rgbaToHex({ r, g, b, a }) {
-    const toHex = value => value.toString(16).padStart(2, '0');
-    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-  }
-
-  function rgbaToCss({ r, g, b, a }) {
-    return `rgba(${r}, ${g}, ${b}, ${a / 255})`;
-  }
-
-  function toCssColor(value) {
-    if (typeof value === 'string') {
-      return value;
-    }
-    if (value && typeof value === 'object') {
-      const { r = 0, g = 0, b = 0, a = 255 } = value;
-      return rgbaToCss({ r, g, b, a });
-    }
-    return 'rgba(0, 0, 0, 0)';
-  }
-
-  function createPixelFrameImage(color, { borderColor = '#C8C8C8' } = {}) {
-    const colorCss = toCssColor(color);
-    const borderCss = toCssColor(borderColor);
-    const checkerA = '#111827';
-    const checkerB = '#334155';
-    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='21' height='21' shape-rendering='crispEdges'>` +
-      `<rect x='1' y='0' width='19' height='1' fill='${borderCss}' />` +
-      `<rect x='0' y='1' width='2' height='1' fill='${borderCss}' />` +
-      // checker base (so fully transparent colors remain visible)
-      `<rect x='2' y='1' width='17' height='19' fill='${checkerA}' />` +
-      `<rect x='2' y='1' width='9' height='10' fill='${checkerB}' />` +
-      `<rect x='11' y='10' width='8' height='10' fill='${checkerB}' />` +
-      // selected color overlay (may include alpha)
-      `<rect x='2' y='1' width='17' height='19' fill='${colorCss}' />` +
-      `<rect x='19' y='1' width='2' height='1' fill='${borderCss}' />` +
-      `<rect x='0' y='2' width='1' height='18' fill='${borderCss}' />` +
-      `<rect x='1' y='2' width='1' height='17' fill='${checkerB}' />` +
-      `<rect x='19' y='2' width='1' height='17' fill='${checkerB}' />` +
-      `<rect x='1' y='2' width='1' height='17' fill='${colorCss}' />` +
-      `<rect x='19' y='2' width='1' height='17' fill='${colorCss}' />` +
-      `<rect x='20' y='2' width='1' height='18' fill='${borderCss}' />` +
-      `<rect x='1' y='19' width='1' height='2' fill='${borderCss}' />` +
-      `<rect x='19' y='19' width='1' height='2' fill='${borderCss}' />` +
-      `<rect x='2' y='20' width='17' height='1' fill='${borderCss}' />` +
-      `</svg>`;
-    const encoded = encodeURIComponent(svg)
-      .replace(/%0A/g, '')
-      .replace(/%09/g, '');
-    return `url("data:image/svg+xml,${encoded}")`;
-  }
-
-  function applyPixelFrameBackground(element, color, options = {}) {
-    if (!element) return;
-    element.classList.add('pixel-frame');
-    element.style.setProperty('--pixel-frame-image', createPixelFrameImage(color, options));
-  }
-
   window.pixelFrameUtils = Object.freeze({
     createImage: createPixelFrameImage,
     applyBackground: applyPixelFrameBackground,
     toCssColor,
   });
-
-  function rgbaToHsv({ r, g, b }) {
-    const rn = clamp(r, 0, 255) / 255;
-    const gn = clamp(g, 0, 255) / 255;
-    const bn = clamp(b, 0, 255) / 255;
-    const max = Math.max(rn, gn, bn);
-    const min = Math.min(rn, gn, bn);
-    const delta = max - min;
-    let h = 0;
-    if (delta !== 0) {
-      if (max === rn) {
-        h = ((gn - bn) / delta) % 6;
-      } else if (max === gn) {
-        h = (bn - rn) / delta + 2;
-      } else {
-        h = (rn - gn) / delta + 4;
-      }
-      h *= 60;
-      if (h < 0) h += 360;
-    }
-    const s = max === 0 ? 0 : delta / max;
-    const v = max;
-    return { h, s, v };
-  }
-
-  function hsvToRgba(h, s, v) {
-    const hue = ((h % 360) + 360) % 360;
-    const saturation = clamp(s, 0, 1);
-    const value = clamp(v, 0, 1);
-    const c = value * saturation;
-    const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
-    const m = value - c;
-    let rp = 0;
-    let gp = 0;
-    let bp = 0;
-    if (hue < 60) {
-      rp = c;
-      gp = x;
-    } else if (hue < 120) {
-      rp = x;
-      gp = c;
-    } else if (hue < 180) {
-      gp = c;
-      bp = x;
-    } else if (hue < 240) {
-      gp = x;
-      bp = c;
-    } else if (hue < 300) {
-      rp = x;
-      bp = c;
-    } else {
-      rp = c;
-      bp = x;
-    }
-    const r = Math.round((rp + m) * 255);
-    const g = Math.round((gp + m) * 255);
-    const b = Math.round((bp + m) * 255);
-    return { r, g, b, a: 255 };
-  }
 
   function getActiveDrawColor(opacityOverride, paletteIndexOverride) {
     const previewTool = pointerState.tool || state.tool;
@@ -91590,24 +90943,6 @@
       color.a = Math.round(clamped * 255);
     }
     return color;
-  }
-
-  function hexToRgba(value) {
-    if (!value || value[0] !== '#') return null;
-    const hex = value.slice(1);
-    if (hex.length === 3) {
-      const r = parseInt(hex[0] + hex[0], 16);
-      const g = parseInt(hex[1] + hex[1], 16);
-      const b = parseInt(hex[2] + hex[2], 16);
-      return { r, g, b, a: 255 };
-    }
-    if (hex.length === 6) {
-      const r = parseInt(hex.slice(0, 2), 16);
-      const g = parseInt(hex.slice(2, 4), 16);
-      const b = parseInt(hex.slice(4, 6), 16);
-      return { r, g, b, a: 255 };
-    }
-    return null;
   }
 
   function getZoomBaseCanvasDocument(canvasDoc = null) {
@@ -91781,41 +91116,6 @@
     const isWhole = Math.abs(roundedTenth - Math.round(roundedTenth)) < 0.05;
     const value = isWhole ? Math.round(roundedTenth) : Number(roundedTenth.toFixed(1));
     return `${value}%`;
-  }
-
-  function clamp(value, min, max) {
-    return Math.min(Math.max(value, min), max);
-  }
-
-  function debounce(fn, wait) {
-    let handle;
-    return (...args) => {
-      clearTimeout(handle);
-      handle = setTimeout(() => fn(...args), wait);
-    };
-  }
-
-  function isInputControlElement(node) {
-    if (!node || node.nodeType !== Node.ELEMENT_NODE) return false;
-    if (node.matches('input, textarea, select')) return true;
-    if (node instanceof Element && node.hasAttribute('contenteditable') && node.getAttribute('contenteditable') !== 'false') {
-      return true;
-    }
-    return false;
-  }
-
-  function isLabelForElement(label, control) {
-    if (!label || !control || label.nodeType !== Node.ELEMENT_NODE || control.nodeType !== Node.ELEMENT_NODE) {
-      return false;
-    }
-    if (label.tagName !== 'LABEL') {
-      return false;
-    }
-    if (label.contains(control)) {
-      return true;
-    }
-    const htmlFor = label.getAttribute('for');
-    return Boolean(htmlFor && control.id && htmlFor === control.id);
   }
 
   function setupGlobalFocusDismiss() {
