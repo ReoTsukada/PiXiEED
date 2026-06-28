@@ -94,5 +94,153 @@
 
   root.storageUtils = Object.freeze({
     createStorageUtils,
+    createLocalRestoreStorageUtils,
   });
+
+  function createLocalRestoreStorageUtils({
+    accountState,
+    canUseSessionStorage,
+    AUTOSAVE_ACTIVE_PROJECT_SYNC_KEY,
+    RELOAD_TARGET_PROJECT_ID_KEY,
+    RELOAD_PROJECT_FALLBACK_STORAGE_KEY,
+  } = {}) {
+    function getCurrentAccountStorageNamespace() {
+      const userId = typeof accountState.userId === 'string' ? accountState.userId.trim() : '';
+      return userId || 'anonymous';
+    }
+
+    function getScopedStorageKey(baseKey, namespace = getCurrentAccountStorageNamespace()) {
+      const normalizedBaseKey = typeof baseKey === 'string' ? baseKey.trim() : '';
+      const normalizedNamespace = typeof namespace === 'string' ? namespace.trim() : '';
+      if (!normalizedBaseKey) {
+        return '';
+      }
+      if (!normalizedNamespace) {
+        return normalizedBaseKey;
+      }
+      return `${normalizedBaseKey}:${normalizedNamespace}`;
+    }
+
+    function getLocalRestoreStorageKeys(baseKey) {
+      const normalizedBaseKey = typeof baseKey === 'string' ? baseKey.trim() : '';
+      if (!normalizedBaseKey) {
+        return [];
+      }
+      const keys = [normalizedBaseKey];
+      const scopedKey = getScopedStorageKey(normalizedBaseKey);
+      if (scopedKey && scopedKey !== normalizedBaseKey) {
+        keys.push(scopedKey);
+      }
+      return keys;
+    }
+
+    function isTabLocalRestoreOnlyKey(baseKey) {
+      return baseKey === AUTOSAVE_ACTIVE_PROJECT_SYNC_KEY
+        || baseKey === RELOAD_TARGET_PROJECT_ID_KEY
+        || baseKey === RELOAD_PROJECT_FALLBACK_STORAGE_KEY;
+    }
+
+    function writeSessionStorageForLocalRestore(baseKey, value) {
+      if (!canUseSessionStorage) {
+        return;
+      }
+      getLocalRestoreStorageKeys(baseKey).forEach(key => {
+        try {
+          window.sessionStorage.setItem(key, value);
+        } catch (error) {
+          // Ignore storage write failures.
+        }
+      });
+    }
+
+    function writeLocalStorageForLocalRestore(baseKey, value) {
+      if (!canUseSessionStorage) {
+        return;
+      }
+      if (isTabLocalRestoreOnlyKey(baseKey)) {
+        return;
+      }
+      getLocalRestoreStorageKeys(baseKey).forEach(key => {
+        try {
+          window.localStorage.setItem(key, value);
+        } catch (error) {
+          // Ignore storage write failures.
+        }
+      });
+    }
+
+    function readSessionStorageForLocalRestore(baseKey) {
+      if (!canUseSessionStorage) {
+        return '';
+      }
+      const keys = getLocalRestoreStorageKeys(baseKey);
+      for (let index = 0; index < keys.length; index += 1) {
+        const key = keys[index];
+        try {
+          const value = window.sessionStorage.getItem(key) || '';
+          if (value) {
+            return value;
+          }
+        } catch (error) {
+          // Ignore storage read failures.
+        }
+      }
+      return '';
+    }
+
+    function readLocalStorageForLocalRestore(baseKey) {
+      if (!canUseSessionStorage) {
+        return '';
+      }
+      if (isTabLocalRestoreOnlyKey(baseKey)) {
+        return '';
+      }
+      const keys = getLocalRestoreStorageKeys(baseKey);
+      for (let index = 0; index < keys.length; index += 1) {
+        const key = keys[index];
+        try {
+          const value = window.localStorage.getItem(key) || '';
+          if (value) {
+            return value;
+          }
+        } catch (error) {
+          // Ignore storage read failures.
+        }
+      }
+      return '';
+    }
+
+    function clearLocalRestoreStorage(baseKey) {
+      if (!canUseSessionStorage) {
+        return;
+      }
+      getLocalRestoreStorageKeys(baseKey).forEach(key => {
+        try {
+          window.sessionStorage.removeItem(key);
+        } catch (error) {
+          // Ignore sessionStorage cleanup failures.
+        }
+        if (isTabLocalRestoreOnlyKey(baseKey)) {
+          return;
+        }
+        try {
+          window.localStorage.removeItem(key);
+        } catch (error) {
+          // Ignore localStorage cleanup failures.
+        }
+      });
+    }
+
+    return Object.freeze({
+      getCurrentAccountStorageNamespace,
+      getScopedStorageKey,
+      getLocalRestoreStorageKeys,
+      isTabLocalRestoreOnlyKey,
+      writeSessionStorageForLocalRestore,
+      writeLocalStorageForLocalRestore,
+      readSessionStorageForLocalRestore,
+      readLocalStorageForLocalRestore,
+      clearLocalRestoreStorage,
+    });
+  }
 })();
