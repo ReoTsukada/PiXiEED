@@ -4,45 +4,9 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.06.28-file-split-cache-fix';
+  const APP_BUILD_VERSION = '2026.06.29-true-presplit';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
-
-  const coreUtils = window.PiXiEEDrawModules?.coreUtils || {};
-  const {
-    clamp,
-    debounce,
-    formatBytes,
-    rgbaToHex,
-    rgbaToCss,
-    toCssColor,
-    createPixelFrameImage,
-    applyPixelFrameBackground,
-    rgbaToHsv,
-    hsvToRgba,
-    hexToRgba,
-    normalizeHelpSearchQuery,
-  } = coreUtils;
-  const paletteBaseUtils = window.PiXiEEDrawModules?.paletteUtils?.createPaletteBaseUtils?.({
-    clamp,
-  }) || {};
-  const {
-    toKebabCase,
-    splitPalettePresetNameTokens,
-    localizePalettePresetNameJa,
-    normalizePalettePresetDisplayName,
-    resolveNewProjectPaletteColorCount,
-    hashTextToUint32,
-    mixUint32Hash,
-    mixTextHash,
-    hslToRgbColor,
-  } = paletteBaseUtils;
-  const domUtils = window.PiXiEEDrawModules?.domUtils || {};
-  const {
-    disableImageLongPress,
-    isInputControlElement,
-    isLabelForElement,
-  } = domUtils;
 
   const dom = {
     appRoot: document.getElementById('appRoot'),
@@ -671,6 +635,22 @@
     }
   });
 
+  function disableImageLongPress(element) {
+    if (!element || !(element instanceof HTMLElement)) {
+      return;
+    }
+    element.setAttribute('draggable', 'false');
+    ['pointerdown', 'touchstart', 'mousedown'].forEach((type) => {
+      element.addEventListener(type, (event) => {
+        event.stopPropagation();
+      }, { passive: false });
+    });
+    element.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    }, { passive: false });
+  }
+
   document.querySelectorAll('img, svg, [data-longpress-block="true"]').forEach(disableImageLongPress);
 
   const referenceDom = {
@@ -1040,15 +1020,6 @@
     ? String(EMBED_CONFIG.documentName).trim()
     : '新規ドキュメント';
   const DEFAULT_DOCUMENT_NAME = `${DEFAULT_DOCUMENT_BASENAME}${PROJECT_FILE_EXTENSION}`;
-  const documentUtils = window.PiXiEEDrawModules?.documentUtils?.createDocumentUtils?.({
-    DEFAULT_DOCUMENT_BASENAME,
-    PROJECT_FILE_EXTENSION,
-  }) || {};
-  const {
-    extractDocumentBaseName,
-    normalizeDocumentName,
-    sanitizeDocumentFileBase,
-  } = documentUtils;
   const MAX_IMPORTED_PALETTE_COLORS = 256;
   const MAX_EXPORT_DIMENSION = 2000;
   const MAX_EXPORT_SCALE_OPTIONS = MAX_EXPORT_DIMENSION;
@@ -1549,22 +1520,475 @@
     'BG: Pink': '背景：粉',
   });
 
-  const storageUtils = window.PiXiEEDrawModules?.storageUtils?.createStorageUtils?.({
-    canUseSessionStorage,
-    UI_LANGUAGE_STORAGE_KEY,
-    UI_LANGUAGE_JA,
-    UI_LANGUAGE_SET,
-    INLINE_GUIDES_STORAGE_KEY,
-  }) || {};
-  const {
-    normalizeUiLanguage,
-    getUiLanguageFromQuery,
-    loadStoredUiLanguage,
-    resolveInitialUiLanguage,
-    storeUiLanguage,
-    loadInlineGuidesVisibility,
-    storeInlineGuidesVisibility,
-  } = storageUtils;
+  function normalizeUiLanguage(value, fallback = UI_LANGUAGE_JA) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (UI_LANGUAGE_SET.has(normalized)) {
+      return normalized;
+    }
+    return UI_LANGUAGE_SET.has(fallback) ? fallback : UI_LANGUAGE_JA;
+  }
+
+  function getUiLanguageFromQuery() {
+    if (typeof window === 'undefined') {
+      return '';
+    }
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return normalizeUiLanguage(params.get('lang') || params.get('language') || '', '');
+    } catch (error) {
+      return '';
+    }
+  }
+
+  function loadStoredUiLanguage() {
+    if (!canUseSessionStorage) {
+      return '';
+    }
+    try {
+      return normalizeUiLanguage(window.localStorage.getItem(UI_LANGUAGE_STORAGE_KEY) || '', '');
+    } catch (error) {
+      return '';
+    }
+  }
+
+  function resolveInitialUiLanguage() {
+    return normalizeUiLanguage(getUiLanguageFromQuery() || loadStoredUiLanguage() || UI_LANGUAGE_JA, UI_LANGUAGE_JA);
+  }
+
+  function storeUiLanguage(language) {
+    if (!canUseSessionStorage) {
+      return;
+    }
+    const normalized = normalizeUiLanguage(language, UI_LANGUAGE_JA);
+    try {
+      window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, normalized);
+    } catch (error) {
+      // Ignore localStorage errors.
+    }
+  }
+
+  function loadInlineGuidesVisibility() {
+    if (!canUseSessionStorage) {
+      return false;
+    }
+    try {
+      return window.localStorage.getItem(INLINE_GUIDES_STORAGE_KEY) === '1';
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function storeInlineGuidesVisibility(visible) {
+    if (!canUseSessionStorage) {
+      return;
+    }
+    try {
+      window.localStorage.setItem(INLINE_GUIDES_STORAGE_KEY, visible ? '1' : '0');
+    } catch (error) {
+      // Ignore localStorage errors.
+    }
+  }
+
+  function toKebabCase(value) {
+    return String(value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
+
+  function splitPalettePresetNameTokens(value) {
+    return String(value || '')
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+  }
+
+  function localizePalettePresetNameJa(name) {
+    const tokenMap = Object.freeze({
+      Pixel: '',
+      Pixels: '',
+      Core: 'コア',
+      Retro: 'レトロ',
+      Bits: 'ビッツ',
+      Soft: 'ソフト',
+      Neon: 'ネオン',
+      Pastel: 'パステル',
+      Vintage: 'ヴィンテージ',
+      Arcade: 'アーケード',
+      Glow: 'グロー',
+      CRT: 'CRT',
+      Dream: 'ドリーム',
+      Old: 'オールド',
+      Screen: 'スクリーン',
+      Classic: 'クラシック',
+      Dawn: 'ドーン',
+      Dusk: 'ダスク',
+      Night: 'ナイト',
+      Horizon: 'ホライズン',
+      Sunrise: 'サンライズ',
+      Sunset: 'サンセット',
+      Moonlight: 'ムーンライト',
+      Galaxy: 'ギャラクシー',
+      Cosmos: 'コスモス',
+      Nebula: 'ネビュラ',
+      Aurora: 'オーロラ',
+      Ocean: 'オーシャン',
+      Lagoon: 'ラグーン',
+      Deep: 'ディープ',
+      Sea: 'シー',
+      Reef: 'リーフ',
+      Forest: 'フォレスト',
+      Meadow: 'メドウ',
+      Jungle: 'ジャングル',
+      Desert: 'デザート',
+      Canyon: 'キャニオン',
+      Mountain: 'マウンテン',
+      Snow: 'スノー',
+      Glacier: 'グレイシャー',
+      Volcano: 'ボルケーノ',
+      Storm: 'ストーム',
+      Thunder: 'サンダー',
+      Lightning: 'ライトニング',
+      Rain: 'レイン',
+      Mist: 'ミスト',
+      Fog: 'フォグ',
+      Frost: 'フロスト',
+      Ember: 'エンバー',
+      Flame: 'フレイム',
+      Lava: 'ラヴァ',
+      Sand: 'サンド',
+      Clay: 'クレイ',
+      Stone: 'ストーン',
+      Marble: 'マーブル',
+      Bronze: 'ブロンズ',
+      Copper: 'コッパー',
+      Iron: 'アイアン',
+      Silver: 'シルバー',
+      Gold: 'ゴールド',
+      Crystal: 'クリスタル',
+      Prism: 'プリズム',
+      Candy: 'キャンディ',
+      Bubblegum: 'バブルガム',
+      Cotton: 'コットン',
+      Mint: 'ミント',
+      Lemon: 'レモン',
+      Peach: 'ピーチ',
+      Berry: 'ベリー',
+      Cherry: 'チェリー',
+      Plum: 'プラム',
+      Sakura: 'サクラ',
+      Indigo: 'インディゴ',
+      Yamabuki: 'ヤマブキ',
+      Wakakusa: 'ワカクサ',
+      Shikon: 'シコン',
+      Ink: 'インク',
+      Shadow: 'シャドウ',
+      Eclipse: 'エクリプス',
+      Cyber: 'サイバー',
+      Circuit: 'サーキット',
+      Matrix: 'マトリクス',
+      Digital: 'デジタル',
+      Hologram: 'ホログラム',
+      Vapor: 'ベイパー',
+      Fantasy: 'ファンタジー',
+      Storybook: 'ストーリーブック',
+      Adventure: 'アドベンチャー',
+      Dungeon: 'ダンジョン',
+      Castle: 'キャッスル',
+      Kingdom: 'キングダム',
+      Hero: 'ヒーロー',
+      Villain: 'ヴィラン',
+      Monster: 'モンスター',
+      Slime: 'スライム',
+      Dragon: 'ドラゴン',
+      Treasure: 'トレジャー',
+      Magic: 'マジック',
+      Potion: 'ポーション',
+      Rune: 'ルーン',
+      Relic: 'レリック',
+      Artifact: 'アーティファクト',
+      Portal: 'ポータル',
+      Temple: 'テンプル',
+      Shrine: 'シュライン',
+      Arena: 'アリーナ',
+      Battle: 'バトル',
+      Victory: 'ビクトリー',
+      Quest: 'クエスト',
+      Journey: 'ジャーニー',
+      Frontier: 'フロンティア',
+      Island: 'アイランド',
+      Harbor: 'ハーバー',
+      City: 'シティ',
+      Metro: 'メトロ',
+      Skyline: 'スカイライン',
+      Alley: 'アレイ',
+      Lantern: 'ランタン',
+      Festival: 'フェスティバル',
+      Carnival: 'カーニバル',
+      Fireworks: 'ファイアワークス',
+      Stardust: 'スターダスト',
+      Comet: 'コメット',
+      Orbit: 'オービット',
+      Satellite: 'サテライト',
+      Signal: 'シグナル',
+      Spectrum: 'スペクトラム',
+      Gradient: 'グラデーション',
+      Harmony: 'ハーモニー',
+      Balance: 'バランス',
+      Contrast: 'コントラスト',
+      Echo: 'エコー',
+      Pulse: 'パルス',
+      Wave: 'ウェーブ',
+      Flux: 'フラックス',
+      Spark: 'スパーク',
+      Radiance: 'レイディアンス',
+      Bloom: 'ブルーム',
+      Garden: 'ガーデン',
+      Orchard: 'オーチャード',
+      Vineyard: 'ヴィンヤード',
+      River: 'リバー',
+      Waterfall: 'ウォーターフォール',
+      Cliff: 'クリフ',
+      Valley: 'バレー',
+      Prairie: 'プレーリー',
+      Savannah: 'サバンナ',
+      Tundra: 'ツンドラ',
+      Solar: 'ソーラー',
+      Wind: 'ウィンド',
+      Lunar: 'ルナー',
+      Dust: 'ダスト',
+      Stellar: 'ステラ',
+    });
+    const tokens = splitPalettePresetNameTokens(name);
+    if (!tokens.length) {
+      return String(name || '');
+    }
+    return tokens
+      .map(token => (Object.prototype.hasOwnProperty.call(tokenMap, token) ? tokenMap[token] : token))
+      .join('')
+      .replace(/pixel/gi, '')
+      .trim();
+  }
+
+  function normalizePalettePresetDisplayName(name) {
+    return String(name || '')
+      .replace(/\bpixel\b/gi, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+  }
+
+  function resolveNewProjectPaletteColorCount(name) {
+    const normalized = String(name || '').trim().toLowerCase();
+    if (!normalized) {
+      return 16;
+    }
+    if (
+      normalized === 'pixel core'
+      || normalized === 'pixel ink'
+      || normalized === 'pixel shadow'
+      || normalized === 'old screen'
+    ) {
+      return 4;
+    }
+    if (
+      normalized.includes('bits')
+      || normalized.includes('mist')
+      || normalized.includes('fog')
+      || normalized.includes('frost')
+      || normalized.includes('stone')
+      || normalized.includes('iron')
+      || normalized.includes('slime')
+      || normalized.includes('dungeon')
+    ) {
+      return 8;
+    }
+    if (
+      normalized.includes('neon')
+      || normalized.includes('galaxy')
+      || normalized.includes('cosmos')
+      || normalized.includes('nebula')
+      || normalized.includes('aurora')
+      || normalized.includes('cyber')
+      || normalized.includes('circuit')
+      || normalized.includes('matrix')
+      || normalized.includes('digital')
+      || normalized.includes('hologram')
+      || normalized.includes('spectrum')
+      || normalized.includes('gradient')
+      || normalized.includes('fireworks')
+      || normalized.includes('stardust')
+      || normalized.includes('comet')
+      || normalized.includes('orbit')
+      || normalized.includes('satellite')
+      || normalized.includes('solarwind')
+      || normalized.includes('stellarwind')
+    ) {
+      return 32;
+    }
+    if (
+      normalized.includes('classic')
+      || normalized.includes('vintage')
+      || normalized.includes('pastel')
+      || normalized.includes('forest')
+      || normalized.includes('meadow')
+      || normalized.includes('desert')
+      || normalized.includes('mountain')
+      || normalized.includes('snow')
+      || normalized.includes('clay')
+      || normalized.includes('bronze')
+      || normalized.includes('silver')
+      || normalized.includes('gold')
+      || normalized.includes('castle')
+      || normalized.includes('kingdom')
+    ) {
+      return 16;
+    }
+    return 24;
+  }
+
+  function getNewProjectPalettePresetDefinition(presetId, fallbackPresetId = NEW_PROJECT_PALETTE_PRESET_DEFAULT) {
+    const normalized = normalizeNewProjectPalettePreset(presetId, fallbackPresetId);
+    return NEW_PROJECT_PALETTE_PRESET_MAP.get(normalized)
+      || NEW_PROJECT_PALETTE_PRESET_MAP.get(NEW_PROJECT_PALETTE_PRESET_DEFAULT)
+      || null;
+  }
+
+  function normalizeNewProjectPalettePreset(value, fallback = NEW_PROJECT_PALETTE_PRESET_DEFAULT) {
+    const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+    if (NEW_PROJECT_PALETTE_PRESET_SET.has(normalized)) {
+      return normalized;
+    }
+    return NEW_PROJECT_PALETTE_PRESET_SET.has(fallback)
+      ? fallback
+      : NEW_PROJECT_PALETTE_PRESET_DEFAULT;
+  }
+
+  function normalizeCurrentPalettePreset(value, fallback = CURRENT_PALETTE_PRESET_CUSTOM) {
+    const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+    if (normalized === CURRENT_PALETTE_PRESET_CUSTOM || NEW_PROJECT_PALETTE_PRESET_SET.has(normalized)) {
+      return normalized;
+    }
+    if (fallback === CURRENT_PALETTE_PRESET_CUSTOM || NEW_PROJECT_PALETTE_PRESET_SET.has(fallback)) {
+      return fallback;
+    }
+    return CURRENT_PALETTE_PRESET_CUSTOM;
+  }
+
+  function hashTextToUint32(value) {
+    const text = String(value || '');
+    let hash = 2166136261;
+    for (let index = 0; index < text.length; index += 1) {
+      hash ^= text.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+    return hash >>> 0;
+  }
+
+  function mixUint32Hash(hash, value) {
+    return Math.imul((hash >>> 0) ^ (Math.round(Number(value) || 0) >>> 0), 16777619) >>> 0;
+  }
+
+  function mixTextHash(hash, value) {
+    return mixUint32Hash(hash, hashTextToUint32(value));
+  }
+
+  function hslToRgbColor(h, s, l) {
+    const hue = ((Number(h) % 360) + 360) % 360;
+    const sat = clamp(Number(s), 0, 100) / 100;
+    const lig = clamp(Number(l), 0, 100) / 100;
+    if (sat <= 0) {
+      const gray = clamp(Math.round(lig * 255), 0, 255);
+      return { r: gray, g: gray, b: gray, a: 255 };
+    }
+    const c = (1 - Math.abs(2 * lig - 1)) * sat;
+    const hPrime = hue / 60;
+    const x = c * (1 - Math.abs((hPrime % 2) - 1));
+    let r1 = 0;
+    let g1 = 0;
+    let b1 = 0;
+    if (hPrime >= 0 && hPrime < 1) {
+      r1 = c;
+      g1 = x;
+    } else if (hPrime < 2) {
+      r1 = x;
+      g1 = c;
+    } else if (hPrime < 3) {
+      g1 = c;
+      b1 = x;
+    } else if (hPrime < 4) {
+      g1 = x;
+      b1 = c;
+    } else if (hPrime < 5) {
+      r1 = x;
+      b1 = c;
+    } else {
+      r1 = c;
+      b1 = x;
+    }
+    const m = lig - (c / 2);
+    return {
+      r: clamp(Math.round((r1 + m) * 255), 0, 255),
+      g: clamp(Math.round((g1 + m) * 255), 0, 255),
+      b: clamp(Math.round((b1 + m) * 255), 0, 255),
+      a: 255,
+    };
+  }
+
+  function generateNewProjectPaletteColors(definition) {
+    const count = clamp(Math.round(Number(definition?.colorCount) || 16), 4, 32);
+    const colorSlots = Math.max(1, count - 1);
+    const seed = hashTextToUint32(definition?.id || definition?.name || 'pixel-core');
+    const baseHue = seed % 360;
+    const baseSaturation = 42 + (seed % 36);
+    const colors = [{ r: 0, g: 0, b: 0, a: 0 }];
+    for (let index = 0; index < colorSlots; index += 1) {
+      const t = colorSlots > 1 ? index / (colorSlots - 1) : 0;
+      const band = index % 4;
+      const hue = (baseHue + (t * 248) + (band * 11)) % 360;
+      const saturation = clamp(baseSaturation + ((index % 5) - 2) * 6, 30, 90);
+      const lightnessBase = 14 + (t * 72);
+      const lightness = clamp(lightnessBase + (band === 0 ? -6 : band === 3 ? 6 : 0), 8, 94);
+      colors.push(hslToRgbColor(hue, saturation, lightness));
+    }
+    return colors.map(color => normalizeColorValue(color));
+  }
+
+  function getNewProjectPalettePresetColors(presetId, fallbackPresetId = NEW_PROJECT_PALETTE_PRESET_DEFAULT) {
+    const definition = getNewProjectPalettePresetDefinition(presetId, fallbackPresetId);
+    if (!definition) {
+      return [{ r: 0, g: 0, b: 0, a: 0 }];
+    }
+    const cached = newProjectPalettePresetColorCache.get(definition.id);
+    if (Array.isArray(cached) && cached.length) {
+      return cached.map(color => normalizeColorValue(color));
+    }
+    const generated = generateNewProjectPaletteColors(definition);
+    newProjectPalettePresetColorCache.set(definition.id, generated);
+    return generated.map(color => normalizeColorValue(color));
+  }
+
+  function createRgbModeDefaultPalette() {
+    return [
+      { r: 0, g: 0, b: 0, a: 0 },
+      { r: 0, g: 0, b: 0, a: 255 },
+      { r: 255, g: 255, b: 255, a: 255 },
+      { r: 255, g: 0, b: 0, a: 255 },
+      { r: 255, g: 128, b: 0, a: 255 },
+      { r: 255, g: 255, b: 0, a: 255 },
+      { r: 128, g: 255, b: 0, a: 255 },
+      { r: 0, g: 255, b: 0, a: 255 },
+      { r: 0, g: 255, b: 255, a: 255 },
+      { r: 0, g: 128, b: 255, a: 255 },
+      { r: 0, g: 0, b: 255, a: 255 },
+      { r: 128, g: 0, b: 255, a: 255 },
+      { r: 255, g: 0, b: 255, a: 255 },
+      { r: 255, g: 128, b: 192, a: 255 },
+      { r: 128, g: 128, b: 128, a: 255 },
+      { r: 192, g: 192, b: 192, a: 255 },
+    ].map(color => normalizeColorValue(color));
+  }
 
   function getPalettePresetDisplayName(definition, language = (uiLanguage === UI_LANGUAGE_JA ? UI_LANGUAGE_JA : UI_LANGUAGE_EN)) {
     if (!definition || typeof definition !== 'object') {
@@ -1989,6 +2413,30 @@
     menu.appendChild(fragment);
   }
 
+  function loadStoredNewProjectPalettePresetId() {
+    if (!canUseSessionStorage) {
+      return NEW_PROJECT_PALETTE_PRESET_DEFAULT;
+    }
+    try {
+      const stored = window.localStorage.getItem(NEW_PROJECT_PALETTE_PRESET_STORAGE_KEY) || '';
+      return normalizeNewProjectPalettePreset(stored, NEW_PROJECT_PALETTE_PRESET_DEFAULT);
+    } catch (error) {
+      return NEW_PROJECT_PALETTE_PRESET_DEFAULT;
+    }
+  }
+
+  function storeNewProjectPalettePresetId(presetId) {
+    if (!canUseSessionStorage) {
+      return;
+    }
+    const normalized = normalizeNewProjectPalettePreset(presetId, NEW_PROJECT_PALETTE_PRESET_DEFAULT);
+    try {
+      window.localStorage.setItem(NEW_PROJECT_PALETTE_PRESET_STORAGE_KEY, normalized);
+    } catch (error) {
+      // Ignore localStorage errors.
+    }
+  }
+
   function setNewProjectPalettePresetId(presetId, { persist = true, syncControl = true } = {}) {
     const normalized = normalizeNewProjectPalettePreset(presetId, newProjectPalettePresetId || NEW_PROJECT_PALETTE_PRESET_DEFAULT);
     newProjectPalettePresetId = normalized;
@@ -2196,26 +2644,6 @@
       }),
     }),
   });
-  const navigationUtils = window.PiXiEEDrawModules?.navigation?.createNavigation?.({
-    EXTERNAL_TOOLS,
-    EXTERNAL_TOOL_PIXIEELENS_ID,
-    EXTERNAL_TOOL_QR_MAKER_ID,
-    LENS_CAMERA_RETURN_MODE_SELF,
-    LENS_CAMERA_RETURN_QUERY_KEY,
-    LENS_CAMERA_DRAW_URL_QUERY_KEY,
-    localizeText,
-  }) || {};
-  const {
-    getExternalToolDefinition,
-    getExternalToolDefinitionByAction,
-    getExternalToolLocalizedName,
-    getExternalToolLocalizedActionLabel,
-    isNativeAppRuntime,
-    buildLensCameraModeUrl,
-    buildLensCameraReturnDrawUrl,
-    buildQrEditorModeUrl,
-    buildPixieedAccountLoginHref,
-  } = navigationUtils;
   let lensImportRequested = (() => {
     if (typeof window === 'undefined') {
       return false;
@@ -2268,17 +2696,6 @@
   const SHARED_LOCAL_OP_JOURNAL_STORE = 'sharedLocalOpJournal';
   const RECENT_PROJECT_STORAGE_LOCAL = 'local';
   const RECENT_PROJECT_STORAGE_SHARED = 'shared';
-  const projectStorageUtils = window.PiXiEEDrawModules?.projectStorageUtils?.createProjectStorageUtils?.({
-    RECENT_PROJECT_STORAGE_LOCAL,
-    RECENT_PROJECT_STORAGE_SHARED,
-  }) || {};
-  const {
-    normalizeAutosaveProjectId,
-    normalizeRecentProjectStorageKind,
-    getRecentProjectStorageKind,
-    normalizeRecentProjectAccountUserId,
-    parseAutosaveTabLockPayload,
-  } = projectStorageUtils;
   const AUTOSAVE_HANDLE_KEY = 'document';
   const AUTOSAVE_ACTIVE_PROJECT_KEY = 'activeProjectId';
   const AUTOSAVE_ACTIVE_PROJECT_SYNC_KEY = 'pixieedraw:active-project-sync';
@@ -2556,35 +2973,6 @@
   );
   const CURRENT_PALETTE_PRESET_CUSTOM = 'custom';
   const newProjectPalettePresetColorCache = new Map();
-  const palettePresetUtils = window.PiXiEEDrawModules?.paletteUtils?.createPalettePresetUtils?.({
-    clamp,
-    normalizeColorValue,
-    NEW_PROJECT_PALETTE_PRESET_DEFAULT,
-    NEW_PROJECT_PALETTE_PRESET_SET,
-    NEW_PROJECT_PALETTE_PRESET_MAP,
-    CURRENT_PALETTE_PRESET_CUSTOM,
-    newProjectPalettePresetColorCache,
-    hashTextToUint32,
-    hslToRgbColor,
-  }) || {};
-  const {
-    getNewProjectPalettePresetDefinition,
-    normalizeNewProjectPalettePreset,
-    normalizeCurrentPalettePreset,
-    generateNewProjectPaletteColors,
-    getNewProjectPalettePresetColors,
-    createRgbModeDefaultPalette,
-  } = palettePresetUtils;
-  const newProjectPaletteStorageUtils = window.PiXiEEDrawModules?.storageUtils?.createNewProjectPaletteStorageUtils?.({
-    canUseSessionStorage,
-    NEW_PROJECT_PALETTE_PRESET_STORAGE_KEY,
-    NEW_PROJECT_PALETTE_PRESET_DEFAULT,
-    normalizeNewProjectPalettePreset,
-  }) || {};
-  const {
-    loadStoredNewProjectPalettePresetId,
-    storeNewProjectPalettePresetId,
-  } = newProjectPaletteStorageUtils;
   const RESIDENT_MULTI_ROOM_PROFILES = Object.freeze({});
   const MULTI_SUPABASE_MODULE_URL = 'https://esm.sh/@supabase/supabase-js@2.46.1?bundle';
   const MULTI_SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
@@ -2654,26 +3042,28 @@
   const QR_EDIT_MODE_TARGET_SOURCE = 'qrmaker';
   const QR_EDIT_CHECK_DELAY_MS = 90;
   const QR_EDIT_SCAN_CANVAS_SIZE = 640;
-  const importUtils = window.PiXiEEDrawModules?.importUtils?.createImportUtils?.({
-    EXTERNAL_IMPORT_MODE_APPEND_TAB,
-    EXTERNAL_IMPORT_MODE_NEW_PROJECT,
-  }) || {};
-  const {
-    normalizeExternalImportMode,
-    shouldAppendExternalImportToProject,
-    isLensImportPayload,
-  } = importUtils;
-  const qrUtils = window.PiXiEEDrawModules?.qrUtils?.createQrUtils?.({
-    QR_EDIT_MODE_TARGET_SOURCE,
-    normalizeAutosaveProjectId,
-  }) || {};
-  const {
-    normalizeQrEditPayload,
-    canUseQrEditJsQrDecoder,
-  } = qrUtils;
   const PIXFIND_UPLOAD_KEY = 'pixfind_creator_upload_v1';
   let pendingLensImportMessagePayload = null;
   let pendingLensImportMessageResolvers = [];
+
+  function normalizeExternalImportMode(value) {
+    return value === EXTERNAL_IMPORT_MODE_APPEND_TAB
+      ? EXTERNAL_IMPORT_MODE_APPEND_TAB
+      : EXTERNAL_IMPORT_MODE_NEW_PROJECT;
+  }
+
+  function shouldAppendExternalImportToProject(payload) {
+    return normalizeExternalImportMode(payload?.importMode) === EXTERNAL_IMPORT_MODE_APPEND_TAB;
+  }
+
+  function isLensImportPayload(payload) {
+    return Boolean(
+      payload
+      && typeof payload === 'object'
+      && typeof payload.dataUrl === 'string'
+      && payload.dataUrl.startsWith('data:image/')
+    );
+  }
 
   function acceptLensImportPayloadFromMessage(payload) {
     if (!isLensImportPayload(payload)) {
@@ -2909,19 +3299,6 @@
   const TIMELAPSE_MAX_FPS = 60;
   const TIMELAPSE_MAX_STEPS = 120;
   const TIMELAPSE_CAPTURE_DEBOUNCE_MS = isLightweightPersistenceMode() ? 1000 : 48;
-  const timelapseUtils = window.PiXiEEDrawModules?.timelapseUtils?.createTimelapseUtils?.({
-    TIMELAPSE_DEFAULT_FPS,
-    TIMELAPSE_MIN_FPS,
-    TIMELAPSE_MAX_FPS,
-    clamp,
-  }) || {};
-  const {
-    normalizeTimelapseFps,
-    createEmptyTimelapseTrack,
-    createEmptyTimelapseOperationLog,
-    normalizeFpsValue,
-    getDurationFromFps,
-  } = timelapseUtils;
   const timelapseState = {
     enabled: false,
     tracksByCanvasId: Object.create(null),
@@ -3129,24 +3506,137 @@
   let sharedProjectFreeCellEnsureTimer = null;
   let sharedProjectFreeCellEnsureInFlight = false;
   let sharedProjectLastAutoLayerAddedAt = 0;
-  const localRestoreStorageUtils = window.PiXiEEDrawModules?.storageUtils?.createLocalRestoreStorageUtils?.({
-    accountState,
-    canUseSessionStorage,
-    AUTOSAVE_ACTIVE_PROJECT_SYNC_KEY,
-    RELOAD_TARGET_PROJECT_ID_KEY,
-    RELOAD_PROJECT_FALLBACK_STORAGE_KEY,
-  }) || {};
-  const {
-    getCurrentAccountStorageNamespace,
-    getScopedStorageKey,
-    getLocalRestoreStorageKeys,
-    isTabLocalRestoreOnlyKey,
-    writeSessionStorageForLocalRestore,
-    writeLocalStorageForLocalRestore,
-    readSessionStorageForLocalRestore,
-    readLocalStorageForLocalRestore,
-    clearLocalRestoreStorage,
-  } = localRestoreStorageUtils;
+  function getCurrentAccountStorageNamespace() {
+    const userId = typeof accountState.userId === 'string' ? accountState.userId.trim() : '';
+    return userId || 'anonymous';
+  }
+
+  function getScopedStorageKey(baseKey, namespace = getCurrentAccountStorageNamespace()) {
+    const normalizedBaseKey = typeof baseKey === 'string' ? baseKey.trim() : '';
+    const normalizedNamespace = typeof namespace === 'string' ? namespace.trim() : '';
+    if (!normalizedBaseKey) {
+      return '';
+    }
+    if (!normalizedNamespace) {
+      return normalizedBaseKey;
+    }
+    return `${normalizedBaseKey}:${normalizedNamespace}`;
+  }
+
+  function getLocalRestoreStorageKeys(baseKey) {
+    const normalizedBaseKey = typeof baseKey === 'string' ? baseKey.trim() : '';
+    if (!normalizedBaseKey) {
+      return [];
+    }
+    const keys = [normalizedBaseKey];
+    const scopedKey = getScopedStorageKey(normalizedBaseKey);
+    if (scopedKey && scopedKey !== normalizedBaseKey) {
+      keys.push(scopedKey);
+    }
+    return keys;
+  }
+
+  function isTabLocalRestoreOnlyKey(baseKey) {
+    return baseKey === AUTOSAVE_ACTIVE_PROJECT_SYNC_KEY
+      || baseKey === RELOAD_TARGET_PROJECT_ID_KEY
+      || baseKey === RELOAD_PROJECT_FALLBACK_STORAGE_KEY;
+  }
+
+  function writeSessionStorageForLocalRestore(baseKey, value) {
+    if (!canUseSessionStorage) {
+      return;
+    }
+    getLocalRestoreStorageKeys(baseKey).forEach(key => {
+      try {
+        window.sessionStorage.setItem(key, value);
+      } catch (error) {
+        // Ignore storage write failures.
+      }
+    });
+  }
+
+  function writeLocalStorageForLocalRestore(baseKey, value) {
+    if (!canUseSessionStorage) {
+      return;
+    }
+    if (isTabLocalRestoreOnlyKey(baseKey)) {
+      return;
+    }
+    getLocalRestoreStorageKeys(baseKey).forEach(key => {
+      try {
+        window.localStorage.setItem(key, value);
+      } catch (error) {
+        // Ignore storage write failures.
+      }
+    });
+  }
+
+  function readSessionStorageForLocalRestore(baseKey) {
+    if (!canUseSessionStorage) {
+      return '';
+    }
+    const keys = getLocalRestoreStorageKeys(baseKey);
+    for (let index = 0; index < keys.length; index += 1) {
+      const key = keys[index];
+      try {
+        const value = window.sessionStorage.getItem(key) || '';
+        if (value) {
+          return value;
+        }
+      } catch (error) {
+        // Ignore storage read failures.
+      }
+    }
+    return '';
+  }
+
+  function readLocalStorageForLocalRestore(baseKey) {
+    if (!canUseSessionStorage) {
+      return '';
+    }
+    if (isTabLocalRestoreOnlyKey(baseKey)) {
+      return '';
+    }
+    const keys = getLocalRestoreStorageKeys(baseKey);
+    for (let index = 0; index < keys.length; index += 1) {
+      const key = keys[index];
+      try {
+        const value = window.localStorage.getItem(key) || '';
+        if (value) {
+          return value;
+        }
+      } catch (error) {
+        // Ignore storage read failures.
+      }
+    }
+    return '';
+  }
+
+  function clearLocalRestoreStorage(baseKey) {
+    if (!canUseSessionStorage) {
+      return;
+    }
+    getLocalRestoreStorageKeys(baseKey).forEach(key => {
+      try {
+        window.sessionStorage.removeItem(key);
+      } catch (error) {
+        // Ignore sessionStorage cleanup failures.
+      }
+      if (isTabLocalRestoreOnlyKey(baseKey)) {
+        return;
+      }
+      try {
+        window.localStorage.removeItem(key);
+      } catch (error) {
+        // Ignore localStorage cleanup failures.
+      }
+    });
+  }
+
+  function normalizeRecentProjectAccountUserId(value = '') {
+    const normalized = typeof value === 'string' ? value.trim() : '';
+    return normalized || 'anonymous';
+  }
 
   function getCurrentRecentProjectAccountUserId() {
     return normalizeRecentProjectAccountUserId(accountState.userId || '');
@@ -3542,42 +4032,6 @@
   const ONION_SKIN_TINT_NEXT = Object.freeze({ r: 255, g: 170, b: 112 });
   const COLOR_MODE_INDEX = 'index';
   const COLOR_MODE_RGB = 'rgb';
-  const stateNormalizers = window.PiXiEEDrawModules?.stateNormalizers?.createStateNormalizers?.({
-    clamp,
-    DEFAULT_LAYER_BLEND_MODE,
-    LAYER_BLEND_MODE_SET,
-    ONION_SKIN_MAX_FRAMES,
-    DEFAULT_ONION_SKIN,
-    DEFAULT_UI_THEME,
-    UI_THEME_SET,
-    BRUSH_SHAPE_SQUARE,
-    BRUSH_SHAPE_SET,
-    SELECT_SAME_MODE_CONNECTED,
-    SELECT_SAME_MODE_SET,
-    FILL_STYLE_SOLID,
-    FILL_STYLE_SET,
-    SELECTION_SHAPE_MODE_CONTENT,
-    SELECTION_SHAPE_MODE_SET,
-    CUSTOM_BRUSH_MAX_PIXELS,
-    encodeTypedArray,
-    decodeBase64,
-  }) || {};
-  const {
-    normalizeLayerBlendMode,
-    normalizeLayerOpacity,
-    normalizeOnionFrameCount,
-    normalizeOnionOpacity,
-    normalizeOnionSkinState,
-    normalizeUiTheme,
-    normalizeBrushShape,
-    normalizeSelectSameMode,
-    normalizeFillStyle,
-    normalizeSelectionShapeMode,
-    normalizeCustomBrushData,
-    isCustomBrushData,
-    serializeCustomBrushPayload,
-    deserializeCustomBrushPayload,
-  } = stateNormalizers;
   const FLOATING_PREVIEW_MIN_SIZE = 120;
   const FLOATING_PREVIEW_MAX_SIZE = 640;
   const FLOATING_PREVIEW_DEFAULT_STATE = Object.freeze({
@@ -4307,6 +4761,74 @@
     mirrorState.axisY = centered.axisY;
   }
 
+  function normalizeLayerBlendMode(value) {
+    if (typeof value !== 'string') {
+      return DEFAULT_LAYER_BLEND_MODE;
+    }
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'softlight') {
+      return 'soft-light';
+    }
+    if (normalized === 'hardlight') {
+      return 'hard-light';
+    }
+    if (normalized === 'colordodge') {
+      return 'color-dodge';
+    }
+    if (normalized === 'colorburn') {
+      return 'color-burn';
+    }
+    return LAYER_BLEND_MODE_SET.has(normalized) ? normalized : DEFAULT_LAYER_BLEND_MODE;
+  }
+
+  function normalizeLayerOpacity(value) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      return 1;
+    }
+    return clamp(parsed, 0, 1);
+  }
+
+  function normalizeOnionFrameCount(value, fallback = 0) {
+    const parsed = Number(value);
+    const safeFallback = clamp(Math.round(Number(fallback) || 0), 0, ONION_SKIN_MAX_FRAMES);
+    if (!Number.isFinite(parsed)) {
+      return safeFallback;
+    }
+    return clamp(Math.round(parsed), 0, ONION_SKIN_MAX_FRAMES);
+  }
+
+  function normalizeOnionOpacity(value, fallback = DEFAULT_ONION_SKIN.opacity) {
+    const parsed = Number(value);
+    const safeFallback = clamp(Number(fallback) || 0, 0, 1);
+    if (!Number.isFinite(parsed)) {
+      return safeFallback;
+    }
+    return clamp(parsed, 0, 1);
+  }
+
+  function normalizeOnionSkinState(source) {
+    const settings = source && typeof source === 'object' ? source : {};
+    return {
+      enabled: Boolean(settings.enabled),
+      prevFrames: normalizeOnionFrameCount(settings.prevFrames, DEFAULT_ONION_SKIN.prevFrames),
+      nextFrames: normalizeOnionFrameCount(settings.nextFrames, DEFAULT_ONION_SKIN.nextFrames),
+      opacity: normalizeOnionOpacity(settings.opacity, DEFAULT_ONION_SKIN.opacity),
+    };
+  }
+
+  function normalizeUiTheme(value, fallback = DEFAULT_UI_THEME) {
+    const normalizedValue = typeof value === 'string' ? value.trim().toLowerCase() : '';
+    if (UI_THEME_SET.has(normalizedValue)) {
+      return normalizedValue;
+    }
+    const normalizedFallback = typeof fallback === 'string' ? fallback.trim().toLowerCase() : '';
+    if (UI_THEME_SET.has(normalizedFallback)) {
+      return normalizedFallback;
+    }
+    return DEFAULT_UI_THEME;
+  }
+
   function normalizeFloatingPreviewState(source, fallback = FLOATING_PREVIEW_DEFAULT_STATE) {
     const settings = source && typeof source === 'object' ? source : {};
     const safeFallback = fallback && typeof fallback === 'object'
@@ -4630,6 +5152,42 @@
     return getZoomScaleForRatio(1, { width, height });
   }
 
+  function normalizeBrushShape(value, fallback = BRUSH_SHAPE_SQUARE) {
+    const normalizedValue = typeof value === 'string' ? value.trim().toLowerCase() : '';
+    if (BRUSH_SHAPE_SET.has(normalizedValue)) {
+      return normalizedValue;
+    }
+    const normalizedFallback = typeof fallback === 'string' ? fallback.trim().toLowerCase() : '';
+    if (BRUSH_SHAPE_SET.has(normalizedFallback)) {
+      return normalizedFallback;
+    }
+    return BRUSH_SHAPE_SQUARE;
+  }
+
+  function normalizeSelectSameMode(value, fallback = SELECT_SAME_MODE_CONNECTED) {
+    const normalizedValue = typeof value === 'string' ? value.trim().toLowerCase() : '';
+    if (SELECT_SAME_MODE_SET.has(normalizedValue)) {
+      return normalizedValue;
+    }
+    const normalizedFallback = typeof fallback === 'string' ? fallback.trim().toLowerCase() : '';
+    if (SELECT_SAME_MODE_SET.has(normalizedFallback)) {
+      return normalizedFallback;
+    }
+    return SELECT_SAME_MODE_CONNECTED;
+  }
+
+  function normalizeFillStyle(value, fallback = FILL_STYLE_SOLID) {
+    const normalizedValue = typeof value === 'string' ? value.trim().toLowerCase() : '';
+    if (FILL_STYLE_SET.has(normalizedValue)) {
+      return normalizedValue;
+    }
+    const normalizedFallback = typeof fallback === 'string' ? fallback.trim().toLowerCase() : '';
+    if (FILL_STYLE_SET.has(normalizedFallback)) {
+      return normalizedFallback;
+    }
+    return FILL_STYLE_SOLID;
+  }
+
   function isGradientFillStyle(value = state.fillStyle) {
     const normalized = normalizeFillStyle(value, FILL_STYLE_SOLID);
     return normalized === FILL_STYLE_RGB_GRADIENT || normalized === FILL_STYLE_DITHER_GRADIENT;
@@ -4665,6 +5223,106 @@
     return FILL_TOOLS.has(tool)
       ? getFillStyleForTool(tool)
       : normalizeFillStyle(state.fillStyle, FILL_STYLE_SOLID);
+  }
+
+  function normalizeSelectionShapeMode(value, fallback = SELECTION_SHAPE_MODE_CONTENT) {
+    const normalizedValue = typeof value === 'string' ? value.trim().toLowerCase() : '';
+    if (SELECTION_SHAPE_MODE_SET.has(normalizedValue)) {
+      return normalizedValue;
+    }
+    const normalizedFallback = typeof fallback === 'string' ? fallback.trim().toLowerCase() : '';
+    if (SELECTION_SHAPE_MODE_SET.has(normalizedFallback)) {
+      return normalizedFallback;
+    }
+    return SELECTION_SHAPE_MODE_CONTENT;
+  }
+
+  function normalizeCustomBrushData(source) {
+    if (!source || typeof source !== 'object' || !Array.isArray(source.offsets)) {
+      return null;
+    }
+    const offsets = [];
+    for (let i = 0; i < source.offsets.length; i += 1) {
+      if (offsets.length >= CUSTOM_BRUSH_MAX_PIXELS) {
+        break;
+      }
+      const entry = source.offsets[i];
+      if (!entry || typeof entry !== 'object') {
+        continue;
+      }
+      const dx = Number(entry.dx);
+      const dy = Number(entry.dy);
+      if (!Number.isFinite(dx) || !Number.isFinite(dy)) {
+        continue;
+      }
+      offsets.push({ dx: clamp(Math.round(dx), -8192, 8192), dy: clamp(Math.round(dy), -8192, 8192) });
+    }
+    if (!offsets.length) {
+      return null;
+    }
+    const width = clamp(Math.round(Number(source.width) || 1), 1, 4096);
+    const height = clamp(Math.round(Number(source.height) || 1), 1, 4096);
+    return {
+      offsets,
+      pixelCount: offsets.length,
+      width,
+      height,
+    };
+  }
+
+  function isCustomBrushData(brush) {
+    return Boolean(
+      brush
+      && typeof brush === 'object'
+      && Array.isArray(brush.offsets)
+      && brush.offsets.length > 0
+      && Number.isFinite(brush.pixelCount)
+      && brush.pixelCount > 0
+    );
+  }
+
+  function serializeCustomBrushPayload(brush) {
+    const normalized = normalizeCustomBrushData(brush);
+    if (!normalized) {
+      return null;
+    }
+    const packed = new Int16Array(normalized.offsets.length * 2);
+    for (let i = 0; i < normalized.offsets.length; i += 1) {
+      const offset = normalized.offsets[i];
+      packed[i * 2] = offset.dx;
+      packed[(i * 2) + 1] = offset.dy;
+    }
+    return {
+      width: normalized.width,
+      height: normalized.height,
+      offsets: encodeTypedArray(packed),
+    };
+  }
+
+  function deserializeCustomBrushPayload(payload) {
+    if (!payload || typeof payload !== 'object' || typeof payload.offsets !== 'string') {
+      return null;
+    }
+    const bytes = decodeBase64(payload.offsets);
+    if (!bytes.length || bytes.length % 2 !== 0) {
+      return null;
+    }
+    const source = new Int16Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 2);
+    if (source.length % 2 !== 0) {
+      return null;
+    }
+    const offsets = [];
+    for (let i = 0; i < source.length; i += 2) {
+      if (offsets.length >= CUSTOM_BRUSH_MAX_PIXELS) {
+        break;
+      }
+      offsets.push({ dx: source[i], dy: source[i + 1] });
+    }
+    return normalizeCustomBrushData({
+      width: payload.width,
+      height: payload.height,
+      offsets,
+    });
   }
 
   function getCustomBrushPixelCount(brush = state.customBrush) {
@@ -6870,18 +7528,176 @@
     }
   }
 
-  const binaryCodecs = window.PiXiEEDrawModules?.binaryCodecs?.createBinaryCodecs?.() || {};
-  const {
-    encodeInt16Rle,
-    decodeInt16Data,
-    encodeUint8Rle,
-    decodeUint8Data,
-    compressInt16Array,
-    compressUint8Array,
-    estimateEncodedByteLength,
-    encodeTypedArray: encodeTypedArrayBinary,
-    decodeBase64: decodeBase64Binary,
-  } = binaryCodecs;
+  function encodeInt16Rle(view) {
+    const length = view.length;
+    if (length === 0) {
+      return { type: 'int16-rle', length: 0, values: new Int16Array(0), counts: new Uint32Array(0) };
+    }
+    const values = [];
+    const counts = [];
+    let current = view[0];
+    let count = 1;
+    for (let i = 1; i < length; i += 1) {
+      const value = view[i];
+      if (value === current) {
+        count += 1;
+      } else {
+        values.push(current);
+        counts.push(count);
+        current = value;
+        count = 1;
+      }
+    }
+    values.push(current);
+    counts.push(count);
+    const valueArray = new Int16Array(values.length);
+    for (let i = 0; i < values.length; i += 1) {
+      valueArray[i] = values[i];
+    }
+    const countArray = new Uint32Array(counts.length);
+    for (let i = 0; i < counts.length; i += 1) {
+      countArray[i] = counts[i];
+    }
+    return { type: 'int16-rle', length, values: valueArray, counts: countArray };
+  }
+
+  function decodeInt16Data(source) {
+    if (!source) {
+      return new Int16Array(0);
+    }
+    if (source instanceof Int16Array) {
+      return new Int16Array(source);
+    }
+    if (ArrayBuffer.isView(source) && source.BYTES_PER_ELEMENT === 2) {
+      return new Int16Array(source.buffer.slice(source.byteOffset, source.byteOffset + source.byteLength));
+    }
+    if (typeof source === 'object' && source.type === 'int16-rle') {
+      const { length, values, counts } = source;
+      const output = new Int16Array(length);
+      let offset = 0;
+      for (let i = 0; i < values.length; i += 1) {
+        const runValue = values[i];
+        const runLength = counts[i];
+        output.fill(runValue, offset, offset + runLength);
+        offset += runLength;
+      }
+      return output;
+    }
+    throw new Error('Unsupported Int16 encoding');
+  }
+
+  function encodeUint8Rle(view) {
+    const length = view.length;
+    if (length === 0) {
+      return { type: 'uint8-rle', length: 0, values: new Uint8Array(0), counts: new Uint32Array(0) };
+    }
+    const values = [];
+    const counts = [];
+    let current = view[0];
+    let count = 1;
+    for (let i = 1; i < length; i += 1) {
+      const value = view[i];
+      if (value === current) {
+        count += 1;
+      } else {
+        values.push(current);
+        counts.push(count);
+        current = value;
+        count = 1;
+      }
+    }
+    values.push(current);
+    counts.push(count);
+    const valueArray = new Uint8Array(values.length);
+    for (let i = 0; i < values.length; i += 1) {
+      valueArray[i] = values[i];
+    }
+    const countArray = new Uint32Array(counts.length);
+    for (let i = 0; i < counts.length; i += 1) {
+      countArray[i] = counts[i];
+    }
+    return { type: 'uint8-rle', length, values: valueArray, counts: countArray };
+  }
+
+  function decodeUint8Data(source, { clamped = false } = {}) {
+    if (!source) {
+      return clamped ? new Uint8ClampedArray(0) : new Uint8Array(0);
+    }
+    if (ArrayBuffer.isView(source) && source.BYTES_PER_ELEMENT === 1 && source.constructor !== Uint32Array) {
+      const buffer = source.buffer.slice(source.byteOffset, source.byteOffset + source.byteLength);
+      return clamped ? new Uint8ClampedArray(buffer) : new Uint8Array(buffer);
+    }
+    if (typeof source === 'object' && source.type === 'uint8-rle') {
+      const { length, values, counts } = source;
+      const shouldClamp = Object.prototype.hasOwnProperty.call(source, 'clamped') ? Boolean(source.clamped) : clamped;
+      const output = shouldClamp ? new Uint8ClampedArray(length) : new Uint8Array(length);
+      let offset = 0;
+      for (let i = 0; i < values.length; i += 1) {
+        const runValue = values[i];
+        const runLength = counts[i];
+        output.fill(runValue, offset, offset + runLength);
+        offset += runLength;
+      }
+      return output;
+    }
+    throw new Error('Unsupported Uint8 encoding');
+  }
+
+  function compressInt16Array(view) {
+    if (!view) {
+      return new Int16Array(0);
+    }
+    if (!(view instanceof Int16Array)) {
+      view = new Int16Array(view);
+    }
+    const encoded = encodeInt16Rle(view);
+    const encodedBytes = encoded.values.byteLength + encoded.counts.byteLength;
+    if (encodedBytes >= view.byteLength) {
+      return view.slice();
+    }
+    return encoded;
+  }
+
+  function compressUint8Array(view, { clamped = false } = {}) {
+    if (!view) {
+      return clamped ? new Uint8ClampedArray(0) : new Uint8Array(0);
+    }
+    const source = clamped && view instanceof Uint8ClampedArray ? view : new Uint8Array(view);
+    const encoded = encodeUint8Rle(source);
+    const encodedBytes = encoded.values.byteLength + encoded.counts.byteLength;
+    const originalBytes = source.byteLength;
+    if (encodedBytes >= originalBytes) {
+      if (clamped) {
+        return view instanceof Uint8ClampedArray ? view.slice() : new Uint8ClampedArray(source);
+      }
+      return source.slice ? source.slice() : new Uint8Array(source);
+    }
+    return { ...encoded, clamped: Boolean(clamped) };
+  }
+
+  function estimateEncodedByteLength(data, elementSize) {
+    if (!data) return 0;
+    if (ArrayBuffer.isView(data)) {
+      return data.byteLength;
+    }
+    if (typeof data === 'object') {
+      if (data.type === 'int16-rle' || data.type === 'uint8-rle') {
+        const valuesBytes = data.values?.byteLength || 0;
+        const countsBytes = data.counts?.byteLength || 0;
+        return valuesBytes + countsBytes;
+      }
+      if (typeof data.length === 'number' && data.BYTES_PER_ELEMENT) {
+        return data.length * data.BYTES_PER_ELEMENT;
+      }
+    }
+    if (typeof data.length === 'number' && Number.isFinite(elementSize)) {
+      return data.length * elementSize;
+    }
+    if (typeof data === 'string') {
+      return data.length;
+    }
+    return 0;
+  }
 
   function compressHistorySnapshot(snapshot) {
     if (!snapshot) return snapshot;
@@ -7390,6 +8206,17 @@
 
   const memoryThresholds = computeMemoryThresholds();
 
+  function formatBytes(bytes) {
+    if (!Number.isFinite(bytes) || bytes < 0) return '0 B';
+    const KB = 1024;
+    const MB = KB * 1024;
+    const GB = MB * 1024;
+    if (bytes >= GB) return `${(bytes / GB).toFixed(1)} GB`;
+    if (bytes >= MB) return `${(bytes / MB).toFixed(1)} MB`;
+    if (bytes >= KB) return `${(bytes / KB).toFixed(1)} KB`;
+    return `${bytes} B`;
+  }
+
   function updateMemoryStatus() {
     const usageNode = dom.controls.memoryUsage || document.getElementById('memoryUsage');
     if (!usageNode) return;
@@ -7822,6 +8649,53 @@
     }
   }
 
+  function extractDocumentBaseName(value) {
+    if (typeof value !== 'string') {
+      return DEFAULT_DOCUMENT_BASENAME;
+    }
+    let base = value.trim();
+    if (!base) {
+      return DEFAULT_DOCUMENT_BASENAME;
+    }
+    const removableExtensions = [
+      PROJECT_FILE_EXTENSION,
+      '.pxdraw',
+      '.json',
+      '.txt',
+      '.png',
+      '.gif',
+      '.jpg',
+      '.jpeg',
+      '.webp',
+      '.bmp',
+      '.svg',
+      '.avif',
+    ];
+    let changed = true;
+    while (changed && base) {
+      changed = false;
+      const lowerBase = base.toLowerCase();
+      for (let index = 0; index < removableExtensions.length; index += 1) {
+        const extension = removableExtensions[index];
+        if (!lowerBase.endsWith(extension)) {
+          continue;
+        }
+        base = base.slice(0, -extension.length).trim();
+        changed = true;
+        break;
+      }
+    }
+    base = base.replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, ' ').trim();
+    return base || DEFAULT_DOCUMENT_BASENAME;
+  }
+
+  function normalizeDocumentName(value) {
+    const base = extractDocumentBaseName(value);
+    const maxBaseLength = Math.max(1, 120 - PROJECT_FILE_EXTENSION.length);
+    const limitedBase = base.slice(0, maxBaseLength);
+    return `${limitedBase}${PROJECT_FILE_EXTENSION}`;
+  }
+
   function updateDocumentMetadata() {
     const name = normalizeDocumentName(state.documentName);
     if (state.documentName !== name) {
@@ -7830,6 +8704,15 @@
     const baseTitle = 'PiXiEEDraw';
     document.title = `${name} • ${baseTitle}`;
     renderOpenProjectTabs();
+  }
+
+  function sanitizeDocumentFileBase(name) {
+    const base = extractDocumentBaseName(name);
+    return base
+      .replace(/[\\/:*?"<>|]/g, '_')
+      .replace(/\s+/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_+|_+$/g, '') || DEFAULT_DOCUMENT_BASENAME.replace(/\s+/g, '_');
   }
 
   function createAutosaveFileName(name = state.documentName) {
@@ -7861,38 +8744,130 @@
     return normalizedExt ? `${safeBase}${safeSuffix}.${normalizedExt}` : `${safeBase}${safeSuffix}`;
   }
 
-  const exportUtils = window.PiXiEEDrawModules?.exportUtils || {};
-  const {
-    sanitizeNativeFilename,
-    normalizeNativeSubdirectory,
-    isLikelyFileAlreadyExistsError,
-    isNativePhotoLibraryExportMimeType,
-    splitFilenameStemAndExtension,
-    buildNumberedFilename,
-    createExportDirectoryStorageUtils,
-  } = exportUtils;
-  const exportDirectoryStorageUtils = createExportDirectoryStorageUtils?.({
-    canUseSessionStorage,
-    EXPORT_DIRECTORY_DISPLAY_LABEL_KEY,
-  }) || {};
-  const {
-    sanitizeExportDirectoryDisplayLabel,
-    buildExportDirectoryDisplayLabel,
-    loadStoredExportDirectoryDisplayLabel,
-    storeExportDirectoryDisplayLabel,
-    clearStoredExportDirectoryDisplayLabel,
-  } = exportDirectoryStorageUtils;
+  function splitFilenameStemAndExtension(filename, fallback = 'export.bin') {
+    const safeFilename = sanitizeNativeFilename(filename, fallback);
+    const match = safeFilename.match(/^(.*?)(\.[^.]*)?$/);
+    const stem = match?.[1] || safeFilename;
+    const extension = match?.[2] || '';
+    return {
+      stem: stem || 'export',
+      extension,
+    };
+  }
 
-  const exportCodecs = window.PiXiEEDrawModules?.exportCodecs?.createExportCodecs?.({
-    clamp,
-    sanitizeFilename: sanitizeNativeFilename,
-  }) || {};
-  const {
-    getZipCrc32Table,
-    computeCrc32,
-    createZipDosDateTime,
-    buildZipBlobFromTasks,
-  } = exportCodecs;
+  function buildNumberedFilename(filename, sequence = 0) {
+    const normalizedSequence = Math.max(0, Math.floor(Number(sequence) || 0));
+    const { stem, extension } = splitFilenameStemAndExtension(filename);
+    if (normalizedSequence <= 0) {
+      return `${stem}${extension}`;
+    }
+    return `${stem}.${normalizedSequence}${extension}`;
+  }
+
+  let zipCrc32Table = null;
+
+  function getZipCrc32Table() {
+    if (zipCrc32Table) {
+      return zipCrc32Table;
+    }
+    zipCrc32Table = new Uint32Array(256);
+    for (let index = 0; index < 256; index += 1) {
+      let value = index;
+      for (let bit = 0; bit < 8; bit += 1) {
+        value = (value & 1) ? (0xEDB88320 ^ (value >>> 1)) : (value >>> 1);
+      }
+      zipCrc32Table[index] = value >>> 0;
+    }
+    return zipCrc32Table;
+  }
+
+  function computeCrc32(bytes) {
+    const table = getZipCrc32Table();
+    let crc = 0xFFFFFFFF;
+    for (let index = 0; index < bytes.length; index += 1) {
+      crc = table[(crc ^ bytes[index]) & 0xFF] ^ (crc >>> 8);
+    }
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+  }
+
+  function createZipDosDateTime(date = new Date()) {
+    const year = Math.max(1980, date.getFullYear());
+    const month = clamp(date.getMonth() + 1, 1, 12);
+    const day = clamp(date.getDate(), 1, 31);
+    const hours = clamp(date.getHours(), 0, 23);
+    const minutes = clamp(date.getMinutes(), 0, 59);
+    const seconds = clamp(Math.floor(date.getSeconds() / 2), 0, 29);
+    return {
+      time: ((hours & 0x1F) << 11) | ((minutes & 0x3F) << 5) | (seconds & 0x1F),
+      date: (((year - 1980) & 0x7F) << 9) | ((month & 0x0F) << 5) | (day & 0x1F),
+    };
+  }
+
+  async function buildZipBlobFromTasks(tasks) {
+    const encoder = new TextEncoder();
+    const now = createZipDosDateTime(new Date());
+    const localParts = [];
+    const centralParts = [];
+    let localSize = 0;
+    for (let index = 0; index < tasks.length; index += 1) {
+      const task = tasks[index];
+      const filename = sanitizeNativeFilename(task.filename || `export_${index + 1}.bin`);
+      const filenameBytes = encoder.encode(filename);
+      const dataBytes = new Uint8Array(await task.blob.arrayBuffer());
+      const crc32 = computeCrc32(dataBytes);
+      const localHeader = new Uint8Array(30 + filenameBytes.length);
+      const localView = new DataView(localHeader.buffer);
+      localView.setUint32(0, 0x04034B50, true);
+      localView.setUint16(4, 20, true);
+      localView.setUint16(6, 0, true);
+      localView.setUint16(8, 0, true);
+      localView.setUint16(10, now.time, true);
+      localView.setUint16(12, now.date, true);
+      localView.setUint32(14, crc32, true);
+      localView.setUint32(18, dataBytes.length, true);
+      localView.setUint32(22, dataBytes.length, true);
+      localView.setUint16(26, filenameBytes.length, true);
+      localView.setUint16(28, 0, true);
+      localHeader.set(filenameBytes, 30);
+      localParts.push(localHeader, dataBytes);
+
+      const centralHeader = new Uint8Array(46 + filenameBytes.length);
+      const centralView = new DataView(centralHeader.buffer);
+      centralView.setUint32(0, 0x02014B50, true);
+      centralView.setUint16(4, 20, true);
+      centralView.setUint16(6, 20, true);
+      centralView.setUint16(8, 0, true);
+      centralView.setUint16(10, 0, true);
+      centralView.setUint16(12, now.time, true);
+      centralView.setUint16(14, now.date, true);
+      centralView.setUint32(16, crc32, true);
+      centralView.setUint32(20, dataBytes.length, true);
+      centralView.setUint32(24, dataBytes.length, true);
+      centralView.setUint16(28, filenameBytes.length, true);
+      centralView.setUint16(30, 0, true);
+      centralView.setUint16(32, 0, true);
+      centralView.setUint16(34, 0, true);
+      centralView.setUint16(36, 0, true);
+      centralView.setUint32(38, 0, true);
+      centralView.setUint32(42, localSize, true);
+      centralHeader.set(filenameBytes, 46);
+      centralParts.push(centralHeader);
+
+      localSize += localHeader.length + dataBytes.length;
+    }
+    const centralSize = centralParts.reduce((sum, part) => sum + part.length, 0);
+    const endRecord = new Uint8Array(22);
+    const endView = new DataView(endRecord.buffer);
+    endView.setUint32(0, 0x06054B50, true);
+    endView.setUint16(4, 0, true);
+    endView.setUint16(6, 0, true);
+    endView.setUint16(8, tasks.length, true);
+    endView.setUint16(10, tasks.length, true);
+    endView.setUint32(12, centralSize, true);
+    endView.setUint32(16, localSize, true);
+    endView.setUint16(20, 0, true);
+    return new Blob([...localParts, ...centralParts, endRecord], { type: 'application/zip' });
+  }
 
   function createOpenProjectTabId() {
     openProjectTabSequence += 1;
@@ -8583,6 +9558,29 @@
     };
   }
 
+  function normalizeQrEditPayload(payload = null, fallbackProjectId = '') {
+    if (!payload || typeof payload !== 'object') {
+      return null;
+    }
+    const source = typeof payload.source === 'string' ? payload.source.trim() : '';
+    if (source !== QR_EDIT_MODE_TARGET_SOURCE) {
+      return null;
+    }
+    const projectId = normalizeAutosaveProjectId(
+      typeof payload.projectId === 'string' ? payload.projectId : fallbackProjectId
+    ) || normalizeAutosaveProjectId(fallbackProjectId || '');
+    const expectedText = typeof payload.rawValue === 'string' ? payload.rawValue.trim() : '';
+    const editSize = Math.max(1, Math.round(Number(payload.editSize) || 0));
+    const panelVisible = payload.panelVisible !== false;
+    return {
+      source,
+      projectId,
+      rawValue: expectedText,
+      editSize,
+      panelVisible,
+    };
+  }
+
   function getActiveQrEditPayload() {
     const activeTab = getActiveOpenProjectTab();
     return normalizeQrEditPayload(activeTab?.qrEditPayload || null, autosaveProjectId || '');
@@ -8748,6 +9746,10 @@
     }
     previewCtx.imageSmoothingEnabled = false;
     previewCtx.drawImage(sourceCanvas, 0, 0, preview.width, preview.height);
+  }
+
+  function canUseQrEditJsQrDecoder() {
+    return typeof window !== 'undefined' && typeof window.jsQR === 'function';
   }
 
   async function ensureQrEditBarcodeDetector() {
@@ -14823,6 +15825,32 @@
     });
   }
 
+  function getExternalToolDefinition(toolId = '') {
+    if (!toolId || typeof toolId !== 'string') {
+      return null;
+    }
+    return EXTERNAL_TOOLS[toolId] || null;
+  }
+
+  function getExternalToolDefinitionByAction(action = '') {
+    const tools = Object.values(EXTERNAL_TOOLS);
+    return tools.find(tool => tool?.action === action) || null;
+  }
+
+  function getExternalToolLocalizedName(tool) {
+    if (!tool?.displayName) {
+      return '';
+    }
+    return localizeText(tool.displayName.ja, tool.displayName.en);
+  }
+
+  function getExternalToolLocalizedActionLabel(tool) {
+    if (!tool?.actionLabel) {
+      return '';
+    }
+    return localizeText(tool.actionLabel.ja, tool.actionLabel.en);
+  }
+
   function syncExternalToolActionButtons() {
     dom.topActionButtons.forEach(button => {
       if (!(button instanceof HTMLButtonElement)) {
@@ -14840,6 +15868,89 @@
         icon.alt = '';
       }
     });
+  }
+
+  function isNativeAppRuntime() {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+    const capacitor = window.Capacitor || globalThis.Capacitor;
+    try {
+      if (capacitor && typeof capacitor.isNativePlatform === 'function' && capacitor.isNativePlatform()) {
+        return true;
+      }
+    } catch (error) {
+      // Ignore native runtime detection failures and continue with fallback checks.
+    }
+    const protocol = String(window.location?.protocol || '');
+    return protocol === 'capacitor:' || protocol === 'ionic:' || protocol === 'app:';
+  }
+
+  function buildLensCameraModeUrl({ returnMode = LENS_CAMERA_RETURN_MODE_SELF } = {}) {
+    const lensTool = getExternalToolDefinition(EXTERNAL_TOOL_PIXIEELENS_ID);
+    const nativeRuntime = isNativeAppRuntime();
+    const fallbackPath = nativeRuntime
+      ? '../pixiee-lens/index.html'
+      : (lensTool?.launchUrl || 'https://pixieed.jp/pixiee-lens/index.html');
+    const protocol = lensTool?.protocol || {};
+    const returnQueryKey = protocol.returnQueryKey || LENS_CAMERA_RETURN_QUERY_KEY;
+    const drawUrlQueryKey = protocol.drawUrlQueryKey || LENS_CAMERA_DRAW_URL_QUERY_KEY;
+    try {
+      const lensTarget = nativeRuntime
+        ? new URL('../pixiee-lens/index.html', window.location.href)
+        : new URL(lensTool?.launchUrl || fallbackPath);
+      const lensUrl = new URL(lensTarget.toString());
+      if (typeof returnMode === 'string' && returnMode) {
+        lensUrl.searchParams.set(returnQueryKey, returnMode);
+      }
+      const drawUrl = buildLensCameraReturnDrawUrl();
+      if (drawUrl) {
+        lensUrl.searchParams.set(drawUrlQueryKey, drawUrl);
+      }
+      return lensUrl.toString();
+    } catch (error) {
+      return fallbackPath;
+    }
+  }
+
+  function buildLensCameraReturnDrawUrl() {
+    if (typeof window === 'undefined' || !window.location) {
+      return '';
+    }
+    try {
+      const drawUrl = new URL(window.location.href);
+      drawUrl.searchParams.delete('lens');
+      return drawUrl.toString();
+    } catch (error) {
+      return '';
+    }
+  }
+
+  function buildQrEditorModeUrl({ returnMode = LENS_CAMERA_RETURN_MODE_SELF } = {}) {
+    const qrTool = getExternalToolDefinition(EXTERNAL_TOOL_QR_MAKER_ID);
+    const nativeRuntime = isNativeAppRuntime();
+    const fallbackPath = nativeRuntime
+      ? '../qr-maker/index.html'
+      : (qrTool?.launchUrl || 'https://pixieed.jp/qr-maker/index.html');
+    const protocol = qrTool?.protocol || {};
+    const returnQueryKey = protocol.returnQueryKey || LENS_CAMERA_RETURN_QUERY_KEY;
+    const drawUrlQueryKey = protocol.drawUrlQueryKey || LENS_CAMERA_DRAW_URL_QUERY_KEY;
+    try {
+      const qrTarget = nativeRuntime
+        ? new URL('../qr-maker/index.html', window.location.href)
+        : new URL(qrTool?.launchUrl || fallbackPath);
+      const qrUrl = new URL(qrTarget.toString());
+      if (typeof returnMode === 'string' && returnMode) {
+        qrUrl.searchParams.set(returnQueryKey, returnMode);
+      }
+      const drawUrl = buildLensCameraReturnDrawUrl();
+      if (drawUrl) {
+        qrUrl.searchParams.set(drawUrlQueryKey, drawUrl);
+      }
+      return qrUrl.toString();
+    } catch (error) {
+      return fallbackPath;
+    }
   }
 
   async function launchLensCameraMode() {
@@ -17852,6 +18963,13 @@
     }
   }
 
+  function normalizeHelpSearchQuery(value) {
+    return String(value || '')
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
   function renderHelpGuideEntries() {
     const container = dom.controls.helpArticleList;
     if (!(container instanceof HTMLElement)) {
@@ -18832,6 +19950,30 @@
     return '';
   }
 
+  function parseAutosaveTabLockPayload(raw) {
+    if (typeof raw !== 'string' || !raw.trim()) {
+      return null;
+    }
+    try {
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') {
+        return null;
+      }
+      const owner = typeof parsed.owner === 'string' ? parsed.owner : '';
+      const expiresAt = Number(parsed.expiresAt);
+      if (!owner || !Number.isFinite(expiresAt)) {
+        return null;
+      }
+      return {
+        owner,
+        expiresAt: Math.round(expiresAt),
+        projectId: normalizeAutosaveProjectId(parsed.projectId || ''),
+      };
+    } catch (error) {
+      return null;
+    }
+  }
+
   function ensureInternetConnectedForAction(actionLabelJa = 'この機能', actionLabelEn = 'this feature') {
     const online = typeof navigator !== 'undefined' ? navigator.onLine !== false : true;
     if (online) {
@@ -18965,6 +20107,61 @@
     if (!button) return;
     button.textContent = localizeText('ローカル自動保存（常時ON）', 'Local Autosave (Always ON)');
     button.disabled = true;
+  }
+
+  function sanitizeExportDirectoryDisplayLabel(value) {
+    return typeof value === 'string' ? value.trim() : '';
+  }
+
+  function buildExportDirectoryDisplayLabel({ rootHandle = null, workspaceHandle = null, fallback = '' } = {}) {
+    const rootName = sanitizeExportDirectoryDisplayLabel(rootHandle?.name || '');
+    const workspaceName = sanitizeExportDirectoryDisplayLabel(workspaceHandle?.name || '');
+    const fallbackName = sanitizeExportDirectoryDisplayLabel(fallback);
+    if (rootName && workspaceName) {
+      if (rootName === workspaceName) {
+        return workspaceName;
+      }
+      return `${rootName}/${workspaceName}`;
+    }
+    return workspaceName || rootName || fallbackName;
+  }
+
+  function loadStoredExportDirectoryDisplayLabel() {
+    if (!canUseSessionStorage) {
+      return '';
+    }
+    try {
+      return sanitizeExportDirectoryDisplayLabel(window.localStorage.getItem(EXPORT_DIRECTORY_DISPLAY_LABEL_KEY) || '');
+    } catch (error) {
+      return '';
+    }
+  }
+
+  function storeExportDirectoryDisplayLabel(label) {
+    if (!canUseSessionStorage) {
+      return;
+    }
+    const normalized = sanitizeExportDirectoryDisplayLabel(label);
+    try {
+      if (normalized) {
+        window.localStorage.setItem(EXPORT_DIRECTORY_DISPLAY_LABEL_KEY, normalized);
+      } else {
+        window.localStorage.removeItem(EXPORT_DIRECTORY_DISPLAY_LABEL_KEY);
+      }
+    } catch (error) {
+      // Ignore localStorage errors.
+    }
+  }
+
+  function clearStoredExportDirectoryDisplayLabel() {
+    if (!canUseSessionStorage) {
+      return;
+    }
+    try {
+      window.localStorage.removeItem(EXPORT_DIRECTORY_DISPLAY_LABEL_KEY);
+    } catch (error) {
+      // Ignore localStorage errors.
+    }
   }
 
   function setExportDirectoryDisplayLabel(label, { persist = true } = {}) {
@@ -20982,22 +22179,112 @@
     return name.endsWith('.gif');
   }
 
-  const imageUtils = window.PiXiEEDrawModules?.imageUtils?.createImageUtils?.({
-    DEFAULT_IMPORT_FRAME_DURATION,
-    IMPORT_FRAME_DURATION_MIN_MS,
-    IMPORT_FRAME_DURATION_MAX_MS,
-    MAX_IMAGE_IMPORT_SOURCE_SIZE,
-    MAX_CANVAS_SIZE,
-    clamp,
-  }) || {};
-  const {
-    isImportableImageFile,
-    createImageImportError,
-    normalizeImportFrameDuration,
-    resolveImageImportTargetSize,
-    getImageImportCheckFrameIndexes,
-    getGreatestCommonDivisor,
-  } = imageUtils;
+  function isImportableImageFile(file) {
+    if (!file) return false;
+    const type = typeof file.type === 'string' ? file.type.toLowerCase() : '';
+    if (type === 'image/png' || type === 'image/gif') {
+      return true;
+    }
+    const name = typeof file.name === 'string' ? file.name.toLowerCase() : '';
+    return name.endsWith('.png') || name.endsWith('.gif');
+  }
+
+  function createImageImportError(message, cause) {
+    const error = new Error(message);
+    error.source = 'image-import';
+    if (cause) {
+      error.cause = cause;
+    }
+    return error;
+  }
+
+  function normalizeImportFrameDuration(durationMs) {
+    const numeric = Number(durationMs);
+    if (!Number.isFinite(numeric) || numeric <= 0) {
+      return DEFAULT_IMPORT_FRAME_DURATION;
+    }
+    return clamp(Math.round(numeric), IMPORT_FRAME_DURATION_MIN_MS, IMPORT_FRAME_DURATION_MAX_MS);
+  }
+
+  function resolveImageImportTargetSize(width, height, { integerScaleFactor = 1 } = {}) {
+    const sourceWidth = Math.max(1, Math.floor(Number(width) || 0));
+    const sourceHeight = Math.max(1, Math.floor(Number(height) || 0));
+    if (!sourceWidth || !sourceHeight) {
+      throw createImageImportError('画像サイズが不正です');
+    }
+    if (sourceWidth > MAX_IMAGE_IMPORT_SOURCE_SIZE || sourceHeight > MAX_IMAGE_IMPORT_SOURCE_SIZE) {
+      throw createImageImportError(`読み込み元画像は最大 ${MAX_IMAGE_IMPORT_SOURCE_SIZE}px までです`);
+    }
+    const normalizedScaleFactor = Math.max(1, Math.floor(Number(integerScaleFactor) || 1));
+    const autoIntegerScaled = normalizedScaleFactor > 1
+      && sourceWidth % normalizedScaleFactor === 0
+      && sourceHeight % normalizedScaleFactor === 0;
+    const effectiveSourceWidth = autoIntegerScaled
+      ? Math.max(1, Math.floor(sourceWidth / normalizedScaleFactor))
+      : sourceWidth;
+    const effectiveSourceHeight = autoIntegerScaled
+      ? Math.max(1, Math.floor(sourceHeight / normalizedScaleFactor))
+      : sourceHeight;
+    if (effectiveSourceWidth <= MAX_CANVAS_SIZE && effectiveSourceHeight <= MAX_CANVAS_SIZE) {
+      return {
+        sourceWidth,
+        sourceHeight,
+        width: effectiveSourceWidth,
+        height: effectiveSourceHeight,
+        scaled: autoIntegerScaled,
+        integerScaleFactor: autoIntegerScaled ? normalizedScaleFactor : 1,
+      };
+    }
+    const ratio = Math.min(MAX_CANVAS_SIZE / effectiveSourceWidth, MAX_CANVAS_SIZE / effectiveSourceHeight);
+    const widthScaled = clamp(Math.floor(effectiveSourceWidth * ratio), 1, MAX_CANVAS_SIZE);
+    const heightScaled = clamp(Math.floor(effectiveSourceHeight * ratio), 1, MAX_CANVAS_SIZE);
+    return {
+      sourceWidth,
+      sourceHeight,
+      width: widthScaled,
+      height: heightScaled,
+      scaled: widthScaled !== sourceWidth
+        || heightScaled !== sourceHeight
+        || autoIntegerScaled,
+      integerScaleFactor: autoIntegerScaled ? normalizedScaleFactor : 1,
+    };
+  }
+
+  function getImageImportCheckFrameIndexes(frameCount) {
+    const total = Math.max(0, Math.floor(Number(frameCount) || 0));
+    if (total <= 0) {
+      return [];
+    }
+    if (total === 1) {
+      return [0];
+    }
+    const indexes = [0, Math.floor((total - 1) / 2), total - 1];
+    const seen = new Set();
+    const output = [];
+    for (let i = 0; i < indexes.length; i += 1) {
+      const index = indexes[i];
+      if (seen.has(index)) {
+        continue;
+      }
+      seen.add(index);
+      output.push(index);
+    }
+    return output;
+  }
+
+  function getGreatestCommonDivisor(a, b) {
+    let x = Math.abs(Math.floor(Number(a) || 0));
+    let y = Math.abs(Math.floor(Number(b) || 0));
+    if (!x || !y) {
+      return 0;
+    }
+    while (y !== 0) {
+      const next = x % y;
+      x = y;
+      y = next;
+    }
+    return x;
+  }
 
   function quickCheckImageDataNearestUpscale(imageData, factor) {
     if (!imageData || !(imageData.data instanceof Uint8ClampedArray)) {
@@ -22438,21 +23725,121 @@
     window.requestAnimationFrame(renderWhenReady);
   }
 
-  const updateHistoryUtils = window.PiXiEEDrawModules?.updateHistoryUtils?.createUpdateHistoryUtils?.({
-    canUseSessionStorage,
-    UPDATE_HISTORY_STORAGE_KEY,
-    UPDATE_HISTORY_RETENTION_MS,
-    BUILTIN_UPDATE_HISTORY_ENTRIES,
-    SUPPRESSED_UPDATE_HISTORY_IDS,
-  }) || {};
-  const {
-    parseUpdateHistoryTimestamp,
-    normalizeUpdateHistoryEntry,
-    formatUpdateHistoryDate,
-    loadStoredUpdateHistoryEntries,
-    saveStoredUpdateHistoryEntries,
-    getUpdateHistoryEntries,
-  } = updateHistoryUtils;
+  function parseUpdateHistoryTimestamp(value) {
+    const timestamp = Date.parse(value);
+    return Number.isFinite(timestamp) ? timestamp : 0;
+  }
+
+  function normalizeUpdateHistoryEntry(entry) {
+    if (!entry || typeof entry !== 'object') {
+      return null;
+    }
+    const at = typeof entry.at === 'string' ? entry.at : '';
+    const timestamp = parseUpdateHistoryTimestamp(at);
+    if (!timestamp) {
+      return null;
+    }
+    const title = typeof entry.title === 'string' ? entry.title.trim() : '';
+    if (!title) {
+      return null;
+    }
+    const detailsSource = Array.isArray(entry.details) ? entry.details : [];
+    const details = detailsSource
+      .map(detail => (typeof detail === 'string' ? detail.trim() : ''))
+      .filter(Boolean);
+    const idSource = typeof entry.id === 'string' ? entry.id.trim() : '';
+    const id = idSource || `${at}:${title}`;
+    return {
+      id,
+      at,
+      timestamp,
+      title,
+      details,
+    };
+  }
+
+  function loadStoredUpdateHistoryEntries() {
+    if (!canUseSessionStorage) {
+      return [];
+    }
+    try {
+      const raw = window.localStorage.getItem(UPDATE_HISTORY_STORAGE_KEY);
+      if (!raw) {
+        return [];
+      }
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+      return parsed;
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function saveStoredUpdateHistoryEntries(entries) {
+    if (!canUseSessionStorage) {
+      return;
+    }
+    try {
+      const payload = Array.isArray(entries)
+        ? entries.map(entry => ({
+          id: entry.id,
+          at: entry.at,
+          title: entry.title,
+          details: Array.isArray(entry.details) ? entry.details : [],
+        }))
+        : [];
+      window.localStorage.setItem(UPDATE_HISTORY_STORAGE_KEY, JSON.stringify(payload));
+    } catch (error) {
+      // Ignore localStorage errors.
+    }
+  }
+
+  function getUpdateHistoryEntries() {
+    const cutoff = Date.now() - UPDATE_HISTORY_RETENTION_MS;
+    const mergedById = new Map();
+    const source = [
+      ...loadStoredUpdateHistoryEntries(),
+      ...BUILTIN_UPDATE_HISTORY_ENTRIES,
+    ];
+    source.forEach(entry => {
+      if (!entry || typeof entry !== 'object') {
+        return;
+      }
+      const entryId = typeof entry.id === 'string' ? entry.id.trim() : '';
+      if ((entry.published === false) || (entryId && SUPPRESSED_UPDATE_HISTORY_IDS.has(entryId))) {
+        return;
+      }
+      const normalized = normalizeUpdateHistoryEntry(entry);
+      if (!normalized) {
+        return;
+      }
+      if (normalized.timestamp < cutoff) {
+        return;
+      }
+      const previous = mergedById.get(normalized.id);
+      if (!previous || normalized.timestamp >= previous.timestamp) {
+        mergedById.set(normalized.id, normalized);
+      }
+    });
+    const merged = Array.from(mergedById.values()).sort((a, b) => b.timestamp - a.timestamp);
+    saveStoredUpdateHistoryEntries(merged);
+    return merged;
+  }
+
+  function formatUpdateHistoryDate(timestamp, fallback = '') {
+    if (!Number.isFinite(timestamp) || timestamp <= 0) {
+      return fallback;
+    }
+    const d = new Date(timestamp);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    return `${y}/${m}/${day} ${hh}:${mm}`;
+  }
 
   function renderUpdateHistoryPanel() {
     const list = dom.updateHistory?.list;
@@ -22975,6 +24362,32 @@
     } else {
       await exportProjectAsPng();
     }
+  }
+
+  function normalizeTimelapseFps(value) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      return TIMELAPSE_DEFAULT_FPS;
+    }
+    return clamp(Math.round(parsed), TIMELAPSE_MIN_FPS, TIMELAPSE_MAX_FPS);
+  }
+
+  function createEmptyTimelapseTrack() {
+    return {
+      snapshots: [],
+      operationLog: null,
+      warningShown: false,
+      sampleStep: 1,
+      lastCaptureToken: -1,
+    };
+  }
+
+  function createEmptyTimelapseOperationLog() {
+    return {
+      version: 1,
+      baseSnapshot: null,
+      entries: [],
+    };
   }
 
   function shouldRecordLocalTimelapseOperationLog() {
@@ -23956,6 +25369,17 @@
       console.error('Timelapse export failed', error);
       updateAutosaveStatus('タイムラプスGIFの書き出しに失敗しました', 'error');
     }
+  }
+
+  function normalizeFpsValue(value) {
+    return clamp(Math.round(Number(value) || 0), 1, 60);
+  }
+
+  function getDurationFromFps(fps) {
+    if (!Number.isFinite(fps) || fps <= 0) {
+      return 1000 / 12;
+    }
+    return 1000 / fps;
   }
 
   function updateAnimationFpsDisplay(fps, durationMs) {
@@ -27096,9 +28520,27 @@
     };
   }
 
+  function normalizeAutosaveProjectId(value) {
+    if (typeof value !== 'string') {
+      return '';
+    }
+    const trimmed = value.trim();
+    return trimmed || '';
+  }
+
+  function normalizeRecentProjectStorageKind(value) {
+    return value === RECENT_PROJECT_STORAGE_SHARED
+      ? RECENT_PROJECT_STORAGE_SHARED
+      : RECENT_PROJECT_STORAGE_LOCAL;
+  }
+
   function buildSharedRecentProjectId(projectKey) {
     const normalizedKey = normalizeMultiProjectKey(projectKey);
     return normalizedKey ? `${SHARED_PROJECT_ID_PREFIX}${normalizedKey}` : '';
+  }
+
+  function getRecentProjectStorageKind(entry) {
+    return normalizeRecentProjectStorageKind(entry?.storageKind);
   }
 
   function isSharedRecentProjectEntry(entry) {
@@ -35137,6 +36579,39 @@
     return nativeMediaPlugin || null;
   }
 
+  function sanitizeNativeFilename(filename, fallback = 'export.bin') {
+    const raw = typeof filename === 'string' ? filename : '';
+    const basename = raw.split(/[\\/]/).pop() || '';
+    const cleaned = basename
+      .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return cleaned || fallback;
+  }
+
+  function normalizeNativeSubdirectory(path) {
+    const raw = typeof path === 'string' ? path : '';
+    return raw
+      .split('/')
+      .map(segment => segment.trim())
+      .filter(Boolean)
+      .map(segment => segment.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_'))
+      .join('/');
+  }
+
+  function isLikelyFileAlreadyExistsError(error) {
+    const code = String(error?.code || '').toLowerCase();
+    const message = String(error?.message || error || '').toLowerCase();
+    return (
+      code.includes('exist')
+      || code.includes('already')
+      || message.includes('eexist')
+      || message.includes('already exists')
+      || message.includes('file exists')
+      || message.includes('exists')
+    );
+  }
+
   async function blobToBase64Payload(blob) {
     const dataUrl = await blobToDataUrl(blob);
     if (typeof dataUrl !== 'string' || !dataUrl) {
@@ -35249,6 +36724,11 @@
       console.warn('All native file save attempts failed', lastError);
     }
     return null;
+  }
+
+  function isNativePhotoLibraryExportMimeType(mimeType) {
+    const normalized = String(mimeType || '').trim().toLowerCase();
+    return normalized.startsWith('image/') && normalized !== 'image/svg+xml';
   }
 
   async function writeBlobToNativePhotoLibrary(blob, filename, mimeType) {
@@ -37304,11 +38784,33 @@
   }
 
   function encodeTypedArray(view) {
-    return encodeTypedArrayBinary(view);
+    if (!view) return '';
+    const bytes = view instanceof Uint8Array
+      ? view
+      : new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
+    let binary = '';
+    const chunkSize = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+    }
+    return window.btoa(binary);
   }
 
   function decodeBase64(value) {
-    return decodeBase64Binary(value);
+    if (typeof value !== 'string' || value.length === 0) {
+      return new Uint8Array(0);
+    }
+    try {
+      const binary = window.atob(value);
+      const length = binary.length;
+      const bytes = new Uint8Array(length);
+      for (let i = 0; i < length; i += 1) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return bytes;
+    } catch (error) {
+      return new Uint8Array(0);
+    }
   }
 
   function normalizeColorValue(input) {
@@ -79644,6 +81146,28 @@
     }
   }
 
+  function buildPixieedAccountLoginHref() {
+    if (typeof window === 'undefined') {
+      return 'https://pixieed.jp/account/';
+    }
+    try {
+      const runtimeUrl = new URL(window.location.href);
+      const usingFileRuntime = runtimeUrl.protocol === 'file:';
+      const url = usingFileRuntime
+        ? new URL('https://pixieed.jp/account/')
+        : new URL('../account/index.html', runtimeUrl.href);
+      url.searchParams.set(
+        'returnTo',
+        usingFileRuntime
+          ? 'https://pixieed.jp/pixiedraw/'
+          : runtimeUrl.href
+      );
+      return url.toString();
+    } catch (_error) {
+      return 'https://pixieed.jp/account/?returnTo=https%3A%2F%2Fpixieed.jp%2Fpixiedraw%2F';
+    }
+  }
+
   function syncPixieedAccountLoginAnchor(anchor) {
     if (!(anchor instanceof HTMLAnchorElement)) {
       return;
@@ -89917,11 +91441,127 @@
     }
   }
 
+  function rgbaToHex({ r, g, b, a }) {
+    const toHex = value => value.toString(16).padStart(2, '0');
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+  }
+
+  function rgbaToCss({ r, g, b, a }) {
+    return `rgba(${r}, ${g}, ${b}, ${a / 255})`;
+  }
+
+  function toCssColor(value) {
+    if (typeof value === 'string') {
+      return value;
+    }
+    if (value && typeof value === 'object') {
+      const { r = 0, g = 0, b = 0, a = 255 } = value;
+      return rgbaToCss({ r, g, b, a });
+    }
+    return 'rgba(0, 0, 0, 0)';
+  }
+
+  function createPixelFrameImage(color, { borderColor = '#C8C8C8' } = {}) {
+    const colorCss = toCssColor(color);
+    const borderCss = toCssColor(borderColor);
+    const checkerA = '#111827';
+    const checkerB = '#334155';
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='21' height='21' shape-rendering='crispEdges'>` +
+      `<rect x='1' y='0' width='19' height='1' fill='${borderCss}' />` +
+      `<rect x='0' y='1' width='2' height='1' fill='${borderCss}' />` +
+      // checker base (so fully transparent colors remain visible)
+      `<rect x='2' y='1' width='17' height='19' fill='${checkerA}' />` +
+      `<rect x='2' y='1' width='9' height='10' fill='${checkerB}' />` +
+      `<rect x='11' y='10' width='8' height='10' fill='${checkerB}' />` +
+      // selected color overlay (may include alpha)
+      `<rect x='2' y='1' width='17' height='19' fill='${colorCss}' />` +
+      `<rect x='19' y='1' width='2' height='1' fill='${borderCss}' />` +
+      `<rect x='0' y='2' width='1' height='18' fill='${borderCss}' />` +
+      `<rect x='1' y='2' width='1' height='17' fill='${checkerB}' />` +
+      `<rect x='19' y='2' width='1' height='17' fill='${checkerB}' />` +
+      `<rect x='1' y='2' width='1' height='17' fill='${colorCss}' />` +
+      `<rect x='19' y='2' width='1' height='17' fill='${colorCss}' />` +
+      `<rect x='20' y='2' width='1' height='18' fill='${borderCss}' />` +
+      `<rect x='1' y='19' width='1' height='2' fill='${borderCss}' />` +
+      `<rect x='19' y='19' width='1' height='2' fill='${borderCss}' />` +
+      `<rect x='2' y='20' width='17' height='1' fill='${borderCss}' />` +
+      `</svg>`;
+    const encoded = encodeURIComponent(svg)
+      .replace(/%0A/g, '')
+      .replace(/%09/g, '');
+    return `url("data:image/svg+xml,${encoded}")`;
+  }
+
+  function applyPixelFrameBackground(element, color, options = {}) {
+    if (!element) return;
+    element.classList.add('pixel-frame');
+    element.style.setProperty('--pixel-frame-image', createPixelFrameImage(color, options));
+  }
+
   window.pixelFrameUtils = Object.freeze({
     createImage: createPixelFrameImage,
     applyBackground: applyPixelFrameBackground,
     toCssColor,
   });
+
+  function rgbaToHsv({ r, g, b }) {
+    const rn = clamp(r, 0, 255) / 255;
+    const gn = clamp(g, 0, 255) / 255;
+    const bn = clamp(b, 0, 255) / 255;
+    const max = Math.max(rn, gn, bn);
+    const min = Math.min(rn, gn, bn);
+    const delta = max - min;
+    let h = 0;
+    if (delta !== 0) {
+      if (max === rn) {
+        h = ((gn - bn) / delta) % 6;
+      } else if (max === gn) {
+        h = (bn - rn) / delta + 2;
+      } else {
+        h = (rn - gn) / delta + 4;
+      }
+      h *= 60;
+      if (h < 0) h += 360;
+    }
+    const s = max === 0 ? 0 : delta / max;
+    const v = max;
+    return { h, s, v };
+  }
+
+  function hsvToRgba(h, s, v) {
+    const hue = ((h % 360) + 360) % 360;
+    const saturation = clamp(s, 0, 1);
+    const value = clamp(v, 0, 1);
+    const c = value * saturation;
+    const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
+    const m = value - c;
+    let rp = 0;
+    let gp = 0;
+    let bp = 0;
+    if (hue < 60) {
+      rp = c;
+      gp = x;
+    } else if (hue < 120) {
+      rp = x;
+      gp = c;
+    } else if (hue < 180) {
+      gp = c;
+      bp = x;
+    } else if (hue < 240) {
+      gp = x;
+      bp = c;
+    } else if (hue < 300) {
+      rp = x;
+      bp = c;
+    } else {
+      rp = c;
+      bp = x;
+    }
+    const r = Math.round((rp + m) * 255);
+    const g = Math.round((gp + m) * 255);
+    const b = Math.round((bp + m) * 255);
+    return { r, g, b, a: 255 };
+  }
 
   function getActiveDrawColor(opacityOverride, paletteIndexOverride) {
     const previewTool = pointerState.tool || state.tool;
@@ -89950,6 +91590,24 @@
       color.a = Math.round(clamped * 255);
     }
     return color;
+  }
+
+  function hexToRgba(value) {
+    if (!value || value[0] !== '#') return null;
+    const hex = value.slice(1);
+    if (hex.length === 3) {
+      const r = parseInt(hex[0] + hex[0], 16);
+      const g = parseInt(hex[1] + hex[1], 16);
+      const b = parseInt(hex[2] + hex[2], 16);
+      return { r, g, b, a: 255 };
+    }
+    if (hex.length === 6) {
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      return { r, g, b, a: 255 };
+    }
+    return null;
   }
 
   function getZoomBaseCanvasDocument(canvasDoc = null) {
@@ -90123,6 +91781,41 @@
     const isWhole = Math.abs(roundedTenth - Math.round(roundedTenth)) < 0.05;
     const value = isWhole ? Math.round(roundedTenth) : Number(roundedTenth.toFixed(1));
     return `${value}%`;
+  }
+
+  function clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
+  }
+
+  function debounce(fn, wait) {
+    let handle;
+    return (...args) => {
+      clearTimeout(handle);
+      handle = setTimeout(() => fn(...args), wait);
+    };
+  }
+
+  function isInputControlElement(node) {
+    if (!node || node.nodeType !== Node.ELEMENT_NODE) return false;
+    if (node.matches('input, textarea, select')) return true;
+    if (node instanceof Element && node.hasAttribute('contenteditable') && node.getAttribute('contenteditable') !== 'false') {
+      return true;
+    }
+    return false;
+  }
+
+  function isLabelForElement(label, control) {
+    if (!label || !control || label.nodeType !== Node.ELEMENT_NODE || control.nodeType !== Node.ELEMENT_NODE) {
+      return false;
+    }
+    if (label.tagName !== 'LABEL') {
+      return false;
+    }
+    if (label.contains(control)) {
+      return true;
+    }
+    const htmlFor = label.getAttribute('for');
+    return Boolean(htmlFor && control.id && htmlFor === control.id);
   }
 
   function setupGlobalFocusDismiss() {
