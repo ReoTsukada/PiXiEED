@@ -21,6 +21,104 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../site/landing.css?v=2026.06.23-account">
+  <style>
+    .account-page{
+      display:grid;
+      gap:14px;
+    }
+    .account-hero{
+      display:grid;
+      gap:10px;
+      padding:20px;
+      border:1px solid rgba(255,255,255,0.12);
+      border-radius:18px;
+      background:rgba(255,255,255,0.05);
+      box-shadow:0 18px 48px rgba(0,0,0,0.22);
+    }
+    .account-grid{
+      display:grid;
+      grid-template-columns:1.1fr .9fr;
+      gap:14px;
+    }
+    .account-stack{
+      display:grid;
+      gap:14px;
+    }
+    .account-panel{
+      padding:16px;
+      border:1px solid rgba(255,255,255,0.12);
+      border-radius:18px;
+      background:rgba(255,255,255,0.05);
+      box-shadow:0 18px 48px rgba(0,0,0,0.22);
+      display:grid;
+      gap:12px;
+    }
+    .account-list{
+      display:grid;
+      gap:10px;
+    }
+    .account-item{
+      display:grid;
+      grid-template-columns:72px 1fr auto;
+      gap:12px;
+      padding:12px;
+      border-radius:18px;
+      background:rgba(255,255,255,0.04);
+      border:1px solid rgba(255,255,255,0.08);
+      align-items:center;
+    }
+    .account-cover{
+      width:72px;
+      height:72px;
+      border-radius:14px;
+      background:linear-gradient(135deg,rgba(255,159,67,.28),rgba(255,255,255,.03));
+      border:1px solid rgba(255,255,255,0.08);
+      overflow:hidden;
+      display:grid;
+      place-items:center;
+    }
+    .account-cover img{
+      width:72%;
+      height:72%;
+      object-fit:contain;
+      image-rendering:pixelated;
+    }
+    .account-item strong{display:block;font-size:14px}
+    .account-item span{display:block;color:#cbd5e1;font-size:12px}
+    .account-item__body{display:grid;gap:4px;min-width:0}
+    .account-chip{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      padding:6px 10px;
+      border-radius:999px;
+      background:rgba(255,255,255,0.08);
+      border:1px solid rgba(255,255,255,0.12);
+      color:#e5e7eb;
+      font-size:12px;
+      font-weight:700;
+      white-space:nowrap;
+    }
+    .account-action{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:38px;
+      padding:8px 12px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,0.14);
+      background:linear-gradient(135deg, rgba(255,159,67,0.95), rgba(255,113,154,0.95));
+      color:#111827;
+      font-size:12px;
+      font-weight:800;
+      white-space:nowrap;
+    }
+    @media (max-width: 900px){
+      .account-grid{grid-template-columns:1fr}
+      .account-item{grid-template-columns:64px 1fr auto}
+      .account-cover{width:64px;height:64px}
+    }
+  </style>
 </head>
 <body>
   <header class="site-header" aria-label="top-nav">
@@ -43,53 +141,69 @@
   <div class="page">
     <main class="page-shell account-page">
       <section class="account-hero" aria-labelledby="accountTitle">
-        <p class="eyebrow">my page</p>
         <h1 class="section-title" id="accountTitle">マイページ</h1>
-        <p class="section-copy">プロフィールとログインをここで管理します。PiXiEEDrawや広場からも同じアカウントを使えます。</p>
       </section>
 
-      <section class="auth-panel auth-panel--page is-open" id="authPanel" aria-hidden="false" aria-label="マイページ">
-        <div class="auth-card">
-          <div class="auth-card__header">
-            <div>
-              <p class="auth-card__eyebrow">Account</p>
-              <h2 class="auth-card__title">プロフィール管理</h2>
-            </div>
-          </div>
-          <div class="profile-block profile-block--profile">
-            <div class="auth-section-head">
-              <strong>プロフィール</strong>
-              <span>表示名とアイコン</span>
-            </div>
-            <div class="profile-row">
-              <button class="avatar-toggle" id="avatarToggle" type="button" aria-label="アイコンを変更" aria-expanded="false" aria-controls="avatarPanel">
-                <span class="avatar-toggle__img" id="avatarPreview"></span>
-              </button>
+      <div class="account-grid">
+        <section class="account-stack" aria-label="作品">
+          <section class="account-panel" id="authPanel" aria-hidden="false" aria-label="マイページ">
+            <h2 class="section-title">作品</h2>
+            <div class="profile-block profile-block--profile">
+              <div class="profile-row">
+                <button class="avatar-toggle" id="avatarToggle" type="button" aria-label="アイコンを変更" aria-expanded="false" aria-controls="avatarPanel">
+                  <span class="avatar-toggle__img" id="avatarPreview"></span>
+                </button>
+                <label class="profile-name">
+                  <span style="font-weight:700; color:#e5e7eb;">ニックネーム</span>
+                  <input class="auth-input" id="profileNickname" type="text" placeholder="なまえ" maxlength="32">
+                </label>
+              </div>
+              <div class="avatar-panel" id="avatarPanel" hidden>
+                <div class="avatar-grid" id="avatarGrid"></div>
+              </div>
               <label class="profile-name">
-                <span style="font-weight:700; color:#e5e7eb;">ニックネーム</span>
-                <input class="auth-input" id="profileNickname" type="text" placeholder="なまえ" maxlength="32">
+                <span style="font-weight:700; color:#e5e7eb;">X (旧Twitter)</span>
+                <input class="auth-input" id="profileX" type="url" placeholder="https://x.com/username" maxlength="200" inputmode="url">
               </label>
+              <button class="auth-btn" id="saveProfile" type="button">プロフィールを保存</button>
+              <p class="auth-status" id="authStatus"></p>
             </div>
-            <div class="avatar-panel" id="avatarPanel" hidden>
-              <div class="avatar-grid" id="avatarGrid"></div>
-            </div>
-            <label class="profile-name">
-              <span style="font-weight:700; color:#e5e7eb;">X (旧Twitter)</span>
-              <input class="auth-input" id="profileX" type="url" placeholder="https://x.com/username" maxlength="200" inputmode="url">
-            </label>
-            <button class="auth-btn" id="saveProfile" type="button">プロフィールを保存</button>
-            <p class="auth-status" id="authStatus"></p>
-          </div>
-        </div>
-      </section>
+          </section>
 
-      <section class="home-panel account-note">
-        <div class="home-panel__header">
-          <h2 class="home-panel__title">PiXiEEDrawとの関係</h2>
-        </div>
-        <p class="card-copy">共有プロジェクト作成、サポーター特典、プロフィール同期はこのマイページのログイン状態を使います。</p>
-        <a class="button" href="../pixiedraw/">PiXiEEDrawへ戻る</a>
-      </section>
+          <section class="account-panel">
+            <div class="account-list" id="localProjectList">
+              <div class="account-item">
+                <div class="account-cover">
+                  <img src="../icon/icon-192-4.png" alt="">
+                </div>
+                <div class="account-item__body">
+                  <strong>作品がありません</strong>
+                  <span>PiXiEEDrawの端末内保存がここに出ます。</span>
+                </div>
+                <span class="account-chip">0件</span>
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <section class="account-stack" aria-label="購入済みQR">
+          <section class="account-panel">
+            <h2 class="section-title">購入済みQR</h2>
+            <div class="account-list" id="ownedQrList" aria-label="購入済みQR一覧">
+              <div class="account-item">
+                <div class="account-cover">
+                  <img src="../icon/icon-192-6.png" alt="">
+                </div>
+                <div class="account-item__body">
+                  <strong>まだ購入済みQRはありません</strong>
+                  <span>購入後にここへ表示されます。</span>
+                </div>
+                <a class="account-action" href="../qr/index.html">設定する</a>
+              </div>
+            </div>
+          </section>
+        </section>
+      </div>
     </main>
   </div>
 

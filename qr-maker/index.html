@@ -51,6 +51,22 @@
 <script async="" crossorigin="anonymous" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253"></script>
 <script src="../scripts/pixieed-adfree.js?v=2026.06.01-serial-code-email"></script>
 <script>
+  (function configureEmbedMode() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const embedMode = params.get('embed') === '1' || params.get('embed') === 'true';
+      if (embedMode) {
+        document.documentElement.dataset.embedMode = 'true';
+        window.__PIXIEED_EMBED_MODE__ = true;
+      } else {
+        window.__PIXIEED_EMBED_MODE__ = false;
+      }
+    } catch (_error) {
+      window.__PIXIEED_EMBED_MODE__ = false;
+    }
+  })();
+</script>
+<script>
   const GA_MEASUREMENT_ID = 'G-SZPVXMX85G';
   const GA_PAGE_PATH = '/qr-maker/';
   window.dataLayer = window.dataLayer || [];
@@ -244,6 +260,23 @@
     background:linear-gradient(135deg, rgba(253, 200, 63, 1), rgba(251, 146, 60, 1));
     border-color:rgba(251, 191, 36, 0.95);
     color:#2b1600;
+  }
+  html[data-embed-mode="true"] body{
+    padding:0 !important;
+    min-height:100vh;
+  }
+  html[data-embed-mode="true"] .site-header,
+  html[data-embed-mode="true"] .bottom-nav,
+  html[data-embed-mode="true"] .pixieed-shared-footer,
+  html[data-embed-mode="true"] .ad-footer,
+  html[data-embed-mode="true"] .support-tip-link{
+    display:none !important;
+  }
+  html[data-embed-mode="true"] .page{
+    max-width:100%;
+  }
+  html[data-embed-mode="true"] .page > main{
+    padding-bottom:0;
   }
   .btn {
     appearance: none;

@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PiXiEED</title>
+<meta name="robots" content="noindex,nofollow">
+<script>
+  (function () {
+    const target = localStorage.getItem('pixieed-qr-target-1');
+    const fallback = `${window.location.origin}/`;
+    const next = target && /^https?:\/\//i.test(target) ? target : fallback;
+    window.location.replace(next);
+  })();
+</script>
+</head>
+<body></body>
+</html>

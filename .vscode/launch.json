@@ -7,6 +7,22 @@
         {
             "type": "pwa-chrome",
             "request": "launch",
+            "name": "PiXiEEDraw (prod)",
+            "url": "http://127.0.0.1:8000/pixiedraw/",
+            "webRoot": "${workspaceFolder}",
+            "preLaunchTask": "Run PiXiEED static server"
+        },
+        {
+            "type": "pwa-chrome",
+            "request": "launch",
+            "name": "PiXiEEDDraw.dev (split work)",
+            "url": "http://127.0.0.1:8000/PiXiEEDDraw.dev/",
+            "webRoot": "${workspaceFolder}",
+            "preLaunchTask": "Run PiXiEED static server"
+        },
+        {
+            "type": "pwa-chrome",
+            "request": "launch",
             "name": "Open Home (index.html)",
             "file": "${workspaceFolder}/index.html"
         },

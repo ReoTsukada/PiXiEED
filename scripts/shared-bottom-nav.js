@@ -7,6 +7,9 @@
   const pageUrl = new URL(window.location.href);
   const pageDirUrl = new URL('./', pageUrl);
   const rootUrl = new URL('../', script.src);
+  if (window.__PIXIEED_EMBED_MODE__) {
+    return;
+  }
   const currentTab = resolveCurrentTab(pageUrl.pathname);
 
   injectStyles();
@@ -17,7 +20,7 @@
   function resolveCurrentTab(pathname) {
     const path = String(pathname || '').toLowerCase();
     if (path.includes('/pixiedraw/')) return 'draw';
-    if (path.includes('/contest/') || path.includes('/talk/')) return 'plaza';
+    if (path.includes('/qr/')) return 'qr';
     if (path.includes('/pixiee-lens/')) return 'camera';
     if (/(?:^|\/)account(?:\/|\/index\.html)?$/.test(path)) return 'profile';
     return 'home';
@@ -137,8 +140,8 @@
   function getNavItems() {
     return [
       { key: 'home', label: 'ホーム', path: 'index.html', icon: 'FooterIcon1.png' },
-      { key: 'plaza', label: '広場', path: 'contest/index.html', icon: 'FooterIcon2.png' },
-      { key: 'draw', label: 'PiXiEEDraw', path: 'pixiedraw/index.html', icon: 'icon/icon-192-4.png', primary: true },
+      { key: 'qr', label: 'QR', path: 'qr/index.html', icon: 'pixiedraw/assets/icons/tool-qr-edit.svg' },
+      { key: 'draw', label: '描く', path: 'pixiedraw/index.html', icon: 'icon/icon-192-4.png', primary: true },
       { key: 'camera', label: 'カメラ', path: 'pixiee-lens/index.html', icon: 'pixiedraw/assets/icons/pixieelensicon_frame_01.png' },
       { key: 'profile', label: 'マイページ', path: 'account/index.html', icon: 'character-dots/maousama.png', useAvatar: true }
     ];
@@ -245,14 +248,14 @@
         align-items:center;
         justify-content:center;
         gap:4px;
-        font-size:10px;
+        font-size:11px;
         line-height:1.2;
         padding:7px 2px;
         cursor:pointer;
       }
       .bottom-nav__item .icon{
-        width:22px;
-        height:22px;
+        width:24px;
+        height:24px;
         display:inline-flex;
         align-items:center;
         justify-content:center;

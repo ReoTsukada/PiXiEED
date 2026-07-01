@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>QR | PiXiEED</title>
+<meta name="description" content="QRコードメーカーと販売所を同じページで切り替えられるPiXiEEDのQRページ。">
+<link rel="canonical" href="https://pixieed.jp/qr/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="PiXiEED">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:title" content="QR | PiXiEED">
+<meta property="og:description" content="QRコードメーカーと販売所を同じページで切り替えられるPiXiEEDのQRページ。">
+<meta property="og:url" content="https://pixieed.jp/qr/">
+<meta property="og:image" content="https://pixieed.jp/assets/screenshots/generated/qr-maker-app.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="QR | PiXiEED">
+<meta name="twitter:description" content="QRコードメーカーと販売所を同じページで切り替えられるPiXiEEDのQRページ。">
+<meta name="twitter:image" content="https://pixieed.jp/assets/screenshots/generated/qr-maker-app.png">
+<meta name="theme-color" content="#0b1224">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600;700&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-6.png">
+<link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-6.png">
+<style>
+  :root{color-scheme:dark;--bg:#0b1224;--panel:rgba(255,255,255,.06);--border:rgba(255,255,255,.12);--text:#f8fafc;--muted:#cbd5e1;--accent:#ff9f43;--accent-2:#ff719a;--radius:18px;--shadow:0 18px 48px rgba(0,0,0,.32);font-family:'Fredoka','DotGothic16',system-ui,sans-serif}
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%;background:radial-gradient(circle at top,rgba(255,159,67,.16),transparent 26%),radial-gradient(circle at right,rgba(255,113,154,.14),transparent 24%),var(--bg);color:var(--text)}
+  body{padding:12px}
+  a{color:inherit;text-decoration:none}
+  .app{max-width:1180px;margin:0 auto;display:grid;gap:12px}
+  .sheet,.panel,.card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);backdrop-filter:blur(14px)}
+  .sheet{padding:14px;display:grid;gap:12px}
+  .sheet__top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .title{margin:0;font-size:32px;line-height:1}
+  .tabs{display:flex;gap:8px;padding:6px;border:1px solid var(--border);border-radius:999px;background:rgba(255,255,255,.04);width:max-content;max-width:100%;overflow:auto}
+  .tabs button{border:0;background:transparent;color:var(--muted);font:inherit;font-weight:800;padding:10px 14px;border-radius:999px;cursor:pointer;white-space:nowrap}
+  .tabs .is-active{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#111827}
+  .view{display:none}.view.is-active{display:block}
+  .maker-shell,.market-shell{display:grid;gap:12px}
+  .maker-frame{
+    width:100%;
+    min-height:calc(100vh - 220px);
+    border:0;
+    border-radius:18px;
+    background:#0b1224;
+    box-shadow:var(--shadow);
+  }
+  .panel{padding:14px;display:grid;gap:12px}
+  .panel h2{margin:0;font-size:18px}
+  .meta{margin:0;color:var(--muted);font-size:12px;line-height:1.6}
+  .actions{display:flex;flex-wrap:wrap;gap:10px}
+  .btn{display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:12px 16px;border-radius:14px;border:1px solid transparent;font-weight:800}
+  .btn--primary{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#111827}
+  .btn--ghost{border-color:var(--border);background:rgba(255,255,255,.04)}
+  .searchbar{display:grid;grid-template-columns:1fr auto auto;gap:10px}
+  .search-input,.search-select{width:100%;min-height:46px;border-radius:14px;border:1px solid var(--border);background:rgba(255,255,255,.05);color:var(--text);padding:12px 14px;font:inherit}
+  .list{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));
+    gap:12px;
+  }
+  .placeholder{
+    min-height:280px;
+    display:grid;
+    place-items:center;
+    padding:24px;
+    text-align:center;
+    color:var(--muted);
+    border:1px dashed rgba(255,255,255,.18);
+    border-radius:20px;
+    background:rgba(255,255,255,.03);
+  }
+  .placeholder strong{display:block;color:var(--text);font-size:15px;margin-bottom:6px}
+  .right{display:grid;gap:12px}
+  .filterline{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{display:inline-flex;align-items:center;justify-content:center;padding:8px 10px;border-radius:999px;border:1px solid var(--border);background:rgba(255,255,255,.04);font-size:12px;font-weight:800}
+  .foot{color:var(--muted);font-size:12px;line-height:1.6;margin:0}
+  @media (max-width: 640px){
+    body{padding:10px}
+    .searchbar{grid-template-columns:1fr}
+    .sheet__top{align-items:flex-start}
+    .tabs{width:100%}
+    .list{grid-template-columns:repeat(2, minmax(0, 1fr))}
+  }
+  @media (max-width: 420px){
+    .list{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+  <main class="app">
+    <section class="sheet">
+      <div class="sheet__top">
+        <h1 class="title">QR</h1>
+        <div class="tabs" role="tablist" aria-label="QRの切り替え">
+          <button type="button" class="is-active" data-tab="maker" aria-selected="true">メーカー</button>
+          <button type="button" data-tab="market" aria-selected="false">販売所</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="view is-active" data-view="maker">
+      <iframe class="maker-frame" src="../qr-maker/index.html?embed=1" title="QRコードメーカー"></iframe>
+    </section>
+
+    <section class="view" data-view="market">
+      <div class="market-shell">
+        <section class="panel">
+          <h2>販売所</h2>
+          <div class="searchbar">
+            <input class="search-input" id="shopSearch" type="search" placeholder="商品名・用途で検索">
+            <select class="search-select" id="shopStatusFilter" aria-label="状態で絞り込み">
+              <option value="all">すべて</option>
+              <option value="sale">販売中</option>
+              <option value="sold">SOLD OUT</option>
+              <option value="new">未設定</option>
+            </select>
+            <button class="btn btn--ghost" id="shopResetBtn" type="button">リセット</button>
+          </div>
+          <div class="filterline">
+            <span class="chip">Stripe決済</span>
+            <span class="chip">ログイン必須</span>
+            <span class="chip">設定はマイページ</span>
+          </div>
+        </section>
+
+        <section class="list" id="products">
+          <div class="placeholder">
+            <div>
+              <strong>商品カードは販売開始時に表示します</strong>
+              <span>現在はメーカーと設定導線の確認を優先しています。</span>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <script src="../scripts/shared-profile-header.js"></script>
+  <script src="../scripts/shared-bottom-nav.js"></script>
+  <script>
+    const tabs = Array.from(document.querySelectorAll('[data-tab]'));
+    const views = Array.from(document.querySelectorAll('[data-view]'));
+    const setView = (name) => {
+      tabs.forEach((button) => {
+        const active = button.dataset.tab === name;
+        button.classList.toggle('is-active', active);
+        button.setAttribute('aria-selected', String(active));
+      });
+      views.forEach((view) => view.classList.toggle('is-active', view.dataset.view === name));
+    };
+    tabs.forEach((button) => button.addEventListener('click', () => setView(button.dataset.tab)));
+
+    const searchInput = document.getElementById('shopSearch');
+    const statusFilter = document.getElementById('shopStatusFilter');
+    const resetBtn = document.getElementById('shopResetBtn');
+    const items = Array.from(document.querySelectorAll('[data-shop-item]'));
+    const normalize = (value) => String(value || '').toLowerCase().trim();
+    const applyFilter = () => {
+      const query = normalize(searchInput.value);
+      const status = statusFilter.value;
+      items.forEach((item) => {
+        const matchesQuery = !query || normalize(item.dataset.search).includes(query);
+        const matchesStatus = status === 'all' || item.dataset.status === status;
+        item.hidden = !(matchesQuery && matchesStatus);
+      });
+    };
+    searchInput.addEventListener('input', applyFilter);
+    statusFilter.addEventListener('change', applyFilter);
+    resetBtn.addEventListener('click', () => {
+      searchInput.value = '';
+      statusFilter.value = 'all';
+      applyFilter();
+    });
+  </script>
+</body>
+</html>
