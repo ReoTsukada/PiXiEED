@@ -166,6 +166,26 @@ const uiStaticConfigSource = fs.readFileSync(path.join(moduleDir, 'ui-static-con
     failures.push(`ui-static-config.js: missing exported ${name}`);
   }
 });
+const projectStorageUtilsSource = fs.readFileSync(path.join(moduleDir, 'project-storage-utils.js'), 'utf8');
+if (
+  !projectStorageUtilsSource.includes('function createProjectRuntimeStaticConfig(')
+  || !projectStorageUtilsSource.includes('    createProjectRuntimeStaticConfig,')
+) {
+  failures.push('project-storage-utils.js: missing exported createProjectRuntimeStaticConfig');
+}
+if (
+  !layoutViewportSource.includes('function createLayoutStaticConfig(')
+  || !layoutViewportSource.includes('    createLayoutStaticConfig,')
+) {
+  failures.push('layout-viewport.js: missing exported createLayoutStaticConfig');
+}
+const stateNormalizersSource = fs.readFileSync(path.join(moduleDir, 'state-normalizers.js'), 'utf8');
+if (
+  !stateNormalizersSource.includes('function createDrawingStateStaticConfig(')
+  || !stateNormalizersSource.includes('    createDrawingStateStaticConfig,')
+) {
+  failures.push('state-normalizers.js: missing exported createDrawingStateStaticConfig');
+}
 
 const toolActionConfigLine = lineOf('const toolActionStaticConfig =');
 const toolbarConfigLine = lineOf('const toolbarStaticConfig =');
@@ -175,6 +195,11 @@ const storageStaticConfigLine = lineOf('const storageStaticConfig =');
 const canUseSessionStorageLine = lineOf('const canUseSessionStorage =');
 const runtimeStaticConfigLine = lineOf('const runtimeStaticConfig =');
 const exportDeliveryUtilsLine = lineOf('const exportDeliveryUtils =');
+const projectRuntimeStaticConfigLine = lineOf('const projectRuntimeStaticConfig =');
+const projectStorageUtilsLine = lineOf('const projectStorageUtils =');
+const layoutStaticConfigLine = lineOf('const layoutStaticConfig =');
+const railSizingLine = lineOf('const railSizing =');
+const drawingStateStaticConfigLine = lineOf('const drawingStateStaticConfig =');
 if (!toolActionConfigLine || !toolbarConfigLine || toolActionConfigLine >= toolbarConfigLine) {
   failures.push('tool action static config must initialize before toolbar static config');
 }
@@ -186,6 +211,15 @@ if (!storageStaticConfigLine || !canUseSessionStorageLine || storageStaticConfig
 }
 if (!runtimeStaticConfigLine || !exportDeliveryUtilsLine || runtimeStaticConfigLine >= exportDeliveryUtilsLine) {
   failures.push('runtime static config must initialize before export delivery utils');
+}
+if (!projectRuntimeStaticConfigLine || !projectStorageUtilsLine || projectRuntimeStaticConfigLine >= projectStorageUtilsLine) {
+  failures.push('project runtime static config must initialize before project storage utils');
+}
+if (!layoutStaticConfigLine || !railSizingLine || layoutStaticConfigLine >= railSizingLine) {
+  failures.push('layout static config must initialize before rail sizing state');
+}
+if (!drawingStateStaticConfigLine || !documentModelLine || drawingStateStaticConfigLine >= documentModelLine) {
+  failures.push('drawing state static config must initialize before document model');
 }
 
 [
