@@ -83,8 +83,17 @@
       object-fit:contain;
       image-rendering:pixelated;
     }
+    .account-panel__head{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+    }
+    .account-panel__head .section-title{
+      margin:0;
+    }
     .account-item strong{display:block;font-size:14px}
-    .account-item span{display:block;color:#cbd5e1;font-size:12px}
+    .account-item__body span{display:block;color:#cbd5e1;font-size:12px}
     .account-item__body{display:grid;gap:4px;min-width:0}
     .account-chip{
       display:inline-flex;
@@ -112,6 +121,13 @@
       font-size:12px;
       font-weight:800;
       white-space:nowrap;
+      text-decoration:none;
+      cursor:pointer;
+      font-family:inherit;
+    }
+    .account-action:disabled{
+      cursor:wait;
+      opacity:.68;
     }
     @media (max-width: 900px){
       .account-grid{grid-template-columns:1fr}
@@ -171,6 +187,10 @@
           </section>
 
           <section class="account-panel">
+            <div class="account-panel__head">
+              <h2 class="section-title">PiXiEEDraw</h2>
+              <span class="account-chip" id="localProjectCount">確認中</span>
+            </div>
             <div class="account-list" id="localProjectList">
               <div class="account-item">
                 <div class="account-cover">
@@ -210,6 +230,7 @@
   <script src="../scripts/shared-profile-header.js"></script>
   <script src="../scripts/shared-auth-panel.js?v=2026.06.26-auth-persist"></script>
   <script src="../scripts/shared-bottom-nav.js"></script>
+  <script src="../scripts/account-local-projects.js?v=2026.07.01-local-projects"></script>
   <script src="../scripts/pixel-art-fit.js"></script>
 </body>
 </html>
