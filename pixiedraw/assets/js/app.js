@@ -45326,10 +45326,7 @@
         state.palette,
         normalizePaletteIndex(state.secondaryPaletteIndex, state.activePaletteIndex)
       );
-      const activeColor = state.palette[state.activePaletteIndex] || state.palette[0];
-      if (activeColor) {
-        state.activeRgb = normalizeColorValue(activeColor);
-      }
+      state.activeRgb = normalizeColorValue(previousActiveColor || state.activeRgb);
       syncPaletteInputs();
       renderPalette();
       if (applyPresetToRgbSwatchesOnly) {
@@ -45811,14 +45808,21 @@
       // 呼び出し側がアクティブを維持してセカンダリを更新したい場合
       state.secondaryPaletteIndex = normalizePaletteIndex(newIndex, previousActive);
     } else if (!isIndexColorMode()) {
-      state.activePaletteIndex = normalizePaletteIndex(mapping[previousActive], previousActive);
-      state.secondaryPaletteIndex = normalizePaletteIndex(mapping[previousSecondary], state.activePaletteIndex);
+      const preservedActiveColor = normalizeColorValue(state.activeRgb);
+      const preservedSecondaryColor = normalizeColorValue(state.palette[previousSecondary] || state.activeRgb);
+      state.activePaletteIndex = findNearestPaletteColorIndexByRgba(
+        preservedActiveColor,
+        state.palette,
+        normalizePaletteIndex(mapping[previousActive], previousActive)
+      );
+      state.secondaryPaletteIndex = findNearestPaletteColorIndexByRgba(
+        preservedSecondaryColor,
+        state.palette,
+        state.activePaletteIndex
+      );
     }
     if (!isIndexColorMode()) {
-      const activeColor = state.palette[state.activePaletteIndex] || state.palette[0];
-      if (activeColor) {
-        state.activeRgb = normalizeColorValue(activeColor);
-      }
+      state.activeRgb = normalizeColorValue(state.activeRgb);
     }
     // DOM を再構築して選択表示を更新
     renderPalette();
@@ -91569,7 +91573,12 @@
     if (previewTool === 'eraser') {
       baseColor = { r: 255, g: 255, b: 255, a: 255 };
     } else if (isRgbColorMode()) {
-      baseColor = normalizeColorValue(state.activeRgb);
+      const overridePaletteIndex = Number.isFinite(paletteIndexOverride)
+        ? resolveDrawPaletteIndex(paletteIndexOverride)
+        : null;
+      baseColor = overridePaletteIndex !== null && state.palette[overridePaletteIndex]
+        ? normalizeColorValue(state.palette[overridePaletteIndex])
+        : normalizeColorValue(state.activeRgb);
     } else {
       baseColor = state.palette[resolveDrawPaletteIndex(paletteIndexOverride)];
     }

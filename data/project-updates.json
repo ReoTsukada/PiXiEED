@@ -1,11 +1,17 @@
 {
-  "generatedAt": "2026-07-01T02:26:09.032Z",
+  "generatedAt": "2026-07-01T03:40:25.077Z",
   "projects": [
     {
       "id": "site",
       "name": "PiXiEED 全体",
       "url": "/index.html",
       "entries": [
+        {
+          "date": "2026-07-01",
+          "items": [
+            "画面を更新"
+          ]
+        },
         {
           "date": "2026-06-26",
           "items": [
@@ -46,12 +52,6 @@
           "date": "2026-05-30",
           "items": [
             "画面を更新"
-          ]
-        },
-        {
-          "date": "2026-05-23",
-          "items": [
-            "画面 / 機能 / SEOを更新"
           ]
         }
       ]
@@ -172,6 +172,12 @@
       "url": "/projects/qr-maker/",
       "entries": [
         {
+          "date": "2026-07-01",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
           "date": "2026-06-28",
           "items": [
             "画面を更新"
@@ -212,17 +218,28 @@
           "items": [
             "画面を更新"
           ]
-        },
-        {
-          "date": "2026-04-03",
-          "items": [
-            "画面を更新"
-          ]
         }
       ]
     }
   ],
   "recentByDate": [
+    {
+      "date": "2026-07-01",
+      "updates": [
+        {
+          "id": "site",
+          "name": "PiXiEED 全体",
+          "url": "/index.html",
+          "summary": "画面を更新"
+        },
+        {
+          "id": "qr-maker",
+          "name": "QRコードメーカー",
+          "url": "/projects/qr-maker/",
+          "summary": "画面を更新"
+        }
+      ]
+    },
     {
       "date": "2026-06-29",
       "updates": [
@@ -320,23 +337,6 @@
           "id": "pixiedraw",
           "name": "PiXiEEDraw",
           "url": "/projects/pixiedraw/",
-          "summary": "画面を更新"
-        }
-      ]
-    },
-    {
-      "date": "2026-06-21",
-      "updates": [
-        {
-          "id": "pixiedraw",
-          "name": "PiXiEEDraw",
-          "url": "/projects/pixiedraw/",
-          "summary": "機能 / スタイル / 画面 / 構成を更新"
-        },
-        {
-          "id": "qr-maker",
-          "name": "QRコードメーカー",
-          "url": "/projects/qr-maker/",
           "summary": "画面を更新"
         }
       ]
