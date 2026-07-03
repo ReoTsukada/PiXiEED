@@ -1,11 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const appPath = 'PiXiEEDDraw.dev/assets/js/app.js';
-const indexPath = 'PiXiEEDDraw.dev/index.html';
-const cssPath = 'PiXiEEDDraw.dev/assets/css/style.css';
-const moduleDir = 'PiXiEEDDraw.dev/assets/js/modules';
-const layoutViewportPath = 'PiXiEEDDraw.dev/assets/js/modules/layout-viewport.js';
+const appPath = 'PiXiEEDrawDEV/assets/js/app.js';
+const indexPath = 'PiXiEEDrawDEV/index.html';
+const cssPath = 'PiXiEEDrawDEV/assets/css/style.css';
+const moduleDir = 'PiXiEEDrawDEV/assets/js/modules';
+const layoutViewportPath = 'PiXiEEDrawDEV/assets/js/modules/layout-viewport.js';
 
 const appSource = fs.readFileSync(appPath, 'utf8');
 const cssSource = fs.readFileSync(cssPath, 'utf8');
@@ -4578,9 +4578,9 @@ if (!appVersion || !indexVersion || appVersion !== indexVersion) {
 }
 
 if (failures.length) {
-  console.error('PiXiEEDDraw.dev TDZ guard failed:');
+  console.error('PiXiEEDrawDEV TDZ guard failed:');
   failures.forEach(failure => console.error(`- ${failure}`));
   process.exit(1);
 }
 
-console.log('PiXiEEDDraw.dev TDZ guard passed.');
+console.log('PiXiEEDrawDEV TDZ guard passed.');

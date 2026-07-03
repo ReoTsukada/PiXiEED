@@ -52,6 +52,21 @@
   }
 
   function setLocalViewportCanvasLayoutAnchor(left, top) {
+    const count = Math.max(0, getLocalViewportCanvasCount());
+    const currentScale = getCurrentLocalViewportCanvasLayoutScale();
+    const previousAnchorLeft = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorLeft, 0) || 0;
+    const previousAnchorTop = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorTop, 0) || 0;
+    const previousPositions = count > 0
+      ? normalizeLocalViewportCanvasPositions(
+        localViewportCanvasState?.positions,
+        localViewportCanvasState?.positions,
+        count,
+        {
+          relative: true,
+          fallbackRelative: true,
+        }
+      )
+      : [];
     const nextState = normalizeLocalViewportCanvasState(
       {
         ...localViewportCanvasState,
@@ -66,6 +81,37 @@
       && nextState.anchorTop === localViewportCanvasState.anchorTop
     ) {
       return false;
+    }
+    if (count > 0) {
+      const nextAnchorLeft = parseLocalViewportCanvasAxis(nextState.anchorLeft, 0) || 0;
+      const nextAnchorTop = parseLocalViewportCanvasAxis(nextState.anchorTop, 0) || 0;
+      const nextPositions = previousPositions.map(position => {
+        if (!position || position.left === null || position.top === null) {
+          return position;
+        }
+        const displayLeft = previousAnchorLeft + (position.left * currentScale);
+        const displayTop = previousAnchorTop + (position.top * currentScale);
+        return normalizeLocalViewportCanvasPosition(
+          {
+            left: (displayLeft - nextAnchorLeft) / Math.max(currentScale, Number.EPSILON),
+            top: (displayTop - nextAnchorTop) / Math.max(currentScale, Number.EPSILON),
+          },
+          position,
+          {
+            relative: true,
+            fallbackRelative: true,
+          }
+        );
+      });
+      nextState.positions = normalizeLocalViewportCanvasPositions(
+        nextPositions,
+        previousPositions,
+        count,
+        {
+          relative: true,
+          fallbackRelative: true,
+        }
+      );
     }
     localViewportCanvasState = nextState;
     localViewportCanvasLayoutResetPending = false;
@@ -1220,8 +1266,13 @@
     if (!targetCanvas) {
       return false;
     }
+    const previousCanvas = getActiveProjectCanvasDocument();
+    const previousSurface = activeCanvasSurface;
     const previousId = projectCanvasStore.activeCanvasId;
     const changed = previousId !== targetCanvas.id;
+    if (changed && previousSurface && previousCanvas) {
+      markProjectCanvasSurfaceRendered(previousSurface, previousCanvas);
+    }
     projectCanvasStore.activeCanvasId = targetCanvas.id;
     localViewportCanvasState = normalizeLocalViewportCanvasState(
       {
@@ -1529,6 +1580,48 @@
     surface.stack.style.setProperty('--tile-offset-y', '0px');
     updateStackGridOpacity(surface.stack, scale);
     updateCanvasSurfaceGridSvg(surface, canvasDoc, scale);
+  }
+
+  function getProjectCanvasSurfaceRenderSignature(canvasDoc) {
+    if (!canvasDoc) {
+      return '';
+    }
+    const frameCount = Array.isArray(canvasDoc.frames) ? canvasDoc.frames.length : 0;
+    const layerCount = Array.isArray(canvasDoc.frames)
+      ? canvasDoc.frames.reduce((total, frame) => total + (Array.isArray(frame?.layers) ? frame.layers.length : 0), 0)
+      : 0;
+    return [
+      canvasDoc.id || '',
+      Math.max(1, Math.round(Number(canvasDoc.width) || 1)),
+      Math.max(1, Math.round(Number(canvasDoc.height) || 1)),
+      getProjectCanvasDisplayScale(canvasDoc),
+      Math.max(0, Math.round(Number(canvasDoc.activeFrame) || 0)),
+      canvasDoc.activeLayer || '',
+      frameCount,
+      layerCount,
+    ].join(':');
+  }
+
+  function markProjectCanvasSurfaceRendered(surface, canvasDoc) {
+    if (!surface || !canvasDoc) {
+      return;
+    }
+    surface.renderSignature = getProjectCanvasSurfaceRenderSignature(canvasDoc);
+  }
+
+  function shouldRenderProjectCanvasSurface(surface, canvasDoc) {
+    if (!surface || !canvasDoc) {
+      return false;
+    }
+    if (!(surface.drawing instanceof HTMLCanvasElement)) {
+      return true;
+    }
+    const width = Math.max(1, Math.round(Number(canvasDoc.width) || 1));
+    const height = Math.max(1, Math.round(Number(canvasDoc.height) || 1));
+    if (surface.drawing.width !== width || surface.drawing.height !== height) {
+      return true;
+    }
+    return surface.renderSignature !== getProjectCanvasSurfaceRenderSignature(canvasDoc);
   }
 
   function ensureLocalViewportCanvasEntries() {
@@ -2031,6 +2124,7 @@
     }
     surface.drawingCtx.clearRect(0, 0, canvasDoc.width, canvasDoc.height);
     surface.drawingCtx.putImageData(resolvedImage, 0, 0);
+    markProjectCanvasSurfaceRendered(surface, canvasDoc);
   }
 
   function renderVoxelExtensionPreviewSurfaceNow({ updateViewport = false } = {}) {
@@ -2069,6 +2163,10 @@
     getProjectCanvasSurfaceEntries().forEach((surface, index) => {
       const canvasDoc = documents[index] || null;
       if (!canvasDoc || surface === activeCanvasSurface) {
+        return;
+      }
+      if (!shouldRenderProjectCanvasSurface(surface, canvasDoc)) {
+        syncProjectCanvasSurfaceDimensions(surface, canvasDoc);
         return;
       }
       renderProjectCanvasSurface(surface, canvasDoc);

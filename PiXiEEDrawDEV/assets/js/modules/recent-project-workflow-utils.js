@@ -498,6 +498,7 @@
   }
 
   function renderRecentProjectsList(entries) {
+    const hasEntries = Array.isArray(entries) && entries.length > 0;
     const targets = [
       {
         section: dom.startup?.recentSection,
@@ -517,14 +518,12 @@
     if (!targets.length) {
       return;
     }
-    targets.forEach(target => {
-      target.list.innerHTML = '';
-    });
     const renderProjectHomeEmptyState = target => {
       const titleNode = target.section.querySelector(target.titleSelector);
       if (titleNode instanceof HTMLElement) {
         titleNode.textContent = target.title;
       }
+      target.list.innerHTML = '';
       const empty = document.createElement('p');
       empty.className = 'startup-recent-list__empty';
       empty.textContent = localizeText(
@@ -534,9 +533,18 @@
       target.list.appendChild(empty);
       target.section.hidden = false;
     };
-    if (!AUTOSAVE_SUPPORTED || !entries || entries.length === 0) {
+    if (!AUTOSAVE_SUPPORTED || !hasEntries) {
       targets.forEach(target => {
         if (target.list === dom.projectHomeRecentList) {
+          if (
+            !hasEntries
+            && recentProjectsCache instanceof Map
+            && recentProjectsCache.size > 0
+            && target.list.children.length > 0
+          ) {
+            target.section.hidden = false;
+            return;
+          }
           renderProjectHomeEmptyState(target);
           return;
         }
@@ -552,6 +560,9 @@
         titleNode.textContent = target.title;
       }
       target.section.hidden = false;
+    });
+    targets.forEach(target => {
+      target.list.innerHTML = '';
     });
     const createRecentProjectCard = entry => {
       if (!entry || !entry.id) {

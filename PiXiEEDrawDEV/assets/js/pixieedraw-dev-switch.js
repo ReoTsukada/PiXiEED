@@ -4,7 +4,7 @@
   const TAP_LIMIT = 10;
   const TAP_WINDOW_MS = 4000;
   const STORAGE_KEY = 'pixieedraw:runtime-target:v1';
-  const RUNTIME_CACHE_BUSTER = '2026.07.03-pixieedrawdev-switch-fix6';
+  const RUNTIME_CACHE_BUSTER = '2026.07.03-pixieedrawdev-switch-fix8';
   let tapCount = 0;
   let firstTapAt = 0;
 
