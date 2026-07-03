@@ -653,6 +653,42 @@
       card.appendChild(deleteButton);
       return card;
     };
+    const createProjectHomeAdCard = () => {
+      if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) {
+        return null;
+      }
+      const card = document.createElement('article');
+      card.className = 'startup-recent-card startup-recent-card--ad';
+      card.setAttribute('role', 'listitem');
+      card.setAttribute('aria-label', localizeText('広告', 'Ad'));
+      const frame = document.createElement('div');
+      frame.className = 'startup-recent-card__open startup-recent-card__open--ad';
+      const kindBadge = document.createElement('span');
+      kindBadge.className = 'startup-recent-card__kind';
+      kindBadge.textContent = localizeText('広告', 'Ad');
+      const thumb = document.createElement('div');
+      thumb.className = 'startup-recent-card__thumb startup-recent-card__thumb--ad';
+      const ad = document.createElement('ins');
+      ad.className = 'startup-recent-card__ad-ins';
+      ad.setAttribute('data-ad-client', 'ca-pub-9801602250480253');
+      ad.setAttribute('data-ad-format', 'auto');
+      ad.setAttribute('data-ad-slot', '2141591954');
+      ad.setAttribute('data-full-width-responsive', 'true');
+      ad.style.display = 'block';
+      thumb.appendChild(ad);
+      const nameNode = document.createElement('span');
+      nameNode.className = 'startup-recent-card__name';
+      nameNode.textContent = localizeText('広告', 'Ad');
+      const metaNode = document.createElement('span');
+      metaNode.className = 'startup-recent-card__meta';
+      metaNode.textContent = localizeText('PiXiEEDを支援', 'Supports PiXiEED');
+      frame.appendChild(kindBadge);
+      frame.appendChild(thumb);
+      frame.appendChild(nameNode);
+      frame.appendChild(metaNode);
+      card.appendChild(frame);
+      return card;
+    };
     entries.forEach(entry => {
       targets.forEach(target => {
         const card = createRecentProjectCard(entry);
@@ -660,6 +696,15 @@
           target.list.appendChild(card);
         }
       });
+    });
+    targets.forEach(target => {
+      if (target.list !== dom.projectHomeRecentList) {
+        return;
+      }
+      const adCard = createProjectHomeAdCard();
+      if (adCard) {
+        target.list.appendChild(adCard);
+      }
     });
     updatePixieedAccountUi();
     syncPixieedSupportBenefitUi();
