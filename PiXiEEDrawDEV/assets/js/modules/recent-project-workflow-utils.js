@@ -520,21 +520,24 @@
     targets.forEach(target => {
       target.list.innerHTML = '';
     });
+    const renderProjectHomeEmptyState = target => {
+      const titleNode = target.section.querySelector(target.titleSelector);
+      if (titleNode instanceof HTMLElement) {
+        titleNode.textContent = target.title;
+      }
+      const empty = document.createElement('p');
+      empty.className = 'startup-recent-list__empty';
+      empty.textContent = localizeText(
+        'まだプロジェクトがありません。',
+        'No projects yet.'
+      );
+      target.list.appendChild(empty);
+      target.section.hidden = false;
+    };
     if (!AUTOSAVE_SUPPORTED || !entries || entries.length === 0) {
       targets.forEach(target => {
-        if (target.list === dom.projectHomeRecentList && AUTOSAVE_SUPPORTED) {
-          const titleNode = target.section.querySelector(target.titleSelector);
-          if (titleNode instanceof HTMLElement) {
-            titleNode.textContent = target.title;
-          }
-          const empty = document.createElement('p');
-          empty.className = 'startup-recent-list__empty';
-          empty.textContent = localizeText(
-            'まだプロジェクトがありません。',
-            'No projects yet.'
-          );
-          target.list.appendChild(empty);
-          target.section.hidden = false;
+        if (target.list === dom.projectHomeRecentList) {
+          renderProjectHomeEmptyState(target);
           return;
         }
         target.section.hidden = true;
@@ -707,11 +710,10 @@
           list.innerHTML = '';
         }
       });
-      [dom.startup?.recentSection, dom.projectHomeRecentSection].forEach(section => {
-        if (section instanceof HTMLElement) {
-          section.hidden = true;
-        }
-      });
+      if (dom.startup?.recentSection instanceof HTMLElement) {
+        dom.startup.recentSection.hidden = true;
+      }
+      renderRecentProjectsList([]);
       return;
     }
     if (options?.syncSharedFromAccount !== false) {
