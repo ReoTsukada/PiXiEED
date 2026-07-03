@@ -522,6 +522,21 @@
     });
     if (!AUTOSAVE_SUPPORTED || !entries || entries.length === 0) {
       targets.forEach(target => {
+        if (target.list === dom.projectHomeRecentList && AUTOSAVE_SUPPORTED) {
+          const titleNode = target.section.querySelector(target.titleSelector);
+          if (titleNode instanceof HTMLElement) {
+            titleNode.textContent = target.title;
+          }
+          const empty = document.createElement('p');
+          empty.className = 'startup-recent-list__empty';
+          empty.textContent = localizeText(
+            'まだプロジェクトがありません。',
+            'No projects yet.'
+          );
+          target.list.appendChild(empty);
+          target.section.hidden = false;
+          return;
+        }
         target.section.hidden = true;
       });
       updatePixieedAccountUi();
@@ -624,58 +639,6 @@
       card.appendChild(deleteButton);
       return card;
     };
-    const createProjectHomeAdCard = () => {
-      const card = document.createElement('article');
-      card.className = 'startup-recent-card startup-recent-card--ad';
-      card.setAttribute('role', 'listitem');
-      const surface = document.createElement('div');
-      surface.className = 'startup-recent-card__open startup-recent-card__open--ad';
-      const kindBadge = document.createElement('span');
-      kindBadge.className = 'startup-recent-card__kind';
-      kindBadge.textContent = localizeText('広告', 'Ad');
-      const thumb = document.createElement('div');
-      thumb.className = 'startup-recent-card__thumb startup-recent-card__thumb--ad';
-      const adIns = document.createElement('ins');
-      adIns.className = 'ad-seed adsbygoogle startup-recent-card__ad-ins';
-      adIns.setAttribute('data-ad-client', 'ca-pub-9801602250480253');
-      adIns.setAttribute('data-ad-slot', '2141591954');
-      adIns.setAttribute('data-ad-format', 'auto');
-      adIns.setAttribute('data-full-width-responsive', 'true');
-      adIns.style.display = 'block';
-      thumb.appendChild(adIns);
-      const nameNode = document.createElement('span');
-      nameNode.className = 'startup-recent-card__name';
-      nameNode.textContent = localizeText('スポンサー', 'Sponsor');
-      const metaNode = document.createElement('span');
-      metaNode.className = 'startup-recent-card__meta';
-      metaNode.textContent = localizeText('応援ありがとうございます', 'Thanks for your support');
-      surface.append(kindBadge, thumb, nameNode, metaNode);
-      card.appendChild(surface);
-      return card;
-    };
-    const queueProjectHomeRecentAdRender = () => {
-      const list = dom.projectHomeRecentList;
-      if (!(list instanceof HTMLElement)) {
-        return;
-      }
-      const adIns = list.querySelector('.startup-recent-card__ad-ins');
-      if (!(adIns instanceof HTMLElement) || adIns.getAttribute('data-adsbygoogle-status') === 'done') {
-        return;
-      }
-      if (!adIns.classList.contains('adsbygoogle')) {
-        adIns.classList.add('adsbygoogle');
-      }
-      try {
-        (window.adsbygoogle = window.adsbygoogle || []).push({});
-      } catch (_error) {
-        // Ignore ad render failures.
-      }
-    };
-    targets.forEach(target => {
-      if (target.list === dom.projectHomeRecentList) {
-        target.list.appendChild(createProjectHomeAdCard());
-      }
-    });
     entries.forEach(entry => {
       targets.forEach(target => {
         const card = createRecentProjectCard(entry);
@@ -691,9 +654,6 @@
         queueStartupRecentAdRender();
       });
     }
-    window.requestAnimationFrame(() => {
-      queueProjectHomeRecentAdRender();
-    });
   }
 
   async function ensureSharedRecentProjectsAccountSynced({ force = false } = {}) {
