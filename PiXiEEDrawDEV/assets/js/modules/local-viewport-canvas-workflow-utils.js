@@ -941,6 +941,7 @@
     if (panel instanceof HTMLElement) {
       panel.classList.remove('is-moving');
     }
+    document.body.classList.remove('is-canvas-surface-moving');
     const target = canvasSurfacePanelDragState.target;
     if (target instanceof HTMLElement && Number.isFinite(canvasSurfacePanelDragState.pointerId)) {
       try {
@@ -966,6 +967,10 @@
     if (shouldPersist) {
       scheduleSessionPersist({ includeSnapshots: false });
     }
+    syncLocalViewportCanvasDockLayout();
+    updateCanvasResizeHandlePosition();
+    syncCanvasResizeHandleVisibility();
+    scheduleMirrorGuideRefresh();
   }
 
   function beginCanvasSurfacePanelDragInteraction(event, surface) {
@@ -992,6 +997,8 @@
     canvasSurfacePanelDragState.startClientX = Number(event.clientX) || 0;
     canvasSurfacePanelDragState.startClientY = Number(event.clientY) || 0;
     panel.classList.add('is-moving');
+    document.body.classList.add('is-canvas-surface-moving');
+    scheduleMirrorGuideRefresh();
     try {
       target.setPointerCapture?.(event.pointerId);
     } catch (error) {
@@ -1296,6 +1303,7 @@
         applyTransform: false,
         syncControls: false,
         updateScaleLimits: false,
+        renderLocalViewports: false,
       });
       renderFrameList();
       renderLayerList();
