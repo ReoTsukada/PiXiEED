@@ -40,6 +40,22 @@
     return readPixieedAccountAvatarId();
   }
 
+  function parseMultiProjectAccessInputForParticipant(value) {
+    try {
+      if (typeof parseMultiProjectAccessInput === 'function') {
+        return parseMultiProjectAccessInput(value);
+      }
+    } catch (error) {
+      // Fall through to the local key-only fallback while app wiring settles.
+    }
+    const raw = typeof value === 'string' ? value.trim() : '';
+    return {
+      raw,
+      projectKey: normalizeMultiProjectKey(raw),
+      inviteToken: '',
+    };
+  }
+
   function getMultiAssignment(clientId) {
     if (!clientId) {
       return null;
@@ -4021,7 +4037,7 @@
         dom.controls.multiJoinProjectKey.readOnly = false;
         dom.controls.multiJoinProjectKey.type = 'text';
         if (sharedProjectFlowPreferred && dom.controls.multiJoinProjectKey !== document.activeElement) {
-          const parsedJoinValue = parseMultiProjectAccessInput(dom.controls.multiJoinProjectKey.value);
+          const parsedJoinValue = parseMultiProjectAccessInputForParticipant(dom.controls.multiJoinProjectKey.value);
           const storedProjectKey = normalizeMultiProjectKey(multiState.projectKey || '');
           if (storedProjectKey && parsedJoinValue.projectKey === storedProjectKey && !parsedJoinValue.inviteToken) {
             dom.controls.multiJoinProjectKey.value = '';
