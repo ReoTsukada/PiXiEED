@@ -11,6 +11,30 @@ const appSource = fs.readFileSync(appPath, 'utf8');
 const cssSource = fs.readFileSync(cssPath, 'utf8');
 const appLines = appSource.split('\n');
 const failures = [];
+const topLevelDepthBeforeLine = [];
+
+function getBraceDepthDelta(line) {
+  const stripped = line
+    .replace(/'[^'\\]*(?:\\.[^'\\]*)*'/g, "''")
+    .replace(/"[^"\\]*(?:\\.[^"\\]*)*"/g, '""')
+    .replace(/`[^`\\]*(?:\\.[^`\\]*)*`/g, '``')
+    .replace(/\/\/.*$/, '');
+  let delta = 0;
+  for (const char of stripped) {
+    if (char === '{') {
+      delta += 1;
+    } else if (char === '}') {
+      delta -= 1;
+    }
+  }
+  return delta;
+}
+
+let topLevelDepth = 0;
+appLines.forEach(line => {
+  topLevelDepthBeforeLine.push(topLevelDepth);
+  topLevelDepth += getBraceDepthDelta(line);
+});
 
 function lineOf(needle) {
   const index = appLines.findIndex(line => line.includes(needle));
@@ -102,6 +126,14 @@ function checkDirectModuleReferenceBeforeInit(moduleKey, moduleFile) {
     before.forEach((line, index) => {
       if (direct.test(line) || propDirect.test(line)) {
         failures.push(`${moduleKey}.${name}: direct reference before module init at line ${index + 1}`);
+      }
+      const lineNumber = index + 1;
+      const topLevelCall = topLevelDepthBeforeLine[index] === 1
+        && new RegExp(`(^|[^.\\w$])${name}\\s*\\(`).test(line)
+        && !new RegExp(`^\\s*(?:async\\s+)?function\\s+${name}\\s*\\(`).test(line)
+        && !new RegExp(`\\b(?:get|set)\\s+${name}\\s*\\(`).test(line);
+      if (topLevelCall) {
+        failures.push(`${moduleKey}.${name}: top-level call before module init at line ${lineNumber}`);
       }
     });
   }
@@ -292,6 +324,20 @@ if (
   || !controlUiUtilsSource.includes('    createControlUiUtils,')
 ) {
   failures.push('control-ui-utils.js: missing exported createControlUiUtils');
+}
+const curveWorkflowUtilsSource = fs.readFileSync(path.join(moduleDir, 'curve-workflow-utils.js'), 'utf8');
+if (
+  !curveWorkflowUtilsSource.includes('function createCurveWorkflowUtils(')
+  || !curveWorkflowUtilsSource.includes('    createCurveWorkflowUtils,')
+) {
+  failures.push('curve-workflow-utils.js: missing exported createCurveWorkflowUtils');
+}
+const canvasGridWorkflowUtilsSource = fs.readFileSync(path.join(moduleDir, 'canvas-grid-workflow-utils.js'), 'utf8');
+if (
+  !canvasGridWorkflowUtilsSource.includes('function createCanvasGridWorkflowUtils(')
+  || !canvasGridWorkflowUtilsSource.includes('    createCanvasGridWorkflowUtils,')
+) {
+  failures.push('canvas-grid-workflow-utils.js: missing exported createCanvasGridWorkflowUtils');
 }
 const canvasResizeWorkflowUtilsSource = fs.readFileSync(path.join(moduleDir, 'canvas-resize-workflow-utils.js'), 'utf8');
 if (
@@ -533,6 +579,48 @@ if (
   || !sharedProjectSetupUtilsSource.includes('    createSharedProjectSetupUtils,')
 ) {
   failures.push('shared-project-setup-utils.js: missing exported createSharedProjectSetupUtils');
+}
+const sharedProjectSessionStateUtilsSource = fs.readFileSync(path.join(moduleDir, 'shared-project-session-state-utils.js'), 'utf8');
+if (
+  !sharedProjectSessionStateUtilsSource.includes('function createSharedProjectSessionStateUtils(')
+  || !sharedProjectSessionStateUtilsSource.includes('    createSharedProjectSessionStateUtils,')
+) {
+  failures.push('shared-project-session-state-utils.js: missing exported createSharedProjectSessionStateUtils');
+}
+const sharedProjectOpUtilsSource = fs.readFileSync(path.join(moduleDir, 'shared-project-op-utils.js'), 'utf8');
+if (
+  !sharedProjectOpUtilsSource.includes('function createSharedProjectOpUtils(')
+  || !sharedProjectOpUtilsSource.includes('    createSharedProjectOpUtils,')
+) {
+  failures.push('shared-project-op-utils.js: missing exported createSharedProjectOpUtils');
+}
+const sharedProjectDrawApplyUtilsSource = fs.readFileSync(path.join(moduleDir, 'shared-project-draw-apply-utils.js'), 'utf8');
+if (
+  !sharedProjectDrawApplyUtilsSource.includes('function createSharedProjectDrawApplyUtils(')
+  || !sharedProjectDrawApplyUtilsSource.includes('    createSharedProjectDrawApplyUtils,')
+) {
+  failures.push('shared-project-draw-apply-utils.js: missing exported createSharedProjectDrawApplyUtils');
+}
+const sharedProjectRecoveryReplayUtilsSource = fs.readFileSync(path.join(moduleDir, 'shared-project-recovery-replay-utils.js'), 'utf8');
+if (
+  !sharedProjectRecoveryReplayUtilsSource.includes('function createSharedProjectRecoveryReplayUtils(')
+  || !sharedProjectRecoveryReplayUtilsSource.includes('    createSharedProjectRecoveryReplayUtils,')
+) {
+  failures.push('shared-project-recovery-replay-utils.js: missing exported createSharedProjectRecoveryReplayUtils');
+}
+const sharedProjectLocalOpUtilsSource = fs.readFileSync(path.join(moduleDir, 'shared-project-local-op-utils.js'), 'utf8');
+if (
+  !sharedProjectLocalOpUtilsSource.includes('function createSharedProjectLocalOpUtils(')
+  || !sharedProjectLocalOpUtilsSource.includes('    createSharedProjectLocalOpUtils,')
+) {
+  failures.push('shared-project-local-op-utils.js: missing exported createSharedProjectLocalOpUtils');
+}
+const sharedProjectRecoveryLifecycleUtilsSource = fs.readFileSync(path.join(moduleDir, 'shared-project-recovery-lifecycle-utils.js'), 'utf8');
+if (
+  !sharedProjectRecoveryLifecycleUtilsSource.includes('function createSharedProjectRecoveryLifecycleUtils(')
+  || !sharedProjectRecoveryLifecycleUtilsSource.includes('    createSharedProjectRecoveryLifecycleUtils,')
+) {
+  failures.push('shared-project-recovery-lifecycle-utils.js: missing exported createSharedProjectRecoveryLifecycleUtils');
 }
 const sharedProjectRealtimeUtilsSource = fs.readFileSync(path.join(moduleDir, 'shared-project-realtime-utils.js'), 'utf8');
 if (
@@ -871,7 +959,8 @@ if (!setVirtualCursorButtonScaleBlock) {
 } else if (/\bupdateFloatingMovePadPosition\s*\(\s*\)\s*;/.test(setVirtualCursorButtonScaleBlock)) {
   failures.push('setVirtualCursorButtonScale: use updateFloatingMovePadPositionIfReady() before floatingDrawControlsUtils init');
 }
-const setFloatingDrawButtonPositionBlock = getFunctionBlock('setFloatingDrawButtonPosition');
+const setFloatingDrawButtonPositionBlock = getFunctionBlockFromSource(floatingDrawButtonWorkflowUtilsSource, 'setFloatingDrawButtonPosition')
+  || getFunctionBlock('setFloatingDrawButtonPosition');
 if (!setFloatingDrawButtonPositionBlock) {
   failures.push('setFloatingDrawButtonPosition: function block not found');
 } else if (/\bupdateFloatingMovePadPosition\s*\(\s*\)\s*;/.test(setFloatingDrawButtonPositionBlock)) {
@@ -2011,6 +2100,40 @@ requireInjectedGetter('timelineLayers', 'TIMELINE_CELL_SIZE');
   'updateAutosaveStatus',
 ].forEach(name => requireInjectedGetter('startupTailWorkflowUtils', name));
 [
+  'beginHistory',
+  'captureSharedProjectCurveCommand',
+  'commitHistory',
+  'ctx',
+  'curveBuilder',
+  'dom',
+  'forEachBrushOffset',
+  'getActiveDrawColor',
+  'getActiveLayer',
+  'getBackgroundTileColor',
+  'getPointerPosition',
+  'handlePointerMove',
+  'handlePointerUp',
+  'hoverPixel',
+  'invertPreviewColor',
+  'pointerState',
+  'requestOverlayRender',
+  'requestRender',
+  'resetCurveBuilder',
+  'resolveSampledColor',
+  'sampleCompositeColor',
+  'scheduleSessionPersist',
+  'stampBrush',
+  'state',
+].forEach(name => requireInjectedGetter('curveWorkflowUtils', name));
+[
+  'activeCanvasSurface',
+  'dom',
+  'getActiveProjectCanvasDocument',
+  'getProjectCanvasDisplayScale',
+  'mainViewportCanvasSurface',
+  'state',
+].forEach(name => requireInjectedGetter('canvasGridWorkflowUtils', name));
+[
   'MAX_CANVAS_SIZE',
   'MIN_CANVAS_SIZE',
   'SPRITE_SCALE_DOWN_PRESETS',
@@ -3066,6 +3189,520 @@ requireInjectedGetter('timelineLayers', 'TIMELINE_CELL_SIZE');
   'MULTI_PALETTE_HISTORY_LABELS',
 ].forEach(name => requireInjectedGetter('sharedProjectRealtimeUtils', name));
 [
+  'sharedProjectOpCodec',
+  'SHARED_PROJECT_STRUCTURE_HISTORY_LABELS',
+  'MULTI_PALETTE_HISTORY_LABELS',
+  'MULTI_LAYER_PATCH_HISTORY_LABELS',
+  'sharedProjectLastAppliedSeq',
+  'sharedProjectSeenOpIds',
+  'getProjectCanvasDocumentById',
+  'adoptSingleProjectCanvasId',
+  'state',
+  'sharedProjectLayerSnapshots',
+  'buildLayerDiffPayload',
+  'activeSharedProjectStructureRevision',
+  'sharedProjectInFlightStroke',
+  'getActiveProjectCanvasDocument',
+  'clamp',
+  'pointerState',
+  'isRgbColorMode',
+  'resolveDrawPaletteIndex',
+  'normalizeColorValue',
+  'getActiveDrawColor',
+  'getEffectiveBrushShape',
+  'hasCustomBrushData',
+  'getBrushOffsets',
+  'BRUSH_SHAPE_CUSTOM',
+  'normalizeMirrorAxisState',
+  'isMultiPaletteIsolationEnabled',
+  'SHAPE_TOOLS',
+  'getFillGradientColors',
+  'normalizeSelectSameMode',
+  'SELECT_SAME_MODE_CONNECTED',
+  'normalizeFillStyle',
+  'MAX_IMPORTED_PALETTE_COLORS',
+  'normalizeBrushShape',
+  'BRUSH_SHAPE_SQUARE',
+  'normalizePaletteIndex',
+  'FILL_STYLE_SOLID',
+  'isSharedProjectCollaborativeMode',
+  'getSharedProjectCanonicalCanvasId',
+  'getProjectCanvasDocuments',
+  'makeHistorySnapshot',
+  'buildPackagedProjectPayload',
+  'buildAutosaveSessionPayload',
+  'buildProjectSheetsPayload',
+  'getDefaultFrameName',
+  'normalizeVoxelPreviewYawDegrees',
+  'normalizeVoxelPreviewPitchDegrees',
+  'isSimulationLayer',
+  'SIM_LAYER_TYPE',
+  'getDefaultLayerName',
+  'normalizeLayerOpacity',
+  'normalizeLayerBlendMode',
+  'activeSharedProjectRevision',
+  'activeSharedProjectId',
+  'activeSharedProjectKey',
+  'sharedProjectSessionId',
+  'normalizeMultiProjectKey',
+].forEach(name => requireInjectedGetter('sharedProjectOpUtils', name));
+[
+  'isSharedProjectCollaborativeMode',
+  'extractSharedProjectOpPayload',
+  'normalizeSharedProjectOpId',
+  'getSharedProjectOpSeq',
+  'normalizeSharedProjectStrokePoints',
+  'logSharedProjectResolveEvent',
+  'activeSharedProjectStructureRevision',
+  'getProjectCanvasDocuments',
+  'getProjectCanvasDocumentById',
+  'adoptSingleProjectCanvasId',
+  'normalizeSharedProjectCanvasId',
+  'resolveSharedProjectCanvasAlias',
+  'getActiveProjectCanvasDocument',
+  'activeSharedProjectKey',
+  'sharedProjectCanvasAliases',
+  'MAX_IMPORTED_PALETTE_COLORS',
+  'normalizeColorValue',
+  'state',
+  'palettesMatch',
+  'getSharedProjectPalettePayloadSyncMode',
+  'clamp',
+  'normalizePaletteIndex',
+  'isIndexColorMode',
+  'syncCurrentPalettePresetFromPalette',
+  'renderPalette',
+  'syncPaletteInputs',
+  'scheduleSessionPersist',
+  'getPaletteColorKey',
+  'colorsMatchRgba',
+  'resolveTransparentStoragePaletteIndex',
+  'isSimulationLayer',
+  'ensureLayerDirect',
+  'BRUSH_SHAPE_SQUARE',
+  'getBrushOffsets',
+  'getMirroredPointSetForState',
+  'normalizeBrushShape',
+  'normalizeMirrorAxisState',
+  'bresenhamLine',
+  'buildSharedProjectLayerSnapshotKey',
+  'captureLayerPatchSnapshot',
+  'sharedProjectLayerSnapshots',
+  'applyIncomingSharedProjectVisualResult',
+  'markDocumentUnsavedChange',
+  'noteSharedProjectOperationApplied',
+  'drawEllipsePixels',
+  'applyLayerPatch',
+  'normalizeSelectSameMode',
+  'SELECT_SAME_MODE_CONNECTED',
+  'normalizeFillStyle',
+  'FILL_STYLE_SOLID',
+  'isGradientFillStyle',
+  'SELECT_SAME_MODE_GLOBAL',
+  'resolveFillGradientPixel',
+  'sampleCubicBezierPoints',
+  'forEachCurveStrokePixel',
+  'sharedProjectSessionId',
+  'applyLayerPatchPayloadToLayer',
+  'resetLocalHistoryForSharedCollaborativeRemoteChange',
+  'remapPaletteIndices',
+  'remapDocumentColorsToPaletteApprox',
+  'renderAllProjectCanvasSurfaces',
+  'requestOverlayRender',
+  'sharedProjectReplayRenderBatchDepth',
+  'sharedProjectReplayRenderNeedsFull',
+  'sharedProjectReplayRenderDirtyRect',
+  'markCanvasDirty',
+  'markDirtyRect',
+  'invalidateFillPreviewCache',
+  'invalidateOnionSkinCache',
+  'clearPlaybackFrameCache',
+  'requestRender',
+  'sharedProjectRemoteApplyFailureKeys',
+  'SHARED_PROJECT_REMOTE_APPLY_FAILURE_KEY_LIMIT',
+  'normalizeLayerOpacity',
+  'getSharedProjectOpId',
+  'isSharedProjectRemoteOpFromCurrentSession',
+  'sharedProjectLastAppliedSeq',
+  'rememberPendingSharedProjectRemoteOp',
+  'createSharedProjectExactHashForOp',
+  'sharedProjectPendingProvisionalOps',
+  'scheduleSharedProjectStructureMismatchRecovery',
+  'triggerImmediateSharedProjectRecovery',
+  'queueSharedProjectRefresh',
+  'rememberSharedProjectRemoteApplyFailureKey',
+  'runSharedProjectConvergenceResync',
+  'sharedProjectAppliedProvisionalOpIds',
+  'logSharedProjectDrawLifecycle',
+  'logRemoteSharedDrawVisibility',
+  'sharedProjectLastProvisionalRemoteAt',
+].forEach(name => requireInjectedGetter('sharedProjectDrawApplyUtils', name));
+[
+  'activeSharedProjectKey',
+  'sharedProjectLastAppliedSeq',
+  'normalizeMultiProjectKey',
+  'canUseSharedProjectsBackend',
+  'sharedProjectOpPollInFlight',
+  'sharedProjectGapRecoveryRerunRequested',
+  'sharedProjectGapRecoveryPromise',
+  'fetchAndReplaySharedProjectOpsBurst',
+  'SHARED_PROJECT_MAX_MISSING_OP_FETCH',
+  'SHARED_PROJECT_BURST_CATCHUP_MAX_ROUNDS',
+  'sharedProjectPendingRemoteOps',
+  'sharedProjectLastRealtimeActivityAt',
+  'sharedProjectWakeRecoveryPromise',
+  'sharedProjectRefreshInFlight',
+  'activeSharedProjectDocumentLoaded',
+  'hasUsableActiveSharedProjectDocumentState',
+  'activeSharedProjectSyncState',
+  'runSharedProjectConvergenceResync',
+  'queueSharedProjectRefresh',
+  'sharedProjectLastRescueAfterSeq',
+  'sharedProjectLastRescueOpCount',
+  'sharedProjectRescueStallCount',
+  'maybeMarkSharedProjectOpCatchupSynced',
+  'isSharedProjectCollaborativeMode',
+  'sharedProjectOpsSinceCheckpoint',
+  'SHARED_PROJECT_CHECKPOINT_OP_COUNT',
+  'openProjectTabs',
+  'getProjectCanvasCount',
+  'SHARED_PROJECT_DEFERRED_PERSIST_DELAY',
+  'queueSharedProjectCurrentSnapshotCapture',
+  'SHARED_PROJECT_CHECKPOINT_DELAY',
+  'activeSharedProjectSnapshotRevision',
+  'activeSharedProjectRevision',
+  'activeSharedProjectSynced',
+  'hasSharedProjectLocalInFlightOps',
+  'hasSharedProjectFailedLocalOps',
+  'window',
+  'applySharedProjectStrokeCommand',
+  'applySharedProjectShapeCommand',
+  'applySharedProjectFillCommand',
+  'applySharedProjectCurveCommand',
+  'applySharedProjectRegionCommand',
+  'getProjectCanvasDocumentById',
+  'adoptSingleProjectCanvasId',
+  'resolveSharedProjectLayerForPayload',
+  'applyLayerPatchPayloadToLayer',
+  'buildSharedProjectLayerSnapshotKey',
+  'captureLayerPatchSnapshot',
+  'sharedProjectLayerSnapshots',
+  'applyIncomingSharedProjectVisualResult',
+  'markDocumentUnsavedChange',
+  'noteSharedProjectOperationApplied',
+  'pendingSharedProjectConflictReplay',
+  'setMultiStatus',
+  'localizeText',
+  'getSharedProjectOpSeq',
+  'getSharedProjectOpId',
+  'fetchSharedProjectOpsSince',
+  'sharedProjectLastOpsFetchSucceededAt',
+  'fetchMissingOps',
+  'confirmSharedProjectLocalOpsFromServerOps',
+  'replayOps',
+  'scheduleSharedProjectConvergenceResync',
+  'setActiveSharedProjectSyncState',
+  'sharedProjectOpsRescueRetryTimer',
+  'sharedProjectOpsRescueRetryDueAt',
+  'SHARED_PROJECT_OP_RESCUE_POLL_INTERVAL_MS',
+  'pollSharedProjectRealtimeOpsRescue',
+  'sharedProjectBroadcastCatchupTimer',
+  'shouldDeferIncomingSharedProjectRemoteApply',
+  'scheduleDeferredSharedProjectRemoteOpsDrain',
+  'normalizeSharedProjectOpId',
+  'sharedProjectSeenOpIds',
+  'activeSharedProjectStructureRevision',
+  'applyOp',
+  'rememberPendingSharedProjectRemoteOp',
+  'replaySharedProjectLocalProvisionalAfterRemoteOps',
+  'markSharedProjectTrafficActivity',
+  'compareSharedProjectOpsForReplay',
+  'beginSharedProjectReplayRenderBatch',
+  'isSharedProjectRemoteOpFromCurrentSession',
+  'logSharedProjectDrawLifecycle',
+  'rememberSharedProjectSeenOp',
+  'endSharedProjectReplayRenderBatch',
+].forEach(name => requireInjectedGetter('sharedProjectRecoveryReplayUtils', name));
+[
+  'accountState',
+  'activeSharedProjectChannel',
+  'activeSharedProjectChannelKey',
+  'activeSharedProjectChannelSignature',
+  'activeSharedProjectDocumentLoaded',
+  'activeSharedProjectId',
+  'activeSharedProjectKey',
+  'activeSharedProjectMembershipRole',
+  'activeSharedProjectOpenInProgress',
+  'activeSharedProjectOpenReadOnly',
+  'activeSharedProjectRevision',
+  'activeSharedProjectSessionToken',
+  'activeSharedProjectSnapshotRevision',
+  'activeSharedProjectStructureRevision',
+  'activeSharedProjectSyncState',
+  'activeSharedProjectSynced',
+  'appReloadInProgress',
+  'armMobileBackBeforeUnloadBypass',
+  'autosaveDirty',
+  'autosaveDirtyGeneration',
+  'autosaveProjectId',
+  'autosaveWriteInFlight',
+  'beginHistory',
+  'buildSharedRecentProjectId',
+  'canCurrentSharedProjectEdit',
+  'canUseSessionStorage',
+  'canUseSharedProjectsBackend',
+  'classifySharedProjectOpType',
+  'clearActiveSharedProjectSession',
+  'clearDeferredSharedProjectRemoteOpsDrain',
+  'clearPendingMultiAssignmentMoveRequests',
+  'clearSharedProjectPendingLocalOpsFlushTimer',
+  'commitHistory',
+  'ensureActiveSharedProjectRealtimeChannel',
+  'ensureMultiClientId',
+  'ensureSharedProjectSessionHeartbeat',
+  'flushAutosaveSnapshotOnLifecycle',
+  'flushPendingTimelapseCapture',
+  'getActiveFrame',
+  'getActiveLayerIndex',
+  'getActiveProjectCanvasDocument',
+  'getDefaultLayerName',
+  'getLocalMultiParticipantName',
+  'getSharedProjectStructureChangeBlockReason',
+  'hasSharedProjectFailedLocalOps',
+  'hasSharedProjectHardLocalWorkInFlight',
+  'hasSharedProjectLocalInFlightOps',
+  'hasSharedProjectStructureLocalWorkInFlight',
+  'history',
+  'initializeSharedProjectCanvasIdentityFromCurrentDocument',
+  'isCurrentProjectSharedEntry',
+  'isSharedProjectCheckpointHistoryLabel',
+  'isSharedProjectCollaborativeMode',
+  'localizeText',
+  'markHistoryDirty',
+  'multiState',
+  'normalizeMultiParticipantName',
+  'normalizeMultiProjectKey',
+  'pendingSharedProjectConflictReplay',
+  'persistCriticalSessionStateForNavigation',
+  'persistReloadProjectFallback',
+  'persistReloadSessionSnapshot',
+  'persistReloadTargetProjectId',
+  'persistSessionState',
+  'pollSharedProjectRealtimeOpsRescue',
+  'queueSharedProjectReconnectRecovery',
+  'queueSharedProjectRefresh',
+  'recoverSharedProjectAfterWake',
+  'renderMultiParticipantsList',
+  'requestOverlayRender',
+  'requestRender',
+  'resetSharedProjectCanvasIdentity',
+  'resolveSharedProjectKeyForCurrentState',
+  'restoreMultiCommentsForProject',
+  'scheduleSessionPersist',
+  'scheduleSharedProjectOpsRescueRetry',
+  'scheduleSharedProjectRecoveryReload',
+  'setActiveAutosaveProjectId',
+  'setActiveSharedProjectSyncState',
+  'setMultiStatus',
+  'sharedProjectBroadcastCatchupTimer',
+  'sharedProjectCatchingUpStartedAt',
+  'sharedProjectCellPresenceBroadcastTimer',
+  'sharedProjectCellPresenceByClient',
+  'sharedProjectCellPresenceHeartbeatTimer',
+  'sharedProjectDeferRealtimeUntilSynced',
+  'sharedProjectDeferredRemoteOpsDelayMs',
+  'sharedProjectFreeCellEnsureInFlight',
+  'sharedProjectFreeCellEnsureTimer',
+  'sharedProjectGapRecoveryPromise',
+  'sharedProjectGapRecoveryRerunRequested',
+  'sharedProjectImmediateRecoveryPromise',
+  'sharedProjectInFlightStroke',
+  'sharedProjectLastAppliedSeq',
+  'sharedProjectLastAutoLayerAddedAt',
+  'sharedProjectLastCanonicalLoadAt',
+  'sharedProjectLastCanonicalRefreshQueuedAt',
+  'sharedProjectLastCheckpointAt',
+  'sharedProjectLastDrawReadinessVerifiedAt',
+  'sharedProjectLastForceRefreshQueuedAt',
+  'sharedProjectLastForceRefreshQueuedReason',
+  'sharedProjectLastRealtimeActivityAt',
+  'sharedProjectLastRxActivityAt',
+  'sharedProjectLastServerOpPollAt',
+  'sharedProjectLastServerOpRefreshBackstopAt',
+  'sharedProjectLastTxActivityAt',
+  'sharedProjectMembers',
+  'sharedProjectOpCommitInFlight',
+  'sharedProjectOpPollInFlight',
+  'sharedProjectOpsRescueRetryDueAt',
+  'sharedProjectOpsRescueRetryTimer',
+  'sharedProjectPendingLocalOps',
+  'sharedProjectPendingLocalOpsRetryDueAt',
+  'sharedProjectPendingLocalOpsRetryTimer',
+  'sharedProjectPendingLocalRetryBlockedUntil',
+  'sharedProjectPendingProvisionalOps',
+  'sharedProjectPendingRemoteOps',
+  'sharedProjectPollingTimer',
+  'sharedProjectRealtimeConnectPromise',
+  'sharedProjectRealtimeConnectSignature',
+  'sharedProjectRealtimeRetryBlockedUntil',
+  'sharedProjectRealtimeStatus',
+  'sharedProjectRealtimeWarnedAt',
+  'sharedProjectReconnectRecoveryPromise',
+  'sharedProjectReconnectRecoveryTimer',
+  'sharedProjectRecoveryInProgress',
+  'sharedProjectRefreshInFlight',
+  'sharedProjectRefreshTimer',
+  'sharedProjectRemoteApplyFailureKeys',
+  'sharedProjectRoomBroadcastSlotAt',
+  'sharedProjectRoomCommitSentAt',
+  'sharedProjectSeenOpIds',
+  'sharedProjectSeenOpSeqById',
+  'sharedProjectSessionInstanceId',
+  'sharedProjectSnapshotReplayInFlight',
+  'sharedProjectSyncInFlight',
+  'sharedProjectWakeRecoveryPromise',
+  'sharedProjectWatchdogLastTickAt',
+  'softResumeSharedProjectAfterSleep',
+  'state',
+  'syncSharedProjectMembers',
+  'syncSharedProjectVisibleStatus',
+  'timelineMatrixRenderKey',
+].forEach(name => requireInjectedGetter('sharedProjectSessionStateUtils', name));
+[
+  'normalizeMultiProjectKey',
+  'activeSharedProjectKey',
+  'sharedProjectRoomCommitSentAt',
+  'SHARED_PROJECT_ROOM_COMMIT_MIN_INTERVAL_MS',
+  'getSharedProjectOpId',
+  'sharedProjectPendingBroadcastOps',
+  'window',
+  'activeSharedProjectChannel',
+  'ensureActiveSharedProjectRealtimeChannel',
+  'sharedProjectRoomBroadcastSlotAt',
+  'SHARED_PROJECT_ROOM_BROADCAST_MIN_INTERVAL_MS',
+  'markSharedProjectLocalOpBroadcastSent',
+  'SHARED_PROJECT_BROADCAST_EVENT',
+  'sharedProjectSeenOpIds',
+  'deleteSharedLocalOpJournalEntry',
+  'sharedProjectPendingLocalOps',
+  'sharedProjectLocalInFlightOps',
+  'markSharedProjectTrafficActivity',
+  'classifySharedProjectOpType',
+  'rememberSharedProjectLocalInFlightOp',
+  'logSharedProjectDrawLifecycle',
+  'markSharedProjectLocalOpProvisionalApplied',
+  'markSharedProjectLocalOpCommitFailed',
+  'buildSharedLocalOpJournalEntry',
+  'upsertSharedLocalOpJournalFallbackEntry',
+  'appendSharedLocalOpJournal',
+  'SHARED_PROJECT_LOCAL_OP_BATCH_DELAY_MS',
+  'sharedProjectPendingLocalOpsFlushTimer',
+  'sharedProjectPendingLocalOpsFlushDueAt',
+  'flushSharedProjectPendingLocalOps',
+  'SHARED_PROJECT_LOCAL_OP_RETRY_DELAY_MS',
+  'sharedProjectPendingLocalOpsRetryTimer',
+  'sharedProjectPendingLocalOpsRetryDueAt',
+  'restorePendingSharedLocalOps',
+  'updateSharedLocalOpJournalStatus',
+  'SHARED_PROJECT_LOCAL_OP_EXPIRE_MS',
+  'logSharedProjectLocalOpLifecycle',
+  'sharedProjectPendingLocalRetryBlockedUntil',
+  'isSharedProjectCollaborativeMode',
+  'history',
+  'clearMultiHistory',
+  'updateHistoryButtons',
+  'activeSharedProjectDocumentLoaded',
+  'hasUsableActiveSharedProjectDocumentState',
+  'activeSharedProjectOpenInProgress',
+  'activeSharedProjectOpenReadOnly',
+  'canCurrentSharedProjectEdit',
+  'sharedProjectSnapshotReplayInFlight',
+].forEach(name => requireInjectedGetter('sharedProjectLocalOpUtils', name));
+[
+  'activeSharedProjectChannelKey',
+  'activeSharedProjectDocumentLoaded',
+  'activeSharedProjectId',
+  'activeSharedProjectKey',
+  'activeSharedProjectOpenInProgress',
+  'activeSharedProjectRevision',
+  'activeSharedProjectSnapshotRevision',
+  'activeSharedProjectStructureRevision',
+  'activeSharedProjectSyncState',
+  'activeSharedProjectSynced',
+  'appReloadInProgress',
+  'applySharedProjectOpsSinceRevision',
+  'canResumeSharedProjectEditingFromDurableHistory',
+  'canUseSessionStorage',
+  'createSharedProjectDocumentFingerprint',
+  'disconnectActiveSharedProjectRealtimeChannel',
+  'dom',
+  'drainPendingSharedProjectRemoteOps',
+  'ensureActiveSharedProjectRealtimeChannel',
+  'ensurePixieedAccountReady',
+  'ensureSharedProjectBackendSession',
+  'ensureSharedProjectRefreshLoop',
+  'ensureSharedRecentProjectsAccountSynced',
+  'fetchAndReplaySharedProjectOpsBurst',
+  'fetchSharedProjectRecord',
+  'flushSharedProjectPendingLocalOps',
+  'getSharedProjectLatestRevision',
+  'getSharedProjectLatestStructureRevision',
+  'getSharedProjectLocalDrawBlockReason',
+  'getSharedProjectVisibleStatus',
+  'hasSharedProjectHardLocalWorkInFlight',
+  'hasUsableActiveSharedProjectDocumentState',
+  'isSharedProjectCollaborativeMode',
+  'localizeText',
+  'logSharedProjectRealtimeChannelLifecycle',
+  'markActiveSharedProjectDocumentLoaded',
+  'markSharedProjectDrawReadinessVerified',
+  'maybePollSharedProjectServerOps',
+  'normalizeMultiProjectKey',
+  'recoverSharedProjectRealtimeGap',
+  'refreshActiveSharedProjectSnapshot',
+  'reportSharedProjectRealtimeSubscribeFailure',
+  'requestMultiResync',
+  'resolveSharedProjectLampState',
+  'restorePendingSharedLocalOps',
+  'runSharedProjectConvergenceResync',
+  'scheduleAppReload',
+  'scheduleSharedProjectConvergenceResync',
+  'scheduleSharedProjectOpsRescueRetry',
+  'setActiveSharedProjectSession',
+  'setActiveSharedProjectSnapshotState',
+  'setActiveSharedProjectSyncState',
+  'setMultiStatus',
+  'setSharedProjectDeferRealtimeUntilSynced',
+  'sharedProjectAutoRecoveryLastAttemptAt',
+  'sharedProjectCatchingUpStartedAt',
+  'sharedProjectDrawReadinessPromise',
+  'sharedProjectLastAppliedSeq',
+  'sharedProjectLastOpsFetchSucceededAt',
+  'sharedProjectPendingLocalOps',
+  'sharedProjectPendingLocalOpsRetryDueAt',
+  'sharedProjectPendingLocalOpsRetryTimer',
+  'sharedProjectPendingLocalRetryBlockedUntil',
+  'sharedProjectPendingRemoteOps',
+  'sharedProjectRealtimeRetryBlockedUntil',
+  'sharedProjectRealtimeStatus',
+  'sharedProjectReconnectRecoveryPromise',
+  'sharedProjectReconnectRecoveryTimer',
+  'sharedProjectRecoveryInProgress',
+  'sharedProjectRecoveryReloadTimer',
+  'sharedProjectRefreshInFlight',
+  'sharedProjectRefreshTimer',
+  'sharedProjectSafariWakeResyncTimer',
+  'sharedProjectSnapshotReplayInFlight',
+  'sharedProjectSoftResumePromise',
+  'sharedProjectVisibilityHiddenAt',
+  'sharedProjectVisibleStatusSignature',
+  'sharedProjectVisibleStatusTimer',
+  'sharedProjectWakeRecoveryPromise',
+  'state',
+  'updateAutosaveStatus',
+  'waitForSharedOpenRetry',
+].forEach(name => requireInjectedGetter('sharedProjectRecoveryLifecycleUtils', name));
+[
   'canUseSharedProjectsBackend',
   'ensureSharedProjectBackendSession',
   'normalizeMultiProjectKey',
@@ -3399,6 +4036,8 @@ requireInjectedGetter('timelineLayers', 'TIMELINE_CELL_SIZE');
   ['layoutViewport', 'layout-viewport.js'],
   ['railToolUiUtils', 'rail-tool-ui-utils.js'],
   ['controlUiUtils', 'control-ui-utils.js'],
+  ['curveWorkflowUtils', 'curve-workflow-utils.js'],
+  ['canvasGridWorkflowUtils', 'canvas-grid-workflow-utils.js'],
   ['canvasResizeWorkflowUtils', 'canvas-resize-workflow-utils.js'],
   ['timelapseSessionUtils', 'timelapse-session-utils.js'],
   ['uiLanguageUtils', 'ui-language-utils.js'],
@@ -3421,6 +4060,12 @@ requireInjectedGetter('timelineLayers', 'TIMELINE_CELL_SIZE');
   ['sharedProjectParticipantUtils', 'shared-project-participant-utils.js', 'shared-project-comment-utils.js', 'shared-project-setup-utils.js'],
   ['sharedProjectCommentUtils', 'shared-project-comment-utils.js'],
   ['sharedProjectSetupUtils', 'shared-project-setup-utils.js'],
+  ['sharedProjectSessionStateUtils', 'shared-project-session-state-utils.js'],
+  ['sharedProjectOpUtils', 'shared-project-op-utils.js'],
+  ['sharedProjectDrawApplyUtils', 'shared-project-draw-apply-utils.js'],
+  ['sharedProjectRecoveryReplayUtils', 'shared-project-recovery-replay-utils.js'],
+  ['sharedProjectLocalOpUtils', 'shared-project-local-op-utils.js'],
+  ['sharedProjectRecoveryLifecycleUtils', 'shared-project-recovery-lifecycle-utils.js'],
   ['sharedProjectRealtimeUtils', 'shared-project-realtime-utils.js'],
   ['sharedProjectWorkflowUtils', 'shared-project-workflow-utils.js'],
   ['sharedProjectCreateProgressUtils', 'shared-project-create-progress-utils.js'],
