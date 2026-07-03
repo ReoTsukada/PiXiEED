@@ -325,6 +325,34 @@ if (
 ) {
   failures.push('control-ui-utils.js: missing exported createControlUiUtils');
 }
+const uiActionButtonsWorkflowUtilsSource = fs.readFileSync(path.join(moduleDir, 'ui-action-buttons-workflow-utils.js'), 'utf8');
+if (
+  !uiActionButtonsWorkflowUtilsSource.includes('function createUiActionButtonsWorkflowUtils(')
+  || !uiActionButtonsWorkflowUtilsSource.includes('    createUiActionButtonsWorkflowUtils,')
+) {
+  failures.push('ui-action-buttons-workflow-utils.js: missing exported createUiActionButtonsWorkflowUtils');
+}
+const uiActionRouterWorkflowUtilsSource = fs.readFileSync(path.join(moduleDir, 'ui-action-router-workflow-utils.js'), 'utf8');
+if (
+  !uiActionRouterWorkflowUtilsSource.includes('function createUiActionRouterWorkflowUtils(')
+  || !uiActionRouterWorkflowUtilsSource.includes('    createUiActionRouterWorkflowUtils,')
+) {
+  failures.push('ui-action-router-workflow-utils.js: missing exported createUiActionRouterWorkflowUtils');
+}
+const canvasControlActionsWorkflowUtilsSource = fs.readFileSync(path.join(moduleDir, 'canvas-control-actions-workflow-utils.js'), 'utf8');
+if (
+  !canvasControlActionsWorkflowUtilsSource.includes('function createCanvasControlActionsWorkflowUtils(')
+  || !canvasControlActionsWorkflowUtilsSource.includes('    createCanvasControlActionsWorkflowUtils,')
+) {
+  failures.push('canvas-control-actions-workflow-utils.js: missing exported createCanvasControlActionsWorkflowUtils');
+}
+const historyGuardWorkflowUtilsSource = fs.readFileSync(path.join(moduleDir, 'history-guard-workflow-utils.js'), 'utf8');
+if (
+  !historyGuardWorkflowUtilsSource.includes('function createHistoryGuardWorkflowUtils(')
+  || !historyGuardWorkflowUtilsSource.includes('    createHistoryGuardWorkflowUtils,')
+) {
+  failures.push('history-guard-workflow-utils.js: missing exported createHistoryGuardWorkflowUtils');
+}
 const curveWorkflowUtilsSource = fs.readFileSync(path.join(moduleDir, 'curve-workflow-utils.js'), 'utf8');
 if (
   !curveWorkflowUtilsSource.includes('function createCurveWorkflowUtils(')
@@ -338,6 +366,48 @@ if (
   || !canvasGridWorkflowUtilsSource.includes('    createCanvasGridWorkflowUtils,')
 ) {
   failures.push('canvas-grid-workflow-utils.js: missing exported createCanvasGridWorkflowUtils');
+}
+const sizeSettingsWorkflowUtilsSource = fs.readFileSync(path.join(moduleDir, 'size-settings-workflow-utils.js'), 'utf8');
+if (
+  !sizeSettingsWorkflowUtilsSource.includes('function createSizeSettingsWorkflowUtils(')
+  || !sizeSettingsWorkflowUtilsSource.includes('    createSizeSettingsWorkflowUtils,')
+) {
+  failures.push('size-settings-workflow-utils.js: missing exported createSizeSettingsWorkflowUtils');
+}
+const timelineNavigationWorkflowUtilsSource = fs.readFileSync(path.join(moduleDir, 'timeline-navigation-workflow-utils.js'), 'utf8');
+if (
+  !timelineNavigationWorkflowUtilsSource.includes('function createTimelineNavigationWorkflowUtils(')
+  || !timelineNavigationWorkflowUtilsSource.includes('    createTimelineNavigationWorkflowUtils,')
+) {
+  failures.push('timeline-navigation-workflow-utils.js: missing exported createTimelineNavigationWorkflowUtils');
+}
+const openProjectTabWorkflowUtilsSource = fs.readFileSync(path.join(moduleDir, 'open-project-tab-workflow-utils.js'), 'utf8');
+if (
+  !openProjectTabWorkflowUtilsSource.includes('function createOpenProjectTabWorkflowUtils(')
+  || !openProjectTabWorkflowUtilsSource.includes('    createOpenProjectTabWorkflowUtils,')
+) {
+  failures.push('open-project-tab-workflow-utils.js: missing exported createOpenProjectTabWorkflowUtils');
+}
+const historyCoreWorkflowUtilsSource = fs.readFileSync(path.join(moduleDir, 'history-core-workflow-utils.js'), 'utf8');
+if (
+  !historyCoreWorkflowUtilsSource.includes('function createHistoryCoreWorkflowUtils(')
+  || !historyCoreWorkflowUtilsSource.includes('    createHistoryCoreWorkflowUtils,')
+) {
+  failures.push('history-core-workflow-utils.js: missing exported createHistoryCoreWorkflowUtils');
+}
+const sharedProjectRecentStateUtilsSource = fs.readFileSync(path.join(moduleDir, 'shared-project-recent-state-utils.js'), 'utf8');
+if (
+  !sharedProjectRecentStateUtilsSource.includes('function createSharedProjectRecentStateUtils(')
+  || !sharedProjectRecentStateUtilsSource.includes('    createSharedProjectRecentStateUtils,')
+) {
+  failures.push('shared-project-recent-state-utils.js: missing exported createSharedProjectRecentStateUtils');
+}
+const sharedProjectLocalJournalUtilsSource = fs.readFileSync(path.join(moduleDir, 'shared-project-local-journal-utils.js'), 'utf8');
+if (
+  !sharedProjectLocalJournalUtilsSource.includes('function createSharedProjectLocalJournalUtils(')
+  || !sharedProjectLocalJournalUtilsSource.includes('    createSharedProjectLocalJournalUtils,')
+) {
+  failures.push('shared-project-local-journal-utils.js: missing exported createSharedProjectLocalJournalUtils');
 }
 const canvasResizeWorkflowUtilsSource = fs.readFileSync(path.join(moduleDir, 'canvas-resize-workflow-utils.js'), 'utf8');
 if (
@@ -2100,6 +2170,171 @@ requireInjectedGetter('timelineLayers', 'TIMELINE_CELL_SIZE');
   'updateAutosaveStatus',
 ].forEach(name => requireInjectedGetter('startupTailWorkflowUtils', name));
 [
+  'canCurrentClientEditProjectStructure',
+  'getNormalizedMirrorState',
+  'isVoxelExtensionModeEnabled',
+  'LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE',
+  'localViewportCanvasState',
+  'localizeText',
+  'MULTI_CANVAS_FEATURE_ENABLED',
+  'normalizeLocalViewportCanvasState',
+  'state',
+  'TOOL_ACTION_FLOATING_PREVIEW_TOGGLE',
+  'TOOL_ACTION_LOCAL_CANVAS_TOGGLE',
+  'TOOL_ACTION_MIRROR_POPUP',
+  'TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE',
+  'TOP_UI_ACTION_FLOATING_PREVIEW_TOGGLE',
+  'TOP_UI_ACTION_LOCAL_CANVAS_TOGGLE',
+  'TOP_UI_ACTION_MIRROR_POPUP',
+  'TOP_UI_ACTION_VIRTUAL_CURSOR_TOGGLE',
+].forEach(name => requireInjectedGetter('uiActionButtonsWorkflowUtils', name));
+[
+  'activateMobileTab',
+  'announceMultiCanvasEditRestriction',
+  'canCurrentClientEditProjectStructure',
+  'getNormalizedMirrorState',
+  'isDesktopRightToolRailMode',
+  'isSharedProjectCollaborativeMode',
+  'isVoxelExtensionModeEnabled',
+  'launchLensCameraMode',
+  'launchQrEditorMode',
+  'layoutMode',
+  'LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE',
+  'localViewportCanvasState',
+  'MULTI_CANVAS_FEATURE_ENABLED',
+  'normalizeLocalViewportCanvasState',
+  'setCompactRightFlyoutOpen',
+  'setFloatingPreviewEnabled',
+  'setLocalViewportCanvasCount',
+  'setMirrorModeEnabled',
+  'setRightTab',
+  'setRightUtilityMenuOpen',
+  'setVirtualCursorEnabled',
+  'state',
+  'TOOL_ACTION_CAMERA_MODE',
+  'TOOL_ACTION_FLOATING_PREVIEW_TOGGLE',
+  'TOOL_ACTION_LOCAL_CANVAS_TOGGLE',
+  'TOOL_ACTION_MIRROR_POPUP',
+  'TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE',
+  'TOP_UI_ACTION_FLOATING_PREVIEW_TOGGLE',
+  'TOP_UI_ACTION_LOCAL_CANVAS_TOGGLE',
+  'TOP_UI_ACTION_MIRROR_POPUP',
+  'TOP_UI_ACTION_OPEN_DETAILS_PANEL',
+  'TOP_UI_ACTION_OPEN_LENS_CAMERA',
+  'TOP_UI_ACTION_OPEN_QR_EDITOR',
+  'TOP_UI_ACTION_VIRTUAL_CURSOR_TOGGLE',
+  'updateFloatingPreviewActionToolButtons',
+  'updateLocalCanvasActionToolButtons',
+  'updateRightTabVisibility',
+  'updateVirtualCursorActionToolButtons',
+].forEach(name => requireInjectedGetter('uiActionRouterWorkflowUtils', name));
+[
+  'activateMobileTab',
+  'canvasControlMode',
+  'dom',
+  'getActiveLayer',
+  'getRailExpandedToggleWidth',
+  'internalClipboard',
+  'isCompactRightRailMode',
+  'isCompactToolFlyoutOpen',
+  'isCompactToolRailMode',
+  'isMobilePeekToolFlyoutMode',
+  'isMirrorToolPopoverOpen',
+  'isMultiSpectatorMode',
+  'layoutMode',
+  'makeIcon',
+  'mobileDrawerState',
+  'normalizeMobileDrawerMode',
+  'pointerState',
+  'selectionMaskHasPixels',
+  'setCompactRightFlyoutOpen',
+  'setCompactToolFlyoutOpen',
+  'setMirrorToolPopoverOpen',
+  'setRailWidth',
+  'setRightTab',
+  'state',
+  'syncBrushControls',
+  'TOOL_TO_GROUP',
+  'updateFloatingMovePadVisibilityIfReady',
+  'updateRightTabVisibility',
+  'updateToolVisibility',
+].forEach(name => requireInjectedGetter('canvasControlActionsWorkflowUtils', name));
+[
+  'dom',
+  'getGuardedHistoryLabelDisplayName',
+  'getHistoryEntryLabel',
+  'globalHistoryConfirmState',
+  'hasPendingCurveUndoRedoInterception',
+  'hasPendingSelectionMove',
+  'history',
+  'isGuardedMultiSharedHistoryLabel',
+  'isMultiMasterMode',
+  'isSharedProjectCollaborativeMode',
+  'localizeText',
+  'multiState',
+  'redo',
+  'undo',
+].forEach(name => requireInjectedGetter('historyGuardWorkflowUtils', name));
+[
+  'MULTI_LAYER_PATCH_HISTORY_LABELS',
+  'MULTI_SCOPED_HISTORY_LABELS',
+  'SHARED_PROJECT_CHECKPOINT_DELAY',
+  'SHARED_PROJECT_DEFERRED_PERSIST_DELAY',
+  'activeSharedProjectKey',
+  'applyHistorySnapshot',
+  'applyHistorySnapshotForClient',
+  'applyHistorySnapshotForSharedLocalCell',
+  'applyPixelPatchHistoryEntry',
+  'cancelPendingCurveInteraction',
+  'cancelPendingSelectionMove',
+  'classifySharedProjectOpType',
+  'clearPlaybackFrameCache',
+  'compressHistorySnapshot',
+  'createTimelapseFrameEntryFromSnapshot',
+  'decompressHistorySnapshot',
+  'dom',
+  'finalizePixelPatchHistoryEntry',
+  'getActiveProjectCanvasDocument',
+  'getActiveTimelapseTrack',
+  'getHistoryEntryLabel',
+  'getMultiHistoryBucket',
+  'handleMultiLocalCommit',
+  'hasPendingSelectionMove',
+  'history',
+  'invalidateFillPreviewCache',
+  'invalidateOnionSkinCache',
+  'isLargeDocumentPerformanceMode',
+  'isLocalOnlyMultiHistoryLabel',
+  'isMultiClientScopedHistoryMode',
+  'isMultiMasterMode',
+  'isPixelPatchHistoryEntry',
+  'isSharedProjectCollaborativeMode',
+  'isVoxelExtensionModeEnabled',
+  'makeHistorySnapshot',
+  'markAutosaveDirty',
+  'markDocumentUnsavedChange',
+  'multiState',
+  'queueSharedProjectCurrentSnapshotCapture',
+  'recordTimelapseOperationLogEntry',
+  'requestImmediateAutosaveSnapshot',
+  'scheduleAutosaveSnapshot',
+  'scheduleGuestLayerPatchSend',
+  'scheduleMasterLayerPatchSend',
+  'scheduleMultiPublicLobbyRoomSync',
+  'scheduleMultiSessionStateBroadcast',
+  'scheduleQrEditReadabilityCheck',
+  'scheduleSessionPersist',
+  'scheduleTimelapseCaptureFromState',
+  'setHistoryEntryLabel',
+  'setVoxelPreviewOrientationForFrameIndex',
+  'shouldPersistSharedProjectSnapshotForHistoryLabel',
+  'state',
+  'thinTimelapseSnapshotsIfNeeded',
+  'timelapseState',
+  'updateMemoryStatus',
+  'voxelExtensionState',
+].forEach(name => requireInjectedGetter('historyCoreWorkflowUtils', name));
+[
   'beginHistory',
   'captureSharedProjectCurveCommand',
   'commitHistory',
@@ -2127,12 +2362,144 @@ requireInjectedGetter('timelineLayers', 'TIMELINE_CELL_SIZE');
 ].forEach(name => requireInjectedGetter('curveWorkflowUtils', name));
 [
   'activeCanvasSurface',
+  'clamp',
   'dom',
   'getActiveProjectCanvasDocument',
   'getProjectCanvasDisplayScale',
   'mainViewportCanvasSurface',
+  'MIN_ZOOM_SCALE',
   'state',
 ].forEach(name => requireInjectedGetter('canvasGridWorkflowUtils', name));
+[
+  'SPRITE_SCALE_EPSILON',
+  'canCurrentClientEditProjectStructure',
+  'clamp',
+  'dom',
+  'getCanvasResizeInputValue',
+  'getMaxSpriteMultiplier',
+  'getNearestSpriteScaleOption',
+  'getSpriteScaleOptionIndex',
+  'getSpriteScaleOptions',
+  'lockedCanvasHeight',
+  'lockedCanvasWidth',
+  'state',
+  'updateSpriteScaleControlLimits',
+].forEach(name => requireInjectedGetter('sizeSettingsWorkflowUtils', name));
+[
+  'VOXEL_EXTENSION_DEFAULT_STATE',
+  'abortActivePointerInteraction',
+  'beginHistory',
+  'canCurrentClientEditProjectStructure',
+  'canSelectSharedProjectTimelineCell',
+  'clamp',
+  'commitHistory',
+  'enforceGuestAssignedLayerSelection',
+  'getActiveFrame',
+  'getActiveLayer',
+  'getActiveLayerIndex',
+  'getActiveLayerTrackIndex',
+  'getActiveProjectCanvasDocument',
+  'getDurationFromFps',
+  'getProjectCanvasDocuments',
+  'getVoxelPreviewOrientationForFrameIndex',
+  'hoverPixel',
+  'invalidateActiveCanvasCompositeRenderState',
+  'isMultiAssignedCellRestrictedEditorMode',
+  'isSharedProjectCollaborativeMode',
+  'isVoxelExtensionModeEnabled',
+  'localizeText',
+  'markHistoryDirty',
+  'normalizeFpsValue',
+  'normalizeVoxelExtensionState',
+  'pointerState',
+  'renderFrameList',
+  'renderLayerList',
+  'renderTimelineMatrix',
+  'requestOverlayRender',
+  'requestRender',
+  'scheduleSessionPersist',
+  'scheduleSharedProjectCellPresenceBroadcast',
+  'scheduleTimelineMatrixRenderSoon',
+  'setMultiStatus',
+  'state',
+  'syncActiveFrameSettingsUI',
+  'syncActiveLayerSettingsUI',
+  'syncAnimationFpsDisplayFromState',
+  'syncVoxelExtensionPreviewFromSource',
+  'updateAnimationFpsDisplay',
+  'updatePixfindModeUI',
+  'virtualCursorDrawState',
+  'voxelExtensionState',
+].forEach(name => requireInjectedGetter('timelineNavigationWorkflowUtils', name));
+[
+  'AUTOSAVE_SUPPORTED',
+  'SHARED_PROJECT_ID_PREFIX',
+  'activeOpenProjectTabId',
+  'activeSharedProjectId',
+  'activeSharedProjectKey',
+  'activeSharedProjectMembershipRole',
+  'activeSharedProjectRevision',
+  'activeSharedProjectStructureRevision',
+  'autosaveProjectId',
+  'buildSharedRecentProjectId',
+  'checkpoint',
+  'clearActiveSharedProjectSession',
+  'clearPendingSharedInvite',
+  'createAutosaveProjectId',
+  'ensureCurrentClientCanReplaceActiveProject',
+  'extractDocumentBaseName',
+  'findOpenProjectTabIndex',
+  'findOpenProjectTabIndexForRecentProjectEntry',
+  'getCurrentSharedRecentProjectEntry',
+  'getOpenProjectTabDisplayLabel',
+  'getOpenProjectTabSharedKey',
+  'getSharedProjectKeyFromProjectId',
+  'getSharedRecentProjectEntryForTab',
+  'handleMultiLocalCommit',
+  'hideProjectHomeScreen',
+  'hideStartupScreen',
+  'isCurrentProjectSharedEntry',
+  'isMultiMasterProjectReplacementBlocked',
+  'isSharedProjectRealtimePrimaryActive',
+  'isSharedRecentProjectEntry',
+  'loadDocumentFromProjectPayload',
+  'loadDocumentFromText',
+  'loadRecentProjectsMetadata',
+  'localizeText',
+  'mapSharedProjectMembershipRoleToUiRole',
+  'markAutosaveDirty',
+  'markDocumentUnsavedChange',
+  'multiState',
+  'normalizeAutosaveProjectId',
+  'normalizeMultiProjectKey',
+  'openProjectTabBusy',
+  'openProjectTabs',
+  'openSharedRecentProject',
+  'persistActiveOpenProjectTab',
+  'projectHomeVisible',
+  'queueProjectTabViewportReset',
+  'queueSharedProjectCurrentSnapshotCapture',
+  'readPendingSharedInvite',
+  'recentProjectsCache',
+  'releaseOpenProjectTabProjectWriteGuard',
+  'renderOpenProjectTabs',
+  'resetDocumentUnsavedChanges',
+  'retainOpenProjectTabProjectWriteGuard',
+  'saveRecentProjectsList',
+  'scheduleAutosaveSnapshot',
+  'scheduleSessionPersist',
+  'setActiveAutosaveProjectId',
+  'setMultiStatus',
+  'setProjectHomeVisible',
+  'setRecentProjectsCache',
+  'startupAutosaveRestoreProjectId',
+  'state',
+  'storeMultiProjectKey',
+  'suppressOpenProjectTabAutoInitialize',
+  'syncMultiProjectKeyInputValues',
+  'unhideSharedProjectFromRecentSync',
+  'updateAutosaveStatus',
+].forEach(name => requireInjectedGetter('openProjectTabWorkflowUtils', name));
 [
   'MAX_CANVAS_SIZE',
   'MIN_CANVAS_SIZE',
@@ -2554,6 +2921,63 @@ requireInjectedGetter('timelineLayers', 'TIMELINE_CELL_SIZE');
   'normalizeRecentProjectAccountUserId',
   'recentProjectsCache',
 ].forEach(name => requireInjectedGetter('sharedRecentProjectUtils', name));
+[
+  'AUTOSAVE_SUPPORTED',
+  'DEFAULT_DOCUMENT_BASENAME',
+  'DEFAULT_DOCUMENT_NAME',
+  'PROJECT_FILE_EXTENSION',
+  'accountState',
+  'activeSharedProjectId',
+  'activeSharedProjectKey',
+  'activeSharedProjectMembershipRole',
+  'activeSharedProjectOpenReadOnly',
+  'activeSharedProjectRevision',
+  'activeSharedProjectStructureRevision',
+  'autosaveProjectId',
+  'buildSharedProjectGraceMessage',
+  'buildSharedProjectOpenBlockedMessage',
+  'buildSharedRecentProjectId',
+  'canSharedProjectMembershipRoleEdit',
+  'canUseSharedProjectsBackend',
+  'enforceSharedRecentProjectLimit',
+  'ensurePixieedAccountClient',
+  'ensureSharedProjectBackendSession',
+  'extractDocumentBaseName',
+  'getCurrentSharedProjectUiRole',
+  'getMaxSharedProjectCount',
+  'getOwnedSharedRecentProjectEntries',
+  'getSharedProjectKeyFromProjectId',
+  'getSharedProjectOwnershipStatus',
+  'handleSharedProjectsBackendError',
+  'isCurrentProjectSharedEntry',
+  'isMissingRpcFunction',
+  'isOwnedSharedRecentProjectEntry',
+  'isSharedProjectCollaborativeMode',
+  'isSharedRecentProjectEntry',
+  'loadRecentProjectsMetadata',
+  'localizeText',
+  'mapSharedProjectMembershipRoleToUiRole',
+  'multiState',
+  'normalizeAutosaveProjectId',
+  'normalizeDocumentName',
+  'normalizeMultiDesiredRole',
+  'normalizeMultiProjectKey',
+  'normalizeSharedProjectMembershipRole',
+  'normalizeSharedRecentProjectEntry',
+  'openSharedProjectLimitDialog',
+  'prefersSharedProjectFlow',
+  'purgeDeletedSharedProjectLocalReferences',
+  'recentProjectsCache',
+  'saveRecentProjectsList',
+  'setActiveSharedProjectSession',
+  'setMultiStatus',
+  'setRecentProjectsCache',
+  'sharedProjectMembers',
+  'sharedRecentProjectUtilsModule',
+  'state',
+  'unhideSharedProjectFromRecentSync',
+  'upsertSharedRecentProjectEntry',
+].forEach(name => requireInjectedGetter('sharedProjectRecentStateUtils', name));
 [
   'MULTI_DEFAULT_ROOM_VISIBILITY',
   'MULTI_ROOM_VISIBILITY_PUBLIC',
@@ -3569,6 +3993,43 @@ requireInjectedGetter('timelineLayers', 'TIMELINE_CELL_SIZE');
   'timelineMatrixRenderKey',
 ].forEach(name => requireInjectedGetter('sharedProjectSessionStateUtils', name));
 [
+  'AUTOSAVE_SUPPORTED',
+  'SHARED_LOCAL_OP_JOURNAL_STORE',
+  'SHARED_LOCAL_OP_JOURNAL_MAX_CONFIRMED_PER_PROJECT',
+  'SHARED_LOCAL_OP_JOURNAL_PRUNE_BATCH',
+  'SHARED_LOCAL_OP_JOURNAL_FALLBACK_STORAGE_KEY',
+  'SHARED_LOCAL_OP_JOURNAL_FALLBACK_MAX_ENTRIES',
+  'activeSharedProjectKey',
+  'activeSharedProjectSessionToken',
+  'activeSharedProjectDocumentLoaded',
+  'canUseSessionStorage',
+  'classifySharedProjectOpType',
+  'console',
+  'discardSharedProjectExpiredLocalOp',
+  'flushSharedProjectPendingLocalOps',
+  'generateSharedProjectOpId',
+  'getSharedProjectOpId',
+  'hasUsableActiveSharedProjectDocumentState',
+  'isSharedProjectLocalOpExpiredForRetry',
+  'localizeText',
+  'normalizeMultiProjectKey',
+  'openAutosaveDatabase',
+  'readLocalStorageForLocalRestore',
+  'readSessionStorageForLocalRestore',
+  'rememberSharedProjectLocalInFlightOp',
+  'replaySharedProjectLocalProvisionalAfterRemoteOps',
+  'setActiveSharedProjectSyncState',
+  'setMultiStatus',
+  'sharedLocalOpJournalWritePromise',
+  'sharedProjectLocalInFlightOps',
+  'sharedProjectPendingLocalOps',
+  'sharedProjectSeenOpIds',
+  'sortSharedProjectPendingLocalOps',
+  'queueSharedProjectRefresh',
+  'writeLocalStorageForLocalRestore',
+  'writeSessionStorageForLocalRestore',
+].forEach(name => requireInjectedGetter('sharedProjectLocalJournalUtils', name));
+[
   'normalizeMultiProjectKey',
   'activeSharedProjectKey',
   'sharedProjectRoomCommitSentAt',
@@ -4036,8 +4497,16 @@ requireInjectedGetter('timelineLayers', 'TIMELINE_CELL_SIZE');
   ['layoutViewport', 'layout-viewport.js'],
   ['railToolUiUtils', 'rail-tool-ui-utils.js'],
   ['controlUiUtils', 'control-ui-utils.js'],
+  ['uiActionButtonsWorkflowUtils', 'ui-action-buttons-workflow-utils.js'],
+  ['uiActionRouterWorkflowUtils', 'ui-action-router-workflow-utils.js'],
+  ['canvasControlActionsWorkflowUtils', 'canvas-control-actions-workflow-utils.js'],
+  ['historyCoreWorkflowUtils', 'history-core-workflow-utils.js'],
+  ['historyGuardWorkflowUtils', 'history-guard-workflow-utils.js'],
   ['curveWorkflowUtils', 'curve-workflow-utils.js'],
   ['canvasGridWorkflowUtils', 'canvas-grid-workflow-utils.js'],
+  ['sizeSettingsWorkflowUtils', 'size-settings-workflow-utils.js'],
+  ['timelineNavigationWorkflowUtils', 'timeline-navigation-workflow-utils.js'],
+  ['openProjectTabWorkflowUtils', 'open-project-tab-workflow-utils.js'],
   ['canvasResizeWorkflowUtils', 'canvas-resize-workflow-utils.js'],
   ['timelapseSessionUtils', 'timelapse-session-utils.js'],
   ['uiLanguageUtils', 'ui-language-utils.js'],
@@ -4055,6 +4524,7 @@ requireInjectedGetter('timelineLayers', 'TIMELINE_CELL_SIZE');
   ['recentAccountWorkflowUtils', 'recent-account-workflow-utils.js'],
   ['pixieedProfileLocalUtils', 'pixieed-profile-local-utils.js'],
   ['sharedRecentProjectUtils', 'shared-recent-project-utils.js'],
+  ['sharedProjectRecentStateUtils', 'shared-project-recent-state-utils.js'],
   ['sharedRuntimeUtils', 'shared-runtime-utils.js'],
   ['pixieedAccountWorkflowUtils', 'pixieed-account-workflow-utils.js'],
   ['sharedProjectParticipantUtils', 'shared-project-participant-utils.js', 'shared-project-comment-utils.js', 'shared-project-setup-utils.js'],
@@ -4064,6 +4534,7 @@ requireInjectedGetter('timelineLayers', 'TIMELINE_CELL_SIZE');
   ['sharedProjectOpUtils', 'shared-project-op-utils.js'],
   ['sharedProjectDrawApplyUtils', 'shared-project-draw-apply-utils.js'],
   ['sharedProjectRecoveryReplayUtils', 'shared-project-recovery-replay-utils.js'],
+  ['sharedProjectLocalJournalUtils', 'shared-project-local-journal-utils.js'],
   ['sharedProjectLocalOpUtils', 'shared-project-local-op-utils.js'],
   ['sharedProjectRecoveryLifecycleUtils', 'shared-project-recovery-lifecycle-utils.js'],
   ['sharedProjectRealtimeUtils', 'shared-project-realtime-utils.js'],
