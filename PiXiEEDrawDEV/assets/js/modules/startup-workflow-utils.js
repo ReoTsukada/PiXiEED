@@ -1079,8 +1079,6 @@
   }
 
   function queueStartupRecentAdRender() {
-    const projectHomeAdContainer = document.getElementById('projectHomeRecentAdContainer');
-    const projectHomeAdSlot = document.getElementById('projectHomeRecentAdSlot');
     const adTargets = [
       {
         screen: dom.startup?.screen,
@@ -1088,13 +1086,18 @@
         container: dom.startup?.recentAdContainer,
         slot: dom.startup?.recentAdSlot,
       },
-      {
-        screen: dom.projectHomeScreen,
-        section: dom.projectHomeRecentSection,
-        container: projectHomeAdContainer,
-        slot: projectHomeAdSlot,
-      },
     ];
+    document.querySelectorAll('.startup-recent-card__ad-ins').forEach(slot => {
+      const card = slot.closest('.startup-recent-card--ad');
+      const section = slot.closest('.startup-screen__recent, .project-home-screen__recent');
+      const screen = slot.closest('.startup-screen, .project-home-screen');
+      adTargets.push({
+        screen,
+        section,
+        container: card,
+        slot,
+      });
+    });
     if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) {
       adTargets.forEach(target => {
         if (target.container instanceof HTMLElement) {
