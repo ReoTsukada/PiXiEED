@@ -4,6 +4,7 @@
   const TAP_LIMIT = 10;
   const TAP_WINDOW_MS = 4000;
   const STORAGE_KEY = 'pixieedraw:runtime-target:v1';
+  const RUNTIME_CACHE_BUSTER = '2026.07.03-pixieedrawdev-switch-fix3';
   let tapCount = 0;
   let firstTapAt = 0;
 
@@ -31,6 +32,7 @@
     }
     const nextUrl = new URL(nextPath, window.location.origin);
     nextUrl.search = window.location.search;
+    nextUrl.searchParams.set('pixieedrawRuntime', nextPath === DEV_PATH ? RUNTIME_CACHE_BUSTER : 'prod');
     nextUrl.hash = window.location.hash;
     window.location.assign(nextUrl.href);
   }
