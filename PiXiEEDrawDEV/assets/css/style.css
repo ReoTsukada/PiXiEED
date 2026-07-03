@@ -3538,6 +3538,10 @@ body.is-startup-active #virtualCursorCanvas {
   pointer-events: none;
 }
 
+body.is-canvas-surface-moving .mirror-guides {
+  display: none;
+}
+
 .mirror-guide {
   position: absolute;
   left: 0;
