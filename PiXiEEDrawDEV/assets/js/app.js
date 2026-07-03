@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.07.03-pixieedrawdev-switch-v1';
+  const APP_BUILD_VERSION = '2026.07.03-pixieedrawdev-switch-v2';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
   const PWA_CONTROLLER_CHANGE_RELOAD_SUPPRESS_MS = 8000;
@@ -12245,21 +12245,6 @@
     if (window.location.protocol === 'file:') {
       return;
     }
-    const isReloadNavigation = () => {
-      try {
-        const nav = window.performance?.getEntriesByType?.('navigation')?.[0];
-        if (nav && typeof nav.type === 'string') {
-          return nav.type === 'reload';
-        }
-      } catch (error) {
-        // Ignore performance API failures and fall back to a conservative check.
-      }
-      try {
-        return window.performance?.navigation?.type === 1;
-      } catch (error) {
-        return false;
-      }
-    };
     const isLocalDevDraw =
       /\/PiXiEEDDraw\.dev(?:\/|$)/.test(window.location.pathname || '')
       && /^(localhost|127\.0\.0\.1|::1)$/.test(window.location.hostname || '');
@@ -12283,9 +12268,7 @@
       return;
     }
     let hadController = Boolean(navigator.serviceWorker.controller);
-    const suppressControllerChangeReloadUntil = isReloadNavigation()
-      ? Date.now() + PWA_CONTROLLER_CHANGE_RELOAD_SUPPRESS_MS
-      : 0;
+    const suppressControllerChangeReloadUntil = 0;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       if (!hadController) {
         hadController = true;
