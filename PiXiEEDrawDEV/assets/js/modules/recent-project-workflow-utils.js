@@ -663,7 +663,7 @@
     });
     updatePixieedAccountUi();
     syncPixieedSupportBenefitUi();
-    if (startupVisible) {
+    if (startupVisible || projectHomeVisible) {
       window.requestAnimationFrame(() => {
         queueStartupRecentAdRender();
       });
