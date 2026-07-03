@@ -405,7 +405,7 @@
       return false;
     }
     if (!openProjectTabs.length) {
-      ensureOpenProjectTabsInitialized();
+      ensureOpenProjectTabsInitialized?.();
     }
     const previousActiveId = activeOpenProjectTabId;
     if (targetId === previousActiveId) {
@@ -589,7 +589,7 @@
     if (!targetId || openProjectTabBusy) {
       return false;
     }
-    ensureOpenProjectTabsInitialized();
+    ensureOpenProjectTabsInitialized?.();
     const index = findOpenProjectTabIndex(targetId);
     if (index < 0) {
       return false;
