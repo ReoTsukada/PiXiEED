@@ -1255,18 +1255,7 @@
           if (isSharedEntry && ownsSharedProject) {
             deletedSharedProjectBackend = await deleteOwnedSharedProjectFromBackend(entry);
             if (!deletedSharedProjectBackend) {
-              updateAutosaveStatus(
-                localizeText(
-                  '共有プロジェクト本体を削除できませんでした。ログイン状態とネットワークを確認して再試行してください。',
-                  'Failed to delete the shared project itself. Check sign-in state and network, then try again.'
-                ),
-                'error'
-              );
-              deleteButton.disabled = false;
-              if (openButton instanceof HTMLButtonElement) {
-                openButton.disabled = false;
-              }
-              return;
+              hideSharedProjectFromRecentSync(entry?.sharedProjectKey || '');
             }
           }
           const deletesOwnedSharedProject = isSharedEntry && deletedSharedProjectBackend;
@@ -1707,18 +1696,7 @@
           if (isSharedEntry && ownsSharedProject) {
             deletedSharedProjectBackend = await deleteOwnedSharedProjectFromBackend(entry);
             if (!deletedSharedProjectBackend) {
-              updateAutosaveStatus(
-                localizeText(
-                  '共有プロジェクト本体を削除できませんでした。ログイン状態とネットワークを確認して再試行してください。',
-                  'Failed to delete the shared project itself. Check sign-in state and network, then try again.'
-                ),
-                'error'
-              );
-              deleteButton.disabled = false;
-              if (openButton instanceof HTMLButtonElement) {
-                openButton.disabled = false;
-              }
-              return;
+              hideSharedProjectFromRecentSync(entry?.sharedProjectKey || '');
             }
           }
           const deletesOwnedSharedProject = isSharedEntry && deletedSharedProjectBackend;
