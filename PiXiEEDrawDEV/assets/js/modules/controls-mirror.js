@@ -1124,6 +1124,15 @@
     if (!(guideContainer instanceof HTMLElement)) {
       return;
     }
+    if (document.body.classList.contains('is-canvas-surface-moving')) {
+      guideContainer.hidden = true;
+      guideContainer.setAttribute('aria-hidden', 'true');
+      MIRROR_AXIS_KEYS.forEach(axis => {
+        setMirrorGuideLine(getMirrorGuideLineElement(axis), null, null, false);
+        setMirrorHandlePosition(getMirrorHandleElement(axis), NaN, NaN, false);
+      });
+      return;
+    }
     const mirrorState = getNormalizedMirrorState();
     const metrics = getCanvasScreenMetrics();
     const showControls = Boolean(mirrorState.enabled && metrics);
