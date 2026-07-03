@@ -158,7 +158,7 @@
     const script = document.createElement('script');
     script.defer = true;
     script.dataset.pixieedSharedAuth = 'true';
-    script.src = asset('./shared-auth-panel.js?v=2026.07.03-account-login-restore-v1');
+    script.src = asset('./shared-auth-panel.js?v=2026.07.03-account-login-health-v1');
     document.head.appendChild(script);
   }
 
