@@ -4270,7 +4270,9 @@
     }
     if (accountState.isLoggedIn && !accountState.isAnonymous) {
       try {
-        await ensureSharedRecentProjectsAccountSynced({ force: true });
+        if (typeof ensureSharedRecentProjectsAccountSynced === 'function') {
+          await ensureSharedRecentProjectsAccountSynced({ force: true });
+        }
         const syncedEntry = getSharedRecentProjectEntry(normalizedEntry.sharedProjectKey || '');
         if (syncedEntry) {
           normalizedEntry = syncedEntry;
