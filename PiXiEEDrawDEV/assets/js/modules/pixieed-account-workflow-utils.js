@@ -551,7 +551,11 @@
     if (!requireLogin) {
       return true;
     }
-    await ensurePixieedAccountReady({ forceRefresh: true, silent: true, allowAnonymous: false });
+    await ensurePixieedAccountReady({
+      forceRefresh: !(accountState.isLoggedIn && accountState.userId && !accountState.isAnonymous),
+      silent: true,
+      allowAnonymous: false,
+    });
     if (accountState.isLoggedIn && accountState.userId && !accountState.isAnonymous) {
       return true;
     }
