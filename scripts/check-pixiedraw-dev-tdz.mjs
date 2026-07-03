@@ -3205,6 +3205,7 @@ requireInjectedGetter('timelineLayers', 'TIMELINE_CELL_SIZE');
   'normalizeMultiParticipantFreeCellMove',
   'normalizeMultiParticipantName',
   'normalizeMultiProjectKey',
+  'parseMultiProjectAccessInput',
   'normalizeMultiRoomVisibility',
   'normalizePixieedAvatarId',
   'normalizeWheelDeltaY',
