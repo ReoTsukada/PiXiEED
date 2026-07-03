@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.07.03-pixieedrawdev-switch-fix3';
+  const APP_BUILD_VERSION = '2026.07.03-pixieedrawdev-switch-fix4';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
   const PWA_CONTROLLER_CHANGE_RELOAD_SUPPRESS_MS = 8000;
@@ -5334,6 +5334,8 @@
   set normalizeFpsValue(value) { normalizeFpsValue = value; },
   get normalizeMultiProjectKey() { return normalizeMultiProjectKey; },
   set normalizeMultiProjectKey(value) { normalizeMultiProjectKey = value; },
+  get normalizeSerializedTimelapseOperationEntry() { return normalizeSerializedTimelapseOperationEntry; },
+  set normalizeSerializedTimelapseOperationEntry(value) { normalizeSerializedTimelapseOperationEntry = value; },
   get normalizeTimelapseFps() { return normalizeTimelapseFps; },
   set normalizeTimelapseFps(value) { normalizeTimelapseFps = value; },
   get scaleFrameSetNearestNeighbor() { return scaleFrameSetNearestNeighbor; },
