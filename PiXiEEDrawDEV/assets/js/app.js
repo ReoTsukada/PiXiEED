@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.07.03-pixieedrawdev-switch-fix4';
+  const APP_BUILD_VERSION = '2026.07.03-pixieedrawdev-switch-fix5';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
   const PWA_CONTROLLER_CHANGE_RELOAD_SUPPRESS_MS = 8000;
@@ -17028,11 +17028,7 @@
         }
         persistSessionState();
       };
-      if (typeof window.requestIdleCallback === 'function') {
-        sessionPersistIdleHandle = window.requestIdleCallback(runPersist, { timeout: 700 });
-      } else {
-        runPersist();
-      }
+      sessionPersistIdleHandle = window.setTimeout(runPersist, 0);
     }, SESSION_PERSIST_DELAY);
   }
 
