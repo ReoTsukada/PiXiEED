@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.07.03-pixieedrawdev-switch-fix10';
+  const APP_BUILD_VERSION = '2026.07.03-pixieedrawdev-switch-fix12';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
   const PWA_CONTROLLER_CHANGE_RELOAD_SUPPRESS_MS = 8000;
@@ -2673,6 +2673,8 @@
   set resizeCanvases(value) { resizeCanvases = value; },
   get scaleVoxelPreviewPixels() { return scaleVoxelPreviewPixels; },
   set scaleVoxelPreviewPixels(value) { scaleVoxelPreviewPixels = value; },
+  get scheduleMirrorGuideRefresh() { return scheduleMirrorGuideRefresh; },
+  set scheduleMirrorGuideRefresh(value) { scheduleMirrorGuideRefresh = value; },
   get scheduleSessionPersist() { return scheduleSessionPersist; },
   set scheduleSessionPersist(value) { scheduleSessionPersist = value; },
   get setSelectionTransformHoverHandle() { return setSelectionTransformHoverHandle; },
@@ -10166,6 +10168,8 @@
   set findOpenProjectTabIndex(value) { findOpenProjectTabIndex = value; },
   get findOpenProjectTabIndexForRecentProjectEntry() { return findOpenProjectTabIndexForRecentProjectEntry; },
   set findOpenProjectTabIndexForRecentProjectEntry(value) { findOpenProjectTabIndexForRecentProjectEntry = value; },
+  get matchesDeletedProjectOpenTab() { return matchesDeletedProjectOpenTab; },
+  set matchesDeletedProjectOpenTab(value) { matchesDeletedProjectOpenTab = value; },
   get getCurrentSharedRecentProjectEntry() { return getCurrentSharedRecentProjectEntry; },
   set getCurrentSharedRecentProjectEntry(value) { getCurrentSharedRecentProjectEntry = value; },
   get getOpenProjectTabDisplayLabel() { return getOpenProjectTabDisplayLabel; },
@@ -22373,6 +22377,8 @@
   set readHiddenSharedProjectKeys(value) { readHiddenSharedProjectKeys = value; },
   get getSharedRecentProjectEntry() { return getSharedRecentProjectEntry; },
   set getSharedRecentProjectEntry(value) { getSharedRecentProjectEntry = value; },
+  get ensureSharedRecentProjectsAccountSynced() { return ensureSharedRecentProjectsAccountSynced; },
+  set ensureSharedRecentProjectsAccountSynced(value) { ensureSharedRecentProjectsAccountSynced = value; },
   get sharedRecentProjectsLastAccountSyncAt() { return sharedRecentProjectsLastAccountSyncAt; },
   set sharedRecentProjectsLastAccountSyncAt(value) { sharedRecentProjectsLastAccountSyncAt = value; },
   get SHARED_PROJECT_SYNC_DELAY() { return SHARED_PROJECT_SYNC_DELAY; },
