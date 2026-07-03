@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.07.03-pixieedrawdev-switch-fix9';
+  const APP_BUILD_VERSION = '2026.07.03-pixieedrawdev-switch-fix10';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
   const PWA_CONTROLLER_CHANGE_RELOAD_SUPPRESS_MS = 8000;
@@ -5935,6 +5935,8 @@
   set exportTimelapseGif(value) { exportTimelapseGif = value; },
   get getExportFileNameBase() { return getExportFileNameBase; },
   set getExportFileNameBase(value) { getExportFileNameBase = value; },
+  get isDesktopRightToolRailMode() { return isDesktopRightToolRailMode; },
+  set isDesktopRightToolRailMode(value) { isDesktopRightToolRailMode = value; },
   get layoutMode() { return layoutMode; },
   set layoutMode(value) { layoutMode = value; },
   get localizeText() { return localizeText; },
