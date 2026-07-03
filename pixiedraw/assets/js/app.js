@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.06.29-true-presplit';
+  const APP_BUILD_VERSION = '2026.07.03-shared-auth-refresh-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
@@ -81531,7 +81531,11 @@
     if (!requireLogin) {
       return true;
     }
-    await ensurePixieedAccountReady({ forceRefresh: true, silent: true, allowAnonymous: false });
+    await ensurePixieedAccountReady({
+      forceRefresh: !(accountState.isLoggedIn && accountState.userId && !accountState.isAnonymous),
+      silent: true,
+      allowAnonymous: false,
+    });
     if (accountState.isLoggedIn && accountState.userId && !accountState.isAnonymous) {
       return true;
     }
