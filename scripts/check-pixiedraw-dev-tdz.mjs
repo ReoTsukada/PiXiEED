@@ -527,6 +527,9 @@ if (
 ) {
   failures.push('timelapse-session-utils.js: missing exported createTimelapseSessionUtils');
 }
+[
+  'normalizeSerializedTimelapseOperationEntry',
+].forEach(name => requireInjectedGetter('timelapseSessionUtils', name));
 const autosaveWorkflowUtilsSource = fs.readFileSync(path.join(moduleDir, 'autosave-workflow-utils.js'), 'utf8');
 if (
   !autosaveWorkflowUtilsSource.includes('function createAutosaveWorkflowUtils(')
