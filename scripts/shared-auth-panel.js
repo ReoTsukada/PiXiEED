@@ -6,6 +6,7 @@
   const SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
   const SUPABASE_MODULE_URL = 'https://esm.sh/@supabase/supabase-js@2.46.1?bundle';
+  const SUPABASE_AUTH_HEALTH_URL = `${SUPABASE_URL}/auth/v1/health`;
   const PANEL_SELECTOR = '#authPanel';
   const AUTH_BLOCK_ID = 'sharedAuthBlock';
   const AUTH_STORAGE_KEY = 'sb-kyyiuakrqomzlikfaire-auth-token';
@@ -30,6 +31,7 @@
   let initPromise = null;
   let supportsProfileXUrl = true;
   let authListenerBound = false;
+  let authHealthCheckPromise = null;
 
   function loadNickname() {
     try {
@@ -429,6 +431,10 @@
       setStatus('Googleログインは公開URLまたはローカルサーバーで利用してください');
       return;
     }
+    if (!(await ensureAuthServiceReachable())) {
+      setStatus('現在ログインサーバーに接続できません。時間をおいて再試行してください');
+      return;
+    }
     setStatus(`${label}へ移動しています...`);
     try {
       const { error } = await supabaseClient.auth.signInWithOAuth({
@@ -452,6 +458,10 @@
   async function sendLoginLink(email) {
     if (!supabaseClient) {
       setStatus('オンラインでログインしてください');
+      return false;
+    }
+    if (!(await ensureAuthServiceReachable())) {
+      setStatus('現在ログインサーバーに接続できません。時間をおいて再試行してください');
       return false;
     }
     setStatus('ログインリンクを送信しています...');
@@ -493,6 +503,23 @@
       return null;
     }
     return { email, passcode };
+  }
+
+  async function ensureAuthServiceReachable() {
+    if (authHealthCheckPromise) {
+      return authHealthCheckPromise;
+    }
+    authHealthCheckPromise = fetch(SUPABASE_AUTH_HEALTH_URL, {
+      method: 'GET',
+      headers: { apikey: SUPABASE_ANON_KEY },
+      cache: 'no-store',
+    })
+      .then(response => response.ok)
+      .catch(() => false)
+      .finally(() => {
+        authHealthCheckPromise = null;
+      });
+    return authHealthCheckPromise;
   }
 
   async function saveProfileToServer() {
@@ -567,6 +594,10 @@
         const input = await validateAuthInputs();
         if (!input) return;
         const { email, passcode } = input;
+        if (!(await ensureAuthServiceReachable())) {
+          setStatus('現在ログインサーバーに接続できません。時間をおいて再試行してください');
+          return;
+        }
         setStatus('サインインしています...');
         try {
           const { error } = await supabaseClient.auth.signInWithPassword({ email, password: passcode });
