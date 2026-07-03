@@ -12238,10 +12238,6 @@
     return sharedProjectRecoveryLifecycleUtilsModule.scheduleSharedProjectRecoveryReload(...args);
   }
 
-  function isReloadNavigation(...args) {
-    return sharedProjectRecoveryLifecycleUtilsModule.isReloadNavigation(...args);
-  }
-
   function registerPwaServiceWorker() {
     if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
       return;
@@ -12249,6 +12245,21 @@
     if (window.location.protocol === 'file:') {
       return;
     }
+    const isReloadNavigation = () => {
+      try {
+        const nav = window.performance?.getEntriesByType?.('navigation')?.[0];
+        if (nav && typeof nav.type === 'string') {
+          return nav.type === 'reload';
+        }
+      } catch (error) {
+        // Ignore performance API failures and fall back to a conservative check.
+      }
+      try {
+        return window.performance?.navigation?.type === 1;
+      } catch (error) {
+        return false;
+      }
+    };
     const isLocalDevDraw =
       /\/PiXiEEDDraw\.dev(?:\/|$)/.test(window.location.pathname || '')
       && /^(localhost|127\.0\.0\.1|::1)$/.test(window.location.hostname || '');
