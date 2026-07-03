@@ -22,6 +22,8 @@ Stripe Dashboard で以下を作成または確認します。
 - PayPay を有効化した Checkout
 - Webhook Endpoint
 
+Product / Price は `scripts/stripe-create-products.mjs` でも作成できます。手順は `docs/stripe-product-automation.md` を参照してください。
+
 必要な値:
 
 - `STRIPE_SECRET_KEY`
