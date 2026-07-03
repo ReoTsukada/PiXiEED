@@ -409,6 +409,13 @@ if (
 ) {
   failures.push('shared-project-local-journal-utils.js: missing exported createSharedProjectLocalJournalUtils');
 }
+const sharedProjectBackendRpcUtilsSource = fs.readFileSync(path.join(moduleDir, 'shared-project-backend-rpc-utils.js'), 'utf8');
+if (
+  !sharedProjectBackendRpcUtilsSource.includes('function createSharedProjectBackendRpcUtils(')
+  || !sharedProjectBackendRpcUtilsSource.includes('    createSharedProjectBackendRpcUtils,')
+) {
+  failures.push('shared-project-backend-rpc-utils.js: missing exported createSharedProjectBackendRpcUtils');
+}
 const canvasResizeWorkflowUtilsSource = fs.readFileSync(path.join(moduleDir, 'canvas-resize-workflow-utils.js'), 'utf8');
 if (
   !canvasResizeWorkflowUtilsSource.includes('function createCanvasResizeWorkflowUtils(')
@@ -4030,6 +4037,11 @@ requireInjectedGetter('timelineLayers', 'TIMELINE_CELL_SIZE');
   'writeSessionStorageForLocalRestore',
 ].forEach(name => requireInjectedGetter('sharedProjectLocalJournalUtils', name));
 [
+  'crypto',
+  'handleSharedProjectsBackendError',
+  'normalizeMultiProjectKey',
+].forEach(name => requireInjectedGetter('sharedProjectBackendRpcUtils', name));
+[
   'normalizeMultiProjectKey',
   'activeSharedProjectKey',
   'sharedProjectRoomCommitSentAt',
@@ -4538,6 +4550,7 @@ requireInjectedGetter('timelineLayers', 'TIMELINE_CELL_SIZE');
   ['sharedProjectLocalOpUtils', 'shared-project-local-op-utils.js'],
   ['sharedProjectRecoveryLifecycleUtils', 'shared-project-recovery-lifecycle-utils.js'],
   ['sharedProjectRealtimeUtils', 'shared-project-realtime-utils.js'],
+  ['sharedProjectBackendRpcUtils', 'shared-project-backend-rpc-utils.js'],
   ['sharedProjectWorkflowUtils', 'shared-project-workflow-utils.js'],
   ['sharedProjectCreateProgressUtils', 'shared-project-create-progress-utils.js'],
   ['controlsMirror', 'controls-mirror.js'],

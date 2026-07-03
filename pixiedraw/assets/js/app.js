@@ -87910,9 +87910,22 @@
     return value.trim();
   }
 
+  function isPiXiEEDrawDevCompatibleBuildVersion(remoteVersion) {
+    const localVersion = normalizeMultiBuildVersion(APP_BUILD_VERSION);
+    const normalizedRemoteVersion = normalizeMultiBuildVersion(remoteVersion);
+    if (!localVersion || !normalizedRemoteVersion || localVersion === normalizedRemoteVersion) {
+      return true;
+    }
+    const localIsDev = localVersion.includes('split') || /pixieedrawdev/i.test(localVersion);
+    const remoteIsDev = normalizedRemoteVersion.includes('split') || /pixieedrawdev/i.test(normalizedRemoteVersion);
+    const localIsProd = localVersion.includes('true-presplit') || (!localIsDev && !/dev/i.test(localVersion));
+    const remoteIsProd = normalizedRemoteVersion.includes('true-presplit') || (!remoteIsDev && !/dev/i.test(normalizedRemoteVersion));
+    return (localIsDev && remoteIsProd) || (localIsProd && remoteIsDev);
+  }
+
   function handleMultiBuildVersionMismatch(remoteVersion, { source = '', clientId = '' } = {}) {
     const normalized = normalizeMultiBuildVersion(remoteVersion);
-    if (!normalized || normalized === APP_BUILD_VERSION) {
+    if (!normalized || normalized === APP_BUILD_VERSION || isPiXiEEDrawDevCompatibleBuildVersion(normalized)) {
       return false;
     }
     const now = Date.now();
@@ -87953,7 +87966,7 @@
       multiState.peerBuildVersions = new Map();
     }
     multiState.peerBuildVersions.set(normalizedClientId, normalizedVersion);
-    if (normalizedVersion !== APP_BUILD_VERSION) {
+    if (normalizedVersion !== APP_BUILD_VERSION && !isPiXiEEDrawDevCompatibleBuildVersion(normalizedVersion)) {
       handleMultiBuildVersionMismatch(normalizedVersion, { source, clientId: normalizedClientId });
     }
   }
