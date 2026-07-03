@@ -1,4 +1,4 @@
-const APP_BUILD_VERSION = '2026.07.03-pixieedrawdev-switch-v1';
+const APP_BUILD_VERSION = '2026.07.03-pixieedrawdev-switch-v2';
 const CACHE_VERSION = `pixieedrawdev-v${APP_BUILD_VERSION}`;
 const CORE_ASSETS = [
   '/PiXiEEDrawDEV/',
