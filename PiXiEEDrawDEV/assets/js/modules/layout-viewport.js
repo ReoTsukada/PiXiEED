@@ -1759,6 +1759,7 @@
         canvasResizeHandleLayoutRaf = null;
         updateCanvasResizeHandlePosition();
         syncCanvasResizeHandleVisibility();
+        updateMirrorGuideHandles();
       });
     });
   }
