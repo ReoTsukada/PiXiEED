@@ -1079,65 +1079,89 @@
   }
 
   function queueStartupRecentAdRender() {
+    const projectHomeAdContainer = document.getElementById('projectHomeRecentAdContainer');
+    const projectHomeAdSlot = document.getElementById('projectHomeRecentAdSlot');
+    const adTargets = [
+      {
+        screen: dom.startup?.screen,
+        section: dom.startup?.recentSection,
+        container: dom.startup?.recentAdContainer,
+        slot: dom.startup?.recentAdSlot,
+      },
+      {
+        screen: dom.projectHomeScreen,
+        section: dom.projectHomeRecentSection,
+        container: projectHomeAdContainer,
+        slot: projectHomeAdSlot,
+      },
+    ];
     if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) {
-      if (dom.startup?.recentAdContainer instanceof HTMLElement) {
-        dom.startup.recentAdContainer.hidden = true;
-      }
+      adTargets.forEach(target => {
+        if (target.container instanceof HTMLElement) {
+          target.container.hidden = true;
+        }
+      });
       return;
     }
-    const screen = dom.startup?.screen;
-    const section = dom.startup?.recentSection;
-    const adSlot = dom.startup?.recentAdSlot;
-    if (!(screen instanceof HTMLElement) || screen.hidden || !(section instanceof HTMLElement) || section.hidden || !(adSlot instanceof HTMLElement)) {
-      return;
-    }
-    if (startupRecentAdRequested) {
-      return;
-    }
-    if (adSlot.dataset.loaded === '1' || adSlot.getAttribute('data-adsbygoogle-status') === 'done') {
-      startupRecentAdRequested = true;
-      return;
-    }
-    if (!adSlot.classList.contains('adsbygoogle')) {
-      adSlot.classList.add('adsbygoogle');
-    }
-
-    const getWidth = () => {
-      try {
-        const rect = adSlot.getBoundingClientRect();
-        return (rect && rect.width) || adSlot.clientWidth || adSlot.offsetWidth || 0;
-      } catch (error) {
-        return adSlot.clientWidth || adSlot.offsetWidth || 0;
-      }
-    };
-
-    let attempts = 0;
-    const MAX_ATTEMPTS = 24;
-    const renderWhenReady = () => {
-      if (!(screen instanceof HTMLElement) || screen.hidden || !(section instanceof HTMLElement) || section.hidden) {
-        startupRecentAdRequested = false;
+    adTargets.forEach(target => {
+      const screen = target.screen;
+      const section = target.section;
+      const container = target.container;
+      const adSlot = target.slot;
+      if (!(screen instanceof HTMLElement) || screen.hidden || !(section instanceof HTMLElement) || section.hidden || !(container instanceof HTMLElement) || !(adSlot instanceof HTMLElement)) {
         return;
       }
-      const width = getWidth();
-      if (width <= 0) {
-        attempts += 1;
-        if (attempts < MAX_ATTEMPTS) {
-          window.requestAnimationFrame(renderWhenReady);
+      container.hidden = false;
+      if (adSlot.dataset.renderPending === '1') {
+        return;
+      }
+      if (adSlot.dataset.loaded === '1' || adSlot.getAttribute('data-adsbygoogle-status') === 'done') {
+        return;
+      }
+      if (!adSlot.classList.contains('adsbygoogle')) {
+        adSlot.classList.add('adsbygoogle');
+      }
+
+      const getWidth = () => {
+        try {
+          const rect = adSlot.getBoundingClientRect();
+          return (rect && rect.width) || adSlot.clientWidth || adSlot.offsetWidth || 0;
+        } catch (error) {
+          return adSlot.clientWidth || adSlot.offsetWidth || 0;
+        }
+      };
+
+      let attempts = 0;
+      const MAX_ATTEMPTS = 24;
+      adSlot.dataset.renderPending = '1';
+      const renderWhenReady = () => {
+        if (!(screen instanceof HTMLElement) || screen.hidden || !(section instanceof HTMLElement) || section.hidden) {
+          delete adSlot.dataset.renderPending;
           return;
         }
-        startupRecentAdRequested = false;
-        return;
-      }
-      startupRecentAdRequested = true;
-      try {
-        (window.adsbygoogle = window.adsbygoogle || []).push({});
-        adSlot.dataset.loaded = '1';
-      } catch (error) {
-        startupRecentAdRequested = false;
-      }
-    };
+        const width = getWidth();
+        if (width <= 0) {
+          attempts += 1;
+          if (attempts < MAX_ATTEMPTS) {
+            window.requestAnimationFrame(renderWhenReady);
+            return;
+          }
+          delete adSlot.dataset.renderPending;
+          return;
+        }
+        try {
+          (window.adsbygoogle = window.adsbygoogle || []).push({});
+          adSlot.dataset.loaded = '1';
+        } catch (error) {
+          delete adSlot.dataset.renderPending;
+          return;
+        }
+        delete adSlot.dataset.renderPending;
+        startupRecentAdRequested = true;
+      };
 
-    window.requestAnimationFrame(renderWhenReady);
+      window.requestAnimationFrame(renderWhenReady);
+    });
   }
 
   function hideStartupScreen() {
