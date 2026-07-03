@@ -663,15 +663,17 @@
       <span class="helper" id="linkedEmail" style="display:none;"></span>
       <p class="helper" id="authAccountStatus" style="margin:0;"></p>
     `;
-    if (card) {
-      const profileBlock = statusNode?.closest('.profile-block');
-      if (profileBlock && profileBlock.parentElement === card) {
-        profileBlock.insertAdjacentElement('afterend', block);
-      } else if (statusNode) {
-        statusNode.insertAdjacentElement('beforebegin', block);
-      } else {
-        card.appendChild(block);
-      }
+    const profileBlock = statusNode?.closest('.profile-block') || panel.querySelector('.profile-block--profile');
+    if (card && profileBlock && profileBlock.parentElement === card) {
+      profileBlock.insertAdjacentElement('afterend', block);
+    } else if (statusNode) {
+      statusNode.insertAdjacentElement('beforebegin', block);
+    } else if (profileBlock) {
+      profileBlock.insertAdjacentElement('afterend', block);
+    } else if (card) {
+      card.appendChild(block);
+    } else {
+      panel.appendChild(block);
     }
   }
 
