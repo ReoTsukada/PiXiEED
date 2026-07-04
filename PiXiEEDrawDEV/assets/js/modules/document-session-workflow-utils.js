@@ -139,8 +139,12 @@
   } = {}) {
     const sheets = Array.isArray(parsedDocument?.sheets) ? parsedDocument.sheets : [];
     const normalizedProjectId = normalizeAutosaveProjectId(projectId || autosaveProjectId || '') || createAutosaveProjectId();
-    const normalizedSharedProjectKey = normalizeMultiProjectKey(sharedProjectKey || '')
-      || getSharedProjectKeyFromProjectId(normalizedProjectId);
+    const normalizedSharedProjectKey = SHARED_PROJECTS_ENABLED
+      ? (
+        normalizeMultiProjectKey(sharedProjectKey || '')
+        || getSharedProjectKeyFromProjectId(normalizedProjectId)
+      )
+      : '';
     if (!sheets.length) {
       resetOpenProjectTabsToCurrentProject({
         source,
@@ -163,14 +167,16 @@
           ? sheet.label.trim()
           : localizeText(`シート ${index + 1}`, `Sheet ${index + 1}`),
         source: sheet.source || source,
-        sharedProjectKey: sheet.sharedProjectKey || normalizedSharedProjectKey,
-        sharedProjectBackendId: sheet.sharedProjectBackendId || sharedProjectBackendId,
-        sharedProjectRevision: sheet.sharedProjectRevision || sharedProjectRevision,
-        sharedProjectStructureRevision: sheet.sharedProjectStructureRevision || sharedProjectStructureRevision,
-        sharedRoleHint: sheet.sharedRoleHint || sharedRoleHint,
-        sharedAutoJoin: Object.prototype.hasOwnProperty.call(sheet, 'sharedAutoJoin')
-          ? sheet.sharedAutoJoin
-          : sharedAutoJoin,
+        sharedProjectKey: SHARED_PROJECTS_ENABLED ? (sheet.sharedProjectKey || normalizedSharedProjectKey) : '',
+        sharedProjectBackendId: SHARED_PROJECTS_ENABLED ? (sheet.sharedProjectBackendId || sharedProjectBackendId) : '',
+        sharedProjectRevision: SHARED_PROJECTS_ENABLED ? (sheet.sharedProjectRevision || sharedProjectRevision) : 0,
+        sharedProjectStructureRevision: SHARED_PROJECTS_ENABLED ? (sheet.sharedProjectStructureRevision || sharedProjectStructureRevision) : 0,
+        sharedRoleHint: SHARED_PROJECTS_ENABLED ? (sheet.sharedRoleHint || sharedRoleHint) : '',
+        sharedAutoJoin: SHARED_PROJECTS_ENABLED && (
+          Object.prototype.hasOwnProperty.call(sheet, 'sharedAutoJoin')
+            ? sheet.sharedAutoJoin
+            : sharedAutoJoin
+        ),
       }))
       .filter(Boolean);
     if (!nextTabs.length) {
