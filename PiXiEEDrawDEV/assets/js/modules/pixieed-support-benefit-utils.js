@@ -94,29 +94,22 @@
   }
 
   function buildPixieedSupportStatusText(adFreeState = getPixieedAdFreeStateSnapshot()) {
-    const { ownedProjectCount, effectiveLimit } = getSharedProjectOwnershipStatus();
-    const usageLabel = buildSharedProjectUsageLabel({ ownedProjectCount, effectiveLimit });
-    const supporterUsageLabel = buildSharedProjectUsageLabel({
-      ownedProjectCount,
-      effectiveLimit: SHARED_PROJECT_LIMIT_AD_FREE,
-    });
-    const memberLimit = getSharedProjectMemberLimitForCurrentPlan();
     if (adFreeState?.isActive === true || hasPixieedrawAdFreeSupport()) {
       const days = getPixieedAdFreeRemainingDays(adFreeState);
       if (days === null) {
         return localizeText(
-          `サポーター特典（500円）が適用中です。広告非表示、共有プロジェクト作成枠 ${usageLabel}、共同編集最大 ${memberLimit} 人、マルチキャンバスは追加3つ（メイン含め最大4つ）まで利用できます。`,
-          `Supporter benefits (500 yen) are active. Ads are hidden, shared project slots are ${usageLabel}, shared editing supports up to ${memberLimit} people, and Multi Canvas supports 3 extra canvases (4 total including the main canvas).`
+          'サポーター特典（500円）が適用中です。広告非表示を利用できます。',
+          'Supporter benefits (500 yen) are active. Ads are hidden.'
         );
       }
       return localizeText(
-        `サポーター特典（500円）が適用中です。広告非表示、共有プロジェクト作成枠 ${usageLabel}、共同編集最大 ${memberLimit} 人、マルチキャンバス追加3つまで利用できます。残り ${days} 日です。`,
-        `Supporter benefits (500 yen) are active. Ads are hidden, shared project slots are ${usageLabel}, shared editing supports up to ${memberLimit} people, and Multi Canvas supports 3 extra canvases. ${days} days remaining.`
+        `サポーター特典（500円）が適用中です。広告非表示を利用できます。残り ${days} 日です。`,
+        `Supporter benefits (500 yen) are active. Ads are hidden. ${days} days remaining.`
       );
     }
     return localizeText(
-      `通常ログインでは共有プロジェクト1件、共同編集最大2人、マルチキャンバス追加1つまで利用できます。サポーター特典は500円で、共有プロジェクト4件、共同編集最大4人、マルチキャンバス追加3つ、広告非表示になります。サポーター枠 ${supporterUsageLabel}。`,
-      `With a standard signed-in account, you get 1 shared project, shared editing for up to 2 people, and 1 extra Multi Canvas. Supporter benefits are 500 yen and unlock 4 shared projects, shared editing for up to 4 people, 3 extra Multi Canvases, and ad removal. Supporter slots: ${supporterUsageLabel}.`
+      'サポーター特典は500円です。広告非表示を利用できます。',
+      'Supporter benefits are 500 yen and remove ads.'
     );
   }
 

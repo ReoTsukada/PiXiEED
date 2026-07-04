@@ -304,7 +304,7 @@
         );
       }
   
-      setLocalizedTextContent('.startup-screen__subtitle', 'PiXiEEDraw（ピクシードロー）でドット絵づくり・共同制作・アニメ制作をはじめよう', 'Start pixel art, collab, and animation with PiXiEEDraw');
+      setLocalizedTextContent('.startup-screen__subtitle', 'PiXiEEDraw（ピクシードロー）でドット絵づくり・アニメ制作をはじめよう', 'Start pixel art and animation with PiXiEEDraw');
       setLocalizedTextContent('#startupActionResume', '最新の端末内プロジェクトを開く', 'Open Latest Local Project');
       setLocalizedTextContent('#startupActionNew', '新規作成', 'New Project');
       setLocalizedTextContent('#startupActionOpen', 'ファイルを開く', 'Open File');
@@ -317,17 +317,15 @@
       setLocalizedTextContent('#projectHomeNew', '新規作成', 'New Project');
       setLocalizedTextContent('#projectHomeOpen', 'ファイルを開く', 'Open File');
       setLocalizedTextContent('#projectHomeAccessTitle', 'コード適用', 'Apply Codes');
-      setLocalizedTextContent('#projectHomeAccessStatus', '特典、参加キー、などのコードを入力してください。', 'Enter your benefit, join key, or other code.');
+      setLocalizedTextContent('#projectHomeAccessStatus', '購入番号または購入コードを入力してください。', 'Enter your purchase number or purchase code.');
       setLocalizedTextContent('#projectHomeApplyAccessCode', '適用', 'Apply');
-      setLocalizedAttribute('#projectHomeJoinProjectKey', 'placeholder', 'コードを入力', 'Enter code');
+      setLocalizedAttribute('#projectHomeJoinProjectKey', 'placeholder', '購入番号 / 購入コード', 'Purchase number / purchase code');
       setLocalizedTextContent('#projectHomeSupporterApply', '適用', 'Apply');
       setLocalizedTextContent('#projectHomeSupporterPurchase', 'サポーター特典を見る', 'View Supporter Benefits');
       setLocalizedAttribute('#projectHomeSupporterCode', 'placeholder', '購入番号 / シリアルコード', 'Purchase number / serial code');
       setLocalizedTextContent('#projectHomeRecentProjects .project-home-screen__section-title', 'プロジェクト', 'Projects');
       setLocalizedTextContent('#startupRecentProjects .startup-screen__recent-title', 'プロジェクト一覧', 'Projects');
       setLocalizedTextContent('#startupRecentAdContainer .export-ad__label', '広告', 'Ad');
-      setLocalizedTextContent('#sharedProjectCreateFailureTitle', '共有プロジェクト作成失敗', 'Shared Project Creation Failed');
-      setLocalizedTextContent('#sharedProjectCreateFailureClose', '閉じる', 'Close');
       setLocalizedTextContent(
         '#startupScreenHint',
         AUTOSAVE_SUPPORTED
@@ -482,7 +480,7 @@
       setLocalizedTextContent('#goHomeButton span:last-child', 'ホーム', 'Home');
       setLocalizedTextContent('#goContestButton span:last-child', '広場', 'Plaza');
       setLocalizedTextContent('#pixieedAdFreeField > span', 'サポーター特典', 'Supporter Benefits');
-      setLocalizedTextContent('#pixieedAdFreeStatus', 'サポーター特典は500円です。広告非表示、共有プロジェクト4件、共同編集最大4人、マルチキャンバス追加3つまで利用できます。', 'Supporter benefits are 500 yen: remove ads, unlock 4 shared projects, edit with up to 4 people, and add up to 3 multi canvases.');
+      setLocalizedTextContent('#pixieedAdFreeStatus', 'サポーター特典は500円です。広告非表示を利用できます。', 'Supporter benefits are 500 yen and remove ads.');
       setLocalizedTextContent('#pixieedAdFreePurchase', 'サポーター特典を見る', 'View Supporter Benefits');
       setLocalizedTextContent('#multiEntryAccountCard .multi-account-card__head > span', '共有プロジェクトを作成', 'Create Shared Project');
       setLocalizedTextContent('#multiFlowAccountCard .multi-account-card__head > span', '共有プロジェクトを作成', 'Create Shared Project');
@@ -605,7 +603,7 @@
       setLocalizedTextContent('#exportProject', '保存/出力', 'Save / Export');
       setLocalizedTextContent('#clearCanvas', 'キャンバスをクリア', 'Clear Canvas');
       setLocalizedTextContent('.file-panel-summary .help-text:nth-child(1)', '自動保存: ON（この端末）', 'Autosave: ON (this device)');
-      setLocalizedTextContent('.file-panel-summary .help-text:nth-child(2)', '共有・配布用の保存は「保存/出力」から手動で行います。', 'Use "Save / Export" for files you want to share.');
+      setLocalizedTextContent('.file-panel-summary .help-text:nth-child(2)', '配布用の保存は「保存/出力」から手動で行います。', 'Use "Save / Export" for distributable files.');
       setLocalizedTextContent('#fileContestPromoTitle', 'コンテスト投稿', 'Contest Posting');
       setLocalizedTextContent('#fileContestPromoDescription', '保存/出力の「保存完了後にコンテスト投稿画面へ移動する」をONにすると、そのまま投稿できます。', 'Turn on "Go to contest post screen after save" to move directly to contest posting.');
       setLocalizedTextContent('#openContestFromFilePanel', 'コンテストページを見る', 'Open Contest Page');
@@ -656,12 +654,11 @@
       renderNewProjectPalettePresetPicker(getNewProjectPalettePresetId());
       setLocalizedTextContent('.new-project__mode-field > span', '作成モード', 'Create Mode');
       setLocalizedTextContent('#newProjectModeLocal', '通常', 'Normal');
-      setLocalizedTextContent('#newProjectModeShared', '共有', 'Shared');
       setLocalizedTextContent('#newProjectAdContainer .export-ad__label', '広告', 'Ad');
       setLocalizedTextContent('#cancelNewProject', 'キャンセル', 'Cancel');
       setLocalizedTextContent('#globalHistoryConfirmTitle', '全体Undo', 'Shared Undo');
-      setLocalizedTextContent('#globalHistoryConfirmMessage', 'この操作は共有ドキュメント全体に反映されます。', 'This action updates the shared document for everyone.');
-      setLocalizedTextContent('#globalHistoryConfirmDetail', '参加者全員の表示が更新されます。続ける前に内容を確認してください。', 'All participant views will be refreshed. Review the action before continuing.');
+      setLocalizedTextContent('#globalHistoryConfirmMessage', 'この操作はプロジェクト全体に反映されます。', 'This action updates the whole project.');
+      setLocalizedTextContent('#globalHistoryConfirmDetail', '続ける前に内容を確認してください。', 'Check before continuing.');
       setLocalizedTextContent('#globalHistoryConfirmCancel', 'キャンセル', 'Cancel');
       setLocalizedTextContent('#globalHistoryConfirmConfirm', '全体Undoする', 'Run Shared Undo');
   

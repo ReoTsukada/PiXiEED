@@ -821,8 +821,14 @@
     renderMultiParticipantsList();
     renderMultiComments();
     applyMultiRoleUiLocks();
-    const inviteApplied = maybeApplyInviteAutoJoin();
-    if (!inviteApplied) {
+    if (!SHARED_PROJECTS_ENABLED) {
+      if (readMultiInviteFromUrl()) {
+        showSharedProjectSunsetDialog();
+      }
+      return;
+    }
+    const inviteApplied = SHARED_PROJECTS_ENABLED && maybeApplyInviteAutoJoin();
+    if (SHARED_PROJECTS_ENABLED && !inviteApplied) {
       maybeAutoResumeMultiSession();
     }
   }

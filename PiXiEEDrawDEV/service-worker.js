@@ -1,4 +1,4 @@
-const APP_BUILD_VERSION = '2026.07.04-shared-copy-url-fix1';
+const APP_BUILD_VERSION = '2026.07.04-shared-project-disabled1';
 const CACHE_VERSION = `pixieedrawdev-v${APP_BUILD_VERSION}`;
 const CORE_ASSETS = [
   '/PiXiEEDrawDEV/',

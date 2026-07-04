@@ -28,7 +28,7 @@ const DEFAULT_PRODUCTS = [
   {
     key: 'pixiedraw_ad_free',
     name: 'PiXiEEDraw Monthly Support',
-    description: 'Monthly PiXiEEDraw support with ad-free and shared project benefits.',
+    description: 'Monthly PiXiEEDraw support with ad-free benefits.',
     amount: 500,
     currency: 'jpy',
     mode: 'subscription',

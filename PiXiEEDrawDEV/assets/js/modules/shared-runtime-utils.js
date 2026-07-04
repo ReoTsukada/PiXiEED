@@ -51,21 +51,39 @@
   }
 
   function isSharedProjectsBlockedByRuntime() {
-    return window.location?.protocol === 'file:';
+    return !SHARED_PROJECTS_ENABLED || window.location?.protocol === 'file:';
+  }
+
+  function getSharedProjectSunsetMessage() {
+    return localizeText(
+      'PiXiEEDrawを楽しんでくださりありがとう。この度急ではございますがシェアプロジェクトを一度廃止いたします。\nさらなる進化を持って復活するのを待っていてください。',
+      'Thank you for enjoying PiXiEEDraw. Shared projects are being retired for now.\nPlease wait for them to return with further evolution.'
+    );
+  }
+
+  function showSharedProjectSunsetDialog() {
+    const message = getSharedProjectSunsetMessage();
+    if (typeof window.alert === 'function') {
+      window.alert(message);
+    }
+    return message;
   }
 
   function showSharedRuntimeBlockedStatus() {
-    setMultiStatus(
-      localizeText(
+    const message = SHARED_PROJECTS_ENABLED
+      ? localizeText(
         '共有モードは file:// 直開きでは使えません。https または localhost で開いてください。',
         'Shared mode is unavailable on file://. Open PiXiEEDraw over https or localhost.'
-      ),
+      )
+      : showSharedProjectSunsetDialog();
+    setMultiStatus(
+      message,
       'error'
     );
   }
 
   function prefersSharedProjectFlow() {
-    return true;
+    return SHARED_PROJECTS_ENABLED;
   }
 
   function createSharedProjectSnapshotTitle(name = state.documentName || DEFAULT_DOCUMENT_NAME) {
@@ -76,6 +94,7 @@
           canUseSharedProjectsBackend,
           isRecoverableSharedBackendPreflightError,
           isSharedProjectsBlockedByRuntime,
+          showSharedProjectSunsetDialog,
           showSharedRuntimeBlockedStatus,
           prefersSharedProjectFlow,
           createSharedProjectSnapshotTitle,

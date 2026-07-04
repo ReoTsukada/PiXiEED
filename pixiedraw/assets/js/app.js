@@ -4,8 +4,9 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.07.03-shared-auth-refresh-fix1';
+  const APP_BUILD_VERSION = '2026.07.04-shared-project-disabled1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
+  const SHARED_PROJECTS_ENABLED = false;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
 
   const dom = {
@@ -664,7 +665,7 @@
   };
 
   const LEFT_TAB_KEYS = ['tools', 'color'];
-  const RIGHT_TAB_KEYS = ['frames', 'details', 'settings', 'extensions', 'help', 'file', 'multi'];
+  const RIGHT_TAB_KEYS = ['frames', 'details', 'settings', 'extensions', 'help', 'file'];
   const TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE = 'virtualCursorToggle';
   const TOOL_ACTION_MIRROR_POPUP = 'mirrorPopup';
   const TOOL_ACTION_CAMERA_MODE = 'cameraMode';
@@ -15063,8 +15064,8 @@
         `The next action to undo is "${operationName}".`
       );
     const detail = localizeText(
-      'この操作は共有ドキュメント全体に反映され、参加者全員の表示も更新されます。',
-      'This updates the shared document for everyone and refreshes all participant views.'
+      'この操作はプロジェクト全体に反映されます。続ける前に内容を確認してください。',
+      'This updates the whole project. Check before continuing.'
     );
     const confirmLabel = normalizedAction === 'redo'
       ? localizeText('全体Redoする', 'Run Shared Redo')
@@ -19364,7 +19365,7 @@
       );
     }
 
-    setLocalizedTextContent('.startup-screen__subtitle', 'PiXiEEDraw（ピクシードロー）でドット絵づくり・共同制作・アニメ制作をはじめよう', 'Start pixel art, collab, and animation with PiXiEEDraw');
+    setLocalizedTextContent('.startup-screen__subtitle', 'PiXiEEDraw（ピクシードロー）でドット絵づくり・アニメ制作をはじめよう', 'Start pixel art and animation with PiXiEEDraw');
     setLocalizedTextContent('#startupActionResume', '最新の端末内プロジェクトを開く', 'Open Latest Local Project');
     setLocalizedTextContent('#startupActionNew', '新規作成', 'New Project');
     setLocalizedTextContent('#startupActionOpen', 'ファイルを開く', 'Open File');
@@ -19377,17 +19378,15 @@
     setLocalizedTextContent('#projectHomeNew', '新規作成', 'New Project');
     setLocalizedTextContent('#projectHomeOpen', 'ファイルを開く', 'Open File');
     setLocalizedTextContent('#projectHomeAccessTitle', 'コード適用', 'Apply Codes');
-    setLocalizedTextContent('#projectHomeAccessStatus', '特典、参加キー、などのコードを入力してください。', 'Enter your benefit, join key, or other code.');
+    setLocalizedTextContent('#projectHomeAccessStatus', '購入番号または購入コードを入力してください。', 'Enter your purchase number or purchase code.');
     setLocalizedTextContent('#projectHomeApplyAccessCode', '適用', 'Apply');
-    setLocalizedAttribute('#projectHomeJoinProjectKey', 'placeholder', 'コードを入力', 'Enter code');
+    setLocalizedAttribute('#projectHomeJoinProjectKey', 'placeholder', '購入番号 / 購入コード', 'Purchase number / purchase code');
     setLocalizedTextContent('#projectHomeSupporterApply', '適用', 'Apply');
     setLocalizedTextContent('#projectHomeSupporterPurchase', 'サポーター特典を見る', 'View Supporter Benefits');
     setLocalizedAttribute('#projectHomeSupporterCode', 'placeholder', '購入番号 / シリアルコード', 'Purchase number / serial code');
     setLocalizedTextContent('#projectHomeRecentProjects .project-home-screen__section-title', 'プロジェクト', 'Projects');
     setLocalizedTextContent('#startupRecentProjects .startup-screen__recent-title', 'プロジェクト一覧', 'Projects');
     setLocalizedTextContent('#startupRecentAdContainer .export-ad__label', '広告', 'Ad');
-    setLocalizedTextContent('#sharedProjectCreateFailureTitle', '共有プロジェクト作成失敗', 'Shared Project Creation Failed');
-    setLocalizedTextContent('#sharedProjectCreateFailureClose', '閉じる', 'Close');
     setLocalizedTextContent(
       '#startupScreenHint',
       AUTOSAVE_SUPPORTED
@@ -19471,7 +19470,6 @@
     setLocalizedTextContent('#multiApplyAccessCode', '確定', 'Apply');
     setLocalizedTextContent('#multiCopyAccessCode', 'コピー', 'Copy');
     setLocalizedSelectOption(dom.newProject?.createMode, 'local', '通常', 'Normal');
-    setLocalizedSelectOption(dom.newProject?.createMode, 'shared', '共有', 'Shared');
     setLocalizedToggleLabel('multiDanmakuToggle', 'コメント弾幕', 'Comment Overlay');
     setLocalizedTextContent('#multiCommentSend', '送信', 'Send');
     setLocalizedTextContent('#multiLeaveSession', '切断', 'Disconnect');
@@ -19542,7 +19540,7 @@
     setLocalizedTextContent('#goHomeButton span:last-child', 'ホーム', 'Home');
     setLocalizedTextContent('#goContestButton span:last-child', '広場', 'Plaza');
     setLocalizedTextContent('#pixieedAdFreeField > span', 'サポーター特典', 'Supporter Benefits');
-    setLocalizedTextContent('#pixieedAdFreeStatus', 'サポーター特典は500円です。広告非表示、共有プロジェクト4件、共同編集最大4人、マルチキャンバス追加3つまで利用できます。', 'Supporter benefits are 500 yen: remove ads, unlock 4 shared projects, edit with up to 4 people, and add up to 3 multi canvases.');
+    setLocalizedTextContent('#pixieedAdFreeStatus', 'サポーター特典は500円です。広告非表示を利用できます。', 'Supporter benefits are 500 yen and remove ads.');
     setLocalizedTextContent('#pixieedAdFreePurchase', 'サポーター特典を見る', 'View Supporter Benefits');
     setLocalizedTextContent('#multiEntryAccountCard .multi-account-card__head > span', '共有プロジェクトを作成', 'Create Shared Project');
     setLocalizedTextContent('#multiFlowAccountCard .multi-account-card__head > span', '共有プロジェクトを作成', 'Create Shared Project');
@@ -19716,12 +19714,11 @@
     renderNewProjectPalettePresetPicker(newProjectPalettePresetId);
     setLocalizedTextContent('.new-project__mode-field > span', '作成モード', 'Create Mode');
     setLocalizedTextContent('#newProjectModeLocal', '通常', 'Normal');
-    setLocalizedTextContent('#newProjectModeShared', '共有', 'Shared');
     setLocalizedTextContent('#newProjectAdContainer .export-ad__label', '広告', 'Ad');
     setLocalizedTextContent('#cancelNewProject', 'キャンセル', 'Cancel');
     setLocalizedTextContent('#globalHistoryConfirmTitle', '全体Undo', 'Shared Undo');
-    setLocalizedTextContent('#globalHistoryConfirmMessage', 'この操作は共有ドキュメント全体に反映されます。', 'This action updates the shared document for everyone.');
-    setLocalizedTextContent('#globalHistoryConfirmDetail', '参加者全員の表示が更新されます。続ける前に内容を確認してください。', 'All participant views will be refreshed. Review the action before continuing.');
+    setLocalizedTextContent('#globalHistoryConfirmMessage', 'この操作はプロジェクト全体に反映されます。', 'This action updates the whole project.');
+    setLocalizedTextContent('#globalHistoryConfirmDetail', '続ける前に内容を確認してください。', 'Check before continuing.');
     setLocalizedTextContent('#globalHistoryConfirmCancel', 'キャンセル', 'Cancel');
     setLocalizedTextContent('#globalHistoryConfirmConfirm', '全体Undoする', 'Run Shared Undo');
 
@@ -25824,7 +25821,7 @@
   }
 
   function syncNewProjectDialogModeText() {
-    const createShared = Boolean(pendingNewProjectCreateShared);
+    const createShared = SHARED_PROJECTS_ENABLED && Boolean(pendingNewProjectCreateShared);
     if (dom.newProject?.title instanceof HTMLElement) {
       dom.newProject.title.textContent = createShared
         ? localizeText('共有プロジェクト作成', 'Create Shared Project')
@@ -25838,7 +25835,7 @@
   }
 
   function syncNewProjectCreateModeButtons(mode = 'local') {
-    const normalized = mode === 'shared' ? 'shared' : 'local';
+    const normalized = SHARED_PROJECTS_ENABLED && mode === 'shared' ? 'shared' : 'local';
     if (dom.newProject?.createMode instanceof HTMLSelectElement) {
       dom.newProject.createMode.value = normalized;
     }
@@ -25898,11 +25895,12 @@
     if (!ensureCurrentClientCanReplaceActiveProject()) {
       return;
     }
+    const requestedSharedCreate = SHARED_PROJECTS_ENABLED && Boolean(createShared);
     const config = dom.newProject;
     if (!config) {
       void promptNewProjectFallback({
         appendAsTab: Boolean(appendAsTab),
-        createShared: Boolean(createShared),
+        createShared: requestedSharedCreate,
       });
       return;
     }
@@ -25929,8 +25927,8 @@
           renderNewProjectPalettePresetPicker(normalizedPreset);
           setNewProjectPalettePresetPickerOpen(false);
         }
-        syncNewProjectCreateModeButtons(Boolean(createShared) ? 'shared' : 'local');
-        pendingNewProjectCreateShared = Boolean(createShared);
+        syncNewProjectCreateModeButtons(requestedSharedCreate ? 'shared' : 'local');
+        pendingNewProjectCreateShared = requestedSharedCreate;
         pendingNewProjectAppendAsTab = Boolean(appendAsTab) && !pendingNewProjectCreateShared;
         syncNewProjectDialogModeText();
         dialog.showModal();
@@ -25955,7 +25953,7 @@
     }
     void promptNewProjectFallback({
       appendAsTab: Boolean(appendAsTab),
-      createShared: Boolean(createShared),
+      createShared: requestedSharedCreate,
     });
   }
 
@@ -26436,6 +26434,11 @@
 
   function openShareStartConfirmDialog() {
     return new Promise(resolve => {
+      if (!SHARED_PROJECTS_ENABLED) {
+        showSharedRuntimeBlockedStatus();
+        resolve(false);
+        return;
+      }
       const config = dom.shareStartConfirm;
       const dialog = config?.dialog;
       if (!(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== 'function') {
@@ -26751,7 +26754,10 @@
       const selectedCreateMode = dom.newProject?.createMode instanceof HTMLSelectElement
         ? dom.newProject.createMode.value
         : 'local';
-      const shouldCreateShared = selectedCreateMode === 'shared' || Boolean(pendingNewProjectCreateShared);
+      const shouldCreateShared = SHARED_PROJECTS_ENABLED && (
+        selectedCreateMode === 'shared'
+        || Boolean(pendingNewProjectCreateShared)
+      );
       const shouldAppendAsTab = Boolean(pendingNewProjectAppendAsTab);
       let created = false;
       let createdLocalProject = false;
@@ -26826,7 +26832,7 @@
     let created = false;
     let createdLocalProject = false;
     let sharedCreationFailure = null;
-    if (createShared) {
+    if (SHARED_PROJECTS_ENABLED && createShared) {
       const result = await createSharedProjectFromNewProject({
         name,
         width,
@@ -26857,7 +26863,7 @@
         promptExportDirectory: false,
       });
     }
-    if (!created && !createShared) {
+    if (!created && !(SHARED_PROJECTS_ENABLED && createShared)) {
       window.alert(`キャンバスサイズは${MIN_CANVAS_SIZE}〜${MAX_CANVAS_SIZE}の数値で入力してください。`);
     } else if ((created || createdLocalProject) && projectHomeVisible) {
       hideProjectHomeScreen();
@@ -27231,12 +27237,9 @@
       }
     });
     dom.controls.projectHomeApplyAccessCode?.addEventListener('click', async () => {
-      const isSignedInAccount = accountState.isLoggedIn && !accountState.isAnonymous;
-      if (!isSignedInAccount) {
-        setMultiStatus(localizeText('ログインしてください', 'Please sign in'), 'warn');
-        return;
-      }
-      const openedShared = await openSharedProjectFromHomeInput();
+      const openedShared = SHARED_PROJECTS_ENABLED
+        ? await openSharedProjectFromHomeInput()
+        : false;
       if (openedShared) {
         return;
       }
@@ -27415,7 +27418,7 @@
     if (!targetEntry) {
       return false;
     }
-    if (isSharedRecentProjectEntry(targetEntry)) {
+    if (SHARED_PROJECTS_ENABLED && isSharedRecentProjectEntry(targetEntry)) {
       storePendingSharedInvite({
         inviteToken: targetEntry.sharedProjectInviteToken || '',
         projectKey: targetEntry.sharedProjectKey || '',
@@ -27444,6 +27447,12 @@
   }
 
   async function maybeRestoreSharedProjectOnStartup() {
+    if (!SHARED_PROJECTS_ENABLED) {
+      startupSharedReloadProjectKey = '';
+      startupSharedReloadRevision = 0;
+      startupSharedReloadStructureRevision = 0;
+      return false;
+    }
     const restoredProjectKey = normalizeMultiProjectKey(startupSharedReloadProjectKey || '');
     if (startupRestoreCancelRequested || !restoredProjectKey || readMultiInviteFromUrl()) {
       return false;
@@ -28610,29 +28619,22 @@
   }
 
   function buildPixieedSupportStatusText(adFreeState = getPixieedAdFreeStateSnapshot()) {
-    const { ownedProjectCount, effectiveLimit } = getSharedProjectOwnershipStatus();
-    const usageLabel = buildSharedProjectUsageLabel({ ownedProjectCount, effectiveLimit });
-    const supporterUsageLabel = buildSharedProjectUsageLabel({
-      ownedProjectCount,
-      effectiveLimit: SHARED_PROJECT_LIMIT_AD_FREE,
-    });
-    const memberLimit = getSharedProjectMemberLimitForCurrentPlan();
     if (adFreeState?.isActive === true || hasPixieedrawAdFreeSupport()) {
       const days = getPixieedAdFreeRemainingDays(adFreeState);
       if (days === null) {
         return localizeText(
-          `サポーター特典（500円）が適用中です。広告非表示、共有プロジェクト作成枠 ${usageLabel}、共同編集最大 ${memberLimit} 人、マルチキャンバスは追加3つ（メイン含め最大4つ）まで利用できます。`,
-          `Supporter benefits (500 yen) are active. Ads are hidden, shared project slots are ${usageLabel}, shared editing supports up to ${memberLimit} people, and Multi Canvas supports 3 extra canvases (4 total including the main canvas).`
+          'サポーター特典（500円）が適用中です。広告非表示を利用できます。',
+          'Supporter benefits (500 yen) are active. Ads are hidden.'
         );
       }
       return localizeText(
-        `サポーター特典（500円）が適用中です。広告非表示、共有プロジェクト作成枠 ${usageLabel}、共同編集最大 ${memberLimit} 人、マルチキャンバス追加3つまで利用できます。残り ${days} 日です。`,
-        `Supporter benefits (500 yen) are active. Ads are hidden, shared project slots are ${usageLabel}, shared editing supports up to ${memberLimit} people, and Multi Canvas supports 3 extra canvases. ${days} days remaining.`
+        `サポーター特典（500円）が適用中です。広告非表示を利用できます。残り ${days} 日です。`,
+        `Supporter benefits (500 yen) are active. Ads are hidden. ${days} days remaining.`
       );
     }
     return localizeText(
-      `通常ログインでは共有プロジェクト1件、共同編集最大2人、マルチキャンバス追加1つまで利用できます。サポーター特典は500円で、共有プロジェクト4件、共同編集最大4人、マルチキャンバス追加3つ、広告非表示になります。サポーター枠 ${supporterUsageLabel}。`,
-      `With a standard signed-in account, you get 1 shared project, shared editing for up to 2 people, and 1 extra Multi Canvas. Supporter benefits are 500 yen and unlock 4 shared projects, shared editing for up to 4 people, 3 extra Multi Canvases, and ad removal. Supporter slots: ${supporterUsageLabel}.`
+      'サポーター特典は500円です。広告非表示を利用できます。',
+      'Supporter benefits are 500 yen and remove ads.'
     );
   }
 
@@ -29213,7 +29215,7 @@
   }
 
   function shouldUseLightweightSharedProjectLocalSave(projectId = '') {
-    return Boolean(resolveSharedProjectKeyForLightweightLocalSave(projectId));
+    return SHARED_PROJECTS_ENABLED && Boolean(resolveSharedProjectKeyForLightweightLocalSave(projectId));
   }
 
   async function recordSharedProjectLightweightLocalSave({
@@ -31827,9 +31829,13 @@
         : (normalizeAutosaveProjectId(projectId || autosaveProjectId || '') || createAutosaveProjectId());
       const initialEntries = await loadRecentProjectsMetadata();
       const previousEntry = initialEntries.find(entry => entry?.id === resolvedProjectId) || null;
-      const sharedProjectKey = isSharedRecentProjectEntry(previousEntry)
-        ? normalizeMultiProjectKey(previousEntry.sharedProjectKey || '')
-        : getSharedProjectKeyFromProjectId(resolvedProjectId);
+      const sharedProjectKey = SHARED_PROJECTS_ENABLED
+        ? (
+          isSharedRecentProjectEntry(previousEntry)
+            ? normalizeMultiProjectKey(previousEntry.sharedProjectKey || '')
+            : getSharedProjectKeyFromProjectId(resolvedProjectId)
+        )
+        : '';
       if (sharedProjectKey) {
         const fileName = getRecentProjectEntryFileName(previousEntry, packagedPayload, snapshot);
         const displayName = previousEntry?.name
@@ -31928,6 +31934,12 @@
     silent = false,
     successMessage = '',
   } = {}) {
+    if (isSharedProjectsBlockedByRuntime()) {
+      if (!silent) {
+        showSharedRuntimeBlockedStatus();
+      }
+      return false;
+    }
     const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
     const normalizedInviteToken = typeof inviteToken === 'string' ? inviteToken.trim() : '';
     const normalizedRequestedRole = requestedRole === 'master' || requestedRole === 'guest' || requestedRole === 'spectator'
@@ -32049,6 +32061,12 @@
     successMessage = '',
     prefetchedProject = null,
   } = {}) {
+    if (isSharedProjectsBlockedByRuntime()) {
+      if (!silent) {
+        showSharedRuntimeBlockedStatus();
+      }
+      return false;
+    }
     const normalizedProjectKey = normalizeMultiProjectKey(access?.projectKey || '');
     const normalizedInviteToken = typeof access?.inviteToken === 'string' ? access.inviteToken.trim() : '';
     const requestedRole = access?.requestedRole === 'master' || access?.requestedRole === 'guest' || access?.requestedRole === 'spectator'
@@ -32728,6 +32746,231 @@
     }
   }
 
+  function buildLocalProjectIdFromSharedRecentProjectEntry(entry = null) {
+    const normalizedEntry = normalizeSharedRecentProjectEntry(entry);
+    const sourceKey = normalizeMultiProjectKey(normalizedEntry?.sharedProjectKey || '');
+    if (sourceKey) {
+      return `local-from-shared-${sourceKey}`;
+    }
+    const backendId = normalizeAutosaveProjectId(normalizedEntry?.sharedProjectBackendId || '');
+    if (backendId) {
+      return `local-from-shared-${backendId}`;
+    }
+    return createAutosaveProjectId();
+  }
+
+  function stripSharedRecentProjectFields(entry = {}) {
+    const {
+      storageKind,
+      sharedProjectBackendId,
+      sharedProjectId,
+      sharedProjectKey,
+      sharedProjectInviteToken,
+      sharedProjectVisibility,
+      sharedProjectRevision,
+      sharedProjectStructureRevision,
+      sharedProjectMembershipRole,
+      sharedProjectOwnerUserId,
+      sharedProjectTransferLocked,
+      sharedRoleHint,
+      sharedAutoJoin,
+      ...localEntry
+    } = entry && typeof entry === 'object' ? entry : {};
+    return localEntry;
+  }
+
+  async function loadSharedRecentProjectPayloadForLocalOpen(entry = null) {
+    let normalizedEntry = normalizeSharedRecentProjectEntry(entry);
+    if (!normalizedEntry) {
+      return null;
+    }
+    if (normalizedEntry.project && typeof normalizedEntry.project === 'object') {
+      return normalizedEntry.project;
+    }
+    if (accountState.isLoggedIn && !accountState.isAnonymous) {
+      try {
+        normalizedEntry = normalizeSharedRecentProjectEntry(
+          await refreshSharedRecentProjectEntryFromBackend(normalizedEntry) || normalizedEntry
+        ) || normalizedEntry;
+      } catch (error) {
+        console.warn('Failed to refresh shared recent project before local conversion', error);
+      }
+    }
+    let project = null;
+    try {
+      if (normalizedEntry.sharedProjectInviteToken) {
+        project = await loadSharedProjectSnapshotRecordByInvite(normalizedEntry.sharedProjectInviteToken, {
+          createIfMissing: false,
+          title: createSharedProjectSnapshotTitle(normalizedEntry.name || state.documentName || DEFAULT_DOCUMENT_NAME),
+        });
+      }
+      if (!project?.project_key && normalizedEntry.sharedProjectKey) {
+        project = await loadSharedProjectSnapshotRecord(normalizedEntry.sharedProjectKey, {
+          createIfMissing: false,
+          title: createSharedProjectSnapshotTitle(normalizedEntry.name || state.documentName || DEFAULT_DOCUMENT_NAME),
+        });
+      }
+      if (project?.project_key) {
+        const freshestProject = await awaitFreshSharedProjectSnapshot(project, {
+          inviteToken: normalizedEntry.sharedProjectInviteToken || '',
+          minRevision: Math.max(0, Math.round(Number(project.latest_revision) || 0)),
+          requireExactLatest: false,
+          timeoutMs: 1200,
+          pollIntervalMs: 160,
+        }) || project;
+        if (freshestProject?.latest_snapshot && typeof freshestProject.latest_snapshot === 'object') {
+          return freshestProject.latest_snapshot;
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to fetch shared recent project snapshot for local conversion', error);
+    }
+    return null;
+  }
+
+  async function storeSharedRecentProjectAsLocalProject(normalizedEntry, projectPayload, localProjectId) {
+    if (!AUTOSAVE_SUPPORTED || !normalizedEntry || !projectPayload || typeof projectPayload !== 'object') {
+      return null;
+    }
+    const resolvedLocalProjectId = normalizeAutosaveProjectId(localProjectId) || buildLocalProjectIdFromSharedRecentProjectEntry(normalizedEntry);
+    const entries = await loadRecentProjectsMetadata();
+    const existingLocalEntry = entries.find(entry => (
+      normalizeAutosaveProjectId(entry?.id || '') === resolvedLocalProjectId
+      && !isSharedRecentProjectEntry(entry)
+    )) || null;
+    const baseEntry = stripSharedRecentProjectFields(existingLocalEntry || normalizedEntry);
+    const fileName = normalizeDocumentName(
+      existingLocalEntry?.fileName
+      || normalizedEntry.fileName
+      || `${normalizedEntry.name || DEFAULT_DOCUMENT_NAME}`
+    );
+    const localEntry = {
+      ...baseEntry,
+      id: resolvedLocalProjectId,
+      accountUserId: getCurrentRecentProjectAccountUserId(),
+      storageKind: RECENT_PROJECT_STORAGE_LOCAL,
+      name: extractDocumentBaseName(existingLocalEntry?.name || normalizedEntry.name || fileName),
+      fileName,
+      updatedAt: new Date().toISOString(),
+      thumbnail: existingLocalEntry?.thumbnail || normalizedEntry.thumbnail || null,
+      project: projectPayload,
+    };
+    if (existingLocalEntry?.thumbnailSheetId || normalizedEntry.thumbnailSheetId) {
+      localEntry.thumbnailSheetId = existingLocalEntry?.thumbnailSheetId || normalizedEntry.thumbnailSheetId;
+    }
+    if (existingLocalEntry?.dotStats || normalizedEntry.dotStats) {
+      localEntry.dotStats = existingLocalEntry?.dotStats || normalizedEntry.dotStats;
+    }
+    const removeIds = new Set([
+      resolvedLocalProjectId,
+      normalizeAutosaveProjectId(normalizedEntry.id || ''),
+      buildSharedRecentProjectId(normalizedEntry.sharedProjectKey || ''),
+    ].filter(Boolean));
+    const workingEntries = entries.filter(entry => {
+      const id = normalizeAutosaveProjectId(entry?.id || '');
+      return id && !removeIds.has(id);
+    });
+    workingEntries.unshift(localEntry);
+    workingEntries.sort((a, b) => {
+      const aTime = typeof a?.updatedAt === 'string' ? a.updatedAt : '';
+      const bTime = typeof b?.updatedAt === 'string' ? b.updatedAt : '';
+      return bTime.localeCompare(aTime);
+    });
+    await saveRecentProjectsList(entries, workingEntries);
+    setRecentProjectsCache(workingEntries);
+    return localEntry;
+  }
+
+  async function openSharedRecentProjectAsLocalProject(entry, { hideStartup = true, silent = false } = {}) {
+    const normalizedEntry = normalizeSharedRecentProjectEntry(entry);
+    if (!normalizedEntry) {
+      return false;
+    }
+    if (!silent) {
+      showSharedProjectSunsetDialog();
+    }
+    const localProjectId = buildLocalProjectIdFromSharedRecentProjectEntry(normalizedEntry);
+    const recentEntries = await loadRecentProjectsMetadata();
+    const existingLocalEntry = recentEntries.find(candidate => (
+      normalizeAutosaveProjectId(candidate?.id || '') === localProjectId
+      && !isSharedRecentProjectEntry(candidate)
+    )) || null;
+    if (existingLocalEntry && (existingLocalEntry.project || existingLocalEntry.handle)) {
+      return await openRecentProject(existingLocalEntry, {
+        hideStartup,
+        silent,
+        allowProjectMismatchLoad: true,
+        replaceOpenProjectTabs: true,
+      });
+    }
+    const closeBlockingLoading = beginBlockingGlobalLoading(localizeText(
+      'シェアプロジェクトを通常プロジェクトとして開いています…',
+      'Opening shared project as a local project...'
+    ));
+    try {
+      const projectPayload = await loadSharedRecentProjectPayloadForLocalOpen(normalizedEntry);
+      if (!projectPayload || typeof projectPayload !== 'object') {
+        if (!silent) {
+          updateAutosaveStatus(
+            localizeText(
+              'シェアプロジェクトを通常プロジェクトとして開けませんでした',
+              'Could not open the shared project as a local project'
+            ),
+            'error'
+          );
+        }
+        return false;
+      }
+      const loaded = await loadDocumentFromText(JSON.stringify(projectPayload), null, {
+        projectId: localProjectId,
+        suppressAutosaveStatus: true,
+        openedFromRecent: true,
+        allowProjectMismatchLoad: true,
+      });
+      if (!loaded || loaded === 'deferred') {
+        if (!silent) {
+          updateAutosaveStatus(
+            localizeText(
+              'シェアプロジェクトを通常プロジェクトとして開けませんでした',
+              'Could not open the shared project as a local project'
+            ),
+            'error'
+          );
+        }
+        return false;
+      }
+      await storeSharedRecentProjectAsLocalProject(normalizedEntry, projectPayload, localProjectId);
+      setActiveAutosaveProjectId(localProjectId);
+      if (!silent) {
+        updateAutosaveStatus(
+          localizeText(
+            'シェアプロジェクトを通常プロジェクトとして開きました',
+            'Opened the shared project as a local project'
+          ),
+          'success'
+        );
+      }
+      if (hideStartup) {
+        hideStartupScreen();
+      }
+      return true;
+    } catch (error) {
+      console.warn('Failed to open shared recent project as local project', error);
+      if (!silent) {
+        updateAutosaveStatus(
+          localizeText(
+            'シェアプロジェクトを通常プロジェクトとして開けませんでした',
+            'Could not open the shared project as a local project'
+          ),
+          'error'
+        );
+      }
+      return false;
+    } finally {
+      closeBlockingLoading();
+    }
+  }
+
   async function openRecentProject(entry, options = {}) {
     if (!entry || typeof entry !== 'object') {
       return false;
@@ -32745,6 +32988,12 @@
         ? ((await loadRecentProjectsMetadata()).find(candidate => candidate?.id === projectId) || entry)
         : entry;
       if (isSharedRecentProjectEntry(latestEntry)) {
+        if (!SHARED_PROJECTS_ENABLED) {
+          return await openSharedRecentProjectAsLocalProject(latestEntry, {
+            hideStartup: hideStartupOnSuccess,
+            silent,
+          });
+        }
         return await openSharedRecentProject(latestEntry, {
           hideStartup: hideStartupOnSuccess,
           silent,
@@ -69958,6 +70207,11 @@
       return false;
     }
     multiInviteAutoJoinHandled = true;
+    if (!SHARED_PROJECTS_ENABLED) {
+      clearPendingSharedInvite();
+      clearMultiInviteQueryParamsFromUrl();
+      return false;
+    }
     const invite = readMultiInviteFromUrl();
     if (!invite) {
       return false;
@@ -72043,17 +72297,36 @@
   }
 
   function isSharedProjectsBlockedByRuntime() {
-    return window.location?.protocol === 'file:';
+    return !SHARED_PROJECTS_ENABLED || window.location?.protocol === 'file:';
+  }
+
+  function getSharedProjectSunsetMessage() {
+    return localizeText(
+      'PiXiEEDrawを楽しんでくださりありがとう。この度急ではございますがシェアプロジェクトを一度廃止いたします。\nさらなる進化を持って復活するのを待っていてください。',
+      'Thank you for enjoying PiXiEEDraw. Shared projects are being retired for now.\nPlease wait for them to return with further evolution.'
+    );
+  }
+
+  function showSharedProjectSunsetDialog() {
+    const message = getSharedProjectSunsetMessage();
+    if (typeof window.alert === 'function') {
+      window.alert(message);
+    }
+    return message;
   }
 
   function showSharedRuntimeBlockedStatus() {
-    setMultiStatus(
-      localizeText(
+    const message = SHARED_PROJECTS_ENABLED
+      ? localizeText(
         '共有モードは file:// 直開きでは使えません。https または localhost で開いてください。',
         'Shared mode is unavailable on file://. Open PiXiEEDraw over https or localhost.'
-      ),
+      )
+      : showSharedProjectSunsetDialog();
+    setMultiStatus(
+      message,
       'error'
     );
+    updateAutosaveStatus(message, 'warn');
   }
 
   function canApplyIncomingSharedProjectSnapshot({ force = false } = {}) {
@@ -72284,7 +72557,7 @@
   }
 
   function prefersSharedProjectFlow() {
-    return true;
+    return SHARED_PROJECTS_ENABLED;
   }
 
   function createSharedProjectSnapshotTitle(name = state.documentName || DEFAULT_DOCUMENT_NAME) {
@@ -81764,6 +82037,22 @@
   }
 
   function updatePixieedShareAccountCard(statusNode, hintNode, loginAnchor) {
+    if (!SHARED_PROJECTS_ENABLED) {
+      if (statusNode instanceof HTMLElement) {
+        statusNode.textContent = localizeText('シェアプロジェクト停止中', 'Shared projects unavailable');
+      }
+      if (hintNode instanceof HTMLElement) {
+        hintNode.textContent = localizeText(
+          'シェアプロジェクトは只今ご利用いただけません。',
+          'Shared projects are currently unavailable.'
+        );
+      }
+      if (loginAnchor instanceof HTMLAnchorElement) {
+        loginAnchor.hidden = true;
+        loginAnchor.setAttribute('aria-hidden', 'true');
+      }
+      return;
+    }
     const nickname = readPixieedAccountNickname();
     const isSignedInAccount = accountState.isLoggedIn && !accountState.isAnonymous;
     const canUseSharedAccount = canUseSharedProjectsBackend() || supportsSharedProjectsBackend;
@@ -81846,13 +82135,11 @@
       dom.controls.multiFlowAccountLogin
     );
     if (dom.controls.projectHomeJoinProjectKey instanceof HTMLInputElement) {
-      dom.controls.projectHomeJoinProjectKey.disabled = !isSignedInAccount;
-      dom.controls.projectHomeJoinProjectKey.placeholder = isSignedInAccount
-        ? localizeText('参加コードを入力', 'Enter join code')
-        : localizeText('ログインしてください', 'Please sign in');
+      dom.controls.projectHomeJoinProjectKey.disabled = false;
+      dom.controls.projectHomeJoinProjectKey.placeholder = localizeText('購入番号 / 購入コード', 'Purchase number / purchase code');
     }
     if (dom.controls.projectHomeApplyAccessCode instanceof HTMLButtonElement) {
-      dom.controls.projectHomeApplyAccessCode.disabled = !isSignedInAccount;
+      dom.controls.projectHomeApplyAccessCode.disabled = false;
     }
     if (dom.controls.projectHomeJoinShared instanceof HTMLElement) {
       dom.controls.projectHomeJoinShared.hidden = false;
@@ -91456,8 +91743,14 @@
     renderMultiParticipantsList();
     renderMultiComments();
     applyMultiRoleUiLocks();
-    const inviteApplied = maybeApplyInviteAutoJoin();
-    if (!inviteApplied) {
+    if (!SHARED_PROJECTS_ENABLED) {
+      if (readMultiInviteFromUrl()) {
+        showSharedProjectSunsetDialog();
+      }
+      return;
+    }
+    const inviteApplied = SHARED_PROJECTS_ENABLED && maybeApplyInviteAutoJoin();
+    if (SHARED_PROJECTS_ENABLED && !inviteApplied) {
       maybeAutoResumeMultiSession();
     }
   }

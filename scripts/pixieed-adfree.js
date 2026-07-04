@@ -430,7 +430,7 @@
       return;
     }
     if (!state.isLoggedIn) {
-      updateStatusElement('ログイン後に購入番号または購入コードを適用できます。広告非表示と共有プロジェクト作成枠を利用できます。');
+      updateStatusElement('ログイン後に購入番号または購入コードを適用できます。広告非表示を利用できます。');
       return;
     }
     if (state.isActive) {
@@ -439,7 +439,7 @@
       const days = Number.isFinite(timestamp) ? Math.max(0, Math.ceil((timestamp - Date.now()) / 86400000)) : null;
       updateStatusElement(expiry
         ? `サポーター特典が適用中です。残り ${days} 日です。(${expiry} まで)`
-        : 'サポーター特典が適用中です。広告非表示と共有プロジェクト作成枠を利用できます。');
+        : 'サポーター特典が適用中です。広告非表示を利用できます。');
       return;
     }
     updateStatusElement('未購入です。購入後は自動反映されます。うまくいかない場合は購入番号または購入コードを入力してください。');

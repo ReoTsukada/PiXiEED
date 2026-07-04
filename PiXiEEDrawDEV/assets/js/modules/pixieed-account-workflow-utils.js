@@ -784,6 +784,22 @@
   }
 
   function updatePixieedShareAccountCard(statusNode, hintNode, loginAnchor) {
+    if (!SHARED_PROJECTS_ENABLED) {
+      if (statusNode instanceof HTMLElement) {
+        statusNode.textContent = localizeText('シェアプロジェクト停止中', 'Shared projects unavailable');
+      }
+      if (hintNode instanceof HTMLElement) {
+        hintNode.textContent = localizeText(
+          'シェアプロジェクトは只今ご利用いただけません。',
+          'Shared projects are currently unavailable.'
+        );
+      }
+      if (loginAnchor instanceof HTMLAnchorElement) {
+        loginAnchor.hidden = true;
+        loginAnchor.setAttribute('aria-hidden', 'true');
+      }
+      return;
+    }
     const nickname = readPixieedAccountNickname();
     const isSignedInAccount = accountState.isLoggedIn && !accountState.isAnonymous;
     const canUseSharedAccount = canUseSharedProjectsBackend() || supportsSharedProjectsBackend;
@@ -866,13 +882,11 @@
       dom.controls.multiFlowAccountLogin
     );
     if (dom.controls.projectHomeJoinProjectKey instanceof HTMLInputElement) {
-      dom.controls.projectHomeJoinProjectKey.disabled = !isSignedInAccount;
-      dom.controls.projectHomeJoinProjectKey.placeholder = isSignedInAccount
-        ? localizeText('参加コードを入力', 'Enter join code')
-        : localizeText('ログインしてください', 'Please sign in');
+      dom.controls.projectHomeJoinProjectKey.disabled = false;
+      dom.controls.projectHomeJoinProjectKey.placeholder = localizeText('購入番号 / 購入コード', 'Purchase number / purchase code');
     }
     if (dom.controls.projectHomeApplyAccessCode instanceof HTMLButtonElement) {
-      dom.controls.projectHomeApplyAccessCode.disabled = !isSignedInAccount;
+      dom.controls.projectHomeApplyAccessCode.disabled = false;
     }
     if (dom.controls.projectHomeJoinShared instanceof HTMLElement) {
       dom.controls.projectHomeJoinShared.hidden = false;

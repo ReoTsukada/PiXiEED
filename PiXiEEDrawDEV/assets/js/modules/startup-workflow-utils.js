@@ -32,7 +32,7 @@
     return ((scope) => {
       with (scope) {
   function syncNewProjectDialogModeText() {
-    const createShared = Boolean(pendingNewProjectCreateShared);
+    const createShared = SHARED_PROJECTS_ENABLED && Boolean(pendingNewProjectCreateShared);
     if (dom.newProject?.title instanceof HTMLElement) {
       dom.newProject.title.textContent = createShared
         ? localizeText('共有プロジェクト作成', 'Create Shared Project')
@@ -46,7 +46,7 @@
   }
 
   function syncNewProjectCreateModeButtons(mode = 'local') {
-    const normalized = mode === 'shared' ? 'shared' : 'local';
+    const normalized = SHARED_PROJECTS_ENABLED && mode === 'shared' ? 'shared' : 'local';
     if (dom.newProject?.createMode instanceof HTMLSelectElement) {
       dom.newProject.createMode.value = normalized;
     }
@@ -106,11 +106,12 @@
     if (!ensureCurrentClientCanReplaceActiveProject()) {
       return;
     }
+    const requestedSharedCreate = SHARED_PROJECTS_ENABLED && Boolean(createShared);
     const config = dom.newProject;
     if (!config) {
       void promptNewProjectFallback({
         appendAsTab: Boolean(appendAsTab),
-        createShared: Boolean(createShared),
+        createShared: requestedSharedCreate,
       });
       return;
     }
@@ -137,8 +138,8 @@
           renderNewProjectPalettePresetPicker(normalizedPreset);
           setNewProjectPalettePresetPickerOpen(false);
         }
-        syncNewProjectCreateModeButtons(Boolean(createShared) ? 'shared' : 'local');
-        pendingNewProjectCreateShared = Boolean(createShared);
+        syncNewProjectCreateModeButtons(requestedSharedCreate ? 'shared' : 'local');
+        pendingNewProjectCreateShared = requestedSharedCreate;
         pendingNewProjectAppendAsTab = Boolean(appendAsTab) && !pendingNewProjectCreateShared;
         syncNewProjectDialogModeText();
         dialog.showModal();
@@ -163,7 +164,7 @@
     }
     void promptNewProjectFallback({
       appendAsTab: Boolean(appendAsTab),
-      createShared: Boolean(createShared),
+      createShared: requestedSharedCreate,
     });
   }
 
@@ -382,6 +383,11 @@
 
   function openShareStartConfirmDialog() {
     return new Promise(resolve => {
+      if (!SHARED_PROJECTS_ENABLED) {
+        showSharedRuntimeBlockedStatus();
+        resolve(false);
+        return;
+      }
       const config = dom.shareStartConfirm;
       const dialog = config?.dialog;
       if (!(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== 'function') {
@@ -697,7 +703,10 @@
       const selectedCreateMode = dom.newProject?.createMode instanceof HTMLSelectElement
         ? dom.newProject.createMode.value
         : 'local';
-      const shouldCreateShared = selectedCreateMode === 'shared' || Boolean(pendingNewProjectCreateShared);
+      const shouldCreateShared = SHARED_PROJECTS_ENABLED && (
+        selectedCreateMode === 'shared'
+        || Boolean(pendingNewProjectCreateShared)
+      );
       const shouldAppendAsTab = Boolean(pendingNewProjectAppendAsTab);
       let created = false;
       let createdLocalProject = false;
@@ -772,7 +781,7 @@
     let created = false;
     let createdLocalProject = false;
     let sharedCreationFailure = null;
-    if (createShared) {
+    if (SHARED_PROJECTS_ENABLED && createShared) {
       const result = await createSharedProjectFromNewProject({
         name,
         width,
@@ -803,7 +812,7 @@
         promptExportDirectory: false,
       });
     }
-    if (!created && !createShared) {
+    if (!created && !(SHARED_PROJECTS_ENABLED && createShared)) {
       window.alert(`キャンバスサイズは${MIN_CANVAS_SIZE}〜${MAX_CANVAS_SIZE}の数値で入力してください。`);
     } else if ((created || createdLocalProject) && projectHomeVisible) {
       hideProjectHomeScreen();
@@ -1204,12 +1213,9 @@
       }
     });
     dom.controls.projectHomeApplyAccessCode?.addEventListener('click', async () => {
-      const isSignedInAccount = accountState.isLoggedIn && !accountState.isAnonymous;
-      if (!isSignedInAccount) {
-        setMultiStatus(localizeText('ログインしてください', 'Please sign in'), 'warn');
-        return;
-      }
-      const openedShared = await openSharedProjectFromHomeInput();
+      const openedShared = SHARED_PROJECTS_ENABLED
+        ? await openSharedProjectFromHomeInput()
+        : false;
       if (openedShared) {
         return;
       }
@@ -1377,7 +1383,7 @@
     if (!targetEntry) {
       return false;
     }
-    if (isSharedRecentProjectEntry(targetEntry)) {
+    if (SHARED_PROJECTS_ENABLED && isSharedRecentProjectEntry(targetEntry)) {
       storePendingSharedInvite({
         inviteToken: targetEntry.sharedProjectInviteToken || '',
         projectKey: targetEntry.sharedProjectKey || '',
@@ -1406,6 +1412,12 @@
   }
 
   async function maybeRestoreSharedProjectOnStartup() {
+    if (!SHARED_PROJECTS_ENABLED) {
+      startupSharedReloadProjectKey = '';
+      startupSharedReloadRevision = 0;
+      startupSharedReloadStructureRevision = 0;
+      return false;
+    }
     const restoredProjectKey = normalizeMultiProjectKey(startupSharedReloadProjectKey || '');
     if (startupRestoreCancelRequested || !restoredProjectKey || readMultiInviteFromUrl()) {
       return false;

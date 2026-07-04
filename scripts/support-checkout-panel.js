@@ -29,7 +29,7 @@
       key: 'pixiedraw_ad_free',
       title: 'PiXiEEDraw継続サポート',
       price: '月額500円',
-      description: 'PiXiEEDrawの広告非表示に加え、共有プロジェクトを最大4件・最大4人（参加者3人）まで使える継続サポートです。',
+      description: 'PiXiEEDrawの広告非表示を利用できる継続サポートです。',
       webUrl: PIXIEDRAW_SUPPORT_URL,
       nativeProductId: 'pixiedraw_ad_free',
       checkoutProductKey: 'pixiedraw_ad_free',
