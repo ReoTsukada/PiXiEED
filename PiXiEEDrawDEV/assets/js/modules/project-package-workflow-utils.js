@@ -232,7 +232,7 @@
         || project?.document?.documentName
         || DEFAULT_DOCUMENT_NAME
       );
-      const sheetSharedProjectKey = getOpenProjectTabSharedKey(tab);
+      const sheetSharedProjectKey = SHARED_PROJECTS_ENABLED ? getOpenProjectTabSharedKey(tab) : '';
       sheets.push({
         id: tab?.id || createOpenProjectTabId(),
         fileName,
