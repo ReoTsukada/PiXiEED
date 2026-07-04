@@ -643,8 +643,27 @@
     } else {
       renderOpenProjectTabs();
     }
+    let savedClosedTabsState = true;
+    if (openProjectTabs.length && activeOpenProjectTabId && AUTOSAVE_SUPPORTED) {
+      try {
+        savedClosedTabsState = await writeAutosaveSnapshot(true);
+      } catch (error) {
+        console.warn('Failed to save project tabs after closing tab', error);
+        savedClosedTabsState = false;
+      }
+    }
+    if (!savedClosedTabsState) {
+      updateAutosaveStatus(
+        localizeText(
+          'シートを閉じましたが、削除後のタブ状態を保存できませんでした',
+          'Closed sheet, but could not save the updated tab state'
+        ),
+        'error'
+      );
+      return false;
+    }
     updateAutosaveStatus(
-      localizeText('シートを閉じました（端末内保存は保持）', 'Closed sheet (local save kept)'),
+      localizeText('シートを閉じました', 'Closed sheet'),
       'info'
     );
     return true;
