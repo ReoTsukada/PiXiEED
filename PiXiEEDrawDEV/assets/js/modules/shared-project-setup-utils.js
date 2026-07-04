@@ -124,6 +124,14 @@
     if (dom.controls.multiCopyAccessCode instanceof HTMLButtonElement && dom.controls.multiCopyAccessCode.dataset.bound !== 'true') {
       dom.controls.multiCopyAccessCode.dataset.bound = 'true';
       dom.controls.multiCopyAccessCode.addEventListener('click', async () => {
+        if (
+          prefersSharedProjectFlow()
+          && (isCurrentProjectSharedEntry() || resolveSharedProjectKeyForCurrentState())
+        ) {
+          await copyMultiInviteLink();
+          syncMultiControls();
+          return;
+        }
         const access = readMultiJoinProjectAccessInputOnly();
         const code = (access.inviteToken || access.projectKey || '').trim();
         if (!code) {
