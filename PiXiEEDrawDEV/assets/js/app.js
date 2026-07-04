@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.07.03-pixieedrawdev-switch-fix14';
+  const APP_BUILD_VERSION = '2026.07.04-shared-session-clamp-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
   const PWA_CONTROLLER_CHANGE_RELOAD_SUPPRESS_MS = 8000;
@@ -11602,6 +11602,8 @@
   set canUseSharedProjectsBackend(value) { canUseSharedProjectsBackend = value; },
   get classifySharedProjectOpType() { return classifySharedProjectOpType; },
   set classifySharedProjectOpType(value) { classifySharedProjectOpType = value; },
+  get clamp() { return clamp; },
+  set clamp(value) { clamp = value; },
   get clearActiveSharedProjectSession() { return clearActiveSharedProjectSession; },
   set clearActiveSharedProjectSession(value) { clearActiveSharedProjectSession = value; },
   get clearDeferredSharedProjectRemoteOpsDrain() { return clearDeferredSharedProjectRemoteOpsDrain; },
@@ -13923,6 +13925,23 @@
     return timelineNavigationWorkflowUtilsModule.stepActiveLayerTrack(...args);
   }
 
+  function settlePendingHistoryBeforeCanvasStructureChange() {
+    if (pointerState.active) {
+      setMultiStatus(
+        localizeText(
+          '現在の描画を確定してからフレーム/レイヤーを変更してください。',
+          'Finish the current stroke before changing frames or layers.'
+        ),
+        'warn'
+      );
+      return false;
+    }
+    if (history.pending) {
+      commitHistory();
+    }
+    return !history.pending;
+  }
+
   function addOrDuplicateFrameAfterActive({ duplicate = false } = {}) {
     if (state.playback.isPlaying) {
       return false;
@@ -13945,6 +13964,9 @@
     }
     const baseFrame = getActiveFrame();
     if (!baseFrame) {
+      return false;
+    }
+    if (!settlePendingHistoryBeforeCanvasStructureChange()) {
       return false;
     }
     clearTimelineSelection();
@@ -19035,7 +19057,7 @@
     if (!ignoreLocalInteraction) {
       if (pointerState.active) return 'local-pointer-active';
       if (typeof hasPendingSelectionMove === 'function' && hasPendingSelectionMove()) return 'selection-move-pending';
-      if (history.pending?.dirty) return 'history-pending';
+      if (history.pending) return 'history-pending';
     }
     if (sharedProjectOpCommitInFlight || hasSharedProjectLocalInFlightOps() || sharedProjectPendingLocalOps.length > 0 || sharedProjectSyncInFlight) return 'local-op-in-flight';
     if (sharedProjectPendingRemoteOps.size > 0) return 'remote-op-pending';
