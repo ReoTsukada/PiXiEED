@@ -183,7 +183,7 @@
     if (!isSharedProjectCollaborativeMode()) {
       return false;
     }
-    if (opType === 'structure' || opType === 'create' || opType === 'snapshot') {
+    if (opType === 'create' || opType === 'snapshot') {
       return true;
     }
     if ((opType === 'draw' || opType === 'palette') && sharedProjectOpsSinceCheckpoint >= SHARED_PROJECT_CHECKPOINT_OP_COUNT) {
