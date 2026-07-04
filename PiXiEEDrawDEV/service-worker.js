@@ -1,4 +1,4 @@
-const APP_BUILD_VERSION = '2026.07.03-pixieedrawdev-switch-fix14';
+const APP_BUILD_VERSION = '2026.07.04-shared-session-clamp-fix1';
 const CACHE_VERSION = `pixieedrawdev-v${APP_BUILD_VERSION}`;
 const CORE_ASSETS = [
   '/PiXiEEDrawDEV/',
