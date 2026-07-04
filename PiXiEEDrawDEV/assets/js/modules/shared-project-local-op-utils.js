@@ -249,7 +249,11 @@
     });
     sharedProjectPendingLocalOps.push(queuedOp);
     sortSharedProjectPendingLocalOps();
-    scheduleSharedProjectPendingLocalOpsFlush(SHARED_PROJECT_LOCAL_OP_BATCH_DELAY_MS, 'local-op-batch');
+    const flushDelay = opType === 'structure' ? 0 : SHARED_PROJECT_LOCAL_OP_BATCH_DELAY_MS;
+    scheduleSharedProjectPendingLocalOpsFlush(
+      flushDelay,
+      opType === 'structure' ? 'local-structure-op' : 'local-op-batch'
+    );
   }
 
   function sortSharedProjectPendingLocalOps() {
