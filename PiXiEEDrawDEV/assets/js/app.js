@@ -6546,6 +6546,8 @@
   set MAX_PROJECT_SHEETS(value) { MAX_PROJECT_SHEETS = value; },
   get MIN_HISTORY_LIMIT() { return MIN_HISTORY_LIMIT; },
   set MIN_HISTORY_LIMIT(value) { MIN_HISTORY_LIMIT = value; },
+  get SHARED_PROJECTS_ENABLED() { return SHARED_PROJECTS_ENABLED; },
+  set SHARED_PROJECTS_ENABLED(value) {},
   get SHARED_PROJECT_ID_PREFIX() { return SHARED_PROJECT_ID_PREFIX; },
   set SHARED_PROJECT_ID_PREFIX(value) { SHARED_PROJECT_ID_PREFIX = value; },
   get activateQrEditMode() { return activateQrEditMode; },
@@ -10103,6 +10105,7 @@
     recentProjectsCache,
     openProjectTabProjectWriteGuards,
     openProjectTabLongPressState,
+    SHARED_PROJECTS_ENABLED,
     getActiveOpenProjectTabId: () => activeOpenProjectTabId,
     getOpenProjectTabBusy: () => openProjectTabBusy,
     getOpenProjectTabSequence: () => openProjectTabSequence,
@@ -10338,6 +10341,7 @@
   }
 
   const openProjectTabModel = window.PiXiEEDrawModules?.openProjectTabModel?.createOpenProjectTabModel?.({
+    SHARED_PROJECTS_ENABLED,
     state,
     makeHistorySnapshot,
     buildProjectSessionPayload,
@@ -11236,6 +11240,7 @@
     dom,
     openProjectTabs,
     recentProjectsCache,
+    SHARED_PROJECTS_ENABLED,
     MAX_PROJECT_SHEETS,
     AUTOSAVE_SUPPORTED,
     getActiveOpenProjectTabId: () => activeOpenProjectTabId,
