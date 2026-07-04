@@ -50,7 +50,7 @@
           localizeText('共有URLを手動でコピーしてください', 'Copy the shared URL manually'),
           value
         );
-        return true;
+        return false;
       } catch (error) {
         return false;
       }
