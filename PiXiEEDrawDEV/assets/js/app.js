@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.07.04-shared-session-clamp-fix1';
+  const APP_BUILD_VERSION = '2026.07.04-shared-open-deps-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
   const PWA_CONTROLLER_CHANGE_RELOAD_SUPPRESS_MS = 8000;
@@ -7194,6 +7194,8 @@
   set getLocalMultiParticipantName(value) { getLocalMultiParticipantName = value; },
   get getMultiAssignment() { return getMultiAssignment; },
   set getMultiAssignment(value) { getMultiAssignment = value; },
+  get getScopedStorageKey() { return getScopedStorageKey; },
+  set getScopedStorageKey(value) { getScopedStorageKey = value; },
   get getScrollableAncestorForDeltaY() { return getScrollableAncestorForDeltaY; },
   set getScrollableAncestorForDeltaY(value) { getScrollableAncestorForDeltaY = value; },
   get isMultiCommentsTabVisible() { return isMultiCommentsTabVisible; },
@@ -11610,6 +11612,8 @@
   set clearDeferredSharedProjectRemoteOpsDrain(value) { clearDeferredSharedProjectRemoteOpsDrain = value; },
   get clearPendingMultiAssignmentMoveRequests() { return clearPendingMultiAssignmentMoveRequests; },
   set clearPendingMultiAssignmentMoveRequests(value) { clearPendingMultiAssignmentMoveRequests = value; },
+  get clearTimelineSelection() { return clearTimelineSelection; },
+  set clearTimelineSelection(value) { clearTimelineSelection = value; },
   get clearSharedProjectPendingLocalOpsFlushTimer() { return clearSharedProjectPendingLocalOpsFlushTimer; },
   set clearSharedProjectPendingLocalOpsFlushTimer(value) { clearSharedProjectPendingLocalOpsFlushTimer = value; },
   get commitHistory() { return commitHistory; },
