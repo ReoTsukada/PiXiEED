@@ -8977,6 +8977,9 @@
     if (!tab || typeof tab !== 'object') {
       return '';
     }
+    if (!SHARED_PROJECTS_ENABLED) {
+      return '';
+    }
     return normalizeMultiProjectKey(tab.sharedProjectKey || '')
       || getSharedProjectKeyFromProjectId(tab.projectId || '');
   }
@@ -9505,16 +9508,17 @@
   }
 
   function resetOpenProjectTabsToCurrentProject(options = {}) {
+    const sharedFieldsEnabled = SHARED_PROJECTS_ENABLED;
     const tab = createOpenProjectTabFromCurrentState({
       source: options.source || 'working',
       projectId: options.projectId || autosaveProjectId,
       label: options.label || localizeText('シート 1', 'Sheet 1'),
-      sharedProjectKey: options.sharedProjectKey,
-      sharedProjectBackendId: options.sharedProjectBackendId,
-      sharedProjectRevision: options.sharedProjectRevision,
-      sharedProjectStructureRevision: options.sharedProjectStructureRevision,
-      sharedRoleHint: options.sharedRoleHint,
-      sharedAutoJoin: options.sharedAutoJoin,
+      sharedProjectKey: sharedFieldsEnabled ? options.sharedProjectKey : '',
+      sharedProjectBackendId: sharedFieldsEnabled ? options.sharedProjectBackendId : '',
+      sharedProjectRevision: sharedFieldsEnabled ? options.sharedProjectRevision : 0,
+      sharedProjectStructureRevision: sharedFieldsEnabled ? options.sharedProjectStructureRevision : 0,
+      sharedRoleHint: sharedFieldsEnabled ? options.sharedRoleHint : '',
+      sharedAutoJoin: sharedFieldsEnabled ? options.sharedAutoJoin : false,
       qrEditPayload: options.qrEditPayload,
     });
     openProjectTabs.splice(0, openProjectTabs.length, tab);
@@ -10250,8 +10254,12 @@
       return null;
     }
     const normalizedProjectId = normalizeAutosaveProjectId(projectId || autosaveProjectId || '') || createAutosaveProjectId();
-    const normalizedSharedProjectKey = normalizeMultiProjectKey(sharedProjectKey || '')
-      || getSharedProjectKeyFromProjectId(normalizedProjectId);
+    const normalizedSharedProjectKey = SHARED_PROJECTS_ENABLED
+      ? (
+        normalizeMultiProjectKey(sharedProjectKey || '')
+        || getSharedProjectKeyFromProjectId(normalizedProjectId)
+      )
+      : '';
     const normalizedFileName = normalizeDocumentName(fileName || project?.documentName || project?.document?.documentName || DEFAULT_DOCUMENT_NAME);
     return {
       id: typeof id === 'string' && id ? id : createOpenProjectTabId(),
@@ -10288,7 +10296,9 @@
       const uniqueId = seenIds.has(id) ? createOpenProjectTabId() : id;
       seenIds.add(uniqueId);
       const fileName = normalizeDocumentName(sheet.fileName || sheet.name || sheet.project?.documentName || sheet.project?.document?.documentName || DEFAULT_DOCUMENT_NAME);
-      const sheetSharedProjectKey = normalizeMultiProjectKey(sheet.sharedProjectKey || '');
+      const sheetSharedProjectKey = SHARED_PROJECTS_ENABLED
+        ? normalizeMultiProjectKey(sheet.sharedProjectKey || '')
+        : '';
       normalized.push({
         id: uniqueId,
         fileName,
@@ -11003,8 +11013,27 @@
     } else {
       renderOpenProjectTabs();
     }
+    let savedClosedTabsState = true;
+    if (openProjectTabs.length && activeOpenProjectTabId && AUTOSAVE_SUPPORTED) {
+      try {
+        savedClosedTabsState = await writeAutosaveSnapshot(true);
+      } catch (error) {
+        console.warn('Failed to save project tabs after closing tab', error);
+        savedClosedTabsState = false;
+      }
+    }
+    if (!savedClosedTabsState) {
+      updateAutosaveStatus(
+        localizeText(
+          'シートを閉じましたが、削除後のタブ状態を保存できませんでした',
+          'Closed sheet, but could not save the updated tab state'
+        ),
+        'error'
+      );
+      return false;
+    }
     updateAutosaveStatus(
-      localizeText('シートを閉じました（端末内保存は保持）', 'Closed sheet (local save kept)'),
+      localizeText('シートを閉じました', 'Closed sheet'),
       'info'
     );
     return true;
@@ -27962,8 +27991,12 @@
   } = {}) {
     const sheets = Array.isArray(parsedDocument?.sheets) ? parsedDocument.sheets : [];
     const normalizedProjectId = normalizeAutosaveProjectId(projectId || autosaveProjectId || '') || createAutosaveProjectId();
-    const normalizedSharedProjectKey = normalizeMultiProjectKey(sharedProjectKey || '')
-      || getSharedProjectKeyFromProjectId(normalizedProjectId);
+    const normalizedSharedProjectKey = SHARED_PROJECTS_ENABLED
+      ? (
+        normalizeMultiProjectKey(sharedProjectKey || '')
+        || getSharedProjectKeyFromProjectId(normalizedProjectId)
+      )
+      : '';
     if (!sheets.length) {
       resetOpenProjectTabsToCurrentProject({
         source,
@@ -27986,14 +28019,16 @@
           ? sheet.label.trim()
           : localizeText(`シート ${index + 1}`, `Sheet ${index + 1}`),
         source: sheet.source || source,
-        sharedProjectKey: sheet.sharedProjectKey || normalizedSharedProjectKey,
-        sharedProjectBackendId: sheet.sharedProjectBackendId || sharedProjectBackendId,
-        sharedProjectRevision: sheet.sharedProjectRevision || sharedProjectRevision,
-        sharedProjectStructureRevision: sheet.sharedProjectStructureRevision || sharedProjectStructureRevision,
-        sharedRoleHint: sheet.sharedRoleHint || sharedRoleHint,
-        sharedAutoJoin: Object.prototype.hasOwnProperty.call(sheet, 'sharedAutoJoin')
-          ? sheet.sharedAutoJoin
-          : sharedAutoJoin,
+        sharedProjectKey: SHARED_PROJECTS_ENABLED ? (sheet.sharedProjectKey || normalizedSharedProjectKey) : '',
+        sharedProjectBackendId: SHARED_PROJECTS_ENABLED ? (sheet.sharedProjectBackendId || sharedProjectBackendId) : '',
+        sharedProjectRevision: SHARED_PROJECTS_ENABLED ? (sheet.sharedProjectRevision || sharedProjectRevision) : 0,
+        sharedProjectStructureRevision: SHARED_PROJECTS_ENABLED ? (sheet.sharedProjectStructureRevision || sharedProjectStructureRevision) : 0,
+        sharedRoleHint: SHARED_PROJECTS_ENABLED ? (sheet.sharedRoleHint || sharedRoleHint) : '',
+        sharedAutoJoin: SHARED_PROJECTS_ENABLED && (
+          Object.prototype.hasOwnProperty.call(sheet, 'sharedAutoJoin')
+            ? sheet.sharedAutoJoin
+            : sharedAutoJoin
+        ),
       }))
       .filter(Boolean);
     if (!nextTabs.length) {
@@ -31538,7 +31573,7 @@
         || project?.document?.documentName
         || DEFAULT_DOCUMENT_NAME
       );
-      const sheetSharedProjectKey = getOpenProjectTabSharedKey(tab);
+      const sheetSharedProjectKey = SHARED_PROJECTS_ENABLED ? getOpenProjectTabSharedKey(tab) : '';
       sheets.push({
         id: tab?.id || createOpenProjectTabId(),
         fileName,
