@@ -7459,9 +7459,12 @@
       viewportZoomRatio = value;
     },
     getViewportVisibilityTargetSurface,
+    getProjectCanvasCount,
+    getProjectCanvasDocumentAt,
     getProjectCanvasDocumentById,
     getActiveProjectCanvasDocument,
     getMainCanvasViewportElement,
+    isMultiCanvasWorldLayoutActive,
     clamp,
   }) || {};
   const {
