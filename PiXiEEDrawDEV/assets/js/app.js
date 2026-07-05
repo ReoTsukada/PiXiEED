@@ -5912,6 +5912,8 @@
   set accountState(value) { accountState = value; },
   get activateMobileTab() { return activateMobileTab; },
   set activateMobileTab(value) { activateMobileTab = value; },
+  get attemptExportDirectoryReauthorization() { return attemptExportDirectoryReauthorization; },
+  set attemptExportDirectoryReauthorization(value) { attemptExportDirectoryReauthorization = value; },
   get canUseSessionStorage() { return canUseSessionStorage; },
   set canUseSessionStorage(value) { canUseSessionStorage = value; },
   get dom() { return dom; },
