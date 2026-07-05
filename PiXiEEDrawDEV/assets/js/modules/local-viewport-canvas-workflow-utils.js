@@ -1332,7 +1332,13 @@
     const previousSurface = activeCanvasSurface;
     const previousId = projectCanvasStore.activeCanvasId;
     const changed = previousId !== targetCanvas.id;
-    if (changed && previousSurface && previousCanvas) {
+    if (!changed) {
+      if (syncUi) {
+        syncMultiCanvasSelectionUi();
+      }
+      return false;
+    }
+    if (previousSurface && previousCanvas) {
       syncStateToProjectCanvasDocument(previousCanvas);
       markProjectCanvasSurfaceRendered(previousSurface, previousCanvas);
     }
@@ -1348,11 +1354,9 @@
       localViewportCanvasState
     );
     bindActiveCanvasSurface(getProjectCanvasSurfaceForIndex(index) || mainViewportCanvasSurface);
-    if (changed) {
-      invalidateFillPreviewCache();
-      invalidateOnionSkinCache();
-      clearPlaybackFrameCache();
-    }
+    invalidateFillPreviewCache();
+    invalidateOnionSkinCache();
+    clearPlaybackFrameCache();
     if (syncUi) {
       pendingProjectCanvasUiSync = false;
       resizeCanvases({
