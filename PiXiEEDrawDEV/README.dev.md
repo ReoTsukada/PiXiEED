@@ -1,4 +1,4 @@
-# PiXiEEDDraw.dev
+# PiXiEEDrawDEV
 
 This directory is a local development workspace for continuing the PiXiEEDraw file-split work.
 

@@ -551,11 +551,7 @@
     if (!requireLogin) {
       return true;
     }
-    await ensurePixieedAccountReady({
-      forceRefresh: !(accountState.isLoggedIn && accountState.userId && !accountState.isAnonymous),
-      silent: true,
-      allowAnonymous: false,
-    });
+    await ensurePixieedAccountReady({ forceRefresh: true, silent: true, allowAnonymous: false });
     if (accountState.isLoggedIn && accountState.userId && !accountState.isAnonymous) {
       return true;
     }
@@ -784,22 +780,6 @@
   }
 
   function updatePixieedShareAccountCard(statusNode, hintNode, loginAnchor) {
-    if (!SHARED_PROJECTS_ENABLED) {
-      if (statusNode instanceof HTMLElement) {
-        statusNode.textContent = localizeText('シェアプロジェクト停止中', 'Shared projects unavailable');
-      }
-      if (hintNode instanceof HTMLElement) {
-        hintNode.textContent = localizeText(
-          'シェアプロジェクトは只今ご利用いただけません。',
-          'Shared projects are currently unavailable.'
-        );
-      }
-      if (loginAnchor instanceof HTMLAnchorElement) {
-        loginAnchor.hidden = true;
-        loginAnchor.setAttribute('aria-hidden', 'true');
-      }
-      return;
-    }
     const nickname = readPixieedAccountNickname();
     const isSignedInAccount = accountState.isLoggedIn && !accountState.isAnonymous;
     const canUseSharedAccount = canUseSharedProjectsBackend() || supportsSharedProjectsBackend;
@@ -828,19 +808,24 @@
     }
     if (hintNode instanceof HTMLElement) {
       if (isSignedInAccount) {
-        hintNode.textContent = localizeText(
-          `このアカウントで共有プロジェクトを最大${maxSharedProjects}件、共同編集最大4人、マルチキャンバス追加3つまで利用できます。`,
-          `This account can create up to ${maxSharedProjects} shared projects, edit with up to 4 people, and add up to 3 Multi Canvases.`
-        );
+        hintNode.textContent = maxSharedProjects > SHARED_PROJECT_LIMIT_DEFAULT
+          ? localizeText(
+            `サポーター特典（500円）が適用中です。このアカウントで共有プロジェクトを最大${maxSharedProjects}件、共同編集最大4人、マルチキャンバス追加3つまで利用できます。`,
+            `Supporter benefits (500 yen) are active. This account can create up to ${maxSharedProjects} shared projects, edit with up to 4 people, and add up to 3 Multi Canvases.`
+          )
+          : localizeText(
+            'このアカウントで共有プロジェクトを1件作成できます。サポーター特典（500円）で4件、共同編集最大4人、マルチキャンバス追加3つまで拡張できます。',
+            'This account can create 1 shared project. Supporter benefits (500 yen) expand this to 4 projects, shared editing for up to 4 people, and up to 3 extra Multi Canvases.'
+          );
       } else if (canUseSharedAccount) {
         hintNode.textContent = localizeText(
-          'ログインすると共有プロジェクトを作成できます。マルチキャンバスはログインなしで利用できます。',
-          'Sign in to create shared projects. Multi Canvas is available without sign-in.'
+          'ログインすると共有プロジェクトを1件作成できます。サポーター特典（500円）で4件、共同編集最大4人まで拡張できます。',
+          'Sign in to create 1 shared project. Supporter benefits (500 yen) expand this to 4 projects and shared editing for up to 4 people.'
         );
       } else {
         hintNode.textContent = localizeText(
-          '共有プロジェクトの作成とコード参加にはログインが必要です。マルチキャンバスはログインなしで利用できます。',
-          'Sign-in is required to create shared projects and join by code. Multi Canvas is available without sign-in.'
+          '共有プロジェクトの作成とコード参加にはログインが必要です。サポーター特典は500円で共有枠と共同編集人数を拡張できます。',
+          'Sign-in is required to create shared projects and join by code. Supporter benefits are 500 yen and expand shared slots and member limits.'
         );
       }
     }
@@ -877,15 +862,16 @@
       dom.controls.multiFlowAccountLogin
     );
     if (dom.controls.projectHomeJoinProjectKey instanceof HTMLInputElement) {
-      dom.controls.projectHomeJoinProjectKey.disabled = true;
-      dom.controls.projectHomeJoinProjectKey.placeholder = localizeText('コード適用は停止中です', 'Code application disabled');
+      dom.controls.projectHomeJoinProjectKey.disabled = !isSignedInAccount;
+      dom.controls.projectHomeJoinProjectKey.placeholder = isSignedInAccount
+        ? localizeText('参加コードを入力', 'Enter join code')
+        : localizeText('ログインしてください', 'Please sign in');
     }
     if (dom.controls.projectHomeApplyAccessCode instanceof HTMLButtonElement) {
-      dom.controls.projectHomeApplyAccessCode.disabled = true;
+      dom.controls.projectHomeApplyAccessCode.disabled = !isSignedInAccount;
     }
     if (dom.controls.projectHomeJoinShared instanceof HTMLElement) {
-      dom.controls.projectHomeJoinShared.hidden = true;
-      dom.controls.projectHomeJoinShared.setAttribute('aria-hidden', 'true');
+      dom.controls.projectHomeJoinShared.hidden = false;
     }
     if (detailAccountActionLabel instanceof HTMLElement) {
       detailAccountActionLabel.textContent = isSignedInAccount
@@ -974,7 +960,7 @@
               return;
             }
             enforceSharedProjectOwnershipLimit().catch(error => {
-              console.warn('Failed to enforce shared project limit after entitlement update', error);
+              console.warn('Failed to enforce shared project limit after ad-free update', error);
             });
           });
         }

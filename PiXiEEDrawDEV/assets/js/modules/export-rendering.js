@@ -1553,10 +1553,6 @@
     const toggle = dom.exportDialog?.contestPostToggle;
     const mode = normalizeExportFormat(dom.exportDialog?.format?.value || 'png');
     if (!(toggle instanceof HTMLInputElement)) {
-      if (exportContestPostAfterSave) {
-        exportContestPostAfterSave = false;
-        scheduleSessionPersist({ includeSnapshots: false });
-      }
       return;
     }
     const canOffer = canOfferContestPostAfterSave(mode);

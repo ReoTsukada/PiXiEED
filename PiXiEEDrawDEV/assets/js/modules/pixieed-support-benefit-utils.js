@@ -32,11 +32,22 @@
     return ((scope) => {
       with (scope) {
   function hasPixieedrawAdFreeSupport() {
-    return true;
+    if (window.__PIXIEED_ADS_DISABLED__) {
+      return true;
+    }
+    const adFreeState = window.pixieedAdFree?.state || null;
+    if (!adFreeState || adFreeState.isActive !== true) {
+      return false;
+    }
+    const entitlements = adFreeState.activeEntitlements;
+    if (!entitlements || typeof entitlements !== 'object') {
+      return true;
+    }
+    return Boolean(entitlements.pixiedraw_ad_free || entitlements.browser_ad_free);
   }
 
   function hasPixieedrawMultiCanvasSupport() {
-    return true;
+    return hasPixieedrawAdFreeSupport();
   }
 
   function hasPixieedrawSignedInAccount() {
@@ -44,7 +55,13 @@
   }
 
   function getLocalViewportCanvasAccountLimit() {
-    return LOCAL_VIEWPORT_CANVAS_STANDARD_MAX_COUNT;
+    if (hasPixieedrawMultiCanvasSupport()) {
+      return LOCAL_VIEWPORT_CANVAS_STANDARD_MAX_COUNT;
+    }
+    if (hasPixieedrawSignedInAccount()) {
+      return LOCAL_VIEWPORT_CANVAS_SIGNED_IN_MAX_COUNT;
+    }
+    return 0;
   }
 
   function getSharedProjectMemberLimitForCurrentPlan() {
@@ -77,9 +94,29 @@
   }
 
   function buildPixieedSupportStatusText(adFreeState = getPixieedAdFreeStateSnapshot()) {
+    const { ownedProjectCount, effectiveLimit } = getSharedProjectOwnershipStatus();
+    const usageLabel = buildSharedProjectUsageLabel({ ownedProjectCount, effectiveLimit });
+    const supporterUsageLabel = buildSharedProjectUsageLabel({
+      ownedProjectCount,
+      effectiveLimit: SHARED_PROJECT_LIMIT_AD_FREE,
+    });
+    const memberLimit = getSharedProjectMemberLimitForCurrentPlan();
+    if (adFreeState?.isActive === true || hasPixieedrawAdFreeSupport()) {
+      const days = getPixieedAdFreeRemainingDays(adFreeState);
+      if (days === null) {
+        return localizeText(
+          `サポーター特典（500円）が適用中です。広告非表示、共有プロジェクト作成枠 ${usageLabel}、共同編集最大 ${memberLimit} 人、マルチキャンバスは追加3つ（メイン含め最大4つ）まで利用できます。`,
+          `Supporter benefits (500 yen) are active. Ads are hidden, shared project slots are ${usageLabel}, shared editing supports up to ${memberLimit} people, and Multi Canvas supports 3 extra canvases (4 total including the main canvas).`
+        );
+      }
+      return localizeText(
+        `サポーター特典（500円）が適用中です。広告非表示、共有プロジェクト作成枠 ${usageLabel}、共同編集最大 ${memberLimit} 人、マルチキャンバス追加3つまで利用できます。残り ${days} 日です。`,
+        `Supporter benefits (500 yen) are active. Ads are hidden, shared project slots are ${usageLabel}, shared editing supports up to ${memberLimit} people, and Multi Canvas supports 3 extra canvases. ${days} days remaining.`
+      );
+    }
     return localizeText(
-      '広告非表示が有効です。',
-      'Ads are hidden.'
+      `通常ログインでは共有プロジェクト1件、共同編集最大2人、マルチキャンバス追加1つまで利用できます。サポーター特典は500円で、共有プロジェクト4件、共同編集最大4人、マルチキャンバス追加3つ、広告非表示になります。サポーター枠 ${supporterUsageLabel}。`,
+      `With a standard signed-in account, you get 1 shared project, shared editing for up to 2 people, and 1 extra Multi Canvas. Supporter benefits are 500 yen and unlock 4 shared projects, shared editing for up to 4 people, 3 extra Multi Canvases, and ad removal. Supporter slots: ${supporterUsageLabel}.`
     );
   }
 
@@ -92,8 +129,11 @@
     if (dom.controls.multiSupportStatus instanceof HTMLElement) {
       dom.controls.multiSupportStatus.textContent = message;
     }
+    const active = adFreeState?.isActive === true || hasPixieedrawAdFreeSupport();
     if (dom.controls.multiSupportPurchase instanceof HTMLElement) {
-      dom.controls.multiSupportPurchase.textContent = localizeText('利用可能', 'Available');
+      dom.controls.multiSupportPurchase.textContent = active
+        ? localizeText('特典を確認', 'View Benefits')
+        : localizeText('サポーター特典を見る', 'View Supporter Benefits');
     }
   }
 

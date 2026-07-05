@@ -57,8 +57,10 @@
       // In multi-canvas mode, keep local panels in the same shared 2D zoom space.
       if (isMultiCanvasWorldLayoutActive()) {
         syncAllProjectCanvasSurfaceDimensions();
-        syncMultiCanvasWorldLayoutDisplayPositions();
+        syncLocalViewportCanvasDockLayout();
         syncMultiCanvasSelectionUi();
+      } else {
+        syncLocalViewportCanvasDockVisibility({ persist: false, render: false });
       }
       updateMirrorGuideHandles();
       updateCanvasResizeHandlePosition();
@@ -162,35 +164,6 @@
     };
   }
 
-  function getViewportWorldZoomFocus(surface, clientX, clientY) {
-    const resolvedSurface = getResolvedCanvasInteractionSurface(surface || getViewportVisibilityTargetSurface());
-    const drawing = resolvedSurface?.drawing instanceof HTMLCanvasElement
-      ? resolvedSurface.drawing
-      : dom.canvases.drawing;
-    const rect = drawing?.getBoundingClientRect?.();
-    if (!rect || rect.width <= 0 || rect.height <= 0) {
-      return null;
-    }
-    const canvasDoc = resolvedSurface?.canvasDoc || getProjectCanvasDocumentById(resolvedSurface?.canvasDocId) || getActiveProjectCanvasDocument();
-    const fallbackScale = getPixelAlignedCanvasDisplayScale(Number(state.scale) || MIN_ZOOM_SCALE);
-    const displayScale = getCanvasSurfaceDrawingDisplayScale(resolvedSurface, canvasDoc, fallbackScale);
-    const scaleX = Math.max(Number(displayScale.x) || fallbackScale, Number.EPSILON);
-    const scaleY = Math.max(Number(displayScale.y) || fallbackScale, Number.EPSILON);
-    const worldX = (clientX - rect.left) / scaleX;
-    const worldY = (clientY - rect.top) / scaleY;
-    return {
-      clientX,
-      clientY,
-      worldX,
-      worldY,
-      cellX: Math.floor(worldX),
-      cellY: Math.floor(worldY),
-      surface: resolvedSurface,
-      canvasDocId: resolvedSurface?.canvasDocId || canvasDoc?.id || '',
-      viewportWorldFocus: true,
-    };
-  }
-
   function getViewportCenterZoomFocus() {
     const viewport = dom.canvasViewport instanceof HTMLElement ? dom.canvasViewport : null;
     const viewportRect = viewport?.getBoundingClientRect?.();
@@ -204,12 +177,6 @@
       surface = getCanvasInteractionSurfaceFromTarget(document.elementFromPoint(centerX, centerY));
     }
     surface = surface || getViewportVisibilityTargetSurface();
-    if (!isMultiCanvasWorldLayoutActive()) {
-      const viewportWorldFocus = getViewportWorldZoomFocus(surface, centerX, centerY);
-      if (viewportWorldFocus) {
-        return viewportWorldFocus;
-      }
-    }
     return getCanvasFocusAt(centerX, centerY, {
       clampToCanvas: true,
       surface,
@@ -288,7 +255,7 @@
     });
     if (multiCanvasWorldLayoutActive) {
       syncAllProjectCanvasSurfaceDimensions();
-      syncMultiCanvasWorldLayoutDisplayPositions();
+      syncLocalViewportCanvasDockLayout();
     }
 
     let anchorCorrectionSurface = null;

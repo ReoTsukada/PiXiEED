@@ -52,29 +52,12 @@
   }
 
   function setLocalViewportCanvasLayoutAnchor(left, top) {
-    const count = Math.max(0, getLocalViewportCanvasCount());
-    const currentScale = getCurrentLocalViewportCanvasLayoutScale();
-    const nextAnchorLeft = parseLocalViewportCanvasUnit((Number(left) || 0) / Math.max(currentScale, Number.EPSILON), 0) || 0;
-    const nextAnchorTop = parseLocalViewportCanvasUnit((Number(top) || 0) / Math.max(currentScale, Number.EPSILON), 0) || 0;
-    const previousAnchorLeft = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorLeft, 0) || 0;
-    const previousAnchorTop = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorTop, 0) || 0;
-    const previousPositions = count > 0
-      ? normalizeLocalViewportCanvasPositions(
-        localViewportCanvasState?.positions,
-        localViewportCanvasState?.positions,
-        count,
-        {
-          relative: true,
-          fallbackRelative: true,
-        }
-      )
-      : [];
     const nextState = normalizeLocalViewportCanvasState(
       {
         ...localViewportCanvasState,
-        layoutScale: 1,
-        anchorLeft: nextAnchorLeft,
-        anchorTop: nextAnchorTop,
+        layoutScale: getCurrentLocalViewportCanvasLayoutScale(),
+        anchorLeft: left,
+        anchorTop: top,
       },
       localViewportCanvasState
     );
@@ -83,35 +66,6 @@
       && nextState.anchorTop === localViewportCanvasState.anchorTop
     ) {
       return false;
-    }
-    if (count > 0) {
-      const nextPositions = previousPositions.map(position => {
-        if (!position || position.left === null || position.top === null) {
-          return position;
-        }
-        const displayLeft = (previousAnchorLeft + position.left) * currentScale;
-        const displayTop = (previousAnchorTop + position.top) * currentScale;
-        return normalizeLocalViewportCanvasPosition(
-          {
-            left: (displayLeft / Math.max(currentScale, Number.EPSILON)) - nextAnchorLeft,
-            top: (displayTop / Math.max(currentScale, Number.EPSILON)) - nextAnchorTop,
-          },
-          position,
-          {
-            relative: true,
-            fallbackRelative: true,
-          }
-        );
-      });
-      nextState.positions = normalizeLocalViewportCanvasPositions(
-        nextPositions,
-        previousPositions,
-        count,
-        {
-          relative: true,
-          fallbackRelative: true,
-        }
-      );
     }
     localViewportCanvasState = nextState;
     localViewportCanvasLayoutResetPending = false;
@@ -132,15 +86,13 @@
   function getDisplayLocalViewportCanvasPosition(index, anchorLeft = 0, anchorTop = 0) {
     const storedPosition = getStoredLocalViewportCanvasPosition(index);
     const currentScale = getCurrentLocalViewportCanvasLayoutScale();
-    const anchorWorldLeft = parseLocalViewportCanvasAxis(anchorLeft, localViewportCanvasState?.anchorLeft) || 0;
-    const anchorWorldTop = parseLocalViewportCanvasAxis(anchorTop, localViewportCanvasState?.anchorTop) || 0;
     return {
       left: storedPosition.left === null
         ? null
-        : Math.round((anchorWorldLeft + storedPosition.left) * currentScale),
+        : Math.round(anchorLeft + (storedPosition.left * currentScale)),
       top: storedPosition.top === null
         ? null
-        : Math.round((anchorWorldTop + storedPosition.top) * currentScale),
+        : Math.round(anchorTop + (storedPosition.top * currentScale)),
     };
   }
 
@@ -162,12 +114,10 @@
     const anchorLeft = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorLeft, 0) || 0;
     const anchorTop = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorTop, 0) || 0;
     const currentScale = getCurrentLocalViewportCanvasLayoutScale();
-    const worldLeft = (Number(left) || 0) / Math.max(currentScale, Number.EPSILON);
-    const worldTop = (Number(top) || 0) / Math.max(currentScale, Number.EPSILON);
     nextPositions[safeIndex] = normalizeLocalViewportCanvasPosition(
       {
-        left: worldLeft - anchorLeft,
-        top: worldTop - anchorTop,
+        left: (Number(left) - anchorLeft) / Math.max(currentScale, Number.EPSILON),
+        top: (Number(top) - anchorTop) / Math.max(currentScale, Number.EPSILON),
       },
       nextPositions[safeIndex],
       {
@@ -178,7 +128,7 @@
     const nextState = normalizeLocalViewportCanvasState(
       {
         ...localViewportCanvasState,
-        layoutScale: 1,
+        layoutScale: getCurrentLocalViewportCanvasLayoutScale(),
         positionsRelative: true,
         positions: nextPositions,
       },
@@ -204,15 +154,8 @@
       return false;
     }
     const defaults = computeDefaultLocalViewportCanvasPositions();
-    const currentScale = getCurrentLocalViewportCanvasLayoutScale();
-    const storedAnchorLeft = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorLeft, null);
-    const storedAnchorTop = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorTop, null);
-    const anchorLeft = storedAnchorLeft === null
-      ? defaults.main.left
-      : Math.round(storedAnchorLeft * currentScale);
-    const anchorTop = storedAnchorTop === null
-      ? defaults.main.top
-      : Math.round(storedAnchorTop * currentScale);
+    const anchorLeft = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorLeft, null) ?? defaults.main.left;
+    const anchorTop = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorTop, null) ?? defaults.main.top;
     const resolvedLayout = computeResolvedMultiCanvasWorldLayoutPositions(anchorLeft, anchorTop);
     setLocalViewportCanvasLayoutAnchor(resolvedLayout.main.left, resolvedLayout.main.top);
     resolvedLayout.locals.forEach((position, index) => {
@@ -231,7 +174,7 @@
       const nextState = normalizeLocalViewportCanvasState(
         {
           ...localViewportCanvasState,
-          layoutScale: 1,
+          layoutScale: getCurrentLocalViewportCanvasLayoutScale(),
           positionsRelative: true,
           anchorLeft: null,
           anchorTop: null,
@@ -262,7 +205,7 @@
     const nextState = normalizeLocalViewportCanvasState(
       {
         ...localViewportCanvasState,
-        layoutScale: 1,
+        layoutScale: getCurrentLocalViewportCanvasLayoutScale(),
         positionsRelative: true,
         anchorLeft: null,
         anchorTop: null,
@@ -589,43 +532,6 @@
     return getPixelAlignedCanvasDisplayScale(
       normalizeProjectCanvasViewScale(state.scale, getProjectCanvasViewScale(canvasDoc, state.scale || 8))
     );
-  }
-
-  function syncStateToProjectCanvasDocument(canvasDoc) {
-    if (!canvasDoc) {
-      return;
-    }
-    const width = Math.max(1, Math.round(Number(state.width) || Number(canvasDoc.width) || 1));
-    const height = Math.max(1, Math.round(Number(state.height) || Number(canvasDoc.height) || 1));
-    canvasDoc.width = width;
-    canvasDoc.height = height;
-    canvasDoc.viewScale = normalizeProjectCanvasViewScale(state.scale, canvasDoc.viewScale || state.scale || 8);
-    canvasDoc.frames = Array.isArray(state.frames) ? state.frames : canvasDoc.frames;
-    canvasDoc.activeFrame = clamp(Math.round(Number(state.activeFrame) || 0), 0, Math.max(0, (canvasDoc.frames?.length || 1) - 1));
-    canvasDoc.activeLayer = state.activeLayer || canvasDoc.activeLayer || null;
-    canvasDoc.mirror = normalizeMirrorAxisState(state.mirror, width, height);
-    canvasDoc.selectionMask = state.selectionMask || null;
-    canvasDoc.selectionContentMask = state.selectionContentMask || null;
-    canvasDoc.selectionBounds = state.selectionBounds ? { ...state.selectionBounds } : null;
-  }
-
-  function syncStateFromProjectCanvasDocument(canvasDoc) {
-    if (!canvasDoc) {
-      return;
-    }
-    const width = Math.max(1, Math.round(Number(canvasDoc.width) || Number(state.width) || 1));
-    const height = Math.max(1, Math.round(Number(canvasDoc.height) || Number(state.height) || 1));
-    const frames = Array.isArray(canvasDoc.frames) && canvasDoc.frames.length ? canvasDoc.frames : state.frames;
-    state.width = width;
-    state.height = height;
-    state.frames = frames;
-    state.activeFrame = clamp(Math.round(Number(canvasDoc.activeFrame) || 0), 0, Math.max(0, (frames?.length || 1) - 1));
-    const activeFrame = frames?.[state.activeFrame] || null;
-    state.activeLayer = canvasDoc.activeLayer || activeFrame?.layers?.[activeFrame.layers.length - 1]?.id || null;
-    state.mirror = normalizeMirrorAxisState(canvasDoc.mirror || state.mirror, width, height);
-    state.selectionMask = canvasDoc.selectionMask || null;
-    state.selectionContentMask = canvasDoc.selectionContentMask || null;
-    state.selectionBounds = canvasDoc.selectionBounds ? { ...canvasDoc.selectionBounds } : null;
   }
 
   function storeProjectCanvasViewScale(canvasDoc, scale = state.scale) {
@@ -989,7 +895,6 @@
     if (panel instanceof HTMLElement) {
       panel.classList.remove('is-moving');
     }
-    document.body.classList.remove('is-canvas-surface-moving');
     const target = canvasSurfacePanelDragState.target;
     if (target instanceof HTMLElement && Number.isFinite(canvasSurfacePanelDragState.pointerId)) {
       try {
@@ -1002,15 +907,6 @@
       canvasSurfacePanelDragState.surfaceKind === 'main'
       || canvasSurfacePanelDragState.surfaceKind === 'local'
     );
-    if (shouldPersist && panel instanceof HTMLElement) {
-      const finalLeft = parseLocalViewportCanvasAxis(panel.style.left, panel.offsetLeft) || 0;
-      const finalTop = parseLocalViewportCanvasAxis(panel.style.top, panel.offsetTop) || 0;
-      if (canvasSurfacePanelDragState.surfaceKind === 'main') {
-        setLocalViewportCanvasLayoutAnchor(finalLeft, finalTop);
-      } else if (canvasSurfacePanelDragState.surfaceKind === 'local') {
-        setLocalViewportCanvasPosition(canvasSurfacePanelDragState.surfaceIndex, finalLeft, finalTop);
-      }
-    }
     canvasSurfacePanelDragState.pointerId = null;
     canvasSurfacePanelDragState.surfaceKind = '';
     canvasSurfacePanelDragState.surfaceIndex = -1;
@@ -1024,10 +920,6 @@
     if (shouldPersist) {
       scheduleSessionPersist({ includeSnapshots: false });
     }
-    syncLocalViewportCanvasDockLayout();
-    updateCanvasResizeHandlePosition();
-    syncCanvasResizeHandleVisibility();
-    scheduleMirrorGuideRefresh();
   }
 
   function beginCanvasSurfacePanelDragInteraction(event, surface) {
@@ -1054,8 +946,6 @@
     canvasSurfacePanelDragState.startClientX = Number(event.clientX) || 0;
     canvasSurfacePanelDragState.startClientY = Number(event.clientY) || 0;
     panel.classList.add('is-moving');
-    document.body.classList.add('is-canvas-surface-moving');
-    scheduleMirrorGuideRefresh();
     try {
       target.setPointerCapture?.(event.pointerId);
     } catch (error) {
@@ -1085,6 +975,8 @@
     panel.style.left = `${nextLeft}px`;
     panel.style.top = `${nextTop}px`;
     if (canvasSurfacePanelDragState.surfaceKind === 'main') {
+      setLocalViewportCanvasLayoutAnchor(nextLeft, nextTop);
+      syncLocalViewportCanvasDockLayout();
       return;
     }
     setLocalViewportCanvasPosition(canvasSurfacePanelDragState.surfaceIndex, nextLeft, nextTop);
@@ -1328,22 +1220,9 @@
     if (!targetCanvas) {
       return false;
     }
-    const previousCanvas = getActiveProjectCanvasDocument();
-    const previousSurface = activeCanvasSurface;
     const previousId = projectCanvasStore.activeCanvasId;
     const changed = previousId !== targetCanvas.id;
-    if (!changed) {
-      if (syncUi) {
-        syncMultiCanvasSelectionUi();
-      }
-      return false;
-    }
-    if (previousSurface && previousCanvas) {
-      syncStateToProjectCanvasDocument(previousCanvas);
-      markProjectCanvasSurfaceRendered(previousSurface, previousCanvas);
-    }
     projectCanvasStore.activeCanvasId = targetCanvas.id;
-    syncStateFromProjectCanvasDocument(targetCanvas);
     localViewportCanvasState = normalizeLocalViewportCanvasState(
       {
         ...localViewportCanvasState,
@@ -1354,9 +1233,11 @@
       localViewportCanvasState
     );
     bindActiveCanvasSurface(getProjectCanvasSurfaceForIndex(index) || mainViewportCanvasSurface);
-    invalidateFillPreviewCache();
-    invalidateOnionSkinCache();
-    clearPlaybackFrameCache();
+    if (changed) {
+      invalidateFillPreviewCache();
+      invalidateOnionSkinCache();
+      clearPlaybackFrameCache();
+    }
     if (syncUi) {
       pendingProjectCanvasUiSync = false;
       resizeCanvases({
@@ -1364,10 +1245,7 @@
         applyTransform: false,
         syncControls: false,
         updateScaleLimits: false,
-        renderLocalViewports: false,
-        syncLocalViewportDock: false,
       });
-      syncAllProjectCanvasSurfaceDimensions();
       renderFrameList();
       renderLayerList();
       syncControlsWithState();
@@ -1396,9 +1274,7 @@
       syncControls: false,
       updateScaleLimits: false,
       renderLocalViewports: false,
-      syncLocalViewportDock: false,
     });
-    syncAllProjectCanvasSurfaceDimensions();
     renderFrameList();
     renderLayerList();
     syncControlsWithState();
@@ -1655,48 +1531,6 @@
     updateCanvasSurfaceGridSvg(surface, canvasDoc, scale);
   }
 
-  function getProjectCanvasSurfaceRenderSignature(canvasDoc) {
-    if (!canvasDoc) {
-      return '';
-    }
-    const frameCount = Array.isArray(canvasDoc.frames) ? canvasDoc.frames.length : 0;
-    const layerCount = Array.isArray(canvasDoc.frames)
-      ? canvasDoc.frames.reduce((total, frame) => total + (Array.isArray(frame?.layers) ? frame.layers.length : 0), 0)
-      : 0;
-    return [
-      canvasDoc.id || '',
-      Math.max(1, Math.round(Number(canvasDoc.width) || 1)),
-      Math.max(1, Math.round(Number(canvasDoc.height) || 1)),
-      getProjectCanvasDisplayScale(canvasDoc),
-      Math.max(0, Math.round(Number(canvasDoc.activeFrame) || 0)),
-      canvasDoc.activeLayer || '',
-      frameCount,
-      layerCount,
-    ].join(':');
-  }
-
-  function markProjectCanvasSurfaceRendered(surface, canvasDoc) {
-    if (!surface || !canvasDoc) {
-      return;
-    }
-    surface.renderSignature = getProjectCanvasSurfaceRenderSignature(canvasDoc);
-  }
-
-  function shouldRenderProjectCanvasSurface(surface, canvasDoc) {
-    if (!surface || !canvasDoc) {
-      return false;
-    }
-    if (!(surface.drawing instanceof HTMLCanvasElement)) {
-      return true;
-    }
-    const width = Math.max(1, Math.round(Number(canvasDoc.width) || 1));
-    const height = Math.max(1, Math.round(Number(canvasDoc.height) || 1));
-    if (surface.drawing.width !== width || surface.drawing.height !== height) {
-      return true;
-    }
-    return surface.renderSignature !== getProjectCanvasSurfaceRenderSignature(canvasDoc);
-  }
-
   function ensureLocalViewportCanvasEntries() {
     const host = dom.localCanvasDock;
     if (!(host instanceof HTMLElement)) {
@@ -1859,29 +1693,14 @@
 
   function computeResolvedMultiCanvasWorldLayoutPositions(anchorLeft = 0, anchorTop = 0) {
     const defaults = computeDefaultLocalViewportCanvasPositions();
-    const currentScale = getCurrentLocalViewportCanvasLayoutScale();
     const occupied = [];
     const mainCanvasDoc = getProjectCanvasDocumentAt(0);
     const mainScale = getProjectCanvasDisplayScale(mainCanvasDoc);
     const mainWidth = Math.max(1, Math.round(Number(mainCanvasDoc?.width) || Number(state.width) || 1)) * mainScale;
     const mainHeight = Math.max(1, Math.round(Number(mainCanvasDoc?.height) || Number(state.height) || 1)) * mainScale;
-    const requestedAnchorLeft = Number(anchorLeft);
-    const requestedAnchorTop = Number(anchorTop);
-    const fallbackAnchorLeft = Number(defaults.main?.left) || 0;
-    const fallbackAnchorTop = Number(defaults.main?.top) || 0;
-    const resolvedMainWorld = {
-      left: parseLocalViewportCanvasUnit(
-        (Number.isFinite(requestedAnchorLeft) ? requestedAnchorLeft : fallbackAnchorLeft) / Math.max(currentScale, Number.EPSILON),
-        0
-      ) || 0,
-      top: parseLocalViewportCanvasUnit(
-        (Number.isFinite(requestedAnchorTop) ? requestedAnchorTop : fallbackAnchorTop) / Math.max(currentScale, Number.EPSILON),
-        0
-      ) || 0,
-    };
     const resolvedMain = {
-      left: Math.round(resolvedMainWorld.left * currentScale),
-      top: Math.round(resolvedMainWorld.top * currentScale),
+      left: Math.round(Number(anchorLeft) || Number(defaults.main?.left) || 0),
+      top: Math.round(Number(anchorTop) || Number(defaults.main?.top) || 0),
     };
     occupied.push({
       left: resolvedMain.left,
@@ -1896,7 +1715,7 @@
       const displayScale = getProjectCanvasDisplayScale(canvasDoc);
       const width = Math.max(1, Math.round(Number(canvasDoc?.width) || Number(state.width) || 1)) * displayScale;
       const height = Math.max(1, Math.round(Number(canvasDoc?.height) || Number(state.height) || 1)) * displayScale;
-      const storedPosition = getDisplayLocalViewportCanvasPosition(index, resolvedMainWorld.left, resolvedMainWorld.top);
+      const storedPosition = getDisplayLocalViewportCanvasPosition(index, resolvedMain.left, resolvedMain.top);
       const defaultPosition = defaults.locals[index] || computeDefaultLocalViewportCanvasWorldPosition(index, resolvedMain.left, resolvedMain.top);
       let nextLeft = storedPosition.left ?? defaultPosition.left ?? resolvedMain.left;
       let nextTop = storedPosition.top ?? defaultPosition.top ?? resolvedMain.top;
@@ -1917,38 +1736,6 @@
       main: resolvedMain,
       locals,
     };
-  }
-
-  function syncMultiCanvasWorldLayoutDisplayPositions() {
-    if (!isMultiCanvasWorldLayoutActive()) {
-      return false;
-    }
-    const mainPanel = mainViewportCanvasSurface?.panel instanceof HTMLElement
-      ? mainViewportCanvasSurface.panel
-      : null;
-    const currentScale = getCurrentLocalViewportCanvasLayoutScale();
-    const fallbackAnchorLeft = parseLocalViewportCanvasAxis(mainPanel?.style.left, mainPanel?.offsetLeft) || 0;
-    const fallbackAnchorTop = parseLocalViewportCanvasAxis(mainPanel?.style.top, mainPanel?.offsetTop) || 0;
-    const anchorWorldLeft = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorLeft, fallbackAnchorLeft / Math.max(currentScale, Number.EPSILON)) || 0;
-    const anchorWorldTop = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorTop, fallbackAnchorTop / Math.max(currentScale, Number.EPSILON)) || 0;
-    const anchorDisplayLeft = Math.round(anchorWorldLeft * currentScale);
-    const anchorDisplayTop = Math.round(anchorWorldTop * currentScale);
-    if (mainPanel) {
-      mainPanel.style.left = `${anchorDisplayLeft}px`;
-      mainPanel.style.top = `${anchorDisplayTop}px`;
-    }
-    localViewportCanvasEntries.forEach((entry, index) => {
-      if (!(entry?.panel instanceof HTMLElement)) {
-        return;
-      }
-      const storedPosition = getStoredLocalViewportCanvasPosition(index);
-      if (storedPosition.left === null || storedPosition.top === null) {
-        return;
-      }
-      entry.panel.style.left = `${Math.round((anchorWorldLeft + storedPosition.left) * currentScale)}px`;
-      entry.panel.style.top = `${Math.round((anchorWorldTop + storedPosition.top) * currentScale)}px`;
-    });
-    return true;
   }
 
   function getViewportPanelZoomFocus(focus, displayScale = getPixelAlignedCanvasDisplayScale(state.scale)) {
@@ -1993,7 +1780,6 @@
     const totalCanvases = Math.max(1, getProjectCanvasCount());
     const multiCanvasWorldLayoutActive = isMultiCanvasWorldLayoutActive();
     const useCenteredMainPanel = isMainCanvasPanelCssCentered();
-    const currentScale = getCurrentLocalViewportCanvasLayoutScale();
     workspace.dataset.localCanvasLayout = totalCanvases > 1 ? 'free' : 'single';
     workspace.style.setProperty('--workspace-canvas-columns', '1');
     workspace.style.setProperty('--workspace-canvas-rows', '1');
@@ -2001,36 +1787,34 @@
       const shouldReset = Boolean(localViewportCanvasLayoutResetPending);
       const resolvedLayout = shouldReset
         ? computeResolvedMultiCanvasWorldLayoutPositions(
-          Math.round((parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorLeft, null) ?? 0) * currentScale),
-          Math.round((parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorTop, null) ?? 0) * currentScale)
+          parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorLeft, null) ?? 0,
+          parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorTop, null) ?? 0
         )
         : null;
       const defaults = resolvedLayout || computeDefaultLocalViewportCanvasPositions();
       const storedAnchorLeft = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorLeft, null);
       const storedAnchorTop = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorTop, null);
-      const anchorDisplayLeft = shouldReset
+      const anchorLeft = shouldReset
         ? resolvedLayout.main.left
-        : (storedAnchorLeft === null ? defaults.main.left : Math.round(storedAnchorLeft * currentScale));
-      const anchorDisplayTop = shouldReset
+        : (storedAnchorLeft ?? defaults.main.left);
+      const anchorTop = shouldReset
         ? resolvedLayout.main.top
-        : (storedAnchorTop === null ? defaults.main.top : Math.round(storedAnchorTop * currentScale));
-      const anchorWorldLeft = anchorDisplayLeft / Math.max(currentScale, Number.EPSILON);
-      const anchorWorldTop = anchorDisplayTop / Math.max(currentScale, Number.EPSILON);
+        : (storedAnchorTop ?? defaults.main.top);
       if (mainPanel) {
-        mainPanel.style.left = `${anchorDisplayLeft}px`;
-        mainPanel.style.top = `${anchorDisplayTop}px`;
+        mainPanel.style.left = `${anchorLeft}px`;
+        mainPanel.style.top = `${anchorTop}px`;
       }
-      setLocalViewportCanvasLayoutAnchor(anchorDisplayLeft, anchorDisplayTop);
+      setLocalViewportCanvasLayoutAnchor(anchorLeft, anchorTop);
       localViewportCanvasEntries.forEach((entry, index) => {
         if (!(entry.panel instanceof HTMLElement)) {
           return;
         }
         const storedPosition = shouldReset
           ? { left: null, top: null }
-          : getDisplayLocalViewportCanvasPosition(index, anchorWorldLeft, anchorWorldTop);
+          : getDisplayLocalViewportCanvasPosition(index, anchorLeft, anchorTop);
         const defaultPosition = shouldReset
-          ? (resolvedLayout.locals[index] || computeDefaultLocalViewportCanvasWorldPosition(index, anchorDisplayLeft, anchorDisplayTop))
-          : (defaults.locals[index] || computeDefaultLocalViewportCanvasWorldPosition(index, anchorDisplayLeft, anchorDisplayTop));
+          ? (resolvedLayout.locals[index] || computeDefaultLocalViewportCanvasWorldPosition(index, anchorLeft, anchorTop))
+          : (defaults.locals[index] || computeDefaultLocalViewportCanvasWorldPosition(index, anchorLeft, anchorTop));
         const left = storedPosition.left ?? defaultPosition.left;
         const top = storedPosition.top ?? defaultPosition.top;
         entry.panel.style.left = `${left}px`;
@@ -2046,14 +1830,8 @@
     const shouldReset = Boolean(localViewportCanvasLayoutResetPending);
     const storedAnchorLeft = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorLeft, null);
     const storedAnchorTop = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorTop, null);
-    const anchorLeft = shouldReset
-      ? defaults.main.left
-      : (storedAnchorLeft === null ? defaults.main.left : Math.round(storedAnchorLeft * currentScale));
-    const anchorTop = shouldReset
-      ? defaults.main.top
-      : (storedAnchorTop === null ? defaults.main.top : Math.round(storedAnchorTop * currentScale));
-    const anchorWorldLeft = anchorLeft / Math.max(currentScale, Number.EPSILON);
-    const anchorWorldTop = anchorTop / Math.max(currentScale, Number.EPSILON);
+    const anchorLeft = shouldReset ? defaults.main.left : (storedAnchorLeft ?? defaults.main.left);
+    const anchorTop = shouldReset ? defaults.main.top : (storedAnchorTop ?? defaults.main.top);
     if (mainPanel) {
       mainPanel.style.left = useCenteredMainPanel ? '0px' : `${anchorLeft}px`;
       mainPanel.style.top = useCenteredMainPanel ? '0px' : `${anchorTop}px`;
@@ -2068,7 +1846,7 @@
       }
       const storedPosition = shouldReset
         ? { left: null, top: null }
-        : getDisplayLocalViewportCanvasPosition(index, anchorWorldLeft, anchorWorldTop);
+        : getDisplayLocalViewportCanvasPosition(index, anchorLeft, anchorTop);
       const defaultPosition = {
         left: parseLocalViewportCanvasAxis(defaults.locals[index]?.left, null),
         top: parseLocalViewportCanvasAxis(defaults.locals[index]?.top, null),
@@ -2253,7 +2031,6 @@
     }
     surface.drawingCtx.clearRect(0, 0, canvasDoc.width, canvasDoc.height);
     surface.drawingCtx.putImageData(resolvedImage, 0, 0);
-    markProjectCanvasSurfaceRendered(surface, canvasDoc);
   }
 
   function renderVoxelExtensionPreviewSurfaceNow({ updateViewport = false } = {}) {
@@ -2292,10 +2069,6 @@
     getProjectCanvasSurfaceEntries().forEach((surface, index) => {
       const canvasDoc = documents[index] || null;
       if (!canvasDoc || surface === activeCanvasSurface) {
-        return;
-      }
-      if (!shouldRenderProjectCanvasSurface(surface, canvasDoc)) {
-        syncProjectCanvasSurfaceDimensions(surface, canvasDoc);
         return;
       }
       renderProjectCanvasSurface(surface, canvasDoc);
@@ -2528,8 +2301,8 @@
             'Sign in to add 1 multi canvas.'
           )
           : localizeText(
-            'マルチキャンバスは3つまで追加できます。',
-            'You can add up to 3 multi canvases.'
+            'マルチキャンバスはサポーターになると3つまで追加できます。',
+            'Supporters can add up to 3 multi canvases.'
           ),
         'info'
       );
@@ -2791,7 +2564,6 @@
     computeDefaultLocalViewportCanvasWorldPosition,
     rectsOverlapWithGap,
     computeResolvedMultiCanvasWorldLayoutPositions,
-    syncMultiCanvasWorldLayoutDisplayPositions,
     getViewportPanelZoomFocus,
     syncLocalViewportCanvasDockLayout,
     buildProjectCanvasImageData,

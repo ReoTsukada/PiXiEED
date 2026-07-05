@@ -1,6 +1,6 @@
-# PiXiEEDDraw.dev split guardrails
+# PiXiEEDrawDEV split guardrails
 
-This note exists to reduce breakage while moving `PiXiEEDDraw.dev/assets/js/app.js` into modules.
+This note exists to reduce breakage while moving `PiXiEEDrawDEV/assets/js/app.js` into modules.
 
 ## 1. Classify every outside dependency before moving code
 
@@ -35,20 +35,20 @@ For each target function block, list every outside identifier and put it into on
 
 ## 3. Before deleting code from app.js
 
-- Run `rg -n "<moved_identifier>" PiXiEEDDraw.dev/assets/js/app.js`
+- Run `rg -n "<moved_identifier>" PiXiEEDrawDEV/assets/js/app.js`
 - Confirm the remaining references are either:
   - the new destructured import from the module, or
   - intentional direct access to an exported singleton / bridge object
 
 ## 4. After wiring the module
 
-- `node --check PiXiEEDDraw.dev/assets/js/app.js`
-- `node --check PiXiEEDDraw.dev/assets/js/modules/<new-module>.js`
+- `node --check PiXiEEDrawDEV/assets/js/app.js`
+- `node --check PiXiEEDrawDEV/assets/js/modules/<new-module>.js`
 - `node scripts/check-pixiedraw-dev-tdz.mjs`
 - If the module owns mutable state or injected constants, run a focused Node `vm` smoke test
 - Bump both:
   - `APP_BUILD_VERSION`
-  - the `?v=` query string in `PiXiEEDDraw.dev/index.html`
+  - the `?v=` query string in `PiXiEEDrawDEV/index.html`
 
 ## 5. Known failure patterns already hit
 

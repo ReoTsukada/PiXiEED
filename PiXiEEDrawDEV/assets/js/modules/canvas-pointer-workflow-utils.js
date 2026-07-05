@@ -930,6 +930,7 @@
           return;
         }
         const baselineCentroid = pointerState.touchPanStart;
+        const baselinePan = pointerState.panOrigin || { x: state.pan.x, y: state.pan.y };
         const dx = centroid.x - baselineCentroid.x;
         const dy = centroid.y - baselineCentroid.y;
         const movementAnalysis = getTouchGestureMovementAnalysis();
@@ -975,8 +976,12 @@
           );
         }
 
-        if (!pointerState.touchGestureMode && (panGestureActive || pinchGestureActive)) {
-          pointerState.touchGestureMode = 'transform';
+        if (!pointerState.touchGestureMode) {
+          if (panGestureActive) {
+            pointerState.touchGestureMode = 'pan';
+          } else if (pinchGestureActive) {
+            pointerState.touchGestureMode = 'pinch';
+          }
         }
 
         if (!pointerState.touchGestureMode) {
@@ -985,23 +990,22 @@
           return;
         }
 
-        if (pinchGestureActive) {
+        if (pointerState.touchGestureMode === 'pinch') {
           if (pinchFocus) {
             pointerState.touchPinchFocus = pinchFocus;
           }
           if (Math.abs(pinchTargetScale - (Number(state.scale) || MIN_ZOOM_SCALE)) >= ZOOM_EPSILON) {
             setZoom(pinchTargetScale, pinchFocus || undefined);
           }
+          return;
         }
-        if (panGestureActive || !pinchGestureActive) {
-          state.pan.x = Math.round((Number(state.pan.x) || 0) + dx);
-          state.pan.y = Math.round((Number(state.pan.y) || 0) + dy);
-        }
+        state.pan.x = Math.round((baselinePan.x || 0) + dx);
+        state.pan.y = Math.round((baselinePan.y || 0) + dy);
         markViewportInteractionActivity();
         const clampResult = applyViewportTransform();
-        refreshTouchPanBaseline({
-          resetPinchFocus: Boolean(clampResult?.clampedX || clampResult?.clampedY || pinchGestureActive),
-        });
+        if (clampResult?.clampedX || clampResult?.clampedY) {
+          refreshTouchPanBaseline({ resetPinchFocus: false });
+        }
         return;
       }
       if (event.pointerId !== pointerState.pointerId) return;

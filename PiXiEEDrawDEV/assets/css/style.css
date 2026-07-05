@@ -3538,10 +3538,6 @@ body.is-startup-active #virtualCursorCanvas {
   pointer-events: none;
 }
 
-body.is-canvas-surface-moving .mirror-guides {
-  display: none;
-}
-
 .mirror-guide {
   position: absolute;
   left: 0;
@@ -5562,6 +5558,13 @@ body:not(.show-inline-guides) .ui-guide-text {
   border: 1px solid rgba(var(--ui-rgb), 0.16);
   background: rgba(7, 11, 17, 0.9);
   clip-path: none;
+}
+
+@media (max-width: 680px) {
+  .toggle-list,
+  .mirror-axis-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .mirror-tool-popover {
@@ -12539,6 +12542,11 @@ body.is-mobile-layout .panel-ad-mount[hidden] {
 }
 
 @media (max-width: 420px) and (orientation: portrait) {
+  .toggle-list,
+  .mirror-axis-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   #panelSettings .settings-size-controls {
     gap: 4px;
   }

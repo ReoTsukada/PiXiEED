@@ -498,7 +498,6 @@
   }
 
   function renderRecentProjectsList(entries) {
-    const hasEntries = Array.isArray(entries) && entries.length > 0;
     const targets = [
       {
         section: dom.startup?.recentSection,
@@ -518,34 +517,24 @@
     if (!targets.length) {
       return;
     }
-    const renderProjectHomeEmptyState = target => {
-      const titleNode = target.section.querySelector(target.titleSelector);
-      if (titleNode instanceof HTMLElement) {
-        titleNode.textContent = target.title;
-      }
+    targets.forEach(target => {
       target.list.innerHTML = '';
-      const empty = document.createElement('p');
-      empty.className = 'startup-recent-list__empty';
-      empty.textContent = localizeText(
-        'まだプロジェクトがありません。',
-        'No projects yet.'
-      );
-      target.list.appendChild(empty);
-      target.section.hidden = false;
-    };
-    if (!AUTOSAVE_SUPPORTED || !hasEntries) {
+    });
+    if (!AUTOSAVE_SUPPORTED || !entries || entries.length === 0) {
       targets.forEach(target => {
-        if (target.list === dom.projectHomeRecentList) {
-          if (
-            !hasEntries
-            && recentProjectsCache instanceof Map
-            && recentProjectsCache.size > 0
-            && target.list.children.length > 0
-          ) {
-            target.section.hidden = false;
-            return;
+        if (target.list === dom.projectHomeRecentList && AUTOSAVE_SUPPORTED) {
+          const titleNode = target.section.querySelector(target.titleSelector);
+          if (titleNode instanceof HTMLElement) {
+            titleNode.textContent = target.title;
           }
-          renderProjectHomeEmptyState(target);
+          const empty = document.createElement('p');
+          empty.className = 'startup-recent-list__empty';
+          empty.textContent = localizeText(
+            'まだプロジェクトがありません。',
+            'No projects yet.'
+          );
+          target.list.appendChild(empty);
+          target.section.hidden = false;
           return;
         }
         target.section.hidden = true;
@@ -560,9 +549,6 @@
         titleNode.textContent = target.title;
       }
       target.section.hidden = false;
-    });
-    targets.forEach(target => {
-      target.list.innerHTML = '';
     });
     const createRecentProjectCard = entry => {
       if (!entry || !entry.id) {
@@ -653,42 +639,6 @@
       card.appendChild(deleteButton);
       return card;
     };
-    const createProjectHomeAdCard = () => {
-      if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) {
-        return null;
-      }
-      const card = document.createElement('article');
-      card.className = 'startup-recent-card startup-recent-card--ad';
-      card.setAttribute('role', 'listitem');
-      card.setAttribute('aria-label', localizeText('広告', 'Ad'));
-      const frame = document.createElement('div');
-      frame.className = 'startup-recent-card__open startup-recent-card__open--ad';
-      const kindBadge = document.createElement('span');
-      kindBadge.className = 'startup-recent-card__kind';
-      kindBadge.textContent = localizeText('広告', 'Ad');
-      const thumb = document.createElement('div');
-      thumb.className = 'startup-recent-card__thumb startup-recent-card__thumb--ad';
-      const ad = document.createElement('ins');
-      ad.className = 'startup-recent-card__ad-ins';
-      ad.setAttribute('data-ad-client', 'ca-pub-9801602250480253');
-      ad.setAttribute('data-ad-format', 'auto');
-      ad.setAttribute('data-ad-slot', '2141591954');
-      ad.setAttribute('data-full-width-responsive', 'true');
-      ad.style.display = 'block';
-      thumb.appendChild(ad);
-      const nameNode = document.createElement('span');
-      nameNode.className = 'startup-recent-card__name';
-      nameNode.textContent = localizeText('広告', 'Ad');
-      const metaNode = document.createElement('span');
-      metaNode.className = 'startup-recent-card__meta';
-      metaNode.textContent = localizeText('PiXiEEDを支援', 'Supports PiXiEED');
-      frame.appendChild(kindBadge);
-      frame.appendChild(thumb);
-      frame.appendChild(nameNode);
-      frame.appendChild(metaNode);
-      card.appendChild(frame);
-      return card;
-    };
     entries.forEach(entry => {
       targets.forEach(target => {
         const card = createRecentProjectCard(entry);
@@ -697,18 +647,9 @@
         }
       });
     });
-    targets.forEach(target => {
-      if (target.list !== dom.projectHomeRecentList) {
-        return;
-      }
-      const adCard = createProjectHomeAdCard();
-      if (adCard) {
-        target.list.appendChild(adCard);
-      }
-    });
     updatePixieedAccountUi();
     syncPixieedSupportBenefitUi();
-    if (startupVisible || projectHomeVisible) {
+    if (startupVisible) {
       window.requestAnimationFrame(() => {
         queueStartupRecentAdRender();
       });
@@ -766,10 +707,11 @@
           list.innerHTML = '';
         }
       });
-      if (dom.startup?.recentSection instanceof HTMLElement) {
-        dom.startup.recentSection.hidden = true;
-      }
-      renderRecentProjectsList([]);
+      [dom.startup?.recentSection, dom.projectHomeRecentSection].forEach(section => {
+        if (section instanceof HTMLElement) {
+          section.hidden = true;
+        }
+      });
       return;
     }
     if (options?.syncSharedFromAccount !== false) {

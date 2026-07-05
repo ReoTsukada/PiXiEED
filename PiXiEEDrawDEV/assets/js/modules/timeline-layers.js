@@ -537,23 +537,6 @@
     return false;
   }
 
-  function settlePendingHistoryBeforeTimelineStructureChange() {
-    if (pointerState.active) {
-      setMultiStatus(
-        localizeText(
-          '現在の描画を確定してからフレーム/レイヤーを変更してください。',
-          'Finish the current stroke before changing frames or layers.'
-        ),
-        'warn'
-      );
-      return false;
-    }
-    if (history.pending) {
-      commitHistory();
-    }
-    return !history.pending;
-  }
-
   function duplicateSelectedTimelineFrames() {
     const selectedFrameIndexes = getTimelineSelectedFrameIndexes();
     if (!selectedFrameIndexes.length) {
@@ -585,9 +568,6 @@
         return frame;
       });
     if (!duplicatedFrames.length) {
-      return false;
-    }
-    if (!settlePendingHistoryBeforeTimelineStructureChange()) {
       return false;
     }
     beginHistory('duplicateFrame');
@@ -1138,9 +1118,6 @@
       }
       const activeFrame = getActiveFrame();
       if (!activeFrame) return;
-      if (!settlePendingHistoryBeforeTimelineStructureChange()) {
-        return;
-      }
       clearTimelineSelection();
       beginHistory('addLayer');
       const insertIndex = clamp(getActiveLayerIndex() + 1, 0, Number.MAX_SAFE_INTEGER);
@@ -1172,9 +1149,6 @@
       }
       const activeFrame = getActiveFrame();
       if (!activeFrame) return;
-      if (!settlePendingHistoryBeforeTimelineStructureChange()) {
-        return;
-      }
       clearTimelineSelection();
       beginHistory('addSimulationLayer');
       const insertIndex = clamp(getActiveLayerIndex() + 1, 0, Number.MAX_SAFE_INTEGER);
@@ -1216,9 +1190,6 @@
         }
       });
       if (!canNormalizeMultiAssignmentsForCanvasDocuments(simulatedCanvases, { announce: true })) {
-        return;
-      }
-      if (!settlePendingHistoryBeforeTimelineStructureChange()) {
         return;
       }
       clearPendingMultiAssignmentMoveRequests();
