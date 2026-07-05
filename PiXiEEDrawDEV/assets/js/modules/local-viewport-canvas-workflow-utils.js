@@ -1365,7 +1365,9 @@
         syncControls: false,
         updateScaleLimits: false,
         renderLocalViewports: false,
+        syncLocalViewportDock: false,
       });
+      syncAllProjectCanvasSurfaceDimensions();
       renderFrameList();
       renderLayerList();
       syncControlsWithState();
@@ -1394,7 +1396,9 @@
       syncControls: false,
       updateScaleLimits: false,
       renderLocalViewports: false,
+      syncLocalViewportDock: false,
     });
+    syncAllProjectCanvasSurfaceDimensions();
     renderFrameList();
     renderLayerList();
     syncControlsWithState();
