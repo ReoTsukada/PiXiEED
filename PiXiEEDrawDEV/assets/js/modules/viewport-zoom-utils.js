@@ -19,14 +19,46 @@
     getViewportZoomRatio,
     setViewportZoomRatio,
     getViewportVisibilityTargetSurface,
+    getProjectCanvasCount,
+    getProjectCanvasDocumentAt,
     getProjectCanvasDocumentById,
     getActiveProjectCanvasDocument,
     getMainCanvasViewportElement,
+    isMultiCanvasWorldLayoutActive,
     clamp,
   } = {}) {
+    function shouldUseProjectZoomBase() {
+      try {
+        if (typeof isMultiCanvasWorldLayoutActive === 'function' && isMultiCanvasWorldLayoutActive()) {
+          return true;
+        }
+      } catch (error) {
+        // Fall through to the count check.
+      }
+      try {
+        return typeof getProjectCanvasCount === 'function' && Number(getProjectCanvasCount()) > 1;
+      } catch (error) {
+        return false;
+      }
+    }
+
+    function getProjectZoomBaseCanvasDocument() {
+      try {
+        return getProjectCanvasDocumentAt?.(0) || null;
+      } catch (error) {
+        return null;
+      }
+    }
+
     function getZoomBaseCanvasDocument(canvasDoc = null) {
       if (canvasDoc && typeof canvasDoc === 'object') {
         return canvasDoc;
+      }
+      if (shouldUseProjectZoomBase()) {
+        const projectBaseDocument = getProjectZoomBaseCanvasDocument();
+        if (projectBaseDocument) {
+          return projectBaseDocument;
+        }
       }
       let targetSurface = null;
       try {
