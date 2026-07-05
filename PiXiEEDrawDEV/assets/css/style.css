@@ -5564,13 +5564,6 @@ body:not(.show-inline-guides) .ui-guide-text {
   clip-path: none;
 }
 
-@media (max-width: 680px) {
-  .toggle-list,
-  .mirror-axis-options {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
 .mirror-tool-popover {
   position: fixed;
   left: 0;
@@ -12546,11 +12539,6 @@ body.is-mobile-layout .panel-ad-mount[hidden] {
 }
 
 @media (max-width: 420px) and (orientation: portrait) {
-  .toggle-list,
-  .mirror-axis-options {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   #panelSettings .settings-size-controls {
     gap: 4px;
   }
