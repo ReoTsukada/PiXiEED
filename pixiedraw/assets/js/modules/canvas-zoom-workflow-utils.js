@@ -57,7 +57,6 @@
       // In multi-canvas mode, keep local panels in the same shared 2D zoom space.
       if (isMultiCanvasWorldLayoutActive()) {
         syncAllProjectCanvasSurfaceDimensions();
-        syncLocalViewportCanvasDockLayout();
         syncMultiCanvasSelectionUi();
       } else {
         syncLocalViewportCanvasDockVisibility({ persist: false, render: false });
@@ -290,7 +289,6 @@
     });
     if (multiCanvasWorldLayoutActive) {
       syncAllProjectCanvasSurfaceDimensions();
-      syncLocalViewportCanvasDockLayout();
     }
 
     let anchorCorrectionSurface = null;
