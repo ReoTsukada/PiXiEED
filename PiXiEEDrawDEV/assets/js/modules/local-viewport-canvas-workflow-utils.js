@@ -591,6 +591,43 @@
     );
   }
 
+  function syncStateToProjectCanvasDocument(canvasDoc) {
+    if (!canvasDoc) {
+      return;
+    }
+    const width = Math.max(1, Math.round(Number(state.width) || Number(canvasDoc.width) || 1));
+    const height = Math.max(1, Math.round(Number(state.height) || Number(canvasDoc.height) || 1));
+    canvasDoc.width = width;
+    canvasDoc.height = height;
+    canvasDoc.viewScale = normalizeProjectCanvasViewScale(state.scale, canvasDoc.viewScale || state.scale || 8);
+    canvasDoc.frames = Array.isArray(state.frames) ? state.frames : canvasDoc.frames;
+    canvasDoc.activeFrame = clamp(Math.round(Number(state.activeFrame) || 0), 0, Math.max(0, (canvasDoc.frames?.length || 1) - 1));
+    canvasDoc.activeLayer = state.activeLayer || canvasDoc.activeLayer || null;
+    canvasDoc.mirror = normalizeMirrorAxisState(state.mirror, width, height);
+    canvasDoc.selectionMask = state.selectionMask || null;
+    canvasDoc.selectionContentMask = state.selectionContentMask || null;
+    canvasDoc.selectionBounds = state.selectionBounds ? { ...state.selectionBounds } : null;
+  }
+
+  function syncStateFromProjectCanvasDocument(canvasDoc) {
+    if (!canvasDoc) {
+      return;
+    }
+    const width = Math.max(1, Math.round(Number(canvasDoc.width) || Number(state.width) || 1));
+    const height = Math.max(1, Math.round(Number(canvasDoc.height) || Number(state.height) || 1));
+    const frames = Array.isArray(canvasDoc.frames) && canvasDoc.frames.length ? canvasDoc.frames : state.frames;
+    state.width = width;
+    state.height = height;
+    state.frames = frames;
+    state.activeFrame = clamp(Math.round(Number(canvasDoc.activeFrame) || 0), 0, Math.max(0, (frames?.length || 1) - 1));
+    const activeFrame = frames?.[state.activeFrame] || null;
+    state.activeLayer = canvasDoc.activeLayer || activeFrame?.layers?.[activeFrame.layers.length - 1]?.id || null;
+    state.mirror = normalizeMirrorAxisState(canvasDoc.mirror || state.mirror, width, height);
+    state.selectionMask = canvasDoc.selectionMask || null;
+    state.selectionContentMask = canvasDoc.selectionContentMask || null;
+    state.selectionBounds = canvasDoc.selectionBounds ? { ...canvasDoc.selectionBounds } : null;
+  }
+
   function storeProjectCanvasViewScale(canvasDoc, scale = state.scale) {
     const normalizedScale = normalizeProjectCanvasViewScale(scale, state.scale || 8);
     const canvases = getProjectCanvasDocuments();
@@ -965,6 +1002,15 @@
       canvasSurfacePanelDragState.surfaceKind === 'main'
       || canvasSurfacePanelDragState.surfaceKind === 'local'
     );
+    if (shouldPersist && panel instanceof HTMLElement) {
+      const finalLeft = parseLocalViewportCanvasAxis(panel.style.left, panel.offsetLeft) || 0;
+      const finalTop = parseLocalViewportCanvasAxis(panel.style.top, panel.offsetTop) || 0;
+      if (canvasSurfacePanelDragState.surfaceKind === 'main') {
+        setLocalViewportCanvasLayoutAnchor(finalLeft, finalTop);
+      } else if (canvasSurfacePanelDragState.surfaceKind === 'local') {
+        setLocalViewportCanvasPosition(canvasSurfacePanelDragState.surfaceIndex, finalLeft, finalTop);
+      }
+    }
     canvasSurfacePanelDragState.pointerId = null;
     canvasSurfacePanelDragState.surfaceKind = '';
     canvasSurfacePanelDragState.surfaceIndex = -1;
@@ -1039,8 +1085,6 @@
     panel.style.left = `${nextLeft}px`;
     panel.style.top = `${nextTop}px`;
     if (canvasSurfacePanelDragState.surfaceKind === 'main') {
-      setLocalViewportCanvasLayoutAnchor(nextLeft, nextTop);
-      syncLocalViewportCanvasDockLayout();
       return;
     }
     setLocalViewportCanvasPosition(canvasSurfacePanelDragState.surfaceIndex, nextLeft, nextTop);
@@ -1289,9 +1333,11 @@
     const previousId = projectCanvasStore.activeCanvasId;
     const changed = previousId !== targetCanvas.id;
     if (changed && previousSurface && previousCanvas) {
+      syncStateToProjectCanvasDocument(previousCanvas);
       markProjectCanvasSurfaceRendered(previousSurface, previousCanvas);
     }
     projectCanvasStore.activeCanvasId = targetCanvas.id;
+    syncStateFromProjectCanvasDocument(targetCanvas);
     localViewportCanvasState = normalizeLocalViewportCanvasState(
       {
         ...localViewportCanvasState,
