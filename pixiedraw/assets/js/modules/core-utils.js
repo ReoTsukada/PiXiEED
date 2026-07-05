@@ -169,6 +169,79 @@
       .trim();
   }
 
+  function resolveVoxelProjectionAxisOrigin(targetLength, volumeLength, candidates = []) {
+    const safeTargetLength = Math.max(1, Math.round(Number(targetLength) || 1));
+    const safeVolumeLength = Math.max(1, Math.round(Number(volumeLength) || 1));
+    const maxOrigin = Math.max(0, safeTargetLength - safeVolumeLength);
+    const candidate = candidates.find(value => Number.isFinite(value));
+    if (Number.isFinite(candidate)) {
+      return clamp(Math.round(candidate), 0, maxOrigin);
+    }
+    return Math.max(0, Math.round((safeTargetLength - safeVolumeLength) / 2));
+  }
+
+  function getVoxelPreviewFaceShadeAmount(face = 'front') {
+    switch (face) {
+      case 'top':
+        return 0.18;
+      case 'bottom':
+        return -0.24;
+      case 'left':
+        return -0.06;
+      case 'right':
+        return -0.18;
+      case 'back':
+        return -0.14;
+      case 'front':
+      default:
+        return 0;
+    }
+  }
+
+  function createVoxelUtils({
+    clamp,
+    VOXEL_EXTENSION_DEFAULT_YAW_DEG,
+    VOXEL_EXTENSION_PREVIEW_ELEVATION_DEG,
+    VOXEL_EXTENSION_PREVIEW_PITCH_MIN_DEG,
+    VOXEL_EXTENSION_PREVIEW_PITCH_MAX_DEG,
+  } = {}) {
+    function normalizeVoxelPreviewYawDegrees(value = VOXEL_EXTENSION_DEFAULT_YAW_DEG) {
+      const numericValue = Number(value);
+      if (Number.isFinite(numericValue)) {
+        return Math.round(numericValue);
+      }
+      return VOXEL_EXTENSION_DEFAULT_YAW_DEG;
+    }
+
+    function normalizeVoxelPreviewPitchDegrees(value = VOXEL_EXTENSION_PREVIEW_ELEVATION_DEG) {
+      const numericValue = Number(value);
+      if (Number.isFinite(numericValue)) {
+        return clamp(
+          Math.round(numericValue),
+          VOXEL_EXTENSION_PREVIEW_PITCH_MIN_DEG,
+          VOXEL_EXTENSION_PREVIEW_PITCH_MAX_DEG
+        );
+      }
+      return VOXEL_EXTENSION_PREVIEW_ELEVATION_DEG;
+    }
+
+    function formatVoxelPreviewYawLabel(value = VOXEL_EXTENSION_DEFAULT_YAW_DEG) {
+      return `${normalizeVoxelPreviewYawDegrees(value)}°`;
+    }
+
+    function formatVoxelPreviewPitchLabel(value = VOXEL_EXTENSION_PREVIEW_ELEVATION_DEG) {
+      const pitch = normalizeVoxelPreviewPitchDegrees(value);
+      return `${pitch >= 0 ? '+' : ''}${pitch}°`;
+    }
+
+    return Object.freeze({
+      normalizeVoxelPreviewYawDegrees,
+      normalizeVoxelPreviewPitchDegrees,
+      formatVoxelPreviewYawLabel,
+      formatVoxelPreviewPitchLabel,
+    });
+  }
+
   root.coreUtils = Object.freeze({
     formatBytes,
     rgbaToHex,
@@ -182,5 +255,8 @@
     clamp,
     debounce,
     normalizeHelpSearchQuery,
+    resolveVoxelProjectionAxisOrigin,
+    getVoxelPreviewFaceShadeAmount,
+    createVoxelUtils,
   });
 })();

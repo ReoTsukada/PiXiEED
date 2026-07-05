@@ -1,0 +1,1453 @@
+(() => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const root = window.PiXiEEDrawModules = window.PiXiEEDrawModules || {};
+
+  function createOpenImportWorkflowUtils(rawScope = {}) {
+    const scope = new Proxy(rawScope, {
+      has() {
+        return true;
+      },
+      get(target, key) {
+        if (key === Symbol.unscopables) {
+          return undefined;
+        }
+        if (Object.prototype.hasOwnProperty.call(target, key)) {
+          return target[key];
+        }
+        return globalThis[key];
+      },
+      set(target, key, value) {
+        if (Object.prototype.hasOwnProperty.call(target, key)) {
+          target[key] = value;
+          return true;
+        }
+        globalThis[key] = value;
+        return true;
+      },
+    });
+
+    return ((scope) => {
+      with (scope) {
+  async function openDocumentsAsProjectTabs(items, loader, { source = 'open', tabOptions = null } = {}) {
+    if (!ensureCurrentClientCanReplaceActiveProject()) {
+      return false;
+    }
+    if (openProjectTabBusy) {
+      return false;
+    }
+    const queue = Array.isArray(items) ? items.filter(Boolean) : [];
+    if (!queue.length || typeof loader !== 'function') {
+      return false;
+    }
+    ensureOpenProjectTabsInitialized();
+    const availableSlots = Math.max(0, MAX_PROJECT_SHEETS - openProjectTabs.length);
+    if (availableSlots <= 0) {
+      updateAutosaveStatus(
+        localizeText(
+          `シートは最大 ${MAX_PROJECT_SHEETS} 枚です`,
+          `You can add up to ${MAX_PROJECT_SHEETS} sheets`
+        ),
+        'warn'
+      );
+      return false;
+    }
+    openProjectTabBusy = true;
+    try {
+      const targets = queue.slice(0, availableSlots);
+      const truncatedCount = Math.max(0, queue.length - targets.length);
+      await persistActiveOpenProjectTab({ flushAutosave: true });
+      const parentProjectId = normalizeAutosaveProjectId(autosaveProjectId || '') || createAutosaveProjectId();
+      const parentSharedFields = buildActiveSharedProjectSheetTabFields(parentProjectId);
+      setActiveAutosaveProjectId(parentProjectId, { persist: false });
+      let openedCount = 0;
+      let failedCount = 0;
+      for (let index = 0; index < targets.length; index += 1) {
+        const item = targets[index];
+        try {
+          const directPayload = await readProjectPayloadFromOpenItem(item);
+          if (directPayload?.project && typeof directPayload.project === 'object') {
+            const directTab = await appendProjectPayloadAsOpenTab({
+              project: directPayload.project,
+              parentProjectId,
+              fileName: directPayload.fileName,
+              unsaved: directPayload.unsaved,
+              source: source || 'open',
+              tabOptions,
+            });
+            if (directTab) {
+              openedCount += 1;
+              continue;
+            }
+          }
+          const loaded = await loader(item);
+          if (loaded === 'deferred') {
+            // Loader declined to apply into the active document because the
+            // payload targets a different project/sheet. Create a new sheet from
+            // the original item so the user's explicit open action still
+            // produces a separate sheet.
+            try {
+              let packaged = null;
+              let deferredProjectId = '';
+              let deferredFileName = DEFAULT_DOCUMENT_NAME;
+              let deferredUnsaved = false;
+              // If item looks like a File/Blob with a text() method, read it
+              if (item && typeof item.text === 'function') {
+                try {
+                  const text = await item.text();
+                  packaged = tryParseJsonSafe(text);
+                  deferredFileName = normalizeDocumentName(item.name || packaged?.documentName || DEFAULT_DOCUMENT_NAME);
+                } catch (e) {
+                  packaged = null;
+                }
+              } else if (item && typeof item.getFile === 'function') {
+                // FileSystemFileHandle
+                try {
+                  const f = await item.getFile();
+                  const text = await f.text();
+                  packaged = tryParseJsonSafe(text);
+                  deferredFileName = normalizeDocumentName(f?.name || item.name || packaged?.documentName || DEFAULT_DOCUMENT_NAME);
+                } catch (e) {
+                  packaged = null;
+                }
+              } else if (item && typeof item === 'object' && item.project) {
+                packaged = item.project;
+                deferredProjectId = normalizeAutosaveProjectId(item.id || '');
+                deferredFileName = normalizeDocumentName(item.name || packaged?.documentName || DEFAULT_DOCUMENT_NAME);
+                deferredUnsaved = Boolean(item.unsaved);
+              }
+              if (packaged && typeof packaged === 'object') {
+                const appended = await appendProjectPayloadAsOpenTab({
+                  project: packaged,
+                  parentProjectId,
+                  fileName: deferredFileName,
+                  unsaved: deferredUnsaved,
+                  source: source || 'open',
+                  tabOptions,
+                });
+                if (appended) {
+                  queueProjectTabViewportReset(appended.id);
+                  openedCount += 1;
+                  continue;
+                }
+              }
+            } catch (e) {
+              console.warn('Failed to create tab from deferred loader item', e);
+              failedCount += 1;
+              continue;
+            }
+            // If we couldn't construct a tab, fall through to treat as failure
+            failedCount += 1;
+            continue;
+          }
+          if (!loaded) {
+            failedCount += 1;
+            continue;
+          }
+          if (normalizeAutosaveProjectId(autosaveProjectId || '') !== parentProjectId) {
+            setActiveAutosaveProjectId(parentProjectId, { persist: false });
+          }
+          const appended = appendOpenProjectTabFromCurrentState({
+            activate: true,
+            source: parentSharedFields ? 'shared-sheet' : source,
+            projectId: parentSharedFields?.projectId || parentProjectId,
+            ...(parentSharedFields || {}),
+            ...(tabOptions && typeof tabOptions === 'object' ? tabOptions : {}),
+          });
+          if (!appended) {
+            failedCount += 1;
+            break;
+          }
+          if (tabOptions?.qrEditPayload) {
+            activateQrEditMode({
+              ...tabOptions.qrEditPayload,
+              projectId: appended.projectId || '',
+            });
+          }
+          if (parentSharedFields) {
+            setActiveSharedProjectSession(
+              parentSharedFields.sharedProjectKey,
+              parentSharedFields.sharedProjectRevision,
+              parentSharedFields.sharedProjectStructureRevision,
+              parentSharedFields.sharedProjectBackendId
+            );
+            queueSharedProjectSheetsSnapshot('addSheet');
+          }
+          openedCount += 1;
+        } catch (error) {
+          console.warn('Failed to open project as tab', error);
+          failedCount += 1;
+        }
+      }
+      if (!openedCount) {
+        if (truncatedCount > 0 || failedCount > 0) {
+          updateAutosaveStatus(
+            localizeText(
+              `複数読み込みに失敗しました（失敗 ${failedCount} / 上限で未追加 ${truncatedCount}）`,
+              `Failed to open projects (failed ${failedCount} / skipped by limit ${truncatedCount})`
+            ),
+            'warn'
+          );
+        }
+        return false;
+      }
+      const summaryJa = `複数読み込み: 開いた ${openedCount}件`
+        + (failedCount > 0 ? ` / 失敗 ${failedCount}件` : '')
+        + (truncatedCount > 0 ? ` / 上限で未追加 ${truncatedCount}件（最大${MAX_PROJECT_SHEETS}）` : '');
+      const summaryEn = `Opened ${openedCount} project tab(s)`
+        + (failedCount > 0 ? ` / Failed ${failedCount}` : '')
+        + (truncatedCount > 0 ? ` / Skipped by limit ${truncatedCount} (max ${MAX_PROJECT_SHEETS})` : '');
+      updateAutosaveStatus(
+        localizeText(summaryJa, summaryEn),
+        (failedCount > 0 || truncatedCount > 0) ? 'warn' : 'success'
+      );
+      renderOpenProjectTabs();
+      return true;
+    } finally {
+      openProjectTabBusy = false;
+    }
+  }
+
+  async function openImageFileAsNewProject(file, { source = 'import', qrEditPayload = null } = {}) {
+    if (!ensureCurrentClientCanReplaceActiveProject()) {
+      return false;
+    }
+    if (openProjectTabBusy) {
+      return false;
+    }
+    if (openProjectTabs.length && activeOpenProjectTabId) {
+      const persistedCurrentProject = await persistActiveOpenProjectTab({ flushAutosave: true });
+      if (!persistedCurrentProject) {
+        return false;
+      }
+    }
+    const loaded = await loadDocumentFromImageFile(file);
+    if (!loaded) {
+      return false;
+    }
+    const tab = resetOpenProjectTabsToCurrentProject({
+      source,
+      projectId: autosaveProjectId,
+      qrEditPayload,
+    });
+    if (qrEditPayload) {
+      activateQrEditMode({
+        ...qrEditPayload,
+        projectId: tab?.projectId || autosaveProjectId || '',
+      });
+    }
+    renderOpenProjectTabs();
+    return true;
+  }
+
+  async function openDocumentAsNewProject(item, { source = 'open' } = {}) {
+    if (!ensureCurrentClientCanReplaceActiveProject()) {
+      return false;
+    }
+    if (!canCurrentClientImportExternalData()) {
+      setMultiStatus(localizeText('参加/視聴モードでは読み込み/インポートはマスターのみ操作できます', 'In participant/viewer mode, only the master can open/import files'), 'warn');
+      return false;
+    }
+    if (openProjectTabBusy) {
+      return false;
+    }
+
+    let file = null;
+    let handle = null;
+    try {
+      if (item && typeof item.getFile === 'function') {
+        handle = item;
+        file = await item.getFile();
+      } else if (item && typeof item.text === 'function') {
+        file = item;
+      }
+    } catch (error) {
+      console.warn('Document open failed', error);
+      updateAutosaveStatus('ドキュメントを開けませんでした', 'error');
+      return false;
+    }
+
+    if (file && isImportableImageFile(file)) {
+      return await openImageFileAsNewProject(file, { source });
+    }
+    if (!file || typeof file.text !== 'function') {
+      updateAutosaveStatus('ドキュメントを開けませんでした', 'error');
+      return false;
+    }
+
+    try {
+      const text = await file.text();
+      try {
+        snapshotFromDocumentText(text);
+      } catch (parseError) {
+        console.warn('Failed to parse document', parseError);
+        updateAutosaveStatus('ドキュメントの読み込みに失敗しました', 'error');
+        return false;
+      }
+      if (openProjectTabs.length && activeOpenProjectTabId) {
+        const persistedCurrentProject = await persistActiveOpenProjectTab({ flushAutosave: true });
+        if (!persistedCurrentProject) {
+          return false;
+        }
+      }
+      const loaded = await loadDocumentFromText(text, handle, { suppressAutosaveStatus: true });
+      if (!loaded || loaded === 'deferred') {
+        return false;
+      }
+      updateAutosaveStatus(
+        localizeText('ファイルを新規プロジェクトとして開きました', 'Opened file as a new project'),
+        'success'
+      );
+      renderOpenProjectTabs();
+      return true;
+    } catch (error) {
+      console.warn('Document load failed', error);
+      updateAutosaveStatus('ドキュメントを開けませんでした', 'error');
+      return false;
+    }
+  }
+
+  function tryParseJsonSafe(text) {
+    if (typeof text !== 'string') return null;
+    try {
+      return JSON.parse(text);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function resolveOpenProjectPayloadFileName(project = null, fallbackName = DEFAULT_DOCUMENT_NAME) {
+    return normalizeDocumentName(
+      fallbackName
+      || project?.documentName
+      || project?.document?.documentName
+      || DEFAULT_DOCUMENT_NAME
+    );
+  }
+
+  async function readProjectPayloadFromOpenItem(item) {
+    if (!item) {
+      return null;
+    }
+    if (item && typeof item === 'object' && item.project && typeof item.project === 'object') {
+      return {
+        project: item.project,
+        fileName: resolveOpenProjectPayloadFileName(item.project, item.name || item.fileName || DEFAULT_DOCUMENT_NAME),
+        unsaved: Boolean(item.unsaved),
+      };
+    }
+    let file = null;
+    let fallbackName = DEFAULT_DOCUMENT_NAME;
+    if (item && typeof item.getFile === 'function') {
+      try {
+        file = await item.getFile();
+        fallbackName = file?.name || item.name || DEFAULT_DOCUMENT_NAME;
+      } catch (_error) {
+        return null;
+      }
+    } else if (item && typeof item.text === 'function') {
+      file = item;
+      fallbackName = item.name || DEFAULT_DOCUMENT_NAME;
+    }
+    if (!file || isImportableImageFile(file) || typeof file.text !== 'function') {
+      return null;
+    }
+    let parsed = null;
+    try {
+      parsed = tryParseJsonSafe(await file.text());
+    } catch (_error) {
+      return null;
+    }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return null;
+    }
+    return {
+      project: parsed,
+      fileName: resolveOpenProjectPayloadFileName(parsed, fallbackName),
+      unsaved: false,
+    };
+  }
+
+  async function appendProjectPayloadAsOpenTab({
+    project = null,
+    parentProjectId = '',
+    fileName = DEFAULT_DOCUMENT_NAME,
+    unsaved = false,
+    source = 'open',
+    tabOptions = null,
+  } = {}) {
+    if (!project || typeof project !== 'object') {
+      return null;
+    }
+    const sharedFields = buildActiveSharedProjectSheetTabFields(parentProjectId);
+    const normalizedParentProjectId = normalizeAutosaveProjectId(parentProjectId || autosaveProjectId || '')
+      || createAutosaveProjectId();
+    const tabProjectId = sharedFields?.projectId || normalizedParentProjectId;
+    const previousActiveId = activeOpenProjectTabId;
+    const nextTab = createOpenProjectSheetTabFromPackagedProject({
+      project,
+      projectId: tabProjectId,
+      fileName,
+      label: extractDocumentBaseName(fileName),
+      unsaved,
+      source: sharedFields ? 'shared-sheet' : source,
+      updatedAt: project?.updatedAt || new Date().toISOString(),
+      qrEditPayload: tabOptions?.qrEditPayload || null,
+      ...(sharedFields || {}),
+    });
+    if (!nextTab) {
+      return null;
+    }
+    openProjectTabs.push(nextTab);
+    activeOpenProjectTabId = nextTab.id;
+    suppressOpenProjectTabAutoInitialize = false;
+    renderOpenProjectTabs();
+    const sharedLoadOptions = sharedFields
+      ? {
+        sharedProjectKey: sharedFields.sharedProjectKey,
+        sharedProjectBackendId: sharedFields.sharedProjectBackendId,
+        sharedProjectRevision: sharedFields.sharedProjectRevision,
+        sharedProjectStructureRevision: sharedFields.sharedProjectStructureRevision,
+        sharedRoleHint: sharedFields.sharedRoleHint,
+        sharedAutoJoin: sharedFields.sharedAutoJoin,
+        preserveDocumentIds: true,
+        preserveCanvasIds: true,
+        preserveFrameIds: true,
+        preserveLayerIds: true,
+      }
+      : {};
+    const loaded = await loadDocumentFromProjectPayload(project, {
+      projectId: tabProjectId,
+      suppressAutosaveStatus: true,
+      qrEditPayload: tabOptions?.qrEditPayload || null,
+      suppressProjectSheetsRestore: true,
+      ...sharedLoadOptions,
+    });
+    if (!loaded || loaded === 'deferred') {
+      const insertedIndex = findOpenProjectTabIndex(nextTab.id);
+      if (insertedIndex >= 0) {
+        openProjectTabs.splice(insertedIndex, 1);
+      }
+      activeOpenProjectTabId = previousActiveId;
+      suppressOpenProjectTabAutoInitialize = false;
+      renderOpenProjectTabs();
+      return null;
+    }
+    queueProjectTabViewportReset(nextTab.id);
+    if (sharedFields) {
+      queueSharedProjectSheetsSnapshot('addSheet');
+    }
+    return openProjectTabs[findOpenProjectTabIndex(nextTab.id)] || nextTab;
+  }
+
+  async function loadRecentProjectPackagedPayload(entry) {
+    if (!entry || typeof entry !== 'object') {
+      return null;
+    }
+    if (entry.project && typeof entry.project === 'object') {
+      return entry.project;
+    }
+    if (!entry.handle || typeof entry.handle.getFile !== 'function') {
+      return null;
+    }
+    try {
+      const file = await entry.handle.getFile();
+      const text = await file.text();
+      return tryParseJsonSafe(text);
+    } catch (error) {
+      console.warn('Failed to read recent project payload for tab open', error);
+      return null;
+    }
+  }
+
+  async function appendPackagedProjectTab({
+    project = null,
+    projectId = '',
+    fileName = DEFAULT_DOCUMENT_NAME,
+    unsaved = false,
+    source = 'open',
+    updatedAt = '',
+    activateOptions = {},
+    skipBusyGuardOnActivate = false,
+    ...extraTabFields
+  } = {}) {
+    if (!project || typeof project !== 'object') {
+      return null;
+    }
+    ensureOpenProjectTabsInitialized();
+    const normalizedProjectId = normalizeAutosaveProjectId(projectId || '');
+    if (normalizedProjectId) {
+      const existingIndex = findOpenProjectTabIndexByProjectId(normalizedProjectId);
+      if (existingIndex >= 0) {
+        const existingTab = openProjectTabs[existingIndex];
+        const activated = await activateOpenProjectTab(existingTab?.id || '', {
+          skipPersistCurrent: true,
+          announce: false,
+          skipBusyGuard: skipBusyGuardOnActivate,
+          ...activateOptions,
+        });
+        return activated ? existingTab : null;
+      }
+    }
+    if (openProjectTabs.length >= MAX_PROJECT_SHEETS) {
+      return null;
+    }
+    const normalizedFileName = normalizeDocumentName(fileName || project?.documentName || DEFAULT_DOCUMENT_NAME);
+    const newTabId = createOpenProjectTabId();
+    const nextTab = {
+      id: newTabId,
+      projectId: normalizedProjectId || createAutosaveProjectId(),
+      fileName: normalizedFileName,
+      label: extractDocumentBaseName(normalizedFileName),
+      project,
+      unsaved: Boolean(unsaved),
+      source,
+      updatedAt: updatedAt || project?.updatedAt || new Date().toISOString(),
+      ...extraTabFields,
+    };
+    openProjectTabs.push(nextTab);
+    suppressOpenProjectTabAutoInitialize = false;
+    renderOpenProjectTabs();
+    const activated = await activateOpenProjectTab(newTabId, {
+      skipPersistCurrent: true,
+      announce: false,
+      skipBusyGuard: skipBusyGuardOnActivate,
+      ...activateOptions,
+    });
+    if (!activated) {
+      const insertedIndex = findOpenProjectTabIndex(newTabId);
+      if (insertedIndex >= 0) {
+        openProjectTabs.splice(insertedIndex, 1);
+      }
+      renderOpenProjectTabs();
+      return null;
+    }
+    return openProjectTabs[findOpenProjectTabIndex(newTabId)] || nextTab;
+  }
+
+  async function createNewProjectAsTab({
+    name,
+    width,
+    height,
+    palettePreset = newProjectPalettePresetId,
+    promptExportDirectory = false,
+  }) {
+    if (openProjectTabBusy) {
+      updateAutosaveStatus(localizeText('プロジェクト切替の完了を待ってください', 'Wait for the current project switch to finish'), 'info');
+      return false;
+    }
+    ensureOpenProjectTabsInitialized();
+    const closedCurrentProject = await closeAllOpenProjectTabsForProjectReplacement({ flushAutosave: true, showHome: false });
+    if (!closedCurrentProject) {
+      return false;
+    }
+    openProjectTabBusy = true;
+    try {
+      const created = await createNewProject({
+        name,
+        width,
+        height,
+        palettePreset,
+        promptExportDirectory,
+        ensureTab: false,
+      });
+      if (!created) {
+        return false;
+      }
+      resetOpenProjectTabsToCurrentProject({
+        source: 'new-project',
+        projectId: autosaveProjectId,
+      });
+      updateAutosaveStatus(
+        localizeText('新規プロジェクトを作成しました', 'Created new project'),
+        'success'
+      );
+      return true;
+    } finally {
+      openProjectTabBusy = false;
+    }
+  }
+
+  async function openRecentProjectAsTab(entry, { hideStartup = true, appendOnly = false } = {}) {
+    if (!entry || typeof entry !== 'object') {
+      return false;
+    }
+    const endStartupProgress = hideStartup || startupVisible
+      ? beginStartupProgress(localizeText('プロジェクトを開いています…', 'Opening project...'))
+      : null;
+    try {
+      if (!ensureCurrentClientCanReplaceActiveProject()) {
+        return false;
+      }
+      const sharedEntryForTab = normalizeSharedRecentProjectEntry(entry);
+      const projectId = sharedEntryForTab
+        ? buildSharedRecentProjectId(sharedEntryForTab.sharedProjectKey || '')
+        : normalizeAutosaveProjectId(entry.id || '');
+      const latestEntry = projectId && !sharedEntryForTab
+        ? ((await loadRecentProjectsMetadata()).find(candidate => candidate?.id === projectId) || entry)
+        : entry;
+      if (openProjectTabBusy) {
+        updateAutosaveStatus(localizeText('プロジェクト切替の完了を待ってください', 'Wait for the current project switch to finish'), 'info');
+        return false;
+      }
+      ensureOpenProjectTabsInitialized();
+      const existingSwitch = await switchToOpenProjectTabForRecentProjectEntry(latestEntry, {
+        hideStartup,
+        silent: false,
+      });
+      if (existingSwitch.found) {
+        return existingSwitch.switched;
+      }
+      if (openProjectTabs.length >= MAX_PROJECT_SHEETS) {
+        updateAutosaveStatus(
+          localizeText(
+            `シートは最大 ${MAX_PROJECT_SHEETS} 枚です`,
+            `You can add up to ${MAX_PROJECT_SHEETS} sheets`
+          ),
+          'warn'
+        );
+        return false;
+      }
+      const shouldReuseActiveTab = !appendOnly && canReuseActiveOpenProjectTabForRecentEntry(entry);
+      const source = sharedEntryForTab ? 'shared-recent' : 'local-recent';
+      openProjectTabBusy = true;
+      try {
+        await persistActiveOpenProjectTab({ flushAutosave: true });
+        const packaged = await loadRecentProjectPackagedPayload(latestEntry);
+        if (packaged && typeof packaged === 'object') {
+          const fileName = normalizeDocumentName(
+            latestEntry?.name
+            || packaged?.documentName
+            || packaged?.document?.documentName
+            || DEFAULT_DOCUMENT_NAME
+          );
+          const nextTab = await appendPackagedProjectTab({
+            project: packaged,
+            projectId: projectId || createAutosaveProjectId(),
+            fileName,
+            unsaved: Boolean(latestEntry?.unsaved),
+            source,
+            updatedAt: latestEntry?.updatedAt || packaged?.updatedAt || new Date().toISOString(),
+            skipBusyGuardOnActivate: true,
+            activateOptions: {
+              skipPersistCurrent: true,
+              announce: false,
+            },
+            ...(sharedEntryForTab ? {
+              sharedProjectKey: sharedEntryForTab.sharedProjectKey || '',
+              sharedProjectBackendId: sharedEntryForTab.sharedProjectBackendId || '',
+              sharedProjectRevision: sharedEntryForTab.sharedProjectRevision || 0,
+              sharedProjectStructureRevision: sharedEntryForTab.sharedProjectStructureRevision || 0,
+              sharedRoleHint: sharedEntryForTab.sharedRoleHint || 'guest',
+              sharedAutoJoin: sharedEntryForTab.sharedAutoJoin !== false,
+            } : {}),
+          });
+          if (!nextTab) {
+            return false;
+          }
+          queueProjectTabViewportReset(nextTab.id);
+          if (hideStartup) {
+            hideStartupScreen();
+          }
+          updateAutosaveStatus(
+            Boolean(sharedEntryForTab)
+              ? localizeText('共有プロジェクトをシートとして追加しました', 'Added shared project as a sheet')
+              : localizeText('端末内プロジェクトをシートとして追加しました', 'Added local project as a sheet'),
+            'success'
+          );
+          return true;
+        }
+        const loaded = await openRecentProject(entry, {
+          hideStartup: false,
+          silent: true,
+          allowProjectMismatchLoad: true,
+        });
+        if (!loaded) {
+          return false;
+        }
+        const nextTab = shouldReuseActiveTab
+          ? replaceActiveOpenProjectTabFromCurrentState({
+              source,
+              projectId: projectId || autosaveProjectId,
+              sharedProjectKey: sharedEntryForTab?.sharedProjectKey || '',
+              sharedProjectBackendId: sharedEntryForTab?.sharedProjectBackendId || '',
+              sharedProjectRevision: sharedEntryForTab?.sharedProjectRevision || 0,
+              sharedProjectStructureRevision: sharedEntryForTab?.sharedProjectStructureRevision || 0,
+              sharedRoleHint: sharedEntryForTab?.sharedRoleHint || 'guest',
+              sharedAutoJoin: sharedEntryForTab?.sharedAutoJoin !== false,
+            })
+          : appendOpenProjectTabFromCurrentState({
+              activate: true,
+              source,
+              projectId: projectId || autosaveProjectId,
+              sharedProjectKey: sharedEntryForTab?.sharedProjectKey || '',
+              sharedProjectBackendId: sharedEntryForTab?.sharedProjectBackendId || '',
+              sharedProjectRevision: sharedEntryForTab?.sharedProjectRevision || 0,
+              sharedProjectStructureRevision: sharedEntryForTab?.sharedProjectStructureRevision || 0,
+              sharedRoleHint: sharedEntryForTab?.sharedRoleHint || 'guest',
+              sharedAutoJoin: sharedEntryForTab?.sharedAutoJoin !== false,
+            });
+        if (!nextTab) {
+          return false;
+        }
+        queueProjectTabViewportReset(nextTab.id);
+        if (hideStartup) {
+          hideStartupScreen();
+        }
+        updateAutosaveStatus(
+          Boolean(sharedEntryForTab)
+            ? localizeText('共有プロジェクトをシートとして追加しました', 'Added shared project as a sheet')
+            : localizeText('端末内プロジェクトをシートとして追加しました', 'Added local project as a sheet'),
+          'success'
+        );
+        return true;
+      } finally {
+        openProjectTabBusy = false;
+      }
+    } finally {
+      if (typeof endStartupProgress === 'function') {
+        endStartupProgress();
+      }
+    }
+  }
+
+  async function openDocumentDialog(options = {}) {
+    if (!ensureCurrentClientCanReplaceActiveProject()) {
+      return false;
+    }
+    if (!canCurrentClientImportExternalData()) {
+      setMultiStatus(localizeText('参加/視聴モードでは読み込み/インポートはマスターのみ操作できます', 'In participant/viewer mode, only the master can open/import files'), 'warn');
+      return false;
+    }
+    const mode = normalizeExternalImportMode(options?.mode);
+    if (typeof window.showOpenFilePicker === 'function') {
+      try {
+        const handles = await window.showOpenFilePicker({
+          multiple: mode !== EXTERNAL_IMPORT_MODE_NEW_PROJECT,
+          excludeAcceptAllOption: false,
+          types: [
+            {
+              description: '対応ファイル (PiXiEEDraw / PNG / GIF)',
+              accept: {
+                'application/json': ['.json', '.pxdraw', '.pixieedraw'],
+                'application/x-pixieedraw': ['.pixieedraw'],
+                'image/png': ['.png'],
+                'image/gif': ['.gif'],
+              },
+            },
+          ],
+        });
+        if (!Array.isArray(handles) || !handles.length) {
+          return false;
+        }
+        if (mode === EXTERNAL_IMPORT_MODE_NEW_PROJECT) {
+          return await openDocumentAsNewProject(handles[0], { source: 'open-picker' });
+        }
+        return await openDocumentsAsProjectTabs(
+          handles,
+          async handle => loadDocumentFromHandle(handle, { suppressAutosaveStatus: true }),
+          { source: 'open-picker' }
+        );
+      } catch (error) {
+        if (error && error.name === 'AbortError') {
+          return false;
+        }
+        console.warn('Document open failed', error);
+        return openDocumentViaInput({ mode });
+      }
+    }
+    return openDocumentViaInput({ mode });
+  }
+
+  function openDocumentViaInput(options = {}) {
+    const mode = normalizeExternalImportMode(options?.mode);
+    return new Promise(resolve => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.multiple = mode !== EXTERNAL_IMPORT_MODE_NEW_PROJECT;
+      const acceptTypes = [
+        '.json',
+        '.pxdraw',
+        '.pixieedraw',
+        '.png',
+        '.gif',
+        'application/json',
+        'application/x-pixieedraw',
+        'image/png',
+        'image/gif',
+      ];
+      if (IS_IOS_DEVICE) {
+        acceptTypes.push('.txt', 'text/plain');
+      }
+      input.accept = acceptTypes.join(',');
+      input.style.display = 'none';
+      let settled = false;
+      const finish = success => {
+        if (settled) return;
+        settled = true;
+        resolve(Boolean(success));
+      };
+      const cleanup = () => {
+        input.value = '';
+        input.remove();
+      };
+      input.addEventListener('change', async () => {
+        const files = Array.from(input.files || []);
+        cleanup();
+        if (!files.length) {
+          finish(false);
+          return;
+        }
+        try {
+          if (mode === EXTERNAL_IMPORT_MODE_NEW_PROJECT) {
+            const opened = await openDocumentAsNewProject(files[0], { source: 'open-input' });
+            finish(opened);
+            return;
+          }
+          const opened = await openDocumentsAsProjectTabs(
+            files,
+            async file => {
+              if (isImportableImageFile(file)) {
+                return await loadDocumentFromImageFile(file);
+              }
+              const text = await file.text();
+              return await loadDocumentFromText(text, null, { suppressAutosaveStatus: true });
+            },
+            { source: 'open-input' }
+          );
+          finish(opened);
+        } catch (error) {
+          console.warn('Document load failed', error);
+          updateAutosaveStatus('ドキュメントを開けませんでした', 'error');
+          finish(false);
+        }
+      });
+      input.addEventListener('cancel', () => {
+        cleanup();
+        finish(false);
+      });
+      input.addEventListener('click', () => {
+        input.value = '';
+      });
+      document.body.appendChild(input);
+      try {
+        input.click();
+      } catch (error) {
+        cleanup();
+        updateAutosaveStatus('ドキュメントを開けませんでした', 'error');
+        finish(false);
+      }
+    });
+  }
+
+  function isGifFile(file) {
+    if (!file) return false;
+    const type = typeof file.type === 'string' ? file.type.toLowerCase() : '';
+    if (type === 'image/gif') {
+      return true;
+    }
+    const name = typeof file.name === 'string' ? file.name.toLowerCase() : '';
+    return name.endsWith('.gif');
+  }
+
+  const imageUtils = window.PiXiEEDrawModules?.imageUtils?.createImageUtils?.({
+    DEFAULT_IMPORT_FRAME_DURATION,
+    IMPORT_FRAME_DURATION_MIN_MS,
+    IMPORT_FRAME_DURATION_MAX_MS,
+    MAX_IMAGE_IMPORT_SOURCE_SIZE,
+    MAX_CANVAS_SIZE,
+    clamp,
+  }) || {};
+  const {
+    isImportableImageFile,
+    createImageImportError,
+    normalizeImportFrameDuration,
+    resolveImageImportTargetSize,
+    getImageImportCheckFrameIndexes,
+    getGreatestCommonDivisor,
+  } = imageUtils;
+
+  const imageImportDecodeUtils = window.PiXiEEDrawModules?.imageImportDecodeUtils?.createImageImportDecodeUtils?.({
+    DEFAULT_IMPORT_FRAME_DURATION,
+    IMPORT_INTEGER_SCALE_SAMPLE_GRID,
+    MAX_IMPORTED_PALETTE_COLORS,
+    clamp,
+    createImageImportError: (...args) => createImageImportError(...args),
+    getImageImportCheckFrameIndexes: (...args) => getImageImportCheckFrameIndexes(...args),
+    getGreatestCommonDivisor: (...args) => getGreatestCommonDivisor(...args),
+    quantizeRgbaColorEntriesWithMapping: (...args) => quantizeRgbaColorEntriesWithMapping(...args),
+    normalizeColorValue: (...args) => normalizeColorValue(...args),
+    getPaletteColorKey: (...args) => getPaletteColorKey(...args),
+    findNearestPaletteColorIndexByRgba: (...args) => findNearestPaletteColorIndexByRgba(...args),
+    resolveTransparentStoragePaletteIndex: (...args) => resolveTransparentStoragePaletteIndex(...args),
+    isGifFile: (...args) => isGifFile(...args),
+    GifReader,
+  }) || {};
+  const {
+    quickCheckImageDataNearestUpscale,
+    isImageDataNearestNeighborUpscaled,
+    detectNearestNeighborIntegerScaleForFrames,
+    createImageDataFromPixels,
+    resizeImageDataNearest,
+    resizeImportFrames,
+    buildIndexedPaletteFromFrameDataList,
+    decodeImageFileToFrames,
+    decodeGifFileToFrames,
+    decodeGifWithImageDecoder,
+    decodeGifWithReader,
+    fillGifCanvas,
+    resolveDisposalFillColor,
+    clearGifFrameRect,
+    decodeImageFileToImageData,
+    imageBitmapToImageData,
+    imageElementToImageData,
+  } = imageImportDecodeUtils;
+
+  function dataUrlToBlob(dataUrl) {
+    if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) {
+      return null;
+    }
+    const match = dataUrl.match(/^data:([^;]+);base64,(.*)$/);
+    if (!match) {
+      return null;
+    }
+    const mimeType = match[1] || 'application/octet-stream';
+    const base64Data = match[2] || '';
+    try {
+      const binary = atob(base64Data);
+      const length = binary.length;
+      const bytes = new Uint8Array(length);
+      for (let i = 0; i < length; i += 1) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return new Blob([bytes], { type: mimeType });
+    } catch (error) {
+      console.warn('Failed to convert data URL to blob', error);
+      return null;
+    }
+  }
+
+  async function loadDocumentFromImageFile(file) {
+    if (!ensureCurrentClientCanReplaceActiveProject()) {
+      return false;
+    }
+    deactivateQrEditMode();
+    const closeLoading = beginBlockingGlobalLoading(
+      localizeText('画像を読み込み中…', 'Loading image...'),
+      { immediate: true }
+    );
+    let importResult;
+    try {
+      setGlobalLoadingIndicatorLabel(localizeText('画像をデコード中…', 'Decoding image...'));
+      try {
+        importResult = await decodeImageFileToFrames(file);
+      } catch (error) {
+        throw createImageImportError('画像を読み込めませんでした', error);
+      }
+
+      const framesData = Array.isArray(importResult?.frames) ? importResult.frames : [];
+      if (!framesData.length) {
+        throw createImageImportError('画像を読み込めませんでした');
+      }
+
+      const inferredWidth = Number(importResult?.width ?? framesData[0]?.imageData?.width ?? 0);
+      const inferredHeight = Number(importResult?.height ?? framesData[0]?.imageData?.height ?? 0);
+      if (!Number.isFinite(inferredWidth) || !Number.isFinite(inferredHeight) || inferredWidth <= 0 || inferredHeight <= 0) {
+        throw createImageImportError('画像サイズが不正です');
+      }
+
+      const integerScaleFactor = detectNearestNeighborIntegerScaleForFrames(framesData, inferredWidth, inferredHeight);
+      const importSize = resolveImageImportTargetSize(inferredWidth, inferredHeight, { integerScaleFactor });
+      const width = importSize.width;
+      const height = importSize.height;
+      setGlobalLoadingIndicatorLabel(localizeText('フルカラー画像を準備中…', 'Preparing full-color frames...'));
+      const normalizedFramesData = importSize.scaled
+        ? resizeImportFrames(framesData, width, height)
+        : framesData;
+
+    const frames = [];
+    const palette = createRgbModeDefaultPalette();
+    const activePaletteIndex = clamp(2, 0, Math.max(0, palette.length - 1));
+    const secondaryPaletteIndex = clamp(1, 0, Math.max(0, palette.length - 1));
+    const activeRgb = palette[activePaletteIndex]
+      ? { ...palette[activePaletteIndex] }
+      : { r: 255, g: 255, b: 255, a: 255 };
+
+    normalizedFramesData.forEach((frameInfo, index) => {
+      const layer = createLayer(localizeText('画像レイヤー', 'Image Layer'), width, height);
+      layer.indices.fill(-1);
+      layer.directOnly = true;
+      const direct = ensureLayerDirect(layer, width, height);
+      if (frameInfo?.imageData?.data instanceof Uint8ClampedArray
+        && frameInfo.imageData.width === width
+        && frameInfo.imageData.height === height) {
+        direct.set(frameInfo.imageData.data);
+        layer.importSourceDirect = new Uint8ClampedArray(frameInfo.imageData.data);
+      } else {
+        direct.fill(0);
+        layer.importSourceDirect = new Uint8ClampedArray(direct);
+      }
+      frames.push({
+        id: crypto.randomUUID ? crypto.randomUUID() : `frame-${Date.now().toString(36)}-${index}`,
+        name: getDefaultFrameName(index + 1),
+        duration: normalizeImportFrameDuration(frameInfo?.duration),
+        layers: [layer],
+      });
+    });
+
+    const activeLayerId = frames[0]?.layers[0]?.id;
+    if (!activeLayerId) {
+      throw createImageImportError('画像を読み込めませんでした');
+    }
+    const isLargeImportedDocument = width * height * Math.max(1, frames.length) >= 256 * 256 * 48;
+
+    const documentName = normalizeDocumentName(typeof file?.name === 'string' ? file.name : state.documentName);
+    const activeToolGroup = TOOL_GROUPS[state.activeToolGroup] ? state.activeToolGroup : (TOOL_TO_GROUP[state.tool] || 'pen');
+
+    setGlobalLoadingIndicatorLabel(localizeText('プロジェクトへ反映中…', 'Applying project...'));
+    const snapshot = {
+      width,
+      height,
+      scale: MIN_ZOOM_RATIO,
+      pan: { x: 0, y: 0 },
+      tool: state.tool,
+      brushSize: state.brushSize,
+      outlineSize: state.outlineSize,
+      palette,
+      activePaletteIndex,
+      secondaryPaletteIndex,
+      activeRgb,
+      colorMode: COLOR_MODE_RGB,
+      frames,
+      activeFrame: 0,
+      activeLayer: activeLayerId,
+      selectionMask: null,
+      selectionBounds: null,
+      showGrid: state.showGrid ?? true,
+      showMajorGrid: state.showMajorGrid ?? true,
+      gridScreenStep: state.gridScreenStep ?? 8,
+      majorGridSpacing: state.majorGridSpacing ?? 16,
+      backgroundMode: state.backgroundMode ?? 'dark',
+      uiTheme: normalizeUiTheme(state.uiTheme, DEFAULT_UI_THEME),
+      documentName,
+      showPixelGuides: isLargeImportedDocument ? false : (state.showPixelGuides ?? true),
+      mirror: normalizeMirrorAxisState(state.mirror, width, height),
+      showVirtualCursor: state.showVirtualCursor ?? false,
+      showCanvasResizeHandles: state.showCanvasResizeHandles ?? true,
+      showChecker: state.showChecker ?? true,
+      onionSkin: normalizeOnionSkinState(state.onionSkin),
+      dualLeftRail: false,
+      activeToolGroup,
+      lastGroupTool: { ...DEFAULT_GROUP_TOOL, ...(state.lastGroupTool || {}) },
+      activeLeftTab: state.activeLeftTab ?? 'tools',
+      activeRightTab: state.activeRightTab ?? 'frames',
+    };
+
+    applyHistorySnapshot(snapshot, { forcePalettePresetSync: true, preservePersonalPreferences: false });
+    history.past = [];
+    history.future = [];
+    history.pending = null;
+    clearTimelapseRecording({ silent: true, scope: 'all' });
+    resetDocumentUnsavedChanges();
+    updateHistoryButtons();
+    resetExportScaleDefaults();
+    syncPixfindSnapshotAfterDocumentReset();
+    setTrackedProjectDotBaseline(snapshot, null);
+    resetOpenedDocumentViewport({ defer: true });
+
+    autosaveHandle = null;
+    pendingAutosaveHandle = null;
+    clearPendingPermissionListener();
+    setActiveAutosaveProjectId(createAutosaveProjectId());
+    clearActiveSharedProjectSession();
+    storeMultiProjectKey('');
+    syncMultiProjectKeyInputValues('', { preserveFocused: false });
+    markAutosaveDirty();
+    scheduleAutosaveSnapshot();
+    if (importSize.scaled) {
+      const integerScaleLabel = importSize.integerScaleFactor > 1
+        ? ` / 整数倍縮小 x${importSize.integerScaleFactor}`
+        : '';
+      updateAutosaveStatus(
+        `画像をRGBカラーで読み込みました (${importSize.sourceWidth}x${importSize.sourceHeight} → ${width}x${height}${integerScaleLabel}) / 端末内へ自動保存します`,
+        'success'
+      );
+    } else {
+      updateAutosaveStatus('画像をRGBカラーで読み込みました / 端末内へ自動保存します', 'success');
+    }
+    scheduleSessionPersist();
+    return true;
+    } finally {
+      closeLoading();
+    }
+  }
+
+  async function fallbackRestoreAutosaveAfterLensFailure() {
+    if (!lensImportRequested) {
+      return;
+    }
+    if (!AUTOSAVE_SUPPORTED) {
+      return;
+    }
+    try {
+      const entries = await loadRecentProjectsMetadata();
+      if (!entries.length) {
+        return;
+      }
+      const target = autosaveProjectId
+        ? (entries.find(entry => entry?.id === autosaveProjectId) || entries[0])
+        : entries[0];
+      const restored = await openRecentProject(target, { hideStartup: false, silent: true });
+      if (restored) {
+        updateAutosaveStatus('自動保存: 端末内データを復元しました', 'info');
+      }
+    } catch (error) {
+      console.warn('Failed to restore autosave after PiXiEELENS import failure', error);
+    }
+  }
+
+  async function fallbackRestoreAutosaveAfterQrFailure() {
+    if (!qrImportRequested) {
+      return;
+    }
+    if (!AUTOSAVE_SUPPORTED) {
+      return;
+    }
+    try {
+      const entries = await loadRecentProjectsMetadata();
+      if (!entries.length) {
+        return;
+      }
+      const target = autosaveProjectId
+        ? (entries.find(entry => entry?.id === autosaveProjectId) || entries[0])
+        : entries[0];
+      const restored = await openRecentProject(target, { hideStartup: false, silent: true });
+      if (restored) {
+        updateAutosaveStatus('自動保存: 端末内データを復元しました', 'info');
+      }
+    } catch (error) {
+      console.warn('Failed to restore autosave after QR import failure', error);
+    }
+  }
+
+  function setLensImportSessionFlag() {
+    if (!canUseSessionStorage) {
+      return;
+    }
+    try {
+      window.sessionStorage.setItem(LENS_IMPORT_SESSION_FLAG, '1');
+    } catch (error) {
+      // ignore
+    }
+  }
+
+  function setQrImportSessionFlag() {
+    if (!canUseSessionStorage) {
+      return;
+    }
+    try {
+      window.sessionStorage.setItem(QR_IMPORT_SESSION_FLAG, '1');
+    } catch (error) {
+      // ignore
+    }
+  }
+
+  async function maybeImportLensCapture() {
+    let shouldImport = false;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      shouldImport = params.get('lens') === '1';
+    } catch (error) {
+      shouldImport = false;
+    }
+    if (!shouldImport && lensImportRequested) {
+      shouldImport = true;
+    }
+    if (!shouldImport) {
+      return false;
+    }
+
+    let rawPayload = null;
+    try {
+      rawPayload = window.localStorage.getItem(LENS_IMPORT_STORAGE_KEY);
+    } catch (error) {
+      console.warn('PiXiEELENS transfer storage is not available', error);
+    }
+
+    let payload = null;
+    if (rawPayload) {
+      try {
+        payload = JSON.parse(rawPayload);
+      } catch (error) {
+        console.warn('Failed to parse PiXiEELENS transfer payload', error);
+      }
+    }
+
+    if (!isLensImportPayload(payload)) {
+      payload = readLensImportWindowNamePayload();
+    }
+
+    if (!isLensImportPayload(payload)) {
+      payload = await waitForLensImportPayloadMessage();
+    }
+
+    clearLensImportRequestParam();
+
+    if (!isLensImportPayload(payload)) {
+      updateAutosaveStatus('PiXiEELENS からのデータが見つかりませんでした', 'warn');
+      await fallbackRestoreAutosaveAfterLensFailure();
+      finalizeLensImportAttempt({ clearPayload: true });
+      return false;
+    }
+
+    if (payload.expiresAt && Number.isFinite(payload.expiresAt) && Date.now() > payload.expiresAt) {
+      updateAutosaveStatus('PiXiEELENS からのデータが期限切れです。再度送信してください。', 'warn');
+      await fallbackRestoreAutosaveAfterLensFailure();
+      finalizeLensImportAttempt({ clearPayload: true });
+      return false;
+    }
+
+    const blob = dataUrlToBlob(payload.dataUrl);
+    if (!blob) {
+      updateAutosaveStatus('PiXiEELENS の画像データを読み込めませんでした', 'error');
+      await fallbackRestoreAutosaveAfterLensFailure();
+      finalizeLensImportAttempt({ clearPayload: true });
+      return false;
+    }
+
+    const inferredName = typeof payload.filename === 'string' && payload.filename
+      ? payload.filename
+      : 'pixiee-lens.png';
+    let file;
+    try {
+      file = new File([blob], inferredName, { type: blob.type || 'image/png' });
+    } catch (error) {
+      file = blob;
+      file.name = inferredName;
+    }
+
+    try {
+      const appendToProject = shouldAppendExternalImportToProject(payload);
+      const imported = appendToProject
+        ? await openDocumentsAsProjectTabs(
+          [file],
+          async lensFile => {
+            const loaded = await loadDocumentFromImageFile(lensFile);
+            if (!loaded) {
+              return false;
+            }
+            await ensureAutosaveForLensImport();
+            return true;
+          },
+          { source: 'lens' }
+        )
+        : await openImageFileAsNewProject(file, { source: 'lens' });
+      if (!imported) {
+        finalizeLensImportAttempt({ clearPayload: true });
+        return false;
+      }
+      hideStartupScreen();
+      hideProjectHomeScreen();
+      if (AUTOSAVE_SUPPORTED) {
+        try {
+          await writeAutosaveSnapshot(true);
+        } catch (error) {
+          console.warn('Immediate autosave after PiXiEELENS import failed', error);
+        }
+      }
+      updateAutosaveStatus(
+        appendToProject
+          ? localizeText(
+            'PiXiEELENS の画像を別シートで開きました',
+            'Opened PiXiEELENS capture in a separate sheet'
+          )
+          : localizeText(
+            'PiXiEELENS の画像を新規プロジェクトとして開きました',
+            'Opened PiXiEELENS capture as a new project'
+          ),
+        'success'
+      );
+      finalizeLensImportAttempt({ clearPayload: true });
+      return true;
+    } catch (error) {
+      console.warn('Failed to import capture from PiXiEELENS', error);
+      updateAutosaveStatus('PiXiEELENS の取り込みに失敗しました', 'error');
+      await fallbackRestoreAutosaveAfterLensFailure();
+      finalizeLensImportAttempt();
+      return false;
+    }
+  }
+
+  async function maybeImportQrCapture() {
+    let shouldImport = false;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      shouldImport = params.get(QR_IMPORT_QUERY_KEY) === '1';
+    } catch (error) {
+      shouldImport = false;
+    }
+    if (!shouldImport && qrImportRequested) {
+      shouldImport = true;
+    }
+    if (!shouldImport) {
+      return false;
+    }
+
+    let rawPayload = null;
+    try {
+      rawPayload = window.localStorage.getItem(QR_IMPORT_STORAGE_KEY);
+    } catch (error) {
+      console.warn('QR transfer storage is not available', error);
+    }
+    if (!rawPayload) {
+      try {
+        rawPayload = window.sessionStorage.getItem(QR_IMPORT_STORAGE_KEY);
+      } catch (error) {
+        console.warn('QR transfer session storage is not available', error);
+      }
+    }
+
+    let payload = null;
+    if (rawPayload) {
+      try {
+        payload = JSON.parse(rawPayload);
+      } catch (error) {
+        console.warn('Failed to parse QR transfer payload', error);
+      }
+    }
+
+    clearLensImportRequestParam();
+
+    if (!payload || typeof payload !== 'object' || typeof payload.dataUrl !== 'string') {
+      updateAutosaveStatus('QR編集モードからのデータが見つかりませんでした', 'warn');
+      await fallbackRestoreAutosaveAfterQrFailure();
+      finalizeQrImportAttempt({ clearPayload: true });
+      return false;
+    }
+
+    if (payload.expiresAt && Number.isFinite(payload.expiresAt) && Date.now() > payload.expiresAt) {
+      updateAutosaveStatus('QR編集モードからのデータが期限切れです。再度送信してください。', 'warn');
+      await fallbackRestoreAutosaveAfterQrFailure();
+      finalizeQrImportAttempt({ clearPayload: true });
+      return false;
+    }
+
+    const blob = dataUrlToBlob(payload.dataUrl);
+    if (!blob) {
+      updateAutosaveStatus('QR画像データを読み込めませんでした', 'error');
+      await fallbackRestoreAutosaveAfterQrFailure();
+      finalizeQrImportAttempt({ clearPayload: true });
+      return false;
+    }
+
+    const inferredName = typeof payload.filename === 'string' && payload.filename
+      ? payload.filename
+      : 'pixiee-qr.png';
+    let file;
+    try {
+      file = new File([blob], inferredName, { type: blob.type || 'image/png' });
+    } catch (error) {
+      file = blob;
+      file.name = inferredName;
+    }
+
+    try {
+      const qrEditPayload = {
+        source: payload.source,
+        rawValue: typeof payload.rawValue === 'string' ? payload.rawValue : '',
+        editSize: payload.editSize,
+      };
+      const appendToProject = shouldAppendExternalImportToProject(payload);
+      const imported = appendToProject
+        ? await openDocumentsAsProjectTabs(
+          [file],
+          async qrFile => {
+            const loaded = await loadDocumentFromImageFile(qrFile);
+            if (!loaded) {
+              return false;
+            }
+            await ensureAutosaveForLensImport();
+            return true;
+          },
+          {
+            source: 'qrmaker',
+            tabOptions: {
+              qrEditPayload,
+            },
+          }
+        )
+        : await openImageFileAsNewProject(file, {
+          source: 'qrmaker',
+          qrEditPayload,
+        });
+      if (!imported) {
+        finalizeQrImportAttempt({ clearPayload: true });
+        return false;
+      }
+      hideStartupScreen();
+      hideProjectHomeScreen();
+      if (AUTOSAVE_SUPPORTED) {
+        try {
+          await writeAutosaveSnapshot(true);
+        } catch (error) {
+          console.warn('Immediate autosave after QR import failed', error);
+        }
+      }
+      updateAutosaveStatus(
+        appendToProject
+          ? localizeText(
+            'QRコードを別シートで開きました',
+            'Opened QR code in a separate sheet'
+          )
+          : localizeText(
+            'QRコードを新規プロジェクトとして開きました',
+            'Opened QR code as a new project'
+          ),
+        'success'
+      );
+      finalizeQrImportAttempt({ clearPayload: true });
+      return true;
+    } catch (error) {
+      console.warn('Failed to import QR capture', error);
+      updateAutosaveStatus('QRコードの取り込みに失敗しました', 'error');
+      await fallbackRestoreAutosaveAfterQrFailure();
+      finalizeQrImportAttempt();
+      return false;
+    }
+  }
+
+
+  return Object.freeze({
+    openDocumentsAsProjectTabs,
+    openImageFileAsNewProject,
+    openDocumentAsNewProject,
+    tryParseJsonSafe,
+    resolveOpenProjectPayloadFileName,
+    readProjectPayloadFromOpenItem,
+    appendProjectPayloadAsOpenTab,
+    loadRecentProjectPackagedPayload,
+    appendPackagedProjectTab,
+    createNewProjectAsTab,
+    openRecentProjectAsTab,
+    openDocumentDialog,
+    openDocumentViaInput,
+    isGifFile,
+    dataUrlToBlob,
+    loadDocumentFromImageFile,
+    fallbackRestoreAutosaveAfterLensFailure,
+    fallbackRestoreAutosaveAfterQrFailure,
+    setLensImportSessionFlag,
+    setQrImportSessionFlag,
+    maybeImportLensCapture,
+    maybeImportQrCapture,
+  });
+      }
+    })(scope);
+  }
+
+  root.openImportWorkflowUtils = Object.freeze({
+    createOpenImportWorkflowUtils,
+  });
+})();

@@ -5,6 +5,45 @@
 
   const root = window.PiXiEEDrawModules = window.PiXiEEDrawModules || {};
 
+  function createExternalTools({
+    EXTERNAL_TOOL_PIXIEELENS_ID,
+    EXTERNAL_TOOL_QR_MAKER_ID,
+    TOP_UI_ACTION_OPEN_LENS_CAMERA,
+    TOP_UI_ACTION_OPEN_QR_EDITOR,
+    LENS_CAMERA_RETURN_QUERY_KEY,
+    LENS_CAMERA_DRAW_URL_QUERY_KEY,
+    LENS_CAMERA_RETURN_MODE_SELF,
+  } = {}) {
+    return Object.freeze({
+      [EXTERNAL_TOOL_PIXIEELENS_ID]: Object.freeze({
+        id: EXTERNAL_TOOL_PIXIEELENS_ID,
+        action: TOP_UI_ACTION_OPEN_LENS_CAMERA,
+        launchUrl: 'https://pixieed.jp/pixiee-lens/index.html',
+        iconSrc: 'assets/icons/pixieelensicon_frame_01.png',
+        displayName: Object.freeze({ ja: 'PiXiEELENS', en: 'PiXiEELENS', zh: 'PiXiEELENS' }),
+        actionLabel: Object.freeze({ ja: 'カメラ', en: 'Camera', zh: '相机' }),
+        protocol: Object.freeze({
+          returnQueryKey: LENS_CAMERA_RETURN_QUERY_KEY,
+          drawUrlQueryKey: LENS_CAMERA_DRAW_URL_QUERY_KEY,
+          defaultReturnMode: LENS_CAMERA_RETURN_MODE_SELF,
+        }),
+      }),
+      [EXTERNAL_TOOL_QR_MAKER_ID]: Object.freeze({
+        id: EXTERNAL_TOOL_QR_MAKER_ID,
+        action: TOP_UI_ACTION_OPEN_QR_EDITOR,
+        launchUrl: 'https://pixieed.jp/qr-maker/index.html',
+        iconSrc: 'assets/icons/tool-qr-edit.svg',
+        displayName: Object.freeze({ ja: 'QRコードリーダー', en: 'QR Code Reader', zh: 'QR码读取器' }),
+        actionLabel: Object.freeze({ ja: 'QR編集', en: 'QR Edit', zh: 'QR编辑' }),
+        protocol: Object.freeze({
+          returnQueryKey: LENS_CAMERA_RETURN_QUERY_KEY,
+          drawUrlQueryKey: LENS_CAMERA_DRAW_URL_QUERY_KEY,
+          defaultReturnMode: LENS_CAMERA_RETURN_MODE_SELF,
+        }),
+      }),
+    });
+  }
+
   function createNavigation({
     EXTERNAL_TOOLS,
     EXTERNAL_TOOL_PIXIEELENS_ID,
@@ -30,14 +69,14 @@
       if (!tool?.displayName) {
         return '';
       }
-      return localizeText(tool.displayName.ja, tool.displayName.en);
+      return localizeText(tool.displayName.ja, tool.displayName.en, tool.displayName.zh);
     }
 
     function getExternalToolLocalizedActionLabel(tool) {
       if (!tool?.actionLabel) {
         return '';
       }
-      return localizeText(tool.actionLabel.ja, tool.actionLabel.en);
+      return localizeText(tool.actionLabel.ja, tool.actionLabel.en, tool.actionLabel.zh);
     }
 
     function isNativeAppRuntime() {
@@ -159,6 +198,7 @@
   }
 
   root.navigation = Object.freeze({
+    createExternalTools,
     createNavigation,
   });
 })();

@@ -2,7 +2,7 @@
   "id": "/pixiedraw/",
   "name": "PiXiEEDraw",
   "short_name": "PiXiEEDraw",
-  "description": "PiXiEEDraw official pixel art web app.",
+  "description": "PiXiEEDraw pixel art web app.",
   "lang": "ja",
   "start_url": "/pixiedraw/",
   "scope": "/pixiedraw/",

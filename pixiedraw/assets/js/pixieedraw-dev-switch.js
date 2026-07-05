@@ -28,7 +28,7 @@
     try {
       window.localStorage.setItem(STORAGE_KEY, nextPath === DEV_PATH ? 'PiXiEEDrawDEV' : 'PiXiEEDraw');
     } catch (error) {
-      // Navigation still works when localStorage is unavailable.
+      // Ignore storage failures; navigation itself is enough.
     }
     const nextUrl = new URL(nextPath, window.location.origin);
     nextUrl.search = window.location.search;

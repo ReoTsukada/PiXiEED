@@ -3538,6 +3538,10 @@ body.is-startup-active #virtualCursorCanvas {
   pointer-events: none;
 }
 
+body.is-canvas-surface-moving .mirror-guides {
+  display: none;
+}
+
 .mirror-guide {
   position: absolute;
   left: 0;
@@ -5560,13 +5564,6 @@ body:not(.show-inline-guides) .ui-guide-text {
   clip-path: none;
 }
 
-@media (max-width: 680px) {
-  .toggle-list,
-  .mirror-axis-options {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
 .mirror-tool-popover {
   position: fixed;
   left: 0;
@@ -7552,6 +7549,15 @@ body.is-mobile-layout .mobile-draw-help {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.palette-preset-picker__button.is-preview-only {
+  grid-template-columns: minmax(0, max-content);
+  justify-content: center;
+}
+
+.palette-preset-picker__button.is-preview-only .palette-preset-picker__button-label {
+  display: none;
 }
 
 .palette-preset-picker__menu {
@@ -12533,11 +12539,6 @@ body.is-mobile-layout .panel-ad-mount[hidden] {
 }
 
 @media (max-width: 420px) and (orientation: portrait) {
-  .toggle-list,
-  .mirror-axis-options {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   #panelSettings .settings-size-controls {
     gap: 4px;
   }
@@ -13113,14 +13114,15 @@ body.is-right-tool-rail:not(.is-mobile-layout) .rail--left[data-compact="false"]
 
 body.is-right-tool-rail:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelColor .palette-topline {
   display: grid;
-  grid-template-columns: minmax(78px, 0.42fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 6px;
 }
 
 body.is-right-tool-rail:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelColor .palette-index-inline {
-  grid-template-columns: 1fr 42px;
+  grid-template-columns: auto 42px;
   gap: 4px;
   min-width: 0;
+  width: 100%;
 }
 
 body.is-right-tool-rail:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelColor .palette-index-inline input[type='number'] {
@@ -13131,13 +13133,19 @@ body.is-right-tool-rail:not(.is-mobile-layout) .rail--left[data-compact="false"]
 
 body.is-right-tool-rail:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelColor .palette-preset-inline {
   grid-template-columns: auto minmax(0, 1fr);
-  width: auto;
+  width: 100%;
   min-width: 0;
 }
 
 body.is-right-tool-rail:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelColor .palette-preset-picker__button {
   min-height: 30px;
   padding: 4px 6px;
+  grid-template-columns: minmax(0, max-content);
+  justify-content: center;
+}
+
+body.is-right-tool-rail:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelColor .palette-preset-picker__button-label {
+  display: none;
 }
 
 body.is-right-tool-rail:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelColor .palette-hsv {
