@@ -2924,6 +2924,10 @@
     return localViewportCanvasWorkflowUtilsModule.syncAllProjectCanvasSurfaceDimensions(...args);
   }
 
+  function syncMultiCanvasWorldLayoutDisplayPositions(...args) {
+    return localViewportCanvasWorkflowUtilsModule.syncMultiCanvasWorldLayoutDisplayPositions(...args);
+  }
+
   function renderInactiveProjectCanvasSurfaces(...args) {
     return localViewportCanvasWorkflowUtilsModule.renderInactiveProjectCanvasSurfaces(...args);
   }
@@ -8629,6 +8633,8 @@
   set state(value) { state = value; },
   get syncAllProjectCanvasSurfaceDimensions() { return syncAllProjectCanvasSurfaceDimensions; },
   set syncAllProjectCanvasSurfaceDimensions(value) { syncAllProjectCanvasSurfaceDimensions = value; },
+  get syncMultiCanvasWorldLayoutDisplayPositions() { return syncMultiCanvasWorldLayoutDisplayPositions; },
+  set syncMultiCanvasWorldLayoutDisplayPositions(value) { syncMultiCanvasWorldLayoutDisplayPositions = value; },
   get syncCanvasResizeHandleVisibility() { return syncCanvasResizeHandleVisibility; },
   set syncCanvasResizeHandleVisibility(value) { syncCanvasResizeHandleVisibility = value; },
   get syncControlsWithState() { return syncControlsWithState; },
