@@ -1919,6 +1919,38 @@
     };
   }
 
+  function syncMultiCanvasWorldLayoutDisplayPositions() {
+    if (!isMultiCanvasWorldLayoutActive()) {
+      return false;
+    }
+    const mainPanel = mainViewportCanvasSurface?.panel instanceof HTMLElement
+      ? mainViewportCanvasSurface.panel
+      : null;
+    const currentScale = getCurrentLocalViewportCanvasLayoutScale();
+    const fallbackAnchorLeft = parseLocalViewportCanvasAxis(mainPanel?.style.left, mainPanel?.offsetLeft) || 0;
+    const fallbackAnchorTop = parseLocalViewportCanvasAxis(mainPanel?.style.top, mainPanel?.offsetTop) || 0;
+    const anchorWorldLeft = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorLeft, fallbackAnchorLeft / Math.max(currentScale, Number.EPSILON)) || 0;
+    const anchorWorldTop = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorTop, fallbackAnchorTop / Math.max(currentScale, Number.EPSILON)) || 0;
+    const anchorDisplayLeft = Math.round(anchorWorldLeft * currentScale);
+    const anchorDisplayTop = Math.round(anchorWorldTop * currentScale);
+    if (mainPanel) {
+      mainPanel.style.left = `${anchorDisplayLeft}px`;
+      mainPanel.style.top = `${anchorDisplayTop}px`;
+    }
+    localViewportCanvasEntries.forEach((entry, index) => {
+      if (!(entry?.panel instanceof HTMLElement)) {
+        return;
+      }
+      const storedPosition = getStoredLocalViewportCanvasPosition(index);
+      if (storedPosition.left === null || storedPosition.top === null) {
+        return;
+      }
+      entry.panel.style.left = `${Math.round((anchorWorldLeft + storedPosition.left) * currentScale)}px`;
+      entry.panel.style.top = `${Math.round((anchorWorldTop + storedPosition.top) * currentScale)}px`;
+    });
+    return true;
+  }
+
   function getViewportPanelZoomFocus(focus, displayScale = getPixelAlignedCanvasDisplayScale(state.scale)) {
     if (!focus) {
       return null;
@@ -2759,6 +2791,7 @@
     computeDefaultLocalViewportCanvasWorldPosition,
     rectsOverlapWithGap,
     computeResolvedMultiCanvasWorldLayoutPositions,
+    syncMultiCanvasWorldLayoutDisplayPositions,
     getViewportPanelZoomFocus,
     syncLocalViewportCanvasDockLayout,
     buildProjectCanvasImageData,
