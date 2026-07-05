@@ -1976,26 +1976,6 @@
         setLocalViewportCanvasCount(0, { persist: true, announce: false });
         return;
       }
-      if (getLocalViewportCanvasAccountLimit() <= 0 && getLocalViewportCanvasCount() <= 0 && getProjectCanvasCount() <= 1) {
-        event.target.checked = false;
-        openLoginPromptDialog({
-          title: localizeText('ログインでマルチキャンバス解放', 'Sign In to Unlock Multi Canvas'),
-          lead: localizeText(
-            'マルチキャンバスはログインすると追加キャンバスを1つ使えます。サポーター特典（500円）では追加キャンバスを3つまで使えます。',
-            'Sign in to use 1 extra Multi Canvas. Supporter benefits (500 yen) unlock up to 3 extra canvases.'
-          ),
-          actionLabel: localizeText('ログインして使う', 'Sign In to Use It'),
-        });
-        updateAutosaveStatus(
-          localizeText(
-            'マルチキャンバスはログインすると1つ追加できます。サポーターは3つまで追加できます。',
-            'Sign in to add 1 multi canvas. Supporters can add up to 3.'
-          ),
-          'info'
-        );
-        syncControlsWithState();
-        return;
-      }
       if (!canCurrentClientEditProjectStructure({ announce: true })) {
         event.target.checked = getLocalViewportCanvasCount() > 0;
         if (!isSharedProjectCollaborativeMode()) {

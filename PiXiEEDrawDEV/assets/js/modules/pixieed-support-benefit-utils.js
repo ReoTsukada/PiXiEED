@@ -32,22 +32,11 @@
     return ((scope) => {
       with (scope) {
   function hasPixieedrawAdFreeSupport() {
-    if (window.__PIXIEED_ADS_DISABLED__) {
-      return true;
-    }
-    const adFreeState = window.pixieedAdFree?.state || null;
-    if (!adFreeState || adFreeState.isActive !== true) {
-      return false;
-    }
-    const entitlements = adFreeState.activeEntitlements;
-    if (!entitlements || typeof entitlements !== 'object') {
-      return true;
-    }
-    return Boolean(entitlements.pixiedraw_ad_free || entitlements.browser_ad_free);
+    return true;
   }
 
   function hasPixieedrawMultiCanvasSupport() {
-    return hasPixieedrawAdFreeSupport();
+    return true;
   }
 
   function hasPixieedrawSignedInAccount() {
@@ -55,13 +44,7 @@
   }
 
   function getLocalViewportCanvasAccountLimit() {
-    if (hasPixieedrawMultiCanvasSupport()) {
-      return LOCAL_VIEWPORT_CANVAS_STANDARD_MAX_COUNT;
-    }
-    if (hasPixieedrawSignedInAccount()) {
-      return LOCAL_VIEWPORT_CANVAS_SIGNED_IN_MAX_COUNT;
-    }
-    return 0;
+    return LOCAL_VIEWPORT_CANVAS_STANDARD_MAX_COUNT;
   }
 
   function getSharedProjectMemberLimitForCurrentPlan() {
@@ -94,22 +77,9 @@
   }
 
   function buildPixieedSupportStatusText(adFreeState = getPixieedAdFreeStateSnapshot()) {
-    if (adFreeState?.isActive === true || hasPixieedrawAdFreeSupport()) {
-      const days = getPixieedAdFreeRemainingDays(adFreeState);
-      if (days === null) {
-        return localizeText(
-          'サポーター特典（500円）が適用中です。広告非表示を利用できます。',
-          'Supporter benefits (500 yen) are active. Ads are hidden.'
-        );
-      }
-      return localizeText(
-        `サポーター特典（500円）が適用中です。広告非表示を利用できます。残り ${days} 日です。`,
-        `Supporter benefits (500 yen) are active. Ads are hidden. ${days} days remaining.`
-      );
-    }
     return localizeText(
-      'サポーター特典は500円です。広告非表示を利用できます。',
-      'Supporter benefits are 500 yen and remove ads.'
+      '広告非表示が有効です。',
+      'Ads are hidden.'
     );
   }
 
@@ -122,11 +92,8 @@
     if (dom.controls.multiSupportStatus instanceof HTMLElement) {
       dom.controls.multiSupportStatus.textContent = message;
     }
-    const active = adFreeState?.isActive === true || hasPixieedrawAdFreeSupport();
     if (dom.controls.multiSupportPurchase instanceof HTMLElement) {
-      dom.controls.multiSupportPurchase.textContent = active
-        ? localizeText('特典を確認', 'View Benefits')
-        : localizeText('サポーター特典を見る', 'View Supporter Benefits');
+      dom.controls.multiSupportPurchase.textContent = localizeText('利用可能', 'Available');
     }
   }
 

@@ -4432,7 +4432,8 @@
       dom.controls.multiFlowAccountCard.hidden = isSignedInAccount;
     }
     if (dom.controls.multiSupportCard instanceof HTMLElement) {
-      dom.controls.multiSupportCard.hidden = !isSignedInAccount;
+      dom.controls.multiSupportCard.hidden = true;
+      dom.controls.multiSupportCard.setAttribute('aria-hidden', 'true');
     }
     if (dom.controls.multiCommentInput instanceof HTMLInputElement) {
       dom.controls.multiCommentInput.disabled = !canSendComment;

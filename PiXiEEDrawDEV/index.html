@@ -70,7 +70,7 @@
         return false;
       }
     })();
-    window.__PIXIEED_ADS_DISABLED__ = Boolean(window.__PIXIEED_ADS_DISABLED__ || isLocalDebug);
+    window.__PIXIEED_ADS_DISABLED__ = true;
     if (window.__PIXIEED_ADS_DISABLED__) {
       return;
     }
@@ -249,17 +249,17 @@
 <button class="button" id="projectHomeOpen" type="button">ファイルを開く</button>
 </div>
 </header>
-<section aria-label="コード適用" class="project-home-supporter" id="projectHomeJoinShared">
+<section aria-hidden="true" aria-label="コード適用" class="project-home-supporter" hidden id="projectHomeJoinShared">
 <div class="project-home-supporter__body">
 <h2 class="project-home-supporter__title" id="projectHomeAccessTitle">コード適用</h2>
-<p class="project-home-supporter__status" id="projectHomeAccessStatus">購入番号または購入コードを入力してください。</p>
+<p class="project-home-supporter__status" id="projectHomeAccessStatus">コード適用は停止中です。</p>
 </div>
 <div class="project-home-supporter__actions project-home-supporter__actions--compact">
-<input autocomplete="off" class="project-home-supporter__input" id="projectHomeJoinProjectKey" inputmode="text" maxlength="280" placeholder="購入番号 / 購入コード" spellcheck="false" type="text"/>
-<button class="button" id="projectHomeApplyAccessCode" type="button">適用</button>
+<input autocomplete="off" class="project-home-supporter__input" disabled id="projectHomeJoinProjectKey" inputmode="text" maxlength="280" placeholder="コード適用は停止中です" spellcheck="false" type="text"/>
+<button class="button" disabled id="projectHomeApplyAccessCode" type="button">適用</button>
 </div>
 <div class="project-home-supporter__actions">
-<a class="button button--primary" data-support-panel-trigger="true" data-support-preferred-product="pixiedraw_ad_free" href="#" id="projectHomeSupporterPurchase" rel="noopener">サポーター特典を見る</a>
+<a aria-hidden="true" class="button button--primary" hidden href="#" id="projectHomeSupporterPurchase" rel="noopener">利用停止中</a>
 </div>
 </section>
 <div class="project-home-screen__recent" id="projectHomeRecentProjects">
@@ -896,9 +896,9 @@
 <span aria-hidden="true" class="detail-panel__icon"><img alt="" src="assets/icons/ecticon_frame_01.png"/></span>
 <span id="detailAccountActionLabel">ログイン</span>
 </a>
-<a class="button detail-panel__action" data-support-panel-trigger="true" data-support-preferred-product="pixiedraw_ad_free" href="#" id="detailSupportPurchase" rel="noopener">
+<a aria-hidden="true" class="button detail-panel__action" hidden href="#" id="detailSupportPurchase" rel="noopener">
 <span aria-hidden="true" class="detail-panel__icon"><img alt="" src="assets/icons/ecticon_frame_06.png"/></span>
-<span>サポーター特典</span>
+<span>利用可能</span>
 </a>
 <button aria-haspopup="dialog" class="button detail-panel__action" id="openShortcutHelp" type="button">
 <span aria-hidden="true" class="detail-panel__icon"><img alt="" src="assets/icons/ecticon_frame_02.png"/></span>
@@ -1282,7 +1282,7 @@
 <p class="tool-spotlight-card__description" id="toolSpotlightContestDesc">保存した作品を投稿して、みんなの作品もチェックできます。</p>
 </div>
 </a>
-<a aria-hidden="true" class="tool-spotlight-card" data-support-panel-trigger="true" data-support-preferred-product="pixiedraw_ad_free" href="#" hidden="" id="toolSpotlightSupportTip" rel="noopener" role="listitem" target="_blank">
+<a aria-hidden="true" class="tool-spotlight-card" href="#" hidden="" id="toolSpotlightSupportTip" rel="noopener" role="listitem" target="_blank">
 <img alt="サポート" class="tool-spotlight-card__icon" src="../icon/PiXiEED.icon512.png"/>
 <div class="tool-spotlight-card__content">
 <h3 class="tool-spotlight-card__title" id="toolSpotlightTipTitle">サポート</h3>

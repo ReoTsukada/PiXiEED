@@ -54,6 +54,8 @@
   function setLocalViewportCanvasLayoutAnchor(left, top) {
     const count = Math.max(0, getLocalViewportCanvasCount());
     const currentScale = getCurrentLocalViewportCanvasLayoutScale();
+    const nextAnchorLeft = parseLocalViewportCanvasUnit((Number(left) || 0) / Math.max(currentScale, Number.EPSILON), 0) || 0;
+    const nextAnchorTop = parseLocalViewportCanvasUnit((Number(top) || 0) / Math.max(currentScale, Number.EPSILON), 0) || 0;
     const previousAnchorLeft = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorLeft, 0) || 0;
     const previousAnchorTop = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorTop, 0) || 0;
     const previousPositions = count > 0
@@ -70,9 +72,9 @@
     const nextState = normalizeLocalViewportCanvasState(
       {
         ...localViewportCanvasState,
-        layoutScale: getCurrentLocalViewportCanvasLayoutScale(),
-        anchorLeft: left,
-        anchorTop: top,
+        layoutScale: 1,
+        anchorLeft: nextAnchorLeft,
+        anchorTop: nextAnchorTop,
       },
       localViewportCanvasState
     );
@@ -83,18 +85,16 @@
       return false;
     }
     if (count > 0) {
-      const nextAnchorLeft = parseLocalViewportCanvasAxis(nextState.anchorLeft, 0) || 0;
-      const nextAnchorTop = parseLocalViewportCanvasAxis(nextState.anchorTop, 0) || 0;
       const nextPositions = previousPositions.map(position => {
         if (!position || position.left === null || position.top === null) {
           return position;
         }
-        const displayLeft = previousAnchorLeft + (position.left * currentScale);
-        const displayTop = previousAnchorTop + (position.top * currentScale);
+        const displayLeft = (previousAnchorLeft + position.left) * currentScale;
+        const displayTop = (previousAnchorTop + position.top) * currentScale;
         return normalizeLocalViewportCanvasPosition(
           {
-            left: (displayLeft - nextAnchorLeft) / Math.max(currentScale, Number.EPSILON),
-            top: (displayTop - nextAnchorTop) / Math.max(currentScale, Number.EPSILON),
+            left: (displayLeft / Math.max(currentScale, Number.EPSILON)) - nextAnchorLeft,
+            top: (displayTop / Math.max(currentScale, Number.EPSILON)) - nextAnchorTop,
           },
           position,
           {
@@ -132,13 +132,15 @@
   function getDisplayLocalViewportCanvasPosition(index, anchorLeft = 0, anchorTop = 0) {
     const storedPosition = getStoredLocalViewportCanvasPosition(index);
     const currentScale = getCurrentLocalViewportCanvasLayoutScale();
+    const anchorWorldLeft = parseLocalViewportCanvasAxis(anchorLeft, localViewportCanvasState?.anchorLeft) || 0;
+    const anchorWorldTop = parseLocalViewportCanvasAxis(anchorTop, localViewportCanvasState?.anchorTop) || 0;
     return {
       left: storedPosition.left === null
         ? null
-        : Math.round(anchorLeft + (storedPosition.left * currentScale)),
+        : Math.round((anchorWorldLeft + storedPosition.left) * currentScale),
       top: storedPosition.top === null
         ? null
-        : Math.round(anchorTop + (storedPosition.top * currentScale)),
+        : Math.round((anchorWorldTop + storedPosition.top) * currentScale),
     };
   }
 
@@ -160,10 +162,12 @@
     const anchorLeft = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorLeft, 0) || 0;
     const anchorTop = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorTop, 0) || 0;
     const currentScale = getCurrentLocalViewportCanvasLayoutScale();
+    const worldLeft = (Number(left) || 0) / Math.max(currentScale, Number.EPSILON);
+    const worldTop = (Number(top) || 0) / Math.max(currentScale, Number.EPSILON);
     nextPositions[safeIndex] = normalizeLocalViewportCanvasPosition(
       {
-        left: (Number(left) - anchorLeft) / Math.max(currentScale, Number.EPSILON),
-        top: (Number(top) - anchorTop) / Math.max(currentScale, Number.EPSILON),
+        left: worldLeft - anchorLeft,
+        top: worldTop - anchorTop,
       },
       nextPositions[safeIndex],
       {
@@ -174,7 +178,7 @@
     const nextState = normalizeLocalViewportCanvasState(
       {
         ...localViewportCanvasState,
-        layoutScale: getCurrentLocalViewportCanvasLayoutScale(),
+        layoutScale: 1,
         positionsRelative: true,
         positions: nextPositions,
       },
@@ -200,8 +204,15 @@
       return false;
     }
     const defaults = computeDefaultLocalViewportCanvasPositions();
-    const anchorLeft = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorLeft, null) ?? defaults.main.left;
-    const anchorTop = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorTop, null) ?? defaults.main.top;
+    const currentScale = getCurrentLocalViewportCanvasLayoutScale();
+    const storedAnchorLeft = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorLeft, null);
+    const storedAnchorTop = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorTop, null);
+    const anchorLeft = storedAnchorLeft === null
+      ? defaults.main.left
+      : Math.round(storedAnchorLeft * currentScale);
+    const anchorTop = storedAnchorTop === null
+      ? defaults.main.top
+      : Math.round(storedAnchorTop * currentScale);
     const resolvedLayout = computeResolvedMultiCanvasWorldLayoutPositions(anchorLeft, anchorTop);
     setLocalViewportCanvasLayoutAnchor(resolvedLayout.main.left, resolvedLayout.main.top);
     resolvedLayout.locals.forEach((position, index) => {
@@ -220,7 +231,7 @@
       const nextState = normalizeLocalViewportCanvasState(
         {
           ...localViewportCanvasState,
-          layoutScale: getCurrentLocalViewportCanvasLayoutScale(),
+          layoutScale: 1,
           positionsRelative: true,
           anchorLeft: null,
           anchorTop: null,
@@ -251,7 +262,7 @@
     const nextState = normalizeLocalViewportCanvasState(
       {
         ...localViewportCanvasState,
-        layoutScale: getCurrentLocalViewportCanvasLayoutScale(),
+        layoutScale: 1,
         positionsRelative: true,
         anchorLeft: null,
         anchorTop: null,
@@ -1794,14 +1805,29 @@
 
   function computeResolvedMultiCanvasWorldLayoutPositions(anchorLeft = 0, anchorTop = 0) {
     const defaults = computeDefaultLocalViewportCanvasPositions();
+    const currentScale = getCurrentLocalViewportCanvasLayoutScale();
     const occupied = [];
     const mainCanvasDoc = getProjectCanvasDocumentAt(0);
     const mainScale = getProjectCanvasDisplayScale(mainCanvasDoc);
     const mainWidth = Math.max(1, Math.round(Number(mainCanvasDoc?.width) || Number(state.width) || 1)) * mainScale;
     const mainHeight = Math.max(1, Math.round(Number(mainCanvasDoc?.height) || Number(state.height) || 1)) * mainScale;
+    const requestedAnchorLeft = Number(anchorLeft);
+    const requestedAnchorTop = Number(anchorTop);
+    const fallbackAnchorLeft = Number(defaults.main?.left) || 0;
+    const fallbackAnchorTop = Number(defaults.main?.top) || 0;
+    const resolvedMainWorld = {
+      left: parseLocalViewportCanvasUnit(
+        (Number.isFinite(requestedAnchorLeft) ? requestedAnchorLeft : fallbackAnchorLeft) / Math.max(currentScale, Number.EPSILON),
+        0
+      ) || 0,
+      top: parseLocalViewportCanvasUnit(
+        (Number.isFinite(requestedAnchorTop) ? requestedAnchorTop : fallbackAnchorTop) / Math.max(currentScale, Number.EPSILON),
+        0
+      ) || 0,
+    };
     const resolvedMain = {
-      left: Math.round(Number(anchorLeft) || Number(defaults.main?.left) || 0),
-      top: Math.round(Number(anchorTop) || Number(defaults.main?.top) || 0),
+      left: Math.round(resolvedMainWorld.left * currentScale),
+      top: Math.round(resolvedMainWorld.top * currentScale),
     };
     occupied.push({
       left: resolvedMain.left,
@@ -1816,7 +1842,7 @@
       const displayScale = getProjectCanvasDisplayScale(canvasDoc);
       const width = Math.max(1, Math.round(Number(canvasDoc?.width) || Number(state.width) || 1)) * displayScale;
       const height = Math.max(1, Math.round(Number(canvasDoc?.height) || Number(state.height) || 1)) * displayScale;
-      const storedPosition = getDisplayLocalViewportCanvasPosition(index, resolvedMain.left, resolvedMain.top);
+      const storedPosition = getDisplayLocalViewportCanvasPosition(index, resolvedMainWorld.left, resolvedMainWorld.top);
       const defaultPosition = defaults.locals[index] || computeDefaultLocalViewportCanvasWorldPosition(index, resolvedMain.left, resolvedMain.top);
       let nextLeft = storedPosition.left ?? defaultPosition.left ?? resolvedMain.left;
       let nextTop = storedPosition.top ?? defaultPosition.top ?? resolvedMain.top;
@@ -1881,6 +1907,7 @@
     const totalCanvases = Math.max(1, getProjectCanvasCount());
     const multiCanvasWorldLayoutActive = isMultiCanvasWorldLayoutActive();
     const useCenteredMainPanel = isMainCanvasPanelCssCentered();
+    const currentScale = getCurrentLocalViewportCanvasLayoutScale();
     workspace.dataset.localCanvasLayout = totalCanvases > 1 ? 'free' : 'single';
     workspace.style.setProperty('--workspace-canvas-columns', '1');
     workspace.style.setProperty('--workspace-canvas-rows', '1');
@@ -1888,34 +1915,36 @@
       const shouldReset = Boolean(localViewportCanvasLayoutResetPending);
       const resolvedLayout = shouldReset
         ? computeResolvedMultiCanvasWorldLayoutPositions(
-          parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorLeft, null) ?? 0,
-          parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorTop, null) ?? 0
+          Math.round((parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorLeft, null) ?? 0) * currentScale),
+          Math.round((parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorTop, null) ?? 0) * currentScale)
         )
         : null;
       const defaults = resolvedLayout || computeDefaultLocalViewportCanvasPositions();
       const storedAnchorLeft = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorLeft, null);
       const storedAnchorTop = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorTop, null);
-      const anchorLeft = shouldReset
+      const anchorDisplayLeft = shouldReset
         ? resolvedLayout.main.left
-        : (storedAnchorLeft ?? defaults.main.left);
-      const anchorTop = shouldReset
+        : (storedAnchorLeft === null ? defaults.main.left : Math.round(storedAnchorLeft * currentScale));
+      const anchorDisplayTop = shouldReset
         ? resolvedLayout.main.top
-        : (storedAnchorTop ?? defaults.main.top);
+        : (storedAnchorTop === null ? defaults.main.top : Math.round(storedAnchorTop * currentScale));
+      const anchorWorldLeft = anchorDisplayLeft / Math.max(currentScale, Number.EPSILON);
+      const anchorWorldTop = anchorDisplayTop / Math.max(currentScale, Number.EPSILON);
       if (mainPanel) {
-        mainPanel.style.left = `${anchorLeft}px`;
-        mainPanel.style.top = `${anchorTop}px`;
+        mainPanel.style.left = `${anchorDisplayLeft}px`;
+        mainPanel.style.top = `${anchorDisplayTop}px`;
       }
-      setLocalViewportCanvasLayoutAnchor(anchorLeft, anchorTop);
+      setLocalViewportCanvasLayoutAnchor(anchorDisplayLeft, anchorDisplayTop);
       localViewportCanvasEntries.forEach((entry, index) => {
         if (!(entry.panel instanceof HTMLElement)) {
           return;
         }
         const storedPosition = shouldReset
           ? { left: null, top: null }
-          : getDisplayLocalViewportCanvasPosition(index, anchorLeft, anchorTop);
+          : getDisplayLocalViewportCanvasPosition(index, anchorWorldLeft, anchorWorldTop);
         const defaultPosition = shouldReset
-          ? (resolvedLayout.locals[index] || computeDefaultLocalViewportCanvasWorldPosition(index, anchorLeft, anchorTop))
-          : (defaults.locals[index] || computeDefaultLocalViewportCanvasWorldPosition(index, anchorLeft, anchorTop));
+          ? (resolvedLayout.locals[index] || computeDefaultLocalViewportCanvasWorldPosition(index, anchorDisplayLeft, anchorDisplayTop))
+          : (defaults.locals[index] || computeDefaultLocalViewportCanvasWorldPosition(index, anchorDisplayLeft, anchorDisplayTop));
         const left = storedPosition.left ?? defaultPosition.left;
         const top = storedPosition.top ?? defaultPosition.top;
         entry.panel.style.left = `${left}px`;
@@ -1931,8 +1960,14 @@
     const shouldReset = Boolean(localViewportCanvasLayoutResetPending);
     const storedAnchorLeft = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorLeft, null);
     const storedAnchorTop = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorTop, null);
-    const anchorLeft = shouldReset ? defaults.main.left : (storedAnchorLeft ?? defaults.main.left);
-    const anchorTop = shouldReset ? defaults.main.top : (storedAnchorTop ?? defaults.main.top);
+    const anchorLeft = shouldReset
+      ? defaults.main.left
+      : (storedAnchorLeft === null ? defaults.main.left : Math.round(storedAnchorLeft * currentScale));
+    const anchorTop = shouldReset
+      ? defaults.main.top
+      : (storedAnchorTop === null ? defaults.main.top : Math.round(storedAnchorTop * currentScale));
+    const anchorWorldLeft = anchorLeft / Math.max(currentScale, Number.EPSILON);
+    const anchorWorldTop = anchorTop / Math.max(currentScale, Number.EPSILON);
     if (mainPanel) {
       mainPanel.style.left = useCenteredMainPanel ? '0px' : `${anchorLeft}px`;
       mainPanel.style.top = useCenteredMainPanel ? '0px' : `${anchorTop}px`;
@@ -1947,7 +1982,7 @@
       }
       const storedPosition = shouldReset
         ? { left: null, top: null }
-        : getDisplayLocalViewportCanvasPosition(index, anchorLeft, anchorTop);
+        : getDisplayLocalViewportCanvasPosition(index, anchorWorldLeft, anchorWorldTop);
       const defaultPosition = {
         left: parseLocalViewportCanvasAxis(defaults.locals[index]?.left, null),
         top: parseLocalViewportCanvasAxis(defaults.locals[index]?.top, null),
@@ -2407,8 +2442,8 @@
             'Sign in to add 1 multi canvas.'
           )
           : localizeText(
-            'マルチキャンバスはサポーターになると3つまで追加できます。',
-            'Supporters can add up to 3 multi canvases.'
+            'マルチキャンバスは3つまで追加できます。',
+            'You can add up to 3 multi canvases.'
           ),
         'info'
       );

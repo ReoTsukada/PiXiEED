@@ -563,12 +563,19 @@
       const normalizedSelectedIndex = normalizedSelectedKind === 'local'
         ? clamp(requestedSelectedIndex, 0, Math.max(0, normalizedCount - 1))
         : -1;
-      const layoutScale = normalizeLocalViewportCanvasLayoutScale(
+      const storedLayoutScale = normalizeLocalViewportCanvasLayoutScale(
         settings.layoutScale,
         safeFallback.layoutScale
       );
-      const anchorLeft = parseLocalViewportCanvasAxis(settings.anchorLeft, safeFallback.anchorLeft);
-      const anchorTop = parseLocalViewportCanvasAxis(settings.anchorTop, safeFallback.anchorTop);
+      const fallbackLayoutScale = normalizeLocalViewportCanvasLayoutScale(safeFallback.layoutScale, storedLayoutScale);
+      const sourceAnchorLeft = parseLocalViewportCanvasAxis(settings.anchorLeft, safeFallback.anchorLeft);
+      const sourceAnchorTop = parseLocalViewportCanvasAxis(settings.anchorTop, safeFallback.anchorTop);
+      const anchorLeft = sourceAnchorLeft === null
+        ? null
+        : parseLocalViewportCanvasUnit(sourceAnchorLeft / Math.max(storedLayoutScale, Number.EPSILON), null);
+      const anchorTop = sourceAnchorTop === null
+        ? null
+        : parseLocalViewportCanvasUnit(sourceAnchorTop / Math.max(storedLayoutScale, Number.EPSILON), null);
       const fallbackAnchorLeft = parseLocalViewportCanvasAxis(safeFallback.anchorLeft, 0) || 0;
       const fallbackAnchorTop = parseLocalViewportCanvasAxis(safeFallback.anchorTop, 0) || 0;
       const positionsRelative = true;
@@ -576,7 +583,7 @@
         count: normalizedCount,
         selectedKind: normalizedSelectedKind,
         selectedIndex: normalizedSelectedIndex,
-        layoutScale,
+        layoutScale: 1,
         positionsRelative,
         anchorLeft,
         anchorTop,
@@ -587,12 +594,12 @@
           {
             relative: settings.positionsRelative !== false,
             fallbackRelative: safeFallback.positionsRelative !== false,
-            anchorLeft: anchorLeft ?? 0,
-            anchorTop: anchorTop ?? 0,
-            layoutScale,
+            anchorLeft: sourceAnchorLeft ?? 0,
+            anchorTop: sourceAnchorTop ?? 0,
+            layoutScale: storedLayoutScale,
             fallbackAnchorLeft,
             fallbackAnchorTop,
-            fallbackLayoutScale: normalizeLocalViewportCanvasLayoutScale(safeFallback.layoutScale, layoutScale),
+            fallbackLayoutScale,
           }
         ),
       };

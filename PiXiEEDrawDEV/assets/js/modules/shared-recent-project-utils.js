@@ -151,8 +151,8 @@
       );
     }
     return localizeText(
-      '無料枠では自分が作成した共有プロジェクトは同時に1件、作業人数は最大2人（マスターと参加者1人）です。500円サポートで作成枠は合計4件、人数は最大4人（参加者3人）まで増やせます。',
-      'The free tier allows 1 owned shared project for up to 2 people (master plus 1 participant). The 500 yen support plan raises this to 4 projects and up to 4 people (3 participants).'
+      '自分が作成した共有プロジェクトは同時に1件まで使えます。',
+      'You can have 1 shared project you own at the same time.'
     );
   }
 

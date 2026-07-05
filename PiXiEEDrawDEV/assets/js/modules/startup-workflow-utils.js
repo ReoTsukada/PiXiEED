@@ -1219,12 +1219,10 @@
       if (openedShared) {
         return;
       }
-      const rawCode = dom.controls.projectHomeJoinProjectKey instanceof HTMLInputElement
-        ? dom.controls.projectHomeJoinProjectKey.value
-        : '';
-      if (window.pixieedAdFree?.applyAccessValue) {
-        await window.pixieedAdFree.applyAccessValue(rawCode);
-      }
+      updateAutosaveStatus(
+        localizeText('コード適用は現在停止中です。', 'Code application is currently disabled.'),
+        'info'
+      );
     });
     dom.projectHomeRecentList?.addEventListener('click', async event => {
       const target = event.target instanceof Element ? event.target : null;

@@ -828,24 +828,19 @@
     }
     if (hintNode instanceof HTMLElement) {
       if (isSignedInAccount) {
-        hintNode.textContent = maxSharedProjects > SHARED_PROJECT_LIMIT_DEFAULT
-          ? localizeText(
-            `サポーター特典（500円）が適用中です。このアカウントで共有プロジェクトを最大${maxSharedProjects}件、共同編集最大4人、マルチキャンバス追加3つまで利用できます。`,
-            `Supporter benefits (500 yen) are active. This account can create up to ${maxSharedProjects} shared projects, edit with up to 4 people, and add up to 3 Multi Canvases.`
-          )
-          : localizeText(
-            'このアカウントで共有プロジェクトを1件作成できます。サポーター特典（500円）で4件、共同編集最大4人、マルチキャンバス追加3つまで拡張できます。',
-            'This account can create 1 shared project. Supporter benefits (500 yen) expand this to 4 projects, shared editing for up to 4 people, and up to 3 extra Multi Canvases.'
-          );
+        hintNode.textContent = localizeText(
+          `このアカウントで共有プロジェクトを最大${maxSharedProjects}件、共同編集最大4人、マルチキャンバス追加3つまで利用できます。`,
+          `This account can create up to ${maxSharedProjects} shared projects, edit with up to 4 people, and add up to 3 Multi Canvases.`
+        );
       } else if (canUseSharedAccount) {
         hintNode.textContent = localizeText(
-          'ログインすると共有プロジェクトを1件作成できます。サポーター特典（500円）で4件、共同編集最大4人まで拡張できます。',
-          'Sign in to create 1 shared project. Supporter benefits (500 yen) expand this to 4 projects and shared editing for up to 4 people.'
+          'ログインすると共有プロジェクトを作成できます。マルチキャンバスはログインなしで利用できます。',
+          'Sign in to create shared projects. Multi Canvas is available without sign-in.'
         );
       } else {
         hintNode.textContent = localizeText(
-          '共有プロジェクトの作成とコード参加にはログインが必要です。サポーター特典は500円で共有枠と共同編集人数を拡張できます。',
-          'Sign-in is required to create shared projects and join by code. Supporter benefits are 500 yen and expand shared slots and member limits.'
+          '共有プロジェクトの作成とコード参加にはログインが必要です。マルチキャンバスはログインなしで利用できます。',
+          'Sign-in is required to create shared projects and join by code. Multi Canvas is available without sign-in.'
         );
       }
     }
@@ -882,14 +877,15 @@
       dom.controls.multiFlowAccountLogin
     );
     if (dom.controls.projectHomeJoinProjectKey instanceof HTMLInputElement) {
-      dom.controls.projectHomeJoinProjectKey.disabled = false;
-      dom.controls.projectHomeJoinProjectKey.placeholder = localizeText('購入番号 / 購入コード', 'Purchase number / purchase code');
+      dom.controls.projectHomeJoinProjectKey.disabled = true;
+      dom.controls.projectHomeJoinProjectKey.placeholder = localizeText('コード適用は停止中です', 'Code application disabled');
     }
     if (dom.controls.projectHomeApplyAccessCode instanceof HTMLButtonElement) {
-      dom.controls.projectHomeApplyAccessCode.disabled = false;
+      dom.controls.projectHomeApplyAccessCode.disabled = true;
     }
     if (dom.controls.projectHomeJoinShared instanceof HTMLElement) {
-      dom.controls.projectHomeJoinShared.hidden = false;
+      dom.controls.projectHomeJoinShared.hidden = true;
+      dom.controls.projectHomeJoinShared.setAttribute('aria-hidden', 'true');
     }
     if (detailAccountActionLabel instanceof HTMLElement) {
       detailAccountActionLabel.textContent = isSignedInAccount
@@ -978,7 +974,7 @@
               return;
             }
             enforceSharedProjectOwnershipLimit().catch(error => {
-              console.warn('Failed to enforce shared project limit after ad-free update', error);
+              console.warn('Failed to enforce shared project limit after entitlement update', error);
             });
           });
         }
