@@ -206,10 +206,10 @@
       + 26
       + Math.min(12, safeBottom)
       + MOBILE_DRAWER_PEEK_HEIGHT_OFFSET;
-    const halfMin = Math.max(halfMinBase, portrait ? 232 : 220);
-    const halfCap = Math.max(halfMin, Math.min(Math.round(height * (portrait ? 0.42 : 0.48)), portrait ? 420 : 320));
+    const halfMin = Math.max(halfMinBase, portrait ? 188 : 210);
+    const halfCap = Math.max(halfMin, Math.min(Math.round(height * (portrait ? 0.34 : 0.46)), portrait ? 340 : 305));
     const half = clamp(
-      Math.round(height * (portrait ? 0.28 : 0.42)),
+      Math.round(height * (portrait ? 0.22 : 0.4)),
       halfMin,
       halfCap
     );
