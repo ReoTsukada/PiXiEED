@@ -86,6 +86,8 @@
       --accent-2: #ff719a;
       font-family: 'Fredoka', 'DotGothic16', system-ui, sans-serif;
       --hud-padding: clamp(18px, 4vw, 42px);
+      --hud-ad-gap-adjust: 8px;
+      --hud-nav-gap-adjust: 8px;
       --safe-top: env(safe-area-inset-top, 0px);
       --safe-right: env(safe-area-inset-right, 0px);
       --safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -593,7 +595,7 @@
     }
     .hud-top {
       position: absolute;
-      top: calc(var(--hud-padding) + var(--safe-top) + var(--ad-header-offset));
+      top: calc(var(--hud-padding) + var(--safe-top) + var(--ad-header-offset) - var(--hud-ad-gap-adjust));
       left: calc(var(--hud-padding) + var(--safe-left) + var(--ad-side-offset));
       right: calc(var(--hud-padding) + var(--safe-right));
       display: flex;
@@ -734,7 +736,7 @@
     }
     .hud-bottom {
       position: absolute;
-      bottom: calc(var(--hud-padding) + var(--safe-bottom) + var(--camera-bottom-nav-clearance));
+      bottom: calc(var(--hud-padding) + var(--safe-bottom) + var(--camera-bottom-nav-clearance) - var(--hud-nav-gap-adjust));
       left: calc(var(--hud-padding) + var(--safe-left) + var(--ad-side-offset));
       right: calc(var(--hud-padding) + var(--safe-right));
       display: flex;
