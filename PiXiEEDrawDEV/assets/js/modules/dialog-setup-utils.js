@@ -59,6 +59,24 @@
         setInlineGuidesVisible(event.target.checked);
       });
     }
+    if (dom.controls.closeOperationHelp instanceof HTMLButtonElement && dom.controls.closeOperationHelp.dataset.bound !== 'true') {
+      dom.controls.closeOperationHelp.dataset.bound = 'true';
+      dom.controls.closeOperationHelp.addEventListener('click', () => {
+        const dialog = dom.controls.operationHelpDialog;
+        if (dialog instanceof HTMLDialogElement && dialog.open) {
+          dialog.close();
+        }
+      });
+    }
+    if (dom.controls.operationHelpDialog instanceof HTMLDialogElement && dom.controls.operationHelpDialog.dataset.bound !== 'true') {
+      dom.controls.operationHelpDialog.dataset.bound = 'true';
+      dom.controls.operationHelpDialog.addEventListener('cancel', event => {
+        event.preventDefault();
+        if (dom.controls.operationHelpDialog.open) {
+          dom.controls.operationHelpDialog.close();
+        }
+      });
+    }
 
     renderHelpGuideEntries();
     applyHelpGuideSearchFilter();
