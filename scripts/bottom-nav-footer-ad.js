@@ -560,6 +560,8 @@
         --pixieed-top-ad-banner-gap:6px;
         --pixieed-top-ad-banner-top:6px;
         --pixieed-top-ad-offset:0px;
+        --pixieed-side-ad-offset:0px;
+        --pixieed-shared-side-ad-width:0px;
       }
       .pixieed-shared-top-ad{
         position:fixed;
@@ -620,8 +622,51 @@
       body[data-pixieed-page="pixiedraw"] .app{
         padding-top:var(--pixieed-top-ad-offset) !important;
       }
+      @media (orientation: landscape){
+        body[data-pixieed-page="pixiedraw"] .pixieed-shared-top-ad{
+          top:calc(env(safe-area-inset-top, 0px) + 6px);
+          bottom:calc(env(safe-area-inset-bottom, 0px) + 6px);
+          left:calc(env(safe-area-inset-left, 0px) + 6px);
+          transform:none;
+          width:clamp(96px, calc((100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 12px) / 3.2), 160px);
+          height:auto;
+          align-items:stretch;
+          justify-content:flex-start;
+        }
+        body[data-pixieed-page="pixiedraw"] .pixieed-shared-top-ad .ad-block{
+          border-radius:10px;
+        }
+        body[data-pixieed-page="pixiedraw"] .pixieed-shared-top-ad .ad-label{
+          top:4px;
+          left:50%;
+          transform:translateX(-50%);
+          writing-mode:vertical-rl;
+          text-orientation:mixed;
+          padding:2px 4px;
+          border-radius:6px;
+          letter-spacing:0.02em;
+        }
+        body[data-pixieed-page="pixiedraw"] .pixieed-shared-top-ad ins.adsbygoogle{
+          min-height:0 !important;
+        }
+        body[data-pixieed-page="pixiedraw"] .app{
+          padding-top:0 !important;
+          padding-left:calc(env(safe-area-inset-left, 0px) + var(--pixieed-side-ad-offset)) !important;
+        }
+      }
     `;
     document.head.appendChild(style);
+  }
+
+  function isLandscapeViewport() {
+    try {
+      if (window.matchMedia) {
+        return window.matchMedia('(orientation: landscape)').matches;
+      }
+      return window.innerWidth > window.innerHeight;
+    } catch (_error) {
+      return false;
+    }
   }
 
   function clearReservedTopSpace() {
@@ -637,6 +682,8 @@
       delete target.dataset.pixieedTopAdOriginalPaddingTop;
     }
     document.documentElement.style.setProperty('--pixieed-top-ad-offset', '0px');
+    document.documentElement.style.setProperty('--pixieed-side-ad-offset', '0px');
+    document.documentElement.style.setProperty('--pixieed-shared-side-ad-width', '0px');
     dispatchPixiedrawAdLayoutChange('clear-top-ad-space');
   }
 
@@ -652,14 +699,19 @@
       return;
     }
     const rect = ad.getBoundingClientRect();
-    const reserved = Math.max(0, Math.ceil(rect.height + 12));
+    const isPixiedrawLandscape = isPixiedrawPage() && isLandscapeViewport();
+    const reserved = Math.max(0, Math.ceil((isPixiedrawLandscape ? rect.width : rect.height) + 12));
     const reservedPx = `${reserved}px`;
-    document.documentElement.style.setProperty('--pixieed-top-ad-offset', reservedPx);
+    document.documentElement.style.setProperty('--pixieed-top-ad-offset', isPixiedrawLandscape ? '0px' : reservedPx);
+    document.documentElement.style.setProperty('--pixieed-side-ad-offset', isPixiedrawLandscape ? reservedPx : '0px');
+    document.documentElement.style.setProperty('--pixieed-shared-side-ad-width', isPixiedrawLandscape ? `${Math.max(0, Math.ceil(rect.width))}px` : '0px');
     if (target.dataset.pixieedTopAdPaddingApplied !== 'true') {
       target.dataset.pixieedTopAdPaddingApplied = 'true';
       target.dataset.pixieedTopAdOriginalPaddingTop = window.getComputedStyle(target).paddingTop || '0px';
     }
-    target.style.paddingTop = `calc(${target.dataset.pixieedTopAdOriginalPaddingTop || '0px'} + ${reservedPx})`;
+    target.style.paddingTop = isPixiedrawLandscape
+      ? (target.dataset.pixieedTopAdOriginalPaddingTop || '0px')
+      : `calc(${target.dataset.pixieedTopAdOriginalPaddingTop || '0px'} + ${reservedPx})`;
     dispatchPixiedrawAdLayoutChange(reason || 'reserve-top-ad-space');
   }
 
@@ -750,6 +802,13 @@
       return;
     }
     reserveTopSpace('resize-top-ad');
+  }, { passive: true });
+  window.addEventListener('orientationchange', () => {
+    if (isPixiedrawPage()) {
+      syncFooterAd();
+      return;
+    }
+    reserveTopSpace('orientation-change-top-ad');
   }, { passive: true });
   document.addEventListener('pixiedraw:mobile-chrome-change', syncFooterAd);
   if (window.visualViewport) {
