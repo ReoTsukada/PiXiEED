@@ -1096,10 +1096,16 @@
 </div>
 </div>
 </section>
-<section class="panel-section" data-section="help" id="panelHelp">
-<div class="panel-section__body help-panel">
-<div class="field field--list">
-<span id="helpPanelTitle">使い方ヘルプ</span>
+<section class="panel-section" data-section="help" id="panelHelp"></section>
+</div>
+<dialog aria-labelledby="helpPanelTitle" class="modal operation-help-modal" id="operationHelpDialog">
+<form class="modal__form" method="dialog">
+<header class="modal__header">
+<h2 class="modal__title" id="helpPanelTitle">使い方ヘルプ</h2>
+<button class="button modal__close" id="closeOperationHelp" type="button">閉じる</button>
+</header>
+<div class="modal__body operation-help-modal__body help-panel">
+<div class="field field--list operation-help-modal__controls">
 <p class="help-text" id="helpPanelLead">操作方法を検索できます。必要なキーワードを入力してください。</p>
 <label class="field field--compact" for="helpSearchInput">
 <span id="helpSearchLabel">検索</span>
@@ -1117,10 +1123,9 @@
 </div>
 <div class="help-panel__list" id="helpArticleList" role="list"></div>
 <p class="help-text" hidden="" id="helpNoResults">一致する項目はありません。</p>
-<div class="panel-ad-mount" data-panel-ad-mount="right"></div>
 </div>
-</section>
-</div>
+</form>
+</dialog>
 <dialog aria-labelledby="exportDialogTitle" class="modal" id="exportDialog">
 <form class="modal__form" id="exportDialogForm" method="dialog">
 <header class="modal__header">
@@ -1366,6 +1371,7 @@
 <form class="modal__form" method="dialog">
 <header class="modal__header">
 <h2 class="modal__title" id="shortcutHelpTitle">ショートカット一覧</h2>
+<button class="button modal__close" id="closeShortcutHelp" type="button">閉じる</button>
 </header>
 <div class="modal__body shortcut-help-modal__body">
 <div class="shortcut-help-section">
@@ -1420,15 +1426,13 @@
 <small class="export-ad__label">広告</small>
 </div>
 </div>
-<footer class="modal__footer">
-<button class="button button--primary" id="closeShortcutHelp" type="button">閉じる</button>
-</footer>
 </form>
 </dialog>
 <dialog aria-labelledby="updateHistoryTitle" class="modal update-history-modal" id="updateHistoryDialog">
 <form class="modal__form" method="dialog">
 <header class="modal__header">
 <h2 class="modal__title" id="updateHistoryTitle">更新情報</h2>
+<button class="button modal__close" id="closeUpdateHistory" type="button">閉じる</button>
 </header>
 <div class="modal__body update-history-modal__body">
 <p class="help-text">直近1年の更新内容を表示しています。</p>
@@ -1440,9 +1444,6 @@
 <small class="export-ad__label">広告</small>
 </div>
 </div>
-<footer class="modal__footer">
-<button class="button button--primary" id="closeUpdateHistory" type="button">閉じる</button>
-</footer>
 </form>
 </dialog>
 <script>
