@@ -126,14 +126,14 @@
           || canvasHeight
         )
       );
-      const fitScale = Math.min(viewportWidth / canvasWidth, viewportHeight / canvasHeight);
+      const portraitViewport = viewportHeight >= viewportWidth;
+      const fitScale = portraitViewport
+        ? (viewportWidth / canvasWidth)
+        : (viewportHeight / canvasHeight);
       if (!Number.isFinite(fitScale) || fitScale <= 0) {
         return MIN_ZOOM_RATIO;
       }
-      const baseScale = fitScale < 1
-        ? fitScale
-        : Math.max(MIN_ZOOM_RATIO, Math.min(fitScale, fitScale * SMALL_CANVAS_BASE_VIEWPORT_FILL_RATIO));
-      return clamp(baseScale, MIN_ZOOM_SCALE, MAX_ZOOM_BASE_SCALE);
+      return clamp(fitScale * 0.94, MIN_ZOOM_SCALE, MAX_ZOOM_BASE_SCALE);
     }
 
     function getZoomRatioForScale(scale, canvasDoc = null) {
