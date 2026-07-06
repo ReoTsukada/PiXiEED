@@ -155,7 +155,6 @@
 </div>
 </div>
 </div>
-<!-- Mobile ad placeholder: using bottom banner (mobileBottomAd) for PiXiEEDraw mobile layout -->
 <div class="app" id="appRoot">
 <div aria-atomic="true" aria-live="polite" class="global-loading-indicator" hidden="" id="globalLoadingIndicator" role="status">
 <div class="global-loading-indicator__label" id="globalLoadingIndicatorLabel">読み込み中…</div>
@@ -1761,185 +1760,8 @@
 	<script defer="" src="assets/js/modules/startup-tail-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/controls-mirror.js?v=2026.07.01-mirror-static-config-split-v1"></script>
 	<script defer="" src="assets/js/modules/external-tool-workflow-utils.js?v=2026.07.02-external-tool-workflow-split-v1"></script>
-	<script defer="" src="assets/js/pixieedraw-dev-switch.js?v=2026.07.03-pixieedrawdev-switch-fix5"></script>
-	<script defer="" src="assets/js/app.js?v=2026.07.03-pixieedrawdev-switch-fix5"></script>
-  <!-- Mobile bottom ad placeholder (visible in portrait / small screens) -->
-  <div id="mobileBottomAd" aria-hidden="false">
-    <div class="mobile-ad-box" id="mobileBottomAdSlot">
-      <ins class="ad-seed"
-           style="display:block"
-           data-ad-client="ca-pub-9801602250480253"
-           data-ad-slot="6568310446"
-           data-ad-format="horizontal"></ins>
-    </div>
-  </div>
-  <script>
-    (function () {
-      if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) {
-        document.documentElement.style.setProperty('--mobile-bottom-ad-height', '0px');
-        document.body.classList.remove('bottom-ad-active');
-        const mobileAd = document.getElementById('mobileBottomAd');
-        if (mobileAd instanceof HTMLElement) {
-          mobileAd.classList.remove('visible');
-          mobileAd.setAttribute('aria-hidden', 'true');
-        }
-        return;
-      }
-      // Manage the mobile bottom ad visibility and geometry by orientation.
-      const mobileAd = document.getElementById('mobileBottomAd');
-      if (!mobileAd) return;
-
-      const mql = window.matchMedia('(orientation: portrait)');
-      const mobileBottomAd = document.getElementById('mobileBottomAd');
-      const mobileBottomAdSlot = document.getElementById('mobileBottomAdSlot');
-      const MOBILE_AD_SLOT_HEIGHT = 48;
-      let raf = null;
-
-      function notifyAdLayoutChange(reason) {
-        try {
-          document.dispatchEvent(new CustomEvent('pixiedraw:ad-layout-change', {
-            detail: { source: 'mobileBottomAd', reason: reason || 'unknown' }
-          }));
-        } catch (error) {
-          // ignore
-        }
-      }
-
-      function clamp(value, min, max) {
-        return Math.max(min, Math.min(max, value));
-      }
-
-      function updateMobileBottomPadding() {
-        let slotHeight = MOBILE_AD_SLOT_HEIGHT;
-        try {
-          const target = (mobileBottomAdSlot instanceof HTMLElement) ? mobileBottomAdSlot : mobileBottomAd;
-          const rect = target && target.getBoundingClientRect ? target.getBoundingClientRect() : null;
-          const measured = Math.ceil((rect && rect.height) || slotHeight);
-          slotHeight = clamp(measured, MOBILE_AD_SLOT_HEIGHT - 4, MOBILE_AD_SLOT_HEIGHT + 4);
-        } catch (e) {}
-
-        const reserved = Math.ceil(slotHeight + 4);
-        document.documentElement.style.setProperty('--mobile-bottom-ad-height', reserved + 'px');
-      }
-
-      function enforceMobileBottomAdGeometry() {
-        if (!(mobileAd instanceof HTMLElement)) return;
-        const slotHeightPx = `${MOBILE_AD_SLOT_HEIGHT}px`;
-
-        mobileAd.style.setProperty('min-height', `calc(${slotHeightPx} + env(safe-area-inset-bottom, 0px))`, 'important');
-        mobileAd.style.setProperty('height', `calc(${slotHeightPx} + env(safe-area-inset-bottom, 0px))`, 'important');
-        mobileAd.style.setProperty('max-height', `calc(${slotHeightPx} + env(safe-area-inset-bottom, 0px))`, 'important');
-
-        if (mobileBottomAdSlot instanceof HTMLElement) {
-          mobileBottomAdSlot.style.setProperty('min-height', slotHeightPx, 'important');
-          mobileBottomAdSlot.style.setProperty('height', slotHeightPx, 'important');
-          mobileBottomAdSlot.style.setProperty('max-height', slotHeightPx, 'important');
-
-          const slotIns = mobileBottomAdSlot.querySelector('ins');
-          if (slotIns instanceof HTMLElement) {
-            slotIns.style.setProperty('min-height', slotHeightPx, 'important');
-            slotIns.style.setProperty('height', slotHeightPx, 'important');
-            slotIns.style.setProperty('max-height', slotHeightPx, 'important');
-            slotIns.style.setProperty('overflow', 'hidden', 'important');
-          }
-
-          mobileBottomAdSlot.querySelectorAll('iframe').forEach((frame) => {
-            if (!(frame instanceof HTMLElement)) return;
-            frame.style.setProperty('min-height', slotHeightPx, 'important');
-            frame.style.setProperty('height', slotHeightPx, 'important');
-            frame.style.setProperty('max-height', slotHeightPx, 'important');
-          });
-        }
-      }
-
-      function showAd() {
-        enforceMobileBottomAdGeometry();
-        if (!mobileAd.classList.contains('visible')) {
-          mobileAd.classList.add('visible');
-        }
-        if (mobileAd.getAttribute('aria-hidden') !== 'false') {
-          mobileAd.setAttribute('aria-hidden', 'false');
-        }
-      }
-
-      function hideAd() {
-        if (mobileAd.classList.contains('visible')) {
-          mobileAd.classList.remove('visible');
-        }
-        if (mobileAd.getAttribute('aria-hidden') !== 'true') {
-          mobileAd.setAttribute('aria-hidden', 'true');
-        }
-      }
-
-      function refreshMobileBottomAd() {
-        if (raf) cancelAnimationFrame(raf);
-        raf = requestAnimationFrame(function () {
-          // Bottom ad: show in portrait as overlay at the bottom and mark body so CSS can add padding
-          if (mobileBottomAd) {
-            if (mql.matches) {
-              enforceMobileBottomAdGeometry();
-              showAd();
-              // keep layout stable even if ad network injects a tall creative.
-              updateMobileBottomPadding();
-              document.body.classList.add('bottom-ad-active');
-            } else {
-              hideAd();
-              document.documentElement.style.setProperty('--mobile-bottom-ad-height', '0px');
-              document.body.classList.remove('bottom-ad-active');
-            }
-          }
-
-          raf = null;
-        });
-      }
-
-      function refreshListeners() {
-        enforceMobileBottomAdGeometry();
-        refreshMobileBottomAd();
-        notifyAdLayoutChange('refreshListeners');
-      }
-
-      if (mobileBottomAdSlot instanceof HTMLElement) {
-        if (typeof ResizeObserver === 'function') {
-          const adResizeObserver = new ResizeObserver(() => {
-            enforceMobileBottomAdGeometry();
-            updateMobileBottomPadding();
-          });
-          adResizeObserver.observe(mobileBottomAdSlot);
-        }
-        const adMutationObserver = new MutationObserver(() => {
-          enforceMobileBottomAdGeometry();
-          updateMobileBottomPadding();
-        });
-        adMutationObserver.observe(mobileBottomAdSlot, {
-          attributes: true,
-          childList: true,
-          subtree: true,
-          attributeFilter: ['style', 'class', 'data-adsbygoogle-status']
-        });
-      }
-
-      if (mql && typeof mql.addEventListener === 'function') {
-        mql.addEventListener('change', () => {
-          refreshListeners();
-          notifyAdLayoutChange('orientation-change');
-        });
-      } else if (mql && typeof mql.addListener === 'function') {
-        mql.addListener(() => {
-          refreshListeners();
-          notifyAdLayoutChange('orientation-change');
-        });
-      }
-      window.addEventListener('resize', () => {
-        refreshListeners();
-        notifyAdLayoutChange('resize');
-      });
-      document.addEventListener('readystatechange', function () { if (document.readyState === 'complete') refreshListeners(); });
-
-      // initial setup
-      refreshListeners();
-    })();
-  </script>
+		<script defer="" src="assets/js/pixieedraw-dev-switch.js?v=2026.07.06-pixieedrawdev-shared-nav-fix1"></script>
+		<script defer="" src="assets/js/app.js?v=2026.07.06-pixieedrawdev-shared-nav-fix1"></script>
   <script>
     (function initPanelAdDocking() {
       const ads = {
@@ -2038,12 +1860,10 @@
       const SLOTS = [
         { containerId: 'leftPanelAdSlot', slot: '3806415737' },
         { containerId: 'rightPanelAdSlot', slot: '1180252398' },
-        { containerId: 'multiSupportAdSlot', slot: '2141591954' },
-        { containerId: 'mobileBottomAdSlot', slot: '6568310446' }
+        { containerId: 'multiSupportAdSlot', slot: '2141591954' }
       ];
       const SIDE_SLOT_IDS = ['leftPanelAdSlot', 'rightPanelAdSlot', 'multiSupportAdSlot'];
       const MIN_SIDE_AD_WIDTH = 140;
-      const MIN_MOBILE_BOTTOM_AD_WIDTH = 250;
       const RETRY_FRAMES = 96;
       const slotByContainerId = new Map(SLOTS.map(item => [item.containerId, item]));
       const resizeObserverByContainer = new WeakMap();
@@ -2066,7 +1886,7 @@
       }
 
       function getAdLayoutMode() {
-        return isPortraitBottomOnlyMode() ? 'portrait-bottom' : 'landscape-side';
+        return 'side-only';
       }
 
       function resetSlotContainer(containerId) {
@@ -2090,7 +1910,7 @@
       }
 
       function getCurrentModeTargetIds() {
-        return isPortraitBottomOnlyMode() ? ['mobileBottomAdSlot'] : SIDE_SLOT_IDS;
+        return SIDE_SLOT_IDS;
       }
 
       function resetCurrentModeSlots() {
@@ -2154,9 +1974,7 @@
         if (handleAdLayoutTransition()) {
           return;
         }
-        const portraitBottomOnly = isPortraitBottomOnlyMode();
-        const targetContainerIds = portraitBottomOnly ? ['mobileBottomAdSlot'] : SIDE_SLOT_IDS;
-        targetContainerIds.forEach((containerId) => {
+        SIDE_SLOT_IDS.forEach((containerId) => {
           queueRenderForContainer(document.getElementById(containerId));
         });
       }
@@ -2171,9 +1989,7 @@
       }
 
       function isMobileBottomSlot(container) {
-        if (!(container instanceof HTMLElement)) return false;
-        if (container.id === 'mobileBottomAdSlot') return true;
-        return Boolean(container.closest && container.closest('#mobileBottomAd'));
+        return false;
       }
 
       function getSideSlotId(container) {
@@ -2206,7 +2022,7 @@
       }
 
       function getRequiredWidth(container) {
-        return isMobileBottomSlot(container) ? MIN_MOBILE_BOTTOM_AD_WIDTH : MIN_SIDE_AD_WIDTH;
+        return MIN_SIDE_AD_WIDTH;
       }
 
       function isContainerRenderable(container) {
@@ -2304,9 +2120,6 @@
       }
 
       function tryRender(container) {
-        const portraitBottomOnly = isPortraitBottomOnlyMode();
-        if (portraitBottomOnly && !isMobileBottomSlot(container)) return false;
-        if (!portraitBottomOnly && isMobileBottomSlot(container)) return false;
         if (!isSideRailExpanded(container)) return false;
         applySideSlotGeometry(container);
         if (!isContainerRenderable(container)) return false;
@@ -2350,13 +2163,6 @@
 
       function queueRenderForContainer(container) {
         if (!(container instanceof HTMLElement)) return;
-        const portraitBottomOnly = isPortraitBottomOnlyMode();
-        if (portraitBottomOnly && container.id !== 'mobileBottomAdSlot') {
-          return;
-        }
-        if (!portraitBottomOnly && container.id === 'mobileBottomAdSlot') {
-          return;
-        }
         const slotConfig = slotByContainerId.get(container.id);
         if (!slotConfig) return;
         if (!isSideRailExpanded(container)) {
@@ -2436,6 +2242,7 @@
     })();
   </script>
 
-  <script src="../scripts/pixel-art-fit.js"></script>
-</body>
-</html>
+	  <script src="../scripts/shared-bottom-nav.js"></script>
+	  <script src="../scripts/pixel-art-fit.js"></script>
+	</body>
+	</html>
