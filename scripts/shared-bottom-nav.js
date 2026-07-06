@@ -11,19 +11,11 @@
     return;
   }
   const currentTab = resolveCurrentTab(pageUrl.pathname);
-  const navMode = script.dataset.pixieedNavMode || script.dataset.navMode || 'default';
-  const isToolNav = navMode === 'tool';
 
   injectStyles();
-  if (isToolNav) {
-    body.dataset.pixieedSharedNavMode = 'tool';
-  } else {
-    replaceFooter();
-  }
+  replaceFooter();
   replaceBottomNav();
-  if (!isToolNav) {
-    ensureFooterAdController();
-  }
+  ensureFooterAdController();
 
   function resolveCurrentTab(pathname) {
     const path = String(pathname || '').toLowerCase();
@@ -97,7 +89,7 @@
     doc.querySelectorAll('.bottom-nav').forEach((node) => node.remove());
 
     const nav = doc.createElement('nav');
-    nav.className = `bottom-nav${isToolNav ? ' bottom-nav--tool' : ''}`;
+    nav.className = 'bottom-nav';
     nav.setAttribute('aria-label', '下部ナビ');
 
     getNavItems().forEach((entry) => {
@@ -126,7 +118,6 @@
       }
 
       const label = doc.createElement('span');
-      label.className = 'bottom-nav__label';
       label.textContent = entry.label;
 
       item.append(icon, label);
@@ -178,7 +169,7 @@
     style.id = 'pixieed-shared-bottom-nav-style';
     style.textContent = `
       body{
-        padding-bottom:${isToolNav ? '0' : 'max(132px, calc(132px + env(safe-area-inset-bottom, 0px)))'} !important;
+        padding-bottom:max(132px, calc(132px + env(safe-area-inset-bottom, 0px))) !important;
       }
       .pixieed-shared-footer{
         color:#cbd5e1;
@@ -307,72 +298,6 @@
         background:rgba(255,255,255,0.08);
         border:1px solid rgba(255,255,255,0.16);
         padding:2px;
-      }
-      .bottom-nav--tool{
-        left:calc(env(safe-area-inset-left, 0px) + 8px);
-        right:calc(env(safe-area-inset-right, 0px) + 8px);
-        bottom:calc(env(safe-area-inset-bottom, 0px) + 8px);
-        height:56px;
-        max-width:440px;
-        margin:0 auto;
-        border:1px solid rgba(255,255,255,0.12);
-        border-radius:18px;
-        background:rgba(7,12,24,0.88);
-        box-shadow:0 14px 32px rgba(0,0,0,0.34);
-        z-index:70;
-      }
-      .bottom-nav--tool .bottom-nav__item{
-        font-size:10px;
-        gap:2px;
-        padding:6px 1px;
-      }
-      .bottom-nav--tool .bottom-nav__item .icon{
-        width:21px;
-        height:21px;
-      }
-      .bottom-nav--tool .bottom-nav__item--primary{
-        transform:none;
-      }
-      .bottom-nav--tool .bottom-nav__item--primary .icon{
-        width:28px;
-        height:28px;
-        border-radius:11px;
-        padding:5px;
-        box-shadow:0 7px 16px rgba(37,99,235,0.26), inset 0 1px 0 rgba(255,255,255,0.2);
-      }
-      body[data-pixieed-shared-nav-mode="tool"] .hud-bottom{
-        bottom:calc(var(--hud-padding, 18px) + var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 66px);
-      }
-      body[data-pixieed-shared-nav-mode="tool"] .qr-readout{
-        bottom:calc(var(--hud-padding, 18px) + var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + var(--vv-offset-bottom, 0px) + 72px);
-      }
-      body[data-pixieed-shared-nav-mode="tool"] .camera-permission__panel{
-        margin-bottom:66px;
-      }
-      @media (orientation: landscape){
-        .bottom-nav--tool{
-          right:auto;
-          left:calc(env(safe-area-inset-left, 0px) + 10px);
-          bottom:calc(env(safe-area-inset-bottom, 0px) + 10px);
-          width:min(150px, calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 20px));
-          max-width:150px;
-          height:50px;
-        }
-        .bottom-nav--tool .bottom-nav__label{
-          position:absolute;
-          width:1px;
-          height:1px;
-          padding:0;
-          margin:-1px;
-          overflow:hidden;
-          clip:rect(0, 0, 0, 0);
-          white-space:nowrap;
-          border:0;
-        }
-        body[data-pixieed-shared-nav-mode="tool"] .hud-bottom,
-        body[data-pixieed-shared-nav-mode="tool"] .qr-readout{
-          bottom:calc(var(--hud-padding, 18px) + var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + var(--vv-offset-bottom, 0px));
-        }
       }
     `;
     doc.head.appendChild(style);
