@@ -10443,6 +10443,25 @@ body.is-mobile-layout #newProjectDialog .modal__form {
   max-height: calc(100vh - 18px - var(--safe-area-top) - var(--safe-area-bottom));
 }
 
+body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] .modal[open] {
+  inset:
+    calc(var(--safe-area-top) + var(--pixieed-top-ad-offset, 0px))
+    var(--safe-area-right)
+    calc(var(--safe-area-bottom) + var(--pixieed-shared-bottom-nav-height, 0px))
+    var(--safe-area-left);
+}
+
+body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] #newProjectDialog .modal__form {
+  max-height: calc(
+    var(--mobile-viewport-height)
+    - var(--safe-area-top)
+    - var(--safe-area-bottom)
+    - var(--pixieed-top-ad-offset, 0px)
+    - var(--pixieed-shared-bottom-nav-height, 0px)
+    - 18px
+  );
+}
+
 body.is-mobile-layout #newProjectDialog .modal__body {
   gap: 6px;
 }
