@@ -215,6 +215,7 @@
     style.textContent = `
       :root{
         --pixieed-shared-bottom-nav-height:68px;
+        --pixieed-shared-side-nav-width:72px;
         --pixieed-shared-bottom-nav-offset:calc(var(--pixieed-shared-bottom-nav-height) + env(safe-area-inset-bottom, 0px));
       }
       html[data-pixieed-page="pixiedraw"]{
@@ -228,6 +229,44 @@
       }
       body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] .app{
         padding-bottom:max(84px, calc(var(--pixieed-shared-bottom-nav-height) + 16px + env(safe-area-inset-bottom, 0px))) !important;
+      }
+      @media (orientation: landscape){
+        body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"]{
+          padding-bottom:0 !important;
+        }
+        body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] .app{
+          padding-right:max(84px, calc(var(--pixieed-shared-side-nav-width) + 16px + env(safe-area-inset-right, 0px))) !important;
+          padding-bottom:0 !important;
+        }
+        body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] .bottom-nav{
+          top:0 !important;
+          right:0 !important;
+          bottom:0 !important;
+          left:auto !important;
+          width:var(--pixieed-shared-side-nav-width) !important;
+          height:100vh !important;
+          height:100dvh !important;
+          min-height:100vh !important;
+          min-height:100dvh !important;
+          max-height:100vh !important;
+          max-height:100dvh !important;
+          flex-direction:column !important;
+          justify-content:center;
+          gap:2px;
+          padding:calc(env(safe-area-inset-top, 0px) + 8px) 0 calc(env(safe-area-inset-bottom, 0px) + 8px) !important;
+          border-top:0;
+          border-left:1px solid rgba(255,255,255,0.08);
+          box-sizing:border-box;
+        }
+        body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] .bottom-nav__item{
+          width:100%;
+          flex:1 1 0 !important;
+          max-height:76px;
+          padding:5px 2px !important;
+        }
+        body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] .bottom-nav__item--primary{
+          transform:none !important;
+        }
       }
       .pixieed-shared-footer{
         color:#cbd5e1;
