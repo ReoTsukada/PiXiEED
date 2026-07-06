@@ -32,6 +32,9 @@
   }
 
   function ensureFooterAdController() {
+    if (script.dataset.pixieedFooterAd === 'false' || body.dataset.pixieedFooterAd === 'false') {
+      return;
+    }
     if (window.__PIXIEED_FOOTER_AD_CONTROLLER__ || doc.querySelector('script[data-pixieed-footer-ad-controller="true"]')) {
       return;
     }
