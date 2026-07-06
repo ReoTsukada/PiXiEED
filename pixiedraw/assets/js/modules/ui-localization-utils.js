@@ -478,7 +478,6 @@
       setLocalizedTextContent('#multiAssignBan', 'BAN', 'Ban');
   
       setLocalizedTextContent('#goHomeButton span:last-child', 'ホーム', 'Home');
-      setLocalizedTextContent('#goContestButton span:last-child', '広場', 'Plaza');
       setLocalizedTextContent('#pixieedAdFreeField > span', '広告非表示', 'Ads Hidden');
       setLocalizedTextContent('#pixieedAdFreeStatus', '広告非表示が有効です。', 'Ads are hidden.');
       setLocalizedTextContent('#pixieedAdFreePurchase', '利用可能', 'Available');
@@ -678,7 +677,6 @@
       setLocalizedTextContent('#toolSpotlightTipTitle', 'サポート', 'Support');
       setLocalizedTextContent('#toolSpotlightTipDesc', 'みんなの応援でPiXiEEDは成長することができます。', 'PiXiEED grows with everyone’s support.');
       setLocalizedTextContent('#toolSpotlightGoHome', 'ホームへ戻る', 'Back to Home');
-      setLocalizedTextContent('#toolSpotlightOpenContest', '広場を見る', 'View Plaza');
       setLocalizedTextContent('#loginPromptTitle', 'ログイン', 'Sign In');
       setLocalizedTextContent('#loginPromptLead', 'ログインすると、プロフィール共有、端末間の引き継ぎ、ログイン限定機能を利用できます。', 'Sign in to sync your profile, carry it to other devices, and use account-only features.');
       setLocalizedTextContent('#loginPromptGoHome', 'マイページでログイン', 'Open My Page Login');
