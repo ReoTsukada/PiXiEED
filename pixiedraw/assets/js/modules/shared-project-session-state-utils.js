@@ -432,6 +432,9 @@
     channelKey = activeSharedProjectChannelKey || '',
     extra = null,
   } = {}) {
+    if (!SHARED_PROJECTS_ENABLED) {
+      return;
+    }
     const sessionDebug = getSharedProjectRealtimeSessionDebugState();
     console.debug(`[shared-realtime] ${action}`, {
       ...sessionDebug,
