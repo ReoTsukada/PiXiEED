@@ -10,6 +10,7 @@
     recentProjectsCache,
     openProjectTabProjectWriteGuards,
     openProjectTabLongPressState,
+    SHARED_PROJECTS_ENABLED,
     getActiveOpenProjectTabId,
     getOpenProjectTabBusy,
     getOpenProjectTabSequence,
