@@ -695,6 +695,7 @@
       setLocalizedTextContent('#toggleInlineHelpLabel', '画面内の説明ラベルを表示', 'Show inline guide labels');
       setLocalizedTextContent('#helpClearSearch', 'クリア', 'Clear');
       setLocalizedTextContent('#helpNoResults', '一致する項目はありません。', 'No matching guides found.');
+      setLocalizedTextContent('#closeOperationHelp', '閉じる', 'Close');
       renderHelpGuideEntries();
       applyHelpGuideSearchFilter();
   
