@@ -49,6 +49,23 @@
 <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
 <script async="" crossorigin="anonymous" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253"></script>
 <script src="../scripts/pixieed-adfree.js?v=2026.06.01-serial-code-email"></script>
+<script>
+  (function configureEmbedMode() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const embedMode = params.get('embed') === '1' || params.get('embed') === 'true';
+      if (embedMode) {
+        document.documentElement.dataset.embedMode = 'true';
+        window.__PIXIEED_EMBED_MODE__ = true;
+        window.__PIXIEED_ADS_DISABLED__ = true;
+      } else {
+        window.__PIXIEED_EMBED_MODE__ = false;
+      }
+    } catch (_error) {
+      window.__PIXIEED_EMBED_MODE__ = false;
+    }
+  })();
+</script>
 <!-- Google tag (gtag.js) -->
 <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-SZPVXMX85G"></script>
 <script>
@@ -126,6 +143,18 @@
       -ms-user-select: none;
       -webkit-touch-callout: none;
       touch-action: none;
+    }
+    html[data-embed-mode="true"] {
+      --ad-header-offset: 0px;
+      --camera-bottom-nav-clearance: 0px;
+      --ad-side-offset: 0px;
+    }
+    html[data-embed-mode="true"] .lens-ad-banner,
+    html[data-embed-mode="true"] .capture-preview__ad,
+    html[data-embed-mode="true"] .bottom-nav,
+    html[data-embed-mode="true"] .pixieed-shared-footer,
+    html[data-embed-mode="true"] .ad-footer {
+      display: none !important;
     }
     main {
       position: relative;
