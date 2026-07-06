@@ -96,6 +96,7 @@
       --vv-offset-right: 0px;
       --vv-offset-bottom: 0px;
       --vv-offset-left: 0px;
+      --camera-bottom-nav-clearance: 68px;
       --lens-ad-aspect-ratio: 6.4; /* 320:50 */
       --lens-ad-landscape-aspect-ratio: 3.2; /* 320:100 */
       --lens-ad-landscape-min-width: 96px;
@@ -103,7 +104,7 @@
       --lens-ad-inline-padding: 6px;
       --lens-ad-banner-width: calc(var(--viewport-width) - var(--safe-left) - var(--safe-right) - (var(--lens-ad-inline-padding) * 2));
       --lens-ad-banner-height: max(50px, calc(var(--lens-ad-banner-width) / var(--lens-ad-aspect-ratio)));
-      --lens-ad-banner-gap: 16px;
+      --lens-ad-banner-gap: 6px;
       --lens-ad-banner-top: 6px;
       --ad-header-offset: calc(var(--lens-ad-banner-height) + var(--lens-ad-banner-gap));
       --ad-side-offset: 0px;
@@ -733,7 +734,7 @@
     }
     .hud-bottom {
       position: absolute;
-      bottom: calc(var(--hud-padding) + var(--safe-bottom));
+      bottom: calc(var(--hud-padding) + var(--safe-bottom) + var(--camera-bottom-nav-clearance));
       left: calc(var(--hud-padding) + var(--safe-left) + var(--ad-side-offset));
       right: calc(var(--hud-padding) + var(--safe-right));
       display: flex;
@@ -802,6 +803,43 @@
     }
     .hud-landscape-capture > * {
       pointer-events: auto;
+    }
+    body.is-landscape {
+      --camera-bottom-nav-clearance: 0px;
+      padding-bottom: 0 !important;
+    }
+    body.is-landscape .bottom-nav {
+      top: 0 !important;
+      right: 0 !important;
+      bottom: 0 !important;
+      left: auto !important;
+      width: 72px !important;
+      height: var(--viewport-height) !important;
+      min-height: var(--viewport-height) !important;
+      max-height: var(--viewport-height) !important;
+      flex-direction: column !important;
+      justify-content: center;
+      gap: 2px;
+      padding: calc(var(--safe-top) + 8px) 0 calc(var(--safe-bottom) + 8px) !important;
+      border-top: 0;
+      border-left: 1px solid rgba(255,255,255,0.08);
+      box-sizing: border-box;
+    }
+    body.is-landscape .bottom-nav__item {
+      width: 100%;
+      flex: 1 1 0 !important;
+      max-height: 76px;
+      padding: 5px 2px !important;
+    }
+    body.is-landscape .bottom-nav__item--primary {
+      transform: none !important;
+    }
+    body.is-landscape .hud-top,
+    body.is-landscape .hud-bottom {
+      right: calc(var(--hud-padding) + var(--safe-right) + var(--vv-offset-right) + 80px);
+    }
+    body.is-landscape .hud-landscape-capture {
+      right: calc(var(--hud-padding) + var(--safe-right) + var(--vv-offset-right) + 80px);
     }
     .zoom-meter {
       position: relative;
@@ -12181,7 +12219,7 @@
       });
     })();
   </script>
-  <script src="../scripts/shared-bottom-nav.js"></script>
+  <script src="../scripts/shared-bottom-nav.js" data-pixieed-footer-ad="false"></script>
   <script src="../scripts/pixel-art-fit.js"></script>
 </body>
 </html>
