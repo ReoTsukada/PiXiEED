@@ -57,21 +57,11 @@
     return /(?:^|\/)(?:pixiedraw|pixieedrawdev)(?:\/|\/index\.html)?$/.test(currentPath);
   }
 
-  function isPhoneLikeViewport() {
-    const coarsePointer = window.matchMedia
-      ? window.matchMedia('(pointer: coarse)').matches
-      : (navigator.maxTouchPoints || 0) > 0;
-    const width = window.innerWidth || doc.documentElement.clientWidth || 0;
-    const height = window.innerHeight || doc.documentElement.clientHeight || 0;
-    const shortSide = Math.min(width, height);
-    return coarsePointer && shortSide > 0 && shortSide <= 820;
-  }
-
   function applyResponsivePageState() {
     if (!isPixiedrawPage()) {
       return;
     }
-    const mobileChromeActive = isPhoneLikeViewport();
+    const mobileChromeActive = true;
     body.dataset.pixieedMobileChrome = mobileChromeActive ? 'true' : 'false';
     doc.documentElement.dataset.pixieedMobileChrome = mobileChromeActive ? 'true' : 'false';
     doc.documentElement.style.setProperty('--mobile-bottom-ad-height', mobileChromeActive ? '68px' : '0px');
@@ -238,9 +228,6 @@
       }
       body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] .app{
         padding-bottom:max(84px, calc(var(--pixieed-shared-bottom-nav-height) + 16px + env(safe-area-inset-bottom, 0px))) !important;
-      }
-      body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="false"] .bottom-nav{
-        display:none !important;
       }
       .pixieed-shared-footer{
         color:#cbd5e1;
