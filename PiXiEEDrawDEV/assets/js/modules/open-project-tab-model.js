@@ -6,6 +6,7 @@
   const root = window.PiXiEEDrawModules = window.PiXiEEDrawModules || {};
 
   function createOpenProjectTabModel({
+    SHARED_PROJECTS_ENABLED,
     state,
     makeHistorySnapshot,
     buildProjectSessionPayload,
@@ -169,8 +170,12 @@
         return null;
       }
       const normalizedProjectId = normalizeAutosaveProjectId(projectId || getAutosaveProjectId?.() || '') || createAutosaveProjectId();
-      const normalizedSharedProjectKey = normalizeMultiProjectKey(sharedProjectKey || '')
-        || getSharedProjectKeyFromProjectId(normalizedProjectId);
+      const normalizedSharedProjectKey = SHARED_PROJECTS_ENABLED
+        ? (
+          normalizeMultiProjectKey(sharedProjectKey || '')
+          || getSharedProjectKeyFromProjectId(normalizedProjectId)
+        )
+        : '';
       const normalizedFileName = normalizeDocumentName(fileName || project?.documentName || project?.document?.documentName || DEFAULT_DOCUMENT_NAME);
       return {
         id: typeof id === 'string' && id ? id : createOpenProjectTabId(),
@@ -207,7 +212,9 @@
         const uniqueId = seenIds.has(id) ? createOpenProjectTabId() : id;
         seenIds.add(uniqueId);
         const fileName = normalizeDocumentName(sheet.fileName || sheet.name || sheet.project?.documentName || sheet.project?.document?.documentName || DEFAULT_DOCUMENT_NAME);
-        const sheetSharedProjectKey = normalizeMultiProjectKey(sheet.sharedProjectKey || '');
+        const sheetSharedProjectKey = SHARED_PROJECTS_ENABLED
+          ? normalizeMultiProjectKey(sheet.sharedProjectKey || '')
+          : '';
         normalized.push({
           id: uniqueId,
           fileName,
