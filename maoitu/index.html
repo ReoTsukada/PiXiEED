@@ -27,6 +27,23 @@ gtag('config', GA_MEASUREMENT_ID, {
 <!-- Google AdSense -->
 <script async="" crossorigin="anonymous" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253"></script>
 <script src="../scripts/pixieed-adfree.js"></script>
+<script>
+(() => {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const embedMode = params.get('embed') === '1' || params.get('embed') === 'true';
+    if (embedMode) {
+      document.documentElement.dataset.embedMode = 'true';
+      window.__PIXIEED_EMBED_MODE__ = true;
+      window.__PIXIEED_ADS_DISABLED__ = true;
+    } else {
+      window.__PIXIEED_EMBED_MODE__ = false;
+    }
+  } catch (_error) {
+    window.__PIXIEED_EMBED_MODE__ = false;
+  }
+})();
+</script>
 <!-- ▼ OGP / Twitterカード -->
 <meta content="魔王様！！いつまでよければいいですか！？" property="og:title"/>
 <meta content="魔王様を操作して敵を避け続けるブラウザ避けゲー。スマホ・PCで遊べるシンプル操作のアクションゲームです。" property="og:description"/>
@@ -109,6 +126,11 @@ html,body {
   max-width:var(--app-width);
   height:var(--app-height);
   overflow:hidden;
+}
+html[data-embed-mode="true"] .bottom-nav,
+html[data-embed-mode="true"] .pixieed-shared-footer,
+html[data-embed-mode="true"] .ad-footer {
+  display:none !important;
 }
 body {
   margin:0;
