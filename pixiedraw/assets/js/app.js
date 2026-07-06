@@ -642,7 +642,6 @@
       list: document.querySelector('#toolSpotlightDialog .tool-spotlight-list'),
       close: document.getElementById('closeToolSpotlight'),
       goHome: document.getElementById('toolSpotlightGoHome'),
-      openContest: document.getElementById('toolSpotlightOpenContest'),
       supportTip: document.getElementById('toolSpotlightSupportTip'),
     },
     loginPrompt: {
