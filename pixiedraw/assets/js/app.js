@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.07.04-shared-project-disabled1';
+  const APP_BUILD_VERSION = '2026.07.06-local-project-open-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECTS_ENABLED = false;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
@@ -11590,6 +11590,8 @@
 
   /** @type {any} */
   const sharedProjectSessionStateUtilsModule = window.PiXiEEDrawModules?.sharedProjectSessionStateUtils?.createSharedProjectSessionStateUtils?.({
+  get SHARED_PROJECTS_ENABLED() { return SHARED_PROJECTS_ENABLED; },
+  set SHARED_PROJECTS_ENABLED(value) {},
   get accountState() { return accountState; },
   set accountState(value) { accountState = value; },
   get activeSharedProjectChannel() { return activeSharedProjectChannel; },
