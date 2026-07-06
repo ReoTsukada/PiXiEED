@@ -4,8 +4,9 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.07.03-pixieedrawdev-switch-fix5';
+  const APP_BUILD_VERSION = '2026.07.06-pixieedrawdev-shared-nav-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
+  const SHARED_PROJECTS_ENABLED = false;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
   const PWA_CONTROLLER_CHANGE_RELOAD_SUPPRESS_MS = 8000;
 
