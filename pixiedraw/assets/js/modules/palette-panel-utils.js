@@ -1824,6 +1824,18 @@
         });
         fragment.appendChild(button);
       });
+      const addButton = document.createElement('button');
+      addButton.type = 'button';
+      addButton.className = 'tool-quick-color__swatch tool-quick-color__swatch--add pixel-frame';
+      addButton.textContent = '+';
+      addButton.title = localizeText('色を追加', 'Add color');
+      addButton.setAttribute('aria-label', localizeText('色を追加', 'Add color'));
+      addButton.disabled = !canCurrentClientEditPaletteColors()
+        || (isIndexColorMode() && state.palette.length >= MAX_IMPORTED_PALETTE_COLORS);
+      addButton.addEventListener('click', () => {
+        addPaletteColorFromCurrentEditor();
+      });
+      fragment.appendChild(addButton);
       container.appendChild(fragment);
       try {
         container.scrollTop = _prevToolQuickPaletteScroll;
