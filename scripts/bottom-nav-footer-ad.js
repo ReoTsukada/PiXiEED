@@ -511,211 +511,156 @@
     document.head.appendChild(script);
   }
 
-  function injectFooterAd({ reservedOnly = false } = {}) {
-    if (arePixieedAdsDisabled() && !reservedOnly) return;
-    const bottomNav = document.querySelector('.bottom-nav');
-    if (!bottomNav) return;
-    if (document.querySelector('.ad-footer')) return;
-
-    const syncPageGutter = () => {
-      const body = document.body;
-      if (!body) return;
-      const styles = window.getComputedStyle(body);
-      const left = Number.parseFloat(styles.paddingLeft) || 0;
-      const right = Number.parseFloat(styles.paddingRight) || 0;
-      const gutter = Math.max(left, right, 0);
-      document.documentElement.style.setProperty('--pixieed-page-gutter', `${gutter}px`);
-    };
-
-    const styleId = 'pixieed-ad-footer-style';
-    if (!document.getElementById(styleId)) {
-      const style = document.createElement('style');
-      style.id = styleId;
-      style.textContent = `
-        :root{
-          --pixieed-page-gutter:0px;
-          --pixieed-layout-max-width:100vw;
-          --pixieed-safe-bottom:env(safe-area-inset-bottom, 0px);
-          --pixieed-footer-ad-height:clamp(40px, 6.4vw, 52px);
-          --pixieed-footer-ad-padding-y:8px;
-          --pixieed-bottom-nav-height:60px;
-          --pixieed-bottom-nav-padding-y:6px;
-          --pixieed-footer-ad-total-height:calc(var(--pixieed-footer-ad-height) + (var(--pixieed-footer-ad-padding-y) * 2) + var(--pixieed-safe-bottom));
-          --pixieed-footer-ad-offset:var(--pixieed-footer-ad-total-height);
-          --pixieed-footer-ad-bg:#000;
-        }
-        @media (orientation: landscape){
-          :root{
-            --pixieed-page-gutter:clamp(18px, 3.6vw, 56px);
-            --pixieed-layout-max-width:1160px;
-          }
-        }
-        @media (min-width: 980px) and (orientation: landscape){
-          :root{
-            --pixieed-page-gutter:clamp(40px, 6vw, 128px);
-            --pixieed-layout-max-width:1040px;
-            --pixieed-footer-ad-height:44px;
-            --pixieed-footer-ad-total-height:calc(var(--pixieed-footer-ad-height) + (var(--pixieed-footer-ad-padding-y) * 2) + var(--pixieed-safe-bottom));
-            --pixieed-footer-ad-offset:var(--pixieed-footer-ad-total-height);
-          }
-        }
-        body.has-footer-ad > .page,
-        body.has-footer-ad > main{
-          width:100%;
-          max-width:min(var(--pixieed-layout-max-width), 100%);
-          min-width:0 !important;
-          margin-left:auto !important;
-          margin-right:auto !important;
-          overflow-x:clip !important;
-        }
-        body.has-footer-ad > .page > header,
-        body.has-footer-ad > .page > .top-nav,
-        body.has-footer-ad > .page > [aria-label="top-nav"]{
-          width:100%;
-          max-width:100% !important;
-          margin-left:0 !important;
-          margin-right:0 !important;
-        }
-        body.has-footer-ad .bottom-nav{
-          bottom:var(--pixieed-footer-ad-offset) !important;
-          height:calc(var(--pixieed-bottom-nav-height) + var(--pixieed-safe-bottom)) !important;
-          box-sizing:border-box !important;
-          padding:var(--pixieed-bottom-nav-padding-y) max(10px, env(safe-area-inset-right, 0px)) calc(var(--pixieed-bottom-nav-padding-y) + var(--pixieed-safe-bottom)) max(10px, env(safe-area-inset-left, 0px)) !important;
-        }
-        body.has-footer-ad .bottom-nav__item{
-          min-width:0 !important;
-          padding:4px 0 !important;
-          gap:3px !important;
-          font-size:11px !important;
-        }
-        body.has-footer-ad .bottom-nav__item .icon{
-          width:20px;
-          height:20px;
-          font-size:18px;
-          display:inline-flex;
-          align-items:center;
-          justify-content:center;
-        }
-        body.has-footer-ad .bottom-nav__item--primary{
-          transform:translateY(-8px) !important;
-          color:#fff !important;
-        }
-        body.has-footer-ad .bottom-nav__item--primary .icon{
-          width:42px !important;
-          height:42px !important;
-          border-radius:16px !important;
-          padding:7px !important;
-          background:linear-gradient(135deg,#2563eb,#7c3aed) !important;
-          border:1px solid rgba(255,255,255,0.24) !important;
-          box-shadow:0 10px 20px rgba(37,99,235,0.3), inset 0 1px 0 rgba(255,255,255,0.2) !important;
-        }
-        .ad-footer{
-          position:fixed;
-          left:0;
-          right:0;
-          bottom:0;
-          z-index:70;
-          width:auto !important;
-          max-width:none !important;
-          min-width:0 !important;
-          box-sizing:border-box;
-          padding:var(--pixieed-footer-ad-padding-y) env(safe-area-inset-right, 0px) calc(var(--pixieed-footer-ad-padding-y) + var(--pixieed-safe-bottom)) env(safe-area-inset-left, 0px);
-          display:flex !important;
-          justify-content:center;
-          align-items:center;
-          margin:0 !important;
-          margin-left:0 !important;
-          margin-right:0 !important;
-          overflow:hidden !important;
-          background:var(--pixieed-footer-ad-bg);
-          border-top:1px solid rgba(255,255,255,0.08);
-          backdrop-filter:blur(8px);
-          min-height:var(--pixieed-footer-ad-total-height);
-          contain:layout paint;
-        }
-        .ad-footer ins{
-          display:block !important;
-          width:100% !important;
-          max-width:min(720px, calc(100vw - 24px)) !important;
-          min-width:0 !important;
-          min-height:var(--pixieed-footer-ad-height);
-          margin:0 auto !important;
-          overflow:hidden !important;
-          background:var(--pixieed-footer-ad-bg) !important;
-          box-sizing:border-box !important;
-        }
-        .ad-footer ins iframe{
-          display:block !important;
-          width:100% !important;
-          max-width:100% !important;
-          min-width:0 !important;
-          margin:0 auto !important;
-          overflow:hidden !important;
-          background:var(--pixieed-footer-ad-bg) !important;
-          box-sizing:border-box !important;
-        }
-        .ad-footer ins.adsbygoogle[data-ad-status="unfilled"]{
-          background:var(--pixieed-footer-ad-bg) !important;
-        }
-        .ad-footer--reserved{
-          pointer-events:none;
-        }
-        .ad-footer--reserved::before{
-          content:"";
-          display:block;
-          width:100%;
-          max-width:min(720px, calc(100vw - 24px));
-          min-height:var(--pixieed-footer-ad-height);
-          margin:0 auto;
-          background:var(--pixieed-footer-ad-bg);
-        }
-      `;
-      document.head.appendChild(style);
-    }
-
-    document.body.classList.add('has-footer-ad');
-    if (!document.body.dataset.footerAdPaddingApplied) {
-      const currentPadding = window.getComputedStyle(document.body).paddingBottom || '0px';
-      document.body.style.paddingBottom = `calc(${currentPadding} + var(--pixieed-footer-ad-offset))`;
-      document.body.dataset.footerAdPaddingApplied = 'true';
-    }
-    syncPageGutter();
-    if (!window.__PIXIEED_FOOTER_AD_GUTTER_BOUND__) {
-      window.__PIXIEED_FOOTER_AD_GUTTER_BOUND__ = true;
-      window.addEventListener('resize', syncPageGutter, { passive: true });
-      if (window.visualViewport) {
-        window.visualViewport.addEventListener('resize', syncPageGutter, { passive: true });
-      }
-    }
-
-    const footer = document.createElement('div');
-    footer.className = reservedOnly ? 'ad-footer ad-footer--reserved' : 'ad-footer';
-    footer.setAttribute('aria-label', reservedOnly ? '広告枠' : '広告');
-    footer.setAttribute('aria-hidden', reservedOnly ? 'true' : 'false');
-    if (!reservedOnly) {
-      footer.innerHTML = `
-        <ins class="adsbygoogle"
-             style="display:block"
-             data-ad-client="ca-pub-9801602250480253"
-             data-ad-slot="rotate"></ins>
-      `;
-    }
-    document.body.appendChild(footer);
-
-    if (reservedOnly) {
-      return;
-    }
-    ensureAdsScript();
-    if (window.pixieedObserveAds) {
-      window.pixieedObserveAds();
-      return;
-    }
+  function isPixieeLensPage() {
     try {
-      window.adsbygoogle = window.adsbygoogle || [];
-      window.adsbygoogle.push({});
+      const path = String(window.location.pathname || '').toLowerCase();
+      return /(?:^|\/)pixiee-lens(?:\/|\/index\.html)?$/.test(path);
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  function isPixiedrawPage() {
+    try {
+      const path = String(window.location.pathname || '').toLowerCase();
+      return /(?:^|\/)(?:pixiedraw|pixieedrawdev)(?:\/|\/index\.html)?$/.test(path);
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  function isPixiedrawMobileChromeActive() {
+    if (!isPixiedrawPage()) return false;
+    const body = document.body;
+    const root = document.documentElement;
+    return body?.dataset.pixieedMobileChrome === 'true' || root?.dataset.pixieedMobileChrome === 'true';
+  }
+
+  function dispatchPixiedrawAdLayoutChange(reason) {
+    if (!isPixiedrawPage()) return;
+    try {
+      document.dispatchEvent(new CustomEvent('pixiedraw:ad-layout-change', {
+        detail: { source: 'sharedTopAd', reason: reason || 'sync' }
+      }));
     } catch (_error) {
       // ignore
     }
+  }
+
+  function ensureTopAdStyles() {
+    const styleId = 'pixieed-shared-top-ad-style';
+    if (document.getElementById(styleId)) {
+      return;
+    }
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = `
+      :root{
+        --pixieed-top-ad-inline-padding:6px;
+        --pixieed-top-ad-banner-gap:6px;
+        --pixieed-top-ad-banner-top:6px;
+        --pixieed-top-ad-offset:0px;
+      }
+      .pixieed-shared-top-ad{
+        position:fixed;
+        top:calc(env(safe-area-inset-top, 0px) + var(--pixieed-top-ad-banner-top));
+        left:50%;
+        transform:translateX(-50%);
+        width:min(640px, calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - (var(--pixieed-top-ad-inline-padding) * 2)));
+        height:clamp(50px, 7.6vw, 60px);
+        box-sizing:border-box;
+        z-index:14040;
+        display:flex;
+        justify-content:center;
+        align-items:center;
+        pointer-events:auto;
+      }
+      .pixieed-shared-top-ad .ad-block{
+        border:1px dashed rgba(255,255,255,0.2);
+        border-radius:8px;
+        background:linear-gradient(150deg, rgba(255,255,255,0.04), rgba(15,23,42,0.9));
+        padding:0;
+        box-shadow:0 10px 30px rgba(0,0,0,0.28);
+        position:relative;
+        width:100%;
+        height:100%;
+        max-width:none;
+        display:block;
+        overflow:hidden;
+      }
+      .pixieed-shared-top-ad .ad-label{
+        position:absolute;
+        top:2px;
+        left:4px;
+        background:rgba(0,0,0,0.6);
+        color:#cbd5e1;
+        font-size:9px;
+        padding:2px 5px;
+        border-radius:999px;
+        letter-spacing:0.04em;
+        line-height:1;
+        z-index:1;
+      }
+      .pixieed-shared-top-ad ins.adsbygoogle{
+        display:block;
+        width:100% !important;
+        max-width:100% !important;
+        min-width:0 !important;
+        min-height:100% !important;
+        height:100% !important;
+        max-height:100% !important;
+        overflow:hidden;
+      }
+      .pixieed-shared-top-ad ins.adsbygoogle iframe{
+        width:100% !important;
+        height:100% !important;
+        max-width:100% !important;
+        max-height:100% !important;
+      }
+      body[data-pixieed-page="pixiedraw"] .app{
+        padding-top:var(--pixieed-top-ad-offset) !important;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function clearReservedTopSpace() {
+    const body = document.body;
+    if (!(body instanceof HTMLElement)) return;
+    const target = isPixiedrawPage()
+      ? document.querySelector('.app')
+      : body;
+    if (!(target instanceof HTMLElement)) return;
+    if (target.dataset.pixieedTopAdPaddingApplied === 'true') {
+      target.style.paddingTop = target.dataset.pixieedTopAdOriginalPaddingTop || '';
+      delete target.dataset.pixieedTopAdPaddingApplied;
+      delete target.dataset.pixieedTopAdOriginalPaddingTop;
+    }
+    document.documentElement.style.setProperty('--pixieed-top-ad-offset', '0px');
+    dispatchPixiedrawAdLayoutChange('clear-top-ad-space');
+  }
+
+  function reserveTopSpace(reason) {
+    const body = document.body;
+    if (!(body instanceof HTMLElement) || isPixieeLensPage()) return;
+    const ad = document.querySelector('.pixieed-shared-top-ad');
+    const target = isPixiedrawPage()
+      ? document.querySelector('.app')
+      : body;
+    if (!(ad instanceof HTMLElement) || !(target instanceof HTMLElement)) {
+      clearReservedTopSpace();
+      return;
+    }
+    const rect = ad.getBoundingClientRect();
+    const reserved = Math.max(0, Math.ceil(rect.height + 12));
+    const reservedPx = `${reserved}px`;
+    document.documentElement.style.setProperty('--pixieed-top-ad-offset', reservedPx);
+    if (target.dataset.pixieedTopAdPaddingApplied !== 'true') {
+      target.dataset.pixieedTopAdPaddingApplied = 'true';
+      target.dataset.pixieedTopAdOriginalPaddingTop = window.getComputedStyle(target).paddingTop || '0px';
+    }
+    target.style.paddingTop = `calc(${target.dataset.pixieedTopAdOriginalPaddingTop || '0px'} + ${reservedPx})`;
+    dispatchPixiedrawAdLayoutChange(reason || 'reserve-top-ad-space');
   }
 
   function removeFooterAd() {
@@ -729,17 +674,57 @@
     }
   }
 
+  function removeTopAd() {
+    document.querySelectorAll('.pixieed-shared-top-ad').forEach((node) => node.remove());
+    clearReservedTopSpace();
+  }
+
+  function injectTopAd() {
+    if (arePixieedAdsDisabled() || isPixieeLensPage() || (isPixiedrawPage() && !isPixiedrawMobileChromeActive())) {
+      removeTopAd();
+      return;
+    }
+    ensureTopAdStyles();
+    removeFooterAd();
+
+    let banner = document.querySelector('.pixieed-shared-top-ad');
+    if (!(banner instanceof HTMLElement)) {
+      banner = document.createElement('div');
+      banner.className = 'pixieed-shared-top-ad';
+      banner.setAttribute('aria-label', '広告');
+      banner.innerHTML = `
+        <div class="ad-block">
+          <ins class="adsbygoogle"
+               style="display:block"
+               data-ad-client="ca-pub-9801602250480253"
+               data-ad-slot="2141591954"></ins>
+          <small class="ad-label">広告</small>
+        </div>
+      `;
+      document.body.appendChild(banner);
+    }
+
+    ensureAdsScript();
+    if (window.pixieedObserveAds) {
+      window.pixieedObserveAds(banner);
+    } else {
+      try {
+        window.adsbygoogle = window.adsbygoogle || [];
+        window.adsbygoogle.push({});
+      } catch (_error) {
+        // ignore
+      }
+    }
+    reserveTopSpace('inject-top-ad');
+  }
+
   function syncFooterAd() {
-    if (shouldReserveFooterAdOnly()) {
-      removeFooterAd();
-      injectFooterAd({ reservedOnly: true });
-      return;
-    }
+    removeFooterAd();
     if (arePixieedAdsDisabled()) {
-      removeFooterAd();
+      removeTopAd();
       return;
     }
-    injectFooterAd();
+    injectTopAd();
   }
 
   if (document.readyState === 'loading') {
@@ -759,4 +744,21 @@
   }
 
   window.addEventListener('pixieed:adfreechange', syncFooterAd);
+  window.addEventListener('resize', () => {
+    if (isPixiedrawPage()) {
+      syncFooterAd();
+      return;
+    }
+    reserveTopSpace('resize-top-ad');
+  }, { passive: true });
+  document.addEventListener('pixiedraw:mobile-chrome-change', syncFooterAd);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', () => {
+      if (isPixiedrawPage()) {
+        syncFooterAd();
+        return;
+      }
+      reserveTopSpace('visual-viewport-resize');
+    }, { passive: true });
+  }
 })();
