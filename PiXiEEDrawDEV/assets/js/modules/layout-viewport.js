@@ -288,7 +288,7 @@
       openedDocumentViewportResetRaf = null;
       const multiCanvasWorldLayoutActive = isMultiCanvasWorldLayoutActive();
       if (!multiCanvasWorldLayoutActive) {
-        resetViewportZoomRatio(MIN_ZOOM_RATIO);
+        resetViewportZoomRatio(1);
         state.pan.x = 0;
         state.pan.y = 0;
         requestLocalViewportCanvasLayoutReset({ clearStored: true });
