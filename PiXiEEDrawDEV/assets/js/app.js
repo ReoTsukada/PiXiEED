@@ -8284,6 +8284,210 @@
     'reorderCanvas',
   ]);
   const sharedProjectOpCodec = createDisabledSharedProjectModule();
+  const globalHistoryConfirmState = {
+    resolve: null,
+    closing: false,
+  };
+  const MEMORY_MONITOR_INTERVAL = 5000;
+  const MEMORY_WARNING_DEFAULT = 250 * 1024 * 1024;
+  const MIN_HISTORY_LIMIT = 20;
+  const DRAW_BUTTON_DRAG_THRESHOLD = 6;
+  const DRAW_BUTTON_DRAG_THRESHOLD_TOUCH = 12;
+  const MOVE_PAD_REPEAT_DELAY_MS = 220;
+  const MOVE_PAD_REPEAT_INTERVAL_MS = 80;
+  const SELECTION_TRANSFORM_ROTATION_STEP_DEG = 15;
+  const SELECTION_TRANSFORM_DRAG_THRESHOLD_PX = 6;
+  const SELECTION_TRANSFORM_MODE_DEADZONE_PX = 2;
+  const SELECTION_TRANSFORM_MODE_DEADZONE_CELLS = 0.5;
+  const SELECTION_TRANSFORM_MODE_DIRECTION_BIAS = 1.15;
+  const SELECTION_TRANSFORM_HANDLE_HIT_RADIUS_PX = 7;
+  const SELECTION_TRANSFORM_HANDLE_DRAW_RADIUS_PX = 7;
+  const SELECTION_TRANSFORM_PREVIEW_CACHE_MAX_PIXELS = 131072;
+  const SELECTION_TRANSFORM_LARGE_PREVIEW_MAX_PIXELS = 262144;
+  const SELECTION_TRANSFORM_SCALE_MIN = 0.125;
+  const SELECTION_TRANSFORM_SCALE_MAX = 8;
+  const SELECTION_TRANSFORM_SCALE_EPSILON = 0.001;
+  const MULTI_LAYER_PATCH_DEBOUNCE_MS = 40;
+  const TIMELINE_CELL_SIZE = 32;
+  const TIMELINE_CELL_VARIANTS = {
+    corner: { fill: 'rgba(16, 22, 32, 0.94)', border: 'rgba(210, 220, 240, 0.45)' },
+    frameHeader: { fill: 'rgba(18, 26, 38, 0.9)', border: 'rgba(160, 172, 190, 0.45)' },
+    frameHeaderActive: { fill: 'rgba(88, 196, 255, 0.3)', border: 'rgba(88, 196, 255, 0.7)' },
+    layer: { fill: 'rgba(18, 26, 38, 0.9)', border: 'rgba(160, 172, 190, 0.45)' },
+    layerActive: { fill: 'rgba(88, 196, 255, 0.26)', border: 'rgba(88, 196, 255, 0.68)' },
+    layerPlaceholder: { fill: 'rgba(12, 16, 24, 0.6)', border: 'rgba(130, 142, 162, 0.45)' },
+    layerHidden: { fill: 'rgba(26, 32, 44, 0.7)', border: 'rgba(118, 128, 148, 0.45)' },
+    layerActiveHidden: { fill: 'rgba(70, 100, 132, 0.6)', border: 'rgba(118, 128, 148, 0.6)' },
+    body: { fill: 'rgba(12, 16, 24, 0.7)', border: 'rgba(96, 108, 128, 0.42)' },
+    bodyActiveRow: { fill: 'rgba(88, 196, 255, 0.18)', border: 'rgba(88, 196, 255, 0.55)' },
+    bodyActiveColumn: { fill: 'rgba(88, 196, 255, 0.16)', border: 'rgba(88, 196, 255, 0.5)' },
+    bodyActiveCell: { fill: 'rgba(88, 196, 255, 0.32)', border: 'rgba(88, 196, 255, 0.75)' },
+    bodyEmpty: { fill: 'rgba(9, 13, 19, 0.55)', border: 'rgba(112, 124, 146, 0.42)' },
+    bodyHidden: { fill: 'rgba(20, 26, 36, 0.62)', border: 'rgba(112, 124, 146, 0.46)' },
+  };
+  const TIMELINE_SLOT_VARIANTS = {
+    default: { fill: 'rgba(16, 22, 30, 0.78)', border: 'rgba(136, 148, 168, 0.55)' },
+    active: { fill: 'rgba(88, 196, 255, 0.38)', border: 'rgba(88, 196, 255, 0.75)' },
+    hidden: { fill: 'rgba(14, 18, 26, 0.55)', border: 'rgba(120, 130, 150, 0.45)' },
+    disabled: { fill: 'rgba(9, 13, 19, 0.48)', border: 'rgba(96, 108, 128, 0.4)' },
+  };
+  const TIMELINE_BUTTON_VARIANTS = {
+    add: { fill: 'rgba(88, 196, 255, 0.3)', border: 'rgba(88, 196, 255, 0.7)' },
+    remove: { fill: 'rgba(255, 107, 107, 0.32)', border: 'rgba(255, 130, 130, 0.68)' },
+    playback: { fill: 'rgba(120, 150, 190, 0.28)', border: 'rgba(184, 200, 224, 0.6)' },
+    playbackActive: { fill: 'rgba(88, 196, 255, 0.36)', border: 'rgba(88, 196, 255, 0.78)' },
+    stop: { fill: 'rgba(255, 156, 126, 0.32)', border: 'rgba(255, 181, 152, 0.72)' },
+  };
+  const selectionTransformUi = {
+    handles: [],
+    hoverHandleId: '',
+    menuVisible: false,
+    menuHandleId: '',
+    menuLocalX: null,
+    menuLocalY: null,
+    interaction: null,
+  };
+  const TIMELINE_SELECTION_MODE_NONE = 'none';
+  const TIMELINE_SELECTION_MODE_FRAME = 'frame';
+  const TIMELINE_SELECTION_MODE_LAYER = 'layer';
+  const TIMELINE_SELECTION_MODE_SLOT = 'slot';
+  const timelineSelection = {
+    mode: TIMELINE_SELECTION_MODE_NONE,
+    frameIndexes: new Set(),
+    layerIndexes: new Set(),
+    slotKeys: new Set(),
+  };
+  let timelineMatrixInteractionBound = false;
+  let timelineMatrixRenderKey = '';
+  let timelineMatrixRenderDirty = false;
+  let timelineMatrixRafRenderHandle = null;
+  let timelineMatrixDeferredRenderHandle = null;
+  const timelineMatrixViewportPan = {
+    active: false,
+    moved: false,
+    axis: '',
+    pointerId: null,
+    startX: 0,
+    startY: 0,
+    startScrollLeft: 0,
+    startScrollTop: 0,
+    captureTarget: null,
+    suppressClickUntil: 0,
+  };
+  let secondaryCanvasRefreshHandle = null;
+  let toolButtons = [];
+  let renderScheduled = false;
+  let playbackHandle = null;
+  let playbackUiRefreshHandle = null;
+  let lastFrameTime = 0;
+  let playbackStartSelectionSnapshot = null;
+  const PLAYBACK_MAX_CATCHUP_STEPS = 6;
+  const PLAYBACK_CACHE_MAX_BYTES = 24 * 1024 * 1024;
+  const PLAYBACK_LARGE_FRAME_BYTES = 512 * 512 * 4;
+  const PLAYBACK_CACHE_MAX_NEARBY_RADIUS = 4;
+  const playbackFrameCache = {
+    active: false,
+    mode: 'lazy',
+    width: 0,
+    height: 0,
+    radius: 0,
+    byFrame: new Map(),
+  };
+  const simulationRuntime = {
+    playing: false,
+    handle: null,
+    lastTickAt: 0,
+  };
+  const simulationEditorState = {
+    paintMode: 'element',
+    element: 2,
+    depthValue: 96,
+    airValue: 96,
+    showLeftPalette: false,
+  };
+  let curveBuilder = null;
+  let paletteWheelCtx = null;
+  let paletteWheelResizeObserver = null;
+  let paletteWheelRenderKey = '';
+  let mirrorGuideResizeObserver = null;
+  let multiEntryMetricsResizeObserver = null;
+  let multiEntryMetricsRaf = null;
+  let railLayoutRefreshHandle = null;
+  let multiAutoResumeAttempted = false;
+  let multiInviteAutoJoinHandled = false;
+  let mirrorGuideSyncRaf = null;
+  let canvasResizeHandleLayoutRaf = null;
+  let deferredUiSetupScheduled = false;
+  let deferredUiSetupDone = false;
+  const paletteEditorState = {
+    hsv: { h: 0, s: 0, v: 1, a: 255 },
+    wheelPointer: { active: false, pointerId: null, upHandler: null, mode: null, captureTarget: null },
+    colorHistoryActive: false,
+    colorHistoryDirty: false,
+  };
+  let dirtyRegion = null;
+  let canvasControlMode = 'zoom';
+  /** @type {any} */
+  const canvasControlActionsWorkflowUtilsModule = window.PiXiEEDrawModules?.canvasControlActionsWorkflowUtils?.createCanvasControlActionsWorkflowUtils?.({
+  get activateMobileTab() { return activateMobileTab; },
+  set activateMobileTab(value) { activateMobileTab = value; },
+  get TOOL_TO_GROUP() { return TOOL_TO_GROUP; },
+  set TOOL_TO_GROUP(value) { TOOL_TO_GROUP = value; },
+  get canvasControlMode() { return canvasControlMode; },
+  set canvasControlMode(value) { canvasControlMode = value; },
+  get dom() { return dom; },
+  set dom(value) { dom = value; },
+  get getActiveLayer() { return getActiveLayer; },
+  set getActiveLayer(value) { getActiveLayer = value; },
+  get getRailExpandedToggleWidth() { return getRailExpandedToggleWidth; },
+  set getRailExpandedToggleWidth(value) { getRailExpandedToggleWidth = value; },
+  get internalClipboard() { return internalClipboard; },
+  set internalClipboard(value) { internalClipboard = value; },
+  get isCompactRightRailMode() { return isCompactRightRailMode; },
+  set isCompactRightRailMode(value) { isCompactRightRailMode = value; },
+  get isCompactToolFlyoutOpen() { return isCompactToolFlyoutOpen; },
+  set isCompactToolFlyoutOpen(value) { isCompactToolFlyoutOpen = value; },
+  get isCompactToolRailMode() { return isCompactToolRailMode; },
+  set isCompactToolRailMode(value) { isCompactToolRailMode = value; },
+  get isMobilePeekToolFlyoutMode() { return isMobilePeekToolFlyoutMode; },
+  set isMobilePeekToolFlyoutMode(value) { isMobilePeekToolFlyoutMode = value; },
+  get isMirrorToolPopoverOpen() { return isMirrorToolPopoverOpen; },
+  set isMirrorToolPopoverOpen(value) { isMirrorToolPopoverOpen = value; },
+  get isMultiSpectatorMode() { return isMultiSpectatorMode; },
+  set isMultiSpectatorMode(value) { isMultiSpectatorMode = value; },
+  get layoutMode() { return layoutMode; },
+  set layoutMode(value) { layoutMode = value; },
+  get makeIcon() { return makeIcon; },
+  set makeIcon(value) { makeIcon = value; },
+  get mobileDrawerState() { return mobileDrawerState; },
+  set mobileDrawerState(value) { mobileDrawerState = value; },
+  get normalizeMobileDrawerMode() { return normalizeMobileDrawerMode; },
+  set normalizeMobileDrawerMode(value) { normalizeMobileDrawerMode = value; },
+  get pointerState() { return pointerState; },
+  set pointerState(value) { pointerState = value; },
+  get selectionMaskHasPixels() { return selectionMaskHasPixels; },
+  set selectionMaskHasPixels(value) { selectionMaskHasPixels = value; },
+  get setCompactRightFlyoutOpen() { return setCompactRightFlyoutOpen; },
+  set setCompactRightFlyoutOpen(value) { setCompactRightFlyoutOpen = value; },
+  get setCompactToolFlyoutOpen() { return setCompactToolFlyoutOpen; },
+  set setCompactToolFlyoutOpen(value) { setCompactToolFlyoutOpen = value; },
+  get setMirrorToolPopoverOpen() { return setMirrorToolPopoverOpen; },
+  set setMirrorToolPopoverOpen(value) { setMirrorToolPopoverOpen = value; },
+  get setRailWidth() { return setRailWidth; },
+  set setRailWidth(value) { setRailWidth = value; },
+  get setRightTab() { return setRightTab; },
+  set setRightTab(value) { setRightTab = value; },
+  get state() { return state; },
+  set state(value) { state = value; },
+  get syncBrushControls() { return syncBrushControls; },
+  set syncBrushControls(value) { syncBrushControls = value; },
+  get updateFloatingMovePadVisibilityIfReady() { return updateFloatingMovePadVisibilityIfReady; },
+  set updateFloatingMovePadVisibilityIfReady(value) { updateFloatingMovePadVisibilityIfReady = value; },
+  get updateRightTabVisibility() { return updateRightTabVisibility; },
+  set updateRightTabVisibility(value) { updateRightTabVisibility = value; },
+  get updateToolVisibility() { return updateToolVisibility; },
+  set updateToolVisibility(value) { updateToolVisibility = value; },
+  }) || {};
 
 
   function openMirrorSettingsPanel(...args) {
@@ -10551,7 +10755,7 @@
     syncMultiControls();
   }
 
-  const sharedProjectSessionStateUtilsModule = createDisabledSharedProjectModule();
+  var sharedProjectSessionStateUtilsModule = createDisabledSharedProjectModule();
 
 
 
@@ -10634,29 +10838,29 @@
 
 
   function markAutosaveDirty(...args) {
-    return sharedProjectSessionStateUtilsModule.markAutosaveDirty(...args);
+    return sharedProjectSessionStateUtilsModule?.markAutosaveDirty?.(...args);
   }
 
   function handleAutosavePageHide(...args) {
-    return sharedProjectSessionStateUtilsModule.handleAutosavePageHide(...args);
+    return sharedProjectSessionStateUtilsModule?.handleAutosavePageHide?.(...args);
   }
 
   function handleAutosaveVisibilityChange(...args) {
-    return sharedProjectSessionStateUtilsModule.handleAutosaveVisibilityChange(...args);
+    return sharedProjectSessionStateUtilsModule?.handleAutosaveVisibilityChange?.(...args);
   }
 
   function scheduleAppReload(...args) {
-    return sharedProjectSessionStateUtilsModule.scheduleAppReload(...args);
+    return sharedProjectSessionStateUtilsModule?.scheduleAppReload?.(...args);
   }
 
   function requestManualAppReload(...args) {
-    return sharedProjectSessionStateUtilsModule.requestManualAppReload(...args);
+    return sharedProjectSessionStateUtilsModule?.requestManualAppReload?.(...args);
   }
 
 
 
 
-  const sharedProjectRecoveryLifecycleUtilsModule = createDisabledSharedProjectModule();
+  var sharedProjectRecoveryLifecycleUtilsModule = createDisabledSharedProjectModule();
 
 
 
@@ -10718,7 +10922,7 @@
 
 
   function queueSharedProjectReconnectRecovery(...args) {
-    return sharedProjectRecoveryLifecycleUtilsModule.queueSharedProjectReconnectRecovery(...args);
+    return sharedProjectRecoveryLifecycleUtilsModule?.queueSharedProjectReconnectRecovery?.(...args);
   }
 
 
@@ -10732,31 +10936,31 @@
   }
 
   function handleMultiVisibilityChange(...args) {
-    return sharedProjectRecoveryLifecycleUtilsModule.handleMultiVisibilityChange(...args);
+    return sharedProjectRecoveryLifecycleUtilsModule?.handleMultiVisibilityChange?.(...args);
   }
 
   function handleMultiWindowFocus(...args) {
-    return sharedProjectRecoveryLifecycleUtilsModule.handleMultiWindowFocus(...args);
+    return sharedProjectRecoveryLifecycleUtilsModule?.handleMultiWindowFocus?.(...args);
   }
 
   function handleMultiOnline(...args) {
-    return sharedProjectRecoveryLifecycleUtilsModule.handleMultiOnline(...args);
+    return sharedProjectRecoveryLifecycleUtilsModule?.handleMultiOnline?.(...args);
   }
 
   function handleMultiOffline(...args) {
-    return sharedProjectRecoveryLifecycleUtilsModule.handleMultiOffline(...args);
+    return sharedProjectRecoveryLifecycleUtilsModule?.handleMultiOffline?.(...args);
   }
 
   function handleMultiPageShow(...args) {
-    return sharedProjectRecoveryLifecycleUtilsModule.handleMultiPageShow(...args);
+    return sharedProjectRecoveryLifecycleUtilsModule?.handleMultiPageShow?.(...args);
   }
 
   function handleMultiDocumentResume(...args) {
-    return sharedProjectRecoveryLifecycleUtilsModule.handleMultiDocumentResume(...args);
+    return sharedProjectRecoveryLifecycleUtilsModule?.handleMultiDocumentResume?.(...args);
   }
 
   function handleMultiPageHide(...args) {
-    return sharedProjectRecoveryLifecycleUtilsModule.handleMultiPageHide(...args);
+    return sharedProjectRecoveryLifecycleUtilsModule?.handleMultiPageHide?.(...args);
   }
 
 
@@ -17496,11 +17700,26 @@
   }
 
   async function waitForStartupBootProgressReveal(...args) {
-    return sharedProjectParticipantUtilsModule.waitForStartupBootProgressReveal(...args);
+    await new Promise(resolve => window.setTimeout(resolve, 160));
   }
 
   function setStartupBootLoadingProgress(...args) {
-    return sharedProjectParticipantUtilsModule.setStartupBootLoadingProgress(...args);
+    const [percent, options = {}] = args;
+    const clamped = clamp(Math.round(Number(percent) || 0), 0, 100);
+    startupBootProgressPercent = options.force ? clamped : Math.max(startupBootProgressPercent, clamped);
+    startupBootProgressUpdatedAt = Date.now();
+    if (dom.startupBootLoadingLabel instanceof HTMLElement && options.label) {
+      dom.startupBootLoadingLabel.textContent = options.label;
+    }
+    if (dom.startupBootLoadingPercent instanceof HTMLElement) {
+      dom.startupBootLoadingPercent.textContent = `${startupBootProgressPercent}%`;
+    }
+    if (dom.startupBootLoadingFill instanceof HTMLElement) {
+      dom.startupBootLoadingFill.style.width = `${startupBootProgressPercent}%`;
+    }
+    if (dom.startupBootLoading instanceof HTMLElement) {
+      dom.startupBootLoading.hidden = false;
+    }
   }
 
   function setGlobalLoadingIndicatorLabel(...args) {
@@ -17512,7 +17731,21 @@
   }
 
   function beginStartupProgress(...args) {
-    return sharedProjectParticipantUtilsModule.beginStartupProgress(...args);
+    const [label = ''] = args;
+    startupProgressDepth += 1;
+    const nextLabel = label || localizeText('起動準備中…', 'Preparing startup...');
+    setStartupBootLoadingProgress(startupBootProgressPercent, { label: nextLabel, force: true });
+    let closed = false;
+    return () => {
+      if (closed) {
+        return;
+      }
+      closed = true;
+      startupProgressDepth = Math.max(0, startupProgressDepth - 1);
+      if (startupProgressDepth <= 0) {
+        startupProgressClose = null;
+      }
+    };
   }
 
   function cancelStartupRestoreProgress(...args) {
@@ -17520,7 +17753,14 @@
   }
 
   function setStartupProgressLabel(...args) {
-    return sharedProjectParticipantUtilsModule.setStartupProgressLabel(...args);
+    const [label = ''] = args;
+    if (startupProgressDepth <= 0) {
+      return;
+    }
+    setStartupBootLoadingProgress(startupBootProgressPercent, {
+      label: label || localizeText('起動準備中…', 'Preparing startup...'),
+      force: true,
+    });
   }
 
   function syncSharedModeStatusDisplay(...args) {
