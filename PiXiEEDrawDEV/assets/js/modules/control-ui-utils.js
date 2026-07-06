@@ -844,6 +844,18 @@
   }
 
   function openOperationHelpPanel() {
+    const dialog = dom.controls.operationHelpDialog;
+    if (dialog instanceof HTMLDialogElement && typeof dialog.showModal === 'function') {
+      renderHelpGuideEntries();
+      applyHelpGuideSearchFilter();
+      if (!dialog.open) {
+        dialog.showModal();
+      }
+      window.requestAnimationFrame(() => {
+        dom.controls.helpSearchInput?.focus?.({ preventScroll: true });
+      });
+      return;
+    }
     if (layoutMode === 'mobilePortrait') {
       activateMobileTab('help', { ensureDrawer: true });
       window.requestAnimationFrame(() => {
