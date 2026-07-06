@@ -6,6 +6,7 @@
   const root = window.PiXiEEDrawModules = window.PiXiEEDrawModules || {};
 
   function createOpenProjectTabModel({
+    SHARED_PROJECTS_ENABLED,
     state,
     makeHistorySnapshot,
     buildProjectSessionPayload,
