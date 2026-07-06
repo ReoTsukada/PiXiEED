@@ -9,6 +9,7 @@
     dom,
     openProjectTabs,
     recentProjectsCache,
+    SHARED_PROJECTS_ENABLED,
     MAX_PROJECT_SHEETS,
     AUTOSAVE_SUPPORTED,
     getActiveOpenProjectTabId,
