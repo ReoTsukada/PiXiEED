@@ -7193,6 +7193,21 @@ body.is-mobile-layout .mobile-draw-help {
   box-shadow: inset 0 0 0 2px rgba(var(--ui-rgb-focus), 0.7);
 }
 
+.tool-quick-color__swatch--add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(var(--ui-rgb-focus), 0.58);
+  background: transparent !important;
+  color: rgba(224, 255, 245, 0.96);
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.tool-quick-color__swatch--add::after {
+  content: none;
+}
+
 .tool-button {
   display: grid;
   gap: 10px;
@@ -12449,21 +12464,55 @@ body.is-mobile-layout .panel-ad-mount[hidden] {
   }
   body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelSettings .panel-section__body {
     padding-top: 4px;
-    padding-bottom: 12px;
+    padding-bottom: 8px;
   }
   body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelSettings .settings-nav-wrap {
     display: none;
   }
+  body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelSettings #settingsSizeTitle,
+  body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelSettings #canvasSizeHint,
+  body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelSettings .settings-color-mode-field,
+  body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelSettings .panel-ad-mount,
+  body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelSettings .panel-section__body > .field[role='group'] {
+    display: none;
+  }
+  body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelSettings .settings-size-grid {
+    gap: 0;
+  }
   body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelSettings .settings-size-row--combined {
-    gap: 5px;
-    padding: 6px;
+    gap: 4px;
+    padding: 5px;
   }
   body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelSettings .settings-size-controls--canvas {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(96px, 0.9fr);
+    gap: 4px;
+  }
+  body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelSettings .canvas-size-stepper input[type='number'],
+  body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelSettings .sprite-scale-stepper input[type='number'] {
+    min-height: 34px;
+    padding: 4px 6px;
+    font-size: 0.78rem;
+  }
+  body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelSettings .sprite-scale-stepper {
+    display: grid;
+    grid-template-columns: 32px minmax(40px, 1fr) 32px;
+    gap: 2px;
+    min-width: 0;
+  }
+  body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelSettings .sprite-scale-stepper .number-stepper__btn {
+    width: 32px;
+    min-width: 32px;
+    height: 34px;
+    min-height: 34px;
+    padding: 0;
+  }
+  body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelSettings .settings-size-apply-row {
     gap: 4px;
   }
   body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelSettings .settings-size-row--combined .settings-size-apply-row .button {
-    min-height: 38px;
-    padding: 6px 10px;
+    min-height: 34px;
+    padding: 4px 8px;
+    font-size: 0.74rem;
   }
   body.is-mobile-layout.is-unified-left-tools-color .mobile-drawer[data-mode='full'] #panelTools .tool-quick-color {
     display: none;
@@ -12528,18 +12577,18 @@ body.is-mobile-layout .panel-ad-mount[hidden] {
     height: 100%;
     min-height: 0;
     grid-template-columns: max-content minmax(0, 1fr) max-content;
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: 30px minmax(68px, 1fr);
     grid-template-areas:
       ". frame playback"
       "layer matrix matrix";
     align-items: stretch;
-    gap: 4px 6px;
+    gap: 3px 5px;
   }
 
   body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFrames .timeline-playback {
     grid-area: playback;
-    grid-template-columns: repeat(4, 32px);
-    grid-auto-rows: 32px;
+    grid-template-columns: repeat(4, 30px);
+    grid-auto-rows: 30px;
     justify-self: end;
     align-self: start;
     width: max-content;
@@ -12547,8 +12596,8 @@ body.is-mobile-layout .panel-ad-mount[hidden] {
   }
 
   body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFrames .timeline-playback .pixel-button {
-    width: 32px;
-    height: 32px;
+    width: 30px;
+    height: 30px;
   }
 
   body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFrames #rewindAnimation {
@@ -12571,7 +12620,7 @@ body.is-mobile-layout .panel-ad-mount[hidden] {
   body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFrames .timeline-matrix-wrapper {
     align-self: stretch;
     height: 100%;
-    min-height: 0;
+    min-height: 68px;
     max-height: 100%;
   }
 
