@@ -133,7 +133,8 @@
       { label: '会話', disabled: true },
       { label: '企業', path: 'portfolio/index.html' },
       { label: '利用規約', path: 'terms/index.html' },
-      { label: 'プライバシーポリシー', path: 'privacy/index.html' }
+      { label: 'プライバシーポリシー', path: 'privacy/index.html' },
+      { label: '特定商取引法に基づく表記', path: 'legal/index.html' }
     ];
   }
 
