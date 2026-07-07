@@ -853,7 +853,7 @@ const ENEMY_TYPES=ENEMY_TYPES_DATA.map(t=>({...t,skin:withAlpha(t.src)}));
 const PLAYER=withAlpha(PLAYER_SRC);
 const ANGEL=withAlpha(ANGEL_SRC);
 const PLAYER_START_X = 86;
-const PLAYER_START_Y = 232;
+const PLAYER_START_Y = 220;
 const PLAYER_START_TX = 96;
 
 // ====== 基本設定 ======
@@ -1048,6 +1048,7 @@ const ENEMY_DANGER_GLOW_SPRITE=createGlowSprite('255,70,70');
 const ANGEL_GLOW_SPRITE=createGlowSprite('16,255,180');
 const FEVER_GLOW_SPRITE=createGlowSprite('250,204,21');
 const SHIELD_GLOW_SPRITE=createGlowSprite('200,255,255');
+const PLAYER_GLOW_SPRITE=createGlowSprite('255,255,255');
 const FEVER_RAINBOW_COLORS = ['255,60,96', '255,188,54', '250,245,80', '49,230,142', '47,205,255', '110,92,255', '235,80,255'];
 let starOffset=0;
 let starOffsetNear=0;
@@ -2028,6 +2029,16 @@ function draw(alpha=1){
   const playerScaleX = 1 + Math.min(0.08, Math.abs(playerShift) * 0.03);
   const playerScaleY = 1 - Math.min(0.06, Math.abs(playerShift) * 0.02);
   const playerBob = Math.sin(elapsedFrames * (feverFrames > 0 ? 0.28 : 0.16)) * (feverFrames > 0 ? 0.7 : 0.24);
+  const playerGlowPulse = 0.52 + 0.48 * Math.sin(elapsedFrames * 0.14);
+  const playerGlowRadius = feverFrames > 0 ? 12.8 : 11.2 + playerGlowPulse * 1.8;
+  const playerGlowAlpha = feverFrames > 0 ? 0.12 : 0.12 + playerGlowPulse * 0.06;
+  drawGlowSprite(
+    PLAYER_GLOW_SPRITE,
+    px + P.w * 0.5,
+    py + P.h * 0.5 + playerBob * 0.5,
+    playerGlowRadius,
+    playerGlowAlpha
+  );
   if(P.skin.img.complete){
     if(feverFrames > 0){
       drawActorSprite(P.skin.img, P.px - playerShift * 0.45, py - 0.6, P.w, P.h, {
