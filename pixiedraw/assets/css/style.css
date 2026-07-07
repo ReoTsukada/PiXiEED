@@ -1772,7 +1772,7 @@ body:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .panel-section__b
   height: 100%;
   min-height: 0;
   display: block;
-  overflow: hidden;
+  overflow: auto;
 }
 
 body:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .panel-ad-mount {
@@ -1793,6 +1793,8 @@ body:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .timeline-card {
   padding: 4px;
   border: 0;
   background: transparent;
+  width: max-content;
+  min-width: max(100%, 720px);
 }
 
 body:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .timeline-toolbar {
@@ -1822,7 +1824,7 @@ body:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .timeline-toolbar
 body:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .timeline-toolbar__group--frame {
   grid-area: frame;
   display: inline-flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-self: start;
   justify-self: start;
   min-width: 0;
@@ -2057,15 +2059,15 @@ body.is-startup-active .bottom-timeline-dock {
 
 @media (max-width: 900px) {
   body:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .timeline-card {
-    grid-template-columns: max-content minmax(0, 1fr) max-content;
+    grid-template-columns: max-content minmax(0, 1fr) max-content minmax(164px, 22%);
     grid-template-rows: auto minmax(0, 1fr);
     grid-template-areas:
-      ". frame playback"
-      "layer matrix matrix";
+      ". frame playback settings"
+      "layer matrix matrix settings";
   }
 
   body:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .timeline-layer-settings {
-    display: none;
+    display: grid;
   }
 }
 
@@ -2391,7 +2393,7 @@ body.is-right-tool-rail:not(.is-mobile-layout) .bottom-timeline-dock #panelFrame
   height: 100%;
   min-height: 0;
   display: block;
-  overflow: hidden;
+  overflow: auto;
 }
 
 body.is-right-tool-rail:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .panel-ad-mount {
@@ -2402,19 +2404,19 @@ body.is-right-tool-rail:not(.is-mobile-layout) .bottom-timeline-dock #panelFrame
   height: 100%;
   min-height: 0;
   display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: max-content minmax(0, 1fr) max-content minmax(184px, 24%);
+  grid-template-rows: auto minmax(0, 1fr);
   grid-template-areas:
-    ". frame"
-    "layer matrix"
-    "playback playback"
-    "settings settings";
+    ". frame playback settings"
+    "layer matrix matrix settings";
   align-items: stretch;
   gap: 6px;
   padding: 6px;
   border: 0;
   background: transparent;
-  overflow: hidden;
+  overflow: visible;
+  width: max-content;
+  min-width: max(100%, 720px);
 }
 
 body.is-right-tool-rail:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .timeline-toolbar {
@@ -2436,7 +2438,7 @@ body.is-right-tool-rail:not(.is-mobile-layout) .bottom-timeline-dock #panelFrame
 body.is-right-tool-rail:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .timeline-toolbar__group--frame {
   grid-area: frame;
   display: inline-flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-self: start;
   justify-self: start;
 }
@@ -2501,8 +2503,8 @@ body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs {
   z-index: 1200;
   flex: 0 0 var(--project-tabs-height);
   height: var(--project-tabs-height);
-  margin-left: calc(-1 * var(--left-width));
-  margin-right: calc(-1 * var(--right-width));
+  margin-left: 0;
+  margin-right: 0;
   padding: 6px 4px 6px 8px;
   border: 0;
   border-bottom: 1px solid var(--workbench-line);
@@ -2778,8 +2780,8 @@ body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom
   align-items: center;
   gap: 8px;
   min-height: 0;
-  margin-left: max(0px, calc(var(--project-tabs-inset-left, 0px) - 24px));
-  margin-right: max(0px, calc(var(--project-tabs-inset-right, 0px) - 24px));
+  margin-left: 0;
+  margin-right: 0;
   padding: 6px 8px 4px;
   border: 1px solid var(--border);
   border-bottom: 0;
@@ -10494,7 +10496,7 @@ body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] .update-h
   }
 
   body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"].is-right-tool-rail:not(.is-mobile-layout) .project-tabs {
-    margin-left: calc(-1 * var(--left-width) + max(0px, calc(var(--pixieed-side-ad-offset, 0px) - 24px)));
+    margin-left: 0;
   }
 
   body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] .modal[open] {
