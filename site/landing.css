@@ -57,6 +57,17 @@ body:has(.home-app) {
   max-inline-size: 100%;
 }
 a { color: inherit; text-decoration: none; }
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 img,
 video,
 canvas,
@@ -1340,6 +1351,13 @@ body:has(.home-app) > .google-auto-placed {
     linear-gradient(180deg, rgba(5, 10, 20, 0.08) 0%, rgba(5, 10, 20, 0.42) 38%, rgba(5, 10, 20, 0.94) 100%),
     linear-gradient(90deg, rgba(5, 10, 20, 0.78) 0%, rgba(5, 10, 20, 0.2) 56%, rgba(5, 10, 20, 0.7) 100%);
 }
+.home-hero-card--simple .home-hero-slide {
+  background-color: #020617;
+  background-size: cover;
+}
+.home-hero-card--simple .home-hero-slide::after {
+  display: none;
+}
 .home-hero-slide__content {
   width: 100%;
   max-width: 760px;
@@ -1478,6 +1496,31 @@ body:has(.home-app) > .google-auto-placed {
   line-height: 1.3;
   overflow-wrap: anywhere;
 }
+.home-tool-detail-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  padding-top: 2px;
+}
+.home-tool-detail-links a {
+  min-height: 30px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.04);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+.home-tool-detail-links a:hover,
+.home-tool-detail-links a:focus-visible {
+  color: #f8fafc;
+  border-color: rgba(121,192,255,0.38);
+  background: rgba(121,192,255,0.1);
+  outline: none;
+}
 .home-tool-grid {
   display: grid;
   gap: 12px;
@@ -1572,6 +1615,12 @@ body:has(.home-app) > .google-auto-placed {
   font-size: 12px;
   line-height: 1.55;
 }
+.home-tool-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
 .home-tool-card__cta,
 .home-guide-button {
   justify-self: start;
@@ -1586,6 +1635,16 @@ body:has(.home-app) > .google-auto-placed {
   justify-content: center;
   font-size: 12px;
   font-weight: 800;
+}
+.home-tool-card__actions .button-secondary {
+  min-height: 30px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+}
+.home-panel--compact-links .home-mini-links {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 .home-panel--updates .home-updates {
   gap: 8px;
