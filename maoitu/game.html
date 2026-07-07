@@ -11,6 +11,23 @@
 <title>魔王様！！いつまでよければいいですか！？</title>
 <meta content="#000000" name="theme-color"/>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet"/>
+<script>
+(() => {
+  const params = new URLSearchParams(window.location.search);
+  const embedMode = params.get('embed') === '1' || params.get('embed') === 'true';
+  if (embedMode) {
+    document.documentElement.dataset.embedMode = 'true';
+    return;
+  }
+  const redirectUrl = new URL('./index.html', window.location.href);
+  redirectUrl.searchParams.set('play', '1');
+  const mode = params.get('mode');
+  if (mode) {
+    redirectUrl.searchParams.set('mode', mode);
+  }
+  window.location.replace(`${redirectUrl.pathname}${redirectUrl.search}`);
+})();
+</script>
 
 <!-- Google tag (gtag.js) -->
 <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-SZPVXMX85G"></script>
@@ -56,6 +73,13 @@ gtag('event', 'project_open_maoitu');
     min-height:100svh;
     touch-action:none;
     overscroll-behavior:none;
+  }
+  html[data-embed-mode="true"] .ad-footer,
+  html[data-embed-mode="true"] #footer{
+    display:none !important;
+  }
+  html[data-embed-mode="true"] body{
+    padding-bottom:0 !important;
   }
   *{
     -webkit-user-select:none;
@@ -103,7 +127,7 @@ gtag('event', 'project_open_maoitu');
     /* さらに余白を絞ってキャンバスを上へ */
     padding:clamp(0px, 3vh, 24px) 0;
   }
-  #c{display:block;touch-action:none;image-rendering:pixelated}
+  #c{display:block;touch-action:none;image-rendering:auto}
   .back-link{
     position:absolute;
     top:calc(var(--safe-top) + 10px);
@@ -134,34 +158,37 @@ gtag('event', 'project_open_maoitu');
     align-items:center;
     justify-content:center;
     padding:calc(var(--safe-top) + 20px) 16px calc(var(--safe-bottom) + 20px);
-    gap:18px;
+    gap:16px;
     z-index:20;
     box-sizing:border-box;
     max-height:100%;
     overflow:hidden;
+    background:linear-gradient(180deg, rgba(2,6,23,0.08), rgba(2,6,23,0.48));
+    backdrop-filter:blur(10px);
   }
   #gameOverPanel{
     width:min(90vw, 336px);
-    padding:14px 16px;
-    background:rgba(0,0,0,0.85);
-    border:1px solid rgba(255,255,255,0.25);
-    border-radius:12px;
+    padding:18px 18px 16px;
+    background:linear-gradient(180deg, rgba(8,15,28,0.94), rgba(5,9,18,0.9));
+    border:1px solid rgba(255,255,255,0.12);
+    border-radius:20px;
     color:#fff;
     text-align:center;
     font-family:sans-serif;
     box-sizing:border-box;
     display:flex;
     flex-direction:column;
-    gap:8px;
-    transition:box-shadow 0.2s ease,border-color 0.2s ease,background 0.2s ease;
+    gap:10px;
+    transition:box-shadow 0.2s ease,border-color 0.2s ease,background 0.2s ease, transform 0.2s ease;
+    box-shadow:0 28px 80px rgba(0,0,0,0.44), inset 0 1px 0 rgba(255,255,255,0.06);
   }
   #gameOverPanel.is-clear{
-    background:linear-gradient(160deg, rgba(22,163,74,0.25), rgba(0,0,0,0.8));
-    border-color:rgba(74,222,128,0.7);
-    box-shadow:0 0 18px rgba(74,222,128,0.45);
+    background:linear-gradient(160deg, rgba(22,163,74,0.28), rgba(5,9,18,0.88));
+    border-color:rgba(74,222,128,0.42);
+    box-shadow:0 0 28px rgba(74,222,128,0.26), 0 28px 80px rgba(0,0,0,0.4);
   }
   .gameover-title{
-    font-size:16px;
+    font-size:18px;
     font-weight:700;
     letter-spacing:0.06em;
   }
@@ -188,24 +215,25 @@ gtag('event', 'project_open_maoitu');
     display:none;
     flex-direction:column;
     gap:10px;
-    padding:12px 16px;
+    padding:14px 16px 16px;
     text-align:center;
-    background:rgba(0,0,0,0.8);
-    border:1px solid rgba(255,255,255,0.25);
-    border-radius:12px;
+    background:linear-gradient(180deg, rgba(8,15,28,0.86), rgba(5,9,18,0.82));
+    border:1px solid rgba(255,255,255,0.12);
+    border-radius:18px;
     color:#fff;
     font-family:sans-serif;
     font-size:12px;
     align-items:stretch;
     width:min(90vw, 336px);
     box-sizing:border-box;
+    box-shadow:0 20px 48px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.05);
   }
   #sharePanel button,
   #sharePanel .share-link{
     font:700 12px system-ui;
-    padding:10px 16px;
-    border:0;
-    border-radius:10px;
+    padding:12px 16px;
+    border:1px solid rgba(255,255,255,0.1);
+    border-radius:14px;
     cursor:pointer;
     width:100%;
     box-sizing:border-box;
@@ -213,13 +241,30 @@ gtag('event', 'project_open_maoitu');
     align-items:center;
     justify-content:center;
     line-height:1;
+    transition:transform 0.15s ease, filter 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
   }
   #sharePanel .share-link{
     text-decoration:none;
-    background:rgba(255,255,255,0.2);
+    background:linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.07));
     color:#fff;
   }
-  #shareScoreLabel{font-size:16px;font-weight:700;text-align:center;}
+  #sharePanel button:hover,
+  #sharePanel button:focus-visible,
+  #sharePanel .share-link:hover,
+  #sharePanel .share-link:focus-visible{
+    transform:translateY(-1px);
+    filter:brightness(1.04);
+    border-color:rgba(255,255,255,0.18);
+    box-shadow:0 12px 24px rgba(15,23,42,0.26);
+    outline:none;
+  }
+  #shareScoreLabel{
+    font-size:18px;
+    font-weight:800;
+    text-align:center;
+    letter-spacing:0.04em;
+    color:#f8fafc;
+  }
   #footer{
     position:absolute;
     bottom:calc(var(--safe-bottom) + 12px);
@@ -685,6 +730,10 @@ restartActionBtn.addEventListener('click', () => {
 
 if(backToStartBtn){
   backToStartBtn.addEventListener('click', () => {
+    if(document.documentElement.dataset.embedMode === 'true' && window.parent && window.parent !== window){
+      window.parent.postMessage({ type: 'maoitu:return-to-start' }, window.location.origin);
+      return;
+    }
     window.location.href = './index.html';
   });
 }
@@ -805,10 +854,56 @@ function createBackground(){
   oc.width=W; oc.height=H;
   const ctx=oc.getContext('2d');
   const g=ctx.createLinearGradient(0,0,0,H);
-  g.addColorStop(0,'#0a0f2a');
-  g.addColorStop(1,'#060912');
+  g.addColorStop(0,'#050816');
+  g.addColorStop(0.45,'#101a3a');
+  g.addColorStop(0.72,'#120c2d');
+  g.addColorStop(1,'#03050b');
   ctx.fillStyle=g;
   ctx.fillRect(0,0,W,H);
+  const nebulae = [
+    { x: W * 0.18, y: H * 0.16, r: 56, color: '88,160,255', alpha: 0.18 },
+    { x: W * 0.74, y: H * 0.26, r: 52, color: '148,92,255', alpha: 0.16 },
+    { x: W * 0.52, y: H * 0.72, r: 68, color: '49,210,255', alpha: 0.12 },
+    { x: W * 0.28, y: H * 0.58, r: 44, color: '255,110,180', alpha: 0.11 }
+  ];
+  nebulae.forEach(({ x, y, r, color, alpha }) => {
+    const glow = ctx.createRadialGradient(x, y, r * 0.08, x, y, r);
+    glow.addColorStop(0, `rgba(${color},${alpha})`);
+    glow.addColorStop(0.55, `rgba(${color},${alpha * 0.35})`);
+    glow.addColorStop(1, `rgba(${color},0)`);
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  return oc;
+}
+function createVignetteLayer(){
+  const oc=document.createElement('canvas');
+  oc.width=W; oc.height=H;
+  const ctx=oc.getContext('2d');
+  const g=ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'rgba(11,16,32,0.18)');
+  g.addColorStop(0.55,'rgba(11,16,32,0)');
+  g.addColorStop(1,'rgba(0,0,0,0.38)');
+  ctx.fillStyle=g;
+  ctx.fillRect(0,0,W,H);
+  return oc;
+}
+function createGlowSprite(color){
+  const size = 64;
+  const oc=document.createElement('canvas');
+  oc.width=size;
+  oc.height=size;
+  const ctx=oc.getContext('2d');
+  const radius=size*0.5;
+  const g=ctx.createRadialGradient(radius,radius,2,radius,radius,radius);
+  g.addColorStop(0,`rgba(${color},1)`);
+  g.addColorStop(1,`rgba(${color},0)`);
+  ctx.fillStyle=g;
+  ctx.beginPath();
+  ctx.arc(radius,radius,radius,0,Math.PI*2);
+  ctx.fill();
   return oc;
 }
 function createStarLayer(count=36,minR=0.2,maxR=1.6,alphaMin=0.05,alphaMax=0.4,heightRatio=0.8){
@@ -825,9 +920,69 @@ function createStarLayer(count=36,minR=0.2,maxR=1.6,alphaMin=0.05,alphaMax=0.4,h
   }
   return oc;
 }
+function createGalaxyLayer(){
+  const oc=document.createElement('canvas');
+  oc.width=W; oc.height=H;
+  const ctx=oc.getContext('2d');
+  for(let i = 0; i < 14; i++){
+    const cx = rnd(0, W);
+    const cy = rnd(0, H * 0.8);
+    const rx = rnd(16, 42);
+    const ry = rx * rnd(0.2, 0.46);
+    const rot = rnd(-0.8, 0.8);
+    const alpha = rnd(0.035, 0.11);
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(rot);
+    const glow = ctx.createRadialGradient(0, 0, 1, 0, 0, rx);
+    glow.addColorStop(0, `rgba(255,255,255,${alpha})`);
+    glow.addColorStop(0.35, `rgba(138,180,255,${alpha * 0.85})`);
+    glow.addColorStop(1, 'rgba(138,180,255,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  return oc;
+}
+function createPlanetLayer(){
+  const oc=document.createElement('canvas');
+  oc.width=W; oc.height=H;
+  const ctx=oc.getContext('2d');
+  const planetX = W * 0.79;
+  const planetY = H * 0.18;
+  const planetR = 30;
+  const planet = ctx.createRadialGradient(planetX - 8, planetY - 10, 4, planetX, planetY, planetR);
+  planet.addColorStop(0, 'rgba(255,250,255,0.95)');
+  planet.addColorStop(0.35, 'rgba(126,222,255,0.78)');
+  planet.addColorStop(0.7, 'rgba(58,99,193,0.82)');
+  planet.addColorStop(1, 'rgba(27,41,88,0.2)');
+  ctx.fillStyle = planet;
+  ctx.beginPath();
+  ctx.arc(planetX, planetY, planetR, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.save();
+  ctx.translate(planetX, planetY);
+  ctx.rotate(-0.25);
+  ctx.strokeStyle = 'rgba(183,230,255,0.4)';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 42, 10, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+  return oc;
+}
 const BG_LAYER=createBackground();
 const STAR_LAYER=createStarLayer(); // 遠景
 const STAR_LAYER_NEAR=createStarLayer(48,0.15,0.9,0.2,0.6,1); // 手前の細かい星
+const GALAXY_LAYER=createGalaxyLayer();
+const PLANET_LAYER=createPlanetLayer();
+const VIGNETTE_LAYER=createVignetteLayer();
+const ENEMY_DANGER_GLOW_SPRITE=createGlowSprite('255,70,70');
+const ANGEL_GLOW_SPRITE=createGlowSprite('16,255,180');
+const FEVER_GLOW_SPRITE=createGlowSprite('250,204,21');
+const SHIELD_GLOW_SPRITE=createGlowSprite('200,255,255');
 let starOffset=0;
 let starOffsetNear=0;
 let starOffsetPrev=0;
@@ -836,8 +991,8 @@ const STAR_SCROLL_SPEED=0.25;
 const STAR_SCROLL_SPEED_NEAR=0.55;
 const HITSTOP_ON_SHIELD_FRAMES = 3;  // 短めにしてカクつきを抑制
 const HITSTOP_ON_FATAL_FRAMES = 6;
-const SHAKE_INTENSITY_SHIELD = 1.0;
-const SHAKE_INTENSITY_FATAL = 1.4;
+const SHAKE_INTENSITY_SHIELD = 0.45;
+const SHAKE_INTENSITY_FATAL = 0.72;
 const SHIELD_FLASH_FRAMES = 14;
 const FEVER_THRESHOLD_FRAMES = 900; // 約15秒
 const FEVER_DURATION_FRAMES = 300; // 5秒
@@ -846,6 +1001,7 @@ const FEVER_PLAYER_SPEED_MULT = 1.2;
 const FEVER_SCORE_MULT = 2;
 const FEVER_HIT_BONUS_FRAMES = 10; // フィーバー中に敵に触れたときの延命量（短め）
 const FEVER_GAUGE_BOOST_ON_PICKUP = 120;
+const MESSAGE_HOLD_FRAMES = 96;
 let P={x:PLAYER_START_X,y:PLAYER_START_Y,px:PLAYER_START_X,py:PLAYER_START_Y,w:16,h:16,v:4,skin:PLAYER};
 let E=[], angels=[], o=0, tx=PLAYER_START_TX, S=0, alive=true, shieldCharges=0;
 let scoreCarry = 0;
@@ -855,9 +1011,19 @@ let shakeFrames=0;
 let shakeIntensity=0;
 let feverGauge=0;
 let feverFrames=0;
+let particles=[];
+let announcements=[];
+let unlockedEnemyCount = 1;
+const MAX_PARTICLES = 56;
+const ENEMY_DANGER_GLOW_MAX = 5;
+const ANGEL_GLOW_MAX = 3;
+let averageFps = 60;
+let effectQuality = 'high';
+let frameTimeSum = 0;
+let frameTimeSamples = 0;
 
 // ====== 表示フィット ======
-const DPR_CAP = 1.25; // 高DPI端末での描画負荷を抑える上限（下げて負荷軽減）
+const DPR_CAP = 2; // キャラの見え方を優先しつつ負荷を抑える上限
 function fit(){
   const d=Math.min(devicePixelRatio||1, DPR_CAP);
   const ar=H/W;
@@ -876,7 +1042,8 @@ function fit(){
   c.style.width=w+'px'; c.style.height=h+'px';
   c.width=(w*d)|0; c.height=(h*d)|0;
   x.setTransform((w*d)/W,0,0,(h*d)/H,0,0);
-  x.imageSmoothingEnabled=false;
+  x.imageSmoothingEnabled=true;
+  x.imageSmoothingQuality='high';
 }
 addEventListener('resize', fit); fit();
 
@@ -886,6 +1053,140 @@ function lerp(a,b,t){ return a + (b - a) * t; }
 function interp(prev, current, alpha){
   const base = Number.isFinite(prev) ? prev : current;
   return lerp(base, current, alpha);
+}
+function easeOutCubic(t){
+  const clamped = Math.max(0, Math.min(1, t));
+  return 1 - Math.pow(1 - clamped, 3);
+}
+function currentParticleBudget(){
+  if(effectQuality === 'low') return 16;
+  if(effectQuality === 'medium') return 32;
+  return MAX_PARTICLES;
+}
+function currentBurstCount(baseCount){
+  if(effectQuality === 'low') return Math.max(4, Math.round(baseCount * 0.35));
+  if(effectQuality === 'medium') return Math.max(6, Math.round(baseCount * 0.6));
+  return baseCount;
+}
+function drawGlowSprite(sprite, cx, cy, radius, alpha){
+  const size = radius * 2;
+  x.save();
+  x.globalAlpha = alpha;
+  x.drawImage(sprite, cx - radius, cy - radius, size, size);
+  x.restore();
+}
+function drawActorSprite(img, px, py, w, h, {
+  rotation = 0,
+  scaleX = 1,
+  scaleY = 1,
+  alpha = 1,
+  shadowAlpha = 0.18,
+  shadowWidth = 0.92,
+  shadowHeight = 0.32,
+  shadowOffset = 0.9
+} = {}){
+  const cx = px + w * 0.5;
+  const cy = py + h * 0.5;
+  x.save();
+  x.globalAlpha = shadowAlpha;
+  x.fillStyle = '#020617';
+  x.beginPath();
+  x.ellipse(cx, py + h * shadowOffset, (w * shadowWidth) / 2, (h * shadowHeight) / 2, 0, 0, Math.PI * 2);
+  x.fill();
+  x.restore();
+
+  x.save();
+  x.globalAlpha = alpha;
+  x.translate(cx, cy);
+  x.rotate(rotation);
+  x.scale(scaleX, scaleY);
+  x.imageSmoothingEnabled = false;
+  x.drawImage(img, -w / 2, -h / 2, w, h);
+  x.restore();
+}
+function updatePerformanceStats(dt){
+  frameTimeSum += dt;
+  frameTimeSamples += 1;
+  if(frameTimeSamples < 20) return;
+  averageFps = 1000 / (frameTimeSum / frameTimeSamples);
+  frameTimeSum = 0;
+  frameTimeSamples = 0;
+  if(averageFps < 34){
+    effectQuality = 'low';
+  }else if(averageFps < 52){
+    effectQuality = 'medium';
+  }else{
+    effectQuality = 'high';
+  }
+}
+function queueAnnouncement(title, subtitle='', accent='#7dd3fc', duration=MESSAGE_HOLD_FRAMES){
+  announcements.push({
+    title,
+    subtitle,
+    accent,
+    duration,
+    frame: 0
+  });
+}
+function updateAnnouncements(){
+  if(!announcements.length) return;
+  const current = announcements[0];
+  current.frame++;
+  if(current.frame >= current.duration){
+    announcements.shift();
+  }
+}
+function spawnBurst(cx, cy, {
+  count = 14,
+  color = '255,255,255',
+  speedMin = 0.4,
+  speedMax = 2.2,
+  lifeMin = 18,
+  lifeMax = 34,
+  sizeMin = 1.5,
+  sizeMax = 4.5,
+  gravity = 0.01
+} = {}){
+  const scaledCount = currentBurstCount(count);
+  const remaining = Math.max(0, currentParticleBudget() - particles.length);
+  const limit = Math.min(scaledCount, remaining);
+  for(let i = 0; i < limit; i++){
+    const angle = Math.random() * Math.PI * 2;
+    const speed = rnd(speedMin, speedMax);
+    const particle = {
+      x: cx,
+      y: cy,
+      px: cx,
+      py: cy,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      size: rnd(sizeMin, sizeMax),
+      life: rnd(lifeMin, lifeMax),
+      maxLife: 1,
+      gravity,
+      color
+    };
+    particle.maxLife = particle.life;
+    particles.push(particle);
+  }
+}
+function updateParticles(){
+  let writeIndex = 0;
+  for(let readIndex = 0; readIndex < particles.length; readIndex++){
+    const p = particles[readIndex];
+    p.px = p.x;
+    p.py = p.y;
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += p.gravity;
+    p.vx *= 0.985;
+    p.vy *= 0.992;
+    p.life -= 1;
+    if(p.life > 0){
+      particles[writeIndex++] = p;
+    }
+  }
+  particles.length = writeIndex;
 }
 function snapshotPrevPosition(o){
   o.px = o.x;
@@ -918,9 +1219,7 @@ function createEnemyFromType(type, spawnX){
   };
 }
 function spawnEnemy(){
-  const elapsedSec = elapsedFrames / 60;
-  const candidates = ENEMY_TYPES.filter(t=>elapsedSec >= t.unlockSec);
-  const type = candidates[(Math.random()*candidates.length)|0];
+  const type = ENEMY_TYPES[(Math.random()*unlockedEnemyCount)|0];
   const sizeMult = type.sizeMult || 1;
   const w = 16 * sizeMult;
   E.push(createEnemyFromType(type, rnd(0, W - w)));
@@ -1006,6 +1305,18 @@ function startFever(){
   feverFrames = FEVER_DURATION_FRAMES;
   feverGauge = 0;
   triggerHitstop(4, 1.2);
+  queueAnnouncement('FEVER!!', 'スコア2倍 / 体当たりで延長', '#facc15', 110);
+  spawnBurst(P.x + P.w * 0.5, P.y + P.h * 0.5, {
+    count: 28,
+    color: '250,204,21',
+    speedMin: 0.8,
+    speedMax: 2.8,
+    lifeMin: 20,
+    lifeMax: 42,
+    sizeMin: 2,
+    sizeMax: 6,
+    gravity: -0.004
+  });
 }
 
 // ====== 楕円ベースのゆるい当たり判定 ======
@@ -1064,6 +1375,9 @@ function reset(countPlay = true){ alive=true; E.length=0; angels.length=0; o=0; 
   shakeIntensity = 0;
   feverGauge = 0;
   feverFrames = 0;
+  particles = [];
+  announcements = [];
+  unlockedEnemyCount = 1;
   enemySpawnIntervalFrames = initialSpawnIntervalFrames;
   enemiesPerSpawn = 1;
   lastDifficultyUpdateSec = 0;
@@ -1079,6 +1393,7 @@ function reset(countPlay = true){ alive=true; E.length=0; angels.length=0; o=0; 
   scoreSubmitted = false;
   hideSharePanel();
   hideBackLink();
+  queueAnnouncement('逃げろ!!', '敵の波をさばけ', '#fb7185', 96);
   if(countPlay) logPlayStart();
 }
 
@@ -1145,6 +1460,7 @@ function step(){
   starOffsetNearPrev = starOffsetNear;
   if(hitstopFrames > 0){
     hitstopFrames--;
+    updateAnnouncements();
     return;
   }
   const enemySpawnEnabled = elapsedFrames >= ENEMY_GRACE_FRAMES;
@@ -1155,6 +1471,9 @@ function step(){
   o++;
   elapsedFrames++;
   const currentSec = elapsedFrames / 60;
+  while(unlockedEnemyCount < ENEMY_TYPES.length && currentSec >= ENEMY_TYPES[unlockedEnemyCount].unlockSec){
+    unlockedEnemyCount++;
+  }
   if(currentSec - lastAngelGuaranteeSec >= ANGEL_GUARANTEE_INTERVAL_SEC){
     spawnAngel();
     lastAngelGuaranteeSec = currentSec;
@@ -1187,16 +1506,33 @@ function step(){
   const dx=tx-P.x; P.x+=Math.sign(dx)*Math.min(Math.abs(dx),playerSpeed);
   P.x=Math.max(0,Math.min(W-P.w,P.x));
 
-  angels = angels.filter(a=>{
+  let angelWriteIndex = 0;
+  for(let angelReadIndex = 0; angelReadIndex < angels.length; angelReadIndex++){
+    const a = angels[angelReadIndex];
     if(hitBox(P,a)){
       shieldCharges += 1;
       P.skin = ANGEL;
       shieldFlashFrames = SHIELD_FLASH_FRAMES;
       feverGauge = Math.min(FEVER_THRESHOLD_FRAMES, feverGauge + FEVER_GAUGE_BOOST_ON_PICKUP);
-      return false;
+      queueAnnouncement('ANGELIN GET', '身代わりシールド +1', '#34d399', 72);
+      spawnBurst(a.x + a.w * 0.5, a.y + a.h * 0.5, {
+        count: 18,
+        color: '52,211,153',
+        speedMin: 0.5,
+        speedMax: 2.4,
+        lifeMin: 18,
+        lifeMax: 34,
+        sizeMin: 2,
+        sizeMax: 5,
+        gravity: -0.002
+      });
+      continue;
     }
-    return a.y<H+20;
-  });
+    if(a.y < H + 20){
+      angels[angelWriteIndex++] = a;
+    }
+  }
+  angels.length = angelWriteIndex;
 
   for (let i = 0; i < E.length; i++) {
     const stickyEnemy = E[i];
@@ -1227,18 +1563,51 @@ function step(){
   for(const e of E){
     if(hitBox(P,e)){
       if (e.ignoreShield) {
+        spawnBurst(P.x + P.w * 0.5, P.y + P.h * 0.5, {
+          count: 26,
+          color: '248,113,113',
+          speedMin: 0.8,
+          speedMax: 3.2,
+          lifeMin: 20,
+          lifeMax: 40,
+          sizeMin: 2,
+          sizeMax: 6
+        });
         triggerHitstop(HITSTOP_ON_FATAL_FRAMES, SHAKE_INTENSITY_FATAL);
         endRun();
         break;
       }
       if (feverFrames > 0){
         feverFrames = Math.min(FEVER_DURATION_FRAMES, feverFrames + FEVER_HIT_BONUS_FRAMES);
+        spawnBurst(e.x + e.w * 0.5, e.y + e.h * 0.5, {
+          count: 14,
+          color: '250,204,21',
+          speedMin: 0.6,
+          speedMax: 2.1,
+          lifeMin: 14,
+          lifeMax: 28,
+          sizeMin: 1.5,
+          sizeMax: 4.5,
+          gravity: -0.003
+        });
         e.y = H + 99; // 無敵中は敵を消す
         continue;
       }
       if(shieldCharges > 0){
         triggerHitstop(HITSTOP_ON_SHIELD_FRAMES, SHAKE_INTENSITY_SHIELD);
         shieldFlashFrames = SHIELD_FLASH_FRAMES;
+        queueAnnouncement('GUARD', 'シールドで防いだ', '#7dd3fc', 56);
+        spawnBurst(P.x + P.w * 0.5, P.y + P.h * 0.5, {
+          count: 16,
+          color: '125,211,252',
+          speedMin: 0.5,
+          speedMax: 2.2,
+          lifeMin: 14,
+          lifeMax: 30,
+          sizeMin: 1.5,
+          sizeMax: 4.5,
+          gravity: -0.002
+        });
         if (e.clearOnShieldHit) {
           shieldCharges = 0; // シールドを全消費
           P.skin = PLAYER;
@@ -1251,13 +1620,30 @@ function step(){
         }
         e.y=H+99;
       }else{
+        spawnBurst(P.x + P.w * 0.5, P.y + P.h * 0.5, {
+          count: 26,
+          color: '248,113,113',
+          speedMin: 0.8,
+          speedMax: 3.2,
+          lifeMin: 20,
+          lifeMax: 40,
+          sizeMin: 2,
+          sizeMax: 6
+        });
         triggerHitstop(HITSTOP_ON_FATAL_FRAMES, SHAKE_INTENSITY_FATAL);
         endRun();
         break;
       }
     }
   }
-  E=E.filter(e=>e.y<H+20);
+  let enemyWriteIndex = 0;
+  for(let enemyReadIndex = 0; enemyReadIndex < E.length; enemyReadIndex++){
+    const e = E[enemyReadIndex];
+    if(e.y < H + 20){
+      E[enemyWriteIndex++] = e;
+    }
+  }
+  E.length = enemyWriteIndex;
   if(feverFrames > 0){
     feverFrames--;
   }else{
@@ -1279,6 +1665,8 @@ function step(){
   if(!alive && sharePanel.style.display==='none'){
     showSharePanel(S);
   }
+  updateParticles();
+  updateAnnouncements();
 
   const elapsedSec = elapsedFrames / 60;
   if(elapsedSec - lastDifficultyUpdateSec >= DIFFICULTY_STEP_SEC){
@@ -1309,6 +1697,14 @@ function step(){
 // ====== 描画 ======
 function draw(alpha=1){
   const t = Math.max(0, Math.min(1, alpha));
+  const playerPx = interp(P.px, P.x, t);
+  const playerPy = interp(P.py, P.y, t);
+  const cameraTargetX = (playerPx + P.w * 0.5 - W * 0.5) * 0.018;
+  const cameraTargetY = (playerPy + P.h * 0.5 - H * 0.52) * 0.016;
+  const cameraFeverPulse = feverFrames > 0 ? Math.sin(elapsedFrames * 0.18) * 0.008 : 0;
+  const cameraScale = 1.008 + cameraFeverPulse;
+  const cameraOffsetX = -cameraTargetX + Math.sin(elapsedFrames * 0.012) * 0.35;
+  const cameraOffsetY = -cameraTargetY + Math.cos(elapsedFrames * 0.01) * 0.28;
   x.save();
   if(shakeFrames > 0){
     const shakePower = (shakeFrames / (shakeFrames + 6)) * shakeIntensity;
@@ -1318,83 +1714,147 @@ function draw(alpha=1){
     shakeFrames--;
   }
   x.drawImage(BG_LAYER,0,0,W,H);
+  x.save();
+  x.translate(cameraOffsetX * 0.12, cameraOffsetY * 0.12);
+  x.drawImage(GALAXY_LAYER,0,0,W,H);
+  x.drawImage(PLANET_LAYER,0,0,W,H);
+  x.restore();
   const offset = interp(starOffsetPrev, starOffset, t) % H;
   x.drawImage(STAR_LAYER,0,offset - H,W,H);
   x.drawImage(STAR_LAYER,0,offset,W,H);
   const offsetNear = interp(starOffsetNearPrev, starOffsetNear, t) % H;
   x.drawImage(STAR_LAYER_NEAR,0,offsetNear - H,W,H);
   x.drawImage(STAR_LAYER_NEAR,0,offsetNear,W,H);
+  x.drawImage(VIGNETTE_LAYER,0,0,W,H);
+  drawGlowSprite(ANGEL_GLOW_SPRITE, W * 0.22 + Math.sin(elapsedFrames * 0.01) * 14, H * 0.18, 34, 0.08);
+  drawGlowSprite(FEVER_GLOW_SPRITE, W * 0.78 + Math.cos(elapsedFrames * 0.014) * 12, H * 0.24, 30, 0.07);
   if(feverFrames > 0){
     const pulse = 0.08 + 0.06 * Math.sin(elapsedFrames * 0.3);
     x.fillStyle = `rgba(255,200,90,${0.12 + pulse})`;
     x.fillRect(0,0,W,H);
   }
-  E.forEach(e=>{
+  x.save();
+  x.translate(W * 0.5, H * 0.52);
+  x.scale(cameraScale, cameraScale);
+  x.translate(-W * 0.5 + cameraOffsetX, -H * 0.52 + cameraOffsetY);
+  for(let i = 0; i < particles.length; i++){
+    const p = particles[i];
+    const px = interp(p.px, p.x, t);
+    const py = interp(p.py, p.y, t);
+    const life = Math.max(0, p.life / p.maxLife);
+    x.fillStyle = `rgba(${p.color},${life * 0.95})`;
+    x.fillRect(px, py, Math.max(1, p.size * life), Math.max(1, p.size * life));
+  }
+  const enemyGlowStep = E.length > ENEMY_DANGER_GLOW_MAX ? Math.ceil(E.length / ENEMY_DANGER_GLOW_MAX) : 1;
+  for(let i = 0; i < E.length; i++){
+    const e = E[i];
     const ex = interp(e.px, e.x, t);
     const ey = interp(e.py, e.y, t);
-    if(e.ignoreShield){
+    const enemyBob = Math.sin((elapsedFrames * 0.11) + i * 0.7) * 0.45;
+    const enemyTilt = Math.max(-0.18, Math.min(0.18, (e.vx || 0) * 0.08));
+    const enemyScale = 1 + Math.sin((elapsedFrames * 0.09) + i * 0.45) * 0.02;
+    if(e.ignoreShield && (i % enemyGlowStep === 0)){
       const pulse = ((Math.sin(elapsedFrames * 0.25) + 1) * 0.3) + 0.3; // 0.3〜0.9
       const cx = ex + e.w * 0.5;
-      const cy = ey + e.h * 0.5;
+      const cy = ey + e.h * 0.5 + enemyBob;
       const radius = Math.max(e.w, e.h) * 0.5 + 6;
-      const grad = x.createRadialGradient(cx, cy, radius * 0.25, cx, cy, radius);
-      grad.addColorStop(0, `rgba(255,70,70,${pulse})`);
-      grad.addColorStop(1, 'rgba(255,70,70,0)');
-      x.fillStyle = grad;
-      x.beginPath();
-      x.arc(cx, cy, radius, 0, Math.PI * 2);
-      x.fill();
+      drawGlowSprite(ENEMY_DANGER_GLOW_SPRITE, cx, cy, radius, pulse);
     }
     if(e.skin.img.complete){
-      x.drawImage(e.skin.img,ex,ey,e.w,e.h);
+      drawActorSprite(e.skin.img, ex, ey + enemyBob, e.w, e.h, {
+        rotation: enemyTilt,
+        scaleX: enemyScale,
+        scaleY: 1 / enemyScale,
+        shadowAlpha: 0.16
+      });
     }else{
       x.fillStyle='#f33'; x.fillRect(ex,ey,e.w,e.h);
     }
-  });
-  angels.forEach(a=>{
+  }
+  const angelGlowStep = angels.length > ANGEL_GLOW_MAX ? Math.ceil(angels.length / ANGEL_GLOW_MAX) : 1;
+  for(let i = 0; i < angels.length; i++){
+    const a = angels[i];
     const ax = interp(a.px, a.x, t);
     const ay = interp(a.py, a.y, t);
-    const pulse = ((Math.sin(elapsedFrames * 0.2) + 1) * 0.25) + 0.35; // 0.35〜0.85
-    const cx = ax + a.w * 0.5;
-    const cy = ay + a.h * 0.5;
-    const radius = Math.max(a.w, a.h) * 0.5 + 6;
-    const grad = x.createRadialGradient(cx, cy, radius * 0.3, cx, cy, radius);
-    grad.addColorStop(0, `rgba(16,255,180,${pulse})`);
-    grad.addColorStop(1, 'rgba(16,255,180,0)');
-    x.fillStyle = grad;
-    x.beginPath();
-    x.arc(cx, cy, radius, 0, Math.PI * 2);
-    x.fill();
+    const angelBob = Math.sin((elapsedFrames * 0.12) + i * 0.8) * 0.7;
+    if(i % angelGlowStep === 0){
+      const pulse = ((Math.sin(elapsedFrames * 0.2) + 1) * 0.25) + 0.35; // 0.35〜0.85
+      const cx = ax + a.w * 0.5;
+      const cy = ay + a.h * 0.5 + angelBob;
+      const radius = Math.max(a.w, a.h) * 0.5 + 6;
+      drawGlowSprite(ANGEL_GLOW_SPRITE, cx, cy, radius, pulse);
+    }
     if(a.skin.img.complete){
-      x.drawImage(a.skin.img,ax,ay,a.w,a.h);
+      drawActorSprite(a.skin.img, ax, ay + angelBob, a.w, a.h, {
+        rotation: Math.sin((elapsedFrames * 0.08) + i * 0.5) * 0.08,
+        scaleX: 1.04,
+        scaleY: 0.98,
+        shadowAlpha: 0.12
+      });
     }else{
       x.fillStyle='#fff'; x.fillRect(ax,ay,a.w,a.h);
     }
-  });
-  const px = interp(P.px, P.x, t);
-  const py = interp(P.py, P.y, t);
-  if(P.skin.img.complete) x.drawImage(P.skin.img,px,py,P.w,P.h); else { x.fillStyle='#0ff'; x.fillRect(px,py,P.w,P.h); }
+  }
+  const px = playerPx;
+  const py = playerPy;
+  const playerShift = px - P.px;
+  const playerTilt = Math.max(-0.24, Math.min(0.24, playerShift * 0.12));
+  const playerScaleX = 1 + Math.min(0.08, Math.abs(playerShift) * 0.03);
+  const playerScaleY = 1 - Math.min(0.06, Math.abs(playerShift) * 0.02);
+  const playerBob = Math.sin(elapsedFrames * (feverFrames > 0 ? 0.28 : 0.16)) * (feverFrames > 0 ? 0.7 : 0.24);
+  if(P.skin.img.complete){
+    if(feverFrames > 0){
+      drawActorSprite(P.skin.img, P.px - playerShift * 0.45, py - 0.6, P.w, P.h, {
+        rotation: playerTilt * 0.55,
+        scaleX: 1.04,
+        scaleY: 0.98,
+        alpha: 0.2,
+        shadowAlpha: 0
+      });
+    }
+    drawActorSprite(P.skin.img, px, py + playerBob, P.w, P.h, {
+      rotation: playerTilt,
+      scaleX: playerScaleX,
+      scaleY: playerScaleY,
+      shadowAlpha: 0.2
+    });
+  } else {
+    x.fillStyle='#0ff'; x.fillRect(px,py,P.w,P.h);
+  }
+  if(feverFrames > 0){
+    const feverPulse = 0.55 + 0.45 * Math.sin(elapsedFrames * 0.45);
+    const ringRadius = 15 + feverPulse * 7;
+    const cx = px + P.w * 0.5;
+    const cy = py + P.h * 0.5;
+    drawGlowSprite(FEVER_GLOW_SPRITE, cx, cy, ringRadius, 0.22 * feverPulse);
+  }
   if(shieldFlashFrames > 0){
     const flashRatio = shieldFlashFrames / SHIELD_FLASH_FRAMES;
     const cx = px + P.w * 0.5;
     const cy = py + P.h * 0.5;
     const radius = 32 + (1 - flashRatio) * 10;
-    const grad = x.createRadialGradient(cx, cy, P.w * 0.4, cx, cy, radius);
-    grad.addColorStop(0, `rgba(200,255,255,${0.45 * flashRatio})`);
-    grad.addColorStop(1, 'rgba(200,255,255,0)');
-    x.fillStyle = grad;
-    x.beginPath();
-    x.arc(cx, cy, radius, 0, Math.PI*2);
-    x.fill();
+    drawGlowSprite(SHIELD_GLOW_SPRITE, cx, cy, radius, 0.45 * flashRatio);
     shieldFlashFrames--;
   }
+  x.restore();
+
+  function drawHudPanel(px, py, pw, ph){
+    x.fillStyle = 'rgba(8,12,24,0.62)';
+    x.fillRect(px, py, pw, ph);
+    x.strokeStyle = 'rgba(255,255,255,0.12)';
+    x.strokeRect(px + 0.5, py + 0.5, pw - 1, ph - 1);
+  }
+
+  drawHudPanel(2, 2, 70, 40);
+  drawHudPanel(W - 98, 2, 96, 40);
+  drawHudPanel(2, H - 20, 70, 16);
 
   x.fillStyle='#fff';
   x.font=HUD_FONT;
-  x.fillText('S:'+S,4,16);
+  x.fillText('S:'+S,6,16);
   x.font=HUD_FONT_SMALL;
   const iconSize = 12;
-  const iconBaseX = 4;
+  const iconBaseX = 6;
   const iconBaseY = 24;
   const iconSpacing = iconSize + 2;
   if (heroShieldIcon && heroShieldIcon.complete) {
@@ -1423,7 +1883,7 @@ function draw(alpha=1){
     : feverGauge / FEVER_THRESHOLD_FRAMES;
   const barW = 86;
   const barH = 6;
-  const barX = W - barW - 6;
+  const barX = W - barW - 8;
   const barY = iconBaseY + 10;
   x.fillStyle = 'rgba(255,255,255,0.18)';
   x.fillRect(barX, barY, barW, barH);
@@ -1431,11 +1891,38 @@ function draw(alpha=1){
   x.fillRect(barX, barY, barW * feverRatio, barH);
   x.fillStyle = '#fff';
   x.fillText(feverFrames > 0 ? 'FEVER x2' : 'FEVER', barX, barY - 2);
-  x.fillText('難易度: '+difficultyLevel,4,iconBaseY + 24);
+  x.fillText('Lv '+difficultyLevel,6,H - 8);
   x.save();
   x.textAlign = 'right';
-  x.fillText('モード: '+difficultyLabel,W-4,12);
+  x.fillText('MODE '+difficultyLabel,W - 6,12);
   x.restore();
+  if(announcements.length){
+    const current = announcements[0];
+    const inRatio = easeOutCubic(Math.min(1, current.frame / 12));
+    const outRatio = easeOutCubic(Math.min(1, (current.duration - current.frame) / 16));
+    const visibility = Math.min(inRatio, outRatio);
+    const boxW = 144;
+    const boxH = current.subtitle ? 42 : 30;
+    const boxX = (W - boxW) / 2;
+    const boxY = H * 0.18 - (1 - visibility) * 10;
+    x.save();
+    x.globalAlpha = Math.max(0, visibility);
+    x.fillStyle = 'rgba(5,10,20,0.78)';
+    x.fillRect(boxX, boxY, boxW, boxH);
+    x.strokeStyle = current.accent;
+    x.strokeRect(boxX + 0.5, boxY + 0.5, boxW - 1, boxH - 1);
+    x.textAlign = 'center';
+    x.fillStyle = current.accent;
+    x.font = '14px "Press Start 2P", monospace';
+    x.fillText(current.title, W / 2, boxY + 16);
+    if(current.subtitle){
+      x.fillStyle = '#f8fafc';
+      x.font = '9px "Noto Sans JP", sans-serif';
+      x.fillText(current.subtitle, W / 2, boxY + 31);
+    }
+    x.restore();
+    x.textAlign = 'left';
+  }
 
   if(!alive){
     // キャンバス上ではパネルを描かず、HTML側のUIに委ねる
@@ -1452,6 +1939,7 @@ function loop(now){
   let dt = now - last;
   last = now;
   if (dt > 1000) dt = 1000;
+  updatePerformanceStats(dt);
   acc += dt;
 
   const MAX_STEPS = 5;
