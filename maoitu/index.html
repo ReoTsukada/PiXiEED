@@ -132,10 +132,17 @@ html[data-embed-mode="true"] .pixieed-shared-footer,
 html[data-embed-mode="true"] .ad-footer {
   display:none !important;
 }
+.pixieed-shared-footer {
+  display:none !important;
+}
 body {
   margin:0;
   min-height:var(--app-height);
-  background:radial-gradient(120% 140% at 50% 0%, #1f2a44 0%, #0b1020 52%, #06070d 100%);
+  background:
+    radial-gradient(38% 32% at 18% 12%, rgba(59,130,246,0.28) 0%, rgba(59,130,246,0) 100%),
+    radial-gradient(34% 28% at 78% 18%, rgba(168,85,247,0.22) 0%, rgba(168,85,247,0) 100%),
+    radial-gradient(48% 34% at 52% 78%, rgba(34,211,238,0.14) 0%, rgba(34,211,238,0) 100%),
+    linear-gradient(180deg, #07111f 0%, #090d18 42%, #04060b 100%);
   display:flex;
   flex-direction:column;
   align-items:center;
@@ -172,10 +179,10 @@ a { color:#7dd3fc; }
 .control-bar__btn {
   font:700 16px system-ui;
   padding:12px 24px;
-  border-radius:12px;
-  border:0;
+  border-radius:14px;
+  border:1px solid rgba(255,255,255,0.12);
   cursor:pointer;
-  transition:transform 0.15s ease, filter 0.15s ease;
+  transition:transform 0.15s ease, filter 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
   width:100%;
   display:inline-flex;
   align-items:center;
@@ -194,24 +201,32 @@ a { color:#7dd3fc; }
 .control-bar__btn:focus-visible {
   transform:translateY(-1px);
   filter:brightness(1.05);
+  border-color:rgba(255,255,255,0.22);
+  box-shadow:0 12px 24px rgba(15,23,42,0.28);
   outline:none;
 }
 .control-bar__btn--primary {
-  background:#22c55e;
-  color:#000;
+  background:linear-gradient(135deg, #34d399 0%, #22c55e 45%, #14b8a6 100%);
+  color:#02140f;
   font-size:18px;
+  box-shadow:0 14px 30px rgba(20,184,166,0.28);
 }
 .control-bar__btn--secondary {
-  background:rgba(255,255,255,0.12);
+  background:linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.07));
   color:#fff;
-  border:1px solid rgba(255,255,255,0.25);
+  border:1px solid rgba(255,255,255,0.14);
 }
 .control-bar__audio {
   display:flex;
   align-items:center;
-  gap:8px;
+  gap:10px;
   width:100%;
   justify-content:flex-start;
+  padding:10px 12px;
+  border-radius:14px;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.08);
+  box-sizing:border-box;
 }
 .difficulty-toggle{
   display:flex;
@@ -219,21 +234,29 @@ a { color:#7dd3fc; }
   flex-wrap:wrap;
   justify-content:flex-start;
   width:100%;
+  padding:6px;
+  border-radius:16px;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.08);
+  box-sizing:border-box;
 }
 .difficulty-btn{
   font:900 15px system-ui;
   padding:12px 16px;
-  border-radius:10px;
-  border:1px solid rgba(255,255,255,0.25);
-  background:rgba(255,255,255,0.08);
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,0.12);
+  background:rgba(255,255,255,0.05);
   color:#fff;
   cursor:pointer;
-  transition:transform 0.15s ease, filter 0.15s ease, border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  transition:transform 0.15s ease, filter 0.15s ease, border-color 0.15s ease, background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  flex:1 1 0;
+  min-width:84px;
 }
 .difficulty-btn:hover,
 .difficulty-btn:focus-visible{
   transform:translateY(-1px);
   filter:brightness(1.05);
+  box-shadow:0 8px 20px rgba(15,23,42,0.24);
   outline:none;
 }
 .difficulty-btn.is-active[data-mode="easy"]{
@@ -254,9 +277,10 @@ a { color:#7dd3fc; }
 .instructions-card {
   width:100%;
   padding:16px 18px;
-  background:transparent;
-  border:1px solid transparent;
-  border-radius:16px;
+  background:linear-gradient(180deg, rgba(15,23,42,0.46), rgba(15,23,42,0.18));
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:18px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.05);
   color:#f3f4f6;
   font-size:14px;
   line-height:1.6;
@@ -404,8 +428,8 @@ a { color:#7dd3fc; }
   align-items:center;
   justify-content:center;
   padding:20px;
-  background:rgba(0,0,0,0.65);
-  backdrop-filter:blur(4px);
+  background:rgba(2,6,23,0.72);
+  backdrop-filter:blur(10px);
   z-index:2000;
 }
 .ranking-modal.is-open { display:flex; }
@@ -414,10 +438,10 @@ a { color:#7dd3fc; }
   max-width:400px;
   max-height:80vh;
   overflow:hidden;
-  background:rgba(0,0,0,0.9);
-  border:1px solid rgba(255,255,255,0.2);
-  border-radius:18px;
-  box-shadow:0 20px 50px rgba(0,0,0,0.35);
+  background:linear-gradient(180deg, rgba(8,15,28,0.96), rgba(6,10,20,0.94));
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:20px;
+  box-shadow:0 28px 80px rgba(0,0,0,0.48), inset 0 1px 0 rgba(255,255,255,0.06);
   display:flex;
   flex-direction:column;
 }
@@ -432,7 +456,7 @@ a { color:#7dd3fc; }
 .ranking-modal__title { margin:0; font-size:16px; }
 .ranking-modal__close {
   background:rgba(255,255,255,0.08);
-  border:1px solid rgba(255,255,255,0.2);
+  border:1px solid rgba(255,255,255,0.12);
   color:#fff;
   padding:6px 10px;
   border-radius:10px;
@@ -520,26 +544,6 @@ a { color:#7dd3fc; }
 .developer-credit a:focus-visible {
   text-decoration:underline;
 }
-.ad-footer{
-  width:100%;
-  max-width:520px;
-  padding:0 0 calc(12px + var(--safe-bottom));
-  box-sizing:border-box;
-  display:flex;
-  justify-content:center;
-  background:#000;
-  border-top:1px solid rgba(255,255,255,0.08);
-  margin:0 auto;
-  min-height:clamp(48px, 9vw, 60px);
-}
-.ad-footer ins{
-  display:block;
-  width:min(320px, 100%);
-  max-width:320px;
-  min-height:clamp(48px, 9vw, 60px);
-  height:clamp(48px, 9vw, 60px);
-  overflow:hidden;
-}
 .control-bar-wrapper {
   width:100%;
   display:flex;
@@ -557,14 +561,70 @@ a { color:#7dd3fc; }
   justify-content:center;
   min-height:0;
 }
+body.is-game-active {
+  padding:0 !important;
+  gap:0;
+  background:#02040a;
+}
+body.is-game-active .start-screen {
+  display:none;
+}
+.game-shell {
+  display:none;
+  position:relative;
+  width:100%;
+  flex:1 1 auto;
+  min-height:0;
+  align-items:stretch;
+  justify-content:center;
+  background:
+    radial-gradient(42% 34% at 18% 12%, rgba(59,130,246,0.18) 0%, rgba(59,130,246,0) 100%),
+    radial-gradient(38% 28% at 80% 16%, rgba(168,85,247,0.16) 0%, rgba(168,85,247,0) 100%),
+    linear-gradient(180deg, #050816 0%, #03050b 100%);
+}
+body.is-game-active .game-shell {
+  display:flex;
+}
+.game-shell__frame {
+  width:100%;
+  height:100%;
+  flex:1 1 auto;
+  border:0;
+  background:transparent;
+}
+.game-shell__close {
+  position:absolute;
+  top:calc(14px + var(--safe-top));
+  left:calc(14px + var(--safe-left));
+  z-index:20;
+  border:1px solid rgba(255,255,255,0.14);
+  border-radius:999px;
+  background:rgba(6,10,20,0.68);
+  color:#fff;
+  font:700 13px/1 system-ui;
+  padding:10px 14px;
+  cursor:pointer;
+  backdrop-filter:blur(10px);
+  box-shadow:0 14px 28px rgba(2,6,23,0.26);
+  transition:transform 0.15s ease, filter 0.15s ease, border-color 0.15s ease;
+}
+.game-shell__close:hover,
+.game-shell__close:focus-visible {
+  transform:translateY(-1px);
+  filter:brightness(1.05);
+  border-color:rgba(255,255,255,0.22);
+  outline:none;
+}
 .start-panel {
   width:100%;
   max-width:520px;
-  background:rgba(15,23,42,0.88);
-  border:1px solid rgba(148,163,184,0.22);
-  border-radius:24px;
+  background:
+    linear-gradient(180deg, rgba(15,23,42,0.92) 0%, rgba(8,15,28,0.88) 100%);
+  border:1px solid rgba(148,163,184,0.16);
+  border-radius:26px;
   padding:24px 22px 26px;
-  box-shadow:0 24px 50px rgba(0,0,0,0.45);
+  box-shadow:0 28px 80px rgba(2,6,23,0.52), inset 0 1px 0 rgba(255,255,255,0.06);
+  backdrop-filter:blur(14px);
   display:flex;
   flex-direction:column;
   gap:18px;
@@ -575,7 +635,46 @@ a { color:#7dd3fc; }
 .start-header {
   display:flex;
   flex-direction:column;
-  gap:6px;
+  gap:8px;
+}
+.start-header::after {
+  content:"";
+  width:72px;
+  height:3px;
+  border-radius:999px;
+  background:linear-gradient(90deg, #38bdf8, #a855f7);
+}
+@media (orientation: landscape) {
+  body {
+    padding-right:max(88px, calc(72px + 16px + var(--safe-right)));
+    padding-bottom:calc(16px + var(--safe-bottom));
+  }
+  .bottom-nav {
+    top:0 !important;
+    right:0 !important;
+    bottom:0 !important;
+    left:auto !important;
+    width:72px !important;
+    height:var(--app-height) !important;
+    min-height:var(--app-height) !important;
+    max-height:var(--app-height) !important;
+    flex-direction:column !important;
+    justify-content:center;
+    gap:2px;
+    padding:calc(var(--safe-top) + 8px) 0 calc(var(--safe-bottom) + 8px) !important;
+    border-top:0;
+    border-left:1px solid rgba(255,255,255,0.08);
+    box-sizing:border-box;
+  }
+  .bottom-nav__item {
+    width:100%;
+    flex:1 1 0 !important;
+    max-height:76px;
+    padding:5px 2px !important;
+  }
+  .bottom-nav__item--primary {
+    transform:none !important;
+  }
 }
 @media (max-width: 480px) {
   body {
@@ -921,6 +1020,10 @@ a { color:#7dd3fc; }
     </div>
   </section>
 </main>
+<section class="game-shell" id="gameShell" hidden aria-label="ゲーム画面">
+  <button class="game-shell__close" id="gameCloseBtn" type="button">戻る</button>
+  <iframe class="game-shell__frame" id="gameFrame" title="まおいつゲーム"></iframe>
+</section>
 <div class="ranking-modal" id="rankingModal" aria-hidden="true" role="dialog" aria-modal="true">
   <div class="ranking-modal__dialog">
     <div class="ranking-modal__header">
@@ -937,13 +1040,7 @@ a { color:#7dd3fc; }
       </form>
       <ol class="rank-list" id="rankList"></ol>
     </div>
-  </div>
 </div>
-<div class="ad-footer">
-<ins class="adsbygoogle"
-     style="display:block"
-     data-ad-client="ca-pub-9801602250480253"
-     data-ad-slot="2141591954"></ins>
 </div>
 <script>
 // Prevent pinch-zoom on iOS to keep the layout stable.
@@ -959,7 +1056,6 @@ document.addEventListener('touchmove', (event) => {
   }
 }, { passive: false });
 
-const GAME_URL = './game.html';
 const AUDIO_KEY = 'maoitu_audio';
 const DIFFICULTY_KEY = 'maoitu_difficulty';
 const GAME_CANONICAL_URL = `${window.location.origin}/maoitu/`;
@@ -972,6 +1068,9 @@ const difficultyToggle = document.getElementById('difficultyToggle');
 const difficultyButtons = Array.from(difficultyToggle.querySelectorAll('.difficulty-btn'));
 const rankingModal = document.getElementById('rankingModal');
 const closeRankingBtn = document.getElementById('closeRankingBtn');
+const gameShell = document.getElementById('gameShell');
+const gameFrame = document.getElementById('gameFrame');
+const gameCloseBtn = document.getElementById('gameCloseBtn');
 let selectedDifficulty = 'endless';
 
 function baseShareText(){
@@ -987,9 +1086,49 @@ shareBtn.addEventListener('click', async () => {
   }
 });
 
-playBtn.addEventListener('click', () => {
-  const url = `${GAME_URL}?mode=${encodeURIComponent(selectedDifficulty)}`;
-  window.location.href = url;
+function buildGameFrameUrl(){
+  const url = new URL('./game.html', window.location.href);
+  url.searchParams.set('embed', '1');
+  url.searchParams.set('mode', selectedDifficulty);
+  return `${url.pathname}${url.search}`;
+}
+
+function startGameView(){
+  if(rankingModal?.classList.contains('is-open')){
+    closeRanking();
+  }
+  document.body.classList.add('is-game-active');
+  if(gameShell){
+    gameShell.hidden = false;
+  }
+  if(gameFrame){
+    const nextSrc = buildGameFrameUrl();
+    if(gameFrame.getAttribute('src') !== nextSrc){
+      gameFrame.setAttribute('src', nextSrc);
+    }
+  }
+}
+
+function stopGameView(){
+  document.body.classList.remove('is-game-active');
+  if(gameShell){
+    gameShell.hidden = true;
+  }
+  if(gameFrame){
+    gameFrame.removeAttribute('src');
+  }
+}
+
+playBtn.addEventListener('click', startGameView);
+if(gameCloseBtn){
+  gameCloseBtn.addEventListener('click', stopGameView);
+}
+
+window.addEventListener('message', (event) => {
+  if(event.origin !== window.location.origin) return;
+  if(event.data?.type === 'maoitu:return-to-start'){
+    stopGameView();
+  }
 });
 
 function openRanking(){
@@ -1040,6 +1179,11 @@ const storedDifficulty = localStorage.getItem(DIFFICULTY_KEY);
 if(storedDifficulty === 'easy' || storedDifficulty === 'normal' || storedDifficulty === 'endless'){
   selectedDifficulty = storedDifficulty;
 }
+const urlParams = new URLSearchParams(window.location.search);
+const initialMode = urlParams.get('mode');
+if(initialMode === 'easy' || initialMode === 'normal' || initialMode === 'endless'){
+  selectedDifficulty = initialMode;
+}
 updateDifficultyButtons();
 difficultyButtons.forEach(btn=>{
   btn.addEventListener('click', ()=>{
@@ -1054,6 +1198,9 @@ difficultyButtons.forEach(btn=>{
 if (window.pixieedObserveAds) {
   window.pixieedObserveAds();
 }
+if(urlParams.get('play') === '1'){
+  startGameView();
+}
 
 </script>
 <script type="module">
@@ -1066,6 +1213,7 @@ initRankingUI({
   window.__rankingController = ctrl;
 });
 </script>
+  <script src="../scripts/shared-bottom-nav.js"></script>
   <script src="../scripts/pixel-art-fit.js"></script>
 </body>
 </html>
