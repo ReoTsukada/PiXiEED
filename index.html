@@ -38,6 +38,17 @@
         "logo": "https://pixieed.jp/icon/icon-512-4.png"
       },
       {
+        "@type": "ItemList",
+        "name": "PiXiEED主要ページ",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "ホーム", "url": "https://pixieed.jp/" },
+          { "@type": "ListItem", "position": 2, "name": "PiXiEEDraw", "url": "https://pixieed.jp/pixiedraw/" },
+          { "@type": "ListItem", "position": 3, "name": "PiXiEELENS", "url": "https://pixieed.jp/pixiee-lens/" },
+          { "@type": "ListItem", "position": 4, "name": "QR", "url": "https://pixieed.jp/qr/" },
+          { "@type": "ListItem", "position": 5, "name": "まおいつ", "url": "https://pixieed.jp/maoitu/" }
+        ]
+      },
+      {
         "@type": "SoftwareApplication",
         "name": "PiXiEEDraw",
         "applicationCategory": "GraphicsApplication",
@@ -46,22 +57,17 @@
       },
       {
         "@type": "SoftwareApplication",
-                  "name": "QRコードメーカー",
-        "applicationCategory": "UtilitiesApplication",
-        "operatingSystem": "Web",
-        "url": "https://pixieed.jp/qr-maker/"
-      },
-      {
-        "@type": "WebPage",
-        "name": "QR",
-        "url": "https://pixieed.jp/qr/"
-      },
-      {
-        "@type": "SoftwareApplication",
         "name": "PiXiEELENS",
         "applicationCategory": "MultimediaApplication",
         "operatingSystem": "Web",
         "url": "https://pixieed.jp/pixiee-lens/"
+      },
+      {
+        "@type": "SoftwareApplication",
+        "name": "QRコードメーカー",
+        "applicationCategory": "UtilitiesApplication",
+        "operatingSystem": "Web",
+        "url": "https://pixieed.jp/qr/"
       },
       {
         "@type": "VideoGame",
@@ -97,53 +103,51 @@
     <div class="home-screen">
       <div class="home-desktop-grid">
         <div class="home-primary-stack">
-          <section class="home-hero-card home-hero-card--image" aria-label="ヒーロー">
+          <section class="home-hero-card home-hero-card--image home-hero-card--simple" aria-label="ヒーロー">
+            <h1 class="sr-only">無料で使えるドット絵作成ツール</h1>
             <div class="home-hero-carousel" aria-label="注目パネル">
               <div class="home-hero-slide is-active" data-hero-slide>
                 <img src="assets/hero/pixieed-pixel-world-hero.png" alt="PiXiEEDのドット絵とキャラクターの世界観ビジュアル" data-pixel-art-fit="off">
-                <div class="home-hero-slide__content">
-                  <p class="home-hero-slide__eyebrow">free browser pixel tool</p>
-                  <h1 class="home-hero-slide__title">無料で使えるドット絵作成ツール</h1>
-                  <p class="home-hero-slide__copy">PiXiEEDは、ブラウザでドット絵を描く、画像をドット絵に変換する、ドット絵アニメーションを作る、保存まで進められるドット絵作成サイトです。スマホ・PCから無料で使えます。</p>
-                </div>
               </div>
-              <a class="home-hero-slide" href="pixiee-lens/index.html" data-hero-slide>
-                <img src="assets/screenshots/generated/pixiee-lens-app.png" alt="PiXiEELENSのカメラ入力とドット変換プレビュー画面" data-pixel-art-fit="off">
-                <div class="home-hero-slide__content">
-                  <p class="home-hero-slide__eyebrow">tool</p>
-                  <h2 class="home-hero-slide__title">PiXiEELENSを開く</h2>
-                  <p class="home-hero-slide__copy">写真やカメラ映像をリアルタイムでドット表現に変換し、作品素材づくりに使えます。</p>
-                </div>
-              </a>
-              <a class="home-hero-slide" href="qr-maker/index.html" data-hero-slide>
-                <img src="assets/screenshots/generated/qr-maker-app.png" alt="QRコードメーカーの入力・調整・生成画面" data-pixel-art-fit="off">
-                <div class="home-hero-slide__content">
-                  <p class="home-hero-slide__eyebrow">utility</p>
-                  <h2 class="home-hero-slide__title">QRコードメーカーを開く</h2>
-                  <p class="home-hero-slide__copy">文字列入力、色や余白の調整、PNG保存までを1画面で完結できます。</p>
-                </div>
-              </a>
+              <div class="home-hero-slide" data-hero-slide>
+                <img src="assets/screenshots/generated/pixiedraw-editor.png" alt="PiXiEEDrawでドット絵を編集している画面" data-pixel-art-fit="off">
+              </div>
+              <div class="home-hero-slide" data-hero-slide>
+                <img src="assets/screenshots/generated/pixiee-lens-app.png" alt="PiXiEELENSでカメラ映像をドット絵風に変換する画面" data-pixel-art-fit="off">
+              </div>
+              <div class="home-hero-slide" data-hero-slide>
+                <img src="assets/screenshots/generated/qr-maker-app.png" alt="QRコードメーカーでQRコードを作成する画面" data-pixel-art-fit="off">
+              </div>
             </div>
           </section>
 
           <section class="home-panel home-panel--tools" id="projects">
+            <div class="home-panel__header">
+              <h2 class="home-panel__title">主要ツール</h2>
+              <a class="home-panel__link" href="glossary/index.html">ドット絵用語集を見る</a>
+            </div>
             <div class="home-app-grid home-app-grid--launcher" aria-label="主要メニュー">
               <a class="home-app-tile" href="pixiedraw/index.html">
                 <span class="home-app-tile__icon"><img src="icon/icon-192-4.png" alt=""></span>
                 <span class="home-app-tile__label">PiXiEEDraw</span>
               </a>
-              <a class="home-app-tile" href="qr-maker/index.html">
-                <span class="home-app-tile__icon"><img src="icon/icon-192-6.png" alt=""></span>
-                <span class="home-app-tile__label">QRコードメーカー</span>
-              </a>
               <a class="home-app-tile" href="pixiee-lens/index.html">
                 <span class="home-app-tile__icon"><img src="icon/icon-192-1.png" alt=""></span>
                 <span class="home-app-tile__label">PiXiEELENS</span>
+              </a>
+              <a class="home-app-tile" href="qr/index.html">
+                <span class="home-app-tile__icon"><img src="icon/icon-192-6.png" alt=""></span>
+                <span class="home-app-tile__label">QR</span>
               </a>
               <a class="home-app-tile" href="maoitu/index.html">
                 <span class="home-app-tile__icon"><img src="icon/icon-192-3.png" alt=""></span>
                 <span class="home-app-tile__label">まおいつ</span>
               </a>
+            </div>
+            <div class="home-tool-detail-links" aria-label="詳しく見る">
+              <a href="projects/pixiedraw/index.html">PiXiEEDrawを詳しく見る</a>
+              <a href="projects/pixiee-lens/index.html">PiXiEELENSを詳しく見る</a>
+              <a href="projects/qr-maker/index.html">QRを詳しく見る</a>
             </div>
           </section>
         </div>
@@ -250,47 +254,27 @@
         </div>
       </section>
 
-      <section class="home-panel">
+      <section class="home-panel home-panel--compact-links">
         <div class="home-panel__header">
-          <h2 class="home-panel__title">投稿・記事・お知らせ</h2>
-          <a class="home-panel__link" href="notes/index.html">見る</a>
+          <h2 class="home-panel__title">その他のページ</h2>
+          <a class="home-panel__link" href="notes/index.html">お知らせ</a>
         </div>
-        <div class="home-feed">
-          <a class="home-feed-card home-feed-card--link" href="events/index.html">
-            <span class="home-feed-card__eyebrow">event</span>
-            <h2 class="home-feed-card__title">イベントや特集をまとめて案内します</h2>
-            <p class="home-feed-card__copy">期間限定の企画や注目してほしい情報を、ひと目で分かる形でお知らせします。</p>
-            <div class="home-feed-card__footer">
-              <span class="home-feed-card__meta">イベント・特集</span>
-              <span class="home-feed-card__cta">開く</span>
-            </div>
+        <div class="home-mini-links home-mini-links--footer">
+          <a class="home-mini-link" href="glossary/index.html">
+            <strong>用語集</strong>
+            <span>ドット絵用語集を見る</span>
           </a>
-          <a class="home-feed-card home-feed-card--link" href="notes/index.html">
-            <span class="home-feed-card__eyebrow">update</span>
-            <h2 class="home-feed-card__title">新機能や更新情報を確認できます</h2>
-            <p class="home-feed-card__copy">最近の改善や追加機能を短くまとめて、必要なページへそのまま進めます。</p>
-            <div class="home-feed-card__footer">
-              <span class="home-feed-card__meta">更新情報</span>
-              <span class="home-feed-card__cta">開く</span>
-            </div>
+          <a class="home-mini-link" href="maoitu/index.html">
+            <strong>ゲーム</strong>
+            <span>まおいつで遊ぶ</span>
           </a>
-          <a class="home-feed-card home-feed-card--link" href="notice/index.html">
-            <span class="home-feed-card__eyebrow">notice</span>
-            <h2 class="home-feed-card__title">お知らせやキャンペーンを受け取れます</h2>
-            <p class="home-feed-card__copy">運営からのお知らせや掲載情報も、ホームの中で分かりやすく確認できます。</p>
-            <div class="home-feed-card__footer">
-              <span class="home-feed-card__meta">お知らせ</span>
-              <span class="home-feed-card__cta">開く</span>
-            </div>
+          <a class="home-mini-link" href="portfolio/index.html">
+            <strong>企業向け</strong>
+            <span>制作相談を見る</span>
           </a>
-          <a class="home-feed-card home-feed-card--link" href="glossary/index.html">
-            <span class="home-feed-card__eyebrow">glossary</span>
-            <h2 class="home-feed-card__title">ドット絵や制作まわりの専門用語を確認できます</h2>
-            <p class="home-feed-card__copy">ピクセルアート、アニメーション、書き出し、制作フローの言葉を、初めてでも分かりやすく読めます。</p>
-            <div class="home-feed-card__footer">
-              <span class="home-feed-card__meta">専門用語</span>
-              <span class="home-feed-card__cta">開く</span>
-            </div>
+          <a class="home-mini-link" href="notes/index.html">
+            <strong>お知らせ</strong>
+            <span>更新情報を見る</span>
           </a>
         </div>
       </section>
@@ -300,7 +284,11 @@
 <footer>
     <p>© <span id="year">2026</span> PiXiEED. All rights reserved.</p>
     <div class="footer-links">
-      <a href="#" aria-disabled="true" onclick="return false;">会話</a>
+      <a href="pixiedraw/index.html">PiXiEEDraw</a>
+      <a href="pixiee-lens/index.html">PiXiEELENS</a>
+      <a href="qr/index.html">QR</a>
+      <a href="maoitu/index.html">まおいつ</a>
+      <a href="glossary/index.html">用語集</a>
       <a href="portfolio/index.html">企業</a>
       <a href="terms/index.html">利用規約</a>
       <a href="privacy/index.html">プライバシーポリシー</a>
@@ -312,6 +300,9 @@
   <nav class="bottom-nav" aria-label="下部ナビ">
       <a class="bottom-nav__item is-active" data-tab="home" href="./index.html">
         <span class="icon"><img src="FooterIcon1.png" alt=""></span><span>ホーム</span>
+      </a>
+      <a class="bottom-nav__item" data-tab="qr" href="qr/index.html">
+        <span class="icon"><img src="pixiedraw/assets/icons/tool-qr-edit.svg" alt=""></span><span>QR</span>
       </a>
       <a class="bottom-nav__item bottom-nav__item--primary" data-tab="draw" href="pixiedraw/index.html">
         <span class="icon"><img src="icon/icon-192-4.png" alt=""></span><span>PiXiEEDraw</span>
