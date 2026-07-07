@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.07.06-local-project-open-fix1';
+  const APP_BUILD_VERSION = '2026.07.07-open-dialog-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECTS_ENABLED = false;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
@@ -54,6 +54,16 @@
     bresenhamLine,
     pointInPolygon,
   } = geometryUtils;
+
+  function isImportableImageFile(file) {
+    if (!file) return false;
+    const type = typeof file.type === 'string' ? file.type.toLowerCase() : '';
+    if (type === 'image/png' || type === 'image/gif') {
+      return true;
+    }
+    const name = typeof file.name === 'string' ? file.name.toLowerCase() : '';
+    return name.endsWith('.png') || name.endsWith('.gif');
+  }
 
   const dom = {
     appRoot: document.getElementById('appRoot'),
