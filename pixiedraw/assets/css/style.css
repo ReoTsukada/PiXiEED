@@ -10490,11 +10490,11 @@ body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] .update-h
 
 @media (orientation: landscape) {
   body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] .project-tabs {
-    margin-left: max(0px, calc(var(--project-tabs-inset-left, 0px) - 24px));
+    margin-left: 0;
   }
 
   body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"].is-right-tool-rail:not(.is-mobile-layout) .project-tabs {
-    margin-left: 0;
+    margin-left: calc(-1 * var(--left-width) + max(0px, calc(var(--pixieed-side-ad-offset, 0px) - 24px)));
   }
 
   body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] .modal[open] {
