@@ -14,10 +14,10 @@
   const currentTab = resolveCurrentTab(currentPath);
   let lastPixiedrawMobileChromeActive = null;
 
-  if (/(?:^|\/)(?:pixiedraw|pixieedrawdev)(?:\/|\/index\.html)?$/.test(currentPath)) {
+  if (!currentPath.includes('/projects/') && /(?:^|\/)(?:pixiedraw|pixieedrawdev)(?:\/|\/index\.html)?$/.test(currentPath)) {
     body.dataset.pixieedPage = 'pixiedraw';
     doc.documentElement.dataset.pixieedPage = 'pixiedraw';
-  } else if (/(?:^|\/)pixiee-lens(?:\/|\/index\.html)?$/.test(currentPath)) {
+  } else if (!currentPath.includes('/projects/') && /(?:^|\/)pixiee-lens(?:\/|\/index\.html)?$/.test(currentPath)) {
     body.dataset.pixieedPage = 'pixiee-lens';
     doc.documentElement.dataset.pixieedPage = 'pixiee-lens';
   } else if (/(?:^|\/)maoitu(?:\/|\/index\.html)?$/.test(currentPath)) {
@@ -34,7 +34,7 @@
   function resolveCurrentTab(pathname) {
     const path = String(pathname || '').toLowerCase();
     if (path.includes('/pixiedraw/') || path.includes('/pixieedrawdev/')) return 'draw';
-    if (path.includes('/qr/')) return 'qr';
+    if (path.includes('/qr/') || path.includes('/qr-maker/')) return 'qr';
     if (path.includes('/pixiee-lens/')) return 'camera';
     if (/(?:^|\/)account(?:\/|\/index\.html)?$/.test(path)) return 'profile';
     return 'home';
@@ -57,7 +57,7 @@
   }
 
   function isPixiedrawPage() {
-    return /(?:^|\/)(?:pixiedraw|pixieedrawdev)(?:\/|\/index\.html)?$/.test(currentPath);
+    return !currentPath.includes('/projects/') && /(?:^|\/)(?:pixiedraw|pixieedrawdev)(?:\/|\/index\.html)?$/.test(currentPath);
   }
 
   function applyResponsivePageState() {
@@ -82,7 +82,7 @@
   }
 
   function replaceFooter() {
-    if (isPixiedrawPage() || currentPath.includes('/pixiee-lens/')) {
+    if (isPixiedrawPage() || (!currentPath.includes('/projects/') && /(?:^|\/)pixiee-lens(?:\/|\/index\.html)?$/.test(currentPath))) {
       doc.querySelectorAll('footer').forEach((node) => {
         if (node.classList.contains('ad-footer')) {
           return;
@@ -178,7 +178,11 @@
 
   function getFooterLinks() {
     return [
-      { label: '会話', disabled: true },
+      { label: 'PiXiEEDraw', path: 'pixiedraw/index.html' },
+      { label: 'PiXiEELENS', path: 'pixiee-lens/index.html' },
+      { label: 'QR', path: 'qr/index.html' },
+      { label: 'まおいつ', path: 'maoitu/index.html' },
+      { label: '用語集', path: 'glossary/index.html' },
       { label: '企業', path: 'portfolio/index.html' },
       { label: '利用規約', path: 'terms/index.html' },
       { label: 'プライバシーポリシー', path: 'privacy/index.html' },
@@ -190,7 +194,7 @@
     return [
       { key: 'home', label: 'ホーム', path: 'index.html', icon: 'FooterIcon1.png' },
       { key: 'qr', label: 'QR', path: 'qr/index.html', icon: 'pixiedraw/assets/icons/tool-qr-edit.svg' },
-      { key: 'draw', label: '描く', path: 'pixiedraw/index.html', icon: 'icon/icon-192-4.png', primary: true },
+      { key: 'draw', label: 'PiXiEEDraw', path: 'pixiedraw/index.html', icon: 'icon/icon-192-4.png', primary: true },
       { key: 'camera', label: 'カメラ', path: 'pixiee-lens/index.html', icon: 'pixiedraw/assets/icons/pixieelensicon_frame_01.png' },
       { key: 'profile', label: 'マイページ', path: 'account/index.html', icon: 'character-dots/maousama.png', useAvatar: true }
     ];
