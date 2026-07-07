@@ -11,21 +11,38 @@
 <meta name="description" content="魔王様を操作して敵を避け続けるブラウザ避けゲー。スマホ・PCで遊べるシンプル操作のアクションゲームです。"/>
 <meta name="keywords" content="魔王様いつまでよければいいですか,まおいつ,ブラウザゲーム,避けゲー,アクションゲーム,PiXiEED"/>
 <link rel="canonical" href="https://pixieed.jp/maoitu/"/>
-<!-- Google tag (gtag.js) -->
-<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-SZPVXMX85G"></script>
 <script>
 const GA_MEASUREMENT_ID = 'G-SZPVXMX85G';
 const GA_PAGE_PATH = '/maoitu/';
 window.dataLayer = window.dataLayer || [];
 function gtag(){dataLayer.push(arguments);}
-gtag('js', new Date());
-gtag('config', GA_MEASUREMENT_ID, {
-  page_path: GA_PAGE_PATH,
-  page_title: document.title
-});
+(() => {
+  const loadAnalytics = () => {
+    if (document.querySelector(`script[src*="googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}"]`)) return;
+    const script = document.createElement('script');
+    script.async = true;
+    script.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(GA_MEASUREMENT_ID)}`;
+    document.head.appendChild(script);
+    gtag('js', new Date());
+    gtag('config', GA_MEASUREMENT_ID, {
+      page_path: GA_PAGE_PATH,
+      page_title: document.title
+    });
+  };
+  const scheduleAnalytics = () => {
+    if ('requestIdleCallback' in window) {
+      window.requestIdleCallback(loadAnalytics, { timeout: 2200 });
+      return;
+    }
+    window.setTimeout(loadAnalytics, 1200);
+  };
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', scheduleAnalytics, { once: true });
+  } else {
+    scheduleAnalytics();
+  }
+})();
 </script>
-<!-- Google AdSense -->
-<script async="" crossorigin="anonymous" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253"></script>
 <script src="../scripts/pixieed-adfree.js"></script>
 <script>
 (() => {
@@ -793,7 +810,7 @@ body.is-game-active .game-shell {
     });
   </script>
   
-<script id="ads-lazy">
+  <script id="ads-lazy">
   (function() {
     if (window.pixieedObserveAds) return;
     if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) return;
@@ -839,6 +856,7 @@ body.is-game-active .game-shell {
     const isEnqueued = (ins) => ins.dataset.adsQueueEnqueued === '1';
     const isLoading = (ins) => ins.dataset.adsQueueLoading === '1';
     const isLoaded = (ins) => ins.dataset.adsLazyLoaded === '1' || isReady(ins);
+    const isGameActive = () => Boolean(window.__MAOITU_GAME_ACTIVE__ || document.body?.classList.contains('is-game-active'));
 
     const assignSlot = (ins) => {
       if (!ins || !(ins instanceof HTMLElement)) return;
@@ -909,6 +927,7 @@ body.is-game-active .game-shell {
     };
 
     function processQueue() {
+      if (isGameActive()) return;
       if (activeAd) return;
       while (queue.length) {
         const ins = queue.shift();
@@ -936,6 +955,7 @@ body.is-game-active .game-shell {
     }
 
     const observeAds = (root) => {
+      if (isGameActive()) return;
       const scope = root && root.querySelectorAll ? root : document;
       scope.querySelectorAll('ins.adsbygoogle').forEach(enqueueAd);
       processQueue();
@@ -954,6 +974,7 @@ body.is-game-active .game-shell {
     }
 
     const mo = new MutationObserver((mutations) => {
+      if (isGameActive()) return;
       mutations.forEach((mutation) => {
         mutation.addedNodes.forEach((node) => {
           if (!(node instanceof HTMLElement)) return;
@@ -979,6 +1000,11 @@ body.is-game-active .game-shell {
     } else {
       startObserver();
     }
+    window.addEventListener('maoitu:game-active-change', () => {
+      if (!isGameActive()) {
+        observeAds(document);
+      }
+    });
   })();
 </script>
 <link rel="apple-touch-icon" href="/icon/PiXiEED.icon512.png"/>
@@ -1100,7 +1126,10 @@ function startGameView(){
   if(rankingModal?.classList.contains('is-open')){
     closeRanking();
   }
+  window.__MAOITU_GAME_ACTIVE__ = true;
+  document.documentElement.dataset.maoituGameActive = 'true';
   document.body.classList.add('is-game-active');
+  window.dispatchEvent(new CustomEvent('maoitu:game-active-change', { detail: { active: true } }));
   if(gameShell){
     gameShell.hidden = false;
   }
@@ -1113,7 +1142,10 @@ function startGameView(){
 }
 
 function stopGameView(){
+  window.__MAOITU_GAME_ACTIVE__ = false;
+  delete document.documentElement.dataset.maoituGameActive;
   document.body.classList.remove('is-game-active');
+  window.dispatchEvent(new CustomEvent('maoitu:game-active-change', { detail: { active: false } }));
   if(gameShell){
     gameShell.hidden = true;
   }
