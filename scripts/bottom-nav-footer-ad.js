@@ -529,6 +529,15 @@
     }
   }
 
+  function isMaoituPage() {
+    try {
+      const path = String(window.location.pathname || '').toLowerCase();
+      return /(?:^|\/)maoitu(?:\/|\/index\.html)?$/.test(path);
+    } catch (_error) {
+      return false;
+    }
+  }
+
   function isPixiedrawMobileChromeActive() {
     if (!isPixiedrawPage()) return false;
     const body = document.body;
@@ -622,34 +631,56 @@
       body[data-pixieed-page="pixiedraw"] .app{
         padding-top:var(--pixieed-top-ad-offset) !important;
       }
+      body[data-pixieed-page="maoitu"] .game-shell{
+        padding-top:var(--pixieed-top-ad-offset) !important;
+        box-sizing:border-box;
+      }
       @media (orientation: landscape){
-        body[data-pixieed-page="pixiedraw"] .pixieed-shared-top-ad{
+        body[data-pixieed-page="pixiedraw"] .pixieed-shared-top-ad,
+        body[data-pixieed-page="maoitu"] .pixieed-shared-top-ad{
           top:calc(env(safe-area-inset-top, 0px) + 6px);
           bottom:calc(env(safe-area-inset-bottom, 0px) + 6px);
           left:calc(env(safe-area-inset-left, 0px) + 6px);
           transform:none;
-          width:clamp(96px, calc((100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 12px) / 3.2), 160px);
+          width:72px;
           height:auto;
           align-items:stretch;
           justify-content:flex-start;
+          overflow:visible;
         }
-        body[data-pixieed-page="pixiedraw"] .pixieed-shared-top-ad .ad-block{
+        body[data-pixieed-page="pixiedraw"] .pixieed-shared-top-ad .ad-block,
+        body[data-pixieed-page="maoitu"] .pixieed-shared-top-ad .ad-block{
+          position:absolute;
+          top:50%;
+          left:50%;
+          width:320px;
+          height:50px;
+          transform:translate(-50%, -50%) rotate(90deg);
+          transform-origin:center center;
           border-radius:10px;
+          overflow:hidden;
         }
-        body[data-pixieed-page="pixiedraw"] .pixieed-shared-top-ad .ad-label{
-          top:4px;
+        body[data-pixieed-page="pixiedraw"] .pixieed-shared-top-ad .ad-label,
+        body[data-pixieed-page="maoitu"] .pixieed-shared-top-ad .ad-label{
+          top:3px;
           left:50%;
           transform:translateX(-50%);
-          writing-mode:vertical-rl;
+          writing-mode:horizontal-tb;
           text-orientation:mixed;
-          padding:2px 4px;
-          border-radius:6px;
+          padding:2px 6px;
+          border-radius:999px;
           letter-spacing:0.02em;
         }
-        body[data-pixieed-page="pixiedraw"] .pixieed-shared-top-ad ins.adsbygoogle{
-          min-height:0 !important;
+        body[data-pixieed-page="pixiedraw"] .pixieed-shared-top-ad ins.adsbygoogle,
+        body[data-pixieed-page="maoitu"] .pixieed-shared-top-ad ins.adsbygoogle{
+          min-height:50px !important;
+          height:50px !important;
         }
         body[data-pixieed-page="pixiedraw"] .app{
+          padding-top:0 !important;
+          padding-left:calc(env(safe-area-inset-left, 0px) + var(--pixieed-side-ad-offset)) !important;
+        }
+        body[data-pixieed-page="maoitu"] .game-shell{
           padding-top:0 !important;
           padding-left:calc(env(safe-area-inset-left, 0px) + var(--pixieed-side-ad-offset)) !important;
         }
@@ -674,7 +705,9 @@
     if (!(body instanceof HTMLElement)) return;
     const target = isPixiedrawPage()
       ? document.querySelector('.app')
-      : body;
+      : isMaoituPage()
+        ? document.querySelector('.game-shell') || body
+        : body;
     if (!(target instanceof HTMLElement)) return;
     if (target.dataset.pixieedTopAdPaddingApplied === 'true') {
       target.style.paddingTop = target.dataset.pixieedTopAdOriginalPaddingTop || '';
@@ -693,23 +726,25 @@
     const ad = document.querySelector('.pixieed-shared-top-ad');
     const target = isPixiedrawPage()
       ? document.querySelector('.app')
-      : body;
+      : isMaoituPage()
+        ? document.querySelector('.game-shell') || body
+        : body;
     if (!(ad instanceof HTMLElement) || !(target instanceof HTMLElement)) {
       clearReservedTopSpace();
       return;
     }
     const rect = ad.getBoundingClientRect();
-    const isPixiedrawLandscape = isPixiedrawPage() && isLandscapeViewport();
-    const reserved = Math.max(0, Math.ceil((isPixiedrawLandscape ? rect.width : rect.height) + 12));
+    const useLandscapeSideAd = (isPixiedrawPage() || isMaoituPage()) && isLandscapeViewport();
+    const reserved = Math.max(0, Math.ceil((useLandscapeSideAd ? rect.width : rect.height) + (useLandscapeSideAd ? 4 : 12)));
     const reservedPx = `${reserved}px`;
-    document.documentElement.style.setProperty('--pixieed-top-ad-offset', isPixiedrawLandscape ? '0px' : reservedPx);
-    document.documentElement.style.setProperty('--pixieed-side-ad-offset', isPixiedrawLandscape ? reservedPx : '0px');
-    document.documentElement.style.setProperty('--pixieed-shared-side-ad-width', isPixiedrawLandscape ? `${Math.max(0, Math.ceil(rect.width))}px` : '0px');
+    document.documentElement.style.setProperty('--pixieed-top-ad-offset', useLandscapeSideAd ? '0px' : reservedPx);
+    document.documentElement.style.setProperty('--pixieed-side-ad-offset', useLandscapeSideAd ? reservedPx : '0px');
+    document.documentElement.style.setProperty('--pixieed-shared-side-ad-width', useLandscapeSideAd ? `${Math.max(0, Math.ceil(rect.width))}px` : '0px');
     if (target.dataset.pixieedTopAdPaddingApplied !== 'true') {
       target.dataset.pixieedTopAdPaddingApplied = 'true';
       target.dataset.pixieedTopAdOriginalPaddingTop = window.getComputedStyle(target).paddingTop || '0px';
     }
-    target.style.paddingTop = isPixiedrawLandscape
+    target.style.paddingTop = useLandscapeSideAd
       ? (target.dataset.pixieedTopAdOriginalPaddingTop || '0px')
       : `calc(${target.dataset.pixieedTopAdOriginalPaddingTop || '0px'} + ${reservedPx})`;
     dispatchPixiedrawAdLayoutChange(reason || 'reserve-top-ad-space');
