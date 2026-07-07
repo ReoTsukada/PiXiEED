@@ -10429,6 +10429,7 @@ body.is-mobile-layout .project-home-screen__list .startup-recent-card__open {
 
 #newProjectDialog .modal__form {
   max-width: 520px;
+  height: min(92vh, 760px);
   max-height: min(92vh, 760px);
   overflow: hidden;
 }
@@ -10438,6 +10439,7 @@ body.is-mobile-layout .project-home-screen__list .startup-recent-card__open {
   gap: 6px;
   overflow: auto;
   padding-right: 2px;
+  padding-bottom: 12px;
 }
 
 #newProjectDialog .field > span {
@@ -10448,6 +10450,10 @@ body.is-mobile-layout .project-home-screen__list .startup-recent-card__open {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(var(--ui-rgb), 0.14);
+  background: rgba(10, 15, 22, 0.98);
+  flex: 0 0 auto;
 }
 
 #newProjectDialog .modal__footer .button {
@@ -10455,6 +10461,7 @@ body.is-mobile-layout .project-home-screen__list .startup-recent-card__open {
 }
 
 body.is-mobile-layout #newProjectDialog .modal__form {
+  height: calc(100vh - 18px - var(--safe-area-top) - var(--safe-area-bottom));
   max-height: calc(100vh - 18px - var(--safe-area-top) - var(--safe-area-bottom));
 }
 
@@ -10467,6 +10474,14 @@ body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] .modal[op
 }
 
 body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] #newProjectDialog .modal__form {
+  height: calc(
+    var(--mobile-viewport-height)
+    - var(--safe-area-top)
+    - var(--safe-area-bottom)
+    - var(--pixieed-top-ad-offset, 0px)
+    - var(--pixieed-shared-bottom-nav-height, 0px)
+    - 18px
+  );
   max-height: calc(
     var(--mobile-viewport-height)
     - var(--safe-area-top)
@@ -10511,6 +10526,13 @@ body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] .update-h
   body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] .shortcut-help-modal .modal__form,
   body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] .operation-help-modal .modal__form,
   body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] .update-history-modal .modal__form {
+    height: calc(
+      var(--mobile-viewport-height)
+      - var(--safe-area-top)
+      - var(--safe-area-bottom)
+      - var(--pixieed-top-ad-offset, 0px)
+      - 18px
+    );
     max-height: calc(
       var(--mobile-viewport-height)
       - var(--safe-area-top)
