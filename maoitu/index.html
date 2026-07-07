@@ -562,7 +562,7 @@ a { color:#7dd3fc; }
   min-height:0;
 }
 body.is-game-active {
-  padding:0 !important;
+  padding:0 0 calc(var(--pixieed-shared-bottom-nav-height, 68px) + 6px + var(--safe-bottom)) 0 !important;
   gap:0;
   background:#02040a;
 }
@@ -594,8 +594,8 @@ body.is-game-active .game-shell {
 }
 .game-shell__close {
   position:absolute;
-  top:calc(14px + var(--safe-top));
-  left:calc(14px + var(--safe-left));
+  top:calc(14px + var(--safe-top) + var(--pixieed-top-ad-offset, 0px));
+  left:calc(14px + var(--safe-left) + var(--pixieed-side-ad-offset, 0px));
   z-index:20;
   border:1px solid rgba(255,255,255,0.14);
   border-radius:999px;
@@ -646,8 +646,11 @@ body.is-game-active .game-shell {
 }
 @media (orientation: landscape) {
   body {
-    padding-right:max(88px, calc(72px + 16px + var(--safe-right)));
+    padding-right:max(78px, calc(72px + 6px + var(--safe-right)));
     padding-bottom:calc(16px + var(--safe-bottom));
+  }
+  body.is-game-active {
+    padding:0 max(78px, calc(72px + 6px + var(--safe-right))) 0 0 !important;
   }
   .bottom-nav {
     top:0 !important;
