@@ -15,8 +15,10 @@
 (() => {
   const params = new URLSearchParams(window.location.search);
   const embedMode = params.get('embed') === '1' || params.get('embed') === 'true';
+  window.__MAOITU_EMBED_MODE__ = embedMode;
   if (embedMode) {
     document.documentElement.dataset.embedMode = 'true';
+    window.__PIXIEED_ADS_DISABLED__ = true;
     return;
   }
   const redirectUrl = new URL('./index.html', window.location.href);
@@ -29,8 +31,6 @@
 })();
 </script>
 
-<!-- Google tag (gtag.js) -->
-<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-SZPVXMX85G"></script>
 <script>
 const GA_MEASUREMENT_ID = 'G-SZPVXMX85G';
 const GA_ADDITIONAL_IDS = ['G-LLSD5KLJVN'];
@@ -40,26 +40,35 @@ const PROJECT_NAME = '魔王様!!いつまでよければいいですか!?';
 const PROJECT_TYPE = 'game';
 window.dataLayer = window.dataLayer || [];
 function gtag(){dataLayer.push(arguments);}
-gtag('js', new Date());
-gtag('config', GA_MEASUREMENT_ID, {
-  page_path: GA_PAGE_PATH,
-  page_title: document.title
-});
-GA_ADDITIONAL_IDS.forEach(id => {
-  gtag('config', id, {
+if (!window.__MAOITU_EMBED_MODE__) {
+  const analyticsScript = document.createElement('script');
+  analyticsScript.async = true;
+  analyticsScript.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(GA_MEASUREMENT_ID)}`;
+  document.head.appendChild(analyticsScript);
+  gtag('js', new Date());
+  gtag('config', GA_MEASUREMENT_ID, {
     page_path: GA_PAGE_PATH,
     page_title: document.title
   });
-});
-gtag('event', 'project_open', {
-  project_slug: PROJECT_SLUG,
-  project_type: PROJECT_TYPE,
-  project_name: PROJECT_NAME
-});
-gtag('event', 'project_open_maoitu');
+  GA_ADDITIONAL_IDS.forEach(id => {
+    gtag('config', id, {
+      page_path: GA_PAGE_PATH,
+      page_title: document.title
+    });
+  });
+  gtag('event', 'project_open', {
+    project_slug: PROJECT_SLUG,
+    project_type: PROJECT_TYPE,
+    project_name: PROJECT_NAME
+  });
+  gtag('event', 'project_open_maoitu');
+  const adsScript = document.createElement('script');
+  adsScript.async = true;
+  adsScript.crossOrigin = 'anonymous';
+  adsScript.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253';
+  document.head.appendChild(adsScript);
+}
 </script>
-<!-- Google AdSense -->
-<script async="" crossorigin="anonymous" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253"></script>
 <style>
   :root{
     --safe-top: env(safe-area-inset-top, 0px);
@@ -973,16 +982,73 @@ function createPlanetLayer(){
   ctx.restore();
   return oc;
 }
+function createDeepSpaceLayer(stage){
+  const oc=document.createElement('canvas');
+  oc.width=W; oc.height=H;
+  const ctx=oc.getContext('2d');
+  const palettes = [
+    { core:'79,209,255', veil:'82,96,255', accent:'255,100,190' },
+    { core:'255,184,96', veil:'129,92,255', accent:'64,225,185' },
+    { core:'150,245,255', veil:'255,76,160', accent:'255,238,116' },
+    { core:'188,255,158', veil:'54,145,255', accent:'248,113,113' }
+  ];
+  const palette = palettes[stage % palettes.length];
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+  for(let i = 0; i < 4; i++){
+    const px = W * (0.16 + ((stage * 0.19 + i * 0.23) % 0.68));
+    const py = H * (0.14 + ((stage * 0.13 + i * 0.17) % 0.7));
+    const r = 46 + stage * 10 + i * 7;
+    const color = i % 2 === 0 ? palette.core : palette.veil;
+    const glow = ctx.createRadialGradient(px, py, r * 0.08, px, py, r);
+    glow.addColorStop(0, `rgba(${color},${0.13 + stage * 0.018})`);
+    glow.addColorStop(0.45, `rgba(${color},${0.04 + stage * 0.006})`);
+    glow.addColorStop(1, `rgba(${color},0)`);
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(px, py, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  for(let i = 0; i < 3; i++){
+    const cx = W * (0.18 + ((stage * 0.21 + i * 0.31) % 0.62));
+    const cy = H * (0.16 + ((stage * 0.15 + i * 0.22) % 0.64));
+    const rx = 28 + stage * 5 + i * 8;
+    const ry = rx * (0.18 + i * 0.04);
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(-0.65 + stage * 0.22 + i * 0.4);
+    const g = ctx.createRadialGradient(0, 0, 1, 0, 0, rx);
+    g.addColorStop(0, `rgba(255,255,255,${0.12 + stage * 0.012})`);
+    g.addColorStop(0.32, `rgba(${palette.accent},${0.08 + stage * 0.008})`);
+    g.addColorStop(1, `rgba(${palette.accent},0)`);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  for(let i = 0; i < 20 + stage * 8; i++){
+    const x0 = rnd(0, W);
+    const y0 = rnd(0, H);
+    const a = rnd(0.05, 0.2);
+    ctx.fillStyle = `rgba(255,255,255,${a})`;
+    ctx.fillRect(x0, y0, rnd(0.5, 1.4), rnd(0.5, 1.4));
+  }
+  ctx.restore();
+  return oc;
+}
 const BG_LAYER=createBackground();
 const STAR_LAYER=createStarLayer(); // 遠景
 const STAR_LAYER_NEAR=createStarLayer(48,0.15,0.9,0.2,0.6,1); // 手前の細かい星
 const GALAXY_LAYER=createGalaxyLayer();
 const PLANET_LAYER=createPlanetLayer();
+const DEEP_SPACE_LAYERS=[0,1,2,3].map(createDeepSpaceLayer);
 const VIGNETTE_LAYER=createVignetteLayer();
 const ENEMY_DANGER_GLOW_SPRITE=createGlowSprite('255,70,70');
 const ANGEL_GLOW_SPRITE=createGlowSprite('16,255,180');
 const FEVER_GLOW_SPRITE=createGlowSprite('250,204,21');
 const SHIELD_GLOW_SPRITE=createGlowSprite('200,255,255');
+const FEVER_RAINBOW_COLORS = ['255,60,96', '255,188,54', '250,245,80', '49,230,142', '47,205,255', '110,92,255', '235,80,255'];
 let starOffset=0;
 let starOffsetNear=0;
 let starOffsetPrev=0;
@@ -1021,6 +1087,10 @@ let averageFps = 60;
 let effectQuality = 'high';
 let frameTimeSum = 0;
 let frameTimeSamples = 0;
+const FEVER_FRAME_CACHE_SIZE = 24;
+let feverFrameCache = null;
+let feverSkyCache = null;
+let normalFrameCache = null;
 
 // ====== 表示フィット ======
 const DPR_CAP = 2; // キャラの見え方を優先しつつ負荷を抑える上限
@@ -1061,9 +1131,9 @@ function easeOutCubic(t){
   return 1 - Math.pow(1 - clamped, 3);
 }
 function currentParticleBudget(){
-  if(effectQuality === 'low') return 16;
-  if(effectQuality === 'medium') return 32;
-  return MAX_PARTICLES;
+  if(effectQuality === 'low') return 14;
+  if(effectQuality === 'medium') return 28;
+  return 46;
 }
 function currentBurstCount(baseCount){
   if(effectQuality === 'low') return Math.max(4, Math.round(baseCount * 0.35));
@@ -1075,6 +1145,125 @@ function drawGlowSprite(sprite, cx, cy, radius, alpha){
   x.save();
   x.globalAlpha = alpha;
   x.drawImage(sprite, cx - radius, cy - radius, size, size);
+  x.restore();
+}
+function roundedRectPath(ctx, px, py, pw, ph, radius){
+  const r = Math.max(0, Math.min(radius, pw * 0.5, ph * 0.5));
+  ctx.beginPath();
+  ctx.moveTo(px + r, py);
+  ctx.lineTo(px + pw - r, py);
+  ctx.quadraticCurveTo(px + pw, py, px + pw, py + r);
+  ctx.lineTo(px + pw, py + ph - r);
+  ctx.quadraticCurveTo(px + pw, py + ph, px + pw - r, py + ph);
+  ctx.lineTo(px + r, py + ph);
+  ctx.quadraticCurveTo(px, py + ph, px, py + ph - r);
+  ctx.lineTo(px, py + r);
+  ctx.quadraticCurveTo(px, py, px + r, py);
+}
+function drawFeverSkyOverlay(){
+  if(feverFrames <= 0) return;
+  const cache = getFeverSkyCache();
+  const frame = cache[Math.floor(elapsedFrames / 3) % cache.length];
+  x.save();
+  x.globalCompositeOperation = 'screen';
+  x.drawImage(frame, 0, 0, W, H);
+  x.restore();
+}
+function createFeverSkyCache(){
+  return Array.from({ length: FEVER_FRAME_CACHE_SIZE }, (_, frameIndex) => {
+    const oc=document.createElement('canvas');
+    oc.width=W; oc.height=H;
+    const ctx=oc.getContext('2d');
+    ctx.globalCompositeOperation = 'screen';
+    const phase = frameIndex / FEVER_FRAME_CACHE_SIZE * Math.PI * 2;
+    const glow = ctx.createRadialGradient(W * 0.5, H * 0.52, 12, W * 0.5, H * 0.52, H * 0.7);
+    glow.addColorStop(0, `rgba(255,255,255,${0.08 + Math.sin(phase) * 0.02})`);
+    glow.addColorStop(0.34, 'rgba(250,204,21,0.12)');
+    glow.addColorStop(0.64, 'rgba(59,130,246,0.08)');
+    glow.addColorStop(1, 'rgba(236,72,153,0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalAlpha = 0.16;
+    for(let i = 0; i < 5; i++){
+      const y = ((frameIndex * 7) + i * 47) % (H + 36) - 18;
+      const hue = (frameIndex * 15 + i * 54) % 360;
+      ctx.fillStyle = `hsl(${hue} 100% 66%)`;
+      ctx.fillRect(0, y, W, 1);
+    }
+    return oc;
+  });
+}
+function getFeverSkyCache(){
+  if(!feverSkyCache) feverSkyCache = createFeverSkyCache();
+  return feverSkyCache;
+}
+function createNormalFrameLayer(){
+  const oc=document.createElement('canvas');
+  oc.width=W; oc.height=H;
+  const ctx=oc.getContext('2d');
+  const line = ctx.createLinearGradient(0, 0, W, H);
+  line.addColorStop(0, 'rgba(125,211,252,0.16)');
+  line.addColorStop(0.5, 'rgba(167,139,250,0.1)');
+  line.addColorStop(1, 'rgba(45,212,191,0.14)');
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = line;
+  roundedRectPath(ctx, 4, 4, W - 8, H - 8, 9);
+  ctx.stroke();
+  return oc;
+}
+function createFeverFrameCache(){
+  return Array.from({ length: FEVER_FRAME_CACHE_SIZE }, (_, frameIndex) => {
+    const oc=document.createElement('canvas');
+    oc.width=W; oc.height=H;
+    const ctx=oc.getContext('2d');
+    const inset = 3;
+    const radius = 12;
+    const phase = frameIndex / FEVER_FRAME_CACHE_SIZE;
+    const pulse = 0.5 + 0.5 * Math.sin(phase * Math.PI * 2);
+    const sweep = ctx.createLinearGradient(-W + phase * W * 2, 0, phase * W * 2, H);
+    sweep.addColorStop(0.00, '#ff2d78');
+    sweep.addColorStop(0.16, '#ffb238');
+    sweep.addColorStop(0.32, '#f6ff5b');
+    sweep.addColorStop(0.50, '#2ff08d');
+    sweep.addColorStop(0.66, '#35d5ff');
+    sweep.addColorStop(0.82, '#7a5cff');
+    sweep.addColorStop(1.00, '#f45cff');
+    ctx.globalCompositeOperation = 'screen';
+    ctx.lineWidth = 7 + pulse * 2;
+    ctx.strokeStyle = sweep;
+    roundedRectPath(ctx, inset, inset, W - inset * 2, H - inset * 2, radius);
+    ctx.stroke();
+    ctx.lineWidth = 2;
+    ctx.setLineDash([10, 8]);
+    ctx.lineDashOffset = -frameIndex * 3;
+    ctx.globalAlpha = 0.86;
+    roundedRectPath(ctx, inset + 5, inset + 5, W - (inset + 5) * 2, H - (inset + 5) * 2, radius - 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 0.22 + pulse * 0.12;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, W, 2);
+    ctx.fillRect(0, H - 2, W, 2);
+    ctx.fillRect(0, 0, 2, H);
+    ctx.fillRect(W - 2, 0, 2, H);
+    return oc;
+  });
+}
+function getFeverFrameCache(){
+  if(!feverFrameCache) feverFrameCache = createFeverFrameCache();
+  return feverFrameCache;
+}
+function drawGameFrameOverlay(){
+  const feverActive = feverFrames > 0;
+  x.save();
+  if(feverActive){
+    x.globalCompositeOperation = 'screen';
+    const cache = getFeverFrameCache();
+    x.drawImage(cache[Math.floor(elapsedFrames / 2) % cache.length], 0, 0, W, H);
+  }else{
+    if(!normalFrameCache) normalFrameCache = createNormalFrameLayer();
+    x.drawImage(normalFrameCache, 0, 0, W, H);
+  }
   x.restore();
 }
 function drawActorSprite(img, px, py, w, h, {
@@ -1104,6 +1293,20 @@ function drawActorSprite(img, px, py, w, h, {
   x.scale(scaleX, scaleY);
   x.imageSmoothingEnabled = false;
   x.drawImage(img, -w / 2, -h / 2, w, h);
+  x.restore();
+}
+function drawProgressSpaceLayers(){
+  const progress = Math.max(0, difficultyLevel - 1) / 2.25;
+  const baseIndex = Math.floor(progress) % DEEP_SPACE_LAYERS.length;
+  const nextIndex = (baseIndex + 1) % DEEP_SPACE_LAYERS.length;
+  const mix = progress - Math.floor(progress);
+  const depthAlpha = Math.min(0.72, 0.2 + Math.max(0, difficultyLevel - 1) * 0.045);
+  x.save();
+  x.globalCompositeOperation = 'screen';
+  x.globalAlpha = depthAlpha * (1 - mix);
+  x.drawImage(DEEP_SPACE_LAYERS[baseIndex], 0, 0, W, H);
+  x.globalAlpha = depthAlpha * mix;
+  x.drawImage(DEEP_SPACE_LAYERS[nextIndex], 0, 0, W, H);
   x.restore();
 }
 function updatePerformanceStats(dt){
@@ -1189,6 +1392,24 @@ function updateParticles(){
     }
   }
   particles.length = writeIndex;
+}
+function spawnFeverAmbientParticles(){
+  if(feverFrames <= 0 || effectQuality === 'low' || (elapsedFrames % 6) !== 0) return;
+  const color = FEVER_RAINBOW_COLORS[(Math.floor(elapsedFrames / 4) % FEVER_RAINBOW_COLORS.length)];
+  const y = rnd(H * 0.08, H * 0.88);
+  const fromLeft = Math.random() < 0.5;
+  const xPos = fromLeft ? rnd(3, 12) : rnd(W - 12, W - 3);
+  spawnBurst(xPos, y, {
+    count: effectQuality === 'medium' ? 1 : 2,
+    color,
+    speedMin: 0.2,
+    speedMax: 1.1,
+    lifeMin: 14,
+    lifeMax: 26,
+    sizeMin: 1.1,
+    sizeMax: 3.2,
+    gravity: -0.006
+  });
 }
 function snapshotPrevPosition(o){
   o.px = o.x;
@@ -1648,6 +1869,7 @@ function step(){
   E.length = enemyWriteIndex;
   if(feverFrames > 0){
     feverFrames--;
+    spawnFeverAmbientParticles();
   }else{
     feverGauge = Math.min(FEVER_THRESHOLD_FRAMES, feverGauge + 1);
     if(feverGauge >= FEVER_THRESHOLD_FRAMES){
@@ -1716,6 +1938,7 @@ function draw(alpha=1){
     shakeFrames--;
   }
   x.drawImage(BG_LAYER,0,0,W,H);
+  drawProgressSpaceLayers();
   x.save();
   x.translate(cameraOffsetX * 0.12, cameraOffsetY * 0.12);
   x.drawImage(GALAXY_LAYER,0,0,W,H);
@@ -1734,6 +1957,7 @@ function draw(alpha=1){
     const pulse = 0.08 + 0.06 * Math.sin(elapsedFrames * 0.3);
     x.fillStyle = `rgba(255,200,90,${0.12 + pulse})`;
     x.fillRect(0,0,W,H);
+    drawFeverSkyOverlay();
   }
   x.save();
   x.translate(W * 0.5, H * 0.52);
@@ -1929,6 +2153,7 @@ function draw(alpha=1){
   if(!alive){
     // キャンバス上ではパネルを描かず、HTML側のUIに委ねる
   }
+  drawGameFrameOverlay();
   x.restore();
 }
 
@@ -1944,12 +2169,15 @@ function loop(now){
   updatePerformanceStats(dt);
   acc += dt;
 
-  const MAX_STEPS = 5;
+  const MAX_STEPS = 3;
   let steps = 0;
   while (acc >= FIXED_DT_MS && steps < MAX_STEPS){
     if (alive) step();
     acc -= FIXED_DT_MS;
     steps++;
+  }
+  if (acc >= FIXED_DT_MS) {
+    acc = FIXED_DT_MS * 0.5;
   }
 
   const alpha = acc / FIXED_DT_MS;
