@@ -5,6 +5,8 @@
   window.__PIXIEED_FOOTER_AD_CONTROLLER__ = true;
 
   const PIXIEED_ADFREE_SCRIPT_VERSION = '2026.05.30-support-email-claim';
+  let adsScriptLoadScheduled = false;
+  let maoituAdsScriptDelayApplied = false;
 
   function buildPixieedAdFreeScriptUrl(baseUrl) {
     const url = new URL(baseUrl, window.location.href);
@@ -504,6 +506,28 @@
   function ensureAdsScript() {
     const existing = document.querySelector('script[src*="pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"]');
     if (existing) return;
+    if (isMaoituPage() && window.__MAOITU_GAME_ACTIVE__) {
+      window.addEventListener('maoitu:game-active-change', () => {
+        if (!window.__MAOITU_GAME_ACTIVE__) {
+          ensureAdsScript();
+        }
+      }, { once: true });
+      return;
+    }
+    if (isMaoituPage() && !adsScriptLoadScheduled && !maoituAdsScriptDelayApplied) {
+      adsScriptLoadScheduled = true;
+      maoituAdsScriptDelayApplied = true;
+      const scheduleLoad = () => {
+        adsScriptLoadScheduled = false;
+        ensureAdsScript();
+      };
+      if ('requestIdleCallback' in window) {
+        window.requestIdleCallback(scheduleLoad, { timeout: 1800 });
+      } else {
+        window.setTimeout(scheduleLoad, 1000);
+      }
+      return;
+    }
     const script = document.createElement('script');
     script.async = true;
     script.crossOrigin = 'anonymous';
@@ -573,6 +597,7 @@
         --pixieed-shared-side-ad-width:0px;
         --pixieed-landscape-side-ad-width:72px;
         --pixieed-landscape-side-ad-gap:4px;
+        --pixieed-landscape-side-ad-length:320px;
       }
       .pixieed-shared-top-ad{
         position:fixed;
@@ -642,8 +667,9 @@
         --pixieed-landscape-side-ad-gap:2px;
       }
       body[data-pixieed-page="maoitu"]{
-        --pixieed-landscape-side-ad-width:96px;
+        --pixieed-landscape-side-ad-width:clamp(96px, calc((100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 12px) / 3.2), 160px);
         --pixieed-landscape-side-ad-gap:6px;
+        --pixieed-landscape-side-ad-length:100%;
       }
       @media (orientation: landscape){
         body[data-pixieed-page="pixiedraw"] .pixieed-shared-top-ad,
@@ -663,12 +689,21 @@
           position:absolute;
           top:50%;
           left:50%;
-          width:320px;
+          width:var(--pixieed-landscape-side-ad-length);
           height:50px;
           transform:translate(-50%, -50%) rotate(90deg);
           transform-origin:center center;
           border-radius:10px;
           overflow:hidden;
+        }
+        body[data-pixieed-page="maoitu"] .pixieed-shared-top-ad .ad-block{
+          position:relative;
+          top:auto;
+          left:auto;
+          width:100%;
+          height:100%;
+          transform:none;
+          display:block;
         }
         body[data-pixieed-page="pixiedraw"] .pixieed-shared-top-ad .ad-label,
         body[data-pixieed-page="maoitu"] .pixieed-shared-top-ad .ad-label{
@@ -681,10 +716,24 @@
           border-radius:999px;
           letter-spacing:0.02em;
         }
+        body[data-pixieed-page="maoitu"] .pixieed-shared-top-ad .ad-label{
+          top:4px;
+          left:50%;
+          transform:translateX(-50%);
+          writing-mode:vertical-rl;
+          text-orientation:mixed;
+          padding:2px 4px;
+          border-radius:6px;
+        }
         body[data-pixieed-page="pixiedraw"] .pixieed-shared-top-ad ins.adsbygoogle,
         body[data-pixieed-page="maoitu"] .pixieed-shared-top-ad ins.adsbygoogle{
           min-height:50px !important;
           height:50px !important;
+        }
+        body[data-pixieed-page="maoitu"] .pixieed-shared-top-ad ins.adsbygoogle{
+          min-height:0 !important;
+          height:100% !important;
+          max-height:100% !important;
         }
         body[data-pixieed-page="pixiedraw"] .app{
           padding-top:0 !important;
