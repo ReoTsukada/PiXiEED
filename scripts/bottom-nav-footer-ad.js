@@ -571,6 +571,8 @@
         --pixieed-top-ad-offset:0px;
         --pixieed-side-ad-offset:0px;
         --pixieed-shared-side-ad-width:0px;
+        --pixieed-landscape-side-ad-width:72px;
+        --pixieed-landscape-side-ad-gap:4px;
       }
       .pixieed-shared-top-ad{
         position:fixed;
@@ -635,6 +637,14 @@
         padding-top:var(--pixieed-top-ad-offset) !important;
         box-sizing:border-box;
       }
+      body[data-pixieed-page="pixiedraw"]{
+        --pixieed-landscape-side-ad-width:54px;
+        --pixieed-landscape-side-ad-gap:2px;
+      }
+      body[data-pixieed-page="maoitu"]{
+        --pixieed-landscape-side-ad-width:96px;
+        --pixieed-landscape-side-ad-gap:6px;
+      }
       @media (orientation: landscape){
         body[data-pixieed-page="pixiedraw"] .pixieed-shared-top-ad,
         body[data-pixieed-page="maoitu"] .pixieed-shared-top-ad{
@@ -642,7 +652,7 @@
           bottom:calc(env(safe-area-inset-bottom, 0px) + 6px);
           left:calc(env(safe-area-inset-left, 0px) + 6px);
           transform:none;
-          width:72px;
+          width:var(--pixieed-landscape-side-ad-width);
           height:auto;
           align-items:stretch;
           justify-content:flex-start;
@@ -735,7 +745,14 @@
     }
     const rect = ad.getBoundingClientRect();
     const useLandscapeSideAd = (isPixiedrawPage() || isMaoituPage()) && isLandscapeViewport();
-    const reserved = Math.max(0, Math.ceil((useLandscapeSideAd ? rect.width : rect.height) + (useLandscapeSideAd ? 4 : 12)));
+    let landscapeGap = 4;
+    if (useLandscapeSideAd) {
+      const rawGap = Number.parseFloat(window.getComputedStyle(ad).getPropertyValue('--pixieed-landscape-side-ad-gap'));
+      if (Number.isFinite(rawGap)) {
+        landscapeGap = rawGap;
+      }
+    }
+    const reserved = Math.max(0, Math.ceil((useLandscapeSideAd ? rect.width : rect.height) + (useLandscapeSideAd ? landscapeGap : 12)));
     const reservedPx = `${reserved}px`;
     document.documentElement.style.setProperty('--pixieed-top-ad-offset', useLandscapeSideAd ? '0px' : reservedPx);
     document.documentElement.style.setProperty('--pixieed-side-ad-offset', useLandscapeSideAd ? reservedPx : '0px');
