@@ -2500,12 +2500,14 @@ body.is-right-tool-rail:not(.is-mobile-layout) .layout {
 }
 
 body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs {
+  position: relative;
   z-index: 1200;
   flex: 0 0 var(--project-tabs-height);
   height: var(--project-tabs-height);
   box-sizing: border-box;
-  width: calc(100% + var(--left-stage-reserve-width));
-  margin-left: calc(-1 * var(--left-stage-reserve-width));
+  left: calc(12px - var(--left-stage-reserve-width));
+  width: calc(100% + var(--left-stage-reserve-width) + var(--right-width) + var(--right-flyout-reserve, 0px) - 12px);
+  margin-left: 0;
   margin-right: 0;
   padding: 6px 4px 6px 8px;
   border: 0;
