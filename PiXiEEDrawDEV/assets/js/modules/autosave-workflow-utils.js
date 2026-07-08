@@ -771,11 +771,9 @@
       }
       updateAutosaveStatus('自動保存: 端末内に保存中…');
       const snapshot = makeHistorySnapshot({ clonePixelData: false });
-      const session = buildAutosaveSessionPayload();
-      const packaged = buildPackagedProjectPayload(snapshot, { session });
       const dirtyGenerationAtStart = autosaveDirtyGeneration;
       const unsavedTokenAtStart = unsavedChangeToken;
-      const savedEntry = await recordRecentProjectSnapshot(snapshot, packaged, {
+      const savedEntry = await recordRecentProjectSnapshot(snapshot, null, {
         projectId,
         thumbnailIntervalMs: AUTOSAVE_THUMBNAIL_UPDATE_INTERVAL_MS,
       });
@@ -794,6 +792,7 @@
       }
       autosaveDirty = false;
       markDocumentDurablySaved();
+      pruneInactiveCanvasDirectCaches?.();
       updateAutosaveStatus('自動保存: 端末内に保存済み', 'success');
       return true;
     } catch (error) {
