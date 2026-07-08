@@ -254,6 +254,7 @@
         setActiveAutosaveProjectId(currentProjectId, { persist: false });
       }
       const updated = isSharedOpenProjectTab(current)
+        && SHARED_PROJECTS_ENABLED
         ? createOpenProjectTabFromCurrentState({
             tabId: current?.id || activeOpenProjectTabId,
             source: current?.source || 'working',
@@ -295,17 +296,16 @@
     }
 
     function resetOpenProjectTabsToCurrentProject(options = {}) {
-      const sharedFieldsEnabled = SHARED_PROJECTS_ENABLED;
       const tab = createOpenProjectTabFromCurrentState({
         source: options.source || 'working',
         projectId: options.projectId || getAutosaveProjectId?.(),
         label: options.label || localizeText('シート 1', 'Sheet 1'),
-        sharedProjectKey: sharedFieldsEnabled ? options.sharedProjectKey : '',
-        sharedProjectBackendId: sharedFieldsEnabled ? options.sharedProjectBackendId : '',
-        sharedProjectRevision: sharedFieldsEnabled ? options.sharedProjectRevision : 0,
-        sharedProjectStructureRevision: sharedFieldsEnabled ? options.sharedProjectStructureRevision : 0,
-        sharedRoleHint: sharedFieldsEnabled ? options.sharedRoleHint : '',
-        sharedAutoJoin: sharedFieldsEnabled ? options.sharedAutoJoin : false,
+        sharedProjectKey: SHARED_PROJECTS_ENABLED ? options.sharedProjectKey : '',
+        sharedProjectBackendId: SHARED_PROJECTS_ENABLED ? options.sharedProjectBackendId : '',
+        sharedProjectRevision: SHARED_PROJECTS_ENABLED ? options.sharedProjectRevision : 0,
+        sharedProjectStructureRevision: SHARED_PROJECTS_ENABLED ? options.sharedProjectStructureRevision : 0,
+        sharedRoleHint: SHARED_PROJECTS_ENABLED ? options.sharedRoleHint : '',
+        sharedAutoJoin: SHARED_PROJECTS_ENABLED ? options.sharedAutoJoin : false,
         qrEditPayload: options.qrEditPayload,
       });
       openProjectTabs.splice(0, openProjectTabs.length, tab);
@@ -328,7 +328,7 @@
       openProjectTabs.splice(0, openProjectTabs.length);
       setActiveOpenProjectTabId?.('');
       setSuppressOpenProjectTabAutoInitialize?.(true);
-      if (getActiveSharedProjectKey?.()) {
+      if (SHARED_PROJECTS_ENABLED && getActiveSharedProjectKey?.()) {
         clearActiveSharedProjectSession?.('project-replace');
       }
       if (showHome) {
