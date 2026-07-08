@@ -10142,6 +10142,8 @@ body.is-mobile-layout .project-home-screen__list .startup-recent-card__open {
 .modal[open] {
   position: fixed;
   inset: var(--safe-area-top) var(--safe-area-right) var(--safe-area-bottom) var(--safe-area-left);
+  display: flex;
+  flex-direction: column;
   margin: auto;
 }
 
@@ -10151,7 +10153,12 @@ body.is-mobile-layout .project-home-screen__list .startup-recent-card__open {
 
 .modal__form {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
   max-height: inherit;
 }
 
@@ -10220,6 +10227,7 @@ body.is-mobile-layout .project-home-screen__list .startup-recent-card__open {
 }
 
 .modal__body {
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -10231,9 +10239,12 @@ body.is-mobile-layout .project-home-screen__list .startup-recent-card__open {
 
 .modal__footer {
   display: flex;
+  flex: 0 0 auto;
   justify-content: flex-end;
   gap: 12px;
   padding-top: 0;
+  border-top: 1px solid rgba(var(--ui-rgb), 0.14);
+  background: rgba(10, 15, 22, 0.98);
 }
 
 .modal__header {
@@ -10465,12 +10476,36 @@ body.is-mobile-layout #newProjectDialog .modal__form {
   max-height: calc(100vh - 18px - var(--safe-area-top) - var(--safe-area-bottom));
 }
 
+body.is-mobile-layout .modal[open] {
+  max-height: calc(100vh - var(--safe-area-top) - var(--safe-area-bottom));
+}
+
+body.is-mobile-layout .modal__form {
+  max-height: 100%;
+}
+
+body.is-mobile-layout .modal__body {
+  overscroll-behavior: contain;
+}
+
+body.is-mobile-layout .modal__footer {
+  padding-top: 10px;
+  padding-bottom: max(18px, calc(18px + var(--safe-area-bottom)));
+}
+
 body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] .modal[open] {
   inset:
     calc(var(--safe-area-top) + var(--pixieed-top-ad-offset, 0px))
     var(--safe-area-right)
     calc(var(--safe-area-bottom) + var(--pixieed-shared-bottom-nav-height, 0px))
     var(--safe-area-left);
+  max-height: calc(
+    var(--mobile-viewport-height)
+    - var(--safe-area-top)
+    - var(--safe-area-bottom)
+    - var(--pixieed-top-ad-offset, 0px)
+    - var(--pixieed-shared-bottom-nav-height, 0px)
+  );
 }
 
 body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] #newProjectDialog .modal__form {
@@ -10587,6 +10622,10 @@ body.is-mobile-layout #newProjectDialog .modal__body {
   grid-template-columns: minmax(260px, 0.92fr) minmax(300px, 1.08fr);
   align-items: start;
   gap: 14px;
+}
+
+#exportDialog .modal__footer {
+  grid-column: 1 / -1;
 }
 
 .export-dialog-body__settings,
