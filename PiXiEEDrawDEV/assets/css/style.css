@@ -10629,6 +10629,9 @@ body.is-mobile-layout #newProjectDialog .modal__body {
 .export-dialog-body {
   display: grid;
   grid-template-columns: minmax(260px, 0.92fr) minmax(300px, 1.08fr);
+  grid-template-areas:
+    "settings preview"
+    "settings ad";
   align-items: start;
   gap: 14px;
 }
@@ -10644,6 +10647,18 @@ body.is-mobile-layout #newProjectDialog .modal__body {
   gap: 10px;
 }
 
+.export-dialog-body__settings {
+  grid-area: settings;
+}
+
+.export-dialog-body__preview {
+  grid-area: preview;
+}
+
+.export-dialog-body__ad {
+  grid-area: ad;
+}
+
 .export-dialog-body__settings > .field--list {
   display: grid;
   grid-template-columns: minmax(180px, 1fr) minmax(150px, 0.7fr);
@@ -10652,7 +10667,7 @@ body.is-mobile-layout #newProjectDialog .modal__body {
 }
 
 .export-dialog-body__settings > .field,
-.export-dialog-body__preview > .export-ad {
+.export-dialog-body__ad {
   margin: 0;
 }
 
@@ -11296,6 +11311,10 @@ body.is-mobile-layout #newProjectDialog .modal__body {
 @media (max-width: 760px) {
   .export-dialog-body {
     grid-template-columns: 1fr;
+    grid-template-areas:
+      "settings"
+      "preview"
+      "ad";
   }
 
   .export-dialog-body__settings > .field--list {
@@ -11345,6 +11364,68 @@ body.is-mobile-layout #newProjectDialog .modal__body {
     flex-direction: column;
   }
 
+}
+
+@media (min-width: 900px) and (orientation: landscape) {
+  .export-dialog-body {
+    grid-template-columns: minmax(320px, 1fr) minmax(180px, 220px);
+    grid-template-areas:
+      "settings ad"
+      "preview ad";
+  }
+
+  .export-dialog-body__ad {
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+  }
+
+  .export-dialog-body__preview .export-preview-panel {
+    height: 100%;
+  }
+
+  .export-dialog-body__ad {
+    width: 100%;
+    max-width: 220px;
+  }
+
+  .export-dialog-body__ad .export-ad__slot {
+    position: relative;
+    width: min(160px, 100%);
+    min-height: clamp(240px, 42vh, 320px);
+    height: clamp(240px, 42vh, 320px);
+    margin-left: auto;
+    margin-right: auto;
+    overflow: hidden;
+  }
+
+  .export-dialog-body__ad .export-ad__slot .adsbygoogle,
+  .export-dialog-body__ad .export-ad__slot ins.adsbygoogle {
+    position: absolute !important;
+    top: 50%;
+    left: 50%;
+    width: clamp(240px, 42vh, 320px) !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    min-height: 160px !important;
+    height: 160px !important;
+    max-height: 160px !important;
+    margin: 0 !important;
+    transform: translate(-50%, -50%) rotate(90deg);
+    transform-origin: center center;
+  }
+
+  .export-dialog-body__ad .export-ad__slot .adsbygoogle iframe,
+  .export-dialog-body__ad .export-ad__slot ins.adsbygoogle iframe {
+    width: clamp(240px, 42vh, 320px) !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    min-height: 160px !important;
+    height: 160px !important;
+    max-height: 160px !important;
+    margin: 0 !important;
+  }
 }
 
 .mobile-topbar {
