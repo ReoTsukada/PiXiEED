@@ -30,6 +30,8 @@
     normalizeMultiProjectKey,
     createOpenProjectTabId,
     extractDocumentBaseName,
+    createLightweightLocalProjectTabState,
+    createLocalProjectEntrySignature,
     normalizeQrEditPayload,
     localizeText,
     MAX_PROJECT_SHEETS,
@@ -50,6 +52,35 @@
       const normalizedProjectId = normalizeAutosaveProjectId(options.projectId || getAutosaveProjectId?.())
         || createAutosaveProjectId();
       const fileName = normalizeDocumentName(options.fileName || payload.fileName || DEFAULT_DOCUMENT_NAME);
+      if (!SHARED_PROJECTS_ENABLED) {
+        const localTab = {
+          id: options.tabId || createOpenProjectTabId(),
+          projectId: normalizedProjectId,
+          fileName,
+          label: typeof options.label === 'string' && options.label.trim()
+            ? options.label.trim()
+            : extractDocumentBaseName(fileName),
+          project: payload.project,
+          unsaved: Boolean(payload.unsaved),
+          source: options.source || 'working',
+          updatedAt: payload.project?.updatedAt || new Date().toISOString(),
+          sharedProjectKey: '',
+          sharedProjectBackendId: '',
+          sharedProjectRevision: 0,
+          sharedProjectStructureRevision: 0,
+          sharedRoleHint: '',
+          sharedAutoJoin: false,
+          deferredRestore: false,
+          remoteUpdateAvailable: false,
+          qrEditPayload: normalizeQrEditPayload(options.qrEditPayload, normalizedProjectId),
+        };
+        const entrySignature = typeof createLocalProjectEntrySignature === 'function'
+          ? createLocalProjectEntrySignature(recentProjectsCache.get(normalizedProjectId) || null)
+          : null;
+        return typeof createLightweightLocalProjectTabState === 'function'
+          ? createLightweightLocalProjectTabState(localTab, entrySignature || {})
+          : localTab;
+      }
       const sharedEntry = isSharedRecentProjectEntry(recentProjectsCache.get(normalizedProjectId) || null)
         ? normalizeSharedRecentProjectEntry(recentProjectsCache.get(normalizedProjectId))
         : null;
@@ -125,7 +156,7 @@
         || payload.fileName
         || DEFAULT_DOCUMENT_NAME
       );
-      return {
+      const nextTab = {
         ...(currentTab && typeof currentTab === 'object' ? currentTab : {}),
         id: options.tabId || currentTab?.id || createOpenProjectTabId(),
         projectId: normalizedProjectId,
@@ -147,6 +178,12 @@
         remoteUpdateAvailable: false,
         qrEditPayload: normalizeQrEditPayload(options.qrEditPayload || currentTab?.qrEditPayload, normalizedProjectId),
       };
+      const entrySignature = typeof createLocalProjectEntrySignature === 'function'
+        ? createLocalProjectEntrySignature(recentProjectsCache.get(normalizedProjectId) || null)
+        : null;
+      return typeof createLightweightLocalProjectTabState === 'function'
+        ? createLightweightLocalProjectTabState(nextTab, entrySignature || {})
+        : nextTab;
     }
 
     function createOpenProjectSheetTabFromPackagedProject({
