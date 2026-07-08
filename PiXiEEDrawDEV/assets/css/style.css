@@ -1772,7 +1772,7 @@ body:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .panel-section__b
   height: 100%;
   min-height: 0;
   display: block;
-  overflow: hidden;
+  overflow: auto;
 }
 
 body:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .panel-ad-mount {
@@ -1793,6 +1793,8 @@ body:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .timeline-card {
   padding: 4px;
   border: 0;
   background: transparent;
+  width: max-content;
+  min-width: max(100%, 720px);
 }
 
 body:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .timeline-toolbar {
@@ -1822,7 +1824,7 @@ body:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .timeline-toolbar
 body:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .timeline-toolbar__group--frame {
   grid-area: frame;
   display: inline-flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-self: start;
   justify-self: start;
   min-width: 0;
@@ -2057,15 +2059,15 @@ body.is-startup-active .bottom-timeline-dock {
 
 @media (max-width: 900px) {
   body:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .timeline-card {
-    grid-template-columns: max-content minmax(0, 1fr) max-content;
+    grid-template-columns: max-content minmax(0, 1fr) max-content minmax(164px, 22%);
     grid-template-rows: auto minmax(0, 1fr);
     grid-template-areas:
-      ". frame playback"
-      "layer matrix matrix";
+      ". frame playback settings"
+      "layer matrix matrix settings";
   }
 
   body:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .timeline-layer-settings {
-    display: none;
+    display: grid;
   }
 }
 
@@ -2391,7 +2393,7 @@ body.is-right-tool-rail:not(.is-mobile-layout) .bottom-timeline-dock #panelFrame
   height: 100%;
   min-height: 0;
   display: block;
-  overflow: hidden;
+  overflow: auto;
 }
 
 body.is-right-tool-rail:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .panel-ad-mount {
@@ -2402,19 +2404,19 @@ body.is-right-tool-rail:not(.is-mobile-layout) .bottom-timeline-dock #panelFrame
   height: 100%;
   min-height: 0;
   display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: max-content minmax(0, 1fr) max-content minmax(184px, 24%);
+  grid-template-rows: auto minmax(0, 1fr);
   grid-template-areas:
-    ". frame"
-    "layer matrix"
-    "playback playback"
-    "settings settings";
+    ". frame playback settings"
+    "layer matrix matrix settings";
   align-items: stretch;
   gap: 6px;
   padding: 6px;
   border: 0;
   background: transparent;
-  overflow: hidden;
+  overflow: visible;
+  width: max-content;
+  min-width: max(100%, 720px);
 }
 
 body.is-right-tool-rail:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .timeline-toolbar {
@@ -2436,7 +2438,7 @@ body.is-right-tool-rail:not(.is-mobile-layout) .bottom-timeline-dock #panelFrame
 body.is-right-tool-rail:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .timeline-toolbar__group--frame {
   grid-area: frame;
   display: inline-flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-self: start;
   justify-self: start;
 }
@@ -2501,8 +2503,8 @@ body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs {
   z-index: 1200;
   flex: 0 0 var(--project-tabs-height);
   height: var(--project-tabs-height);
-  margin-left: calc(-1 * var(--left-width));
-  margin-right: calc(-1 * var(--right-width));
+  margin-left: 0;
+  margin-right: 0;
   padding: 6px 4px 6px 8px;
   border: 0;
   border-bottom: 1px solid var(--workbench-line);
@@ -2778,8 +2780,8 @@ body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom
   align-items: center;
   gap: 8px;
   min-height: 0;
-  margin-left: max(0px, calc(var(--project-tabs-inset-left, 0px) - 24px));
-  margin-right: max(0px, calc(var(--project-tabs-inset-right, 0px) - 24px));
+  margin-left: 0;
+  margin-right: 0;
   padding: 6px 8px 4px;
   border: 1px solid var(--border);
   border-bottom: 0;
@@ -3537,6 +3539,10 @@ body.is-startup-active #virtualCursorCanvas {
   inset: 0;
   z-index: 5;
   pointer-events: none;
+}
+
+body.is-canvas-surface-moving .mirror-guides {
+  display: none;
 }
 
 .mirror-guide {
@@ -5559,13 +5565,6 @@ body:not(.show-inline-guides) .ui-guide-text {
   border: 1px solid rgba(var(--ui-rgb), 0.16);
   background: rgba(7, 11, 17, 0.9);
   clip-path: none;
-}
-
-@media (max-width: 680px) {
-  .toggle-list,
-  .mirror-axis-options {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 .mirror-tool-popover {
@@ -10430,6 +10429,7 @@ body.is-mobile-layout .project-home-screen__list .startup-recent-card__open {
 
 #newProjectDialog .modal__form {
   max-width: 520px;
+  height: min(92vh, 760px);
   max-height: min(92vh, 760px);
   overflow: hidden;
 }
@@ -10439,6 +10439,7 @@ body.is-mobile-layout .project-home-screen__list .startup-recent-card__open {
   gap: 6px;
   overflow: auto;
   padding-right: 2px;
+  padding-bottom: 12px;
 }
 
 #newProjectDialog .field > span {
@@ -10449,6 +10450,10 @@ body.is-mobile-layout .project-home-screen__list .startup-recent-card__open {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(var(--ui-rgb), 0.14);
+  background: rgba(10, 15, 22, 0.98);
+  flex: 0 0 auto;
 }
 
 #newProjectDialog .modal__footer .button {
@@ -10456,6 +10461,7 @@ body.is-mobile-layout .project-home-screen__list .startup-recent-card__open {
 }
 
 body.is-mobile-layout #newProjectDialog .modal__form {
+  height: calc(100vh - 18px - var(--safe-area-top) - var(--safe-area-bottom));
   max-height: calc(100vh - 18px - var(--safe-area-top) - var(--safe-area-bottom));
 }
 
@@ -10468,6 +10474,14 @@ body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] .modal[op
 }
 
 body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] #newProjectDialog .modal__form {
+  height: calc(
+    var(--mobile-viewport-height)
+    - var(--safe-area-top)
+    - var(--safe-area-bottom)
+    - var(--pixieed-top-ad-offset, 0px)
+    - var(--pixieed-shared-bottom-nav-height, 0px)
+    - 18px
+  );
   max-height: calc(
     var(--mobile-viewport-height)
     - var(--safe-area-top)
@@ -10493,7 +10507,7 @@ body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] .update-h
 
 @media (orientation: landscape) {
   body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] .project-tabs {
-    margin-left: max(0px, calc(var(--project-tabs-inset-left, 0px) - 24px));
+    margin-left: 0;
   }
 
   body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"].is-right-tool-rail:not(.is-mobile-layout) .project-tabs {
@@ -10512,6 +10526,13 @@ body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] .update-h
   body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] .shortcut-help-modal .modal__form,
   body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] .operation-help-modal .modal__form,
   body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] .update-history-modal .modal__form {
+    height: calc(
+      var(--mobile-viewport-height)
+      - var(--safe-area-top)
+      - var(--safe-area-bottom)
+      - var(--pixieed-top-ad-offset, 0px)
+      - 18px
+    );
     max-height: calc(
       var(--mobile-viewport-height)
       - var(--safe-area-top)
@@ -12682,11 +12703,6 @@ body.is-mobile-layout .panel-ad-mount[hidden] {
 }
 
 @media (max-width: 420px) and (orientation: portrait) {
-  .toggle-list,
-  .mirror-axis-options {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   #panelSettings .settings-size-controls {
     gap: 4px;
   }

@@ -1,8 +1,8 @@
 {
   "id": "/PiXiEEDrawDEV/",
   "name": "PiXiEEDrawDEV",
-  "short_name": "PiXiEEDrawDEV",
-  "description": "PiXiEEDrawDEV pixel art web app.",
+  "short_name": "PiXiEEDraw",
+  "description": "PiXiEEDraw pixel art web app.",
   "lang": "ja",
   "start_url": "/PiXiEEDrawDEV/",
   "scope": "/PiXiEEDrawDEV/",

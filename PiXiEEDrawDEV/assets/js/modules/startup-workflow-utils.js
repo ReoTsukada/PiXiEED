@@ -32,7 +32,7 @@
     return ((scope) => {
       with (scope) {
   function syncNewProjectDialogModeText() {
-    const createShared = Boolean(pendingNewProjectCreateShared);
+    const createShared = SHARED_PROJECTS_ENABLED && Boolean(pendingNewProjectCreateShared);
     if (dom.newProject?.title instanceof HTMLElement) {
       dom.newProject.title.textContent = createShared
         ? localizeText('共有プロジェクト作成', 'Create Shared Project')
@@ -46,7 +46,7 @@
   }
 
   function syncNewProjectCreateModeButtons(mode = 'local') {
-    const normalized = mode === 'shared' ? 'shared' : 'local';
+    const normalized = SHARED_PROJECTS_ENABLED && mode === 'shared' ? 'shared' : 'local';
     if (dom.newProject?.createMode instanceof HTMLSelectElement) {
       dom.newProject.createMode.value = normalized;
     }
@@ -106,11 +106,12 @@
     if (!ensureCurrentClientCanReplaceActiveProject()) {
       return;
     }
+    const requestedSharedCreate = SHARED_PROJECTS_ENABLED && Boolean(createShared);
     const config = dom.newProject;
     if (!config) {
       void promptNewProjectFallback({
         appendAsTab: Boolean(appendAsTab),
-        createShared: Boolean(createShared),
+        createShared: requestedSharedCreate,
       });
       return;
     }
@@ -137,8 +138,8 @@
           renderNewProjectPalettePresetPicker(normalizedPreset);
           setNewProjectPalettePresetPickerOpen(false);
         }
-        syncNewProjectCreateModeButtons(Boolean(createShared) ? 'shared' : 'local');
-        pendingNewProjectCreateShared = Boolean(createShared);
+        syncNewProjectCreateModeButtons(requestedSharedCreate ? 'shared' : 'local');
+        pendingNewProjectCreateShared = requestedSharedCreate;
         pendingNewProjectAppendAsTab = Boolean(appendAsTab) && !pendingNewProjectCreateShared;
         syncNewProjectDialogModeText();
         dialog.showModal();
@@ -163,7 +164,7 @@
     }
     void promptNewProjectFallback({
       appendAsTab: Boolean(appendAsTab),
-      createShared: Boolean(createShared),
+      createShared: requestedSharedCreate,
     });
   }
 
@@ -382,6 +383,11 @@
 
   function openShareStartConfirmDialog() {
     return new Promise(resolve => {
+      if (!SHARED_PROJECTS_ENABLED) {
+        showSharedRuntimeBlockedStatus();
+        resolve(false);
+        return;
+      }
       const config = dom.shareStartConfirm;
       const dialog = config?.dialog;
       if (!(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== 'function') {
@@ -697,7 +703,10 @@
       const selectedCreateMode = dom.newProject?.createMode instanceof HTMLSelectElement
         ? dom.newProject.createMode.value
         : 'local';
-      const shouldCreateShared = selectedCreateMode === 'shared' || Boolean(pendingNewProjectCreateShared);
+      const shouldCreateShared = SHARED_PROJECTS_ENABLED && (
+        selectedCreateMode === 'shared'
+        || Boolean(pendingNewProjectCreateShared)
+      );
       const shouldAppendAsTab = Boolean(pendingNewProjectAppendAsTab);
       let created = false;
       let createdLocalProject = false;
@@ -772,7 +781,7 @@
     let created = false;
     let createdLocalProject = false;
     let sharedCreationFailure = null;
-    if (createShared) {
+    if (SHARED_PROJECTS_ENABLED && createShared) {
       const result = await createSharedProjectFromNewProject({
         name,
         width,
@@ -803,7 +812,7 @@
         promptExportDirectory: false,
       });
     }
-    if (!created && !createShared) {
+    if (!created && !(SHARED_PROJECTS_ENABLED && createShared)) {
       window.alert(`キャンバスサイズは${MIN_CANVAS_SIZE}〜${MAX_CANVAS_SIZE}の数値で入力してください。`);
     } else if ((created || createdLocalProject) && projectHomeVisible) {
       hideProjectHomeScreen();
@@ -1079,65 +1088,92 @@
   }
 
   function queueStartupRecentAdRender() {
+    const adTargets = [
+      {
+        screen: dom.startup?.screen,
+        section: dom.startup?.recentSection,
+        container: dom.startup?.recentAdContainer,
+        slot: dom.startup?.recentAdSlot,
+      },
+    ];
+    document.querySelectorAll('.startup-recent-card__ad-ins').forEach(slot => {
+      const card = slot.closest('.startup-recent-card--ad');
+      const section = slot.closest('.startup-screen__recent, .project-home-screen__recent');
+      const screen = slot.closest('.startup-screen, .project-home-screen');
+      adTargets.push({
+        screen,
+        section,
+        container: card,
+        slot,
+      });
+    });
     if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) {
-      if (dom.startup?.recentAdContainer instanceof HTMLElement) {
-        dom.startup.recentAdContainer.hidden = true;
-      }
+      adTargets.forEach(target => {
+        if (target.container instanceof HTMLElement) {
+          target.container.hidden = true;
+        }
+      });
       return;
     }
-    const screen = dom.startup?.screen;
-    const section = dom.startup?.recentSection;
-    const adSlot = dom.startup?.recentAdSlot;
-    if (!(screen instanceof HTMLElement) || screen.hidden || !(section instanceof HTMLElement) || section.hidden || !(adSlot instanceof HTMLElement)) {
-      return;
-    }
-    if (startupRecentAdRequested) {
-      return;
-    }
-    if (adSlot.dataset.loaded === '1' || adSlot.getAttribute('data-adsbygoogle-status') === 'done') {
-      startupRecentAdRequested = true;
-      return;
-    }
-    if (!adSlot.classList.contains('adsbygoogle')) {
-      adSlot.classList.add('adsbygoogle');
-    }
-
-    const getWidth = () => {
-      try {
-        const rect = adSlot.getBoundingClientRect();
-        return (rect && rect.width) || adSlot.clientWidth || adSlot.offsetWidth || 0;
-      } catch (error) {
-        return adSlot.clientWidth || adSlot.offsetWidth || 0;
-      }
-    };
-
-    let attempts = 0;
-    const MAX_ATTEMPTS = 24;
-    const renderWhenReady = () => {
-      if (!(screen instanceof HTMLElement) || screen.hidden || !(section instanceof HTMLElement) || section.hidden) {
-        startupRecentAdRequested = false;
+    adTargets.forEach(target => {
+      const screen = target.screen;
+      const section = target.section;
+      const container = target.container;
+      const adSlot = target.slot;
+      if (!(screen instanceof HTMLElement) || screen.hidden || !(section instanceof HTMLElement) || section.hidden || !(container instanceof HTMLElement) || !(adSlot instanceof HTMLElement)) {
         return;
       }
-      const width = getWidth();
-      if (width <= 0) {
-        attempts += 1;
-        if (attempts < MAX_ATTEMPTS) {
-          window.requestAnimationFrame(renderWhenReady);
+      container.hidden = false;
+      if (adSlot.dataset.renderPending === '1') {
+        return;
+      }
+      if (adSlot.dataset.loaded === '1' || adSlot.getAttribute('data-adsbygoogle-status') === 'done') {
+        return;
+      }
+      if (!adSlot.classList.contains('adsbygoogle')) {
+        adSlot.classList.add('adsbygoogle');
+      }
+
+      const getWidth = () => {
+        try {
+          const rect = adSlot.getBoundingClientRect();
+          return (rect && rect.width) || adSlot.clientWidth || adSlot.offsetWidth || 0;
+        } catch (error) {
+          return adSlot.clientWidth || adSlot.offsetWidth || 0;
+        }
+      };
+
+      let attempts = 0;
+      const MAX_ATTEMPTS = 24;
+      adSlot.dataset.renderPending = '1';
+      const renderWhenReady = () => {
+        if (!(screen instanceof HTMLElement) || screen.hidden || !(section instanceof HTMLElement) || section.hidden) {
+          delete adSlot.dataset.renderPending;
           return;
         }
-        startupRecentAdRequested = false;
-        return;
-      }
-      startupRecentAdRequested = true;
-      try {
-        (window.adsbygoogle = window.adsbygoogle || []).push({});
-        adSlot.dataset.loaded = '1';
-      } catch (error) {
-        startupRecentAdRequested = false;
-      }
-    };
+        const width = getWidth();
+        if (width <= 0) {
+          attempts += 1;
+          if (attempts < MAX_ATTEMPTS) {
+            window.requestAnimationFrame(renderWhenReady);
+            return;
+          }
+          delete adSlot.dataset.renderPending;
+          return;
+        }
+        try {
+          (window.adsbygoogle = window.adsbygoogle || []).push({});
+          adSlot.dataset.loaded = '1';
+        } catch (error) {
+          delete adSlot.dataset.renderPending;
+          return;
+        }
+        delete adSlot.dataset.renderPending;
+        startupRecentAdRequested = true;
+      };
 
-    window.requestAnimationFrame(renderWhenReady);
+      window.requestAnimationFrame(renderWhenReady);
+    });
   }
 
   function hideStartupScreen() {
@@ -1177,21 +1213,16 @@
       }
     });
     dom.controls.projectHomeApplyAccessCode?.addEventListener('click', async () => {
-      const isSignedInAccount = accountState.isLoggedIn && !accountState.isAnonymous;
-      if (!isSignedInAccount) {
-        setMultiStatus(localizeText('ログインしてください', 'Please sign in'), 'warn');
-        return;
-      }
-      const openedShared = await openSharedProjectFromHomeInput();
+      const openedShared = SHARED_PROJECTS_ENABLED
+        ? await openSharedProjectFromHomeInput()
+        : false;
       if (openedShared) {
         return;
       }
-      const rawCode = dom.controls.projectHomeJoinProjectKey instanceof HTMLInputElement
-        ? dom.controls.projectHomeJoinProjectKey.value
-        : '';
-      if (window.pixieedAdFree?.applyAccessValue) {
-        await window.pixieedAdFree.applyAccessValue(rawCode);
-      }
+      updateAutosaveStatus(
+        localizeText('コード適用は現在停止中です。', 'Code application is currently disabled.'),
+        'info'
+      );
     });
     dom.projectHomeRecentList?.addEventListener('click', async event => {
       const target = event.target instanceof Element ? event.target : null;
@@ -1231,18 +1262,7 @@
           if (isSharedEntry && ownsSharedProject) {
             deletedSharedProjectBackend = await deleteOwnedSharedProjectFromBackend(entry);
             if (!deletedSharedProjectBackend) {
-              updateAutosaveStatus(
-                localizeText(
-                  '共有プロジェクト本体を削除できませんでした。ログイン状態とネットワークを確認して再試行してください。',
-                  'Failed to delete the shared project itself. Check sign-in state and network, then try again.'
-                ),
-                'error'
-              );
-              deleteButton.disabled = false;
-              if (openButton instanceof HTMLButtonElement) {
-                openButton.disabled = false;
-              }
-              return;
+              hideSharedProjectFromRecentSync(entry?.sharedProjectKey || '');
             }
           }
           const deletesOwnedSharedProject = isSharedEntry && deletedSharedProjectBackend;
@@ -1361,7 +1381,7 @@
     if (!targetEntry) {
       return false;
     }
-    if (isSharedRecentProjectEntry(targetEntry)) {
+    if (SHARED_PROJECTS_ENABLED && isSharedRecentProjectEntry(targetEntry)) {
       storePendingSharedInvite({
         inviteToken: targetEntry.sharedProjectInviteToken || '',
         projectKey: targetEntry.sharedProjectKey || '',
@@ -1390,6 +1410,12 @@
   }
 
   async function maybeRestoreSharedProjectOnStartup() {
+    if (!SHARED_PROJECTS_ENABLED) {
+      startupSharedReloadProjectKey = '';
+      startupSharedReloadRevision = 0;
+      startupSharedReloadStructureRevision = 0;
+      return false;
+    }
     const restoredProjectKey = normalizeMultiProjectKey(startupSharedReloadProjectKey || '');
     if (startupRestoreCancelRequested || !restoredProjectKey || readMultiInviteFromUrl()) {
       return false;
@@ -1683,18 +1709,7 @@
           if (isSharedEntry && ownsSharedProject) {
             deletedSharedProjectBackend = await deleteOwnedSharedProjectFromBackend(entry);
             if (!deletedSharedProjectBackend) {
-              updateAutosaveStatus(
-                localizeText(
-                  '共有プロジェクト本体を削除できませんでした。ログイン状態とネットワークを確認して再試行してください。',
-                  'Failed to delete the shared project itself. Check sign-in state and network, then try again.'
-                ),
-                'error'
-              );
-              deleteButton.disabled = false;
-              if (openButton instanceof HTMLButtonElement) {
-                openButton.disabled = false;
-              }
-              return;
+              hideSharedProjectFromRecentSync(entry?.sharedProjectKey || '');
             }
           }
           const deletesOwnedSharedProject = isSharedEntry && deletedSharedProjectBackend;

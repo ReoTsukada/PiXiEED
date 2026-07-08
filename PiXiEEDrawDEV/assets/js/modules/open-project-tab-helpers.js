@@ -111,6 +111,9 @@
       if (!tab || typeof tab !== 'object') {
         return '';
       }
+      if (!SHARED_PROJECTS_ENABLED) {
+        return '';
+      }
       return normalizeMultiProjectKey(tab.sharedProjectKey || '')
         || getSharedProjectKeyFromProjectId(tab.projectId || '');
     }

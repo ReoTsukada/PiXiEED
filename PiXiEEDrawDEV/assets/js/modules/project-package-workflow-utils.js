@@ -232,7 +232,7 @@
         || project?.document?.documentName
         || DEFAULT_DOCUMENT_NAME
       );
-      const sheetSharedProjectKey = getOpenProjectTabSharedKey(tab);
+      const sheetSharedProjectKey = SHARED_PROJECTS_ENABLED ? getOpenProjectTabSharedKey(tab) : '';
       sheets.push({
         id: tab?.id || createOpenProjectTabId(),
         fileName,
@@ -523,9 +523,13 @@
         : (normalizeAutosaveProjectId(projectId || autosaveProjectId || '') || createAutosaveProjectId());
       const initialEntries = await loadRecentProjectsMetadata();
       const previousEntry = initialEntries.find(entry => entry?.id === resolvedProjectId) || null;
-      const sharedProjectKey = isSharedRecentProjectEntry(previousEntry)
-        ? normalizeMultiProjectKey(previousEntry.sharedProjectKey || '')
-        : getSharedProjectKeyFromProjectId(resolvedProjectId);
+      const sharedProjectKey = SHARED_PROJECTS_ENABLED
+        ? (
+          isSharedRecentProjectEntry(previousEntry)
+            ? normalizeMultiProjectKey(previousEntry.sharedProjectKey || '')
+            : getSharedProjectKeyFromProjectId(resolvedProjectId)
+        )
+        : '';
       if (sharedProjectKey) {
         const fileName = getRecentProjectEntryFileName(previousEntry, packagedPayload, snapshot);
         const displayName = previousEntry?.name

@@ -47,8 +47,8 @@
         `The next action to undo is "${operationName}".`
       );
     const detail = localizeText(
-      'この操作は共有ドキュメント全体に反映され、参加者全員の表示も更新されます。',
-      'This updates the shared document for everyone and refreshes all participant views.'
+      'この操作はプロジェクト全体に反映されます。続ける前に内容を確認してください。',
+      'This updates the whole project. Check before continuing.'
     );
     const confirmLabel = normalizedAction === 'redo'
       ? localizeText('全体Redoする', 'Run Shared Redo')

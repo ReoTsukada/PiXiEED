@@ -1,4 +1,4 @@
-const APP_BUILD_VERSION = '2026.07.03-pixieedrawdev-switch-fix5';
+const APP_BUILD_VERSION = '2026.07.07-open-dialog-fix1';
 const CACHE_VERSION = `pixieedrawdev-v${APP_BUILD_VERSION}`;
 const CORE_ASSETS = [
   '/PiXiEEDrawDEV/',
@@ -53,7 +53,7 @@ function isNetworkFirstRequest(request, url) {
 function offlineFallbackResponse(request) {
   if (request.mode === 'navigate') {
     return caches.match('/PiXiEEDrawDEV/index.html').then(cached => (
-      cached || new Response('PiXiEEDraw is offline.', {
+      cached || new Response('PiXiEEDrawDEV is offline.', {
         status: 503,
         statusText: 'Service Unavailable',
         headers: { 'Content-Type': 'text/plain; charset=utf-8' },

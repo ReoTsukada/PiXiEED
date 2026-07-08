@@ -7,20 +7,20 @@
 <title>PiXiEEDrawDEV</title>
 <meta content="#1f1f1f" name="theme-color"/>
 <meta content="PiXiEEDrawは無料で使えるブラウザのドット絵作成ツール。ドット絵を描くサイトを探す人向けに、レイヤー編集、オニオンスキン、PNG/GIF書き出し、PC/スマホ対応を提供。" name="description"/>
-<meta content="PiXiEEDraw,ピクシードロー,ドット絵 エディター,ドット絵 描く サイト,ピクセルアート,リアルタイム 共同編集,アニメーション GIF,オニオンスキン,タイムラプスGIF,拡張機能,PC スマホ" name="keywords"/>
+<meta content="PiXiEEDraw,ピクシードロー,ドット絵 エディター,ドット絵 描く サイト,ピクセルアート,アニメーション GIF,オニオンスキン,タイムラプスGIF,拡張機能,PC スマホ" name="keywords"/>
 <link rel="canonical" href="https://pixieed.jp/PiXiEEDrawDEV/"/>
 <meta content="website" property="og:type"/>
 <meta content="PiXiEED" property="og:site_name"/>
 <meta content="ja_JP" property="og:locale"/>
 <meta content="PiXiEEDrawDEV" property="og:title"/>
-<meta content="PiXiEEDrawは無料で使えるブラウザのドット絵作成ツール。本格制作・共同制作・アニメ制作に対応し、レイヤー/オニオンスキン、PNG/JPEG/SVG/GIF/タイムラプスGIF書き出し、拡張機能、PC/モバイル対応。" property="og:description"/>
+<meta content="PiXiEEDrawは無料で使えるブラウザのドット絵作成ツール。本格制作・アニメ制作に対応し、レイヤー/オニオンスキン、PNG/JPEG/SVG/GIF/タイムラプスGIF書き出し、拡張機能、PC/モバイル対応。" property="og:description"/>
 <meta content="https://pixieed.jp/PiXiEEDrawDEV/" property="og:url"/>
 <meta content="https://pixieed.jp/PiXiEEDrawDEV/ogp-app.png" property="og:image"/>
 <meta content="summary_large_image" name="twitter:card"/>
 <meta content="@PiXiEED_arta" name="twitter:site"/>
 <meta content="https://pixieed.jp/PiXiEEDrawDEV/" name="twitter:url"/>
 <meta content="PiXiEEDrawDEV" name="twitter:title"/>
-<meta content="PiXiEEDrawは無料で使えるブラウザのドット絵作成ツール。本格制作・共同制作・アニメ制作に対応し、レイヤー/オニオンスキン、PNG/JPEG/SVG/GIF/タイムラプスGIF書き出し、拡張機能、PC/モバイル対応。" name="twitter:description"/>
+<meta content="PiXiEEDrawは無料で使えるブラウザのドット絵作成ツール。本格制作・アニメ制作に対応し、レイヤー/オニオンスキン、PNG/JPEG/SVG/GIF/タイムラプスGIF書き出し、拡張機能、PC/モバイル対応。" name="twitter:description"/>
 <meta content="https://pixieed.jp/PiXiEEDrawDEV/ogp-app.png" name="twitter:image"/>
 <script type="application/ld+json">
 {
@@ -31,9 +31,8 @@
   "operatingSystem": "Web",
   "url": "https://pixieed.jp/PiXiEEDrawDEV/",
   "image": "https://pixieed.jp/PiXiEEDrawDEV/ogp-app.png",
-  "description": "PiXiEEDrawは無料で使えるブラウザのドット絵作成ツール。本格制作・共同制作・アニメ制作に対応し、レイヤー/オニオンスキン、PNG/JPEG/SVG/GIF/タイムラプスGIF書き出し、拡張機能、PC/モバイル対応。",
+  "description": "PiXiEEDrawは無料で使えるブラウザのドット絵作成ツール。本格制作・アニメ制作に対応し、レイヤー/オニオンスキン、PNG/JPEG/SVG/GIF/タイムラプスGIF書き出し、拡張機能、PC/モバイル対応。",
   "featureList": [
-    "リアルタイム共有プロジェクト",
     "マルチキャンバス編集",
     "フレームアニメーション編集（FPS設定）",
     "オニオンスキン表示",
@@ -58,6 +57,27 @@
 }
 </script>
 <script>
+  (function configureEmbedMode() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const embedMode = params.get('embed') === '1' || params.get('embed') === 'true';
+      if (embedMode) {
+        document.documentElement.dataset.embedMode = 'true';
+        window.__PIXIEED_EMBED_MODE__ = true;
+        window.__PIXIEED_ADS_DISABLED__ = true;
+        window.PIXIEEDRAW_EMBED_CONFIG = {
+          ...(window.PIXIEEDRAW_EMBED_CONFIG || {}),
+          skipStartup: true,
+        };
+      } else {
+        window.__PIXIEED_EMBED_MODE__ = false;
+      }
+    } catch (_error) {
+      window.__PIXIEED_EMBED_MODE__ = false;
+    }
+  })();
+</script>
+<script>
   (function configurePixieedAds() {
     const isLocalDebug = (() => {
       try {
@@ -71,7 +91,7 @@
         return false;
       }
     })();
-    window.__PIXIEED_ADS_DISABLED__ = Boolean(window.__PIXIEED_ADS_DISABLED__ || isLocalDebug);
+    window.__PIXIEED_ADS_DISABLED__ = true;
     if (window.__PIXIEED_ADS_DISABLED__) {
       return;
     }
@@ -87,8 +107,8 @@
 <script>
       const GA_MEASUREMENT_ID = 'G-SZPVXMX85G';
       const GA_PAGE_PATH = '/PiXiEEDrawDEV/';
-      const PROJECT_SLUG = 'pixiedraw';
-      const PROJECT_NAME = 'PiXiEEDraw';
+      const PROJECT_SLUG = 'pixiedraw-dev';
+      const PROJECT_NAME = 'PiXiEEDrawDEV';
       const PROJECT_TYPE = 'tool';
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
@@ -102,14 +122,40 @@
         project_type: PROJECT_TYPE,
         project_name: PROJECT_NAME
       });
-      gtag('event', 'project_open_pixiedraw');
+      gtag('event', 'project_open_pixiedraw_dev');
     </script>
 
 
 
-<link href="assets/css/style.css?v=2026.07.06-local-project-open-fix1" rel="stylesheet"/>
+<link href="assets/css/style.css?v=2026.07.07-open-dialog-fix1" rel="stylesheet"/>
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-4.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-4.png"/>
+<style>
+  html[data-embed-mode="true"],
+  html[data-embed-mode="true"] body {
+    height: 100%;
+  }
+  html[data-embed-mode="true"] body {
+    padding: 0 !important;
+    overflow: hidden;
+  }
+  html[data-embed-mode="true"] .bottom-nav,
+  html[data-embed-mode="true"] .pixieed-shared-footer,
+  html[data-embed-mode="true"] .panel-ad,
+  html[data-embed-mode="true"] .panel-ad-mount,
+  html[data-embed-mode="true"] #mobileBottomAd,
+  html[data-embed-mode="true"] .startup-screen__ad,
+  html[data-embed-mode="true"] .new-project__ad,
+  html[data-embed-mode="true"] .export-ad,
+  html[data-embed-mode="true"] .export-interstitial,
+  html[data-embed-mode="true"] .shortcut-help__ad,
+  html[data-embed-mode="true"] .update-history__ad {
+    display: none !important;
+  }
+  html[data-embed-mode="true"] .app {
+    padding: 0 !important;
+  }
+</style>
   <style id="interaction-guard">
     * {
       -webkit-touch-callout: none;
@@ -155,6 +201,7 @@
 </div>
 </div>
 </div>
+<!-- Mobile ad placeholder: using bottom banner (mobileBottomAd) for PiXiEEDraw mobile layout -->
 <div class="app" id="appRoot">
 <div aria-atomic="true" aria-live="polite" class="global-loading-indicator" hidden="" id="globalLoadingIndicator" role="status">
 <div class="global-loading-indicator__label" id="globalLoadingIndicatorLabel">読み込み中…</div>
@@ -167,8 +214,8 @@
 <div class="startup-screen__backdrop"></div>
 <div class="startup-screen__content">
 <div class="startup-screen__header">
-<h1 class="startup-screen__title" id="startupScreenTitle">PiXiEEDraw</h1>
-<p class="startup-screen__subtitle">PiXiEEDraw（ピクシードロー）でドット絵づくり・共同制作・アニメ制作をはじめよう</p>
+<h1 class="startup-screen__title" id="startupScreenTitle">PiXiEEDrawDEV</h1>
+<p class="startup-screen__subtitle">PiXiEEDrawDEVでドット絵づくり・アニメ制作をはじめよう</p>
 </div>
 <div aria-label="起動操作" class="startup-screen__actions" role="group">
 <button class="button button--primary" id="startupActionResume" type="button">前回の続きから再開</button>
@@ -178,7 +225,7 @@
 <div class="startup-screen__hints">
 <p class="startup-screen__hint" id="startupScreenHint">描画内容はこの端末に自動保存され、起動時に前回データを復元できます。</p>
 <p class="startup-screen__hint" id="startupResumeHint">端末内プロジェクトを確認しています…</p>
-<p class="startup-screen__hint" id="startupLensHint">写真をドット絵変換するなら PiXiEELENS</p>
+<p class="startup-screen__hint" id="startupLensHint">写真をドット絵変換するなら <a href="../pixiee-lens/index.html" rel="noopener" target="_blank">PiXiEELENS</a></p>
 </div>
 <div class="startup-screen__recent" hidden="" id="startupRecentProjects">
 <h2 class="startup-screen__recent-title">端末内プロジェクト（自動保存）</h2>
@@ -249,17 +296,17 @@
 <button class="button" id="projectHomeOpen" type="button">ファイルを開く</button>
 </div>
 </header>
-<section aria-label="コード適用" class="project-home-supporter" id="projectHomeJoinShared">
+<section aria-hidden="true" aria-label="コード適用" class="project-home-supporter" hidden id="projectHomeJoinShared">
 <div class="project-home-supporter__body">
 <h2 class="project-home-supporter__title" id="projectHomeAccessTitle">コード適用</h2>
-<p class="project-home-supporter__status" id="projectHomeAccessStatus">特典、参加キー、などのコードを入力してください。</p>
+<p class="project-home-supporter__status" id="projectHomeAccessStatus">コード適用は停止中です。</p>
 </div>
 <div class="project-home-supporter__actions project-home-supporter__actions--compact">
-<input autocomplete="off" class="project-home-supporter__input" id="projectHomeJoinProjectKey" inputmode="text" maxlength="280" placeholder="コードを入力" spellcheck="false" type="text"/>
-<button class="button" id="projectHomeApplyAccessCode" type="button">適用</button>
+<input autocomplete="off" class="project-home-supporter__input" disabled id="projectHomeJoinProjectKey" inputmode="text" maxlength="280" placeholder="コード適用は停止中です" spellcheck="false" type="text"/>
+<button class="button" disabled id="projectHomeApplyAccessCode" type="button">適用</button>
 </div>
 <div class="project-home-supporter__actions">
-<a class="button button--primary" data-support-panel-trigger="true" data-support-preferred-product="pixiedraw_ad_free" href="#" id="projectHomeSupporterPurchase" rel="noopener">サポーター特典を見る</a>
+<a aria-hidden="true" class="button button--primary" hidden href="#" id="projectHomeSupporterPurchase" rel="noopener">利用停止中</a>
 </div>
 </section>
 <div class="project-home-screen__recent" id="projectHomeRecentProjects">
@@ -302,10 +349,6 @@
 <button aria-controls="panelSettings" aria-label="設定" class="chip canvas-quick-action" data-quick-right-tab="settings" title="設定" type="button">
 <img alt="" aria-hidden="true" height="20" src="assets/icons/menu-settings.svg" width="20"/>
 <span class="sr-only">設定</span>
-</button>
-<button aria-controls="panelMulti" aria-label="共有モード" class="chip canvas-quick-action" data-quick-right-tab="multi" title="共有モード" type="button">
-<img alt="" aria-hidden="true" height="20" src="assets/icons/maltimode.svg" width="20"/>
-<span class="sr-only">共有モード</span>
 </button>
 <button aria-controls="panelFile" aria-label="ファイル" class="chip canvas-quick-action" data-quick-right-tab="file" title="ファイル" type="button">
 <img alt="" aria-hidden="true" height="20" src="assets/icons/menu-file.svg" width="20"/>
@@ -470,10 +513,6 @@
 <img alt="" class="tab-icon" src="assets/icons/menu-settings.svg"/>
 <span class="sr-only">設定</span>
 </button>
-<button aria-controls="mobilePanelMulti" aria-label="共有モード" aria-selected="false" class="mobile-tab" data-mobile-tab="multi" id="mobileTabMulti" role="tab" tabindex="-1" type="button">
-<img alt="" class="tab-icon" src="assets/icons/maltimode.svg"/>
-<span class="sr-only">共有</span>
-</button>
 <button aria-controls="mobilePanelExtensions" aria-label="拡張" aria-selected="false" class="mobile-tab" data-mobile-tab="extensions" hidden="" id="mobileTabExtensions" role="tab" tabindex="-1" type="button">
 <img alt="" class="tab-icon" src="assets/icons/EXicon.png"/>
 <span class="sr-only">拡張</span>
@@ -501,7 +540,6 @@
 <div aria-labelledby="mobileTabExtensions" class="mobile-panel" hidden="" id="mobilePanelExtensions" role="tabpanel"></div>
 <div aria-labelledby="mobileTabHelp" class="mobile-panel" hidden="" id="mobilePanelHelp" role="tabpanel"></div>
 <div aria-labelledby="mobileTabFile" class="mobile-panel" hidden="" id="mobilePanelFile" role="tabpanel"></div>
-<div aria-labelledby="mobileTabMulti" class="mobile-panel" hidden="" id="mobilePanelMulti" role="tabpanel"></div>
 </div>
 </div>
 <section class="panel-section" data-section="tools" id="panelTools">
@@ -865,7 +903,7 @@
 </div>
 <div class="file-panel-summary">
 <p class="help-text ui-guide-text">自動保存: ON（この端末）</p>
-<p class="help-text ui-guide-text">共有・配布用の保存は「保存/出力」から手動で行います。</p>
+<p class="help-text ui-guide-text">配布用の保存は「保存/出力」から手動で行います。</p>
 </div>
 <button class="button" hidden id="enableAutosave" type="button">ローカル自動保存（常時ON）</button>
 <button class="button" hidden id="bindExportFolder" type="button">出力フォルダを設定</button>
@@ -897,130 +935,6 @@
 </details>
 </div>
 </section>
-<section class="panel-section" data-section="multi" id="panelMulti">
-<div class="panel-section__body">
-<div class="multi-entry-screen" id="multiEntryScreen">
-<div class="multi-entry-actions" id="multiEntryActions">
-<button class="button multi-entry-action" id="multiEntryMaster" type="button">
-<span id="multiEntryMasterTitle">共有</span>
-<small id="multiEntryMasterMeta">空欄なら作成、リンクなら開く</small>
-</button>
-<button class="button multi-entry-action" hidden id="multiEntryGuest" type="button">
-<span id="multiEntryGuestTitle">共有を開く</span>
-<small id="multiEntryGuestMeta">共有リンクを貼り付け</small>
-</button>
-</div>
-<div class="multi-entry-join-panel" hidden id="multiEntryJoinPanel">
-<div class="multi-entry-role-actions">
-<button class="button multi-entry-action" hidden id="multiEntryJoinAsGuest" type="button">
-<span id="multiEntryJoinAsGuestTitle">共有を開く</span>
-<small id="multiEntryJoinAsGuestMeta">共有プロジェクトをそのまま開く</small>
-</button>
-<button class="button multi-entry-action" hidden id="multiEntrySpectator" type="button">
-<span id="multiEntrySpectatorTitle">視聴で入る</span>
-<small id="multiEntrySpectatorMeta">見るだけで入室</small>
-</button>
-</div>
-<button class="chip multi-entry-join-back" hidden id="multiEntryJoinBack" type="button">戻る</button>
-</div>
-<section class="multi-account-card" id="multiEntryAccountCard">
-<div class="multi-account-card__head">
-<span>共有プロジェクトを作成</span>
-<small id="multiEntryAccountStatus">無料枠 0/1</small>
-</div>
-<p class="help-text" id="multiEntryAccountHint">ログインすると共有プロジェクトを1件作成できます。サポーター特典（500円）で4件、共同編集最大4人まで拡張できます。</p>
-<div class="field field--compact">
-<label for="multiRoomVisibility">作成する共有</label>
-<select id="multiRoomVisibility">
-<option value="private">限定プロジェクト</option>
-<option value="public">公開プロジェクト</option>
-</select>
-<p class="help-text" id="multiRoomVisibilityHint">限定はログイン後にコードまたはURLで参加できます。公開はURLからログインなしで参加できます。</p>
-</div>
-<a class="chip" href="../account/index.html" id="multiEntryAccountLogin" rel="noopener">ログインして共有を作成</a>
-</section>
-<div class="field field--list settings-account-field" id="pixieedAdFreeField">
-<span>サポーター特典</span>
-<p class="help-text" id="pixieedAdFreeStatus">サポーター特典は500円です。広告非表示、共有プロジェクト4件、共同編集最大4人、マルチキャンバス追加3つまで利用できます。</p>
-<div class="field field--inline">
-<a class="chip" data-support-panel-trigger="true" data-support-preferred-product="pixiedraw_ad_free" id="pixieedAdFreePurchase" href="#" rel="noopener">サポーター特典を見る</a>
-</div>
-<div class="field field--inline">
-<input autocomplete="off" id="pixieedAdFreeOrderId" maxlength="64" placeholder="購入番号 / 購入コード" type="text"/>
-<button class="chip" id="pixieedAdFreeClaim" type="button">適用</button>
-</div>
-<p class="help-text">購入後はメールで届くシリアルコードをログイン後に適用できます。シリアルコードは1回だけ使用でき、購入時と違うメールアドレスのアカウントでも利用できます。</p>
-<p class="help-text">広告を消さずに支援したい場合は <a class="chip" data-support-panel-trigger="true" data-support-preferred-product="pixiedraw_ad_free" href="#" id="supportTipLink" target="_blank" rel="noopener noreferrer" aria-label="サポーター特典を見る">サポート</a> も利用できます。</p>
-</div>
-</div>
-<div class="multi-flow-panel" hidden id="multiFlowPanel">
-<div aria-labelledby="multiFlowTabCollab" class="multi-flow-tabpanel multi-flow-tabpanel--collab" id="multiFlowCollabPanel" role="tabpanel">
-<section class="multi-overview" id="multiOverview">
-<div class="field field--compact multi-project-key-field" id="multiJoinProjectKeyField">
-<div class="multi-project-key-row">
-<button class="chip multi-project-key-copy" id="multiToggleCodeVisibility" type="button">表示</button>
-<input autocomplete="off" autocapitalize="none" autocorrect="off" id="multiJoinProjectKey" inputmode="text" maxlength="280" placeholder="共有リンクまたは招待コードを貼り付け" spellcheck="false" type="text"/>
-<button class="chip multi-project-key-copy" id="multiApplyAccessCode" type="button">確定</button>
-<button class="chip multi-project-key-copy" id="multiCopyAccessCode" type="button">コピー</button>
-</div>
-</div>
-<div class="multi-overview__chips" hidden id="multiOverviewChips"></div>
-<section class="field field--list multi-participants-panel">
-<div aria-label="参加者とコメント" class="multi-participants-tabs" role="tablist">
-<button aria-controls="multiParticipantsView" aria-selected="true" class="multi-participants-tab is-active" data-multi-panel-tab="participants" id="multiParticipantsPanelTab" role="tab" type="button"><span id="multiParticipantsPanelTabLabel">参加者一覧</span> <span class="multi-participants-count" id="multiParticipantsCount">0</span></button>
-<button aria-controls="multiCommentsView" aria-selected="false" class="multi-participants-tab" data-multi-panel-tab="comments" id="multiCommentsPanelTab" role="tab" tabindex="-1" type="button"><span id="multiCommentsPanelTabLabel">コメント</span></button>
-</div>
-<div class="multi-participants-view is-active" id="multiParticipantsView" role="tabpanel" aria-labelledby="multiParticipantsPanelTab">
-<div class="multi-participants-scroll">
-<ul class="toggle-list multi-participants-list" id="multiParticipants">
-<li class="help-text">共有リンクを作成すると、ここにメンバーが表示されます。</li>
-</ul>
-</div>
-</div>
-<div class="multi-participants-view" hidden id="multiCommentsView" role="tabpanel" aria-labelledby="multiCommentsPanelTab">
-<div class="multi-comment-field">
-<div aria-live="polite" class="multi-comment-log" id="multiCommentList"></div>
-</div>
-</div>
-</section>
-<p class="help-text ui-guide-text" id="multiOverviewSummary">接続状態に応じて、できることがここに表示されます。</p>
-<div class="multi-status-row">
-<button aria-live="polite" class="button" id="multiStatus" type="button">共有リンクを作成</button>
-</div>
-<p class="help-text ui-guide-text" id="multiOverviewHint">共有リンクを作成すると、このプロジェクトのURLをコピーできます。</p>
-</section>
-<section class="multi-account-card" id="multiFlowAccountCard">
-<div class="multi-account-card__head">
-<span>共有プロジェクトを作成</span>
-<small id="multiFlowAccountStatus">無料枠 0/1</small>
-</div>
-<p class="help-text" id="multiFlowAccountHint">ログインすると共有プロジェクトを1件作成できます。サポーター特典（500円）で4件、共同編集最大4人まで拡張できます。</p>
-<a class="chip" href="../account/index.html" id="multiFlowAccountLogin" rel="noopener">ログインして共有を作成</a>
-</section>
-<section class="multi-support-card" id="multiSupportCard">
-<div class="multi-support-card__head">
-<span>サポーター特典</span>
-<small id="multiSupportStatus">サポーター特典は500円です。共有プロジェクト4件、共同編集最大4人、マルチキャンバス追加3つまで利用できます。</small>
-</div>
-<a class="chip" data-support-panel-trigger="true" data-support-preferred-product="pixiedraw_ad_free" href="#" id="multiSupportPurchase" rel="noopener">サポーター特典を見る</a>
-</section>
-<div aria-label="広告" class="export-ad multi-support__ad" id="multiSupportAdContainer">
-<div class="export-ad__slot">
-<ins class="ad-seed multi-support-ad-ins" data-ad-client="ca-pub-9801602250480253" data-ad-format="auto" data-ad-slot="2141591954" data-full-width-responsive="true" id="multiSupportAdSlot" style="display:block"></ins>
-</div>
-<small class="export-ad__label">広告</small>
-</div>
-<div class="field-group">
-<div class="multi-session-actions multi-session-actions--single">
-<button class="chip" id="multiInviteCopy" type="button">共有URLをコピー</button>
-<button class="chip" id="multiInviteShare" type="button">共有</button>
-<button class="button" hidden id="multiLeaveSession" type="button">切断</button>
-</div>
-</div>
-</div>
-</div>
-<div class="panel-ad-mount" data-panel-ad-mount="right"></div>
-</section>
 <section class="panel-section" data-section="details" id="panelDetails">
 <div class="panel-section__body">
 <div class="detail-panel">
@@ -1029,9 +943,9 @@
 <span aria-hidden="true" class="detail-panel__icon"><img alt="" src="assets/icons/ecticon_frame_01.png"/></span>
 <span id="detailAccountActionLabel">ログイン</span>
 </a>
-<a class="button detail-panel__action" data-support-panel-trigger="true" data-support-preferred-product="pixiedraw_ad_free" href="#" id="detailSupportPurchase" rel="noopener">
+<a aria-hidden="true" class="button detail-panel__action" hidden href="#" id="detailSupportPurchase" rel="noopener">
 <span aria-hidden="true" class="detail-panel__icon"><img alt="" src="assets/icons/ecticon_frame_06.png"/></span>
-<span>サポーター特典</span>
+<span>利用可能</span>
 </a>
 <button aria-haspopup="dialog" class="button detail-panel__action" id="openShortcutHelp" type="button">
 <span aria-hidden="true" class="detail-panel__icon"><img alt="" src="assets/icons/ecticon_frame_02.png"/></span>
@@ -1052,10 +966,6 @@
 <a class="button detail-panel__action" href="../index.html" id="goHomeButton">
 <span aria-hidden="true" class="detail-panel__icon"><img alt="" src="assets/icons/ecticon_frame_07.png"/></span>
 <span>ホーム</span>
-</a>
-<a class="button detail-panel__action" href="../contest/index.html" id="goContestButton">
-<span aria-hidden="true" class="detail-panel__icon"><img alt="" src="assets/icons/ecticon_frame_08.png"/></span>
-<span>広場</span>
 </a>
 </div>
 <div class="field field--list settings-account-field" id="pixieedPwaInstallField">
@@ -1205,25 +1115,6 @@
 </label>
 </li>
 </ul>
-<div class="mirror-axis-options" id="mirrorAxisOptions" role="group">
-<label class="toggle-option" for="mirrorAxisVertical">
-<input checked="" id="mirrorAxisVertical" type="checkbox"/>
-<span>左右対称</span>
-</label>
-<label class="toggle-option" for="mirrorAxisHorizontal">
-<input id="mirrorAxisHorizontal" type="checkbox"/>
-<span>上下対称</span>
-</label>
-<label class="toggle-option" for="mirrorAxisDiagonalA">
-<input id="mirrorAxisDiagonalA" type="checkbox"/>
-<span>斜め対称 (＼)</span>
-</label>
-<label class="toggle-option" for="mirrorAxisDiagonalB">
-<input id="mirrorAxisDiagonalB" type="checkbox"/>
-<span>斜め対称 (/)</span>
-</label>
-</div>
-<p class="help-text ui-guide-text" id="mirrorAxisHelp">ミラーモード中はキャンバス周囲の＋で対称軸をON/OFFし、ONの軸はそのままドラッグして位置を動かせます。</p>
 <div class="virtual-cursor-scale" id="virtualCursorScale">
 <label class="virtual-cursor-scale__control" for="virtualCursorButtonScale">
 <span class="virtual-cursor-scale__label">仮想カーソルボタンサイズ</span>
@@ -1334,11 +1225,6 @@
 <span aria-hidden="true" class="export-toggle-icon"><img alt="" decoding="async" src="../icon-e1_frame_02.png"/></span>
 <span>SpriteMAP出力</span>
 </label>
-<label class="toggle-option export-icon-toggle" for="exportContestPostToggle" id="exportContestPostOptionRow" title="コンテスト投稿へ移動">
-<input id="exportContestPostToggle" type="checkbox"/>
-<span aria-hidden="true" class="export-toggle-icon"><img alt="" decoding="async" src="../icon-e1_frame_05.png"/></span>
-<span>コンテスト投稿へ移動</span>
-</label>
 <label class="toggle-option export-spritemap-option export-icon-toggle" for="exportSpriteMapColorSpritesToggle" id="exportSpriteMapColorSpritesRow" title="カラースプライト出力">
 <input id="exportSpriteMapColorSpritesToggle" type="checkbox"/>
 <span aria-hidden="true" class="export-toggle-icon"><img alt="" decoding="async" src="../icon-e1_frame_03.png"/></span>
@@ -1413,14 +1299,7 @@
 <p class="tool-spotlight-card__description" id="toolSpotlightLensDesc">カメラ画像をドット化できるツール。撮影してそのまま編集導線につなげられます。</p>
 </div>
 </a>
-<a class="tool-spotlight-card" href="../contest/index.html" role="listitem">
-<img alt="PiXiEEDコンテスト" class="tool-spotlight-card__icon" src="../icon/icon-192-6.png"/>
-<div class="tool-spotlight-card__content">
-<h3 class="tool-spotlight-card__title" id="toolSpotlightContestTitle">PiXiEEDコンテスト</h3>
-<p class="tool-spotlight-card__description" id="toolSpotlightContestDesc">保存した作品を投稿して、みんなの作品もチェックできます。</p>
-</div>
-</a>
-<a aria-hidden="true" class="tool-spotlight-card" data-support-panel-trigger="true" data-support-preferred-product="pixiedraw_ad_free" href="#" hidden="" id="toolSpotlightSupportTip" rel="noopener" role="listitem" target="_blank">
+<a aria-hidden="true" class="tool-spotlight-card" href="#" hidden="" id="toolSpotlightSupportTip" rel="noopener" role="listitem" target="_blank">
 <img alt="サポート" class="tool-spotlight-card__icon" src="../icon/PiXiEED.icon512.png"/>
 <div class="tool-spotlight-card__content">
 <h3 class="tool-spotlight-card__title" id="toolSpotlightTipTitle">サポート</h3>
@@ -1431,7 +1310,6 @@
 </div>
 <footer class="modal__footer tool-spotlight-modal__footer">
 <a class="button button--ghost" href="../index.html" id="toolSpotlightGoHome">ホームへ戻る</a>
-<a class="button" href="../contest/index.html" id="toolSpotlightOpenContest">広場を見る</a>
 <button class="button button--primary" id="closeToolSpotlight" type="button">閉じる</button>
 </footer>
 </form>
@@ -1500,10 +1378,10 @@
 <small class="export-ad__label">広告</small>
 </div>
 </div>
-<footer class="modal__footer">
+<div class="modal__footer">
 <button class="button button--ghost" id="cancelNewProject" type="button">キャンセル</button>
 <button class="button button--primary" id="confirmNewProject" type="submit">作成</button>
-</footer>
+</div>
 </form>
 </dialog>
 <dialog aria-labelledby="globalHistoryConfirmTitle" class="modal" id="globalHistoryConfirmDialog">
@@ -1512,8 +1390,8 @@
 <h2 class="modal__title" id="globalHistoryConfirmTitle">全体Undo</h2>
 </header>
 <div class="modal__body">
-<p id="globalHistoryConfirmMessage">この操作は共有ドキュメント全体に反映されます。</p>
-<p class="help-text" id="globalHistoryConfirmDetail">共有中の全員へ反映されます。続ける前に内容を確認してください。</p>
+<p id="globalHistoryConfirmMessage">この操作はプロジェクト全体に反映されます。</p>
+<p class="help-text" id="globalHistoryConfirmDetail">続ける前に内容を確認してください。</p>
 </div>
 <footer class="modal__footer">
 <button class="button button--ghost" id="globalHistoryConfirmCancel" type="button">キャンセル</button>
@@ -1650,8 +1528,8 @@
       })();
     </script>
 <script defer="" src="../scripts/pixieed-dot-stats.js"></script>
-	<script src="../scripts/pixieed-adfree.js?v=2026.06.01-serial-code-email"></script>
-	<script src="../scripts/support-checkout-panel.js?v=2026.06.22-active-supporters"></script>
+	<script src="../scripts/pixieed-adfree.js?v=2026.07.04-shared-project-disabled1"></script>
+	<script src="../scripts/support-checkout-panel.js?v=2026.07.04-shared-project-disabled1"></script>
 	<script defer="" src="assets/js/modules/core-utils.js?v=2026.06.29-multi-invite-split"></script>
 	<script defer="" src="assets/js/modules/embed-config-utils.js?v=2026.07.02-startup-helper-split-v1"></script>
 	<script defer="" src="assets/js/modules/palette-utils.js?v=2026.07.01-palette-preset-names-split-v1"></script>
@@ -1670,7 +1548,8 @@
 	<script defer="" src="assets/js/modules/autosave-database-utils.js?v=2026.07.02-startup-helper-split-v1"></script>
 	<script defer="" src="assets/js/modules/project-storage-utils.js?v=2026.07.01-pixfind-mode-split-v1"></script>
 	<script defer="" src="assets/js/modules/navigation.js?v=2026.07.01-navigation-config-split-v1"></script>
-	<script defer="" src="assets/js/modules/clipboard-utils.js?v=2026.06.30-clipboard-utils-v1"></script>
+	<script defer="" src="assets/js/modules/clipboard-utils.js?v=2026.07.04-shared-copy-url-fix1"></script>
+	<script defer="" src="assets/js/modules/multi-invite-utils.js?v=2026.06.29-multi-invite-split"></script>
 	<script defer="" src="assets/js/modules/timelapse-utils.js?v=2026.06.28-file-split-step6"></script>
 	<script defer="" src="assets/js/modules/import-utils.js?v=2026.06.29-import-transfer-split"></script>
 	<script defer="" src="assets/js/modules/pixfind-mode-utils.js?v=2026.07.01-pixfind-mode-split-v1"></script>
@@ -1682,9 +1561,9 @@
 	<script defer="" src="assets/js/modules/export-utils.js?v=2026.06.28-file-split-step4"></script>
 	<script defer="" src="assets/js/modules/export-normalizer-utils.js?v=2026.07.02-startup-helper-split-v1"></script>
 	<script defer="" src="assets/js/modules/export-session.js?v=2026.06.29-document-model-export-session-fix2"></script>
-	<script defer="" src="assets/js/modules/pixieed-support-benefit-utils.js?v=2026.07.02-support-benefit-split-v1"></script>
+	<script defer="" src="assets/js/modules/pixieed-support-benefit-utils.js?v=2026.07.04-shared-project-disabled1"></script>
 	<script defer="" src="assets/js/modules/open-project-tab-helpers.js?v=2026.07.06-local-project-open-fix1"></script>
-	<script defer="" src="assets/js/modules/open-project-tab-workflow-utils.js?v=2026.07.03-open-project-tab-workflow-split-v1"></script>
+	<script defer="" src="assets/js/modules/open-project-tab-workflow-utils.js?v=2026.07.03-open-project-tab-workflow-fix2"></script>
 	<script defer="" src="assets/js/modules/open-project-tab-view.js?v=2026.06.29-open-project-tab-batch-v1"></script>
 	<script defer="" src="assets/js/modules/open-project-tab-lifecycle.js?v=2026.07.06-local-project-open-fix1"></script>
 	<script defer="" src="assets/js/modules/open-project-tab-sheet-actions.js?v=2026.06.29-open-project-tab-sheet-actions-v1"></script>
@@ -1710,8 +1589,8 @@
 	<script defer="" src="assets/vendor/jsQR.min.js?v=1.4.0"></script>
 	<script defer="" src="assets/js/modules/image-import-decode-utils.js?v=2026.06.30-image-import-decode-v1"></script>
 	<script defer="" src="assets/js/modules/palette-panel-utils.js?v=2026.06.30-palette-panel-v1"></script>
-	<script defer="" src="assets/js/modules/timeline-layers.js?v=2026.06.30-timeline-layers-v2"></script>
-	<script defer="" src="assets/js/modules/ui-localization-utils.js?v=2026.06.30-zh-localization-v1"></script>
+	<script defer="" src="assets/js/modules/timeline-layers.js?v=2026.07.04-frame-pending-structure-fix1"></script>
+	<script defer="" src="assets/js/modules/ui-localization-utils.js?v=2026.07.04-shared-project-disabled1"></script>
 	<script defer="" src="assets/js/modules/ui-language-utils.js?v=2026.07.03-small-helper-batch-split-v1"></script>
 	<script defer="" src="assets/js/modules/scroll-input-utils.js?v=2026.07.03-small-helper-batch-split-v1"></script>
 	<script defer="" src="assets/js/modules/sprite-scale-utils.js?v=2026.06.30-zh-localization-v1"></script>
@@ -1731,7 +1610,7 @@
 	<script defer="" src="assets/js/modules/dialog-setup-utils.js?v=2026.07.01-dialog-setup-v1"></script>
 	<script defer="" src="assets/js/modules/canvas-resize-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/canvas-resize-handle-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
-	<script defer="" src="assets/js/modules/local-viewport-canvas-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
+	<script defer="" src="assets/js/modules/local-viewport-canvas-workflow-utils.js?v=2026.07.03-multicanvas-lightweight-fix2"></script>
 	<script defer="" src="assets/js/modules/floating-draw-button-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/selection-move-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/layout-viewport.js?v=2026.07.03-mirror-follow-fix1"></script>
@@ -1741,7 +1620,7 @@
 	<script defer="" src="assets/js/modules/ui-action-router-workflow-utils.js?v=2026.07.03-ui-action-router-split-v1"></script>
 	<script defer="" src="assets/js/modules/canvas-control-actions-workflow-utils.js?v=2026.07.03-canvas-control-actions-split-v1"></script>
 	<script defer="" src="assets/js/modules/history-core-workflow-utils.js?v=2026.07.03-history-core-split-v1"></script>
-	<script defer="" src="assets/js/modules/history-guard-workflow-utils.js?v=2026.07.03-history-guard-split-v1"></script>
+	<script defer="" src="assets/js/modules/history-guard-workflow-utils.js?v=2026.07.04-shared-project-disabled1"></script>
 	<script defer="" src="assets/js/modules/curve-workflow-utils.js?v=2026.07.03-curve-workflow-split-v1"></script>
 	<script defer="" src="assets/js/modules/canvas-grid-workflow-utils.js?v=2026.07.03-grid-workflow-split-v1"></script>
 	<script defer="" src="assets/js/modules/timeline-navigation-workflow-utils.js?v=2026.07.03-size-timeline-split-v1"></script>
@@ -1749,20 +1628,37 @@
 	<script defer="" src="assets/js/modules/autosave-workflow-utils.js?v=2026.07.01-autosave-workflow-split-v1"></script>
 	<script defer="" src="assets/js/modules/open-import-workflow-utils.js?v=2026.07.01-open-import-workflow-split-v1"></script>
 	<script defer="" src="assets/js/modules/export-format-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
-	<script defer="" src="assets/js/modules/export-dialog-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
-	<script defer="" src="assets/js/modules/startup-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
-	<script defer="" src="assets/js/modules/recent-project-workflow-utils.js?v=2026.07.03-project-home-list-fix1"></script>
+	<script defer="" src="assets/js/modules/export-dialog-workflow-utils.js?v=2026.07.03-export-dialog-fix1"></script>
+	<script defer="" src="assets/js/modules/startup-workflow-utils.js?v=2026.07.04-shared-project-disabled1"></script>
+	<script defer="" src="assets/js/modules/recent-project-workflow-utils.js?v=2026.07.03-project-home-ad-card-fix1"></script>
 	<script defer="" src="assets/js/modules/project-package-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/document-serialization-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/document-session-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/recent-account-workflow-utils.js?v=2026.07.03-safe-helper-split-v1"></script>
 	<script defer="" src="assets/js/modules/pixieed-profile-local-utils.js?v=2026.07.03-safe-helper-split-v1"></script>
-	<script defer="" src="assets/js/modules/pixieed-account-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
+	<script defer="" src="assets/js/modules/shared-recent-project-utils.js?v=2026.07.03-shared-recent-helper-split-v1"></script>
+	<script defer="" src="assets/js/modules/shared-project-recent-state-utils.js?v=2026.07.03-shared-recent-state-split-v1"></script>
+	<script defer="" src="assets/js/modules/shared-runtime-utils.js?v=2026.07.04-shared-project-disabled1"></script>
+	<script defer="" src="assets/js/modules/pixieed-account-workflow-utils.js?v=2026.07.04-shared-project-disabled1"></script>
+	<script defer="" src="assets/js/modules/shared-project-participant-utils.js?v=2026.07.03-shared-participant-migration-fix1"></script>
+	<script defer="" src="assets/js/modules/shared-project-comment-utils.js?v=2026.07.04-shared-open-deps-fix1"></script>
+	<script defer="" src="assets/js/modules/shared-project-setup-utils.js?v=2026.07.04-shared-project-disabled1"></script>
+	<script defer="" src="assets/js/modules/shared-project-session-state-utils.js?v=2026.07.06-local-project-open-fix1"></script>
+	<script defer="" src="assets/js/modules/shared-project-op-utils.js?v=2026.07.03-shared-op-utils-v1"></script>
+	<script defer="" src="assets/js/modules/shared-project-draw-apply-utils.js?v=2026.07.03-shared-draw-apply-v1"></script>
+	<script defer="" src="assets/js/modules/shared-project-recovery-replay-utils.js?v=2026.07.04-shared-structure-queue-fix1"></script>
+	<script defer="" src="assets/js/modules/shared-project-local-journal-utils.js?v=2026.07.03-shared-local-journal-split-v1"></script>
+	<script defer="" src="assets/js/modules/shared-project-local-op-utils.js?v=2026.07.04-shared-structure-queue-fix1"></script>
+	<script defer="" src="assets/js/modules/shared-project-recovery-lifecycle-utils.js?v=2026.07.03-shared-recovery-lifecycle-v1"></script>
+	<script defer="" src="assets/js/modules/shared-project-realtime-utils.js?v=2026.07.03-shared-open-workflow-v1"></script>
+	<script defer="" src="assets/js/modules/shared-project-backend-rpc-utils.js?v=2026.07.03-shared-backend-rpc-split-v1"></script>
+	<script defer="" src="assets/js/modules/shared-project-workflow-utils.js?v=2026.07.03-shared-open-workflow-fix2"></script>
+	<script defer="" src="assets/js/modules/shared-project-create-progress-utils.js?v=2026.07.03-shared-open-workflow-v1"></script>
 	<script defer="" src="assets/js/modules/startup-tail-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
-	<script defer="" src="assets/js/modules/controls-mirror.js?v=2026.07.01-mirror-static-config-split-v1"></script>
+	<script defer="" src="assets/js/modules/controls-mirror.js?v=2026.07.03-mirror-guide-drag-fix1"></script>
 	<script defer="" src="assets/js/modules/external-tool-workflow-utils.js?v=2026.07.02-external-tool-workflow-split-v1"></script>
-		<script defer="" src="assets/js/pixieedraw-dev-switch.js?v=2026.07.06-pixieedrawdev-shared-nav-fix1"></script>
-		<script defer="" src="assets/js/app.js?v=2026.07.06-local-project-open-fix1"></script>
+	<script defer="" src="assets/js/pixieedraw-dev-switch.js?v=2026.07.03-pixieedrawdev-switch-fix14"></script>
+	<script defer="" src="assets/js/app.js?v=2026.07.07-open-dialog-fix1"></script>
   <script>
     (function initPanelAdDocking() {
       const ads = {
@@ -1861,10 +1757,11 @@
       const SLOTS = [
         { containerId: 'leftPanelAdSlot', slot: '3806415737' },
         { containerId: 'rightPanelAdSlot', slot: '1180252398' },
-        { containerId: 'multiSupportAdSlot', slot: '2141591954' }
+        { containerId: 'mobileBottomAdSlot', slot: '6568310446' }
       ];
-      const SIDE_SLOT_IDS = ['leftPanelAdSlot', 'rightPanelAdSlot', 'multiSupportAdSlot'];
+      const SIDE_SLOT_IDS = ['leftPanelAdSlot', 'rightPanelAdSlot'];
       const MIN_SIDE_AD_WIDTH = 140;
+      const MIN_MOBILE_BOTTOM_AD_WIDTH = 250;
       const RETRY_FRAMES = 96;
       const slotByContainerId = new Map(SLOTS.map(item => [item.containerId, item]));
       const resizeObserverByContainer = new WeakMap();
@@ -1887,7 +1784,7 @@
       }
 
       function getAdLayoutMode() {
-        return 'side-only';
+        return isPortraitBottomOnlyMode() ? 'portrait-bottom' : 'landscape-side';
       }
 
       function resetSlotContainer(containerId) {
@@ -1911,7 +1808,7 @@
       }
 
       function getCurrentModeTargetIds() {
-        return SIDE_SLOT_IDS;
+        return isPortraitBottomOnlyMode() ? ['mobileBottomAdSlot'] : SIDE_SLOT_IDS;
       }
 
       function resetCurrentModeSlots() {
@@ -1975,7 +1872,9 @@
         if (handleAdLayoutTransition()) {
           return;
         }
-        SIDE_SLOT_IDS.forEach((containerId) => {
+        const portraitBottomOnly = isPortraitBottomOnlyMode();
+        const targetContainerIds = portraitBottomOnly ? ['mobileBottomAdSlot'] : SIDE_SLOT_IDS;
+        targetContainerIds.forEach((containerId) => {
           queueRenderForContainer(document.getElementById(containerId));
         });
       }
@@ -1990,7 +1889,9 @@
       }
 
       function isMobileBottomSlot(container) {
-        return false;
+        if (!(container instanceof HTMLElement)) return false;
+        if (container.id === 'mobileBottomAdSlot') return true;
+        return Boolean(container.closest && container.closest('#mobileBottomAd'));
       }
 
       function getSideSlotId(container) {
@@ -2023,7 +1924,7 @@
       }
 
       function getRequiredWidth(container) {
-        return MIN_SIDE_AD_WIDTH;
+        return isMobileBottomSlot(container) ? MIN_MOBILE_BOTTOM_AD_WIDTH : MIN_SIDE_AD_WIDTH;
       }
 
       function isContainerRenderable(container) {
@@ -2121,6 +2022,9 @@
       }
 
       function tryRender(container) {
+        const portraitBottomOnly = isPortraitBottomOnlyMode();
+        if (portraitBottomOnly && !isMobileBottomSlot(container)) return false;
+        if (!portraitBottomOnly && isMobileBottomSlot(container)) return false;
         if (!isSideRailExpanded(container)) return false;
         applySideSlotGeometry(container);
         if (!isContainerRenderable(container)) return false;
@@ -2137,7 +2041,6 @@
         promoteForRender(ins);
 
         try {
-          console.debug('[pixiedraw] calling (adsbygoogle).push for', container.id, 'width=', Math.round(getContainerWidth(container)));
           (window.adsbygoogle = window.adsbygoogle || []).push({});
           ins.dataset.pixiedRendered = '1';
           return true;
@@ -2164,6 +2067,13 @@
 
       function queueRenderForContainer(container) {
         if (!(container instanceof HTMLElement)) return;
+        const portraitBottomOnly = isPortraitBottomOnlyMode();
+        if (portraitBottomOnly && container.id !== 'mobileBottomAdSlot') {
+          return;
+        }
+        if (!portraitBottomOnly && container.id === 'mobileBottomAdSlot') {
+          return;
+        }
         const slotConfig = slotByContainerId.get(container.id);
         if (!slotConfig) return;
         if (!isSideRailExpanded(container)) {
@@ -2243,7 +2153,7 @@
     })();
   </script>
 
-	  <script src="../scripts/shared-bottom-nav.js"></script>
-	  <script src="../scripts/pixel-art-fit.js"></script>
-	</body>
-	</html>
+  <script src="../scripts/shared-bottom-nav.js?v=2026.07.08-modal-footer-preserve1"></script>
+  <script src="../scripts/pixel-art-fit.js"></script>
+</body>
+</html>
