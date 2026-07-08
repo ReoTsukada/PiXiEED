@@ -608,6 +608,19 @@
       if (!pendingInvite) {
         return false;
       }
+      if (!SHARED_PROJECTS_ENABLED) {
+        clearPendingSharedInvite();
+        closeLoginPromptDialog();
+        clearMultiInviteQueryParamsFromUrl();
+        setMultiStatus(
+          localizeText(
+            '共有プロジェクトは現在利用できません。',
+            'Shared projects are currently unavailable.'
+          ),
+          'warn'
+        );
+        return false;
+      }
       await ensurePixieedAccountReady({ forceRefresh: true, silent: true });
       if (!accountState.isLoggedIn || !accountState.userId || accountState.isAnonymous) {
         return false;
