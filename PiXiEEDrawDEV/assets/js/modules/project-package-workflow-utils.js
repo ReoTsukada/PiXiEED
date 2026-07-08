@@ -208,6 +208,9 @@
     const fallbackId = activeOpenProjectTabId || openProjectTabs[0]?.id || createOpenProjectTabId();
     const activeId = activeOpenProjectTabId || fallbackId;
     const activeProjectId = normalizeAutosaveProjectId(autosaveProjectId || '') || createAutosaveProjectId();
+    const fallbackPackagedProject = activeProjectId && typeof resolveStoredLocalProjectPayloadForProjectId === 'function'
+      ? resolveStoredLocalProjectPayloadForProjectId(activeProjectId)
+      : null;
     const sourceTabs = openProjectTabs.length
       ? openProjectTabs
       : [{
@@ -222,7 +225,15 @@
       const isActive = tab?.id && tab.id === activeId;
       const project = isActive && activePackagedProject
         ? activePackagedProject
-        : (tab?.project && typeof tab.project === 'object' ? tab.project : null);
+        : (
+          (tab?.project && typeof tab.project === 'object')
+            ? tab.project
+            : (
+              fallbackPackagedProject && typeof extractLocalProjectSheetPayload === 'function'
+                ? extractLocalProjectSheetPayload(fallbackPackagedProject, typeof tab?.id === 'string' ? tab.id : '')
+                : null
+            )
+        );
       if (!project) {
         return;
       }
@@ -286,12 +297,20 @@
       updatedAt: activePackagedProject.updatedAt || current?.updatedAt || new Date().toISOString(),
       qrEditPayload: normalizeQrEditPayload(current?.qrEditPayload, activeProjectId),
     };
+    const lightweightSyncedTab = typeof createLightweightLocalProjectTabState === 'function'
+      ? createLightweightLocalProjectTabState(
+        syncedTab,
+        typeof createLocalProjectEntrySignature === 'function'
+          ? createLocalProjectEntrySignature(recentProjectsCache.get(activeProjectId) || null)
+          : {}
+      )
+      : syncedTab;
     if (index >= 0) {
-      openProjectTabs[index] = syncedTab;
+      openProjectTabs[index] = lightweightSyncedTab;
     } else if (!openProjectTabs.length) {
-      openProjectTabs.push(syncedTab);
+      openProjectTabs.push(lightweightSyncedTab);
     } else {
-      openProjectTabs.unshift(syncedTab);
+      openProjectTabs.unshift(lightweightSyncedTab);
     }
     activeOpenProjectTabId = activeId;
     suppressOpenProjectTabAutoInitialize = false;
@@ -509,6 +528,7 @@
       skipThumbnail = false,
       thumbnailIntervalMs = LOCAL_PROJECT_THUMBNAIL_UPDATE_INTERVAL_MS,
       activateProject = true,
+      journalPayload = null,
     } = {}
   ) {
     if (!AUTOSAVE_SUPPORTED) {
@@ -543,15 +563,30 @@
           thumbnail: previousEntry?.thumbnail || null,
         });
       }
-      const packaged = packagedPayload && typeof packagedPayload === 'object'
-        ? packagedPayload
-        : buildPackagedProjectPayload(snapshot);
+      const savePlan = typeof buildActiveLocalProjectSavePlan === 'function'
+        ? buildActiveLocalProjectSavePlan({
+          projectId: resolvedProjectId,
+          snapshot,
+          packagedPayload,
+          buildPackagedProjectPayload,
+          buildAutosaveSessionPayload: buildProjectSessionPayload,
+        })
+        : null;
+      const packaged = savePlan?.packagedPayload && typeof savePlan.packagedPayload === 'object'
+        ? savePlan.packagedPayload
+        : (
+          packagedPayload && typeof packagedPayload === 'object'
+            ? packagedPayload
+            : buildPackagedProjectPayload(snapshot)
+        );
       ensurePackagedProjectSheetsForSave(packaged, snapshot);
       preserveExistingProjectSheetsForSave(packaged, previousEntry?.project || null);
       if (!validatePackagedProjectSheetCountForSave(packaged)) {
         throw new Error('Refusing to save incomplete project sheets');
       }
-      const listSnapshot = getRecentProjectListSnapshot(packaged, snapshot);
+      const listSnapshot = (savePlan?.journalPayload && snapshot)
+        ? snapshot
+        : getRecentProjectListSnapshot(packaged, snapshot);
       const listSheet = getPackagedProjectFirstSheet(packaged);
       const listThumbnailSheetId = typeof listSheet?.id === 'string' ? listSheet.id : '';
       const fileName = getRecentProjectEntryFileName(previousEntry, packaged, snapshot);
@@ -586,6 +621,17 @@
         thumbnailSheetId: listThumbnailSheetId || '',
         project: packaged,
       };
+      const resolvedJournalPayload = journalPayload && typeof journalPayload === 'object'
+        ? journalPayload
+        : (savePlan?.journalPayload && typeof savePlan.journalPayload === 'object' ? savePlan.journalPayload : null);
+      if (resolvedJournalPayload) {
+        updatedEntry.projectJournal = resolvedJournalPayload;
+        updatedEntry.checkpointId = String(resolvedJournalPayload.checkpointId || savePlan?.checkpointId || '');
+        updatedEntry.dirtyOpCount = Math.max(
+          0,
+          Math.round(Number(resolvedJournalPayload.dirtyOpCount) || Number(savePlan?.dirtyOpCount) || 0)
+        );
+      }
       if (dotStats) {
         updatedEntry.dotStats = dotStats;
       }
