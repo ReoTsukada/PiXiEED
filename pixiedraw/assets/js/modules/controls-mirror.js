@@ -119,12 +119,13 @@
     const rightWidth = isMobile ? 0 : normalizeRailWidth('right', railSizing.right);
     const leftFlyoutReserve = isMobile ? 0 : getLeftFloatingRailReserveWidth(leftWidth);
     const rightFlyoutReserve = isMobile ? 0 : getRightFloatingRailReserveWidth(rightWidth);
+    const projectTabsInsetLeft = isMobile ? 0 : Math.max(0, Math.min(28, Math.round(leftWidth * 0.36)));
     const toggleMargin = 12;
     layoutNode.style.setProperty('--left-toggle-offset', `${leftWidth ? leftWidth + toggleMargin : toggleMargin}px`);
     layoutNode.style.setProperty('--right-toggle-offset', `${rightWidth ? rightWidth + toggleMargin : toggleMargin}px`);
     layoutNode.style.setProperty('--left-flyout-reserve', `${leftFlyoutReserve}px`);
     layoutNode.style.setProperty('--right-flyout-reserve', `${rightFlyoutReserve}px`);
-    layoutNode.style.setProperty('--project-tabs-inset-left', '0px');
+    layoutNode.style.setProperty('--project-tabs-inset-left', `${projectTabsInsetLeft}px`);
     layoutNode.style.setProperty('--project-tabs-inset-right', '0px');
   }
 
