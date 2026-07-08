@@ -1382,21 +1382,6 @@
     if (!targetEntry) {
       return false;
     }
-    if (SHARED_PROJECTS_ENABLED && isSharedRecentProjectEntry(targetEntry)) {
-      storePendingSharedInvite({
-        inviteToken: targetEntry.sharedProjectInviteToken || '',
-        projectKey: targetEntry.sharedProjectKey || '',
-        requestedRole: targetEntry.sharedRoleHint || 'guest',
-        autoJoin: targetEntry.sharedAutoJoin !== false,
-        source: 'startup-reopen',
-      });
-      if (!(await ensureSharedProjectAuthenticatedStart({ requireLogin: true }))) {
-        return false;
-      }
-      if (!await ensureSharedProjectBackendSession()) {
-        return false;
-      }
-    }
     const restored = await openRecentProject(targetEntry, { hideStartup: true, silent: true });
     if (restored) {
       clearReloadTargetProjectId();
@@ -1411,97 +1396,9 @@
   }
 
   async function maybeRestoreSharedProjectOnStartup() {
-    if (!SHARED_PROJECTS_ENABLED) {
-      startupSharedReloadProjectKey = '';
-      startupSharedReloadRevision = 0;
-      startupSharedReloadStructureRevision = 0;
-      return false;
-    }
-    const restoredProjectKey = normalizeMultiProjectKey(startupSharedReloadProjectKey || '');
-    if (startupRestoreCancelRequested || !restoredProjectKey || readMultiInviteFromUrl()) {
-      return false;
-    }
-    setStartupProgressLabel(localizeText('共有プロジェクトへ復帰中…', 'Reopening shared project...'));
-    try {
-      const entries = await loadRecentProjectsMetadata();
-      if (startupRestoreCancelRequested) {
-        return false;
-      }
-      const limitedEntries = enforceSharedRecentProjectLimit(entries);
-      setRecentProjectsCache(limitedEntries);
-      let sharedEntry = getCurrentSharedRecentProjectEntry(restoredProjectKey);
-      if (!sharedEntry) {
-        sharedEntry = normalizeSharedRecentProjectEntry(
-          limitedEntries.find(entry => (
-            isSharedRecentProjectEntry(entry)
-            && normalizeMultiProjectKey(entry?.sharedProjectKey || '') === restoredProjectKey
-          )) || {
-            sharedProjectKey: restoredProjectKey,
-            sharedProjectId: buildSharedRecentProjectId(restoredProjectKey),
-            id: buildSharedRecentProjectId(restoredProjectKey),
-            name: restoredProjectKey,
-            sharedRoleHint: 'guest',
-            sharedAutoJoin: false,
-            sharedProjectRevision: startupSharedReloadRevision,
-            sharedProjectStructureRevision: startupSharedReloadStructureRevision,
-          }
-        );
-      }
-      if (!accountState.isLoggedIn || accountState.isAnonymous) {
-        storePendingSharedInvite({
-          inviteToken: sharedEntry?.sharedProjectInviteToken || '',
-          projectKey: restoredProjectKey,
-          requestedRole: sharedEntry?.sharedRoleHint || 'guest',
-          autoJoin: sharedEntry?.sharedAutoJoin !== false,
-          source: 'reload-shared',
-        });
-      }
-      if (!(await ensureSharedProjectAuthenticatedStart({ requireLogin: true }))) {
-        return false;
-      }
-      if (startupRestoreCancelRequested) {
-        return false;
-      }
-      await initPixieedAccount();
-      if (!await ensureSharedProjectBackendSession()) {
-        return false;
-      }
-      if (startupRestoreCancelRequested) {
-        return false;
-      }
-      await ensureNoLegacyMultiSessionForSharedProject();
-      if (startupRestoreCancelRequested) {
-        return false;
-      }
-      const opened = sharedEntry
-        ? await openSharedRecentProject(sharedEntry, {
-          hideStartup: true,
-          silent: true,
-          skipLatestRefresh: true,
-        })
-        : await openSharedProjectCanonical({
-            projectKey: restoredProjectKey,
-            requestedRole: 'guest',
-            autoJoin: false,
-            reason: 'reload-shared',
-            hideStartup: true,
-            silent: true,
-          });
-      if (opened) {
-        clearReloadTargetProjectId();
-        startupSharedReloadProjectKey = '';
-        startupSharedReloadRevision = 0;
-        startupSharedReloadStructureRevision = 0;
-        startupAutosaveRestoreProjectId = '';
-        updateAutosaveStatus(
-          localizeText('共有プロジェクト: 再読み込み前のプロジェクトへ復帰しました', 'Shared project: reopened the project from before reload'),
-          'success'
-        );
-        return true;
-      }
-    } catch (error) {
-      console.warn('Failed to reopen shared project after reload', error);
-    }
+    startupSharedReloadProjectKey = '';
+    startupSharedReloadRevision = 0;
+    startupSharedReloadStructureRevision = 0;
     return false;
   }
 
