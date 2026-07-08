@@ -58,6 +58,9 @@
   }
 
   function buildActiveSharedProjectSheetTabFields(projectId = autosaveProjectId) {
+    if (!SHARED_PROJECTS_ENABLED) {
+      return null;
+    }
     const normalizedProjectId = normalizeAutosaveProjectId(projectId || autosaveProjectId || '');
     const sharedProjectKey = normalizeMultiProjectKey(activeSharedProjectKey || '')
       || getSharedProjectKeyFromProjectId(normalizedProjectId);
@@ -85,6 +88,9 @@
   }
 
   function queueSharedProjectSheetsSnapshot(historyLabel = 'addSheet') {
+    if (!SHARED_PROJECTS_ENABLED) {
+      return false;
+    }
     if (!activeSharedProjectKey || !isCurrentProjectSharedEntry()) {
       return false;
     }
@@ -242,6 +248,9 @@
   }
 
   function clearDeletedSharedProjectLocalState(projectKey = '', projectId = '') {
+    if (!SHARED_PROJECTS_ENABLED) {
+      return false;
+    }
     const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
     const normalizedProjectId = normalizeAutosaveProjectId(projectId || '');
     const sharedRecentProjectId = normalizedProjectKey
@@ -290,9 +299,13 @@
     if (sharedRecentProjectId && startupAutosaveRestoreProjectId === sharedRecentProjectId) {
       startupAutosaveRestoreProjectId = '';
     }
+    return true;
   }
 
   async function purgeDeletedSharedProjectLocalReferences(projectKey = '', projectId = '') {
+    if (!SHARED_PROJECTS_ENABLED) {
+      return false;
+    }
     const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
     const normalizedProjectId = normalizeAutosaveProjectId(projectId || '');
     if (normalizedProjectKey) {
@@ -416,6 +429,96 @@
       return false;
     }
     const target = openProjectTabs[targetIndex];
+    if (!SHARED_PROJECTS_ENABLED) {
+      const targetProjectId = normalizeAutosaveProjectId(target?.projectId || '');
+      let targetProjectPayload = target?.project && typeof target.project === 'object'
+        ? target.project
+        : null;
+      if (!targetProjectPayload) {
+        const latestEntries = await loadRecentProjectsMetadata();
+        const latestEntry = latestEntries.find(entry => normalizeAutosaveProjectId(entry?.id || '') === targetProjectId) || recentProjectsCache.get(targetProjectId) || null;
+        const reconstructed = typeof reconstructLocalRecentProjectPayload === 'function'
+          ? reconstructLocalRecentProjectPayload(latestEntry)
+          : null;
+        targetProjectPayload = reconstructed && typeof reconstructed === 'object'
+          ? (typeof extractLocalProjectSheetPayload === 'function'
+            ? extractLocalProjectSheetPayload(reconstructed, target.id) || reconstructed
+            : reconstructed)
+          : null;
+        if (!targetProjectPayload) {
+          return false;
+        }
+      }
+      const guardedProjectTabIds = Array.from(new Set([previousActiveId, target.id].filter(Boolean)));
+      guardedProjectTabIds.forEach(retainOpenProjectTabProjectWriteGuard);
+      if (!skipPersistCurrent && previousActiveId && findOpenProjectTabIndex(previousActiveId) >= 0) {
+        const persistedCurrentSheet = await persistActiveOpenProjectTab({ flushAutosave: true });
+        if (!persistedCurrentSheet) {
+          updateAutosaveStatus(localizeText('現在のシートを保持できなかったため、切替を中止しました', 'Sheet switch was canceled because the current sheet could not be preserved'), 'error');
+          guardedProjectTabIds.forEach(releaseOpenProjectTabProjectWriteGuard);
+          return false;
+        }
+      }
+      activeOpenProjectTabId = target.id;
+      suppressOpenProjectTabAutoInitialize = false;
+      renderOpenProjectTabs();
+      openProjectTabBusy = true;
+      try {
+        const loaded = await loadDocumentFromProjectPayload(targetProjectPayload, {
+          projectId: target.projectId || '',
+          suppressAutosaveStatus: true,
+          qrEditPayload: target?.qrEditPayload || null,
+          suppressProjectSheetsRestore: true,
+        });
+        if (!loaded || loaded === 'deferred') {
+          activeOpenProjectTabId = previousActiveId;
+          renderOpenProjectTabs();
+          updateAutosaveStatus(localizeText('シートの切替に失敗しました', 'Failed to switch sheet'), 'error');
+          return false;
+        }
+        queueProjectTabViewportReset(target.id);
+        if (target.unsaved) {
+          markDocumentUnsavedChange();
+        } else {
+          resetDocumentUnsavedChanges();
+        }
+        hydrateActiveLocalProjectJournalFromRecentEntry?.(
+          recentProjectsCache.get(targetProjectId) || null,
+          targetProjectId
+        );
+        openProjectTabs.forEach((tab, index) => {
+          if (!tab || tab.id === target.id) {
+            return;
+          }
+          openProjectTabs[index] = {
+            ...tab,
+            project: null,
+            residentProjectLoaded: false,
+          };
+        });
+        pruneInactiveCanvasDirectCaches?.();
+        renderOpenProjectTabs();
+        if (announce) {
+          updateAutosaveStatus(
+            localizeText(
+              `プロジェクトを切り替えました (${extractDocumentBaseName(state.documentName)})`,
+              `Switched project (${extractDocumentBaseName(state.documentName)})`
+            ),
+            'info'
+          );
+        }
+        return true;
+      } catch (error) {
+        console.warn('Failed to activate local project tab', error);
+        activeOpenProjectTabId = previousActiveId;
+        renderOpenProjectTabs();
+        updateAutosaveStatus(localizeText('シートの切替に失敗しました', 'Failed to switch sheet'), 'error');
+        return false;
+      } finally {
+        guardedProjectTabIds.forEach(releaseOpenProjectTabProjectWriteGuard);
+        openProjectTabBusy = false;
+      }
+    }
     const targetRecentEntry = getSharedRecentProjectEntryForTab(target);
     const targetIsShared = Boolean(targetRecentEntry && isSharedRecentProjectEntry(targetRecentEntry));
     const targetProjectId = normalizeAutosaveProjectId(target?.projectId || '');
@@ -439,13 +542,28 @@
       );
       return false;
     }
-    if (!targetIsShared && (!target?.project || typeof target.project !== 'object')) {
-      return false;
+    let targetProjectPayload = target?.project && typeof target.project === 'object'
+      ? target.project
+      : null;
+    if (!targetIsShared && !targetProjectPayload) {
+      const latestEntries = await loadRecentProjectsMetadata();
+      const latestEntry = latestEntries.find(entry => normalizeAutosaveProjectId(entry?.id || '') === targetProjectId) || recentProjectsCache.get(targetProjectId) || null;
+      const reconstructed = typeof reconstructLocalRecentProjectPayload === 'function'
+        ? reconstructLocalRecentProjectPayload(latestEntry)
+        : null;
+      targetProjectPayload = reconstructed && typeof reconstructed === 'object'
+        ? (typeof extractLocalProjectSheetPayload === 'function'
+          ? extractLocalProjectSheetPayload(reconstructed, target.id) || reconstructed
+          : reconstructed)
+        : null;
+      if (!targetProjectPayload) {
+        return false;
+      }
     }
     const guardedProjectTabIds = Array.from(new Set([previousActiveId, target.id].filter(Boolean)));
     guardedProjectTabIds.forEach(retainOpenProjectTabProjectWriteGuard);
     if (!skipPersistCurrent && previousActiveId && findOpenProjectTabIndex(previousActiveId) >= 0) {
-      const persistedCurrentSheet = await persistActiveOpenProjectTab({ flushAutosave: false });
+      const persistedCurrentSheet = await persistActiveOpenProjectTab({ flushAutosave: true });
       if (!persistedCurrentSheet) {
         updateAutosaveStatus(localizeText('現在のシートを保持できなかったため、切替を中止しました', 'Sheet switch was canceled because the current sheet could not be preserved'), 'error');
         guardedProjectTabIds.forEach(releaseOpenProjectTabProjectWriteGuard);
@@ -514,7 +632,7 @@
           });
         }
       } else {
-        loaded = await loadDocumentFromProjectPayload(target.project, {
+        loaded = await loadDocumentFromProjectPayload(targetProjectPayload, {
           projectId: target.projectId || '',
           suppressAutosaveStatus: true,
           qrEditPayload: target?.qrEditPayload || null,
@@ -561,6 +679,23 @@
       } else {
         resetDocumentUnsavedChanges();
       }
+      if (!targetIsShared) {
+        hydrateActiveLocalProjectJournalFromRecentEntry?.(
+          recentProjectsCache.get(targetProjectId) || null,
+          targetProjectId
+        );
+      }
+      openProjectTabs.forEach((tab, index) => {
+        if (!tab || tab.id === target.id || isSharedOpenProjectTab(tab)) {
+          return;
+        }
+        openProjectTabs[index] = {
+          ...tab,
+          project: null,
+          residentProjectLoaded: false,
+        };
+      });
+      pruneInactiveCanvasDirectCaches?.();
       renderOpenProjectTabs();
       if (announce) {
         updateAutosaveStatus(
