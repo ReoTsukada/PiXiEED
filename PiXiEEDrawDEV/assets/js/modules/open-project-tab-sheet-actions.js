@@ -24,13 +24,11 @@
     buildPackagedProjectPayload,
     ensureOpenProjectTabsInitialized,
     persistActiveOpenProjectTab,
-    buildActiveSharedProjectSheetTabFields,
     createOpenProjectSheetTabFromPackagedProject,
     extractDocumentBaseName,
     renderOpenProjectTabs,
     loadDocumentFromProjectPayload,
     findOpenProjectTabIndex,
-    queueSharedProjectSheetsSnapshot,
     markAutosaveDirty,
     markDocumentUnsavedChange,
     scheduleSessionPersist,
@@ -83,14 +81,12 @@
         const packaged = createBlankSheetPackagedProject(sheetIndex);
         const fileName = normalizeDocumentName(packaged?.document?.documentName || localizeText(`シート ${sheetIndex}`, `Sheet ${sheetIndex}`));
         const autosaveProjectId = getAutosaveProjectId?.();
-        const sharedFields = buildActiveSharedProjectSheetTabFields(autosaveProjectId);
         const nextTab = createOpenProjectSheetTabFromPackagedProject({
           project: packaged,
-          projectId: sharedFields?.projectId || autosaveProjectId,
+          projectId: autosaveProjectId,
           fileName,
           label: extractDocumentBaseName(fileName),
-          source: sharedFields ? 'shared-sheet' : 'sheet',
-          ...(sharedFields || {}),
+          source: 'sheet',
         });
         if (!nextTab) {
           return false;
@@ -103,18 +99,6 @@
           projectId: nextTab.projectId || getAutosaveProjectId?.(),
           suppressAutosaveStatus: true,
           suppressProjectSheetsRestore: true,
-          ...(sharedFields ? {
-            sharedProjectKey: sharedFields.sharedProjectKey,
-            sharedProjectBackendId: sharedFields.sharedProjectBackendId,
-            sharedProjectRevision: sharedFields.sharedProjectRevision,
-            sharedProjectStructureRevision: sharedFields.sharedProjectStructureRevision,
-            sharedRoleHint: sharedFields.sharedRoleHint,
-            sharedAutoJoin: sharedFields.sharedAutoJoin,
-            preserveDocumentIds: true,
-            preserveCanvasIds: true,
-            preserveFrameIds: true,
-            preserveLayerIds: true,
-          } : {}),
         });
         if (!loaded) {
           const insertedIndex = findOpenProjectTabIndex(nextTab.id);
@@ -124,12 +108,10 @@
           renderOpenProjectTabs?.();
           return false;
         }
-        if (!queueSharedProjectSheetsSnapshot('addSheet')) {
-          markAutosaveDirty?.();
-          markDocumentUnsavedChange?.();
-          scheduleSessionPersist?.({ includeSnapshots: true });
-          scheduleAutosaveSnapshot?.();
-        }
+        markAutosaveDirty?.();
+        markDocumentUnsavedChange?.();
+        scheduleSessionPersist?.({ includeSnapshots: true });
+        scheduleAutosaveSnapshot?.();
         updateAutosaveStatus(
           localizeText('新規シートを追加しました', 'Added a new sheet'),
           'success'
