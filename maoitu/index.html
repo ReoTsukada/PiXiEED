@@ -193,6 +193,9 @@ a { color:#7dd3fc; }
   gap:12px;
   width:100%;
 }
+.control-bar > .control-bar__btn--primary {
+  grid-column:1 / -1;
+}
 .control-bar__btn {
   font:700 16px system-ui;
   padding:12px 24px;
@@ -302,6 +305,7 @@ a { color:#7dd3fc; }
   font-size:14px;
   line-height:1.6;
   text-align:left;
+  box-sizing:border-box;
 }
 .start-content {
   display:flex;
@@ -310,6 +314,7 @@ a { color:#7dd3fc; }
   gap:18px;
   width:100%;
   min-height:0;
+  min-width:0;
 }
 .instructions-card h2 {
   margin:0 0 8px;
@@ -461,6 +466,8 @@ a { color:#7dd3fc; }
   box-shadow:0 28px 80px rgba(0,0,0,0.48), inset 0 1px 0 rgba(255,255,255,0.06);
   display:flex;
   flex-direction:column;
+  box-sizing:border-box;
+  min-width:0;
 }
 .ranking-modal__header {
   padding:14px 16px;
@@ -486,6 +493,8 @@ a { color:#7dd3fc; }
   display:flex;
   flex-direction:column;
   gap:10px;
+  box-sizing:border-box;
+  min-width:0;
 }
 .ranking-button {
   width:100%;
@@ -574,9 +583,11 @@ a { color:#7dd3fc; }
   width:100%;
   flex:1 1 auto;
   display:flex;
-  align-items:center;
+  align-items:flex-start;
   justify-content:center;
   min-height:0;
+  box-sizing:border-box;
+  padding:8px 0 calc(116px + var(--pixieed-shared-bottom-nav-height, 68px) + var(--safe-bottom));
 }
 body.is-game-active {
   padding:0 0 calc(var(--pixieed-shared-bottom-nav-height, 68px) + 6px + var(--safe-bottom)) 0 !important;
@@ -648,6 +659,8 @@ body.is-game-active .game-shell {
   text-align:left;
   max-height:100%;
   overflow:auto;
+  box-sizing:border-box;
+  min-width:0;
 }
 .start-header {
   display:flex;
@@ -668,6 +681,10 @@ body.is-game-active .game-shell {
   }
   body.is-game-active {
     padding:0 max(78px, calc(72px + 6px + var(--safe-right))) 0 0 !important;
+  }
+  .start-screen {
+    align-items:center;
+    padding:8px 0 calc(20px + var(--safe-bottom));
   }
   .bottom-nav {
     top:0 !important;
@@ -722,7 +739,6 @@ body.is-game-active .game-shell {
 <style id="ads-safe">
   html, body {
     max-width: 100vw;
-    overflow-x: hidden;
   }
   .adsbygoogle,
   ins.adsbygoogle {
@@ -1042,15 +1058,12 @@ body.is-game-active .game-shell {
           <button class="control-bar__btn control-bar__btn--primary" id="playBtn">▶ プレイ</button>
           <button class="control-bar__btn control-bar__btn--secondary" id="titleShareBtn">シェアする</button>
           <button class="control-bar__btn control-bar__btn--secondary" id="openRankingBtn">ランキング</button>
-          <a class="control-bar__btn control-bar__btn--secondary" href="../index.html#projects">他のゲームで遊ぶ</a>
-          <a class="control-bar__btn control-bar__btn--secondary control-bar__btn--compact" href="../index.html#projects">他のゲーム・ツール</a>
         </div>
       </div>
     </div>
   </section>
 </main>
 <section class="game-shell" id="gameShell" hidden aria-label="ゲーム画面">
-  <button class="game-shell__close" id="gameCloseBtn" type="button">戻る</button>
   <iframe class="game-shell__frame" id="gameFrame" title="まおいつゲーム"></iframe>
 </section>
 <div class="ranking-modal" id="rankingModal" aria-hidden="true" role="dialog" aria-modal="true">
@@ -1099,7 +1112,6 @@ const rankingModal = document.getElementById('rankingModal');
 const closeRankingBtn = document.getElementById('closeRankingBtn');
 const gameShell = document.getElementById('gameShell');
 const gameFrame = document.getElementById('gameFrame');
-const gameCloseBtn = document.getElementById('gameCloseBtn');
 let selectedDifficulty = 'endless';
 
 function baseShareText(){
@@ -1155,9 +1167,6 @@ function stopGameView(){
 }
 
 playBtn.addEventListener('click', startGameView);
-if(gameCloseBtn){
-  gameCloseBtn.addEventListener('click', stopGameView);
-}
 
 window.addEventListener('message', (event) => {
   if(event.origin !== window.location.origin) return;
