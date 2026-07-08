@@ -5718,6 +5718,8 @@
   set findOpenProjectTabIndexByProjectId(value) { findOpenProjectTabIndexByProjectId = value; },
   get getDefaultFrameName() { return getDefaultFrameName; },
   set getDefaultFrameName(value) { getDefaultFrameName = value; },
+  get GifReader() { return GifReader; },
+  set GifReader(value) { GifReader = value; },
   get getPaletteColorKey() { return getPaletteColorKey; },
   set getPaletteColorKey(value) { getPaletteColorKey = value; },
   get hideProjectHomeScreen() { return hideProjectHomeScreen; },
