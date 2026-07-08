@@ -917,6 +917,7 @@
     pendingAutosaveHandle = null;
     clearPendingPermissionListener();
     setActiveAutosaveProjectId(createAutosaveProjectId());
+    clearActiveLocalProjectJournal?.();
     clearActiveSharedProjectSession();
     storeMultiProjectKey('');
     syncMultiProjectKeyInputValues('', { preserveFocused: false });
