@@ -90,6 +90,13 @@ function commitHistory() {
       } else {
         history.past.push(historyEntry);
       }
+      if (!isSharedProjectCollaborativeMode()) {
+        noteActiveLocalProjectHistoryEntry?.(
+          normalizeAutosaveProjectId?.(autosaveProjectId || '') || '',
+          historyEntry,
+          pendingLabel
+        );
+      }
       const recordedTimelapseOperation = recordTimelapseOperationLogEntry(historyEntry, pendingLabel);
       const activeTimelapseTrack = getActiveTimelapseTrack();
       if (
@@ -227,6 +234,9 @@ function undo() {
       updateHistoryButtons();
       markAutosaveDirty();
       markDocumentUnsavedChange();
+      markActiveLocalProjectJournalNeedsCheckpoint?.(
+        normalizeAutosaveProjectId?.(autosaveProjectId || '') || ''
+      );
       scheduleAutosaveSnapshot();
       scheduleQrEditReadabilityCheck();
       if (isSharedProjectCollaborativeMode()) {
@@ -338,11 +348,14 @@ function redo() {
                 canvasId: activeCanvasId,
                 restoreSelection: true,
               });
-          if (applied) {
-            updateHistoryButtons();
-            markAutosaveDirty();
-            markDocumentUnsavedChange();
-            scheduleAutosaveSnapshot();
+    if (applied) {
+      updateHistoryButtons();
+      markAutosaveDirty();
+      markDocumentUnsavedChange();
+      markActiveLocalProjectJournalNeedsCheckpoint?.(
+        normalizeAutosaveProjectId?.(autosaveProjectId || '') || ''
+      );
+      scheduleAutosaveSnapshot();
             scheduleQrEditReadabilityCheck();
             try {
               if (sharedScopedHistory) {
@@ -383,6 +396,9 @@ function redo() {
       updateHistoryButtons();
       markAutosaveDirty();
       markDocumentUnsavedChange();
+      markActiveLocalProjectJournalNeedsCheckpoint?.(
+        normalizeAutosaveProjectId?.(autosaveProjectId || '') || ''
+      );
       scheduleAutosaveSnapshot();
       scheduleQrEditReadabilityCheck();
       if (isSharedProjectCollaborativeMode()) {
