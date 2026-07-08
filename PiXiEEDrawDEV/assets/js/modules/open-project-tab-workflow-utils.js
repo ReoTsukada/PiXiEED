@@ -429,123 +429,11 @@
       return false;
     }
     const target = openProjectTabs[targetIndex];
-    if (!SHARED_PROJECTS_ENABLED) {
-      const targetProjectId = normalizeAutosaveProjectId(target?.projectId || '');
-      let targetProjectPayload = target?.project && typeof target.project === 'object'
-        ? target.project
-        : null;
-      if (!targetProjectPayload) {
-        const latestEntries = await loadRecentProjectsMetadata();
-        const latestEntry = latestEntries.find(entry => normalizeAutosaveProjectId(entry?.id || '') === targetProjectId) || recentProjectsCache.get(targetProjectId) || null;
-        const reconstructed = typeof reconstructLocalRecentProjectPayload === 'function'
-          ? reconstructLocalRecentProjectPayload(latestEntry)
-          : null;
-        targetProjectPayload = reconstructed && typeof reconstructed === 'object'
-          ? (typeof extractLocalProjectSheetPayload === 'function'
-            ? extractLocalProjectSheetPayload(reconstructed, target.id) || reconstructed
-            : reconstructed)
-          : null;
-        if (!targetProjectPayload) {
-          return false;
-        }
-      }
-      const guardedProjectTabIds = Array.from(new Set([previousActiveId, target.id].filter(Boolean)));
-      guardedProjectTabIds.forEach(retainOpenProjectTabProjectWriteGuard);
-      if (!skipPersistCurrent && previousActiveId && findOpenProjectTabIndex(previousActiveId) >= 0) {
-        const persistedCurrentSheet = await persistActiveOpenProjectTab({ flushAutosave: true });
-        if (!persistedCurrentSheet) {
-          updateAutosaveStatus(localizeText('現在のシートを保持できなかったため、切替を中止しました', 'Sheet switch was canceled because the current sheet could not be preserved'), 'error');
-          guardedProjectTabIds.forEach(releaseOpenProjectTabProjectWriteGuard);
-          return false;
-        }
-      }
-      activeOpenProjectTabId = target.id;
-      suppressOpenProjectTabAutoInitialize = false;
-      renderOpenProjectTabs();
-      openProjectTabBusy = true;
-      try {
-        const loaded = await loadDocumentFromProjectPayload(targetProjectPayload, {
-          projectId: target.projectId || '',
-          suppressAutosaveStatus: true,
-          qrEditPayload: target?.qrEditPayload || null,
-          suppressProjectSheetsRestore: true,
-        });
-        if (!loaded || loaded === 'deferred') {
-          activeOpenProjectTabId = previousActiveId;
-          renderOpenProjectTabs();
-          updateAutosaveStatus(localizeText('シートの切替に失敗しました', 'Failed to switch sheet'), 'error');
-          return false;
-        }
-        queueProjectTabViewportReset(target.id);
-        if (target.unsaved) {
-          markDocumentUnsavedChange();
-        } else {
-          resetDocumentUnsavedChanges();
-        }
-        hydrateActiveLocalProjectJournalFromRecentEntry?.(
-          recentProjectsCache.get(targetProjectId) || null,
-          targetProjectId
-        );
-        openProjectTabs.forEach((tab, index) => {
-          if (!tab || tab.id === target.id) {
-            return;
-          }
-          openProjectTabs[index] = {
-            ...tab,
-            project: null,
-            residentProjectLoaded: false,
-          };
-        });
-        pruneInactiveCanvasDirectCaches?.();
-        renderOpenProjectTabs();
-        if (announce) {
-          updateAutosaveStatus(
-            localizeText(
-              `プロジェクトを切り替えました (${extractDocumentBaseName(state.documentName)})`,
-              `Switched project (${extractDocumentBaseName(state.documentName)})`
-            ),
-            'info'
-          );
-        }
-        return true;
-      } catch (error) {
-        console.warn('Failed to activate local project tab', error);
-        activeOpenProjectTabId = previousActiveId;
-        renderOpenProjectTabs();
-        updateAutosaveStatus(localizeText('シートの切替に失敗しました', 'Failed to switch sheet'), 'error');
-        return false;
-      } finally {
-        guardedProjectTabIds.forEach(releaseOpenProjectTabProjectWriteGuard);
-        openProjectTabBusy = false;
-      }
-    }
-    const targetRecentEntry = getSharedRecentProjectEntryForTab(target);
-    const targetIsShared = Boolean(targetRecentEntry && isSharedRecentProjectEntry(targetRecentEntry));
     const targetProjectId = normalizeAutosaveProjectId(target?.projectId || '');
-    const targetSharedKey = getOpenProjectTabSharedKey(target);
-    const canLoadActiveSharedSheetFromTab = Boolean(
-      targetIsShared
-      && target?.project
-      && typeof target.project === 'object'
-      && activeSharedProjectKey
-      && targetSharedKey
-      && normalizeMultiProjectKey(targetSharedKey) === normalizeMultiProjectKey(activeSharedProjectKey)
-      && isCurrentProjectSharedEntry()
-    );
-    if (!targetIsShared && targetProjectId.startsWith(SHARED_PROJECT_ID_PREFIX)) {
-      updateAutosaveStatus(
-        localizeText(
-          '共有プロジェクト情報を確認できないため、通常プロジェクトとしては開きませんでした。',
-          'Shared project metadata is unavailable, so it was not opened as a local project.'
-        ),
-        'warn'
-      );
-      return false;
-    }
     let targetProjectPayload = target?.project && typeof target.project === 'object'
       ? target.project
       : null;
-    if (!targetIsShared && !targetProjectPayload) {
+    if (!targetProjectPayload) {
       const latestEntries = await loadRecentProjectsMetadata();
       const latestEntry = latestEntries.find(entry => normalizeAutosaveProjectId(entry?.id || '') === targetProjectId) || recentProjectsCache.get(targetProjectId) || null;
       const reconstructed = typeof reconstructLocalRecentProjectPayload === 'function'
@@ -570,20 +458,10 @@
         return false;
       }
     }
-    // If there is an active shared project session for a different project/tab,
-    // clear it before loading the target. This prevents incoming shared-project
-    // remote ops or refreshes from being applied to the wrong tab while
-    // switching tabs.
+    // Clear any leftover shared session before activating a local-only tab.
     try {
-      const previousTab = previousActiveId ? openProjectTabs[findOpenProjectTabIndex(previousActiveId)] : null;
-      const previousSharedKey = getOpenProjectTabSharedKey(previousTab);
       if (activeSharedProjectKey) {
-        // If the target does not map to the same shared project key, clear the
-        // current shared session to stop background sync from affecting the
-        // newly active document.
-        if (!targetSharedKey || normalizeMultiProjectKey(targetSharedKey) !== normalizeMultiProjectKey(activeSharedProjectKey)) {
-          clearActiveSharedProjectSession('tab-switch');
-        }
+        clearActiveSharedProjectSession('tab-switch');
       }
     } catch (e) {
       // Non-fatal: if anything goes wrong here, continue with tab activation.
@@ -595,50 +473,12 @@
     renderOpenProjectTabs();
     openProjectTabBusy = true;
     try {
-      let loaded = false;
-      if (targetIsShared) {
-        if (canLoadActiveSharedSheetFromTab) {
-          loaded = await loadDocumentFromProjectPayload(target.project, {
-            projectId: target.projectId || buildSharedRecentProjectId(targetSharedKey),
-            suppressAutosaveStatus: true,
-            qrEditPayload: target?.qrEditPayload || null,
-            suppressProjectSheetsRestore: true,
-            preserveDocumentIds: true,
-            preserveCanvasIds: true,
-            preserveFrameIds: true,
-            preserveLayerIds: true,
-            sharedProjectKey: targetSharedKey,
-            sharedProjectBackendId: target.sharedProjectBackendId || targetRecentEntry?.sharedProjectBackendId || activeSharedProjectId || '',
-            sharedProjectRevision: Math.max(
-              0,
-              Math.round(Number(target.sharedProjectRevision) || 0),
-              Math.round(Number(targetRecentEntry?.sharedProjectRevision) || 0),
-              Math.round(Number(activeSharedProjectRevision) || 0)
-            ),
-            sharedProjectStructureRevision: Math.max(
-              0,
-              Math.round(Number(target.sharedProjectStructureRevision) || 0),
-              Math.round(Number(targetRecentEntry?.sharedProjectStructureRevision) || 0),
-              Math.round(Number(activeSharedProjectStructureRevision) || 0)
-            ),
-            sharedRoleHint: target.sharedRoleHint || targetRecentEntry?.sharedRoleHint || 'guest',
-            sharedAutoJoin: target.sharedAutoJoin !== false && targetRecentEntry?.sharedAutoJoin !== false,
-          });
-        } else {
-          loaded = await openSharedRecentProject(targetRecentEntry, {
-            hideStartup: false,
-            silent: true,
-            skipLatestRefresh: true,
-          });
-        }
-      } else {
-        loaded = await loadDocumentFromProjectPayload(targetProjectPayload, {
-          projectId: target.projectId || '',
-          suppressAutosaveStatus: true,
-          qrEditPayload: target?.qrEditPayload || null,
-          suppressProjectSheetsRestore: true,
-        });
-      }
+      const loaded = await loadDocumentFromProjectPayload(targetProjectPayload, {
+        projectId: target.projectId || '',
+        suppressAutosaveStatus: true,
+        qrEditPayload: target?.qrEditPayload || null,
+        suppressProjectSheetsRestore: true,
+      });
       // If loadDocumentFromText returned the 'deferred' sentinel, it means
       // the snapshot targets a different project/sheet and should not be
       // applied into the currently active sheet. Mark the sheet as having
@@ -679,14 +519,12 @@
       } else {
         resetDocumentUnsavedChanges();
       }
-      if (!targetIsShared) {
-        hydrateActiveLocalProjectJournalFromRecentEntry?.(
-          recentProjectsCache.get(targetProjectId) || null,
-          targetProjectId
-        );
-      }
+      hydrateActiveLocalProjectJournalFromRecentEntry?.(
+        recentProjectsCache.get(targetProjectId) || null,
+        targetProjectId
+      );
       openProjectTabs.forEach((tab, index) => {
-        if (!tab || tab.id === target.id || isSharedOpenProjectTab(tab)) {
+        if (!tab || tab.id === target.id) {
           return;
         }
         openProjectTabs[index] = {
@@ -708,7 +546,7 @@
       }
       return true;
     } catch (error) {
-      console.warn('Failed to activate project tab', error);
+      console.warn('Failed to activate local project tab', error);
       activeOpenProjectTabId = previousActiveId;
       renderOpenProjectTabs();
       updateAutosaveStatus(localizeText('シートの切替に失敗しました', 'Failed to switch sheet'), 'error');
