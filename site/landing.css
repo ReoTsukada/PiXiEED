@@ -661,6 +661,13 @@ footer{
   overflow: clip;
   box-sizing: border-box;
 }
+a.home-hero-slide {
+  cursor: pointer;
+}
+a.home-hero-slide:focus-visible {
+  outline: 3px solid rgba(126, 240, 199, 0.9);
+  outline-offset: -6px;
+}
 .home-hero-slide.is-active {
   display: grid;
 }
