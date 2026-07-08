@@ -1,4 +1,4 @@
-const APP_BUILD_VERSION = '2026.07.08-tabbar-leftlane-stable-fix1';
+const APP_BUILD_VERSION = '2026.07.08-export-landscape-vertical-ad-fix1';
 const CACHE_VERSION = `pixiedraw-v${APP_BUILD_VERSION}`;
 const CORE_ASSETS = [
   '/pixiedraw/',
