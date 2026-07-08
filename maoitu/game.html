@@ -604,8 +604,6 @@ if (!window.__MAOITU_EMBED_MODE__) {
 <div id="sharePanel">
   <button id="shareActionBtn" style="background:#22c55e;color:#000;">シェアする</button>
   <button id="restartActionBtn" style="background:#3b82f6;color:#fff;">もう一度遊ぶ</button>
-  <a class="share-link" href="../index.html#projects">他のゲームで遊ぶ</a>
-  <button id="backToStartBtn" style="background:rgba(255,255,255,0.2);color:#fff;">スタート画面に戻る</button>
   <button id="nextDifficultyBtn" style="background:#f97316;color:#fff;display:none;">次の難易度へ</button>
 </div>
 </div>
@@ -687,7 +685,6 @@ const shareScoreLabel = document.getElementById('shareScoreLabel');
 const rankPercentLabel = document.getElementById('rankPercentLabel');
 const shareActionBtn = document.getElementById('shareActionBtn');
 const restartActionBtn = document.getElementById('restartActionBtn');
-const backToStartBtn = document.getElementById('backToStartBtn');
 const nextDifficultyBtn = document.getElementById('nextDifficultyBtn');
 const backLink = document.getElementById('backLink');
 const gameOverPanel = document.getElementById('gameOverPanel');
@@ -736,16 +733,6 @@ restartActionBtn.addEventListener('click', () => {
   hideSharePanel();
   reset();
 });
-
-if(backToStartBtn){
-  backToStartBtn.addEventListener('click', () => {
-    if(document.documentElement.dataset.embedMode === 'true' && window.parent && window.parent !== window){
-      window.parent.postMessage({ type: 'maoitu:return-to-start' }, window.location.origin);
-      return;
-    }
-    window.location.href = './index.html';
-  });
-}
 
 if(nextDifficultyBtn){
   nextDifficultyBtn.addEventListener('click', () => {
