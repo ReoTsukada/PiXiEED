@@ -82,9 +82,17 @@
   }
 
   function replaceFooter() {
+    const shouldPreserveFooter = (node) => {
+      if (!(node instanceof HTMLElement)) {
+        return true;
+      }
+      return node.classList.contains('ad-footer')
+        || node.classList.contains('modal__footer')
+        || Boolean(node.closest('dialog'));
+    };
     if (isPixiedrawPage() || (!currentPath.includes('/projects/') && /(?:^|\/)pixiee-lens(?:\/|\/index\.html)?$/.test(currentPath))) {
       doc.querySelectorAll('footer').forEach((node) => {
-        if (node.classList.contains('ad-footer')) {
+        if (shouldPreserveFooter(node)) {
           return;
         }
         node.remove();
@@ -92,7 +100,7 @@
       return;
     }
     doc.querySelectorAll('footer').forEach((node) => {
-      if (node.classList.contains('ad-footer')) {
+      if (shouldPreserveFooter(node)) {
         return;
       }
       node.remove();
