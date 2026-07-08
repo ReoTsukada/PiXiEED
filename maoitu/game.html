@@ -604,6 +604,7 @@ if (!window.__MAOITU_EMBED_MODE__) {
 <div id="sharePanel">
   <button id="shareActionBtn" style="background:#22c55e;color:#000;">シェアする</button>
   <button id="restartActionBtn" style="background:#3b82f6;color:#fff;">もう一度遊ぶ</button>
+  <button id="backToStartBtn" style="background:rgba(255,255,255,0.2);color:#fff;">スタート画面へ戻る</button>
   <button id="nextDifficultyBtn" style="background:#f97316;color:#fff;display:none;">次の難易度へ</button>
 </div>
 </div>
@@ -685,12 +686,14 @@ const shareScoreLabel = document.getElementById('shareScoreLabel');
 const rankPercentLabel = document.getElementById('rankPercentLabel');
 const shareActionBtn = document.getElementById('shareActionBtn');
 const restartActionBtn = document.getElementById('restartActionBtn');
+const backToStartBtn = document.getElementById('backToStartBtn');
 const nextDifficultyBtn = document.getElementById('nextDifficultyBtn');
 const backLink = document.getElementById('backLink');
 const gameOverPanel = document.getElementById('gameOverPanel');
 const clearBadge = document.getElementById('clearBadge');
 let shareScore = 0;
 let runCleared = false;
+const RANK_LABEL_TIMEOUT_MS = 4500;
 
 window.addEventListener('pixieed:score-queued', () => {
   if(rankPercentLabel){
@@ -733,6 +736,16 @@ restartActionBtn.addEventListener('click', () => {
   hideSharePanel();
   reset();
 });
+
+if(backToStartBtn){
+  backToStartBtn.addEventListener('click', () => {
+    if(document.documentElement.dataset.embedMode === 'true' && window.parent && window.parent !== window){
+      window.parent.postMessage({ type: 'maoitu:return-to-start' }, window.location.origin);
+      return;
+    }
+    window.location.href = './index.html';
+  });
+}
 
 if(nextDifficultyBtn){
   nextDifficultyBtn.addEventListener('click', () => {
@@ -1617,7 +1630,13 @@ async function refreshRankLabel(score){
   const requestId = ++currentRankRequestId;
   rankPercentLabel.textContent = '順位計算中...';
   try{
-    const { total, rank, percentile } = await fetchRankInfo(score);
+    const result = await Promise.race([
+      fetchRankInfo(score),
+      new Promise((_, reject) => {
+        window.setTimeout(() => reject(new Error('rank-timeout')), RANK_LABEL_TIMEOUT_MS);
+      })
+    ]);
+    const { total, rank, percentile } = result || {};
     if(requestId !== currentRankRequestId) return;
     if(!total){
       rankPercentLabel.textContent = 'まだスコアがありません';
@@ -1631,7 +1650,7 @@ async function refreshRankLabel(score){
     }
   }catch(_){
     if(requestId === currentRankRequestId){
-      rankPercentLabel.textContent = '';
+      rankPercentLabel.textContent = '順位を取得できませんでした';
     }
   }
 }
