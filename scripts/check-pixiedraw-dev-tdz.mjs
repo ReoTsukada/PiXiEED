@@ -444,6 +444,20 @@ if (
 ) {
   failures.push('selection-move-workflow-utils.js: missing exported createSelectionMoveWorkflowUtils');
 }
+const sharedProjectSnapshotFetchUtilsSource = fs.readFileSync(path.join(moduleDir, 'shared-project-snapshot-fetch-utils.js'), 'utf8');
+if (
+  !sharedProjectSnapshotFetchUtilsSource.includes('function createSharedProjectSnapshotFetchUtils(')
+  || !sharedProjectSnapshotFetchUtilsSource.includes('    createSharedProjectSnapshotFetchUtils,')
+) {
+  failures.push('shared-project-snapshot-fetch-utils.js: missing exported createSharedProjectSnapshotFetchUtils');
+}
+const sharedProjectLocalConversionUtilsSource = fs.readFileSync(path.join(moduleDir, 'shared-project-local-conversion-utils.js'), 'utf8');
+if (
+  !sharedProjectLocalConversionUtilsSource.includes('function createSharedProjectLocalConversionUtils(')
+  || !sharedProjectLocalConversionUtilsSource.includes('    createSharedProjectLocalConversionUtils,')
+) {
+  failures.push('shared-project-local-conversion-utils.js: missing exported createSharedProjectLocalConversionUtils');
+}
 const reloadSessionWorkflowUtilsSource = fs.readFileSync(path.join(moduleDir, 'reload-session-workflow-utils.js'), 'utf8');
 if (
   !reloadSessionWorkflowUtilsSource.includes('function createReloadSessionWorkflowUtils(')
@@ -683,7 +697,8 @@ const startupWorkflowUtilsLine = lineOf('const startupWorkflowUtilsModule =');
 const pixieedAccountWorkflowUtilsLine = lineOf('const pixieedAccountWorkflowUtilsModule =');
 const sharedProjectParticipantUtilsLine = lineOf('const sharedProjectParticipantUtilsModule =');
 const sharedProjectCommentUtilsLine = lineOf('const sharedProjectCommentUtilsModule =');
-const sharedProjectSetupUtilsLine = lineOf('const sharedProjectSetupUtilsModule =');
+const sharedProjectSnapshotFetchUtilsLine = lineOf('const sharedProjectSnapshotFetchUtilsModule =');
+const sharedProjectLocalConversionUtilsLine = lineOf('const sharedProjectLocalConversionUtilsModule =');
 const startupTailWorkflowUtilsLine = lineOf('const startupTailWorkflowUtilsModule =');
 const iosSnapshotUtilsLine = lineOf('iosSnapshotUtilsModule =');
 const memoryUtilsLine = lineOf('const memoryUtils =');
@@ -883,8 +898,11 @@ if (!sharedProjectParticipantUtilsLine || !restoreCallLine || sharedProjectParti
 if (!sharedProjectCommentUtilsLine || !restoreCallLine || sharedProjectCommentUtilsLine >= restoreCallLine) {
   failures.push('shared project comment utils must initialize before restoreSessionState()');
 }
-if (!sharedProjectSetupUtilsLine || !restoreCallLine || sharedProjectSetupUtilsLine >= restoreCallLine) {
-  failures.push('shared project setup utils must initialize before restoreSessionState()');
+if (!sharedProjectSnapshotFetchUtilsLine || !restoreCallLine || sharedProjectSnapshotFetchUtilsLine >= restoreCallLine) {
+  failures.push('shared project snapshot fetch utils must initialize before restoreSessionState()');
+}
+if (!sharedProjectLocalConversionUtilsLine || !restoreCallLine || sharedProjectLocalConversionUtilsLine >= restoreCallLine) {
+  failures.push('shared project local conversion utils must initialize before restoreSessionState()');
 }
 if (!startupTailWorkflowUtilsLine || !initCallLine || startupTailWorkflowUtilsLine >= initCallLine) {
   failures.push('startup tail workflow utils must initialize before init()');
