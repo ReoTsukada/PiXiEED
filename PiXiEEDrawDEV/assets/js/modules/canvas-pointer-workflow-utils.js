@@ -4245,10 +4245,19 @@
     );
   }
 
+  function isWithinCanvasViewportTarget(target) {
+    return Boolean(
+      target instanceof Element
+      && dom.canvasViewport instanceof HTMLElement
+      && dom.canvasViewport.contains(target)
+    );
+  }
+
   function handleViewportPointerDown(event) {
     const targetElement = event.target instanceof Element ? event.target : null;
     const isCanvasTarget = targetElement && isCanvasSurfaceTarget(targetElement);
     const isControlTarget = targetElement && isViewportControlTarget(targetElement);
+    const isWithinCanvasViewport = isWithinCanvasViewportTarget(targetElement);
     const isTouch = event.pointerType === 'touch';
     const activeTool = state.tool;
     const isSelectionToolForTransform = activeTool === 'selectRect'
@@ -4256,6 +4265,13 @@
       || activeTool === 'selectSame'
       || activeTool === 'move'
       || activeTool === 'selectionTransform';
+
+    if (targetElement && !isCanvasTarget && !isControlTarget && !isWithinCanvasViewport) {
+      if (pointerState.active && pointerState.tool === 'pan') {
+        finishPanInteraction();
+      }
+      return;
+    }
 
     if (!isCanvasTarget && !isControlTarget && !pointerState.active) {
       const transformHandle = isSelectionToolForTransform
