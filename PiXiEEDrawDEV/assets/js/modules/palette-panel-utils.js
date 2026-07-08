@@ -646,6 +646,52 @@
       state.activeRgb = normalizeColorValue(mappedColor);
       return { addedCount, activePaletteIndex: state.activePaletteIndex };
     }
+
+
+    function projectHasIndexedPixels() {
+      let hasIndexedPixels = false;
+      forEachProjectCanvasLayer(({ layer }) => {
+        if (hasIndexedPixels || !(layer?.indices instanceof Int16Array)) {
+          return;
+        }
+        for (let index = 0; index < layer.indices.length; index += 1) {
+          if (layer.indices[index] >= 0) {
+            hasIndexedPixels = true;
+            break;
+          }
+        }
+      });
+      return hasIndexedPixels;
+    }
+
+
+    function applyCustomIndexedPaletteFromActiveColor() {
+      const activeColor = normalizeColorValue(
+        state.activeRgb
+        || state.palette?.[state.activePaletteIndex]
+        || state.palette?.[1]
+        || { r: 0, g: 0, b: 0, a: 255 }
+      );
+      const hasIndexedPixels = projectHasIndexedPixels();
+      let compactedToSingleColor = false;
+      if (!hasIndexedPixels) {
+        state.palette = [
+          { r: 0, g: 0, b: 0, a: 0 },
+          activeColor,
+        ].map(color => normalizeColorValue(color));
+        state.activePaletteIndex = Math.min(1, Math.max(0, state.palette.length - 1));
+        state.secondaryPaletteIndex = 0;
+        compactedToSingleColor = true;
+      } else {
+        mapActiveRgbToIndexedPalette();
+      }
+      state.activeRgb = normalizeColorValue(state.palette[state.activePaletteIndex] || activeColor);
+      markCurrentPalettePresetCustom({ syncControl: true });
+      return {
+        compactedToSingleColor,
+        hasIndexedPixels,
+      };
+    }
   
   
     function reserveUniquePaletteColor(baseColor, usedKeys, salt = 0, { allowTransparent = false } = {}) {
@@ -837,7 +883,27 @@
         return true;
       }
       const canRemapDocument = canCurrentClientReindexPalette();
-      if (!canRemapDocument) {
+      const shouldCreateCustomIndexPalette = (
+        previousMode === COLOR_MODE_RGB
+        && nextMode === COLOR_MODE_INDEX
+      );
+      const shouldRemapToRgb = (
+        previousMode === COLOR_MODE_INDEX
+        && nextMode === COLOR_MODE_RGB
+        && canRemapDocument
+      );
+      if (shouldCreateCustomIndexPalette && !canCurrentClientEditPaletteColors()) {
+        syncColorModeControls();
+        updateAutosaveStatus(
+          localizeText(
+            'このモードではカスタムインデックスパレットを作成できません',
+            'A custom indexed palette is not available in this mode'
+          ),
+          'warn'
+        );
+        return false;
+      }
+      if (!shouldCreateCustomIndexPalette && previousMode === COLOR_MODE_INDEX && nextMode === COLOR_MODE_RGB && !canRemapDocument) {
         syncColorModeControls();
         updateAutosaveStatus(
           localizeText(
@@ -848,38 +914,11 @@
         );
         return false;
       }
-      const shouldRemapToIndex = (
-        previousMode === COLOR_MODE_RGB
-        && nextMode === COLOR_MODE_INDEX
-        && canRemapDocument
-      );
-      const shouldRemapToRgb = (
-        previousMode === COLOR_MODE_INDEX
-        && nextMode === COLOR_MODE_RGB
-        && canRemapDocument
-      );
-      let remapResult = null;
       let remapToRgbResult = null;
-      let activeColorMapResult = null;
-      let paletteDedupeResult = null;
-      let paletteLimitResult = null;
+      let customIndexPaletteResult = null;
       let remapMutated = false;
-      if (shouldRemapToIndex) {
-        beginHistory('colorModeConvert');
-        remapResult = convertCurrentDocumentRgbPixelsToIndexedPalette();
-        activeColorMapResult = { addedCount: 0, activePaletteIndex: state.activePaletteIndex };
-        paletteDedupeResult = { removedCount: 0 };
-        paletteLimitResult = { reduced: Boolean(remapResult?.reduced), paletteSize: remapResult?.paletteSize || state.palette.length };
-        remapMutated = (
-          (remapResult?.convertedPixels || 0) > 0
-          || Boolean(paletteLimitResult?.reduced)
-        );
-        if (
-          remapResult.convertedPixels > 0
-          || Boolean(paletteLimitResult?.reduced)
-        ) {
-          applyPaletteChange();
-        }
+      if (shouldCreateCustomIndexPalette) {
+        customIndexPaletteResult = applyCustomIndexedPaletteFromActiveColor();
       } else if (shouldRemapToRgb) {
         beginHistory('colorModeConvert');
         remapToRgbResult = remapDocumentIndexedPixelsToDirect();
@@ -894,7 +933,7 @@
         if (paletteColor) {
           state.activeRgb = normalizeColorValue(paletteColor);
         }
-      } else if (!activeColorMapResult) {
+      } else if (!customIndexPaletteResult) {
         state.activePaletteIndex = normalizePaletteIndex(state.activePaletteIndex, state.activePaletteIndex);
         state.secondaryPaletteIndex = normalizePaletteIndex(state.secondaryPaletteIndex, state.activePaletteIndex);
         const paletteColor = state.palette[state.activePaletteIndex];
@@ -907,36 +946,36 @@
       renderPalette();
       updateColorTabSwatch();
       focusUnifiedLeftContext('color', { persist: false });
-      if (shouldRemapToIndex || shouldRemapToRgb) {
+      if (shouldCreateCustomIndexPalette) {
+        if (persist) {
+          applyPaletteChange({
+            preserveCurrentPalettePreset: true,
+            renderSurfaces: Boolean(customIndexPaletteResult?.hasIndexedPixels),
+          });
+        } else {
+          requestRender();
+          if (customIndexPaletteResult?.hasIndexedPixels) {
+            renderAllProjectCanvasSurfaces();
+          } else {
+            scheduleSecondaryCanvasRefresh();
+          }
+          requestOverlayRender();
+        }
+        updateAutosaveStatus(
+          localizeText(
+            customIndexPaletteResult?.compactedToSingleColor
+              ? '描画色のみのカスタムパレットを生成してインデックスカラーへ切り替えました'
+              : '描画色をカスタムパレットへ反映してインデックスカラーへ切り替えました',
+            customIndexPaletteResult?.compactedToSingleColor
+              ? 'Switched to indexed color with a custom palette built only from the active draw color'
+              : 'Switched to indexed color and synced the active draw color into the custom palette'
+          ),
+          'info'
+        );
+      } else if (shouldRemapToRgb) {
         if (remapMutated) {
           commitHistory();
-          if (shouldRemapToIndex) {
-            const paletteAddedCount = (remapResult?.addedCount || 0) + (activeColorMapResult?.addedCount || 0);
-            const paletteRemovedCount = paletteDedupeResult?.removedCount || 0;
-            const paletteLimited = Boolean(paletteLimitResult?.reduced);
-            if (paletteAddedCount > 0 || paletteRemovedCount > 0 || paletteLimited) {
-              const usedColorCount = Math.max(0, Math.round(Number(remapResult?.usedColorCount) || 0));
-              const sourceColorCount = Math.max(0, Math.round(Number(remapResult?.sourceColorCount) || paletteAddedCount || 0));
-              const messageJa = paletteLimited
-                ? `元RGB ${sourceColorCount} 色を透明1色 + 不透明 ${usedColorCount} 色に減色してインデックス化しました`
-                : paletteAddedCount > 0 && paletteRemovedCount > 0
-                  ? `RGB色 ${paletteAddedCount} 色を追加し、重複色 ${paletteRemovedCount} 色を統合してインデックス化しました`
-                  : paletteAddedCount > 0
-                  ? `RGB色 ${paletteAddedCount} 色をパレットに追加してインデックス化しました`
-                  : `重複色 ${paletteRemovedCount} 色を統合してインデックス化しました`;
-              const messageEn = paletteLimited
-                ? `Reduced ${sourceColorCount} source RGB color${sourceColorCount === 1 ? '' : 's'} to 1 transparent + ${usedColorCount} used opaque indexed color${usedColorCount === 1 ? '' : 's'}`
-                : paletteAddedCount > 0 && paletteRemovedCount > 0
-                  ? `Added ${paletteAddedCount} RGB color${paletteAddedCount === 1 ? '' : 's'} and merged ${paletteRemovedCount} duplicate palette color${paletteRemovedCount === 1 ? '' : 's'} while converting to indexed mode`
-                  : paletteAddedCount > 0
-                  ? `Added ${paletteAddedCount} RGB color${paletteAddedCount === 1 ? '' : 's'} to the palette while converting to indexed mode`
-                  : `Merged ${paletteRemovedCount} duplicate palette color${paletteRemovedCount === 1 ? '' : 's'} while converting to indexed mode`;
-              updateAutosaveStatus(
-                localizeText(messageJa, messageEn),
-                'info'
-              );
-            }
-          } else if (shouldRemapToRgb && (remapToRgbResult?.convertedPixels || 0) > 0) {
+          if ((remapToRgbResult?.convertedPixels || 0) > 0) {
             updateAutosaveStatus(
               localizeText(
                 `インデックス描画をRGBに変換しました (${remapToRgbResult.convertedPixels}px)`,
@@ -949,7 +988,7 @@
           history.pending = null;
         }
       }
-      if (persist) {
+      if (persist && !shouldCreateCustomIndexPalette) {
         scheduleSessionPersist();
       }
       return true;
