@@ -113,11 +113,55 @@
     return null;
   }
 
+  async function removeConvertedSharedRecentProjectSource(normalizedEntry) {
+    if (!AUTOSAVE_SUPPORTED || !normalizedEntry) {
+      return false;
+    }
+    const normalizedProjectKey = normalizeMultiProjectKey(normalizedEntry.sharedProjectKey || '');
+    const normalizedBackendId = normalizeAutosaveProjectId(normalizedEntry.sharedProjectBackendId || '');
+    if (normalizedProjectKey) {
+      hideSharedProjectFromRecentSync(normalizedProjectKey);
+    }
+    const existingEntries = await loadRecentProjectsMetadata();
+    const nextEntries = existingEntries.filter(entry => {
+      if (!isSharedRecentProjectEntry(entry)) {
+        return true;
+      }
+      const entryId = normalizeAutosaveProjectId(entry?.id || '');
+      const entryProjectKey = normalizeMultiProjectKey(entry?.sharedProjectKey || '');
+      const entryBackendId = normalizeAutosaveProjectId(entry?.sharedProjectBackendId || '');
+      if (normalizeAutosaveProjectId(normalizedEntry.id || '') === entryId) {
+        return false;
+      }
+      if (normalizedProjectKey && entryProjectKey === normalizedProjectKey) {
+        return false;
+      }
+      if (normalizedProjectKey && entryId === buildSharedRecentProjectId(normalizedProjectKey)) {
+        return false;
+      }
+      if (normalizedBackendId && entryBackendId === normalizedBackendId) {
+        return false;
+      }
+      return true;
+    });
+    if (nextEntries.length === existingEntries.length) {
+      setRecentProjectsCache(existingEntries);
+      return false;
+    }
+    await saveRecentProjectsList(existingEntries, nextEntries);
+    setRecentProjectsCache(nextEntries);
+    return true;
+  }
+
   async function storeSharedRecentProjectAsLocalProject(normalizedEntry, projectPayload, localProjectId) {
     if (!AUTOSAVE_SUPPORTED || !normalizedEntry || !projectPayload || typeof projectPayload !== 'object') {
       return null;
     }
     const resolvedLocalProjectId = normalizeAutosaveProjectId(localProjectId) || buildLocalProjectIdFromSharedRecentProjectEntry(normalizedEntry);
+    const normalizedProjectKey = normalizeMultiProjectKey(normalizedEntry.sharedProjectKey || '');
+    if (normalizedProjectKey) {
+      hideSharedProjectFromRecentSync(normalizedProjectKey);
+    }
     const entries = await loadRecentProjectsMetadata();
     const existingLocalEntry = entries.find(entry => (
       normalizeAutosaveProjectId(entry?.id || '') === resolvedLocalProjectId
@@ -146,14 +190,29 @@
     if (existingLocalEntry?.dotStats || normalizedEntry.dotStats) {
       localEntry.dotStats = existingLocalEntry?.dotStats || normalizedEntry.dotStats;
     }
+    const normalizedBackendId = normalizeAutosaveProjectId(normalizedEntry.sharedProjectBackendId || '');
     const removeIds = new Set([
       resolvedLocalProjectId,
       normalizeAutosaveProjectId(normalizedEntry.id || ''),
-      buildSharedRecentProjectId(normalizedEntry.sharedProjectKey || ''),
+      buildSharedRecentProjectId(normalizedProjectKey),
     ].filter(Boolean));
     const workingEntries = entries.filter(entry => {
       const id = normalizeAutosaveProjectId(entry?.id || '');
-      return id && !removeIds.has(id);
+      if (!id || removeIds.has(id)) {
+        return false;
+      }
+      if (!isSharedRecentProjectEntry(entry)) {
+        return true;
+      }
+      const entryProjectKey = normalizeMultiProjectKey(entry?.sharedProjectKey || '');
+      const entryBackendId = normalizeAutosaveProjectId(entry?.sharedProjectBackendId || '');
+      if (normalizedProjectKey && entryProjectKey === normalizedProjectKey) {
+        return false;
+      }
+      if (normalizedBackendId && entryBackendId === normalizedBackendId) {
+        return false;
+      }
+      return true;
     });
     workingEntries.unshift(localEntry);
     workingEntries.sort((a, b) => {
@@ -181,6 +240,7 @@
       && !isSharedRecentProjectEntry(candidate)
     )) || null;
     if (existingLocalEntry && (existingLocalEntry.project || existingLocalEntry.handle)) {
+      await removeConvertedSharedRecentProjectSource(normalizedEntry);
       return await openRecentProject(existingLocalEntry, {
         hideStartup,
         silent,
@@ -260,6 +320,7 @@
     buildLocalProjectIdFromSharedRecentProjectEntry,
     stripSharedRecentProjectFields,
     loadSharedRecentProjectPayloadForLocalOpen,
+    removeConvertedSharedRecentProjectSource,
     storeSharedRecentProjectAsLocalProject,
     openSharedRecentProjectAsLocalProject,
   };
