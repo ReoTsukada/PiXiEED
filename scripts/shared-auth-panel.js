@@ -7,6 +7,7 @@
   const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
   const SUPABASE_MODULE_URL = 'https://esm.sh/@supabase/supabase-js@2.46.1?bundle';
   const SUPABASE_AUTH_HEALTH_URL = `${SUPABASE_URL}/auth/v1/health`;
+  const currentScript = document.currentScript;
   const PANEL_SELECTOR = '#authPanel';
   const AUTH_BLOCK_ID = 'sharedAuthBlock';
   const AUTH_STORAGE_KEY = 'sb-kyyiuakrqomzlikfaire-auth-token';
@@ -32,6 +33,45 @@
   let supportsProfileXUrl = true;
   let authListenerBound = false;
   let authHealthCheckPromise = null;
+  const AVATARS = [
+    { id: 'mao', src: '../character-dots/maousama.png' },
+    { id: 'jerin1', src: '../character-dots/Jerin1.png' },
+    { id: 'jerin2', src: '../character-dots/Jerin2.png' },
+    { id: 'jerin3', src: '../character-dots/Jerin3.png' },
+    { id: 'jerin4', src: '../character-dots/Jerin4.png' },
+    { id: 'jerin5', src: '../character-dots/Jerin5.png' },
+    { id: 'jerin6', src: '../character-dots/Jerin6.png' },
+    { id: 'jerin7', src: '../character-dots/Jerin7.png' },
+    { id: 'jerin8', src: '../character-dots/Jerin8.png' },
+    { id: 'jellnall1', src: '../character-dots/JELLNALL1.png' },
+    { id: 'jellnall2', src: '../character-dots/JELLNALL2.png' },
+    { id: 'jellnall3', src: '../character-dots/JELLNALL3.png' },
+    { id: 'jellnall4', src: '../character-dots/JELLNALL4.png' },
+    { id: 'jellnall5', src: '../character-dots/JELLNALL5.png' },
+    { id: 'jellnall6', src: '../character-dots/JELLNALL6.png' },
+    { id: 'jellnall7', src: '../character-dots/JELLNALL7.png' },
+    { id: 'jellnall8', src: '../character-dots/JELLNALL8.png' },
+    { id: 'jellnall9', src: '../character-dots/JELLNALL9.png' },
+    { id: 'jellnall10', src: '../character-dots/JELLNALL10.png' },
+    { id: 'jellnall11', src: '../character-dots/JELLNALL11.png' },
+    { id: 'jellnall12', src: '../character-dots/JELLNALL12.png' },
+    { id: 'jellnall13', src: '../character-dots/JELLNALL13.png' },
+    { id: 'jellnall14', src: '../character-dots/JELLNALL14.png' },
+    { id: 'jellnall15', src: '../character-dots/JELLNALL15.png' },
+    { id: 'jellnall16', src: '../character-dots/JELLNALL16.png' },
+    { id: 'jellnall17', src: '../character-dots/JELLNALL17.png' },
+    { id: 'jellnall18', src: '../character-dots/JELLNALL18.png' },
+    { id: 'jellnall19', src: '../character-dots/JELLNALL19.png' },
+    { id: 'baburin', src: '../character-dots/baburinpng.png' },
+  ];
+
+  function asset(relativePath) {
+    try {
+      return new URL(relativePath, currentScript?.src || window.location.href).href;
+    } catch (_error) {
+      return relativePath;
+    }
+  }
 
   function loadNickname() {
     try {
@@ -60,6 +100,12 @@
     try {
       localStorage.setItem('pixieed_avatar', value === 'pixiedraw' ? 'mao' : value || 'mao');
     } catch (_error) {}
+  }
+
+  function getAvatarSrc() {
+    const current = loadAvatar();
+    const avatar = AVATARS.find((entry) => entry.id === current) || AVATARS[0];
+    return asset(avatar.src);
   }
 
   function normalizeXUrl(value) {
@@ -170,6 +216,71 @@
       return;
     }
     brandUser.textContent = loadNickname() || 'ユーザー';
+  }
+
+  function renderAvatarChoices() {
+    const grid = document.getElementById('avatarGrid');
+    if (!grid) {
+      return;
+    }
+    const current = loadAvatar();
+    grid.textContent = '';
+    AVATARS.forEach((avatar) => {
+      const button = document.createElement('button');
+      button.className = `avatar-option${avatar.id === current ? ' is-active' : ''}`;
+      button.type = 'button';
+      button.setAttribute('aria-label', avatar.id);
+
+      const image = document.createElement('img');
+      image.src = asset(avatar.src);
+      image.alt = '';
+      image.loading = 'lazy';
+      button.appendChild(image);
+
+      button.addEventListener('click', () => {
+        saveAvatar(avatar.id);
+        updateProfileUi();
+        const panel = document.getElementById('avatarPanel');
+        const toggle = document.getElementById('avatarToggle');
+        if (panel) panel.hidden = true;
+        if (toggle) toggle.setAttribute('aria-expanded', 'false');
+        window.dispatchEvent(new CustomEvent('pixieed:profile-updated'));
+      });
+      grid.appendChild(button);
+    });
+  }
+
+  function updateProfileUi() {
+    const nickname = loadNickname();
+    const xUrl = loadXUrl();
+    const avatarSrc = getAvatarSrc();
+
+    const brandAvatar = document.querySelector('#brandAvatar img');
+    if (brandAvatar) {
+      brandAvatar.src = avatarSrc;
+    }
+
+    const avatarPreview = document.getElementById('avatarPreview');
+    if (avatarPreview) {
+      avatarPreview.textContent = '';
+      const image = document.createElement('img');
+      image.src = avatarSrc;
+      image.alt = '';
+      avatarPreview.appendChild(image);
+    }
+
+    const nicknameInput = document.getElementById('profileNickname');
+    if (nicknameInput && document.activeElement !== nicknameInput) {
+      nicknameInput.value = nickname;
+    }
+
+    const xInput = document.getElementById('profileX');
+    if (xInput && document.activeElement !== xInput) {
+      xInput.value = xUrl;
+    }
+
+    renderAvatarChoices();
+    updateHeaderLabel();
   }
 
   function readCachedAuthSession() {
@@ -371,7 +482,7 @@
     } catch (_error) {
       // keep local profile when online sync fails
     }
-    updateHeaderLabel();
+    updateProfileUi();
   }
 
   function updateAuthUi() {
@@ -584,6 +695,17 @@
       });
     }
 
+    const avatarToggle = document.getElementById('avatarToggle');
+    const avatarPanel = document.getElementById('avatarPanel');
+    if (avatarToggle && avatarPanel && avatarToggle.dataset.bound !== 'true') {
+      avatarToggle.dataset.bound = 'true';
+      avatarToggle.addEventListener('click', () => {
+        const expanded = avatarPanel.hidden !== false;
+        avatarPanel.hidden = !expanded;
+        avatarToggle.setAttribute('aria-expanded', String(expanded));
+      });
+    }
+
     if (loginBtn && loginBtn.dataset.bound !== 'true') {
       loginBtn.dataset.bound = 'true';
       loginBtn.addEventListener('click', async () => {
@@ -642,7 +764,16 @@
     if (saveBtn && saveBtn.dataset.authSyncBound !== 'true') {
       saveBtn.dataset.authSyncBound = 'true';
       saveBtn.addEventListener('click', async () => {
-        if (!supabaseUser) return;
+        const nicknameInput = document.getElementById('profileNickname');
+        const xInput = document.getElementById('profileX');
+        saveNickname(nicknameInput?.value || '');
+        saveXUrl(xInput?.value || '');
+        updateProfileUi();
+        window.dispatchEvent(new CustomEvent('pixieed:profile-updated'));
+        if (!supabaseUser) {
+          setStatus('プロフィールを保存しました');
+          return;
+        }
         try {
           await saveProfileToServer();
           setStatus('プロフィールを保存しました');
@@ -715,6 +846,7 @@
       return;
     }
     bindControls();
+    updateProfileUi();
     try {
       const supabase = await ensureSupabase();
       const { data } = await supabase.auth.getSession();
