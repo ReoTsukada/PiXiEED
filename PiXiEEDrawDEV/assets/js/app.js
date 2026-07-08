@@ -8719,6 +8719,8 @@
   set extractDocumentBaseName(value) { extractDocumentBaseName = value; },
   get getCurrentRecentProjectAccountUserId() { return getCurrentRecentProjectAccountUserId; },
   set getCurrentRecentProjectAccountUserId(value) { getCurrentRecentProjectAccountUserId = value; },
+  get hideSharedProjectFromRecentSync() { return hideSharedProjectFromRecentSync; },
+  set hideSharedProjectFromRecentSync(value) { hideSharedProjectFromRecentSync = value; },
   get hideStartupScreen() { return hideStartupScreen; },
   set hideStartupScreen(value) { hideStartupScreen = value; },
   get isSharedRecentProjectEntry() { return isSharedRecentProjectEntry; },
