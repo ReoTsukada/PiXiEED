@@ -7,6 +7,7 @@ const NAME_STORAGE_KEY = 'maoitu_rank_name';
 const SUPABASE_MAINTENANCE_KEY = 'pixieed_supabase_maintenance';
 const RANKING_CACHE_KEY = 'maoitu_rank_cache';
 const RANKING_CACHE_LIMIT = 100;
+const LAST_SCORE_KEY = 'maoitu_last_score';
 
 let supabaseMaintenance = Boolean(readSupabaseMaintenance());
 
@@ -190,6 +191,17 @@ function renderProfileIdentity(nameDisplay) {
   nameDisplay.appendChild(wrap);
 }
 
+async function flushQueuedScores() {
+  if (typeof window === 'undefined' || typeof window.pixieedFlushMaoituScoreQueue !== 'function') {
+    return;
+  }
+  try {
+    await window.pixieedFlushMaoituScoreQueue();
+  } catch (error) {
+    console.warn('maoitu ranking queue flush failed', error);
+  }
+}
+
 async function fetchTopScores(includeClientId = true) {
   const collected = [];
   let from = 0;
@@ -262,6 +274,7 @@ export async function initRankingUI({ formSelector, listSelector, statusSelector
     renderProfileIdentity(nameDisplay);
     try {
       renderStatus('読み込み中...');
+      await flushQueuedScores();
       const rows = await fetchTopScores();
       renderStatus(baseStatus);
       if (!rows.length) {
@@ -285,6 +298,26 @@ export async function initRankingUI({ formSelector, listSelector, statusSelector
 
   renderStatus(baseStatus);
   await refreshList();
+  const handleProfileUpdated = () => {
+    renderProfileIdentity(nameDisplay);
+  };
+  const handleScoreChanged = () => {
+    refreshList().catch(error => console.warn('maoitu ranking refresh failed', error));
+  };
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('pixieed:profile-updated', handleProfileUpdated);
+    window.addEventListener('pixieed:score-queued', handleScoreChanged);
+    window.addEventListener('storage', (event) => {
+      if (!event || !event.key) return;
+      if (event.key === 'pixieed_nickname' || event.key === 'pixieed_avatar' || event.key === 'pixieed_x_url') {
+        handleProfileUpdated();
+      }
+      if (event.key === RANKING_CACHE_KEY || event.key === SUPABASE_MAINTENANCE_KEY || event.key === LAST_SCORE_KEY) {
+        handleScoreChanged();
+      }
+    });
+  }
   return { refresh: refreshList };
 }
 
