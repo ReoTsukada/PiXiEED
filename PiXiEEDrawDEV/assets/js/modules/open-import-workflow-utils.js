@@ -60,7 +60,6 @@
       const truncatedCount = Math.max(0, queue.length - targets.length);
       await persistActiveOpenProjectTab({ flushAutosave: true });
       const parentProjectId = normalizeAutosaveProjectId(autosaveProjectId || '') || createAutosaveProjectId();
-      const parentSharedFields = buildActiveSharedProjectSheetTabFields(parentProjectId);
       setActiveAutosaveProjectId(parentProjectId, { persist: false });
       let openedCount = 0;
       let failedCount = 0;
@@ -151,9 +150,8 @@
           }
           const appended = appendOpenProjectTabFromCurrentState({
             activate: true,
-            source: parentSharedFields ? 'shared-sheet' : source,
-            projectId: parentSharedFields?.projectId || parentProjectId,
-            ...(parentSharedFields || {}),
+            source,
+            projectId: parentProjectId,
             ...(tabOptions && typeof tabOptions === 'object' ? tabOptions : {}),
           });
           if (!appended) {
@@ -165,15 +163,6 @@
               ...tabOptions.qrEditPayload,
               projectId: appended.projectId || '',
             });
-          }
-          if (parentSharedFields) {
-            setActiveSharedProjectSession(
-              parentSharedFields.sharedProjectKey,
-              parentSharedFields.sharedProjectRevision,
-              parentSharedFields.sharedProjectStructureRevision,
-              parentSharedFields.sharedProjectBackendId
-            );
-            queueSharedProjectSheetsSnapshot('addSheet');
           }
           openedCount += 1;
         } catch (error) {
@@ -381,10 +370,9 @@
     if (!project || typeof project !== 'object') {
       return null;
     }
-    const sharedFields = buildActiveSharedProjectSheetTabFields(parentProjectId);
     const normalizedParentProjectId = normalizeAutosaveProjectId(parentProjectId || autosaveProjectId || '')
       || createAutosaveProjectId();
-    const tabProjectId = sharedFields?.projectId || normalizedParentProjectId;
+    const tabProjectId = normalizedParentProjectId;
     const previousActiveId = activeOpenProjectTabId;
     const nextTab = createOpenProjectSheetTabFromPackagedProject({
       project,
@@ -392,10 +380,9 @@
       fileName,
       label: extractDocumentBaseName(fileName),
       unsaved,
-      source: sharedFields ? 'shared-sheet' : source,
+      source,
       updatedAt: project?.updatedAt || new Date().toISOString(),
       qrEditPayload: tabOptions?.qrEditPayload || null,
-      ...(sharedFields || {}),
     });
     if (!nextTab) {
       return null;
@@ -404,26 +391,11 @@
     activeOpenProjectTabId = nextTab.id;
     suppressOpenProjectTabAutoInitialize = false;
     renderOpenProjectTabs();
-    const sharedLoadOptions = sharedFields
-      ? {
-        sharedProjectKey: sharedFields.sharedProjectKey,
-        sharedProjectBackendId: sharedFields.sharedProjectBackendId,
-        sharedProjectRevision: sharedFields.sharedProjectRevision,
-        sharedProjectStructureRevision: sharedFields.sharedProjectStructureRevision,
-        sharedRoleHint: sharedFields.sharedRoleHint,
-        sharedAutoJoin: sharedFields.sharedAutoJoin,
-        preserveDocumentIds: true,
-        preserveCanvasIds: true,
-        preserveFrameIds: true,
-        preserveLayerIds: true,
-      }
-      : {};
     const loaded = await loadDocumentFromProjectPayload(project, {
       projectId: tabProjectId,
       suppressAutosaveStatus: true,
       qrEditPayload: tabOptions?.qrEditPayload || null,
       suppressProjectSheetsRestore: true,
-      ...sharedLoadOptions,
     });
     if (!loaded || loaded === 'deferred') {
       const insertedIndex = findOpenProjectTabIndex(nextTab.id);
@@ -436,15 +408,18 @@
       return null;
     }
     queueProjectTabViewportReset(nextTab.id);
-    if (sharedFields) {
-      queueSharedProjectSheetsSnapshot('addSheet');
-    }
     return openProjectTabs[findOpenProjectTabIndex(nextTab.id)] || nextTab;
   }
 
   async function loadRecentProjectPackagedPayload(entry) {
     if (!entry || typeof entry !== 'object') {
       return null;
+    }
+    if (typeof reconstructLocalRecentProjectPayload === 'function') {
+      const reconstructed = reconstructLocalRecentProjectPayload(entry);
+      if (reconstructed && typeof reconstructed === 'object') {
+        return reconstructed;
+      }
     }
     if (entry.project && typeof entry.project === 'object') {
       return entry.project;
@@ -581,11 +556,8 @@
       if (!ensureCurrentClientCanReplaceActiveProject()) {
         return false;
       }
-      const sharedEntryForTab = normalizeSharedRecentProjectEntry(entry);
-      const projectId = sharedEntryForTab
-        ? buildSharedRecentProjectId(sharedEntryForTab.sharedProjectKey || '')
-        : normalizeAutosaveProjectId(entry.id || '');
-      const latestEntry = projectId && !sharedEntryForTab
+      const projectId = normalizeAutosaveProjectId(entry.id || '');
+      const latestEntry = projectId
         ? ((await loadRecentProjectsMetadata()).find(candidate => candidate?.id === projectId) || entry)
         : entry;
       if (openProjectTabBusy) {
@@ -611,7 +583,7 @@
         return false;
       }
       const shouldReuseActiveTab = !appendOnly && canReuseActiveOpenProjectTabForRecentEntry(entry);
-      const source = sharedEntryForTab ? 'shared-recent' : 'local-recent';
+      const source = 'local-recent';
       openProjectTabBusy = true;
       try {
         await persistActiveOpenProjectTab({ flushAutosave: true });
@@ -635,14 +607,6 @@
               skipPersistCurrent: true,
               announce: false,
             },
-            ...(sharedEntryForTab ? {
-              sharedProjectKey: sharedEntryForTab.sharedProjectKey || '',
-              sharedProjectBackendId: sharedEntryForTab.sharedProjectBackendId || '',
-              sharedProjectRevision: sharedEntryForTab.sharedProjectRevision || 0,
-              sharedProjectStructureRevision: sharedEntryForTab.sharedProjectStructureRevision || 0,
-              sharedRoleHint: sharedEntryForTab.sharedRoleHint || 'guest',
-              sharedAutoJoin: sharedEntryForTab.sharedAutoJoin !== false,
-            } : {}),
           });
           if (!nextTab) {
             return false;
@@ -652,9 +616,7 @@
             hideStartupScreen();
           }
           updateAutosaveStatus(
-            Boolean(sharedEntryForTab)
-              ? localizeText('共有プロジェクトをシートとして追加しました', 'Added shared project as a sheet')
-              : localizeText('端末内プロジェクトをシートとして追加しました', 'Added local project as a sheet'),
+            localizeText('端末内プロジェクトをシートとして追加しました', 'Added local project as a sheet'),
             'success'
           );
           return true;
@@ -671,23 +633,11 @@
           ? replaceActiveOpenProjectTabFromCurrentState({
               source,
               projectId: projectId || autosaveProjectId,
-              sharedProjectKey: sharedEntryForTab?.sharedProjectKey || '',
-              sharedProjectBackendId: sharedEntryForTab?.sharedProjectBackendId || '',
-              sharedProjectRevision: sharedEntryForTab?.sharedProjectRevision || 0,
-              sharedProjectStructureRevision: sharedEntryForTab?.sharedProjectStructureRevision || 0,
-              sharedRoleHint: sharedEntryForTab?.sharedRoleHint || 'guest',
-              sharedAutoJoin: sharedEntryForTab?.sharedAutoJoin !== false,
             })
           : appendOpenProjectTabFromCurrentState({
               activate: true,
               source,
               projectId: projectId || autosaveProjectId,
-              sharedProjectKey: sharedEntryForTab?.sharedProjectKey || '',
-              sharedProjectBackendId: sharedEntryForTab?.sharedProjectBackendId || '',
-              sharedProjectRevision: sharedEntryForTab?.sharedProjectRevision || 0,
-              sharedProjectStructureRevision: sharedEntryForTab?.sharedProjectStructureRevision || 0,
-              sharedRoleHint: sharedEntryForTab?.sharedRoleHint || 'guest',
-              sharedAutoJoin: sharedEntryForTab?.sharedAutoJoin !== false,
             });
         if (!nextTab) {
           return false;
@@ -697,9 +647,7 @@
           hideStartupScreen();
         }
         updateAutosaveStatus(
-          Boolean(sharedEntryForTab)
-            ? localizeText('共有プロジェクトをシートとして追加しました', 'Added shared project as a sheet')
-            : localizeText('端末内プロジェクトをシートとして追加しました', 'Added local project as a sheet'),
+          localizeText('端末内プロジェクトをシートとして追加しました', 'Added local project as a sheet'),
           'success'
         );
         return true;
