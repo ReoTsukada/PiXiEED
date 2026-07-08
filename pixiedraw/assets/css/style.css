@@ -2503,7 +2503,9 @@ body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs {
   z-index: 1200;
   flex: 0 0 var(--project-tabs-height);
   height: var(--project-tabs-height);
-  margin-left: 0;
+  box-sizing: border-box;
+  width: calc(100% + var(--left-stage-reserve-width));
+  margin-left: calc(-1 * var(--left-stage-reserve-width));
   margin-right: 0;
   padding: 6px 4px 6px 8px;
   border: 0;
@@ -2549,7 +2551,7 @@ body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs__actions .canvas-co
 
 body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs__actions #appReloadAction {
   order: 2;
-  margin-left: 46px;
+  margin-left: 10px;
 }
 
 body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs__actions .canvas-controls__quick-actions {
@@ -2557,6 +2559,11 @@ body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs__actions .canvas-co
   order: 1;
   align-items: center;
   gap: 6px;
+}
+
+body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs__actions .canvas-controls__quick-actions [data-ui-action="openLensCamera"],
+body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs__actions .canvas-controls__quick-actions [data-ui-action="openQrEditor"] {
+  display: none;
 }
 
 body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs__actions .canvas-controls__history {
