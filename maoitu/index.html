@@ -447,7 +447,7 @@ a { color:#7dd3fc; }
 .rank-featured{
   display:grid;
   grid-template-columns:repeat(3, minmax(0, 1fr));
-  align-items:end;
+  align-items:stretch;
   gap:12px;
 }
 .rank-featured__empty{
@@ -464,6 +464,7 @@ a { color:#7dd3fc; }
   position:relative;
   overflow:hidden;
   min-height:166px;
+  height:166px;
   padding:14px 14px 16px;
   border-radius:20px;
   border:1px solid rgba(255,255,255,0.14);
@@ -1099,6 +1100,7 @@ body.is-game-active .game-shell {
   }
   .rank-featured-card{
     min-height:132px;
+    height:132px;
     padding:12px 10px 14px;
     border-radius:16px;
   }
@@ -1169,6 +1171,7 @@ body.is-game-active .game-shell {
   }
   .rank-featured-card{
     min-height:124px;
+    height:124px;
     padding:11px 10px 12px;
   }
   .rank-featured-card__avatar{
