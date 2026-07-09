@@ -387,6 +387,185 @@ a { color:#7dd3fc; }
   flex-direction:column;
   gap:12px;
 }
+.rank-overview{
+  position:relative;
+  overflow:hidden;
+  padding:16px;
+  border-radius:20px;
+  border:1px solid rgba(255,255,255,0.12);
+  background:
+    radial-gradient(circle at top right, rgba(96,165,250,0.18), transparent 32%),
+    radial-gradient(circle at left center, rgba(244,114,182,0.18), transparent 28%),
+    linear-gradient(135deg, rgba(15,23,42,0.96), rgba(30,41,59,0.9));
+  box-shadow:0 18px 36px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.05);
+}
+.rank-overview__hero{
+  display:grid;
+  gap:8px;
+}
+.rank-overview__eyebrow{
+  color:#7dd3fc;
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:0.16em;
+}
+.rank-overview__title{
+  font-size:22px;
+  font-weight:900;
+  letter-spacing:0.01em;
+}
+.rank-overview__copy{
+  color:#cbd5e1;
+  font-size:13px;
+  line-height:1.55;
+}
+.rank-overview__stats{
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:10px;
+  margin-top:14px;
+}
+.rank-overview__stat{
+  padding:12px 14px;
+  border-radius:16px;
+  border:1px solid rgba(255,255,255,0.1);
+  background:rgba(255,255,255,0.05);
+  display:grid;
+  gap:5px;
+}
+.rank-overview__stat-label{
+  color:#94a3b8;
+  font-size:11px;
+  font-weight:700;
+  letter-spacing:0.08em;
+}
+.rank-overview__stat-value{
+  color:#fff;
+  font-size:20px;
+  line-height:1;
+}
+.rank-featured{
+  display:grid;
+  grid-template-columns:repeat(3, minmax(0, 1fr));
+  gap:12px;
+}
+.rank-featured__empty{
+  grid-column:1 / -1;
+  padding:18px 16px;
+  border-radius:18px;
+  border:1px dashed rgba(255,255,255,0.18);
+  background:rgba(255,255,255,0.04);
+  color:#cbd5e1;
+  text-align:center;
+  font-size:13px;
+}
+.rank-featured-card{
+  position:relative;
+  overflow:hidden;
+  min-height:166px;
+  padding:14px 14px 16px;
+  border-radius:20px;
+  border:1px solid rgba(255,255,255,0.14);
+  background:
+    radial-gradient(circle at top center, rgba(255,255,255,0.12), transparent 34%),
+    linear-gradient(180deg, rgba(15,23,42,0.96), rgba(30,41,59,0.92));
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:flex-start;
+  gap:8px;
+  box-shadow:0 18px 32px rgba(0,0,0,0.28);
+}
+.rank-featured-card__glow{
+  position:absolute;
+  inset:auto -18% -28% -18%;
+  height:78px;
+  background:radial-gradient(circle, rgba(255,255,255,0.14), transparent 66%);
+  pointer-events:none;
+}
+.rank-featured-card__top{
+  width:100%;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+}
+.rank-featured-card__badge{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:42px;
+  min-height:28px;
+  padding:0 10px;
+  border-radius:999px;
+  background:rgba(255,255,255,0.08);
+  border:1px solid rgba(255,255,255,0.14);
+  font-size:12px;
+  font-weight:900;
+}
+.rank-featured-card__tier{
+  color:#cbd5e1;
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:0.12em;
+}
+.rank-featured-card__avatar{
+  width:56px;
+  height:56px;
+  border-radius:18px;
+  border:1px solid rgba(255,255,255,0.18);
+  background:rgba(255,255,255,0.08);
+  box-shadow:0 8px 18px rgba(0,0,0,0.24);
+}
+.rank-featured-card__name{
+  width:100%;
+  color:#fff;
+  text-align:center;
+  font-size:14px;
+  font-weight:800;
+  line-height:1.35;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.rank-featured-card__score{
+  color:#f8fafc;
+  font-size:26px;
+  font-weight:900;
+  line-height:1;
+}
+.rank-featured-card[data-rank="1"]{
+  transform:translateY(-4px);
+}
+.rank-featured-card[data-rank-tier="rainbow"]{
+  border-color:transparent;
+  background:
+    linear-gradient(180deg, rgba(15,23,42,0.96), rgba(30,41,59,0.92)) padding-box,
+    linear-gradient(125deg, #fb7185, #fbbf24, #7dd3fc, #34d399, #c084fc, #fb7185) border-box;
+  box-shadow:0 0 32px rgba(125,211,252,0.16), 0 20px 34px rgba(0,0,0,0.3);
+}
+.rank-featured-card[data-rank-tier="red-metallic"]{
+  border-color:rgba(255,138,128,0.9);
+  box-shadow:0 0 22px rgba(239,68,68,0.18), 0 18px 32px rgba(0,0,0,0.28);
+}
+.rank-featured-card[data-rank-tier="gold"]{
+  border-color:rgba(251,191,36,0.9);
+  box-shadow:0 0 22px rgba(251,191,36,0.16), 0 18px 32px rgba(0,0,0,0.28);
+}
+.rank-featured-card--self::after{
+  content:"YOU";
+  position:absolute;
+  top:12px;
+  right:12px;
+  padding:4px 8px;
+  border-radius:999px;
+  background:rgba(16,185,129,0.2);
+  border:1px solid rgba(110,231,183,0.38);
+  color:#d1fae5;
+  font-size:10px;
+  font-weight:900;
+  letter-spacing:0.08em;
+}
 .rank-item {
   --rank-item-background:linear-gradient(135deg, rgba(30,41,59,0.85), rgba(15,23,42,0.85));
   position:relative;
@@ -613,6 +792,10 @@ a { color:#7dd3fc; }
   gap:12px;
   box-sizing:border-box;
   min-width:0;
+}
+.rank-panel-shell{
+  display:grid;
+  gap:14px;
 }
 .ranking-button {
   width:100%;
@@ -867,6 +1050,15 @@ body.is-game-active .game-shell {
   .rank-status,
   .volume-label {
     font-size:12px;
+  }
+  .rank-featured{
+    grid-template-columns:1fr;
+  }
+  .rank-featured-card[data-rank="1"]{
+    transform:none;
+  }
+  .rank-overview__title{
+    font-size:20px;
   }
   .instructions-card {
     padding:12px 14px;
@@ -1275,7 +1467,11 @@ body.is-game-active .game-shell {
         </label>
         <p class="rank-status" id="rankStatus"></p>
       </form>
-      <ol class="rank-list" id="rankList"></ol>
+      <div class="rank-panel-shell">
+        <section class="rank-overview" id="rankOverview" aria-label="ランキング概要"></section>
+        <section class="rank-featured" id="rankFeatured" aria-label="上位3名"></section>
+        <ol class="rank-list" id="rankList"></ol>
+      </div>
     </div>
 </div>
 </div>
