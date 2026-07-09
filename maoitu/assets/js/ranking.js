@@ -4,6 +4,8 @@ const RANKING_LIMIT = 100;
 const PAGE_SIZE = 500;
 const MAX_PAGES = 10;
 const NAME_STORAGE_KEY = 'maoitu_rank_name';
+const CLIENT_ID_KEY = 'pixieed_client_id';
+const AVATAR_STORAGE_KEY = 'pixieed_avatar';
 const SUPABASE_MAINTENANCE_KEY = 'pixieed_supabase_maintenance';
 const RANKING_CACHE_KEY = 'maoitu_rank_cache';
 const RANKING_CACHE_LIMIT = 100;
@@ -28,6 +30,28 @@ function uniqueByAccount(rows, limit = Infinity) {
     if (unique.length >= limit) break;
   }
   return unique;
+}
+
+function getCurrentAccountIdentity() {
+  let clientId = '';
+  let name = '';
+  let avatar = '';
+  try {
+    clientId = String(localStorage.getItem(CLIENT_ID_KEY) || '').trim();
+  } catch (_) {
+    // ignore
+  }
+  try {
+    name = String(localStorage.getItem('pixieed_nickname') || localStorage.getItem(NAME_STORAGE_KEY) || '').trim();
+  } catch (_) {
+    // ignore
+  }
+  try {
+    avatar = String(localStorage.getItem(AVATAR_STORAGE_KEY) || '').trim();
+  } catch (_) {
+    // ignore
+  }
+  return { client_id: clientId, name, avatar };
 }
 
 function readSupabaseMaintenance() {
@@ -99,6 +123,11 @@ function isMissingClientId(error) {
   return msg.includes('client_id');
 }
 
+function isMissingAvatar(error) {
+  const msg = String(error?.message || '');
+  return msg.includes('avatar');
+}
+
 function resolveAvatarSrcFromId(value) {
   const id = String(value || '').trim().toLowerCase();
   if (!id || id === 'mao') return '../character-dots/mao1.png';
@@ -106,6 +135,17 @@ function resolveAvatarSrcFromId(value) {
   if (/^jellnall([1-9]|1[0-9])$/.test(id)) return `../character-dots/${id.toUpperCase()}.png`;
   if (id === 'baburin') return '../character-dots/baburinpng.png';
   return '../character-dots/mao1.png';
+}
+
+function rankTierForPosition(rank) {
+  if (rank === 1) return 'rainbow';
+  if (rank === 2) return 'red-metallic';
+  if (rank === 3) return 'gold';
+  if (rank === 4) return 'silver';
+  if (rank === 5) return 'bronze';
+  if (rank <= 10) return 'blue';
+  if (rank <= 30) return 'green';
+  return 'white';
 }
 
 function normalizeProfileUrl(value) {
@@ -202,13 +242,14 @@ async function flushQueuedScores() {
   }
 }
 
-async function fetchTopScores(includeClientId = true) {
+async function fetchTopScores(includeClientId = true, includeAvatar = true) {
   const collected = [];
   let from = 0;
   for (let page = 0; page < MAX_PAGES; page++) {
     const to = from + PAGE_SIZE - 1;
     const selectColumns = ['name', 'score', 'created_at'];
     if (includeClientId) selectColumns.push('client_id');
+    if (includeAvatar) selectColumns.push('avatar');
     const { data, error } = await supabase
       .from('scores')
       .select(selectColumns.join(', '))
@@ -217,8 +258,11 @@ async function fetchTopScores(includeClientId = true) {
       .range(from, to);
     if (error) {
       markSupabaseMaintenanceFromError(error);
+      if (includeAvatar && isMissingAvatar(error)) {
+        return fetchTopScores(includeClientId, false);
+      }
       if (includeClientId && isMissingClientId(error)) {
-        return fetchTopScores(false);
+        return fetchTopScores(false, includeAvatar);
       }
       throw error;
     }
@@ -238,15 +282,20 @@ async function fetchTopScores(includeClientId = true) {
 
 function renderRankingRows(list, rows) {
   list.innerHTML = '';
+  const currentAccount = getCurrentAccountIdentity();
+  const currentAccountId = accountKey(currentAccount);
   rows.forEach((row, idx) => {
     const li = document.createElement('li');
+    const rank = idx + 1;
     li.className = 'rank-item';
-    li.dataset.rank = String(idx + 1);
-    const medal = idx === 0 ? '<span class="rank-medal rank-medal--1">1st</span>'
-      : idx === 1 ? '<span class="rank-medal rank-medal--2">2nd</span>'
-      : idx === 2 ? '<span class="rank-medal rank-medal--3">3rd</span>'
-      : '';
-    li.innerHTML = `<div class="rank-left"><span class="rank-index">${idx + 1}.</span>${medal}<span class="rank-name">${escapeHtml(String(row?.name || '名無し'))}</span></div><span class="rank-score">${Math.max(0, Math.floor(Number(row?.score) || 0))}</span>`;
+    li.dataset.rank = String(rank);
+    li.dataset.rankTier = rankTierForPosition(rank);
+    if (accountKey(row) === currentAccountId) {
+      li.classList.add('rank-item--self');
+      li.setAttribute('aria-label', `あなたの順位 ${rank}位`);
+    }
+    const avatarId = String(row?.avatar || '').trim() || (accountKey(row) === currentAccountId ? currentAccount.avatar : '');
+    li.innerHTML = `<div class="rank-left"><span class="rank-index">${rank}.</span><img class="rank-avatar" src="${escapeHtml(resolveAvatarSrcFromId(avatarId))}" alt="" aria-hidden="true"><span class="rank-name">${escapeHtml(String(row?.name || '名無し'))}</span></div><span class="rank-score">${Math.max(0, Math.floor(Number(row?.score) || 0))}</span>`;
     list.appendChild(li);
   });
 }
