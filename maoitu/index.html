@@ -382,10 +382,10 @@ a { color:#7dd3fc; }
 .rank-list {
   list-style:none;
   padding:0;
-  margin:12px 0 0;
+  margin:14px 0 0;
   display:flex;
   flex-direction:column;
-  gap:10px;
+  gap:12px;
 }
 .rank-item {
   --rank-item-background:linear-gradient(135deg, rgba(30,41,59,0.85), rgba(15,23,42,0.85));
@@ -393,14 +393,21 @@ a { color:#7dd3fc; }
   display:flex;
   align-items:center;
   justify-content:space-between;
-  gap:10px;
-  padding:10px 12px;
+  gap:14px;
+  min-height:74px;
+  padding:14px 16px;
   border:1px solid rgba(255,255,255,0.24);
-  border-radius:12px;
+  border-radius:16px;
   background:var(--rank-item-background);
   box-shadow:0 6px 18px rgba(0,0,0,0.3);
-  font-size:14px;
+  font-size:15px;
   overflow:hidden;
+}
+.rank-item--empty{
+  justify-content:center;
+  min-height:64px;
+  color:#e2e8f0;
+  text-align:center;
 }
 .rank-item[data-rank-tier="rainbow"]{
   --rank-item-background:
@@ -473,23 +480,27 @@ a { color:#7dd3fc; }
 .rank-left{
   display:flex;
   align-items:center;
-  gap:8px;
+  gap:12px;
   min-width:0;
   position:relative;
   z-index:1;
+  flex:1;
 }
 .rank-index {
   color:#9ca3af;
-  font-weight:700;
-  min-width:28px;
+  font-weight:800;
+  font-size:18px;
+  line-height:1;
+  min-width:36px;
+  text-align:right;
 }
 .rank-avatar{
   display:block;
-  width:28px;
-  min-width:28px;
-  height:28px;
-  min-height:28px;
-  border-radius:9px;
+  width:38px;
+  min-width:38px;
+  height:38px;
+  min-height:38px;
+  border-radius:12px;
   object-fit:cover;
   flex-shrink:0;
   border:1px solid rgba(255,255,255,0.16);
@@ -500,35 +511,56 @@ a { color:#7dd3fc; }
   flex:1;
   text-align:left;
   color:#e5e7eb;
-  font-weight:600;
+  font-weight:700;
+  font-size:15px;
+  line-height:1.35;
   overflow:hidden;
   text-overflow:ellipsis;
   white-space:nowrap;
+}
+.rank-right{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  justify-content:center;
+  gap:4px;
+  position:relative;
+  z-index:1;
+  flex-shrink:0;
+}
+.rank-score-label{
+  color:#94a3b8;
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:0.12em;
 }
 .rank-item--self .rank-name,
 .rank-item--self .rank-index{
   color:#d1fae5;
 }
 .rank-item--self .rank-avatar{
-  width:28px;
-  min-width:28px;
-  height:28px;
-  min-height:28px;
+  width:38px;
+  min-width:38px;
+  height:38px;
+  min-height:38px;
   border-color:rgba(110,231,183,0.78);
   box-shadow:0 0 14px rgba(16,185,129,0.34);
 }
 .rank-score {
-  position:relative;
-  z-index:1;
   font-weight:800;
   color:#fbbf24;
-  letter-spacing:0.03em;
+  font-size:20px;
+  line-height:1;
+  letter-spacing:0.02em;
+}
+.rank-item--self .rank-score-label{
+  color:#a7f3d0;
 }
 .rank-item--self .rank-score{
   color:#a7f3d0;
   text-shadow:0 0 12px rgba(110,231,183,0.35);
 }
-.rank-status { color:#cbd5e1; font-size:13px; min-height:18px; }
+.rank-status { color:#cbd5e1; font-size:13px; min-height:18px; line-height:1.5; }
 .ranking-modal {
   position:fixed;
   inset:0;
@@ -543,12 +575,12 @@ a { color:#7dd3fc; }
 .ranking-modal.is-open { display:flex; }
 .ranking-modal__dialog {
   width:100%;
-  max-width:400px;
-  max-height:80vh;
+  max-width:460px;
+  max-height:min(86vh, 760px);
   overflow:hidden;
   background:linear-gradient(180deg, rgba(8,15,28,0.96), rgba(6,10,20,0.94));
   border:1px solid rgba(255,255,255,0.12);
-  border-radius:20px;
+  border-radius:24px;
   box-shadow:0 28px 80px rgba(0,0,0,0.48), inset 0 1px 0 rgba(255,255,255,0.06);
   display:flex;
   flex-direction:column;
@@ -556,29 +588,29 @@ a { color:#7dd3fc; }
   min-width:0;
 }
 .ranking-modal__header {
-  padding:14px 16px;
+  padding:16px 18px;
   display:flex;
   align-items:center;
   justify-content:space-between;
   gap:10px;
   border-bottom:1px solid rgba(255,255,255,0.12);
 }
-.ranking-modal__title { margin:0; font-size:16px; }
+.ranking-modal__title { margin:0; font-size:18px; }
 .ranking-modal__close {
   background:rgba(255,255,255,0.08);
   border:1px solid rgba(255,255,255,0.12);
   color:#fff;
-  padding:6px 10px;
-  border-radius:10px;
+  padding:8px 12px;
+  border-radius:12px;
   cursor:pointer;
 }
 .ranking-modal__body {
-  padding:16px;
+  padding:18px;
   overflow:auto;
-  max-height:70vh;
+  max-height:calc(min(86vh, 760px) - 72px);
   display:flex;
   flex-direction:column;
-  gap:10px;
+  gap:12px;
   box-sizing:border-box;
   min-width:0;
 }
@@ -587,7 +619,7 @@ a { color:#7dd3fc; }
   max-width:360px;
 }
 .rank-list {
-  max-height:60vh;
+  max-height:calc(min(86vh, 760px) - 172px);
   overflow:auto;
   scrollbar-width:thin;
 }
