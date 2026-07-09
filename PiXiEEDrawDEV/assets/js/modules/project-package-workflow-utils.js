@@ -301,7 +301,7 @@
       ? createLightweightLocalProjectTabState(
         syncedTab,
         typeof createLocalProjectEntrySignature === 'function'
-          ? createLocalProjectEntrySignature(recentProjectsCache.get(activeProjectId) || null)
+          ? createLocalProjectEntrySignature(recentProjectsCache?.get?.(activeProjectId) || null)
           : {}
       )
       : syncedTab;
