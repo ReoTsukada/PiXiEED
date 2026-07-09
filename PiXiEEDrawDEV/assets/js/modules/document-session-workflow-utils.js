@@ -37,8 +37,7 @@
       if (isImportableImageFile(file)) {
         return await loadDocumentFromImageFile(file);
       }
-      const text = await file.text();
-      return await loadDocumentFromText(text, handle, options);
+      return await loadDocumentFromBlob(file, handle, options);
     } catch (error) {
       if (error?.name !== 'NotAllowedError') {
         console.warn('Document handle load failed', error);
@@ -87,6 +86,38 @@
       parsedDocument = snapshotFromDocumentText(text);
     } catch (error) {
       console.warn('Failed to parse document', error);
+      updateAutosaveStatus('ドキュメントの読み込みに失敗しました', 'error');
+      return false;
+    }
+    return await applyLoadedDocumentSnapshot(parsedDocument, options);
+  }
+
+  async function loadDocumentFromBlob(blob, handle, options = {}) {
+    if (!ensureCurrentClientCanReplaceActiveProject({ announce: !options?.suppressAutosaveStatus })) {
+      return false;
+    }
+    if ((options?.openedFromRecent || options?.sharedProjectKey) && !options?.allowProjectMismatchLoad) {
+      try {
+        const requestedProjectId = normalizeAutosaveProjectId(String(options?.projectId || '') || '');
+        const requestedSharedKey = String(options?.sharedProjectKey || '').trim() || '';
+        const activeTab = getActiveOpenProjectTab();
+        const activeProjectId = normalizeAutosaveProjectId(activeTab?.projectId || autosaveProjectId || '');
+        const activeSharedKey = String(getOpenProjectTabSharedKey(activeTab) || '').trim() || '';
+        if (requestedProjectId && activeProjectId && requestedProjectId !== activeProjectId) {
+          return 'deferred';
+        }
+        if (requestedSharedKey && activeSharedKey && requestedSharedKey !== activeSharedKey) {
+          return 'deferred';
+        }
+      } catch (_error) {
+        // Ignore guard failures and continue to load.
+      }
+    }
+    let parsedDocument = null;
+    try {
+      parsedDocument = await snapshotFromDocumentBlob(blob);
+    } catch (error) {
+      console.warn('Failed to parse document blob', error);
       updateAutosaveStatus('ドキュメントの読み込みに失敗しました', 'error');
       return false;
     }
@@ -699,6 +730,24 @@
     return resolved;
   }
 
+  async function snapshotFromDocumentBlob(blob) {
+    if (!blob || typeof blob.arrayBuffer !== 'function') {
+      throw new Error('Document blob is not readable');
+    }
+    if (typeof parseProjectStorageBlob === 'function') {
+      const parsedResult = await parseProjectStorageBlob(blob);
+      const parsed = parsedResult && Object.prototype.hasOwnProperty.call(parsedResult, 'parsed')
+        ? parsedResult.parsed
+        : parsedResult;
+      const resolved = snapshotFromParsedDocumentValue(parsed);
+      if (resolved && typeof resolved === 'object' && typeof parsedResult?.adapterId === 'string') {
+        resolved.storageAdapterId = parsedResult.adapterId;
+      }
+      return resolved;
+    }
+    return snapshotFromDocumentText(await blob.text());
+  }
+
   function snapshotFromParsedDocumentValue(parsed) {
     const parsedResult = typeof parseProjectStoragePayload === 'function'
       ? parseProjectStoragePayload(parsed)
@@ -741,6 +790,7 @@
 
         return Object.freeze({
         loadDocumentFromHandle,
+        loadDocumentFromBlob,
         loadDocumentFromText,
         loadDocumentFromProjectPayload,
         restoreOpenProjectSheetsFromParsedDocument,
@@ -759,6 +809,7 @@
         deserializeProjectTimelapseTracks,
         deserializeProjectTimelapseOperationLogs,
         parseProjectSessionPayload,
+        snapshotFromDocumentBlob,
         snapshotFromDocumentText,
         snapshotFromParsedDocumentValue,
         });
