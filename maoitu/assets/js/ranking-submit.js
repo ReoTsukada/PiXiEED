@@ -3,6 +3,7 @@ import { supabase } from './supabase.js';
 const NAME_STORAGE_KEY = 'maoitu_rank_name';
 const LAST_SCORE_KEY = 'maoitu_last_score';
 const CLIENT_ID_KEY = 'pixieed_client_id';
+const AVATAR_STORAGE_KEY = 'pixieed_avatar';
 const PAGE_SIZE = 500;
 const MAX_PAGES = 20;
 const SUPABASE_MAINTENANCE_KEY = 'pixieed_supabase_maintenance';
@@ -148,19 +149,34 @@ function isMissingClientId(error) {
   return msg.includes('client_id');
 }
 
-async function submitScoreToSupabase(score) {
+function isMissingAvatar(error) {
+  const msg = String(error?.message || '');
+  return msg.includes('avatar');
+}
+
+function getAvatarId() {
+  try {
+    return (localStorage.getItem(AVATAR_STORAGE_KEY) || 'mao').trim() || 'mao';
+  } catch (_) {
+    return 'mao';
+  }
+}
+
+async function submitScoreToSupabase(score, includeClientId = true, includeAvatar = true) {
   const safeScore = Math.max(0, Math.floor(Number(score) || 0));
   const payload = {
     name: getName(),
-    score: safeScore,
-    client_id: getClientId(),
+    score: safeScore
   };
+  if (includeClientId) payload.client_id = getClientId();
+  if (includeAvatar) payload.avatar = getAvatarId();
 
   let { error } = await supabase.from('scores').insert(payload);
-  if (error && payload.client_id && isMissingClientId(error)) {
-    delete payload.client_id;
-    const retry = await supabase.from('scores').insert(payload);
-    error = retry.error;
+  if (error && includeAvatar && isMissingAvatar(error)) {
+    return submitScoreToSupabase(score, includeClientId, false);
+  }
+  if (error && includeClientId && isMissingClientId(error)) {
+    return submitScoreToSupabase(score, false, includeAvatar);
   }
   if (error) {
     throw error;
