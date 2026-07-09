@@ -897,6 +897,20 @@
   }
 
   window.addEventListener('pixieed:adfreechange', syncFooterAd);
+  window.addEventListener('pageshow', () => {
+    syncFooterAd();
+  });
+  window.addEventListener('focus', () => {
+    syncFooterAd();
+  });
+  window.addEventListener('online', () => {
+    syncFooterAd();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      syncFooterAd();
+    }
+  });
   window.addEventListener('resize', () => {
     if (isPixiedrawPage()) {
       syncFooterAd();
