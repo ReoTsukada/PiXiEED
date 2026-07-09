@@ -45,6 +45,9 @@
     }
     try {
       setExportFileBaseName(getExportFileNameBase() || state.documentName);
+      if (dom.exportDialog?.projectV2ExperimentalToggle instanceof HTMLInputElement) {
+        dom.exportDialog.projectV2ExperimentalToggle.checked = false;
+      }
       if (EXPORT_DIRECTORY_SUPPORTED) {
         if (pendingExportDirectoryHandle && !exportDirectoryHandle) {
           await attemptExportDirectoryReauthorization();
@@ -752,7 +755,7 @@
       return;
     }
     const choice = window.prompt(
-      '出力形式を入力してください (png / jpeg / svg / glb / grid / gif / timelapse / project)',
+      '出力形式を入力してください (png / jpeg / svg / glb / grid / gif / timelapse / project / projectv2)',
       'png'
     );
     if (!choice) {
@@ -774,8 +777,10 @@
       && inputMode !== 'gif'
       && inputMode !== 'timelapse'
       && inputMode !== 'project'
+      && inputMode !== 'projectv2'
+      && inputMode !== 'projectv2experimental'
     ) {
-      window.alert('png / jpeg / svg / glb / grid / gif / timelapse / project のいずれかを入力してください。');
+      window.alert('png / jpeg / svg / glb / grid / gif / timelapse / project / projectv2 のいずれかを入力してください。');
       return;
     }
     const normalized = normalizeExportFormat(inputMode);
@@ -809,6 +814,13 @@
       updateAutosaveStatus('コンテスト投稿は現在停止中です', 'warn');
     } else if (normalized === 'project') {
       const result = await saveProjectAsPixieedraw({
+        fileNameBase: getExportFileNameBase() || state.documentName,
+      });
+      if (result?.saved) {
+        showLoginPromptAfterExport();
+      }
+    } else if (normalized === 'projectv2experimental') {
+      const result = await saveProjectAsPixieedrawV2Experimental({
         fileNameBase: getExportFileNameBase() || state.documentName,
       });
       if (result?.saved) {
