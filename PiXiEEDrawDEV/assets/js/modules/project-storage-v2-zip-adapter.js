@@ -271,6 +271,19 @@
       return output;
     }
 
+    function buildBitmapHashSourceBytes(bytes, { encoding = 'rgba.zlib', width = 0, height = 0 } = {}) {
+      const payloadBytes = ArrayBuffer.isView(bytes)
+        ? new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+        : (bytes instanceof ArrayBuffer ? new Uint8Array(bytes) : new Uint8Array(0));
+      const safeWidth = Math.max(0, Math.round(Number(width) || 0));
+      const safeHeight = Math.max(0, Math.round(Number(height) || 0));
+      const headerBytes = encodeText(`${String(encoding || 'rgba.zlib')}\0${safeWidth}\0${safeHeight}\0`);
+      const output = new Uint8Array(headerBytes.length + payloadBytes.length);
+      output.set(headerBytes, 0);
+      output.set(payloadBytes, headerBytes.length);
+      return output;
+    }
+
     function decodeIndicesBase64(indicesBase64, pixelCount) {
       if (typeof indicesBase64 !== 'string' || !indicesBase64.length || typeof decodeBase64 !== 'function') {
         return null;
@@ -419,6 +432,19 @@
       ), 0);
     }
 
+    function createArchiveDocumentBase(documentPayload = null) {
+      const baseDocument = cloneJsonValue(documentPayload) || {};
+      delete baseDocument.frames;
+      delete baseDocument.canvases;
+      const activeCanvasId = typeof documentPayload?.activeCanvasId === 'string' && documentPayload.activeCanvasId
+        ? documentPayload.activeCanvasId
+        : '';
+      return {
+        baseDocument,
+        activeCanvasId,
+      };
+    }
+
     async function normalizeBitmapPayload(base64, width, height, {
       indicesBase64 = '',
       directOnly = false,
@@ -444,7 +470,11 @@
         indices,
         onlyTransparentIndices,
       });
-      const hash = await sha256Hex(cropped);
+      const hash = await sha256Hex(buildBitmapHashSourceBytes(cropped, {
+        encoding: 'rgba.zlib',
+        width: bounds.w,
+        height: bounds.h,
+      }));
       if (!bitmapTasksByHash.has(hash)) {
         const compressed = await compressProjectBytes(cropped);
         bitmapTasksByHash.set(hash, {
@@ -502,23 +532,11 @@
       return nextCanvas;
     }
 
-    async function serializeArchiveProject(projectState, options = {}) {
-      if (typeof buildPackagedProjectPayload !== 'function') {
-        throw new Error('buildPackagedProjectPayload is required for v2 project serialization');
-      }
-      const snapshot = projectState?.snapshot || null;
-      const session = projectState?.session || null;
-      const packaged = buildPackagedProjectPayload(snapshot, {
-        session,
-        updatedAt: options?.updatedAt || '',
-        includeSheets: options?.includeSheets === true,
-      });
-      const documentPayload = packaged?.document;
+    async function serializePackagedProjectBody(packagedProject, bitmapTasksByHash, { basePath = '', stripSheets = true } = {}) {
+      const documentPayload = packagedProject?.document;
       if (!documentPayload || typeof documentPayload !== 'object') {
         throw new Error('Packaged project document is missing');
       }
-
-      const bitmapTasksByHash = new Map();
       const { hadCanvases, canvases } = listCanvasSources(documentPayload);
       const normalizedCanvases = [];
       const canvasEntries = [];
@@ -528,7 +546,7 @@
         const canvasId = typeof normalizedCanvas?.id === 'string' && normalizedCanvas.id
           ? normalizedCanvas.id
           : `canvas-${index + 1}`;
-        const canvasPath = `canvases/${normalizePathSegment(canvasId, `canvas-${index + 1}`)}.json`;
+        const canvasPath = `${basePath}canvases/${normalizePathSegment(canvasId, `canvas-${index + 1}`)}.json`;
         normalizedCanvases.push({ path: canvasPath, payload: normalizedCanvas });
         canvasEntries.push({
           id: canvasId,
@@ -541,22 +559,176 @@
         });
       }
 
-      const baseDocument = cloneJsonValue(documentPayload) || {};
-      delete baseDocument.frames;
-      delete baseDocument.canvases;
-      const activeCanvasId = typeof documentPayload.activeCanvasId === 'string' && documentPayload.activeCanvasId
-        ? documentPayload.activeCanvasId
-        : (canvasEntries[0]?.id || '');
-
-      const projectPayload = cloneJsonValue(packaged) || {};
+      const { baseDocument, activeCanvasId } = createArchiveDocumentBase(documentPayload);
+      const projectPayload = cloneJsonValue(packagedProject) || {};
       projectPayload.storageVersion = 2;
       projectPayload.storageAdapterId = ADAPTER_ID;
       projectPayload.hadCanvases = hadCanvases;
       projectPayload.canvasEntries = canvasEntries;
       projectPayload.document = {
         ...baseDocument,
-        activeCanvasId,
+        activeCanvasId: activeCanvasId || (canvasEntries[0]?.id || ''),
       };
+      if (stripSheets) {
+        delete projectPayload.sheets;
+        delete projectPayload.activeSheetId;
+      }
+
+      return {
+        projectPayload,
+        canvasTasks: normalizedCanvases.map(entry => ({
+          filename: entry.path,
+          blob: createJsonBlob(entry.payload),
+        })),
+        activeCanvasId: projectPayload.document.activeCanvasId,
+        canvasEntries,
+      };
+    }
+
+    function createFallbackSheetEntries(packagedProject = null) {
+      if (!packagedProject || typeof packagedProject !== 'object') {
+        return [];
+      }
+      const fallbackDocumentName = typeof packagedProject?.document?.documentName === 'string'
+        ? packagedProject.document.documentName
+        : 'Sheet 1';
+      return [{
+        id: 'sheet-1',
+        fileName: fallbackDocumentName,
+        label: 'Sheet 1',
+        project: cloneJsonValue(packagedProject),
+        unsaved: false,
+        source: 'sheet',
+        updatedAt: packagedProject.updatedAt || new Date().toISOString(),
+      }];
+    }
+
+    function buildSheetArchiveDirectory(sheetId = '', index = 0, usedPaths = new Set()) {
+      const baseName = normalizePathSegment(sheetId, `sheet-${index + 1}`);
+      let nextName = baseName;
+      let suffix = 2;
+      while (usedPaths.has(nextName)) {
+        nextName = `${baseName}-${suffix}`;
+        suffix += 1;
+      }
+      usedPaths.add(nextName);
+      return `sheets/${nextName}/`;
+    }
+
+    function buildSheetArchiveManifestEntry(sheet = null, {
+      sheetId = '',
+      fallbackFileName = '',
+      fallbackLabel = '',
+      projectPath = '',
+      fallbackUpdatedAt = '',
+    } = {}) {
+      const nextSheet = cloneJsonValue(sheet) || {};
+      delete nextSheet.project;
+      return {
+        ...nextSheet,
+        id: typeof sheetId === 'string' && sheetId ? sheetId : (typeof nextSheet.id === 'string' && nextSheet.id ? nextSheet.id : ''),
+        fileName: typeof nextSheet.fileName === 'string' && nextSheet.fileName
+          ? nextSheet.fileName
+          : fallbackFileName,
+        label: typeof nextSheet.label === 'string' && nextSheet.label
+          ? nextSheet.label
+          : fallbackLabel,
+        updatedAt: typeof nextSheet.updatedAt === 'string' && nextSheet.updatedAt
+          ? nextSheet.updatedAt
+          : fallbackUpdatedAt,
+        path: projectPath,
+      };
+    }
+
+    async function serializeArchiveProject(projectState, options = {}) {
+      if (typeof buildPackagedProjectPayload !== 'function') {
+        throw new Error('buildPackagedProjectPayload is required for v2 project serialization');
+      }
+      const snapshot = projectState?.snapshot || null;
+      const session = projectState?.session || null;
+      const packaged = buildPackagedProjectPayload(snapshot, {
+        session,
+        updatedAt: options?.updatedAt || '',
+        includeSheets: options?.includeSheets === true,
+      });
+      const bitmapTasksByHash = new Map();
+      let projectPayload = null;
+      let tasks = [];
+      let activeCanvasId = '';
+      if (options?.includeSheets === true) {
+        const sourceSheets = Array.isArray(packaged?.sheets) && packaged.sheets.length
+          ? packaged.sheets
+          : createFallbackSheetEntries(packaged);
+        const resolvedActiveSheetId = typeof packaged?.activeSheetId === 'string' && packaged.activeSheetId
+          ? packaged.activeSheetId
+          : (typeof sourceSheets[0]?.id === 'string' ? sourceSheets[0].id : 'sheet-1');
+        const usedSheetPaths = new Set();
+        const sheetManifests = [];
+        const sheetTasks = [];
+        let activeSheetProject = null;
+
+        for (let index = 0; index < sourceSheets.length; index += 1) {
+          const sheet = sourceSheets[index];
+          const sheetId = typeof sheet?.id === 'string' && sheet.id ? sheet.id : `sheet-${index + 1}`;
+          const sheetProject = sheet?.project && typeof sheet.project === 'object'
+            ? sheet.project
+            : (sheetId === resolvedActiveSheetId ? packaged : null);
+          if (!sheetProject || typeof sheetProject !== 'object') {
+            throw new Error(`Packaged project sheet is missing payload: ${sheetId}`);
+          }
+          if (!activeSheetProject && sheetId === resolvedActiveSheetId) {
+            activeSheetProject = sheetProject;
+          }
+          const sheetDirectory = buildSheetArchiveDirectory(sheetId, index, usedSheetPaths);
+          const sheetProjectPath = `${sheetDirectory}project.json`;
+          const serializedSheet = await serializePackagedProjectBody(sheetProject, bitmapTasksByHash, {
+            basePath: sheetDirectory,
+            stripSheets: true,
+          });
+          sheetTasks.push(
+            {
+              filename: sheetProjectPath,
+              blob: createJsonBlob(serializedSheet.projectPayload),
+            },
+            ...serializedSheet.canvasTasks,
+          );
+          sheetManifests.push(buildSheetArchiveManifestEntry(sheet, {
+            sheetId,
+            fallbackFileName: typeof sheetProject?.document?.documentName === 'string' ? sheetProject.document.documentName : `Sheet ${index + 1}`,
+            fallbackLabel: `Sheet ${index + 1}`,
+            projectPath: sheetProjectPath,
+            fallbackUpdatedAt: typeof sheetProject?.updatedAt === 'string' ? sheetProject.updatedAt : new Date().toISOString(),
+          }));
+        }
+
+        if (!activeSheetProject || typeof activeSheetProject !== 'object') {
+          activeSheetProject = sourceSheets[0]?.project && typeof sourceSheets[0].project === 'object'
+            ? sourceSheets[0].project
+            : packaged;
+        }
+        const { baseDocument, activeCanvasId: rootActiveCanvasId } = createArchiveDocumentBase(activeSheetProject?.document || packaged?.document || null);
+        projectPayload = cloneJsonValue(packaged) || {};
+        projectPayload.storageVersion = 2;
+        projectPayload.storageAdapterId = ADAPTER_ID;
+        delete projectPayload.hadCanvases;
+        delete projectPayload.canvasEntries;
+        projectPayload.document = {
+          ...baseDocument,
+          activeCanvasId: rootActiveCanvasId,
+        };
+        projectPayload.sheets = sheetManifests;
+        projectPayload.activeSheetId = resolvedActiveSheetId;
+        activeCanvasId = rootActiveCanvasId;
+        tasks = sheetTasks;
+      } else {
+        const serializedRoot = await serializePackagedProjectBody(packaged, bitmapTasksByHash, {
+          basePath: '',
+          stripSheets: false,
+        });
+        projectPayload = serializedRoot.projectPayload;
+        tasks = serializedRoot.canvasTasks;
+        activeCanvasId = serializedRoot.activeCanvasId;
+      }
 
       const manifest = {
         format: 'pixieedraw',
@@ -564,16 +736,19 @@
         storageAdapterId: ADAPTER_ID,
         packageType: packaged.type || PROJECT_PACKAGE_TYPE,
         packageVersion: Math.max(1, Math.round(Number(packaged.packageVersion) || 2)),
-        documentVersion: Math.max(1, Math.round(Number(documentPayload.version) || Number(packaged.version) || 1)),
-        width: Math.max(1, Math.round(Number(documentPayload.width) || 1)),
-        height: Math.max(1, Math.round(Number(documentPayload.height) || 1)),
-        canvasCount: canvasEntries.length,
+        documentVersion: Math.max(1, Math.round(Number(packaged?.document?.version) || Number(packaged.version) || 1)),
+        width: Math.max(1, Math.round(Number(packaged?.document?.width) || 1)),
+        height: Math.max(1, Math.round(Number(packaged?.document?.height) || 1)),
+        canvasCount: Array.isArray(packaged?.document?.canvases) && packaged.document.canvases.length
+          ? packaged.document.canvases.length
+          : 1,
         activeCanvasId,
-        documentName: typeof documentPayload.documentName === 'string' ? documentPayload.documentName : '',
+        sheetCount: Array.isArray(projectPayload?.sheets) ? projectPayload.sheets.length : 0,
+        documentName: typeof packaged?.document?.documentName === 'string' ? packaged.document.documentName : '',
         updatedAt: typeof packaged.updatedAt === 'string' ? packaged.updatedAt : '',
       };
 
-      const tasks = [
+      const archiveTasks = [
         {
           filename: 'manifest.json',
           blob: createJsonBlob(manifest),
@@ -582,18 +757,13 @@
           filename: 'project.json',
           blob: createJsonBlob(projectPayload),
         },
+        ...tasks,
       ];
-      normalizedCanvases.forEach(entry => {
-        tasks.push({
-          filename: entry.path,
-          blob: createJsonBlob(entry.payload),
-        });
-      });
       bitmapTasksByHash.forEach(task => {
-        tasks.push(task);
+        archiveTasks.push(task);
       });
 
-      const blob = await buildProjectZipBlob(tasks);
+      const blob = await buildProjectZipBlob(archiveTasks);
       const fileNameBase = options?.fileNameBase || snapshot?.documentName || '';
       const filename = typeof createAutosaveFileName === 'function'
         ? createAutosaveFileName(fileNameBase)
@@ -663,12 +833,7 @@
       return nextCanvas;
     }
 
-    async function restoreArchiveProject(entries) {
-      const manifest = readJsonEntry(entries, 'manifest.json');
-      const projectPayload = readJsonEntry(entries, 'project.json');
-      if (manifest?.format !== 'pixieedraw' || Number(manifest?.version) !== 2) {
-        throw new Error('Unsupported PiXiEEDraw archive manifest');
-      }
+    async function restorePackagedProjectBody(projectPayload, entries) {
       const packaged = cloneJsonValue(projectPayload) || {};
       const canvasEntries = Array.isArray(projectPayload?.canvasEntries) ? projectPayload.canvasEntries : [];
       const restoredCanvases = [];
@@ -717,6 +882,64 @@
       delete packaged.hadCanvases;
       delete packaged.canvasEntries;
       packaged.document = baseDocument;
+      return packaged;
+    }
+
+    function isSheetArchiveManifestEntry(sheet = null) {
+      return Boolean(
+        sheet
+        && typeof sheet === 'object'
+        && typeof sheet.path === 'string'
+        && sheet.path.startsWith('sheets/')
+        && sheet.path.endsWith('/project.json')
+        && !Object.prototype.hasOwnProperty.call(sheet, 'project')
+      );
+    }
+
+    async function restoreArchiveProject(entries) {
+      const manifest = readJsonEntry(entries, 'manifest.json');
+      const projectPayload = readJsonEntry(entries, 'project.json');
+      if (manifest?.format !== 'pixieedraw' || Number(manifest?.version) !== 2) {
+        throw new Error('Unsupported PiXiEEDraw archive manifest');
+      }
+      const sheetManifests = Array.isArray(projectPayload?.sheets)
+        ? projectPayload.sheets.filter(isSheetArchiveManifestEntry)
+        : [];
+      if (!sheetManifests.length) {
+        return await restorePackagedProjectBody(projectPayload, entries);
+      }
+
+      const restoredSheets = [];
+      for (let index = 0; index < sheetManifests.length; index += 1) {
+        const sheetManifest = sheetManifests[index];
+        const sheetProjectPayload = readJsonEntry(entries, sheetManifest.path);
+        const restoredProject = await restorePackagedProjectBody(sheetProjectPayload, entries);
+        const restoredSheet = cloneJsonValue(sheetManifest) || {};
+        delete restoredSheet.path;
+        restoredSheet.project = restoredProject;
+        restoredSheets.push(restoredSheet);
+      }
+
+      const packaged = cloneJsonValue(projectPayload) || {};
+      const activeSheetId = typeof projectPayload?.activeSheetId === 'string' && projectPayload.activeSheetId
+        ? projectPayload.activeSheetId
+        : (restoredSheets[0]?.id || '');
+      const activeSheet = restoredSheets.find(sheet => sheet?.id === activeSheetId) || restoredSheets[0] || null;
+      const activeSheetDocument = activeSheet?.project?.document && typeof activeSheet.project.document === 'object'
+        ? cloneJsonValue(activeSheet.project.document)
+        : {};
+      const rootDocumentFallback = cloneJsonValue(projectPayload?.document) || {};
+      const mergedRootDocument = {
+        ...rootDocumentFallback,
+        ...activeSheetDocument,
+      };
+      delete packaged.storageVersion;
+      delete packaged.storageAdapterId;
+      delete packaged.hadCanvases;
+      delete packaged.canvasEntries;
+      packaged.document = mergedRootDocument;
+      packaged.sheets = restoredSheets;
+      packaged.activeSheetId = activeSheetId;
       return packaged;
     }
 
