@@ -297,6 +297,14 @@
     scope.querySelectorAll('ins.adsbygoogle').forEach(loadAd);
   }
 
+  function refreshAdsAfterLifecycleResume(root) {
+    const scope = root && typeof root.querySelectorAll === 'function' ? root : document;
+    window.requestAnimationFrame(() => {
+      observeAds(scope);
+      scheduleClamp(scope);
+    });
+  }
+
   window.pixieedObserveAds = observeAds;
 
   if (document.readyState === 'loading') {
@@ -304,6 +312,21 @@
   } else {
     observeAds(document);
   }
+
+  window.addEventListener('pageshow', () => {
+    refreshAdsAfterLifecycleResume(document);
+  });
+  window.addEventListener('focus', () => {
+    refreshAdsAfterLifecycleResume(document);
+  });
+  window.addEventListener('online', () => {
+    refreshAdsAfterLifecycleResume(document);
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      refreshAdsAfterLifecycleResume(document);
+    }
+  });
 
   const observer = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
