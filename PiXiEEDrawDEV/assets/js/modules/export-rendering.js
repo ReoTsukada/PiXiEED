@@ -2486,16 +2486,32 @@
     commitHistory();
     const snapshot = makeHistorySnapshot();
     const session = buildProjectSessionPayload();
-    const packaged = buildPackagedProjectPayload(snapshot, { session });
-    const json = JSON.stringify(packaged);
-    const blob = new Blob([json], { type: PROJECT_FILE_MIME_TYPE });
-    const filename = createAutosaveFileName(fileNameBase || state.documentName);
+    const serializedProject = typeof serializeProjectStorageSnapshot === 'function'
+      ? serializeProjectStorageSnapshot({
+          snapshot,
+          session,
+        }, {
+          fileNameBase: fileNameBase || state.documentName,
+          includeSheets: true,
+        })
+      : null;
+    const packaged = serializedProject?.packaged || buildPackagedProjectPayload(snapshot, { session });
+    const json = typeof serializedProject?.text === 'string'
+      ? serializedProject.text
+      : JSON.stringify(packaged);
+    const blob = serializedProject?.blob instanceof Blob
+      ? serializedProject.blob
+      : new Blob([json], { type: PROJECT_FILE_MIME_TYPE });
+    const filename = typeof serializedProject?.filename === 'string' && serializedProject.filename
+      ? serializedProject.filename
+      : createAutosaveFileName(fileNameBase || state.documentName);
     return {
       snapshot,
       session,
       packaged,
       blob,
       filename,
+      storageAdapterId: typeof serializedProject?.adapterId === 'string' ? serializedProject.adapterId : '',
     };
   }
 
