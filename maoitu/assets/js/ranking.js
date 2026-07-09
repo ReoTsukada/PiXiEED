@@ -20,12 +20,20 @@ function accountKey(row) {
 }
 
 function uniqueByAccount(rows, limit = Infinity) {
-  const seen = new Set();
+  const indexByKey = new Map();
   const unique = [];
   for (const row of rows) {
     const key = accountKey(row);
-    if (seen.has(key)) continue;
-    seen.add(key);
+    const existingIndex = indexByKey.get(key);
+    if (existingIndex != null) {
+      const existing = unique[existingIndex];
+      const nextAvatar = String(row?.avatar || '').trim();
+      if (nextAvatar) {
+        existing.avatar = nextAvatar;
+      }
+      continue;
+    }
+    indexByKey.set(key, unique.length);
     unique.push(row);
     if (unique.length >= limit) break;
   }
