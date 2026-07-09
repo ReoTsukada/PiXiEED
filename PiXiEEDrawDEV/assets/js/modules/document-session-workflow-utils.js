@@ -686,29 +686,55 @@
     if (!text || typeof text !== 'string') {
       throw new Error('Document text is empty');
     }
-    const parsed = JSON.parse(text);
-    return snapshotFromParsedDocumentValue(parsed);
+    const parsedResult = typeof parseProjectStorageText === 'function'
+      ? parseProjectStorageText(text)
+      : { adapterId: '', parsed: JSON.parse(text) };
+    const parsed = parsedResult && Object.prototype.hasOwnProperty.call(parsedResult, 'parsed')
+      ? parsedResult.parsed
+      : parsedResult;
+    const resolved = snapshotFromParsedDocumentValue(parsed);
+    if (resolved && typeof resolved === 'object' && typeof parsedResult?.adapterId === 'string') {
+      resolved.storageAdapterId = parsedResult.adapterId;
+    }
+    return resolved;
   }
 
   function snapshotFromParsedDocumentValue(parsed) {
-    const hasPackagedDocument = Boolean(parsed && typeof parsed === 'object' && parsed.document && typeof parsed.document === 'object');
-    const payload = hasPackagedDocument ? parsed.document : parsed;
+    const parsedResult = typeof parseProjectStoragePayload === 'function'
+      ? parseProjectStoragePayload(parsed)
+      : { adapterId: '', parsed };
+    const normalizedParsed = parsedResult && Object.prototype.hasOwnProperty.call(parsedResult, 'parsed')
+      ? parsedResult.parsed
+      : parsedResult;
+    const hasPackagedDocument = Boolean(
+      normalizedParsed
+      && typeof normalizedParsed === 'object'
+      && normalizedParsed.document
+      && typeof normalizedParsed.document === 'object'
+    );
+    const payload = hasPackagedDocument ? normalizedParsed.document : normalizedParsed;
     const snapshot = deserializeDocumentPayload(payload);
     const projectSession = hasPackagedDocument
-      ? parseProjectSessionPayload(parsed.session, snapshot?.activeCanvasId || '')
+      ? parseProjectSessionPayload(normalizedParsed.session, snapshot?.activeCanvasId || '')
       : null;
     const dotStats = hasPackagedDocument
-      ? resolvePackagedProjectDotStats(parsed)
+      ? resolvePackagedProjectDotStats(normalizedParsed)
       : null;
     const sheets = hasPackagedDocument
-      ? normalizePackagedProjectSheets(parsed.sheets, typeof parsed.activeSheetId === 'string' ? parsed.activeSheetId : '')
+      ? normalizePackagedProjectSheets(
+          normalizedParsed.sheets,
+          typeof normalizedParsed.activeSheetId === 'string' ? normalizedParsed.activeSheetId : ''
+        )
       : [];
     return {
       snapshot,
       projectSession,
       dotStats,
       sheets,
-      activeSheetId: hasPackagedDocument && typeof parsed.activeSheetId === 'string' ? parsed.activeSheetId : '',
+      activeSheetId: hasPackagedDocument && typeof normalizedParsed.activeSheetId === 'string'
+        ? normalizedParsed.activeSheetId
+        : '',
+      storageAdapterId: typeof parsedResult?.adapterId === 'string' ? parsedResult.adapterId : '',
     };
   }
 
