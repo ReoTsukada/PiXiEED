@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.07.09-export-routing-fix2';
+  const APP_BUILD_VERSION = '2026.07.10-pixiedraw-ads-restore1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECTS_ENABLED = false;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
@@ -572,6 +572,8 @@
       includeOriginalRow: document.getElementById('exportOriginalOptionRow'),
       saveProjectCompanionToggle: document.getElementById('exportSaveProjectCompanionToggle'),
       saveProjectCompanionRow: document.getElementById('exportCompanionOptionRow'),
+      projectV2ExperimentalToggle: document.getElementById('exportProjectV2ExperimentalToggle'),
+      projectV2ExperimentalRow: document.getElementById('exportProjectV2ExperimentalRow'),
       saveSpriteMapCompanionToggle: document.getElementById('exportSpriteMapCompanionToggle'),
       saveSpriteMapCompanionRow: document.getElementById('exportSpriteMapCompanionOptionRow'),
       contestPostToggle: document.getElementById('exportContestPostToggle'),
@@ -6003,6 +6005,8 @@
   set runUiAction(value) { runUiAction = value; },
   get saveProjectAsPixieedraw() { return saveProjectAsPixieedraw; },
   set saveProjectAsPixieedraw(value) { saveProjectAsPixieedraw = value; },
+  get saveProjectAsPixieedrawV2Experimental() { return saveProjectAsPixieedrawV2Experimental; },
+  set saveProjectAsPixieedrawV2Experimental(value) { saveProjectAsPixieedrawV2Experimental = value; },
   get setCompactRightFlyoutOpen() { return setCompactRightFlyoutOpen; },
   set setCompactRightFlyoutOpen(value) { setCompactRightFlyoutOpen = value; },
   get setExportFileBaseName() { return setExportFileBaseName; },
@@ -6485,6 +6489,8 @@
   set projectDotCumulativeStats(value) { projectDotCumulativeStats = value; },
   get recordSharedProjectLightweightLocalSave() { return recordSharedProjectLightweightLocalSave; },
   set recordSharedProjectLightweightLocalSave(value) { recordSharedProjectLightweightLocalSave = value; },
+  get recentProjectsCache() { return recentProjectsCache; },
+  set recentProjectsCache(value) { recentProjectsCache = value; },
   get saveRecentProjectsList() { return saveRecentProjectsList; },
   set saveRecentProjectsList(value) { saveRecentProjectsList = value; },
   get buildActiveLocalProjectSavePlan() { return buildActiveLocalProjectSavePlan; },
@@ -17901,7 +17907,7 @@
     if (isSharedProjectCollaborativeMode()) {
       return true;
     }
-    if (normalizedFormat === 'project') {
+    if (normalizedFormat === 'project' || normalizedFormat === 'projectv2experimental') {
       return isMultiMasterMode();
     }
     const permission = normalizeMultiExportPermission(
@@ -17931,7 +17937,7 @@
     if (!multiState.connected || canCurrentClientExportProject(normalizedFormat)) {
       return '';
     }
-    if (normalizedFormat === 'project') {
+    if (normalizedFormat === 'project' || normalizedFormat === 'projectv2experimental') {
       if (!isMultiMasterMode()) {
         return 'プロジェクト保存はマスターのみ利用できます';
       }
