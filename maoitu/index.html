@@ -467,7 +467,7 @@ a { color:#7dd3fc; }
   height:166px;
   padding:0;
   border-radius:20px;
-  border:1px solid rgba(255,255,255,0.14);
+  border:2px solid rgba(255,255,255,0.22);
   background:
     radial-gradient(circle at top center, rgba(255,255,255,0.12), transparent 34%),
     linear-gradient(180deg, rgba(15,23,42,0.96), rgba(30,41,59,0.92));
@@ -541,8 +541,11 @@ a { color:#7dd3fc; }
   font-weight:800;
   line-height:1.35;
   overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap;
+  display:-webkit-box;
+  -webkit-box-orient:vertical;
+  -webkit-line-clamp:2;
+  line-clamp:2;
+  word-break:break-word;
 }
 .rank-featured-card__score{
   color:#f8fafc;
@@ -582,12 +585,32 @@ a { color:#7dd3fc; }
   box-shadow:0 0 32px rgba(125,211,252,0.16), 0 20px 34px rgba(0,0,0,0.3);
 }
 .rank-featured-card[data-rank-tier="red-metallic"]{
-  border-color:rgba(255,138,128,0.9);
-  box-shadow:0 0 22px rgba(239,68,68,0.18), 0 18px 32px rgba(0,0,0,0.28);
+  border-color:rgba(255,138,128,0.98);
+  box-shadow:0 0 22px rgba(239,68,68,0.24), 0 18px 32px rgba(0,0,0,0.28);
 }
 .rank-featured-card[data-rank-tier="gold"]{
-  border-color:rgba(251,191,36,0.9);
-  box-shadow:0 0 22px rgba(251,191,36,0.16), 0 18px 32px rgba(0,0,0,0.28);
+  border-color:rgba(251,191,36,0.98);
+  box-shadow:0 0 22px rgba(251,191,36,0.22), 0 18px 32px rgba(0,0,0,0.28);
+}
+.rank-featured-card[data-rank-tier="silver"]{
+  border-color:rgba(226,232,240,0.98);
+  box-shadow:0 0 20px rgba(226,232,240,0.18), 0 18px 32px rgba(0,0,0,0.28);
+}
+.rank-featured-card[data-rank-tier="bronze"]{
+  border-color:rgba(217,119,6,0.98);
+  box-shadow:0 0 20px rgba(180,83,9,0.2), 0 18px 32px rgba(0,0,0,0.28);
+}
+.rank-featured-card[data-rank-tier="blue"]{
+  border-color:rgba(96,165,250,0.95);
+  box-shadow:0 0 18px rgba(96,165,250,0.2), 0 18px 32px rgba(0,0,0,0.28);
+}
+.rank-featured-card[data-rank-tier="green"]{
+  border-color:rgba(74,222,128,0.95);
+  box-shadow:0 0 18px rgba(74,222,128,0.18), 0 18px 32px rgba(0,0,0,0.28);
+}
+.rank-featured-card[data-rank-tier="white"]{
+  border-color:rgba(255,255,255,0.88);
+  box-shadow:0 0 16px rgba(255,255,255,0.12), 0 18px 32px rgba(0,0,0,0.28);
 }
 .rank-featured-card--self::after{
   content:"YOU";
@@ -612,7 +635,7 @@ a { color:#7dd3fc; }
   gap:14px;
   min-height:68px;
   padding:12px 16px;
-  border:1px solid rgba(255,255,255,0.24);
+  border:2px solid rgba(255,255,255,0.28);
   border-radius:16px;
   background:var(--rank-item-background);
   box-shadow:0 6px 18px rgba(0,0,0,0.3);
@@ -1090,44 +1113,71 @@ body.is-game-active .game-shell {
     padding:10px 16px;
   }
   .rank-featured{
-    gap:8px;
+    gap:7px;
   }
   .rank-featured-card{
-    min-height:132px;
-    height:132px;
+    min-height:146px;
+    height:146px;
     border-radius:16px;
   }
   .rank-featured-card__content{
-    padding:12px 10px 14px;
+    padding:10px 8px 12px;
   }
   .rank-featured-card[data-rank="1"] .rank-featured-card__content{
-    transform:scale(1.04);
+    transform:scale(1.02);
   }
   .rank-featured-card__badge{
-    min-width:36px;
-    min-height:24px;
-    padding:0 8px;
-    font-size:11px;
+    min-width:32px;
+    min-height:22px;
+    padding:0 6px;
+    font-size:10px;
   }
   .rank-featured-card__tier{
-    font-size:9px;
-    letter-spacing:0.08em;
+    font-size:8px;
+    letter-spacing:0.04em;
   }
   .rank-featured-card__avatar{
-    width:46px;
-    height:46px;
-    border-radius:14px;
+    width:40px;
+    height:40px;
+    border-radius:12px;
   }
   .rank-featured-card__name{
-    font-size:12px;
+    font-size:11px;
+    line-height:1.25;
   }
   .rank-featured-card__score{
-    font-size:21px;
+    font-size:19px;
   }
   .rank-featured-card__trend{
-    min-width:18px;
-    min-height:18px;
+    min-width:16px;
+    min-height:16px;
+    font-size:12px;
+  }
+  .rank-item{
+    min-height:64px;
+    padding:10px 12px;
+    border-radius:14px;
+  }
+  .rank-index{
+    min-width:30px;
+    font-size:16px;
+  }
+  .rank-avatar,
+  .rank-item--self .rank-avatar{
+    width:34px;
+    min-width:34px;
+    height:34px;
+    min-height:34px;
+    border-radius:10px;
+  }
+  .rank-left{
+    gap:10px;
+  }
+  .rank-name{
     font-size:14px;
+  }
+  .rank-score{
+    font-size:18px;
   }
 }
 @media (max-height: 760px) {
@@ -1159,29 +1209,30 @@ body.is-game-active .game-shell {
     font-size:20px;
   }
   .rank-featured-card{
-    min-height:124px;
-    height:124px;
+    min-height:136px;
+    height:136px;
   }
   .rank-featured-card__content{
-    padding:11px 10px 12px;
+    padding:10px 8px 11px;
   }
   .rank-featured-card[data-rank="1"] .rank-featured-card__content{
-    transform:scale(1.03);
+    transform:scale(1.015);
   }
   .rank-featured-card__avatar{
-    width:44px;
-    height:44px;
+    width:38px;
+    height:38px;
   }
   .rank-featured-card__name{
-    font-size:12px;
+    font-size:11px;
+    line-height:1.2;
   }
   .rank-featured-card__score{
-    font-size:20px;
+    font-size:18px;
   }
   .rank-featured-card__trend{
-    min-width:18px;
-    min-height:18px;
-    font-size:14px;
+    min-width:16px;
+    min-height:16px;
+    font-size:12px;
   }
   .instructions-card {
     padding:12px 14px;
