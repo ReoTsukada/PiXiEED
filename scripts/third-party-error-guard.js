@@ -7,10 +7,22 @@
       && /score\.min\.js(?:[?#]|$)/.test(normalizedFilename);
   }
 
+  function isIgnoredAdsbygoogleTagError(message, filename) {
+    const normalizedMessage = String(message || '');
+    const normalizedFilename = String(filename || '');
+    return normalizedMessage.includes("adsbygoogle.push() error: All 'ins' elements in the DOM with class=adsbygoogle already have ads in them.")
+      && /pagead\/js\/adsbygoogle\.js(?:[?#]|$)/.test(normalizedFilename);
+  }
+
+  function isIgnoredThirdPartyError(message, filename) {
+    return isIgnoredThirdPartyFrameError(message, filename)
+      || isIgnoredAdsbygoogleTagError(message, filename);
+  }
+
   window.addEventListener('error', (event) => {
     const message = event?.message || event?.error?.message || '';
     const filename = event?.filename || event?.error?.fileName || '';
-    if (!isIgnoredThirdPartyFrameError(message, filename)) {
+    if (!isIgnoredThirdPartyError(message, filename)) {
       return;
     }
     event.preventDefault();
@@ -23,7 +35,7 @@
       ? reason
       : reason?.message || '';
     const filename = reason?.fileName || '';
-    if (!isIgnoredThirdPartyFrameError(message, filename)) {
+    if (!isIgnoredThirdPartyError(message, filename)) {
       return;
     }
     event.preventDefault();
