@@ -1339,6 +1339,7 @@
     if (normalized === 'gridpng') return localizeText('PNG（グリッド分割）', 'PNG (Grid Split)');
     if (normalized === 'gif') return 'GIF';
     if (normalized === 'timelapse') return localizeText('タイムラプスGIF', 'Timelapse GIF');
+    if (normalized === 'projectv2experimental') return localizeText('プロジェクト保存 V2 experimental', 'Project Save V2 experimental');
     if (normalized === 'project') return localizeText('プロジェクト保存', 'Project Save');
     return 'PNG';
   }
@@ -1458,7 +1459,7 @@
 
   function canOfferSpriteMapCompanionExport(mode) {
     const format = normalizeExportFormat(mode);
-    if (format === 'project') {
+    if (format === 'project' || format === 'projectv2experimental') {
       return false;
     }
     if (!canCurrentClientExportProject('spritemap')) {
@@ -1473,7 +1474,7 @@
 
   function canOfferColorSpriteExport(mode) {
     const format = normalizeExportFormat(mode);
-    if (format === 'project') {
+    if (format === 'project' || format === 'projectv2experimental') {
       return false;
     }
     if (!canCurrentClientExportProject('spritemap')) {
@@ -1652,6 +1653,18 @@
     if (companionRow instanceof HTMLElement) {
       companionRow.hidden = !doesExportFormatSupportProjectCompanion(format);
     }
+    const projectV2Row = dom.exportDialog?.projectV2ExperimentalRow;
+    const projectV2Toggle = dom.exportDialog?.projectV2ExperimentalToggle;
+    const showProjectV2Row = format === 'project';
+    if (projectV2Row instanceof HTMLElement) {
+      projectV2Row.hidden = !showProjectV2Row;
+    }
+    if (projectV2Toggle instanceof HTMLInputElement) {
+      projectV2Toggle.disabled = !showProjectV2Row;
+      if (!showProjectV2Row) {
+        projectV2Toggle.checked = false;
+      }
+    }
     updateExportSpriteMapCompanionToggleUI();
 
     const contestRow = dom.exportDialog?.contestPostRow;
@@ -1661,7 +1674,7 @@
 
     const spriteMapColorSpritesRow = dom.exportDialog?.spriteMapColorSpritesRow;
     if (spriteMapColorSpritesRow instanceof HTMLElement) {
-      spriteMapColorSpritesRow.hidden = format === 'project';
+      spriteMapColorSpritesRow.hidden = format === 'project' || format === 'projectv2experimental';
     }
     const spriteMapColorSpritesToggle = dom.exportDialog?.spriteMapColorSpritesToggle;
     if (spriteMapColorSpritesToggle instanceof HTMLInputElement) {
