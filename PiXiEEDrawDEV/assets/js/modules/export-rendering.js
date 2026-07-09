@@ -2335,7 +2335,7 @@
   async function deliverExportTasks(tasks, options = {}) {
     const normalizedTasks = Array.isArray(tasks) ? tasks.slice() : [];
     if (options.includeProjectCompanion && doesExportFormatSupportProjectCompanion(options.mode || '')) {
-      const companionBundle = buildProjectExportBundle();
+      const companionBundle = await buildProjectExportBundle();
       normalizedTasks.push({
         blob: companionBundle.blob,
         filename: companionBundle.filename,
@@ -2482,17 +2482,18 @@
     }
   }
 
-  function buildProjectExportBundle(fileNameBase = state.documentName) {
+  async function buildProjectExportBundle(fileNameBase = state.documentName, options = {}) {
     commitHistory();
     const snapshot = makeHistorySnapshot();
     const session = buildProjectSessionPayload();
     const serializedProject = typeof serializeProjectStorageSnapshot === 'function'
-      ? serializeProjectStorageSnapshot({
+      ? await serializeProjectStorageSnapshot({
           snapshot,
           session,
         }, {
           fileNameBase: fileNameBase || state.documentName,
-          includeSheets: true,
+          includeSheets: options?.includeSheets !== false,
+          preferredAdapterId: options?.preferredStorageAdapterId || '',
         })
       : null;
     const packaged = serializedProject?.packaged || buildPackagedProjectPayload(snapshot, { session });
@@ -2515,6 +2516,11 @@
     };
   }
 
+  function buildExperimentalProjectFileNameBase(fileNameBase = '') {
+    const raw = String(fileNameBase || '').trim() || String(state.documentName || '').trim() || 'project';
+    return raw.replace(/\.pixieedraw$/i, '') + '-v2-experimental';
+  }
+
   async function saveProjectAsPixieedraw(options = {}) {
     if (!ensureCurrentClientCanExportProject({ announce: true, format: 'project' })) {
       return { saved: false, cancelled: false, skipped: true };
@@ -2526,7 +2532,13 @@
         packaged,
         blob,
         filename,
-      } = buildProjectExportBundle(options?.fileNameBase || getExportFileNameBase() || state.documentName);
+      } = await buildProjectExportBundle(
+        options?.fileNameBase || getExportFileNameBase() || state.documentName,
+        {
+          includeSheets: options?.includeSheets !== false,
+          preferredStorageAdapterId: options?.preferredStorageAdapterId || '',
+        }
+      );
 
       const boundHandle = autosaveHandle || pendingAutosaveHandle;
       if (!DISABLE_FILE_SYSTEM_ACCESS_SAVE && boundHandle) {
@@ -2611,6 +2623,53 @@
       console.error('Manual project save failed', error);
       if (announceStatus) {
         updateAutosaveStatus('手動保存: ファイルを書き出せませんでした', 'error');
+      }
+      return { saved: false, cancelled: false };
+    }
+  }
+
+  async function saveProjectAsPixieedrawV2Experimental(options = {}) {
+    if (!ensureCurrentClientCanExportProject({ announce: true, format: 'project' })) {
+      return { saved: false, cancelled: false, skipped: true };
+    }
+    const announceStatus = options?.announceStatus !== false;
+    try {
+      const bundle = await buildProjectExportBundle(
+        options?.fileNameBase || buildExperimentalProjectFileNameBase(getExportFileNameBase() || state.documentName),
+        {
+          includeSheets: options?.includeSheets === true,
+          preferredStorageAdapterId: 'pixieedraw-v2-zip-experimental',
+        }
+      );
+      const result = await triggerDownloadFromBlob(bundle.blob, bundle.filename, {
+        mimeType: PROJECT_FILE_MIME_TYPE,
+        fileExtensions: [PROJECT_FILE_EXTENSION],
+        shareTitle: `${state.documentName || 'PiXiEEDraw'} v2`,
+        shareText: `${state.documentName || 'PiXiEEDraw'} (PiXiEEDraw v2 experimental)`,
+        nativeSubdirectory: NATIVE_PROJECTS_SUBDIRECTORY,
+      });
+      if (result && !String(result).endsWith('cancel')) {
+        if (announceStatus) {
+          updateAutosaveStatus('実験保存: v2 PiXiEEDファイルを書き出しました', 'success');
+        }
+        return {
+          saved: true,
+          cancelled: false,
+          storageAdapterId: bundle.storageAdapterId,
+          filename: bundle.filename,
+        };
+      }
+      if (String(result || '').endsWith('cancel')) {
+        return { saved: false, cancelled: true };
+      }
+      if (announceStatus) {
+        updateAutosaveStatus('実験保存: v2 PiXiEEDファイルを書き出せませんでした', 'error');
+      }
+      return { saved: false, cancelled: false };
+    } catch (error) {
+      console.error('Experimental v2 project save failed', error);
+      if (announceStatus) {
+        updateAutosaveStatus('実験保存: v2 PiXiEEDファイルを書き出せませんでした', 'error');
       }
       return { saved: false, cancelled: false };
     }
@@ -2742,6 +2801,7 @@
           getProjectFilePickerTypes,
           buildProjectExportBundle,
           saveProjectAsPixieedraw,
+          saveProjectAsPixieedrawV2Experimental,
         });
       }
     })(scope);
