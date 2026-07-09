@@ -363,7 +363,7 @@
   }
 
   function applyDomState() {
-    window.__PIXIEED_ADS_DISABLED__ = Boolean(state.isActive);
+    window.__PIXIEED_ADS_DISABLED__ = Boolean(window.__PIXIEED_ADS_DISABLED__ || state.isActive);
     if (document.body) {
       document.body.classList.toggle('pixieed-adfree', Boolean(state.isActive));
     }
