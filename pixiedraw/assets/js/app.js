@@ -7444,6 +7444,8 @@
   set setMultiUiView(value) { setMultiUiView = value; },
   get shareMultiInviteLink() { return shareMultiInviteLink; },
   set shareMultiInviteLink(value) { shareMultiInviteLink = value; },
+  get showSharedProjectSunsetDialog() { return showSharedProjectSunsetDialog; },
+  set showSharedProjectSunsetDialog(value) { showSharedProjectSunsetDialog = value; },
   get storeMultiProjectKey() { return storeMultiProjectKey; },
   set storeMultiProjectKey(value) { storeMultiProjectKey = value; },
   get syncDanmakuControls() { return syncDanmakuControls; },
