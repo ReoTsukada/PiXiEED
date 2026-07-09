@@ -92,7 +92,7 @@
         return false;
       }
     })();
-    window.__PIXIEED_ADS_DISABLED__ = true;
+    window.__PIXIEED_ADS_DISABLED__ = Boolean(window.__PIXIEED_ADS_DISABLED__ || isLocalDebug);
     if (window.__PIXIEED_ADS_DISABLED__) {
       return;
     }
@@ -128,7 +128,7 @@
 
 
 
-<link href="assets/css/style.css?v=2026.07.08-export-landscape-vertical-ad-fix1" rel="stylesheet"/>
+<link href="assets/css/style.css?v=2026.07.10-pixiedraw-ads-restore1" rel="stylesheet"/>
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-4.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-4.png"/>
 <style>
@@ -1221,6 +1221,11 @@
 <span aria-hidden="true" class="export-toggle-icon"><img alt="" decoding="async" src="../icon-e1_frame_01.png"/></span>
 <span>PiXiEEDファイルも保存</span>
 </label>
+<label class="toggle-option export-icon-toggle" for="exportProjectV2ExperimentalToggle" hidden id="exportProjectV2ExperimentalRow" title="DEV専用の実験保存です">
+<input id="exportProjectV2ExperimentalToggle" type="checkbox"/>
+<span aria-hidden="true" class="export-toggle-icon"><img alt="" decoding="async" src="../icon-e1_frame_01.png"/></span>
+<span id="exportProjectV2ExperimentalLabel">V2 experimentalで保存</span>
+</label>
 <label class="toggle-option export-icon-toggle" for="exportSpriteMapCompanionToggle" id="exportSpriteMapCompanionOptionRow" title="SpriteMAP出力">
 <input id="exportSpriteMapCompanionToggle" type="checkbox"/>
 <span aria-hidden="true" class="export-toggle-icon"><img alt="" decoding="async" src="../icon-e1_frame_02.png"/></span>
@@ -1664,7 +1669,7 @@
 	<script defer="" src="assets/js/modules/controls-mirror.js?v=2026.07.03-mirror-guide-drag-fix1"></script>
 	<script defer="" src="assets/js/modules/external-tool-workflow-utils.js?v=2026.07.02-external-tool-workflow-split-v1"></script>
 	<script defer="" src="assets/js/pixieedraw-dev-switch.js?v=2026.07.03-pixieedrawdev-switch-fix14"></script>
-	<script defer="" src="assets/js/app.js?v=2026.07.09-export-routing-fix2"></script>
+	<script defer="" src="assets/js/app.js?v=2026.07.10-pixiedraw-ads-restore1"></script>
   <script>
     (function initPanelAdDocking() {
       const ads = {
@@ -2147,6 +2152,9 @@
           queueAllSlotsOnce();
         }
       });
+      window.addEventListener('pageshow', queueAllSlotsOnce);
+      window.addEventListener('focus', queueAllSlotsOnce);
+      window.addEventListener('online', queueAllSlotsOnce);
 
       const observer = new MutationObserver(queueAllSlotsOnce);
       observer.observe(document.body, {
