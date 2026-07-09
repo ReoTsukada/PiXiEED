@@ -13,6 +13,7 @@
     createAutosaveFileName,
     JSONGlobal = JSON,
     BlobCtor = typeof Blob === 'function' ? Blob : null,
+    TextDecoderCtor = typeof TextDecoder === 'function' ? TextDecoder : null,
   } = {}) {
     function canReadParsedValue(parsed) {
       if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
@@ -29,6 +30,22 @@
         throw new Error('Project text is empty');
       }
       return JSONGlobal.parse(text);
+    }
+
+    function canReadBytes(bytes) {
+      if (!(bytes instanceof Uint8Array) || !bytes.length || !TextDecoderCtor) {
+        return false;
+      }
+      const probeLength = Math.min(bytes.length, 32);
+      const probe = new TextDecoderCtor().decode(bytes.subarray(0, probeLength)).trimStart();
+      return probe.startsWith('{') || probe.startsWith('[');
+    }
+
+    function parseBytes(bytes) {
+      if (!(bytes instanceof Uint8Array) || !bytes.length || !TextDecoderCtor) {
+        throw new Error('Project bytes are empty');
+      }
+      return parseText(new TextDecoderCtor().decode(bytes));
     }
 
     function normalizeParsedValue(parsed) {
@@ -67,7 +84,9 @@
       fileExtension: PROJECT_FILE_EXTENSION,
       mimeType: PROJECT_FILE_MIME_TYPE,
       canReadParsedValue,
+      canReadBytes,
       parseText,
+      parseBytes,
       normalizeParsedValue,
       serializeProject,
     });
