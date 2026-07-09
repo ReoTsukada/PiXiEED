@@ -371,8 +371,10 @@ function renderFeaturedRanks(featuredEl, rows, currentAccountId, movementByAccou
     featuredEl.innerHTML = '<div class="rank-featured__empty">最初のランカーを待っています</div>';
     return;
   }
-  topRows.forEach((row, idx) => {
-    const rank = idx + 1;
+  const podiumRows = [1, 0, 2]
+    .map(index => ({ row: topRows[index], rank: index + 1 }))
+    .filter(entry => entry.row);
+  podiumRows.forEach(({ row, rank }) => {
     const card = document.createElement('article');
     card.className = 'rank-featured-card';
     card.dataset.rank = String(rank);
@@ -382,7 +384,7 @@ function renderFeaturedRanks(featuredEl, rows, currentAccountId, movementByAccou
     }
     const avatarId = String(row?.avatar || '').trim();
     const movement = movementByAccount.get(accountKey(row));
-    card.innerHTML = `<div class="rank-featured-card__glow" aria-hidden="true"></div><div class="rank-featured-card__top"><span class="rank-featured-card__badge">#${rank}</span><span class="rank-featured-card__tier">${tierLabelForRank(rank)}</span></div><img class="rank-featured-card__avatar" src="${escapeHtml(resolveAvatarSrcFromId(avatarId))}" alt="" aria-hidden="true"><div class="rank-featured-card__name">${escapeHtml(String(row?.name || '名無し'))}</div><div class="rank-featured-card__score-row"><div class="rank-featured-card__score">${Math.max(0, Math.floor(Number(row?.score) || 0))}</div>${renderMovementBadge(movement, 'rank-featured-card__trend')}</div>`;
+    card.innerHTML = `<div class="rank-featured-card__glow" aria-hidden="true"></div><div class="rank-featured-card__content"><div class="rank-featured-card__top"><span class="rank-featured-card__badge">#${rank}</span><span class="rank-featured-card__tier">${tierLabelForRank(rank)}</span></div><img class="rank-featured-card__avatar" src="${escapeHtml(resolveAvatarSrcFromId(avatarId))}" alt="" aria-hidden="true"><div class="rank-featured-card__name">${escapeHtml(String(row?.name || '名無し'))}</div><div class="rank-featured-card__score-row"><div class="rank-featured-card__score">${Math.max(0, Math.floor(Number(row?.score) || 0))}</div>${renderMovementBadge(movement, 'rank-featured-card__trend')}</div></div>`;
     featuredEl.appendChild(card);
   });
 }
