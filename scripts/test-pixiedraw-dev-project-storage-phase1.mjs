@@ -66,7 +66,7 @@ const sessionPayload = {
     operationLogsByCanvas: {},
   },
 };
-const serialized = registry.serializeProject({
+const serialized = await registry.serializeProject({
   snapshot: rawDocument,
   session: sessionPayload,
 }, {
@@ -146,8 +146,8 @@ const exportRenderingModule = window.PiXiEEDrawModules.exportRendering.createExp
   buildProjectSessionPayload() {
     return sessionPayload;
   },
-  serializeProjectStorageSnapshot(projectState, options) {
-    return registry.serializeProject(projectState, options);
+  async serializeProjectStorageSnapshot(projectState, options) {
+    return await registry.serializeProject(projectState, options);
   },
   buildPackagedProjectPayload(snapshot, { session } = {}) {
     return {
@@ -164,7 +164,7 @@ const exportRenderingModule = window.PiXiEEDrawModules.exportRendering.createExp
   PROJECT_FILE_MIME_TYPE: 'application/x-pixieedraw',
 });
 
-const bundle = exportRenderingModule.buildProjectExportBundle('phase1-test.pixieedraw');
+const bundle = await exportRenderingModule.buildProjectExportBundle('phase1-test.pixieedraw');
 assert.equal(bundle.storageAdapterId, 'pixieedraw-v1-json');
 assert.equal(bundle.filename, 'phase1-test.pixieedraw');
 assert.deepEqual(bundle.packaged.document, rawDocument);
