@@ -303,7 +303,7 @@ function renderRankingRows(list, rows) {
       li.setAttribute('aria-label', `あなたの順位 ${rank}位`);
     }
     const avatarId = String(row?.avatar || '').trim() || (accountKey(row) === currentAccountId ? currentAccount.avatar : '');
-    li.innerHTML = `<div class="rank-left"><span class="rank-index">${rank}.</span><img class="rank-avatar" src="${escapeHtml(resolveAvatarSrcFromId(avatarId))}" alt="" aria-hidden="true"><span class="rank-name">${escapeHtml(String(row?.name || '名無し'))}</span></div><span class="rank-score">${Math.max(0, Math.floor(Number(row?.score) || 0))}</span>`;
+    li.innerHTML = `<div class="rank-left"><span class="rank-index">${rank}.</span><img class="rank-avatar" src="${escapeHtml(resolveAvatarSrcFromId(avatarId))}" alt="" aria-hidden="true"><span class="rank-name">${escapeHtml(String(row?.name || '名無し'))}</span></div><span class="rank-right"><span class="rank-score-label">SCORE</span><span class="rank-score">${Math.max(0, Math.floor(Number(row?.score) || 0))}</span></span>`;
     list.appendChild(li);
   });
 }
@@ -335,7 +335,7 @@ export async function initRankingUI({ formSelector, listSelector, statusSelector
       const rows = await fetchTopScores();
       renderStatus(baseStatus);
       if (!rows.length) {
-        list.innerHTML = '<li class="rank-item">まだスコアがありません。</li>';
+        list.innerHTML = '<li class="rank-item rank-item--empty">まだスコアがありません。</li>';
         return;
       }
       saveRankingCache(rows);
@@ -349,7 +349,7 @@ export async function initRankingUI({ formSelector, listSelector, statusSelector
         return;
       }
       renderStatus('メンテナンス中です');
-      list.innerHTML = '<li class="rank-item">ランキングを取得できませんでした。</li>';
+      list.innerHTML = '<li class="rank-item rank-item--empty">ランキングを取得できませんでした。</li>';
     }
   }
 
