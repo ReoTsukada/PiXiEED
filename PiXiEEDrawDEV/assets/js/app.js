@@ -5740,6 +5740,8 @@
   set lensImportRequested(value) { lensImportRequested = value; },
   get loadDocumentFromHandle() { return loadDocumentFromHandle; },
   set loadDocumentFromHandle(value) { loadDocumentFromHandle = value; },
+  get loadDocumentFromBlob() { return loadDocumentFromBlob; },
+  set loadDocumentFromBlob(value) { loadDocumentFromBlob = value; },
   get loadDocumentFromProjectPayload() { return loadDocumentFromProjectPayload; },
   set loadDocumentFromProjectPayload(value) { loadDocumentFromProjectPayload = value; },
   get loadDocumentFromText() { return loadDocumentFromText; },
@@ -5822,8 +5824,12 @@
   set setMultiStatus(value) { setMultiStatus = value; },
   get setTrackedProjectDotBaseline() { return setTrackedProjectDotBaseline; },
   set setTrackedProjectDotBaseline(value) { setTrackedProjectDotBaseline = value; },
+  get parseProjectStorageBlob() { return parseProjectStorageBlob; },
+  set parseProjectStorageBlob(value) { parseProjectStorageBlob = value; },
   get shouldAppendExternalImportToProject() { return shouldAppendExternalImportToProject; },
   set shouldAppendExternalImportToProject(value) { shouldAppendExternalImportToProject = value; },
+  get snapshotFromDocumentBlob() { return snapshotFromDocumentBlob; },
+  set snapshotFromDocumentBlob(value) { snapshotFromDocumentBlob = value; },
   get snapshotFromDocumentText() { return snapshotFromDocumentText; },
   set snapshotFromDocumentText(value) { snapshotFromDocumentText = value; },
   get state() { return state; },
@@ -6509,8 +6515,21 @@
     createAutosaveFileName: (...args) => createAutosaveFileName(...args),
   }) || null;
 
+  const pixieeDrawV2ZipAdapter = window.PiXiEEDrawModules?.projectStorageV2ZipAdapter?.createPixieeDrawV2ZipAdapter?.({
+    PROJECT_FILE_EXTENSION,
+    PROJECT_FILE_MIME_TYPE,
+    PROJECT_PACKAGE_TYPE,
+    buildPackagedProjectPayload: (...args) => projectPackageWorkflowUtilsModule.buildPackagedProjectPayload(...args),
+    createAutosaveFileName: (...args) => createAutosaveFileName(...args),
+    decodeBase64: (...args) => decodeBase64(...args),
+    encodeTypedArray: (...args) => encodeTypedArray(...args),
+  }) || null;
+
   const projectStorageAdapterRegistry = projectStorageAdapterUtilsModule.createProjectStorageAdapterRegistry?.({
-    adapters: pixieeDrawV1JsonAdapter ? [pixieeDrawV1JsonAdapter] : [],
+    adapters: [
+      pixieeDrawV1JsonAdapter,
+      pixieeDrawV2ZipAdapter,
+    ].filter(Boolean),
     defaultAdapterId: pixieeDrawV1JsonAdapter?.id || '',
   }) || null;
 
@@ -6528,11 +6547,18 @@
     return projectStorageAdapterRegistry.parseParsedValue(...args);
   }
 
-  function serializeProjectStorageSnapshot(...args) {
+  async function parseProjectStorageBlob(...args) {
+    if (!projectStorageAdapterRegistry?.parseBlob) {
+      throw new Error('Project storage blob parser is not available');
+    }
+    return await projectStorageAdapterRegistry.parseBlob(...args);
+  }
+
+  async function serializeProjectStorageSnapshot(...args) {
     if (!projectStorageAdapterRegistry?.serializeProject) {
       throw new Error('Project storage serializer is not available');
     }
-    return projectStorageAdapterRegistry.serializeProject(...args);
+    return await projectStorageAdapterRegistry.serializeProject(...args);
   }
 
   const documentSerializationUtilsModule = window.PiXiEEDrawModules?.documentSerializationUtils?.createDocumentSerializationUtils?.({
@@ -6707,6 +6733,8 @@
   set normalizeMultiProjectKey(value) { normalizeMultiProjectKey = value; },
   get normalizePackagedProjectSheets() { return normalizePackagedProjectSheets; },
   set normalizePackagedProjectSheets(value) { normalizePackagedProjectSheets = value; },
+  get parseProjectStorageBlob() { return parseProjectStorageBlob; },
+  set parseProjectStorageBlob(value) { parseProjectStorageBlob = value; },
   get parseProjectStoragePayload() { return parseProjectStoragePayload; },
   set parseProjectStoragePayload(value) { parseProjectStoragePayload = value; },
   get parseProjectStorageText() { return parseProjectStorageText; },
@@ -14233,6 +14261,10 @@
     return documentSessionWorkflowUtilsModule.loadDocumentFromHandle(...args);
   }
 
+  async function loadDocumentFromBlob(...args) {
+    return documentSessionWorkflowUtilsModule.loadDocumentFromBlob(...args);
+  }
+
   async function loadDocumentFromText(...args) {
     return documentSessionWorkflowUtilsModule.loadDocumentFromText(...args);
   }
@@ -14267,6 +14299,10 @@
 
   function snapshotFromDocumentText(...args) {
     return documentSessionWorkflowUtilsModule.snapshotFromDocumentText(...args);
+  }
+
+  async function snapshotFromDocumentBlob(...args) {
+    return documentSessionWorkflowUtilsModule.snapshotFromDocumentBlob(...args);
   }
 
   function snapshotFromParsedDocumentValue(...args) {
@@ -15677,6 +15713,10 @@
 
   async function saveProjectAsPixieedraw(...args) {
     return exportRenderingModule.saveProjectAsPixieedraw(...args);
+  }
+
+  async function saveProjectAsPixieedrawV2Experimental(...args) {
+    return exportRenderingModule.saveProjectAsPixieedrawV2Experimental(...args);
   }
 
   function normalizeToolId(value, fallback = 'pen') {
