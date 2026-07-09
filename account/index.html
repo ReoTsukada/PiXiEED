@@ -24,16 +24,11 @@
   <style>
     .account-page{
       display:grid;
-      gap:14px;
+      gap:12px;
     }
-    .account-hero{
-      display:grid;
-      gap:10px;
-      padding:20px;
-      border:1px solid rgba(255,255,255,0.12);
-      border-radius:18px;
-      background:rgba(255,255,255,0.05);
-      box-shadow:0 18px 48px rgba(0,0,0,0.22);
+    .account-title{
+      margin:0;
+      padding:2px 2px 0;
     }
     .account-grid{
       display:grid;
@@ -170,28 +165,9 @@
   </style>
 </head>
 <body>
-  <header class="site-header" aria-label="top-nav">
-    <div class="header-inner header-inner--app">
-      <a class="brand" id="openProfilePanel" href="./">
-        <span class="brand-icon" id="brandAvatar">
-          <img src="../character-dots/maousama.png" alt="avatar">
-        </span>
-        <div class="brand-text">
-          <p class="brand-title">PiXiEED</p>
-          <p class="brand-sub" id="brandUser">ユーザー</p>
-        </div>
-      </a>
-      <div class="header-actions">
-        <a class="support-tip-link" id="supportTipLink" href="#" target="_blank" rel="noopener noreferrer" aria-label="PiXiEEDのサポートを購入">サポート</a>
-      </div>
-    </div>
-  </header>
-
   <div class="page">
     <main class="page-shell account-page">
-      <section class="account-hero" aria-labelledby="accountTitle">
-        <h1 class="section-title" id="accountTitle">マイページ</h1>
-      </section>
+      <h1 class="section-title account-title" id="accountTitle">マイページ</h1>
 
       <div class="account-grid">
         <section class="account-stack" aria-label="作品">
