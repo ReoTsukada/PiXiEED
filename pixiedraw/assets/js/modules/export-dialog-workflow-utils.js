@@ -43,23 +43,44 @@
       exportProjectWithFallback();
       return;
     }
-    setExportFileBaseName(getExportFileNameBase() || state.documentName);
-    if (EXPORT_DIRECTORY_SUPPORTED) {
-      if (pendingExportDirectoryHandle && !exportDirectoryHandle) {
-        await attemptExportDirectoryReauthorization();
-      } else if (!exportDirectoryHandle && !exportDirectorySetupDismissed) {
-        await requestExportDirectoryBinding();
+    try {
+      setExportFileBaseName(getExportFileNameBase() || state.documentName);
+      if (EXPORT_DIRECTORY_SUPPORTED) {
+        if (pendingExportDirectoryHandle && !exportDirectoryHandle) {
+          await attemptExportDirectoryReauthorization();
+        } else if (!exportDirectoryHandle && !exportDirectorySetupDismissed) {
+          await requestExportDirectoryBinding();
+        }
       }
+    } catch (error) {
+      console.warn('Failed to prepare export dialog', error);
     }
     const dialog = config.dialog;
     if (dialog && typeof dialog.showModal === 'function') {
+      if (dialog.open) {
+        return;
+      }
       refreshExportScaleControls();
       updateExportFormatAvailability();
       updateExportOriginalToggleUI();
-      dialog.showModal();
+      try {
+        dialog.showModal();
+      } catch (error) {
+        console.warn('Failed to open export dialog', error);
+        exportProjectWithFallback();
+        return;
+      }
       window.requestAnimationFrame(() => {
-        updateExportPreview();
-        queueExportAdRender();
+        try {
+          updateExportPreview();
+        } catch (error) {
+          console.warn('Failed to update export preview', error);
+        }
+        try {
+          queueExportAdRender();
+        } catch (error) {
+          console.warn('Failed to queue export ad render', error);
+        }
       });
     } else {
       exportProjectWithFallback();
