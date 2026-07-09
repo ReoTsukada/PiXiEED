@@ -11026,6 +11026,8 @@
   updateExportOptionVisibility,
   updateExportOriginalToggleUI,
   announceProjectCompanionSaveResult,
+  maybeRedirectToContestPostAfterExport,
+  maybeSaveProjectCompanionAfterExport,
   resolveContestUploadCanvasSizeLabel,
   applyExportScaleConstraints,
   updateExportScaleHint,
@@ -11045,6 +11047,8 @@
   scaleFramePixelsNearestNeighbor,
   scaleFrameSetNearestNeighbor,
   buildSpriteMapCanvas,
+  deliverExportTasks,
+  getExportScaleCandidates,
   getProjectFilePickerTypes,
   buildProjectExportBundle,
   } = exportRenderingModule;
@@ -15595,6 +15599,26 @@
     return pixfindModeUtilsModule.exportProjectToPixfind();
   }
 
+  async function exportProjectAsSpriteMap(...args) {
+    return exportRenderingModule.exportProjectAsSpriteMap(...args);
+  }
+
+  async function exportProjectAsJpeg(...args) {
+    return exportRenderingModule.exportProjectAsJpeg(...args);
+  }
+
+  async function exportProjectAsSvg(...args) {
+    return exportRenderingModule.exportProjectAsSvg(...args);
+  }
+
+  async function exportProjectAsGlb(...args) {
+    return exportRenderingModule.exportProjectAsGlb(...args);
+  }
+
+  async function exportProjectAsGif(...args) {
+    return exportRenderingModule.exportProjectAsGif(...args);
+  }
+
   async function exportProjectAsGridPng(...args) {
     return exportFormatWorkflowUtilsModule.exportProjectAsGridPng(...args);
   }
@@ -15605,6 +15629,10 @@
 
   async function exportProjectAsVoxelPreviewPng(...args) {
     return exportFormatWorkflowUtilsModule.exportProjectAsVoxelPreviewPng(...args);
+  }
+
+  async function saveProjectAsPixieedraw(...args) {
+    return exportRenderingModule.saveProjectAsPixieedraw(...args);
   }
 
   function normalizeToolId(value, fallback = 'pen') {

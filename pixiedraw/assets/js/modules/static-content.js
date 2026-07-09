@@ -280,6 +280,18 @@
 
   const BUILTIN_UPDATE_HISTORY_ENTRIES = Object.freeze([
     Object.freeze({
+      id: '2026-07-09-export-fix-apology',
+      at: '2026-07-09T15:26:00+09:00',
+      title: '保存/出力不具合の修正とお詫び',
+      published: true,
+      details: Object.freeze([
+        '保存/出力ボタンでパネルが開かない、または PNG などの出力が完了しない不具合を修正。',
+        '出力関連モジュールの読み込み順と分岐を見直し、保存/出力の処理経路を整理。',
+        '起動後ポップアップと更新情報パネルに、今回の修正内容のまとめを追加。',
+        '保存/出力が不安定な状態が続いてしまい、申し訳ありませんでした。',
+      ]),
+    }),
+    Object.freeze({
       id: '2026-03-22-voxel-extension-preview',
       at: '2026-03-22T23:58:00+09:00',
       title: 'ボクセルモードと小窓プレビューを追加',

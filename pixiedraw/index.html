@@ -240,15 +240,15 @@
 <button class="startup-screen__link" id="startupActionSkip" type="button">この画面を閉じる</button>
 </div>
 </div>
-<div aria-hidden="true" class="update-toast" data-update-id="2026-03-22-voxel-extension-preview" data-update-published="true" hidden="" id="updateToast" role="status" aria-live="polite">
+<div aria-hidden="true" class="update-toast" data-update-id="2026-07-09-export-fix-apology" data-update-published="true" hidden="" id="updateToast" role="status" aria-live="polite">
 <div class="update-toast__body">
 <p class="update-toast__message">
-<strong>更新情報 (2026/03/22)</strong><br/>
+<strong>更新情報 (2026/07/09)</strong><br/>
 【今回更新】<br/>
-・拡張モードにボクセル6面入力と小窓プレビューを追加しました<br/>
-・小窓プレビューはドラッグで上下左右に回転でき、描画ごとに即時更新されます<br/>
-・マルチキャンバスは初期グリッド配置のあと自由配置でき、選択中だけ移動つまみを表示します<br/>
-・OBJのボクセル出力は一旦廃止し、制作とプレビュー調整を優先する構成に戻しました<br/>
+・保存/出力パネルが開かない、または PNG などの出力が完了しない不具合を修正しました<br/>
+・出力関連モジュールの読み込みと処理経路を見直しました<br/>
+・起動後ポップアップと更新情報に今回の修正内容を掲載しました<br/>
+・保存/出力が不安定な状態が続いてしまい、申し訳ありませんでした<br/>
 ・詳細は設定の「更新情報」から確認できます
 </p>
 <div class="update-toast__actions">
@@ -1606,7 +1606,7 @@
 	<script defer="" src="assets/js/modules/keyboard-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/canvas-pointer-workflow-utils.js?v=2026.07.02-canvas-pointer-deps-fix1"></script>
 	<script defer="" src="assets/js/modules/canvas-tool-state-workflow-utils.js?v=2026.07.02-canvas-tool-state-fix2"></script>
-	<script defer="" src="assets/js/modules/export-rendering.js?v=2026.06.30-export-rendering-v1"></script>
+	<script defer="" src="assets/js/modules/export-rendering.js?v=2026.07.09-export-routing-fix2"></script>
 	<script defer="" src="assets/js/modules/dialog-setup-utils.js?v=2026.07.01-dialog-setup-v1"></script>
 	<script defer="" src="assets/js/modules/canvas-resize-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/canvas-resize-handle-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
@@ -1628,7 +1628,7 @@
 	<script defer="" src="assets/js/modules/autosave-workflow-utils.js?v=2026.07.01-autosave-workflow-split-v1"></script>
 	<script defer="" src="assets/js/modules/open-import-workflow-utils.js?v=2026.07.01-open-import-workflow-split-v1"></script>
 	<script defer="" src="assets/js/modules/export-format-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
-	<script defer="" src="assets/js/modules/export-dialog-workflow-utils.js?v=2026.07.03-export-dialog-fix1"></script>
+	<script defer="" src="assets/js/modules/export-dialog-workflow-utils.js?v=2026.07.09-export-routing-fix2"></script>
 	<script defer="" src="assets/js/modules/startup-workflow-utils.js?v=2026.07.04-shared-project-disabled1"></script>
 	<script defer="" src="assets/js/modules/recent-project-workflow-utils.js?v=2026.07.03-project-home-ad-card-fix1"></script>
 	<script defer="" src="assets/js/modules/project-package-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
@@ -1658,7 +1658,7 @@
 	<script defer="" src="assets/js/modules/controls-mirror.js?v=2026.07.03-mirror-guide-drag-fix1"></script>
 	<script defer="" src="assets/js/modules/external-tool-workflow-utils.js?v=2026.07.02-external-tool-workflow-split-v1"></script>
 	<script defer="" src="assets/js/pixieedraw-dev-switch.js?v=2026.07.03-pixieedrawdev-switch-fix14"></script>
-	<script defer="" src="assets/js/app.js?v=2026.07.08-export-landscape-vertical-ad-fix1"></script>
+	<script defer="" src="assets/js/app.js?v=2026.07.09-export-routing-fix2"></script>
   <script>
     (function initPanelAdDocking() {
       const ads = {

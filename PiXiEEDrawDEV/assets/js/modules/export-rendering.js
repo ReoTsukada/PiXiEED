@@ -299,14 +299,20 @@
     };
   }
 
-  async function exportProjectAsSpriteMap() {
+  async function exportProjectAsSpriteMap(options = {}) {
+    const companionExport = Boolean(options?.companionExport);
+    const includeProjectCompanion = options?.includeProjectCompanion !== undefined
+      ? Boolean(options.includeProjectCompanion)
+      : shouldSaveProjectCompanion('spritemap');
     if (!ensureCurrentClientCanExportProject({ announce: true, format: 'spritemap' })) {
-      return;
+      return { exportedCount: 0, total: 0, wasCancelled: false, hadFailure: true };
     }
     const frameCount = state.frames.length;
     if (!frameCount) {
-      updateAutosaveStatus('SpriteMAPにまとめるフレームがありません', 'warn');
-      return;
+      if (!companionExport) {
+        updateAutosaveStatus('SpriteMAPにまとめるフレームがありません', 'warn');
+      }
+      return { exportedCount: 0, total: 0, wasCancelled: false, hadFailure: true };
     }
     try {
       const candidates = getExportScaleCandidates('spritemap');
@@ -325,9 +331,9 @@
         shareTitle: state.documentName || 'PiXiEEDraw',
         shareText: 'SpriteMAPを書き出しました',
         mode: 'spritemap',
-        includeProjectCompanion: shouldSaveProjectCompanion('spritemap'),
+        includeProjectCompanion,
         archiveSuffix: 'spritemap',
-        archiveShareText: shouldSaveProjectCompanion('spritemap')
+        archiveShareText: includeProjectCompanion
           ? 'SpriteMAP一式と .pixieedraw を ZIP で書き出しました'
           : 'SpriteMAP一式をZIPで書き出しました',
       });
@@ -344,34 +350,39 @@
       }
       const detail = detailParts.length ? ` (${detailParts.join(' / ')})` : '';
 
-      if (result.exportedCount === result.total) {
-        updateAutosaveStatus(`SpriteMAPを書き出しました${detail}`, 'success');
-      } else if (result.wasCancelled) {
-        const remaining = result.total - result.exportedCount;
-        updateAutosaveStatus(remaining === result.total
-          ? 'SpriteMAPの書き出しをキャンセルしました'
-          : `SpriteMAPを書き出しましたが ${remaining} 件はキャンセルされました`, 'warn');
-      } else if (result.exportedCount > 0 && result.hadFailure) {
-        updateAutosaveStatus(`SpriteMAPを書き出しましたが ${result.total - result.exportedCount} 件エクスポートできませんでした`, 'warn');
-      } else {
-        updateAutosaveStatus('SpriteMAPの書き出しに失敗しました', 'error');
+      if (!companionExport) {
+        if (result.exportedCount === result.total) {
+          updateAutosaveStatus(`SpriteMAPを書き出しました${detail}`, 'success');
+        } else if (result.wasCancelled) {
+          const remaining = result.total - result.exportedCount;
+          updateAutosaveStatus(remaining === result.total
+            ? 'SpriteMAPの書き出しをキャンセルしました'
+            : `SpriteMAPを書き出しましたが ${remaining} 件はキャンセルされました`, 'warn');
+        } else if (result.exportedCount > 0 && result.hadFailure) {
+          updateAutosaveStatus(`SpriteMAPを書き出しましたが ${result.total - result.exportedCount} 件エクスポートできませんでした`, 'warn');
+        } else {
+          updateAutosaveStatus('SpriteMAPの書き出しに失敗しました', 'error');
+        }
       }
       if (result.exportedCount > 0) {
         markDocumentDurablySaved();
         if (result.exportedCount === result.total && !result.wasCancelled && !result.hadFailure) {
-          const companionResult = shouldSaveProjectCompanion('spritemap')
-            ? 'saved'
-            : await maybeSaveProjectCompanionAfterExport('spritemap', {
-              exportedCount: result.exportedCount,
-              wasCancelled: result.wasCancelled,
-            });
-          announceProjectCompanionSaveResult('spritemap', companionResult);
+          const companionResult = includeProjectCompanion ? 'saved' : 'skipped';
+          if (!companionExport) {
+            announceProjectCompanionSaveResult('spritemap', companionResult);
+          }
         }
-        showLoginPromptAfterExport();
+        if (!companionExport) {
+          showLoginPromptAfterExport();
+        }
       }
+      return result;
     } catch (error) {
       console.error('SpriteMAP export failed', error);
-      updateAutosaveStatus('SpriteMAPの書き出しに失敗しました', 'error');
+      if (!companionExport) {
+        updateAutosaveStatus('SpriteMAPの書き出しに失敗しました', 'error');
+      }
+      return { exportedCount: 0, total: 0, wasCancelled: false, hadFailure: true, error };
     }
   }
 
@@ -2630,6 +2641,7 @@
 
         return Object.freeze({
           buildVoxelPreviewAnimationFrameSet,
+          buildSpriteMapExportTasks,
           buildColorSpriteExportPlanFromFramePixels,
           copyPixelBlockToBuffer,
           buildColorSpriteAppendAreaFromFramePixels,
@@ -2637,6 +2649,11 @@
           buildColorSpriteAppendAreaForCurrentExport,
           appendColorSpriteAreaToStillFrameSet,
           appendColorSpriteAreaToFrameSet,
+          exportProjectAsSpriteMap,
+          exportProjectAsJpeg,
+          exportProjectAsSvg,
+          exportProjectAsGlb,
+          exportProjectAsGif,
           createJpegCanvasFromSourceCanvas,
           toSvgColorHex,
           toSvgOpacity,
@@ -2676,13 +2693,16 @@
           canOfferContestPostAfterSave,
           updateExportContestPostToggleUI,
           normalizeExportGridTileSize,
+          getExportScaleCandidates,
           canOfferOriginalCompanionExport,
           shouldExportOriginalCompanion,
           doesExportFormatUseScale,
           doesExportFormatSupportProjectCompanion,
           updateExportOptionVisibility,
           updateExportOriginalToggleUI,
+          maybeSaveProjectCompanionAfterExport,
           announceProjectCompanionSaveResult,
+          maybeRedirectToContestPostAfterExport,
           resolveContestUploadCanvasSizeLabel,
           applyExportScaleConstraints,
           updateExportScaleHint,
@@ -2702,8 +2722,10 @@
           scaleFramePixelsNearestNeighbor,
           scaleFrameSetNearestNeighbor,
           buildSpriteMapCanvas,
+          deliverExportTasks,
           getProjectFilePickerTypes,
           buildProjectExportBundle,
+          saveProjectAsPixieedraw,
         });
       }
     })(scope);
