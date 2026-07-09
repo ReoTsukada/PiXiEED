@@ -12,6 +12,7 @@
   const AUTH_BLOCK_ID = 'sharedAuthBlock';
   const AUTH_STORAGE_KEY = 'sb-kyyiuakrqomzlikfaire-auth-token';
   const AUTH_SESSION_CACHE_KEY = 'pixieed:auth-session-cache:v1';
+  const MAOITU_NAME_STORAGE_KEY = 'maoitu_rank_name';
   const AUTH_URL_PARAM_KEYS = [
     'code',
     'error',
@@ -83,7 +84,9 @@
 
   function saveNickname(value) {
     try {
-      localStorage.setItem('pixieed_nickname', String(value || '').trim());
+      const normalized = String(value || '').trim();
+      localStorage.setItem('pixieed_nickname', normalized);
+      localStorage.setItem(MAOITU_NAME_STORAGE_KEY, normalized || '名無し');
     } catch (_error) {}
   }
 
@@ -170,6 +173,15 @@
     }
   }
 
+  function getMaoituProfilePayload() {
+    const name = loadNickname().trim().slice(0, 24) || '名無し';
+    const avatar = loadAvatar() || 'mao';
+    try {
+      localStorage.setItem(MAOITU_NAME_STORAGE_KEY, name);
+    } catch (_error) {}
+    return { name, avatar };
+  }
+
   function setStatus(message) {
     const status = document.getElementById('authAccountStatus');
     if (status) {
@@ -245,6 +257,7 @@
         if (panel) panel.hidden = true;
         if (toggle) toggle.setAttribute('aria-expanded', 'false');
         window.dispatchEvent(new CustomEvent('pixieed:profile-updated'));
+        syncMaoituRankingProfile().catch(() => {});
       });
       grid.appendChild(button);
     });
@@ -656,6 +669,39 @@
     }
   }
 
+  async function syncMaoituRankingProfile() {
+    const clientId = getClientId();
+    if (!clientId) {
+      return false;
+    }
+    let client = supabaseClient;
+    if (!client) {
+      try {
+        client = await ensureSupabaseClient();
+      } catch (_error) {
+        return false;
+      }
+    }
+    if (!client) {
+      return false;
+    }
+    const payload = getMaoituProfilePayload();
+    let result = await client
+      .from('scores')
+      .update(payload)
+      .eq('client_id', clientId);
+    if (result.error && isMissingColumn(result.error, 'avatar')) {
+      result = await client
+        .from('scores')
+        .update({ name: payload.name })
+        .eq('client_id', clientId);
+    }
+    if (result.error) {
+      return false;
+    }
+    return true;
+  }
+
   function bindControls() {
     const loginBtn = document.getElementById('authLoginBtn');
     const logoutBtn = document.getElementById('logoutBtn');
@@ -770,6 +816,7 @@
         saveXUrl(xInput?.value || '');
         updateProfileUi();
         window.dispatchEvent(new CustomEvent('pixieed:profile-updated'));
+        await syncMaoituRankingProfile().catch(() => false);
         if (!supabaseUser) {
           setStatus('プロフィールを保存しました');
           return;
