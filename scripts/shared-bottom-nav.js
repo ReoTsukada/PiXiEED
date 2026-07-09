@@ -208,7 +208,30 @@
     ];
   }
 
+  function getStoredAvatarId() {
+    try {
+      const saved = String(localStorage.getItem('pixieed_avatar') || '').trim().toLowerCase();
+      if (!saved || saved === 'pixiedraw') return 'mao';
+      return saved;
+    } catch (_error) {
+      return 'mao';
+    }
+  }
+
+  function resolveAvatarSrcFromId(avatarId) {
+    const id = String(avatarId || '').trim().toLowerCase();
+    if (!id || id === 'mao') return relHref('character-dots/maousama.png');
+    if (/^jerin[1-8]$/.test(id)) return relHref(`character-dots/Jerin${id.slice(5)}.png`);
+    if (/^jellnall([1-9]|1[0-9])$/.test(id)) return relHref(`character-dots/${id.toUpperCase()}.png`);
+    if (id === 'baburin') return relHref('character-dots/baburinpng.png');
+    return relHref('character-dots/maousama.png');
+  }
+
   function getProfileNavAvatarSrc() {
+    const savedAvatarSrc = resolveAvatarSrcFromId(getStoredAvatarId());
+    if (savedAvatarSrc) {
+      return savedAvatarSrc;
+    }
     const brandAvatar = doc.querySelector('#brandAvatar img');
     if (brandAvatar?.getAttribute('src')) {
       return brandAvatar.getAttribute('src');
