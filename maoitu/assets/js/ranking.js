@@ -156,6 +156,15 @@ function rankTierForPosition(rank) {
   return 'white';
 }
 
+function tierLabelForRank(rank) {
+  if (rank === 1) return 'CHAMPION';
+  if (rank === 2) return 'ELITE';
+  if (rank === 3) return 'MASTER';
+  if (rank <= 10) return 'TOP 10';
+  if (rank <= 30) return 'TOP 30';
+  return 'LEADERBOARD';
+}
+
 function normalizeProfileUrl(value) {
   const raw = String(value || '').trim();
   if (!raw) return '';
@@ -308,10 +317,44 @@ function renderRankingRows(list, rows) {
   });
 }
 
-export async function initRankingUI({ formSelector, listSelector, statusSelector }) {
+function renderFeaturedRanks(featuredEl, rows, currentAccountId) {
+  if (!featuredEl) return;
+  featuredEl.innerHTML = '';
+  const topRows = Array.isArray(rows) ? rows.slice(0, 3) : [];
+  if (!topRows.length) {
+    featuredEl.innerHTML = '<div class="rank-featured__empty">最初のランカーを待っています</div>';
+    return;
+  }
+  topRows.forEach((row, idx) => {
+    const rank = idx + 1;
+    const card = document.createElement('article');
+    card.className = 'rank-featured-card';
+    card.dataset.rank = String(rank);
+    card.dataset.rankTier = rankTierForPosition(rank);
+    if (accountKey(row) === currentAccountId) {
+      card.classList.add('rank-featured-card--self');
+    }
+    const avatarId = String(row?.avatar || '').trim();
+    card.innerHTML = `<div class="rank-featured-card__glow" aria-hidden="true"></div><div class="rank-featured-card__top"><span class="rank-featured-card__badge">#${rank}</span><span class="rank-featured-card__tier">${tierLabelForRank(rank)}</span></div><img class="rank-featured-card__avatar" src="${escapeHtml(resolveAvatarSrcFromId(avatarId))}" alt="" aria-hidden="true"><div class="rank-featured-card__name">${escapeHtml(String(row?.name || '名無し'))}</div><div class="rank-featured-card__score">${Math.max(0, Math.floor(Number(row?.score) || 0))}</div>`;
+    featuredEl.appendChild(card);
+  });
+}
+
+function renderOverview(overviewEl, rows, currentAccountId) {
+  if (!overviewEl) return;
+  const total = Array.isArray(rows) ? rows.length : 0;
+  const selfRank = Array.isArray(rows)
+    ? rows.findIndex(row => accountKey(row) === currentAccountId) + 1
+    : 0;
+  overviewEl.innerHTML = `<div class="rank-overview__hero"><div class="rank-overview__eyebrow">LIVE LEADERBOARD</div><div class="rank-overview__title">避け続けた勇者たち</div><div class="rank-overview__copy">いま強いプレイヤーがひと目で分かる、まおいつのオンラインランキングです。</div></div><div class="rank-overview__stats"><div class="rank-overview__stat"><span class="rank-overview__stat-label">表示中</span><strong class="rank-overview__stat-value">TOP ${Math.max(1, total)}</strong></div><div class="rank-overview__stat"><span class="rank-overview__stat-label">あなた</span><strong class="rank-overview__stat-value">${selfRank ? `#${selfRank}` : '圏外'}</strong></div></div>`;
+}
+
+export async function initRankingUI({ formSelector, listSelector, statusSelector, featuredSelector, overviewSelector }) {
   const form = formSelector ? document.querySelector(formSelector) : null;
   const list = listSelector ? document.querySelector(listSelector) : null;
   const statusEl = statusSelector ? document.querySelector(statusSelector) : null;
+  const featuredEl = featuredSelector ? document.querySelector(featuredSelector) : document.getElementById('rankFeatured');
+  const overviewEl = overviewSelector ? document.querySelector(overviewSelector) : document.getElementById('rankOverview');
   const nameDisplay = form ? form.querySelector('#rankNameDisplay') : document.getElementById('rankNameDisplay');
   if (!list) return;
 
@@ -334,21 +377,33 @@ export async function initRankingUI({ formSelector, listSelector, statusSelector
       await flushQueuedScores();
       const rows = await fetchTopScores();
       renderStatus(baseStatus);
+      const currentAccount = getCurrentAccountIdentity();
+      const currentAccountId = accountKey(currentAccount);
       if (!rows.length) {
+        renderOverview(overviewEl, [], currentAccountId);
+        renderFeaturedRanks(featuredEl, [], currentAccountId);
         list.innerHTML = '<li class="rank-item rank-item--empty">まだスコアがありません。</li>';
         return;
       }
       saveRankingCache(rows);
+      renderOverview(overviewEl, rows, currentAccountId);
+      renderFeaturedRanks(featuredEl, rows, currentAccountId);
       renderRankingRows(list, rows);
     } catch (error) {
       markSupabaseMaintenanceFromError(error);
       const cached = loadRankingCache();
       if (cached.length) {
         renderStatus('メンテナンス中のため前回のランキングを表示しています');
+        const currentAccount = getCurrentAccountIdentity();
+        const currentAccountId = accountKey(currentAccount);
+        renderOverview(overviewEl, cached, currentAccountId);
+        renderFeaturedRanks(featuredEl, cached, currentAccountId);
         renderRankingRows(list, cached);
         return;
       }
       renderStatus('メンテナンス中です');
+      renderOverview(overviewEl, [], 'guest');
+      renderFeaturedRanks(featuredEl, [], 'guest');
       list.innerHTML = '<li class="rank-item rank-item--empty">ランキングを取得できませんでした。</li>';
     }
   }
