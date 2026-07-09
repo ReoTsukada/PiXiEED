@@ -10966,6 +10966,13 @@ body.is-mobile-layout #newProjectDialog .modal__body {
   min-width: min(320px, calc(var(--mobile-viewport-width) - var(--safe-area-left) - var(--safe-area-right) - 24px));
 }
 
+.export-interstitial-modal .modal__form,
+.tool-spotlight-modal .modal__form,
+.login-prompt-modal .modal__form {
+  height: auto;
+  max-height: inherit;
+}
+
 .shortcut-help-modal {
   width: min(560px, calc(var(--mobile-viewport-width) - var(--safe-area-left) - var(--safe-area-right) - 24px));
   min-width: min(320px, calc(var(--mobile-viewport-width) - var(--safe-area-left) - var(--safe-area-right) - 24px));
@@ -11089,6 +11096,11 @@ body.is-mobile-layout #newProjectDialog .modal__body {
 
 .tool-spotlight-modal {
   width: min(620px, calc(var(--mobile-viewport-width) - var(--safe-area-left) - var(--safe-area-right) - 24px));
+  min-width: min(320px, calc(var(--mobile-viewport-width) - var(--safe-area-left) - var(--safe-area-right) - 24px));
+}
+
+.login-prompt-modal {
+  width: min(420px, calc(var(--mobile-viewport-width) - var(--safe-area-left) - var(--safe-area-right) - 24px));
   min-width: min(320px, calc(var(--mobile-viewport-width) - var(--safe-area-left) - var(--safe-area-right) - 24px));
 }
 
