@@ -261,15 +261,18 @@
     if (file && isImportableImageFile(file)) {
       return await openImageFileAsNewProject(file, { source });
     }
-    if (!file || typeof file.text !== 'function') {
+    if (!file || typeof file.arrayBuffer !== 'function') {
       updateAutosaveStatus('ドキュメントを開けませんでした', 'error');
       return false;
     }
 
     try {
-      const text = await file.text();
       try {
-        snapshotFromDocumentText(text);
+        if (typeof snapshotFromDocumentBlob === 'function') {
+          await snapshotFromDocumentBlob(file);
+        } else {
+          snapshotFromDocumentText(await file.text());
+        }
       } catch (parseError) {
         console.warn('Failed to parse document', parseError);
         updateAutosaveStatus('ドキュメントの読み込みに失敗しました', 'error');
@@ -281,7 +284,9 @@
           return false;
         }
       }
-      const loaded = await loadDocumentFromText(text, handle, { suppressAutosaveStatus: true });
+      const loaded = typeof loadDocumentFromBlob === 'function'
+        ? await loadDocumentFromBlob(file, handle, { suppressAutosaveStatus: true })
+        : await loadDocumentFromText(await file.text(), handle, { suppressAutosaveStatus: true });
       if (!loaded || loaded === 'deferred') {
         return false;
       }
@@ -340,23 +345,36 @@
       file = item;
       fallbackName = item.name || DEFAULT_DOCUMENT_NAME;
     }
-    if (!file || isImportableImageFile(file) || typeof file.text !== 'function') {
+    if (!file || isImportableImageFile(file) || typeof file.arrayBuffer !== 'function') {
       return null;
     }
-    let parsed = null;
     try {
-      parsed = tryParseJsonSafe(await file.text());
+      if (typeof parseProjectStorageBlob === 'function') {
+        const parsedResult = await parseProjectStorageBlob(file);
+        const parsed = parsedResult && Object.prototype.hasOwnProperty.call(parsedResult, 'parsed')
+          ? parsedResult.parsed
+          : parsedResult;
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          return {
+            project: parsed,
+            fileName: resolveOpenProjectPayloadFileName(parsed, fallbackName),
+            unsaved: false,
+          };
+        }
+        return null;
+      }
+      const parsed = tryParseJsonSafe(await file.text());
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        return null;
+      }
+      return {
+        project: parsed,
+        fileName: resolveOpenProjectPayloadFileName(parsed, fallbackName),
+        unsaved: false,
+      };
     } catch (_error) {
       return null;
     }
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      return null;
-    }
-    return {
-      project: parsed,
-      fileName: resolveOpenProjectPayloadFileName(parsed, fallbackName),
-      unsaved: false,
-    };
   }
 
   async function appendProjectPayloadAsOpenTab({
