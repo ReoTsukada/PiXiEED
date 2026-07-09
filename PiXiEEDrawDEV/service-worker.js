@@ -1,4 +1,4 @@
-const APP_BUILD_VERSION = '2026.07.08-export-landscape-vertical-ad-fix1';
+const APP_BUILD_VERSION = '2026.07.10-pixiedraw-ads-restore1';
 const CACHE_VERSION = `pixieedrawdev-v${APP_BUILD_VERSION}`;
 const CORE_ASSETS = [
   '/PiXiEEDrawDEV/',
