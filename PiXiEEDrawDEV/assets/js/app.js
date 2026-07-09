@@ -6497,6 +6497,44 @@
   set suppressOpenProjectTabAutoInitialize(value) { suppressOpenProjectTabAutoInitialize = value; },
   }) || {};
 
+  const projectStorageAdapterUtilsModule = window.PiXiEEDrawModules?.projectStorageAdapterUtils?.createProjectStorageAdapterUtils?.({
+    console,
+  }) || {};
+
+  const pixieeDrawV1JsonAdapter = window.PiXiEEDrawModules?.projectStorageV1JsonAdapter?.createPixieeDrawV1JsonAdapter?.({
+    PROJECT_FILE_EXTENSION,
+    PROJECT_FILE_MIME_TYPE,
+    PROJECT_PACKAGE_TYPE,
+    buildPackagedProjectPayload: (...args) => projectPackageWorkflowUtilsModule.buildPackagedProjectPayload(...args),
+    createAutosaveFileName: (...args) => createAutosaveFileName(...args),
+  }) || null;
+
+  const projectStorageAdapterRegistry = projectStorageAdapterUtilsModule.createProjectStorageAdapterRegistry?.({
+    adapters: pixieeDrawV1JsonAdapter ? [pixieeDrawV1JsonAdapter] : [],
+    defaultAdapterId: pixieeDrawV1JsonAdapter?.id || '',
+  }) || null;
+
+  function parseProjectStorageText(...args) {
+    if (!projectStorageAdapterRegistry?.parseText) {
+      throw new Error('Project storage text parser is not available');
+    }
+    return projectStorageAdapterRegistry.parseText(...args);
+  }
+
+  function parseProjectStoragePayload(...args) {
+    if (!projectStorageAdapterRegistry?.parseParsedValue) {
+      return { adapterId: '', parsed: args[0] };
+    }
+    return projectStorageAdapterRegistry.parseParsedValue(...args);
+  }
+
+  function serializeProjectStorageSnapshot(...args) {
+    if (!projectStorageAdapterRegistry?.serializeProject) {
+      throw new Error('Project storage serializer is not available');
+    }
+    return projectStorageAdapterRegistry.serializeProject(...args);
+  }
+
   const documentSerializationUtilsModule = window.PiXiEEDrawModules?.documentSerializationUtils?.createDocumentSerializationUtils?.({
   get BRUSH_SHAPE_CUSTOM() { return BRUSH_SHAPE_CUSTOM; },
   set BRUSH_SHAPE_CUSTOM(value) { BRUSH_SHAPE_CUSTOM = value; },
@@ -6669,6 +6707,10 @@
   set normalizeMultiProjectKey(value) { normalizeMultiProjectKey = value; },
   get normalizePackagedProjectSheets() { return normalizePackagedProjectSheets; },
   set normalizePackagedProjectSheets(value) { normalizePackagedProjectSheets = value; },
+  get parseProjectStoragePayload() { return parseProjectStoragePayload; },
+  set parseProjectStoragePayload(value) { parseProjectStoragePayload = value; },
+  get parseProjectStorageText() { return parseProjectStorageText; },
+  set parseProjectStorageText(value) { parseProjectStorageText = value; },
   get normalizeTimelapseCanvasId() { return normalizeTimelapseCanvasId; },
   set normalizeTimelapseCanvasId(value) { normalizeTimelapseCanvasId = value; },
   get normalizeTimelapseFps() { return normalizeTimelapseFps; },
@@ -10924,6 +10966,8 @@
   set schedulePendingAutosavePermission(value) { schedulePendingAutosavePermission = value; },
   get scheduleSessionPersist() { return scheduleSessionPersist; },
   set scheduleSessionPersist(value) { scheduleSessionPersist = value; },
+  get serializeProjectStorageSnapshot() { return serializeProjectStorageSnapshot; },
+  set serializeProjectStorageSnapshot(value) { serializeProjectStorageSnapshot = value; },
   get setTrackedProjectDotBaseline() { return setTrackedProjectDotBaseline; },
   set setTrackedProjectDotBaseline(value) { setTrackedProjectDotBaseline = value; },
   get showLoginPromptAfterExport() { return showLoginPromptAfterExport; },
