@@ -2116,8 +2116,8 @@ body:has(.home-app) > .google-auto-placed {
   }
   .home-hero-card--image {
     margin-top: 10px;
-    aspect-ratio: 1200 / 630;
-    min-height: 0;
+    aspect-ratio: auto;
+    min-height: clamp(460px, 34vw, 580px);
   }
   .home-hero-slide__content {
     gap: 12px;
@@ -2170,6 +2170,28 @@ body:has(.home-app) > .google-auto-placed {
   }
   .home-showcase__stage {
     aspect-ratio: 16 / 7;
+  }
+}
+
+@media (min-width: 860px) and (max-width: 1420px) {
+  .home-hero-slide__title {
+    max-width: 13.2em;
+    font-size: clamp(27px, 3vw, 36px);
+  }
+  .home-hero-slide__copy {
+    max-width: 38ch;
+  }
+  .home-hero-slide__content--split {
+    grid-template-columns: minmax(0, 1fr) minmax(190px, 244px);
+    gap: 14px;
+  }
+  .home-hero-preview {
+    width: min(100%, 244px);
+    padding: 10px;
+    border-radius: 20px;
+  }
+  .home-hero-preview img {
+    border-radius: 16px;
   }
 }
 
