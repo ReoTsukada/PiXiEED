@@ -51,6 +51,7 @@
     if (normalized === 'spritemap' || normalized === 'sprite-map' || normalized === 'spritesheet' || normalized === 'sprite-sheet') return 'spritemap';
     if (normalized === 'png') return 'png';
     if (normalized === 'gridpng' || normalized === 'grid') return 'gridpng';
+    if (normalized === 'projectv2experimental' || normalized === 'project-v2-experimental' || normalized === 'projectv2' || normalized === 'project-v2') return 'projectv2experimental';
     if (normalized === 'project') return 'project';
     return 'png';
   }
