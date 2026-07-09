@@ -10,6 +10,8 @@ const SUPABASE_MAINTENANCE_KEY = 'pixieed_supabase_maintenance';
 const RANKING_CACHE_KEY = 'maoitu_rank_cache';
 const RANKING_CACHE_LIMIT = 100;
 const LAST_SCORE_KEY = 'maoitu_last_score';
+const LIVE_REFRESH_MS = 8000;
+const LIVE_REFRESH_DEBOUNCE_MS = 240;
 
 let supabaseMaintenance = Boolean(readSupabaseMaintenance());
 
@@ -27,6 +29,10 @@ function uniqueByAccount(rows, limit = Infinity) {
     const existingIndex = indexByKey.get(key);
     if (existingIndex != null) {
       const existing = unique[existingIndex];
+      const nextName = String(row?.name || '').trim();
+      if (nextName) {
+        existing.name = nextName;
+      }
       const nextAvatar = String(row?.avatar || '').trim();
       if (nextAvatar) {
         existing.avatar = nextAvatar;
@@ -165,6 +171,45 @@ function tierLabelForRank(rank) {
   return 'LEADERBOARD';
 }
 
+function cloneRows(rows) {
+  return Array.isArray(rows) ? rows.map(row => ({ ...row })) : [];
+}
+
+function buildRankMovement(rows, previousRows) {
+  const previousRanks = new Map();
+  const movementByAccount = new Map();
+  if (!Array.isArray(rows) || !Array.isArray(previousRows)) {
+    return movementByAccount;
+  }
+  previousRows.forEach((row, index) => {
+    previousRanks.set(accountKey(row), index + 1);
+  });
+  rows.forEach((row, index) => {
+    const currentRank = index + 1;
+    const previousRank = previousRanks.get(accountKey(row));
+    if (!previousRank || previousRank === currentRank) {
+      return;
+    }
+    movementByAccount.set(accountKey(row), {
+      direction: previousRank > currentRank ? 'up' : 'down',
+      previousRank,
+      currentRank,
+      delta: Math.abs(previousRank - currentRank),
+    });
+  });
+  return movementByAccount;
+}
+
+function renderMovementBadge(movement, className) {
+  if (!movement) return '';
+  const direction = movement.direction === 'up' ? 'up' : 'down';
+  const symbol = direction === 'up' ? '↑' : '↓';
+  const label = direction === 'up'
+    ? `${movement.delta}位アップ`
+    : `${movement.delta}位ダウン`;
+  return `<span class="${className} ${className}--${direction}" aria-label="${label}" title="${label}">${symbol}</span>`;
+}
+
 function normalizeProfileUrl(value) {
   const raw = String(value || '').trim();
   if (!raw) return '';
@@ -297,7 +342,7 @@ async function fetchTopScores(includeClientId = true, includeAvatar = true) {
   return uniqueByAccount(collected, RANKING_LIMIT);
 }
 
-function renderRankingRows(list, rows) {
+function renderRankingRows(list, rows, movementByAccount = new Map()) {
   list.innerHTML = '';
   const currentAccount = getCurrentAccountIdentity();
   const currentAccountId = accountKey(currentAccount);
@@ -312,12 +357,13 @@ function renderRankingRows(list, rows) {
       li.setAttribute('aria-label', `あなたの順位 ${rank}位`);
     }
     const avatarId = String(row?.avatar || '').trim() || (accountKey(row) === currentAccountId ? currentAccount.avatar : '');
-    li.innerHTML = `<div class="rank-left"><span class="rank-index">${rank}.</span><img class="rank-avatar" src="${escapeHtml(resolveAvatarSrcFromId(avatarId))}" alt="" aria-hidden="true"><span class="rank-name">${escapeHtml(String(row?.name || '名無し'))}</span></div><span class="rank-right"><span class="rank-score-label">SCORE</span><span class="rank-score">${Math.max(0, Math.floor(Number(row?.score) || 0))}</span></span>`;
+    const movement = movementByAccount.get(accountKey(row));
+    li.innerHTML = `<div class="rank-left"><span class="rank-index">${rank}.</span><img class="rank-avatar" src="${escapeHtml(resolveAvatarSrcFromId(avatarId))}" alt="" aria-hidden="true"><span class="rank-name">${escapeHtml(String(row?.name || '名無し'))}</span></div><span class="rank-right"><span class="rank-score-label">SCORE</span><span class="rank-score-row"><span class="rank-score">${Math.max(0, Math.floor(Number(row?.score) || 0))}</span>${renderMovementBadge(movement, 'rank-score-movement')}</span></span>`;
     list.appendChild(li);
   });
 }
 
-function renderFeaturedRanks(featuredEl, rows, currentAccountId) {
+function renderFeaturedRanks(featuredEl, rows, currentAccountId, movementByAccount = new Map()) {
   if (!featuredEl) return;
   featuredEl.innerHTML = '';
   const topRows = Array.isArray(rows) ? rows.slice(0, 3) : [];
@@ -335,7 +381,8 @@ function renderFeaturedRanks(featuredEl, rows, currentAccountId) {
       card.classList.add('rank-featured-card--self');
     }
     const avatarId = String(row?.avatar || '').trim();
-    card.innerHTML = `<div class="rank-featured-card__glow" aria-hidden="true"></div><div class="rank-featured-card__top"><span class="rank-featured-card__badge">#${rank}</span><span class="rank-featured-card__tier">${tierLabelForRank(rank)}</span></div><img class="rank-featured-card__avatar" src="${escapeHtml(resolveAvatarSrcFromId(avatarId))}" alt="" aria-hidden="true"><div class="rank-featured-card__name">${escapeHtml(String(row?.name || '名無し'))}</div><div class="rank-featured-card__score">${Math.max(0, Math.floor(Number(row?.score) || 0))}</div>`;
+    const movement = movementByAccount.get(accountKey(row));
+    card.innerHTML = `<div class="rank-featured-card__glow" aria-hidden="true"></div><div class="rank-featured-card__top"><span class="rank-featured-card__badge">#${rank}</span><span class="rank-featured-card__tier">${tierLabelForRank(rank)}</span></div><img class="rank-featured-card__avatar" src="${escapeHtml(resolveAvatarSrcFromId(avatarId))}" alt="" aria-hidden="true"><div class="rank-featured-card__name">${escapeHtml(String(row?.name || '名無し'))}</div><div class="rank-featured-card__score-row"><div class="rank-featured-card__score">${Math.max(0, Math.floor(Number(row?.score) || 0))}</div>${renderMovementBadge(movement, 'rank-featured-card__trend')}</div>`;
     featuredEl.appendChild(card);
   });
 }
@@ -360,6 +407,12 @@ export async function initRankingUI({ formSelector, listSelector, statusSelector
 
   const baseStatus = 'スコアはゲーム終了時に自動送信されます';
   const renderStatus = msg => { if (statusEl) statusEl.textContent = msg || ''; };
+  let previousRowsSnapshot = cloneRows(loadRankingCache());
+  let refreshTimer = 0;
+  let liveRefreshTimer = 0;
+  let liveChannel = null;
+  let isRefreshing = false;
+  let needsRefresh = false;
 
   if (supabaseMaintenance) {
     setSupabaseMaintenance(true, 'cached');
@@ -370,7 +423,60 @@ export async function initRankingUI({ formSelector, listSelector, statusSelector
 
   renderProfileIdentity(nameDisplay);
 
+  function scheduleRefresh(delay = LIVE_REFRESH_DEBOUNCE_MS) {
+    if (typeof window === 'undefined') return;
+    if (refreshTimer) {
+      window.clearTimeout(refreshTimer);
+    }
+    refreshTimer = window.setTimeout(() => {
+      refreshTimer = 0;
+      refreshList().catch(error => console.warn('maoitu ranking refresh failed', error));
+    }, Math.max(0, delay));
+  }
+
+  function startLiveUpdates() {
+    if (typeof window === 'undefined') return;
+    if (!liveRefreshTimer) {
+      liveRefreshTimer = window.setInterval(() => {
+        scheduleRefresh();
+      }, LIVE_REFRESH_MS);
+    }
+    if (liveChannel || typeof supabase?.channel !== 'function') {
+      return;
+    }
+    try {
+      liveChannel = supabase
+        .channel('maoitu-ranking-live')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'scores' }, () => {
+          scheduleRefresh();
+        })
+        .subscribe();
+    } catch (error) {
+      console.warn('maoitu ranking live subscribe failed', error);
+    }
+  }
+
+  function cleanupLiveUpdates() {
+    if (typeof window !== 'undefined' && liveRefreshTimer) {
+      window.clearInterval(liveRefreshTimer);
+      liveRefreshTimer = 0;
+    }
+    if (refreshTimer && typeof window !== 'undefined') {
+      window.clearTimeout(refreshTimer);
+      refreshTimer = 0;
+    }
+    if (liveChannel && typeof supabase?.removeChannel === 'function') {
+      supabase.removeChannel(liveChannel);
+      liveChannel = null;
+    }
+  }
+
   async function refreshList() {
+    if (isRefreshing) {
+      needsRefresh = true;
+      return;
+    }
+    isRefreshing = true;
     renderProfileIdentity(nameDisplay);
     try {
       renderStatus('読み込み中...');
@@ -379,16 +485,19 @@ export async function initRankingUI({ formSelector, listSelector, statusSelector
       renderStatus(baseStatus);
       const currentAccount = getCurrentAccountIdentity();
       const currentAccountId = accountKey(currentAccount);
+      const movementByAccount = buildRankMovement(rows, previousRowsSnapshot);
       if (!rows.length) {
+        previousRowsSnapshot = [];
         renderOverview(overviewEl, [], currentAccountId);
-        renderFeaturedRanks(featuredEl, [], currentAccountId);
+        renderFeaturedRanks(featuredEl, [], currentAccountId, movementByAccount);
         list.innerHTML = '<li class="rank-item rank-item--empty">まだスコアがありません。</li>';
         return;
       }
       saveRankingCache(rows);
+      previousRowsSnapshot = cloneRows(rows);
       renderOverview(overviewEl, rows, currentAccountId);
-      renderFeaturedRanks(featuredEl, rows, currentAccountId);
-      renderRankingRows(list, rows);
+      renderFeaturedRanks(featuredEl, rows, currentAccountId, movementByAccount);
+      renderRankingRows(list, rows, movementByAccount);
     } catch (error) {
       markSupabaseMaintenanceFromError(error);
       const cached = loadRankingCache();
@@ -396,15 +505,24 @@ export async function initRankingUI({ formSelector, listSelector, statusSelector
         renderStatus('メンテナンス中のため前回のランキングを表示しています');
         const currentAccount = getCurrentAccountIdentity();
         const currentAccountId = accountKey(currentAccount);
+        const movementByAccount = buildRankMovement(cached, previousRowsSnapshot);
+        previousRowsSnapshot = cloneRows(cached);
         renderOverview(overviewEl, cached, currentAccountId);
-        renderFeaturedRanks(featuredEl, cached, currentAccountId);
-        renderRankingRows(list, cached);
+        renderFeaturedRanks(featuredEl, cached, currentAccountId, movementByAccount);
+        renderRankingRows(list, cached, movementByAccount);
         return;
       }
+      previousRowsSnapshot = [];
       renderStatus('メンテナンス中です');
       renderOverview(overviewEl, [], 'guest');
       renderFeaturedRanks(featuredEl, [], 'guest');
       list.innerHTML = '<li class="rank-item rank-item--empty">ランキングを取得できませんでした。</li>';
+    } finally {
+      isRefreshing = false;
+      if (needsRefresh) {
+        needsRefresh = false;
+        scheduleRefresh(0);
+      }
     }
   }
 
@@ -412,14 +530,16 @@ export async function initRankingUI({ formSelector, listSelector, statusSelector
   await refreshList();
   const handleProfileUpdated = () => {
     renderProfileIdentity(nameDisplay);
+    scheduleRefresh(120);
   };
   const handleScoreChanged = () => {
-    refreshList().catch(error => console.warn('maoitu ranking refresh failed', error));
+    scheduleRefresh(0);
   };
 
   if (typeof window !== 'undefined') {
     window.addEventListener('pixieed:profile-updated', handleProfileUpdated);
     window.addEventListener('pixieed:score-queued', handleScoreChanged);
+    window.addEventListener('beforeunload', cleanupLiveUpdates, { once: true });
     window.addEventListener('storage', (event) => {
       if (!event || !event.key) return;
       if (event.key === 'pixieed_nickname' || event.key === 'pixieed_avatar' || event.key === 'pixieed_x_url') {
@@ -430,7 +550,8 @@ export async function initRankingUI({ formSelector, listSelector, statusSelector
       }
     });
   }
-  return { refresh: refreshList };
+  startLiveUpdates();
+  return { refresh: refreshList, destroy: cleanupLiveUpdates };
 }
 
 function escapeHtml(str) {
