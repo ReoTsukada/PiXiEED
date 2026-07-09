@@ -479,16 +479,25 @@ a { color:#7dd3fc; }
 }
 .rank-featured-card[data-rank="2"]{
   grid-column:1;
-  min-height:156px;
 }
 .rank-featured-card[data-rank="1"]{
   grid-column:2;
-  min-height:208px;
+  transform:scale(1.06);
+  transform-origin:center bottom;
   z-index:2;
 }
 .rank-featured-card[data-rank="3"]{
   grid-column:3;
-  min-height:156px;
+}
+.rank-featured-card[data-rank="1"] .rank-featured-card__avatar{
+  width:62px;
+  height:62px;
+}
+.rank-featured-card[data-rank="1"] .rank-featured-card__name{
+  font-size:15px;
+}
+.rank-featured-card[data-rank="1"] .rank-featured-card__score{
+  font-size:29px;
 }
 .rank-featured-card__glow{
   position:absolute;
@@ -1095,14 +1104,8 @@ body.is-game-active .game-shell {
     padding:12px 10px 14px;
     border-radius:16px;
   }
-  .rank-featured-card[data-rank="2"]{
-    min-height:132px;
-  }
   .rank-featured-card[data-rank="1"]{
-    min-height:176px;
-  }
-  .rank-featured-card[data-rank="3"]{
-    min-height:132px;
+    transform:scale(1.04);
   }
   .rank-featured-card__badge{
     min-width:36px;
@@ -1119,11 +1122,21 @@ body.is-game-active .game-shell {
     height:46px;
     border-radius:14px;
   }
+  .rank-featured-card[data-rank="1"] .rank-featured-card__avatar{
+    width:50px;
+    height:50px;
+  }
   .rank-featured-card__name{
     font-size:12px;
   }
+  .rank-featured-card[data-rank="1"] .rank-featured-card__name{
+    font-size:13px;
+  }
   .rank-featured-card__score{
     font-size:21px;
+  }
+  .rank-featured-card[data-rank="1"] .rank-featured-card__score{
+    font-size:23px;
   }
   .rank-featured-card__trend{
     min-width:18px;
@@ -1163,24 +1176,28 @@ body.is-game-active .game-shell {
     min-height:124px;
     padding:11px 10px 12px;
   }
-  .rank-featured-card[data-rank="2"]{
-    min-height:126px;
-  }
   .rank-featured-card[data-rank="1"]{
-    min-height:168px;
-  }
-  .rank-featured-card[data-rank="3"]{
-    min-height:126px;
+    transform:scale(1.035);
   }
   .rank-featured-card__avatar{
     width:44px;
     height:44px;
   }
+  .rank-featured-card[data-rank="1"] .rank-featured-card__avatar{
+    width:47px;
+    height:47px;
+  }
   .rank-featured-card__name{
     font-size:12px;
   }
+  .rank-featured-card[data-rank="1"] .rank-featured-card__name{
+    font-size:13px;
+  }
   .rank-featured-card__score{
     font-size:20px;
+  }
+  .rank-featured-card[data-rank="1"] .rank-featured-card__score{
+    font-size:22px;
   }
   .rank-featured-card__trend{
     min-width:18px;
