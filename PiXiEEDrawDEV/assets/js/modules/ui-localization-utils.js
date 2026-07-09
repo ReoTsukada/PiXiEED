@@ -622,6 +622,8 @@
       setLocalizedSelectOption(dom.exportDialog?.format, 'gif', 'GIF（アニメーション）', 'GIF (Animation)');
       setLocalizedSelectOption(dom.exportDialog?.format, 'timelapse', 'タイムラプスGIF（記録）', 'Timelapse GIF');
       setLocalizedSelectOption(dom.exportDialog?.format, 'project', 'プロジェクト（.pixieedraw）', 'Project (.pixieedraw)');
+      setLocalizedTextContent('#exportProjectV2ExperimentalLabel', 'V2 experimentalで保存', 'Save as V2 experimental');
+      setLocalizedAttribute('#exportProjectV2ExperimentalRow', 'title', 'DEV専用の実験保存です', 'DEV-only experimental save');
       setLocalizedTextContent('label[for="exportFileNameBase"] > span', '出力名', 'Export Name');
       setLocalizedAttribute('#exportFileNameBase', 'placeholder', '例: my_artwork', 'e.g. my_artwork');
       setLocalizedTextContent('#exportFileNameHint', '拡張子は自動で付きます。同名がある場合は .1 .2 ... を付けて保存します。', 'Extension is added automatically. If the same name exists, .1 .2 ... will be appended.');
