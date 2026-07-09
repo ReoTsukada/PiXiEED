@@ -1,4 +1,4 @@
-const APP_BUILD_VERSION = '2026.07.09-export-routing-fix2';
+const APP_BUILD_VERSION = '2026.07.10-pixiedraw-ads-restore1';
 const CACHE_VERSION = `pixiedraw-v${APP_BUILD_VERSION}`;
 const CORE_ASSETS = [
   '/pixiedraw/',
