@@ -271,6 +271,127 @@ v2構造：
 
 ---
 
+
+# Codexプロンプト 4：Phase 3前 includeSheets:true 設計確認
+
+Phase 2が完了し、v2 experimental保存がDEV限定で動作することを確認した後に使う。
+
+このプロンプトでは、まだ実装しない。
+
+目的は、v2を「active sheetだけの実験保存」から「PiXiEEDraw元ファイルとして成立する保存形式」に近づけるため、`includeSheets:true` の設計を先に固めること。
+
+```text
+Phase 2は成功扱いで一旦止めます。
+
+次はPhase 3へ進む前に、includeSheets:true の設計確認だけしてください。
+まだ実装しないでください。
+
+前提：
+- 対象は PiXiEEDrawDEV のみ
+- 本番 pixiedraw/ には触れない
+- 既定保存は v1 JSON のまま
+- v2 ZIP は saveProjectAsPixieedrawV2Experimental() の明示経路のみ
+- 通常保存、上書き保存、autosave、recentProjects、shared sync は v1 JSON のまま
+- v2読み込み後は v1相当payloadへ復元できる
+- active sheet内の multi-canvas は保存・復元できる
+- document.canvases と activeCanvasId は欠落しない
+- direct / indices / directOnly / importSourceDirect / timelapse は保持できる
+- 現在の v2 experimental 保存は includeSheets:false が既定
+- includeSheets:false で保存対象外になるのは active sheet 以外の top-level sheets / activeSheetId
+- multi-canvas と multi-sheet は別問題として扱う
+
+今回確認したいこと：
+
+1. 現行v1の top-level sheets / activeSheetId の構造を整理してください。
+どのファイル・関数で生成され、保存され、読み込み時にどう復元されるかを短く示してください。
+
+2. includeSheets:true にする場合、v2 archiveで sheets をどの単位で保存するのが安全か設計案を出してください。
+候補：
+A. sheets/{sheetId}.json に各sheetのpackaged project payloadをそのまま保存する
+B. sheets/{sheetId}/project.json + canvases/*.json に分解保存する
+C. active sheetと同じnormalize処理を各sheetに適用し、bitmapsは全体共通でhash重複排除する
+
+推奨案と理由を出してください。
+
+3. bitmap hash deduplication は、全sheet共通の bitmaps/ で共有できますか？
+共有した場合のメリット・リスクを整理してください。
+
+4. includeSheets:true の復元時に、v1 package shapeへ戻すために必要な項目を列挙してください。
+特に以下を維持できるか確認してください。
+- type
+- packageVersion
+- document
+- session
+- sheets
+- activeSheetId
+- document.canvases
+- activeCanvasId
+- frames
+- layers
+- indices
+- direct
+- directOnly
+- importSourceDirect
+- timelapse
+
+5. includeSheets:true 用に追加すべきfixtureとテストを提案してください。
+最低限、以下を含めてください。
+- active sheetのみ
+- active + non-active sheet
+- non-active sheetにmulti-canvasあり
+- sheet間で同一bitmapあり
+- timelapseあり
+- directOnly layer
+- indexed layer
+- mixed indexed + direct layer
+
+6. 販売用元ファイルにv2を使う前に、includeSheets:true が必須か判断してください。
+特に以下を確認してください。
+- active sheetのみ販売で問題ないケース
+- 複数シート作品を販売する場合に欠落してはいけないデータ
+- 購入者がPiXiEEDrawで再編集するときに必要な情報
+- timelapseを含める/含めないの扱い
+- 販売用軽量元ファイルとして使える最低条件
+
+7. Phase 3の実装順を提案してください。
+候補：
+- Phase 3-A: includeSheets:true 設計
+- Phase 3-B: includeSheets:true 実装
+- Phase 3-C: 複数sheet fixture / round-trip test
+- Phase 3-D: DEV限定のv2手動保存導線
+- Phase 3-E: 実ファイルでサイズ・速度・復元検証
+- Phase 3-F: timelapse分離の設計
+- Phase 3-G: Web Worker化の設計
+
+まだ実装しないでください。
+まず設計レポートだけ出してください。
+
+出力形式：
+1. 現行v1 sheets構造の整理
+2. includeSheets:true のv2 archive設計案
+3. 推奨する保存構造
+4. 共通bitmaps重複排除の可否
+5. v1 package shapeへの復元方針
+6. 追加すべきfixtureとテスト
+7. 販売用元ファイルに使う前の必須条件
+8. Phase 3の推奨実装順
+9. 実装前に残るリスク
+```
+
+## このプロンプトの判断
+
+前回までのPhase 0〜Phase 2プロンプトは、基礎資料として残す。
+
+ただし、Phase 2が完了した後は、すでに完了済みの調査・adapter化・v2 experimental保存の確認を繰り返さない。
+
+次に見るべき中心は、`includeSheets:true` によってv2を完全なPiXiEEDraw元ファイルとして成立させられるかどうかである。
+
+特に、active sheet内のmulti-canvas対応と、top-level sheets対応は別問題として扱う。
+
+Phase 3の最初にやるべきことは、軽量化強化やWeb Worker化ではなく、`includeSheets:true` の設計確認である。
+
+---
+
 # コードテンプレート
 
 ## storage/types.ts
