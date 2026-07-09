@@ -527,6 +527,9 @@
         if (!tab || tab.id === target.id) {
           return;
         }
+        if (tab.residentProjectLoaded === true && tab.project && typeof tab.project === 'object') {
+          return;
+        }
         openProjectTabs[index] = {
           ...tab,
           project: null,
