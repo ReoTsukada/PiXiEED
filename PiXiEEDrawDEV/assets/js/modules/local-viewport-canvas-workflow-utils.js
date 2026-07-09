@@ -2635,9 +2635,114 @@
     return false;
   }
 
-  function handleLocalViewportCanvasViewportChange() {
-    syncLocalViewportCanvasDockVisibility({ persist: false, render: true });
+  function preserveViewportAnchorAcrossViewportChange(runLayoutUpdate) {
+    const updateLayout = typeof runLayoutUpdate === 'function'
+      ? runLayoutUpdate
+      : () => {};
+    const viewport = dom.canvasViewport instanceof HTMLElement ? dom.canvasViewport : null;
+    const canPreserveAnchor = Boolean(
+      viewport
+      && typeof getViewportCenterZoomFocus === 'function'
+      && typeof getCanvasSurfacePanelLayoutOffset === 'function'
+      && typeof getCanvasSurfaceDrawingLocalOffset === 'function'
+      && typeof getCanvasSurfaceDrawingDisplayScale === 'function'
+    );
+    if (!canPreserveAnchor) {
+      updateLayout();
+      applyViewportTransform();
+      return;
+    }
+    const focus = getViewportCenterZoomFocus();
+    const focusSurface = focus?.surface
+      ? getResolvedCanvasInteractionSurface(focus.surface)
+      : (typeof getViewportVisibilityTargetSurface === 'function' ? getViewportVisibilityTargetSurface() : null);
+    const focusCanvasId = focus?.canvasDocId || focusSurface?.canvasDocId || focusSurface?.canvasDoc?.id || '';
+    const viewportRectBefore = viewport.getBoundingClientRect();
+    const focusCanvasDocBefore = focusSurface?.canvasDoc
+      || getProjectCanvasDocumentById(focusSurface?.canvasDocId)
+      || getActiveProjectCanvasDocument();
+    const fallbackDisplayScale = getPixelAlignedCanvasDisplayScale(Number(state.scale) || MIN_ZOOM_SCALE);
+    const panelOffsetBefore = getCanvasSurfacePanelLayoutOffset(focusSurface);
+    const drawingOffsetBefore = getCanvasSurfaceDrawingLocalOffset(focusSurface);
+    const drawingScaleBefore = getCanvasSurfaceDrawingDisplayScale(
+      focusSurface,
+      focusCanvasDocBefore,
+      fallbackDisplayScale
+    );
+    const focusViewportOffsetX = focus && viewportRectBefore && Number.isFinite(focus.clientX)
+      ? (Number(focus.clientX) - viewportRectBefore.left)
+      : (focus
+        ? (Number(state.pan.x) || 0) + panelOffsetBefore.x + drawingOffsetBefore.x + ((Number(focus.worldX) || 0) * drawingScaleBefore.x)
+        : null);
+    const focusViewportOffsetY = focus && viewportRectBefore && Number.isFinite(focus.clientY)
+      ? (Number(focus.clientY) - viewportRectBefore.top)
+      : (focus
+        ? (Number(state.pan.y) || 0) + panelOffsetBefore.y + drawingOffsetBefore.y + ((Number(focus.worldY) || 0) * drawingScaleBefore.y)
+        : null);
+
+    updateLayout();
+
+    if (
+      !focus
+      || !Number.isFinite(focusViewportOffsetX)
+      || !Number.isFinite(focusViewportOffsetY)
+    ) {
+      applyViewportTransform();
+      return;
+    }
+
+    const focusedSurface = focusCanvasId
+      ? getProjectCanvasSurfaceByCanvasId(focusCanvasId)
+      : focusSurface;
+    const focusedCanvasDoc = focusedSurface?.canvasDoc
+      || getProjectCanvasDocumentById(focusedSurface?.canvasDocId)
+      || getActiveProjectCanvasDocument();
+    const panelOffsetAfter = getCanvasSurfacePanelLayoutOffset(focusedSurface, panelOffsetBefore);
+    const drawingOffsetAfter = getCanvasSurfaceDrawingLocalOffset(focusedSurface);
+    const drawingScaleAfter = getCanvasSurfaceDrawingDisplayScale(
+      focusedSurface,
+      focusedCanvasDoc,
+      fallbackDisplayScale
+    );
+    state.pan.x = (
+      focusViewportOffsetX
+      - (panelOffsetAfter.x + drawingOffsetAfter.x + ((Number(focus.worldX) || 0) * drawingScaleAfter.x))
+    );
+    state.pan.y = (
+      focusViewportOffsetY
+      - (panelOffsetAfter.y + drawingOffsetAfter.y + ((Number(focus.worldY) || 0) * drawingScaleAfter.y))
+    );
+
+    applyViewportTransform({
+      updateDecorations: false,
+      clampVisibility: false,
+    });
+
+    if (focusedSurface?.drawing instanceof HTMLCanvasElement) {
+      const viewportRectAfter = viewport.getBoundingClientRect();
+      const drawingRectAfter = focusedSurface.drawing.getBoundingClientRect();
+      const actualScaleAfter = getCanvasSurfaceDrawingDisplayScale(
+        focusedSurface,
+        focusedCanvasDoc,
+        fallbackDisplayScale
+      );
+      const anchorViewportX = (drawingRectAfter.left - viewportRectAfter.left) + ((Number(focus.worldX) || 0) * actualScaleAfter.x);
+      const anchorViewportY = (drawingRectAfter.top - viewportRectAfter.top) + ((Number(focus.worldY) || 0) * actualScaleAfter.y);
+      const correctionX = focusViewportOffsetX - anchorViewportX;
+      const correctionY = focusViewportOffsetY - anchorViewportY;
+      if (Math.abs(correctionX) > 0.01 || Math.abs(correctionY) > 0.01) {
+        state.pan.x = (Number(state.pan.x) || 0) + correctionX;
+        state.pan.y = (Number(state.pan.y) || 0) + correctionY;
+      }
+    }
+
     applyViewportTransform();
+  }
+
+  function handleLocalViewportCanvasViewportChange() {
+    preserveViewportAnchorAcrossViewportChange(() => {
+      syncLocalViewportCanvasDockVisibility({ persist: false, render: true });
+    });
   }
 
   function handleLocalViewportCanvasVisualViewportChange() {
@@ -2645,10 +2750,12 @@
       handleLocalViewportCanvasViewportChange();
       return;
     }
-    syncAllProjectCanvasSurfaceDimensions();
-    renderLocalViewportCanvasOverlays();
-    syncMultiCanvasSelectionUi();
-    applyViewportTransform();
+    preserveViewportAnchorAcrossViewportChange(() => {
+      syncAllProjectCanvasSurfaceDimensions();
+      syncMultiCanvasWorldLayoutDisplayPositions();
+      renderLocalViewportCanvasOverlays();
+      syncMultiCanvasSelectionUi();
+    });
   }
 
   function reconcileProjectCanvasesFromLocalViewportState() {
