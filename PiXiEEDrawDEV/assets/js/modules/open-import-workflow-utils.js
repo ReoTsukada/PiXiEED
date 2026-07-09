@@ -405,6 +405,7 @@
     if (!nextTab) {
       return null;
     }
+    nextTab.residentProjectLoaded = true;
     openProjectTabs.push(nextTab);
     activeOpenProjectTabId = nextTab.id;
     suppressOpenProjectTabAutoInitialize = false;
@@ -498,6 +499,7 @@
       unsaved: Boolean(unsaved),
       source,
       updatedAt: updatedAt || project?.updatedAt || new Date().toISOString(),
+      residentProjectLoaded: source === 'open',
       ...extraTabFields,
     };
     openProjectTabs.push(nextTab);
