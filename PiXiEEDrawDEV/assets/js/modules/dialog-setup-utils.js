@@ -116,7 +116,14 @@
         ? config.fileNameInput.value
         : '';
       setExportFileBaseName(inputBaseName || state.documentName);
-      const mode = normalizeExportFormat(config.format?.value || 'png');
+      let mode = normalizeExportFormat(config.format?.value || 'png');
+      if (
+        mode === 'project'
+        && config.projectV2ExperimentalToggle instanceof HTMLInputElement
+        && config.projectV2ExperimentalToggle.checked
+      ) {
+        mode = 'projectv2experimental';
+      }
       if (!ensureCurrentClientCanExportProject({ announce: true, format: mode })) {
         updateExportFormatAvailability();
         return;
