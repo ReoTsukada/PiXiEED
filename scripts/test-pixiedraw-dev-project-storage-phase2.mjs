@@ -120,6 +120,16 @@ function createPatchPixels(width, height, { x0, y0, size, rgba }) {
   return buildRgba(width, height, pixels);
 }
 
+function createRectPixels(width, height, { x0, y0, rectWidth, rectHeight, rgba }) {
+  const pixels = [];
+  for (let y = y0; y < y0 + rectHeight; y += 1) {
+    for (let x = x0; x < x0 + rectWidth; x += 1) {
+      pixels.push({ x, y, ...rgba });
+    }
+  }
+  return buildRgba(width, height, pixels);
+}
+
 function parseStoredZipEntries(bytes) {
   const entries = new Map();
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -157,6 +167,20 @@ const bluePatch = createPatchPixels(width, height, {
   y0: 2,
   size: 4,
   rgba: { r: 20, g: 100, b: 255, a: 255 },
+});
+const collisionTallPatch = createRectPixels(width, height, {
+  x0: 1,
+  y0: 1,
+  rectWidth: 2,
+  rectHeight: 6,
+  rgba: { r: 70, g: 220, b: 110, a: 255 },
+});
+const collisionWidePatch = createRectPixels(width, height, {
+  x0: 10,
+  y0: 4,
+  rectWidth: 3,
+  rectHeight: 4,
+  rgba: { r: 70, g: 220, b: 110, a: 255 },
 });
 const transparentDirect = new Uint8ClampedArray(width * height * 4);
 const mixedIndices = buildIndices(width, height, 0);
@@ -257,6 +281,28 @@ const canvasB = {
         importSourceDirect: null,
         directOnly: true,
       },
+      {
+        id: 'layer-collision-tall',
+        name: 'Collision Tall',
+        visible: true,
+        opacity: 1,
+        blendMode: 'normal',
+        indices: encodeTypedArray(buildIndices(width, height, -1)),
+        direct: encodeTypedArray(collisionTallPatch),
+        importSourceDirect: null,
+        directOnly: true,
+      },
+      {
+        id: 'layer-collision-wide',
+        name: 'Collision Wide',
+        visible: true,
+        opacity: 1,
+        blendMode: 'normal',
+        indices: encodeTypedArray(buildIndices(width, height, -1)),
+        direct: encodeTypedArray(collisionWidePatch),
+        importSourceDirect: null,
+        directOnly: true,
+      },
     ],
   }],
 };
@@ -323,11 +369,21 @@ assert.equal(manifest.activeCanvasId, 'canvas-a');
 
 const zipEntries = parseStoredZipEntries(v2Bytes);
 const bitmapEntryNames = Array.from(zipEntries.keys()).filter(name => name.startsWith('bitmaps/'));
-assert.equal(bitmapEntryNames.length, 2, 'expected deduped bitmap entries only');
+assert.equal(bitmapEntryNames.length, 4, 'expected deduped bitmap entries with collision-safe dimensions');
 assert.ok(zipEntries.has('manifest.json'));
 assert.ok(zipEntries.has('project.json'));
 assert.ok(zipEntries.has('canvases/canvas-a.json'));
 assert.ok(zipEntries.has('canvases/canvas-b.json'));
+const canvasBArchive = JSON.parse(Buffer.from(zipEntries.get('canvases/canvas-b.json')).toString('utf8'));
+const collisionTallCel = canvasBArchive.frames?.[0]?.layers?.find(layer => layer?.id === 'layer-collision-tall')?.cel || null;
+const collisionWideCel = canvasBArchive.frames?.[0]?.layers?.find(layer => layer?.id === 'layer-collision-wide')?.cel || null;
+assert.ok(collisionTallCel?.bitmapRef, 'expected tall collision bitmap ref');
+assert.ok(collisionWideCel?.bitmapRef, 'expected wide collision bitmap ref');
+assert.notEqual(
+  collisionTallCel.bitmapRef,
+  collisionWideCel.bitmapRef,
+  'same RGBA bytes with different dimensions must not share bitmap hash'
+);
 
 const parsedFromV2 = await registry.parseBlob(v2Serialized.blob);
 assert.equal(parsedFromV2.adapterId, 'pixieedraw-v2-zip-experimental');
@@ -336,6 +392,7 @@ assert.equal(parsedFromV2.parsed.document.height, height);
 assert.equal(parsedFromV2.parsed.document.canvases.length, 2);
 assert.equal(parsedFromV2.parsed.document.canvases[0].frames.length, 1);
 assert.equal(parsedFromV2.parsed.document.canvases[0].frames[0].layers.length, 4);
+assert.equal(parsedFromV2.parsed.document.canvases[1].frames[0].layers.length, 3);
 
 assert.equal(
   parsedFromV2.parsed.document.canvases[0].frames[0].layers[1].direct,
@@ -351,6 +408,16 @@ assert.equal(
   parsedFromV2.parsed.document.canvases[0].frames[0].layers[2].direct,
   encodeTypedArray(new Uint8ClampedArray(width * height * 4)),
   'transparent directOnly layer should restore as zero-filled direct buffer'
+);
+assert.equal(
+  parsedFromV2.parsed.document.canvases[1].frames[0].layers[1].direct,
+  canvasB.frames[0].layers[1].direct,
+  'collision tall payload should roundtrip'
+);
+assert.equal(
+  parsedFromV2.parsed.document.canvases[1].frames[0].layers[2].direct,
+  canvasB.frames[0].layers[2].direct,
+  'collision wide payload should roundtrip'
 );
 
 const documentSessionUtils = window.PiXiEEDrawModules.documentSessionWorkflowUtils.createDocumentSessionWorkflowUtils({
