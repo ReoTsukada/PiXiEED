@@ -6521,6 +6521,11 @@
     createAutosaveFileName: (...args) => createAutosaveFileName(...args),
   }) || null;
 
+  const projectStorageV2WorkerBridge = window.PiXiEEDrawModules?.projectStorageV2WorkerBridge?.createProjectStorageV2WorkerBridge?.({
+    workerUrl: 'assets/js/workers/project-storage-v2.worker.js?v=2026.07.10-project-storage-worker1',
+    console,
+  }) || null;
+
   const pixieeDrawV2ZipAdapter = window.PiXiEEDrawModules?.projectStorageV2ZipAdapter?.createPixieeDrawV2ZipAdapter?.({
     PROJECT_FILE_EXTENSION,
     PROJECT_FILE_MIME_TYPE,
@@ -6529,6 +6534,9 @@
     createAutosaveFileName: (...args) => createAutosaveFileName(...args),
     decodeBase64: (...args) => decodeBase64(...args),
     encodeTypedArray: (...args) => encodeTypedArray(...args),
+    workerBridge: projectStorageV2WorkerBridge,
+    useWorkerByDefault: false,
+    console,
   }) || null;
 
   const projectStorageAdapterRegistry = projectStorageAdapterUtilsModule.createProjectStorageAdapterRegistry?.({
@@ -15723,6 +15731,22 @@
 
   async function saveProjectAsPixieedrawV2Experimental(...args) {
     return exportRenderingModule.saveProjectAsPixieedrawV2Experimental(...args);
+  }
+
+  async function saveProjectAsPixieedrawV2ExperimentalIncludeSheetsDev(...args) {
+    return exportRenderingModule.saveProjectAsPixieedrawV2ExperimentalIncludeSheetsDev(...args);
+  }
+
+  if (typeof window !== 'undefined') {
+    window.__pixieedrawSaveV2ExperimentalIncludeSheets = async function __pixieedrawSaveV2ExperimentalIncludeSheets(...args) {
+      return saveProjectAsPixieedrawV2ExperimentalIncludeSheetsDev(...args);
+    };
+    window.__pixieedrawSaveV2ExperimentalIncludeSheetsWorker = async function __pixieedrawSaveV2ExperimentalIncludeSheetsWorker(options = {}) {
+      return saveProjectAsPixieedrawV2ExperimentalIncludeSheetsDev({
+        ...(options && typeof options === 'object' ? options : {}),
+        useWorker: true,
+      });
+    };
   }
 
   function normalizeToolId(value, fallback = 'pen') {
