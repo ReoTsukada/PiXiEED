@@ -20,6 +20,7 @@ globalThis.window = {
 
 loadBrowserModule('PiXiEEDrawDEV/assets/js/modules/project-storage-adapter-utils.js');
 loadBrowserModule('PiXiEEDrawDEV/assets/js/modules/project-storage-v1-json-adapter.js');
+loadBrowserModule('PiXiEEDrawDEV/assets/js/modules/project-storage-v2-archive-codec.js');
 loadBrowserModule('PiXiEEDrawDEV/assets/js/modules/project-storage-v2-zip-adapter.js');
 loadBrowserModule('PiXiEEDrawDEV/assets/js/modules/document-session-workflow-utils.js');
 
@@ -443,8 +444,13 @@ function buildPackagedProjectFixture(snapshot, { session, updatedAt = '', includ
   if (includeSheets !== true) {
     return activePackaged;
   }
+  const fixtureMode = snapshot?.fixtureMode;
+  const activeSheetId = fixtureMode === 'phase3d-duplicate-sheet-id' ? 'sheet-dup' : 'sheet-active';
+  const extraSheetId = fixtureMode === 'phase3d-duplicate-sheet-id'
+    ? 'sheet-dup'
+    : (fixtureMode === 'phase3d-path-sheet-id' ? 'sheet/../unsafe?name' : 'sheet-extra');
   const activeSheet = {
-    id: 'sheet-active',
+    id: activeSheetId,
     fileName: 'phase3d-active.pixieedraw',
     label: 'Active Sheet',
     project: activePackaged,
@@ -452,22 +458,23 @@ function buildPackagedProjectFixture(snapshot, { session, updatedAt = '', includ
     source: 'working',
     updatedAt: effectiveUpdatedAt,
     qrEditPayload: null,
+    sharedProjectMeta: { channel: 'alpha' },
   };
-  if (snapshot?.fixtureMode !== 'phase3d-multi') {
+  if (!['phase3d-multi', 'phase3d-duplicate-sheet-id', 'phase3d-path-sheet-id'].includes(fixtureMode)) {
     return {
       ...activePackaged,
-      activeSheetId: 'sheet-active',
+      activeSheetId,
       sheets: [activeSheet],
     };
   }
   const extraPackaged = buildExtraPackagedProject(effectiveUpdatedAt);
   return {
     ...activePackaged,
-    activeSheetId: 'sheet-active',
+    activeSheetId,
     sheets: [
       activeSheet,
       {
-        id: 'sheet-extra',
+        id: extraSheetId,
         fileName: 'phase3d-extra.pixieedraw',
         label: 'Extra Sheet',
         project: extraPackaged,
@@ -475,6 +482,7 @@ function buildPackagedProjectFixture(snapshot, { session, updatedAt = '', includ
         source: 'sheet',
         updatedAt: effectiveUpdatedAt,
         qrEditPayload: { type: 'qr', version: 1 },
+        sharedSyncState: { legacy: true },
       },
     ],
   };
@@ -631,6 +639,8 @@ async function runMultiSheetScenario() {
   assert.equal(rootProjectJson.sheets.length, 2);
   assert.ok(rootProjectJson.sheets.every(sheet => !Object.prototype.hasOwnProperty.call(sheet, 'project')));
   assert.ok(rootProjectJson.sheets.every(sheet => typeof sheet.path === 'string' && sheet.path.startsWith('sheets/')));
+  assert.deepEqual(rootProjectJson.sheets[0].sharedProjectMeta, { channel: 'alpha' });
+  assert.deepEqual(rootProjectJson.sheets[1].sharedSyncState, { legacy: true });
   assert.ok(!Object.prototype.hasOwnProperty.call(rootProjectJson, 'canvasEntries'));
   assert.ok(!Array.isArray(rootProjectJson.document?.canvases));
   assert.ok(!Array.isArray(rootProjectJson.document?.frames));
@@ -659,6 +669,7 @@ async function runMultiSheetScenario() {
   assert.equal(parsedFromV2.parsed.sheets[1].project.document.canvases[1].frames[0].layers.length, 2);
   assert.equal(parsedFromV2.parsed.sheets[1].project.session.timelapse.enabled, true);
   assert.equal(parsedFromV2.parsed.session.timelapse.enabled, true);
+  assert.equal(parsedFromV2.parsed.session.historyLimit, 24);
 
   assert.equal(
     parsedFromV2.parsed.document.canvases[0].frames[0].layers[1].direct,
@@ -685,6 +696,8 @@ async function runMultiSheetScenario() {
     canvasD.frames[0].layers[1].importSourceDirect,
     'non-active importSourceDirect should roundtrip'
   );
+  assert.equal(parsedFromV2.parsed.sheets[1].project.session.historyLimit, 18);
+  assert.deepEqual(parsedFromV2.parsed.sheets[1].sharedSyncState, { legacy: true });
 
   const documentSessionUtils = createDocumentSessionUtils(registry);
   const parsedSnapshot = await documentSessionUtils.snapshotFromDocumentBlob(v2Serialized.blob);
@@ -700,8 +713,58 @@ async function runMultiSheetScenario() {
   };
 }
 
+async function runSanitizedSheetPathScenario() {
+  const { registry } = createAdapters();
+  const sanitizedSnapshot = {
+    ...activeDocument,
+    fixtureMode: 'phase3d-path-sheet-id',
+    documentName: 'phase3d-path-sheet-id',
+  };
+  const v2Serialized = await registry.serializeProject({
+    snapshot: sanitizedSnapshot,
+    session: rootSession,
+  }, {
+    fileNameBase: 'phase3d-path-sheet-id.pixieedraw',
+    preferredAdapterId: 'pixieedraw-v2-zip-experimental',
+    includeSheets: true,
+  });
+
+  const v2Bytes = new Uint8Array(await v2Serialized.blob.arrayBuffer());
+  const zipEntries = parseStoredZipEntries(v2Bytes);
+  const rootProjectJson = JSON.parse(Buffer.from(zipEntries.get('project.json')).toString('utf8'));
+  const unsafeSheet = rootProjectJson.sheets.find(sheet => sheet.id === 'sheet/../unsafe?name');
+  assert.ok(unsafeSheet);
+  assert.equal(unsafeSheet.path, 'sheets/sheet-..-unsafe-name/project.json');
+  assert.ok(zipEntries.has('sheets/sheet-..-unsafe-name/project.json'));
+
+  const parsedFromV2 = await registry.parseBlob(v2Serialized.blob);
+  assert.equal(parsedFromV2.parsed.sheets[1].id, 'sheet/../unsafe?name');
+}
+
+async function runDuplicateSheetIdScenario() {
+  const { registry } = createAdapters();
+  const duplicateSnapshot = {
+    ...activeDocument,
+    fixtureMode: 'phase3d-duplicate-sheet-id',
+    documentName: 'phase3d-duplicate-sheet-id',
+  };
+  await assert.rejects(
+    registry.serializeProject({
+      snapshot: duplicateSnapshot,
+      session: rootSession,
+    }, {
+      fileNameBase: 'phase3d-duplicate-sheet-id.pixieedraw',
+      preferredAdapterId: 'pixieedraw-v2-zip-experimental',
+      includeSheets: true,
+    }),
+    /Duplicate packaged project sheet id: sheet-dup/
+  );
+}
+
 await runSingleSheetScenario();
 const sizes = await runMultiSheetScenario();
+await runSanitizedSheetPathScenario();
+await runDuplicateSheetIdScenario();
 
 console.log(
   `Phase 3-D sheet archive checks passed. v1=${sizes.v1Size} bytes, v2=${sizes.v2Size} bytes`
