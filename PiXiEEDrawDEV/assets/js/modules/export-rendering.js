@@ -2786,9 +2786,13 @@
         {
           includeSheets: options?.includeSheets === true,
           includeTimelapse: options?.includeTimelapse !== false,
+          useWorker: options?.useWorker === true,
+          requireWorker: options?.requireWorker === true,
           preferredStorageAdapterId: 'pixieedraw-v2-zip-experimental',
         }
       );
+      console.info('[PiXiEEDraw V2 Experimental]');
+      console.info(`worker used: ${bundle.workerUsed === true}`);
       const result = await triggerDownloadFromBlob(bundle.blob, bundle.filename, {
         mimeType: PROJECT_FILE_MIME_TYPE,
         fileExtensions: [PROJECT_FILE_EXTENSION],
@@ -2805,6 +2809,7 @@
           cancelled: false,
           storageAdapterId: bundle.storageAdapterId,
           filename: bundle.filename,
+          workerUsed: bundle.workerUsed === true,
         };
       }
       if (String(result || '').endsWith('cancel')) {
@@ -2838,6 +2843,8 @@
         {
           includeSheets: true,
           includeTimelapse: options?.includeTimelapse !== false,
+          useWorker: options?.useWorker === true,
+          requireWorker: options?.requireWorker === true,
           preferredStorageAdapterId: 'pixieedraw-v2-zip-experimental',
         }
       );
@@ -2854,6 +2861,7 @@
       console.info(`saved bytes: ${sizeComparison.savedBytes}`);
       console.info(`reduction percent: ${sizeComparison.reductionPercent}%`);
       console.info(`saved as new file: ${saveResult.savedAsNewFile === true}`);
+      console.info(`worker used: ${v2Bundle.workerUsed === true}`);
 
       if (saveResult.saved && announceStatus) {
         updateAutosaveStatus('実験保存: includeSheets:true の v2 ファイルを書き出しました', 'success');
@@ -2866,6 +2874,7 @@
         includeSheets: true,
         storageAdapterId: v2Bundle.storageAdapterId,
         filename: saveResult.filename || v2Bundle.filename,
+        workerUsed: v2Bundle.workerUsed === true,
         sizeComparison,
       };
     } catch (error) {
