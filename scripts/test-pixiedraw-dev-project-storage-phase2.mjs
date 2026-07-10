@@ -20,6 +20,7 @@ globalThis.window = {
 
 loadBrowserModule('PiXiEEDrawDEV/assets/js/modules/project-storage-adapter-utils.js');
 loadBrowserModule('PiXiEEDrawDEV/assets/js/modules/project-storage-v1-json-adapter.js');
+loadBrowserModule('PiXiEEDrawDEV/assets/js/modules/project-storage-v2-archive-codec.js');
 loadBrowserModule('PiXiEEDrawDEV/assets/js/modules/project-storage-v2-zip-adapter.js');
 loadBrowserModule('PiXiEEDrawDEV/assets/js/modules/document-session-workflow-utils.js');
 loadBrowserModule('PiXiEEDrawDEV/assets/js/modules/export-rendering.js');
