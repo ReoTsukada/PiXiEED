@@ -467,6 +467,10 @@
     event.preventDefault?.();
     event.stopPropagation?.();
     pointerState.suppressTouchCompatibilityUntil = performance.now() + 800;
+    const preservedTouches = Array.from(activeTouchPointers.entries())
+      .slice(0, TOUCH_PAN_MIN_POINTERS)
+      .map(([pointerId, point]) => [pointerId, { x: Number(point?.x) || 0, y: Number(point?.y) || 0 }]);
+    const toolBaseline = pointerState.touchToolBaseline;
     if (activeTouchPointers.size > TOUCH_PAN_MIN_POINTERS) {
       return true;
     }
@@ -482,6 +486,23 @@
       }
       clearSharedProjectInFlightStroke();
     }
+    // Snapshot/history rollback can rebuild canvas state and clear transient
+    // touch tracking. Restore the exact two pointers before starting the
+    // viewport gesture so drawing cancellation cannot swallow the gesture.
+    preservedTouches.forEach(([pointerId, point]) => {
+      activeTouchPointers.set(pointerId, point);
+    });
+    if (toolBaseline) {
+      state.activePaletteIndex = toolBaseline.activePaletteIndex;
+      state.secondaryPaletteIndex = toolBaseline.secondaryPaletteIndex;
+      state.activeRgb = normalizeColorValue(toolBaseline.activeRgb);
+      if (toolBaseline.tool && state.tool !== toolBaseline.tool) {
+        setActiveTool(toolBaseline.tool, undefined, { persist: false });
+      }
+      syncControlsWithState();
+      updateColorTabSwatch();
+    }
+    pointerState.touchToolBaseline = null;
     if (!pointerState.active || pointerState.tool !== 'pan' || pointerState.panMode !== 'multiTouch') {
       abortActivePointerInteraction({ commitHistory: false });
       beginExclusiveTouchGesture(event);
@@ -4473,6 +4494,14 @@
     // tool can own the second pointer. UI controls remain outside this path.
     if (isTouch && !isControlTarget) {
       updateTouchPointer(event);
+      if (activeTouchPointers.size === 1) {
+        pointerState.touchToolBaseline = {
+          tool: state.tool,
+          activePaletteIndex: state.activePaletteIndex,
+          secondaryPaletteIndex: state.secondaryPaletteIndex,
+          activeRgb: normalizeColorValue(state.activeRgb),
+        };
+      }
       if (promoteTouchPointersToExclusiveGesture(event)) {
         return;
       }
