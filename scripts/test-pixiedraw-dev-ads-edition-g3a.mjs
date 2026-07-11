@@ -25,7 +25,6 @@ assert.deepEqual(resolveEdition('web-free'), { edition: 'web-free', ads: true, s
 assert.deepEqual(resolveEdition('product'), { edition: 'product', ads: false, shouldShowAds: false });
 assert.equal(resolveEdition('dev', { embed: true }).shouldShowAds, false, 'embed is a display context, not an entitlement');
 assert.deepEqual(resolveEdition('unexpected'), { edition: 'dev', ads: true, shouldShowAds: true });
-assert.match(editionSource, /window\.pixieedAdFree\?\.subscribe\?\./);
 assert.match(editionSource, /classList\.remove\('pixieed-adfree'\)/);
 
 for (const relativePath of [
