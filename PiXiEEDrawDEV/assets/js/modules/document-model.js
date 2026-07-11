@@ -1078,6 +1078,13 @@
         touchPinchFocus: null,
         touchGestureMode: null,
         touchGestureStartPointers: null,
+        touchGesturePointerIds: [],
+        touchGestureStartedAt: 0,
+        touchGestureStartCentroid: null,
+        touchGestureStartDistance: null,
+        touchGestureStartScale: null,
+        touchGestureStartPan: null,
+        touchGestureRafId: null,
         curveHandle: null,
         panCaptureElement: null,
       };
