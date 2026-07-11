@@ -271,6 +271,11 @@
         suppressAutosaveStatus: true,
         openedFromRecent: true,
         allowProjectMismatchLoad: true,
+        sourceKind: 'shared-local',
+        sourceStorageAdapterId: null,
+        lastSavedStorageAdapterId: null,
+        projectSaveHandleState: 'none',
+        sharedLocalRestore: true,
       });
       if (!loaded || loaded === 'deferred') {
         if (!silent) {
