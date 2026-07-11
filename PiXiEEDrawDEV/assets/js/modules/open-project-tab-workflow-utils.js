@@ -546,6 +546,7 @@
     // persistence/activation sequence before this switch reaches its first await.
     openProjectTabBusy = true;
     renderOpenProjectTabs();
+    const guardedProjectTabIds = new Set();
     try {
     console.info('[sheet-switch-debug:start]', {
       fromSheetId: previousActiveId,
@@ -570,8 +571,10 @@
       : (target?.deferredProjectPayload && typeof target.deferredProjectPayload === 'object'
         ? target.deferredProjectPayload
         : null);
-    const guardedProjectTabIds = Array.from(new Set([previousActiveId, target.id].filter(Boolean)));
-    guardedProjectTabIds.forEach(retainOpenProjectTabProjectWriteGuard);
+    for (const projectTabId of new Set([previousActiveId, target.id].filter(Boolean))) {
+      retainOpenProjectTabProjectWriteGuard(projectTabId);
+      guardedProjectTabIds.add(projectTabId);
+    }
     if (!skipPersistCurrent && previousActiveId && findOpenProjectTabIndex(previousActiveId) >= 0) {
       const persistedCurrentSheet = await persistActiveOpenProjectTab({
         flushAutosave: true,
@@ -742,9 +745,21 @@
       updateAutosaveStatus(localizeText('シートの切替に失敗しました', 'Failed to switch sheet'), 'error');
       return false;
     } finally {
-      guardedProjectTabIds.forEach(releaseOpenProjectTabProjectWriteGuard);
-      openProjectTabBusy = false;
-      renderOpenProjectTabs();
+      try {
+        for (const projectTabId of guardedProjectTabIds) {
+          try {
+            releaseOpenProjectTabProjectWriteGuard(projectTabId);
+          } catch (error) {
+            console.warn('Failed to release project tab write guard', {
+              projectTabId,
+              error,
+            });
+          }
+        }
+      } finally {
+        openProjectTabBusy = false;
+        renderOpenProjectTabs();
+      }
     }
   }
 
