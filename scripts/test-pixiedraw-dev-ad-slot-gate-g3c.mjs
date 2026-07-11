@@ -17,12 +17,22 @@ assert.match(index, /slot\.dataset\.loaded === '1'/);
 assert.match(index, /slot\.getAttribute\('data-adsbygoogle-status'\)/);
 assert.match(index, /slot\.dataset\.pixiedAdInFlight === '1'/);
 assert.match(index, /slot\.isConnected/);
+assert.match(index, /slot\.closest\('#panelAdPreloadHost'\)/,
+  'the shared slot gate rejects hidden panel preload slots');
 assert.match(index, /rect\.width > 0 && rect\.height > 0/);
+assert.match(index, /function applyResponsiveAdShape\(slot\)/);
+assert.match(index, /const isMobileContext = Boolean\(document\.body\?\.classList\.contains\('is-mobile-layout'\)\)/);
+assert.match(index, /\? 'auto'/);
+assert.match(index, /\? 'horizontal'/);
+assert.match(index, /\? 'vertical' : 'rectangle'/);
+assert.match(index, /slot\.setAttribute\('data-ad-format', format\)/);
 assert.match(index, /window\.__PIXIEEDRAW_RENDER_AD_SLOT__ = renderAdSlot/);
 assert.match(index, /window\.pixieedObserveAds = root =>/);
 assert.equal((index.match(/\(window\.adsbygoogle = window\.adsbygoogle \|\| \[\]\)\.push\(\{\}\);/g) || []).length, 1,
   'DEV has one physical adsbygoogle push gate');
 assert.match(index, /owner: `editor-static:\$\{container\.id\}`/);
+assert.match(index, /container\.closest\('#panelAdPreloadHost'\) \|\| container\.closest\('\[hidden\]'\)/,
+  'panel ads wait until they leave the preload host and become visible');
 assert.match(index, /wrapperClass:/);
 assert.match(index, /wrapperWidth:/);
 assert.match(index, /wrapperHeight:/);
