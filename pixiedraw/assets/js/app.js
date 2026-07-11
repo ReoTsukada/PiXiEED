@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.07.11-touch-arbiter-v4';
+  const APP_BUILD_VERSION = '2026.07.11-touch-arbiter-v5';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECTS_ENABLED = false;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
@@ -3951,6 +3951,10 @@
 
   function handleViewportPointerCancel(...args) {
     return canvasPointerWorkflowUtilsModule.handleViewportPointerCancel(...args);
+  }
+
+  function handleViewportCompatibilityMouseEvent(...args) {
+    return canvasPointerWorkflowUtilsModule.handleViewportCompatibilityMouseEvent(...args);
   }
 
 
@@ -17146,6 +17150,9 @@
       gestureSurface.addEventListener('pointermove', handleViewportPointerMove, { passive: false });
       gestureSurface.addEventListener('pointerup', handleViewportPointerUp, { passive: false });
       gestureSurface.addEventListener('pointercancel', handleViewportPointerCancel, { passive: false });
+      gestureSurface.addEventListener('mousedown', handleViewportCompatibilityMouseEvent, { passive: false, capture: true });
+      gestureSurface.addEventListener('click', handleViewportCompatibilityMouseEvent, { passive: false, capture: true });
+      gestureSurface.addEventListener('dblclick', handleViewportCompatibilityMouseEvent, { passive: false, capture: true });
     }
     refreshViewportCursorStyle();
     updateMirrorGuideHandles();
