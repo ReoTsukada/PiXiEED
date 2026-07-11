@@ -11786,6 +11786,9 @@
       if (enabled || !(addButton instanceof HTMLButtonElement)) {
         return;
       }
+      const sheetAddDebug = typeof window.__pixieedrawGetSheetAddDebugState === 'function'
+        ? window.__pixieedrawGetSheetAddDebugState()
+        : null;
       console.debug('[project-tab-add:availability]', {
         reason,
         activeSheetId: activeOpenProjectTabId,
@@ -11794,11 +11797,12 @@
         disabled: addButton.disabled,
         ariaDisabled: addButton.getAttribute('aria-disabled'),
         pointerEvents: window.getComputedStyle(addButton).pointerEvents,
-        sheetAddInFlight: openProjectTabBusy,
-        imageImportInFlight: false,
+        openProjectTabBusy,
+        sheetAddInFlight: Boolean(sheetAddDebug?.inFlight),
+        imageImportInFlight: false, // Imports share openProjectTabBusy; no separate lock exists.
         gifImportInFlight: false,
         projectImportInFlight: false,
-        pickerOpen: false,
+        pickerOpen: Boolean(sheetAddDebug?.pickerOpen),
         hasActiveProject: Boolean(activeTab),
         hasActiveDocument: Boolean(activeTab?.project?.document),
         connected: addButton.isConnected,
