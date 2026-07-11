@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.07.11-touch-arbiter-v4';
+  const APP_BUILD_VERSION = '2026.07.11-touch-arbiter-v5';
   window.__PIXIEEDRAW_BUILD_ID__ = APP_BUILD_VERSION;
   window.__PIXIEEDRAW_BUILD_REVISION__ = 2026071100;
   const APP_SW_VERSION = APP_BUILD_VERSION;
@@ -507,7 +507,6 @@
       multiBlockedRemove: document.getElementById('multiBlockedRemove'),
       multiBlockedHint: document.getElementById('multiBlockedHint'),
       supportTipLink: document.getElementById('supportTipLink'),
-      adFreeField: document.getElementById('pixieedAdFreeField'),
       pwaInstallField: document.getElementById('pixieedPwaInstallField'),
       pwaInstallStatus: document.getElementById('pixieedPwaInstallStatus'),
       pwaInstallButton: document.getElementById('pixieedPwaInstallButton'),
@@ -3996,6 +3995,10 @@
 
   function handleViewportPointerCancel(...args) {
     return canvasPointerWorkflowUtilsModule.handleViewportPointerCancel(...args);
+  }
+
+  function handleViewportCompatibilityMouseEvent(...args) {
+    return canvasPointerWorkflowUtilsModule.handleViewportCompatibilityMouseEvent(...args);
   }
 
 
@@ -17885,6 +17888,9 @@
       gestureSurface.addEventListener('pointermove', handleViewportPointerMove, { passive: false });
       gestureSurface.addEventListener('pointerup', handleViewportPointerUp, { passive: false });
       gestureSurface.addEventListener('pointercancel', handleViewportPointerCancel, { passive: false });
+      gestureSurface.addEventListener('mousedown', handleViewportCompatibilityMouseEvent, { passive: false, capture: true });
+      gestureSurface.addEventListener('click', handleViewportCompatibilityMouseEvent, { passive: false, capture: true });
+      gestureSurface.addEventListener('dblclick', handleViewportCompatibilityMouseEvent, { passive: false, capture: true });
     }
     refreshViewportCursorStyle();
     updateMirrorGuideHandles();
