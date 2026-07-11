@@ -1,4 +1,4 @@
-const APP_BUILD_VERSION = '2026.07.11-touch-arbiter-v5';
+const APP_BUILD_VERSION = '2026.07.11-touch-arbiter-v6';
 const CACHE_VERSION = `pixiedraw-v${APP_BUILD_VERSION}`;
 const CORE_ASSETS = [
   '/pixiedraw/',
