@@ -6,11 +6,13 @@
   let channel = null;
   const render = () => {
     let el = document.getElementById('pixieedrawUpdateNotice');
-    if (state.status !== 'update-available' && state.status !== 'required-update') { el?.remove(); return; }
-    if (!el) { el = document.createElement('aside'); el.id = 'pixieedrawUpdateNotice'; el.setAttribute('role', 'status'); document.body.append(el); }
+    if (state.status !== 'update-available' && state.status !== 'required-update') { if (el?.open) el.close(); return; }
+    if (!el) { el = document.createElement('dialog'); el.id = 'pixieedrawUpdateNotice'; el.className = 'pixieedraw-update-dialog'; document.body.append(el); }
     el.setAttribute('aria-live', state.status === 'required-update' ? 'assertive' : 'polite');
-    el.innerHTML = `<strong>${state.status === 'required-update' ? '重要な更新があります' : '新しいバージョンがあります'}</strong><span>${state.message || ''}</span><button type="button" data-safe>安全更新は準備中です</button>${state.status === 'optional-update' || state.status === 'update-available' ? '<button type="button" data-later>あとで</button>' : ''}`;
+    el.innerHTML = `<form method="dialog"><strong>${state.status === 'required-update' ? '重要な更新があります' : '新しいバージョンがあります'}</strong><p>${state.message || ''}</p><div><button type="button" data-safe>安全更新は準備中です</button>${state.status === 'update-available' ? '<button type="button" data-later>あとで</button>' : ''}</div></form>`;
+    el.querySelector('[data-safe]')?.addEventListener('click', () => { el.querySelector('p').textContent = '安全更新は準備中です。現在の編集内容はそのまま維持されます。'; });
     el.querySelector('[data-later]')?.addEventListener('click', () => { dismissedBuild = state.availableBuildId; try { sessionStorage.setItem('pixieedraw:update-dismissed-build', dismissedBuild); } catch {} render(); });
+    if (!el.open && typeof el.showModal === 'function') el.showModal();
   };
   const valid = m => m && typeof m.buildId === 'string' && Number.isInteger(m.buildRevision) && m.buildRevision > 0 && ['optional', 'required'].includes(m.updateMode) && typeof m.message === 'string';
   async function check({ force = false } = {}) {
