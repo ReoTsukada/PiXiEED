@@ -5471,6 +5471,8 @@
   set createAutosaveFileName(value) { createAutosaveFileName = value; },
   get createAutosaveProjectId() { return createAutosaveProjectId; },
   set createAutosaveProjectId(value) { createAutosaveProjectId = value; },
+  get createProjectPersistenceToken() { return createProjectPersistenceToken; },
+  set createProjectPersistenceToken(value) { createProjectPersistenceToken = value; },
   get ensureActiveAutosaveProjectId() { return ensureActiveAutosaveProjectId; },
   set ensureActiveAutosaveProjectId(value) { ensureActiveAutosaveProjectId = value; },
   get dom() { return dom; },
@@ -5589,6 +5591,8 @@
   set updateHistoryButtons(value) { updateHistoryButtons = value; },
   get updateMemoryStatus() { return updateMemoryStatus; },
   set updateMemoryStatus(value) { updateMemoryStatus = value; },
+  get updateActiveProjectPersistenceState() { return updateActiveProjectPersistenceState; },
+  set updateActiveProjectPersistenceState(value) { updateActiveProjectPersistenceState = value; },
   get virtualCursorDrawState() { return virtualCursorDrawState; },
   set virtualCursorDrawState(value) { virtualCursorDrawState = value; },
   }) || {};
@@ -5654,6 +5658,8 @@
   set autosaveHandle(value) { autosaveHandle = value; },
   get autosaveProjectId() { return autosaveProjectId; },
   set autosaveProjectId(value) { autosaveProjectId = value; },
+  get getActiveProjectPersistenceState() { return getActiveProjectPersistenceState; },
+  set getActiveProjectPersistenceState(value) { getActiveProjectPersistenceState = value; },
   get beginBlockingGlobalLoading() { return beginBlockingGlobalLoading; },
   set beginBlockingGlobalLoading(value) { beginBlockingGlobalLoading = value; },
   get beginStartupProgress() { return beginStartupProgress; },
@@ -5664,6 +5670,8 @@
   set buildIndexedPaletteFromFrameDataList(value) { buildIndexedPaletteFromFrameDataList = value; },
   get buildSharedRecentProjectId() { return buildSharedRecentProjectId; },
   set buildSharedRecentProjectId(value) { buildSharedRecentProjectId = value; },
+  get createProjectPersistenceToken() { return createProjectPersistenceToken; },
+  set createProjectPersistenceToken(value) { createProjectPersistenceToken = value; },
   get canCurrentClientImportExternalData() { return canCurrentClientImportExternalData; },
   set canCurrentClientImportExternalData(value) { canCurrentClientImportExternalData = value; },
   get canReuseActiveOpenProjectTabForRecentEntry() { return canReuseActiveOpenProjectTabForRecentEntry; },
@@ -5764,12 +5772,20 @@
   set newProjectPalettePresetId(value) { newProjectPalettePresetId = value; },
   get normalizeAutosaveProjectId() { return normalizeAutosaveProjectId; },
   set normalizeAutosaveProjectId(value) { normalizeAutosaveProjectId = value; },
+  get normalizeProjectPersistenceState() { return normalizeProjectPersistenceState; },
+  set normalizeProjectPersistenceState(value) { normalizeProjectPersistenceState = value; },
   get normalizeColorValue() { return normalizeColorValue; },
   set normalizeColorValue(value) { normalizeColorValue = value; },
   get normalizeDocumentName() { return normalizeDocumentName; },
   set normalizeDocumentName(value) { normalizeDocumentName = value; },
   get normalizeExternalImportMode() { return normalizeExternalImportMode; },
   set normalizeExternalImportMode(value) { normalizeExternalImportMode = value; },
+  get normalizeProjectSaveHandleState() { return normalizeProjectSaveHandleState; },
+  set normalizeProjectSaveHandleState(value) { normalizeProjectSaveHandleState = value; },
+  get normalizeProjectSourceKind() { return normalizeProjectSourceKind; },
+  set normalizeProjectSourceKind(value) { normalizeProjectSourceKind = value; },
+  get normalizeProjectStorageAdapterId() { return normalizeProjectStorageAdapterId; },
+  set normalizeProjectStorageAdapterId(value) { normalizeProjectStorageAdapterId = value; },
   get normalizeMirrorAxisState() { return normalizeMirrorAxisState; },
   set normalizeMirrorAxisState(value) { normalizeMirrorAxisState = value; },
   get normalizeOnionSkinState() { return normalizeOnionSkinState; },
@@ -5810,6 +5826,8 @@
   set resetOpenedDocumentViewport(value) { resetOpenedDocumentViewport = value; },
   get resetOpenProjectTabsToCurrentProject() { return resetOpenProjectTabsToCurrentProject; },
   set resetOpenProjectTabsToCurrentProject(value) { resetOpenProjectTabsToCurrentProject = value; },
+  get resolveProjectSourceKind() { return resolveProjectSourceKind; },
+  set resolveProjectSourceKind(value) { resolveProjectSourceKind = value; },
   get resolveTransparentStoragePaletteIndex() { return resolveTransparentStoragePaletteIndex; },
   set resolveTransparentStoragePaletteIndex(value) { resolveTransparentStoragePaletteIndex = value; },
   get scheduleAutosaveSnapshot() { return scheduleAutosaveSnapshot; },
@@ -5850,6 +5868,8 @@
   set updateAutosaveStatus(value) { updateAutosaveStatus = value; },
   get updateHistoryButtons() { return updateHistoryButtons; },
   set updateHistoryButtons(value) { updateHistoryButtons = value; },
+  get updateActiveProjectPersistenceState() { return updateActiveProjectPersistenceState; },
+  set updateActiveProjectPersistenceState(value) { updateActiveProjectPersistenceState = value; },
   get waitForLensImportPayloadMessage() { return waitForLensImportPayloadMessage; },
   set waitForLensImportPayloadMessage(value) { waitForLensImportPayloadMessage = value; },
   get writeAutosaveSnapshot() { return writeAutosaveSnapshot; },
@@ -6697,6 +6717,8 @@
   set compressUint8Array(value) { compressUint8Array = value; },
   get createAutosaveProjectId() { return createAutosaveProjectId; },
   set createAutosaveProjectId(value) { createAutosaveProjectId = value; },
+  get createProjectPersistenceToken() { return createProjectPersistenceToken; },
+  set createProjectPersistenceToken(value) { createProjectPersistenceToken = value; },
   get createEmptyTimelapseTrack() { return createEmptyTimelapseTrack; },
   set createEmptyTimelapseTrack(value) { createEmptyTimelapseTrack = value; },
   get createOpenProjectSheetTabFromPackagedProject() { return createOpenProjectSheetTabFromPackagedProject; },
@@ -6743,6 +6765,14 @@
   set markAutosaveDirty(value) { markAutosaveDirty = value; },
   get normalizeAutosaveProjectId() { return normalizeAutosaveProjectId; },
   set normalizeAutosaveProjectId(value) { normalizeAutosaveProjectId = value; },
+  get normalizeProjectPersistenceState() { return normalizeProjectPersistenceState; },
+  set normalizeProjectPersistenceState(value) { normalizeProjectPersistenceState = value; },
+  get normalizeProjectSaveHandleState() { return normalizeProjectSaveHandleState; },
+  set normalizeProjectSaveHandleState(value) { normalizeProjectSaveHandleState = value; },
+  get normalizeProjectSourceKind() { return normalizeProjectSourceKind; },
+  set normalizeProjectSourceKind(value) { normalizeProjectSourceKind = value; },
+  get normalizeProjectStorageAdapterId() { return normalizeProjectStorageAdapterId; },
+  set normalizeProjectStorageAdapterId(value) { normalizeProjectStorageAdapterId = value; },
   get normalizeMultiProjectKey() { return normalizeMultiProjectKey; },
   set normalizeMultiProjectKey(value) { normalizeMultiProjectKey = value; },
   get normalizePackagedProjectSheets() { return normalizePackagedProjectSheets; },
@@ -6775,6 +6805,8 @@
   set resetOpenedDocumentViewport(value) { resetOpenedDocumentViewport = value; },
   get resetOpenProjectTabsToCurrentProject() { return resetOpenProjectTabsToCurrentProject; },
   set resetOpenProjectTabsToCurrentProject(value) { resetOpenProjectTabsToCurrentProject = value; },
+  get resolveProjectSourceKind() { return resolveProjectSourceKind; },
+  set resolveProjectSourceKind(value) { resolveProjectSourceKind = value; },
   get resolvePackagedProjectDotStats() { return resolvePackagedProjectDotStats; },
   set resolvePackagedProjectDotStats(value) { resolvePackagedProjectDotStats = value; },
   get resolveTimelapseFrameEntry() { return resolveTimelapseFrameEntry; },
@@ -6815,6 +6847,8 @@
   set updateHistoryButtons(value) { updateHistoryButtons = value; },
   get updateMemoryStatus() { return updateMemoryStatus; },
   set updateMemoryStatus(value) { updateMemoryStatus = value; },
+  get updateActiveProjectPersistenceState() { return updateActiveProjectPersistenceState; },
+  set updateActiveProjectPersistenceState(value) { updateActiveProjectPersistenceState = value; },
   }) || {};
 
   const pixieedAccountWorkflowUtilsModule = window.PiXiEEDrawModules?.pixieedAccountWorkflowUtils?.createPixieedAccountWorkflowUtils?.({
@@ -8953,6 +8987,226 @@
     suppressClickTabId: '',
     suppressClickUntil: 0,
   };
+
+  function normalizeProjectStorageAdapterId(value) {
+    const normalized = typeof value === 'string' ? value.trim() : '';
+    return normalized || null;
+  }
+
+  function normalizeProjectSourceKind(value, fallback = 'unknown') {
+    const normalized = typeof value === 'string' ? value.trim() : '';
+    const allowed = new Set(['new', 'file', 'recent', 'autosave', 'shared-local', 'import-image', 'mixed', 'unknown']);
+    if (allowed.has(normalized)) {
+      return normalized;
+    }
+    return allowed.has(fallback) ? fallback : 'unknown';
+  }
+
+  function normalizeProjectSaveHandleState(value, fallback = 'none') {
+    const normalized = typeof value === 'string' ? value.trim() : '';
+    const allowed = new Set(['none', 'bound', 'unknown', 'conversion-required', 'stale', 'unavailable']);
+    if (allowed.has(normalized)) {
+      return normalized;
+    }
+    return allowed.has(fallback) ? fallback : 'none';
+  }
+
+  function normalizeProjectSaveHandleMeta(value = null, fallback = null, tab = null) {
+    const next = value && typeof value === 'object' ? value : {};
+    const base = fallback && typeof fallback === 'object' ? fallback : {};
+    const fileName = normalizeDocumentName(
+      (typeof next.fileName === 'string' && next.fileName.trim())
+        ? next.fileName.trim()
+        : (
+          (typeof base.fileName === 'string' && base.fileName.trim())
+            ? base.fileName.trim()
+            : (
+              typeof tab?.fileName === 'string' && tab.fileName.trim()
+                ? tab.fileName.trim()
+                : ''
+            )
+        )
+    );
+    const adapterId = normalizeProjectStorageAdapterId(
+      Object.prototype.hasOwnProperty.call(next, 'adapterId')
+        ? next.adapterId
+        : (
+          Object.prototype.hasOwnProperty.call(base, 'adapterId')
+            ? base.adapterId
+            : (tab?.lastSavedStorageAdapterId || tab?.sourceStorageAdapterId || null)
+        )
+    );
+    const boundAt = typeof next.boundAt === 'string' && next.boundAt.trim()
+      ? next.boundAt.trim()
+      : (typeof base.boundAt === 'string' && base.boundAt.trim() ? base.boundAt.trim() : '');
+    const sourceProjectToken = typeof next.sourceProjectToken === 'string' && next.sourceProjectToken.trim()
+      ? next.sourceProjectToken.trim()
+      : (
+        typeof base.sourceProjectToken === 'string' && base.sourceProjectToken.trim()
+          ? base.sourceProjectToken.trim()
+          : (typeof tab?.sourceProjectToken === 'string' && tab.sourceProjectToken.trim() ? tab.sourceProjectToken.trim() : '')
+      );
+    const handleKind = (() => {
+      const candidate = typeof next.handleKind === 'string' && next.handleKind.trim()
+        ? next.handleKind.trim()
+        : (typeof base.handleKind === 'string' && base.handleKind.trim() ? base.handleKind.trim() : 'unknown');
+      const allowed = new Set(['external-project-file', 'file-picker', 'directory', 'download', 'unknown']);
+      return allowed.has(candidate) ? candidate : 'unknown';
+    })();
+    const permissionState = (() => {
+      const candidate = typeof next.permissionState === 'string' && next.permissionState.trim()
+        ? next.permissionState.trim()
+        : (typeof base.permissionState === 'string' && base.permissionState.trim() ? base.permissionState.trim() : 'unknown');
+      const allowed = new Set(['granted', 'prompt', 'denied', 'unknown']);
+      return allowed.has(candidate) ? candidate : 'unknown';
+    })();
+    if (!fileName && !adapterId && !boundAt && !sourceProjectToken && handleKind === 'unknown' && permissionState === 'unknown') {
+      return null;
+    }
+    return {
+      fileName,
+      adapterId,
+      boundAt,
+      sourceProjectToken: sourceProjectToken || null,
+      handleKind,
+      permissionState,
+    };
+  }
+
+  function createProjectPersistenceToken(seed = '') {
+    const normalizedSeed = typeof seed === 'string' ? seed.trim() : '';
+    const randomPart = typeof crypto?.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    return normalizedSeed ? `${normalizedSeed}:${randomPart}` : randomPart;
+  }
+
+  function normalizeProjectPersistenceState(value = null, fallback = null, { createToken = true } = {}) {
+    const next = value && typeof value === 'object' ? value : {};
+    const base = fallback && typeof fallback === 'object' ? fallback : {};
+    const sourceKind = normalizeProjectSourceKind(
+      Object.prototype.hasOwnProperty.call(next, 'sourceKind') ? next.sourceKind : base.sourceKind,
+      'unknown'
+    );
+    const sourceStorageAdapterId = Object.prototype.hasOwnProperty.call(next, 'sourceStorageAdapterId')
+      ? normalizeProjectStorageAdapterId(next.sourceStorageAdapterId)
+      : normalizeProjectStorageAdapterId(base.sourceStorageAdapterId);
+    const lastSavedStorageAdapterId = Object.prototype.hasOwnProperty.call(next, 'lastSavedStorageAdapterId')
+      ? normalizeProjectStorageAdapterId(next.lastSavedStorageAdapterId)
+      : normalizeProjectStorageAdapterId(base.lastSavedStorageAdapterId);
+    const sourceProjectToken = (() => {
+      const candidate = typeof next.sourceProjectToken === 'string' && next.sourceProjectToken.trim()
+        ? next.sourceProjectToken.trim()
+        : (typeof base.sourceProjectToken === 'string' && base.sourceProjectToken.trim() ? base.sourceProjectToken.trim() : '');
+      if (candidate) {
+        return candidate;
+      }
+      return createToken ? createProjectPersistenceToken(sourceKind) : null;
+    })();
+    return {
+      sourceStorageAdapterId,
+      sourceKind,
+      sourceProjectToken,
+      lastSavedStorageAdapterId,
+      projectSaveHandleState: normalizeProjectSaveHandleState(
+        Object.prototype.hasOwnProperty.call(next, 'projectSaveHandleState')
+          ? next.projectSaveHandleState
+          : base.projectSaveHandleState,
+        'none'
+      ),
+    };
+  }
+
+  function getProjectPersistenceStateFromTab(tab = null, options = {}) {
+    return normalizeProjectPersistenceState(tab, null, {
+      createToken: options?.createToken === true,
+    });
+  }
+
+  function getActiveProjectPersistenceState(options = {}) {
+    const activeTab = typeof getActiveOpenProjectTab === 'function'
+      ? getActiveOpenProjectTab()
+      : null;
+    return getProjectPersistenceStateFromTab(activeTab, options);
+  }
+
+  function updateOpenProjectTabPersistenceState(tabId, patch = null, options = {}) {
+    const normalizedTabId = typeof tabId === 'string' ? tabId : '';
+    if (!normalizedTabId || typeof findOpenProjectTabIndex !== 'function') {
+      return null;
+    }
+    const index = findOpenProjectTabIndex(normalizedTabId);
+    if (index < 0 || !openProjectTabs[index]) {
+      return null;
+    }
+    const currentTab = openProjectTabs[index];
+    const nextState = normalizeProjectPersistenceState(patch, currentTab, { createToken: true });
+    openProjectTabs[index] = {
+      ...currentTab,
+      ...nextState,
+    };
+    if (options?.render !== false && typeof renderOpenProjectTabs === 'function') {
+      renderOpenProjectTabs();
+    }
+    if (options?.log !== false) {
+      console.info('[project-persistence-debug]', {
+        activeTabId: activeOpenProjectTabId || '',
+        tabId: normalizedTabId,
+        sourceKind: nextState.sourceKind,
+        sourceStorageAdapterId: nextState.sourceStorageAdapterId,
+        lastSavedStorageAdapterId: nextState.lastSavedStorageAdapterId,
+        projectSaveHandleState: nextState.projectSaveHandleState,
+      });
+    }
+    return nextState;
+  }
+
+  function updateActiveProjectPersistenceState(patch = null, options = {}) {
+    return updateOpenProjectTabPersistenceState(activeOpenProjectTabId || '', patch, options);
+  }
+
+  function resolveProjectSourceKind(options = {}) {
+    if (typeof options?.sourceKind === 'string' && options.sourceKind.trim()) {
+      return normalizeProjectSourceKind(options.sourceKind, 'unknown');
+    }
+    if (options?.openedFromRecent) {
+      return 'recent';
+    }
+    if (options?.restoredFromAutosave) {
+      return 'autosave';
+    }
+    if (options?.sharedLocalRestore) {
+      return 'shared-local';
+    }
+    if (options?.importImage) {
+      return 'import-image';
+    }
+    if (options?.newProject) {
+      return 'new';
+    }
+    if (options?.handle || options?.fileLoad) {
+      return 'file';
+    }
+    return 'unknown';
+  }
+
+  function resolveTargetStorageAdapterId(options = {}) {
+    const preferred = normalizeProjectStorageAdapterId(options?.preferredStorageAdapterId);
+    if (preferred) {
+      return preferred;
+    }
+    if (typeof window !== 'undefined' && window.__pixieedrawUseV2ProjectSave === true) {
+      return 'pixieedraw-v2-zip-experimental';
+    }
+    return 'pixieedraw-v1-json';
+  }
+
+  function isProjectStorageConversionSave(sourceStorageAdapterId, targetStorageAdapterId) {
+    const source = normalizeProjectStorageAdapterId(sourceStorageAdapterId);
+    const target = normalizeProjectStorageAdapterId(targetStorageAdapterId);
+    return Boolean(source && target && source !== target);
+  }
+
   const SELECTION_DASH_SPEED = 40;
   let selectionDashScreenOffset = 0;
   let lastSelectionDashTime = 0;
@@ -10424,6 +10678,8 @@
     extractDocumentBaseName,
     createLightweightLocalProjectTabState,
     createLocalProjectEntrySignature,
+    normalizeProjectPersistenceState,
+    normalizeProjectSaveHandleMeta,
     normalizeQrEditPayload,
     localizeText,
     MAX_PROJECT_SHEETS,
@@ -10784,6 +11040,8 @@
   set CONTEST_POST_PAGE_URL(value) { CONTEST_POST_PAGE_URL = value; },
   get DEFAULT_DOCUMENT_NAME() { return DEFAULT_DOCUMENT_NAME; },
   set DEFAULT_DOCUMENT_NAME(value) { DEFAULT_DOCUMENT_NAME = value; },
+  get DEFAULT_PROJECT_STORAGE_ADAPTER_ID() { return pixieeDrawV1JsonAdapter?.id || 'pixieedraw-v1-json'; },
+  set DEFAULT_PROJECT_STORAGE_ADAPTER_ID(value) {},
   get DEFAULT_LAYER_BLEND_MODE() { return DEFAULT_LAYER_BLEND_MODE; },
   set DEFAULT_LAYER_BLEND_MODE(value) { DEFAULT_LAYER_BLEND_MODE = value; },
   get DISABLE_FILE_SYSTEM_ACCESS_SAVE() { return DISABLE_FILE_SYSTEM_ACCESS_SAVE; },
@@ -10846,6 +11104,8 @@
   set buildGifFromPixels(value) { buildGifFromPixels = value; },
   get buildPackagedProjectPayload() { return buildPackagedProjectPayload; },
   set buildPackagedProjectPayload(value) { buildPackagedProjectPayload = value; },
+  get bindActiveProjectSaveHandle() { return bindActiveProjectSaveHandle; },
+  set bindActiveProjectSaveHandle(value) { bindActiveProjectSaveHandle = value; },
   get buildProjectSessionPayload() { return buildProjectSessionPayload; },
   set buildProjectSessionPayload(value) { buildProjectSessionPayload = value; },
   get buildSpriteMapExportPlan() { return buildSpriteMapExportPlan; },
@@ -10870,6 +11130,8 @@
   set clamp(value) { clamp = value; },
   get clearPendingPermissionListener() { return clearPendingPermissionListener; },
   set clearPendingPermissionListener(value) { clearPendingPermissionListener = value; },
+  get clearActiveProjectSaveHandle() { return clearActiveProjectSaveHandle; },
+  set clearActiveProjectSaveHandle(value) { clearActiveProjectSaveHandle = value; },
   get cloneSimulationColor() { return cloneSimulationColor; },
   set cloneSimulationColor(value) { cloneSimulationColor = value; },
   get collectUsedColorsFromFramePixels() { return collectUsedColorsFromFramePixels; },
@@ -10946,6 +11208,14 @@
   set getExportScaleCandidates(value) { getExportScaleCandidates = value; },
   get getFileHandleInExportDirectory() { return getFileHandleInExportDirectory; },
   set getFileHandleInExportDirectory(value) { getFileHandleInExportDirectory = value; },
+  get getActiveProjectPersistenceState() { return getActiveProjectPersistenceState; },
+  set getActiveProjectPersistenceState(value) { getActiveProjectPersistenceState = value; },
+  get getActiveProjectSaveBinding() { return getActiveProjectSaveBinding; },
+  set getActiveProjectSaveBinding(value) { getActiveProjectSaveBinding = value; },
+  get updateActiveProjectPersistenceState() { return updateActiveProjectPersistenceState; },
+  set updateActiveProjectPersistenceState(value) { updateActiveProjectPersistenceState = value; },
+  get replaceActiveOpenProjectTabFromCurrentState() { return replaceActiveOpenProjectTabFromCurrentState; },
+  set replaceActiveOpenProjectTabFromCurrentState(value) { replaceActiveOpenProjectTabFromCurrentState = value; },
   get getMultiExportDisabledReason() { return getMultiExportDisabledReason; },
   set getMultiExportDisabledReason(value) { getMultiExportDisabledReason = value; },
   get getPaletteColorKey() { return getPaletteColorKey; },
@@ -10980,6 +11250,8 @@
   set normalizeColorValue(value) { normalizeColorValue = value; },
   get normalizeDocumentName() { return normalizeDocumentName; },
   set normalizeDocumentName(value) { normalizeDocumentName = value; },
+  get normalizeProjectSaveHandleMeta() { return normalizeProjectSaveHandleMeta; },
+  set normalizeProjectSaveHandleMeta(value) { normalizeProjectSaveHandleMeta = value; },
   get normalizeLayerBlendMode() { return normalizeLayerBlendMode; },
   set normalizeLayerBlendMode(value) { normalizeLayerBlendMode = value; },
   get normalizeLayerOpacity() { return normalizeLayerOpacity; },
@@ -11002,6 +11274,8 @@
   set resolvePackagedProjectDotStats(value) { resolvePackagedProjectDotStats = value; },
   get resolveUniqueExportDirectoryFilename() { return resolveUniqueExportDirectoryFilename; },
   set resolveUniqueExportDirectoryFilename(value) { resolveUniqueExportDirectoryFilename = value; },
+  get markActiveProjectSaveHandleUnavailable() { return markActiveProjectSaveHandleUnavailable; },
+  set markActiveProjectSaveHandleUnavailable(value) { markActiveProjectSaveHandleUnavailable = value; },
   get scaleVoxelPreviewPixels() { return scaleVoxelPreviewPixels; },
   set scaleVoxelPreviewPixels(value) { scaleVoxelPreviewPixels = value; },
   get schedulePendingAutosavePermission() { return schedulePendingAutosavePermission; },
@@ -11336,6 +11610,9 @@
     createLocalOpenProjectTabFromCurrentState,
     isSharedOpenProjectTab,
     getActiveOpenProjectTab,
+    normalizeProjectSaveHandleMeta,
+    normalizeProjectSaveHandleState,
+    normalizeProjectStorageAdapterId,
     hasDocumentUnsavedChanges,
     writeAutosaveSnapshot: (...args) => writeAutosaveSnapshot(...args),
     updateAutosaveStatus,
@@ -11356,6 +11633,14 @@
     revealActiveProjectAfterOpen,
     appendOpenProjectTabFromCurrentState,
     replaceActiveOpenProjectTabFromCurrentState,
+    getProjectSaveBindingFromTab,
+    getActiveProjectSaveBinding,
+    bindOpenProjectTabSaveHandle,
+    bindActiveProjectSaveHandle,
+    clearOpenProjectTabSaveHandle,
+    clearActiveProjectSaveHandle,
+    markOpenProjectTabSaveHandleUnavailable,
+    markActiveProjectSaveHandleUnavailable,
     canReuseActiveOpenProjectTabForRecentEntry,
     persistActiveOpenProjectTab,
     resetOpenProjectTabsToCurrentProject,
@@ -11374,6 +11659,7 @@
       openProjectTabBusy = Boolean(value);
     },
     getAutosaveProjectId: () => autosaveProjectId,
+    getActiveProjectPersistenceState: (...args) => getActiveProjectPersistenceState(...args),
     getNewProjectPalettePresetId: () => newProjectPalettePresetId,
     setActiveOpenProjectTabId: (value) => {
       activeOpenProjectTabId = value;
@@ -15530,6 +15816,10 @@
           suppressAutosaveStatus: true,
           openedFromRecent: true,
           allowProjectMismatchLoad,
+          sourceKind: 'recent',
+          sourceStorageAdapterId: null,
+          lastSavedStorageAdapterId: null,
+          projectSaveHandleState: 'none',
         });
         if (loaded === 'deferred') {
           return false;
@@ -15551,6 +15841,10 @@
           suppressAutosaveStatus: true,
           openedFromRecent: true,
           allowProjectMismatchLoad,
+          sourceKind: 'recent',
+          sourceStorageAdapterId: null,
+          lastSavedStorageAdapterId: null,
+          projectSaveHandleState: 'none',
         });
         if (loaded === 'deferred') {
           if (Array.isArray(latestPackagedProject?.sheets) && latestPackagedProject.sheets.length > 0) {
@@ -15559,6 +15853,10 @@
               suppressAutosaveStatus: true,
               openedFromRecent: true,
               allowProjectMismatchLoad: true,
+              sourceKind: 'recent',
+              sourceStorageAdapterId: null,
+              lastSavedStorageAdapterId: null,
+              projectSaveHandleState: 'none',
             });
             if (retryLoaded && retryLoaded !== 'deferred') {
               return finishRecentProjectOpen();
@@ -15576,6 +15874,10 @@
               unsaved: Boolean(latestEntry.unsaved) || false,
               source: 'recent',
               updatedAt: latestEntry.updatedAt || new Date().toISOString(),
+              sourceStorageAdapterId: null,
+              sourceKind: 'recent',
+              lastSavedStorageAdapterId: null,
+              projectSaveHandleState: 'none',
               activateOptions: {
                 skipPersistCurrent: true,
                 announce: !silent,
@@ -15738,6 +16040,24 @@
   }
 
   if (typeof window !== 'undefined') {
+    if (typeof window.__pixieedrawUseV2ProjectSave !== 'boolean') {
+      window.__pixieedrawUseV2ProjectSave = false;
+    }
+    window.__pixieedrawSetV2ProjectSaveEnabled = function __pixieedrawSetV2ProjectSaveEnabled(enabled) {
+      window.__pixieedrawUseV2ProjectSave = enabled === true;
+      return window.__pixieedrawGetV2ProjectSaveStatus();
+    };
+    window.__pixieedrawGetV2ProjectSaveStatus = function __pixieedrawGetV2ProjectSaveStatus() {
+      return {
+        enabled: window.__pixieedrawUseV2ProjectSave === true,
+        adapterId: window.__pixieedrawUseV2ProjectSave === true
+          ? 'pixieedraw-v2-zip-experimental'
+          : 'pixieedraw-v1-json',
+        workerEnabled: false,
+        affectsAutosave: false,
+        affectsRecentProjects: false,
+      };
+    };
     window.__pixieedrawSaveV2ExperimentalIncludeSheets = async function __pixieedrawSaveV2ExperimentalIncludeSheets(...args) {
       return saveProjectAsPixieedrawV2ExperimentalIncludeSheetsDev(...args);
     };
