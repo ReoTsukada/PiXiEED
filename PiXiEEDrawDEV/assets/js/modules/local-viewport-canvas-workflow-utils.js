@@ -866,7 +866,6 @@
     canvas.dataset.pointerBinding = 'true';
     canvas.addEventListener('pointerdown', handlePointerDown);
     canvas.addEventListener('pointercancel', handlePointerCancel);
-    canvas.addEventListener('lostpointercapture', handlePointerCancel);
     canvas.addEventListener('pointermove', event => {
       let needsRender = false;
       if (!pointerState.active) {
