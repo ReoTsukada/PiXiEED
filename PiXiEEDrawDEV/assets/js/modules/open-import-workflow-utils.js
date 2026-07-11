@@ -347,6 +347,9 @@
       return true;
     } finally {
       openProjectTabBusy = false;
+      // The tab bar may have been rendered while the command lock was true.
+      // Render once more after release so the delegated + button is enabled.
+      renderOpenProjectTabs();
     }
   }
 
@@ -875,6 +878,7 @@
         return true;
       } finally {
         openProjectTabBusy = false;
+        renderOpenProjectTabs();
       }
     } finally {
       if (typeof endStartupProgress === 'function') {
