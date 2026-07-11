@@ -25,18 +25,11 @@
     document.documentElement?.style.removeProperty('--mobile-bottom-ad-height');
   }
 
-  function bindLegacyAdFreeEntitlementIsolation() {
-    enforceEditionAdvertising();
-    // The legacy script may refresh asynchronously. Subscribe only to restore
-    // the edition rule; entitlement data itself remains untouched for G3-B/G4.
-    window.pixieedAdFree?.subscribe?.(() => enforceEditionAdvertising());
-  }
-
   if (typeof document !== 'undefined') {
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', bindLegacyAdFreeEntitlementIsolation, { once: true });
+      document.addEventListener('DOMContentLoaded', enforceEditionAdvertising, { once: true });
     } else {
-      bindLegacyAdFreeEntitlementIsolation();
+      enforceEditionAdvertising();
     }
   }
 })();
