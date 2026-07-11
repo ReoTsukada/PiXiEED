@@ -226,13 +226,13 @@
       const project = isActive && activePackagedProject
         ? activePackagedProject
         : (
-          (tab?.project && typeof tab.project === 'object')
+          tab?.project && typeof tab.project === 'object'
             ? tab.project
-            : (
-              fallbackPackagedProject && typeof extractLocalProjectSheetPayload === 'function'
+            : (tab?.deferredProjectPayload && typeof tab.deferredProjectPayload === 'object'
+              ? tab.deferredProjectPayload
+              : (fallbackPackagedProject && typeof extractLocalProjectSheetPayload === 'function'
                 ? extractLocalProjectSheetPayload(fallbackPackagedProject, typeof tab?.id === 'string' ? tab.id : '')
-                : null
-            )
+                : null))
         );
       if (!project) {
         return;
@@ -258,8 +258,12 @@
         sourceProjectToken: tab?.sourceProjectToken || null,
         sourceProjectId: tab?.sourceProjectId || null,
         sourceSheetId: tab?.sourceSheetId || null,
+        runtimeProjectId: tab?.runtimeProjectId || null,
         sheetRuntimeId: tab?.sheetRuntimeId || null,
+        deferredPayloadKey: tab?.deferredPayloadKey || null,
         sheetPersistenceKey: tab?.sheetPersistenceKey || null,
+        localPersistenceKey: tab?.localPersistenceKey || null,
+        autosaveV2SheetId: tab?.autosaveV2SheetId || null,
         historyOwnerId: tab?.historyOwnerId || null,
         timelapseOwnerId: tab?.timelapseOwnerId || null,
         updatedAt: project?.updatedAt || tab?.updatedAt || new Date().toISOString(),
@@ -301,6 +305,8 @@
       fileName,
       label: current?.label || localizeText('シート 1', 'Sheet 1'),
       project: activePackagedProject,
+      deferredProjectPayload: activePackagedProject,
+      deferredPayloadKey: current?.deferredPayloadKey || current?.sheetPersistenceKey || activeId,
       unsaved: hasDocumentUnsavedChanges(),
       source: current?.source || 'working',
       updatedAt: activePackagedProject.updatedAt || current?.updatedAt || new Date().toISOString(),
