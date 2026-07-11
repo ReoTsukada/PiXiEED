@@ -3004,6 +3004,7 @@ body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom
   background-size: 8px 8px;
   box-shadow: none;
   overflow: hidden;
+  touch-action: none;
 }
 
 .stage__workspace {
@@ -3014,6 +3015,7 @@ body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom
   transform-origin: 0 0;
   min-width: 0;
   min-height: 0;
+  touch-action: none;
 }
 
 .stage__workspace[data-local-canvas-layout='single'] {
@@ -3334,6 +3336,7 @@ body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom
 .canvas-stack {
   position: relative;
   display: inline-flex;
+  touch-action: none;
   --tile-size: 16;
   --tile-screen-size: 16px;
   --tile-offset-x: 0px;
