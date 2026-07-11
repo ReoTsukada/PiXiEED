@@ -15,4 +15,28 @@
   window.__PIXIEEDRAW_SHOULD_SHOW_ADS__ = () => (
     capabilities.ads && window.__PIXIEED_EMBED_MODE__ !== true
   );
+
+  function enforceEditionAdvertising() {
+    const showAds = window.__PIXIEEDRAW_SHOULD_SHOW_ADS__();
+    window.__PIXIEED_ADS_DISABLED__ = !showAds;
+    if (!showAds || typeof document === 'undefined') return;
+    document.body?.classList.remove('pixieed-adfree');
+    document.documentElement?.classList.remove('pixieed-adfree');
+    document.documentElement?.style.removeProperty('--mobile-bottom-ad-height');
+  }
+
+  function bindLegacyAdFreeEntitlementIsolation() {
+    enforceEditionAdvertising();
+    // The legacy script may refresh asynchronously. Subscribe only to restore
+    // the edition rule; entitlement data itself remains untouched for G3-B/G4.
+    window.pixieedAdFree?.subscribe?.(() => enforceEditionAdvertising());
+  }
+
+  if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', bindLegacyAdFreeEntitlementIsolation, { once: true });
+    } else {
+      bindLegacyAdFreeEntitlementIsolation();
+    }
+  }
 })();
