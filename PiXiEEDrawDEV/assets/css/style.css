@@ -9269,6 +9269,37 @@ body.is-mobile-layout #multiSupportAdContainer {
   }
 }
 
+/* The shared mobile banner becomes a left-side vertical rail in landscape.
+   Keep the original horizontal creative rotated inside a viewport-bounded
+   frame so short landscape screens cannot leak it across the editor. */
+@media (orientation: landscape) {
+  body[data-pixieed-page="pixiedraw"] .pixieed-shared-top-ad {
+    --pixieed-landscape-side-ad-length: min(
+      320px,
+      calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 12px)
+    );
+    overflow: hidden !important;
+    contain: layout paint;
+    clip-path: inset(0);
+  }
+
+  body[data-pixieed-page="pixiedraw"] .pixieed-shared-top-ad .ad-block {
+    width: var(--pixieed-landscape-side-ad-length) !important;
+    height: 50px !important;
+    max-width: none !important;
+    overflow: hidden !important;
+  }
+
+  body[data-pixieed-page="pixiedraw"] .pixieed-shared-top-ad ins.adsbygoogle,
+  body[data-pixieed-page="pixiedraw"] .pixieed-shared-top-ad ins.adsbygoogle iframe {
+    width: 100% !important;
+    min-height: 50px !important;
+    height: 50px !important;
+    max-height: 50px !important;
+    overflow: hidden !important;
+  }
+}
+
 /* Mobile bottom banner: compact horizontal slot */
 #mobileBottomAd {
   display: none;
