@@ -11518,29 +11518,30 @@ body.is-mobile-layout #newProjectDialog .modal__body {
 
   .export-dialog-body__ad .export-ad__slot .adsbygoogle,
   .export-dialog-body__ad .export-ad__slot ins.adsbygoogle {
-    position: absolute !important;
-    top: 50%;
-    left: 50%;
-    width: clamp(240px, 42vh, 320px) !important;
-    max-width: none !important;
+    position: relative !important;
+    top: auto;
+    left: auto;
+    width: min(160px, 100%) !important;
+    max-width: 100% !important;
     min-width: 0 !important;
-    min-height: 160px !important;
-    height: 160px !important;
-    max-height: 160px !important;
+    min-height: clamp(240px, 42vh, 320px) !important;
+    height: clamp(240px, 42vh, 320px) !important;
+    max-height: clamp(240px, 42vh, 320px) !important;
     margin: 0 !important;
-    transform: translate(-50%, -50%) rotate(90deg);
-    transform-origin: center center;
+    transform: none !important;
+    transform-origin: initial;
   }
 
   .export-dialog-body__ad .export-ad__slot .adsbygoogle iframe,
   .export-dialog-body__ad .export-ad__slot ins.adsbygoogle iframe {
-    width: clamp(240px, 42vh, 320px) !important;
-    max-width: none !important;
+    width: min(160px, 100%) !important;
+    max-width: 100% !important;
     min-width: 0 !important;
-    min-height: 160px !important;
-    height: 160px !important;
-    max-height: 160px !important;
+    min-height: clamp(240px, 42vh, 320px) !important;
+    height: clamp(240px, 42vh, 320px) !important;
+    max-height: clamp(240px, 42vh, 320px) !important;
     margin: 0 !important;
+    transform: none !important;
   }
 }
 
