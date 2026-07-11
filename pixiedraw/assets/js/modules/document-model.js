@@ -1083,6 +1083,7 @@
         touchGestureMovedPointerIds: null,
         touchGestureDecisionTimer: null,
         touchGestureCaptureElement: null,
+        suppressTouchCompatibilityUntil: 0,
         touchGestureStartCentroid: null,
         touchGestureStartDistance: null,
         touchGestureStartScale: null,
