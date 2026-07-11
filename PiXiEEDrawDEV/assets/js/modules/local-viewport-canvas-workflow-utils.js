@@ -1002,13 +1002,14 @@
       canvasSurfacePanelDragState.surfaceKind === 'main'
       || canvasSurfacePanelDragState.surfaceKind === 'local'
     );
+    let layoutChanged = false;
     if (shouldPersist && panel instanceof HTMLElement) {
       const finalLeft = parseLocalViewportCanvasAxis(panel.style.left, panel.offsetLeft) || 0;
       const finalTop = parseLocalViewportCanvasAxis(panel.style.top, panel.offsetTop) || 0;
       if (canvasSurfacePanelDragState.surfaceKind === 'main') {
-        setLocalViewportCanvasLayoutAnchor(finalLeft, finalTop);
+        layoutChanged = setLocalViewportCanvasLayoutAnchor(finalLeft, finalTop);
       } else if (canvasSurfacePanelDragState.surfaceKind === 'local') {
-        setLocalViewportCanvasPosition(canvasSurfacePanelDragState.surfaceIndex, finalLeft, finalTop);
+        layoutChanged = setLocalViewportCanvasPosition(canvasSurfacePanelDragState.surfaceIndex, finalLeft, finalTop);
       }
     }
     canvasSurfacePanelDragState.pointerId = null;
@@ -1022,7 +1023,11 @@
     canvasSurfacePanelDragState.startClientY = 0;
     teardownCanvasSurfacePanelDragInteraction();
     if (shouldPersist) {
-      scheduleSessionPersist({ includeSnapshots: false });
+      if (layoutChanged) {
+        markAutosaveDirty();
+        markDocumentUnsavedChange();
+      }
+      scheduleSessionPersist({ includeSnapshots: layoutChanged });
     }
     syncLocalViewportCanvasDockLayout();
     updateCanvasResizeHandlePosition();
@@ -2517,25 +2522,17 @@
     }
     const previous = getLocalViewportCanvasCount();
     const currentCanvases = getProjectCanvasDocuments();
-    const targetCount = clamp(Math.round(Number(nextCount) || 0), 0, getLocalViewportCanvasMaxCount());
-    const accountLimit = getLocalViewportCanvasAccountLimit();
-    if (targetCount > previous && targetCount > accountLimit) {
-      const needsLogin = accountLimit <= 0;
+    const requestedCount = Math.round(Number(nextCount) || 0);
+    const maximumAdditionalCanvases = 3;
+    if (requestedCount > previous && currentCanvases.length >= 4) {
       updateAutosaveStatus(
-        needsLogin
-          ? localizeText(
-            'マルチキャンバスはログインすると1つ追加できます。ログインしてください。',
-            'Sign in to add 1 multi canvas.'
-          )
-          : localizeText(
-            'マルチキャンバスは3つまで追加できます。',
-            'You can add up to 3 multi canvases.'
-          ),
-        'info'
+        localizeText('キャンバスは1シートにつき最大4件です', 'A sheet can contain at most 4 canvases'),
+        'warn'
       );
       syncControlsWithState();
       return false;
     }
+    const targetCount = clamp(requestedCount, 0, maximumAdditionalCanvases);
     if (targetCount === previous) {
       if (persist) {
         scheduleSessionPersist({ includeSnapshots: false });
@@ -2561,6 +2558,17 @@
     while (nextCanvases.length < targetTotal) {
       nextCanvases.push(createBlankProjectCanvasDocument(sourceCanvas, nextCanvases.length + 1));
     }
+    const validation = window.PiXiEEDrawModules?.projectSheetCollectionUtils
+      ?.createProjectSheetCollectionUtils?.()
+      ?.validateSheetCanvasCount?.({ document: { canvases: nextCanvases } });
+    if (!validation?.valid) {
+      updateAutosaveStatus(
+        localizeText('キャンバスは1シートにつき最大4件です', 'A sheet can contain at most 4 canvases'),
+        'warn'
+      );
+      syncControlsWithState();
+      return false;
+    }
     if (targetCount < previous && !canNormalizeMultiAssignmentsForCanvasDocuments(nextCanvases, { announce: true })) {
       return false;
     }
@@ -2572,8 +2580,8 @@
       ? activeCanvasId
       : (nextCanvases[Math.min(activeCanvasIndex, nextCanvases.length - 1)]?.id || nextCanvases[0]?.id || '');
     replaceProjectCanvasDocuments(nextCanvases, resolvedActiveCanvasId);
-    requestLocalViewportCanvasLayoutReset({ clearStored: true });
     if (targetCount > previous) {
+      requestLocalViewportCanvasLayoutReset({ clearStored: true });
       assignAdjacentPositionForNewLocalViewportCanvases(previous);
     }
     ensureLocalViewportCanvasEntries();
@@ -2624,11 +2632,10 @@
     const currentProjectCanvasCount = Array.isArray(projectCanvasStore?.canvases)
       ? Math.max(0, projectCanvasStore.canvases.length - 1)
       : 0;
-    const accountLimit = getLocalViewportCanvasAccountLimit();
     const modeLimit = isVoxelExtensionModeEnabled()
       ? VOXEL_EXTENSION_LOCAL_CANVAS_MAX_COUNT
       : 0;
-    return Math.max(accountLimit, currentProjectCanvasCount, modeLimit);
+    return Math.min(3, Math.max(3, currentProjectCanvasCount, modeLimit));
   }
 
   function canUseVoxelExtensionMode() {

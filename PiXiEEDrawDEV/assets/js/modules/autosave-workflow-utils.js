@@ -773,13 +773,27 @@
       const snapshot = makeHistorySnapshot({ clonePixelData: false });
       const dirtyGenerationAtStart = autosaveDirtyGeneration;
       const unsavedTokenAtStart = unsavedChangeToken;
-      const savedEntry = await recordRecentProjectSnapshot(snapshot, null, {
-        projectId,
-        thumbnailIntervalMs: AUTOSAVE_THUMBNAIL_UPDATE_INTERVAL_MS,
-      });
+      let savedEntry = null;
+      try {
+        savedEntry = await recordRecentProjectSnapshot(snapshot, null, {
+          projectId,
+          thumbnailIntervalMs: AUTOSAVE_THUMBNAIL_UPDATE_INTERVAL_MS,
+        });
+      } catch (error) {
+        try {
+          queueAutosaveV2ShadowWrite?.({ projectId, snapshot, v1Project: null, v1Error: error?.message || 'v1-write-failed' });
+        } catch (_shadowError) {}
+        throw error;
+      }
       if (!savedEntry) {
+        try {
+          queueAutosaveV2ShadowWrite?.({ projectId, snapshot, v1Project: null, v1Error: 'v1-write-returned-empty' });
+        } catch (_shadowError) {}
         throw new Error('Failed to record autosave snapshot');
       }
+      try {
+        queueAutosaveV2ShadowWrite?.({ projectId, snapshot, v1Project: savedEntry.project || null });
+      } catch (_shadowError) {}
       const stillCurrentWrite = (
         normalizeAutosaveProjectId(autosaveProjectId || '') === projectId
         && autosaveDirtyGeneration === dirtyGenerationAtStart

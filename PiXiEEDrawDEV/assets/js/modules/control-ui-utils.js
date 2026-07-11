@@ -642,13 +642,16 @@
       dom.controls.localCanvasCountControls.setAttribute('aria-hidden', String(!showControls));
     }
     if (dom.controls.localCanvasCountValue instanceof HTMLElement) {
-      dom.controls.localCanvasCountValue.textContent = String(MULTI_CANVAS_FEATURE_ENABLED ? localCanvasCount : 0);
+      const totalCanvasCount = MULTI_CANVAS_FEATURE_ENABLED ? localCanvasCount + 1 : 1;
+      dom.controls.localCanvasCountValue.textContent = `${totalCanvasCount} / 4`;
     }
     if (dom.controls.removeLocalCanvas instanceof HTMLButtonElement) {
       dom.controls.removeLocalCanvas.disabled = !MULTI_CANVAS_FEATURE_ENABLED || localCanvasCount <= 0 || !canEditProjectStructure || voxelModeEnabled;
     }
     if (dom.controls.addLocalCanvas instanceof HTMLButtonElement) {
       dom.controls.addLocalCanvas.disabled = !MULTI_CANVAS_FEATURE_ENABLED || localCanvasCount >= getLocalViewportCanvasMaxCount() || !canEditProjectStructure || voxelModeEnabled;
+      dom.controls.addLocalCanvas.setAttribute('aria-label', localizeText('マルチキャンバスを増やす（最大4件）', 'Add multi canvas (maximum 4)'));
+      dom.controls.addLocalCanvas.title = localizeText('キャンバスは1シートにつき最大4件', 'A sheet can contain at most 4 canvases');
     }
     if (MULTI_CANVAS_FEATURE_ENABLED && localCanvasCount > 0) {
       syncMultiCanvasSelectionUi();

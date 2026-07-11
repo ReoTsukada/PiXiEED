@@ -62,8 +62,13 @@ function createHarness({
   activeProjectSaveBinding = null,
   autosaveHandleSeed = null,
   pendingAutosaveHandleSeed = null,
+  openSheetCount = 1,
+  packagedSheets = null,
+  multiSheetFlagEnabled = false,
+  completeMultiSheetCandidate = null,
 } = {}) {
   const consoleInfo = [];
+  const consoleWarn = [];
   const replaceCalls = [];
   const bindCalls = [];
   const triggerCalls = [];
@@ -81,6 +86,7 @@ function createHarness({
     document: {},
     PiXiEEDrawModules: {},
     __pixieedrawUseV2ProjectSave: flagEnabled,
+    __pixieedrawUseMultiSheetV2ExternalSave: multiSheetFlagEnabled,
     showSaveFilePicker: async function showSaveFilePicker() {
       return pickerHandle;
     },
@@ -88,7 +94,7 @@ function createHarness({
   globalThis.document = window.document;
   globalThis.console = {
     info: (...args) => consoleInfo.push(args.join(' ')),
-    warn() {},
+    warn: (...args) => consoleWarn.push(args),
     error() {},
     log() {},
   };
@@ -105,6 +111,10 @@ function createHarness({
     documentName: 'phase4j-test.pixieedraw',
     frames: [],
   };
+  globalThis.openProjectTabs = Array.from(
+    { length: Math.max(1, Math.round(Number(openSheetCount) || 1)) },
+    (_, index) => ({ id: `sheet-${index + 1}` })
+  );
 
   loadBrowserModule('PiXiEEDrawDEV/assets/js/modules/export-rendering.js');
 
@@ -144,6 +154,16 @@ function createHarness({
     getActiveProjectSaveBinding() {
       return activeBindingState;
     },
+    getOpenProjectSheetCount() {
+      return globalThis.openProjectTabs.length;
+    },
+    normalizeAutosaveProjectId(value) {
+      return typeof value === 'string' ? value.trim() : '';
+    },
+    activeOpenProjectTabId: 'sheet-1',
+    collectCompleteMultiSheetV2SaveCandidate() {
+      return completeMultiSheetCandidate;
+    },
     bindActiveProjectSaveHandle(handle, meta) {
       const normalizedMeta = normalizeProjectSaveHandleMeta(meta, null);
       activeBindingState = {
@@ -161,11 +181,12 @@ function createHarness({
     normalizeProjectSaveHandleMeta,
     async serializeProjectStorageSnapshot(projectState, options) {
       return {
-        packaged: {
+        packaged: projectState?.packaged || {
           type: 'pixieedraw-project',
           packageVersion: 2,
           document: projectState.snapshot,
           session: projectState.session,
+          ...(Array.isArray(packagedSheets) ? { sheets: packagedSheets } : {}),
         },
         blob: new Blob(['phase4j'], { type: PROJECT_FILE_MIME_TYPE }),
         filename: 'phase4j-test.pixieedraw',
@@ -215,6 +236,7 @@ function createHarness({
     autosaveHandle,
     pendingAutosaveHandle,
     consoleInfo,
+    consoleWarn,
     replaceCalls,
     bindCalls,
     triggerCalls,
@@ -263,6 +285,192 @@ assert.equal(overwriteHarness.replaceCalls.at(-1)?.lastSavedStorageAdapterId, V2
 assert.equal(overwriteHarness.replaceCalls.at(-1)?.sourceKind, 'file');
 assert.equal(overwriteHarness.replaceCalls.at(-1)?.projectSaveHandleState, 'bound');
 assert.equal(overwriteHarness.replaceCalls.at(-1)?.fileName, 'bound-v2.pixieedraw');
+
+const multiSheetOverwriteCounter = { count: 0 };
+const multiSheetOverwriteHandle = createWritableHandle('bound-v2-multi.pixieedraw', multiSheetOverwriteCounter);
+const multiSheetHarness = createHarness({
+  flagEnabled: true,
+  openSheetCount: 2,
+  packagedSheets: [
+    {
+      id: 'sheet-1',
+      project: {
+        type: 'pixieedraw-project',
+        packageVersion: 2,
+        document: { version: 1, frames: [] },
+        session: {},
+      },
+    },
+  ],
+  activePersistenceState: {
+    sourceKind: 'file',
+    sourceStorageAdapterId: V2_ADAPTER_ID,
+    sourceProjectToken: 'token-v2-multi',
+    lastSavedStorageAdapterId: V2_ADAPTER_ID,
+    projectSaveHandleState: 'bound',
+  },
+  activeProjectSaveBinding: {
+    projectSaveHandle: multiSheetOverwriteHandle,
+    projectSaveHandleMeta: normalizeProjectSaveHandleMeta({
+      fileName: 'bound-v2-multi.pixieedraw',
+      adapterId: V2_ADAPTER_ID,
+      sourceProjectToken: 'token-v2-multi',
+      handleKind: 'file-picker',
+      permissionState: 'granted',
+    }),
+    projectSaveHandleState: 'bound',
+  },
+});
+const multiSheetResult = await multiSheetHarness.exportRenderingModule.saveProjectAsPixieedraw({
+  announceStatus: false,
+  includeSheets: false,
+});
+assert.equal(multiSheetResult.saved, false);
+assert.equal(multiSheetResult.blocked, true, 'incomplete multi-sheet V2 save is blocked');
+assert.equal(multiSheetResult.savePlan.openSheetCount, 2);
+assert.equal(multiSheetResult.savePlan.packagedSheetCount, 0);
+assert.equal(multiSheetResult.savePlan.includesAllSheets, false);
+assert.equal(multiSheetResult.savePlan.isMultiSheetProject, true);
+assert.equal(multiSheetResult.savePlan.allowMultiSheetOverwrite, false);
+assert.equal(multiSheetResult.savePlan.allowSameHandleOverwrite, false);
+assert.equal(multiSheetResult.savePlan.forceSaveAsNewFile, true);
+assert.equal(multiSheetResult.savePlan.overwriteBlockedReason, 'multi-sheet-v2-flag-disabled');
+assert.equal(multiSheetOverwriteCounter.count, 0, 'multi-sheet save never writes the existing V2 handle');
+assert.equal(multiSheetHarness.pickerCounter.count, 0, 'multi-sheet safety guard does not create an incomplete new file');
+assert.equal(multiSheetHarness.triggerCalls.length, 0, 'multi-sheet safety guard does not download an incomplete file');
+assert.ok(
+  multiSheetHarness.consoleWarn.some(args => String(args[0]).includes('blocked multi-sheet V2 save preflight')),
+  'multi-sheet safety guard logs its reason'
+);
+
+const completePackagedSheets = [
+  { id: 'sheet-1', project: { document: {}, session: {} } },
+  { id: 'sheet-2', project: { document: {}, session: {} } },
+];
+const includeSheetsDisabledSafety = multiSheetHarness.exportRenderingModule.resolveV2ProjectSheetOverwriteSafety({
+  packagedProject: { sheets: completePackagedSheets },
+  includeSheets: false,
+  openSheetCount: 2,
+});
+assert.equal(includeSheetsDisabledSafety.allowMultiSheetOverwrite, false);
+assert.equal(includeSheetsDisabledSafety.overwriteBlockedReason, 'include-sheets-disabled');
+
+const currentCompleteMultiSheetSafety = multiSheetHarness.exportRenderingModule.resolveV2ProjectSheetOverwriteSafety({
+  packagedProject: { sheets: completePackagedSheets },
+  includeSheets: true,
+  openSheetCount: 2,
+});
+assert.equal(currentCompleteMultiSheetSafety.includesAllSheets, true);
+assert.equal(currentCompleteMultiSheetSafety.allowMultiSheetOverwrite, false);
+assert.equal(currentCompleteMultiSheetSafety.overwriteBlockedReason, 'multi-sheet-v2-incomplete');
+
+const futureCompleteMultiSheetSafety = multiSheetHarness.exportRenderingModule.resolveV2ProjectSheetOverwriteSafety({
+  packagedProject: { sheets: completePackagedSheets },
+  includeSheets: true,
+  openSheetCount: 2,
+  allowCompleteMultiSheetOverwrite: true,
+});
+assert.equal(futureCompleteMultiSheetSafety.allowMultiSheetOverwrite, true);
+assert.equal(futureCompleteMultiSheetSafety.overwriteBlockedReason, '');
+
+const completeMultiSheetCandidate = {
+  complete: true,
+  packagedSheetCount: 2,
+  packaged: {
+    sheets: completePackagedSheets,
+    sheetOrder: ['sheet-1', 'sheet-2'],
+    activeSheetId: 'sheet-1',
+  },
+};
+const completeMultiSheetEligibility = multiSheetHarness.exportRenderingModule.resolveProjectSameHandleOverwriteEligibility({
+  activeProjectSaveBinding: {
+    projectSaveHandle: multiSheetOverwriteHandle,
+    projectSaveHandleState: 'bound',
+  },
+  savePlan: {
+    allowSameHandleOverwrite: true,
+    sourceKind: 'file',
+    sourceStorageAdapterId: V2_ADAPTER_ID,
+    targetStorageAdapterId: V2_ADAPTER_ID,
+    isMultiSheetProject: true,
+    openSheetCount: 2,
+  },
+  targetStorageAdapterId: V2_ADAPTER_ID,
+  multiSheetCandidate: completeMultiSheetCandidate,
+  multiSheetFlagEnabled: true,
+  v2ProjectSaveFlagEnabled: true,
+});
+assert.equal(completeMultiSheetEligibility.eligible, true, 'complete bound multi-sheet V2 save is overwrite eligible');
+
+const completeMultiSheetOverwriteCounter = { count: 0 };
+const completeMultiSheetOverwriteHandle = createWritableHandle('bound-v2-multi-complete.pixieedraw', completeMultiSheetOverwriteCounter);
+const completeMultiSheetHarness = createHarness({
+  flagEnabled: true,
+  multiSheetFlagEnabled: true,
+  openSheetCount: 2,
+  completeMultiSheetCandidate,
+  activePersistenceState: {
+    sourceKind: 'file',
+    sourceStorageAdapterId: V2_ADAPTER_ID,
+    sourceProjectToken: 'token-v2-multi-complete',
+    lastSavedStorageAdapterId: V2_ADAPTER_ID,
+    projectSaveHandleState: 'bound',
+  },
+  activeProjectSaveBinding: {
+    projectSaveHandle: completeMultiSheetOverwriteHandle,
+    projectSaveHandleMeta: normalizeProjectSaveHandleMeta({
+      fileName: 'bound-v2-multi-complete.pixieedraw',
+      adapterId: V2_ADAPTER_ID,
+      sourceProjectToken: 'token-v2-multi-complete',
+      handleKind: 'file-picker',
+      permissionState: 'granted',
+    }),
+    projectSaveHandleState: 'bound',
+  },
+});
+const completeMultiSheetOverwriteResult = await completeMultiSheetHarness.exportRenderingModule.executeProjectSave({ announceStatus: false });
+assert.equal(completeMultiSheetOverwriteResult.ok, true);
+assert.equal(completeMultiSheetOverwriteResult.status, 'saved');
+assert.equal(completeMultiSheetOverwriteResult.outputKind, 'bound-handle');
+assert.equal(completeMultiSheetOverwriteResult.legacyResult.savePlan.allowSameHandleOverwrite, true);
+assert.equal(completeMultiSheetOverwriteResult.legacyResult.savePlan.forceSaveAsNewFile, false);
+assert.equal(completeMultiSheetOverwriteCounter.count, 1, 'complete multi-sheet V2 save writes the bound handle');
+assert.equal(completeMultiSheetHarness.pickerCounter.count, 0, 'complete multi-sheet V2 overwrite does not open picker');
+
+const saveAsHarness = createHarness({
+  flagEnabled: true,
+  activePersistenceState: {
+    sourceKind: 'file', sourceStorageAdapterId: V2_ADAPTER_ID, projectSaveHandleState: 'bound',
+  },
+  activeProjectSaveBinding: {
+    projectSaveHandle: createWritableHandle('save-as-source.pixieedraw', { count: 0 }),
+    projectSaveHandleState: 'bound',
+  },
+});
+const saveAsResult = await saveAsHarness.exportRenderingModule.executeProjectSaveAs({ announceStatus: false });
+assert.equal(saveAsResult.ok, true);
+assert.equal(saveAsResult.status, 'saved-as');
+assert.equal(saveAsHarness.pickerCounter.count, 1, 'Save As always opens the picker');
+assert.equal(saveAsHarness.bindCalls.length, 1, 'Save As binds only its successfully selected picker handle');
+
+const copyHarness = createHarness({
+  flagEnabled: true,
+  activePersistenceState: {
+    sourceKind: 'file', sourceStorageAdapterId: V2_ADAPTER_ID, projectSaveHandleState: 'bound',
+  },
+  activeProjectSaveBinding: {
+    projectSaveHandle: createWritableHandle('copy-source.pixieedraw', { count: 0 }),
+    projectSaveHandleState: 'bound',
+  },
+});
+const copyResult = await copyHarness.exportRenderingModule.executeProjectSaveCopy({ announceStatus: false });
+assert.equal(copyResult.ok, true);
+assert.equal(copyResult.status, 'copy-saved');
+assert.equal(copyResult.bindingChanged, false);
+assert.equal(copyResult.dirtyChanged, false);
+assert.equal(copyHarness.pickerCounter.count, 1, 'Save Copy always opens a new picker');
+assert.equal(copyHarness.bindCalls.length, 0, 'Save Copy does not bind the output handle');
+assert.equal(copyHarness.replaceCalls.length, 0, 'Save Copy does not replace active persistence state');
 
 const noBoundHarness = createHarness({
   flagEnabled: true,

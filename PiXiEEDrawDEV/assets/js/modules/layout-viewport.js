@@ -279,7 +279,7 @@
     );
   }
 
-  function resetOpenedDocumentViewport({ defer = false } = {}) {
+  function resetOpenedDocumentViewport({ defer = false, preserveLocalCanvasLayout = false } = {}) {
     if (openedDocumentViewportResetRaf !== null) {
       window.cancelAnimationFrame(openedDocumentViewportResetRaf);
       openedDocumentViewportResetRaf = null;
@@ -291,8 +291,10 @@
         resetViewportZoomRatio(1);
         state.pan.x = 0;
         state.pan.y = 0;
-        requestLocalViewportCanvasLayoutReset({ clearStored: true });
-      } else {
+        if (!preserveLocalCanvasLayout) {
+          requestLocalViewportCanvasLayoutReset({ clearStored: true });
+        }
+      } else if (!preserveLocalCanvasLayout) {
         requestLocalViewportCanvasLayoutReset({ clearStored: true });
       }
       resizeCanvases({

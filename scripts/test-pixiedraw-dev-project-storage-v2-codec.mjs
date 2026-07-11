@@ -271,6 +271,16 @@ function createSession(fps, snapshotCanvasId, logCanvasId, label) {
     historyLimit: 24,
     historyPast: [],
     historyFuture: [],
+    localViewportCanvases: {
+      count: 1,
+      selectedKind: 'local',
+      selectedIndex: 0,
+      layoutScale: 1,
+      positionsRelative: true,
+      anchorLeft: 42,
+      anchorTop: 24,
+      positions: [{ left: 192, top: 96 }],
+    },
     timelapse: {
       enabled: true,
       fps,
@@ -401,6 +411,7 @@ async function runSingleSheetScenario() {
   assert.equal(decoded.packaged.session.timelapse.enabled, true);
   assert.deepEqual(decoded.packaged.session.timelapse.byCanvas, rootSession.timelapse.byCanvas);
   assert.deepEqual(decoded.packaged.session.timelapse.operationLogsByCanvas, rootSession.timelapse.operationLogsByCanvas);
+  assert.deepEqual(decoded.packaged.session.localViewportCanvases, rootSession.localViewportCanvases);
   assert.equal(decoded.packaged.session.timelapseArchive, undefined);
   assert.equal(decoded.packaged.document.canvases[0].frames[0].layers[0].directOnly, true);
   assert.equal(decoded.packaged.document.canvases[0].frames[0].layers[1].indices, canvasA.frames[0].layers[1].indices);
@@ -449,6 +460,10 @@ async function runMultiSheetIncludeTimelapseScenario() {
   assert.equal(decoded.packaged.sheets[1].project.session.timelapse.enabled, true);
   assert.deepEqual(decoded.packaged.sheets[1].project.session.timelapse.byCanvas, extraSession.timelapse.byCanvas);
   assert.deepEqual(
+    decoded.packaged.sheets[1].project.session.localViewportCanvases,
+    extraSession.localViewportCanvases
+  );
+  assert.deepEqual(
     decoded.packaged.sheets[1].project.session.timelapse.operationLogsByCanvas,
     extraSession.timelapse.operationLogsByCanvas
   );
@@ -488,9 +503,29 @@ async function runMultiSheetOmitTimelapseScenario() {
   return encoded.blob.size;
 }
 
+async function runLargeMultiSheetScenario(sheetCount) {
+  const sheets = Array.from({ length: sheetCount }, (_, index) => {
+    const id = `large-sheet-${index + 1}`;
+    const project = structuredClone(activePackagedProject);
+    project.document.documentName = `${id}.pixieedraw`;
+    project.session.localViewportCanvases.anchorLeft = index;
+    return { id, fileName: `${id}.pixieedraw`, label: `Large ${index + 1}`, source: 'sheet', sourceKind: 'file', project };
+  });
+  const packaged = { ...structuredClone(activePackagedProject), sheets, sheetOrder: sheets.map(sheet => sheet.id), activeSheetId: sheets[Math.floor(sheetCount / 2)].id };
+  const codec = createCodec();
+  const encoded = await codec.encodePackagedProject(packaged, { adapterId: 'pixieedraw-v2-zip-experimental', includeSheets: true, includeTimelapse: false });
+  const decoded = await codec.decodeArchiveBytes(new Uint8Array(await encoded.blob.arrayBuffer()));
+  assert.equal(decoded.packaged.sheets.length, sheetCount);
+  assert.deepEqual(decoded.packaged.sheets.map(sheet => sheet.id), packaged.sheetOrder);
+  assert.equal(decoded.packaged.activeSheetId, packaged.activeSheetId);
+  assert.equal(decoded.packaged.sheets.at(-1).project.session.localViewportCanvases.anchorLeft, sheetCount - 1);
+}
+
 const singleSize = await runSingleSheetScenario();
 const includeSize = await runMultiSheetIncludeTimelapseScenario();
 const omitSize = await runMultiSheetOmitTimelapseScenario();
+await runLargeMultiSheetScenario(20);
+await runLargeMultiSheetScenario(50);
 
 console.log(
   `V2 archive codec checks passed. single=${singleSize} bytes, multi+timelapse=${includeSize} bytes, multi-timelapse=${omitSize} bytes`

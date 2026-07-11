@@ -221,7 +221,7 @@
         source: 'working',
         project: activePackagedProject,
       }];
-    sourceTabs.slice(0, MAX_PROJECT_SHEETS).forEach((tab, index) => {
+    sourceTabs.forEach((tab, index) => {
       const isActive = tab?.id && tab.id === activeId;
       const project = isActive && activePackagedProject
         ? activePackagedProject
@@ -354,7 +354,7 @@
     if (!packagedPayload || typeof packagedPayload !== 'object') {
       return packagedPayload;
     }
-    const expectedSheetCount = Math.min(MAX_PROJECT_SHEETS, Math.max(1, openProjectTabs.length || 1));
+    const expectedSheetCount = Math.max(1, openProjectTabs.length || 1);
     const currentSheetCount = Array.isArray(packagedPayload.sheets) ? packagedPayload.sheets.length : 0;
     if (currentSheetCount >= expectedSheetCount) {
       return packagedPayload;
@@ -374,7 +374,7 @@
   }
 
   function validatePackagedProjectSheetCountForSave(packagedPayload = null) {
-    const openSheetCount = Math.min(MAX_PROJECT_SHEETS, Math.max(1, openProjectTabs.length || 1));
+    const openSheetCount = Math.max(1, openProjectTabs.length || 1);
     const packagedSheetCount = countPackagedProjectSheets(packagedPayload);
     if (openSheetCount > 1 && packagedSheetCount < openSheetCount) {
       console.warn('[project-sheets] refusing incomplete sheet save', {
@@ -401,9 +401,9 @@
     if (previousSheets.length <= nextSheets.length || previousSheets.length <= 1) {
       return packagedPayload;
     }
-    const mergedSheets = previousSheets.slice(0, MAX_PROJECT_SHEETS).map(sheet => ({ ...sheet }));
+    const mergedSheets = previousSheets.map(sheet => ({ ...sheet }));
     const preferredActiveId = typeof packagedPayload.activeSheetId === 'string' ? packagedPayload.activeSheetId : '';
-    nextSheets.slice(0, MAX_PROJECT_SHEETS).forEach((sheet, index) => {
+    nextSheets.forEach((sheet, index) => {
       const sheetId = typeof sheet.id === 'string' ? sheet.id : '';
       let replaceIndex = sheetId ? mergedSheets.findIndex(candidate => candidate?.id === sheetId) : -1;
       if (replaceIndex < 0 && preferredActiveId) {

@@ -2467,17 +2467,19 @@
       const writable = await handle.createWritable();
       await writable.write(blob);
       await writable.close();
-      markDocumentDurablySaved();
-      const packaged = buildPackagedProjectPayload(snapshot);
-      const dotStats = resolvePackagedProjectDotStats(packaged);
-      if (dotStats) {
-        setTrackedProjectDotBaseline(snapshot, dotStats);
+      if (options?.applyExternalSaveEffects !== false) {
+        markDocumentDurablySaved();
+        const packaged = buildPackagedProjectPayload(snapshot);
+        const dotStats = resolvePackagedProjectDotStats(packaged);
+        if (dotStats) {
+          setTrackedProjectDotBaseline(snapshot, dotStats);
+        }
+        recordRecentProjectSnapshot(snapshot, packaged, {
+          projectId: autosaveProjectId || createAutosaveProjectId(),
+        }).catch(error => {
+          console.warn('Failed to update recent projects snapshot', error);
+        });
       }
-      recordRecentProjectSnapshot(snapshot, packaged, {
-        projectId: autosaveProjectId || createAutosaveProjectId(),
-      }).catch(error => {
-        console.warn('Failed to update recent projects snapshot', error);
-      });
       if (options?.bindProjectSaveHandle === true && typeof bindActiveProjectSaveHandle === 'function') {
         bindActiveProjectSaveHandle(handle, options?.projectSaveHandleMeta || null, {
           log: options?.logProjectSaveHandleBinding !== false,
@@ -2492,12 +2494,13 @@
 
   async function buildProjectExportBundle(fileNameBase = state.documentName, options = {}) {
     commitHistory();
-    const snapshot = makeHistorySnapshot();
-    const session = buildProjectSessionPayload();
+    const snapshot = options?.snapshot || makeHistorySnapshot();
+    const session = options?.session || buildProjectSessionPayload();
     const serializedProject = typeof serializeProjectStorageSnapshot === 'function'
       ? await serializeProjectStorageSnapshot({
           snapshot,
           session,
+          packaged: options?.packaged || null,
         }, {
           fileNameBase: fileNameBase || state.documentName,
           includeSheets: options?.includeSheets !== false,
@@ -2507,7 +2510,7 @@
           preferredAdapterId: options?.preferredStorageAdapterId || '',
         })
       : null;
-    const packaged = serializedProject?.packaged || buildPackagedProjectPayload(snapshot, { session });
+    const packaged = serializedProject?.packaged || options?.packaged || buildPackagedProjectPayload(snapshot, { session });
     const json = typeof serializedProject?.text === 'string'
       ? serializedProject.text
       : JSON.stringify(packaged);
@@ -2550,6 +2553,29 @@
 
   function isDevV2ProjectSaveEnabled() {
     return typeof window !== 'undefined' && window.__pixieedrawUseV2ProjectSave === true;
+  }
+
+  function isDevMultiSheetV2ExternalSaveEnabled() {
+    return typeof window !== 'undefined' && window.__pixieedrawUseMultiSheetV2ExternalSave === true;
+  }
+
+  function collectCompleteMultiSheetV2Candidate(activePackagedProject, { includeTimelapse = true } = {}) {
+    if (typeof collectCompleteMultiSheetV2SaveCandidate !== 'function') return null;
+    const activeProjectId = normalizeAutosaveProjectId(autosaveProjectId || '');
+    return collectCompleteMultiSheetV2SaveCandidate({
+      openProjectTabs,
+      activeSheetId: activeOpenProjectTabId,
+      activePackagedProject,
+      includeTimelapse,
+      resolveStoredProjectForSheet: tab => {
+        const stored = activeProjectId && typeof resolveStoredLocalProjectPayloadForProjectId === 'function'
+          ? resolveStoredLocalProjectPayloadForProjectId(activeProjectId)
+          : null;
+        return stored && typeof extractLocalProjectSheetPayload === 'function'
+          ? extractLocalProjectSheetPayload(stored, tab?.id || '')
+          : null;
+      },
+    });
   }
 
   function normalizeProjectStorageAdapterId(adapterId = '') {
@@ -2637,7 +2663,7 @@
       )
       : null;
     if (typeof replaceActiveOpenProjectTabFromCurrentState === 'function') {
-      replaceActiveOpenProjectTabFromCurrentState({
+      const replacedTab = replaceActiveOpenProjectTabFromCurrentState({
         fileName: normalizedFileName,
         label: buildProjectTabLabelFromFileName(normalizedFileName),
         sourceKind: 'file',
@@ -2647,7 +2673,9 @@
         projectSaveHandle: nextHandle,
         projectSaveHandleMeta: nextHandleMeta,
       });
-      return;
+      if (replacedTab) {
+        return;
+      }
     }
     if (typeof updateActiveProjectPersistenceState === 'function') {
       updateActiveProjectPersistenceState({
@@ -2815,6 +2843,92 @@
     };
   }
 
+  // Keep the project save plan and multi-sheet preflight in one final decision.
+  function resolveProjectSameHandleOverwriteEligibility({
+    activeProjectSaveBinding = null,
+    savePlan = null,
+    targetStorageAdapterId = '',
+    multiSheetCandidate = null,
+    multiSheetFlagEnabled = false,
+    v2ProjectSaveFlagEnabled = false,
+  } = {}) {
+    const boundCandidate = resolveBoundProjectSaveOverwriteCandidate({
+      activeProjectSaveBinding,
+      savePlan,
+      targetStorageAdapterId,
+    });
+    const isV2Target = isV2ProjectStorageAdapterId(targetStorageAdapterId);
+    const isMultiSheet = savePlan?.isMultiSheetProject === true;
+    const completeMultiSheet = !isMultiSheet || Boolean(
+      multiSheetCandidate?.complete === true
+      && multiSheetCandidate?.packagedSheetCount === savePlan?.openSheetCount
+      && multiSheetCandidate?.packaged?.sheetOrder?.length === savePlan?.openSheetCount
+      && multiSheetCandidate?.packaged?.activeSheetId
+    );
+    const multiSheetFlagsValid = !isMultiSheet || (!isV2Target || (
+      multiSheetFlagEnabled === true && v2ProjectSaveFlagEnabled === true
+    ));
+    return {
+      ...boundCandidate,
+      eligible: boundCandidate.eligible && completeMultiSheet && multiSheetFlagsValid,
+      reason: !boundCandidate.eligible
+        ? 'overwrite-binding-invalid'
+        : (!completeMultiSheet
+          ? 'incomplete-project'
+          : (!multiSheetFlagsValid ? 'multi-sheet-v2-flag-disabled' : 'eligible')),
+    };
+  }
+
+  function resolveV2ProjectSheetOverwriteSafety({
+    packagedProject = null,
+    includeSheets = false,
+    openSheetCount = null,
+    allowCompleteMultiSheetOverwrite = false,
+  } = {}) {
+    const runtimeOpenSheetCount = typeof getOpenProjectSheetCount === 'function'
+      ? Math.max(0, Math.round(Number(getOpenProjectSheetCount()) || 0))
+      : (
+          Array.isArray(openProjectTabs)
+            ? openProjectTabs.filter(tab => tab && typeof tab === 'object').length
+            : 0
+        );
+    const hasExplicitOpenSheetCount = openSheetCount !== null
+      && openSheetCount !== undefined
+      && Number.isFinite(Number(openSheetCount));
+    const resolvedOpenSheetCount = Math.max(
+      1,
+      Math.round(hasExplicitOpenSheetCount ? Number(openSheetCount) : runtimeOpenSheetCount) || 1
+    );
+    const packagedSheetCount = Array.isArray(packagedProject?.sheets)
+      ? packagedProject.sheets.filter(
+        sheet => sheet && typeof sheet === 'object' && sheet.project && typeof sheet.project === 'object'
+      ).length
+      : 0;
+    const isMultiSheetProject = resolvedOpenSheetCount > 1;
+    const includesAllSheets = includeSheets === true && packagedSheetCount >= resolvedOpenSheetCount;
+    const allowMultiSheetOverwrite = !isMultiSheetProject || (
+      allowCompleteMultiSheetOverwrite === true && includesAllSheets
+    );
+    let overwriteBlockedReason = '';
+    if (isMultiSheetProject && !allowMultiSheetOverwrite) {
+      if (packagedSheetCount < resolvedOpenSheetCount) {
+        overwriteBlockedReason = 'sheet-package-incomplete';
+      } else if (includeSheets !== true) {
+        overwriteBlockedReason = 'include-sheets-disabled';
+      } else {
+        overwriteBlockedReason = 'multi-sheet-v2-incomplete';
+      }
+    }
+    return {
+      openSheetCount: resolvedOpenSheetCount,
+      packagedSheetCount,
+      includesAllSheets,
+      isMultiSheetProject,
+      allowMultiSheetOverwrite,
+      overwriteBlockedReason,
+    };
+  }
+
   async function writeProjectBlobToNewHandle(handle, blob) {
     if (!handle || !(blob instanceof Blob)) {
       return false;
@@ -2838,7 +2952,7 @@
       : createAutosaveFileName(buildExperimentalProjectFileNameBase(state.documentName));
     let selectedHandle = null;
     let saveMethod = '';
-    if (!DISABLE_FILE_SYSTEM_ACCESS_SAVE) {
+    if (!options?.forcePicker && !DISABLE_FILE_SYSTEM_ACCESS_SAVE) {
       const uniqueFilename = await resolveUniqueExportDirectoryFilename(resolvedFilename, {
         requestPermission: true,
       });
@@ -2873,12 +2987,14 @@
     if (selectedHandle) {
       const savedToSelected = await writeProjectBlobToNewHandle(selectedHandle, bundle.blob);
       if (savedToSelected) {
-        bindExternalProjectSaveHandleIfEligible(selectedHandle, {
-          saveMethod,
-          filename: resolvedFilename,
-          adapterId: bundle?.storageAdapterId || '',
-          permissionState: 'granted',
-        });
+        if (options?.bindProjectSaveHandle !== false) {
+          bindExternalProjectSaveHandleIfEligible(selectedHandle, {
+            saveMethod,
+            filename: resolvedFilename,
+            adapterId: bundle?.storageAdapterId || '',
+            permissionState: 'granted',
+          });
+        }
         return {
           saved: true,
           cancelled: false,
@@ -2936,11 +3052,16 @@
     };
   }
 
-  async function saveProjectAsPixieedraw(options = {}) {
+  async function executeProjectSaveInternal(options = {}) {
     if (!ensureCurrentClientCanExportProject({ announce: true, format: 'project' })) {
       return { saved: false, cancelled: false, skipped: true };
     }
     const announceStatus = options?.announceStatus !== false;
+    const commandMode = options?.commandMode === 'save-as'
+      ? 'save-as'
+      : (options?.commandMode === 'copy' ? 'copy' : 'save');
+    const forceSaveAs = commandMode !== 'save';
+    const preserveCurrentProjectState = commandMode === 'copy';
     try {
       const devV2ProjectSaveEnabled = isDevV2ProjectSaveEnabled() && !options?.preferredStorageAdapterId;
       const activePersistenceState = typeof getActiveProjectPersistenceState === 'function'
@@ -2949,13 +3070,68 @@
       const activeProjectSaveBinding = typeof getActiveProjectSaveBinding === 'function'
         ? (getActiveProjectSaveBinding() || null)
         : null;
-      const savePlan = resolveActiveProjectSavePlan({
+      const resolvedBaseSavePlan = resolveActiveProjectSavePlan({
         activePersistenceState,
         explicitPreferredStorageAdapterId: options?.preferredStorageAdapterId || '',
         devV2SaveFlag: devV2ProjectSaveEnabled,
         defaultStorageAdapterId: DEFAULT_PROJECT_STORAGE_ADAPTER_ID || 'pixieedraw-v1-json',
       });
-      const preferredStorageAdapterId = savePlan.targetStorageAdapterId || resolvePreferredProjectSaveAdapterId(options);
+      const baseSavePlan = forceSaveAs
+        ? {
+          ...resolvedBaseSavePlan,
+          allowSameHandleOverwrite: false,
+          forceSaveAsNewFile: true,
+          reason: commandMode === 'copy' ? 'copy-save' : 'save-as-required',
+        }
+        : resolvedBaseSavePlan;
+      const preferredStorageAdapterId = baseSavePlan.targetStorageAdapterId || resolvePreferredProjectSaveAdapterId(options);
+      const requestedV2Save = isV2ProjectStorageAdapterId(preferredStorageAdapterId);
+      const openSheetCount = typeof getOpenProjectSheetCount === 'function' ? getOpenProjectSheetCount() : openProjectTabs.length;
+      const isMultiSheetProject = openSheetCount > 1;
+      const multiSheetFlagEnabled = isDevMultiSheetV2ExternalSaveEnabled();
+      let multiSheetCandidate = null;
+      let preflightBlockReason = '';
+      let preflightSnapshot = null;
+      let preflightSession = null;
+      if (requestedV2Save && isMultiSheetProject) {
+        if (!multiSheetFlagEnabled) {
+          preflightBlockReason = 'multi-sheet-v2-flag-disabled';
+        } else {
+          commitHistory();
+          preflightSnapshot = makeHistorySnapshot();
+          preflightSession = buildProjectSessionPayload();
+          const activePackagedProject = buildPackagedProjectPayload(preflightSnapshot, {
+            session: preflightSession,
+            includeSheets: false,
+          });
+          multiSheetCandidate = collectCompleteMultiSheetV2Candidate(activePackagedProject, {
+            includeTimelapse: options?.includeTimelapse !== false,
+          });
+          if (!multiSheetCandidate?.complete) {
+            preflightBlockReason = multiSheetCandidate?.errors?.[0]?.code || 'sheet-materialization-failed';
+          }
+        }
+        if (preflightBlockReason) {
+          const blockedPlan = {
+            ...baseSavePlan,
+            openSheetCount,
+            packagedSheetCount: multiSheetCandidate?.packagedSheetCount || 0,
+            includesAllSheets: false,
+            isMultiSheetProject: true,
+            allowMultiSheetOverwrite: false,
+            allowSameHandleOverwrite: false,
+            forceSaveAsNewFile: true,
+            reason: preflightBlockReason,
+            overwriteBlockedReason: preflightBlockReason,
+          };
+          console.warn('[PiXiEEDraw DEV] blocked multi-sheet V2 save preflight', {
+            reason: preflightBlockReason,
+            errors: multiSheetCandidate?.errors || [],
+          });
+          if (announceStatus) updateAutosaveStatus('複数シートV2保存の事前検証に失敗したため、保存を中止しました。', 'error');
+          return { saved: false, cancelled: false, blocked: true, storageAdapterId: preferredStorageAdapterId, savePlan: blockedPlan };
+        }
+      }
       const {
         snapshot,
         packaged,
@@ -2966,19 +3142,47 @@
       } = await buildProjectExportBundle(
         options?.fileNameBase || getExportFileNameBase() || state.documentName,
         {
-          includeSheets: options?.includeSheets !== false,
+          includeSheets: multiSheetCandidate ? true : options?.includeSheets !== false,
           includeTimelapse: options?.includeTimelapse !== false,
           useWorker: options?.useWorker === true,
           requireWorker: options?.requireWorker === true,
           preferredStorageAdapterId,
+          snapshot: preflightSnapshot,
+          session: preflightSession,
+          packaged: multiSheetCandidate?.packaged || null,
         }
       );
       const selectedStorageAdapterId = storageAdapterId || preferredStorageAdapterId || 'pixieedraw-v1-json';
       const usesV2ProjectSave = isV2ProjectStorageAdapterId(selectedStorageAdapterId);
-      const boundProjectSaveOverwrite = resolveBoundProjectSaveOverwriteCandidate({
+      const v2SheetOverwriteSafety = resolveV2ProjectSheetOverwriteSafety({
+        packagedProject: packaged,
+        includeSheets: multiSheetCandidate ? true : options?.includeSheets === true,
+        allowCompleteMultiSheetOverwrite: multiSheetCandidate?.complete === true,
+      });
+      const multiSheetV2OverwriteReady = usesV2ProjectSave
+        && v2SheetOverwriteSafety.isMultiSheetProject
+        && multiSheetCandidate?.complete === true
+        && v2SheetOverwriteSafety.allowMultiSheetOverwrite === true
+        && multiSheetFlagEnabled === true
+        && devV2ProjectSaveEnabled === true;
+      const savePlan = {
+        ...baseSavePlan,
+        ...v2SheetOverwriteSafety,
+        allowSameHandleOverwrite: baseSavePlan.allowSameHandleOverwrite === true
+          && (!usesV2ProjectSave || !v2SheetOverwriteSafety.isMultiSheetProject || multiSheetV2OverwriteReady),
+        forceSaveAsNewFile: baseSavePlan.forceSaveAsNewFile === true
+          || (usesV2ProjectSave && v2SheetOverwriteSafety.isMultiSheetProject && !multiSheetV2OverwriteReady),
+        reason: (usesV2ProjectSave && v2SheetOverwriteSafety.isMultiSheetProject && !multiSheetV2OverwriteReady)
+          ? (v2SheetOverwriteSafety.overwriteBlockedReason || 'multi-sheet-v2-incomplete')
+          : baseSavePlan.reason,
+      };
+      const boundProjectSaveOverwrite = resolveProjectSameHandleOverwriteEligibility({
         activeProjectSaveBinding,
         savePlan,
         targetStorageAdapterId: selectedStorageAdapterId,
+        multiSheetCandidate,
+        multiSheetFlagEnabled,
+        v2ProjectSaveFlagEnabled: devV2ProjectSaveEnabled,
       });
       const shouldLogSavePlan = devV2ProjectSaveEnabled || savePlan.isConversionSave || savePlan.isDowngradeSave;
 
@@ -2994,9 +3198,35 @@
         console.info(`reason: ${savePlan.reason}`);
         console.info(`has project save handle: ${Boolean(activeProjectSaveBinding?.projectSaveHandle)}`);
         console.info(`project save handle state: ${activeProjectSaveBinding?.projectSaveHandleState || '(none)'}`);
+        console.info(`open sheet count: ${savePlan.openSheetCount}`);
+        console.info(`packaged sheet count: ${savePlan.packagedSheetCount}`);
+        console.info(`includes all sheets: ${savePlan.includesAllSheets === true}`);
+        console.info(`overwrite blocked reason: ${savePlan.overwriteBlockedReason || '(none)'}`);
       }
 
       if (usesV2ProjectSave) {
+        if (savePlan.isMultiSheetProject && !savePlan.allowMultiSheetOverwrite) {
+          console.warn('[PiXiEEDraw DEV] blocked incomplete multi-sheet V2 project save', {
+            openSheetCount: savePlan.openSheetCount,
+            packagedSheetCount: savePlan.packagedSheetCount,
+            includesAllSheets: savePlan.includesAllSheets,
+            overwriteBlockedReason: savePlan.overwriteBlockedReason,
+          });
+          if (announceStatus) {
+            updateAutosaveStatus(
+              '現在のV2通常保存は複数シートの完全保存に対応していません。保存を中止しました。',
+              'error'
+            );
+          }
+          return {
+            saved: false,
+            cancelled: false,
+            blocked: true,
+            storageAdapterId: selectedStorageAdapterId,
+            workerUsed: workerUsed === true,
+            savePlan,
+          };
+        }
         if (boundProjectSaveOverwrite.eligible) {
           const overwriteFilename = boundProjectSaveOverwrite.projectSaveHandleMeta?.fileName
             || boundProjectSaveOverwrite.projectSaveHandle?.name
@@ -3045,6 +3275,8 @@
         }, {
           shareTitle: state.documentName || 'PiXiEEDraw',
           shareText: `${state.documentName || 'PiXiEEDraw'} (PiXiEEDraw v2)`,
+          forcePicker: forceSaveAs,
+          bindProjectSaveHandle: !preserveCurrentProjectState,
         });
         if (devV2ProjectSaveEnabled) {
           console.info('[PiXiEEDraw DEV] V2 project save flag enabled');
@@ -3052,7 +3284,7 @@
           console.info(`save as new file: ${saveResult.savedAsNewFile === true}`);
           console.info(`worker used: ${workerUsed === true}`);
         }
-        if (saveResult.saved) {
+        if (saveResult.saved && !preserveCurrentProjectState) {
           const nextBinding = typeof getActiveProjectSaveBinding === 'function'
             ? (getActiveProjectSaveBinding() || null)
             : null;
@@ -3075,6 +3307,16 @@
             saved: true,
             cancelled: false,
             savedAsNewFile: saveResult.savedAsNewFile === true,
+            storageAdapterId: selectedStorageAdapterId,
+            workerUsed: workerUsed === true,
+            savePlan,
+          };
+        }
+        if (saveResult.saved && preserveCurrentProjectState) {
+          return {
+            saved: true,
+            cancelled: false,
+            savedAsNewFile: true,
             storageAdapterId: selectedStorageAdapterId,
             workerUsed: workerUsed === true,
             savePlan,
@@ -3121,7 +3363,7 @@
       let selectedHandle = null;
       let resolvedProjectFilename = filename;
       let selectedHandleSource = '';
-      if (!DISABLE_FILE_SYSTEM_ACCESS_SAVE) {
+      if (!forceSaveAs && !DISABLE_FILE_SYSTEM_ACCESS_SAVE) {
         const uniqueFilename = await resolveUniqueExportDirectoryFilename(filename, {
           requestPermission: true,
         });
@@ -3153,7 +3395,8 @@
       }
       if (selectedHandle) {
         const savedToSelected = await saveProjectBlobToHandle(selectedHandle, blob, snapshot, {
-          bindProjectSaveHandle: selectedHandleSource === 'picker',
+          bindProjectSaveHandle: selectedHandleSource === 'picker' && !preserveCurrentProjectState,
+          applyExternalSaveEffects: !preserveCurrentProjectState,
           projectSaveHandleMeta: buildExternalProjectSaveHandleMeta({
             filename: resolvedProjectFilename,
             adapterId: selectedStorageAdapterId,
@@ -3161,7 +3404,7 @@
             permissionState: 'granted',
           }),
         });
-        if (savedToSelected) {
+        if (savedToSelected && !preserveCurrentProjectState) {
           const nextBinding = typeof getActiveProjectSaveBinding === 'function'
             ? (getActiveProjectSaveBinding() || null)
             : null;
@@ -3182,6 +3425,9 @@
           }
           return { saved: true, cancelled: false, savePlan };
         }
+        if (savedToSelected && preserveCurrentProjectState) {
+          return { saved: true, cancelled: false, savedAsNewFile: true, savePlan };
+        }
       }
       if (pickerCancelled) {
         return { saved: false, cancelled: true, savePlan };
@@ -3195,6 +3441,9 @@
         nativeSubdirectory: NATIVE_PROJECTS_SUBDIRECTORY,
       });
       if (result && !String(result).endsWith('cancel')) {
+        if (preserveCurrentProjectState) {
+          return { saved: true, cancelled: false, savedAsNewFile: true, savePlan };
+        }
         syncActiveProjectPersistenceAfterExternalSave({
           filename: resolvedProjectFilename,
           storageAdapterId: selectedStorageAdapterId,
@@ -3226,6 +3475,97 @@
       }
       return { saved: false, cancelled: false };
     }
+  }
+
+  function buildProjectFileCommandResult(legacyResult = null, {
+    commandMode = 'save',
+    adapterId = null,
+  } = {}) {
+    const result = legacyResult && typeof legacyResult === 'object' ? legacyResult : {};
+    const saved = result.saved === true;
+    const cancelled = result.cancelled === true;
+    const blocked = result.blocked === true;
+    const isCopy = commandMode === 'copy';
+    const savedAsNewFile = result.savedAsNewFile === true;
+    const outputKind = result.outputKind || (saved
+      ? (savedAsNewFile ? 'new-handle' : 'bound-handle')
+      : 'none');
+    return {
+      ok: saved,
+      status: saved
+        ? (isCopy ? 'copy-saved' : (savedAsNewFile ? 'saved-as' : 'saved'))
+        : (cancelled ? 'cancelled' : (blocked ? 'blocked' : 'failed')),
+      reason: cancelled
+        ? 'picker-cancel'
+        : (result.savePlan?.reason || (blocked ? 'incomplete-project' : null)),
+      adapterId: result.storageAdapterId || adapterId || null,
+      outputKind,
+      bindingChanged: result.bindingChanged === true || (saved && !isCopy && savedAsNewFile && outputKind === 'new-handle'),
+      dirtyChanged: result.dirtyChanged === true || (saved && !isCopy),
+      fileNameChanged: result.fileNameChanged === true || (saved && !isCopy && savedAsNewFile && outputKind === 'new-handle'),
+      error: result.error instanceof Error ? result.error : null,
+      legacyResult: result,
+    };
+  }
+
+  async function executeProjectSave(options = {}) {
+    const result = await executeProjectSaveInternal({ ...options, commandMode: 'save' });
+    return buildProjectFileCommandResult(result, {
+      commandMode: 'save',
+      adapterId: result?.storageAdapterId || options?.preferredStorageAdapterId || null,
+    });
+  }
+
+  async function executeProjectSaveAs(options = {}) {
+    const result = await executeProjectSaveInternal({ ...options, commandMode: 'save-as' });
+    return buildProjectFileCommandResult(result, {
+      commandMode: 'save-as',
+      adapterId: result?.storageAdapterId || options?.preferredStorageAdapterId || null,
+    });
+  }
+
+  async function executeProjectSaveCopy(options = {}) {
+    const result = await executeProjectSaveInternal({ ...options, commandMode: 'copy' });
+    return buildProjectFileCommandResult(result, {
+      commandMode: 'copy',
+      adapterId: result?.storageAdapterId || options?.preferredStorageAdapterId || null,
+    });
+  }
+
+  async function executeProjectOpen(options = {}) {
+    if (typeof openDocumentDialog !== 'function') {
+      return {
+        ok: false,
+        status: 'failed',
+        reason: 'unsupported-browser',
+        adapterId: null,
+        outputKind: 'none',
+        bindingChanged: false,
+        dirtyChanged: false,
+        fileNameChanged: false,
+        error: null,
+      };
+    }
+    const opened = await openDocumentDialog({
+      ...options,
+      mode: options?.mode || EXTERNAL_IMPORT_MODE_NEW_PROJECT,
+    });
+    return {
+      ok: opened === true,
+      status: opened === true ? 'opened' : 'cancelled',
+      reason: opened === true ? null : 'picker-cancel',
+      adapterId: null,
+      outputKind: 'none',
+      bindingChanged: false,
+      dirtyChanged: false,
+      fileNameChanged: false,
+      error: null,
+    };
+  }
+
+  // Legacy callers still receive the established saved/cancelled result shape.
+  async function saveProjectAsPixieedraw(options = {}) {
+    return await executeProjectSaveInternal({ ...options, commandMode: 'save' });
   }
 
   async function saveProjectAsPixieedrawV2Experimental(options = {}) {
@@ -3465,6 +3805,12 @@
           getProjectFilePickerTypes,
           buildProjectExportBundle,
           resolveActiveProjectSavePlan,
+          resolveV2ProjectSheetOverwriteSafety,
+          resolveProjectSameHandleOverwriteEligibility,
+          executeProjectSave,
+          executeProjectSaveAs,
+          executeProjectSaveCopy,
+          executeProjectOpen,
           saveProjectAsPixieedraw,
           saveProjectAsPixieedrawV2Experimental,
           saveProjectAsPixieedrawV2ExperimentalIncludeSheetsDev,

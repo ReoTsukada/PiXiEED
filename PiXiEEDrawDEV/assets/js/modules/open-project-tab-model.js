@@ -36,7 +36,6 @@
     normalizeProjectPersistenceState,
     normalizeQrEditPayload,
     localizeText,
-    MAX_PROJECT_SHEETS,
   } = {}) {
     function resolveTabPersistenceState(value = null, fallback = null, { createToken = true } = {}) {
       if (typeof normalizeProjectPersistenceState === 'function') {
@@ -400,9 +399,6 @@
             sharedAutoJoin: sheet.sharedAutoJoin !== false,
           } : {}),
         });
-        if (normalized.length >= MAX_PROJECT_SHEETS) {
-          break;
-        }
       }
       if (!normalized.length) {
         return [];

@@ -43,24 +43,100 @@
       return false;
     }
     ensureOpenProjectTabsInitialized();
-    const availableSlots = Math.max(0, MAX_PROJECT_SHEETS - openProjectTabs.length);
-    if (availableSlots <= 0) {
-      updateAutosaveStatus(
-        localizeText(
-          `シートは最大 ${MAX_PROJECT_SHEETS} 枚です`,
-          `You can add up to ${MAX_PROJECT_SHEETS} sheets`
-        ),
-        'warn'
-      );
-      return false;
-    }
     openProjectTabBusy = true;
     try {
-      const targets = queue.slice(0, availableSlots);
-      const truncatedCount = Math.max(0, queue.length - targets.length);
+      const targets = queue;
+      const truncatedCount = 0;
       await persistActiveOpenProjectTab({ flushAutosave: true });
       const parentProjectId = normalizeAutosaveProjectId(autosaveProjectId || '') || createAutosaveProjectId();
       setActiveAutosaveProjectId(parentProjectId, { persist: false });
+      const directPayloads = await Promise.all(targets.map(item => readProjectPayloadFromOpenItem(item)));
+      const allDirectPayloads = directPayloads.every(payload => payload?.project && typeof payload.project === 'object');
+      if (allDirectPayloads) {
+        const collectionUtils = window.PiXiEEDrawModules?.projectSheetCollectionUtils?.createProjectSheetCollectionUtils?.();
+        const transactionUtils = window.PiXiEEDrawModules?.projectSheetTransactionUtils?.createProjectSheetTransactionUtils?.({ collectionUtils });
+        const candidates = directPayloads.map(payload => collectionUtils.prepareSheetCandidate('file', {
+          id: createOpenProjectTabId(),
+          project: payload.project,
+          fileName: payload.fileName,
+          label: extractDocumentBaseName(payload.fileName),
+          sourceKind: payload.sourceKind || 'file',
+          sourceStorageAdapterId: payload.sourceStorageAdapterId || null,
+          sourceProjectToken: payload.sourceProjectToken || createProjectPersistenceToken?.('file'),
+        }));
+        const validation = transactionUtils.validateCandidates(candidates, {
+          existingSheetIds: openProjectTabs.map(tab => tab?.id || ''),
+        });
+        if (!validation.valid) {
+          updateAutosaveStatus(localizeText('複数読み込みの候補を検証できませんでした', 'Unable to validate all import candidates'), 'warn');
+          return false;
+        }
+        const transaction = transactionUtils.createTransactionSnapshot({ openProjectTabs, activeOpenProjectTabId });
+        try {
+          const nextTabs = candidates.map(candidate => createOpenProjectSheetTabFromPackagedProject({
+            id: candidate.id,
+            project: candidate.project,
+            projectId: parentProjectId,
+            fileName: candidate.fileName,
+            label: candidate.label,
+            source: source || 'open',
+            unsaved: false,
+            sourceStorageAdapterId: candidate.sourceStorageAdapterId,
+            sourceKind: candidate.sourceKind,
+            sourceProjectToken: candidate.sourceProjectToken,
+            lastSavedStorageAdapterId: candidate.sourceStorageAdapterId,
+            projectSaveHandleState: 'none',
+            projectSaveHandle: null,
+            projectSaveHandleMeta: null,
+            qrEditPayload: tabOptions?.qrEditPayload || null,
+          }));
+          if (nextTabs.some(tab => !tab)) throw new Error('ERR_SHEET_TAB_CREATE_FAILED');
+          openProjectTabs.push(...nextTabs);
+          const activeTab = nextTabs[nextTabs.length - 1];
+          activeOpenProjectTabId = activeTab.id;
+          suppressOpenProjectTabAutoInitialize = false;
+          renderOpenProjectTabs();
+          const loaded = await loadDocumentFromProjectPayload(activeTab.project, {
+            projectId: parentProjectId,
+            suppressAutosaveStatus: true,
+            suppressProjectSheetsRestore: true,
+            sourcePersistenceState: {
+              sourceStorageAdapterId: activeTab.sourceStorageAdapterId,
+              sourceKind: activeTab.sourceKind,
+              sourceProjectToken: activeTab.sourceProjectToken,
+              lastSavedStorageAdapterId: activeTab.lastSavedStorageAdapterId,
+              projectSaveHandleState: 'none',
+            },
+          });
+          if (!loaded || loaded === 'deferred') throw new Error('ERR_SHEET_ACTIVATE_FAILED');
+          queueProjectTabViewportReset(activeTab.id);
+          updateAutosaveStatus(localizeText(`複数読み込み: 開いた ${nextTabs.length}件`, `Opened ${nextTabs.length} project tab(s)`), 'success');
+          return true;
+        } catch (error) {
+          transactionUtils.rollbackSheetCandidate(transaction, {
+            openProjectTabs,
+            setActiveOpenProjectTabId: value => { activeOpenProjectTabId = value; },
+          });
+          const previous = transaction.tabs.find(tab => tab?.id === transaction.activeOpenProjectTabId);
+          if (previous?.project) {
+            await loadDocumentFromProjectPayload(previous.project, {
+              projectId: previous.projectId || parentProjectId,
+              suppressAutosaveStatus: true,
+              suppressProjectSheetsRestore: true,
+            });
+          }
+          renderOpenProjectTabs();
+          console.warn('Atomic multi-project import rolled back', error);
+          updateAutosaveStatus(localizeText('複数読み込みに失敗したため、追加を取り消しました', 'Multiple import failed; no sheets were added'), 'warn');
+          return false;
+        }
+      }
+      if (targets.length > 1) {
+        // Image/GIF candidates still require the image decoder. Refuse the whole
+        // batch rather than retaining the former partial-import behavior.
+        updateAutosaveStatus(localizeText('複数読み込みには、すべての候補を先に準備できるファイルを選択してください', 'Select files whose candidates can all be prepared before import'), 'warn');
+        return false;
+      }
       let openedCount = 0;
       let failedCount = 0;
       for (let index = 0; index < targets.length; index += 1) {
@@ -196,10 +272,10 @@
       }
       const summaryJa = `複数読み込み: 開いた ${openedCount}件`
         + (failedCount > 0 ? ` / 失敗 ${failedCount}件` : '')
-        + (truncatedCount > 0 ? ` / 上限で未追加 ${truncatedCount}件（最大${MAX_PROJECT_SHEETS}）` : '');
+        + (truncatedCount > 0 ? ` / 未追加 ${truncatedCount}件` : '');
       const summaryEn = `Opened ${openedCount} project tab(s)`
         + (failedCount > 0 ? ` / Failed ${failedCount}` : '')
-        + (truncatedCount > 0 ? ` / Skipped by limit ${truncatedCount} (max ${MAX_PROJECT_SHEETS})` : '');
+        + (truncatedCount > 0 ? ` / Skipped ${truncatedCount}` : '');
       updateAutosaveStatus(
         localizeText(summaryJa, summaryEn),
         (failedCount > 0 || truncatedCount > 0) ? 'warn' : 'success'
@@ -356,12 +432,12 @@
         project: item.project,
         fileName: resolveOpenProjectPayloadFileName(item.project, item.name || item.fileName || DEFAULT_DOCUMENT_NAME),
         unsaved: Boolean(item.unsaved),
-        sourceStorageAdapterId: null,
-        sourceKind: 'unknown',
-        sourceProjectToken: typeof createProjectPersistenceToken === 'function'
-          ? createProjectPersistenceToken('unknown')
-          : null,
-        lastSavedStorageAdapterId: null,
+        sourceStorageAdapterId: item.sourceStorageAdapterId || null,
+        sourceKind: item.sourceKind || 'unknown',
+        sourceProjectToken: item.sourceProjectToken || (typeof createProjectPersistenceToken === 'function'
+          ? createProjectPersistenceToken(item.sourceKind || 'unknown')
+          : null),
+        lastSavedStorageAdapterId: item.lastSavedStorageAdapterId || null,
         projectSaveHandleState: 'none',
       };
     }
@@ -549,9 +625,6 @@
         return activated ? existingTab : null;
       }
     }
-    if (openProjectTabs.length >= MAX_PROJECT_SHEETS) {
-      return null;
-    }
     const normalizedFileName = normalizeDocumentName(fileName || project?.documentName || DEFAULT_DOCUMENT_NAME);
     const newTabId = createOpenProjectTabId();
     const nextTab = {
@@ -660,16 +733,6 @@
       if (existingSwitch.found) {
         return existingSwitch.switched;
       }
-      if (openProjectTabs.length >= MAX_PROJECT_SHEETS) {
-        updateAutosaveStatus(
-          localizeText(
-            `シートは最大 ${MAX_PROJECT_SHEETS} 枚です`,
-            `You can add up to ${MAX_PROJECT_SHEETS} sheets`
-          ),
-          'warn'
-        );
-        return false;
-      }
       const shouldReuseActiveTab = !appendOnly && canReuseActiveOpenProjectTabForRecentEntry(entry);
       const source = 'local-recent';
       openProjectTabBusy = true;
@@ -749,6 +812,65 @@
     }
   }
 
+  async function appendRecentProjectAsSheets(entry) {
+    if (!entry || typeof entry !== 'object') return false;
+    const packaged = await loadRecentProjectPackagedPayload(entry);
+    if (!packaged || typeof packaged !== 'object') {
+      updateAutosaveStatus(localizeText('最近使ったプロジェクトの内容を読み込めませんでした', 'Unable to read the recent project payload'), 'warn');
+      return false;
+    }
+    const embeddedSheets = Array.isArray(packaged.sheets) && packaged.sheets.length
+      ? packaged.sheets
+      : [{ project: packaged, fileName: entry.name || packaged?.document?.documentName || DEFAULT_DOCUMENT_NAME }];
+    const items = embeddedSheets.map((sheet, index) => ({
+      project: sheet?.project,
+      fileName: sheet?.fileName || sheet?.name || entry.name || packaged?.document?.documentName || DEFAULT_DOCUMENT_NAME,
+      sourceKind: 'recent',
+      sourceStorageAdapterId: sheet?.sourceStorageAdapterId || null,
+      sourceProjectToken: sheet?.sourceProjectToken || (typeof createProjectPersistenceToken === 'function'
+        ? createProjectPersistenceToken(`recent-${index + 1}`)
+        : null),
+      lastSavedStorageAdapterId: null,
+      unsaved: Boolean(sheet?.unsaved || entry.unsaved),
+    }));
+    if (items.some(item => !item.project || typeof item.project !== 'object')) {
+      updateAutosaveStatus(localizeText('最近使ったプロジェクトのシート内容が不完全です', 'Recent project sheet payload is incomplete'), 'warn');
+      return false;
+    }
+    return await openDocumentsAsProjectTabs(items, async () => false, { source: 'local-recent' });
+  }
+
+  function normalizeSheetAddKind(value = '') {
+    return ['project', 'image', 'gif'].includes(value) ? value : '';
+  }
+
+  function getSheetAddPickerTypes(kind = '') {
+    if (kind === 'project') {
+      return [{
+        description: 'PiXiEEDraw project',
+        accept: {
+          'application/json': ['.json', '.pxdraw', '.pixieedraw'],
+          'application/x-pixieedraw': ['.pixieedraw'],
+        },
+      }];
+    }
+    if (kind === 'image') {
+      return [{ description: 'PNG image', accept: { 'image/png': ['.png'] } }];
+    }
+    if (kind === 'gif') {
+      return [{ description: 'GIF image', accept: { 'image/gif': ['.gif'] } }];
+    }
+    return [{
+      description: '対応ファイル (PiXiEEDraw / PNG / GIF)',
+      accept: {
+        'application/json': ['.json', '.pxdraw', '.pixieedraw'],
+        'application/x-pixieedraw': ['.pixieedraw'],
+        'image/png': ['.png'],
+        'image/gif': ['.gif'],
+      },
+    }];
+  }
+
   async function openDocumentDialog(options = {}) {
     if (!ensureCurrentClientCanReplaceActiveProject()) {
       return false;
@@ -758,22 +880,13 @@
       return false;
     }
     const mode = normalizeExternalImportMode(options?.mode);
+    const sheetAddKind = normalizeSheetAddKind(options?.sheetAddKind);
     if (typeof window.showOpenFilePicker === 'function') {
       try {
         const handles = await window.showOpenFilePicker({
-          multiple: mode !== EXTERNAL_IMPORT_MODE_NEW_PROJECT,
+          multiple: mode !== EXTERNAL_IMPORT_MODE_NEW_PROJECT && sheetAddKind !== 'image' && sheetAddKind !== 'gif',
           excludeAcceptAllOption: false,
-          types: [
-            {
-              description: '対応ファイル (PiXiEEDraw / PNG / GIF)',
-              accept: {
-                'application/json': ['.json', '.pxdraw', '.pixieedraw'],
-                'application/x-pixieedraw': ['.pixieedraw'],
-                'image/png': ['.png'],
-                'image/gif': ['.gif'],
-              },
-            },
-          ],
+          types: getSheetAddPickerTypes(sheetAddKind),
         });
         if (!Array.isArray(handles) || !handles.length) {
           return false;
@@ -784,26 +897,43 @@
         return await openDocumentsAsProjectTabs(
           handles,
           async handle => loadDocumentFromHandle(handle, { suppressAutosaveStatus: true }),
-          { source: 'open-picker' }
+          {
+            source: 'open-picker',
+            tabOptions: sheetAddKind === 'image' || sheetAddKind === 'gif'
+              ? {
+                  sourceKind: sheetAddKind === 'gif' ? 'import-gif' : 'import-image',
+                  sourceStorageAdapterId: null,
+                  lastSavedStorageAdapterId: null,
+                  projectSaveHandleState: 'none',
+                }
+              : null,
+          }
         );
       } catch (error) {
         if (error && error.name === 'AbortError') {
           return false;
         }
         console.warn('Document open failed', error);
-        return openDocumentViaInput({ mode });
+        return openDocumentViaInput({ mode, sheetAddKind });
       }
     }
-    return openDocumentViaInput({ mode });
+    return openDocumentViaInput({ mode, sheetAddKind });
   }
 
   function openDocumentViaInput(options = {}) {
     const mode = normalizeExternalImportMode(options?.mode);
+    const sheetAddKind = normalizeSheetAddKind(options?.sheetAddKind);
     return new Promise(resolve => {
       const input = document.createElement('input');
       input.type = 'file';
-      input.multiple = mode !== EXTERNAL_IMPORT_MODE_NEW_PROJECT;
-      const acceptTypes = [
+      input.multiple = mode !== EXTERNAL_IMPORT_MODE_NEW_PROJECT && sheetAddKind !== 'image' && sheetAddKind !== 'gif';
+      const acceptTypes = sheetAddKind === 'project' ? [
+        '.json', '.pxdraw', '.pixieedraw', 'application/json', 'application/x-pixieedraw',
+      ] : sheetAddKind === 'image' ? [
+        '.png', 'image/png',
+      ] : sheetAddKind === 'gif' ? [
+        '.gif', 'image/gif',
+      ] : [
         '.json',
         '.pxdraw',
         '.pixieedraw',
@@ -856,7 +986,17 @@
                 projectSaveHandleState: 'none',
               });
             },
-            { source: 'open-input' }
+            {
+              source: 'open-input',
+              tabOptions: sheetAddKind === 'image' || sheetAddKind === 'gif'
+                ? {
+                    sourceKind: sheetAddKind === 'gif' ? 'import-gif' : 'import-image',
+                    sourceStorageAdapterId: null,
+                    lastSavedStorageAdapterId: null,
+                    projectSaveHandleState: 'none',
+                  }
+                : null,
+            }
           );
           finish(opened);
         } catch (error) {
@@ -1472,8 +1612,11 @@
     appendPackagedProjectTab,
     createNewProjectAsTab,
     openRecentProjectAsTab,
+    appendRecentProjectAsSheets,
     openDocumentDialog,
     openDocumentViaInput,
+    normalizeSheetAddKind,
+    getSheetAddPickerTypes,
     isGifFile,
     dataUrlToBlob,
     loadDocumentFromImageFile,

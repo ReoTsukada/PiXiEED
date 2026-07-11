@@ -1198,8 +1198,6 @@
   } = exportDeliveryUtils;
 
   const NEW_PROJECT_IMMEDIATE_AUTOSAVE_ATTEMPTS = 2;
-  const MAX_OPEN_PROJECT_TABS = 5;
-  const MAX_PROJECT_SHEETS = 3;
   const ALWAYS_CONFIRM_BEFORE_CLOSE = true;
   const MOBILE_BACK_BUTTON_CONFIRM_ENABLED = true;
   const MOBILE_BACK_GUARD_STATE_KEY = '__pixieed_back_guard_v1';
@@ -1292,6 +1290,13 @@
     RECENT_PROJECTS_STORE,
     FLOATING_PREVIEW_REFERENCE_MEDIA_KEY_PREFIX,
     SHARED_LOCAL_OP_JOURNAL_STORE,
+    LOCAL_PROJECT_MANIFESTS_STORE,
+    LOCAL_PROJECT_SHEET_CHECKPOINTS_STORE,
+    LOCAL_PROJECT_JOURNALS_STORE,
+    LOCAL_PROJECT_THUMBNAILS_STORE,
+    LOCAL_PROJECT_CURRENT_MANIFESTS_STORE,
+    AUTOSAVE_SCHEMA_V2_DB_NAME,
+    AUTOSAVE_SCHEMA_V2_DB_VERSION,
     RECENT_PROJECT_STORAGE_LOCAL,
     RECENT_PROJECT_STORAGE_SHARED,
     AUTOSAVE_HANDLE_KEY,
@@ -1552,6 +1557,42 @@
   function openAutosaveDatabase(...args) {
     return autosaveDatabaseUtilsModule.openAutosaveDatabase(...args);
   }
+
+  const autosaveSchemaV2UtilsModule = window.PiXiEEDrawModules?.autosaveSchemaV2Utils?.createAutosaveSchemaV2Utils?.() || {};
+  const autosaveSchemaV2IndexedDbUtilsModule = window.PiXiEEDrawModules?.autosaveSchemaV2IndexedDbUtils?.createAutosaveSchemaV2IndexedDbUtils?.({
+    autosaveSchemaV2Utils: autosaveSchemaV2UtilsModule,
+    AUTOSAVE_SCHEMA_V2_DB_NAME,
+    AUTOSAVE_SCHEMA_V2_DB_VERSION,
+    LOCAL_PROJECT_MANIFESTS_STORE,
+    LOCAL_PROJECT_SHEET_CHECKPOINTS_STORE,
+    LOCAL_PROJECT_JOURNALS_STORE,
+    LOCAL_PROJECT_THUMBNAILS_STORE,
+    LOCAL_PROJECT_CURRENT_MANIFESTS_STORE,
+  }) || {};
+  if (typeof window !== 'undefined' && typeof window.__pixieedrawAutosaveV2ShadowWriteEnabled !== 'boolean') {
+    window.__pixieedrawAutosaveV2ShadowWriteEnabled = false;
+  }
+  if (typeof window !== 'undefined' && typeof window.__pixieedrawAutosaveV2ReadShadowEnabled !== 'boolean') {
+    window.__pixieedrawAutosaveV2ReadShadowEnabled = false;
+  }
+  const autosaveSchemaV2ReadShadowUtilsModule = window.PiXiEEDrawModules?.autosaveSchemaV2ReadShadowUtils?.createAutosaveSchemaV2ReadShadowUtils?.() || {};
+  const autosaveSchemaV2RestorePreviewUtilsModule = window.PiXiEEDrawModules?.autosaveSchemaV2RestorePreviewUtils?.createAutosaveSchemaV2RestorePreviewUtils?.({
+    readProject: (projectId, options) => autosaveSchemaV2IndexedDbUtilsModule.readSchemaV2Project(projectId, options),
+    getComparison: projectId => autosaveSchemaV2ShadowUtilsModule.getStatus?.(projectId)?.lastResult?.diagnostics || null,
+  }) || {};
+  const autosaveSchemaV2RecoveryUtilsModule = window.PiXiEEDrawModules?.autosaveSchemaV2RecoveryUtils?.createAutosaveSchemaV2RecoveryUtils?.() || {};
+  let autosaveV2RecoveryOpenStatus = { opened: false, reason: 'not-run' };
+  let autosaveV2RecoveryUiBusy = false;
+  let autosaveV2RecoveryUiElement = null;
+  const autosaveSchemaV2ShadowUtilsModule = window.PiXiEEDrawModules?.autosaveSchemaV2ShadowUtils?.createAutosaveSchemaV2ShadowUtils?.({
+    isEnabled: () => window.__pixieedrawAutosaveV2ShadowWriteEnabled === true,
+    buildProjectState: job => buildAutosaveSchemaV2ShadowProjectState(job),
+    writeProject: projectState => autosaveSchemaV2IndexedDbUtilsModule.writeSchemaV2Project(projectState),
+    readProject: projectId => autosaveSchemaV2IndexedDbUtilsModule.readSchemaV2Project(projectId),
+    comparePayloads: compareAutosaveShadowPayloads,
+    shouldCompare: () => window.__pixieedrawAutosaveV2ReadShadowEnabled === true,
+    onStatus: status => console[status.type === 'error' ? 'warn' : 'info']('[PiXiEEDraw DEV] autosave V2 shadow write', status),
+  }) || {};
 
   let autosaveHandle = null;
   let pendingAutosaveHandle = null;
@@ -3983,6 +4024,8 @@
   set activeSharedProjectRevision(value) { activeSharedProjectRevision = value; },
   get activeSharedProjectStructureRevision() { return activeSharedProjectStructureRevision; },
   set activeSharedProjectStructureRevision(value) { activeSharedProjectStructureRevision = value; },
+  get activateProjectSheetForRemoval() { return activateOpenProjectTab; },
+  set activateProjectSheetForRemoval(value) { activateProjectSheetForRemoval = value; },
   get activeSharedProjectSynced() { return activeSharedProjectSynced; },
   set activeSharedProjectSynced(value) { activeSharedProjectSynced = value; },
   get applyHistorySnapshot() { return applyHistorySnapshot; },
@@ -5284,6 +5327,8 @@
   const timelapseSessionUtilsModule = window.PiXiEEDrawModules?.timelapseSessionUtils?.createTimelapseSessionUtils?.({
   get MAX_IMPORTED_PALETTE_COLORS() { return MAX_IMPORTED_PALETTE_COLORS; },
   set MAX_IMPORTED_PALETTE_COLORS(value) { MAX_IMPORTED_PALETTE_COLORS = value; },
+  // Deprecated split-module contract. It intentionally has no sheet limit.
+  get MAX_PROJECT_SHEETS() { return undefined; },
   get TIMELAPSE_CAPTURE_DEBOUNCE_MS() { return TIMELAPSE_CAPTURE_DEBOUNCE_MS; },
   set TIMELAPSE_CAPTURE_DEBOUNCE_MS(value) { TIMELAPSE_CAPTURE_DEBOUNCE_MS = value; },
   get TIMELAPSE_MAX_STEPS() { return TIMELAPSE_MAX_STEPS; },
@@ -5541,6 +5586,8 @@
   set reconcileTimelapseTracksForSingleCanvas(value) { reconcileTimelapseTracksForSingleCanvas = value; },
   get recordRecentProjectSnapshot() { return recordRecentProjectSnapshot; },
   set recordRecentProjectSnapshot(value) { recordRecentProjectSnapshot = value; },
+  get queueAutosaveV2ShadowWrite() { return queueAutosaveV2ShadowWrite; },
+  set queueAutosaveV2ShadowWrite(value) { queueAutosaveV2ShadowWrite = value; },
   get recordSharedProjectLightweightLocalSave() { return recordSharedProjectLightweightLocalSave; },
   set recordSharedProjectLightweightLocalSave(value) { recordSharedProjectLightweightLocalSave = value; },
   get reloadSnapshotRestored() { return reloadSnapshotRestored; },
@@ -5630,8 +5677,6 @@
   set MAX_IMAGE_IMPORT_SOURCE_SIZE(value) { MAX_IMAGE_IMPORT_SOURCE_SIZE = value; },
   get MAX_IMPORTED_PALETTE_COLORS() { return MAX_IMPORTED_PALETTE_COLORS; },
   set MAX_IMPORTED_PALETTE_COLORS(value) { MAX_IMPORTED_PALETTE_COLORS = value; },
-  get MAX_PROJECT_SHEETS() { return MAX_PROJECT_SHEETS; },
-  set MAX_PROJECT_SHEETS(value) { MAX_PROJECT_SHEETS = value; },
   get MIN_ZOOM_RATIO() { return MIN_ZOOM_RATIO; },
   set MIN_ZOOM_RATIO(value) { MIN_ZOOM_RATIO = value; },
   get QR_IMPORT_QUERY_KEY() { return QR_IMPORT_QUERY_KEY; },
@@ -5766,6 +5811,12 @@
   set hydrateActiveLocalProjectJournalFromRecentEntry(value) { hydrateActiveLocalProjectJournalFromRecentEntry = value; },
   get localizeText() { return localizeText; },
   set localizeText(value) { localizeText = value; },
+  get LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE() { return LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE; },
+  set LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE(value) { LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE = value; },
+  get localViewportCanvasLayoutResetPending() { return localViewportCanvasLayoutResetPending; },
+  set localViewportCanvasLayoutResetPending(value) { localViewportCanvasLayoutResetPending = value; },
+  get localViewportCanvasState() { return localViewportCanvasState; },
+  set localViewportCanvasState(value) { localViewportCanvasState = value; },
   get markAutosaveDirty() { return markAutosaveDirty; },
   set markAutosaveDirty(value) { markAutosaveDirty = value; },
   get newProjectPalettePresetId() { return newProjectPalettePresetId; },
@@ -5834,6 +5885,8 @@
   set scheduleAutosaveSnapshot(value) { scheduleAutosaveSnapshot = value; },
   get scheduleSessionPersist() { return scheduleSessionPersist; },
   set scheduleSessionPersist(value) { scheduleSessionPersist = value; },
+  get writeAutosaveSnapshot() { return writeAutosaveSnapshot; },
+  set writeAutosaveSnapshot(value) { writeAutosaveSnapshot = value; },
   get setActiveAutosaveProjectId() { return setActiveAutosaveProjectId; },
   set setActiveAutosaveProjectId(value) { setActiveAutosaveProjectId = value; },
   get setActiveSharedProjectSession() { return setActiveSharedProjectSession; },
@@ -6209,6 +6262,8 @@
   set normalizeDocumentName(value) { normalizeDocumentName = value; },
   get normalizeMultiProjectKey() { return normalizeMultiProjectKey; },
   set normalizeMultiProjectKey(value) { normalizeMultiProjectKey = value; },
+  get normalizeLocalViewportCanvasState() { return normalizeLocalViewportCanvasState; },
+  set normalizeLocalViewportCanvasState(value) { normalizeLocalViewportCanvasState = value; },
   get normalizeNewProjectPalettePreset() { return normalizeNewProjectPalettePreset; },
   set normalizeNewProjectPalettePreset(value) { normalizeNewProjectPalettePreset = value; },
   get normalizeSharedRecentProjectEntry() { return normalizeSharedRecentProjectEntry; },
@@ -6437,8 +6492,8 @@
   set DOCUMENT_FILE_VERSION(value) { DOCUMENT_FILE_VERSION = value; },
   get LOCAL_PROJECT_THUMBNAIL_UPDATE_INTERVAL_MS() { return LOCAL_PROJECT_THUMBNAIL_UPDATE_INTERVAL_MS; },
   set LOCAL_PROJECT_THUMBNAIL_UPDATE_INTERVAL_MS(value) { LOCAL_PROJECT_THUMBNAIL_UPDATE_INTERVAL_MS = value; },
-  get MAX_PROJECT_SHEETS() { return MAX_PROJECT_SHEETS; },
-  set MAX_PROJECT_SHEETS(value) { MAX_PROJECT_SHEETS = value; },
+  // Deprecated split-module contract. It intentionally has no sheet limit.
+  get MAX_PROJECT_SHEETS() { return undefined; },
   get PROJECT_FILE_EXTENSION() { return PROJECT_FILE_EXTENSION; },
   set PROJECT_FILE_EXTENSION(value) { PROJECT_FILE_EXTENSION = value; },
   get PROJECT_PACKAGE_TYPE() { return PROJECT_PACKAGE_TYPE; },
@@ -6685,8 +6740,8 @@
   const documentSessionWorkflowUtilsModule = window.PiXiEEDrawModules?.documentSessionWorkflowUtils?.createDocumentSessionWorkflowUtils?.({
   get DEFAULT_HISTORY_LIMIT() { return DEFAULT_HISTORY_LIMIT; },
   set DEFAULT_HISTORY_LIMIT(value) { DEFAULT_HISTORY_LIMIT = value; },
-  get MAX_PROJECT_SHEETS() { return MAX_PROJECT_SHEETS; },
-  set MAX_PROJECT_SHEETS(value) { MAX_PROJECT_SHEETS = value; },
+  // Deprecated split-module contract. It intentionally has no sheet limit.
+  get MAX_PROJECT_SHEETS() { return undefined; },
   get MIN_HISTORY_LIMIT() { return MIN_HISTORY_LIMIT; },
   set MIN_HISTORY_LIMIT(value) { MIN_HISTORY_LIMIT = value; },
   get SHARED_PROJECTS_ENABLED() { return SHARED_PROJECTS_ENABLED; },
@@ -6759,12 +6814,20 @@
   set isSharedRecentProjectEntry(value) { isSharedRecentProjectEntry = value; },
   get loadDocumentFromImageFile() { return loadDocumentFromImageFile; },
   set loadDocumentFromImageFile(value) { loadDocumentFromImageFile = value; },
+  get LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE() { return LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE; },
+  set LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE(value) { LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE = value; },
+  get localViewportCanvasLayoutResetPending() { return localViewportCanvasLayoutResetPending; },
+  set localViewportCanvasLayoutResetPending(value) { localViewportCanvasLayoutResetPending = value; },
+  get localViewportCanvasState() { return localViewportCanvasState; },
+  set localViewportCanvasState(value) { localViewportCanvasState = value; },
   get localizeText() { return localizeText; },
   set localizeText(value) { localizeText = value; },
   get markAutosaveDirty() { return markAutosaveDirty; },
   set markAutosaveDirty(value) { markAutosaveDirty = value; },
   get normalizeAutosaveProjectId() { return normalizeAutosaveProjectId; },
   set normalizeAutosaveProjectId(value) { normalizeAutosaveProjectId = value; },
+  get normalizeLocalViewportCanvasState() { return normalizeLocalViewportCanvasState; },
+  set normalizeLocalViewportCanvasState(value) { normalizeLocalViewportCanvasState = value; },
   get normalizeProjectPersistenceState() { return normalizeProjectPersistenceState; },
   set normalizeProjectPersistenceState(value) { normalizeProjectPersistenceState = value; },
   get normalizeProjectSaveHandleState() { return normalizeProjectSaveHandleState; },
@@ -8335,6 +8398,111 @@
     bindClickHandlerOnce(dom.newProject?.button, 'coreProjectActionBound', () => {
       openNewProjectDialog();
     });
+    bindProjectFileMenuOnce();
+  }
+
+  let projectFileCommandInFlight = false;
+
+  function updateProjectFileStatus(message) {
+    const status = document.getElementById('projectFileStatus');
+    if (status) status.textContent = message;
+  }
+
+  function refreshProjectFileStatus() {
+    const persistence = getActiveProjectPersistenceState?.({ createToken: false }) || {};
+    const binding = getActiveProjectSaveBinding?.() || {};
+    if (persistence.projectSaveHandleState === 'bound' && binding.projectSaveHandle) {
+      updateProjectFileStatus(hasDocumentUnsavedChanges?.() ? '未保存の変更あり: 保存すると現在の保存先へ上書きします' : '保存先あり');
+    } else if (persistence.projectSaveHandleState === 'unavailable') {
+      updateProjectFileStatus('保存先への権限なし: 新しい保存先が必要です');
+    } else if (persistence.sourceKind === 'recent' || persistence.sourceKind === 'autosave' || persistence.sourceKind === 'recovery') {
+      updateProjectFileStatus('新しい保存先が必要です');
+    } else {
+      updateProjectFileStatus(hasDocumentUnsavedChanges?.() ? '未保存の変更あり' : '未保存');
+    }
+  }
+
+  function announceProjectFileCommandResult(result) {
+    if (!result || result.status === 'cancelled') return;
+    const messages = {
+      saved: '保存しました',
+      'saved-as': '名前を付けて保存しました',
+      'copy-saved': 'コピーを保存しました。現在の保存先は変更されません。',
+      'canvas-limit-exceeded': 'キャンバスは1シートにつき4件までです。',
+      'incomplete-project': 'プロジェクト内容が不完全なため保存を中止しました。',
+      'sheet-materialization-failed': 'すべてのシートを準備できないため保存を中止しました。',
+      'permission-denied': '保存先への権限が必要です。',
+      'write-failed': 'ファイルへ書き込めませんでした。',
+      'close-failed': 'ファイルを閉じられなかったため保存を確定できませんでした。',
+      'multi-sheet-v2-flag-disabled': '複数シートV2保存はDEV設定で有効化されていません。',
+      'download-fallback': 'ファイルをダウンロードしました。現在の保存先とは関連付けられていません。',
+    };
+    const message = messages[result.status] || messages[result.reason] || 'ファイル操作に失敗しました。';
+    updateAutosaveStatus(message, result.ok ? 'success' : 'warn');
+    updateProjectFileStatus(result.ok ? (result.status === 'copy-saved' ? 'コピーを保存しました。現在の保存先は変更されません。' : '保存済み') : message);
+  }
+
+  async function runProjectFileCommand(command) {
+    if (projectFileCommandInFlight) return null;
+    projectFileCommandInFlight = true;
+    try {
+      let result = null;
+      if (command === 'save') result = await executeProjectSave({ announceStatus: false });
+      else if (command === 'save-as') result = await executeProjectSaveAs({ announceStatus: false });
+      else if (command === 'copy') result = await executeProjectSaveCopy({ announceStatus: false });
+      else if (command === 'open') result = await executeProjectOpen({ mode: EXTERNAL_IMPORT_MODE_NEW_PROJECT });
+      else if (command === 'new') {
+        openNewProjectDialog();
+        return null;
+      } else if (command === 'recent') {
+        showProjectHomeScreen({ refresh: true });
+        return null;
+      } else if (command === 'add-sheet') {
+        await openDocumentDialog({ mode: EXTERNAL_IMPORT_MODE_APPEND_TAB, sheetAddKind: 'project' });
+        return null;
+      } else if (command === 'export') {
+        openExportDialog();
+        return null;
+      }
+      announceProjectFileCommandResult(result);
+      return result;
+    } finally {
+      projectFileCommandInFlight = false;
+      refreshProjectFileStatus();
+    }
+  }
+
+  function bindProjectFileMenuOnce() {
+    const button = document.getElementById('projectFileMenuButton');
+    const menu = document.getElementById('projectFileMenuItems');
+    if (!(button instanceof HTMLButtonElement) || !(menu instanceof HTMLElement) || button.dataset.bound === 'true') return;
+    button.dataset.bound = 'true';
+    const close = () => { menu.hidden = true; button.setAttribute('aria-expanded', 'false'); };
+    button.addEventListener('click', () => {
+      const opening = menu.hidden;
+      menu.hidden = !opening;
+      button.setAttribute('aria-expanded', opening ? 'true' : 'false');
+      if (opening) menu.querySelector('button')?.focus();
+    });
+    menu.addEventListener('click', event => {
+      const target = event.target instanceof Element ? event.target.closest('button[data-project-file-command]') : null;
+      if (!target) return;
+      close();
+      void runProjectFileCommand(target.dataset.projectFileCommand || '');
+    });
+    document.addEventListener('pointerdown', event => {
+      if (!menu.hidden && event.target instanceof Node && !button.parentElement?.contains(event.target)) close();
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && !menu.hidden) { close(); button.focus(); }
+      if (event.isComposing || event.key === 'Process' || event.repeat || !(event.metaKey || event.ctrlKey) || isEditableTarget(event.target)) return;
+      const key = event.key.toLowerCase();
+      const command = key === 'n' ? 'new' : key === 'o' ? 'open' : key === 's' ? (event.shiftKey ? 'save-as' : 'save') : '';
+      if (!command) return;
+      event.preventDefault();
+      void runProjectFileCommand(command);
+    });
+    refreshProjectFileStatus();
   }
 
   const virtualCursorWorkflowUtilsModule = window.PiXiEEDrawModules?.virtualCursorWorkflowUtils?.createVirtualCursorWorkflowUtils?.({
@@ -10643,6 +10811,34 @@
     return openProjectTabWorkflowUtilsModule.renameOpenProjectTab(...args);
   }
 
+  function createReplacementEmptySheetTab({ projectId = '', sheetIndex = 1 } = {}) {
+    const documentName = normalizeDocumentName(localizeText(`シート ${sheetIndex}`, `Sheet ${sheetIndex}`));
+    const snapshot = createInitialState({
+      width: DEFAULT_CANVAS_SIZE,
+      height: DEFAULT_CANVAS_SIZE,
+      name: documentName,
+      uiTheme: state.uiTheme,
+      palettePreset: newProjectPalettePresetId || NEW_PROJECT_PALETTE_PRESET_DEFAULT,
+    });
+    const project = buildPackagedProjectPayload(snapshot, { session: null, includeSheets: false });
+    return createOpenProjectSheetTabFromPackagedProject({
+      id: createOpenProjectTabId(),
+      project,
+      projectId: projectId || createAutosaveProjectId(),
+      fileName: documentName,
+      label: extractDocumentBaseName(documentName),
+      source: 'sheet',
+      unsaved: true,
+      sourceStorageAdapterId: null,
+      sourceKind: 'new',
+      sourceProjectToken: createProjectPersistenceToken('new'),
+      lastSavedStorageAdapterId: null,
+      projectSaveHandleState: 'none',
+      projectSaveHandle: null,
+      projectSaveHandleMeta: null,
+    });
+  }
+
   async function activateOpenProjectTab(...args) {
     return await openProjectTabWorkflowUtilsModule.activateOpenProjectTab(...args);
   }
@@ -10662,6 +10858,7 @@
     hasDocumentUnsavedChanges,
     normalizeAutosaveProjectId,
     getAutosaveProjectId: () => autosaveProjectId,
+    getActiveOpenProjectTabId: () => activeOpenProjectTabId,
     createAutosaveProjectId,
     recentProjectsCache,
     isSharedRecentProjectEntry,
@@ -10682,7 +10879,6 @@
     normalizeProjectSaveHandleMeta,
     normalizeQrEditPayload,
     localizeText,
-    MAX_PROJECT_SHEETS,
   }) || {};
   const {
     createOpenProjectTabFromCurrentState,
@@ -11031,6 +11227,17 @@
     buildVoxelGlbBinaryFromCanvases,
   } = voxelGlbUtilsModule;
 
+  const projectStorageV2MultisheetCandidateUtilsModule = window.PiXiEEDrawModules
+    ?.projectStorageV2MultisheetCandidateUtils
+    ?.createProjectStorageV2MultisheetCandidateUtils?.({
+      validateSheetCanvasCount: project => window.PiXiEEDrawModules
+        ?.projectSheetCollectionUtils
+        ?.createProjectSheetCollectionUtils?.()
+        ?.validateSheetCanvasCount?.(project),
+      normalizeLocalViewportCanvasState,
+      LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE,
+    }) || {};
+
   const exportRenderingModule = window.PiXiEEDrawModules?.exportRendering?.createExportRenderingModule?.({
   get $() { return $; },
   set $(value) { $ = value; },
@@ -11104,6 +11311,8 @@
   set buildGifFromPixels(value) { buildGifFromPixels = value; },
   get buildPackagedProjectPayload() { return buildPackagedProjectPayload; },
   set buildPackagedProjectPayload(value) { buildPackagedProjectPayload = value; },
+  get collectCompleteMultiSheetV2SaveCandidate() { return projectStorageV2MultisheetCandidateUtilsModule.collectCompleteMultiSheetV2SaveCandidate; },
+  set collectCompleteMultiSheetV2SaveCandidate(value) {},
   get bindActiveProjectSaveHandle() { return bindActiveProjectSaveHandle; },
   set bindActiveProjectSaveHandle(value) { bindActiveProjectSaveHandle = value; },
   get buildProjectSessionPayload() { return buildProjectSessionPayload; },
@@ -11148,6 +11357,8 @@
   set createAutosaveFileName(value) { createAutosaveFileName = value; },
   get createAutosaveProjectId() { return createAutosaveProjectId; },
   set createAutosaveProjectId(value) { createAutosaveProjectId = value; },
+  get createReplacementEmptySheetTab() { return createReplacementEmptySheetTab; },
+  set createReplacementEmptySheetTab(value) { createReplacementEmptySheetTab = value; },
   get createExportFileName() { return createExportFileName; },
   set createExportFileName(value) { createExportFileName = value; },
   get decodeBase64Binary() { return decodeBase64Binary; },
@@ -11212,6 +11423,17 @@
   set getActiveProjectPersistenceState(value) { getActiveProjectPersistenceState = value; },
   get getActiveProjectSaveBinding() { return getActiveProjectSaveBinding; },
   set getActiveProjectSaveBinding(value) { getActiveProjectSaveBinding = value; },
+  get activeOpenProjectTabId() { return activeOpenProjectTabId; },
+  set activeOpenProjectTabId(value) { activeOpenProjectTabId = value; },
+  get openProjectTabs() { return openProjectTabs; },
+  set openProjectTabs(value) { openProjectTabs = value; },
+  get openDocumentDialog() { return openDocumentDialog; },
+  set openDocumentDialog(value) { openDocumentDialog = value; },
+  get resolveStoredLocalProjectPayloadForProjectId() { return resolveStoredLocalProjectPayloadForProjectId; },
+  set resolveStoredLocalProjectPayloadForProjectId(value) { resolveStoredLocalProjectPayloadForProjectId = value; },
+  get extractLocalProjectSheetPayload() { return extractLocalProjectSheetPayload; },
+  set extractLocalProjectSheetPayload(value) { extractLocalProjectSheetPayload = value; },
+  getOpenProjectSheetCount: () => Array.isArray(openProjectTabs) ? openProjectTabs.length : 0,
   get updateActiveProjectPersistenceState() { return updateActiveProjectPersistenceState; },
   set updateActiveProjectPersistenceState(value) { updateActiveProjectPersistenceState = value; },
   get replaceActiveOpenProjectTabFromCurrentState() { return replaceActiveOpenProjectTabFromCurrentState; },
@@ -11533,7 +11755,6 @@
     setOpenProjectTabsLastStructureSignature: (value) => {
       openProjectTabsLastStructureSignature = value;
     },
-    MAX_PROJECT_SHEETS,
     normalizeAutosaveProjectId,
     getAutosaveProjectId: () => autosaveProjectId,
     extractDocumentBaseName,
@@ -11580,7 +11801,6 @@
     openProjectTabs,
     recentProjectsCache,
     SHARED_PROJECTS_ENABLED,
-    MAX_PROJECT_SHEETS,
     AUTOSAVE_SUPPORTED,
     getActiveOpenProjectTabId: () => activeOpenProjectTabId,
     setActiveOpenProjectTabId: (value) => {
@@ -11624,6 +11844,9 @@
     refreshRecentProjectsUI: (...args) => refreshRecentProjectsUI(...args),
     maybePromptAndTransferRecentProjectsFromHome: (...args) => maybePromptAndTransferRecentProjectsFromHome(...args),
     clearActiveSharedProjectSession: (...args) => clearActiveSharedProjectSession(...args),
+    makeHistorySnapshot,
+    buildProjectSessionPayload,
+    buildPackagedProjectPayload,
   }) || {};
   const {
     ensureOpenProjectTabsInitialized,
@@ -11653,12 +11876,12 @@
     openProjectTabs,
     DEFAULT_CANVAS_SIZE,
     NEW_PROJECT_PALETTE_PRESET_DEFAULT,
-    MAX_PROJECT_SHEETS,
     getOpenProjectTabBusy: () => openProjectTabBusy,
     setOpenProjectTabBusy: (value) => {
       openProjectTabBusy = Boolean(value);
     },
     getAutosaveProjectId: () => autosaveProjectId,
+    getActiveOpenProjectTabId: () => activeOpenProjectTabId,
     getActiveProjectPersistenceState: (...args) => getActiveProjectPersistenceState(...args),
     getNewProjectPalettePresetId: () => newProjectPalettePresetId,
     setActiveOpenProjectTabId: (value) => {
@@ -11692,6 +11915,20 @@
     activateOpenProjectTab,
     hideProjectHomeScreen,
     renameOpenProjectTab,
+    openProjectSheetDialog: () => openDocumentDialog({
+      mode: EXTERNAL_IMPORT_MODE_APPEND_TAB,
+      sheetAddKind: 'project',
+    }),
+    openImageSheetDialog: () => openDocumentDialog({
+      mode: EXTERNAL_IMPORT_MODE_APPEND_TAB,
+      sheetAddKind: 'image',
+    }),
+    openGifSheetDialog: () => openDocumentDialog({
+      mode: EXTERNAL_IMPORT_MODE_APPEND_TAB,
+      sheetAddKind: 'gif',
+    }),
+    loadRecentProjects: () => loadRecentProjectsMetadata(),
+    appendRecentProjectAsSheets: (...args) => appendRecentProjectAsSheets(...args),
   }) || {};
   const {
     createBlankSheetPackagedProject,
@@ -13996,6 +14233,10 @@
     return openImportWorkflowUtilsModule.openRecentProjectAsTab(...args);
   }
 
+  async function appendRecentProjectAsSheets(...args) {
+    return openImportWorkflowUtilsModule.appendRecentProjectAsSheets(...args);
+  }
+
   async function openDocumentDialog(...args) {
     return openImportWorkflowUtilsModule.openDocumentDialog(...args);
   }
@@ -15700,6 +15941,150 @@
     return projectPackageWorkflowUtilsModule.buildPackagedProjectPayload(...args);
   }
 
+  function buildAutosaveSchemaV2ExperimentalProjectState(options = {}) {
+    const settings = options && typeof options === 'object' ? options : {};
+    const snapshot = settings.snapshot || makeHistorySnapshot({ clonePixelData: true });
+    const activePackaged = buildPackagedProjectPayload(snapshot, {
+      session: buildProjectSessionPayload(),
+      includeSheets: false,
+    });
+    const projectId = normalizeAutosaveProjectId(settings.projectId || autosaveProjectId || '') || createAutosaveProjectId();
+    const tabsById = new Map(openProjectTabs.map(tab => [tab?.id, tab]));
+    const activeSheetId = activeOpenProjectTabId || openProjectTabs[0]?.id || createOpenProjectTabId();
+    const sourceTabs = openProjectTabs.length ? openProjectTabs : [{ id: activeSheetId, project: activePackaged }];
+    const sheets = sourceTabs.map((tab, index) => {
+        const isActive = tab?.id === activeSheetId;
+        const project = isActive ? activePackaged : tab?.project;
+        if (!project || typeof project !== 'object') {
+          throw new Error(`Autosave schema V2 shadow write is missing sheet payload: ${tab?.id || index}`);
+        }
+        return {
+          id: tab?.id || createOpenProjectTabId(),
+          fileName: tab?.fileName || project?.document?.documentName || DEFAULT_DOCUMENT_NAME,
+          label: tab?.label || `Sheet ${index + 1}`,
+          project,
+          sourceKind: tab?.sourceKind || 'unknown',
+          sourceStorageAdapterId: tab?.sourceStorageAdapterId || '',
+          sourceProjectToken: tab?.sourceProjectToken || '',
+        };
+      });
+    return {
+      projectId,
+      name: state.documentName || DEFAULT_DOCUMENT_NAME,
+      updatedAt: activePackaged.updatedAt,
+      activeSheetId: activeSheetId || sheets[0]?.id || '',
+      sheets,
+      journalsBySheet: settings.journalsBySheet && typeof settings.journalsBySheet === 'object'
+        ? settings.journalsBySheet
+        : {},
+      thumbnail: typeof settings.thumbnail === 'string' ? settings.thumbnail : null,
+      dotStats: activePackaged.dotStats || null,
+    };
+  }
+
+  function countAutosaveShadowProject(project = null) {
+    const sheets = Array.isArray(project?.sheets) && project.sheets.length ? project.sheets : [];
+    const metrics = sheets.map(sheet => {
+      const documentPayload = sheet?.project?.document || sheet?.document || {};
+      const canvases = Array.isArray(documentPayload.canvases) && documentPayload.canvases.length ? documentPayload.canvases : [documentPayload];
+      return {
+        id: sheet?.id || '', sourceKind: sheet?.sourceKind || '', sourceStorageAdapterId: sheet?.sourceStorageAdapterId || '',
+        activeCanvasId: documentPayload.activeCanvasId || '', palette: JSON.stringify(documentPayload.palette || []),
+        canvasCount: canvases.length,
+        frameCount: canvases.reduce((sum, canvas) => sum + (canvas?.frames?.length || 0), 0),
+        layerCount: canvases.reduce((sum, canvas) => sum + (canvas?.frames || []).reduce((count, frame) => count + (frame?.layers?.length || 0), 0), 0),
+        pixelChecksum: JSON.stringify(canvases.map(canvas => (canvas?.frames || []).map(frame => (frame?.layers || []).map(layer => [layer?.indices, layer?.direct, layer?.importSourceDirect])))),
+      };
+    });
+    return { sheetOrder: sheets.map(sheet => sheet?.id || ''), activeSheetId: project?.activeSheetId || '', sheets: metrics };
+  }
+
+  function compareAutosaveShadowPayloads(v1Project, v2Project, options = {}) {
+    return autosaveSchemaV2ReadShadowUtilsModule.compare?.(v1Project, v2Project, options) || { comparable: false, reason: 'read-shadow-unavailable' };
+  }
+
+  async function compareAutosaveV1AndV2(projectId) {
+    const id = normalizeAutosaveProjectId(projectId || autosaveProjectId || '');
+    if (!id) throw new Error('Autosave project id is required');
+    const entries = await loadRecentProjectsMetadata();
+    const v1Project = entries.find(entry => entry?.id === id)?.project || null;
+    let v2Project = null;
+    let v2Error = '';
+    try { v2Project = (await readAutosaveSchemaV2Experimental(id)).packaged || null; } catch (error) { v2Error = error?.message || String(error); }
+    const result = autosaveSchemaV2ReadShadowUtilsModule.compare?.(v1Project, v2Project, { projectId: id }) || { projectId: id, comparable: false, reason: 'read-shadow-unavailable' };
+    if (v2Error) result.warnings = [...(result.warnings || []), `v2-read-error:${v2Error}`];
+    console[result.matched === false ? 'warn' : 'info']('[PiXiEEDraw DEV] autosave V1/V2 read shadow', result);
+    return result;
+  }
+
+  function buildAutosaveSchemaV2ShadowProjectState(job = {}) {
+    return buildAutosaveSchemaV2ExperimentalProjectState({ projectId: job.projectId, snapshot: job.snapshot });
+  }
+
+  function queueAutosaveV2ShadowWrite(job = {}) {
+    return autosaveSchemaV2ShadowUtilsModule.enqueue?.(job) || { queued: false, reason: 'unavailable' };
+  }
+
+  async function writeAutosaveSchemaV2Experimental(options = {}) {
+    if (typeof autosaveSchemaV2IndexedDbUtilsModule.writeSchemaV2Project !== 'function') {
+      throw new Error('Autosave schema V2 IndexedDB utility is unavailable');
+    }
+    const projectState = buildAutosaveSchemaV2ExperimentalProjectState(options);
+    const result = await autosaveSchemaV2IndexedDbUtilsModule.writeSchemaV2Project(projectState, options);
+    console.info('[PiXiEEDraw DEV] autosave schema V2 experimental write', {
+      projectId: projectState.projectId,
+      revision: result.manifest?.revision || 0,
+      sheetCount: projectState.sheets.length,
+      cleanupError: result.cleanupError?.message || '',
+    });
+    return result;
+  }
+
+  async function readAutosaveSchemaV2Experimental(projectId, options = {}) {
+    if (typeof autosaveSchemaV2IndexedDbUtilsModule.readSchemaV2Project !== 'function') {
+      throw new Error('Autosave schema V2 IndexedDB utility is unavailable');
+    }
+    const result = await autosaveSchemaV2IndexedDbUtilsModule.readSchemaV2Project(projectId, options);
+    console.info('[PiXiEEDraw DEV] autosave schema V2 experimental read', {
+      projectId,
+      revision: result.manifest?.revision || 0,
+      sheetCount: result.packaged?.sheets?.length || 0,
+      fallbackUsed: result.fallbackUsed === true,
+    });
+    return result;
+  }
+
+  async function previewAutosaveSchemaV2Restore(projectId, options = {}) {
+    const result = await autosaveSchemaV2RestorePreviewUtilsModule.preview?.(projectId, options);
+    if (!result) throw new Error('Autosave schema V2 restore preview is unavailable');
+    console[result.restorable ? 'info' : 'warn']('[PiXiEEDraw DEV] autosave V2 restore preview', result);
+    return result;
+  }
+
+  async function openAutosaveSchemaV2RecoveryPreview(projectId, options = {}) {
+    const preview = await previewAutosaveSchemaV2Restore(projectId, options);
+    if (!preview.restorable) return autosaveV2RecoveryOpenStatus = { opened: false, reason: preview.status, warnings: preview.warnings, errors: preview.errors };
+    const payload = autosaveSchemaV2RestorePreviewUtilsModule.getPayload?.(projectId);
+    const candidate = autosaveSchemaV2RecoveryUtilsModule.buildCandidate?.(payload, { sourceProjectId: projectId, revision: preview.restoredRevision });
+    if (!candidate?.ok) return autosaveV2RecoveryOpenStatus = { opened: false, reason: candidate?.reason || 'unrestorable', warnings: candidate?.warnings || [], errors: candidate?.errors || [] };
+    const recoveryProjectId = `recovery-${createAutosaveProjectId()}`;
+    const appended = await appendPackagedProjectTab({ project: candidate.project, projectId: recoveryProjectId, fileName: candidate.project.document?.documentName || DEFAULT_DOCUMENT_NAME, source: 'recovery', sourceKind: 'recovery', sourceStorageAdapterId: null, lastSavedStorageAdapterId: null, projectSaveHandleState: 'none', unsaved: true, activateOptions: { skipPersistCurrent: true, announce: true } });
+    if (!appended) return autosaveV2RecoveryOpenStatus = { opened: false, reason: 'tab-commit-failed', warnings: candidate.warnings, errors: [] };
+    return autosaveV2RecoveryOpenStatus = { opened: true, recoveryProjectId, sourceProjectId: projectId, revision: preview.restoredRevision, usedFallbackRevision: preview.usedFallbackRevision, sheetCount: candidate.project.sheets.length, activeSheetId: candidate.project.activeSheetId, warnings: candidate.warnings };
+  }
+
+  function renderAutosaveV2RecoveryUi() {
+    const enabled = window.__pixieedrawAutosaveV2RecoveryUiEnabled === true;
+    if (!enabled) { autosaveV2RecoveryUiElement?.remove(); autosaveV2RecoveryUiElement = null; return; }
+    if (!autosaveV2RecoveryUiElement) {
+      const panel = document.createElement('section'); panel.id = 'autosaveV2RecoveryDevPanel'; panel.style.cssText = 'position:fixed;right:12px;bottom:12px;z-index:99999;max-width:320px;padding:10px;background:#17212b;color:#fff;border:1px solid #5d758b;border-radius:8px;font:12px sans-serif';
+      panel.innerHTML = '<strong>DEV: V2復元候補</strong><div><input data-id placeholder="projectId" style="width:150px"><input data-revision placeholder="revision" style="width:60px"></div><button data-preview>V2復元候補を確認</button><button data-open hidden>復元コピーを開く</button><pre data-status style="white-space:pre-wrap;max-height:160px;overflow:auto"></pre>';
+      panel.querySelector('[data-preview]').onclick = async () => { if (autosaveV2RecoveryUiBusy) return; autosaveV2RecoveryUiBusy=true; const id=panel.querySelector('[data-id]').value.trim(); const revision=Number(panel.querySelector('[data-revision]').value)||0; const result=await previewAutosaveSchemaV2Restore(id,{revision}); const text={status:result.status,revision:result.restoredRevision,fallback:result.usedFallbackRevision,sheets:result.summary?.sheetCount,canvases:result.summary?.canvasCount,frames:result.summary?.frameCount,layers:result.summary?.layerCount,activeSheet:result.summary?.activeSheetId,journalFallback:result.status==='journal-fallback',comparison:result.comparison?.matched,warnings:result.warnings,errors:result.errors}; panel.querySelector('[data-status]').textContent=JSON.stringify(text,null,2); panel.querySelector('[data-open]').hidden=!result.restorable; autosaveV2RecoveryUiBusy=false; };
+      panel.querySelector('[data-open]').onclick = async () => { if (autosaveV2RecoveryUiBusy) return; autosaveV2RecoveryUiBusy=true; const id=panel.querySelector('[data-id]').value.trim(); const revision=Number(panel.querySelector('[data-revision]').value)||0; const result=await openAutosaveSchemaV2RecoveryPreview(id,{revision}); panel.querySelector('[data-status]').textContent=JSON.stringify(result,null,2); autosaveV2RecoveryUiBusy=false; };
+      document.body.append(panel); autosaveV2RecoveryUiElement=panel;
+    }
+  }
+
   function resolvePackagedProjectDotStats(...args) {
     return projectPackageWorkflowUtilsModule.resolvePackagedProjectDotStats(...args);
   }
@@ -16031,6 +16416,22 @@
     return exportRenderingModule.saveProjectAsPixieedraw(...args);
   }
 
+  async function executeProjectSave(...args) {
+    return exportRenderingModule.executeProjectSave(...args);
+  }
+
+  async function executeProjectSaveAs(...args) {
+    return exportRenderingModule.executeProjectSaveAs(...args);
+  }
+
+  async function executeProjectSaveCopy(...args) {
+    return exportRenderingModule.executeProjectSaveCopy(...args);
+  }
+
+  async function executeProjectOpen(...args) {
+    return exportRenderingModule.executeProjectOpen(...args);
+  }
+
   async function saveProjectAsPixieedrawV2Experimental(...args) {
     return exportRenderingModule.saveProjectAsPixieedrawV2Experimental(...args);
   }
@@ -16042,6 +16443,9 @@
   if (typeof window !== 'undefined') {
     if (typeof window.__pixieedrawUseV2ProjectSave !== 'boolean') {
       window.__pixieedrawUseV2ProjectSave = false;
+    }
+    if (typeof window.__pixieedrawUseMultiSheetV2ExternalSave !== 'boolean') {
+      window.__pixieedrawUseMultiSheetV2ExternalSave = false;
     }
     window.__pixieedrawSetV2ProjectSaveEnabled = function __pixieedrawSetV2ProjectSaveEnabled(enabled) {
       window.__pixieedrawUseV2ProjectSave = enabled === true;
@@ -16058,6 +16462,19 @@
         affectsRecentProjects: false,
       };
     };
+    window.__pixieedrawSetMultiSheetV2ExternalSaveEnabled = function __pixieedrawSetMultiSheetV2ExternalSaveEnabled(enabled) {
+      window.__pixieedrawUseMultiSheetV2ExternalSave = enabled === true;
+      return window.__pixieedrawGetMultiSheetV2ExternalSaveStatus();
+    };
+    window.__pixieedrawGetMultiSheetV2ExternalSaveStatus = function __pixieedrawGetMultiSheetV2ExternalSaveStatus() {
+      return {
+        enabled: window.__pixieedrawUseMultiSheetV2ExternalSave === true,
+        adapterId: 'pixieedraw-v2-zip-experimental',
+        requiresCompleteCandidate: true,
+        affectsAutosave: false,
+        affectsV1: false,
+      };
+    };
     window.__pixieedrawSaveV2ExperimentalIncludeSheets = async function __pixieedrawSaveV2ExperimentalIncludeSheets(...args) {
       return saveProjectAsPixieedrawV2ExperimentalIncludeSheetsDev(...args);
     };
@@ -16067,6 +16484,50 @@
         useWorker: true,
       });
     };
+    window.__pixieedrawWriteAutosaveV2Experimental = async function __pixieedrawWriteAutosaveV2Experimental(options = {}) {
+      return await writeAutosaveSchemaV2Experimental(options);
+    };
+    window.__pixieedrawReadAutosaveV2Experimental = async function __pixieedrawReadAutosaveV2Experimental(projectId) {
+      return await readAutosaveSchemaV2Experimental(projectId);
+    };
+    window.__pixieedrawSetAutosaveV2ShadowWriteEnabled = function __pixieedrawSetAutosaveV2ShadowWriteEnabled(enabled) {
+      window.__pixieedrawAutosaveV2ShadowWriteEnabled = enabled === true;
+      return window.__pixieedrawGetAutosaveV2ShadowWriteStatus();
+    };
+    window.__pixieedrawGetAutosaveV2ShadowWriteStatus = function __pixieedrawGetAutosaveV2ShadowWriteStatus(projectId = '') {
+      return autosaveSchemaV2ShadowUtilsModule.getStatus?.(projectId) || { enabled: false, reason: 'unavailable' };
+    };
+    window.__pixieedrawSetAutosaveV2ReadShadowEnabled = function __pixieedrawSetAutosaveV2ReadShadowEnabled(enabled) {
+      window.__pixieedrawAutosaveV2ReadShadowEnabled = enabled === true;
+      return window.__pixieedrawGetAutosaveV2ReadShadowStatus();
+    };
+    window.__pixieedrawGetAutosaveV2ReadShadowStatus = function __pixieedrawGetAutosaveV2ReadShadowStatus(projectId = '') {
+      return { enabled: window.__pixieedrawAutosaveV2ReadShadowEnabled === true, projectId, writeQueue: autosaveSchemaV2ShadowUtilsModule.getStatus?.(projectId) || null };
+    };
+    window.__pixieedrawCompareAutosaveV1AndV2 = async function __pixieedrawCompareAutosaveV1AndV2(projectId) {
+      return await compareAutosaveV1AndV2(projectId);
+    };
+    window.__pixieedrawPreviewAutosaveV2Restore = async function __pixieedrawPreviewAutosaveV2Restore(projectId, options = {}) {
+      return await previewAutosaveSchemaV2Restore(projectId, options);
+    };
+    window.__pixieedrawGetAutosaveV2RestorePreviewStatus = function __pixieedrawGetAutosaveV2RestorePreviewStatus(projectId) {
+      return autosaveSchemaV2RestorePreviewUtilsModule.getStatus?.(projectId) || { projectId, status: 'not-found' };
+    };
+    window.__pixieedrawClearAutosaveV2RestorePreview = function __pixieedrawClearAutosaveV2RestorePreview(projectId) {
+      return autosaveSchemaV2RestorePreviewUtilsModule.clear?.(projectId) === true;
+    };
+    window.__pixieedrawOpenAutosaveV2RecoveryPreview = async function __pixieedrawOpenAutosaveV2RecoveryPreview(projectId, options = {}) {
+      return await openAutosaveSchemaV2RecoveryPreview(projectId, options);
+    };
+    window.__pixieedrawGetAutosaveV2RecoveryOpenStatus = function __pixieedrawGetAutosaveV2RecoveryOpenStatus() { return autosaveV2RecoveryOpenStatus; };
+    if (typeof window.__pixieedrawAutosaveV2RecoveryUiEnabled !== 'boolean') window.__pixieedrawAutosaveV2RecoveryUiEnabled = false;
+    window.__pixieedrawSetAutosaveV2RecoveryUiEnabled = function(enabled) { window.__pixieedrawAutosaveV2RecoveryUiEnabled = enabled === true; renderAutosaveV2RecoveryUi(); return window.__pixieedrawGetAutosaveV2RecoveryUiStatus(); };
+    window.__pixieedrawGetAutosaveV2RecoveryUiStatus = function() { return { enabled: window.__pixieedrawAutosaveV2RecoveryUiEnabled === true, visible: Boolean(autosaveV2RecoveryUiElement), busy: autosaveV2RecoveryUiBusy }; };
+    window.addEventListener('pagehide', () => {
+      if (window.__pixieedrawAutosaveV2ShadowWriteEnabled !== true) return;
+      const projectId = normalizeAutosaveProjectId(autosaveProjectId || '');
+      if (projectId) autosaveSchemaV2ShadowUtilsModule.flush?.(projectId).catch(() => {});
+    });
   }
 
   function normalizeToolId(value, fallback = 'pen') {
@@ -20629,7 +21090,7 @@
     const sharedEntry = getCurrentSharedRecentProjectEntry(projectKey);
     const previousActiveTabId = activeOpenProjectTabId;
     let changed = false;
-    sheets.slice(0, MAX_PROJECT_SHEETS).forEach((sheet, index) => {
+    sheets.forEach((sheet, index) => {
       const tab = createOpenProjectSheetTabFromPackagedProject({
         ...sheet,
         projectId: sharedProjectId,
@@ -20684,10 +21145,8 @@
         changed = true;
         return;
       }
-      if (openProjectTabs.length < MAX_PROJECT_SHEETS) {
-        openProjectTabs.push(tab);
-        changed = true;
-      }
+      openProjectTabs.push(tab);
+      changed = true;
     });
     if (!openProjectTabs.length) {
       return false;

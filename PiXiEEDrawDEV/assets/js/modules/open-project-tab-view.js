@@ -16,7 +16,6 @@
     setOpenProjectTabsLastRenderSignature,
     getOpenProjectTabsLastStructureSignature,
     setOpenProjectTabsLastStructureSignature,
-    MAX_PROJECT_SHEETS,
     normalizeAutosaveProjectId,
     getAutosaveProjectId,
     extractDocumentBaseName,
@@ -48,7 +47,6 @@
 
     function buildOpenProjectTabsStructureSignature() {
       return JSON.stringify({
-        maxTabs: MAX_PROJECT_SHEETS,
         tabs: openProjectTabs.map(tab => ({
           id: tab?.id || '',
           projectId: tab?.projectId || '',
@@ -94,7 +92,7 @@
       });
       const addButton = list.querySelector('[data-project-tab-add="true"]');
       if (addButton instanceof HTMLButtonElement) {
-        addButton.disabled = getOpenProjectTabBusy?.() || openProjectTabs.length >= MAX_PROJECT_SHEETS;
+        addButton.disabled = Boolean(getOpenProjectTabBusy?.());
       }
       return true;
     }
@@ -174,7 +172,7 @@
         selectButton.setAttribute('aria-selected', isActive ? 'true' : 'false');
         selectButton.setAttribute('tabindex', isActive ? '0' : '-1');
         const displayLabel = getOpenProjectTabRenderLabel(tab, labelCounts, labelOrdinals, { active: isActive });
-        const slotPrefix = `${index + 1}/${MAX_PROJECT_SHEETS}`;
+        const slotPrefix = String(index + 1);
         selectButton.setAttribute(
           'aria-label',
           localizeText(`シート ${slotPrefix}: ${displayLabel}`, `Sheet ${slotPrefix}: ${displayLabel}`)
@@ -193,8 +191,9 @@
         closeButton.textContent = '×';
         closeButton.setAttribute(
           'aria-label',
-          localizeText(`${displayLabel} を閉じる`, `Close ${displayLabel}`)
+          localizeText(`${displayLabel} をプロジェクトから削除`, `Delete ${displayLabel} from project`)
         );
+        closeButton.title = localizeText('シートをプロジェクトから削除', 'Delete sheet from project');
         item.appendChild(closeButton);
 
         list.appendChild(item);
@@ -211,7 +210,7 @@
         'aria-label',
         localizeText('新規シートを追加', 'Add new sheet')
       );
-      addButton.disabled = openProjectTabBusy || openProjectTabs.length >= MAX_PROJECT_SHEETS;
+      addButton.disabled = openProjectTabBusy;
       addItem.appendChild(addButton);
       list.appendChild(addItem);
     }

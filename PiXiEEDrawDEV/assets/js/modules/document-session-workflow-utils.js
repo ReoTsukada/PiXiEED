@@ -63,6 +63,11 @@
     const sourceKind = typeof resolveProjectSourceKind === 'function'
       ? resolveProjectSourceKind({
         ...options,
+        sourceKind: (
+          typeof explicitState?.sourceKind === 'string' && explicitState.sourceKind.trim()
+            ? explicitState.sourceKind.trim()
+            : options?.sourceKind
+        ),
         handle,
         fileLoad: options?.fileLoad === true || Boolean(handle),
       })
@@ -312,7 +317,6 @@
       return false;
     }
     const nextTabs = sheets
-      .slice(0, MAX_PROJECT_SHEETS)
       .map((sheet, index) => {
         const nextTab = createOpenProjectSheetTabFromPackagedProject({
           ...sheet,
@@ -440,6 +444,13 @@
         });
         timelapseState.enabled = projectSession.timelapse.enabled;
         timelapseState.fps = projectSession.timelapse.fps;
+        if (projectSession.localViewportCanvases) {
+          localViewportCanvasState = normalizeLocalViewportCanvasState(
+            projectSession.localViewportCanvases,
+            LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE
+          );
+          localViewportCanvasLayoutResetPending = false;
+        }
       } else {
         history.past = [];
         history.future = [];
@@ -459,7 +470,10 @@
     resetExportScaleDefaults();
     syncPixfindSnapshotAfterDocumentReset();
     setTrackedProjectDotBaseline(snapshot, dotStats);
-    resetOpenedDocumentViewport({ defer: true });
+    resetOpenedDocumentViewport({
+      defer: true,
+      preserveLocalCanvasLayout: Boolean(projectSession?.localViewportCanvases),
+    });
 
     const requestedProjectId = normalizeAutosaveProjectId(options?.projectId || '');
     const requestedSharedProjectKey = normalizeMultiProjectKey(options?.sharedProjectKey || '');
@@ -482,6 +496,12 @@
         sharedAutoJoin: options?.sharedAutoJoin !== false && activeEntryAfterLoad?.sharedAutoJoin !== false,
         sourcePersistenceState,
       });
+      if (sourcePersistenceState && typeof updateActiveProjectPersistenceState === 'function') {
+        updateActiveProjectPersistenceState(sourcePersistenceState, {
+          render: false,
+          log: true,
+        });
+      }
     } else if (sourcePersistenceState && typeof updateActiveProjectPersistenceState === 'function') {
       updateActiveProjectPersistenceState(sourcePersistenceState, {
         render: false,
@@ -694,6 +714,11 @@
       historyLimit,
       historyPast: serializeProjectHistoryList(history.past, historyLimit),
       historyFuture: serializeProjectHistoryList(history.future, historyLimit),
+      // Canvas positions are per-sheet workspace state, not device-only UI state.
+      localViewportCanvases: normalizeLocalViewportCanvasState(
+        localViewportCanvasState,
+        LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE
+      ),
       timelapse: {
         enabled: Boolean(timelapseState.enabled),
         fps: normalizeTimelapseFps(timelapseState.fps),
@@ -709,6 +734,10 @@
       historyLimit: normalizeProjectHistoryLimit(history.limit, DEFAULT_HISTORY_LIMIT),
       historyPast: [],
       historyFuture: [],
+      localViewportCanvases: normalizeLocalViewportCanvasState(
+        localViewportCanvasState,
+        LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE
+      ),
       timelapse: {
         enabled: Boolean(timelapseState.enabled),
         fps: normalizeTimelapseFps(timelapseState.fps),
@@ -871,6 +900,12 @@
       historyLimit,
       historyPast,
       historyFuture,
+      localViewportCanvases: Object.prototype.hasOwnProperty.call(payload, 'localViewportCanvases')
+        ? normalizeLocalViewportCanvasState(
+          payload.localViewportCanvases,
+          LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE
+        )
+        : null,
       timelapse: {
         enabled: Boolean(timelapsePayload.enabled),
         fps: normalizeTimelapseFps(timelapsePayload.fps),
@@ -921,6 +956,20 @@
     const normalizedParsed = parsedResult && Object.prototype.hasOwnProperty.call(parsedResult, 'parsed')
       ? parsedResult.parsed
       : parsedResult;
+    const canvasValidator = window.PiXiEEDrawModules?.projectSheetCollectionUtils
+      ?.createProjectSheetCollectionUtils?.();
+    const validateCanvasLimit = project => {
+      const result = canvasValidator?.validateSheetCanvasCount?.(project);
+      if (result && !result.valid) {
+        const error = new Error(result.code || 'ERR_CANVAS_LIMIT_EXCEEDED');
+        error.code = result.code || 'ERR_CANVAS_LIMIT_EXCEEDED';
+        throw error;
+      }
+    };
+    if (normalizedParsed?.document) validateCanvasLimit(normalizedParsed);
+    if (Array.isArray(normalizedParsed?.sheets)) {
+      normalizedParsed.sheets.forEach(sheet => validateCanvasLimit(sheet?.project || sheet));
+    }
     const hasPackagedDocument = Boolean(
       normalizedParsed
       && typeof normalizedParsed === 'object'

@@ -11,10 +11,10 @@
     openProjectTabs,
     DEFAULT_CANVAS_SIZE,
     NEW_PROJECT_PALETTE_PRESET_DEFAULT,
-    MAX_PROJECT_SHEETS,
     getOpenProjectTabBusy,
     setOpenProjectTabBusy,
     getAutosaveProjectId,
+    getActiveOpenProjectTabId,
     getActiveProjectPersistenceState,
     getNewProjectPalettePresetId,
     setActiveOpenProjectTabId,
@@ -44,7 +44,17 @@
     activateOpenProjectTab,
     hideProjectHomeScreen,
     renameOpenProjectTab,
+    openProjectSheetDialog,
+    openImageSheetDialog,
+    openGifSheetDialog,
+    loadRecentProjects,
+    appendRecentProjectAsSheets,
   } = {}) {
+    const collectionUtils = root.projectSheetCollectionUtils?.createProjectSheetCollectionUtils?.();
+    const transactionUtils = root.projectSheetTransactionUtils?.createProjectSheetTransactionUtils?.({ collectionUtils });
+    let addMenu = null;
+    let addMenuAbortController = null;
+    let addMenuBusy = false;
     function createBlankSheetPackagedProject(index = openProjectTabs.length + 1) {
       const sheetName = normalizeDocumentName(localizeText(`シート ${index}`, `Sheet ${index}`));
       const snapshot = createInitialState({
@@ -60,72 +70,89 @@
       });
     }
 
+    async function restoreTransactionRuntime(transaction) {
+      const previous = transaction?.tabs?.find(tab => tab?.id === transaction?.activeOpenProjectTabId);
+      if (!previous?.project) return;
+      await loadDocumentFromProjectPayload?.(previous.project, {
+        projectId: previous.projectId || getAutosaveProjectId?.(),
+        suppressAutosaveStatus: true,
+        suppressProjectSheetsRestore: true,
+      });
+    }
+
+    async function commitSheetCandidate(candidate, { announce = true } = {}) {
+      const validation = transactionUtils?.validateCandidates?.([candidate], {
+        existingSheetIds: openProjectTabs.map(tab => tab?.id || ''),
+      });
+      if (!validation?.valid) return { committed: false, reason: validation?.code || 'ERR_SHEET_CANDIDATE_INVALID' };
+
+      const transaction = transactionUtils?.createTransactionSnapshot?.({
+        openProjectTabs,
+        activeOpenProjectTabId: getActiveOpenProjectTabId?.() || '',
+      }) || { tabs: openProjectTabs.slice(), activeOpenProjectTabId: getActiveOpenProjectTabId?.() || '' };
+      try {
+        const sheetIndex = openProjectTabs.length + 1;
+        const fileName = normalizeDocumentName(candidate.fileName || candidate.project?.document?.documentName || localizeText(`シート ${sheetIndex}`, `Sheet ${sheetIndex}`));
+        const nextTab = createOpenProjectSheetTabFromPackagedProject({
+          id: candidate.id,
+          project: candidate.project,
+          projectId: getAutosaveProjectId?.(),
+          fileName,
+          label: candidate.label || extractDocumentBaseName(fileName),
+          source: 'sheet',
+          sourceStorageAdapterId: candidate.sourceStorageAdapterId || null,
+          sourceKind: candidate.sourceKind || 'new',
+          sourceProjectToken: candidate.sourceProjectToken || null,
+          lastSavedStorageAdapterId: null,
+          projectSaveHandleState: 'none',
+          projectSaveHandle: null,
+          projectSaveHandleMeta: null,
+        });
+        if (!nextTab) throw new Error('ERR_SHEET_TAB_CREATE_FAILED');
+        openProjectTabs.push(nextTab);
+        setActiveOpenProjectTabId?.(nextTab.id);
+        setSuppressOpenProjectTabAutoInitialize?.(false);
+        renderOpenProjectTabs?.();
+        const loaded = await loadDocumentFromProjectPayload(candidate.project, {
+          projectId: nextTab.projectId || getAutosaveProjectId?.(),
+          suppressAutosaveStatus: true,
+          suppressProjectSheetsRestore: true,
+        });
+        if (!loaded) throw new Error('ERR_SHEET_ACTIVATE_FAILED');
+        markAutosaveDirty?.();
+        markDocumentUnsavedChange?.();
+        scheduleSessionPersist?.({ includeSnapshots: true });
+        scheduleAutosaveSnapshot?.();
+        if (announce) updateAutosaveStatus(localizeText('新規シートを追加しました', 'Added a new sheet'), 'success');
+        return { committed: true, addedSheetIds: [nextTab.id], failures: [], warnings: [] };
+      } catch (error) {
+        transactionUtils?.rollbackSheetCandidate?.(transaction, { openProjectTabs, setActiveOpenProjectTabId });
+        await restoreTransactionRuntime(transaction);
+        renderOpenProjectTabs?.();
+        console.warn('Failed to commit sheet candidate', error);
+        return { committed: false, addedSheetIds: [], failures: [{ reason: error?.message || 'ERR_SHEET_COMMIT_FAILED' }], warnings: [] };
+      }
+    }
+
     async function createNewSheetTab() {
       if (getOpenProjectTabBusy?.()) {
         return false;
       }
       ensureOpenProjectTabsInitialized?.();
-      if (openProjectTabs.length >= MAX_PROJECT_SHEETS) {
-        updateAutosaveStatus(
-          localizeText(
-            `シートは最大 ${MAX_PROJECT_SHEETS} 枚です`,
-            `You can add up to ${MAX_PROJECT_SHEETS} sheets`
-          ),
-          'warn'
-        );
-        return false;
-      }
       setOpenProjectTabBusy?.(true);
       try {
         await persistActiveOpenProjectTab?.({ flushAutosave: false });
         const sheetIndex = openProjectTabs.length + 1;
         const packaged = createBlankSheetPackagedProject(sheetIndex);
-        const fileName = normalizeDocumentName(packaged?.document?.documentName || localizeText(`シート ${sheetIndex}`, `Sheet ${sheetIndex}`));
-        const autosaveProjectId = getAutosaveProjectId?.();
-        const activePersistenceState = typeof getActiveProjectPersistenceState === 'function'
-          ? (getActiveProjectPersistenceState() || null)
-          : null;
-        const nextTab = createOpenProjectSheetTabFromPackagedProject({
+        const candidate = collectionUtils?.prepareSheetCandidate?.('new', {
           project: packaged,
-          projectId: autosaveProjectId,
-          fileName,
-          label: extractDocumentBaseName(fileName),
-          source: 'sheet',
-          sourceStorageAdapterId: activePersistenceState?.sourceStorageAdapterId ?? null,
-          sourceKind: activePersistenceState?.sourceKind ?? 'unknown',
-          sourceProjectToken: activePersistenceState?.sourceProjectToken ?? null,
-          lastSavedStorageAdapterId: activePersistenceState?.lastSavedStorageAdapterId ?? null,
-          projectSaveHandleState: activePersistenceState?.projectSaveHandleState ?? 'none',
+          fileName: normalizeDocumentName(packaged?.document?.documentName || localizeText(`シート ${sheetIndex}`, `Sheet ${sheetIndex}`)),
+          sourceKind: 'new',
+        }, {
+          createId: () => `sheet-${crypto.randomUUID?.() || Date.now().toString(36)}`,
         });
-        if (!nextTab) {
-          return false;
-        }
-        openProjectTabs.push(nextTab);
-        setActiveOpenProjectTabId?.(nextTab.id);
-        setSuppressOpenProjectTabAutoInitialize?.(false);
-        renderOpenProjectTabs?.();
-        const loaded = await loadDocumentFromProjectPayload(packaged, {
-          projectId: nextTab.projectId || getAutosaveProjectId?.(),
-          suppressAutosaveStatus: true,
-          suppressProjectSheetsRestore: true,
-        });
-        if (!loaded) {
-          const insertedIndex = findOpenProjectTabIndex(nextTab.id);
-          if (insertedIndex >= 0) {
-            openProjectTabs.splice(insertedIndex, 1);
-          }
-          renderOpenProjectTabs?.();
-          return false;
-        }
-        markAutosaveDirty?.();
-        markDocumentUnsavedChange?.();
-        scheduleSessionPersist?.({ includeSnapshots: true });
-        scheduleAutosaveSnapshot?.();
-        updateAutosaveStatus(
-          localizeText('新規シートを追加しました', 'Added a new sheet'),
-          'success'
-        );
-        return true;
+        const result = await commitSheetCandidate(candidate);
+        return result.committed;
       } finally {
         setOpenProjectTabBusy?.(false);
         renderOpenProjectTabs?.();
@@ -136,7 +163,107 @@
       if (getOpenProjectTabBusy?.()) {
         return;
       }
-      void createNewSheetTab();
+      if (addMenu) {
+        closeProjectTabAddMenu();
+        return;
+      }
+      addMenu = document.createElement('div');
+      addMenu.className = 'project-tab-add-menu';
+      addMenu.setAttribute('role', 'menu');
+      addMenu.setAttribute('aria-label', localizeText('シートを追加', 'Add sheet'));
+      addMenu.tabIndex = -1;
+      const anchor = dom.projectTabsList?.querySelector?.('[data-project-tab-add="true"]');
+      const rect = anchor?.getBoundingClientRect?.();
+      if (rect) {
+        const menuWidth = Math.min(260, Math.max(0, window.innerWidth - 16));
+        addMenu.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - menuWidth - 8))}px`;
+        addMenu.style.top = `${Math.max(8, rect.bottom + 6)}px`;
+      }
+      document.body.appendChild(addMenu);
+      addMenuAbortController = new AbortController();
+      const { signal } = addMenuAbortController;
+      document.addEventListener('pointerdown', event => {
+        const target = event.target instanceof Node ? event.target : null;
+        if (target && (addMenu?.contains(target) || anchor?.contains(target))) return;
+        closeProjectTabAddMenu();
+      }, { capture: true, signal });
+      document.addEventListener('keydown', event => {
+        if (event.key !== 'Escape') return;
+        event.preventDefault();
+        closeProjectTabAddMenu();
+        anchor?.focus?.();
+      }, { signal });
+
+      const setBusy = busy => {
+        addMenuBusy = Boolean(busy);
+        addMenu?.querySelectorAll('button').forEach(button => { button.disabled = addMenuBusy; });
+      };
+      const run = async action => {
+        if (addMenuBusy) return;
+        setBusy(true);
+        try {
+          await action();
+        } catch (error) {
+          console.warn('Failed to add project sheet', error);
+          updateAutosaveStatus?.(localizeText('シートの追加に失敗しました', 'Failed to add sheet'), 'warn');
+        } finally {
+          closeProjectTabAddMenu();
+        }
+      };
+      const appendAction = (label, action) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.setAttribute('role', 'menuitem');
+        button.textContent = label;
+        button.addEventListener('click', () => { void run(action); });
+        addMenu.appendChild(button);
+        return button;
+      };
+      const firstButton = appendAction(localizeText('空のシートを作成', 'Create empty sheet'), () => createNewSheetTab());
+      appendAction(localizeText('プロジェクトをシートとして追加', 'Add project as sheet'), () => openProjectSheetDialog?.());
+      appendAction(localizeText('画像を追加', 'Add image'), () => openImageSheetDialog?.());
+      appendAction(localizeText('GIFを追加', 'Add GIF'), () => openGifSheetDialog?.());
+      const recentButton = document.createElement('button');
+      recentButton.type = 'button';
+      recentButton.setAttribute('role', 'menuitem');
+      recentButton.textContent = localizeText('最近使ったプロジェクトから追加', 'Add from recent projects');
+      recentButton.addEventListener('click', async () => {
+        if (addMenuBusy) return;
+        setBusy(true);
+        try {
+          const entries = await loadRecentProjects?.();
+          if (!Array.isArray(entries) || !entries.length) {
+            updateAutosaveStatus?.(localizeText('追加できる最近使ったプロジェクトがありません', 'No recent projects are available'), 'info');
+            return;
+          }
+          addMenu.textContent = '';
+          entries.slice(0, 12).forEach(entry => {
+            const entryButton = document.createElement('button');
+            entryButton.type = 'button';
+            entryButton.setAttribute('role', 'menuitem');
+            entryButton.textContent = entry?.name || entry?.project?.document?.documentName || localizeText('名称未設定', 'Untitled');
+            entryButton.addEventListener('click', () => { void run(() => appendRecentProjectAsSheets?.(entry)); });
+            addMenu.appendChild(entryButton);
+          });
+          addMenu.querySelector('button')?.focus();
+        } catch (error) {
+          console.warn('Failed to list recent projects for sheet append', error);
+          updateAutosaveStatus?.(localizeText('最近使ったプロジェクトを取得できませんでした', 'Unable to load recent projects'), 'warn');
+          closeProjectTabAddMenu();
+        } finally {
+          if (addMenu) setBusy(false);
+        }
+      });
+      addMenu.appendChild(recentButton);
+      firstButton.focus();
+    }
+
+    function closeProjectTabAddMenu() {
+      addMenuAbortController?.abort();
+      addMenuAbortController = null;
+      addMenu?.remove();
+      addMenu = null;
+      addMenuBusy = false;
     }
 
     function setupOpenProjectTabs() {
@@ -234,6 +361,7 @@
     return {
       createBlankSheetPackagedProject,
       createNewSheetTab,
+      commitSheetCandidate,
       openProjectTabAddPicker,
       setupOpenProjectTabs,
     };

@@ -355,12 +355,124 @@
 
   function confirmCloseOpenProjectTab(tab, { active = false } = {}) {
     const displayLabel = getOpenProjectTabDisplayLabel(tab, { active });
+    const isLastSheet = openProjectTabs.length === 1;
     return window.confirm(
       localizeText(
-        `シート「${displayLabel}」を閉じますか？\n端末内プロジェクトは削除されません。`,
-        `Close the sheet "${displayLabel}"?\nThe local project will not be deleted.`
+        isLastSheet
+          ? `最後のシート「${displayLabel}」をプロジェクトから削除し、新しい空のシートを作成します。`
+          : `シート「${displayLabel}」をプロジェクトから削除します。`,
+        isLastSheet
+          ? `Delete the last sheet "${displayLabel}" and create a new empty sheet?`
+          : `Delete the sheet "${displayLabel}" from this project?`
       )
     );
+  }
+
+  function planProjectSheetRemoval(sheetId) {
+    const targetId = typeof sheetId === 'string' ? sheetId : '';
+    const index = findOpenProjectTabIndex(targetId);
+    if (!targetId || index < 0) return null;
+    const target = openProjectTabs[index];
+    if (!target) return null;
+    const wasActive = target.id === activeOpenProjectTabId;
+    const fallback = wasActive
+      ? (openProjectTabs[index + 1] || openProjectTabs[index - 1] || null)
+      : null;
+    return {
+      targetId,
+      target,
+      index,
+      wasActive,
+      isLastSheet: openProjectTabs.length === 1,
+      nextActiveSheetId: fallback?.id || '',
+      sheetOrder: openProjectTabs.map(tab => tab?.id || ''),
+    };
+  }
+
+  async function rollbackProjectSheetRemoval(transaction) {
+    if (!transaction || !Array.isArray(transaction.tabs)) return false;
+    openProjectTabs.splice(0, openProjectTabs.length, ...transaction.tabs);
+    activeOpenProjectTabId = transaction.activeOpenProjectTabId;
+    const previous = transaction.tabs.find(tab => tab?.id === transaction.activeOpenProjectTabId);
+    if (previous?.project && typeof previous.project === 'object') {
+      await loadDocumentFromProjectPayload(previous.project, {
+        projectId: previous.projectId || autosaveProjectId || '',
+        suppressAutosaveStatus: true,
+        suppressProjectSheetsRestore: true,
+      });
+    }
+    renderOpenProjectTabs();
+    return true;
+  }
+
+  async function commitProjectSheetRemoval(plan) {
+    if (!plan?.targetId || openProjectTabBusy) return false;
+    const currentIndex = findOpenProjectTabIndex(plan.targetId);
+    if (currentIndex < 0 || openProjectTabs[currentIndex] !== plan.target) return false;
+    const transaction = {
+      tabs: openProjectTabs.slice(),
+      activeOpenProjectTabId,
+      projectHomeVisible,
+    };
+    openProjectTabBusy = true;
+    try {
+      if (plan.isLastSheet) {
+        const replacement = await createReplacementEmptySheetTab?.({
+          projectId: plan.target.projectId || autosaveProjectId || '',
+          sheetIndex: 1,
+        });
+        if (!replacement?.project || !replacement.id) throw new Error('ERR_EMPTY_SHEET_CANDIDATE_FAILED');
+        openProjectTabs.splice(currentIndex, 1, replacement);
+        activeOpenProjectTabId = replacement.id;
+        suppressOpenProjectTabAutoInitialize = false;
+        const loaded = await loadDocumentFromProjectPayload(replacement.project, {
+          projectId: replacement.projectId || autosaveProjectId || '',
+          suppressAutosaveStatus: true,
+          suppressProjectSheetsRestore: true,
+          sourcePersistenceState: {
+            sourceStorageAdapterId: null,
+            sourceKind: 'new',
+            sourceProjectToken: replacement.sourceProjectToken || null,
+            lastSavedStorageAdapterId: null,
+            projectSaveHandleState: 'none',
+          },
+        });
+        if (!loaded || loaded === 'deferred') throw new Error('ERR_EMPTY_SHEET_ACTIVATE_FAILED');
+      } else {
+        if (plan.wasActive) {
+          const activateTarget = typeof activateProjectSheetForRemoval === 'function'
+            ? activateProjectSheetForRemoval
+            : activateOpenProjectTab;
+          const switched = await activateTarget(plan.nextActiveSheetId, {
+            skipPersistCurrent: true,
+            announce: false,
+          });
+          if (!switched) throw new Error('ERR_SHEET_REMOVAL_ACTIVATE_FAILED');
+        }
+        const removalIndex = findOpenProjectTabIndex(plan.targetId);
+        if (removalIndex < 0) throw new Error('ERR_SHEET_REMOVAL_TARGET_MISSING');
+        openProjectTabs.splice(removalIndex, 1);
+      }
+      markAutosaveDirty();
+      markDocumentUnsavedChange();
+      scheduleSessionPersist({ includeSnapshots: true });
+      scheduleAutosaveSnapshot();
+      renderOpenProjectTabs();
+      updateAutosaveStatus(
+        plan.isLastSheet
+          ? localizeText('最後のシートを削除し、新しい空のシートを作成しました', 'Deleted the last sheet and created a new empty sheet')
+          : localizeText('シートをプロジェクトから削除しました', 'Deleted sheet from project'),
+        'success'
+      );
+      return true;
+    } catch (error) {
+      console.warn('Failed to remove project sheet; rolling back', error);
+      await rollbackProjectSheetRemoval(transaction);
+      updateAutosaveStatus(localizeText('シートの削除に失敗しました', 'Failed to delete sheet'), 'error');
+      return false;
+    } finally {
+      openProjectTabBusy = false;
+    }
   }
 
   function renameOpenProjectTab(tabId) {
@@ -451,7 +563,10 @@
     const guardedProjectTabIds = Array.from(new Set([previousActiveId, target.id].filter(Boolean)));
     guardedProjectTabIds.forEach(retainOpenProjectTabProjectWriteGuard);
     if (!skipPersistCurrent && previousActiveId && findOpenProjectTabIndex(previousActiveId) >= 0) {
-      const persistedCurrentSheet = await persistActiveOpenProjectTab({ flushAutosave: true });
+      const persistedCurrentSheet = await persistActiveOpenProjectTab({
+        flushAutosave: true,
+        retainProjectPayload: true,
+      });
       if (!persistedCurrentSheet) {
         updateAutosaveStatus(localizeText('現在のシートを保持できなかったため、切替を中止しました', 'Sheet switch was canceled because the current sheet could not be preserved'), 'error');
         guardedProjectTabIds.forEach(releaseOpenProjectTabProjectWriteGuard);
@@ -459,11 +574,18 @@
       }
     }
     if (!targetProjectPayload) {
-      const latestEntries = await loadRecentProjectsMetadata();
-      const latestEntry = latestEntries.find(entry => normalizeAutosaveProjectId(entry?.id || '') === targetProjectId) || recentProjectsCache.get(targetProjectId) || null;
-      const reconstructed = typeof reconstructLocalRecentProjectPayload === 'function'
-        ? reconstructLocalRecentProjectPayload(latestEntry)
+      const storedPackagedProject = typeof resolveStoredLocalProjectPayloadForProjectId === 'function'
+        ? resolveStoredLocalProjectPayloadForProjectId(targetProjectId)
         : null;
+      const latestEntries = storedPackagedProject ? [] : await loadRecentProjectsMetadata();
+      const latestEntry = storedPackagedProject
+        ? null
+        : (latestEntries.find(entry => normalizeAutosaveProjectId(entry?.id || '') === targetProjectId) || recentProjectsCache.get(targetProjectId) || null);
+      const reconstructed = storedPackagedProject && typeof storedPackagedProject === 'object'
+        ? storedPackagedProject
+        : (typeof reconstructLocalRecentProjectPayload === 'function'
+          ? reconstructLocalRecentProjectPayload(latestEntry)
+          : null);
       targetProjectPayload = reconstructed && typeof reconstructed === 'object'
         ? (typeof extractLocalProjectSheetPayload === 'function'
           ? extractLocalProjectSheetPayload(reconstructed, target.id) || reconstructed
@@ -616,14 +738,11 @@
       return false;
     }
     ensureOpenProjectTabsInitialized?.();
-    const index = findOpenProjectTabIndex(targetId);
-    if (index < 0) {
+    const plan = planProjectSheetRemoval(targetId);
+    if (!plan) {
       return false;
     }
-    const target = openProjectTabs[index];
-    const wasActive = target?.id === activeOpenProjectTabId;
-    const targetProjectId = normalizeAutosaveProjectId(target?.projectId || '');
-    if (wasActive && isMultiMasterProjectReplacementBlocked()) {
+    if (plan.wasActive && isMultiMasterProjectReplacementBlocked()) {
       setMultiStatus(
         localizeText(
           '共有中のメインプロジェクトは、マスター接続中は閉じられません。先に共有を切断してください。',
@@ -633,66 +752,10 @@
       );
       return false;
     }
-    if (!confirmCloseOpenProjectTab(target, { active: wasActive })) {
+    if (!confirmCloseOpenProjectTab(plan.target, { active: plan.wasActive })) {
       return false;
     }
-    const fallback = wasActive
-      ? (openProjectTabs[index - 1] || openProjectTabs[index + 1] || null)
-      : null;
-    if (fallback?.id) {
-      const switched = await activateOpenProjectTab(fallback.id, {
-        skipPersistCurrent: true,
-        announce: false,
-      });
-      if (!switched) {
-        updateAutosaveStatus(localizeText('シートの切替に失敗しました', 'Failed to switch sheet'), 'warn');
-        return false;
-      }
-    }
-    if (targetProjectId && startupAutosaveRestoreProjectId === targetProjectId) {
-      startupAutosaveRestoreProjectId = '';
-    }
-    const removalIndex = findOpenProjectTabIndex(targetId);
-    if (removalIndex >= 0) {
-      openProjectTabs.splice(removalIndex, 1);
-    }
-    if (wasActive && !fallback) {
-      activeOpenProjectTabId = '';
-      suppressOpenProjectTabAutoInitialize = true;
-      if (targetProjectId && normalizeAutosaveProjectId(autosaveProjectId || '') === targetProjectId) {
-        setActiveAutosaveProjectId(createAutosaveProjectId());
-      }
-      if (activeSharedProjectKey) {
-        clearActiveSharedProjectSession('project-tab-close');
-      }
-      setProjectHomeVisible(true, { refresh: true });
-    } else {
-      renderOpenProjectTabs();
-    }
-    let savedClosedTabsState = true;
-    if (openProjectTabs.length && activeOpenProjectTabId && AUTOSAVE_SUPPORTED) {
-      try {
-        savedClosedTabsState = await writeAutosaveSnapshot(true);
-      } catch (error) {
-        console.warn('Failed to save project tabs after closing tab', error);
-        savedClosedTabsState = false;
-      }
-    }
-    if (!savedClosedTabsState) {
-      updateAutosaveStatus(
-        localizeText(
-          'シートを閉じましたが、削除後のタブ状態を保存できませんでした',
-          'Closed sheet, but could not save the updated tab state'
-        ),
-        'error'
-      );
-      return false;
-    }
-    updateAutosaveStatus(
-      localizeText('シートを閉じました', 'Closed sheet'),
-      'info'
-    );
-    return true;
+    return await commitProjectSheetRemoval(plan);
   }
 
 
@@ -707,6 +770,9 @@
     clearDeletedSharedProjectLocalState,
     purgeDeletedSharedProjectLocalReferences,
     confirmCloseOpenProjectTab,
+    planProjectSheetRemoval,
+    commitProjectSheetRemoval,
+    rollbackProjectSheetRemoval,
     renameOpenProjectTab,
     activateOpenProjectTab,
     closeOpenProjectTab,

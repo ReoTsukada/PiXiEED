@@ -809,7 +809,30 @@
       return projectPayload.sheets.some(sheet => sheet?.project?.session?.timelapseArchive?.included === true);
     }
 
+    function assertPackagedCanvasLimit(packaged) {
+      const documents = [];
+      if (packaged?.document && typeof packaged.document === 'object') documents.push(packaged.document);
+      if (Array.isArray(packaged?.sheets)) {
+        packaged.sheets.forEach(sheet => {
+          if (sheet?.project?.document && typeof sheet.project.document === 'object') {
+            documents.push(sheet.project.document);
+          }
+        });
+      }
+      for (const documentPayload of documents) {
+        const canvasCount = Array.isArray(documentPayload.canvases) ? documentPayload.canvases.length : 1;
+        if (canvasCount > 4) {
+          throw createCodecError(
+            'ERR_CANVAS_LIMIT_EXCEEDED',
+            `A sheet can contain at most 4 canvases (received ${canvasCount})`,
+            { canvasCount, maximum: 4 }
+          );
+        }
+      }
+    }
+
     async function encodePackagedProject(packaged, options = {}) {
+      assertPackagedCanvasLimit(packaged);
       const adapterId = typeof options?.adapterId === 'string' ? options.adapterId : '';
       const packageType = typeof options?.packageType === 'string' && options.packageType
         ? options.packageType
@@ -1169,6 +1192,7 @@
     async function decodeArchiveBytes(bytes, _options = {}) {
       const entries = parseStoredZipEntries(bytes);
       const restored = await restoreArchiveProject(entries);
+      assertPackagedCanvasLimit(restored.packaged);
       return {
         packaged: restored.packaged,
         archiveManifest: restored.archiveManifest,

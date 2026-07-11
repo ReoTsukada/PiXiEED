@@ -115,11 +115,13 @@
       const includeTimelapse = options?.includeTimelapse !== false;
       const snapshot = projectState?.snapshot || null;
       const session = projectState?.session || null;
-      const packaged = buildPackagedProjectPayload(snapshot, {
-        session,
-        updatedAt: options?.updatedAt || '',
-        includeSheets,
-      });
+      const packaged = projectState?.packaged && typeof projectState.packaged === 'object'
+        ? projectState.packaged
+        : buildPackagedProjectPayload(snapshot, {
+            session,
+            updatedAt: options?.updatedAt || '',
+            includeSheets,
+          });
       try {
         const encodeOptions = {
           adapterId: ADAPTER_ID,
