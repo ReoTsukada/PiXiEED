@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.07.11-touch-arbiter-v5';
+  const APP_BUILD_VERSION = '2026.07.11-touch-arbiter-v6';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECTS_ENABLED = false;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
@@ -3695,6 +3695,10 @@
   set setVirtualCursor(value) { setVirtualCursor = value; },
   get setZoom() { return setZoom; },
   set setZoom(value) { setZoom = value; },
+  get syncControlsWithState() { return syncControlsWithState; },
+  set syncControlsWithState(value) { syncControlsWithState = value; },
+  get updateColorTabSwatch() { return updateColorTabSwatch; },
+  set updateColorTabSwatch(value) { updateColorTabSwatch = value; },
   get SELECT_RECT_GRID_CELL_SIZE() { return SELECT_RECT_GRID_CELL_SIZE; },
   set SELECT_RECT_GRID_CELL_SIZE(value) { SELECT_RECT_GRID_CELL_SIZE = value; },
   get SELECT_RECT_GRID_DOUBLE_TAP_MS() { return SELECT_RECT_GRID_DOUBLE_TAP_MS; },
