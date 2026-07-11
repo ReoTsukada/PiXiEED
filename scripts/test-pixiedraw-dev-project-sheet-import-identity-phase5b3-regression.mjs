@@ -17,7 +17,7 @@ assert.match(importSource, /runtimeProjectId: createProjectPersistenceToken\?\.\
 assert.match(importSource, /deferredPayloadKey: createProjectPersistenceToken\?\.\('import-deferred'\)/);
 assert.match(importSource, /async function buildImageSheetImportCandidate\(file, kind = 'image'\)/);
 assert.match(importSource, /loadDocumentFromImageFile\(file, \{ applyToRuntime: false \}\)/);
-assert.match(importSource, /if \(!applyToRuntime\) \{\s*return buildPackagedProjectPayload\(snapshot, \{ includeSheets: false \}\);/);
+assert.match(importSource, /if \(!applyToRuntime\) \{\s*if \(typeof buildPackagedProjectPayload !== 'function'\) \{\s*throw new Error\('ERR_PROJECT_PAYLOAD_BUILDER_UNAVAILABLE'\);\s*\}\s*return buildPackagedProjectPayload\(snapshot, \{ includeSheets: false \}\);/);
 assert.match(importSource, /isImportedSheet: loaded\.isImportedSheet === true/);
 assert.match(switchSource, /target\?\.deferredProjectPayload && typeof target\.deferredProjectPayload === 'object'/);
 assert.match(packageSource, /tab\?\.deferredProjectPayload && typeof tab\.deferredProjectPayload === 'object'/);
