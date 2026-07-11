@@ -12,6 +12,7 @@
     buildProjectSessionPayload,
     buildPackagedProjectPayload,
     normalizeDocumentName,
+    normalizeProjectSaveHandleMeta,
     DEFAULT_DOCUMENT_NAME,
     hasDocumentUnsavedChanges,
     normalizeAutosaveProjectId,
@@ -32,10 +33,89 @@
     extractDocumentBaseName,
     createLightweightLocalProjectTabState,
     createLocalProjectEntrySignature,
+    normalizeProjectPersistenceState,
     normalizeQrEditPayload,
     localizeText,
     MAX_PROJECT_SHEETS,
   } = {}) {
+    function resolveTabPersistenceState(value = null, fallback = null, { createToken = true } = {}) {
+      if (typeof normalizeProjectPersistenceState === 'function') {
+        return normalizeProjectPersistenceState(value, fallback, { createToken });
+      }
+      const base = fallback && typeof fallback === 'object' ? fallback : {};
+      const next = value && typeof value === 'object' ? value : {};
+      return {
+        sourceStorageAdapterId: typeof next.sourceStorageAdapterId === 'string' && next.sourceStorageAdapterId
+          ? next.sourceStorageAdapterId
+          : (typeof base.sourceStorageAdapterId === 'string' && base.sourceStorageAdapterId ? base.sourceStorageAdapterId : null),
+        sourceKind: typeof next.sourceKind === 'string' && next.sourceKind
+          ? next.sourceKind
+          : (typeof base.sourceKind === 'string' && base.sourceKind ? base.sourceKind : 'unknown'),
+        sourceProjectToken: typeof next.sourceProjectToken === 'string' && next.sourceProjectToken
+          ? next.sourceProjectToken
+          : (typeof base.sourceProjectToken === 'string' && base.sourceProjectToken ? base.sourceProjectToken : (createToken ? `project-${Date.now().toString(36)}` : null)),
+        lastSavedStorageAdapterId: typeof next.lastSavedStorageAdapterId === 'string' && next.lastSavedStorageAdapterId
+          ? next.lastSavedStorageAdapterId
+          : (typeof base.lastSavedStorageAdapterId === 'string' && base.lastSavedStorageAdapterId ? base.lastSavedStorageAdapterId : null),
+        projectSaveHandleState: typeof next.projectSaveHandleState === 'string' && next.projectSaveHandleState
+          ? next.projectSaveHandleState
+          : (typeof base.projectSaveHandleState === 'string' && base.projectSaveHandleState ? base.projectSaveHandleState : 'none'),
+      };
+    }
+
+    function resolveTabProjectSaveHandle(handle, fallback = null) {
+      if (handle && typeof handle === 'object') {
+        return handle;
+      }
+      if (fallback && typeof fallback === 'object') {
+        return fallback;
+      }
+      return null;
+    }
+
+    function resolveTabProjectSaveHandleMeta(value = null, fallback = null) {
+      if (typeof normalizeProjectSaveHandleMeta === 'function') {
+        return normalizeProjectSaveHandleMeta(value, fallback);
+      }
+      const next = value && typeof value === 'object' ? value : {};
+      const base = fallback && typeof fallback === 'object' ? fallback : {};
+      const fileName = typeof next.fileName === 'string' && next.fileName.trim()
+        ? next.fileName.trim()
+        : (typeof base.fileName === 'string' && base.fileName.trim() ? base.fileName.trim() : '');
+      const adapterId = typeof next.adapterId === 'string' && next.adapterId.trim()
+        ? next.adapterId.trim()
+        : (typeof base.adapterId === 'string' && base.adapterId.trim() ? base.adapterId.trim() : '');
+      const boundAt = typeof next.boundAt === 'string' && next.boundAt.trim()
+        ? next.boundAt.trim()
+        : (typeof base.boundAt === 'string' && base.boundAt.trim() ? base.boundAt.trim() : '');
+      const sourceProjectToken = typeof next.sourceProjectToken === 'string' && next.sourceProjectToken.trim()
+        ? next.sourceProjectToken.trim()
+        : (typeof base.sourceProjectToken === 'string' && base.sourceProjectToken.trim() ? base.sourceProjectToken.trim() : '');
+      const handleKind = typeof next.handleKind === 'string' && next.handleKind.trim()
+        ? next.handleKind.trim()
+        : (typeof base.handleKind === 'string' && base.handleKind.trim() ? base.handleKind.trim() : '');
+      const permissionState = typeof next.permissionState === 'string' && next.permissionState.trim()
+        ? next.permissionState.trim()
+        : (typeof base.permissionState === 'string' && base.permissionState.trim() ? base.permissionState.trim() : 'unknown');
+      if (!fileName && !adapterId && !boundAt && !sourceProjectToken && !handleKind && !permissionState) {
+        return null;
+      }
+      return {
+        fileName,
+        adapterId: adapterId || null,
+        boundAt,
+        sourceProjectToken: sourceProjectToken || null,
+        handleKind: handleKind || 'unknown',
+        permissionState,
+      };
+    }
+
+    function getProjectPersistenceStateFromTab(tab = null, options = {}) {
+      return resolveTabPersistenceState(tab, null, {
+        createToken: options?.createToken === true,
+      });
+    }
+
     function buildOpenProjectTabPayloadFromCurrentState() {
       const snapshot = makeHistorySnapshot();
       const session = buildProjectSessionPayload();
@@ -52,6 +132,9 @@
       const normalizedProjectId = normalizeAutosaveProjectId(options.projectId || getAutosaveProjectId?.())
         || createAutosaveProjectId();
       const fileName = normalizeDocumentName(options.fileName || payload.fileName || DEFAULT_DOCUMENT_NAME);
+      const persistenceState = resolveTabPersistenceState(options, null, { createToken: true });
+      const projectSaveHandle = resolveTabProjectSaveHandle(options.projectSaveHandle, null);
+      const projectSaveHandleMeta = resolveTabProjectSaveHandleMeta(options.projectSaveHandleMeta, null);
       if (!SHARED_PROJECTS_ENABLED) {
         const localTab = {
           id: options.tabId || createOpenProjectTabId(),
@@ -73,6 +156,9 @@
           deferredRestore: false,
           remoteUpdateAvailable: false,
           qrEditPayload: normalizeQrEditPayload(options.qrEditPayload, normalizedProjectId),
+          projectSaveHandle,
+          projectSaveHandleMeta,
+          ...persistenceState,
         };
         const entrySignature = typeof createLocalProjectEntrySignature === 'function'
           ? createLocalProjectEntrySignature(recentProjectsCache.get(normalizedProjectId) || null)
@@ -120,6 +206,9 @@
         source: options.source || (currentProjectIsShared ? 'shared' : 'working'),
         updatedAt: payload.project?.updatedAt || new Date().toISOString(),
         qrEditPayload: normalizeQrEditPayload(options.qrEditPayload, normalizedProjectId),
+        projectSaveHandle,
+        projectSaveHandleMeta,
+        ...persistenceState,
         ...(currentProjectIsShared ? {
           sharedProjectKey: currentSharedProjectKey || getSharedProjectKeyFromProjectId(normalizedProjectId),
           sharedProjectBackendId: typeof options.sharedProjectBackendId === 'string'
@@ -156,6 +245,19 @@
         || payload.fileName
         || DEFAULT_DOCUMENT_NAME
       );
+      const persistenceState = resolveTabPersistenceState(options, currentTab, { createToken: true });
+      const projectSaveHandle = resolveTabProjectSaveHandle(
+        Object.prototype.hasOwnProperty.call(options, 'projectSaveHandle')
+          ? options.projectSaveHandle
+          : currentTab?.projectSaveHandle,
+        currentTab?.projectSaveHandle || null
+      );
+      const projectSaveHandleMeta = resolveTabProjectSaveHandleMeta(
+        Object.prototype.hasOwnProperty.call(options, 'projectSaveHandleMeta')
+          ? options.projectSaveHandleMeta
+          : currentTab?.projectSaveHandleMeta,
+        currentTab?.projectSaveHandleMeta || null
+      );
       const nextTab = {
         ...(currentTab && typeof currentTab === 'object' ? currentTab : {}),
         id: options.tabId || currentTab?.id || createOpenProjectTabId(),
@@ -177,6 +279,9 @@
         deferredRestore: false,
         remoteUpdateAvailable: false,
         qrEditPayload: normalizeQrEditPayload(options.qrEditPayload || currentTab?.qrEditPayload, normalizedProjectId),
+        projectSaveHandle,
+        projectSaveHandleMeta,
+        ...persistenceState,
       };
       const entrySignature = typeof createLocalProjectEntrySignature === 'function'
         ? createLocalProjectEntrySignature(recentProjectsCache.get(normalizedProjectId) || null)
@@ -202,6 +307,13 @@
       sharedProjectStructureRevision = 0,
       sharedRoleHint = '',
       sharedAutoJoin = false,
+      sourceStorageAdapterId = null,
+      sourceKind = 'unknown',
+      sourceProjectToken = null,
+      lastSavedStorageAdapterId = null,
+      projectSaveHandleState = 'none',
+      projectSaveHandle = null,
+      projectSaveHandleMeta = null,
     } = {}) {
       if (!project || typeof project !== 'object') {
         return null;
@@ -214,6 +326,15 @@
         )
         : '';
       const normalizedFileName = normalizeDocumentName(fileName || project?.documentName || project?.document?.documentName || DEFAULT_DOCUMENT_NAME);
+      const persistenceState = resolveTabPersistenceState({
+        sourceStorageAdapterId,
+        sourceKind,
+        sourceProjectToken,
+        lastSavedStorageAdapterId,
+        projectSaveHandleState,
+      }, null, { createToken: true });
+      const normalizedProjectSaveHandle = resolveTabProjectSaveHandle(projectSaveHandle, null);
+      const normalizedProjectSaveHandleMeta = resolveTabProjectSaveHandleMeta(projectSaveHandleMeta, null);
       return {
         id: typeof id === 'string' && id ? id : createOpenProjectTabId(),
         projectId: normalizedProjectId,
@@ -224,6 +345,9 @@
         source,
         updatedAt: updatedAt || project?.updatedAt || new Date().toISOString(),
         qrEditPayload: normalizeQrEditPayload(qrEditPayload, projectId || getAutosaveProjectId?.() || ''),
+        projectSaveHandle: normalizedProjectSaveHandle,
+        projectSaveHandleMeta: normalizedProjectSaveHandleMeta,
+        ...persistenceState,
         ...(normalizedSharedProjectKey ? {
           sharedProjectKey: normalizedSharedProjectKey,
           sharedProjectBackendId: typeof sharedProjectBackendId === 'string' ? sharedProjectBackendId.trim() : '',
@@ -252,6 +376,9 @@
         const sheetSharedProjectKey = SHARED_PROJECTS_ENABLED
           ? normalizeMultiProjectKey(sheet.sharedProjectKey || '')
           : '';
+        const persistenceState = resolveTabPersistenceState(sheet, null, { createToken: true });
+        const projectSaveHandle = resolveTabProjectSaveHandle(sheet.projectSaveHandle, null);
+        const projectSaveHandleMeta = resolveTabProjectSaveHandleMeta(sheet.projectSaveHandleMeta, null);
         normalized.push({
           id: uniqueId,
           fileName,
@@ -261,6 +388,9 @@
           source: typeof sheet.source === 'string' && sheet.source ? sheet.source : 'sheet',
           updatedAt: sheet.updatedAt || sheet.project?.updatedAt || new Date().toISOString(),
           qrEditPayload: normalizeQrEditPayload(sheet.qrEditPayload, getAutosaveProjectId?.() || ''),
+          projectSaveHandle,
+          projectSaveHandleMeta,
+          ...persistenceState,
           ...(sheetSharedProjectKey ? {
             sharedProjectKey: sheetSharedProjectKey,
             sharedProjectBackendId: typeof sheet.sharedProjectBackendId === 'string' ? sheet.sharedProjectBackendId.trim() : '',
@@ -289,6 +419,7 @@
       createLocalOpenProjectTabFromCurrentState,
       createOpenProjectSheetTabFromPackagedProject,
       normalizePackagedProjectSheets,
+      getProjectPersistenceStateFromTab,
     };
   }
 
