@@ -148,6 +148,28 @@
       return rect.width > 0 && rect.height > 0;
     }
 
+    function applyResponsiveAdShape(slot) {
+      const rect = slot.getBoundingClientRect();
+      const width = Math.max(1, rect.width);
+      const height = Math.max(1, rect.height);
+      const ratio = width / height;
+      const isMobileContext = Boolean(document.body?.classList.contains('is-mobile-layout'))
+        || Boolean(window.matchMedia?.('(max-width: 767px)').matches);
+      const format = isMobileContext
+        ? 'auto'
+        : (ratio >= 2.1
+          ? 'horizontal'
+          : (ratio <= 0.72 ? 'vertical' : 'rectangle'));
+      slot.setAttribute('data-ad-format', format);
+      slot.dataset.pixiedAdFormat = format;
+      if (isMobileContext) {
+        slot.setAttribute('data-full-width-responsive', 'true');
+      } else {
+        slot.setAttribute('data-full-width-responsive', 'false');
+      }
+      return format;
+    }
+
     function renderAdSlot(slot, options = {}) {
       const owner = String(options.owner || 'unassigned');
       const reason = String(options.reason || 'render-request');
@@ -158,6 +180,10 @@
       if (!(slot instanceof HTMLElement) || !slot.isConnected) {
         logAdSlot('skip', slot, { owner }, 'slot-disconnected');
         return { ok: false, pushed: false, reason: 'slot-disconnected' };
+      }
+      if (slot.closest('#panelAdPreloadHost')) {
+        logAdSlot('skip', slot, { owner }, 'slot-in-preload-host');
+        return { ok: false, pushed: false, reason: 'slot-in-preload-host' };
       }
       if (!isSlotVisible(slot)) {
         logAdSlot('skip', slot, { owner }, 'slot-not-renderable');
@@ -184,6 +210,7 @@
       inFlightSlots.add(slot);
       slot.dataset.pixiedAdOwner = owner;
       slot.dataset.pixiedAdInFlight = '1';
+      applyResponsiveAdShape(slot);
       if (!slot.classList.contains('adsbygoogle')) {
         slot.classList.add('adsbygoogle');
       }
@@ -2088,6 +2115,9 @@
 
       function isContainerRenderable(container) {
         if (!(container instanceof HTMLElement) || !container.isConnected) return false;
+        if (container.closest('#panelAdPreloadHost') || container.closest('[hidden]')) return false;
+        const style = window.getComputedStyle(container);
+        if (style.display === 'none' || style.visibility === 'hidden') return false;
         const width = getContainerWidth(container);
         if (width < getRequiredWidth(container)) return false;
         if (container.getClientRects && container.getClientRects().length === 0) return false;
