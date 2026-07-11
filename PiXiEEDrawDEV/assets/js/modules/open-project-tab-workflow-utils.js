@@ -472,6 +472,7 @@
       return false;
     } finally {
       openProjectTabBusy = false;
+      renderOpenProjectTabs();
     }
   }
 
@@ -541,6 +542,11 @@
       return false;
     }
     const target = openProjectTabs[targetIndex];
+    // Acquire synchronously so a duplicate click cannot enter a second
+    // persistence/activation sequence before this switch reaches its first await.
+    openProjectTabBusy = true;
+    renderOpenProjectTabs();
+    try {
     console.info('[sheet-switch-debug:start]', {
       fromSheetId: previousActiveId,
       toSheetId: targetId,
@@ -573,7 +579,6 @@
       });
       if (!persistedCurrentSheet) {
         updateAutosaveStatus(localizeText('現在のシートを保持できなかったため、切替を中止しました', 'Sheet switch was canceled because the current sheet could not be preserved'), 'error');
-        guardedProjectTabIds.forEach(releaseOpenProjectTabProjectWriteGuard);
         return false;
       }
     }
@@ -615,7 +620,6 @@
           sheetIds: openProjectTabs.map(tab => tab?.id || ''),
         });
         updateAutosaveStatus(localizeText('シートデータを復元できないため、切替を中止しました', 'Sheet data could not be restored; switching was canceled'), 'error');
-        guardedProjectTabIds.forEach(releaseOpenProjectTabProjectWriteGuard);
         return false;
       }
     }
@@ -632,8 +636,6 @@
     activeOpenProjectTabId = target.id;
     suppressOpenProjectTabAutoInitialize = false;
     renderOpenProjectTabs();
-    openProjectTabBusy = true;
-    try {
       const loaded = await loadDocumentFromProjectPayload(targetProjectPayload, {
         projectId: target.projectId || '',
         suppressAutosaveStatus: true,
@@ -742,6 +744,7 @@
     } finally {
       guardedProjectTabIds.forEach(releaseOpenProjectTabProjectWriteGuard);
       openProjectTabBusy = false;
+      renderOpenProjectTabs();
     }
   }
 
