@@ -157,6 +157,12 @@
           qrEditPayload: normalizeQrEditPayload(options.qrEditPayload, normalizedProjectId),
           projectSaveHandle,
           projectSaveHandleMeta,
+          sourceProjectId: typeof sheet.sourceProjectId === 'string' && sheet.sourceProjectId ? sheet.sourceProjectId : null,
+          sourceSheetId: typeof sheet.sourceSheetId === 'string' && sheet.sourceSheetId ? sheet.sourceSheetId : null,
+          sheetRuntimeId: typeof sheet.sheetRuntimeId === 'string' && sheet.sheetRuntimeId ? sheet.sheetRuntimeId : `${uniqueId}:runtime`,
+          sheetPersistenceKey: typeof sheet.sheetPersistenceKey === 'string' && sheet.sheetPersistenceKey ? sheet.sheetPersistenceKey : `${uniqueId}:persistence`,
+          historyOwnerId: typeof sheet.historyOwnerId === 'string' && sheet.historyOwnerId ? sheet.historyOwnerId : `${uniqueId}:history`,
+          timelapseOwnerId: typeof sheet.timelapseOwnerId === 'string' && sheet.timelapseOwnerId ? sheet.timelapseOwnerId : `${uniqueId}:timelapse`,
           ...persistenceState,
         };
         const entrySignature = typeof createLocalProjectEntrySignature === 'function'
@@ -313,6 +319,12 @@
       projectSaveHandleState = 'none',
       projectSaveHandle = null,
       projectSaveHandleMeta = null,
+      sourceProjectId = null,
+      sourceSheetId = null,
+      sheetRuntimeId = '',
+      sheetPersistenceKey = '',
+      historyOwnerId = '',
+      timelapseOwnerId = '',
     } = {}) {
       if (!project || typeof project !== 'object') {
         return null;
@@ -346,6 +358,12 @@
         qrEditPayload: normalizeQrEditPayload(qrEditPayload, projectId || getAutosaveProjectId?.() || ''),
         projectSaveHandle: normalizedProjectSaveHandle,
         projectSaveHandleMeta: normalizedProjectSaveHandleMeta,
+        sourceProjectId: typeof sourceProjectId === 'string' && sourceProjectId ? sourceProjectId : null,
+        sourceSheetId: typeof sourceSheetId === 'string' && sourceSheetId ? sourceSheetId : null,
+        sheetRuntimeId: typeof sheetRuntimeId === 'string' && sheetRuntimeId ? sheetRuntimeId : `${id || 'sheet'}:runtime`,
+        sheetPersistenceKey: typeof sheetPersistenceKey === 'string' && sheetPersistenceKey ? sheetPersistenceKey : `${id || 'sheet'}:persistence`,
+        historyOwnerId: typeof historyOwnerId === 'string' && historyOwnerId ? historyOwnerId : `${id || 'sheet'}:history`,
+        timelapseOwnerId: typeof timelapseOwnerId === 'string' && timelapseOwnerId ? timelapseOwnerId : `${id || 'sheet'}:timelapse`,
         ...persistenceState,
         ...(normalizedSharedProjectKey ? {
           sharedProjectKey: normalizedSharedProjectKey,
