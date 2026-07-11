@@ -949,6 +949,10 @@
       resetOpenProjectTabsToCurrentProject({
         source: 'new-project',
         projectId: autosaveProjectId,
+        sourceStorageAdapterId: null,
+        sourceKind: 'new',
+        lastSavedStorageAdapterId: null,
+        projectSaveHandleState: 'none',
       });
     }
     scheduleSessionPersist();
