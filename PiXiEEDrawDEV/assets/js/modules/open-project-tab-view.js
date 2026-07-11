@@ -12,6 +12,8 @@
     getActiveOpenProjectTabId,
     getProjectHomeVisible,
     getOpenProjectTabBusy,
+    getProjectTabAddAvailability,
+    onProjectTabAddAvailabilityChange,
     getOpenProjectTabsLastRenderSignature,
     setOpenProjectTabsLastRenderSignature,
     getOpenProjectTabsLastStructureSignature,
@@ -90,11 +92,39 @@
         button.setAttribute('aria-selected', String(isActive));
         button.setAttribute('tabindex', isActive ? '0' : '-1');
       });
-      const addButton = list.querySelector('[data-project-tab-add="true"]');
-      if (addButton instanceof HTMLButtonElement) {
-        addButton.disabled = Boolean(getOpenProjectTabBusy?.());
-      }
+      syncProjectTabAddButtonAvailability(list);
       return true;
+    }
+
+    function resolveProjectTabAddAvailability() {
+      const resolved = getProjectTabAddAvailability?.();
+      if (resolved && typeof resolved === 'object') {
+        return {
+          enabled: resolved.enabled !== false,
+          reason: typeof resolved.reason === 'string'
+            ? resolved.reason
+            : (resolved.enabled === false ? 'unavailable' : 'ready'),
+          activeTab: resolved.activeTab || null,
+        };
+      }
+      const busy = Boolean(getOpenProjectTabBusy?.());
+      return {
+        enabled: !busy,
+        reason: busy ? 'command-in-flight' : 'ready',
+        activeTab: null,
+      };
+    }
+
+    function syncProjectTabAddButtonAvailability(list) {
+      const addButton = list?.querySelector?.('[data-project-tab-add="true"]');
+      if (!(addButton instanceof HTMLButtonElement)) {
+        return;
+      }
+      const availability = resolveProjectTabAddAvailability();
+      addButton.disabled = !availability.enabled;
+      addButton.setAttribute('aria-disabled', String(!availability.enabled));
+      addButton.dataset.availabilityReason = availability.reason;
+      onProjectTabAddAvailabilityChange?.({ ...availability, addButton });
     }
 
     function renderOpenProjectTabs() {
@@ -210,9 +240,9 @@
         'aria-label',
         localizeText('新規シートを追加', 'Add new sheet')
       );
-      addButton.disabled = openProjectTabBusy;
       addItem.appendChild(addButton);
       list.appendChild(addItem);
+      syncProjectTabAddButtonAvailability(list);
     }
 
     return {
