@@ -258,6 +258,7 @@
         sourceProjectToken: tab?.sourceProjectToken || null,
         sourceProjectId: tab?.sourceProjectId || null,
         sourceSheetId: tab?.sourceSheetId || null,
+        isImportedSheet: tab?.isImportedSheet === true,
         runtimeProjectId: tab?.runtimeProjectId || null,
         sheetRuntimeId: tab?.sheetRuntimeId || null,
         deferredPayloadKey: tab?.deferredPayloadKey || null,
