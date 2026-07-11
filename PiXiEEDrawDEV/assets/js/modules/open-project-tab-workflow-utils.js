@@ -609,6 +609,7 @@
           projectId: targetProjectId,
           sheetIds: openProjectTabs.map(tab => tab?.id || ''),
         });
+        updateAutosaveStatus(localizeText('シートデータを復元できないため、切替を中止しました', 'Sheet data could not be restored; switching was canceled'), 'error');
         guardedProjectTabIds.forEach(releaseOpenProjectTabProjectWriteGuard);
         return false;
       }
