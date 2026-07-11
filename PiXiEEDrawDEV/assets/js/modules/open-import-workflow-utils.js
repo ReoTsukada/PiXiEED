@@ -1334,6 +1334,9 @@
     };
 
     if (!applyToRuntime) {
+      if (typeof buildPackagedProjectPayload !== 'function') {
+        throw new Error('ERR_PROJECT_PAYLOAD_BUILDER_UNAVAILABLE');
+      }
       return buildPackagedProjectPayload(snapshot, { includeSheets: false });
     }
 
