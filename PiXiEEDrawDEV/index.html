@@ -95,6 +95,136 @@
     document.head.appendChild(script);
   })();
 </script>
+<script>
+  (function configurePixieedrawAdSlotRenderer() {
+    const initializedSlots = new WeakSet();
+    const inFlightSlots = new WeakSet();
+    const slotOwners = new WeakMap();
+
+    function getSlotDiagnostics(slot, { phase, owner, reason } = {}) {
+      const rect = slot instanceof HTMLElement ? slot.getBoundingClientRect() : null;
+      const style = slot instanceof HTMLElement ? window.getComputedStyle(slot) : null;
+      const layoutWrapper = slot?.closest?.('.ad-block') || slot?.parentElement || null;
+      const wrapperRect = layoutWrapper instanceof HTMLElement ? layoutWrapper.getBoundingClientRect() : null;
+      const wrapperStyle = layoutWrapper instanceof HTMLElement ? window.getComputedStyle(layoutWrapper) : null;
+      return {
+        phase: phase || 'unknown',
+        owner: owner || '',
+        containerId: slot?.parentElement?.id || '',
+        elementId: slot?.id || '',
+        adSlot: slot?.getAttribute?.('data-ad-slot') || '',
+        connected: Boolean(slot?.isConnected),
+        width: Math.round(rect?.width || 0),
+        height: Math.round(rect?.height || 0),
+        transform: wrapperStyle?.transform || style?.transform || 'none',
+        wrapperClass: layoutWrapper?.className || '',
+        wrapperWidth: Math.round(wrapperRect?.width || 0),
+        wrapperHeight: Math.round(wrapperRect?.height || 0),
+        adsbygoogleStatus: slot?.getAttribute?.('data-adsbygoogle-status') || '',
+        datasetLoaded: slot?.dataset?.loaded || '',
+        appInitialized: initializedSlots.has(slot),
+        inFlight: inFlightSlots.has(slot),
+        reason: reason || '',
+      };
+    }
+
+    function logAdSlot(phase, slot, options, reason) {
+      console.info('[pixiedraw-dev:ad-slot]', getSlotDiagnostics(slot, {
+        phase,
+        owner: options?.owner,
+        reason,
+      }));
+    }
+
+    function isSlotVisible(slot) {
+      if (!(slot instanceof HTMLElement) || !slot.isConnected || slot.closest('[hidden]')) {
+        return false;
+      }
+      const style = window.getComputedStyle(slot);
+      if (style.display === 'none' || style.visibility === 'hidden') {
+        return false;
+      }
+      const rect = slot.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    }
+
+    function renderAdSlot(slot, options = {}) {
+      const owner = String(options.owner || 'unassigned');
+      const reason = String(options.reason || 'render-request');
+      if (!window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.()) {
+        logAdSlot('skip', slot, { owner }, 'edition-ads-disabled');
+        return { ok: false, pushed: false, reason: 'edition-ads-disabled' };
+      }
+      if (!(slot instanceof HTMLElement) || !slot.isConnected) {
+        logAdSlot('skip', slot, { owner }, 'slot-disconnected');
+        return { ok: false, pushed: false, reason: 'slot-disconnected' };
+      }
+      if (!isSlotVisible(slot)) {
+        logAdSlot('skip', slot, { owner }, 'slot-not-renderable');
+        return { ok: false, pushed: false, reason: 'slot-not-renderable' };
+      }
+      const priorOwner = slotOwners.get(slot);
+      if (priorOwner && priorOwner !== owner) {
+        logAdSlot('skip', slot, { owner }, `owner-conflict:${priorOwner}`);
+        return { ok: false, pushed: false, reason: 'owner-conflict' };
+      }
+      if (initializedSlots.has(slot)
+        || slot.dataset.pixiedAdInitialized === '1'
+        || slot.dataset.loaded === '1'
+        || slot.getAttribute('data-adsbygoogle-status')) {
+        logAdSlot('skip', slot, { owner }, 'already-initialized');
+        return { ok: true, pushed: false, reason: 'already-initialized' };
+      }
+      if (inFlightSlots.has(slot) || slot.dataset.pixiedAdInFlight === '1') {
+        logAdSlot('skip', slot, { owner }, 'in-flight');
+        return { ok: false, pushed: false, reason: 'in-flight' };
+      }
+
+      slotOwners.set(slot, owner);
+      inFlightSlots.add(slot);
+      slot.dataset.pixiedAdOwner = owner;
+      slot.dataset.pixiedAdInFlight = '1';
+      if (!slot.classList.contains('adsbygoogle')) {
+        slot.classList.add('adsbygoogle');
+      }
+      try {
+        (window.adsbygoogle = window.adsbygoogle || []).push({});
+        initializedSlots.add(slot);
+        slot.dataset.pixiedAdInitialized = '1';
+        logAdSlot('push', slot, { owner }, reason);
+        return { ok: true, pushed: true, reason: 'pushed' };
+      } catch (error) {
+        const message = String(error?.message || error || 'adsbygoogle-push-failed');
+        if (/already have ads/i.test(message)) {
+          initializedSlots.add(slot);
+          slot.dataset.pixiedAdInitialized = '1';
+          logAdSlot('skip', slot, { owner }, 'already-initialized-by-adsense');
+          return { ok: true, pushed: false, reason: 'already-initialized-by-adsense' };
+        }
+        logAdSlot('error', slot, { owner }, message);
+        return { ok: false, pushed: false, reason: 'push-failed' };
+      } finally {
+        inFlightSlots.delete(slot);
+        delete slot.dataset.pixiedAdInFlight;
+      }
+    }
+
+    window.__PIXIEEDRAW_RENDER_AD_SLOT__ = renderAdSlot;
+    // The shared mobile chrome calls this after page lifecycle and orientation
+    // changes. The same slot gate prevents it from pushing an existing ins twice.
+    window.pixieedObserveAds = root => {
+      const slots = [];
+      if (root instanceof HTMLElement && root.matches('ins.adsbygoogle, ins.ad-seed')) {
+        slots.push(root);
+      }
+      root?.querySelectorAll?.('ins.adsbygoogle, ins.ad-seed').forEach(slot => slots.push(slot));
+      slots.forEach(slot => renderAdSlot(slot, {
+        owner: 'shared-mobile-top-ad',
+        reason: 'shared-mobile-observer',
+      }));
+    };
+  })();
+</script>
 <!-- Google tag (gtag.js) -->
 <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-SZPVXMX85G"></script>
 <script>
@@ -120,7 +250,7 @@
 
 
 
-<link href="assets/css/style.css?v=2026.07.11-landscape-rotated-ad-fix1" rel="stylesheet"/>
+<link href="assets/css/style.css?v=2026.07.12-export-vertical-ad1" rel="stylesheet"/>
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-4.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-4.png"/>
 <style>
@@ -233,7 +363,7 @@
 <button class="startup-screen__link" id="startupActionSkip" type="button">この画面を閉じる</button>
 </div>
 </div>
-<div aria-hidden="true" class="update-toast" data-update-id="2026-07-11-touch-arbiter-v8" data-update-published="true" hidden="" id="updateToast" role="status" aria-live="polite">
+<div aria-hidden="true" class="update-toast" data-update-id="2026-07-12-touch-pan-bias-v9" data-update-published="true" hidden="" id="updateToast" role="status" aria-live="polite">
 <div class="update-toast__body">
 <p class="update-toast__message">
 <strong>更新情報 (2026/07/11)</strong><br/>
@@ -1599,7 +1729,7 @@
 	<script defer="" src="assets/js/modules/canvas-drawing-workflow-utils.js?v=2026.07.02-canvas-pointer-deps-fix1"></script>
 	<script defer="" src="assets/js/modules/canvas-overlay-workflow-utils.js?v=2026.07.02-canvas-overlay-split-v1"></script>
 	<script defer="" src="assets/js/modules/canvas-render-workflow-utils.js?v=2026.07.02-canvas-render-split-v1"></script>
-	<script defer="" src="assets/js/modules/viewport-gesture-arbiter-utils.js?v=2026.07.11-touch-arbiter-v3"></script>
+	<script defer="" src="assets/js/modules/viewport-gesture-arbiter-utils.js?v=2026.07.12-touch-pan-bias-v9"></script>
 	<script defer="" src="assets/js/modules/canvas-zoom-workflow-utils.js?v=2026.07.11-touch-arbiter-v3"></script>
 	<script defer="" src="assets/js/modules/virtual-cursor-workflow-utils.js?v=2026.07.02-virtual-cursor-split-v1"></script>
 	<script defer="" src="assets/js/modules/canvas-wheel-zoom-workflow-utils.js?v=2026.07.11-touch-arbiter-v3"></script>
@@ -1650,8 +1780,8 @@
 	<script defer="" src="assets/js/modules/autosave-workflow-utils.js?v=2026.07.01-autosave-workflow-split-v1"></script>
 	<script defer="" src="assets/js/modules/open-import-workflow-utils.js?v=2026.07.11-tab-availability-fix1"></script>
 	<script defer="" src="assets/js/modules/export-format-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
-	<script defer="" src="assets/js/modules/export-dialog-workflow-utils.js?v=2026.07.11-g3a-edition-ads"></script>
-	<script defer="" src="assets/js/modules/startup-workflow-utils.js?v=2026.07.11-g3a-edition-ads"></script>
+	<script defer="" src="assets/js/modules/export-dialog-workflow-utils.js?v=2026.07.12-ad-slot-gate1"></script>
+	<script defer="" src="assets/js/modules/startup-workflow-utils.js?v=2026.07.12-ad-slot-gate1"></script>
 		<script defer="" src="assets/js/modules/recent-project-workflow-utils.js?v=2026.07.11-g3a-edition-ads"></script>
 		<script defer="" src="assets/js/modules/project-package-workflow-utils.js?v=2026.07.11-sheet-payload-ownership-fix1"></script>
 		<script defer="" src="assets/js/modules/project-storage-adapter-utils.js?v=2026.07.09-project-storage-phase1"></script>
@@ -1686,7 +1816,7 @@
 	<script defer="" src="assets/js/modules/controls-mirror.js?v=2026.07.03-mirror-guide-drag-fix1"></script>
 	<script defer="" src="assets/js/modules/external-tool-workflow-utils.js?v=2026.07.02-external-tool-workflow-split-v1"></script>
 	<script defer="" src="assets/js/pixieedraw-dev-switch.js?v=2026.07.03-pixieedrawdev-switch-fix14"></script>
-	<script defer="" src="assets/js/app.js?v=2026.07.11-touch-arbiter-v8"></script>
+	<script defer="" src="assets/js/app.js?v=2026.07.12-touch-pan-bias-v9"></script>
 	<script defer="" src="assets/js/modules/update-detection-utils.js?v=2026071102"></script>
   <script>
     (function initPanelAdDocking() {
@@ -2070,7 +2200,14 @@
         promoteForRender(ins);
 
         try {
-          (window.adsbygoogle = window.adsbygoogle || []).push({});
+          const result = window.__PIXIEEDRAW_RENDER_AD_SLOT__?.(ins, {
+            owner: `editor-static:${container.id}`,
+            reason: 'editor-static-slot',
+          });
+          if (!result?.ok) {
+            rollbackPending(ins);
+            return false;
+          }
           ins.dataset.pixiedRendered = '1';
           return true;
         } catch (error) {
