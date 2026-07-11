@@ -266,6 +266,21 @@
       addMenuBusy = false;
     }
 
+    function getProjectTabAddDebugState() {
+      const addButton = dom.projectTabsList?.querySelector?.('[data-project-tab-add="true"]') || null;
+      const menuOpen = Boolean(addMenu?.isConnected);
+      return {
+        disabled: Boolean(addButton?.disabled),
+        ariaDisabled: addButton?.getAttribute?.('aria-disabled') || null,
+        pointerEvents: addButton ? window.getComputedStyle(addButton).pointerEvents : null,
+        menuOpen,
+        inFlight: addMenuBusy,
+        commandInFlight: Boolean(getOpenProjectTabBusy?.()),
+        overlayCount: document.querySelectorAll('[data-sheet-add-overlay]').length,
+        connected: Boolean(addButton?.isConnected),
+      };
+    }
+
     function setupOpenProjectTabs() {
       const list = dom.projectTabsList;
       if (!(list instanceof HTMLElement)) {
@@ -363,6 +378,7 @@
       createNewSheetTab,
       commitSheetCandidate,
       openProjectTabAddPicker,
+      getProjectTabAddDebugState,
       setupOpenProjectTabs,
     };
   }
