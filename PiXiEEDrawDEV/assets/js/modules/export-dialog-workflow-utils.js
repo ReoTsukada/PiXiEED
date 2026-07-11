@@ -91,7 +91,7 @@
   }
 
   function queueExportAdRender() {
-    if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) {
+    if (!window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.()) {
       return;
     }
     const dialog = dom.exportDialog?.dialog;
@@ -179,7 +179,7 @@
   }
 
   function queueShortcutHelpAdRender() {
-    if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) {
+    if (!window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.()) {
       return;
     }
     const dialog = dom.shortcutHelp?.dialog;
@@ -237,7 +237,7 @@
   }
 
   function queueUpdateHistoryAdRender() {
-    if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) {
+    if (!window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.()) {
       return;
     }
     const dialog = dom.updateHistory?.dialog;
@@ -514,7 +514,7 @@
   }
 
   function canShowExportInterstitial() {
-    if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) {
+    if (!window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.()) {
       return false;
     }
     const dialog = dom.exportInterstitial?.dialog;
@@ -547,7 +547,7 @@
   }
 
   function queueExportInterstitialAdRender() {
-    if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) {
+    if (!window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.()) {
       return;
     }
     const dialog = dom.exportInterstitial?.dialog;
