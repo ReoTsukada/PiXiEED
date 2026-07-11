@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.07.11-touch-arbiter-v5';
+  const APP_BUILD_VERSION = '2026.07.11-touch-arbiter-v6';
   window.__PIXIEEDRAW_BUILD_ID__ = APP_BUILD_VERSION;
   window.__PIXIEEDRAW_BUILD_REVISION__ = 2026071100;
   const APP_SW_VERSION = APP_BUILD_VERSION;
@@ -3739,6 +3739,10 @@
   set setVirtualCursor(value) { setVirtualCursor = value; },
   get setZoom() { return setZoom; },
   set setZoom(value) { setZoom = value; },
+  get syncControlsWithState() { return syncControlsWithState; },
+  set syncControlsWithState(value) { syncControlsWithState = value; },
+  get updateColorTabSwatch() { return updateColorTabSwatch; },
+  set updateColorTabSwatch(value) { updateColorTabSwatch = value; },
   get SELECT_RECT_GRID_CELL_SIZE() { return SELECT_RECT_GRID_CELL_SIZE; },
   set SELECT_RECT_GRID_CELL_SIZE(value) { SELECT_RECT_GRID_CELL_SIZE = value; },
   get SELECT_RECT_GRID_DOUBLE_TAP_MS() { return SELECT_RECT_GRID_DOUBLE_TAP_MS; },
@@ -5727,6 +5731,8 @@
   set beginStartupProgress(value) { beginStartupProgress = value; },
   get buildActiveSharedProjectSheetTabFields() { return buildActiveSharedProjectSheetTabFields; },
   set buildActiveSharedProjectSheetTabFields(value) { buildActiveSharedProjectSheetTabFields = value; },
+  get buildPackagedProjectPayload() { return buildPackagedProjectPayload; },
+  set buildPackagedProjectPayload(value) { buildPackagedProjectPayload = value; },
   get buildIndexedPaletteFromFrameDataList() { return buildIndexedPaletteFromFrameDataList; },
   set buildIndexedPaletteFromFrameDataList(value) { buildIndexedPaletteFromFrameDataList = value; },
   get buildSharedRecentProjectId() { return buildSharedRecentProjectId; },
@@ -11765,6 +11771,39 @@
     getActiveOpenProjectTabId: () => activeOpenProjectTabId,
     getProjectHomeVisible: () => projectHomeVisible,
     getOpenProjectTabBusy: () => openProjectTabBusy,
+    getProjectTabAddAvailability: () => {
+      const activeTab = openProjectTabs.find(tab => tab?.id === activeOpenProjectTabId) || null;
+      const hasActiveProject = Boolean(activeTab);
+      return {
+        enabled: hasActiveProject && !openProjectTabBusy,
+        reason: openProjectTabBusy
+          ? 'command-in-flight'
+          : (hasActiveProject ? 'ready' : 'no-active-project'),
+        activeTab,
+      };
+    },
+    onProjectTabAddAvailabilityChange: ({ enabled, reason, addButton, activeTab }) => {
+      if (enabled || !(addButton instanceof HTMLButtonElement)) {
+        return;
+      }
+      console.debug('[project-tab-add:availability]', {
+        reason,
+        activeSheetId: activeOpenProjectTabId,
+        activeTabId: activeTab?.id || '',
+        activeSourceKind: activeTab?.sourceKind || '',
+        disabled: addButton.disabled,
+        ariaDisabled: addButton.getAttribute('aria-disabled'),
+        pointerEvents: window.getComputedStyle(addButton).pointerEvents,
+        sheetAddInFlight: openProjectTabBusy,
+        imageImportInFlight: false,
+        gifImportInFlight: false,
+        projectImportInFlight: false,
+        pickerOpen: false,
+        hasActiveProject: Boolean(activeTab),
+        hasActiveDocument: Boolean(activeTab?.project?.document),
+        connected: addButton.isConnected,
+      });
+    },
     getOpenProjectTabsLastRenderSignature: () => openProjectTabsLastRenderSignature,
     setOpenProjectTabsLastRenderSignature: (value) => {
       openProjectTabsLastRenderSignature = value;
@@ -11895,6 +11934,17 @@
     DEFAULT_CANVAS_SIZE,
     NEW_PROJECT_PALETTE_PRESET_DEFAULT,
     getOpenProjectTabBusy: () => openProjectTabBusy,
+    getProjectTabAddAvailability: () => {
+      const activeTab = openProjectTabs.find(tab => tab?.id === activeOpenProjectTabId) || null;
+      const hasActiveProject = Boolean(activeTab);
+      return {
+        enabled: hasActiveProject && !openProjectTabBusy,
+        reason: openProjectTabBusy
+          ? 'command-in-flight'
+          : (hasActiveProject ? 'ready' : 'no-active-project'),
+        activeTab,
+      };
+    },
     setOpenProjectTabBusy: (value) => {
       openProjectTabBusy = Boolean(value);
     },
