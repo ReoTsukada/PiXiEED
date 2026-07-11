@@ -13,6 +13,8 @@ assert.match(importSource, /finally \{\s*openProjectTabBusy = false;\s*renderOpe
 assert.match(actionSource, /function getProjectTabAddDebugState\(\)/);
 assert.match(actionSource, /overlayCount: document\.querySelectorAll\('\[data-sheet-add-overlay\]'\)\.length/);
 assert.match(actionSource, /list\.addEventListener\('click'/);
-assert.match(viewSource, /addButton\.disabled = Boolean\(getOpenProjectTabBusy\?\.\(\)\);/);
+assert.match(viewSource, /function syncProjectTabAddButtonAvailability\(list\)/);
+assert.match(viewSource, /addButton\.disabled = !availability\.enabled;/);
+assert.match(viewSource, /addButton\.setAttribute\('aria-disabled', String\(!availability\.enabled\)\);/);
 
 console.log('PiXiEEDraw DEV sheet add lock release checks passed');
