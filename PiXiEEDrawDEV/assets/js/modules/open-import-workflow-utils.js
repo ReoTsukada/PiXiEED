@@ -67,6 +67,7 @@
         const candidates = directPayloads.map(payload => collectionUtils.prepareSheetCandidate('file', {
           id: createOpenProjectTabId(),
           project: payload.project,
+          isImportedSheet: true,
           fileName: payload.fileName,
           label: extractDocumentBaseName(payload.fileName),
           sourceKind: payload.sourceKind || 'file',
@@ -108,6 +109,7 @@
               sourceProjectToken: candidate.sourceProjectToken,
               sourceProjectId: candidate.sourceProjectId,
               sourceSheetId: candidate.sourceSheetId,
+              isImportedSheet: candidate.isImportedSheet,
               runtimeProjectId: candidate.runtimeProjectId,
               sheetRuntimeId: candidate.sheetRuntimeId,
               deferredPayloadKey: candidate.deferredPayloadKey,
@@ -202,6 +204,28 @@
             }
           }
           const loaded = await loader(item);
+          if (loaded?.project && typeof loaded.project === 'object') {
+            const appended = await appendProjectPayloadAsOpenTab({
+              project: loaded.project,
+              parentProjectId,
+              fileName: loaded.fileName || DEFAULT_DOCUMENT_NAME,
+              unsaved: false,
+              source: source || 'open',
+              tabOptions,
+              sourceStorageAdapterId: loaded.sourceStorageAdapterId ?? null,
+              sourceKind: loaded.sourceKind ?? tabOptions?.sourceKind ?? 'unknown',
+              sourceProjectToken: loaded.sourceProjectToken ?? null,
+              lastSavedStorageAdapterId: loaded.lastSavedStorageAdapterId ?? null,
+              projectSaveHandleState: 'none',
+              isImportedSheet: loaded.isImportedSheet === true,
+            });
+            if (appended) {
+              openedCount += 1;
+              continue;
+            }
+            failedCount += 1;
+            continue;
+          }
           if (loaded === 'deferred') {
             // Loader declined to apply into the active document because the
             // payload targets a different project/sheet. Create a new sheet from
@@ -557,6 +581,7 @@
     sourceProjectToken = null,
     lastSavedStorageAdapterId = null,
     projectSaveHandleState = 'none',
+    isImportedSheet = false,
   } = {}) {
     if (!project || typeof project !== 'object') {
       return null;
@@ -579,6 +604,7 @@
       sourceProjectToken,
       lastSavedStorageAdapterId,
       projectSaveHandleState,
+      isImportedSheet,
     });
     if (!nextTab) {
       return null;
@@ -941,7 +967,13 @@
         }
         return await openDocumentsAsProjectTabs(
           handles,
-          async handle => loadDocumentFromHandle(handle, { suppressAutosaveStatus: true }),
+          async handle => {
+            if (sheetAddKind === 'image' || sheetAddKind === 'gif') {
+              const file = await handle.getFile();
+              return await buildImageSheetImportCandidate(file, sheetAddKind);
+            }
+            return await loadDocumentFromHandle(handle, { suppressAutosaveStatus: true });
+          },
           {
             source: 'open-picker',
             tabOptions: sheetAddKind === 'image' || sheetAddKind === 'gif'
@@ -1020,6 +1052,9 @@
           const opened = await openDocumentsAsProjectTabs(
             files,
             async file => {
+              if (sheetAddKind === 'image' || sheetAddKind === 'gif') {
+                return await buildImageSheetImportCandidate(file, sheetAddKind);
+              }
               if (isImportableImageFile(file)) {
                 return await loadDocumentFromImageFile(file);
               }
@@ -1155,11 +1190,31 @@
     }
   }
 
-  async function loadDocumentFromImageFile(file) {
-    if (!ensureCurrentClientCanReplaceActiveProject()) {
+  async function buildImageSheetImportCandidate(file, kind = 'image') {
+    const project = await loadDocumentFromImageFile(file, { applyToRuntime: false });
+    if (!project || typeof project !== 'object') {
       return false;
     }
-    deactivateQrEditMode();
+    return {
+      project,
+      fileName: normalizeDocumentName(typeof file?.name === 'string' ? file.name : DEFAULT_DOCUMENT_NAME),
+      sourceStorageAdapterId: null,
+      sourceKind: kind === 'gif' ? 'import-gif' : 'import-image',
+      sourceProjectToken: typeof createProjectPersistenceToken === 'function'
+        ? createProjectPersistenceToken(kind === 'gif' ? 'gif' : 'image')
+        : null,
+      lastSavedStorageAdapterId: null,
+      isImportedSheet: true,
+    };
+  }
+
+  async function loadDocumentFromImageFile(file, { applyToRuntime = true } = {}) {
+    if (applyToRuntime && !ensureCurrentClientCanReplaceActiveProject()) {
+      return false;
+    }
+    if (applyToRuntime) {
+      deactivateQrEditMode();
+    }
     const closeLoading = beginBlockingGlobalLoading(
       localizeText('画像を読み込み中…', 'Loading image...'),
       { immediate: true }
@@ -1232,7 +1287,10 @@
     const documentName = normalizeDocumentName(typeof file?.name === 'string' ? file.name : state.documentName);
     const activeToolGroup = TOOL_GROUPS[state.activeToolGroup] ? state.activeToolGroup : (TOOL_TO_GROUP[state.tool] || 'pen');
 
-    setGlobalLoadingIndicatorLabel(localizeText('プロジェクトへ反映中…', 'Applying project...'));
+    setGlobalLoadingIndicatorLabel(localizeText(
+      applyToRuntime ? 'プロジェクトへ反映中…' : 'シートを準備中…',
+      applyToRuntime ? 'Applying project...' : 'Preparing sheet...'
+    ));
     const snapshot = {
       width,
       height,
@@ -1270,6 +1328,10 @@
       activeLeftTab: state.activeLeftTab ?? 'tools',
       activeRightTab: state.activeRightTab ?? 'frames',
     };
+
+    if (!applyToRuntime) {
+      return buildPackagedProjectPayload(snapshot, { includeSheets: false });
+    }
 
     applyHistorySnapshot(snapshot, { forcePalettePresetSync: true, preservePersonalPreferences: false });
     history.past = [];
