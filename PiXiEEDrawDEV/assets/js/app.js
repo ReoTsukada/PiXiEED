@@ -5,6 +5,8 @@
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
   const APP_BUILD_VERSION = '2026.07.10-pixiedraw-ads-restore1';
+  window.__PIXIEEDRAW_BUILD_ID__ = APP_BUILD_VERSION;
+  window.__PIXIEEDRAW_BUILD_REVISION__ = 2026071100;
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECTS_ENABLED = false;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
