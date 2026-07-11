@@ -15,6 +15,10 @@ assert.match(importSource, /createOpenProjectTabId\(\)/);
 assert.match(importSource, /projectSaveHandleState: 'none'/);
 assert.match(importSource, /runtimeProjectId: createProjectPersistenceToken\?\.\('import-runtime-project'\)/);
 assert.match(importSource, /deferredPayloadKey: createProjectPersistenceToken\?\.\('import-deferred'\)/);
+assert.match(importSource, /async function buildImageSheetImportCandidate\(file, kind = 'image'\)/);
+assert.match(importSource, /loadDocumentFromImageFile\(file, \{ applyToRuntime: false \}\)/);
+assert.match(importSource, /if \(!applyToRuntime\) \{\s*return buildPackagedProjectPayload\(snapshot, \{ includeSheets: false \}\);/);
+assert.match(importSource, /isImportedSheet: loaded\.isImportedSheet === true/);
 assert.match(switchSource, /target\?\.deferredProjectPayload && typeof target\.deferredProjectPayload === 'object'/);
 assert.match(packageSource, /tab\?\.deferredProjectPayload && typeof tab\.deferredProjectPayload === 'object'/);
 
@@ -50,8 +54,8 @@ assert.equal(first.projectSaveHandle, null);
 assert.equal(first.projectSaveHandleMeta, null);
 
 const importedTabs = [
-  { id: first.id, projectId: 'current-project', project: first.project, deferredProjectPayload: first.project, deferredPayloadKey: first.deferredPayloadKey, runtimeProjectId: first.runtimeProjectId, residentProjectLoaded: true },
-  { id: second.id, projectId: 'current-project', project: second.project, deferredProjectPayload: second.project, deferredPayloadKey: second.deferredPayloadKey, runtimeProjectId: second.runtimeProjectId, residentProjectLoaded: true },
+  { id: first.id, projectId: 'current-project', project: first.project, deferredProjectPayload: first.project, deferredPayloadKey: first.deferredPayloadKey, runtimeProjectId: first.runtimeProjectId, isImportedSheet: true, residentProjectLoaded: true },
+  { id: second.id, projectId: 'current-project', project: second.project, deferredProjectPayload: second.project, deferredPayloadKey: second.deferredPayloadKey, runtimeProjectId: second.runtimeProjectId, isImportedSheet: true, residentProjectLoaded: true },
 ];
 assert.notEqual(importedTabs[0].id, importedTabs[1].id);
 assert.ok(importedTabs.every(tab => tab.project && tab.residentProjectLoaded));
@@ -62,7 +66,7 @@ assert.equal(new Set(importedTabs.map(tab => tab.deferredPayloadKey)).size, 2, '
 loadLocalJournal();
 const journal = window.PiXiEEDrawModules.localProjectJournalUtils.createLocalProjectJournalUtils();
 const lightweight = journal.createLightweightTabState(importedTabs[0]);
-assert.equal(lightweight.project, null, 'lightweight tab releases the resident field');
+assert.equal(lightweight.project, first.project, 'imported lightweight tab retains the resident field until a sheet-owned persistence store exists');
 assert.equal(lightweight.deferredProjectPayload, first.project, 'lightweight tab retains its sheet-owned restore payload');
 assert.equal(lightweight.deferredPayloadKey, first.deferredPayloadKey, 'lightweight tab retains its sheet-owned restore key');
 
