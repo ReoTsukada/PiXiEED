@@ -280,6 +280,17 @@
 
   const BUILTIN_UPDATE_HISTORY_ENTRIES = Object.freeze([
     Object.freeze({
+      id: '2026-07-11-touch-zoom-pan-immediate',
+      at: '2026-07-11T23:30:00+09:00',
+      title: 'スマホのズーム・パン操作を改善',
+      published: true,
+      details: Object.freeze([
+        '2本指ズーム/パンを少ない指の移動でも認識するよう、操作開始の感度を改善。',
+        '指のmove入力をフレーム待ちせず即時反映し、ゆっくり動かした時の段付きやカクつきを軽減。',
+        '最初の判定では2本の指の入力を確認し、パンとズームの誤認を抑えながら反応を早めた。',
+      ]),
+    }),
+    Object.freeze({
       id: '2026-07-09-export-fix-apology',
       at: '2026-07-09T15:26:00+09:00',
       title: '保存/出力不具合の修正とお詫び',
