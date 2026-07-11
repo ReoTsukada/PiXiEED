@@ -885,6 +885,20 @@
       updateMemoryStatus();
       setTrackedProjectDotBaseline(snapshot, dotStats);
       resetOpenedDocumentViewport({ defer: true });
+      if (typeof updateActiveProjectPersistenceState === 'function') {
+        updateActiveProjectPersistenceState({
+          sourceStorageAdapterId: null,
+          sourceKind: 'autosave',
+          sourceProjectToken: typeof createProjectPersistenceToken === 'function'
+            ? createProjectPersistenceToken('autosave')
+            : null,
+          lastSavedStorageAdapterId: null,
+          projectSaveHandleState: 'none',
+        }, {
+          render: false,
+          log: true,
+        });
+      }
       return true;
     } catch (error) {
       autosaveRestoring = false;
