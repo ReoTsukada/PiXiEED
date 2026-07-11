@@ -1,0 +1,8 @@
+{
+  "buildId": "2026.07.11.1",
+  "buildRevision": 2026071101,
+  "releasedAt": "2026-07-11T21:00:00+09:00",
+  "updateMode": "optional",
+  "minimumCompatibleBuild": "2026.07.01.1",
+  "message": "シート操作と保存機能を改善しました"
+}
