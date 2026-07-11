@@ -29,8 +29,9 @@ const activateFunction = workflowSource.slice(
   workflowSource.indexOf('async function activateOpenProjectTab'),
   workflowSource.indexOf('async function closeOpenProjectTab')
 );
-assert.match(activateFunction, /openProjectTabBusy = true;\s*renderOpenProjectTabs\(\);\s*try \{/);
-assert.match(activateFunction, /finally \{\s*guardedProjectTabIds\.forEach\(releaseOpenProjectTabProjectWriteGuard\);\s*openProjectTabBusy = false;\s*renderOpenProjectTabs\(\);/);
+assert.match(activateFunction, /openProjectTabBusy = true;\s*renderOpenProjectTabs\(\);\s*const guardedProjectTabIds = new Set\(\);\s*try \{/);
+assert.match(activateFunction, /for \(const projectTabId of guardedProjectTabIds\) \{\s*try \{\s*releaseOpenProjectTabProjectWriteGuard\(projectTabId\);/);
+assert.match(activateFunction, /finally \{\s*openProjectTabBusy = false;\s*renderOpenProjectTabs\(\);/);
 assert.equal((activateFunction.match(/\[sheet-switch-debug:start\]/g) || []).length, 1, 'one activation path emits one start diagnostic');
 
 console.log('PiXiEEDraw DEV Phase 5-B3 tab availability and image payload dependency checks passed');
