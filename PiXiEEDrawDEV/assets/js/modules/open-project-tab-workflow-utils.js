@@ -554,12 +554,16 @@
         hasDocument: Boolean(target?.project?.document && typeof target.project.document === 'object'),
         hasCanvases: Array.isArray(target?.project?.document?.canvases),
         hasFrames: Array.isArray(target?.project?.document?.frames),
+        runtimeProjectId: target?.runtimeProjectId || '',
+        deferredPayloadKey: target?.deferredPayloadKey || target?.sheetPersistenceKey || '',
       },
     });
     const targetProjectId = normalizeAutosaveProjectId(target?.projectId || '');
     let targetProjectPayload = target?.project && typeof target.project === 'object'
       ? target.project
-      : null;
+      : (target?.deferredProjectPayload && typeof target.deferredProjectPayload === 'object'
+        ? target.deferredProjectPayload
+        : null);
     const guardedProjectTabIds = Array.from(new Set([previousActiveId, target.id].filter(Boolean)));
     guardedProjectTabIds.forEach(retainOpenProjectTabProjectWriteGuard);
     if (!skipPersistCurrent && previousActiveId && findOpenProjectTabIndex(previousActiveId) >= 0) {
@@ -595,6 +599,7 @@
         fromSheetId: previousActiveId,
         toSheetId: targetId,
         projectId: targetProjectId,
+        deferredPayloadKey: target?.deferredPayloadKey || target?.sheetPersistenceKey || '',
         reconstructed: Boolean(reconstructed && typeof reconstructed === 'object'),
         hasTargetProjectPayload: Boolean(targetProjectPayload && typeof targetProjectPayload === 'object'),
         reconstructedActiveSheetId: typeof reconstructed?.activeSheetId === 'string' ? reconstructed.activeSheetId : '',
@@ -684,9 +689,14 @@
       } else {
         resetDocumentUnsavedChanges();
       }
+      // Imported sheets own their history. Do not replay the collection-wide
+      // recent journal into a copied sheet after it has been restored.
+      const sheetHistoryOwnerId = target?.sourceProjectId || target?.sourceSheetId
+        ? (target?.historyOwnerId || target?.runtimeProjectId || '')
+        : '';
       hydrateActiveLocalProjectJournalFromRecentEntry?.(
-        recentProjectsCache.get(targetProjectId) || null,
-        targetProjectId
+        sheetHistoryOwnerId ? null : (recentProjectsCache.get(targetProjectId) || null),
+        sheetHistoryOwnerId || targetProjectId
       );
       openProjectTabs.forEach((tab, index) => {
         if (!tab || tab.id === target.id) {
@@ -709,6 +719,8 @@
         activeDocumentName: state.documentName || '',
         targetSource: target?.source || '',
         targetFileName: target?.fileName || '',
+        runtimeProjectId: target?.runtimeProjectId || '',
+        deferredPayloadKey: target?.deferredPayloadKey || target?.sheetPersistenceKey || '',
       });
       renderOpenProjectTabs();
       if (announce) {
