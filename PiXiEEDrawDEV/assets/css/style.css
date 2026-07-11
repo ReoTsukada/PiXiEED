@@ -5127,21 +5127,17 @@ input[type='range']::-moz-focus-outer {
   margin-bottom: 8px;
 }
 
-#pixieedrawUpdateNotice {
-  position: fixed;
+.pixieedraw-update-dialog {
   z-index: 10000;
-  top: 12px;
-  left: 50%;
+  max-width: min(92vw, 440px);
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  max-width: min(92vw, 620px);
   padding: 10px 12px;
   border: 1px solid rgba(var(--ui-rgb-focus), .65);
   border-radius: 10px;
   background: var(--panel-bg, #fff);
   box-shadow: 0 8px 24px rgba(0,0,0,.2);
-  transform: translateX(-50%);
 }
 
 .project-file-menu__items {
