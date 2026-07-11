@@ -316,6 +316,9 @@
   function setActiveTool(tool, buttons = toolButtons, options = {}) {
     const { persist = true, skipGroupUpdate = false } = options;
     if (!tool) return;
+    if (pointerState.active && pointerState.tool === 'pan' && pointerState.panMode === 'multiTouch') {
+      cancelActiveViewportGesture('tool-change');
+    }
     // Prevent active tool changes for spectators, except allowing 'pan'
     if (isMultiSpectatorMode() && tool !== 'pan') {
       setMultiStatus(localizeText('視聴モードではツールを切替できません', 'Cannot switch tools in viewer mode'), 'warn');
