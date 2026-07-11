@@ -1080,6 +1080,7 @@
         touchGestureStartPointers: null,
         touchGesturePointerIds: [],
         touchGestureStartedAt: 0,
+        touchGestureMovedPointerIds: null,
         touchGestureStartCentroid: null,
         touchGestureStartDistance: null,
         touchGestureStartScale: null,
