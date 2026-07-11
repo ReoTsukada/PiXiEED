@@ -139,7 +139,11 @@
       }
       exportAdRequested = true;
       try {
-        (window.adsbygoogle = window.adsbygoogle || []).push({});
+        const result = window.__PIXIEEDRAW_RENDER_AD_SLOT__?.(adSlot, {
+          owner: 'export-dialog',
+          reason: 'dialog-open',
+        });
+        if (!result?.ok) throw new Error(result?.reason || 'ERR_AD_SLOT_RENDER_FAILED');
         adSlot.dataset.loaded = '1';
       } catch (error) {
         exportAdRequested = false;
@@ -226,7 +230,11 @@
       }
       shortcutHelpAdRequested = true;
       try {
-        (window.adsbygoogle = window.adsbygoogle || []).push({});
+        const result = window.__PIXIEEDRAW_RENDER_AD_SLOT__?.(adSlot, {
+          owner: 'shortcut-help-dialog',
+          reason: 'dialog-open',
+        });
+        if (!result?.ok) throw new Error(result?.reason || 'ERR_AD_SLOT_RENDER_FAILED');
         adSlot.dataset.loaded = '1';
       } catch (error) {
         shortcutHelpAdRequested = false;
@@ -284,7 +292,11 @@
       }
       updateHistoryAdRequested = true;
       try {
-        (window.adsbygoogle = window.adsbygoogle || []).push({});
+        const result = window.__PIXIEEDRAW_RENDER_AD_SLOT__?.(adSlot, {
+          owner: 'update-history-dialog',
+          reason: 'dialog-open',
+        });
+        if (!result?.ok) throw new Error(result?.reason || 'ERR_AD_SLOT_RENDER_FAILED');
         adSlot.dataset.loaded = '1';
       } catch (error) {
         updateHistoryAdRequested = false;
@@ -594,7 +606,11 @@
       }
       exportInterstitialAdRequested = true;
       try {
-        (window.adsbygoogle = window.adsbygoogle || []).push({});
+        const result = window.__PIXIEEDRAW_RENDER_AD_SLOT__?.(adSlot, {
+          owner: 'export-interstitial-dialog',
+          reason: 'dialog-open',
+        });
+        if (!result?.ok) throw new Error(result?.reason || 'ERR_AD_SLOT_RENDER_FAILED');
         adSlot.dataset.loaded = '1';
       } catch (error) {
         exportInterstitialAdRequested = false;
