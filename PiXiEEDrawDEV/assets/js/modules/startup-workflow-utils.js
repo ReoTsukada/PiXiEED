@@ -169,7 +169,7 @@
   }
 
   function queueNewProjectAdRender() {
-    if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) {
+    if (!window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.()) {
       return;
     }
     const dialog = dom.newProject?.dialog;
@@ -1112,7 +1112,7 @@
         slot,
       });
     });
-    if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) {
+    if (!window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.()) {
       adTargets.forEach(target => {
         if (target.container instanceof HTMLElement) {
           target.container.hidden = true;
