@@ -1081,6 +1081,8 @@
         touchGesturePointerIds: [],
         touchGestureStartedAt: 0,
         touchGestureMovedPointerIds: null,
+        touchGestureDecisionTimer: null,
+        touchGestureCaptureElement: null,
         touchGestureStartCentroid: null,
         touchGestureStartDistance: null,
         touchGestureStartScale: null,
