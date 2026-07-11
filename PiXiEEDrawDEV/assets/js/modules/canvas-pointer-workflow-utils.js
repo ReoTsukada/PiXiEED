@@ -31,6 +31,16 @@
 
     return ((scope) => {
       with (scope) {
+  const viewportGestureArbiter = window.PiXiEEDrawModules?.viewportGestureArbiterUtils || {};
+  const GestureMode = viewportGestureArbiter.GestureMode || Object.freeze({
+    IDLE: 'idle',
+    TOUCH_UNDECIDED: 'touch-undecided',
+    TOUCH_PAN: 'touch-pan',
+    TOUCH_ZOOM: 'touch-zoom',
+    CANCELLED_UNTIL_ALL_UP: 'cancelled-until-all-up',
+  });
+  const VIEWPORT_GESTURE_CONFIG = viewportGestureArbiter.VIEWPORT_GESTURE_CONFIG || {};
+
   function detachPointerListeners() {
     window.removeEventListener('pointermove', handlePointerMove);
     window.removeEventListener('pointerup', handlePointerUp);
@@ -51,6 +61,7 @@
   }
 
   function resetPointerState({ commitHistory: shouldCommit = false } = {}) {
+    resetExclusiveTouchGesture();
     if (pointerState.pointerId !== null) {
       const captureTarget = pointerState.panCaptureElement || pointerState.surface?.drawing || dom.canvases.drawing;
       if (captureTarget && typeof captureTarget.releasePointerCapture === 'function') {
@@ -101,6 +112,7 @@
   }
 
   function resetPointerStateForVirtualCursor() {
+    resetExclusiveTouchGesture();
     pointerState.active = false;
     pointerState.pointerId = null;
     pointerState.pendingCanvasSwitch = null;
@@ -267,6 +279,16 @@
     return Math.hypot(first.x - second.x, first.y - second.y);
   }
 
+  function getLockedTouchGestureMetrics() {
+    const ids = Array.isArray(pointerState.touchGesturePointerIds)
+      ? pointerState.touchGesturePointerIds
+      : [];
+    if (ids.length !== 2) return null;
+    const pointA = activeTouchPointers.get(ids[0]);
+    const pointB = activeTouchPointers.get(ids[1]);
+    return viewportGestureArbiter.getTwoPointMetrics?.(pointA, pointB) || null;
+  }
+
   function captureTouchGestureStartPointers() {
     if (activeTouchPointers.size < TOUCH_PAN_MIN_POINTERS) {
       return null;
@@ -329,7 +351,10 @@
     if (isMultiCanvasWorldLayoutActive() && typeof document.elementFromPoint === 'function') {
       surface = getCanvasInteractionSurfaceFromTarget(document.elementFromPoint(nextCentroid.x, nextCentroid.y));
     }
-    const focus = getCanvasFocusAt(nextCentroid.x, nextCentroid.y, { clampToCanvas: true, surface });
+    const focus = getCanvasFocusAt(nextCentroid.x, nextCentroid.y, {
+      allowOutsideCanvas: true,
+      surface,
+    });
     if (!focus) {
       return null;
     }
@@ -355,6 +380,108 @@
     if (resetPinchFocus) {
       pointerState.touchPinchFocus = getTouchPinchFocusForCentroid(centroid);
     }
+  }
+
+  function clearTouchGestureFrame() {
+    if (pointerState.touchGestureRafId !== null && pointerState.touchGestureRafId !== undefined) {
+      cancelAnimationFrame(pointerState.touchGestureRafId);
+    }
+    pointerState.touchGestureRafId = null;
+  }
+
+  function resetExclusiveTouchGesture({ waitForAllTouches = false } = {}) {
+    clearTouchGestureFrame();
+    pointerState.touchGestureMode = waitForAllTouches
+      ? GestureMode.CANCELLED_UNTIL_ALL_UP
+      : GestureMode.IDLE;
+    pointerState.touchGesturePointerIds = [];
+    pointerState.touchGestureStartedAt = 0;
+    pointerState.touchGestureStartCentroid = null;
+    pointerState.touchGestureStartDistance = null;
+    pointerState.touchGestureStartScale = null;
+    pointerState.touchGestureStartPan = null;
+    pointerState.touchPinchFocus = null;
+  }
+
+  function beginExclusiveTouchGesture(event) {
+    const ids = Array.from(activeTouchPointers.keys()).slice(0, 2);
+    if (ids.length !== 2) return false;
+    const metrics = viewportGestureArbiter.getTwoPointMetrics?.(
+      activeTouchPointers.get(ids[0]),
+      activeTouchPointers.get(ids[1])
+    );
+    if (!metrics) return false;
+    pointerState.touchGesturePointerIds = ids;
+    pointerState.touchGestureMode = GestureMode.TOUCH_UNDECIDED;
+    pointerState.touchGestureStartedAt = performance.now();
+    pointerState.touchGestureStartCentroid = metrics.centroid;
+    pointerState.touchGestureStartDistance = metrics.distance;
+    pointerState.touchGestureStartScale = Number(state.scale) || MIN_ZOOM_SCALE;
+    pointerState.touchGestureStartPan = { x: Number(state.pan.x) || 0, y: Number(state.pan.y) || 0 };
+    pointerState.touchPinchFocus = getTouchPinchFocusForCentroid(metrics.centroid);
+    pointerState.active = true;
+    pointerState.tool = 'pan';
+    pointerState.panMode = 'multiTouch';
+    pointerState.pointerId = null;
+    pointerState.panCaptureElement = null;
+    document.body.classList.add('is-pan-dragging');
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    return true;
+  }
+
+  function applyLatestExclusiveTouchGesture() {
+    const metrics = getLockedTouchGestureMetrics();
+    if (!metrics) return;
+    let mode = pointerState.touchGestureMode;
+    if (mode === GestureMode.TOUCH_UNDECIDED) {
+      const decision = viewportGestureArbiter.classifyTouchGesture?.({
+        startCentroid: pointerState.touchGestureStartCentroid,
+        startDistance: pointerState.touchGestureStartDistance,
+        currentCentroid: metrics.centroid,
+        currentDistance: metrics.distance,
+        elapsedMs: performance.now() - (Number(pointerState.touchGestureStartedAt) || performance.now()),
+        config: VIEWPORT_GESTURE_CONFIG,
+      });
+      mode = decision?.mode || mode;
+      if (mode === GestureMode.TOUCH_PAN || mode === GestureMode.TOUCH_ZOOM) {
+        // The arbiter locks ownership once. It never switches until every touch is up.
+        pointerState.touchGestureMode = mode;
+      }
+    }
+    if (mode === GestureMode.TOUCH_PAN) {
+      const targetPan = viewportGestureArbiter.calculateTouchPan?.(
+        pointerState.touchGestureStartPan,
+        pointerState.touchGestureStartCentroid,
+        metrics.centroid
+      );
+      if (!targetPan) return;
+      state.pan.x = Math.round(targetPan.x);
+      state.pan.y = Math.round(targetPan.y);
+      markViewportInteractionActivity();
+      applyViewportTransform();
+      return;
+    }
+    if (mode === GestureMode.TOUCH_ZOOM) {
+      const targetScale = viewportGestureArbiter.calculateTouchZoomScale?.(
+        pointerState.touchGestureStartScale,
+        pointerState.touchGestureStartDistance,
+        metrics.distance,
+        VIEWPORT_GESTURE_CONFIG
+      );
+      if (!Number.isFinite(targetScale)) return;
+      // setZoom may change pan only to preserve the fixed start anchor. Current
+      // centroid movement is intentionally never added as ordinary panning.
+      setZoom(normalizeZoomScale(targetScale, state.scale), pointerState.touchPinchFocus || undefined);
+    }
+  }
+
+  function scheduleExclusiveTouchGestureFrame() {
+    if (pointerState.touchGestureRafId !== null && pointerState.touchGestureRafId !== undefined) return;
+    pointerState.touchGestureRafId = requestAnimationFrame(() => {
+      pointerState.touchGestureRafId = null;
+      applyLatestExclusiveTouchGesture();
+    });
   }
 
   function startPanInteraction(event, { multiTouch = false, captureElement = dom.canvases.drawing } = {}) {
@@ -428,16 +555,34 @@
     pointerState.touchPinchStartDistance = null;
     pointerState.touchPinchStartScale = null;
     pointerState.touchPinchFocus = null;
-    pointerState.touchGestureMode = null;
+    resetExclusiveTouchGesture({ waitForAllTouches: activeTouchPointers.size > 0 });
     pointerState.touchGestureStartPointers = null;
     pointerState.startClient = null;
     pointerState.path = [];
     pointerState.drawPaletteIndex = null;
     pointerState.panCaptureElement = null;
     document.body.classList.remove('is-pan-dragging');
-    activeTouchPointers.clear();
     requestOverlayRender();
     scheduleSessionPersist({ includeSnapshots: false });
+  }
+
+  function cancelActiveViewportGesture(reason = 'cancel') {
+    clearTouchGestureFrame();
+    activeTouchPointers.clear();
+    if (pointerState.active && pointerState.tool === 'pan') {
+      finishPanInteraction();
+    } else if (pointerState.active) {
+      abortActivePointerInteraction({ commitHistory: false });
+      rollbackPendingHistory({ reRender: false });
+      clearSharedProjectInFlightStroke();
+    }
+    resetExclusiveTouchGesture();
+    releaseVirtualCursorPointer();
+    document.body.classList.remove('is-pan-dragging');
+    if (VIEWPORT_GESTURE_CONFIG.ENABLE_GESTURE_DEBUG_LOG) {
+      console.debug('[PiXiEEDraw gesture cancelled]', reason);
+    }
+    requestOverlayRender();
   }
 
   function handlePointerDown(event) {
@@ -515,6 +660,9 @@
 
     if (isTouch && hasActiveMultiTouch()) {
       event.preventDefault();
+      if (activeTouchPointers.size > TOUCH_PAN_MIN_POINTERS) {
+        return;
+      }
       clearPendingCanvasSwitchPointer({ detachListeners: true });
       releaseVirtualCursorPointer();
       if (pointerState.active && pointerState.tool !== 'pan') {
@@ -526,9 +674,7 @@
       }
       if (!pointerState.active || pointerState.tool !== 'pan' || pointerState.panMode !== 'multiTouch') {
         abortActivePointerInteraction();
-        startPanInteraction(event, { multiTouch: true });
-      } else {
-        refreshTouchPanBaseline();
+        beginExclusiveTouchGesture(event);
       }
       return;
     }
@@ -609,6 +755,11 @@
       }
       pointerState.surface = interactionSurface;
       startPanInteraction(event, { multiTouch: false, captureElement: interactionSurface?.drawing || dom.canvases.drawing });
+      return;
+    }
+    if (activeTool === 'zoom') {
+      // Reserved internal tool. Wheel and two-touch zoom remain handled by the
+      // viewport arbiter; no toolbar or one-pointer zoom gesture is exposed.
       return;
     }
 
@@ -916,92 +1067,13 @@
     if (pointerState.tool === 'pan') {
       if (pointerState.panMode === 'multiTouch') {
         event.preventDefault();
-        if (activeTouchPointers.size < TOUCH_PAN_MIN_POINTERS) {
+        if (pointerState.touchGestureMode === GestureMode.CANCELLED_UNTIL_ALL_UP) {
           return;
         }
-        if (!activeTouchPointers.has(event.pointerId)) {
+        if (!pointerState.touchGesturePointerIds?.includes(event.pointerId)) {
           return;
         }
-        if (!pointerState.touchPanStart) {
-          refreshTouchPanBaseline({ resetPinchFocus: true });
-        }
-        const centroid = getTouchCentroid();
-        if (!centroid || !pointerState.touchPanStart) {
-          return;
-        }
-        const baselineCentroid = pointerState.touchPanStart;
-        const dx = centroid.x - baselineCentroid.x;
-        const dy = centroid.y - baselineCentroid.y;
-        const movementAnalysis = getTouchGestureMovementAnalysis();
-        const panDistance = movementAnalysis
-          ? movementAnalysis.averageDistance
-          : Math.hypot(dx, dy);
-        const panGestureActive = Boolean(
-          movementAnalysis
-          && panDistance >= TOUCH_PAN_DEADZONE_PX
-          && movementAnalysis.normalizedDot >= TOUCH_PAN_DIRECTION_DOT_MIN
-          && movementAnalysis.balance >= TOUCH_PAN_VECTOR_BALANCE_MIN
-        );
-        let pinchGestureActive = false;
-        let pinchTargetScale = Number(state.scale) || MIN_ZOOM_SCALE;
-        let pinchFocus = getTouchPinchFocusForCentroid(centroid)
-          || pointerState.touchPinchFocus
-          || getTouchPinchFocusForCentroid(baselineCentroid);
-        let pinchStrength = 0;
-
-        const baselineDistance = Number(pointerState.touchPinchStartDistance);
-        const nextDistance = Number(getTouchPointerDistance());
-        const baselineScale = Number(pointerState.touchPinchStartScale) || Number(state.scale) || MIN_ZOOM_SCALE;
-        if (Number.isFinite(baselineDistance) && baselineDistance > 0 && Number.isFinite(nextDistance) && nextDistance > 0) {
-          const rawRatio = nextDistance / baselineDistance;
-          const cappedRatio = clamp(
-            rawRatio,
-            1 / TOUCH_PINCH_MAX_GESTURE_RATIO,
-            TOUCH_PINCH_MAX_GESTURE_RATIO
-          );
-          const ratioDelta = Math.abs(cappedRatio - 1);
-          const distanceDelta = Math.abs(nextDistance - baselineDistance);
-          pinchGestureActive =
-            ratioDelta >= TOUCH_PINCH_DEADZONE_RATIO &&
-            distanceDelta >= TOUCH_PINCH_DEADZONE_PX;
-          pinchStrength = Math.min(
-            ratioDelta / Math.max(TOUCH_PINCH_DEADZONE_RATIO, Number.EPSILON),
-            distanceDelta / Math.max(TOUCH_PINCH_DEADZONE_PX, Number.EPSILON)
-          );
-          const amplifiedRatio = 1 + ((cappedRatio - 1) * TOUCH_PINCH_SENSITIVITY);
-          pinchTargetScale = normalizeZoomScale(
-            baselineScale * Math.max(TOUCH_PINCH_MIN_RATIO, amplifiedRatio),
-            Number(state.scale) || baselineScale
-          );
-        }
-
-        if (!pointerState.touchGestureMode && (panGestureActive || pinchGestureActive)) {
-          pointerState.touchGestureMode = 'transform';
-        }
-
-        if (!pointerState.touchGestureMode) {
-          // Keep virtual cursor stable during two-finger pan/zoom gestures.
-          // Updating from each touch move causes unexpected cursor warps.
-          return;
-        }
-
-        if (pinchGestureActive) {
-          if (pinchFocus) {
-            pointerState.touchPinchFocus = pinchFocus;
-          }
-          if (Math.abs(pinchTargetScale - (Number(state.scale) || MIN_ZOOM_SCALE)) >= ZOOM_EPSILON) {
-            setZoom(pinchTargetScale, pinchFocus || undefined);
-          }
-        }
-        if (panGestureActive || !pinchGestureActive) {
-          state.pan.x = Math.round((Number(state.pan.x) || 0) + dx);
-          state.pan.y = Math.round((Number(state.pan.y) || 0) + dy);
-        }
-        markViewportInteractionActivity();
-        const clampResult = applyViewportTransform();
-        refreshTouchPanBaseline({
-          resetPinchFocus: Boolean(clampResult?.clampedX || clampResult?.clampedY || pinchGestureActive),
-        });
+        scheduleExclusiveTouchGestureFrame();
         return;
       }
       if (event.pointerId !== pointerState.pointerId) return;
@@ -1084,6 +1156,28 @@
 
   function handlePointerUp(event) {
     markSaveInteractionActivity();
+    if (
+      event.pointerType === 'touch'
+      && pointerState.active
+      && pointerState.tool === 'pan'
+      && pointerState.panMode === 'multiTouch'
+    ) {
+      const wasGesturePointer = pointerState.touchGesturePointerIds?.includes(event.pointerId);
+      if (wasGesturePointer) {
+        applyLatestExclusiveTouchGesture();
+      }
+      removeTouchPointer(event);
+      if (!wasGesturePointer) {
+        return;
+      }
+      if (activeTouchPointers.size > 0) {
+        clearTouchGestureFrame();
+        pointerState.touchGestureMode = GestureMode.CANCELLED_UNTIL_ALL_UP;
+        return;
+      }
+      finishPanInteraction();
+      return;
+    }
     if (event.pointerType === 'touch') {
       removeTouchPointer(event);
     }
@@ -1294,6 +1388,21 @@
 
   function handlePointerCancel(event) {
     markSaveInteractionActivity();
+    if (
+      event.pointerType === 'touch'
+      && pointerState.active
+      && pointerState.tool === 'pan'
+      && pointerState.panMode === 'multiTouch'
+    ) {
+      removeTouchPointer(event);
+      clearTouchGestureFrame();
+      if (activeTouchPointers.size > 0) {
+        pointerState.touchGestureMode = GestureMode.CANCELLED_UNTIL_ALL_UP;
+      } else {
+        finishPanInteraction();
+      }
+      return;
+    }
     if (event.pointerType === 'touch') {
       removeTouchPointer(event);
     }
@@ -4298,6 +4407,9 @@
         updateTouchPointer(event);
         if (hasActiveMultiTouch()) {
           event.preventDefault();
+          if (activeTouchPointers.size > TOUCH_PAN_MIN_POINTERS) {
+            return;
+          }
           releaseVirtualCursorPointer();
           if (pointerState.active && pointerState.tool !== 'pan') {
             const wasSelectionTransform = pointerState.tool === 'selectionTransform';
@@ -4308,9 +4420,7 @@
           }
           if (!pointerState.active || pointerState.tool !== 'pan' || pointerState.panMode !== 'multiTouch') {
             abortActivePointerInteraction();
-            startPanInteraction(event, { multiTouch: true });
-          } else {
-            refreshTouchPanBaseline();
+            beginExclusiveTouchGesture(event);
           }
           return;
         }
@@ -4411,6 +4521,7 @@
           resetPointerState,
           resetPointerStateForVirtualCursor,
           abortActivePointerInteraction,
+          cancelActiveViewportGesture,
           updateTouchPointer,
           hasActiveMultiTouch,
           shouldDeferInactiveCanvasPointerDown,
