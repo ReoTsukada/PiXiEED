@@ -31,6 +31,12 @@ assert.notEqual(first.project.document.canvases[0].frames[0].layers[0].indices, 
 first.project.document.canvases[0].frames[0].layers[0].indices[0] = 99;
 assert.equal(sourceProject.document.canvases[0].frames[0].layers[0].indices[0], 1);
 assert.equal(second.project.document.canvases[0].frames[0].layers[0].indices[0], 1);
+assert.notEqual(first.sheetRuntimeId, second.sheetRuntimeId);
+assert.notEqual(first.sheetPersistenceKey, second.sheetPersistenceKey);
+assert.notEqual(first.historyOwnerId, second.historyOwnerId);
+assert.notEqual(first.timelapseOwnerId, second.timelapseOwnerId);
+assert.equal(first.projectSaveHandle, null);
+assert.equal(first.projectSaveHandleMeta, null);
 
 const importedTabs = [
   { id: first.id, projectId: 'current-project', project: first.project, residentProjectLoaded: true },
