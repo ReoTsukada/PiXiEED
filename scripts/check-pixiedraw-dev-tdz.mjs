@@ -187,9 +187,29 @@ const focusListenerLine = lineOf("window.addEventListener('focus', handleMultiWi
 const stateNormalizersLine = lineOf('const stateNormalizers =');
 const documentModelLine = lineOf('const documentModel =');
 const initCallLine = lineOf('init();');
+const projectFileMenuBindLine = lineOf('bindProjectFileMenuOnce();');
+const projectPersistenceGetterLine = lineOf('function getActiveProjectPersistenceState(');
+const editableTargetLine = lineOf('function isEditableTarget(');
 
 requireBefore('init', 'init() call', initCallLine);
 requireBefore('runStartupTaskWithTimeout', 'init() call', initCallLine);
+
+// File menu startup invokes persistence rendering immediately and installs a
+// keydown callback that uses isEditableTarget. It must bind after both exist.
+if (!projectFileMenuBindLine || !projectPersistenceGetterLine || !editableTargetLine) {
+  failures.push('project file menu: required binding or dependency declaration is missing');
+} else {
+  if (projectFileMenuBindLine <= projectPersistenceGetterLine) {
+    failures.push(`project file menu: binding at line ${projectFileMenuBindLine} precedes getActiveProjectPersistenceState at line ${projectPersistenceGetterLine}`);
+  }
+  if (projectFileMenuBindLine <= editableTargetLine) {
+    failures.push(`project file menu: binding at line ${projectFileMenuBindLine} precedes isEditableTarget at line ${editableTargetLine}`);
+  }
+}
+const coreProjectActions = getFunctionBlock('bindCoreProjectActionButtons');
+if (/bindProjectFileMenuOnce\(\)/.test(coreProjectActions)) {
+  failures.push('project file menu: must not bind from early core project action setup');
+}
 
 const layoutViewportSource = fs.readFileSync(layoutViewportPath, 'utf8');
 if (/\basync\s+function\s+init\s*\(/.test(layoutViewportSource) || /\bfunction\s+init\s*\(/.test(layoutViewportSource)) {
