@@ -15,6 +15,7 @@
     getOpenProjectTabBusy,
     setOpenProjectTabBusy,
     getAutosaveProjectId,
+    getActiveProjectPersistenceState,
     getNewProjectPalettePresetId,
     setActiveOpenProjectTabId,
     setSuppressOpenProjectTabAutoInitialize,
@@ -81,12 +82,20 @@
         const packaged = createBlankSheetPackagedProject(sheetIndex);
         const fileName = normalizeDocumentName(packaged?.document?.documentName || localizeText(`シート ${sheetIndex}`, `Sheet ${sheetIndex}`));
         const autosaveProjectId = getAutosaveProjectId?.();
+        const activePersistenceState = typeof getActiveProjectPersistenceState === 'function'
+          ? (getActiveProjectPersistenceState() || null)
+          : null;
         const nextTab = createOpenProjectSheetTabFromPackagedProject({
           project: packaged,
           projectId: autosaveProjectId,
           fileName,
           label: extractDocumentBaseName(fileName),
           source: 'sheet',
+          sourceStorageAdapterId: activePersistenceState?.sourceStorageAdapterId ?? null,
+          sourceKind: activePersistenceState?.sourceKind ?? 'unknown',
+          sourceProjectToken: activePersistenceState?.sourceProjectToken ?? null,
+          lastSavedStorageAdapterId: activePersistenceState?.lastSavedStorageAdapterId ?? null,
+          projectSaveHandleState: activePersistenceState?.projectSaveHandleState ?? 'none',
         });
         if (!nextTab) {
           return false;
