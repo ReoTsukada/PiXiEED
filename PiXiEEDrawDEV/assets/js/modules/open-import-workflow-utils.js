@@ -63,6 +63,12 @@
           sourceKind: payload.sourceKind || 'file',
           sourceStorageAdapterId: payload.sourceStorageAdapterId || null,
           sourceProjectToken: payload.sourceProjectToken || createProjectPersistenceToken?.('file'),
+          sourceProjectId: payload.sourceProjectId || null,
+          sourceSheetId: payload.sourceSheetId || null,
+          sheetRuntimeId: createProjectPersistenceToken?.('import-runtime'),
+          sheetPersistenceKey: createProjectPersistenceToken?.('import-persistence'),
+          historyOwnerId: createProjectPersistenceToken?.('import-history'),
+          timelapseOwnerId: createProjectPersistenceToken?.('import-timelapse'),
         }));
         const validation = transactionUtils.validateCandidates(candidates, {
           existingSheetIds: openProjectTabs.map(tab => tab?.id || ''),
@@ -87,6 +93,12 @@
               sourceStorageAdapterId: candidate.sourceStorageAdapterId,
               sourceKind: candidate.sourceKind,
               sourceProjectToken: candidate.sourceProjectToken,
+              sourceProjectId: candidate.sourceProjectId,
+              sourceSheetId: candidate.sourceSheetId,
+              sheetRuntimeId: candidate.sheetRuntimeId,
+              sheetPersistenceKey: candidate.sheetPersistenceKey,
+              historyOwnerId: candidate.historyOwnerId,
+              timelapseOwnerId: candidate.timelapseOwnerId,
               lastSavedStorageAdapterId: candidate.sourceStorageAdapterId,
               projectSaveHandleState: 'none',
               projectSaveHandle: null,
@@ -444,6 +456,8 @@
         unsaved: Boolean(item.unsaved),
         sourceStorageAdapterId: item.sourceStorageAdapterId || null,
         sourceKind: item.sourceKind || 'unknown',
+        sourceProjectId: item.projectId || item.sourceProjectId || item.id || null,
+        sourceSheetId: item.sourceSheetId || item.sheetId || null,
         sourceProjectToken: item.sourceProjectToken || (typeof createProjectPersistenceToken === 'function'
           ? createProjectPersistenceToken(item.sourceKind || 'unknown')
           : null),
@@ -480,6 +494,8 @@
             unsaved: false,
             sourceStorageAdapterId: parsedResult?.adapterId || null,
             sourceKind: 'file',
+            sourceProjectId: null,
+            sourceSheetId: typeof parsed.activeSheetId === 'string' ? parsed.activeSheetId : null,
             sourceProjectToken: typeof createProjectPersistenceToken === 'function'
               ? createProjectPersistenceToken('file')
               : null,
@@ -499,6 +515,8 @@
         unsaved: false,
         sourceStorageAdapterId: null,
         sourceKind: 'file',
+        sourceProjectId: null,
+        sourceSheetId: typeof parsed.activeSheetId === 'string' ? parsed.activeSheetId : null,
         sourceProjectToken: typeof createProjectPersistenceToken === 'function'
           ? createProjectPersistenceToken('file')
           : null,
