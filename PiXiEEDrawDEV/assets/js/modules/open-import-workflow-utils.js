@@ -47,7 +47,16 @@
     try {
       const targets = queue;
       const truncatedCount = 0;
-      await persistActiveOpenProjectTab({ flushAutosave: true });
+      // The current sheet becomes inactive after this atomic append. Retain
+      // its resident payload until the completed multi-sheet checkpoint can
+      // safely become the deferred restore source.
+      const persistedCurrentSheet = await persistActiveOpenProjectTab({
+        flushAutosave: true,
+        retainProjectPayload: true,
+      });
+      if (!persistedCurrentSheet) {
+        return false;
+      }
       const parentProjectId = normalizeAutosaveProjectId(autosaveProjectId || '') || createAutosaveProjectId();
       setActiveAutosaveProjectId(parentProjectId, { persist: false });
       const directPayloads = await Promise.all(targets.map(item => readProjectPayloadFromOpenItem(item)));
