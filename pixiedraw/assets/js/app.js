@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.07.11-touch-immediate-v2';
+  const APP_BUILD_VERSION = '2026.07.11-touch-arbiter-v3';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECTS_ENABLED = false;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
@@ -17142,7 +17142,7 @@
       dom.canvasViewport.addEventListener('pointerleave', handleViewportPointerLeave);
     }
     if (gestureSurface) {
-      gestureSurface.addEventListener('pointerdown', handleViewportPointerDown, { passive: false });
+      gestureSurface.addEventListener('pointerdown', handleViewportPointerDown, { passive: false, capture: true });
       gestureSurface.addEventListener('pointermove', handleViewportPointerMove, { passive: false });
       gestureSurface.addEventListener('pointerup', handleViewportPointerUp, { passive: false });
       gestureSurface.addEventListener('pointercancel', handleViewportPointerCancel, { passive: false });
