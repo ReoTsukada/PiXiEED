@@ -391,6 +391,23 @@
 
   function resetExclusiveTouchGesture({ waitForAllTouches = false } = {}) {
     clearTouchGestureFrame();
+    if (pointerState.touchGestureDecisionTimer !== null && pointerState.touchGestureDecisionTimer !== undefined) {
+      window.clearTimeout(pointerState.touchGestureDecisionTimer);
+    }
+    pointerState.touchGestureDecisionTimer = null;
+    const captureElement = pointerState.touchGestureCaptureElement;
+    if (captureElement && typeof captureElement.releasePointerCapture === 'function') {
+      (pointerState.touchGesturePointerIds || []).forEach(pointerId => {
+        try {
+          if (!captureElement.hasPointerCapture || captureElement.hasPointerCapture(pointerId)) {
+            captureElement.releasePointerCapture(pointerId);
+          }
+        } catch (_error) {
+          // Pointer may already have ended or been cancelled.
+        }
+      });
+    }
+    pointerState.touchGestureCaptureElement = null;
     pointerState.touchGestureMode = waitForAllTouches
       ? GestureMode.CANCELLED_UNTIL_ALL_UP
       : GestureMode.IDLE;
@@ -421,6 +438,17 @@
     pointerState.touchGestureStartScale = Number(state.scale) || MIN_ZOOM_SCALE;
     pointerState.touchGestureStartPan = { x: Number(state.pan.x) || 0, y: Number(state.pan.y) || 0 };
     pointerState.touchPinchFocus = getTouchPinchFocusForCentroid(metrics.centroid);
+    const captureElement = dom.canvasViewport instanceof HTMLElement ? dom.canvasViewport : null;
+    pointerState.touchGestureCaptureElement = captureElement;
+    if (captureElement && typeof captureElement.setPointerCapture === 'function') {
+      ids.forEach(pointerId => {
+        try {
+          captureElement.setPointerCapture(pointerId);
+        } catch (_error) {
+          // Continue with window listeners when capture is unavailable.
+        }
+      });
+    }
     pointerState.active = true;
     pointerState.tool = 'pan';
     pointerState.panMode = 'multiTouch';
@@ -1113,7 +1141,19 @@
         if (pointerState.touchGestureMode === GestureMode.TOUCH_UNDECIDED) {
           pointerState.touchGestureMovedPointerIds?.add(event.pointerId);
           if ((pointerState.touchGestureMovedPointerIds?.size || 0) < 2) {
+            if (pointerState.touchGestureDecisionTimer === null || pointerState.touchGestureDecisionTimer === undefined) {
+              // Give the other pointer one brief chance to report its move. If
+              // it stays still (a common pinch), still classify this gesture.
+              pointerState.touchGestureDecisionTimer = window.setTimeout(() => {
+                pointerState.touchGestureDecisionTimer = null;
+                applyLatestExclusiveTouchGesture();
+              }, 16);
+            }
             return;
+          }
+          if (pointerState.touchGestureDecisionTimer !== null && pointerState.touchGestureDecisionTimer !== undefined) {
+            window.clearTimeout(pointerState.touchGestureDecisionTimer);
+            pointerState.touchGestureDecisionTimer = null;
           }
         }
         scheduleExclusiveTouchGestureFrame();
