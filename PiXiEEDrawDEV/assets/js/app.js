@@ -734,6 +734,7 @@
     UNIFIED_LEFT_TOOLS_COLOR_MODE,
     DESKTOP_RIGHT_TOOL_RAIL_MODE,
     INLINE_GUIDES_STORAGE_KEY,
+    INTERNAL_TOOL_DEFINITIONS = Object.freeze({}),
   } = toolActionStaticConfig;
   const toolbarStaticConfig = window.PiXiEEDrawModules?.uiStaticConfig?.createToolbarStaticConfig?.({
     TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE,
@@ -2550,6 +2551,8 @@
   set VOXEL_EXTENSION_LOCAL_CANVAS_MAX_COUNT(value) { VOXEL_EXTENSION_LOCAL_CANVAS_MAX_COUNT = value; },
   get abortActivePointerInteraction() { return abortActivePointerInteraction; },
   set abortActivePointerInteraction(value) { abortActivePointerInteraction = value; },
+  get cancelActiveViewportGesture() { return cancelActiveViewportGesture; },
+  set cancelActiveViewportGesture(value) { cancelActiveViewportGesture = value; },
   get activeCanvasSurface() { return activeCanvasSurface; },
   set activeCanvasSurface(value) { activeCanvasSurface = value; },
   get activeSharedProjectCanonicalCanvasId() { return activeSharedProjectCanonicalCanvasId; },
@@ -3102,6 +3105,8 @@
   set VOXEL_EXTENSION_DEFAULT_STATE(value) { VOXEL_EXTENSION_DEFAULT_STATE = value; },
   get bindCanvasSurfaceInteractionEvents() { return bindCanvasSurfaceInteractionEvents; },
   set bindCanvasSurfaceInteractionEvents(value) { bindCanvasSurfaceInteractionEvents = value; },
+  get cancelActiveViewportGesture() { return cancelActiveViewportGesture; },
+  set cancelActiveViewportGesture(value) { cancelActiveViewportGesture = value; },
   get clamp() { return clamp; },
   set clamp(value) { clamp = value; },
   get compactToolFlyoutAnchorButton() { return compactToolFlyoutAnchorButton; },
@@ -3589,6 +3594,8 @@
   set getProjectCanvasSurfaceByCanvasId(value) { getProjectCanvasSurfaceByCanvasId = value; },
   get getResolvedCanvasInteractionSurface() { return getResolvedCanvasInteractionSurface; },
   set getResolvedCanvasInteractionSurface(value) { getResolvedCanvasInteractionSurface = value; },
+  get getViewportVisibilityTargetSurface() { return getViewportVisibilityTargetSurface; },
+  set getViewportVisibilityTargetSurface(value) { getViewportVisibilityTargetSurface = value; },
   get getSelectionMoveContentMask() { return getSelectionMoveContentMask; },
   set getSelectionMoveContentMask(value) { getSelectionMoveContentMask = value; },
   get getSelectionMoveTransformState() { return getSelectionMoveTransformState; },
@@ -3813,6 +3820,10 @@
 
   function abortActivePointerInteraction(...args) {
     return canvasPointerWorkflowUtilsModule.abortActivePointerInteraction(...args);
+  }
+
+  function cancelActiveViewportGesture(...args) {
+    return canvasPointerWorkflowUtilsModule.cancelActiveViewportGesture(...args);
   }
 
   function handlePointerDown(...args) {
@@ -9766,6 +9777,9 @@
 
   function handleGlobalTouchPointerEnd(event) {
     if (event.pointerType !== 'touch') {
+      return;
+    }
+    if (pointerState.active && pointerState.tool === 'pan' && pointerState.panMode === 'multiTouch') {
       return;
     }
     activeTouchPointers.delete(event.pointerId);
@@ -16541,10 +16555,10 @@
     const fallbackTool = typeof fallback === 'string' ? fallback : 'pen';
     const rawTool = typeof value === 'string' ? value : fallbackTool;
     const mappedTool = LEGACY_TOOL_ALIASES[rawTool] || rawTool;
-    if (TOOL_ACTIONS.has(mappedTool) || TOOL_TO_GROUP[mappedTool]) {
+    if (TOOL_ACTIONS.has(mappedTool) || TOOL_TO_GROUP[mappedTool] || INTERNAL_TOOL_DEFINITIONS[mappedTool]) {
       return mappedTool;
     }
-    if (TOOL_ACTIONS.has(fallbackTool) || TOOL_TO_GROUP[fallbackTool]) {
+    if (TOOL_ACTIONS.has(fallbackTool) || TOOL_TO_GROUP[fallbackTool] || INTERNAL_TOOL_DEFINITIONS[fallbackTool]) {
       return fallbackTool;
     }
     return 'pen';
@@ -17874,6 +17888,13 @@
     }
     refreshViewportCursorStyle();
     updateMirrorGuideHandles();
+    if (!window.__PIXIEED_VIEWPORT_GESTURE_CANCEL_BOUND__) {
+      window.__PIXIEED_VIEWPORT_GESTURE_CANCEL_BOUND__ = true;
+      window.addEventListener('blur', () => cancelActiveViewportGesture('window-blur'));
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) cancelActiveViewportGesture('visibility-hidden');
+      });
+    }
   }
 
   function setupSelectionTransformMenu() {
@@ -17905,14 +17926,10 @@
   }
 
   function ensureCanvasWheelListener() {
-    getProjectCanvasSurfaceEntries().forEach(surface => {
-      const stack = surface?.stack;
-      if (!(stack instanceof HTMLElement) || stack.dataset.wheelBound === 'true') {
-        return;
-      }
-      stack.dataset.wheelBound = 'true';
-      stack.addEventListener('wheel', handleCanvasWheel, { passive: false });
-    });
+    const viewport = dom.canvasViewport;
+    if (!(viewport instanceof HTMLElement) || viewport.dataset.wheelBound === 'true') return;
+    viewport.dataset.wheelBound = 'true';
+    viewport.addEventListener('wheel', handleCanvasWheel, { passive: false });
   }
 
   function resizeCanvases({
