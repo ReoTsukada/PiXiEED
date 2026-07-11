@@ -1084,6 +1084,7 @@
         touchGestureDecisionTimer: null,
         touchGestureCaptureElement: null,
         suppressTouchCompatibilityUntil: 0,
+        touchToolBaseline: null,
         touchGestureStartCentroid: null,
         touchGestureStartDistance: null,
         touchGestureStartScale: null,
