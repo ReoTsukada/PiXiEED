@@ -28,6 +28,7 @@
       const id = input.id || context.createId?.() || `sheet-${Date.now()}`;
       return {
         kind,
+        isImportedSheet: input.isImportedSheet !== false && kind === 'file',
         id,
         project,
         fileName: input.fileName || project?.document?.documentName || '',
