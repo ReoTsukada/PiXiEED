@@ -12,6 +12,7 @@
     DEFAULT_CANVAS_SIZE,
     NEW_PROJECT_PALETTE_PRESET_DEFAULT,
     getOpenProjectTabBusy,
+    getProjectTabAddAvailability,
     setOpenProjectTabBusy,
     getAutosaveProjectId,
     getActiveOpenProjectTabId,
@@ -160,7 +161,12 @@
     }
 
     function openProjectTabAddPicker() {
-      if (getOpenProjectTabBusy?.()) {
+      const availability = getProjectTabAddAvailability?.() || {
+        enabled: !getOpenProjectTabBusy?.(),
+        reason: getOpenProjectTabBusy?.() ? 'command-in-flight' : 'ready',
+      };
+      if (availability.enabled === false) {
+        console.debug('[project-tab-add:blocked]', { reason: availability.reason || 'unavailable' });
         return;
       }
       if (addMenu) {
@@ -270,12 +276,17 @@
       const addButton = dom.projectTabsList?.querySelector?.('[data-project-tab-add="true"]') || null;
       const menuOpen = Boolean(addMenu?.isConnected);
       return {
+        reason: addButton?.dataset?.availabilityReason || (getOpenProjectTabBusy?.() ? 'command-in-flight' : 'ready'),
         disabled: Boolean(addButton?.disabled),
         ariaDisabled: addButton?.getAttribute?.('aria-disabled') || null,
         pointerEvents: addButton ? window.getComputedStyle(addButton).pointerEvents : null,
         menuOpen,
         inFlight: addMenuBusy,
         commandInFlight: Boolean(getOpenProjectTabBusy?.()),
+        imageImportInFlight: false,
+        gifImportInFlight: false,
+        projectImportInFlight: false,
+        pickerOpen: false,
         overlayCount: document.querySelectorAll('[data-sheet-add-overlay]').length,
         connected: Boolean(addButton?.isConnected),
       };
