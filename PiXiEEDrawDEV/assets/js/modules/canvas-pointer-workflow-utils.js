@@ -432,6 +432,34 @@
     return true;
   }
 
+  function promoteTouchPointersToExclusiveGesture(event) {
+    if (event?.pointerType !== 'touch' || activeTouchPointers.size < TOUCH_PAN_MIN_POINTERS) {
+      return false;
+    }
+    event.preventDefault?.();
+    event.stopPropagation?.();
+    if (activeTouchPointers.size > TOUCH_PAN_MIN_POINTERS) {
+      return true;
+    }
+    clearPendingCanvasSwitchPointer({ detachListeners: true });
+    releaseVirtualCursorPointer();
+    if (pointerState.active && !(pointerState.tool === 'pan' && pointerState.panMode === 'multiTouch')) {
+      const wasSelectionTransform = pointerState.tool === 'selectionTransform';
+      abortActivePointerInteraction({ commitHistory: false });
+      if (!wasSelectionTransform) {
+        // Restore the pixels from before the one-pointer tool interaction. This
+        // removes a pen/eraser dot already applied before the second touch.
+        rollbackPendingHistory();
+      }
+      clearSharedProjectInFlightStroke();
+    }
+    if (!pointerState.active || pointerState.tool !== 'pan' || pointerState.panMode !== 'multiTouch') {
+      abortActivePointerInteraction({ commitHistory: false });
+      beginExclusiveTouchGesture(event);
+    }
+    return true;
+  }
+
   function applyLatestExclusiveTouchGesture() {
     const metrics = getLockedTouchGestureMetrics();
     if (!metrics) return;
@@ -593,6 +621,15 @@
     const activeCanvasIdBeforeDown = getActiveProjectCanvasDocument()?.id || '';
     const requestedCanvasId = interactionSurface?.canvasDocId || '';
     const isTouch = event.pointerType === 'touch';
+    if (
+      isTouch
+      && pointerState.active
+      && pointerState.tool === 'pan'
+      && pointerState.panMode === 'multiTouch'
+    ) {
+      event.preventDefault();
+      return;
+    }
     const shouldDeferInactiveCanvasSwitch = shouldDeferInactiveCanvasPointerDown(
       event,
       requestedCanvasId,
@@ -4380,6 +4417,15 @@
       || activeTool === 'selectSame'
       || activeTool === 'move'
       || activeTool === 'selectionTransform';
+
+    // Capture-phase arbiter: register touch pointers before drawingCanvas or a
+    // tool can own the second pointer. UI controls remain outside this path.
+    if (isTouch && !isControlTarget) {
+      updateTouchPointer(event);
+      if (promoteTouchPointersToExclusiveGesture(event)) {
+        return;
+      }
+    }
 
     if (targetElement && !isCanvasTarget && !isControlTarget && !isWithinCanvasViewport) {
       if (pointerState.active && pointerState.tool === 'pan') {
