@@ -471,6 +471,7 @@
       .slice(0, TOUCH_PAN_MIN_POINTERS)
       .map(([pointerId, point]) => [pointerId, { x: Number(point?.x) || 0, y: Number(point?.y) || 0 }]);
     const toolBaseline = pointerState.touchToolBaseline;
+    const pixelBaseline = pointerState.touchPixelBaseline;
     if (activeTouchPointers.size > TOUCH_PAN_MIN_POINTERS) {
       return true;
     }
@@ -480,9 +481,13 @@
       const wasSelectionTransform = pointerState.tool === 'selectionTransform';
       abortActivePointerInteraction({ commitHistory: false });
       if (!wasSelectionTransform) {
-        // Restore the pixels from before the one-pointer tool interaction. This
-        // removes a pen/eraser dot already applied before the second touch.
-        rollbackPendingHistory();
+        if (HISTORY_DRAW_TOOLS.has(toolBaseline?.tool)) {
+          // The layer baseline below restores pixels directly. Discarding the
+          // pending history avoids rebuilding document state and losing touch IDs.
+          discardPendingHistory();
+        } else {
+          rollbackPendingHistory();
+        }
       }
       clearSharedProjectInFlightStroke();
     }
@@ -502,7 +507,25 @@
       syncControlsWithState();
       updateColorTabSwatch();
     }
+    if (pixelBaseline?.layer) {
+      const baselineLayer = pixelBaseline.layer;
+      if (baselineLayer.indices instanceof Int16Array && pixelBaseline.indices instanceof Int16Array) {
+        baselineLayer.indices.set(pixelBaseline.indices);
+      }
+      if (pixelBaseline.direct instanceof Uint8ClampedArray) {
+        if (!(baselineLayer.direct instanceof Uint8ClampedArray) || baselineLayer.direct.length !== pixelBaseline.direct.length) {
+          baselineLayer.direct = new Uint8ClampedArray(pixelBaseline.direct.length);
+        }
+        baselineLayer.direct.set(pixelBaseline.direct);
+      } else {
+        baselineLayer.direct = null;
+      }
+      baselineLayer.directOnly = Boolean(pixelBaseline.directOnly);
+      requestRender();
+      requestOverlayRender();
+    }
     pointerState.touchToolBaseline = null;
+    pointerState.touchPixelBaseline = null;
     if (!pointerState.active || pointerState.tool !== 'pan' || pointerState.panMode !== 'multiTouch') {
       abortActivePointerInteraction({ commitHistory: false });
       beginExclusiveTouchGesture(event);
@@ -820,6 +843,19 @@
       }
     }
     const layer = getActiveLayer();
+    if (
+      isTouch
+      && activeTouchPointers.size === 1
+      && HISTORY_DRAW_TOOLS.has(state.tool)
+      && layer
+    ) {
+      pointerState.touchPixelBaseline = {
+        layer,
+        indices: layer.indices instanceof Int16Array ? new Int16Array(layer.indices) : null,
+        direct: layer.direct instanceof Uint8ClampedArray ? new Uint8ClampedArray(layer.direct) : null,
+        directOnly: Boolean(layer.directOnly),
+      };
+    }
     const shouldExtendSelection = Boolean(
       event.shiftKey
       && (activeTool === 'selectRect' || activeTool === 'selectLasso' || activeTool === 'selectSame')
