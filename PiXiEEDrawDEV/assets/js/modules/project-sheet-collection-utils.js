@@ -38,8 +38,12 @@
         // Source identity is diagnostic-only. Runtime ownership is always new.
         sourceProjectId: input.sourceProjectId || null,
         sourceSheetId: input.sourceSheetId || null,
+        runtimeProjectId: input.runtimeProjectId || context.createRuntimeProjectId?.() || `${id}:runtime-project`,
         sheetRuntimeId: input.sheetRuntimeId || context.createRuntimeId?.() || `${id}:runtime`,
+        deferredPayloadKey: input.deferredPayloadKey || context.createDeferredPayloadKey?.() || `${id}:deferred`,
         sheetPersistenceKey: input.sheetPersistenceKey || context.createPersistenceKey?.() || `${id}:persistence`,
+        localPersistenceKey: input.localPersistenceKey || context.createLocalPersistenceKey?.() || `${id}:local`,
+        autosaveV2SheetId: input.autosaveV2SheetId || context.createAutosaveV2SheetId?.() || `${id}:autosave-v2`,
         historyOwnerId: input.historyOwnerId || context.createHistoryOwnerId?.() || `${id}:history`,
         timelapseOwnerId: input.timelapseOwnerId || context.createTimelapseOwnerId?.() || `${id}:timelapse`,
         projectSaveHandle: null,
