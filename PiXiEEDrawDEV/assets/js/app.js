@@ -8398,7 +8398,6 @@
     bindClickHandlerOnce(dom.newProject?.button, 'coreProjectActionBound', () => {
       openNewProjectDialog();
     });
-    bindProjectFileMenuOnce();
   }
 
   let projectFileCommandInFlight = false;
@@ -25182,5 +25181,8 @@
     }
   }
 
+  // File commands depend on persistence and input helpers declared above.
+  // Bind only after the complete app dependency graph is initialized.
+  bindProjectFileMenuOnce();
   init();
 })();
