@@ -31,7 +31,7 @@
 
     return ((scope) => {
       with (scope) {
-  function getCanvasFocusAt(clientX, clientY, { clampToCanvas = false, surface = null } = {}) {
+  function getCanvasFocusAt(clientX, clientY, { clampToCanvas = false, allowOutsideCanvas = false, surface = null } = {}) {
     const metrics = getCanvasInteractionSurfaceMetrics(surface || null);
     const resolvedSurface = metrics.surface || null;
     const drawing = resolvedSurface?.drawing instanceof HTMLCanvasElement
@@ -46,7 +46,7 @@
     }
     const outsideX = clientX < rect.left || clientX > rect.right;
     const outsideY = clientY < rect.top || clientY > rect.bottom;
-    if ((outsideX || outsideY) && !clampToCanvas) {
+    if ((outsideX || outsideY) && !clampToCanvas && !allowOutsideCanvas) {
       return null;
     }
     const clampedClientX = clampToCanvas ? clamp(clientX, rect.left, rect.right) : clientX;
@@ -112,7 +112,11 @@
     const targetElement = event.target instanceof Element
       ? event.target
       : (event.currentTarget instanceof Element ? event.currentTarget : null);
-    const targetSurface = getCanvasInteractionSurfaceFromTarget(targetElement);
+    if (targetElement?.closest?.('input, textarea, select, button, [contenteditable="true"], dialog, [role="menu"], [popover], .panel-section, .mobile-drawer, .canvas-controls')) {
+      return;
+    }
+    const targetSurface = getCanvasInteractionSurfaceFromTarget(targetElement)
+      || getViewportVisibilityTargetSurface();
     if (!targetSurface?.canvasDoc) {
       return;
     }
@@ -125,7 +129,10 @@
     commitPreviewProjectCanvasSelection({ persist: false, flushUi: false });
     flushActiveProjectCanvasUiSync({ persist: false });
     const resolvedSurface = getResolvedCanvasInteractionSurface(targetSurface);
-    const pointerFocus = getCanvasFocusAt(event.clientX, event.clientY, { surface: resolvedSurface });
+    const pointerFocus = getCanvasFocusAt(event.clientX, event.clientY, {
+      surface: resolvedSurface,
+      allowOutsideCanvas: true,
+    });
     const focus = pointerFocus || (state.showVirtualCursor ? getVirtualCursorZoomFocus() : null);
     if (!focus) {
       return;
