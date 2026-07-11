@@ -1,4 +1,4 @@
-const APP_BUILD_VERSION = '2026.07.10-pixiedraw-ads-restore1';
+const APP_BUILD_VERSION = '2026.07.11-touch-immediate-v2';
 const CACHE_VERSION = `pixiedraw-v${APP_BUILD_VERSION}`;
 const CORE_ASSETS = [
   '/pixiedraw/',
@@ -7,6 +7,9 @@ const CORE_ASSETS = [
   '/pixiedraw/assets/css/style.css',
   '/pixiedraw/assets/css/local-extension-runtime.css',
   '/pixiedraw/assets/js/app.js',
+  '/pixiedraw/assets/js/modules/viewport-gesture-arbiter-utils.js',
+  '/pixiedraw/assets/js/modules/canvas-pointer-workflow-utils.js',
+  '/pixiedraw/assets/js/modules/canvas-wheel-zoom-workflow-utils.js',
   '/icon/icon-192-4.png',
   '/icon/icon-512-4.png',
   '/icon-e1_frame_01.png',
