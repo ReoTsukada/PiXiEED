@@ -75,6 +75,11 @@
               unsaved: directPayload.unsaved,
               source: source || 'open',
               tabOptions,
+              sourceStorageAdapterId: directPayload.sourceStorageAdapterId ?? null,
+              sourceKind: directPayload.sourceKind ?? 'unknown',
+              sourceProjectToken: directPayload.sourceProjectToken ?? null,
+              lastSavedStorageAdapterId: directPayload.lastSavedStorageAdapterId ?? null,
+              projectSaveHandleState: directPayload.projectSaveHandleState ?? 'none',
             });
             if (directTab) {
               openedCount += 1;
@@ -125,6 +130,10 @@
                   unsaved: deferredUnsaved,
                   source: source || 'open',
                   tabOptions,
+                  sourceStorageAdapterId: null,
+                  sourceKind: 'unknown',
+                  lastSavedStorageAdapterId: null,
+                  projectSaveHandleState: 'none',
                 });
                 if (appended) {
                   queueProjectTabViewportReset(appended.id);
@@ -152,6 +161,9 @@
             activate: true,
             source,
             projectId: parentProjectId,
+            ...(typeof getActiveProjectPersistenceState === 'function'
+              ? (getActiveProjectPersistenceState() || {})
+              : {}),
             ...(tabOptions && typeof tabOptions === 'object' ? tabOptions : {}),
           });
           if (!appended) {
@@ -220,6 +232,10 @@
       source,
       projectId: autosaveProjectId,
       qrEditPayload,
+      sourceStorageAdapterId: null,
+      sourceKind: 'import-image',
+      lastSavedStorageAdapterId: null,
+      projectSaveHandleState: 'none',
     });
     if (qrEditPayload) {
       activateQrEditMode({
@@ -285,8 +301,18 @@
         }
       }
       const loaded = typeof loadDocumentFromBlob === 'function'
-        ? await loadDocumentFromBlob(file, handle, { suppressAutosaveStatus: true })
-        : await loadDocumentFromText(await file.text(), handle, { suppressAutosaveStatus: true });
+        ? await loadDocumentFromBlob(file, handle, {
+          suppressAutosaveStatus: true,
+          sourceKind: 'file',
+          fileLoad: true,
+          projectSaveHandleState: handle ? 'unknown' : 'none',
+        })
+        : await loadDocumentFromText(await file.text(), handle, {
+          suppressAutosaveStatus: true,
+          sourceKind: 'file',
+          fileLoad: true,
+          projectSaveHandleState: handle ? 'unknown' : 'none',
+        });
       if (!loaded || loaded === 'deferred') {
         return false;
       }
@@ -330,6 +356,13 @@
         project: item.project,
         fileName: resolveOpenProjectPayloadFileName(item.project, item.name || item.fileName || DEFAULT_DOCUMENT_NAME),
         unsaved: Boolean(item.unsaved),
+        sourceStorageAdapterId: null,
+        sourceKind: 'unknown',
+        sourceProjectToken: typeof createProjectPersistenceToken === 'function'
+          ? createProjectPersistenceToken('unknown')
+          : null,
+        lastSavedStorageAdapterId: null,
+        projectSaveHandleState: 'none',
       };
     }
     let file = null;
@@ -359,6 +392,13 @@
             project: parsed,
             fileName: resolveOpenProjectPayloadFileName(parsed, fallbackName),
             unsaved: false,
+            sourceStorageAdapterId: parsedResult?.adapterId || null,
+            sourceKind: 'file',
+            sourceProjectToken: typeof createProjectPersistenceToken === 'function'
+              ? createProjectPersistenceToken('file')
+              : null,
+            lastSavedStorageAdapterId: parsedResult?.adapterId || null,
+            projectSaveHandleState: item && typeof item.getFile === 'function' ? 'unknown' : 'none',
           };
         }
         return null;
@@ -371,6 +411,13 @@
         project: parsed,
         fileName: resolveOpenProjectPayloadFileName(parsed, fallbackName),
         unsaved: false,
+        sourceStorageAdapterId: null,
+        sourceKind: 'file',
+        sourceProjectToken: typeof createProjectPersistenceToken === 'function'
+          ? createProjectPersistenceToken('file')
+          : null,
+        lastSavedStorageAdapterId: null,
+        projectSaveHandleState: item && typeof item.getFile === 'function' ? 'unknown' : 'none',
       };
     } catch (_error) {
       return null;
@@ -384,6 +431,11 @@
     unsaved = false,
     source = 'open',
     tabOptions = null,
+    sourceStorageAdapterId = null,
+    sourceKind = 'unknown',
+    sourceProjectToken = null,
+    lastSavedStorageAdapterId = null,
+    projectSaveHandleState = 'none',
   } = {}) {
     if (!project || typeof project !== 'object') {
       return null;
@@ -401,6 +453,11 @@
       source,
       updatedAt: project?.updatedAt || new Date().toISOString(),
       qrEditPayload: tabOptions?.qrEditPayload || null,
+      sourceStorageAdapterId,
+      sourceKind,
+      sourceProjectToken,
+      lastSavedStorageAdapterId,
+      projectSaveHandleState,
     });
     if (!nextTab) {
       return null;
@@ -415,6 +472,13 @@
       suppressAutosaveStatus: true,
       qrEditPayload: tabOptions?.qrEditPayload || null,
       suppressProjectSheetsRestore: true,
+      sourcePersistenceState: {
+        sourceStorageAdapterId,
+        sourceKind,
+        sourceProjectToken,
+        lastSavedStorageAdapterId,
+        projectSaveHandleState,
+      },
     });
     if (!loaded || loaded === 'deferred') {
       const insertedIndex = findOpenProjectTabIndex(nextTab.id);
@@ -554,6 +618,10 @@
       resetOpenProjectTabsToCurrentProject({
         source: 'new-project',
         projectId: autosaveProjectId,
+        sourceStorageAdapterId: null,
+        sourceKind: 'new',
+        lastSavedStorageAdapterId: null,
+        projectSaveHandleState: 'none',
       });
       updateAutosaveStatus(
         localizeText('新規プロジェクトを作成しました', 'Created new project'),
@@ -781,7 +849,12 @@
                 return await loadDocumentFromImageFile(file);
               }
               const text = await file.text();
-              return await loadDocumentFromText(text, null, { suppressAutosaveStatus: true });
+              return await loadDocumentFromText(text, null, {
+                suppressAutosaveStatus: true,
+                sourceKind: 'file',
+                fileLoad: true,
+                projectSaveHandleState: 'none',
+              });
             },
             { source: 'open-input' }
           );
