@@ -9274,9 +9274,8 @@ body.is-mobile-layout #multiSupportAdContainer {
    frame so short landscape screens cannot leak it across the editor. */
 @media (orientation: landscape) {
   body[data-pixieed-page="pixiedraw"] .pixieed-shared-top-ad {
-    --pixieed-landscape-side-ad-length: min(
-      320px,
-      calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 12px)
+    --pixieed-landscape-side-ad-length: calc(
+      100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 12px
     );
     overflow: hidden !important;
     contain: layout paint;
