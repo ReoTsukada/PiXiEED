@@ -34,6 +34,10 @@
     const UNIFIED_LEFT_TOOLS_COLOR_MODE = true;
     const DESKTOP_RIGHT_TOOL_RAIL_MODE = true;
     const INLINE_GUIDES_STORAGE_KEY = 'pixieedraw:inline-guides-visible-v1';
+    const INTERNAL_TOOL_DEFINITIONS = Object.freeze({
+      pan: Object.freeze({ id: 'pan', internal: true, visibleInToolbar: false }),
+      zoom: Object.freeze({ id: 'zoom', internal: true, visibleInToolbar: false }),
+    });
     return Object.freeze({
       TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE,
       TOOL_ACTION_MIRROR_POPUP,
@@ -58,6 +62,7 @@
       UNIFIED_LEFT_TOOLS_COLOR_MODE,
       DESKTOP_RIGHT_TOOL_RAIL_MODE,
       INLINE_GUIDES_STORAGE_KEY,
+      INTERNAL_TOOL_DEFINITIONS,
     });
   }
 
@@ -96,7 +101,6 @@
       virtualCursorCenter: TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE,
       localCanvasToggle: TOOL_ACTION_LOCAL_CANVAS_TOGGLE,
       floatingPreviewToggle: TOOL_ACTION_FLOATING_PREVIEW_TOGGLE,
-      pan: 'move',
       fillRgbGradient: 'fillGradient',
       fillDitherGradient: 'fillDither',
     });
