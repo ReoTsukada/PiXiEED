@@ -466,6 +466,7 @@
     }
     event.preventDefault?.();
     event.stopPropagation?.();
+    pointerState.suppressTouchCompatibilityUntil = performance.now() + 800;
     if (activeTouchPointers.size > TOUCH_PAN_MIN_POINTERS) {
       return true;
     }
@@ -1245,6 +1246,7 @@
       && pointerState.tool === 'pan'
       && pointerState.panMode === 'multiTouch'
     ) {
+      pointerState.suppressTouchCompatibilityUntil = performance.now() + 800;
       const wasGesturePointer = pointerState.touchGesturePointerIds?.includes(event.pointerId);
       if (wasGesturePointer) {
         applyLatestExclusiveTouchGesture();
@@ -1477,6 +1479,7 @@
       && pointerState.tool === 'pan'
       && pointerState.panMode === 'multiTouch'
     ) {
+      pointerState.suppressTouchCompatibilityUntil = performance.now() + 800;
       removeTouchPointer(event);
       clearTouchGestureFrame();
       if (activeTouchPointers.size > 0) {
@@ -4446,6 +4449,14 @@
   }
 
   function handleViewportPointerDown(event) {
+    if (
+      event.pointerType === 'mouse'
+      && performance.now() < (Number(pointerState.suppressTouchCompatibilityUntil) || 0)
+    ) {
+      event.preventDefault();
+      event.stopImmediatePropagation?.();
+      return;
+    }
     const targetElement = event.target instanceof Element ? event.target : null;
     const isCanvasTarget = targetElement && isCanvasSurfaceTarget(targetElement);
     const isControlTarget = targetElement && isViewportControlTarget(targetElement);
@@ -4606,6 +4617,14 @@
     requestOverlayRender();
   }
 
+  function handleViewportCompatibilityMouseEvent(event) {
+    if (performance.now() >= (Number(pointerState.suppressTouchCompatibilityUntil) || 0)) {
+      return;
+    }
+    event.preventDefault();
+    event.stopImmediatePropagation?.();
+  }
+
 
         return Object.freeze({
           detachPointerListeners,
@@ -4732,6 +4751,7 @@
           handleViewportPointerMove,
           handleViewportPointerUp,
           handleViewportPointerCancel,
+          handleViewportCompatibilityMouseEvent,
         });
       }
     })(scope);
