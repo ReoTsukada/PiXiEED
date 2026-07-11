@@ -396,6 +396,7 @@
       : GestureMode.IDLE;
     pointerState.touchGesturePointerIds = [];
     pointerState.touchGestureStartedAt = 0;
+    pointerState.touchGestureMovedPointerIds = null;
     pointerState.touchGestureStartCentroid = null;
     pointerState.touchGestureStartDistance = null;
     pointerState.touchGestureStartScale = null;
@@ -412,6 +413,7 @@
     );
     if (!metrics) return false;
     pointerState.touchGesturePointerIds = ids;
+    pointerState.touchGestureMovedPointerIds = new Set();
     pointerState.touchGestureMode = GestureMode.TOUCH_UNDECIDED;
     pointerState.touchGestureStartedAt = performance.now();
     pointerState.touchGestureStartCentroid = metrics.centroid;
@@ -477,11 +479,9 @@
   }
 
   function scheduleExclusiveTouchGestureFrame() {
-    if (pointerState.touchGestureRafId !== null && pointerState.touchGestureRafId !== undefined) return;
-    pointerState.touchGestureRafId = requestAnimationFrame(() => {
-      pointerState.touchGestureRafId = null;
-      applyLatestExclusiveTouchGesture();
-    });
+    // Touch input is applied for every PointerEvent. RAF batching made slow
+    // finger motion feel stepped on phones with irregular event delivery.
+    applyLatestExclusiveTouchGesture();
   }
 
   function startPanInteraction(event, { multiTouch = false, captureElement = dom.canvases.drawing } = {}) {
@@ -1072,6 +1072,12 @@
         }
         if (!pointerState.touchGesturePointerIds?.includes(event.pointerId)) {
           return;
+        }
+        if (pointerState.touchGestureMode === GestureMode.TOUCH_UNDECIDED) {
+          pointerState.touchGestureMovedPointerIds?.add(event.pointerId);
+          if ((pointerState.touchGestureMovedPointerIds?.size || 0) < 2) {
+            return;
+          }
         }
         scheduleExclusiveTouchGestureFrame();
         return;
