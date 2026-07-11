@@ -520,15 +520,22 @@
       const deferredProjectPayload = overrides.deferredProjectPayload
         || base.deferredProjectPayload
         || (base.project && typeof base.project === 'object' ? base.project : null);
+      const importedSheetOwnsPayload = Boolean(
+        deferredProjectPayload
+        && base.isImportedSheet === true
+      );
       return {
         ...base,
         ...overrides,
-        project: null,
+        // Imported sheets have no collection-level fallback that can safely
+        // identify their payload. Keep their resident copy until a dedicated
+        // persisted payload store exists.
+        project: importedSheetOwnsPayload ? deferredProjectPayload : null,
         deferredProjectPayload,
         deferredPayloadKey: String(overrides.deferredPayloadKey || base.deferredPayloadKey || base.sheetPersistenceKey || base.id || ''),
         checkpointId: String(overrides.checkpointId || base.checkpointId || ''),
         dirtyOpCount: Math.max(0, Math.round(Number(overrides.dirtyOpCount ?? base.dirtyOpCount) || 0)),
-        residentProjectLoaded: false,
+        residentProjectLoaded: importedSheetOwnsPayload,
       };
     }
 
