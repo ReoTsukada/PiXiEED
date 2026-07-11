@@ -8,6 +8,7 @@ const importSource = fs.readFileSync(path.join(root, 'PiXiEEDrawDEV/assets/js/mo
 
 assert.match(importSource, /projectId: parentProjectId/);
 assert.match(importSource, /project: candidate\.project, residentProjectLoaded: true, deferredRestore: false/);
+assert.match(importSource, /persistActiveOpenProjectTab\(\{\s*flushAutosave: true,\s*retainProjectPayload: true,\s*\}\)/);
 assert.match(importSource, /createOpenProjectTabId\(\)/);
 assert.match(importSource, /projectSaveHandleState: 'none'/);
 
