@@ -56,6 +56,108 @@
     }
   }
 
+  function buildLoadedProjectPersistenceState(parsedDocument = null, handle = null, options = {}) {
+    const explicitState = options?.sourcePersistenceState && typeof options.sourcePersistenceState === 'object'
+      ? options.sourcePersistenceState
+      : null;
+    const sourceKind = typeof resolveProjectSourceKind === 'function'
+      ? resolveProjectSourceKind({
+        ...options,
+        handle,
+        fileLoad: options?.fileLoad === true || Boolean(handle),
+      })
+      : (
+        typeof options?.sourceKind === 'string' && options.sourceKind.trim()
+          ? options.sourceKind.trim()
+          : 'unknown'
+      );
+    const hasExplicitSourceAdapterId = Boolean(
+      explicitState
+      && Object.prototype.hasOwnProperty.call(explicitState, 'sourceStorageAdapterId')
+    ) || Object.prototype.hasOwnProperty.call(options || {}, 'sourceStorageAdapterId');
+    const sourceStorageAdapterId = hasExplicitSourceAdapterId
+      ? (
+        explicitState?.sourceStorageAdapterId
+        ?? options?.sourceStorageAdapterId
+        ?? null
+      )
+      : (
+        sourceKind === 'file'
+          ? (parsedDocument?.storageAdapterId || null)
+          : null
+      );
+    const hasExplicitLastSavedStorageAdapterId = Boolean(
+      explicitState
+      && Object.prototype.hasOwnProperty.call(explicitState, 'lastSavedStorageAdapterId')
+    ) || Object.prototype.hasOwnProperty.call(options || {}, 'lastSavedStorageAdapterId');
+    const lastSavedStorageAdapterId = hasExplicitLastSavedStorageAdapterId
+      ? (
+        explicitState?.lastSavedStorageAdapterId
+        ?? options?.lastSavedStorageAdapterId
+        ?? null
+      )
+      : (
+        sourceKind === 'file'
+          ? sourceStorageAdapterId
+          : null
+      );
+    const hasExplicitProjectSaveHandleState = Boolean(
+      explicitState
+      && Object.prototype.hasOwnProperty.call(explicitState, 'projectSaveHandleState')
+    ) || Object.prototype.hasOwnProperty.call(options || {}, 'projectSaveHandleState');
+    const projectSaveHandleState = hasExplicitProjectSaveHandleState
+      ? (
+        explicitState?.projectSaveHandleState
+        ?? options?.projectSaveHandleState
+        ?? (handle ? 'unknown' : 'none')
+      )
+      : (handle ? 'unknown' : 'none');
+    const hasExplicitToken = Boolean(
+      explicitState
+      && Object.prototype.hasOwnProperty.call(explicitState, 'sourceProjectToken')
+      && typeof explicitState.sourceProjectToken === 'string'
+      && explicitState.sourceProjectToken.trim()
+    ) || (
+      typeof options?.sourceProjectToken === 'string'
+      && options.sourceProjectToken.trim()
+    );
+    const sourceProjectToken = hasExplicitToken
+      ? (
+        explicitState?.sourceProjectToken
+        || options?.sourceProjectToken
+        || null
+      )
+      : (
+        typeof createProjectPersistenceToken === 'function'
+          ? createProjectPersistenceToken(sourceKind)
+          : null
+      );
+    if (
+      !sourceKind
+      && sourceStorageAdapterId == null
+      && lastSavedStorageAdapterId == null
+      && sourceProjectToken == null
+      && !projectSaveHandleState
+    ) {
+      return null;
+    }
+    return typeof normalizeProjectPersistenceState === 'function'
+      ? normalizeProjectPersistenceState({
+        sourceStorageAdapterId,
+        sourceKind,
+        sourceProjectToken,
+        lastSavedStorageAdapterId,
+        projectSaveHandleState,
+      }, null, { createToken: true })
+      : {
+        sourceStorageAdapterId,
+        sourceKind,
+        sourceProjectToken,
+        lastSavedStorageAdapterId,
+        projectSaveHandleState,
+      };
+  }
+
   async function loadDocumentFromText(text, handle, options = {}) {
     if (!ensureCurrentClientCanReplaceActiveProject({ announce: !options?.suppressAutosaveStatus })) {
       return false;
@@ -89,7 +191,11 @@
       updateAutosaveStatus('ドキュメントの読み込みに失敗しました', 'error');
       return false;
     }
-    return await applyLoadedDocumentSnapshot(parsedDocument, options);
+    const sourcePersistenceState = buildLoadedProjectPersistenceState(parsedDocument, handle, options);
+    return await applyLoadedDocumentSnapshot(parsedDocument, {
+      ...options,
+      sourcePersistenceState,
+    });
   }
 
   async function loadDocumentFromBlob(blob, handle, options = {}) {
@@ -121,7 +227,11 @@
       updateAutosaveStatus('ドキュメントの読み込みに失敗しました', 'error');
       return false;
     }
-    return await applyLoadedDocumentSnapshot(parsedDocument, options);
+    const sourcePersistenceState = buildLoadedProjectPersistenceState(parsedDocument, handle, options);
+    return await applyLoadedDocumentSnapshot(parsedDocument, {
+      ...options,
+      sourcePersistenceState,
+    });
   }
 
   async function loadDocumentFromProjectPayload(projectPayload, options = {}) {
@@ -155,7 +265,13 @@
       }
       return false;
     }
-    return await applyLoadedDocumentSnapshot(parsedDocument, options);
+    const sourcePersistenceState = options?.sourcePersistenceState && typeof options.sourcePersistenceState === 'object'
+      ? buildLoadedProjectPersistenceState(parsedDocument, null, options)
+      : null;
+    return await applyLoadedDocumentSnapshot(parsedDocument, {
+      ...options,
+      sourcePersistenceState,
+    });
   }
 
   function restoreOpenProjectSheetsFromParsedDocument(parsedDocument = null, {
@@ -167,6 +283,7 @@
     sharedProjectStructureRevision = 0,
     sharedRoleHint = '',
     sharedAutoJoin = false,
+    sourcePersistenceState = null,
   } = {}) {
     const sheets = Array.isArray(parsedDocument?.sheets) ? parsedDocument.sheets : [];
     const normalizedProjectId = normalizeAutosaveProjectId(projectId || autosaveProjectId || '') || createAutosaveProjectId();
@@ -186,39 +303,79 @@
         sharedProjectStructureRevision,
         sharedRoleHint,
         sharedAutoJoin,
+        sourceStorageAdapterId: sourcePersistenceState?.sourceStorageAdapterId ?? null,
+        sourceKind: sourcePersistenceState?.sourceKind ?? 'unknown',
+        sourceProjectToken: sourcePersistenceState?.sourceProjectToken ?? null,
+        lastSavedStorageAdapterId: sourcePersistenceState?.lastSavedStorageAdapterId ?? null,
+        projectSaveHandleState: sourcePersistenceState?.projectSaveHandleState ?? 'none',
       });
       return false;
     }
     const nextTabs = sheets
       .slice(0, MAX_PROJECT_SHEETS)
-      .map((sheet, index) => createOpenProjectSheetTabFromPackagedProject({
-        ...sheet,
-        projectId: normalizedProjectId,
-        label: typeof sheet?.label === 'string' && sheet.label.trim()
-          ? sheet.label.trim()
-          : localizeText(`シート ${index + 1}`, `Sheet ${index + 1}`),
-        source: sheet.source || source,
-        sharedProjectKey: SHARED_PROJECTS_ENABLED ? (sheet.sharedProjectKey || normalizedSharedProjectKey) : '',
-        sharedProjectBackendId: SHARED_PROJECTS_ENABLED ? (sheet.sharedProjectBackendId || sharedProjectBackendId) : '',
-        sharedProjectRevision: SHARED_PROJECTS_ENABLED ? (sheet.sharedProjectRevision || sharedProjectRevision) : 0,
-        sharedProjectStructureRevision: SHARED_PROJECTS_ENABLED ? (sheet.sharedProjectStructureRevision || sharedProjectStructureRevision) : 0,
-        sharedRoleHint: SHARED_PROJECTS_ENABLED ? (sheet.sharedRoleHint || sharedRoleHint) : '',
-        sharedAutoJoin: SHARED_PROJECTS_ENABLED && (
-          Object.prototype.hasOwnProperty.call(sheet, 'sharedAutoJoin')
-            ? sheet.sharedAutoJoin
-            : sharedAutoJoin
-        ),
-      }))
+      .map((sheet, index) => {
+        const nextTab = createOpenProjectSheetTabFromPackagedProject({
+          ...sheet,
+          projectId: normalizedProjectId,
+          label: typeof sheet?.label === 'string' && sheet.label.trim()
+            ? sheet.label.trim()
+            : localizeText(`シート ${index + 1}`, `Sheet ${index + 1}`),
+          source: sheet.source || source,
+          sharedProjectKey: SHARED_PROJECTS_ENABLED ? (sheet.sharedProjectKey || normalizedSharedProjectKey) : '',
+          sharedProjectBackendId: SHARED_PROJECTS_ENABLED ? (sheet.sharedProjectBackendId || sharedProjectBackendId) : '',
+          sharedProjectRevision: SHARED_PROJECTS_ENABLED ? (sheet.sharedProjectRevision || sharedProjectRevision) : 0,
+          sharedProjectStructureRevision: SHARED_PROJECTS_ENABLED ? (sheet.sharedProjectStructureRevision || sharedProjectStructureRevision) : 0,
+          sharedRoleHint: SHARED_PROJECTS_ENABLED ? (sheet.sharedRoleHint || sharedRoleHint) : '',
+          sharedAutoJoin: SHARED_PROJECTS_ENABLED && (
+            Object.prototype.hasOwnProperty.call(sheet, 'sharedAutoJoin')
+              ? sheet.sharedAutoJoin
+              : sharedAutoJoin
+          ),
+          sourceStorageAdapterId: sheet?.sourceStorageAdapterId ?? sourcePersistenceState?.sourceStorageAdapterId ?? null,
+          sourceKind: sheet?.sourceKind ?? sourcePersistenceState?.sourceKind ?? 'unknown',
+          sourceProjectToken: sheet?.sourceProjectToken ?? sourcePersistenceState?.sourceProjectToken ?? null,
+          lastSavedStorageAdapterId: sheet?.lastSavedStorageAdapterId ?? sourcePersistenceState?.lastSavedStorageAdapterId ?? null,
+          projectSaveHandleState: sheet?.projectSaveHandleState ?? sourcePersistenceState?.projectSaveHandleState ?? 'none',
+        });
+        if (!nextTab) {
+          return null;
+        }
+        return {
+          ...nextTab,
+          residentProjectLoaded: true,
+        };
+      })
       .filter(Boolean);
     if (!nextTabs.length) {
       resetOpenProjectTabsToCurrentProject({
         source,
         projectId: normalizedProjectId,
+        sourceStorageAdapterId: sourcePersistenceState?.sourceStorageAdapterId ?? null,
+        sourceKind: sourcePersistenceState?.sourceKind ?? 'unknown',
+        sourceProjectToken: sourcePersistenceState?.sourceProjectToken ?? null,
+        lastSavedStorageAdapterId: sourcePersistenceState?.lastSavedStorageAdapterId ?? null,
+        projectSaveHandleState: sourcePersistenceState?.projectSaveHandleState ?? 'none',
       });
       return false;
     }
     const activeSheetId = typeof parsedDocument?.activeSheetId === 'string' ? parsedDocument.activeSheetId : '';
     const activeTab = nextTabs.find(tab => tab.id === activeSheetId) || nextTabs[0];
+    console.info('[sheet-restore-debug]', {
+      activeSheetId,
+      sheetIds: nextTabs.map(tab => tab?.id || ''),
+      tabs: nextTabs.map(tab => ({
+        id: tab?.id || '',
+        source: tab?.source || '',
+        fileName: tab?.fileName || '',
+        label: tab?.label || '',
+        unsaved: Boolean(tab?.unsaved),
+        updatedAt: tab?.updatedAt || '',
+        residentProjectLoaded: tab?.residentProjectLoaded === true,
+        hasProject: Boolean(tab?.project && typeof tab.project === 'object'),
+        hasDocument: Boolean(tab?.project?.document && typeof tab.project.document === 'object'),
+        hasCanvases: Array.isArray(tab?.project?.document?.canvases),
+      })),
+    });
     openProjectTabs.splice(0, openProjectTabs.length, ...nextTabs);
     activeOpenProjectTabId = activeTab?.id || nextTabs[0]?.id || '';
     suppressOpenProjectTabAutoInitialize = false;
@@ -309,6 +466,9 @@
     const requestedSharedProjectRevision = Math.max(0, Math.round(Number(options?.sharedProjectRevision) || 0));
     const requestedSharedProjectStructureRevision = Math.max(0, Math.round(Number(options?.sharedProjectStructureRevision) || 0));
     const activeEntryAfterLoad = recentProjectsCache.get(normalizeAutosaveProjectId(requestedProjectId || '')) || null;
+    const sourcePersistenceState = options?.sourcePersistenceState && typeof options.sourcePersistenceState === 'object'
+      ? options.sourcePersistenceState
+      : null;
     setActiveAutosaveProjectId(requestedProjectId || createAutosaveProjectId());
     if (!options?.suppressProjectSheetsRestore) {
       restoreOpenProjectSheetsFromParsedDocument(parsedDocument, {
@@ -320,6 +480,12 @@
         sharedProjectStructureRevision: requestedSharedProjectStructureRevision,
         sharedRoleHint: options?.sharedRoleHint || activeEntryAfterLoad?.sharedRoleHint || '',
         sharedAutoJoin: options?.sharedAutoJoin !== false && activeEntryAfterLoad?.sharedAutoJoin !== false,
+        sourcePersistenceState,
+      });
+    } else if (sourcePersistenceState && typeof updateActiveProjectPersistenceState === 'function') {
+      updateActiveProjectPersistenceState(sourcePersistenceState, {
+        render: false,
+        log: true,
       });
     }
     const loadedQrEditPayload = Object.prototype.hasOwnProperty.call(options || {}, 'qrEditPayload')
