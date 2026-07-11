@@ -73,23 +73,33 @@
         }
         const transaction = transactionUtils.createTransactionSnapshot({ openProjectTabs, activeOpenProjectTabId });
         try {
-          const nextTabs = candidates.map(candidate => createOpenProjectSheetTabFromPackagedProject({
-            id: candidate.id,
-            project: candidate.project,
-            projectId: parentProjectId,
-            fileName: candidate.fileName,
-            label: candidate.label,
-            source: source || 'open',
-            unsaved: false,
-            sourceStorageAdapterId: candidate.sourceStorageAdapterId,
-            sourceKind: candidate.sourceKind,
-            sourceProjectToken: candidate.sourceProjectToken,
-            lastSavedStorageAdapterId: candidate.sourceStorageAdapterId,
-            projectSaveHandleState: 'none',
-            projectSaveHandle: null,
-            projectSaveHandleMeta: null,
-            qrEditPayload: tabOptions?.qrEditPayload || null,
-          }));
+          const nextTabs = candidates.map(candidate => {
+            const tab = createOpenProjectSheetTabFromPackagedProject({
+              id: candidate.id,
+              project: candidate.project,
+              // projectId identifies the current multi-sheet collection. The
+              // tab id owns the individual sheet payload inside that record.
+              projectId: parentProjectId,
+              fileName: candidate.fileName,
+              label: candidate.label,
+              source: source || 'open',
+              unsaved: false,
+              sourceStorageAdapterId: candidate.sourceStorageAdapterId,
+              sourceKind: candidate.sourceKind,
+              sourceProjectToken: candidate.sourceProjectToken,
+              lastSavedStorageAdapterId: candidate.sourceStorageAdapterId,
+              projectSaveHandleState: 'none',
+              projectSaveHandle: null,
+              projectSaveHandleMeta: null,
+              qrEditPayload: tabOptions?.qrEditPayload || null,
+            });
+            // Imported sheets cannot be lightweight until their complete
+            // collection checkpoint exists. Otherwise a switch has no
+            // resident or stored payload to restore.
+            return tab && candidate.project && typeof candidate.project === 'object'
+              ? { ...tab, project: candidate.project, residentProjectLoaded: true, deferredRestore: false }
+              : tab;
+          });
           if (nextTabs.some(tab => !tab)) throw new Error('ERR_SHEET_TAB_CREATE_FAILED');
           openProjectTabs.push(...nextTabs);
           const activeTab = nextTabs[nextTabs.length - 1];
