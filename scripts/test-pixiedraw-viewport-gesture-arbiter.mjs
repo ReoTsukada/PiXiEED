@@ -43,7 +43,7 @@ const start = metrics([100, 100], [200, 100]);
 }
 
 {
-  const ambiguous = metrics([112.5, 100], [217.5, 100]);
+  const ambiguous = metrics([109.25, 100], [210.75, 100]);
   const early = classifyTouchGesture({ startCentroid: start.centroid, startDistance: start.distance, currentCentroid: ambiguous.centroid, currentDistance: ambiguous.distance, elapsedMs: 50 });
   assert.equal(early.mode, GestureMode.TOUCH_UNDECIDED);
   const timed = classifyTouchGesture({ startCentroid: start.centroid, startDistance: start.distance, currentCentroid: ambiguous.centroid, currentDistance: ambiguous.distance, elapsedMs: VIEWPORT_GESTURE_CONFIG.GESTURE_DECISION_TIMEOUT_MS });
