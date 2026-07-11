@@ -78,21 +78,13 @@
     }
   })();
 </script>
+<script src="assets/js/modules/edition-capabilities-utils.js?v=2026.07.11-g3a-edition-ads"></script>
 <script>
   (function configurePixieedAds() {
-    const isLocalDebug = (() => {
-      try {
-        const protocol = window.location?.protocol || '';
-        const host = window.location?.hostname || '';
-        return protocol === 'file:'
-          || host === 'localhost'
-          || host === '127.0.0.1'
-          || host === '::1';
-      } catch (error) {
-        return false;
-      }
-    })();
-    window.__PIXIEED_ADS_DISABLED__ = Boolean(window.__PIXIEED_ADS_DISABLED__ || isLocalDebug);
+    const shouldShowAds = typeof window.__PIXIEEDRAW_SHOULD_SHOW_ADS__ === 'function'
+      ? window.__PIXIEEDRAW_SHOULD_SHOW_ADS__()
+      : false;
+    window.__PIXIEED_ADS_DISABLED__ = !shouldShowAds;
     if (window.__PIXIEED_ADS_DISABLED__) {
       return;
     }
@@ -128,7 +120,7 @@
 
 
 
-<link href="assets/css/style.css?v=2026.07.10-pixiedraw-ads-restore1" rel="stylesheet"/>
+<link href="assets/css/style.css?v=2026.07.11-touch-immediate-v2" rel="stylesheet"/>
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-4.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-4.png"/>
 <style>
@@ -241,15 +233,14 @@
 <button class="startup-screen__link" id="startupActionSkip" type="button">この画面を閉じる</button>
 </div>
 </div>
-<div aria-hidden="true" class="update-toast" data-update-id="2026-07-09-export-fix-apology" data-update-published="true" hidden="" id="updateToast" role="status" aria-live="polite">
+<div aria-hidden="true" class="update-toast" data-update-id="2026-07-11-touch-zoom-pan-immediate" data-update-published="true" hidden="" id="updateToast" role="status" aria-live="polite">
 <div class="update-toast__body">
 <p class="update-toast__message">
-<strong>更新情報 (2026/07/09)</strong><br/>
+<strong>更新情報 (2026/07/11)</strong><br/>
 【今回更新】<br/>
-・保存/出力パネルが開かない、または PNG などの出力が完了しない不具合を修正しました<br/>
-・出力関連モジュールの読み込みと処理経路を見直しました<br/>
-・起動後ポップアップと更新情報に今回の修正内容を掲載しました<br/>
-・保存/出力が不安定な状態が続いてしまい、申し訳ありませんでした<br/>
+・スマホの2本指ズーム/パンを、少ない指の移動でも反応するよう改善しました<br/>
+・指の動きをフレーム待ちせず即時反映し、カクつきを軽減しました<br/>
+・パンとズームの誤切り替えを防ぎながら、操作開始を早めました<br/>
 ・詳細は設定の「更新情報」から確認できます
 </p>
 <div class="update-toast__actions">
@@ -1608,13 +1599,13 @@
 	<script defer="" src="assets/js/modules/canvas-drawing-workflow-utils.js?v=2026.07.02-canvas-pointer-deps-fix1"></script>
 	<script defer="" src="assets/js/modules/canvas-overlay-workflow-utils.js?v=2026.07.02-canvas-overlay-split-v1"></script>
 	<script defer="" src="assets/js/modules/canvas-render-workflow-utils.js?v=2026.07.02-canvas-render-split-v1"></script>
-	<script defer="" src="assets/js/modules/viewport-gesture-arbiter-utils.js?v=2026.07.11-exclusive-touch-gesture-v1"></script>
-	<script defer="" src="assets/js/modules/canvas-zoom-workflow-utils.js?v=2026.07.11-exclusive-touch-gesture-v1"></script>
+	<script defer="" src="assets/js/modules/viewport-gesture-arbiter-utils.js?v=2026.07.11-touch-immediate-v2"></script>
+	<script defer="" src="assets/js/modules/canvas-zoom-workflow-utils.js?v=2026.07.11-touch-immediate-v2"></script>
 	<script defer="" src="assets/js/modules/virtual-cursor-workflow-utils.js?v=2026.07.02-virtual-cursor-split-v1"></script>
-	<script defer="" src="assets/js/modules/canvas-wheel-zoom-workflow-utils.js?v=2026.07.11-exclusive-touch-gesture-v1"></script>
+	<script defer="" src="assets/js/modules/canvas-wheel-zoom-workflow-utils.js?v=2026.07.11-touch-immediate-v2"></script>
 	<script defer="" src="assets/js/modules/ios-snapshot-utils.js?v=2026.07.01-pixfind-mode-split-v1"></script>
 	<script defer="" src="assets/js/modules/update-history-utils.js?v=2026.06.28-file-split-step7"></script>
-	<script defer="" src="assets/js/modules/static-content.js?v=2026.07.01-static-localization-split-v1"></script>
+	<script defer="" src="assets/js/modules/static-content.js?v=2026.07.11-touch-immediate-v2"></script>
 	<script defer="" src="assets/js/modules/binary-codecs.js?v=2026.06.28-file-split-step2"></script>
 	<script defer="" src="assets/js/modules/export-codecs.js?v=2026.06.28-file-split-step1"></script>
 	<script defer="" src="assets/vendor/jsQR.min.js?v=1.4.0"></script>
@@ -1635,7 +1626,7 @@
 	<script defer="" src="assets/js/modules/voxel-glb-utils.js?v=2026.06.30-voxel-glb-v1"></script>
 	<script defer="" src="assets/js/modules/simulation-playback-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/keyboard-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
-	<script defer="" src="assets/js/modules/canvas-pointer-workflow-utils.js?v=2026.07.11-exclusive-touch-gesture-v1"></script>
+	<script defer="" src="assets/js/modules/canvas-pointer-workflow-utils.js?v=2026.07.11-touch-immediate-v2"></script>
 	<script defer="" src="assets/js/modules/canvas-tool-state-workflow-utils.js?v=2026.07.02-canvas-tool-state-fix2"></script>
 	<script defer="" src="assets/js/modules/export-rendering.js?v=2026.07.09-export-routing-fix2"></script>
 	<script defer="" src="assets/js/modules/dialog-setup-utils.js?v=2026.07.01-dialog-setup-v1"></script>
@@ -1695,7 +1686,7 @@
 	<script defer="" src="assets/js/modules/controls-mirror.js?v=2026.07.03-mirror-guide-drag-fix1"></script>
 	<script defer="" src="assets/js/modules/external-tool-workflow-utils.js?v=2026.07.02-external-tool-workflow-split-v1"></script>
 	<script defer="" src="assets/js/pixieedraw-dev-switch.js?v=2026.07.03-pixieedrawdev-switch-fix14"></script>
-	<script defer="" src="assets/js/app.js?v=2026.07.10-pixiedraw-ads-restore1"></script>
+	<script defer="" src="assets/js/app.js?v=2026.07.11-touch-immediate-v2"></script>
 	<script defer="" src="assets/js/modules/update-detection-utils.js?v=2026071102"></script>
   <script>
     (function initPanelAdDocking() {
@@ -1790,7 +1781,7 @@
     // right before push(), so 0px hidden slots never poison the global queue.
     (function initAds() {
       if (!document || !window) return;
-      if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) return;
+      if (!window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.()) return;
       const ADS_CLIENT = 'ca-pub-9801602250480253';
       const SLOTS = [
         { containerId: 'leftPanelAdSlot', slot: '3806415737' },
