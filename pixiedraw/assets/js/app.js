@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.07.11-touch-arbiter-v7';
+  const APP_BUILD_VERSION = '2026.07.11-touch-arbiter-v8';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECTS_ENABLED = false;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
@@ -3475,6 +3475,8 @@
   set commitHistory(value) { commitHistory = value; },
   get commitPreviewProjectCanvasSelection() { return commitPreviewProjectCanvasSelection; },
   set commitPreviewProjectCanvasSelection(value) { commitPreviewProjectCanvasSelection = value; },
+  get discardPendingHistory() { return discardPendingHistory; },
+  set discardPendingHistory(value) { discardPendingHistory = value; },
   get createBlankImageData() { return createBlankImageData; },
   set createBlankImageData(value) { createBlankImageData = value; },
   get createCustomBrushFromSelection() { return createCustomBrushFromSelection; },
@@ -11470,6 +11472,11 @@
       dirty: false,
       label,
     };
+  }
+
+  function discardPendingHistory() {
+    history.pending = null;
+    updateHistoryButtons();
   }
 
   function markDocumentUnsavedChange() {
