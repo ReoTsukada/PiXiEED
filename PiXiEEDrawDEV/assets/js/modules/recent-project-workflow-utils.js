@@ -654,7 +654,7 @@
       return card;
     };
     const createProjectHomeAdCard = () => {
-      if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) {
+      if (!window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.()) {
         return null;
       }
       const card = document.createElement('article');
