@@ -31,6 +31,26 @@
 
     return ((scope) => {
       with (scope) {
+  let openProjectTabBusyOwner = null;
+  let removeProjectSheetCommandSequence = 0;
+
+  function createRemoveProjectSheetCommandOwner() {
+    removeProjectSheetCommandSequence += 1;
+    return Symbol(`remove-project-sheet-${removeProjectSheetCommandSequence}`);
+  }
+
+  function logProjectSheetRemovalTransaction(phase, details = {}) {
+    console.info('[project-sheet-remove-debug]', {
+      phase,
+      ...details,
+      openProjectTabBusy: Boolean(openProjectTabBusy),
+      commandOwner: typeof details.commandOwner === 'symbol'
+        ? String(details.commandOwner)
+        : null,
+      sheetIds: openProjectTabs.map(tab => tab?.id || ''),
+    });
+  }
+
   function releaseAutosaveProjectId(projectId) {
     const normalized = normalizeAutosaveProjectId(projectId || '');
     if (!normalized) {
@@ -414,7 +434,15 @@
       activeOpenProjectTabId,
       projectHomeVisible,
     };
+    const commandOwner = createRemoveProjectSheetCommandOwner();
     openProjectTabBusy = true;
+    openProjectTabBusyOwner = commandOwner;
+    logProjectSheetRemovalTransaction('remove-start', {
+      commandOwner,
+      targetSheetId: plan.targetId,
+      activeSheetId: activeOpenProjectTabId,
+      fallbackSheetId: plan.nextActiveSheetId,
+    });
     try {
       if (plan.isLastSheet) {
         const replacement = await createReplacementEmptySheetTab?.({
@@ -440,14 +468,33 @@
         if (!loaded || loaded === 'deferred') throw new Error('ERR_EMPTY_SHEET_ACTIVATE_FAILED');
       } else {
         if (plan.wasActive) {
+          logProjectSheetRemovalTransaction('fallback-selected', {
+            commandOwner,
+            targetSheetId: plan.targetId,
+            activeSheetId: activeOpenProjectTabId,
+            fallbackSheetId: plan.nextActiveSheetId,
+          });
           const activateTarget = typeof activateProjectSheetForRemoval === 'function'
             ? activateProjectSheetForRemoval
             : activateOpenProjectTab;
+          logProjectSheetRemovalTransaction('activate-start', {
+            commandOwner,
+            targetSheetId: plan.targetId,
+            activeSheetId: activeOpenProjectTabId,
+            fallbackSheetId: plan.nextActiveSheetId,
+          });
           const switched = await activateTarget(plan.nextActiveSheetId, {
             skipPersistCurrent: true,
             announce: false,
+            commandOwner,
           });
           if (!switched) throw new Error('ERR_SHEET_REMOVAL_ACTIVATE_FAILED');
+          logProjectSheetRemovalTransaction('activate-success', {
+            commandOwner,
+            targetSheetId: plan.targetId,
+            activeSheetId: activeOpenProjectTabId,
+            fallbackSheetId: plan.nextActiveSheetId,
+          });
         }
         const removalIndex = findOpenProjectTabIndex(plan.targetId);
         if (removalIndex < 0) throw new Error('ERR_SHEET_REMOVAL_TARGET_MISSING');
@@ -467,12 +514,34 @@
       return true;
     } catch (error) {
       console.warn('Failed to remove project sheet; rolling back', error);
-      await rollbackProjectSheetRemoval(transaction);
+      logProjectSheetRemovalTransaction('rollback', {
+        commandOwner,
+        targetSheetId: plan.targetId,
+        activeSheetId: activeOpenProjectTabId,
+        fallbackSheetId: plan.nextActiveSheetId,
+      });
+      try {
+        await rollbackProjectSheetRemoval(transaction);
+      } catch (rollbackError) {
+        console.warn('Failed to roll back project sheet removal', rollbackError);
+      }
       updateAutosaveStatus(localizeText('シートの削除に失敗しました', 'Failed to delete sheet'), 'error');
       return false;
     } finally {
-      openProjectTabBusy = false;
-      renderOpenProjectTabs();
+      try {
+        if (openProjectTabBusyOwner === commandOwner) {
+          openProjectTabBusyOwner = null;
+          openProjectTabBusy = false;
+        }
+      } finally {
+        logProjectSheetRemovalTransaction('cleanup', {
+          commandOwner,
+          targetSheetId: plan.targetId,
+          activeSheetId: activeOpenProjectTabId,
+          fallbackSheetId: plan.nextActiveSheetId,
+        });
+        renderOpenProjectTabs();
+      }
     }
   }
 
@@ -519,7 +588,12 @@
   }
 
 
-  async function activateOpenProjectTab(tabId, { skipPersistCurrent = false, announce = true, skipBusyGuard = false } = {}) {
+  async function activateOpenProjectTab(tabId, {
+    skipPersistCurrent = false,
+    announce = true,
+    skipBusyGuard = false,
+    commandOwner = null,
+  } = {}) {
     const targetId = typeof tabId === 'string' ? tabId : '';
     if (!targetId) {
       return false;
@@ -527,7 +601,11 @@
     if (!ensureCurrentClientCanReplaceActiveProject({ announce })) {
       return false;
     }
-    if (openProjectTabBusy && !skipBusyGuard) {
+    const reusesBusyLock = Boolean(
+      openProjectTabBusy
+      && (skipBusyGuard || (commandOwner && commandOwner === openProjectTabBusyOwner))
+    );
+    if (openProjectTabBusy && !reusesBusyLock) {
       return false;
     }
     if (!openProjectTabs.length) {
@@ -544,8 +622,13 @@
     const target = openProjectTabs[targetIndex];
     // Acquire synchronously so a duplicate click cannot enter a second
     // persistence/activation sequence before this switch reaches its first await.
-    openProjectTabBusy = true;
-    renderOpenProjectTabs();
+    const activationOwner = commandOwner || Symbol('activate-open-project-tab');
+    const acquiredBusyLock = !reusesBusyLock;
+    if (acquiredBusyLock) {
+      openProjectTabBusy = true;
+      openProjectTabBusyOwner = activationOwner;
+      renderOpenProjectTabs();
+    }
     const guardedProjectTabIds = new Set();
     try {
     console.info('[sheet-switch-debug:start]', {
@@ -757,8 +840,11 @@
           }
         }
       } finally {
-        openProjectTabBusy = false;
-        renderOpenProjectTabs();
+        if (acquiredBusyLock && openProjectTabBusyOwner === activationOwner) {
+          openProjectTabBusyOwner = null;
+          openProjectTabBusy = false;
+          renderOpenProjectTabs();
+        }
       }
     }
   }
