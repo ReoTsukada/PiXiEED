@@ -514,10 +514,18 @@
 
     function createLightweightTabState(tab = null, overrides = {}) {
       const base = tab && typeof tab === 'object' ? tab : {};
+      // A lightweight tab must retain its own restore payload. The collection
+      // project id is not a sheet identity and cannot reconstruct an imported
+      // sheet after another tab has become active.
+      const deferredProjectPayload = overrides.deferredProjectPayload
+        || base.deferredProjectPayload
+        || (base.project && typeof base.project === 'object' ? base.project : null);
       return {
         ...base,
         ...overrides,
         project: null,
+        deferredProjectPayload,
+        deferredPayloadKey: String(overrides.deferredPayloadKey || base.deferredPayloadKey || base.sheetPersistenceKey || base.id || ''),
         checkpointId: String(overrides.checkpointId || base.checkpointId || ''),
         dirtyOpCount: Math.max(0, Math.round(Number(overrides.dirtyOpCount ?? base.dirtyOpCount) || 0)),
         residentProjectLoaded: false,
