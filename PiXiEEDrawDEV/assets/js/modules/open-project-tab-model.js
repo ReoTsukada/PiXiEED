@@ -130,19 +130,22 @@
       const payload = buildOpenProjectTabPayloadFromCurrentState();
       const normalizedProjectId = normalizeAutosaveProjectId(options.projectId || getAutosaveProjectId?.())
         || createAutosaveProjectId();
+      const tabId = options.tabId || createOpenProjectTabId();
       const fileName = normalizeDocumentName(options.fileName || payload.fileName || DEFAULT_DOCUMENT_NAME);
       const persistenceState = resolveTabPersistenceState(options, null, { createToken: true });
       const projectSaveHandle = resolveTabProjectSaveHandle(options.projectSaveHandle, null);
       const projectSaveHandleMeta = resolveTabProjectSaveHandleMeta(options.projectSaveHandleMeta, null);
       if (!SHARED_PROJECTS_ENABLED) {
         const localTab = {
-          id: options.tabId || createOpenProjectTabId(),
+          id: tabId,
           projectId: normalizedProjectId,
           fileName,
           label: typeof options.label === 'string' && options.label.trim()
             ? options.label.trim()
             : extractDocumentBaseName(fileName),
           project: payload.project,
+          deferredProjectPayload: payload.project,
+          deferredPayloadKey: options.deferredPayloadKey || options.sheetPersistenceKey || tabId,
           unsaved: Boolean(payload.unsaved),
           source: options.source || 'working',
           updatedAt: payload.project?.updatedAt || new Date().toISOString(),
@@ -157,12 +160,13 @@
           qrEditPayload: normalizeQrEditPayload(options.qrEditPayload, normalizedProjectId),
           projectSaveHandle,
           projectSaveHandleMeta,
-          sourceProjectId: typeof sheet.sourceProjectId === 'string' && sheet.sourceProjectId ? sheet.sourceProjectId : null,
-          sourceSheetId: typeof sheet.sourceSheetId === 'string' && sheet.sourceSheetId ? sheet.sourceSheetId : null,
-          sheetRuntimeId: typeof sheet.sheetRuntimeId === 'string' && sheet.sheetRuntimeId ? sheet.sheetRuntimeId : `${uniqueId}:runtime`,
-          sheetPersistenceKey: typeof sheet.sheetPersistenceKey === 'string' && sheet.sheetPersistenceKey ? sheet.sheetPersistenceKey : `${uniqueId}:persistence`,
-          historyOwnerId: typeof sheet.historyOwnerId === 'string' && sheet.historyOwnerId ? sheet.historyOwnerId : `${uniqueId}:history`,
-          timelapseOwnerId: typeof sheet.timelapseOwnerId === 'string' && sheet.timelapseOwnerId ? sheet.timelapseOwnerId : `${uniqueId}:timelapse`,
+          sourceProjectId: typeof options.sourceProjectId === 'string' && options.sourceProjectId ? options.sourceProjectId : null,
+          sourceSheetId: typeof options.sourceSheetId === 'string' && options.sourceSheetId ? options.sourceSheetId : null,
+          runtimeProjectId: typeof options.runtimeProjectId === 'string' && options.runtimeProjectId ? options.runtimeProjectId : `${tabId}:runtime-project`,
+          sheetRuntimeId: typeof options.sheetRuntimeId === 'string' && options.sheetRuntimeId ? options.sheetRuntimeId : `${tabId}:runtime`,
+          sheetPersistenceKey: typeof options.sheetPersistenceKey === 'string' && options.sheetPersistenceKey ? options.sheetPersistenceKey : `${tabId}:persistence`,
+          historyOwnerId: typeof options.historyOwnerId === 'string' && options.historyOwnerId ? options.historyOwnerId : `${tabId}:history`,
+          timelapseOwnerId: typeof options.timelapseOwnerId === 'string' && options.timelapseOwnerId ? options.timelapseOwnerId : `${tabId}:timelapse`,
           ...persistenceState,
         };
         const entrySignature = typeof createLocalProjectEntrySignature === 'function'
@@ -207,6 +211,8 @@
           ? options.label.trim()
           : extractDocumentBaseName(fileName),
         project: payload.project,
+        deferredProjectPayload: payload.project,
+        deferredPayloadKey: options.deferredPayloadKey || options.sheetPersistenceKey || tabId,
         unsaved: Boolean(payload.unsaved),
         source: options.source || (currentProjectIsShared ? 'shared' : 'working'),
         updatedAt: payload.project?.updatedAt || new Date().toISOString(),
@@ -272,6 +278,8 @@
           ? options.label.trim()
           : (currentTab?.label || extractDocumentBaseName(fileName)),
         project: payload.project,
+        deferredProjectPayload: payload.project,
+        deferredPayloadKey: currentTab?.deferredPayloadKey || currentTab?.sheetPersistenceKey || options.sheetPersistenceKey || currentTab?.id || '',
         unsaved: Boolean(payload.unsaved),
         source: options.source || currentTab?.source || 'working',
         updatedAt: payload.project?.updatedAt || new Date().toISOString(),
@@ -286,6 +294,7 @@
         qrEditPayload: normalizeQrEditPayload(options.qrEditPayload || currentTab?.qrEditPayload, normalizedProjectId),
         projectSaveHandle,
         projectSaveHandleMeta,
+        runtimeProjectId: currentTab?.runtimeProjectId || options.runtimeProjectId || `${currentTab?.id || 'sheet'}:runtime-project`,
         ...persistenceState,
       };
       const entrySignature = typeof createLocalProjectEntrySignature === 'function'
@@ -321,8 +330,12 @@
       projectSaveHandleMeta = null,
       sourceProjectId = null,
       sourceSheetId = null,
+      runtimeProjectId = '',
       sheetRuntimeId = '',
+      deferredPayloadKey = '',
       sheetPersistenceKey = '',
+      localPersistenceKey = '',
+      autosaveV2SheetId = '',
       historyOwnerId = '',
       timelapseOwnerId = '',
     } = {}) {
@@ -352,6 +365,8 @@
         fileName: normalizedFileName,
         label: label || extractDocumentBaseName(normalizedFileName),
         project,
+        deferredProjectPayload: project,
+        deferredPayloadKey: deferredPayloadKey || sheetPersistenceKey || id || '',
         unsaved: Boolean(unsaved),
         source,
         updatedAt: updatedAt || project?.updatedAt || new Date().toISOString(),
@@ -360,8 +375,11 @@
         projectSaveHandleMeta: normalizedProjectSaveHandleMeta,
         sourceProjectId: typeof sourceProjectId === 'string' && sourceProjectId ? sourceProjectId : null,
         sourceSheetId: typeof sourceSheetId === 'string' && sourceSheetId ? sourceSheetId : null,
+        runtimeProjectId: typeof runtimeProjectId === 'string' && runtimeProjectId ? runtimeProjectId : `${id || 'sheet'}:runtime-project`,
         sheetRuntimeId: typeof sheetRuntimeId === 'string' && sheetRuntimeId ? sheetRuntimeId : `${id || 'sheet'}:runtime`,
         sheetPersistenceKey: typeof sheetPersistenceKey === 'string' && sheetPersistenceKey ? sheetPersistenceKey : `${id || 'sheet'}:persistence`,
+        localPersistenceKey: typeof localPersistenceKey === 'string' && localPersistenceKey ? localPersistenceKey : `${id || 'sheet'}:local`,
+        autosaveV2SheetId: typeof autosaveV2SheetId === 'string' && autosaveV2SheetId ? autosaveV2SheetId : `${id || 'sheet'}:autosave-v2`,
         historyOwnerId: typeof historyOwnerId === 'string' && historyOwnerId ? historyOwnerId : `${id || 'sheet'}:history`,
         timelapseOwnerId: typeof timelapseOwnerId === 'string' && timelapseOwnerId ? timelapseOwnerId : `${id || 'sheet'}:timelapse`,
         ...persistenceState,
@@ -401,12 +419,25 @@
           fileName,
           label: typeof sheet.label === 'string' && sheet.label ? sheet.label : localizeText(`シート ${normalized.length + 1}`, `Sheet ${normalized.length + 1}`),
           project: sheet.project,
+          deferredProjectPayload: sheet.project,
+          deferredPayloadKey: typeof sheet.deferredPayloadKey === 'string' && sheet.deferredPayloadKey
+            ? sheet.deferredPayloadKey
+            : (typeof sheet.sheetPersistenceKey === 'string' && sheet.sheetPersistenceKey ? sheet.sheetPersistenceKey : uniqueId),
           unsaved: Boolean(sheet.unsaved),
           source: typeof sheet.source === 'string' && sheet.source ? sheet.source : 'sheet',
           updatedAt: sheet.updatedAt || sheet.project?.updatedAt || new Date().toISOString(),
           qrEditPayload: normalizeQrEditPayload(sheet.qrEditPayload, getAutosaveProjectId?.() || ''),
           projectSaveHandle,
           projectSaveHandleMeta,
+          sourceProjectId: typeof sheet.sourceProjectId === 'string' && sheet.sourceProjectId ? sheet.sourceProjectId : null,
+          sourceSheetId: typeof sheet.sourceSheetId === 'string' && sheet.sourceSheetId ? sheet.sourceSheetId : null,
+          runtimeProjectId: typeof sheet.runtimeProjectId === 'string' && sheet.runtimeProjectId ? sheet.runtimeProjectId : `${uniqueId}:runtime-project`,
+          sheetRuntimeId: typeof sheet.sheetRuntimeId === 'string' && sheet.sheetRuntimeId ? sheet.sheetRuntimeId : `${uniqueId}:runtime`,
+          sheetPersistenceKey: typeof sheet.sheetPersistenceKey === 'string' && sheet.sheetPersistenceKey ? sheet.sheetPersistenceKey : `${uniqueId}:persistence`,
+          localPersistenceKey: typeof sheet.localPersistenceKey === 'string' && sheet.localPersistenceKey ? sheet.localPersistenceKey : `${uniqueId}:local`,
+          autosaveV2SheetId: typeof sheet.autosaveV2SheetId === 'string' && sheet.autosaveV2SheetId ? sheet.autosaveV2SheetId : `${uniqueId}:autosave-v2`,
+          historyOwnerId: typeof sheet.historyOwnerId === 'string' && sheet.historyOwnerId ? sheet.historyOwnerId : `${uniqueId}:history`,
+          timelapseOwnerId: typeof sheet.timelapseOwnerId === 'string' && sheet.timelapseOwnerId ? sheet.timelapseOwnerId : `${uniqueId}:timelapse`,
           ...persistenceState,
           ...(sheetSharedProjectKey ? {
             sharedProjectKey: sheetSharedProjectKey,
