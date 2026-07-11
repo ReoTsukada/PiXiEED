@@ -866,6 +866,7 @@
     canvas.dataset.pointerBinding = 'true';
     canvas.addEventListener('pointerdown', handlePointerDown);
     canvas.addEventListener('pointercancel', handlePointerCancel);
+    canvas.addEventListener('lostpointercapture', handlePointerCancel);
     canvas.addEventListener('pointermove', event => {
       let needsRender = false;
       if (!pointerState.active) {
@@ -2485,7 +2486,11 @@
       cancelPendingSelectionMove();
     }
     if (pointerState.active) {
-      abortActivePointerInteraction({ commitHistory: false });
+      if (pointerState.tool === 'pan' && pointerState.panMode === 'multiTouch') {
+        cancelActiveViewportGesture('canvas-structure-change');
+      } else {
+        abortActivePointerInteraction({ commitHistory: false });
+      }
     }
     clearPendingCanvasSwitchPointer({ detachListeners: true });
     pointerState.selectionMove = null;
