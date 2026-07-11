@@ -40,6 +40,7 @@ function setup({ tabs = [tab('a'), tab('b'), tab('c')], activeId = 'a', activate
   let dirty = 0;
   let autosave = 0;
   let sessionPersist = 0;
+  let activationOptions = null;
   const scope = {
     openProjectTabs: tabs,
     openProjectTabBusy: false,
@@ -50,13 +51,15 @@ function setup({ tabs = [tab('a'), tab('b'), tab('c')], activeId = 'a', activate
     localizeText: ja => ja,
     renderOpenProjectTabs() {},
     loadDocumentFromProjectPayload: async () => true,
-    activateOpenProjectTab: async id => {
-      if (activate) return await activate(id, value => { currentActiveId = value; });
+    activateOpenProjectTab: async (id, options) => {
+      activationOptions = options || null;
+      if (activate) return await activate(id, value => { currentActiveId = value; }, options);
       currentActiveId = id;
       return true;
     },
-    activateProjectSheetForRemoval: async id => {
-      if (activate) return await activate(id, value => { currentActiveId = value; });
+    activateProjectSheetForRemoval: async (id, options) => {
+      activationOptions = options || null;
+      if (activate) return await activate(id, value => { currentActiveId = value; }, options);
       currentActiveId = id;
       return true;
     },
@@ -77,7 +80,13 @@ function setup({ tabs = [tab('a'), tab('b'), tab('c')], activeId = 'a', activate
     enumerable: true,
   });
   const utils = window.PiXiEEDrawModules.openProjectTabWorkflowUtils.createOpenProjectTabWorkflowUtils(scope);
-  return { utils, tabs, getActiveId: () => currentActiveId, counts: () => ({ dirty, autosave, sessionPersist }) };
+  return {
+    utils,
+    tabs,
+    getActiveId: () => currentActiveId,
+    getActivationOptions: () => activationOptions,
+    counts: () => ({ dirty, autosave, sessionPersist }),
+  };
 }
 
 let test = setup({ activeId: 'a' });
@@ -94,6 +103,8 @@ assert.equal(plan.nextActiveSheetId, 'c', 'active deletion chooses the right nei
 assert.equal(await test.utils.commitProjectSheetRemoval(plan), true);
 assert.deepEqual(test.tabs.map(item => item.id), ['a', 'c']);
 assert.equal(test.getActiveId(), 'c');
+assert.equal(typeof test.getActivationOptions()?.commandOwner, 'symbol', 'active deletion reuses its owned busy command');
+assert.equal(test.getActivationOptions()?.skipBusyGuard, undefined, 'removal does not broadly bypass the busy guard');
 
 test = setup({ tabs: [tab('a'), tab('b')], activeId: 'b' });
 plan = test.utils.planProjectSheetRemoval('b');
@@ -144,6 +155,9 @@ const source = fs.readFileSync(path.join(repoRoot, 'PiXiEEDrawDEV/assets/js/modu
 assert.match(source, /function planProjectSheetRemoval/);
 assert.match(source, /async function commitProjectSheetRemoval/);
 assert.match(source, /async function rollbackProjectSheetRemoval/);
+assert.match(source, /createRemoveProjectSheetCommandOwner/);
+assert.match(source, /commandOwner,/);
+assert.match(source, /const reusesBusyLock = Boolean/);
 assert.match(source, /Deleted the last sheet and created a new empty sheet/);
 
 console.log('PiXiEEDraw DEV Phase 5-B4 sheet removal checks passed');
