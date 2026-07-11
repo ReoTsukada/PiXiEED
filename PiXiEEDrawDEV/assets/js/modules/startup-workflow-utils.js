@@ -216,7 +216,11 @@
       }
       newProjectAdRequested = true;
       try {
-        (window.adsbygoogle = window.adsbygoogle || []).push({});
+        const result = window.__PIXIEEDRAW_RENDER_AD_SLOT__?.(adSlot, {
+          owner: 'new-project-dialog',
+          reason: 'dialog-open',
+        });
+        if (!result?.ok) throw new Error(result?.reason || 'ERR_AD_SLOT_RENDER_FAILED');
         adSlot.dataset.loaded = '1';
       } catch (error) {
         newProjectAdRequested = false;
@@ -1167,7 +1171,11 @@
           return;
         }
         try {
-          (window.adsbygoogle = window.adsbygoogle || []).push({});
+          const result = window.__PIXIEEDRAW_RENDER_AD_SLOT__?.(adSlot, {
+            owner: 'startup-recent',
+            reason: 'startup-recent-visible',
+          });
+          if (!result?.ok) throw new Error(result?.reason || 'ERR_AD_SLOT_RENDER_FAILED');
           adSlot.dataset.loaded = '1';
         } catch (error) {
           delete adSlot.dataset.renderPending;
