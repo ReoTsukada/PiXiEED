@@ -11935,8 +11935,14 @@
     createBlankSheetPackagedProject,
     createNewSheetTab,
     openProjectTabAddPicker,
+    getProjectTabAddDebugState,
     setupOpenProjectTabs,
   } = openProjectTabSheetActions;
+  window.__pixieedrawGetSheetAddDebugState = () => (
+    typeof getProjectTabAddDebugState === 'function'
+      ? getProjectTabAddDebugState()
+      : null
+  );
 
   const pixelPatchHistoryUtils = window.PiXiEEDrawModules?.pixelPatchHistoryUtils?.createPixelPatchHistoryUtils?.({
     state,
