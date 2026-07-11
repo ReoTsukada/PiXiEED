@@ -976,21 +976,6 @@
     }
     accountInitPromise = (async () => {
       try {
-        if (!pixieedAdFreeSharedLimitBound && window.pixieedAdFree?.subscribe) {
-          pixieedAdFreeSharedLimitBound = true;
-          window.pixieedAdFree.subscribe(nextState => {
-            syncPixieedSupportBenefitUi(nextState);
-            if (!accountState.isLoggedIn || accountState.isAnonymous) {
-              return;
-            }
-            if (!nextState?.isReady) {
-              return;
-            }
-            enforceSharedProjectOwnershipLimit().catch(error => {
-              console.warn('Failed to enforce shared project limit after entitlement update', error);
-            });
-          });
-        }
         syncPixieedSupportBenefitUi();
         const supabase = await ensurePixieedAccountClient();
         if (!supabase) {
