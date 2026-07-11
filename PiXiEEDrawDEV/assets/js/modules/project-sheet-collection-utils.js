@@ -23,7 +23,29 @@
       if (activeSheetId && !ids.has(activeSheetId)) return { valid: false, code: 'ERR_ACTIVE_SHEET_INVALID' };
       return { valid: true, count: sheets.length, sheetOrder: order };
     }
-    function prepareSheetCandidate(kind, input = {}, context = {}) { const project = input.project ? clone(input.project) : null; return { kind, id: input.id || context.createId?.() || `sheet-${Date.now()}`, project, fileName: input.fileName || project?.document?.documentName || '', label: input.label || '', sourceKind: input.sourceKind || kind, sourceStorageAdapterId: input.sourceStorageAdapterId || null, sourceProjectToken: input.sourceProjectToken || context.createToken?.() || '', projectSaveHandle: null, projectSaveHandleMeta: null }; }
+    function prepareSheetCandidate(kind, input = {}, context = {}) {
+      const project = input.project ? clone(input.project) : null;
+      const id = input.id || context.createId?.() || `sheet-${Date.now()}`;
+      return {
+        kind,
+        id,
+        project,
+        fileName: input.fileName || project?.document?.documentName || '',
+        label: input.label || '',
+        sourceKind: input.sourceKind || kind,
+        sourceStorageAdapterId: input.sourceStorageAdapterId || null,
+        sourceProjectToken: input.sourceProjectToken || context.createToken?.() || '',
+        // Source identity is diagnostic-only. Runtime ownership is always new.
+        sourceProjectId: input.sourceProjectId || null,
+        sourceSheetId: input.sourceSheetId || null,
+        sheetRuntimeId: input.sheetRuntimeId || context.createRuntimeId?.() || `${id}:runtime`,
+        sheetPersistenceKey: input.sheetPersistenceKey || context.createPersistenceKey?.() || `${id}:persistence`,
+        historyOwnerId: input.historyOwnerId || context.createHistoryOwnerId?.() || `${id}:history`,
+        timelapseOwnerId: input.timelapseOwnerId || context.createTimelapseOwnerId?.() || `${id}:timelapse`,
+        projectSaveHandle: null,
+        projectSaveHandleMeta: null,
+      };
+    }
     function validateSheetCandidate(candidate) { if (!candidate?.id || !candidate.project) return { valid: false, code: 'ERR_SHEET_CANDIDATE_INVALID' }; return validateProjectSheetsCollection([candidate], { activeSheetId: candidate.id }); }
     return Object.freeze({ MAX_CANVASES_PER_SHEET, validateSheetCanvasCount, validateProjectSheetsCollection, prepareSheetCandidate, validateSheetCandidate });
   }
