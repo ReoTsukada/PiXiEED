@@ -478,9 +478,6 @@
       setLocalizedTextContent('#multiAssignBan', 'BAN', 'Ban');
   
       setLocalizedTextContent('#goHomeButton span:last-child', 'ホーム', 'Home');
-      setLocalizedTextContent('#pixieedAdFreeField > span', '広告非表示', 'Ads Hidden');
-      setLocalizedTextContent('#pixieedAdFreeStatus', '広告非表示が有効です。', 'Ads are hidden.');
-      setLocalizedTextContent('#pixieedAdFreePurchase', '利用可能', 'Available');
       setLocalizedTextContent('#multiEntryAccountCard .multi-account-card__head > span', '共有プロジェクトを作成', 'Create Shared Project');
       setLocalizedTextContent('#multiFlowAccountCard .multi-account-card__head > span', '共有プロジェクトを作成', 'Create Shared Project');
       setLocalizedTextContent('#multiEntryAccountLogin', 'ログインして共有を作成', 'Sign In to Create Shared Project');
@@ -739,10 +736,6 @@
       if (dom.controls.supportTipLink instanceof HTMLElement) {
         dom.controls.supportTipLink.hidden = hidden;
         dom.controls.supportTipLink.setAttribute('aria-hidden', String(hidden));
-      }
-      if (dom.controls.adFreeField instanceof HTMLElement) {
-        dom.controls.adFreeField.hidden = hidden;
-        dom.controls.adFreeField.setAttribute('aria-hidden', String(hidden));
       }
       const spotlightTip = dom.toolSpotlight?.supportTip;
       if (spotlightTip instanceof HTMLElement) {
