@@ -5667,6 +5667,36 @@
   }) || {};
 
   const canonicalV2ProjectUtilsModule = window.PiXiEEDrawModules?.canonicalV2ProjectUtils || {};
+  const projectCommandLockManager = window.PiXiEEDrawModules?.projectCommandLockUtils
+    ?.createProjectCommandLockManager?.({
+      onDiagnostic: details => console.info('[pixiedraw-dev:command-lock]', details),
+    });
+  function inspectProjectCommandLock() {
+    return projectCommandLockManager?.inspect?.() || {
+      locked: false, owner: null, command: null, acquiredAt: 0, lockAgeMs: 0, tokenPresent: false,
+    };
+  }
+  function isProjectCommandLocked() {
+    return inspectProjectCommandLock().locked === true;
+  }
+  function acquireProjectCommandLock(options) {
+    return projectCommandLockManager?.acquire?.(options) || { ok: false, code: 'ERR_PROJECT_COMMAND_STATE_INVALID' };
+  }
+  function releaseProjectCommandLock(options) {
+    return projectCommandLockManager?.release?.(options) || { ok: false, code: 'ERR_PROJECT_COMMAND_STATE_INVALID' };
+  }
+  function isProjectCommandLockHeldBy(options) {
+    return projectCommandLockManager?.isHeldBy?.(options) === true;
+  }
+  function detectStaleProjectCommandLock() {
+    return projectCommandLockManager?.detectStale?.() || { stale: false, ...inspectProjectCommandLock() };
+  }
+  window.acquireProjectCommandLock = acquireProjectCommandLock;
+  window.releaseProjectCommandLock = releaseProjectCommandLock;
+  window.inspectProjectCommandLock = inspectProjectCommandLock;
+  window.isProjectCommandLockHeldBy = isProjectCommandLockHeldBy;
+  window.detectStaleProjectCommandLock = detectStaleProjectCommandLock;
+  window.__pixieedrawGetProjectCommandLockStatus = () => inspectProjectCommandLock();
   const openImportWorkflowUtilsModule = window.PiXiEEDrawModules?.openImportWorkflowUtils?.createOpenImportWorkflowUtils?.({
   get AUTOSAVE_SUPPORTED() { return AUTOSAVE_SUPPORTED; },
   set AUTOSAVE_SUPPORTED(value) { AUTOSAVE_SUPPORTED = value; },
@@ -5874,8 +5904,7 @@
   set normalizeSharedRecentProjectEntry(value) { normalizeSharedRecentProjectEntry = value; },
   get normalizeUiTheme() { return normalizeUiTheme; },
   set normalizeUiTheme(value) { normalizeUiTheme = value; },
-  get openProjectTabBusy() { return openProjectTabBusy; },
-  set openProjectTabBusy(value) { openProjectTabBusy = value; },
+  get openProjectTabBusy() { return isProjectCommandLocked(); },
   get openProjectTabs() { return openProjectTabs; },
   set openProjectTabs(value) { openProjectTabs = value; },
   get openRecentProject() { return openRecentProject; },
@@ -9164,9 +9193,9 @@
   let selectionCanvasActive = false;
   const openProjectTabs = [];
   let activeOpenProjectTabId = '';
+  let startupReady = false;
   let suppressOpenProjectTabAutoInitialize = false;
   let openProjectTabSequence = 0;
-  let openProjectTabBusy = false;
   const openProjectTabProjectWriteGuards = new Map();
   let openProjectTabsLastRenderSignature = '';
   let openProjectTabsLastStructureSignature = '';
@@ -10615,7 +10644,7 @@
     openProjectTabLongPressState,
     SHARED_PROJECTS_ENABLED,
     getActiveOpenProjectTabId: () => activeOpenProjectTabId,
-    getOpenProjectTabBusy: () => openProjectTabBusy,
+    getOpenProjectTabBusy: () => isProjectCommandLocked(),
     getOpenProjectTabSequence: () => openProjectTabSequence,
     setOpenProjectTabSequence: (value) => {
       openProjectTabSequence = value;
@@ -10744,8 +10773,7 @@
   set normalizeAutosaveProjectId(value) { normalizeAutosaveProjectId = value; },
   get normalizeMultiProjectKey() { return normalizeMultiProjectKey; },
   set normalizeMultiProjectKey(value) { normalizeMultiProjectKey = value; },
-  get openProjectTabBusy() { return openProjectTabBusy; },
-  set openProjectTabBusy(value) { openProjectTabBusy = value; },
+  get openProjectTabBusy() { return isProjectCommandLocked(); },
   get openProjectTabs() { return openProjectTabs; },
   set openProjectTabs(value) { openProjectTabs = value; },
   get openSharedRecentProject() { return openSharedRecentProject; },
@@ -11777,15 +11805,15 @@
     openProjectTabs,
     getActiveOpenProjectTabId: () => activeOpenProjectTabId,
     getProjectHomeVisible: () => projectHomeVisible,
-    getOpenProjectTabBusy: () => openProjectTabBusy,
+    getOpenProjectTabBusy: () => isProjectCommandLocked(),
     getProjectTabAddAvailability: () => {
       const activeTab = openProjectTabs.find(tab => tab?.id === activeOpenProjectTabId) || null;
       const hasActiveProject = Boolean(activeTab);
       return {
-        enabled: hasActiveProject && !openProjectTabBusy,
-        reason: openProjectTabBusy
+        enabled: hasActiveProject && !isProjectCommandLocked(),
+        reason: isProjectCommandLocked()
           ? 'command-in-flight'
-          : (hasActiveProject ? 'ready' : 'no-active-project'),
+          : (hasActiveProject ? 'available' : 'no-active-project'),
         activeTab,
       };
     },
@@ -11804,9 +11832,12 @@
         disabled: addButton.disabled,
         ariaDisabled: addButton.getAttribute('aria-disabled'),
         pointerEvents: window.getComputedStyle(addButton).pointerEvents,
-        openProjectTabBusy,
+        lockOwner: inspectProjectCommandLock().owner,
+        lockCommand: inspectProjectCommandLock().command,
+        lockAgeMs: inspectProjectCommandLock().lockAgeMs,
+        startupReady,
         sheetAddInFlight: Boolean(sheetAddDebug?.inFlight),
-        imageImportInFlight: false, // Imports share openProjectTabBusy; no separate lock exists.
+        imageImportInFlight: inspectProjectCommandLock().owner === 'png-import',
         gifImportInFlight: false,
         projectImportInFlight: false,
         pickerOpen: Boolean(sheetAddDebug?.pickerOpen),
@@ -11884,7 +11915,7 @@
     },
     getStartupAutosaveRestoreProjectId: () => startupAutosaveRestoreProjectId,
     getAutosaveProjectId: () => autosaveProjectId,
-    getOpenProjectTabBusy: () => openProjectTabBusy,
+    getOpenProjectTabBusy: () => isProjectCommandLocked(),
     getStartupVisible: () => startupVisible,
     getActiveSharedProjectKey: () => activeSharedProjectKey,
     findOpenProjectTabIndex,
@@ -11944,21 +11975,21 @@
     openProjectTabs,
     DEFAULT_CANVAS_SIZE,
     NEW_PROJECT_PALETTE_PRESET_DEFAULT,
-    getOpenProjectTabBusy: () => openProjectTabBusy,
+    getOpenProjectTabBusy: () => isProjectCommandLocked(),
     getProjectTabAddAvailability: () => {
       const activeTab = openProjectTabs.find(tab => tab?.id === activeOpenProjectTabId) || null;
       const hasActiveProject = Boolean(activeTab);
       return {
-        enabled: hasActiveProject && !openProjectTabBusy,
-        reason: openProjectTabBusy
+        enabled: hasActiveProject && !isProjectCommandLocked(),
+        reason: isProjectCommandLocked()
           ? 'command-in-flight'
-          : (hasActiveProject ? 'ready' : 'no-active-project'),
+          : (hasActiveProject ? 'available' : 'no-active-project'),
         activeTab,
       };
     },
-    setOpenProjectTabBusy: (value) => {
-      openProjectTabBusy = Boolean(value);
-    },
+    acquireProjectCommandLock,
+    releaseProjectCommandLock,
+    inspectProjectCommandLock,
     getAutosaveProjectId: () => autosaveProjectId,
     getActiveOpenProjectTabId: () => activeOpenProjectTabId,
     getActiveProjectPersistenceState: (...args) => getActiveProjectPersistenceState(...args),
@@ -12998,6 +13029,9 @@
       console.info('[pixiedraw-dev:update]', {
         phase: 'service-worker-controllerchange',
         reason: 'controller-changed-without-reload',
+        startupReady,
+        commandLocked: isProjectCommandLocked(),
+        lockOwner: inspectProjectCommandLock().owner,
       });
     });
     const swUrl = `service-worker.js?v=${encodeURIComponent(APP_SW_VERSION)}`;
@@ -25174,6 +25208,8 @@
   }
 
   async function init() {
+    startupReady = false;
+    console.info('[pixiedraw-dev:startup]', { phase: 'startup-bootstrap-start' });
     startupRestoreCancelRequested = false;
     setStartupBootLoadingProgress(0, {
       label: localizeText('起動準備中…', 'Preparing startup...'),
@@ -25240,9 +25276,11 @@
       setupMirrorGuideResizeObserver();
       setupMirrorToolPopover();
       setupKeyboard();
+      console.info('[pixiedraw-dev:startup]', { phase: 'startup-workflows-created' });
       updateDocumentMetadata();
       setupStartupScreen();
       setupProjectHomeScreen();
+      console.info('[pixiedraw-dev:startup]', { phase: 'startup-listeners-bound' });
       hydratePixieedAccountFromLocalCache();
       const accountInitTask = initPixieedAccount().catch(error => {
         console.warn('Account bootstrap failed', error);
@@ -25255,6 +25293,7 @@
       let restoredAutosaveProject = false;
       if (!lensImportRequested && !qrImportRequested && !skipStartup) {
         try {
+          console.info('[pixiedraw-dev:startup]', { phase: 'startup-session-restore-start' });
           setStartupProgressLabel(localizeText('前回の作業を確認中…', 'Checking your previous work...'));
           if (startupSharedReloadProjectKey) {
             await runStartupTaskWithTimeout(accountInitTask, {
@@ -25286,6 +25325,7 @@
               }
             );
           }
+          console.info('[pixiedraw-dev:startup]', { phase: 'startup-session-restore-success', restored: Boolean(restoredAutosaveProject || reloadSnapshotRestored) });
         } catch (error) {
           console.warn('Startup autosave restore failed', error);
           restoredAutosaveProject = Boolean(reloadSnapshotRestored);
@@ -25327,6 +25367,20 @@
       if (typeof document !== 'undefined' && document.body instanceof HTMLElement) {
         document.body.classList.remove('app-preinit');
         document.body.classList.add('app-ready');
+      }
+      startupReady = true;
+      const commandLock = inspectProjectCommandLock();
+      const startupStatus = {
+        phase: 'startup-ready',
+        commandLocked: commandLock.locked,
+        lockOwner: commandLock.owner,
+        lockAgeMs: commandLock.lockAgeMs,
+        recentProjectCount: recentProjectsCache.size,
+        hasActiveProject: Boolean(activeOpenProjectTabId),
+      };
+      console.info('[pixiedraw-dev:startup]', startupStatus);
+      if (commandLock.locked) {
+        console.warn('[pixiedraw-dev:startup]', { ...startupStatus, code: 'ERR_STARTUP_READY_WITH_COMMAND_LOCK' });
       }
     }
   }
