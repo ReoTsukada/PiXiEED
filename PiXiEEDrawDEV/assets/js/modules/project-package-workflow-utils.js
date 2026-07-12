@@ -573,12 +573,14 @@
       thumbnailIntervalMs = LOCAL_PROJECT_THUMBNAIL_UPDATE_INTERVAL_MS,
       activateProject = true,
       journalPayload = null,
+      savePlan: suppliedSavePlan = null,
     } = {}
   ) {
     if (!AUTOSAVE_SUPPORTED) {
       return null;
     }
-    if (!snapshot || typeof snapshot !== 'object') {
+    const journalOnlySave = suppliedSavePlan?.journalOnly === true;
+    if ((!snapshot || typeof snapshot !== 'object') && !journalOnlySave) {
       return null;
     }
     try {
@@ -613,7 +615,7 @@
       let savePlan;
       let packaged;
       try {
-        savePlan = typeof buildActiveLocalProjectSavePlan === 'function'
+        savePlan = suppliedSavePlan || (typeof buildActiveLocalProjectSavePlan === 'function'
           ? buildActiveLocalProjectSavePlan({
             projectId: resolvedProjectId,
             snapshot,
@@ -621,18 +623,23 @@
             buildPackagedProjectPayload,
             buildAutosaveSessionPayload: buildProjectSessionPayload,
           })
-          : null;
+          : null);
         packaged = savePlan?.packagedPayload && typeof savePlan.packagedPayload === 'object'
           ? savePlan.packagedPayload
           : (
             packagedPayload && typeof packagedPayload === 'object'
               ? packagedPayload
-              : buildPackagedProjectPayload(snapshot)
+              : (savePlan?.journalOnly === true ? previousEntry?.project || null : buildPackagedProjectPayload(snapshot))
           );
-        ensurePackagedProjectSheetsForSave(packaged, snapshot);
-        preserveExistingProjectSheetsForSave(packaged, previousEntry?.project || null);
-        if (!validatePackagedProjectSheetCountForSave(packaged)) {
-          throw new Error('Refusing to save incomplete project sheets');
+        if (!packaged || typeof packaged !== 'object') {
+          throw new Error('Missing local project checkpoint for journal-only save');
+        }
+        if (!savePlan?.journalOnly) {
+          ensurePackagedProjectSheetsForSave(packaged, snapshot);
+          preserveExistingProjectSheetsForSave(packaged, previousEntry?.project || null);
+          if (!validatePackagedProjectSheetCountForSave(packaged)) {
+            throw new Error('Refusing to save incomplete project sheets');
+          }
         }
       } finally {
         endProjectPackagePerformanceSpan(packageSpan, {
@@ -655,7 +662,8 @@
         Math.round(Number(thumbnailIntervalMs) || LOCAL_PROJECT_THUMBNAIL_UPDATE_INTERVAL_MS)
       );
       const shouldRefreshThumbnail =
-        !skipThumbnail
+        !savePlan?.journalOnly
+        && !skipThumbnail
         && (
           !previousEntry?.thumbnail
           || (listThumbnailSheetId && previousEntry?.thumbnailSheetId !== listThumbnailSheetId)
@@ -673,7 +681,9 @@
       } finally {
         endProjectPackagePerformanceSpan(thumbnailSpan);
       }
-      const dotStats = resolvePackagedProjectDotStats(packaged, snapshot);
+      const dotStats = savePlan?.journalOnly
+        ? (previousEntry?.dotStats || null)
+        : resolvePackagedProjectDotStats(packaged, snapshot);
       const updatedEntry = {
         id: resolvedProjectId,
         accountUserId: getCurrentRecentProjectAccountUserId(),
@@ -724,7 +734,9 @@
       }
       setRecentProjectsCache(workingEntries);
       if (dotStats) {
-        setTrackedProjectDotBaseline(snapshot, dotStats);
+        if (snapshot) {
+          setTrackedProjectDotBaseline(snapshot, dotStats);
+        }
         schedulePackagedProjectDotSync(resolvedProjectId, dotStats);
       }
       return updatedEntry;
