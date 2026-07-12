@@ -5535,6 +5535,8 @@
   set buildNumberedFilename(value) { buildNumberedFilename = value; },
   get buildPackagedProjectPayload() { return buildPackagedProjectPayload; },
   set buildPackagedProjectPayload(value) { buildPackagedProjectPayload = value; },
+  get buildProjectSessionPayload() { return buildProjectSessionPayload; },
+  set buildProjectSessionPayload(value) { buildProjectSessionPayload = value; },
   get canUseSessionStorage() { return canUseSessionStorage; },
   set canUseSessionStorage(value) { canUseSessionStorage = value; },
   get clearTimelapseRecording() { return clearTimelapseRecording; },
@@ -5581,6 +5583,8 @@
   set lastViewportInteractionAt(value) { lastViewportInteractionAt = value; },
   get loadStoredAutosaveProjectId() { return loadStoredAutosaveProjectId; },
   set loadStoredAutosaveProjectId(value) { loadStoredAutosaveProjectId = value; },
+  get loadStoredAutosaveHandle() { return loadStoredAutosaveHandle; },
+  set loadStoredAutosaveHandle(value) { loadStoredAutosaveHandle = value; },
   get loadStoredExportDirectoryDisplayLabel() { return loadStoredExportDirectoryDisplayLabel; },
   set loadStoredExportDirectoryDisplayLabel(value) { loadStoredExportDirectoryDisplayLabel = value; },
   get loadStoredExportDirectoryHandle() { return loadStoredExportDirectoryHandle; },
@@ -16063,6 +16067,10 @@
     return localProjectJournalUtilsModule.markNeedsCheckpoint(...args);
   }
 
+  function markActiveLocalProjectJournalCheckpointPersisted(...args) {
+    return localProjectJournalUtilsModule.markCheckpointPersisted(...args);
+  }
+
   function buildActiveLocalProjectSavePlan(...args) {
     return localProjectJournalUtilsModule.buildSavePlan(...args);
   }
@@ -16353,6 +16361,9 @@
     await saveRecentProjectsList(existingEntries, nextEntries);
     setRecentProjectsCache(nextEntries);
     autosaveV2CheckpointReadyProjectIds.add(normalizedProjectId);
+    if (!journalOnly) {
+      markActiveLocalProjectJournalCheckpointPersisted(normalizedProjectId);
+    }
     return metadata;
   }
 
