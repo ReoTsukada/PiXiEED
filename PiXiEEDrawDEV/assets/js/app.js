@@ -5612,6 +5612,10 @@
   set reconcileTimelapseTracksForSingleCanvas(value) { reconcileTimelapseTracksForSingleCanvas = value; },
   get recordRecentProjectSnapshot() { return recordRecentProjectSnapshot; },
   set recordRecentProjectSnapshot(value) { recordRecentProjectSnapshot = value; },
+  get isAutosaveV2PrimaryEnabled() { return isAutosaveV2PrimaryEnabled; },
+  set isAutosaveV2PrimaryEnabled(value) { isAutosaveV2PrimaryEnabled = value; },
+  get writeAutosaveV2Primary() { return writeAutosaveV2Primary; },
+  set writeAutosaveV2Primary(value) { writeAutosaveV2Primary = value; },
   get queueAutosaveV2ShadowWrite() { return queueAutosaveV2ShadowWrite; },
   set queueAutosaveV2ShadowWrite(value) { queueAutosaveV2ShadowWrite = value; },
   get recordSharedProjectLightweightLocalSave() { return recordSharedProjectLightweightLocalSave; },
@@ -5800,6 +5804,8 @@
   set closeAllOpenProjectTabsForProjectReplacement(value) { closeAllOpenProjectTabsForProjectReplacement = value; },
   get reconstructLocalRecentProjectPayload() { return reconstructLocalRecentProjectPayload; },
   set reconstructLocalRecentProjectPayload(value) { reconstructLocalRecentProjectPayload = value; },
+  get readAutosaveV2PrimaryProject() { return readAutosaveV2PrimaryProject; },
+  set readAutosaveV2PrimaryProject(value) { readAutosaveV2PrimaryProject = value; },
   get createAutosaveProjectId() { return createAutosaveProjectId; },
   set createAutosaveProjectId(value) { createAutosaveProjectId = value; },
   get createLayer() { return createLayer; },
@@ -16196,6 +16202,62 @@
       fallbackUsed: result.fallbackUsed === true,
     });
     return result;
+  }
+
+  // V2 is the normal local-save authority.  The legacy recent-project entry
+  // stores only this manifest reference; its V1 `project` payload remains a
+  // reader-only compatibility path.
+  function isAutosaveV2PrimaryEnabled() {
+    return typeof autosaveSchemaV2IndexedDbUtilsModule.writeSchemaV2Project === 'function'
+      && typeof autosaveSchemaV2IndexedDbUtilsModule.readSchemaV2Project === 'function';
+  }
+
+  async function readAutosaveV2PrimaryProject(projectId) {
+    const restored = await autosaveSchemaV2IndexedDbUtilsModule.readSchemaV2Project(projectId);
+    return restored?.packaged && typeof restored.packaged === 'object' ? restored.packaged : null;
+  }
+
+  async function writeAutosaveV2Primary({ projectId, snapshot, thumbnailIntervalMs = 0 } = {}) {
+    const normalizedProjectId = normalizeAutosaveProjectId(projectId || autosaveProjectId || '');
+    if (!normalizedProjectId || !snapshot || typeof snapshot !== 'object') {
+      return null;
+    }
+    const existingEntries = await loadRecentProjectsMetadata();
+    const previousEntry = existingEntries.find(entry => entry?.id === normalizedProjectId) || null;
+    const now = Date.now();
+    const previousUpdatedAt = Date.parse(previousEntry?.updatedAt || '');
+    const refreshThumbnail = !previousEntry?.thumbnail
+      || !Number.isFinite(previousUpdatedAt)
+      || now - previousUpdatedAt >= Math.max(0, Math.round(Number(thumbnailIntervalMs) || 0));
+    const thumbnail = refreshThumbnail
+      ? await generateSnapshotThumbnail(snapshot)
+      : previousEntry.thumbnail;
+    const state = buildAutosaveSchemaV2ExperimentalProjectState({
+      projectId: normalizedProjectId,
+      snapshot,
+      thumbnail,
+    });
+    const written = await autosaveSchemaV2IndexedDbUtilsModule.writeSchemaV2Project(state);
+    const manifest = written?.manifest;
+    if (!manifest?.key) {
+      throw new Error('V2 autosave manifest was not committed');
+    }
+    const metadata = {
+      id: normalizedProjectId,
+      accountUserId: getCurrentRecentProjectAccountUserId(),
+      autosaveSchemaVersion: Number(manifest.autosaveSchemaVersion) || 2,
+      manifestKey: manifest.key,
+      name: state.name,
+      fileName: state.sheets.find(sheet => sheet.id === state.activeSheetId)?.fileName || state.name,
+      updatedAt: manifest.updatedAt,
+      thumbnail: thumbnail || null,
+      dotStats: state.dotStats || null,
+    };
+    const nextEntries = existingEntries.filter(entry => entry?.id !== normalizedProjectId);
+    nextEntries.unshift(metadata);
+    await saveRecentProjectsList(existingEntries, nextEntries);
+    setRecentProjectsCache(nextEntries);
+    return metadata;
   }
 
   const preUpdateCheckpointUtilsModule = window.PiXiEEDrawModules?.preUpdateCheckpointUtils?.createPreUpdateCheckpointUtils?.({
