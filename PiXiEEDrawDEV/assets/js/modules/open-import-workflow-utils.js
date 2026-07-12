@@ -744,6 +744,16 @@
     if (!entry || typeof entry !== 'object') {
       return null;
     }
+    if (Number(entry.autosaveSchemaVersion) === 2 && typeof readAutosaveV2PrimaryProject === 'function') {
+      try {
+        const restored = await readAutosaveV2PrimaryProject(entry.id);
+        if (restored && typeof restored === 'object') {
+          return restored;
+        }
+      } catch (error) {
+        console.warn('Failed to restore V2 recent project payload', error);
+      }
+    }
     if (typeof reconstructLocalRecentProjectPayload === 'function') {
       const reconstructed = reconstructLocalRecentProjectPayload(entry);
       if (reconstructed && typeof reconstructed === 'object') {
