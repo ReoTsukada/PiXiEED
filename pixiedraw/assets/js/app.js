@@ -8568,6 +8568,8 @@
   set getProjectCanvasDocumentById(value) { getProjectCanvasDocumentById = value; },
   get getResolvedCanvasInteractionSurface() { return getResolvedCanvasInteractionSurface; },
   set getResolvedCanvasInteractionSurface(value) { getResolvedCanvasInteractionSurface = value; },
+  get getViewportVisibilityTargetSurface() { return getViewportVisibilityTargetSurface; },
+  set getViewportVisibilityTargetSurface(value) { getViewportVisibilityTargetSurface = value; },
   get getVirtualCursorZoomFocus() { return getVirtualCursorZoomFocus; },
   set getVirtualCursorZoomFocus(value) { getVirtualCursorZoomFocus = value; },
   get normalizeZoomScale() { return normalizeZoomScale; },
@@ -17426,7 +17428,10 @@
 
 
 
-  function scheduleSessionPersist({ includeSnapshots = true, includeReloadSnapshot = includeSnapshots } = {}) {
+  // A reload snapshot serializes the complete document and history on the main
+  // thread.  It is intentionally opt-in: normal edits are already protected by
+  // the autosave path and must not rebuild a full recovery payload.
+  function scheduleSessionPersist({ includeSnapshots = true, includeReloadSnapshot = false } = {}) {
     if (includeSnapshots) {
       scheduleAutosaveSnapshot();
       scheduleIosSnapshotPersist();
