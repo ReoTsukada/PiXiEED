@@ -31,6 +31,45 @@
 
     return ((scope) => {
       with (scope) {
+  let autosavePerformanceSequence = 0;
+
+  function beginAutosavePerformanceSpan(name, details = null) {
+    const perf = window?.performance;
+    const id = `${name}:${Date.now().toString(36)}:${++autosavePerformanceSequence}`;
+    const startMark = `${id}:start`;
+    try {
+      perf?.mark?.(startMark);
+    } catch (_error) {}
+    return { name, details, perf, id, startMark, startedAt: perf?.now?.() ?? Date.now() };
+  }
+
+  function endAutosavePerformanceSpan(span, details = null) {
+    if (!span) return;
+    const finishedAt = span.perf?.now?.() ?? Date.now();
+    const endMark = `${span.id}:end`;
+    const mergedDetails = { ...(span.details || {}), ...(details || {}) };
+    try {
+      span.perf?.mark?.(endMark);
+      span.perf?.measure?.(span.name, span.startMark, endMark);
+    } catch (_error) {}
+    console.info('[pixiedraw-dev:performance]', {
+      phase: span.name,
+      elapsedMs: Math.round(finishedAt - span.startedAt),
+      ...mergedDetails,
+    });
+  }
+
+  function queueAutosaveV2ShadowWriteMeasured(job) {
+    const span = beginAutosavePerformanceSpan('pixiedraw-dev:autosave:v2-shadow-queue', {
+      projectId: String(job?.projectId || ''),
+    });
+    try {
+      return queueAutosaveV2ShadowWrite?.(job);
+    } finally {
+      endAutosavePerformanceSpan(span);
+    }
+  }
+
   function updateAutosaveStatus(message, tone = 'info') {
     const statusNode = dom.controls.autosaveStatus;
     if (!statusNode) return;
@@ -746,6 +785,7 @@
     }
     autosaveWriteInFlight = true;
     autosaveWriteQueued = false;
+    const autosaveSpan = beginAutosavePerformanceSpan('pixiedraw-dev:autosave:total', { projectId });
     try {
       if (shouldUseLightweightSharedProjectLocalSave(projectId)) {
         updateAutosaveStatus('自動保存: 共有プロジェクトの復帰情報を保存中…');
@@ -770,10 +810,17 @@
         return true;
       }
       updateAutosaveStatus('自動保存: 端末内に保存中…');
-      const snapshot = makeHistorySnapshot({ clonePixelData: false });
+      const snapshotSpan = beginAutosavePerformanceSpan('pixiedraw-dev:autosave:make-history-snapshot');
+      let snapshot;
+      try {
+        snapshot = makeHistorySnapshot({ clonePixelData: false });
+      } finally {
+        endAutosavePerformanceSpan(snapshotSpan);
+      }
       const dirtyGenerationAtStart = autosaveDirtyGeneration;
       const unsavedTokenAtStart = unsavedChangeToken;
       let savedEntry = null;
+      const recordSpan = beginAutosavePerformanceSpan('pixiedraw-dev:autosave:record-recent-project');
       try {
         savedEntry = await recordRecentProjectSnapshot(snapshot, null, {
           projectId,
@@ -781,18 +828,20 @@
         });
       } catch (error) {
         try {
-          queueAutosaveV2ShadowWrite?.({ projectId, snapshot, v1Project: null, v1Error: error?.message || 'v1-write-failed' });
+          queueAutosaveV2ShadowWriteMeasured({ projectId, snapshot, v1Project: null, v1Error: error?.message || 'v1-write-failed' });
         } catch (_shadowError) {}
         throw error;
+      } finally {
+        endAutosavePerformanceSpan(recordSpan);
       }
       if (!savedEntry) {
         try {
-          queueAutosaveV2ShadowWrite?.({ projectId, snapshot, v1Project: null, v1Error: 'v1-write-returned-empty' });
+          queueAutosaveV2ShadowWriteMeasured({ projectId, snapshot, v1Project: null, v1Error: 'v1-write-returned-empty' });
         } catch (_shadowError) {}
         throw new Error('Failed to record autosave snapshot');
       }
       try {
-        queueAutosaveV2ShadowWrite?.({ projectId, snapshot, v1Project: savedEntry.project || null });
+        queueAutosaveV2ShadowWriteMeasured({ projectId, snapshot, v1Project: savedEntry.project || null });
       } catch (_shadowError) {}
       const stillCurrentWrite = (
         normalizeAutosaveProjectId(autosaveProjectId || '') === projectId
@@ -812,6 +861,7 @@
     } catch (error) {
       throw error;
     } finally {
+      endAutosavePerformanceSpan(autosaveSpan);
       autosaveWriteInFlight = false;
       releaseAutosaveTabLock();
       if (autosaveWriteQueued || autosaveDirty) {
