@@ -1575,6 +1575,7 @@
     LOCAL_PROJECT_THUMBNAILS_STORE,
     LOCAL_PROJECT_CURRENT_MANIFESTS_STORE,
   }) || {};
+  const autosaveV2CheckpointReadyProjectIds = new Set();
   if (typeof window !== 'undefined' && typeof window.__pixieedrawAutosaveV2ShadowWriteEnabled !== 'boolean') {
     window.__pixieedrawAutosaveV2ShadowWriteEnabled = false;
   }
@@ -5614,6 +5615,10 @@
   set recordRecentProjectSnapshot(value) { recordRecentProjectSnapshot = value; },
   get isAutosaveV2PrimaryEnabled() { return isAutosaveV2PrimaryEnabled; },
   set isAutosaveV2PrimaryEnabled(value) { isAutosaveV2PrimaryEnabled = value; },
+  get isAutosaveV2JournalReady() { return isAutosaveV2JournalReady; },
+  set isAutosaveV2JournalReady(value) { isAutosaveV2JournalReady = value; },
+  get markActiveLocalProjectJournalNeedsCheckpoint() { return markActiveLocalProjectJournalNeedsCheckpoint; },
+  set markActiveLocalProjectJournalNeedsCheckpoint(value) { markActiveLocalProjectJournalNeedsCheckpoint = value; },
   get writeAutosaveV2Primary() { return writeAutosaveV2Primary; },
   set writeAutosaveV2Primary(value) { writeAutosaveV2Primary = value; },
   get queueAutosaveV2ShadowWrite() { return queueAutosaveV2ShadowWrite; },
@@ -6463,6 +6468,8 @@
   set AUTOSAVE_SUPPORTED(value) { AUTOSAVE_SUPPORTED = value; },
   get DEFAULT_DOCUMENT_NAME() { return DEFAULT_DOCUMENT_NAME; },
   set DEFAULT_DOCUMENT_NAME(value) { DEFAULT_DOCUMENT_NAME = value; },
+  get removeAutosaveV2ProjectData() { return removeAutosaveV2ProjectData; },
+  set removeAutosaveV2ProjectData(value) { removeAutosaveV2ProjectData = value; },
   get RECENT_PROJECT_STORAGE_LOCAL() { return RECENT_PROJECT_STORAGE_LOCAL; },
   set RECENT_PROJECT_STORAGE_LOCAL(value) { RECENT_PROJECT_STORAGE_LOCAL = value; },
   get SHARED_RECENT_PROJECTS_ACCOUNT_SYNC_COOLDOWN_MS() { return SHARED_RECENT_PROJECTS_ACCOUNT_SYNC_COOLDOWN_MS; },
@@ -16047,6 +16054,10 @@
     return localProjectJournalUtilsModule.buildSavePlan(...args);
   }
 
+  function normalizeV2PixelPatchJournalOps(...args) {
+    return localProjectJournalUtilsModule.normalizeV2PixelPatchJournalOps(...args);
+  }
+
   function createLightweightLocalProjectTabState(...args) {
     return localProjectJournalUtilsModule.createLightweightTabState(...args);
   }
@@ -16094,12 +16105,13 @@
   function buildAutosaveSchemaV2ExperimentalProjectState(options = {}) {
     const settings = options && typeof options === 'object' ? options : {};
     const snapshot = settings.snapshot || makeHistorySnapshot({ clonePixelData: true });
-    const activePackaged = buildPackagedProjectPayload(snapshot, {
-      session: buildProjectSessionPayload(),
-      includeSheets: false,
-    });
+    const activePackaged = settings.packagedPayload && typeof settings.packagedPayload === 'object'
+      ? settings.packagedPayload
+      : buildPackagedProjectPayload(snapshot, {
+        session: buildProjectSessionPayload(),
+        includeSheets: false,
+      });
     const projectId = normalizeAutosaveProjectId(settings.projectId || autosaveProjectId || '') || createAutosaveProjectId();
-    const tabsById = new Map(openProjectTabs.map(tab => [tab?.id, tab]));
     const activeSheetId = activeOpenProjectTabId || openProjectTabs[0]?.id || createOpenProjectTabId();
     const sourceTabs = openProjectTabs.length ? openProjectTabs : [{ id: activeSheetId, project: activePackaged }];
     const sheets = sourceTabs.map((tab, index) => {
@@ -16212,32 +16224,67 @@
       && typeof autosaveSchemaV2IndexedDbUtilsModule.readSchemaV2Project === 'function';
   }
 
+  function isAutosaveV2JournalReady(projectId) {
+    return autosaveV2CheckpointReadyProjectIds.has(normalizeAutosaveProjectId(projectId || ''));
+  }
+
   async function readAutosaveV2PrimaryProject(projectId) {
     const restored = await autosaveSchemaV2IndexedDbUtilsModule.readSchemaV2Project(projectId);
+    if (restored?.manifest?.key) {
+      autosaveV2CheckpointReadyProjectIds.add(normalizeAutosaveProjectId(projectId || ''));
+    }
     return restored?.packaged && typeof restored.packaged === 'object' ? restored.packaged : null;
   }
 
-  async function writeAutosaveV2Primary({ projectId, snapshot, thumbnailIntervalMs = 0 } = {}) {
+  async function removeAutosaveV2ProjectData(projectId) {
+    const normalizedProjectId = normalizeAutosaveProjectId(projectId || '');
+    if (!normalizedProjectId) return false;
+    autosaveV2CheckpointReadyProjectIds.delete(normalizedProjectId);
+    return await autosaveSchemaV2IndexedDbUtilsModule.deleteSchemaV2Project(normalizedProjectId);
+  }
+
+  async function writeAutosaveV2Primary({ projectId, snapshot, thumbnailIntervalMs = 0, savePlan = null } = {}) {
     const normalizedProjectId = normalizeAutosaveProjectId(projectId || autosaveProjectId || '');
-    if (!normalizedProjectId || !snapshot || typeof snapshot !== 'object') {
+    const journalOnly = savePlan?.journalOnly === true;
+    if (!normalizedProjectId || (!journalOnly && (!snapshot || typeof snapshot !== 'object'))) {
       return null;
     }
     const existingEntries = await loadRecentProjectsMetadata();
     const previousEntry = existingEntries.find(entry => entry?.id === normalizedProjectId) || null;
+    let written;
+    let projectState = null;
+    let thumbnail = previousEntry?.thumbnail || null;
+    if (journalOnly) {
+      const activeSheetId = String(activeOpenProjectTabId || '');
+      const normalizedOps = normalizeV2PixelPatchJournalOps(savePlan?.journalPayload || null);
+      if (!activeSheetId || !normalizedOps || !normalizedOps.length) {
+        throw new Error('V2 journal save requires valid pixel patches and an active sheet');
+      }
+      written = await autosaveSchemaV2IndexedDbUtilsModule.writeSchemaV2JournalRevision(
+        normalizedProjectId,
+        { [activeSheetId]: normalizedOps },
+        {
+          updatedAt: new Date().toISOString(),
+          name: previousEntry?.name || state.documentName || DEFAULT_DOCUMENT_NAME,
+        }
+      );
+    } else {
     const now = Date.now();
     const previousUpdatedAt = Date.parse(previousEntry?.updatedAt || '');
     const refreshThumbnail = !previousEntry?.thumbnail
       || !Number.isFinite(previousUpdatedAt)
       || now - previousUpdatedAt >= Math.max(0, Math.round(Number(thumbnailIntervalMs) || 0));
-    const thumbnail = refreshThumbnail
+    thumbnail = refreshThumbnail
       ? await generateSnapshotThumbnail(snapshot)
       : previousEntry.thumbnail;
-    const state = buildAutosaveSchemaV2ExperimentalProjectState({
+    projectState = buildAutosaveSchemaV2ExperimentalProjectState({
       projectId: normalizedProjectId,
       snapshot,
       thumbnail,
+      packagedPayload: savePlan?.packagedPayload || null,
     });
-    const written = await autosaveSchemaV2IndexedDbUtilsModule.writeSchemaV2Project(state);
+    written = await autosaveSchemaV2IndexedDbUtilsModule.writeSchemaV2Project(projectState);
+    }
     const manifest = written?.manifest;
     if (!manifest?.key) {
       throw new Error('V2 autosave manifest was not committed');
@@ -16247,16 +16294,17 @@
       accountUserId: getCurrentRecentProjectAccountUserId(),
       autosaveSchemaVersion: Number(manifest.autosaveSchemaVersion) || 2,
       manifestKey: manifest.key,
-      name: state.name,
-      fileName: state.sheets.find(sheet => sheet.id === state.activeSheetId)?.fileName || state.name,
+      name: projectState?.name || previousEntry?.name || DEFAULT_DOCUMENT_NAME,
+      fileName: projectState?.sheets?.find(sheet => sheet.id === projectState.activeSheetId)?.fileName || previousEntry?.fileName || projectState?.name || DEFAULT_DOCUMENT_NAME,
       updatedAt: manifest.updatedAt,
       thumbnail: thumbnail || null,
-      dotStats: state.dotStats || null,
+      dotStats: projectState?.dotStats || previousEntry?.dotStats || null,
     };
     const nextEntries = existingEntries.filter(entry => entry?.id !== normalizedProjectId);
     nextEntries.unshift(metadata);
     await saveRecentProjectsList(existingEntries, nextEntries);
     setRecentProjectsCache(nextEntries);
+    autosaveV2CheckpointReadyProjectIds.add(normalizedProjectId);
     return metadata;
   }
 
