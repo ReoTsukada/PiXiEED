@@ -226,20 +226,56 @@
       if (!Array.isArray(frames) || !frames.length) {
         return [];
       }
-      return frames.map((frameInfo) => {
-        const imageData = frameInfo?.imageData;
-        if (!imageData || !Number.isFinite(imageData.width) || !Number.isFinite(imageData.height)) {
-          return {
-            ...frameInfo,
-            imageData: null,
-          };
+      const resizedFrames = new Array(frames.length);
+      for (let index = 0; index < frames.length; index += 1) {
+        let sourceFrame = frames[index];
+        let resizedFrame = null;
+        try {
+          const sourceImageData = sourceFrame?.imageData;
+          if (!sourceImageData || !Number.isFinite(sourceImageData.width) || !Number.isFinite(sourceImageData.height)) {
+            resizedFrame = {
+              ...sourceFrame,
+              imageData: null,
+            };
+          } else {
+            const resizedImageData = resizeImageDataNearest(sourceImageData, targetWidth, targetHeight);
+            const sourcePixels = sourceImageData.data;
+            const resizedPixels = resizedImageData?.data;
+            const dimensionsChanged = sourceImageData.width !== resizedImageData?.width
+              || sourceImageData.height !== resizedImageData?.height;
+            const viewsOverlap = (
+              sourcePixels instanceof Uint8ClampedArray
+              && resizedPixels instanceof Uint8ClampedArray
+              && sourcePixels.buffer === resizedPixels.buffer
+              && sourcePixels.byteOffset < resizedPixels.byteOffset + resizedPixels.byteLength
+              && resizedPixels.byteOffset < sourcePixels.byteOffset + sourcePixels.byteLength
+            );
+            if (
+              dimensionsChanged
+              && viewsOverlap
+            ) {
+              throw createImageImportError('画像の縮小処理で元データを共有しています');
+            }
+            resizedFrame = {
+              ...sourceFrame,
+              imageData: resizedImageData,
+            };
+          }
+          resizedFrames[index] = resizedFrame;
+          resizedFrame = null;
+        } finally {
+          // `resizedFrames` owns the converted ImageData. Once it has been
+          // transferred, retain neither the original ImageData nor its RGBA
+          // buffer through the decoder result array.
+          if (sourceFrame && typeof sourceFrame === 'object') {
+            sourceFrame.imageData = null;
+          }
+          frames[index] = null;
+          sourceFrame = null;
+          resizedFrame = null;
         }
-        const resized = resizeImageDataNearest(imageData, targetWidth, targetHeight);
-        return {
-          ...frameInfo,
-          imageData: resized,
-        };
-      });
+      }
+      return resizedFrames;
     }
   
   
