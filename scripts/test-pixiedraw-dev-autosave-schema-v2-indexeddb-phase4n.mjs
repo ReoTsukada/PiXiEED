@@ -149,6 +149,38 @@ try {
     const read1 = await indexed.readSchemaV2Project('phase4n-project');
     const patched = read1.packaged.sheets[0].project.document.canvases[0].frames[0].layers[0];
 
+    const journalProject = createProject(1);
+    journalProject.projectId = 'phase4n-journal-project';
+    const journalWrite1 = await indexed.writeSchemaV2Project(journalProject);
+    const basePatch = journalProject.journalsBySheet['sheet-a'][0];
+    const patch2 = {
+      sequence: 2,
+      kind: 'pixel-patch',
+      canvasId: 'sheet-a-canvas-1', frameId: 'sheet-a-frame-1', layerId: 'sheet-a-layer-1',
+      changes: [{ index: 2, after: { paletteIndex: -1, direct: [101, 102, 103, 255], importSourceDirect: null } }],
+    };
+    const journalWrite2 = await indexed.writeSchemaV2JournalRevision(
+      journalProject.projectId,
+      { 'sheet-a': [basePatch, patch2] },
+      { updatedAt: '2026-07-11T00:00:11Z' }
+    );
+    const patch3 = {
+      sequence: 3,
+      kind: 'pixel-patch',
+      canvasId: 'sheet-a-canvas-1', frameId: 'sheet-a-frame-1', layerId: 'sheet-a-layer-1',
+      changes: [{ index: 3, after: { paletteIndex: 1, direct: null, importSourceDirect: null } }],
+    };
+    const journalWrite3 = await indexed.writeSchemaV2JournalRevision(
+      journalProject.projectId,
+      { 'sheet-a': [basePatch, patch2, patch3] },
+      { updatedAt: '2026-07-11T00:00:12Z', keepManifestRevisions: 2 }
+    );
+    const journalRead3 = await indexed.readSchemaV2Project(journalProject.projectId);
+    const journalRecords3 = await indexed.loadAllProjectSchemaRecords(journalProject.projectId);
+    const journalPatchedLayer = journalRead3.packaged.sheets[0].project.document.canvases[0].frames[0].layers[0];
+    await indexed.deleteSchemaV2Project(journalProject.projectId);
+    const journalRecordsDeleted = await indexed.loadAllProjectSchemaRecords(journalProject.projectId);
+
     const abortResults = [];
     for (const stage of ['checkpoint', 'journal', 'manifest', 'current-ref']) {
       let errorMessage = '';
@@ -189,7 +221,7 @@ try {
     await mutateStore(config.LOCAL_PROJECT_SHEET_CHECKPOINTS_STORE, revision2Checkpoint.key, value => { value.checksum = 'corrupt'; });
     const checkpointFallback = await indexed.readSchemaV2Project('phase4n-project');
 
-    // Restore a clean V2 revision, then verify journal corruption falls back only that sheet.
+    // Restore a clean V2 revision, then verify journal corruption falls back to a valid immutable revision.
     const write3 = await indexed.writeSchemaV2Project(createProject(3, { includeThumbnail: false, includeDotStats: false }), { keepManifestRevisions: 3 });
     const records3 = await indexed.loadAllProjectSchemaRecords('phase4n-project');
     const revision3Journal = records3.journals.find(record => record.revision === 3 && record.sheetId === 'sheet-a');
@@ -217,6 +249,18 @@ try {
     await deleteDatabase(schemaDbName);
     return {
       write1Revision: write1.manifest.revision,
+      journalWriteRevisions: [journalWrite1.manifest.revision, journalWrite2.manifest.revision, journalWrite3.manifest.revision],
+      journalCheckpointCount: journalRecords3.checkpoints.length,
+      journalManifestCount: journalRecords3.manifests.length,
+      journalPatchedDirect: journalPatchedLayer.direct.slice(8, 12),
+      journalPatchedIndex: journalPatchedLayer.indices[3],
+      journalDeletedCounts: {
+        manifests: journalRecordsDeleted.manifests.length,
+        checkpoints: journalRecordsDeleted.checkpoints.length,
+        journals: journalRecordsDeleted.journals.length,
+        thumbnails: journalRecordsDeleted.thumbnails.length,
+        current: journalRecordsDeleted.current,
+      },
       read1Sheets: read1.packaged.sheets.length,
       patchedDirect: patched.direct.slice(4, 8),
       abortResults,
@@ -237,6 +281,18 @@ try {
   });
 
   assert.equal(result.write1Revision, 1);
+  assert.deepEqual(result.journalWriteRevisions, [1, 2, 3]);
+  assert.equal(result.journalManifestCount, 2, 'cleanup retains the latest two manifests');
+  assert.equal(result.journalCheckpointCount, 3, 'journal revisions reuse one checkpoint per sheet');
+  assert.deepEqual(result.journalPatchedDirect, [101, 102, 103, 255]);
+  assert.equal(result.journalPatchedIndex, 1);
+  assert.deepEqual(result.journalDeletedCounts, {
+    manifests: 0,
+    checkpoints: 0,
+    journals: 0,
+    thumbnails: 0,
+    current: null,
+  });
   assert.equal(result.read1Sheets, 3);
   assert.deepEqual(result.patchedDirect, [90, 91, 92, 255]);
   for (const abort of result.abortResults) {
@@ -247,10 +303,9 @@ try {
   assert.equal(result.currentRevisionAfterCleanup, 2);
   assert.equal(result.checkpointFallbackUsed, true);
   assert.equal(result.checkpointFallbackRevision, 1);
-  assert.equal(result.journalFallbackRevision, 3);
-  assert.ok(result.journalWarnings.includes('sheet-a'));
-  assert.equal(result.thumbnail, null);
-  assert.equal(result.dotStats, null);
+  assert.equal(result.journalFallbackRevision, 1);
+  assert.equal(result.thumbnail, 'data:image/png;base64,phase4n');
+  assert.deepEqual(result.dotStats, { totalDots: 9 });
   assert.deepEqual(result.legacyV1, { id: 'legacy-v1', project: { version: 1 } });
   assert.equal(result.serializedRecords.includes('projectSaveHandle'), false);
   assert.equal(result.serializedRecords.includes('must-not-persist'), false);
