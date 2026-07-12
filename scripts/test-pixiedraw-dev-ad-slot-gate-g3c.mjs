@@ -64,6 +64,8 @@ const exportSideAd = css.slice(
   css.indexOf('.mobile-topbar')
 );
 assert.match(exportSideAd, /\.export-dialog-body__ad \.export-ad__slot \.(?:adsbygoogle|export-ad__slot)/);
+assert.match(exportSideAd, /\.export-dialog-body__ad \.export-ad__slot \{[\s\S]*?width: 100%;[\s\S]*?height: 100%;[\s\S]*?flex: 1 1 auto;/);
+assert.match(exportSideAd, /\.export-dialog-body__ad \.export-ad__slot \.adsbygoogle,[\s\S]*?width: 100% !important;[\s\S]*?height: 100% !important;/);
 assert.match(exportSideAd, /transform: none !important;/);
 assert.doesNotMatch(exportSideAd, /rotate\(90deg\)/,
   'the export preview side slot is an unrotated vertical container');
