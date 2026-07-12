@@ -9336,8 +9336,9 @@ body.is-mobile-layout #multiSupportAdContainer {
 @media (orientation: landscape) {
   body[data-pixieed-page="pixiedraw"] .pixieed-shared-top-ad {
     --pixieed-landscape-side-ad-length: calc(
-      100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 12px
+      min(320px, 100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 12px)
     );
+    width: 50px !important;
     overflow: hidden !important;
     contain: layout paint;
     clip-path: inset(0);
@@ -9357,6 +9358,24 @@ body.is-mobile-layout #multiSupportAdContainer {
     height: 50px !important;
     max-height: 50px !important;
     overflow: hidden !important;
+  }
+}
+
+body[data-pixieed-page="pixiedraw"] .pixieed-shared-top-ad {
+  width: min(320px, calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 12px)) !important;
+  min-height: 50px !important;
+  height: 50px !important;
+  max-height: 50px !important;
+  overflow: hidden !important;
+  contain: layout paint;
+}
+
+@media (orientation: landscape) {
+  body[data-pixieed-page="pixiedraw"] .pixieed-shared-top-ad {
+    width: 50px !important;
+    min-height: 0 !important;
+    height: auto !important;
+    max-height: none !important;
   }
 }
 
