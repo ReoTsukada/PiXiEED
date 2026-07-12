@@ -14,10 +14,11 @@ assert.match(journal, /journalOnly: true/);
 assert.match(journal, /journalOnly: false/);
 
 assert.match(autosave, /snapshot: null/);
-assert.match(autosave, /const journalOnly = journalOnlySavePlan\?\.journalOnly === true/);
+assert.match(autosave, /const useV2Journal = Boolean\(/);
+assert.match(autosave, /const journalOnly = useV2Journal \|\| \(!useV2Primary/);
 assert.match(autosave, /if \(!journalOnly\) \{\s*snapshot = makeHistorySnapshot/);
-assert.match(autosave, /savePlan: journalOnlySavePlan/);
-assert.match(autosave, /if \(!journalOnly\) \{\s*queueAutosaveV2ShadowWriteMeasured/);
+assert.match(autosave, /savePlan: useV2Journal \? journalOnlySavePlan : activeSavePlan/);
+assert.match(autosave, /if \(!useV2Primary && !journalOnly\) \{\s*queueAutosaveV2ShadowWriteMeasured/);
 
 assert.match(packageWorkflow, /savePlan: suppliedSavePlan = null/);
 assert.match(packageWorkflow, /const journalOnlySave = suppliedSavePlan\?\.journalOnly === true/);
@@ -71,5 +72,52 @@ const plan = journalUtils.buildSavePlan({
 assert.equal(plan?.journalOnly, true);
 assert.equal(plan?.dirtyOpCount, 1);
 assert.equal(fullPackageBuilds, 0, 'journal-only saves must not rebuild a full checkpoint package');
+
+const normalizedV2Ops = journalUtils.normalizeV2PixelPatchJournalOps({
+  ops: [{
+    kind: 'pixel-patch',
+    historyEntry: {
+      canvasId: 'canvas-1',
+      frameId: 'frame-1',
+      layerId: 'layer-1',
+      changes: [{ index: 3, after: { paletteIndex: 1, direct: null, importSourceDirect: null } }],
+    },
+  }],
+});
+assert.deepEqual(JSON.parse(JSON.stringify(normalizedV2Ops)), [{
+  sequence: 1,
+  kind: 'pixel-patch',
+  canvasId: 'canvas-1',
+  frameId: 'frame-1',
+  layerId: 'layer-1',
+  changes: [{ index: 3, after: { paletteIndex: 1, direct: null, importSourceDirect: null } }],
+}]);
+
+for (let index = 1; index < 30; index += 1) {
+  journalUtils.noteHistoryEntry('project-1', { kind: 'pixel-patch', index }, 'draw');
+}
+assert.equal(
+  journalUtils.buildSavePlan({
+    projectId: 'project-1',
+    snapshot: null,
+    buildPackagedProjectPayload: () => ({ unexpected: true }),
+    buildAutosaveSessionPayload: () => ({ historyLimit: 30 }),
+  }),
+  null,
+  '30 accumulated operations require a new checkpoint snapshot'
+);
+let checkpointBuilds = 0;
+const checkpointPlan = journalUtils.buildSavePlan({
+  projectId: 'project-1',
+  snapshot: { documentName: 'checkpoint' },
+  buildPackagedProjectPayload: () => {
+    checkpointBuilds += 1;
+    return { type: 'pixieed-project-package', document: { documentName: 'checkpoint' } };
+  },
+  buildAutosaveSessionPayload: () => ({ historyLimit: 30 }),
+});
+assert.equal(checkpointBuilds, 1);
+assert.equal(checkpointPlan?.dirtyOpCount, 0);
+assert.equal(checkpointPlan?.journalPayload?.ops?.length, 0);
 
 console.log('P-AUTOSAVE-1A local journal fast-path checks passed.');
