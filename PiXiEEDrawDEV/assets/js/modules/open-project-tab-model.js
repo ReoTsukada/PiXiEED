@@ -246,6 +246,16 @@
 
     function createLocalOpenProjectTabFromCurrentState(currentTab = null, options = {}) {
       const payload = buildOpenProjectTabPayloadFromCurrentState();
+      if (currentTab?.canonicalPayloadFormat === 'v2' && payload?.project && typeof payload.project === 'object') {
+        payload.project = {
+          ...payload.project,
+          canonicalPayloadFormat: 'v2',
+          canonicalSchemaVersion: Math.max(1, Math.round(Number(currentTab?.canonicalSchemaVersion) || 1)),
+          canonicalSourceMetadata: currentTab?.canonicalSourceMetadata && typeof currentTab.canonicalSourceMetadata === 'object'
+            ? currentTab.canonicalSourceMetadata
+            : null,
+        };
+      }
       const normalizedProjectId = normalizeAutosaveProjectId(
         options.projectId
         || currentTab?.projectId
@@ -296,6 +306,11 @@
         projectSaveHandle,
         projectSaveHandleMeta,
         runtimeProjectId: currentTab?.runtimeProjectId || options.runtimeProjectId || `${currentTab?.id || 'sheet'}:runtime-project`,
+        canonicalPayloadFormat: currentTab?.canonicalPayloadFormat === 'v2' ? 'v2' : '',
+        canonicalSchemaVersion: Math.max(0, Math.round(Number(currentTab?.canonicalSchemaVersion) || 0)),
+        canonicalSourceMetadata: currentTab?.canonicalSourceMetadata && typeof currentTab.canonicalSourceMetadata === 'object'
+          ? currentTab.canonicalSourceMetadata
+          : null,
         ...persistenceState,
       };
       const entrySignature = typeof createLocalProjectEntrySignature === 'function'
