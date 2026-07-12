@@ -670,7 +670,7 @@
         --pixieed-landscape-side-ad-gap:2px;
       }
       body[data-pixieed-page="pixiedraw"] .pixieed-shared-top-ad{
-        width:min(320px, calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 12px));
+        width:calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 12px);
         min-height:50px;
         height:50px;
         max-height:50px;
@@ -708,7 +708,7 @@
           overflow:hidden;
         }
         body[data-pixieed-page="pixiedraw"] .pixieed-shared-top-ad .ad-block{
-          width:min(320px, calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 12px));
+          width:calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 12px);
           min-width:0;
           max-width:none;
         }
