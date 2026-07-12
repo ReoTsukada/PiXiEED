@@ -505,9 +505,27 @@
       if (currentProjectId && normalizeAutosaveProjectId(getAutosaveProjectId?.() || '') !== currentProjectId) {
         setActiveAutosaveProjectId(currentProjectId, { persist: false });
       }
-      let updated = isSharedOpenProjectTab(current)
-        && SHARED_PROJECTS_ENABLED
-        ? createOpenProjectTabFromCurrentState({
+      // A tab that has not changed already owns an immutable packaged payload.
+      // Recreating a history snapshot here clones every GIF frame just before
+      // it is replaced by the next sheet, which made ordinary tab switches
+      // more expensive than keeping the resident reference.
+      const canReuseResidentLocalPayload = Boolean(
+        !isSharedOpenProjectTab(current)
+        && !hasDocumentUnsavedChanges()
+        && (current?.project && typeof current.project === 'object'
+          || current?.deferredProjectPayload && typeof current.deferredProjectPayload === 'object')
+      );
+      let updated = canReuseResidentLocalPayload
+        ? {
+          ...current,
+          project: current.project || current.deferredProjectPayload,
+          deferredProjectPayload: current.deferredProjectPayload || current.project,
+          residentProjectLoaded: true,
+          unsaved: false,
+        }
+        : (isSharedOpenProjectTab(current)
+          && SHARED_PROJECTS_ENABLED
+          ? createOpenProjectTabFromCurrentState({
             tabId: current?.id || activeOpenProjectTabId,
             source: current?.source || 'working',
             projectId: currentProjectId,
@@ -521,14 +539,14 @@
             projectSaveHandle: current?.projectSaveHandle,
             projectSaveHandleMeta: current?.projectSaveHandleMeta,
           })
-        : createLocalOpenProjectTabFromCurrentState(current, {
+          : createLocalOpenProjectTabFromCurrentState(current, {
             tabId: current?.id || activeOpenProjectTabId,
             source: current?.source || 'working',
             projectId: currentProjectId,
             qrEditPayload: current?.qrEditPayload,
             projectSaveHandle: current?.projectSaveHandle,
             projectSaveHandleMeta: current?.projectSaveHandleMeta,
-          });
+          }));
       // createLocalOpenProjectTabFromCurrentState already creates the resident
       // payload.  Rebuilding it here created a second full history snapshot on
       // every local sheet switch.
