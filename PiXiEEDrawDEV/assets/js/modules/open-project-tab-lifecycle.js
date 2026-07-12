@@ -492,27 +492,6 @@
       return true;
     }
 
-    function buildResidentProjectPayloadFromCurrentState() {
-      if (
-        typeof makeHistorySnapshot !== 'function'
-        || typeof buildProjectSessionPayload !== 'function'
-        || typeof buildPackagedProjectPayload !== 'function'
-      ) {
-        return null;
-      }
-      try {
-        const snapshot = makeHistorySnapshot();
-        const session = buildProjectSessionPayload();
-        return buildPackagedProjectPayload(snapshot, {
-          session,
-          includeSheets: false,
-        });
-      } catch (error) {
-        console.warn('Failed to build resident project payload for open project tab', error);
-        return null;
-      }
-    }
-
     async function persistActiveOpenProjectTab({ flushAutosave = false, retainProjectPayload = false } = {}) {
       ensureOpenProjectTabsInitialized();
       const activeOpenProjectTabId = getActiveOpenProjectTabId?.() || '';
@@ -526,12 +505,6 @@
       if (currentProjectId && normalizeAutosaveProjectId(getAutosaveProjectId?.() || '') !== currentProjectId) {
         setActiveAutosaveProjectId(currentProjectId, { persist: false });
       }
-      const residentProjectPayload = retainProjectPayload
-        ? (
-          buildResidentProjectPayloadFromCurrentState()
-          || (current?.project && typeof current.project === 'object' ? current.project : null)
-        )
-        : null;
       let updated = isSharedOpenProjectTab(current)
         && SHARED_PROJECTS_ENABLED
         ? createOpenProjectTabFromCurrentState({
@@ -556,14 +529,9 @@
             projectSaveHandle: current?.projectSaveHandle,
             projectSaveHandleMeta: current?.projectSaveHandleMeta,
           });
-      if (retainProjectPayload && residentProjectPayload && typeof residentProjectPayload === 'object') {
-        updated = {
-          ...updated,
-          project: residentProjectPayload,
-          residentProjectLoaded: true,
-          updatedAt: residentProjectPayload.updatedAt || updated?.updatedAt || new Date().toISOString(),
-        };
-      }
+      // createLocalOpenProjectTabFromCurrentState already creates the resident
+      // payload.  Rebuilding it here created a second full history snapshot on
+      // every local sheet switch.
       openProjectTabs[index] = updated;
       setActiveOpenProjectTabId?.(updated.id);
       renderOpenProjectTabs?.();
