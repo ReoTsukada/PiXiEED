@@ -79,7 +79,7 @@
   })();
 </script>
 <script src="assets/js/modules/edition-capabilities-utils.js?v=2026.07.11-g3a-edition-ads"></script>
-<script src="assets/js/build-info.js?v=20260712-005"></script>
+<script src="assets/js/build-info.js?v=20260712-011"></script>
 <script>
   (function configurePixieedAds() {
     const shouldShowAds = typeof window.__PIXIEEDRAW_SHOULD_SHOW_ADS__ === 'function'
@@ -89,11 +89,61 @@
     if (window.__PIXIEED_ADS_DISABLED__) {
       return;
     }
-    const script = document.createElement('script');
-    script.async = true;
-    script.crossOrigin = 'anonymous';
-    script.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253';
-    document.head.appendChild(script);
+    // The editor must become interactive before an external ad iframe is
+    // allowed to compete for the main thread or compositor.
+    window.__PIXIEEDRAW_AD_RENDER_ENABLED__ = false;
+    let adLoadPromise = null;
+    window.__PIXIEEDRAW_LOAD_ADS__ = () => {
+      if (window.__PIXIEEDRAW_EDITOR_READY__ !== true) {
+        return Promise.resolve(false);
+      }
+      if (adLoadPromise) {
+        return adLoadPromise;
+      }
+      adLoadPromise = new Promise(resolve => {
+        let finished = false;
+        const finish = () => {
+          if (finished) {
+            return;
+          }
+          finished = true;
+          window.__PIXIEEDRAW_AD_RENDER_ENABLED__ = true;
+          document.dispatchEvent(new CustomEvent('pixieedraw:ads-ready'));
+          resolve(true);
+        };
+        const fail = () => {
+          if (finished) {
+            return;
+          }
+          finished = true;
+          adLoadPromise = null;
+          resolve(false);
+        };
+        const existing = document.querySelector('script[src*="pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"]');
+        if (existing instanceof HTMLScriptElement) {
+          existing.dataset.pixieedAdsLoader = 'true';
+          if (existing.dataset.pixieedReady === '1' || window.adsbygoogle) {
+            finish();
+            return;
+          }
+          existing.addEventListener('load', finish, { once: true });
+          existing.addEventListener('error', fail, { once: true });
+          return;
+        }
+        const script = document.createElement('script');
+        script.async = true;
+        script.crossOrigin = 'anonymous';
+        script.dataset.pixieedAdsLoader = 'true';
+        script.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253';
+        script.addEventListener('load', () => {
+          script.dataset.pixieedReady = '1';
+          finish();
+        }, { once: true });
+        script.addEventListener('error', fail, { once: true });
+        document.head.appendChild(script);
+      });
+      return adLoadPromise;
+    };
   })();
 </script>
 <script>
@@ -154,16 +204,21 @@
       const width = Math.max(1, rect.width);
       const height = Math.max(1, rect.height);
       const ratio = width / height;
+      const isProjectCardAd = slot.dataset.pixieedAdCard === 'true';
       const isMobileContext = Boolean(document.body?.classList.contains('is-mobile-layout'))
         || Boolean(window.matchMedia?.('(max-width: 767px)').matches);
-      const format = isMobileContext
+      // A project-list card is a near-square thumbnail. Letting the mobile
+      // auto format choose a banner leaves the card blank or mismatched.
+      const format = isProjectCardAd
+        ? 'rectangle'
+        : isMobileContext
         ? 'auto'
         : (ratio >= 2.1
           ? 'horizontal'
           : (ratio <= 0.72 ? 'vertical' : 'rectangle'));
       slot.setAttribute('data-ad-format', format);
       slot.dataset.pixiedAdFormat = format;
-      if (isMobileContext) {
+      if (isMobileContext && !isProjectCardAd) {
         slot.setAttribute('data-full-width-responsive', 'true');
       } else {
         slot.setAttribute('data-full-width-responsive', 'false');
@@ -177,6 +232,10 @@
       if (!window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.()) {
         logAdSlot('skip', slot, { owner }, 'edition-ads-disabled');
         return { ok: false, pushed: false, reason: 'edition-ads-disabled' };
+      }
+      if (window.__PIXIEEDRAW_AD_RENDER_ENABLED__ !== true) {
+        logAdSlot('skip', slot, { owner }, 'editor-not-ready');
+        return { ok: false, pushed: false, reason: 'editor-not-ready' };
       }
       if (!(slot instanceof HTMLElement) || !slot.isConnected) {
         logAdSlot('skip', slot, { owner }, 'slot-disconnected');
@@ -615,7 +674,6 @@
     </div>
     </div>
   </div>
-  <div id="rightPanelAdPreloadMount" style="width:320px;min-width:320px;max-width:320px;height:320px;min-height:320px;max-height:320px;overflow:hidden;"></div>
 </div>
 <button aria-label="描画ボタン（左=主色 / 右=副色）" class="floating-draw-button" id="floatingDrawButton" type="button">描画</button>
 <div aria-hidden="true" aria-label="選択範囲移動" class="floating-move-pad is-hidden" hidden="" id="floatingMovePad" role="group">
@@ -1034,13 +1092,6 @@
 </div>
 </div>
 </div>
-<div class="panel-ad-mount" data-panel-ad-mount="right">
-<div aria-label="広告" class="panel-ad" id="rightPanelAd">
-<div class="ad-box" id="rightPanelAdSlot">
-<ins class="ad-seed" data-ad-client="ca-pub-9801602250480253" data-ad-format="auto" data-ad-slot="1180252398" data-full-width-responsive="true" style="display:block"></ins>
-</div>
-</div>
-</div>
 </div>
 </section>
 <section class="panel-section" data-section="extensions" id="panelExtensions">
@@ -1054,28 +1105,15 @@
 </section>
 <section class="panel-section" data-section="file" id="panelFile">
 <div class="panel-section__body">
-<div class="project-file-menu" id="projectFileMenu">
-<button aria-expanded="false" aria-haspopup="menu" class="button" id="projectFileMenuButton" type="button">ファイル</button>
-<div class="project-file-menu__items" hidden id="projectFileMenuItems" role="menu">
-<button data-project-file-command="new" role="menuitem" type="button">新規プロジェクト</button>
-<button data-project-file-command="open" role="menuitem" type="button">開く</button>
-<button data-project-file-command="recent" role="menuitem" type="button">最近使ったプロジェクト</button>
-<button data-project-file-command="save" role="menuitem" type="button">保存</button>
-<button data-project-file-command="save-as" role="menuitem" type="button">名前を付けて保存</button>
-<button data-project-file-command="copy" role="menuitem" title="現在の保存先は変更されません" type="button">コピーを保存</button>
-<button data-project-file-command="add-sheet" role="menuitem" type="button">プロジェクトをシートとして追加</button>
-<button data-project-file-command="export" role="menuitem" type="button">書き出し</button>
-</div>
-</div>
 <div class="field-group field-group--file-actions">
 <button class="button" id="newProject" type="button">新規作成</button>
 <button class="button" id="openDocument" type="button">ファイルを開く</button>
 <button class="button" id="showLocalProjects" type="button">端末内プロジェクト</button>
-<button class="button button--primary" id="exportProject" type="button">保存/出力</button>
+<button class="button button--primary" id="exportProject" type="button">出力パネルを開く</button>
 </div>
 <div class="file-panel-summary">
 <p class="help-text ui-guide-text">自動保存: ON（この端末）</p>
-<p class="help-text ui-guide-text">配布用の保存は「保存/出力」から手動で行います。</p>
+<p class="help-text ui-guide-text">画像・GIF・PiXiEEDraw形式の保存は出力パネルから行います。</p>
 </div>
 <button class="button" hidden id="enableAutosave" type="button">ローカル自動保存（常時ON）</button>
 <button class="button" hidden id="bindExportFolder" type="button">出力フォルダを設定</button>
@@ -1358,12 +1396,9 @@
 <span class="export-format-label sr-only">形式</span>
 <select id="exportFormat">
 <option value="png">PNG（画像）</option>
-<option value="jpeg">JPEG（画像）</option>
-<option value="svg">SVG（画像）</option>
-<option value="glb">GLB（推奨 / 3Dボクセル）</option>
-<option value="gridpng">PNG（グリッド分割）</option>
 <option value="gif">GIF（アニメーション）</option>
-<option value="timelapse">タイムラプスGIF（記録）</option>
+<option value="svg">SVG（画像）</option>
+<option value="jpeg">JPEG（画像）</option>
 <option value="project">プロジェクト（.pixieedraw）</option>
 </select>
 </label>
@@ -1402,6 +1437,14 @@
 <input id="exportSpriteMapCompanionToggle" type="checkbox"/>
 <span aria-hidden="true" class="export-toggle-icon"><img alt="" decoding="async" src="../icon-e1_frame_02.png"/></span>
 <span>SpriteMAP出力</span>
+</label>
+<label class="toggle-option export-icon-toggle" for="exportGridSplitToggle" id="exportGridSplitOptionRow" title="PNGをタイル単位に分割して出力">
+<input id="exportGridSplitToggle" type="checkbox"/>
+<span>グリッド分割</span>
+</label>
+<label class="toggle-option export-icon-toggle" for="exportTimelapseToggle" id="exportTimelapseOptionRow" title="記録済みの描画工程をGIFで出力">
+<input id="exportTimelapseToggle" type="checkbox"/>
+<span>タイムラプスGIF</span>
 </label>
 <label class="toggle-option export-spritemap-option export-icon-toggle" for="exportSpriteMapColorSpritesToggle" id="exportSpriteMapColorSpritesRow" title="カラースプライト出力">
 <input id="exportSpriteMapColorSpritesToggle" type="checkbox"/>
@@ -1779,7 +1822,7 @@
 	<script defer="" src="assets/js/modules/image-import-decode-utils.js?v=2026.06.30-image-import-decode-v1"></script>
 	<script defer="" src="assets/js/modules/palette-panel-utils.js?v=2026.07.12-rgb-index-used-colors-only1"></script>
 	<script defer="" src="assets/js/modules/timeline-layers.js?v=2026.07.04-frame-pending-structure-fix1"></script>
-	<script defer="" src="assets/js/modules/ui-localization-utils.js?v=2026.07.04-shared-project-disabled1"></script>
+	<script defer="" src="assets/js/modules/ui-localization-utils.js?v=2026.07.12-export-format-options1"></script>
 	<script defer="" src="assets/js/modules/ui-language-utils.js?v=2026.07.03-small-helper-batch-split-v1"></script>
 	<script defer="" src="assets/js/modules/scroll-input-utils.js?v=2026.07.03-small-helper-batch-split-v1"></script>
 	<script defer="" src="assets/js/modules/sprite-scale-utils.js?v=2026.06.30-zh-localization-v1"></script>
@@ -1795,15 +1838,15 @@
 	<script defer="" src="assets/js/modules/keyboard-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/canvas-pointer-workflow-utils.js?v=2026.07.11-touch-arbiter-v8"></script>
 	<script defer="" src="assets/js/modules/canvas-tool-state-workflow-utils.js?v=2026.07.02-canvas-tool-state-fix2"></script>
-	<script defer="" src="assets/js/modules/export-rendering.js?v=2026.07.09-export-routing-fix2"></script>
-	<script defer="" src="assets/js/modules/dialog-setup-utils.js?v=2026.07.01-dialog-setup-v1"></script>
+	<script defer="" src="assets/js/modules/export-rendering.js?v=2026.07.12-export-format-options1"></script>
+	<script defer="" src="assets/js/modules/dialog-setup-utils.js?v=2026.07.12-export-format-options1"></script>
 	<script defer="" src="assets/js/modules/canvas-resize-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/canvas-resize-handle-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/local-viewport-canvas-workflow-utils.js?v=2026.07.11-touch-arbiter-v7"></script>
 	<script defer="" src="assets/js/modules/floating-draw-button-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/selection-move-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/layout-viewport.js?v=2026.07.03-mirror-follow-fix1"></script>
-	<script defer="" src="assets/js/modules/rail-tool-ui-utils.js?v=2026.07.01-rail-tool-ui-split-v1"></script>
+	<script defer="" src="assets/js/modules/rail-tool-ui-utils.js?v=2026.07.12-auto-dismiss-right-panels1"></script>
 	<script defer="" src="assets/js/modules/control-ui-utils.js?v=2026.07.01-control-ui-split-v1"></script>
 	<script defer="" src="assets/js/modules/ui-action-buttons-workflow-utils.js?v=2026.07.03-ui-action-buttons-split-v1"></script>
 	<script defer="" src="assets/js/modules/ui-action-router-workflow-utils.js?v=2026.07.03-ui-action-router-split-v1"></script>
@@ -1815,9 +1858,9 @@
 	<script defer="" src="assets/js/modules/timeline-navigation-workflow-utils.js?v=2026.07.03-size-timeline-split-v1"></script>
 	<script defer="" src="assets/js/modules/timelapse-session-utils.js?v=2026.07.01-timelapse-session-split-v1"></script>
 	<script defer="" src="assets/js/modules/autosave-workflow-utils.js?v=2026.07.01-autosave-workflow-split-v1"></script>
-	<script defer="" src="assets/js/modules/open-import-workflow-utils.js?v=2026.07.12-command-lock-r3"></script>
+	<script defer="" src="assets/js/modules/open-import-workflow-utils.js?v=2026.07.12-single-parse1"></script>
 	<script defer="" src="assets/js/modules/export-format-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
-	<script defer="" src="assets/js/modules/export-dialog-workflow-utils.js?v=2026.07.12-ad-slot-gate1"></script>
+	<script defer="" src="assets/js/modules/export-dialog-workflow-utils.js?v=2026.07.12-export-format-options1"></script>
 	<script defer="" src="assets/js/modules/startup-workflow-utils.js?v=2026.07.12-project-delete-dialog-v2"></script>
 		<script defer="" src="assets/js/modules/recent-project-workflow-utils.js?v=2026.07.11-g3a-edition-ads"></script>
 		<script defer="" src="assets/js/modules/project-package-workflow-utils.js?v=2026.07.11-sheet-payload-ownership-fix1"></script>
@@ -1827,7 +1870,7 @@
 		<script defer="" src="assets/js/modules/project-storage-v2-worker-bridge.js?v=2026.07.10-project-storage-worker1"></script>
 		<script defer="" src="assets/js/modules/project-storage-v2-zip-adapter.js?v=2026.07.10-project-storage-codec1"></script>
 		<script defer="" src="assets/js/modules/document-serialization-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
-		<script defer="" src="assets/js/modules/document-session-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
+		<script defer="" src="assets/js/modules/document-session-workflow-utils.js?v=2026.07.12-single-parse1"></script>
 	<script defer="" src="assets/js/modules/recent-account-workflow-utils.js?v=2026.07.03-safe-helper-split-v1"></script>
 	<script defer="" src="assets/js/modules/pixieed-profile-local-utils.js?v=2026.07.03-safe-helper-split-v1"></script>
 	<script defer="" src="assets/js/modules/shared-recent-project-utils.js?v=2026.07.03-shared-recent-helper-split-v1"></script>
@@ -1855,23 +1898,20 @@
 	<script defer="" src="assets/js/modules/canonical-v2-project-utils.js?v=20260712-canonical-v2-e2"></script>
 	<script defer="" src="assets/js/modules/pre-update-checkpoint-utils.js?v=20260712-pre-update-checkpoint-u3"></script>
 	<script defer="" src="assets/js/pixieedraw-dev-switch.js?v=2026.07.03-pixieedrawdev-switch-fix14"></script>
-	<script defer="" src="assets/js/app.js?v=20260712-005"></script>
-	<script defer="" src="assets/js/modules/update-detection-utils.js?v=20260712-005"></script>
+	<script defer="" src="assets/js/app.js?v=20260712-011"></script>
+	<script defer="" src="assets/js/modules/update-detection-utils.js?v=20260712-011"></script>
   <script>
     (function initPanelAdDocking() {
       const ads = {
         left: document.getElementById('leftPanelAd'),
-        right: document.getElementById('rightPanelAd'),
       };
       const preloadMounts = {
         left: document.getElementById('leftPanelAdPreloadMount'),
-        right: document.getElementById('rightPanelAdPreloadMount'),
       };
       const sideSections = {
         left: ['panelColor'],
-        right: ['panelHelp', 'panelFile', 'panelSettings', 'panelExtensions'],
       };
-      if (!(ads.left instanceof HTMLElement) && !(ads.right instanceof HTMLElement)) return;
+      if (!(ads.left instanceof HTMLElement)) return;
 
       function isMountRenderable(node) {
         if (!(node instanceof HTMLElement) || !node.isConnected) return false;
@@ -1919,8 +1959,7 @@
 
       function refresh() {
         const movedLeft = dock('left');
-        const movedRight = dock('right');
-        if (movedLeft || movedRight) {
+        if (movedLeft) {
           try {
             document.dispatchEvent(new CustomEvent('pixiedraw:panel-ad-dock-change'));
           } catch (error) {
@@ -1954,10 +1993,8 @@
       const ADS_CLIENT = 'ca-pub-9801602250480253';
       const SLOTS = [
         { containerId: 'leftPanelAdSlot', slot: '3806415737' },
-        { containerId: 'rightPanelAdSlot', slot: '1180252398' },
         { containerId: 'mobileBottomAdSlot', slot: '6568310446' }
       ];
-      const SIDE_SLOT_IDS = ['leftPanelAdSlot', 'rightPanelAdSlot'];
       const MIN_SIDE_AD_WIDTH = 140;
       const MIN_MOBILE_BOTTOM_AD_WIDTH = 250;
       const RETRY_FRAMES = 96;
@@ -2006,7 +2043,18 @@
       }
 
       function getCurrentModeTargetIds() {
-        return isPortraitBottomOnlyMode() ? ['mobileBottomAdSlot'] : SIDE_SLOT_IDS;
+        if (document.body?.classList.contains('is-project-home-active')
+          || document.body?.classList.contains('is-startup-active')) {
+          return [];
+        }
+        if (isPortraitBottomOnlyMode()) {
+          return ['mobileBottomAdSlot'];
+        }
+        const leftSlot = document.getElementById('leftPanelAdSlot');
+        if (isContainerRenderable(leftSlot) && isSideRailExpanded(leftSlot)) {
+          return ['leftPanelAdSlot'];
+        }
+        return [];
       }
 
       function resetCurrentModeSlots() {
@@ -2067,11 +2115,13 @@
       }
 
       function queueAllSlots() {
+        if (window.__PIXIEEDRAW_AD_RENDER_ENABLED__ !== true) {
+          return;
+        }
         if (handleAdLayoutTransition()) {
           return;
         }
-        const portraitBottomOnly = isPortraitBottomOnlyMode();
-        const targetContainerIds = portraitBottomOnly ? ['mobileBottomAdSlot'] : SIDE_SLOT_IDS;
+        const targetContainerIds = getCurrentModeTargetIds();
         targetContainerIds.forEach((containerId) => {
           queueRenderForContainer(document.getElementById(containerId));
         });
@@ -2095,7 +2145,6 @@
       function getSideSlotId(container) {
         if (!(container instanceof HTMLElement)) return '';
         if (container.id === 'leftPanelAdSlot') return 'left';
-        if (container.id === 'rightPanelAdSlot') return 'right';
         return '';
       }
 
@@ -2318,6 +2367,7 @@
         window.requestAnimationFrame(retry);
       }
 
+      document.addEventListener('pixieedraw:ads-ready', queueAllSlotsOnce);
       queueAllSlots();
       window.addEventListener('resize', queueAllSlotsOnce, { passive: true });
       window.addEventListener('orientationchange', () => {
@@ -2364,7 +2414,7 @@
     })();
   </script>
 
-  <script src="../scripts/shared-bottom-nav.js?v=2026.07.08-modal-footer-preserve1"></script>
+	<script src="../scripts/shared-bottom-nav.js?v=2026.07.12-shared-ads-ready2"></script>
   <script src="../scripts/pixel-art-fit.js"></script>
 </body>
 </html>
