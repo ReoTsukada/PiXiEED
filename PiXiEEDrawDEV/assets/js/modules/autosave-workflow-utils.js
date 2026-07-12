@@ -810,10 +810,19 @@
         return true;
       }
       updateAutosaveStatus('自動保存: 端末内に保存中…');
-      const snapshotSpan = beginAutosavePerformanceSpan('pixiedraw-dev:autosave:make-history-snapshot');
-      let snapshot;
+      const journalOnlySavePlan = buildActiveLocalProjectSavePlan?.({
+        projectId,
+        snapshot: null,
+        buildPackagedProjectPayload,
+        buildAutosaveSessionPayload: buildProjectSessionPayload,
+      }) || null;
+      const journalOnly = journalOnlySavePlan?.journalOnly === true;
+      const snapshotSpan = beginAutosavePerformanceSpan('pixiedraw-dev:autosave:make-history-snapshot', { skipped: journalOnly });
+      let snapshot = null;
       try {
-        snapshot = makeHistorySnapshot({ clonePixelData: false });
+        if (!journalOnly) {
+          snapshot = makeHistorySnapshot({ clonePixelData: false });
+        }
       } finally {
         endAutosavePerformanceSpan(snapshotSpan);
       }
@@ -825,10 +834,13 @@
         savedEntry = await recordRecentProjectSnapshot(snapshot, null, {
           projectId,
           thumbnailIntervalMs: AUTOSAVE_THUMBNAIL_UPDATE_INTERVAL_MS,
+          savePlan: journalOnlySavePlan,
         });
       } catch (error) {
         try {
-          queueAutosaveV2ShadowWriteMeasured({ projectId, snapshot, v1Project: null, v1Error: error?.message || 'v1-write-failed' });
+          if (!journalOnly) {
+            queueAutosaveV2ShadowWriteMeasured({ projectId, snapshot, v1Project: null, v1Error: error?.message || 'v1-write-failed' });
+          }
         } catch (_shadowError) {}
         throw error;
       } finally {
@@ -836,12 +848,16 @@
       }
       if (!savedEntry) {
         try {
-          queueAutosaveV2ShadowWriteMeasured({ projectId, snapshot, v1Project: null, v1Error: 'v1-write-returned-empty' });
+          if (!journalOnly) {
+            queueAutosaveV2ShadowWriteMeasured({ projectId, snapshot, v1Project: null, v1Error: 'v1-write-returned-empty' });
+          }
         } catch (_shadowError) {}
         throw new Error('Failed to record autosave snapshot');
       }
       try {
-        queueAutosaveV2ShadowWriteMeasured({ projectId, snapshot, v1Project: savedEntry.project || null });
+        if (!journalOnly) {
+          queueAutosaveV2ShadowWriteMeasured({ projectId, snapshot, v1Project: savedEntry.project || null });
+        }
       } catch (_shadowError) {}
       const stillCurrentWrite = (
         normalizeAutosaveProjectId(autosaveProjectId || '') === projectId
