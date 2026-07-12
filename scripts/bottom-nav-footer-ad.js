@@ -682,7 +682,9 @@
           height:auto;
           align-items:stretch;
           justify-content:flex-start;
-          overflow:visible;
+          overflow:hidden;
+          contain:layout paint;
+          isolation:isolate;
         }
         body[data-pixieed-page="pixiedraw"] .pixieed-shared-top-ad .ad-block,
         body[data-pixieed-page="maoitu"] .pixieed-shared-top-ad .ad-block{
@@ -856,17 +858,49 @@
       `;
       document.body.appendChild(banner);
     }
+    if (banner.dataset.pixieedInteractionGuard !== '1') {
+      banner.dataset.pixieedInteractionGuard = '1';
+      ['pointerdown', 'pointerup', 'click', 'touchstart', 'touchend', 'contextmenu'].forEach(type => {
+        banner.addEventListener(type, event => {
+          // Keep input inside the shared ad rail. This prevents a transformed
+          // banner edge from activating a PiXiEEDraw tool behind it.
+          event.stopPropagation();
+        });
+      });
+    }
 
-    ensureAdsScript();
-    if (window.pixieedObserveAds) {
-      window.pixieedObserveAds(banner);
-    } else {
-      try {
-        window.adsbygoogle = window.adsbygoogle || [];
-        window.adsbygoogle.push({});
-      } catch (_error) {
-        // ignore
+    const renderBanner = () => {
+      if (!(banner instanceof HTMLElement) || !banner.isConnected) {
+        return;
       }
+      if (window.pixieedObserveAds) {
+        window.pixieedObserveAds(banner);
+      } else {
+        try {
+          window.adsbygoogle = window.adsbygoogle || [];
+          window.adsbygoogle.push({});
+        } catch (_error) {
+          // ignore
+        }
+      }
+    };
+    const usesManagedPixiedrawAds = isPixiedrawPage()
+      && typeof window.__PIXIEEDRAW_LOAD_ADS__ === 'function';
+    if (usesManagedPixiedrawAds) {
+      // PiXiEEDraw owns the external library lifecycle. The shared, rotated
+      // banner waits for the editor-ready event instead of competing at boot.
+      if (window.__PIXIEEDRAW_AD_RENDER_ENABLED__ === true) {
+        renderBanner();
+      } else if (banner.dataset.pixieedEditorAdReadyListener !== '1') {
+        banner.dataset.pixieedEditorAdReadyListener = '1';
+        document.addEventListener('pixieedraw:ads-ready', () => {
+          delete banner.dataset.pixieedEditorAdReadyListener;
+          renderBanner();
+        }, { once: true });
+      }
+    } else {
+      ensureAdsScript();
+      renderBanner();
     }
     reserveTopSpace('inject-top-ad');
   }
