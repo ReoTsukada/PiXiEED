@@ -658,7 +658,10 @@
     }
     if (!skipPersistCurrent && previousActiveId && findOpenProjectTabIndex(previousActiveId) >= 0) {
       const persistedCurrentSheet = await persistActiveOpenProjectTab({
-        flushAutosave: true,
+        // The tab payload below is retained in memory.  Do not synchronously
+        // package and write the complete project again just to switch sheets;
+        // the regular autosave queue will persist it without blocking the UI.
+        flushAutosave: false,
         retainProjectPayload: true,
       });
       if (!persistedCurrentSheet) {
