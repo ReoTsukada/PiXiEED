@@ -434,6 +434,67 @@ img,
   }
 }
 
+.version-update-notice {
+  position: fixed;
+  right: calc(var(--safe-area-right) + 18px);
+  bottom: calc(var(--safe-area-bottom) + 18px);
+  z-index: 10020;
+  width: min(330px, calc(100vw - var(--safe-area-left) - var(--safe-area-right) - 32px));
+  padding: 14px;
+  border: 1px solid rgba(var(--ui-rgb), 0.45);
+  border-radius: 14px;
+  background: rgba(10, 18, 29, 0.96);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+  color: var(--fg);
+}
+
+.version-update-notice__title,
+.version-update-notice__message {
+  margin: 0;
+}
+
+.version-update-notice__title {
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.version-update-notice__message {
+  margin-top: 6px;
+  color: var(--fg-muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.version-update-notice__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.version-update-notice__button {
+  min-height: 32px;
+  padding: 5px 10px;
+  border: 1px solid rgba(var(--ui-rgb), 0.4);
+  border-radius: 8px;
+  background: rgba(24, 43, 57, 0.9);
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.version-update-notice__button:disabled {
+  cursor: default;
+  opacity: 0.58;
+}
+
+@media (max-width: 640px) {
+  .version-update-notice {
+    right: calc(var(--safe-area-right) + 10px);
+    bottom: calc(var(--safe-area-bottom) + 10px);
+  }
+}
+
 button,
 input,
 select,
