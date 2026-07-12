@@ -491,12 +491,11 @@
       }
       const pixelCount = layer.indices.length;
       const data = new Uint8ClampedArray(pixelCount * 4);
-      const sourceDirect = layer.importSourceDirect instanceof Uint8ClampedArray && layer.importSourceDirect.length === pixelCount * 4
-        ? layer.importSourceDirect
-        : null;
-      const direct = sourceDirect || (layer.direct instanceof Uint8ClampedArray && layer.direct.length === pixelCount * 4
+      const direct = layer.direct instanceof Uint8ClampedArray && layer.direct.length === pixelCount * 4
         ? layer.direct
-        : null);
+        : (layer.importSourceDirect instanceof Uint8ClampedArray && layer.importSourceDirect.length === pixelCount * 4
+          ? layer.importSourceDirect
+          : null);
       for (let i = 0; i < pixelCount; i += 1) {
         const base = i * 4;
         if (direct) {
