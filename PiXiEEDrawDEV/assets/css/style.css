@@ -9210,6 +9210,42 @@ body.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data
   min-width: 0;
 }
 
+.panel-ad-mount--context {
+  margin-top: auto;
+}
+
+#panelFile .panel-section__body,
+#panelSettings .panel-section__body,
+#panelDetails .panel-section__body {
+  min-height: 100%;
+}
+
+.panel-ad--context {
+  width: 100%;
+  min-height: clamp(48px, 8vh, 84px);
+  height: clamp(48px, 8vh, 84px);
+  max-height: clamp(48px, 8vh, 84px);
+  margin-top: 0;
+}
+
+.panel-ad--context .ad-box {
+  width: 100%;
+  min-height: 100%;
+  height: 100%;
+  max-height: 100%;
+}
+
+.panel-ad--context .ad-box ins.adsbygoogle,
+.panel-ad--context .ad-box ins.ad-seed,
+.panel-ad--context .ad-box ins.adsbygoogle iframe,
+.panel-ad--context .ad-box .adsbygoogle iframe {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-height: 100% !important;
+  height: 100% !important;
+  max-height: 100% !important;
+}
+
 .panel-ad .ad-box {
   --panel-ad-width: 180px;
   --panel-ad-height: 112px;
@@ -9271,6 +9307,28 @@ body.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data
 .rail-ad .ad-box .adsbygoogle iframe {
   max-width: 100% !important;
   box-sizing: border-box !important;
+}
+
+/* Contextual right-panel ad: one compact, flexible slot shared by File,
+   Settings and Details. Keep it inside the panel instead of reserving a rail. */
+.panel-ad--context {
+  width: 100% !important;
+  min-height: clamp(48px, 8vh, 84px) !important;
+  height: clamp(48px, 8vh, 84px) !important;
+  max-height: clamp(48px, 8vh, 84px) !important;
+  margin-top: 0 !important;
+}
+
+.panel-ad--context .ad-box,
+.panel-ad--context .ad-box ins.adsbygoogle,
+.panel-ad--context .ad-box ins.ad-seed,
+.panel-ad--context .ad-box ins.adsbygoogle iframe,
+.panel-ad--context .ad-box .adsbygoogle iframe {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-height: 100% !important;
+  height: 100% !important;
+  max-height: 100% !important;
 }
 
 /* In mobile layout, disable side-panel ad mounts completely. */
@@ -9338,7 +9396,21 @@ body.is-mobile-layout #multiSupportAdContainer {
     --pixieed-landscape-side-ad-length: calc(
       100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 12px
     );
-    width: 50px !important;
+    --pixieed-landscape-side-ad-width: var(--pixieed-shared-side-nav-width, 72px);
+    --pixieed-landscape-side-ad-gap: var(--pixieed-shared-side-nav-gap, 6px);
+    top: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    width: var(--pixieed-landscape-side-ad-width) !important;
+    min-height: 100vh !important;
+    min-height: 100dvh !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    max-height: 100vh !important;
+    max-height: 100dvh !important;
+    box-sizing: border-box;
+    align-items: center !important;
+    justify-content: center !important;
     overflow: hidden !important;
     contain: layout paint;
     clip-path: inset(0);
@@ -9372,10 +9444,10 @@ body[data-pixieed-page="pixiedraw"] .pixieed-shared-top-ad {
 
 @media (orientation: landscape) {
   body[data-pixieed-page="pixiedraw"] .pixieed-shared-top-ad {
-    width: 50px !important;
-    min-height: 0 !important;
-    height: auto !important;
-    max-height: none !important;
+    width: var(--pixieed-landscape-side-ad-width) !important;
+    min-height: 100dvh !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
   }
 }
 
