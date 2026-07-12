@@ -304,9 +304,12 @@
         }
       });
       if (!layerEntries.length) {
+        const activeDrawColor = normalizeColorValue(
+          state.activeRgb || state.palette?.[state.activePaletteIndex] || { r: 0, g: 0, b: 0, a: 255 }
+        );
         state.palette = [
           { r: 0, g: 0, b: 0, a: 0 },
-          { r: 0, g: 0, b: 0, a: 255 },
+          { ...activeDrawColor, a: activeDrawColor.a > 0 ? activeDrawColor.a : 255 },
         ];
         state.activePaletteIndex = 1;
         state.secondaryPaletteIndex = 0;
