@@ -3,10 +3,10 @@
     return;
   }
 
-  // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.07.12-touch-pan-bias-v9';
-  window.__PIXIEEDRAW_BUILD_ID__ = APP_BUILD_VERSION;
-  window.__PIXIEEDRAW_BUILD_REVISION__ = 2026071100;
+  // The build-info script is loaded before app.js. Keep legacy consumers on
+  // the same build identity without defining a second version source here.
+  const APP_BUILD_INFO = window.__PIXIEEDRAW_BUILD_INFO__ || {};
+  const APP_BUILD_VERSION = String(APP_BUILD_INFO.buildId || 'unknown-build');
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECTS_ENABLED = false;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
@@ -5666,6 +5666,7 @@
   set virtualCursorDrawState(value) { virtualCursorDrawState = value; },
   }) || {};
 
+  const canonicalV2ProjectUtilsModule = window.PiXiEEDrawModules?.canonicalV2ProjectUtils || {};
   const openImportWorkflowUtilsModule = window.PiXiEEDrawModules?.openImportWorkflowUtils?.createOpenImportWorkflowUtils?.({
   get AUTOSAVE_SUPPORTED() { return AUTOSAVE_SUPPORTED; },
   set AUTOSAVE_SUPPORTED(value) { AUTOSAVE_SUPPORTED = value; },
@@ -5735,6 +5736,10 @@
   set buildActiveSharedProjectSheetTabFields(value) { buildActiveSharedProjectSheetTabFields = value; },
   get buildPackagedProjectPayload() { return buildPackagedProjectPayload; },
   set buildPackagedProjectPayload(value) { buildPackagedProjectPayload = value; },
+  get normalizeExternalProjectToCanonicalV2() { return canonicalV2ProjectUtilsModule.normalizeExternalProjectToCanonicalV2; },
+  set normalizeExternalProjectToCanonicalV2(value) { canonicalV2ProjectUtilsModule.normalizeExternalProjectToCanonicalV2 = value; },
+  get validateCanonicalV2ProjectPayload() { return canonicalV2ProjectUtilsModule.validateCanonicalV2ProjectPayload; },
+  set validateCanonicalV2ProjectPayload(value) { canonicalV2ProjectUtilsModule.validateCanonicalV2ProjectPayload = value; },
   get buildIndexedPaletteFromFrameDataList() { return buildIndexedPaletteFromFrameDataList; },
   set buildIndexedPaletteFromFrameDataList(value) { buildIndexedPaletteFromFrameDataList = value; },
   get buildSharedRecentProjectId() { return buildSharedRecentProjectId; },
@@ -12990,7 +12995,10 @@
       if (suppressControllerChangeReloadUntil && Date.now() <= suppressControllerChangeReloadUntil) {
         return;
       }
-      scheduleAppReload('pwa-controllerchange');
+      console.info('[pixiedraw-dev:update]', {
+        phase: 'service-worker-controllerchange',
+        reason: 'controller-changed-without-reload',
+      });
     });
     const swUrl = `service-worker.js?v=${encodeURIComponent(APP_SW_VERSION)}`;
     navigator.serviceWorker.register(swUrl).catch(error => {
@@ -16138,6 +16146,56 @@
     });
     return result;
   }
+
+  const preUpdateCheckpointUtilsModule = window.PiXiEEDrawModules?.preUpdateCheckpointUtils?.createPreUpdateCheckpointUtils?.({
+    getOpenProjectTabs: () => openProjectTabs,
+    getActiveOpenProjectTabId: () => activeOpenProjectTabId,
+    getBuildInfo: () => APP_BUILD_INFO,
+    getActiveProjectPayload: (tab) => {
+      const payload = buildPackagedProjectPayload(
+        makeHistorySnapshot({ clonePixelData: true }),
+        { session: buildProjectSessionPayload(), includeSheets: false }
+      );
+      if (tab?.canonicalPayloadFormat === 'v2') {
+        return {
+          ...payload,
+          canonicalPayloadFormat: 'v2',
+          canonicalSchemaVersion: Math.max(1, Math.round(Number(tab?.canonicalSchemaVersion) || 1)),
+          canonicalSourceMetadata: tab?.canonicalSourceMetadata && typeof tab.canonicalSourceMetadata === 'object'
+            ? tab.canonicalSourceMetadata
+            : null,
+        };
+      }
+      return payload;
+    },
+    resolveInactiveProjectPayload: (tab) => {
+      if (tab?.project && typeof tab.project === 'object') return tab.project;
+      if (tab?.deferredProjectPayload && typeof tab.deferredProjectPayload === 'object') return tab.deferredProjectPayload;
+      const stored = resolveStoredLocalProjectPayloadForProjectId(tab?.projectId || '');
+      return stored && typeof extractLocalProjectSheetPayload === 'function'
+        ? extractLocalProjectSheetPayload(stored, tab?.id || '')
+        : null;
+    },
+    log: (details) => console.info('[pixieedraw-dev:pre-update-checkpoint]', details),
+  }) || {};
+
+  async function preparePreUpdateCheckpoint(options = {}) {
+    if (typeof preUpdateCheckpointUtilsModule.preparePreUpdateCheckpoint !== 'function') {
+      return {
+        ok: false,
+        status: 'failed',
+        code: 'ERR_PRE_UPDATE_SNAPSHOT_FAILED',
+        phase: 'prepare',
+        recoverable: true,
+      };
+    }
+    return await preUpdateCheckpointUtilsModule.preparePreUpdateCheckpoint(options);
+  }
+
+  window.__pixieedrawPreparePreUpdateCheckpoint = async (options = {}) => await preparePreUpdateCheckpoint(options);
+  window.__pixieedrawGetPreUpdateCheckpointStatus = () => preUpdateCheckpointUtilsModule.getStatus?.()
+    || { ok: false, status: 'idle', checkpointSessionId: '' };
+  window.__pixieedrawReadPreUpdateCheckpoint = async (checkpointSessionId) => await preUpdateCheckpointUtilsModule.readSession?.(checkpointSessionId);
 
   async function previewAutosaveSchemaV2Restore(projectId, options = {}) {
     const result = await autosaveSchemaV2RestorePreviewUtilsModule.preview?.(projectId, options);
