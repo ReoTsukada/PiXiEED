@@ -708,13 +708,16 @@
     if (newProjectSubmitBusy) {
       return;
     }
+    console.info('[pixiedraw-dev:new-project]', { phase: 'new-project-submit' });
     const config = dom.newProject;
     if (config?.form && typeof config.form.reportValidity === 'function') {
       if (!config.form.reportValidity()) {
+        console.info('[pixiedraw-dev:new-project]', { phase: 'new-project-validation-failed' });
         return;
       }
     }
     newProjectSubmitBusy = true;
+    let commandLock = null;
     try {
       const rawName = config?.nameInput?.value ?? state.documentName;
       const name = normalizeDocumentName(rawName);
@@ -731,6 +734,13 @@
         || Boolean(pendingNewProjectCreateShared)
       );
       const shouldAppendAsTab = Boolean(pendingNewProjectAppendAsTab);
+      commandLock = (!shouldCreateShared && !shouldAppendAsTab)
+        ? acquireProjectCommandLock({ owner: 'new-project-create', command: 'submit-new-project' })
+        : null;
+      if (commandLock && !commandLock.ok) {
+        console.info('[pixiedraw-dev:new-project]', { phase: 'new-project-failed', code: commandLock.code });
+        return;
+      }
       let created = false;
       let createdLocalProject = false;
       let sharedCreationFailure = null;
@@ -760,6 +770,8 @@
           promptExportDirectory: false,
         });
       } else {
+        console.info('[pixiedraw-dev:new-project]', { phase: 'new-project-candidate-built' });
+        console.info('[pixiedraw-dev:new-project]', { phase: 'new-project-commit-start' });
         created = await createNewProject({
           name,
           width,
@@ -769,6 +781,7 @@
         });
       }
       if (created || createdLocalProject) {
+        console.info('[pixiedraw-dev:new-project]', { phase: 'new-project-commit-success' });
         if (config?.nameInput) {
           config.nameInput.value = extractDocumentBaseName(name);
         }
@@ -784,7 +797,15 @@
       } else if (sharedCreationFailure) {
         openSharedProjectCreateFailureDialog(sharedCreationFailure);
       }
+    } catch (error) {
+      console.warn('New project submit failed', error);
+      console.info('[pixiedraw-dev:new-project]', { phase: 'new-project-failed', code: String(error?.message || error || '') });
+      throw error;
     } finally {
+      if (commandLock?.ok) {
+        releaseProjectCommandLock({ token: commandLock.token, owner: commandLock.owner });
+        console.info('[pixiedraw-dev:new-project]', { phase: 'new-project-lock-released' });
+      }
       newProjectSubmitBusy = false;
     }
   }
