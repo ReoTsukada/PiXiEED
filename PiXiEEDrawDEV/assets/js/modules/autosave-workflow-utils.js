@@ -925,11 +925,10 @@
         buildAutosaveSessionPayload: buildProjectSessionPayload,
       }) || null;
       const useV2Primary = isAutosaveV2PrimaryEnabled?.() === true;
-      const journalOnlyHasOps = Boolean(
-        journalOnlySavePlan?.journalOnly === true
-        && Array.isArray(journalOnlySavePlan?.journalPayload?.ops)
-        && journalOnlySavePlan.journalPayload.ops.length > 0
-      );
+      const normalizedJournalOps = journalOnlySavePlan?.journalOnly === true
+        ? normalizeV2PixelPatchJournalOps?.(journalOnlySavePlan.journalPayload)
+        : null;
+      const journalOnlyHasOps = Array.isArray(normalizedJournalOps) && normalizedJournalOps.length > 0;
       const useV2Journal = Boolean(
         useV2Primary
         && journalOnlyHasOps
@@ -961,20 +960,47 @@
       const dirtyGenerationAtStart = autosaveDirtyGeneration;
       const unsavedTokenAtStart = unsavedChangeToken;
       let savedEntry = null;
+      let usedV2Journal = useV2Journal;
       const recordSpan = beginAutosavePerformanceSpan('pixiedraw-dev:autosave:record-recent-project');
       try {
-        savedEntry = useV2Primary
-          ? await writeAutosaveV2Primary({
-            projectId,
-            snapshot,
-            thumbnailIntervalMs: AUTOSAVE_THUMBNAIL_UPDATE_INTERVAL_MS,
-            savePlan: useV2Journal ? journalOnlySavePlan : activeSavePlan,
-          })
-          : await recordRecentProjectSnapshot(snapshot, null, {
+        if (useV2Primary) {
+          try {
+            savedEntry = await writeAutosaveV2Primary({
+              projectId,
+              snapshot,
+              thumbnailIntervalMs: AUTOSAVE_THUMBNAIL_UPDATE_INTERVAL_MS,
+              savePlan: usedV2Journal ? journalOnlySavePlan : activeSavePlan,
+            });
+          } catch (error) {
+            const emptyJournalRevision = usedV2Journal
+              && /journal revision requires at least one changed sheet|journal save requires valid pixel patches/i.test(String(error?.message || ''));
+            if (!emptyJournalRevision) {
+              throw error;
+            }
+            // A sheet switch can leave a valid patch list whose sheet reference
+            // is no longer in the current manifest. Commit a checkpoint instead.
+            markActiveLocalProjectJournalNeedsCheckpoint?.(projectId);
+            activeSavePlan = buildActiveLocalProjectSavePlan?.({
+              projectId,
+              snapshot,
+              buildPackagedProjectPayload,
+              buildAutosaveSessionPayload: buildProjectSessionPayload,
+            }) || null;
+            usedV2Journal = false;
+            savedEntry = await writeAutosaveV2Primary({
+              projectId,
+              snapshot,
+              thumbnailIntervalMs: AUTOSAVE_THUMBNAIL_UPDATE_INTERVAL_MS,
+              savePlan: activeSavePlan,
+            });
+          }
+        } else {
+          savedEntry = await recordRecentProjectSnapshot(snapshot, null, {
             projectId,
             thumbnailIntervalMs: AUTOSAVE_THUMBNAIL_UPDATE_INTERVAL_MS,
             savePlan: journalOnlySavePlan,
           });
+        }
       } catch (error) {
         try {
           if (!useV2Primary && !journalOnly) {
