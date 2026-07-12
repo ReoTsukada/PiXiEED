@@ -81,15 +81,39 @@
       }
 
       function parseText(text, options = {}) {
-        const adapter = resolveWriterAdapter(options?.preferredAdapterId);
-        if (!adapter || typeof adapter.parseText !== 'function') {
+        const preferredId = typeof options?.preferredAdapterId === 'string'
+          ? options.preferredAdapterId
+          : '';
+        const preferredAdapter = preferredId
+          ? normalizedAdapters.find(candidate => candidate.id === preferredId)
+          : null;
+        const candidates = [
+          preferredAdapter,
+          ...normalizedAdapters.filter(candidate => candidate !== preferredAdapter),
+        ].filter(candidate => typeof candidate?.parseText === 'function');
+        let lastError = null;
+        for (let index = 0; index < candidates.length; index += 1) {
+          const adapter = candidates[index];
+          try {
+            const parsed = adapter.parseText(text, options);
+            if (typeof adapter.canReadParsedValue === 'function' && !adapter.canReadParsedValue(parsed)) {
+              continue;
+            }
+            return {
+              adapterId: adapter.id,
+              parsed,
+            };
+          } catch (error) {
+            lastError = error;
+          }
+        }
+        if (lastError) {
+          throw lastError;
+        }
+        if (!candidates.length) {
           throw new Error('No project storage adapter is available for text parsing');
         }
-        const parsed = adapter.parseText(text, options);
-        return {
-          adapterId: adapter.id,
-          parsed,
-        };
+        throw new Error('No project storage adapter accepted the text payload');
       }
 
       function findReaderAdapterForBytes(bytes, options = {}) {
