@@ -612,6 +612,9 @@
         justify-content:center;
         align-items:center;
         pointer-events:auto;
+        overflow:hidden;
+        contain:layout paint;
+        isolation:isolate;
       }
       .pixieed-shared-top-ad .ad-block{
         border:1px dashed rgba(255,255,255,0.2);
@@ -663,8 +666,14 @@
         box-sizing:border-box;
       }
       body[data-pixieed-page="pixiedraw"]{
-        --pixieed-landscape-side-ad-width:54px;
+        --pixieed-landscape-side-ad-width:50px;
         --pixieed-landscape-side-ad-gap:2px;
+      }
+      body[data-pixieed-page="pixiedraw"] .pixieed-shared-top-ad{
+        width:min(320px, calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 12px));
+        min-height:50px;
+        height:50px;
+        max-height:50px;
       }
       body[data-pixieed-page="maoitu"]{
         --pixieed-landscape-side-ad-width:clamp(96px, calc((100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 12px) / 3.2), 160px);
@@ -697,6 +706,11 @@
           transform-origin:center center;
           border-radius:10px;
           overflow:hidden;
+        }
+        body[data-pixieed-page="pixiedraw"] .pixieed-shared-top-ad .ad-block{
+          width:min(320px, calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 12px));
+          min-width:0;
+          max-width:none;
         }
         body[data-pixieed-page="maoitu"] .pixieed-shared-top-ad .ad-block{
           position:relative;
@@ -852,7 +866,8 @@
           <ins class="adsbygoogle"
                style="display:block"
                data-ad-client="ca-pub-9801602250480253"
-               data-ad-slot="2141591954"></ins>
+               data-ad-slot="2141591954"
+               data-pixieed-shared-banner="true"></ins>
           <small class="ad-label">広告</small>
         </div>
       `;
