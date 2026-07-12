@@ -666,8 +666,9 @@
         box-sizing:border-box;
       }
       body[data-pixieed-page="pixiedraw"]{
-        --pixieed-landscape-side-ad-width:50px;
-        --pixieed-landscape-side-ad-gap:2px;
+        /* Match the landscape shared navigation rail exactly. */
+        --pixieed-landscape-side-ad-width:var(--pixieed-shared-side-nav-width, 72px);
+        --pixieed-landscape-side-ad-gap:var(--pixieed-shared-side-nav-gap, 6px);
       }
       body[data-pixieed-page="pixiedraw"] .pixieed-shared-top-ad{
         width:calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 12px);
@@ -694,6 +695,24 @@
           overflow:hidden;
           contain:layout paint;
           isolation:isolate;
+        }
+        /* PiXiEEDraw uses the same full-height rail geometry as its navigation.
+           The rotated creative stays centered within the rail rather than
+           inheriting a small, top-aligned advertising frame. */
+        body[data-pixieed-page="pixiedraw"] .pixieed-shared-top-ad{
+          top:0;
+          bottom:0;
+          left:0;
+          width:var(--pixieed-landscape-side-ad-width);
+          min-height:100vh;
+          min-height:100dvh;
+          height:100vh;
+          height:100dvh;
+          max-height:100vh;
+          max-height:100dvh;
+          box-sizing:border-box;
+          align-items:center;
+          justify-content:center;
         }
         body[data-pixieed-page="pixiedraw"] .pixieed-shared-top-ad .ad-block,
         body[data-pixieed-page="maoitu"] .pixieed-shared-top-ad .ad-block{
