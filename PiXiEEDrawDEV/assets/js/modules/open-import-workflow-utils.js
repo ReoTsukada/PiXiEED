@@ -205,6 +205,19 @@
           }
           const loaded = await loader(item);
           if (loaded?.project && typeof loaded.project === 'object') {
+            const isCanonicalPngCandidate = loaded.sourceKind === 'import-image'
+              && loaded.canonicalPayloadFormat === 'v2';
+            if (isCanonicalPngCandidate) {
+              const documentValue = loaded.project.document && typeof loaded.project.document === 'object'
+                ? loaded.project.document
+                : {};
+              console.info('[pixieedraw-dev:png-canonical-import]', {
+                phase: 'png-commit-start',
+                sourceFileBytes: Math.max(0, Number(loaded.project?.canonicalSourceMetadata?.sourceFileBytes) || 0),
+                sourceWidth: Math.max(0, Number(loaded.project?.canonicalSourceMetadata?.sourceWidth) || Number(documentValue.width) || 0),
+                sourceHeight: Math.max(0, Number(loaded.project?.canonicalSourceMetadata?.sourceHeight) || Number(documentValue.height) || 0),
+              });
+            }
             const appended = await appendProjectPayloadAsOpenTab({
               project: loaded.project,
               parentProjectId,
@@ -218,10 +231,26 @@
               lastSavedStorageAdapterId: loaded.lastSavedStorageAdapterId ?? null,
               projectSaveHandleState: 'none',
               isImportedSheet: loaded.isImportedSheet === true,
+              canonicalPayloadFormat: loaded.canonicalPayloadFormat || '',
+              canonicalSourceMetadata: loaded.project?.canonicalSourceMetadata || null,
             });
             if (appended) {
+              if (isCanonicalPngCandidate) {
+                console.info('[pixieedraw-dev:png-canonical-import]', {
+                  phase: 'png-commit-success',
+                  sourceFileBytes: Math.max(0, Number(loaded.project?.canonicalSourceMetadata?.sourceFileBytes) || 0),
+                  sheetCount: openProjectTabs.length,
+                });
+              }
               openedCount += 1;
               continue;
+            }
+            if (isCanonicalPngCandidate) {
+              console.warn('[pixieedraw-dev:png-canonical-import]', {
+                phase: 'png-commit-failed',
+                sourceFileBytes: Math.max(0, Number(loaded.project?.canonicalSourceMetadata?.sourceFileBytes) || 0),
+                code: 'ERR_V2_COMMIT_FAILED',
+              });
             }
             failedCount += 1;
             continue;
@@ -585,6 +614,8 @@
     lastSavedStorageAdapterId = null,
     projectSaveHandleState = 'none',
     isImportedSheet = false,
+    canonicalPayloadFormat = '',
+    canonicalSourceMetadata = null,
   } = {}) {
     if (!project || typeof project !== 'object') {
       return null;
@@ -611,6 +642,13 @@
     });
     if (!nextTab) {
       return null;
+    }
+    if (canonicalPayloadFormat === 'v2') {
+      nextTab.canonicalPayloadFormat = 'v2';
+      nextTab.canonicalSchemaVersion = Math.max(1, Math.round(Number(project?.canonicalSchemaVersion) || 1));
+      nextTab.canonicalSourceMetadata = canonicalSourceMetadata && typeof canonicalSourceMetadata === 'object'
+        ? canonicalSourceMetadata
+        : null;
     }
     nextTab.residentProjectLoaded = true;
     openProjectTabs.push(nextTab);
@@ -1194,10 +1232,116 @@
     }
   }
 
+  function normalizePngSheetCandidate(project, file, metrics = {}) {
+    const sourceFileBytes = Math.max(0, Number(metrics.sourceFileBytes ?? file?.size) || 0);
+    const sourceWidth = Math.max(0, Number(metrics.sourceWidth) || Number(project?.document?.width) || Number(project?.document?.canvases?.[0]?.width) || 0);
+    const sourceHeight = Math.max(0, Number(metrics.sourceHeight) || Number(project?.document?.height) || Number(project?.document?.canvases?.[0]?.height) || 0);
+    if (typeof normalizeExternalProjectToCanonicalV2 !== 'function') {
+      return { ok: false, code: 'ERR_CANONICAL_V2_NORMALIZER_UNAVAILABLE', phase: 'normalize' };
+    }
+    if (typeof validateCanonicalV2ProjectPayload !== 'function') {
+      return { ok: false, code: 'ERR_CANONICAL_V2_VALIDATOR_UNAVAILABLE', phase: 'validate' };
+    }
+    console.info('[pixieedraw-dev:png-canonical-import]', {
+      phase: 'png-normalize-start', sourceFileBytes, sourceWidth, sourceHeight,
+    });
+    const normalized = normalizeExternalProjectToCanonicalV2({
+      sourceKind: 'import-image',
+      sourceAdapterId: null,
+      decodedPayload: project,
+      sourceMetadata: {
+        sourceMimeType: typeof file?.type === 'string' ? file.type : 'image/png',
+        sourceFileName: typeof file?.name === 'string' ? file.name : '',
+        sourceFileBytes,
+        sourceWidth,
+        sourceHeight,
+      },
+    });
+    if (!normalized?.ok || !normalized.canonicalPayload) {
+      return { ok: false, code: normalized?.code || 'ERR_CANONICAL_V2_NORMALIZE_FAILED', phase: normalized?.phase || 'normalize' };
+    }
+    const validation = validateCanonicalV2ProjectPayload(normalized.canonicalPayload);
+    if (!validation?.ok) {
+      return { ok: false, code: validation?.code || 'ERR_CANONICAL_V2_CANDIDATE_INVALID', phase: validation?.phase || 'validate' };
+    }
+    console.info('[pixieedraw-dev:png-canonical-import]', {
+      phase: 'png-normalize-success',
+      sourceFileBytes,
+      sourceWidth,
+      sourceHeight,
+      sheetCount: normalized.metrics?.sheetCount || 0,
+      canvasCount: normalized.metrics?.canvasCount || 0,
+      layerCount: normalized.metrics?.layerCount || 0,
+      frameCount: normalized.metrics?.frameCount || 0,
+      bitmapCount: normalized.metrics?.bitmapCount || 0,
+      typedByteLength: normalized.metrics?.typedByteLength || 0,
+      warningCount: normalized.metrics?.warningCount || 0,
+    });
+    return { ok: true, canonicalPayload: normalized.canonicalPayload, metrics: normalized.metrics || {} };
+  }
+
   async function buildImageSheetImportCandidate(file, kind = 'image') {
-    const project = await loadDocumentFromImageFile(file, { applyToRuntime: false });
+    const isPng = kind === 'image' && (() => {
+      const type = typeof file?.type === 'string' ? file.type.toLowerCase() : '';
+      const name = typeof file?.name === 'string' ? file.name.toLowerCase() : '';
+      return type === 'image/png' || name.endsWith('.png');
+    })();
+    const sourceFileBytes = Math.max(0, Number(file?.size) || 0);
+    if (isPng) {
+      console.info('[pixieedraw-dev:png-canonical-import]', {
+        phase: 'png-decode-start',
+        sourceFileBytes,
+      });
+    }
+    let project = null;
+    try {
+      project = await loadDocumentFromImageFile(file, { applyToRuntime: false });
+    } catch (error) {
+      if (isPng) {
+        console.warn('[pixieedraw-dev:png-canonical-import]', {
+          phase: 'png-normalize-failed',
+          sourceFileBytes,
+          code: 'ERR_EXTERNAL_DECODE_FAILED',
+        });
+      }
+      throw error;
+    }
     if (!project || typeof project !== 'object') {
       return false;
+    }
+    const documentValue = project.document && typeof project.document === 'object' ? project.document : {};
+    const canvasCount = Array.isArray(documentValue.canvases) && documentValue.canvases.length
+      ? documentValue.canvases.length
+      : 1;
+    const sourceWidth = Math.max(0, Number(documentValue.width) || Number(documentValue.canvases?.[0]?.width) || 0);
+    const sourceHeight = Math.max(0, Number(documentValue.height) || Number(documentValue.canvases?.[0]?.height) || 0);
+    if (isPng) {
+      console.info('[pixieedraw-dev:png-canonical-import]', {
+        phase: 'png-candidate-built',
+        sourceFileBytes,
+        sourceWidth,
+        sourceHeight,
+        canvasCount,
+      });
+      const normalized = normalizePngSheetCandidate(project, file, {
+        sourceFileBytes,
+        sourceWidth,
+        sourceHeight,
+      });
+      if (!normalized?.ok) {
+        console.warn('[pixieedraw-dev:png-canonical-import]', {
+          phase: 'png-normalize-failed',
+          sourceFileBytes,
+          sourceWidth,
+          sourceHeight,
+          code: normalized?.code || 'ERR_CANONICAL_V2_NORMALIZE_FAILED',
+        });
+        const error = new Error('ERR_CANONICAL_V2_CANDIDATE_INVALID');
+        error.code = 'ERR_CANONICAL_V2_CANDIDATE_INVALID';
+        error.causeCode = normalized?.code || 'ERR_CANONICAL_V2_NORMALIZE_FAILED';
+        throw error;
+      }
+      project = normalized.canonicalPayload;
     }
     return {
       project,
@@ -1209,6 +1353,7 @@
         : null,
       lastSavedStorageAdapterId: null,
       isImportedSheet: true,
+      canonicalPayloadFormat: isPng ? project.canonicalPayloadFormat || '' : '',
     };
   }
 
@@ -1721,6 +1866,7 @@
     tryParseJsonSafe,
     resolveOpenProjectPayloadFileName,
     readProjectPayloadFromOpenItem,
+    normalizePngSheetCandidate,
     appendProjectPayloadAsOpenTab,
     loadRecentProjectPackagedPayload,
     appendPackagedProjectTab,
