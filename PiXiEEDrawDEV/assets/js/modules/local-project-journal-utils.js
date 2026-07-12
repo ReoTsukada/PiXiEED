@@ -562,28 +562,22 @@
 
     function createLightweightTabState(tab = null, overrides = {}) {
       const base = tab && typeof tab === 'object' ? tab : {};
-      // A lightweight tab must retain its own restore payload. The collection
-      // project id is not a sheet identity and cannot reconstruct an imported
-      // sheet after another tab has become active.
+      // A local sheet keeps one resident payload reference. `project` and
+      // `deferredProjectPayload` deliberately point at that same object: this
+      // avoids a full snapshot/rehydrate cycle for an unchanged GIF sheet
+      // without duplicating its pixel buffers.
       const deferredProjectPayload = overrides.deferredProjectPayload
         || base.deferredProjectPayload
         || (base.project && typeof base.project === 'object' ? base.project : null);
-      const importedSheetOwnsPayload = Boolean(
-        deferredProjectPayload
-        && base.isImportedSheet === true
-      );
       return {
         ...base,
         ...overrides,
-        // Imported sheets have no collection-level fallback that can safely
-        // identify their payload. Keep their resident copy until a dedicated
-        // persisted payload store exists.
-        project: importedSheetOwnsPayload ? deferredProjectPayload : null,
+        project: deferredProjectPayload,
         deferredProjectPayload,
         deferredPayloadKey: String(overrides.deferredPayloadKey || base.deferredPayloadKey || base.sheetPersistenceKey || base.id || ''),
         checkpointId: String(overrides.checkpointId || base.checkpointId || ''),
         dirtyOpCount: Math.max(0, Math.round(Number(overrides.dirtyOpCount ?? base.dirtyOpCount) || 0)),
-        residentProjectLoaded: importedSheetOwnsPayload,
+        residentProjectLoaded: Boolean(deferredProjectPayload),
       };
     }
 
