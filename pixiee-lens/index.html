@@ -2560,7 +2560,7 @@
 <div class="hud-top">
 <div class="hud-top__bar">
 <div aria-label="ドット絵コントロール" class="hud-top__actions" role="group">
-<button aria-label="ドット絵を読み込む" class="icon-button" id="pixelArtBtn" type="button">
+<button aria-label="画像を読み込む" class="icon-button" id="pixelArtBtn" type="button">
 <svg aria-hidden="true" class="control-icon" shape-rendering="crispEdges" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
 <rect fill="#FFFFFF" height="1" width="14" x="1" y="0"></rect>
 <rect fill="#FFFFFF" height="1" width="2" x="0" y="1"></rect>
@@ -2577,7 +2577,7 @@
 <rect fill="#FFFFFF" height="2" width="1" x="22" y="22"></rect>
 <rect fill="#FFFFFF" height="1" width="20" x="2" y="23"></rect>
 </svg>
-<span class="icon-button__label visually-hidden">ドット絵を読み込む</span>
+<span class="icon-button__label visually-hidden">画像を読み込む</span>
 </button>
 <button aria-controls="stampPanel" aria-expanded="false" aria-label="スタンプを開く" class="icon-button" id="stampBtn" type="button">
 <img alt="" aria-hidden="true" class="control-icon" draggable="false" src="./icon-stamp.svg"/>
@@ -2928,7 +2928,7 @@
     </div>
   </div>
 </div>
-<input accept="image/png, image/gif, image/webp, image/bmp" hidden="" id="pixelArtInput" multiple="" type="file"/>
+<input accept="image/*" hidden="" id="pixelArtInput" type="file"/>
 <script>
   if (window.pixieedObserveAds) {
     window.pixieedObserveAds();
@@ -3434,6 +3434,9 @@
       gradientMode: 'dither',
       cameraSettings: { ...CAMERA_SETTING_DEFAULTS }
     };
+
+    let photoSourceImage = null;
+    let photoSourceObjectUrl = null;
 
     const overlays = [];
     let activeOverlay = null;
@@ -6533,8 +6536,9 @@
       const metrics = getViewportMetrics();
       const viewportWidth = metrics.width;
       const viewportHeight = metrics.height;
-      const sourceWidth = video.videoWidth || viewportWidth;
-      const sourceHeight = video.videoHeight || viewportHeight;
+      const sourceSize = getActiveDotSourceSize();
+      const sourceWidth = sourceSize.width || viewportWidth;
+      const sourceHeight = sourceSize.height || viewportHeight;
       if (!sourceWidth || !sourceHeight) {
         return {
           width: viewportWidth,
@@ -6552,6 +6556,95 @@
       const offsetX = metrics.offsetLeft + Math.round((viewportWidth - width) / 2);
       const offsetY = metrics.offsetTop + Math.round((viewportHeight - height) / 2);
       return { width, height, offsetX, offsetY };
+    }
+
+    function getActiveDotSource() {
+      if (photoSourceImage && photoSourceImage.complete && photoSourceImage.naturalWidth > 0 && photoSourceImage.naturalHeight > 0) {
+        return photoSourceImage;
+      }
+      if (video && video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
+        return video;
+      }
+      return null;
+    }
+
+    function getActiveDotSourceSize() {
+      const source = getActiveDotSource();
+      if (source === photoSourceImage) {
+        return {
+          width: Math.max(0, Number(photoSourceImage?.naturalWidth) || 0),
+          height: Math.max(0, Number(photoSourceImage?.naturalHeight) || 0)
+        };
+      }
+      return {
+        width: Math.max(0, Number(video?.videoWidth) || 0),
+        height: Math.max(0, Number(video?.videoHeight) || 0)
+      };
+    }
+
+    function updateImageImportButton() {
+      if (!pixelArtBtn) {
+        return;
+      }
+      const hasPhotoSource = Boolean(photoSourceImage);
+      pixelArtBtn.classList.toggle('is-active', hasPhotoSource);
+      pixelArtBtn.setAttribute('aria-pressed', hasPhotoSource ? 'true' : 'false');
+      setIconButtonLabel(pixelArtBtn, hasPhotoSource ? 'カメラに戻る' : '画像を読み込む');
+    }
+
+    function clearPhotoSource({ announce = true } = {}) {
+      if (photoSourceObjectUrl) {
+        URL.revokeObjectURL(photoSourceObjectUrl);
+      }
+      photoSourceObjectUrl = null;
+      photoSourceImage = null;
+      if (video) {
+        video.hidden = false;
+      }
+      updateImageImportButton();
+      updateAspectLayout();
+      if (state.dotMode) {
+        ensureDotResolution();
+        startDotRendering();
+      }
+      if (announce) {
+        setStatus('カメラ映像に戻りました');
+      }
+    }
+
+    function loadPhotoAsDotSource(file) {
+      if (!file || !/^image\//i.test(file.type || '')) {
+        setStatus('写真ファイルを選択してください');
+        return Promise.resolve(false);
+      }
+      const objectUrl = URL.createObjectURL(file);
+      const image = new Image();
+      image.decoding = 'async';
+      return new Promise(resolve => {
+        image.onload = () => {
+          if (photoSourceObjectUrl) {
+            URL.revokeObjectURL(photoSourceObjectUrl);
+          }
+          photoSourceObjectUrl = objectUrl;
+          photoSourceImage = image;
+          if (video) {
+            video.hidden = true;
+          }
+          updateImageImportButton();
+          setDotMode(true);
+          updateAspectLayout();
+          ensureDotResolution();
+          startDotRendering();
+          setStatus(`写真を ${getDotResolution().width} × ${getDotResolution().height} PXでドット化しています`);
+          resolve(true);
+        };
+        image.onerror = () => {
+          URL.revokeObjectURL(objectUrl);
+          setStatus('写真を読み込めませんでした');
+          resolve(false);
+        };
+        image.src = objectUrl;
+      });
     }
 
     function getWindowViewportSize() {
@@ -6745,8 +6838,9 @@
       if (!dotCanvas || !dotCanvasCtx) {
         return null;
       }
-      const videoWidth = video.videoWidth || 0;
-      const videoHeight = video.videoHeight || 0;
+      const sourceSize = getActiveDotSourceSize();
+      const videoWidth = sourceSize.width;
+      const videoHeight = sourceSize.height;
       if (!videoWidth || !videoHeight) {
         return null;
       }
@@ -7748,7 +7842,8 @@
     }
 
     function captureCurrentSourceImageData(targetWidth, targetHeight) {
-      if (!video || video.readyState < 2 || !smoothingCanvas || !smoothingCtx) {
+      const source = getActiveDotSource();
+      if (!source || !smoothingCanvas || !smoothingCtx) {
         return null;
       }
       const width = Math.max(1, Math.round(Number(targetWidth) || 0));
@@ -7773,7 +7868,7 @@
       smoothingCtx.filter = smoothingFilter;
       smoothingCtx.clearRect(0, 0, width, height);
       smoothingCtx.drawImage(
-        video,
+        source,
         crop.sx,
         crop.sy,
         crop.sw,
@@ -7965,9 +8060,10 @@
         return;
       }
       ensureDotResolution();
+      const source = getActiveDotSource();
       const crop = getDotSourceRect();
-      const mirrorPreview = Boolean(state.useFrontCamera);
-      if (video.readyState >= 2 && crop) {
+      const mirrorPreview = source === video && Boolean(state.useFrontCamera);
+      if (source && crop) {
         const targetWidth = dotCanvas.width;
         const targetHeight = dotCanvas.height;
         if (!targetWidth || !targetHeight) {
@@ -7992,7 +8088,7 @@
             smoothingCtx.scale(-1, 1);
           }
           smoothingCtx.drawImage(
-            video,
+            source,
             crop.sx,
             crop.sy,
             crop.sw,
@@ -8016,7 +8112,7 @@
             dotCanvasCtx.scale(-1, 1);
           }
           dotCanvasCtx.drawImage(
-            video,
+            source,
             crop.sx,
             crop.sy,
             crop.sw,
@@ -9172,16 +9268,90 @@
       return createOverlayFromImageSource(objectUrl, { objectUrl });
     }
 
+    function analyzeImportedImage(file) {
+      if (!file) {
+        return Promise.resolve('pixel-art');
+      }
+      const type = String(file.type || '').toLowerCase();
+      if (type === 'image/jpeg' || type === 'image/jpg') {
+        return Promise.resolve('photo');
+      }
+      const objectUrl = URL.createObjectURL(file);
+      const image = new Image();
+      image.decoding = 'async';
+      return new Promise(resolve => {
+        const finish = result => {
+          URL.revokeObjectURL(objectUrl);
+          resolve(result);
+        };
+        image.onload = () => {
+          const sourceWidth = image.naturalWidth || image.width || 0;
+          const sourceHeight = image.naturalHeight || image.height || 0;
+          if (!sourceWidth || !sourceHeight || Math.max(sourceWidth, sourceHeight) <= 256 || type === 'image/gif') {
+            finish('pixel-art');
+            return;
+          }
+          const maxSampleSide = 160;
+          const scale = Math.min(1, maxSampleSide / Math.max(sourceWidth, sourceHeight));
+          const sampleWidth = Math.max(1, Math.round(sourceWidth * scale));
+          const sampleHeight = Math.max(1, Math.round(sourceHeight * scale));
+          const sample = document.createElement('canvas');
+          sample.width = sampleWidth;
+          sample.height = sampleHeight;
+          const ctx = sample.getContext('2d', { willReadFrequently: true });
+          if (!ctx) {
+            finish('photo');
+            return;
+          }
+          ctx.imageSmoothingEnabled = false;
+          ctx.drawImage(image, 0, 0, sampleWidth, sampleHeight);
+          const pixels = ctx.getImageData(0, 0, sampleWidth, sampleHeight).data;
+          const colors = new Set();
+          for (let i = 0; i < pixels.length; i += 4) {
+            if (pixels[i + 3] < 16) continue;
+            colors.add(`${pixels[i]},${pixels[i + 1]},${pixels[i + 2]}`);
+            if (colors.size > 128) {
+              finish('photo');
+              return;
+            }
+          }
+          finish('pixel-art');
+        };
+        image.onerror = () => finish('pixel-art');
+        image.src = objectUrl;
+      });
+    }
+
+    async function importImageFromFile(file) {
+      if (!file) {
+        return false;
+      }
+      setStatus('画像を分析中…');
+      const kind = await analyzeImportedImage(file);
+      if (kind === 'photo') {
+        return await loadPhotoAsDotSource(file);
+      }
+      const loaded = await loadPixelArt(file);
+      if (loaded) {
+        setStatus('ドット絵として挿入しました');
+      }
+      return loaded;
+    }
+
     pixelArtBtn.addEventListener('click', (event) => {
       event.stopPropagation();
       closeAllMenus();
+      if (photoSourceImage) {
+        clearPhotoSource();
+        return;
+      }
       pixelArtInput.click();
     });
 
     pixelArtInput.addEventListener('change', async (event) => {
-      const files = Array.from(event.target.files || []);
-      for (const file of files) {
-        await loadPixelArt(file);
+      const file = event.target.files?.[0] || null;
+      if (file) {
+        await importImageFromFile(file);
       }
       pixelArtInput.value = '';
     });
@@ -9329,6 +9499,10 @@
     }
 
     function handleTapAutoAdjust(event) {
+      if (photoSourceImage) {
+        setStatus('写真モードでは、上部の設定で色味を調整できます');
+        return;
+      }
       if (!video || video.readyState < 2) {
         return;
       }
@@ -12021,6 +12195,7 @@
         }
         await waitForVideoReady();
         video.style.transform = state.useFrontCamera ? 'scaleX(-1)' : 'scaleX(1)';
+        video.hidden = Boolean(photoSourceImage);
         applyCameraSettings();
         cameraPermissionDenied = false;
         cameraPermissionGranted = true;
@@ -12098,6 +12273,7 @@
 
     window.addEventListener('beforeunload', () => {
       stopQrScanLoop();
+      clearPhotoSource({ announce: false });
       stopCamera();
     });
     window.addEventListener('pagehide', () => {
@@ -12176,6 +12352,7 @@
     updatePaletteToggleAvailability();
     setDotMode(true);
     updateDotModeUI();
+    updateImageImportButton();
     setAspectMode(state.aspectMode);
     updateControlPlacement();
     setQrReadoutVisibility(false);
