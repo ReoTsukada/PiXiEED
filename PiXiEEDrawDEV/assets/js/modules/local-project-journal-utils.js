@@ -442,7 +442,7 @@
       buildAutosaveSessionPayload,
     } = {}) {
       const normalizedProjectId = normalizeAutosaveProjectId(projectId || activeState?.projectId || '');
-      if (!normalizedProjectId || !snapshot || typeof snapshot !== 'object' || typeof buildPackagedProjectPayload !== 'function') {
+      if (!normalizedProjectId || typeof buildPackagedProjectPayload !== 'function') {
         return null;
       }
       const next = ensureActiveState(normalizedProjectId) || createEmptyActiveState(normalizedProjectId);
@@ -460,6 +460,24 @@
         : '';
       const useCheckpoint = shouldUseJournalCheckpoint(next)
         || Boolean(currentActiveSheetId && checkpointActiveSheetId && currentActiveSheetId !== checkpointActiveSheetId);
+      const hasSnapshot = Boolean(snapshot && typeof snapshot === 'object');
+      if (!hasSnapshot && !useCheckpoint && next.checkpointProject && typeof next.checkpointProject === 'object') {
+        next.historyPast = normalizeHistoryEntryList(session.historyPast);
+        next.historyFuture = normalizeHistoryEntryList(session.historyFuture);
+        next.historyLimit = Math.max(1, Math.round(Number(session.historyLimit) || 30));
+        next.dirtyOpCount = Math.max(0, next.ops.length);
+        activeState = next;
+        return {
+          packagedPayload: null,
+          journalPayload: buildJournalPayloadFromState(next),
+          checkpointId: next.checkpointId,
+          dirtyOpCount: next.dirtyOpCount,
+          journalOnly: true,
+        };
+      }
+      if (!hasSnapshot) {
+        return null;
+      }
       if (useCheckpoint) {
         const fullPackaged = packagedPayload && typeof packagedPayload === 'object'
           ? packagedPayload
@@ -513,6 +531,7 @@
         journalPayload: buildJournalPayloadFromState(next),
         checkpointId: next.checkpointId,
         dirtyOpCount: next.dirtyOpCount,
+        journalOnly: false,
       };
     }
 
