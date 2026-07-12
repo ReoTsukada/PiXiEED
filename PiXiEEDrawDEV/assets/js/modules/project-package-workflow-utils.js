@@ -31,6 +31,34 @@
 
     return ((scope) => {
       with (scope) {
+  let projectPackagePerformanceSequence = 0;
+
+  function beginProjectPackagePerformanceSpan(name, details = null) {
+    const perf = window?.performance;
+    const id = `${name}:${Date.now().toString(36)}:${++projectPackagePerformanceSequence}`;
+    const startMark = `${id}:start`;
+    try {
+      perf?.mark?.(startMark);
+    } catch (_error) {}
+    return { name, details, perf, id, startMark, startedAt: perf?.now?.() ?? Date.now() };
+  }
+
+  function endProjectPackagePerformanceSpan(span, details = null) {
+    if (!span) return;
+    const finishedAt = span.perf?.now?.() ?? Date.now();
+    const endMark = `${span.id}:end`;
+    const mergedDetails = { ...(span.details || {}), ...(details || {}) };
+    try {
+      span.perf?.mark?.(endMark);
+      span.perf?.measure?.(span.name, span.startMark, endMark);
+    } catch (_error) {}
+    console.info('[pixiedraw-dev:performance]', {
+      phase: span.name,
+      elapsedMs: Math.round(finishedAt - span.startedAt),
+      ...mergedDetails,
+    });
+  }
+
   function resolveSnapshotThumbnailCanvasSource(snapshot) {
     if (!snapshot || typeof snapshot !== 'object') {
       return null;
@@ -579,26 +607,37 @@
           thumbnail: previousEntry?.thumbnail || null,
         });
       }
-      const savePlan = typeof buildActiveLocalProjectSavePlan === 'function'
-        ? buildActiveLocalProjectSavePlan({
-          projectId: resolvedProjectId,
-          snapshot,
-          packagedPayload,
-          buildPackagedProjectPayload,
-          buildAutosaveSessionPayload: buildProjectSessionPayload,
-        })
-        : null;
-      const packaged = savePlan?.packagedPayload && typeof savePlan.packagedPayload === 'object'
-        ? savePlan.packagedPayload
-        : (
-          packagedPayload && typeof packagedPayload === 'object'
-            ? packagedPayload
-            : buildPackagedProjectPayload(snapshot)
-        );
-      ensurePackagedProjectSheetsForSave(packaged, snapshot);
-      preserveExistingProjectSheetsForSave(packaged, previousEntry?.project || null);
-      if (!validatePackagedProjectSheetCountForSave(packaged)) {
-        throw new Error('Refusing to save incomplete project sheets');
+      const packageSpan = beginProjectPackagePerformanceSpan('pixiedraw-dev:autosave:package', {
+        projectId: resolvedProjectId,
+      });
+      let savePlan;
+      let packaged;
+      try {
+        savePlan = typeof buildActiveLocalProjectSavePlan === 'function'
+          ? buildActiveLocalProjectSavePlan({
+            projectId: resolvedProjectId,
+            snapshot,
+            packagedPayload,
+            buildPackagedProjectPayload,
+            buildAutosaveSessionPayload: buildProjectSessionPayload,
+          })
+          : null;
+        packaged = savePlan?.packagedPayload && typeof savePlan.packagedPayload === 'object'
+          ? savePlan.packagedPayload
+          : (
+            packagedPayload && typeof packagedPayload === 'object'
+              ? packagedPayload
+              : buildPackagedProjectPayload(snapshot)
+          );
+        ensurePackagedProjectSheetsForSave(packaged, snapshot);
+        preserveExistingProjectSheetsForSave(packaged, previousEntry?.project || null);
+        if (!validatePackagedProjectSheetCountForSave(packaged)) {
+          throw new Error('Refusing to save incomplete project sheets');
+        }
+      } finally {
+        endProjectPackagePerformanceSpan(packageSpan, {
+          sheetCount: countPackagedProjectSheets(packaged),
+        });
       }
       const listSnapshot = (savePlan?.journalPayload && snapshot)
         ? snapshot
@@ -623,9 +662,17 @@
           || !Number.isFinite(previousUpdatedAt)
           || (nowTs - previousUpdatedAt >= safeThumbnailInterval)
         );
-      const thumbnail = shouldRefreshThumbnail
-        ? (await generateSnapshotThumbnail(listSnapshot || snapshot))
-        : previousEntry.thumbnail;
+      const thumbnailSpan = beginProjectPackagePerformanceSpan('pixiedraw-dev:autosave:thumbnail', {
+        refresh: shouldRefreshThumbnail,
+      });
+      let thumbnail;
+      try {
+        thumbnail = shouldRefreshThumbnail
+          ? (await generateSnapshotThumbnail(listSnapshot || snapshot))
+          : previousEntry.thumbnail;
+      } finally {
+        endProjectPackagePerformanceSpan(thumbnailSpan);
+      }
       const dotStats = resolvePackagedProjectDotStats(packaged, snapshot);
       const updatedEntry = {
         id: resolvedProjectId,
@@ -663,7 +710,14 @@
         const bTime = typeof b?.updatedAt === 'string' ? b.updatedAt : '';
         return bTime.localeCompare(aTime);
       });
-      await saveRecentProjectsList(latestEntries, workingEntries);
+      const indexedDbSpan = beginProjectPackagePerformanceSpan('pixiedraw-dev:autosave:indexeddb-write', {
+        projectId: resolvedProjectId,
+      });
+      try {
+        await saveRecentProjectsList(latestEntries, workingEntries);
+      } finally {
+        endProjectPackagePerformanceSpan(indexedDbSpan);
+      }
       const expectedSavedSheetCount = countPackagedProjectSheets(packaged);
       if (!await verifyRecentProjectSheetSave(resolvedProjectId, expectedSavedSheetCount)) {
         throw new Error(`Recent project sheet save verification failed (${expectedSavedSheetCount})`);
