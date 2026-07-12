@@ -79,7 +79,7 @@
   })();
 </script>
 <script src="assets/js/modules/edition-capabilities-utils.js?v=2026.07.11-g3a-edition-ads"></script>
-<script src="assets/js/build-info.js?v=20260712-013"></script>
+<script src="assets/js/build-info.js?v=20260712-015"></script>
 <script>
   (function configurePixieedAds() {
     const shouldShowAds = typeof window.__PIXIEEDRAW_SHOULD_SHOW_ADS__ === 'function'
@@ -677,6 +677,13 @@
     </div>
     </div>
   </div>
+  <div id="rightPanelAdPreloadMount" style="width:320px;min-width:320px;max-width:320px;height:96px;min-height:96px;max-height:96px;overflow:hidden;">
+    <div aria-label="広告" class="panel-ad panel-ad--context" id="rightPanelContextAd">
+      <div class="ad-box" id="rightPanelContextAdSlot">
+        <ins class="ad-seed" data-ad-client="ca-pub-9801602250480253" data-ad-format="horizontal" data-ad-slot="1180252398" data-full-width-responsive="false" style="display:block"></ins>
+      </div>
+    </div>
+  </div>
 </div>
 <button aria-label="描画ボタン（左=主色 / 右=副色）" class="floating-draw-button" id="floatingDrawButton" type="button">描画</button>
 <div aria-hidden="true" aria-label="選択範囲移動" class="floating-move-pad is-hidden" hidden="" id="floatingMovePad" role="group">
@@ -1103,7 +1110,6 @@
 <span>拡張機能</span>
 <p class="help-text ui-guide-text">今は使用不可です。立体作成モードは設定のトグルへ移動しました。</p>
 </div>
-<div class="panel-ad-mount" data-panel-ad-mount="right"></div>
 </div>
 </section>
 <section class="panel-section" data-section="file" id="panelFile">
@@ -1124,7 +1130,6 @@
 <p aria-live="polite" class="help-text" id="autosaveStatus"></p>
 <p aria-live="polite" class="help-text" id="projectFileStatus">未保存</p>
 <p aria-live="polite" class="help-text" id="exportFolderStatus"></p>
-<div class="panel-ad-mount" data-panel-ad-mount="right"></div>
 <div class="field field--list">
 <span id="timelapseSectionTitle">タイムラプス</span>
 <div class="field-group">
@@ -1147,6 +1152,7 @@
 <button class="button button--danger" id="clearCanvas" type="button">キャンバスをクリア</button>
 </div>
 </details>
+<div class="panel-ad-mount panel-ad-mount--context" data-panel-ad-mount="right"></div>
 </div>
 </section>
 <section class="panel-section" data-section="details" id="panelDetails">
@@ -1190,6 +1196,7 @@
 </div>
 </div>
 </div>
+<div class="panel-ad-mount panel-ad-mount--context" data-panel-ad-mount="right"></div>
 </div>
 </section>
 <section class="panel-section" data-section="settings" id="panelSettings">
@@ -1225,7 +1232,6 @@
 <p class="help-text ui-guide-text" id="canvasSizeHint">X/Y と倍率をまとめて調整</p>
 </div>
 </div>
-<div class="panel-ad-mount" data-panel-ad-mount="right"></div>
 <div class="field field--list settings-color-mode-field">
 <span>カラーモード</span>
 <div aria-label="カラーモード" class="color-mode-switch" id="settingsColorModeSwitch" role="radiogroup">
@@ -1355,6 +1361,7 @@
 </div>
 <p class="help-text ui-guide-text" id="settingsDisplayHint">背景とUI配色を切り替えます（描画色には影響しません）。</p>
 </div>
+<div class="panel-ad-mount panel-ad-mount--context" data-panel-ad-mount="right"></div>
 </div>
 </section>
 <section class="panel-section" data-section="help" id="panelHelp"></section>
@@ -1896,25 +1903,28 @@
 	<script defer="" src="assets/js/modules/shared-project-local-conversion-utils.js?v=2026.07.08-shared-local-conversion-split-v1"></script>
 	<script defer="" src="assets/js/modules/shared-project-create-progress-utils.js?v=2026.07.03-shared-open-workflow-v1"></script>
 	<script defer="" src="assets/js/modules/startup-tail-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
-	<script defer="" src="assets/js/modules/controls-mirror.js?v=2026.07.03-mirror-guide-drag-fix1"></script>
+	<script defer="" src="assets/js/modules/controls-mirror.js?v=2026.07.12-detail-dialog-fallback1"></script>
 	<script defer="" src="assets/js/modules/external-tool-workflow-utils.js?v=2026.07.02-external-tool-workflow-split-v1"></script>
 	<script defer="" src="assets/js/modules/canonical-v2-project-utils.js?v=20260712-canonical-v2-e2"></script>
 	<script defer="" src="assets/js/modules/pre-update-checkpoint-utils.js?v=20260712-pre-update-checkpoint-u3"></script>
 	<script defer="" src="assets/js/pixieedraw-dev-switch.js?v=2026.07.03-pixieedrawdev-switch-fix14"></script>
-	<script defer="" src="assets/js/app.js?v=20260712-013"></script>
-	<script defer="" src="assets/js/modules/update-detection-utils.js?v=20260712-013"></script>
+	<script defer="" src="assets/js/app.js?v=20260712-015"></script>
+	<script defer="" src="assets/js/modules/update-detection-utils.js?v=20260712-015"></script>
   <script>
     (function initPanelAdDocking() {
       const ads = {
         left: document.getElementById('leftPanelAd'),
+        right: document.getElementById('rightPanelContextAd'),
       };
       const preloadMounts = {
         left: document.getElementById('leftPanelAdPreloadMount'),
+        right: document.getElementById('rightPanelAdPreloadMount'),
       };
       const sideSections = {
         left: ['panelColor'],
+        right: ['panelFile', 'panelSettings', 'panelDetails'],
       };
-      if (!(ads.left instanceof HTMLElement)) return;
+      if (!(ads.left instanceof HTMLElement) && !(ads.right instanceof HTMLElement)) return;
 
       function isMountRenderable(node) {
         if (!(node instanceof HTMLElement) || !node.isConnected) return false;
@@ -1962,13 +1972,39 @@
 
       function refresh() {
         const movedLeft = dock('left');
-        if (movedLeft) {
+        const movedRight = dock('right');
+        if (movedLeft || movedRight) {
           try {
             document.dispatchEvent(new CustomEvent('pixiedraw:panel-ad-dock-change'));
           } catch (error) {
             // ignore
           }
         }
+        queueContextAdRender();
+      }
+
+      function queueContextAdRender() {
+        const ad = ads.right;
+        const slot = ad?.querySelector?.('#rightPanelContextAdSlot > ins');
+        if (!(ad instanceof HTMLElement) || !(slot instanceof HTMLElement)
+          || ad.closest('#panelAdPreloadHost') || slot.dataset.contextRenderQueued === '1'
+          || slot.dataset.loaded === '1' || slot.getAttribute('data-adsbygoogle-status') === 'done') {
+          return;
+        }
+        slot.dataset.contextRenderQueued = '1';
+        window.requestAnimationFrame(() => {
+          delete slot.dataset.contextRenderQueued;
+          if (!ad.isConnected || ad.closest('#panelAdPreloadHost')) {
+            return;
+          }
+          const result = window.__PIXIEEDRAW_RENDER_AD_SLOT__?.(slot, {
+            owner: 'right-panel-context',
+            reason: 'visible-panel-bottom',
+          });
+          if (result?.ok) {
+            slot.dataset.loaded = '1';
+          }
+        });
       }
 
       const observer = new MutationObserver(refresh);
@@ -1979,6 +2015,10 @@
         subtree: true,
       });
       window.addEventListener('resize', refresh);
+      document.addEventListener('pixieedraw:ads-ready', () => {
+        refresh();
+        queueContextAdRender();
+      });
       if (document.readyState === 'complete') {
         refresh();
       } else {
@@ -2417,7 +2457,7 @@
     })();
   </script>
 
-	<script src="../scripts/shared-bottom-nav.js?v=2026.07.12-shared-ads-banner-full1"></script>
+	<script src="../scripts/shared-bottom-nav.js?v=2026.07.12-shared-ads-rail2"></script>
   <script src="../scripts/pixel-art-fit.js"></script>
 </body>
 </html>
