@@ -816,7 +816,11 @@
         buildPackagedProjectPayload,
         buildAutosaveSessionPayload: buildProjectSessionPayload,
       }) || null;
-      const journalOnly = journalOnlySavePlan?.journalOnly === true;
+      const useV2Primary = isAutosaveV2PrimaryEnabled?.() === true;
+      // The V2 primary writer owns its immutable revisions.  Until its
+      // journal bridge is promoted, it must receive a full checkpoint rather
+      // than silently falling back to a V1-only journal entry.
+      const journalOnly = !useV2Primary && journalOnlySavePlan?.journalOnly === true;
       const snapshotSpan = beginAutosavePerformanceSpan('pixiedraw-dev:autosave:make-history-snapshot', { skipped: journalOnly });
       let snapshot = null;
       try {
@@ -831,14 +835,20 @@
       let savedEntry = null;
       const recordSpan = beginAutosavePerformanceSpan('pixiedraw-dev:autosave:record-recent-project');
       try {
-        savedEntry = await recordRecentProjectSnapshot(snapshot, null, {
-          projectId,
-          thumbnailIntervalMs: AUTOSAVE_THUMBNAIL_UPDATE_INTERVAL_MS,
-          savePlan: journalOnlySavePlan,
-        });
+        savedEntry = useV2Primary
+          ? await writeAutosaveV2Primary({
+            projectId,
+            snapshot,
+            thumbnailIntervalMs: AUTOSAVE_THUMBNAIL_UPDATE_INTERVAL_MS,
+          })
+          : await recordRecentProjectSnapshot(snapshot, null, {
+            projectId,
+            thumbnailIntervalMs: AUTOSAVE_THUMBNAIL_UPDATE_INTERVAL_MS,
+            savePlan: journalOnlySavePlan,
+          });
       } catch (error) {
         try {
-          if (!journalOnly) {
+          if (!useV2Primary && !journalOnly) {
             queueAutosaveV2ShadowWriteMeasured({ projectId, snapshot, v1Project: null, v1Error: error?.message || 'v1-write-failed' });
           }
         } catch (_shadowError) {}
@@ -848,14 +858,14 @@
       }
       if (!savedEntry) {
         try {
-          if (!journalOnly) {
+          if (!useV2Primary && !journalOnly) {
             queueAutosaveV2ShadowWriteMeasured({ projectId, snapshot, v1Project: null, v1Error: 'v1-write-returned-empty' });
           }
         } catch (_shadowError) {}
         throw new Error('Failed to record autosave snapshot');
       }
       try {
-        if (!journalOnly) {
+        if (!useV2Primary && !journalOnly) {
           queueAutosaveV2ShadowWriteMeasured({ projectId, snapshot, v1Project: savedEntry.project || null });
         }
       } catch (_shadowError) {}
