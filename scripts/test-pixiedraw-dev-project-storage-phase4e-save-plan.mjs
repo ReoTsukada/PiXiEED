@@ -102,6 +102,10 @@ function createExportRenderingHarness({
     PROJECT_FILE_EXTENSION,
     PROJECT_FILE_MIME_TYPE,
     NATIVE_PROJECTS_SUBDIRECTORY,
+    openProjectTabs: [],
+    getOpenProjectSheetCount() {
+      return 1;
+    },
     DEFAULT_PROJECT_STORAGE_ADAPTER_ID: V1_ADAPTER_ID,
     commitHistory() {},
     makeHistorySnapshot() {
