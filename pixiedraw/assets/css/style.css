@@ -10157,6 +10157,13 @@ body.is-mobile-layout .project-home-screen__list .startup-recent-card__open {
   display: flex;
   flex-direction: column;
   margin: auto;
+  z-index: 20000;
+}
+
+/* Project home uses an editor-sized overlay. Keep native confirmation dialogs
+ * visibly above it even on browsers with incomplete dialog top-layer support. */
+body.is-project-home-active .modal[open] {
+  z-index: 20010;
 }
 
 .modal::backdrop {
