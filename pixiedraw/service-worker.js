@@ -1,4 +1,4 @@
-const APP_BUILD_VERSION = '2026.07.12-touch-pan-bias-v9';
+const APP_BUILD_VERSION = '2026.07.12-project-delete-dialog-v1';
 const CACHE_VERSION = `pixiedraw-v${APP_BUILD_VERSION}`;
 const CORE_ASSETS = [
   '/pixiedraw/',
