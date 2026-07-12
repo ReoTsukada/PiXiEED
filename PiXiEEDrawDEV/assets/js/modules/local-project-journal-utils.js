@@ -49,6 +49,7 @@
         checkpointId: '',
         checkpointSequence: 0,
         checkpointProject: null,
+        checkpointPersisted: false,
         ops: [],
         dirtyOpCount: 0,
         forceCheckpoint: false,
@@ -112,6 +113,10 @@
         checkpointProject: entry?.project && typeof entry.project === 'object'
           ? cloneJsonValue(entry.project, null)
           : null,
+        checkpointPersisted: Boolean(
+          (entry?.project && typeof entry.project === 'object')
+          || (Number(entry?.autosaveSchemaVersion) >= 2 && entry?.manifestKey)
+        ),
         ops: Array.isArray(journal?.ops) ? (cloneJsonValue(journal.ops, []) || []) : [],
         dirtyOpCount: Math.max(0, Math.round(Number(journal?.dirtyOpCount) || (Array.isArray(journal?.ops) ? journal.ops.length : 0))),
         forceCheckpoint: false,
@@ -368,7 +373,7 @@
       if (!activeValue || typeof activeValue !== 'object') {
         return true;
       }
-      if (!activeValue.checkpointProject || typeof activeValue.checkpointProject !== 'object') {
+      if (!activeValue.checkpointPersisted && (!activeValue.checkpointProject || typeof activeValue.checkpointProject !== 'object')) {
         return true;
       }
       if (activeValue.forceCheckpoint) {
@@ -386,6 +391,7 @@
       next.checkpointSequence = Math.max(0, Math.round(Number(next.checkpointSequence) || 0)) + 1;
       next.checkpointId = createCheckpointId(normalizedProjectId, next.checkpointSequence);
       next.checkpointProject = buildCheckpointProject(snapshot, session, session?.updatedAt || '');
+      next.checkpointPersisted = false;
       next.ops = [];
       next.dirtyOpCount = 0;
       next.forceCheckpoint = false;
@@ -394,6 +400,18 @@
       next.historyLimit = Math.max(1, Math.round(Number(session?.historyLimit) || Number(history?.limit) || 30));
       activeState = next;
       return next;
+    }
+
+    // The V2 writer has durably committed the checkpoint. Retaining another
+    // full JSON copy here duplicates large pixel buffers in the renderer.
+    function markCheckpointPersisted(projectId = '') {
+      const normalizedProjectId = normalizeAutosaveProjectId(projectId || activeState?.projectId || '');
+      if (!normalizedProjectId || !activeState || activeState.projectId !== normalizedProjectId) {
+        return false;
+      }
+      activeState.checkpointProject = null;
+      activeState.checkpointPersisted = true;
+      return true;
     }
 
     function noteHistoryEntry(projectId = '', historyEntry = null, historyLabel = '') {
@@ -486,7 +504,7 @@
       const useCheckpoint = shouldUseJournalCheckpoint(next)
         || Boolean(currentActiveSheetId && checkpointActiveSheetId && currentActiveSheetId !== checkpointActiveSheetId);
       const hasSnapshot = Boolean(snapshot && typeof snapshot === 'object');
-      if (!hasSnapshot && !useCheckpoint && next.checkpointProject && typeof next.checkpointProject === 'object') {
+      if (!hasSnapshot && !useCheckpoint && next.checkpointPersisted) {
         next.historyPast = normalizeHistoryEntryList(session.historyPast);
         next.historyFuture = normalizeHistoryEntryList(session.historyFuture);
         next.historyLimit = Math.max(1, Math.round(Number(session.historyLimit) || 30));
@@ -511,6 +529,7 @@
         next.checkpointSequence = Math.max(0, Math.round(Number(next.checkpointSequence) || 0)) + 1;
         next.checkpointId = createCheckpointId(normalizedProjectId, next.checkpointSequence);
         next.checkpointProject = checkpointProject;
+        next.checkpointPersisted = false;
         next.ops = [];
         next.dirtyOpCount = 0;
         next.forceCheckpoint = false;
@@ -532,6 +551,7 @@
         next.checkpointSequence = Math.max(0, Math.round(Number(next.checkpointSequence) || 0)) + 1;
         next.checkpointId = createCheckpointId(normalizedProjectId, next.checkpointSequence);
         next.checkpointProject = cloneJsonValue(fullPackaged, null);
+        next.checkpointPersisted = false;
         next.ops = [];
         next.dirtyOpCount = 0;
         next.forceCheckpoint = false;
@@ -655,6 +675,7 @@
       buildCheckpointProject,
       reconstructPackagedProjectFromEntry,
       captureActiveStateCheckpoint,
+      markCheckpointPersisted,
       noteHistoryEntry,
       markNeedsCheckpoint,
       buildSavePlan,
