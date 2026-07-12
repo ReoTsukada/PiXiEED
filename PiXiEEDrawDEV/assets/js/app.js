@@ -16114,11 +16114,27 @@
     const projectId = normalizeAutosaveProjectId(settings.projectId || autosaveProjectId || '') || createAutosaveProjectId();
     const activeSheetId = activeOpenProjectTabId || openProjectTabs[0]?.id || createOpenProjectTabId();
     const sourceTabs = openProjectTabs.length ? openProjectTabs : [{ id: activeSheetId, project: activePackaged }];
+    // A non-active tab is deliberately allowed to release its resident
+    // payload.  A full V2 checkpoint must recover that unchanged sheet from
+    // the already committed V2 package instead of treating the memory-saving
+    // shape as a missing document (or, worse, committing a sheet-less save).
+    const fallbackPackagedPayload = settings.fallbackPackagedPayload && typeof settings.fallbackPackagedPayload === 'object'
+      ? settings.fallbackPackagedPayload
+      : null;
     const sheets = sourceTabs.map((tab, index) => {
         const isActive = tab?.id === activeSheetId;
-        const project = isActive ? activePackaged : tab?.project;
+        const project = isActive
+          ? activePackaged
+          : (
+            tab?.project && typeof tab.project === 'object'
+              ? tab.project
+              : (tab?.deferredProjectPayload && typeof tab.deferredProjectPayload === 'object'
+                ? tab.deferredProjectPayload
+                : extractLocalProjectSheetPayload(fallbackPackagedPayload, tab?.id || '')
+              )
+          );
         if (!project || typeof project !== 'object') {
-          throw new Error(`Autosave schema V2 shadow write is missing sheet payload: ${tab?.id || index}`);
+          throw new Error(`Autosave schema V2 write is missing sheet payload: ${tab?.id || index}`);
         }
         return {
           id: tab?.id || createOpenProjectTabId(),
@@ -16277,11 +16293,30 @@
     thumbnail = refreshThumbnail
       ? await generateSnapshotThumbnail(snapshot)
       : previousEntry.thumbnail;
+    const activeSheetId = String(activeOpenProjectTabId || '');
+    const requiresStoredSheetFallback = openProjectTabs.some(tab => (
+      tab?.id
+      && tab.id !== activeSheetId
+      && !(tab.project && typeof tab.project === 'object')
+      && !(tab.deferredProjectPayload && typeof tab.deferredProjectPayload === 'object')
+    ));
+    let fallbackPackagedPayload = null;
+    if (requiresStoredSheetFallback) {
+      try {
+        fallbackPackagedPayload = await readAutosaveV2PrimaryProject(normalizedProjectId);
+      } catch (_error) {
+        // A pre-V2 project can still provide the fallback through the legacy
+        // reader. If neither store contains every inactive sheet, the builder
+        // rejects before any V2 manifest/current reference is changed.
+        fallbackPackagedPayload = resolveStoredLocalProjectPayloadForProjectId(normalizedProjectId);
+      }
+    }
     projectState = buildAutosaveSchemaV2ExperimentalProjectState({
       projectId: normalizedProjectId,
       snapshot,
       thumbnail,
       packagedPayload: savePlan?.packagedPayload || null,
+      fallbackPackagedPayload,
     });
     written = await autosaveSchemaV2IndexedDbUtilsModule.writeSchemaV2Project(projectState);
     }
