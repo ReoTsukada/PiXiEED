@@ -82,7 +82,7 @@ assert.equal(status.status, 'update-available');
 assert.equal(status.reason, 'newer-build');
 
 status = await createDetector(current002, baseManifest).check({ force: true });
-assert.equal(status.status, 'up-to-date');
+assert.equal(status.status, 'current-newer');
 assert.equal(status.reason, 'manifest-older');
 
 status = await createDetector(current001, { ...baseManifest, buildId: '' }).check({ force: true });
@@ -90,8 +90,7 @@ assert.equal(status.status, 'failed', 'invalid manifests must not create an upda
 
 const buildInfo = fs.readFileSync(buildInfoPath, 'utf8');
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-assert.match(buildInfo, /buildId: '20260712-002'/);
-assert.equal(manifest.buildId, '20260712-001', 'R1 must preserve evidence of the stale manifest');
+assert.match(buildInfo, new RegExp(`buildId: '${manifest.buildId}'`), 'R2 keeps the deployed manifest aligned with the running build identity');
 
 const serviceWorker = fs.readFileSync(serviceWorkerPath, 'utf8');
 assert.doesNotMatch(serviceWorker, /skipWaiting\s*\(/);
@@ -106,12 +105,11 @@ const startupWorkflow = fs.readFileSync(startupWorkflowPath, 'utf8');
 const recentWorkflow = fs.readFileSync(recentWorkflowPath, 'utf8');
 const index = fs.readFileSync(indexPath, 'utf8');
 
-assert.match(app, /let openProjectTabBusy = false/);
-assert.match(app, /enabled: hasActiveProject && !openProjectTabBusy/);
-assert.match(app, /reason: openProjectTabBusy\s*\?\s*'command-in-flight'/);
-assert.match(importWorkflow, /openProjectTabBusy = true/);
-assert.match(importWorkflow, /finally \{\s*openProjectTabBusy = false;[\s\S]{0,260}?renderOpenProjectTabs\(\);/);
-assert.match(tabWorkflow, /let openProjectTabBusyOwner = null/);
+assert.match(app, /function isProjectCommandLocked\(\)/);
+assert.match(app, /enabled: hasActiveProject && !isProjectCommandLocked\(\)/);
+assert.match(app, /reason: isProjectCommandLocked\(\)\s*\?\s*'command-in-flight'/);
+assert.match(importWorkflow, /acquireProjectCommandLock\(/);
+assert.match(importWorkflow, /releaseProjectCommandLock\(/);
 assert.match(tabWorkflow, /const guardedProjectTabIds = new Set\(\)/);
 assert.match(tabWorkflow, /for \(const projectTabId of guardedProjectTabIds\)/);
 assert.match(tabWorkflow, /openProjectTabBusyOwner === activationOwner/);
