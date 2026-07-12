@@ -577,6 +577,10 @@
       projectV2ExperimentalRow: document.getElementById('exportProjectV2ExperimentalRow'),
       saveSpriteMapCompanionToggle: document.getElementById('exportSpriteMapCompanionToggle'),
       saveSpriteMapCompanionRow: document.getElementById('exportSpriteMapCompanionOptionRow'),
+      gridSplitToggle: document.getElementById('exportGridSplitToggle'),
+      gridSplitRow: document.getElementById('exportGridSplitOptionRow'),
+      timelapseToggle: document.getElementById('exportTimelapseToggle'),
+      timelapseRow: document.getElementById('exportTimelapseOptionRow'),
       contestPostToggle: document.getElementById('exportContestPostToggle'),
       contestPostRow: document.getElementById('exportContestPostOptionRow'),
       spriteMapColorSpritesToggle: document.getElementById('exportSpriteMapColorSpritesToggle'),
@@ -25421,6 +25425,23 @@
         document.body.classList.add('app-ready');
       }
       startupReady = true;
+      if (typeof window !== 'undefined') {
+        window.__PIXIEEDRAW_EDITOR_READY__ = true;
+        Promise.resolve(window.__PIXIEEDRAW_LOAD_ADS__?.())
+          .then(loaded => {
+            if (!loaded) return;
+            queueStartupRecentAdRender();
+            const sharedNav = document.querySelector('.bottom-nav');
+            if (sharedNav instanceof HTMLElement
+              && !document.body?.classList.contains('is-project-home-active')
+              && !document.body?.classList.contains('is-startup-active')) {
+              window.pixieedObserveAds?.(sharedNav);
+            }
+          })
+          .catch(error => {
+            console.warn('Deferred ad initialization failed', error);
+          });
+      }
       const commandLock = inspectProjectCommandLock();
       const startupStatus = {
         phase: 'startup-ready',
