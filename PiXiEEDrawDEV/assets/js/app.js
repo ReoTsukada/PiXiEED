@@ -6678,7 +6678,7 @@
     decodeBase64: (...args) => decodeBase64(...args),
     encodeTypedArray: (...args) => encodeTypedArray(...args),
     workerBridge: projectStorageV2WorkerBridge,
-    useWorkerByDefault: false,
+    useWorkerByDefault: true,
     console,
   }) || null;
 
@@ -6687,7 +6687,7 @@
       pixieeDrawV1JsonAdapter,
       pixieeDrawV2ZipAdapter,
     ].filter(Boolean),
-    defaultAdapterId: pixieeDrawV1JsonAdapter?.id || '',
+    defaultAdapterId: pixieeDrawV2ZipAdapter?.id || pixieeDrawV1JsonAdapter?.id || '',
   }) || null;
 
   function parseProjectStorageText(...args) {
@@ -9430,10 +9430,7 @@
     if (preferred) {
       return preferred;
     }
-    if (typeof window !== 'undefined' && window.__pixieedrawUseV2ProjectSave === true) {
-      return 'pixieedraw-v2-zip-experimental';
-    }
-    return 'pixieedraw-v1-json';
+    return 'pixieedraw-v2-zip-experimental';
   }
 
   function isProjectStorageConversionSave(sourceStorageAdapterId, targetStorageAdapterId) {
@@ -11324,7 +11321,7 @@
   set CONTEST_POST_PAGE_URL(value) { CONTEST_POST_PAGE_URL = value; },
   get DEFAULT_DOCUMENT_NAME() { return DEFAULT_DOCUMENT_NAME; },
   set DEFAULT_DOCUMENT_NAME(value) { DEFAULT_DOCUMENT_NAME = value; },
-  get DEFAULT_PROJECT_STORAGE_ADAPTER_ID() { return pixieeDrawV1JsonAdapter?.id || 'pixieedraw-v1-json'; },
+  get DEFAULT_PROJECT_STORAGE_ADAPTER_ID() { return pixieeDrawV2ZipAdapter?.id || pixieeDrawV1JsonAdapter?.id || 'pixieedraw-v2-zip-experimental'; },
   set DEFAULT_PROJECT_STORAGE_ADAPTER_ID(value) {},
   get DEFAULT_LAYER_BLEND_MODE() { return DEFAULT_LAYER_BLEND_MODE; },
   set DEFAULT_LAYER_BLEND_MODE(value) { DEFAULT_LAYER_BLEND_MODE = value; },
@@ -16637,10 +16634,10 @@
 
   if (typeof window !== 'undefined') {
     if (typeof window.__pixieedrawUseV2ProjectSave !== 'boolean') {
-      window.__pixieedrawUseV2ProjectSave = false;
+      window.__pixieedrawUseV2ProjectSave = true;
     }
     if (typeof window.__pixieedrawUseMultiSheetV2ExternalSave !== 'boolean') {
-      window.__pixieedrawUseMultiSheetV2ExternalSave = false;
+      window.__pixieedrawUseMultiSheetV2ExternalSave = true;
     }
     window.__pixieedrawSetV2ProjectSaveEnabled = function __pixieedrawSetV2ProjectSaveEnabled(enabled) {
       window.__pixieedrawUseV2ProjectSave = enabled === true;
@@ -16649,10 +16646,8 @@
     window.__pixieedrawGetV2ProjectSaveStatus = function __pixieedrawGetV2ProjectSaveStatus() {
       return {
         enabled: window.__pixieedrawUseV2ProjectSave === true,
-        adapterId: window.__pixieedrawUseV2ProjectSave === true
-          ? 'pixieedraw-v2-zip-experimental'
-          : 'pixieedraw-v1-json',
-        workerEnabled: false,
+        adapterId: 'pixieedraw-v2-zip-experimental',
+        workerEnabled: projectStorageV2WorkerBridge?.isSupported?.() === true,
         affectsAutosave: false,
         affectsRecentProjects: false,
       };
