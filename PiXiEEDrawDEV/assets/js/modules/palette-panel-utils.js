@@ -665,6 +665,64 @@
     }
 
 
+    function getPaletteUiSwatchCount() {
+      const container = dom.controls.paletteList;
+      if (!(container instanceof HTMLElement)) {
+        return 0;
+      }
+      return container.querySelectorAll('.palette-swatch:not(.palette-swatch--add)').length;
+    }
+
+
+    function logRgbToIndexedPaletteRefresh(phase, details = {}) {
+      // DEV-only diagnostic data: do not include file names, palette entries, or pixel bytes.
+      if (typeof console === 'undefined' || typeof console.info !== 'function') {
+        return;
+      }
+      console.info('[rgb-to-indexed-palette]', {
+        phase,
+        colorModeBefore: details.colorModeBefore,
+        colorModeAfter: details.colorModeAfter,
+        paletteLengthBefore: details.paletteLengthBefore,
+        paletteLengthAfter: details.paletteLengthAfter,
+        activePaletteIndexBefore: details.activePaletteIndexBefore,
+        activePaletteIndexAfter: details.activePaletteIndexAfter,
+        paletteUiSwatchCountBefore: details.paletteUiSwatchCountBefore,
+        paletteUiSwatchCountAfter: getPaletteUiSwatchCount(),
+        indexedLayerCount: details.indexedLayerCount,
+        directLayerCount: details.directLayerCount,
+        activeSheetId: typeof state.activeSheetId === 'string' ? state.activeSheetId : '',
+        code: details.code || '',
+      });
+    }
+
+
+    function countProjectColorStorageLayers() {
+      let indexedLayerCount = 0;
+      let directLayerCount = 0;
+      forEachProjectCanvasLayer(({ layer }) => {
+        if (layer?.indices instanceof Int16Array) {
+          indexedLayerCount += 1;
+        }
+        if (layer?.direct instanceof Uint8ClampedArray || layer?.importSourceDirect instanceof Uint8ClampedArray) {
+          directLayerCount += 1;
+        }
+      });
+      return { indexedLayerCount, directLayerCount };
+    }
+
+
+    function refreshPaletteUiAfterColorModeChange(details = {}) {
+      logRgbToIndexedPaletteRefresh('rgb-to-indexed-palette-ui-refresh-start', details);
+      syncColorModeControls();
+      renderPalette();
+      syncPaletteInputs();
+      updateColorTabSwatch();
+      focusUnifiedLeftContext('color', { persist: false });
+      logRgbToIndexedPaletteRefresh('rgb-to-indexed-palette-ui-refresh-success', details);
+    }
+
+
     function applyCustomIndexedPaletteFromActiveColor() {
       const activeColor = normalizeColorValue(
         state.activeRgb
@@ -917,8 +975,22 @@
       let remapToRgbResult = null;
       let customIndexPaletteResult = null;
       let remapMutated = false;
+      const paletteLengthBefore = Array.isArray(state.palette) ? state.palette.length : 0;
+      const activePaletteIndexBefore = state.activePaletteIndex;
+      const paletteUiSwatchCountBefore = getPaletteUiSwatchCount();
       if (shouldCreateCustomIndexPalette) {
-        customIndexPaletteResult = applyCustomIndexedPaletteFromActiveColor();
+        logRgbToIndexedPaletteRefresh('rgb-to-indexed-start', {
+          colorModeBefore: previousMode,
+          colorModeAfter: nextMode,
+          paletteLengthBefore,
+          paletteLengthAfter: paletteLengthBefore,
+          activePaletteIndexBefore,
+          activePaletteIndexAfter: activePaletteIndexBefore,
+          paletteUiSwatchCountBefore,
+          ...countProjectColorStorageLayers(),
+        });
+        beginHistory('colorModeConvert');
+        customIndexPaletteResult = convertCurrentDocumentRgbPixelsToIndexedPalette();
       } else if (shouldRemapToRgb) {
         beginHistory('colorModeConvert');
         remapToRgbResult = remapDocumentIndexedPixelsToDirect();
@@ -941,20 +1013,30 @@
           state.activeRgb = normalizeColorValue(paletteColor);
         }
       }
-      syncColorModeControls();
-      syncPaletteInputs();
-      renderPalette();
-      updateColorTabSwatch();
-      focusUnifiedLeftContext('color', { persist: false });
+      const paletteRefreshDetails = {
+        colorModeBefore: previousMode,
+        colorModeAfter: nextMode,
+        paletteLengthBefore,
+        paletteLengthAfter: Array.isArray(state.palette) ? state.palette.length : 0,
+        activePaletteIndexBefore,
+        activePaletteIndexAfter: state.activePaletteIndex,
+        paletteUiSwatchCountBefore,
+        ...countProjectColorStorageLayers(),
+      };
+      if (shouldCreateCustomIndexPalette) {
+        logRgbToIndexedPaletteRefresh('rgb-to-indexed-state-committed', paletteRefreshDetails);
+      }
+      refreshPaletteUiAfterColorModeChange(paletteRefreshDetails);
       if (shouldCreateCustomIndexPalette) {
         if (persist) {
           applyPaletteChange({
-            preserveCurrentPalettePreset: true,
-            renderSurfaces: Boolean(customIndexPaletteResult?.hasIndexedPixels),
+            preserveCurrentPalettePreset: false,
+            renderSurfaces: Boolean(customIndexPaletteResult?.touchedLayers),
           });
+          commitHistory();
         } else {
           requestRender();
-          if (customIndexPaletteResult?.hasIndexedPixels) {
+          if (customIndexPaletteResult?.touchedLayers) {
             renderAllProjectCanvasSurfaces();
           } else {
             scheduleSecondaryCanvasRefresh();
@@ -963,15 +1045,15 @@
         }
         updateAutosaveStatus(
           localizeText(
-            customIndexPaletteResult?.compactedToSingleColor
-              ? '描画色のみのカスタムパレットを生成してインデックスカラーへ切り替えました'
-              : '描画色をカスタムパレットへ反映してインデックスカラーへ切り替えました',
-            customIndexPaletteResult?.compactedToSingleColor
-              ? 'Switched to indexed color with a custom palette built only from the active draw color'
-              : 'Switched to indexed color and synced the active draw color into the custom palette'
+            `RGB描画をインデックスカラーへ変換しました (${customIndexPaletteResult?.convertedPixels || 0}px)`,
+            `Converted RGB pixels to indexed color (${customIndexPaletteResult?.convertedPixels || 0}px)`
           ),
           'info'
         );
+        logRgbToIndexedPaletteRefresh('rgb-to-indexed-complete', {
+          ...paletteRefreshDetails,
+          ...countProjectColorStorageLayers(),
+        });
       } else if (shouldRemapToRgb) {
         if (remapMutated) {
           commitHistory();
