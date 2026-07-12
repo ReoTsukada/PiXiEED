@@ -290,22 +290,24 @@ const corruptJournalStore = seedFallbackStore();
 const corruptJournal = corruptJournalStore.journals.get(revision2.journals.find(journal => journal.sheetId === 'sheet-a').key);
 corruptJournal.checksum = 'invalid';
 const corruptJournalResult = utils.restoreSchemaV2WithFallback(corruptJournalStore, revision2.recentEntry);
-assert.equal(corruptJournalResult.fallbackUsed, false);
-assert.ok(corruptJournalResult.packaged.recovery.journalWarnings.includes('sheet-a'));
+assert.equal(corruptJournalResult.fallbackUsed, true);
+assert.equal(corruptJournalResult.manifest.key, revision1.manifest.key);
 
 const sequenceStore = seedFallbackStore();
 const sequenceJournal = sequenceStore.journals.get(revision2.journals.find(journal => journal.sheetId === 'sheet-a').key);
 sequenceJournal.ops[0].sequence = 2;
 refreshChecksum(utils, sequenceJournal);
 const sequenceResult = utils.restoreSchemaV2WithFallback(sequenceStore, revision2.recentEntry);
-assert.ok(sequenceResult.packaged.recovery.journalWarnings.includes('sheet-a'));
+assert.equal(sequenceResult.fallbackUsed, true);
+assert.equal(sequenceResult.manifest.key, revision1.manifest.key);
 
 const baseMismatchStore = seedFallbackStore();
 const baseMismatchJournal = baseMismatchStore.journals.get(revision2.journals.find(journal => journal.sheetId === 'sheet-a').key);
 baseMismatchJournal.baseCheckpointKey = 'wrong-checkpoint';
 refreshChecksum(utils, baseMismatchJournal);
 const baseMismatchResult = utils.restoreSchemaV2WithFallback(baseMismatchStore, revision2.recentEntry);
-assert.ok(baseMismatchResult.packaged.recovery.journalWarnings.includes('sheet-a'));
+assert.equal(baseMismatchResult.fallbackUsed, true);
+assert.equal(baseMismatchResult.manifest.key, revision1.manifest.key);
 
 const optionalMetadataStore = seedFallbackStore();
 const optionalMetadataManifest = optionalMetadataStore.manifests.get(revision2.manifest.key);
@@ -322,6 +324,64 @@ const pageHideFlush = utils.commitSchemaV2Revision(pageHideStore, revision2, { f
 assert.equal(pageHideFlush.committed, false);
 const pageHideRecovery = utils.restoreSchemaV2WithFallback(pageHideStore, revision1.recentEntry);
 assert.equal(pageHideRecovery.manifest.key, revision1.manifest.key, 'failed best-effort page hide flush keeps prior commit recoverable');
+
+const journalRevisionStore = utils.createInMemoryAutosaveSchemaV2Store();
+utils.commitSchemaV2Revision(journalRevisionStore, revision1);
+const cumulativeOps2 = [
+  ...state2.journalsBySheet['sheet-a'],
+  {
+    sequence: 2,
+    kind: 'pixel-patch',
+    canvasId: 'sheet-a-main',
+    frameId: 'sheet-a-main-frame-1',
+    layerId: 'sheet-a-main-mixed',
+    changes: [{
+      index: 2,
+      after: { paletteIndex: -1, direct: [101, 102, 103, 255], importSourceDirect: null },
+    }],
+  },
+];
+const journalRevision2 = utils.createSchemaV2JournalRevision(
+  revision1.manifest,
+  { 'sheet-a': cumulativeOps2 },
+  { revision: 2, updatedAt: '2026-07-11T00:00:11Z' }
+);
+assert.equal(journalRevision2.checkpoints.length, 0, 'journal revision reuses the existing checkpoint');
+assert.equal(
+  journalRevision2.manifest.sheets[0].checkpointRef.key,
+  revision1.manifest.sheets[0].checkpointRef.key,
+  'journal revision keeps the base checkpoint reference'
+);
+utils.commitSchemaV2Revision(journalRevisionStore, journalRevision2);
+const journalRestored2 = utils.restoreSchemaV2WithFallback(journalRevisionStore, journalRevision2.recentEntry);
+const journalLayer2 = journalRestored2.packaged.sheets[0].project.document.canvases[0].frames[0].layers.find(layer => layer.id === 'sheet-a-main-mixed');
+assert.deepEqual(journalLayer2.direct.slice(8, 12), [101, 102, 103, 255]);
+
+const cumulativeOps3 = [
+  ...cumulativeOps2,
+  {
+    sequence: 3,
+    kind: 'pixel-patch',
+    canvasId: 'sheet-a-main',
+    frameId: 'sheet-a-main-frame-1',
+    layerId: 'sheet-a-main-mixed',
+    changes: [{
+      index: 3,
+      after: { paletteIndex: 1, direct: null, importSourceDirect: null },
+    }],
+  },
+];
+const journalRevision3 = utils.createSchemaV2JournalRevision(
+  journalRevision2.manifest,
+  { 'sheet-a': cumulativeOps3 },
+  { revision: 3, updatedAt: '2026-07-11T00:00:12Z' }
+);
+utils.commitSchemaV2Revision(journalRevisionStore, journalRevision3, { keepManifestRevisions: 2 });
+assert.equal(journalRevisionStore.manifests.has(revision1.manifest.key), false, 'old manifest is pruned');
+assert.equal(journalRevisionStore.checkpoints.has(revision1.checkpoints[0].key), true, 'referenced checkpoint survives manifest cleanup');
+const journalRestored3 = utils.restoreSchemaV2WithFallback(journalRevisionStore, journalRevision3.recentEntry);
+assert.equal(journalRestored3.manifest.revision, 3);
+assert.equal(journalRestored3.packaged.sheets[0].journalRecovered, true);
 
 globalThis.console = originalConsole;
 originalConsole.log(
