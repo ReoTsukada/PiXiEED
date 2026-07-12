@@ -2163,6 +2163,22 @@
     dom.controls.openUpdateHistory?.addEventListener('click', () => {
       openUpdateHistoryDialog();
     });
+    if (document.body?.dataset.detailPanelDialogFallbackBound !== 'true') {
+      document.body.dataset.detailPanelDialogFallbackBound = 'true';
+      document.addEventListener('click', event => {
+        const target = event.target instanceof Element ? event.target.closest('#openShortcutHelp, #openOperationHelpPanel, #openUpdateHistory') : null;
+        if (!(target instanceof HTMLButtonElement) || target.disabled) {
+          return;
+        }
+        if (target.id === 'openShortcutHelp') {
+          openShortcutHelpDialog();
+        } else if (target.id === 'openOperationHelpPanel') {
+          openOperationHelpPanel();
+        } else if (target.id === 'openUpdateHistory') {
+          openUpdateHistoryDialog();
+        }
+      });
+    }
     dom.controls.closeShortcutHelp?.addEventListener('click', () => {
       closeShortcutHelpDialog();
     });
