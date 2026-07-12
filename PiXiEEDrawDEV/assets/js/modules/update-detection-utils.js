@@ -166,7 +166,12 @@
         log('update-available', state.reason);
         return state;
       }
-      setStatus('up-to-date', versionComparison < 0 || buildComparison < 0 ? 'manifest-older' : 'same-build');
+      if (versionComparison < 0 || buildComparison < 0) {
+        setStatus('current-newer', 'manifest-older');
+        log('current-newer', state.reason);
+        return state;
+      }
+      setStatus('up-to-date', 'same-build');
       log('up-to-date', state.reason);
       return state;
     }
