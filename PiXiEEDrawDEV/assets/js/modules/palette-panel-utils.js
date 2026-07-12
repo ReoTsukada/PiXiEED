@@ -363,7 +363,10 @@
         }
       });
       const sourceColorCount = Math.max(0, Math.round(Number(extraction.sourceColorCount) || 0));
-      padIndexedPaletteToMaxColors(state.palette, MAX_IMPORTED_PALETTE_COLORS);
+      // Keep the palette limited to colors that are actually present in RGB
+      // pixels. `buildIndexedPaletteFromFrameDataList()` already uses the
+      // existing quantizer when the source exceeds the indexed-color limit;
+      // padding here only manufactured unused swatches.
       state.activePaletteIndex = findNearestPaletteColorIndexByRgba(previousActiveColor, state.palette, Math.min(1, state.palette.length - 1));
       state.secondaryPaletteIndex = findNearestPaletteColorIndexByRgba(previousSecondaryColor, state.palette, 0);
       state.activeRgb = normalizeColorValue(state.palette[state.activePaletteIndex] || previousActiveColor);
