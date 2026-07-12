@@ -31,11 +31,19 @@
 
     return ((scope) => {
       with (scope) {
+  function getProjectCommandLockDescriptor(source = '', tabOptions = null) {
+    const sourceKind = String(tabOptions?.sourceKind || '');
+    if (sourceKind === 'import-gif') return { owner: 'gif-import', command: 'import-gif' };
+    if (sourceKind === 'import-image') return { owner: 'png-import', command: 'import-image' };
+    if (source === 'local-recent') return { owner: 'recent-project-open', command: 'append-recent-project' };
+    return { owner: 'project-open-input', command: 'append-project-input' };
+  }
+
   async function openDocumentsAsProjectTabs(items, loader, { source = 'open', tabOptions = null } = {}) {
     if (!ensureCurrentClientCanReplaceActiveProject()) {
       return false;
     }
-    if (openProjectTabBusy) {
+    if (isProjectCommandLocked()) {
       return false;
     }
     const queue = Array.isArray(items) ? items.filter(Boolean) : [];
@@ -43,7 +51,9 @@
       return false;
     }
     ensureOpenProjectTabsInitialized();
-    openProjectTabBusy = true;
+    const lock = acquireProjectCommandLock(getProjectCommandLockDescriptor(source, tabOptions));
+    if (!lock?.ok) return false;
+    console.info('[pixiedraw-dev:import-command]', { phase: 'import-lock-acquired', owner: lock.owner, command: lock.command });
     try {
       const targets = queue;
       const truncatedCount = 0;
@@ -375,7 +385,8 @@
       renderOpenProjectTabs();
       return true;
     } finally {
-      openProjectTabBusy = false;
+      releaseProjectCommandLock({ token: lock.token, owner: lock.owner });
+      console.info('[pixiedraw-dev:import-command]', { phase: 'import-lock-released', owner: lock.owner, command: lock.command });
       // The tab bar may have been rendered while the command lock was true.
       // Render once more after release so the delegated + button is enabled.
       renderOpenProjectTabs();
@@ -386,9 +397,12 @@
     if (!ensureCurrentClientCanReplaceActiveProject()) {
       return false;
     }
-    if (openProjectTabBusy) {
+    if (isProjectCommandLocked()) {
       return false;
     }
+    const lock = acquireProjectCommandLock({ owner: isGifFile?.(file) ? 'gif-import' : 'png-import', command: 'import-image-new-project' });
+    if (!lock?.ok) return false;
+    try {
     if (openProjectTabs.length && activeOpenProjectTabId) {
       const persistedCurrentProject = await persistActiveOpenProjectTab({ flushAutosave: true });
       if (!persistedCurrentProject) {
@@ -416,6 +430,9 @@
     }
     renderOpenProjectTabs();
     return true;
+    } finally {
+      releaseProjectCommandLock({ token: lock.token, owner: lock.owner });
+    }
   }
 
   async function openDocumentAsNewProject(item, { source = 'open' } = {}) {
@@ -426,12 +443,14 @@
       setMultiStatus(localizeText('参加/視聴モードでは読み込み/インポートはマスターのみ操作できます', 'In participant/viewer mode, only the master can open/import files'), 'warn');
       return false;
     }
-    if (openProjectTabBusy) {
+    if (isProjectCommandLocked()) {
       return false;
     }
 
     let file = null;
     let handle = null;
+    const lock = acquireProjectCommandLock({ owner: 'project-open-input', command: 'open-project-new' });
+    if (!lock?.ok) return false;
     try {
       if (item && typeof item.getFile === 'function') {
         handle = item;
@@ -442,14 +461,17 @@
     } catch (error) {
       console.warn('Document open failed', error);
       updateAutosaveStatus('ドキュメントを開けませんでした', 'error');
+      releaseProjectCommandLock({ token: lock.token, owner: lock.owner });
       return false;
     }
 
     if (file && isImportableImageFile(file)) {
+      releaseProjectCommandLock({ token: lock.token, owner: lock.owner });
       return await openImageFileAsNewProject(file, { source });
     }
     if (!file || typeof file.arrayBuffer !== 'function') {
       updateAutosaveStatus('ドキュメントを開けませんでした', 'error');
+      releaseProjectCommandLock({ token: lock.token, owner: lock.owner });
       return false;
     }
 
@@ -497,6 +519,8 @@
       console.warn('Document load failed', error);
       updateAutosaveStatus('ドキュメントを開けませんでした', 'error');
       return false;
+    } finally {
+      releaseProjectCommandLock({ token: lock.token, owner: lock.owner });
     }
   }
 
@@ -717,6 +741,7 @@
     updatedAt = '',
     activateOptions = {},
     skipBusyGuardOnActivate = false,
+    commandLock = null,
     ...extraTabFields
   } = {}) {
     if (!project || typeof project !== 'object') {
@@ -732,6 +757,7 @@
           skipPersistCurrent: true,
           announce: false,
           skipBusyGuard: skipBusyGuardOnActivate,
+          commandLock,
           ...activateOptions,
         });
         return activated ? existingTab : null;
@@ -758,6 +784,7 @@
       skipPersistCurrent: true,
       announce: false,
       skipBusyGuard: skipBusyGuardOnActivate,
+      commandLock,
       ...activateOptions,
     });
     if (!activated) {
@@ -778,7 +805,7 @@
     palettePreset = newProjectPalettePresetId,
     promptExportDirectory = false,
   }) {
-    if (openProjectTabBusy) {
+    if (isProjectCommandLocked()) {
       updateAutosaveStatus(localizeText('プロジェクト切替の完了を待ってください', 'Wait for the current project switch to finish'), 'info');
       return false;
     }
@@ -787,7 +814,8 @@
     if (!closedCurrentProject) {
       return false;
     }
-    openProjectTabBusy = true;
+    const lock = acquireProjectCommandLock({ owner: 'new-project-create', command: 'create-new-project' });
+    if (!lock?.ok) return false;
     try {
       const created = await createNewProject({
         name,
@@ -814,7 +842,7 @@
       );
       return true;
     } finally {
-      openProjectTabBusy = false;
+      releaseProjectCommandLock({ token: lock.token, owner: lock.owner });
     }
   }
 
@@ -833,7 +861,7 @@
       const latestEntry = projectId
         ? ((await loadRecentProjectsMetadata()).find(candidate => candidate?.id === projectId) || entry)
         : entry;
-      if (openProjectTabBusy) {
+      if (isProjectCommandLocked()) {
         updateAutosaveStatus(localizeText('プロジェクト切替の完了を待ってください', 'Wait for the current project switch to finish'), 'info');
         return false;
       }
@@ -847,7 +875,8 @@
       }
       const shouldReuseActiveTab = !appendOnly && canReuseActiveOpenProjectTabForRecentEntry(entry);
       const source = 'local-recent';
-      openProjectTabBusy = true;
+      const lock = acquireProjectCommandLock({ owner: 'recent-project-open', command: 'open-recent-project' });
+      if (!lock?.ok) return false;
       try {
         await persistActiveOpenProjectTab({ flushAutosave: true });
         const packaged = await loadRecentProjectPackagedPayload(latestEntry);
@@ -866,6 +895,7 @@
             source,
             updatedAt: latestEntry?.updatedAt || packaged?.updatedAt || new Date().toISOString(),
             skipBusyGuardOnActivate: true,
+            commandLock: lock,
             activateOptions: {
               skipPersistCurrent: true,
               announce: false,
@@ -915,7 +945,7 @@
         );
         return true;
       } finally {
-        openProjectTabBusy = false;
+        releaseProjectCommandLock({ token: lock.token, owner: lock.owner });
         renderOpenProjectTabs();
       }
     } finally {
