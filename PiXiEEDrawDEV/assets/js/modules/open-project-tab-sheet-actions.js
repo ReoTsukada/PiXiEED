@@ -13,7 +13,9 @@
     NEW_PROJECT_PALETTE_PRESET_DEFAULT,
     getOpenProjectTabBusy,
     getProjectTabAddAvailability,
-    setOpenProjectTabBusy,
+    acquireProjectCommandLock,
+    releaseProjectCommandLock,
+    inspectProjectCommandLock,
     getAutosaveProjectId,
     getActiveOpenProjectTabId,
     getActiveProjectPersistenceState,
@@ -140,7 +142,8 @@
         return false;
       }
       ensureOpenProjectTabsInitialized?.();
-      setOpenProjectTabBusy?.(true);
+      const lock = acquireProjectCommandLock?.({ owner: 'sheet-add', command: 'create-empty-sheet' });
+      if (!lock?.ok) return false;
       try {
         await persistActiveOpenProjectTab?.({ flushAutosave: false });
         const sheetIndex = openProjectTabs.length + 1;
@@ -155,7 +158,7 @@
         const result = await commitSheetCandidate(candidate);
         return result.committed;
       } finally {
-        setOpenProjectTabBusy?.(false);
+        releaseProjectCommandLock?.({ token: lock.token, owner: lock.owner });
         renderOpenProjectTabs?.();
       }
     }
@@ -283,9 +286,12 @@
         menuOpen,
         inFlight: addMenuBusy,
         commandInFlight: Boolean(getOpenProjectTabBusy?.()),
-        imageImportInFlight: false,
-        gifImportInFlight: false,
-        projectImportInFlight: false,
+        lockOwner: inspectProjectCommandLock?.()?.owner || null,
+        lockCommand: inspectProjectCommandLock?.()?.command || null,
+        lockAgeMs: inspectProjectCommandLock?.()?.lockAgeMs || 0,
+        imageImportInFlight: inspectProjectCommandLock?.()?.owner === 'png-import',
+        gifImportInFlight: inspectProjectCommandLock?.()?.owner === 'gif-import',
+        projectImportInFlight: inspectProjectCommandLock?.()?.owner === 'project-open-input',
         pickerOpen: false,
         overlayCount: document.querySelectorAll('[data-sheet-add-overlay]').length,
         connected: Boolean(addButton?.isConnected),
