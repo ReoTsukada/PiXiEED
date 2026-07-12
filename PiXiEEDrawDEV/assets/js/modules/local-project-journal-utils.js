@@ -430,12 +430,14 @@
     function normalizeV2PixelPatchJournalOps(journalPayload = null) {
       const wrappedOps = Array.isArray(journalPayload?.ops) ? journalPayload.ops : [];
       const normalized = [];
-      for (const wrapped of wrappedOps) {
+      for (let opIndex = 0; opIndex < wrappedOps.length; opIndex += 1) {
+        const wrapped = wrappedOps[opIndex];
         const entry = wrapped?.kind === 'pixel-patch' ? wrapped.historyEntry : null;
         if (!entry || !isPixelPatchHistoryEntry(entry) || !Array.isArray(entry.changes) || !entry.changes.length) {
           return null;
         }
         normalized.push({
+          sequence: opIndex + 1,
           kind: 'pixel-patch',
           canvasId: String(entry.canvasId || ''),
           frameId: String(entry.frameId || ''),
@@ -661,8 +663,8 @@
       captureActiveStateCheckpoint,
       noteHistoryEntry,
       markNeedsCheckpoint,
-        buildSavePlan,
-        normalizeV2PixelPatchJournalOps,
+      buildSavePlan,
+      normalizeV2PixelPatchJournalOps,
       createLightweightTabState,
       extractSheetProjectFromPackagedProject,
       resolveStoredPackagedProjectForProjectId,
