@@ -10,13 +10,14 @@ const app = read('PiXiEEDrawDEV/assets/js/app.js');
 
 assert.match(decoder, /const framePixels = new Uint8ClampedArray\(pixels\)/);
 assert.match(decoder, /imageData: new ImageData\(framePixels, width, height\)/);
-assert.match(decoder, /return frames\.map\(\(frameInfo\) =>/);
+assert.match(decoder, /const resizedFrames = new Array\(frames\.length\)/);
+assert.match(decoder, /frames\[index\] = null/);
 assert.match(decoder, /const canvas = document\.createElement\('canvas'\)/);
 assert.match(decoder, /return ctx\.getImageData\(0, 0, canvas\.width, canvas\.height\)/);
 assert.match(decoder, /bitmap\.close\(\)/);
 
 assert.match(workflow, /const framesData = Array\.isArray\(importResult\?\.frames\) \? importResult\.frames : \[\]/);
-assert.match(workflow, /const normalizedFramesData = importSize\.scaled[\s\S]*?resizeImportFrames\(framesData, width, height\)/);
+assert.match(workflow, /let normalizedFramesData;[\s\S]*?resizeImportFrames\(framesData, width, height\)/);
 assert.match(workflow, /normalizedFramesData\.forEach/);
 assert.match(workflow, /direct\.set\(frameInfo\.imageData\.data\)/);
 assert.match(workflow, /applyHistorySnapshot\(snapshot/);
