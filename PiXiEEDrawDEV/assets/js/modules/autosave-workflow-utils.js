@@ -817,10 +817,12 @@
         buildAutosaveSessionPayload: buildProjectSessionPayload,
       }) || null;
       const useV2Primary = isAutosaveV2PrimaryEnabled?.() === true;
-      // The V2 primary writer owns its immutable revisions.  Until its
-      // journal bridge is promoted, it must receive a full checkpoint rather
-      // than silently falling back to a V1-only journal entry.
-      const journalOnly = !useV2Primary && journalOnlySavePlan?.journalOnly === true;
+      const useV2Journal = Boolean(
+        useV2Primary
+        && journalOnlySavePlan?.journalOnly === true
+        && isAutosaveV2JournalReady?.(projectId) === true
+      );
+      const journalOnly = useV2Journal || (!useV2Primary && journalOnlySavePlan?.journalOnly === true);
       const snapshotSpan = beginAutosavePerformanceSpan('pixiedraw-dev:autosave:make-history-snapshot', { skipped: journalOnly });
       let snapshot = null;
       try {
@@ -829,6 +831,18 @@
         }
       } finally {
         endAutosavePerformanceSpan(snapshotSpan);
+      }
+      let activeSavePlan = journalOnlySavePlan;
+      if (useV2Primary && !useV2Journal) {
+        if (journalOnlySavePlan?.journalOnly === true) {
+          markActiveLocalProjectJournalNeedsCheckpoint?.(projectId);
+        }
+        activeSavePlan = buildActiveLocalProjectSavePlan?.({
+          projectId,
+          snapshot,
+          buildPackagedProjectPayload,
+          buildAutosaveSessionPayload: buildProjectSessionPayload,
+        }) || null;
       }
       const dirtyGenerationAtStart = autosaveDirtyGeneration;
       const unsavedTokenAtStart = unsavedChangeToken;
@@ -840,6 +854,7 @@
             projectId,
             snapshot,
             thumbnailIntervalMs: AUTOSAVE_THUMBNAIL_UPDATE_INTERVAL_MS,
+            savePlan: useV2Journal ? journalOnlySavePlan : activeSavePlan,
           })
           : await recordRecentProjectSnapshot(snapshot, null, {
             projectId,
