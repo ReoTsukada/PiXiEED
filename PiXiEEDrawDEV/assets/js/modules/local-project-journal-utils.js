@@ -423,6 +423,29 @@
       return next;
     }
 
+    // V2 journals store the replayable patch itself, while the legacy local
+    // journal wraps it in { kind, historyEntry }. Keep this conversion at the
+    // persistence boundary so a malformed or structural entry can force a
+    // checkpoint instead of producing an unrecoverable V2 revision.
+    function normalizeV2PixelPatchJournalOps(journalPayload = null) {
+      const wrappedOps = Array.isArray(journalPayload?.ops) ? journalPayload.ops : [];
+      const normalized = [];
+      for (const wrapped of wrappedOps) {
+        const entry = wrapped?.kind === 'pixel-patch' ? wrapped.historyEntry : null;
+        if (!entry || !isPixelPatchHistoryEntry(entry) || !Array.isArray(entry.changes) || !entry.changes.length) {
+          return null;
+        }
+        normalized.push({
+          kind: 'pixel-patch',
+          canvasId: String(entry.canvasId || ''),
+          frameId: String(entry.frameId || ''),
+          layerId: String(entry.layerId || ''),
+          changes: cloneJsonValue(entry.changes, []),
+        });
+      }
+      return normalized;
+    }
+
     function markNeedsCheckpoint(projectId = '') {
       const normalizedProjectId = normalizeAutosaveProjectId(projectId || activeState?.projectId || '');
       if (!normalizedProjectId) {
@@ -638,7 +661,8 @@
       captureActiveStateCheckpoint,
       noteHistoryEntry,
       markNeedsCheckpoint,
-      buildSavePlan,
+        buildSavePlan,
+        normalizeV2PixelPatchJournalOps,
       createLightweightTabState,
       extractSheetProjectFromPackagedProject,
       resolveStoredPackagedProjectForProjectId,
