@@ -31,6 +31,34 @@
 
     return ((scope) => {
       with (scope) {
+  let importPerformanceSequence = 0;
+
+  function beginImportPerformanceSpan(name, details = null) {
+    const perf = window?.performance;
+    const id = `${name}:${Date.now().toString(36)}:${++importPerformanceSequence}`;
+    const startMark = `${id}:start`;
+    try {
+      perf?.mark?.(startMark);
+    } catch (_error) {}
+    return { name, details, perf, id, startMark, startedAt: perf?.now?.() ?? Date.now() };
+  }
+
+  function endImportPerformanceSpan(span, details = null) {
+    if (!span) return;
+    const finishedAt = span.perf?.now?.() ?? Date.now();
+    const endMark = `${span.id}:end`;
+    const mergedDetails = { ...(span.details || {}), ...(details || {}) };
+    try {
+      span.perf?.mark?.(endMark);
+      span.perf?.measure?.(span.name, span.startMark, endMark);
+    } catch (_error) {}
+    console.info('[pixiedraw-dev:performance]', {
+      phase: span.name,
+      elapsedMs: Math.round(finishedAt - span.startedAt),
+      ...mergedDetails,
+    });
+  }
+
   function getProjectCommandLockDescriptor(source = '', tabOptions = null) {
     const sourceKind = String(tabOptions?.sourceKind || '');
     if (sourceKind === 'import-gif') return { owner: 'gif-import', command: 'import-gif' };
@@ -1281,7 +1309,10 @@
     console.info('[pixieedraw-dev:png-canonical-import]', {
       phase: 'png-normalize-start', sourceFileBytes, sourceWidth, sourceHeight,
     });
-    const normalized = normalizeExternalProjectToCanonicalV2({
+    const normalizeSpan = beginImportPerformanceSpan('pixiedraw-dev:import:canonical-normalize');
+    let normalized;
+    try {
+    normalized = normalizeExternalProjectToCanonicalV2({
       sourceKind: 'import-image',
       sourceAdapterId: null,
       decodedPayload: project,
@@ -1293,10 +1324,19 @@
         sourceHeight,
       },
     });
+    } finally {
+      endImportPerformanceSpan(normalizeSpan);
+    }
     if (!normalized?.ok || !normalized.canonicalPayload) {
       return { ok: false, code: normalized?.code || 'ERR_CANONICAL_V2_NORMALIZE_FAILED', phase: normalized?.phase || 'normalize' };
     }
-    const validation = validateCanonicalV2ProjectPayload(normalized.canonicalPayload);
+    const validationSpan = beginImportPerformanceSpan('pixiedraw-dev:import:canonical-validate');
+    let validation;
+    try {
+      validation = validateCanonicalV2ProjectPayload(normalized.canonicalPayload);
+    } finally {
+      endImportPerformanceSpan(validationSpan);
+    }
     if (!validation?.ok) {
       return { ok: false, code: validation?.code || 'ERR_CANONICAL_V2_CANDIDATE_INVALID', phase: validation?.phase || 'validate' };
     }
@@ -1404,13 +1444,22 @@
       localizeText('画像を読み込み中…', 'Loading image...'),
       { immediate: true }
     );
+    const importSpan = beginImportPerformanceSpan('pixiedraw-dev:import:total', {
+      fileName: typeof file?.name === 'string' ? file.name : '',
+      fileBytes: Math.max(0, Number(file?.size) || 0),
+    });
     let importResult;
     try {
       setGlobalLoadingIndicatorLabel(localizeText('画像をデコード中…', 'Decoding image...'));
+      const decodeSpan = beginImportPerformanceSpan('pixiedraw-dev:import:decode');
       try {
         importResult = await decodeImageFileToFrames(file);
       } catch (error) {
         throw createImageImportError('画像を読み込めませんでした', error);
+      } finally {
+        endImportPerformanceSpan(decodeSpan, {
+          frameCount: Array.isArray(importResult?.frames) ? importResult.frames.length : 0,
+        });
       }
 
       const framesData = Array.isArray(importResult?.frames) ? importResult.frames : [];
@@ -1429,9 +1478,21 @@
       const width = importSize.width;
       const height = importSize.height;
       setGlobalLoadingIndicatorLabel(localizeText('フルカラー画像を準備中…', 'Preparing full-color frames...'));
-      const normalizedFramesData = importSize.scaled
-        ? resizeImportFrames(framesData, width, height)
-        : framesData;
+      const resizeSpan = beginImportPerformanceSpan('pixiedraw-dev:import:resize', {
+        sourceWidth: inferredWidth,
+        sourceHeight: inferredHeight,
+        targetWidth: width,
+        targetHeight: height,
+        scaled: importSize.scaled === true,
+      });
+      let normalizedFramesData;
+      try {
+        normalizedFramesData = importSize.scaled
+          ? resizeImportFrames(framesData, width, height)
+          : framesData;
+      } finally {
+        endImportPerformanceSpan(resizeSpan, { frameCount: framesData.length });
+      }
 
     const frames = [];
     const palette = createRgbModeDefaultPalette();
@@ -1441,6 +1502,12 @@
       ? { ...palette[activePaletteIndex] }
       : { r: 255, g: 255, b: 255, a: 255 };
 
+    const runtimeFramesSpan = beginImportPerformanceSpan('pixiedraw-dev:import:runtime-frames', {
+      width,
+      height,
+      frameCount: normalizedFramesData.length,
+    });
+    try {
     normalizedFramesData.forEach((frameInfo, index) => {
       const layer = createLayer(localizeText('画像レイヤー', 'Image Layer'), width, height);
       layer.indices.fill(-1);
@@ -1460,6 +1527,9 @@
         layers: [layer],
       });
     });
+    } finally {
+      endImportPerformanceSpan(runtimeFramesSpan, { createdFrameCount: frames.length });
+    }
 
     const activeLayerId = frames[0]?.layers[0]?.id;
     if (!activeLayerId) {
@@ -1519,7 +1589,16 @@
       return buildPackagedProjectPayload(snapshot, { includeSheets: false });
     }
 
-    applyHistorySnapshot(snapshot, { forcePalettePresetSync: true, preservePersonalPreferences: false });
+    const applySnapshotSpan = beginImportPerformanceSpan('pixiedraw-dev:import:apply-history-snapshot', {
+      frameCount: frames.length,
+      width,
+      height,
+    });
+    try {
+      applyHistorySnapshot(snapshot, { forcePalettePresetSync: true, preservePersonalPreferences: false });
+    } finally {
+      endImportPerformanceSpan(applySnapshotSpan);
+    }
     history.past = [];
     history.future = [];
     history.pending = null;
@@ -1554,6 +1633,9 @@
     scheduleSessionPersist();
     return true;
     } finally {
+      endImportPerformanceSpan(importSpan, {
+        frameCount: Array.isArray(importResult?.frames) ? importResult.frames.length : 0,
+      });
       closeLoading();
     }
   }
