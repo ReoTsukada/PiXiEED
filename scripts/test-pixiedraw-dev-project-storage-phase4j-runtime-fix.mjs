@@ -321,6 +321,7 @@ async function runTabWorkflowRuntimeFixTest() {
   };
   let currentLoadedProject = createRootProject().sheets[0].project;
   let autosaveSnapshotCalls = 0;
+  let autosaveScheduleCalls = 0;
   let viewportResetTarget = '';
 
   function createAutosaveProjectId() {
@@ -672,6 +673,19 @@ async function runTabWorkflowRuntimeFixTest() {
     isMultiMasterProjectReplacementBlocked() {
       return false;
     },
+    isProjectCommandLocked() {
+      return false;
+    },
+    isProjectCommandLockHeldBy() {
+      return false;
+    },
+    inspectProjectCommandLock() {
+      return { locked: false, owner: null, command: null, token: null, lockAgeMs: 0 };
+    },
+    acquireProjectCommandLock() {
+      return { ok: true, token: 'test-lock', owner: 'test' };
+    },
+    releaseProjectCommandLock() {},
     isSharedProjectRealtimePrimaryActive() {
       return false;
     },
@@ -725,7 +739,9 @@ async function runTabWorkflowRuntimeFixTest() {
     pruneInactiveCanvasDirectCaches() {},
     retainOpenProjectTabProjectWriteGuard() {},
     saveRecentProjectsList() {},
-    scheduleAutosaveSnapshot() {},
+    scheduleAutosaveSnapshot() {
+      autosaveScheduleCalls += 1;
+    },
     scheduleSessionPersist() {},
     setActiveAutosaveProjectId(value) {
       sharedState.autosaveProjectId = value;
@@ -798,7 +814,7 @@ async function runTabWorkflowRuntimeFixTest() {
 
   const closeResult = await workflow.closeOpenProjectTab('sheet-b');
   assert.equal(closeResult, true);
-  assert.equal(autosaveSnapshotCalls > 0, true, 'closing a tab calls writeAutosaveSnapshot successfully');
+  assert.equal(autosaveScheduleCalls > 0, true, 'closing a tab schedules autosave successfully');
   assert.equal(
     warnings.some(message => message.includes('writeAutosaveSnapshot is not a function')),
     false,
