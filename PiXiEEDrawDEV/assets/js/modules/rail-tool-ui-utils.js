@@ -764,11 +764,18 @@
           if (dom.rightRail instanceof HTMLElement && dom.rightRail.contains(target)) {
             return;
           }
-          if (!shouldKeepRailPanelsPinned()) {
+          const dismissOnOutsideInteraction = state.activeRightTab === 'file'
+            || state.activeRightTab === 'settings';
+          if (dismissOnOutsideInteraction || !shouldKeepRailPanelsPinned()) {
             setCompactRightFlyoutOpen(false);
             updateRightTabVisibility();
             return;
           }
+        }
+        if ((state.activeRightTab === 'file' || state.activeRightTab === 'settings')
+          && shouldDismissRightTransientPanelForTarget(target)) {
+          closeRightTransientPanel({ persist: true });
+          return;
         }
         if (shouldDismissRightTransientPanelForTarget(target)) {
           closeRightTransientPanel({ persist: true });
