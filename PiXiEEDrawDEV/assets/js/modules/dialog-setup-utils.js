@@ -106,6 +106,35 @@
     }
     const dialog = config.dialog;
     const supportsDialog = dialog && typeof dialog.showModal === 'function';
+    const resolveSelectedExportMode = () => {
+      const format = normalizeExportFormat(config.format?.value || 'png');
+      if (format === 'png' && config.gridSplitToggle instanceof HTMLInputElement && config.gridSplitToggle.checked) {
+        return 'gridpng';
+      }
+      if (format === 'gif' && config.timelapseToggle instanceof HTMLInputElement && config.timelapseToggle.checked) {
+        return 'timelapse';
+      }
+      return format;
+    };
+    const syncFormatOptions = () => {
+      const format = normalizeExportFormat(config.format?.value || 'png');
+      const gridAvailable = format === 'png';
+      const timelapseAvailable = format === 'gif';
+      if (config.gridSplitRow instanceof HTMLElement) {
+        config.gridSplitRow.hidden = !gridAvailable;
+      }
+      if (config.gridSplitToggle instanceof HTMLInputElement) {
+        config.gridSplitToggle.disabled = !gridAvailable;
+        if (!gridAvailable) config.gridSplitToggle.checked = false;
+      }
+      if (config.timelapseRow instanceof HTMLElement) {
+        config.timelapseRow.hidden = !timelapseAvailable;
+      }
+      if (config.timelapseToggle instanceof HTMLInputElement) {
+        config.timelapseToggle.disabled = !timelapseAvailable;
+        if (!timelapseAvailable) config.timelapseToggle.checked = false;
+      }
+    };
     const bind = (element, handler) => {
       if (element) {
         element.addEventListener('click', handler);
@@ -116,7 +145,7 @@
         ? config.fileNameInput.value
         : '';
       setExportFileBaseName(inputBaseName || state.documentName);
-      let mode = normalizeExportFormat(config.format?.value || 'png');
+      let mode = resolveSelectedExportMode();
       if (
         mode === 'project'
         && config.projectV2ExperimentalToggle instanceof HTMLInputElement
@@ -153,12 +182,25 @@
     if (config.format && config.format.dataset.bound !== 'true') {
       config.format.dataset.bound = 'true';
       config.format.addEventListener('change', () => {
+        syncFormatOptions();
         refreshExportScaleControls();
         updateExportFormatAvailability();
         updateExportOriginalToggleUI();
         updateExportPreview();
       });
     }
+    [config.gridSplitToggle, config.timelapseToggle].forEach(toggle => {
+      if (!(toggle instanceof HTMLInputElement) || toggle.dataset.bound === 'true') {
+        return;
+      }
+      toggle.dataset.bound = 'true';
+      toggle.addEventListener('change', () => {
+        syncFormatOptions();
+        refreshExportScaleControls();
+        updateExportOriginalToggleUI();
+        updateExportPreview();
+      });
+    });
     if (config.fileNameInput instanceof HTMLInputElement && config.fileNameInput.dataset.bound !== 'true') {
       config.fileNameInput.dataset.bound = 'true';
       config.fileNameInput.addEventListener('change', event => {
@@ -304,6 +346,7 @@
     }
 
     syncExportGridInputs();
+    syncFormatOptions();
     updateExportFormatAvailability();
     updateExportOriginalToggleUI();
   }
