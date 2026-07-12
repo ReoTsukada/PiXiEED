@@ -843,7 +843,10 @@
       updateAutosaveStatus(blockedStatus, 'info');
       return false;
     }
-    if (!force && !autosaveDirty) return false;
+    // Tab replacement asks for a forced flush even when nothing changed.
+    // Treat that as an already-saved success; attempting a V2 journal write
+    // with an empty patch list is invalid and blocks the tab transition.
+    if (!autosaveDirty) return true;
     if (autosaveWriteInFlight) {
       autosaveWriteQueued = true;
       if (!force) {
@@ -914,7 +917,7 @@
         updateAutosaveStatus('自動保存: 共有プロジェクトの復帰情報を保存済み', 'success');
         return true;
       }
-      updateAutosaveStatus('自動保存: 端末内に保存中…');
+      updateAutosaveStatus('自動保存: 保存先ファイルへ保存中…');
       const journalOnlySavePlan = buildActiveLocalProjectSavePlan?.({
         projectId,
         snapshot: null,
@@ -922,9 +925,14 @@
         buildAutosaveSessionPayload: buildProjectSessionPayload,
       }) || null;
       const useV2Primary = isAutosaveV2PrimaryEnabled?.() === true;
+      const journalOnlyHasOps = Boolean(
+        journalOnlySavePlan?.journalOnly === true
+        && Array.isArray(journalOnlySavePlan?.journalPayload?.ops)
+        && journalOnlySavePlan.journalPayload.ops.length > 0
+      );
       const useV2Journal = Boolean(
         useV2Primary
-        && journalOnlySavePlan?.journalOnly === true
+        && journalOnlyHasOps
         && isAutosaveV2JournalReady?.(projectId) === true
       );
       const journalOnly = useV2Journal || (!useV2Primary && journalOnlySavePlan?.journalOnly === true);
