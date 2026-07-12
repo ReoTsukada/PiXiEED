@@ -1450,10 +1450,8 @@
         && frameInfo.imageData.width === width
         && frameInfo.imageData.height === height) {
         direct.set(frameInfo.imageData.data);
-        layer.importSourceDirect = new Uint8ClampedArray(frameInfo.imageData.data);
       } else {
         direct.fill(0);
-        layer.importSourceDirect = new Uint8ClampedArray(direct);
       }
       frames.push({
         id: crypto.randomUUID ? crypto.randomUUID() : `frame-${Date.now().toString(36)}-${index}`,
