@@ -133,7 +133,7 @@ const api = context.window.PiXiEEDrawModules.palettePanelUtils.createPalettePane
 
 assert.equal(api.setColorMode('indexed'), true);
 assert.equal(state.colorMode, 'indexed');
-assert.equal(state.palette.length, 256, 'indexed conversion retains the existing fixed palette capacity');
+assert.equal(state.palette.length, 3, 'indexed conversion retains only transparent plus the colors actually drawn');
 assert.deepEqual(Array.from(layer.indices), [1, 2]);
 assert.equal(layer.direct, null);
 assert.equal(layer.importSourceDirect, null);
