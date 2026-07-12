@@ -104,8 +104,21 @@
           nextEntry.updatedAt = nowIso;
         }
         seenIds.add(normalizedId);
-        changed = true;
-        repairedCount += 1;
+        const isV2Reference = Number(original.autosaveSchemaVersion) === 2
+          && typeof original.manifestKey === 'string'
+          && original.manifestKey.length > 0;
+        entryChanged = entryChanged
+          || nextEntry.accountUserId !== original.accountUserId
+          || nextEntry.fileName !== original.fileName
+          || nextEntry.name !== original.name
+          || nextEntry.storageKind !== original.storageKind
+          || !Number.isFinite(parsedUpdatedAt);
+        if (entryChanged) {
+          changed = true;
+          repairedCount += 1;
+        } else if (!isV2Reference && !original.handle) {
+          nextEntry.openError = 'missing-project-payload';
+        }
         sanitizedEntries.push(nextEntry);
         continue;
       }
@@ -205,6 +218,9 @@
       return false;
     }
     await saveRecentProjectsList(existingEntries, nextEntries);
+    if (Number(removedEntry?.autosaveSchemaVersion) === 2) {
+      await removeAutosaveV2ProjectData?.(normalizedId);
+    }
     setRecentProjectsCache(nextEntries);
     closeOpenProjectTabsForDeletedProject({
       projectId: normalizedId,
