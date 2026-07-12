@@ -228,12 +228,16 @@
         layer.direct[directBase + 2] = 0;
         layer.direct[directBase + 3] = 0;
       }
-      if (Array.isArray(value.importSourceDirect) && value.importSourceDirect.length === 4) {
-        const importSourceDirect = ensureTypedDirectBuffer(layer, 'importSourceDirect', directLength);
-        importSourceDirect[directBase] = Math.round(Number(value.importSourceDirect[0]) || 0);
-        importSourceDirect[directBase + 1] = Math.round(Number(value.importSourceDirect[1]) || 0);
-        importSourceDirect[directBase + 2] = Math.round(Number(value.importSourceDirect[2]) || 0);
-        importSourceDirect[directBase + 3] = Math.round(Number(value.importSourceDirect[3]) || 0);
+      if (
+        Array.isArray(value.importSourceDirect)
+        && value.importSourceDirect.length === 4
+        && layer.importSourceDirect instanceof Uint8ClampedArray
+        && layer.importSourceDirect.length === directLength
+      ) {
+        layer.importSourceDirect[directBase] = Math.round(Number(value.importSourceDirect[0]) || 0);
+        layer.importSourceDirect[directBase + 1] = Math.round(Number(value.importSourceDirect[1]) || 0);
+        layer.importSourceDirect[directBase + 2] = Math.round(Number(value.importSourceDirect[2]) || 0);
+        layer.importSourceDirect[directBase + 3] = Math.round(Number(value.importSourceDirect[3]) || 0);
       } else if (layer.importSourceDirect instanceof Uint8ClampedArray && directBase + 3 < layer.importSourceDirect.length) {
         layer.importSourceDirect[directBase] = 0;
         layer.importSourceDirect[directBase + 1] = 0;
