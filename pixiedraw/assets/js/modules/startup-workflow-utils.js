@@ -349,11 +349,30 @@
       const onDialogClose = () => {
         cleanup(dialog.returnValue === 'confirm');
       };
+      try {
+        // A previous unsupported-dialog fallback can leave the element hidden.
+        // `showModal()` does not clear that attribute, so make visibility part
+        // of the confirmation dialog's opening contract.
+        dialog.hidden = false;
+        if (dialog.open) {
+          dialog.close();
+        }
+      } catch (error) {
+        console.warn('Failed to prepare recent project delete confirmation dialog', error);
+        resolve(window.confirm(`${message}\n${detail}`));
+        return;
+      }
       config?.cancel?.addEventListener('click', onCancel, { once: true });
       config?.confirm?.addEventListener('click', onConfirm, { once: true });
       dialog.addEventListener('cancel', onDialogCancel, { once: true });
       dialog.addEventListener('close', onDialogClose, { once: true });
-      dialog.showModal();
+      try {
+        dialog.showModal();
+      } catch (error) {
+        console.warn('Failed to open recent project delete confirmation dialog', error);
+        cleanup(window.confirm(`${message}\n${detail}`));
+        return;
+      }
       window.requestAnimationFrame(() => {
         config?.confirm?.focus?.({ preventScroll: true });
       });
