@@ -787,20 +787,6 @@
         sheetHistoryOwnerId ? null : (recentProjectsCache.get(targetProjectId) || null),
         sheetHistoryOwnerId || targetProjectId
       );
-      openProjectTabs.forEach((tab, index) => {
-        if (!tab || tab.id === target.id) {
-          return;
-        }
-        if (tab.residentProjectLoaded === true && tab.project && typeof tab.project === 'object') {
-          return;
-        }
-        openProjectTabs[index] = {
-          ...tab,
-          project: null,
-          residentProjectLoaded: false,
-        };
-      });
-      pruneInactiveCanvasDirectCaches?.();
       console.info('[sheet-switch-debug:success]', {
         fromSheetId: previousActiveId,
         toSheetId: targetId,
