@@ -360,6 +360,10 @@ const multiSheetPackagedProject = {
     },
   ],
 };
+multiSheetPackagedProject.sheets[1].project.canonicalSourceMetadata = {
+  sourceKind: 'import-gif', sourceMimeType: 'image/gif', sourceFileBytes: 42,
+  sourceWidth: width, sourceHeight: height, sourceFrameCount: 3, gifLoopCount: null,
+};
 
 function createCodec() {
   return window.PiXiEEDrawModules.projectStorageV2ArchiveCodec.createProjectStorageV2ArchiveCodec({
@@ -458,6 +462,8 @@ async function runMultiSheetIncludeTimelapseScenario() {
   assert.equal(decoded.packaged.sheets[1].sharedProjectKey, 'legacy-shared-key');
   assert.equal(decoded.packaged.sheets[1].project.document.canvases.length, 2);
   assert.equal(decoded.packaged.sheets[1].project.session.timelapse.enabled, true);
+  assert.equal(decoded.packaged.sheets[1].project.canonicalSourceMetadata.gifLoopCount, null);
+  assert.equal(decoded.packaged.sheets[1].project.canonicalSourceMetadata.sourceFrameCount, 3);
   assert.deepEqual(decoded.packaged.sheets[1].project.session.timelapse.byCanvas, extraSession.timelapse.byCanvas);
   assert.deepEqual(
     decoded.packaged.sheets[1].project.session.localViewportCanvases,
