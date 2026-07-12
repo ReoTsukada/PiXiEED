@@ -475,12 +475,16 @@
       return false;
     }
 
+    let preparedSnapshot = null;
     try {
       try {
         if (typeof snapshotFromDocumentBlob === 'function') {
-          await snapshotFromDocumentBlob(file);
+          // Parse once before persisting the current project. The validated
+          // snapshot is handed to the actual load below, so large V1 JSON or
+          // V2 archives are not decoded and expanded a second time.
+          preparedSnapshot = await snapshotFromDocumentBlob(file);
         } else {
-          snapshotFromDocumentText(await file.text());
+          preparedSnapshot = snapshotFromDocumentText(await file.text());
         }
       } catch (parseError) {
         console.warn('Failed to parse document', parseError);
@@ -499,12 +503,14 @@
           sourceKind: 'file',
           fileLoad: true,
           projectSaveHandleState: handle ? 'unknown' : 'none',
+          preparedSnapshot,
         })
         : await loadDocumentFromText(await file.text(), handle, {
           suppressAutosaveStatus: true,
           sourceKind: 'file',
           fileLoad: true,
           projectSaveHandleState: handle ? 'unknown' : 'none',
+          preparedSnapshot,
         });
       if (!loaded || loaded === 'deferred') {
         return false;
