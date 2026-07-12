@@ -1173,6 +1173,30 @@
         return;
       }
       container.hidden = false;
+      if (adSlot.dataset.pixieedAdCard === 'true' && adSlot.dataset.visibilityObserved !== '1') {
+        if (typeof window.IntersectionObserver === 'function') {
+          const observer = new window.IntersectionObserver(entries => {
+            if (!entries.some(entry => entry.isIntersecting)) {
+              return;
+            }
+            observer.disconnect();
+            adSlot.dataset.visibilityObserved = '1';
+            const queue = () => queueStartupRecentAdRender();
+            if (typeof window.requestIdleCallback === 'function') {
+              window.requestIdleCallback(queue, { timeout: 1200 });
+            } else {
+              window.setTimeout(queue, 0);
+            }
+          }, { root: section.closest('.startup-recent-list') || null, threshold: 0.1 });
+          observer.observe(container);
+          adSlot.dataset.visibilityObserved = 'pending';
+          return;
+        }
+        adSlot.dataset.visibilityObserved = '1';
+      }
+      if (adSlot.dataset.visibilityObserved === 'pending') {
+        return;
+      }
       if (adSlot.dataset.renderPending === '1') {
         return;
       }
