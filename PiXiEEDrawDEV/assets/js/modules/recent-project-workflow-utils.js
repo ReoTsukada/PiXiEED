@@ -498,6 +498,13 @@
   }
 
   function renderRecentProjectsList(entries) {
+    console.info('[pixiedraw-dev:recent-projects]', {
+      phase: 'recent-projects-render-start',
+      count: Array.isArray(entries) ? entries.length : 0,
+      hasContainer: Boolean(dom.startup?.recentList || dom.projectHomeRecentList),
+      containerHidden: Boolean(dom.startup?.recentSection?.hidden && dom.projectHomeRecentSection?.hidden),
+      code: '',
+    });
     const hasEntries = Array.isArray(entries) && entries.length > 0;
     const targets = [
       {
@@ -516,6 +523,7 @@
       },
     ].filter(target => target.section instanceof HTMLElement && target.list instanceof HTMLElement);
     if (!targets.length) {
+      console.info('[pixiedraw-dev:recent-projects]', { phase: 'recent-projects-render-success', count: 0, hasContainer: false, containerHidden: true, code: 'ERR_RECENT_CONTAINER_MISSING' });
       return;
     }
     const renderProjectHomeEmptyState = target => {
@@ -552,6 +560,7 @@
       });
       updatePixieedAccountUi();
       syncPixieedSupportBenefitUi();
+      console.info('[pixiedraw-dev:recent-projects]', { phase: 'recent-projects-render-success', count: Array.isArray(entries) ? entries.length : 0, hasContainer: true, containerHidden: Boolean(dom.startup?.recentSection?.hidden), code: '' });
       return;
     }
     targets.forEach(target => {
@@ -713,6 +722,7 @@
         queueStartupRecentAdRender();
       });
     }
+    console.info('[pixiedraw-dev:recent-projects]', { phase: 'recent-projects-render-success', count: entries.length, hasContainer: true, containerHidden: false, code: '' });
   }
 
   async function ensureSharedRecentProjectsAccountSynced({ force = false } = {}) {
@@ -752,11 +762,13 @@
   }
 
   async function refreshRecentProjectsUI(options = {}) {
+    console.info('[pixiedraw-dev:recent-projects]', { phase: 'recent-projects-load-start', count: 0, hasContainer: Boolean(dom.startup?.recentList || dom.projectHomeRecentList), containerHidden: Boolean(dom.startup?.recentSection?.hidden && dom.projectHomeRecentSection?.hidden), code: '' });
     const hasRecentList = (
       (dom.startup?.recentSection instanceof HTMLElement && dom.startup?.recentList instanceof HTMLElement)
       || (dom.projectHomeRecentSection instanceof HTMLElement && dom.projectHomeRecentList instanceof HTMLElement)
     );
     if (!hasRecentList) {
+      console.info('[pixiedraw-dev:recent-projects]', { phase: 'recent-projects-load-failed', count: 0, hasContainer: false, containerHidden: true, code: 'ERR_RECENT_CONTAINER_MISSING' });
       return;
     }
     if (!AUTOSAVE_SUPPORTED) {
@@ -770,6 +782,7 @@
         dom.startup.recentSection.hidden = true;
       }
       renderRecentProjectsList([]);
+      console.info('[pixiedraw-dev:recent-projects]', { phase: 'recent-projects-load-success', count: 0, hasContainer: true, containerHidden: true, code: 'AUTOSAVE_UNSUPPORTED' });
       return;
     }
     if (options?.syncSharedFromAccount !== false) {
@@ -782,6 +795,7 @@
     const shouldSanitize = options?.sanitize !== false;
     if (shouldSanitize) {
       await sanitizeRecentProjectsStore({ announce: false });
+      console.info('[pixiedraw-dev:recent-projects]', { phase: 'recent-projects-load-success', count: recentProjectsCache.size, hasContainer: true, containerHidden: Boolean(dom.startup?.recentSection?.hidden), code: 'SANITIZED' });
       return;
     }
     const entries = await loadRecentProjectsMetadata();
@@ -790,6 +804,7 @@
       await saveRecentProjectsList(entries, limitedEntries);
     }
     setRecentProjectsCache(limitedEntries);
+    console.info('[pixiedraw-dev:recent-projects]', { phase: 'recent-projects-load-success', count: limitedEntries.length, hasContainer: true, containerHidden: Boolean(dom.startup?.recentSection?.hidden), code: '' });
   }
 
 
