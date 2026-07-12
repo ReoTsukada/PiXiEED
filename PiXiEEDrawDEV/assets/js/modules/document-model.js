@@ -216,6 +216,19 @@
       return layer.direct;
     }
 
+    // `direct` is the runtime source of truth. Older payloads may contain
+    // only importSourceDirect; promote that legacy fallback once at ingress
+    // without discarding it, so old snapshots remain representable.
+    function promoteLegacyImportSourceDirect(direct, importSourceDirect, length) {
+      if (direct instanceof Uint8ClampedArray && direct.length === length) {
+        return direct;
+      }
+      if (importSourceDirect instanceof Uint8ClampedArray && importSourceDirect.length === length) {
+        return new Uint8ClampedArray(importSourceDirect);
+      }
+      return direct instanceof Uint8ClampedArray ? direct : null;
+    }
+
     function isSimulationLayer(layer) {
       return Boolean(layer && layer.type === 'simulation' && layer.elementMap instanceof Uint8Array);
     }
@@ -403,9 +416,12 @@
       if (copyPixels && baseLayer.indices instanceof Int16Array) {
         layer.indices.set(baseLayer.indices);
       }
-      if (copyPixels && baseLayer.direct instanceof Uint8ClampedArray) {
+      const directSource = baseLayer.direct instanceof Uint8ClampedArray
+        ? baseLayer.direct
+        : (baseLayer.importSourceDirect instanceof Uint8ClampedArray ? baseLayer.importSourceDirect : null);
+      if (copyPixels && directSource instanceof Uint8ClampedArray) {
         const direct = ensureLayerDirect(layer, width, height);
-        direct.set(baseLayer.direct);
+        direct.set(directSource.subarray(0, Math.min(direct.length, directSource.length)));
       }
       return layer;
     }
@@ -567,6 +583,7 @@
         importSourceDirect = new Uint8ClampedArray(size * 4);
         importSourceDirect.set(layer.importSourceDirect.subarray(0, Math.min(importSourceDirect.length, layer.importSourceDirect.length)));
       }
+      direct = promoteLegacyImportSourceDirect(direct, importSourceDirect, size * 4);
       return {
         name: typeof layer.name === 'string' ? layer.name : getDefaultLayerName(1),
         visible: layer.visible !== false,
@@ -602,6 +619,7 @@
         layer.importSourceDirect = new Uint8ClampedArray(width * height * 4);
         layer.importSourceDirect.set(snapshot.importSourceDirect.subarray(0, Math.min(layer.importSourceDirect.length, snapshot.importSourceDirect.length)));
       }
+      layer.direct = promoteLegacyImportSourceDirect(layer.direct, layer.importSourceDirect, width * height * 4);
       return layer;
     }
 
@@ -687,6 +705,7 @@
             } else if (!clonePixelData && layer?.importSourceDirect instanceof Uint8ClampedArray) {
               nextLayer.importSourceDirect = layer.importSourceDirect;
             }
+            nextLayer.direct = promoteLegacyImportSourceDirect(nextLayer.direct, nextLayer.importSourceDirect, width * height * 4);
             return nextLayer;
           })
           : [createLayer(getDefaultLayerName(1), width, height)],
@@ -715,6 +734,7 @@
       if (layer.importSourceDirect instanceof Uint8ClampedArray) {
         clonedLayer.importSourceDirect = clonePixelData ? new Uint8ClampedArray(layer.importSourceDirect) : layer.importSourceDirect;
       }
+      clonedLayer.direct = promoteLegacyImportSourceDirect(clonedLayer.direct, clonedLayer.importSourceDirect, state.width * state.height * 4);
       return clonedLayer;
     }
 
@@ -873,6 +893,7 @@
           importSourceDirect.set(sourceBytes);
         }
       }
+      direct = promoteLegacyImportSourceDirect(direct, importSourceDirect, pixelCount * 4);
       return {
         id: typeof layer.id === 'string' ? layer.id : fallbackId,
         name: typeof layer.name === 'string' ? layer.name : fallbackName,
