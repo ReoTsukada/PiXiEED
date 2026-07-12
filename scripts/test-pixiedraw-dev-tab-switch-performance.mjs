@@ -22,8 +22,18 @@ assert.doesNotMatch(
 );
 assert.match(
   lifecycle,
-  /createLocalOpenProjectTabFromCurrentState\(current,/,
-  'the single local-tab payload build must remain in place'
+  /const canReuseResidentLocalPayload = Boolean\(/,
+  'unchanged local tabs must reuse their resident payload rather than clone every GIF frame'
+);
+assert.match(
+  lifecycle,
+  /!hasDocumentUnsavedChanges\(\)/,
+  'a full local tab snapshot is required only after an actual document change'
+);
+assert.doesNotMatch(
+  workflow,
+  /openProjectTabs\.forEach\(\(tab, index\) => \{[\s\S]{0,500}project: null/,
+  'switching tabs must not discard resident payload references'
 );
 
 console.log('PiXiEEDrawDEV tab-switch performance regression checks passed.');
