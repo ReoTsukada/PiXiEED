@@ -590,8 +590,8 @@
     style.textContent = `
       :root{
         --pixieed-top-ad-inline-padding:6px;
-        --pixieed-top-ad-banner-gap:6px;
-        --pixieed-top-ad-banner-top:6px;
+        --pixieed-top-ad-banner-gap:4px;
+        --pixieed-top-ad-banner-top:4px;
         --pixieed-top-ad-offset:0px;
         --pixieed-side-ad-offset:0px;
         --pixieed-shared-side-ad-width:0px;
@@ -836,7 +836,8 @@
         landscapeGap = rawGap;
       }
     }
-    const reserved = Math.max(0, Math.ceil((useLandscapeSideAd ? rect.width : rect.height) + (useLandscapeSideAd ? landscapeGap : 12)));
+    const portraitGap = isPixiedrawPage() ? 4 : 12;
+    const reserved = Math.max(0, Math.ceil((useLandscapeSideAd ? rect.width : rect.height) + (useLandscapeSideAd ? landscapeGap : portraitGap)));
     const reservedPx = `${reserved}px`;
     document.documentElement.style.setProperty('--pixieed-top-ad-offset', useLandscapeSideAd ? '0px' : reservedPx);
     document.documentElement.style.setProperty('--pixieed-side-ad-offset', useLandscapeSideAd ? reservedPx : '0px');
