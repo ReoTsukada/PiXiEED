@@ -31,7 +31,6 @@
 
     return ((scope) => {
       with (scope) {
-  let openProjectTabBusyOwner = null;
   let removeProjectSheetCommandSequence = 0;
 
   function createRemoveProjectSheetCommandOwner() {
@@ -43,7 +42,7 @@
     console.info('[project-sheet-remove-debug]', {
       phase,
       ...details,
-      openProjectTabBusy: Boolean(openProjectTabBusy),
+      commandLock: inspectProjectCommandLock(),
       commandOwner: typeof details.commandOwner === 'symbol'
         ? String(details.commandOwner)
         : null,
@@ -426,7 +425,7 @@
   }
 
   async function commitProjectSheetRemoval(plan) {
-    if (!plan?.targetId || openProjectTabBusy) return false;
+    if (!plan?.targetId || isProjectCommandLocked()) return false;
     const currentIndex = findOpenProjectTabIndex(plan.targetId);
     if (currentIndex < 0 || openProjectTabs[currentIndex] !== plan.target) return false;
     const transaction = {
@@ -434,9 +433,9 @@
       activeOpenProjectTabId,
       projectHomeVisible,
     };
-    const commandOwner = createRemoveProjectSheetCommandOwner();
-    openProjectTabBusy = true;
-    openProjectTabBusyOwner = commandOwner;
+    const commandOwner = 'sheet-delete';
+    const lock = acquireProjectCommandLock({ owner: commandOwner, command: 'remove-project-sheet' });
+    if (!lock?.ok) return false;
     logProjectSheetRemovalTransaction('remove-start', {
       commandOwner,
       targetSheetId: plan.targetId,
@@ -486,7 +485,7 @@
           const switched = await activateTarget(plan.nextActiveSheetId, {
             skipPersistCurrent: true,
             announce: false,
-            commandOwner,
+            commandLock: lock,
           });
           if (!switched) throw new Error('ERR_SHEET_REMOVAL_ACTIVATE_FAILED');
           logProjectSheetRemovalTransaction('activate-success', {
@@ -529,10 +528,7 @@
       return false;
     } finally {
       try {
-        if (openProjectTabBusyOwner === commandOwner) {
-          openProjectTabBusyOwner = null;
-          openProjectTabBusy = false;
-        }
+        releaseProjectCommandLock({ token: lock.token, owner: lock.owner });
       } finally {
         logProjectSheetRemovalTransaction('cleanup', {
           commandOwner,
@@ -547,7 +543,7 @@
 
   function renameOpenProjectTab(tabId) {
     const targetId = typeof tabId === 'string' ? tabId : '';
-    if (!targetId || openProjectTabBusy) {
+    if (!targetId || isProjectCommandLocked()) {
       return false;
     }
     const index = findOpenProjectTabIndex(targetId);
@@ -592,7 +588,7 @@
     skipPersistCurrent = false,
     announce = true,
     skipBusyGuard = false,
-    commandOwner = null,
+    commandLock = null,
   } = {}) {
     const targetId = typeof tabId === 'string' ? tabId : '';
     if (!targetId) {
@@ -602,10 +598,10 @@
       return false;
     }
     const reusesBusyLock = Boolean(
-      openProjectTabBusy
-      && (skipBusyGuard || (commandOwner && commandOwner === openProjectTabBusyOwner))
+      skipBusyGuard
+      || isProjectCommandLockHeldBy({ token: commandLock?.token, owner: commandLock?.owner })
     );
-    if (openProjectTabBusy && !reusesBusyLock) {
+    if (isProjectCommandLocked() && !reusesBusyLock) {
       return false;
     }
     if (!openProjectTabs.length) {
@@ -622,11 +618,13 @@
     const target = openProjectTabs[targetIndex];
     // Acquire synchronously so a duplicate click cannot enter a second
     // persistence/activation sequence before this switch reaches its first await.
-    const activationOwner = commandOwner || Symbol('activate-open-project-tab');
+    const activationOwner = 'sheet-switch';
     const acquiredBusyLock = !reusesBusyLock;
+    const lock = acquiredBusyLock
+      ? acquireProjectCommandLock({ owner: activationOwner, command: 'activate-project-sheet' })
+      : commandLock;
+    if (!lock?.ok) return false;
     if (acquiredBusyLock) {
-      openProjectTabBusy = true;
-      openProjectTabBusyOwner = activationOwner;
       renderOpenProjectTabs();
     }
     const guardedProjectTabIds = new Set();
@@ -840,9 +838,8 @@
           }
         }
       } finally {
-        if (acquiredBusyLock && openProjectTabBusyOwner === activationOwner) {
-          openProjectTabBusyOwner = null;
-          openProjectTabBusy = false;
+        if (acquiredBusyLock) {
+          releaseProjectCommandLock({ token: lock.token, owner: lock.owner });
           renderOpenProjectTabs();
         }
       }
@@ -851,7 +848,7 @@
 
   async function closeOpenProjectTab(tabId) {
     const targetId = typeof tabId === 'string' ? tabId : '';
-    if (!targetId || openProjectTabBusy) {
+    if (!targetId || isProjectCommandLocked()) {
       return false;
     }
     ensureOpenProjectTabsInitialized?.();
