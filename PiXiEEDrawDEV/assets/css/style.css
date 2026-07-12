@@ -10310,6 +10310,23 @@ body.is-project-home-active .modal[open] {
   z-index: 20010;
 }
 
+/* Project-home cards sit above the editor. Give its destructive-action
+ * confirmation a self-contained, viewport-based box so a native dialog that
+ * only paints its backdrop cannot be obscured by that home layer. */
+#recentProjectDeleteConfirmDialog[open] {
+  z-index: 2147483647;
+  width: min(420px, calc(100vw - 24px));
+  min-width: min(320px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px);
+}
+
+#recentProjectDeleteConfirmDialog[open] .modal__form {
+  flex: 0 1 auto;
+  height: auto;
+  min-height: 0;
+}
+
 .modal::backdrop {
   background: rgba(0, 0, 0, 0.6);
 }
