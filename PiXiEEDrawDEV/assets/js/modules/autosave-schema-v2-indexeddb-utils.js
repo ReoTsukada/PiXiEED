@@ -225,6 +225,29 @@
           return { ...result, bundle };
         }
 
+        async function writeSchemaV2JournalRevision(projectId, journalsBySheet, options = {}) {
+          const id = normalizeProjectId(projectId);
+          if (!id) {
+            throw new Error('Autosave schema V2 projectId is required');
+          }
+          const records = await loadAllProjectSchemaRecords(id);
+          const baseManifest = records.manifests.find(record => record?.key === records.current?.manifestKey) || null;
+          if (!baseManifest) {
+            throw new Error('Autosave schema V2 current manifest is unavailable for journal save');
+          }
+          const nextRevision = Math.max(
+            Math.round(Number(baseManifest.revision) || 0) + 1,
+            Math.round(Number(options.revision) || 0)
+          );
+          const bundle = autosaveSchemaV2Utils.createSchemaV2JournalRevision(
+            baseManifest,
+            journalsBySheet,
+            { ...options, revision: nextRevision }
+          );
+          const result = await commitSchemaV2Bundle(bundle, options);
+          return { ...result, bundle };
+        }
+
         async function loadAllProjectSchemaRecords(projectId) {
           assertSchemaDependencies();
           const id = normalizeProjectId(projectId);
@@ -291,10 +314,17 @@
           const sorted = records.manifests
             .filter(manifest => manifest?.projectId === id)
             .sort((left, right) => Math.round(Number(right.revision) || 0) - Math.round(Number(left.revision) || 0));
-          const retained = new Set(sorted.slice(0, Math.max(1, Math.round(Number(keepManifestRevisions) || 2))).map(manifest => manifest.revision));
-          const removable = sorted.filter(manifest => !retained.has(manifest.revision));
+          const retainedManifests = sorted.slice(0, Math.max(1, Math.round(Number(keepManifestRevisions) || 2)));
+          const retainedManifestKeys = new Set(retainedManifests.map(manifest => manifest.key));
+          const retainedCheckpointKeys = new Set(retainedManifests.flatMap(manifest => (
+            Array.isArray(manifest?.sheets) ? manifest.sheets.map(sheet => sheet?.checkpointRef?.key).filter(Boolean) : []
+          )));
+          const retainedJournalKeys = new Set(retainedManifests.flatMap(manifest => (
+            Array.isArray(manifest?.sheets) ? manifest.sheets.map(sheet => sheet?.journalRef?.key).filter(Boolean) : []
+          )));
+          const retainedThumbnailKeys = new Set(retainedManifests.map(manifest => manifest?.thumbnailRef?.key).filter(Boolean));
+          const removable = sorted.filter(manifest => !retainedManifestKeys.has(manifest.key));
           if (!removable.length) return { removedRevisionCount: 0 };
-          const removeRevisions = new Set(removable.map(manifest => manifest.revision));
           const db = await openSchemaV2Database();
           try {
             ensureStoresExist(db);
@@ -306,9 +336,9 @@
             ], 'readwrite');
             const deletes = [
               [LOCAL_PROJECT_MANIFESTS_STORE, removable],
-              [LOCAL_PROJECT_SHEET_CHECKPOINTS_STORE, records.checkpoints.filter(record => removeRevisions.has(record?.rootRevision))],
-              [LOCAL_PROJECT_JOURNALS_STORE, records.journals.filter(record => removeRevisions.has(record?.revision))],
-              [LOCAL_PROJECT_THUMBNAILS_STORE, records.thumbnails.filter(record => removeRevisions.has(record?.rootRevision))],
+              [LOCAL_PROJECT_SHEET_CHECKPOINTS_STORE, records.checkpoints.filter(record => !retainedCheckpointKeys.has(record?.key))],
+              [LOCAL_PROJECT_JOURNALS_STORE, records.journals.filter(record => !retainedJournalKeys.has(record?.key))],
+              [LOCAL_PROJECT_THUMBNAILS_STORE, records.thumbnails.filter(record => !retainedThumbnailKeys.has(record?.key))],
             ];
             deletes.forEach(([storeName, values]) => {
               const objectStore = tx.objectStore(storeName);
@@ -322,14 +352,43 @@
           return { removedRevisionCount: removable.length };
         }
 
+        async function deleteSchemaV2Project(projectId) {
+          const id = normalizeProjectId(projectId);
+          if (!id) return false;
+          const records = await loadAllProjectSchemaRecords(id);
+          const db = await openSchemaV2Database();
+          try {
+            ensureStoresExist(db);
+            const tx = db.transaction(requiredStoreNames(), 'readwrite');
+            const deletes = [
+              [LOCAL_PROJECT_MANIFESTS_STORE, records.manifests],
+              [LOCAL_PROJECT_SHEET_CHECKPOINTS_STORE, records.checkpoints],
+              [LOCAL_PROJECT_JOURNALS_STORE, records.journals],
+              [LOCAL_PROJECT_THUMBNAILS_STORE, records.thumbnails],
+            ];
+            deletes.forEach(([storeName, values]) => {
+              const objectStore = tx.objectStore(storeName);
+              values.forEach(value => objectStore.delete(value.key));
+            });
+            tx.objectStore(LOCAL_PROJECT_CURRENT_MANIFESTS_STORE).delete(id);
+            await waitForTransaction(tx, db);
+            return true;
+          } catch (error) {
+            try { db.close(); } catch (_error) {}
+            throw error;
+          }
+        }
+
         return Object.freeze({
           requiredStoreNames,
           readCurrentManifestReference,
           commitSchemaV2Bundle,
           writeSchemaV2Project,
+          writeSchemaV2JournalRevision,
           loadAllProjectSchemaRecords,
           readSchemaV2Project,
           cleanupSchemaV2Revisions,
+          deleteSchemaV2Project,
         });
       }
     })(scope);
