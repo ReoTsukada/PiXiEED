@@ -224,13 +224,17 @@
         // Ignore guard failures and continue to load.
       }
     }
-    let parsedDocument = null;
-    try {
-      parsedDocument = await snapshotFromDocumentBlob(blob);
-    } catch (error) {
-      console.warn('Failed to parse document blob', error);
-      updateAutosaveStatus('ドキュメントの読み込みに失敗しました', 'error');
-      return false;
+    let parsedDocument = options?.preparedSnapshot && typeof options.preparedSnapshot === 'object'
+      ? options.preparedSnapshot
+      : null;
+    if (!parsedDocument) {
+      try {
+        parsedDocument = await snapshotFromDocumentBlob(blob);
+      } catch (error) {
+        console.warn('Failed to parse document blob', error);
+        updateAutosaveStatus('ドキュメントの読み込みに失敗しました', 'error');
+        return false;
+      }
     }
     const sourcePersistenceState = buildLoadedProjectPersistenceState(parsedDocument, handle, options);
     return await applyLoadedDocumentSnapshot(parsedDocument, {
