@@ -1396,6 +1396,17 @@
     return !getExportDisabledReason(mode);
   }
 
+  function resolveSelectedExportDialogFormat(mode = '') {
+    const format = normalizeExportFormat(mode || dom.exportDialog?.format?.value || 'png');
+    if (format === 'png' && dom.exportDialog?.gridSplitToggle instanceof HTMLInputElement && dom.exportDialog.gridSplitToggle.checked) {
+      return 'gridpng';
+    }
+    if (format === 'gif' && dom.exportDialog?.timelapseToggle instanceof HTMLInputElement && dom.exportDialog.timelapseToggle.checked) {
+      return 'timelapse';
+    }
+    return format;
+  }
+
   function updateExportFormatAvailability() {
     const config = dom.exportDialog;
     const select = config?.format;
@@ -1414,14 +1425,14 @@
     });
 
     const hasAllowedMode = Boolean(firstAllowedValue);
-    const currentMode = normalizeExportFormat(select.value || 'png');
+    const currentMode = resolveSelectedExportDialogFormat();
     if (!canExportFormatInCurrentState(currentMode) && firstAllowedValue) {
       select.value = firstAllowedValue;
     }
     select.disabled = !hasAllowedMode;
 
     if (config?.confirm instanceof HTMLButtonElement) {
-      const activeMode = normalizeExportFormat(select.value || 'png');
+      const activeMode = resolveSelectedExportDialogFormat();
       const canConfirm = hasAllowedMode && canExportFormatInCurrentState(activeMode);
       config.confirm.disabled = !canConfirm;
       const reason = canConfirm ? '' : getExportDisabledReason(activeMode);
@@ -1634,7 +1645,7 @@
   }
 
   function updateExportOptionVisibility(mode) {
-    const format = normalizeExportFormat(mode || dom.exportDialog?.format?.value || 'png');
+    const format = resolveSelectedExportDialogFormat(mode);
     const scaleControls = dom.exportDialog?.scaleControls;
     if (scaleControls instanceof HTMLElement) {
       scaleControls.hidden = !doesExportFormatUseScale(format);
@@ -1692,7 +1703,7 @@
 
   function updateExportOriginalToggleUI() {
     const toggle = dom.exportDialog?.includeOriginalToggle;
-    const mode = normalizeExportFormat(dom.exportDialog?.format?.value || 'png');
+    const mode = resolveSelectedExportDialogFormat();
     const isGridMode = isGridPngExportMode(mode);
     if (toggle instanceof HTMLInputElement) {
       const canOffer = !isGridMode && canOfferOriginalCompanionExport(mode, exportScale);
@@ -2020,7 +2031,7 @@
   }
 
   function refreshExportScaleControls() {
-    const candidates = getExportScaleCandidates(dom.exportDialog?.format?.value || 'png');
+    const candidates = getExportScaleCandidates(resolveSelectedExportDialogFormat());
     applyExportScaleConstraints(candidates);
     syncExportScaleInputs();
     updateExportPreview();
@@ -2147,7 +2158,7 @@
     if (dialog instanceof HTMLDialogElement && !dialog.open) {
       return;
     }
-    const format = normalizeExportFormat(dom.exportDialog?.format?.value || 'png');
+    const format = resolveSelectedExportDialogFormat();
     try {
       const { canvas, meta } = buildExportPreviewSourceCanvas(format);
       drawExportPreviewCanvas(canvas, meta);
