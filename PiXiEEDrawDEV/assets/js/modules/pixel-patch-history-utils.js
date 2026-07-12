@@ -230,11 +230,12 @@
         layer.direct[base + 2] = 0;
         layer.direct[base + 3] = 0;
       }
-      if (Array.isArray(value.importSourceDirect) && value.importSourceDirect.length === 4) {
-        const length = Math.max(1, width * height) * 4;
-        if (!(layer.importSourceDirect instanceof Uint8ClampedArray) || layer.importSourceDirect.length !== length) {
-          layer.importSourceDirect = new Uint8ClampedArray(length);
-        }
+      if (
+        Array.isArray(value.importSourceDirect)
+        && value.importSourceDirect.length === 4
+        && layer.importSourceDirect instanceof Uint8ClampedArray
+        && layer.importSourceDirect.length === Math.max(1, width * height) * 4
+      ) {
         layer.importSourceDirect[base] = clamp(Math.round(Number(value.importSourceDirect[0]) || 0), 0, 255);
         layer.importSourceDirect[base + 1] = clamp(Math.round(Number(value.importSourceDirect[1]) || 0), 0, 255);
         layer.importSourceDirect[base + 2] = clamp(Math.round(Number(value.importSourceDirect[2]) || 0), 0, 255);
