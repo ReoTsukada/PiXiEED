@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.07.12-project-delete-dialog-v1';
+  const APP_BUILD_VERSION = '2026.07.12-rgb-index-palette-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECTS_ENABLED = false;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
@@ -16955,6 +16955,44 @@
     return floatingDrawButtonWorkflowUtilsModule.setupFloatingDrawButton(...args);
   }
 
+  // The image decoder owns the canonical RGB-to-index palette extraction.
+  // Keep that dependency explicit here: after the app split, the old global
+  // helper was no longer declared in this scope and mode switching failed at
+  // the first RGB document conversion.
+  const imageImportPaletteUtils = window.PiXiEEDrawModules?.imageImportDecodeUtils?.createImageImportDecodeUtils?.({
+    MAX_IMPORTED_PALETTE_COLORS,
+    clamp,
+    quantizeRgbaColorEntriesWithMapping: (...args) => quantizeRgbaColorEntriesWithMapping(...args),
+    normalizeColorValue: (...args) => normalizeColorValue(...args),
+    getPaletteColorKey: color => {
+      const normalized = normalizeColorValue(color);
+      return `${normalized.r},${normalized.g},${normalized.b},${normalized.a}`;
+    },
+    findNearestPaletteColorIndexByRgba: (color, palette, fallbackIndex = 0) => {
+      const normalized = normalizeColorValue(color);
+      const candidates = Array.isArray(palette) ? palette : [];
+      let nearestIndex = Number.isInteger(fallbackIndex) ? fallbackIndex : 0;
+      let nearestDistance = Number.POSITIVE_INFINITY;
+      candidates.forEach((candidate, index) => {
+        const target = normalizeColorValue(candidate);
+        const distance = (
+          ((normalized.r - target.r) ** 2)
+          + ((normalized.g - target.g) ** 2)
+          + ((normalized.b - target.b) ** 2)
+          + ((normalized.a - target.a) ** 2)
+        );
+        if (distance < nearestDistance) {
+          nearestDistance = distance;
+          nearestIndex = index;
+        }
+      });
+      return nearestIndex;
+    },
+    // The extracted palette contains opaque colors only. Transparency is
+    // represented as -1 until the palette panel reserves index 0 for it.
+    resolveTransparentStoragePaletteIndex: () => -1,
+  }) || {};
+
   const palettePanelUtils = window.PiXiEEDrawModules?.palettePanelUtils?.createPalettePanelUtils?.({
     COLOR_MODE_INDEX,
     COLOR_MODE_RGB,
@@ -16985,7 +17023,7 @@
     localizeText: (...args) => localizeText(...args),
     normalizeColorValue: (...args) => normalizeColorValue(...args),
     buildPaletteColorLookup: (...args) => buildPaletteColorLookup(...args),
-    buildIndexedPaletteFromFrameDataList: (...args) => buildIndexedPaletteFromFrameDataList(...args),
+    buildIndexedPaletteFromFrameDataList: (...args) => imageImportPaletteUtils.buildIndexedPaletteFromFrameDataList?.(...args),
     quantizeRgbaColorEntriesWithMapping: (...args) => quantizeRgbaColorEntriesWithMapping(...args),
     getRgbaMergeDistance: (...args) => getRgbaMergeDistance(...args),
     mergeWeightedRgbaColors: (...args) => mergeWeightedRgbaColors(...args),
