@@ -1,4 +1,6 @@
-const APP_BUILD_VERSION = '2026.07.10-pixiedraw-ads-restore1';
+importScripts('./assets/js/build-info.js');
+
+const APP_BUILD_VERSION = String(self.__PIXIEEDRAW_BUILD_INFO__?.buildId || 'unknown-build');
 const CACHE_VERSION = `pixieedrawdev-v${APP_BUILD_VERSION}`;
 const CORE_ASSETS = [
   '/PiXiEEDrawDEV/',
@@ -17,7 +19,6 @@ const CORE_ASSETS = [
 ];
 
 self.addEventListener('install', event => {
-  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_VERSION).then(cache => (
       Promise.allSettled(CORE_ASSETS.map(asset => cache.add(asset)))
@@ -31,7 +32,7 @@ self.addEventListener('activate', event => {
       keys
         .filter(key => key !== CACHE_VERSION)
         .map(key => caches.delete(key))
-    )).then(() => self.clients.claim())
+    ))
   );
 });
 
@@ -44,6 +45,7 @@ function isNetworkFirstRequest(request, url) {
     || url.pathname.endsWith('.css')
     || url.pathname.endsWith('.html')
     || url.pathname.endsWith('.webmanifest')
+    || url.pathname.endsWith('/version.json')
   ) {
     return true;
   }
