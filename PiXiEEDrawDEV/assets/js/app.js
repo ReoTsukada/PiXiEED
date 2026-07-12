@@ -7616,6 +7616,19 @@
     normalizeZoomScale,
     formatZoomLabel,
   } = viewportZoomUtils;
+
+  // `selectionMoveWorkflowUtils` and the import workflow are initialized
+  // before the image decoder adapter below. Keep the palette extractor as a
+  // late-bound function so those dependency getters never resolve an old
+  // split-era global that no longer exists in app.js.
+  function buildIndexedPaletteFromFrameDataList(...args) {
+    const extractor = imageImportPaletteUtils?.buildIndexedPaletteFromFrameDataList;
+    if (typeof extractor !== 'function') {
+      throw new Error('Indexed palette extractor is unavailable');
+    }
+    return extractor(...args);
+  }
+
   const selectionMoveWorkflowUtilsModule = window.PiXiEEDrawModules?.selectionMoveWorkflowUtils?.createSelectionMoveWorkflowUtils?.({
   get BRUSH_SHAPE_CUSTOM() { return BRUSH_SHAPE_CUSTOM; },
   set BRUSH_SHAPE_CUSTOM(value) { BRUSH_SHAPE_CUSTOM = value; },
