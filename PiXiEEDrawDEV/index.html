@@ -79,7 +79,7 @@
   })();
 </script>
 <script src="assets/js/modules/edition-capabilities-utils.js?v=2026.07.11-g3a-edition-ads"></script>
-<script src="assets/js/build-info.js?v=20260712-011"></script>
+<script src="assets/js/build-info.js?v=20260712-012"></script>
 <script>
   (function configurePixieedAds() {
     const shouldShowAds = typeof window.__PIXIEEDRAW_SHOULD_SHOW_ADS__ === 'function'
@@ -205,11 +205,14 @@
       const height = Math.max(1, rect.height);
       const ratio = width / height;
       const isProjectCardAd = slot.dataset.pixieedAdCard === 'true';
+      const isSharedBannerAd = slot.dataset.pixieedSharedBanner === 'true';
       const isMobileContext = Boolean(document.body?.classList.contains('is-mobile-layout'))
         || Boolean(window.matchMedia?.('(max-width: 767px)').matches);
       // A project-list card is a near-square thumbnail. Letting the mobile
       // auto format choose a banner leaves the card blank or mismatched.
-      const format = isProjectCardAd
+      const format = isSharedBannerAd
+        ? 'horizontal'
+        : isProjectCardAd
         ? 'rectangle'
         : isMobileContext
         ? 'auto'
@@ -218,7 +221,7 @@
           : (ratio <= 0.72 ? 'vertical' : 'rectangle'));
       slot.setAttribute('data-ad-format', format);
       slot.dataset.pixiedAdFormat = format;
-      if (isMobileContext && !isProjectCardAd) {
+      if (isMobileContext && !isProjectCardAd && !isSharedBannerAd) {
         slot.setAttribute('data-full-width-responsive', 'true');
       } else {
         slot.setAttribute('data-full-width-responsive', 'false');
@@ -1898,8 +1901,8 @@
 	<script defer="" src="assets/js/modules/canonical-v2-project-utils.js?v=20260712-canonical-v2-e2"></script>
 	<script defer="" src="assets/js/modules/pre-update-checkpoint-utils.js?v=20260712-pre-update-checkpoint-u3"></script>
 	<script defer="" src="assets/js/pixieedraw-dev-switch.js?v=2026.07.03-pixieedrawdev-switch-fix14"></script>
-	<script defer="" src="assets/js/app.js?v=20260712-011"></script>
-	<script defer="" src="assets/js/modules/update-detection-utils.js?v=20260712-011"></script>
+	<script defer="" src="assets/js/app.js?v=20260712-012"></script>
+	<script defer="" src="assets/js/modules/update-detection-utils.js?v=20260712-012"></script>
   <script>
     (function initPanelAdDocking() {
       const ads = {
@@ -2414,7 +2417,7 @@
     })();
   </script>
 
-	<script src="../scripts/shared-bottom-nav.js?v=2026.07.12-shared-ads-ready2"></script>
+	<script src="../scripts/shared-bottom-nav.js?v=2026.07.12-shared-ads-banner-size1"></script>
   <script src="../scripts/pixel-art-fit.js"></script>
 </body>
 </html>
