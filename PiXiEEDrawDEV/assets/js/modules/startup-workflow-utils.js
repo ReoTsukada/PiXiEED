@@ -717,7 +717,6 @@
       }
     }
     newProjectSubmitBusy = true;
-    let commandLock = null;
     try {
       const rawName = config?.nameInput?.value ?? state.documentName;
       const name = normalizeDocumentName(rawName);
@@ -734,13 +733,6 @@
         || Boolean(pendingNewProjectCreateShared)
       );
       const shouldAppendAsTab = Boolean(pendingNewProjectAppendAsTab);
-      commandLock = (!shouldCreateShared && !shouldAppendAsTab)
-        ? acquireProjectCommandLock({ owner: 'new-project-create', command: 'submit-new-project' })
-        : null;
-      if (commandLock && !commandLock.ok) {
-        console.info('[pixiedraw-dev:new-project]', { phase: 'new-project-failed', code: commandLock.code });
-        return;
-      }
       let created = false;
       let createdLocalProject = false;
       let sharedCreationFailure = null;
@@ -793,7 +785,19 @@
           openSharedProjectCreateFailureDialog(sharedCreationFailure);
         }
       } else if (!shouldCreateShared) {
-        window.alert(`キャンバスサイズは${MIN_CANVAS_SIZE}〜${MAX_CANVAS_SIZE}の数値で入力してください。`);
+        const invalidDimensions = !Number.isFinite(width)
+          || !Number.isFinite(height)
+          || width < MIN_CANVAS_SIZE
+          || width > MAX_CANVAS_SIZE
+          || height < MIN_CANVAS_SIZE
+          || height > MAX_CANVAS_SIZE;
+        console.info('[pixiedraw-dev:new-project]', {
+          phase: 'new-project-failed',
+          code: invalidDimensions ? 'invalid-canvas-size' : 'project-replacement-failed',
+        });
+        window.alert(invalidDimensions
+          ? `キャンバスサイズは${MIN_CANVAS_SIZE}〜${MAX_CANVAS_SIZE}の数値で入力してください。`
+          : '新規プロジェクトを作成できませんでした。現在のプロジェクトの保存状態を確認して、もう一度お試しください。');
       } else if (sharedCreationFailure) {
         openSharedProjectCreateFailureDialog(sharedCreationFailure);
       }
@@ -802,10 +806,6 @@
       console.info('[pixiedraw-dev:new-project]', { phase: 'new-project-failed', code: String(error?.message || error || '') });
       throw error;
     } finally {
-      if (commandLock?.ok) {
-        releaseProjectCommandLock({ token: commandLock.token, owner: commandLock.owner });
-        console.info('[pixiedraw-dev:new-project]', { phase: 'new-project-lock-released' });
-      }
       newProjectSubmitBusy = false;
     }
   }
@@ -928,6 +928,17 @@
         return false;
       }
     }
+    // The active tab must be flushed before acquiring this lock. The tab lifecycle
+    // intentionally rejects replacement while a project command is locked, so
+    // locking the submit handler itself made every valid new-project request
+    // reject its own tab-close step.
+    const projectCreationLock = ensureTab
+      ? acquireProjectCommandLock({ owner: 'new-project-create', command: 'create-new-project' })
+      : null;
+    if (ensureTab && !projectCreationLock?.ok) {
+      return false;
+    }
+    try {
     const clampedWidth = clamp(Math.round(widthNumber), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
     const clampedHeight = clamp(Math.round(heightNumber), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
     const normalizedPalettePreset = normalizeNewProjectPalettePreset(
@@ -1001,6 +1012,11 @@
     }
     scheduleSessionPersist();
     return true;
+    } finally {
+      if (projectCreationLock?.ok) {
+        releaseProjectCommandLock({ token: projectCreationLock.token, owner: projectCreationLock.owner });
+      }
+    }
   }
 
   function createStartupQuickProjectName() {
