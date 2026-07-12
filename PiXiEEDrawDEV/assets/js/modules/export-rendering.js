@@ -2516,7 +2516,7 @@
           fileNameBase: fileNameBase || state.documentName,
           includeSheets: options?.includeSheets !== false,
           includeTimelapse: options?.includeTimelapse !== false,
-          useWorker: options?.useWorker === true,
+          useWorker: options?.useWorker !== false,
           requireWorker: options?.requireWorker === true,
           preferredAdapterId: options?.preferredStorageAdapterId || '',
         })
@@ -2737,7 +2737,7 @@
     activePersistenceState = null,
     explicitPreferredStorageAdapterId = '',
     devV2SaveFlag = false,
-    defaultStorageAdapterId = 'pixieedraw-v1-json',
+    defaultStorageAdapterId = 'pixieedraw-v2-zip-experimental',
   } = {}) {
     const sourceState = activePersistenceState && typeof activePersistenceState === 'object'
       ? activePersistenceState
@@ -2747,8 +2747,8 @@
       explicitPreferredStorageAdapterId
       || (devV2SaveFlag ? 'pixieedraw-v2-zip-experimental' : '')
       || defaultStorageAdapterId
-      || 'pixieedraw-v1-json'
-    ) || 'pixieedraw-v1-json';
+      || 'pixieedraw-v2-zip-experimental'
+    ) || 'pixieedraw-v2-zip-experimental';
     const sourceKind = normalizeProjectSourceKind(sourceState?.sourceKind, 'unknown');
     const projectSaveHandleState = normalizeProjectSaveHandleState(sourceState?.projectSaveHandleState, 'none');
     const isNewProject = sourceKind === 'new';
@@ -3085,7 +3085,7 @@
         activePersistenceState,
         explicitPreferredStorageAdapterId: options?.preferredStorageAdapterId || '',
         devV2SaveFlag: devV2ProjectSaveEnabled,
-        defaultStorageAdapterId: DEFAULT_PROJECT_STORAGE_ADAPTER_ID || 'pixieedraw-v1-json',
+        defaultStorageAdapterId: DEFAULT_PROJECT_STORAGE_ADAPTER_ID || 'pixieedraw-v2-zip-experimental',
       });
       const baseSavePlan = forceSaveAs
         ? {
@@ -3155,7 +3155,7 @@
         {
           includeSheets: multiSheetCandidate ? true : options?.includeSheets !== false,
           includeTimelapse: options?.includeTimelapse !== false,
-          useWorker: options?.useWorker === true,
+          useWorker: options?.useWorker !== false,
           requireWorker: options?.requireWorker === true,
           preferredStorageAdapterId,
           snapshot: preflightSnapshot,
@@ -3163,7 +3163,7 @@
           packaged: multiSheetCandidate?.packaged || null,
         }
       );
-      const selectedStorageAdapterId = storageAdapterId || preferredStorageAdapterId || 'pixieedraw-v1-json';
+      const selectedStorageAdapterId = storageAdapterId || preferredStorageAdapterId || 'pixieedraw-v2-zip-experimental';
       const usesV2ProjectSave = isV2ProjectStorageAdapterId(selectedStorageAdapterId);
       const v2SheetOverwriteSafety = resolveV2ProjectSheetOverwriteSafety({
         packagedProject: packaged,
