@@ -629,6 +629,8 @@
       setLocalizedTextContent('#exportOriginalOptionRow span:not(.export-toggle-icon)', '原寸も追加', 'Original too');
       setLocalizedTextContent('#exportCompanionOptionRow span:not(.export-toggle-icon)', 'PiXiEEDファイルも保存', 'Save project file');
       setLocalizedTextContent('#exportSpriteMapCompanionOptionRow span:not(.export-toggle-icon)', 'SpriteMAP出力', 'SpriteMAP export');
+      setLocalizedTextContent('#exportGridSplitOptionRow span', 'グリッド分割', 'Grid split');
+      setLocalizedTextContent('#exportTimelapseOptionRow span', 'タイムラプスGIF', 'Timelapse GIF');
       setLocalizedTextContent('#exportContestPostOptionRow span:not(.export-toggle-icon)', 'コンテスト投稿へ移動', 'Go to contest post');
       setLocalizedTextContent('#exportSpriteMapColorSpritesRow span:not(.export-toggle-icon)', 'カラースプライト出力', 'Color sprite export');
       setLocalizedTextContent('#exportGridSettings > span', 'グリッド分割 (PNG)', 'Grid Split (PNG)');
