@@ -98,6 +98,10 @@ function createExportRenderingHarness({ flagEnabled = false } = {}) {
     PROJECT_FILE_EXTENSION,
     PROJECT_FILE_MIME_TYPE,
     NATIVE_PROJECTS_SUBDIRECTORY,
+    openProjectTabs: [],
+    getOpenProjectSheetCount() {
+      return 1;
+    },
     commitHistory() {},
     makeHistorySnapshot() {
       return snapshot;
@@ -177,6 +181,9 @@ function createExportRenderingHarness({ flagEnabled = false } = {}) {
       });
       return 'download';
     },
+    async writeProjectBlobToNewHandle() {
+      return false;
+    },
   });
 
   return {
@@ -207,7 +214,7 @@ const appSource = fs.readFileSync(
   path.join(repoRoot, 'PiXiEEDrawDEV/assets/js/app.js'),
   'utf8'
 );
-assert.match(appSource, /defaultAdapterId:\s*pixieeDrawV1JsonAdapter\?\.id\s*\|\|\s*''/);
+assert.match(appSource, /defaultAdapterId:\s*pixieeDrawV2ZipAdapter\?\.id\s*\|\|\s*pixieeDrawV1JsonAdapter\?\.id\s*\|\|\s*''/);
 assert.match(appSource, /window\.__pixieedrawSetV2ProjectSaveEnabled/);
 assert.match(appSource, /window\.__pixieedrawGetV2ProjectSaveStatus/);
 
@@ -216,7 +223,8 @@ const flagOffResult = await flagOffHarness.exportRenderingModule.saveProjectAsPi
   announceStatus: false,
 });
 assert.equal(flagOffResult.saved, true);
-assert.equal(flagOffHarness.serializedOptions[0]?.preferredAdapterId, V1_ADAPTER_ID);
+assert.equal(flagOffResult.storageAdapterId, V2_ADAPTER_ID);
+assert.equal(flagOffHarness.serializedOptions[0]?.preferredAdapterId, V2_ADAPTER_ID);
 assert.equal(flagOffHarness.handleCreateWritableCalls, 0);
 assert.equal(flagOffHarness.storeAutosaveHandleCalls, 0);
 assert.equal(flagOffHarness.recentProjectCalls, 0);
@@ -246,7 +254,7 @@ assert.ok(
   flagOnHarness.consoleCapture.info.some(entry => entry.includes('save as new file: true'))
 );
 assert.ok(
-  flagOnHarness.consoleCapture.info.some(entry => entry.includes('worker used: false'))
+  flagOnHarness.consoleCapture.info.some(entry => entry.includes('worker used: true'))
 );
 
 globalThis.console = originalConsole;
