@@ -680,9 +680,10 @@
       const ad = document.createElement('ins');
       ad.className = 'startup-recent-card__ad-ins';
       ad.setAttribute('data-ad-client', 'ca-pub-9801602250480253');
-      ad.setAttribute('data-ad-format', 'auto');
+      ad.setAttribute('data-ad-format', 'rectangle');
       ad.setAttribute('data-ad-slot', '2141591954');
-      ad.setAttribute('data-full-width-responsive', 'true');
+      ad.setAttribute('data-full-width-responsive', 'false');
+      ad.dataset.pixieedAdCard = 'true';
       ad.style.display = 'block';
       thumb.appendChild(ad);
       const nameNode = document.createElement('span');
