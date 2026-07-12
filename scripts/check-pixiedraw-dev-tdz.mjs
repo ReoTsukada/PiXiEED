@@ -1609,6 +1609,7 @@ requireInjectedGetter('timelineLayers', 'TIMELINE_CELL_SIZE');
   'wheelZoomPendingScale',
   'wheelZoomRaf',
   'wheelZoomRawResetTimer',
+  'getViewportVisibilityTargetSurface',
 ].forEach(name => requireInjectedGetter('canvasWheelZoomWorkflowUtils', name));
 [
   'BRUSH_TOOLS',
