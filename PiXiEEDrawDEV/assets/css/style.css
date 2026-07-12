@@ -9336,7 +9336,7 @@ body.is-mobile-layout #multiSupportAdContainer {
 @media (orientation: landscape) {
   body[data-pixieed-page="pixiedraw"] .pixieed-shared-top-ad {
     --pixieed-landscape-side-ad-length: calc(
-      min(320px, 100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 12px)
+      100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 12px
     );
     width: 50px !important;
     overflow: hidden !important;
@@ -9362,7 +9362,7 @@ body.is-mobile-layout #multiSupportAdContainer {
 }
 
 body[data-pixieed-page="pixiedraw"] .pixieed-shared-top-ad {
-  width: min(320px, calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 12px)) !important;
+  width: calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 12px) !important;
   min-height: 50px !important;
   height: 50px !important;
   max-height: 50px !important;
