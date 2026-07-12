@@ -79,7 +79,7 @@
   })();
 </script>
 <script src="assets/js/modules/edition-capabilities-utils.js?v=2026.07.11-g3a-edition-ads"></script>
-<script src="assets/js/build-info.js?v=20260712-025"></script>
+<script src="assets/js/build-info.js?v=20260713-026"></script>
 <script>
   (function configurePixieedAds() {
     const shouldShowAds = typeof window.__PIXIEEDRAW_SHOULD_SHOW_ADS__ === 'function'
@@ -1121,10 +1121,10 @@
 <button class="button button--primary" id="exportProject" type="button">出力パネルを開く</button>
 </div>
 <div class="file-panel-summary">
-<p class="help-text ui-guide-text">自動保存: ON（この端末）</p>
+<p class="help-text ui-guide-text">自動保存: 保存先を設定したプロジェクトのみ</p>
 <p class="help-text ui-guide-text">画像・GIF・PiXiEEDraw形式の保存は出力パネルから行います。</p>
 </div>
-<button class="button" hidden id="enableAutosave" type="button">ローカル自動保存（常時ON）</button>
+<button class="button" id="enableAutosave" type="button">自動保存先を設定</button>
 <button class="button" hidden id="bindExportFolder" type="button">出力フォルダを設定</button>
 <p aria-live="polite" class="help-text export-destination-label" id="exportDestinationLabel">画像/GIF/SVG出力先: 未固定（保存時に保存先を選択）</p>
 <p aria-live="polite" class="help-text" id="autosaveStatus"></p>
@@ -1615,6 +1615,21 @@
 </div>
 </form>
 </dialog>
+<dialog aria-labelledby="autosaveDestinationDialogTitle" class="modal" id="autosaveDestinationDialog">
+<form class="modal__form" method="dialog">
+<header class="modal__header">
+<h2 class="modal__title" id="autosaveDestinationDialogTitle">自動保存先を設定</h2>
+</header>
+<div class="modal__body">
+<p>このプロジェクトの自動保存先を選択してください。</p>
+<p class="help-text">設定後は、タイムラプスと履歴を含む PiXiEEDraw ファイルへ自動上書き保存します。保存先を設定するまで端末内への自動保存は行いません。</p>
+</div>
+<footer class="modal__footer">
+<button class="button button--ghost" id="autosaveDestinationLater" type="button">あとで設定</button>
+<button class="button button--primary" id="autosaveDestinationChoose" type="button">保存先を選択</button>
+</footer>
+</form>
+</dialog>
 <dialog aria-labelledby="globalHistoryConfirmTitle" class="modal" id="globalHistoryConfirmDialog">
 <form class="modal__form" method="dialog">
 <header class="modal__header">
@@ -1807,7 +1822,7 @@
 	<script defer="" src="assets/js/modules/open-project-tab-view.js?v=2026.07.11-tab-availability-fix1"></script>
 	<script defer="" src="assets/js/modules/open-project-tab-lifecycle.js?v=2026.07.12-tab-switch-resident1"></script>
 	<script defer="" src="assets/js/modules/open-project-tab-sheet-actions.js?v=2026.07.12-command-lock-r2"></script>
-	<script defer="" src="assets/js/modules/local-project-journal-utils.js?v=2026.07.12-tab-switch-resident1"></script>
+	<script defer="" src="assets/js/modules/local-project-journal-utils.js?v=2026.07.13-file-primary-memory1"></script>
 	<script defer="" src="assets/js/modules/pixel-patch-history-utils.js?v=2026.07.12-direct-authority-gmem2a1"></script>
 	<script defer="" src="assets/js/modules/history-snapshot-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/memory-utils.js?v=2026.06.30-memory-utils-v1"></script>
@@ -1867,7 +1882,7 @@
 	<script defer="" src="assets/js/modules/canvas-grid-workflow-utils.js?v=2026.07.03-grid-workflow-split-v1"></script>
 	<script defer="" src="assets/js/modules/timeline-navigation-workflow-utils.js?v=2026.07.03-size-timeline-split-v1"></script>
 	<script defer="" src="assets/js/modules/timelapse-session-utils.js?v=2026.07.01-timelapse-session-split-v1"></script>
-	<script defer="" src="assets/js/modules/autosave-workflow-utils.js?v=2026.07.12-v2-journal-revision1"></script>
+	<script defer="" src="assets/js/modules/autosave-workflow-utils.js?v=2026.07.13-file-primary-memory1"></script>
 	<script defer="" src="assets/js/modules/open-import-workflow-utils.js?v=2026.07.12-v2-primary-autosave1"></script>
 	<script defer="" src="assets/js/modules/export-format-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/export-dialog-workflow-utils.js?v=2026.07.12-export-format-options1"></script>
@@ -1908,8 +1923,8 @@
 	<script defer="" src="assets/js/modules/canonical-v2-project-utils.js?v=20260712-canonical-v2-e2"></script>
 	<script defer="" src="assets/js/modules/pre-update-checkpoint-utils.js?v=20260712-pre-update-checkpoint-u3"></script>
 	<script defer="" src="assets/js/pixieedraw-dev-switch.js?v=2026.07.03-pixieedrawdev-switch-fix14"></script>
-	<script defer="" src="assets/js/app.js?v=20260712-025"></script>
-	<script defer="" src="assets/js/modules/update-detection-utils.js?v=20260712-025"></script>
+	<script defer="" src="assets/js/app.js?v=20260713-026"></script>
+	<script defer="" src="assets/js/modules/update-detection-utils.js?v=20260713-026"></script>
   <script>
     (function initPanelAdDocking() {
       const ads = {
