@@ -32,6 +32,28 @@
     return ((scope) => {
       with (scope) {
   let autosavePerformanceSequence = 0;
+  let autosaveDestinationPromptDismissed = false;
+  let autosaveDestinationDialogBound = false;
+
+  function getAutosaveDestinationDialog() {
+    return document.getElementById('autosaveDestinationDialog');
+  }
+
+  function openAutosaveDestinationDialog() {
+    if (!FILE_HANDLE_AUTOSAVE_SUPPORTED) {
+      updateAutosaveStatus('自動保存: このブラウザでは保存先を設定できません', 'warn');
+      return false;
+    }
+    const dialog = getAutosaveDestinationDialog();
+    if (!dialog || typeof dialog.showModal !== 'function') {
+      updateAutosaveStatus('自動保存: 保存先を設定してください', 'warn');
+      return false;
+    }
+    if (!dialog.open) {
+      dialog.showModal();
+    }
+    return true;
+  }
 
   function beginAutosavePerformanceSpan(name, details = null) {
     const perf = window?.performance;
@@ -219,9 +241,88 @@
 
   function setupAutosaveControls() {
     const button = dom.controls.enableAutosave;
-    if (!button) return;
-    button.textContent = localizeText('ローカル自動保存（常時ON）', 'Local Autosave (Always ON)');
-    button.disabled = true;
+    if (button) {
+      button.hidden = false;
+      button.disabled = false;
+      button.textContent = localizeText('自動保存先を設定', 'Set autosave destination');
+      if (!button.dataset.autosaveDestinationBound) {
+        button.dataset.autosaveDestinationBound = 'true';
+        button.addEventListener('click', () => {
+          autosaveDestinationPromptDismissed = false;
+          requestAutosaveBinding().catch(error => {
+            console.warn('Autosave destination selection failed', error);
+          });
+        });
+      }
+    }
+    if (autosaveDestinationDialogBound) return;
+    const dialog = getAutosaveDestinationDialog();
+    const choose = document.getElementById('autosaveDestinationChoose');
+    const later = document.getElementById('autosaveDestinationLater');
+    if (!dialog || !choose || !later) return;
+    autosaveDestinationDialogBound = true;
+    choose.addEventListener('click', async () => {
+      autosaveDestinationPromptDismissed = false;
+      const bound = await requestAutosaveBinding();
+      if (bound && dialog.open) dialog.close();
+    });
+    later.addEventListener('click', () => {
+      autosaveDestinationPromptDismissed = true;
+      if (dialog.open) dialog.close();
+      updateAutosaveStatus('自動保存: 保存先を設定するまで保存しません', 'warn');
+    });
+  }
+
+  async function ensureAutosaveDestination() {
+    if (!FILE_HANDLE_AUTOSAVE_SUPPORTED) {
+      return false;
+    }
+    if (!autosaveHandle) {
+      const storedHandle = await loadStoredAutosaveHandle();
+      if (storedHandle) {
+        const granted = await ensureHandlePermission(storedHandle, { request: false });
+        if (granted) {
+          autosaveHandle = storedHandle;
+          pendingAutosaveHandle = null;
+        } else {
+          pendingAutosaveHandle = storedHandle;
+        }
+      }
+    }
+    if (autosaveHandle && await ensureHandlePermission(autosaveHandle, { request: false })) {
+      return true;
+    }
+    if (!autosaveDestinationPromptDismissed) {
+      openAutosaveDestinationDialog();
+    }
+    updateAutosaveStatus('自動保存: 保存先を設定してください', 'warn');
+    return false;
+  }
+
+  async function writeAutosaveDestinationFile(snapshot) {
+    if (!autosaveHandle || !snapshot || typeof snapshot !== 'object') {
+      return false;
+    }
+    const granted = await ensureHandlePermission(autosaveHandle, { request: false });
+    if (!granted) {
+      pendingAutosaveHandle = autosaveHandle;
+      autosaveHandle = null;
+      updateAutosaveStatus('自動保存: 保存先への権限を再設定してください', 'warn');
+      return false;
+    }
+    const packaged = buildPackagedProjectPayload(snapshot, {
+      session: buildProjectSessionPayload(),
+      includeSheets: true,
+    });
+    const writable = await autosaveHandle.createWritable();
+    try {
+      await writable.write(new Blob([JSON.stringify(packaged)], { type: 'application/x-pixieedraw' }));
+      await writable.close();
+      return true;
+    } catch (error) {
+      try { await writable.abort?.(); } catch (_abortError) {}
+      throw error;
+    }
   }
 
   function setExportDirectoryDisplayLabel(label, { persist = true } = {}) {
@@ -543,7 +644,7 @@
       return;
     }
 
-    updateAutosaveStatus('自動保存: 端末内データを確認中…');
+    updateAutosaveStatus('自動保存: 保存先を確認中…');
 
     try {
       const reloadRestoreProjectId = normalizeAutosaveProjectId(
@@ -571,8 +672,8 @@
       setActiveAutosaveProjectId(startupRestoreTargetId || reusableProjectId || createAutosaveProjectId());
       updateAutosaveStatus(
         recentEntries.length
-          ? '自動保存: 端末内プロジェクトを復元できます'
-          : '自動保存: 新規作成すると端末内への自動保存を開始します',
+          ? '自動保存: 保存済みプロジェクトを開けます'
+          : '自動保存: 新規作成後に保存先を設定してください',
         'info'
       );
     } catch (error) {
@@ -768,6 +869,10 @@
       scheduleAutosaveSnapshot();
       return false;
     }
+    if (!await ensureAutosaveDestination()) {
+      autosaveWriteQueued = false;
+      return false;
+    }
     const projectId = await ensureActiveAutosaveProjectId();
     if (!tryAcquireAutosaveTabLock()) {
       autosaveWriteQueued = true;
@@ -823,12 +928,13 @@
         && isAutosaveV2JournalReady?.(projectId) === true
       );
       const journalOnly = useV2Journal || (!useV2Primary && journalOnlySavePlan?.journalOnly === true);
-      const snapshotSpan = beginAutosavePerformanceSpan('pixiedraw-dev:autosave:make-history-snapshot', { skipped: journalOnly });
+      // The destination file is the durable source of truth. Even a V2
+      // journal-only revision therefore needs a current snapshot to overwrite
+      // that file with the complete history and timelapse payload.
+      const snapshotSpan = beginAutosavePerformanceSpan('pixiedraw-dev:autosave:make-history-snapshot', { skipped: false, destinationFile: true });
       let snapshot = null;
       try {
-        if (!journalOnly) {
-          snapshot = makeHistorySnapshot({ clonePixelData: false });
-        }
+        snapshot = makeHistorySnapshot({ clonePixelData: false });
       } finally {
         endAutosavePerformanceSpan(snapshotSpan);
       }
@@ -879,6 +985,9 @@
         } catch (_shadowError) {}
         throw new Error('Failed to record autosave snapshot');
       }
+      if (!await writeAutosaveDestinationFile(snapshot)) {
+        throw new Error('Failed to write autosave destination file');
+      }
       try {
         if (!useV2Primary && !journalOnly) {
           queueAutosaveV2ShadowWriteMeasured({ projectId, snapshot, v1Project: savedEntry.project || null });
@@ -897,7 +1006,7 @@
       autosaveDirty = false;
       markDocumentDurablySaved();
       pruneInactiveCanvasDirectCaches?.();
-      updateAutosaveStatus('自動保存: 端末内に保存済み', 'success');
+      updateAutosaveStatus('自動保存: 保存先ファイルへ保存済み', 'success');
       return true;
     } catch (error) {
       throw error;
@@ -1060,7 +1169,7 @@
   }
 
   async function requestAutosaveBinding(options = {}) {
-    if (!FILE_HANDLE_AUTOSAVE_SUPPORTED) return;
+    if (!FILE_HANDLE_AUTOSAVE_SUPPORTED) return false;
     try {
       const suggestedNameOption = typeof options.suggestedName === 'string' ? options.suggestedName.trim() : '';
       const suggestedName = suggestedNameOption || createAutosaveFileName();
@@ -1104,7 +1213,7 @@
       clearPendingPermissionListener();
       await storeAutosaveHandle(handle);
       if (dom.controls.enableAutosave) {
-        dom.controls.enableAutosave.textContent = 'ローカル自動保存（常時ON）';
+        dom.controls.enableAutosave.textContent = '自動保存先を変更';
       }
       updateAutosaveStatus(
         boundFromExportDirectory
@@ -1113,26 +1222,28 @@
       );
       markAutosaveDirty();
       await writeAutosaveSnapshot(true);
+      return true;
     } catch (error) {
       if (error && error.name === 'AbortError') {
         updateAutosaveStatus('自動保存: キャンセルしました', 'warn');
-        return;
+        return false;
       }
       console.warn('Autosave binding failed', error);
       updateAutosaveStatus('自動保存: ファイルを選択できませんでした', 'error');
+      return false;
     }
   }
 
   async function ensureAutosaveForLensImport() {
     if (!AUTOSAVE_SUPPORTED) {
-      return;
+      return false;
     }
     if (!autosaveProjectId) {
       setActiveAutosaveProjectId(createAutosaveProjectId());
     }
     markAutosaveDirty();
     scheduleAutosaveSnapshot();
-    updateAutosaveStatus('PiXiEELENS の取り込み内容を端末内に自動保存します', 'info');
+    updateAutosaveStatus('PiXiEELENS の取り込み後に自動保存先を設定してください', 'info');
   }
 
   async function ensureHandlePermission(handle, { request = false } = {}) {
@@ -1171,7 +1282,7 @@
     const listener = (event) => {
       const target = event?.target instanceof Element ? event.target : null;
       if (!target) {
-        return;
+      return false;
       }
       const isEditable = Boolean(target.closest('input, textarea, select, [contenteditable="true"], [contenteditable=""]'));
       if (isEditable) {
