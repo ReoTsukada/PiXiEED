@@ -116,7 +116,9 @@
       return;
     }
     const targetSurface = getCanvasInteractionSurfaceFromTarget(targetElement)
-      || getViewportVisibilityTargetSurface();
+      || (typeof getViewportVisibilityTargetSurface === 'function'
+        ? getViewportVisibilityTargetSurface()
+        : null);
     if (!targetSurface?.canvasDoc) {
       return;
     }
