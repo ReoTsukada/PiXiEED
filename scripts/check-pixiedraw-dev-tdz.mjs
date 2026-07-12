@@ -4472,10 +4472,15 @@ for (const moduleFile of ['layout-viewport.js', 'rail-tool-ui-utils.js', 'contro
 }
 
 const indexSource = fs.readFileSync(indexPath, 'utf8');
-const appVersion = appSource.match(/const APP_BUILD_VERSION = '([^']+)'/)?.[1] || '';
+const buildInfoPath = 'PiXiEEDrawDEV/assets/js/build-info.js';
+const buildInfoSource = fs.readFileSync(buildInfoPath, 'utf8');
+const appVersion = buildInfoSource.match(/buildId: '([^']+)'/)?.[1] || '';
 const indexVersion = indexSource.match(/assets\/js\/app\.js\?v=([^"]+)/)?.[1] || '';
+if (!/const APP_BUILD_VERSION = String\(APP_BUILD_INFO\.buildId/.test(appSource)) {
+  failures.push('APP_BUILD_VERSION must read the single build-info source');
+}
 if (!appVersion || !indexVersion || appVersion !== indexVersion) {
-  failures.push(`APP_BUILD_VERSION/index query mismatch: app=${appVersion || '(missing)'} index=${indexVersion || '(missing)'}`);
+  failures.push(`build-info/index query mismatch: build=${appVersion || '(missing)'} index=${indexVersion || '(missing)'}`);
 }
 
 const activeFailures = failures.filter(failure => (
