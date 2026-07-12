@@ -771,7 +771,7 @@
       return;
     }
     const choice = window.prompt(
-      '出力形式を入力してください (png / jpeg / svg / glb / grid / gif / timelapse / project / projectv2)',
+      '出力形式を入力してください (png / jpeg / svg / gif / project)',
       'png'
     );
     if (!choice) {
@@ -787,16 +787,10 @@
       && inputMode !== 'jpg'
       && inputMode !== 'jpeg'
       && inputMode !== 'svg'
-      && inputMode !== 'glb'
-      && inputMode !== 'grid'
-      && inputMode !== 'gridpng'
       && inputMode !== 'gif'
-      && inputMode !== 'timelapse'
       && inputMode !== 'project'
-      && inputMode !== 'projectv2'
-      && inputMode !== 'projectv2experimental'
     ) {
-      window.alert('png / jpeg / svg / glb / grid / gif / timelapse / project / projectv2 のいずれかを入力してください。');
+      window.alert('png / jpeg / svg / gif / project のいずれかを入力してください。');
       return;
     }
     const normalized = normalizeExportFormat(inputMode);
