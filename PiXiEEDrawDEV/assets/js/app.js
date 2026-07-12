@@ -5601,6 +5601,8 @@
   set multiState(value) { multiState = value; },
   get normalizeAutosaveProjectId() { return normalizeAutosaveProjectId; },
   set normalizeAutosaveProjectId(value) { normalizeAutosaveProjectId = value; },
+  get normalizeV2PixelPatchJournalOps() { return normalizeV2PixelPatchJournalOps; },
+  set normalizeV2PixelPatchJournalOps(value) { normalizeV2PixelPatchJournalOps = value; },
   get normalizeSerializedTimelapseOperationEntry() { return normalizeSerializedTimelapseOperationEntry; },
   set normalizeSerializedTimelapseOperationEntry(value) { normalizeSerializedTimelapseOperationEntry = value; },
   get parseAutosaveTabLockPayload() { return parseAutosaveTabLockPayload; },
