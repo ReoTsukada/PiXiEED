@@ -63,6 +63,6 @@ const history = fs.readFileSync(path.join(root, 'PiXiEEDrawDEV/assets/js/modules
 const recovery = fs.readFileSync(path.join(root, 'PiXiEEDrawDEV/assets/js/modules/autosave-schema-v2-recovery-utils.js'), 'utf8');
 assert.match(codec, /nextLayer\.importSourceDirect =/);
 assert.match(history, /importSourceDirect: layer\.importSourceDirect \? decodeUint8Data/);
-assert.match(recovery, /const project = clone\(payload\)/);
+assert.match(recovery, /const raw = clone\(payload\)/);
 
 console.log('G-MEM-2B legacy-shape compatibility checks passed.');
