@@ -79,19 +79,10 @@
   })();
 </script>
 <script src="assets/js/modules/edition-capabilities-utils.js?v=2026.07.11-g3a-edition-ads"></script>
-<script src="assets/js/build-info.js?v=20260713-050"></script>
-<script>
-  // PiXiEELENS-compatible policy: one dedicated ad slot outside the editor.
-  window.__PIXIEEDRAW_LENS_AD_LAYOUT__ = true;
-  document.documentElement.dataset.pixieedAdLayout = 'lens';
-</script>
+<script src="assets/js/build-info.js?v=20260713-051"></script>
 <script async="" crossorigin="anonymous" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253"></script>
 <script>
   (function configurePixieedAds() {
-    if (window.__PIXIEEDRAW_LENS_AD_LAYOUT__ === true) {
-      window.__PIXIEEDRAW_AD_RENDER_ENABLED__ = false;
-      return;
-    }
     const shouldShowAds = typeof window.__PIXIEEDRAW_SHOULD_SHOW_ADS__ === 'function'
       ? window.__PIXIEEDRAW_SHOULD_SHOW_ADS__()
       : false;
@@ -158,9 +149,6 @@
 </script>
 <script>
   (function configurePixieedrawAdSlotRenderer() {
-    if (window.__PIXIEEDRAW_LENS_AD_LAYOUT__ === true) {
-      return;
-    }
     const initializedSlots = new WeakSet();
     const inFlightSlots = new WeakSet();
     const slotOwners = new WeakMap();
@@ -353,7 +341,7 @@
 
 
 
-<link href="assets/css/style.css?v=20260713-050" rel="stylesheet"/>
+<link href="assets/css/style.css?v=20260713-051" rel="stylesheet"/>
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-4.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-4.png"/>
 <style>
@@ -417,12 +405,6 @@
 <link rel="apple-touch-icon" href="/icon/icon-512-4.png"/>
 </head>
 <body class="app-preinit">
-<div aria-label="広告" class="pixieedraw-lens-ad-banner" id="pixieedrawLensAd">
-  <div class="ad-block">
-    <ins class="adsbygoogle" data-ad-client="ca-pub-9801602250480253" data-ad-slot="2141591954" id="pixieedrawLensAdSlot" style="display:block"></ins>
-    <small class="ad-label">広告</small>
-  </div>
-</div>
 <div aria-atomic="true" aria-live="polite" class="startup-boot-loading" id="startupBootLoading" role="status">
 <div class="startup-boot-loading__panel">
 <p class="startup-boot-loading__title">PiXiEEDrawDEV</p>
@@ -919,6 +901,8 @@
 <output class="brush-custom-info" id="customBrushInfo">カスタム: 未作成</output>
 </div>
 </div>
+<div class="panel-ad-mount" data-panel-ad-mount="left"></div>
+</div>
 </section>
 <section class="panel-section" data-section="color" id="panelColor">
 <div class="panel-section__body">
@@ -1086,6 +1070,7 @@
 </div>
 </div>
 </div>
+<div class="panel-ad-mount" data-panel-ad-mount="left"></div>
 </div>
 </section>
 <section class="panel-section" data-section="extensions" id="panelExtensions">
@@ -1137,6 +1122,7 @@
 </div>
 </details>
 <div class="panel-ad-mount panel-ad-mount--context" data-panel-ad-mount="right"></div>
+<div class="panel-ad-mount" data-panel-ad-mount="left"></div>
 </div>
 </section>
 <section class="panel-section" data-section="details" id="panelDetails">
@@ -1181,6 +1167,7 @@
 </div>
 </div>
 <div class="panel-ad-mount panel-ad-mount--context" data-panel-ad-mount="right"></div>
+<div class="panel-ad-mount" data-panel-ad-mount="left"></div>
 </div>
 </section>
 <section class="panel-section" data-section="settings" id="panelSettings">
@@ -1346,6 +1333,7 @@
 <p class="help-text ui-guide-text" id="settingsDisplayHint">背景とUI配色を切り替えます（描画色には影響しません）。</p>
 </div>
 <div class="panel-ad-mount panel-ad-mount--context" data-panel-ad-mount="right"></div>
+<div class="panel-ad-mount" data-panel-ad-mount="left"></div>
 </div>
 </section>
 <section class="panel-section" data-section="help" id="panelHelp"></section>
@@ -1375,6 +1363,12 @@
 </div>
 <div class="help-panel__list" id="helpArticleList" role="list"></div>
 <p class="help-text" hidden="" id="helpNoResults">一致する項目はありません。</p>
+<div aria-label="広告" class="export-ad operation-help__ad" id="operationHelpAdContainer">
+<div class="export-ad__slot">
+<ins class="operation-help-ad-ins" data-ad-client="ca-pub-9801602250480253" data-ad-format="auto" data-ad-slot="2141591954" data-full-width-responsive="true" id="operationHelpAdSlot" style="display:block"></ins>
+</div>
+<small class="export-ad__label">広告</small>
+</div>
 </div>
 </form>
 </dialog>
@@ -1907,11 +1901,10 @@
 	<script defer="" src="assets/js/modules/pre-update-checkpoint-utils.js?v=20260712-pre-update-checkpoint-u3"></script>
 	<script defer="" src="assets/js/active-project-session-utils.js?v=2026.07.13-active-project-session-r2c"></script>
 	<script defer="" src="assets/js/pixieedraw-dev-switch.js?v=2026.07.03-pixieedrawdev-switch-fix14"></script>
-	<script defer="" src="assets/js/app.js?v=20260713-050"></script>
+	<script defer="" src="assets/js/app.js?v=20260713-051"></script>
 	<script defer="" src="assets/js/modules/update-detection-utils.js?v=20260713-026"></script>
   <script>
     (function initPanelAdDocking() {
-      if (window.__PIXIEEDRAW_LENS_AD_LAYOUT__ === true) return;
       const ads = {
         left: document.getElementById('leftPanelAd'),
         right: document.getElementById('rightPanelContextAd'),
@@ -1921,7 +1914,7 @@
         right: document.getElementById('rightPanelAdPreloadMount'),
       };
       const sideSections = {
-        left: ['panelColor'],
+        left: ['panelColor', 'panelTools', 'panelFrames', 'panelFile', 'panelSettings', 'panelDetails'],
         right: ['panelFile', 'panelSettings', 'panelDetails'],
       };
       if (!(ads.left instanceof HTMLElement) && !(ads.right instanceof HTMLElement)) return;
@@ -1939,8 +1932,12 @@
       }
 
       function findMount(side) {
-        const ids = sideSections[side] || [];
         const preloadMount = preloadMounts[side] instanceof HTMLElement ? preloadMounts[side] : null;
+        const isMobile = document.body?.classList.contains('is-mobile-layout');
+        if (isMobile && side === 'right') return preloadMount;
+        const ids = side === 'left' && isMobile
+          ? ['panelTools', 'panelFrames', 'panelFile', 'panelSettings', 'panelDetails']
+          : (sideSections[side] || []);
         let fallback = null;
         let firstMount = null;
         for (const id of ids) {
@@ -1951,6 +1948,9 @@
           if (!firstMount) firstMount = mount;
           const mountRenderable = isMountRenderable(mount);
           if (!fallback && mountRenderable) fallback = mount;
+          if (mountRenderable && mount.closest('.mobile-panel.is-active')) {
+            return mount;
+          }
           if (section.classList.contains('is-active') && !section.hidden && mountRenderable) {
             return mount;
           }
@@ -2031,7 +2031,6 @@
     // AdSense injector: keep slot nodes mounted and only promote a slot to `adsbygoogle`
     // right before push(), so 0px hidden slots never poison the global queue.
     (function initAds() {
-      if (window.__PIXIEEDRAW_LENS_AD_LAYOUT__ === true) return;
       if (!document || !window) return;
       if (!window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.()) return;
       const ADS_CLIENT = 'ca-pub-9801602250480253';
@@ -2090,9 +2089,6 @@
         if (document.body?.classList.contains('is-project-home-active')
           || document.body?.classList.contains('is-startup-active')) {
           return [];
-        }
-        if (isPortraitBottomOnlyMode()) {
-          return ['mobileBottomAdSlot'];
         }
         const leftSlot = document.getElementById('leftPanelAdSlot');
         if (isContainerRenderable(leftSlot) && isSideRailExpanded(leftSlot)) {
@@ -2198,9 +2194,8 @@
         const railId = side === 'left' ? 'leftRail' : 'rightRail';
         const rail = document.getElementById(railId);
         if (!(rail instanceof HTMLElement)) return true;
+        if (container.closest('.mobile-panel.is-active')) return true;
         if (rail.dataset.collapsed === 'true') return false;
-        // Match request: left side ad only starts after the rail is widened (non-compact).
-        if (side === 'left' && rail.dataset.compact === 'true') return false;
         return true;
       }
 
@@ -2316,9 +2311,6 @@
       }
 
       function tryRender(container) {
-        const portraitBottomOnly = isPortraitBottomOnlyMode();
-        if (portraitBottomOnly && !isMobileBottomSlot(container)) return false;
-        if (!portraitBottomOnly && isMobileBottomSlot(container)) return false;
         if (!isSideRailExpanded(container)) return false;
         applySideSlotGeometry(container);
         if (!isContainerRenderable(container)) return false;
@@ -2368,13 +2360,6 @@
 
       function queueRenderForContainer(container) {
         if (!(container instanceof HTMLElement)) return;
-        const portraitBottomOnly = isPortraitBottomOnlyMode();
-        if (portraitBottomOnly && container.id !== 'mobileBottomAdSlot') {
-          return;
-        }
-        if (!portraitBottomOnly && container.id === 'mobileBottomAdSlot') {
-          return;
-        }
         const slotConfig = slotByContainerId.get(container.id);
         if (!slotConfig) return;
         if (!isSideRailExpanded(container)) {
@@ -2458,27 +2443,27 @@
     })();
   </script>
 
-	<script src="../scripts/shared-bottom-nav.js?v=20260713-050" data-pixieed-footer-ad="false"></script>
+	<script src="../scripts/shared-bottom-nav.js?v=20260713-051" data-pixieed-footer-ad="false"></script>
 	<script>
-    (function initPixieedrawLensAd() {
-      if (!window.__PIXIEEDRAW_LENS_AD_LAYOUT__ || !window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.()) return;
-      const slot = document.getElementById('pixieedrawLensAdSlot');
-      if (!(slot instanceof HTMLElement)) return;
+    (function initOperationHelpAd() {
+      if (!window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.()) return;
+      const dialog = document.getElementById('operationHelpDialog');
+      const slot = document.getElementById('operationHelpAdSlot');
+      if (!(dialog instanceof HTMLDialogElement) || !(slot instanceof HTMLElement)) return;
       const render = () => {
-        if (slot.dataset.loaded === '1' || slot.getAttribute('data-adsbygoogle-status')) return;
+        if (!dialog.open || slot.dataset.loaded === '1') return;
         const rect = slot.getBoundingClientRect();
-        if (rect.width < 1 || rect.height < 1) {
-          window.setTimeout(render, 180);
+        if (rect.width < 120 || rect.height < 24) {
+          window.requestAnimationFrame(render);
           return;
         }
-        try {
-          (window.adsbygoogle = window.adsbygoogle || []).push({});
-          slot.dataset.loaded = '1';
-        } catch (error) {
-          window.setTimeout(render, 1000);
-        }
+        const result = window.__PIXIEEDRAW_RENDER_AD_SLOT__?.(slot, {
+          owner: 'operation-help-dialog',
+          reason: 'dialog-open',
+        });
+        if (result?.ok) slot.dataset.loaded = '1';
       };
-      window.setTimeout(render, 0);
+      dialog.addEventListener('toggle', () => window.requestAnimationFrame(render));
     })();
   </script>
   <script src="../scripts/pixel-art-fit.js"></script>
