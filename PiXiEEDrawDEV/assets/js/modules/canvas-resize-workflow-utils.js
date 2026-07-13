@@ -164,14 +164,17 @@
       return false;
     }
 
+    const resizeStartedAt = typeof performance?.now === 'function' ? performance.now() : Date.now();
     const previousWidth = state.width;
     const previousHeight = state.height;
     const scale = getPixelAlignedCanvasDisplayScale(state.scale);
     beginHistory('resizeCanvas');
+    const historyPreparedAt = typeof performance?.now === 'function' ? performance.now() : Date.now();
     resizeAllLayers(nextWidth, nextHeight, {
       offsetX: Math.round(Number(contentOffsetX) || 0),
       offsetY: Math.round(Number(contentOffsetY) || 0),
     });
+    const layersResizedAt = typeof performance?.now === 'function' ? performance.now() : Date.now();
     state.width = nextWidth;
     state.height = nextHeight;
     translateMirrorPivotForCanvasResize(nextWidth, nextHeight, {
@@ -200,8 +203,24 @@
     requestRender();
     requestOverlayRender();
     commitHistory();
+    const historyCommittedAt = typeof performance?.now === 'function' ? performance.now() : Date.now();
     scheduleSessionPersist();
     updateCanvasResizeControls({ normalizeValues: true });
+    const resizeFinishedAt = typeof performance?.now === 'function' ? performance.now() : Date.now();
+    console.info('[pixiedraw-dev:performance]', {
+      phase: 'pixiedraw-dev:canvas-resize',
+      from: { width: previousWidth, height: previousHeight },
+      to: { width: nextWidth, height: nextHeight },
+      frameCount: Array.isArray(state.frames) ? state.frames.length : 0,
+      layerCount: Array.isArray(state.frames)
+        ? state.frames.reduce((total, frame) => total + (Array.isArray(frame?.layers) ? frame.layers.length : 0), 0)
+        : 0,
+      historyPrepareMs: Math.round(historyPreparedAt - resizeStartedAt),
+      resizeLayersMs: Math.round(layersResizedAt - historyPreparedAt),
+      historyCommitMs: Math.round(historyCommittedAt - layersResizedAt),
+      uiSyncMs: Math.round(resizeFinishedAt - historyCommittedAt),
+      totalMs: Math.round(resizeFinishedAt - resizeStartedAt),
+    });
 
     if (restoreFocusInput instanceof HTMLInputElement && !restoreFocusInput.disabled && restoreFocusInput.isConnected) {
       window.requestAnimationFrame(() => {
@@ -317,32 +336,34 @@
   function resizeAllLayers(width, height, { offsetX = 0, offsetY = 0 } = {}) {
     const shiftX = Math.round(Number(offsetX) || 0);
     const shiftY = Math.round(Number(offsetY) || 0);
+    const sourceWidth = state.width;
+    const sourceHeight = state.height;
+    const sourceStartX = Math.max(0, -shiftX);
+    const sourceEndX = Math.min(sourceWidth, width - shiftX);
+    const sourceStartY = Math.max(0, -shiftY);
+    const sourceEndY = Math.min(sourceHeight, height - shiftY);
+    const copyWidth = Math.max(0, sourceEndX - sourceStartX);
     state.frames.forEach(frame => {
       frame.layers = frame.layers.map(layer => {
         const resized = createLayer(layer.name, width, height);
         resized.id = layer.id;
         const sourceDirect = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
         const targetDirect = sourceDirect ? ensureLayerDirect(resized, width, height) : null;
-        for (let y = 0; y < state.height; y += 1) {
-          const dstY = y + shiftY;
-          if (dstY < 0 || dstY >= height) {
-            continue;
-          }
-          for (let x = 0; x < state.width; x += 1) {
-            const dstX = x + shiftX;
-            if (dstX < 0 || dstX >= width) {
-              continue;
-            }
-            const srcIdx = y * state.width + x;
-            const dstIdx = dstY * width + dstX;
-            resized.indices[dstIdx] = layer.indices[srcIdx];
+        if (copyWidth > 0 && sourceEndY > sourceStartY) {
+          for (let sourceY = sourceStartY; sourceY < sourceEndY; sourceY += 1) {
+            const destinationY = sourceY + shiftY;
+            const sourceIndex = (sourceY * sourceWidth) + sourceStartX;
+            const destinationIndex = (destinationY * width) + sourceStartX + shiftX;
+            // TypedArray#set copies a complete row in native code. The previous
+            // per-pixel loop made a large GIF's frame/layer matrix block pointerup.
+            resized.indices.set(layer.indices.subarray(sourceIndex, sourceIndex + copyWidth), destinationIndex);
             if (sourceDirect && targetDirect) {
-              const baseSrc = srcIdx * 4;
-              const baseDst = dstIdx * 4;
-              targetDirect[baseDst] = sourceDirect[baseSrc];
-              targetDirect[baseDst + 1] = sourceDirect[baseSrc + 1];
-              targetDirect[baseDst + 2] = sourceDirect[baseSrc + 2];
-              targetDirect[baseDst + 3] = sourceDirect[baseSrc + 3];
+              const sourceByteIndex = sourceIndex * 4;
+              const destinationByteIndex = destinationIndex * 4;
+              targetDirect.set(
+                sourceDirect.subarray(sourceByteIndex, sourceByteIndex + (copyWidth * 4)),
+                destinationByteIndex
+              );
             }
           }
         }
