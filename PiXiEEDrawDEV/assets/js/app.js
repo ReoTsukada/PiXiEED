@@ -10613,6 +10613,48 @@
     return Math.round((bytes / (1024 * 1024)) * 10) / 10;
   }
 
+  function collectPixieeDrawResourceDiagnostics() {
+    const resources = typeof performance?.getEntriesByType === 'function'
+      ? performance.getEntriesByType('resource')
+      : [];
+    const currentOrigin = typeof window?.location?.origin === 'string' ? window.location.origin : '';
+    const byInitiatorType = {};
+    const byOrigin = {};
+    let localResourceCount = 0;
+    let externalResourceCount = 0;
+    let transferBytes = 0;
+    resources.forEach(entry => {
+      const initiatorType = String(entry?.initiatorType || 'other');
+      byInitiatorType[initiatorType] = (byInitiatorType[initiatorType] || 0) + 1;
+      transferBytes += Math.max(0, Number(entry?.transferSize) || 0);
+      let origin = '';
+      try {
+        origin = new URL(entry?.name || '', window.location.href).origin;
+      } catch (error) {
+        origin = '';
+      }
+      const originKey = origin || 'unknown';
+      byOrigin[originKey] = (byOrigin[originKey] || 0) + 1;
+      if (origin && origin === currentOrigin) {
+        localResourceCount += 1;
+      } else {
+        externalResourceCount += 1;
+      }
+    });
+    const diagnostics = {
+      total: resources.length,
+      localResourceCount,
+      externalResourceCount,
+      transferMiB: bytesToMiB(transferBytes),
+      byInitiatorType,
+      byOrigin: Object.fromEntries(
+        Object.entries(byOrigin).sort((left, right) => right[1] - left[1]).slice(0, 12)
+      ),
+    };
+    console.info('[pixiedraw-dev:resource-diagnostics]', diagnostics);
+    return diagnostics;
+  }
+
   async function collectPixieeDrawMemoryDiagnostics() {
     const editor = typeof getMemoryUsageBreakdown === 'function'
       ? getMemoryUsageBreakdown()
@@ -10627,7 +10669,7 @@
     const resources = typeof performance?.getEntriesByType === 'function'
       ? performance.getEntriesByType('resource')
       : [];
-    const resourceTransferBytes = resources.reduce((total, entry) => total + Math.max(0, Number(entry?.transferSize) || 0), 0);
+    const resourceDiagnostics = collectPixieeDrawResourceDiagnostics();
     const diagnostics = {
       editorMiB: Object.fromEntries(Object.entries(editor).map(([key, value]) => [key, bytesToMiB(value)])),
       heapMiB: heap && Object.fromEntries(Object.entries(heap).map(([key, value]) => [key, bytesToMiB(value)])),
@@ -10646,7 +10688,8 @@
         iframeCount: document.querySelectorAll('iframe').length,
         adIframeCount: document.querySelectorAll('ins.adsbygoogle iframe, iframe[id^="google_"]').length,
         resourceCount: resources.length,
-        resourceTransferMiB: bytesToMiB(resourceTransferBytes),
+        resourceTransferMiB: resourceDiagnostics.transferMiB,
+        resourceDiagnostics,
       },
     };
     if (typeof performance?.measureUserAgentSpecificMemory === 'function') {
@@ -10669,6 +10712,7 @@
   }
 
   window.__pixieedrawGetMemoryDiagnostics = async () => await collectPixieeDrawMemoryDiagnostics();
+  window.__pixieedrawGetResourceDiagnostics = () => collectPixieeDrawResourceDiagnostics();
 
   function remapSharedProjectHistorySnapshotIdentity(snapshot) {
     if (!snapshot || typeof snapshot !== 'object' || !isSharedProjectCollaborativeMode()) {
