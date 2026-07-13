@@ -29,7 +29,9 @@
   injectStyles();
   replaceFooter();
   replaceBottomNav();
-  ensureFooterAdController();
+  if (script.dataset.pixieedFooterAd !== 'false') {
+    ensureFooterAdController();
+  }
 
   function resolveCurrentTab(pathname) {
     const path = String(pathname || '').toLowerCase();
