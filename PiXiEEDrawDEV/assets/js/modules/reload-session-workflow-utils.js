@@ -363,10 +363,10 @@
           setActiveAutosaveProjectId(restoredProjectId, { persist: false });
         }
         if (parsedDocument?.sheets?.length) {
-          restoreOpenProjectSheetsFromParsedDocument(parsedDocument, {
+          Promise.resolve(restoreOpenProjectSheetsFromParsedDocument(parsedDocument, {
             projectId: restoredProjectId || autosaveProjectId,
             source: 'sheet',
-          });
+          })).catch(error => console.warn('Failed to split restored legacy multi-project package', error));
         }
       }
       history.pending = null;
@@ -530,10 +530,10 @@
       setActiveAutosaveProjectId(startupProjectId, { persist: false });
     }
     if (parsedProjectDocument?.sheets?.length) {
-      restoreOpenProjectSheetsFromParsedDocument(parsedProjectDocument, {
+      Promise.resolve(restoreOpenProjectSheetsFromParsedDocument(parsedProjectDocument, {
         projectId: startupProjectId || autosaveProjectId,
         source: restoredSharedProjectKey ? 'shared-sheet' : 'sheet',
-      });
+      })).catch(error => console.warn('Failed to split restored legacy multi-project package', error));
     }
     if (restoredSharedProjectKey) {
       startupSharedReloadProjectKey = restoredSharedProjectKey;
