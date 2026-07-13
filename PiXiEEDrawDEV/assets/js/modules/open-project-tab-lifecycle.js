@@ -395,6 +395,9 @@
         projectSaveHandleState: options.projectSaveHandleState,
         projectSaveHandle: options.projectSaveHandle,
         projectSaveHandleMeta: options.projectSaveHandleMeta,
+        canonicalPayloadFormat: options.canonicalPayloadFormat,
+        canonicalSchemaVersion: options.canonicalSchemaVersion,
+        canonicalSourceMetadata: options.canonicalSourceMetadata,
       });
       const normalizedTabProjectId = normalizeAutosaveProjectId(tab.projectId || '');
       if (options.dedupeByProjectId === true && normalizedTabProjectId) {
