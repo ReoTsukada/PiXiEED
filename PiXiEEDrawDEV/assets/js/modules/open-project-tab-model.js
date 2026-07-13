@@ -160,6 +160,13 @@
           qrEditPayload: normalizeQrEditPayload(options.qrEditPayload, normalizedProjectId),
           projectSaveHandle,
           projectSaveHandleMeta,
+          canonicalPayloadFormat: typeof options.canonicalPayloadFormat === 'string'
+            ? options.canonicalPayloadFormat
+            : '',
+          canonicalSchemaVersion: Math.max(0, Math.round(Number(options.canonicalSchemaVersion) || 0)),
+          canonicalSourceMetadata: options.canonicalSourceMetadata && typeof options.canonicalSourceMetadata === 'object'
+            ? options.canonicalSourceMetadata
+            : null,
           sourceProjectId: typeof options.sourceProjectId === 'string' && options.sourceProjectId ? options.sourceProjectId : null,
           sourceSheetId: typeof options.sourceSheetId === 'string' && options.sourceSheetId ? options.sourceSheetId : null,
           isImportedSheet: options.isImportedSheet === true,
@@ -220,6 +227,13 @@
         qrEditPayload: normalizeQrEditPayload(options.qrEditPayload, normalizedProjectId),
         projectSaveHandle,
         projectSaveHandleMeta,
+        canonicalPayloadFormat: typeof options.canonicalPayloadFormat === 'string'
+          ? options.canonicalPayloadFormat
+          : '',
+        canonicalSchemaVersion: Math.max(0, Math.round(Number(options.canonicalSchemaVersion) || 0)),
+        canonicalSourceMetadata: options.canonicalSourceMetadata && typeof options.canonicalSourceMetadata === 'object'
+          ? options.canonicalSourceMetadata
+          : null,
         ...persistenceState,
         ...(currentProjectIsShared ? {
           sharedProjectKey: currentSharedProjectKey || getSharedProjectKeyFromProjectId(normalizedProjectId),
