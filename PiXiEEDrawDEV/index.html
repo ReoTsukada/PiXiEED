@@ -401,7 +401,7 @@
 
 
 
-<link href="assets/css/style.css?v=20260713-061" rel="stylesheet"/>
+<link href="assets/css/style.css?v=20260713-shared-top-ad-compact1" rel="stylesheet"/>
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-4.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-4.png"/>
 <style>
@@ -699,7 +699,7 @@
   <div id="leftPanelAdPreloadMount" style="width:320px;min-width:320px;max-width:320px;height:320px;min-height:320px;max-height:320px;overflow:hidden;">
     <div aria-label="広告" class="panel-ad" id="leftPanelAd">
     <div class="ad-box" id="leftPanelAdSlot">
-    <ins class="ad-seed" data-ad-client="ca-pub-9801602250480253" data-ad-format="auto" data-ad-slot="3806415737" data-full-width-responsive="true" style="display:block"></ins>
+    <ins class="ad-seed" data-ad-client="ca-pub-9801602250480253" data-ad-format="horizontal" data-ad-slot="3806415737" data-full-width-responsive="true" style="display:block"></ins>
     </div>
     </div>
   </div>
@@ -2029,8 +2029,11 @@
         const preloadMount = preloadMounts[side] instanceof HTMLElement ? preloadMounts[side] : null;
         const isMobile = document.body?.classList.contains('is-mobile-layout');
         if (isMobile && side === 'right') return preloadMount;
+        // Tools and color share one drawer on portrait.  The color section is
+        // the visual end of that drawer, so it owns the common inline ad.
+        // This keeps the ad after the palette rather than interrupting tools.
         const ids = side === 'left' && isMobile
-          ? ['panelTools', 'panelFrames', 'panelFile', 'panelSettings', 'panelDetails']
+          ? ['panelColor', 'panelTools', 'panelFrames', 'panelFile', 'panelSettings', 'panelDetails']
           : (sideSections[side] || []);
         let fallback = null;
         let firstMount = null;
@@ -2214,6 +2217,12 @@
         if (!(container instanceof HTMLElement)) {
           return { width: 160, height: 110 };
         }
+        if (isMobileDrawerPanelSlot(container)) {
+          return {
+            width: Math.max(MIN_SIDE_AD_WIDTH, Math.round(getContainerWidth(container)) || MIN_SIDE_AD_WIDTH),
+            height: 96,
+          };
+        }
         let mountWidth = 0;
         try {
           const host = container.closest('.panel-ad') || container.parentElement || container;
@@ -2235,7 +2244,8 @@
       function applySideSlotGeometry(container) {
         if (!(container instanceof HTMLElement) || isMobileBottomSlot(container)) return;
         const frame = getSideAdFrameSize(container);
-        const widthPx = `${frame.width}px`;
+        const useDrawerWidth = isMobileDrawerPanelSlot(container);
+        const widthPx = useDrawerWidth ? '100%' : `${frame.width}px`;
         const heightPx = `${frame.height}px`;
         container.style.setProperty('--panel-ad-width', widthPx);
         container.style.setProperty('--panel-ad-height', heightPx);
@@ -2275,6 +2285,14 @@
         if (!(container instanceof HTMLElement)) return false;
         if (container.id === 'mobileBottomAdSlot') return true;
         return Boolean(container.closest && container.closest('#mobileBottomAd'));
+      }
+
+      function isMobileDrawerPanelSlot(container) {
+        return Boolean(
+          container instanceof HTMLElement
+          && document.body?.classList.contains('is-mobile-layout')
+          && container.closest('.mobile-panel.is-active')
+        );
       }
 
       function getSideSlotId(container) {
@@ -2350,7 +2368,8 @@
           ins.removeAttribute('data-full-width-responsive');
         } else {
           const sideFrame = getSideAdFrameSize(container);
-          container.style.setProperty('--panel-ad-width', `${sideFrame.width}px`);
+          const useDrawerWidth = isMobileDrawerPanelSlot(container);
+          container.style.setProperty('--panel-ad-width', useDrawerWidth ? '100%' : `${sideFrame.width}px`);
           container.style.setProperty('--panel-ad-height', `${sideFrame.height}px`);
           ins.style.display = 'block';
           ins.style.width = '100%';
@@ -2358,7 +2377,7 @@
           ins.style.height = `${sideFrame.height}px`;
           ins.style.minHeight = `${sideFrame.height}px`;
           ins.style.maxHeight = `${sideFrame.height}px`;
-          ins.setAttribute('data-ad-format', 'auto');
+          ins.setAttribute('data-ad-format', useDrawerWidth ? 'horizontal' : 'auto');
           ins.setAttribute('data-full-width-responsive', 'true');
         }
 
