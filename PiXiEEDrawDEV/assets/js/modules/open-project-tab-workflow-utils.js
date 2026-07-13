@@ -688,11 +688,17 @@
       if (!reconstructed && typeof reconstructLocalRecentProjectPayload === 'function') {
         reconstructed = reconstructLocalRecentProjectPayload(latestEntry);
       }
-      targetProjectPayload = reconstructed && typeof reconstructed === 'object'
-        ? (typeof extractLocalProjectSheetPayload === 'function'
-          ? extractLocalProjectSheetPayload(reconstructed, target.id) || reconstructed
-          : reconstructed)
+      const reconstructedHasSheets = Array.isArray(reconstructed?.sheets) && reconstructed.sheets.length > 0;
+      const extractedSheetProject = reconstructed && typeof extractLocalProjectSheetPayload === 'function'
+        ? extractLocalProjectSheetPayload(reconstructed, target.id)
         : null;
+      // Never substitute the active/root project for a requested sheet. That
+      // makes a tab appear selected while still displaying another sheet (for
+      // example an imported GIF). A missing exact sheet is a recoverable
+      // restore failure, not a valid fallback.
+      targetProjectPayload = extractedSheetProject && typeof extractedSheetProject === 'object'
+        ? extractedSheetProject
+        : (!reconstructedHasSheets ? reconstructed : null);
       console.info('[sheet-switch-debug:reconstruct]', {
         fromSheetId: previousActiveId,
         toSheetId: targetId,
@@ -704,6 +710,8 @@
         reconstructedSheetIds: Array.isArray(reconstructed?.sheets)
           ? reconstructed.sheets.map(sheet => sheet?.id || '')
           : [],
+        extractedSheetId: extractedSheetProject && typeof extractedSheetProject === 'object' ? target.id : '',
+        exactSheetFound: Boolean(extractedSheetProject && typeof extractedSheetProject === 'object'),
       });
       if (!targetProjectPayload) {
         console.warn('[sheet-switch-debug:missing-target-project]', {
