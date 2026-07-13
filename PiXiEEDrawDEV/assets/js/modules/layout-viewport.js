@@ -2052,10 +2052,11 @@
       }
     }
     dom.mobileDrawer?.classList.remove('is-dragging');
+    const fallbackHeight = mobileDrawerState.heights[mobileDrawerState.mode] || mobileDrawerState.heights.half;
+    const snapHeight = mobileDrawerState.drag.currentHeight || mobileDrawerState.drag.startHeight || fallbackHeight;
+    const resolvedMode = getClosestMobileDrawerMode(snapHeight);
+    mobileDrawerState.mode = resolvedMode;
     if (snap) {
-      const fallbackHeight = mobileDrawerState.heights[mobileDrawerState.mode] || mobileDrawerState.heights.half;
-      const snapHeight = mobileDrawerState.drag.currentHeight || mobileDrawerState.drag.startHeight || fallbackHeight;
-      const resolvedMode = getClosestMobileDrawerMode(snapHeight);
       setMobileDrawerMode(resolvedMode, { persist });
     }
     mobileDrawerState.drag.pointerId = null;
@@ -2098,12 +2099,8 @@
       return;
     }
     if (!moved) {
-      // A tap is a discrete half/full toggle. Do not infer the source mode
-      // from a transitioning DOM height: that could turn an intended open
-      // into a close when the previous height animation has not settled.
-      const currentMode = mobileDrawerState.mode;
       endMobileDrawerDrag({ persist: false, snap: false });
-      setMobileDrawerMode(getNextMobileDrawerMode(currentMode), { persist: true });
+      setMobileDrawerMode(getNextMobileDrawerMode(mobileDrawerState.mode), { persist: true });
       return;
     }
     endMobileDrawerDrag({ persist: true });
