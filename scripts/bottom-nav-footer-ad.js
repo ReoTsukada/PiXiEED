@@ -912,6 +912,65 @@
       });
     }
 
+    // AdSense can apply a late inline size to its `ins` or generated iframe.
+    // The banner itself is deliberately a fixed-size mobile chrome element;
+    // keep every generated child inside that measured frame so a late ad
+    // response cannot expand over the editor after its top space was reserved.
+    const syncBannerGeometry = () => {
+      const portrait = !isLandscapeViewport();
+      const nodes = [
+        banner,
+        banner.querySelector('.ad-block'),
+        banner.querySelector('ins.adsbygoogle'),
+        ...Array.from(banner.querySelectorAll('iframe')),
+      ].filter(node => node instanceof HTMLElement);
+      const clearGeometryLock = node => {
+        if (node.dataset.pixieedBannerGeometryLock !== 'true') return;
+        ['height', 'min-height', 'max-height'].forEach(property => node.style.removeProperty(property));
+        delete node.dataset.pixieedBannerGeometryLock;
+      };
+      if (!portrait) {
+        nodes.forEach(clearGeometryLock);
+        return;
+      }
+      const height = Math.max(1, Math.round(banner.getBoundingClientRect().height));
+      const heightValue = `${height}px`;
+      nodes.forEach(node => {
+        ['height', 'min-height', 'max-height'].forEach(property => {
+          if (node.style.getPropertyValue(property) !== heightValue
+            || node.style.getPropertyPriority(property) !== 'important') {
+            node.style.setProperty(property, heightValue, 'important');
+          }
+        });
+        node.dataset.pixieedBannerGeometryLock = 'true';
+      });
+    };
+
+    if (banner.dataset.pixieedGeometryGuard !== 'true') {
+      banner.dataset.pixieedGeometryGuard = 'true';
+      let geometryFrame = 0;
+      const scheduleGeometrySync = () => {
+        if (geometryFrame) return;
+        geometryFrame = window.requestAnimationFrame(() => {
+          geometryFrame = 0;
+          syncBannerGeometry();
+          reserveTopSpace('shared-top-ad-geometry-sync');
+        });
+      };
+      const geometryObserver = new MutationObserver(scheduleGeometrySync);
+      geometryObserver.observe(banner, {
+        attributes: true,
+        attributeFilter: ['style'],
+        childList: true,
+        subtree: true,
+      });
+      window.addEventListener('orientationchange', scheduleGeometrySync, { passive: true });
+      window.addEventListener('resize', scheduleGeometrySync, { passive: true });
+      scheduleGeometrySync();
+    } else {
+      syncBannerGeometry();
+    }
+
     const renderBanner = () => {
       if (!(banner instanceof HTMLElement) || !banner.isConnected) {
         return;
