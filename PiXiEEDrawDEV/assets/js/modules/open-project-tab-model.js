@@ -355,6 +355,9 @@
       autosaveV2SheetId = '',
       historyOwnerId = '',
       timelapseOwnerId = '',
+      canonicalPayloadFormat = '',
+      canonicalSchemaVersion = 0,
+      canonicalSourceMetadata = null,
     } = {}) {
       if (!project || typeof project !== 'object') {
         return null;
@@ -400,6 +403,13 @@
         autosaveV2SheetId: typeof autosaveV2SheetId === 'string' && autosaveV2SheetId ? autosaveV2SheetId : `${id || 'sheet'}:autosave-v2`,
         historyOwnerId: typeof historyOwnerId === 'string' && historyOwnerId ? historyOwnerId : `${id || 'sheet'}:history`,
         timelapseOwnerId: typeof timelapseOwnerId === 'string' && timelapseOwnerId ? timelapseOwnerId : `${id || 'sheet'}:timelapse`,
+        canonicalPayloadFormat: canonicalPayloadFormat === 'v2' || project?.canonicalPayloadFormat === 'v2' ? 'v2' : '',
+        canonicalSchemaVersion: Math.max(0, Math.round(Number(canonicalSchemaVersion || project?.canonicalSchemaVersion) || 0)),
+        canonicalSourceMetadata: canonicalSourceMetadata && typeof canonicalSourceMetadata === 'object'
+          ? canonicalSourceMetadata
+          : (project?.canonicalSourceMetadata && typeof project.canonicalSourceMetadata === 'object'
+            ? project.canonicalSourceMetadata
+            : null),
         ...persistenceState,
         ...(normalizedSharedProjectKey ? {
           sharedProjectKey: normalizedSharedProjectKey,
