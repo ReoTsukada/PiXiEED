@@ -9222,6 +9222,7 @@ body.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data
 .panel-ad-mount.is-ad-unfilled,
 .export-ad.is-ad-unfilled,
 .startup-recent-card--ad.is-ad-unfilled,
+.pixieed-shared-top-ad.is-ad-unfilled,
 .ad-block.is-ad-unfilled {
   display: none !important;
   width: 0 !important;
@@ -13959,4 +13960,48 @@ body.is-mobile-layout .mobile-panel.is-active #panelFrames .timeline-card {
 
 body.is-mobile-layout .mobile-panel.is-active #panelFrames .panel-section__body {
   scroll-padding-bottom: calc(var(--pixieed-shared-bottom-nav-offset, 68px) + 18px);
+}
+
+/* On a portrait device the panel, rather than the drawer shell, owns its
+   trailing ad.  Make the drawer's panel viewport the one scroll container so
+   the complete panel body and its final ad are reachable in every height mode. */
+body.is-mobile-layout .mobile-panels {
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scroll-padding-bottom: calc(var(--pixieed-shared-bottom-nav-offset, 68px) + 18px);
+}
+
+body.is-mobile-layout .mobile-panel.is-active {
+  height: auto;
+  min-height: 100%;
+  overflow: visible;
+}
+
+body.is-mobile-layout .mobile-panel.is-active > .panel-section {
+  height: auto;
+  min-height: 100%;
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
+body.is-mobile-layout .mobile-panel.is-active > .panel-section .panel-section__body {
+  flex: 0 0 auto;
+  overflow: visible;
+  padding-bottom: 16px;
+}
+
+body.is-mobile-layout .mobile-drawer .mobile-panel.is-active .panel-ad-mount[data-panel-ad-mount='left'],
+body.is-mobile-layout .mobile-drawer .mobile-panel.is-active .panel-ad-mount[data-panel-ad-mount='left'] #leftPanelAd {
+  display: block !important;
+  width: 100% !important;
+  min-height: 96px !important;
+  height: auto !important;
+  margin: 12px 0 0 !important;
+  padding: 0 !important;
+}
+
+body.is-mobile-layout .mobile-drawer .mobile-panel.is-active .panel-ad-mount[data-panel-ad-mount='left'] #leftPanelAd {
+  display: flex !important;
+  margin: 0 !important;
+  overflow: hidden !important;
 }
