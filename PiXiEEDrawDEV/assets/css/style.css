@@ -13982,21 +13982,3 @@ body.is-mobile-layout.is-unified-left-tools-color .mobile-panel.is-active > .pan
   min-height: 0;
   flex: 1 1 auto;
 }
-
-/* Keep the drawer's initial height independent from advertising. On mobile
-   the docking code moves the active panel's mount into its scrollable body. */
-body.is-mobile-layout .mobile-drawer:not([data-mode='full']) .mobile-panel.is-active .panel-ad-mount[data-panel-ad-mount='left'],
-body.is-mobile-layout .mobile-drawer:not([data-mode='full']) .mobile-panel.is-active .panel-ad-mount[data-panel-ad-mount='left'] #leftPanelAd {
-  display: block !important;
-  width: 100% !important;
-  min-height: 96px !important;
-  height: auto !important;
-  margin: 12px 0 0 !important;
-  padding: 0 !important;
-}
-
-body.is-mobile-layout .mobile-drawer:not([data-mode='full']) .mobile-panel.is-active .panel-ad-mount[data-panel-ad-mount='left'] #leftPanelAd {
-  display: flex !important;
-  margin: 0 !important;
-  overflow: hidden !important;
-}
