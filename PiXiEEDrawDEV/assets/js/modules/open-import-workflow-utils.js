@@ -78,6 +78,19 @@
     if (!queue.length || typeof loader !== 'function') {
       return false;
     }
+    // The editor no longer accepts a collection of resident project tabs.
+    // Route ordinary picker/input files through the one-project replacement
+    // path before any old sheet transaction can materialize their payload.
+    if (queue.length === 1 && (typeof queue[0]?.getFile === 'function' || typeof queue[0]?.arrayBuffer === 'function')) {
+      return await openDocumentAsNewProject(queue[0], { source });
+    }
+    if (queue.length > 1) {
+      updateAutosaveStatus(
+        localizeText('一度に開けるのは1プロジェクトです。ファイルを1つ選択してください', 'Open one project at a time. Select one file.'),
+        'info'
+      );
+      return false;
+    }
     ensureOpenProjectTabsInitialized();
     const lock = acquireProjectCommandLock(getProjectCommandLockDescriptor(source, tabOptions));
     if (!lock?.ok) return false;
@@ -437,19 +450,24 @@
         return false;
       }
     }
-    const loaded = await loadDocumentFromImageFile(file);
-    if (!loaded) {
+    const candidate = await buildImageSheetImportCandidate(file, isGifFile?.(file) ? 'gif' : 'image');
+    if (!candidate?.project || typeof candidate.project !== 'object') {
       return false;
     }
-    const tab = resetOpenProjectTabsToCurrentProject({
-      source,
-      projectId: autosaveProjectId,
+    const loaded = await loadDocumentFromProjectPayload(candidate.project, {
+      suppressAutosaveStatus: true,
+      forceV2WorkingCopy: true,
+      sourcePersistenceState: {
+        sourceStorageAdapterId: null,
+        sourceKind: candidate.sourceKind || 'import-image',
+        sourceProjectToken: candidate.sourceProjectToken || null,
+        lastSavedStorageAdapterId: null,
+        projectSaveHandleState: 'none',
+      },
       qrEditPayload,
-      sourceStorageAdapterId: null,
-      sourceKind: 'import-image',
-      lastSavedStorageAdapterId: null,
-      projectSaveHandleState: 'none',
     });
+    if (!loaded || loaded === 'deferred') return false;
+    const tab = getActiveOpenProjectTab?.() || null;
     if (qrEditPayload) {
       activateQrEditMode({
         ...qrEditPayload,
@@ -1083,17 +1101,26 @@
       }];
     }
     if (kind === 'image') {
-      return [{ description: 'PNG image', accept: { 'image/png': ['.png'] } }];
+      return [{
+        description: '画像 (PNG / JPEG / WebP)',
+        accept: {
+          'image/png': ['.png'],
+          'image/jpeg': ['.jpg', '.jpeg'],
+          'image/webp': ['.webp'],
+        },
+      }];
     }
     if (kind === 'gif') {
       return [{ description: 'GIF image', accept: { 'image/gif': ['.gif'] } }];
     }
     return [{
-      description: '対応ファイル (PiXiEEDraw / PNG / GIF)',
+      description: '対応ファイル (PiXiEEDraw / PNG / JPEG / WebP / GIF)',
       accept: {
         'application/json': ['.json', '.pxdraw', '.pixieedraw'],
         'application/x-pixieedraw': ['.pixieedraw'],
         'image/png': ['.png'],
+        'image/jpeg': ['.jpg', '.jpeg'],
+        'image/webp': ['.webp'],
         'image/gif': ['.gif'],
       },
     }];
@@ -1164,7 +1191,7 @@
       const acceptTypes = sheetAddKind === 'project' ? [
         '.json', '.pxdraw', '.pixieedraw', 'application/json', 'application/x-pixieedraw',
       ] : sheetAddKind === 'image' ? [
-        '.png', 'image/png',
+        '.png', '.jpg', '.jpeg', '.webp', 'image/png', 'image/jpeg', 'image/webp',
       ] : sheetAddKind === 'gif' ? [
         '.gif', 'image/gif',
       ] : [
@@ -1172,10 +1199,15 @@
         '.pxdraw',
         '.pixieedraw',
         '.png',
+        '.jpg',
+        '.jpeg',
+        '.webp',
         '.gif',
         'application/json',
         'application/x-pixieedraw',
         'image/png',
+        'image/jpeg',
+        'image/webp',
         'image/gif',
       ];
       if (IS_IOS_DEVICE) {
