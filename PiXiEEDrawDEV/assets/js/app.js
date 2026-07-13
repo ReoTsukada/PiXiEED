@@ -5917,6 +5917,8 @@
   set normalizeDocumentName(value) { normalizeDocumentName = value; },
   get normalizeExternalImportMode() { return normalizeExternalImportMode; },
   set normalizeExternalImportMode(value) { normalizeExternalImportMode = value; },
+  get normalizeExternalProjectToCanonicalV2() { return canonicalV2ProjectUtilsModule.normalizeExternalProjectToCanonicalV2; },
+  set normalizeExternalProjectToCanonicalV2(value) { canonicalV2ProjectUtilsModule.normalizeExternalProjectToCanonicalV2 = value; },
   get normalizeProjectSaveHandleState() { return normalizeProjectSaveHandleState; },
   set normalizeProjectSaveHandleState(value) { normalizeProjectSaveHandleState = value; },
   get normalizeProjectSourceKind() { return normalizeProjectSourceKind; },
@@ -6659,6 +6661,8 @@
   set buildActiveLocalProjectSavePlan(value) { buildActiveLocalProjectSavePlan = value; },
   get serializeDocumentSnapshot() { return serializeDocumentSnapshot; },
   set serializeDocumentSnapshot(value) { serializeDocumentSnapshot = value; },
+  get serializeProjectStorageSnapshot() { return serializeProjectStorageSnapshot; },
+  set serializeProjectStorageSnapshot(value) { serializeProjectStorageSnapshot = value; },
   get setActiveAutosaveProjectId() { return setActiveAutosaveProjectId; },
   set setActiveAutosaveProjectId(value) { setActiveAutosaveProjectId = value; },
   get setRecentProjectsCache() { return setRecentProjectsCache; },
@@ -6933,6 +6937,8 @@
   set parseProjectStoragePayload(value) { parseProjectStoragePayload = value; },
   get parseProjectStorageText() { return parseProjectStorageText; },
   set parseProjectStorageText(value) { parseProjectStorageText = value; },
+  get validateCanonicalV2ProjectPayload() { return canonicalV2ProjectUtilsModule.validateCanonicalV2ProjectPayload; },
+  set validateCanonicalV2ProjectPayload(value) { canonicalV2ProjectUtilsModule.validateCanonicalV2ProjectPayload = value; },
   get normalizeTimelapseCanvasId() { return normalizeTimelapseCanvasId; },
   set normalizeTimelapseCanvasId(value) { normalizeTimelapseCanvasId = value; },
   get normalizeTimelapseFps() { return normalizeTimelapseFps; },
@@ -10837,6 +10843,8 @@
   set queueSharedProjectCurrentSnapshotCapture(value) { queueSharedProjectCurrentSnapshotCapture = value; },
   get readPendingSharedInvite() { return readPendingSharedInvite; },
   set readPendingSharedInvite(value) { readPendingSharedInvite = value; },
+  get readAutosaveV2PrimaryProject() { return readAutosaveV2PrimaryProject; },
+  set readAutosaveV2PrimaryProject(value) { readAutosaveV2PrimaryProject = value; },
   get recentProjectsCache() { return recentProjectsCache; },
   set recentProjectsCache(value) { recentProjectsCache = value; },
   get releaseOpenProjectTabProjectWriteGuard() { return releaseOpenProjectTabProjectWriteGuard; },
@@ -16101,6 +16109,34 @@
     return localProjectJournalUtilsModule.pruneInactiveCanvasDirectCaches(...args);
   }
 
+  function releasePersistedInactiveOpenProjectTabPayloads(projectId = '') {
+    const normalizedProjectId = normalizeAutosaveProjectId(projectId || '');
+    if (!normalizedProjectId) return 0;
+    let released = 0;
+    openProjectTabs.forEach((tab, index) => {
+      if (!tab || tab.id === activeOpenProjectTabId) return;
+      if (normalizeAutosaveProjectId(tab.projectId || '') !== normalizedProjectId) return;
+      if (!(tab.project && typeof tab.project === 'object')
+        && !(tab.deferredProjectPayload && typeof tab.deferredProjectPayload === 'object')) return;
+      openProjectTabs[index] = {
+        ...tab,
+        project: null,
+        deferredProjectPayload: null,
+        residentProjectLoaded: false,
+        deferredRestore: true,
+      };
+      released += 1;
+    });
+    if (released) {
+      console.info('[pixiedraw-dev:memory]', {
+        phase: 'inactive-tab-payloads-released',
+        projectId: normalizedProjectId,
+        released,
+      });
+    }
+    return released;
+  }
+
 
   function compositeLayerPixel(data, destBase, srcR, srcG, srcB, srcA, layerOpacity, blendMode) {
     const parsedOpacity = Number(layerOpacity);
@@ -16365,6 +16401,7 @@
     autosaveV2CheckpointReadyProjectIds.add(normalizedProjectId);
     if (!journalOnly) {
       markActiveLocalProjectJournalCheckpointPersisted(normalizedProjectId);
+      releasePersistedInactiveOpenProjectTabPayloads(normalizedProjectId);
     }
     return metadata;
   }
