@@ -169,7 +169,7 @@
   }
 
   function queueNewProjectAdRender() {
-    if (!window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.()) {
+    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.()) {
       return;
     }
     const dialog = dom.newProject?.dialog;
