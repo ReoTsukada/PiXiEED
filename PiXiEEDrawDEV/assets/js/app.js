@@ -371,7 +371,7 @@
       toggleTimelapse: document.getElementById('toggleTimelapse'),
       mobileDrawHelp: document.getElementById('mobileDrawHelp'),
       openDocument: document.getElementById('openDocument'),
-      showLocalProjects: document.getElementById('showLocalProjects'),
+      openPixieedMyPage: document.getElementById('openPixieedMyPage'),
       exportProject: document.getElementById('exportProject'),
       togglePixfindMode: document.getElementById('togglePixfindMode'),
       togglePixfindHelp: document.getElementById('togglePixfindHelp'),
@@ -1661,6 +1661,10 @@
   let autosaveDirty = false;
   let autosaveDirtyGeneration = 0;
   let autosaveProjectId = '';
+  // R2: metadata-only authority candidate for the one editor/project session.
+  // Document pixels, canvases, frames, layers, and history remain in `state`.
+  let activeProjectSession = null;
+  let activeProjectSessionMismatchCount = 0;
   let startupAutosaveRestoreProjectId = '';
   let startupSharedReloadProjectKey = '';
   let startupSharedReloadRevision = 0;
@@ -6919,6 +6923,8 @@
   set localizeText(value) { localizeText = value; },
   get markAutosaveDirty() { return markAutosaveDirty; },
   set markAutosaveDirty(value) { markAutosaveDirty = value; },
+  get migrateLegacyMultiProjectPackage() { return migrateLegacyMultiProjectPackage; },
+  set migrateLegacyMultiProjectPackage(value) { migrateLegacyMultiProjectPackage = value; },
   get normalizeAutosaveProjectId() { return normalizeAutosaveProjectId; },
   set normalizeAutosaveProjectId(value) { normalizeAutosaveProjectId = value; },
   get normalizeLocalViewportCanvasState() { return normalizeLocalViewportCanvasState; },
@@ -8502,9 +8508,6 @@
     bindClickHandlerOnce(dom.controls.openDocument, 'coreProjectActionBound', () => {
       openDocumentDialog({ mode: EXTERNAL_IMPORT_MODE_APPEND_TAB });
     });
-    bindClickHandlerOnce(dom.controls.showLocalProjects, 'coreProjectActionBound', () => {
-      showProjectHomeScreen({ refresh: true });
-    });
     bindClickHandlerOnce(dom.newProject?.button, 'coreProjectActionBound', () => {
       openNewProjectDialog();
     });
@@ -9402,7 +9405,213 @@
     });
   }
 
+  const activeProjectSessionUtils = window.PiXiEEDrawModules?.activeProjectSessionUtils
+    ?.createActiveProjectSessionUtils?.({
+      normalizeAutosaveProjectId,
+      normalizeProjectSourceKind,
+      normalizeProjectStorageAdapterId,
+      normalizeProjectSaveHandleState,
+      normalizeProjectSaveHandleMeta,
+    }) || {};
+
+  function getActiveProjectSession() {
+    return activeProjectSession;
+  }
+
+  function getActiveProjectSessionDebugSummary(session = activeProjectSession) {
+    return activeProjectSessionUtils.getActiveProjectSessionDebugSummary?.(session) || null;
+  }
+
+  function getRuntimeActiveDocumentId() {
+    const activeCanvas = typeof getActiveProjectCanvasDocument === 'function'
+      ? getActiveProjectCanvasDocument()
+      : null;
+    return typeof activeCanvas?.id === 'string' ? activeCanvas.id : '';
+  }
+
+  function buildActiveProjectSessionInputFromTab(tab = null, overrides = {}) {
+    const currentTab = tab && typeof tab === 'object' ? tab : {};
+    const patch = overrides && typeof overrides === 'object' ? overrides : {};
+    const projectId = normalizeAutosaveProjectId(
+      patch.projectId || currentTab.projectId || autosaveProjectId || ''
+    );
+    const sameProject = Boolean(
+      activeProjectSession?.projectId
+      && projectId
+      && activeProjectSession.projectId === projectId
+    );
+    return {
+      projectId,
+      documentId: patch.documentId || getRuntimeActiveDocumentId(),
+      sourceKind: Object.prototype.hasOwnProperty.call(patch, 'sourceKind')
+        ? patch.sourceKind
+        : currentTab.sourceKind,
+      sourceAdapterId: Object.prototype.hasOwnProperty.call(patch, 'sourceAdapterId')
+        ? patch.sourceAdapterId
+        : (Object.prototype.hasOwnProperty.call(patch, 'sourceStorageAdapterId')
+          ? patch.sourceStorageAdapterId
+          : currentTab.sourceStorageAdapterId),
+      canonicalPayloadFormat: Object.prototype.hasOwnProperty.call(patch, 'canonicalPayloadFormat')
+        ? patch.canonicalPayloadFormat
+        : currentTab.canonicalPayloadFormat,
+      canonicalSchemaVersion: Object.prototype.hasOwnProperty.call(patch, 'canonicalSchemaVersion')
+        ? patch.canonicalSchemaVersion
+        : currentTab.canonicalSchemaVersion,
+      sourceProjectToken: Object.prototype.hasOwnProperty.call(patch, 'sourceProjectToken')
+        ? patch.sourceProjectToken
+        : currentTab.sourceProjectToken,
+      lastSavedAdapterId: Object.prototype.hasOwnProperty.call(patch, 'lastSavedAdapterId')
+        ? patch.lastSavedAdapterId
+        : (Object.prototype.hasOwnProperty.call(patch, 'lastSavedStorageAdapterId')
+          ? patch.lastSavedStorageAdapterId
+          : currentTab.lastSavedStorageAdapterId),
+      projectSaveHandle: Object.prototype.hasOwnProperty.call(patch, 'projectSaveHandle')
+        ? patch.projectSaveHandle
+        : currentTab.projectSaveHandle,
+      projectSaveHandleMeta: Object.prototype.hasOwnProperty.call(patch, 'projectSaveHandleMeta')
+        ? patch.projectSaveHandleMeta
+        : currentTab.projectSaveHandleMeta,
+      projectSaveHandleState: Object.prototype.hasOwnProperty.call(patch, 'projectSaveHandleState')
+        ? patch.projectSaveHandleState
+        : currentTab.projectSaveHandleState,
+      autosaveIdentity: patch.autosaveIdentity || projectId || null,
+      recoveryIdentity: patch.recoveryIdentity || projectId || null,
+      dirty: Object.prototype.hasOwnProperty.call(patch, 'dirty')
+        ? patch.dirty === true
+        : hasDocumentUnsavedChanges(),
+      openedAt: sameProject ? activeProjectSession.openedAt : '',
+      updatedAt: patch.updatedAt || '',
+    };
+  }
+
+  function assertActiveProjectIdentityConsistency({
+    phase = 'unspecified',
+    allowTransientMismatch = false,
+  } = {}) {
+    const session = activeProjectSession;
+    const tab = typeof getActiveOpenProjectTab === 'function' ? getActiveOpenProjectTab() : null;
+    if (!session) {
+      return { ok: true, skipped: 'missing-session', phase };
+    }
+    const comparison = activeProjectSessionUtils.compareActiveProjectSessionWithTab?.(session, tab)
+      || { ok: false, mismatches: ['session-utils-unavailable'] };
+    const autosaveId = normalizeAutosaveProjectId(autosaveProjectId || '');
+    const runtimeProjectId = normalizeAutosaveProjectId(tab?.projectId || autosaveId || '');
+    const mismatches = Array.from(new Set([
+      ...(comparison.mismatches || []),
+      ...(session.projectId && autosaveId && session.projectId !== autosaveId ? ['autosaveProjectId'] : []),
+      ...(session.projectId && runtimeProjectId && session.projectId !== runtimeProjectId ? ['runtimeProjectId'] : []),
+    ]));
+    const result = {
+      ok: mismatches.length === 0,
+      phase,
+      sessionProjectId: session.projectId || '',
+      autosaveProjectId: autosaveId,
+      activeTabProjectId: normalizeAutosaveProjectId(tab?.projectId || ''),
+      runtimeProjectId,
+      sourceKind: session.sourceKind || '',
+      sourceAdapterId: session.sourceAdapterId || null,
+      mismatches,
+      transient: allowTransientMismatch === true,
+    };
+    if (!result.ok) {
+      activeProjectSessionMismatchCount += 1;
+      const logger = allowTransientMismatch ? console.warn : console.error;
+      logger('[pixiedraw-dev:active-project-session-mismatch]', result);
+    }
+    return result;
+  }
+
+  function replaceActiveProjectSessionFromTab(tab = null, {
+    phase = 'runtime-commit',
+    allowTransientMismatch = false,
+    overrides = null,
+  } = {}) {
+    const input = buildActiveProjectSessionInputFromTab(tab, overrides || {});
+    const next = activeProjectSessionUtils.replaceActiveProjectSession?.(activeProjectSession, input) || null;
+    const validation = activeProjectSessionUtils.validateActiveProjectSession?.(next) || { ok: false, errors: ['session-utils-unavailable'] };
+    if (!validation.ok) {
+      console.error('[pixiedraw-dev:active-project-session-invalid]', {
+        phase,
+        errors: validation.errors || [],
+        candidate: getActiveProjectSessionDebugSummary(next),
+      });
+      return null;
+    }
+    activeProjectSession = next;
+    assertActiveProjectIdentityConsistency({ phase, allowTransientMismatch });
+    return activeProjectSession;
+  }
+
+  function updateActiveProjectSessionMetadata(patch = null, {
+    phase = 'session-update',
+    allowTransientMismatch = false,
+  } = {}) {
+    const activeTab = typeof getActiveOpenProjectTab === 'function' ? getActiveOpenProjectTab() : null;
+    if (!activeProjectSession) {
+      const initialized = replaceActiveProjectSessionFromTab(activeTab, {
+        phase: `${phase}:initialize`,
+        allowTransientMismatch,
+      });
+      if (!initialized) return null;
+    }
+    const next = activeProjectSessionUtils.updateActiveProjectSession?.(activeProjectSession, patch || {}) || null;
+    const validation = activeProjectSessionUtils.validateActiveProjectSession?.(next) || { ok: false, errors: ['session-utils-unavailable'] };
+    if (!validation.ok) {
+      console.error('[pixiedraw-dev:active-project-session-invalid]', {
+        phase,
+        errors: validation.errors || [],
+        candidate: getActiveProjectSessionDebugSummary(next),
+      });
+      return null;
+    }
+    activeProjectSession = next;
+    assertActiveProjectIdentityConsistency({ phase, allowTransientMismatch });
+    return activeProjectSession;
+  }
+
+  function updateActiveProjectSessionSaveBinding(binding = null, {
+    phase = 'save-handle-update',
+    allowTransientMismatch = true,
+  } = {}) {
+    const value = binding && typeof binding === 'object' ? binding : {};
+    return updateActiveProjectSessionMetadata({
+      projectSaveHandle: Object.prototype.hasOwnProperty.call(value, 'projectSaveHandle')
+        ? value.projectSaveHandle
+        : activeProjectSession?.projectSaveHandle,
+      projectSaveHandleMeta: Object.prototype.hasOwnProperty.call(value, 'projectSaveHandleMeta')
+        ? value.projectSaveHandleMeta
+        : activeProjectSession?.projectSaveHandleMeta,
+      projectSaveHandleState: Object.prototype.hasOwnProperty.call(value, 'projectSaveHandleState')
+        ? value.projectSaveHandleState
+        : activeProjectSession?.projectSaveHandleState,
+      lastSavedAdapterId: Object.prototype.hasOwnProperty.call(value, 'lastSavedAdapterId')
+        ? value.lastSavedAdapterId
+        : (Object.prototype.hasOwnProperty.call(value, 'lastSavedStorageAdapterId')
+          ? value.lastSavedStorageAdapterId
+          : activeProjectSession?.lastSavedAdapterId),
+    }, { phase, allowTransientMismatch });
+  }
+
+  function syncActiveProjectSessionDirty(phase = 'dirty-sync') {
+    if (!activeProjectSession) return null;
+    return updateActiveProjectSessionMetadata({ dirty: hasDocumentUnsavedChanges() }, {
+      phase,
+      allowTransientMismatch: false,
+    });
+  }
+
   function getActiveProjectPersistenceState(options = {}) {
+    if (activeProjectSession) {
+      const stateFromSession = activeProjectSessionUtils.getActiveProjectSessionPersistenceState?.(activeProjectSession) || null;
+      if (stateFromSession) {
+        return stateFromSession;
+      }
+      console.warn('[pixiedraw-dev:active-project-session-invalid]', {
+        phase: 'get-active-project-persistence-state',
+        errors: activeProjectSessionUtils.validateActiveProjectSession?.(activeProjectSession)?.errors || [],
+      });
+    }
     const activeTab = typeof getActiveOpenProjectTab === 'function'
       ? getActiveOpenProjectTab()
       : null;
@@ -9441,7 +9650,35 @@
   }
 
   function updateActiveProjectPersistenceState(patch = null, options = {}) {
-    return updateOpenProjectTabPersistenceState(activeOpenProjectTabId || '', patch, options);
+    const nextPatch = patch && typeof patch === 'object' ? patch : {};
+    const sessionPatch = {};
+    if (Object.prototype.hasOwnProperty.call(nextPatch, 'sourceKind')) {
+      sessionPatch.sourceKind = nextPatch.sourceKind;
+    }
+    if (Object.prototype.hasOwnProperty.call(nextPatch, 'sourceStorageAdapterId')) {
+      sessionPatch.sourceAdapterId = nextPatch.sourceStorageAdapterId;
+    }
+    if (Object.prototype.hasOwnProperty.call(nextPatch, 'sourceProjectToken')) {
+      sessionPatch.sourceProjectToken = nextPatch.sourceProjectToken;
+    }
+    if (Object.prototype.hasOwnProperty.call(nextPatch, 'lastSavedStorageAdapterId')) {
+      sessionPatch.lastSavedAdapterId = nextPatch.lastSavedStorageAdapterId;
+    }
+    if (Object.prototype.hasOwnProperty.call(nextPatch, 'projectSaveHandleState')) {
+      sessionPatch.projectSaveHandleState = nextPatch.projectSaveHandleState;
+    }
+    const session = updateActiveProjectSessionMetadata(sessionPatch, {
+      phase: 'persistence-state-update:session-first',
+      allowTransientMismatch: true,
+    });
+    const tabState = updateOpenProjectTabPersistenceState(activeOpenProjectTabId || '', nextPatch, options);
+    if (session && tabState) {
+      assertActiveProjectIdentityConsistency({
+        phase: 'persistence-state-update:tab-mirror',
+        allowTransientMismatch: false,
+      });
+    }
+    return tabState;
   }
 
   function resolveProjectSourceKind(options = {}) {
@@ -12069,6 +12306,13 @@
     makeHistorySnapshot,
     buildProjectSessionPayload,
     buildPackagedProjectPayload,
+    getActiveProjectSession: () => activeProjectSession,
+    getActiveProjectSessionSaveBinding: session => (
+      activeProjectSessionUtils.getActiveProjectSessionSaveBinding?.(session) || null
+    ),
+    replaceActiveProjectSessionFromTab: (...args) => replaceActiveProjectSessionFromTab(...args),
+    updateActiveProjectSessionSaveBinding: (...args) => updateActiveProjectSessionSaveBinding(...args),
+    assertActiveProjectIdentityConsistency: (...args) => assertActiveProjectIdentityConsistency(...args),
   }) || {};
   const {
     ensureOpenProjectTabsInitialized,
@@ -12091,6 +12335,55 @@
     resetOpenProjectTabsToCurrentProject,
     closeAllOpenProjectTabsForProjectReplacement,
   } = openProjectTabLifecycle;
+
+  function getActiveProjectTabDebugSummary(tab = getActiveOpenProjectTab?.()) {
+    if (!tab || typeof tab !== 'object') return null;
+    return {
+      projectId: normalizeAutosaveProjectId(tab.projectId || ''),
+      sourceKind: tab.sourceKind || 'unknown',
+      sourceAdapterId: tab.sourceStorageAdapterId || null,
+      sourceProjectToken: tab.sourceProjectToken || null,
+      lastSavedAdapterId: tab.lastSavedStorageAdapterId || null,
+      projectSaveHandleState: tab.projectSaveHandleState || 'none',
+      hasProjectSaveHandle: Boolean(tab.projectSaveHandle),
+      projectSaveHandleMeta: tab.projectSaveHandleMeta || null,
+    };
+  }
+
+  function compareActiveProjectSessionWithTabForDev() {
+    const tab = typeof getActiveOpenProjectTab === 'function' ? getActiveOpenProjectTab() : null;
+    const comparison = activeProjectSessionUtils.compareActiveProjectSessionWithTab?.(activeProjectSession, tab)
+      || { ok: false, mismatches: ['session-utils-unavailable'] };
+    const identity = assertActiveProjectIdentityConsistency({
+      phase: 'dev-helper-compare',
+      allowTransientMismatch: false,
+    });
+    const mismatches = Array.from(new Set([
+      ...(comparison.mismatches || []),
+      ...(identity.mismatches || []),
+    ]));
+    return {
+      ok: mismatches.length === 0,
+      session: getActiveProjectSessionDebugSummary(),
+      tab: getActiveProjectTabDebugSummary(tab),
+      mismatches,
+    };
+  }
+
+  window.__pixieedrawGetActiveProjectSession = () => getActiveProjectSessionDebugSummary();
+  window.__pixieedrawValidateActiveProjectSession = () => {
+    const validation = activeProjectSessionUtils.validateActiveProjectSession?.(activeProjectSession)
+      || { ok: false, errors: ['session-utils-unavailable'] };
+    const comparison = compareActiveProjectSessionWithTabForDev();
+    return {
+      ok: validation.ok && comparison.ok,
+      errors: validation.errors || [],
+      session: comparison.session,
+      tab: comparison.tab,
+      mismatches: comparison.mismatches,
+    };
+  };
+  window.__pixieedrawCompareActiveProjectSessionWithTab = () => compareActiveProjectSessionWithTabForDev();
 
   const openProjectTabSheetActions = window.PiXiEEDrawModules?.openProjectTabSheetActions?.createOpenProjectTabSheetActions?.({
     state,
@@ -12242,6 +12535,7 @@
 
   function markDocumentUnsavedChange() {
     unsavedChangeToken += 1;
+    syncActiveProjectSessionDirty('document-mutation');
     if (
       activeSharedProjectKey
       && !autosaveRestoring
@@ -12257,11 +12551,13 @@
 
   function markDocumentDurablySaved() {
     durableSaveToken = unsavedChangeToken;
+    syncActiveProjectSessionDirty('document-durably-saved');
   }
 
   function resetDocumentUnsavedChanges() {
     unsavedChangeToken = 0;
     durableSaveToken = 0;
+    syncActiveProjectSessionDirty('document-reset-clean');
   }
 
   function hasDocumentUnsavedChanges() {
@@ -16375,6 +16671,119 @@
       autosaveV2CheckpointReadyProjectIds.add(normalizeAutosaveProjectId(projectId || ''));
     }
     return restored?.packaged && typeof restored.packaged === 'object' ? restored.packaged : null;
+  }
+
+  // Packages saved before the single-project editor change can contain several
+  // resident tabs. Split those payloads once into normal V2 projects instead of
+  // restoring all of them into one browser session. The original package stays
+  // untouched so a failed or interrupted migration never loses user data.
+  const legacyMultiProjectMigrationPromises = new Map();
+
+  async function migrateLegacyMultiProjectPackage({
+    sourceProjectId = '',
+    sheets = [],
+    activeSheetId = '',
+  } = {}) {
+    const normalizedSourceProjectId = normalizeAutosaveProjectId(sourceProjectId || '');
+    const sourceSheets = Array.isArray(sheets)
+      ? sheets.filter(sheet => sheet?.project && typeof sheet.project === 'object')
+      : [];
+    if (!AUTOSAVE_SUPPORTED
+      || !normalizedSourceProjectId
+      || sourceSheets.length < 2
+      || typeof autosaveSchemaV2IndexedDbUtilsModule.writeSchemaV2Project !== 'function') {
+      return { migrated: false, reason: 'not-applicable', projectIds: [] };
+    }
+    const inFlight = legacyMultiProjectMigrationPromises.get(normalizedSourceProjectId);
+    if (inFlight) return await inFlight;
+
+    const migration = (async () => {
+      const existingEntries = await loadRecentProjectsMetadata();
+      const migratedSheetIds = new Set(
+        existingEntries
+          .filter(entry => entry?.legacyMultiProjectSourceId === normalizedSourceProjectId)
+          .map(entry => String(entry?.legacyMultiProjectSourceSheetId || ''))
+          .filter(Boolean)
+      );
+      const createdEntries = [];
+      for (let index = 0; index < sourceSheets.length; index += 1) {
+        const sourceSheet = sourceSheets[index];
+        const sourceSheetId = typeof sourceSheet?.id === 'string' && sourceSheet.id.trim()
+          ? sourceSheet.id.trim()
+          : `legacy-sheet-${index + 1}`;
+        if (migratedSheetIds.has(sourceSheetId)) continue;
+
+        const sourceProject = { ...sourceSheet.project };
+        // V2 checkpoints intentionally contain one project's document only.
+        // This also removes the legacy resident-tab payload from every copy.
+        delete sourceProject.sheets;
+        delete sourceProject.activeSheetId;
+        const rawFileName = typeof sourceSheet?.fileName === 'string' && sourceSheet.fileName.trim()
+          ? sourceSheet.fileName
+          : (sourceProject?.document?.documentName || `移行プロジェクト ${index + 1}${PROJECT_FILE_EXTENSION}`);
+        const fileName = normalizeDocumentName(rawFileName) || DEFAULT_DOCUMENT_NAME;
+        const projectId = createAutosaveProjectId();
+        const sheetId = `project-root-${projectId.slice(-12)}`;
+        const projectState = {
+          projectId,
+          name: fileName,
+          updatedAt: sourceProject?.updatedAt || new Date().toISOString(),
+          activeSheetId: sheetId,
+          sheets: [{
+            id: sheetId,
+            fileName,
+            label: typeof sourceSheet?.label === 'string' && sourceSheet.label.trim()
+              ? sourceSheet.label.trim()
+              : extractDocumentBaseName(fileName),
+            project: sourceProject,
+            sourceKind: sourceSheet?.sourceKind || 'legacy-multi-project',
+            sourceStorageAdapterId: sourceSheet?.sourceStorageAdapterId || '',
+            sourceProjectToken: sourceSheet?.sourceProjectToken || '',
+          }],
+          thumbnail: null,
+          dotStats: sourceProject?.dotStats || null,
+        };
+        const written = await autosaveSchemaV2IndexedDbUtilsModule.writeSchemaV2Project(projectState);
+        if (!written?.manifest?.key) {
+          throw new Error(`Legacy project migration did not commit: ${sourceSheetId}`);
+        }
+        autosaveV2CheckpointReadyProjectIds.add(projectId);
+        createdEntries.push({
+          id: projectId,
+          accountUserId: getCurrentRecentProjectAccountUserId(),
+          autosaveSchemaVersion: Number(written.manifest.autosaveSchemaVersion) || 2,
+          manifestKey: written.manifest.key,
+          name: fileName,
+          fileName,
+          updatedAt: written.manifest.updatedAt,
+          thumbnail: null,
+          dotStats: projectState.dotStats,
+          legacyMultiProjectSourceId: normalizedSourceProjectId,
+          legacyMultiProjectSourceSheetId: sourceSheetId,
+          legacyMultiProjectWasActive: sourceSheetId === activeSheetId,
+        });
+      }
+      if (!createdEntries.length) {
+        return { migrated: false, reason: 'already-migrated', projectIds: [] };
+      }
+      const latestEntries = await loadRecentProjectsMetadata();
+      const nextEntries = latestEntries.concat(createdEntries);
+      await saveRecentProjectsList(latestEntries, nextEntries);
+      setRecentProjectsCache(nextEntries);
+      console.info('[pixiedraw-dev:project-normalize]', {
+        phase: 'legacy-multi-project-split-success',
+        sourceProjectId: normalizedSourceProjectId,
+        sourceSheetCount: sourceSheets.length,
+        projectIds: createdEntries.map(entry => entry.id),
+      });
+      return { migrated: true, reason: 'migrated', projectIds: createdEntries.map(entry => entry.id) };
+    })();
+    legacyMultiProjectMigrationPromises.set(normalizedSourceProjectId, migration);
+    try {
+      return await migration;
+    } finally {
+      legacyMultiProjectMigrationPromises.delete(normalizedSourceProjectId);
+    }
   }
 
   async function removeAutosaveV2ProjectData(projectId) {
