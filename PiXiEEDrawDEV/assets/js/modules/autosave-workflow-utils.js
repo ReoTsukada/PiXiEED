@@ -321,7 +321,7 @@
         session: buildProjectSessionPayload(),
       }, {
         fileNameBase: state?.documentName || '',
-        includeSheets: true,
+        includeSheets: false,
         includeTimelapse: true,
         useWorker: true,
       });
@@ -998,7 +998,7 @@
             });
           } catch (error) {
             const emptyJournalRevision = usedV2Journal
-              && /journal revision requires at least one changed sheet|journal save requires valid pixel patches/i.test(String(error?.message || ''));
+              && /journal revision requires at least one changed (sheet|project)|journal save requires valid pixel patches/i.test(String(error?.message || ''));
             if (!emptyJournalRevision) {
               throw error;
             }
