@@ -294,8 +294,31 @@
     sharedAutoJoin = false,
     sourcePersistenceState = null,
   } = {}) {
-    const sheets = Array.isArray(parsedDocument?.sheets) ? parsedDocument.sheets : [];
+    const packagedSheets = Array.isArray(parsedDocument?.sheets) ? parsedDocument.sheets : [];
+    // A project is now opened as one editor instance. Older V2 packages can
+    // contain several resident project tabs; their root snapshot already
+    // represents the saved active project, so do not recreate the old tab
+    // collection (which would retain every project in memory again).
+    const sheets = [];
+    if (packagedSheets.length > 1) {
+      console.info('[pixiedraw-dev:project-normalize]', {
+        phase: 'collapse-legacy-multi-project-package',
+        sheetCount: packagedSheets.length,
+        activeSheetId: parsedDocument?.activeSheetId || '',
+      });
+    }
     const normalizedProjectId = normalizeAutosaveProjectId(projectId || autosaveProjectId || '') || createAutosaveProjectId();
+    if (packagedSheets.length > 1) {
+      Promise.resolve(
+        migrateLegacyMultiProjectPackage?.({
+          sourceProjectId: normalizedProjectId,
+          sheets: packagedSheets,
+          activeSheetId: parsedDocument?.activeSheetId || '',
+        })
+      ).catch(error => {
+        console.warn('Failed to split legacy multi-project package', error);
+      });
+    }
     const normalizedSharedProjectKey = SHARED_PROJECTS_ENABLED
       ? (
         normalizeMultiProjectKey(sharedProjectKey || '')
