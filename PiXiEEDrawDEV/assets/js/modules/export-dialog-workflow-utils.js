@@ -40,7 +40,8 @@
     }
     const config = dom.exportDialog;
     if (!config) {
-      exportProjectWithFallback();
+      console.error('[PiXiEEDraw DEV] export settings dialog is unavailable');
+      updateAutosaveStatus('出力設定を開けません。出力は開始していません。画面を再読み込みしてからもう一度お試しください。', 'error');
       return;
     }
     try {
@@ -70,7 +71,7 @@
         dialog.showModal();
       } catch (error) {
         console.warn('Failed to open export dialog', error);
-        exportProjectWithFallback();
+        updateAutosaveStatus('出力設定を開けません。出力は開始していません。画面を再読み込みしてからもう一度お試しください。', 'error');
         return;
       }
       window.requestAnimationFrame(() => {
@@ -86,7 +87,8 @@
         }
       });
     } else {
-      exportProjectWithFallback();
+      console.error('[PiXiEEDraw DEV] export settings dialog does not support showModal');
+      updateAutosaveStatus('この環境では出力設定パネルを開けません。出力は開始していません。', 'error');
     }
   }
 
