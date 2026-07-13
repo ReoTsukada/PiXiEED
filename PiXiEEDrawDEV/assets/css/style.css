@@ -9216,6 +9216,24 @@ body.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data
   margin-top: auto;
 }
 
+/* AdSense marks a final no-fill response on the ins node.  Do not leave the
+   panel-sized iframe shell behind when that happens. */
+.panel-ad.is-ad-unfilled,
+.panel-ad-mount.is-ad-unfilled,
+.export-ad.is-ad-unfilled,
+.startup-recent-card--ad.is-ad-unfilled,
+.ad-block.is-ad-unfilled {
+  display: none !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  max-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
 #panelFile .panel-section__body,
 #panelSettings .panel-section__body,
 #panelDetails .panel-section__body {
