@@ -128,6 +128,14 @@
       return `autosave-v2:${projectId}:r:${revision}:s:${sheetId}:journal`;
     }
 
+    function createProjectCheckpointKey(projectId, revision) {
+      return `autosave-v2:${projectId}:r:${revision}:project:checkpoint`;
+    }
+
+    function createProjectJournalKey(projectId, revision) {
+      return `autosave-v2:${projectId}:r:${revision}:project:journal`;
+    }
+
     function createManifestKey(projectId, revision) {
       return `autosave-v2:${projectId}:r:${revision}:manifest`;
     }
@@ -156,7 +164,115 @@
       });
     }
 
+    function normalizeSingleProjectInput(projectState = {}) {
+      const value = projectState && typeof projectState === 'object' ? projectState : {};
+      const project = sanitizeRuntimeValues(cloneJsonValue(value.project, null));
+      if (!project || typeof project !== 'object') {
+        throw new Error('Autosave schema V2 single project is missing project payload');
+      }
+      const canvases = Array.isArray(project?.document?.canvases) && project.document.canvases.length
+        ? project.document.canvases
+        : (project?.document ? [project.document] : []);
+      if (canvases.length > MAX_CANVASES_PER_SHEET) {
+        const error = new Error(`Autosave schema V2 canvas limit exceeded: ${canvases.length}/${MAX_CANVASES_PER_SHEET}`);
+        error.code = 'ERR_CANVAS_LIMIT_EXCEEDED';
+        throw error;
+      }
+      delete project.sheets;
+      delete project.sheetOrder;
+      delete project.activeSheetId;
+      project.projectLayout = 'single-project';
+      return {
+        fileName: normalizeString(value.fileName, project?.document?.documentName || 'PiXiEEDraw.pixieedraw'),
+        source: normalizeSourceMetadata(value.source || value),
+        project,
+      };
+    }
+
+    function createProjectJournal({ projectId, revision, baseCheckpointKey, ops = [] } = {}) {
+      const normalizedOps = normalizeJournalOps(ops);
+      const normalizedProjectId = normalizeString(projectId);
+      const normalizedRevision = Math.max(1, Math.round(Number(revision) || 1));
+      return withChecksum({
+        autosaveJournalVersion: AUTOSAVE_JOURNAL_VERSION,
+        key: createProjectJournalKey(normalizedProjectId, normalizedRevision),
+        projectId: normalizedProjectId,
+        baseCheckpointKey: normalizeString(baseCheckpointKey),
+        revision: normalizedRevision,
+        ops: normalizedOps,
+        dirtyOpCount: normalizedOps.length,
+      });
+    }
+
+    function createSchemaV2SingleProjectRevision(projectState = {}, { revision = 1, parentRevision = 0 } = {}) {
+      const projectId = normalizeString(projectState.projectId);
+      if (!projectId) {
+        throw new Error('Autosave schema V2 projectId is required');
+      }
+      const normalizedRevision = Math.max(1, Math.round(Number(revision) || 1));
+      const singleProject = normalizeSingleProjectInput(projectState);
+      const checkpoint = withChecksum({
+        key: createProjectCheckpointKey(projectId, normalizedRevision),
+        projectId,
+        rootRevision: normalizedRevision,
+        projectRevision: normalizedRevision,
+        updatedAt: normalizeString(projectState.updatedAt, new Date().toISOString()),
+        source: singleProject.source,
+        fileName: singleProject.fileName,
+        project: singleProject.project,
+      });
+      const journal = createProjectJournal({
+        projectId,
+        revision: normalizedRevision,
+        baseCheckpointKey: checkpoint.key,
+        ops: projectState.journalOps || [],
+      });
+      const manifest = withChecksum({
+        autosaveSchemaVersion: AUTOSAVE_SCHEMA_VERSION,
+        projectLayout: 'single-project',
+        key: createManifestKey(projectId, normalizedRevision),
+        projectId,
+        revision: normalizedRevision,
+        parentRevision: Math.max(0, Math.round(Number(parentRevision) || 0)),
+        updatedAt: normalizeString(projectState.updatedAt, new Date().toISOString()),
+        project: {
+          fileName: checkpoint.fileName,
+          sourceKind: checkpoint.source.sourceKind,
+          sourceStorageAdapterId: checkpoint.source.sourceStorageAdapterId,
+          sourceProjectToken: checkpoint.source.sourceProjectToken,
+          checkpointRef: { key: checkpoint.key, revision: normalizedRevision, checksum: checkpoint.checksum },
+          journalRef: { key: journal.key, baseCheckpointKey: checkpoint.key, checksum: journal.checksum },
+        },
+        thumbnailRef: projectState.thumbnail ? {
+          key: `autosave-v2:${projectId}:r:${normalizedRevision}:thumbnail`,
+          updatedAt: normalizeString(projectState.updatedAt, new Date().toISOString()),
+        } : null,
+        dotStats: sanitizeRuntimeValues(cloneJsonValue(projectState.dotStats, null)),
+        recovery: { previousManifestKey: parentRevision > 0 ? createManifestKey(projectId, parentRevision) : '', warnings: [] },
+      });
+      const thumbnail = projectState.thumbnail ? withChecksum({
+        key: manifest.thumbnailRef.key,
+        projectId,
+        rootRevision: normalizedRevision,
+        value: String(projectState.thumbnail),
+      }) : null;
+      const recentEntry = {
+        id: projectId,
+        autosaveSchemaVersion: AUTOSAVE_SCHEMA_VERSION,
+        manifestKey: manifest.key,
+        name: normalizeString(projectState.name, checkpoint.fileName || 'PiXiEEDraw'),
+        fileName: checkpoint.fileName,
+        updatedAt: manifest.updatedAt,
+        thumbnail: null,
+        dotStats: manifest.dotStats,
+      };
+      return { manifest, checkpoints: [checkpoint], journals: [journal], thumbnail, recentEntry };
+    }
+
     function createSchemaV2Revision(projectState = {}, { revision = 1, parentRevision = 0 } = {}) {
+      if (projectState?.project && typeof projectState.project === 'object') {
+        return createSchemaV2SingleProjectRevision(projectState, { revision, parentRevision });
+      }
       const projectId = normalizeString(projectState.projectId);
       if (!projectId) {
         throw new Error('Autosave schema V2 projectId is required');
@@ -261,6 +377,70 @@
     } = {}) {
       if (!baseManifest || !hasValidChecksum(baseManifest) || baseManifest.autosaveSchemaVersion !== AUTOSAVE_SCHEMA_VERSION) {
         throw new Error('Autosave schema V2 journal revision requires a valid base manifest');
+      }
+      if (baseManifest.projectLayout === 'single-project' && baseManifest.project?.checkpointRef?.key) {
+        const projectId = normalizeString(baseManifest.projectId);
+        const parentRevision = Math.max(1, Math.round(Number(baseManifest.revision) || 1));
+        const normalizedRevision = Math.max(parentRevision + 1, Math.round(Number(revision) || 0));
+        const requestedOps = Array.isArray(journalsBySheet)
+          ? journalsBySheet
+          : (Array.isArray(journalsBySheet?.project) ? journalsBySheet.project : []);
+        if (!requestedOps.length) {
+          throw new Error('Autosave schema V2 journal revision requires at least one changed project');
+        }
+        const journal = createProjectJournal({
+          projectId,
+          revision: normalizedRevision,
+          baseCheckpointKey: baseManifest.project.checkpointRef.key,
+          ops: requestedOps,
+        });
+        const normalizedUpdatedAt = normalizeString(updatedAt, new Date().toISOString());
+        const nextThumbnail = typeof thumbnail === 'string' && thumbnail
+          ? withChecksum({
+            key: `autosave-v2:${projectId}:r:${normalizedRevision}:thumbnail`,
+            projectId,
+            rootRevision: normalizedRevision,
+            value: thumbnail,
+          })
+          : null;
+        const manifest = withChecksum({
+          ...cloneJsonValue(baseManifest, {}),
+          key: createManifestKey(projectId, normalizedRevision),
+          revision: normalizedRevision,
+          parentRevision,
+          updatedAt: normalizedUpdatedAt,
+          project: {
+            ...cloneJsonValue(baseManifest.project, {}),
+            journalRef: {
+              key: journal.key,
+              baseCheckpointKey: journal.baseCheckpointKey,
+              checksum: journal.checksum,
+            },
+          },
+          thumbnailRef: nextThumbnail
+            ? { key: nextThumbnail.key, updatedAt: normalizedUpdatedAt }
+            : cloneJsonValue(baseManifest.thumbnailRef, null),
+          dotStats: typeof dotStats === 'undefined'
+            ? sanitizeRuntimeValues(cloneJsonValue(baseManifest.dotStats, null))
+            : sanitizeRuntimeValues(cloneJsonValue(dotStats, null)),
+          recovery: { previousManifestKey: baseManifest.key, warnings: [] },
+        });
+        return {
+          manifest,
+          checkpoints: [],
+          journals: [journal],
+          thumbnail: nextThumbnail,
+          recentEntry: {
+            id: projectId,
+            autosaveSchemaVersion: AUTOSAVE_SCHEMA_VERSION,
+            manifestKey: manifest.key,
+            name: normalizeString(name, manifest.project?.fileName || 'PiXiEEDraw'),
+            fileName: manifest.project?.fileName || '',
+            updatedAt: manifest.updatedAt,
+            thumbnail: null,
+            dotStats: manifest.dotStats,
+          },
+        };
       }
       const projectId = normalizeString(baseManifest.projectId);
       const parentRevision = Math.max(1, Math.round(Number(baseManifest.revision) || 1));
@@ -424,6 +604,45 @@
     function restoreSchemaV2Manifest(manifest, checkpointsByKey, journalsByKey) {
       if (!hasValidChecksum(manifest) || manifest?.autosaveSchemaVersion !== AUTOSAVE_SCHEMA_VERSION) {
         throw new Error('Invalid autosave schema V2 manifest');
+      }
+      if (manifest.projectLayout === 'single-project' && manifest.project?.checkpointRef?.key) {
+        const checkpoint = checkpointsByKey.get(manifest.project.checkpointRef.key) || null;
+        if (!checkpoint || !hasValidChecksum(checkpoint)) {
+          throw new Error('Autosave schema V2 project checkpoint missing or corrupt');
+        }
+        const checkpointRevision = Math.max(1, Math.round(Number(manifest.project.checkpointRef?.revision) || 0));
+        if (
+          checkpoint.rootRevision !== checkpointRevision
+          || checkpoint.rootRevision > manifest.revision
+          || checkpoint.checksum !== manifest.project.checkpointRef?.checksum
+        ) {
+          throw new Error('Autosave schema V2 project checkpoint revision mismatch');
+        }
+        const journal = journalsByKey.get(manifest.project.journalRef?.key) || null;
+        if (
+          journal
+          && (
+            journal.revision > manifest.revision
+            || journal.baseCheckpointKey !== checkpoint.key
+            || journal.checksum !== manifest.project.journalRef?.checksum
+          )
+        ) {
+          throw new Error('Autosave schema V2 project journal revision mismatch');
+        }
+        const replayed = replaySheetJournal(checkpoint, journal);
+        const project = replayed.project && typeof replayed.project === 'object' ? replayed.project : {};
+        delete project.sheets;
+        delete project.sheetOrder;
+        delete project.activeSheetId;
+        project.projectLayout = 'single-project';
+        return {
+          ...project,
+          updatedAt: manifest.updatedAt,
+          dotStats: sanitizeRuntimeValues(cloneJsonValue(manifest.dotStats, null)),
+          autosaveSchemaVersion: AUTOSAVE_SCHEMA_VERSION,
+          projectLayout: 'single-project',
+          recovery: { journalWarnings: replayed.reason ? ['project'] : [] },
+        };
       }
       const sheetOrder = Array.isArray(manifest.sheetOrder) ? manifest.sheetOrder : [];
       if (!sheetOrder.length || !Array.isArray(manifest.sheets) || manifest.sheets.length !== sheetOrder.length) {
