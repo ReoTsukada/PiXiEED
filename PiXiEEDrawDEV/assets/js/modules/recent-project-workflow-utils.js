@@ -539,7 +539,8 @@
       },
     ].filter(target => target.section instanceof HTMLElement && target.list instanceof HTMLElement);
     if (!targets.length) {
-      console.info('[pixiedraw-dev:recent-projects]', { phase: 'recent-projects-render-success', count: 0, hasContainer: false, containerHidden: true, code: 'ERR_RECENT_CONTAINER_MISSING' });
+      // The drawing app is now a start screen only. Recent projects remain
+      // durable local metadata, but their management UI lives in My Page.
       return;
     }
     const renderProjectHomeEmptyState = target => {
