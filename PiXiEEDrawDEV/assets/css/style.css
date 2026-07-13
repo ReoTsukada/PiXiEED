@@ -13951,6 +13951,29 @@ body.is-mobile-layout .mobile-drawer:not([data-mode='full']) .panel-ad-mount[dat
   padding: 0 !important;
 }
 
+/* Diagnostic mode: modal ads are disabled independently from panel ads.
+   Do not leave an empty reserved frame while the drawer-position issue is
+   being isolated. */
+html[data-pixieed-modal-ads='false'] dialog .export-ad,
+html[data-pixieed-modal-ads='false'] #exportInterstitialDialog .export-interstitial__lead,
+html[data-pixieed-modal-ads='false'] #exportInterstitialDialog .export-interstitial__slot-wrap {
+  display: none !important;
+}
+
+html[data-pixieed-modal-ads='false'] #exportDialog .export-dialog-body {
+  grid-template-columns: minmax(260px, 0.92fr) minmax(300px, 1.08fr);
+  grid-template-areas: "settings preview";
+}
+
+@media (max-width: 760px) {
+  html[data-pixieed-modal-ads='false'] #exportDialog .export-dialog-body {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "settings"
+      "preview";
+  }
+}
+
 /* The timeline used to stretch to the drawer's whole height on mobile. Keep
    it in normal document flow here so its final ad mount is reached by the
    panel's own scroll area rather than spilling beneath the common nav. */
