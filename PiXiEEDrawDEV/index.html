@@ -79,7 +79,7 @@
   })();
 </script>
 <script src="assets/js/modules/edition-capabilities-utils.js?v=2026.07.11-g3a-edition-ads"></script>
-<script src="assets/js/build-info.js?v=20260713-051"></script>
+<script src="assets/js/build-info.js?v=20260713-052"></script>
 <script async="" crossorigin="anonymous" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253"></script>
 <script>
   (function configurePixieedAds() {
@@ -152,6 +152,48 @@
     const initializedSlots = new WeakSet();
     const inFlightSlots = new WeakSet();
     const slotOwners = new WeakMap();
+    const fillObservers = new WeakSet();
+
+    function getAdVisualHost(slot) {
+      if (!(slot instanceof HTMLElement)) {
+        return null;
+      }
+      return slot.closest('.panel-ad, .export-ad, .startup-recent-card--ad, .ad-block')
+        || slot.parentElement;
+    }
+
+    function updateAdFillState(slot) {
+      if (!(slot instanceof HTMLElement)) {
+        return false;
+      }
+      const status = String(
+        slot.getAttribute('data-ad-status')
+        || slot.getAttribute('data-adsbygoogle-status')
+        || ''
+      ).trim().toLowerCase();
+      const isUnfilled = status === 'unfilled';
+      const visualHost = getAdVisualHost(slot);
+      const mount = visualHost?.closest?.('.panel-ad-mount') || null;
+      visualHost?.classList?.toggle('is-ad-unfilled', isUnfilled);
+      mount?.classList?.toggle('is-ad-unfilled', isUnfilled);
+      return isUnfilled;
+    }
+
+    function observeAdFillState(slot) {
+      if (!(slot instanceof HTMLElement) || fillObservers.has(slot)) {
+        return;
+      }
+      fillObservers.add(slot);
+      const refresh = () => updateAdFillState(slot);
+      refresh();
+      const observer = new MutationObserver(refresh);
+      observer.observe(slot, {
+        attributes: true,
+        attributeFilter: ['data-ad-status', 'data-adsbygoogle-status'],
+      });
+    }
+
+    window.__PIXIEEDRAW_OBSERVE_AD_FILL__ = observeAdFillState;
 
     function getSlotDiagnostics(slot, { phase, owner, reason } = {}) {
       const rect = slot instanceof HTMLElement ? slot.getBoundingClientRect() : null;
@@ -244,6 +286,11 @@
       if (!(slot instanceof HTMLElement) || !slot.isConnected) {
         logAdSlot('skip', slot, { owner }, 'slot-disconnected');
         return { ok: false, pushed: false, reason: 'slot-disconnected' };
+      }
+      observeAdFillState(slot);
+      if (updateAdFillState(slot)) {
+        logAdSlot('skip', slot, { owner }, 'slot-unfilled');
+        return { ok: false, pushed: false, reason: 'slot-unfilled' };
       }
       if (slot.closest('#panelAdPreloadHost')) {
         logAdSlot('skip', slot, { owner }, 'slot-in-preload-host');
@@ -341,7 +388,7 @@
 
 
 
-<link href="assets/css/style.css?v=20260713-051" rel="stylesheet"/>
+<link href="assets/css/style.css?v=20260713-052" rel="stylesheet"/>
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-4.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-4.png"/>
 <style>
@@ -1901,7 +1948,7 @@
 	<script defer="" src="assets/js/modules/pre-update-checkpoint-utils.js?v=20260712-pre-update-checkpoint-u3"></script>
 	<script defer="" src="assets/js/active-project-session-utils.js?v=2026.07.13-active-project-session-r2c"></script>
 	<script defer="" src="assets/js/pixieedraw-dev-switch.js?v=2026.07.03-pixieedrawdev-switch-fix14"></script>
-	<script defer="" src="assets/js/app.js?v=20260713-051"></script>
+	<script defer="" src="assets/js/app.js?v=20260713-052"></script>
 	<script defer="" src="assets/js/modules/update-detection-utils.js?v=20260713-026"></script>
   <script>
     (function initPanelAdDocking() {
