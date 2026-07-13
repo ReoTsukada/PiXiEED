@@ -317,6 +317,9 @@
         sourceProjectToken: sourcePersistenceState?.sourceProjectToken ?? null,
         lastSavedStorageAdapterId: sourcePersistenceState?.lastSavedStorageAdapterId ?? null,
         projectSaveHandleState: sourcePersistenceState?.projectSaveHandleState ?? 'none',
+        canonicalPayloadFormat: parsedDocument?.canonicalPayloadFormat || '',
+        canonicalSchemaVersion: parsedDocument?.canonicalSchemaVersion || 0,
+        canonicalSourceMetadata: parsedDocument?.canonicalSourceMetadata || null,
       });
       return false;
     }
@@ -344,6 +347,9 @@
           sourceProjectToken: sheet?.sourceProjectToken ?? sourcePersistenceState?.sourceProjectToken ?? null,
           lastSavedStorageAdapterId: sheet?.lastSavedStorageAdapterId ?? sourcePersistenceState?.lastSavedStorageAdapterId ?? null,
           projectSaveHandleState: sheet?.projectSaveHandleState ?? sourcePersistenceState?.projectSaveHandleState ?? 'none',
+          canonicalPayloadFormat: parsedDocument?.canonicalPayloadFormat || '',
+          canonicalSchemaVersion: parsedDocument?.canonicalSchemaVersion || 0,
+          canonicalSourceMetadata: parsedDocument?.canonicalSourceMetadata || null,
         });
         if (!nextTab) {
           return null;
@@ -363,6 +369,9 @@
         sourceProjectToken: sourcePersistenceState?.sourceProjectToken ?? null,
         lastSavedStorageAdapterId: sourcePersistenceState?.lastSavedStorageAdapterId ?? null,
         projectSaveHandleState: sourcePersistenceState?.projectSaveHandleState ?? 'none',
+        canonicalPayloadFormat: parsedDocument?.canonicalPayloadFormat || '',
+        canonicalSchemaVersion: parsedDocument?.canonicalSchemaVersion || 0,
+        canonicalSourceMetadata: parsedDocument?.canonicalSourceMetadata || null,
       });
       return false;
     }
@@ -918,6 +927,71 @@
     };
   }
 
+  function normalizeExternalParsedProjectToCanonicalV2(parsed, storageAdapterId = '') {
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return { project: parsed, canonical: null };
+    }
+    if (parsed.canonicalPayloadFormat === 'v2') {
+      const validation = typeof validateCanonicalV2ProjectPayload === 'function'
+        ? validateCanonicalV2ProjectPayload(parsed)
+        : { ok: true };
+      if (!validation?.ok) {
+        const error = new Error(validation?.code || 'ERR_CANONICAL_V2_PROJECT_INVALID');
+        error.code = validation?.code || 'ERR_CANONICAL_V2_PROJECT_INVALID';
+        throw error;
+      }
+      return {
+        project: parsed,
+        canonical: {
+          canonicalPayloadFormat: 'v2',
+          canonicalSchemaVersion: Math.max(1, Math.round(Number(parsed.canonicalSchemaVersion) || 1)),
+          canonicalSourceMetadata: parsed.canonicalSourceMetadata && typeof parsed.canonicalSourceMetadata === 'object'
+            ? parsed.canonicalSourceMetadata
+            : null,
+        },
+      };
+    }
+    if (typeof normalizeExternalProjectToCanonicalV2 !== 'function'
+      || typeof validateCanonicalV2ProjectPayload !== 'function') {
+      return { project: parsed, canonical: null };
+    }
+    const normalized = normalizeExternalProjectToCanonicalV2({
+      sourceKind: 'file',
+      sourceAdapterId: typeof storageAdapterId === 'string' && storageAdapterId ? storageAdapterId : null,
+      decodedPayload: parsed,
+      sourceMetadata: {
+        importedFormat: storageAdapterId === 'pixieedraw-v1-json' ? 'v1-json' : 'external-project',
+      },
+    });
+    if (!normalized?.ok || !normalized.canonicalPayload) {
+      const error = new Error(normalized?.code || 'ERR_CANONICAL_V2_NORMALIZE_FAILED');
+      error.code = normalized?.code || 'ERR_CANONICAL_V2_NORMALIZE_FAILED';
+      throw error;
+    }
+    const validation = validateCanonicalV2ProjectPayload(normalized.canonicalPayload);
+    if (!validation?.ok) {
+      const error = new Error(validation?.code || 'ERR_CANONICAL_V2_PROJECT_INVALID');
+      error.code = validation?.code || 'ERR_CANONICAL_V2_PROJECT_INVALID';
+      throw error;
+    }
+    console.info('[pixiedraw-dev:canonical-import]', {
+      phase: 'file-normalize-success',
+      sourceAdapterId: storageAdapterId || null,
+      importedFormat: normalized.canonicalPayload?.canonicalSourceMetadata?.importedFormat || 'external-project',
+      typedByteLength: normalized.metrics?.typedByteLength || 0,
+      sheetCount: normalized.metrics?.sheetCount || 0,
+      frameCount: normalized.metrics?.frameCount || 0,
+    });
+    return {
+      project: normalized.canonicalPayload,
+      canonical: {
+        canonicalPayloadFormat: 'v2',
+        canonicalSchemaVersion: Math.max(1, Math.round(Number(normalized.canonicalPayload.canonicalSchemaVersion) || 1)),
+        canonicalSourceMetadata: normalized.canonicalPayload.canonicalSourceMetadata || null,
+      },
+    };
+  }
+
   function snapshotFromDocumentText(text) {
     if (!text || typeof text !== 'string') {
       throw new Error('Document text is empty');
@@ -928,9 +1002,11 @@
     const parsed = parsedResult && Object.prototype.hasOwnProperty.call(parsedResult, 'parsed')
       ? parsedResult.parsed
       : parsedResult;
-    const resolved = snapshotFromParsedDocumentValue(parsed);
+    const canonicalized = normalizeExternalParsedProjectToCanonicalV2(parsed, parsedResult?.adapterId || '');
+    const resolved = snapshotFromParsedDocumentValue(canonicalized.project);
     if (resolved && typeof resolved === 'object' && typeof parsedResult?.adapterId === 'string') {
       resolved.storageAdapterId = parsedResult.adapterId;
+      Object.assign(resolved, canonicalized.canonical || {});
     }
     return resolved;
   }
@@ -944,9 +1020,11 @@
       const parsed = parsedResult && Object.prototype.hasOwnProperty.call(parsedResult, 'parsed')
         ? parsedResult.parsed
         : parsedResult;
-      const resolved = snapshotFromParsedDocumentValue(parsed);
+      const canonicalized = normalizeExternalParsedProjectToCanonicalV2(parsed, parsedResult?.adapterId || '');
+      const resolved = snapshotFromParsedDocumentValue(canonicalized.project);
       if (resolved && typeof resolved === 'object' && typeof parsedResult?.adapterId === 'string') {
         resolved.storageAdapterId = parsedResult.adapterId;
+        Object.assign(resolved, canonicalized.canonical || {});
       }
       return resolved;
     }
