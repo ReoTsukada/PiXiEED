@@ -305,35 +305,20 @@
       }
   
       setLocalizedTextContent('.startup-screen__subtitle', 'PiXiEEDraw（ピクシードロー）でドット絵づくり・アニメ制作をはじめよう', 'Start pixel art and animation with PiXiEEDraw');
-      setLocalizedTextContent('#startupActionResume', '最新の端末内プロジェクトを開く', 'Open Latest Local Project');
       setLocalizedTextContent('#startupActionNew', '新規作成', 'New Project');
       setLocalizedTextContent('#startupActionOpen', 'ファイルを開く', 'Open File');
+      setLocalizedTextContent('.startup-screen__actions a[href="../account/index.html"]', 'PiXiEED マイページ', 'PiXiEED My Page');
       setLocalizedTextContent('#startupActionSkip', 'この画面を閉じる', 'Close');
       setLocalizedTextContent('#globalLoadingIndicatorCancel', 'キャンセル', 'Cancel');
       setLocalizedTextContent('#multiInviteShare', '共有', 'Share');
-      setLocalizedAttribute('#projectTabsBar', 'aria-label', 'プロジェクト内シート', 'Project Sheets');
-      setLocalizedAttribute('#projectTabsList', 'aria-label', 'シートタブ', 'Sheet Tabs');
-      setLocalizedTextContent('#projectHomeTitle', 'プロジェクト一覧', 'Projects');
+      setLocalizedTextContent('#projectHomeTitle', 'PiXiEEDrawDEVをはじめる', 'Start PiXiEEDrawDEV');
       setLocalizedTextContent('#projectHomeNew', '新規作成', 'New Project');
       setLocalizedTextContent('#projectHomeOpen', 'ファイルを開く', 'Open File');
-      setLocalizedTextContent('#projectHomeAccessTitle', 'コード適用', 'Apply Codes');
-      setLocalizedTextContent('#projectHomeAccessStatus', 'コード適用は停止中です。', 'Code application is disabled.');
-      setLocalizedTextContent('#projectHomeApplyAccessCode', '適用', 'Apply');
-      setLocalizedAttribute('#projectHomeJoinProjectKey', 'placeholder', 'コード適用は停止中です', 'Code application disabled');
-      setLocalizedTextContent('#projectHomeSupporterApply', '適用', 'Apply');
-      setLocalizedTextContent('#projectHomeSupporterPurchase', '利用停止中', 'Disabled');
-      setLocalizedAttribute('#projectHomeSupporterCode', 'placeholder', 'コード適用は停止中です', 'Code application disabled');
-      setLocalizedTextContent('#projectHomeRecentProjects .project-home-screen__section-title', 'プロジェクト', 'Projects');
-      setLocalizedTextContent('#startupRecentProjects .startup-screen__recent-title', 'プロジェクト一覧', 'Projects');
-      setLocalizedTextContent('#startupRecentAdContainer .export-ad__label', '広告', 'Ad');
+      setLocalizedTextContent('.project-home-screen__actions a[href="../account/index.html"]', 'PiXiEED マイページ', 'PiXiEED My Page');
       setLocalizedTextContent(
         '#startupScreenHint',
-        AUTOSAVE_SUPPORTED
-          ? '描画内容はこの端末に自動保存され、起動時に前回データを復元できます。'
-          : 'このブラウザでは自動保存が利用できません。保存/出力から手動保存してください。',
-        AUTOSAVE_SUPPORTED
-          ? 'Your drawing is autosaved on this device and restored when you reopen.'
-          : 'Autosave is not available in this browser. Please save manually from Save / Export.'
+        '新規作成またはファイルを開いて、ドット絵づくりを始めましょう。',
+        'Create a new project or open a file to start making pixel art.'
       );
       setLocalizedHtmlContent(
         '#startupLensHint',
@@ -595,7 +580,7 @@
   
       setLocalizedTextContent('#newProject', '新規作成', 'New Project');
       setLocalizedTextContent('#openDocument', 'ファイルを開く', 'Open File');
-      setLocalizedTextContent('#showLocalProjects', '端末内プロジェクト', 'Local Projects');
+      setLocalizedTextContent('#openPixieedMyPage', 'PiXiEED マイページ', 'PiXiEED My Page');
       setLocalizedTextContent('#exportProject', '保存/出力', 'Save / Export');
       setLocalizedTextContent('#clearCanvas', 'キャンバスをクリア', 'Clear Canvas');
       setLocalizedTextContent('.file-panel-summary .help-text:nth-child(1)', '自動保存: ON（この端末）', 'Autosave: ON (this device)');
