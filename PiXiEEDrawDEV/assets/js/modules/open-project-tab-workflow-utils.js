@@ -689,16 +689,33 @@
         reconstructed = reconstructLocalRecentProjectPayload(latestEntry);
       }
       const reconstructedHasSheets = Array.isArray(reconstructed?.sheets) && reconstructed.sheets.length > 0;
-      const extractedSheetProject = reconstructed && typeof extractLocalProjectSheetPayload === 'function'
+      const exactSheetProject = reconstructed && typeof extractLocalProjectSheetPayload === 'function'
         ? extractLocalProjectSheetPayload(reconstructed, target.id)
+        : null;
+      const targetSheetIndex = openProjectTabs.findIndex(tab => tab?.id === target.id);
+      const orderedSheet = reconstructedHasSheets
+        && targetSheetIndex >= 0
+        && reconstructed.sheets.length === openProjectTabs.length
+        ? reconstructed.sheets[targetSheetIndex]
+        : null;
+      // Older V2 checkpoints can predate the current runtime tab IDs. The
+      // V2 checkpoint preserves sheet order, so use that order only when it
+      // covers exactly the same number of tabs. This is deliberately not a
+      // root-project fallback: it cannot substitute the active GIF for sheet
+      // 1 when the collection shape changed.
+      const orderedSheetProject = !exactSheetProject
+        && orderedSheet?.project && typeof orderedSheet.project === 'object'
+        ? orderedSheet.project
         : null;
       // Never substitute the active/root project for a requested sheet. That
       // makes a tab appear selected while still displaying another sheet (for
       // example an imported GIF). A missing exact sheet is a recoverable
       // restore failure, not a valid fallback.
-      targetProjectPayload = extractedSheetProject && typeof extractedSheetProject === 'object'
-        ? extractedSheetProject
-        : (!reconstructedHasSheets ? reconstructed : null);
+      targetProjectPayload = exactSheetProject && typeof exactSheetProject === 'object'
+        ? exactSheetProject
+        : (orderedSheetProject && typeof orderedSheetProject === 'object'
+          ? orderedSheetProject
+          : (!reconstructedHasSheets ? reconstructed : null));
       console.info('[sheet-switch-debug:reconstruct]', {
         fromSheetId: previousActiveId,
         toSheetId: targetId,
@@ -710,8 +727,9 @@
         reconstructedSheetIds: Array.isArray(reconstructed?.sheets)
           ? reconstructed.sheets.map(sheet => sheet?.id || '')
           : [],
-        extractedSheetId: extractedSheetProject && typeof extractedSheetProject === 'object' ? target.id : '',
-        exactSheetFound: Boolean(extractedSheetProject && typeof extractedSheetProject === 'object'),
+        exactSheetFound: Boolean(exactSheetProject && typeof exactSheetProject === 'object'),
+        orderedSheetIndex: orderedSheetProject ? targetSheetIndex : -1,
+        restoredBy: exactSheetProject ? 'sheet-id' : (orderedSheetProject ? 'sheet-order' : 'none'),
       });
       if (!targetProjectPayload) {
         console.warn('[sheet-switch-debug:missing-target-project]', {
