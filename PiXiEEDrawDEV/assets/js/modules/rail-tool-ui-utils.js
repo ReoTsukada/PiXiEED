@@ -457,15 +457,20 @@
       : computedLeft;
     const left = clamp(Math.round(preferredLeft), minLeft, maxLeft);
     compactRightFlyoutLockedLeft = left;
-    let top = clamp(
-      Math.round(railRect.top + 4),
-      safeTop + edgePadding,
-      Math.max(safeTop + edgePadding, safeBottom - 120)
-    );
-    let maxHeight = Math.max(140, Math.round(safeBottom - top - edgePadding));
+    // A compact rail can be vertically scrolled, especially on a landscape
+    // phone. Its current top is therefore not a stable flyout origin: using it
+    // lets a newly opened panel follow the rail below the visible viewport.
+    // Keep the portal in the layout viewport and only use the rail as a hint.
+    const minTop = Math.round(safeTop + edgePadding);
+    const maxBottom = Math.round(safeBottom - edgePadding);
+    const preferredVisibleHeight = Math.min(420, Math.max(220, Math.round((safeBottom - safeTop) * 0.72)));
+    const maxTopForPreferredHeight = Math.max(minTop, maxBottom - preferredVisibleHeight);
+    const railTop = Math.round(railRect.top + 4);
+    let top = clamp(railTop, minTop, maxTopForPreferredHeight);
+    let maxHeight = Math.max(140, maxBottom - top);
     if (maxHeight < 220) {
-      top = Math.max(safeTop + edgePadding, Math.round(safeBottom - 220 - edgePadding));
-      maxHeight = Math.max(140, Math.round(safeBottom - top - edgePadding));
+      top = Math.max(minTop, maxBottom - 220);
+      maxHeight = Math.max(140, maxBottom - top);
     }
     clearCompactRightFlyoutStyles();
     ensureCompactRightFlyoutPortal(true, section);
