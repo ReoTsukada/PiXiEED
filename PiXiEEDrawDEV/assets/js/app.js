@@ -5537,6 +5537,8 @@
   set buildPackagedProjectPayload(value) { buildPackagedProjectPayload = value; },
   get buildProjectSessionPayload() { return buildProjectSessionPayload; },
   set buildProjectSessionPayload(value) { buildProjectSessionPayload = value; },
+  get serializeProjectStorageSnapshot() { return serializeProjectStorageSnapshot; },
+  set serializeProjectStorageSnapshot(value) { serializeProjectStorageSnapshot = value; },
   get canUseSessionStorage() { return canUseSessionStorage; },
   set canUseSessionStorage(value) { canUseSessionStorage = value; },
   get clearTimelapseRecording() { return clearTimelapseRecording; },
