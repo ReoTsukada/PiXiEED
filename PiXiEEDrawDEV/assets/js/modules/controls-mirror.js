@@ -342,9 +342,9 @@
       if (isMobile && dom.mobileShortcutsMount) {
         dom.canvasControls.dataset.mobile = 'true';
         dom.mobileShortcutsMount.appendChild(dom.canvasControls);
-      } else if (!isMobile && dom.projectTabsActions instanceof HTMLElement) {
+      } else if (!isMobile && dom.editorCommandLaneActions instanceof HTMLElement) {
         delete dom.canvasControls.dataset.mobile;
-        dom.projectTabsActions.appendChild(dom.canvasControls);
+        dom.editorCommandLaneActions.appendChild(dom.canvasControls);
       } else if (!isMobile && canvasControlsDefaultParent) {
         delete dom.canvasControls.dataset.mobile;
         if (canvasControlsDefaultNextSibling && canvasControlsDefaultNextSibling.parentNode === canvasControlsDefaultParent) {
@@ -355,8 +355,8 @@
       }
     }
     if (dom.rightUtilityMenu instanceof HTMLElement) {
-      if (!isMobile && dom.projectTabsActions instanceof HTMLElement) {
-        dom.projectTabsActions.appendChild(dom.rightUtilityMenu);
+      if (!isMobile && dom.editorCommandLaneActions instanceof HTMLElement) {
+        dom.editorCommandLaneActions.appendChild(dom.rightUtilityMenu);
       } else if (rightUtilityMenuDefaultParent instanceof HTMLElement) {
         if (
           rightUtilityMenuDefaultNextSibling
