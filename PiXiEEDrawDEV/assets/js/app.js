@@ -16617,12 +16617,24 @@
         }
         return loaded ? finishRecentProjectOpen('自動保存: プロジェクトを開きました') : false;
       };
-      const latestPackagedProject = latestEntry.project && typeof latestEntry.project === 'object'
-        ? (
-          reconstructLocalRecentProjectPayload(latestEntry)
-          || latestEntry.project
-        )
-        : null;
+      let latestPackagedProject = null;
+      if (Number(latestEntry.autosaveSchemaVersion) === 2) {
+        try {
+          latestPackagedProject = await readAutosaveV2PrimaryProject(projectId || latestEntry.id || '');
+          console.info('[pixiedraw-dev:recent-project-open]', {
+            phase: 'v2-primary-read',
+            projectId: projectId || latestEntry.id || '',
+            restored: Boolean(latestPackagedProject && typeof latestPackagedProject === 'object'),
+            sheetCount: Array.isArray(latestPackagedProject?.sheets) ? latestPackagedProject.sheets.length : 0,
+          });
+        } catch (error) {
+          console.warn('Failed to read V2 recent project payload', error);
+        }
+      }
+      if (!latestPackagedProject && latestEntry.project && typeof latestEntry.project === 'object') {
+        latestPackagedProject = reconstructLocalRecentProjectPayload(latestEntry)
+          || latestEntry.project;
+      }
       if (latestPackagedProject && typeof latestPackagedProject === 'object') {
         if (latestEntry.openError === 'invalid-project-payload' && await tryOpenRecentProjectHandle()) {
           return true;
