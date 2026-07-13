@@ -76,11 +76,14 @@
           ? options.sourceKind.trim()
           : 'unknown'
       );
+    const normalizeExternalInputToV2 = options?.fileLoad === true || options?.forceV2WorkingCopy === true;
     const hasExplicitSourceAdapterId = Boolean(
       explicitState
       && Object.prototype.hasOwnProperty.call(explicitState, 'sourceStorageAdapterId')
     ) || Object.prototype.hasOwnProperty.call(options || {}, 'sourceStorageAdapterId');
-    const sourceStorageAdapterId = hasExplicitSourceAdapterId
+    const sourceStorageAdapterId = normalizeExternalInputToV2
+      ? null
+      : (hasExplicitSourceAdapterId
       ? (
         explicitState?.sourceStorageAdapterId
         ?? options?.sourceStorageAdapterId
@@ -90,12 +93,14 @@
         sourceKind === 'file'
           ? (parsedDocument?.storageAdapterId || null)
           : null
-      );
+      ));
     const hasExplicitLastSavedStorageAdapterId = Boolean(
       explicitState
       && Object.prototype.hasOwnProperty.call(explicitState, 'lastSavedStorageAdapterId')
     ) || Object.prototype.hasOwnProperty.call(options || {}, 'lastSavedStorageAdapterId');
-    const lastSavedStorageAdapterId = hasExplicitLastSavedStorageAdapterId
+    const lastSavedStorageAdapterId = normalizeExternalInputToV2
+      ? null
+      : (hasExplicitLastSavedStorageAdapterId
       ? (
         explicitState?.lastSavedStorageAdapterId
         ?? options?.lastSavedStorageAdapterId
@@ -105,18 +110,20 @@
         sourceKind === 'file'
           ? sourceStorageAdapterId
           : null
-      );
+      ));
     const hasExplicitProjectSaveHandleState = Boolean(
       explicitState
       && Object.prototype.hasOwnProperty.call(explicitState, 'projectSaveHandleState')
     ) || Object.prototype.hasOwnProperty.call(options || {}, 'projectSaveHandleState');
-    const projectSaveHandleState = hasExplicitProjectSaveHandleState
+    const projectSaveHandleState = normalizeExternalInputToV2
+      ? 'none'
+      : (hasExplicitProjectSaveHandleState
       ? (
         explicitState?.projectSaveHandleState
         ?? options?.projectSaveHandleState
         ?? (handle ? 'unknown' : 'none')
       )
-      : (handle ? 'unknown' : 'none');
+      : (handle ? 'unknown' : 'none'));
     const hasExplicitToken = Boolean(
       explicitState
       && Object.prototype.hasOwnProperty.call(explicitState, 'sourceProjectToken')
@@ -283,7 +290,7 @@
     });
   }
 
-  function restoreOpenProjectSheetsFromParsedDocument(parsedDocument = null, {
+  async function restoreOpenProjectSheetsFromParsedDocument(parsedDocument = null, {
     projectId = '',
     source = 'sheet',
     sharedProjectKey = '',
@@ -307,16 +314,31 @@
         activeSheetId: parsedDocument?.activeSheetId || '',
       });
     }
-    const normalizedProjectId = normalizeAutosaveProjectId(projectId || autosaveProjectId || '') || createAutosaveProjectId();
+    let normalizedProjectId = normalizeAutosaveProjectId(projectId || autosaveProjectId || '') || createAutosaveProjectId();
     if (packagedSheets.length > 1) {
-      Promise.resolve(
-        migrateLegacyMultiProjectPackage?.({
-          sourceProjectId: normalizedProjectId,
-          sheets: packagedSheets,
-          activeSheetId: parsedDocument?.activeSheetId || '',
-        })
-      ).catch(error => {
-        console.warn('Failed to split legacy multi-project package', error);
+      const migration = await migrateLegacyMultiProjectPackage?.({
+        sourceProjectId: normalizedProjectId,
+        sheets: packagedSheets,
+        activeSheetId: parsedDocument?.activeSheetId || '',
+      });
+      if (!migration || (migration.migrated !== true && migration.reason !== 'already-migrated')) {
+        const error = new Error(`Legacy multi-project conversion failed: ${migration?.reason || 'unknown'}`);
+        error.code = 'ERR_LEGACY_MULTI_PROJECT_CONVERSION_FAILED';
+        throw error;
+      }
+      const activeSourceSheetId = typeof parsedDocument?.activeSheetId === 'string' ? parsedDocument.activeSheetId : '';
+      const migratedActive = (migration.projects || []).find(entry => entry?.sourceSheetId === activeSourceSheetId)
+        || (migration.projects || []).find(entry => entry?.wasActive === true)
+        || (migration.projects || [])[0]
+        || null;
+      if (migratedActive?.projectId) {
+        normalizedProjectId = normalizeAutosaveProjectId(migratedActive.projectId) || normalizedProjectId;
+      }
+      console.info('[pixiedraw-dev:project-normalize]', {
+        phase: 'legacy-multi-project-split-ready',
+        sourceProjectId: projectId || '',
+        activeProjectId: normalizedProjectId,
+        projectIds: migration.projectIds || [],
       });
     }
     const normalizedSharedProjectKey = SHARED_PROJECTS_ENABLED
@@ -520,8 +542,23 @@
       ? options.sourcePersistenceState
       : null;
     setActiveAutosaveProjectId(requestedProjectId || createAutosaveProjectId());
+    if (options?.fileLoad === true || options?.forceV2WorkingCopy === true) {
+      // The opened bytes are only an import source.  Do not retain its file
+      // handle or let a subsequent autosave overwrite V1/legacy V2/input
+      // files; the next durable save must choose a V2 destination.
+      autosaveHandle = null;
+      pendingAutosaveHandle = null;
+      clearPendingPermissionListener?.();
+      clearActiveProjectSaveHandle?.();
+      console.info('[pixiedraw-dev:v2-import]', {
+        phase: 'external-input-converted-to-v2-working-copy',
+        sourceKind: sourcePersistenceState?.sourceKind || options?.sourceKind || 'file',
+        sourceAdapterId: parsedDocument?.storageAdapterId || null,
+        projectId: autosaveProjectId,
+      });
+    }
     if (!options?.suppressProjectSheetsRestore) {
-      restoreOpenProjectSheetsFromParsedDocument(parsedDocument, {
+      await restoreOpenProjectSheetsFromParsedDocument(parsedDocument, {
         projectId: requestedProjectId || autosaveProjectId,
         source: options?.sharedProjectKey ? 'shared-sheet' : 'sheet',
         sharedProjectKey: requestedSharedProjectKey,
