@@ -29,6 +29,11 @@
   injectStyles();
   replaceFooter();
   replaceBottomNav();
+  if (script.dataset.pixieedFooterAdLandscape === 'false') {
+    body.dataset.pixieedFooterAdLandscape = 'false';
+  } else {
+    delete body.dataset.pixieedFooterAdLandscape;
+  }
   if (script.dataset.pixieedFooterAd !== 'false') {
     ensureFooterAdController();
   }
@@ -54,7 +59,7 @@
     const controller = doc.createElement('script');
     controller.defer = true;
     controller.dataset.pixieedFooterAdController = 'true';
-    controller.src = relHref('scripts/bottom-nav-footer-ad.js?v=2026.07.12-shared-ads-rail3');
+    controller.src = relHref('scripts/bottom-nav-footer-ad.js?v=2026.07.13-pixiedraw-landscape-ad-optout1');
     doc.body.appendChild(controller);
   }
 
