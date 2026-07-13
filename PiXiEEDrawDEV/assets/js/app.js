@@ -10293,6 +10293,68 @@
     initMemoryMonitor,
   } = memoryUtils;
 
+  function bytesToMiB(value) {
+    const bytes = Math.max(0, Number(value) || 0);
+    return Math.round((bytes / (1024 * 1024)) * 10) / 10;
+  }
+
+  async function collectPixieeDrawMemoryDiagnostics() {
+    const editor = typeof getMemoryUsageBreakdown === 'function'
+      ? getMemoryUsageBreakdown()
+      : { current: 0, past: 0, future: 0, pending: 0, timelapse: 0, total: 0 };
+    const heap = performance?.memory && typeof performance.memory === 'object'
+      ? {
+          usedJsHeapSize: Number(performance.memory.usedJSHeapSize) || 0,
+          totalJsHeapSize: Number(performance.memory.totalJSHeapSize) || 0,
+          jsHeapSizeLimit: Number(performance.memory.jsHeapSizeLimit) || 0,
+        }
+      : null;
+    const resources = typeof performance?.getEntriesByType === 'function'
+      ? performance.getEntriesByType('resource')
+      : [];
+    const resourceTransferBytes = resources.reduce((total, entry) => total + Math.max(0, Number(entry?.transferSize) || 0), 0);
+    const diagnostics = {
+      editorMiB: Object.fromEntries(Object.entries(editor).map(([key, value]) => [key, bytesToMiB(value)])),
+      heapMiB: heap && Object.fromEntries(Object.entries(heap).map(([key, value]) => [key, bytesToMiB(value)])),
+      activeDocument: {
+        width: Number(state.width) || 0,
+        height: Number(state.height) || 0,
+        frameCount: Array.isArray(state.frames) ? state.frames.length : 0,
+        historyPast: history.past.length,
+        historyFuture: history.future.length,
+        timelapseSteps: getAllTimelapseStepCount?.() || 0,
+        openTabCount: openProjectTabs.length,
+        activeTabId: activeOpenProjectTabId || '',
+      },
+      page: {
+        homeVisible: Boolean(projectHomeVisible),
+        iframeCount: document.querySelectorAll('iframe').length,
+        adIframeCount: document.querySelectorAll('ins.adsbygoogle iframe, iframe[id^="google_"]').length,
+        resourceCount: resources.length,
+        resourceTransferMiB: bytesToMiB(resourceTransferBytes),
+      },
+    };
+    if (typeof performance?.measureUserAgentSpecificMemory === 'function') {
+      try {
+        const measured = await performance.measureUserAgentSpecificMemory();
+        diagnostics.userAgentMemoryMiB = bytesToMiB(measured?.bytes);
+        diagnostics.userAgentMemoryBreakdown = Array.isArray(measured?.breakdown)
+          ? measured.breakdown.map(item => ({
+              bytesMiB: bytesToMiB(item?.bytes),
+              attribution: item?.attribution || [],
+              types: item?.types || [],
+            }))
+          : [];
+      } catch (error) {
+        diagnostics.userAgentMemoryError = error?.name || error?.message || 'unavailable';
+      }
+    }
+    console.info('[pixiedraw-dev:memory-diagnostics]', diagnostics);
+    return diagnostics;
+  }
+
+  window.__pixieedrawGetMemoryDiagnostics = async () => await collectPixieeDrawMemoryDiagnostics();
+
   function remapSharedProjectHistorySnapshotIdentity(snapshot) {
     if (!snapshot || typeof snapshot !== 'object' || !isSharedProjectCollaborativeMode()) {
       return snapshot;
