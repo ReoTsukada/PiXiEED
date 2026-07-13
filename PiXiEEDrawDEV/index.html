@@ -340,7 +340,7 @@
 
 
 
-<link href="assets/css/style.css?v=2026.07.12-shared-ads-production1" rel="stylesheet"/>
+<link href="assets/css/style.css?v=2026.07.13-start-screen-only1" rel="stylesheet"/>
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-4.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-4.png"/>
 <style>
@@ -431,24 +431,13 @@
 <p class="startup-screen__subtitle">PiXiEEDrawDEVでドット絵づくり・アニメ制作をはじめよう</p>
 </div>
 <div aria-label="起動操作" class="startup-screen__actions" role="group">
-<button class="button button--primary" id="startupActionResume" type="button">前回の続きから再開</button>
 <button class="button" id="startupActionNew" type="button">新規作成</button>
 <button class="button" id="startupActionOpen" type="button">ファイルを開く</button>
+<a class="button" href="../account/index.html">PiXiEED マイページ</a>
 </div>
 <div class="startup-screen__hints">
-<p class="startup-screen__hint" id="startupScreenHint">描画内容はこの端末に自動保存され、起動時に前回データを復元できます。</p>
-<p class="startup-screen__hint" id="startupResumeHint">端末内プロジェクトを確認しています…</p>
+<p class="startup-screen__hint" id="startupScreenHint">新規作成またはファイルを開いて、ドット絵づくりを始めましょう。</p>
 <p class="startup-screen__hint" id="startupLensHint">写真をドット絵変換するなら <a href="../pixiee-lens/index.html" rel="noopener" target="_blank">PiXiEELENS</a></p>
-</div>
-<div class="startup-screen__recent" hidden="" id="startupRecentProjects">
-<h2 class="startup-screen__recent-title">端末内プロジェクト（自動保存）</h2>
-<div class="startup-recent-list" id="startupRecentList" role="list"></div>
-<div aria-label="広告" class="export-ad startup-screen__ad" id="startupRecentAdContainer">
-<div class="export-ad__slot">
-<ins class="startup-recent-ad-ins" data-ad-client="ca-pub-9801602250480253" data-ad-format="auto" data-ad-slot="2141591954" data-full-width-responsive="true" id="startupRecentAdSlot" style="display:block"></ins>
-</div>
-<small class="export-ad__label">広告</small>
-</div>
 </div>
 <button class="startup-screen__link" id="startupActionSkip" type="button">この画面を閉じる</button>
 </div>
@@ -495,45 +484,18 @@
 <button aria-label="左パネルを開く / 幅を変更" class="rail-resizer rail-resizer--left" hidden="" id="resizeLeftRail" type="button"></button>
 </aside>
 <main aria-label="ドットキャンバス" class="stage" id="stage">
-<div aria-label="プロジェクト内シート" class="project-tabs" hidden="" id="projectTabsBar" role="region">
-<div class="project-tabs__status-slot" hidden="" id="projectTabsStatusSlot">
-<div aria-live="polite" class="shared-status-indicator" hidden id="sharedStatusIndicator" role="status">
-<span class="sr-only" id="sharedStatusIndicatorText">最新</span>
-<span aria-hidden="true" class="shared-status-indicator__lamp" id="sharedStatusLamp" title="同期状態"></span>
-<button class="chip shared-status-indicator__recover" hidden id="sharedStatusRecoverAction" type="button">再読込</button>
-</div>
-</div>
-<div aria-label="シートタブ" class="project-tabs__list" id="projectTabsList" role="tablist"></div>
-<div aria-label="上部操作" class="project-tabs__actions" id="projectTabsActions"></div>
-</div>
 <section aria-labelledby="projectHomeTitle" class="project-home-screen" hidden id="projectHomeScreen" tabindex="-1">
 <div class="project-home-screen__inner">
 <header class="project-home-screen__header">
 <div>
-<h1 class="project-home-screen__title" id="projectHomeTitle">プロジェクト一覧</h1>
+<h1 class="project-home-screen__title" id="projectHomeTitle">PiXiEEDrawDEVをはじめる</h1>
 </div>
 <div aria-label="ホーム操作" class="project-home-screen__actions" role="group">
 <button class="button button--primary" id="projectHomeNew" type="button">新規作成</button>
 <button class="button" id="projectHomeOpen" type="button">ファイルを開く</button>
+<a class="button" href="../account/index.html">PiXiEED マイページ</a>
 </div>
 </header>
-<section aria-hidden="true" aria-label="コード適用" class="project-home-supporter" hidden id="projectHomeJoinShared">
-<div class="project-home-supporter__body">
-<h2 class="project-home-supporter__title" id="projectHomeAccessTitle">コード適用</h2>
-<p class="project-home-supporter__status" id="projectHomeAccessStatus">コード適用は停止中です。</p>
-</div>
-<div class="project-home-supporter__actions project-home-supporter__actions--compact">
-<input autocomplete="off" class="project-home-supporter__input" disabled id="projectHomeJoinProjectKey" inputmode="text" maxlength="280" placeholder="コード適用は停止中です" spellcheck="false" type="text"/>
-<button class="button" disabled id="projectHomeApplyAccessCode" type="button">適用</button>
-</div>
-<div class="project-home-supporter__actions">
-<a aria-hidden="true" class="button button--primary" hidden href="#" id="projectHomeSupporterPurchase" rel="noopener">利用停止中</a>
-</div>
-</section>
-<div class="project-home-screen__recent" id="projectHomeRecentProjects">
-<h2 class="project-home-screen__section-title">プロジェクト</h2>
-<div class="startup-recent-list project-home-screen__list" id="projectHomeRecentList" role="list"></div>
-</div>
 </div>
 </section>
 <div class="stage__canvas" id="canvasViewport">
@@ -1117,7 +1079,7 @@
 <div class="field-group field-group--file-actions">
 <button class="button" id="newProject" type="button">新規作成</button>
 <button class="button" id="openDocument" type="button">ファイルを開く</button>
-<button class="button" id="showLocalProjects" type="button">端末内プロジェクト</button>
+<a class="button" href="../account/index.html" id="openPixieedMyPage">PiXiEED マイページ</a>
 <button class="button button--primary" id="exportProject" type="button">出力パネルを開く</button>
 </div>
 <div class="file-panel-summary">
@@ -1818,9 +1780,9 @@
 	<script defer="" src="assets/js/modules/export-session.js?v=2026.06.29-document-model-export-session-fix2"></script>
 	<script defer="" src="assets/js/modules/pixieed-support-benefit-utils.js?v=2026.07.04-shared-project-disabled1"></script>
 	<script defer="" src="assets/js/modules/open-project-tab-helpers.js?v=2026.07.06-local-project-open-fix1"></script>
-		<script defer="" src="assets/js/modules/open-project-tab-workflow-utils.js?v=2026.07.13-v2-sheet-id-restore2"></script>
-	<script defer="" src="assets/js/modules/open-project-tab-view.js?v=2026.07.11-tab-availability-fix1"></script>
-	<script defer="" src="assets/js/modules/open-project-tab-lifecycle.js?v=2026.07.13-home-state-reconcile1"></script>
+		<script defer="" src="assets/js/modules/open-project-tab-workflow-utils.js?v=2026.07.13-v2-sheet-order-recovery3"></script>
+		<script defer="" src="assets/js/modules/open-project-tab-view.js?v=2026.07.13-single-project-indicator1"></script>
+	<script defer="" src="assets/js/modules/open-project-tab-lifecycle.js?v=2026.07.13-start-screen-only1"></script>
 	<script defer="" src="assets/js/modules/open-project-tab-sheet-actions.js?v=2026.07.12-command-lock-r2"></script>
 	<script defer="" src="assets/js/modules/local-project-journal-utils.js?v=2026.07.13-file-primary-memory1"></script>
 	<script defer="" src="assets/js/modules/pixel-patch-history-utils.js?v=2026.07.12-direct-authority-gmem2a1"></script>
@@ -1847,7 +1809,7 @@
 	<script defer="" src="assets/js/modules/image-import-decode-utils.js?v=2026.07.12-gmem3a-streaming-resize1"></script>
 	<script defer="" src="assets/js/modules/palette-panel-utils.js?v=2026.07.12-direct-authority-gmem2a1"></script>
 	<script defer="" src="assets/js/modules/timeline-layers.js?v=2026.07.04-frame-pending-structure-fix1"></script>
-	<script defer="" src="assets/js/modules/ui-localization-utils.js?v=2026.07.12-export-format-options1"></script>
+	<script defer="" src="assets/js/modules/ui-localization-utils.js?v=2026.07.13-start-screen-only1"></script>
 	<script defer="" src="assets/js/modules/ui-language-utils.js?v=2026.07.03-small-helper-batch-split-v1"></script>
 	<script defer="" src="assets/js/modules/scroll-input-utils.js?v=2026.07.03-small-helper-batch-split-v1"></script>
 	<script defer="" src="assets/js/modules/sprite-scale-utils.js?v=2026.06.30-zh-localization-v1"></script>
@@ -1886,8 +1848,8 @@
 	<script defer="" src="assets/js/modules/open-import-workflow-utils.js?v=2026.07.13-canonical-all-raster1"></script>
 	<script defer="" src="assets/js/modules/export-format-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/export-dialog-workflow-utils.js?v=2026.07.12-export-format-options1"></script>
-		<script defer="" src="assets/js/modules/startup-workflow-utils.js?v=2026.07.13-recent-open-safe-replace1"></script>
-		<script defer="" src="assets/js/modules/recent-project-workflow-utils.js?v=2026.07.12-v2-journal-revision1"></script>
+		<script defer="" src="assets/js/modules/startup-workflow-utils.js?v=2026.07.13-start-screen-only1"></script>
+		<script defer="" src="assets/js/modules/recent-project-workflow-utils.js?v=2026.07.13-start-screen-only1"></script>
 		<script defer="" src="assets/js/modules/project-package-workflow-utils.js?v=2026.07.12-performance-instrumentation1"></script>
 		<script defer="" src="assets/js/modules/project-storage-adapter-utils.js?v=2026.07.12-text-reader-regression1"></script>
 		<script defer="" src="assets/js/modules/project-storage-v1-json-adapter.js?v=2026.07.09-project-storage-phase1"></script>
@@ -1895,7 +1857,7 @@
 		<script defer="" src="assets/js/modules/project-storage-v2-worker-bridge.js?v=2026.07.10-project-storage-worker1"></script>
 		<script defer="" src="assets/js/modules/project-storage-v2-zip-adapter.js?v=2026.07.10-project-storage-codec1"></script>
 		<script defer="" src="assets/js/modules/document-serialization-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
-		<script defer="" src="assets/js/modules/document-session-workflow-utils.js?v=2026.07.13-canonical-file-v2a"></script>
+		<script defer="" src="assets/js/modules/document-session-workflow-utils.js?v=2026.07.13-single-project-migration1"></script>
 	<script defer="" src="assets/js/modules/recent-account-workflow-utils.js?v=2026.07.03-safe-helper-split-v1"></script>
 	<script defer="" src="assets/js/modules/pixieed-profile-local-utils.js?v=2026.07.03-safe-helper-split-v1"></script>
 	<script defer="" src="assets/js/modules/shared-recent-project-utils.js?v=2026.07.03-shared-recent-helper-split-v1"></script>
@@ -1922,8 +1884,9 @@
 	<script defer="" src="assets/js/modules/external-tool-workflow-utils.js?v=2026.07.02-external-tool-workflow-split-v1"></script>
 	<script defer="" src="assets/js/modules/canonical-v2-project-utils.js?v=20260712-canonical-v2-e2"></script>
 	<script defer="" src="assets/js/modules/pre-update-checkpoint-utils.js?v=20260712-pre-update-checkpoint-u3"></script>
+	<script defer="" src="assets/js/active-project-session-utils.js?v=2026.07.13-active-project-session-r2"></script>
 	<script defer="" src="assets/js/pixieedraw-dev-switch.js?v=2026.07.03-pixieedrawdev-switch-fix14"></script>
-	<script defer="" src="assets/js/app.js?v=20260713-035"></script>
+	<script defer="" src="assets/js/app.js?v=20260713-040"></script>
 	<script defer="" src="assets/js/modules/update-detection-utils.js?v=20260713-026"></script>
   <script>
     (function initPanelAdDocking() {
