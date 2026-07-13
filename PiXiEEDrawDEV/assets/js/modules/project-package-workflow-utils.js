@@ -361,7 +361,10 @@
     return true;
   }
 
-  function buildPackagedProjectPayload(snapshot, { session = null, updatedAt = '', includeSheets = true } = {}) {
+  // A saved PiXiEEDraw project is exactly one document.  `includeSheets` is
+  // accepted only so older call sites do not throw while they are being
+  // retired; it must never make a newly written package multi-project again.
+  function buildPackagedProjectPayload(snapshot, { session = null, updatedAt = '', includeSheets = false } = {}) {
     const resolvedDotStats = resolveTrackedProjectDotStats(snapshot);
     const payload = serializeDocumentSnapshot(snapshot);
     const packagedSession = session && typeof session === 'object'
@@ -374,11 +377,12 @@
       document: payload,
       session: packagedSession,
       updatedAt: updatedAt || new Date().toISOString(),
+      projectLayout: 'single-project',
     };
     if (resolvedDotStats) {
       packaged.dotStats = resolvedDotStats;
     }
-    if (includeSheets) {
+    if (includeSheets === 'legacy-read-only') {
       const activeSheetPackaged = buildPackagedProjectPayload(snapshot, {
         session: packagedSession,
         updatedAt: packaged.updatedAt,
@@ -634,13 +638,13 @@
         if (!packaged || typeof packaged !== 'object') {
           throw new Error('Missing local project checkpoint for journal-only save');
         }
-        if (!savePlan?.journalOnly) {
-          ensurePackagedProjectSheetsForSave(packaged, snapshot);
-          preserveExistingProjectSheetsForSave(packaged, previousEntry?.project || null);
-          if (!validatePackagedProjectSheetCountForSave(packaged)) {
-            throw new Error('Refusing to save incomplete project sheets');
-          }
-        }
+        // New local checkpoints are deliberately root-document only. Older
+        // packages containing sheets are split during read, never preserved
+        // into a subsequent save.
+        delete packaged.sheets;
+        delete packaged.sheetOrder;
+        delete packaged.activeSheetId;
+        packaged.projectLayout = 'single-project';
       } finally {
         endProjectPackagePerformanceSpan(packageSpan, {
           sheetCount: countPackagedProjectSheets(packaged),
@@ -648,9 +652,8 @@
       }
       const listSnapshot = (savePlan?.journalPayload && snapshot)
         ? snapshot
-        : getRecentProjectListSnapshot(packaged, snapshot);
-      const listSheet = getPackagedProjectFirstSheet(packaged);
-      const listThumbnailSheetId = typeof listSheet?.id === 'string' ? listSheet.id : '';
+        : (snapshotFromParsedDocumentValue(packaged)?.snapshot || snapshot);
+      const listThumbnailSheetId = '';
       const fileName = getRecentProjectEntryFileName(previousEntry, packaged, snapshot);
       const displayName = previousEntry?.name
         ? extractDocumentBaseName(previousEntry.name)
