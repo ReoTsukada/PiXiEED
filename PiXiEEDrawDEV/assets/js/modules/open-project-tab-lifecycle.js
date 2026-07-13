@@ -50,6 +50,11 @@
     makeHistorySnapshot,
     buildProjectSessionPayload,
     buildPackagedProjectPayload,
+    getActiveProjectSession,
+    getActiveProjectSessionSaveBinding,
+    replaceActiveProjectSessionFromTab,
+    updateActiveProjectSessionSaveBinding,
+    assertActiveProjectIdentityConsistency,
   } = {}) {
     function normalizeBindingHandleState(value, fallback = 'none') {
       if (typeof normalizeProjectSaveHandleState === 'function') {
@@ -135,6 +140,17 @@
     }
 
     function getActiveProjectSaveBinding() {
+      const session = getActiveProjectSession?.() || null;
+      if (session) {
+        const sessionBinding = getActiveProjectSessionSaveBinding?.(session) || null;
+        if (sessionBinding) {
+          return sessionBinding;
+        }
+        console.warn('[pixiedraw-dev:active-project-session-invalid]', {
+          phase: 'get-active-project-save-binding',
+          projectId: session?.projectId || '',
+        });
+      }
       return getProjectSaveBindingFromTab(getActiveOpenProjectTab?.() || null);
     }
 
@@ -165,11 +181,36 @@
           : current.projectSaveHandleState,
         'none'
       );
+      const nextLastSavedAdapterId = Object.prototype.hasOwnProperty.call(nextBinding, 'lastSavedAdapterId')
+        ? normalizeBindingAdapterId(nextBinding.lastSavedAdapterId)
+        : current?.lastSavedStorageAdapterId || null;
+      const isActiveTab = normalizedTabId === (getActiveOpenProjectTabId?.() || '');
+      let sessionUpdated = false;
+      if (isActiveTab) {
+        const updatedSession = updateActiveProjectSessionSaveBinding?.({
+          projectSaveHandle: nextHandle,
+          projectSaveHandleMeta: nextMeta,
+          projectSaveHandleState: nextState,
+          lastSavedAdapterId: nextLastSavedAdapterId,
+        }, {
+          phase: 'save-handle-update:session-first',
+          allowTransientMismatch: true,
+        });
+        sessionUpdated = Boolean(updatedSession);
+        if (!sessionUpdated) {
+          console.error('[pixiedraw-dev:active-project-session-write-failed]', {
+            phase: 'save-handle-update:session-first',
+            tabId: normalizedTabId,
+            projectId: current?.projectId || '',
+          });
+        }
+      }
       openProjectTabs[index] = {
         ...current,
         projectSaveHandle: nextHandle,
         projectSaveHandleMeta: nextMeta,
         projectSaveHandleState: nextState,
+        lastSavedStorageAdapterId: nextLastSavedAdapterId,
       };
       if (options?.render !== false) {
         renderOpenProjectTabs?.();
@@ -184,6 +225,12 @@
           adapterId: nextMeta?.adapterId || '',
           handleKind: nextMeta?.handleKind || '',
           permissionState: nextMeta?.permissionState || '',
+        });
+      }
+      if (isActiveTab && sessionUpdated) {
+        assertActiveProjectIdentityConsistency?.({
+          phase: 'save-handle-update:tab-mirror',
+          allowTransientMismatch: false,
         });
       }
       return getProjectSaveBindingFromTab(openProjectTabs[index]);
@@ -213,6 +260,7 @@
         projectSaveHandle: handle,
         projectSaveHandleMeta: normalizedMeta,
         projectSaveHandleState: 'bound',
+        lastSavedAdapterId: normalizedMeta?.adapterId || current?.lastSavedStorageAdapterId || null,
       }, options);
     }
 
@@ -311,6 +359,9 @@
       openProjectTabs.push(initialTab);
       setActiveOpenProjectTabId?.(initialTab.id);
       setSuppressOpenProjectTabAutoInitialize?.(false);
+      replaceActiveProjectSessionFromTab?.(initialTab, {
+        phase: 'initial-project-session',
+      });
       renderOpenProjectTabs?.();
     }
 
@@ -331,19 +382,6 @@
       }
       if (!projectHomeVisible) {
         return;
-      }
-      scheduleRecentProjectsListRender?.(Array.from(recentProjectsCache.values()), { immediate: true });
-      if (refresh && AUTOSAVE_SUPPORTED) {
-        refreshRecentProjectsUI?.().catch(error => {
-          console.warn('Failed to refresh project home list', error);
-        });
-      }
-      if (AUTOSAVE_SUPPORTED) {
-        window.setTimeout(() => {
-          maybePromptAndTransferRecentProjectsFromHome?.().catch(error => {
-            console.warn('Failed to prompt project transfer from home', error);
-          });
-        }, 0);
       }
       window.requestAnimationFrame(() => {
         screen?.focus?.({ preventScroll: true });
@@ -422,6 +460,11 @@
         setActiveOpenProjectTabId?.(tab.id);
         setSuppressOpenProjectTabAutoInitialize?.(false);
       }
+      if (options.activate !== false) {
+        replaceActiveProjectSessionFromTab?.(tab, {
+          phase: 'append-project-session',
+        });
+      }
       renderOpenProjectTabs?.();
       return tab;
     }
@@ -467,10 +510,22 @@
         projectSaveHandleMeta: Object.prototype.hasOwnProperty.call(options, 'projectSaveHandleMeta')
           ? options.projectSaveHandleMeta
           : current?.projectSaveHandleMeta,
+        canonicalPayloadFormat: Object.prototype.hasOwnProperty.call(options, 'canonicalPayloadFormat')
+          ? options.canonicalPayloadFormat
+          : current?.canonicalPayloadFormat,
+        canonicalSchemaVersion: Object.prototype.hasOwnProperty.call(options, 'canonicalSchemaVersion')
+          ? options.canonicalSchemaVersion
+          : current?.canonicalSchemaVersion,
+        canonicalSourceMetadata: Object.prototype.hasOwnProperty.call(options, 'canonicalSourceMetadata')
+          ? options.canonicalSourceMetadata
+          : current?.canonicalSourceMetadata,
       });
       openProjectTabs[index] = updated;
       setActiveOpenProjectTabId?.(updated.id);
       setSuppressOpenProjectTabAutoInitialize?.(false);
+      replaceActiveProjectSessionFromTab?.(updated, {
+        phase: 'replace-project-session',
+      });
       renderOpenProjectTabs?.();
       return updated;
     }
@@ -600,10 +655,16 @@
         projectSaveHandleState: options.projectSaveHandleState,
         projectSaveHandle: options.projectSaveHandle,
         projectSaveHandleMeta: options.projectSaveHandleMeta,
+        canonicalPayloadFormat: options.canonicalPayloadFormat,
+        canonicalSchemaVersion: options.canonicalSchemaVersion,
+        canonicalSourceMetadata: options.canonicalSourceMetadata,
       });
       openProjectTabs.splice(0, openProjectTabs.length, tab);
       setActiveOpenProjectTabId?.(tab.id);
       setSuppressOpenProjectTabAutoInitialize?.(false);
+      replaceActiveProjectSessionFromTab?.(tab, {
+        phase: 'reset-project-session',
+      });
       renderOpenProjectTabs?.();
       return tab;
     }
