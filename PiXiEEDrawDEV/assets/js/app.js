@@ -9429,6 +9429,42 @@
     return typeof activeCanvas?.id === 'string' ? activeCanvas.id : '';
   }
 
+  function getActiveProjectIdentityComparison() {
+    const sessionProjectId = normalizeAutosaveProjectId(activeProjectSession?.projectId || '');
+    const autosaveProjectIdValue = normalizeAutosaveProjectId(autosaveProjectId || '');
+    const tab = typeof getActiveOpenProjectTab === 'function' ? getActiveOpenProjectTab() : null;
+    const activeTabProjectId = normalizeAutosaveProjectId(tab?.projectId || '');
+    // A canvas document ID and the legacy tab.runtimeProjectId identify runtime
+    // objects, not the persisted project. They must not be treated as a fourth
+    // project-ID authority.
+    const runtimeProjectId = null;
+    const runtimeDocumentId = getRuntimeActiveDocumentId() || null;
+    const mismatches = [];
+    const compareIdentity = (field, value) => {
+      if (sessionProjectId && value && sessionProjectId !== value) {
+        mismatches.push({
+          field,
+          sessionValue: sessionProjectId,
+          autosaveValue: autosaveProjectIdValue || null,
+          activeTabValue: activeTabProjectId || null,
+          runtimeValue: runtimeProjectId,
+        });
+      }
+    };
+    compareIdentity('autosaveProjectId', autosaveProjectIdValue);
+    compareIdentity('activeTabProjectId', activeTabProjectId);
+    return {
+      ok: mismatches.length === 0,
+      mismatches,
+      sessionProjectId,
+      autosaveProjectId: autosaveProjectIdValue,
+      activeTabProjectId,
+      runtimeProjectId,
+      runtimeDocumentId,
+      tab,
+    };
+  }
+
   function buildActiveProjectSessionInputFromTab(tab = null, overrides = {}) {
     const currentTab = tab && typeof tab === 'object' ? tab : {};
     const patch = overrides && typeof overrides === 'object' ? overrides : {};
@@ -9488,36 +9524,58 @@
     phase = 'unspecified',
     allowTransientMismatch = false,
   } = {}) {
-    const session = activeProjectSession;
-    const tab = typeof getActiveOpenProjectTab === 'function' ? getActiveOpenProjectTab() : null;
-    if (!session) {
+    if (!activeProjectSession) {
       return { ok: true, skipped: 'missing-session', phase };
     }
-    const comparison = activeProjectSessionUtils.compareActiveProjectSessionWithTab?.(session, tab)
-      || { ok: false, mismatches: ['session-utils-unavailable'] };
-    const autosaveId = normalizeAutosaveProjectId(autosaveProjectId || '');
-    const runtimeProjectId = normalizeAutosaveProjectId(tab?.projectId || autosaveId || '');
-    const mismatches = Array.from(new Set([
-      ...(comparison.mismatches || []),
-      ...(session.projectId && autosaveId && session.projectId !== autosaveId ? ['autosaveProjectId'] : []),
-      ...(session.projectId && runtimeProjectId && session.projectId !== runtimeProjectId ? ['runtimeProjectId'] : []),
-    ]));
+    const identity = getActiveProjectIdentityComparison();
     const result = {
-      ok: mismatches.length === 0,
+      ok: identity.ok,
       phase,
-      sessionProjectId: session.projectId || '',
-      autosaveProjectId: autosaveId,
-      activeTabProjectId: normalizeAutosaveProjectId(tab?.projectId || ''),
-      runtimeProjectId,
-      sourceKind: session.sourceKind || '',
-      sourceAdapterId: session.sourceAdapterId || null,
-      mismatches,
+      mismatches: identity.mismatches,
+      sessionProjectId: identity.sessionProjectId,
+      autosaveProjectId: identity.autosaveProjectId,
+      activeTabProjectId: identity.activeTabProjectId,
+      runtimeProjectId: identity.runtimeProjectId,
+      runtimeDocumentId: identity.runtimeDocumentId,
       transient: allowTransientMismatch === true,
     };
     if (!result.ok) {
       activeProjectSessionMismatchCount += 1;
       const logger = allowTransientMismatch ? console.warn : console.error;
       logger('[pixiedraw-dev:active-project-session-mismatch]', result);
+    }
+    return result;
+  }
+
+  function assertActiveProjectSessionMirrorConsistency({
+    phase = 'unspecified',
+    allowTransientMismatch = false,
+  } = {}) {
+    const validation = activeProjectSessionUtils.validateActiveProjectSession?.(activeProjectSession)
+      || { ok: false, errors: ['session-utils-unavailable'] };
+    const identity = getActiveProjectIdentityComparison();
+    const metadata = activeProjectSessionUtils.compareActiveProjectSessionWithTab?.(activeProjectSession, identity.tab)
+      || { ok: false, mismatches: [{ field: 'session-utils-unavailable', sessionValue: null, tabValue: null }] };
+    const mismatches = [
+      ...(validation.errors || []).map(field => ({ field: `session:${field}`, sessionValue: null, tabValue: null })),
+      ...(identity.mismatches || []),
+      ...(metadata.mismatches || []),
+    ];
+    const result = {
+      ok: mismatches.length === 0,
+      phase,
+      mismatches,
+      sessionProjectId: identity.sessionProjectId,
+      autosaveProjectId: identity.autosaveProjectId,
+      activeTabProjectId: identity.activeTabProjectId,
+      runtimeProjectId: identity.runtimeProjectId,
+      runtimeDocumentId: identity.runtimeDocumentId,
+      transient: allowTransientMismatch === true,
+    };
+    if (!result.ok) {
+      activeProjectSessionMismatchCount += 1;
+      const logger = allowTransientMismatch ? console.warn : console.error;
+      logger('[pixiedraw-dev:active-project-session-metadata-mismatch]', result);
     }
     return result;
   }
@@ -9540,6 +9598,7 @@
     }
     activeProjectSession = next;
     assertActiveProjectIdentityConsistency({ phase, allowTransientMismatch });
+    assertActiveProjectSessionMirrorConsistency({ phase, allowTransientMismatch });
     return activeProjectSession;
   }
 
@@ -9595,10 +9654,21 @@
 
   function syncActiveProjectSessionDirty(phase = 'dirty-sync') {
     if (!activeProjectSession) return null;
-    return updateActiveProjectSessionMetadata({ dirty: hasDocumentUnsavedChanges() }, {
+    const dirty = hasDocumentUnsavedChanges();
+    const session = updateActiveProjectSessionMetadata({ dirty }, {
       phase,
       allowTransientMismatch: false,
     });
+    const index = typeof findOpenProjectTabIndex === 'function'
+      ? findOpenProjectTabIndex(activeOpenProjectTabId || '')
+      : -1;
+    if (index >= 0 && openProjectTabs[index]) {
+      openProjectTabs[index] = { ...openProjectTabs[index], unsaved: dirty };
+    }
+    if (session) {
+      assertActiveProjectSessionMirrorConsistency({ phase, allowTransientMismatch: false });
+    }
+    return session;
   }
 
   function getActiveProjectPersistenceState(options = {}) {
@@ -9673,7 +9743,7 @@
     });
     const tabState = updateOpenProjectTabPersistenceState(activeOpenProjectTabId || '', nextPatch, options);
     if (session && tabState) {
-      assertActiveProjectIdentityConsistency({
+      assertActiveProjectSessionMirrorConsistency({
         phase: 'persistence-state-update:tab-mirror',
         allowTransientMismatch: false,
       });
@@ -12313,6 +12383,7 @@
     replaceActiveProjectSessionFromTab: (...args) => replaceActiveProjectSessionFromTab(...args),
     updateActiveProjectSessionSaveBinding: (...args) => updateActiveProjectSessionSaveBinding(...args),
     assertActiveProjectIdentityConsistency: (...args) => assertActiveProjectIdentityConsistency(...args),
+    assertActiveProjectSessionMirrorConsistency: (...args) => assertActiveProjectSessionMirrorConsistency(...args),
   }) || {};
   const {
     ensureOpenProjectTabsInitialized,
@@ -12352,18 +12423,29 @@
 
   function compareActiveProjectSessionWithTabForDev() {
     const tab = typeof getActiveOpenProjectTab === 'function' ? getActiveOpenProjectTab() : null;
-    const comparison = activeProjectSessionUtils.compareActiveProjectSessionWithTab?.(activeProjectSession, tab)
-      || { ok: false, mismatches: ['session-utils-unavailable'] };
-    const identity = assertActiveProjectIdentityConsistency({
-      phase: 'dev-helper-compare',
-      allowTransientMismatch: false,
-    });
-    const mismatches = Array.from(new Set([
-      ...(comparison.mismatches || []),
+    const validation = activeProjectSessionUtils.validateActiveProjectSession?.(activeProjectSession)
+      || { ok: false, errors: ['session-utils-unavailable'] };
+    const metadata = activeProjectSessionUtils.compareActiveProjectSessionWithTab?.(activeProjectSession, tab)
+      || { ok: false, mismatches: [{ field: 'session-utils-unavailable', sessionValue: null, tabValue: null }] };
+    const identity = getActiveProjectIdentityComparison();
+    const mismatches = [
+      ...(validation.errors || []).map(field => ({ field: `session:${field}`, sessionValue: null, tabValue: null })),
       ...(identity.mismatches || []),
-    ]));
+      ...(metadata.mismatches || []),
+    ];
     return {
       ok: mismatches.length === 0,
+      validation,
+      identity: {
+        ok: identity.ok,
+        mismatches: identity.mismatches,
+        sessionProjectId: identity.sessionProjectId,
+        autosaveProjectId: identity.autosaveProjectId,
+        activeTabProjectId: identity.activeTabProjectId,
+        runtimeProjectId: identity.runtimeProjectId,
+        runtimeDocumentId: identity.runtimeDocumentId,
+      },
+      metadata,
       session: getActiveProjectSessionDebugSummary(),
       tab: getActiveProjectTabDebugSummary(tab),
       mismatches,
