@@ -1600,16 +1600,20 @@ body.is-dual-left-rail:not(.is-mobile-layout) .rail--left[data-compact="false"] 
 
 body:not(.is-mobile-layout) .layout {
   --rail-resizer-offset: -8px;
-  --project-tabs-height: 52px;
+  --editor-command-lane-height: 52px;
   --workbench-line: rgba(var(--ui-rgb), 0.17);
   --workbench-line-soft: rgba(var(--ui-rgb), 0.1);
 }
 
 body:not(.is-mobile-layout) .stage {
-  top: var(--project-tabs-height);
+  top: var(--editor-command-lane-height);
   left: var(--left-stage-reserve-width);
   right: calc(var(--right-width) + var(--right-flyout-reserve, 0px));
   padding: 0;
+}
+
+body:not(.is-mobile-layout) .rail {
+  top: var(--editor-command-lane-height);
 }
 
 body:not(.is-mobile-layout) .rail-resizer {
@@ -2558,31 +2562,28 @@ body.is-right-tool-rail:not(.is-mobile-layout) .bottom-timeline-dock #panelFrame
 }
 
 body.is-right-tool-rail:not(.is-mobile-layout) .layout {
-  --project-tabs-height: 52px;
+  --editor-command-lane-height: 52px;
 }
 
-body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs {
+.editor-command-lane {
   position: relative;
   z-index: 1200;
-  flex: 0 0 var(--project-tabs-height);
-  height: var(--project-tabs-height);
+  display: none;
+  flex: 0 0 var(--editor-command-lane-height, 0px);
+  height: var(--editor-command-lane-height, 0px);
   box-sizing: border-box;
-  left: calc(12px - var(--left-stage-reserve-width));
-  width: calc(100% + var(--left-stage-reserve-width) + var(--right-width) + var(--right-flyout-reserve, 0px) - 12px);
-  margin-left: 0;
-  margin-right: 0;
   padding: 6px 4px 6px 8px;
   border: 0;
   border-bottom: 1px solid var(--workbench-line);
   background: rgba(4, 8, 13, 0.98);
 }
 
-body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs__list {
-  flex: 1 1 auto;
-  min-width: 0;
+body:not(.is-mobile-layout) .editor-command-lane {
+  display: flex;
+  width: 100%;
 }
 
-.project-tabs__actions {
+body.is-project-home-active .editor-command-lane {
   display: none;
 }
 
@@ -2590,7 +2591,7 @@ body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs__list {
   display: none;
 }
 
-body:not(.is-mobile-layout) .project-tabs__actions {
+body:not(.is-mobile-layout) .editor-command-lane__actions {
   display: flex;
   order: 3;
   flex: 0 0 auto;
@@ -2601,7 +2602,7 @@ body:not(.is-mobile-layout) .project-tabs__actions {
   padding-left: 8px;
 }
 
-body:not(.is-mobile-layout) .project-tabs__actions .canvas-controls {
+body:not(.is-mobile-layout) .editor-command-lane__actions .canvas-controls {
   position: static;
   inset: auto;
   display: flex;
@@ -2613,44 +2614,44 @@ body:not(.is-mobile-layout) .project-tabs__actions .canvas-controls {
   z-index: auto;
 }
 
-body:not(.is-mobile-layout) .project-tabs__actions #appReloadAction {
+body:not(.is-mobile-layout) .editor-command-lane__actions #appReloadAction {
   order: 2;
   margin-left: 10px;
 }
 
-body:not(.is-mobile-layout) .project-tabs__actions .canvas-controls__quick-actions {
+body:not(.is-mobile-layout) .editor-command-lane__actions .canvas-controls__quick-actions {
   display: flex;
   order: 1;
   align-items: center;
   gap: 6px;
 }
 
-body:not(.is-mobile-layout) .project-tabs__actions .canvas-controls__quick-actions [data-ui-action="openLensCamera"],
-body:not(.is-mobile-layout) .project-tabs__actions .canvas-controls__quick-actions [data-ui-action="openQrEditor"] {
+body:not(.is-mobile-layout) .editor-command-lane__actions .canvas-controls__quick-actions [data-ui-action="openLensCamera"],
+body:not(.is-mobile-layout) .editor-command-lane__actions .canvas-controls__quick-actions [data-ui-action="openQrEditor"] {
   display: none;
 }
 
-body:not(.is-mobile-layout) .project-tabs__actions .canvas-controls__history {
+body:not(.is-mobile-layout) .editor-command-lane__actions .canvas-controls__history {
   order: 3;
 }
 
-body:not(.is-mobile-layout) .project-tabs__actions #canvasControlButtons {
+body:not(.is-mobile-layout) .editor-command-lane__actions #canvasControlButtons {
   order: 1;
 }
 
-body:not(.is-mobile-layout) .project-tabs__actions .canvas-clipboard-buttons {
+body:not(.is-mobile-layout) .editor-command-lane__actions .canvas-clipboard-buttons {
   display: none !important;
 }
 
-body:not(.is-mobile-layout) .project-tabs__actions > .right-utility-menu {
+body:not(.is-mobile-layout) .editor-command-lane__actions > .right-utility-menu {
   order: 4;
 }
 
-body:not(.is-mobile-layout) .project-tabs__actions > .chip,
-body:not(.is-mobile-layout) .project-tabs__actions > .rail-tab,
-body:not(.is-mobile-layout) .project-tabs__actions > .canvas-controls .chip,
-body:not(.is-mobile-layout) .project-tabs__actions > .canvas-controls .rail-tab,
-body:not(.is-mobile-layout) .project-tabs__actions > .right-utility-menu > .right-utility-menu__trigger {
+body:not(.is-mobile-layout) .editor-command-lane__actions > .chip,
+body:not(.is-mobile-layout) .editor-command-lane__actions > .rail-tab,
+body:not(.is-mobile-layout) .editor-command-lane__actions > .canvas-controls .chip,
+body:not(.is-mobile-layout) .editor-command-lane__actions > .canvas-controls .rail-tab,
+body:not(.is-mobile-layout) .editor-command-lane__actions > .right-utility-menu > .right-utility-menu__trigger {
   width: 40px;
   min-width: 40px;
   height: 40px;
@@ -2658,14 +2659,14 @@ body:not(.is-mobile-layout) .project-tabs__actions > .right-utility-menu > .righ
   padding: 0;
 }
 
-body:not(.is-mobile-layout) .project-tabs__actions > .canvas-controls .chip,
-body:not(.is-mobile-layout) .project-tabs__actions > .right-utility-menu > .right-utility-menu__trigger {
+body:not(.is-mobile-layout) .editor-command-lane__actions > .canvas-controls .chip,
+body:not(.is-mobile-layout) .editor-command-lane__actions > .right-utility-menu > .right-utility-menu__trigger {
   display: inline-grid;
   place-items: center;
 }
 
-body:not(.is-mobile-layout) .project-tabs__actions > .canvas-controls .chip > img,
-body:not(.is-mobile-layout) .project-tabs__actions > .right-utility-menu > .right-utility-menu__trigger > .tab-icon {
+body:not(.is-mobile-layout) .editor-command-lane__actions > .canvas-controls .chip > img,
+body:not(.is-mobile-layout) .editor-command-lane__actions > .right-utility-menu > .right-utility-menu__trigger > .tab-icon {
   display: block;
   width: 24px;
   height: 24px;
@@ -2675,7 +2676,7 @@ body:not(.is-mobile-layout) .project-tabs__actions > .right-utility-menu > .righ
   object-position: center;
 }
 
-body:not(.is-mobile-layout) .project-tabs__actions #canvasControlButtons {
+body:not(.is-mobile-layout) .editor-command-lane__actions #canvasControlButtons {
   display: none;
 }
 
@@ -2691,9 +2692,9 @@ body.is-right-tool-rail:not(.is-mobile-layout) .right-utility-menu__trigger {
 }
 
 body.is-right-tool-rail:not(.is-mobile-layout) .right-utility-menu__popover {
-  top: calc(var(--project-tabs-height) + 8px);
+  top: calc(var(--editor-command-lane-height) + 8px);
   right: 8px;
-  max-height: min(420px, calc(100vh - var(--project-tabs-height) - 16px));
+  max-height: min(420px, calc(100vh - var(--editor-command-lane-height) - 16px));
 }
 
 body.is-right-tool-rail:not(.is-mobile-layout) .right-utility-menu__popover .rail-tabs--utility .rail-tab {
@@ -2706,7 +2707,7 @@ body.is-right-tool-rail:not(.is-mobile-layout) .right-utility-menu__popover .rai
 
 body.is-right-tool-rail:not(.is-mobile-layout) .rail--left,
 body.is-right-tool-rail:not(.is-mobile-layout) .rail--right {
-  top: var(--project-tabs-height);
+  top: var(--editor-command-lane-height);
 }
 
 body.is-right-tool-rail:not(.is-mobile-layout) .rail--left {
@@ -9540,6 +9541,7 @@ body.is-project-home-active {
 }
 
 body.is-project-home-active .stage {
+  top: 0;
   z-index: 530;
 }
 
