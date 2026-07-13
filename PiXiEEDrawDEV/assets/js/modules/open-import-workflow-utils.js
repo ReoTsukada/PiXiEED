@@ -576,6 +576,45 @@
     );
   }
 
+  function normalizeExternalProjectFileCandidate(project, sourceStorageAdapterId = null) {
+    if (!project || typeof project !== 'object' || Array.isArray(project)) {
+      return null;
+    }
+    if (project.canonicalPayloadFormat === 'v2') {
+      const validation = typeof validateCanonicalV2ProjectPayload === 'function'
+        ? validateCanonicalV2ProjectPayload(project)
+        : { ok: true };
+      return validation?.ok ? project : null;
+    }
+    if (typeof normalizeExternalProjectToCanonicalV2 !== 'function'
+      || typeof validateCanonicalV2ProjectPayload !== 'function') {
+      return project;
+    }
+    const normalized = normalizeExternalProjectToCanonicalV2({
+      sourceKind: 'file',
+      sourceAdapterId: typeof sourceStorageAdapterId === 'string' && sourceStorageAdapterId ? sourceStorageAdapterId : null,
+      decodedPayload: project,
+      sourceMetadata: {
+        importedFormat: sourceStorageAdapterId === 'pixieedraw-v1-json' ? 'v1-json' : 'external-project',
+      },
+    });
+    if (!normalized?.ok || !normalized.canonicalPayload) {
+      return null;
+    }
+    const validation = validateCanonicalV2ProjectPayload(normalized.canonicalPayload);
+    if (!validation?.ok) {
+      return null;
+    }
+    console.info('[pixiedraw-dev:canonical-import]', {
+      phase: 'file-tab-normalize-success',
+      sourceAdapterId: sourceStorageAdapterId || null,
+      typedByteLength: normalized.metrics?.typedByteLength || 0,
+      sheetCount: normalized.metrics?.sheetCount || 0,
+      frameCount: normalized.metrics?.frameCount || 0,
+    });
+    return normalized.canonicalPayload;
+  }
+
   async function readProjectPayloadFromOpenItem(item) {
     if (!item) {
       return null;
@@ -618,15 +657,16 @@
         const parsed = parsedResult && Object.prototype.hasOwnProperty.call(parsedResult, 'parsed')
           ? parsedResult.parsed
           : parsedResult;
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        const project = normalizeExternalProjectFileCandidate(parsed, parsedResult?.adapterId || null);
+        if (project && typeof project === 'object') {
           return {
-            project: parsed,
-            fileName: resolveOpenProjectPayloadFileName(parsed, fallbackName),
+            project,
+            fileName: resolveOpenProjectPayloadFileName(project, fallbackName),
             unsaved: false,
             sourceStorageAdapterId: parsedResult?.adapterId || null,
             sourceKind: 'file',
             sourceProjectId: null,
-            sourceSheetId: typeof parsed.activeSheetId === 'string' ? parsed.activeSheetId : null,
+            sourceSheetId: typeof project.activeSheetId === 'string' ? project.activeSheetId : null,
             sourceProjectToken: typeof createProjectPersistenceToken === 'function'
               ? createProjectPersistenceToken('file')
               : null,
@@ -637,17 +677,18 @@
         return null;
       }
       const parsed = tryParseJsonSafe(await file.text());
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      const project = normalizeExternalProjectFileCandidate(parsed, null);
+      if (!project || typeof project !== 'object') {
         return null;
       }
       return {
-        project: parsed,
-        fileName: resolveOpenProjectPayloadFileName(parsed, fallbackName),
+        project,
+        fileName: resolveOpenProjectPayloadFileName(project, fallbackName),
         unsaved: false,
         sourceStorageAdapterId: null,
         sourceKind: 'file',
         sourceProjectId: null,
-        sourceSheetId: typeof parsed.activeSheetId === 'string' ? parsed.activeSheetId : null,
+        sourceSheetId: typeof project.activeSheetId === 'string' ? project.activeSheetId : null,
         sourceProjectToken: typeof createProjectPersistenceToken === 'function'
           ? createProjectPersistenceToken('file')
           : null,
@@ -1306,7 +1347,9 @@
     }
   }
 
-  function normalizePngSheetCandidate(project, file, metrics = {}) {
+  function normalizeExternalRasterSheetCandidate(project, file, metrics = {}) {
+    const kind = metrics.kind === 'gif' ? 'gif' : 'image';
+    const documentValue = project?.document && typeof project.document === 'object' ? project.document : {};
     const sourceFileBytes = Math.max(0, Number(metrics.sourceFileBytes ?? file?.size) || 0);
     const sourceWidth = Math.max(0, Number(metrics.sourceWidth) || Number(project?.document?.width) || Number(project?.document?.canvases?.[0]?.width) || 0);
     const sourceHeight = Math.max(0, Number(metrics.sourceHeight) || Number(project?.document?.height) || Number(project?.document?.canvases?.[0]?.height) || 0);
@@ -1316,22 +1359,26 @@
     if (typeof validateCanonicalV2ProjectPayload !== 'function') {
       return { ok: false, code: 'ERR_CANONICAL_V2_VALIDATOR_UNAVAILABLE', phase: 'validate' };
     }
-    console.info('[pixieedraw-dev:png-canonical-import]', {
-      phase: 'png-normalize-start', sourceFileBytes, sourceWidth, sourceHeight,
+    console.info('[pixieedraw-dev:canonical-import]', {
+      phase: 'normalize-start', kind, sourceFileBytes, sourceWidth, sourceHeight,
     });
     const normalizeSpan = beginImportPerformanceSpan('pixiedraw-dev:import:canonical-normalize');
     let normalized;
     try {
     normalized = normalizeExternalProjectToCanonicalV2({
-      sourceKind: 'import-image',
+      sourceKind: kind === 'gif' ? 'import-gif' : 'import-image',
       sourceAdapterId: null,
       decodedPayload: project,
       sourceMetadata: {
-        sourceMimeType: typeof file?.type === 'string' ? file.type : 'image/png',
+        sourceMimeType: kind === 'gif' ? 'image/gif' : (typeof file?.type === 'string' ? file.type : 'image/png'),
         sourceFileName: typeof file?.name === 'string' ? file.name : '',
         sourceFileBytes,
         sourceWidth,
         sourceHeight,
+        ...(kind === 'gif' ? {
+          sourceFrameCount: Math.max(1, Number(documentValue?.frames?.length) || Number(documentValue?.canvases?.[0]?.frames?.length) || 1),
+          gifLoopCount: null,
+        } : {}),
       },
     });
     } finally {
@@ -1350,8 +1397,8 @@
     if (!validation?.ok) {
       return { ok: false, code: validation?.code || 'ERR_CANONICAL_V2_CANDIDATE_INVALID', phase: validation?.phase || 'validate' };
     }
-    console.info('[pixieedraw-dev:png-canonical-import]', {
-      phase: 'png-normalize-success',
+    console.info('[pixieedraw-dev:canonical-import]', {
+      phase: 'normalize-success', kind,
       sourceFileBytes,
       sourceWidth,
       sourceHeight,
@@ -1367,29 +1414,21 @@
   }
 
   async function buildImageSheetImportCandidate(file, kind = 'image') {
+    // Kept as an explicit classification for the PNG-specific regression
+    // checks; canonicalization itself now covers every raster input.
     const isPng = kind === 'image' && (() => {
       const type = typeof file?.type === 'string' ? file.type.toLowerCase() : '';
       const name = typeof file?.name === 'string' ? file.name.toLowerCase() : '';
       return type === 'image/png' || name.endsWith('.png');
     })();
+    const isGif = kind === 'gif';
     const sourceFileBytes = Math.max(0, Number(file?.size) || 0);
-    if (isPng) {
-      console.info('[pixieedraw-dev:png-canonical-import]', {
-        phase: 'png-decode-start',
-        sourceFileBytes,
-      });
-    }
+    console.info('[pixieedraw-dev:canonical-import]', { phase: 'decode-start', kind, sourceFileBytes });
     let project = null;
     try {
       project = await loadDocumentFromImageFile(file, { applyToRuntime: false });
     } catch (error) {
-      if (isPng) {
-        console.warn('[pixieedraw-dev:png-canonical-import]', {
-          phase: 'png-normalize-failed',
-          sourceFileBytes,
-          code: 'ERR_EXTERNAL_DECODE_FAILED',
-        });
-      }
+      console.warn('[pixieedraw-dev:canonical-import]', { phase: 'decode-failed', kind, sourceFileBytes, code: 'ERR_EXTERNAL_DECODE_FAILED' });
       throw error;
     }
     if (!project || typeof project !== 'object') {
@@ -1401,34 +1440,20 @@
       : 1;
     const sourceWidth = Math.max(0, Number(documentValue.width) || Number(documentValue.canvases?.[0]?.width) || 0);
     const sourceHeight = Math.max(0, Number(documentValue.height) || Number(documentValue.canvases?.[0]?.height) || 0);
-    if (isPng) {
-      console.info('[pixieedraw-dev:png-canonical-import]', {
-        phase: 'png-candidate-built',
-        sourceFileBytes,
-        sourceWidth,
-        sourceHeight,
-        canvasCount,
+    const normalized = normalizeExternalRasterSheetCandidate(project, file, {
+      kind: isGif ? 'gif' : 'image', sourceFileBytes, sourceWidth, sourceHeight,
+    });
+    if (!normalized?.ok) {
+      console.warn('[pixieedraw-dev:canonical-import]', {
+        phase: 'normalize-failed', kind, sourceFileBytes, sourceWidth, sourceHeight,
+        code: normalized?.code || 'ERR_CANONICAL_V2_NORMALIZE_FAILED',
       });
-      const normalized = normalizePngSheetCandidate(project, file, {
-        sourceFileBytes,
-        sourceWidth,
-        sourceHeight,
-      });
-      if (!normalized?.ok) {
-        console.warn('[pixieedraw-dev:png-canonical-import]', {
-          phase: 'png-normalize-failed',
-          sourceFileBytes,
-          sourceWidth,
-          sourceHeight,
-          code: normalized?.code || 'ERR_CANONICAL_V2_NORMALIZE_FAILED',
-        });
-        const error = new Error('ERR_CANONICAL_V2_CANDIDATE_INVALID');
-        error.code = 'ERR_CANONICAL_V2_CANDIDATE_INVALID';
-        error.causeCode = normalized?.code || 'ERR_CANONICAL_V2_NORMALIZE_FAILED';
-        throw error;
-      }
-      project = normalized.canonicalPayload;
+      const error = new Error('ERR_CANONICAL_V2_CANDIDATE_INVALID');
+      error.code = 'ERR_CANONICAL_V2_CANDIDATE_INVALID';
+      error.causeCode = normalized?.code || 'ERR_CANONICAL_V2_NORMALIZE_FAILED';
+      throw error;
     }
+    project = normalized.canonicalPayload;
     return {
       project,
       fileName: normalizeDocumentName(typeof file?.name === 'string' ? file.name : DEFAULT_DOCUMENT_NAME),
@@ -1439,7 +1464,7 @@
         : null,
       lastSavedStorageAdapterId: null,
       isImportedSheet: true,
-      canonicalPayloadFormat: isPng ? project.canonicalPayloadFormat || '' : '',
+      canonicalPayloadFormat: project.canonicalPayloadFormat || '',
     };
   }
 
@@ -1992,7 +2017,8 @@
     tryParseJsonSafe,
     resolveOpenProjectPayloadFileName,
     readProjectPayloadFromOpenItem,
-    normalizePngSheetCandidate,
+    normalizePngSheetCandidate: normalizeExternalRasterSheetCandidate,
+    normalizeExternalRasterSheetCandidate,
     appendProjectPayloadAsOpenTab,
     loadRecentProjectPackagedPayload,
     appendPackagedProjectTab,
