@@ -79,9 +79,19 @@
   })();
 </script>
 <script src="assets/js/modules/edition-capabilities-utils.js?v=2026.07.11-g3a-edition-ads"></script>
-<script src="assets/js/build-info.js?v=20260713-048"></script>
+<script src="assets/js/build-info.js?v=20260713-050"></script>
+<script>
+  // PiXiEELENS-compatible policy: one dedicated ad slot outside the editor.
+  window.__PIXIEEDRAW_LENS_AD_LAYOUT__ = true;
+  document.documentElement.dataset.pixieedAdLayout = 'lens';
+</script>
+<script async="" crossorigin="anonymous" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253"></script>
 <script>
   (function configurePixieedAds() {
+    if (window.__PIXIEEDRAW_LENS_AD_LAYOUT__ === true) {
+      window.__PIXIEEDRAW_AD_RENDER_ENABLED__ = false;
+      return;
+    }
     const shouldShowAds = typeof window.__PIXIEEDRAW_SHOULD_SHOW_ADS__ === 'function'
       ? window.__PIXIEEDRAW_SHOULD_SHOW_ADS__()
       : false;
@@ -148,6 +158,9 @@
 </script>
 <script>
   (function configurePixieedrawAdSlotRenderer() {
+    if (window.__PIXIEEDRAW_LENS_AD_LAYOUT__ === true) {
+      return;
+    }
     const initializedSlots = new WeakSet();
     const inFlightSlots = new WeakSet();
     const slotOwners = new WeakMap();
@@ -340,7 +353,7 @@
 
 
 
-<link href="assets/css/style.css?v=2026.07.13-editor-command-lane1" rel="stylesheet"/>
+<link href="assets/css/style.css?v=20260713-050" rel="stylesheet"/>
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-4.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-4.png"/>
 <style>
@@ -404,6 +417,12 @@
 <link rel="apple-touch-icon" href="/icon/icon-512-4.png"/>
 </head>
 <body class="app-preinit">
+<div aria-label="広告" class="pixieedraw-lens-ad-banner" id="pixieedrawLensAd">
+  <div class="ad-block">
+    <ins class="adsbygoogle" data-ad-client="ca-pub-9801602250480253" data-ad-slot="2141591954" id="pixieedrawLensAdSlot" style="display:block"></ins>
+    <small class="ad-label">広告</small>
+  </div>
+</div>
 <div aria-atomic="true" aria-live="polite" class="startup-boot-loading" id="startupBootLoading" role="status">
 <div class="startup-boot-loading__panel">
 <p class="startup-boot-loading__title">PiXiEEDrawDEV</p>
@@ -1789,7 +1808,7 @@
 	<script defer="" src="assets/js/modules/local-project-journal-utils.js?v=2026.07.13-file-primary-memory1"></script>
 	<script defer="" src="assets/js/modules/pixel-patch-history-utils.js?v=2026.07.12-direct-authority-gmem2a1"></script>
 	<script defer="" src="assets/js/modules/history-snapshot-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
-	<script defer="" src="assets/js/modules/memory-utils.js?v=2026.06.30-memory-utils-v1"></script>
+	<script defer="" src="assets/js/modules/memory-utils.js?v=20260713-049"></script>
 	<script defer="" src="assets/js/modules/playback-cache-utils.js?v=2026.06.30-playback-cache-v1"></script>
 	<script defer="" src="assets/js/modules/multi-history-utils.js?v=2026.06.30-multi-history-v1"></script>
 	<script defer="" src="assets/js/modules/reload-snapshot-utils.js?v=2026.06.30-reload-snapshot-v1"></script>
@@ -1829,7 +1848,7 @@
 	<script defer="" src="assets/js/modules/canvas-tool-state-workflow-utils.js?v=2026.07.02-canvas-tool-state-fix2"></script>
 	<script defer="" src="assets/js/modules/export-rendering.js?v=20260713-048"></script>
 	<script defer="" src="assets/js/modules/dialog-setup-utils.js?v=2026.07.12-export-format-options1"></script>
-	<script defer="" src="assets/js/modules/canvas-resize-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
+	<script defer="" src="assets/js/modules/canvas-resize-workflow-utils.js?v=20260713-049"></script>
 	<script defer="" src="assets/js/modules/canvas-resize-handle-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/local-viewport-canvas-workflow-utils.js?v=2026.07.11-touch-arbiter-v7"></script>
 	<script defer="" src="assets/js/modules/floating-draw-button-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
@@ -1888,10 +1907,11 @@
 	<script defer="" src="assets/js/modules/pre-update-checkpoint-utils.js?v=20260712-pre-update-checkpoint-u3"></script>
 	<script defer="" src="assets/js/active-project-session-utils.js?v=2026.07.13-active-project-session-r2c"></script>
 	<script defer="" src="assets/js/pixieedraw-dev-switch.js?v=2026.07.03-pixieedrawdev-switch-fix14"></script>
-	<script defer="" src="assets/js/app.js?v=20260713-048"></script>
+	<script defer="" src="assets/js/app.js?v=20260713-050"></script>
 	<script defer="" src="assets/js/modules/update-detection-utils.js?v=20260713-026"></script>
   <script>
     (function initPanelAdDocking() {
+      if (window.__PIXIEEDRAW_LENS_AD_LAYOUT__ === true) return;
       const ads = {
         left: document.getElementById('leftPanelAd'),
         right: document.getElementById('rightPanelContextAd'),
@@ -2011,6 +2031,7 @@
     // AdSense injector: keep slot nodes mounted and only promote a slot to `adsbygoogle`
     // right before push(), so 0px hidden slots never poison the global queue.
     (function initAds() {
+      if (window.__PIXIEEDRAW_LENS_AD_LAYOUT__ === true) return;
       if (!document || !window) return;
       if (!window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.()) return;
       const ADS_CLIENT = 'ca-pub-9801602250480253';
@@ -2437,7 +2458,29 @@
     })();
   </script>
 
-	<script src="../scripts/shared-bottom-nav.js?v=2026.07.08-modal-footer-preserve1"></script>
+	<script src="../scripts/shared-bottom-nav.js?v=20260713-050" data-pixieed-footer-ad="false"></script>
+	<script>
+    (function initPixieedrawLensAd() {
+      if (!window.__PIXIEEDRAW_LENS_AD_LAYOUT__ || !window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.()) return;
+      const slot = document.getElementById('pixieedrawLensAdSlot');
+      if (!(slot instanceof HTMLElement)) return;
+      const render = () => {
+        if (slot.dataset.loaded === '1' || slot.getAttribute('data-adsbygoogle-status')) return;
+        const rect = slot.getBoundingClientRect();
+        if (rect.width < 1 || rect.height < 1) {
+          window.setTimeout(render, 180);
+          return;
+        }
+        try {
+          (window.adsbygoogle = window.adsbygoogle || []).push({});
+          slot.dataset.loaded = '1';
+        } catch (error) {
+          window.setTimeout(render, 1000);
+        }
+      };
+      window.setTimeout(render, 0);
+    })();
+  </script>
   <script src="../scripts/pixel-art-fit.js"></script>
 </body>
 </html>
