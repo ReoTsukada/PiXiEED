@@ -12679,6 +12679,7 @@ body.is-mobile-layout #newProjectDialog .modal__body {
   }
   .mobile-panel.is-active > .panel-section .panel-section__body {
     flex: 1 1 auto;
+    min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
     scrollbar-width: none;
@@ -13962,36 +13963,30 @@ body.is-mobile-layout .mobile-panel.is-active #panelFrames .panel-section__body 
   scroll-padding-bottom: calc(var(--pixieed-shared-bottom-nav-offset, 68px) + 18px);
 }
 
-/* On a portrait device the panel, rather than the drawer shell, owns its
-   trailing ad.  Make the drawer's panel viewport the one scroll container so
-   the complete panel body and its final ad are reachable in every height mode. */
-body.is-mobile-layout .mobile-panels {
-  overflow-y: auto;
-  overscroll-behavior-y: contain;
-  scroll-padding-bottom: calc(var(--pixieed-shared-bottom-nav-offset, 68px) + 18px);
-}
-
-body.is-mobile-layout .mobile-panel.is-active {
-  height: auto;
-  min-height: 100%;
-  overflow: visible;
-}
-
-body.is-mobile-layout .mobile-panel.is-active > .panel-section {
-  height: auto;
-  min-height: 100%;
-  flex: 0 0 auto;
-  overflow: visible;
-}
-
+/* The panel section is a flex child of the fixed-height drawer.  It must be
+   allowed to shrink so the body—not the drawer—becomes the scroll viewport. */
+body.is-mobile-layout .mobile-panel.is-active > .panel-section,
 body.is-mobile-layout .mobile-panel.is-active > .panel-section .panel-section__body {
-  flex: 0 0 auto;
-  overflow: visible;
-  padding-bottom: 16px;
+  min-height: 0;
 }
 
-body.is-mobile-layout .mobile-drawer .mobile-panel.is-active .panel-ad-mount[data-panel-ad-mount='left'],
-body.is-mobile-layout .mobile-drawer .mobile-panel.is-active .panel-ad-mount[data-panel-ad-mount='left'] #leftPanelAd {
+body.is-mobile-layout.is-unified-left-tools-color .mobile-panel.is-active > .panel-section[data-section='tools'] .panel-section__body,
+body.is-mobile-layout.is-unified-left-tools-color .mobile-panel.is-active > .panel-section[data-section='color'] .panel-section__body {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+body.is-mobile-layout.is-unified-left-tools-color .mobile-panel.is-active > .panel-section[data-section='tools'],
+body.is-mobile-layout.is-unified-left-tools-color .mobile-panel.is-active > .panel-section[data-section='color'] {
+  height: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+/* Keep the drawer's initial height independent from advertising. On mobile
+   the docking code moves the active panel's mount into its scrollable body. */
+body.is-mobile-layout .mobile-drawer:not([data-mode='full']) .mobile-panel.is-active .panel-ad-mount[data-panel-ad-mount='left'],
+body.is-mobile-layout .mobile-drawer:not([data-mode='full']) .mobile-panel.is-active .panel-ad-mount[data-panel-ad-mount='left'] #leftPanelAd {
   display: block !important;
   width: 100% !important;
   min-height: 96px !important;
@@ -14000,7 +13995,7 @@ body.is-mobile-layout .mobile-drawer .mobile-panel.is-active .panel-ad-mount[dat
   padding: 0 !important;
 }
 
-body.is-mobile-layout .mobile-drawer .mobile-panel.is-active .panel-ad-mount[data-panel-ad-mount='left'] #leftPanelAd {
+body.is-mobile-layout .mobile-drawer:not([data-mode='full']) .mobile-panel.is-active .panel-ad-mount[data-panel-ad-mount='left'] #leftPanelAd {
   display: flex !important;
   margin: 0 !important;
   overflow: hidden !important;
