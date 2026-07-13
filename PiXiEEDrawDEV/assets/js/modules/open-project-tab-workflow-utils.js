@@ -677,11 +677,17 @@
       const latestEntry = storedPackagedProject
         ? null
         : (latestEntries.find(entry => normalizeAutosaveProjectId(entry?.id || '') === targetProjectId) || recentProjectsCache.get(targetProjectId) || null);
-      const reconstructed = storedPackagedProject && typeof storedPackagedProject === 'object'
+      let reconstructed = storedPackagedProject && typeof storedPackagedProject === 'object'
         ? storedPackagedProject
-        : (typeof reconstructLocalRecentProjectPayload === 'function'
-          ? reconstructLocalRecentProjectPayload(latestEntry)
-          : null);
+        : null;
+      if (!reconstructed
+        && Number(latestEntry?.autosaveSchemaVersion) === 2
+        && typeof readAutosaveV2PrimaryProject === 'function') {
+        reconstructed = await readAutosaveV2PrimaryProject(targetProjectId);
+      }
+      if (!reconstructed && typeof reconstructLocalRecentProjectPayload === 'function') {
+        reconstructed = reconstructLocalRecentProjectPayload(latestEntry);
+      }
       targetProjectPayload = reconstructed && typeof reconstructed === 'object'
         ? (typeof extractLocalProjectSheetPayload === 'function'
           ? extractLocalProjectSheetPayload(reconstructed, target.id) || reconstructed
