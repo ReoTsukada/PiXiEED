@@ -178,7 +178,10 @@
       });
     }
 
-    function comparableMeta(meta = null) {
+    function comparableMeta(meta = null, handleState = 'none') {
+      if (handleState === 'none') {
+        return null;
+      }
       const value = meta && typeof meta === 'object' ? meta : {};
       return {
         fileName: asString(value.fileName),
@@ -187,35 +190,41 @@
     }
 
     function compareActiveProjectSessionWithTab(session = null, tab = null) {
-      const validation = validateActiveProjectSession(session);
       const value = tab && typeof tab === 'object' ? tab : null;
       const mismatches = [];
-      if (!validation.ok) {
-        mismatches.push(...validation.errors.map(error => `session:${error}`));
-      }
+      const recordMismatch = (field, sessionValue, tabValue) => {
+        mismatches.push({ field, sessionValue, tabValue });
+      };
       if (!value) {
-        mismatches.push('missing-tab');
+        recordMismatch('activeTab', Boolean(session), null);
       }
-      if (value && validation.ok) {
+      if (value && session && typeof session === 'object') {
+        const sessionHandleState = normalizeProjectSaveHandleState(session.projectSaveHandleState, 'none');
+        const tabHandleState = normalizeProjectSaveHandleState(value.projectSaveHandleState, 'none');
         const pairs = [
-          ['projectId', session.projectId, normalizeAutosaveProjectId(value.projectId || '')],
           ['sourceKind', session.sourceKind, normalizeProjectSourceKind(value.sourceKind, 'unknown')],
           ['sourceAdapterId', session.sourceAdapterId, normalizeProjectStorageAdapterId(value.sourceStorageAdapterId)],
           ['sourceProjectToken', session.sourceProjectToken || '', asString(value.sourceProjectToken)],
           ['lastSavedAdapterId', session.lastSavedAdapterId, normalizeProjectStorageAdapterId(value.lastSavedStorageAdapterId)],
-          ['projectSaveHandleState', session.projectSaveHandleState, normalizeProjectSaveHandleState(value.projectSaveHandleState, 'none')],
+          ['projectSaveHandleState', sessionHandleState, tabHandleState],
+          ['dirty', session.dirty === true, value.unsaved === true],
         ];
         pairs.forEach(([field, left, right]) => {
-          if ((left || null) !== (right || null)) mismatches.push(field);
+          if ((left || null) !== (right || null)) recordMismatch(field, left || null, right || null);
         });
-        const tabHandle = normalizeHandle(value.projectSaveHandle);
-        if ((session.projectSaveHandle || null) !== (tabHandle || null)) {
-          mismatches.push('projectSaveHandle');
+        const sessionHasHandle = Boolean(normalizeHandle(session.projectSaveHandle));
+        const tabHasHandle = Boolean(normalizeHandle(value.projectSaveHandle));
+        if (sessionHasHandle !== tabHasHandle) {
+          recordMismatch('hasProjectSaveHandle', sessionHasHandle, tabHasHandle);
         }
-        const sessionMeta = comparableMeta(session.projectSaveHandleMeta);
-        const tabMeta = comparableMeta(value.projectSaveHandleMeta);
-        if (sessionMeta.fileName !== tabMeta.fileName) mismatches.push('projectSaveHandleMeta.fileName');
-        if (sessionMeta.adapterId !== tabMeta.adapterId) mismatches.push('projectSaveHandleMeta.adapterId');
+        const sessionMeta = comparableMeta(session.projectSaveHandleMeta, sessionHandleState);
+        const tabMeta = comparableMeta(value.projectSaveHandleMeta, tabHandleState);
+        if ((sessionMeta?.fileName || null) !== (tabMeta?.fileName || null)) {
+          recordMismatch('projectSaveHandleMeta.fileName', sessionMeta?.fileName || null, tabMeta?.fileName || null);
+        }
+        if ((sessionMeta?.adapterId || null) !== (tabMeta?.adapterId || null)) {
+          recordMismatch('projectSaveHandleMeta.adapterId', sessionMeta?.adapterId || null, tabMeta?.adapterId || null);
+        }
       }
       return {
         ok: mismatches.length === 0,
