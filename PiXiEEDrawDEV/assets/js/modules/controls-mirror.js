@@ -307,7 +307,6 @@
 
   function applyLayoutMode() {
     const isMobile = layoutMode === 'mobilePortrait';
-    const desktopRightTools = !isMobile && isDesktopRightToolRailMode();
     if (isMobile || !isDualLeftRailEnabled()) {
       endLeftDualSplitResize({ persist: false });
     }
@@ -343,7 +342,7 @@
       if (isMobile && dom.mobileShortcutsMount) {
         dom.canvasControls.dataset.mobile = 'true';
         dom.mobileShortcutsMount.appendChild(dom.canvasControls);
-      } else if (desktopRightTools && dom.projectTabsActions instanceof HTMLElement) {
+      } else if (!isMobile && dom.projectTabsActions instanceof HTMLElement) {
         delete dom.canvasControls.dataset.mobile;
         dom.projectTabsActions.appendChild(dom.canvasControls);
       } else if (!isMobile && canvasControlsDefaultParent) {
@@ -356,7 +355,7 @@
       }
     }
     if (dom.rightUtilityMenu instanceof HTMLElement) {
-      if (desktopRightTools && dom.projectTabsActions instanceof HTMLElement) {
+      if (!isMobile && dom.projectTabsActions instanceof HTMLElement) {
         dom.projectTabsActions.appendChild(dom.rightUtilityMenu);
       } else if (rightUtilityMenuDefaultParent instanceof HTMLElement) {
         if (
