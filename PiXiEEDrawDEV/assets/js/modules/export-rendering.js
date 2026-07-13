@@ -2570,23 +2570,15 @@
     return typeof window !== 'undefined' && window.__pixieedrawUseMultiSheetV2ExternalSave === true;
   }
 
-  function collectCompleteMultiSheetV2Candidate(activePackagedProject, { includeTimelapse = true } = {}) {
-    if (typeof collectCompleteMultiSheetV2SaveCandidate !== 'function') return null;
-    const activeProjectId = normalizeAutosaveProjectId(autosaveProjectId || '');
-    return collectCompleteMultiSheetV2SaveCandidate({
-      openProjectTabs,
-      activeSheetId: activeOpenProjectTabId,
-      activePackagedProject,
-      includeTimelapse,
-      resolveStoredProjectForSheet: tab => {
-        const stored = activeProjectId && typeof resolveStoredLocalProjectPayloadForProjectId === 'function'
-          ? resolveStoredLocalProjectPayloadForProjectId(activeProjectId)
-          : null;
-        return stored && typeof extractLocalProjectSheetPayload === 'function'
-          ? extractLocalProjectSheetPayload(stored, tab?.id || '')
-          : null;
-      },
-    });
+  function collectCompleteMultiSheetV2Candidate(activePackagedProject) {
+    // Compatibility name retained for the former DEV command. It now emits
+    // only the active document, never a resident-tab collection.
+    if (!activePackagedProject || typeof activePackagedProject !== 'object') return null;
+    const packaged = { ...activePackagedProject, projectLayout: 'single-project' };
+    delete packaged.sheets;
+    delete packaged.sheetOrder;
+    delete packaged.activeSheetId;
+    return { includeSheets: false, packaged, complete: true, warnings: [], errors: [] };
   }
 
   function normalizeProjectStorageAdapterId(adapterId = '') {
@@ -3640,12 +3632,12 @@
     try {
       const exportFileNameBase = options?.fileNameBase || getExportFileNameBase() || state.documentName;
       const v1Bundle = await buildProjectExportBundle(exportFileNameBase, {
-        includeSheets: true,
+        includeSheets: false,
       });
       const v2Bundle = await buildProjectExportBundle(
         buildExperimentalProjectFileNameBase(exportFileNameBase),
         {
-          includeSheets: true,
+          includeSheets: false,
           includeTimelapse: options?.includeTimelapse !== false,
           useWorker: options?.useWorker === true,
           requireWorker: options?.requireWorker === true,
@@ -3655,11 +3647,11 @@
       const sizeComparison = buildProjectBundleSizeComparison(v1Bundle, v2Bundle);
       const saveResult = await saveProjectBundleAsNewFile(v2Bundle, {
         shareTitle: `${state.documentName || 'PiXiEEDraw'} v2`,
-        shareText: `${state.documentName || 'PiXiEEDraw'} (PiXiEEDraw v2 experimental includeSheets:true)`,
+        shareText: `${state.documentName || 'PiXiEEDraw'} (PiXiEEDraw v2 single project)`,
       });
 
       console.info('[PiXiEEDraw V2 Experimental]');
-      console.info('includeSheets: true');
+      console.info('includeSheets: false (single project)');
       console.info(`v1 bytes: ${sizeComparison.v1Bytes}`);
       console.info(`v2 bytes: ${sizeComparison.v2Bytes}`);
       console.info(`saved bytes: ${sizeComparison.savedBytes}`);
@@ -3668,23 +3660,23 @@
       console.info(`worker used: ${v2Bundle.workerUsed === true}`);
 
       if (saveResult.saved && announceStatus) {
-        updateAutosaveStatus('実験保存: includeSheets:true の v2 ファイルを書き出しました', 'success');
+        updateAutosaveStatus('実験保存: 単一プロジェクトの v2 ファイルを書き出しました', 'success');
       } else if (!saveResult.cancelled && announceStatus) {
-        updateAutosaveStatus('実験保存: includeSheets:true の v2 ファイルを書き出せませんでした', 'error');
+        updateAutosaveStatus('実験保存: 単一プロジェクトの v2 ファイルを書き出せませんでした', 'error');
       }
 
       return {
         ...saveResult,
-        includeSheets: true,
+        includeSheets: false,
         storageAdapterId: v2Bundle.storageAdapterId,
         filename: saveResult.filename || v2Bundle.filename,
         workerUsed: v2Bundle.workerUsed === true,
         sizeComparison,
       };
     } catch (error) {
-      console.error('Experimental v2 includeSheets save failed', error);
+      console.error('Experimental v2 single-project save failed', error);
       if (announceStatus) {
-        updateAutosaveStatus('実験保存: includeSheets:true の v2 ファイルを書き出せませんでした', 'error');
+        updateAutosaveStatus('実験保存: 単一プロジェクトの v2 ファイルを書き出せませんでした', 'error');
       }
       return { saved: false, cancelled: false, error };
     }
