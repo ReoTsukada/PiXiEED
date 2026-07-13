@@ -13861,118 +13861,84 @@ body.is-right-tool-rail:not(.is-mobile-layout) #panelColor .palette-action-menu:
   display: none;
 }
 
-/* PiXiEELENS-compatible single ad slot. The editor reserves the ad region so
-   its command lane, tabs, and canvas never sit beneath an iframe. */
-html[data-pixieed-ad-layout='lens'] {
-  --pixieedraw-lens-ad-inline-padding: 6px;
-  --pixieedraw-lens-ad-height: 50px;
-  --pixieedraw-lens-ad-gap: 8px;
-  --pixieedraw-lens-ad-side-width: 120px;
-}
-
-html[data-pixieed-ad-layout='lens'] #panelAdPreloadHost,
-html[data-pixieed-ad-layout='lens'] .panel-ad,
-html[data-pixieed-ad-layout='lens'] .panel-ad-mount,
-html[data-pixieed-ad-layout='lens'] #mobileBottomAd,
-html[data-pixieed-ad-layout='lens'] .startup-screen__ad,
-html[data-pixieed-ad-layout='lens'] .new-project__ad,
-html[data-pixieed-ad-layout='lens'] .export-ad {
-  display: none !important;
-}
-
-.pixieedraw-lens-ad-banner {
-  position: fixed;
-  top: calc(env(safe-area-inset-top, 0px) + var(--pixieedraw-lens-ad-inline-padding));
-  left: 50%;
-  z-index: 14020;
-  display: none;
-  width: calc(100vw - (var(--pixieedraw-lens-ad-inline-padding) * 2));
-  height: var(--pixieedraw-lens-ad-height);
-  transform: translateX(-50%);
-  pointer-events: auto;
-}
-
-body.app-ready .pixieedraw-lens-ad-banner {
-  display: flex;
-  align-items: stretch;
-  justify-content: center;
-}
-
-.pixieedraw-lens-ad-banner .ad-block {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  border: 1px dashed rgba(255, 255, 255, 0.2);
-  border-radius: 8px;
-  background: linear-gradient(150deg, rgba(255, 255, 255, 0.04), rgba(15, 23, 42, 0.9));
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
-}
-
-.pixieedraw-lens-ad-banner .ad-label {
-  position: absolute;
-  z-index: 1;
-  top: 2px;
-  left: 4px;
-  padding: 2px 5px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.6);
-  color: #cbd5e1;
-  font-size: 9px;
-  line-height: 1;
-  letter-spacing: 0.04em;
-  pointer-events: none;
-}
-
-.pixieedraw-lens-ad-banner ins.adsbygoogle,
-.pixieedraw-lens-ad-banner ins.adsbygoogle iframe {
-  display: block;
-  width: 100% !important;
-  max-width: 100% !important;
-  min-height: 100% !important;
-  height: 100% !important;
-  max-height: 100% !important;
-  overflow: hidden;
-}
-
-@media (orientation: portrait) {
-  html[data-pixieed-ad-layout='lens'] body.app-ready .app {
-    padding-top: calc(
-      env(safe-area-inset-top, 0px)
-      + var(--pixieedraw-lens-ad-height)
-      + (var(--pixieedraw-lens-ad-inline-padding) * 2)
-      + var(--pixieedraw-lens-ad-gap)
-    ) !important;
-    padding-bottom: var(--pixieed-shared-bottom-nav-offset, 68px) !important;
-  }
-}
-
-@media (orientation: landscape) {
-  .pixieedraw-lens-ad-banner {
-    top: 50%;
-    left: calc(env(safe-area-inset-left, 0px) + var(--pixieedraw-lens-ad-inline-padding));
-    width: var(--pixieedraw-lens-ad-side-width);
-    height: calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - (var(--pixieedraw-lens-ad-inline-padding) * 2));
-    transform: translateY(-50%);
-  }
-
-  html[data-pixieed-ad-layout='lens'] body.app-ready .app {
-    padding-left: calc(
-      env(safe-area-inset-left, 0px)
-      + var(--pixieedraw-lens-ad-side-width)
-      + (var(--pixieedraw-lens-ad-inline-padding) * 2)
-      + var(--pixieedraw-lens-ad-gap)
-    ) !important;
-  }
-}
-
-html[data-embed-mode='true'] .pixieedraw-lens-ad-banner {
-  display: none !important;
-}
-
 body.is-right-tool-rail:not(.is-mobile-layout) #panelColor .palette-action-menu__content .chip {
   width: var(--ui-control-tile-size);
   min-width: var(--ui-control-tile-size);
   height: var(--ui-control-tile-size);
   min-height: var(--ui-control-tile-size);
+}
+
+/* Mobile ads belong to the selected drawer panel, not to a fixed footer.
+   Only the active panel owns the moved left-panel slot, so a single ad is
+   rendered at a time and never overlays the canvas or the shared navigation. */
+body.is-mobile-layout #mobileBottomAd {
+  display: none !important;
+}
+
+body.is-mobile-layout .app {
+  padding-bottom: var(--pixieed-shared-bottom-nav-offset, 68px) !important;
+}
+
+body.is-mobile-layout .mobile-panel.is-active .panel-ad-mount[data-panel-ad-mount='left'] {
+  display: block !important;
+  width: 100% !important;
+  min-height: 96px !important;
+  height: auto !important;
+  margin: 12px 0 0 !important;
+  padding: 0 !important;
+  overflow: visible !important;
+}
+
+body.is-mobile-layout .mobile-panel.is-active .panel-ad-mount[data-panel-ad-mount='left'] #leftPanelAd {
+  display: flex !important;
+  width: 100% !important;
+  min-height: 96px !important;
+  height: auto !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+body.is-mobile-layout .mobile-panel.is-active .panel-ad-mount[data-panel-ad-mount='left'] #leftPanelAdSlot,
+body.is-mobile-layout .mobile-panel.is-active .panel-ad-mount[data-panel-ad-mount='left'] #leftPanelAdSlot > ins {
+  display: block !important;
+  width: min(100%, 320px) !important;
+  min-width: 0 !important;
+  min-height: 96px !important;
+  height: 96px !important;
+  max-height: 96px !important;
+  margin: 0 auto !important;
+}
+
+body.is-mobile-layout .mobile-panel.is-active .panel-ad-mount[data-panel-ad-mount='left'] #leftPanelAdSlot > ins iframe {
+  display: block !important;
+  width: 100% !important;
+  min-height: 96px !important;
+  height: 96px !important;
+  max-height: 96px !important;
+}
+
+/* A half-height drawer is intentionally a compact control surface. Rendering
+   an iframe there would place the panel tail beneath the fixed common nav.
+   The ad becomes available as soon as the user expands that panel fully. */
+body.is-mobile-layout .mobile-drawer:not([data-mode='full']) .panel-ad-mount[data-panel-ad-mount='left'],
+body.is-mobile-layout .mobile-drawer:not([data-mode='full']) .panel-ad-mount[data-panel-ad-mount='left'] #leftPanelAd {
+  display: none !important;
+  min-height: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* The timeline used to stretch to the drawer's whole height on mobile. Keep
+   it in normal document flow here so its final ad mount is reached by the
+   panel's own scroll area rather than spilling beneath the common nav. */
+body.is-mobile-layout .mobile-panel.is-active #panelFrames .timeline-card {
+  height: auto !important;
+  min-height: 0 !important;
+}
+
+body.is-mobile-layout .mobile-panel.is-active #panelFrames .panel-section__body {
+  scroll-padding-bottom: calc(var(--pixieed-shared-bottom-nav-offset, 68px) + 18px);
 }
