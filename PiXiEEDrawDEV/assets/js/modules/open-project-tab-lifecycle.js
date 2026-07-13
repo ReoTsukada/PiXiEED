@@ -360,7 +360,13 @@
     }
 
     function hideProjectHomeScreen() {
-      if (!getProjectHomeVisible?.()) {
+      const screen = dom?.projectHomeScreen;
+      const visiblyOpen = screen instanceof HTMLElement && screen.hidden === false;
+      const classStillActive = document.body?.classList.contains('is-project-home-active') === true;
+      // A startup transition or interstitial can leave the home DOM visible
+      // after its state flag changed. Clear the actual layer as well, or it
+      // continues to sit above project tabs and intercepts their clicks.
+      if (!getProjectHomeVisible?.() && !visiblyOpen && !classStillActive) {
         return;
       }
       setProjectHomeVisible(false);
