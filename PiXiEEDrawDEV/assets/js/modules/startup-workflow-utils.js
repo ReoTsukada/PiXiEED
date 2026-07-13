@@ -1427,15 +1427,10 @@
         return;
       }
       openButton.disabled = true;
-      const closedCurrentProject = await closeAllOpenProjectTabsForProjectReplacement({ flushAutosave: true, showHome: false });
-      if (!closedCurrentProject) {
-        openButton.disabled = false;
-        updateAutosaveStatus(
-          localizeText('現在のプロジェクトを保存できなかったため、切り替えを中止しました', 'Project switch was canceled because the current project could not be saved'),
-          'error'
-        );
-        return;
-      }
+      // Keep the current project alive until the selected recent project has
+      // actually been decoded. `openRecentProject` replaces the tab set only
+      // after a successful load, so a corrupt/missing V2 record cannot leave
+      // the user with an empty editor.
       const success = await openRecentProject(entry, {
         hideStartup: false,
         replaceOpenProjectTabs: true,
