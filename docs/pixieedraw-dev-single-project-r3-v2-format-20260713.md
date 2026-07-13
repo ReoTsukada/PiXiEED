@@ -4,7 +4,7 @@
 
 ## 新規V2の保存構造
 
-build `20260713-045` から、新しく保存・自動保存・V2エクスポートするデータは一つのプロジェクトだけを保持する。
+build `20260713-048` から、新しく保存・自動保存・V2エクスポートするデータは一つのプロジェクトだけを保持する。
 
 ```text
 V2 archive (.pixieedraw ZIP)
@@ -66,4 +66,14 @@ node scripts/test-pixiedraw-dev-active-project-session-r2.mjs
 node scripts/check-pixiedraw-dev-tdz.mjs
 ```
 
-すべて成功。実ブラウザでは build `20260713-045` を読み込んだ後、V2初回保存、同一保存先上書き、旧V2複数プロジェクト読込・分割、V1/画像入力、recent/recovery/reloadを順に確認する。
+すべて成功。
+
+## 実ブラウザのGIF読込記録とR3-C修正
+
+build `20260713-047` の実ブラウザログでは、GIFのデコード、単一V2への正規化、保存先未設定のV2作業コピー作成、V2ファイル書込みを確認した。一方、画像切替直後に旧プロジェクトの保存handleを解除していたため、`save-handle-update:session-first` の一時的な active-project-session mismatch が発生した。
+
+build `20260713-048` では、単一projectのsessionとtab mirrorを新しいproject IDで確定してから、外部入力由来の保存handleを解除する順序へ修正した。これにより元V1・旧V2・画像ファイルを上書きしない保証を保ったまま、旧sessionと新autosave IDの混在をなくす。
+
+また、描画ツール内のrecent一覧DOMを廃止してPiXiEED My Pageへ移したため、recent一覧コンテナがないことを `ERR_RECENT_CONTAINER_MISSING` としていたログを、正常な `RECENT_UI_REMOVED` skipへ変更した。
+
+実ブラウザでは build `20260713-048` を読み込んだ後、まずGIF/PNGの読込直後に `active-project-session-mismatch` が出ないことを確認する。その後、V2初回保存、同一保存先上書き、旧V2複数プロジェクト読込・分割、V1/画像入力、recent/recovery/reloadを順に確認する。

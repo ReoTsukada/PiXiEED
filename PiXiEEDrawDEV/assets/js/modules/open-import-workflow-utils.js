@@ -457,6 +457,11 @@
     const loaded = await loadDocumentFromProjectPayload(candidate.project, {
       suppressAutosaveStatus: true,
       forceV2WorkingCopy: true,
+      sourceKind: candidate.sourceKind || 'import-image',
+      sourceProjectToken: candidate.sourceProjectToken || null,
+      sourceStorageAdapterId: null,
+      lastSavedStorageAdapterId: null,
+      projectSaveHandleState: 'none',
       sourcePersistenceState: {
         sourceStorageAdapterId: null,
         sourceKind: candidate.sourceKind || 'import-image',

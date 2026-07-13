@@ -786,7 +786,10 @@
       || (dom.projectHomeRecentSection instanceof HTMLElement && dom.projectHomeRecentList instanceof HTMLElement)
     );
     if (!hasRecentList) {
-      console.info('[pixiedraw-dev:recent-projects]', { phase: 'recent-projects-load-failed', count: 0, hasContainer: false, containerHidden: true, code: 'ERR_RECENT_CONTAINER_MISSING' });
+      // The editor deliberately has no local-project list. Project browsing
+      // lives in PiXiEED My Page, so a missing list is an expected UI shape,
+      // not a storage failure.
+      console.info('[pixiedraw-dev:recent-projects]', { phase: 'recent-projects-load-skipped', count: recentProjectsCache.size, hasContainer: false, containerHidden: true, code: 'RECENT_UI_REMOVED' });
       return;
     }
     if (!AUTOSAVE_SUPPORTED) {

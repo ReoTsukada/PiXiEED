@@ -10,10 +10,18 @@ const imageUtils = read('PiXiEEDrawDEV/assets/js/modules/image-utils.js');
 const app = read('PiXiEEDrawDEV/assets/js/app.js');
 
 assert.match(session, /const normalizeExternalInputToV2 = options\?\.fileLoad === true \|\| options\?\.forceV2WorkingCopy === true/);
+assert.match(session, /const mustCreateUnboundV2WorkingCopy = options\?\.fileLoad === true \|\| options\?\.forceV2WorkingCopy === true/);
 assert.match(session, /autosaveHandle = null/);
 assert.match(session, /clearActiveProjectSaveHandle\?\.\(\)/);
 assert.match(session, /external-input-converted-to-v2-working-copy/);
+assert.ok(
+  session.indexOf('await restoreOpenProjectSheetsFromParsedDocument')
+    < session.indexOf('if (mustCreateUnboundV2WorkingCopy)'),
+  'external-input save binding must be cleared only after the new project session/tab mirror is restored'
+);
 assert.match(imports, /forceV2WorkingCopy: true/);
+assert.match(imports, /sourceKind: candidate\.sourceKind \|\| 'import-image'/);
+assert.match(app, /'import-image', 'import-gif', 'mixed'/);
 assert.match(imports, /Open one project at a time/);
 assert.match(imports, /image\/jpeg/);
 assert.match(imports, /image\/webp/);

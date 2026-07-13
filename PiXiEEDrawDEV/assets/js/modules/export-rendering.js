@@ -2589,7 +2589,7 @@
 
   function normalizeProjectSourceKind(sourceKind = '', fallback = 'unknown') {
     const normalized = typeof sourceKind === 'string' ? sourceKind.trim() : '';
-    const allowed = new Set(['new', 'file', 'recent', 'autosave', 'shared-local', 'import-image', 'mixed', 'unknown']);
+    const allowed = new Set(['new', 'file', 'recent', 'autosave', 'shared-local', 'import-image', 'import-gif', 'mixed', 'unknown']);
     if (allowed.has(normalized)) {
       return normalized;
     }

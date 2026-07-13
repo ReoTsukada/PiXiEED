@@ -541,22 +541,8 @@
     const sourcePersistenceState = options?.sourcePersistenceState && typeof options.sourcePersistenceState === 'object'
       ? options.sourcePersistenceState
       : null;
+    const mustCreateUnboundV2WorkingCopy = options?.fileLoad === true || options?.forceV2WorkingCopy === true;
     setActiveAutosaveProjectId(requestedProjectId || createAutosaveProjectId());
-    if (options?.fileLoad === true || options?.forceV2WorkingCopy === true) {
-      // The opened bytes are only an import source.  Do not retain its file
-      // handle or let a subsequent autosave overwrite V1/legacy V2/input
-      // files; the next durable save must choose a V2 destination.
-      autosaveHandle = null;
-      pendingAutosaveHandle = null;
-      clearPendingPermissionListener?.();
-      clearActiveProjectSaveHandle?.();
-      console.info('[pixiedraw-dev:v2-import]', {
-        phase: 'external-input-converted-to-v2-working-copy',
-        sourceKind: sourcePersistenceState?.sourceKind || options?.sourceKind || 'file',
-        sourceAdapterId: parsedDocument?.storageAdapterId || null,
-        projectId: autosaveProjectId,
-      });
-    }
     if (!options?.suppressProjectSheetsRestore) {
       await restoreOpenProjectSheetsFromParsedDocument(parsedDocument, {
         projectId: requestedProjectId || autosaveProjectId,
@@ -579,6 +565,23 @@
       updateActiveProjectPersistenceState(sourcePersistenceState, {
         render: false,
         log: true,
+      });
+    }
+    if (mustCreateUnboundV2WorkingCopy) {
+      // The opened bytes are only an import source. Do not retain its file
+      // handle or let a subsequent autosave overwrite V1/legacy V2/input
+      // files. This must run after the new project's session and tab mirror
+      // are committed; clearing the former project's binding here would make
+      // session metadata briefly point at a different project ID.
+      autosaveHandle = null;
+      pendingAutosaveHandle = null;
+      clearPendingPermissionListener?.();
+      clearActiveProjectSaveHandle?.();
+      console.info('[pixiedraw-dev:v2-import]', {
+        phase: 'external-input-converted-to-v2-working-copy',
+        sourceKind: sourcePersistenceState?.sourceKind || options?.sourceKind || 'file',
+        sourceAdapterId: parsedDocument?.storageAdapterId || null,
+        projectId: autosaveProjectId,
       });
     }
     const loadedQrEditPayload = Object.prototype.hasOwnProperty.call(options || {}, 'qrEditPayload')
