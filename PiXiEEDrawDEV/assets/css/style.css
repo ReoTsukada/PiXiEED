@@ -75,8 +75,8 @@
   --ui-compact-tool-flyout-size: var(--ui-control-tile-size);
   --left-unified-tools-min-height: calc((var(--ui-control-tile-size) * 2) + 34px);
   --left-unified-color-min-height: 168px;
-  --project-tabs-height: 40px;
-  --project-tabs-mobile-height: 36px;
+  --project-tabs-height: 0px;
+  --project-tabs-mobile-height: 0px;
 }
 
 html,
@@ -1600,7 +1600,7 @@ body.is-dual-left-rail:not(.is-mobile-layout) .rail--left[data-compact="false"] 
 
 body:not(.is-mobile-layout) .layout {
   --rail-resizer-offset: -8px;
-  --project-tabs-height: 34px;
+  --project-tabs-height: 0px;
   --workbench-line: rgba(var(--ui-rgb), 0.17);
   --workbench-line-soft: rgba(var(--ui-rgb), 0.1);
 }
@@ -2557,7 +2557,7 @@ body.is-right-tool-rail:not(.is-mobile-layout) .bottom-timeline-dock #panelFrame
 }
 
 body.is-right-tool-rail:not(.is-mobile-layout) .layout {
-  --project-tabs-height: 52px;
+  --project-tabs-height: 0px;
 }
 
 body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs {
