@@ -1776,11 +1776,33 @@
     const clampedHeight = clamp(Math.round(Number(height) || 0), minHeight, maxHeight);
     mobileDrawerState.drag.currentHeight = clampedHeight;
     root.style.setProperty('--mobile-drawer-height', `${clampedHeight}px`);
+    syncMobileDrawerInlineHeight(clampedHeight, minHeight, maxHeight);
     scheduleMirrorGuideRefresh();
     scheduleCanvasResizeHandleLayoutRefresh();
     if (isMirrorToolPopoverOpen()) {
       positionMirrorToolPopover();
     }
+  }
+
+  function syncMobileDrawerInlineHeight(height, minHeight, maxHeight) {
+    const drawer = dom.mobileDrawer;
+    if (!(drawer instanceof HTMLElement) || layoutMode !== 'mobilePortrait') {
+      return;
+    }
+    const expectedHeight = `${Math.round(height)}px`;
+    const expectedMinHeight = `${Math.round(minHeight)}px`;
+    const expectedMaxHeight = `${Math.round(maxHeight)}px`;
+    const setImportant = (property, value) => {
+      if (
+        drawer.style.getPropertyValue(property) !== value
+        || drawer.style.getPropertyPriority(property) !== 'important'
+      ) {
+        drawer.style.setProperty(property, value, 'important');
+      }
+    };
+    setImportant('height', expectedHeight);
+    setImportant('min-height', expectedMinHeight);
+    setImportant('max-height', expectedMaxHeight);
   }
 
   function getClosestMobileDrawerMode(height) {
@@ -2145,6 +2167,24 @@
       return;
     }
     dom.mobileDrawerHandle.dataset.bound = 'true';
+    const drawer = dom.mobileDrawer;
+    if (drawer instanceof HTMLElement && drawer.dataset.heightGuardBound !== 'true') {
+      drawer.dataset.heightGuardBound = 'true';
+      const restoreHeight = () => {
+        if (layoutMode !== 'mobilePortrait') {
+          return;
+        }
+        const minHeight = Math.min(mobileDrawerState.heights.peek, mobileDrawerState.heights.full);
+        const maxHeight = Math.max(mobileDrawerState.heights.peek, mobileDrawerState.heights.full);
+        const activeHeight = mobileDrawerState.drag.active
+          ? mobileDrawerState.drag.currentHeight
+          : mobileDrawerState.heights[normalizeMobileDrawerMode(mobileDrawerState.mode)];
+        syncMobileDrawerInlineHeight(activeHeight, minHeight, maxHeight);
+      };
+      const observer = new MutationObserver(restoreHeight);
+      observer.observe(drawer, { attributes: true, attributeFilter: ['style'] });
+      restoreHeight();
+    }
     dom.mobileDrawerHandle.addEventListener('pointerdown', beginMobileDrawerDrag);
     dom.mobileDrawerHandle.addEventListener('keydown', event => {
       if (layoutMode !== 'mobilePortrait') {
