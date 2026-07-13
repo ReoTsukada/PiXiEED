@@ -111,7 +111,9 @@
       if (typeof buildPackagedProjectPayload !== 'function') {
         throw new Error('buildPackagedProjectPayload is required for v2 project serialization');
       }
-      const includeSheets = options?.includeSheets === true;
+      // The archive codec still accepts the option for old callers, but V2
+      // writing is permanently one-project.
+      const includeSheets = false;
       const includeTimelapse = options?.includeTimelapse !== false;
       const snapshot = projectState?.snapshot || null;
       const session = projectState?.session || null;
