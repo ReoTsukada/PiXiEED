@@ -79,13 +79,22 @@
   })();
 </script>
 <script src="assets/js/modules/edition-capabilities-utils.js?v=2026.07.11-g3a-edition-ads"></script>
-<script src="assets/js/build-info.js?v=20260713-059"></script>
+<script src="assets/js/build-info.js?v=20260713-060"></script>
 <script async="" crossorigin="anonymous" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253"></script>
 <script>
   (function configurePixieedAds() {
     const shouldShowAds = typeof window.__PIXIEEDRAW_SHOULD_SHOW_ADS__ === 'function'
       ? window.__PIXIEEDRAW_SHOULD_SHOW_ADS__()
       : false;
+    // Temporary diagnostic switch: keep editor/panel ads available while
+    // completely removing ad work and reserved space from modal dialogs.
+    // This isolates dialog iframe/layout changes from drawer positioning.
+    window.__PIXIEEDRAW_MODAL_ADS_ENABLED__ = false;
+    document.documentElement.dataset.pixieedModalAds = 'false';
+    window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__ = () => (
+      window.__PIXIEEDRAW_MODAL_ADS_ENABLED__ === true
+      && window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.() === true
+    );
     window.__PIXIEED_ADS_DISABLED__ = !shouldShowAds;
     if (window.__PIXIEED_ADS_DISABLED__) {
       return;
@@ -279,6 +288,11 @@
         logAdSlot('skip', slot, { owner }, 'edition-ads-disabled');
         return { ok: false, pushed: false, reason: 'edition-ads-disabled' };
       }
+      if (slot instanceof HTMLElement && slot.closest('dialog')
+        && !window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.()) {
+        logAdSlot('skip', slot, { owner }, 'modal-ads-disabled');
+        return { ok: false, pushed: false, reason: 'modal-ads-disabled' };
+      }
       if (window.__PIXIEEDRAW_AD_RENDER_ENABLED__ !== true) {
         logAdSlot('skip', slot, { owner }, 'editor-not-ready');
         return { ok: false, pushed: false, reason: 'editor-not-ready' };
@@ -388,7 +402,7 @@
 
 
 
-<link href="assets/css/style.css?v=20260713-059" rel="stylesheet"/>
+<link href="assets/css/style.css?v=20260713-060" rel="stylesheet"/>
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-4.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-4.png"/>
 <style>
@@ -1948,7 +1962,7 @@
 	<script defer="" src="assets/js/modules/pre-update-checkpoint-utils.js?v=20260712-pre-update-checkpoint-u3"></script>
 	<script defer="" src="assets/js/active-project-session-utils.js?v=2026.07.13-active-project-session-r2c"></script>
 	<script defer="" src="assets/js/pixieedraw-dev-switch.js?v=2026.07.03-pixieedrawdev-switch-fix14"></script>
-	<script defer="" src="assets/js/app.js?v=20260713-059"></script>
+	<script defer="" src="assets/js/app.js?v=20260713-060"></script>
 	<script defer="" src="assets/js/modules/update-detection-utils.js?v=20260713-026"></script>
   <script>
     (function initPanelAdDocking() {
@@ -2528,7 +2542,7 @@
 	<script src="../scripts/shared-bottom-nav.js?v=20260713-053" data-pixieed-footer-ad-landscape="false"></script>
 	<script>
     (function initOperationHelpAd() {
-      if (!window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.()) return;
+      if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.()) return;
       const dialog = document.getElementById('operationHelpDialog');
       const slot = document.getElementById('operationHelpAdSlot');
       if (!(dialog instanceof HTMLDialogElement) || !(slot instanceof HTMLElement)) return;
