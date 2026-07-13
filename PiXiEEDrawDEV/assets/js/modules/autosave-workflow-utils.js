@@ -313,19 +313,31 @@
     if (typeof serializeProjectStorageSnapshot !== 'function') {
       throw new Error('V2 project storage serializer is unavailable');
     }
-    const serialized = await serializeProjectStorageSnapshot({
-      snapshot,
-      session: buildProjectSessionPayload(),
-    }, {
-      fileNameBase: state?.documentName || '',
-      includeSheets: true,
-      includeTimelapse: true,
-      useWorker: true,
-    });
+    const serializeSpan = beginAutosavePerformanceSpan('pixiedraw-dev:autosave:destination-v2-serialize');
+    let serialized = null;
+    try {
+      serialized = await serializeProjectStorageSnapshot({
+        snapshot,
+        session: buildProjectSessionPayload(),
+      }, {
+        fileNameBase: state?.documentName || '',
+        includeSheets: true,
+        includeTimelapse: true,
+        useWorker: true,
+      });
+    } finally {
+      endAutosavePerformanceSpan(serializeSpan, {
+        bytes: Math.max(0, Number(serialized?.blob?.size) || 0),
+        workerUsed: serialized?.workerUsed === true,
+      });
+    }
     if (!(serialized?.blob instanceof Blob)) {
       throw new Error('V2 project storage serializer did not return an archive');
     }
     const writable = await autosaveHandle.createWritable();
+    const writeSpan = beginAutosavePerformanceSpan('pixiedraw-dev:autosave:destination-file-write', {
+      bytes: Math.max(0, Number(serialized.blob.size) || 0),
+    });
     try {
       await writable.write(serialized.blob);
       await writable.close();
@@ -333,6 +345,8 @@
     } catch (error) {
       try { await writable.abort?.(); } catch (_abortError) {}
       throw error;
+    } finally {
+      endAutosavePerformanceSpan(writeSpan);
     }
   }
 
