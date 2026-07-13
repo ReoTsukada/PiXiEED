@@ -310,13 +310,24 @@
       updateAutosaveStatus('自動保存: 保存先への権限を再設定してください', 'warn');
       return false;
     }
-    const packaged = buildPackagedProjectPayload(snapshot, {
+    if (typeof serializeProjectStorageSnapshot !== 'function') {
+      throw new Error('V2 project storage serializer is unavailable');
+    }
+    const serialized = await serializeProjectStorageSnapshot({
+      snapshot,
       session: buildProjectSessionPayload(),
+    }, {
+      fileNameBase: state?.documentName || '',
       includeSheets: true,
+      includeTimelapse: true,
+      useWorker: true,
     });
+    if (!(serialized?.blob instanceof Blob)) {
+      throw new Error('V2 project storage serializer did not return an archive');
+    }
     const writable = await autosaveHandle.createWritable();
     try {
-      await writable.write(new Blob([JSON.stringify(packaged)], { type: 'application/x-pixieedraw' }));
+      await writable.write(serialized.blob);
       await writable.close();
       return true;
     } catch (error) {
