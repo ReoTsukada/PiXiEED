@@ -13899,13 +13899,28 @@ body.is-mobile-layout .app {
   padding-bottom: var(--pixieed-shared-bottom-nav-offset, 68px) !important;
 }
 
+/* DEV keeps the shared top banner compact on portrait. The shared-ad
+   controller measures this frame and reserves the same amount above the
+   editor, so it cannot overlap drawing controls. */
+@media (max-width: 900px) and (orientation: portrait) {
+  body[data-pixieed-page='pixiedraw'] .pixieed-shared-top-ad,
+  body[data-pixieed-page='pixiedraw'] .pixieed-shared-top-ad .ad-block,
+  body[data-pixieed-page='pixiedraw'] .pixieed-shared-top-ad ins.adsbygoogle,
+  body[data-pixieed-page='pixiedraw'] .pixieed-shared-top-ad ins.adsbygoogle iframe {
+    min-height: 42px !important;
+    height: 42px !important;
+    max-height: 42px !important;
+  }
+}
+
 body.is-mobile-layout .mobile-panel.is-active .panel-ad-mount[data-panel-ad-mount='left'] {
   display: block !important;
   width: 100% !important;
+  max-width: none !important;
   min-height: 96px !important;
   height: auto !important;
-  margin: 12px 0 0 !important;
-  padding: 0 !important;
+  margin: 16px 0 0 !important;
+  padding: 0 0 12px !important;
   overflow: visible !important;
 }
 
@@ -13923,7 +13938,8 @@ body.is-mobile-layout .mobile-panel.is-active .panel-ad-mount[data-panel-ad-moun
 body.is-mobile-layout .mobile-panel.is-active .panel-ad-mount[data-panel-ad-mount='left'] #leftPanelAdSlot,
 body.is-mobile-layout .mobile-panel.is-active .panel-ad-mount[data-panel-ad-mount='left'] #leftPanelAdSlot > ins {
   display: block !important;
-  width: min(100%, 320px) !important;
+  width: 100% !important;
+  max-width: 100% !important;
   min-width: 0 !important;
   min-height: 96px !important;
   height: 96px !important;
