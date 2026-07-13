@@ -175,74 +175,21 @@
       homeButton.appendChild(homeName);
       homeItem.appendChild(homeButton);
       list.appendChild(homeItem);
-      const labelCounts = new Map();
-      openProjectTabs.forEach(tab => {
-        if (!tab || !tab.id) {
-          return;
-        }
-        const isActive = !projectHomeVisible && tab.id === activeOpenProjectTabId;
-        const label = getOpenProjectTabDisplayLabel(tab, { active: isActive });
-        labelCounts.set(label, (labelCounts.get(label) || 0) + 1);
-      });
-      const labelOrdinals = new Map();
-      openProjectTabs.forEach((tab, index) => {
-        if (!tab || !tab.id) {
-          return;
-        }
-        const isActive = !projectHomeVisible && tab.id === activeOpenProjectTabId;
+      // PiXiEEDrawDEV now keeps one project per editor instance. This area is
+      // a project indicator, not a resident multi-project tab strip.
+      const activeTab = openProjectTabs.find(tab => tab?.id === activeOpenProjectTabId)
+        || openProjectTabs[0]
+        || null;
+      if (activeTab && !projectHomeVisible) {
         const item = document.createElement('div');
-        item.className = `project-tab-item${isActive ? ' is-active' : ''}`;
-        item.dataset.projectTabItemId = tab.id;
-
-        const selectButton = document.createElement('button');
-        selectButton.type = 'button';
-        selectButton.className = 'project-tab-item__button';
-        selectButton.dataset.projectTabId = tab.id;
-        selectButton.setAttribute('role', 'tab');
-        selectButton.setAttribute('aria-selected', isActive ? 'true' : 'false');
-        selectButton.setAttribute('tabindex', isActive ? '0' : '-1');
-        const displayLabel = getOpenProjectTabRenderLabel(tab, labelCounts, labelOrdinals, { active: isActive });
-        const slotPrefix = String(index + 1);
-        selectButton.setAttribute(
-          'aria-label',
-          localizeText(`シート ${slotPrefix}: ${displayLabel}`, `Sheet ${slotPrefix}: ${displayLabel}`)
-        );
-
+        item.className = 'project-tab-item is-active';
+        item.setAttribute('role', 'presentation');
         const name = document.createElement('span');
         name.className = 'project-tab-item__name';
-        name.textContent = displayLabel;
-        selectButton.appendChild(name);
-        item.appendChild(selectButton);
-
-        const closeButton = document.createElement('button');
-        closeButton.type = 'button';
-        closeButton.className = 'project-tab-item__close';
-        closeButton.dataset.projectTabCloseId = tab.id;
-        closeButton.textContent = '×';
-        closeButton.setAttribute(
-          'aria-label',
-          localizeText(`${displayLabel} をプロジェクトから削除`, `Delete ${displayLabel} from project`)
-        );
-        closeButton.title = localizeText('シートをプロジェクトから削除', 'Delete sheet from project');
-        item.appendChild(closeButton);
-
+        name.textContent = getOpenProjectTabDisplayLabel(activeTab, { active: true });
+        item.appendChild(name);
         list.appendChild(item);
-      });
-      const addItem = document.createElement('div');
-      addItem.className = 'project-tab-item project-tab-item--add';
-      addItem.setAttribute('role', 'presentation');
-      const addButton = document.createElement('button');
-      addButton.type = 'button';
-      addButton.className = 'project-tab-item__add';
-      addButton.dataset.projectTabAdd = 'true';
-      addButton.textContent = '+';
-      addButton.setAttribute(
-        'aria-label',
-        localizeText('新規シートを追加', 'Add new sheet')
-      );
-      addItem.appendChild(addButton);
-      list.appendChild(addItem);
-      syncProjectTabAddButtonAvailability(list);
+      }
     }
 
     return {
