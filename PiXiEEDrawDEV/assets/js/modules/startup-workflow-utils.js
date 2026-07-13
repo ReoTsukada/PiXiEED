@@ -1120,13 +1120,6 @@
     hideProjectHomeScreen();
     const nextMode = normalizeStartupScreenMode(options?.mode);
     setStartupScreenMode(nextMode);
-    if (AUTOSAVE_SUPPORTED) {
-      refreshRecentProjectsUI().catch(error => {
-        console.warn('Failed to refresh recent projects', error);
-      });
-    } else if (dom.startup?.recentSection) {
-      dom.startup.recentSection.hidden = true;
-    }
     if (startupVisible) {
       return;
     }
@@ -1139,7 +1132,6 @@
     container.setAttribute('aria-hidden', 'false');
     document.body.classList.add('is-startup-active');
     window.requestAnimationFrame(() => {
-      queueStartupRecentAdRender();
       container.focus?.({ preventScroll: true });
       const startupTargets = [
         dom.startup?.resumeButton,
@@ -1557,15 +1549,10 @@
     bindCoreProjectActionButtons();
     getUpdateHistoryEntries();
     if (dom.startup?.hint) {
-      dom.startup.hint.textContent = AUTOSAVE_SUPPORTED
-        ? localizeText(
-          '前回の作業はこの端末に自動保存されます。すぐ描くなら「最新の端末内プロジェクトを開く」を使ってください。',
-          'Your work is autosaved on this device. Use "Open Latest Local Project" to continue quickly.'
-        )
-        : localizeText(
-          'このブラウザでは自動保存が利用できません。保存/出力から手動保存してください。',
-          'Autosave is not available in this browser. Please save manually from Save / Export.'
-        );
+      dom.startup.hint.textContent = localizeText(
+        '新規作成またはファイルを開いて、ドット絵づくりを始めましょう。',
+        'Create a new project or open a file to start making pixel art.'
+      );
     }
     if (dom.startup?.quickSetupButton instanceof HTMLButtonElement) {
       if (AUTOSAVE_SUPPORTED) {
@@ -1780,14 +1767,8 @@
         openButton.disabled = false;
       }
     });
-    if (AUTOSAVE_SUPPORTED) {
-      refreshRecentProjectsUI().catch(error => {
-        console.warn('Failed to refresh recent projects', error);
-      });
-      syncStartupResumeState(Array.from(recentProjectsCache.values()));
-    } else if (dom.startup?.recentSection) {
+    if (dom.startup?.recentSection) {
       dom.startup.recentSection.hidden = true;
-      syncStartupResumeState([]);
     }
   }
 
