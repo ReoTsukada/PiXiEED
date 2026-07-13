@@ -581,7 +581,7 @@
       setLocalizedTextContent('#newProject', '新規作成', 'New Project');
       setLocalizedTextContent('#openDocument', 'ファイルを開く', 'Open File');
       setLocalizedTextContent('#openPixieedMyPage', 'PiXiEED マイページ', 'PiXiEED My Page');
-      setLocalizedTextContent('#exportProject', '保存/出力', 'Save / Export');
+      setLocalizedTextContent('#exportProject', '出力設定を開く', 'Open Export Settings');
       setLocalizedTextContent('#clearCanvas', 'キャンバスをクリア', 'Clear Canvas');
       setLocalizedTextContent('.file-panel-summary .help-text:nth-child(1)', '自動保存: ON（この端末）', 'Autosave: ON (this device)');
       setLocalizedTextContent('.file-panel-summary .help-text:nth-child(2)', '配布用の保存は「保存/出力」から手動で行います。', 'Use "Save / Export" for distributable files.');
@@ -594,7 +594,7 @@
       setLocalizedTextContent('#timelapseDescription', '記録ON時は描画履歴を自動記録します。出力は通常の「出力」ボタンから選択してください。', 'When recording is ON, drawing history is captured automatically. Export from the regular Save / Export dialog.');
       setLocalizedTextContent('#memoryClear', 'メモリ削除', 'Clear Memory');
   
-      setLocalizedTextContent('#exportDialogTitle', '保存/出力形式', 'Save / Export');
+      setLocalizedTextContent('#exportDialogTitle', '出力設定', 'Export Settings');
       setLocalizedTextContent('label[for="exportFormat"] > .export-format-label', '形式', 'Format');
       setLocalizedSelectOption(dom.exportDialog?.format, 'png', 'PNG（画像）', 'PNG (Image)');
       setLocalizedSelectOption(dom.exportDialog?.format, 'jpeg', 'JPEG（画像）', 'JPEG (Image)');
@@ -622,7 +622,7 @@
       setLocalizedControlLabel('exportGridWidth', '幅 (px)', 'Width (px)');
       setLocalizedControlLabel('exportGridHeight', '高さ (px)', 'Height (px)');
       setLocalizedTextContent('#exportGridHint', '分割順: 右上から左へ、次の段へ進みます（右→左、上→下）。分割サイズは原寸px基準です。', 'Split order: starts at top-right, moves right-to-left, then top-to-bottom. Split size uses source pixels.');
-      setLocalizedTextContent('#confirmExport', '保存/出力', 'Save / Export');
+      setLocalizedTextContent('#confirmExport', 'この設定で出力', 'Export with These Settings');
       setLocalizedTextContent('#cancelExport', 'キャンセル', 'Cancel');
       setLocalizedTextContent('#exportAdContainer .export-ad__label', '広告', 'Ad');
       setLocalizedTextContent('#exportInterstitialTitle', '広告', 'Ad');
