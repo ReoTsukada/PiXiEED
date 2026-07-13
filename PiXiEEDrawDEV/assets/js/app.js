@@ -147,7 +147,7 @@
     projectTabsBar: document.getElementById('projectTabsBar'),
     projectTabsStatusSlot: document.getElementById('projectTabsStatusSlot'),
     projectTabsList: document.getElementById('projectTabsList'),
-    projectTabsActions: document.getElementById('projectTabsActions'),
+    editorCommandLaneActions: document.getElementById('editorCommandLaneActions'),
     projectHomeScreen: document.getElementById('projectHomeScreen'),
     projectHomeNew: document.getElementById('projectHomeNew'),
     projectHomeOpen: document.getElementById('projectHomeOpen'),
