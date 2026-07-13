@@ -9502,6 +9502,26 @@ body.is-mobile-layout #multiSupportAdContainer {
   box-sizing: border-box !important;
 }
 
+/* The mobile shortcut lane hosts reload and history controls. Keep a bottom
+   banner above the shared navigation, and reserve both areas inside the app. */
+@media (max-width: 900px) and (orientation: portrait) {
+  body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] .app {
+    padding-bottom: calc(
+      var(--pixieed-shared-bottom-nav-offset, 0px)
+      + var(--mobile-bottom-ad-height, 0px)
+    ) !important;
+  }
+
+  body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] #mobileBottomAd {
+    bottom: var(--pixieed-shared-bottom-nav-offset, 0px);
+  }
+
+  body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] .mobile-topbar {
+    position: relative;
+    z-index: 14070;
+  }
+}
+
 #panelSettings .settings-size-row .button {
   display: inline-flex;
   width: auto;
