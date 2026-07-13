@@ -31,6 +31,8 @@
     let historyTrimmedRecently = false;
     let historyTrimmedAt = 0;
     let memoryMonitorHandle = null;
+    let memoryMonitorIdleHandle = null;
+    let memoryMonitorIdleUsesRequestIdleCallback = false;
 
     function bytesForLayer(layer) {
       if (!layer) return 0;
@@ -262,7 +264,31 @@
       if (memoryMonitorHandle !== null) {
         window.clearInterval(memoryMonitorHandle);
       }
-      memoryMonitorHandle = window.setInterval(updateMemoryStatus, MEMORY_MONITOR_INTERVAL);
+      if (memoryMonitorIdleHandle !== null) {
+        if (memoryMonitorIdleUsesRequestIdleCallback && typeof window.cancelIdleCallback === 'function') {
+          window.cancelIdleCallback(memoryMonitorIdleHandle);
+        } else {
+          window.clearTimeout(memoryMonitorIdleHandle);
+        }
+        memoryMonitorIdleHandle = null;
+      }
+      const scheduleMemoryStatusUpdate = () => {
+        if (memoryMonitorIdleHandle !== null) return;
+        const run = () => {
+          memoryMonitorIdleHandle = null;
+          updateMemoryStatus();
+        };
+        if (typeof window.requestIdleCallback === 'function') {
+          memoryMonitorIdleUsesRequestIdleCallback = true;
+          memoryMonitorIdleHandle = window.requestIdleCallback(run, { timeout: 1500 });
+        } else {
+          memoryMonitorIdleUsesRequestIdleCallback = false;
+          memoryMonitorIdleHandle = window.setTimeout(run, 0);
+        }
+      };
+      // Estimating every frame/layer/history/timelapse entry can take tens of
+      // milliseconds for a large document. Keep the monitor out of input work.
+      memoryMonitorHandle = window.setInterval(scheduleMemoryStatusUpdate, MEMORY_MONITOR_INTERVAL);
       const clearButtons = document.querySelectorAll('#memoryClear');
       clearButtons.forEach(button => {
         if (button.dataset.memoryBound) return;
