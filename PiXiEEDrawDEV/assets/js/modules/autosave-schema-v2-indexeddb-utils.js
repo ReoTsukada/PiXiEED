@@ -317,10 +317,14 @@
           const retainedManifests = sorted.slice(0, Math.max(1, Math.round(Number(keepManifestRevisions) || 2)));
           const retainedManifestKeys = new Set(retainedManifests.map(manifest => manifest.key));
           const retainedCheckpointKeys = new Set(retainedManifests.flatMap(manifest => (
-            Array.isArray(manifest?.sheets) ? manifest.sheets.map(sheet => sheet?.checkpointRef?.key).filter(Boolean) : []
+            manifest?.projectLayout === 'single-project'
+              ? [manifest?.project?.checkpointRef?.key].filter(Boolean)
+              : (Array.isArray(manifest?.sheets) ? manifest.sheets.map(sheet => sheet?.checkpointRef?.key).filter(Boolean) : [])
           )));
           const retainedJournalKeys = new Set(retainedManifests.flatMap(manifest => (
-            Array.isArray(manifest?.sheets) ? manifest.sheets.map(sheet => sheet?.journalRef?.key).filter(Boolean) : []
+            manifest?.projectLayout === 'single-project'
+              ? [manifest?.project?.journalRef?.key].filter(Boolean)
+              : (Array.isArray(manifest?.sheets) ? manifest.sheets.map(sheet => sheet?.journalRef?.key).filter(Boolean) : [])
           )));
           const retainedThumbnailKeys = new Set(retainedManifests.map(manifest => manifest?.thumbnailRef?.key).filter(Boolean));
           const removable = sorted.filter(manifest => !retainedManifestKeys.has(manifest.key));
