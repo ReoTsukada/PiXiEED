@@ -843,7 +843,9 @@
       const mimeType = typeof options?.mimeType === 'string' && options.mimeType
         ? options.mimeType
         : 'application/x-pixieedraw';
-      const includeSheets = options?.includeSheets === true;
+      // New V2 archives have a single root project. The option remains
+      // accepted for old callers but cannot re-enable the retired layout.
+      const includeSheets = false;
       const includeTimelapse = options?.includeTimelapse !== false;
       const bitmapTasksByHash = new Map();
       const diagnostics = {
@@ -942,7 +944,7 @@
         const serializedRoot = await serializePackagedProjectBody(packaged, bitmapTasksByHash, diagnostics, {
           adapterId,
           basePath: '',
-          stripSheets: false,
+          stripSheets: true,
           includeTimelapse,
         });
         projectPayload = serializedRoot.projectPayload;
