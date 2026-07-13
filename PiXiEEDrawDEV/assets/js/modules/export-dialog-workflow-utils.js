@@ -91,7 +91,7 @@
   }
 
   function queueExportAdRender() {
-    if (!window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.()) {
+    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.()) {
       return;
     }
     const dialog = dom.exportDialog?.dialog;
@@ -183,7 +183,7 @@
   }
 
   function queueShortcutHelpAdRender() {
-    if (!window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.()) {
+    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.()) {
       return;
     }
     const dialog = dom.shortcutHelp?.dialog;
@@ -245,7 +245,7 @@
   }
 
   function queueUpdateHistoryAdRender() {
-    if (!window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.()) {
+    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.()) {
       return;
     }
     const dialog = dom.updateHistory?.dialog;
@@ -526,7 +526,7 @@
   }
 
   function canShowExportInterstitial() {
-    if (!window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.()) {
+    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.()) {
       return false;
     }
     const dialog = dom.exportInterstitial?.dialog;
@@ -559,7 +559,7 @@
   }
 
   function queueExportInterstitialAdRender() {
-    if (!window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.()) {
+    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.()) {
       return;
     }
     const dialog = dom.exportInterstitial?.dialog;
@@ -748,6 +748,9 @@
   function openExportInterstitialDialog({ force = false } = {}) {
     const dialog = dom.exportInterstitial?.dialog;
     if (!(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== 'function') {
+      return false;
+    }
+    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.()) {
       return false;
     }
     if (dialog.open) {
