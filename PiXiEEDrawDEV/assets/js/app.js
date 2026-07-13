@@ -60,11 +60,11 @@
   function isImportableImageFile(file) {
     if (!file) return false;
     const type = typeof file.type === 'string' ? file.type.toLowerCase() : '';
-    if (type === 'image/png' || type === 'image/gif') {
+    if (type === 'image/png' || type === 'image/gif' || type === 'image/jpeg' || type === 'image/webp') {
       return true;
     }
     const name = typeof file.name === 'string' ? file.name.toLowerCase() : '';
-    return name.endsWith('.png') || name.endsWith('.gif');
+    return name.endsWith('.png') || name.endsWith('.gif') || name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.webp');
   }
 
   const dom = {
@@ -6696,7 +6696,7 @@
   }) || null;
 
   const projectStorageV2WorkerBridge = window.PiXiEEDrawModules?.projectStorageV2WorkerBridge?.createProjectStorageV2WorkerBridge?.({
-    workerUrl: 'assets/js/workers/project-storage-v2.worker.js?v=2026.07.10-project-storage-worker1',
+    workerUrl: 'assets/js/workers/project-storage-v2.worker.js?v=20260713-047',
     console,
   }) || null;
 
@@ -6855,12 +6855,20 @@
   set applyHistorySnapshot(value) { applyHistorySnapshot = value; },
   get autosaveProjectId() { return autosaveProjectId; },
   set autosaveProjectId(value) { autosaveProjectId = value; },
+  get autosaveHandle() { return autosaveHandle; },
+  set autosaveHandle(value) { autosaveHandle = value; },
+  get pendingAutosaveHandle() { return pendingAutosaveHandle; },
+  set pendingAutosaveHandle(value) { pendingAutosaveHandle = value; },
   get autosaveRestoring() { return autosaveRestoring; },
   set autosaveRestoring(value) { autosaveRestoring = value; },
   get clamp() { return clamp; },
   set clamp(value) { clamp = value; },
   get clearActiveSharedProjectSession() { return clearActiveSharedProjectSession; },
   set clearActiveSharedProjectSession(value) { clearActiveSharedProjectSession = value; },
+  get clearActiveProjectSaveHandle() { return clearActiveProjectSaveHandle; },
+  set clearActiveProjectSaveHandle(value) { clearActiveProjectSaveHandle = value; },
+  get clearPendingPermissionListener() { return clearPendingPermissionListener; },
+  set clearPendingPermissionListener(value) { clearPendingPermissionListener = value; },
   get clearTimelapseRecording() { return clearTimelapseRecording; },
   set clearTimelapseRecording(value) { clearTimelapseRecording = value; },
   get cloneTimelapsePixelPatchValue() { return cloneTimelapsePixelPatchValue; },
@@ -11716,17 +11724,6 @@
     buildVoxelGlbBinaryFromCanvases,
   } = voxelGlbUtilsModule;
 
-  const projectStorageV2MultisheetCandidateUtilsModule = window.PiXiEEDrawModules
-    ?.projectStorageV2MultisheetCandidateUtils
-    ?.createProjectStorageV2MultisheetCandidateUtils?.({
-      validateSheetCanvasCount: project => window.PiXiEEDrawModules
-        ?.projectSheetCollectionUtils
-        ?.createProjectSheetCollectionUtils?.()
-        ?.validateSheetCanvasCount?.(project),
-      normalizeLocalViewportCanvasState,
-      LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE,
-    }) || {};
-
   const exportRenderingModule = window.PiXiEEDrawModules?.exportRendering?.createExportRenderingModule?.({
   get $() { return $; },
   set $(value) { $ = value; },
@@ -11800,8 +11797,6 @@
   set buildGifFromPixels(value) { buildGifFromPixels = value; },
   get buildPackagedProjectPayload() { return buildPackagedProjectPayload; },
   set buildPackagedProjectPayload(value) { buildPackagedProjectPayload = value; },
-  get collectCompleteMultiSheetV2SaveCandidate() { return projectStorageV2MultisheetCandidateUtilsModule.collectCompleteMultiSheetV2SaveCandidate; },
-  set collectCompleteMultiSheetV2SaveCandidate(value) {},
   get bindActiveProjectSaveHandle() { return bindActiveProjectSaveHandle; },
   set bindActiveProjectSaveHandle(value) { bindActiveProjectSaveHandle = value; },
   get buildProjectSessionPayload() { return buildProjectSessionPayload; },
@@ -16615,56 +16610,33 @@
         includeSheets: false,
       });
     const projectId = normalizeAutosaveProjectId(settings.projectId || autosaveProjectId || '') || createAutosaveProjectId();
-    const activeSheetId = activeOpenProjectTabId || openProjectTabs[0]?.id || createOpenProjectTabId();
-    const sourceTabs = openProjectTabs.length ? openProjectTabs : [{ id: activeSheetId, project: activePackaged }];
-    // A non-active tab is deliberately allowed to release its resident
-    // payload.  A full V2 checkpoint must recover that unchanged sheet from
-    // the already committed V2 package instead of treating the memory-saving
-    // shape as a missing document (or, worse, committing a sheet-less save).
-    const fallbackPackagedPayload = settings.fallbackPackagedPayload && typeof settings.fallbackPackagedPayload === 'object'
-      ? settings.fallbackPackagedPayload
-      : null;
-    const sheets = sourceTabs.map((tab, index) => {
-        const isActive = tab?.id === activeSheetId;
-        const project = isActive
-          ? activePackaged
-          : (
-            tab?.project && typeof tab.project === 'object'
-              ? tab.project
-              : (tab?.deferredProjectPayload && typeof tab.deferredProjectPayload === 'object'
-                ? tab.deferredProjectPayload
-                : extractLocalProjectSheetPayload(fallbackPackagedPayload, tab?.id || '')
-              )
-          );
-        if (!project || typeof project !== 'object') {
-          throw new Error(`Autosave schema V2 write is missing sheet payload: ${tab?.id || index}`);
-        }
-        return {
-          id: tab?.id || createOpenProjectTabId(),
-          fileName: tab?.fileName || project?.document?.documentName || DEFAULT_DOCUMENT_NAME,
-          label: tab?.label || `Sheet ${index + 1}`,
-          project,
-          sourceKind: tab?.sourceKind || 'unknown',
-          sourceStorageAdapterId: tab?.sourceStorageAdapterId || '',
-          sourceProjectToken: tab?.sourceProjectToken || '',
-        };
-      });
+    // The autosave manifest stores exactly the current project. Old manifests
+    // with `sheets` remain readable in the schema utility, but no new write
+    // retains inactive project payloads or a sheet identifier.
+    const activeTab = getActiveOpenProjectTab?.() || openProjectTabs[0] || null;
+    delete activePackaged.sheets;
+    delete activePackaged.sheetOrder;
+    delete activePackaged.activeSheetId;
+    activePackaged.projectLayout = 'single-project';
     return {
       projectId,
       name: state.documentName || DEFAULT_DOCUMENT_NAME,
       updatedAt: activePackaged.updatedAt,
-      activeSheetId: activeSheetId || sheets[0]?.id || '',
-      sheets,
-      journalsBySheet: settings.journalsBySheet && typeof settings.journalsBySheet === 'object'
-        ? settings.journalsBySheet
-        : {},
+      fileName: activeTab?.fileName || activePackaged?.document?.documentName || DEFAULT_DOCUMENT_NAME,
+      sourceKind: activeTab?.sourceKind || 'unknown',
+      sourceStorageAdapterId: activeTab?.sourceStorageAdapterId || '',
+      sourceProjectToken: activeTab?.sourceProjectToken || '',
+      project: activePackaged,
+      journalOps: Array.isArray(settings.journalOps) ? settings.journalOps : [],
       thumbnail: typeof settings.thumbnail === 'string' ? settings.thumbnail : null,
       dotStats: activePackaged.dotStats || null,
     };
   }
 
   function countAutosaveShadowProject(project = null) {
-    const sheets = Array.isArray(project?.sheets) && project.sheets.length ? project.sheets : [];
+    const sheets = Array.isArray(project?.sheets) && project.sheets.length
+      ? project.sheets
+      : (project?.project && typeof project.project === 'object' ? [{ id: 'project', project: project.project }] : []);
     const metrics = sheets.map(sheet => {
       const documentPayload = sheet?.project?.document || sheet?.document || {};
       const canvases = Array.isArray(documentPayload.canvases) && documentPayload.canvases.length ? documentPayload.canvases : [documentPayload];
@@ -16677,7 +16649,7 @@
         pixelChecksum: JSON.stringify(canvases.map(canvas => (canvas?.frames || []).map(frame => (frame?.layers || []).map(layer => [layer?.indices, layer?.direct, layer?.importSourceDirect])))),
       };
     });
-    return { sheetOrder: sheets.map(sheet => sheet?.id || ''), activeSheetId: project?.activeSheetId || '', sheets: metrics };
+    return { projectLayout: project?.projectLayout || (project?.project ? 'single-project' : 'legacy-sheets'), sheets: metrics };
   }
 
   function compareAutosaveShadowPayloads(v1Project, v2Project, options = {}) {
@@ -16715,7 +16687,7 @@
     console.info('[PiXiEEDraw DEV] autosave schema V2 experimental write', {
       projectId: projectState.projectId,
       revision: result.manifest?.revision || 0,
-      sheetCount: projectState.sheets.length,
+      projectLayout: result.manifest?.projectLayout || 'legacy-sheets',
       cleanupError: result.cleanupError?.message || '',
     });
     return result;
@@ -16729,7 +16701,7 @@
     console.info('[PiXiEEDraw DEV] autosave schema V2 experimental read', {
       projectId,
       revision: result.manifest?.revision || 0,
-      sheetCount: result.packaged?.sheets?.length || 0,
+      projectLayout: result.packaged?.projectLayout || 'legacy-sheets',
       fallbackUsed: result.fallbackUsed === true,
     });
     return result;
@@ -16774,7 +16746,7 @@
       || !normalizedSourceProjectId
       || sourceSheets.length < 2
       || typeof autosaveSchemaV2IndexedDbUtilsModule.writeSchemaV2Project !== 'function') {
-      return { migrated: false, reason: 'not-applicable', projectIds: [] };
+      return { migrated: false, reason: 'not-applicable', projectIds: [], projects: [] };
     }
     const inFlight = legacyMultiProjectMigrationPromises.get(normalizedSourceProjectId);
     if (inFlight) return await inFlight;
@@ -16805,23 +16777,15 @@
           : (sourceProject?.document?.documentName || `移行プロジェクト ${index + 1}${PROJECT_FILE_EXTENSION}`);
         const fileName = normalizeDocumentName(rawFileName) || DEFAULT_DOCUMENT_NAME;
         const projectId = createAutosaveProjectId();
-        const sheetId = `project-root-${projectId.slice(-12)}`;
         const projectState = {
           projectId,
           name: fileName,
           updatedAt: sourceProject?.updatedAt || new Date().toISOString(),
-          activeSheetId: sheetId,
-          sheets: [{
-            id: sheetId,
-            fileName,
-            label: typeof sourceSheet?.label === 'string' && sourceSheet.label.trim()
-              ? sourceSheet.label.trim()
-              : extractDocumentBaseName(fileName),
-            project: sourceProject,
-            sourceKind: sourceSheet?.sourceKind || 'legacy-multi-project',
-            sourceStorageAdapterId: sourceSheet?.sourceStorageAdapterId || '',
-            sourceProjectToken: sourceSheet?.sourceProjectToken || '',
-          }],
+          fileName,
+          project: sourceProject,
+          sourceKind: sourceSheet?.sourceKind || 'legacy-multi-project',
+          sourceStorageAdapterId: sourceSheet?.sourceStorageAdapterId || '',
+          sourceProjectToken: sourceSheet?.sourceProjectToken || '',
           thumbnail: null,
           dotStats: sourceProject?.dotStats || null,
         };
@@ -16846,19 +16810,40 @@
         });
       }
       if (!createdEntries.length) {
-        return { migrated: false, reason: 'already-migrated', projectIds: [] };
+        const projects = existingEntries
+          .filter(entry => entry?.legacyMultiProjectSourceId === normalizedSourceProjectId)
+          .map(entry => ({
+            projectId: entry.id,
+            sourceSheetId: String(entry?.legacyMultiProjectSourceSheetId || ''),
+            wasActive: entry?.legacyMultiProjectWasActive === true,
+          }))
+          .filter(entry => entry.projectId && entry.sourceSheetId);
+        return { migrated: false, reason: 'already-migrated', projectIds: projects.map(entry => entry.projectId), projects };
       }
       const latestEntries = await loadRecentProjectsMetadata();
       const nextEntries = latestEntries.concat(createdEntries);
       await saveRecentProjectsList(latestEntries, nextEntries);
       setRecentProjectsCache(nextEntries);
+      const projects = nextEntries
+        .filter(entry => entry?.legacyMultiProjectSourceId === normalizedSourceProjectId)
+        .map(entry => ({
+          projectId: entry.id,
+          sourceSheetId: String(entry?.legacyMultiProjectSourceSheetId || ''),
+          wasActive: entry?.legacyMultiProjectWasActive === true,
+        }))
+        .filter(entry => entry.projectId && entry.sourceSheetId);
       console.info('[pixiedraw-dev:project-normalize]', {
         phase: 'legacy-multi-project-split-success',
         sourceProjectId: normalizedSourceProjectId,
         sourceSheetCount: sourceSheets.length,
         projectIds: createdEntries.map(entry => entry.id),
       });
-      return { migrated: true, reason: 'migrated', projectIds: createdEntries.map(entry => entry.id) };
+      return {
+        migrated: true,
+        reason: 'migrated',
+        projectIds: createdEntries.map(entry => entry.id),
+        projects,
+      };
     })();
     legacyMultiProjectMigrationPromises.set(normalizedSourceProjectId, migration);
     try {
@@ -16887,14 +16872,13 @@
     let projectState = null;
     let thumbnail = previousEntry?.thumbnail || null;
     if (journalOnly) {
-      const activeSheetId = String(activeOpenProjectTabId || '');
       const normalizedOps = normalizeV2PixelPatchJournalOps(savePlan?.journalPayload || null);
-      if (!activeSheetId || !normalizedOps || !normalizedOps.length) {
-        throw new Error('V2 journal save requires valid pixel patches and an active sheet');
+      if (!normalizedOps || !normalizedOps.length) {
+        throw new Error('V2 journal save requires valid pixel patches');
       }
       written = await autosaveSchemaV2IndexedDbUtilsModule.writeSchemaV2JournalRevision(
         normalizedProjectId,
-        { [activeSheetId]: normalizedOps },
+        normalizedOps,
         {
           updatedAt: new Date().toISOString(),
           name: previousEntry?.name || state.documentName || DEFAULT_DOCUMENT_NAME,
@@ -16909,30 +16893,11 @@
     thumbnail = refreshThumbnail
       ? await generateSnapshotThumbnail(snapshot)
       : previousEntry.thumbnail;
-    const activeSheetId = String(activeOpenProjectTabId || '');
-    const requiresStoredSheetFallback = openProjectTabs.some(tab => (
-      tab?.id
-      && tab.id !== activeSheetId
-      && !(tab.project && typeof tab.project === 'object')
-      && !(tab.deferredProjectPayload && typeof tab.deferredProjectPayload === 'object')
-    ));
-    let fallbackPackagedPayload = null;
-    if (requiresStoredSheetFallback) {
-      try {
-        fallbackPackagedPayload = await readAutosaveV2PrimaryProject(normalizedProjectId);
-      } catch (_error) {
-        // A pre-V2 project can still provide the fallback through the legacy
-        // reader. If neither store contains every inactive sheet, the builder
-        // rejects before any V2 manifest/current reference is changed.
-        fallbackPackagedPayload = resolveStoredLocalProjectPayloadForProjectId(normalizedProjectId);
-      }
-    }
     projectState = buildAutosaveSchemaV2ExperimentalProjectState({
       projectId: normalizedProjectId,
       snapshot,
       thumbnail,
       packagedPayload: savePlan?.packagedPayload || null,
-      fallbackPackagedPayload,
     });
     written = await autosaveSchemaV2IndexedDbUtilsModule.writeSchemaV2Project(projectState);
     }
@@ -16946,7 +16911,7 @@
       autosaveSchemaVersion: Number(manifest.autosaveSchemaVersion) || 2,
       manifestKey: manifest.key,
       name: projectState?.name || previousEntry?.name || DEFAULT_DOCUMENT_NAME,
-      fileName: projectState?.sheets?.find(sheet => sheet.id === projectState.activeSheetId)?.fileName || previousEntry?.fileName || projectState?.name || DEFAULT_DOCUMENT_NAME,
+      fileName: projectState?.fileName || previousEntry?.fileName || projectState?.name || DEFAULT_DOCUMENT_NAME,
       updatedAt: manifest.updatedAt,
       thumbnail: thumbnail || null,
       dotStats: projectState?.dotStats || previousEntry?.dotStats || null,
@@ -17027,9 +16992,17 @@
     const candidate = autosaveSchemaV2RecoveryUtilsModule.buildCandidate?.(payload, { sourceProjectId: projectId, revision: preview.restoredRevision });
     if (!candidate?.ok) return autosaveV2RecoveryOpenStatus = { opened: false, reason: candidate?.reason || 'unrestorable', warnings: candidate?.warnings || [], errors: candidate?.errors || [] };
     const recoveryProjectId = `recovery-${createAutosaveProjectId()}`;
-    const appended = await appendPackagedProjectTab({ project: candidate.project, projectId: recoveryProjectId, fileName: candidate.project.document?.documentName || DEFAULT_DOCUMENT_NAME, source: 'recovery', sourceKind: 'recovery', sourceStorageAdapterId: null, lastSavedStorageAdapterId: null, projectSaveHandleState: 'none', unsaved: true, activateOptions: { skipPersistCurrent: true, announce: true } });
-    if (!appended) return autosaveV2RecoveryOpenStatus = { opened: false, reason: 'tab-commit-failed', warnings: candidate.warnings, errors: [] };
-    return autosaveV2RecoveryOpenStatus = { opened: true, recoveryProjectId, sourceProjectId: projectId, revision: preview.restoredRevision, usedFallbackRevision: preview.usedFallbackRevision, sheetCount: candidate.project.sheets.length, activeSheetId: candidate.project.activeSheetId, warnings: candidate.warnings };
+    const opened = await loadDocumentFromProjectPayload(candidate.project, {
+      projectId: recoveryProjectId,
+      suppressAutosaveStatus: true,
+      sourceKind: 'recovery',
+      sourceStorageAdapterId: null,
+      lastSavedStorageAdapterId: null,
+      projectSaveHandleState: 'none',
+    });
+    if (!opened) return autosaveV2RecoveryOpenStatus = { opened: false, reason: 'project-replace-failed', warnings: candidate.warnings, errors: [] };
+    markDocumentUnsavedChange();
+    return autosaveV2RecoveryOpenStatus = { opened: true, recoveryProjectId, sourceProjectId: projectId, revision: preview.restoredRevision, usedFallbackRevision: preview.usedFallbackRevision, projectCount: 1, warnings: candidate.warnings };
   }
 
   function renderAutosaveV2RecoveryUi() {
@@ -17038,7 +17011,7 @@
     if (!autosaveV2RecoveryUiElement) {
       const panel = document.createElement('section'); panel.id = 'autosaveV2RecoveryDevPanel'; panel.style.cssText = 'position:fixed;right:12px;bottom:12px;z-index:99999;max-width:320px;padding:10px;background:#17212b;color:#fff;border:1px solid #5d758b;border-radius:8px;font:12px sans-serif';
       panel.innerHTML = '<strong>DEV: V2復元候補</strong><div><input data-id placeholder="projectId" style="width:150px"><input data-revision placeholder="revision" style="width:60px"></div><button data-preview>V2復元候補を確認</button><button data-open hidden>復元コピーを開く</button><pre data-status style="white-space:pre-wrap;max-height:160px;overflow:auto"></pre>';
-      panel.querySelector('[data-preview]').onclick = async () => { if (autosaveV2RecoveryUiBusy) return; autosaveV2RecoveryUiBusy=true; const id=panel.querySelector('[data-id]').value.trim(); const revision=Number(panel.querySelector('[data-revision]').value)||0; const result=await previewAutosaveSchemaV2Restore(id,{revision}); const text={status:result.status,revision:result.restoredRevision,fallback:result.usedFallbackRevision,sheets:result.summary?.sheetCount,canvases:result.summary?.canvasCount,frames:result.summary?.frameCount,layers:result.summary?.layerCount,activeSheet:result.summary?.activeSheetId,journalFallback:result.status==='journal-fallback',comparison:result.comparison?.matched,warnings:result.warnings,errors:result.errors}; panel.querySelector('[data-status]').textContent=JSON.stringify(text,null,2); panel.querySelector('[data-open]').hidden=!result.restorable; autosaveV2RecoveryUiBusy=false; };
+      panel.querySelector('[data-preview]').onclick = async () => { if (autosaveV2RecoveryUiBusy) return; autosaveV2RecoveryUiBusy=true; const id=panel.querySelector('[data-id]').value.trim(); const revision=Number(panel.querySelector('[data-revision]').value)||0; const result=await previewAutosaveSchemaV2Restore(id,{revision}); const text={status:result.status,revision:result.restoredRevision,fallback:result.usedFallbackRevision,projectLayout:result.summary?.projectLayout,projects:result.summary?.projectCount,canvases:result.summary?.canvasCount,frames:result.summary?.frameCount,layers:result.summary?.layerCount,journalFallback:result.status==='journal-fallback',comparison:result.comparison?.matched,warnings:result.warnings,errors:result.errors}; panel.querySelector('[data-status]').textContent=JSON.stringify(text,null,2); panel.querySelector('[data-open]').hidden=!result.restorable; autosaveV2RecoveryUiBusy=false; };
       panel.querySelector('[data-open]').onclick = async () => { if (autosaveV2RecoveryUiBusy) return; autosaveV2RecoveryUiBusy=true; const id=panel.querySelector('[data-id]').value.trim(); const revision=Number(panel.querySelector('[data-revision]').value)||0; const result=await openAutosaveSchemaV2RecoveryPreview(id,{revision}); panel.querySelector('[data-status]').textContent=JSON.stringify(result,null,2); autosaveV2RecoveryUiBusy=false; };
       document.body.append(panel); autosaveV2RecoveryUiElement=panel;
     }
