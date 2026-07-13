@@ -6611,6 +6611,8 @@
   set createOpenProjectTabId(value) { createOpenProjectTabId = value; },
   get extractDocumentBaseName() { return extractDocumentBaseName; },
   set extractDocumentBaseName(value) { extractDocumentBaseName = value; },
+  get extractLocalProjectSheetPayload() { return extractLocalProjectSheetPayload; },
+  set extractLocalProjectSheetPayload(value) { extractLocalProjectSheetPayload = value; },
   get findOpenProjectTabIndex() { return findOpenProjectTabIndex; },
   set findOpenProjectTabIndex(value) { findOpenProjectTabIndex = value; },
   get getCurrentRecentProjectAccountUserId() { return getCurrentRecentProjectAccountUserId; },
