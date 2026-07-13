@@ -101,13 +101,39 @@ const tab = {
   projectSaveHandleState: 'bound',
   projectSaveHandle: handle,
   projectSaveHandleMeta: { fileName: 'example.pixieedraw', adapterId: 'pixieedraw-v1-json' },
+  unsaved: true,
 };
 const comparison = api.compareActiveProjectSessionWithTab(session, tab);
 assert.equal(comparison.ok, true);
 assert.deepEqual(comparison.mismatches, []);
 
-const mismatch = api.compareActiveProjectSessionWithTab(session, { ...tab, projectId: 'local-other' });
+const mismatch = api.compareActiveProjectSessionWithTab(session, { ...tab, sourceKind: 'recent' });
 assert.equal(mismatch.ok, false);
-assert.ok(mismatch.mismatches.includes('projectId'));
+assert.ok(mismatch.mismatches.some(item => item.field === 'sourceKind'));
+
+const unboundSession = api.createActiveProjectSession({
+  projectId: 'local-c',
+  sourceKind: 'new',
+  autosaveIdentity: 'local-c',
+  recoveryIdentity: 'local-c',
+  projectSaveHandleState: 'none',
+  dirty: false,
+});
+const unboundTabWithLegacyMeta = {
+  projectId: 'local-c',
+  sourceKind: 'new',
+  sourceStorageAdapterId: null,
+  sourceProjectToken: null,
+  lastSavedStorageAdapterId: null,
+  projectSaveHandleState: 'none',
+  projectSaveHandle: null,
+  projectSaveHandleMeta: { fileName: 'untitled.pixieedraw', adapterId: null },
+  unsaved: false,
+};
+assert.equal(
+  api.compareActiveProjectSessionWithTab(unboundSession, unboundTabWithLegacyMeta).ok,
+  true,
+  'unbound compatibility metadata must not be treated as a save-binding mismatch'
+);
 
 console.log('PiXiEEDrawDEV active project session R2 tests passed.');
