@@ -55,6 +55,7 @@
     replaceActiveProjectSessionFromTab,
     updateActiveProjectSessionSaveBinding,
     assertActiveProjectIdentityConsistency,
+    assertActiveProjectSessionMirrorConsistency,
   } = {}) {
     function normalizeBindingHandleState(value, fallback = 'none') {
       if (typeof normalizeProjectSaveHandleState === 'function') {
@@ -228,7 +229,7 @@
         });
       }
       if (isActiveTab && sessionUpdated) {
-        assertActiveProjectIdentityConsistency?.({
+        assertActiveProjectSessionMirrorConsistency?.({
           phase: 'save-handle-update:tab-mirror',
           allowTransientMismatch: false,
         });
