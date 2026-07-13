@@ -553,6 +553,11 @@
     }
   }
 
+  function shouldHideSharedAdInLandscape() {
+    return document.body?.dataset?.pixieedFooterAdLandscape === 'false'
+      && window.matchMedia?.('(orientation: landscape)').matches === true;
+  }
+
   function isMaoituPage() {
     try {
       const path = String(window.location.pathname || '').toLowerCase();
@@ -869,7 +874,10 @@
   }
 
   function injectTopAd() {
-    if (arePixieedAdsDisabled() || isPixieeLensPage() || (isPixiedrawPage() && !isPixiedrawMobileChromeActive())) {
+    if (arePixieedAdsDisabled()
+      || isPixieeLensPage()
+      || shouldHideSharedAdInLandscape()
+      || (isPixiedrawPage() && !isPixiedrawMobileChromeActive())) {
       removeTopAd();
       return;
     }
