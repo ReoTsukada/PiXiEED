@@ -59,7 +59,7 @@
     const controller = doc.createElement('script');
     controller.defer = true;
     controller.dataset.pixieedFooterAdController = 'true';
-    controller.src = relHref('scripts/bottom-nav-footer-ad.js?v=2026.07.13-shared-banner-height-lock1');
+    controller.src = relHref('scripts/bottom-nav-footer-ad.js?v=2026.07.14-shared-banner-height-lock2');
     doc.body.appendChild(controller);
   }
 
