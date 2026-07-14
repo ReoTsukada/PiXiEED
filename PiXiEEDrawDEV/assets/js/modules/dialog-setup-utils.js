@@ -145,14 +145,7 @@
         ? config.fileNameInput.value
         : '';
       setExportFileBaseName(inputBaseName || state.documentName);
-      let mode = resolveSelectedExportMode();
-      if (
-        mode === 'project'
-        && config.projectV2ExperimentalToggle instanceof HTMLInputElement
-        && config.projectV2ExperimentalToggle.checked
-      ) {
-        mode = 'projectv2experimental';
-      }
+      const mode = resolveSelectedExportMode();
       if (!ensureCurrentClientCanExportProject({ announce: true, format: mode })) {
         updateExportFormatAvailability();
         return;
