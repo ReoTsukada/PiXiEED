@@ -316,6 +316,17 @@
   function setActiveTool(tool, buttons = toolButtons, options = {}) {
     const { persist = true, skipGroupUpdate = false } = options;
     if (!tool) return;
+    const pendingFloatingSelection = !pointerState.active && Boolean(
+      pointerState.selectionMove?.hasCleared
+      || pointerState.lastSelectionMove?.hasCleared
+      || state.pendingPasteMoveState?.hasCleared
+    );
+    if (pendingFloatingSelection && typeof confirmPendingSelectionMove === 'function') {
+      // A floating selection has already cleared its source pixels. Never
+      // discard that transient state during a tool change, or the visible
+      // moved artwork would be lost. Tool changes commit it like Aseprite.
+      confirmPendingSelectionMove({ allowOutOfBoundsClip: true });
+    }
     if (pointerState.active && pointerState.tool === 'pan' && pointerState.panMode === 'multiTouch') {
       cancelActiveViewportGesture('tool-change');
     }
