@@ -1336,6 +1336,11 @@
     const previousCanvas = getActiveProjectCanvasDocument();
     const previousSurface = activeCanvasSurface;
     const previousId = projectCanvasStore.activeCanvasId;
+    // Switching the active canvas must not recenter the shared world. Safari
+    // landscape can issue visualViewport work adjacent to this pointer event.
+    const preservedMultiCanvasPan = isMultiCanvasWorldLayoutActive()
+      ? { x: Number(state.pan.x) || 0, y: Number(state.pan.y) || 0 }
+      : null;
     const changed = previousId !== targetCanvas.id;
     if (!changed) {
       if (syncUi) {
@@ -1382,6 +1387,12 @@
     } else {
       pendingProjectCanvasUiSync = true;
       syncMultiCanvasSelectionUi();
+    }
+    if (preservedMultiCanvasPan) {
+      state.pan.x = preservedMultiCanvasPan.x;
+      state.pan.y = preservedMultiCanvasPan.y;
+      syncMultiCanvasWorldLayoutDisplayPositions();
+      applyViewportTransform();
     }
     updateHistoryButtons();
     if (persist) {
