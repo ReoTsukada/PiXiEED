@@ -933,7 +933,13 @@
         nodes.forEach(clearGeometryLock);
         return;
       }
-      const height = Math.max(1, Math.round(banner.getBoundingClientRect().height));
+      // PiXiEEDraw's portrait banner is deliberately the same fixed 50px
+      // chrome in production and DEV.  Do not use a late AdSense response as
+      // the source of truth here: when it reports a tall responsive creative,
+      // measuring it first would lock that oversized height above the editor.
+      const height = isPixiedrawPage()
+        ? 50
+        : Math.max(1, Math.round(banner.getBoundingClientRect().height));
       const heightValue = `${height}px`;
       nodes.forEach(node => {
         ['height', 'min-height', 'max-height'].forEach(property => {
