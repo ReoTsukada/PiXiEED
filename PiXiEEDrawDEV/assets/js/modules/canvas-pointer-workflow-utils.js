@@ -1003,8 +1003,11 @@
     }
     const pendingSelectionHit = Boolean(pendingMoveState && isPositionInMoveState(position, pendingMoveState));
     if (pendingMoveState) {
-      // Keep dragging when touching the moved selection preview; confirm when touching outside.
-      if (isSelectionTool && (selectionHit || pendingSelectionHit)) {
+      // Source mask stays in state until the floating selection is committed.
+      // It must not keep the old, now-empty source area draggable: only the
+      // visible moved preview continues the move. Every other click commits
+      // the pixels and clears the selection, matching Aseprite's behavior.
+      if (isSelectionTool && pendingSelectionHit) {
         const moved = beginSelectionMove(event, position, { reuseOffset: true });
         if (moved) {
           updateCanvasControlButtons();
