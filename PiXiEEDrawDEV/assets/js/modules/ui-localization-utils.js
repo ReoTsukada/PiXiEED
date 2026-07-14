@@ -237,6 +237,8 @@
         rectFill: { ja: '塗り四角', en: 'Filled Rect', zh: '填充矩形' },
         ellipse: { ja: '丸', en: 'Ellipse', zh: '椭圆' },
         ellipseFill: { ja: '塗り丸', en: 'Filled Ellipse', zh: '填充椭圆' },
+        oval: { ja: '楕円', en: 'Oval', zh: '椭圆' },
+        ovalFill: { ja: '塗り楕円', en: 'Filled Oval', zh: '填充椭圆' },
         fill: { ja: '単色塗り', en: 'Solid Fill', zh: '单色填充' },
         fillDither: { ja: 'ディザ塗り', en: 'Dither Fill', zh: '抖动填充' },
         fillGradient: { ja: 'グラデーション塗り', en: 'Gradient Fill', zh: '渐变填充' },
