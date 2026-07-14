@@ -46,9 +46,6 @@
     }
     try {
       setExportFileBaseName(getExportFileNameBase() || state.documentName);
-      if (dom.exportDialog?.projectV2ExperimentalToggle instanceof HTMLInputElement) {
-        dom.exportDialog.projectV2ExperimentalToggle.checked = false;
-      }
       if (EXPORT_DIRECTORY_SUPPORTED) {
         if (pendingExportDirectoryHandle && !exportDirectoryHandle) {
           await attemptExportDirectoryReauthorization();
@@ -829,13 +826,6 @@
       updateAutosaveStatus('コンテスト投稿は現在停止中です', 'warn');
     } else if (normalized === 'project') {
       const result = await saveProjectAsPixieedraw({
-        fileNameBase: getExportFileNameBase() || state.documentName,
-      });
-      if (result?.saved) {
-        showLoginPromptAfterExport();
-      }
-    } else if (normalized === 'projectv2experimental') {
-      const result = await saveProjectAsPixieedrawV2Experimental({
         fileNameBase: getExportFileNameBase() || state.documentName,
       });
       if (result?.saved) {
