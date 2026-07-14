@@ -231,9 +231,8 @@
     if (viewportRect.width <= 0 || viewportRect.height <= 0) {
       return { clampedX: false, clampedY: false };
     }
-    if (isMultiCanvasWorldLayoutActive()) {
-      return { clampedX: false, clampedY: false };
-    }
+    // In the shared multi-canvas world, only the active surface is the
+    // navigation reference. Other canvases must not enlarge the clamp area.
     return clampPanToKeepRectIntersectingViewport(getPrimaryViewportCanvasRect(), viewportRect);
   }
 
