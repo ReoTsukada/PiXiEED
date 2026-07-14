@@ -35,6 +35,7 @@
     createLocalProjectEntrySignature,
     normalizeProjectPersistenceState,
     normalizeQrEditPayload,
+    createNativeProjectOriginalityMetadata,
     localizeText,
   } = {}) {
     function resolveTabPersistenceState(value = null, fallback = null, { createToken = true } = {}) {
@@ -135,6 +136,28 @@
       const persistenceState = resolveTabPersistenceState(options, null, { createToken: true });
       const projectSaveHandle = resolveTabProjectSaveHandle(options.projectSaveHandle, null);
       const projectSaveHandleMeta = resolveTabProjectSaveHandleMeta(options.projectSaveHandleMeta, null);
+      const isNativeNewProject = persistenceState.sourceKind === 'new';
+      const canonicalPayloadFormat = typeof options.canonicalPayloadFormat === 'string' && options.canonicalPayloadFormat
+        ? options.canonicalPayloadFormat
+        : (isNativeNewProject ? 'v2' : '');
+      const canonicalSchemaVersion = Math.max(0, Math.round(Number(options.canonicalSchemaVersion) || (isNativeNewProject ? 1 : 0)));
+      const canonicalSourceMetadata = options.canonicalSourceMetadata && typeof options.canonicalSourceMetadata === 'object'
+        ? options.canonicalSourceMetadata
+        : (isNativeNewProject && typeof createNativeProjectOriginalityMetadata === 'function'
+          ? {
+              sourceKind: 'new',
+              sourceAdapterId: null,
+              projectOriginality: createNativeProjectOriginalityMetadata(),
+            }
+          : null);
+      if (canonicalPayloadFormat === 'v2' && payload?.project && typeof payload.project === 'object') {
+        payload.project = {
+          ...payload.project,
+          canonicalPayloadFormat: 'v2',
+          canonicalSchemaVersion: Math.max(1, canonicalSchemaVersion || 1),
+          canonicalSourceMetadata,
+        };
+      }
       if (!SHARED_PROJECTS_ENABLED) {
         const localTab = {
           id: tabId,
@@ -160,13 +183,9 @@
           qrEditPayload: normalizeQrEditPayload(options.qrEditPayload, normalizedProjectId),
           projectSaveHandle,
           projectSaveHandleMeta,
-          canonicalPayloadFormat: typeof options.canonicalPayloadFormat === 'string'
-            ? options.canonicalPayloadFormat
-            : '',
-          canonicalSchemaVersion: Math.max(0, Math.round(Number(options.canonicalSchemaVersion) || 0)),
-          canonicalSourceMetadata: options.canonicalSourceMetadata && typeof options.canonicalSourceMetadata === 'object'
-            ? options.canonicalSourceMetadata
-            : null,
+          canonicalPayloadFormat,
+          canonicalSchemaVersion,
+          canonicalSourceMetadata,
           sourceProjectId: typeof options.sourceProjectId === 'string' && options.sourceProjectId ? options.sourceProjectId : null,
           sourceSheetId: typeof options.sourceSheetId === 'string' && options.sourceSheetId ? options.sourceSheetId : null,
           isImportedSheet: options.isImportedSheet === true,
@@ -227,13 +246,9 @@
         qrEditPayload: normalizeQrEditPayload(options.qrEditPayload, normalizedProjectId),
         projectSaveHandle,
         projectSaveHandleMeta,
-        canonicalPayloadFormat: typeof options.canonicalPayloadFormat === 'string'
-          ? options.canonicalPayloadFormat
-          : '',
-        canonicalSchemaVersion: Math.max(0, Math.round(Number(options.canonicalSchemaVersion) || 0)),
-        canonicalSourceMetadata: options.canonicalSourceMetadata && typeof options.canonicalSourceMetadata === 'object'
-          ? options.canonicalSourceMetadata
-          : null,
+        canonicalPayloadFormat,
+        canonicalSchemaVersion,
+        canonicalSourceMetadata,
         ...persistenceState,
         ...(currentProjectIsShared ? {
           sharedProjectKey: currentSharedProjectKey || getSharedProjectKeyFromProjectId(normalizedProjectId),
