@@ -10,6 +10,67 @@
   ]);
   const UNSAFE_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 
+  function createNativeProjectOriginalityMetadata(createdAt = new Date().toISOString()) {
+    return {
+      schemaVersion: 1,
+      saleEligibility: 'eligible',
+      projectWide: true,
+      createdWith: 'pixieedraw-native',
+      createdAt,
+      externalInputDetected: false,
+      disqualificationReasons: [],
+      serverAttestation: null,
+    };
+  }
+
+  function createIneligibleProjectOriginalityMetadata(reason = 'unknown-external-source', detectedAt = new Date().toISOString()) {
+    return {
+      schemaVersion: 1,
+      saleEligibility: 'ineligible',
+      projectWide: true,
+      createdWith: 'external-or-unverified',
+      createdAt: null,
+      externalInputDetected: true,
+      detectedAt,
+      disqualificationReasons: [reason],
+      serverAttestation: null,
+    };
+  }
+
+  function normalizeProjectOriginalityMetadata(value, sourceKind = 'unknown') {
+    const incoming = value && typeof value === 'object' ? value : null;
+    // An imported project must never become sale-eligible again simply by
+    // editing or removing layers in the browser.
+    if (incoming?.saleEligibility === 'ineligible') {
+      return {
+        ...incoming,
+        schemaVersion: 1,
+        saleEligibility: 'ineligible',
+        projectWide: true,
+        externalInputDetected: true,
+        disqualificationReasons: Array.isArray(incoming.disqualificationReasons) && incoming.disqualificationReasons.length
+          ? incoming.disqualificationReasons.slice()
+          : ['external-or-unverified-source'],
+      };
+    }
+    if (incoming?.saleEligibility === 'eligible'
+      && incoming.createdWith === 'pixieedraw-native'
+      && incoming.externalInputDetected !== true) {
+      return {
+        ...incoming,
+        schemaVersion: 1,
+        saleEligibility: 'eligible',
+        projectWide: true,
+        externalInputDetected: false,
+        disqualificationReasons: [],
+      };
+    }
+    if (sourceKind === 'import-gif') return createIneligibleProjectOriginalityMetadata('external-gif-import');
+    if (sourceKind === 'import-image') return createIneligibleProjectOriginalityMetadata('external-image-import');
+    if (sourceKind === 'new') return createNativeProjectOriginalityMetadata();
+    return createIneligibleProjectOriginalityMetadata('external-or-unverified-project');
+  }
+
   function failure(code, phase, path, details = '') {
     return { ok: false, code, phase, path, recoverable: true, details };
   }
@@ -276,6 +337,10 @@
       const rawGifMetadataFailure = validateGifSourceMetadata({ ...rawMetadata, sourceKind: normalizedSourceKind });
       if (rawGifMetadataFailure) return rawGifMetadataFailure;
       const metadata = cloneSafe(rawMetadata, 'sourceMetadata');
+      metadata.projectOriginality = normalizeProjectOriginalityMetadata(
+        metadata.projectOriginality,
+        normalizedSourceKind
+      );
       const canonicalPayload = {
         ...project,
         canonicalPayloadFormat: CANONICAL_V2_PAYLOAD_FORMAT,
@@ -346,6 +411,8 @@
   root.canonicalV2ProjectUtils = Object.freeze({
     CANONICAL_V2_SCHEMA_VERSION,
     CANONICAL_V2_PAYLOAD_FORMAT,
+    createNativeProjectOriginalityMetadata,
+    normalizeProjectOriginalityMetadata,
     normalizeExternalProjectToCanonicalV2,
     validateCanonicalV2ProjectPayload,
     inspectCanonicalV2ProjectPayload,
