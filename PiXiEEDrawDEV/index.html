@@ -79,7 +79,7 @@
   })();
 </script>
 <script src="assets/js/modules/edition-capabilities-utils.js?v=2026.07.11-g3a-edition-ads"></script>
-<script src="assets/js/build-info.js?v=20260713-061"></script>
+<script src="assets/js/build-info.js?v=20260714-062"></script>
 <script>
   (function configurePixieedAds() {
     const shouldShowAds = typeof window.__PIXIEEDRAW_SHOULD_SHOW_ADS__ === 'function'
@@ -1447,7 +1447,7 @@
 <option value="gif">GIF（アニメーション）</option>
 <option value="svg">SVG（画像）</option>
 <option value="jpeg">JPEG（画像）</option>
-<option value="project">プロジェクト（.pixieedraw）</option>
+<option value="project">プロジェクト（.pixieedraw / V2）</option>
 </select>
 </label>
 <label class="field field--compact export-name-field" for="exportFileNameBase">
@@ -1475,11 +1475,6 @@
 <input id="exportSaveProjectCompanionToggle" type="checkbox"/>
 <span aria-hidden="true" class="export-toggle-icon"><img alt="" decoding="async" src="../icon-e1_frame_01.png"/></span>
 <span>PiXiEEDファイルも保存</span>
-</label>
-<label class="toggle-option export-icon-toggle" for="exportProjectV2ExperimentalToggle" hidden id="exportProjectV2ExperimentalRow" title="DEV専用の実験保存です">
-<input id="exportProjectV2ExperimentalToggle" type="checkbox"/>
-<span aria-hidden="true" class="export-toggle-icon"><img alt="" decoding="async" src="../icon-e1_frame_01.png"/></span>
-<span id="exportProjectV2ExperimentalLabel">V2 experimentalで保存</span>
 </label>
 <label class="toggle-option export-icon-toggle" for="exportSpriteMapCompanionToggle" id="exportSpriteMapCompanionOptionRow" title="SpriteMAP出力">
 <input id="exportSpriteMapCompanionToggle" type="checkbox"/>
@@ -1698,6 +1693,21 @@
 </footer>
 </form>
 </dialog>
+<dialog aria-labelledby="legacyProjectMigrationTitle" class="modal" id="legacyProjectMigrationDialog">
+<form class="modal__form" method="dialog">
+<header class="modal__header">
+<h2 class="modal__title" id="legacyProjectMigrationTitle">V2プロジェクトへ移行</h2>
+</header>
+<div class="modal__body">
+<p id="legacyProjectMigrationMessage">このファイルは旧形式です。PiXiEEDrawDEV用の単一プロジェクトV2へ移行します。</p>
+<p class="help-text" id="legacyProjectMigrationDetail">移行後はV2だけを端末内プロジェクトとして使用します。選択した元ファイルは削除・上書きしません。</p>
+</div>
+<footer class="modal__footer">
+<button class="button button--ghost" id="legacyProjectMigrationCancel" type="button">キャンセル</button>
+<button class="button button--primary" id="legacyProjectMigrationConfirm" type="button">V2へ移行する</button>
+</footer>
+</form>
+</dialog>
 <dialog aria-labelledby="shortcutHelpTitle" class="modal shortcut-help-modal" id="shortcutHelpDialog">
 <form class="modal__form" method="dialog">
 <header class="modal__header">
@@ -1851,7 +1861,7 @@
 	<script defer="" src="assets/js/modules/open-project-tab-model.js?v=2026.07.11-sheet-payload-ownership-fix1"></script>
 	<script defer="" src="assets/js/modules/project-command-lock-utils.js?v=2026.07.12-command-lock-r2"></script>
 	<script defer="" src="assets/js/modules/export-utils.js?v=2026.06.28-file-split-step4"></script>
-	<script defer="" src="assets/js/modules/export-normalizer-utils.js?v=2026.07.02-startup-helper-split-v1"></script>
+	<script defer="" src="assets/js/modules/export-normalizer-utils.js?v=20260714-project-v2-default1"></script>
 	<script defer="" src="assets/js/modules/export-session.js?v=2026.06.29-document-model-export-session-fix2"></script>
 	<script defer="" src="assets/js/modules/pixieed-support-benefit-utils.js?v=2026.07.04-shared-project-disabled1"></script>
 	<script defer="" src="assets/js/modules/open-project-tab-helpers.js?v=2026.07.06-local-project-open-fix1"></script>
@@ -1884,7 +1894,7 @@
 	<script defer="" src="assets/js/modules/image-import-decode-utils.js?v=2026.07.12-gmem3a-streaming-resize1"></script>
 	<script defer="" src="assets/js/modules/palette-panel-utils.js?v=2026.07.12-direct-authority-gmem2a1"></script>
 	<script defer="" src="assets/js/modules/timeline-layers.js?v=2026.07.04-frame-pending-structure-fix1"></script>
-	<script defer="" src="assets/js/modules/ui-localization-utils.js?v=2026.07.13-start-screen-only1"></script>
+	<script defer="" src="assets/js/modules/ui-localization-utils.js?v=20260714-project-v2-default1"></script>
 	<script defer="" src="assets/js/modules/ui-language-utils.js?v=2026.07.03-small-helper-batch-split-v1"></script>
 	<script defer="" src="assets/js/modules/scroll-input-utils.js?v=2026.07.03-small-helper-batch-split-v1"></script>
 	<script defer="" src="assets/js/modules/sprite-scale-utils.js?v=2026.06.30-zh-localization-v1"></script>
@@ -1900,8 +1910,8 @@
 	<script defer="" src="assets/js/modules/keyboard-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/canvas-pointer-workflow-utils.js?v=2026.07.11-touch-arbiter-v8"></script>
 	<script defer="" src="assets/js/modules/canvas-tool-state-workflow-utils.js?v=2026.07.02-canvas-tool-state-fix2"></script>
-	<script defer="" src="assets/js/modules/export-rendering.js?v=20260713-048"></script>
-	<script defer="" src="assets/js/modules/dialog-setup-utils.js?v=2026.07.12-export-format-options1"></script>
+	<script defer="" src="assets/js/modules/export-rendering.js?v=20260714-project-v2-default1"></script>
+	<script defer="" src="assets/js/modules/dialog-setup-utils.js?v=20260714-project-v2-default1"></script>
 	<script defer="" src="assets/js/modules/canvas-resize-workflow-utils.js?v=20260713-049"></script>
 	<script defer="" src="assets/js/modules/canvas-resize-handle-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/local-viewport-canvas-workflow-utils.js?v=2026.07.11-touch-arbiter-v7"></script>
@@ -1922,7 +1932,7 @@
 	<script defer="" src="assets/js/modules/autosave-workflow-utils.js?v=20260713-047"></script>
 	<script defer="" src="assets/js/modules/open-import-workflow-utils.js?v=20260713-048"></script>
 	<script defer="" src="assets/js/modules/export-format-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
-	<script defer="" src="assets/js/modules/export-dialog-workflow-utils.js?v=2026.07.12-export-format-options1"></script>
+	<script defer="" src="assets/js/modules/export-dialog-workflow-utils.js?v=20260714-project-v2-default1"></script>
 		<script defer="" src="assets/js/modules/startup-workflow-utils.js?v=2026.07.13-start-screen-only1"></script>
 		<script defer="" src="assets/js/modules/recent-project-workflow-utils.js?v=20260713-048"></script>
 		<script defer="" src="assets/js/modules/project-package-workflow-utils.js?v=20260713-047"></script>
@@ -1930,7 +1940,7 @@
 		<script defer="" src="assets/js/modules/project-storage-v1-json-adapter.js?v=2026.07.09-project-storage-phase1"></script>
 		<script defer="" src="assets/js/modules/project-storage-v2-archive-codec.js?v=20260713-047"></script>
 		<script defer="" src="assets/js/modules/project-storage-v2-worker-bridge.js?v=2026.07.10-project-storage-worker1"></script>
-		<script defer="" src="assets/js/modules/project-storage-v2-zip-adapter.js?v=20260713-047"></script>
+		<script defer="" src="assets/js/modules/project-storage-v2-zip-adapter.js?v=20260714-project-v2-default1"></script>
 		<script defer="" src="assets/js/modules/document-serialization-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 		<script defer="" src="assets/js/modules/document-session-workflow-utils.js?v=20260713-048"></script>
 	<script defer="" src="assets/js/modules/recent-account-workflow-utils.js?v=2026.07.03-safe-helper-split-v1"></script>
@@ -1961,7 +1971,7 @@
 	<script defer="" src="assets/js/modules/pre-update-checkpoint-utils.js?v=20260712-pre-update-checkpoint-u3"></script>
 	<script defer="" src="assets/js/active-project-session-utils.js?v=2026.07.13-active-project-session-r2c"></script>
 	<script defer="" src="assets/js/pixieedraw-dev-switch.js?v=2026.07.03-pixieedrawdev-switch-fix14"></script>
-	<script defer="" src="assets/js/app.js?v=20260713-061"></script>
+	<script defer="" src="assets/js/app.js?v=20260714-062"></script>
 	<script defer="" src="assets/js/modules/update-detection-utils.js?v=20260713-026"></script>
   <script>
     (function initPanelAdDocking() {
