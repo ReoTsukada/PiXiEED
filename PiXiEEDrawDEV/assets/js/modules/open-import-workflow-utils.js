@@ -553,6 +553,7 @@
           suppressAutosaveStatus: true,
           sourceKind: 'file',
           fileLoad: true,
+          sourceFileName: file.name || '',
           projectSaveHandleState: handle ? 'unknown' : 'none',
           preparedSnapshot,
         })
@@ -560,6 +561,7 @@
           suppressAutosaveStatus: true,
           sourceKind: 'file',
           fileLoad: true,
+          sourceFileName: file.name || '',
           projectSaveHandleState: handle ? 'unknown' : 'none',
           preparedSnapshot,
         });
