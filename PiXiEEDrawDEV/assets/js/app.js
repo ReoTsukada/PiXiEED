@@ -573,8 +573,6 @@
       includeOriginalRow: document.getElementById('exportOriginalOptionRow'),
       saveProjectCompanionToggle: document.getElementById('exportSaveProjectCompanionToggle'),
       saveProjectCompanionRow: document.getElementById('exportCompanionOptionRow'),
-      projectV2ExperimentalToggle: document.getElementById('exportProjectV2ExperimentalToggle'),
-      projectV2ExperimentalRow: document.getElementById('exportProjectV2ExperimentalRow'),
       saveSpriteMapCompanionToggle: document.getElementById('exportSpriteMapCompanionToggle'),
       saveSpriteMapCompanionRow: document.getElementById('exportSpriteMapCompanionOptionRow'),
       gridSplitToggle: document.getElementById('exportGridSplitToggle'),
@@ -631,6 +629,13 @@
       detail: document.getElementById('recentProjectDeleteConfirmDetail'),
       cancel: document.getElementById('recentProjectDeleteConfirmCancel'),
       confirm: document.getElementById('recentProjectDeleteConfirmConfirm'),
+    },
+    legacyProjectMigration: {
+      dialog: /** @type {HTMLDialogElement|null} */ (document.getElementById('legacyProjectMigrationDialog')),
+      message: document.getElementById('legacyProjectMigrationMessage'),
+      detail: document.getElementById('legacyProjectMigrationDetail'),
+      cancel: document.getElementById('legacyProjectMigrationCancel'),
+      confirm: document.getElementById('legacyProjectMigrationConfirm'),
     },
     shareStartConfirm: {
       dialog: /** @type {HTMLDialogElement|null} */ (document.getElementById('shareStartConfirmDialog')),
@@ -3115,6 +3120,8 @@
   set bindCanvasSurfaceInteractionEvents(value) { bindCanvasSurfaceInteractionEvents = value; },
   get cancelActiveViewportGesture() { return cancelActiveViewportGesture; },
   set cancelActiveViewportGesture(value) { cancelActiveViewportGesture = value; },
+  get confirmPendingSelectionMove() { return confirmPendingSelectionMove; },
+  set confirmPendingSelectionMove(value) { confirmPendingSelectionMove = value; },
   get clamp() { return clamp; },
   set clamp(value) { clamp = value; },
   get compactToolFlyoutAnchorButton() { return compactToolFlyoutAnchorButton; },
@@ -5851,6 +5858,8 @@
   set extractDocumentBaseName(value) { extractDocumentBaseName = value; },
   get isProjectCommandLocked() { return isProjectCommandLocked; },
   set isProjectCommandLocked(value) { isProjectCommandLocked = value; },
+  get requestLegacyV2MigrationConsent() { return requestLegacyV2MigrationConsent; },
+  set requestLegacyV2MigrationConsent(value) { requestLegacyV2MigrationConsent = value; },
   get acquireProjectCommandLock() { return acquireProjectCommandLock; },
   set acquireProjectCommandLock(value) { acquireProjectCommandLock = value; },
   get releaseProjectCommandLock() { return releaseProjectCommandLock; },
@@ -6171,8 +6180,6 @@
   set runUiAction(value) { runUiAction = value; },
   get saveProjectAsPixieedraw() { return saveProjectAsPixieedraw; },
   set saveProjectAsPixieedraw(value) { saveProjectAsPixieedraw = value; },
-  get saveProjectAsPixieedrawV2Experimental() { return saveProjectAsPixieedrawV2Experimental; },
-  set saveProjectAsPixieedrawV2Experimental(value) { saveProjectAsPixieedrawV2Experimental = value; },
   get setCompactRightFlyoutOpen() { return setCompactRightFlyoutOpen; },
   set setCompactRightFlyoutOpen(value) { setCompactRightFlyoutOpen = value; },
   get setExportFileBaseName() { return setExportFileBaseName; },
@@ -6969,6 +6976,8 @@
   set recentProjectsCache(value) { recentProjectsCache = value; },
   get reconcileTimelapseTracksForSingleCanvas() { return reconcileTimelapseTracksForSingleCanvas; },
   set reconcileTimelapseTracksForSingleCanvas(value) { reconcileTimelapseTracksForSingleCanvas = value; },
+  get requestLegacyV2MigrationConsent() { return requestLegacyV2MigrationConsent; },
+  set requestLegacyV2MigrationConsent(value) { requestLegacyV2MigrationConsent = value; },
   get renderOpenProjectTabs() { return renderOpenProjectTabs; },
   set renderOpenProjectTabs(value) { renderOpenProjectTabs = value; },
   get resetDocumentUnsavedChanges() { return resetDocumentUnsavedChanges; },
@@ -9789,7 +9798,7 @@
     if (preferred) {
       return preferred;
     }
-    return 'pixieedraw-v2-zip-experimental';
+    return 'pixieedraw-v2-zip';
   }
 
   function isProjectStorageConversionSave(sourceStorageAdapterId, targetStorageAdapterId) {
@@ -11777,7 +11786,7 @@
   set CONTEST_POST_PAGE_URL(value) { CONTEST_POST_PAGE_URL = value; },
   get DEFAULT_DOCUMENT_NAME() { return DEFAULT_DOCUMENT_NAME; },
   set DEFAULT_DOCUMENT_NAME(value) { DEFAULT_DOCUMENT_NAME = value; },
-  get DEFAULT_PROJECT_STORAGE_ADAPTER_ID() { return pixieeDrawV2ZipAdapter?.id || pixieeDrawV1JsonAdapter?.id || 'pixieedraw-v2-zip-experimental'; },
+  get DEFAULT_PROJECT_STORAGE_ADAPTER_ID() { return pixieeDrawV2ZipAdapter?.id || pixieeDrawV1JsonAdapter?.id || 'pixieedraw-v2-zip'; },
   set DEFAULT_PROJECT_STORAGE_ADAPTER_ID(value) {},
   get DEFAULT_LAYER_BLEND_MODE() { return DEFAULT_LAYER_BLEND_MODE; },
   set DEFAULT_LAYER_BLEND_MODE(value) { DEFAULT_LAYER_BLEND_MODE = value; },
@@ -15369,6 +15378,46 @@
     return startupWorkflowUtilsModule.openRecentProjectDeleteConfirmDialog(...args);
   }
 
+  async function requestLegacyV2MigrationConsent({ sourceFileName = '', sourceAdapterId = '', projectCount = 1 } = {}) {
+    const dialog = dom.legacyProjectMigration?.dialog;
+    if (!dialog || typeof dialog.showModal !== 'function') return false;
+    const normalizedCount = Math.max(1, Math.round(Number(projectCount) || 1));
+    const name = typeof sourceFileName === 'string' && sourceFileName.trim()
+      ? sourceFileName.trim()
+      : '選択したプロジェクト';
+    const isV1 = sourceAdapterId === 'pixieedraw-v1-json';
+    if (dom.legacyProjectMigration.message) {
+      dom.legacyProjectMigration.message.textContent = normalizedCount > 1
+        ? `「${name}」には ${normalizedCount} 件の旧プロジェクトがあります。各プロジェクトを単一のV2プロジェクトへ分割します。`
+        : `「${name}」は${isV1 ? 'V1' : '旧V2'}形式です。単一のV2プロジェクトへ移行します。`;
+    }
+    if (dom.legacyProjectMigration.detail) {
+      dom.legacyProjectMigration.detail.textContent = '移行後はV2だけを端末内プロジェクトとして使用します。選択した元ファイル、PNG、GIFなどの元データは削除・上書きせず、PiXiEEDrawDEVからも参照を保持しません。';
+    }
+    return await new Promise(resolve => {
+      let settled = false;
+      const finish = (accepted) => {
+        if (settled) return;
+        settled = true;
+        dialog.removeEventListener('cancel', onCancel);
+        dom.legacyProjectMigration.cancel?.removeEventListener('click', onCancel);
+        dom.legacyProjectMigration.confirm?.removeEventListener('click', onConfirm);
+        if (dialog.open) dialog.close();
+        resolve(accepted);
+      };
+      const onCancel = (event) => {
+        event?.preventDefault?.();
+        finish(false);
+      };
+      const onConfirm = () => finish(true);
+      dialog.addEventListener('cancel', onCancel, { once: true });
+      dom.legacyProjectMigration.cancel?.addEventListener('click', onCancel, { once: true });
+      dom.legacyProjectMigration.confirm?.addEventListener('click', onConfirm, { once: true });
+      dialog.showModal();
+      dom.legacyProjectMigration.confirm?.focus();
+    });
+  }
+
   function setupRecentProjectDeleteConfirmDialog(...args) {
     return startupWorkflowUtilsModule.setupRecentProjectDeleteConfirmDialog(...args);
   }
@@ -16773,8 +16822,8 @@
 
   // Packages saved before the single-project editor change can contain several
   // resident tabs. Split those payloads once into normal V2 projects instead of
-  // restoring all of them into one browser session. The original package stays
-  // untouched so a failed or interrupted migration never loses user data.
+  // restoring all of them into one browser session. The legacy local entry is
+  // removed only after every new V2 project has committed successfully.
   const legacyMultiProjectMigrationPromises = new Map();
 
   async function migrateLegacyMultiProjectPackage({
@@ -16854,6 +16903,14 @@
         });
       }
       if (!createdEntries.length) {
+        const nextEntries = existingEntries.filter(entry => entry?.id !== normalizedSourceProjectId);
+        if (nextEntries.length !== existingEntries.length) {
+          await saveRecentProjectsList(existingEntries, nextEntries);
+          setRecentProjectsCache(nextEntries);
+          await removeAutosaveV2ProjectData(normalizedSourceProjectId).catch(error => {
+            console.warn('Legacy V2 source cleanup deferred', error);
+          });
+        }
         const projects = existingEntries
           .filter(entry => entry?.legacyMultiProjectSourceId === normalizedSourceProjectId)
           .map(entry => ({
@@ -16865,9 +16922,16 @@
         return { migrated: false, reason: 'already-migrated', projectIds: projects.map(entry => entry.projectId), projects };
       }
       const latestEntries = await loadRecentProjectsMetadata();
-      const nextEntries = latestEntries.concat(createdEntries);
+      // The source package has been split into independent V2 projects.
+      // Remove its local legacy entry only after every V2 manifest committed.
+      const nextEntries = latestEntries
+        .filter(entry => entry?.id !== normalizedSourceProjectId)
+        .concat(createdEntries);
       await saveRecentProjectsList(latestEntries, nextEntries);
       setRecentProjectsCache(nextEntries);
+      await removeAutosaveV2ProjectData(normalizedSourceProjectId).catch(error => {
+        console.warn('Legacy V2 source cleanup deferred', error);
+      });
       const projects = nextEntries
         .filter(entry => entry?.legacyMultiProjectSourceId === normalizedSourceProjectId)
         .map(entry => ({
@@ -17420,56 +17484,7 @@
     return exportRenderingModule.executeProjectOpen(...args);
   }
 
-  async function saveProjectAsPixieedrawV2Experimental(...args) {
-    return exportRenderingModule.saveProjectAsPixieedrawV2Experimental(...args);
-  }
-
-  async function saveProjectAsPixieedrawV2ExperimentalIncludeSheetsDev(...args) {
-    return exportRenderingModule.saveProjectAsPixieedrawV2ExperimentalIncludeSheetsDev(...args);
-  }
-
   if (typeof window !== 'undefined') {
-    if (typeof window.__pixieedrawUseV2ProjectSave !== 'boolean') {
-      window.__pixieedrawUseV2ProjectSave = true;
-    }
-    if (typeof window.__pixieedrawUseMultiSheetV2ExternalSave !== 'boolean') {
-      window.__pixieedrawUseMultiSheetV2ExternalSave = true;
-    }
-    window.__pixieedrawSetV2ProjectSaveEnabled = function __pixieedrawSetV2ProjectSaveEnabled(enabled) {
-      window.__pixieedrawUseV2ProjectSave = enabled === true;
-      return window.__pixieedrawGetV2ProjectSaveStatus();
-    };
-    window.__pixieedrawGetV2ProjectSaveStatus = function __pixieedrawGetV2ProjectSaveStatus() {
-      return {
-        enabled: window.__pixieedrawUseV2ProjectSave === true,
-        adapterId: 'pixieedraw-v2-zip-experimental',
-        workerEnabled: projectStorageV2WorkerBridge?.isSupported?.() === true,
-        affectsAutosave: false,
-        affectsRecentProjects: false,
-      };
-    };
-    window.__pixieedrawSetMultiSheetV2ExternalSaveEnabled = function __pixieedrawSetMultiSheetV2ExternalSaveEnabled(enabled) {
-      window.__pixieedrawUseMultiSheetV2ExternalSave = enabled === true;
-      return window.__pixieedrawGetMultiSheetV2ExternalSaveStatus();
-    };
-    window.__pixieedrawGetMultiSheetV2ExternalSaveStatus = function __pixieedrawGetMultiSheetV2ExternalSaveStatus() {
-      return {
-        enabled: window.__pixieedrawUseMultiSheetV2ExternalSave === true,
-        adapterId: 'pixieedraw-v2-zip-experimental',
-        requiresCompleteCandidate: true,
-        affectsAutosave: false,
-        affectsV1: false,
-      };
-    };
-    window.__pixieedrawSaveV2ExperimentalIncludeSheets = async function __pixieedrawSaveV2ExperimentalIncludeSheets(...args) {
-      return saveProjectAsPixieedrawV2ExperimentalIncludeSheetsDev(...args);
-    };
-    window.__pixieedrawSaveV2ExperimentalIncludeSheetsWorker = async function __pixieedrawSaveV2ExperimentalIncludeSheetsWorker(options = {}) {
-      return saveProjectAsPixieedrawV2ExperimentalIncludeSheetsDev({
-        ...(options && typeof options === 'object' ? options : {}),
-        useWorker: true,
-      });
-    };
     window.__pixieedrawWriteAutosaveV2Experimental = async function __pixieedrawWriteAutosaveV2Experimental(options = {}) {
       return await writeAutosaveSchemaV2Experimental(options);
     };
@@ -19745,7 +19760,7 @@
     if (isSharedProjectCollaborativeMode()) {
       return true;
     }
-    if (normalizedFormat === 'project' || normalizedFormat === 'projectv2experimental') {
+    if (normalizedFormat === 'project') {
       return isMultiMasterMode();
     }
     const permission = normalizeMultiExportPermission(
@@ -19775,7 +19790,7 @@
     if (!multiState.connected || canCurrentClientExportProject(normalizedFormat)) {
       return '';
     }
-    if (normalizedFormat === 'project' || normalizedFormat === 'projectv2experimental') {
+    if (normalizedFormat === 'project') {
       if (!isMultiMasterMode()) {
         return 'プロジェクト保存はマスターのみ利用できます';
       }
