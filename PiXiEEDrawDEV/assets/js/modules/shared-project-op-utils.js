@@ -303,7 +303,7 @@
         x: Math.round(Number(end.x) || 0),
         y: Math.round(Number(end.y) || 0),
       },
-      filled: normalizedTool === 'rectFill' || normalizedTool === 'ellipseFill',
+      filled: normalizedTool === 'rectFill' || normalizedTool === 'ellipseFill' || normalizedTool === 'ovalFill',
     };
   }
 
