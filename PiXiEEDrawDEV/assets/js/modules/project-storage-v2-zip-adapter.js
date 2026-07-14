@@ -29,7 +29,7 @@
     useWorkerByDefault = false,
     console: logger = console,
   } = {}) {
-    const ADAPTER_ID = 'pixieedraw-v2-zip-experimental';
+    const ADAPTER_ID = 'pixieedraw-v2-zip';
 
     function normalizeCodecError(error) {
       if (error instanceof Error) {
