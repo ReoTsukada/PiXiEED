@@ -170,6 +170,30 @@
       };
   }
 
+  function needsLegacyV2MigrationConsent(parsedDocument = null) {
+    const adapterId = typeof parsedDocument?.storageAdapterId === 'string'
+      ? parsedDocument.storageAdapterId
+      : '';
+    const packagedProjectCount = Array.isArray(parsedDocument?.sheets)
+      ? parsedDocument.sheets.filter(sheet => sheet?.project && typeof sheet.project === 'object').length
+      : 0;
+    return adapterId === 'pixieedraw-v1-json' || packagedProjectCount > 1;
+  }
+
+  async function confirmLegacyV2MigrationIfNeeded(parsedDocument, options = {}) {
+    if (!needsLegacyV2MigrationConsent(parsedDocument)) return true;
+    if (typeof requestLegacyV2MigrationConsent !== 'function') return false;
+    const accepted = await requestLegacyV2MigrationConsent({
+      sourceFileName: options?.sourceFileName || options?.fileName || parsedDocument?.document?.documentName || '',
+      sourceAdapterId: parsedDocument?.storageAdapterId || '',
+      projectCount: Array.isArray(parsedDocument?.sheets) ? parsedDocument.sheets.length : 1,
+    });
+    if (!accepted && !options?.suppressAutosaveStatus) {
+      updateAutosaveStatus('V2への移行をキャンセルしました', 'warn');
+    }
+    return accepted;
+  }
+
   async function loadDocumentFromText(text, handle, options = {}) {
     if (!ensureCurrentClientCanReplaceActiveProject({ announce: !options?.suppressAutosaveStatus })) {
       return false;
@@ -203,9 +227,17 @@
       updateAutosaveStatus('ドキュメントの読み込みに失敗しました', 'error');
       return false;
     }
-    const sourcePersistenceState = buildLoadedProjectPersistenceState(parsedDocument, handle, options);
+    if (!await confirmLegacyV2MigrationIfNeeded(parsedDocument, options)) {
+      return false;
+    }
+    const forceV2WorkingCopy = needsLegacyV2MigrationConsent(parsedDocument) || options?.forceV2WorkingCopy === true;
+    const sourcePersistenceState = buildLoadedProjectPersistenceState(parsedDocument, handle, {
+      ...options,
+      forceV2WorkingCopy,
+    });
     return await applyLoadedDocumentSnapshot(parsedDocument, {
       ...options,
+      forceV2WorkingCopy,
       sourcePersistenceState,
     });
   }
@@ -243,9 +275,17 @@
         return false;
       }
     }
-    const sourcePersistenceState = buildLoadedProjectPersistenceState(parsedDocument, handle, options);
+    if (!await confirmLegacyV2MigrationIfNeeded(parsedDocument, options)) {
+      return false;
+    }
+    const forceV2WorkingCopy = needsLegacyV2MigrationConsent(parsedDocument) || options?.forceV2WorkingCopy === true;
+    const sourcePersistenceState = buildLoadedProjectPersistenceState(parsedDocument, handle, {
+      ...options,
+      forceV2WorkingCopy,
+    });
     return await applyLoadedDocumentSnapshot(parsedDocument, {
       ...options,
+      forceV2WorkingCopy,
       sourcePersistenceState,
     });
   }
@@ -281,11 +321,19 @@
       }
       return false;
     }
+    if (!await confirmLegacyV2MigrationIfNeeded(parsedDocument, options)) {
+      return false;
+    }
+    const forceV2WorkingCopy = needsLegacyV2MigrationConsent(parsedDocument) || options?.forceV2WorkingCopy === true;
     const sourcePersistenceState = options?.sourcePersistenceState && typeof options.sourcePersistenceState === 'object'
-      ? buildLoadedProjectPersistenceState(parsedDocument, null, options)
+      ? buildLoadedProjectPersistenceState(parsedDocument, null, {
+        ...options,
+        forceV2WorkingCopy,
+      })
       : null;
     return await applyLoadedDocumentSnapshot(parsedDocument, {
       ...options,
+      forceV2WorkingCopy,
       sourcePersistenceState,
     });
   }
