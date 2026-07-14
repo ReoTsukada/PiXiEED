@@ -1386,7 +1386,7 @@
     }
   }
 
-  function normalizeExternalRasterSheetCandidate(project, file, metrics = {}) {
+  async function normalizeExternalRasterSheetCandidate(project, file, metrics = {}) {
     const kind = metrics.kind === 'gif' ? 'gif' : 'image';
     const documentValue = project?.document && typeof project.document === 'object' ? project.document : {};
     const sourceFileBytes = Math.max(0, Number(metrics.sourceFileBytes ?? file?.size) || 0);
@@ -1404,22 +1404,29 @@
     const normalizeSpan = beginImportPerformanceSpan('pixiedraw-dev:import:canonical-normalize');
     let normalized;
     try {
-    normalized = normalizeExternalProjectToCanonicalV2({
-      sourceKind: kind === 'gif' ? 'import-gif' : 'import-image',
-      sourceAdapterId: null,
-      decodedPayload: project,
-      sourceMetadata: {
-        sourceMimeType: kind === 'gif' ? 'image/gif' : (typeof file?.type === 'string' ? file.type : 'image/png'),
-        sourceFileName: typeof file?.name === 'string' ? file.name : '',
-        sourceFileBytes,
-        sourceWidth,
-        sourceHeight,
-        ...(kind === 'gif' ? {
-          sourceFrameCount: Math.max(1, Number(documentValue?.frames?.length) || Number(documentValue?.canvases?.[0]?.frames?.length) || 1),
-          gifLoopCount: null,
-        } : {}),
-      },
-    });
+      const sourceProvenance = typeof createRasterImportProvenance === 'function'
+        ? await createRasterImportProvenance({ file, project, kind })
+        : null;
+      normalized = normalizeExternalProjectToCanonicalV2({
+        sourceKind: kind === 'gif' ? 'import-gif' : 'import-image',
+        sourceAdapterId: null,
+        decodedPayload: project,
+        sourceMetadata: {
+          sourceMimeType: kind === 'gif' ? 'image/gif' : (typeof file?.type === 'string' ? file.type : 'image/png'),
+          sourceFileName: typeof file?.name === 'string' ? file.name : '',
+          sourceFileBytes,
+          sourceWidth,
+          sourceHeight,
+          sourceProvenance,
+          projectOriginality: typeof normalizeProjectOriginalityMetadata === 'function'
+            ? normalizeProjectOriginalityMetadata(null, kind === 'gif' ? 'import-gif' : 'import-image')
+            : null,
+          ...(kind === 'gif' ? {
+            sourceFrameCount: Math.max(1, Number(documentValue?.frames?.length) || Number(documentValue?.canvases?.[0]?.frames?.length) || 1),
+            gifLoopCount: null,
+          } : {}),
+        },
+      });
     } finally {
       endImportPerformanceSpan(normalizeSpan);
     }
@@ -1479,7 +1486,7 @@
       : 1;
     const sourceWidth = Math.max(0, Number(documentValue.width) || Number(documentValue.canvases?.[0]?.width) || 0);
     const sourceHeight = Math.max(0, Number(documentValue.height) || Number(documentValue.canvases?.[0]?.height) || 0);
-    const normalized = normalizeExternalRasterSheetCandidate(project, file, {
+    const normalized = await normalizeExternalRasterSheetCandidate(project, file, {
       kind: isGif ? 'gif' : 'image', sourceFileBytes, sourceWidth, sourceHeight,
     });
     if (!normalized?.ok) {
