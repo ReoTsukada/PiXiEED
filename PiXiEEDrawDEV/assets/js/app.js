@@ -2614,6 +2614,8 @@
   set compositeFramePixels(value) { compositeFramePixels = value; },
   get confirmPendingSelectionMove() { return confirmPendingSelectionMove; },
   set confirmPendingSelectionMove(value) { confirmPendingSelectionMove = value; },
+  get finalizeSelectionMove() { return finalizeSelectionMove; },
+  set finalizeSelectionMove(value) { finalizeSelectionMove = value; },
   get createBlankImageData() { return createBlankImageData; },
   set createBlankImageData(value) { createBlankImageData = value; },
   get createFrame() { return createFrame; },
@@ -3466,6 +3468,10 @@
     return canvasDrawingWorkflowUtilsModule.drawEllipse(...args);
   }
 
+  function drawOval(...args) {
+    return canvasDrawingWorkflowUtilsModule.drawOval(...args);
+  }
+
   function drawEllipsePixels(...args) {
     return canvasDrawingWorkflowUtilsModule.drawEllipsePixels(...args);
   }
@@ -3573,6 +3579,8 @@
   set dom(value) { dom = value; },
   get drawEllipse() { return drawEllipse; },
   set drawEllipse(value) { drawEllipse = value; },
+  get drawOval() { return drawOval; },
+  set drawOval(value) { drawOval = value; },
   get drawLine() { return drawLine; },
   set drawLine(value) { drawLine = value; },
   get drawRectangle() { return drawRectangle; },
@@ -8671,6 +8679,8 @@
   set dom(value) { dom = value; },
   get drawEllipse() { return drawEllipse; },
   set drawEllipse(value) { drawEllipse = value; },
+  get drawOval() { return drawOval; },
+  set drawOval(value) { drawOval = value; },
   get drawLine() { return drawLine; },
   set drawLine(value) { drawLine = value; },
   get drawRectangle() { return drawRectangle; },
@@ -8994,6 +9004,8 @@
   set drawButtonResizeListenerBound(value) { drawButtonResizeListenerBound = value; },
   get drawEllipse() { return drawEllipse; },
   set drawEllipse(value) { drawEllipse = value; },
+  get drawOval() { return drawOval; },
+  set drawOval(value) { drawOval = value; },
   get drawLine() { return drawLine; },
   set drawLine(value) { drawLine = value; },
   get drawRectangle() { return drawRectangle; },
