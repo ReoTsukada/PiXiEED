@@ -442,6 +442,11 @@
   }
 
   function drawEllipse(start, end, filled) {
+    const bounds = getCircleBounds(start, end);
+    drawOval(bounds.start, bounds.end, filled);
+  }
+
+  function drawOval(start, end, filled) {
     const layer = getActiveLayer();
     if (!layer) return;
     const x0 = Math.min(start.x, end.x);
@@ -457,95 +462,60 @@
     requestRender();
   }
 
+  function getCircleBounds(start, end) {
+    const minX = Math.min(start.x, end.x);
+    const maxX = Math.max(start.x, end.x);
+    const minY = Math.min(start.y, end.y);
+    const maxY = Math.max(start.y, end.y);
+    const diameter = Math.max(1, Math.min((maxX - minX) + 1, (maxY - minY) + 1));
+    const circleMinX = minX + Math.floor((((maxX - minX) + 1) - diameter) * 0.5);
+    const circleMinY = minY + Math.floor((((maxY - minY) + 1) - diameter) * 0.5);
+    return {
+      start: { x: circleMinX, y: circleMinY },
+      end: { x: circleMinX + diameter - 1, y: circleMinY + diameter - 1 },
+    };
+  }
+
   function drawEllipsePixels(x0, y0, x1, y1, filled, plotPixel) {
     const minX = Math.min(x0, x1);
     const maxX = Math.max(x0, x1);
     const minY = Math.min(y0, y1);
     const maxY = Math.max(y0, y1);
     if (maxX < minX || maxY < minY) return;
-    const width = (maxX - minX) + 1;
-    const height = (maxY - minY) + 1;
-    const diameter = Math.max(1, Math.min(width, height));
-    const circleMinX = minX + Math.floor((width - diameter) * 0.5);
-    const circleMinY = minY + Math.floor((height - diameter) * 0.5);
-    const circleMaxX = circleMinX + diameter - 1;
-    const circleMaxY = circleMinY + diameter - 1;
-
-    if (diameter === 1) {
-      plotPixel(circleMinX, circleMinY);
+    if (minX === maxX) {
+      for (let y = minY; y <= maxY; y += 1) plotPixel(minX, y);
+      return;
+    }
+    if (minY === maxY) {
+      for (let x = minX; x <= maxX; x += 1) plotPixel(x, minY);
       return;
     }
 
-    const centerX2 = circleMinX + circleMaxX;
-    const centerY2 = circleMinY + circleMaxY;
-    const parity = Math.abs(centerX2) % 2;
-    let radius2 = circleMaxX - circleMinX;
-    if ((Math.abs(radius2) % 2) !== parity) {
-      radius2 -= 1;
-    }
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+    const radiusX = (maxX - minX) / 2;
+    const radiusY = (maxY - minY) / 2;
+    let previousLeft = null;
+    let previousRight = null;
 
-    const fillRanges = filled ? new Map() : null;
-    const recordPoint = (x, y) => {
-      if (x < circleMinX || x > circleMaxX || y < circleMinY || y > circleMaxY) {
-        return;
-      }
-      if (fillRanges) {
-        const existing = fillRanges.get(y);
-        if (existing) {
-          existing.min = Math.min(existing.min, x);
-          existing.max = Math.max(existing.max, x);
-        } else {
-          fillRanges.set(y, { min: x, max: x });
-        }
+    for (let y = minY; y <= maxY; y += 1) {
+      const vertical = (y - centerY) / radiusY;
+      const horizontalRadius = radiusX * Math.sqrt(Math.max(0, 1 - (vertical * vertical)));
+      const left = Math.max(minX, Math.round(centerX - horizontalRadius));
+      const right = Math.min(maxX, Math.round(centerX + horizontalRadius));
+      if (filled) {
+        for (let x = left; x <= right; x += 1) plotPixel(x, y);
       } else {
-        plotPixel(x, y);
-      }
-    };
-
-    const plotSymmetricOffset2 = (dx2, dy2) => {
-      const pairs = [
-        [dx2, dy2],
-        [-dx2, dy2],
-        [dx2, -dy2],
-        [-dx2, -dy2],
-        [dy2, dx2],
-        [-dy2, dx2],
-        [dy2, -dx2],
-        [-dy2, -dx2],
-      ];
-      for (let i = 0; i < pairs.length; i += 1) {
-        const [ox2, oy2] = pairs[i];
-        const px2 = centerX2 + ox2;
-        const py2 = centerY2 + oy2;
-        if ((px2 & 1) !== 0 || (py2 & 1) !== 0) {
-          continue;
+        if (previousLeft !== null) {
+          bresenhamLine({ x: previousLeft, y: y - 1 }, { x: left, y }).forEach(point => plotPixel(point.x, point.y));
+          bresenhamLine({ x: previousRight, y: y - 1 }, { x: right, y }).forEach(point => plotPixel(point.x, point.y));
+        } else {
+          plotPixel(left, y);
+          plotPixel(right, y);
         }
-        recordPoint(px2 / 2, py2 / 2);
       }
-    };
-
-    let dx2 = parity;
-    let dy2 = radius2;
-    while (dx2 <= dy2) {
-      plotSymmetricOffset2(dx2, dy2);
-      const nextDx2 = dx2 + 2;
-      const errEast = Math.abs((nextDx2 * nextDx2) + (dy2 * dy2) - (radius2 * radius2));
-      const nextDy2 = dy2 - 2;
-      const errSouthEast = nextDy2 >= parity
-        ? Math.abs((nextDx2 * nextDx2) + (nextDy2 * nextDy2) - (radius2 * radius2))
-        : Number.POSITIVE_INFINITY;
-      if (errSouthEast <= errEast) {
-        dy2 = nextDy2;
-      }
-      dx2 = nextDx2;
-    }
-
-    if (fillRanges) {
-      fillRanges.forEach((range, y) => {
-        for (let x = range.min; x <= range.max; x += 1) {
-          plotPixel(x, y);
-        }
-      });
+      previousLeft = left;
+      previousRight = right;
     }
   }
 
@@ -1005,6 +975,7 @@
     drawLine,
     drawRectangle,
     drawEllipse,
+    drawOval,
     drawEllipsePixels,
     getFillGradientColors,
     normalizeFillGradientPoint,
