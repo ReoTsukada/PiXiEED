@@ -5707,6 +5707,7 @@
   }) || {};
 
   const canonicalV2ProjectUtilsModule = window.PiXiEEDrawModules?.canonicalV2ProjectUtils || {};
+  const projectProvenanceUtilsModule = window.PiXiEEDrawModules?.projectProvenanceUtils?.createProjectProvenanceUtils?.() || {};
   const projectCommandLockManager = window.PiXiEEDrawModules?.projectCommandLockUtils
     ?.createProjectCommandLockManager?.({
       onDiagnostic: details => console.info('[pixiedraw-dev:command-lock]', details),
@@ -5806,10 +5807,14 @@
   set buildActiveSharedProjectSheetTabFields(value) { buildActiveSharedProjectSheetTabFields = value; },
   get buildPackagedProjectPayload() { return buildPackagedProjectPayload; },
   set buildPackagedProjectPayload(value) { buildPackagedProjectPayload = value; },
+  get createRasterImportProvenance() { return projectProvenanceUtilsModule.createRasterImportProvenance; },
+  set createRasterImportProvenance(value) { projectProvenanceUtilsModule.createRasterImportProvenance = value; },
   get normalizeExternalProjectToCanonicalV2() { return canonicalV2ProjectUtilsModule.normalizeExternalProjectToCanonicalV2; },
   set normalizeExternalProjectToCanonicalV2(value) { canonicalV2ProjectUtilsModule.normalizeExternalProjectToCanonicalV2 = value; },
   get validateCanonicalV2ProjectPayload() { return canonicalV2ProjectUtilsModule.validateCanonicalV2ProjectPayload; },
   set validateCanonicalV2ProjectPayload(value) { canonicalV2ProjectUtilsModule.validateCanonicalV2ProjectPayload = value; },
+  get normalizeProjectOriginalityMetadata() { return canonicalV2ProjectUtilsModule.normalizeProjectOriginalityMetadata; },
+  set normalizeProjectOriginalityMetadata(value) { canonicalV2ProjectUtilsModule.normalizeProjectOriginalityMetadata = value; },
   get buildIndexedPaletteFromFrameDataList() { return buildIndexedPaletteFromFrameDataList; },
   set buildIndexedPaletteFromFrameDataList(value) { buildIndexedPaletteFromFrameDataList = value; },
   get buildSharedRecentProjectId() { return buildSharedRecentProjectId; },
@@ -6618,6 +6623,18 @@
   set activeOpenProjectTabId(value) { activeOpenProjectTabId = value; },
   get autosaveProjectId() { return autosaveProjectId; },
   set autosaveProjectId(value) { autosaveProjectId = value; },
+  get getActiveCanonicalProjectMetadata() {
+    return () => {
+      const tab = typeof getActiveOpenProjectTab === 'function' ? getActiveOpenProjectTab() : null;
+      return tab?.canonicalPayloadFormat === 'v2'
+        ? {
+            canonicalPayloadFormat: 'v2',
+            canonicalSchemaVersion: tab.canonicalSchemaVersion,
+            canonicalSourceMetadata: tab.canonicalSourceMetadata || null,
+          }
+        : null;
+    };
+  },
   get buildProjectSessionPayload() { return buildProjectSessionPayload; },
   set buildProjectSessionPayload(value) { buildProjectSessionPayload = value; },
   get clamp() { return clamp; },
@@ -11440,6 +11457,7 @@
     normalizeProjectPersistenceState,
     normalizeProjectSaveHandleMeta,
     normalizeQrEditPayload,
+    createNativeProjectOriginalityMetadata: (...args) => canonicalV2ProjectUtilsModule.createNativeProjectOriginalityMetadata?.(...args),
     localizeText,
   }) || {};
   const {
