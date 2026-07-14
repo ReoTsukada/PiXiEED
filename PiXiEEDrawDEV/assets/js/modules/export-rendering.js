@@ -1339,7 +1339,6 @@
     if (normalized === 'gridpng') return localizeText('PNG（グリッド分割）', 'PNG (Grid Split)');
     if (normalized === 'gif') return 'GIF';
     if (normalized === 'timelapse') return localizeText('タイムラプスGIF', 'Timelapse GIF');
-    if (normalized === 'projectv2experimental') return localizeText('プロジェクト保存 V2 experimental', 'Project Save V2 experimental');
     if (normalized === 'project') return localizeText('プロジェクト保存', 'Project Save');
     return 'PNG';
   }
@@ -1470,7 +1469,7 @@
 
   function canOfferSpriteMapCompanionExport(mode) {
     const format = normalizeExportFormat(mode);
-    if (format === 'project' || format === 'projectv2experimental') {
+    if (format === 'project') {
       return false;
     }
     if (!canCurrentClientExportProject('spritemap')) {
@@ -1485,7 +1484,7 @@
 
   function canOfferColorSpriteExport(mode) {
     const format = normalizeExportFormat(mode);
-    if (format === 'project' || format === 'projectv2experimental') {
+    if (format === 'project') {
       return false;
     }
     if (!canCurrentClientExportProject('spritemap')) {
@@ -1664,18 +1663,6 @@
     if (companionRow instanceof HTMLElement) {
       companionRow.hidden = !doesExportFormatSupportProjectCompanion(format);
     }
-    const projectV2Row = dom.exportDialog?.projectV2ExperimentalRow;
-    const projectV2Toggle = dom.exportDialog?.projectV2ExperimentalToggle;
-    const showProjectV2Row = format === 'project';
-    if (projectV2Row instanceof HTMLElement) {
-      projectV2Row.hidden = !showProjectV2Row;
-    }
-    if (projectV2Toggle instanceof HTMLInputElement) {
-      projectV2Toggle.disabled = !showProjectV2Row;
-      if (!showProjectV2Row) {
-        projectV2Toggle.checked = false;
-      }
-    }
     updateExportSpriteMapCompanionToggleUI();
 
     const contestRow = dom.exportDialog?.contestPostRow;
@@ -1685,7 +1672,7 @@
 
     const spriteMapColorSpritesRow = dom.exportDialog?.spriteMapColorSpritesRow;
     if (spriteMapColorSpritesRow instanceof HTMLElement) {
-      spriteMapColorSpritesRow.hidden = format === 'project' || format === 'projectv2experimental';
+      spriteMapColorSpritesRow.hidden = format === 'project';
     }
     const spriteMapColorSpritesToggle = dom.exportDialog?.spriteMapColorSpritesToggle;
     if (spriteMapColorSpritesToggle instanceof HTMLInputElement) {
@@ -2514,7 +2501,9 @@
           packaged: options?.packaged || null,
         }, {
           fileNameBase: fileNameBase || state.documentName,
-          includeSheets: options?.includeSheets !== false,
+          // Project tabs are no longer a saved project feature. V2 files
+          // always contain the active document only.
+          includeSheets: false,
           includeTimelapse: options?.includeTimelapse !== false,
           useWorker: options?.useWorker !== false,
           requireWorker: options?.requireWorker === true,
@@ -2542,32 +2531,17 @@
     };
   }
 
-  function buildExperimentalProjectFileNameBase(fileNameBase = '') {
+  function buildProjectFileNameBase(fileNameBase = '') {
     const raw = String(fileNameBase || '').trim() || String(state.documentName || '').trim() || 'project';
-    return raw.replace(/\.pixieedraw$/i, '') + '-v2-experimental';
-  }
-
-  function buildProjectBundleSizeComparison(v1Bundle, v2Bundle) {
-    const v1Bytes = Math.max(0, Math.round(Number(v1Bundle?.blob?.size) || 0));
-    const v2Bytes = Math.max(0, Math.round(Number(v2Bundle?.blob?.size) || 0));
-    const savedBytes = Math.max(0, v1Bytes - v2Bytes);
-    const reductionPercent = v1Bytes > 0
-      ? Math.round(((savedBytes / v1Bytes) * 1000)) / 10
-      : 0;
-    return {
-      v1Bytes,
-      v2Bytes,
-      savedBytes,
-      reductionPercent,
-    };
+    return raw.replace(/\.pixieedraw$/i, '');
   }
 
   function isDevV2ProjectSaveEnabled() {
-    return typeof window !== 'undefined' && window.__pixieedrawUseV2ProjectSave === true;
+    return true;
   }
 
   function isDevMultiSheetV2ExternalSaveEnabled() {
-    return typeof window !== 'undefined' && window.__pixieedrawUseMultiSheetV2ExternalSave === true;
+    return true;
   }
 
   function collectCompleteMultiSheetV2Candidate(activePackagedProject) {
@@ -2716,20 +2690,20 @@
       return options.preferredStorageAdapterId;
     }
     if (isDevV2ProjectSaveEnabled()) {
-      return 'pixieedraw-v2-zip-experimental';
+      return 'pixieedraw-v2-zip';
     }
     return '';
   }
 
   function isV2ProjectStorageAdapterId(adapterId = '') {
-    return String(adapterId || '') === 'pixieedraw-v2-zip-experimental';
+    return String(adapterId || '') === 'pixieedraw-v2-zip';
   }
 
   function resolveActiveProjectSavePlan({
     activePersistenceState = null,
     explicitPreferredStorageAdapterId = '',
     devV2SaveFlag = false,
-    defaultStorageAdapterId = 'pixieedraw-v2-zip-experimental',
+    defaultStorageAdapterId = 'pixieedraw-v2-zip',
   } = {}) {
     const sourceState = activePersistenceState && typeof activePersistenceState === 'object'
       ? activePersistenceState
@@ -2737,10 +2711,10 @@
     const sourceStorageAdapterId = normalizeProjectStorageAdapterId(sourceState?.sourceStorageAdapterId || '');
     const targetStorageAdapterId = normalizeProjectStorageAdapterId(
       explicitPreferredStorageAdapterId
-      || (devV2SaveFlag ? 'pixieedraw-v2-zip-experimental' : '')
+      || (devV2SaveFlag ? 'pixieedraw-v2-zip' : '')
       || defaultStorageAdapterId
-      || 'pixieedraw-v2-zip-experimental'
-    ) || 'pixieedraw-v2-zip-experimental';
+      || 'pixieedraw-v2-zip'
+    ) || 'pixieedraw-v2-zip';
     const sourceKind = normalizeProjectSourceKind(sourceState?.sourceKind, 'unknown');
     const projectSaveHandleState = normalizeProjectSaveHandleState(sourceState?.projectSaveHandleState, 'none');
     const isNewProject = sourceKind === 'new';
@@ -2749,7 +2723,7 @@
       && targetStorageAdapterId
       && sourceStorageAdapterId !== targetStorageAdapterId
     );
-    const isDowngradeSave = sourceStorageAdapterId === 'pixieedraw-v2-zip-experimental'
+    const isDowngradeSave = sourceStorageAdapterId === 'pixieedraw-v2-zip'
       && targetStorageAdapterId === 'pixieedraw-v1-json';
     const isMixedOrUnknownSource = (
       sourceKind === 'mixed'
@@ -2952,7 +2926,7 @@
     }
     let resolvedFilename = typeof bundle?.filename === 'string' && bundle.filename
       ? bundle.filename
-      : createAutosaveFileName(buildExperimentalProjectFileNameBase(state.documentName));
+      : createAutosaveFileName(buildProjectFileNameBase(state.documentName));
     let selectedHandle = null;
     let saveMethod = '';
     if (!options?.forcePicker && !DISABLE_FILE_SYSTEM_ACCESS_SAVE) {
@@ -3077,7 +3051,7 @@
         activePersistenceState,
         explicitPreferredStorageAdapterId: options?.preferredStorageAdapterId || '',
         devV2SaveFlag: devV2ProjectSaveEnabled,
-        defaultStorageAdapterId: DEFAULT_PROJECT_STORAGE_ADAPTER_ID || 'pixieedraw-v2-zip-experimental',
+        defaultStorageAdapterId: DEFAULT_PROJECT_STORAGE_ADAPTER_ID || 'pixieedraw-v2-zip',
       });
       const baseSavePlan = forceSaveAs
         ? {
@@ -3089,8 +3063,8 @@
         : resolvedBaseSavePlan;
       const preferredStorageAdapterId = baseSavePlan.targetStorageAdapterId || resolvePreferredProjectSaveAdapterId(options);
       const requestedV2Save = isV2ProjectStorageAdapterId(preferredStorageAdapterId);
-      const openSheetCount = typeof getOpenProjectSheetCount === 'function' ? getOpenProjectSheetCount() : openProjectTabs.length;
-      const isMultiSheetProject = openSheetCount > 1;
+      const openSheetCount = 1;
+      const isMultiSheetProject = false;
       const multiSheetFlagEnabled = isDevMultiSheetV2ExternalSaveEnabled();
       let multiSheetCandidate = null;
       let preflightBlockReason = '';
@@ -3145,7 +3119,7 @@
       } = await buildProjectExportBundle(
         options?.fileNameBase || getExportFileNameBase() || state.documentName,
         {
-          includeSheets: multiSheetCandidate ? true : options?.includeSheets !== false,
+          includeSheets: false,
           includeTimelapse: options?.includeTimelapse !== false,
           useWorker: options?.useWorker !== false,
           requireWorker: options?.requireWorker === true,
@@ -3155,11 +3129,12 @@
           packaged: multiSheetCandidate?.packaged || null,
         }
       );
-      const selectedStorageAdapterId = storageAdapterId || preferredStorageAdapterId || 'pixieedraw-v2-zip-experimental';
+      const selectedStorageAdapterId = storageAdapterId || preferredStorageAdapterId || 'pixieedraw-v2-zip';
       const usesV2ProjectSave = isV2ProjectStorageAdapterId(selectedStorageAdapterId);
       const v2SheetOverwriteSafety = resolveV2ProjectSheetOverwriteSafety({
         packagedProject: packaged,
-        includeSheets: multiSheetCandidate ? true : options?.includeSheets === true,
+        includeSheets: false,
+        openSheetCount: 1,
         allowCompleteMultiSheetOverwrite: multiSheetCandidate?.complete === true,
       });
       const multiSheetV2OverwriteReady = usesV2ProjectSave
@@ -3571,117 +3546,6 @@
     return await executeProjectSaveInternal({ ...options, commandMode: 'save' });
   }
 
-  async function saveProjectAsPixieedrawV2Experimental(options = {}) {
-    if (!ensureCurrentClientCanExportProject({ announce: true, format: 'project' })) {
-      return { saved: false, cancelled: false, skipped: true };
-    }
-    const announceStatus = options?.announceStatus !== false;
-    try {
-      const bundle = await buildProjectExportBundle(
-        options?.fileNameBase || buildExperimentalProjectFileNameBase(getExportFileNameBase() || state.documentName),
-        {
-          includeSheets: options?.includeSheets === true,
-          includeTimelapse: options?.includeTimelapse !== false,
-          useWorker: options?.useWorker === true,
-          requireWorker: options?.requireWorker === true,
-          preferredStorageAdapterId: 'pixieedraw-v2-zip-experimental',
-        }
-      );
-      console.info('[PiXiEEDraw V2 Experimental]');
-      console.info(`worker used: ${bundle.workerUsed === true}`);
-      const result = await triggerDownloadFromBlob(bundle.blob, bundle.filename, {
-        mimeType: PROJECT_FILE_MIME_TYPE,
-        fileExtensions: [PROJECT_FILE_EXTENSION],
-        shareTitle: `${state.documentName || 'PiXiEEDraw'} v2`,
-        shareText: `${state.documentName || 'PiXiEEDraw'} (PiXiEEDraw v2 experimental)`,
-        nativeSubdirectory: NATIVE_PROJECTS_SUBDIRECTORY,
-      });
-      if (result && !String(result).endsWith('cancel')) {
-        if (announceStatus) {
-          updateAutosaveStatus('実験保存: v2 PiXiEEDファイルを書き出しました', 'success');
-        }
-        return {
-          saved: true,
-          cancelled: false,
-          storageAdapterId: bundle.storageAdapterId,
-          filename: bundle.filename,
-          workerUsed: bundle.workerUsed === true,
-        };
-      }
-      if (String(result || '').endsWith('cancel')) {
-        return { saved: false, cancelled: true };
-      }
-      if (announceStatus) {
-        updateAutosaveStatus('実験保存: v2 PiXiEEDファイルを書き出せませんでした', 'error');
-      }
-      return { saved: false, cancelled: false };
-    } catch (error) {
-      console.error('Experimental v2 project save failed', error);
-      if (announceStatus) {
-        updateAutosaveStatus('実験保存: v2 PiXiEEDファイルを書き出せませんでした', 'error');
-      }
-      return { saved: false, cancelled: false };
-    }
-  }
-
-  async function saveProjectAsPixieedrawV2ExperimentalIncludeSheetsDev(options = {}) {
-    if (!ensureCurrentClientCanExportProject({ announce: true, format: 'project' })) {
-      return { saved: false, cancelled: false, skipped: true };
-    }
-    const announceStatus = options?.announceStatus !== false;
-    try {
-      const exportFileNameBase = options?.fileNameBase || getExportFileNameBase() || state.documentName;
-      const v1Bundle = await buildProjectExportBundle(exportFileNameBase, {
-        includeSheets: false,
-      });
-      const v2Bundle = await buildProjectExportBundle(
-        buildExperimentalProjectFileNameBase(exportFileNameBase),
-        {
-          includeSheets: false,
-          includeTimelapse: options?.includeTimelapse !== false,
-          useWorker: options?.useWorker === true,
-          requireWorker: options?.requireWorker === true,
-          preferredStorageAdapterId: 'pixieedraw-v2-zip-experimental',
-        }
-      );
-      const sizeComparison = buildProjectBundleSizeComparison(v1Bundle, v2Bundle);
-      const saveResult = await saveProjectBundleAsNewFile(v2Bundle, {
-        shareTitle: `${state.documentName || 'PiXiEEDraw'} v2`,
-        shareText: `${state.documentName || 'PiXiEEDraw'} (PiXiEEDraw v2 single project)`,
-      });
-
-      console.info('[PiXiEEDraw V2 Experimental]');
-      console.info('includeSheets: false (single project)');
-      console.info(`v1 bytes: ${sizeComparison.v1Bytes}`);
-      console.info(`v2 bytes: ${sizeComparison.v2Bytes}`);
-      console.info(`saved bytes: ${sizeComparison.savedBytes}`);
-      console.info(`reduction percent: ${sizeComparison.reductionPercent}%`);
-      console.info(`saved as new file: ${saveResult.savedAsNewFile === true}`);
-      console.info(`worker used: ${v2Bundle.workerUsed === true}`);
-
-      if (saveResult.saved && announceStatus) {
-        updateAutosaveStatus('実験保存: 単一プロジェクトの v2 ファイルを書き出しました', 'success');
-      } else if (!saveResult.cancelled && announceStatus) {
-        updateAutosaveStatus('実験保存: 単一プロジェクトの v2 ファイルを書き出せませんでした', 'error');
-      }
-
-      return {
-        ...saveResult,
-        includeSheets: false,
-        storageAdapterId: v2Bundle.storageAdapterId,
-        filename: saveResult.filename || v2Bundle.filename,
-        workerUsed: v2Bundle.workerUsed === true,
-        sizeComparison,
-      };
-    } catch (error) {
-      console.error('Experimental v2 single-project save failed', error);
-      if (announceStatus) {
-        updateAutosaveStatus('実験保存: 単一プロジェクトの v2 ファイルを書き出せませんでした', 'error');
-      }
-      return { saved: false, cancelled: false, error };
-    }
-  }
-
 
 
 
@@ -3815,8 +3679,6 @@
           executeProjectSaveCopy,
           executeProjectOpen,
           saveProjectAsPixieedraw,
-          saveProjectAsPixieedrawV2Experimental,
-          saveProjectAsPixieedrawV2ExperimentalIncludeSheetsDev,
         });
       }
     })(scope);
