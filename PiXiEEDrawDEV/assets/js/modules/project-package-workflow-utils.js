@@ -382,6 +382,19 @@
     if (resolvedDotStats) {
       packaged.dotStats = resolvedDotStats;
     }
+    // Imported-raster provenance belongs to the project envelope, not to a
+    // mutable layer. This preserves its matching data through autosave,
+    // explicit V2 saves, and later V2 exports without retaining source bytes.
+    const canonical = typeof getActiveCanonicalProjectMetadata === 'function'
+      ? getActiveCanonicalProjectMetadata()
+      : null;
+    if (canonical?.canonicalPayloadFormat === 'v2') {
+      packaged.canonicalPayloadFormat = 'v2';
+      packaged.canonicalSchemaVersion = Math.max(1, Math.round(Number(canonical.canonicalSchemaVersion) || 1));
+      packaged.canonicalSourceMetadata = canonical.canonicalSourceMetadata && typeof canonical.canonicalSourceMetadata === 'object'
+        ? canonical.canonicalSourceMetadata
+        : null;
+    }
     if (includeSheets === 'legacy-read-only') {
       const activeSheetPackaged = buildPackagedProjectPayload(snapshot, {
         session: packagedSession,
