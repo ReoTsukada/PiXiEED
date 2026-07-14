@@ -80,7 +80,7 @@
       pen: { label: 'ペン', tools: ['pen'] },
       eyedropper: { label: 'スポイト', tools: ['eyedropper'] },
       eraser: { label: '消しゴム', tools: ['eraser'] },
-      shape: { label: '図形', tools: ['line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill'] },
+      shape: { label: '図形', tools: ['line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill', 'oval', 'ovalFill'] },
       fill: { label: '塗りつぶし', tools: ['fill', 'fillDither', 'fillGradient'] },
     };
     const DEFAULT_GROUP_TOOL = {
@@ -150,7 +150,7 @@
     FILL_TOOL_GRADIENT,
   } = {}) {
     const FILL_TOOL_SET = new Set([FILL_TOOL_SOLID, FILL_TOOL_DITHER, FILL_TOOL_GRADIENT]);
-    const MIRROR_DRAW_TOOLS = new Set(['pen', 'eraser', 'line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill', ...FILL_TOOL_SET]);
+    const MIRROR_DRAW_TOOLS = new Set(['pen', 'eraser', 'line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill', 'oval', 'ovalFill', ...FILL_TOOL_SET]);
     const BRUSH_TOOLS = new Set(['pen', 'eraser']);
     const VIRTUAL_CURSOR_SUPPORTED_TOOLS = new Set([
       'pen',
@@ -160,16 +160,18 @@
       'rectFill',
       'ellipse',
       'ellipseFill',
+      'oval',
+      'ovalFill',
       'move',
       'selectRect',
       'selectLasso',
       'curve',
     ]);
-    const VIRTUAL_CURSOR_SHAPE_TOOLS = new Set(['line', 'rect', 'rectFill', 'ellipse', 'ellipseFill']);
+    const VIRTUAL_CURSOR_SHAPE_TOOLS = new Set(['line', 'rect', 'rectFill', 'ellipse', 'ellipseFill', 'oval', 'ovalFill']);
     const VIRTUAL_CURSOR_SELECTION_TOOLS = new Set(['selectRect', 'selectLasso']);
     const VIRTUAL_CURSOR_MOVE_TOOLS = new Set(['move']);
     const FILL_TOOLS = FILL_TOOL_SET;
-    const SHAPE_TOOLS = new Set(['line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill']);
+    const SHAPE_TOOLS = new Set(['line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill', 'oval', 'ovalFill']);
     const BRUSH_SIZE_TOOLS = new Set([...BRUSH_TOOLS, ...SHAPE_TOOLS]);
     const SELECTION_TOOLS = new Set(['move', 'selectRect', 'selectLasso', 'selectSame', 'selectionMove', 'layerMove', 'selectionTransform']);
     const TOOL_ICON_FALLBACK = {
@@ -183,6 +185,8 @@
       rectFill: '▣',
       ellipse: '◯',
       ellipseFill: '⬤',
+      oval: '⬭',
+      ovalFill: '⬮',
       fill: '▣',
       fillDither: '░',
       fillGradient: '▥',
