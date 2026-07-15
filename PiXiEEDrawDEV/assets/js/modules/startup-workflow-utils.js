@@ -1650,6 +1650,7 @@
   }
 
   let startupWorkspaceEntries = [];
+  let startupWorkspaceRenderGeneration = 0;
   let startupWorkspaceMigrationPrompted = false;
   let startupWorkspaceMigrationPromise = null;
 
@@ -1675,6 +1676,7 @@
     const list = dom.startup?.workspaceProjectList;
     if (!(list instanceof HTMLElement)) return;
     startupWorkspaceEntries = Array.isArray(entries) ? entries.slice() : [];
+    const renderGeneration = ++startupWorkspaceRenderGeneration;
     list.replaceChildren();
     if (!startupWorkspaceEntries.length) {
       const empty = document.createElement('p');
@@ -1692,6 +1694,15 @@
       button.className = 'startup-workspace__project';
       button.dataset.workspaceProjectIndex = String(index);
       button.setAttribute('role', 'listitem');
+      const thumbnail = document.createElement('span');
+      thumbnail.className = 'startup-workspace__project-thumbnail';
+      thumbnail.dataset.workspaceProjectThumbnail = String(index);
+      const placeholder = document.createElement('span');
+      placeholder.className = 'startup-workspace__project-thumbnail-placeholder';
+      placeholder.textContent = 'PXD';
+      thumbnail.appendChild(placeholder);
+      const details = document.createElement('span');
+      details.className = 'startup-workspace__project-details';
       const name = document.createElement('span');
       name.className = 'startup-workspace__project-name';
       name.textContent = entry?.name || DEFAULT_DOCUMENT_NAME;
@@ -1701,9 +1712,140 @@
         ? new Date(Number(entry.lastModified)).toLocaleString()
         : localizeText('更新日時不明', 'Unknown date');
       meta.textContent = `${modified} / ${formatWorkspaceProjectSize(entry?.size)}`;
-      button.append(name, meta);
+      const certification = document.createElement('span');
+      certification.className = 'startup-workspace__project-certification is-checking';
+      certification.dataset.workspaceProjectCertification = String(index);
+      certification.textContent = localizeText('確認中', 'Checking');
+      certification.setAttribute('aria-label', localizeText('PiXiEED公認状態を確認中', 'Checking PiXiEED certification'));
+      details.append(name, meta, certification);
+      button.append(thumbnail, details);
       list.appendChild(button);
     });
+    void hydrateStartupWorkspaceProjectCards(startupWorkspaceEntries, renderGeneration);
+  }
+
+  function resolveWorkspaceProjectCertification(adapterId, manifest = null, packaged = null) {
+    const originality = packaged?.canonicalSourceMetadata?.projectOriginality || null;
+    const integrity = packaged?.session?.projectExportIntegrity || null;
+    const summary = manifest?.certification && typeof manifest.certification === 'object'
+      ? manifest.certification
+      : {
+          nativeCreated: originality?.saleEligibility === 'eligible'
+            && originality?.createdWith === 'pixieedraw-native'
+            && originality?.externalInputDetected !== true,
+          externalInputDetected: originality?.externalInputDetected === true,
+          completeProjectSave: integrity?.completeProjectSave === true,
+          timelapseSynchronized: integrity?.timelapseSynchronized === true,
+          saleCandidateDataComplete: integrity?.saleCandidateDataComplete === true,
+        };
+    const official = adapterId === 'pixieedraw-v2-zip'
+      && summary.nativeCreated === true
+      && summary.externalInputDetected !== true
+      && summary.completeProjectSave === true
+      && summary.timelapseSynchronized === true
+      && summary.saleCandidateDataComplete === true;
+    if (official) {
+      return {
+        state: 'official',
+        label: localizeText('✓ PiXiEED公認', '✓ PiXiEED Certified'),
+        description: localizeText(
+          'PiXiEED内で新規作成され、外部入力なし・完全V2保存・タイムラプス同期済みです。',
+          'Created in PiXiEED with no external input, complete V2 save, and synchronized timelapse.'
+        ),
+      };
+    }
+    if (summary.externalInputDetected === true) {
+      return {
+        state: 'external',
+        label: localizeText('外部入力あり', 'External Input'),
+        description: localizeText('外部画像・GIF・他形式由来のため、PiXiEED公認対象外です。', 'Not PiXiEED certified because external input was detected.'),
+      };
+    }
+    return {
+      state: 'unverified',
+      label: localizeText('未認証', 'Unverified'),
+      description: localizeText('公認に必要な制作元・完全保存・タイムラプス情報を確認できません。', 'Required origin, complete-save, or timelapse data could not be verified.'),
+    };
+  }
+
+  async function inspectStartupWorkspaceProject(entry) {
+    const file = entry?.file || (typeof entry?.handle?.getFile === 'function' ? await entry.handle.getFile() : null);
+    if (!file) throw new Error('Workspace project file is unavailable');
+    let adapterId = '';
+    let manifest = null;
+    if (typeof readProjectStorageManifestFromBlob === 'function') {
+      const manifestResult = await readProjectStorageManifestFromBlob(file, { fileName: file.name || entry?.name || '' });
+      adapterId = manifestResult?.adapterId || '';
+      manifest = manifestResult?.manifest || null;
+    }
+    let packaged = null;
+    let thumbnail = typeof manifest?.previewThumbnail === 'string' ? manifest.previewThumbnail : '';
+    const needsPackagedInspection = !manifest?.certification || !thumbnail;
+    if (needsPackagedInspection && typeof parseProjectStorageBlob === 'function') {
+      const parsedResult = await parseProjectStorageBlob(file, { fileName: file.name || entry?.name || '' });
+      adapterId = parsedResult?.adapterId || adapterId;
+      packaged = parsedResult?.parsed && typeof parsedResult.parsed === 'object' ? parsedResult.parsed : null;
+      thumbnail = thumbnail || (typeof packaged?.previewThumbnail === 'string' ? packaged.previewThumbnail : '');
+      if (!thumbnail && packaged && typeof snapshotFromParsedDocumentValue === 'function' && typeof generateSnapshotThumbnail === 'function') {
+        const snapshot = snapshotFromParsedDocumentValue(packaged)?.snapshot || null;
+        if (snapshot) thumbnail = await generateSnapshotThumbnail(snapshot) || '';
+      }
+    }
+    return {
+      thumbnail,
+      certification: resolveWorkspaceProjectCertification(adapterId, manifest, packaged),
+    };
+  }
+
+  function updateStartupWorkspaceProjectCard(index, inspection, renderGeneration) {
+    if (renderGeneration !== startupWorkspaceRenderGeneration) return;
+    const list = dom.startup?.workspaceProjectList;
+    if (!(list instanceof HTMLElement)) return;
+    const thumbnail = list.querySelector(`[data-workspace-project-thumbnail="${index}"]`);
+    if (thumbnail instanceof HTMLElement && inspection?.thumbnail) {
+      const image = new Image();
+      image.src = inspection.thumbnail;
+      image.alt = localizeText('プロジェクトのサムネイル', 'Project thumbnail');
+      image.decoding = 'async';
+      thumbnail.replaceChildren(image);
+    }
+    const badge = list.querySelector(`[data-workspace-project-certification="${index}"]`);
+    if (badge instanceof HTMLElement) {
+      const certificationState = inspection?.certification?.state || 'unverified';
+      const certificationLabel = inspection?.certification?.label || localizeText('未認証', 'Unverified');
+      badge.className = `startup-workspace__project-certification is-${certificationState}`;
+      badge.replaceChildren();
+      if (certificationState === 'official') {
+        const mark = new Image();
+        mark.className = 'startup-workspace__project-certification-mark';
+        mark.src = '../PiXiEEDEndorsed.png';
+        mark.alt = '';
+        mark.decoding = 'async';
+        badge.appendChild(mark);
+      }
+      const label = document.createElement('span');
+      label.textContent = certificationLabel;
+      badge.appendChild(label);
+      badge.title = inspection?.certification?.description || '';
+      badge.setAttribute('aria-label', `${certificationLabel}: ${badge.title}`);
+    }
+  }
+
+  async function hydrateStartupWorkspaceProjectCards(entries, renderGeneration) {
+    for (let index = 0; index < entries.length; index += 1) {
+      if (renderGeneration !== startupWorkspaceRenderGeneration) return;
+      try {
+        const inspection = await inspectStartupWorkspaceProject(entries[index]);
+        updateStartupWorkspaceProjectCard(index, inspection, renderGeneration);
+      } catch (error) {
+        console.warn('[PiXiEED workspace] project card inspection failed', { name: entries[index]?.name || '', error });
+        updateStartupWorkspaceProjectCard(index, {
+          thumbnail: '',
+          certification: resolveWorkspaceProjectCertification('', null, null),
+        }, renderGeneration);
+      }
+      await new Promise(resolve => window.setTimeout(resolve, 0));
+    }
   }
 
   function getLegacyPackagedProjectCollections(packaged = null) {
@@ -1829,7 +1971,15 @@
       || packaged?.document?.documentName
       || DEFAULT_DOCUMENT_NAME
     );
-    const serialized = await serializeProjectStorageSnapshot({ packaged }, {
+    let previewThumbnail = '';
+    if (typeof snapshotFromParsedDocumentValue === 'function' && typeof generateSnapshotThumbnail === 'function') {
+      const snapshot = snapshotFromParsedDocumentValue(packaged)?.snapshot || null;
+      if (snapshot) previewThumbnail = await generateSnapshotThumbnail(snapshot) || '';
+    }
+    const serialized = await serializeProjectStorageSnapshot({
+      packaged,
+      thumbnail: previewThumbnail,
+    }, {
       fileNameBase: fileName,
       includeSheets: false,
       includeTimelapse: true,
