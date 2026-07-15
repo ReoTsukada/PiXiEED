@@ -332,6 +332,11 @@ img,
   z-index: 9999;
   width: min(360px, calc(100vw - var(--safe-area-left) - var(--safe-area-right) - 2rem));
   max-width: min(360px, calc(100vw - var(--safe-area-left) - var(--safe-area-right) - 2rem));
+  /* Keep the complete notice, including its close button, inside the visible viewport. */
+  max-height: calc(100vh - var(--safe-area-top) - var(--safe-area-bottom) - 2rem);
+  max-height: calc(100dvh - var(--safe-area-top) - var(--safe-area-bottom) - 2rem);
+  display: flex;
+  flex-direction: column;
   background: rgba(12, 20, 32, 0.94);
   border: 1px solid rgba(var(--ui-rgb), 0.35);
   border-radius: 18px;
@@ -341,7 +346,10 @@ img,
 }
 
 .update-toast__body {
-  display: grid;
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
   gap: 0.9rem;
   padding: 1.1rem 1.2rem;
 }
@@ -351,7 +359,8 @@ img,
   color: var(--fg);
   font-size: 0.88rem;
   line-height: 1.5;
-  max-height: min(44vh, 320px);
+  min-height: 0;
+  flex: 1 1 auto;
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 6px;
