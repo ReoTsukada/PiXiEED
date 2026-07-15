@@ -1204,7 +1204,7 @@
       }
     } else if (activeTool === 'selectSame') {
       pointerState.selectionPreview = null;
-    } else if (activeTool === 'line' || activeTool === 'rect' || activeTool === 'rectFill' || activeTool === 'ellipse' || activeTool === 'ellipseFill' || activeTool === 'oval' || activeTool === 'ovalFill') {
+    } else if (activeTool === 'line' || activeTool === 'rect' || activeTool === 'rectFill' || activeTool === 'ellipse' || activeTool === 'ellipseFill') {
       if (activeTool !== 'line') {
         pointerState.shapeDrag = { lastRawPosition: { ...position } };
       }
@@ -1305,7 +1305,7 @@
         pointerState.last = position;
         requestOverlayRender();
       }
-    } else if (pointerState.tool === 'line' || pointerState.tool === 'rect' || pointerState.tool === 'rectFill' || pointerState.tool === 'ellipse' || pointerState.tool === 'ellipseFill' || pointerState.tool === 'oval' || pointerState.tool === 'ovalFill') {
+    } else if (pointerState.tool === 'line' || pointerState.tool === 'rect' || pointerState.tool === 'rectFill' || pointerState.tool === 'ellipse' || pointerState.tool === 'ellipseFill') {
       const shapePoints = getConstrainedShapePoints(pointerState.tool, position, event);
       pointerState.current = shapePoints.end;
       pointerState.preview = { start: shapePoints.start, end: shapePoints.end, points: pointerState.path.slice() };
@@ -1435,7 +1435,7 @@
 
     updateVirtualCursorFromEvent(event);
 
-    if (pointerState.tool === 'rect' || pointerState.tool === 'rectFill' || pointerState.tool === 'ellipse' || pointerState.tool === 'ellipseFill' || pointerState.tool === 'oval' || pointerState.tool === 'ovalFill') {
+    if (pointerState.tool === 'rect' || pointerState.tool === 'rectFill' || pointerState.tool === 'ellipse' || pointerState.tool === 'ellipseFill') {
       const position = getPointerPosition(event, { clampToCanvas: true, surface: pointerState.surface });
       if (position) {
         const shapePoints = getConstrainedShapePoints(pointerState.tool, position, event);
@@ -1494,12 +1494,6 @@
     } else if (tool === 'ellipseFill') {
       captureSharedProjectShapeCommand(tool, shapeStart, shapeEnd, pointerState.surface);
       drawEllipse(shapeStart, shapeEnd, true);
-    } else if (tool === 'oval') {
-      captureSharedProjectShapeCommand(tool, shapeStart, shapeEnd, pointerState.surface);
-      drawOval(shapeStart, shapeEnd, false);
-    } else if (tool === 'ovalFill') {
-      captureSharedProjectShapeCommand(tool, shapeStart, shapeEnd, pointerState.surface);
-      drawOval(shapeStart, shapeEnd, true);
     } else if (FILL_TOOLS.has(tool)) {
       const fillStyle = normalizeFillStyle(
         getFillStyleForInteraction(tool, pointerState.start, pointerState.current),
