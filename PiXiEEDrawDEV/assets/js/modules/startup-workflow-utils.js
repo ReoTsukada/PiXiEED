@@ -1694,6 +1694,12 @@
       button.className = 'startup-workspace__project';
       button.dataset.workspaceProjectIndex = String(index);
       button.setAttribute('role', 'listitem');
+      if (entry?.migrationRecovery !== true && Number(entry?.size) === 0) {
+        button.title = localizeText(
+          'このファイルは0バイトのため開けません。端末内の元データが残っている場合は「V2移行待ち」のカードから復旧してください。ファイルは自動削除しません。',
+          'This file is empty and cannot be opened. If the original on-device data remains, recover it from the "Awaiting V2 migration" card. The file will not be deleted automatically.'
+        );
+      }
       if (entry?.migrationRecovery === true) {
         button.title = localizeText(
           `V2移行を完了できませんでした。元データは削除されていません。\n${entry?.migrationErrorCode || ''}: ${entry?.migrationErrorMessage || ''}`,
@@ -1795,6 +1801,20 @@
   async function inspectStartupWorkspaceProject(entry) {
     const file = entry?.file || (typeof entry?.handle?.getFile === 'function' ? await entry.handle.getFile() : null);
     if (!file) throw new Error('Workspace project file is unavailable');
+    if (Number(file.size) === 0) {
+      return {
+        thumbnail: '',
+        emptyFile: true,
+        certification: {
+          state: 'invalid',
+          label: localizeText('空ファイル', 'Empty File'),
+          description: localizeText(
+            '0バイトのためプロジェクトデータを読み取れません。端末内の元データは自動削除されません。',
+            'No project data can be read because the file is empty. Original on-device data is not deleted automatically.'
+          ),
+        },
+      };
+    }
     let adapterId = '';
     let manifest = null;
     if (typeof readProjectStorageManifestFromBlob === 'function') {
@@ -2288,6 +2308,16 @@
         } finally {
           target.disabled = false;
         }
+        return;
+      }
+      if (Number(entry?.size) === 0) {
+        setStartupWorkspaceStatus(
+          localizeText(
+            'このファイルは0バイトのため開けません。端末内の元データが残っている場合は「V2移行待ち」のカードから復旧してください。ファイルは削除していません。',
+            'This file is empty and cannot be opened. If the original on-device data remains, recover it from the "Awaiting V2 migration" card. The file has not been deleted.'
+          ),
+          'error'
+        );
         return;
       }
       const item = entry?.handle || entry?.file || null;
