@@ -972,6 +972,22 @@
     pendingAutosaveHandle = null;
     clearPendingPermissionListener();
     setActiveAutosaveProjectId(createAutosaveProjectId());
+    let workspaceProjectHandle = null;
+    if (window.PiXiEEDWorkspace) {
+      try {
+        workspaceProjectHandle = await window.PiXiEEDWorkspace.createProjectFileHandle(
+          state.documentName || name || DEFAULT_DOCUMENT_NAME,
+          { requestPermission: false }
+        );
+        if (workspaceProjectHandle) {
+          autosaveHandle = workspaceProjectHandle;
+          await storeAutosaveHandle?.(workspaceProjectHandle);
+        }
+      } catch (error) {
+        console.warn('Failed to create project file in PiXiEED workspace', error);
+        workspaceProjectHandle = null;
+      }
+    }
     clearActiveLocalProjectJournal?.();
     clearActiveSharedProjectSession();
     storeMultiProjectKey('');
@@ -1006,9 +1022,26 @@
         projectId: autosaveProjectId,
         sourceStorageAdapterId: null,
         sourceKind: 'new',
-        lastSavedStorageAdapterId: null,
-        projectSaveHandleState: 'none',
+        lastSavedStorageAdapterId: workspaceProjectHandle ? 'pixieedraw-v2-zip' : null,
+        projectSaveHandleState: workspaceProjectHandle ? 'bound' : 'none',
+        projectSaveHandle: workspaceProjectHandle,
+        projectSaveHandleMeta: workspaceProjectHandle ? {
+          fileName: workspaceProjectHandle.name || state.documentName || DEFAULT_DOCUMENT_NAME,
+          handleKind: 'workspace-project-file',
+          permissionState: 'granted',
+          adapterId: 'pixieedraw-v2-zip',
+          boundAt: new Date().toISOString(),
+        } : null,
       });
+      if (workspaceProjectHandle) {
+        bindActiveProjectSaveHandle?.(workspaceProjectHandle, {
+          fileName: workspaceProjectHandle.name || state.documentName || DEFAULT_DOCUMENT_NAME,
+          handleKind: 'workspace-project-file',
+          permissionState: 'granted',
+          adapterId: 'pixieedraw-v2-zip',
+          boundAt: new Date().toISOString(),
+        }, { log: true });
+      }
     }
     scheduleSessionPersist();
     return true;
@@ -1446,6 +1479,28 @@
     const recentEntries = await loadRecentProjectsMetadata();
     const limitedEntries = enforceSharedRecentProjectLimit(recentEntries);
     setRecentProjectsCache(limitedEntries);
+    const navigationEntry = typeof performance?.getEntriesByType === 'function'
+      ? performance.getEntriesByType('navigation')[0]
+      : null;
+    const isSameTabReload = navigationEntry?.type === 'reload';
+    if (!isSameTabReload) {
+      const recoveryPayload = readReloadSessionSnapshotPayload();
+      if (recoveryPayload?.unsaved && !isTinyStartupSnapshot(recoveryPayload.currentSnapshot)) {
+        const action = await requestStartupRecoveryAction(recoveryPayload);
+        if (action === 'restore') {
+          const restored = restoreReloadSessionSnapshot();
+          if (restored && recoveryPayload.projectId) {
+            setActiveAutosaveProjectId(recoveryPayload.projectId);
+          }
+          return restored;
+        }
+        if (action === 'delete') {
+          clearReloadRecoveryData();
+          updateAutosaveStatus(localizeText('復帰データを削除しました', 'Recovery data deleted'), 'info');
+        }
+      }
+      return false;
+    }
     if (!limitedEntries.length) {
       return false;
     }
@@ -1472,6 +1527,59 @@
       return true;
     }
     return false;
+  }
+
+  function requestStartupRecoveryAction(payload = null) {
+    const dialog = dom.startupRecovery?.dialog;
+    if (!(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== 'function') {
+      return Promise.resolve('later');
+    }
+    const snapshot = payload?.currentSnapshot || null;
+    const projectName = normalizeDocumentName(snapshot?.documentName || DEFAULT_DOCUMENT_NAME);
+    const savedAt = Number(payload?.at) > 0
+      ? new Date(Number(payload.at)).toLocaleString()
+      : '';
+    if (dom.startupRecovery.message) {
+      dom.startupRecovery.message.textContent = localizeText(
+        `「${projectName}」の未保存作業が端末内に残っています。`,
+        `Unsaved work for “${projectName}” remains on this device.`
+      );
+    }
+    if (dom.startupRecovery.detail) {
+      dom.startupRecovery.detail.textContent = localizeText(
+        `${savedAt ? `復帰データ: ${savedAt}。` : ''}復帰しても保存先の .pixieedraw ファイルは自動で上書きしません。`,
+        `${savedAt ? `Recovery data: ${savedAt}. ` : ''}Restoring does not automatically overwrite the destination .pixieedraw file.`
+      );
+    }
+    return new Promise(resolve => {
+      let settled = false;
+      const finish = action => {
+        if (settled) return;
+        settled = true;
+        dom.startupRecovery.later?.removeEventListener('click', onLater);
+        dom.startupRecovery.restore?.removeEventListener('click', onRestore);
+        dom.startupRecovery.delete?.removeEventListener('click', onDelete);
+        dialog.removeEventListener('cancel', onCancel);
+        dialog.removeEventListener('close', onClose);
+        if (dialog.open) dialog.close();
+        resolve(action);
+      };
+      const onLater = () => finish('later');
+      const onRestore = () => finish('restore');
+      const onDelete = () => finish('delete');
+      const onCancel = event => {
+        event.preventDefault();
+        finish('later');
+      };
+      const onClose = () => finish('later');
+      dom.startupRecovery.later?.addEventListener('click', onLater, { once: true });
+      dom.startupRecovery.restore?.addEventListener('click', onRestore, { once: true });
+      dom.startupRecovery.delete?.addEventListener('click', onDelete, { once: true });
+      dialog.addEventListener('cancel', onCancel, { once: true });
+      dialog.addEventListener('close', onClose, { once: true });
+      dialog.showModal();
+      dom.startupRecovery.restore?.focus();
+    });
   }
 
   async function maybeRestoreSharedProjectOnStartup() {
@@ -1541,12 +1649,177 @@
     setUpdateToastVisibility(false);
   }
 
+  let startupWorkspaceEntries = [];
+
+  function setStartupWorkspaceStatus(message, tone = 'info') {
+    const node = dom.startup?.workspaceStatus;
+    if (!(node instanceof HTMLElement)) return;
+    node.textContent = message;
+    if (tone && tone !== 'info') {
+      node.dataset.tone = tone;
+    } else {
+      delete node.dataset.tone;
+    }
+  }
+
+  function formatWorkspaceProjectSize(bytes) {
+    const value = Math.max(0, Number(bytes) || 0);
+    if (value < 1024) return `${value} B`;
+    if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+    return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  function renderStartupWorkspaceProjects(entries = []) {
+    const list = dom.startup?.workspaceProjectList;
+    if (!(list instanceof HTMLElement)) return;
+    startupWorkspaceEntries = Array.isArray(entries) ? entries.slice() : [];
+    list.replaceChildren();
+    if (!startupWorkspaceEntries.length) {
+      const empty = document.createElement('p');
+      empty.className = 'startup-workspace__empty';
+      empty.textContent = localizeText(
+        'PiXiEEDフォルダ内に .pixieedraw プロジェクトがありません。',
+        'No .pixieedraw projects were found in the PiXiEED folder.'
+      );
+      list.appendChild(empty);
+      return;
+    }
+    startupWorkspaceEntries.forEach((entry, index) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'startup-workspace__project';
+      button.dataset.workspaceProjectIndex = String(index);
+      button.setAttribute('role', 'listitem');
+      const name = document.createElement('span');
+      name.className = 'startup-workspace__project-name';
+      name.textContent = entry?.name || DEFAULT_DOCUMENT_NAME;
+      const meta = document.createElement('span');
+      meta.className = 'startup-workspace__project-meta';
+      const modified = Number(entry?.lastModified) > 0
+        ? new Date(Number(entry.lastModified)).toLocaleString()
+        : localizeText('更新日時不明', 'Unknown date');
+      meta.textContent = `${modified} / ${formatWorkspaceProjectSize(entry?.size)}`;
+      button.append(name, meta);
+      list.appendChild(button);
+    });
+  }
+
+  async function refreshStartupWorkspaceProjects({ requestPermission = false } = {}) {
+    const workspace = window.PiXiEEDWorkspace;
+    if (!workspace) {
+      setStartupWorkspaceStatus(
+        localizeText('この環境では共通ワークスペースを初期化できません。', 'The shared workspace could not be initialized.'),
+        'warn'
+      );
+      return false;
+    }
+    setStartupWorkspaceStatus(localizeText('PiXiEEDフォルダを確認しています…', 'Checking the PiXiEED folder...'));
+    const handle = await workspace.connect({ requestPermission });
+    if (!handle) {
+      const status = workspace.getStatus();
+      setStartupWorkspaceStatus(
+        status.directoryPickerSupported
+          ? localizeText('未接続です。「PiXiEEDフォルダに接続」を押してください。', 'Not connected. Select “Connect PiXiEED Folder”.')
+          : localizeText('直接接続に未対応です。「フォルダを読み取る」を使用してください。', 'Direct folder access is unavailable. Use “Read Folder”.'),
+        'warn'
+      );
+      return false;
+    }
+    const entries = await workspace.listProjects({ requestPermission: false, includeWorkspaceRoot: true });
+    renderStartupWorkspaceProjects(entries);
+    setStartupWorkspaceStatus(
+      localizeText(`PiXiEEDフォルダに接続済み / ${entries.length}件`, `PiXiEED folder connected / ${entries.length} project(s)`),
+      'success'
+    );
+    return true;
+  }
+
+  function setupStartupWorkspace() {
+    const workspace = window.PiXiEEDWorkspace;
+    const connectButton = dom.startup?.workspaceConnect;
+    const refreshButton = dom.startup?.workspaceRefresh;
+    const readFolderButton = dom.startup?.workspaceReadFolder;
+    const folderInput = dom.startup?.workspaceFolderInput;
+    const projectList = dom.startup?.workspaceProjectList;
+    if (!workspace || !(projectList instanceof HTMLElement) || projectList.dataset.bound === 'true') {
+      return;
+    }
+    projectList.dataset.bound = 'true';
+    const status = workspace.getStatus();
+    if (connectButton instanceof HTMLButtonElement) {
+      connectButton.hidden = !status.directoryPickerSupported;
+      connectButton.addEventListener('click', async () => {
+        connectButton.disabled = true;
+        try {
+          await refreshStartupWorkspaceProjects({ requestPermission: true });
+        } finally {
+          connectButton.disabled = false;
+        }
+      });
+    }
+    if (refreshButton instanceof HTMLButtonElement) {
+      refreshButton.addEventListener('click', async () => {
+        refreshButton.disabled = true;
+        try {
+          await refreshStartupWorkspaceProjects({ requestPermission: false });
+        } finally {
+          refreshButton.disabled = false;
+        }
+      });
+    }
+    if (readFolderButton instanceof HTMLButtonElement && folderInput instanceof HTMLInputElement) {
+      readFolderButton.addEventListener('click', () => folderInput.click());
+      folderInput.addEventListener('change', () => {
+        const files = workspace.collectProjectFiles(folderInput.files);
+        const entries = files.map(file => ({
+          name: file.name,
+          file,
+          handle: null,
+          size: file.size,
+          lastModified: file.lastModified,
+          relativeDirectory: typeof file.webkitRelativePath === 'string' ? file.webkitRelativePath : '',
+        }));
+        renderStartupWorkspaceProjects(entries);
+        setStartupWorkspaceStatus(
+          localizeText(
+            `フォルダを読み取りました / ${entries.length}件（保存時は保存先の再選択が必要です）`,
+            `Folder read / ${entries.length} project(s) (choose a destination when saving)`
+          ),
+          entries.length ? 'success' : 'warn'
+        );
+      });
+    }
+    projectList.addEventListener('click', async event => {
+      const target = event.target instanceof Element
+        ? event.target.closest('button[data-workspace-project-index]')
+        : null;
+      if (!(target instanceof HTMLButtonElement)) return;
+      const entry = startupWorkspaceEntries[Number(target.dataset.workspaceProjectIndex)] || null;
+      const item = entry?.handle || entry?.file || null;
+      if (!item) return;
+      target.disabled = true;
+      try {
+        const opened = await openDocumentAsNewProject(item, {
+          source: entry.handle ? 'workspace' : 'workspace-folder-import',
+        });
+        if (opened) {
+          hideStartupScreen();
+          hideProjectHomeScreen();
+        }
+      } finally {
+        target.disabled = false;
+      }
+    });
+    void refreshStartupWorkspaceProjects({ requestPermission: false });
+  }
+
   function setupStartupScreen() {
     const container = dom.startup?.screen;
     if (!container) {
       return;
     }
     bindCoreProjectActionButtons();
+    setupStartupWorkspace();
     getUpdateHistoryEntries();
     if (dom.startup?.hint) {
       dom.startup.hint.textContent = localizeText(
@@ -1582,7 +1855,6 @@
       }
       if (event.key === 'Escape') {
         event.preventDefault();
-        hideStartupScreen();
         return;
       }
       if (event.key === 'Tab') {
