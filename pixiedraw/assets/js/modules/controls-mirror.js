@@ -175,7 +175,11 @@
       return;
     }
     const { width, height } = getViewportSize();
-    const portrait = height >= width;
+    // An embedded preview can be physically small on a portrait phone while
+    // its own viewport is intentionally a 16:9 landscape surface.  Do not
+    // reintroduce portrait sizing through these adaptive variables.
+    const forceEmbeddedLandscape = document.documentElement?.dataset.embedLandscape === 'true';
+    const portrait = !forceEmbeddedLandscape && height >= width;
     const topbar = clamp(
       Math.round(height * (portrait ? 0.082 : 0.15)),
       portrait ? 60 : 72,
@@ -237,7 +241,8 @@
 
   function updateLayoutMode() {
     const { width, height } = getViewportSize();
-    const orientation = height >= width ? 'portrait' : 'landscape';
+    const forceEmbeddedLandscape = document.documentElement?.dataset.embedLandscape === 'true';
+    const orientation = forceEmbeddedLandscape || width > height ? 'landscape' : 'portrait';
     if (!lastViewportOrientation) {
       lastViewportOrientation = orientation;
     } else if (lastViewportOrientation !== orientation) {
@@ -250,13 +255,14 @@
       }
       return;
     }
-    const portrait = height >= width;
+    const portrait = !forceEmbeddedLandscape && height >= width;
     const coarsePointer = isCoarsePointerDevice();
     const shortestEdge = Math.min(width, height);
     const longestEdge = Math.max(width, height);
-    const shouldUseMobilePortrait =
+    const shouldUseMobilePortrait = !forceEmbeddedLandscape && (
       (coarsePointer && portrait && shortestEdge <= 980 && longestEdge <= 2200) ||
-      (!coarsePointer && portrait && width <= 680 && height <= 1280);
+      (!coarsePointer && portrait && width <= 680 && height <= 1280)
+    );
     let nextMode = 'desktop';
 
     if (shouldUseMobilePortrait) {
