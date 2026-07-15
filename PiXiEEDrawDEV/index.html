@@ -79,7 +79,7 @@
   })();
 </script>
 <script src="assets/js/modules/edition-capabilities-utils.js?v=2026.07.11-g3a-edition-ads"></script>
-<script src="assets/js/build-info.js?v=20260715-077"></script>
+<script src="assets/js/build-info.js?v=20260715-079"></script>
 <script>
   (function configurePixieedAds() {
     const shouldShowAds = typeof window.__PIXIEEDRAW_SHOULD_SHOW_ADS__ === 'function'
@@ -130,7 +130,6 @@
         };
         const existing = document.querySelector('script[src*="pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"]');
         if (existing instanceof HTMLScriptElement) {
-          existing.dataset.pixieedAdsLoader = 'true';
           if (existing.dataset.pixieedReady === '1' || window.adsbygoogle) {
             finish();
             return;
@@ -142,7 +141,6 @@
         const script = document.createElement('script');
         script.async = true;
         script.crossOrigin = 'anonymous';
-        script.dataset.pixieedAdsLoader = 'true';
         script.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253';
         script.addEventListener('load', () => {
           script.dataset.pixieedReady = '1';
@@ -1973,9 +1971,9 @@
 		<script defer="" src="assets/js/modules/startup-workflow-utils.js?v=20260715-workspace-location-guide1"></script>
 		<script defer="" src="assets/js/modules/recent-project-workflow-utils.js?v=20260713-048"></script>
 		<script defer="" src="assets/js/modules/project-package-workflow-utils.js?v=20260714-provenance-v1"></script>
-		<script defer="" src="assets/js/modules/project-storage-adapter-utils.js?v=20260715-startup-certified-p13"></script>
-		<script defer="" src="assets/js/modules/project-storage-v1-json-adapter.js?v=2026.07.09-project-storage-phase1"></script>
-		<script defer="" src="assets/js/modules/project-storage-v2-archive-codec.js?v=20260715-startup-certified-p13"></script>
+		<script defer="" src="assets/js/modules/project-storage-adapter-utils.js?v=20260715-legacy-project-card-recovery1"></script>
+		<script defer="" src="assets/js/modules/project-storage-v1-json-adapter.js?v=20260715-legacy-project-card-recovery1"></script>
+		<script defer="" src="assets/js/modules/project-storage-v2-archive-codec.js?v=20260715-legacy-project-card-recovery1"></script>
 		<script defer="" src="assets/js/modules/project-storage-v2-worker-bridge.js?v=2026.07.10-project-storage-worker1"></script>
 		<script defer="" src="assets/js/modules/project-storage-v2-zip-adapter.js?v=20260715-startup-certified-p13"></script>
 		<script defer="" src="assets/js/modules/document-serialization-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
@@ -2008,7 +2006,7 @@
 	<script defer="" src="assets/js/modules/pre-update-checkpoint-utils.js?v=20260712-pre-update-checkpoint-u3"></script>
 	<script defer="" src="assets/js/active-project-session-utils.js?v=2026.07.13-active-project-session-r2c"></script>
 	<script defer="" src="assets/js/pixieedraw-dev-switch.js?v=2026.07.03-pixieedrawdev-switch-fix14"></script>
-	<script defer="" src="assets/js/app.js?v=20260715-077"></script>
+	<script defer="" src="assets/js/app.js?v=20260715-079"></script>
 	<script defer="" src="assets/js/modules/update-detection-utils.js?v=20260713-026"></script>
   <script>
     (function initPanelAdDocking() {
