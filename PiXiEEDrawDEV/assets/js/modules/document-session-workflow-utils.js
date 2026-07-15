@@ -318,6 +318,17 @@
       }
       return false;
     }
+    // A project restored from an IndexedDB V2 manifest is already trusted V2
+    // storage. The generic parsed-value registry may identify its JSON-shaped
+    // in-memory object as the V1 JSON adapter even though no V1 file was read.
+    // Remove only that false adapter label; real legacy sheets/canvases are
+    // still detected below and continue through the migration confirmation.
+    if (
+      Number(options?.trustedAutosaveSchemaVersion) === 2
+      && parsedDocument?.storageAdapterId === 'pixieedraw-v1-json'
+    ) {
+      parsedDocument.storageAdapterId = '';
+    }
     if (!await confirmLegacyV2MigrationIfNeeded(parsedDocument, options)) {
       return false;
     }
