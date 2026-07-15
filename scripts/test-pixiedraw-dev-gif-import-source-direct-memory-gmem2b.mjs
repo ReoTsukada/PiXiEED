@@ -51,6 +51,18 @@ const nullLegacy = fromPayload(base64(direct), null);
 assert.deepEqual(Array.from(nullLegacy.direct), Array.from(direct));
 assert.equal(nullLegacy.importSourceDirect, null);
 
+const arrayPayload = model.deserializeLayerFromDocument({
+  id: 'array-layer', name: 'Array Layer', indices: [-1], direct: [1, 2, 3, 255], importSourceDirect: null,
+}, 1, 'array-layer', 'Array Layer', 1, 1);
+assert.deepEqual(Array.from(arrayPayload.indices), [-1], 'IndexedDB V2 numeric indices remain readable');
+assert.deepEqual(Array.from(arrayPayload.direct), [1, 2, 3, 255], 'IndexedDB V2 numeric direct pixels remain readable');
+
+const missingIndicesDirect = model.deserializeLayerFromDocument({
+  id: 'direct-layer', name: 'Direct Layer', directOnly: true, direct: [4, 5, 6, 255],
+}, 1, 'direct-layer', 'Direct Layer', 1, 1);
+assert.deepEqual(Array.from(missingIndicesDirect.indices), [-1], 'direct-only V2 layers recover missing indices as transparent');
+assert.deepEqual(Array.from(missingIndicesDirect.direct), [4, 5, 6, 255]);
+
 const clipboardImportOnly = model.createLayerFromClipboardSnapshot({ name: 'clipboard', indices, direct: null, importSourceDirect: legacy }, 1, 1);
 assert.deepEqual(Array.from(clipboardImportOnly.direct), Array.from(legacy), 'clipboard import-only payload is promoted');
 assert.deepEqual(Array.from(clipboardImportOnly.importSourceDirect), Array.from(legacy));
