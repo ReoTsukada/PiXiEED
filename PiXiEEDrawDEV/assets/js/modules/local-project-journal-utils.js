@@ -489,12 +489,6 @@
         return null;
       }
       const next = ensureActiveState(normalizedProjectId) || createEmptyActiveState(normalizedProjectId);
-      const session = typeof buildAutosaveSessionPayload === 'function'
-        ? buildAutosaveSessionPayload()
-        : buildProjectSessionPayload();
-      session.historyPast = normalizeHistoryEntryList(history?.past || []);
-      session.historyFuture = normalizeHistoryEntryList(history?.future || []);
-      session.historyLimit = Math.max(1, Math.round(Number(history?.limit) || Number(session.historyLimit) || 30));
       const currentActiveSheetId = typeof getActiveOpenProjectTabId === 'function'
         ? String(getActiveOpenProjectTabId() || '')
         : '';
@@ -505,9 +499,13 @@
         || Boolean(currentActiveSheetId && checkpointActiveSheetId && currentActiveSheetId !== checkpointActiveSheetId);
       const hasSnapshot = Boolean(snapshot && typeof snapshot === 'object');
       if (!hasSnapshot && !useCheckpoint && next.checkpointPersisted) {
-        next.historyPast = normalizeHistoryEntryList(session.historyPast);
-        next.historyFuture = normalizeHistoryEntryList(session.historyFuture);
-        next.historyLimit = Math.max(1, Math.round(Number(session.historyLimit) || 30));
+        // A journal-only revision persists replayable pixel patches plus the
+        // lightweight history lists. Building the complete session here used
+        // to serialize every timelapse track even though that payload was
+        // discarded before the V2 journal write.
+        next.historyPast = normalizeHistoryEntryList(history?.past || []);
+        next.historyFuture = normalizeHistoryEntryList(history?.future || []);
+        next.historyLimit = Math.max(1, Math.round(Number(history?.limit) || 30));
         next.dirtyOpCount = Math.max(0, next.ops.length);
         activeState = next;
         return {
@@ -521,6 +519,12 @@
       if (!hasSnapshot) {
         return null;
       }
+      const session = typeof buildAutosaveSessionPayload === 'function'
+        ? buildAutosaveSessionPayload()
+        : buildProjectSessionPayload();
+      session.historyPast = normalizeHistoryEntryList(history?.past || []);
+      session.historyFuture = normalizeHistoryEntryList(history?.future || []);
+      session.historyLimit = Math.max(1, Math.round(Number(history?.limit) || Number(session.historyLimit) || 30));
       if (useCheckpoint) {
         const fullPackaged = packagedPayload && typeof packagedPayload === 'object'
           ? packagedPayload
