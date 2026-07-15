@@ -1288,15 +1288,10 @@
         }
       }
       updateAutosaveStatus(
-        appendToProject
-          ? localizeText(
-            'PiXiEELENS の画像を別シートで開きました',
-            'Opened PiXiEELENS capture in a separate sheet'
-          )
-          : localizeText(
-            'PiXiEELENS の画像を新規プロジェクトとして開きました',
-            'Opened PiXiEELENS capture as a new project'
-          ),
+        localizeText(
+          'PiXiEELENS の画像を新規プロジェクトとして開きました',
+          'Opened PiXiEELENS capture as a new project'
+        ),
         'success'
       );
       finalizeLensImportAttempt({ clearPayload: true });
@@ -1407,15 +1402,10 @@
         }
       }
       updateAutosaveStatus(
-        appendToProject
-          ? localizeText(
-            'QRコードを別シートで開きました',
-            'Opened QR code in a separate sheet'
-          )
-          : localizeText(
-            'QRコードを新規プロジェクトとして開きました',
-            'Opened QR code as a new project'
-          ),
+        localizeText(
+          'QRコードを新規プロジェクトとして開きました',
+          'Opened QR code as a new project'
+        ),
         'success'
       );
       finalizeQrImportAttempt({ clearPayload: true });
