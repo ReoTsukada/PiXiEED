@@ -14071,9 +14071,9 @@ body.is-right-tool-rail:not(.is-mobile-layout) #panelColor .palette-action-menu_
   min-height: var(--ui-control-tile-size);
 }
 
-/* Mobile ads belong to the selected drawer panel, not to a fixed footer.
-   Only the active panel owns the moved left-panel slot, so a single ad is
-   rendered at a time and never overlays the canvas or the shared navigation. */
+/* Match the working File/Settings behavior on every portrait drawer panel:
+   keep one ad in normal document flow at the very end of the active content.
+   Tools and Color share a panel, so only Color's final mount may reserve room. */
 body.is-mobile-layout #mobileBottomAd {
   display: none !important;
 }
@@ -14082,30 +14082,53 @@ body.is-mobile-layout .app {
   padding-bottom: var(--pixieed-shared-bottom-nav-offset, 68px) !important;
 }
 
-body.is-mobile-layout .mobile-panel.is-active .panel-ad-mount[data-panel-ad-mount='left'] {
-  display: block !important;
-  width: 100% !important;
-  max-width: none !important;
-  min-height: 96px !important;
-  height: auto !important;
-  margin: 16px 0 0 !important;
-  padding: 0 0 12px !important;
-  overflow: visible !important;
-}
-
-body.is-mobile-layout .mobile-panel.is-active .panel-ad-mount[data-panel-ad-mount='left'] #leftPanelAd {
-  display: flex !important;
-  width: 100% !important;
-  min-height: 96px !important;
-  height: auto !important;
-  max-height: none !important;
+body.is-mobile-layout .mobile-panel .panel-ad-mount[data-panel-ad-mount='left'] {
+  display: none !important;
+  min-height: 0 !important;
+  height: 0 !important;
+  max-height: 0 !important;
   margin: 0 !important;
   padding: 0 !important;
   overflow: hidden !important;
 }
 
-body.is-mobile-layout .mobile-panel.is-active .panel-ad-mount[data-panel-ad-mount='left'] #leftPanelAdSlot,
-body.is-mobile-layout .mobile-panel.is-active .panel-ad-mount[data-panel-ad-mount='left'] #leftPanelAdSlot > ins {
+body.is-mobile-layout .mobile-drawer[data-mode='full'] .mobile-panel.is-active #panelColor .panel-ad-mount[data-panel-ad-mount='left'],
+body.is-mobile-layout .mobile-drawer[data-mode='full'] .mobile-panel.is-active #panelFrames .panel-ad-mount[data-panel-ad-mount='left'],
+body.is-mobile-layout .mobile-drawer[data-mode='full'] .mobile-panel.is-active #panelFile .panel-ad-mount[data-panel-ad-mount='left'],
+body.is-mobile-layout .mobile-drawer[data-mode='full'] .mobile-panel.is-active #panelSettings .panel-ad-mount[data-panel-ad-mount='left'],
+body.is-mobile-layout .mobile-drawer[data-mode='full'] .mobile-panel.is-active #panelDetails .panel-ad-mount[data-panel-ad-mount='left'] {
+  display: block !important;
+  position: static !important;
+  flex: 0 0 auto;
+  width: 100% !important;
+  max-width: none !important;
+  min-height: 108px !important;
+  height: auto !important;
+  max-height: none !important;
+  margin: 16px 0 0 !important;
+  padding: 0 0 12px !important;
+  overflow: hidden !important;
+  box-sizing: border-box;
+  isolation: isolate;
+  z-index: auto;
+}
+
+body.is-mobile-layout .mobile-drawer[data-mode='full'] .mobile-panel.is-active .panel-ad-mount[data-panel-ad-mount='left'] #leftPanelAd {
+  display: flex !important;
+  width: 100% !important;
+  min-height: 96px !important;
+  height: 96px !important;
+  max-height: 96px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  position: static !important;
+  transform: none !important;
+  z-index: 0 !important;
+}
+
+body.is-mobile-layout .mobile-drawer[data-mode='full'] .mobile-panel.is-active .panel-ad-mount[data-panel-ad-mount='left'] #leftPanelAdSlot,
+body.is-mobile-layout .mobile-drawer[data-mode='full'] .mobile-panel.is-active .panel-ad-mount[data-panel-ad-mount='left'] #leftPanelAdSlot > ins {
   display: block !important;
   width: 100% !important;
   max-width: 100% !important;
@@ -14114,26 +14137,43 @@ body.is-mobile-layout .mobile-panel.is-active .panel-ad-mount[data-panel-ad-moun
   height: 96px !important;
   max-height: 96px !important;
   margin: 0 auto !important;
+  position: static !important;
+  transform: none !important;
+  overflow: hidden !important;
 }
 
-body.is-mobile-layout .mobile-panel.is-active .panel-ad-mount[data-panel-ad-mount='left'] #leftPanelAdSlot > ins iframe {
+body.is-mobile-layout .mobile-drawer[data-mode='full'] .mobile-panel.is-active .panel-ad-mount[data-panel-ad-mount='left'] #leftPanelAdSlot > ins iframe {
   display: block !important;
   width: 100% !important;
   min-height: 96px !important;
   height: 96px !important;
   max-height: 96px !important;
+  position: static !important;
+  transform: none !important;
+  overflow: hidden !important;
 }
 
-/* A half-height drawer is intentionally a compact control surface. Rendering
-   an iframe there would place the panel tail beneath the fixed common nav.
-   The ad becomes available as soon as the user expands that panel fully. */
 body.is-mobile-layout .mobile-drawer:not([data-mode='full']) .panel-ad-mount[data-panel-ad-mount='left'],
 body.is-mobile-layout .mobile-drawer:not([data-mode='full']) .panel-ad-mount[data-panel-ad-mount='left'] #leftPanelAd {
   display: none !important;
   min-height: 0 !important;
   height: 0 !important;
+  max-height: 0 !important;
   margin: 0 !important;
   padding: 0 !important;
+  overflow: hidden !important;
+}
+
+body.is-mobile-layout .mobile-panel.is-active #panelFrames .panel-section__body {
+  display: block;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+body.is-mobile-layout .mobile-panel.is-active #panelFrames .timeline-card,
+body.is-mobile-layout .mobile-panel.is-active #panelFrames .panel-ad-mount[data-panel-ad-mount='left'] {
+  position: static !important;
+  transform: none !important;
 }
 
 /* Diagnostic mode: modal ads are disabled independently from panel ads.
