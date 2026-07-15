@@ -1,11 +1,17 @@
 {
-  "generatedAt": "2026-07-15T04:24:11.318Z",
+  "generatedAt": "2026-07-15T04:24:13.703Z",
   "projects": [
     {
       "id": "site",
       "name": "PiXiEED 全体",
       "url": "/index.html",
       "entries": [
+        {
+          "date": "2026-07-15",
+          "items": [
+            "画面を更新"
+          ]
+        },
         {
           "date": "2026-07-09",
           "items": [
@@ -46,12 +52,6 @@
           "date": "2026-06-24",
           "items": [
             "SEO / 画面を更新"
-          ]
-        },
-        {
-          "date": "2026-06-13",
-          "items": [
-            "画面を更新"
           ]
         }
       ]
@@ -226,6 +226,12 @@
     {
       "date": "2026-07-15",
       "updates": [
+        {
+          "id": "site",
+          "name": "PiXiEED 全体",
+          "url": "/index.html",
+          "summary": "画面を更新"
+        },
         {
           "id": "qr-maker",
           "name": "QRコードメーカー",
