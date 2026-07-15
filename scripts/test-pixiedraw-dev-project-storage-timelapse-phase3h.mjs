@@ -691,7 +691,7 @@ async function runIncludeTimelapseTrueScenario() {
     session: rootSession,
   }, {
     fileNameBase: 'phase3h-include-timelapse.pixieedraw',
-    preferredAdapterId: 'pixieedraw-v2-zip-experimental',
+    preferredAdapterId: 'pixieedraw-v2-zip',
     includeSheets: true,
     includeTimelapse: true,
   });
@@ -699,40 +699,19 @@ async function runIncludeTimelapseTrueScenario() {
   const v2Bytes = new Uint8Array(await v2Serialized.blob.arrayBuffer());
   const zipEntries = parseStoredZipEntries(v2Bytes);
   assert.ok(zipEntries.has('timelapse/session.json'));
-  assert.ok(zipEntries.has('sheets/sheet-active/timelapse/session.json'));
-  assert.ok(zipEntries.has('sheets/sheet-shared-origin/timelapse/session.json'));
+  assert.ok(!Array.from(zipEntries.keys()).some(path => path.startsWith('sheets/')));
 
   const rootProjectJson = JSON.parse(Buffer.from(zipEntries.get('project.json')).toString('utf8'));
   assert.equal(rootProjectJson.session.timelapseArchive.included, true);
   assert.equal(rootProjectJson.session.timelapseArchive.path, 'timelapse/session.json');
   assertEmptyTimelapsePayload(rootProjectJson.session.timelapse, 12);
 
-  const activeSheetProjectJson = JSON.parse(Buffer.from(zipEntries.get('sheets/sheet-active/project.json')).toString('utf8'));
-  assert.equal(activeSheetProjectJson.session.timelapseArchive.included, true);
-  assert.equal(activeSheetProjectJson.session.timelapseArchive.path, 'sheets/sheet-active/timelapse/session.json');
-  assertEmptyTimelapsePayload(activeSheetProjectJson.session.timelapse, 12);
-
-  const extraSheetProjectJson = JSON.parse(Buffer.from(zipEntries.get('sheets/sheet-shared-origin/project.json')).toString('utf8'));
-  assert.equal(extraSheetProjectJson.session.timelapseArchive.included, true);
-  assert.equal(extraSheetProjectJson.session.timelapseArchive.path, 'sheets/sheet-shared-origin/timelapse/session.json');
-  assertEmptyTimelapsePayload(extraSheetProjectJson.session.timelapse, 8);
-
   const parsedFromV2 = await registry.parseBlob(v2Serialized.blob);
   assert.equal(parsedFromV2.parsed.session.timelapse.enabled, true);
   assert.equal(parsedFromV2.parsed.session.timelapse.fps, 12);
   assert.deepEqual(parsedFromV2.parsed.session.timelapse.byCanvas, rootSession.timelapse.byCanvas);
   assert.deepEqual(parsedFromV2.parsed.session.timelapse.operationLogsByCanvas, rootSession.timelapse.operationLogsByCanvas);
-  assert.equal(parsedFromV2.parsed.sheets[1].project.session.timelapse.enabled, true);
-  assert.equal(parsedFromV2.parsed.sheets[1].project.session.timelapse.fps, 8);
-  assert.deepEqual(parsedFromV2.parsed.sheets[1].project.session.timelapse.byCanvas, extraSession.timelapse.byCanvas);
-  assert.deepEqual(
-    parsedFromV2.parsed.sheets[1].project.session.timelapse.operationLogsByCanvas,
-    extraSession.timelapse.operationLogsByCanvas
-  );
-  assert.equal(parsedFromV2.parsed.sheets[1].source, 'shared-sheet');
-  assert.equal(parsedFromV2.parsed.sheets[1].sharedProjectKey, 'legacy-shared-key');
-  assert.equal(parsedFromV2.parsed.sheets[1].sharedProjectBackendId, 'legacy-backend-id');
-  assert.deepEqual(parsedFromV2.parsed.sheets[1].sharedSyncState, { legacy: true });
+  assert.equal(Array.isArray(parsedFromV2.parsed.sheets), false);
   assert.equal(parsedFromV2.parsed.session.timelapseArchive, undefined);
 
   const parsedSnapshot = await documentSessionUtils.snapshotFromDocumentBlob(v2Serialized.blob);
@@ -740,7 +719,7 @@ async function runIncludeTimelapseTrueScenario() {
   assert.equal(parsedSnapshot.projectSession.timelapse.fps, 12);
   assert.equal(parsedSnapshot.projectSession.timelapse.tracksByCanvasId['canvas-a'].snapshots.length, 1);
   assert.equal(parsedSnapshot.projectSession.timelapse.tracksByCanvasId['canvas-b'].operationLog.entries.length, 2);
-  assert.equal(parsedSnapshot.sheets[1].sharedProjectKey, 'legacy-shared-key');
+  assert.equal(parsedSnapshot.sheets.length, 0);
 
   return {
     v1Size: v1Serialized.blob.size,
@@ -756,7 +735,7 @@ async function runIncludeTimelapseFalseScenario() {
     session: rootSession,
   }, {
     fileNameBase: 'phase3h-omit-timelapse.pixieedraw',
-    preferredAdapterId: 'pixieedraw-v2-zip-experimental',
+    preferredAdapterId: 'pixieedraw-v2-zip',
     includeSheets: true,
     includeTimelapse: false,
   });
@@ -773,8 +752,7 @@ async function runIncludeTimelapseFalseScenario() {
 
   const parsedFromV2 = await registry.parseBlob(v2Serialized.blob);
   assertEmptyTimelapsePayload(parsedFromV2.parsed.session.timelapse, 12);
-  assertEmptyTimelapsePayload(parsedFromV2.parsed.sheets[0].project.session.timelapse, 12);
-  assertEmptyTimelapsePayload(parsedFromV2.parsed.sheets[1].project.session.timelapse, 8);
+  assert.equal(Array.isArray(parsedFromV2.parsed.sheets), false);
 
   const parsedSnapshot = await documentSessionUtils.snapshotFromDocumentBlob(v2Serialized.blob);
   assert.equal(parsedSnapshot.projectSession.timelapse.enabled, false);
@@ -792,7 +770,7 @@ async function runMissingTimelapseEntryErrorScenario() {
     session: rootSession,
   }, {
     fileNameBase: 'phase3h-missing-timelapse.pixieedraw',
-    preferredAdapterId: 'pixieedraw-v2-zip-experimental',
+    preferredAdapterId: 'pixieedraw-v2-zip',
     includeSheets: true,
     includeTimelapse: true,
   });
@@ -814,7 +792,7 @@ async function runBrokenTimelapseJsonScenario() {
     session: rootSession,
   }, {
     fileNameBase: 'phase3h-broken-timelapse.pixieedraw',
-    preferredAdapterId: 'pixieedraw-v2-zip-experimental',
+    preferredAdapterId: 'pixieedraw-v2-zip',
     includeSheets: true,
     includeTimelapse: true,
   });

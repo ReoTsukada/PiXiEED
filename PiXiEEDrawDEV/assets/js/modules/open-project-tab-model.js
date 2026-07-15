@@ -12,7 +12,6 @@
     buildProjectSessionPayload,
     buildPackagedProjectPayload,
     normalizeDocumentName,
-    normalizeProjectSaveHandleMeta,
     DEFAULT_DOCUMENT_NAME,
     hasDocumentUnsavedChanges,
     normalizeAutosaveProjectId,
@@ -57,56 +56,6 @@
         lastSavedStorageAdapterId: typeof next.lastSavedStorageAdapterId === 'string' && next.lastSavedStorageAdapterId
           ? next.lastSavedStorageAdapterId
           : (typeof base.lastSavedStorageAdapterId === 'string' && base.lastSavedStorageAdapterId ? base.lastSavedStorageAdapterId : null),
-        projectSaveHandleState: typeof next.projectSaveHandleState === 'string' && next.projectSaveHandleState
-          ? next.projectSaveHandleState
-          : (typeof base.projectSaveHandleState === 'string' && base.projectSaveHandleState ? base.projectSaveHandleState : 'none'),
-      };
-    }
-
-    function resolveTabProjectSaveHandle(handle, fallback = null) {
-      if (handle && typeof handle === 'object') {
-        return handle;
-      }
-      if (fallback && typeof fallback === 'object') {
-        return fallback;
-      }
-      return null;
-    }
-
-    function resolveTabProjectSaveHandleMeta(value = null, fallback = null) {
-      if (typeof normalizeProjectSaveHandleMeta === 'function') {
-        return normalizeProjectSaveHandleMeta(value, fallback);
-      }
-      const next = value && typeof value === 'object' ? value : {};
-      const base = fallback && typeof fallback === 'object' ? fallback : {};
-      const fileName = typeof next.fileName === 'string' && next.fileName.trim()
-        ? next.fileName.trim()
-        : (typeof base.fileName === 'string' && base.fileName.trim() ? base.fileName.trim() : '');
-      const adapterId = typeof next.adapterId === 'string' && next.adapterId.trim()
-        ? next.adapterId.trim()
-        : (typeof base.adapterId === 'string' && base.adapterId.trim() ? base.adapterId.trim() : '');
-      const boundAt = typeof next.boundAt === 'string' && next.boundAt.trim()
-        ? next.boundAt.trim()
-        : (typeof base.boundAt === 'string' && base.boundAt.trim() ? base.boundAt.trim() : '');
-      const sourceProjectToken = typeof next.sourceProjectToken === 'string' && next.sourceProjectToken.trim()
-        ? next.sourceProjectToken.trim()
-        : (typeof base.sourceProjectToken === 'string' && base.sourceProjectToken.trim() ? base.sourceProjectToken.trim() : '');
-      const handleKind = typeof next.handleKind === 'string' && next.handleKind.trim()
-        ? next.handleKind.trim()
-        : (typeof base.handleKind === 'string' && base.handleKind.trim() ? base.handleKind.trim() : '');
-      const permissionState = typeof next.permissionState === 'string' && next.permissionState.trim()
-        ? next.permissionState.trim()
-        : (typeof base.permissionState === 'string' && base.permissionState.trim() ? base.permissionState.trim() : 'unknown');
-      if (!fileName && !adapterId && !boundAt && !sourceProjectToken && !handleKind && !permissionState) {
-        return null;
-      }
-      return {
-        fileName,
-        adapterId: adapterId || null,
-        boundAt,
-        sourceProjectToken: sourceProjectToken || null,
-        handleKind: handleKind || 'unknown',
-        permissionState,
       };
     }
 
@@ -134,8 +83,6 @@
       const tabId = options.tabId || createOpenProjectTabId();
       const fileName = normalizeDocumentName(options.fileName || payload.fileName || DEFAULT_DOCUMENT_NAME);
       const persistenceState = resolveTabPersistenceState(options, null, { createToken: true });
-      const projectSaveHandle = resolveTabProjectSaveHandle(options.projectSaveHandle, null);
-      const projectSaveHandleMeta = resolveTabProjectSaveHandleMeta(options.projectSaveHandleMeta, null);
       const isNativeNewProject = persistenceState.sourceKind === 'new';
       const canonicalPayloadFormat = typeof options.canonicalPayloadFormat === 'string' && options.canonicalPayloadFormat
         ? options.canonicalPayloadFormat
@@ -181,8 +128,6 @@
           deferredRestore: false,
           remoteUpdateAvailable: false,
           qrEditPayload: normalizeQrEditPayload(options.qrEditPayload, normalizedProjectId),
-          projectSaveHandle,
-          projectSaveHandleMeta,
           canonicalPayloadFormat,
           canonicalSchemaVersion,
           canonicalSourceMetadata,
@@ -244,8 +189,6 @@
         source: options.source || (currentProjectIsShared ? 'shared' : 'working'),
         updatedAt: payload.project?.updatedAt || new Date().toISOString(),
         qrEditPayload: normalizeQrEditPayload(options.qrEditPayload, normalizedProjectId),
-        projectSaveHandle,
-        projectSaveHandleMeta,
         canonicalPayloadFormat,
         canonicalSchemaVersion,
         canonicalSourceMetadata,
@@ -297,18 +240,6 @@
         || DEFAULT_DOCUMENT_NAME
       );
       const persistenceState = resolveTabPersistenceState(options, currentTab, { createToken: true });
-      const projectSaveHandle = resolveTabProjectSaveHandle(
-        Object.prototype.hasOwnProperty.call(options, 'projectSaveHandle')
-          ? options.projectSaveHandle
-          : currentTab?.projectSaveHandle,
-        currentTab?.projectSaveHandle || null
-      );
-      const projectSaveHandleMeta = resolveTabProjectSaveHandleMeta(
-        Object.prototype.hasOwnProperty.call(options, 'projectSaveHandleMeta')
-          ? options.projectSaveHandleMeta
-          : currentTab?.projectSaveHandleMeta,
-        currentTab?.projectSaveHandleMeta || null
-      );
       const nextTab = {
         ...(currentTab && typeof currentTab === 'object' ? currentTab : {}),
         id: options.tabId || currentTab?.id || createOpenProjectTabId(),
@@ -332,8 +263,6 @@
         deferredRestore: false,
         remoteUpdateAvailable: false,
         qrEditPayload: normalizeQrEditPayload(options.qrEditPayload || currentTab?.qrEditPayload, normalizedProjectId),
-        projectSaveHandle,
-        projectSaveHandleMeta,
         runtimeProjectId: currentTab?.runtimeProjectId || options.runtimeProjectId || `${currentTab?.id || 'sheet'}:runtime-project`,
         canonicalPayloadFormat: currentTab?.canonicalPayloadFormat === 'v2' ? 'v2' : '',
         canonicalSchemaVersion: Math.max(0, Math.round(Number(currentTab?.canonicalSchemaVersion) || 0)),
@@ -370,9 +299,6 @@
       sourceKind = 'unknown',
       sourceProjectToken = null,
       lastSavedStorageAdapterId = null,
-      projectSaveHandleState = 'none',
-      projectSaveHandle = null,
-      projectSaveHandleMeta = null,
       sourceProjectId = null,
       sourceSheetId = null,
       isImportedSheet = false,
@@ -404,10 +330,7 @@
         sourceKind,
         sourceProjectToken,
         lastSavedStorageAdapterId,
-        projectSaveHandleState,
       }, null, { createToken: true });
-      const normalizedProjectSaveHandle = resolveTabProjectSaveHandle(projectSaveHandle, null);
-      const normalizedProjectSaveHandleMeta = resolveTabProjectSaveHandleMeta(projectSaveHandleMeta, null);
       return {
         id: typeof id === 'string' && id ? id : createOpenProjectTabId(),
         projectId: normalizedProjectId,
@@ -420,8 +343,6 @@
         source,
         updatedAt: updatedAt || project?.updatedAt || new Date().toISOString(),
         qrEditPayload: normalizeQrEditPayload(qrEditPayload, projectId || getAutosaveProjectId?.() || ''),
-        projectSaveHandle: normalizedProjectSaveHandle,
-        projectSaveHandleMeta: normalizedProjectSaveHandleMeta,
         sourceProjectId: typeof sourceProjectId === 'string' && sourceProjectId ? sourceProjectId : null,
         sourceSheetId: typeof sourceSheetId === 'string' && sourceSheetId ? sourceSheetId : null,
         isImportedSheet: isImportedSheet === true,
@@ -469,8 +390,6 @@
           ? normalizeMultiProjectKey(sheet.sharedProjectKey || '')
           : '';
         const persistenceState = resolveTabPersistenceState(sheet, null, { createToken: true });
-        const projectSaveHandle = resolveTabProjectSaveHandle(sheet.projectSaveHandle, null);
-        const projectSaveHandleMeta = resolveTabProjectSaveHandleMeta(sheet.projectSaveHandleMeta, null);
         normalized.push({
           id: uniqueId,
           fileName,
@@ -484,8 +403,6 @@
           source: typeof sheet.source === 'string' && sheet.source ? sheet.source : 'sheet',
           updatedAt: sheet.updatedAt || sheet.project?.updatedAt || new Date().toISOString(),
           qrEditPayload: normalizeQrEditPayload(sheet.qrEditPayload, getAutosaveProjectId?.() || ''),
-          projectSaveHandle,
-          projectSaveHandleMeta,
           sourceProjectId: typeof sheet.sourceProjectId === 'string' && sheet.sourceProjectId ? sheet.sourceProjectId : null,
           sourceSheetId: typeof sheet.sourceSheetId === 'string' && sheet.sourceSheetId ? sheet.sourceSheetId : null,
           isImportedSheet: sheet.isImportedSheet === true,

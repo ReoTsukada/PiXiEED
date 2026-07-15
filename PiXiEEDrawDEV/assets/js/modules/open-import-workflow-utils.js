@@ -67,373 +67,6 @@
     return { owner: 'project-open-input', command: 'append-project-input' };
   }
 
-  async function openDocumentsAsProjectTabs(items, loader, { source = 'open', tabOptions = null } = {}) {
-    if (!ensureCurrentClientCanReplaceActiveProject()) {
-      return false;
-    }
-    if (isProjectCommandLocked()) {
-      return false;
-    }
-    const queue = Array.isArray(items) ? items.filter(Boolean) : [];
-    if (!queue.length || typeof loader !== 'function') {
-      return false;
-    }
-    // The editor no longer accepts a collection of resident project tabs.
-    // Route ordinary picker/input files through the one-project replacement
-    // path before any old sheet transaction can materialize their payload.
-    if (queue.length === 1 && (typeof queue[0]?.getFile === 'function' || typeof queue[0]?.arrayBuffer === 'function')) {
-      return await openDocumentAsNewProject(queue[0], { source });
-    }
-    if (queue.length > 1) {
-      updateAutosaveStatus(
-        localizeText('一度に開けるのは1プロジェクトです。ファイルを1つ選択してください', 'Open one project at a time. Select one file.'),
-        'info'
-      );
-      return false;
-    }
-    ensureOpenProjectTabsInitialized();
-    const lock = acquireProjectCommandLock(getProjectCommandLockDescriptor(source, tabOptions));
-    if (!lock?.ok) return false;
-    console.info('[pixiedraw-dev:import-command]', { phase: 'import-lock-acquired', owner: lock.owner, command: lock.command });
-    try {
-      const targets = queue;
-      const truncatedCount = 0;
-      // The current sheet becomes inactive after this atomic append. Retain
-      // its resident payload until the completed multi-sheet checkpoint can
-      // safely become the deferred restore source.
-      const persistedCurrentSheet = await persistActiveOpenProjectTab({
-        flushAutosave: true,
-        retainProjectPayload: true,
-      });
-      if (!persistedCurrentSheet) {
-        return false;
-      }
-      const parentProjectId = normalizeAutosaveProjectId(autosaveProjectId || '') || createAutosaveProjectId();
-      setActiveAutosaveProjectId(parentProjectId, { persist: false });
-      const directPayloads = await Promise.all(targets.map(item => readProjectPayloadFromOpenItem(item)));
-      const allDirectPayloads = directPayloads.every(payload => payload?.project && typeof payload.project === 'object');
-      if (allDirectPayloads) {
-        const collectionUtils = window.PiXiEEDrawModules?.projectSheetCollectionUtils?.createProjectSheetCollectionUtils?.();
-        const transactionUtils = window.PiXiEEDrawModules?.projectSheetTransactionUtils?.createProjectSheetTransactionUtils?.({ collectionUtils });
-        const candidates = directPayloads.map(payload => collectionUtils.prepareSheetCandidate('file', {
-          id: createOpenProjectTabId(),
-          project: payload.project,
-          isImportedSheet: true,
-          fileName: payload.fileName,
-          label: extractDocumentBaseName(payload.fileName),
-          sourceKind: payload.sourceKind || 'file',
-          sourceStorageAdapterId: payload.sourceStorageAdapterId || null,
-          sourceProjectToken: payload.sourceProjectToken || createProjectPersistenceToken?.('file'),
-          sourceProjectId: payload.sourceProjectId || null,
-          sourceSheetId: payload.sourceSheetId || null,
-          runtimeProjectId: createProjectPersistenceToken?.('import-runtime-project'),
-          sheetRuntimeId: createProjectPersistenceToken?.('import-runtime'),
-          deferredPayloadKey: createProjectPersistenceToken?.('import-deferred'),
-          sheetPersistenceKey: createProjectPersistenceToken?.('import-persistence'),
-          localPersistenceKey: createProjectPersistenceToken?.('import-local'),
-          autosaveV2SheetId: createProjectPersistenceToken?.('import-autosave-v2'),
-          historyOwnerId: createProjectPersistenceToken?.('import-history'),
-          timelapseOwnerId: createProjectPersistenceToken?.('import-timelapse'),
-        }));
-        const validation = transactionUtils.validateCandidates(candidates, {
-          existingSheetIds: openProjectTabs.map(tab => tab?.id || ''),
-        });
-        if (!validation.valid) {
-          updateAutosaveStatus(localizeText('複数読み込みの候補を検証できませんでした', 'Unable to validate all import candidates'), 'warn');
-          return false;
-        }
-        const transaction = transactionUtils.createTransactionSnapshot({ openProjectTabs, activeOpenProjectTabId });
-        try {
-          const nextTabs = candidates.map(candidate => {
-            const tab = createOpenProjectSheetTabFromPackagedProject({
-              id: candidate.id,
-              project: candidate.project,
-              // projectId identifies the current multi-sheet collection. The
-              // tab id owns the individual sheet payload inside that record.
-              projectId: parentProjectId,
-              fileName: candidate.fileName,
-              label: candidate.label,
-              source: source || 'open',
-              unsaved: false,
-              sourceStorageAdapterId: candidate.sourceStorageAdapterId,
-              sourceKind: candidate.sourceKind,
-              sourceProjectToken: candidate.sourceProjectToken,
-              sourceProjectId: candidate.sourceProjectId,
-              sourceSheetId: candidate.sourceSheetId,
-              isImportedSheet: candidate.isImportedSheet,
-              runtimeProjectId: candidate.runtimeProjectId,
-              sheetRuntimeId: candidate.sheetRuntimeId,
-              deferredPayloadKey: candidate.deferredPayloadKey,
-              sheetPersistenceKey: candidate.sheetPersistenceKey,
-              localPersistenceKey: candidate.localPersistenceKey,
-              autosaveV2SheetId: candidate.autosaveV2SheetId,
-              historyOwnerId: candidate.historyOwnerId,
-              timelapseOwnerId: candidate.timelapseOwnerId,
-              lastSavedStorageAdapterId: candidate.sourceStorageAdapterId,
-              projectSaveHandleState: 'none',
-              projectSaveHandle: null,
-              projectSaveHandleMeta: null,
-              qrEditPayload: tabOptions?.qrEditPayload || null,
-            });
-            // Imported sheets cannot be lightweight until their complete
-            // collection checkpoint exists. Otherwise a switch has no
-            // resident or stored payload to restore.
-            return tab && candidate.project && typeof candidate.project === 'object'
-              ? { ...tab, project: candidate.project, residentProjectLoaded: true, deferredRestore: false }
-              : tab;
-          });
-          if (nextTabs.some(tab => !tab)) throw new Error('ERR_SHEET_TAB_CREATE_FAILED');
-          openProjectTabs.push(...nextTabs);
-          const activeTab = nextTabs[nextTabs.length - 1];
-          activeOpenProjectTabId = activeTab.id;
-          suppressOpenProjectTabAutoInitialize = false;
-          renderOpenProjectTabs();
-          const loaded = await loadDocumentFromProjectPayload(activeTab.project, {
-            projectId: parentProjectId,
-            suppressAutosaveStatus: true,
-            suppressProjectSheetsRestore: true,
-            sourcePersistenceState: {
-              sourceStorageAdapterId: activeTab.sourceStorageAdapterId,
-              sourceKind: activeTab.sourceKind,
-              sourceProjectToken: activeTab.sourceProjectToken,
-              lastSavedStorageAdapterId: activeTab.lastSavedStorageAdapterId,
-              projectSaveHandleState: 'none',
-            },
-          });
-          if (!loaded || loaded === 'deferred') throw new Error('ERR_SHEET_ACTIVATE_FAILED');
-          queueProjectTabViewportReset(activeTab.id);
-          updateAutosaveStatus(localizeText(`複数読み込み: 開いた ${nextTabs.length}件`, `Opened ${nextTabs.length} project tab(s)`), 'success');
-          return true;
-        } catch (error) {
-          transactionUtils.rollbackSheetCandidate(transaction, {
-            openProjectTabs,
-            setActiveOpenProjectTabId: value => { activeOpenProjectTabId = value; },
-          });
-          const previous = transaction.tabs.find(tab => tab?.id === transaction.activeOpenProjectTabId);
-          if (previous?.project) {
-            await loadDocumentFromProjectPayload(previous.project, {
-              projectId: previous.projectId || parentProjectId,
-              suppressAutosaveStatus: true,
-              suppressProjectSheetsRestore: true,
-            });
-          }
-          renderOpenProjectTabs();
-          console.warn('Atomic multi-project import rolled back', error);
-          updateAutosaveStatus(localizeText('複数読み込みに失敗したため、追加を取り消しました', 'Multiple import failed; no sheets were added'), 'warn');
-          return false;
-        }
-      }
-      if (targets.length > 1) {
-        // Image/GIF candidates still require the image decoder. Refuse the whole
-        // batch rather than retaining the former partial-import behavior.
-        updateAutosaveStatus(localizeText('複数読み込みには、すべての候補を先に準備できるファイルを選択してください', 'Select files whose candidates can all be prepared before import'), 'warn');
-        return false;
-      }
-      let openedCount = 0;
-      let failedCount = 0;
-      for (let index = 0; index < targets.length; index += 1) {
-        const item = targets[index];
-        try {
-          const directPayload = await readProjectPayloadFromOpenItem(item);
-          if (directPayload?.project && typeof directPayload.project === 'object') {
-            const directTab = await appendProjectPayloadAsOpenTab({
-              project: directPayload.project,
-              parentProjectId,
-              fileName: directPayload.fileName,
-              unsaved: directPayload.unsaved,
-              source: source || 'open',
-              tabOptions,
-              sourceStorageAdapterId: directPayload.sourceStorageAdapterId ?? null,
-              sourceKind: directPayload.sourceKind ?? 'unknown',
-              sourceProjectToken: directPayload.sourceProjectToken ?? null,
-              lastSavedStorageAdapterId: directPayload.lastSavedStorageAdapterId ?? null,
-              projectSaveHandleState: directPayload.projectSaveHandleState ?? 'none',
-            });
-            if (directTab) {
-              openedCount += 1;
-              continue;
-            }
-          }
-          const loaded = await loader(item);
-          if (loaded?.project && typeof loaded.project === 'object') {
-            const isCanonicalPngCandidate = loaded.sourceKind === 'import-image'
-              && loaded.canonicalPayloadFormat === 'v2';
-            if (isCanonicalPngCandidate) {
-              const documentValue = loaded.project.document && typeof loaded.project.document === 'object'
-                ? loaded.project.document
-                : {};
-              console.info('[pixieedraw-dev:png-canonical-import]', {
-                phase: 'png-commit-start',
-                sourceFileBytes: Math.max(0, Number(loaded.project?.canonicalSourceMetadata?.sourceFileBytes) || 0),
-                sourceWidth: Math.max(0, Number(loaded.project?.canonicalSourceMetadata?.sourceWidth) || Number(documentValue.width) || 0),
-                sourceHeight: Math.max(0, Number(loaded.project?.canonicalSourceMetadata?.sourceHeight) || Number(documentValue.height) || 0),
-              });
-            }
-            const appended = await appendProjectPayloadAsOpenTab({
-              project: loaded.project,
-              parentProjectId,
-              fileName: loaded.fileName || DEFAULT_DOCUMENT_NAME,
-              unsaved: false,
-              source: source || 'open',
-              tabOptions,
-              sourceStorageAdapterId: loaded.sourceStorageAdapterId ?? null,
-              sourceKind: loaded.sourceKind ?? tabOptions?.sourceKind ?? 'unknown',
-              sourceProjectToken: loaded.sourceProjectToken ?? null,
-              lastSavedStorageAdapterId: loaded.lastSavedStorageAdapterId ?? null,
-              projectSaveHandleState: 'none',
-              isImportedSheet: loaded.isImportedSheet === true,
-              canonicalPayloadFormat: loaded.canonicalPayloadFormat || '',
-              canonicalSourceMetadata: loaded.project?.canonicalSourceMetadata || null,
-            });
-            if (appended) {
-              if (isCanonicalPngCandidate) {
-                console.info('[pixieedraw-dev:png-canonical-import]', {
-                  phase: 'png-commit-success',
-                  sourceFileBytes: Math.max(0, Number(loaded.project?.canonicalSourceMetadata?.sourceFileBytes) || 0),
-                  sheetCount: openProjectTabs.length,
-                });
-              }
-              openedCount += 1;
-              continue;
-            }
-            if (isCanonicalPngCandidate) {
-              console.warn('[pixieedraw-dev:png-canonical-import]', {
-                phase: 'png-commit-failed',
-                sourceFileBytes: Math.max(0, Number(loaded.project?.canonicalSourceMetadata?.sourceFileBytes) || 0),
-                code: 'ERR_V2_COMMIT_FAILED',
-              });
-            }
-            failedCount += 1;
-            continue;
-          }
-          if (loaded === 'deferred') {
-            // Loader declined to apply into the active document because the
-            // payload targets a different project/sheet. Create a new sheet from
-            // the original item so the user's explicit open action still
-            // produces a separate sheet.
-            try {
-              let packaged = null;
-              let deferredProjectId = '';
-              let deferredFileName = DEFAULT_DOCUMENT_NAME;
-              let deferredUnsaved = false;
-              // If item looks like a File/Blob with a text() method, read it
-              if (item && typeof item.text === 'function') {
-                try {
-                  const text = await item.text();
-                  packaged = tryParseJsonSafe(text);
-                  deferredFileName = normalizeDocumentName(item.name || packaged?.documentName || DEFAULT_DOCUMENT_NAME);
-                } catch (e) {
-                  packaged = null;
-                }
-              } else if (item && typeof item.getFile === 'function') {
-                // FileSystemFileHandle
-                try {
-                  const f = await item.getFile();
-                  const text = await f.text();
-                  packaged = tryParseJsonSafe(text);
-                  deferredFileName = normalizeDocumentName(f?.name || item.name || packaged?.documentName || DEFAULT_DOCUMENT_NAME);
-                } catch (e) {
-                  packaged = null;
-                }
-              } else if (item && typeof item === 'object' && item.project) {
-                packaged = item.project;
-                deferredProjectId = normalizeAutosaveProjectId(item.id || '');
-                deferredFileName = normalizeDocumentName(item.name || packaged?.documentName || DEFAULT_DOCUMENT_NAME);
-                deferredUnsaved = Boolean(item.unsaved);
-              }
-              if (packaged && typeof packaged === 'object') {
-                const appended = await appendProjectPayloadAsOpenTab({
-                  project: packaged,
-                  parentProjectId,
-                  fileName: deferredFileName,
-                  unsaved: deferredUnsaved,
-                  source: source || 'open',
-                  tabOptions,
-                  sourceStorageAdapterId: null,
-                  sourceKind: 'unknown',
-                  lastSavedStorageAdapterId: null,
-                  projectSaveHandleState: 'none',
-                });
-                if (appended) {
-                  queueProjectTabViewportReset(appended.id);
-                  openedCount += 1;
-                  continue;
-                }
-              }
-            } catch (e) {
-              console.warn('Failed to create tab from deferred loader item', e);
-              failedCount += 1;
-              continue;
-            }
-            // If we couldn't construct a tab, fall through to treat as failure
-            failedCount += 1;
-            continue;
-          }
-          if (!loaded) {
-            failedCount += 1;
-            continue;
-          }
-          if (normalizeAutosaveProjectId(autosaveProjectId || '') !== parentProjectId) {
-            setActiveAutosaveProjectId(parentProjectId, { persist: false });
-          }
-          const appended = appendOpenProjectTabFromCurrentState({
-            activate: true,
-            source,
-            projectId: parentProjectId,
-            ...(typeof getActiveProjectPersistenceState === 'function'
-              ? (getActiveProjectPersistenceState() || {})
-              : {}),
-            ...(tabOptions && typeof tabOptions === 'object' ? tabOptions : {}),
-          });
-          if (!appended) {
-            failedCount += 1;
-            break;
-          }
-          if (tabOptions?.qrEditPayload) {
-            activateQrEditMode({
-              ...tabOptions.qrEditPayload,
-              projectId: appended.projectId || '',
-            });
-          }
-          openedCount += 1;
-        } catch (error) {
-          console.warn('Failed to open project as tab', error);
-          failedCount += 1;
-        }
-      }
-      if (!openedCount) {
-        if (truncatedCount > 0 || failedCount > 0) {
-          updateAutosaveStatus(
-            localizeText(
-              `複数読み込みに失敗しました（失敗 ${failedCount} / 上限で未追加 ${truncatedCount}）`,
-              `Failed to open projects (failed ${failedCount} / skipped by limit ${truncatedCount})`
-            ),
-            'warn'
-          );
-        }
-        return false;
-      }
-      const summaryJa = `複数読み込み: 開いた ${openedCount}件`
-        + (failedCount > 0 ? ` / 失敗 ${failedCount}件` : '')
-        + (truncatedCount > 0 ? ` / 未追加 ${truncatedCount}件` : '');
-      const summaryEn = `Opened ${openedCount} project tab(s)`
-        + (failedCount > 0 ? ` / Failed ${failedCount}` : '')
-        + (truncatedCount > 0 ? ` / Skipped ${truncatedCount}` : '');
-      updateAutosaveStatus(
-        localizeText(summaryJa, summaryEn),
-        (failedCount > 0 || truncatedCount > 0) ? 'warn' : 'success'
-      );
-      renderOpenProjectTabs();
-      return true;
-    } finally {
-      releaseProjectCommandLock({ token: lock.token, owner: lock.owner });
-      console.info('[pixiedraw-dev:import-command]', { phase: 'import-lock-released', owner: lock.owner, command: lock.command });
-      // The tab bar may have been rendered while the command lock was true.
-      // Render once more after release so the delegated + button is enabled.
-      renderOpenProjectTabs();
-    }
-  }
-
   async function openImageFileAsNewProject(file, { source = 'import', qrEditPayload = null } = {}) {
     if (!ensureCurrentClientCanReplaceActiveProject()) {
       return false;
@@ -461,13 +94,11 @@
       sourceProjectToken: candidate.sourceProjectToken || null,
       sourceStorageAdapterId: null,
       lastSavedStorageAdapterId: null,
-      projectSaveHandleState: 'none',
       sourcePersistenceState: {
         sourceStorageAdapterId: null,
         sourceKind: candidate.sourceKind || 'import-image',
         sourceProjectToken: candidate.sourceProjectToken || null,
         lastSavedStorageAdapterId: null,
-        projectSaveHandleState: 'none',
       },
       qrEditPayload,
     });
@@ -553,18 +184,14 @@
           suppressAutosaveStatus: true,
           sourceKind: 'file',
           fileLoad: true,
-          bindOpenedFile: Boolean(handle),
           sourceFileName: file.name || '',
-          projectSaveHandleState: handle ? 'bound' : 'none',
           preparedSnapshot,
         })
         : await loadDocumentFromText(await file.text(), handle, {
           suppressAutosaveStatus: true,
           sourceKind: 'file',
           fileLoad: true,
-          bindOpenedFile: Boolean(handle),
           sourceFileName: file.name || '',
-          projectSaveHandleState: handle ? 'bound' : 'none',
           preparedSnapshot,
         });
       if (!loaded || loaded === 'deferred') {
@@ -659,7 +286,6 @@
           ? createProjectPersistenceToken(item.sourceKind || 'unknown')
           : null),
         lastSavedStorageAdapterId: item.lastSavedStorageAdapterId || null,
-        projectSaveHandleState: 'none',
       };
     }
     let file = null;
@@ -698,7 +324,6 @@
               ? createProjectPersistenceToken('file')
               : null,
             lastSavedStorageAdapterId: parsedResult?.adapterId || null,
-            projectSaveHandleState: item && typeof item.getFile === 'function' ? 'unknown' : 'none',
           };
         }
         return null;
@@ -720,7 +345,6 @@
           ? createProjectPersistenceToken('file')
           : null,
         lastSavedStorageAdapterId: null,
-        projectSaveHandleState: item && typeof item.getFile === 'function' ? 'unknown' : 'none',
       };
     } catch (_error) {
       return null;
@@ -738,7 +362,6 @@
     sourceKind = 'unknown',
     sourceProjectToken = null,
     lastSavedStorageAdapterId = null,
-    projectSaveHandleState = 'none',
     isImportedSheet = false,
     canonicalPayloadFormat = '',
     canonicalSourceMetadata = null,
@@ -763,7 +386,6 @@
       sourceKind,
       sourceProjectToken,
       lastSavedStorageAdapterId,
-      projectSaveHandleState,
       isImportedSheet,
     });
     if (!nextTab) {
@@ -791,7 +413,6 @@
         sourceKind,
         sourceProjectToken,
         lastSavedStorageAdapterId,
-        projectSaveHandleState,
       },
     });
     if (!loaded || loaded === 'deferred') {
@@ -910,54 +531,6 @@
     return openProjectTabs[findOpenProjectTabIndex(newTabId)] || nextTab;
   }
 
-  async function createNewProjectAsTab({
-    name,
-    width,
-    height,
-    palettePreset = newProjectPalettePresetId,
-    promptExportDirectory = false,
-  }) {
-    if (isProjectCommandLocked()) {
-      updateAutosaveStatus(localizeText('プロジェクト切替の完了を待ってください', 'Wait for the current project switch to finish'), 'info');
-      return false;
-    }
-    ensureOpenProjectTabsInitialized();
-    const closedCurrentProject = await closeAllOpenProjectTabsForProjectReplacement({ flushAutosave: true, showHome: false });
-    if (!closedCurrentProject) {
-      return false;
-    }
-    const lock = acquireProjectCommandLock({ owner: 'new-project-create', command: 'create-new-project' });
-    if (!lock?.ok) return false;
-    try {
-      const created = await createNewProject({
-        name,
-        width,
-        height,
-        palettePreset,
-        promptExportDirectory,
-        ensureTab: false,
-      });
-      if (!created) {
-        return false;
-      }
-      resetOpenProjectTabsToCurrentProject({
-        source: 'new-project',
-        projectId: autosaveProjectId,
-        sourceStorageAdapterId: null,
-        sourceKind: 'new',
-        lastSavedStorageAdapterId: null,
-        projectSaveHandleState: 'none',
-      });
-      updateAutosaveStatus(
-        localizeText('新規プロジェクトを作成しました', 'Created new project'),
-        'success'
-      );
-      return true;
-    } finally {
-      releaseProjectCommandLock({ token: lock.token, owner: lock.owner });
-    }
-  }
-
   async function openRecentProjectAsTab(entry, { hideStartup = true, appendOnly = false } = {}) {
     if (!entry || typeof entry !== 'object') {
       return false;
@@ -1067,240 +640,75 @@
     }
   }
 
-  async function appendRecentProjectAsSheets(entry) {
-    if (!entry || typeof entry !== 'object') return false;
-    const packaged = await loadRecentProjectPackagedPayload(entry);
-    if (!packaged || typeof packaged !== 'object') {
-      updateAutosaveStatus(localizeText('最近使ったプロジェクトの内容を読み込めませんでした', 'Unable to read the recent project payload'), 'warn');
-      return false;
-    }
-    const embeddedSheets = Array.isArray(packaged.sheets) && packaged.sheets.length
-      ? packaged.sheets
-      : [{ project: packaged, fileName: entry.name || packaged?.document?.documentName || DEFAULT_DOCUMENT_NAME }];
-    const items = embeddedSheets.map((sheet, index) => ({
-      project: sheet?.project,
-      fileName: sheet?.fileName || sheet?.name || entry.name || packaged?.document?.documentName || DEFAULT_DOCUMENT_NAME,
-      sourceKind: 'recent',
-      sourceStorageAdapterId: sheet?.sourceStorageAdapterId || null,
-      sourceProjectToken: sheet?.sourceProjectToken || (typeof createProjectPersistenceToken === 'function'
-        ? createProjectPersistenceToken(`recent-${index + 1}`)
-        : null),
-      lastSavedStorageAdapterId: null,
-      unsaved: Boolean(sheet?.unsaved || entry.unsaved),
-    }));
-    if (items.some(item => !item.project || typeof item.project !== 'object')) {
-      updateAutosaveStatus(localizeText('最近使ったプロジェクトのシート内容が不完全です', 'Recent project sheet payload is incomplete'), 'warn');
-      return false;
-    }
-    return await openDocumentsAsProjectTabs(items, async () => false, { source: 'local-recent' });
-  }
-
-  function normalizeSheetAddKind(value = '') {
-    return ['project', 'image', 'gif'].includes(value) ? value : '';
-  }
-
-  function getSheetAddPickerTypes(kind = '') {
-    if (kind === 'project') {
-      return [{
-        description: 'PiXiEEDraw project',
-        accept: {
-          'application/json': ['.json', '.pxdraw', '.pixieedraw'],
-          'application/x-pixieedraw': ['.pixieedraw'],
-        },
-      }];
-    }
-    if (kind === 'image') {
-      return [{
-        description: '画像 (PNG / JPEG / WebP)',
-        accept: {
-          'image/png': ['.png'],
-          'image/jpeg': ['.jpg', '.jpeg'],
-          'image/webp': ['.webp'],
-        },
-      }];
-    }
-    if (kind === 'gif') {
-      return [{ description: 'GIF image', accept: { 'image/gif': ['.gif'] } }];
-    }
-    return [{
-      description: '対応ファイル (PiXiEEDraw / PNG / JPEG / WebP / GIF)',
-      accept: {
-        'application/json': ['.json', '.pxdraw', '.pixieedraw'],
-        'application/x-pixieedraw': ['.pixieedraw'],
-        'image/png': ['.png'],
-        'image/jpeg': ['.jpg', '.jpeg'],
-        'image/webp': ['.webp'],
-        'image/gif': ['.gif'],
-      },
-    }];
-  }
-
-  async function openDocumentDialog(options = {}) {
-    if (!ensureCurrentClientCanReplaceActiveProject()) {
-      return false;
-    }
+  async function openDocumentDialog() {
+    if (!ensureCurrentClientCanReplaceActiveProject()) return false;
     if (!canCurrentClientImportExternalData()) {
-      setMultiStatus(localizeText('参加/視聴モードでは読み込み/インポートはマスターのみ操作できます', 'In participant/viewer mode, only the master can open/import files'), 'warn');
+      setMultiStatus(
+        localizeText(
+          '参加/視聴モードでは読み込み/インポートはマスターのみ操作できます',
+          'In participant/viewer mode, only the master can open/import files'
+        ),
+        'warn'
+      );
       return false;
     }
-    const mode = normalizeExternalImportMode(options?.mode);
-    const sheetAddKind = normalizeSheetAddKind(options?.sheetAddKind);
     if (typeof window.showOpenFilePicker === 'function') {
       try {
         const handles = await window.showOpenFilePicker({
-          multiple: mode !== EXTERNAL_IMPORT_MODE_NEW_PROJECT && sheetAddKind !== 'image' && sheetAddKind !== 'gif',
+          multiple: false,
           excludeAcceptAllOption: false,
-          types: getSheetAddPickerTypes(sheetAddKind),
+          types: [{
+            description: 'PiXiEEDraw project or image',
+            accept: {
+              'application/x-pixieedraw': ['.pixieedraw', '.pxdraw'],
+              'application/json': ['.json'],
+              'image/png': ['.png'],
+              'image/jpeg': ['.jpg', '.jpeg'],
+              'image/webp': ['.webp'],
+              'image/gif': ['.gif'],
+            },
+          }],
         });
-        if (!Array.isArray(handles) || !handles.length) {
-          return false;
-        }
-        if (mode === EXTERNAL_IMPORT_MODE_NEW_PROJECT) {
-          return await openDocumentAsNewProject(handles[0], { source: 'open-picker' });
-        }
-        return await openDocumentsAsProjectTabs(
-          handles,
-          async handle => {
-            if (sheetAddKind === 'image' || sheetAddKind === 'gif') {
-              const file = await handle.getFile();
-              return await buildImageSheetImportCandidate(file, sheetAddKind);
-            }
-            return await loadDocumentFromHandle(handle, { suppressAutosaveStatus: true });
-          },
-          {
-            source: 'open-picker',
-            tabOptions: sheetAddKind === 'image' || sheetAddKind === 'gif'
-              ? {
-                  sourceKind: sheetAddKind === 'gif' ? 'import-gif' : 'import-image',
-                  sourceStorageAdapterId: null,
-                  lastSavedStorageAdapterId: null,
-                  projectSaveHandleState: 'none',
-                }
-              : null,
-          }
-        );
+        if (!Array.isArray(handles) || !handles.length) return false;
+        return await openDocumentAsNewProject(handles[0], { source: 'open-picker' });
       } catch (error) {
-        if (error && error.name === 'AbortError') {
-          return false;
-        }
-        console.warn('Document open failed', error);
-        return openDocumentViaInput({ mode, sheetAddKind });
+        if (error?.name === 'AbortError') return false;
+        console.warn('Open picker failed; using file input fallback', error);
       }
     }
-    return openDocumentViaInput({ mode, sheetAddKind });
+    return openDocumentViaInput();
   }
 
-  function openDocumentViaInput(options = {}) {
-    const mode = normalizeExternalImportMode(options?.mode);
-    const sheetAddKind = normalizeSheetAddKind(options?.sheetAddKind);
+  function openDocumentViaInput() {
     return new Promise(resolve => {
       const input = document.createElement('input');
       input.type = 'file';
-      input.multiple = mode !== EXTERNAL_IMPORT_MODE_NEW_PROJECT && sheetAddKind !== 'image' && sheetAddKind !== 'gif';
-      const acceptTypes = sheetAddKind === 'project' ? [
-        '.json', '.pxdraw', '.pixieedraw', 'application/json', 'application/x-pixieedraw',
-      ] : sheetAddKind === 'image' ? [
-        '.png', '.jpg', '.jpeg', '.webp', 'image/png', 'image/jpeg', 'image/webp',
-      ] : sheetAddKind === 'gif' ? [
-        '.gif', 'image/gif',
-      ] : [
-        '.json',
-        '.pxdraw',
-        '.pixieedraw',
-        '.png',
-        '.jpg',
-        '.jpeg',
-        '.webp',
-        '.gif',
-        'application/json',
-        'application/x-pixieedraw',
-        'image/png',
-        'image/jpeg',
-        'image/webp',
-        'image/gif',
-      ];
-      if (IS_IOS_DEVICE) {
-        acceptTypes.push('.txt', 'text/plain');
-      }
-      input.accept = acceptTypes.join(',');
-      input.style.display = 'none';
-      let settled = false;
-      const finish = success => {
-        if (settled) return;
-        settled = true;
-        resolve(Boolean(success));
-      };
+      input.accept = '.pixieedraw,.pxdraw,.json,.png,.jpg,.jpeg,.webp,.gif';
+      input.multiple = false;
+      input.hidden = true;
       const cleanup = () => {
         input.value = '';
         input.remove();
       };
       input.addEventListener('change', async () => {
-        const files = Array.from(input.files || []);
+        const file = input.files?.[0] || null;
         cleanup();
-        if (!files.length) {
-          finish(false);
+        if (!file) {
+          resolve(false);
           return;
         }
         try {
-          if (mode === EXTERNAL_IMPORT_MODE_NEW_PROJECT) {
-            const opened = await openDocumentAsNewProject(files[0], { source: 'open-input' });
-            finish(opened);
-            return;
-          }
-          const opened = await openDocumentsAsProjectTabs(
-            files,
-            async file => {
-              if (sheetAddKind === 'image' || sheetAddKind === 'gif') {
-                return await buildImageSheetImportCandidate(file, sheetAddKind);
-              }
-              if (isImportableImageFile(file)) {
-                return await loadDocumentFromImageFile(file);
-              }
-              const text = await file.text();
-              return await loadDocumentFromText(text, null, {
-                suppressAutosaveStatus: true,
-                sourceKind: 'file',
-                fileLoad: true,
-                projectSaveHandleState: 'none',
-              });
-            },
-            {
-              source: 'open-input',
-              tabOptions: sheetAddKind === 'image' || sheetAddKind === 'gif'
-                ? {
-                    sourceKind: sheetAddKind === 'gif' ? 'import-gif' : 'import-image',
-                    sourceStorageAdapterId: null,
-                    lastSavedStorageAdapterId: null,
-                    projectSaveHandleState: 'none',
-                  }
-                : null,
-            }
-          );
-          finish(opened);
+          resolve(await openDocumentAsNewProject(file, { source: 'open-input' }));
         } catch (error) {
-          console.warn('Document load failed', error);
-          updateAutosaveStatus('ドキュメントを開けませんでした', 'error');
-          finish(false);
+          console.warn('Document input open failed', error);
+          updateAutosaveStatus(localizeText('ファイルを開けませんでした', 'Unable to open the file'), 'error');
+          resolve(false);
         }
-      });
-      input.addEventListener('cancel', () => {
-        cleanup();
-        finish(false);
-      });
-      input.addEventListener('click', () => {
-        input.value = '';
-      });
+      }, { once: true });
       document.body.appendChild(input);
-      try {
-        input.click();
-      } catch (error) {
-        cleanup();
-        updateAutosaveStatus('ドキュメントを開けませんでした', 'error');
-        finish(false);
-      }
+      input.click();
     });
   }
-
   function isGifFile(file) {
     if (!file) return false;
     const type = typeof file.type === 'string' ? file.type.toLowerCase() : '';
@@ -1693,9 +1101,6 @@
     setTrackedProjectDotBaseline(snapshot, null);
     resetOpenedDocumentViewport({ defer: true });
 
-    autosaveHandle = null;
-    pendingAutosaveHandle = null;
-    clearPendingPermissionListener();
     setActiveAutosaveProjectId(createAutosaveProjectId());
     clearActiveSharedProjectSession();
     storeMultiProjectKey('');
@@ -1868,21 +1273,7 @@
     }
 
     try {
-      const appendToProject = shouldAppendExternalImportToProject(payload);
-      const imported = appendToProject
-        ? await openDocumentsAsProjectTabs(
-          [file],
-          async lensFile => {
-            const loaded = await loadDocumentFromImageFile(lensFile);
-            if (!loaded) {
-              return false;
-            }
-            await ensureAutosaveForLensImport();
-            return true;
-          },
-          { source: 'lens' }
-        )
-        : await openImageFileAsNewProject(file, { source: 'lens' });
+      const imported = await openImageFileAsNewProject(file, { source: 'lens' });
       if (!imported) {
         finalizeLensImportAttempt({ clearPayload: true });
         return false;
@@ -1998,29 +1389,10 @@
         rawValue: typeof payload.rawValue === 'string' ? payload.rawValue : '',
         editSize: payload.editSize,
       };
-      const appendToProject = shouldAppendExternalImportToProject(payload);
-      const imported = appendToProject
-        ? await openDocumentsAsProjectTabs(
-          [file],
-          async qrFile => {
-            const loaded = await loadDocumentFromImageFile(qrFile);
-            if (!loaded) {
-              return false;
-            }
-            await ensureAutosaveForLensImport();
-            return true;
-          },
-          {
-            source: 'qrmaker',
-            tabOptions: {
-              qrEditPayload,
-            },
-          }
-        )
-        : await openImageFileAsNewProject(file, {
-          source: 'qrmaker',
-          qrEditPayload,
-        });
+      const imported = await openImageFileAsNewProject(file, {
+        source: 'qrmaker',
+        qrEditPayload,
+      });
       if (!imported) {
         finalizeQrImportAttempt({ clearPayload: true });
         return false;
@@ -2059,7 +1431,6 @@
 
 
   return Object.freeze({
-    openDocumentsAsProjectTabs,
     openImageFileAsNewProject,
     openDocumentAsNewProject,
     tryParseJsonSafe,
@@ -2070,13 +1441,9 @@
     appendProjectPayloadAsOpenTab,
     loadRecentProjectPackagedPayload,
     appendPackagedProjectTab,
-    createNewProjectAsTab,
     openRecentProjectAsTab,
-    appendRecentProjectAsSheets,
     openDocumentDialog,
     openDocumentViaInput,
-    normalizeSheetAddKind,
-    getSheetAddPickerTypes,
     isGifFile,
     dataUrlToBlob,
     loadDocumentFromImageFile,

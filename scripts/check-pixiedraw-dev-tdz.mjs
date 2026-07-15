@@ -720,9 +720,7 @@ const sharedProjectCommentUtilsLine = lineOf('const sharedProjectCommentUtilsMod
 const sharedProjectSnapshotFetchUtilsLine = lineOf('const sharedProjectSnapshotFetchUtilsModule =');
 const sharedProjectLocalConversionUtilsLine = lineOf('const sharedProjectLocalConversionUtilsModule =');
 const startupTailWorkflowUtilsLine = lineOf('const startupTailWorkflowUtilsModule =');
-const iosSnapshotUtilsLine = lineOf('iosSnapshotUtilsModule =');
 const memoryUtilsLine = lineOf('const memoryUtils =');
-const attemptAutosaveReauthorizationLine = lineOf('async function attemptAutosaveReauthorization(');
 if (!toolActionConfigLine || !toolbarConfigLine || toolActionConfigLine >= toolbarConfigLine) {
   failures.push('tool action static config must initialize before toolbar static config');
 }
@@ -927,9 +925,6 @@ if (!sharedProjectLocalConversionUtilsLine || !restoreCallLine || sharedProjectL
 if (!startupTailWorkflowUtilsLine || !initCallLine || startupTailWorkflowUtilsLine >= initCallLine) {
   failures.push('startup tail workflow utils must initialize before init()');
 }
-if (!iosSnapshotUtilsLine || !attemptAutosaveReauthorizationLine || iosSnapshotUtilsLine >= attemptAutosaveReauthorizationLine) {
-  failures.push('iOS snapshot utils must initialize before autosave reauthorization block');
-}
 
 [
   'normalizeExportFormat',
@@ -1042,7 +1037,6 @@ if (
 ].forEach(name => requireInjectedGetter('exportNormalizerUtils', name));
 [
   'LOCAL_VIEWPORT_CANVAS_SIGNED_IN_MAX_COUNT',
-  'LOCAL_VIEWPORT_CANVAS_STANDARD_MAX_COUNT',
   'MULTI_GUEST_LIMIT_MIN',
   'SHARED_PROJECT_LIMIT_AD_FREE',
   'SHARED_PROJECT_LIMIT_DEFAULT',
@@ -2109,11 +2103,9 @@ requireInjectedGetter('timelineLayers', 'TIMELINE_CELL_SIZE');
   'normalizeLocalViewportCanvasState',
   'state',
   'TOOL_ACTION_FLOATING_PREVIEW_TOGGLE',
-  'TOOL_ACTION_LOCAL_CANVAS_TOGGLE',
   'TOOL_ACTION_MIRROR_POPUP',
   'TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE',
   'TOP_UI_ACTION_FLOATING_PREVIEW_TOGGLE',
-  'TOP_UI_ACTION_LOCAL_CANVAS_TOGGLE',
   'TOP_UI_ACTION_MIRROR_POPUP',
   'TOP_UI_ACTION_VIRTUAL_CURSOR_TOGGLE',
 ].forEach(name => requireInjectedGetter('uiActionButtonsWorkflowUtils', name));
@@ -2142,18 +2134,15 @@ requireInjectedGetter('timelineLayers', 'TIMELINE_CELL_SIZE');
   'state',
   'TOOL_ACTION_CAMERA_MODE',
   'TOOL_ACTION_FLOATING_PREVIEW_TOGGLE',
-  'TOOL_ACTION_LOCAL_CANVAS_TOGGLE',
   'TOOL_ACTION_MIRROR_POPUP',
   'TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE',
   'TOP_UI_ACTION_FLOATING_PREVIEW_TOGGLE',
-  'TOP_UI_ACTION_LOCAL_CANVAS_TOGGLE',
   'TOP_UI_ACTION_MIRROR_POPUP',
   'TOP_UI_ACTION_OPEN_DETAILS_PANEL',
   'TOP_UI_ACTION_OPEN_LENS_CAMERA',
   'TOP_UI_ACTION_OPEN_QR_EDITOR',
   'TOP_UI_ACTION_VIRTUAL_CURSOR_TOGGLE',
   'updateFloatingPreviewActionToolButtons',
-  'updateLocalCanvasActionToolButtons',
   'updateRightTabVisibility',
   'updateVirtualCursorActionToolButtons',
 ].forEach(name => requireInjectedGetter('uiActionRouterWorkflowUtils', name));
@@ -2661,7 +2650,6 @@ requireInjectedGetter('timelineLayers', 'TIMELINE_CELL_SIZE');
   'getSharedProjectKeyFromProjectId',
   'isOwnedSharedRecentProjectEntry',
   'isSharedRecentProjectEntry',
-  'isStartupScreenAppendTabMode',
   'loadRecentProjectsMetadata',
   'loadSharedProjectSnapshotRecord',
   'localizeText',
@@ -2691,20 +2679,16 @@ requireInjectedGetter('timelineLayers', 'TIMELINE_CELL_SIZE');
   'DEFAULT_CANVAS_SIZE',
   'DEFAULT_DOCUMENT_BASENAME',
   'DEFAULT_DOCUMENT_NAME',
-  'EXPORT_DIRECTORY_SUPPORTED',
   'EXTERNAL_IMPORT_MODE_NEW_PROJECT',
   'MAX_CANVAS_SIZE',
   'MIN_CANVAS_SIZE',
   'NEW_PROJECT_IMMEDIATE_AUTOSAVE_ATTEMPTS',
   'NEW_PROJECT_PALETTE_PRESET_DEFAULT',
   'STARTUP_SCREEN_DISMISSED_KEY',
-  'STARTUP_SCREEN_MODE_APPEND_TAB',
   'STARTUP_SCREEN_MODE_DEFAULT',
   'STARTUP_UPDATE_TOAST_HIDDEN_KEY',
   'accountState',
   'applyHistorySnapshot',
-  'attemptExportDirectoryReauthorization',
-  'autosaveHandle',
   'autosaveProjectId',
   'autosaveWriteTimer',
   'bindCoreProjectActionButtons',
@@ -2714,14 +2698,12 @@ requireInjectedGetter('timelineLayers', 'TIMELINE_CELL_SIZE');
   'cancelStartupRestoreProgress',
   'clamp',
   'clearActiveSharedProjectSession',
-  'clearPendingPermissionListener',
   'clearReloadTargetProjectId',
   'clearTimelapseRecording',
   'closeAllOpenProjectTabsForProjectReplacement',
   'closeGlobalHistoryConfirmDialog',
   'createAutosaveProjectId',
   'createInitialState',
-  'createNewProjectAsTab',
   'createSharedProjectFromCurrentDocument',
   'deleteOwnedSharedProjectFromBackend',
   'dom',
@@ -2732,8 +2714,6 @@ requireInjectedGetter('timelineLayers', 'TIMELINE_CELL_SIZE');
   'ensureSharedProjectAuthenticatedStart',
   'ensureSharedProjectBackendSession',
   'ensureTimelapseStartCapture',
-  'exportDirectoryHandle',
-  'exportDirectorySetupDismissed',
   'extractDocumentBaseName',
   'getCurrentSharedRecentProjectEntry',
   'getMaxSharedProjectCount',
@@ -2764,9 +2744,6 @@ requireInjectedGetter('timelineLayers', 'TIMELINE_CELL_SIZE');
   'openDocumentDialog',
   'openRecentProject',
   'openSharedProjectFromHomeInput',
-  'pendingAutosaveHandle',
-  'pendingExportDirectoryHandle',
-  'pendingNewProjectAppendAsTab',
   'pendingNewProjectCreateShared',
   'projectHomeVisible',
   'purgeDeletedSharedProjectLocalReferences',
@@ -2778,7 +2755,6 @@ requireInjectedGetter('timelineLayers', 'TIMELINE_CELL_SIZE');
   'removeRecentProjectEntry',
   'renderNewProjectPalettePresetOptions',
   'renderNewProjectPalettePresetPicker',
-  'requestExportDirectoryBinding',
   'resetDocumentUnsavedChanges',
   'resetExportScaleDefaults',
   'resetOpenProjectTabsToCurrentProject',
@@ -2813,7 +2789,6 @@ requireInjectedGetter('timelineLayers', 'TIMELINE_CELL_SIZE');
   'syncPixfindSnapshotAfterDocumentReset',
   'syncStartupResumeState',
   'updateAutosaveStatus',
-  'updateExportFolderStatus',
   'updateHistoryButtons',
   'writeAutosaveSnapshot',
 ].forEach(name => requireInjectedGetter('startupWorkflowUtils', name));

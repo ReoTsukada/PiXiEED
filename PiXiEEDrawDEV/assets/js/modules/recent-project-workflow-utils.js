@@ -527,9 +527,7 @@
         section: dom.startup?.recentSection,
         list: dom.startup?.recentList,
         titleSelector: '.startup-screen__recent-title',
-        title: isStartupScreenAppendTabMode()
-          ? localizeText('プロジェクト一覧', 'Projects')
-          : localizeText('端末内プロジェクト（自動保存）', 'Local Projects (Autosave)'),
+        title: localizeText('端末内プロジェクト（自動保存）', 'Local Projects (Autosave)'),
       },
       {
         section: dom.projectHomeRecentSection,
@@ -539,8 +537,8 @@
       },
     ].filter(target => target.section instanceof HTMLElement && target.list instanceof HTMLElement);
     if (!targets.length) {
-      // The drawing app is now a start screen only. Recent projects remain
-      // durable local metadata, but their management UI lives in My Page.
+      // Recent projects remain durable local metadata even when this view is
+      // not mounted yet.
       return;
     }
     const renderProjectHomeEmptyState = target => {

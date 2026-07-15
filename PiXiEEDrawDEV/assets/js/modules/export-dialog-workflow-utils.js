@@ -44,18 +44,7 @@
       updateAutosaveStatus('出力設定を開けません。出力は開始していません。画面を再読み込みしてからもう一度お試しください。', 'error');
       return;
     }
-    try {
-      setExportFileBaseName(getExportFileNameBase() || state.documentName);
-      if (EXPORT_DIRECTORY_SUPPORTED) {
-        if (pendingExportDirectoryHandle && !exportDirectoryHandle) {
-          await attemptExportDirectoryReauthorization();
-        } else if (!exportDirectoryHandle && !exportDirectorySetupDismissed) {
-          await requestExportDirectoryBinding();
-        }
-      }
-    } catch (error) {
-      console.warn('Failed to prepare export dialog', error);
-    }
+    setExportFileBaseName(getExportFileNameBase() || state.documentName);
     const dialog = config.dialog;
     if (dialog && typeof dialog.showModal === 'function') {
       if (dialog.open) {

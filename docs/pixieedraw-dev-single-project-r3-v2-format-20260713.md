@@ -61,18 +61,16 @@ node scripts/test-pixiedraw-dev-autosave-schema-v2-phase4m.mjs
 node scripts/test-pixiedraw-dev-autosave-schema-v2-recovery-open-phase4r.mjs
 node scripts/test-pixiedraw-dev-autosave-schema-v2-restore-preview-phase4q.mjs
 node scripts/test-pixiedraw-dev-project-storage-phase2.mjs
-node scripts/test-pixiedraw-dev-project-storage-phase4d-persistence.mjs
+node scripts/test-pixiedraw-dev-local-true-v2-migration-p14.mjs
 node scripts/test-pixiedraw-dev-active-project-session-r2.mjs
 node scripts/check-pixiedraw-dev-tdz.mjs
 ```
 
 すべて成功。
 
-## 実ブラウザのGIF読込記録とR3-C修正
+## 現行方針への更新
 
-build `20260713-047` の実ブラウザログでは、GIFのデコード、単一V2への正規化、保存先未設定のV2作業コピー作成、V2ファイル書込みを確認した。一方、画像切替直後に旧プロジェクトの保存handleを解除していたため、`save-handle-update:session-first` の一時的な active-project-session mismatch が発生した。
-
-build `20260713-048` では、単一projectのsessionとtab mirrorを新しいproject IDで確定してから、外部入力由来の保存handleを解除する順序へ修正した。これにより元V1・旧V2・画像ファイルを上書きしない保証を保ったまま、旧sessionと新autosave IDの混在をなくす。
+build `20260715-086` では外部ファイルへの自動接続と保存handleを廃止した。V1・旧V2・画像・GIFは端末内真V2の作業プロジェクトとして扱い、元入力を上書きしない。完全な`.pixieedraw`は利用者が明示した場合だけダウンロードする。
 
 また、描画ツール内のrecent一覧DOMを廃止してPiXiEED My Pageへ移したため、recent一覧コンテナがないことを `ERR_RECENT_CONTAINER_MISSING` としていたログを、正常な `RECENT_UI_REMOVED` skipへ変更した。
 

@@ -33,9 +33,6 @@
     createLocalOpenProjectTabFromCurrentState,
     isSharedOpenProjectTab,
     getActiveOpenProjectTab,
-    normalizeProjectSaveHandleMeta,
-    normalizeProjectSaveHandleState,
-    normalizeProjectStorageAdapterId,
     hasDocumentUnsavedChanges,
     writeAutosaveSnapshot,
     updateAutosaveStatus,
@@ -50,278 +47,8 @@
     makeHistorySnapshot,
     buildProjectSessionPayload,
     buildPackagedProjectPayload,
-    getActiveProjectSession,
-    getActiveProjectSessionSaveBinding,
     replaceActiveProjectSessionFromTab,
-    updateActiveProjectSessionSaveBinding,
-    assertActiveProjectIdentityConsistency,
-    assertActiveProjectSessionMirrorConsistency,
   } = {}) {
-    function normalizeBindingHandleState(value, fallback = 'none') {
-      if (typeof normalizeProjectSaveHandleState === 'function') {
-        return normalizeProjectSaveHandleState(value, fallback);
-      }
-      const normalized = typeof value === 'string' ? value.trim() : '';
-      const allowed = new Set(['none', 'bound', 'unknown', 'conversion-required', 'stale', 'unavailable']);
-      if (allowed.has(normalized)) {
-        return normalized;
-      }
-      return allowed.has(fallback) ? fallback : 'none';
-    }
-
-    function normalizeBindingAdapterId(value) {
-      if (typeof normalizeProjectStorageAdapterId === 'function') {
-        return normalizeProjectStorageAdapterId(value);
-      }
-      return typeof value === 'string' && value.trim() ? value.trim() : null;
-    }
-
-    function normalizeBindingMeta(value = null, fallback = null, tab = null) {
-      if (typeof normalizeProjectSaveHandleMeta === 'function') {
-        return normalizeProjectSaveHandleMeta(value, fallback, tab);
-      }
-      const next = value && typeof value === 'object' ? value : {};
-      const base = fallback && typeof fallback === 'object' ? fallback : {};
-      const fileName = typeof next.fileName === 'string' && next.fileName.trim()
-        ? next.fileName.trim()
-        : (typeof base.fileName === 'string' && base.fileName.trim()
-          ? base.fileName.trim()
-          : (typeof tab?.fileName === 'string' && tab.fileName.trim() ? tab.fileName.trim() : ''));
-      const adapterId = normalizeBindingAdapterId(
-        Object.prototype.hasOwnProperty.call(next, 'adapterId')
-          ? next.adapterId
-          : (Object.prototype.hasOwnProperty.call(base, 'adapterId') ? base.adapterId : (tab?.lastSavedStorageAdapterId || tab?.sourceStorageAdapterId || null))
-      );
-      const boundAt = typeof next.boundAt === 'string' && next.boundAt.trim()
-        ? next.boundAt.trim()
-        : (typeof base.boundAt === 'string' && base.boundAt.trim() ? base.boundAt.trim() : '');
-      const sourceProjectToken = typeof next.sourceProjectToken === 'string' && next.sourceProjectToken.trim()
-        ? next.sourceProjectToken.trim()
-        : (typeof base.sourceProjectToken === 'string' && base.sourceProjectToken.trim()
-          ? base.sourceProjectToken.trim()
-          : (typeof tab?.sourceProjectToken === 'string' && tab.sourceProjectToken.trim() ? tab.sourceProjectToken.trim() : ''));
-      const handleKind = typeof next.handleKind === 'string' && next.handleKind.trim()
-        ? next.handleKind.trim()
-        : (typeof base.handleKind === 'string' && base.handleKind.trim() ? base.handleKind.trim() : 'unknown');
-      const permissionState = (() => {
-        const candidate = typeof next.permissionState === 'string' && next.permissionState.trim()
-          ? next.permissionState.trim()
-          : (typeof base.permissionState === 'string' && base.permissionState.trim() ? base.permissionState.trim() : 'unknown');
-        const allowed = new Set(['granted', 'prompt', 'denied', 'unknown']);
-        return allowed.has(candidate) ? candidate : 'unknown';
-      })();
-      if (!fileName && !adapterId && !boundAt && !sourceProjectToken && handleKind === 'unknown' && permissionState === 'unknown') {
-        return null;
-      }
-      return {
-        fileName,
-        adapterId,
-        boundAt,
-        sourceProjectToken: sourceProjectToken || null,
-        handleKind,
-        permissionState,
-      };
-    }
-
-    function getProjectSaveBindingFromTab(tab = null) {
-      if (!tab || typeof tab !== 'object') {
-        return {
-          projectSaveHandle: null,
-          projectSaveHandleMeta: null,
-          projectSaveHandleState: 'none',
-        };
-      }
-      return {
-        projectSaveHandle: tab.projectSaveHandle && typeof tab.projectSaveHandle === 'object'
-          ? tab.projectSaveHandle
-          : null,
-        projectSaveHandleMeta: normalizeBindingMeta(tab.projectSaveHandleMeta, null, tab),
-        projectSaveHandleState: normalizeBindingHandleState(tab.projectSaveHandleState, 'none'),
-      };
-    }
-
-    function getActiveProjectSaveBinding() {
-      const session = getActiveProjectSession?.() || null;
-      if (session) {
-        const sessionBinding = getActiveProjectSessionSaveBinding?.(session) || null;
-        if (sessionBinding) {
-          return sessionBinding;
-        }
-        console.warn('[pixiedraw-dev:active-project-session-invalid]', {
-          phase: 'get-active-project-save-binding',
-          projectId: session?.projectId || '',
-        });
-      }
-      return getProjectSaveBindingFromTab(getActiveOpenProjectTab?.() || null);
-    }
-
-    function updateOpenProjectTabSaveBinding(tabId, binding = null, options = {}) {
-      const normalizedTabId = typeof tabId === 'string' ? tabId.trim() : '';
-      if (!normalizedTabId) {
-        return null;
-      }
-      const index = findOpenProjectTabIndex(normalizedTabId);
-      if (index < 0 || !openProjectTabs[index]) {
-        return null;
-      }
-      const current = openProjectTabs[index];
-      const nextBinding = binding && typeof binding === 'object' ? binding : {};
-      const nextHandle = Object.prototype.hasOwnProperty.call(nextBinding, 'projectSaveHandle')
-        ? (nextBinding.projectSaveHandle && typeof nextBinding.projectSaveHandle === 'object' ? nextBinding.projectSaveHandle : null)
-        : (current.projectSaveHandle && typeof current.projectSaveHandle === 'object' ? current.projectSaveHandle : null);
-      const nextMeta = normalizeBindingMeta(
-        Object.prototype.hasOwnProperty.call(nextBinding, 'projectSaveHandleMeta')
-          ? nextBinding.projectSaveHandleMeta
-          : current.projectSaveHandleMeta,
-        current.projectSaveHandleMeta,
-        current
-      );
-      const nextState = normalizeBindingHandleState(
-        Object.prototype.hasOwnProperty.call(nextBinding, 'projectSaveHandleState')
-          ? nextBinding.projectSaveHandleState
-          : current.projectSaveHandleState,
-        'none'
-      );
-      const nextLastSavedAdapterId = Object.prototype.hasOwnProperty.call(nextBinding, 'lastSavedAdapterId')
-        ? normalizeBindingAdapterId(nextBinding.lastSavedAdapterId)
-        : current?.lastSavedStorageAdapterId || null;
-      const isActiveTab = normalizedTabId === (getActiveOpenProjectTabId?.() || '');
-      let sessionUpdated = false;
-      if (isActiveTab) {
-        const updatedSession = updateActiveProjectSessionSaveBinding?.({
-          projectSaveHandle: nextHandle,
-          projectSaveHandleMeta: nextMeta,
-          projectSaveHandleState: nextState,
-          lastSavedAdapterId: nextLastSavedAdapterId,
-        }, {
-          phase: 'save-handle-update:session-first',
-          allowTransientMismatch: true,
-        });
-        sessionUpdated = Boolean(updatedSession);
-        if (!sessionUpdated) {
-          console.error('[pixiedraw-dev:active-project-session-write-failed]', {
-            phase: 'save-handle-update:session-first',
-            tabId: normalizedTabId,
-            projectId: current?.projectId || '',
-          });
-        }
-      }
-      openProjectTabs[index] = {
-        ...current,
-        projectSaveHandle: nextHandle,
-        projectSaveHandleMeta: nextMeta,
-        projectSaveHandleState: nextState,
-        lastSavedStorageAdapterId: nextLastSavedAdapterId,
-      };
-      if (options?.render !== false) {
-        renderOpenProjectTabs?.();
-      }
-      if (options?.log !== false) {
-        console.info('[project-save-handle-debug]', {
-          activeTabId: getActiveOpenProjectTabId?.() || '',
-          tabId: normalizedTabId,
-          projectSaveHandleState: nextState,
-          handleBound: Boolean(nextHandle),
-          fileName: nextMeta?.fileName || '',
-          adapterId: nextMeta?.adapterId || '',
-          handleKind: nextMeta?.handleKind || '',
-          permissionState: nextMeta?.permissionState || '',
-        });
-      }
-      if (isActiveTab && sessionUpdated) {
-        assertActiveProjectSessionMirrorConsistency?.({
-          phase: 'save-handle-update:tab-mirror',
-          allowTransientMismatch: false,
-        });
-      }
-      return getProjectSaveBindingFromTab(openProjectTabs[index]);
-    }
-
-    function bindOpenProjectTabSaveHandle(tabId, handle, meta = null, options = {}) {
-      const normalizedTabId = typeof tabId === 'string' ? tabId.trim() : '';
-      if (!normalizedTabId) {
-        return null;
-      }
-      const index = findOpenProjectTabIndex(normalizedTabId);
-      if (index < 0 || !openProjectTabs[index]) {
-        return null;
-      }
-      if (!handle || typeof handle !== 'object') {
-        return clearOpenProjectTabSaveHandle(normalizedTabId, 'missing-handle', options);
-      }
-      const current = openProjectTabs[index];
-      const normalizedMeta = normalizeBindingMeta({
-        ...(meta && typeof meta === 'object' ? meta : {}),
-        fileName: meta?.fileName || handle?.name || current?.fileName || '',
-        boundAt: meta?.boundAt || new Date().toISOString(),
-        sourceProjectToken: meta?.sourceProjectToken || current?.sourceProjectToken || '',
-        handleKind: meta?.handleKind || 'external-project-file',
-      }, current.projectSaveHandleMeta, current);
-      return updateOpenProjectTabSaveBinding(normalizedTabId, {
-        projectSaveHandle: handle,
-        projectSaveHandleMeta: normalizedMeta,
-        projectSaveHandleState: 'bound',
-        lastSavedAdapterId: normalizedMeta?.adapterId || current?.lastSavedStorageAdapterId || null,
-      }, options);
-    }
-
-    function bindActiveProjectSaveHandle(handle, meta = null, options = {}) {
-      return bindOpenProjectTabSaveHandle(getActiveOpenProjectTabId?.() || '', handle, meta, options);
-    }
-
-    function clearOpenProjectTabSaveHandle(tabId, reason = '', options = {}) {
-      const normalizedTabId = typeof tabId === 'string' ? tabId.trim() : '';
-      if (!normalizedTabId) {
-        return null;
-      }
-      const index = findOpenProjectTabIndex(normalizedTabId);
-      if (index < 0 || !openProjectTabs[index]) {
-        return null;
-      }
-      const current = openProjectTabs[index];
-      const nextMeta = options?.preserveMeta === true
-        ? normalizeBindingMeta(current.projectSaveHandleMeta, current.projectSaveHandleMeta, current)
-        : null;
-      return updateOpenProjectTabSaveBinding(normalizedTabId, {
-        projectSaveHandle: null,
-        projectSaveHandleMeta: nextMeta,
-        projectSaveHandleState: 'none',
-      }, {
-        ...options,
-        log: options?.log !== false,
-      });
-    }
-
-    function clearActiveProjectSaveHandle(reason = '', options = {}) {
-      return clearOpenProjectTabSaveHandle(getActiveOpenProjectTabId?.() || '', reason, options);
-    }
-
-    function markOpenProjectTabSaveHandleUnavailable(tabId, reason = '', options = {}) {
-      const normalizedTabId = typeof tabId === 'string' ? tabId.trim() : '';
-      if (!normalizedTabId) {
-        return null;
-      }
-      const index = findOpenProjectTabIndex(normalizedTabId);
-      if (index < 0 || !openProjectTabs[index]) {
-        return null;
-      }
-      const current = openProjectTabs[index];
-      const currentBinding = getProjectSaveBindingFromTab(current);
-      const nextMeta = normalizeBindingMeta({
-        ...(currentBinding.projectSaveHandleMeta || {}),
-        permissionState: currentBinding.projectSaveHandleMeta?.permissionState || 'unknown',
-      }, currentBinding.projectSaveHandleMeta, current);
-      return updateOpenProjectTabSaveBinding(normalizedTabId, {
-        projectSaveHandle: null,
-        projectSaveHandleMeta: nextMeta,
-        projectSaveHandleState: 'unavailable',
-      }, options);
-    }
-
-    function markActiveProjectSaveHandleUnavailable(reason = '', options = {}) {
-      return markOpenProjectTabSaveHandleUnavailable(getActiveOpenProjectTabId?.() || '', reason, options);
-    }
-
     function ensureOpenProjectTabsInitialized() {
       const activeOpenProjectTabId = getActiveOpenProjectTabId?.() || '';
       const suppressOpenProjectTabAutoInitialize = Boolean(getSuppressOpenProjectTabAutoInitialize?.());
@@ -437,9 +164,6 @@
         sourceKind: options.sourceKind,
         sourceProjectToken: options.sourceProjectToken,
         lastSavedStorageAdapterId: options.lastSavedStorageAdapterId,
-        projectSaveHandleState: options.projectSaveHandleState,
-        projectSaveHandle: options.projectSaveHandle,
-        projectSaveHandleMeta: options.projectSaveHandleMeta,
         canonicalPayloadFormat: options.canonicalPayloadFormat,
         canonicalSchemaVersion: options.canonicalSchemaVersion,
         canonicalSourceMetadata: options.canonicalSourceMetadata,
@@ -502,15 +226,6 @@
         lastSavedStorageAdapterId: Object.prototype.hasOwnProperty.call(options, 'lastSavedStorageAdapterId')
           ? options.lastSavedStorageAdapterId
           : current?.lastSavedStorageAdapterId,
-        projectSaveHandleState: Object.prototype.hasOwnProperty.call(options, 'projectSaveHandleState')
-          ? options.projectSaveHandleState
-          : current?.projectSaveHandleState,
-        projectSaveHandle: Object.prototype.hasOwnProperty.call(options, 'projectSaveHandle')
-          ? options.projectSaveHandle
-          : current?.projectSaveHandle,
-        projectSaveHandleMeta: Object.prototype.hasOwnProperty.call(options, 'projectSaveHandleMeta')
-          ? options.projectSaveHandleMeta
-          : current?.projectSaveHandleMeta,
         canonicalPayloadFormat: Object.prototype.hasOwnProperty.call(options, 'canonicalPayloadFormat')
           ? options.canonicalPayloadFormat
           : current?.canonicalPayloadFormat,
@@ -601,16 +316,12 @@
             sharedRoleHint: current?.sharedRoleHint || '',
             sharedAutoJoin: current?.sharedAutoJoin !== false,
             qrEditPayload: current?.qrEditPayload,
-            projectSaveHandle: current?.projectSaveHandle,
-            projectSaveHandleMeta: current?.projectSaveHandleMeta,
           })
           : createLocalOpenProjectTabFromCurrentState(current, {
             tabId: current?.id || activeOpenProjectTabId,
             source: current?.source || 'working',
             projectId: currentProjectId,
             qrEditPayload: current?.qrEditPayload,
-            projectSaveHandle: current?.projectSaveHandle,
-            projectSaveHandleMeta: current?.projectSaveHandleMeta,
           }));
       // createLocalOpenProjectTabFromCurrentState already creates the resident
       // payload.  Rebuilding it here created a second full history snapshot on
@@ -653,9 +364,6 @@
         sourceKind: options.sourceKind,
         sourceProjectToken: options.sourceProjectToken,
         lastSavedStorageAdapterId: options.lastSavedStorageAdapterId,
-        projectSaveHandleState: options.projectSaveHandleState,
-        projectSaveHandle: options.projectSaveHandle,
-        projectSaveHandleMeta: options.projectSaveHandleMeta,
         canonicalPayloadFormat: options.canonicalPayloadFormat,
         canonicalSchemaVersion: options.canonicalSchemaVersion,
         canonicalSourceMetadata: options.canonicalSourceMetadata,
@@ -702,14 +410,6 @@
       revealActiveProjectAfterOpen,
       appendOpenProjectTabFromCurrentState,
       replaceActiveOpenProjectTabFromCurrentState,
-      getProjectSaveBindingFromTab,
-      getActiveProjectSaveBinding,
-      bindOpenProjectTabSaveHandle,
-      bindActiveProjectSaveHandle,
-      clearOpenProjectTabSaveHandle,
-      clearActiveProjectSaveHandle,
-      markOpenProjectTabSaveHandleUnavailable,
-      markActiveProjectSaveHandleUnavailable,
       canReuseActiveOpenProjectTabForRecentEntry,
       persistActiveOpenProjectTab,
       resetOpenProjectTabsToCurrentProject,

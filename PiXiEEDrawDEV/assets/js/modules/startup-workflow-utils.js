@@ -102,17 +102,14 @@
     detectHorizontalOverflow();
   }
 
-  function openNewProjectDialog({ dismissStartup = false, appendAsTab = false, createShared = false } = {}) {
+  function openNewProjectDialog({ dismissStartup = false, createShared = false } = {}) {
     if (!ensureCurrentClientCanReplaceActiveProject()) {
       return;
     }
     const requestedSharedCreate = SHARED_PROJECTS_ENABLED && Boolean(createShared);
     const config = dom.newProject;
     if (!config) {
-      void promptNewProjectFallback({
-        appendAsTab: Boolean(appendAsTab),
-        createShared: requestedSharedCreate,
-      });
+      void promptNewProjectFallback({ createShared: requestedSharedCreate });
       return;
     }
     const dialog = config.dialog;
@@ -140,7 +137,6 @@
         }
         syncNewProjectCreateModeButtons(requestedSharedCreate ? 'shared' : 'local');
         pendingNewProjectCreateShared = requestedSharedCreate;
-        pendingNewProjectAppendAsTab = Boolean(appendAsTab) && !pendingNewProjectCreateShared;
         syncNewProjectDialogModeText();
         dialog.showModal();
         if (dismissStartup) {
@@ -156,16 +152,12 @@
         console.warn('Failed to open new project dialog', error);
       }
     }
-    pendingNewProjectAppendAsTab = false;
     pendingNewProjectCreateShared = false;
     syncNewProjectDialogModeText();
     if (dismissStartup) {
       hideStartupScreen();
     }
-    void promptNewProjectFallback({
-      appendAsTab: Boolean(appendAsTab),
-      createShared: requestedSharedCreate,
-    });
+    void promptNewProjectFallback({ createShared: requestedSharedCreate });
   }
 
   function queueNewProjectAdRender() {
@@ -240,7 +232,6 @@
 
   function closeNewProjectDialog() {
     setNewProjectPalettePresetPickerOpen(false);
-    pendingNewProjectAppendAsTab = false;
     pendingNewProjectCreateShared = false;
     syncNewProjectDialogModeText();
     const dialog = dom.newProject?.dialog;
@@ -657,7 +648,7 @@
     promptExportDirectory = false,
   } = {}) {
     clearSharedProjectCreationFailureReason();
-    const localCreated = await createNewProjectAsTab({
+    const localCreated = await createNewProject({
       name,
       width,
       height,
@@ -732,7 +723,6 @@
         selectedCreateMode === 'shared'
         || Boolean(pendingNewProjectCreateShared)
       );
-      const shouldAppendAsTab = Boolean(pendingNewProjectAppendAsTab);
       let created = false;
       let createdLocalProject = false;
       let sharedCreationFailure = null;
@@ -753,14 +743,6 @@
             localCreated: createdLocalProject,
           };
         }
-      } else if (shouldAppendAsTab) {
-        created = await createNewProjectAsTab({
-          name,
-          width,
-          height,
-          palettePreset: palettePresetValue,
-          promptExportDirectory: false,
-        });
       } else {
         console.info('[pixiedraw-dev:new-project]', { phase: 'new-project-candidate-built' });
         console.info('[pixiedraw-dev:new-project]', { phase: 'new-project-commit-start' });
@@ -810,7 +792,7 @@
     }
   }
 
-  async function promptNewProjectFallback({ appendAsTab = false, createShared = false } = {}) {
+  async function promptNewProjectFallback({ createShared = false } = {}) {
     if (!ensureCurrentClientCanReplaceActiveProject()) {
       return;
     }
@@ -841,13 +823,6 @@
           localCreated: createdLocalProject,
         };
       }
-    } else if (appendAsTab) {
-      created = await createNewProjectAsTab({
-        name,
-        width,
-        height,
-        promptExportDirectory: false,
-      });
     } else {
       created = await createNewProject({
         name,
@@ -866,45 +841,11 @@
     }
   }
 
-  async function ensureExportDirectoryForNewProject() {
-    if (!EXPORT_DIRECTORY_SUPPORTED || exportDirectoryHandle) {
-      return;
-    }
-    if (pendingExportDirectoryHandle) {
-      const restored = await attemptExportDirectoryReauthorization();
-      if (restored || exportDirectoryHandle) {
-        return;
-      }
-    }
-    if (typeof window.showDirectoryPicker !== 'function') {
-      return;
-    }
-    exportDirectorySetupDismissed = false;
-    updateExportFolderStatus(
-      localizeText(
-        '新規作成: 画像/GIFの保存先フォルダを選択してください',
-        'New project: choose a folder for image/GIF exports'
-      ),
-      'info'
-    );
-    const bound = await requestExportDirectoryBinding();
-    if (!bound && !exportDirectoryHandle) {
-      updateExportFolderStatus(
-        localizeText(
-          '新規作成: 保存先フォルダは未設定のまま続行します（保存時に選択可能）',
-          'New project: continuing without a fixed export folder (you can choose on each save)'
-        ),
-        'warn'
-      );
-    }
-  }
-
   async function createNewProject({
     name,
     width,
     height,
     palettePreset = newProjectPalettePresetId,
-    promptExportDirectory = false,
     ensureTab = true,
   }) {
     if (!ensureCurrentClientCanReplaceActiveProject()) {
@@ -914,13 +855,6 @@
     const heightNumber = lockedCanvasHeight !== null ? lockedCanvasHeight : Number(height);
     if (!Number.isFinite(widthNumber) || !Number.isFinite(heightNumber)) {
       return false;
-    }
-    if (promptExportDirectory) {
-      try {
-        await ensureExportDirectoryForNewProject();
-      } catch (error) {
-        console.warn('Failed to prepare export directory during new project creation', error);
-      }
     }
     if (ensureTab) {
       const closedCurrentProject = await closeAllOpenProjectTabsForProjectReplacement({ flushAutosave: true, showHome: false });
@@ -968,26 +902,7 @@
     setTrackedProjectDotBaseline(snapshot, null);
     resetOpenedDocumentViewport({ defer: true });
 
-    autosaveHandle = null;
-    pendingAutosaveHandle = null;
-    clearPendingPermissionListener();
     setActiveAutosaveProjectId(createAutosaveProjectId());
-    let workspaceProjectHandle = null;
-    if (window.PiXiEEDWorkspace) {
-      try {
-        workspaceProjectHandle = await window.PiXiEEDWorkspace.createProjectFileHandle(
-          state.documentName || name || DEFAULT_DOCUMENT_NAME,
-          { requestPermission: false }
-        );
-        if (workspaceProjectHandle) {
-          autosaveHandle = workspaceProjectHandle;
-          await storeAutosaveHandle?.(workspaceProjectHandle);
-        }
-      } catch (error) {
-        console.warn('Failed to create project file in PiXiEED workspace', error);
-        workspaceProjectHandle = null;
-      }
-    }
     clearActiveLocalProjectJournal?.();
     clearActiveSharedProjectSession();
     storeMultiProjectKey('');
@@ -1009,7 +924,10 @@
       }
     }
     if (savedImmediately) {
-      updateAutosaveStatus('自動保存: 新規プロジェクトを端末内に保存しました', 'success');
+      updateAutosaveStatus(
+        localizeText('自動保存: 新規プロジェクトを端末内V2へ保存しました', 'Autosave: saved the new project to on-device V2 storage'),
+        'success'
+      );
     } else if (AUTOSAVE_SUPPORTED) {
       scheduleAutosaveSnapshot();
       updateAutosaveStatus('自動保存: 新規プロジェクトの即時保存に失敗したため再試行します', 'warn');
@@ -1022,26 +940,8 @@
         projectId: autosaveProjectId,
         sourceStorageAdapterId: null,
         sourceKind: 'new',
-        lastSavedStorageAdapterId: workspaceProjectHandle ? 'pixieedraw-v2-zip' : null,
-        projectSaveHandleState: workspaceProjectHandle ? 'bound' : 'none',
-        projectSaveHandle: workspaceProjectHandle,
-        projectSaveHandleMeta: workspaceProjectHandle ? {
-          fileName: workspaceProjectHandle.name || state.documentName || DEFAULT_DOCUMENT_NAME,
-          handleKind: 'workspace-project-file',
-          permissionState: 'granted',
-          adapterId: 'pixieedraw-v2-zip',
-          boundAt: new Date().toISOString(),
-        } : null,
+        lastSavedStorageAdapterId: null,
       });
-      if (workspaceProjectHandle) {
-        bindActiveProjectSaveHandle?.(workspaceProjectHandle, {
-          fileName: workspaceProjectHandle.name || state.documentName || DEFAULT_DOCUMENT_NAME,
-          handleKind: 'workspace-project-file',
-          permissionState: 'granted',
-          adapterId: 'pixieedraw-v2-zip',
-          boundAt: new Date().toISOString(),
-        }, { log: true });
-      }
     }
     scheduleSessionPersist();
     return true;
@@ -1127,10 +1027,8 @@
     }
   }
 
-  function normalizeStartupScreenMode(mode) {
-    return mode === STARTUP_SCREEN_MODE_APPEND_TAB
-      ? STARTUP_SCREEN_MODE_APPEND_TAB
-      : STARTUP_SCREEN_MODE_DEFAULT;
+  function normalizeStartupScreenMode() {
+    return STARTUP_SCREEN_MODE_DEFAULT;
   }
 
   function setStartupScreenMode(mode) {
@@ -1141,19 +1039,21 @@
     }
   }
 
-  function isStartupScreenAppendTabMode() {
-    return startupScreenMode === STARTUP_SCREEN_MODE_APPEND_TAB;
-  }
-
   function showStartupScreen(options = {}) {
     const container = dom.startup?.screen;
     if (!container) {
       return;
     }
+    const refreshWorkspace = options?.refreshWorkspace !== false;
     hideProjectHomeScreen();
     const nextMode = normalizeStartupScreenMode(options?.mode);
     setStartupScreenMode(nextMode);
     if (startupVisible) {
+      if (refreshWorkspace) {
+        void refreshStartupWorkspaceProjects({ requestPermission: false }).catch(error => {
+          console.warn('[PiXiEED workspace] project list refresh failed', error);
+        });
+      }
       return;
     }
     startupVirtualCursorState = state.showVirtualCursor;
@@ -1164,6 +1064,11 @@
     container.hidden = false;
     container.setAttribute('aria-hidden', 'false');
     document.body.classList.add('is-startup-active');
+    if (refreshWorkspace) {
+      void refreshStartupWorkspaceProjects({ requestPermission: false }).catch(error => {
+        console.warn('[PiXiEED workspace] project list refresh failed', error);
+      });
+    }
     window.requestAnimationFrame(() => {
       container.focus?.({ preventScroll: true });
       const startupTargets = [
@@ -1322,7 +1227,7 @@
     }
     screen.dataset.bound = 'true';
     dom.projectHomeNew?.addEventListener('click', () => {
-      openNewProjectDialog({ dismissStartup: false, appendAsTab: false });
+      openNewProjectDialog({ dismissStartup: false });
     });
     dom.projectHomeOpen?.addEventListener('click', async () => {
       const opened = await openDocumentDialog({ mode: EXTERNAL_IMPORT_MODE_NEW_PROJECT });
@@ -1650,9 +1555,7 @@
   }
 
   let startupWorkspaceEntries = [];
-  let startupWorkspaceRenderGeneration = 0;
   let startupWorkspaceMigrationPrompted = false;
-  let startupWorkspaceMigrationPromise = null;
 
   function setStartupWorkspaceStatus(message, tone = 'info') {
     const node = dom.startup?.workspaceStatus;
@@ -1665,26 +1568,32 @@
     }
   }
 
-  function formatWorkspaceProjectSize(bytes) {
-    const value = Math.max(0, Number(bytes) || 0);
-    if (value < 1024) return `${value} B`;
-    if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
-    return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+  function buildDeviceLocalWorkspaceEntries(entries = []) {
+    return (Array.isArray(entries) ? entries : [])
+      .filter(entry => entry?.id && !isSharedRecentProjectEntry(entry))
+      .map(entry => ({
+        ...entry,
+        name: entry.fileName || entry.name || DEFAULT_DOCUMENT_NAME,
+        deviceLocalProject: true,
+        lastModified: Number.isFinite(Date.parse(entry.updatedAt || ''))
+          ? Date.parse(entry.updatedAt)
+          : 0,
+      }));
+  }
+
+  async function loadDeviceLocalWorkspaceEntries() {
+    return buildDeviceLocalWorkspaceEntries(await loadRecentProjectsMetadata());
   }
 
   function renderStartupWorkspaceProjects(entries = []) {
     const list = dom.startup?.workspaceProjectList;
     if (!(list instanceof HTMLElement)) return;
     startupWorkspaceEntries = Array.isArray(entries) ? entries.slice() : [];
-    const renderGeneration = ++startupWorkspaceRenderGeneration;
     list.replaceChildren();
     if (!startupWorkspaceEntries.length) {
       const empty = document.createElement('p');
       empty.className = 'startup-workspace__empty';
-      empty.textContent = localizeText(
-        'PiXiEEDフォルダ内に .pixieedraw プロジェクトがありません。',
-        'No .pixieedraw projects were found in the PiXiEED folder.'
-      );
+      empty.textContent = localizeText('保存済みプロジェクトはありません。', 'No saved projects were found.');
       list.appendChild(empty);
       return;
     }
@@ -1694,7 +1603,7 @@
       button.className = 'startup-workspace__project';
       button.dataset.workspaceProjectIndex = String(index);
       button.setAttribute('role', 'listitem');
-      if (entry?.migrationRecovery !== true && Number(entry?.size) === 0) {
+      if (entry?.deviceLocalProject !== true && entry?.migrationRecovery !== true && Number(entry?.size) === 0) {
         button.title = localizeText(
           'このファイルは0バイトのため開けません。端末内の元データが残っている場合は「V2移行待ち」のカードから復旧してください。ファイルは自動削除しません。',
           'This file is empty and cannot be opened. If the original on-device data remains, recover it from the "Awaiting V2 migration" card. The file will not be deleted automatically.'
@@ -1713,7 +1622,9 @@
       placeholder.className = 'startup-workspace__project-thumbnail-placeholder';
       placeholder.textContent = 'PXD';
       thumbnail.appendChild(placeholder);
-      if (entry?.migrationRecovery === true && typeof entry?.thumbnail === 'string' && entry.thumbnail) {
+      if ((entry?.migrationRecovery === true || entry?.deviceLocalProject === true)
+        && typeof entry?.thumbnail === 'string'
+        && entry.thumbnail) {
         const image = new Image();
         image.src = entry.thumbnail;
         image.alt = localizeText('端末内プロジェクトのサムネイル', 'Local project thumbnail');
@@ -1727,207 +1638,36 @@
       name.textContent = entry?.name || DEFAULT_DOCUMENT_NAME;
       const meta = document.createElement('span');
       meta.className = 'startup-workspace__project-meta';
-      const modified = entry?.migrationRecovery === true && typeof entry?.updatedAt === 'string'
+      const modified = (entry?.migrationRecovery === true || entry?.deviceLocalProject === true)
+        && typeof entry?.updatedAt === 'string'
         ? new Date(entry.updatedAt).toLocaleString()
         : (Number(entry?.lastModified) > 0
             ? new Date(Number(entry.lastModified)).toLocaleString()
             : localizeText('更新日時不明', 'Unknown date'));
       meta.textContent = entry?.migrationRecovery === true
         ? `${modified} / ${localizeText('端末内・V2移行待ち', 'On device · awaiting V2 migration')}`
-        : `${modified} / ${formatWorkspaceProjectSize(entry?.size)}`;
+        : entry?.deviceLocalProject === true
+          ? `${modified} / ${localizeText('端末内保存', 'On-device storage')}`
+          : modified;
       const certification = document.createElement('span');
-      certification.className = 'startup-workspace__project-certification is-checking';
-      certification.dataset.workspaceProjectCertification = String(index);
+      certification.className = entry?.migrationRecovery === true
+        ? 'startup-workspace__project-certification is-recovery'
+        : 'startup-workspace__project-certification is-local';
       certification.textContent = entry?.migrationRecovery === true
         ? localizeText('復旧して開く', 'Open for recovery')
-        : localizeText('確認中', 'Checking');
+        : (Number(entry?.autosaveSchemaVersion) === 2
+            ? localizeText('端末内V2', 'On-device V2')
+            : localizeText('端末内プロジェクト', 'On-device project'));
       certification.setAttribute('aria-label', entry?.migrationRecovery === true
         ? localizeText('端末内の元データを保持しています。開いて復旧できます。', 'The original on-device data is retained and can be opened for recovery.')
-        : localizeText('PiXiEED公認状態を確認中', 'Checking PiXiEED certification'));
-      if (entry?.migrationRecovery === true) {
-        certification.className = 'startup-workspace__project-certification is-recovery';
-      }
+        : localizeText(
+          'このブラウザの端末内保存から開けます。完全ファイルは手動保存できます。',
+          'This project can be opened from on-device storage. Save a complete file manually when needed.'
+        ));
       details.append(name, meta, certification);
       button.append(thumbnail, details);
       list.appendChild(button);
     });
-    void hydrateStartupWorkspaceProjectCards(startupWorkspaceEntries, renderGeneration);
-  }
-
-  function resolveWorkspaceProjectCertification(adapterId, manifest = null, packaged = null) {
-    const originality = packaged?.canonicalSourceMetadata?.projectOriginality || null;
-    const integrity = packaged?.session?.projectExportIntegrity || null;
-    const summary = manifest?.certification && typeof manifest.certification === 'object'
-      ? manifest.certification
-      : {
-          nativeCreated: originality?.saleEligibility === 'eligible'
-            && originality?.createdWith === 'pixieedraw-native'
-            && originality?.externalInputDetected !== true,
-          externalInputDetected: originality?.externalInputDetected === true,
-          completeProjectSave: integrity?.completeProjectSave === true,
-          timelapseSynchronized: integrity?.timelapseSynchronized === true,
-          saleCandidateDataComplete: integrity?.saleCandidateDataComplete === true,
-        };
-    const official = adapterId === 'pixieedraw-v2-zip'
-      && summary.nativeCreated === true
-      && summary.externalInputDetected !== true
-      && summary.completeProjectSave === true
-      && summary.timelapseSynchronized === true
-      && summary.saleCandidateDataComplete === true;
-    if (official) {
-      return {
-        state: 'official',
-        label: localizeText('✓ PiXiEED公認', '✓ PiXiEED Certified'),
-        description: localizeText(
-          'PiXiEED内で新規作成され、外部入力なし・完全V2保存・タイムラプス同期済みです。',
-          'Created in PiXiEED with no external input, complete V2 save, and synchronized timelapse.'
-        ),
-      };
-    }
-    if (summary.externalInputDetected === true) {
-      return {
-        state: 'external',
-        label: localizeText('外部入力あり', 'External Input'),
-        description: localizeText('外部画像・GIF・他形式由来のため、PiXiEED公認対象外です。', 'Not PiXiEED certified because external input was detected.'),
-      };
-    }
-    return {
-      state: 'unverified',
-      label: localizeText('未認証', 'Unverified'),
-      description: localizeText('公認に必要な制作元・完全保存・タイムラプス情報を確認できません。', 'Required origin, complete-save, or timelapse data could not be verified.'),
-    };
-  }
-
-  async function inspectStartupWorkspaceProject(entry) {
-    const file = entry?.file || (typeof entry?.handle?.getFile === 'function' ? await entry.handle.getFile() : null);
-    if (!file) throw new Error('Workspace project file is unavailable');
-    if (Number(file.size) === 0) {
-      return {
-        thumbnail: '',
-        emptyFile: true,
-        certification: {
-          state: 'invalid',
-          label: localizeText('空ファイル', 'Empty File'),
-          description: localizeText(
-            '0バイトのためプロジェクトデータを読み取れません。端末内の元データは自動削除されません。',
-            'No project data can be read because the file is empty. Original on-device data is not deleted automatically.'
-          ),
-        },
-      };
-    }
-    let adapterId = '';
-    let manifest = null;
-    if (typeof readProjectStorageManifestFromBlob === 'function') {
-      const manifestResult = await readProjectStorageManifestFromBlob(file, { fileName: file.name || entry?.name || '' });
-      adapterId = manifestResult?.adapterId || '';
-      manifest = manifestResult?.manifest || null;
-    }
-    let packaged = null;
-    let thumbnail = typeof manifest?.previewThumbnail === 'string' ? manifest.previewThumbnail : '';
-    const needsPackagedInspection = !manifest?.certification || !thumbnail;
-    if (needsPackagedInspection && typeof parseProjectStorageBlob === 'function') {
-      const parsedResult = await parseProjectStorageBlob(file, { fileName: file.name || entry?.name || '' });
-      adapterId = parsedResult?.adapterId || adapterId;
-      packaged = parsedResult?.parsed && typeof parsedResult.parsed === 'object' ? parsedResult.parsed : null;
-      thumbnail = thumbnail || (typeof packaged?.previewThumbnail === 'string' ? packaged.previewThumbnail : '');
-      if (!thumbnail && packaged && typeof snapshotFromParsedDocumentValue === 'function' && typeof generateSnapshotThumbnail === 'function') {
-        const snapshot = snapshotFromParsedDocumentValue(packaged)?.snapshot || null;
-        if (snapshot) thumbnail = await generateSnapshotThumbnail(snapshot) || '';
-      }
-    }
-    return {
-      thumbnail,
-      certification: resolveWorkspaceProjectCertification(adapterId, manifest, packaged),
-    };
-  }
-
-  function updateStartupWorkspaceProjectCard(index, inspection, renderGeneration) {
-    if (renderGeneration !== startupWorkspaceRenderGeneration) return;
-    const list = dom.startup?.workspaceProjectList;
-    if (!(list instanceof HTMLElement)) return;
-    const thumbnail = list.querySelector(`[data-workspace-project-thumbnail="${index}"]`);
-    if (thumbnail instanceof HTMLElement && inspection?.thumbnail) {
-      const image = new Image();
-      image.src = inspection.thumbnail;
-      image.alt = localizeText('プロジェクトのサムネイル', 'Project thumbnail');
-      image.decoding = 'async';
-      thumbnail.replaceChildren(image);
-    }
-    const badge = list.querySelector(`[data-workspace-project-certification="${index}"]`);
-    if (badge instanceof HTMLElement) {
-      const certificationState = inspection?.certification?.state || 'unverified';
-      const certificationLabel = inspection?.certification?.label || localizeText('未認証', 'Unverified');
-      badge.className = `startup-workspace__project-certification is-${certificationState}`;
-      badge.replaceChildren();
-      if (certificationState === 'official') {
-        const mark = new Image();
-        mark.className = 'startup-workspace__project-certification-mark';
-        mark.src = '../PiXiEEDEndorsed.png';
-        mark.alt = '';
-        mark.decoding = 'async';
-        badge.appendChild(mark);
-      }
-      const label = document.createElement('span');
-      label.textContent = certificationLabel;
-      badge.appendChild(label);
-      badge.title = inspection?.certification?.description || '';
-      badge.setAttribute('aria-label', `${certificationLabel}: ${badge.title}`);
-    }
-  }
-
-  async function hydrateStartupWorkspaceProjectCards(entries, renderGeneration) {
-    for (let index = 0; index < entries.length; index += 1) {
-      if (renderGeneration !== startupWorkspaceRenderGeneration) return;
-      if (entries[index]?.migrationRecovery === true) continue;
-      try {
-        const inspection = await inspectStartupWorkspaceProject(entries[index]);
-        updateStartupWorkspaceProjectCard(index, inspection, renderGeneration);
-      } catch (error) {
-        console.warn('[PiXiEED workspace] project card inspection failed', { name: entries[index]?.name || '', error });
-        updateStartupWorkspaceProjectCard(index, {
-          thumbnail: '',
-          certification: resolveWorkspaceProjectCertification('', null, null),
-        }, renderGeneration);
-      }
-      await new Promise(resolve => window.setTimeout(resolve, 0));
-    }
-  }
-
-  function getLegacyPackagedProjectCollections(packaged = null) {
-    const sheets = Array.isArray(packaged?.sheets)
-      ? packaged.sheets.filter(sheet => sheet?.project && typeof sheet.project === 'object')
-      : [];
-    const canvases = Array.isArray(packaged?.document?.canvases)
-      ? packaged.document.canvases.filter(canvas => canvas && typeof canvas === 'object')
-      : [];
-    const sheetHasMultipleCanvases = sheets.some(sheet => (
-      Array.isArray(sheet?.project?.document?.canvases)
-      && sheet.project.document.canvases.filter(canvas => canvas && typeof canvas === 'object').length > 1
-    ));
-    return {
-      sheets,
-      canvases,
-      needsSplit: sheets.length > 1 || canvases.length > 1 || sheetHasMultipleCanvases,
-    };
-  }
-
-  async function splitLegacyWorkspaceMigrationEntry(entry, packaged) {
-    const collections = getLegacyPackagedProjectCollections(packaged);
-    if (!collections.needsSplit || typeof migrateLegacyMultiProjectPackage !== 'function') {
-      return false;
-    }
-    const result = await migrateLegacyMultiProjectPackage({
-      sourceProjectId: entry?.id || '',
-      sheets: collections.sheets,
-      activeSheetId: packaged?.activeSheetId || '',
-      sourceProject: packaged,
-      canvases: collections.canvases,
-      activeCanvasId: packaged?.document?.activeCanvasId || '',
-    });
-    if (result?.migrated === true || result?.reason === 'already-migrated') {
-      return true;
-    }
-    throw new Error(`Legacy project split failed (${result?.reason || 'unknown'})`);
   }
 
   function mergePersistedTimelapseIntoSession(session, persistedByCanvas, canvasIds = []) {
@@ -2009,323 +1749,83 @@
     return packaged;
   }
 
-  async function writePackagedProjectToWorkspace(workspace, entry, packaged) {
-    if (typeof serializeProjectStorageSnapshot !== 'function') {
-      throw new Error('V2 project serializer is unavailable');
+  async function refreshStartupWorkspaceProjects() {
+    let migration = { migrated: 0, created: 0, failed: 0, declined: false, failedEntries: [] };
+    if (!startupWorkspaceMigrationPrompted && typeof migrateLegacyLocalProjectsToTrueV2 === 'function') {
+      migration = await migrateLegacyLocalProjectsToTrueV2({
+        confirmMigration: ({ count, candidates }) => {
+          startupWorkspaceMigrationPrompted = true;
+          const hasSplit = Array.isArray(candidates) && candidates.some(candidate => candidate?.needsSplit === true);
+          return window.confirm(localizeText(
+            `端末内にV1・旧V2プロジェクトが${count}件あります。\n\n真V2の単一プロジェクトへ変換します。${hasSplit ? '\n複数タブ・複数キャンバスは、それぞれ独立した真V2プロジェクトへ分割します。' : ''}\n変換先を端末内へ完全保存できた後だけ、元のV1・旧V2データを削除します。\n変換中は画面を閉じないでください。\n\n変換を開始しますか？`,
+            `${count} V1 or legacy V2 on-device project(s) were found.\n\nThey will be converted to true V2 single projects.${hasSplit ? '\nMultiple tabs and canvases will be split into independent true V2 projects.' : ''}\nThe original V1/legacy V2 data is deleted only after its on-device true V2 replacement is fully committed.\nKeep this page open during conversion.\n\nStart conversion?`
+          ));
+        },
+        preparePackaged: async (entry, packaged) => await mergeFileBackedTimelapseIntoPackaged(entry, packaged),
+        onProgress: ({ index, total }) => {
+          setStartupWorkspaceStatus(localizeText(
+            `端末内プロジェクトを真V2へ変換しています… ${index}/${total}`,
+            `Converting on-device projects to true V2... ${index}/${total}`
+          ));
+        },
+      });
     }
-    const fileName = normalizeDocumentName(
-      entry?.fileName
-      || entry?.name
-      || packaged?.document?.documentName
-      || DEFAULT_DOCUMENT_NAME
-    );
-    let previewThumbnail = '';
-    if (typeof snapshotFromParsedDocumentValue === 'function' && typeof generateSnapshotThumbnail === 'function') {
-      try {
-        const snapshot = snapshotFromParsedDocumentValue(packaged)?.snapshot || null;
-        if (snapshot) previewThumbnail = await generateSnapshotThumbnail(snapshot) || '';
-      } catch (error) {
-        console.warn('[PiXiEED workspace] legacy thumbnail generation skipped', { projectId: entry?.id || '', error });
-      }
-    }
-    const serialized = await serializeProjectStorageSnapshot({
-      packaged,
-      thumbnail: previewThumbnail,
-    }, {
-      fileNameBase: fileName,
-      includeSheets: false,
-      includeTimelapse: true,
-      useWorker: true,
-      preferredAdapterId: 'pixieedraw-v2-zip',
-    });
-    if (!(serialized?.blob instanceof Blob)) {
-      throw new Error('V2 project serializer did not return a file');
-    }
-    const fileHandle = await workspace.createProjectFileHandle(fileName, { requestPermission: false });
-    if (!fileHandle || typeof fileHandle.createWritable !== 'function') {
-      throw new Error('Workspace project file could not be created');
-    }
-    try {
-      const writable = await fileHandle.createWritable();
-      try {
-        await writable.write(serialized.blob);
-        await writable.close();
-      } catch (error) {
-        try { await writable.abort?.(); } catch (_abortError) {}
-        throw error;
-      }
-    } catch (error) {
-      await workspace.removeProjectFile?.(fileHandle.name, { requestPermission: false });
-      throw error;
-    }
-    return fileHandle.name || fileName;
-  }
-
-  function filterFilelessLocalProjects(entries, workspaceEntries = []) {
-    const existingFileNames = new Set(
-      (Array.isArray(workspaceEntries) ? workspaceEntries : [])
-        .map(entry => String(entry?.name || '').trim().toLowerCase())
-        .filter(Boolean)
-    );
-    return (Array.isArray(entries) ? entries : []).filter(entry => {
-      if (!entry || !entry.id || isSharedRecentProjectEntry(entry)) return false;
-      if (String(entry.workspaceFileName || '').trim()) return false;
-      const fileName = normalizeDocumentName(entry.fileName || entry.name || DEFAULT_DOCUMENT_NAME).toLowerCase();
-      return !existingFileNames.has(fileName);
-    });
-  }
-
-  function classifyWorkspaceMigrationError(error) {
-    const explicitCode = typeof error?.code === 'string' ? error.code.trim() : '';
-    if (explicitCode) return explicitCode;
-    const message = String(error?.message || error || '');
-    if (/payload is unavailable/i.test(message)) return 'ERR_LEGACY_PAYLOAD_UNAVAILABLE';
-    if (/serializer is unavailable|serializer did not return/i.test(message)) return 'ERR_V2_SERIALIZER_UNAVAILABLE';
-    if (/file could not be created/i.test(message)) return 'ERR_WORKSPACE_FILE_CREATE_FAILED';
-    if (/could not be removed/i.test(message)) return 'ERR_LEGACY_CLEANUP_FAILED';
-    if (/still contains multiple projects/i.test(message)) return 'ERR_LEGACY_SPLIT_INCOMPLETE';
-    const errorName = typeof error?.name === 'string' ? error.name.trim() : '';
-    return errorName && errorName !== 'Error' ? errorName : 'ERR_V2_MIGRATION_FAILED';
-  }
-
-  async function migrateFilelessLocalProjectsToWorkspace(workspace, workspaceEntries = []) {
-    if (startupWorkspaceMigrationPromise) return await startupWorkspaceMigrationPromise;
-    startupWorkspaceMigrationPromise = (async () => {
-      let entries = filterFilelessLocalProjects(await loadRecentProjectsMetadata(), workspaceEntries);
-      if (!entries.length) {
-        return { migrated: 0, failed: 0, declined: false, failedEntries: [] };
-      }
-      if (startupWorkspaceMigrationPrompted) {
-        return {
-          migrated: 0,
-          failed: entries.length,
-          declined: false,
-          failedEntries: entries.map(entry => ({
-            entry,
-            code: 'ERR_V2_MIGRATION_RETRY_REQUIRED',
-            message: 'Reload to retry V2 migration',
-          })),
-        };
-      }
-      startupWorkspaceMigrationPrompted = true;
-      const accepted = window.confirm(localizeText(
-        `端末内だけに保存されている旧プロジェクトが${entries.length}件あります。\n\n単一プロジェクト形式のV2へ変換して、PiXiEED/Projectsに実ファイルとして保存します。複数タブ・複数キャンバスは、それぞれ独立したV2ファイルへ分割します。元の端末内データは、対応するV2ファイルの保存に成功した後だけ削除します。\n\n変換を開始しますか？`,
-        `${entries.length} legacy project(s) are stored only on this device.\n\nThey will be converted to single-project V2 files in PiXiEED/Projects. Multiple tabs and canvases will be split into separate V2 files. Original device data is removed only after its V2 file is saved successfully.\n\nStart conversion?`
-      ));
-      if (!accepted) {
-        return {
-          migrated: 0,
-          failed: entries.length,
-          declined: true,
-          failedEntries: entries.map(entry => ({
-            entry,
-            code: 'V2_MIGRATION_DECLINED',
-            message: 'V2 migration was not started',
-          })),
-        };
-      }
-
-      setStartupWorkspaceStatus(localizeText('端末内プロジェクトをV2へ変換しています…', 'Converting local projects to V2...'));
-      for (const entry of entries) {
-        try {
-          const packaged = await loadRecentProjectPackagedPayload(entry);
-          if (!packaged || typeof packaged !== 'object') continue;
-          await mergeFileBackedTimelapseIntoPackaged(entry, packaged);
-          await splitLegacyWorkspaceMigrationEntry(entry, packaged);
-        } catch (error) {
-          console.warn('[PiXiEED workspace] legacy project split failed', { projectId: entry.id, error });
-        }
-      }
-
-      entries = filterFilelessLocalProjects(await loadRecentProjectsMetadata(), workspaceEntries);
-      let migrated = 0;
-      let failed = 0;
-      const failedEntries = [];
-      for (let index = 0; index < entries.length; index += 1) {
-        const entry = entries[index];
-        setStartupWorkspaceStatus(localizeText(
-          `端末内プロジェクトをV2へ変換しています… ${index + 1}/${entries.length}`,
-          `Converting local projects to V2... ${index + 1}/${entries.length}`
-        ));
-        try {
-          const packaged = await loadRecentProjectPackagedPayload(entry);
-          if (!packaged || typeof packaged !== 'object') {
-            throw new Error('Local project payload is unavailable');
+    const failuresById = new Map((migration.failedEntries || [])
+      .filter(failure => failure?.entry?.id)
+      .map(failure => [failure.entry.id, failure]));
+    const localEntries = (await loadDeviceLocalWorkspaceEntries()).map(entry => {
+      const failure = failuresById.get(entry.id);
+      return failure
+        ? {
+            ...entry,
+            migrationRecovery: true,
+            migrationErrorCode: failure.code || 'ERR_TRUE_V2_MIGRATION_FAILED',
+            migrationErrorMessage: failure.message || '',
           }
-          await mergeFileBackedTimelapseIntoPackaged(entry, packaged);
-          const collections = getLegacyPackagedProjectCollections(packaged);
-          if (collections.needsSplit) {
-            throw new Error('Legacy project still contains multiple projects');
-          }
-          const workspaceFileName = await writePackagedProjectToWorkspace(workspace, entry, packaged);
-          const removed = await removeRecentProjectEntry(entry.id);
-          if (!removed) {
-            await workspace.removeProjectFile?.(workspaceFileName, { requestPermission: false });
-            throw new Error('Original local project could not be removed');
-          }
-          migrated += 1;
-        } catch (error) {
-          failed += 1;
-          failedEntries.push({
-            entry,
-            code: classifyWorkspaceMigrationError(error),
-            message: String(error?.message || error || 'V2 migration failed'),
-          });
-          console.warn('[PiXiEED workspace] local project migration failed', { projectId: entry.id, error });
-        }
-      }
-      if (typeof refreshRecentProjectsUI === 'function') {
-        await refreshRecentProjectsUI().catch(error => {
-          console.warn('Failed to refresh recent projects after workspace migration', error);
-        });
-      }
-      return { migrated, failed, declined: false, failedEntries };
-    })();
-    try {
-      return await startupWorkspaceMigrationPromise;
-    } finally {
-      startupWorkspaceMigrationPromise = null;
-    }
-  }
-
-  async function refreshStartupWorkspaceProjects({ requestPermission = false } = {}) {
-    const workspace = window.PiXiEEDWorkspace;
-    if (!workspace) {
-      setStartupWorkspaceStatus(
-        localizeText('この環境では共通ワークスペースを初期化できません。', 'The shared workspace could not be initialized.'),
-        'warn'
-      );
-      return false;
-    }
-    setStartupWorkspaceStatus(localizeText('PiXiEEDフォルダを確認しています…', 'Checking the PiXiEED folder...'));
-    const handle = await workspace.connect({ requestPermission });
-    if (!handle) {
-      const status = workspace.getStatus();
-      setStartupWorkspaceStatus(
-        status.lastErrorCode === 'projects-folder-selected'
-          ? localizeText(
-              'Projectsフォルダが選択されました。既存のPiXiEEDフォルダ、またはPiXiEEDを作成する親フォルダを選んでください。',
-              'The Projects folder was selected. Choose the existing PiXiEED folder or the parent folder where PiXiEED should be created.'
-            )
-          : status.directoryPickerSupported
-          ? localizeText('未接続です。「保存場所を選んで接続」を押してください。', 'Not connected. Select “Choose Save Location”.')
-          : localizeText(
-              'このブラウザでは端末フォルダへの直接接続に対応していません。端末内プロジェクトは削除されません。',
-              'This browser does not support direct folder access. On-device projects will not be deleted.'
-            ),
-        'warn'
-      );
-      return false;
-    }
-    const projectsDirectory = await workspace.getSubdirectory?.('Projects', {
-      create: true,
-      requestPermission: false,
+        : entry;
     });
-    if (!projectsDirectory) {
-      setStartupWorkspaceStatus(
-        localizeText(
-          '接続先に PiXiEED/Projects を作成できませんでした。別の親フォルダを選び直してください。元データは削除されていません。',
-          'PiXiEED/Projects could not be created in the selected location. Choose a different parent folder. Original data was not deleted.'
-        ),
-        'error'
-      );
-      return false;
-    }
-    const existingEntries = await workspace.listProjects({ requestPermission: false, includeWorkspaceRoot: true });
-    const migration = await migrateFilelessLocalProjectsToWorkspace(workspace, existingEntries);
-    const entries = migration.migrated > 0
-      ? await workspace.listProjects({ requestPermission: false, includeWorkspaceRoot: true })
-      : existingEntries;
-    const recoveryEntries = (Array.isArray(migration.failedEntries) ? migration.failedEntries : [])
-      .map(failure => ({
-        ...(failure?.entry || {}),
-        name: failure?.entry?.fileName || failure?.entry?.name || DEFAULT_DOCUMENT_NAME,
-        migrationRecovery: true,
-        migrationErrorCode: failure?.code || 'ERR_V2_MIGRATION_FAILED',
-        migrationErrorMessage: failure?.message || '',
-      }));
-    const firstFailureCode = recoveryEntries[0]?.migrationErrorCode || '';
-    renderStartupWorkspaceProjects(entries.concat(recoveryEntries));
+    renderStartupWorkspaceProjects(localEntries);
+    const migrationSummary = migration.migrated > 0
+      ? localizeText(
+          ` 真V2移行: 元${migration.migrated}件→${migration.created}件。`,
+          ` True V2 migration: ${migration.migrated} source(s) to ${migration.created} project(s).`
+        )
+      : '';
     setStartupWorkspaceStatus(
       migration.failed > 0
         ? localizeText(
-          `接続済み / ファイル${entries.length}件（V2移行 成功${migration.migrated}・未完了${migration.failed}${firstFailureCode ? ` / ${firstFailureCode}` : ''}）`,
-          `Connected / ${entries.length} file(s) (V2 migrated ${migration.migrated}, incomplete ${migration.failed}${firstFailureCode ? ` / ${firstFailureCode}` : ''})`
-        )
+            `端末内プロジェクト${localEntries.length}件。真V2移行の未完了が${migration.failed}件あります。元データは削除していません。`,
+            `${localEntries.length} on-device project(s). ${migration.failed} true V2 migration(s) remain incomplete; original data was retained.`
+          )
         : localizeText(
-          `PiXiEEDフォルダに接続済み / ${entries.length}件${migration.migrated ? `（V2移行 ${migration.migrated}件）` : ''}`,
-          `PiXiEED folder connected / ${entries.length} project(s)${migration.migrated ? ` (V2 migrated ${migration.migrated})` : ''}`
-        ),
-      migration.failed > 0 ? 'warn' : 'success'
+            `端末内の真V2プロジェクトを表示しています（${localEntries.length}件）。${migrationSummary}販売前に .pixieedraw をダウンロードしてください。`,
+            `Showing ${localEntries.length} on-device true V2 project(s).${migrationSummary} Download a .pixieedraw file before sale.`
+          ),
+      migration.failed > 0 ? 'warn' : 'info'
     );
     return true;
   }
 
   function setupStartupWorkspace() {
-    const workspace = window.PiXiEEDWorkspace;
-    const connectButton = dom.startup?.workspaceConnect;
     const projectList = dom.startup?.workspaceProjectList;
-    if (!workspace || !(projectList instanceof HTMLElement) || projectList.dataset.bound === 'true') {
+    if (!(projectList instanceof HTMLElement) || projectList.dataset.bound === 'true') {
       return;
     }
     projectList.dataset.bound = 'true';
-    const status = workspace.getStatus();
-    if (connectButton instanceof HTMLButtonElement) {
-      connectButton.hidden = !status.directoryPickerSupported;
-      connectButton.addEventListener('click', async () => {
-        const accepted = window.confirm(localizeText(
-          '保存場所を設定します。\n\n・すでに PiXiEED フォルダがある場合は、その PiXiEED フォルダを選択してください。\n・まだない場合は「書類」など作成先の親フォルダを選択してください。その中に PiXiEED/Projects を作成します。\n・Projects フォルダそのものは選択しないでください。\n\nV2ファイルの作成に成功するまで、端末内の元プロジェクトは削除しません。\n\n保存場所の選択へ進みますか？',
-          'Set the save location.\n\n• If a PiXiEED folder already exists, select that PiXiEED folder.\n• Otherwise, select a parent location such as Documents. PiXiEED/Projects will be created inside it.\n• Do not select the Projects folder itself.\n\nOriginal on-device projects will not be deleted until their V2 files are created successfully.\n\nContinue to location selection?'
-        ));
-        if (!accepted) return;
-        connectButton.disabled = true;
-        try {
-          await refreshStartupWorkspaceProjects({ requestPermission: true });
-        } finally {
-          connectButton.disabled = false;
-        }
-      });
-    }
     projectList.addEventListener('click', async event => {
       const target = event.target instanceof Element
         ? event.target.closest('button[data-workspace-project-index]')
         : null;
       if (!(target instanceof HTMLButtonElement)) return;
       const entry = startupWorkspaceEntries[Number(target.dataset.workspaceProjectIndex)] || null;
-      if (entry?.migrationRecovery === true) {
-        target.disabled = true;
-        try {
-          const opened = await openRecentProject(entry, {
-            hideStartup: true,
-            silent: false,
-            allowProjectMismatchLoad: true,
-            replaceOpenProjectTabs: true,
-          });
-          if (opened) {
-            hideStartupScreen();
-            hideProjectHomeScreen();
-          }
-        } finally {
-          target.disabled = false;
-        }
-        return;
-      }
-      if (Number(entry?.size) === 0) {
-        setStartupWorkspaceStatus(
-          localizeText(
-            'このファイルは0バイトのため開けません。端末内の元データが残っている場合は「V2移行待ち」のカードから復旧してください。ファイルは削除していません。',
-            'This file is empty and cannot be opened. If the original on-device data remains, recover it from the "Awaiting V2 migration" card. The file has not been deleted.'
-          ),
-          'error'
-        );
-        return;
-      }
-      const item = entry?.handle || entry?.file || null;
-      if (!item) return;
+      if (entry?.deviceLocalProject !== true && entry?.migrationRecovery !== true) return;
       target.disabled = true;
       try {
-        const opened = await openDocumentAsNewProject(item, {
-          source: entry.handle ? 'workspace' : 'workspace-folder-import',
+        const opened = await openRecentProject(entry, {
+          hideStartup: true,
+          silent: false,
+          allowProjectMismatchLoad: true,
+          replaceOpenProjectTabs: true,
         });
         if (opened) {
           hideStartupScreen();
@@ -2335,7 +1835,7 @@
         target.disabled = false;
       }
     });
-    void refreshStartupWorkspaceProjects({ requestPermission: false });
+    void refreshStartupWorkspaceProjects();
   }
 
   function setupStartupScreen() {
@@ -2597,7 +2097,6 @@
         markStartupScreenDismissed,
         normalizeStartupScreenMode,
         setStartupScreenMode,
-        isStartupScreenAppendTabMode,
         showStartupScreen,
         queueStartupRecentAdRender,
         hideStartupScreen,

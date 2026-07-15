@@ -146,6 +146,17 @@ const exportRenderingModule = window.PiXiEEDrawModules.exportRendering.createExp
   buildProjectSessionPayload() {
     return sessionPayload;
   },
+  async buildProjectSessionPayloadWithPersistedTimelapse() {
+    return {
+      ...sessionPayload,
+      timelapse: {
+        ...sessionPayload.timelapse,
+        synchronization: {
+          complete: true,
+        },
+      },
+    };
+  },
   async serializeProjectStorageSnapshot(projectState, options) {
     return await registry.serializeProject(projectState, options);
   },

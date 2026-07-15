@@ -982,6 +982,9 @@
         previewThumbnail,
         certification: {
           schemaVersion: 1,
+          approvalStatus: 'unsubmitted',
+          approvalScope: 'sales-submission-only',
+          serverAttested: false,
           nativeCreated: projectOriginality?.saleEligibility === 'eligible'
             && projectOriginality?.createdWith === 'pixieedraw-native'
             && projectOriginality?.externalInputDetected !== true,

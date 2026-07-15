@@ -6,7 +6,6 @@
     AUTOSAVE_SUPPORTED,
     STREAMING_HIDE_MONETIZATION_UI,
     TOP_UI_ACTION_FLOATING_PREVIEW_TOGGLE,
-    TOP_UI_ACTION_LOCAL_CANVAS_TOGGLE,
     TOP_UI_ACTION_MIRROR_POPUP,
     TOP_UI_ACTION_OPEN_DETAILS_PANEL,
     TOP_UI_ACTION_VIRTUAL_CURSOR_TOGGLE,
@@ -23,7 +22,6 @@
     syncExternalToolActionButtons,
     updateMirrorActionButtons,
     updateVirtualCursorActionToolButtons,
-    updateLocalCanvasActionToolButtons,
     updateFloatingPreviewActionToolButtons,
     setLocalizedTextContent,
     setLocalizedAttribute,
@@ -39,8 +37,6 @@
     applyHelpGuideSearchFilter,
     renderMirrorToolPopover,
     syncMirrorToolPopoverControls,
-    updateExportDestinationLabel,
-    updateExportFolderButtonLabel,
     updateExportScaleHint,
     renderOpenProjectTabs,
     syncControlsWithState,
@@ -118,7 +114,6 @@
       const actionLabels = {
         [TOP_UI_ACTION_MIRROR_POPUP]: { ja: '対称', en: 'Mirror', zh: '对称' },
         [TOP_UI_ACTION_VIRTUAL_CURSOR_TOGGLE]: { ja: '仮想カーソル', en: 'Virtual Cursor', zh: '虚拟光标' },
-        [TOP_UI_ACTION_LOCAL_CANVAS_TOGGLE]: { ja: 'マルチキャンバス', en: 'Multi Canvas', zh: '多画布' },
         [TOP_UI_ACTION_FLOATING_PREVIEW_TOGGLE]: { ja: '小窓プレビュー', en: 'Floating Preview', zh: '浮动预览' },
         [TOP_UI_ACTION_OPEN_DETAILS_PANEL]: { ja: '詳細', en: 'Details', zh: '详情' },
       };
@@ -195,7 +190,6 @@
       syncExternalToolActionButtons();
       updateMirrorActionButtons();
       updateVirtualCursorActionToolButtons();
-      updateLocalCanvasActionToolButtons();
       updateFloatingPreviewActionToolButtons();
     }
   
@@ -309,7 +303,7 @@
       setLocalizedTextContent('.startup-screen__subtitle', 'PiXiEEDraw（ピクシードロー）でドット絵づくり・アニメ制作をはじめよう', 'Start pixel art and animation with PiXiEEDraw');
       setLocalizedTextContent('#startupActionNew', '新規作成', 'New Project');
       setLocalizedTextContent('#startupActionOpen', 'ファイルを開く', 'Open File');
-      setLocalizedTextContent('#startupWorkspaceTitle', 'PiXiEEDワークスペース', 'PiXiEED Workspace');
+      setLocalizedTextContent('#startupWorkspaceTitle', 'プロジェクト一覧', 'Projects');
       setLocalizedTextContent('#startupWorkspaceConnect', 'PiXiEEDフォルダに接続', 'Connect PiXiEED Folder');
       setLocalizedTextContent('#startupActionSkip', 'この画面を閉じる', 'Close');
       setLocalizedTextContent('#globalLoadingIndicatorCancel', 'キャンセル', 'Cancel');
@@ -515,13 +509,6 @@
       setLocalizedToggleLabel('toggleVirtualCursor', '仮想カーソル', 'Virtual Cursor');
       setLocalizedToggleLabel('toggleFloatingPreview', '小窓プレビュー', 'Floating Preview');
       setLocalizedToggleLabel('toggleCanvasResizeHandles', 'キャンバスサイズつまみ', 'Canvas Resize Handles');
-      setLocalizedTextContent('#localCanvasCountLabel', 'キャンバス数', 'Canvas Count');
-      setLocalizedToggleLabel('toggleLocalCanvas', '複数キャンバス（上級）', 'Advanced Multi Canvas');
-      setLocalizedAttribute('#toggleLocalCanvas', 'title', '通常制作は単一キャンバスです。共同制作や素材分担では複数キャンバスを使えます。', 'Single canvas is standard. Use multiple canvases for collaboration or asset work.');
-      setLocalizedAttribute('#removeLocalCanvas', 'aria-label', '追加キャンバスを減らす', 'Remove additional canvas');
-      setLocalizedAttribute('#addLocalCanvas', 'aria-label', '追加キャンバスを増やす', 'Add additional canvas');
-      setLocalizedAttribute('#removeLocalCanvas', 'title', '追加キャンバスを減らす', 'Remove additional canvas');
-      setLocalizedAttribute('#addLocalCanvas', 'title', '追加キャンバスを増やす', 'Add additional canvas');
       setLocalizedTextContent('#voxelExtensionTitle', 'ボクセルモード', 'Voxel Mode');
       setLocalizedToggleLabel('toggleVoxelExtensionMode', 'ボクセルモード', 'Voxel Mode');
       setLocalizedTextContent('#voxelExtensionHint', 'ON にすると Front / Back / Left / Right / Top / Bottom の6面構成へ切り替わり、小窓プレビューを自動生成します。小窓をドラッグすると左右と上下に回転できます。', 'When enabled, the workspace switches to Front / Back / Left / Right / Top / Bottom and generates the floating preview automatically. Drag the floating preview to rotate horizontally and vertically.');
@@ -573,12 +560,12 @@
   
       setLocalizedTextContent('#newProject', '新規作成', 'New Project');
       setLocalizedTextContent('#openDocument', 'ファイルを開く', 'Open File');
-      setLocalizedTextContent('#openPixieedMyPage', 'PiXiEED マイページ', 'PiXiEED My Page');
+      setLocalizedTextContent('#showLocalProjects', 'プロジェクト一覧', 'Projects');
       setLocalizedTextContent('#exportProject', '出力設定を開く', 'Open Export Settings');
       setLocalizedTextContent('#clearCanvas', 'キャンバスをクリア', 'Clear Canvas');
-      setLocalizedTextContent('.file-panel-summary .help-text:nth-child(1)', '自動保存とタイムラプスは常時ONです。完全ファイル同期には保存先の設定が必要です。', 'Autosave and timelapse are always ON. Set a destination to synchronize the complete project file.');
-      setLocalizedTextContent('.file-panel-summary .help-text:nth-child(2)', '画像・GIF・PiXiEEDraw形式の保存は出力パネルから行います。', 'Save images, GIFs, and PiXiEEDraw files from the Export panel.');
-      setLocalizedTextContent('label[for="toggleAutosaveRequired"] span', '自動保存（常時ON）', 'Autosave (Always ON)');
+      setLocalizedTextContent('.file-panel-summary .help-text:nth-child(1)', '描画は端末内V2へ自動保存し、10操作ごとに差分をチェックポイントへ統合します。', 'Drawing changes are autosaved to on-device V2 storage and compacted into a checkpoint every 10 operations.');
+      setLocalizedTextContent('.file-panel-summary .help-text:nth-child(2)', '外部ファイルへは自動出力しません。画像・GIF・PiXiEEDraw形式は出力パネルからダウンロードします。', 'Files are never exported automatically. Download images, GIFs, and PiXiEEDraw files from the Export panel.');
+      setLocalizedTextContent('label[for="toggleAutosaveRequired"] span', '端末内V2自動保存（常時ON）', 'On-device V2 autosave (Always ON)');
       setLocalizedTextContent('#fileContestPromoTitle', 'コンテスト投稿', 'Contest Posting');
       setLocalizedTextContent('#fileContestPromoDescription', '保存/出力の「保存完了後にコンテスト投稿画面へ移動する」をONにすると、そのまま投稿できます。', 'Turn on "Go to contest post screen after save" to move directly to contest posting.');
       setLocalizedTextContent('#openContestFromFilePanel', 'コンテストページを見る', 'Open Contest Page');
@@ -600,11 +587,11 @@
       setLocalizedSelectOption(dom.exportDialog?.format, 'project', 'プロジェクト（.pixieedraw / V2）', 'Project (.pixieedraw / V2)');
       setLocalizedTextContent('label[for="exportFileNameBase"] > span', '出力名', 'Export Name');
       setLocalizedAttribute('#exportFileNameBase', 'placeholder', '例: my_artwork', 'e.g. my_artwork');
-      setLocalizedTextContent('#exportFileNameHint', '拡張子は自動で付きます。同名がある場合は .1 .2 ... を付けて保存します。', 'Extension is added automatically. If the same name exists, .1 .2 ... will be appended.');
+      setLocalizedTextContent('#exportFileNameHint', '拡張子は自動で付きます。保存先と同名処理はブラウザが案内します。', 'The extension is added automatically. Your browser handles the destination and duplicate names.');
       setLocalizedTextContent('#exportScaleControls > span', '出力倍率', 'Output Scale');
       setLocalizedTextContent('label[for="exportScaleSlider"]', '倍率 (×)', 'Scale (×)');
       setLocalizedTextContent('#exportOriginalOptionRow span:not(.export-toggle-icon)', '原寸も追加', 'Original too');
-      setLocalizedTextContent('#exportCompanionOptionRow span:not(.export-toggle-icon)', 'PiXiEEDファイルも同期', 'Sync project file');
+      setLocalizedTextContent('#exportCompanionOptionRow span:not(.export-toggle-icon)', 'PiXiEEDrawもダウンロード', 'Download PiXiEEDraw too');
       setLocalizedTextContent('#exportSpriteMapCompanionOptionRow span:not(.export-toggle-icon)', 'SpriteMAP出力', 'SpriteMAP export');
       setLocalizedTextContent('#exportGridSplitOptionRow span', 'グリッド分割', 'Grid split');
       setLocalizedTextContent('#exportTimelapseOptionRow span', 'タイムラプスGIF', 'Timelapse GIF');
@@ -674,8 +661,6 @@
   
       renderMirrorToolPopover();
       syncMirrorToolPopoverControls();
-      updateExportDestinationLabel();
-      updateExportFolderButtonLabel();
       updateExportScaleHint();
       renderOpenProjectTabs();
     }

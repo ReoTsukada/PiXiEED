@@ -100,8 +100,12 @@ const scope = {
     : (checkpointRequired ? null : { journalOnly: true, journalPayload: { ops: [{ kind: 'pixel-patch' }] } }),
   buildPackagedProjectPayload: snapshot => ({ document: snapshot }),
   buildProjectSessionPayload: () => ({ historyLimit: 30 }),
+  buildProjectSessionPayloadWithPersistedTimelapse: async () => ({
+    timelapse: { synchronization: { complete: true } },
+  }),
   ensureActiveAutosaveProjectId: async () => 'project-1',
   ensureHandlePermission: async () => true,
+  generateSnapshotThumbnail: async () => null,
   isAutosaveV2JournalReady: () => true,
   isAutosaveV2PrimaryEnabled: () => true,
   isCurrentProjectSharedEntry: () => false,
@@ -137,7 +141,7 @@ const scope = {
 
 const utils = window.PiXiEEDrawModules.autosaveWorkflowUtils.createAutosaveWorkflowUtils(scope);
 
-const journalWriteResult = await utils.writeAutosaveSnapshot(false, { syncDestination: false });
+const journalWriteResult = await utils.writeAutosaveSnapshot(false);
 if (journalWriteResult !== true) {
   console.error({ journalWriteResult, counters, autosaveDirty: scope.autosaveDirty, statusNode: scope.dom.controls.autosaveStatus });
 }
@@ -147,26 +151,42 @@ assert.equal(counters.snapshots, 0, 'journal-only autosave must not build a full
 assert.equal(counters.serializes, 0, 'journal-only autosave must not rebuild the archive');
 assert.equal(counters.destinationWrites, 0, 'journal-only autosave must not rewrite the destination file');
 assert.equal(scope.autosaveDirty, false);
-assert.equal(utils.hasPendingAutosaveWork(), true, 'destination-file lag must remain visible as pending work');
-assert.equal([...timers.values()].some(timer => timer.delay === 12000), true, 'destination sync must be scheduled for idle time');
-assert.equal(scope.dom.controls.autosaveStatus.textContent.includes('反映待ち'), true);
+assert.equal(utils.hasPendingAutosaveWork(), false, 'external destination sync must not remain pending');
+assert.equal([...timers.values()].some(timer => timer.delay === 12000), false, 'external destination sync must never be scheduled');
+assert.equal(scope.dom.controls.autosaveStatus.textContent.includes('端末内V2へ保存済み'), true);
 
-assert.equal(await utils.writeAutosaveSnapshot(true), true, 'forced flush must synchronize the destination file');
-assert.equal(counters.snapshots, 1, 'forced destination sync must build one current snapshot');
-assert.equal(counters.serializes, 1);
-assert.equal(counters.destinationWrites, 1);
-assert.equal(counters.v2Writes, 1, 'destination-only sync must not duplicate the V2 journal revision');
+assert.equal(await utils.writeAutosaveSnapshot(true), true, 'forced flush with no new changes stays on-device only');
+assert.equal(counters.snapshots, 0);
+assert.equal(counters.serializes, 0);
+assert.equal(counters.destinationWrites, 0);
+assert.equal(counters.v2Writes, 1);
 assert.equal(utils.hasPendingAutosaveWork(), false);
-assert.equal(scope.dom.controls.autosaveStatus.textContent.includes('反映済み'), true);
 
 checkpointRequired = true;
 scope.autosaveDirty = true;
 scope.autosaveDirtyGeneration = 2;
 scope.unsavedChangeToken = 2;
-assert.equal(await utils.writeAutosaveSnapshot(false, { syncDestination: false }), true);
-assert.equal(counters.snapshots, 2, 'a checkpoint must build a full snapshot immediately');
+assert.equal(await utils.writeAutosaveSnapshot(false), true);
+assert.equal(counters.snapshots, 1, 'a checkpoint must build a full on-device snapshot immediately');
 assert.equal(counters.v2Writes, 2);
-assert.equal(counters.destinationWrites, 2, 'a checkpoint must immediately refresh the destination file');
+assert.equal(counters.destinationWrites, 0, 'a checkpoint must not write an external file');
 assert.equal(utils.hasPendingAutosaveWork(), false);
+
+const destinationWritesBeforeLocalOnlySave = counters.destinationWrites;
+const v2WritesBeforeLocalOnlySave = counters.v2Writes;
+scope.FILE_HANDLE_AUTOSAVE_SUPPORTED = false;
+scope.autosaveHandle = null;
+scope.pendingAutosaveHandle = null;
+scope.autosaveDirty = true;
+scope.autosaveDirtyGeneration = 3;
+scope.unsavedChangeToken = 3;
+assert.equal(
+  await utils.writeAutosaveSnapshot(true),
+  true,
+  'on-device V2 autosave must succeed without a file handle'
+);
+assert.equal(counters.v2Writes, v2WritesBeforeLocalOnlySave + 1);
+assert.equal(counters.destinationWrites, destinationWritesBeforeLocalOnlySave);
+assert.equal(scope.dom.controls.autosaveStatus.textContent.includes('端末内V2へ保存済み'), true);
 
 console.log('PiXiEEDrawDEV P2 autosave destination-sync checks passed.');

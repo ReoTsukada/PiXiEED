@@ -18,12 +18,13 @@ assert.ok(documentScopeStart >= 0 && documentScopeEnd > documentScopeStart);
 const documentScope = appSource.slice(documentScopeStart, documentScopeEnd);
 
 assert.match(documentScope, /get dom\(\) \{ return dom; \}/);
-assert.match(documentSessionSource, /const enableAutosaveButton = dom\?\.controls\?\.enableAutosave/);
-assert.match(startupSource, /if \(Number\(file\.size\) === 0\)/);
-assert.match(startupSource, /state: 'invalid'/);
-assert.match(startupSource, /if \(Number\(entry\?\.size\) === 0\)/);
+assert.doesNotMatch(documentSessionSource, /enableAutosaveButton|bindOpenedProjectFile/);
+assert.match(startupSource, /loadDeviceLocalWorkspaceEntries/);
+assert.match(startupSource, /entry\?\.deviceLocalProject === true/);
+assert.match(startupSource, /migrateLegacyLocalProjectsToTrueV2/);
 assert.match(indexSource, /window\.__PIXIEEDRAW_AD_DEBUG__ !== true/);
-assert.match(indexSource, /startup-workflow-utils\.js\?v=20260715-workspace-open-guard1/);
-assert.match(indexSource, /document-session-workflow-utils\.js\?v=20260715-workspace-open-guard1/);
+assert.doesNotMatch(indexSource, /pixieed-workspace\.js|autosaveDestinationDialog|bindExportFolder/);
+assert.match(indexSource, /startup-workflow-utils\.js\?v=20260715-local-true-v2-cleanup1/);
+assert.match(indexSource, /document-session-workflow-utils\.js\?v=20260715-local-true-v2-cleanup1/);
 
 console.log('PiXiEEDrawDEV workspace open guard checks passed');

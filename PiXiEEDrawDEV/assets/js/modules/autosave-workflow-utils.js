@@ -32,76 +32,6 @@
     return ((scope) => {
       with (scope) {
   let autosavePerformanceSequence = 0;
-  let autosaveDestinationPromptDismissed = false;
-  let autosaveDestinationDialogBound = false;
-  let autosaveDestinationSyncTimer = null;
-  let autosaveDestinationSyncPending = false;
-  let autosaveDestinationSyncProjectId = '';
-
-  function clearAutosaveDestinationSyncTimer() {
-    if (autosaveDestinationSyncTimer === null) {
-      return;
-    }
-    window.clearTimeout(autosaveDestinationSyncTimer);
-    autosaveDestinationSyncTimer = null;
-  }
-
-  function clearAutosaveDestinationSyncPending(projectId = '') {
-    const normalizedProjectId = normalizeAutosaveProjectId(projectId || '');
-    if (
-      normalizedProjectId
-      && autosaveDestinationSyncProjectId
-      && normalizedProjectId !== autosaveDestinationSyncProjectId
-    ) {
-      return false;
-    }
-    clearAutosaveDestinationSyncTimer();
-    autosaveDestinationSyncPending = false;
-    autosaveDestinationSyncProjectId = '';
-    return true;
-  }
-
-  function scheduleAutosaveDestinationFileSync(projectId = '', { delayMs = AUTOSAVE_DESTINATION_SYNC_DELAY_MS } = {}) {
-    const normalizedProjectId = normalizeAutosaveProjectId(projectId || autosaveProjectId || '');
-    if (!normalizedProjectId) {
-      return false;
-    }
-    autosaveDestinationSyncPending = true;
-    autosaveDestinationSyncProjectId = normalizedProjectId;
-    clearAutosaveDestinationSyncTimer();
-    const safeDelayMs = Math.max(0, Math.round(Number(delayMs) || 0));
-    autosaveDestinationSyncTimer = window.setTimeout(() => {
-      autosaveDestinationSyncTimer = null;
-      writeAutosaveSnapshot(false, { syncDestination: true }).catch(error => {
-        console.warn('Autosave destination file sync failed', error);
-        updateAutosaveStatus('自動保存: 内部V2は保存済み・保存先ファイルの反映に失敗しました', 'error');
-        scheduleAutosaveDestinationFileSync(normalizedProjectId, {
-          delayMs: Math.max(3000, Math.round(Number(AUTOSAVE_DESTINATION_SYNC_DELAY_MS) || 12000)),
-        });
-      });
-    }, safeDelayMs);
-    return true;
-  }
-
-  function getAutosaveDestinationDialog() {
-    return document.getElementById('autosaveDestinationDialog');
-  }
-
-  function openAutosaveDestinationDialog() {
-    if (!FILE_HANDLE_AUTOSAVE_SUPPORTED) {
-      updateAutosaveStatus('自動保存: このブラウザでは保存先を設定できません', 'warn');
-      return false;
-    }
-    const dialog = getAutosaveDestinationDialog();
-    if (!dialog || typeof dialog.showModal !== 'function') {
-      updateAutosaveStatus('自動保存: 保存先を設定してください', 'warn');
-      return false;
-    }
-    if (!dialog.open) {
-      dialog.showModal();
-    }
-    return true;
-  }
 
   function beginAutosavePerformanceSpan(name, details = null) {
     const perf = window?.performance;
@@ -127,17 +57,6 @@
       elapsedMs: Math.round(finishedAt - span.startedAt),
       ...mergedDetails,
     });
-  }
-
-  function queueAutosaveV2ShadowWriteMeasured(job) {
-    const span = beginAutosavePerformanceSpan('pixiedraw-dev:autosave:v2-shadow-queue', {
-      projectId: String(job?.projectId || ''),
-    });
-    try {
-      return queueAutosaveV2ShadowWrite?.(job);
-    } finally {
-      endAutosavePerformanceSpan(span);
-    }
   }
 
   function updateAutosaveStatus(message, tone = 'info') {
@@ -287,461 +206,13 @@
     }
   }
 
-  function setupAutosaveControls() {
-    const button = dom.controls.enableAutosave;
-    if (button) {
-      button.hidden = false;
-      button.disabled = false;
-      button.textContent = localizeText('完全ファイルの保存先を設定', 'Set complete-file destination');
-      if (!button.dataset.autosaveDestinationBound) {
-        button.dataset.autosaveDestinationBound = 'true';
-        button.addEventListener('click', () => {
-          autosaveDestinationPromptDismissed = false;
-          requestAutosaveBinding().catch(error => {
-            console.warn('Autosave destination selection failed', error);
-          });
-        });
-      }
-    }
-    if (autosaveDestinationDialogBound) return;
-    const dialog = getAutosaveDestinationDialog();
-    const choose = document.getElementById('autosaveDestinationChoose');
-    const later = document.getElementById('autosaveDestinationLater');
-    if (!dialog || !choose || !later) return;
-    autosaveDestinationDialogBound = true;
-    choose.addEventListener('click', async () => {
-      autosaveDestinationPromptDismissed = false;
-      const bound = await requestAutosaveBinding();
-      if (bound && dialog.open) dialog.close();
-    });
-    later.addEventListener('click', () => {
-      autosaveDestinationPromptDismissed = true;
-      if (dialog.open) dialog.close();
-      updateAutosaveStatus('自動保存: 保存先を設定するまで保存しません', 'warn');
-    });
-  }
-
-  async function ensureAutosaveDestination() {
-    if (!FILE_HANDLE_AUTOSAVE_SUPPORTED) {
-      return false;
-    }
-    if (!autosaveHandle) {
-      const storedHandle = await loadStoredAutosaveHandle();
-      if (storedHandle) {
-        const granted = await ensureHandlePermission(storedHandle, { request: false });
-        if (granted) {
-          autosaveHandle = storedHandle;
-          pendingAutosaveHandle = null;
-        } else {
-          pendingAutosaveHandle = storedHandle;
-        }
-      }
-    }
-    if (autosaveHandle && await ensureHandlePermission(autosaveHandle, { request: false })) {
-      return true;
-    }
-    if (!autosaveDestinationPromptDismissed) {
-      openAutosaveDestinationDialog();
-    }
-    updateAutosaveStatus('自動保存: 保存先を設定してください', 'warn');
-    return false;
-  }
-
-  async function writeAutosaveDestinationFile(snapshot) {
-    if (!autosaveHandle || !snapshot || typeof snapshot !== 'object') {
-      return false;
-    }
-    const granted = await ensureHandlePermission(autosaveHandle, { request: false });
-    if (!granted) {
-      pendingAutosaveHandle = autosaveHandle;
-      autosaveHandle = null;
-      updateAutosaveStatus('自動保存: 保存先への権限を再設定してください', 'warn');
-      return false;
-    }
-    if (typeof serializeProjectStorageSnapshot !== 'function') {
-      throw new Error('V2 project storage serializer is unavailable');
-    }
-    if (typeof buildProjectSessionPayloadWithPersistedTimelapse !== 'function') {
-      throw new Error('Complete timelapse synchronization is unavailable');
-    }
-    const serializeSpan = beginAutosavePerformanceSpan('pixiedraw-dev:autosave:destination-v2-serialize');
-    let serialized = null;
-    try {
-      const completeSession = await buildProjectSessionPayloadWithPersistedTimelapse({
-        requireComplete: true,
-      });
-      if (completeSession?.timelapse?.synchronization?.complete !== true) {
-        throw new Error('Complete timelapse synchronization is required');
-      }
-      completeSession.projectExportIntegrity = {
-        schemaVersion: 1,
-        completeProjectSave: true,
-        autosavePolicy: 'always-on',
-        autosaveRequired: true,
-        autosaveDestinationConnectedBySave: true,
-        timelapseRequired: true,
-        timelapseSynchronized: true,
-        saleCandidateDataComplete: true,
-        generatedAt: new Date().toISOString(),
-      };
-      const previewThumbnail = typeof generateSnapshotThumbnail === 'function'
-        ? await generateSnapshotThumbnail(snapshot)
-        : null;
-      serialized = await serializeProjectStorageSnapshot({
-        snapshot,
-        session: completeSession,
-        thumbnail: previewThumbnail,
-      }, {
-        fileNameBase: state?.documentName || '',
-        includeSheets: false,
-        includeTimelapse: true,
-        useWorker: true,
-      });
-    } finally {
-      endAutosavePerformanceSpan(serializeSpan, {
-        bytes: Math.max(0, Number(serialized?.blob?.size) || 0),
-        workerUsed: serialized?.workerUsed === true,
-      });
-    }
-    if (!(serialized?.blob instanceof Blob)) {
-      throw new Error('V2 project storage serializer did not return an archive');
-    }
-    const writable = await autosaveHandle.createWritable();
-    const writeSpan = beginAutosavePerformanceSpan('pixiedraw-dev:autosave:destination-file-write', {
-      bytes: Math.max(0, Number(serialized.blob.size) || 0),
-    });
-    try {
-      await writable.write(serialized.blob);
-      await writable.close();
-      return true;
-    } catch (error) {
-      try { await writable.abort?.(); } catch (_abortError) {}
-      throw error;
-    } finally {
-      endAutosavePerformanceSpan(writeSpan);
-    }
-  }
-
-  function setExportDirectoryDisplayLabel(label, { persist = true } = {}) {
-    exportDirectoryDisplayLabel = sanitizeExportDirectoryDisplayLabel(label);
-    if (persist) {
-      storeExportDirectoryDisplayLabel(exportDirectoryDisplayLabel);
-    }
-    updateExportDestinationLabel();
-  }
-
-  function getExportDestinationLabelText() {
-    if (!EXPORT_DIRECTORY_SUPPORTED) {
-      return localizeText(
-        '派生出力先: 保存時に選択（既存ファイルは上書きしません）',
-        'Derived export destination: choose when saving (existing files are not overwritten)'
-      );
-    }
-    const activeHandle = exportDirectoryHandle || pendingExportDirectoryHandle;
-    const displayLabel = sanitizeExportDirectoryDisplayLabel(exportDirectoryDisplayLabel)
-      || buildExportDirectoryDisplayLabel({
-        workspaceHandle: activeHandle,
-        fallback: EXPORT_WORKSPACE_DIR_NAME,
-      });
-    if (exportDirectoryHandle) {
-      return localizeText(
-        `派生出力先: ${displayLabel}/Exports/形式別（同名は連番保存）`,
-        `Derived exports: ${displayLabel}/Exports/by format (numbered when names match)`
-      );
-    }
-    if (pendingExportDirectoryHandle) {
-      return localizeText(
-        `派生出力先: ${displayLabel}/Exports/形式別（再許可が必要）`,
-        `Derived exports: ${displayLabel}/Exports/by format (reauthorization required)`
-      );
-    }
-    return localizeText(
-      '派生出力先: 未固定（既存ファイルは上書きしません）',
-      'Derived export destination: not fixed (existing files are not overwritten)'
-    );
-  }
-
-  function updateExportDestinationLabel() {
-    const labelText = getExportDestinationLabelText();
-    const labelNodes = [
-      dom.controls.exportDestinationLabel,
-      dom.exportDialog?.destinationLabel,
-      dom.newProject?.exportDestinationLabel,
-    ];
-    labelNodes.forEach(node => {
-      if (node instanceof HTMLElement) {
-        node.textContent = labelText;
-      }
-    });
-  }
-
-  function updateExportFolderStatus(message, tone = 'info') {
-    const statusNode = dom.controls.exportFolderStatus;
-    if (statusNode) {
-      statusNode.hidden = !EXPORT_DIRECTORY_SUPPORTED;
-      if (statusNode.hidden) {
-        statusNode.textContent = '';
-        delete statusNode.dataset.tone;
-        updateExportDestinationLabel();
-        return;
-      }
-      statusNode.textContent = message;
-      statusNode.dataset.tone = tone;
-    }
-    updateExportDestinationLabel();
-  }
-
-  function updateExportFolderButtonLabel() {
-    const buttons = [dom.controls.bindExportFolder, dom.newProject?.bindExportFolder];
-    if (!buttons.length) {
-      return;
-    }
-    if (!EXPORT_DIRECTORY_SUPPORTED) {
-      buttons.forEach(button => {
-        if (!(button instanceof HTMLButtonElement)) {
-          return;
-        }
-        const isNewProjectButton = button === dom.newProject?.bindExportFolder;
-        button.hidden = true;
-        button.disabled = true;
-        button.textContent = isNewProjectButton
-          ? localizeText('保存先固定を使用しない', 'Disable fixed save destination')
-          : localizeText('出力先固定を使用しない', 'Disable fixed export destination');
-      });
-      return;
-    }
-    buttons.forEach(button => {
-      if (!(button instanceof HTMLButtonElement)) {
-        return;
-      }
-      const isNewProjectButton = button === dom.newProject?.bindExportFolder;
-      button.hidden = false;
-      button.disabled = false;
-      if (exportDirectoryHandle) {
-        button.textContent = isNewProjectButton
-          ? localizeText('保存先フォルダを変更', 'Change save folder')
-          : localizeText('出力フォルダを変更', 'Change export folder');
-        return;
-      }
-      if (pendingExportDirectoryHandle) {
-        button.textContent = isNewProjectButton
-          ? localizeText('保存先フォルダを再許可', 'Reauthorize save folder')
-          : localizeText('出力フォルダを再許可', 'Reauthorize export folder');
-        return;
-      }
-      button.textContent = isNewProjectButton
-        ? localizeText('保存先フォルダを指定', 'Choose save folder')
-        : localizeText('出力フォルダを設定', 'Set export folder');
-    });
-  }
-
-  async function ensureExportWorkspaceDirectory(handle) {
-    if (!handle || typeof handle.getDirectoryHandle !== 'function') {
-      return handle;
-    }
-    try {
-      return await handle.getDirectoryHandle(EXPORT_WORKSPACE_DIR_NAME, { create: true });
-    } catch (error) {
-      console.warn('Failed to create PiXiEED export workspace directory', error);
-      return handle;
-    }
-  }
-
-  function schedulePendingExportDirectoryPermission(handle) {
-    pendingExportDirectoryHandle = handle || null;
-    exportDirectoryHandle = null;
-    if (handle) {
-      const nextLabel = buildExportDirectoryDisplayLabel({
-        workspaceHandle: handle,
-        fallback: exportDirectoryDisplayLabel || EXPORT_WORKSPACE_DIR_NAME,
-      });
-      setExportDirectoryDisplayLabel(nextLabel);
-    } else {
-      updateExportDestinationLabel();
-    }
-    updateExportFolderButtonLabel();
-    updateExportFolderStatus(
-      localizeText(
-        '出力フォルダ: 権限が必要です。ボタンを押して再許可してください',
-        'Export folder: permission required. Press the button to reauthorize.'
-      ),
-      'warn'
-    );
-  }
-
-  async function attemptExportDirectoryReauthorization() {
-    if (!pendingExportDirectoryHandle) {
-      return false;
-    }
-    const handle = pendingExportDirectoryHandle;
-    const granted = await ensureHandlePermission(handle, { request: true });
-    if (!granted) {
-      schedulePendingExportDirectoryPermission(handle);
-      return false;
-    }
-    pendingExportDirectoryHandle = null;
-    exportDirectoryHandle = handle;
-    const nextLabel = buildExportDirectoryDisplayLabel({
-      workspaceHandle: handle,
-      fallback: exportDirectoryDisplayLabel || EXPORT_WORKSPACE_DIR_NAME,
-    });
-    setExportDirectoryDisplayLabel(nextLabel);
-    await storeExportDirectoryHandle(handle);
-    updateExportFolderButtonLabel();
-    updateExportFolderStatus(
-      localizeText(
-        `出力フォルダ: 設定済み (${EXPORT_WORKSPACE_DIR_NAME})`,
-        `Export folder: set (${EXPORT_WORKSPACE_DIR_NAME})`
-      ),
-      'success'
-    );
-    return true;
-  }
-
-  async function requestExportDirectoryBinding() {
-    if (!EXPORT_DIRECTORY_SUPPORTED || typeof window.showDirectoryPicker !== 'function') {
-      updateExportFolderButtonLabel();
-      updateExportFolderStatus(localizeText('出力フォルダ: このブラウザでは利用できません', 'Export folder: unsupported in this browser'), 'warn');
-      return false;
-    }
-    try {
-      const rootHandle = await window.showDirectoryPicker({
-        id: EXPORT_DIRECTORY_PICKER_ID,
-        mode: 'readwrite',
-      });
-      const grantedRoot = await ensureHandlePermission(rootHandle, { request: true });
-      if (!grantedRoot) {
-        schedulePendingExportDirectoryPermission(rootHandle);
-        return false;
-      }
-      const workspaceHandle = await ensureExportWorkspaceDirectory(rootHandle);
-      const grantedWorkspace = await ensureHandlePermission(workspaceHandle, { request: true });
-      if (!grantedWorkspace) {
-        schedulePendingExportDirectoryPermission(workspaceHandle);
-        return false;
-      }
-      exportDirectoryHandle = workspaceHandle;
-      pendingExportDirectoryHandle = null;
-      exportDirectorySetupDismissed = false;
-      const nextLabel = buildExportDirectoryDisplayLabel({
-        rootHandle,
-        workspaceHandle,
-        fallback: EXPORT_WORKSPACE_DIR_NAME,
-      });
-      setExportDirectoryDisplayLabel(nextLabel);
-      await storeExportDirectoryHandle(workspaceHandle);
-      updateExportFolderButtonLabel();
-      updateExportFolderStatus(
-        localizeText(
-          `出力フォルダ: 設定済み (${EXPORT_WORKSPACE_DIR_NAME})`,
-          `Export folder: set (${EXPORT_WORKSPACE_DIR_NAME})`
-        ),
-        'success'
-      );
-      return true;
-    } catch (error) {
-      if (error && error.name === 'AbortError') {
-        exportDirectorySetupDismissed = true;
-        updateExportFolderStatus(localizeText('出力フォルダ: キャンセルしました', 'Export folder: cancelled'), 'warn');
-        return false;
-      }
-      console.warn('Export directory binding failed', error);
-      updateExportFolderStatus(localizeText('出力フォルダ: フォルダを選択できませんでした', 'Export folder: failed to select folder'), 'error');
-      return false;
-    }
-  }
-
-  function setupExportDirectoryControls() {
-    const buttons = [
-      dom.controls.bindExportFolder,
-      dom.newProject?.bindExportFolder,
-    ].filter(button => button instanceof HTMLButtonElement);
-    if (!buttons.length) {
-      updateExportDestinationLabel();
-      return;
-    }
-    updateExportFolderButtonLabel();
-    updateExportDestinationLabel();
-    if (!EXPORT_DIRECTORY_SUPPORTED) {
-      updateExportFolderStatus(
-        localizeText(
-          '出力フォルダ: 固定出力先は使用しません（保存時に保存先を選択）',
-          'Export folder: fixed destination is disabled (choose destination when saving)'
-        ),
-        'info'
-      );
-      return;
-    }
-    buttons.forEach(button => {
-      if (button.dataset.bound === 'true') {
-        return;
-      }
-      button.dataset.bound = 'true';
-      button.addEventListener('click', async () => {
-        exportDirectorySetupDismissed = false;
-        if (pendingExportDirectoryHandle && !exportDirectoryHandle) {
-          const restored = await attemptExportDirectoryReauthorization();
-          if (restored) {
-            return;
-          }
-        }
-        await requestExportDirectoryBinding();
-      });
-    });
-  }
-
-  async function initializeExportDirectoryBinding() {
-    const storedDisplayLabel = loadStoredExportDirectoryDisplayLabel();
-    setExportDirectoryDisplayLabel(storedDisplayLabel, { persist: false });
-    setupExportDirectoryControls();
-    if (!EXPORT_DIRECTORY_SUPPORTED) {
-      return;
-    }
-    updateExportFolderStatus(localizeText('出力フォルダ: 初期化中…', 'Export folder: initializing...'), 'info');
-    try {
-      const handle = await loadStoredExportDirectoryHandle();
-      if (!handle) {
-        setExportDirectoryDisplayLabel('');
-        updateExportFolderButtonLabel();
-        updateExportFolderStatus(localizeText('出力フォルダ: 未設定', 'Export folder: not set'), 'info');
-        return;
-      }
-      const granted = await ensureHandlePermission(handle, { request: false });
-      if (granted) {
-        exportDirectoryHandle = handle;
-        pendingExportDirectoryHandle = null;
-        const nextLabel = sanitizeExportDirectoryDisplayLabel(exportDirectoryDisplayLabel)
-          || buildExportDirectoryDisplayLabel({
-            workspaceHandle: handle,
-            fallback: EXPORT_WORKSPACE_DIR_NAME,
-          });
-        setExportDirectoryDisplayLabel(nextLabel);
-        updateExportFolderButtonLabel();
-        updateExportFolderStatus(
-          localizeText(
-            `出力フォルダ: 設定済み (${EXPORT_WORKSPACE_DIR_NAME})`,
-            `Export folder: set (${EXPORT_WORKSPACE_DIR_NAME})`
-          ),
-          'success'
-        );
-      } else {
-        schedulePendingExportDirectoryPermission(handle);
-      }
-    } catch (error) {
-      console.warn('Export directory initialisation failed', error);
-      updateExportFolderButtonLabel();
-      updateExportFolderStatus(localizeText('出力フォルダ: 初期化でエラーが発生しました', 'Export folder: initialization failed'), 'error');
-    }
-  }
-
   async function initializeAutosave(options = {}) {
-    setupAutosaveControls();
     if (!AUTOSAVE_SUPPORTED) {
       updateAutosaveStatus('自動保存: このブラウザでは利用できません', 'warn');
       return;
     }
 
-    updateAutosaveStatus('自動保存: 保存先を確認中…');
+    updateAutosaveStatus('自動保存: 端末内V2を確認中…');
 
     try {
       const reloadRestoreProjectId = normalizeAutosaveProjectId(
@@ -767,7 +238,7 @@
         updateAutosaveStatus(
           recentEntries.length
             ? '自動保存: 保存済みプロジェクトを選んで開けます'
-            : '自動保存: 新規作成後に保存先を設定してください',
+            : '自動保存: 新規作成後、端末内V2へ保存します',
           'info'
         );
         return;
@@ -782,7 +253,7 @@
       updateAutosaveStatus(
         recentEntries.length
           ? '自動保存: 保存済みプロジェクトを開けます'
-          : '自動保存: 新規作成後に保存先を設定してください',
+          : '自動保存: 新規作成後、端末内V2へ保存します',
         'info'
       );
     } catch (error) {
@@ -839,7 +310,7 @@
       scheduleAutosaveSnapshot();
       return;
     }
-    writeAutosaveSnapshot(true, { syncDestination: false }).catch(error => {
+    writeAutosaveSnapshot(true).catch(error => {
       console.warn('Immediate autosave failed', error);
       updateAutosaveStatus('自動保存: 保存に失敗しました', 'error');
     });
@@ -885,8 +356,6 @@
       || autosaveWriteQueued
       || autosaveWriteInFlight
       || autosaveWriteTimer !== null
-      || autosaveDestinationSyncPending
-      || autosaveDestinationSyncTimer !== null
     );
   }
 
@@ -920,9 +389,6 @@
     }
     if (autosaveWriteInFlight) {
       autosaveWriteQueued = true;
-      if (force) {
-        scheduleAutosaveDestinationFileSync(autosaveProjectId, { delayMs: 0 });
-      }
       return;
     }
     writeAutosaveSnapshot(true).catch(error => {
@@ -943,11 +409,8 @@
     return true;
   }
 
-  async function writeAutosaveSnapshot(force = false, options = {}) {
-    if (!AUTOSAVE_SUPPORTED) return;
-    if (autosaveRestoring) return;
-    const syncDestination = options?.syncDestination === true
-      || (force && options?.syncDestination !== false);
+  async function writeAutosaveSnapshot(force = false) {
+    if (!AUTOSAVE_SUPPORTED || autosaveRestoring) return;
     const blockedStatus = getAutosaveBlockedStatusMessage();
     if (blockedStatus) {
       if (autosaveWriteTimer !== null) {
@@ -959,10 +422,7 @@
       updateAutosaveStatus(blockedStatus, 'info');
       return false;
     }
-    // Tab replacement asks for a forced flush even when nothing changed.
-    // Treat that as an already-saved success; attempting a V2 journal write
-    // with an empty patch list is invalid and blocks the tab transition.
-    if (!autosaveDirty && !(syncDestination && autosaveDestinationSyncPending)) return true;
+    if (!autosaveDirty) return true;
     if (autosaveWriteInFlight) {
       autosaveWriteQueued = true;
       if (!force) {
@@ -973,45 +433,22 @@
         return false;
       }
     }
-    if (!force && isAutosaveInteractionBusy()) {
+    if (
+      !force
+      && (isAutosaveInteractionBusy() || hasRecentSaveInteraction() || hasRecentViewportInteraction())
+    ) {
       autosaveWriteQueued = true;
-      if (autosaveDirty) {
-        scheduleAutosaveSnapshot();
-      } else if (autosaveDestinationSyncPending) {
-        scheduleAutosaveDestinationFileSync(autosaveDestinationSyncProjectId || autosaveProjectId, { delayMs: 1200 });
-      }
+      scheduleAutosaveSnapshot();
       return false;
     }
-    if (!force && hasRecentSaveInteraction()) {
-      autosaveWriteQueued = true;
-      if (autosaveDirty) {
-        scheduleAutosaveSnapshot();
-      } else if (autosaveDestinationSyncPending) {
-        scheduleAutosaveDestinationFileSync(autosaveDestinationSyncProjectId || autosaveProjectId, { delayMs: 1200 });
-      }
-      return false;
+    if (isAutosaveV2PrimaryEnabled?.() !== true) {
+      throw new Error('On-device true V2 autosave is unavailable');
     }
-    if (!force && hasRecentViewportInteraction()) {
-      autosaveWriteQueued = true;
-      if (autosaveDirty) {
-        scheduleAutosaveSnapshot();
-      } else if (autosaveDestinationSyncPending) {
-        scheduleAutosaveDestinationFileSync(autosaveDestinationSyncProjectId || autosaveProjectId, { delayMs: 1200 });
-      }
-      return false;
-    }
-    if (!await ensureAutosaveDestination()) {
-      autosaveWriteQueued = false;
-      return false;
-    }
+
     const projectId = await ensureActiveAutosaveProjectId();
     if (!tryAcquireAutosaveTabLock()) {
       autosaveWriteQueued = true;
-      if (autosaveDirty) {
-        scheduleAutosaveSnapshot();
-      } else if (autosaveDestinationSyncPending) {
-        scheduleAutosaveDestinationFileSync(autosaveDestinationSyncProjectId || projectId, { delayMs: 1200 });
-      }
+      scheduleAutosaveSnapshot();
       if (shouldAnnounceAutosaveTabLockWait()) {
         updateAutosaveStatus(
           localizeText(
@@ -1023,48 +460,11 @@
       }
       return false;
     }
+
     autosaveWriteInFlight = true;
     autosaveWriteQueued = false;
     const autosaveSpan = beginAutosavePerformanceSpan('pixiedraw-dev:autosave:total', { projectId });
     try {
-      if (!autosaveDirty && syncDestination && autosaveDestinationSyncPending) {
-        const pendingProjectId = normalizeAutosaveProjectId(autosaveDestinationSyncProjectId || '');
-        if (pendingProjectId && pendingProjectId !== projectId) {
-          throw new Error('Autosave destination sync project changed before file write');
-        }
-        const dirtyGenerationAtStart = autosaveDirtyGeneration;
-        const unsavedTokenAtStart = unsavedChangeToken;
-        const snapshotSpan = beginAutosavePerformanceSpan('pixiedraw-dev:autosave:make-history-snapshot', {
-          skipped: false,
-          destinationFile: true,
-          destinationOnly: true,
-        });
-        let destinationSnapshot = null;
-        try {
-          destinationSnapshot = makeHistorySnapshot({ clonePixelData: false });
-        } finally {
-          endAutosavePerformanceSpan(snapshotSpan);
-        }
-        updateAutosaveStatus('自動保存: 保存先ファイルへ反映中…', 'info');
-        if (!await writeAutosaveDestinationFile(destinationSnapshot)) {
-          throw new Error('Failed to write autosave destination file');
-        }
-        const stillCurrentWrite = (
-          normalizeAutosaveProjectId(autosaveProjectId || '') === projectId
-          && autosaveDirtyGeneration === dirtyGenerationAtStart
-          && unsavedChangeToken === unsavedTokenAtStart
-        );
-        if (!stillCurrentWrite) {
-          scheduleAutosaveDestinationFileSync(projectId);
-          updateAutosaveStatus('自動保存: 追加変更を内部V2へ保存します', 'info');
-          return false;
-        }
-        clearAutosaveDestinationSyncPending(projectId);
-        markDocumentDurablySaved();
-        pruneInactiveCanvasDirectCaches?.();
-        updateAutosaveStatus('自動保存: 保存先ファイルへ反映済み', 'success');
-        return true;
-      }
       if (shouldUseLightweightSharedProjectLocalSave(projectId)) {
         updateAutosaveStatus('自動保存: 共有プロジェクトの復帰情報を保存中…');
         const dirtyGenerationAtStart = autosaveDirtyGeneration;
@@ -1087,37 +487,31 @@
         updateAutosaveStatus('自動保存: 共有プロジェクトの復帰情報を保存済み', 'success');
         return true;
       }
-      updateAutosaveStatus(
-        syncDestination
-          ? '自動保存: 内部V2と保存先ファイルへ保存中…'
-          : '自動保存: 内部V2へ差分保存中…'
-      );
-      const journalOnlySavePlan = buildActiveLocalProjectSavePlan?.({
+
+      updateAutosaveStatus('自動保存: 端末内V2へ差分保存中…');
+      const journalSavePlan = buildActiveLocalProjectSavePlan?.({
         projectId,
         snapshot: null,
         buildPackagedProjectPayload,
         buildAutosaveSessionPayload: buildProjectSessionPayload,
       }) || null;
-      const useV2Primary = isAutosaveV2PrimaryEnabled?.() === true;
-      const normalizedJournalOps = journalOnlySavePlan?.journalOnly === true
-        ? normalizeV2PixelPatchJournalOps?.(journalOnlySavePlan.journalPayload)
+      const normalizedJournalOps = journalSavePlan?.journalOnly === true
+        ? normalizeV2PixelPatchJournalOps?.(journalSavePlan.journalPayload)
         : null;
-      const journalOnlyHasOps = Array.isArray(normalizedJournalOps) && normalizedJournalOps.length > 0;
-      const useV2Journal = Boolean(
-        useV2Primary
-        && journalOnlyHasOps
+      let useV2Journal = Boolean(
+        Array.isArray(normalizedJournalOps)
+        && normalizedJournalOps.length > 0
         && isAutosaveV2JournalReady?.(projectId) === true
       );
-      const journalOnly = useV2Journal || (!useV2Primary && journalOnlySavePlan?.journalOnly === true);
       let snapshot = null;
       const ensureCurrentSnapshot = () => {
         if (snapshot) {
           return snapshot;
         }
-        const snapshotSpan = beginAutosavePerformanceSpan('pixiedraw-dev:autosave:make-history-snapshot', {
-          skipped: false,
-          destinationFile: syncDestination,
-        });
+        const snapshotSpan = beginAutosavePerformanceSpan(
+          'pixiedraw-dev:autosave:make-history-snapshot',
+          { skipped: false }
+        );
         try {
           snapshot = makeHistorySnapshot({ clonePixelData: false });
           return snapshot;
@@ -1125,14 +519,13 @@
           endAutosavePerformanceSpan(snapshotSpan);
         }
       };
-      if (!useV2Journal || syncDestination) {
-        ensureCurrentSnapshot();
-      }
-      let activeSavePlan = journalOnlySavePlan;
-      if (useV2Primary && !useV2Journal) {
-        if (journalOnlySavePlan?.journalOnly === true) {
+
+      let activeSavePlan = journalSavePlan;
+      if (!useV2Journal) {
+        if (journalSavePlan?.journalOnly === true) {
           markActiveLocalProjectJournalNeedsCheckpoint?.(projectId);
         }
+        ensureCurrentSnapshot();
         activeSavePlan = buildActiveLocalProjectSavePlan?.({
           projectId,
           snapshot,
@@ -1140,80 +533,48 @@
           buildAutosaveSessionPayload: buildProjectSessionPayload,
         }) || null;
       }
+
       const dirtyGenerationAtStart = autosaveDirtyGeneration;
       const unsavedTokenAtStart = unsavedChangeToken;
       let savedEntry = null;
-      let usedV2Journal = useV2Journal;
       const recordSpan = beginAutosavePerformanceSpan('pixiedraw-dev:autosave:record-recent-project');
       try {
-        if (useV2Primary) {
-          try {
-            savedEntry = await writeAutosaveV2Primary({
-              projectId,
-              snapshot,
-              thumbnailIntervalMs: AUTOSAVE_THUMBNAIL_UPDATE_INTERVAL_MS,
-              savePlan: usedV2Journal ? journalOnlySavePlan : activeSavePlan,
-            });
-          } catch (error) {
-            const emptyJournalRevision = usedV2Journal
-              && /journal revision requires at least one changed (sheet|project)|journal save requires valid pixel patches/i.test(String(error?.message || ''));
-            if (!emptyJournalRevision) {
-              throw error;
-            }
-            // A sheet switch can leave a valid patch list whose sheet reference
-            // is no longer in the current manifest. Commit a checkpoint instead.
-            markActiveLocalProjectJournalNeedsCheckpoint?.(projectId);
-            ensureCurrentSnapshot();
-            activeSavePlan = buildActiveLocalProjectSavePlan?.({
-              projectId,
-              snapshot,
-              buildPackagedProjectPayload,
-              buildAutosaveSessionPayload: buildProjectSessionPayload,
-            }) || null;
-            usedV2Journal = false;
-            savedEntry = await writeAutosaveV2Primary({
-              projectId,
-              snapshot,
-              thumbnailIntervalMs: AUTOSAVE_THUMBNAIL_UPDATE_INTERVAL_MS,
-              savePlan: activeSavePlan,
-            });
-          }
-        } else {
-          savedEntry = await recordRecentProjectSnapshot(snapshot, null, {
+        try {
+          savedEntry = await writeAutosaveV2Primary({
             projectId,
+            snapshot,
             thumbnailIntervalMs: AUTOSAVE_THUMBNAIL_UPDATE_INTERVAL_MS,
-            savePlan: journalOnlySavePlan,
+            savePlan: useV2Journal ? journalSavePlan : activeSavePlan,
+          });
+        } catch (error) {
+          const emptyJournalRevision = useV2Journal
+            && /journal revision requires at least one changed (sheet|project)|journal save requires valid pixel patches/i.test(String(error?.message || ''));
+          if (!emptyJournalRevision) {
+            throw error;
+          }
+          markActiveLocalProjectJournalNeedsCheckpoint?.(projectId);
+          ensureCurrentSnapshot();
+          activeSavePlan = buildActiveLocalProjectSavePlan?.({
+            projectId,
+            snapshot,
+            buildPackagedProjectPayload,
+            buildAutosaveSessionPayload: buildProjectSessionPayload,
+          }) || null;
+          useV2Journal = false;
+          savedEntry = await writeAutosaveV2Primary({
+            projectId,
+            snapshot,
+            thumbnailIntervalMs: AUTOSAVE_THUMBNAIL_UPDATE_INTERVAL_MS,
+            savePlan: activeSavePlan,
           });
         }
-      } catch (error) {
-        try {
-          if (!useV2Primary && !journalOnly) {
-            queueAutosaveV2ShadowWriteMeasured({ projectId, snapshot, v1Project: null, v1Error: error?.message || 'v1-write-failed' });
-          }
-        } catch (_shadowError) {}
-        throw error;
       } finally {
         endAutosavePerformanceSpan(recordSpan);
       }
       if (!savedEntry) {
-        try {
-          if (!useV2Primary && !journalOnly) {
-            queueAutosaveV2ShadowWriteMeasured({ projectId, snapshot, v1Project: null, v1Error: 'v1-write-returned-empty' });
-          }
-        } catch (_shadowError) {}
-        throw new Error('Failed to record autosave snapshot');
+        throw new Error('Failed to record true V2 autosave snapshot');
       }
-      if (!usedV2Journal || syncDestination) {
-        ensureCurrentSnapshot();
-        if (!await writeAutosaveDestinationFile(snapshot)) {
-          throw new Error('Failed to write autosave destination file');
-        }
-      }
-      try {
-        if (!useV2Primary && !journalOnly) {
-          queueAutosaveV2ShadowWriteMeasured({ projectId, snapshot, v1Project: savedEntry.project || null });
-        }
-      } catch (_shadowError) {}
+
       const stillCurrentWrite = (
         normalizeAutosaveProjectId(autosaveProjectId || '') === projectId
         && autosaveDirtyGeneration === dirtyGenerationAtStart
@@ -1227,16 +588,14 @@
       autosaveDirty = false;
       markDocumentDurablySaved();
       pruneInactiveCanvasDirectCaches?.();
-      if (usedV2Journal && !syncDestination) {
-        scheduleAutosaveDestinationFileSync(projectId);
-        updateAutosaveStatus('自動保存: 内部V2へ保存済み・保存先ファイルへ反映待ち', 'info');
-      } else {
-        clearAutosaveDestinationSyncPending(projectId);
-        updateAutosaveStatus('自動保存: 保存先ファイルへ反映済み', 'success');
-      }
+      updateAutosaveStatus(
+        localizeText(
+          '自動保存: 端末内V2へ保存済み（完全ファイルは手動保存できます）',
+          'Autosave: saved to on-device V2 storage (complete file can be saved manually)'
+        ),
+        'success'
+      );
       return true;
-    } catch (error) {
-      throw error;
     } finally {
       endAutosavePerformanceSpan(autosaveSpan);
       autosaveWriteInFlight = false;
@@ -1244,235 +603,10 @@
       if (autosaveWriteQueued || autosaveDirty) {
         autosaveWriteQueued = false;
         scheduleAutosaveSnapshot();
-      } else if (autosaveDestinationSyncPending && autosaveDestinationSyncTimer === null) {
-        scheduleAutosaveDestinationFileSync(autosaveDestinationSyncProjectId || autosaveProjectId);
       }
     }
   }
 
-  async function restoreAutosaveDocument(handle) {
-    if (!ensureCurrentClientCanReplaceActiveProject({ announce: false })) {
-      return false;
-    }
-    try {
-      const file = await handle.getFile();
-      if (!file) {
-        return false;
-      }
-      const text = await file.text();
-      if (!text) {
-        updateAutosaveStatus('自動保存: 新しいファイルに保存します');
-        return false;
-      }
-      const parsedDocument = snapshotFromDocumentText(text);
-      const snapshot = parsedDocument?.snapshot || null;
-      const projectSession = parsedDocument?.projectSession || null;
-      const dotStats = parsedDocument?.dotStats || null;
-      if (!snapshot) {
-        updateAutosaveStatus('自動保存: ファイルを読み込めませんでした', 'error');
-        return false;
-      }
-      if (isTinyStartupSnapshot(snapshot)) {
-        updateAutosaveStatus('自動保存: 起動時の 1x1 バックアップ読み込みをスキップしました', 'warn');
-        return false;
-      }
-      synchronizeImportedSnapshotPalette(snapshot);
-      autosaveRestoring = true;
-      try {
-        applyHistorySnapshot(snapshot, { forcePalettePresetSync: true });
-        history.pending = null;
-        if (projectSession) {
-          history.limit = projectSession.historyLimit;
-          history.past = projectSession.historyPast;
-          history.future = projectSession.historyFuture;
-          trimHistoryStacksToLimit();
-          timelapseState.tracksByCanvasId = Object.create(null);
-          Object.entries(projectSession.timelapse.tracksByCanvasId || {}).forEach(([canvasId, track]) => {
-            timelapseState.tracksByCanvasId[canvasId] = {
-              snapshots: Array.isArray(track?.snapshots) ? track.snapshots.slice() : [],
-              operationLog: track?.operationLog && typeof track.operationLog === 'object'
-                ? {
-                    version: 1,
-                    baseSnapshot: track.operationLog.baseSnapshot || null,
-                    entries: Array.isArray(track.operationLog.entries)
-                      ? track.operationLog.entries
-                        .map(entry => normalizeSerializedTimelapseOperationEntry(entry))
-                        .filter(Boolean)
-                      : [],
-                  }
-                : null,
-              warningShown: Boolean(track?.warningShown),
-              sampleStep: Math.max(1, Math.round(Number(track?.sampleStep) || 1)),
-              lastCaptureToken: Number.isFinite(Number(track?.lastCaptureToken))
-                ? Math.round(Number(track.lastCaptureToken))
-                : -1,
-            };
-          });
-          timelapseState.enabled = true;
-          timelapseState.fps = projectSession.timelapse.fps;
-        } else {
-          history.past = [];
-          history.future = [];
-          clearTimelapseRecording({ silent: true, scope: 'all' });
-        }
-        reconcileTimelapseTracksForSingleCanvas();
-        ensureTimelapseStartCapture();
-      } finally {
-        autosaveRestoring = false;
-      }
-      syncTimelapseControls();
-      updateHistoryButtons();
-      autosaveDirty = false;
-      resetDocumentUnsavedChanges();
-      syncPixfindSnapshotAfterDocumentReset();
-      updateMemoryStatus();
-      setTrackedProjectDotBaseline(snapshot, dotStats);
-      resetOpenedDocumentViewport({ defer: true });
-      if (typeof updateActiveProjectPersistenceState === 'function') {
-        updateActiveProjectPersistenceState({
-          sourceStorageAdapterId: null,
-          sourceKind: 'autosave',
-          sourceProjectToken: typeof createProjectPersistenceToken === 'function'
-            ? createProjectPersistenceToken('autosave')
-            : null,
-          lastSavedStorageAdapterId: null,
-          projectSaveHandleState: 'none',
-        }, {
-          render: false,
-          log: true,
-        });
-      }
-      return true;
-    } catch (error) {
-      autosaveRestoring = false;
-      console.warn('Failed to restore autosave document', error);
-      updateAutosaveStatus('自動保存: ファイルを読み込めませんでした', 'error');
-      return false;
-    }
-  }
-
-  async function getFileHandleInExportDirectory(filename, { create = true, requestPermission = false } = {}) {
-    if (!exportDirectoryHandle || typeof exportDirectoryHandle.getFileHandle !== 'function') {
-      return null;
-    }
-    const granted = await ensureHandlePermission(exportDirectoryHandle, { request: requestPermission });
-    if (!granted) {
-      if (requestPermission) {
-        schedulePendingExportDirectoryPermission(exportDirectoryHandle);
-      }
-      return null;
-    }
-    try {
-      return await exportDirectoryHandle.getFileHandle(filename, { create: Boolean(create) });
-    } catch (error) {
-      console.warn('Failed to create/open file in export directory', error);
-      return null;
-    }
-  }
-
-  async function resolveUniqueExportDirectoryFilename(filename, { requestPermission = true, maxSequence = 256 } = {}) {
-    if (!exportDirectoryHandle || typeof exportDirectoryHandle.getFileHandle !== 'function') {
-      return null;
-    }
-    const granted = await ensureHandlePermission(exportDirectoryHandle, { request: requestPermission });
-    if (!granted) {
-      if (requestPermission) {
-        schedulePendingExportDirectoryPermission(exportDirectoryHandle);
-      }
-      return null;
-    }
-    const baseFilename = sanitizeNativeFilename(filename, 'export.bin');
-    for (let sequence = 0; sequence <= maxSequence; sequence += 1) {
-      const candidate = buildNumberedFilename(baseFilename, sequence);
-      try {
-        await exportDirectoryHandle.getFileHandle(candidate, { create: false });
-      } catch (error) {
-        if (error && error.name === 'NotFoundError') {
-          return candidate;
-        }
-        console.warn('Failed to inspect existing export filename', error);
-        return candidate;
-      }
-    }
-    return buildNumberedFilename(baseFilename, maxSequence + 1);
-  }
-
-  async function requestAutosaveBinding(options = {}) {
-    if (!FILE_HANDLE_AUTOSAVE_SUPPORTED) return false;
-    try {
-      const suggestedNameOption = typeof options.suggestedName === 'string' ? options.suggestedName.trim() : '';
-      const suggestedName = suggestedNameOption || createAutosaveFileName();
-      let handle = null;
-      let boundFromExportDirectory = false;
-      const workspace = window.PiXiEEDWorkspace;
-      if (workspace && typeof workspace.createProjectFileHandle === 'function') {
-        handle = await workspace.createProjectFileHandle(suggestedName, {
-          requestPermission: true,
-        });
-        boundFromExportDirectory = Boolean(handle);
-      }
-      if (!handle) {
-        handle = await getFileHandleInExportDirectory(suggestedName, {
-          create: true,
-          requestPermission: true,
-        });
-        boundFromExportDirectory = Boolean(handle);
-      }
-      if (!handle && EXPORT_DIRECTORY_SUPPORTED && typeof window.showDirectoryPicker === 'function' && !exportDirectorySetupDismissed) {
-        const bound = await requestExportDirectoryBinding();
-        if (bound) {
-          handle = await getFileHandleInExportDirectory(suggestedName, {
-            create: true,
-            requestPermission: true,
-          });
-          boundFromExportDirectory = Boolean(handle);
-        }
-      }
-      if (!handle) {
-        handle = await window.showSaveFilePicker({
-          suggestedName,
-          types: [
-            {
-              description: 'PiXiEEDraw ドキュメント',
-              accept: {
-                'application/json': ['.json', '.pxdraw', '.pixieedraw'],
-                'application/x-pixieedraw': ['.pixieedraw'],
-              },
-            },
-          ],
-        });
-        boundFromExportDirectory = false;
-      }
-      const granted = await ensureHandlePermission(handle, { request: true });
-      if (!granted) {
-        updateAutosaveStatus('自動保存: 権限が必要です', 'warn');
-        return;
-      }
-      autosaveHandle = handle;
-      pendingAutosaveHandle = null;
-      clearPendingPermissionListener();
-      await storeAutosaveHandle(handle);
-      if (dom.controls.enableAutosave) {
-        dom.controls.enableAutosave.textContent = '完全ファイルの保存先を変更';
-      }
-      updateAutosaveStatus(
-        boundFromExportDirectory
-          ? `自動保存: ${EXPORT_WORKSPACE_DIR_NAME} フォルダ内に保存中…`
-          : '自動保存: 保存中…'
-      );
-      markAutosaveDirty();
-      await writeAutosaveSnapshot(true);
-      return true;
-    } catch (error) {
-      if (error && error.name === 'AbortError') {
-        updateAutosaveStatus('自動保存: キャンセルしました', 'warn');
-        return false;
-      }
-      console.warn('Autosave binding failed', error);
-      updateAutosaveStatus('自動保存: ファイルを選択できませんでした', 'error');
-      return false;
-    }
-  }
 
   async function ensureAutosaveForLensImport() {
     if (!AUTOSAVE_SUPPORTED) {
@@ -1483,110 +617,8 @@
     }
     markAutosaveDirty();
     scheduleAutosaveSnapshot();
-    updateAutosaveStatus('PiXiEELENS の取り込み後に自動保存先を設定してください', 'info');
+    updateAutosaveStatus('PiXiEELENS の取り込みを端末内V2へ保存します', 'info');
   }
-
-  async function ensureHandlePermission(handle, { request = false } = {}) {
-    if (!handle) return false;
-    const opts = { mode: 'readwrite' };
-    const canQuery = typeof handle.queryPermission === 'function';
-    const canRequest = typeof handle.requestPermission === 'function';
-
-    if (!canQuery) {
-      if (!request || !canRequest) {
-        return false;
-      }
-      const outcome = await handle.requestPermission(opts);
-      return outcome === 'granted';
-    }
-
-    let permission = await handle.queryPermission(opts);
-    if (permission === 'granted') {
-      return true;
-    }
-    if (!request || !canRequest) {
-      return false;
-    }
-    permission = await handle.requestPermission(opts);
-    return permission === 'granted';
-  }
-
-  function schedulePendingAutosavePermission(handle) {
-    pendingAutosaveHandle = handle;
-    autosaveHandle = null;
-    clearPendingPermissionListener();
-    updateAutosaveStatus('自動保存: 権限が必要です。キャンバスをクリックして再許可してください', 'warn');
-    if (dom.controls.enableAutosave) {
-      dom.controls.enableAutosave.textContent = '完全ファイルの保存先を再許可';
-    }
-    const listener = (event) => {
-      const target = event?.target instanceof Element ? event.target : null;
-      if (!target) {
-      return false;
-      }
-      const isEditable = Boolean(target.closest('input, textarea, select, [contenteditable="true"], [contenteditable=""]'));
-      if (isEditable) {
-        return;
-      }
-      const isAutosaveButton = Boolean(
-        dom.controls.enableAutosave
-          && (target === dom.controls.enableAutosave || target.closest('#enableAutosave') === dom.controls.enableAutosave)
-      );
-      const isCanvasTap = Boolean(
-        (dom.canvasViewport && dom.canvasViewport.contains(target))
-          || isCanvasSurfaceTarget(target)
-      );
-      if (!isAutosaveButton && !isCanvasTap) {
-        return;
-      }
-      clearPendingPermissionListener();
-      attemptAutosaveReauthorization().catch(error => {
-        console.warn('Autosave reauthorization failed', error);
-        updateAutosaveStatus('自動保存: 権限を付与できませんでした', 'error');
-      });
-    };
-    autosavePermissionListener = listener;
-    window.addEventListener('pointerdown', listener, true);
-  }
-
-  function clearPendingPermissionListener() {
-    if (!autosavePermissionListener) return;
-    window.removeEventListener('pointerdown', autosavePermissionListener, true);
-    autosavePermissionListener = null;
-  }
-
-
-  async function attemptAutosaveReauthorization() {
-    if (!pendingAutosaveHandle) {
-      return false;
-    }
-    const handle = pendingAutosaveHandle;
-    clearPendingPermissionListener();
-    const granted = await ensureHandlePermission(handle, { request: true });
-    if (!granted) {
-      updateAutosaveStatus('自動保存: 権限が必要です。右のボタンから再許可してください', 'warn');
-      schedulePendingAutosavePermission(handle);
-      return false;
-    }
-    pendingAutosaveHandle = null;
-    autosaveHandle = handle;
-    if (dom.controls.enableAutosave) {
-      dom.controls.enableAutosave.textContent = '完全ファイルの保存先を変更';
-    }
-    try {
-      const restored = await restoreAutosaveDocument(handle);
-      if (restored) {
-        updateAutosaveStatus('自動保存: 端末内データを読み込みました', 'success');
-      } else {
-        updateAutosaveStatus('自動保存: 端末内へ自動保存します', 'info');
-      }
-    } catch (error) {
-      console.warn('Autosave restore after reauthorization failed', error);
-      updateAutosaveStatus('自動保存: 既存バックアップの読み込みに失敗しました', 'error');
-    }
-    return true;
-  }
-
 
   return Object.freeze({
     updateAutosaveStatus,
@@ -1597,18 +629,6 @@
     releaseAutosaveTabLock,
     shouldAnnounceAutosaveTabLockWait,
     handleAutosaveStorageEvent,
-    setupAutosaveControls,
-    setExportDirectoryDisplayLabel,
-    getExportDestinationLabelText,
-    updateExportDestinationLabel,
-    updateExportFolderStatus,
-    updateExportFolderButtonLabel,
-    ensureExportWorkspaceDirectory,
-    schedulePendingExportDirectoryPermission,
-    attemptExportDirectoryReauthorization,
-    requestExportDirectoryBinding,
-    setupExportDirectoryControls,
-    initializeExportDirectoryBinding,
     initializeAutosave,
     scheduleAutosaveSnapshot,
     requestImmediateAutosaveSnapshot,
@@ -1618,20 +638,10 @@
     hasRecentSaveInteraction,
     hasRecentViewportInteraction,
     hasPendingAutosaveWork,
-    scheduleAutosaveDestinationFileSync,
-    clearAutosaveDestinationSyncPending,
     flushAutosaveSnapshotOnLifecycle,
     waitForAutosaveWriteIdle,
     writeAutosaveSnapshot,
-    restoreAutosaveDocument,
-    getFileHandleInExportDirectory,
-    resolveUniqueExportDirectoryFilename,
-    requestAutosaveBinding,
     ensureAutosaveForLensImport,
-    ensureHandlePermission,
-    schedulePendingAutosavePermission,
-    clearPendingPermissionListener,
-    attemptAutosaveReauthorization,
   });
       }
     })(scope);

@@ -605,7 +605,6 @@
     syncMirrorToolPopoverControls(mirrorState);
     updateMirrorActionButtons();
     updateVirtualCursorActionToolButtons();
-    updateLocalCanvasActionToolButtons();
     updateFloatingPreviewActionToolButtons();
     syncVirtualCursorControlVisibility({ syncToggle: true });
     if (dom.controls.toggleFloatingPreview instanceof HTMLInputElement) {
@@ -629,30 +628,6 @@
       localViewportCanvasState,
       LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE
     ).count;
-    const canEditProjectStructure = canCurrentClientEditProjectStructure();
-    const voxelModeEnabled = isVoxelExtensionModeEnabled();
-    if (dom.controls.toggleLocalCanvas instanceof HTMLInputElement) {
-      dom.controls.toggleLocalCanvas.checked = MULTI_CANVAS_FEATURE_ENABLED && localCanvasCount > 0;
-      dom.controls.toggleLocalCanvas.disabled = !MULTI_CANVAS_FEATURE_ENABLED || !canEditProjectStructure || voxelModeEnabled;
-    }
-    if (dom.controls.localCanvasCountControls instanceof HTMLElement) {
-      const showControls = MULTI_CANVAS_FEATURE_ENABLED && localCanvasCount > 0;
-      dom.controls.localCanvasCountControls.hidden = !showControls;
-      dom.controls.localCanvasCountControls.classList.toggle('is-hidden', !showControls);
-      dom.controls.localCanvasCountControls.setAttribute('aria-hidden', String(!showControls));
-    }
-    if (dom.controls.localCanvasCountValue instanceof HTMLElement) {
-      const totalCanvasCount = MULTI_CANVAS_FEATURE_ENABLED ? localCanvasCount + 1 : 1;
-      dom.controls.localCanvasCountValue.textContent = `${totalCanvasCount} / 4`;
-    }
-    if (dom.controls.removeLocalCanvas instanceof HTMLButtonElement) {
-      dom.controls.removeLocalCanvas.disabled = !MULTI_CANVAS_FEATURE_ENABLED || localCanvasCount <= 0 || !canEditProjectStructure || voxelModeEnabled;
-    }
-    if (dom.controls.addLocalCanvas instanceof HTMLButtonElement) {
-      dom.controls.addLocalCanvas.disabled = !MULTI_CANVAS_FEATURE_ENABLED || localCanvasCount >= getLocalViewportCanvasMaxCount() || !canEditProjectStructure || voxelModeEnabled;
-      dom.controls.addLocalCanvas.setAttribute('aria-label', localizeText('マルチキャンバスを増やす（最大4件）', 'Add multi canvas (maximum 4)'));
-      dom.controls.addLocalCanvas.title = localizeText('キャンバスは1シートにつき最大4件', 'A sheet can contain at most 4 canvases');
-    }
     if (MULTI_CANVAS_FEATURE_ENABLED && localCanvasCount > 0) {
       syncMultiCanvasSelectionUi();
     } else if (dom.mainCanvasArea instanceof HTMLElement) {

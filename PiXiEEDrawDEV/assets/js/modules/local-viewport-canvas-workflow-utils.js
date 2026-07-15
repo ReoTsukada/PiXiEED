@@ -2573,12 +2573,12 @@
     while (nextCanvases.length < targetTotal) {
       nextCanvases.push(createBlankProjectCanvasDocument(sourceCanvas, nextCanvases.length + 1));
     }
-    const validation = window.PiXiEEDrawModules?.projectSheetCollectionUtils
-      ?.createProjectSheetCollectionUtils?.()
-      ?.validateSheetCanvasCount?.({ document: { canvases: nextCanvases } });
+    const validation = window.PiXiEEDrawModules?.projectCanvasValidationUtils
+      ?.createProjectCanvasValidationUtils?.()
+      ?.validateCanvasCount?.({ document: { canvases: nextCanvases } });
     if (!validation?.valid) {
       updateAutosaveStatus(
-        localizeText('キャンバスは1シートにつき最大4件です', 'A sheet can contain at most 4 canvases'),
+        localizeText('真V2で編集できるキャンバスは1件です', 'True V2 edits one canvas per project'),
         'warn'
       );
       syncControlsWithState();
@@ -2817,32 +2817,6 @@
     }
     if (reconcileProjectCanvasesFromLocalViewportState()) {
       bindActiveCanvasSurface(getProjectCanvasSurfaceForIndex(getActiveProjectCanvasIndex()) || mainViewportCanvasSurface);
-    }
-    if (dom.controls.addLocalCanvas instanceof HTMLButtonElement) {
-      dom.controls.addLocalCanvas.addEventListener('click', event => {
-        event.preventDefault();
-        if (!canCurrentClientEditProjectStructure({ announce: true })) {
-          if (!isSharedProjectCollaborativeMode()) {
-            announceMultiCanvasEditRestriction();
-          }
-          syncControlsWithState();
-          return;
-        }
-        adjustLocalViewportCanvasCount(1, { persist: true, announce: true, recordHistory: true });
-      });
-    }
-    if (dom.controls.removeLocalCanvas instanceof HTMLButtonElement) {
-      dom.controls.removeLocalCanvas.addEventListener('click', event => {
-        event.preventDefault();
-        if (!canCurrentClientEditProjectStructure({ announce: true })) {
-          if (!isSharedProjectCollaborativeMode()) {
-            announceMultiCanvasEditRestriction();
-          }
-          syncControlsWithState();
-          return;
-        }
-        adjustLocalViewportCanvasCount(-1, { persist: true, announce: true, recordHistory: true });
-      });
     }
     window.addEventListener('resize', handleLocalViewportCanvasViewportChange);
     window.addEventListener('orientationchange', handleLocalViewportCanvasViewportChange);

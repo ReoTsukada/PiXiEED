@@ -14,12 +14,12 @@ assert.match(journal, /journalOnly: true/);
 assert.match(journal, /journalOnly: false/);
 
 assert.match(autosave, /snapshot: null/);
-assert.match(autosave, /const useV2Journal = Boolean\(/);
-assert.match(autosave, /const journalOnly = useV2Journal \|\| \(!useV2Primary/);
-assert.match(autosave, /if \(!useV2Journal \|\| syncDestination\) \{\s*ensureCurrentSnapshot\(\)/);
-assert.match(autosave, /savePlan: usedV2Journal \? journalOnlySavePlan : activeSavePlan/);
-assert.match(autosave, /usedV2Journal && !syncDestination/);
-assert.match(autosave, /if \(!useV2Primary && !journalOnly\) \{\s*queueAutosaveV2ShadowWriteMeasured/);
+assert.match(autosave, /let useV2Journal = Boolean\(/);
+assert.match(autosave, /isAutosaveV2JournalReady\?\.\(projectId\) === true/);
+assert.match(autosave, /if \(!useV2Journal\) \{/);
+assert.match(autosave, /savePlan: useV2Journal \? journalSavePlan : activeSavePlan/);
+assert.match(autosave, /writeAutosaveV2Primary/);
+assert.doesNotMatch(autosave, /recordRecentProjectSnapshot|queueAutosaveV2ShadowWrite|syncDestination/);
 
 assert.match(packageWorkflow, /savePlan: suppliedSavePlan = null/);
 assert.match(packageWorkflow, /const journalOnlySave = suppliedSavePlan\?\.journalOnly === true/);
@@ -30,7 +30,7 @@ const context = { console: { warn() {} }, window: { PiXiEEDrawModules: {} } };
 vm.createContext(context);
 vm.runInContext(journal, context, { filename: 'local-project-journal-utils.js' });
 const journalUtils = context.window.PiXiEEDrawModules.localProjectJournalUtils.createLocalProjectJournalUtils({
-  LOCAL_PROJECT_CHECKPOINT_HISTORY_INTERVAL: 30,
+  LOCAL_PROJECT_CHECKPOINT_HISTORY_INTERVAL: 10,
   PROJECT_PACKAGE_TYPE: 'pixieed-project-package',
   PROJECT_PACKAGE_VERSION: 1,
   DOCUMENT_FILE_VERSION: 1,
@@ -99,7 +99,7 @@ assert.deepEqual(JSON.parse(JSON.stringify(normalizedV2Ops)), [{
   changes: [{ index: 3, after: { paletteIndex: 1, direct: null, importSourceDirect: null } }],
 }]);
 
-for (let index = 1; index < 30; index += 1) {
+for (let index = 1; index < 10; index += 1) {
   journalUtils.noteHistoryEntry('project-1', { kind: 'pixel-patch', index }, 'draw');
 }
 assert.equal(
@@ -110,7 +110,7 @@ assert.equal(
     buildAutosaveSessionPayload: () => ({ historyLimit: 30 }),
   }),
   null,
-  '30 accumulated operations require a new checkpoint snapshot'
+  '10 accumulated operations require a new checkpoint snapshot'
 );
 let checkpointBuilds = 0;
 let checkpointSessionBuilds = 0;

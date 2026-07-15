@@ -15,23 +15,15 @@ const autosave = read('PiXiEEDrawDEV/assets/js/modules/autosave-workflow-utils.j
 const exportRendering = read('PiXiEEDrawDEV/assets/js/modules/export-rendering.js');
 const html = read('PiXiEEDrawDEV/index.html');
 
-assert.match(startup, /hydrateStartupWorkspaceProjectCards/);
-assert.match(startup, /inspectStartupWorkspaceProject/);
-assert.match(startup, /resolveWorkspaceProjectCertification/);
-assert.match(startup, /adapterId === 'pixieedraw-v2-zip'/);
-assert.match(startup, /summary\.nativeCreated === true/);
-assert.match(startup, /summary\.externalInputDetected !== true/);
-assert.match(startup, /summary\.completeProjectSave === true/);
-assert.match(startup, /summary\.timelapseSynchronized === true/);
-assert.match(startup, /summary\.saleCandidateDataComplete === true/);
-assert.match(startup, /✓ PiXiEED公認/);
-assert.match(startup, /PiXiEEDEndorsed\.png/);
-assert.match(startup, /外部入力あり/);
-assert.match(startup, /未認証/);
-assert.match(startup, /generateSnapshotThumbnail/);
+assert.match(startup, /loadDeviceLocalWorkspaceEntries/);
+assert.match(startup, /renderStartupWorkspaceProjects\(localEntries\)/);
+assert.match(startup, /端末内プロジェクトのサムネイル/);
+assert.match(startup, /端末内V2/);
+assert.match(startup, /完全ファイルは手動保存できます/);
+assert.doesNotMatch(startup, /hydrateStartupWorkspaceProjectCards|inspectStartupWorkspaceProject|resolveWorkspaceProjectCertification/);
 
 assert.match(css, /startup-workspace__project-thumbnail/);
-assert.match(css, /startup-workspace__project-certification\.is-official/);
+assert.match(css, /startup-workspace__project-certification\.is-local/);
 assert.match(css, /image-rendering:\s*pixelated/);
 
 assert.match(adapterUtils, /readManifestFromBlob/);
@@ -39,12 +31,15 @@ assert.match(app, /readProjectStorageManifestFromBlob/);
 assert.match(v2Adapter, /projectState\?\.thumbnail/);
 assert.match(codec, /previewThumbnail/);
 assert.match(codec, /certification:\s*\{/);
+assert.match(codec, /approvalStatus: 'unsubmitted'/);
+assert.match(codec, /approvalScope: 'sales-submission-only'/);
+assert.match(codec, /serverAttested: false/);
 assert.match(codec, /nativeCreated:/);
 assert.match(codec, /saleCandidateDataComplete:/);
-assert.match(autosave, /projectExportIntegrity\s*=\s*\{/);
-assert.match(autosave, /thumbnail:\s*previewThumbnail/);
+assert.doesNotMatch(autosave, /projectExportIntegrity\s*=\s*\{/);
+assert.match(autosave, /writeAutosaveV2Primary/);
 assert.match(exportRendering, /thumbnail:\s*previewThumbnail/);
-assert.match(html, /startup-workflow-utils\.js\?v=20260715-workspace-location-guide1/);
-assert.match(html, /app\.js\?v=20260715-079/);
+assert.match(html, /startup-workflow-utils\.js\?v=20260715-local-true-v2-cleanup1/);
+assert.match(html, /app\.js\?v=20260715-086/);
 
 console.log('PiXiEEDrawDEV P13 startup certified card checks passed.');

@@ -461,7 +461,6 @@
             sourceKind: 'new',
             sourceProjectToken: replacement.sourceProjectToken || null,
             lastSavedStorageAdapterId: null,
-            projectSaveHandleState: 'none',
           },
         });
         if (!loaded || loaded === 'deferred') throw new Error('ERR_EMPTY_SHEET_ACTIVATE_FAILED');

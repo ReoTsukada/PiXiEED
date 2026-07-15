@@ -1967,42 +1967,6 @@
     };
     dom.controls.toggleCanvasResizeHandles?.addEventListener('change', handleCanvasResizeHandlesToggleInput);
     dom.controls.toggleCanvasResizeHandles?.addEventListener('input', handleCanvasResizeHandlesToggleInput);
-    const handleLocalCanvasToggleInput = event => {
-      if (!(event.target instanceof HTMLInputElement)) {
-        return;
-      }
-      if (!MULTI_CANVAS_FEATURE_ENABLED) {
-        event.target.checked = false;
-        setLocalViewportCanvasCount(0, { persist: true, announce: false });
-        return;
-      }
-      if (!canCurrentClientEditProjectStructure({ announce: true })) {
-        event.target.checked = getLocalViewportCanvasCount() > 0;
-        if (!isSharedProjectCollaborativeMode()) {
-          announceMultiCanvasEditRestriction();
-        }
-        syncControlsWithState();
-        return;
-      }
-      if (isVoxelExtensionModeEnabled()) {
-        event.target.checked = getLocalViewportCanvasCount() > 0;
-        updateAutosaveStatus(
-          localizeText('ボクセルモード中は通常のマルチキャンバス数を変更できません', 'Standard multi-canvas controls are locked while voxel mode is enabled'),
-          'info'
-        );
-        syncControlsWithState();
-        return;
-      }
-      const enabled = Boolean(event.target.checked);
-      const currentCount = normalizeLocalViewportCanvasState(
-        localViewportCanvasState,
-        LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE
-      ).count;
-      const nextCount = enabled ? Math.max(1, currentCount) : 0;
-      setLocalViewportCanvasCount(nextCount, { persist: true, announce: false, recordHistory: true });
-    };
-    dom.controls.toggleLocalCanvas?.addEventListener('change', handleLocalCanvasToggleInput);
-    dom.controls.toggleLocalCanvas?.addEventListener('input', handleLocalCanvasToggleInput);
     const handleVoxelExtensionToggleInput = event => {
       if (!(event.target instanceof HTMLInputElement)) {
         return;

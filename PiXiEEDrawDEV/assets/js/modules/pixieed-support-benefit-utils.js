@@ -35,16 +35,8 @@
     return true;
   }
 
-  function hasPixieedrawMultiCanvasSupport() {
-    return true;
-  }
-
   function hasPixieedrawSignedInAccount() {
     return Boolean(accountState.isLoggedIn && accountState.userId && !accountState.isAnonymous);
-  }
-
-  function getLocalViewportCanvasAccountLimit() {
-    return LOCAL_VIEWPORT_CANVAS_STANDARD_MAX_COUNT;
   }
 
   function getSharedProjectMemberLimitForCurrentPlan() {
@@ -75,9 +67,7 @@
 
   return Object.freeze({
     hasPixieedrawAdFreeSupport,
-    hasPixieedrawMultiCanvasSupport,
     hasPixieedrawSignedInAccount,
-    getLocalViewportCanvasAccountLimit,
     getSharedProjectMemberLimitForCurrentPlan,
     getMultiGuestLimitForCurrentPlan,
     syncPixieedSupportBenefitUi,

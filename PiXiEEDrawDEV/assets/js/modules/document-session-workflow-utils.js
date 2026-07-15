@@ -111,19 +111,6 @@
           ? sourceStorageAdapterId
           : null
       ));
-    const hasExplicitProjectSaveHandleState = Boolean(
-      explicitState
-      && Object.prototype.hasOwnProperty.call(explicitState, 'projectSaveHandleState')
-    ) || Object.prototype.hasOwnProperty.call(options || {}, 'projectSaveHandleState');
-    const projectSaveHandleState = normalizeExternalInputToV2
-      ? 'none'
-      : (hasExplicitProjectSaveHandleState
-      ? (
-        explicitState?.projectSaveHandleState
-        ?? options?.projectSaveHandleState
-        ?? (handle ? 'unknown' : 'none')
-      )
-      : (handle ? 'unknown' : 'none'));
     const hasExplicitToken = Boolean(
       explicitState
       && Object.prototype.hasOwnProperty.call(explicitState, 'sourceProjectToken')
@@ -149,7 +136,6 @@
       && sourceStorageAdapterId == null
       && lastSavedStorageAdapterId == null
       && sourceProjectToken == null
-      && !projectSaveHandleState
     ) {
       return null;
     }
@@ -159,14 +145,12 @@
         sourceKind,
         sourceProjectToken,
         lastSavedStorageAdapterId,
-        projectSaveHandleState,
       }, null, { createToken: true })
       : {
         sourceStorageAdapterId,
         sourceKind,
         sourceProjectToken,
         lastSavedStorageAdapterId,
-        projectSaveHandleState,
       };
   }
 
@@ -181,19 +165,6 @@
       ? parsedDocument.snapshot.canvases.length
       : 1;
     return adapterId === 'pixieedraw-v1-json' || packagedProjectCount > 1 || canvasCount > 1;
-  }
-
-  function canBindOpenedProjectFile(parsedDocument = null, handle = null, options = {}) {
-    if (options?.bindOpenedFile !== true || !handle || typeof handle.createWritable !== 'function') {
-      return false;
-    }
-    if (needsLegacyV2MigrationConsent(parsedDocument)) {
-      return false;
-    }
-    const adapterId = typeof parsedDocument?.storageAdapterId === 'string'
-      ? parsedDocument.storageAdapterId.trim()
-      : '';
-    return adapterId === 'pixieedraw-v2-zip' || adapterId.startsWith('pixieedraw-v3');
   }
 
   async function confirmLegacyV2MigrationIfNeeded(parsedDocument, options = {}) {
@@ -252,18 +223,16 @@
     if (!await confirmLegacyV2MigrationIfNeeded(parsedDocument, options)) {
       return false;
     }
-    const forceV2WorkingCopy = needsLegacyV2MigrationConsent(parsedDocument) || options?.forceV2WorkingCopy === true;
-    const bindOpenedFile = canBindOpenedProjectFile(parsedDocument, handle, options);
+    const forceV2WorkingCopy = needsLegacyV2MigrationConsent(parsedDocument)
+      || options?.forceV2WorkingCopy === true
+      || options?.fileLoad === true;
     const sourcePersistenceState = buildLoadedProjectPersistenceState(parsedDocument, handle, {
       ...options,
       forceV2WorkingCopy,
-      projectSaveHandleState: bindOpenedFile ? 'bound' : 'none',
     });
     return await applyLoadedDocumentSnapshot(parsedDocument, {
       ...options,
       forceV2WorkingCopy,
-      bindOpenedFile,
-      openedProjectFileHandle: bindOpenedFile ? handle : null,
       sourcePersistenceState,
     });
   }
@@ -304,18 +273,16 @@
     if (!await confirmLegacyV2MigrationIfNeeded(parsedDocument, options)) {
       return false;
     }
-    const forceV2WorkingCopy = needsLegacyV2MigrationConsent(parsedDocument) || options?.forceV2WorkingCopy === true;
-    const bindOpenedFile = canBindOpenedProjectFile(parsedDocument, handle, options);
+    const forceV2WorkingCopy = needsLegacyV2MigrationConsent(parsedDocument)
+      || options?.forceV2WorkingCopy === true
+      || options?.fileLoad === true;
     const sourcePersistenceState = buildLoadedProjectPersistenceState(parsedDocument, handle, {
       ...options,
       forceV2WorkingCopy,
-      projectSaveHandleState: bindOpenedFile ? 'bound' : 'none',
     });
     return await applyLoadedDocumentSnapshot(parsedDocument, {
       ...options,
       forceV2WorkingCopy,
-      bindOpenedFile,
-      openedProjectFileHandle: bindOpenedFile ? handle : null,
       sourcePersistenceState,
     });
   }
@@ -439,7 +406,6 @@
         sourceKind: sourcePersistenceState?.sourceKind ?? 'unknown',
         sourceProjectToken: sourcePersistenceState?.sourceProjectToken ?? null,
         lastSavedStorageAdapterId: sourcePersistenceState?.lastSavedStorageAdapterId ?? null,
-        projectSaveHandleState: sourcePersistenceState?.projectSaveHandleState ?? 'none',
         canonicalPayloadFormat: parsedDocument?.canonicalPayloadFormat || '',
         canonicalSchemaVersion: parsedDocument?.canonicalSchemaVersion || 0,
         canonicalSourceMetadata: parsedDocument?.canonicalSourceMetadata || null,
@@ -469,7 +435,6 @@
           sourceKind: sheet?.sourceKind ?? sourcePersistenceState?.sourceKind ?? 'unknown',
           sourceProjectToken: sheet?.sourceProjectToken ?? sourcePersistenceState?.sourceProjectToken ?? null,
           lastSavedStorageAdapterId: sheet?.lastSavedStorageAdapterId ?? sourcePersistenceState?.lastSavedStorageAdapterId ?? null,
-          projectSaveHandleState: sheet?.projectSaveHandleState ?? sourcePersistenceState?.projectSaveHandleState ?? 'none',
           canonicalPayloadFormat: parsedDocument?.canonicalPayloadFormat || '',
           canonicalSchemaVersion: parsedDocument?.canonicalSchemaVersion || 0,
           canonicalSourceMetadata: parsedDocument?.canonicalSourceMetadata || null,
@@ -491,7 +456,6 @@
         sourceKind: sourcePersistenceState?.sourceKind ?? 'unknown',
         sourceProjectToken: sourcePersistenceState?.sourceProjectToken ?? null,
         lastSavedStorageAdapterId: sourcePersistenceState?.lastSavedStorageAdapterId ?? null,
-        projectSaveHandleState: sourcePersistenceState?.projectSaveHandleState ?? 'none',
         canonicalPayloadFormat: parsedDocument?.canonicalPayloadFormat || '',
         canonicalSchemaVersion: parsedDocument?.canonicalSchemaVersion || 0,
         canonicalSourceMetadata: parsedDocument?.canonicalSourceMetadata || null,
@@ -673,10 +637,6 @@
     const sourcePersistenceState = options?.sourcePersistenceState && typeof options.sourcePersistenceState === 'object'
       ? options.sourcePersistenceState
       : null;
-    const mustCreateUnboundV2WorkingCopy = (
-      options?.forceV2WorkingCopy === true
-      || (options?.fileLoad === true && options?.bindOpenedFile !== true)
-    );
     setActiveAutosaveProjectId(requestedProjectId || createAutosaveProjectId());
     if (!options?.suppressProjectSheetsRestore) {
       await restoreOpenProjectSheetsFromParsedDocument(parsedDocument, {
@@ -702,49 +662,15 @@
         log: true,
       });
     }
-    if (mustCreateUnboundV2WorkingCopy) {
-      // The opened bytes are only an import source. Do not retain its file
-      // handle or let a subsequent autosave overwrite V1/legacy V2/input
-      // files. This must run after the new project's session and tab mirror
-      // are committed; clearing the former project's binding here would make
-      // session metadata briefly point at a different project ID.
-      autosaveHandle = null;
-      pendingAutosaveHandle = null;
-      clearPendingPermissionListener?.();
-      clearActiveProjectSaveHandle?.();
+    if (options?.fileLoad === true || options?.forceV2WorkingCopy === true) {
       console.info('[pixiedraw-dev:v2-import]', {
         phase: 'external-input-converted-to-v2-working-copy',
         sourceKind: sourcePersistenceState?.sourceKind || options?.sourceKind || 'file',
         sourceAdapterId: parsedDocument?.storageAdapterId || null,
         projectId: autosaveProjectId,
       });
-    } else if (options?.bindOpenedFile === true && options?.openedProjectFileHandle) {
-      const handle = options.openedProjectFileHandle;
-      autosaveHandle = handle;
-      pendingAutosaveHandle = null;
-      clearPendingPermissionListener?.();
-      try {
-        await storeAutosaveHandle?.(handle);
-      } catch (error) {
-        console.warn('Failed to persist opened project file handle', error);
-      }
-      bindActiveProjectSaveHandle?.(handle, {
-        fileName: handle.name || state.documentName || DEFAULT_DOCUMENT_NAME,
-        handleKind: 'external-project-file',
-        permissionState: 'granted',
-        adapterId: parsedDocument?.storageAdapterId || 'pixieedraw-v2-zip',
-        boundAt: new Date().toISOString(),
-      }, { log: true });
-      const enableAutosaveButton = dom?.controls?.enableAutosave;
-      if (typeof HTMLButtonElement !== 'undefined' && enableAutosaveButton instanceof HTMLButtonElement) {
-        enableAutosaveButton.textContent = localizeText('保存ファイルに自動接続中', 'Auto-connected to project file');
-      }
-      console.info('[pixiedraw-dev:file-binding]', {
-        phase: 'opened-project-file-bound',
-        fileName: handle.name || '',
-        projectId: autosaveProjectId,
-      });
     }
+
     const loadedQrEditPayload = Object.prototype.hasOwnProperty.call(options || {}, 'qrEditPayload')
       ? options.qrEditPayload
       : getActiveQrEditPayload();
@@ -1272,10 +1198,10 @@
     const normalizedParsed = parsedResult && Object.prototype.hasOwnProperty.call(parsedResult, 'parsed')
       ? parsedResult.parsed
       : parsedResult;
-    const canvasValidator = window.PiXiEEDrawModules?.projectSheetCollectionUtils
-      ?.createProjectSheetCollectionUtils?.();
+    const canvasValidator = window.PiXiEEDrawModules?.projectCanvasValidationUtils
+      ?.createProjectCanvasValidationUtils?.();
     const validateCanvasLimit = project => {
-      const result = canvasValidator?.validateSheetCanvasCount?.(project);
+      const result = canvasValidator?.validateCanvasCount?.(project, { maximum: 4 });
       if (result && !result.valid) {
         const error = new Error(result.code || 'ERR_CANVAS_LIMIT_EXCEEDED');
         error.code = result.code || 'ERR_CANVAS_LIMIT_EXCEEDED';

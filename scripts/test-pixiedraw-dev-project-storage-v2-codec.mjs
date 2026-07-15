@@ -391,7 +391,7 @@ function assertEmptyTimelapsePayload(timelapse, expectedFps = 12) {
 async function runSingleSheetScenario() {
   const codec = createCodec();
   const encoded = await codec.encodePackagedProject(activePackagedProject, {
-    adapterId: 'pixieedraw-v2-zip-experimental',
+    adapterId: 'pixieedraw-v2-zip',
     packageType: 'pixieedraw-project',
     fileExtension: '.pixieedraw',
     mimeType: 'application/x-pixieedraw',
@@ -406,7 +406,7 @@ async function runSingleSheetScenario() {
   assert.ok(encoded.diagnostics.bitmapCount >= encoded.diagnostics.dedupedBitmapCount);
 
   const decoded = await codec.decodeArchiveBytes(new Uint8Array(await encoded.blob.arrayBuffer()), {
-    adapterId: 'pixieedraw-v2-zip-experimental',
+    adapterId: 'pixieedraw-v2-zip',
   });
 
   assert.equal(decoded.archiveManifest.sheetCount, 0);
@@ -427,7 +427,7 @@ async function runSingleSheetScenario() {
 async function runMultiSheetIncludeTimelapseScenario() {
   const codec = createCodec();
   const encoded = await codec.encodePackagedProject(multiSheetPackagedProject, {
-    adapterId: 'pixieedraw-v2-zip-experimental',
+    adapterId: 'pixieedraw-v2-zip',
     packageType: 'pixieedraw-project',
     fileExtension: '.pixieedraw',
     mimeType: 'application/x-pixieedraw',
@@ -435,44 +435,23 @@ async function runMultiSheetIncludeTimelapseScenario() {
     includeTimelapse: true,
   });
 
-  assert.equal(encoded.archiveManifest.sheetCount, 2);
-  assert.equal(encoded.diagnostics.sheetCount, 2);
+  assert.equal(encoded.archiveManifest.sheetCount, 0);
+  assert.equal(encoded.diagnostics.sheetCount, 0);
   assert.equal(encoded.diagnostics.timelapseIncluded, true);
-  assert.ok(encoded.diagnostics.dedupedBitmapCount < encoded.diagnostics.bitmapCount);
   assert.equal(encoded.archiveProject.session.timelapseArchive.included, true);
   assertEmptyTimelapsePayload(encoded.archiveProject.session.timelapse, 12);
 
   const zipEntries = parseStoredZipEntries(new Uint8Array(await encoded.blob.arrayBuffer()));
   assert.ok(zipEntries.has('timelapse/session.json'));
-  assert.ok(zipEntries.has('sheets/sheet-active/timelapse/session.json'));
-  assert.ok(zipEntries.has('sheets/sheet-shared-origin/timelapse/session.json'));
-  const extraSheetProjectJson = JSON.parse(Buffer.from(zipEntries.get('sheets/sheet-shared-origin/project.json')).toString('utf8'));
-  assert.equal(extraSheetProjectJson.session.timelapseArchive.included, true);
-  assertEmptyTimelapsePayload(extraSheetProjectJson.session.timelapse, 8);
+  assert.ok(!Array.from(zipEntries.keys()).some(path => path.startsWith('sheets/')));
 
   const decoded = await codec.decodeArchiveBytes(new Uint8Array(await encoded.blob.arrayBuffer()), {
-    adapterId: 'pixieedraw-v2-zip-experimental',
+    adapterId: 'pixieedraw-v2-zip',
   });
-  assert.equal(decoded.archiveManifest.sheetCount, 2);
-  assert.equal(decoded.diagnostics.sheetCount, 2);
+  assert.equal(decoded.archiveManifest.sheetCount, 0);
+  assert.equal(decoded.diagnostics.sheetCount, 0);
   assert.equal(decoded.diagnostics.timelapseIncluded, true);
-  assert.equal(decoded.packaged.activeSheetId, 'sheet-active');
-  assert.equal(decoded.packaged.sheets.length, 2);
-  assert.equal(decoded.packaged.sheets[1].source, 'shared-sheet');
-  assert.equal(decoded.packaged.sheets[1].sharedProjectKey, 'legacy-shared-key');
-  assert.equal(decoded.packaged.sheets[1].project.document.canvases.length, 2);
-  assert.equal(decoded.packaged.sheets[1].project.session.timelapse.enabled, true);
-  assert.equal(decoded.packaged.sheets[1].project.canonicalSourceMetadata.gifLoopCount, null);
-  assert.equal(decoded.packaged.sheets[1].project.canonicalSourceMetadata.sourceFrameCount, 3);
-  assert.deepEqual(decoded.packaged.sheets[1].project.session.timelapse.byCanvas, extraSession.timelapse.byCanvas);
-  assert.deepEqual(
-    decoded.packaged.sheets[1].project.session.localViewportCanvases,
-    extraSession.localViewportCanvases
-  );
-  assert.deepEqual(
-    decoded.packaged.sheets[1].project.session.timelapse.operationLogsByCanvas,
-    extraSession.timelapse.operationLogsByCanvas
-  );
+  assert.equal(Array.isArray(decoded.packaged.sheets), false);
   assert.equal(decoded.packaged.session.timelapseArchive, undefined);
 
   return encoded.blob.size;
@@ -481,7 +460,7 @@ async function runMultiSheetIncludeTimelapseScenario() {
 async function runMultiSheetOmitTimelapseScenario() {
   const codec = createCodec();
   const encoded = await codec.encodePackagedProject(multiSheetPackagedProject, {
-    adapterId: 'pixieedraw-v2-zip-experimental',
+    adapterId: 'pixieedraw-v2-zip',
     packageType: 'pixieedraw-project',
     fileExtension: '.pixieedraw',
     mimeType: 'application/x-pixieedraw',
@@ -502,9 +481,7 @@ async function runMultiSheetOmitTimelapseScenario() {
   });
   assert.equal(decoded.diagnostics.timelapseIncluded, false);
   assertEmptyTimelapsePayload(decoded.packaged.session.timelapse, 12);
-  assertEmptyTimelapsePayload(decoded.packaged.sheets[0].project.session.timelapse, 12);
-  assertEmptyTimelapsePayload(decoded.packaged.sheets[1].project.session.timelapse, 8);
-  assert.equal(decoded.packaged.sheets[1].sharedProjectBackendId, 'legacy-backend-id');
+  assert.equal(Array.isArray(decoded.packaged.sheets), false);
 
   return encoded.blob.size;
 }
@@ -519,12 +496,10 @@ async function runLargeMultiSheetScenario(sheetCount) {
   });
   const packaged = { ...structuredClone(activePackagedProject), sheets, sheetOrder: sheets.map(sheet => sheet.id), activeSheetId: sheets[Math.floor(sheetCount / 2)].id };
   const codec = createCodec();
-  const encoded = await codec.encodePackagedProject(packaged, { adapterId: 'pixieedraw-v2-zip-experimental', includeSheets: true, includeTimelapse: false });
+  const encoded = await codec.encodePackagedProject(packaged, { adapterId: 'pixieedraw-v2-zip', includeSheets: true, includeTimelapse: false });
   const decoded = await codec.decodeArchiveBytes(new Uint8Array(await encoded.blob.arrayBuffer()));
-  assert.equal(decoded.packaged.sheets.length, sheetCount);
-  assert.deepEqual(decoded.packaged.sheets.map(sheet => sheet.id), packaged.sheetOrder);
-  assert.equal(decoded.packaged.activeSheetId, packaged.activeSheetId);
-  assert.equal(decoded.packaged.sheets.at(-1).project.session.localViewportCanvases.anchorLeft, sheetCount - 1);
+  assert.equal(Array.isArray(decoded.packaged.sheets), false);
+  assert.equal(decoded.archiveManifest.sheetCount, 0);
 }
 
 const singleSize = await runSingleSheetScenario();

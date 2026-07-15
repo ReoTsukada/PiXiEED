@@ -274,7 +274,6 @@
         sourceKind: 'shared-local',
         sourceStorageAdapterId: null,
         lastSavedStorageAdapterId: null,
-        projectSaveHandleState: 'none',
         sharedLocalRestore: true,
       });
       if (!loaded || loaded === 'deferred') {

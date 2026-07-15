@@ -5,20 +5,7 @@
 
   const root = window.PiXiEEDrawModules = window.PiXiEEDrawModules || {};
 
-  function createImportUtils({
-    EXTERNAL_IMPORT_MODE_APPEND_TAB,
-    EXTERNAL_IMPORT_MODE_NEW_PROJECT,
-  } = {}) {
-    function normalizeExternalImportMode(value) {
-      return value === EXTERNAL_IMPORT_MODE_APPEND_TAB
-        ? EXTERNAL_IMPORT_MODE_APPEND_TAB
-        : EXTERNAL_IMPORT_MODE_NEW_PROJECT;
-    }
-
-    function shouldAppendExternalImportToProject(payload) {
-      return normalizeExternalImportMode(payload?.importMode) === EXTERNAL_IMPORT_MODE_APPEND_TAB;
-    }
-
+  function createImportUtils() {
     function isLensImportPayload(payload) {
       return Boolean(
         payload
@@ -29,8 +16,6 @@
     }
 
     return Object.freeze({
-      normalizeExternalImportMode,
-      shouldAppendExternalImportToProject,
       isLensImportPayload,
     });
   }

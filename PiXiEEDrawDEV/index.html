@@ -33,7 +33,6 @@
   "image": "https://pixieed.jp/PiXiEEDrawDEV/ogp-app.png",
   "description": "PiXiEEDrawは無料で使えるブラウザのドット絵作成ツール。本格制作・アニメ制作に対応し、レイヤー/オニオンスキン、PNG/JPEG/SVG/GIF/タイムラプスGIF書き出し、拡張機能、PC/モバイル対応。",
   "featureList": [
-    "マルチキャンバス編集",
     "フレームアニメーション編集（FPS設定）",
     "オニオンスキン表示",
     "レイヤー不透明度・合成モード",
@@ -79,7 +78,7 @@
   })();
 </script>
 <script src="assets/js/modules/edition-capabilities-utils.js?v=2026.07.11-g3a-edition-ads"></script>
-<script src="assets/js/build-info.js?v=20260715-080"></script>
+<script src="assets/js/build-info.js?v=20260715-086"></script>
 <script>
   (function configurePixieedAds() {
     const shouldShowAds = typeof window.__PIXIEEDRAW_SHOULD_SHOW_ADS__ === 'function'
@@ -402,7 +401,7 @@
 
 
 
-<link href="assets/css/style.css?v=20260715-workspace-open-guard1" rel="stylesheet"/>
+<link href="assets/css/style.css?v=20260715-safari-local-projects1" rel="stylesheet"/>
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-4.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-4.png"/>
 <style>
@@ -499,15 +498,14 @@
 <section aria-labelledby="startupWorkspaceTitle" class="startup-workspace" id="startupWorkspace">
 <div class="startup-workspace__header">
 <div>
-<h2 class="startup-workspace__title" id="startupWorkspaceTitle">PiXiEEDワークスペース</h2>
-<p aria-live="polite" class="startup-workspace__status" id="startupWorkspaceStatus">接続状態を確認しています…</p>
+<h2 class="startup-workspace__title" id="startupWorkspaceTitle">プロジェクト一覧</h2>
+<p aria-live="polite" class="startup-workspace__status" id="startupWorkspaceStatus">端末内プロジェクトを確認しています…</p>
 </div>
 <div class="startup-workspace__actions">
-<button class="button button--primary" id="startupWorkspaceConnect" type="button">保存場所を選んで接続</button>
 </div>
 </div>
 <div aria-live="polite" class="startup-workspace__list" id="startupWorkspaceProjectList" role="list">
-<p class="startup-workspace__empty">PiXiEEDフォルダへ接続すると、実ファイルのプロジェクト一覧が表示されます。</p>
+<p class="startup-workspace__empty">保存済みプロジェクトを確認しています…</p>
 </div>
 </section>
 </div>
@@ -1159,23 +1157,19 @@
 <div class="field-group field-group--file-actions">
 <button class="button" id="newProject" type="button">新規作成</button>
 <button class="button" id="openDocument" type="button">ファイルを開く</button>
-<a class="button" href="../account/index.html" id="openPixieedMyPage">PiXiEED マイページ</a>
+<button class="button" id="showLocalProjects" type="button">プロジェクト一覧</button>
 <button class="button button--primary" id="exportProject" type="button">出力設定を開く</button>
 </div>
 <div class="file-panel-summary">
-<p class="help-text ui-guide-text">自動保存とタイムラプスは常時ONです。完全ファイル同期には保存先の設定が必要です。</p>
-<p class="help-text ui-guide-text">画像・GIF・PiXiEEDraw形式の保存は出力パネルから行います。</p>
+<p class="help-text ui-guide-text">描画は端末内V2へ自動保存し、10操作ごとに差分をチェックポイントへ統合します。</p>
+<p class="help-text ui-guide-text">外部ファイルへは自動出力しません。画像・GIF・PiXiEEDraw形式は出力パネルからダウンロードします。</p>
 </div>
 <label class="toggle-option" for="toggleAutosaveRequired">
 <input checked disabled id="toggleAutosaveRequired" type="checkbox"/>
-<span>自動保存（常時ON）</span>
+<span>端末内V2自動保存（常時ON）</span>
 </label>
-<button class="button" id="enableAutosave" type="button">完全ファイルの保存先を設定</button>
-<button class="button" hidden id="bindExportFolder" type="button">出力フォルダを設定</button>
-<p aria-live="polite" class="help-text export-destination-label" id="exportDestinationLabel">派生出力先: 未固定（既存ファイルは上書きしません）</p>
 <p aria-live="polite" class="help-text" id="autosaveStatus"></p>
 <p aria-live="polite" class="help-text" id="projectFileStatus">未保存</p>
-<p aria-live="polite" class="help-text" id="exportFolderStatus"></p>
 <div class="field field--list">
 <span id="timelapseSectionTitle">タイムラプス</span>
 <div class="field-group">
@@ -1363,20 +1357,6 @@
 </label>
 </li>
 <li>
-<label class="toggle-option" for="toggleLocalCanvas" title="通常制作は単一キャンバスです。共同制作や素材分担では複数キャンバスを使えます。">
-<input id="toggleLocalCanvas" type="checkbox"/>
-<span>複数キャンバス（上級）</span>
-</label>
-<div aria-label="複数キャンバス設定" class="local-canvas-count-controls is-hidden" hidden="" id="localCanvasCountControls">
-<span class="local-canvas-count-controls__label" id="localCanvasCountLabel">キャンバス数</span>
-<div class="local-canvas-count-controls__row">
-<button class="chip local-canvas-count-controls__button" id="removeLocalCanvas" type="button" aria-label="追加キャンバスを減らす">-</button>
-<span aria-live="polite" class="local-canvas-count-controls__value" id="localCanvasCountValue">0</span>
-<button class="chip local-canvas-count-controls__button" id="addLocalCanvas" type="button" aria-label="追加キャンバスを増やす">+</button>
-</div>
-</div>
-</li>
-<li>
 <label class="toggle-option" for="toggleMirrorMode">
 <input id="toggleMirrorMode" type="checkbox"/>
 <span>ミラーモード</span>
@@ -1488,10 +1468,10 @@
 <span aria-hidden="true" class="export-toggle-icon"><img alt="" decoding="async" src="../icon-e1_frame_04.png"/></span>
 <span>原寸も追加</span>
 </label>
-<label class="toggle-option export-icon-toggle" for="exportSaveProjectCompanionToggle" id="exportCompanionOptionRow" title="接続中のPiXiEEDファイルを同期（未接続時のみ新規作成）">
+<label class="toggle-option export-icon-toggle" for="exportSaveProjectCompanionToggle" id="exportCompanionOptionRow" title="PiXiEEDrawファイルもダウンロード">
 <input id="exportSaveProjectCompanionToggle" type="checkbox"/>
 <span aria-hidden="true" class="export-toggle-icon"><img alt="" decoding="async" src="../icon-e1_frame_01.png"/></span>
-<span>PiXiEEDファイルも同期</span>
+<span>PiXiEEDrawもダウンロード</span>
 </label>
 <label class="toggle-option export-icon-toggle" for="exportSpriteMapCompanionToggle" id="exportSpriteMapCompanionOptionRow" title="SpriteMAP出力">
 <input id="exportSpriteMapCompanionToggle" type="checkbox"/>
@@ -1663,22 +1643,6 @@
 <button class="button button--ghost" id="cancelNewProject" type="button">キャンセル</button>
 <button class="button button--primary" id="confirmNewProject" type="submit">作成</button>
 </div>
-</form>
-</dialog>
-<dialog aria-labelledby="autosaveDestinationDialogTitle" class="modal" id="autosaveDestinationDialog">
-<form class="modal__form" method="dialog">
-<header class="modal__header">
-<h2 class="modal__title" id="autosaveDestinationDialogTitle">完全ファイルの保存先を設定</h2>
-</header>
-<div class="modal__body">
-<p>自動保存は常時ONです。このプロジェクトの完全ファイル同期先を選択してください。</p>
-<p class="help-text">設定後は、通常の描画を復元可能なV2差分として先に保護し、操作停止から約12〜15秒後、チェックポイント到達時、プロジェクト切替時、画面を閉じる前に、タイムラプスと履歴を含む完全な PiXiEEDraw ファイルへ反映します。</p>
-<p class="help-text">保存先が未設定の間は完全ファイルへ同期できず、販売用データの完了条件を満たしません。手動でプロジェクト保存した場合は、そのファイルへ自動接続します。</p>
-</div>
-<footer class="modal__footer">
-<button class="button button--ghost" id="autosaveDestinationLater" type="button">あとで設定</button>
-<button class="button button--primary" id="autosaveDestinationChoose" type="button">保存先を選択</button>
-</footer>
 </form>
 </dialog>
 <dialog aria-labelledby="globalHistoryConfirmTitle" class="modal" id="globalHistoryConfirmDialog">
@@ -1856,18 +1820,17 @@
       })();
     </script>
 <script defer="" src="../scripts/pixieed-dot-stats.js"></script>
-<script defer="" src="../scripts/pixieed-workspace.js?v=20260715-location-validation1"></script>
 	<script src="../scripts/support-checkout-panel.js?v=2026.07.04-shared-project-disabled1"></script>
 	<script defer="" src="assets/js/modules/core-utils.js?v=2026.06.29-multi-invite-split"></script>
 	<script defer="" src="assets/js/modules/embed-config-utils.js?v=2026.07.02-startup-helper-split-v1"></script>
 	<script defer="" src="assets/js/modules/palette-utils.js?v=2026.07.01-palette-preset-names-split-v1"></script>
 	<script defer="" src="assets/js/modules/palette-preset-workflow-utils.js?v=2026.07.02-palette-preset-workflow-split-v1"></script>
 	<script defer="" src="assets/js/modules/color-codec-utils.js?v=2026.06.30-color-codec-v1"></script>
-	<script defer="" src="assets/js/modules/export-delivery-utils.js?v=2026.06.30-export-delivery-v1"></script>
+	<script defer="" src="assets/js/modules/export-delivery-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/document-utils.js?v=2026.06.28-file-split-step5"></script>
 	<script defer="" src="assets/js/modules/document-model.js?v=2026.07.12-direct-authority-gmem2b1"></script>
 	<script defer="" src="assets/js/modules/state-normalizers.js?v=20260715-true-v2-single-canvas-v1"></script>
-	<script defer="" src="assets/js/modules/ui-static-config.js?v=2026.07.14-circle-oval-v1"></script>
+	<script defer="" src="assets/js/modules/ui-static-config.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/geometry-utils.js?v=2026.06.30-geometry-utils-v1"></script>
 	<script defer="" src="assets/js/modules/viewport-zoom-utils.js?v=2026.06.30-viewport-zoom-v1"></script>
 	<script defer="" src="assets/js/modules/local-layer-preferences-utils.js?v=2026.06.30-local-layer-preferences-v1"></script>
@@ -1876,13 +1839,10 @@
 	<script defer="" src="assets/js/modules/autosave-database-utils.js?v=2026.07.02-startup-helper-split-v1"></script>
 	<script defer="" src="assets/js/modules/autosave-schema-v2-utils.js?v=20260713-047"></script>
 	<script defer="" src="assets/js/modules/autosave-schema-v2-indexeddb-utils.js?v=20260713-047"></script>
-	<script defer="" src="assets/js/modules/autosave-schema-v2-shadow-utils.js?v=2026.07.11-autosave-schema-v2-phase4o"></script>
-	<script defer="" src="assets/js/modules/autosave-schema-v2-read-shadow-utils.js?v=2026.07.11-autosave-schema-v2-phase4p"></script>
 	<script defer="" src="assets/js/modules/autosave-schema-v2-restore-preview-utils.js?v=20260713-047"></script>
 	<script defer="" src="assets/js/modules/autosave-schema-v2-recovery-utils.js?v=20260715-timelapse-always-on-p7"></script>
-	<script defer="" src="assets/js/modules/project-storage-utils.js?v=2026.07.01-pixfind-mode-split-v1"></script>
-	<script defer="" src="assets/js/modules/project-sheet-collection-utils.js?v=2026.07.11-sheet-payload-ownership-fix1"></script>
-	<script defer="" src="assets/js/modules/project-sheet-transaction-utils.js?v=2026.07.11-sheet-api-phase5b2b"></script>
+	<script defer="" src="assets/js/modules/project-storage-utils.js?v=20260715-local-true-v2-cleanup1"></script>
+	<script defer="" src="assets/js/modules/project-canvas-validation-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/navigation.js?v=2026.07.01-navigation-config-split-v1"></script>
 	<script defer="" src="assets/js/modules/clipboard-utils.js?v=2026.07.04-shared-copy-url-fix1"></script>
 	<script defer="" src="assets/js/modules/multi-invite-utils.js?v=2026.06.29-multi-invite-split"></script>
@@ -1893,17 +1853,17 @@
 	<script defer="" src="assets/js/modules/qr-edit-core-utils.js?v=2026.06.30-qr-edit-core-v1"></script>
 	<script defer="" src="assets/js/modules/qr-edit-panel-utils.js?v=2026.06.29-open-project-tab-batch-v1"></script>
 	<script defer="" src="assets/js/modules/image-utils.js?v=20260713-047"></script>
-	<script defer="" src="assets/js/modules/open-project-tab-model.js?v=2026.07.11-sheet-payload-ownership-fix1"></script>
+	<script defer="" src="assets/js/modules/open-project-tab-model.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/project-command-lock-utils.js?v=2026.07.12-command-lock-r2"></script>
-	<script defer="" src="assets/js/modules/export-utils.js?v=2026.06.28-file-split-step4"></script>
+	<script defer="" src="assets/js/modules/export-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/export-normalizer-utils.js?v=20260714-project-v2-default1"></script>
 	<script defer="" src="assets/js/modules/export-session.js?v=2026.06.29-document-model-export-session-fix2"></script>
 	<script defer="" src="assets/js/modules/pixieed-support-benefit-utils.js?v=2026.07.04-shared-project-disabled1"></script>
 	<script defer="" src="assets/js/modules/open-project-tab-helpers.js?v=2026.07.06-local-project-open-fix1"></script>
 		<script defer="" src="assets/js/modules/open-project-tab-workflow-utils.js?v=2026.07.13-v2-sheet-order-recovery3"></script>
-		<script defer="" src="assets/js/modules/open-project-tab-view.js?v=2026.07.13-single-project-indicator1"></script>
-	<script defer="" src="assets/js/modules/open-project-tab-lifecycle.js?v=2026.07.13-start-screen-only1"></script>
-	<script defer="" src="assets/js/modules/open-project-tab-sheet-actions.js?v=2026.07.12-command-lock-r2"></script>
+		<script defer="" src="assets/js/modules/open-project-tab-view.js?v=20260715-local-true-v2-cleanup1"></script>
+	<script defer="" src="assets/js/modules/open-project-tab-lifecycle.js?v=20260715-local-true-v2-cleanup1"></script>
+	<script defer="" src="assets/js/modules/open-project-tab-interactions.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/local-project-journal-utils.js?v=2026.07.13-file-primary-memory1"></script>
 	<script defer="" src="assets/js/modules/pixel-patch-history-utils.js?v=2026.07.12-direct-authority-gmem2a1"></script>
 	<script defer="" src="assets/js/modules/cold-history-store-utils.js?v=20260715-cold-history-p6"></script>
@@ -1931,7 +1891,7 @@
 	<script defer="" src="assets/js/modules/image-import-decode-utils.js?v=2026.07.12-gmem3a-streaming-resize1"></script>
 	<script defer="" src="assets/js/modules/palette-panel-utils.js?v=2026.07.12-direct-authority-gmem2a1"></script>
 	<script defer="" src="assets/js/modules/timeline-layers.js?v=2026.07.04-frame-pending-structure-fix1"></script>
-	<script defer="" src="assets/js/modules/ui-localization-utils.js?v=20260715-advanced-multicanvas-v1"></script>
+	<script defer="" src="assets/js/modules/ui-localization-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/ui-language-utils.js?v=2026.07.03-small-helper-batch-split-v1"></script>
 	<script defer="" src="assets/js/modules/scroll-input-utils.js?v=2026.07.03-small-helper-batch-split-v1"></script>
 	<script defer="" src="assets/js/modules/sprite-scale-utils.js?v=2026.06.30-zh-localization-v1"></script>
@@ -1947,7 +1907,7 @@
 	<script defer="" src="assets/js/modules/keyboard-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/canvas-pointer-workflow-utils.js?v=20260715-selection-cancel-restore-v1"></script>
 	<script defer="" src="assets/js/modules/canvas-tool-state-workflow-utils.js?v=2026.07.14-selection-keep-v1"></script>
-	<script defer="" src="assets/js/modules/export-rendering.js?v=20260715-startup-certified-p13"></script>
+	<script defer="" src="assets/js/modules/export-rendering.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/dialog-setup-utils.js?v=20260714-project-v2-default1"></script>
 	<script defer="" src="assets/js/modules/canvas-resize-workflow-utils.js?v=20260713-049"></script>
 	<script defer="" src="assets/js/modules/canvas-resize-handle-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
@@ -1966,21 +1926,21 @@
 	<script defer="" src="assets/js/modules/canvas-grid-workflow-utils.js?v=2026.07.03-grid-workflow-split-v1"></script>
 	<script defer="" src="assets/js/modules/timeline-navigation-workflow-utils.js?v=2026.07.03-size-timeline-split-v1"></script>
 	<script defer="" src="assets/js/modules/timelapse-session-utils.js?v=20260715-timelapse-disk-p8"></script>
-	<script defer="" src="assets/js/modules/autosave-workflow-utils.js?v=20260715-startup-certified-p13"></script>
+	<script defer="" src="assets/js/modules/autosave-workflow-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/project-provenance-utils.js?v=20260714-provenance-v1"></script>
-	<script defer="" src="assets/js/modules/open-import-workflow-utils.js?v=20260714-originality-v1"></script>
+	<script defer="" src="assets/js/modules/open-import-workflow-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/export-format-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
-	<script defer="" src="assets/js/modules/export-dialog-workflow-utils.js?v=20260714-project-v2-default1"></script>
-		<script defer="" src="assets/js/modules/startup-workflow-utils.js?v=20260715-workspace-open-guard1"></script>
-		<script defer="" src="assets/js/modules/recent-project-workflow-utils.js?v=20260713-048"></script>
+	<script defer="" src="assets/js/modules/export-dialog-workflow-utils.js?v=20260715-local-true-v2-cleanup1"></script>
+		<script defer="" src="assets/js/modules/startup-workflow-utils.js?v=20260715-local-true-v2-cleanup1"></script>
+		<script defer="" src="assets/js/modules/recent-project-workflow-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 		<script defer="" src="assets/js/modules/project-package-workflow-utils.js?v=20260714-provenance-v1"></script>
 		<script defer="" src="assets/js/modules/project-storage-adapter-utils.js?v=20260715-legacy-project-card-recovery1"></script>
 		<script defer="" src="assets/js/modules/project-storage-v1-json-adapter.js?v=20260715-legacy-project-card-recovery1"></script>
-		<script defer="" src="assets/js/modules/project-storage-v2-archive-codec.js?v=20260715-legacy-project-card-recovery1"></script>
+		<script defer="" src="assets/js/modules/project-storage-v2-archive-codec.js?v=20260715-local-true-v2-cleanup1"></script>
 		<script defer="" src="assets/js/modules/project-storage-v2-worker-bridge.js?v=2026.07.10-project-storage-worker1"></script>
 		<script defer="" src="assets/js/modules/project-storage-v2-zip-adapter.js?v=20260715-startup-certified-p13"></script>
 		<script defer="" src="assets/js/modules/document-serialization-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
-	<script defer="" src="assets/js/modules/document-session-workflow-utils.js?v=20260715-workspace-open-guard1"></script>
+	<script defer="" src="assets/js/modules/document-session-workflow-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/recent-account-workflow-utils.js?v=2026.07.03-safe-helper-split-v1"></script>
 	<script defer="" src="assets/js/modules/pixieed-profile-local-utils.js?v=2026.07.03-safe-helper-split-v1"></script>
 	<script defer="" src="assets/js/modules/shared-recent-project-utils.js?v=2026.07.03-shared-recent-helper-split-v1"></script>
@@ -2006,10 +1966,11 @@
 	<script defer="" src="assets/js/modules/controls-mirror.js?v=2026.07.13-editor-command-lane2"></script>
 	<script defer="" src="assets/js/modules/external-tool-workflow-utils.js?v=2026.07.02-external-tool-workflow-split-v1"></script>
 	<script defer="" src="assets/js/modules/canonical-v2-project-utils.js?v=20260714-originality-v1"></script>
+	<script defer="" src="assets/js/modules/local-project-v2-migration-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/pre-update-checkpoint-utils.js?v=20260712-pre-update-checkpoint-u3"></script>
-	<script defer="" src="assets/js/active-project-session-utils.js?v=2026.07.13-active-project-session-r2c"></script>
+	<script defer="" src="assets/js/active-project-session-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/pixieedraw-dev-switch.js?v=2026.07.03-pixieedrawdev-switch-fix14"></script>
-	<script defer="" src="assets/js/app.js?v=20260715-080"></script>
+	<script defer="" src="assets/js/app.js?v=20260715-086"></script>
 	<script defer="" src="assets/js/modules/update-detection-utils.js?v=20260713-026"></script>
   <script>
     (function initPanelAdDocking() {

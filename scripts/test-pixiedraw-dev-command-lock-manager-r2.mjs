@@ -44,7 +44,7 @@ assert.equal(manager.release({ token: lock.token, owner: 'png-import' }).ok, tru
 assert.equal(manager.inspect().locked, false);
 
 async function releaseInFinally({ throwError = false } = {}) {
-  const active = manager.acquire({ owner: 'sheet-add', command: 'create-empty-sheet' });
+  const active = manager.acquire({ owner: 'project-open-input', command: 'open-project' });
   try {
     if (throwError) throw new Error('fixture');
     return 'ok';
@@ -60,26 +60,22 @@ assert.ok(diagnostics.some(entry => entry.phase === 'command-lock-stale-detected
 const appPath = new URL('../PiXiEEDrawDEV/assets/js/app.js', import.meta.url);
 const importPath = new URL('../PiXiEEDrawDEV/assets/js/modules/open-import-workflow-utils.js', import.meta.url);
 const switchPath = new URL('../PiXiEEDrawDEV/assets/js/modules/open-project-tab-workflow-utils.js', import.meta.url);
-const sheetPath = new URL('../PiXiEEDrawDEV/assets/js/modules/open-project-tab-sheet-actions.js', import.meta.url);
 const updatePath = new URL('../PiXiEEDrawDEV/assets/js/modules/update-detection-utils.js', import.meta.url);
 const buildPath = new URL('../PiXiEEDrawDEV/assets/js/build-info.js', import.meta.url);
 const manifestPath = new URL('../PiXiEEDrawDEV/version.json', import.meta.url);
 const app = fs.readFileSync(appPath, 'utf8');
 const importer = fs.readFileSync(importPath, 'utf8');
 const switcher = fs.readFileSync(switchPath, 'utf8');
-const sheet = fs.readFileSync(sheetPath, 'utf8');
 const update = fs.readFileSync(updatePath, 'utf8');
 const build = fs.readFileSync(buildPath, 'utf8');
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 
 assert.doesNotMatch(importer, /openProjectTabBusy\s*=/);
 assert.doesNotMatch(switcher, /openProjectTabBusy\s*=/);
-assert.doesNotMatch(sheet, /setOpenProjectTabBusy/);
 assert.match(importer, /acquireProjectCommandLock\(/);
 assert.match(importer, /releaseProjectCommandLock\(/);
 assert.match(switcher, /activationOwner = 'sheet-switch'/);
 assert.match(switcher, /commandOwner = 'sheet-delete'/);
-assert.match(sheet, /owner: 'sheet-add'/);
 assert.match(app, /ERR_STARTUP_READY_WITH_COMMAND_LOCK/);
 assert.match(app, /startupReady/);
 assert.match(update, /setStatus\('current-newer', 'manifest-older'\)/);
