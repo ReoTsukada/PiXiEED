@@ -22017,6 +22017,8 @@
   set FILL_STYLE_SOLID(value) { FILL_STYLE_SOLID = value; },
   get isSharedProjectCollaborativeMode() { return isSharedProjectCollaborativeMode; },
   set isSharedProjectCollaborativeMode(value) { isSharedProjectCollaborativeMode = value; },
+  get resolveSharedProjectDrawCommandTarget() { return resolveSharedProjectDrawCommandTarget; },
+  set resolveSharedProjectDrawCommandTarget(value) {},
   get getSharedProjectCanonicalCanvasId() { return getSharedProjectCanonicalCanvasId; },
   set getSharedProjectCanonicalCanvasId(value) { getSharedProjectCanonicalCanvasId = value; },
   get getProjectCanvasDocuments() { return getProjectCanvasDocuments; },
@@ -22102,6 +22104,9 @@
   }
 
   function captureSharedProjectRegionCommand(...args) {
+    if (!SHARED_PROJECTS_ENABLED) {
+      return false;
+    }
     return sharedProjectOpUtilsModule.captureSharedProjectRegionCommand(...args);
   }
 
@@ -23527,6 +23532,10 @@
 
   function resolveSharedProjectLayerForPayload(...args) {
     return sharedProjectDrawApplyUtilsModule.resolveSharedProjectLayerForPayload(...args);
+  }
+
+  function resolveSharedProjectDrawCommandTarget(...args) {
+    return sharedProjectDrawApplyUtilsModule.resolveSharedProjectDrawCommandTarget(...args);
   }
 
   function inspectIncomingSharedProjectDrawOp(...args) {
