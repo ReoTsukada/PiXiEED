@@ -92,8 +92,10 @@
             <a class="button-secondary" href="../../index.html">ホームへ戻る</a>
           </div>
         </div>
-        <div class="project-hero__media">
-          <img src="../../assets/screenshots/generated/pixiedraw-editor.png" alt="PiXiEEDrawの編集画面">
+        <div class="project-hero__media project-live-tool" data-project-live-tool data-project-tool-page="../../pixiedraw/index.html" data-project-tool-embed="../../pixiedraw/index.html?embed=1">
+          <div class="project-live-tool__head"><strong>PiXiEEDrawをこの場で試す</strong><span>広告なしの埋め込み</span></div>
+          <iframe class="project-live-tool__frame" data-project-live-frame src="../../pixiedraw/index.html?embed=1" title="PiXiEEDrawを試す" allow="fullscreen"></iframe>
+          <div class="project-live-tool__actions"><a data-project-live-fullscreen href="../../pixiedraw/index.html?fullscreen=1">フルスクリーンで使う</a></div>
         </div>
       </div>
     </section>
@@ -315,6 +317,7 @@
     </div>
   </div>
   <script src="../../scripts/ads-lazy.js"></script>
+  <script src="../../scripts/live-tool-embed.js"></script>
   <script src="../../scripts/shared-profile-header.js"></script>
   <script src="../../scripts/pixieed-dot-stats.js"></script>
   <script src="../../scripts/shared-bottom-nav.js"></script>
