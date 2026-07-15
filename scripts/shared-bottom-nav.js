@@ -24,6 +24,9 @@
     body.dataset.pixieedPage = 'maoitu';
     doc.documentElement.dataset.pixieedPage = 'maoitu';
   }
+  if (!isStandaloneToolOrGamePage()) {
+    body.classList.add('pixieed-seamless-page');
+  }
 
   applyResponsivePageState();
   injectStyles();
@@ -65,6 +68,13 @@
 
   function isPixiedrawPage() {
     return !currentPath.includes('/projects/') && /(?:^|\/)(?:pixiedraw|pixieedrawdev)(?:\/|\/index\.html)?$/.test(currentPath);
+  }
+
+  function isStandaloneToolOrGamePage() {
+    if (currentPath.includes('/projects/')) {
+      return false;
+    }
+    return /(?:^|\/)(?:pixiedraw|pixieedrawdev|pixiee-lens|qr|qr-maker|maoitu|contest)(?:\/|\/index\.html)?$/.test(currentPath);
   }
 
   function applyResponsivePageState() {
@@ -269,6 +279,84 @@
       }
       body{
         padding-bottom:max(84px, calc(var(--pixieed-shared-bottom-nav-height) + 16px + env(safe-area-inset-bottom, 0px))) !important;
+      }
+      body.pixieed-seamless-page{
+        padding-inline:0 !important;
+      }
+      body.pixieed-seamless-page > .page,
+      body.pixieed-seamless-page > main,
+      body.pixieed-seamless-page > .page > main,
+      body.pixieed-seamless-page > .page > .page-shell{
+        gap:0 !important;
+      }
+      body.pixieed-seamless-page main > section,
+      body.pixieed-seamless-page .page > section,
+      body.pixieed-seamless-page .page-shell > section,
+      body.pixieed-seamless-page .page > .card{
+        margin-block:0 !important;
+        border-radius:0 !important;
+      }
+      body.pixieed-seamless-page main > section + section,
+      body.pixieed-seamless-page .page > section + section,
+      body.pixieed-seamless-page .page-shell > section + section,
+      body.pixieed-seamless-page .page > .card + .card{
+        border-top-width:0 !important;
+      }
+      body.pixieed-seamless-page #devNotes{
+        display:grid;
+        gap:0 !important;
+      }
+      body.pixieed-seamless-page #devNotes > *{
+        margin-block:0 !important;
+        border-radius:0 !important;
+      }
+      body.pixieed-seamless-page{
+        background:
+          radial-gradient(48rem 30rem at -8% -12%, rgba(37,99,235,0.18), transparent 64%),
+          radial-gradient(40rem 28rem at 108% 8%, rgba(124,58,237,0.16), transparent 60%),
+          #070d1b !important;
+      }
+      body.pixieed-seamless-page > header,
+      body.pixieed-seamless-page > .site-header{
+        background:rgba(7,13,27,0.84) !important;
+        border-color:rgba(148,163,184,0.18) !important;
+        box-shadow:0 12px 30px rgba(2,6,23,0.2);
+        backdrop-filter:blur(18px) saturate(1.3);
+      }
+      body.pixieed-seamless-page > main > section,
+      body.pixieed-seamless-page > .page > section,
+      body.pixieed-seamless-page > .page > .card,
+      body.pixieed-seamless-page .page-shell > .section{
+        background:rgba(12,22,43,0.84) !important;
+        border-color:rgba(148,163,184,0.16) !important;
+        box-shadow:none !important;
+      }
+      body.pixieed-seamless-page > main > section + section,
+      body.pixieed-seamless-page > .page > section + section,
+      body.pixieed-seamless-page > .page > .card + .card,
+      body.pixieed-seamless-page .page-shell > .section + .section{
+        border-top-color:rgba(148,163,184,0.14) !important;
+      }
+      body.pixieed-seamless-page .button,
+      body.pixieed-seamless-page .button-secondary,
+      body.pixieed-seamless-page .account-action{
+        min-height:42px;
+        border-radius:13px;
+        font-weight:800;
+      }
+      body.pixieed-seamless-page .button{
+        background:linear-gradient(135deg,#2563eb,#7c3aed);
+        box-shadow:0 10px 22px rgba(37,99,235,0.24);
+      }
+      body.pixieed-seamless-page .button-secondary{
+        background:rgba(15,23,42,0.72);
+        border-color:rgba(148,163,184,0.24);
+      }
+      body.pixieed-seamless-page .card,
+      body.pixieed-seamless-page .link-card,
+      body.pixieed-seamless-page .info-card{
+        border-color:rgba(148,163,184,0.16);
+        background:rgba(15,23,42,0.58);
       }
       body[data-pixieed-page="pixiedraw"]{
         padding-bottom:0 !important;
