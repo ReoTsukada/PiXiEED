@@ -15408,7 +15408,7 @@
     return startupWorkflowUtilsModule.openRecentProjectDeleteConfirmDialog(...args);
   }
 
-  async function requestLegacyV2MigrationConsent({ sourceFileName = '', sourceAdapterId = '', projectCount = 1 } = {}) {
+  async function requestLegacyV2MigrationConsent({ sourceFileName = '', sourceAdapterId = '', projectCount = 1, multiCanvasCount = 1 } = {}) {
     const dialog = dom.legacyProjectMigration?.dialog;
     if (!dialog || typeof dialog.showModal !== 'function') return false;
     const normalizedCount = Math.max(1, Math.round(Number(projectCount) || 1));
@@ -15416,8 +15416,11 @@
       ? sourceFileName.trim()
       : '選択したプロジェクト';
     const isV1 = sourceAdapterId === 'pixieedraw-v1-json';
+    const normalizedCanvasCount = Math.max(1, Math.round(Number(multiCanvasCount) || 1));
     if (dom.legacyProjectMigration.message) {
-      dom.legacyProjectMigration.message.textContent = normalizedCount > 1
+      dom.legacyProjectMigration.message.textContent = normalizedCanvasCount > 1
+        ? `「${name}」には ${normalizedCanvasCount} 枚の旧マルチキャンバスがあります。各キャンバスを単一のV2プロジェクトへ分割します。`
+        : normalizedCount > 1
         ? `「${name}」には ${normalizedCount} 件の旧プロジェクトがあります。各プロジェクトを単一のV2プロジェクトへ分割します。`
         : `「${name}」は${isV1 ? 'V1' : '旧V2'}形式です。単一のV2プロジェクトへ移行します。`;
     }
@@ -16860,11 +16863,135 @@
     sourceProjectId = '',
     sheets = [],
     activeSheetId = '',
+    sourceProject = null,
+    canvases = [],
+    activeCanvasId = '',
   } = {}) {
     const normalizedSourceProjectId = normalizeAutosaveProjectId(sourceProjectId || '');
-    const sourceSheets = Array.isArray(sheets)
+    let sourceSheets = Array.isArray(sheets)
       ? sheets.filter(sheet => sheet?.project && typeof sheet.project === 'object')
       : [];
+    const legacyCanvases = Array.isArray(canvases)
+      ? canvases.filter(canvas => canvas && typeof canvas === 'object')
+      : [];
+    let migratingCanvases = false;
+    // Old packages can have both resident tabs and canvases within each tab.
+    // Flatten the complete tab × canvas matrix before any V2 write so every
+    // resulting project owns exactly one canvas.
+    if (sourceSheets.length > 0) {
+      const expandedSheets = [];
+      sourceSheets.forEach((sourceSheet, sheetIndex) => {
+        const sheetProject = sourceSheet?.project && typeof sourceSheet.project === 'object'
+          ? sourceSheet.project
+          : null;
+        const sheetDocument = sheetProject?.document && typeof sheetProject.document === 'object'
+          ? sheetProject.document
+          : null;
+        const sheetCanvases = Array.isArray(sheetDocument?.canvases)
+          ? sheetDocument.canvases.filter(canvas => canvas && typeof canvas === 'object')
+          : [];
+        if (sheetCanvases.length <= 1) {
+          expandedSheets.push(sourceSheet);
+          return;
+        }
+        migratingCanvases = true;
+        const sourceSheetId = typeof sourceSheet?.id === 'string' && sourceSheet.id.trim()
+          ? sourceSheet.id.trim()
+          : `legacy-sheet-${sheetIndex + 1}`;
+        const baseName = typeof sheetDocument.documentName === 'string' && sheetDocument.documentName.trim()
+          ? sheetDocument.documentName.trim().replace(/\.pixieedraw$/i, '')
+          : `移行プロジェクト ${sheetIndex + 1}`;
+        sheetCanvases.forEach((canvas, canvasIndex) => {
+          const sourceCanvasId = typeof canvas.id === 'string' && canvas.id.trim()
+            ? canvas.id.trim()
+            : `legacy-canvas-${canvasIndex + 1}`;
+          const canvasName = typeof canvas.name === 'string' && canvas.name.trim()
+            ? canvas.name.trim()
+            : `キャンバス ${canvasIndex + 1}`;
+          expandedSheets.push({
+            ...sourceSheet,
+            id: `${sourceSheetId}:canvas:${sourceCanvasId}`,
+            sourceOriginalSheetId: sourceSheetId,
+            sourceCanvasId,
+            wasActive: sourceSheetId === activeSheetId && sourceCanvasId === sheetDocument.activeCanvasId,
+            fileName: `${baseName} - ${canvasName}${PROJECT_FILE_EXTENSION}`,
+            sourceKind: 'legacy-multi-canvas',
+            project: {
+              ...sheetProject,
+              projectLayout: 'single-project',
+              document: {
+                ...sheetDocument,
+                width: canvas.width,
+                height: canvas.height,
+                frames: canvas.frames,
+                activeFrame: canvas.activeFrame,
+                activeLayer: canvas.activeLayer,
+                mirror: canvas.mirror,
+                selectionMask: canvas.selectionMask || null,
+                selectionContentMask: canvas.selectionContentMask || null,
+                selectionBounds: canvas.selectionBounds || null,
+                documentName: `${baseName} - ${canvasName}${PROJECT_FILE_EXTENSION}`,
+                activeCanvasId: sourceCanvasId,
+                canvases: [canvas],
+              },
+              session: {
+                ...(sheetProject.session && typeof sheetProject.session === 'object' ? sheetProject.session : {}),
+                localViewportCanvases: { ...LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE },
+              },
+            },
+          });
+        });
+      });
+      sourceSheets = expandedSheets;
+    }
+    if (sourceSheets.length === 0 && sourceProject && typeof sourceProject === 'object' && legacyCanvases.length > 1) {
+      migratingCanvases = true;
+      sourceSheets = legacyCanvases.map((canvas, index) => {
+        const sourceCanvasId = typeof canvas.id === 'string' && canvas.id.trim()
+          ? canvas.id.trim()
+          : `legacy-canvas-${index + 1}`;
+        const baseDocument = sourceProject.document && typeof sourceProject.document === 'object'
+          ? sourceProject.document
+          : {};
+        const canvasName = typeof canvas.name === 'string' && canvas.name.trim()
+          ? canvas.name.trim()
+          : `キャンバス ${index + 1}`;
+        const baseName = typeof baseDocument.documentName === 'string' && baseDocument.documentName.trim()
+          ? baseDocument.documentName.trim().replace(/\.pixieedraw$/i, '')
+          : '移行プロジェクト';
+        return {
+          id: `canvas:${sourceCanvasId}`,
+          sourceCanvasId,
+          wasActive: sourceCanvasId === activeCanvasId,
+          fileName: `${baseName} - ${canvasName}${PROJECT_FILE_EXTENSION}`,
+          sourceKind: 'legacy-multi-canvas',
+          sourceStorageAdapterId: sourceProject.storageAdapterId || '',
+          project: {
+            ...sourceProject,
+            projectLayout: 'single-project',
+            document: {
+              ...baseDocument,
+              width: canvas.width,
+              height: canvas.height,
+              frames: canvas.frames,
+              activeFrame: canvas.activeFrame,
+              activeLayer: canvas.activeLayer,
+              mirror: canvas.mirror,
+              selectionMask: canvas.selectionMask || null,
+              selectionContentMask: canvas.selectionContentMask || null,
+              selectionBounds: canvas.selectionBounds || null,
+              documentName: `${baseName} - ${canvasName}${PROJECT_FILE_EXTENSION}`,
+              activeCanvasId: sourceCanvasId,
+              canvases: [canvas],
+            },
+            session: {
+              ...(sourceProject.session && typeof sourceProject.session === 'object' ? sourceProject.session : {}),
+              localViewportCanvases: { ...LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE },
+            },
+          },
+        };
+      });
+    }
     if (!AUTOSAVE_SUPPORTED
       || !normalizedSourceProjectId
       || sourceSheets.length < 2
@@ -16929,7 +17056,16 @@
           dotStats: projectState.dotStats,
           legacyMultiProjectSourceId: normalizedSourceProjectId,
           legacyMultiProjectSourceSheetId: sourceSheetId,
-          legacyMultiProjectWasActive: sourceSheetId === activeSheetId,
+          legacyMultiProjectWasActive: sourceSheet.wasActive === true || sourceSheetId === activeSheetId,
+          legacyMultiCanvasSourceId: migratingCanvases ? normalizedSourceProjectId : '',
+          legacyMultiCanvasSourceCanvasId: migratingCanvases ? String(sourceSheet?.sourceCanvasId || '') : '',
+          legacyMultiCanvasWasActive: migratingCanvases && (
+            sourceSheet.wasActive === true
+            || String(sourceSheet?.sourceCanvasId || '') === activeCanvasId
+          ),
+          legacyMultiCanvasSourceSheetId: migratingCanvases
+            ? String(sourceSheet?.sourceOriginalSheetId || '')
+            : '',
         });
       }
       if (!createdEntries.length) {
@@ -16947,6 +17083,8 @@
             projectId: entry.id,
             sourceSheetId: String(entry?.legacyMultiProjectSourceSheetId || ''),
             wasActive: entry?.legacyMultiProjectWasActive === true,
+            sourceCanvasId: String(entry?.legacyMultiCanvasSourceCanvasId || ''),
+            sourceOriginalSheetId: String(entry?.legacyMultiCanvasSourceSheetId || ''),
           }))
           .filter(entry => entry.projectId && entry.sourceSheetId);
         return { migrated: false, reason: 'already-migrated', projectIds: projects.map(entry => entry.projectId), projects };
@@ -16968,12 +17106,15 @@
           projectId: entry.id,
           sourceSheetId: String(entry?.legacyMultiProjectSourceSheetId || ''),
           wasActive: entry?.legacyMultiProjectWasActive === true,
+          sourceCanvasId: String(entry?.legacyMultiCanvasSourceCanvasId || ''),
+          sourceOriginalSheetId: String(entry?.legacyMultiCanvasSourceSheetId || ''),
         }))
         .filter(entry => entry.projectId && entry.sourceSheetId);
       console.info('[pixiedraw-dev:project-normalize]', {
         phase: 'legacy-multi-project-split-success',
         sourceProjectId: normalizedSourceProjectId,
         sourceSheetCount: sourceSheets.length,
+        sourceKind: migratingCanvases ? 'legacy-multi-canvas' : 'legacy-multi-project',
         projectIds: createdEntries.map(entry => entry.id),
       });
       return {
