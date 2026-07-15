@@ -835,20 +835,16 @@
           plotPoint(x1, y);
         }
       }
-    } else if (normalizedTool === 'ellipse' || normalizedTool === 'ellipseFill' || normalizedTool === 'oval' || normalizedTool === 'ovalFill') {
-      let ellipseStart = start;
-      let ellipseEnd = end;
-      if (normalizedTool === 'ellipse' || normalizedTool === 'ellipseFill') {
-        const minX = Math.min(start.x, end.x);
-        const maxX = Math.max(start.x, end.x);
-        const minY = Math.min(start.y, end.y);
-        const maxY = Math.max(start.y, end.y);
-        const diameter = Math.max(1, Math.min((maxX - minX) + 1, (maxY - minY) + 1));
-        const circleMinX = minX + Math.floor((((maxX - minX) + 1) - diameter) * 0.5);
-        const circleMinY = minY + Math.floor((((maxY - minY) + 1) - diameter) * 0.5);
-        ellipseStart = { x: circleMinX, y: circleMinY };
-        ellipseEnd = { x: circleMinX + diameter - 1, y: circleMinY + diameter - 1 };
-      }
+    } else if (normalizedTool === 'ellipse' || normalizedTool === 'ellipseFill') {
+      const minX = Math.min(start.x, end.x);
+      const maxX = Math.max(start.x, end.x);
+      const minY = Math.min(start.y, end.y);
+      const maxY = Math.max(start.y, end.y);
+      const diameter = Math.max(1, Math.min((maxX - minX) + 1, (maxY - minY) + 1));
+      const circleMinX = minX + Math.floor((((maxX - minX) + 1) - diameter) * 0.5);
+      const circleMinY = minY + Math.floor((((maxY - minY) + 1) - diameter) * 0.5);
+      const ellipseStart = { x: circleMinX, y: circleMinY };
+      const ellipseEnd = { x: circleMinX + diameter - 1, y: circleMinY + diameter - 1 };
       drawEllipsePixels(ellipseStart.x, ellipseStart.y, ellipseEnd.x, ellipseEnd.y, Boolean(command.filled), plotPoint);
     } else {
       return false;
