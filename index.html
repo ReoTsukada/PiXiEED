@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="site/landing.css?v=2026.07.09-home-hero-midwidth-fix">
+<link rel="stylesheet" href="site/landing.css?v=2026.07.15-home-clear-entry1">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -103,55 +103,49 @@
     <div class="home-screen">
       <div class="home-desktop-grid">
         <div class="home-primary-stack">
-          <section class="home-live-tool" id="try-tools" aria-labelledby="liveToolTitle">
-            <div class="home-live-tool__intro">
-              <p class="home-live-tool__eyebrow">Live tool preview</p>
-              <h1 id="liveToolTitle">PiXiEED</h1>
-              <p class="home-live-tool__lead">実際にこの画面から使用感を試していただけます</p>
-            </div>
-            <div class="home-live-tool__tabs" role="tablist" aria-label="試すツールを選ぶ">
-              <button class="home-live-tool__tab is-active" type="button" role="tab" aria-selected="true" data-live-tool="draw">PiXiEEDraw</button>
-              <button class="home-live-tool__tab" type="button" role="tab" aria-selected="false" data-live-tool="lens">PiXiEELENS</button>
-              <button class="home-live-tool__tab" type="button" role="tab" aria-selected="false" data-live-tool="qr">QR</button>
-              <button class="home-live-tool__tab" type="button" role="tab" aria-selected="false" data-live-tool="maoitu">まおいつ</button>
-            </div>
-            <div class="home-live-tool__stage" id="liveToolStage">
-              <div class="home-live-tool__stage-head">
-                <div>
-                  <strong id="liveToolName">PiXiEEDraw</strong>
-                  <span id="liveToolHint">ドット絵を描く・動かす</span>
-                </div>
-                <span class="home-live-tool__adfree">広告なしの埋め込み表示</span>
+          <section class="home-hero-card home-hero-card--image" aria-label="ヒーロー">
+            <div class="home-hero-carousel">
+              <div class="home-hero-slide home-hero-slide--brand is-active">
+                <img src="assets/hero/pixieed-pixel-world-hero.png" alt="PiXiEEDのドット絵とキャラクターの世界観ビジュアル" data-pixel-art-fit="off">
+                <div class="home-hero-slide__content"><div class="home-hero-surface">
+                  <p class="home-hero-slide__eyebrow">PiXiEED</p>
+                  <h1 class="home-hero-slide__title">まず、何をしますか？</h1>
+                  <p class="home-hero-slide__copy">使いたいことを選ぶだけで始められます。</p>
+                  <div class="home-hero-actions home-hero-actions--primary-choice">
+                    <a class="home-hero-cta home-hero-cta--primary" href="pixiedraw/index.html"><span>ドット絵を自分で描く</span><strong>PiXiEEDrawを開く</strong></a>
+                    <a class="home-hero-cta home-hero-cta--lens" href="pixiee-lens/index.html"><span>写真をドット絵に変換する</span><strong>PiXiEELENSを開く</strong></a>
+                  </div>
+                  <div class="home-hero-tags"><span>無料</span><span>登録不要</span><span>スマホ / PC</span></div>
+                </div></div>
               </div>
-              <iframe id="liveToolFrame" class="home-live-tool__frame" src="pixiedraw/index.html?embed=1" title="PiXiEEDrawを試す" allow="fullscreen; camera"></iframe>
-            </div>
-            <div class="home-live-tool__actions">
-              <a class="home-live-tool__primary" id="liveToolFullscreen" href="pixiedraw/index.html?fullscreen=1">フルスクリーンで使う</a>
             </div>
           </section>
-
           <section class="home-panel home-panel--tools" id="projects">
             <div class="home-panel__header">
-              <h2 class="home-panel__title">主要ツール</h2>
+              <h2 class="home-panel__title">ほかにできること</h2>
               <a class="home-panel__link" href="glossary/index.html">ドット絵用語集を見る</a>
             </div>
-            <p class="section-copy">使いたいものを選ぶと、上の実機プレビューが切り替わります。専用ページとSEO向けの詳しい紹介ページも、そのまま残しています。</p>
+            <p class="section-copy">目的が決まっている方はこちらから選べます。</p>
             <div class="home-app-grid home-app-grid--launcher" aria-label="主要メニュー">
               <a class="home-app-tile" href="pixiedraw/index.html">
                 <span class="home-app-tile__icon"><img src="icon/icon-192-4.png" alt=""></span>
                 <span class="home-app-tile__label">PiXiEEDraw</span>
+                <span class="home-app-tile__sub">ドット絵を描く</span>
               </a>
               <a class="home-app-tile" href="pixiee-lens/index.html">
                 <span class="home-app-tile__icon"><img src="icon/icon-192-1.png" alt=""></span>
                 <span class="home-app-tile__label">PiXiEELENS</span>
+                <span class="home-app-tile__sub">写真をドット化</span>
               </a>
               <a class="home-app-tile" href="qr/index.html">
                 <span class="home-app-tile__icon"><img src="icon/icon-192-6.png" alt=""></span>
                 <span class="home-app-tile__label">QR</span>
+                <span class="home-app-tile__sub">QRを作る</span>
               </a>
               <a class="home-app-tile" href="maoitu/index.html">
                 <span class="home-app-tile__icon"><img src="icon/icon-192-3.png" alt=""></span>
                 <span class="home-app-tile__label">まおいつ</span>
+                <span class="home-app-tile__sub">ゲームで遊ぶ</span>
               </a>
             </div>
             <div class="home-tool-detail-links" aria-label="詳しく見る">
@@ -286,37 +280,6 @@
   <script src="scripts/ads-lazy.js"></script>
   <script src="scripts/bottom-nav-footer-ad.js"></script>
   <script>
-    (() => {
-      const tools = {
-        draw: { name: 'PiXiEEDraw', hint: 'ドット絵を描く・動かす', embed: 'pixiedraw/index.html?embed=1', page: 'pixiedraw/index.html', guide: 'projects/pixiedraw/' },
-        lens: { name: 'PiXiEELENS', hint: '写真をドット絵に変換する', embed: 'pixiee-lens/index.html?embed=1', page: 'pixiee-lens/index.html', guide: 'projects/pixiee-lens/' },
-        qr: { name: 'QRコードメーカー', hint: 'URLや文字列からQRを作る', embed: 'qr-maker/index.html?embed=1', page: 'qr/index.html', guide: 'projects/qr-maker/' },
-        maoitu: { name: 'まおいつ', hint: 'ドット絵ゲームをすぐ遊ぶ', embed: 'maoitu/index.html?embed=1', page: 'maoitu/index.html', guide: 'maoitu/index.html' }
-      };
-      const tabs = Array.from(document.querySelectorAll('[data-live-tool]'));
-      const frame = document.getElementById('liveToolFrame');
-      const name = document.getElementById('liveToolName');
-      const hint = document.getElementById('liveToolHint');
-      const fullscreen = document.getElementById('liveToolFullscreen');
-      if (!frame) return;
-      const selectTool = key => {
-        const tool = tools[key];
-        if (!tool) return;
-        tabs.forEach(tab => {
-          const active = tab.dataset.liveTool === key;
-          tab.classList.toggle('is-active', active);
-          tab.setAttribute('aria-selected', active ? 'true' : 'false');
-        });
-        name.textContent = tool.name;
-        hint.textContent = tool.hint;
-        frame.title = `${tool.name}を試す`;
-        if (frame.getAttribute('src') !== tool.embed) frame.setAttribute('src', tool.embed);
-        fullscreen.href = `${tool.page}?fullscreen=1`;
-      };
-      tabs.forEach(tab => tab.addEventListener('click', () => selectTool(tab.dataset.liveTool)));
-    })();
-  </script>
-  <script>
     const year = document.getElementById('year');
     if (year) year.textContent = new Date().getFullYear();
   </script>
@@ -355,7 +318,7 @@
       </div>
     </div>
   </div>
-  <script src="scripts/shared-bottom-nav.js"></script>
+  <script src="scripts/shared-bottom-nav.js?v=2026.07.15-seamless-places2"></script>
   <script src="scripts/pixel-art-fit.js"></script>
 </body>
 </html>
