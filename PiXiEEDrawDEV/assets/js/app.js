@@ -5662,6 +5662,8 @@
   set buildProjectSessionPayloadWithPersistedTimelapse(value) { buildProjectSessionPayloadWithPersistedTimelapse = value; },
   get serializeProjectStorageSnapshot() { return serializeProjectStorageSnapshot; },
   set serializeProjectStorageSnapshot(value) { serializeProjectStorageSnapshot = value; },
+  get generateSnapshotThumbnail() { return generateSnapshotThumbnail; },
+  set generateSnapshotThumbnail(value) { generateSnapshotThumbnail = value; },
   get canUseSessionStorage() { return canUseSessionStorage; },
   set canUseSessionStorage(value) { canUseSessionStorage = value; },
   get clearTimelapseRecording() { return clearTimelapseRecording; },
@@ -6021,6 +6023,10 @@
   set loadDocumentFromText(value) { loadDocumentFromText = value; },
   get loadRecentProjectsMetadata() { return loadRecentProjectsMetadata; },
   set loadRecentProjectsMetadata(value) { loadRecentProjectsMetadata = value; },
+  get parseProjectStorageBlob() { return parseProjectStorageBlob; },
+  set parseProjectStorageBlob(value) { parseProjectStorageBlob = value; },
+  get readProjectStorageManifestFromBlob() { return readProjectStorageManifestFromBlob; },
+  set readProjectStorageManifestFromBlob(value) { readProjectStorageManifestFromBlob = value; },
   get reconstructLocalRecentProjectPayload() { return reconstructLocalRecentProjectPayload; },
   set reconstructLocalRecentProjectPayload(value) { reconstructLocalRecentProjectPayload = value; },
   get extractLocalProjectSheetPayload() { return extractLocalProjectSheetPayload; },
@@ -6467,6 +6473,10 @@
   set loadPersistedTimelapseSnapshots(value) { loadPersistedTimelapseSnapshots = value; },
   get loadRecentProjectsMetadata() { return loadRecentProjectsMetadata; },
   set loadRecentProjectsMetadata(value) { loadRecentProjectsMetadata = value; },
+  get parseProjectStorageBlob() { return parseProjectStorageBlob; },
+  set parseProjectStorageBlob(value) { parseProjectStorageBlob = value; },
+  get readProjectStorageManifestFromBlob() { return readProjectStorageManifestFromBlob; },
+  set readProjectStorageManifestFromBlob(value) { readProjectStorageManifestFromBlob = value; },
   get localizeText() { return localizeText; },
   set localizeText(value) { localizeText = value; },
   get lockedCanvasHeight() { return lockedCanvasHeight; },
@@ -6497,6 +6507,8 @@
   set normalizeSharedRecentProjectEntry(value) { normalizeSharedRecentProjectEntry = value; },
   get openDocumentDialog() { return openDocumentDialog; },
   set openDocumentDialog(value) { openDocumentDialog = value; },
+  get openDocumentAsNewProject() { return openDocumentAsNewProject; },
+  set openDocumentAsNewProject(value) { openDocumentAsNewProject = value; },
   get openRecentProject() { return openRecentProject; },
   set openRecentProject(value) { openRecentProject = value; },
   get openSharedProjectCanonical() { return openSharedProjectCanonical; },
@@ -6555,6 +6567,10 @@
   set serializeProjectStorageSnapshot(value) { serializeProjectStorageSnapshot = value; },
   get serializeProjectTimelapseSnapshotList() { return serializeProjectTimelapseSnapshotList; },
   set serializeProjectTimelapseSnapshotList(value) { serializeProjectTimelapseSnapshotList = value; },
+  get snapshotFromParsedDocumentValue() { return snapshotFromParsedDocumentValue; },
+  set snapshotFromParsedDocumentValue(value) { snapshotFromParsedDocumentValue = value; },
+  get generateSnapshotThumbnail() { return generateSnapshotThumbnail; },
+  set generateSnapshotThumbnail(value) { generateSnapshotThumbnail = value; },
   get scheduleSessionPersist() { return scheduleSessionPersist; },
   set scheduleSessionPersist(value) { scheduleSessionPersist = value; },
   get setActiveAutosaveProjectId() { return setActiveAutosaveProjectId; },
@@ -6892,6 +6908,13 @@
       throw new Error('Project storage blob parser is not available');
     }
     return await projectStorageAdapterRegistry.parseBlob(...args);
+  }
+
+  async function readProjectStorageManifestFromBlob(...args) {
+    if (!projectStorageAdapterRegistry?.readManifestFromBlob) {
+      return { adapterId: '', manifest: null };
+    }
+    return await projectStorageAdapterRegistry.readManifestFromBlob(...args);
   }
 
   async function serializeProjectStorageSnapshot(...args) {
@@ -12350,6 +12373,8 @@
   set scheduleSessionPersist(value) { scheduleSessionPersist = value; },
   get serializeProjectStorageSnapshot() { return serializeProjectStorageSnapshot; },
   set serializeProjectStorageSnapshot(value) { serializeProjectStorageSnapshot = value; },
+  get generateSnapshotThumbnail() { return generateSnapshotThumbnail; },
+  set generateSnapshotThumbnail(value) { generateSnapshotThumbnail = value; },
   get setTrackedProjectDotBaseline() { return setTrackedProjectDotBaseline; },
   set setTrackedProjectDotBaseline(value) { setTrackedProjectDotBaseline = value; },
   get showLoginPromptAfterExport() { return showLoginPromptAfterExport; },
