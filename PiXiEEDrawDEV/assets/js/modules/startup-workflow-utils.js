@@ -1635,7 +1635,8 @@
       details.className = 'startup-workspace__project-details';
       const name = document.createElement('span');
       name.className = 'startup-workspace__project-name';
-      name.textContent = entry?.name || DEFAULT_DOCUMENT_NAME;
+      const displayName = String(entry?.name || DEFAULT_DOCUMENT_NAME).replace(/\.pixieedraw$/i, '');
+      name.textContent = displayName || 'PiXiEEDraw';
       const meta = document.createElement('span');
       meta.className = 'startup-workspace__project-meta';
       const modified = (entry?.migrationRecovery === true || entry?.deviceLocalProject === true)
