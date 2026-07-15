@@ -103,124 +103,30 @@
     <div class="home-screen">
       <div class="home-desktop-grid">
         <div class="home-primary-stack">
-          <section class="home-hero-card home-hero-card--image" aria-label="ヒーロー">
-            <h1 class="sr-only">無料で使えるドット絵作成ツール</h1>
-            <div class="home-hero-carousel" aria-label="注目パネル">
-              <div class="home-hero-slide home-hero-slide--brand is-active" data-hero-slide>
-                <img src="assets/hero/pixieed-pixel-world-hero.png" alt="PiXiEEDのドット絵とキャラクターの世界観ビジュアル" data-hero-bg data-pixel-art-fit="off">
-                <div class="home-hero-slide__content">
-                  <div class="home-hero-surface">
-                    <p class="home-hero-slide__eyebrow">Pixel Tool Suite</p>
-                    <h2 class="home-hero-slide__title">ドット絵を描く。写真を変換する。ブラウザで完結。</h2>
-                    <p class="home-hero-slide__copy">PiXiEEDは、無料で始められるドット絵向けツール群です。PiXiEEDrawで制作し、PiXiEELENSで写真を4色ディザリングへ変換し、そのまま次の作業へつなげられます。</p>
-                    <div class="home-hero-actions">
-                      <a class="home-hero-cta home-hero-cta--primary" href="pixiedraw/index.html">
-                        <span>いちばん使う制作画面</span>
-                        <strong>PiXiEEDrawを開く</strong>
-                      </a>
-                      <a class="home-hero-cta home-hero-cta--lens" href="pixiee-lens/index.html">
-                        <span>4色ディザリングへ変換</span>
-                        <strong>PiXiEELENSを開く</strong>
-                      </a>
-                    </div>
-                    <div class="home-hero-tags">
-                      <span>無料</span>
-                      <span>登録不要</span>
-                      <span>スマホ / PC</span>
-                      <span>PiXiEEDraw</span>
-                      <span>PiXiEELENS</span>
-                    </div>
-                  </div>
+          <section class="home-live-tool" id="try-tools" aria-labelledby="liveToolTitle">
+            <div class="home-live-tool__intro">
+              <p class="home-live-tool__eyebrow">Live tool preview</p>
+              <h1 id="liveToolTitle">実際に使える画面を、ここから。</h1>
+              <p>広告や余計な共通表示を出さない埋め込みで、各ツールの本体をそのまま試せます。集中して使いたい時はフルスクリーン、または専用ページへ移動できます。</p>
+            </div>
+            <div class="home-live-tool__tabs" role="tablist" aria-label="試すツールを選ぶ">
+              <button class="home-live-tool__tab is-active" type="button" role="tab" aria-selected="true" data-live-tool="draw">PiXiEEDraw</button>
+              <button class="home-live-tool__tab" type="button" role="tab" aria-selected="false" data-live-tool="lens">PiXiEELENS</button>
+              <button class="home-live-tool__tab" type="button" role="tab" aria-selected="false" data-live-tool="qr">QR</button>
+              <button class="home-live-tool__tab" type="button" role="tab" aria-selected="false" data-live-tool="maoitu">まおいつ</button>
+            </div>
+            <div class="home-live-tool__stage" id="liveToolStage">
+              <div class="home-live-tool__stage-head">
+                <div>
+                  <strong id="liveToolName">PiXiEEDraw</strong>
+                  <span id="liveToolHint">ドット絵を描く・動かす</span>
                 </div>
+                <span class="home-live-tool__adfree">広告なしの埋め込み表示</span>
               </div>
-              <div class="home-hero-slide home-hero-slide--draw" data-hero-slide>
-                <img src="assets/screenshots/generated/pixiedraw-maousama-canvas.png" alt="PiXiEEDrawで魔王様のドット絵をキャンバス編集している画面" data-hero-bg data-pixel-art-fit="off">
-                <div class="home-hero-slide__content">
-                  <div class="home-hero-surface">
-                    <p class="home-hero-slide__eyebrow">PiXiEEDraw</p>
-                    <h2 class="home-hero-slide__title">描き始めた瞬間から、制作に集中できるドット絵エディタ。</h2>
-                    <p class="home-hero-slide__copy">レイヤー、アニメ、保存、書き出しまでブラウザで完結。スマホでもPCでも、そのまま描き始められます。</p>
-                    <div class="home-hero-actions">
-                      <a class="home-hero-cta home-hero-cta--primary" href="pixiedraw/index.html">
-                        <span>そのまま制作を始める</span>
-                        <strong>エディタを開く</strong>
-                      </a>
-                      <a class="home-hero-cta" href="projects/pixiedraw/">
-                        <span>用途と特徴を先に確認</span>
-                        <strong>詳しく見る</strong>
-                      </a>
-                    </div>
-                    <div class="home-hero-tags">
-                      <span>ドット絵メーカー</span>
-                      <span>レイヤー</span>
-                      <span>アニメ</span>
-                      <span>PNG / GIF</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="home-hero-slide home-hero-slide--lens-showcase" data-hero-slide>
-                <img src="assets/screenshots/generated/pixiee-lens-generated-landscape-source.png" alt="PiXiEELENSで変換前の風景画像" data-hero-bg data-pixel-art-fit="off">
-                <div class="home-hero-slide__content home-hero-slide__content--split">
-                  <div class="home-hero-surface">
-                    <p class="home-hero-slide__eyebrow">PiXiEELENS</p>
-                    <h2 class="home-hero-slide__title">初期状態の4色ディザリングを、そのまま見せるカメラ変換。</h2>
-                    <p class="home-hero-slide__copy">PiXiEELENSは4色設定から始まります。写真や風景を256pxの粒感で確認しながら、レトロな見た目へすぐ変換できます。</p>
-                    <div class="home-hero-actions">
-                      <a class="home-hero-cta home-hero-cta--lens" href="pixiee-lens/index.html">
-                        <span>写真をドット絵にする</span>
-                        <strong>PiXiEELENSを開く</strong>
-                      </a>
-                      <a class="home-hero-cta" href="projects/pixiee-lens/">
-                        <span>使い方と用途を見る</span>
-                        <strong>詳しく見る</strong>
-                      </a>
-                    </div>
-                    <div class="home-hero-tags">
-                      <span>4色</span>
-                      <span>256px</span>
-                      <span>ディザリング</span>
-                      <span>カメラ / 画像</span>
-                    </div>
-                  </div>
-                  <div class="home-hero-preview" aria-label="PiXiEELENSの4色256pxディザリング見本">
-                    <img src="assets/screenshots/generated/pixiee-lens-4color-256-dither.png" alt="PiXiEELENSの4色256pxディザリング見本" data-pixel-art-fit="off">
-                    <div class="home-hero-preview__meta">
-                      <p class="home-hero-preview__label">Default Output</p>
-                      <div class="home-hero-preview__specs">
-                        <span>4 colors</span>
-                        <span>256 px</span>
-                        <span>Dither</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="home-hero-slide home-hero-slide--qr" data-hero-slide>
-                <img src="assets/screenshots/generated/qr-maker-app.png" alt="QRコードメーカーでQRコードを作成する画面" data-hero-bg data-pixel-art-fit="off">
-                <div class="home-hero-slide__content">
-                  <div class="home-hero-surface">
-                    <p class="home-hero-slide__eyebrow">QR</p>
-                    <h2 class="home-hero-slide__title">制作物の共有や導線づくりまで、同じホームからすぐ進める。</h2>
-                    <p class="home-hero-slide__copy">URLやテキストからQRを作成し、そのまま保存。PiXiEEDの中で制作後の導線整理までまとめて進められます。</p>
-                    <div class="home-hero-actions">
-                      <a class="home-hero-cta" href="qr/index.html">
-                        <span>URLや文字列から生成</span>
-                        <strong>QRを開く</strong>
-                      </a>
-                      <a class="home-hero-cta" href="projects/qr-maker/">
-                        <span>用途を先に確認</span>
-                        <strong>詳しく見る</strong>
-                      </a>
-                    </div>
-                    <div class="home-hero-tags">
-                      <span>QR作成</span>
-                      <span>画像保存</span>
-                      <span>ブラウザ対応</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <iframe id="liveToolFrame" class="home-live-tool__frame" src="pixiedraw/index.html?embed=1" title="PiXiEEDrawを試す" allow="fullscreen; camera"></iframe>
+            </div>
+            <div class="home-live-tool__actions">
+              <a class="home-live-tool__primary" id="liveToolFullscreen" href="pixiedraw/index.html?fullscreen=1">フルスクリーンで使う</a>
             </div>
           </section>
 
@@ -229,7 +135,7 @@
               <h2 class="home-panel__title">主要ツール</h2>
               <a class="home-panel__link" href="glossary/index.html">ドット絵用語集を見る</a>
             </div>
-            <p class="section-copy">PiXiEEDは、ブラウザでドット絵を描きたい人向けの入口です。無料で使えるドット絵メーカーの PiXiEEDraw、写真をドット絵にする PiXiEELENS、制作まわりの用語集までまとめています。</p>
+            <p class="section-copy">使いたいものを選ぶと、上の実機プレビューが切り替わります。専用ページとSEO向けの詳しい紹介ページも、そのまま残しています。</p>
             <div class="home-app-grid home-app-grid--launcher" aria-label="主要メニュー">
               <a class="home-app-tile" href="pixiedraw/index.html">
                 <span class="home-app-tile__icon"><img src="icon/icon-192-4.png" alt=""></span>
@@ -312,52 +218,6 @@
         </aside>
       </div>
 
-      <section class="home-panel home-showcase" id="home-showcase">
-        <div class="home-panel__header">
-          <h2 class="home-panel__title">ドット絵ギャラリー</h2>
-          <a class="home-panel__link" href="portfolio/index.html#dot-gallery">企業ページ</a>
-        </div>
-        <div class="home-showcase__tabs" role="tablist" aria-label="ギャラリー表示切り替え">
-          <button class="home-showcase__tab is-active" type="button" role="tab" aria-selected="true" aria-controls="homeDotPanel" id="homeDotTab" data-home-showcase-tab="dots">ドット絵</button>
-          <button class="home-showcase__tab" type="button" role="tab" aria-selected="false" aria-controls="homeCharacterPanel" id="homeCharacterTab" data-home-showcase-tab="characters">キャラクター</button>
-        </div>
-        <div class="home-showcase__panel" id="homeDotPanel" role="tabpanel" aria-labelledby="homeDotTab" data-home-showcase-panel="dots">
-          <div class="home-showcase__stage">
-            <div class="dot-gallery__viewer">
-              <img alt="" id="dotGalleryMain" loading="lazy" src="">
-            </div>
-          </div>
-          <div aria-label="ドット絵一覧" class="dot-gallery__buttons" data-asset-base="portfolio/dots/" data-manifest-path="portfolio/dots/manifest.json" id="dotGalleryButtons"></div>
-        </div>
-        <div class="home-showcase__panel" id="homeCharacterPanel" role="tabpanel" aria-labelledby="homeCharacterTab" data-home-showcase-panel="characters" hidden>
-          <div class="home-showcase__stage">
-            <div aria-live="polite" class="character-preview">
-              <div class="character-preview__frame">
-                <img alt="" data-pixel-art-max-scale="20" hidden id="characterGalleryMain" loading="lazy" src="">
-                <div class="character-preview__placeholder" id="characterGalleryPlaceholder">
-                  <small id="characterPlaceholderMeta">差し替え待ち</small>
-                </div>
-              </div>
-              <div class="character-preview__details" id="characterPreviewDetails">
-                <h3 class="character-preview__name" id="characterGalleryName">キャラクター</h3>
-                <p class="character-preview__weight" id="characterGalleryWeight">Weight: 調整中</p>
-                <div class="character-preview__traits">
-                  <h4>特徴</h4>
-                  <ul id="characterTraits">
-                    <li>特徴メモ</li>
-                  </ul>
-                </div>
-                <div class="character-preview__detail">
-                  <h4>詳細</h4>
-                  <p id="characterGalleryDetail">選択したキャラクターの詳細がここに表示されます。</p>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div aria-label="キャラクター一覧" class="character-preview__buttons" data-asset-base="character-dots/" data-reveal-all="true" id="characterGalleryButtons" role="listbox"></div>
-        </div>
-      </section>
-
       <section class="home-panel home-panel--compact-links">
         <div class="home-panel__header">
           <h2 class="home-panel__title">その他のページ</h2>
@@ -419,10 +279,6 @@
       </a>
   </nav>
 
-  <script src="portfolio/dots/manifest.js"></script>
-  <script src="scripts/gallery.js"></script>
-  <script src="character-dots/manifest.js"></script>
-  <script src="scripts/character-gallery.js"></script>
   <script src="scripts/home-updates.js"></script>
   <script src="scripts/shared-profile-header.js"></script>
   <script src="scripts/shared-auth-panel.js?v=2026.06.26-auth-persist"></script>
@@ -431,71 +287,33 @@
   <script src="scripts/bottom-nav-footer-ad.js"></script>
   <script>
     (() => {
-      const tabs = Array.from(document.querySelectorAll('[data-home-showcase-tab]'));
-      const panels = Array.from(document.querySelectorAll('[data-home-showcase-panel]'));
-      if (!tabs.length || !panels.length) return;
-
-      const showPanel = panelName => {
+      const tools = {
+        draw: { name: 'PiXiEEDraw', hint: 'ドット絵を描く・動かす', embed: 'pixiedraw/index.html?embed=1', page: 'pixiedraw/index.html', guide: 'projects/pixiedraw/' },
+        lens: { name: 'PiXiEELENS', hint: '写真をドット絵に変換する', embed: 'pixiee-lens/index.html?embed=1', page: 'pixiee-lens/index.html', guide: 'projects/pixiee-lens/' },
+        qr: { name: 'QRコードメーカー', hint: 'URLや文字列からQRを作る', embed: 'qr-maker/index.html?embed=1', page: 'qr/index.html', guide: 'projects/qr-maker/' },
+        maoitu: { name: 'まおいつ', hint: 'ドット絵ゲームをすぐ遊ぶ', embed: 'maoitu/index.html?embed=1', page: 'maoitu/index.html', guide: 'maoitu/index.html' }
+      };
+      const tabs = Array.from(document.querySelectorAll('[data-live-tool]'));
+      const frame = document.getElementById('liveToolFrame');
+      const name = document.getElementById('liveToolName');
+      const hint = document.getElementById('liveToolHint');
+      const fullscreen = document.getElementById('liveToolFullscreen');
+      if (!frame) return;
+      const selectTool = key => {
+        const tool = tools[key];
+        if (!tool) return;
         tabs.forEach(tab => {
-          const isActive = tab.dataset.homeShowcaseTab === panelName;
-          tab.classList.toggle('is-active', isActive);
-          tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+          const active = tab.dataset.liveTool === key;
+          tab.classList.toggle('is-active', active);
+          tab.setAttribute('aria-selected', active ? 'true' : 'false');
         });
-        panels.forEach(panel => {
-          panel.hidden = panel.dataset.homeShowcasePanel !== panelName;
-        });
-        window.dispatchEvent(new Event('resize'));
+        name.textContent = tool.name;
+        hint.textContent = tool.hint;
+        frame.title = `${tool.name}を試す`;
+        if (frame.getAttribute('src') !== tool.embed) frame.setAttribute('src', tool.embed);
+        fullscreen.href = `${tool.page}?fullscreen=1`;
       };
-
-      tabs.forEach(tab => {
-        tab.addEventListener('click', () => showPanel(tab.dataset.homeShowcaseTab));
-      });
-    })();
-  </script>
-  <script>
-    (() => {
-      const slides = Array.from(document.querySelectorAll('[data-hero-slide]'));
-      if (!slides.length) return;
-      slides.forEach(slide => {
-        const img = slide.querySelector('[data-hero-bg]');
-        const src = img?.getAttribute('src');
-        if (!src) return;
-        slide.style.backgroundImage = `url("${src}")`;
-        slide.classList.add('is-bg-ready');
-      });
-      let activeIndex = Math.max(0, slides.findIndex(slide => slide.classList.contains('is-active')));
-      if (activeIndex < 0) activeIndex = 0;
-      const CONTENT_DELAY_MS = 5000;
-      let rotationTimer = null;
-      const clearRotationTimer = () => {
-        if (rotationTimer) {
-          window.clearTimeout(rotationTimer);
-          rotationTimer = null;
-        }
-      };
-      const scheduleNextRotation = () => {
-        clearRotationTimer();
-        rotationTimer = window.setTimeout(() => {
-          showSlide(pickNextIndex());
-          scheduleNextRotation();
-        }, CONTENT_DELAY_MS);
-      };
-      const showSlide = index => {
-        slides.forEach((slide, slideIndex) => {
-          slide.classList.toggle('is-active', slideIndex === index);
-        });
-        activeIndex = index;
-      };
-      const pickNextIndex = () => {
-        if (slides.length <= 1) return activeIndex;
-        let nextIndex = activeIndex;
-        while (nextIndex === activeIndex) {
-          nextIndex = Math.floor(Math.random() * slides.length);
-        }
-        return nextIndex;
-      };
-      showSlide(activeIndex);
-      scheduleNextRotation();
+      tabs.forEach(tab => tab.addEventListener('click', () => selectTool(tab.dataset.liveTool)));
     })();
   </script>
   <script>
