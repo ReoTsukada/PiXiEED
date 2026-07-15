@@ -10,26 +10,27 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../site/landing.css">
+  <link rel="stylesheet" href="../site/landing.css?v=2026.07.15-home-clear-entry1">
 </head>
-<body>
-  <header class="site-header">
+<body class="project-tool-window">
+  <header class="site-header project-tool-window__header">
     <div class="header-inner header-inner--app"><a class="brand" href="../index.html"><span class="brand-icon"><img src="../character-dots/mao1.png" alt=""></span><span class="brand-text"><span class="brand-title">PiXiEED</span><span class="brand-sub">プロジェクト</span></span></a></div>
   </header>
-  <div class="page"><main class="page-shell">
+  <div class="page project-tool-window__page"><main class="page-shell project-tool-window__shell">
     <section class="home-live-tool" aria-labelledby="projectsTitle">
-      <div class="home-live-tool__intro"><p class="home-live-tool__eyebrow">Project hub</p><h1 id="projectsTitle">各ツールを、ここで試せます。</h1><p>縦画面では縦画面向け、横画面では横画面向けのツール表示に自動で切り替わります。通常の埋め込みでは広告を表示せず、フルスクリーン時は各ツールの通常表示へ切り替えます。</p></div>
+      <div class="home-live-tool__intro"><p class="home-live-tool__eyebrow">Project hub</p><h1 id="projectsTitle">各ツールを、ここで試せます。</h1><p>埋め込みのツール・ゲームは端末の向きにかかわらず横画面で表示します。通常の埋め込みでは広告を表示せず、フルスクリーン時は各ツールの通常表示へ切り替えます。</p></div>
       <div class="home-live-tool__tabs" role="tablist" aria-label="プロジェクトを選ぶ">
         <button class="home-live-tool__tab is-active" type="button" aria-selected="true" data-project-tab="draw">PiXiEEDraw</button><button class="home-live-tool__tab" type="button" aria-selected="false" data-project-tab="lens">PiXiEELENS</button><button class="home-live-tool__tab" type="button" aria-selected="false" data-project-tab="qr">QR</button><button class="home-live-tool__tab" type="button" aria-selected="false" data-project-tab="maoitu">まおいつ</button>
       </div>
-      <div class="home-live-tool__stage" id="projectToolStage"><div class="home-live-tool__stage-head"><div><strong id="projectToolName">PiXiEEDraw</strong><span id="projectToolHint">ドット絵を描く・動かす</span></div><span class="home-live-tool__adfree">広告なしの埋め込み表示</span></div><iframe id="projectToolFrame" class="home-live-tool__frame" src="../pixiedraw/index.html?embed=1" title="PiXiEEDrawを試す" allow="fullscreen; camera"></iframe></div>
+      <div class="home-live-tool__stage" id="projectToolStage"><div class="home-live-tool__stage-head"><div><strong id="projectToolName">PiXiEEDraw</strong><span id="projectToolHint">ドット絵を描く・動かす</span></div><span class="home-live-tool__adfree">広告なしの埋め込み表示</span></div><iframe id="projectToolFrame" class="home-live-tool__frame" src="../pixiedraw/index.html?embed=1&landscape=1" title="PiXiEEDrawを試す" allow="fullscreen; camera"></iframe></div>
       <div class="home-live-tool__actions"><a class="home-live-tool__primary" id="projectToolFullscreen" href="../pixiedraw/index.html?fullscreen=1">フルスクリーンで使う</a></div>
     </section>
     <section class="section"><div class="section__inner"><p class="eyebrow">project pages</p><h2 class="section-title">詳しく知りたい時は</h2><div class="link-grid related-tool-grid"><a class="link-card" href="pixiedraw/"><h3>PiXiEEDraw</h3><p class="card-copy">ドット絵制作、アニメ、保存の紹介</p></a><a class="link-card" href="pixiee-lens/"><h3>PiXiEELENS</h3><p class="card-copy">写真・カメラのドット絵変換の紹介</p></a><a class="link-card" href="qr-maker/"><h3>QRコードメーカー</h3><p class="card-copy">QR作成と保存の紹介</p></a><a class="link-card" href="maoitu/"><h3>まおいつ</h3><p class="card-copy">ゲームの遊び方と特徴</p></a></div></div></section>
   </main></div>
+  <script src="../scripts/live-tool-embed.js?v=2026.07.15-landscape-iframe8"></script>
   <script>
   (() => {
-    const tools={draw:{name:'PiXiEEDraw',hint:'ドット絵を描く・動かす',embed:'../pixiedraw/index.html?embed=1',page:'../pixiedraw/index.html',guide:'pixiedraw/'},lens:{name:'PiXiEELENS',hint:'写真をドット絵に変換する',embed:'../pixiee-lens/index.html?embed=1',page:'../pixiee-lens/index.html',guide:'pixiee-lens/'},qr:{name:'QRコードメーカー',hint:'URLや文字列からQRを作る',embed:'../qr-maker/index.html?embed=1',page:'../qr/index.html',guide:'qr-maker/'},maoitu:{name:'まおいつ',hint:'ドット絵ゲームをすぐ遊ぶ',embed:'../maoitu/index.html?embed=1',page:'../maoitu/index.html',guide:'maoitu/'}};
+    const tools={draw:{name:'PiXiEEDraw',hint:'ドット絵を描く・動かす',embed:'../pixiedraw/index.html?embed=1&landscape=1',page:'../pixiedraw/index.html',guide:'pixiedraw/'},lens:{name:'PiXiEELENS',hint:'写真をドット絵に変換する',embed:'../pixiee-lens/index.html?embed=1&landscape=1',page:'../pixiee-lens/index.html',guide:'pixiee-lens/'},qr:{name:'QRコードメーカー',hint:'URLや文字列からQRを作る',embed:'../qr-maker/index.html?embed=1&landscape=1',page:'../qr/index.html',guide:'qr-maker/'},maoitu:{name:'まおいつ',hint:'ドット絵ゲームをすぐ遊ぶ',embed:'../maoitu/index.html?embed=1&landscape=1',page:'../maoitu/index.html',guide:'maoitu/'}};
     const frame=document.getElementById('projectToolFrame'),name=document.getElementById('projectToolName'),hint=document.getElementById('projectToolHint'),full=document.getElementById('projectToolFullscreen');
     const select=key=>{const tool=tools[key];if(!tool)return;document.querySelectorAll('[data-project-tab]').forEach(tab=>{const selected=tab.dataset.projectTab===key;tab.classList.toggle('is-active',selected);tab.setAttribute('aria-selected',String(selected));});name.textContent=tool.name;hint.textContent=tool.hint;frame.title=tool.name+'を試す';frame.src=tool.embed;full.href=tool.page+'?fullscreen=1';};
     document.querySelectorAll('[data-project-tab]').forEach(tab=>tab.addEventListener('click',()=>select(tab.dataset.projectTab)));
