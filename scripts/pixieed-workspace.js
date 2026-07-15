@@ -337,6 +337,24 @@
     return entry?.fileHandle || null;
   }
 
+  async function removeProjectFile(name, { requestPermission = false } = {}) {
+    const filename = sanitizeProjectFilename(name);
+    const directory = await getSubdirectory(PROJECTS_DIRECTORY, {
+      create: false,
+      requestPermission,
+    });
+    if (!directory || typeof directory.removeEntry !== 'function') return false;
+    try {
+      await directory.removeEntry(filename);
+      return true;
+    } catch (error) {
+      if (error?.name !== 'NotFoundError') {
+        console.warn('[PiXiEED workspace] failed to remove project file', { filename, error });
+      }
+      return false;
+    }
+  }
+
   function collectProjectFiles(fileList) {
     return Array.from(fileList || [])
       .filter(file => String(file?.name || '').toLowerCase().endsWith(PROJECT_EXTENSION))
@@ -366,6 +384,7 @@
     getNestedSubdirectory,
     listProjects,
     createProjectFileHandle,
+    removeProjectFile,
     createUniqueFileEntry,
     createDerivedExportFileEntry,
     resolveDerivedExportCategory,

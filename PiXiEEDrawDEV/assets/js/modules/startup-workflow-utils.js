@@ -1650,6 +1650,8 @@
   }
 
   let startupWorkspaceEntries = [];
+  let startupWorkspaceMigrationPrompted = false;
+  let startupWorkspaceMigrationPromise = null;
 
   function setStartupWorkspaceStatus(message, tone = 'info') {
     const node = dom.startup?.workspaceStatus;
@@ -1704,6 +1706,246 @@
     });
   }
 
+  function getLegacyPackagedProjectCollections(packaged = null) {
+    const sheets = Array.isArray(packaged?.sheets)
+      ? packaged.sheets.filter(sheet => sheet?.project && typeof sheet.project === 'object')
+      : [];
+    const canvases = Array.isArray(packaged?.document?.canvases)
+      ? packaged.document.canvases.filter(canvas => canvas && typeof canvas === 'object')
+      : [];
+    const sheetHasMultipleCanvases = sheets.some(sheet => (
+      Array.isArray(sheet?.project?.document?.canvases)
+      && sheet.project.document.canvases.filter(canvas => canvas && typeof canvas === 'object').length > 1
+    ));
+    return {
+      sheets,
+      canvases,
+      needsSplit: sheets.length > 1 || canvases.length > 1 || sheetHasMultipleCanvases,
+    };
+  }
+
+  async function splitLegacyWorkspaceMigrationEntry(entry, packaged) {
+    const collections = getLegacyPackagedProjectCollections(packaged);
+    if (!collections.needsSplit || typeof migrateLegacyMultiProjectPackage !== 'function') {
+      return false;
+    }
+    const result = await migrateLegacyMultiProjectPackage({
+      sourceProjectId: entry?.id || '',
+      sheets: collections.sheets,
+      activeSheetId: packaged?.activeSheetId || '',
+      sourceProject: packaged,
+      canvases: collections.canvases,
+      activeCanvasId: packaged?.document?.activeCanvasId || '',
+    });
+    if (result?.migrated === true || result?.reason === 'already-migrated') {
+      return true;
+    }
+    throw new Error(`Legacy project split failed (${result?.reason || 'unknown'})`);
+  }
+
+  function mergePersistedTimelapseIntoSession(session, persistedByCanvas, canvasIds = []) {
+    if (!session || typeof session !== 'object' || !persistedByCanvas || typeof persistedByCanvas !== 'object') {
+      return false;
+    }
+    const allowedCanvasIds = new Set((Array.isArray(canvasIds) ? canvasIds : []).filter(Boolean));
+    const sourceEntries = Object.entries(persistedByCanvas).filter(([canvasId]) => (
+      !allowedCanvasIds.size || allowedCanvasIds.has(canvasId)
+    ));
+    if (!sourceEntries.length) return false;
+    const timelapse = session.timelapse && typeof session.timelapse === 'object'
+      ? session.timelapse
+      : { byCanvas: {}, operationLogsByCanvas: {} };
+    if (!timelapse.byCanvas || typeof timelapse.byCanvas !== 'object') {
+      timelapse.byCanvas = {};
+    }
+    let mergedAny = false;
+    sourceEntries.forEach(([canvasId, snapshots]) => {
+      const serialized = typeof serializeProjectTimelapseSnapshotList === 'function'
+        ? serializeProjectTimelapseSnapshotList(snapshots)
+        : [];
+      if (!serialized.length) return;
+      const existing = Array.isArray(timelapse.byCanvas[canvasId]?.snapshots)
+        ? timelapse.byCanvas[canvasId].snapshots
+        : [];
+      const seen = new Set();
+      const merged = [...serialized, ...existing].filter(snapshot => {
+        const key = `${snapshot?.width || 0}x${snapshot?.height || 0}:${snapshot?.pixels || ''}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      timelapse.byCanvas[canvasId] = {
+        warningShown: true,
+        sampleStep: Math.max(1, Math.round(Number(timelapse.byCanvas[canvasId]?.sampleStep) || 1)),
+        lastCaptureToken: Number.isFinite(Number(timelapse.byCanvas[canvasId]?.lastCaptureToken))
+          ? Math.round(Number(timelapse.byCanvas[canvasId].lastCaptureToken))
+          : -1,
+        snapshots: merged,
+      };
+      mergedAny = true;
+    });
+    if (!mergedAny) return false;
+    timelapse.enabled = true;
+    timelapse.synchronization = {
+      schemaVersion: 1,
+      complete: true,
+      synchronizedAt: new Date().toISOString(),
+      persistedArchiveMerged: true,
+    };
+    session.timelapse = timelapse;
+    return true;
+  }
+
+  async function mergeFileBackedTimelapseIntoPackaged(entry, packaged) {
+    if (typeof loadPersistedTimelapseSnapshots !== 'function') return packaged;
+    const persistedByCanvas = await loadPersistedTimelapseSnapshots(entry?.id || '', { throwOnError: true });
+    if (!persistedByCanvas || !Object.keys(persistedByCanvas).length) return packaged;
+    const rootCanvasIds = Array.isArray(packaged?.document?.canvases)
+      ? packaged.document.canvases.map(canvas => canvas?.id || '').filter(Boolean)
+      : [];
+    if (!packaged.session || typeof packaged.session !== 'object') packaged.session = {};
+    mergePersistedTimelapseIntoSession(packaged.session, persistedByCanvas, rootCanvasIds);
+    if (Array.isArray(packaged.sheets)) {
+      packaged.sheets.forEach(sheet => {
+        const project = sheet?.project;
+        if (!project || typeof project !== 'object') return;
+        if (!project.session || typeof project.session !== 'object') project.session = {};
+        const canvasIds = Array.isArray(project?.document?.canvases)
+          ? project.document.canvases.map(canvas => canvas?.id || '').filter(Boolean)
+          : [];
+        mergePersistedTimelapseIntoSession(project.session, persistedByCanvas, canvasIds);
+      });
+    }
+    return packaged;
+  }
+
+  async function writePackagedProjectToWorkspace(workspace, entry, packaged) {
+    if (typeof serializeProjectStorageSnapshot !== 'function') {
+      throw new Error('V2 project serializer is unavailable');
+    }
+    const fileName = normalizeDocumentName(
+      entry?.fileName
+      || entry?.name
+      || packaged?.document?.documentName
+      || DEFAULT_DOCUMENT_NAME
+    );
+    const serialized = await serializeProjectStorageSnapshot({ packaged }, {
+      fileNameBase: fileName,
+      includeSheets: false,
+      includeTimelapse: true,
+      useWorker: true,
+      preferredAdapterId: 'pixieedraw-v2-zip',
+    });
+    if (!(serialized?.blob instanceof Blob)) {
+      throw new Error('V2 project serializer did not return a file');
+    }
+    const fileHandle = await workspace.createProjectFileHandle(fileName, { requestPermission: false });
+    if (!fileHandle || typeof fileHandle.createWritable !== 'function') {
+      throw new Error('Workspace project file could not be created');
+    }
+    try {
+      const writable = await fileHandle.createWritable();
+      try {
+        await writable.write(serialized.blob);
+        await writable.close();
+      } catch (error) {
+        try { await writable.abort?.(); } catch (_abortError) {}
+        throw error;
+      }
+    } catch (error) {
+      await workspace.removeProjectFile?.(fileHandle.name, { requestPermission: false });
+      throw error;
+    }
+    return fileHandle.name || fileName;
+  }
+
+  function filterFilelessLocalProjects(entries, workspaceEntries = []) {
+    const existingFileNames = new Set(
+      (Array.isArray(workspaceEntries) ? workspaceEntries : [])
+        .map(entry => String(entry?.name || '').trim().toLowerCase())
+        .filter(Boolean)
+    );
+    return (Array.isArray(entries) ? entries : []).filter(entry => {
+      if (!entry || !entry.id || isSharedRecentProjectEntry(entry)) return false;
+      if (String(entry.workspaceFileName || '').trim()) return false;
+      const fileName = normalizeDocumentName(entry.fileName || entry.name || DEFAULT_DOCUMENT_NAME).toLowerCase();
+      return !existingFileNames.has(fileName);
+    });
+  }
+
+  async function migrateFilelessLocalProjectsToWorkspace(workspace, workspaceEntries = []) {
+    if (startupWorkspaceMigrationPromise) return await startupWorkspaceMigrationPromise;
+    startupWorkspaceMigrationPromise = (async () => {
+      let entries = filterFilelessLocalProjects(await loadRecentProjectsMetadata(), workspaceEntries);
+      if (!entries.length || startupWorkspaceMigrationPrompted) {
+        return { migrated: 0, failed: 0, declined: false };
+      }
+      startupWorkspaceMigrationPrompted = true;
+      const accepted = window.confirm(localizeText(
+        `端末内だけに保存されている旧プロジェクトが${entries.length}件あります。\n\n単一プロジェクト形式のV2へ変換して、PiXiEED/Projectsに実ファイルとして保存します。複数タブ・複数キャンバスは、それぞれ独立したV2ファイルへ分割します。元の端末内データは、対応するV2ファイルの保存に成功した後だけ削除します。\n\n変換を開始しますか？`,
+        `${entries.length} legacy project(s) are stored only on this device.\n\nThey will be converted to single-project V2 files in PiXiEED/Projects. Multiple tabs and canvases will be split into separate V2 files. Original device data is removed only after its V2 file is saved successfully.\n\nStart conversion?`
+      ));
+      if (!accepted) {
+        return { migrated: 0, failed: 0, declined: true };
+      }
+
+      setStartupWorkspaceStatus(localizeText('端末内プロジェクトをV2へ変換しています…', 'Converting local projects to V2...'));
+      for (const entry of entries) {
+        try {
+          const packaged = await loadRecentProjectPackagedPayload(entry);
+          if (!packaged || typeof packaged !== 'object') continue;
+          await mergeFileBackedTimelapseIntoPackaged(entry, packaged);
+          await splitLegacyWorkspaceMigrationEntry(entry, packaged);
+        } catch (error) {
+          console.warn('[PiXiEED workspace] legacy project split failed', { projectId: entry.id, error });
+        }
+      }
+
+      entries = filterFilelessLocalProjects(await loadRecentProjectsMetadata(), workspaceEntries);
+      let migrated = 0;
+      let failed = 0;
+      for (let index = 0; index < entries.length; index += 1) {
+        const entry = entries[index];
+        setStartupWorkspaceStatus(localizeText(
+          `端末内プロジェクトをV2へ変換しています… ${index + 1}/${entries.length}`,
+          `Converting local projects to V2... ${index + 1}/${entries.length}`
+        ));
+        try {
+          const packaged = await loadRecentProjectPackagedPayload(entry);
+          if (!packaged || typeof packaged !== 'object') {
+            throw new Error('Local project payload is unavailable');
+          }
+          await mergeFileBackedTimelapseIntoPackaged(entry, packaged);
+          const collections = getLegacyPackagedProjectCollections(packaged);
+          if (collections.needsSplit) {
+            throw new Error('Legacy project still contains multiple projects');
+          }
+          const workspaceFileName = await writePackagedProjectToWorkspace(workspace, entry, packaged);
+          const removed = await removeRecentProjectEntry(entry.id);
+          if (!removed) {
+            await workspace.removeProjectFile?.(workspaceFileName, { requestPermission: false });
+            throw new Error('Original local project could not be removed');
+          }
+          migrated += 1;
+        } catch (error) {
+          failed += 1;
+          console.warn('[PiXiEED workspace] local project migration failed', { projectId: entry.id, error });
+        }
+      }
+      if (typeof refreshRecentProjectsUI === 'function') {
+        await refreshRecentProjectsUI().catch(error => {
+          console.warn('Failed to refresh recent projects after workspace migration', error);
+        });
+      }
+      return { migrated, failed, declined: false };
+    })();
+    try {
+      return await startupWorkspaceMigrationPromise;
+    } finally {
+      startupWorkspaceMigrationPromise = null;
+    }
+  }
+
   async function refreshStartupWorkspaceProjects({ requestPermission = false } = {}) {
     const workspace = window.PiXiEEDWorkspace;
     if (!workspace) {
@@ -1725,11 +1967,23 @@
       );
       return false;
     }
-    const entries = await workspace.listProjects({ requestPermission: false, includeWorkspaceRoot: true });
+    const existingEntries = await workspace.listProjects({ requestPermission: false, includeWorkspaceRoot: true });
+    const migration = await migrateFilelessLocalProjectsToWorkspace(workspace, existingEntries);
+    const entries = migration.migrated > 0
+      ? await workspace.listProjects({ requestPermission: false, includeWorkspaceRoot: true })
+      : existingEntries;
     renderStartupWorkspaceProjects(entries);
     setStartupWorkspaceStatus(
-      localizeText(`PiXiEEDフォルダに接続済み / ${entries.length}件`, `PiXiEED folder connected / ${entries.length} project(s)`),
-      'success'
+      migration.failed > 0
+        ? localizeText(
+          `接続済み / ${entries.length}件（V2移行 成功${migration.migrated}・未完了${migration.failed}）`,
+          `Connected / ${entries.length} project(s) (V2 migrated ${migration.migrated}, incomplete ${migration.failed})`
+        )
+        : localizeText(
+          `PiXiEEDフォルダに接続済み / ${entries.length}件${migration.migrated ? `（V2移行 ${migration.migrated}件）` : ''}`,
+          `PiXiEED folder connected / ${entries.length} project(s)${migration.migrated ? ` (V2 migrated ${migration.migrated})` : ''}`
+        ),
+      migration.failed > 0 ? 'warn' : 'success'
     );
     return true;
   }
@@ -1737,9 +1991,6 @@
   function setupStartupWorkspace() {
     const workspace = window.PiXiEEDWorkspace;
     const connectButton = dom.startup?.workspaceConnect;
-    const refreshButton = dom.startup?.workspaceRefresh;
-    const readFolderButton = dom.startup?.workspaceReadFolder;
-    const folderInput = dom.startup?.workspaceFolderInput;
     const projectList = dom.startup?.workspaceProjectList;
     if (!workspace || !(projectList instanceof HTMLElement) || projectList.dataset.bound === 'true') {
       return;
@@ -1755,38 +2006,6 @@
         } finally {
           connectButton.disabled = false;
         }
-      });
-    }
-    if (refreshButton instanceof HTMLButtonElement) {
-      refreshButton.addEventListener('click', async () => {
-        refreshButton.disabled = true;
-        try {
-          await refreshStartupWorkspaceProjects({ requestPermission: false });
-        } finally {
-          refreshButton.disabled = false;
-        }
-      });
-    }
-    if (readFolderButton instanceof HTMLButtonElement && folderInput instanceof HTMLInputElement) {
-      readFolderButton.addEventListener('click', () => folderInput.click());
-      folderInput.addEventListener('change', () => {
-        const files = workspace.collectProjectFiles(folderInput.files);
-        const entries = files.map(file => ({
-          name: file.name,
-          file,
-          handle: null,
-          size: file.size,
-          lastModified: file.lastModified,
-          relativeDirectory: typeof file.webkitRelativePath === 'string' ? file.webkitRelativePath : '',
-        }));
-        renderStartupWorkspaceProjects(entries);
-        setStartupWorkspaceStatus(
-          localizeText(
-            `フォルダを読み取りました / ${entries.length}件（保存時は保存先の再選択が必要です）`,
-            `Folder read / ${entries.length} project(s) (choose a destination when saving)`
-          ),
-          entries.length ? 'success' : 'warn'
-        );
       });
     }
     projectList.addEventListener('click', async event => {
@@ -1821,12 +2040,6 @@
     bindCoreProjectActionButtons();
     setupStartupWorkspace();
     getUpdateHistoryEntries();
-    if (dom.startup?.hint) {
-      dom.startup.hint.textContent = localizeText(
-        '新規作成またはファイルを開いて、ドット絵づくりを始めましょう。',
-        'Create a new project or open a file to start making pixel art.'
-      );
-    }
     if (dom.startup?.quickSetupButton instanceof HTMLButtonElement) {
       if (AUTOSAVE_SUPPORTED) {
         dom.startup.quickSetupButton.textContent = localizeText('新規作成（かんたん開始）', 'New Project (Quick Start)');

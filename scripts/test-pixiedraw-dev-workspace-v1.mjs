@@ -33,6 +33,7 @@ assert.deepEqual(
 assert.match(workspaceSource, /pixieed-workspace-v1/);
 assert.match(workspaceSource, /LEGACY_DB_NAME = 'pixieedraw-autosave'/);
 assert.match(workspaceSource, /createProjectFileHandle/);
+assert.equal(typeof workspace.removeProjectFile, 'function');
 assert.equal(workspace.resolveDerivedExportCategory('work.png'), 'PNG');
 assert.equal(workspace.resolveDerivedExportCategory('work-animation.gif'), 'GIF');
 assert.equal(workspace.resolveDerivedExportCategory('work-timelapse.gif'), 'Timelapse');
@@ -70,6 +71,9 @@ class MockDirectoryHandle {
     this.files.set(name, file);
     return file;
   }
+  async removeEntry(name) {
+    if (!this.files.delete(name)) throw Object.assign(new Error('missing file'), { name: 'NotFoundError' });
+  }
 }
 
 const pickedRoot = new MockDirectoryHandle('Selected');
@@ -92,6 +96,8 @@ assert.equal(timelapse.filename, 'art-timelapse.gif');
 assert.equal(project.name, 'art.pixieedraw');
 const pixieedDirectory = pickedRoot.directories.get('PiXiEED');
 assert.ok(pixieedDirectory.directories.get('Projects').files.has('art.pixieedraw'));
+assert.equal(await filesystemWorkspace.removeProjectFile('art.pixieedraw'), true);
+assert.equal(pixieedDirectory.directories.get('Projects').files.has('art.pixieedraw'), false);
 assert.ok(pixieedDirectory.directories.get('Exports').directories.get('PNG').files.has('art-1.png'));
 assert.ok(pixieedDirectory.directories.get('Exports').directories.get('Timelapse').files.has('art-timelapse.gif'));
 
@@ -105,7 +111,12 @@ const drawHtml = read('PiXiEEDrawDEV/index.html');
 const lensHtml = read('pixiee-lens/index.html');
 
 assert.match(drawHtml, /id="startupWorkspaceProjectList"/);
-assert.match(drawHtml, /id="startupWorkspaceFolderInput"[^>]*webkitdirectory/);
+assert.doesNotMatch(drawHtml, /id="startupWorkspaceRefresh"/);
+assert.doesNotMatch(drawHtml, /id="startupWorkspaceReadFolder"/);
+assert.doesNotMatch(drawHtml, /id="startupWorkspaceFolderInput"/);
+const startupActionsMarkup = drawHtml.match(/<div[^>]*class="startup-screen__actions"[^>]*>[\s\S]*?<\/div>/)?.[0] || '';
+assert.doesNotMatch(startupActionsMarkup, /account\/index\.html/);
+assert.doesNotMatch(drawHtml, /id="startupScreenHint"|id="startupLensHint"/);
 assert.match(drawHtml, /scripts\/pixieed-workspace\.js/);
 assert.doesNotMatch(drawHtml, /id="startupActionSkip"/);
 assert.match(app, /const shouldAutoRestoreReloadSnapshot = false;/);
@@ -113,6 +124,12 @@ assert.match(app, /phase: 'startup-session-restore-skipped'/);
 assert.match(app, /hideProjectHomeScreen\(\);\s*showStartupScreen\(\);/);
 assert.match(startup, /setupStartupWorkspace\(\);/);
 assert.match(startup, /createProjectFileHandle/);
+assert.match(startup, /migrateFilelessLocalProjectsToWorkspace/);
+assert.match(startup, /filterFilelessLocalProjects/);
+assert.match(startup, /serializeProjectStorageSnapshot/);
+assert.match(startup, /mergeFileBackedTimelapseIntoPackaged/);
+assert.match(startup, /removeRecentProjectEntry/);
+assert.match(app, /workspaceFileName: autosaveHandle\?\.name/);
 assert.match(openImport, /bindOpenedFile: Boolean\(handle\)/);
 assert.match(session, /canBindOpenedProjectFile/);
 assert.match(session, /adapterId === 'pixieedraw-v2-zip'/);

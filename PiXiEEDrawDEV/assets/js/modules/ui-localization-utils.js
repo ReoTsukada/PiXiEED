@@ -309,11 +309,8 @@
       setLocalizedTextContent('.startup-screen__subtitle', 'PiXiEEDraw（ピクシードロー）でドット絵づくり・アニメ制作をはじめよう', 'Start pixel art and animation with PiXiEEDraw');
       setLocalizedTextContent('#startupActionNew', '新規作成', 'New Project');
       setLocalizedTextContent('#startupActionOpen', 'ファイルを開く', 'Open File');
-      setLocalizedTextContent('.startup-screen__actions a[href="../account/index.html"]', 'PiXiEED マイページ', 'PiXiEED My Page');
       setLocalizedTextContent('#startupWorkspaceTitle', 'PiXiEEDワークスペース', 'PiXiEED Workspace');
       setLocalizedTextContent('#startupWorkspaceConnect', 'PiXiEEDフォルダに接続', 'Connect PiXiEED Folder');
-      setLocalizedTextContent('#startupWorkspaceRefresh', '一覧を更新', 'Refresh List');
-      setLocalizedTextContent('#startupWorkspaceReadFolder', 'フォルダを読み取る', 'Read Folder');
       setLocalizedTextContent('#startupActionSkip', 'この画面を閉じる', 'Close');
       setLocalizedTextContent('#globalLoadingIndicatorCancel', 'キャンセル', 'Cancel');
       setLocalizedTextContent('#multiInviteShare', '共有', 'Share');
@@ -321,16 +318,6 @@
       setLocalizedTextContent('#projectHomeNew', '新規作成', 'New Project');
       setLocalizedTextContent('#projectHomeOpen', 'ファイルを開く', 'Open File');
       setLocalizedTextContent('.project-home-screen__actions a[href="../account/index.html"]', 'PiXiEED マイページ', 'PiXiEED My Page');
-      setLocalizedTextContent(
-        '#startupScreenHint',
-        '新規作成またはファイルを開いて、ドット絵づくりを始めましょう。',
-        'Create a new project or open a file to start making pixel art.'
-      );
-      setLocalizedHtmlContent(
-        '#startupLensHint',
-        '写真をドット絵変換するなら <a href="../pixiee-lens/index.html" target="_blank" rel="noopener">PiXiEELENS</a>',
-        'Convert photos to pixel art with <a href="../pixiee-lens/index.html" target="_blank" rel="noopener">PiXiEELENS</a>.'
-      );
       setLocalizedTextContent('#updateToastCloseBtn', '閉じる', 'Close');
   
       applyTabLocalization();
