@@ -3456,10 +3456,6 @@
     return canvasDrawingWorkflowUtilsModule.drawEllipse(...args);
   }
 
-  function drawOval(...args) {
-    return canvasDrawingWorkflowUtilsModule.drawOval(...args);
-  }
-
   function drawEllipsePixels(...args) {
     return canvasDrawingWorkflowUtilsModule.drawEllipsePixels(...args);
   }
@@ -3569,8 +3565,6 @@
   set dom(value) { dom = value; },
   get drawEllipse() { return drawEllipse; },
   set drawEllipse(value) { drawEllipse = value; },
-  get drawOval() { return drawOval; },
-  set drawOval(value) { drawOval = value; },
   get drawLine() { return drawLine; },
   set drawLine(value) { drawLine = value; },
   get drawRectangle() { return drawRectangle; },
@@ -8566,8 +8560,6 @@
   set dom(value) { dom = value; },
   get drawEllipse() { return drawEllipse; },
   set drawEllipse(value) { drawEllipse = value; },
-  get drawOval() { return drawOval; },
-  set drawOval(value) { drawOval = value; },
   get drawLine() { return drawLine; },
   set drawLine(value) { drawLine = value; },
   get drawRectangle() { return drawRectangle; },
@@ -8891,8 +8883,6 @@
   set drawButtonResizeListenerBound(value) { drawButtonResizeListenerBound = value; },
   get drawEllipse() { return drawEllipse; },
   set drawEllipse(value) { drawEllipse = value; },
-  get drawOval() { return drawOval; },
-  set drawOval(value) { drawOval = value; },
   get drawLine() { return drawLine; },
   set drawLine(value) { drawLine = value; },
   get drawRectangle() { return drawRectangle; },
@@ -9749,7 +9739,7 @@
   let onionSkinCacheRevision = 0;
   const selectionMaskCacheIds = new WeakMap();
   let selectionMaskCacheIdCounter = 1;
-  const HISTORY_DRAW_TOOLS = new Set(['pen', 'eraser', 'line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill', 'oval', 'ovalFill', ...FILL_TOOL_SET]);
+  const HISTORY_DRAW_TOOLS = new Set(['pen', 'eraser', 'line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill', ...FILL_TOOL_SET]);
   const HISTORY_ENTRY_TYPE_PIXEL_PATCH = 'pixelPatch';
   const PIXEL_PATCH_HISTORY_LABELS = new Set([
     'pen',
@@ -9760,8 +9750,6 @@
     'rectFill',
     'ellipse',
     'ellipseFill',
-    'oval',
-    'ovalFill',
     'selectionMove',
     'selectionTransform',
     'selectionCut',
