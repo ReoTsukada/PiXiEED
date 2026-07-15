@@ -822,10 +822,6 @@
 <img alt="" aria-hidden="true" class="tool-group-icon" height="20" src="assets/icons/tool-cursor.png" width="20"/>
 <span class="tool-group-label">仮想カーソル</span>
 </button>
-<button aria-label="マルチキャンバス" aria-pressed="false" class="tool-group-button tool-group-button--action" data-ui-action="localCanvasToggle" title="マルチキャンバス" type="button">
-<img alt="" aria-hidden="true" class="tool-group-icon" height="20" src="assets/icons/menu-canvas.png" width="20"/>
-<span class="tool-group-label">マルチキャンバス</span>
-</button>
 <button aria-label="小窓プレビュー" aria-pressed="false" class="tool-group-button tool-group-button--action" data-ui-action="floatingPreviewToggle" title="小窓プレビュー" type="button">
 <img alt="" aria-hidden="true" class="tool-group-icon" height="20" src="assets/icons/action-preview.svg" width="20"/>
 <span class="tool-group-label">小窓プレビュー</span>
@@ -1354,16 +1350,16 @@
 </label>
 </li>
 <li>
-<label class="toggle-option" for="toggleLocalCanvas">
+<label class="toggle-option" for="toggleLocalCanvas" title="通常制作は単一キャンバスです。共同制作や素材分担では複数キャンバスを使えます。">
 <input id="toggleLocalCanvas" type="checkbox"/>
-<span>マルチキャンバス</span>
+<span>複数キャンバス（上級）</span>
 </label>
-<div aria-label="マルチキャンバス設定" class="local-canvas-count-controls is-hidden" hidden="" id="localCanvasCountControls">
+<div aria-label="複数キャンバス設定" class="local-canvas-count-controls is-hidden" hidden="" id="localCanvasCountControls">
 <span class="local-canvas-count-controls__label" id="localCanvasCountLabel">キャンバス数</span>
 <div class="local-canvas-count-controls__row">
-<button class="chip local-canvas-count-controls__button" id="removeLocalCanvas" type="button" aria-label="マルチキャンバスを減らす">-</button>
+<button class="chip local-canvas-count-controls__button" id="removeLocalCanvas" type="button" aria-label="追加キャンバスを減らす">-</button>
 <span aria-live="polite" class="local-canvas-count-controls__value" id="localCanvasCountValue">0</span>
-<button class="chip local-canvas-count-controls__button" id="addLocalCanvas" type="button" aria-label="マルチキャンバスを増やす">+</button>
+<button class="chip local-canvas-count-controls__button" id="addLocalCanvas" type="button" aria-label="追加キャンバスを増やす">+</button>
 </div>
 </div>
 </li>
@@ -1839,7 +1835,7 @@
 	<script defer="" src="assets/js/modules/export-delivery-utils.js?v=2026.06.30-export-delivery-v1"></script>
 	<script defer="" src="assets/js/modules/document-utils.js?v=2026.06.28-file-split-step5"></script>
 	<script defer="" src="assets/js/modules/document-model.js?v=2026.07.12-direct-authority-gmem2b1"></script>
-	<script defer="" src="assets/js/modules/state-normalizers.js?v=2026.07.01-pixfind-mode-split-v1"></script>
+	<script defer="" src="assets/js/modules/state-normalizers.js?v=20260715-true-v2-single-canvas-v1"></script>
 	<script defer="" src="assets/js/modules/ui-static-config.js?v=2026.07.14-circle-oval-v1"></script>
 	<script defer="" src="assets/js/modules/geometry-utils.js?v=2026.06.30-geometry-utils-v1"></script>
 	<script defer="" src="assets/js/modules/viewport-zoom-utils.js?v=2026.06.30-viewport-zoom-v1"></script>
@@ -1902,7 +1898,7 @@
 	<script defer="" src="assets/js/modules/image-import-decode-utils.js?v=2026.07.12-gmem3a-streaming-resize1"></script>
 	<script defer="" src="assets/js/modules/palette-panel-utils.js?v=2026.07.12-direct-authority-gmem2a1"></script>
 	<script defer="" src="assets/js/modules/timeline-layers.js?v=2026.07.04-frame-pending-structure-fix1"></script>
-	<script defer="" src="assets/js/modules/ui-localization-utils.js?v=20260714-circle-oval-v1"></script>
+	<script defer="" src="assets/js/modules/ui-localization-utils.js?v=20260715-advanced-multicanvas-v1"></script>
 	<script defer="" src="assets/js/modules/ui-language-utils.js?v=2026.07.03-small-helper-batch-split-v1"></script>
 	<script defer="" src="assets/js/modules/scroll-input-utils.js?v=2026.07.03-small-helper-batch-split-v1"></script>
 	<script defer="" src="assets/js/modules/sprite-scale-utils.js?v=2026.06.30-zh-localization-v1"></script>
@@ -1928,7 +1924,7 @@
 	<script defer="" src="assets/js/modules/layout-viewport.js?v=20260715-safari-viewport-scroll-v1"></script>
 	<script defer="" src="assets/js/modules/rail-tool-ui-utils.js?v=2026.07.12-auto-dismiss-right-panels1"></script>
 	<script defer="" src="assets/js/modules/control-ui-utils.js?v=2026.07.01-control-ui-split-v1"></script>
-	<script defer="" src="assets/js/modules/ui-action-buttons-workflow-utils.js?v=2026.07.03-ui-action-buttons-split-v1"></script>
+	<script defer="" src="assets/js/modules/ui-action-buttons-workflow-utils.js?v=20260715-advanced-multicanvas-v1"></script>
 	<script defer="" src="assets/js/modules/ui-action-router-workflow-utils.js?v=2026.07.03-ui-action-router-split-v1"></script>
 	<script defer="" src="assets/js/modules/canvas-control-actions-workflow-utils.js?v=2026.07.03-canvas-control-actions-split-v1"></script>
 	<script defer="" src="assets/js/modules/history-core-workflow-utils.js?v=2026.07.03-history-core-split-v1"></script>
@@ -1951,7 +1947,7 @@
 		<script defer="" src="assets/js/modules/project-storage-v2-worker-bridge.js?v=2026.07.10-project-storage-worker1"></script>
 		<script defer="" src="assets/js/modules/project-storage-v2-zip-adapter.js?v=20260714-project-v2-default1"></script>
 		<script defer="" src="assets/js/modules/document-serialization-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
-		<script defer="" src="assets/js/modules/document-session-workflow-utils.js?v=20260713-048"></script>
+	<script defer="" src="assets/js/modules/document-session-workflow-utils.js?v=20260715-true-v2-tab-canvas-split-v1"></script>
 	<script defer="" src="assets/js/modules/recent-account-workflow-utils.js?v=2026.07.03-safe-helper-split-v1"></script>
 	<script defer="" src="assets/js/modules/pixieed-profile-local-utils.js?v=2026.07.03-safe-helper-split-v1"></script>
 	<script defer="" src="assets/js/modules/shared-recent-project-utils.js?v=2026.07.03-shared-recent-helper-split-v1"></script>
@@ -1980,7 +1976,7 @@
 	<script defer="" src="assets/js/modules/pre-update-checkpoint-utils.js?v=20260712-pre-update-checkpoint-u3"></script>
 	<script defer="" src="assets/js/active-project-session-utils.js?v=2026.07.13-active-project-session-r2c"></script>
 	<script defer="" src="assets/js/pixieedraw-dev-switch.js?v=2026.07.03-pixieedrawdev-switch-fix14"></script>
-	<script defer="" src="assets/js/app.js?v=20260715-069"></script>
+	<script defer="" src="assets/js/app.js?v=20260715-072"></script>
 	<script defer="" src="assets/js/modules/update-detection-utils.js?v=20260713-026"></script>
   <script>
     (function initPanelAdDocking() {
