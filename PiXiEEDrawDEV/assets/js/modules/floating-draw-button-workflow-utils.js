@@ -382,14 +382,6 @@
           drawEllipse(position, position, true);
           actionPerformed = true;
           break;
-        case 'oval':
-          drawOval(position, position, false);
-          actionPerformed = true;
-          break;
-        case 'ovalFill':
-          drawOval(position, position, true);
-          actionPerformed = true;
-          break;
         case 'curve':
           applyBrushStroke(position.x, position.y, position.x, position.y);
           actionPerformed = true;
