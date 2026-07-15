@@ -1615,6 +1615,110 @@ body:has(.home-app) > .google-auto-placed {
   background: rgba(121,192,255,0.1);
   outline: none;
 }
+
+/* Home live-tool surface: the tool itself is the hero, not a screenshot. */
+.home-live-tool {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: clamp(16px, 2.4vw, 28px);
+  border: 1px solid rgba(121, 192, 255, 0.2);
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at 92% 8%, rgba(45, 212, 191, 0.13), transparent 30%),
+    linear-gradient(145deg, rgba(18, 33, 62, 0.94), rgba(8, 14, 29, 0.94));
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.28);
+}
+.home-live-tool__intro { display: grid; gap: 8px; max-width: 780px; }
+.home-live-tool__eyebrow {
+  margin: 0;
+  color: var(--accent-3);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.home-live-tool__intro h1 { margin: 0; font-size: clamp(26px, 4vw, 44px); line-height: 1.14; }
+.home-live-tool__intro p:not(.home-live-tool__eyebrow) { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.7; }
+.home-live-tool__tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+}
+.home-live-tool__tab {
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 8px 13px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.05);
+  color: var(--muted);
+  font: 800 13px/1.2 'Fredoka', 'DotGothic16', system-ui, sans-serif;
+  cursor: pointer;
+}
+.home-live-tool__tab:hover,
+.home-live-tool__tab:focus-visible,
+.home-live-tool__tab.is-active { color: #fff; background: rgba(121,192,255,0.18); border-color: rgba(121,192,255,0.58); outline: none; }
+.home-live-tool__stage {
+  min-width: 0;
+  min-height: clamp(440px, 62vw, 720px);
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 18px;
+  background: #08101f;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.22);
+}
+.home-live-tool__stage-head {
+  min-height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.045);
+}
+.home-live-tool__stage-head > div { display: grid; gap: 2px; min-width: 0; }
+.home-live-tool__stage-head strong { font-size: 14px; }
+.home-live-tool__stage-head span:not(.home-live-tool__adfree) { color: var(--muted); font-size: 11px; }
+.home-live-tool__adfree { flex: 0 0 auto; color: var(--accent-3); font-size: 11px; font-weight: 800; }
+.home-live-tool__frame { width: 100%; height: clamp(388px, 56vw, 668px); border: 0; display: block; background: #08101f; }
+.home-live-tool__actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.home-live-tool__actions > * { min-height: 44px; padding: 11px 15px; border-radius: 12px; font: 800 14px/1.2 'Fredoka', 'DotGothic16', system-ui, sans-serif; }
+.home-live-tool__primary { border: 1px solid #54b3ff; background: #1976d2; color: #fff; cursor: pointer; }
+.home-live-tool__secondary { border: 1px solid rgba(121,192,255,0.55); background: rgba(121,192,255,0.12); color: #fff; }
+.home-live-tool__guide { border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.04); color: var(--muted); }
+.home-live-tool__primary:hover, .home-live-tool__primary:focus-visible { background: #2587e5; outline: none; }
+.home-live-tool__secondary:hover, .home-live-tool__secondary:focus-visible, .home-live-tool__guide:hover, .home-live-tool__guide:focus-visible { color: #fff; border-color: rgba(255,255,255,0.38); outline: none; }
+.home-live-tool__stage:fullscreen { width: 100%; height: 100%; border-radius: 0; border: 0; background: #08101f; }
+.home-live-tool__stage:fullscreen .home-live-tool__frame { height: calc(100vh - 50px); }
+@media (orientation: portrait) {
+  .home-live-tool__frame { height: min(62vh, 668px); }
+  .home-live-tool__stage { min-height: 0; }
+}
+@media (orientation: landscape) and (max-height: 760px) {
+  .home-live-tool__frame { height: min(66vh, 540px); }
+  .home-live-tool__stage { min-height: 0; }
+}
+
+.project-live-tool { display: grid; min-width: 0; background: #08101f; }
+.project-live-tool__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 11px; background: rgba(255,255,255,0.06); }
+.project-live-tool__head strong { font-size: 13px; }
+.project-live-tool__head span { color: var(--accent-3); font-size: 10px; font-weight: 800; }
+.project-live-tool__frame { display: block; width: 100%; height: min(56vw, 420px); min-height: 280px; border: 0; background: #08101f; }
+.project-live-tool__actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; border-top: 1px solid rgba(255,255,255,0.1); }
+.project-live-tool__actions > * { min-height: 36px; padding: 8px 11px; border-radius: 10px; border: 1px solid rgba(121,192,255,0.5); background: rgba(121,192,255,0.12); color: #fff; font: 800 12px/1.2 'Fredoka', 'DotGothic16', system-ui, sans-serif; cursor: pointer; }
+.project-live-tool__actions a { color: var(--muted); border-color: rgba(255,255,255,0.16); background: rgba(255,255,255,0.04); }
+.project-live-tool:fullscreen { width: 100%; height: 100%; border-radius: 0; }
+.project-live-tool:fullscreen .project-live-tool__frame { height: calc(100vh - 52px); max-height: none; }
+@media (orientation: portrait) {
+  .project-live-tool__frame { height: min(72vh, 580px); }
+}
+@media (orientation: landscape) and (max-height: 760px) {
+  .project-live-tool__frame { height: min(66vh, 440px); }
+}
 .home-tool-grid {
   display: grid;
   gap: 12px;
