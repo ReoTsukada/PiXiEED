@@ -75,7 +75,7 @@
     Object.freeze({
       id: 'shape-fill',
       title: { ja: '図形・塗りつぶし', en: 'Shapes & Fill', zh: '图形与填充' },
-      keywords: { ja: '直線 曲線 四角 丸 楕円 塗りつぶし プレビュー', en: 'line curve rectangle circle oval fill preview', zh: '直线 曲线 矩形 圆 椭圆 填充 预览' },
+      keywords: { ja: '直線 曲線 四角 丸 塗りつぶし プレビュー', en: 'line curve rectangle circle fill preview', zh: '直线 曲线 矩形 圆 填充 预览' },
       points: {
         ja: [
           '図形ツールはプレビュー表示後、確定で描画されます。',
