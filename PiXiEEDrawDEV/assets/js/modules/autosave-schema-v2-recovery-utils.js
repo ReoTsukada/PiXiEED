@@ -4,7 +4,7 @@
 
   function createAutosaveSchemaV2RecoveryUtils() {
     const clone = value => JSON.parse(JSON.stringify(value));
-    const emptyTimelapse = () => ({ enabled: false, fps: 12, byCanvas: {}, operationLogsByCanvas: {} });
+    const emptyTimelapse = () => ({ enabled: true, fps: 12, byCanvas: {}, operationLogsByCanvas: {} });
 
     function sanitizeProject(project) {
       const next = project && typeof project === 'object' ? project : {};
