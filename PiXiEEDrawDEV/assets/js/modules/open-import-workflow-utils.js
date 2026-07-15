@@ -553,16 +553,18 @@
           suppressAutosaveStatus: true,
           sourceKind: 'file',
           fileLoad: true,
+          bindOpenedFile: Boolean(handle),
           sourceFileName: file.name || '',
-          projectSaveHandleState: handle ? 'unknown' : 'none',
+          projectSaveHandleState: handle ? 'bound' : 'none',
           preparedSnapshot,
         })
         : await loadDocumentFromText(await file.text(), handle, {
           suppressAutosaveStatus: true,
           sourceKind: 'file',
           fileLoad: true,
+          bindOpenedFile: Boolean(handle),
           sourceFileName: file.name || '',
-          projectSaveHandleState: handle ? 'unknown' : 'none',
+          projectSaveHandleState: handle ? 'bound' : 'none',
           preparedSnapshot,
         });
       if (!loaded || loaded === 'deferred') {
