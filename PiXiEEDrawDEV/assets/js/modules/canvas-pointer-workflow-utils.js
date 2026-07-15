@@ -190,7 +190,8 @@
 
     let deltaX = end.x - start.x;
     let deltaY = end.y - start.y;
-    if (event.shiftKey) {
+    const isCircleTool = tool === 'ellipse' || tool === 'ellipseFill';
+    if (event.shiftKey || isCircleTool) {
       const span = Math.max(Math.abs(deltaX), Math.abs(deltaY));
       deltaX = (deltaX < 0 ? -1 : 1) * span;
       deltaY = (deltaY < 0 ? -1 : 1) * span;

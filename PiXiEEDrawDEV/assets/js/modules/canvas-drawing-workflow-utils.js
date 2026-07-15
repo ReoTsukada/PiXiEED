@@ -459,16 +459,20 @@
   }
 
   function getCircleBounds(start, end) {
-    const minX = Math.min(start.x, end.x);
-    const maxX = Math.max(start.x, end.x);
-    const minY = Math.min(start.y, end.y);
-    const maxY = Math.max(start.y, end.y);
-    const diameter = Math.max(1, Math.min((maxX - minX) + 1, (maxY - minY) + 1));
-    const circleMinX = minX + Math.floor((((maxX - minX) + 1) - diameter) * 0.5);
-    const circleMinY = minY + Math.floor((((maxY - minY) + 1) - diameter) * 0.5);
+    const deltaX = end.x - start.x;
+    const deltaY = end.y - start.y;
+    const span = Math.max(Math.abs(deltaX), Math.abs(deltaY));
+    const circleEndX = start.x + (deltaX < 0 ? -span : span);
+    const circleEndY = start.y + (deltaY < 0 ? -span : span);
     return {
-      start: { x: circleMinX, y: circleMinY },
-      end: { x: circleMinX + diameter - 1, y: circleMinY + diameter - 1 },
+      start: {
+        x: Math.min(start.x, circleEndX),
+        y: Math.min(start.y, circleEndY),
+      },
+      end: {
+        x: Math.max(start.x, circleEndX),
+        y: Math.max(start.y, circleEndY),
+      },
     };
   }
 
@@ -971,6 +975,7 @@
     drawLine,
     drawRectangle,
     drawEllipse,
+    getCircleBounds,
     drawEllipsePixels,
     getFillGradientColors,
     normalizeFillGradientPoint,

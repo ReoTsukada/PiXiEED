@@ -836,15 +836,19 @@
         }
       }
     } else if (normalizedTool === 'ellipse' || normalizedTool === 'ellipseFill') {
-      const minX = Math.min(start.x, end.x);
-      const maxX = Math.max(start.x, end.x);
-      const minY = Math.min(start.y, end.y);
-      const maxY = Math.max(start.y, end.y);
-      const diameter = Math.max(1, Math.min((maxX - minX) + 1, (maxY - minY) + 1));
-      const circleMinX = minX + Math.floor((((maxX - minX) + 1) - diameter) * 0.5);
-      const circleMinY = minY + Math.floor((((maxY - minY) + 1) - diameter) * 0.5);
-      const ellipseStart = { x: circleMinX, y: circleMinY };
-      const ellipseEnd = { x: circleMinX + diameter - 1, y: circleMinY + diameter - 1 };
+      const deltaX = end.x - start.x;
+      const deltaY = end.y - start.y;
+      const span = Math.max(Math.abs(deltaX), Math.abs(deltaY));
+      const circleEndX = start.x + (deltaX < 0 ? -span : span);
+      const circleEndY = start.y + (deltaY < 0 ? -span : span);
+      const ellipseStart = {
+        x: Math.min(start.x, circleEndX),
+        y: Math.min(start.y, circleEndY),
+      };
+      const ellipseEnd = {
+        x: Math.max(start.x, circleEndX),
+        y: Math.max(start.y, circleEndY),
+      };
       drawEllipsePixels(ellipseStart.x, ellipseStart.y, ellipseEnd.x, ellipseEnd.y, Boolean(command.filled), plotPoint);
     } else {
       return false;
