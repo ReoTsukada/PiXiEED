@@ -210,6 +210,23 @@ assert.equal(patchedLayer.indices[1], -1);
 assert.equal(restored1.packaged.sheets[1].journalRecovered, false);
 assert.equal(restored1.packaged.sheets[0].journalRecovered, true);
 
+// Real editor checkpoints use Base64 strings. Journal replay must decode the
+// existing buffers before patching instead of replacing all untouched pixels.
+const base64State = createProjectState(1);
+const base64Layer = base64State.sheets[0].project.document.canvases[0].frames[0].layers[1];
+base64Layer.indices = Buffer.from(new Int16Array(base64Layer.indices).buffer).toString('base64');
+base64Layer.direct = Buffer.from(new Uint8Array(base64Layer.direct)).toString('base64');
+base64Layer.importSourceDirect = Buffer.from(new Uint8Array(base64Layer.importSourceDirect)).toString('base64');
+base64State.journalsBySheet['sheet-a'][0].changes[0].after.paletteIndex = 0;
+const base64Revision = utils.createSchemaV2Revision(base64State, { revision: 1 });
+const base64Store = utils.createInMemoryAutosaveSchemaV2Store();
+utils.commitSchemaV2Revision(base64Store, base64Revision);
+const base64Restored = utils.restoreSchemaV2WithFallback(base64Store, base64Revision.recentEntry);
+const base64Patched = base64Restored.packaged.sheets[0].project.document.canvases[0].frames[0].layers[1];
+assert.deepEqual(base64Patched.indices, [0, 0, 1, -1], 'journal patch preserves untouched Base64 indices and accepts palette index 0');
+assert.deepEqual(base64Patched.direct.slice(0, 4), [0, 0, 0, 0], 'journal patch preserves untouched Base64 direct pixels');
+assert.deepEqual(base64Patched.direct.slice(4, 8), [90, 91, 92, 255], 'journal patch applies the changed direct pixel');
+
 const serializedBundle = JSON.stringify(revision1);
 for (const forbidden of ['projectSaveHandle', 'projectSaveHandleMeta', 'autosaveHandle', 'pendingAutosaveHandle', 'must-not-persist']) {
   assert.equal(serializedBundle.includes(forbidden), false, `${forbidden} must not enter schema V2 records`);
