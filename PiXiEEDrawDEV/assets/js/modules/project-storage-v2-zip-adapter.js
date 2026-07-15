@@ -117,13 +117,19 @@
       const includeTimelapse = options?.includeTimelapse !== false;
       const snapshot = projectState?.snapshot || null;
       const session = projectState?.session || null;
-      const packaged = projectState?.packaged && typeof projectState.packaged === 'object'
+      const packagedSource = projectState?.packaged && typeof projectState.packaged === 'object'
         ? projectState.packaged
         : buildPackagedProjectPayload(snapshot, {
             session,
             updatedAt: options?.updatedAt || '',
             includeSheets,
           });
+      const previewThumbnail = typeof projectState?.thumbnail === 'string'
+        ? projectState.thumbnail
+        : (typeof packagedSource?.previewThumbnail === 'string' ? packagedSource.previewThumbnail : '');
+      const packaged = previewThumbnail
+        ? { ...packagedSource, previewThumbnail }
+        : packagedSource;
       try {
         const encodeOptions = {
           adapterId: ADAPTER_ID,
@@ -180,6 +186,9 @@
         return await parseBytesWithOptions(bytes, options);
       },
       readManifestFromBytes,
+      async readManifestFromBlob(blob) {
+        return await codec.readManifestFromBlob(blob);
+      },
       serializeProject,
     });
   }
