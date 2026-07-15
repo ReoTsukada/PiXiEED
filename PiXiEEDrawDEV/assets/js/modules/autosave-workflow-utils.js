@@ -373,9 +373,24 @@
       if (completeSession?.timelapse?.synchronization?.complete !== true) {
         throw new Error('Complete timelapse synchronization is required');
       }
+      completeSession.projectExportIntegrity = {
+        schemaVersion: 1,
+        completeProjectSave: true,
+        autosavePolicy: 'always-on',
+        autosaveRequired: true,
+        autosaveDestinationConnectedBySave: true,
+        timelapseRequired: true,
+        timelapseSynchronized: true,
+        saleCandidateDataComplete: true,
+        generatedAt: new Date().toISOString(),
+      };
+      const previewThumbnail = typeof generateSnapshotThumbnail === 'function'
+        ? await generateSnapshotThumbnail(snapshot)
+        : null;
       serialized = await serializeProjectStorageSnapshot({
         snapshot,
         session: completeSession,
+        thumbnail: previewThumbnail,
       }, {
         fileNameBase: state?.documentName || '',
         includeSheets: false,
