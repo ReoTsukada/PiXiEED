@@ -21,6 +21,7 @@
   let cachedWorkspaceHandle = null;
   let pendingWorkspaceHandle = null;
   let hydrationPromise = null;
+  let lastErrorCode = '';
 
   function supportsIndexedDb() {
     return typeof indexedDB !== 'undefined' && indexedDB !== null;
@@ -156,6 +157,7 @@
   }
 
   async function connect({ requestPermission = true } = {}) {
+    lastErrorCode = '';
     await hydrate();
     if (cachedWorkspaceHandle && await ensurePermission(cachedWorkspaceHandle, { request: requestPermission })) {
       return cachedWorkspaceHandle;
@@ -171,9 +173,16 @@
     }
     try {
       const rootHandle = await window.showDirectoryPicker({ id: PICKER_ID, mode: 'readwrite' });
+      if (String(rootHandle?.name || '').trim().toLowerCase() === PROJECTS_DIRECTORY.toLowerCase()) {
+        lastErrorCode = 'projects-folder-selected';
+        return null;
+      }
       if (!await ensurePermission(rootHandle, { request: true })) return null;
       const workspace = await normalizeWorkspaceHandle(rootHandle, { create: true });
-      if (!workspace || !await ensurePermission(workspace, { request: true })) return null;
+      if (!workspace || !await ensurePermission(workspace, { request: true })) {
+        lastErrorCode = 'workspace-create-or-permission-failed';
+        return null;
+      }
       cachedWorkspaceHandle = workspace;
       pendingWorkspaceHandle = null;
       await storeWorkspaceHandle(workspace);
@@ -181,6 +190,7 @@
       return workspace;
     } catch (error) {
       if (error?.name !== 'AbortError') {
+        lastErrorCode = error?.name || 'workspace-connect-failed';
         console.warn('[PiXiEED workspace] connection failed', error);
       }
       return null;
@@ -368,6 +378,7 @@
       indexedDbSupported: supportsIndexedDb(),
       connected: Boolean(cachedWorkspaceHandle),
       permissionPending: Boolean(pendingWorkspaceHandle),
+      lastErrorCode,
     };
   }
 
