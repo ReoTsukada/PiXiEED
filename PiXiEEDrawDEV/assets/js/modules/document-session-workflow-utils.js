@@ -177,7 +177,10 @@
     const packagedProjectCount = Array.isArray(parsedDocument?.sheets)
       ? parsedDocument.sheets.filter(sheet => sheet?.project && typeof sheet.project === 'object').length
       : 0;
-    return adapterId === 'pixieedraw-v1-json' || packagedProjectCount > 1;
+    const canvasCount = Array.isArray(parsedDocument?.snapshot?.canvases)
+      ? parsedDocument.snapshot.canvases.length
+      : 1;
+    return adapterId === 'pixieedraw-v1-json' || packagedProjectCount > 1 || canvasCount > 1;
   }
 
   async function confirmLegacyV2MigrationIfNeeded(parsedDocument, options = {}) {
@@ -186,7 +189,13 @@
     const accepted = await requestLegacyV2MigrationConsent({
       sourceFileName: options?.sourceFileName || options?.fileName || parsedDocument?.document?.documentName || '',
       sourceAdapterId: parsedDocument?.storageAdapterId || '',
-      projectCount: Array.isArray(parsedDocument?.sheets) ? parsedDocument.sheets.length : 1,
+      projectCount: Math.max(
+        Array.isArray(parsedDocument?.sheets) ? parsedDocument.sheets.length : 1,
+        Array.isArray(parsedDocument?.snapshot?.canvases) ? parsedDocument.snapshot.canvases.length : 1
+      ),
+      multiCanvasCount: Array.isArray(parsedDocument?.snapshot?.canvases)
+        ? parsedDocument.snapshot.canvases.length
+        : 1,
     });
     if (!accepted && !options?.suppressAutosaveStatus) {
       updateAutosaveStatus('V2への移行をキャンセルしました', 'warn');
@@ -495,16 +504,70 @@
 
   async function applyLoadedDocumentSnapshot(parsedDocument, options = {}) {
     const preservedSelectionClipboard = preserveCanvasSelectionClipboard();
-    const snapshot = parsedDocument?.snapshot || null;
+    let snapshot = parsedDocument?.snapshot || null;
     const projectSession = parsedDocument?.projectSession || null;
-    const preserveDotStats = Boolean(options?.projectId || options?.openedFromRecent || options?.preserveDotStats);
-    const dotStats = preserveDotStats ? (parsedDocument?.dotStats || null) : null;
     if (!snapshot) {
       if (!options?.suppressAutosaveStatus) {
         updateAutosaveStatus('ドキュメントの読み込みに失敗しました', 'error');
       }
       return false;
     }
+    const legacyCanvases = Array.isArray(snapshot.canvases) ? snapshot.canvases : [];
+    const hasLegacyMultiProjectSheets = Array.isArray(parsedDocument?.sheets)
+      && parsedDocument.sheets.filter(sheet => sheet?.project && typeof sheet.project === 'object').length > 1;
+    if (legacyCanvases.length > 1 && !hasLegacyMultiProjectSheets) {
+      const sourceProjectId = normalizeAutosaveProjectId(options?.projectId || '') || createAutosaveProjectId();
+      const activeCanvasId = typeof snapshot.activeCanvasId === 'string' ? snapshot.activeCanvasId : '';
+      const migration = await migrateLegacyMultiProjectPackage?.({
+        sourceProjectId,
+        sourceProject: {
+          type: 'pixieedraw-project',
+          packageVersion: 2,
+          projectLayout: 'legacy-multi-canvas',
+          document: { ...snapshot, canvases: legacyCanvases, activeCanvasId },
+          session: projectSession || {},
+          canonicalPayloadFormat: parsedDocument?.canonicalPayloadFormat || '',
+          canonicalSchemaVersion: parsedDocument?.canonicalSchemaVersion || 0,
+          canonicalSourceMetadata: parsedDocument?.canonicalSourceMetadata || null,
+        },
+        canvases: legacyCanvases,
+        activeCanvasId,
+      });
+      if (!migration || (migration.migrated !== true && migration.reason !== 'already-migrated')) {
+        const error = new Error(`Legacy multi-canvas conversion failed: ${migration?.reason || 'unknown'}`);
+        error.code = 'ERR_LEGACY_MULTI_CANVAS_CONVERSION_FAILED';
+        throw error;
+      }
+      const activeMigration = (migration.projects || []).find(entry => entry?.sourceCanvasId === activeCanvasId)
+        || (migration.projects || []).find(entry => entry?.wasActive === true)
+        || (migration.projects || [])[0]
+        || null;
+      const activeCanvas = legacyCanvases.find(canvas => canvas?.id === activeMigration?.sourceCanvasId)
+        || legacyCanvases.find(canvas => canvas?.id === activeCanvasId)
+        || legacyCanvases[0];
+      snapshot = {
+        ...snapshot,
+        width: activeCanvas.width,
+        height: activeCanvas.height,
+        frames: activeCanvas.frames,
+        activeFrame: activeCanvas.activeFrame,
+        activeLayer: activeCanvas.activeLayer,
+        mirror: activeCanvas.mirror,
+        selectionMask: activeCanvas.selectionMask || null,
+        selectionContentMask: activeCanvas.selectionContentMask || null,
+        selectionBounds: activeCanvas.selectionBounds || null,
+        activeCanvasId: activeCanvas.id,
+        canvases: [activeCanvas],
+        documentName: activeCanvas.name || snapshot.documentName,
+      };
+      options = {
+        ...options,
+        projectId: activeMigration?.projectId || sourceProjectId,
+        forceV2WorkingCopy: true,
+      };
+    }
+    const preserveDotStats = Boolean(options?.projectId || options?.openedFromRecent || options?.preserveDotStats);
+    const dotStats = preserveDotStats ? (parsedDocument?.dotStats || null) : null;
     synchronizeImportedSnapshotPalette(snapshot);
 
     autosaveRestoring = true;
