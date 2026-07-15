@@ -1068,6 +1068,11 @@
       }
 
       nextLayer.directOnly = Boolean(layer.directOnly);
+      if (typeof nextLayer.indices !== 'string' && typeof encodeTypedArray === 'function') {
+        const transparentIndices = new Int16Array(width * height);
+        transparentIndices.fill(-1);
+        nextLayer.indices = encodeTypedArray(transparentIndices);
+      }
       return nextLayer;
     }
 
