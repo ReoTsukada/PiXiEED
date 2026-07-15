@@ -95,8 +95,8 @@
       button.classList.toggle('is-active', enabled);
       button.setAttribute('aria-pressed', String(enabled));
       const controlLabel = localizeText(
-        enabled ? 'マルチキャンバスをオフ' : 'マルチキャンバスをオン',
-        enabled ? 'Turn Multi Canvas Off' : 'Turn Multi Canvas On'
+        enabled ? '複数キャンバス（上級）をオフ' : '複数キャンバス（上級）をオン',
+        enabled ? 'Turn Advanced Multi Canvas Off' : 'Turn Advanced Multi Canvas On'
       );
       button.setAttribute('aria-label', controlLabel);
       button.setAttribute('title', controlLabel);
@@ -106,7 +106,7 @@
         ? srOnly
         : (groupLabel instanceof HTMLElement ? groupLabel : button.querySelector('span'));
       if (label instanceof HTMLElement) {
-        label.textContent = localizeText('マルチキャンバス', 'Multi Canvas');
+        label.textContent = localizeText('複数キャンバス（上級）', 'Advanced Multi Canvas');
       }
     });
   }
