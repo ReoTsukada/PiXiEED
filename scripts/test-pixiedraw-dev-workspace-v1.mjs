@@ -21,6 +21,7 @@ assert.equal(workspace.WORKSPACE_NAME, 'PiXiEED');
 assert.equal(workspace.PROJECTS_DIRECTORY, 'Projects');
 assert.equal(workspace.EXPORTS_DIRECTORY, 'Exports');
 assert.equal(workspace.getStatus().directoryPickerSupported, false);
+assert.equal(workspace.getStatus().lastErrorCode, '');
 assert.deepEqual(
   Array.from(workspace.collectProjectFiles([
     { name: 'image.png', lastModified: 3 },
@@ -101,6 +102,17 @@ assert.equal(pixieedDirectory.directories.get('Projects').files.has('art.pixieed
 assert.ok(pixieedDirectory.directories.get('Exports').directories.get('PNG').files.has('art-1.png'));
 assert.ok(pixieedDirectory.directories.get('Exports').directories.get('Timelapse').files.has('art-timelapse.gif'));
 
+const invalidRootContext = vm.createContext({
+  window: { showDirectoryPicker: async () => new MockDirectoryHandle('Projects') },
+  console,
+  CustomEvent: class CustomEvent {},
+});
+invalidRootContext.window.window = invalidRootContext.window;
+invalidRootContext.window.dispatchEvent = () => {};
+vm.runInContext(workspaceSource, invalidRootContext, { filename: 'pixieed-workspace.js' });
+assert.equal(await invalidRootContext.window.PiXiEEDWorkspace.connect({ requestPermission: true }), null);
+assert.equal(invalidRootContext.window.PiXiEEDWorkspace.getStatus().lastErrorCode, 'projects-folder-selected');
+
 const app = read('PiXiEEDrawDEV/assets/js/app.js');
 const startup = read('PiXiEEDrawDEV/assets/js/modules/startup-workflow-utils.js');
 const openImport = read('PiXiEEDrawDEV/assets/js/modules/open-import-workflow-utils.js');
@@ -129,6 +141,14 @@ assert.match(startup, /filterFilelessLocalProjects/);
 assert.match(startup, /serializeProjectStorageSnapshot/);
 assert.match(startup, /mergeFileBackedTimelapseIntoPackaged/);
 assert.match(startup, /removeRecentProjectEntry/);
+assert.match(startup, /migrationRecovery/);
+assert.match(startup, /端末内・V2移行待ち/);
+assert.match(startup, /await openRecentProject\(entry/);
+assert.match(startup, /throwOnError: false/);
+assert.match(startup, /classifyWorkspaceMigrationError/);
+assert.match(startup, /Projects フォルダそのものは選択しないでください/);
+assert.match(startup, /PiXiEED\/Projects を作成できませんでした/);
+assert.match(drawHtml, /保存場所を選んで接続/);
 assert.match(app, /workspaceFileName: autosaveHandle\?\.name/);
 assert.match(app, /get openDocumentAsNewProject\(\) \{ return openDocumentAsNewProject; \}/);
 assert.match(startup, /await openDocumentAsNewProject\(item/);
