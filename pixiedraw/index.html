@@ -63,6 +63,9 @@
       const embedMode = params.get('embed') === '1' || params.get('embed') === 'true';
       if (embedMode) {
         document.documentElement.dataset.embedMode = 'true';
+        if (params.get('landscape') === '1' || params.get('landscape') === 'true') {
+          document.documentElement.dataset.embedLandscape = 'true';
+        }
         window.__PIXIEED_EMBED_MODE__ = true;
         window.__PIXIEED_ADS_DISABLED__ = true;
         window.PIXIEEDRAW_EMBED_CONFIG = {
@@ -79,17 +82,16 @@
 </script>
 <script>window.__PIXIEEDRAW_BUILD_EDITION__ = 'web-free';</script>
 <script src="assets/js/modules/edition-capabilities-utils.js?v=2026.07.11-g3a-edition-ads"></script>
-<script src="assets/js/build-info.js?v=20260715-097"></script>
+<script src="assets/js/build-info.js?v=20260715-098"></script>
 <script>
   (function configurePixieedAds() {
     const shouldShowAds = typeof window.__PIXIEEDRAW_SHOULD_SHOW_ADS__ === 'function'
       ? window.__PIXIEEDRAW_SHOULD_SHOW_ADS__()
       : false;
-    // Temporary diagnostic switch: keep editor/panel ads available while
-    // completely removing ad work and reserved space from modal dialogs.
-    // This isolates dialog iframe/layout changes from drawer positioning.
-    window.__PIXIEEDRAW_MODAL_ADS_ENABLED__ = false;
-    document.documentElement.dataset.pixieedModalAds = 'false';
+    // Modal ads use the dialog's dedicated responsive layout.  They remain
+    // separate from editor/panel ad placement.
+    window.__PIXIEEDRAW_MODAL_ADS_ENABLED__ = true;
+    document.documentElement.dataset.pixieedModalAds = 'true';
     window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__ = () => (
       window.__PIXIEEDRAW_MODAL_ADS_ENABLED__ === true
       && window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.() === true
@@ -402,7 +404,7 @@
 
 
 
-<link href="assets/css/style.css?v=20260715-mobile-drawer-ad-flow1" rel="stylesheet"/>
+<link href="assets/css/style.css?v=20260715-export-preview-ad-layout1" rel="stylesheet"/>
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-4.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-4.png"/>
 <style>
@@ -1921,7 +1923,7 @@
 	<script defer="" src="assets/js/modules/timelapse-session-utils.js?v=20260715-timelapse-disk-p8"></script>
 	<script defer="" src="assets/js/modules/autosave-workflow-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/project-provenance-utils.js?v=20260714-provenance-v1"></script>
-	<script defer="" src="assets/js/modules/open-import-workflow-utils.js?v=20260715-local-true-v2-cleanup1"></script>
+	<script defer="" src="assets/js/modules/open-import-workflow-utils.js?v=20260715-external-return-new-project1"></script>
 	<script defer="" src="assets/js/modules/export-format-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/export-dialog-workflow-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 		<script defer="" src="assets/js/modules/startup-workflow-utils.js?v=20260715-startup-grid-no-oval1"></script>
@@ -1956,14 +1958,14 @@
 	<script defer="" src="assets/js/modules/shared-project-local-conversion-utils.js?v=2026.07.08-shared-local-conversion-split-v1"></script>
 	<script defer="" src="assets/js/modules/shared-project-create-progress-utils.js?v=2026.07.03-shared-open-workflow-v1"></script>
 	<script defer="" src="assets/js/modules/startup-tail-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
-	<script defer="" src="assets/js/modules/controls-mirror.js?v=2026.07.13-editor-command-lane2"></script>
+	<script defer="" src="assets/js/modules/controls-mirror.js?v=2026.07.15-embed-landscape-force2"></script>
 	<script defer="" src="assets/js/modules/external-tool-workflow-utils.js?v=2026.07.02-external-tool-workflow-split-v1"></script>
 	<script defer="" src="assets/js/modules/canonical-v2-project-utils.js?v=20260714-originality-v1"></script>
 	<script defer="" src="assets/js/modules/local-project-v2-migration-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/pre-update-checkpoint-utils.js?v=20260712-pre-update-checkpoint-u3"></script>
 	<script defer="" src="assets/js/active-project-session-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/pixieedraw-dev-switch.js?v=2026.07.03-pixieedrawdev-switch-fix14"></script>
-	<script defer="" src="assets/js/app.js?v=20260715-097"></script>
+	<script defer="" src="assets/js/app.js?v=20260715-098"></script>
 	<script defer="" src="assets/js/modules/update-detection-utils.js?v=20260713-026"></script>
   <script>
     (function initPanelAdDocking() {
@@ -2559,6 +2561,7 @@
     })();
   </script>
 
+	<script src="../scripts/tool-fullscreen.js?v=2026.07.15-pixiedraw-fullscreen-restore1"></script>
 	<script src="../scripts/shared-bottom-nav.js?v=20260714-shared-banner-height-lock2" data-pixieed-footer-ad-landscape="false"></script>
 	<script>
     (function initOperationHelpAd() {
