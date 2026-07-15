@@ -51,6 +51,9 @@ function gtag(){dataLayer.push(arguments);}
     const embedMode = params.get('embed') === '1' || params.get('embed') === 'true';
     if (embedMode) {
       document.documentElement.dataset.embedMode = 'true';
+      if (params.get('landscape') === '1' || params.get('landscape') === 'true') {
+        document.documentElement.dataset.embedLandscape = 'true';
+      }
       window.__PIXIEED_EMBED_MODE__ = true;
       window.__PIXIEED_ADS_DISABLED__ = true;
     } else {
