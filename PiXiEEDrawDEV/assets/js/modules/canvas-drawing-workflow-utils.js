@@ -443,16 +443,12 @@
 
   function drawEllipse(start, end, filled) {
     const bounds = getCircleBounds(start, end);
-    drawOval(bounds.start, bounds.end, filled);
-  }
-
-  function drawOval(start, end, filled) {
     const layer = getActiveLayer();
     if (!layer) return;
-    const x0 = Math.min(start.x, end.x);
-    const x1 = Math.max(start.x, end.x);
-    const y0 = Math.min(start.y, end.y);
-    const y1 = Math.max(start.y, end.y);
+    const x0 = bounds.start.x;
+    const x1 = bounds.end.x;
+    const y0 = bounds.start.y;
+    const y1 = bounds.end.y;
     if (x0 === x1 && y0 === y1) {
       stampBrush(layer, x0, y0);
       requestRender();
@@ -975,7 +971,6 @@
     drawLine,
     drawRectangle,
     drawEllipse,
-    drawOval,
     drawEllipsePixels,
     getFillGradientColors,
     normalizeFillGradientPoint,
