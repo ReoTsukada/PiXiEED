@@ -1396,15 +1396,10 @@
         }
       }
     } else if (tool === 'ellipse' || tool === 'ellipseFill') {
-      const deltaX = end.x - start.x;
-      const deltaY = end.y - start.y;
-      const span = Math.max(Math.abs(deltaX), Math.abs(deltaY));
-      const circleEndX = start.x + (deltaX < 0 ? -span : span);
-      const circleEndY = start.y + (deltaY < 0 ? -span : span);
-      const x0 = Math.min(start.x, circleEndX);
-      const x1 = Math.max(start.x, circleEndX);
-      const y0 = Math.min(start.y, circleEndY);
-      const y1 = Math.max(start.y, circleEndY);
+      const x0 = Math.min(start.x, end.x);
+      const x1 = Math.max(start.x, end.x);
+      const y0 = Math.min(start.y, end.y);
+      const y1 = Math.max(start.y, end.y);
       const filled = tool === 'ellipseFill';
       drawEllipsePixels(x0, y0, x1, y1, filled, (x, y) => stamp(x, y));
     }
