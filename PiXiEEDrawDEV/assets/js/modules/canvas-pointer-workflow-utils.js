@@ -2177,7 +2177,8 @@
     y0 = clamp(y0, 0, maxY0);
     const bounds = { x0, y0, x1: x0 + width - 1, y1: y0 + height - 1 };
     commitHistory();
-    beginHistory('selectionPaste');
+    const paletteExpansionCount = getClipboardPaletteExpansionCount(clip);
+    beginHistory(paletteExpansionCount > 0 ? 'selectionPaste' : 'selectionPastePixels');
     const moveState = createMoveStateFromClipboard(clip, bounds, layer, { autoExpandPalette: true });
     if (!moveState) {
       rollbackPendingHistory({ reRender: false });
@@ -2310,6 +2311,7 @@
         if (canvasX < 0 || canvasY < 0 || canvasX >= state.width || canvasY >= state.height) continue;
         const canvasIndex = canvasY * state.width + canvasX;
         const base = canvasIndex * 4;
+        recordPendingPixelPatchBefore(layer, canvasIndex);
         const previousIndex = layer.indices[canvasIndex];
         let previousAlpha = 0;
         if (previousIndex >= 0 && state.palette[previousIndex]) {
@@ -2355,6 +2357,7 @@
         if (layer.indices[canvasIndex] !== previousIndex || nextAlpha !== previousAlpha) {
           modified = true;
         }
+        recordPendingPixelPatchAfter(layer, canvasIndex);
       }
     }
     if (modified) {
@@ -2605,6 +2608,7 @@
       const targetBase = targetIndex * 4;
       const sourceBase = sourceIndex * 4;
       const nextPaletteIndex = hasEntryRgba ? -1 : indices[sourceIndex];
+      recordPendingPixelPatchBefore(layer, targetIndex);
       layer.indices[targetIndex] = nextPaletteIndex;
       newContentMask[targetIndex] = 1;
       if (targetDirect) {
@@ -2632,6 +2636,7 @@
       if (!placed) {
         placed = true;
       }
+      recordPendingPixelPatchAfter(layer, targetIndex);
     }
     if (placed) {
       refreshLayerDirectOnlyFlag(layer);
