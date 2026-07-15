@@ -10090,6 +10090,12 @@ body.is-mobile-layout .project-home-screen__list .startup-recent-card__open {
   background: rgba(126, 78, 16, 0.22);
 }
 
+.startup-workspace__project-certification.is-recovery {
+  border-color: rgba(255, 194, 92, 0.56);
+  color: rgba(255, 224, 166, 0.98);
+  background: rgba(126, 78, 16, 0.26);
+}
+
 .startup-workspace__empty {
   grid-column: 1 / -1;
   margin: 0;
