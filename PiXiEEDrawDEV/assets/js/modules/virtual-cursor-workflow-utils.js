@@ -545,14 +545,6 @@
             drawEllipse(start, end, true);
             actionPerformed = true;
             break;
-          case 'oval':
-            drawOval(start, end, false);
-            actionPerformed = true;
-            break;
-          case 'ovalFill':
-            drawOval(start, end, true);
-            actionPerformed = true;
-            break;
           default:
             break;
         }
