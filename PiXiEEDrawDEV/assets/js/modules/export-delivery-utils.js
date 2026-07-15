@@ -318,16 +318,28 @@
       if (!blob || !filename) {
         return null;
       }
-      const resolvedFilename = await resolveUniqueExportDirectoryFilename(filename, {
-        requestPermission: true,
-      });
-      if (!resolvedFilename) {
-        return null;
+      let resolvedFilename = '';
+      let fileHandle = null;
+      let cleanupDirectoryHandle = null;
+      const workspace = window.PiXiEEDWorkspace;
+      if (workspace && typeof workspace.createDerivedExportFileEntry === 'function') {
+        const entry = await workspace.createDerivedExportFileEntry(filename, { requestPermission: true });
+        resolvedFilename = entry?.filename || '';
+        fileHandle = entry?.fileHandle || null;
+        cleanupDirectoryHandle = entry?.directoryHandle || null;
       }
-      const fileHandle = await getFileHandleInExportDirectory(resolvedFilename, {
-        create: true,
-        requestPermission: true,
-      });
+      if (!fileHandle) {
+        resolvedFilename = await resolveUniqueExportDirectoryFilename(filename, {
+          requestPermission: true,
+        });
+        if (!resolvedFilename) {
+          return null;
+        }
+        fileHandle = await getFileHandleInExportDirectory(resolvedFilename, {
+          create: true,
+          requestPermission: true,
+        });
+      }
       if (!fileHandle) {
         return null;
       }
@@ -341,7 +353,7 @@
         // On some Android environments a zero-byte file can remain when createWritable fails.
         // Best-effort cleanup prevents an extra "broken" file from being left behind.
         try {
-          const exportDirectoryHandle = getExportDirectoryHandle();
+          const exportDirectoryHandle = cleanupDirectoryHandle || getExportDirectoryHandle();
           if (exportDirectoryHandle && typeof exportDirectoryHandle.removeEntry === 'function') {
             await exportDirectoryHandle.removeEntry(resolvedFilename, { recursive: false });
           }
