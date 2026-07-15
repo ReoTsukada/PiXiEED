@@ -1717,7 +1717,10 @@
     return { addedCount, convertedPixels, ...limitResult };
   }
 
-  function remapClipboardSelectionColorsToCurrentPalette(clip, indices, direct, mask, { strategy = 'add-missing' } = {}) {
+  function remapClipboardSelectionColorsToCurrentPalette(clip, indices, direct, mask, {
+    strategy = 'add-missing',
+    targetPalette = state.palette,
+  } = {}) {
     if (
       !(indices instanceof Int16Array)
       || !(mask instanceof Uint8Array)
@@ -1727,7 +1730,8 @@
     }
     const sourcePalette = Array.isArray(clip?.palette) ? clip.palette : null;
     const remappedIndices = new Int16Array(indices);
-    const paletteLookup = buildPaletteColorLookup(state.palette);
+    const palette = Array.isArray(targetPalette) ? targetPalette : state.palette;
+    const paletteLookup = buildPaletteColorLookup(palette);
     const sourceIndexMap = new Map();
     let addedCount = 0;
     const useNearestPalette = strategy === 'nearest-existing';
@@ -1748,16 +1752,16 @@
             if (Number.isInteger(existingIndex) && existingIndex >= 0) {
               mappedIndex = existingIndex;
             } else if (useNearestPalette) {
-              mappedIndex = findNearestPaletteIndexForColor(sourceColor, state.palette, state.activePaletteIndex);
+              mappedIndex = findNearestPaletteIndexForColor(sourceColor, palette, state.activePaletteIndex);
               if (!Number.isInteger(mappedIndex) || mappedIndex < 0) {
-                const result = ensurePaletteColor(state.palette, paletteLookup, sourceColor);
+                const result = ensurePaletteColor(palette, paletteLookup, sourceColor);
                 mappedIndex = result.paletteIndex;
                 if (result.added) {
                   addedCount += 1;
                 }
               }
             } else {
-              const result = ensurePaletteColor(state.palette, paletteLookup, sourceColor);
+              const result = ensurePaletteColor(palette, paletteLookup, sourceColor);
               mappedIndex = result.paletteIndex;
               if (result.added) {
                 addedCount += 1;
@@ -1788,16 +1792,16 @@
       let mappedIndex = paletteLookup.get(directKey);
       if (!Number.isInteger(mappedIndex) || mappedIndex < 0) {
         if (useNearestPalette) {
-          mappedIndex = findNearestPaletteIndexForColor(directColor, state.palette, state.activePaletteIndex);
+          mappedIndex = findNearestPaletteIndexForColor(directColor, palette, state.activePaletteIndex);
           if (!Number.isInteger(mappedIndex) || mappedIndex < 0) {
-            const result = ensurePaletteColor(state.palette, paletteLookup, directColor);
+            const result = ensurePaletteColor(palette, paletteLookup, directColor);
             mappedIndex = result.paletteIndex;
             if (result.added) {
               addedCount += 1;
             }
           }
         } else {
-          const result = ensurePaletteColor(state.palette, paletteLookup, directColor);
+          const result = ensurePaletteColor(palette, paletteLookup, directColor);
           mappedIndex = result.paletteIndex;
           if (result.added) {
             addedCount += 1;
@@ -1811,6 +1815,37 @@
       direct[base + 3] = 0;
     }
     return { indices: remappedIndices, addedCount };
+  }
+
+  function getClipboardPaletteExpansionCount(clip) {
+    const width = Math.max(0, Math.floor(Number(clip?.width) || 0));
+    const height = Math.max(0, Math.floor(Number(clip?.height) || 0));
+    const size = width * height;
+    if (!clip || size === 0) {
+      return 0;
+    }
+    const mask = clip.mask instanceof Uint8Array && clip.mask.length === size
+      ? new Uint8Array(clip.mask)
+      : new Uint8Array(size);
+    const indices = clip.indices instanceof Int16Array && clip.indices.length === size
+      ? new Int16Array(clip.indices)
+      : new Int16Array(size);
+    const direct = clip.direct instanceof Uint8ClampedArray && clip.direct.length === size * 4
+      ? new Uint8ClampedArray(clip.direct)
+      : new Uint8ClampedArray(size * 4);
+    const previewPalette = Array.isArray(state.palette)
+      ? state.palette.map(color => normalizeColorValue(color))
+      : [];
+    return remapClipboardSelectionColorsToCurrentPalette(
+      clip,
+      indices,
+      direct,
+      mask,
+      {
+        strategy: isIndexColorMode() ? 'nearest-existing' : 'add-missing',
+        targetPalette: previewPalette,
+      }
+    ).addedCount;
   }
 
   function createMoveStateFromClipboard(clip, bounds, layer, { autoExpandPalette = false } = {}) {
@@ -2119,6 +2154,7 @@
     createLayerMoveState,
     createPasteRestoreSnapshot,
     createMoveStateFromClipboard,
+    getClipboardPaletteExpansionCount,
     remapClipboardSelectionColorsToCurrentPalette,
   });
       }
