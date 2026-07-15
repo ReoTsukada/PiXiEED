@@ -2252,7 +2252,13 @@
     window.addEventListener('resize', handleLayoutResize);
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', handleLayoutResize);
-      window.visualViewport.addEventListener('scroll', handleLayoutResize);
+      // Safari can emit visualViewport.scroll while a fixed button opens a
+      // details/file flyout.  That changes neither the editor's layout size
+      // nor its orientation.  Treating it as a layout resize reruns rail
+      // sizing and viewport clamping, which can move a zoomed canvas toward
+      // the top-left.  Actual visual viewport size changes still use the
+      // resize handler above; flyouts position themselves on their own scroll
+      // listener.
     }
 
     dom.mobileTabs.forEach(tab => {
