@@ -524,12 +524,41 @@
       return canvases.find(canvas => canvas?.id === canvasId) || canvases[0] || null;
     }
 
-    function ensureLayerArray(layer, key, length) {
-      if (!Array.isArray(layer[key])) {
-        layer[key] = new Array(length).fill(0);
+    function decodeStoredLayerArray(value, key, length) {
+      if (Array.isArray(value)) {
+        return value.slice(0, length);
       }
+      if (ArrayBuffer.isView(value)) {
+        return Array.from(value).slice(0, length);
+      }
+      if (typeof value === 'string' && value.length > 0 && typeof globalThis.atob === 'function') {
+        try {
+          const binary = globalThis.atob(value);
+          const bytes = new Uint8Array(binary.length);
+          for (let index = 0; index < binary.length; index += 1) {
+            bytes[index] = binary.charCodeAt(index) & 0xff;
+          }
+          if (key === 'indices') {
+            if (bytes.byteLength !== length * Int16Array.BYTES_PER_ELEMENT) return null;
+            const copy = new Uint8Array(bytes.byteLength);
+            copy.set(bytes);
+            return Array.from(new Int16Array(copy.buffer));
+          }
+          if (bytes.byteLength !== length) return null;
+          return Array.from(bytes);
+        } catch (_error) {
+          return null;
+        }
+      }
+      return null;
+    }
+
+    function ensureLayerArray(layer, key, length) {
+      const fillValue = key === 'indices' ? -1 : 0;
+      const decoded = decodeStoredLayerArray(layer[key], key, length);
+      layer[key] = decoded || new Array(length).fill(fillValue);
       while (layer[key].length < length) {
-        layer[key].push(0);
+        layer[key].push(fillValue);
       }
       return layer[key];
     }
@@ -556,7 +585,8 @@
           return;
         }
         const after = change.after;
-        indices[index] = Math.round(Number(after.paletteIndex) || -1);
+        const paletteIndex = Number(after.paletteIndex);
+        indices[index] = Number.isFinite(paletteIndex) ? Math.round(paletteIndex) : -1;
         [['direct', after.direct], ['importSourceDirect', after.importSourceDirect]].forEach(([key, rgba]) => {
           if (!Array.isArray(rgba) || rgba.length !== 4) {
             return;
