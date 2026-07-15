@@ -3,7 +3,7 @@
   const buildInfo = Object.freeze({
     edition: 'dev',
     version: '0.9.0-dev.1',
-    buildId: '20260715-086',
+    buildId: '20260715-088',
     releasedAt: '2026-07-15T00:00:00+09:00',
   });
 
