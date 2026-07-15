@@ -92,7 +92,11 @@
             <a class="button-secondary" href="../../index.html">ホームへ戻る</a>
           </div>
         </div>
-        <div class="project-hero__media"><img src="../../qr-maker/qrogp.png" alt="QRコードメーカーの画面"></div>
+        <div class="project-hero__media project-live-tool" data-project-live-tool data-project-tool-page="../../qr/index.html" data-project-tool-embed="../../qr-maker/index.html?embed=1">
+          <div class="project-live-tool__head"><strong>QRコードメーカーをこの場で試す</strong><span>広告なしの埋め込み</span></div>
+          <iframe class="project-live-tool__frame" data-project-live-frame src="../../qr-maker/index.html?embed=1" title="QRコードメーカーを試す" allow="fullscreen"></iframe>
+          <div class="project-live-tool__actions"><a data-project-live-fullscreen href="../../qr/index.html?fullscreen=1">フルスクリーンで使う</a></div>
+        </div>
       </div>
     </section>
 
@@ -243,6 +247,7 @@
     </div>
   </div>
   <script src="../../scripts/ads-lazy.js"></script>
+  <script src="../../scripts/live-tool-embed.js"></script>
   <script src="../../scripts/shared-profile-header.js"></script>
   <script src="../../scripts/pixieed-dot-stats.js"></script>
   <script src="../../scripts/shared-bottom-nav.js"></script>
