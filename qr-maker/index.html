@@ -57,6 +57,9 @@
       const embedMode = params.get('embed') === '1' || params.get('embed') === 'true';
       if (embedMode) {
         document.documentElement.dataset.embedMode = 'true';
+        if (params.get('landscape') === '1' || params.get('landscape') === 'true') {
+          document.documentElement.dataset.embedLandscape = 'true';
+        }
         window.__PIXIEED_EMBED_MODE__ = true;
         window.__PIXIEED_ADS_DISABLED__ = true;
       } else {
@@ -1388,9 +1391,8 @@
   }
 
   function getDrawImportMode() {
-    return shouldReturnToDrawInSameTab() || Boolean(getRequestedDrawUrl())
-      ? DRAW_IMPORT_MODE_APPEND_TAB
-      : DRAW_IMPORT_MODE_NEW_PROJECT;
+    // A QR sent back to PiXiEEDraw is an independent canvas/project.
+    return DRAW_IMPORT_MODE_NEW_PROJECT;
   }
 
   function getDefaultDrawUrl() {
