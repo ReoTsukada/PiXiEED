@@ -11829,7 +11829,7 @@ body.is-mobile-layout #newProjectDialog .modal__body {
 
 }
 
-@media (min-width: 900px) and (orientation: landscape) {
+@media (min-width: 560px) and (orientation: landscape) {
   .export-dialog-body {
     grid-template-columns: minmax(320px, 1fr) minmax(180px, 220px);
     grid-template-areas:
