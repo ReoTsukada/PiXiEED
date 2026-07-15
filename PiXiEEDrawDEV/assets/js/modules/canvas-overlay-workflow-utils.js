@@ -1396,15 +1396,15 @@
         }
       }
     } else if (tool === 'ellipse' || tool === 'ellipseFill') {
-      let x0 = Math.min(start.x, end.x);
-      let x1 = Math.max(start.x, end.x);
-      let y0 = Math.min(start.y, end.y);
-      let y1 = Math.max(start.y, end.y);
-      const diameter = Math.max(1, Math.min((x1 - x0) + 1, (y1 - y0) + 1));
-      x0 += Math.floor((((x1 - x0) + 1) - diameter) * 0.5);
-      y0 += Math.floor((((y1 - y0) + 1) - diameter) * 0.5);
-      x1 = x0 + diameter - 1;
-      y1 = y0 + diameter - 1;
+      const deltaX = end.x - start.x;
+      const deltaY = end.y - start.y;
+      const span = Math.max(Math.abs(deltaX), Math.abs(deltaY));
+      const circleEndX = start.x + (deltaX < 0 ? -span : span);
+      const circleEndY = start.y + (deltaY < 0 ? -span : span);
+      const x0 = Math.min(start.x, circleEndX);
+      const x1 = Math.max(start.x, circleEndX);
+      const y0 = Math.min(start.y, circleEndY);
+      const y1 = Math.max(start.y, circleEndY);
       const filled = tool === 'ellipseFill';
       drawEllipsePixels(x0, y0, x1, y1, filled, (x, y) => stamp(x, y));
     }
