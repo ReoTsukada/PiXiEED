@@ -56,6 +56,9 @@
       const embedMode = params.get('embed') === '1' || params.get('embed') === 'true';
       if (embedMode) {
         document.documentElement.dataset.embedMode = 'true';
+        if (params.get('landscape') === '1' || params.get('landscape') === 'true') {
+          document.documentElement.dataset.embedLandscape = 'true';
+        }
         window.__PIXIEED_EMBED_MODE__ = true;
         window.__PIXIEED_ADS_DISABLED__ = true;
       } else {
@@ -5155,6 +5158,9 @@
     }
 
     function getViewportOrientationKey() {
+      if (document.documentElement.dataset.embedLandscape === 'true') {
+        return 'landscape';
+      }
       const { width, height } = getWindowViewportSize();
       return width > height ? 'landscape' : 'portrait';
     }
@@ -6399,9 +6405,10 @@
     }
 
     function getDrawImportMode() {
-      return shouldReturnToDrawInSameTab() || Boolean(getRequestedDrawUrl())
-        ? DRAW_IMPORT_MODE_APPEND_TAB
-        : DRAW_IMPORT_MODE_NEW_PROJECT;
+      // PiXiEEDraw now uses one canvas per project.  A returned capture must
+      // always become its own project instead of modifying the project that
+      // launched the camera.
+      return DRAW_IMPORT_MODE_NEW_PROJECT;
     }
 
     function updateAspectLayout() {
