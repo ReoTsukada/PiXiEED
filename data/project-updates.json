@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-15T04:25:05.147Z",
+  "generatedAt": "2026-07-15T04:25:07.075Z",
   "projects": [
     {
       "id": "site",
@@ -117,6 +117,12 @@
       "url": "/projects/pixiee-lens/",
       "entries": [
         {
+          "date": "2026-07-15",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
           "date": "2026-07-13",
           "items": [
             "画面を更新"
@@ -154,12 +160,6 @@
         },
         {
           "date": "2026-06-07",
-          "items": [
-            "画面を更新"
-          ]
-        },
-        {
-          "date": "2026-06-01",
           "items": [
             "画面を更新"
           ]
@@ -230,6 +230,12 @@
           "id": "site",
           "name": "PiXiEED 全体",
           "url": "/index.html",
+          "summary": "画面を更新"
+        },
+        {
+          "id": "pixiee-lens",
+          "name": "PiXiEELENS",
+          "url": "/projects/pixiee-lens/",
           "summary": "画面を更新"
         },
         {
