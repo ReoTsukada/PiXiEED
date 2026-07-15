@@ -31,6 +31,6 @@ assert.match(
   /body:not\(\.is-mobile-layout\) \.editor-command-lane__actions > \.right-utility-menu \{\s*order: 99;/,
   'the details menu must be the rightmost landscape command'
 );
-assert.match(html, /style\.css\?v=20260715-project-card-size1/);
+assert.match(html, /style\.css\?v=20260715-top-camera-qr1/);
 
 console.log('PiXiEEDraw DEV selection click-away and landscape details regression checks passed.');

@@ -59,7 +59,7 @@ assert.match(codec, /approvalScope: 'sales-submission-only'/);
 assert.match(codec, /serverAttested: false/);
 assert.doesNotMatch(startup, /summary\.serverAttested|summary\.approvalStatus/);
 
-assert.match(html, /build-info\.js\?v=20260715-095/);
-assert.match(html, /app\.js\?v=20260715-095/);
+assert.match(html, /build-info\.js\?v=20260715-096/);
+assert.match(html, /app\.js\?v=20260715-096/);
 
 console.log('PiXiEEDrawDEV IndexedDB-only autosave and manual export checks passed.');

@@ -78,7 +78,7 @@
   })();
 </script>
 <script src="assets/js/modules/edition-capabilities-utils.js?v=2026.07.11-g3a-edition-ads"></script>
-<script src="assets/js/build-info.js?v=20260715-095"></script>
+<script src="assets/js/build-info.js?v=20260715-096"></script>
 <script>
   (function configurePixieedAds() {
     const shouldShowAds = typeof window.__PIXIEEDRAW_SHOULD_SHOW_ADS__ === 'function'
@@ -401,7 +401,7 @@
 
 
 
-<link href="assets/css/style.css?v=20260715-project-card-size1" rel="stylesheet"/>
+<link href="assets/css/style.css?v=20260715-top-camera-qr1" rel="stylesheet"/>
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-4.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-4.png"/>
 <style>
@@ -607,6 +607,14 @@
 <button aria-controls="panelFile" aria-label="ファイル" class="chip canvas-quick-action" data-quick-right-tab="file" title="ファイル" type="button">
 <img alt="" aria-hidden="true" height="20" src="assets/icons/menu-file.svg" width="20"/>
 <span class="sr-only">ファイル</span>
+</button>
+<button aria-label="カメラ" class="chip canvas-quick-action" data-external-tool="pixieelens" data-ui-action="openLensCamera" title="カメラ" type="button">
+<img alt="" aria-hidden="true" height="20" src="assets/icons/pixieelensicon_frame_01.png" width="20"/>
+<span class="sr-only">カメラ</span>
+</button>
+<button aria-label="QR編集" class="chip canvas-quick-action" data-external-tool="qrmaker" data-ui-action="openQrEditor" title="QR編集" type="button">
+<img alt="" aria-hidden="true" height="20" src="assets/icons/tool-qr-edit.svg" width="20"/>
+<span class="sr-only">QR編集</span>
 </button>
 </div>
 <div aria-label="コピー・ペースト・カット" aria-hidden="true" class="canvas-clipboard-buttons" id="canvasClipboardButtons" role="group">
@@ -832,14 +840,6 @@
 <button aria-label="小窓プレビュー" aria-pressed="false" class="tool-group-button tool-group-button--action" data-ui-action="floatingPreviewToggle" title="小窓プレビュー" type="button">
 <img alt="" aria-hidden="true" class="tool-group-icon" height="20" src="assets/icons/action-preview.svg" width="20"/>
 <span class="tool-group-label">小窓プレビュー</span>
-</button>
-<button aria-label="カメラ" class="tool-group-button tool-group-button--action" data-external-tool="pixieelens" data-ui-action="openLensCamera" title="カメラ" type="button">
-<img alt="" aria-hidden="true" class="tool-group-icon" height="20" src="assets/icons/pixieelensicon_frame_01.png" width="20"/>
-<span class="tool-group-label">カメラ</span>
-</button>
-<button aria-label="QR編集" class="tool-group-button tool-group-button--action" data-external-tool="qrmaker" data-ui-action="openQrEditor" title="QR編集" type="button">
-<img alt="" aria-hidden="true" class="tool-group-icon" height="20" src="assets/icons/tool-qr-edit.svg" width="20"/>
-<span class="tool-group-label">QR編集</span>
 </button>
 </div>
 <div aria-label="描画ツール" class="tool-grid" id="toolGrid" role="toolbar">
@@ -1962,7 +1962,7 @@
 	<script defer="" src="assets/js/modules/pre-update-checkpoint-utils.js?v=20260712-pre-update-checkpoint-u3"></script>
 	<script defer="" src="assets/js/active-project-session-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/pixieedraw-dev-switch.js?v=2026.07.03-pixieedrawdev-switch-fix14"></script>
-	<script defer="" src="assets/js/app.js?v=20260715-095"></script>
+	<script defer="" src="assets/js/app.js?v=20260715-096"></script>
 	<script defer="" src="assets/js/modules/update-detection-utils.js?v=20260713-026"></script>
   <script>
     (function initPanelAdDocking() {

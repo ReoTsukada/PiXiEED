@@ -2628,11 +2628,6 @@ body:not(.is-mobile-layout) .editor-command-lane__actions .canvas-controls__quic
   gap: 6px;
 }
 
-body:not(.is-mobile-layout) .editor-command-lane__actions .canvas-controls__quick-actions [data-ui-action="openLensCamera"],
-body:not(.is-mobile-layout) .editor-command-lane__actions .canvas-controls__quick-actions [data-ui-action="openQrEditor"] {
-  display: none;
-}
-
 body:not(.is-mobile-layout) .editor-command-lane__actions .canvas-controls__history {
   order: 3;
 }
