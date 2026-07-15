@@ -45,6 +45,6 @@ assert.match(autosave, /projectExportIntegrity\s*=\s*\{/);
 assert.match(autosave, /thumbnail:\s*previewThumbnail/);
 assert.match(exportRendering, /thumbnail:\s*previewThumbnail/);
 assert.match(html, /startup-workflow-utils\.js\?v=20260715-workspace-location-guide1/);
-assert.match(html, /app\.js\?v=20260715-077/);
+assert.match(html, /app\.js\?v=20260715-079/);
 
 console.log('PiXiEEDrawDEV P13 startup certified card checks passed.');
