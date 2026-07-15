@@ -35,7 +35,7 @@ const utils = window.PiXiEEDrawModules.pixelPatchHistoryUtils.createPixelPatchHi
   state: { width, height },
   history: historyState,
   HISTORY_ENTRY_TYPE_PIXEL_PATCH: 'pixelPatch',
-  PIXEL_PATCH_HISTORY_LABELS: new Set(['pen', 'oval', 'ovalFill', 'selectionMove', 'selectionTransform', 'selectionCut']),
+  PIXEL_PATCH_HISTORY_LABELS: new Set(['pen', 'ellipse', 'ellipseFill', 'selectionMove', 'selectionTransform', 'selectionCut']),
   multiState,
   getActiveSharedProjectKey: () => '',
   isSharedProjectCollaborativeMode: () => false,
@@ -57,8 +57,8 @@ const utils = window.PiXiEEDrawModules.pixelPatchHistoryUtils.createPixelPatchHi
   renderAllProjectCanvasSurfaces: () => { calls.allSurfaces += 1; },
 });
 
-assert.equal(utils.canUsePixelPatchHistory('oval'), true);
-assert.equal(utils.canUsePixelPatchHistory('ovalFill'), true);
+assert.equal(utils.canUsePixelPatchHistory('ellipse'), true);
+assert.equal(utils.canUsePixelPatchHistory('ellipseFill'), true);
 assert.equal(utils.canUsePixelPatchHistory('selectionMove'), true);
 assert.equal(utils.canUsePixelPatchHistory('selectionTransform'), true);
 assert.equal(utils.canUsePixelPatchHistory('selectionCut'), true);
@@ -108,7 +108,7 @@ historyState.pending = null;
 const entry = {
   __historyEntryType: 'pixelPatch',
   version: 1,
-  historyLabel: 'oval',
+  historyLabel: 'ellipse',
   canvasId: canvas.id,
   frameId: frame.id,
   layerId: layer.id,
@@ -136,12 +136,12 @@ assert.equal(layer.indices[1], -1);
 assert.equal(layer.indices[10], -1);
 
 multiState.connected = true;
-assert.equal(utils.canUsePixelPatchHistory('oval'), false, 'new collaborative edits must keep using scoped history');
+assert.equal(utils.canUsePixelPatchHistory('ellipse'), false, 'new collaborative edits must keep using scoped history');
 assert.equal(utils.applyPixelPatchHistoryEntry(entry, 'redo'), true, 'an existing patch must remain replayable after collaboration starts');
 assert.equal(calls.allSurfaces, 1, 'collaborative replay must preserve the all-surface refresh path');
 
 const appSource = fs.readFileSync(path.join(root, 'PiXiEEDrawDEV/assets/js/app.js'), 'utf8');
-assert.match(appSource, /PIXEL_PATCH_HISTORY_LABELS = new Set\(\[[^\]]*'oval'[^\]]*'ovalFill'/);
+assert.match(appSource, /PIXEL_PATCH_HISTORY_LABELS = new Set\(\[[^\]]*'ellipse'[^\]]*'ellipseFill'/);
 assert.match(appSource, /PIXEL_PATCH_HISTORY_LABELS = new Set\(\[[^\]]*'selectionMove'[^\]]*'selectionTransform'[^\]]*'selectionCut'/);
 assert.match(appSource, /PIXEL_PATCH_HISTORY_LABELS = new Set\(\[[^\]]*'selectionPastePixels'/);
 
