@@ -2596,6 +2596,7 @@ body:not(.is-mobile-layout) .editor-command-lane__actions {
   display: flex;
   order: 3;
   flex: 0 0 auto;
+  margin-left: auto;
   align-items: center;
   justify-content: flex-end;
   gap: 6px;
@@ -2645,7 +2646,7 @@ body:not(.is-mobile-layout) .editor-command-lane__actions .canvas-clipboard-butt
 }
 
 body:not(.is-mobile-layout) .editor-command-lane__actions > .right-utility-menu {
-  order: 4;
+  order: 99;
 }
 
 body:not(.is-mobile-layout) .editor-command-lane__actions > .chip,
