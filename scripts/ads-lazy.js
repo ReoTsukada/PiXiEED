@@ -91,8 +91,8 @@
     return ins.getAttribute('data-ad-status') === 'unfilled';
   }
 
-  function isHomePage() {
-    return Boolean(document.querySelector('.home-app'));
+  function needsInlineAdGuard() {
+    return Boolean(document.querySelector('.home-app, .project-live-tool'));
   }
 
   function contentWidth() {
@@ -104,40 +104,56 @@
     return Math.max(1, Math.floor((window.innerWidth || body.clientWidth || 0) - left - right));
   }
 
-  function injectHomeAdGuardStyle() {
-    if (!isHomePage() || document.getElementById('pixieed-home-auto-ad-guard')) return;
-    document.body?.classList.add('home-ad-guard');
+  function injectInlineAdGuardStyle() {
+    if (!needsInlineAdGuard() || document.getElementById('pixieed-inline-ad-guard')) return;
+    document.body?.classList.add('pixieed-inline-ad-guard');
     const style = document.createElement('style');
-    style.id = 'pixieed-home-auto-ad-guard';
+    style.id = 'pixieed-inline-ad-guard';
     style.textContent = `
-      body.home-ad-guard{
+      body.pixieed-inline-ad-guard{
         max-inline-size:100dvw !important;
         overflow-x:clip !important;
       }
-      body.home-ad-guard .page,
-      body.home-ad-guard .page-shell,
-      body.home-ad-guard .home-screen,
-      body.home-ad-guard .home-panel,
-      body.home-ad-guard .home-hero-card{
+      body.pixieed-inline-ad-guard .page,
+      body.pixieed-inline-ad-guard .page-shell,
+      body.pixieed-inline-ad-guard .home-screen,
+      body.pixieed-inline-ad-guard .home-panel,
+      body.pixieed-inline-ad-guard .home-hero-card,
+      body.pixieed-inline-ad-guard .section,
+      body.pixieed-inline-ad-guard .section__inner,
+      body.pixieed-inline-ad-guard .ad-banner{
         max-inline-size:100% !important;
         min-inline-size:0 !important;
         overflow-x:clip !important;
       }
-      body.home-ad-guard ins.adsbygoogle,
-      body.home-ad-guard .adsbygoogle,
-      body.home-ad-guard .google-auto-placed,
-      body.home-ad-guard iframe[id^="google_ads_iframe"],
-      body.home-ad-guard iframe[name^="google_ads_iframe"],
-      body.home-ad-guard iframe[id^="aswift_"],
-      body.home-ad-guard iframe[name^="aswift_"]{
+      body.pixieed-inline-ad-guard ins.adsbygoogle,
+      body.pixieed-inline-ad-guard .adsbygoogle,
+      body.pixieed-inline-ad-guard .google-auto-placed,
+      body.pixieed-inline-ad-guard iframe[id^="google_ads_iframe"],
+      body.pixieed-inline-ad-guard iframe[name^="google_ads_iframe"],
+      body.pixieed-inline-ad-guard iframe[id^="aswift_"],
+      body.pixieed-inline-ad-guard iframe[name^="aswift_"]{
+        inline-size:100% !important;
         max-inline-size:100% !important;
         min-inline-size:0 !important;
         box-sizing:border-box !important;
         overflow:hidden !important;
       }
-      body.home-ad-guard > ins.adsbygoogle,
-      body.home-ad-guard > .adsbygoogle,
-      body.home-ad-guard > .google-auto-placed{
+      body.pixieed-inline-ad-guard .ad-banner ins.adsbygoogle{
+        margin-inline:0 !important;
+      }
+      body.pixieed-inline-ad-guard .ad-banner ins.adsbygoogle > div,
+      body.pixieed-inline-ad-guard .ad-banner ins.adsbygoogle > div > iframe{
+        inline-size:100% !important;
+        max-inline-size:100% !important;
+        min-inline-size:0 !important;
+        box-sizing:border-box !important;
+        margin-inline:0 !important;
+        overflow:hidden !important;
+      }
+      body.pixieed-inline-ad-guard > ins.adsbygoogle,
+      body.pixieed-inline-ad-guard > .adsbygoogle,
+      body.pixieed-inline-ad-guard > .google-auto-placed{
         inline-size:calc(100dvw - 28px) !important;
         max-inline-size:calc(100dvw - 28px) !important;
         margin-inline:auto !important;
@@ -181,9 +197,9 @@
     }
   }
 
-  function clampHomeAutoAds(root) {
-    if (!isHomePage()) return;
-    injectHomeAdGuardStyle();
+  function clampInlineAds(root) {
+    if (!needsInlineAdGuard()) return;
+    injectInlineAdGuardStyle();
     const scope = root && typeof root.querySelectorAll === 'function' ? root : document;
     if (isAdNode(scope)) clampElement(scope);
     scope.querySelectorAll?.([
@@ -198,12 +214,12 @@
   }
 
   function scheduleClamp(root) {
-    if (!isHomePage()) return;
+    if (!needsInlineAdGuard()) return;
     if (clampScheduled) return;
     clampScheduled = true;
     window.requestAnimationFrame(() => {
       clampScheduled = false;
-      clampHomeAutoAds(root || document);
+      clampInlineAds(root || document);
     });
   }
 
@@ -293,7 +309,7 @@
 
   function observeAds(root) {
     const scope = root && typeof root.querySelectorAll === 'function' ? root : document;
-    clampHomeAutoAds(scope);
+    clampInlineAds(scope);
     scope.querySelectorAll('ins.adsbygoogle').forEach(loadAd);
   }
 
