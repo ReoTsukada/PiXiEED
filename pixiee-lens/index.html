@@ -2929,6 +2929,7 @@
   </div>
 </div>
 <input accept="image/*" hidden="" id="pixelArtInput" type="file"/>
+<script src="../scripts/pixieed-workspace.js?v=20260715-workspace-v1"></script>
 <script>
   if (window.pixieedObserveAds) {
     window.pixieedObserveAds();
@@ -10165,6 +10166,14 @@
     }
 
     async function resolvePiXiEEDWorkspaceHandleForSave() {
+      if (window.PiXiEEDWorkspace) {
+        const sharedWorkspace = await window.PiXiEEDWorkspace.connect({ requestPermission: true });
+        if (sharedWorkspace) {
+          pixieedWorkspaceHandle = sharedWorkspace;
+          pixieedWorkspacePendingHandle = null;
+          return sharedWorkspace;
+        }
+      }
       if (!PIXIEED_WORKSPACE_SUPPORTED) {
         return null;
       }
@@ -10198,7 +10207,10 @@
         return 'unsupported';
       }
       try {
-        const fileHandle = await directoryHandle.getFileHandle(filename, { create: true });
+        const lensDirectory = await directoryHandle.getDirectoryHandle('LENS', { create: true });
+        const categoryName = String(filename || '').toLowerCase().endsWith('.gif') ? 'GIF' : 'Photos';
+        const categoryDirectory = await lensDirectory.getDirectoryHandle(categoryName, { create: true });
+        const fileHandle = await categoryDirectory.getFileHandle(filename, { create: true });
         const writable = await fileHandle.createWritable();
         await writable.write(blob);
         await writable.close();
@@ -10208,8 +10220,11 @@
         // Some Android browsers can leave a zero-byte placeholder when writable creation fails.
         // Remove it best-effort so users don't see an extra broken file.
         try {
-          if (directoryHandle && typeof directoryHandle.removeEntry === 'function') {
-            await directoryHandle.removeEntry(filename, { recursive: false });
+          if (directoryHandle && typeof directoryHandle.getDirectoryHandle === 'function') {
+            const lensDirectory = await directoryHandle.getDirectoryHandle('LENS', { create: false });
+            const categoryName = String(filename || '').toLowerCase().endsWith('.gif') ? 'GIF' : 'Photos';
+            const categoryDirectory = await lensDirectory.getDirectoryHandle(categoryName, { create: false });
+            await categoryDirectory.removeEntry(filename, { recursive: false });
           }
         } catch (cleanupError) {
           console.warn('Failed to cleanup partial workspace file', cleanupError);
@@ -12428,6 +12443,7 @@
     })();
   </script>
   <script src="../scripts/shared-bottom-nav.js?v=20260713-051" data-pixieed-footer-ad="false"></script>
+  <script src="../scripts/tool-fullscreen.js"></script>
   <script src="../scripts/pixel-art-fit.js"></script>
 </body>
 </html>
