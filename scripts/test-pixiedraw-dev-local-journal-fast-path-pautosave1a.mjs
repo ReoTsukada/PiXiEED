@@ -9,15 +9,16 @@ const journal = read('PiXiEEDrawDEV/assets/js/modules/local-project-journal-util
 const autosave = read('PiXiEEDrawDEV/assets/js/modules/autosave-workflow-utils.js');
 const packageWorkflow = read('PiXiEEDrawDEV/assets/js/modules/project-package-workflow-utils.js');
 
-assert.match(journal, /if \(!hasSnapshot && !useCheckpoint && next\.checkpointProject/);
+assert.match(journal, /if \(!hasSnapshot && !useCheckpoint && next\.checkpointPersisted/);
 assert.match(journal, /journalOnly: true/);
 assert.match(journal, /journalOnly: false/);
 
 assert.match(autosave, /snapshot: null/);
 assert.match(autosave, /const useV2Journal = Boolean\(/);
 assert.match(autosave, /const journalOnly = useV2Journal \|\| \(!useV2Primary/);
-assert.match(autosave, /if \(!journalOnly\) \{\s*snapshot = makeHistorySnapshot/);
-assert.match(autosave, /savePlan: useV2Journal \? journalOnlySavePlan : activeSavePlan/);
+assert.match(autosave, /if \(!useV2Journal \|\| syncDestination\) \{\s*ensureCurrentSnapshot\(\)/);
+assert.match(autosave, /savePlan: usedV2Journal \? journalOnlySavePlan : activeSavePlan/);
+assert.match(autosave, /usedV2Journal && !syncDestination/);
 assert.match(autosave, /if \(!useV2Primary && !journalOnly\) \{\s*queueAutosaveV2ShadowWriteMeasured/);
 
 assert.match(packageWorkflow, /savePlan: suppliedSavePlan = null/);
@@ -60,6 +61,7 @@ journalUtils.hydrateActiveStateFromRecentEntry({
 });
 journalUtils.noteHistoryEntry('project-1', { kind: 'pixel-patch' }, 'draw');
 let fullPackageBuilds = 0;
+let fullSessionBuilds = 0;
 const plan = journalUtils.buildSavePlan({
   projectId: 'project-1',
   snapshot: null,
@@ -67,11 +69,15 @@ const plan = journalUtils.buildSavePlan({
     fullPackageBuilds += 1;
     return { unexpected: true };
   },
-  buildAutosaveSessionPayload: () => ({ historyLimit: 30 }),
+  buildAutosaveSessionPayload: () => {
+    fullSessionBuilds += 1;
+    return { historyLimit: 30, timelapse: { byCanvas: { unexpected: true } } };
+  },
 });
 assert.equal(plan?.journalOnly, true);
 assert.equal(plan?.dirtyOpCount, 1);
 assert.equal(fullPackageBuilds, 0, 'journal-only saves must not rebuild a full checkpoint package');
+assert.equal(fullSessionBuilds, 0, 'journal-only saves must not serialize complete timelapse/session data');
 
 const normalizedV2Ops = journalUtils.normalizeV2PixelPatchJournalOps({
   ops: [{
@@ -107,6 +113,7 @@ assert.equal(
   '30 accumulated operations require a new checkpoint snapshot'
 );
 let checkpointBuilds = 0;
+let checkpointSessionBuilds = 0;
 const checkpointPlan = journalUtils.buildSavePlan({
   projectId: 'project-1',
   snapshot: { documentName: 'checkpoint' },
@@ -114,9 +121,13 @@ const checkpointPlan = journalUtils.buildSavePlan({
     checkpointBuilds += 1;
     return { type: 'pixieed-project-package', document: { documentName: 'checkpoint' } };
   },
-  buildAutosaveSessionPayload: () => ({ historyLimit: 30 }),
+  buildAutosaveSessionPayload: () => {
+    checkpointSessionBuilds += 1;
+    return { historyLimit: 30, timelapse: { byCanvas: {} } };
+  },
 });
 assert.equal(checkpointBuilds, 1);
+assert.equal(checkpointSessionBuilds, 1, 'checkpoint saves must retain complete session/timelapse packaging');
 assert.equal(checkpointPlan?.dirtyOpCount, 0);
 assert.equal(checkpointPlan?.journalPayload?.ops?.length, 0);
 
