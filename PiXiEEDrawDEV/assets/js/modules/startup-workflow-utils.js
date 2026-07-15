@@ -1694,6 +1694,12 @@
       button.className = 'startup-workspace__project';
       button.dataset.workspaceProjectIndex = String(index);
       button.setAttribute('role', 'listitem');
+      if (entry?.migrationRecovery === true) {
+        button.title = localizeText(
+          `V2移行を完了できませんでした。元データは削除されていません。\n${entry?.migrationErrorCode || ''}: ${entry?.migrationErrorMessage || ''}`,
+          `V2 migration could not be completed. The original data was not deleted.\n${entry?.migrationErrorCode || ''}: ${entry?.migrationErrorMessage || ''}`
+        );
+      }
       const thumbnail = document.createElement('span');
       thumbnail.className = 'startup-workspace__project-thumbnail';
       thumbnail.dataset.workspaceProjectThumbnail = String(index);
@@ -1701,6 +1707,13 @@
       placeholder.className = 'startup-workspace__project-thumbnail-placeholder';
       placeholder.textContent = 'PXD';
       thumbnail.appendChild(placeholder);
+      if (entry?.migrationRecovery === true && typeof entry?.thumbnail === 'string' && entry.thumbnail) {
+        const image = new Image();
+        image.src = entry.thumbnail;
+        image.alt = localizeText('端末内プロジェクトのサムネイル', 'Local project thumbnail');
+        image.decoding = 'async';
+        thumbnail.replaceChildren(image);
+      }
       const details = document.createElement('span');
       details.className = 'startup-workspace__project-details';
       const name = document.createElement('span');
@@ -1708,15 +1721,26 @@
       name.textContent = entry?.name || DEFAULT_DOCUMENT_NAME;
       const meta = document.createElement('span');
       meta.className = 'startup-workspace__project-meta';
-      const modified = Number(entry?.lastModified) > 0
-        ? new Date(Number(entry.lastModified)).toLocaleString()
-        : localizeText('更新日時不明', 'Unknown date');
-      meta.textContent = `${modified} / ${formatWorkspaceProjectSize(entry?.size)}`;
+      const modified = entry?.migrationRecovery === true && typeof entry?.updatedAt === 'string'
+        ? new Date(entry.updatedAt).toLocaleString()
+        : (Number(entry?.lastModified) > 0
+            ? new Date(Number(entry.lastModified)).toLocaleString()
+            : localizeText('更新日時不明', 'Unknown date'));
+      meta.textContent = entry?.migrationRecovery === true
+        ? `${modified} / ${localizeText('端末内・V2移行待ち', 'On device · awaiting V2 migration')}`
+        : `${modified} / ${formatWorkspaceProjectSize(entry?.size)}`;
       const certification = document.createElement('span');
       certification.className = 'startup-workspace__project-certification is-checking';
       certification.dataset.workspaceProjectCertification = String(index);
-      certification.textContent = localizeText('確認中', 'Checking');
-      certification.setAttribute('aria-label', localizeText('PiXiEED公認状態を確認中', 'Checking PiXiEED certification'));
+      certification.textContent = entry?.migrationRecovery === true
+        ? localizeText('復旧して開く', 'Open for recovery')
+        : localizeText('確認中', 'Checking');
+      certification.setAttribute('aria-label', entry?.migrationRecovery === true
+        ? localizeText('端末内の元データを保持しています。開いて復旧できます。', 'The original on-device data is retained and can be opened for recovery.')
+        : localizeText('PiXiEED公認状態を確認中', 'Checking PiXiEED certification'));
+      if (entry?.migrationRecovery === true) {
+        certification.className = 'startup-workspace__project-certification is-recovery';
+      }
       details.append(name, meta, certification);
       button.append(thumbnail, details);
       list.appendChild(button);
@@ -1834,6 +1858,7 @@
   async function hydrateStartupWorkspaceProjectCards(entries, renderGeneration) {
     for (let index = 0; index < entries.length; index += 1) {
       if (renderGeneration !== startupWorkspaceRenderGeneration) return;
+      if (entries[index]?.migrationRecovery === true) continue;
       try {
         const inspection = await inspectStartupWorkspaceProject(entries[index]);
         updateStartupWorkspaceProjectCard(index, inspection, renderGeneration);
@@ -1940,7 +1965,10 @@
 
   async function mergeFileBackedTimelapseIntoPackaged(entry, packaged) {
     if (typeof loadPersistedTimelapseSnapshots !== 'function') return packaged;
-    const persistedByCanvas = await loadPersistedTimelapseSnapshots(entry?.id || '', { throwOnError: true });
+    // Legacy production projects may predate the separate timelapse store, or
+    // Safari may temporarily deny access to it. Missing optional archive data
+    // must not make the drawable project itself impossible to migrate.
+    const persistedByCanvas = await loadPersistedTimelapseSnapshots(entry?.id || '', { throwOnError: false });
     if (!persistedByCanvas || !Object.keys(persistedByCanvas).length) return packaged;
     const rootCanvasIds = Array.isArray(packaged?.document?.canvases)
       ? packaged.document.canvases.map(canvas => canvas?.id || '').filter(Boolean)
@@ -1973,8 +2001,12 @@
     );
     let previewThumbnail = '';
     if (typeof snapshotFromParsedDocumentValue === 'function' && typeof generateSnapshotThumbnail === 'function') {
-      const snapshot = snapshotFromParsedDocumentValue(packaged)?.snapshot || null;
-      if (snapshot) previewThumbnail = await generateSnapshotThumbnail(snapshot) || '';
+      try {
+        const snapshot = snapshotFromParsedDocumentValue(packaged)?.snapshot || null;
+        if (snapshot) previewThumbnail = await generateSnapshotThumbnail(snapshot) || '';
+      } catch (error) {
+        console.warn('[PiXiEED workspace] legacy thumbnail generation skipped', { projectId: entry?.id || '', error });
+      }
     }
     const serialized = await serializeProjectStorageSnapshot({
       packaged,
@@ -2023,12 +2055,37 @@
     });
   }
 
+  function classifyWorkspaceMigrationError(error) {
+    const explicitCode = typeof error?.code === 'string' ? error.code.trim() : '';
+    if (explicitCode) return explicitCode;
+    const message = String(error?.message || error || '');
+    if (/payload is unavailable/i.test(message)) return 'ERR_LEGACY_PAYLOAD_UNAVAILABLE';
+    if (/serializer is unavailable|serializer did not return/i.test(message)) return 'ERR_V2_SERIALIZER_UNAVAILABLE';
+    if (/file could not be created/i.test(message)) return 'ERR_WORKSPACE_FILE_CREATE_FAILED';
+    if (/could not be removed/i.test(message)) return 'ERR_LEGACY_CLEANUP_FAILED';
+    if (/still contains multiple projects/i.test(message)) return 'ERR_LEGACY_SPLIT_INCOMPLETE';
+    const errorName = typeof error?.name === 'string' ? error.name.trim() : '';
+    return errorName && errorName !== 'Error' ? errorName : 'ERR_V2_MIGRATION_FAILED';
+  }
+
   async function migrateFilelessLocalProjectsToWorkspace(workspace, workspaceEntries = []) {
     if (startupWorkspaceMigrationPromise) return await startupWorkspaceMigrationPromise;
     startupWorkspaceMigrationPromise = (async () => {
       let entries = filterFilelessLocalProjects(await loadRecentProjectsMetadata(), workspaceEntries);
-      if (!entries.length || startupWorkspaceMigrationPrompted) {
-        return { migrated: 0, failed: 0, declined: false };
+      if (!entries.length) {
+        return { migrated: 0, failed: 0, declined: false, failedEntries: [] };
+      }
+      if (startupWorkspaceMigrationPrompted) {
+        return {
+          migrated: 0,
+          failed: entries.length,
+          declined: false,
+          failedEntries: entries.map(entry => ({
+            entry,
+            code: 'ERR_V2_MIGRATION_RETRY_REQUIRED',
+            message: 'Reload to retry V2 migration',
+          })),
+        };
       }
       startupWorkspaceMigrationPrompted = true;
       const accepted = window.confirm(localizeText(
@@ -2036,7 +2093,16 @@
         `${entries.length} legacy project(s) are stored only on this device.\n\nThey will be converted to single-project V2 files in PiXiEED/Projects. Multiple tabs and canvases will be split into separate V2 files. Original device data is removed only after its V2 file is saved successfully.\n\nStart conversion?`
       ));
       if (!accepted) {
-        return { migrated: 0, failed: 0, declined: true };
+        return {
+          migrated: 0,
+          failed: entries.length,
+          declined: true,
+          failedEntries: entries.map(entry => ({
+            entry,
+            code: 'V2_MIGRATION_DECLINED',
+            message: 'V2 migration was not started',
+          })),
+        };
       }
 
       setStartupWorkspaceStatus(localizeText('端末内プロジェクトをV2へ変換しています…', 'Converting local projects to V2...'));
@@ -2054,6 +2120,7 @@
       entries = filterFilelessLocalProjects(await loadRecentProjectsMetadata(), workspaceEntries);
       let migrated = 0;
       let failed = 0;
+      const failedEntries = [];
       for (let index = 0; index < entries.length; index += 1) {
         const entry = entries[index];
         setStartupWorkspaceStatus(localizeText(
@@ -2079,6 +2146,11 @@
           migrated += 1;
         } catch (error) {
           failed += 1;
+          failedEntries.push({
+            entry,
+            code: classifyWorkspaceMigrationError(error),
+            message: String(error?.message || error || 'V2 migration failed'),
+          });
           console.warn('[PiXiEED workspace] local project migration failed', { projectId: entry.id, error });
         }
       }
@@ -2087,7 +2159,7 @@
           console.warn('Failed to refresh recent projects after workspace migration', error);
         });
       }
-      return { migrated, failed, declined: false };
+      return { migrated, failed, declined: false, failedEntries };
     })();
     try {
       return await startupWorkspaceMigrationPromise;
@@ -2110,10 +2182,32 @@
     if (!handle) {
       const status = workspace.getStatus();
       setStartupWorkspaceStatus(
-        status.directoryPickerSupported
-          ? localizeText('未接続です。「PiXiEEDフォルダに接続」を押してください。', 'Not connected. Select “Connect PiXiEED Folder”.')
-          : localizeText('直接接続に未対応です。「フォルダを読み取る」を使用してください。', 'Direct folder access is unavailable. Use “Read Folder”.'),
+        status.lastErrorCode === 'projects-folder-selected'
+          ? localizeText(
+              'Projectsフォルダが選択されました。既存のPiXiEEDフォルダ、またはPiXiEEDを作成する親フォルダを選んでください。',
+              'The Projects folder was selected. Choose the existing PiXiEED folder or the parent folder where PiXiEED should be created.'
+            )
+          : status.directoryPickerSupported
+          ? localizeText('未接続です。「保存場所を選んで接続」を押してください。', 'Not connected. Select “Choose Save Location”.')
+          : localizeText(
+              'このブラウザでは端末フォルダへの直接接続に対応していません。端末内プロジェクトは削除されません。',
+              'This browser does not support direct folder access. On-device projects will not be deleted.'
+            ),
         'warn'
+      );
+      return false;
+    }
+    const projectsDirectory = await workspace.getSubdirectory?.('Projects', {
+      create: true,
+      requestPermission: false,
+    });
+    if (!projectsDirectory) {
+      setStartupWorkspaceStatus(
+        localizeText(
+          '接続先に PiXiEED/Projects を作成できませんでした。別の親フォルダを選び直してください。元データは削除されていません。',
+          'PiXiEED/Projects could not be created in the selected location. Choose a different parent folder. Original data was not deleted.'
+        ),
+        'error'
       );
       return false;
     }
@@ -2122,12 +2216,21 @@
     const entries = migration.migrated > 0
       ? await workspace.listProjects({ requestPermission: false, includeWorkspaceRoot: true })
       : existingEntries;
-    renderStartupWorkspaceProjects(entries);
+    const recoveryEntries = (Array.isArray(migration.failedEntries) ? migration.failedEntries : [])
+      .map(failure => ({
+        ...(failure?.entry || {}),
+        name: failure?.entry?.fileName || failure?.entry?.name || DEFAULT_DOCUMENT_NAME,
+        migrationRecovery: true,
+        migrationErrorCode: failure?.code || 'ERR_V2_MIGRATION_FAILED',
+        migrationErrorMessage: failure?.message || '',
+      }));
+    const firstFailureCode = recoveryEntries[0]?.migrationErrorCode || '';
+    renderStartupWorkspaceProjects(entries.concat(recoveryEntries));
     setStartupWorkspaceStatus(
       migration.failed > 0
         ? localizeText(
-          `接続済み / ${entries.length}件（V2移行 成功${migration.migrated}・未完了${migration.failed}）`,
-          `Connected / ${entries.length} project(s) (V2 migrated ${migration.migrated}, incomplete ${migration.failed})`
+          `接続済み / ファイル${entries.length}件（V2移行 成功${migration.migrated}・未完了${migration.failed}${firstFailureCode ? ` / ${firstFailureCode}` : ''}）`,
+          `Connected / ${entries.length} file(s) (V2 migrated ${migration.migrated}, incomplete ${migration.failed}${firstFailureCode ? ` / ${firstFailureCode}` : ''})`
         )
         : localizeText(
           `PiXiEEDフォルダに接続済み / ${entries.length}件${migration.migrated ? `（V2移行 ${migration.migrated}件）` : ''}`,
@@ -2150,6 +2253,11 @@
     if (connectButton instanceof HTMLButtonElement) {
       connectButton.hidden = !status.directoryPickerSupported;
       connectButton.addEventListener('click', async () => {
+        const accepted = window.confirm(localizeText(
+          '保存場所を設定します。\n\n・すでに PiXiEED フォルダがある場合は、その PiXiEED フォルダを選択してください。\n・まだない場合は「書類」など作成先の親フォルダを選択してください。その中に PiXiEED/Projects を作成します。\n・Projects フォルダそのものは選択しないでください。\n\nV2ファイルの作成に成功するまで、端末内の元プロジェクトは削除しません。\n\n保存場所の選択へ進みますか？',
+          'Set the save location.\n\n• If a PiXiEED folder already exists, select that PiXiEED folder.\n• Otherwise, select a parent location such as Documents. PiXiEED/Projects will be created inside it.\n• Do not select the Projects folder itself.\n\nOriginal on-device projects will not be deleted until their V2 files are created successfully.\n\nContinue to location selection?'
+        ));
+        if (!accepted) return;
         connectButton.disabled = true;
         try {
           await refreshStartupWorkspaceProjects({ requestPermission: true });
@@ -2164,6 +2272,24 @@
         : null;
       if (!(target instanceof HTMLButtonElement)) return;
       const entry = startupWorkspaceEntries[Number(target.dataset.workspaceProjectIndex)] || null;
+      if (entry?.migrationRecovery === true) {
+        target.disabled = true;
+        try {
+          const opened = await openRecentProject(entry, {
+            hideStartup: true,
+            silent: false,
+            allowProjectMismatchLoad: true,
+            replaceOpenProjectTabs: true,
+          });
+          if (opened) {
+            hideStartupScreen();
+            hideProjectHomeScreen();
+          }
+        } finally {
+          target.disabled = false;
+        }
+        return;
+      }
       const item = entry?.handle || entry?.file || null;
       if (!item) return;
       target.disabled = true;
