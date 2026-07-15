@@ -358,7 +358,7 @@ const v2Serialized = await registry.serializeProject({
 });
 
 assert.equal(v1Serialized.adapterId, 'pixieedraw-v1-json');
-assert.equal(v2Serialized.adapterId, 'pixieedraw-v2-zip-experimental');
+assert.equal(v2Serialized.adapterId, 'pixieedraw-v2-zip');
 assert.ok(v2Serialized.blob instanceof Blob);
 
 const v2Bytes = new Uint8Array(await v2Serialized.blob.arrayBuffer());
@@ -387,7 +387,7 @@ assert.notEqual(
 );
 
 const parsedFromV2 = await registry.parseBlob(v2Serialized.blob);
-assert.equal(parsedFromV2.adapterId, 'pixieedraw-v2-zip-experimental');
+assert.equal(parsedFromV2.adapterId, 'pixieedraw-v2-zip');
 assert.equal(parsedFromV2.parsed.document.width, width);
 assert.equal(parsedFromV2.parsed.document.height, height);
 assert.equal(parsedFromV2.parsed.document.canvases.length, 2);
@@ -419,6 +419,59 @@ assert.equal(
   parsedFromV2.parsed.document.canvases[1].frames[0].layers[2].direct,
   canvasB.frames[0].layers[2].direct,
   'collision wide payload should roundtrip'
+);
+
+const v2DefaultRegistry = adapterUtils.createProjectStorageAdapterRegistry({
+  adapters: [v1Adapter, v2Adapter],
+  defaultAdapterId: v2Adapter.id,
+});
+const paddedV1Blob = new Blob([`${' '.repeat(64)}${v1Serialized.text}`], {
+  type: 'application/x-pixieedraw',
+});
+const paddedV1Manifest = await v2DefaultRegistry.readManifestFromBlob(paddedV1Blob);
+assert.equal(paddedV1Manifest.adapterId, '', 'a short whitespace probe must not misclassify V1 JSON as ZIP');
+const parsedPaddedV1 = await v2DefaultRegistry.parseBlob(paddedV1Blob);
+assert.equal(parsedPaddedV1.adapterId, 'pixieedraw-v1-json');
+
+const missingIndicesProject = {
+  type: 'pixieedraw-project',
+  packageVersion: 2,
+  version: 1,
+  document: {
+    documentName: 'missing-indices.pixieedraw',
+    activeCanvasId: 'canvas-recovery',
+    canvases: [{
+      id: 'canvas-recovery',
+      width: 2,
+      height: 2,
+      activeFrame: 0,
+      activeLayer: 'layer-recovery',
+      frames: [{
+        id: 'frame-recovery',
+        layers: [{
+          id: 'layer-recovery',
+          directOnly: true,
+          direct: encodeTypedArray(buildRgba(2, 2, [{ x: 0, y: 0, r: 255, g: 0, b: 0, a: 255 }])),
+        }],
+      }],
+    }],
+  },
+  session: {},
+};
+const missingIndicesArchive = await v2DefaultRegistry.serializeProject({ packaged: missingIndicesProject }, {
+  preferredAdapterId: v2Adapter.id,
+});
+const parsedMissingIndices = await v2DefaultRegistry.parseBlob(missingIndicesArchive.blob);
+const recoveredIndicesBase64 = parsedMissingIndices.parsed.document.canvases[0].frames[0].layers[0].indices;
+assert.equal(typeof recoveredIndicesBase64, 'string');
+assert.deepEqual(
+  Array.from(new Int16Array(
+    decodeBase64(recoveredIndicesBase64).buffer,
+    decodeBase64(recoveredIndicesBase64).byteOffset,
+    4
+  )),
+  [-1, -1, -1, -1],
+  'missing legacy indices should recover as transparent while retaining direct pixels'
 );
 
 const documentSessionUtils = window.PiXiEEDrawModules.documentSessionWorkflowUtils.createDocumentSessionWorkflowUtils({
@@ -467,7 +520,7 @@ const documentSessionUtils = window.PiXiEEDrawModules.documentSessionWorkflowUti
 });
 
 const parsedSnapshot = await documentSessionUtils.snapshotFromDocumentBlob(v2Serialized.blob);
-assert.equal(parsedSnapshot.storageAdapterId, 'pixieedraw-v2-zip-experimental');
+assert.equal(parsedSnapshot.storageAdapterId, 'pixieedraw-v2-zip');
 assert.equal(parsedSnapshot.snapshot.canvases.length, 2);
 
 const exportRenderingModule = window.PiXiEEDrawModules.exportRendering.createExportRenderingModule({
@@ -481,6 +534,15 @@ const exportRenderingModule = window.PiXiEEDrawModules.exportRendering.createExp
   },
   buildProjectSessionPayload() {
     return sessionPayload;
+  },
+  async buildProjectSessionPayloadWithPersistedTimelapse() {
+    return {
+      ...sessionPayload,
+      timelapse: {
+        ...sessionPayload.timelapse,
+        synchronization: { complete: true },
+      },
+    };
   },
   async serializeProjectStorageSnapshot(projectState, options) {
     return await registry.serializeProject(projectState, options);
@@ -504,7 +566,7 @@ const v2Bundle = await exportRenderingModule.buildProjectExportBundle('phase2-sa
   preferredStorageAdapterId: v2Adapter.id,
   includeSheets: false,
 });
-assert.equal(v2Bundle.storageAdapterId, 'pixieedraw-v2-zip-experimental');
+assert.equal(v2Bundle.storageAdapterId, 'pixieedraw-v2-zip');
 assert.ok(v2Bundle.blob instanceof Blob);
 
 console.log(
