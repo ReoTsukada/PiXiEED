@@ -7064,6 +7064,8 @@
   set decodeBase64(value) { decodeBase64 = value; },
   get decompressHistorySnapshot() { return decompressHistorySnapshot; },
   set decompressHistorySnapshot(value) { decompressHistorySnapshot = value; },
+  get dom() { return dom; },
+  set dom(value) { dom = value; },
   get deserializeDocumentPayload() { return deserializeDocumentPayload; },
   set deserializeDocumentPayload(value) { deserializeDocumentPayload = value; },
   get encodeTypedArray() { return encodeTypedArray; },
