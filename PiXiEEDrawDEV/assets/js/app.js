@@ -17611,6 +17611,7 @@
     let written;
     let projectState = null;
     let thumbnail = previousEntry?.thumbnail || null;
+    let deferThumbnailRefresh = false;
     if (journalOnly) {
       const normalizedOps = normalizeV2PixelPatchJournalOps(savePlan?.journalPayload || null);
       if (!normalizedOps || !normalizedOps.length) {
@@ -17631,7 +17632,7 @@
     const refreshThumbnail = needsInitialThumbnail
       || !Number.isFinite(previousUpdatedAt)
       || now - previousUpdatedAt >= Math.max(0, Math.round(Number(thumbnailIntervalMs) || 0));
-    const deferThumbnailRefresh = refreshThumbnail;
+    deferThumbnailRefresh = refreshThumbnail;
     // Keep checkpoint persistence on the critical path and refresh even the
     // first thumbnail after interaction settles. The recent-project card can
     // briefly use its placeholder instead of blocking V2 durability.
