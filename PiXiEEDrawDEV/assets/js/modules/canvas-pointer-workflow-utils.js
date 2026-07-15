@@ -1058,8 +1058,8 @@
           return;
         }
       }
-      const cleared = clearSelection();
-      if (!cleared) {
+      const finalized = confirmPendingSelectionMove({ allowOutOfBoundsClip: true });
+      if (!finalized) {
         updateCanvasControlButtons();
         return;
       }
@@ -2221,9 +2221,6 @@
     if (!success) {
       state.pendingPasteMoveState = null;
       rollbackPendingHistory({ reRender: false });
-    } else {
-      captureSharedProjectRegionCommand(result.bounds, pointerState.surface || null, 'selectionPaste');
-      commitHistory();
     }
     updateCanvasControlButtons();
     return success;
@@ -2238,7 +2235,12 @@
     const offsetX = position.x - start.x;
     const offsetY = position.y - start.y;
     if (!moveState.hasCleared && (offsetX !== 0 || offsetY !== 0)) {
-      beginHistory('selectionMove');
+      // A pasted selection already owns a pending selectionPaste snapshot.
+      // Keep that original snapshot alive until the user confirms or cancels,
+      // rather than replacing it with a post-paste selectionMove snapshot.
+      if (!moveState.fromPastePlacement) {
+        beginHistory('selectionMove');
+      }
       clearSelectionSourcePixels(moveState);
     }
     if (moveState.offset.x === offsetX && moveState.offset.y === offsetY && moveState.hasCleared) {
@@ -2476,7 +2478,7 @@
       return direct;
     }
     const pending = state.pendingPasteMoveState;
-    if (pending && pending.hasCleared && !pending.committed) {
+    if (pending && !pending.committed && (pending.hasCleared || pending.fromPastePlacement)) {
       return pending;
     }
     const fallback = pointerState.lastSelectionMove;
