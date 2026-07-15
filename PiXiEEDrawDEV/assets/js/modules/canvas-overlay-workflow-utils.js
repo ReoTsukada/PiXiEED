@@ -385,8 +385,6 @@
         || previewTool === 'rectFill'
         || previewTool === 'ellipse'
         || previewTool === 'ellipseFill'
-        || previewTool === 'oval'
-        || previewTool === 'ovalFill'
         || previewTool === 'curve')
     ) {
       drawPreviewShape({
@@ -1397,19 +1395,17 @@
           stamp(x1, y);
         }
       }
-    } else if (tool === 'ellipse' || tool === 'ellipseFill' || tool === 'oval' || tool === 'ovalFill') {
+    } else if (tool === 'ellipse' || tool === 'ellipseFill') {
       let x0 = Math.min(start.x, end.x);
       let x1 = Math.max(start.x, end.x);
       let y0 = Math.min(start.y, end.y);
       let y1 = Math.max(start.y, end.y);
-      if (tool === 'ellipse' || tool === 'ellipseFill') {
-        const diameter = Math.max(1, Math.min((x1 - x0) + 1, (y1 - y0) + 1));
-        x0 += Math.floor((((x1 - x0) + 1) - diameter) * 0.5);
-        y0 += Math.floor((((y1 - y0) + 1) - diameter) * 0.5);
-        x1 = x0 + diameter - 1;
-        y1 = y0 + diameter - 1;
-      }
-      const filled = tool === 'ellipseFill' || tool === 'ovalFill';
+      const diameter = Math.max(1, Math.min((x1 - x0) + 1, (y1 - y0) + 1));
+      x0 += Math.floor((((x1 - x0) + 1) - diameter) * 0.5);
+      y0 += Math.floor((((y1 - y0) + 1) - diameter) * 0.5);
+      x1 = x0 + diameter - 1;
+      y1 = y0 + diameter - 1;
+      const filled = tool === 'ellipseFill';
       drawEllipsePixels(x0, y0, x1, y1, filled, (x, y) => stamp(x, y));
     }
 
