@@ -525,12 +525,12 @@
       setLocalizedToggleLabel('toggleFloatingPreview', '小窓プレビュー', 'Floating Preview');
       setLocalizedToggleLabel('toggleCanvasResizeHandles', 'キャンバスサイズつまみ', 'Canvas Resize Handles');
       setLocalizedTextContent('#localCanvasCountLabel', 'キャンバス数', 'Canvas Count');
-      setLocalizedAttribute('#toggleLocalCanvas', 'aria-label', 'マルチキャンバス', 'Multi Canvas');
-      setLocalizedAttribute('#toggleLocalCanvas', 'title', 'マルチキャンバス', 'Multi Canvas');
-      setLocalizedAttribute('#removeLocalCanvas', 'aria-label', 'マルチキャンバスを減らす', 'Remove multi canvas');
-      setLocalizedAttribute('#addLocalCanvas', 'aria-label', 'マルチキャンバスを増やす', 'Add multi canvas');
-      setLocalizedAttribute('#removeLocalCanvas', 'title', 'マルチキャンバスを減らす', 'Remove multi canvas');
-      setLocalizedAttribute('#addLocalCanvas', 'title', 'マルチキャンバスを増やす', 'Add multi canvas');
+      setLocalizedToggleLabel('toggleLocalCanvas', '複数キャンバス（上級）', 'Advanced Multi Canvas');
+      setLocalizedAttribute('#toggleLocalCanvas', 'title', '通常制作は単一キャンバスです。共同制作や素材分担では複数キャンバスを使えます。', 'Single canvas is standard. Use multiple canvases for collaboration or asset work.');
+      setLocalizedAttribute('#removeLocalCanvas', 'aria-label', '追加キャンバスを減らす', 'Remove additional canvas');
+      setLocalizedAttribute('#addLocalCanvas', 'aria-label', '追加キャンバスを増やす', 'Add additional canvas');
+      setLocalizedAttribute('#removeLocalCanvas', 'title', '追加キャンバスを減らす', 'Remove additional canvas');
+      setLocalizedAttribute('#addLocalCanvas', 'title', '追加キャンバスを増やす', 'Add additional canvas');
       setLocalizedTextContent('#voxelExtensionTitle', 'ボクセルモード', 'Voxel Mode');
       setLocalizedToggleLabel('toggleVoxelExtensionMode', 'ボクセルモード', 'Voxel Mode');
       setLocalizedTextContent('#voxelExtensionHint', 'ON にすると Front / Back / Left / Right / Top / Bottom の6面構成へ切り替わり、小窓プレビューを自動生成します。小窓をドラッグすると左右と上下に回転できます。', 'When enabled, the workspace switches to Front / Back / Left / Right / Top / Bottom and generates the floating preview automatically. Drag the floating preview to rotate horizontally and vertically.');
