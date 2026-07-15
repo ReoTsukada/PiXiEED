@@ -10056,7 +10056,36 @@ body.is-startup-active .pixieed-shared-top-ad {
   }
 
   .startup-workspace__list {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .startup-workspace__project {
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 7px;
+    padding: 7px;
+  }
+
+  .startup-workspace__project-thumbnail {
+    width: 42px;
+    height: 42px;
+    border-radius: 7px;
+  }
+
+  .startup-workspace__project-name {
+    font-size: 0.72rem;
+  }
+
+  .startup-workspace__project-meta {
+    margin-top: 2px;
+    font-size: 0.6rem;
+  }
+
+  .startup-workspace__project-certification {
+    min-height: 17px;
+    margin-top: 4px;
+    padding: 1px 5px;
+    font-size: 0.56rem;
   }
 }
 
