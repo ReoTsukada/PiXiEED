@@ -28,7 +28,7 @@ const utils = context.window.PiXiEEDrawModules.openImportWorkflowUtils.createOpe
   },
 });
 
-const result = utils.normalizePngSheetCandidate(original, { type: 'image/png', name: 'secret.png', size: 42 });
+const result = await utils.normalizePngSheetCandidate(original, { type: 'image/png', name: 'secret.png', size: 42 });
 assert.equal(result.ok, true);
 assert.equal(result.canonicalPayload, canonical);
 assert.equal(calls.normalize, 1);
@@ -36,13 +36,13 @@ assert.equal(calls.validate, 1);
 assert.equal(original.canonicalPayloadFormat, undefined, 'normalization must not mutate the decoder candidate');
 
 const unavailable = context.window.PiXiEEDrawModules.openImportWorkflowUtils.createOpenImportWorkflowUtils({});
-assert.equal(unavailable.normalizePngSheetCandidate(original, { type: 'image/png' }).code, 'ERR_CANONICAL_V2_NORMALIZER_UNAVAILABLE');
+assert.equal((await unavailable.normalizePngSheetCandidate(original, { type: 'image/png' })).code, 'ERR_CANONICAL_V2_NORMALIZER_UNAVAILABLE');
 
 const validationFailure = context.window.PiXiEEDrawModules.openImportWorkflowUtils.createOpenImportWorkflowUtils({
   normalizeExternalProjectToCanonicalV2: () => ({ ok: true, canonicalPayload: canonical }),
   validateCanonicalV2ProjectPayload: () => ({ ok: false, code: 'ERR_CANONICAL_V2_CANVAS_INVALID', phase: 'validate' }),
 });
-assert.equal(validationFailure.normalizePngSheetCandidate(original, { type: 'image/png' }).code, 'ERR_CANONICAL_V2_CANVAS_INVALID');
+assert.equal((await validationFailure.normalizePngSheetCandidate(original, { type: 'image/png' })).code, 'ERR_CANONICAL_V2_CANVAS_INVALID');
 
 assert.match(source, /const isPng = kind === 'image'/);
 assert.match(source, /project = normalized\.canonicalPayload;/);
