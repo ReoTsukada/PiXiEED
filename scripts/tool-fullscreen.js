@@ -32,8 +32,8 @@
   const button = document.createElement('button');
   button.id = 'pixieedToolFullscreen';
   button.type = 'button';
-  button.textContent = '全画面';
-  button.setAttribute('aria-label', '全画面で使う');
+  button.textContent = 'フルスクリーン';
+  button.setAttribute('aria-label', 'フルスクリーンで使う');
   document.body.appendChild(button);
   if (fullscreenIntent) {
     button.classList.add('is-requested');
@@ -43,9 +43,9 @@
   const sync = () => {
     const active = document.fullscreenElement === document.documentElement;
     document.body.classList.toggle('pixieed-tool-is-fullscreen', active);
-    button.textContent = active ? '全画面を終了' : (fullscreenIntent ? 'タップして全画面' : '全画面');
+    button.textContent = active ? 'フルスクリーンを終了' : (fullscreenIntent ? 'タップしてフルスクリーン' : 'フルスクリーン');
     button.classList.toggle('is-requested', !active && fullscreenIntent);
-    button.setAttribute('aria-label', active ? '全画面を終了' : '全画面で使う');
+    button.setAttribute('aria-label', active ? 'フルスクリーンを終了' : 'フルスクリーンで使う');
   };
 
   button.addEventListener('click', async () => {
