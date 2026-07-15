@@ -35,16 +35,8 @@
     return true;
   }
 
-  function hasPixieedrawMultiCanvasSupport() {
-    return true;
-  }
-
   function hasPixieedrawSignedInAccount() {
     return Boolean(accountState.isLoggedIn && accountState.userId && !accountState.isAnonymous);
-  }
-
-  function getLocalViewportCanvasAccountLimit() {
-    return LOCAL_VIEWPORT_CANVAS_STANDARD_MAX_COUNT;
   }
 
   function getSharedProjectMemberLimitForCurrentPlan() {
@@ -60,41 +52,11 @@
     );
   }
 
-  function getPixieedAdFreeStateSnapshot() {
-    return window.pixieedAdFree?.state || null;
-  }
-
-  function getPixieedAdFreeRemainingDays(adFreeState = getPixieedAdFreeStateSnapshot()) {
-    const raw = typeof adFreeState?.expiresAt === 'string' ? adFreeState.expiresAt : '';
-    if (!raw) {
-      return null;
-    }
-    const timestamp = Date.parse(raw);
-    if (!Number.isFinite(timestamp)) {
-      return null;
-    }
-    return Math.max(0, Math.ceil((timestamp - Date.now()) / 86400000));
-  }
-
-  function buildPixieedSupportStatusText(adFreeState = getPixieedAdFreeStateSnapshot()) {
-    return localizeText(
-      '広告非表示が有効です。',
-      'Ads are hidden.'
-    );
-  }
-
-  function syncPixieedSupportBenefitUi(adFreeState = getPixieedAdFreeStateSnapshot()) {
-    const message = buildPixieedSupportStatusText(adFreeState);
-    const status = document.getElementById('pixieedAdFreeStatus');
-    if (status instanceof HTMLElement && !window.pixieedAdFree?.state?.lastError) {
-      status.textContent = message;
-    }
-    if (dom.controls.multiSupportStatus instanceof HTMLElement) {
-      dom.controls.multiSupportStatus.textContent = message;
-    }
-    if (dom.controls.multiSupportPurchase instanceof HTMLElement) {
-      dom.controls.multiSupportPurchase.textContent = localizeText('利用可能', 'Available');
-    }
+  // G3-B leaves generic support surfaces intact while removing the former
+  // advertising-off entitlement UI. Keep this bridge inert until G4 removes
+  // the legacy shared-project quota plumbing that still calls it.
+  function syncPixieedSupportBenefitUi() {
+    return undefined;
   }
 
   function getMaxSharedProjectCount() {
@@ -105,14 +67,9 @@
 
   return Object.freeze({
     hasPixieedrawAdFreeSupport,
-    hasPixieedrawMultiCanvasSupport,
     hasPixieedrawSignedInAccount,
-    getLocalViewportCanvasAccountLimit,
     getSharedProjectMemberLimitForCurrentPlan,
     getMultiGuestLimitForCurrentPlan,
-    getPixieedAdFreeStateSnapshot,
-    getPixieedAdFreeRemainingDays,
-    buildPixieedSupportStatusText,
     syncPixieedSupportBenefitUi,
     getMaxSharedProjectCount,
   });

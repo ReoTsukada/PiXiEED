@@ -10,7 +10,6 @@
     openProjectTabs,
     recentProjectsCache,
     SHARED_PROJECTS_ENABLED,
-    MAX_PROJECT_SHEETS,
     AUTOSAVE_SUPPORTED,
     getActiveOpenProjectTabId,
     setActiveOpenProjectTabId,
@@ -45,6 +44,10 @@
     refreshRecentProjectsUI,
     maybePromptAndTransferRecentProjectsFromHome,
     clearActiveSharedProjectSession,
+    makeHistorySnapshot,
+    buildProjectSessionPayload,
+    buildPackagedProjectPayload,
+    replaceActiveProjectSessionFromTab,
   } = {}) {
     function ensureOpenProjectTabsInitialized() {
       const activeOpenProjectTabId = getActiveOpenProjectTabId?.() || '';
@@ -84,6 +87,9 @@
       openProjectTabs.push(initialTab);
       setActiveOpenProjectTabId?.(initialTab.id);
       setSuppressOpenProjectTabAutoInitialize?.(false);
+      replaceActiveProjectSessionFromTab?.(initialTab, {
+        phase: 'initial-project-session',
+      });
       renderOpenProjectTabs?.();
     }
 
@@ -105,19 +111,6 @@
       if (!projectHomeVisible) {
         return;
       }
-      scheduleRecentProjectsListRender?.(Array.from(recentProjectsCache.values()), { immediate: true });
-      if (refresh && AUTOSAVE_SUPPORTED) {
-        refreshRecentProjectsUI?.().catch(error => {
-          console.warn('Failed to refresh project home list', error);
-        });
-      }
-      if (AUTOSAVE_SUPPORTED) {
-        window.setTimeout(() => {
-          maybePromptAndTransferRecentProjectsFromHome?.().catch(error => {
-            console.warn('Failed to prompt project transfer from home', error);
-          });
-        }, 0);
-      }
       window.requestAnimationFrame(() => {
         screen?.focus?.({ preventScroll: true });
       });
@@ -133,7 +126,13 @@
     }
 
     function hideProjectHomeScreen() {
-      if (!getProjectHomeVisible?.()) {
+      const screen = dom?.projectHomeScreen;
+      const visiblyOpen = screen instanceof HTMLElement && screen.hidden === false;
+      const classStillActive = document.body?.classList.contains('is-project-home-active') === true;
+      // A startup transition or interstitial can leave the home DOM visible
+      // after its state flag changed. Clear the actual layer as well, or it
+      // continues to sit above project tabs and intercepts their clicks.
+      if (!getProjectHomeVisible?.() && !visiblyOpen && !classStillActive) {
         return;
       }
       setProjectHomeVisible(false);
@@ -149,9 +148,6 @@
 
     function appendOpenProjectTabFromCurrentState(options = {}) {
       ensureOpenProjectTabsInitialized();
-      if (openProjectTabs.length >= MAX_PROJECT_SHEETS) {
-        return null;
-      }
       const tab = createOpenProjectTabFromCurrentState({
         source: options.source || 'open',
         projectId: (typeof options.projectId !== 'undefined')
@@ -164,6 +160,13 @@
         sharedRoleHint: options.sharedRoleHint,
         sharedAutoJoin: options.sharedAutoJoin,
         qrEditPayload: options.qrEditPayload,
+        sourceStorageAdapterId: options.sourceStorageAdapterId,
+        sourceKind: options.sourceKind,
+        sourceProjectToken: options.sourceProjectToken,
+        lastSavedStorageAdapterId: options.lastSavedStorageAdapterId,
+        canonicalPayloadFormat: options.canonicalPayloadFormat,
+        canonicalSchemaVersion: options.canonicalSchemaVersion,
+        canonicalSourceMetadata: options.canonicalSourceMetadata,
       });
       const normalizedTabProjectId = normalizeAutosaveProjectId(tab.projectId || '');
       if (options.dedupeByProjectId === true && normalizedTabProjectId) {
@@ -181,6 +184,11 @@
       if (options.activate !== false) {
         setActiveOpenProjectTabId?.(tab.id);
         setSuppressOpenProjectTabAutoInitialize?.(false);
+      }
+      if (options.activate !== false) {
+        replaceActiveProjectSessionFromTab?.(tab, {
+          phase: 'append-project-session',
+        });
       }
       renderOpenProjectTabs?.();
       return tab;
@@ -206,10 +214,34 @@
         sharedRoleHint: options.sharedRoleHint ?? current?.sharedRoleHint,
         sharedAutoJoin: options.sharedAutoJoin ?? current?.sharedAutoJoin,
         qrEditPayload: typeof options.qrEditPayload !== 'undefined' ? options.qrEditPayload : current?.qrEditPayload,
+        sourceStorageAdapterId: Object.prototype.hasOwnProperty.call(options, 'sourceStorageAdapterId')
+          ? options.sourceStorageAdapterId
+          : current?.sourceStorageAdapterId,
+        sourceKind: Object.prototype.hasOwnProperty.call(options, 'sourceKind')
+          ? options.sourceKind
+          : current?.sourceKind,
+        sourceProjectToken: Object.prototype.hasOwnProperty.call(options, 'sourceProjectToken')
+          ? options.sourceProjectToken
+          : current?.sourceProjectToken,
+        lastSavedStorageAdapterId: Object.prototype.hasOwnProperty.call(options, 'lastSavedStorageAdapterId')
+          ? options.lastSavedStorageAdapterId
+          : current?.lastSavedStorageAdapterId,
+        canonicalPayloadFormat: Object.prototype.hasOwnProperty.call(options, 'canonicalPayloadFormat')
+          ? options.canonicalPayloadFormat
+          : current?.canonicalPayloadFormat,
+        canonicalSchemaVersion: Object.prototype.hasOwnProperty.call(options, 'canonicalSchemaVersion')
+          ? options.canonicalSchemaVersion
+          : current?.canonicalSchemaVersion,
+        canonicalSourceMetadata: Object.prototype.hasOwnProperty.call(options, 'canonicalSourceMetadata')
+          ? options.canonicalSourceMetadata
+          : current?.canonicalSourceMetadata,
       });
       openProjectTabs[index] = updated;
       setActiveOpenProjectTabId?.(updated.id);
       setSuppressOpenProjectTabAutoInitialize?.(false);
+      replaceActiveProjectSessionFromTab?.(updated, {
+        phase: 'replace-project-session',
+      });
       renderOpenProjectTabs?.();
       return updated;
     }
@@ -240,7 +272,7 @@
       return true;
     }
 
-    async function persistActiveOpenProjectTab({ flushAutosave = false } = {}) {
+    async function persistActiveOpenProjectTab({ flushAutosave = false, retainProjectPayload = false } = {}) {
       ensureOpenProjectTabsInitialized();
       const activeOpenProjectTabId = getActiveOpenProjectTabId?.() || '';
       const index = findOpenProjectTabIndex(activeOpenProjectTabId);
@@ -253,8 +285,27 @@
       if (currentProjectId && normalizeAutosaveProjectId(getAutosaveProjectId?.() || '') !== currentProjectId) {
         setActiveAutosaveProjectId(currentProjectId, { persist: false });
       }
-      const updated = isSharedOpenProjectTab(current)
-        ? createOpenProjectTabFromCurrentState({
+      // A tab that has not changed already owns an immutable packaged payload.
+      // Recreating a history snapshot here clones every GIF frame just before
+      // it is replaced by the next sheet, which made ordinary tab switches
+      // more expensive than keeping the resident reference.
+      const canReuseResidentLocalPayload = Boolean(
+        !isSharedOpenProjectTab(current)
+        && !hasDocumentUnsavedChanges()
+        && (current?.project && typeof current.project === 'object'
+          || current?.deferredProjectPayload && typeof current.deferredProjectPayload === 'object')
+      );
+      let updated = canReuseResidentLocalPayload
+        ? {
+          ...current,
+          project: current.project || current.deferredProjectPayload,
+          deferredProjectPayload: current.deferredProjectPayload || current.project,
+          residentProjectLoaded: true,
+          unsaved: false,
+        }
+        : (isSharedOpenProjectTab(current)
+          && SHARED_PROJECTS_ENABLED
+          ? createOpenProjectTabFromCurrentState({
             tabId: current?.id || activeOpenProjectTabId,
             source: current?.source || 'working',
             projectId: currentProjectId,
@@ -266,12 +317,15 @@
             sharedAutoJoin: current?.sharedAutoJoin !== false,
             qrEditPayload: current?.qrEditPayload,
           })
-        : createLocalOpenProjectTabFromCurrentState(current, {
+          : createLocalOpenProjectTabFromCurrentState(current, {
             tabId: current?.id || activeOpenProjectTabId,
             source: current?.source || 'working',
             projectId: currentProjectId,
             qrEditPayload: current?.qrEditPayload,
-          });
+          }));
+      // createLocalOpenProjectTabFromCurrentState already creates the resident
+      // payload.  Rebuilding it here created a second full history snapshot on
+      // every local sheet switch.
       openProjectTabs[index] = updated;
       setActiveOpenProjectTabId?.(updated.id);
       renderOpenProjectTabs?.();
@@ -295,22 +349,31 @@
     }
 
     function resetOpenProjectTabsToCurrentProject(options = {}) {
-      const sharedFieldsEnabled = SHARED_PROJECTS_ENABLED;
       const tab = createOpenProjectTabFromCurrentState({
         source: options.source || 'working',
         projectId: options.projectId || getAutosaveProjectId?.(),
         label: options.label || localizeText('シート 1', 'Sheet 1'),
-        sharedProjectKey: sharedFieldsEnabled ? options.sharedProjectKey : '',
-        sharedProjectBackendId: sharedFieldsEnabled ? options.sharedProjectBackendId : '',
-        sharedProjectRevision: sharedFieldsEnabled ? options.sharedProjectRevision : 0,
-        sharedProjectStructureRevision: sharedFieldsEnabled ? options.sharedProjectStructureRevision : 0,
-        sharedRoleHint: sharedFieldsEnabled ? options.sharedRoleHint : '',
-        sharedAutoJoin: sharedFieldsEnabled ? options.sharedAutoJoin : false,
+        sharedProjectKey: SHARED_PROJECTS_ENABLED ? options.sharedProjectKey : '',
+        sharedProjectBackendId: SHARED_PROJECTS_ENABLED ? options.sharedProjectBackendId : '',
+        sharedProjectRevision: SHARED_PROJECTS_ENABLED ? options.sharedProjectRevision : 0,
+        sharedProjectStructureRevision: SHARED_PROJECTS_ENABLED ? options.sharedProjectStructureRevision : 0,
+        sharedRoleHint: SHARED_PROJECTS_ENABLED ? options.sharedRoleHint : '',
+        sharedAutoJoin: SHARED_PROJECTS_ENABLED ? options.sharedAutoJoin : false,
         qrEditPayload: options.qrEditPayload,
+        sourceStorageAdapterId: options.sourceStorageAdapterId,
+        sourceKind: options.sourceKind,
+        sourceProjectToken: options.sourceProjectToken,
+        lastSavedStorageAdapterId: options.lastSavedStorageAdapterId,
+        canonicalPayloadFormat: options.canonicalPayloadFormat,
+        canonicalSchemaVersion: options.canonicalSchemaVersion,
+        canonicalSourceMetadata: options.canonicalSourceMetadata,
       });
       openProjectTabs.splice(0, openProjectTabs.length, tab);
       setActiveOpenProjectTabId?.(tab.id);
       setSuppressOpenProjectTabAutoInitialize?.(false);
+      replaceActiveProjectSessionFromTab?.(tab, {
+        phase: 'reset-project-session',
+      });
       renderOpenProjectTabs?.();
       return tab;
     }
@@ -328,7 +391,7 @@
       openProjectTabs.splice(0, openProjectTabs.length);
       setActiveOpenProjectTabId?.('');
       setSuppressOpenProjectTabAutoInitialize?.(true);
-      if (getActiveSharedProjectKey?.()) {
+      if (SHARED_PROJECTS_ENABLED && getActiveSharedProjectKey?.()) {
         clearActiveSharedProjectSession?.('project-replace');
       }
       if (showHome) {

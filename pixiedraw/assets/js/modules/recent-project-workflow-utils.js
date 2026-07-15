@@ -104,8 +104,21 @@
           nextEntry.updatedAt = nowIso;
         }
         seenIds.add(normalizedId);
-        changed = true;
-        repairedCount += 1;
+        const isV2Reference = Number(original.autosaveSchemaVersion) === 2
+          && typeof original.manifestKey === 'string'
+          && original.manifestKey.length > 0;
+        entryChanged = entryChanged
+          || nextEntry.accountUserId !== original.accountUserId
+          || nextEntry.fileName !== original.fileName
+          || nextEntry.name !== original.name
+          || nextEntry.storageKind !== original.storageKind
+          || !Number.isFinite(parsedUpdatedAt);
+        if (entryChanged) {
+          changed = true;
+          repairedCount += 1;
+        } else if (!isV2Reference && !original.handle) {
+          nextEntry.openError = 'missing-project-payload';
+        }
         sanitizedEntries.push(nextEntry);
         continue;
       }
@@ -205,6 +218,9 @@
       return false;
     }
     await saveRecentProjectsList(existingEntries, nextEntries);
+    if (Number(removedEntry?.autosaveSchemaVersion) === 2) {
+      await removeAutosaveV2ProjectData?.(normalizedId);
+    }
     setRecentProjectsCache(nextEntries);
     closeOpenProjectTabsForDeletedProject({
       projectId: normalizedId,
@@ -498,15 +514,20 @@
   }
 
   function renderRecentProjectsList(entries) {
+    console.info('[pixiedraw:recent-projects]', {
+      phase: 'recent-projects-render-start',
+      count: Array.isArray(entries) ? entries.length : 0,
+      hasContainer: Boolean(dom.startup?.recentList || dom.projectHomeRecentList),
+      containerHidden: Boolean(dom.startup?.recentSection?.hidden && dom.projectHomeRecentSection?.hidden),
+      code: '',
+    });
     const hasEntries = Array.isArray(entries) && entries.length > 0;
     const targets = [
       {
         section: dom.startup?.recentSection,
         list: dom.startup?.recentList,
         titleSelector: '.startup-screen__recent-title',
-        title: isStartupScreenAppendTabMode()
-          ? localizeText('プロジェクト一覧', 'Projects')
-          : localizeText('端末内プロジェクト（自動保存）', 'Local Projects (Autosave)'),
+        title: localizeText('端末内プロジェクト（自動保存）', 'Local Projects (Autosave)'),
       },
       {
         section: dom.projectHomeRecentSection,
@@ -516,6 +537,8 @@
       },
     ].filter(target => target.section instanceof HTMLElement && target.list instanceof HTMLElement);
     if (!targets.length) {
+      // Recent projects remain durable local metadata even when this view is
+      // not mounted yet.
       return;
     }
     const renderProjectHomeEmptyState = target => {
@@ -552,6 +575,7 @@
       });
       updatePixieedAccountUi();
       syncPixieedSupportBenefitUi();
+      console.info('[pixiedraw:recent-projects]', { phase: 'recent-projects-render-success', count: Array.isArray(entries) ? entries.length : 0, hasContainer: true, containerHidden: Boolean(dom.startup?.recentSection?.hidden), code: '' });
       return;
     }
     targets.forEach(target => {
@@ -654,7 +678,7 @@
       return card;
     };
     const createProjectHomeAdCard = () => {
-      if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) {
+      if (!window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.()) {
         return null;
       }
       const card = document.createElement('article');
@@ -671,9 +695,10 @@
       const ad = document.createElement('ins');
       ad.className = 'startup-recent-card__ad-ins';
       ad.setAttribute('data-ad-client', 'ca-pub-9801602250480253');
-      ad.setAttribute('data-ad-format', 'auto');
+      ad.setAttribute('data-ad-format', 'rectangle');
       ad.setAttribute('data-ad-slot', '2141591954');
-      ad.setAttribute('data-full-width-responsive', 'true');
+      ad.setAttribute('data-full-width-responsive', 'false');
+      ad.dataset.pixieedAdCard = 'true';
       ad.style.display = 'block';
       thumb.appendChild(ad);
       const nameNode = document.createElement('span');
@@ -713,6 +738,7 @@
         queueStartupRecentAdRender();
       });
     }
+    console.info('[pixiedraw:recent-projects]', { phase: 'recent-projects-render-success', count: entries.length, hasContainer: true, containerHidden: false, code: '' });
   }
 
   async function ensureSharedRecentProjectsAccountSynced({ force = false } = {}) {
@@ -752,11 +778,16 @@
   }
 
   async function refreshRecentProjectsUI(options = {}) {
+    console.info('[pixiedraw:recent-projects]', { phase: 'recent-projects-load-start', count: 0, hasContainer: Boolean(dom.startup?.recentList || dom.projectHomeRecentList), containerHidden: Boolean(dom.startup?.recentSection?.hidden && dom.projectHomeRecentSection?.hidden), code: '' });
     const hasRecentList = (
       (dom.startup?.recentSection instanceof HTMLElement && dom.startup?.recentList instanceof HTMLElement)
       || (dom.projectHomeRecentSection instanceof HTMLElement && dom.projectHomeRecentList instanceof HTMLElement)
     );
     if (!hasRecentList) {
+      // The editor deliberately has no local-project list. Project browsing
+      // lives in PiXiEED My Page, so a missing list is an expected UI shape,
+      // not a storage failure.
+      console.info('[pixiedraw:recent-projects]', { phase: 'recent-projects-load-skipped', count: recentProjectsCache.size, hasContainer: false, containerHidden: true, code: 'RECENT_UI_REMOVED' });
       return;
     }
     if (!AUTOSAVE_SUPPORTED) {
@@ -770,6 +801,7 @@
         dom.startup.recentSection.hidden = true;
       }
       renderRecentProjectsList([]);
+      console.info('[pixiedraw:recent-projects]', { phase: 'recent-projects-load-success', count: 0, hasContainer: true, containerHidden: true, code: 'AUTOSAVE_UNSUPPORTED' });
       return;
     }
     if (options?.syncSharedFromAccount !== false) {
@@ -782,6 +814,7 @@
     const shouldSanitize = options?.sanitize !== false;
     if (shouldSanitize) {
       await sanitizeRecentProjectsStore({ announce: false });
+      console.info('[pixiedraw:recent-projects]', { phase: 'recent-projects-load-success', count: recentProjectsCache.size, hasContainer: true, containerHidden: Boolean(dom.startup?.recentSection?.hidden), code: 'SANITIZED' });
       return;
     }
     const entries = await loadRecentProjectsMetadata();
@@ -790,6 +823,7 @@
       await saveRecentProjectsList(entries, limitedEntries);
     }
     setRecentProjectsCache(limitedEntries);
+    console.info('[pixiedraw:recent-projects]', { phase: 'recent-projects-load-success', count: limitedEntries.length, hasContainer: true, containerHidden: Boolean(dom.startup?.recentSection?.hidden), code: '' });
   }
 
 

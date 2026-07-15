@@ -90,6 +90,13 @@ function commitHistory() {
       } else {
         history.past.push(historyEntry);
       }
+      if (!isSharedProjectCollaborativeMode()) {
+        noteActiveLocalProjectHistoryEntry?.(
+          normalizeAutosaveProjectId?.(autosaveProjectId || '') || '',
+          historyEntry,
+          pendingLabel
+        );
+      }
       const recordedTimelapseOperation = recordTimelapseOperationLogEntry(historyEntry, pendingLabel);
       const activeTimelapseTrack = getActiveTimelapseTrack();
       if (
@@ -122,9 +129,13 @@ function commitHistory() {
         }
       }
       if (history.past.length > history.limit) {
-        history.past.shift();
+        archiveEvictedHistoryEntry('past', history.past.shift());
+      }
+      if (history.future.length || hasColdHistoryEntries('future')) {
+        clearColdHistoryDirection('future');
       }
       history.future.length = 0;
+      trimHistoryToByteBudget?.();
       if (isLargeDocumentPerformanceMode()) {
         scheduleAutosaveSnapshot();
       } else {
@@ -211,13 +222,18 @@ function undo() {
       }
     }
 
-    if (!history.past.length) return;
+    if (!history.past.length) {
+      if (hasColdHistoryEntries('past')) {
+        requestColdHistoryRefill('past');
+      }
+      return;
+    }
     const previous = history.past.pop();
     const historyLabel = getHistoryEntryLabel(previous);
     if (isPixelPatchHistoryEntry(previous)) {
       history.future.push(previous);
       if (history.future.length > history.limit) {
-        history.future.shift();
+        archiveEvictedHistoryEntry('future', history.future.shift());
       }
       if (!applyPixelPatchHistoryEntry(previous, 'undo')) {
         history.future.pop();
@@ -227,6 +243,9 @@ function undo() {
       updateHistoryButtons();
       markAutosaveDirty();
       markDocumentUnsavedChange();
+      markActiveLocalProjectJournalNeedsCheckpoint?.(
+        normalizeAutosaveProjectId?.(autosaveProjectId || '') || ''
+      );
       scheduleAutosaveSnapshot();
       scheduleQrEditReadabilityCheck();
       if (isSharedProjectCollaborativeMode()) {
@@ -259,7 +278,7 @@ function undo() {
     );
     history.future.push(snapshot);
     if (history.future.length > history.limit) {
-      history.future.shift();
+      archiveEvictedHistoryEntry('future', history.future.shift());
     }
     const sharedUndoOpType = classifySharedProjectOpType(historyLabel);
     applyHistorySnapshot(decompressHistorySnapshot(previous), {
@@ -338,11 +357,14 @@ function redo() {
                 canvasId: activeCanvasId,
                 restoreSelection: true,
               });
-          if (applied) {
-            updateHistoryButtons();
-            markAutosaveDirty();
-            markDocumentUnsavedChange();
-            scheduleAutosaveSnapshot();
+    if (applied) {
+      updateHistoryButtons();
+      markAutosaveDirty();
+      markDocumentUnsavedChange();
+      markActiveLocalProjectJournalNeedsCheckpoint?.(
+        normalizeAutosaveProjectId?.(autosaveProjectId || '') || ''
+      );
+      scheduleAutosaveSnapshot();
             scheduleQrEditReadabilityCheck();
             try {
               if (sharedScopedHistory) {
@@ -367,13 +389,18 @@ function redo() {
       }
     }
 
-    if (!history.future.length) return;
+    if (!history.future.length) {
+      if (hasColdHistoryEntries('future')) {
+        requestColdHistoryRefill('future');
+      }
+      return;
+    }
     const next = history.future.pop();
     const historyLabel = getHistoryEntryLabel(next);
     if (isPixelPatchHistoryEntry(next)) {
       history.past.push(next);
       if (history.past.length > history.limit) {
-        history.past.shift();
+        archiveEvictedHistoryEntry('past', history.past.shift());
       }
       if (!applyPixelPatchHistoryEntry(next, 'redo')) {
         history.past.pop();
@@ -383,6 +410,9 @@ function redo() {
       updateHistoryButtons();
       markAutosaveDirty();
       markDocumentUnsavedChange();
+      markActiveLocalProjectJournalNeedsCheckpoint?.(
+        normalizeAutosaveProjectId?.(autosaveProjectId || '') || ''
+      );
       scheduleAutosaveSnapshot();
       scheduleQrEditReadabilityCheck();
       if (isSharedProjectCollaborativeMode()) {
@@ -415,7 +445,7 @@ function redo() {
     );
     history.past.push(snapshot);
     if (history.past.length > history.limit) {
-      history.past.shift();
+      archiveEvictedHistoryEntry('past', history.past.shift());
     }
     const sharedRedoOpType = classifySharedProjectOpType(historyLabel);
     applyHistorySnapshot(decompressHistorySnapshot(next), {
@@ -496,8 +526,8 @@ function updateHistoryButtons() {
         return;
       }
       if (!multiState.connected) {
-        if (dom.controls.undoAction) dom.controls.undoAction.disabled = history.past.length === 0;
-        if (dom.controls.redoAction) dom.controls.redoAction.disabled = history.future.length === 0;
+        if (dom.controls.undoAction) dom.controls.undoAction.disabled = history.past.length === 0 && !hasColdHistoryEntries('past');
+        if (dom.controls.redoAction) dom.controls.redoAction.disabled = history.future.length === 0 && !hasColdHistoryEntries('future');
         return;
       }
       const bucket = getMultiHistoryBucket(multiState.clientId || '', getActiveProjectCanvasDocument()?.id || '');

@@ -25,6 +25,7 @@
     invalidateFillPreviewCache,
     invalidateOnionSkinCache,
     clearPlaybackFrameCache,
+    markDirtyRect,
     requestRender,
     requestOverlayRender,
     renderAllProjectCanvasSurfaces,
@@ -230,11 +231,12 @@
         layer.direct[base + 2] = 0;
         layer.direct[base + 3] = 0;
       }
-      if (Array.isArray(value.importSourceDirect) && value.importSourceDirect.length === 4) {
-        const length = Math.max(1, width * height) * 4;
-        if (!(layer.importSourceDirect instanceof Uint8ClampedArray) || layer.importSourceDirect.length !== length) {
-          layer.importSourceDirect = new Uint8ClampedArray(length);
-        }
+      if (
+        Array.isArray(value.importSourceDirect)
+        && value.importSourceDirect.length === 4
+        && layer.importSourceDirect instanceof Uint8ClampedArray
+        && layer.importSourceDirect.length === Math.max(1, width * height) * 4
+      ) {
         layer.importSourceDirect[base] = clamp(Math.round(Number(value.importSourceDirect[0]) || 0), 0, 255);
         layer.importSourceDirect[base + 1] = clamp(Math.round(Number(value.importSourceDirect[1]) || 0), 0, 255);
         layer.importSourceDirect[base + 2] = clamp(Math.round(Number(value.importSourceDirect[2]) || 0), 0, 255);
@@ -257,13 +259,28 @@
       }
       const useAfter = direction === 'redo';
       let applied = false;
+      let dirtyX0 = target.width;
+      let dirtyY0 = target.height;
+      let dirtyX1 = -1;
+      let dirtyY1 = -1;
       for (let index = 0; index < changes.length; index += 1) {
         const change = changes[index];
         const value = useAfter ? change?.after : change?.before;
         if (!value) {
           continue;
         }
-        applied = writeLayerPixelPatchValue(target.layer, change.index, value, target.width, target.height) || applied;
+        const changeApplied = writeLayerPixelPatchValue(target.layer, change.index, value, target.width, target.height);
+        if (!changeApplied) {
+          continue;
+        }
+        applied = true;
+        const safeIndex = Math.max(0, Math.round(Number(change.index) || 0));
+        const x = safeIndex % target.width;
+        const y = Math.floor(safeIndex / target.width);
+        if (x < dirtyX0) dirtyX0 = x;
+        if (y < dirtyY0) dirtyY0 = y;
+        if (x > dirtyX1) dirtyX1 = x;
+        if (y > dirtyY1) dirtyY1 = y;
       }
       if (!applied) {
         return false;
@@ -271,9 +288,23 @@
       invalidateFillPreviewCache();
       invalidateOnionSkinCache();
       clearPlaybackFrameCache();
-      requestRender();
+      const activeCanvasId = String(getActiveProjectCanvasDocument()?.id || '');
+      const targetCanvasId = String(target.canvasDoc?.id || '');
+      const targetsActiveCanvas = Boolean(activeCanvasId && targetCanvasId === activeCanvasId);
+      if (targetsActiveCanvas) {
+        if (dirtyX1 >= dirtyX0 && dirtyY1 >= dirtyY0) {
+          markDirtyRect?.(dirtyX0, dirtyY0, dirtyX1, dirtyY1);
+        }
+        requestRender();
+      }
       requestOverlayRender();
-      renderAllProjectCanvasSurfaces();
+      const requiresAllSurfaceRefresh = !targetsActiveCanvas
+        || multiState.connected
+        || Boolean(getActiveSharedProjectKey?.())
+        || isSharedProjectCollaborativeMode();
+      if (requiresAllSurfaceRefresh) {
+        renderAllProjectCanvasSurfaces();
+      }
       return true;
     }
 

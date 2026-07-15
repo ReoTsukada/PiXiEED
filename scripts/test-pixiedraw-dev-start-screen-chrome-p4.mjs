@@ -25,7 +25,7 @@ assert.match(styleSource, /\.startup-screen__backdrop \{[\s\S]*?transparent 62%\
 assert.match(styleSource, /body\.is-startup-active \.bottom-nav,[\s\S]*?z-index: 15020 !important/);
 assert.match(styleSource, /@media \(max-width: 430px\) \{[\s\S]*?\.startup-screen \{[\s\S]*?calc\(12px \+ var\(--safe-area-left\)\)/);
 assert.match(styleSource, /@media \(max-width: 430px\) \{[\s\S]*?\.startup-screen__actions \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\)/);
-assert.match(indexSource, /build-info\.js\?v=20260715-094/);
-assert.match(indexSource, /app\.js\?v=20260715-094/);
+assert.match(indexSource, /build-info\.js\?v=20260715-095/);
+assert.match(indexSource, /app\.js\?v=20260715-095/);
 
 console.log('PiXiEEDrawDEV start-screen chrome checks passed');

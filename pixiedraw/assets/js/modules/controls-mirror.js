@@ -307,7 +307,6 @@
 
   function applyLayoutMode() {
     const isMobile = layoutMode === 'mobilePortrait';
-    const desktopRightTools = !isMobile && isDesktopRightToolRailMode();
     if (isMobile || !isDualLeftRailEnabled()) {
       endLeftDualSplitResize({ persist: false });
     }
@@ -343,9 +342,9 @@
       if (isMobile && dom.mobileShortcutsMount) {
         dom.canvasControls.dataset.mobile = 'true';
         dom.mobileShortcutsMount.appendChild(dom.canvasControls);
-      } else if (desktopRightTools && dom.projectTabsActions instanceof HTMLElement) {
+      } else if (!isMobile && dom.editorCommandLaneActions instanceof HTMLElement) {
         delete dom.canvasControls.dataset.mobile;
-        dom.projectTabsActions.appendChild(dom.canvasControls);
+        dom.editorCommandLaneActions.appendChild(dom.canvasControls);
       } else if (!isMobile && canvasControlsDefaultParent) {
         delete dom.canvasControls.dataset.mobile;
         if (canvasControlsDefaultNextSibling && canvasControlsDefaultNextSibling.parentNode === canvasControlsDefaultParent) {
@@ -356,8 +355,8 @@
       }
     }
     if (dom.rightUtilityMenu instanceof HTMLElement) {
-      if (desktopRightTools && dom.projectTabsActions instanceof HTMLElement) {
-        dom.projectTabsActions.appendChild(dom.rightUtilityMenu);
+      if (!isMobile && dom.editorCommandLaneActions instanceof HTMLElement) {
+        dom.editorCommandLaneActions.appendChild(dom.rightUtilityMenu);
       } else if (rightUtilityMenuDefaultParent instanceof HTMLElement) {
         if (
           rightUtilityMenuDefaultNextSibling
@@ -1968,42 +1967,6 @@
     };
     dom.controls.toggleCanvasResizeHandles?.addEventListener('change', handleCanvasResizeHandlesToggleInput);
     dom.controls.toggleCanvasResizeHandles?.addEventListener('input', handleCanvasResizeHandlesToggleInput);
-    const handleLocalCanvasToggleInput = event => {
-      if (!(event.target instanceof HTMLInputElement)) {
-        return;
-      }
-      if (!MULTI_CANVAS_FEATURE_ENABLED) {
-        event.target.checked = false;
-        setLocalViewportCanvasCount(0, { persist: true, announce: false });
-        return;
-      }
-      if (!canCurrentClientEditProjectStructure({ announce: true })) {
-        event.target.checked = getLocalViewportCanvasCount() > 0;
-        if (!isSharedProjectCollaborativeMode()) {
-          announceMultiCanvasEditRestriction();
-        }
-        syncControlsWithState();
-        return;
-      }
-      if (isVoxelExtensionModeEnabled()) {
-        event.target.checked = getLocalViewportCanvasCount() > 0;
-        updateAutosaveStatus(
-          localizeText('ボクセルモード中は通常のマルチキャンバス数を変更できません', 'Standard multi-canvas controls are locked while voxel mode is enabled'),
-          'info'
-        );
-        syncControlsWithState();
-        return;
-      }
-      const enabled = Boolean(event.target.checked);
-      const currentCount = normalizeLocalViewportCanvasState(
-        localViewportCanvasState,
-        LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE
-      ).count;
-      const nextCount = enabled ? Math.max(1, currentCount) : 0;
-      setLocalViewportCanvasCount(nextCount, { persist: true, announce: false, recordHistory: true });
-    };
-    dom.controls.toggleLocalCanvas?.addEventListener('change', handleLocalCanvasToggleInput);
-    dom.controls.toggleLocalCanvas?.addEventListener('input', handleLocalCanvasToggleInput);
     const handleVoxelExtensionToggleInput = event => {
       if (!(event.target instanceof HTMLInputElement)) {
         return;
@@ -2163,6 +2126,22 @@
     dom.controls.openUpdateHistory?.addEventListener('click', () => {
       openUpdateHistoryDialog();
     });
+    if (document.body?.dataset.detailPanelDialogFallbackBound !== 'true') {
+      document.body.dataset.detailPanelDialogFallbackBound = 'true';
+      document.addEventListener('click', event => {
+        const target = event.target instanceof Element ? event.target.closest('#openShortcutHelp, #openOperationHelpPanel, #openUpdateHistory') : null;
+        if (!(target instanceof HTMLButtonElement) || target.disabled) {
+          return;
+        }
+        if (target.id === 'openShortcutHelp') {
+          openShortcutHelpDialog();
+        } else if (target.id === 'openOperationHelpPanel') {
+          openOperationHelpPanel();
+        } else if (target.id === 'openUpdateHistory') {
+          openUpdateHistoryDialog();
+        }
+      });
+    }
     dom.controls.closeShortcutHelp?.addEventListener('click', () => {
       closeShortcutHelpDialog();
     });

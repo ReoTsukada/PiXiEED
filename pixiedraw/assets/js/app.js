@@ -3,8 +3,10 @@
     return;
   }
 
-  // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.07.12-rgb-index-palette-fix1';
+  // The build-info script is loaded before app.js. Keep legacy consumers on
+  // the same build identity without defining a second version source here.
+  const APP_BUILD_INFO = window.__PIXIEEDRAW_BUILD_INFO__ || {};
+  const APP_BUILD_VERSION = String(APP_BUILD_INFO.buildId || 'unknown-build');
   const APP_SW_VERSION = APP_BUILD_VERSION;
   const SHARED_PROJECTS_ENABLED = false;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
@@ -58,11 +60,11 @@
   function isImportableImageFile(file) {
     if (!file) return false;
     const type = typeof file.type === 'string' ? file.type.toLowerCase() : '';
-    if (type === 'image/png' || type === 'image/gif') {
+    if (type === 'image/png' || type === 'image/gif' || type === 'image/jpeg' || type === 'image/webp') {
       return true;
     }
     const name = typeof file.name === 'string' ? file.name.toLowerCase() : '';
-    return name.endsWith('.png') || name.endsWith('.gif');
+    return name.endsWith('.png') || name.endsWith('.gif') || name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.webp');
   }
 
   const dom = {
@@ -145,7 +147,7 @@
     projectTabsBar: document.getElementById('projectTabsBar'),
     projectTabsStatusSlot: document.getElementById('projectTabsStatusSlot'),
     projectTabsList: document.getElementById('projectTabsList'),
-    projectTabsActions: document.getElementById('projectTabsActions'),
+    editorCommandLaneActions: document.getElementById('editorCommandLaneActions'),
     projectHomeScreen: document.getElementById('projectHomeScreen'),
     projectHomeNew: document.getElementById('projectHomeNew'),
     projectHomeOpen: document.getElementById('projectHomeOpen'),
@@ -340,12 +342,6 @@
       toggleVirtualCursor: document.getElementById('toggleVirtualCursor'),
       toggleFloatingPreview: document.getElementById('toggleFloatingPreview'),
       toggleCanvasResizeHandles: document.getElementById('toggleCanvasResizeHandles'),
-      toggleLocalCanvas: document.getElementById('toggleLocalCanvas'),
-      addLocalCanvas: document.getElementById('addLocalCanvas'),
-      removeLocalCanvas: document.getElementById('removeLocalCanvas'),
-      localCanvasCountControls: document.getElementById('localCanvasCountControls'),
-      localCanvasCountLabel: document.getElementById('localCanvasCountLabel'),
-      localCanvasCountValue: document.getElementById('localCanvasCountValue'),
       toggleVoxelExtensionMode: document.getElementById('toggleVoxelExtensionMode'),
       voxelPreviewYaw: document.getElementById('voxelPreviewYaw'),
       voxelPreviewYawValue: document.getElementById('voxelPreviewYawValue'),
@@ -390,11 +386,7 @@
       sendToPixfind: document.getElementById('sendToPixfind'),
       pixfindActionReason: document.getElementById('pixfindActionReason'),
       clearCanvas: document.getElementById('clearCanvas'),
-      enableAutosave: document.getElementById('enableAutosave'),
       autosaveStatus: document.getElementById('autosaveStatus'),
-      bindExportFolder: document.getElementById('bindExportFolder'),
-      exportFolderStatus: document.getElementById('exportFolderStatus'),
-      exportDestinationLabel: document.getElementById('exportDestinationLabel'),
       timelapseClear: document.getElementById('timelapseClear'),
       timelapseFps: document.getElementById('timelapseFps'),
       timelapseStatus: document.getElementById('timelapseStatus'),
@@ -505,7 +497,6 @@
       multiBlockedRemove: document.getElementById('multiBlockedRemove'),
       multiBlockedHint: document.getElementById('multiBlockedHint'),
       supportTipLink: document.getElementById('supportTipLink'),
-      adFreeField: document.getElementById('pixieedAdFreeField'),
       pwaInstallField: document.getElementById('pixieedPwaInstallField'),
       pwaInstallStatus: document.getElementById('pixieedPwaInstallStatus'),
       pwaInstallButton: document.getElementById('pixieedPwaInstallButton'),
@@ -526,8 +517,10 @@
       openButton: document.getElementById('startupActionOpen'),
       quickSetupButton: document.getElementById('startupActionQuickSetup'),
       skipButton: document.getElementById('startupActionSkip'),
-      hint: document.getElementById('startupScreenHint'),
       quickSetupStatus: document.getElementById('startupQuickSetupStatus'),
+      workspace: document.getElementById('startupWorkspace'),
+      workspaceStatus: document.getElementById('startupWorkspaceStatus'),
+      workspaceProjectList: document.getElementById('startupWorkspaceProjectList'),
       recentSection: document.getElementById('startupRecentProjects'),
       recentList: document.getElementById('startupRecentList'),
       recentAdContainer: document.getElementById('startupRecentAdContainer'),
@@ -551,8 +544,6 @@
       modeLocal: document.getElementById('newProjectModeLocal'),
       modeShared: document.getElementById('newProjectModeShared'),
       modeButtons: Array.from(document.querySelectorAll('#newProjectDialog [data-create-mode]')),
-      bindExportFolder: document.getElementById('newProjectBindExportFolder'),
-      exportDestinationLabel: document.getElementById('newProjectExportDestinationLabel'),
       adContainer: document.getElementById('newProjectAdContainer'),
       adSlot: document.getElementById('newProjectAdSlot'),
       cancel: document.getElementById('cancelNewProject'),
@@ -574,6 +565,10 @@
       saveProjectCompanionRow: document.getElementById('exportCompanionOptionRow'),
       saveSpriteMapCompanionToggle: document.getElementById('exportSpriteMapCompanionToggle'),
       saveSpriteMapCompanionRow: document.getElementById('exportSpriteMapCompanionOptionRow'),
+      gridSplitToggle: document.getElementById('exportGridSplitToggle'),
+      gridSplitRow: document.getElementById('exportGridSplitOptionRow'),
+      timelapseToggle: document.getElementById('exportTimelapseToggle'),
+      timelapseRow: document.getElementById('exportTimelapseOptionRow'),
       contestPostToggle: document.getElementById('exportContestPostToggle'),
       contestPostRow: document.getElementById('exportContestPostOptionRow'),
       spriteMapColorSpritesToggle: document.getElementById('exportSpriteMapColorSpritesToggle'),
@@ -617,6 +612,14 @@
       cancel: document.getElementById('globalHistoryConfirmCancel'),
       confirm: document.getElementById('globalHistoryConfirmConfirm'),
     },
+    startupRecovery: {
+      dialog: /** @type {HTMLDialogElement|null} */ (document.getElementById('startupRecoveryDialog')),
+      message: document.getElementById('startupRecoveryMessage'),
+      detail: document.getElementById('startupRecoveryDetail'),
+      later: document.getElementById('startupRecoveryLater'),
+      restore: document.getElementById('startupRecoveryRestore'),
+      delete: document.getElementById('startupRecoveryDelete'),
+    },
     recentProjectDeleteConfirm: {
       dialog: /** @type {HTMLDialogElement|null} */ (document.getElementById('recentProjectDeleteConfirmDialog')),
       title: document.getElementById('recentProjectDeleteConfirmTitle'),
@@ -624,6 +627,13 @@
       detail: document.getElementById('recentProjectDeleteConfirmDetail'),
       cancel: document.getElementById('recentProjectDeleteConfirmCancel'),
       confirm: document.getElementById('recentProjectDeleteConfirmConfirm'),
+    },
+    legacyProjectMigration: {
+      dialog: /** @type {HTMLDialogElement|null} */ (document.getElementById('legacyProjectMigrationDialog')),
+      message: document.getElementById('legacyProjectMigrationMessage'),
+      detail: document.getElementById('legacyProjectMigrationDetail'),
+      cancel: document.getElementById('legacyProjectMigrationCancel'),
+      confirm: document.getElementById('legacyProjectMigrationConfirm'),
     },
     shareStartConfirm: {
       dialog: /** @type {HTMLDialogElement|null} */ (document.getElementById('shareStartConfirmDialog')),
@@ -710,11 +720,9 @@
     TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE,
     TOOL_ACTION_MIRROR_POPUP,
     TOOL_ACTION_CAMERA_MODE,
-    TOOL_ACTION_LOCAL_CANVAS_TOGGLE,
     TOOL_ACTION_FLOATING_PREVIEW_TOGGLE,
     TOP_UI_ACTION_MIRROR_POPUP,
     TOP_UI_ACTION_VIRTUAL_CURSOR_TOGGLE,
-    TOP_UI_ACTION_LOCAL_CANVAS_TOGGLE,
     TOP_UI_ACTION_FLOATING_PREVIEW_TOGGLE,
     TOP_UI_ACTION_OPEN_LENS_CAMERA,
     TOP_UI_ACTION_OPEN_QR_EDITOR,
@@ -734,7 +742,6 @@
   } = toolActionStaticConfig;
   const toolbarStaticConfig = window.PiXiEEDrawModules?.uiStaticConfig?.createToolbarStaticConfig?.({
     TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE,
-    TOOL_ACTION_LOCAL_CANVAS_TOGGLE,
     TOOL_ACTION_FLOATING_PREVIEW_TOGGLE,
     TOOL_ACTION_MIRROR_POPUP,
     TOOL_SHORTCUT_SHAPE_GROUP,
@@ -800,10 +807,6 @@
     MAX_EXPORT_SCALE_OPTIONS,
     MAX_SELECTION_CANVAS_DIMENSION,
     TARGET_EXPORT_OUTPUT_SIZE,
-    NATIVE_FILESYSTEM_DIRECTORY_DOCUMENTS,
-    NATIVE_FILESYSTEM_DIRECTORY_DATA,
-    NATIVE_EXPORTS_SUBDIRECTORY,
-    NATIVE_PROJECTS_SUBDIRECTORY,
   } = appStaticConfig;
   const embedConfigUtilsModule = window.PiXiEEDrawModules?.embedConfigUtils?.createEmbedConfigUtils?.({
   get MAX_CANVAS_SIZE() { return MAX_CANVAS_SIZE; },
@@ -1134,10 +1137,7 @@
     USER_AGENT_LOWER,
     IS_IOS_DEVICE,
     IS_ANDROID_DEVICE,
-    DISABLE_FILE_SYSTEM_ACCESS_SAVE,
     AUTOSAVE_SUPPORTED,
-    FILE_HANDLE_AUTOSAVE_SUPPORTED,
-    EXPORT_DIRECTORY_SUPPORTED,
     SUPPORTS_ANCHOR_DOWNLOAD,
     DOWNLOAD_OBJECT_URL_REVOKE_DELAY_MS,
     CAN_USE_WEB_SHARE,
@@ -1161,22 +1161,9 @@
     SHARE_HASHTAG,
     IS_IOS_DEVICE,
     IS_ANDROID_DEVICE,
-    DISABLE_FILE_SYSTEM_ACCESS_SAVE,
     SUPPORTS_ANCHOR_DOWNLOAD,
     DOWNLOAD_OBJECT_URL_REVOKE_DELAY_MS,
     CAN_USE_WEB_SHARE,
-    NATIVE_FILESYSTEM_DIRECTORY_DOCUMENTS,
-    NATIVE_FILESYSTEM_DIRECTORY_DATA,
-    NATIVE_EXPORTS_SUBDIRECTORY,
-    isNativeAppRuntime: (...args) => isNativeAppRuntime(...args),
-    sanitizeNativeFilename: (...args) => sanitizeNativeFilename(...args),
-    normalizeNativeSubdirectory: (...args) => normalizeNativeSubdirectory(...args),
-    isLikelyFileAlreadyExistsError: (...args) => isLikelyFileAlreadyExistsError(...args),
-    isNativePhotoLibraryExportMimeType: (...args) => isNativePhotoLibraryExportMimeType(...args),
-    buildNumberedFilename: (...args) => buildNumberedFilename(...args),
-    resolveUniqueExportDirectoryFilename: (...args) => resolveUniqueExportDirectoryFilename(...args),
-    getFileHandleInExportDirectory: (...args) => getFileHandleInExportDirectory(...args),
-    getExportDirectoryHandle: () => exportDirectoryHandle,
   }) || {};
   const {
     canvasToBlob,
@@ -1184,21 +1171,11 @@
     appendShareHashtag,
     isStandaloneAppDisplayMode,
     isLightweightPersistenceMode,
-    getCapacitorRuntime,
-    getNativeFilesystemPlugin,
-    getNativeMediaPlugin,
-    blobToBase64Payload,
-    ensureNativeFilesystemDocumentsAccess,
-    writeBlobToNativeFilesystem,
-    writeBlobToNativePhotoLibrary,
     shareBlobFile,
-    writeBlobToExportDirectory,
     triggerDownloadFromBlob,
   } = exportDeliveryUtils;
 
   const NEW_PROJECT_IMMEDIATE_AUTOSAVE_ATTEMPTS = 2;
-  const MAX_OPEN_PROJECT_TABS = 5;
-  const MAX_PROJECT_SHEETS = 3;
   const ALWAYS_CONFIRM_BEFORE_CLOSE = true;
   const MOBILE_BACK_BUTTON_CONFIRM_ENABLED = true;
   const MOBILE_BACK_GUARD_STATE_KEY = '__pixieed_back_guard_v1';
@@ -1291,9 +1268,15 @@
     RECENT_PROJECTS_STORE,
     FLOATING_PREVIEW_REFERENCE_MEDIA_KEY_PREFIX,
     SHARED_LOCAL_OP_JOURNAL_STORE,
+    LOCAL_PROJECT_MANIFESTS_STORE,
+    LOCAL_PROJECT_SHEET_CHECKPOINTS_STORE,
+    LOCAL_PROJECT_JOURNALS_STORE,
+    LOCAL_PROJECT_THUMBNAILS_STORE,
+    LOCAL_PROJECT_CURRENT_MANIFESTS_STORE,
+    AUTOSAVE_SCHEMA_V2_DB_NAME,
+    AUTOSAVE_SCHEMA_V2_DB_VERSION,
     RECENT_PROJECT_STORAGE_LOCAL,
     RECENT_PROJECT_STORAGE_SHARED,
-    AUTOSAVE_HANDLE_KEY,
     AUTOSAVE_ACTIVE_PROJECT_KEY,
     AUTOSAVE_ACTIVE_PROJECT_SYNC_KEY,
     AUTOSAVE_TAB_LOCK_KEY,
@@ -1304,10 +1287,6 @@
     PALETTE_PRESET_BUTTON_SWATCH_FALLBACK,
     PALETTE_PRESET_BUTTON_SWATCH_STEP_PX,
     PALETTE_PRESET_BUTTON_SWATCH_FRAME_PX,
-    EXPORT_DIRECTORY_HANDLE_KEY,
-    EXPORT_DIRECTORY_DISPLAY_LABEL_KEY,
-    EXPORT_WORKSPACE_DIR_NAME,
-    EXPORT_DIRECTORY_PICKER_ID,
     PIXIEED_NICKNAME_STORAGE_KEY,
     PIXIEED_AVATAR_STORAGE_KEY,
     PIXIEED_X_URL_STORAGE_KEY,
@@ -1422,7 +1401,6 @@
     LENS_IMPORT_READY_MESSAGE_TYPE,
     LENS_IMPORT_MESSAGE_WAIT_MS,
     QR_IMPORT_STORAGE_KEY,
-    EXTERNAL_IMPORT_MODE_APPEND_TAB,
     EXTERNAL_IMPORT_MODE_NEW_PROJECT,
     QR_EDIT_MODE_TARGET_SOURCE,
     QR_EDIT_CHECK_DELAY_MS,
@@ -1494,13 +1472,8 @@
   const AUTOSAVE_REMOTE_MULTI_WRITE_DELAY = isLightweightPersistenceMode() ? 3600 : 2200;
   const AUTOSAVE_THUMBNAIL_UPDATE_INTERVAL_MS = isLightweightPersistenceMode() ? 60000 : 12000;
   const LOCAL_PROJECT_THUMBNAIL_UPDATE_INTERVAL_MS = isLightweightPersistenceMode() ? 30000 : 1500;
-  const importUtils = window.PiXiEEDrawModules?.importUtils?.createImportUtils?.({
-    EXTERNAL_IMPORT_MODE_APPEND_TAB,
-    EXTERNAL_IMPORT_MODE_NEW_PROJECT,
-  }) || {};
+  const importUtils = window.PiXiEEDrawModules?.importUtils?.createImportUtils?.() || {};
   const {
-    normalizeExternalImportMode,
-    shouldAppendExternalImportToProject,
     isLensImportPayload,
   } = importUtils;
   const qrUtils = window.PiXiEEDrawModules?.qrUtils?.createQrUtils?.({
@@ -1552,13 +1525,30 @@
     return autosaveDatabaseUtilsModule.openAutosaveDatabase(...args);
   }
 
-  let autosaveHandle = null;
-  let pendingAutosaveHandle = null;
-  let autosavePermissionListener = null;
-  let exportDirectoryHandle = null;
-  let pendingExportDirectoryHandle = null;
-  let exportDirectoryDisplayLabel = '';
-  let exportDirectorySetupDismissed = false;
+  const autosaveSchemaV2UtilsModule = window.PiXiEEDrawModules?.autosaveSchemaV2Utils?.createAutosaveSchemaV2Utils?.() || {};
+  const autosaveSchemaV2IndexedDbUtilsModule = window.PiXiEEDrawModules?.autosaveSchemaV2IndexedDbUtils?.createAutosaveSchemaV2IndexedDbUtils?.({
+    autosaveSchemaV2Utils: autosaveSchemaV2UtilsModule,
+    AUTOSAVE_SCHEMA_V2_DB_NAME,
+    AUTOSAVE_SCHEMA_V2_DB_VERSION,
+    LOCAL_PROJECT_MANIFESTS_STORE,
+    LOCAL_PROJECT_SHEET_CHECKPOINTS_STORE,
+    LOCAL_PROJECT_JOURNALS_STORE,
+    LOCAL_PROJECT_THUMBNAILS_STORE,
+    LOCAL_PROJECT_CURRENT_MANIFESTS_STORE,
+  }) || {};
+  const autosaveV2CheckpointReadyProjectIds = new Set();
+  let autosaveThumbnailRefreshTimer = null;
+  let autosaveThumbnailRefreshProjectId = '';
+  let autosaveThumbnailRefreshGeneration = -1;
+  const autosaveSchemaV2RestorePreviewUtilsModule = window.PiXiEEDrawModules?.autosaveSchemaV2RestorePreviewUtils?.createAutosaveSchemaV2RestorePreviewUtils?.({
+    readProject: (projectId, options) => autosaveSchemaV2IndexedDbUtilsModule.readSchemaV2Project(projectId, options),
+    getComparison: () => null,
+  }) || {};
+  const autosaveSchemaV2RecoveryUtilsModule = window.PiXiEEDrawModules?.autosaveSchemaV2RecoveryUtils?.createAutosaveSchemaV2RecoveryUtils?.() || {};
+  let autosaveV2RecoveryOpenStatus = { opened: false, reason: 'not-run' };
+  let autosaveV2RecoveryUiBusy = false;
+  let autosaveV2RecoveryUiElement = null;
+
   let autosaveWriteTimer = null;
   let autosaveWriteDeadline = 0;
   let autosaveWriteInFlight = false;
@@ -1612,6 +1602,10 @@
   let autosaveDirty = false;
   let autosaveDirtyGeneration = 0;
   let autosaveProjectId = '';
+  // R2: metadata-only authority candidate for the one editor/project session.
+  // Document pixels, canvases, frames, layers, and history remain in `state`.
+  let activeProjectSession = null;
+  let activeProjectSessionMismatchCount = 0;
   let startupAutosaveRestoreProjectId = '';
   let startupSharedReloadProjectKey = '';
   let startupSharedReloadRevision = 0;
@@ -1669,6 +1663,9 @@
   const TIMELAPSE_MIN_FPS = 1;
   const TIMELAPSE_MAX_FPS = 60;
   const TIMELAPSE_MAX_STEPS = 120;
+  const TIMELAPSE_OPERATION_LOG_MAX_ENTRIES = isLightweightPersistenceMode() ? 120 : 240;
+  const TIMELAPSE_OPERATION_LOG_RECENT_ENTRIES = isLightweightPersistenceMode() ? 60 : 120;
+  const TIMELAPSE_OPERATION_LOG_MAX_CHANGES = isLightweightPersistenceMode() ? 8192 : 32768;
   const TIMELAPSE_CAPTURE_DEBOUNCE_MS = isLightweightPersistenceMode() ? 1000 : 48;
   const timelapseUtils = window.PiXiEEDrawModules?.timelapseUtils?.createTimelapseUtils?.({
     TIMELAPSE_DEFAULT_FPS,
@@ -1684,10 +1681,67 @@
     getDurationFromFps,
   } = timelapseUtils;
   const timelapseState = {
-    enabled: false,
+    enabled: true,
     tracksByCanvasId: Object.create(null),
     fps: TIMELAPSE_DEFAULT_FPS,
   };
+  const timelapseChunkStore = window.PiXiEEDrawModules?.timelapseChunkStoreUtils?.createTimelapseChunkStoreUtils?.({
+    maxSnapshotsPerCanvas: TIMELAPSE_MAX_STEPS,
+  }) || null;
+  const pendingTimelapseArchiveWrites = new Set();
+
+  function archiveTimelapseSnapshots(canvasId = '', snapshots = []) {
+    const projectId = normalizeAutosaveProjectId?.(autosaveProjectId || '') || '';
+    if (!timelapseChunkStore || !projectId || !canvasId || !Array.isArray(snapshots) || !snapshots.length) {
+      return Promise.resolve(false);
+    }
+    const write = timelapseChunkStore.appendSnapshots(projectId, canvasId, snapshots)
+      .then(result => result !== false)
+      .catch(error => {
+        console.warn('Failed to archive timelapse snapshots.', error);
+        return false;
+      });
+    pendingTimelapseArchiveWrites.add(write);
+    write.finally(() => pendingTimelapseArchiveWrites.delete(write));
+    return write;
+  }
+
+  async function waitForPendingTimelapseArchiveWrites({ requireSuccess = false } = {}) {
+    const pending = Array.from(pendingTimelapseArchiveWrites);
+    if (!pending.length) return true;
+    const results = await Promise.all(pending);
+    const succeeded = results.every(Boolean);
+    if (!succeeded && requireSuccess) {
+      const error = new Error('Timelapse archive synchronization failed');
+      error.code = 'ERR_TIMELAPSE_ARCHIVE_SYNC_FAILED';
+      throw error;
+    }
+    return succeeded;
+  }
+
+  async function loadPersistedTimelapseSnapshots(projectId = autosaveProjectId, options = {}) {
+    const normalizedProjectId = normalizeAutosaveProjectId?.(projectId || '') || '';
+    if (!timelapseChunkStore || !normalizedProjectId) return {};
+    try {
+      const stored = await timelapseChunkStore.readProject(normalizedProjectId);
+      return stored?.byCanvas && typeof stored.byCanvas === 'object' ? stored.byCanvas : {};
+    } catch (error) {
+      console.warn('Failed to load archived timelapse snapshots.', error);
+      if (options?.throwOnError === true) {
+        throw error;
+      }
+      return {};
+    }
+  }
+
+  function clearPersistedTimelapseSnapshots(projectId = autosaveProjectId) {
+    const normalizedProjectId = normalizeAutosaveProjectId?.(projectId || '') || '';
+    if (!timelapseChunkStore || !normalizedProjectId) return Promise.resolve(false);
+    return timelapseChunkStore.removeProject(normalizedProjectId).catch(error => {
+      console.warn('Failed to clear archived timelapse snapshots.', error);
+      return false;
+    });
+  }
   let timelapseCaptureTimer = null;
   const timelapseQueuedCanvasIds = new Set();
   let pixfindModeEnabled = false;
@@ -2285,7 +2339,6 @@
     FLOATING_PREVIEW_DEFAULT_STATE,
     MULTI_CANVAS_FEATURE_ENABLED,
     LOCAL_VIEWPORT_CANVAS_SIGNED_IN_MAX_COUNT,
-    LOCAL_VIEWPORT_CANVAS_STANDARD_MAX_COUNT,
     LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE,
   } = drawingStateStaticConfig;
   const drawingToolStaticConfig = window.PiXiEEDrawModules?.uiStaticConfig?.createDrawingToolStaticConfig?.({
@@ -2457,7 +2510,6 @@
   } = voxelUtils;
   const pixieedSupportBenefitUtilsModule = window.PiXiEEDrawModules?.pixieedSupportBenefitUtils?.createPixieedSupportBenefitUtils?.({
   get LOCAL_VIEWPORT_CANVAS_SIGNED_IN_MAX_COUNT() { return LOCAL_VIEWPORT_CANVAS_SIGNED_IN_MAX_COUNT; },
-  get LOCAL_VIEWPORT_CANVAS_STANDARD_MAX_COUNT() { return LOCAL_VIEWPORT_CANVAS_STANDARD_MAX_COUNT; },
   get MULTI_GUEST_LIMIT_MIN() { return MULTI_GUEST_LIMIT_MIN; },
   get SHARED_PROJECT_LIMIT_AD_FREE() { return SHARED_PROJECT_LIMIT_AD_FREE; },
   get SHARED_PROJECT_LIMIT_DEFAULT() { return SHARED_PROJECT_LIMIT_DEFAULT; },
@@ -2470,10 +2522,6 @@
   get getSharedProjectOwnershipStatus() { return getSharedProjectOwnershipStatus; },
   get localizeText() { return localizeText; },
   }) || {};
-
-  function getLocalViewportCanvasAccountLimit(...args) {
-    return pixieedSupportBenefitUtilsModule.getLocalViewportCanvasAccountLimit(...args);
-  }
 
   function getSharedProjectMemberLimitForCurrentPlan(...args) {
     return pixieedSupportBenefitUtilsModule.getSharedProjectMemberLimitForCurrentPlan(...args);
@@ -2556,6 +2604,8 @@
   set compositeFramePixels(value) { compositeFramePixels = value; },
   get confirmPendingSelectionMove() { return confirmPendingSelectionMove; },
   set confirmPendingSelectionMove(value) { confirmPendingSelectionMove = value; },
+  get finalizeSelectionMove() { return finalizeSelectionMove; },
+  set finalizeSelectionMove(value) { finalizeSelectionMove = value; },
   get createBlankImageData() { return createBlankImageData; },
   set createBlankImageData(value) { createBlankImageData = value; },
   get createFrame() { return createFrame; },
@@ -2584,8 +2634,6 @@
   set getDefaultLayerName(value) { getDefaultLayerName = value; },
   get getDefaultProjectCanvasName() { return getDefaultProjectCanvasName; },
   set getDefaultProjectCanvasName(value) { getDefaultProjectCanvasName = value; },
-  get getLocalViewportCanvasAccountLimit() { return getLocalViewportCanvasAccountLimit; },
-  set getLocalViewportCanvasAccountLimit(value) { getLocalViewportCanvasAccountLimit = value; },
   get getPendingSelectionMoveState() { return getPendingSelectionMoveState; },
   set getPendingSelectionMoveState(value) { getPendingSelectionMoveState = value; },
   get getPixelAlignedCanvasDisplayScale() { return getPixelAlignedCanvasDisplayScale; },
@@ -3062,6 +3110,8 @@
   set bindCanvasSurfaceInteractionEvents(value) { bindCanvasSurfaceInteractionEvents = value; },
   get cancelActiveViewportGesture() { return cancelActiveViewportGesture; },
   set cancelActiveViewportGesture(value) { cancelActiveViewportGesture = value; },
+  get confirmPendingSelectionMove() { return confirmPendingSelectionMove; },
+  set confirmPendingSelectionMove(value) { confirmPendingSelectionMove = value; },
   get clamp() { return clamp; },
   set clamp(value) { clamp = value; },
   get compactToolFlyoutAnchorButton() { return compactToolFlyoutAnchorButton; },
@@ -3489,6 +3539,8 @@
   set createMovePreviewCanvasFromPixels(value) { createMovePreviewCanvasFromPixels = value; },
   get createMoveStateFromClipboard() { return createMoveStateFromClipboard; },
   set createMoveStateFromClipboard(value) { createMoveStateFromClipboard = value; },
+  get getClipboardPaletteExpansionCount() { return getClipboardPaletteExpansionCount; },
+  set getClipboardPaletteExpansionCount(value) { getClipboardPaletteExpansionCount = value; },
   get createPasteRestoreSnapshot() { return createPasteRestoreSnapshot; },
   set createPasteRestoreSnapshot(value) { createPasteRestoreSnapshot = value; },
   get createSelectionMoveState() { return createSelectionMoveState; },
@@ -3607,6 +3659,10 @@
   set markDirtyRect(value) { markDirtyRect = value; },
   get markHistoryDirty() { return markHistoryDirty; },
   set markHistoryDirty(value) { markHistoryDirty = value; },
+  get recordPendingPixelPatchAfter() { return recordPendingPixelPatchAfter; },
+  set recordPendingPixelPatchAfter(value) { recordPendingPixelPatchAfter = value; },
+  get recordPendingPixelPatchBefore() { return recordPendingPixelPatchBefore; },
+  set recordPendingPixelPatchBefore(value) { recordPendingPixelPatchBefore = value; },
   get markSaveInteractionActivity() { return markSaveInteractionActivity; },
   set markSaveInteractionActivity(value) { markSaveInteractionActivity = value; },
   get markViewportInteractionActivity() { return markViewportInteractionActivity; },
@@ -4002,6 +4058,8 @@
   set activeSharedProjectRevision(value) { activeSharedProjectRevision = value; },
   get activeSharedProjectStructureRevision() { return activeSharedProjectStructureRevision; },
   set activeSharedProjectStructureRevision(value) { activeSharedProjectStructureRevision = value; },
+  get activateProjectSheetForRemoval() { return activateOpenProjectTab; },
+  set activateProjectSheetForRemoval(value) { activateProjectSheetForRemoval = value; },
   get activeSharedProjectSynced() { return activeSharedProjectSynced; },
   set activeSharedProjectSynced(value) { activeSharedProjectSynced = value; },
   get applyHistorySnapshot() { return applyHistorySnapshot; },
@@ -4148,6 +4206,14 @@
 
   function restoreReloadSessionSnapshot(...args) {
     return reloadSessionWorkflowUtilsModule.restoreReloadSessionSnapshot(...args);
+  }
+
+  function readReloadSessionSnapshotPayload(...args) {
+    return reloadSessionWorkflowUtilsModule.readReloadSessionSnapshotPayload(...args);
+  }
+
+  function clearReloadRecoveryData(...args) {
+    return reloadSessionWorkflowUtilsModule.clearReloadRecoveryData(...args);
   }
 
   const canvasOverlayWorkflowUtilsModule = window.PiXiEEDrawModules?.canvasOverlayWorkflowUtils?.createCanvasOverlayWorkflowUtils?.({
@@ -4632,8 +4698,6 @@
   set initPwaInstallSupport(value) { initPwaInstallSupport = value; },
   get initializeAutosave() { return initializeAutosave; },
   set initializeAutosave(value) { initializeAutosave = value; },
-  get initializeExportDirectoryBinding() { return initializeExportDirectoryBinding; },
-  set initializeExportDirectoryBinding(value) { initializeExportDirectoryBinding = value; },
   get initializeIosSnapshotFallback() { return initializeIosSnapshotFallback; },
   set initializeIosSnapshotFallback(value) { initializeIosSnapshotFallback = value; },
   get isCoarsePointerDevice() { return isCoarsePointerDevice; },
@@ -5284,8 +5348,6 @@
   set updateLeftTabUI(value) { updateLeftTabUI = value; },
   get updateLeftTabVisibility() { return updateLeftTabVisibility; },
   set updateLeftTabVisibility(value) { updateLeftTabVisibility = value; },
-  get updateLocalCanvasActionToolButtons() { return updateLocalCanvasActionToolButtons; },
-  set updateLocalCanvasActionToolButtons(value) { updateLocalCanvasActionToolButtons = value; },
   get updateMirrorActionButtons() { return updateMirrorActionButtons; },
   set updateMirrorActionButtons(value) { updateMirrorActionButtons = value; },
   get updateMirrorGuideHandles() { return updateMirrorGuideHandles; },
@@ -5303,10 +5365,18 @@
   const timelapseSessionUtilsModule = window.PiXiEEDrawModules?.timelapseSessionUtils?.createTimelapseSessionUtils?.({
   get MAX_IMPORTED_PALETTE_COLORS() { return MAX_IMPORTED_PALETTE_COLORS; },
   set MAX_IMPORTED_PALETTE_COLORS(value) { MAX_IMPORTED_PALETTE_COLORS = value; },
+  // Deprecated split-module contract. It intentionally has no sheet limit.
+  get MAX_PROJECT_SHEETS() { return undefined; },
   get TIMELAPSE_CAPTURE_DEBOUNCE_MS() { return TIMELAPSE_CAPTURE_DEBOUNCE_MS; },
   set TIMELAPSE_CAPTURE_DEBOUNCE_MS(value) { TIMELAPSE_CAPTURE_DEBOUNCE_MS = value; },
   get TIMELAPSE_MAX_STEPS() { return TIMELAPSE_MAX_STEPS; },
   set TIMELAPSE_MAX_STEPS(value) { TIMELAPSE_MAX_STEPS = value; },
+  get TIMELAPSE_OPERATION_LOG_MAX_ENTRIES() { return TIMELAPSE_OPERATION_LOG_MAX_ENTRIES; },
+  set TIMELAPSE_OPERATION_LOG_MAX_ENTRIES(value) { TIMELAPSE_OPERATION_LOG_MAX_ENTRIES = value; },
+  get TIMELAPSE_OPERATION_LOG_RECENT_ENTRIES() { return TIMELAPSE_OPERATION_LOG_RECENT_ENTRIES; },
+  set TIMELAPSE_OPERATION_LOG_RECENT_ENTRIES(value) { TIMELAPSE_OPERATION_LOG_RECENT_ENTRIES = value; },
+  get TIMELAPSE_OPERATION_LOG_MAX_CHANGES() { return TIMELAPSE_OPERATION_LOG_MAX_CHANGES; },
+  set TIMELAPSE_OPERATION_LOG_MAX_CHANGES(value) { TIMELAPSE_OPERATION_LOG_MAX_CHANGES = value; },
   get activeSharedProjectKey() { return activeSharedProjectKey; },
   set activeSharedProjectKey(value) { activeSharedProjectKey = value; },
   get announceProjectCompanionSaveResult() { return announceProjectCompanionSaveResult; },
@@ -5315,6 +5385,8 @@
   set appendColorSpriteAreaToFrameSet(value) { appendColorSpriteAreaToFrameSet = value; },
   get applyExportScaleConstraints() { return applyExportScaleConstraints; },
   set applyExportScaleConstraints(value) { applyExportScaleConstraints = value; },
+  get archiveTimelapseSnapshots() { return archiveTimelapseSnapshots; },
+  set archiveTimelapseSnapshots(value) { archiveTimelapseSnapshots = value; },
   get applyLayerPatchPayloadToLayer() { return applyLayerPatchPayloadToLayer; },
   set applyLayerPatchPayloadToLayer(value) { applyLayerPatchPayloadToLayer = value; },
   get buildGifFromPixels() { return buildGifFromPixels; },
@@ -5323,6 +5395,8 @@
   set clamp(value) { clamp = value; },
   get compositeFramePixels() { return compositeFramePixels; },
   set compositeFramePixels(value) { compositeFramePixels = value; },
+  get clearPersistedTimelapseSnapshots() { return clearPersistedTimelapseSnapshots; },
+  set clearPersistedTimelapseSnapshots(value) { clearPersistedTimelapseSnapshots = value; },
   get compressUint8Array() { return compressUint8Array; },
   set compressUint8Array(value) { compressUint8Array = value; },
   get createEmptyTimelapseOperationLog() { return createEmptyTimelapseOperationLog; },
@@ -5367,6 +5441,8 @@
   set isSharedProjectCollaborativeMode(value) { isSharedProjectCollaborativeMode = value; },
   get localizeText() { return localizeText; },
   set localizeText(value) { localizeText = value; },
+  get loadPersistedTimelapseSnapshots() { return loadPersistedTimelapseSnapshots; },
+  set loadPersistedTimelapseSnapshots(value) { loadPersistedTimelapseSnapshots = value; },
   get makeHistorySnapshot() { return makeHistorySnapshot; },
   set makeHistorySnapshot(value) { makeHistorySnapshot = value; },
   get markDocumentDurablySaved() { return markDocumentDurablySaved; },
@@ -5430,32 +5506,18 @@
   set AUTOSAVE_THUMBNAIL_UPDATE_INTERVAL_MS(value) { AUTOSAVE_THUMBNAIL_UPDATE_INTERVAL_MS = value; },
   get AUTOSAVE_WRITE_DELAY() { return AUTOSAVE_WRITE_DELAY; },
   set AUTOSAVE_WRITE_DELAY(value) { AUTOSAVE_WRITE_DELAY = value; },
-  get EXPORT_DIRECTORY_PICKER_ID() { return EXPORT_DIRECTORY_PICKER_ID; },
-  set EXPORT_DIRECTORY_PICKER_ID(value) { EXPORT_DIRECTORY_PICKER_ID = value; },
-  get EXPORT_DIRECTORY_SUPPORTED() { return EXPORT_DIRECTORY_SUPPORTED; },
-  set EXPORT_DIRECTORY_SUPPORTED(value) { EXPORT_DIRECTORY_SUPPORTED = value; },
-  get EXPORT_WORKSPACE_DIR_NAME() { return EXPORT_WORKSPACE_DIR_NAME; },
-  set EXPORT_WORKSPACE_DIR_NAME(value) { EXPORT_WORKSPACE_DIR_NAME = value; },
-  get FILE_HANDLE_AUTOSAVE_SUPPORTED() { return FILE_HANDLE_AUTOSAVE_SUPPORTED; },
-  set FILE_HANDLE_AUTOSAVE_SUPPORTED(value) { FILE_HANDLE_AUTOSAVE_SUPPORTED = value; },
   get MULTI_REPLICA_AUTOSAVE_BLOCKED_STATUS() { return MULTI_REPLICA_AUTOSAVE_BLOCKED_STATUS; },
   set MULTI_REPLICA_AUTOSAVE_BLOCKED_STATUS(value) { MULTI_REPLICA_AUTOSAVE_BLOCKED_STATUS = value; },
   get SAVE_INTERACTION_GRACE_MS() { return SAVE_INTERACTION_GRACE_MS; },
   set SAVE_INTERACTION_GRACE_MS(value) { SAVE_INTERACTION_GRACE_MS = value; },
   get VIEWPORT_INTERACTION_GRACE_MS() { return VIEWPORT_INTERACTION_GRACE_MS; },
   set VIEWPORT_INTERACTION_GRACE_MS(value) { VIEWPORT_INTERACTION_GRACE_MS = value; },
-  get applyHistorySnapshot() { return applyHistorySnapshot; },
-  set applyHistorySnapshot(value) { applyHistorySnapshot = value; },
   get autosaveDirty() { return autosaveDirty; },
   set autosaveDirty(value) { autosaveDirty = value; },
   get autosaveDirtyGeneration() { return autosaveDirtyGeneration; },
   set autosaveDirtyGeneration(value) { autosaveDirtyGeneration = value; },
-  get autosaveHandle() { return autosaveHandle; },
-  set autosaveHandle(value) { autosaveHandle = value; },
   get autosaveLifecycleFlushAt() { return autosaveLifecycleFlushAt; },
   set autosaveLifecycleFlushAt(value) { autosaveLifecycleFlushAt = value; },
-  get autosavePermissionListener() { return autosavePermissionListener; },
-  set autosavePermissionListener(value) { autosavePermissionListener = value; },
   get autosaveProjectId() { return autosaveProjectId; },
   set autosaveProjectId(value) { autosaveProjectId = value; },
   get autosaveRestoring() { return autosaveRestoring; },
@@ -5472,42 +5534,24 @@
   set autosaveWriteQueued(value) { autosaveWriteQueued = value; },
   get autosaveWriteTimer() { return autosaveWriteTimer; },
   set autosaveWriteTimer(value) { autosaveWriteTimer = value; },
-  get buildAutosaveSessionPayload() { return buildAutosaveSessionPayload; },
-  set buildAutosaveSessionPayload(value) { buildAutosaveSessionPayload = value; },
-  get buildExportDirectoryDisplayLabel() { return buildExportDirectoryDisplayLabel; },
-  set buildExportDirectoryDisplayLabel(value) { buildExportDirectoryDisplayLabel = value; },
-  get buildNumberedFilename() { return buildNumberedFilename; },
-  set buildNumberedFilename(value) { buildNumberedFilename = value; },
+  get buildActiveLocalProjectSavePlan() { return buildActiveLocalProjectSavePlan; },
+  set buildActiveLocalProjectSavePlan(value) { buildActiveLocalProjectSavePlan = value; },
   get buildPackagedProjectPayload() { return buildPackagedProjectPayload; },
   set buildPackagedProjectPayload(value) { buildPackagedProjectPayload = value; },
+  get buildProjectSessionPayload() { return buildProjectSessionPayload; },
+  set buildProjectSessionPayload(value) { buildProjectSessionPayload = value; },
   get canUseSessionStorage() { return canUseSessionStorage; },
   set canUseSessionStorage(value) { canUseSessionStorage = value; },
-  get clearTimelapseRecording() { return clearTimelapseRecording; },
-  set clearTimelapseRecording(value) { clearTimelapseRecording = value; },
-  get createAutosaveFileName() { return createAutosaveFileName; },
-  set createAutosaveFileName(value) { createAutosaveFileName = value; },
   get createAutosaveProjectId() { return createAutosaveProjectId; },
   set createAutosaveProjectId(value) { createAutosaveProjectId = value; },
   get ensureActiveAutosaveProjectId() { return ensureActiveAutosaveProjectId; },
   set ensureActiveAutosaveProjectId(value) { ensureActiveAutosaveProjectId = value; },
   get dom() { return dom; },
   set dom(value) { dom = value; },
-  get ensureCurrentClientCanReplaceActiveProject() { return ensureCurrentClientCanReplaceActiveProject; },
-  set ensureCurrentClientCanReplaceActiveProject(value) { ensureCurrentClientCanReplaceActiveProject = value; },
-  get ensureTimelapseStartCapture() { return ensureTimelapseStartCapture; },
-  set ensureTimelapseStartCapture(value) { ensureTimelapseStartCapture = value; },
-  get exportDirectoryDisplayLabel() { return exportDirectoryDisplayLabel; },
-  set exportDirectoryDisplayLabel(value) { exportDirectoryDisplayLabel = value; },
-  get exportDirectoryHandle() { return exportDirectoryHandle; },
-  set exportDirectoryHandle(value) { exportDirectoryHandle = value; },
-  get exportDirectorySetupDismissed() { return exportDirectorySetupDismissed; },
-  set exportDirectorySetupDismissed(value) { exportDirectorySetupDismissed = value; },
   get floatingDrawButtonState() { return floatingDrawButtonState; },
   set floatingDrawButtonState(value) { floatingDrawButtonState = value; },
   get history() { return history; },
   set history(value) { history = value; },
-  get isCanvasSurfaceTarget() { return isCanvasSurfaceTarget; },
-  set isCanvasSurfaceTarget(value) { isCanvasSurfaceTarget = value; },
   get isCurrentProjectSharedEntry() { return isCurrentProjectSharedEntry; },
   set isCurrentProjectSharedEntry(value) { isCurrentProjectSharedEntry = value; },
   get isLargeDocumentPerformanceMode() { return isLargeDocumentPerformanceMode; },
@@ -5516,18 +5560,12 @@
   set isLightweightPersistenceMode(value) { isLightweightPersistenceMode = value; },
   get isMultiMasterMode() { return isMultiMasterMode; },
   set isMultiMasterMode(value) { isMultiMasterMode = value; },
-  get isTinyStartupSnapshot() { return isTinyStartupSnapshot; },
-  set isTinyStartupSnapshot(value) { isTinyStartupSnapshot = value; },
   get lastSaveInteractionAt() { return lastSaveInteractionAt; },
   set lastSaveInteractionAt(value) { lastSaveInteractionAt = value; },
   get lastViewportInteractionAt() { return lastViewportInteractionAt; },
   set lastViewportInteractionAt(value) { lastViewportInteractionAt = value; },
   get loadStoredAutosaveProjectId() { return loadStoredAutosaveProjectId; },
   set loadStoredAutosaveProjectId(value) { loadStoredAutosaveProjectId = value; },
-  get loadStoredExportDirectoryDisplayLabel() { return loadStoredExportDirectoryDisplayLabel; },
-  set loadStoredExportDirectoryDisplayLabel(value) { loadStoredExportDirectoryDisplayLabel = value; },
-  get loadStoredExportDirectoryHandle() { return loadStoredExportDirectoryHandle; },
-  set loadStoredExportDirectoryHandle(value) { loadStoredExportDirectoryHandle = value; },
   get localizeText() { return localizeText; },
   set localizeText(value) { localizeText = value; },
   get makeHistorySnapshot() { return makeHistorySnapshot; },
@@ -5540,74 +5578,80 @@
   set multiState(value) { multiState = value; },
   get normalizeAutosaveProjectId() { return normalizeAutosaveProjectId; },
   set normalizeAutosaveProjectId(value) { normalizeAutosaveProjectId = value; },
-  get normalizeSerializedTimelapseOperationEntry() { return normalizeSerializedTimelapseOperationEntry; },
-  set normalizeSerializedTimelapseOperationEntry(value) { normalizeSerializedTimelapseOperationEntry = value; },
+  get normalizeV2PixelPatchJournalOps() { return normalizeV2PixelPatchJournalOps; },
+  set normalizeV2PixelPatchJournalOps(value) { normalizeV2PixelPatchJournalOps = value; },
   get parseAutosaveTabLockPayload() { return parseAutosaveTabLockPayload; },
   set parseAutosaveTabLockPayload(value) { parseAutosaveTabLockPayload = value; },
-  get pendingAutosaveHandle() { return pendingAutosaveHandle; },
-  set pendingAutosaveHandle(value) { pendingAutosaveHandle = value; },
-  get pendingExportDirectoryHandle() { return pendingExportDirectoryHandle; },
-  set pendingExportDirectoryHandle(value) { pendingExportDirectoryHandle = value; },
   get pointerState() { return pointerState; },
   set pointerState(value) { pointerState = value; },
   get readReloadTargetProjectId() { return readReloadTargetProjectId; },
   set readReloadTargetProjectId(value) { readReloadTargetProjectId = value; },
-  get reconcileTimelapseTracksForSingleCanvas() { return reconcileTimelapseTracksForSingleCanvas; },
-  set reconcileTimelapseTracksForSingleCanvas(value) { reconcileTimelapseTracksForSingleCanvas = value; },
-  get recordRecentProjectSnapshot() { return recordRecentProjectSnapshot; },
-  set recordRecentProjectSnapshot(value) { recordRecentProjectSnapshot = value; },
+  get isAutosaveV2PrimaryEnabled() { return isAutosaveV2PrimaryEnabled; },
+  set isAutosaveV2PrimaryEnabled(value) { isAutosaveV2PrimaryEnabled = value; },
+  get isAutosaveV2JournalReady() { return isAutosaveV2JournalReady; },
+  set isAutosaveV2JournalReady(value) { isAutosaveV2JournalReady = value; },
+  get markActiveLocalProjectJournalNeedsCheckpoint() { return markActiveLocalProjectJournalNeedsCheckpoint; },
+  set markActiveLocalProjectJournalNeedsCheckpoint(value) { markActiveLocalProjectJournalNeedsCheckpoint = value; },
+  get markAutosaveDirty() { return markAutosaveDirty; },
+  set markAutosaveDirty(value) { markAutosaveDirty = value; },
+  get writeAutosaveV2Primary() { return writeAutosaveV2Primary; },
+  set writeAutosaveV2Primary(value) { writeAutosaveV2Primary = value; },
   get recordSharedProjectLightweightLocalSave() { return recordSharedProjectLightweightLocalSave; },
   set recordSharedProjectLightweightLocalSave(value) { recordSharedProjectLightweightLocalSave = value; },
   get reloadSnapshotRestored() { return reloadSnapshotRestored; },
   set reloadSnapshotRestored(value) { reloadSnapshotRestored = value; },
-  get resetDocumentUnsavedChanges() { return resetDocumentUnsavedChanges; },
-  set resetDocumentUnsavedChanges(value) { resetDocumentUnsavedChanges = value; },
-  get resetOpenedDocumentViewport() { return resetOpenedDocumentViewport; },
-  set resetOpenedDocumentViewport(value) { resetOpenedDocumentViewport = value; },
-  get sanitizeExportDirectoryDisplayLabel() { return sanitizeExportDirectoryDisplayLabel; },
-  set sanitizeExportDirectoryDisplayLabel(value) { sanitizeExportDirectoryDisplayLabel = value; },
-  get sanitizeNativeFilename() { return sanitizeNativeFilename; },
-  set sanitizeNativeFilename(value) { sanitizeNativeFilename = value; },
   get sanitizeRecentProjectsStore() { return sanitizeRecentProjectsStore; },
   set sanitizeRecentProjectsStore(value) { sanitizeRecentProjectsStore = value; },
   get setActiveAutosaveProjectId() { return setActiveAutosaveProjectId; },
   set setActiveAutosaveProjectId(value) { setActiveAutosaveProjectId = value; },
   get setMultiStatus() { return setMultiStatus; },
   set setMultiStatus(value) { setMultiStatus = value; },
-  get setTrackedProjectDotBaseline() { return setTrackedProjectDotBaseline; },
-  set setTrackedProjectDotBaseline(value) { setTrackedProjectDotBaseline = value; },
   get shouldUseLightweightSharedProjectLocalSave() { return shouldUseLightweightSharedProjectLocalSave; },
   set shouldUseLightweightSharedProjectLocalSave(value) { shouldUseLightweightSharedProjectLocalSave = value; },
-  get snapshotFromDocumentText() { return snapshotFromDocumentText; },
-  set snapshotFromDocumentText(value) { snapshotFromDocumentText = value; },
+  get pruneInactiveCanvasDirectCaches() { return pruneInactiveCanvasDirectCaches; },
+  set pruneInactiveCanvasDirectCaches(value) { pruneInactiveCanvasDirectCaches = value; },
   get startupAutosaveRestoreProjectId() { return startupAutosaveRestoreProjectId; },
   set startupAutosaveRestoreProjectId(value) { startupAutosaveRestoreProjectId = value; },
-  get storeAutosaveHandle() { return storeAutosaveHandle; },
-  set storeAutosaveHandle(value) { storeAutosaveHandle = value; },
-  get storeExportDirectoryDisplayLabel() { return storeExportDirectoryDisplayLabel; },
-  set storeExportDirectoryDisplayLabel(value) { storeExportDirectoryDisplayLabel = value; },
-  get storeExportDirectoryHandle() { return storeExportDirectoryHandle; },
-  set storeExportDirectoryHandle(value) { storeExportDirectoryHandle = value; },
-  get synchronizeImportedSnapshotPalette() { return synchronizeImportedSnapshotPalette; },
-  set synchronizeImportedSnapshotPalette(value) { synchronizeImportedSnapshotPalette = value; },
-  get syncPixfindSnapshotAfterDocumentReset() { return syncPixfindSnapshotAfterDocumentReset; },
-  set syncPixfindSnapshotAfterDocumentReset(value) { syncPixfindSnapshotAfterDocumentReset = value; },
-  get syncTimelapseControls() { return syncTimelapseControls; },
-  set syncTimelapseControls(value) { syncTimelapseControls = value; },
-  get timelapseState() { return timelapseState; },
-  set timelapseState(value) { timelapseState = value; },
-  get trimHistoryStacksToLimit() { return trimHistoryStacksToLimit; },
-  set trimHistoryStacksToLimit(value) { trimHistoryStacksToLimit = value; },
   get unsavedChangeToken() { return unsavedChangeToken; },
   set unsavedChangeToken(value) { unsavedChangeToken = value; },
-  get updateHistoryButtons() { return updateHistoryButtons; },
-  set updateHistoryButtons(value) { updateHistoryButtons = value; },
-  get updateMemoryStatus() { return updateMemoryStatus; },
-  set updateMemoryStatus(value) { updateMemoryStatus = value; },
   get virtualCursorDrawState() { return virtualCursorDrawState; },
   set virtualCursorDrawState(value) { virtualCursorDrawState = value; },
   }) || {};
 
+  const canonicalV2ProjectUtilsModule = window.PiXiEEDrawModules?.canonicalV2ProjectUtils || {};
+  const localProjectV2MigrationUtilsModule = window.PiXiEEDrawModules?.localProjectV2MigrationUtils
+    ?.createLocalProjectV2MigrationUtils?.() || {};
+  const projectProvenanceUtilsModule = window.PiXiEEDrawModules?.projectProvenanceUtils?.createProjectProvenanceUtils?.() || {};
+  const projectCommandLockManager = window.PiXiEEDrawModules?.projectCommandLockUtils
+    ?.createProjectCommandLockManager?.({
+      onDiagnostic: details => console.info('[pixiedraw:command-lock]', details),
+    });
+  function inspectProjectCommandLock() {
+    return projectCommandLockManager?.inspect?.() || {
+      locked: false, owner: null, command: null, acquiredAt: 0, lockAgeMs: 0, tokenPresent: false,
+    };
+  }
+  function isProjectCommandLocked() {
+    return inspectProjectCommandLock().locked === true;
+  }
+  function acquireProjectCommandLock(options) {
+    return projectCommandLockManager?.acquire?.(options) || { ok: false, code: 'ERR_PROJECT_COMMAND_STATE_INVALID' };
+  }
+  function releaseProjectCommandLock(options) {
+    return projectCommandLockManager?.release?.(options) || { ok: false, code: 'ERR_PROJECT_COMMAND_STATE_INVALID' };
+  }
+  function isProjectCommandLockHeldBy(options) {
+    return projectCommandLockManager?.isHeldBy?.(options) === true;
+  }
+  function detectStaleProjectCommandLock() {
+    return projectCommandLockManager?.detectStale?.() || { stale: false, ...inspectProjectCommandLock() };
+  }
+  window.acquireProjectCommandLock = acquireProjectCommandLock;
+  window.releaseProjectCommandLock = releaseProjectCommandLock;
+  window.inspectProjectCommandLock = inspectProjectCommandLock;
+  window.isProjectCommandLockHeldBy = isProjectCommandLockHeldBy;
+  window.detectStaleProjectCommandLock = detectStaleProjectCommandLock;
+  window.__pixieedrawGetProjectCommandLockStatus = () => inspectProjectCommandLock();
   const openImportWorkflowUtilsModule = window.PiXiEEDrawModules?.openImportWorkflowUtils?.createOpenImportWorkflowUtils?.({
   get AUTOSAVE_SUPPORTED() { return AUTOSAVE_SUPPORTED; },
   set AUTOSAVE_SUPPORTED(value) { AUTOSAVE_SUPPORTED = value; },
@@ -5641,8 +5685,6 @@
   set MAX_IMAGE_IMPORT_SOURCE_SIZE(value) { MAX_IMAGE_IMPORT_SOURCE_SIZE = value; },
   get MAX_IMPORTED_PALETTE_COLORS() { return MAX_IMPORTED_PALETTE_COLORS; },
   set MAX_IMPORTED_PALETTE_COLORS(value) { MAX_IMPORTED_PALETTE_COLORS = value; },
-  get MAX_PROJECT_SHEETS() { return MAX_PROJECT_SHEETS; },
-  set MAX_PROJECT_SHEETS(value) { MAX_PROJECT_SHEETS = value; },
   get MIN_ZOOM_RATIO() { return MIN_ZOOM_RATIO; },
   set MIN_ZOOM_RATIO(value) { MIN_ZOOM_RATIO = value; },
   get QR_IMPORT_QUERY_KEY() { return QR_IMPORT_QUERY_KEY; },
@@ -5665,20 +5707,32 @@
   set appendOpenProjectTabFromCurrentState(value) { appendOpenProjectTabFromCurrentState = value; },
   get applyHistorySnapshot() { return applyHistorySnapshot; },
   set applyHistorySnapshot(value) { applyHistorySnapshot = value; },
-  get autosaveHandle() { return autosaveHandle; },
-  set autosaveHandle(value) { autosaveHandle = value; },
   get autosaveProjectId() { return autosaveProjectId; },
   set autosaveProjectId(value) { autosaveProjectId = value; },
+  get getActiveProjectPersistenceState() { return getActiveProjectPersistenceState; },
+  set getActiveProjectPersistenceState(value) { getActiveProjectPersistenceState = value; },
   get beginBlockingGlobalLoading() { return beginBlockingGlobalLoading; },
   set beginBlockingGlobalLoading(value) { beginBlockingGlobalLoading = value; },
   get beginStartupProgress() { return beginStartupProgress; },
   set beginStartupProgress(value) { beginStartupProgress = value; },
   get buildActiveSharedProjectSheetTabFields() { return buildActiveSharedProjectSheetTabFields; },
   set buildActiveSharedProjectSheetTabFields(value) { buildActiveSharedProjectSheetTabFields = value; },
+  get buildPackagedProjectPayload() { return buildPackagedProjectPayload; },
+  set buildPackagedProjectPayload(value) { buildPackagedProjectPayload = value; },
+  get createRasterImportProvenance() { return projectProvenanceUtilsModule.createRasterImportProvenance; },
+  set createRasterImportProvenance(value) { projectProvenanceUtilsModule.createRasterImportProvenance = value; },
+  get normalizeExternalProjectToCanonicalV2() { return canonicalV2ProjectUtilsModule.normalizeExternalProjectToCanonicalV2; },
+  set normalizeExternalProjectToCanonicalV2(value) { canonicalV2ProjectUtilsModule.normalizeExternalProjectToCanonicalV2 = value; },
+  get validateCanonicalV2ProjectPayload() { return canonicalV2ProjectUtilsModule.validateCanonicalV2ProjectPayload; },
+  set validateCanonicalV2ProjectPayload(value) { canonicalV2ProjectUtilsModule.validateCanonicalV2ProjectPayload = value; },
+  get normalizeProjectOriginalityMetadata() { return canonicalV2ProjectUtilsModule.normalizeProjectOriginalityMetadata; },
+  set normalizeProjectOriginalityMetadata(value) { canonicalV2ProjectUtilsModule.normalizeProjectOriginalityMetadata = value; },
   get buildIndexedPaletteFromFrameDataList() { return buildIndexedPaletteFromFrameDataList; },
   set buildIndexedPaletteFromFrameDataList(value) { buildIndexedPaletteFromFrameDataList = value; },
   get buildSharedRecentProjectId() { return buildSharedRecentProjectId; },
   set buildSharedRecentProjectId(value) { buildSharedRecentProjectId = value; },
+  get createProjectPersistenceToken() { return createProjectPersistenceToken; },
+  set createProjectPersistenceToken(value) { createProjectPersistenceToken = value; },
   get canCurrentClientImportExternalData() { return canCurrentClientImportExternalData; },
   set canCurrentClientImportExternalData(value) { canCurrentClientImportExternalData = value; },
   get canReuseActiveOpenProjectTabForRecentEntry() { return canReuseActiveOpenProjectTabForRecentEntry; },
@@ -5691,20 +5745,20 @@
   set clearActiveSharedProjectSession(value) { clearActiveSharedProjectSession = value; },
   get clearLensImportRequestParam() { return clearLensImportRequestParam; },
   set clearLensImportRequestParam(value) { clearLensImportRequestParam = value; },
-  get clearPendingPermissionListener() { return clearPendingPermissionListener; },
-  set clearPendingPermissionListener(value) { clearPendingPermissionListener = value; },
   get clearTimelapseRecording() { return clearTimelapseRecording; },
   set clearTimelapseRecording(value) { clearTimelapseRecording = value; },
   get closeAllOpenProjectTabsForProjectReplacement() { return closeAllOpenProjectTabsForProjectReplacement; },
   set closeAllOpenProjectTabsForProjectReplacement(value) { closeAllOpenProjectTabsForProjectReplacement = value; },
+  get reconstructLocalRecentProjectPayload() { return reconstructLocalRecentProjectPayload; },
+  set reconstructLocalRecentProjectPayload(value) { reconstructLocalRecentProjectPayload = value; },
+  get readAutosaveV2PrimaryProject() { return readAutosaveV2PrimaryProject; },
+  set readAutosaveV2PrimaryProject(value) { readAutosaveV2PrimaryProject = value; },
   get createAutosaveProjectId() { return createAutosaveProjectId; },
   set createAutosaveProjectId(value) { createAutosaveProjectId = value; },
   get createLayer() { return createLayer; },
   set createLayer(value) { createLayer = value; },
   get createNewProject() { return createNewProject; },
   set createNewProject(value) { createNewProject = value; },
-  get createNewProjectAsTab() { return createNewProjectAsTab; },
-  set createNewProjectAsTab(value) { createNewProjectAsTab = value; },
   get createOpenProjectSheetTabFromPackagedProject() { return createOpenProjectSheetTabFromPackagedProject; },
   set createOpenProjectSheetTabFromPackagedProject(value) { createOpenProjectSheetTabFromPackagedProject = value; },
   get createOpenProjectTabId() { return createOpenProjectTabId; },
@@ -5723,6 +5777,14 @@
   set ensureOpenProjectTabsInitialized(value) { ensureOpenProjectTabsInitialized = value; },
   get extractDocumentBaseName() { return extractDocumentBaseName; },
   set extractDocumentBaseName(value) { extractDocumentBaseName = value; },
+  get isProjectCommandLocked() { return isProjectCommandLocked; },
+  set isProjectCommandLocked(value) { isProjectCommandLocked = value; },
+  get requestLegacyV2MigrationConsent() { return requestLegacyV2MigrationConsent; },
+  set requestLegacyV2MigrationConsent(value) { requestLegacyV2MigrationConsent = value; },
+  get acquireProjectCommandLock() { return acquireProjectCommandLock; },
+  set acquireProjectCommandLock(value) { acquireProjectCommandLock = value; },
+  get releaseProjectCommandLock() { return releaseProjectCommandLock; },
+  set releaseProjectCommandLock(value) { releaseProjectCommandLock = value; },
   get fallbackRestoreAutosaveAfterLensFailure() { return fallbackRestoreAutosaveAfterLensFailure; },
   set fallbackRestoreAutosaveAfterLensFailure(value) { fallbackRestoreAutosaveAfterLensFailure = value; },
   get fallbackRestoreAutosaveAfterQrFailure() { return fallbackRestoreAutosaveAfterQrFailure; },
@@ -5755,26 +5817,50 @@
   set lensImportRequested(value) { lensImportRequested = value; },
   get loadDocumentFromHandle() { return loadDocumentFromHandle; },
   set loadDocumentFromHandle(value) { loadDocumentFromHandle = value; },
+  get loadDocumentFromBlob() { return loadDocumentFromBlob; },
+  set loadDocumentFromBlob(value) { loadDocumentFromBlob = value; },
   get loadDocumentFromProjectPayload() { return loadDocumentFromProjectPayload; },
   set loadDocumentFromProjectPayload(value) { loadDocumentFromProjectPayload = value; },
   get loadDocumentFromText() { return loadDocumentFromText; },
   set loadDocumentFromText(value) { loadDocumentFromText = value; },
   get loadRecentProjectsMetadata() { return loadRecentProjectsMetadata; },
   set loadRecentProjectsMetadata(value) { loadRecentProjectsMetadata = value; },
+  get parseProjectStorageBlob() { return parseProjectStorageBlob; },
+  set parseProjectStorageBlob(value) { parseProjectStorageBlob = value; },
+  get readProjectStorageManifestFromBlob() { return readProjectStorageManifestFromBlob; },
+  set readProjectStorageManifestFromBlob(value) { readProjectStorageManifestFromBlob = value; },
+  get reconstructLocalRecentProjectPayload() { return reconstructLocalRecentProjectPayload; },
+  set reconstructLocalRecentProjectPayload(value) { reconstructLocalRecentProjectPayload = value; },
+  get extractLocalProjectSheetPayload() { return extractLocalProjectSheetPayload; },
+  set extractLocalProjectSheetPayload(value) { extractLocalProjectSheetPayload = value; },
+  get hydrateActiveLocalProjectJournalFromRecentEntry() { return hydrateActiveLocalProjectJournalFromRecentEntry; },
+  set hydrateActiveLocalProjectJournalFromRecentEntry(value) { hydrateActiveLocalProjectJournalFromRecentEntry = value; },
   get localizeText() { return localizeText; },
   set localizeText(value) { localizeText = value; },
+  get LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE() { return LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE; },
+  set LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE(value) { LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE = value; },
+  get localViewportCanvasLayoutResetPending() { return localViewportCanvasLayoutResetPending; },
+  set localViewportCanvasLayoutResetPending(value) { localViewportCanvasLayoutResetPending = value; },
+  get localViewportCanvasState() { return localViewportCanvasState; },
+  set localViewportCanvasState(value) { localViewportCanvasState = value; },
   get markAutosaveDirty() { return markAutosaveDirty; },
   set markAutosaveDirty(value) { markAutosaveDirty = value; },
   get newProjectPalettePresetId() { return newProjectPalettePresetId; },
   set newProjectPalettePresetId(value) { newProjectPalettePresetId = value; },
   get normalizeAutosaveProjectId() { return normalizeAutosaveProjectId; },
   set normalizeAutosaveProjectId(value) { normalizeAutosaveProjectId = value; },
+  get normalizeProjectPersistenceState() { return normalizeProjectPersistenceState; },
+  set normalizeProjectPersistenceState(value) { normalizeProjectPersistenceState = value; },
   get normalizeColorValue() { return normalizeColorValue; },
   set normalizeColorValue(value) { normalizeColorValue = value; },
   get normalizeDocumentName() { return normalizeDocumentName; },
   set normalizeDocumentName(value) { normalizeDocumentName = value; },
-  get normalizeExternalImportMode() { return normalizeExternalImportMode; },
-  set normalizeExternalImportMode(value) { normalizeExternalImportMode = value; },
+  get normalizeExternalProjectToCanonicalV2() { return canonicalV2ProjectUtilsModule.normalizeExternalProjectToCanonicalV2; },
+  set normalizeExternalProjectToCanonicalV2(value) { canonicalV2ProjectUtilsModule.normalizeExternalProjectToCanonicalV2 = value; },
+  get normalizeProjectSourceKind() { return normalizeProjectSourceKind; },
+  set normalizeProjectSourceKind(value) { normalizeProjectSourceKind = value; },
+  get normalizeProjectStorageAdapterId() { return normalizeProjectStorageAdapterId; },
+  set normalizeProjectStorageAdapterId(value) { normalizeProjectStorageAdapterId = value; },
   get normalizeMirrorAxisState() { return normalizeMirrorAxisState; },
   set normalizeMirrorAxisState(value) { normalizeMirrorAxisState = value; },
   get normalizeOnionSkinState() { return normalizeOnionSkinState; },
@@ -5783,14 +5869,11 @@
   set normalizeSharedRecentProjectEntry(value) { normalizeSharedRecentProjectEntry = value; },
   get normalizeUiTheme() { return normalizeUiTheme; },
   set normalizeUiTheme(value) { normalizeUiTheme = value; },
-  get openProjectTabBusy() { return openProjectTabBusy; },
-  set openProjectTabBusy(value) { openProjectTabBusy = value; },
+  get openProjectTabBusy() { return isProjectCommandLocked(); },
   get openProjectTabs() { return openProjectTabs; },
   set openProjectTabs(value) { openProjectTabs = value; },
   get openRecentProject() { return openRecentProject; },
   set openRecentProject(value) { openRecentProject = value; },
-  get pendingAutosaveHandle() { return pendingAutosaveHandle; },
-  set pendingAutosaveHandle(value) { pendingAutosaveHandle = value; },
   get persistActiveOpenProjectTab() { return persistActiveOpenProjectTab; },
   set persistActiveOpenProjectTab(value) { persistActiveOpenProjectTab = value; },
   get qrImportRequested() { return qrImportRequested; },
@@ -5815,12 +5898,16 @@
   set resetOpenedDocumentViewport(value) { resetOpenedDocumentViewport = value; },
   get resetOpenProjectTabsToCurrentProject() { return resetOpenProjectTabsToCurrentProject; },
   set resetOpenProjectTabsToCurrentProject(value) { resetOpenProjectTabsToCurrentProject = value; },
+  get resolveProjectSourceKind() { return resolveProjectSourceKind; },
+  set resolveProjectSourceKind(value) { resolveProjectSourceKind = value; },
   get resolveTransparentStoragePaletteIndex() { return resolveTransparentStoragePaletteIndex; },
   set resolveTransparentStoragePaletteIndex(value) { resolveTransparentStoragePaletteIndex = value; },
   get scheduleAutosaveSnapshot() { return scheduleAutosaveSnapshot; },
   set scheduleAutosaveSnapshot(value) { scheduleAutosaveSnapshot = value; },
   get scheduleSessionPersist() { return scheduleSessionPersist; },
   set scheduleSessionPersist(value) { scheduleSessionPersist = value; },
+  get writeAutosaveSnapshot() { return writeAutosaveSnapshot; },
+  set writeAutosaveSnapshot(value) { writeAutosaveSnapshot = value; },
   get setActiveAutosaveProjectId() { return setActiveAutosaveProjectId; },
   set setActiveAutosaveProjectId(value) { setActiveAutosaveProjectId = value; },
   get setActiveSharedProjectSession() { return setActiveSharedProjectSession; },
@@ -5831,8 +5918,10 @@
   set setMultiStatus(value) { setMultiStatus = value; },
   get setTrackedProjectDotBaseline() { return setTrackedProjectDotBaseline; },
   set setTrackedProjectDotBaseline(value) { setTrackedProjectDotBaseline = value; },
-  get shouldAppendExternalImportToProject() { return shouldAppendExternalImportToProject; },
-  set shouldAppendExternalImportToProject(value) { shouldAppendExternalImportToProject = value; },
+  get parseProjectStorageBlob() { return parseProjectStorageBlob; },
+  set parseProjectStorageBlob(value) { parseProjectStorageBlob = value; },
+  get snapshotFromDocumentBlob() { return snapshotFromDocumentBlob; },
+  set snapshotFromDocumentBlob(value) { snapshotFromDocumentBlob = value; },
   get snapshotFromDocumentText() { return snapshotFromDocumentText; },
   set snapshotFromDocumentText(value) { snapshotFromDocumentText = value; },
   get state() { return state; },
@@ -5851,6 +5940,8 @@
   set updateAutosaveStatus(value) { updateAutosaveStatus = value; },
   get updateHistoryButtons() { return updateHistoryButtons; },
   set updateHistoryButtons(value) { updateHistoryButtons = value; },
+  get updateActiveProjectPersistenceState() { return updateActiveProjectPersistenceState; },
+  set updateActiveProjectPersistenceState(value) { updateActiveProjectPersistenceState = value; },
   get waitForLensImportPayloadMessage() { return waitForLensImportPayloadMessage; },
   set waitForLensImportPayloadMessage(value) { waitForLensImportPayloadMessage = value; },
   get writeAutosaveSnapshot() { return writeAutosaveSnapshot; },
@@ -5932,8 +6023,6 @@
   const exportDialogWorkflowUtilsModule = window.PiXiEEDrawModules?.exportDialogWorkflowUtils?.createExportDialogWorkflowUtils?.({
   get BUILTIN_UPDATE_HISTORY_ENTRIES() { return BUILTIN_UPDATE_HISTORY_ENTRIES; },
   set BUILTIN_UPDATE_HISTORY_ENTRIES(value) { BUILTIN_UPDATE_HISTORY_ENTRIES = value; },
-  get EXPORT_DIRECTORY_SUPPORTED() { return EXPORT_DIRECTORY_SUPPORTED; },
-  set EXPORT_DIRECTORY_SUPPORTED(value) { EXPORT_DIRECTORY_SUPPORTED = value; },
   get EXPORT_INTERSTITIAL_COOLDOWN_MS() { return EXPORT_INTERSTITIAL_COOLDOWN_MS; },
   set EXPORT_INTERSTITIAL_COOLDOWN_MS(value) { EXPORT_INTERSTITIAL_COOLDOWN_MS = value; },
   get EXPORT_INTERSTITIAL_LAST_SHOWN_KEY() { return EXPORT_INTERSTITIAL_LAST_SHOWN_KEY; },
@@ -5950,8 +6039,6 @@
   set accountState(value) { accountState = value; },
   get activateMobileTab() { return activateMobileTab; },
   set activateMobileTab(value) { activateMobileTab = value; },
-  get attemptExportDirectoryReauthorization() { return attemptExportDirectoryReauthorization; },
-  set attemptExportDirectoryReauthorization(value) { attemptExportDirectoryReauthorization = value; },
   get canUseSessionStorage() { return canUseSessionStorage; },
   set canUseSessionStorage(value) { canUseSessionStorage = value; },
   get dom() { return dom; },
@@ -5962,10 +6049,6 @@
   set ensureInternetConnectedForAction(value) { ensureInternetConnectedForAction = value; },
   get exportAdRequested() { return exportAdRequested; },
   set exportAdRequested(value) { exportAdRequested = value; },
-  get exportDirectoryHandle() { return exportDirectoryHandle; },
-  set exportDirectoryHandle(value) { exportDirectoryHandle = value; },
-  get exportDirectorySetupDismissed() { return exportDirectorySetupDismissed; },
-  set exportDirectorySetupDismissed(value) { exportDirectorySetupDismissed = value; },
   get exportInterstitialAdRequested() { return exportInterstitialAdRequested; },
   set exportInterstitialAdRequested(value) { exportInterstitialAdRequested = value; },
   get exportProjectAsGif() { return exportProjectAsGif; },
@@ -5996,12 +6079,8 @@
   set normalizeExportFormat(value) { normalizeExportFormat = value; },
   get pendingExportAction() { return pendingExportAction; },
   set pendingExportAction(value) { pendingExportAction = value; },
-  get pendingExportDirectoryHandle() { return pendingExportDirectoryHandle; },
-  set pendingExportDirectoryHandle(value) { pendingExportDirectoryHandle = value; },
   get refreshExportScaleControls() { return refreshExportScaleControls; },
   set refreshExportScaleControls(value) { refreshExportScaleControls = value; },
-  get requestExportDirectoryBinding() { return requestExportDirectoryBinding; },
-  set requestExportDirectoryBinding(value) { requestExportDirectoryBinding = value; },
   get runUiAction() { return runUiAction; },
   set runUiAction(value) { runUiAction = value; },
   get saveProjectAsPixieedraw() { return saveProjectAsPixieedraw; },
@@ -6050,8 +6129,6 @@
   set DEFAULT_DOCUMENT_BASENAME(value) { DEFAULT_DOCUMENT_BASENAME = value; },
   get DEFAULT_DOCUMENT_NAME() { return DEFAULT_DOCUMENT_NAME; },
   set DEFAULT_DOCUMENT_NAME(value) { DEFAULT_DOCUMENT_NAME = value; },
-  get EXPORT_DIRECTORY_SUPPORTED() { return EXPORT_DIRECTORY_SUPPORTED; },
-  set EXPORT_DIRECTORY_SUPPORTED(value) { EXPORT_DIRECTORY_SUPPORTED = value; },
   get EXTERNAL_IMPORT_MODE_NEW_PROJECT() { return EXTERNAL_IMPORT_MODE_NEW_PROJECT; },
   set EXTERNAL_IMPORT_MODE_NEW_PROJECT(value) { EXTERNAL_IMPORT_MODE_NEW_PROJECT = value; },
   get MAX_CANVAS_SIZE() { return MAX_CANVAS_SIZE; },
@@ -6066,8 +6143,6 @@
   set SHARED_PROJECTS_ENABLED(value) {},
   get STARTUP_SCREEN_DISMISSED_KEY() { return STARTUP_SCREEN_DISMISSED_KEY; },
   set STARTUP_SCREEN_DISMISSED_KEY(value) { STARTUP_SCREEN_DISMISSED_KEY = value; },
-  get STARTUP_SCREEN_MODE_APPEND_TAB() { return STARTUP_SCREEN_MODE_APPEND_TAB; },
-  set STARTUP_SCREEN_MODE_APPEND_TAB(value) { STARTUP_SCREEN_MODE_APPEND_TAB = value; },
   get STARTUP_SCREEN_MODE_DEFAULT() { return STARTUP_SCREEN_MODE_DEFAULT; },
   set STARTUP_SCREEN_MODE_DEFAULT(value) { STARTUP_SCREEN_MODE_DEFAULT = value; },
   get STARTUP_UPDATE_TOAST_HIDDEN_KEY() { return STARTUP_UPDATE_TOAST_HIDDEN_KEY; },
@@ -6076,10 +6151,6 @@
   set accountState(value) { accountState = value; },
   get applyHistorySnapshot() { return applyHistorySnapshot; },
   set applyHistorySnapshot(value) { applyHistorySnapshot = value; },
-  get attemptExportDirectoryReauthorization() { return attemptExportDirectoryReauthorization; },
-  set attemptExportDirectoryReauthorization(value) { attemptExportDirectoryReauthorization = value; },
-  get autosaveHandle() { return autosaveHandle; },
-  set autosaveHandle(value) { autosaveHandle = value; },
   get autosaveProjectId() { return autosaveProjectId; },
   set autosaveProjectId(value) { autosaveProjectId = value; },
   get autosaveWriteTimer() { return autosaveWriteTimer; },
@@ -6098,10 +6169,10 @@
   set clamp(value) { clamp = value; },
   get clearActiveSharedProjectSession() { return clearActiveSharedProjectSession; },
   set clearActiveSharedProjectSession(value) { clearActiveSharedProjectSession = value; },
-  get clearPendingPermissionListener() { return clearPendingPermissionListener; },
-  set clearPendingPermissionListener(value) { clearPendingPermissionListener = value; },
   get clearReloadTargetProjectId() { return clearReloadTargetProjectId; },
   set clearReloadTargetProjectId(value) { clearReloadTargetProjectId = value; },
+  get clearReloadRecoveryData() { return clearReloadRecoveryData; },
+  set clearReloadRecoveryData(value) { clearReloadRecoveryData = value; },
   get clearTimelapseRecording() { return clearTimelapseRecording; },
   set clearTimelapseRecording(value) { clearTimelapseRecording = value; },
   get closeAllOpenProjectTabsForProjectReplacement() { return closeAllOpenProjectTabsForProjectReplacement; },
@@ -6112,8 +6183,6 @@
   set createAutosaveProjectId(value) { createAutosaveProjectId = value; },
   get createInitialState() { return createInitialState; },
   set createInitialState(value) { createInitialState = value; },
-  get createNewProjectAsTab() { return createNewProjectAsTab; },
-  set createNewProjectAsTab(value) { createNewProjectAsTab = value; },
   get createSharedProjectFromCurrentDocument() { return createSharedProjectFromCurrentDocument; },
   set createSharedProjectFromCurrentDocument(value) { createSharedProjectFromCurrentDocument = value; },
   get deleteOwnedSharedProjectFromBackend() { return deleteOwnedSharedProjectFromBackend; },
@@ -6134,10 +6203,6 @@
   set ensureSharedProjectBackendSession(value) { ensureSharedProjectBackendSession = value; },
   get ensureTimelapseStartCapture() { return ensureTimelapseStartCapture; },
   set ensureTimelapseStartCapture(value) { ensureTimelapseStartCapture = value; },
-  get exportDirectoryHandle() { return exportDirectoryHandle; },
-  set exportDirectoryHandle(value) { exportDirectoryHandle = value; },
-  get exportDirectorySetupDismissed() { return exportDirectorySetupDismissed; },
-  set exportDirectorySetupDismissed(value) { exportDirectorySetupDismissed = value; },
   get extractDocumentBaseName() { return extractDocumentBaseName; },
   set extractDocumentBaseName(value) { extractDocumentBaseName = value; },
   get getCurrentSharedRecentProjectEntry() { return getCurrentSharedRecentProjectEntry; },
@@ -6160,14 +6225,24 @@
   set initPixieedAccount(value) { initPixieedAccount = value; },
   get isSharedRecentProjectEntry() { return isSharedRecentProjectEntry; },
   set isSharedRecentProjectEntry(value) { isSharedRecentProjectEntry = value; },
+  get isTinyStartupSnapshot() { return isTinyStartupSnapshot; },
+  set isTinyStartupSnapshot(value) { isTinyStartupSnapshot = value; },
   get lastSharedProjectCreationFailureDetail() { return lastSharedProjectCreationFailureDetail; },
   set lastSharedProjectCreationFailureDetail(value) { lastSharedProjectCreationFailureDetail = value; },
   get lastSharedProjectCreationFailureReason() { return lastSharedProjectCreationFailureReason; },
   set lastSharedProjectCreationFailureReason(value) { lastSharedProjectCreationFailureReason = value; },
   get lensImportRequested() { return lensImportRequested; },
   set lensImportRequested(value) { lensImportRequested = value; },
+  get loadRecentProjectPackagedPayload() { return loadRecentProjectPackagedPayload; },
+  set loadRecentProjectPackagedPayload(value) { loadRecentProjectPackagedPayload = value; },
+  get loadPersistedTimelapseSnapshots() { return loadPersistedTimelapseSnapshots; },
+  set loadPersistedTimelapseSnapshots(value) { loadPersistedTimelapseSnapshots = value; },
   get loadRecentProjectsMetadata() { return loadRecentProjectsMetadata; },
   set loadRecentProjectsMetadata(value) { loadRecentProjectsMetadata = value; },
+  get parseProjectStorageBlob() { return parseProjectStorageBlob; },
+  set parseProjectStorageBlob(value) { parseProjectStorageBlob = value; },
+  get readProjectStorageManifestFromBlob() { return readProjectStorageManifestFromBlob; },
+  set readProjectStorageManifestFromBlob(value) { readProjectStorageManifestFromBlob = value; },
   get localizeText() { return localizeText; },
   set localizeText(value) { localizeText = value; },
   get lockedCanvasHeight() { return lockedCanvasHeight; },
@@ -6176,6 +6251,10 @@
   set lockedCanvasWidth(value) { lockedCanvasWidth = value; },
   get markAutosaveDirty() { return markAutosaveDirty; },
   set markAutosaveDirty(value) { markAutosaveDirty = value; },
+  get migrateLegacyMultiProjectPackage() { return migrateLegacyMultiProjectPackage; },
+  set migrateLegacyMultiProjectPackage(value) { migrateLegacyMultiProjectPackage = value; },
+  get migrateLegacyLocalProjectsToTrueV2() { return migrateLegacyLocalProjectsToTrueV2; },
+  set migrateLegacyLocalProjectsToTrueV2(value) { migrateLegacyLocalProjectsToTrueV2 = value; },
   get newProjectAdRequested() { return newProjectAdRequested; },
   set newProjectAdRequested(value) { newProjectAdRequested = value; },
   get newProjectPalettePresetId() { return newProjectPalettePresetId; },
@@ -6188,12 +6267,16 @@
   set normalizeDocumentName(value) { normalizeDocumentName = value; },
   get normalizeMultiProjectKey() { return normalizeMultiProjectKey; },
   set normalizeMultiProjectKey(value) { normalizeMultiProjectKey = value; },
+  get normalizeLocalViewportCanvasState() { return normalizeLocalViewportCanvasState; },
+  set normalizeLocalViewportCanvasState(value) { normalizeLocalViewportCanvasState = value; },
   get normalizeNewProjectPalettePreset() { return normalizeNewProjectPalettePreset; },
   set normalizeNewProjectPalettePreset(value) { normalizeNewProjectPalettePreset = value; },
   get normalizeSharedRecentProjectEntry() { return normalizeSharedRecentProjectEntry; },
   set normalizeSharedRecentProjectEntry(value) { normalizeSharedRecentProjectEntry = value; },
   get openDocumentDialog() { return openDocumentDialog; },
   set openDocumentDialog(value) { openDocumentDialog = value; },
+  get openDocumentAsNewProject() { return openDocumentAsNewProject; },
+  set openDocumentAsNewProject(value) { openDocumentAsNewProject = value; },
   get openRecentProject() { return openRecentProject; },
   set openRecentProject(value) { openRecentProject = value; },
   get openSharedProjectCanonical() { return openSharedProjectCanonical; },
@@ -6202,12 +6285,6 @@
   set openSharedProjectFromHomeInput(value) { openSharedProjectFromHomeInput = value; },
   get openSharedRecentProject() { return openSharedRecentProject; },
   set openSharedRecentProject(value) { openSharedRecentProject = value; },
-  get pendingAutosaveHandle() { return pendingAutosaveHandle; },
-  set pendingAutosaveHandle(value) { pendingAutosaveHandle = value; },
-  get pendingExportDirectoryHandle() { return pendingExportDirectoryHandle; },
-  set pendingExportDirectoryHandle(value) { pendingExportDirectoryHandle = value; },
-  get pendingNewProjectAppendAsTab() { return pendingNewProjectAppendAsTab; },
-  set pendingNewProjectAppendAsTab(value) { pendingNewProjectAppendAsTab = value; },
   get pendingNewProjectCreateShared() { return pendingNewProjectCreateShared; },
   set pendingNewProjectCreateShared(value) { pendingNewProjectCreateShared = value; },
   get projectHomeVisible() { return projectHomeVisible; },
@@ -6218,6 +6295,8 @@
   set readMultiInviteFromUrl(value) { readMultiInviteFromUrl = value; },
   get readReloadTargetProjectId() { return readReloadTargetProjectId; },
   set readReloadTargetProjectId(value) { readReloadTargetProjectId = value; },
+  get readReloadSessionSnapshotPayload() { return readReloadSessionSnapshotPayload; },
+  set readReloadSessionSnapshotPayload(value) { readReloadSessionSnapshotPayload = value; },
   get recentProjectsCache() { return recentProjectsCache; },
   set recentProjectsCache(value) { recentProjectsCache = value; },
   get refreshRecentProjectsUI() { return refreshRecentProjectsUI; },
@@ -6230,8 +6309,6 @@
   set renderNewProjectPalettePresetOptions(value) { renderNewProjectPalettePresetOptions = value; },
   get renderNewProjectPalettePresetPicker() { return renderNewProjectPalettePresetPicker; },
   set renderNewProjectPalettePresetPicker(value) { renderNewProjectPalettePresetPicker = value; },
-  get requestExportDirectoryBinding() { return requestExportDirectoryBinding; },
-  set requestExportDirectoryBinding(value) { requestExportDirectoryBinding = value; },
   get resetDocumentUnsavedChanges() { return resetDocumentUnsavedChanges; },
   set resetDocumentUnsavedChanges(value) { resetDocumentUnsavedChanges = value; },
   get resetExportScaleDefaults() { return resetExportScaleDefaults; },
@@ -6246,6 +6323,14 @@
   set resolveSharedRecentProjectOwnedByCurrentUser(value) { resolveSharedRecentProjectOwnedByCurrentUser = value; },
   get scheduleAutosaveSnapshot() { return scheduleAutosaveSnapshot; },
   set scheduleAutosaveSnapshot(value) { scheduleAutosaveSnapshot = value; },
+  get serializeProjectStorageSnapshot() { return serializeProjectStorageSnapshot; },
+  set serializeProjectStorageSnapshot(value) { serializeProjectStorageSnapshot = value; },
+  get serializeProjectTimelapseSnapshotList() { return serializeProjectTimelapseSnapshotList; },
+  set serializeProjectTimelapseSnapshotList(value) { serializeProjectTimelapseSnapshotList = value; },
+  get snapshotFromParsedDocumentValue() { return snapshotFromParsedDocumentValue; },
+  set snapshotFromParsedDocumentValue(value) { snapshotFromParsedDocumentValue = value; },
+  get generateSnapshotThumbnail() { return generateSnapshotThumbnail; },
+  set generateSnapshotThumbnail(value) { generateSnapshotThumbnail = value; },
   get scheduleSessionPersist() { return scheduleSessionPersist; },
   set scheduleSessionPersist(value) { scheduleSessionPersist = value; },
   get setActiveAutosaveProjectId() { return setActiveAutosaveProjectId; },
@@ -6300,8 +6385,6 @@
   set syncStartupResumeState(value) { syncStartupResumeState = value; },
   get updateAutosaveStatus() { return updateAutosaveStatus; },
   set updateAutosaveStatus(value) { updateAutosaveStatus = value; },
-  get updateExportFolderStatus() { return updateExportFolderStatus; },
-  set updateExportFolderStatus(value) { updateExportFolderStatus = value; },
   get updateHistoryButtons() { return updateHistoryButtons; },
   set updateHistoryButtons(value) { updateHistoryButtons = value; },
   get writeAutosaveSnapshot() { return writeAutosaveSnapshot; },
@@ -6313,6 +6396,8 @@
   set AUTOSAVE_SUPPORTED(value) { AUTOSAVE_SUPPORTED = value; },
   get DEFAULT_DOCUMENT_NAME() { return DEFAULT_DOCUMENT_NAME; },
   set DEFAULT_DOCUMENT_NAME(value) { DEFAULT_DOCUMENT_NAME = value; },
+  get removeAutosaveV2ProjectData() { return removeAutosaveV2ProjectData; },
+  set removeAutosaveV2ProjectData(value) { removeAutosaveV2ProjectData = value; },
   get RECENT_PROJECT_STORAGE_LOCAL() { return RECENT_PROJECT_STORAGE_LOCAL; },
   set RECENT_PROJECT_STORAGE_LOCAL(value) { RECENT_PROJECT_STORAGE_LOCAL = value; },
   get SHARED_RECENT_PROJECTS_ACCOUNT_SYNC_COOLDOWN_MS() { return SHARED_RECENT_PROJECTS_ACCOUNT_SYNC_COOLDOWN_MS; },
@@ -6355,8 +6440,6 @@
   set isOwnedSharedRecentProjectEntry(value) { isOwnedSharedRecentProjectEntry = value; },
   get isSharedRecentProjectEntry() { return isSharedRecentProjectEntry; },
   set isSharedRecentProjectEntry(value) { isSharedRecentProjectEntry = value; },
-  get isStartupScreenAppendTabMode() { return isStartupScreenAppendTabMode; },
-  set isStartupScreenAppendTabMode(value) { isStartupScreenAppendTabMode = value; },
   get loadRecentProjectsMetadata() { return loadRecentProjectsMetadata; },
   set loadRecentProjectsMetadata(value) { loadRecentProjectsMetadata = value; },
   get loadSharedProjectSnapshotRecord() { return loadSharedProjectSnapshotRecord; },
@@ -6416,8 +6499,8 @@
   set DOCUMENT_FILE_VERSION(value) { DOCUMENT_FILE_VERSION = value; },
   get LOCAL_PROJECT_THUMBNAIL_UPDATE_INTERVAL_MS() { return LOCAL_PROJECT_THUMBNAIL_UPDATE_INTERVAL_MS; },
   set LOCAL_PROJECT_THUMBNAIL_UPDATE_INTERVAL_MS(value) { LOCAL_PROJECT_THUMBNAIL_UPDATE_INTERVAL_MS = value; },
-  get MAX_PROJECT_SHEETS() { return MAX_PROJECT_SHEETS; },
-  set MAX_PROJECT_SHEETS(value) { MAX_PROJECT_SHEETS = value; },
+  // Deprecated split-module contract. It intentionally has no sheet limit.
+  get MAX_PROJECT_SHEETS() { return undefined; },
   get PROJECT_FILE_EXTENSION() { return PROJECT_FILE_EXTENSION; },
   set PROJECT_FILE_EXTENSION(value) { PROJECT_FILE_EXTENSION = value; },
   get PROJECT_PACKAGE_TYPE() { return PROJECT_PACKAGE_TYPE; },
@@ -6432,6 +6515,18 @@
   set activeOpenProjectTabId(value) { activeOpenProjectTabId = value; },
   get autosaveProjectId() { return autosaveProjectId; },
   set autosaveProjectId(value) { autosaveProjectId = value; },
+  get getActiveCanonicalProjectMetadata() {
+    return () => {
+      const tab = typeof getActiveOpenProjectTab === 'function' ? getActiveOpenProjectTab() : null;
+      return tab?.canonicalPayloadFormat === 'v2'
+        ? {
+            canonicalPayloadFormat: 'v2',
+            canonicalSchemaVersion: tab.canonicalSchemaVersion,
+            canonicalSourceMetadata: tab.canonicalSourceMetadata || null,
+          }
+        : null;
+    };
+  },
   get buildProjectSessionPayload() { return buildProjectSessionPayload; },
   set buildProjectSessionPayload(value) { buildProjectSessionPayload = value; },
   get clamp() { return clamp; },
@@ -6444,6 +6539,8 @@
   set createOpenProjectTabId(value) { createOpenProjectTabId = value; },
   get extractDocumentBaseName() { return extractDocumentBaseName; },
   set extractDocumentBaseName(value) { extractDocumentBaseName = value; },
+  get extractLocalProjectSheetPayload() { return extractLocalProjectSheetPayload; },
+  set extractLocalProjectSheetPayload(value) { extractLocalProjectSheetPayload = value; },
   get findOpenProjectTabIndex() { return findOpenProjectTabIndex; },
   set findOpenProjectTabIndex(value) { findOpenProjectTabIndex = value; },
   get getCurrentRecentProjectAccountUserId() { return getCurrentRecentProjectAccountUserId; },
@@ -6454,6 +6551,16 @@
   set getSharedProjectKeyFromProjectId(value) { getSharedProjectKeyFromProjectId = value; },
   get hasDocumentUnsavedChanges() { return hasDocumentUnsavedChanges; },
   set hasDocumentUnsavedChanges(value) { hasDocumentUnsavedChanges = value; },
+  get createLocalProjectEntrySignature() { return createLocalProjectEntrySignature; },
+  set createLocalProjectEntrySignature(value) { createLocalProjectEntrySignature = value; },
+  get createLightweightLocalProjectTabState() { return createLightweightLocalProjectTabState; },
+  set createLightweightLocalProjectTabState(value) { createLightweightLocalProjectTabState = value; },
+  get reconstructLocalRecentProjectPayload() { return reconstructLocalRecentProjectPayload; },
+  set reconstructLocalRecentProjectPayload(value) { reconstructLocalRecentProjectPayload = value; },
+  get resolveStoredLocalProjectPayloadForProjectId() { return resolveStoredLocalProjectPayloadForProjectId; },
+  set resolveStoredLocalProjectPayloadForProjectId(value) { resolveStoredLocalProjectPayloadForProjectId = value; },
+  get extractLocalProjectSheetPayload() { return extractLocalProjectSheetPayload; },
+  set extractLocalProjectSheetPayload(value) { extractLocalProjectSheetPayload = value; },
   get isSharedRecentProjectEntry() { return isSharedRecentProjectEntry; },
   set isSharedRecentProjectEntry(value) { isSharedRecentProjectEntry = value; },
   get loadRecentProjectsMetadata() { return loadRecentProjectsMetadata; },
@@ -6478,10 +6585,16 @@
   set projectDotCumulativeStats(value) { projectDotCumulativeStats = value; },
   get recordSharedProjectLightweightLocalSave() { return recordSharedProjectLightweightLocalSave; },
   set recordSharedProjectLightweightLocalSave(value) { recordSharedProjectLightweightLocalSave = value; },
+  get recentProjectsCache() { return recentProjectsCache; },
+  set recentProjectsCache(value) { recentProjectsCache = value; },
   get saveRecentProjectsList() { return saveRecentProjectsList; },
   set saveRecentProjectsList(value) { saveRecentProjectsList = value; },
+  get buildActiveLocalProjectSavePlan() { return buildActiveLocalProjectSavePlan; },
+  set buildActiveLocalProjectSavePlan(value) { buildActiveLocalProjectSavePlan = value; },
   get serializeDocumentSnapshot() { return serializeDocumentSnapshot; },
   set serializeDocumentSnapshot(value) { serializeDocumentSnapshot = value; },
+  get serializeProjectStorageSnapshot() { return serializeProjectStorageSnapshot; },
+  set serializeProjectStorageSnapshot(value) { serializeProjectStorageSnapshot = value; },
   get setActiveAutosaveProjectId() { return setActiveAutosaveProjectId; },
   set setActiveAutosaveProjectId(value) { setActiveAutosaveProjectId = value; },
   get setRecentProjectsCache() { return setRecentProjectsCache; },
@@ -6493,6 +6606,79 @@
   get suppressOpenProjectTabAutoInitialize() { return suppressOpenProjectTabAutoInitialize; },
   set suppressOpenProjectTabAutoInitialize(value) { suppressOpenProjectTabAutoInitialize = value; },
   }) || {};
+
+  const projectStorageAdapterUtilsModule = window.PiXiEEDrawModules?.projectStorageAdapterUtils?.createProjectStorageAdapterUtils?.({
+    console,
+  }) || {};
+
+  const pixieeDrawV1JsonAdapter = window.PiXiEEDrawModules?.projectStorageV1JsonAdapter?.createPixieeDrawV1JsonAdapter?.({
+    PROJECT_FILE_EXTENSION,
+    PROJECT_FILE_MIME_TYPE,
+    PROJECT_PACKAGE_TYPE,
+    buildPackagedProjectPayload: (...args) => projectPackageWorkflowUtilsModule.buildPackagedProjectPayload(...args),
+    createAutosaveFileName: (...args) => createAutosaveFileName(...args),
+  }) || null;
+
+  const projectStorageV2WorkerBridge = window.PiXiEEDrawModules?.projectStorageV2WorkerBridge?.createProjectStorageV2WorkerBridge?.({
+    workerUrl: 'assets/js/workers/project-storage-v2.worker.js?v=20260713-047',
+    console,
+  }) || null;
+
+  const pixieeDrawV2ZipAdapter = window.PiXiEEDrawModules?.projectStorageV2ZipAdapter?.createPixieeDrawV2ZipAdapter?.({
+    PROJECT_FILE_EXTENSION,
+    PROJECT_FILE_MIME_TYPE,
+    PROJECT_PACKAGE_TYPE,
+    buildPackagedProjectPayload: (...args) => projectPackageWorkflowUtilsModule.buildPackagedProjectPayload(...args),
+    createAutosaveFileName: (...args) => createAutosaveFileName(...args),
+    decodeBase64: (...args) => decodeBase64(...args),
+    encodeTypedArray: (...args) => encodeTypedArray(...args),
+    workerBridge: projectStorageV2WorkerBridge,
+    useWorkerByDefault: true,
+    console,
+  }) || null;
+
+  const projectStorageAdapterRegistry = projectStorageAdapterUtilsModule.createProjectStorageAdapterRegistry?.({
+    adapters: [
+      pixieeDrawV1JsonAdapter,
+      pixieeDrawV2ZipAdapter,
+    ].filter(Boolean),
+    defaultAdapterId: pixieeDrawV2ZipAdapter?.id || pixieeDrawV1JsonAdapter?.id || '',
+  }) || null;
+
+  function parseProjectStorageText(...args) {
+    if (!projectStorageAdapterRegistry?.parseText) {
+      throw new Error('Project storage text parser is not available');
+    }
+    return projectStorageAdapterRegistry.parseText(...args);
+  }
+
+  function parseProjectStoragePayload(...args) {
+    if (!projectStorageAdapterRegistry?.parseParsedValue) {
+      return { adapterId: '', parsed: args[0] };
+    }
+    return projectStorageAdapterRegistry.parseParsedValue(...args);
+  }
+
+  async function parseProjectStorageBlob(...args) {
+    if (!projectStorageAdapterRegistry?.parseBlob) {
+      throw new Error('Project storage blob parser is not available');
+    }
+    return await projectStorageAdapterRegistry.parseBlob(...args);
+  }
+
+  async function readProjectStorageManifestFromBlob(...args) {
+    if (!projectStorageAdapterRegistry?.readManifestFromBlob) {
+      return { adapterId: '', manifest: null };
+    }
+    return await projectStorageAdapterRegistry.readManifestFromBlob(...args);
+  }
+
+  async function serializeProjectStorageSnapshot(...args) {
+    if (!projectStorageAdapterRegistry?.serializeProject) {
+      throw new Error('Project storage serializer is not available');
+    }
+    return await projectStorageAdapterRegistry.serializeProject(...args);
+  }
 
   const documentSerializationUtilsModule = window.PiXiEEDrawModules?.documentSerializationUtils?.createDocumentSerializationUtils?.({
   get BRUSH_SHAPE_CUSTOM() { return BRUSH_SHAPE_CUSTOM; },
@@ -6584,8 +6770,8 @@
   const documentSessionWorkflowUtilsModule = window.PiXiEEDrawModules?.documentSessionWorkflowUtils?.createDocumentSessionWorkflowUtils?.({
   get DEFAULT_HISTORY_LIMIT() { return DEFAULT_HISTORY_LIMIT; },
   set DEFAULT_HISTORY_LIMIT(value) { DEFAULT_HISTORY_LIMIT = value; },
-  get MAX_PROJECT_SHEETS() { return MAX_PROJECT_SHEETS; },
-  set MAX_PROJECT_SHEETS(value) { MAX_PROJECT_SHEETS = value; },
+  // Deprecated split-module contract. It intentionally has no sheet limit.
+  get MAX_PROJECT_SHEETS() { return undefined; },
   get MIN_HISTORY_LIMIT() { return MIN_HISTORY_LIMIT; },
   set MIN_HISTORY_LIMIT(value) { MIN_HISTORY_LIMIT = value; },
   get SHARED_PROJECTS_ENABLED() { return SHARED_PROJECTS_ENABLED; },
@@ -6616,6 +6802,8 @@
   set compressUint8Array(value) { compressUint8Array = value; },
   get createAutosaveProjectId() { return createAutosaveProjectId; },
   set createAutosaveProjectId(value) { createAutosaveProjectId = value; },
+  get createProjectPersistenceToken() { return createProjectPersistenceToken; },
+  set createProjectPersistenceToken(value) { createProjectPersistenceToken = value; },
   get createEmptyTimelapseTrack() { return createEmptyTimelapseTrack; },
   set createEmptyTimelapseTrack(value) { createEmptyTimelapseTrack = value; },
   get createOpenProjectSheetTabFromPackagedProject() { return createOpenProjectSheetTabFromPackagedProject; },
@@ -6624,6 +6812,8 @@
   set decodeBase64(value) { decodeBase64 = value; },
   get decompressHistorySnapshot() { return decompressHistorySnapshot; },
   set decompressHistorySnapshot(value) { decompressHistorySnapshot = value; },
+  get dom() { return dom; },
+  set dom(value) { dom = value; },
   get deserializeDocumentPayload() { return deserializeDocumentPayload; },
   set deserializeDocumentPayload(value) { deserializeDocumentPayload = value; },
   get encodeTypedArray() { return encodeTypedArray; },
@@ -6656,16 +6846,40 @@
   set isSharedRecentProjectEntry(value) { isSharedRecentProjectEntry = value; },
   get loadDocumentFromImageFile() { return loadDocumentFromImageFile; },
   set loadDocumentFromImageFile(value) { loadDocumentFromImageFile = value; },
+  get LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE() { return LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE; },
+  set LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE(value) { LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE = value; },
+  get localViewportCanvasLayoutResetPending() { return localViewportCanvasLayoutResetPending; },
+  set localViewportCanvasLayoutResetPending(value) { localViewportCanvasLayoutResetPending = value; },
+  get localViewportCanvasState() { return localViewportCanvasState; },
+  set localViewportCanvasState(value) { localViewportCanvasState = value; },
   get localizeText() { return localizeText; },
   set localizeText(value) { localizeText = value; },
   get markAutosaveDirty() { return markAutosaveDirty; },
   set markAutosaveDirty(value) { markAutosaveDirty = value; },
+  get migrateLegacyMultiProjectPackage() { return migrateLegacyMultiProjectPackage; },
+  set migrateLegacyMultiProjectPackage(value) { migrateLegacyMultiProjectPackage = value; },
   get normalizeAutosaveProjectId() { return normalizeAutosaveProjectId; },
   set normalizeAutosaveProjectId(value) { normalizeAutosaveProjectId = value; },
+  get normalizeLocalViewportCanvasState() { return normalizeLocalViewportCanvasState; },
+  set normalizeLocalViewportCanvasState(value) { normalizeLocalViewportCanvasState = value; },
+  get normalizeProjectPersistenceState() { return normalizeProjectPersistenceState; },
+  set normalizeProjectPersistenceState(value) { normalizeProjectPersistenceState = value; },
+  get normalizeProjectSourceKind() { return normalizeProjectSourceKind; },
+  set normalizeProjectSourceKind(value) { normalizeProjectSourceKind = value; },
+  get normalizeProjectStorageAdapterId() { return normalizeProjectStorageAdapterId; },
+  set normalizeProjectStorageAdapterId(value) { normalizeProjectStorageAdapterId = value; },
   get normalizeMultiProjectKey() { return normalizeMultiProjectKey; },
   set normalizeMultiProjectKey(value) { normalizeMultiProjectKey = value; },
   get normalizePackagedProjectSheets() { return normalizePackagedProjectSheets; },
   set normalizePackagedProjectSheets(value) { normalizePackagedProjectSheets = value; },
+  get parseProjectStorageBlob() { return parseProjectStorageBlob; },
+  set parseProjectStorageBlob(value) { parseProjectStorageBlob = value; },
+  get parseProjectStoragePayload() { return parseProjectStoragePayload; },
+  set parseProjectStoragePayload(value) { parseProjectStoragePayload = value; },
+  get parseProjectStorageText() { return parseProjectStorageText; },
+  set parseProjectStorageText(value) { parseProjectStorageText = value; },
+  get validateCanonicalV2ProjectPayload() { return canonicalV2ProjectUtilsModule.validateCanonicalV2ProjectPayload; },
+  set validateCanonicalV2ProjectPayload(value) { canonicalV2ProjectUtilsModule.validateCanonicalV2ProjectPayload = value; },
   get normalizeTimelapseCanvasId() { return normalizeTimelapseCanvasId; },
   set normalizeTimelapseCanvasId(value) { normalizeTimelapseCanvasId = value; },
   get normalizeTimelapseFps() { return normalizeTimelapseFps; },
@@ -6678,6 +6892,8 @@
   set recentProjectsCache(value) { recentProjectsCache = value; },
   get reconcileTimelapseTracksForSingleCanvas() { return reconcileTimelapseTracksForSingleCanvas; },
   set reconcileTimelapseTracksForSingleCanvas(value) { reconcileTimelapseTracksForSingleCanvas = value; },
+  get requestLegacyV2MigrationConsent() { return requestLegacyV2MigrationConsent; },
+  set requestLegacyV2MigrationConsent(value) { requestLegacyV2MigrationConsent = value; },
   get renderOpenProjectTabs() { return renderOpenProjectTabs; },
   set renderOpenProjectTabs(value) { renderOpenProjectTabs = value; },
   get resetDocumentUnsavedChanges() { return resetDocumentUnsavedChanges; },
@@ -6688,6 +6904,8 @@
   set resetOpenedDocumentViewport(value) { resetOpenedDocumentViewport = value; },
   get resetOpenProjectTabsToCurrentProject() { return resetOpenProjectTabsToCurrentProject; },
   set resetOpenProjectTabsToCurrentProject(value) { resetOpenProjectTabsToCurrentProject = value; },
+  get resolveProjectSourceKind() { return resolveProjectSourceKind; },
+  set resolveProjectSourceKind(value) { resolveProjectSourceKind = value; },
   get resolvePackagedProjectDotStats() { return resolvePackagedProjectDotStats; },
   set resolvePackagedProjectDotStats(value) { resolvePackagedProjectDotStats = value; },
   get resolveTimelapseFrameEntry() { return resolveTimelapseFrameEntry; },
@@ -6728,6 +6946,8 @@
   set updateHistoryButtons(value) { updateHistoryButtons = value; },
   get updateMemoryStatus() { return updateMemoryStatus; },
   set updateMemoryStatus(value) { updateMemoryStatus = value; },
+  get updateActiveProjectPersistenceState() { return updateActiveProjectPersistenceState; },
+  set updateActiveProjectPersistenceState(value) { updateActiveProjectPersistenceState = value; },
   }) || {};
 
   const pixieedAccountWorkflowUtilsModule = window.PiXiEEDrawModules?.pixieedAccountWorkflowUtils?.createPixieedAccountWorkflowUtils?.({
@@ -7309,188 +7529,6 @@
   set state(value) { state = value; },
   }) || {};
 
-  /** @type {any} */
-  const sharedProjectSetupUtilsModule = window.PiXiEEDrawModules?.sharedProjectSetupUtils?.createSharedProjectSetupUtils?.({
-  get MULTI_DEFAULT_EXPORT_PERMISSION() { return MULTI_DEFAULT_EXPORT_PERMISSION; },
-  set MULTI_DEFAULT_EXPORT_PERMISSION(value) { MULTI_DEFAULT_EXPORT_PERMISSION = value; },
-  get MULTI_DEFAULT_JOIN_POLICY() { return MULTI_DEFAULT_JOIN_POLICY; },
-  set MULTI_DEFAULT_JOIN_POLICY(value) { MULTI_DEFAULT_JOIN_POLICY = value; },
-  get MULTI_DEFAULT_ROOM_VISIBILITY() { return MULTI_DEFAULT_ROOM_VISIBILITY; },
-  set MULTI_DEFAULT_ROOM_VISIBILITY(value) { MULTI_DEFAULT_ROOM_VISIBILITY = value; },
-  get MULTI_JOIN_POLICY_OPEN() { return MULTI_JOIN_POLICY_OPEN; },
-  set MULTI_JOIN_POLICY_OPEN(value) { MULTI_JOIN_POLICY_OPEN = value; },
-  get MULTI_ROOM_VISIBILITY_PUBLIC() { return MULTI_ROOM_VISIBILITY_PUBLIC; },
-  set MULTI_ROOM_VISIBILITY_PUBLIC(value) { MULTI_ROOM_VISIBILITY_PUBLIC = value; },
-  get applyMultiMasterPreset() { return applyMultiMasterPreset; },
-  set applyMultiMasterPreset(value) { applyMultiMasterPreset = value; },
-  get applyMultiRoleUiLocks() { return applyMultiRoleUiLocks; },
-  set applyMultiRoleUiLocks(value) { applyMultiRoleUiLocks = value; },
-  get approveSelectedMultiJoinRequest() { return approveSelectedMultiJoinRequest; },
-  set approveSelectedMultiJoinRequest(value) { approveSelectedMultiJoinRequest = value; },
-  get banMultiParticipant() { return banMultiParticipant; },
-  set banMultiParticipant(value) { banMultiParticipant = value; },
-  get bindMultiCommentScrollHandoff() { return bindMultiCommentScrollHandoff; },
-  set bindMultiCommentScrollHandoff(value) { bindMultiCommentScrollHandoff = value; },
-  get bindTabKeyboardNavigation() { return bindTabKeyboardNavigation; },
-  set bindTabKeyboardNavigation(value) { bindTabKeyboardNavigation = value; },
-  get connectMultiSessionAs() { return connectMultiSessionAs; },
-  set connectMultiSessionAs(value) { connectMultiSessionAs = value; },
-  get copyMultiInviteLink() { return copyMultiInviteLink; },
-  set copyMultiInviteLink(value) { copyMultiInviteLink = value; },
-  get createSharedProjectFromCurrentDocument() { return createSharedProjectFromCurrentDocument; },
-  set createSharedProjectFromCurrentDocument(value) { createSharedProjectFromCurrentDocument = value; },
-  get disconnectMultiSession() { return disconnectMultiSession; },
-  set disconnectMultiSession(value) { disconnectMultiSession = value; },
-  get dom() { return dom; },
-  set dom(value) { dom = value; },
-  get ensureSharedProjectAuthenticatedStart() { return ensureSharedProjectAuthenticatedStart; },
-  set ensureSharedProjectAuthenticatedStart(value) { ensureSharedProjectAuthenticatedStart = value; },
-  get forceMultiParticipantRole() { return forceMultiParticipantRole; },
-  set forceMultiParticipantRole(value) { forceMultiParticipantRole = value; },
-  get generateMultiProjectKey() { return generateMultiProjectKey; },
-  set generateMultiProjectKey(value) { generateMultiProjectKey = value; },
-  get getActiveProjectCanvasDocument() { return getActiveProjectCanvasDocument; },
-  set getActiveProjectCanvasDocument(value) { getActiveProjectCanvasDocument = value; },
-  get getAssignedGuestCount() { return getAssignedGuestCount; },
-  set getAssignedGuestCount(value) { getAssignedGuestCount = value; },
-  get getAssignmentCanvasDocument() { return getAssignmentCanvasDocument; },
-  set getAssignmentCanvasDocument(value) { getAssignmentCanvasDocument = value; },
-  get getMultiAssignment() { return getMultiAssignment; },
-  set getMultiAssignment(value) { getMultiAssignment = value; },
-  get getMultiFlowTabButtons() { return getMultiFlowTabButtons; },
-  set getMultiFlowTabButtons(value) { getMultiFlowTabButtons = value; },
-  get getMultiProjectKeyInputElements() { return getMultiProjectKeyInputElements; },
-  set getMultiProjectKeyInputElements(value) { getMultiProjectKeyInputElements = value; },
-  get getPendingMultiAssignmentMoveRequest() { return getPendingMultiAssignmentMoveRequest; },
-  set getPendingMultiAssignmentMoveRequest(value) { getPendingMultiAssignmentMoveRequest = value; },
-  get getProjectCanvasDocumentAt() { return getProjectCanvasDocumentAt; },
-  set getProjectCanvasDocumentAt(value) { getProjectCanvasDocumentAt = value; },
-  get getProjectCanvasDocumentById() { return getProjectCanvasDocumentById; },
-  set getProjectCanvasDocumentById(value) { getProjectCanvasDocumentById = value; },
-  get isCurrentProjectSharedEntry() { return isCurrentProjectSharedEntry; },
-  set isCurrentProjectSharedEntry(value) { isCurrentProjectSharedEntry = value; },
-  get isMultiMasterConfigMode() { return isMultiMasterConfigMode; },
-  set isMultiMasterConfigMode(value) { isMultiMasterConfigMode = value; },
-  get isMultiMasterMode() { return isMultiMasterMode; },
-  set isMultiMasterMode(value) { isMultiMasterMode = value; },
-  get isMultiParticipantsCommentModeActive() { return isMultiParticipantsCommentModeActive; },
-  set isMultiParticipantsCommentModeActive(value) { isMultiParticipantsCommentModeActive = value; },
-  get isMultiSpectatorMode() { return isMultiSpectatorMode; },
-  set isMultiSpectatorMode(value) { isMultiSpectatorMode = value; },
-  get kickMultiParticipant() { return kickMultiParticipant; },
-  set kickMultiParticipant(value) { kickMultiParticipant = value; },
-  get localizeText() { return localizeText; },
-  set localizeText(value) { localizeText = value; },
-  get maybeApplyInviteAutoJoin() { return maybeApplyInviteAutoJoin; },
-  set maybeApplyInviteAutoJoin(value) { maybeApplyInviteAutoJoin = value; },
-  get maybeAutoResumeMultiSession() { return maybeAutoResumeMultiSession; },
-  set maybeAutoResumeMultiSession(value) { maybeAutoResumeMultiSession = value; },
-  get SHARED_PROJECTS_ENABLED() { return SHARED_PROJECTS_ENABLED; },
-  set SHARED_PROJECTS_ENABLED(value) {},
-  get moveMultiParticipantToCell() { return moveMultiParticipantToCell; },
-  set moveMultiParticipantToCell(value) { moveMultiParticipantToCell = value; },
-  get multiEntryJoinPanelOpen() { return multiEntryJoinPanelOpen; },
-  set multiEntryJoinPanelOpen(value) { multiEntryJoinPanelOpen = value; },
-  get multiEntryMetricsResizeObserver() { return multiEntryMetricsResizeObserver; },
-  set multiEntryMetricsResizeObserver(value) { multiEntryMetricsResizeObserver = value; },
-  get multiState() { return multiState; },
-  set multiState(value) { multiState = value; },
-  get normalizeMultiAssignmentCanvasId() { return normalizeMultiAssignmentCanvasId; },
-  set normalizeMultiAssignmentCanvasId(value) { normalizeMultiAssignmentCanvasId = value; },
-  get normalizeMultiDesiredRole() { return normalizeMultiDesiredRole; },
-  set normalizeMultiDesiredRole(value) { normalizeMultiDesiredRole = value; },
-  get normalizeMultiExportPermission() { return normalizeMultiExportPermission; },
-  set normalizeMultiExportPermission(value) { normalizeMultiExportPermission = value; },
-  get normalizeMultiJoinPolicy() { return normalizeMultiJoinPolicy; },
-  set normalizeMultiJoinPolicy(value) { normalizeMultiJoinPolicy = value; },
-  get normalizeMultiMaxGuests() { return normalizeMultiMaxGuests; },
-  set normalizeMultiMaxGuests(value) { normalizeMultiMaxGuests = value; },
-  get normalizeMultiRoomVisibility() { return normalizeMultiRoomVisibility; },
-  set normalizeMultiRoomVisibility(value) { normalizeMultiRoomVisibility = value; },
-  get normalizeMultiUiView() { return normalizeMultiUiView; },
-  set normalizeMultiUiView(value) { normalizeMultiUiView = value; },
-  get openShareStartConfirmDialog() { return openShareStartConfirmDialog; },
-  set openShareStartConfirmDialog(value) { openShareStartConfirmDialog = value; },
-  get openSharedProjectFromInput() { return openSharedProjectFromInput; },
-  set openSharedProjectFromInput(value) { openSharedProjectFromInput = value; },
-  get parseMultiProjectAccessInput() { return parseMultiProjectAccessInput; },
-  set parseMultiProjectAccessInput(value) { parseMultiProjectAccessInput = value; },
-  get prefersSharedProjectFlow() { return prefersSharedProjectFlow; },
-  set prefersSharedProjectFlow(value) { prefersSharedProjectFlow = value; },
-  get readCurrentMultiProjectKey() { return readCurrentMultiProjectKey; },
-  set readCurrentMultiProjectKey(value) { readCurrentMultiProjectKey = value; },
-  get readMultiInviteFromUrl() { return readMultiInviteFromUrl; },
-  set readMultiInviteFromUrl(value) { readMultiInviteFromUrl = value; },
-  get readMultiJoinProjectAccessInputOnly() { return readMultiJoinProjectAccessInputOnly; },
-  set readMultiJoinProjectAccessInputOnly(value) { readMultiJoinProjectAccessInputOnly = value; },
-  get rejectSelectedMultiJoinRequest() { return rejectSelectedMultiJoinRequest; },
-  set rejectSelectedMultiJoinRequest(value) { rejectSelectedMultiJoinRequest = value; },
-  get renderMultiComments() { return renderMultiComments; },
-  set renderMultiComments(value) { renderMultiComments = value; },
-  get renderMultiParticipantsList() { return renderMultiParticipantsList; },
-  set renderMultiParticipantsList(value) { renderMultiParticipantsList = value; },
-  get renderTimelineMatrix() { return renderTimelineMatrix; },
-  set renderTimelineMatrix(value) { renderTimelineMatrix = value; },
-  get resolveSharedProjectKeyForCurrentState() { return resolveSharedProjectKeyForCurrentState; },
-  set resolveSharedProjectKeyForCurrentState(value) { resolveSharedProjectKeyForCurrentState = value; },
-  get scheduleMultiEntryScreenMetricsUpdate() { return scheduleMultiEntryScreenMetricsUpdate; },
-  set scheduleMultiEntryScreenMetricsUpdate(value) { scheduleMultiEntryScreenMetricsUpdate = value; },
-  get scheduleMultiPublicLobbyRoomSync() { return scheduleMultiPublicLobbyRoomSync; },
-  set scheduleMultiPublicLobbyRoomSync(value) { scheduleMultiPublicLobbyRoomSync = value; },
-  get scheduleMultiSessionStateBroadcast() { return scheduleMultiSessionStateBroadcast; },
-  set scheduleMultiSessionStateBroadcast(value) { scheduleMultiSessionStateBroadcast = value; },
-  get scheduleSessionPersist() { return scheduleSessionPersist; },
-  set scheduleSessionPersist(value) { scheduleSessionPersist = value; },
-  get sendMultiComment() { return sendMultiComment; },
-  set sendMultiComment(value) { sendMultiComment = value; },
-  get sendMultiGuestJoinRequest() { return sendMultiGuestJoinRequest; },
-  set sendMultiGuestJoinRequest(value) { sendMultiGuestJoinRequest = value; },
-  get setDanmakuEnabled() { return setDanmakuEnabled; },
-  set setDanmakuEnabled(value) { setDanmakuEnabled = value; },
-  get setMultiEntryJoinPanelOpen() { return setMultiEntryJoinPanelOpen; },
-  set setMultiEntryJoinPanelOpen(value) { setMultiEntryJoinPanelOpen = value; },
-  get setMultiFlowTab() { return setMultiFlowTab; },
-  set setMultiFlowTab(value) { setMultiFlowTab = value; },
-  get setMultiHelpPanelVisible() { return setMultiHelpPanelVisible; },
-  set setMultiHelpPanelVisible(value) { setMultiHelpPanelVisible = value; },
-  get setMultiParticipantCellLocked() { return setMultiParticipantCellLocked; },
-  set setMultiParticipantCellLocked(value) { setMultiParticipantCellLocked = value; },
-  get setMultiParticipantsPanelTab() { return setMultiParticipantsPanelTab; },
-  set setMultiParticipantsPanelTab(value) { setMultiParticipantsPanelTab = value; },
-  get setMultiSelectedControlClientId() { return setMultiSelectedControlClientId; },
-  set setMultiSelectedControlClientId(value) { setMultiSelectedControlClientId = value; },
-  get setMultiStatus() { return setMultiStatus; },
-  set setMultiStatus(value) { setMultiStatus = value; },
-  get setMultiUiView() { return setMultiUiView; },
-  set setMultiUiView(value) { setMultiUiView = value; },
-  get shareMultiInviteLink() { return shareMultiInviteLink; },
-  set shareMultiInviteLink(value) { shareMultiInviteLink = value; },
-  get showSharedProjectSunsetDialog() { return showSharedProjectSunsetDialog; },
-  set showSharedProjectSunsetDialog(value) { showSharedProjectSunsetDialog = value; },
-  get storeMultiProjectKey() { return storeMultiProjectKey; },
-  set storeMultiProjectKey(value) { storeMultiProjectKey = value; },
-  get syncDanmakuControls() { return syncDanmakuControls; },
-  set syncDanmakuControls(value) { syncDanmakuControls = value; },
-  get syncMultiAssignmentControls() { return syncMultiAssignmentControls; },
-  set syncMultiAssignmentControls(value) { syncMultiAssignmentControls = value; },
-  get syncMultiControls() { return syncMultiControls; },
-  set syncMultiControls(value) { syncMultiControls = value; },
-  get syncMultiJoinRequestControls() { return syncMultiJoinRequestControls; },
-  set syncMultiJoinRequestControls(value) { syncMultiJoinRequestControls = value; },
-  get syncMultiProjectKeyInputValues() { return syncMultiProjectKeyInputValues; },
-  set syncMultiProjectKeyInputValues(value) { syncMultiProjectKeyInputValues = value; },
-  get syncSharedModeStatusDisplay() { return syncSharedModeStatusDisplay; },
-  set syncSharedModeStatusDisplay(value) { syncSharedModeStatusDisplay = value; },
-  get syncSharedProjectVisibleStatus() { return syncSharedProjectVisibleStatus; },
-  set syncSharedProjectVisibleStatus(value) { syncSharedProjectVisibleStatus = value; },
-  get unbanMultiParticipant() { return unbanMultiParticipant; },
-  set unbanMultiParticipant(value) { unbanMultiParticipant = value; },
-  get updateMultiAssignmentControlsFromSelection() { return updateMultiAssignmentControlsFromSelection; },
-  set updateMultiAssignmentControlsFromSelection(value) { updateMultiAssignmentControlsFromSelection = value; },
-  get writeTextToClipboard() { return writeTextToClipboard; },
-  set writeTextToClipboard(value) { writeTextToClipboard = value; },
-  }) || {};
-
   const viewportZoomUtils = window.PiXiEEDrawModules?.viewportZoomUtils?.createViewportZoomUtils?.({
     state,
     DEFAULT_CANVAS_SIZE,
@@ -7533,6 +7571,19 @@
     normalizeZoomScale,
     formatZoomLabel,
   } = viewportZoomUtils;
+
+  // `selectionMoveWorkflowUtils` and the import workflow are initialized
+  // before the image decoder adapter below. Keep the palette extractor as a
+  // late-bound function so those dependency getters never resolve an old
+  // split-era global that no longer exists in app.js.
+  function buildIndexedPaletteFromFrameDataList(...args) {
+    const extractor = imageImportPaletteUtils?.buildIndexedPaletteFromFrameDataList;
+    if (typeof extractor !== 'function') {
+      throw new Error('Indexed palette extractor is unavailable');
+    }
+    return extractor(...args);
+  }
+
   const selectionMoveWorkflowUtilsModule = window.PiXiEEDrawModules?.selectionMoveWorkflowUtils?.createSelectionMoveWorkflowUtils?.({
   get BRUSH_SHAPE_CUSTOM() { return BRUSH_SHAPE_CUSTOM; },
   set BRUSH_SHAPE_CUSTOM(value) { BRUSH_SHAPE_CUSTOM = value; },
@@ -7718,6 +7769,10 @@
 
   function createMoveStateFromClipboard(...args) {
     return selectionMoveWorkflowUtilsModule.createMoveStateFromClipboard(...args);
+  }
+
+  function getClipboardPaletteExpansionCount(...args) {
+    return selectionMoveWorkflowUtilsModule.getClipboardPaletteExpansionCount(...args);
   }
 
   function createPasteRestoreSnapshot(...args) {
@@ -8014,16 +8069,12 @@
   set state(value) { state = value; },
   get TOOL_ACTION_FLOATING_PREVIEW_TOGGLE() { return TOOL_ACTION_FLOATING_PREVIEW_TOGGLE; },
   set TOOL_ACTION_FLOATING_PREVIEW_TOGGLE(value) { TOOL_ACTION_FLOATING_PREVIEW_TOGGLE = value; },
-  get TOOL_ACTION_LOCAL_CANVAS_TOGGLE() { return TOOL_ACTION_LOCAL_CANVAS_TOGGLE; },
-  set TOOL_ACTION_LOCAL_CANVAS_TOGGLE(value) { TOOL_ACTION_LOCAL_CANVAS_TOGGLE = value; },
   get TOOL_ACTION_MIRROR_POPUP() { return TOOL_ACTION_MIRROR_POPUP; },
   set TOOL_ACTION_MIRROR_POPUP(value) { TOOL_ACTION_MIRROR_POPUP = value; },
   get TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE() { return TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE; },
   set TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE(value) { TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE = value; },
   get TOP_UI_ACTION_FLOATING_PREVIEW_TOGGLE() { return TOP_UI_ACTION_FLOATING_PREVIEW_TOGGLE; },
   set TOP_UI_ACTION_FLOATING_PREVIEW_TOGGLE(value) { TOP_UI_ACTION_FLOATING_PREVIEW_TOGGLE = value; },
-  get TOP_UI_ACTION_LOCAL_CANVAS_TOGGLE() { return TOP_UI_ACTION_LOCAL_CANVAS_TOGGLE; },
-  set TOP_UI_ACTION_LOCAL_CANVAS_TOGGLE(value) { TOP_UI_ACTION_LOCAL_CANVAS_TOGGLE = value; },
   get TOP_UI_ACTION_MIRROR_POPUP() { return TOP_UI_ACTION_MIRROR_POPUP; },
   set TOP_UI_ACTION_MIRROR_POPUP(value) { TOP_UI_ACTION_MIRROR_POPUP = value; },
   get TOP_UI_ACTION_VIRTUAL_CURSOR_TOGGLE() { return TOP_UI_ACTION_VIRTUAL_CURSOR_TOGGLE; },
@@ -8032,10 +8083,6 @@
 
   function updateVirtualCursorActionToolButtons(...args) {
     return uiActionButtonsWorkflowUtilsModule.updateVirtualCursorActionToolButtons(...args);
-  }
-
-  function updateLocalCanvasActionToolButtons(...args) {
-    return uiActionButtonsWorkflowUtilsModule.updateLocalCanvasActionToolButtons(...args);
   }
 
   function updateFloatingPreviewActionToolButtons(...args) {
@@ -8062,16 +8109,12 @@
   set TOOL_ACTION_CAMERA_MODE(value) { TOOL_ACTION_CAMERA_MODE = value; },
   get TOOL_ACTION_FLOATING_PREVIEW_TOGGLE() { return TOOL_ACTION_FLOATING_PREVIEW_TOGGLE; },
   set TOOL_ACTION_FLOATING_PREVIEW_TOGGLE(value) { TOOL_ACTION_FLOATING_PREVIEW_TOGGLE = value; },
-  get TOOL_ACTION_LOCAL_CANVAS_TOGGLE() { return TOOL_ACTION_LOCAL_CANVAS_TOGGLE; },
-  set TOOL_ACTION_LOCAL_CANVAS_TOGGLE(value) { TOOL_ACTION_LOCAL_CANVAS_TOGGLE = value; },
   get TOOL_ACTION_MIRROR_POPUP() { return TOOL_ACTION_MIRROR_POPUP; },
   set TOOL_ACTION_MIRROR_POPUP(value) { TOOL_ACTION_MIRROR_POPUP = value; },
   get TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE() { return TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE; },
   set TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE(value) { TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE = value; },
   get TOP_UI_ACTION_FLOATING_PREVIEW_TOGGLE() { return TOP_UI_ACTION_FLOATING_PREVIEW_TOGGLE; },
   set TOP_UI_ACTION_FLOATING_PREVIEW_TOGGLE(value) { TOP_UI_ACTION_FLOATING_PREVIEW_TOGGLE = value; },
-  get TOP_UI_ACTION_LOCAL_CANVAS_TOGGLE() { return TOP_UI_ACTION_LOCAL_CANVAS_TOGGLE; },
-  set TOP_UI_ACTION_LOCAL_CANVAS_TOGGLE(value) { TOP_UI_ACTION_LOCAL_CANVAS_TOGGLE = value; },
   get TOP_UI_ACTION_MIRROR_POPUP() { return TOP_UI_ACTION_MIRROR_POPUP; },
   set TOP_UI_ACTION_MIRROR_POPUP(value) { TOP_UI_ACTION_MIRROR_POPUP = value; },
   get TOP_UI_ACTION_OPEN_DETAILS_PANEL() { return TOP_UI_ACTION_OPEN_DETAILS_PANEL; },
@@ -8122,8 +8165,6 @@
   set state(value) { state = value; },
   get updateFloatingPreviewActionToolButtons() { return updateFloatingPreviewActionToolButtons; },
   set updateFloatingPreviewActionToolButtons(value) { updateFloatingPreviewActionToolButtons = value; },
-  get updateLocalCanvasActionToolButtons() { return updateLocalCanvasActionToolButtons; },
-  set updateLocalCanvasActionToolButtons(value) { updateLocalCanvasActionToolButtons = value; },
   get updateRightTabVisibility() { return updateRightTabVisibility; },
   set updateRightTabVisibility(value) { updateRightTabVisibility = value; },
   get updateVirtualCursorActionToolButtons() { return updateVirtualCursorActionToolButtons; },
@@ -8345,12 +8386,10 @@
   /* solidShape tool removed */
   const toolIconCache = new Map();
   const STARTUP_SCREEN_MODE_DEFAULT = 'default';
-  const STARTUP_SCREEN_MODE_APPEND_TAB = 'append-tab';
   let startupVisible = false;
   let projectHomeVisible = false;
   let startupScreenMode = STARTUP_SCREEN_MODE_DEFAULT;
   let startupVirtualCursorState = null;
-  let pendingNewProjectAppendAsTab = false;
   let pendingNewProjectCreateShared = false;
   let newProjectSubmitBusy = false;
   let lastSharedProjectCreationFailureReason = '';
@@ -8372,30 +8411,116 @@
 
   function bindCoreProjectActionButtons() {
     bindClickHandlerOnce(dom.startup?.newButton, 'coreProjectActionBound', () => {
-      openNewProjectDialog({
-        dismissStartup: true,
-        appendAsTab: isStartupScreenAppendTabMode(),
-      });
+      openNewProjectDialog({ dismissStartup: true });
     });
     bindClickHandlerOnce(dom.startup?.openButton, 'coreProjectActionBound', async () => {
-      const opened = await openDocumentDialog({
-        mode: isStartupScreenAppendTabMode()
-          ? EXTERNAL_IMPORT_MODE_APPEND_TAB
-          : EXTERNAL_IMPORT_MODE_NEW_PROJECT,
-      });
+      const opened = await openDocumentDialog({ mode: EXTERNAL_IMPORT_MODE_NEW_PROJECT });
       if (opened) {
         hideStartupScreen();
       }
     });
     bindClickHandlerOnce(dom.controls.openDocument, 'coreProjectActionBound', () => {
-      openDocumentDialog({ mode: EXTERNAL_IMPORT_MODE_APPEND_TAB });
+      openDocumentDialog({ mode: EXTERNAL_IMPORT_MODE_NEW_PROJECT });
     });
     bindClickHandlerOnce(dom.controls.showLocalProjects, 'coreProjectActionBound', () => {
-      showProjectHomeScreen({ refresh: true });
+      showStartupScreen();
     });
     bindClickHandlerOnce(dom.newProject?.button, 'coreProjectActionBound', () => {
       openNewProjectDialog();
     });
+  }
+
+  let projectFileCommandInFlight = false;
+
+  function updateProjectFileStatus(message) {
+    const status = document.getElementById('projectFileStatus');
+    if (status) status.textContent = message;
+  }
+
+  function refreshProjectFileStatus() {
+    updateProjectFileStatus(hasDocumentUnsavedChanges?.()
+      ? '端末内V2へ自動保存中・ファイルは手動ダウンロード'
+      : '端末内V2へ保存済み・ファイルは手動ダウンロード');
+  }
+
+  function announceProjectFileCommandResult(result) {
+    if (!result || result.status === 'cancelled') return;
+    const messages = {
+      saved: '保存しました',
+      'saved-as': '名前を付けて保存しました',
+      'copy-saved': 'コピーを保存しました。現在の保存先は変更されません。',
+      'canvas-limit-exceeded': 'キャンバスは1シートにつき4件までです。',
+      'incomplete-project': 'プロジェクト内容が不完全なため保存を中止しました。',
+      'sheet-materialization-failed': 'すべてのシートを準備できないため保存を中止しました。',
+      'permission-denied': '保存先への権限が必要です。',
+      'write-failed': 'ファイルへ書き込めませんでした。',
+      'close-failed': 'ファイルを閉じられなかったため保存を確定できませんでした。',
+      'multi-sheet-v2-flag-disabled': '複数シートV2保存はDEV設定で有効化されていません。',
+      'download-fallback': 'ファイルをダウンロードしました。現在の保存先とは関連付けられていません。',
+    };
+    const message = messages[result.status] || messages[result.reason] || 'ファイル操作に失敗しました。';
+    updateAutosaveStatus(message, result.ok ? 'success' : 'warn');
+    updateProjectFileStatus(result.ok ? (result.status === 'copy-saved' ? 'コピーを保存しました。現在の保存先は変更されません。' : '保存済み') : message);
+  }
+
+  async function runProjectFileCommand(command) {
+    if (projectFileCommandInFlight) return null;
+    projectFileCommandInFlight = true;
+    try {
+      let result = null;
+      if (command === 'save') result = await executeProjectSave({ announceStatus: false });
+      else if (command === 'save-as') result = await executeProjectSaveAs({ announceStatus: false });
+      else if (command === 'copy') result = await executeProjectSaveCopy({ announceStatus: false });
+      else if (command === 'open') result = await executeProjectOpen({ mode: EXTERNAL_IMPORT_MODE_NEW_PROJECT });
+      else if (command === 'new') {
+        openNewProjectDialog();
+        return null;
+      } else if (command === 'recent') {
+        showStartupScreen();
+        return null;
+      } else if (command === 'export') {
+        openExportDialog();
+        return null;
+      }
+      announceProjectFileCommandResult(result);
+      return result;
+    } finally {
+      projectFileCommandInFlight = false;
+      refreshProjectFileStatus();
+    }
+  }
+
+  function bindProjectFileMenuOnce() {
+    const button = document.getElementById('projectFileMenuButton');
+    const menu = document.getElementById('projectFileMenuItems');
+    if (!(button instanceof HTMLButtonElement) || !(menu instanceof HTMLElement) || button.dataset.bound === 'true') return;
+    button.dataset.bound = 'true';
+    const close = () => { menu.hidden = true; button.setAttribute('aria-expanded', 'false'); };
+    button.addEventListener('click', () => {
+      const opening = menu.hidden;
+      menu.hidden = !opening;
+      button.setAttribute('aria-expanded', opening ? 'true' : 'false');
+      if (opening) menu.querySelector('button')?.focus();
+    });
+    menu.addEventListener('click', event => {
+      const target = event.target instanceof Element ? event.target.closest('button[data-project-file-command]') : null;
+      if (!target) return;
+      close();
+      void runProjectFileCommand(target.dataset.projectFileCommand || '');
+    });
+    document.addEventListener('pointerdown', event => {
+      if (!menu.hidden && event.target instanceof Node && !button.parentElement?.contains(event.target)) close();
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && !menu.hidden) { close(); button.focus(); }
+      if (event.isComposing || event.key === 'Process' || event.repeat || !(event.metaKey || event.ctrlKey) || isEditableTarget(event.target)) return;
+      const key = event.key.toLowerCase();
+      const command = key === 'n' ? 'new' : key === 'o' ? 'open' : key === 's' ? (event.shiftKey ? 'save-as' : 'save') : '';
+      if (!command) return;
+      event.preventDefault();
+      void runProjectFileCommand(command);
+    });
+    refreshProjectFileStatus();
   }
 
   const virtualCursorWorkflowUtilsModule = window.PiXiEEDrawModules?.virtualCursorWorkflowUtils?.createVirtualCursorWorkflowUtils?.({
@@ -8850,6 +8975,98 @@
     return floatingDrawButtonWorkflowUtilsModule.clampFloatingDrawButtonPosition(...args);
   }
 
+  /** @type {any} */
+  const sharedProjectSnapshotFetchUtilsModule = window.PiXiEEDrawModules?.sharedProjectSnapshotFetchUtils?.createSharedProjectSnapshotFetchUtils?.({
+  get MULTI_ROOM_VISIBILITY_PUBLIC() { return MULTI_ROOM_VISIBILITY_PUBLIC; },
+  set MULTI_ROOM_VISIBILITY_PUBLIC(value) { MULTI_ROOM_VISIBILITY_PUBLIC = value; },
+  get DEFAULT_DOCUMENT_NAME() { return DEFAULT_DOCUMENT_NAME; },
+  set DEFAULT_DOCUMENT_NAME(value) { DEFAULT_DOCUMENT_NAME = value; },
+  get activeSharedProjectKey() { return activeSharedProjectKey; },
+  set activeSharedProjectKey(value) { activeSharedProjectKey = value; },
+  get canUseSharedProjectsBackend() { return canUseSharedProjectsBackend; },
+  set canUseSharedProjectsBackend(value) { canUseSharedProjectsBackend = value; },
+  get createSharedProjectInviteToken() { return createSharedProjectInviteToken; },
+  set createSharedProjectInviteToken(value) { createSharedProjectInviteToken = value; },
+  get createSharedProjectSnapshotTitle() { return createSharedProjectSnapshotTitle; },
+  set createSharedProjectSnapshotTitle(value) { createSharedProjectSnapshotTitle = value; },
+  get ensurePixieedAccountClient() { return ensurePixieedAccountClient; },
+  set ensurePixieedAccountClient(value) { ensurePixieedAccountClient = value; },
+  get ensureSharedProjectBackendSession() { return ensureSharedProjectBackendSession; },
+  set ensureSharedProjectBackendSession(value) { ensureSharedProjectBackendSession = value; },
+  get handleSharedProjectsBackendError() { return handleSharedProjectsBackendError; },
+  set handleSharedProjectsBackendError(value) { handleSharedProjectsBackendError = value; },
+  get normalizeMultiProjectKey() { return normalizeMultiProjectKey; },
+  set normalizeMultiProjectKey(value) { normalizeMultiProjectKey = value; },
+  get state() { return state; },
+  set state(value) { state = value; },
+  }) || {};
+
+  /** @type {any} */
+  const sharedProjectLocalConversionUtilsModule = window.PiXiEEDrawModules?.sharedProjectLocalConversionUtils?.createSharedProjectLocalConversionUtils?.({
+  get AUTOSAVE_SUPPORTED() { return AUTOSAVE_SUPPORTED; },
+  set AUTOSAVE_SUPPORTED(value) { AUTOSAVE_SUPPORTED = value; },
+  get DEFAULT_DOCUMENT_NAME() { return DEFAULT_DOCUMENT_NAME; },
+  set DEFAULT_DOCUMENT_NAME(value) { DEFAULT_DOCUMENT_NAME = value; },
+  get RECENT_PROJECT_STORAGE_LOCAL() { return RECENT_PROJECT_STORAGE_LOCAL; },
+  set RECENT_PROJECT_STORAGE_LOCAL(value) { RECENT_PROJECT_STORAGE_LOCAL = value; },
+  get accountState() { return accountState; },
+  set accountState(value) { accountState = value; },
+  get awaitFreshSharedProjectSnapshot() { return awaitFreshSharedProjectSnapshot; },
+  set awaitFreshSharedProjectSnapshot(value) { awaitFreshSharedProjectSnapshot = value; },
+  get beginBlockingGlobalLoading() { return beginBlockingGlobalLoading; },
+  set beginBlockingGlobalLoading(value) { beginBlockingGlobalLoading = value; },
+  get buildSharedRecentProjectId() { return buildSharedRecentProjectId; },
+  set buildSharedRecentProjectId(value) { buildSharedRecentProjectId = value; },
+  get createAutosaveProjectId() { return createAutosaveProjectId; },
+  set createAutosaveProjectId(value) { createAutosaveProjectId = value; },
+  get createSharedProjectSnapshotTitle() { return createSharedProjectSnapshotTitle; },
+  set createSharedProjectSnapshotTitle(value) { createSharedProjectSnapshotTitle = value; },
+  get extractDocumentBaseName() { return extractDocumentBaseName; },
+  set extractDocumentBaseName(value) { extractDocumentBaseName = value; },
+  get getCurrentRecentProjectAccountUserId() { return getCurrentRecentProjectAccountUserId; },
+  set getCurrentRecentProjectAccountUserId(value) { getCurrentRecentProjectAccountUserId = value; },
+  get hideSharedProjectFromRecentSync() { return hideSharedProjectFromRecentSync; },
+  set hideSharedProjectFromRecentSync(value) { hideSharedProjectFromRecentSync = value; },
+  get hideStartupScreen() { return hideStartupScreen; },
+  set hideStartupScreen(value) { hideStartupScreen = value; },
+  get isSharedRecentProjectEntry() { return isSharedRecentProjectEntry; },
+  set isSharedRecentProjectEntry(value) { isSharedRecentProjectEntry = value; },
+  get loadDocumentFromText() { return loadDocumentFromText; },
+  set loadDocumentFromText(value) { loadDocumentFromText = value; },
+  get loadRecentProjectsMetadata() { return loadRecentProjectsMetadata; },
+  set loadRecentProjectsMetadata(value) { loadRecentProjectsMetadata = value; },
+  get loadSharedProjectSnapshotRecord() { return loadSharedProjectSnapshotRecord; },
+  set loadSharedProjectSnapshotRecord(value) { loadSharedProjectSnapshotRecord = value; },
+  get loadSharedProjectSnapshotRecordByInvite() { return loadSharedProjectSnapshotRecordByInvite; },
+  set loadSharedProjectSnapshotRecordByInvite(value) { loadSharedProjectSnapshotRecordByInvite = value; },
+  get localizeText() { return localizeText; },
+  set localizeText(value) { localizeText = value; },
+  get normalizeAutosaveProjectId() { return normalizeAutosaveProjectId; },
+  set normalizeAutosaveProjectId(value) { normalizeAutosaveProjectId = value; },
+  get normalizeDocumentName() { return normalizeDocumentName; },
+  set normalizeDocumentName(value) { normalizeDocumentName = value; },
+  get normalizeMultiProjectKey() { return normalizeMultiProjectKey; },
+  set normalizeMultiProjectKey(value) { normalizeMultiProjectKey = value; },
+  get normalizeSharedRecentProjectEntry() { return normalizeSharedRecentProjectEntry; },
+  set normalizeSharedRecentProjectEntry(value) { normalizeSharedRecentProjectEntry = value; },
+  get openRecentProject() { return openRecentProject; },
+  set openRecentProject(value) { openRecentProject = value; },
+  get refreshSharedRecentProjectEntryFromBackend() { return refreshSharedRecentProjectEntryFromBackend; },
+  set refreshSharedRecentProjectEntryFromBackend(value) { refreshSharedRecentProjectEntryFromBackend = value; },
+  get saveRecentProjectsList() { return saveRecentProjectsList; },
+  set saveRecentProjectsList(value) { saveRecentProjectsList = value; },
+  get setActiveAutosaveProjectId() { return setActiveAutosaveProjectId; },
+  set setActiveAutosaveProjectId(value) { setActiveAutosaveProjectId = value; },
+  get setRecentProjectsCache() { return setRecentProjectsCache; },
+  set setRecentProjectsCache(value) { setRecentProjectsCache = value; },
+  get showSharedProjectSunsetDialog() { return showSharedProjectSunsetDialog; },
+  set showSharedProjectSunsetDialog(value) { showSharedProjectSunsetDialog = value; },
+  get state() { return state; },
+  set state(value) { state = value; },
+  get updateAutosaveStatus() { return updateAutosaveStatus; },
+  set updateAutosaveStatus(value) { updateAutosaveStatus = value; },
+  }) || {};
+
 
 
   multiState.clientId = ensureMultiClientId();
@@ -8881,6 +9098,9 @@
   updateGridDecorations();
   const pointerState = createPointerState();
   const recentProjectsCache = new Map();
+  // One history entry represents one committed editor operation (stroke,
+  // shape, paste, structural edit, undo/redo), never one individual pixel.
+  const LOCAL_PROJECT_CHECKPOINT_HISTORY_INTERVAL = 10;
   window.addEventListener('pagehide', handleMultiPageHide);
   window.addEventListener('pagehide', handleAutosavePageHide);
   window.addEventListener('pagehide', () => {
@@ -8938,9 +9158,9 @@
   let selectionCanvasActive = false;
   const openProjectTabs = [];
   let activeOpenProjectTabId = '';
+  let startupReady = false;
   let suppressOpenProjectTabAutoInitialize = false;
   let openProjectTabSequence = 0;
-  let openProjectTabBusy = false;
   const openProjectTabProjectWriteGuards = new Map();
   let openProjectTabsLastRenderSignature = '';
   let openProjectTabsLastStructureSignature = '';
@@ -8957,6 +9177,412 @@
     suppressClickTabId: '',
     suppressClickUntil: 0,
   };
+
+  function normalizeProjectStorageAdapterId(value) {
+    const normalized = typeof value === 'string' ? value.trim() : '';
+    return normalized || null;
+  }
+
+  function normalizeProjectSourceKind(value, fallback = 'unknown') {
+    const normalized = typeof value === 'string' ? value.trim() : '';
+    const allowed = new Set(['new', 'file', 'recent', 'autosave', 'shared-local', 'import-image', 'import-gif', 'mixed', 'unknown']);
+    if (allowed.has(normalized)) {
+      return normalized;
+    }
+    return allowed.has(fallback) ? fallback : 'unknown';
+  }
+
+  function createProjectPersistenceToken(seed = '') {
+    const normalizedSeed = typeof seed === 'string' ? seed.trim() : '';
+    const randomPart = typeof crypto?.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    return normalizedSeed ? `${normalizedSeed}:${randomPart}` : randomPart;
+  }
+
+  function normalizeProjectPersistenceState(value = null, fallback = null, { createToken = true } = {}) {
+    const next = value && typeof value === 'object' ? value : {};
+    const base = fallback && typeof fallback === 'object' ? fallback : {};
+    const sourceKind = normalizeProjectSourceKind(
+      Object.prototype.hasOwnProperty.call(next, 'sourceKind') ? next.sourceKind : base.sourceKind,
+      'unknown'
+    );
+    const sourceStorageAdapterId = Object.prototype.hasOwnProperty.call(next, 'sourceStorageAdapterId')
+      ? normalizeProjectStorageAdapterId(next.sourceStorageAdapterId)
+      : normalizeProjectStorageAdapterId(base.sourceStorageAdapterId);
+    const lastSavedStorageAdapterId = Object.prototype.hasOwnProperty.call(next, 'lastSavedStorageAdapterId')
+      ? normalizeProjectStorageAdapterId(next.lastSavedStorageAdapterId)
+      : normalizeProjectStorageAdapterId(base.lastSavedStorageAdapterId);
+    const sourceProjectToken = (() => {
+      const candidate = typeof next.sourceProjectToken === 'string' && next.sourceProjectToken.trim()
+        ? next.sourceProjectToken.trim()
+        : (typeof base.sourceProjectToken === 'string' && base.sourceProjectToken.trim() ? base.sourceProjectToken.trim() : '');
+      if (candidate) {
+        return candidate;
+      }
+      return createToken ? createProjectPersistenceToken(sourceKind) : null;
+    })();
+    return {
+      sourceStorageAdapterId,
+      sourceKind,
+      sourceProjectToken,
+      lastSavedStorageAdapterId,
+    };
+  }
+
+  function getProjectPersistenceStateFromTab(tab = null, options = {}) {
+    return normalizeProjectPersistenceState(tab, null, {
+      createToken: options?.createToken === true,
+    });
+  }
+
+  const activeProjectSessionUtils = window.PiXiEEDrawModules?.activeProjectSessionUtils
+    ?.createActiveProjectSessionUtils?.({
+      normalizeAutosaveProjectId,
+      normalizeProjectSourceKind,
+      normalizeProjectStorageAdapterId,
+    }) || {};
+
+  function getActiveProjectSession() {
+    return activeProjectSession;
+  }
+
+  function getActiveProjectSessionDebugSummary(session = activeProjectSession) {
+    return activeProjectSessionUtils.getActiveProjectSessionDebugSummary?.(session) || null;
+  }
+
+  function getRuntimeActiveDocumentId() {
+    const activeCanvas = typeof getActiveProjectCanvasDocument === 'function'
+      ? getActiveProjectCanvasDocument()
+      : null;
+    return typeof activeCanvas?.id === 'string' ? activeCanvas.id : '';
+  }
+
+  function getActiveProjectIdentityComparison() {
+    const sessionProjectId = normalizeAutosaveProjectId(activeProjectSession?.projectId || '');
+    const autosaveProjectIdValue = normalizeAutosaveProjectId(autosaveProjectId || '');
+    const tab = typeof getActiveOpenProjectTab === 'function' ? getActiveOpenProjectTab() : null;
+    const activeTabProjectId = normalizeAutosaveProjectId(tab?.projectId || '');
+    // A canvas document ID and the legacy tab.runtimeProjectId identify runtime
+    // objects, not the persisted project. They must not be treated as a fourth
+    // project-ID authority.
+    const runtimeProjectId = null;
+    const runtimeDocumentId = getRuntimeActiveDocumentId() || null;
+    const mismatches = [];
+    const compareIdentity = (field, value) => {
+      if (sessionProjectId && value && sessionProjectId !== value) {
+        mismatches.push({
+          field,
+          sessionValue: sessionProjectId,
+          autosaveValue: autosaveProjectIdValue || null,
+          activeTabValue: activeTabProjectId || null,
+          runtimeValue: runtimeProjectId,
+        });
+      }
+    };
+    compareIdentity('autosaveProjectId', autosaveProjectIdValue);
+    compareIdentity('activeTabProjectId', activeTabProjectId);
+    return {
+      ok: mismatches.length === 0,
+      mismatches,
+      sessionProjectId,
+      autosaveProjectId: autosaveProjectIdValue,
+      activeTabProjectId,
+      runtimeProjectId,
+      runtimeDocumentId,
+      tab,
+    };
+  }
+
+  function buildActiveProjectSessionInputFromTab(tab = null, overrides = {}) {
+    const currentTab = tab && typeof tab === 'object' ? tab : {};
+    const patch = overrides && typeof overrides === 'object' ? overrides : {};
+    const projectId = normalizeAutosaveProjectId(
+      patch.projectId || currentTab.projectId || autosaveProjectId || ''
+    );
+    const sameProject = Boolean(
+      activeProjectSession?.projectId
+      && projectId
+      && activeProjectSession.projectId === projectId
+    );
+    return {
+      projectId,
+      documentId: patch.documentId || getRuntimeActiveDocumentId(),
+      sourceKind: Object.prototype.hasOwnProperty.call(patch, 'sourceKind')
+        ? patch.sourceKind
+        : currentTab.sourceKind,
+      sourceAdapterId: Object.prototype.hasOwnProperty.call(patch, 'sourceAdapterId')
+        ? patch.sourceAdapterId
+        : (Object.prototype.hasOwnProperty.call(patch, 'sourceStorageAdapterId')
+          ? patch.sourceStorageAdapterId
+          : currentTab.sourceStorageAdapterId),
+      canonicalPayloadFormat: Object.prototype.hasOwnProperty.call(patch, 'canonicalPayloadFormat')
+        ? patch.canonicalPayloadFormat
+        : currentTab.canonicalPayloadFormat,
+      canonicalSchemaVersion: Object.prototype.hasOwnProperty.call(patch, 'canonicalSchemaVersion')
+        ? patch.canonicalSchemaVersion
+        : currentTab.canonicalSchemaVersion,
+      sourceProjectToken: Object.prototype.hasOwnProperty.call(patch, 'sourceProjectToken')
+        ? patch.sourceProjectToken
+        : currentTab.sourceProjectToken,
+      lastSavedAdapterId: Object.prototype.hasOwnProperty.call(patch, 'lastSavedAdapterId')
+        ? patch.lastSavedAdapterId
+        : (Object.prototype.hasOwnProperty.call(patch, 'lastSavedStorageAdapterId')
+          ? patch.lastSavedStorageAdapterId
+          : currentTab.lastSavedStorageAdapterId),
+      autosaveIdentity: patch.autosaveIdentity || projectId || null,
+      recoveryIdentity: patch.recoveryIdentity || projectId || null,
+      dirty: Object.prototype.hasOwnProperty.call(patch, 'dirty')
+        ? patch.dirty === true
+        : hasDocumentUnsavedChanges(),
+      openedAt: sameProject ? activeProjectSession.openedAt : '',
+      updatedAt: patch.updatedAt || '',
+    };
+  }
+
+  function assertActiveProjectIdentityConsistency({
+    phase = 'unspecified',
+    allowTransientMismatch = false,
+  } = {}) {
+    if (!activeProjectSession) {
+      return { ok: true, skipped: 'missing-session', phase };
+    }
+    const identity = getActiveProjectIdentityComparison();
+    const result = {
+      ok: identity.ok,
+      phase,
+      mismatches: identity.mismatches,
+      sessionProjectId: identity.sessionProjectId,
+      autosaveProjectId: identity.autosaveProjectId,
+      activeTabProjectId: identity.activeTabProjectId,
+      runtimeProjectId: identity.runtimeProjectId,
+      runtimeDocumentId: identity.runtimeDocumentId,
+      transient: allowTransientMismatch === true,
+    };
+    if (!result.ok) {
+      activeProjectSessionMismatchCount += 1;
+      const logger = allowTransientMismatch ? console.warn : console.error;
+      logger('[pixiedraw:active-project-session-mismatch]', result);
+    }
+    return result;
+  }
+
+  function assertActiveProjectSessionMirrorConsistency({
+    phase = 'unspecified',
+    allowTransientMismatch = false,
+  } = {}) {
+    const validation = activeProjectSessionUtils.validateActiveProjectSession?.(activeProjectSession)
+      || { ok: false, errors: ['session-utils-unavailable'] };
+    const identity = getActiveProjectIdentityComparison();
+    const metadata = activeProjectSessionUtils.compareActiveProjectSessionWithTab?.(activeProjectSession, identity.tab)
+      || { ok: false, mismatches: [{ field: 'session-utils-unavailable', sessionValue: null, tabValue: null }] };
+    const mismatches = [
+      ...(validation.errors || []).map(field => ({ field: `session:${field}`, sessionValue: null, tabValue: null })),
+      ...(identity.mismatches || []),
+      ...(metadata.mismatches || []),
+    ];
+    const result = {
+      ok: mismatches.length === 0,
+      phase,
+      mismatches,
+      sessionProjectId: identity.sessionProjectId,
+      autosaveProjectId: identity.autosaveProjectId,
+      activeTabProjectId: identity.activeTabProjectId,
+      runtimeProjectId: identity.runtimeProjectId,
+      runtimeDocumentId: identity.runtimeDocumentId,
+      transient: allowTransientMismatch === true,
+    };
+    if (!result.ok) {
+      activeProjectSessionMismatchCount += 1;
+      const logger = allowTransientMismatch ? console.warn : console.error;
+      logger('[pixiedraw:active-project-session-metadata-mismatch]', result);
+    }
+    return result;
+  }
+
+  function replaceActiveProjectSessionFromTab(tab = null, {
+    phase = 'runtime-commit',
+    allowTransientMismatch = false,
+    overrides = null,
+  } = {}) {
+    const input = buildActiveProjectSessionInputFromTab(tab, overrides || {});
+    const next = activeProjectSessionUtils.replaceActiveProjectSession?.(activeProjectSession, input) || null;
+    const validation = activeProjectSessionUtils.validateActiveProjectSession?.(next) || { ok: false, errors: ['session-utils-unavailable'] };
+    if (!validation.ok) {
+      console.error('[pixiedraw:active-project-session-invalid]', {
+        phase,
+        errors: validation.errors || [],
+        candidate: getActiveProjectSessionDebugSummary(next),
+      });
+      return null;
+    }
+    activeProjectSession = next;
+    assertActiveProjectIdentityConsistency({ phase, allowTransientMismatch });
+    assertActiveProjectSessionMirrorConsistency({ phase, allowTransientMismatch });
+    return activeProjectSession;
+  }
+
+  function updateActiveProjectSessionMetadata(patch = null, {
+    phase = 'session-update',
+    allowTransientMismatch = false,
+  } = {}) {
+    const activeTab = typeof getActiveOpenProjectTab === 'function' ? getActiveOpenProjectTab() : null;
+    if (!activeProjectSession) {
+      const initialized = replaceActiveProjectSessionFromTab(activeTab, {
+        phase: `${phase}:initialize`,
+        allowTransientMismatch,
+      });
+      if (!initialized) return null;
+    }
+    const next = activeProjectSessionUtils.updateActiveProjectSession?.(activeProjectSession, patch || {}) || null;
+    const validation = activeProjectSessionUtils.validateActiveProjectSession?.(next) || { ok: false, errors: ['session-utils-unavailable'] };
+    if (!validation.ok) {
+      console.error('[pixiedraw:active-project-session-invalid]', {
+        phase,
+        errors: validation.errors || [],
+        candidate: getActiveProjectSessionDebugSummary(next),
+      });
+      return null;
+    }
+    activeProjectSession = next;
+    assertActiveProjectIdentityConsistency({ phase, allowTransientMismatch });
+    return activeProjectSession;
+  }
+
+  function syncActiveProjectSessionDirty(phase = 'dirty-sync') {
+    if (!activeProjectSession) return null;
+    const dirty = hasDocumentUnsavedChanges();
+    const session = updateActiveProjectSessionMetadata({ dirty }, {
+      phase,
+      allowTransientMismatch: false,
+    });
+    const index = typeof findOpenProjectTabIndex === 'function'
+      ? findOpenProjectTabIndex(activeOpenProjectTabId || '')
+      : -1;
+    if (index >= 0 && openProjectTabs[index]) {
+      openProjectTabs[index] = { ...openProjectTabs[index], unsaved: dirty };
+    }
+    if (session) {
+      assertActiveProjectSessionMirrorConsistency({ phase, allowTransientMismatch: false });
+    }
+    return session;
+  }
+
+  function getActiveProjectPersistenceState(options = {}) {
+    if (activeProjectSession) {
+      const stateFromSession = activeProjectSessionUtils.getActiveProjectSessionPersistenceState?.(activeProjectSession) || null;
+      if (stateFromSession) {
+        return stateFromSession;
+      }
+      console.warn('[pixiedraw:active-project-session-invalid]', {
+        phase: 'get-active-project-persistence-state',
+        errors: activeProjectSessionUtils.validateActiveProjectSession?.(activeProjectSession)?.errors || [],
+      });
+    }
+    const activeTab = typeof getActiveOpenProjectTab === 'function'
+      ? getActiveOpenProjectTab()
+      : null;
+    return getProjectPersistenceStateFromTab(activeTab, options);
+  }
+
+  function updateOpenProjectTabPersistenceState(tabId, patch = null, options = {}) {
+    const normalizedTabId = typeof tabId === 'string' ? tabId : '';
+    if (!normalizedTabId || typeof findOpenProjectTabIndex !== 'function') {
+      return null;
+    }
+    const index = findOpenProjectTabIndex(normalizedTabId);
+    if (index < 0 || !openProjectTabs[index]) {
+      return null;
+    }
+    const currentTab = openProjectTabs[index];
+    const nextState = normalizeProjectPersistenceState(patch, currentTab, { createToken: true });
+    openProjectTabs[index] = {
+      ...currentTab,
+      ...nextState,
+    };
+    if (options?.render !== false && typeof renderOpenProjectTabs === 'function') {
+      renderOpenProjectTabs();
+    }
+    if (options?.log !== false) {
+      console.info('[project-persistence-debug]', {
+        activeTabId: activeOpenProjectTabId || '',
+        tabId: normalizedTabId,
+        sourceKind: nextState.sourceKind,
+        sourceStorageAdapterId: nextState.sourceStorageAdapterId,
+        lastSavedStorageAdapterId: nextState.lastSavedStorageAdapterId,
+      });
+    }
+    return nextState;
+  }
+
+  function updateActiveProjectPersistenceState(patch = null, options = {}) {
+    const nextPatch = patch && typeof patch === 'object' ? patch : {};
+    const sessionPatch = {};
+    if (Object.prototype.hasOwnProperty.call(nextPatch, 'sourceKind')) {
+      sessionPatch.sourceKind = nextPatch.sourceKind;
+    }
+    if (Object.prototype.hasOwnProperty.call(nextPatch, 'sourceStorageAdapterId')) {
+      sessionPatch.sourceAdapterId = nextPatch.sourceStorageAdapterId;
+    }
+    if (Object.prototype.hasOwnProperty.call(nextPatch, 'sourceProjectToken')) {
+      sessionPatch.sourceProjectToken = nextPatch.sourceProjectToken;
+    }
+    if (Object.prototype.hasOwnProperty.call(nextPatch, 'lastSavedStorageAdapterId')) {
+      sessionPatch.lastSavedAdapterId = nextPatch.lastSavedStorageAdapterId;
+    }
+    const session = updateActiveProjectSessionMetadata(sessionPatch, {
+      phase: 'persistence-state-update:session-first',
+      allowTransientMismatch: true,
+    });
+    const tabState = updateOpenProjectTabPersistenceState(activeOpenProjectTabId || '', nextPatch, options);
+    if (session && tabState) {
+      assertActiveProjectSessionMirrorConsistency({
+        phase: 'persistence-state-update:tab-mirror',
+        allowTransientMismatch: false,
+      });
+    }
+    return tabState;
+  }
+
+  function resolveProjectSourceKind(options = {}) {
+    if (typeof options?.sourceKind === 'string' && options.sourceKind.trim()) {
+      return normalizeProjectSourceKind(options.sourceKind, 'unknown');
+    }
+    if (options?.openedFromRecent) {
+      return 'recent';
+    }
+    if (options?.restoredFromAutosave) {
+      return 'autosave';
+    }
+    if (options?.sharedLocalRestore) {
+      return 'shared-local';
+    }
+    if (options?.importImage) {
+      return 'import-image';
+    }
+    if (options?.newProject) {
+      return 'new';
+    }
+    if (options?.handle || options?.fileLoad) {
+      return 'file';
+    }
+    return 'unknown';
+  }
+
+  function resolveTargetStorageAdapterId(options = {}) {
+    const preferred = normalizeProjectStorageAdapterId(options?.preferredStorageAdapterId);
+    if (preferred) {
+      return preferred;
+    }
+    return 'pixieedraw-v2-zip';
+  }
+
+  function isProjectStorageConversionSave(sourceStorageAdapterId, targetStorageAdapterId) {
+    const source = normalizeProjectStorageAdapterId(sourceStorageAdapterId);
+    const target = normalizeProjectStorageAdapterId(targetStorageAdapterId);
+    return Boolean(source && target && source !== target);
+  }
+
   const SELECTION_DASH_SPEED = 40;
   let selectionDashScreenOffset = 0;
   let lastSelectionDashTime = 0;
@@ -8966,6 +9592,135 @@
     ? LIGHTWEIGHT_HISTORY_LIMIT
     : DESKTOP_HISTORY_LIMIT;
   const history = { past: [], future: [], pending: null, limit: DEFAULT_HISTORY_LIMIT };
+  const coldHistoryStore = window.PiXiEEDrawModules?.coldHistoryStoreUtils?.createColdHistoryStoreUtils?.({
+    chunkSize: 20,
+    maxEntriesPerDirection: isLightweightPersistenceMode() ? 300 : 1000,
+  }) || null;
+  const coldHistoryStatusCache = new Map();
+  const coldHistoryStatusRequests = new Map();
+  const coldHistoryRefillRequests = new Map();
+
+  function getActiveColdHistoryProjectId() {
+    if (isSharedProjectCollaborativeMode?.()) return '';
+    return normalizeAutosaveProjectId?.(autosaveProjectId || '') || '';
+  }
+
+  function cacheColdHistoryStatus(projectId, status = null) {
+    const normalizedProjectId = normalizeAutosaveProjectId?.(projectId || '') || '';
+    if (!normalizedProjectId) return { pastCount: 0, futureCount: 0 };
+    const normalizedStatus = {
+      projectId: normalizedProjectId,
+      pastCount: Math.max(0, Math.round(Number(status?.pastCount) || 0)),
+      futureCount: Math.max(0, Math.round(Number(status?.futureCount) || 0)),
+    };
+    coldHistoryStatusCache.set(normalizedProjectId, normalizedStatus);
+    return normalizedStatus;
+  }
+
+  function refreshColdHistoryStatus(projectId = getActiveColdHistoryProjectId()) {
+    const normalizedProjectId = normalizeAutosaveProjectId?.(projectId || '') || '';
+    if (!coldHistoryStore || !normalizedProjectId) return Promise.resolve(null);
+    if (coldHistoryStatusRequests.has(normalizedProjectId)) {
+      return coldHistoryStatusRequests.get(normalizedProjectId);
+    }
+    const request = coldHistoryStore.getStatus(normalizedProjectId)
+      .then(status => cacheColdHistoryStatus(normalizedProjectId, status))
+      .catch(error => {
+        console.warn('Failed to read file-backed history status.', error);
+        return null;
+      })
+      .finally(() => {
+        coldHistoryStatusRequests.delete(normalizedProjectId);
+        updateHistoryButtons?.();
+        updateMemoryStatus?.();
+      });
+    coldHistoryStatusRequests.set(normalizedProjectId, request);
+    return request;
+  }
+
+  function hasColdHistoryEntries(direction = 'past') {
+    const projectId = getActiveColdHistoryProjectId();
+    if (!projectId) return false;
+    const status = coldHistoryStatusCache.get(projectId);
+    if (!status) {
+      refreshColdHistoryStatus(projectId);
+      return false;
+    }
+    return (direction === 'future' ? status.futureCount : status.pastCount) > 0;
+  }
+
+  function archiveEvictedHistoryEntry(direction, entry) {
+    const projectId = getActiveColdHistoryProjectId();
+    if (!coldHistoryStore || !projectId || !entry) return false;
+    const normalizedDirection = direction === 'future' ? 'future' : 'past';
+    if (!isPixelPatchHistoryEntry(entry)) {
+      // A cold pixel-only chain cannot safely jump across an evicted structural
+      // snapshot. Drop that direction instead of offering an invalid Undo.
+      coldHistoryStore.clearDirection(projectId, normalizedDirection)
+        .then(() => refreshColdHistoryStatus(projectId))
+        .catch(error => console.warn('Failed to reset discontinuous cold history.', error));
+      cacheColdHistoryStatus(projectId, {
+        ...coldHistoryStatusCache.get(projectId),
+        [`${normalizedDirection}Count`]: 0,
+      });
+      return false;
+    }
+    const cached = coldHistoryStatusCache.get(projectId) || { pastCount: 0, futureCount: 0 };
+    cacheColdHistoryStatus(projectId, {
+      ...cached,
+      [`${normalizedDirection}Count`]: (cached[`${normalizedDirection}Count`] || 0) + 1,
+    });
+    coldHistoryStore.push(projectId, normalizedDirection, [entry])
+      .then(status => cacheColdHistoryStatus(projectId, status))
+      .catch(error => {
+        console.warn('Failed to archive evicted history entry.', error);
+        refreshColdHistoryStatus(projectId);
+      });
+    return true;
+  }
+
+  function clearColdHistoryDirection(direction = 'future') {
+    const projectId = getActiveColdHistoryProjectId();
+    if (!coldHistoryStore || !projectId) return false;
+    const normalizedDirection = direction === 'past' ? 'past' : 'future';
+    const cached = coldHistoryStatusCache.get(projectId) || { pastCount: 0, futureCount: 0 };
+    cacheColdHistoryStatus(projectId, { ...cached, [`${normalizedDirection}Count`]: 0 });
+    coldHistoryStore.clearDirection(projectId, normalizedDirection)
+      .then(() => refreshColdHistoryStatus(projectId))
+      .catch(error => console.warn('Failed to clear file-backed redo branch.', error));
+    return true;
+  }
+
+  function requestColdHistoryRefill(direction = 'past') {
+    const projectId = getActiveColdHistoryProjectId();
+    const normalizedDirection = direction === 'future' ? 'future' : 'past';
+    const requestKey = `${projectId}\u0000${normalizedDirection}`;
+    if (!coldHistoryStore || !projectId || coldHistoryRefillRequests.has(requestKey)) return false;
+    const request = coldHistoryStore.popLatest(projectId, normalizedDirection)
+      .then(entries => {
+        const target = normalizedDirection === 'future' ? history.future : history.past;
+        if (Array.isArray(entries) && entries.length) {
+          target.push(...entries);
+        }
+        return refreshColdHistoryStatus(projectId).then(() => entries || []);
+      })
+      .then(entries => {
+        if (!entries.length || projectId !== getActiveColdHistoryProjectId()) return;
+        if (normalizedDirection === 'future') {
+          redo();
+        } else {
+          undo();
+        }
+      })
+      .catch(error => console.warn('Failed to refill history from IndexedDB.', error))
+      .finally(() => {
+        coldHistoryRefillRequests.delete(requestKey);
+        updateHistoryButtons?.();
+        updateMemoryStatus?.();
+      });
+    coldHistoryRefillRequests.set(requestKey, request);
+    return true;
+  }
   // Per-client/per-canvas history for multi-session participants.
   // Key format: `${clientId}\u0000${canvasId}`
   // Each entry: { past: [compressedSnapshots], future: [compressedSnapshots], limit }
@@ -8986,7 +9741,21 @@
   let selectionMaskCacheIdCounter = 1;
   const HISTORY_DRAW_TOOLS = new Set(['pen', 'eraser', 'line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill', ...FILL_TOOL_SET]);
   const HISTORY_ENTRY_TYPE_PIXEL_PATCH = 'pixelPatch';
-  const PIXEL_PATCH_HISTORY_LABELS = new Set(['pen', 'eraser', 'line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill', ...FILL_TOOL_SET]);
+  const PIXEL_PATCH_HISTORY_LABELS = new Set([
+    'pen',
+    'eraser',
+    'line',
+    'curve',
+    'rect',
+    'rectFill',
+    'ellipse',
+    'ellipseFill',
+    'selectionMove',
+    'selectionTransform',
+    'selectionCut',
+    'selectionPastePixels',
+    ...FILL_TOOL_SET,
+  ]);
   const MULTI_SCOPED_HISTORY_LABELS = new Set([
     ...HISTORY_DRAW_TOOLS,
     'selectionCut',
@@ -9030,6 +9799,9 @@
   const MEMORY_MONITOR_INTERVAL = 5000;
   const MEMORY_WARNING_DEFAULT = 250 * 1024 * 1024;
   const MIN_HISTORY_LIMIT = 20;
+  const HISTORY_MEMORY_BUDGET_BYTES = isLightweightPersistenceMode()
+    ? 24 * 1024 * 1024
+    : 64 * 1024 * 1024;
   const DRAW_BUTTON_DRAG_THRESHOLD = 6;
   const DRAW_BUTTON_DRAG_THRESHOLD_TOUCH = 12;
   const MOVE_PAD_REPEAT_DELAY_MS = 220;
@@ -9737,6 +10509,7 @@
     MEMORY_MONITOR_INTERVAL,
     MEMORY_WARNING_DEFAULT,
     MIN_HISTORY_LIMIT,
+    HISTORY_MEMORY_BUDGET_BYTES,
     estimateEncodedByteLength,
     isPixelPatchHistoryEntry: (...args) => isPixelPatchHistoryEntry(...args),
     finalizePixelPatchHistoryEntry: (...args) => finalizePixelPatchHistoryEntry(...args),
@@ -9746,6 +10519,7 @@
     clearTimelapseRecording,
     fillPreviewCache,
     updateHistoryButtons: (...args) => updateHistoryButtons(...args),
+    archiveEvictedHistoryEntry: (...args) => archiveEvictedHistoryEntry(...args),
     markAutosaveDirty: (...args) => markAutosaveDirty(...args),
     scheduleAutosaveSnapshot: (...args) => scheduleAutosaveSnapshot(...args),
     localizeText,
@@ -9760,12 +10534,119 @@
     estimateTimelapseBytes,
     getMemoryUsageBreakdown,
     trimHistoryForMemoryIfNeeded,
+    trimHistoryToByteBudget,
     computeMemoryThresholds,
     updateMemoryStatus,
     clearMemoryUsage,
     trimHistoryStacksToLimit,
     initMemoryMonitor,
   } = memoryUtils;
+
+  function bytesToMiB(value) {
+    const bytes = Math.max(0, Number(value) || 0);
+    return Math.round((bytes / (1024 * 1024)) * 10) / 10;
+  }
+
+  function collectPixieeDrawResourceDiagnostics() {
+    const resources = typeof performance?.getEntriesByType === 'function'
+      ? performance.getEntriesByType('resource')
+      : [];
+    const currentOrigin = typeof window?.location?.origin === 'string' ? window.location.origin : '';
+    const byInitiatorType = {};
+    const byOrigin = {};
+    let localResourceCount = 0;
+    let externalResourceCount = 0;
+    let transferBytes = 0;
+    resources.forEach(entry => {
+      const initiatorType = String(entry?.initiatorType || 'other');
+      byInitiatorType[initiatorType] = (byInitiatorType[initiatorType] || 0) + 1;
+      transferBytes += Math.max(0, Number(entry?.transferSize) || 0);
+      let origin = '';
+      try {
+        origin = new URL(entry?.name || '', window.location.href).origin;
+      } catch (error) {
+        origin = '';
+      }
+      const originKey = origin || 'unknown';
+      byOrigin[originKey] = (byOrigin[originKey] || 0) + 1;
+      if (origin && origin === currentOrigin) {
+        localResourceCount += 1;
+      } else {
+        externalResourceCount += 1;
+      }
+    });
+    const diagnostics = {
+      total: resources.length,
+      localResourceCount,
+      externalResourceCount,
+      transferMiB: bytesToMiB(transferBytes),
+      byInitiatorType,
+      byOrigin: Object.fromEntries(
+        Object.entries(byOrigin).sort((left, right) => right[1] - left[1]).slice(0, 12)
+      ),
+    };
+    console.info('[pixiedraw:resource-diagnostics]', diagnostics);
+    return diagnostics;
+  }
+
+  async function collectPixieeDrawMemoryDiagnostics() {
+    const editor = typeof getMemoryUsageBreakdown === 'function'
+      ? getMemoryUsageBreakdown()
+      : { current: 0, past: 0, future: 0, pending: 0, timelapse: 0, total: 0 };
+    const heap = performance?.memory && typeof performance.memory === 'object'
+      ? {
+          usedJsHeapSize: Number(performance.memory.usedJSHeapSize) || 0,
+          totalJsHeapSize: Number(performance.memory.totalJSHeapSize) || 0,
+          jsHeapSizeLimit: Number(performance.memory.jsHeapSizeLimit) || 0,
+        }
+      : null;
+    const resources = typeof performance?.getEntriesByType === 'function'
+      ? performance.getEntriesByType('resource')
+      : [];
+    const resourceDiagnostics = collectPixieeDrawResourceDiagnostics();
+    const diagnostics = {
+      editorMiB: Object.fromEntries(Object.entries(editor).map(([key, value]) => [key, bytesToMiB(value)])),
+      heapMiB: heap && Object.fromEntries(Object.entries(heap).map(([key, value]) => [key, bytesToMiB(value)])),
+      activeDocument: {
+        width: Number(state.width) || 0,
+        height: Number(state.height) || 0,
+        frameCount: Array.isArray(state.frames) ? state.frames.length : 0,
+        historyPast: history.past.length,
+        historyFuture: history.future.length,
+        timelapseSteps: getAllTimelapseStepCount?.() || 0,
+        openTabCount: openProjectTabs.length,
+        activeTabId: activeOpenProjectTabId || '',
+      },
+      page: {
+        homeVisible: Boolean(projectHomeVisible),
+        iframeCount: document.querySelectorAll('iframe').length,
+        adIframeCount: document.querySelectorAll('ins.adsbygoogle iframe, iframe[id^="google_"]').length,
+        resourceCount: resources.length,
+        resourceTransferMiB: resourceDiagnostics.transferMiB,
+        resourceDiagnostics,
+      },
+    };
+    if (typeof performance?.measureUserAgentSpecificMemory === 'function') {
+      try {
+        const measured = await performance.measureUserAgentSpecificMemory();
+        diagnostics.userAgentMemoryMiB = bytesToMiB(measured?.bytes);
+        diagnostics.userAgentMemoryBreakdown = Array.isArray(measured?.breakdown)
+          ? measured.breakdown.map(item => ({
+              bytesMiB: bytesToMiB(item?.bytes),
+              attribution: item?.attribution || [],
+              types: item?.types || [],
+            }))
+          : [];
+      } catch (error) {
+        diagnostics.userAgentMemoryError = error?.name || error?.message || 'unavailable';
+      }
+    }
+    console.info('[pixiedraw:memory-diagnostics]', diagnostics);
+    return diagnostics;
+  }
+
+  window.__pixieedrawGetMemoryDiagnostics = async () => await collectPixieeDrawMemoryDiagnostics();
+  window.__pixieedrawGetResourceDiagnostics = () => collectPixieeDrawResourceDiagnostics();
 
   function remapSharedProjectHistorySnapshotIdentity(snapshot) {
     if (!snapshot || typeof snapshot !== 'object' || !isSharedProjectCollaborativeMode()) {
@@ -10132,24 +11013,7 @@
   const exportUtils = window.PiXiEEDrawModules?.exportUtils || {};
   const {
     sanitizeNativeFilename,
-    normalizeNativeSubdirectory,
-    isLikelyFileAlreadyExistsError,
-    isNativePhotoLibraryExportMimeType,
-    splitFilenameStemAndExtension,
-    buildNumberedFilename,
-    createExportDirectoryStorageUtils,
   } = exportUtils;
-  const exportDirectoryStorageUtils = createExportDirectoryStorageUtils?.({
-    canUseSessionStorage,
-    EXPORT_DIRECTORY_DISPLAY_LABEL_KEY,
-  }) || {};
-  const {
-    sanitizeExportDirectoryDisplayLabel,
-    buildExportDirectoryDisplayLabel,
-    loadStoredExportDirectoryDisplayLabel,
-    storeExportDirectoryDisplayLabel,
-    clearStoredExportDirectoryDisplayLabel,
-  } = exportDirectoryStorageUtils;
 
   const exportCodecs = window.PiXiEEDrawModules?.exportCodecs?.createExportCodecs?.({
     clamp,
@@ -10169,7 +11033,7 @@
     openProjectTabLongPressState,
     SHARED_PROJECTS_ENABLED,
     getActiveOpenProjectTabId: () => activeOpenProjectTabId,
-    getOpenProjectTabBusy: () => openProjectTabBusy,
+    getOpenProjectTabBusy: () => isProjectCommandLocked(),
     getOpenProjectTabSequence: () => openProjectTabSequence,
     setOpenProjectTabSequence: (value) => {
       openProjectTabSequence = value;
@@ -10272,6 +11136,14 @@
   set hideStartupScreen(value) { hideStartupScreen = value; },
   get isCurrentProjectSharedEntry() { return isCurrentProjectSharedEntry; },
   set isCurrentProjectSharedEntry(value) { isCurrentProjectSharedEntry = value; },
+  get isProjectCommandLocked() { return isProjectCommandLocked; },
+  set isProjectCommandLocked(value) { isProjectCommandLocked = value; },
+  get acquireProjectCommandLock() { return acquireProjectCommandLock; },
+  set acquireProjectCommandLock(value) { acquireProjectCommandLock = value; },
+  get releaseProjectCommandLock() { return releaseProjectCommandLock; },
+  set releaseProjectCommandLock(value) { releaseProjectCommandLock = value; },
+  get isProjectCommandLockHeldBy() { return isProjectCommandLockHeldBy; },
+  set isProjectCommandLockHeldBy(value) { isProjectCommandLockHeldBy = value; },
   get isMultiMasterProjectReplacementBlocked() { return isMultiMasterProjectReplacementBlocked; },
   set isMultiMasterProjectReplacementBlocked(value) { isMultiMasterProjectReplacementBlocked = value; },
   get isSharedProjectRealtimePrimaryActive() { return isSharedProjectRealtimePrimaryActive; },
@@ -10298,8 +11170,7 @@
   set normalizeAutosaveProjectId(value) { normalizeAutosaveProjectId = value; },
   get normalizeMultiProjectKey() { return normalizeMultiProjectKey; },
   set normalizeMultiProjectKey(value) { normalizeMultiProjectKey = value; },
-  get openProjectTabBusy() { return openProjectTabBusy; },
-  set openProjectTabBusy(value) { openProjectTabBusy = value; },
+  get openProjectTabBusy() { return isProjectCommandLocked(); },
   get openProjectTabs() { return openProjectTabs; },
   set openProjectTabs(value) { openProjectTabs = value; },
   get openSharedRecentProject() { return openSharedRecentProject; },
@@ -10314,6 +11185,8 @@
   set queueSharedProjectCurrentSnapshotCapture(value) { queueSharedProjectCurrentSnapshotCapture = value; },
   get readPendingSharedInvite() { return readPendingSharedInvite; },
   set readPendingSharedInvite(value) { readPendingSharedInvite = value; },
+  get readAutosaveV2PrimaryProject() { return readAutosaveV2PrimaryProject; },
+  set readAutosaveV2PrimaryProject(value) { readAutosaveV2PrimaryProject = value; },
   get recentProjectsCache() { return recentProjectsCache; },
   set recentProjectsCache(value) { recentProjectsCache = value; },
   get releaseOpenProjectTabProjectWriteGuard() { return releaseOpenProjectTabProjectWriteGuard; },
@@ -10322,6 +11195,8 @@
   set renderOpenProjectTabs(value) { renderOpenProjectTabs = value; },
   get resetDocumentUnsavedChanges() { return resetDocumentUnsavedChanges; },
   set resetDocumentUnsavedChanges(value) { resetDocumentUnsavedChanges = value; },
+  get pruneInactiveCanvasDirectCaches() { return pruneInactiveCanvasDirectCaches; },
+  set pruneInactiveCanvasDirectCaches(value) { pruneInactiveCanvasDirectCaches = value; },
   get retainOpenProjectTabProjectWriteGuard() { return retainOpenProjectTabProjectWriteGuard; },
   set retainOpenProjectTabProjectWriteGuard(value) { retainOpenProjectTabProjectWriteGuard = value; },
   get saveRecentProjectsList() { return saveRecentProjectsList; },
@@ -10394,6 +11269,31 @@
     return openProjectTabWorkflowUtilsModule.renameOpenProjectTab(...args);
   }
 
+  function createReplacementEmptySheetTab({ projectId = '', sheetIndex = 1 } = {}) {
+    const documentName = normalizeDocumentName(localizeText(`シート ${sheetIndex}`, `Sheet ${sheetIndex}`));
+    const snapshot = createInitialState({
+      width: DEFAULT_CANVAS_SIZE,
+      height: DEFAULT_CANVAS_SIZE,
+      name: documentName,
+      uiTheme: state.uiTheme,
+      palettePreset: newProjectPalettePresetId || NEW_PROJECT_PALETTE_PRESET_DEFAULT,
+    });
+    const project = buildPackagedProjectPayload(snapshot, { session: null, includeSheets: false });
+    return createOpenProjectSheetTabFromPackagedProject({
+      id: createOpenProjectTabId(),
+      project,
+      projectId: projectId || createAutosaveProjectId(),
+      fileName: documentName,
+      label: extractDocumentBaseName(documentName),
+      source: 'sheet',
+      unsaved: true,
+      sourceStorageAdapterId: null,
+      sourceKind: 'new',
+      sourceProjectToken: createProjectPersistenceToken('new'),
+      lastSavedStorageAdapterId: null,
+    });
+  }
+
   async function activateOpenProjectTab(...args) {
     return await openProjectTabWorkflowUtilsModule.activateOpenProjectTab(...args);
   }
@@ -10413,6 +11313,7 @@
     hasDocumentUnsavedChanges,
     normalizeAutosaveProjectId,
     getAutosaveProjectId: () => autosaveProjectId,
+    getActiveOpenProjectTabId: () => activeOpenProjectTabId,
     createAutosaveProjectId,
     recentProjectsCache,
     isSharedRecentProjectEntry,
@@ -10427,9 +11328,12 @@
     normalizeMultiProjectKey,
     createOpenProjectTabId,
     extractDocumentBaseName,
+    createLightweightLocalProjectTabState,
+    createLocalProjectEntrySignature,
+    normalizeProjectPersistenceState,
     normalizeQrEditPayload,
+    createNativeProjectOriginalityMetadata: (...args) => canonicalV2ProjectUtilsModule.createNativeProjectOriginalityMetadata?.(...args),
     localizeText,
-    MAX_PROJECT_SHEETS,
   }) || {};
   const {
     createOpenProjectTabFromCurrentState,
@@ -10789,8 +11693,6 @@
   set DEFAULT_DOCUMENT_NAME(value) { DEFAULT_DOCUMENT_NAME = value; },
   get DEFAULT_LAYER_BLEND_MODE() { return DEFAULT_LAYER_BLEND_MODE; },
   set DEFAULT_LAYER_BLEND_MODE(value) { DEFAULT_LAYER_BLEND_MODE = value; },
-  get DISABLE_FILE_SYSTEM_ACCESS_SAVE() { return DISABLE_FILE_SYSTEM_ACCESS_SAVE; },
-  set DISABLE_FILE_SYSTEM_ACCESS_SAVE(value) { DISABLE_FILE_SYSTEM_ACCESS_SAVE = value; },
   get EXPORT_GRID_TILE_MAX_SIZE() { return EXPORT_GRID_TILE_MAX_SIZE; },
   set EXPORT_GRID_TILE_MAX_SIZE(value) { EXPORT_GRID_TILE_MAX_SIZE = value; },
   get EXPORT_GRID_TILE_MIN_SIZE() { return EXPORT_GRID_TILE_MIN_SIZE; },
@@ -10799,8 +11701,6 @@
   set MAX_EXPORT_DIMENSION(value) { MAX_EXPORT_DIMENSION = value; },
   get MAX_EXPORT_SCALE_OPTIONS() { return MAX_EXPORT_SCALE_OPTIONS; },
   set MAX_EXPORT_SCALE_OPTIONS(value) { MAX_EXPORT_SCALE_OPTIONS = value; },
-  get NATIVE_PROJECTS_SUBDIRECTORY() { return NATIVE_PROJECTS_SUBDIRECTORY; },
-  set NATIVE_PROJECTS_SUBDIRECTORY(value) { NATIVE_PROJECTS_SUBDIRECTORY = value; },
   get PROJECT_FILE_EXTENSION() { return PROJECT_FILE_EXTENSION; },
   set PROJECT_FILE_EXTENSION(value) { PROJECT_FILE_EXTENSION = value; },
   get PROJECT_FILE_MIME_TYPE() { return PROJECT_FILE_MIME_TYPE; },
@@ -10833,10 +11733,14 @@
   set amount(value) { amount = value; },
   get autosaveDirty() { return autosaveDirty; },
   set autosaveDirty(value) { autosaveDirty = value; },
-  get autosaveHandle() { return autosaveHandle; },
-  set autosaveHandle(value) { autosaveHandle = value; },
   get autosaveProjectId() { return autosaveProjectId; },
   set autosaveProjectId(value) { autosaveProjectId = value; },
+  get writeAutosaveSnapshot() { return writeAutosaveSnapshot; },
+  set writeAutosaveSnapshot(value) { writeAutosaveSnapshot = value; },
+  get markActiveLocalProjectJournalNeedsCheckpoint() { return markActiveLocalProjectJournalNeedsCheckpoint; },
+  set markActiveLocalProjectJournalNeedsCheckpoint(value) { markActiveLocalProjectJournalNeedsCheckpoint = value; },
+  get markAutosaveDirty() { return markAutosaveDirty; },
+  set markAutosaveDirty(value) { markAutosaveDirty = value; },
   get baseColor() { return baseColor; },
   set baseColor(value) { baseColor = value; },
   get basePixels() { return basePixels; },
@@ -10851,6 +11755,8 @@
   set buildPackagedProjectPayload(value) { buildPackagedProjectPayload = value; },
   get buildProjectSessionPayload() { return buildProjectSessionPayload; },
   set buildProjectSessionPayload(value) { buildProjectSessionPayload = value; },
+  get buildProjectSessionPayloadWithPersistedTimelapse() { return buildProjectSessionPayloadWithPersistedTimelapse; },
+  set buildProjectSessionPayloadWithPersistedTimelapse(value) { buildProjectSessionPayloadWithPersistedTimelapse = value; },
   get buildSpriteMapExportPlan() { return buildSpriteMapExportPlan; },
   set buildSpriteMapExportPlan(value) { buildSpriteMapExportPlan = value; },
   get buildVoxelGlbBinaryFromCanvases() { return buildVoxelGlbBinaryFromCanvases; },
@@ -10871,8 +11777,6 @@
   set canvasToBlob(value) { canvasToBlob = value; },
   get clamp() { return clamp; },
   set clamp(value) { clamp = value; },
-  get clearPendingPermissionListener() { return clearPendingPermissionListener; },
-  set clearPendingPermissionListener(value) { clearPendingPermissionListener = value; },
   get cloneSimulationColor() { return cloneSimulationColor; },
   set cloneSimulationColor(value) { cloneSimulationColor = value; },
   get collectUsedColorsFromFramePixels() { return collectUsedColorsFromFramePixels; },
@@ -10889,6 +11793,8 @@
   set createAutosaveFileName(value) { createAutosaveFileName = value; },
   get createAutosaveProjectId() { return createAutosaveProjectId; },
   set createAutosaveProjectId(value) { createAutosaveProjectId = value; },
+  get createReplacementEmptySheetTab() { return createReplacementEmptySheetTab; },
+  set createReplacementEmptySheetTab(value) { createReplacementEmptySheetTab = value; },
   get createExportFileName() { return createExportFileName; },
   set createExportFileName(value) { createExportFileName = value; },
   get decodeBase64Binary() { return decodeBase64Binary; },
@@ -10899,8 +11805,6 @@
   set encodeTypedArrayBinary(value) { encodeTypedArrayBinary = value; },
   get ensureCurrentClientCanExportProject() { return ensureCurrentClientCanExportProject; },
   set ensureCurrentClientCanExportProject(value) { ensureCurrentClientCanExportProject = value; },
-  get ensureHandlePermission() { return ensureHandlePermission; },
-  set ensureHandlePermission(value) { ensureHandlePermission = value; },
   get exportColorSpritesEnabled() { return exportColorSpritesEnabled; },
   set exportColorSpritesEnabled(value) { exportColorSpritesEnabled = value; },
   get exportContestPostAfterSave() { return exportContestPostAfterSave; },
@@ -10947,8 +11851,12 @@
   set getExportFileNameBase(value) { getExportFileNameBase = value; },
   get getExportScaleCandidates() { return getExportScaleCandidates; },
   set getExportScaleCandidates(value) { getExportScaleCandidates = value; },
-  get getFileHandleInExportDirectory() { return getFileHandleInExportDirectory; },
-  set getFileHandleInExportDirectory(value) { getFileHandleInExportDirectory = value; },
+  get openDocumentDialog() { return openDocumentDialog; },
+  set openDocumentDialog(value) { openDocumentDialog = value; },
+  get resolveStoredLocalProjectPayloadForProjectId() { return resolveStoredLocalProjectPayloadForProjectId; },
+  set resolveStoredLocalProjectPayloadForProjectId(value) { resolveStoredLocalProjectPayloadForProjectId = value; },
+  get extractLocalProjectSheetPayload() { return extractLocalProjectSheetPayload; },
+  set extractLocalProjectSheetPayload(value) { extractLocalProjectSheetPayload = value; },
   get getMultiExportDisabledReason() { return getMultiExportDisabledReason; },
   set getMultiExportDisabledReason(value) { getMultiExportDisabledReason = value; },
   get getPaletteColorKey() { return getPaletteColorKey; },
@@ -10987,8 +11895,6 @@
   set normalizeLayerBlendMode(value) { normalizeLayerBlendMode = value; },
   get normalizeLayerOpacity() { return normalizeLayerOpacity; },
   set normalizeLayerOpacity(value) { normalizeLayerOpacity = value; },
-  get pendingAutosaveHandle() { return pendingAutosaveHandle; },
-  set pendingAutosaveHandle(value) { pendingAutosaveHandle = value; },
   get placements() { return placements; },
   set placements(value) { placements = value; },
   get primaryBlob() { return primaryBlob; },
@@ -11003,14 +11909,14 @@
   set requestedRows(value) { requestedRows = value; },
   get resolvePackagedProjectDotStats() { return resolvePackagedProjectDotStats; },
   set resolvePackagedProjectDotStats(value) { resolvePackagedProjectDotStats = value; },
-  get resolveUniqueExportDirectoryFilename() { return resolveUniqueExportDirectoryFilename; },
-  set resolveUniqueExportDirectoryFilename(value) { resolveUniqueExportDirectoryFilename = value; },
   get scaleVoxelPreviewPixels() { return scaleVoxelPreviewPixels; },
   set scaleVoxelPreviewPixels(value) { scaleVoxelPreviewPixels = value; },
-  get schedulePendingAutosavePermission() { return schedulePendingAutosavePermission; },
-  set schedulePendingAutosavePermission(value) { schedulePendingAutosavePermission = value; },
   get scheduleSessionPersist() { return scheduleSessionPersist; },
   set scheduleSessionPersist(value) { scheduleSessionPersist = value; },
+  get serializeProjectStorageSnapshot() { return serializeProjectStorageSnapshot; },
+  set serializeProjectStorageSnapshot(value) { serializeProjectStorageSnapshot = value; },
+  get generateSnapshotThumbnail() { return generateSnapshotThumbnail; },
+  set generateSnapshotThumbnail(value) { generateSnapshotThumbnail = value; },
   get setTrackedProjectDotBaseline() { return setTrackedProjectDotBaseline; },
   set setTrackedProjectDotBaseline(value) { setTrackedProjectDotBaseline = value; },
   get showLoginPromptAfterExport() { return showLoginPromptAfterExport; },
@@ -11023,8 +11929,6 @@
   set spritePixels(value) { spritePixels = value; },
   get state() { return state; },
   set state(value) { state = value; },
-  get storeAutosaveHandle() { return storeAutosaveHandle; },
-  set storeAutosaveHandle(value) { storeAutosaveHandle = value; },
   get targetPixels() { return targetPixels; },
   set targetPixels(value) { targetPixels = value; },
   get text() { return text; },
@@ -11251,7 +12155,7 @@
     openProjectTabs,
     getActiveOpenProjectTabId: () => activeOpenProjectTabId,
     getProjectHomeVisible: () => projectHomeVisible,
-    getOpenProjectTabBusy: () => openProjectTabBusy,
+    getOpenProjectTabBusy: () => isProjectCommandLocked(),
     getOpenProjectTabsLastRenderSignature: () => openProjectTabsLastRenderSignature,
     setOpenProjectTabsLastRenderSignature: (value) => {
       openProjectTabsLastRenderSignature = value;
@@ -11260,7 +12164,6 @@
     setOpenProjectTabsLastStructureSignature: (value) => {
       openProjectTabsLastStructureSignature = value;
     },
-    MAX_PROJECT_SHEETS,
     normalizeAutosaveProjectId,
     getAutosaveProjectId: () => autosaveProjectId,
     extractDocumentBaseName,
@@ -11307,7 +12210,6 @@
     openProjectTabs,
     recentProjectsCache,
     SHARED_PROJECTS_ENABLED,
-    MAX_PROJECT_SHEETS,
     AUTOSAVE_SUPPORTED,
     getActiveOpenProjectTabId: () => activeOpenProjectTabId,
     setActiveOpenProjectTabId: (value) => {
@@ -11323,7 +12225,7 @@
     },
     getStartupAutosaveRestoreProjectId: () => startupAutosaveRestoreProjectId,
     getAutosaveProjectId: () => autosaveProjectId,
-    getOpenProjectTabBusy: () => openProjectTabBusy,
+    getOpenProjectTabBusy: () => isProjectCommandLocked(),
     getStartupVisible: () => startupVisible,
     getActiveSharedProjectKey: () => activeSharedProjectKey,
     findOpenProjectTabIndex,
@@ -11348,6 +12250,10 @@
     refreshRecentProjectsUI: (...args) => refreshRecentProjectsUI(...args),
     maybePromptAndTransferRecentProjectsFromHome: (...args) => maybePromptAndTransferRecentProjectsFromHome(...args),
     clearActiveSharedProjectSession: (...args) => clearActiveSharedProjectSession(...args),
+    makeHistorySnapshot,
+    buildProjectSessionPayload,
+    buildPackagedProjectPayload,
+    replaceActiveProjectSessionFromTab: (...args) => replaceActiveProjectSessionFromTab(...args),
   }) || {};
   const {
     ensureOpenProjectTabsInitialized,
@@ -11363,59 +12269,77 @@
     closeAllOpenProjectTabsForProjectReplacement,
   } = openProjectTabLifecycle;
 
-  const openProjectTabSheetActions = window.PiXiEEDrawModules?.openProjectTabSheetActions?.createOpenProjectTabSheetActions?.({
-    state,
-    dom,
-    openProjectTabs,
-    DEFAULT_CANVAS_SIZE,
-    NEW_PROJECT_PALETTE_PRESET_DEFAULT,
-    MAX_PROJECT_SHEETS,
-    getOpenProjectTabBusy: () => openProjectTabBusy,
-    setOpenProjectTabBusy: (value) => {
-      openProjectTabBusy = Boolean(value);
-    },
-    getAutosaveProjectId: () => autosaveProjectId,
-    getNewProjectPalettePresetId: () => newProjectPalettePresetId,
-    setActiveOpenProjectTabId: (value) => {
-      activeOpenProjectTabId = value;
-    },
-    setSuppressOpenProjectTabAutoInitialize: (value) => {
-      suppressOpenProjectTabAutoInitialize = Boolean(value);
-    },
-    normalizeDocumentName,
-    localizeText,
-    createInitialState,
-    buildPackagedProjectPayload,
-    ensureOpenProjectTabsInitialized,
-    persistActiveOpenProjectTab,
-    buildActiveSharedProjectSheetTabFields,
-    createOpenProjectSheetTabFromPackagedProject,
-    extractDocumentBaseName,
-    renderOpenProjectTabs: (...args) => renderOpenProjectTabs(...args),
-    loadDocumentFromProjectPayload: (...args) => loadDocumentFromProjectPayload(...args),
-    findOpenProjectTabIndex,
-    queueSharedProjectSheetsSnapshot,
-    markAutosaveDirty: (...args) => markAutosaveDirty(...args),
-    markDocumentUnsavedChange,
-    scheduleSessionPersist,
-    scheduleAutosaveSnapshot,
-    updateAutosaveStatus,
-    beginOpenProjectTabLongPress,
-    updateOpenProjectTabLongPress,
-    endOpenProjectTabLongPress,
-    showProjectHomeScreen,
-    closeOpenProjectTab,
-    shouldSuppressOpenProjectTabClick,
-    activateOpenProjectTab,
-    hideProjectHomeScreen,
-    renameOpenProjectTab,
-  }) || {};
-  const {
-    createBlankSheetPackagedProject,
-    createNewSheetTab,
-    openProjectTabAddPicker,
-    setupOpenProjectTabs,
-  } = openProjectTabSheetActions;
+  function getActiveProjectTabDebugSummary(tab = getActiveOpenProjectTab?.()) {
+    if (!tab || typeof tab !== 'object') return null;
+    return {
+      projectId: normalizeAutosaveProjectId(tab.projectId || ''),
+      sourceKind: tab.sourceKind || 'unknown',
+      sourceAdapterId: tab.sourceStorageAdapterId || null,
+      sourceProjectToken: tab.sourceProjectToken || null,
+      lastSavedAdapterId: tab.lastSavedStorageAdapterId || null,
+    };
+  }
+
+  function compareActiveProjectSessionWithTabForDev() {
+    const tab = typeof getActiveOpenProjectTab === 'function' ? getActiveOpenProjectTab() : null;
+    const validation = activeProjectSessionUtils.validateActiveProjectSession?.(activeProjectSession)
+      || { ok: false, errors: ['session-utils-unavailable'] };
+    const metadata = activeProjectSessionUtils.compareActiveProjectSessionWithTab?.(activeProjectSession, tab)
+      || { ok: false, mismatches: [{ field: 'session-utils-unavailable', sessionValue: null, tabValue: null }] };
+    const identity = getActiveProjectIdentityComparison();
+    const mismatches = [
+      ...(validation.errors || []).map(field => ({ field: `session:${field}`, sessionValue: null, tabValue: null })),
+      ...(identity.mismatches || []),
+      ...(metadata.mismatches || []),
+    ];
+    return {
+      ok: mismatches.length === 0,
+      validation,
+      identity: {
+        ok: identity.ok,
+        mismatches: identity.mismatches,
+        sessionProjectId: identity.sessionProjectId,
+        autosaveProjectId: identity.autosaveProjectId,
+        activeTabProjectId: identity.activeTabProjectId,
+        runtimeProjectId: identity.runtimeProjectId,
+        runtimeDocumentId: identity.runtimeDocumentId,
+      },
+      metadata,
+      session: getActiveProjectSessionDebugSummary(),
+      tab: getActiveProjectTabDebugSummary(tab),
+      mismatches,
+    };
+  }
+
+  window.__pixieedrawGetActiveProjectSession = () => getActiveProjectSessionDebugSummary();
+  window.__pixieedrawValidateActiveProjectSession = () => {
+    const validation = activeProjectSessionUtils.validateActiveProjectSession?.(activeProjectSession)
+      || { ok: false, errors: ['session-utils-unavailable'] };
+    const comparison = compareActiveProjectSessionWithTabForDev();
+    return {
+      ok: validation.ok && comparison.ok,
+      errors: validation.errors || [],
+      session: comparison.session,
+      tab: comparison.tab,
+      mismatches: comparison.mismatches,
+    };
+  };
+  window.__pixieedrawCompareActiveProjectSessionWithTab = () => compareActiveProjectSessionWithTabForDev();
+
+  const { setupOpenProjectTabs } = window.PiXiEEDrawModules?.openProjectTabInteractions
+    ?.createOpenProjectTabInteractions?.({
+      dom,
+      ensureOpenProjectTabsInitialized,
+      showProjectHomeScreen,
+      hideProjectHomeScreen,
+      closeOpenProjectTab,
+      activateOpenProjectTab,
+      renameOpenProjectTab,
+      shouldSuppressOpenProjectTabClick,
+      beginOpenProjectTabLongPress,
+      updateOpenProjectTabLongPress,
+      endOpenProjectTabLongPress,
+    }) || {};
 
   const pixelPatchHistoryUtils = window.PiXiEEDrawModules?.pixelPatchHistoryUtils?.createPixelPatchHistoryUtils?.({
     state,
@@ -11437,6 +12361,7 @@
     invalidateFillPreviewCache,
     invalidateOnionSkinCache,
     clearPlaybackFrameCache: (...args) => clearPlaybackFrameCache(...args),
+    markDirtyRect,
     requestRender,
     requestOverlayRender,
     renderAllProjectCanvasSurfaces,
@@ -11483,6 +12408,7 @@
 
   function markDocumentUnsavedChange() {
     unsavedChangeToken += 1;
+    syncActiveProjectSessionDirty('document-mutation');
     if (
       activeSharedProjectKey
       && !autosaveRestoring
@@ -11498,11 +12424,13 @@
 
   function markDocumentDurablySaved() {
     durableSaveToken = unsavedChangeToken;
+    syncActiveProjectSessionDirty('document-durably-saved');
   }
 
   function resetDocumentUnsavedChanges() {
     unsavedChangeToken = 0;
     durableSaveToken = 0;
+    syncActiveProjectSessionDirty('document-reset-clean');
   }
 
   function hasDocumentUnsavedChanges() {
@@ -12358,14 +13286,14 @@
     if (window.location.protocol === 'file:') {
       return;
     }
-    const isLocalDevDraw =
-      /\/PiXiEEDDraw\.dev(?:\/|$)/.test(window.location.pathname || '')
+    const isLocalProductionDraw =
+      /\/pixiedraw(?:\/|$)/.test(window.location.pathname || '')
       && /^(localhost|127\.0\.0\.1|::1)$/.test(window.location.hostname || '');
-    if (isLocalDevDraw) {
+    if (isLocalProductionDraw) {
       if (typeof navigator.serviceWorker.getRegistrations === 'function') {
         navigator.serviceWorker.getRegistrations().then(registrations => {
           registrations.forEach(registration => {
-            if (typeof registration?.scope === 'string' && registration.scope.includes('/PiXiEEDDraw.dev/')) {
+            if (typeof registration?.scope === 'string' && registration.scope.includes('/pixiedraw/')) {
               registration.unregister().catch(() => {});
             }
           });
@@ -12374,7 +13302,7 @@
       if (typeof window.caches !== 'undefined' && typeof window.caches.keys === 'function') {
         window.caches.keys().then(keys => (
           Promise.all(keys
-            .filter(key => /^pixiedraw-v/.test(key) || key.includes('PiXiEEDDraw.dev'))
+            .filter(key => /^pixieedraw-v/.test(key))
             .map(key => window.caches.delete(key)))
         )).catch(() => {});
       }
@@ -12390,7 +13318,13 @@
       if (suppressControllerChangeReloadUntil && Date.now() <= suppressControllerChangeReloadUntil) {
         return;
       }
-      scheduleAppReload('pwa-controllerchange');
+      console.info('[pixiedraw:update]', {
+        phase: 'service-worker-controllerchange',
+        reason: 'controller-changed-without-reload',
+        startupReady,
+        commandLocked: isProjectCommandLocked(),
+        lockOwner: inspectProjectCommandLock().owner,
+      });
     });
     const swUrl = `service-worker.js?v=${encodeURIComponent(APP_SW_VERSION)}`;
     navigator.serviceWorker.register(swUrl).catch(error => {
@@ -12695,6 +13629,8 @@
   set SHARED_PROJECT_DEFERRED_PERSIST_DELAY(value) { SHARED_PROJECT_DEFERRED_PERSIST_DELAY = value; },
   get activeSharedProjectKey() { return activeSharedProjectKey; },
   set activeSharedProjectKey(value) { activeSharedProjectKey = value; },
+  get autosaveProjectId() { return autosaveProjectId; },
+  set autosaveProjectId(value) { autosaveProjectId = value; },
   get applyHistorySnapshot() { return applyHistorySnapshot; },
   set applyHistorySnapshot(value) { applyHistorySnapshot = value; },
   get applyHistorySnapshotForClient() { return applyHistorySnapshotForClient; },
@@ -12735,6 +13671,14 @@
   set hasPendingSelectionMove(value) { hasPendingSelectionMove = value; },
   get history() { return history; },
   set history(value) { history = value; },
+  get archiveEvictedHistoryEntry() { return archiveEvictedHistoryEntry; },
+  set archiveEvictedHistoryEntry(value) { archiveEvictedHistoryEntry = value; },
+  get clearColdHistoryDirection() { return clearColdHistoryDirection; },
+  set clearColdHistoryDirection(value) { clearColdHistoryDirection = value; },
+  get hasColdHistoryEntries() { return hasColdHistoryEntries; },
+  set hasColdHistoryEntries(value) { hasColdHistoryEntries = value; },
+  get requestColdHistoryRefill() { return requestColdHistoryRefill; },
+  set requestColdHistoryRefill(value) { requestColdHistoryRefill = value; },
   get invalidateFillPreviewCache() { return invalidateFillPreviewCache; },
   set invalidateFillPreviewCache(value) { invalidateFillPreviewCache = value; },
   get invalidateOnionSkinCache() { return invalidateOnionSkinCache; },
@@ -12761,6 +13705,8 @@
   set markDocumentUnsavedChange(value) { markDocumentUnsavedChange = value; },
   get multiState() { return multiState; },
   set multiState(value) { multiState = value; },
+  get noteActiveLocalProjectHistoryEntry() { return noteActiveLocalProjectHistoryEntry; },
+  set noteActiveLocalProjectHistoryEntry(value) { noteActiveLocalProjectHistoryEntry = value; },
   get queueSharedProjectCurrentSnapshotCapture() { return queueSharedProjectCurrentSnapshotCapture; },
   set queueSharedProjectCurrentSnapshotCapture(value) { queueSharedProjectCurrentSnapshotCapture = value; },
   get recordTimelapseOperationLogEntry() { return recordTimelapseOperationLogEntry; },
@@ -12785,6 +13731,8 @@
   set scheduleTimelapseCaptureFromState(value) { scheduleTimelapseCaptureFromState = value; },
   get setHistoryEntryLabel() { return setHistoryEntryLabel; },
   set setHistoryEntryLabel(value) { setHistoryEntryLabel = value; },
+  get markActiveLocalProjectJournalNeedsCheckpoint() { return markActiveLocalProjectJournalNeedsCheckpoint; },
+  set markActiveLocalProjectJournalNeedsCheckpoint(value) { markActiveLocalProjectJournalNeedsCheckpoint = value; },
   get setVoxelPreviewOrientationForFrameIndex() { return setVoxelPreviewOrientationForFrameIndex; },
   set setVoxelPreviewOrientationForFrameIndex(value) { setVoxelPreviewOrientationForFrameIndex = value; },
   get shouldPersistSharedProjectSnapshotForHistoryLabel() { return shouldPersistSharedProjectSnapshotForHistoryLabel; },
@@ -12795,6 +13743,8 @@
   set thinTimelapseSnapshotsIfNeeded(value) { thinTimelapseSnapshotsIfNeeded = value; },
   get timelapseState() { return timelapseState; },
   set timelapseState(value) { timelapseState = value; },
+  get trimHistoryToByteBudget() { return trimHistoryToByteBudget; },
+  set trimHistoryToByteBudget(value) { trimHistoryToByteBudget = value; },
   get updateMemoryStatus() { return updateMemoryStatus; },
   set updateMemoryStatus(value) { updateMemoryStatus = value; },
   get voxelExtensionState() { return voxelExtensionState; },
@@ -13343,7 +14293,6 @@
     AUTOSAVE_SUPPORTED,
     STREAMING_HIDE_MONETIZATION_UI,
     TOP_UI_ACTION_FLOATING_PREVIEW_TOGGLE,
-    TOP_UI_ACTION_LOCAL_CANVAS_TOGGLE,
     TOP_UI_ACTION_MIRROR_POPUP,
     TOP_UI_ACTION_OPEN_DETAILS_PANEL,
     TOP_UI_ACTION_VIRTUAL_CURSOR_TOGGLE,
@@ -13360,7 +14309,6 @@
     syncExternalToolActionButtons: (...args) => syncExternalToolActionButtons(...args),
     updateMirrorActionButtons: (...args) => updateMirrorActionButtons(...args),
     updateVirtualCursorActionToolButtons: (...args) => updateVirtualCursorActionToolButtons(...args),
-    updateLocalCanvasActionToolButtons: (...args) => updateLocalCanvasActionToolButtons(...args),
     updateFloatingPreviewActionToolButtons: (...args) => updateFloatingPreviewActionToolButtons(...args),
     setLocalizedTextContent: (...args) => setLocalizedTextContent(...args),
     setLocalizedAttribute: (...args) => setLocalizedAttribute(...args),
@@ -13376,8 +14324,6 @@
     applyHelpGuideSearchFilter: (...args) => applyHelpGuideSearchFilter(...args),
     renderMirrorToolPopover: (...args) => renderMirrorToolPopover(...args),
     syncMirrorToolPopoverControls: (...args) => syncMirrorToolPopoverControls(...args),
-    updateExportDestinationLabel: (...args) => updateExportDestinationLabel(...args),
-    updateExportFolderButtonLabel: (...args) => updateExportFolderButtonLabel(...args),
     updateExportScaleHint: (...args) => updateExportScaleHint(...args),
     renderOpenProjectTabs: (...args) => renderOpenProjectTabs(...args),
     syncControlsWithState: (...args) => syncControlsWithState(...args),
@@ -13483,34 +14429,6 @@
     return autosaveWorkflowUtilsModule.handleAutosaveStorageEvent(...args);
   }
 
-  function updateExportDestinationLabel(...args) {
-    return autosaveWorkflowUtilsModule.updateExportDestinationLabel(...args);
-  }
-
-  function updateExportFolderStatus(...args) {
-    return autosaveWorkflowUtilsModule.updateExportFolderStatus(...args);
-  }
-
-  function updateExportFolderButtonLabel(...args) {
-    return autosaveWorkflowUtilsModule.updateExportFolderButtonLabel(...args);
-  }
-
-  async function ensureExportWorkspaceDirectory(...args) {
-    return autosaveWorkflowUtilsModule.ensureExportWorkspaceDirectory(...args);
-  }
-
-  async function attemptExportDirectoryReauthorization(...args) {
-    return autosaveWorkflowUtilsModule.attemptExportDirectoryReauthorization(...args);
-  }
-
-  async function requestExportDirectoryBinding(...args) {
-    return autosaveWorkflowUtilsModule.requestExportDirectoryBinding(...args);
-  }
-
-  async function initializeExportDirectoryBinding(...args) {
-    return autosaveWorkflowUtilsModule.initializeExportDirectoryBinding(...args);
-  }
-
   async function initializeAutosave(...args) {
     return autosaveWorkflowUtilsModule.initializeAutosave(...args);
   }
@@ -13559,36 +14477,8 @@
     return autosaveWorkflowUtilsModule.writeAutosaveSnapshot(...args);
   }
 
-  async function restoreAutosaveDocument(...args) {
-    return autosaveWorkflowUtilsModule.restoreAutosaveDocument(...args);
-  }
-
-  async function getFileHandleInExportDirectory(...args) {
-    return autosaveWorkflowUtilsModule.getFileHandleInExportDirectory(...args);
-  }
-
-  async function resolveUniqueExportDirectoryFilename(...args) {
-    return autosaveWorkflowUtilsModule.resolveUniqueExportDirectoryFilename(...args);
-  }
-
-  async function requestAutosaveBinding(...args) {
-    return autosaveWorkflowUtilsModule.requestAutosaveBinding(...args);
-  }
-
   async function ensureAutosaveForLensImport(...args) {
     return autosaveWorkflowUtilsModule.ensureAutosaveForLensImport(...args);
-  }
-
-  async function ensureHandlePermission(...args) {
-    return autosaveWorkflowUtilsModule.ensureHandlePermission(...args);
-  }
-
-  function schedulePendingAutosavePermission(...args) {
-    return autosaveWorkflowUtilsModule.schedulePendingAutosavePermission(...args);
-  }
-
-  function clearPendingPermissionListener(...args) {
-    return autosaveWorkflowUtilsModule.clearPendingPermissionListener(...args);
   }
 
   // -------------------------------------------------------------------------
@@ -13672,14 +14562,6 @@
     return iosSnapshotUtilsModule.initializeIosSnapshotFallback(...args);
   }
 
-  async function attemptAutosaveReauthorization(...args) {
-    return autosaveWorkflowUtilsModule.attemptAutosaveReauthorization(...args);
-  }
-
-  async function openDocumentsAsProjectTabs(...args) {
-    return openImportWorkflowUtilsModule.openDocumentsAsProjectTabs(...args);
-  }
-
   async function openImageFileAsNewProject(...args) {
     return openImportWorkflowUtilsModule.openImageFileAsNewProject(...args);
   }
@@ -13702,10 +14584,6 @@
 
   async function appendPackagedProjectTab(...args) {
     return openImportWorkflowUtilsModule.appendPackagedProjectTab(...args);
-  }
-
-  async function createNewProjectAsTab(...args) {
-    return openImportWorkflowUtilsModule.createNewProjectAsTab(...args);
   }
 
   async function openRecentProjectAsTab(...args) {
@@ -14177,6 +15055,49 @@
     return startupWorkflowUtilsModule.openRecentProjectDeleteConfirmDialog(...args);
   }
 
+  async function requestLegacyV2MigrationConsent({ sourceFileName = '', sourceAdapterId = '', projectCount = 1, multiCanvasCount = 1 } = {}) {
+    const dialog = dom.legacyProjectMigration?.dialog;
+    if (!dialog || typeof dialog.showModal !== 'function') return false;
+    const normalizedCount = Math.max(1, Math.round(Number(projectCount) || 1));
+    const name = typeof sourceFileName === 'string' && sourceFileName.trim()
+      ? sourceFileName.trim()
+      : '選択したプロジェクト';
+    const isV1 = sourceAdapterId === 'pixieedraw-v1-json';
+    const normalizedCanvasCount = Math.max(1, Math.round(Number(multiCanvasCount) || 1));
+    if (dom.legacyProjectMigration.message) {
+      dom.legacyProjectMigration.message.textContent = normalizedCanvasCount > 1
+        ? `「${name}」には ${normalizedCanvasCount} 枚の旧マルチキャンバスがあります。各キャンバスを単一のV2プロジェクトへ分割します。`
+        : normalizedCount > 1
+        ? `「${name}」には ${normalizedCount} 件の旧プロジェクトがあります。各プロジェクトを単一のV2プロジェクトへ分割します。`
+        : `「${name}」は${isV1 ? 'V1' : '旧V2'}形式です。単一のV2プロジェクトへ移行します。`;
+    }
+    if (dom.legacyProjectMigration.detail) {
+      dom.legacyProjectMigration.detail.textContent = '移行後はV2だけを端末内プロジェクトとして使用します。選択した元ファイル、PNG、GIFなどの元データは削除・上書きせず、PiXiEEDrawからも参照を保持しません。';
+    }
+    return await new Promise(resolve => {
+      let settled = false;
+      const finish = (accepted) => {
+        if (settled) return;
+        settled = true;
+        dialog.removeEventListener('cancel', onCancel);
+        dom.legacyProjectMigration.cancel?.removeEventListener('click', onCancel);
+        dom.legacyProjectMigration.confirm?.removeEventListener('click', onConfirm);
+        if (dialog.open) dialog.close();
+        resolve(accepted);
+      };
+      const onCancel = (event) => {
+        event?.preventDefault?.();
+        finish(false);
+      };
+      const onConfirm = () => finish(true);
+      dialog.addEventListener('cancel', onCancel, { once: true });
+      dom.legacyProjectMigration.cancel?.addEventListener('click', onCancel, { once: true });
+      dom.legacyProjectMigration.confirm?.addEventListener('click', onConfirm, { once: true });
+      dialog.showModal();
+      dom.legacyProjectMigration.confirm?.focus();
+    });
+  }
+
   function setupRecentProjectDeleteConfirmDialog(...args) {
     return startupWorkflowUtilsModule.setupRecentProjectDeleteConfirmDialog(...args);
   }
@@ -14241,10 +15162,6 @@
     return startupWorkflowUtilsModule.runStartupQuickSetup(...args);
   }
 
-  function isStartupScreenAppendTabMode(...args) {
-    return startupWorkflowUtilsModule.isStartupScreenAppendTabMode(...args);
-  }
-
   function showStartupScreen(...args) {
     return startupWorkflowUtilsModule.showStartupScreen(...args);
   }
@@ -14277,6 +15194,10 @@
     return documentSessionWorkflowUtilsModule.loadDocumentFromHandle(...args);
   }
 
+  async function loadDocumentFromBlob(...args) {
+    return documentSessionWorkflowUtilsModule.loadDocumentFromBlob(...args);
+  }
+
   async function loadDocumentFromText(...args) {
     return documentSessionWorkflowUtilsModule.loadDocumentFromText(...args);
   }
@@ -14301,6 +15222,10 @@
     return documentSessionWorkflowUtilsModule.normalizeSerializedTimelapseOperationEntry(...args);
   }
 
+  function serializeProjectTimelapseSnapshotList(...args) {
+    return documentSessionWorkflowUtilsModule.serializeProjectTimelapseSnapshotList(...args);
+  }
+
   function buildProjectSessionPayload(...args) {
     return documentSessionWorkflowUtilsModule.buildProjectSessionPayload(...args);
   }
@@ -14309,8 +15234,79 @@
     return documentSessionWorkflowUtilsModule.buildAutosaveSessionPayload(...args);
   }
 
+  async function buildProjectSessionPayloadWithPersistedTimelapse(options = {}) {
+    const requireComplete = options?.requireComplete === true;
+    timelapseState.enabled = true;
+    ensureTimelapseStartCapture();
+    flushPendingTimelapseCapture({ force: true });
+    await waitForPendingTimelapseArchiveWrites({ requireSuccess: requireComplete });
+    const session = buildProjectSessionPayload();
+    const persistedByCanvas = await loadPersistedTimelapseSnapshots(autosaveProjectId, {
+      throwOnError: requireComplete,
+    });
+    const timelapse = session?.timelapse;
+    if (!timelapse || !persistedByCanvas || typeof persistedByCanvas !== 'object') {
+      if (requireComplete) {
+        const error = new Error('Timelapse session is unavailable');
+        error.code = 'ERR_TIMELAPSE_SESSION_UNAVAILABLE';
+        throw error;
+      }
+      return session;
+    }
+    if (!timelapse.byCanvas || typeof timelapse.byCanvas !== 'object') {
+      timelapse.byCanvas = {};
+    }
+    Object.entries(persistedByCanvas).forEach(([canvasId, snapshots]) => {
+      const serialized = serializeProjectTimelapseSnapshotList(snapshots);
+      if (!serialized.length) return;
+      const existing = timelapse.byCanvas[canvasId]?.snapshots || [];
+      const seen = new Set();
+      const merged = [...serialized, ...existing].filter(entry => {
+        const key = `${entry?.width || 0}x${entry?.height || 0}:${entry?.pixels || ''}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      while (merged.length > TIMELAPSE_MAX_STEPS) {
+        for (let index = merged.length - 2; index >= 1 && merged.length > TIMELAPSE_MAX_STEPS; index -= 2) {
+          merged.splice(index, 1);
+        }
+      }
+      timelapse.byCanvas[canvasId] = {
+        warningShown: true,
+        sampleStep: Math.max(1, Math.round(Number(timelapse.byCanvas[canvasId]?.sampleStep) || 1)),
+        lastCaptureToken: Number.isFinite(Number(timelapse.byCanvas[canvasId]?.lastCaptureToken))
+          ? Math.round(Number(timelapse.byCanvas[canvasId].lastCaptureToken))
+          : -1,
+        snapshots: merged,
+      };
+    });
+    const hasTimelapseData = Object.values(timelapse.byCanvas || {}).some(track =>
+      Array.isArray(track?.snapshots) && track.snapshots.length > 0
+    ) || Object.values(timelapse.operationLogsByCanvas || {}).some(log =>
+      log?.baseSnapshot && Array.isArray(log?.entries)
+    );
+    timelapse.enabled = true;
+    timelapse.synchronization = {
+      schemaVersion: 1,
+      complete: hasTimelapseData,
+      synchronizedAt: new Date().toISOString(),
+      persistedArchiveMerged: true,
+    };
+    if (requireComplete && !hasTimelapseData) {
+      const error = new Error('Complete timelapse data is required for project export');
+      error.code = 'ERR_TIMELAPSE_DATA_INCOMPLETE';
+      throw error;
+    }
+    return session;
+  }
+
   function snapshotFromDocumentText(...args) {
     return documentSessionWorkflowUtilsModule.snapshotFromDocumentText(...args);
+  }
+
+  async function snapshotFromDocumentBlob(...args) {
+    return documentSessionWorkflowUtilsModule.snapshotFromDocumentBlob(...args);
   }
 
   function snapshotFromParsedDocumentValue(...args) {
@@ -14864,6 +15860,7 @@
       });
     }
     if (changed) {
+      refreshColdHistoryStatus(normalizedId);
       restoreFloatingPreviewReferenceMediaForActiveProject().catch(error => {
         console.warn('Failed to restore floating preview reference media on project switch', error);
       });
@@ -14885,168 +15882,6 @@
       return stored;
     }
     return setActiveAutosaveProjectId(createAutosaveProjectId());
-  }
-
-  async function storeAutosaveHandle(handle) {
-    if (!FILE_HANDLE_AUTOSAVE_SUPPORTED) return;
-    try {
-      const db = await openAutosaveDatabase();
-      await new Promise((resolve, reject) => {
-        const tx = db.transaction([AUTOSAVE_STORE_NAME], 'readwrite');
-        const store = tx.objectStore(AUTOSAVE_STORE_NAME);
-        const request = store.put(handle, AUTOSAVE_HANDLE_KEY);
-        request.onerror = () => reject(request.error);
-        tx.oncomplete = () => {
-          db.close();
-          resolve();
-        };
-        tx.onerror = () => {
-          const error = tx.error;
-          db.close();
-          reject(error);
-        };
-      });
-    } catch (error) {
-      console.warn('Failed to store autosave handle', error);
-    }
-  }
-
-  async function loadStoredAutosaveHandle() {
-    if (!FILE_HANDLE_AUTOSAVE_SUPPORTED) return null;
-    try {
-      const db = await openAutosaveDatabase();
-      return await new Promise((resolve, reject) => {
-        let value = null;
-        const tx = db.transaction([AUTOSAVE_STORE_NAME], 'readonly');
-        const store = tx.objectStore(AUTOSAVE_STORE_NAME);
-        const request = store.get(AUTOSAVE_HANDLE_KEY);
-        request.onsuccess = () => {
-          value = request.result || null;
-        };
-        request.onerror = () => {
-          reject(request.error);
-        };
-        tx.oncomplete = () => {
-          db.close();
-          resolve(value);
-        };
-        tx.onerror = () => {
-          const error = tx.error;
-          db.close();
-          reject(error);
-        };
-      });
-    } catch (error) {
-      console.warn('Autosave handle load failed', error);
-      return null;
-    }
-  }
-
-  async function clearStoredAutosaveHandle() {
-    if (!FILE_HANDLE_AUTOSAVE_SUPPORTED) return;
-    try {
-      const db = await openAutosaveDatabase();
-      await new Promise((resolve, reject) => {
-        const tx = db.transaction([AUTOSAVE_STORE_NAME], 'readwrite');
-        const store = tx.objectStore(AUTOSAVE_STORE_NAME);
-        const request = store.delete(AUTOSAVE_HANDLE_KEY);
-        request.onerror = () => reject(request.error);
-        tx.oncomplete = () => {
-          db.close();
-          resolve();
-        };
-        tx.onerror = () => {
-          const error = tx.error;
-          db.close();
-          reject(error);
-        };
-      });
-    } catch (error) {
-      console.warn('Failed to clear autosave handle', error);
-    }
-  }
-
-  async function storeExportDirectoryHandle(handle) {
-    if (!EXPORT_DIRECTORY_SUPPORTED) return;
-    try {
-      const db = await openAutosaveDatabase();
-      await new Promise((resolve, reject) => {
-        const tx = db.transaction([AUTOSAVE_STORE_NAME], 'readwrite');
-        const store = tx.objectStore(AUTOSAVE_STORE_NAME);
-        const request = store.put(handle, EXPORT_DIRECTORY_HANDLE_KEY);
-        request.onerror = () => reject(request.error);
-        tx.oncomplete = () => {
-          db.close();
-          resolve();
-        };
-        tx.onerror = () => {
-          const error = tx.error;
-          db.close();
-          reject(error);
-        };
-      });
-    } catch (error) {
-      console.warn('Failed to store export directory handle', error);
-    }
-  }
-
-  async function loadStoredExportDirectoryHandle() {
-    if (!EXPORT_DIRECTORY_SUPPORTED) return null;
-    try {
-      const db = await openAutosaveDatabase();
-      return await new Promise((resolve, reject) => {
-        let value = null;
-        const tx = db.transaction([AUTOSAVE_STORE_NAME], 'readonly');
-        const store = tx.objectStore(AUTOSAVE_STORE_NAME);
-        const request = store.get(EXPORT_DIRECTORY_HANDLE_KEY);
-        request.onsuccess = () => {
-          value = request.result || null;
-        };
-        request.onerror = () => {
-          reject(request.error);
-        };
-        tx.oncomplete = () => {
-          db.close();
-          resolve(value);
-        };
-        tx.onerror = () => {
-          const error = tx.error;
-          db.close();
-          reject(error);
-        };
-      });
-    } catch (error) {
-      console.warn('Export directory handle load failed', error);
-      return null;
-    }
-  }
-
-  async function clearStoredExportDirectoryHandle() {
-    if (!EXPORT_DIRECTORY_SUPPORTED) {
-      clearStoredExportDirectoryDisplayLabel();
-      return;
-    }
-    try {
-      const db = await openAutosaveDatabase();
-      await new Promise((resolve, reject) => {
-        const tx = db.transaction([AUTOSAVE_STORE_NAME], 'readwrite');
-        const store = tx.objectStore(AUTOSAVE_STORE_NAME);
-        const request = store.delete(EXPORT_DIRECTORY_HANDLE_KEY);
-        request.onerror = () => reject(request.error);
-        tx.oncomplete = () => {
-          db.close();
-          resolve();
-        };
-        tx.onerror = () => {
-          const error = tx.error;
-          db.close();
-          reject(error);
-        };
-      });
-    } catch (error) {
-      console.warn('Failed to clear export directory handle', error);
-    }
-    clearStoredExportDirectoryDisplayLabel();
   }
 
   async function loadRecentProjectsMetadata({ includeAllAccounts = false } = {}) {
@@ -15310,6 +16145,116 @@
     return recentProjectWorkflowUtilsModule.refreshRecentProjectsUI(...args);
   }
 
+  const localProjectJournalUtilsModule = window.PiXiEEDrawModules?.localProjectJournalUtils?.createLocalProjectJournalUtils?.({
+    LOCAL_PROJECT_CHECKPOINT_HISTORY_INTERVAL,
+    PROJECT_PACKAGE_TYPE,
+    PROJECT_PACKAGE_VERSION,
+    DOCUMENT_FILE_VERSION,
+    DEFAULT_DOCUMENT_NAME,
+    history,
+    state,
+    recentProjectsCache,
+    normalizeAutosaveProjectId,
+    normalizeDocumentName,
+    extractDocumentBaseName,
+    createAutosaveProjectId,
+    snapshotFromParsedDocumentValue,
+    serializeDocumentSnapshot,
+    buildProjectSessionPayload,
+    isPixelPatchHistoryEntry,
+    getProjectCanvasDocuments,
+    getActiveProjectCanvasDocument,
+    getActiveOpenProjectTabId: () => activeOpenProjectTabId,
+    findOpenProjectTabIndex,
+    openProjectTabs,
+    getRecentProjectEntryFileName,
+    localizeText,
+  }) || {};
+
+  function clearActiveLocalProjectJournal(...args) {
+    return localProjectJournalUtilsModule.clearActiveState(...args);
+  }
+
+  function hydrateActiveLocalProjectJournalFromRecentEntry(...args) {
+    return localProjectJournalUtilsModule.hydrateActiveStateFromRecentEntry(...args);
+  }
+
+  function ensureActiveLocalProjectJournal(...args) {
+    return localProjectJournalUtilsModule.ensureActiveState(...args);
+  }
+
+  function reconstructLocalRecentProjectPayload(...args) {
+    return localProjectJournalUtilsModule.reconstructPackagedProjectFromEntry(...args);
+  }
+
+  function noteActiveLocalProjectHistoryEntry(...args) {
+    return localProjectJournalUtilsModule.noteHistoryEntry(...args);
+  }
+
+  function markActiveLocalProjectJournalNeedsCheckpoint(...args) {
+    return localProjectJournalUtilsModule.markNeedsCheckpoint(...args);
+  }
+
+  function markActiveLocalProjectJournalCheckpointPersisted(...args) {
+    return localProjectJournalUtilsModule.markCheckpointPersisted(...args);
+  }
+
+  function buildActiveLocalProjectSavePlan(...args) {
+    return localProjectJournalUtilsModule.buildSavePlan(...args);
+  }
+
+  function normalizeV2PixelPatchJournalOps(...args) {
+    return localProjectJournalUtilsModule.normalizeV2PixelPatchJournalOps(...args);
+  }
+
+  function createLightweightLocalProjectTabState(...args) {
+    return localProjectJournalUtilsModule.createLightweightTabState(...args);
+  }
+
+  function extractLocalProjectSheetPayload(...args) {
+    return localProjectJournalUtilsModule.extractSheetProjectFromPackagedProject(...args);
+  }
+
+  function resolveStoredLocalProjectPayloadForProjectId(...args) {
+    return localProjectJournalUtilsModule.resolveStoredPackagedProjectForProjectId(...args);
+  }
+
+  function createLocalProjectEntrySignature(...args) {
+    return localProjectJournalUtilsModule.createEntrySignature(...args);
+  }
+
+  function pruneInactiveCanvasDirectCaches(...args) {
+    return localProjectJournalUtilsModule.pruneInactiveCanvasDirectCaches(...args);
+  }
+
+  function releasePersistedInactiveOpenProjectTabPayloads(projectId = '') {
+    const normalizedProjectId = normalizeAutosaveProjectId(projectId || '');
+    if (!normalizedProjectId) return 0;
+    let released = 0;
+    openProjectTabs.forEach((tab, index) => {
+      if (!tab || tab.id === activeOpenProjectTabId) return;
+      if (normalizeAutosaveProjectId(tab.projectId || '') !== normalizedProjectId) return;
+      if (!(tab.project && typeof tab.project === 'object')
+        && !(tab.deferredProjectPayload && typeof tab.deferredProjectPayload === 'object')) return;
+      openProjectTabs[index] = {
+        ...tab,
+        project: null,
+        deferredProjectPayload: null,
+        residentProjectLoaded: false,
+        deferredRestore: true,
+      };
+      released += 1;
+    });
+    if (released) {
+      console.info('[pixiedraw:memory]', {
+        phase: 'inactive-tab-payloads-released',
+        projectId: normalizedProjectId,
+        released,
+      });
+    }
+    return released;
+  }
+
 
   function compositeLayerPixel(data, destBase, srcR, srcG, srcB, srcA, layerOpacity, blendMode) {
     const parsedOpacity = Number(layerOpacity);
@@ -15334,6 +16279,838 @@
     return projectPackageWorkflowUtilsModule.buildPackagedProjectPayload(...args);
   }
 
+  function buildAutosaveSchemaV2ExperimentalProjectState(options = {}) {
+    const settings = options && typeof options === 'object' ? options : {};
+    const snapshot = settings.snapshot || makeHistorySnapshot({ clonePixelData: true });
+    const activePackaged = settings.packagedPayload && typeof settings.packagedPayload === 'object'
+      ? settings.packagedPayload
+      : buildPackagedProjectPayload(snapshot, {
+        session: buildProjectSessionPayload(),
+        includeSheets: false,
+      });
+    const projectId = normalizeAutosaveProjectId(settings.projectId || autosaveProjectId || '') || createAutosaveProjectId();
+    // The autosave manifest stores exactly the current project. Old manifests
+    // with `sheets` remain readable in the schema utility, but no new write
+    // retains inactive project payloads or a sheet identifier.
+    const activeTab = getActiveOpenProjectTab?.() || openProjectTabs[0] || null;
+    delete activePackaged.sheets;
+    delete activePackaged.sheetOrder;
+    delete activePackaged.activeSheetId;
+    activePackaged.projectLayout = 'single-project';
+    return {
+      projectId,
+      name: state.documentName || DEFAULT_DOCUMENT_NAME,
+      updatedAt: activePackaged.updatedAt,
+      fileName: activeTab?.fileName || activePackaged?.document?.documentName || DEFAULT_DOCUMENT_NAME,
+      sourceKind: activeTab?.sourceKind || 'unknown',
+      sourceStorageAdapterId: activeTab?.sourceStorageAdapterId || '',
+      sourceProjectToken: activeTab?.sourceProjectToken || '',
+      project: activePackaged,
+      journalOps: Array.isArray(settings.journalOps) ? settings.journalOps : [],
+      thumbnail: typeof settings.thumbnail === 'string' ? settings.thumbnail : null,
+      dotStats: activePackaged.dotStats || null,
+    };
+  }
+
+  async function writeAutosaveSchemaV2Experimental(options = {}) {
+    if (typeof autosaveSchemaV2IndexedDbUtilsModule.writeSchemaV2Project !== 'function') {
+      throw new Error('Autosave schema V2 IndexedDB utility is unavailable');
+    }
+    const projectState = buildAutosaveSchemaV2ExperimentalProjectState(options);
+    const result = await autosaveSchemaV2IndexedDbUtilsModule.writeSchemaV2Project(projectState, options);
+    console.info('[PiXiEEDraw DEV] autosave schema V2 experimental write', {
+      projectId: projectState.projectId,
+      revision: result.manifest?.revision || 0,
+      projectLayout: result.manifest?.projectLayout || 'legacy-sheets',
+      cleanupError: result.cleanupError?.message || '',
+    });
+    return result;
+  }
+
+  async function readAutosaveSchemaV2Experimental(projectId, options = {}) {
+    if (typeof autosaveSchemaV2IndexedDbUtilsModule.readSchemaV2Project !== 'function') {
+      throw new Error('Autosave schema V2 IndexedDB utility is unavailable');
+    }
+    const result = await autosaveSchemaV2IndexedDbUtilsModule.readSchemaV2Project(projectId, options);
+    console.info('[PiXiEEDraw DEV] autosave schema V2 experimental read', {
+      projectId,
+      revision: result.manifest?.revision || 0,
+      projectLayout: result.packaged?.projectLayout || 'legacy-sheets',
+      fallbackUsed: result.fallbackUsed === true,
+    });
+    return result;
+  }
+
+  // V2 is the normal local-save authority.  The legacy recent-project entry
+  // stores only this manifest reference; its V1 `project` payload remains a
+  // reader-only compatibility path.
+  function isAutosaveV2PrimaryEnabled() {
+    return typeof autosaveSchemaV2IndexedDbUtilsModule.writeSchemaV2Project === 'function'
+      && typeof autosaveSchemaV2IndexedDbUtilsModule.readSchemaV2Project === 'function';
+  }
+
+  function isAutosaveV2JournalReady(projectId) {
+    return autosaveV2CheckpointReadyProjectIds.has(normalizeAutosaveProjectId(projectId || ''));
+  }
+
+  async function readAutosaveV2PrimaryProject(projectId) {
+    const restored = await autosaveSchemaV2IndexedDbUtilsModule.readSchemaV2Project(projectId);
+    if (restored?.manifest?.key) {
+      autosaveV2CheckpointReadyProjectIds.add(normalizeAutosaveProjectId(projectId || ''));
+    }
+    return restored?.packaged && typeof restored.packaged === 'object' ? restored.packaged : null;
+  }
+
+  // Packages saved before the single-project editor change can contain several
+  // resident tabs. Split those payloads once into normal V2 projects instead of
+  // restoring all of them into one browser session. The legacy local entry is
+  // removed only after every new V2 project has committed successfully.
+  const legacyMultiProjectMigrationPromises = new Map();
+
+  async function migrateLegacyMultiProjectPackage({
+    sourceProjectId = '',
+    sheets = [],
+    activeSheetId = '',
+    sourceProject = null,
+    canvases = [],
+    activeCanvasId = '',
+  } = {}) {
+    const normalizedSourceProjectId = normalizeAutosaveProjectId(sourceProjectId || '');
+    let sourceSheets = Array.isArray(sheets)
+      ? sheets.filter(sheet => sheet?.project && typeof sheet.project === 'object')
+      : [];
+    const legacyCanvases = Array.isArray(canvases)
+      ? canvases.filter(canvas => canvas && typeof canvas === 'object')
+      : [];
+    let migratingCanvases = false;
+    // Old packages can have both resident tabs and canvases within each tab.
+    // Flatten the complete tab × canvas matrix before any V2 write so every
+    // resulting project owns exactly one canvas.
+    if (sourceSheets.length > 0) {
+      const expandedSheets = [];
+      sourceSheets.forEach((sourceSheet, sheetIndex) => {
+        const sheetProject = sourceSheet?.project && typeof sourceSheet.project === 'object'
+          ? sourceSheet.project
+          : null;
+        const sheetDocument = sheetProject?.document && typeof sheetProject.document === 'object'
+          ? sheetProject.document
+          : null;
+        const sheetCanvases = Array.isArray(sheetDocument?.canvases)
+          ? sheetDocument.canvases.filter(canvas => canvas && typeof canvas === 'object')
+          : [];
+        if (sheetCanvases.length <= 1) {
+          expandedSheets.push(sourceSheet);
+          return;
+        }
+        migratingCanvases = true;
+        const sourceSheetId = typeof sourceSheet?.id === 'string' && sourceSheet.id.trim()
+          ? sourceSheet.id.trim()
+          : `legacy-sheet-${sheetIndex + 1}`;
+        const baseName = typeof sheetDocument.documentName === 'string' && sheetDocument.documentName.trim()
+          ? sheetDocument.documentName.trim().replace(/\.pixieedraw$/i, '')
+          : `移行プロジェクト ${sheetIndex + 1}`;
+        sheetCanvases.forEach((canvas, canvasIndex) => {
+          const sourceCanvasId = typeof canvas.id === 'string' && canvas.id.trim()
+            ? canvas.id.trim()
+            : `legacy-canvas-${canvasIndex + 1}`;
+          const canvasName = typeof canvas.name === 'string' && canvas.name.trim()
+            ? canvas.name.trim()
+            : `キャンバス ${canvasIndex + 1}`;
+          expandedSheets.push({
+            ...sourceSheet,
+            id: `${sourceSheetId}:canvas:${sourceCanvasId}`,
+            sourceOriginalSheetId: sourceSheetId,
+            sourceCanvasId,
+            wasActive: sourceSheetId === activeSheetId && sourceCanvasId === sheetDocument.activeCanvasId,
+            fileName: `${baseName} - ${canvasName}${PROJECT_FILE_EXTENSION}`,
+            sourceKind: 'legacy-multi-canvas',
+            project: {
+              ...sheetProject,
+              projectLayout: 'single-project',
+              document: {
+                ...sheetDocument,
+                width: canvas.width,
+                height: canvas.height,
+                frames: canvas.frames,
+                activeFrame: canvas.activeFrame,
+                activeLayer: canvas.activeLayer,
+                mirror: canvas.mirror,
+                selectionMask: canvas.selectionMask || null,
+                selectionContentMask: canvas.selectionContentMask || null,
+                selectionBounds: canvas.selectionBounds || null,
+                documentName: `${baseName} - ${canvasName}${PROJECT_FILE_EXTENSION}`,
+                activeCanvasId: sourceCanvasId,
+                canvases: [canvas],
+              },
+              session: {
+                ...(sheetProject.session && typeof sheetProject.session === 'object' ? sheetProject.session : {}),
+                localViewportCanvases: { ...LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE },
+              },
+            },
+          });
+        });
+      });
+      sourceSheets = expandedSheets;
+    }
+    if (sourceSheets.length === 0 && sourceProject && typeof sourceProject === 'object' && legacyCanvases.length > 1) {
+      migratingCanvases = true;
+      sourceSheets = legacyCanvases.map((canvas, index) => {
+        const sourceCanvasId = typeof canvas.id === 'string' && canvas.id.trim()
+          ? canvas.id.trim()
+          : `legacy-canvas-${index + 1}`;
+        const baseDocument = sourceProject.document && typeof sourceProject.document === 'object'
+          ? sourceProject.document
+          : {};
+        const canvasName = typeof canvas.name === 'string' && canvas.name.trim()
+          ? canvas.name.trim()
+          : `キャンバス ${index + 1}`;
+        const baseName = typeof baseDocument.documentName === 'string' && baseDocument.documentName.trim()
+          ? baseDocument.documentName.trim().replace(/\.pixieedraw$/i, '')
+          : '移行プロジェクト';
+        return {
+          id: `canvas:${sourceCanvasId}`,
+          sourceCanvasId,
+          wasActive: sourceCanvasId === activeCanvasId,
+          fileName: `${baseName} - ${canvasName}${PROJECT_FILE_EXTENSION}`,
+          sourceKind: 'legacy-multi-canvas',
+          sourceStorageAdapterId: sourceProject.storageAdapterId || '',
+          project: {
+            ...sourceProject,
+            projectLayout: 'single-project',
+            document: {
+              ...baseDocument,
+              width: canvas.width,
+              height: canvas.height,
+              frames: canvas.frames,
+              activeFrame: canvas.activeFrame,
+              activeLayer: canvas.activeLayer,
+              mirror: canvas.mirror,
+              selectionMask: canvas.selectionMask || null,
+              selectionContentMask: canvas.selectionContentMask || null,
+              selectionBounds: canvas.selectionBounds || null,
+              documentName: `${baseName} - ${canvasName}${PROJECT_FILE_EXTENSION}`,
+              activeCanvasId: sourceCanvasId,
+              canvases: [canvas],
+            },
+            session: {
+              ...(sourceProject.session && typeof sourceProject.session === 'object' ? sourceProject.session : {}),
+              localViewportCanvases: { ...LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE },
+            },
+          },
+        };
+      });
+    }
+    if (!AUTOSAVE_SUPPORTED
+      || !normalizedSourceProjectId
+      || sourceSheets.length < 2
+      || typeof autosaveSchemaV2IndexedDbUtilsModule.writeSchemaV2Project !== 'function') {
+      return { migrated: false, reason: 'not-applicable', projectIds: [], projects: [] };
+    }
+    const inFlight = legacyMultiProjectMigrationPromises.get(normalizedSourceProjectId);
+    if (inFlight) return await inFlight;
+
+    const migration = (async () => {
+      const existingEntries = await loadRecentProjectsMetadata();
+      const migratedSheetIds = new Set(
+        existingEntries
+          .filter(entry => entry?.legacyMultiProjectSourceId === normalizedSourceProjectId)
+          .map(entry => String(entry?.legacyMultiProjectSourceSheetId || ''))
+          .filter(Boolean)
+      );
+      const createdEntries = [];
+      try {
+      for (let index = 0; index < sourceSheets.length; index += 1) {
+        const sourceSheet = sourceSheets[index];
+        const sourceSheetId = typeof sourceSheet?.id === 'string' && sourceSheet.id.trim()
+          ? sourceSheet.id.trim()
+          : `legacy-sheet-${index + 1}`;
+        if (migratedSheetIds.has(sourceSheetId)) continue;
+
+        const sourceProject = { ...sourceSheet.project };
+        // V2 checkpoints intentionally contain one project's document only.
+        // This also removes the legacy resident-tab payload from every copy.
+        delete sourceProject.sheets;
+        delete sourceProject.sheetOrder;
+        delete sourceProject.activeSheetId;
+        sourceProject.projectLayout = 'single-project';
+        const rawFileName = typeof sourceSheet?.fileName === 'string' && sourceSheet.fileName.trim()
+          ? sourceSheet.fileName
+          : (sourceProject?.document?.documentName || `移行プロジェクト ${index + 1}${PROJECT_FILE_EXTENSION}`);
+        const fileName = normalizeDocumentName(rawFileName) || DEFAULT_DOCUMENT_NAME;
+        const projectId = createAutosaveProjectId();
+        const projectState = {
+          projectId,
+          name: fileName,
+          updatedAt: sourceProject?.updatedAt || new Date().toISOString(),
+          fileName,
+          project: sourceProject,
+          sourceKind: 'legacy-local-migration',
+          sourceStorageAdapterId: 'pixieedraw-v2-zip',
+          sourceProjectToken: sourceSheet?.sourceProjectToken || '',
+          thumbnail: null,
+          dotStats: sourceProject?.dotStats || null,
+        };
+        const written = await autosaveSchemaV2IndexedDbUtilsModule.writeSchemaV2Project(projectState);
+        if (!written?.manifest?.key) {
+          throw new Error(`Legacy project migration did not commit: ${sourceSheetId}`);
+        }
+        autosaveV2CheckpointReadyProjectIds.add(projectId);
+        createdEntries.push({
+          id: projectId,
+          accountUserId: getCurrentRecentProjectAccountUserId(),
+          autosaveSchemaVersion: Number(written.manifest.autosaveSchemaVersion) || 2,
+          manifestKey: written.manifest.key,
+          name: fileName,
+          fileName,
+          updatedAt: written.manifest.updatedAt,
+          thumbnail: null,
+          dotStats: projectState.dotStats,
+          legacyMultiProjectSourceId: normalizedSourceProjectId,
+          legacyMultiProjectSourceSheetId: sourceSheetId,
+          legacyMultiProjectWasActive: sourceSheet.wasActive === true || sourceSheetId === activeSheetId,
+          legacyMultiCanvasSourceId: migratingCanvases ? normalizedSourceProjectId : '',
+          legacyMultiCanvasSourceCanvasId: migratingCanvases ? String(sourceSheet?.sourceCanvasId || '') : '',
+          legacyMultiCanvasWasActive: migratingCanvases && (
+            sourceSheet.wasActive === true
+            || String(sourceSheet?.sourceCanvasId || '') === activeCanvasId
+          ),
+          legacyMultiCanvasSourceSheetId: migratingCanvases
+            ? String(sourceSheet?.sourceOriginalSheetId || '')
+            : '',
+        });
+      }
+      } catch (error) {
+        await Promise.all(createdEntries.map(entry => (
+          removeAutosaveV2ProjectData(entry.id).catch(cleanupError => {
+            console.warn('Failed to rollback partial true V2 split migration', {
+              projectId: entry.id,
+              cleanupError,
+            });
+          })
+        )));
+        throw error;
+      }
+      if (!createdEntries.length) {
+        const nextEntries = existingEntries.filter(entry => entry?.id !== normalizedSourceProjectId);
+        if (nextEntries.length !== existingEntries.length) {
+          await saveRecentProjectsList(existingEntries, nextEntries);
+          setRecentProjectsCache(nextEntries);
+          await removeAutosaveV2ProjectData(normalizedSourceProjectId).catch(error => {
+            console.warn('Legacy V2 source cleanup deferred', error);
+          });
+        }
+        const projects = existingEntries
+          .filter(entry => entry?.legacyMultiProjectSourceId === normalizedSourceProjectId)
+          .map(entry => ({
+            projectId: entry.id,
+            sourceSheetId: String(entry?.legacyMultiProjectSourceSheetId || ''),
+            wasActive: entry?.legacyMultiProjectWasActive === true,
+            sourceCanvasId: String(entry?.legacyMultiCanvasSourceCanvasId || ''),
+            sourceOriginalSheetId: String(entry?.legacyMultiCanvasSourceSheetId || ''),
+          }))
+          .filter(entry => entry.projectId && entry.sourceSheetId);
+        return { migrated: false, reason: 'already-migrated', projectIds: projects.map(entry => entry.projectId), projects };
+      }
+      const latestEntries = await loadRecentProjectsMetadata();
+      // The source package has been split into independent V2 projects.
+      // Remove its local legacy entry only after every V2 manifest committed.
+      const nextEntries = latestEntries
+        .filter(entry => entry?.id !== normalizedSourceProjectId)
+        .concat(createdEntries);
+      await saveRecentProjectsList(latestEntries, nextEntries);
+      setRecentProjectsCache(nextEntries);
+      try {
+        await removeAutosaveV2ProjectData(normalizedSourceProjectId);
+      } catch (error) {
+        await saveRecentProjectsList(nextEntries, latestEntries);
+        setRecentProjectsCache(latestEntries);
+        await Promise.all(createdEntries.map(entry => (
+          removeAutosaveV2ProjectData(entry.id).catch(cleanupError => {
+            console.warn('Failed to rollback true V2 split after source cleanup failure', {
+              projectId: entry.id,
+              cleanupError,
+            });
+          })
+        )));
+        throw error;
+      }
+      const projects = nextEntries
+        .filter(entry => entry?.legacyMultiProjectSourceId === normalizedSourceProjectId)
+        .map(entry => ({
+          projectId: entry.id,
+          sourceSheetId: String(entry?.legacyMultiProjectSourceSheetId || ''),
+          wasActive: entry?.legacyMultiProjectWasActive === true,
+          sourceCanvasId: String(entry?.legacyMultiCanvasSourceCanvasId || ''),
+          sourceOriginalSheetId: String(entry?.legacyMultiCanvasSourceSheetId || ''),
+        }))
+        .filter(entry => entry.projectId && entry.sourceSheetId);
+      console.info('[pixiedraw:project-normalize]', {
+        phase: 'legacy-multi-project-split-success',
+        sourceProjectId: normalizedSourceProjectId,
+        sourceSheetCount: sourceSheets.length,
+        sourceKind: migratingCanvases ? 'legacy-multi-canvas' : 'legacy-multi-project',
+        projectIds: createdEntries.map(entry => entry.id),
+      });
+      return {
+        migrated: true,
+        reason: 'migrated',
+        projectIds: createdEntries.map(entry => entry.id),
+        projects,
+      };
+    })();
+    legacyMultiProjectMigrationPromises.set(normalizedSourceProjectId, migration);
+    try {
+      return await migration;
+    } finally {
+      legacyMultiProjectMigrationPromises.delete(normalizedSourceProjectId);
+    }
+  }
+
+  let legacyLocalTrueV2MigrationPromise = null;
+
+  function classifyLocalV2MigrationError(error) {
+    const explicitCode = typeof error?.code === 'string' && error.code.trim()
+      ? error.code.trim()
+      : '';
+    if (explicitCode) return explicitCode;
+    const message = String(error?.message || error || '');
+    if (/payload is unavailable/i.test(message)) return 'ERR_LEGACY_PAYLOAD_UNAVAILABLE';
+    if (/multiple projects|multiple canvases/i.test(message)) return 'ERR_LEGACY_SPLIT_INCOMPLETE';
+    if (/manifest was not committed/i.test(message)) return 'ERR_TRUE_V2_COMMIT_FAILED';
+    return 'ERR_TRUE_V2_MIGRATION_FAILED';
+  }
+
+  async function migrateLegacyLocalProjectsToTrueV2({
+    confirmMigration = null,
+    preparePackaged = null,
+    onProgress = null,
+  } = {}) {
+    if (legacyLocalTrueV2MigrationPromise) return await legacyLocalTrueV2MigrationPromise;
+    legacyLocalTrueV2MigrationPromise = (async () => {
+      const initialEntries = (await loadRecentProjectsMetadata())
+        .filter(entry => entry?.id && !isSharedRecentProjectEntry(entry));
+      const candidates = [];
+      for (const entry of initialEntries) {
+        let packaged = null;
+        let loadError = null;
+        try {
+          packaged = await loadRecentProjectPackagedPayload(entry);
+        } catch (error) {
+          loadError = error;
+        }
+        const inspection = typeof localProjectV2MigrationUtilsModule.inspectEntry === 'function'
+          ? localProjectV2MigrationUtilsModule.inspectEntry(entry, packaged)
+          : { trueV2: Number(entry?.autosaveSchemaVersion) === 2 && !entry?.project, requiresMigration: true, needsSplit: false };
+        if (inspection.trueV2 === true && !loadError) continue;
+        candidates.push({ entry, packaged, inspection, loadError });
+      }
+      if (!candidates.length) {
+        return { migrated: 0, created: 0, failed: 0, declined: false, failedEntries: [] };
+      }
+      if (typeof confirmMigration === 'function') {
+        const accepted = await confirmMigration({
+          count: candidates.length,
+          candidates: candidates.map(candidate => ({
+            id: candidate.entry.id,
+            name: candidate.entry.fileName || candidate.entry.name || DEFAULT_DOCUMENT_NAME,
+            reason: candidate.inspection?.reason || 'legacy-project',
+            needsSplit: candidate.inspection?.needsSplit === true,
+          })),
+        });
+        if (!accepted) {
+          return {
+            migrated: 0,
+            created: 0,
+            failed: candidates.length,
+            declined: true,
+            failedEntries: candidates.map(candidate => ({
+              entry: candidate.entry,
+              code: 'V2_MIGRATION_DECLINED',
+              message: 'True V2 migration was not started',
+            })),
+          };
+        }
+      }
+
+      let migrated = 0;
+      let created = 0;
+      const failedEntries = [];
+      for (let index = 0; index < candidates.length; index += 1) {
+        const candidate = candidates[index];
+        const entry = candidate.entry;
+        try {
+          if (candidate.loadError) throw candidate.loadError;
+          let packaged = candidate.packaged;
+          if (!packaged || typeof packaged !== 'object') {
+            throw new Error('Local project payload is unavailable');
+          }
+          if (typeof preparePackaged === 'function') {
+            packaged = await preparePackaged(entry, packaged) || packaged;
+          }
+          const inspection = localProjectV2MigrationUtilsModule.inspectEntry(entry, packaged);
+          if (inspection.needsSplit) {
+            const splitResult = await migrateLegacyMultiProjectPackage({
+              sourceProjectId: entry.id,
+              sheets: inspection.sheets,
+              activeSheetId: packaged.activeSheetId || '',
+              sourceProject: packaged,
+              canvases: inspection.canvases,
+              activeCanvasId: packaged?.document?.activeCanvasId || '',
+            });
+            if (splitResult?.migrated !== true && splitResult?.reason !== 'already-migrated') {
+              throw new Error(`Legacy project split failed (${splitResult?.reason || 'unknown'})`);
+            }
+            migrated += 1;
+            created += Math.max(1, splitResult?.projectIds?.length || 0);
+          } else {
+            const normalizedProject = localProjectV2MigrationUtilsModule.normalizeSingleProject(entry, packaged);
+            const projectId = normalizeAutosaveProjectId(entry.id);
+            const fileName = normalizeDocumentName(
+              entry.fileName || entry.name || normalizedProject?.document?.documentName || DEFAULT_DOCUMENT_NAME
+            ) || DEFAULT_DOCUMENT_NAME;
+            const written = await autosaveSchemaV2IndexedDbUtilsModule.writeSchemaV2Project({
+              projectId,
+              name: fileName,
+              fileName,
+              updatedAt: normalizedProject.updatedAt || new Date().toISOString(),
+              project: normalizedProject,
+              sourceKind: 'legacy-local-migration',
+              sourceStorageAdapterId: 'pixieedraw-v2-zip',
+              sourceProjectToken: '',
+              thumbnail: entry.thumbnail || null,
+              dotStats: normalizedProject.dotStats || entry.dotStats || null,
+            });
+            if (!written?.manifest?.key) {
+              throw new Error('True V2 manifest was not committed');
+            }
+            await autosaveSchemaV2IndexedDbUtilsModule.cleanupSchemaV2Revisions(projectId, {
+              keepManifestRevisions: 1,
+            });
+            const latestEntries = await loadRecentProjectsMetadata();
+            const latestEntry = latestEntries.find(item => item?.id === projectId) || entry;
+            const migratedEntry = {
+              id: projectId,
+              accountUserId: latestEntry.accountUserId || getCurrentRecentProjectAccountUserId(),
+              autosaveSchemaVersion: Number(written.manifest.autosaveSchemaVersion) || 2,
+              manifestKey: written.manifest.key,
+              name: fileName,
+              fileName,
+              updatedAt: written.manifest.updatedAt,
+              thumbnail: latestEntry.thumbnail || null,
+              dotStats: normalizedProject.dotStats || latestEntry.dotStats || null,
+            };
+            const nextEntries = latestEntries
+              .filter(item => item?.id !== projectId)
+              .concat(migratedEntry);
+            await saveRecentProjectsList(latestEntries, nextEntries);
+            setRecentProjectsCache(nextEntries);
+            autosaveV2CheckpointReadyProjectIds.add(projectId);
+            migrated += 1;
+            created += 1;
+          }
+          if (typeof onProgress === 'function') {
+            onProgress({ index: index + 1, total: candidates.length, entry, success: true });
+          }
+        } catch (error) {
+          failedEntries.push({
+            entry,
+            code: classifyLocalV2MigrationError(error),
+            message: String(error?.message || error || 'True V2 migration failed'),
+          });
+          console.warn('[pixiedraw:local-v2-migration]', {
+            phase: 'failed',
+            projectId: entry?.id || '',
+            error,
+          });
+          if (typeof onProgress === 'function') {
+            onProgress({ index: index + 1, total: candidates.length, entry, success: false, error });
+          }
+        }
+      }
+      if (migrated > 0) {
+        await refreshRecentProjectsUI().catch(error => {
+          console.warn('Failed to refresh recent projects after true V2 migration', error);
+        });
+      }
+      console.info('[pixiedraw:local-v2-migration]', {
+        phase: 'complete',
+        sourceCount: candidates.length,
+        migrated,
+        created,
+        failed: failedEntries.length,
+      });
+      return {
+        migrated,
+        created,
+        failed: failedEntries.length,
+        declined: false,
+        failedEntries,
+      };
+    })();
+    try {
+      return await legacyLocalTrueV2MigrationPromise;
+    } finally {
+      legacyLocalTrueV2MigrationPromise = null;
+    }
+  }
+
+  async function removeAutosaveV2ProjectData(projectId) {
+    const normalizedProjectId = normalizeAutosaveProjectId(projectId || '');
+    if (!normalizedProjectId) return false;
+    autosaveV2CheckpointReadyProjectIds.delete(normalizedProjectId);
+    const [removedProject] = await Promise.all([
+      autosaveSchemaV2IndexedDbUtilsModule.deleteSchemaV2Project(normalizedProjectId),
+      coldHistoryStore?.removeProject?.(normalizedProjectId).catch(error => {
+        console.warn('Failed to remove file-backed history for deleted project.', error);
+        return false;
+      }),
+      timelapseChunkStore?.removeProject?.(normalizedProjectId).catch(error => {
+        console.warn('Failed to remove file-backed timelapse for deleted project.', error);
+        return false;
+      }),
+    ]);
+    coldHistoryStatusCache.delete(normalizedProjectId);
+    return removedProject;
+  }
+
+  function scheduleAutosaveThumbnailRefresh(projectId, { expectedUpdatedAt = '', delayMs = 1800 } = {}) {
+    const normalizedProjectId = normalizeAutosaveProjectId(projectId || '');
+    if (!normalizedProjectId) return false;
+    if (autosaveThumbnailRefreshTimer !== null) {
+      window.clearTimeout(autosaveThumbnailRefreshTimer);
+      autosaveThumbnailRefreshTimer = null;
+    }
+    autosaveThumbnailRefreshProjectId = normalizedProjectId;
+    autosaveThumbnailRefreshGeneration = autosaveDirtyGeneration;
+    const scheduledGeneration = autosaveThumbnailRefreshGeneration;
+    const run = async () => {
+      autosaveThumbnailRefreshTimer = null;
+      if (
+        normalizeAutosaveProjectId(autosaveProjectId || '') !== normalizedProjectId
+        || autosaveDirtyGeneration !== scheduledGeneration
+      ) {
+        return;
+      }
+      if (isAutosaveInteractionBusy() || hasRecentSaveInteraction() || hasRecentViewportInteraction()) {
+        scheduleAutosaveThumbnailRefresh(normalizedProjectId, { expectedUpdatedAt, delayMs: 1200 });
+        return;
+      }
+      try {
+        const snapshot = makeHistorySnapshot({ clonePixelData: false });
+        const thumbnail = await generateSnapshotThumbnail(snapshot);
+        if (
+          !thumbnail
+          || normalizeAutosaveProjectId(autosaveProjectId || '') !== normalizedProjectId
+          || autosaveDirtyGeneration !== scheduledGeneration
+        ) {
+          return;
+        }
+        const latestEntries = await loadRecentProjectsMetadata();
+        const latestEntry = latestEntries.find(entry => entry?.id === normalizedProjectId) || null;
+        if (!latestEntry) return;
+        if (expectedUpdatedAt && latestEntry.updatedAt !== expectedUpdatedAt) {
+          scheduleAutosaveThumbnailRefresh(normalizedProjectId, {
+            expectedUpdatedAt: latestEntry.updatedAt || '',
+            delayMs: 1200,
+          });
+          return;
+        }
+        const nextEntries = latestEntries.map(entry => entry?.id === normalizedProjectId
+          ? {
+              ...entry,
+              thumbnail,
+              thumbnailUpdatedAt: new Date().toISOString(),
+            }
+          : entry);
+        await saveRecentProjectsList(latestEntries, nextEntries);
+        setRecentProjectsCache(nextEntries);
+      } catch (error) {
+        console.warn('Deferred autosave thumbnail refresh failed', error);
+      } finally {
+        if (autosaveThumbnailRefreshProjectId === normalizedProjectId) {
+          autosaveThumbnailRefreshProjectId = '';
+          autosaveThumbnailRefreshGeneration = -1;
+        }
+      }
+    };
+    autosaveThumbnailRefreshTimer = window.setTimeout(run, Math.max(250, Math.round(Number(delayMs) || 1800)));
+    return true;
+  }
+
+  async function writeAutosaveV2Primary({ projectId, snapshot, thumbnailIntervalMs = 0, savePlan = null } = {}) {
+    const normalizedProjectId = normalizeAutosaveProjectId(projectId || autosaveProjectId || '');
+    const journalOnly = savePlan?.journalOnly === true;
+    if (!normalizedProjectId || (!journalOnly && (!snapshot || typeof snapshot !== 'object'))) {
+      return null;
+    }
+    const existingEntries = await loadRecentProjectsMetadata();
+    const previousEntry = existingEntries.find(entry => entry?.id === normalizedProjectId) || null;
+    let written;
+    let projectState = null;
+    let thumbnail = previousEntry?.thumbnail || null;
+    let deferThumbnailRefresh = false;
+    if (journalOnly) {
+      const normalizedOps = normalizeV2PixelPatchJournalOps(savePlan?.journalPayload || null);
+      if (!normalizedOps || !normalizedOps.length) {
+        throw new Error('V2 journal save requires valid pixel patches');
+      }
+      written = await autosaveSchemaV2IndexedDbUtilsModule.writeSchemaV2JournalRevision(
+        normalizedProjectId,
+        normalizedOps,
+        {
+          updatedAt: new Date().toISOString(),
+          name: previousEntry?.name || state.documentName || DEFAULT_DOCUMENT_NAME,
+        }
+      );
+    } else {
+    const now = Date.now();
+    const previousUpdatedAt = Date.parse(previousEntry?.updatedAt || '');
+    const needsInitialThumbnail = !previousEntry?.thumbnail;
+    const refreshThumbnail = needsInitialThumbnail
+      || !Number.isFinite(previousUpdatedAt)
+      || now - previousUpdatedAt >= Math.max(0, Math.round(Number(thumbnailIntervalMs) || 0));
+    deferThumbnailRefresh = refreshThumbnail;
+    // Keep checkpoint persistence on the critical path and refresh even the
+    // first thumbnail after interaction settles. The recent-project card can
+    // briefly use its placeholder instead of blocking V2 durability.
+    thumbnail = previousEntry?.thumbnail || null;
+    const persistedTimelapseSession = await buildProjectSessionPayloadWithPersistedTimelapse();
+    const packagedPayload = savePlan?.packagedPayload
+      ? { ...savePlan.packagedPayload, session: persistedTimelapseSession }
+      : buildPackagedProjectPayload(snapshot, {
+          session: persistedTimelapseSession,
+          includeSheets: false,
+        });
+    projectState = buildAutosaveSchemaV2ExperimentalProjectState({
+      projectId: normalizedProjectId,
+      snapshot,
+      thumbnail,
+      packagedPayload,
+    });
+    written = await autosaveSchemaV2IndexedDbUtilsModule.writeSchemaV2Project(projectState);
+    }
+    const manifest = written?.manifest;
+    if (!manifest?.key) {
+      throw new Error('V2 autosave manifest was not committed');
+    }
+    const metadata = {
+      id: normalizedProjectId,
+      accountUserId: getCurrentRecentProjectAccountUserId(),
+      autosaveSchemaVersion: Number(manifest.autosaveSchemaVersion) || 2,
+      manifestKey: manifest.key,
+      name: projectState?.name || previousEntry?.name || DEFAULT_DOCUMENT_NAME,
+      fileName: projectState?.fileName || previousEntry?.fileName || projectState?.name || DEFAULT_DOCUMENT_NAME,
+      updatedAt: manifest.updatedAt,
+      thumbnail: thumbnail || null,
+      dotStats: projectState?.dotStats || previousEntry?.dotStats || null,
+      // A newly-created FileSystemHandle is still a 0-byte placeholder until
+      // the destination write commits. Existing filenames remain trustworthy;
+      // new bindings are discovered from the real workspace file list.
+      workspaceFileName: previousEntry?.workspaceFileName || '',
+    };
+    const nextEntries = existingEntries.filter(entry => entry?.id !== normalizedProjectId);
+    nextEntries.unshift(metadata);
+    await saveRecentProjectsList(existingEntries, nextEntries);
+    setRecentProjectsCache(nextEntries);
+    if (!journalOnly && deferThumbnailRefresh) {
+      scheduleAutosaveThumbnailRefresh(normalizedProjectId, { expectedUpdatedAt: manifest.updatedAt });
+    }
+    autosaveV2CheckpointReadyProjectIds.add(normalizedProjectId);
+    if (!journalOnly) {
+      markActiveLocalProjectJournalCheckpointPersisted(normalizedProjectId);
+      releasePersistedInactiveOpenProjectTabPayloads(normalizedProjectId);
+    }
+    return metadata;
+  }
+
+  const preUpdateCheckpointUtilsModule = window.PiXiEEDrawModules?.preUpdateCheckpointUtils?.createPreUpdateCheckpointUtils?.({
+    getOpenProjectTabs: () => openProjectTabs,
+    getActiveOpenProjectTabId: () => activeOpenProjectTabId,
+    getBuildInfo: () => APP_BUILD_INFO,
+    getActiveProjectPayload: (tab) => {
+      const payload = buildPackagedProjectPayload(
+        makeHistorySnapshot({ clonePixelData: true }),
+        { session: buildProjectSessionPayload(), includeSheets: false }
+      );
+      if (tab?.canonicalPayloadFormat === 'v2') {
+        return {
+          ...payload,
+          canonicalPayloadFormat: 'v2',
+          canonicalSchemaVersion: Math.max(1, Math.round(Number(tab?.canonicalSchemaVersion) || 1)),
+          canonicalSourceMetadata: tab?.canonicalSourceMetadata && typeof tab.canonicalSourceMetadata === 'object'
+            ? tab.canonicalSourceMetadata
+            : null,
+        };
+      }
+      return payload;
+    },
+    resolveInactiveProjectPayload: (tab) => {
+      if (tab?.project && typeof tab.project === 'object') return tab.project;
+      if (tab?.deferredProjectPayload && typeof tab.deferredProjectPayload === 'object') return tab.deferredProjectPayload;
+      const stored = resolveStoredLocalProjectPayloadForProjectId(tab?.projectId || '');
+      return stored && typeof extractLocalProjectSheetPayload === 'function'
+        ? extractLocalProjectSheetPayload(stored, tab?.id || '')
+        : null;
+    },
+    log: (details) => console.info('[pixieedraw-dev:pre-update-checkpoint]', details),
+  }) || {};
+
+  async function preparePreUpdateCheckpoint(options = {}) {
+    if (typeof preUpdateCheckpointUtilsModule.preparePreUpdateCheckpoint !== 'function') {
+      return {
+        ok: false,
+        status: 'failed',
+        code: 'ERR_PRE_UPDATE_SNAPSHOT_FAILED',
+        phase: 'prepare',
+        recoverable: true,
+      };
+    }
+    return await preUpdateCheckpointUtilsModule.preparePreUpdateCheckpoint(options);
+  }
+
+  window.__pixieedrawPreparePreUpdateCheckpoint = async (options = {}) => await preparePreUpdateCheckpoint(options);
+  window.__pixieedrawGetPreUpdateCheckpointStatus = () => preUpdateCheckpointUtilsModule.getStatus?.()
+    || { ok: false, status: 'idle', checkpointSessionId: '' };
+  window.__pixieedrawReadPreUpdateCheckpoint = async (checkpointSessionId) => await preUpdateCheckpointUtilsModule.readSession?.(checkpointSessionId);
+
+  async function previewAutosaveSchemaV2Restore(projectId, options = {}) {
+    const result = await autosaveSchemaV2RestorePreviewUtilsModule.preview?.(projectId, options);
+    if (!result) throw new Error('Autosave schema V2 restore preview is unavailable');
+    console[result.restorable ? 'info' : 'warn']('[PiXiEEDraw DEV] autosave V2 restore preview', result);
+    return result;
+  }
+
+  async function openAutosaveSchemaV2RecoveryPreview(projectId, options = {}) {
+    const preview = await previewAutosaveSchemaV2Restore(projectId, options);
+    if (!preview.restorable) return autosaveV2RecoveryOpenStatus = { opened: false, reason: preview.status, warnings: preview.warnings, errors: preview.errors };
+    const payload = autosaveSchemaV2RestorePreviewUtilsModule.getPayload?.(projectId);
+    const candidate = autosaveSchemaV2RecoveryUtilsModule.buildCandidate?.(payload, { sourceProjectId: projectId, revision: preview.restoredRevision });
+    if (!candidate?.ok) return autosaveV2RecoveryOpenStatus = { opened: false, reason: candidate?.reason || 'unrestorable', warnings: candidate?.warnings || [], errors: candidate?.errors || [] };
+    const recoveryProjectId = `recovery-${createAutosaveProjectId()}`;
+    const opened = await loadDocumentFromProjectPayload(candidate.project, {
+      projectId: recoveryProjectId,
+      suppressAutosaveStatus: true,
+      sourceKind: 'recovery',
+      sourceStorageAdapterId: null,
+      lastSavedStorageAdapterId: null,
+    });
+    if (!opened) return autosaveV2RecoveryOpenStatus = { opened: false, reason: 'project-replace-failed', warnings: candidate.warnings, errors: [] };
+    markDocumentUnsavedChange();
+    return autosaveV2RecoveryOpenStatus = { opened: true, recoveryProjectId, sourceProjectId: projectId, revision: preview.restoredRevision, usedFallbackRevision: preview.usedFallbackRevision, projectCount: 1, warnings: candidate.warnings };
+  }
+
+  function renderAutosaveV2RecoveryUi() {
+    const enabled = window.__pixieedrawAutosaveV2RecoveryUiEnabled === true;
+    if (!enabled) { autosaveV2RecoveryUiElement?.remove(); autosaveV2RecoveryUiElement = null; return; }
+    if (!autosaveV2RecoveryUiElement) {
+      const panel = document.createElement('section'); panel.id = 'autosaveV2RecoveryDevPanel'; panel.style.cssText = 'position:fixed;right:12px;bottom:12px;z-index:99999;max-width:320px;padding:10px;background:#17212b;color:#fff;border:1px solid #5d758b;border-radius:8px;font:12px sans-serif';
+      panel.innerHTML = '<strong>DEV: V2復元候補</strong><div><input data-id placeholder="projectId" style="width:150px"><input data-revision placeholder="revision" style="width:60px"></div><button data-preview>V2復元候補を確認</button><button data-open hidden>復元コピーを開く</button><pre data-status style="white-space:pre-wrap;max-height:160px;overflow:auto"></pre>';
+      panel.querySelector('[data-preview]').onclick = async () => { if (autosaveV2RecoveryUiBusy) return; autosaveV2RecoveryUiBusy=true; const id=panel.querySelector('[data-id]').value.trim(); const revision=Number(panel.querySelector('[data-revision]').value)||0; const result=await previewAutosaveSchemaV2Restore(id,{revision}); const text={status:result.status,revision:result.restoredRevision,fallback:result.usedFallbackRevision,projectLayout:result.summary?.projectLayout,projects:result.summary?.projectCount,canvases:result.summary?.canvasCount,frames:result.summary?.frameCount,layers:result.summary?.layerCount,journalFallback:result.status==='journal-fallback',comparison:result.comparison?.matched,warnings:result.warnings,errors:result.errors}; panel.querySelector('[data-status]').textContent=JSON.stringify(text,null,2); panel.querySelector('[data-open]').hidden=!result.restorable; autosaveV2RecoveryUiBusy=false; };
+      panel.querySelector('[data-open]').onclick = async () => { if (autosaveV2RecoveryUiBusy) return; autosaveV2RecoveryUiBusy=true; const id=panel.querySelector('[data-id]').value.trim(); const revision=Number(panel.querySelector('[data-revision]').value)||0; const result=await openAutosaveSchemaV2RecoveryPreview(id,{revision}); panel.querySelector('[data-status]').textContent=JSON.stringify(result,null,2); autosaveV2RecoveryUiBusy=false; };
+      document.body.append(panel); autosaveV2RecoveryUiElement=panel;
+    }
+  }
+
   function resolvePackagedProjectDotStats(...args) {
     return projectPackageWorkflowUtilsModule.resolvePackagedProjectDotStats(...args);
   }
@@ -15355,240 +17132,53 @@
   }
 
   async function openSharedProjectCanonical(...args) {
+    const options = args[0] && typeof args[0] === 'object' ? args[0] : null;
+    if (isSharedProjectsBlockedByRuntime()) {
+      if (!(options?.silent === true)) {
+        showSharedRuntimeBlockedStatus();
+      }
+      return false;
+    }
     return await sharedProjectWorkflowUtilsModule.openSharedProjectCanonical(...args);
   }
 
   async function openSharedProjectAccess(...args) {
+    const options = args[0] && typeof args[0] === 'object' ? args[0] : null;
+    if (isSharedProjectsBlockedByRuntime()) {
+      if (!(options?.silent === true)) {
+        showSharedRuntimeBlockedStatus();
+      }
+      return false;
+    }
     return await sharedProjectWorkflowUtilsModule.openSharedProjectAccess(...args);
   }
 
-  async function openSharedRecentProject(...args) {
-    return await sharedProjectWorkflowUtilsModule.openSharedRecentProject(...args);
+  async function openSharedRecentProject(entry, options = {}) {
+    if (!SHARED_PROJECTS_ENABLED) {
+      return await openSharedRecentProjectAsLocalProject(entry, options);
+    }
+    return await sharedProjectWorkflowUtilsModule.openSharedRecentProject(entry, options);
   }
 
-  function buildLocalProjectIdFromSharedRecentProjectEntry(entry = null) {
-    const normalizedEntry = normalizeSharedRecentProjectEntry(entry);
-    const sourceKey = normalizeMultiProjectKey(normalizedEntry?.sharedProjectKey || '');
-    if (sourceKey) {
-      return `local-from-shared-${sourceKey}`;
-    }
-    const backendId = normalizeAutosaveProjectId(normalizedEntry?.sharedProjectBackendId || '');
-    if (backendId) {
-      return `local-from-shared-${backendId}`;
-    }
-    return createAutosaveProjectId();
+  function buildLocalProjectIdFromSharedRecentProjectEntry(...args) {
+    return sharedProjectLocalConversionUtilsModule.buildLocalProjectIdFromSharedRecentProjectEntry(...args);
   }
 
-  function stripSharedRecentProjectFields(entry = {}) {
-    const {
-      storageKind,
-      sharedProjectBackendId,
-      sharedProjectId,
-      sharedProjectKey,
-      sharedProjectInviteToken,
-      sharedProjectVisibility,
-      sharedProjectRevision,
-      sharedProjectStructureRevision,
-      sharedProjectMembershipRole,
-      sharedProjectOwnerUserId,
-      sharedProjectTransferLocked,
-      sharedRoleHint,
-      sharedAutoJoin,
-      ...localEntry
-    } = entry && typeof entry === 'object' ? entry : {};
-    return localEntry;
+  function stripSharedRecentProjectFields(...args) {
+    return sharedProjectLocalConversionUtilsModule.stripSharedRecentProjectFields(...args);
   }
 
-  async function loadSharedRecentProjectPayloadForLocalOpen(entry = null) {
-    let normalizedEntry = normalizeSharedRecentProjectEntry(entry);
-    if (!normalizedEntry) {
-      return null;
-    }
-    if (normalizedEntry.project && typeof normalizedEntry.project === 'object') {
-      return normalizedEntry.project;
-    }
-    if (accountState.isLoggedIn && !accountState.isAnonymous) {
-      try {
-        normalizedEntry = normalizeSharedRecentProjectEntry(
-          await refreshSharedRecentProjectEntryFromBackend(normalizedEntry) || normalizedEntry
-        ) || normalizedEntry;
-      } catch (error) {
-        console.warn('Failed to refresh shared recent project before local conversion', error);
-      }
-    }
-    let project = null;
-    try {
-      if (normalizedEntry.sharedProjectInviteToken) {
-        project = await loadSharedProjectSnapshotRecordByInvite(normalizedEntry.sharedProjectInviteToken, {
-          createIfMissing: false,
-          title: createSharedProjectSnapshotTitle(normalizedEntry.name || state.documentName || DEFAULT_DOCUMENT_NAME),
-        });
-      }
-      if (!project?.project_key && normalizedEntry.sharedProjectKey) {
-        project = await loadSharedProjectSnapshotRecord(normalizedEntry.sharedProjectKey, {
-          createIfMissing: false,
-          title: createSharedProjectSnapshotTitle(normalizedEntry.name || state.documentName || DEFAULT_DOCUMENT_NAME),
-        });
-      }
-      if (project?.project_key) {
-        const freshestProject = await awaitFreshSharedProjectSnapshot(project, {
-          inviteToken: normalizedEntry.sharedProjectInviteToken || '',
-          minRevision: Math.max(0, Math.round(Number(project.latest_revision) || 0)),
-          requireExactLatest: false,
-          timeoutMs: 1200,
-          pollIntervalMs: 160,
-        }) || project;
-        if (freshestProject?.latest_snapshot && typeof freshestProject.latest_snapshot === 'object') {
-          return freshestProject.latest_snapshot;
-        }
-      }
-    } catch (error) {
-      console.warn('Failed to fetch shared recent project snapshot for local conversion', error);
-    }
-    return null;
+  async function loadSharedRecentProjectPayloadForLocalOpen(...args) {
+    return await sharedProjectLocalConversionUtilsModule.loadSharedRecentProjectPayloadForLocalOpen(...args);
   }
 
-  async function storeSharedRecentProjectAsLocalProject(normalizedEntry, projectPayload, localProjectId) {
-    if (!AUTOSAVE_SUPPORTED || !normalizedEntry || !projectPayload || typeof projectPayload !== 'object') {
-      return null;
-    }
-    const resolvedLocalProjectId = normalizeAutosaveProjectId(localProjectId) || buildLocalProjectIdFromSharedRecentProjectEntry(normalizedEntry);
-    const entries = await loadRecentProjectsMetadata();
-    const existingLocalEntry = entries.find(entry => (
-      normalizeAutosaveProjectId(entry?.id || '') === resolvedLocalProjectId
-      && !isSharedRecentProjectEntry(entry)
-    )) || null;
-    const baseEntry = stripSharedRecentProjectFields(existingLocalEntry || normalizedEntry);
-    const fileName = normalizeDocumentName(
-      existingLocalEntry?.fileName
-      || normalizedEntry.fileName
-      || `${normalizedEntry.name || DEFAULT_DOCUMENT_NAME}`
-    );
-    const localEntry = {
-      ...baseEntry,
-      id: resolvedLocalProjectId,
-      accountUserId: getCurrentRecentProjectAccountUserId(),
-      storageKind: RECENT_PROJECT_STORAGE_LOCAL,
-      name: extractDocumentBaseName(existingLocalEntry?.name || normalizedEntry.name || fileName),
-      fileName,
-      updatedAt: new Date().toISOString(),
-      thumbnail: existingLocalEntry?.thumbnail || normalizedEntry.thumbnail || null,
-      project: projectPayload,
-    };
-    if (existingLocalEntry?.thumbnailSheetId || normalizedEntry.thumbnailSheetId) {
-      localEntry.thumbnailSheetId = existingLocalEntry?.thumbnailSheetId || normalizedEntry.thumbnailSheetId;
-    }
-    if (existingLocalEntry?.dotStats || normalizedEntry.dotStats) {
-      localEntry.dotStats = existingLocalEntry?.dotStats || normalizedEntry.dotStats;
-    }
-    const removeIds = new Set([
-      resolvedLocalProjectId,
-      normalizeAutosaveProjectId(normalizedEntry.id || ''),
-      buildSharedRecentProjectId(normalizedEntry.sharedProjectKey || ''),
-    ].filter(Boolean));
-    const workingEntries = entries.filter(entry => {
-      const id = normalizeAutosaveProjectId(entry?.id || '');
-      return id && !removeIds.has(id);
-    });
-    workingEntries.unshift(localEntry);
-    workingEntries.sort((a, b) => {
-      const aTime = typeof a?.updatedAt === 'string' ? a.updatedAt : '';
-      const bTime = typeof b?.updatedAt === 'string' ? b.updatedAt : '';
-      return bTime.localeCompare(aTime);
-    });
-    await saveRecentProjectsList(entries, workingEntries);
-    setRecentProjectsCache(workingEntries);
-    return localEntry;
+  async function storeSharedRecentProjectAsLocalProject(...args) {
+    return await sharedProjectLocalConversionUtilsModule.storeSharedRecentProjectAsLocalProject(...args);
   }
 
-  async function openSharedRecentProjectAsLocalProject(entry, { hideStartup = true, silent = false } = {}) {
-    const normalizedEntry = normalizeSharedRecentProjectEntry(entry);
-    if (!normalizedEntry) {
-      return false;
-    }
-    if (!silent) {
-      showSharedProjectSunsetDialog();
-    }
-    const localProjectId = buildLocalProjectIdFromSharedRecentProjectEntry(normalizedEntry);
-    const recentEntries = await loadRecentProjectsMetadata();
-    const existingLocalEntry = recentEntries.find(candidate => (
-      normalizeAutosaveProjectId(candidate?.id || '') === localProjectId
-      && !isSharedRecentProjectEntry(candidate)
-    )) || null;
-    if (existingLocalEntry && (existingLocalEntry.project || existingLocalEntry.handle)) {
-      return await openRecentProject(existingLocalEntry, {
-        hideStartup,
-        silent,
-        allowProjectMismatchLoad: true,
-        replaceOpenProjectTabs: true,
-      });
-    }
-    const closeBlockingLoading = beginBlockingGlobalLoading(localizeText(
-      'シェアプロジェクトを通常プロジェクトとして開いています…',
-      'Opening shared project as a local project...'
-    ));
-    try {
-      const projectPayload = await loadSharedRecentProjectPayloadForLocalOpen(normalizedEntry);
-      if (!projectPayload || typeof projectPayload !== 'object') {
-        if (!silent) {
-          updateAutosaveStatus(
-            localizeText(
-              'シェアプロジェクトを通常プロジェクトとして開けませんでした',
-              'Could not open the shared project as a local project'
-            ),
-            'error'
-          );
-        }
-        return false;
-      }
-      const loaded = await loadDocumentFromText(JSON.stringify(projectPayload), null, {
-        projectId: localProjectId,
-        suppressAutosaveStatus: true,
-        openedFromRecent: true,
-        allowProjectMismatchLoad: true,
-      });
-      if (!loaded || loaded === 'deferred') {
-        if (!silent) {
-          updateAutosaveStatus(
-            localizeText(
-              'シェアプロジェクトを通常プロジェクトとして開けませんでした',
-              'Could not open the shared project as a local project'
-            ),
-            'error'
-          );
-        }
-        return false;
-      }
-      await storeSharedRecentProjectAsLocalProject(normalizedEntry, projectPayload, localProjectId);
-      setActiveAutosaveProjectId(localProjectId);
-      if (!silent) {
-        updateAutosaveStatus(
-          localizeText(
-            'シェアプロジェクトを通常プロジェクトとして開きました',
-            'Opened the shared project as a local project'
-          ),
-          'success'
-        );
-      }
-      if (hideStartup) {
-        hideStartupScreen();
-      }
-      return true;
-    } catch (error) {
-      console.warn('Failed to open shared recent project as local project', error);
-      if (!silent) {
-        updateAutosaveStatus(
-          localizeText(
-            'シェアプロジェクトを通常プロジェクトとして開けませんでした',
-            'Could not open the shared project as a local project'
-          ),
-          'error'
-        );
-      }
-      return false;
-    } finally {
-      closeBlockingLoading();
-    }
+  // Compatibility path for old shared recent entries while live sharing stays disabled.
+  async function openSharedRecentProjectAsLocalProject(...args) {
+    return await sharedProjectLocalConversionUtilsModule.openSharedRecentProjectAsLocalProject(...args);
   }
 
   async function openRecentProject(entry, options = {}) {
@@ -15637,29 +17227,79 @@
           suppressAutosaveStatus: true,
           openedFromRecent: true,
           allowProjectMismatchLoad,
+          sourceKind: 'recent',
+          sourceStorageAdapterId: null,
+          lastSavedStorageAdapterId: null,
         });
         if (loaded === 'deferred') {
           return false;
         }
         return loaded ? finishRecentProjectOpen('自動保存: プロジェクトを開きました') : false;
       };
-      if (latestEntry.project && typeof latestEntry.project === 'object') {
+      let latestPackagedProject = null;
+      let restoredFromV2Primary = false;
+      if (Number(latestEntry.autosaveSchemaVersion) === 2) {
+        try {
+          latestPackagedProject = await readAutosaveV2PrimaryProject(projectId || latestEntry.id || '');
+          restoredFromV2Primary = Boolean(latestPackagedProject && typeof latestPackagedProject === 'object');
+          console.info('[pixiedraw:recent-project-open]', {
+            phase: 'v2-primary-read',
+            projectId: projectId || latestEntry.id || '',
+            restored: restoredFromV2Primary,
+            sheetCount: Array.isArray(latestPackagedProject?.sheets) ? latestPackagedProject.sheets.length : 0,
+          });
+        } catch (error) {
+          console.warn('Failed to read V2 recent project payload', error);
+        }
+      }
+      if (!latestPackagedProject && latestEntry.project && typeof latestEntry.project === 'object') {
+        latestPackagedProject = reconstructLocalRecentProjectPayload(latestEntry)
+          || latestEntry.project;
+      }
+      if (latestPackagedProject && typeof latestPackagedProject === 'object') {
         if (latestEntry.openError === 'invalid-project-payload' && await tryOpenRecentProjectHandle()) {
           return true;
         }
-        const loaded = await loadDocumentFromText(JSON.stringify(latestEntry.project), null, {
+        // IndexedDB V2 payloads retain typed pixel buffers. Stringifying them
+        // expands every byte into JSON object properties and can freeze Safari
+        // before the document restore even begins. Keep the payload in memory
+        // and let the parsed-value adapter preserve those typed arrays.
+        console.info('[pixiedraw:recent-project-open]', {
+          phase: 'project-payload-apply-start',
+          projectId: latestEntry.id || '',
+          autosaveSchemaVersion: Number(latestEntry.autosaveSchemaVersion) || 0,
+        });
+        const loaded = await loadDocumentFromProjectPayload(latestPackagedProject, {
           projectId: latestEntry.id || '',
           suppressAutosaveStatus: true,
           openedFromRecent: true,
           allowProjectMismatchLoad,
+          sourceKind: 'recent',
+          sourceStorageAdapterId: null,
+          lastSavedStorageAdapterId: null,
+          trustedAutosaveSchemaVersion: restoredFromV2Primary ? 2 : 0,
+          sourcePersistenceState: {
+            sourceKind: 'recent',
+            sourceStorageAdapterId: null,
+            lastSavedStorageAdapterId: null,
+          },
+        });
+        console.info('[pixiedraw:recent-project-open]', {
+          phase: 'project-payload-apply-complete',
+          projectId: latestEntry.id || '',
+          loaded: loaded === true,
+          deferred: loaded === 'deferred',
         });
         if (loaded === 'deferred') {
-          if (Array.isArray(latestEntry.project?.sheets) && latestEntry.project.sheets.length > 0) {
-            const retryLoaded = await loadDocumentFromProjectPayload(latestEntry.project, {
+          if (Array.isArray(latestPackagedProject?.sheets) && latestPackagedProject.sheets.length > 0) {
+            const retryLoaded = await loadDocumentFromProjectPayload(latestPackagedProject, {
               projectId: latestEntry.id || '',
               suppressAutosaveStatus: true,
               openedFromRecent: true,
               allowProjectMismatchLoad: true,
+              sourceKind: 'recent',
+              sourceStorageAdapterId: null,
+              lastSavedStorageAdapterId: null,
             });
             if (retryLoaded && retryLoaded !== 'deferred') {
               return finishRecentProjectOpen();
@@ -15671,12 +17311,15 @@
           try {
             const deferredProjectId = normalizeAutosaveProjectId(latestEntry.id || '') || createAutosaveProjectId();
             const appended = await appendPackagedProjectTab({
-              project: latestEntry.project || null,
+              project: latestPackagedProject || null,
               projectId: deferredProjectId,
               fileName: normalizeDocumentName(latestEntry.name || DEFAULT_DOCUMENT_NAME),
               unsaved: Boolean(latestEntry.unsaved) || false,
               source: 'recent',
               updatedAt: latestEntry.updatedAt || new Date().toISOString(),
+              sourceStorageAdapterId: null,
+              sourceKind: 'recent',
+              lastSavedStorageAdapterId: null,
               activateOptions: {
                 skipPersistCurrent: true,
                 announce: !silent,
@@ -15706,6 +17349,7 @@
           }
           return false;
         }
+        hydrateActiveLocalProjectJournalFromRecentEntry(latestEntry, latestEntry.id || '');
         return finishRecentProjectOpen();
       }
 
@@ -15827,6 +17471,47 @@
 
   async function saveProjectAsPixieedraw(...args) {
     return exportRenderingModule.saveProjectAsPixieedraw(...args);
+  }
+
+  async function executeProjectSave(...args) {
+    return exportRenderingModule.executeProjectSave(...args);
+  }
+
+  async function executeProjectSaveAs(...args) {
+    return exportRenderingModule.executeProjectSaveAs(...args);
+  }
+
+  async function executeProjectSaveCopy(...args) {
+    return exportRenderingModule.executeProjectSaveCopy(...args);
+  }
+
+  async function executeProjectOpen(...args) {
+    return exportRenderingModule.executeProjectOpen(...args);
+  }
+
+  if (typeof window !== 'undefined') {
+    window.__pixieedrawWriteAutosaveV2Experimental = async function __pixieedrawWriteAutosaveV2Experimental(options = {}) {
+      return await writeAutosaveSchemaV2Experimental(options);
+    };
+    window.__pixieedrawReadAutosaveV2Experimental = async function __pixieedrawReadAutosaveV2Experimental(projectId) {
+      return await readAutosaveSchemaV2Experimental(projectId);
+    };
+    window.__pixieedrawPreviewAutosaveV2Restore = async function __pixieedrawPreviewAutosaveV2Restore(projectId, options = {}) {
+      return await previewAutosaveSchemaV2Restore(projectId, options);
+    };
+    window.__pixieedrawGetAutosaveV2RestorePreviewStatus = function __pixieedrawGetAutosaveV2RestorePreviewStatus(projectId) {
+      return autosaveSchemaV2RestorePreviewUtilsModule.getStatus?.(projectId) || { projectId, status: 'not-found' };
+    };
+    window.__pixieedrawClearAutosaveV2RestorePreview = function __pixieedrawClearAutosaveV2RestorePreview(projectId) {
+      return autosaveSchemaV2RestorePreviewUtilsModule.clear?.(projectId) === true;
+    };
+    window.__pixieedrawOpenAutosaveV2RecoveryPreview = async function __pixieedrawOpenAutosaveV2RecoveryPreview(projectId, options = {}) {
+      return await openAutosaveSchemaV2RecoveryPreview(projectId, options);
+    };
+    window.__pixieedrawGetAutosaveV2RecoveryOpenStatus = function __pixieedrawGetAutosaveV2RecoveryOpenStatus() { return autosaveV2RecoveryOpenStatus; };
+    if (typeof window.__pixieedrawAutosaveV2RecoveryUiEnabled !== 'boolean') window.__pixieedrawAutosaveV2RecoveryUiEnabled = false;
+    window.__pixieedrawSetAutosaveV2RecoveryUiEnabled = function(enabled) { window.__pixieedrawAutosaveV2RecoveryUiEnabled = enabled === true; renderAutosaveV2RecoveryUi(); return window.__pixieedrawGetAutosaveV2RecoveryUiStatus(); };
+    window.__pixieedrawGetAutosaveV2RecoveryUiStatus = function() { return { enabled: window.__pixieedrawAutosaveV2RecoveryUiEnabled === true, visible: Boolean(autosaveV2RecoveryUiElement), busy: autosaveV2RecoveryUiBusy }; };
   }
 
   function normalizeToolId(value, fallback = 'pen') {
@@ -16091,8 +17776,6 @@
   set getActiveProjectCanvasDocument(value) { getActiveProjectCanvasDocument = value; },
   get getLeftFloatingRailReserveWidth() { return getLeftFloatingRailReserveWidth; },
   set getLeftFloatingRailReserveWidth(value) { getLeftFloatingRailReserveWidth = value; },
-  get getLocalViewportCanvasAccountLimit() { return getLocalViewportCanvasAccountLimit; },
-  set getLocalViewportCanvasAccountLimit(value) { getLocalViewportCanvasAccountLimit = value; },
   get getLocalViewportCanvasCount() { return getLocalViewportCanvasCount; },
   set getLocalViewportCanvasCount(value) { getLocalViewportCanvasCount = value; },
   get getMirrorActionAnchor() { return getMirrorActionAnchor; },
@@ -17780,9 +19463,7 @@
     if (Number.isFinite(payload.exportGridTileHeight)) {
       exportGridTileHeight = normalizeExportGridTileSize(payload.exportGridTileHeight, exportGridTileHeight);
     }
-    if (typeof payload.timelapseEnabled === 'boolean') {
-      timelapseState.enabled = payload.timelapseEnabled;
-    }
+    timelapseState.enabled = true;
     if (Number.isFinite(payload.timelapseFps)) {
       timelapseState.fps = normalizeTimelapseFps(payload.timelapseFps);
     }
@@ -20324,6 +22005,8 @@
   set FILL_STYLE_SOLID(value) { FILL_STYLE_SOLID = value; },
   get isSharedProjectCollaborativeMode() { return isSharedProjectCollaborativeMode; },
   set isSharedProjectCollaborativeMode(value) { isSharedProjectCollaborativeMode = value; },
+  get resolveSharedProjectDrawCommandTarget() { return resolveSharedProjectDrawCommandTarget; },
+  set resolveSharedProjectDrawCommandTarget(value) {},
   get getSharedProjectCanonicalCanvasId() { return getSharedProjectCanonicalCanvasId; },
   set getSharedProjectCanonicalCanvasId(value) { getSharedProjectCanonicalCanvasId = value; },
   get getProjectCanvasDocuments() { return getProjectCanvasDocuments; },
@@ -20409,6 +22092,9 @@
   }
 
   function captureSharedProjectRegionCommand(...args) {
+    if (!SHARED_PROJECTS_ENABLED) {
+      return false;
+    }
     return sharedProjectOpUtilsModule.captureSharedProjectRegionCommand(...args);
   }
 
@@ -20436,7 +22122,7 @@
     const sharedEntry = getCurrentSharedRecentProjectEntry(projectKey);
     const previousActiveTabId = activeOpenProjectTabId;
     let changed = false;
-    sheets.slice(0, MAX_PROJECT_SHEETS).forEach((sheet, index) => {
+    sheets.forEach((sheet, index) => {
       const tab = createOpenProjectSheetTabFromPackagedProject({
         ...sheet,
         projectId: sharedProjectId,
@@ -20491,10 +22177,8 @@
         changed = true;
         return;
       }
-      if (openProjectTabs.length < MAX_PROJECT_SHEETS) {
-        openProjectTabs.push(tab);
-        changed = true;
-      }
+      openProjectTabs.push(tab);
+      changed = true;
     });
     if (!openProjectTabs.length) {
       return false;
@@ -21838,6 +23522,10 @@
     return sharedProjectDrawApplyUtilsModule.resolveSharedProjectLayerForPayload(...args);
   }
 
+  function resolveSharedProjectDrawCommandTarget(...args) {
+    return sharedProjectDrawApplyUtilsModule.resolveSharedProjectDrawCommandTarget(...args);
+  }
+
   function inspectIncomingSharedProjectDrawOp(...args) {
     return sharedProjectDrawApplyUtilsModule.inspectIncomingSharedProjectDrawOp(...args);
   }
@@ -22627,6 +24315,26 @@
   set state(value) { state = value; },
   get DEFAULT_DOCUMENT_NAME() { return DEFAULT_DOCUMENT_NAME; },
   set DEFAULT_DOCUMENT_NAME(value) { DEFAULT_DOCUMENT_NAME = value; },
+  get shouldTrustSharedProjectSnapshotRevision() { return sharedProjectSnapshotFetchUtilsModule.shouldTrustSharedProjectSnapshotRevision; },
+  set shouldTrustSharedProjectSnapshotRevision(value) {},
+  get readSharedProjectRevisionNumber() { return sharedProjectSnapshotFetchUtilsModule.readSharedProjectRevisionNumber; },
+  set readSharedProjectRevisionNumber(value) {},
+  get getSharedProjectLatestRevision() { return sharedProjectSnapshotFetchUtilsModule.getSharedProjectLatestRevision; },
+  set getSharedProjectLatestRevision(value) {},
+  get getSharedProjectLatestStructureRevision() { return sharedProjectSnapshotFetchUtilsModule.getSharedProjectLatestStructureRevision; },
+  set getSharedProjectLatestStructureRevision(value) {},
+  get getSharedProjectSnapshotRevision() { return sharedProjectSnapshotFetchUtilsModule.getSharedProjectSnapshotRevision; },
+  set getSharedProjectSnapshotRevision(value) {},
+  get getSharedProjectSnapshotStructureRevision() { return sharedProjectSnapshotFetchUtilsModule.getSharedProjectSnapshotStructureRevision; },
+  set getSharedProjectSnapshotStructureRevision(value) {},
+  get awaitFreshSharedProjectSnapshot() { return sharedProjectSnapshotFetchUtilsModule.awaitFreshSharedProjectSnapshot; },
+  set awaitFreshSharedProjectSnapshot(value) {},
+  get ensureSharedProjectMembership() { return sharedProjectSnapshotFetchUtilsModule.ensureSharedProjectMembership; },
+  set ensureSharedProjectMembership(value) {},
+  get loadSharedProjectSnapshotRecord() { return sharedProjectSnapshotFetchUtilsModule.loadSharedProjectSnapshotRecord; },
+  set loadSharedProjectSnapshotRecord(value) {},
+  get loadSharedProjectSnapshotRecordByInvite() { return sharedProjectSnapshotFetchUtilsModule.loadSharedProjectSnapshotRecordByInvite; },
+  set loadSharedProjectSnapshotRecordByInvite(value) {},
   get createSharedProjectInviteToken() { return createSharedProjectInviteToken; },
   set createSharedProjectInviteToken(value) { createSharedProjectInviteToken = value; },
   get MULTI_ROOM_VISIBILITY_PUBLIC() { return MULTI_ROOM_VISIBILITY_PUBLIC; },
@@ -23078,35 +24786,35 @@
   }
 
   function getSharedProjectLatestRevision(...args) {
-    return sharedProjectWorkflowUtilsModule.getSharedProjectLatestRevision(...args);
+    return sharedProjectSnapshotFetchUtilsModule.getSharedProjectLatestRevision(...args);
   }
 
   function getSharedProjectLatestStructureRevision(...args) {
-    return sharedProjectWorkflowUtilsModule.getSharedProjectLatestStructureRevision(...args);
+    return sharedProjectSnapshotFetchUtilsModule.getSharedProjectLatestStructureRevision(...args);
   }
 
   function getSharedProjectSnapshotRevision(...args) {
-    return sharedProjectWorkflowUtilsModule.getSharedProjectSnapshotRevision(...args);
+    return sharedProjectSnapshotFetchUtilsModule.getSharedProjectSnapshotRevision(...args);
   }
 
   function getSharedProjectSnapshotStructureRevision(...args) {
-    return sharedProjectWorkflowUtilsModule.getSharedProjectSnapshotStructureRevision(...args);
+    return sharedProjectSnapshotFetchUtilsModule.getSharedProjectSnapshotStructureRevision(...args);
   }
 
   async function awaitFreshSharedProjectSnapshot(...args) {
-    return await sharedProjectWorkflowUtilsModule.awaitFreshSharedProjectSnapshot(...args);
+    return await sharedProjectSnapshotFetchUtilsModule.awaitFreshSharedProjectSnapshot(...args);
   }
 
   async function ensureSharedProjectMembership(...args) {
-    return await sharedProjectWorkflowUtilsModule.ensureSharedProjectMembership(...args);
+    return await sharedProjectSnapshotFetchUtilsModule.ensureSharedProjectMembership(...args);
   }
 
   async function loadSharedProjectSnapshotRecord(...args) {
-    return await sharedProjectWorkflowUtilsModule.loadSharedProjectSnapshotRecord(...args);
+    return await sharedProjectSnapshotFetchUtilsModule.loadSharedProjectSnapshotRecord(...args);
   }
 
   async function loadSharedProjectSnapshotRecordByInvite(...args) {
-    return await sharedProjectWorkflowUtilsModule.loadSharedProjectSnapshotRecordByInvite(...args);
+    return await sharedProjectSnapshotFetchUtilsModule.loadSharedProjectSnapshotRecordByInvite(...args);
   }
 
   async function fetchSharedProjectMemberProfileNicknames(...args) {
@@ -24258,7 +25966,10 @@
   }
 
   function setupMultiModeControls(...args) {
-    return sharedProjectSetupUtilsModule.setupMultiModeControls(...args);
+    if (!SHARED_PROJECTS_ENABLED && readMultiInviteFromUrl()) {
+      showSharedProjectSunsetDialog();
+    }
+    return undefined;
   }
 
   window.pixelFrameUtils = Object.freeze({
@@ -24350,6 +26061,8 @@
   }
 
   async function init() {
+    startupReady = false;
+    console.info('[pixiedraw:startup]', { phase: 'startup-bootstrap-start' });
     startupRestoreCancelRequested = false;
     setStartupBootLoadingProgress(0, {
       label: localizeText('起動準備中…', 'Preparing startup...'),
@@ -24363,28 +26076,15 @@
       } catch (error) {
         console.warn('iOS snapshot bootstrap failed', error);
       }
-      if (RELOAD_SNAPSHOT_ENABLED) {
-        try {
-          restoreReloadSessionSnapshot();
-        } catch (error) {
-          console.warn('Reload session restore failed', error);
-          if (canUseSessionStorage) {
-            try {
-              window.sessionStorage.removeItem(getScopedStorageKey(RELOAD_SNAPSHOT_STORAGE_KEY));
-            } catch (storageError) {
-              // Ignore reload snapshot cleanup failures.
-            }
-          }
-        }
-      }
+      // DEV always starts from the project chooser. Reload snapshots and
+      // recent projects remain available as explicit recovery/open choices,
+      // but they must never replace the startup screen automatically.
+      const shouldAutoRestoreReloadSnapshot = false;
       try {
-        await initializeAutosave();
+        await initializeAutosave({ reusePreviousProjectId: shouldAutoRestoreReloadSnapshot });
       } catch (error) {
         console.warn('Autosave bootstrap failed', error);
       }
-      initializeExportDirectoryBinding().catch(error => {
-        console.warn('Export directory bootstrap failed', error);
-      });
       setupOpenProjectTabs();
       ensureOpenProjectTabsInitialized();
       setupLeftTabs();
@@ -24416,71 +26116,27 @@
       setupMirrorGuideResizeObserver();
       setupMirrorToolPopover();
       setupKeyboard();
+      console.info('[pixiedraw:startup]', { phase: 'startup-workflows-created' });
       updateDocumentMetadata();
       setupStartupScreen();
       setupProjectHomeScreen();
+      console.info('[pixiedraw:startup]', { phase: 'startup-listeners-bound' });
       hydratePixieedAccountFromLocalCache();
-      const accountInitTask = initPixieedAccount().catch(error => {
+      void initPixieedAccount().catch(error => {
         console.warn('Account bootstrap failed', error);
         return false;
       });
-      const skipStartup = EMBED_CONFIG.skipStartup === true;
-    if (lensImportRequested || qrImportRequested || skipStartup) {
-        hideStartupScreen();
-      }
-      let restoredAutosaveProject = false;
-      if (!lensImportRequested && !qrImportRequested && !skipStartup) {
-        try {
-          setStartupProgressLabel(localizeText('前回の作業を確認中…', 'Checking your previous work...'));
-          if (startupSharedReloadProjectKey) {
-            await runStartupTaskWithTimeout(accountInitTask, {
-              timeoutMs: STARTUP_ACCOUNT_INIT_TIMEOUT_MS,
-              fallbackValue: false,
-              label: 'account-bootstrap',
-            });
-            restoredAutosaveProject = await runStartupTaskWithTimeout(
-              () => maybeRestoreSharedProjectOnStartup(),
-              {
-                timeoutMs: STARTUP_RESTORE_TIMEOUT_MS,
-                fallbackValue: false,
-                label: 'restore-shared-project',
-                clearLoadingOnTimeout: true,
-              }
-            );
-          }
-          if (!restoredAutosaveProject) {
-            restoredAutosaveProject = Boolean(reloadSnapshotRestored);
-          }
-          if (!restoredAutosaveProject && !reloadSnapshotRestored) {
-            restoredAutosaveProject = await runStartupTaskWithTimeout(
-              () => maybeRestoreAutosaveProjectOnStartup(),
-              {
-                timeoutMs: STARTUP_RESTORE_TIMEOUT_MS,
-                fallbackValue: false,
-                label: 'restore-autosave-project',
-                clearLoadingOnTimeout: true,
-              }
-            );
-          }
-        } catch (error) {
-          console.warn('Startup autosave restore failed', error);
-          restoredAutosaveProject = Boolean(reloadSnapshotRestored);
-        }
-      }
-      let importedFromLens = false;
+      console.info('[pixiedraw:startup]', { phase: 'startup-session-restore-skipped', reason: 'always-start-from-home' });
       try {
         setStartupProgressLabel(localizeText('起動内容を読込中…', 'Loading startup content...'));
-        importedFromLens = await maybeImportLensCapture();
+        await maybeImportLensCapture();
       } catch (error) {
         console.warn('Lens capture bootstrap failed', error);
-        importedFromLens = false;
       }
-      let importedFromQr = false;
       try {
-        importedFromQr = await maybeImportQrCapture();
+        await maybeImportQrCapture();
       } catch (error) {
         console.warn('QR import bootstrap failed', error);
-        importedFromQr = false;
       }
       setStartupProgressLabel(localizeText('起動を完了しています…', 'Finalizing startup...'));
       setStartupBootLoadingProgress(97, {
@@ -24490,9 +26146,8 @@
       resetOpenedDocumentViewport({ defer: true });
       refreshLocalizedUi();
       scheduleDeferredUiSetup();
-      if (!lensImportRequested && !qrImportRequested && !importedFromLens && !importedFromQr && !skipStartup && !restoredAutosaveProject && !reloadSnapshotRestored) {
-        showProjectHomeScreen({ refresh: true });
-      }
+      hideProjectHomeScreen();
+      showStartupScreen({ refreshWorkspace: false });
     } finally {
       setStartupBootLoadingProgress(100, {
         label: localizeText('起動完了', 'Ready'),
@@ -24504,8 +26159,42 @@
         document.body.classList.remove('app-preinit');
         document.body.classList.add('app-ready');
       }
+      startupReady = true;
+      if (typeof window !== 'undefined') {
+        window.__PIXIEEDRAW_EDITOR_READY__ = true;
+        Promise.resolve(window.__PIXIEEDRAW_LOAD_ADS__?.())
+          .then(loaded => {
+            if (!loaded) return;
+            queueStartupRecentAdRender();
+            const sharedNav = document.querySelector('.bottom-nav');
+            if (sharedNav instanceof HTMLElement
+              && !document.body?.classList.contains('is-project-home-active')
+              && !document.body?.classList.contains('is-startup-active')) {
+              window.pixieedObserveAds?.(sharedNav);
+            }
+          })
+          .catch(error => {
+            console.warn('Deferred ad initialization failed', error);
+          });
+      }
+      const commandLock = inspectProjectCommandLock();
+      const startupStatus = {
+        phase: 'startup-ready',
+        commandLocked: commandLock.locked,
+        lockOwner: commandLock.owner,
+        lockAgeMs: commandLock.lockAgeMs,
+        recentProjectCount: recentProjectsCache.size,
+        hasActiveProject: Boolean(activeOpenProjectTabId),
+      };
+      console.info('[pixiedraw:startup]', startupStatus);
+      if (commandLock.locked) {
+        console.warn('[pixiedraw:startup]', { ...startupStatus, code: 'ERR_STARTUP_READY_WITH_COMMAND_LOCK' });
+      }
     }
   }
 
+  // File commands depend on persistence and input helpers declared above.
+  // Bind only after the complete app dependency graph is initialized.
+  bindProjectFileMenuOnce();
   init();
 })();

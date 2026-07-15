@@ -70,47 +70,6 @@
     });
   }
 
-  function updateLocalCanvasActionToolButtons() {
-    const localCanvasCount = normalizeLocalViewportCanvasState(
-      localViewportCanvasState,
-      LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE
-    ).count;
-    const canEditProjectStructure = canCurrentClientEditProjectStructure();
-    const voxelModeEnabled = isVoxelExtensionModeEnabled();
-    const available = MULTI_CANVAS_FEATURE_ENABLED && !voxelModeEnabled;
-    const enabled = available && localCanvasCount > 0;
-    const disabled = !available || !canEditProjectStructure;
-    const toggleButtons = Array.from(document.querySelectorAll(
-      `.tool-button[data-tool="${TOOL_ACTION_LOCAL_CANVAS_TOGGLE}"], [data-ui-action="${TOP_UI_ACTION_LOCAL_CANVAS_TOGGLE}"]`
-    ));
-    toggleButtons.forEach(button => {
-      if (!(button instanceof HTMLElement)) {
-        return;
-      }
-      button.hidden = !MULTI_CANVAS_FEATURE_ENABLED;
-      button.setAttribute('aria-hidden', String(!MULTI_CANVAS_FEATURE_ENABLED));
-      if (button instanceof HTMLButtonElement) {
-        button.disabled = disabled;
-      }
-      button.classList.toggle('is-active', enabled);
-      button.setAttribute('aria-pressed', String(enabled));
-      const controlLabel = localizeText(
-        enabled ? 'マルチキャンバスをオフ' : 'マルチキャンバスをオン',
-        enabled ? 'Turn Multi Canvas Off' : 'Turn Multi Canvas On'
-      );
-      button.setAttribute('aria-label', controlLabel);
-      button.setAttribute('title', controlLabel);
-      const srOnly = button.querySelector('.sr-only');
-      const groupLabel = button.querySelector('.tool-group-label');
-      const label = srOnly instanceof HTMLElement
-        ? srOnly
-        : (groupLabel instanceof HTMLElement ? groupLabel : button.querySelector('span'));
-      if (label instanceof HTMLElement) {
-        label.textContent = localizeText('マルチキャンバス', 'Multi Canvas');
-      }
-    });
-  }
-
   function updateFloatingPreviewActionToolButtons() {
     const voxelModeEnabled = isVoxelExtensionModeEnabled();
     const enabled = Boolean(state.floatingPreview?.enabled) || voxelModeEnabled;
@@ -194,7 +153,6 @@
 
   return Object.freeze({
     updateVirtualCursorActionToolButtons,
-    updateLocalCanvasActionToolButtons,
     updateFloatingPreviewActionToolButtons,
     getMirrorActionAnchor,
     updateMirrorActionButtons,

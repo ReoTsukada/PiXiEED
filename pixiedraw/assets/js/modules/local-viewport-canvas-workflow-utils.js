@@ -1002,13 +1002,14 @@
       canvasSurfacePanelDragState.surfaceKind === 'main'
       || canvasSurfacePanelDragState.surfaceKind === 'local'
     );
+    let layoutChanged = false;
     if (shouldPersist && panel instanceof HTMLElement) {
       const finalLeft = parseLocalViewportCanvasAxis(panel.style.left, panel.offsetLeft) || 0;
       const finalTop = parseLocalViewportCanvasAxis(panel.style.top, panel.offsetTop) || 0;
       if (canvasSurfacePanelDragState.surfaceKind === 'main') {
-        setLocalViewportCanvasLayoutAnchor(finalLeft, finalTop);
+        layoutChanged = setLocalViewportCanvasLayoutAnchor(finalLeft, finalTop);
       } else if (canvasSurfacePanelDragState.surfaceKind === 'local') {
-        setLocalViewportCanvasPosition(canvasSurfacePanelDragState.surfaceIndex, finalLeft, finalTop);
+        layoutChanged = setLocalViewportCanvasPosition(canvasSurfacePanelDragState.surfaceIndex, finalLeft, finalTop);
       }
     }
     canvasSurfacePanelDragState.pointerId = null;
@@ -1022,7 +1023,11 @@
     canvasSurfacePanelDragState.startClientY = 0;
     teardownCanvasSurfacePanelDragInteraction();
     if (shouldPersist) {
-      scheduleSessionPersist({ includeSnapshots: false });
+      if (layoutChanged) {
+        markAutosaveDirty();
+        markDocumentUnsavedChange();
+      }
+      scheduleSessionPersist({ includeSnapshots: layoutChanged });
     }
     syncLocalViewportCanvasDockLayout();
     updateCanvasResizeHandlePosition();
@@ -1331,6 +1336,11 @@
     const previousCanvas = getActiveProjectCanvasDocument();
     const previousSurface = activeCanvasSurface;
     const previousId = projectCanvasStore.activeCanvasId;
+    // Switching the active canvas must not recenter the shared world. Safari
+    // landscape can issue visualViewport work adjacent to this pointer event.
+    const preservedMultiCanvasPan = isMultiCanvasWorldLayoutActive()
+      ? { x: Number(state.pan.x) || 0, y: Number(state.pan.y) || 0 }
+      : null;
     const changed = previousId !== targetCanvas.id;
     if (!changed) {
       if (syncUi) {
@@ -1377,6 +1387,12 @@
     } else {
       pendingProjectCanvasUiSync = true;
       syncMultiCanvasSelectionUi();
+    }
+    if (preservedMultiCanvasPan) {
+      state.pan.x = preservedMultiCanvasPan.x;
+      state.pan.y = preservedMultiCanvasPan.y;
+      syncMultiCanvasWorldLayoutDisplayPositions();
+      applyViewportTransform();
     }
     updateHistoryButtons();
     if (persist) {
@@ -2521,25 +2537,17 @@
     }
     const previous = getLocalViewportCanvasCount();
     const currentCanvases = getProjectCanvasDocuments();
-    const targetCount = clamp(Math.round(Number(nextCount) || 0), 0, getLocalViewportCanvasMaxCount());
-    const accountLimit = getLocalViewportCanvasAccountLimit();
-    if (targetCount > previous && targetCount > accountLimit) {
-      const needsLogin = accountLimit <= 0;
+    const requestedCount = Math.round(Number(nextCount) || 0);
+    const maximumAdditionalCanvases = 3;
+    if (requestedCount > previous && currentCanvases.length >= 4) {
       updateAutosaveStatus(
-        needsLogin
-          ? localizeText(
-            'マルチキャンバスはログインすると1つ追加できます。ログインしてください。',
-            'Sign in to add 1 multi canvas.'
-          )
-          : localizeText(
-            'マルチキャンバスは3つまで追加できます。',
-            'You can add up to 3 multi canvases.'
-          ),
-        'info'
+        localizeText('キャンバスは1シートにつき最大4件です', 'A sheet can contain at most 4 canvases'),
+        'warn'
       );
       syncControlsWithState();
       return false;
     }
+    const targetCount = clamp(requestedCount, 0, maximumAdditionalCanvases);
     if (targetCount === previous) {
       if (persist) {
         scheduleSessionPersist({ includeSnapshots: false });
@@ -2565,6 +2573,17 @@
     while (nextCanvases.length < targetTotal) {
       nextCanvases.push(createBlankProjectCanvasDocument(sourceCanvas, nextCanvases.length + 1));
     }
+    const validation = window.PiXiEEDrawModules?.projectCanvasValidationUtils
+      ?.createProjectCanvasValidationUtils?.()
+      ?.validateCanvasCount?.({ document: { canvases: nextCanvases } });
+    if (!validation?.valid) {
+      updateAutosaveStatus(
+        localizeText('真V2で編集できるキャンバスは1件です', 'True V2 edits one canvas per project'),
+        'warn'
+      );
+      syncControlsWithState();
+      return false;
+    }
     if (targetCount < previous && !canNormalizeMultiAssignmentsForCanvasDocuments(nextCanvases, { announce: true })) {
       return false;
     }
@@ -2576,8 +2595,8 @@
       ? activeCanvasId
       : (nextCanvases[Math.min(activeCanvasIndex, nextCanvases.length - 1)]?.id || nextCanvases[0]?.id || '');
     replaceProjectCanvasDocuments(nextCanvases, resolvedActiveCanvasId);
-    requestLocalViewportCanvasLayoutReset({ clearStored: true });
     if (targetCount > previous) {
+      requestLocalViewportCanvasLayoutReset({ clearStored: true });
       assignAdjacentPositionForNewLocalViewportCanvases(previous);
     }
     ensureLocalViewportCanvasEntries();
@@ -2628,20 +2647,124 @@
     const currentProjectCanvasCount = Array.isArray(projectCanvasStore?.canvases)
       ? Math.max(0, projectCanvasStore.canvases.length - 1)
       : 0;
-    const accountLimit = getLocalViewportCanvasAccountLimit();
     const modeLimit = isVoxelExtensionModeEnabled()
       ? VOXEL_EXTENSION_LOCAL_CANVAS_MAX_COUNT
       : 0;
-    return Math.max(accountLimit, currentProjectCanvasCount, modeLimit);
+    return Math.min(3, Math.max(3, currentProjectCanvasCount, modeLimit));
   }
 
   function canUseVoxelExtensionMode() {
     return false;
   }
 
-  function handleLocalViewportCanvasViewportChange() {
-    syncLocalViewportCanvasDockVisibility({ persist: false, render: true });
+  function preserveViewportAnchorAcrossViewportChange(runLayoutUpdate) {
+    const updateLayout = typeof runLayoutUpdate === 'function'
+      ? runLayoutUpdate
+      : () => {};
+    const viewport = dom.canvasViewport instanceof HTMLElement ? dom.canvasViewport : null;
+    const canPreserveAnchor = Boolean(
+      viewport
+      && typeof getViewportCenterZoomFocus === 'function'
+      && typeof getCanvasSurfacePanelLayoutOffset === 'function'
+      && typeof getCanvasSurfaceDrawingLocalOffset === 'function'
+      && typeof getCanvasSurfaceDrawingDisplayScale === 'function'
+    );
+    if (!canPreserveAnchor) {
+      updateLayout();
+      applyViewportTransform();
+      return;
+    }
+    const focus = getViewportCenterZoomFocus();
+    const focusSurface = focus?.surface
+      ? getResolvedCanvasInteractionSurface(focus.surface)
+      : (typeof getViewportVisibilityTargetSurface === 'function' ? getViewportVisibilityTargetSurface() : null);
+    const focusCanvasId = focus?.canvasDocId || focusSurface?.canvasDocId || focusSurface?.canvasDoc?.id || '';
+    const viewportRectBefore = viewport.getBoundingClientRect();
+    const focusCanvasDocBefore = focusSurface?.canvasDoc
+      || getProjectCanvasDocumentById(focusSurface?.canvasDocId)
+      || getActiveProjectCanvasDocument();
+    const fallbackDisplayScale = getPixelAlignedCanvasDisplayScale(Number(state.scale) || MIN_ZOOM_SCALE);
+    const panelOffsetBefore = getCanvasSurfacePanelLayoutOffset(focusSurface);
+    const drawingOffsetBefore = getCanvasSurfaceDrawingLocalOffset(focusSurface);
+    const drawingScaleBefore = getCanvasSurfaceDrawingDisplayScale(
+      focusSurface,
+      focusCanvasDocBefore,
+      fallbackDisplayScale
+    );
+    const focusViewportOffsetX = focus && viewportRectBefore && Number.isFinite(focus.clientX)
+      ? (Number(focus.clientX) - viewportRectBefore.left)
+      : (focus
+        ? (Number(state.pan.x) || 0) + panelOffsetBefore.x + drawingOffsetBefore.x + ((Number(focus.worldX) || 0) * drawingScaleBefore.x)
+        : null);
+    const focusViewportOffsetY = focus && viewportRectBefore && Number.isFinite(focus.clientY)
+      ? (Number(focus.clientY) - viewportRectBefore.top)
+      : (focus
+        ? (Number(state.pan.y) || 0) + panelOffsetBefore.y + drawingOffsetBefore.y + ((Number(focus.worldY) || 0) * drawingScaleBefore.y)
+        : null);
+
+    updateLayout();
+
+    if (
+      !focus
+      || !Number.isFinite(focusViewportOffsetX)
+      || !Number.isFinite(focusViewportOffsetY)
+    ) {
+      applyViewportTransform();
+      return;
+    }
+
+    const focusedSurface = focusCanvasId
+      ? getProjectCanvasSurfaceByCanvasId(focusCanvasId)
+      : focusSurface;
+    const focusedCanvasDoc = focusedSurface?.canvasDoc
+      || getProjectCanvasDocumentById(focusedSurface?.canvasDocId)
+      || getActiveProjectCanvasDocument();
+    const panelOffsetAfter = getCanvasSurfacePanelLayoutOffset(focusedSurface, panelOffsetBefore);
+    const drawingOffsetAfter = getCanvasSurfaceDrawingLocalOffset(focusedSurface);
+    const drawingScaleAfter = getCanvasSurfaceDrawingDisplayScale(
+      focusedSurface,
+      focusedCanvasDoc,
+      fallbackDisplayScale
+    );
+    state.pan.x = (
+      focusViewportOffsetX
+      - (panelOffsetAfter.x + drawingOffsetAfter.x + ((Number(focus.worldX) || 0) * drawingScaleAfter.x))
+    );
+    state.pan.y = (
+      focusViewportOffsetY
+      - (panelOffsetAfter.y + drawingOffsetAfter.y + ((Number(focus.worldY) || 0) * drawingScaleAfter.y))
+    );
+
+    applyViewportTransform({
+      updateDecorations: false,
+      clampVisibility: false,
+    });
+
+    if (focusedSurface?.drawing instanceof HTMLCanvasElement) {
+      const viewportRectAfter = viewport.getBoundingClientRect();
+      const drawingRectAfter = focusedSurface.drawing.getBoundingClientRect();
+      const actualScaleAfter = getCanvasSurfaceDrawingDisplayScale(
+        focusedSurface,
+        focusedCanvasDoc,
+        fallbackDisplayScale
+      );
+      const anchorViewportX = (drawingRectAfter.left - viewportRectAfter.left) + ((Number(focus.worldX) || 0) * actualScaleAfter.x);
+      const anchorViewportY = (drawingRectAfter.top - viewportRectAfter.top) + ((Number(focus.worldY) || 0) * actualScaleAfter.y);
+      const correctionX = focusViewportOffsetX - anchorViewportX;
+      const correctionY = focusViewportOffsetY - anchorViewportY;
+      if (Math.abs(correctionX) > 0.01 || Math.abs(correctionY) > 0.01) {
+        state.pan.x = (Number(state.pan.x) || 0) + correctionX;
+        state.pan.y = (Number(state.pan.y) || 0) + correctionY;
+      }
+    }
+
     applyViewportTransform();
+  }
+
+  function handleLocalViewportCanvasViewportChange() {
+    preserveViewportAnchorAcrossViewportChange(() => {
+      syncLocalViewportCanvasDockVisibility({ persist: false, render: true });
+    });
   }
 
   function handleLocalViewportCanvasVisualViewportChange() {
@@ -2649,10 +2772,20 @@
       handleLocalViewportCanvasViewportChange();
       return;
     }
-    syncAllProjectCanvasSurfaceDimensions();
-    renderLocalViewportCanvasOverlays();
-    syncMultiCanvasSelectionUi();
-    applyViewportTransform();
+    preserveViewportAnchorAcrossViewportChange(() => {
+      syncAllProjectCanvasSurfaceDimensions();
+      syncMultiCanvasWorldLayoutDisplayPositions();
+      renderLocalViewportCanvasOverlays();
+      syncMultiCanvasSelectionUi();
+    });
+  }
+
+  function handleLocalViewportCanvasVisualViewportScroll() {
+    // Safari also reports a visualViewport scroll when a fixed flyout takes
+    // focus.  The canvas viewport has not been resized in that case, so do
+    // not run anchor preservation: it rewrites state.pan using transient
+    // viewport offsets.  An overlay repaint is sufficient for visual aids.
+    requestOverlayRender();
   }
 
   function reconcileProjectCanvasesFromLocalViewportState() {
@@ -2685,37 +2818,11 @@
     if (reconcileProjectCanvasesFromLocalViewportState()) {
       bindActiveCanvasSurface(getProjectCanvasSurfaceForIndex(getActiveProjectCanvasIndex()) || mainViewportCanvasSurface);
     }
-    if (dom.controls.addLocalCanvas instanceof HTMLButtonElement) {
-      dom.controls.addLocalCanvas.addEventListener('click', event => {
-        event.preventDefault();
-        if (!canCurrentClientEditProjectStructure({ announce: true })) {
-          if (!isSharedProjectCollaborativeMode()) {
-            announceMultiCanvasEditRestriction();
-          }
-          syncControlsWithState();
-          return;
-        }
-        adjustLocalViewportCanvasCount(1, { persist: true, announce: true, recordHistory: true });
-      });
-    }
-    if (dom.controls.removeLocalCanvas instanceof HTMLButtonElement) {
-      dom.controls.removeLocalCanvas.addEventListener('click', event => {
-        event.preventDefault();
-        if (!canCurrentClientEditProjectStructure({ announce: true })) {
-          if (!isSharedProjectCollaborativeMode()) {
-            announceMultiCanvasEditRestriction();
-          }
-          syncControlsWithState();
-          return;
-        }
-        adjustLocalViewportCanvasCount(-1, { persist: true, announce: true, recordHistory: true });
-      });
-    }
     window.addEventListener('resize', handleLocalViewportCanvasViewportChange);
     window.addEventListener('orientationchange', handleLocalViewportCanvasViewportChange);
     if (window.visualViewport && typeof window.visualViewport.addEventListener === 'function') {
       window.visualViewport.addEventListener('resize', handleLocalViewportCanvasVisualViewportChange);
-      window.visualViewport.addEventListener('scroll', handleLocalViewportCanvasVisualViewportChange);
+      window.visualViewport.addEventListener('scroll', handleLocalViewportCanvasVisualViewportScroll);
     }
     syncLocalViewportCanvasDockVisibility({ persist: false, render: true });
   }
@@ -2820,6 +2927,7 @@
     canUseVoxelExtensionMode,
     handleLocalViewportCanvasViewportChange,
     handleLocalViewportCanvasVisualViewportChange,
+    handleLocalViewportCanvasVisualViewportScroll,
     reconcileProjectCanvasesFromLocalViewportState,
     setupLocalViewportCanvasDock,
   });

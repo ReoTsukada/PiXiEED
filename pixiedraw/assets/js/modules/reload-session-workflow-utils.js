@@ -363,10 +363,10 @@
           setActiveAutosaveProjectId(restoredProjectId, { persist: false });
         }
         if (parsedDocument?.sheets?.length) {
-          restoreOpenProjectSheetsFromParsedDocument(parsedDocument, {
+          Promise.resolve(restoreOpenProjectSheetsFromParsedDocument(parsedDocument, {
             projectId: restoredProjectId || autosaveProjectId,
             source: 'sheet',
-          });
+          })).catch(error => console.warn('Failed to split restored legacy multi-project package', error));
         }
       }
       history.pending = null;
@@ -447,6 +447,7 @@
     const past = normalizeReloadHistoryList(parsed.past, historyLimit);
     const future = normalizeReloadHistoryList(parsed.future, historyLimit);
     return {
+      at: timestamp,
       projectId: normalizeAutosaveProjectId(parsed.projectId || ''),
       sharedProjectKey: normalizeMultiProjectKey(parsed.sharedProjectKey || ''),
       sharedProjectRevision: Math.max(0, Math.round(Number(parsed.sharedProjectRevision) || 0)),
@@ -458,6 +459,13 @@
       historyLimit,
       unsaved: Boolean(parsed.unsaved),
     };
+  }
+
+  function clearReloadRecoveryData() {
+    clearLocalRestoreStorage(RELOAD_SNAPSHOT_STORAGE_KEY);
+    clearLocalRestoreStorage(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY);
+    clearLocalRestoreStorage(RELOAD_PROJECT_FALLBACK_STORAGE_KEY);
+    clearReloadTargetProjectId();
   }
 
   function restoreReloadSessionSnapshot() {
@@ -530,10 +538,10 @@
       setActiveAutosaveProjectId(startupProjectId, { persist: false });
     }
     if (parsedProjectDocument?.sheets?.length) {
-      restoreOpenProjectSheetsFromParsedDocument(parsedProjectDocument, {
+      Promise.resolve(restoreOpenProjectSheetsFromParsedDocument(parsedProjectDocument, {
         projectId: startupProjectId || autosaveProjectId,
         source: restoredSharedProjectKey ? 'shared-sheet' : 'sheet',
-      });
+      })).catch(error => console.warn('Failed to split restored legacy multi-project package', error));
     }
     if (restoredSharedProjectKey) {
       startupSharedReloadProjectKey = restoredSharedProjectKey;
@@ -583,6 +591,7 @@
     clearReloadTargetProjectId,
     restoreReloadProjectFallback,
     readReloadSessionSnapshotPayload,
+    clearReloadRecoveryData,
     restoreReloadSessionSnapshot,
   });
       }

@@ -75,7 +75,7 @@
     Object.freeze({
       id: 'shape-fill',
       title: { ja: '図形・塗りつぶし', en: 'Shapes & Fill', zh: '图形与填充' },
-      keywords: { ja: '直線 曲線 四角 丸 塗りつぶし プレビュー', en: 'line curve rectangle ellipse fill preview', zh: '直线 曲线 矩形 椭圆 填充 预览' },
+      keywords: { ja: '直線 曲線 四角 丸 塗りつぶし プレビュー', en: 'line curve rectangle circle fill preview', zh: '直线 曲线 矩形 圆 填充 预览' },
       points: {
         ja: [
           '図形ツールはプレビュー表示後、確定で描画されます。',
@@ -657,7 +657,7 @@
     'ON にすると Front / Back / Left / Right / Top / Bottom の6面構成へ切り替わり、小窓プレビューを自動生成します。小窓をドラッグすると左右と上下に回転できます。': '开启后会切换为 Front / Back / Left / Right / Top / Bottom 六面结构，并自动生成浮动预览。拖动浮动预览可左右和上下旋转。',
     'PiXiEEDraw（ピクシードロー）でドット絵づくり・共同制作・アニメ制作をはじめよう': '用 PiXiEEDraw 开始制作像素画、协作创作和动画。',
     'PiXiEEDコンテスト': 'PiXiEED比赛',
-    'PiXiEEDファイルも保存': '同时保存PiXiEED文件',
+    'PiXiEEDファイルも同期': '同时同步PiXiEED文件',
     'QRモード': 'QR模式',
     'RGBカラー': 'RGB颜色',
     'X/Y と倍率をまとめて調整': '同时调整 X/Y 和倍率。',

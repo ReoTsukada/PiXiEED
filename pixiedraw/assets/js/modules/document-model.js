@@ -216,6 +216,19 @@
       return layer.direct;
     }
 
+    // `direct` is the runtime source of truth. Older payloads may contain
+    // only importSourceDirect; promote that legacy fallback once at ingress
+    // without discarding it, so old snapshots remain representable.
+    function promoteLegacyImportSourceDirect(direct, importSourceDirect, length) {
+      if (direct instanceof Uint8ClampedArray && direct.length === length) {
+        return direct;
+      }
+      if (importSourceDirect instanceof Uint8ClampedArray && importSourceDirect.length === length) {
+        return new Uint8ClampedArray(importSourceDirect);
+      }
+      return direct instanceof Uint8ClampedArray ? direct : null;
+    }
+
     function isSimulationLayer(layer) {
       return Boolean(layer && layer.type === 'simulation' && layer.elementMap instanceof Uint8Array);
     }
@@ -403,9 +416,12 @@
       if (copyPixels && baseLayer.indices instanceof Int16Array) {
         layer.indices.set(baseLayer.indices);
       }
-      if (copyPixels && baseLayer.direct instanceof Uint8ClampedArray) {
+      const directSource = baseLayer.direct instanceof Uint8ClampedArray
+        ? baseLayer.direct
+        : (baseLayer.importSourceDirect instanceof Uint8ClampedArray ? baseLayer.importSourceDirect : null);
+      if (copyPixels && directSource instanceof Uint8ClampedArray) {
         const direct = ensureLayerDirect(layer, width, height);
-        direct.set(baseLayer.direct);
+        direct.set(directSource.subarray(0, Math.min(direct.length, directSource.length)));
       }
       return layer;
     }
@@ -567,6 +583,7 @@
         importSourceDirect = new Uint8ClampedArray(size * 4);
         importSourceDirect.set(layer.importSourceDirect.subarray(0, Math.min(importSourceDirect.length, layer.importSourceDirect.length)));
       }
+      direct = promoteLegacyImportSourceDirect(direct, importSourceDirect, size * 4);
       return {
         name: typeof layer.name === 'string' ? layer.name : getDefaultLayerName(1),
         visible: layer.visible !== false,
@@ -602,6 +619,7 @@
         layer.importSourceDirect = new Uint8ClampedArray(width * height * 4);
         layer.importSourceDirect.set(snapshot.importSourceDirect.subarray(0, Math.min(layer.importSourceDirect.length, snapshot.importSourceDirect.length)));
       }
+      layer.direct = promoteLegacyImportSourceDirect(layer.direct, layer.importSourceDirect, width * height * 4);
       return layer;
     }
 
@@ -687,6 +705,7 @@
             } else if (!clonePixelData && layer?.importSourceDirect instanceof Uint8ClampedArray) {
               nextLayer.importSourceDirect = layer.importSourceDirect;
             }
+            nextLayer.direct = promoteLegacyImportSourceDirect(nextLayer.direct, nextLayer.importSourceDirect, width * height * 4);
             return nextLayer;
           })
           : [createLayer(getDefaultLayerName(1), width, height)],
@@ -715,6 +734,7 @@
       if (layer.importSourceDirect instanceof Uint8ClampedArray) {
         clonedLayer.importSourceDirect = clonePixelData ? new Uint8ClampedArray(layer.importSourceDirect) : layer.importSourceDirect;
       }
+      clonedLayer.direct = promoteLegacyImportSourceDirect(clonedLayer.direct, clonedLayer.importSourceDirect, state.width * state.height * 4);
       return clonedLayer;
     }
 
@@ -817,6 +837,39 @@
       return output;
     }
 
+    function deserializeRasterTypedArray(value, Type, expectedLength, mismatchMessage, {
+      allowMissing = false,
+      fillValue = 0,
+    } = {}) {
+      if (typeof value === 'string' && value.length > 0) {
+        const bytes = decodeBase64(value);
+        const itemSize = Type.BYTES_PER_ELEMENT || 1;
+        if (bytes.length !== expectedLength * itemSize) {
+          throw new Error(mismatchMessage);
+        }
+        const aligned = new Uint8Array(bytes.byteLength);
+        aligned.set(bytes);
+        const view = new Type(aligned.buffer, 0, expectedLength);
+        const output = new Type(expectedLength);
+        output.set(view);
+        return output;
+      }
+      if (Array.isArray(value) || ArrayBuffer.isView(value)) {
+        if (value.length !== expectedLength) {
+          throw new Error(mismatchMessage);
+        }
+        const output = new Type(expectedLength);
+        output.set(value);
+        return output;
+      }
+      if (allowMissing) {
+        const output = new Type(expectedLength);
+        if (fillValue !== 0) output.fill(fillValue);
+        return output;
+      }
+      throw new Error('Layer is missing index data');
+    }
+
     function deserializeLayerFromDocument(layer, pixelCount, fallbackId, fallbackName, width = state.width, height = state.height) {
       if (layer?.type === SIM_LAYER_TYPE) {
         const simLayer = createSimulationLayer(fallbackName, width, height);
@@ -846,33 +899,45 @@
         };
         return simLayer;
       }
-      if (!layer || typeof layer.indices !== 'string') {
+      if (!layer || typeof layer !== 'object') {
         throw new Error('Layer is missing index data');
       }
-      const indicesBytes = decodeBase64(layer.indices);
-      if (indicesBytes.length !== pixelCount * 2) {
-        throw new Error('Layer pixel data mismatch');
-      }
-      const indicesView = new Int16Array(indicesBytes.buffer, indicesBytes.byteOffset, indicesBytes.byteLength / 2);
-      const indices = new Int16Array(indicesView.length);
-      indices.set(indicesView);
+      const hasDirectPayload = (typeof layer.direct === 'string' && layer.direct.length > 0)
+        || Array.isArray(layer.direct)
+        || ArrayBuffer.isView(layer.direct);
+      const indices = deserializeRasterTypedArray(
+        layer.indices,
+        Int16Array,
+        pixelCount,
+        'Layer pixel data mismatch',
+        { allowMissing: hasDirectPayload, fillValue: -1 }
+      );
       let direct = null;
-      if (typeof layer.direct === 'string' && layer.direct.length > 0) {
-        const directBytes = decodeBase64(layer.direct);
-        if (directBytes.length !== pixelCount * 4) {
-          throw new Error('Layer direct pixel data mismatch');
-        }
-        direct = new Uint8ClampedArray(directBytes.length);
-        direct.set(directBytes);
+      if (hasDirectPayload) {
+        direct = deserializeRasterTypedArray(
+          layer.direct,
+          Uint8ClampedArray,
+          pixelCount * 4,
+          'Layer direct pixel data mismatch'
+        );
       }
       let importSourceDirect = null;
-      if (typeof layer.importSourceDirect === 'string' && layer.importSourceDirect.length > 0) {
-        const sourceBytes = decodeBase64(layer.importSourceDirect);
-        if (sourceBytes.length === pixelCount * 4) {
-          importSourceDirect = new Uint8ClampedArray(sourceBytes.length);
-          importSourceDirect.set(sourceBytes);
+      const hasImportSourcePayload = (typeof layer.importSourceDirect === 'string' && layer.importSourceDirect.length > 0)
+        || Array.isArray(layer.importSourceDirect)
+        || ArrayBuffer.isView(layer.importSourceDirect);
+      if (hasImportSourcePayload) {
+        try {
+          importSourceDirect = deserializeRasterTypedArray(
+            layer.importSourceDirect,
+            Uint8ClampedArray,
+            pixelCount * 4,
+            'Layer import source pixel data mismatch'
+          );
+        } catch (_error) {
+          importSourceDirect = null;
         }
       }
+      direct = promoteLegacyImportSourceDirect(direct, importSourceDirect, pixelCount * 4);
       return {
         id: typeof layer.id === 'string' ? layer.id : fallbackId,
         name: typeof layer.name === 'string' ? layer.name : fallbackName,

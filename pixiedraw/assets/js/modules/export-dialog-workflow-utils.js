@@ -40,21 +40,11 @@
     }
     const config = dom.exportDialog;
     if (!config) {
-      exportProjectWithFallback();
+      console.error('[PiXiEEDraw DEV] export settings dialog is unavailable');
+      updateAutosaveStatus('出力設定を開けません。出力は開始していません。画面を再読み込みしてからもう一度お試しください。', 'error');
       return;
     }
-    try {
-      setExportFileBaseName(getExportFileNameBase() || state.documentName);
-      if (EXPORT_DIRECTORY_SUPPORTED) {
-        if (pendingExportDirectoryHandle && !exportDirectoryHandle) {
-          await attemptExportDirectoryReauthorization();
-        } else if (!exportDirectoryHandle && !exportDirectorySetupDismissed) {
-          await requestExportDirectoryBinding();
-        }
-      }
-    } catch (error) {
-      console.warn('Failed to prepare export dialog', error);
-    }
+    setExportFileBaseName(getExportFileNameBase() || state.documentName);
     const dialog = config.dialog;
     if (dialog && typeof dialog.showModal === 'function') {
       if (dialog.open) {
@@ -67,7 +57,7 @@
         dialog.showModal();
       } catch (error) {
         console.warn('Failed to open export dialog', error);
-        exportProjectWithFallback();
+        updateAutosaveStatus('出力設定を開けません。出力は開始していません。画面を再読み込みしてからもう一度お試しください。', 'error');
         return;
       }
       window.requestAnimationFrame(() => {
@@ -83,12 +73,13 @@
         }
       });
     } else {
-      exportProjectWithFallback();
+      console.error('[PiXiEEDraw DEV] export settings dialog does not support showModal');
+      updateAutosaveStatus('この環境では出力設定パネルを開けません。出力は開始していません。', 'error');
     }
   }
 
   function queueExportAdRender() {
-    if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) {
+    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.()) {
       return;
     }
     const dialog = dom.exportDialog?.dialog;
@@ -136,7 +127,11 @@
       }
       exportAdRequested = true;
       try {
-        (window.adsbygoogle = window.adsbygoogle || []).push({});
+        const result = window.__PIXIEEDRAW_RENDER_AD_SLOT__?.(adSlot, {
+          owner: 'export-dialog',
+          reason: 'dialog-open',
+        });
+        if (!result?.ok) throw new Error(result?.reason || 'ERR_AD_SLOT_RENDER_FAILED');
         adSlot.dataset.loaded = '1';
       } catch (error) {
         exportAdRequested = false;
@@ -176,7 +171,7 @@
   }
 
   function queueShortcutHelpAdRender() {
-    if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) {
+    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.()) {
       return;
     }
     const dialog = dom.shortcutHelp?.dialog;
@@ -223,7 +218,11 @@
       }
       shortcutHelpAdRequested = true;
       try {
-        (window.adsbygoogle = window.adsbygoogle || []).push({});
+        const result = window.__PIXIEEDRAW_RENDER_AD_SLOT__?.(adSlot, {
+          owner: 'shortcut-help-dialog',
+          reason: 'dialog-open',
+        });
+        if (!result?.ok) throw new Error(result?.reason || 'ERR_AD_SLOT_RENDER_FAILED');
         adSlot.dataset.loaded = '1';
       } catch (error) {
         shortcutHelpAdRequested = false;
@@ -234,7 +233,7 @@
   }
 
   function queueUpdateHistoryAdRender() {
-    if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) {
+    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.()) {
       return;
     }
     const dialog = dom.updateHistory?.dialog;
@@ -281,7 +280,11 @@
       }
       updateHistoryAdRequested = true;
       try {
-        (window.adsbygoogle = window.adsbygoogle || []).push({});
+        const result = window.__PIXIEEDRAW_RENDER_AD_SLOT__?.(adSlot, {
+          owner: 'update-history-dialog',
+          reason: 'dialog-open',
+        });
+        if (!result?.ok) throw new Error(result?.reason || 'ERR_AD_SLOT_RENDER_FAILED');
         adSlot.dataset.loaded = '1';
       } catch (error) {
         updateHistoryAdRequested = false;
@@ -511,7 +514,7 @@
   }
 
   function canShowExportInterstitial() {
-    if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) {
+    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.()) {
       return false;
     }
     const dialog = dom.exportInterstitial?.dialog;
@@ -544,7 +547,7 @@
   }
 
   function queueExportInterstitialAdRender() {
-    if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) {
+    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.()) {
       return;
     }
     const dialog = dom.exportInterstitial?.dialog;
@@ -591,7 +594,11 @@
       }
       exportInterstitialAdRequested = true;
       try {
-        (window.adsbygoogle = window.adsbygoogle || []).push({});
+        const result = window.__PIXIEEDRAW_RENDER_AD_SLOT__?.(adSlot, {
+          owner: 'export-interstitial-dialog',
+          reason: 'dialog-open',
+        });
+        if (!result?.ok) throw new Error(result?.reason || 'ERR_AD_SLOT_RENDER_FAILED');
         adSlot.dataset.loaded = '1';
       } catch (error) {
         exportInterstitialAdRequested = false;
@@ -731,6 +738,9 @@
     if (!(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== 'function') {
       return false;
     }
+    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.()) {
+      return false;
+    }
     if (dialog.open) {
       return true;
     }
@@ -752,7 +762,7 @@
       return;
     }
     const choice = window.prompt(
-      '出力形式を入力してください (png / jpeg / svg / glb / grid / gif / timelapse / project)',
+      '出力形式を入力してください (png / jpeg / svg / gif / project)',
       'png'
     );
     if (!choice) {
@@ -768,14 +778,10 @@
       && inputMode !== 'jpg'
       && inputMode !== 'jpeg'
       && inputMode !== 'svg'
-      && inputMode !== 'glb'
-      && inputMode !== 'grid'
-      && inputMode !== 'gridpng'
       && inputMode !== 'gif'
-      && inputMode !== 'timelapse'
       && inputMode !== 'project'
     ) {
-      window.alert('png / jpeg / svg / glb / grid / gif / timelapse / project のいずれかを入力してください。');
+      window.alert('png / jpeg / svg / gif / project のいずれかを入力してください。');
       return;
     }
     const normalized = normalizeExportFormat(inputMode);

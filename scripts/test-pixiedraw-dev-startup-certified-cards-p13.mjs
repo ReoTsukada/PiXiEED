@@ -24,6 +24,8 @@ assert.doesNotMatch(startup, /hydrateStartupWorkspaceProjectCards|inspectStartup
 
 assert.match(css, /startup-workspace__project-thumbnail/);
 assert.match(css, /startup-workspace__project-certification\.is-local/);
+assert.match(css, /@media \(max-width: 720px\) \{[\s\S]*?\.startup-workspace__project \{[\s\S]*?grid-template-columns: 48px minmax\(0, 1fr\)/);
+assert.match(css, /@media \(max-width: 720px\) \{[\s\S]*?\.startup-workspace__project-thumbnail \{[\s\S]*?width: 48px;[\s\S]*?height: 48px;/);
 assert.match(css, /image-rendering:\s*pixelated/);
 
 assert.match(adapterUtils, /readManifestFromBlob/);
@@ -40,6 +42,6 @@ assert.doesNotMatch(autosave, /projectExportIntegrity\s*=\s*\{/);
 assert.match(autosave, /writeAutosaveV2Primary/);
 assert.match(exportRendering, /thumbnail:\s*previewThumbnail/);
 assert.match(html, /startup-workflow-utils\.js\?v=20260715-startup-grid-no-oval1/);
-assert.match(html, /app\.js\?v=20260715-094/);
+assert.match(html, /app\.js\?v=20260715-095/);
 
 console.log('PiXiEEDrawDEV P13 startup certified card checks passed.');

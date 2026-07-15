@@ -13,6 +13,7 @@
     MEMORY_MONITOR_INTERVAL,
     MEMORY_WARNING_DEFAULT,
     MIN_HISTORY_LIMIT,
+    HISTORY_MEMORY_BUDGET_BYTES,
     estimateEncodedByteLength,
     isPixelPatchHistoryEntry,
     finalizePixelPatchHistoryEntry,
@@ -22,6 +23,7 @@
     clearTimelapseRecording,
     fillPreviewCache,
     updateHistoryButtons,
+    archiveEvictedHistoryEntry = () => false,
     markAutosaveDirty,
     scheduleAutosaveSnapshot,
     localizeText,
@@ -31,6 +33,9 @@
     let historyTrimmedRecently = false;
     let historyTrimmedAt = 0;
     let memoryMonitorHandle = null;
+    let memoryMonitorIdleHandle = null;
+    let memoryMonitorIdleUsesRequestIdleCallback = false;
+    const snapshotByteEstimateCache = new WeakMap();
 
     function bytesForLayer(layer) {
       if (!layer) return 0;
@@ -60,9 +65,22 @@
 
     function estimateSnapshotBytes(snapshot) {
       if (!snapshot || typeof snapshot !== 'object') return 0;
+      if (snapshotByteEstimateCache.has(snapshot)) {
+        return snapshotByteEstimateCache.get(snapshot) || 0;
+      }
       if (isPixelPatchHistoryEntry(snapshot)) {
-        const changes = Array.isArray(snapshot.changes) ? snapshot.changes.length : 0;
-        return changes * 40;
+        const changes = Array.isArray(snapshot.changes) ? snapshot.changes : [];
+        const total = changes.reduce((sum, change) => {
+          const valueBytes = value => {
+            if (!value || typeof value !== 'object') return 0;
+            return 8
+              + (Array.isArray(value.direct) ? value.direct.length : 0)
+              + (Array.isArray(value.importSourceDirect) ? value.importSourceDirect.length : 0);
+          };
+          return sum + 40 + valueBytes(change?.before) + valueBytes(change?.after);
+        }, 96);
+        snapshotByteEstimateCache.set(snapshot, total);
+        return total;
       }
       let total = 0;
       if (Array.isArray(snapshot.frames)) {
@@ -82,6 +100,7 @@
       if (Array.isArray(snapshot.palette)) {
         total += snapshot.palette.length * 16;
       }
+      snapshotByteEstimateCache.set(snapshot, total);
       return total;
     }
 
@@ -134,10 +153,11 @@
     }
 
     function trimHistoryForMemoryIfNeeded(breakdown) {
+      const budgetTrim = trimHistoryToByteBudget();
       if (!memoryThresholds || !Number.isFinite(memoryThresholds.warningBytes)) {
-        return breakdown || getMemoryUsageBreakdown();
+        return budgetTrim.trimmed ? getMemoryUsageBreakdown() : (breakdown || getMemoryUsageBreakdown());
       }
-      let usage = breakdown || getMemoryUsageBreakdown();
+      let usage = budgetTrim.trimmed ? getMemoryUsageBreakdown() : (breakdown || getMemoryUsageBreakdown());
       if (usage.total <= memoryThresholds.warningBytes) {
         return usage;
       }
@@ -148,8 +168,10 @@
         let removed;
         if (history.future.length && history.future.length >= history.past.length) {
           removed = history.future.shift();
+          archiveEvictedHistoryEntry('future', removed);
         } else {
           removed = history.past.shift();
+          archiveEvictedHistoryEntry('past', removed);
         }
         total -= estimateSnapshotBytes(removed);
         trimmed = true;
@@ -161,15 +183,46 @@
         usage = getMemoryUsageBreakdown();
         history.limit = Math.max(MIN_HISTORY_LIMIT, Math.min(history.limit, Math.ceil(history.limit * 0.75)));
         while (history.past.length > history.limit) {
-          history.past.shift();
+          archiveEvictedHistoryEntry('past', history.past.shift());
         }
         while (history.future.length > history.limit) {
-          history.future.shift();
+          archiveEvictedHistoryEntry('future', history.future.shift());
         }
         historyTrimmedRecently = true;
         historyTrimmedAt = performance && typeof performance.now === 'function' ? performance.now() : Date.now();
       }
       return usage;
+    }
+
+    function trimHistoryToByteBudget() {
+      const budget = Math.max(1024 * 1024, Math.round(Number(HISTORY_MEMORY_BUDGET_BYTES) || 0));
+      let pastBytes = estimateHistoryBytes(history.past);
+      let futureBytes = estimateHistoryBytes(history.future);
+      let total = pastBytes + futureBytes;
+      let trimmed = false;
+      // Keep the nearest undo or redo entry even when one structural snapshot
+      // alone exceeds the budget. Older entries are released from the front.
+      while (total > budget && history.past.length + history.future.length > 1) {
+        const removeFuture = history.future.length > 0
+          && (history.past.length === 0 || futureBytes >= pastBytes);
+        const target = removeFuture ? history.future : history.past;
+        const removed = target.shift();
+        archiveEvictedHistoryEntry(removeFuture ? 'future' : 'past', removed);
+        const removedBytes = estimateSnapshotBytes(removed);
+        if (removeFuture) {
+          futureBytes = Math.max(0, futureBytes - removedBytes);
+        } else {
+          pastBytes = Math.max(0, pastBytes - removedBytes);
+        }
+        total = pastBytes + futureBytes;
+        trimmed = true;
+      }
+      if (trimmed) {
+        updateHistoryButtons();
+        historyTrimmedRecently = true;
+        historyTrimmedAt = performance && typeof performance.now === 'function' ? performance.now() : Date.now();
+      }
+      return { past: pastBytes, future: futureBytes, total, budget, trimmed };
     }
 
     function computeMemoryThresholds() {
@@ -200,6 +253,10 @@
       text += localizeText(
         ` | ヒストリー ${history.past.length}/${history.limit}`,
         ` | History ${history.past.length}/${history.limit}`
+      );
+      text += localizeText(
+        ` (${formatBytes(usage.past + usage.future)}/${formatBytes(HISTORY_MEMORY_BUDGET_BYTES)})`,
+        ` (${formatBytes(usage.past + usage.future)}/${formatBytes(HISTORY_MEMORY_BUDGET_BYTES)})`
       );
       text += localizeText(
         ` | タイムラプス ${getAllTimelapseStepCount()}`,
@@ -242,11 +299,12 @@
       const limit = normalizeProjectHistoryLimit(history.limit, DEFAULT_HISTORY_LIMIT);
       history.limit = limit;
       while (history.past.length > limit) {
-        history.past.shift();
+        archiveEvictedHistoryEntry('past', history.past.shift());
       }
       while (history.future.length > limit) {
-        history.future.shift();
+        archiveEvictedHistoryEntry('future', history.future.shift());
       }
+      trimHistoryToByteBudget();
     }
 
     function initMemoryMonitor() {
@@ -262,7 +320,31 @@
       if (memoryMonitorHandle !== null) {
         window.clearInterval(memoryMonitorHandle);
       }
-      memoryMonitorHandle = window.setInterval(updateMemoryStatus, MEMORY_MONITOR_INTERVAL);
+      if (memoryMonitorIdleHandle !== null) {
+        if (memoryMonitorIdleUsesRequestIdleCallback && typeof window.cancelIdleCallback === 'function') {
+          window.cancelIdleCallback(memoryMonitorIdleHandle);
+        } else {
+          window.clearTimeout(memoryMonitorIdleHandle);
+        }
+        memoryMonitorIdleHandle = null;
+      }
+      const scheduleMemoryStatusUpdate = () => {
+        if (memoryMonitorIdleHandle !== null) return;
+        const run = () => {
+          memoryMonitorIdleHandle = null;
+          updateMemoryStatus();
+        };
+        if (typeof window.requestIdleCallback === 'function') {
+          memoryMonitorIdleUsesRequestIdleCallback = true;
+          memoryMonitorIdleHandle = window.requestIdleCallback(run, { timeout: 1500 });
+        } else {
+          memoryMonitorIdleUsesRequestIdleCallback = false;
+          memoryMonitorIdleHandle = window.setTimeout(run, 0);
+        }
+      };
+      // Estimating every frame/layer/history/timelapse entry can take tens of
+      // milliseconds for a large document. Keep the monitor out of input work.
+      memoryMonitorHandle = window.setInterval(scheduleMemoryStatusUpdate, MEMORY_MONITOR_INTERVAL);
       const clearButtons = document.querySelectorAll('#memoryClear');
       clearButtons.forEach(button => {
         if (button.dataset.memoryBound) return;
@@ -282,6 +364,7 @@
       estimateTimelapseBytes,
       getMemoryUsageBreakdown,
       trimHistoryForMemoryIfNeeded,
+      trimHistoryToByteBudget,
       computeMemoryThresholds,
       updateMemoryStatus,
       clearMemoryUsage,

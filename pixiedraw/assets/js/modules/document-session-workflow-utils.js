@@ -37,8 +37,7 @@
       if (isImportableImageFile(file)) {
         return await loadDocumentFromImageFile(file);
       }
-      const text = await file.text();
-      return await loadDocumentFromText(text, handle, options);
+      return await loadDocumentFromBlob(file, handle, options);
     } catch (error) {
       if (error?.name !== 'NotAllowedError') {
         console.warn('Document handle load failed', error);
@@ -55,6 +54,137 @@
       }
       return false;
     }
+  }
+
+  function buildLoadedProjectPersistenceState(parsedDocument = null, handle = null, options = {}) {
+    const explicitState = options?.sourcePersistenceState && typeof options.sourcePersistenceState === 'object'
+      ? options.sourcePersistenceState
+      : null;
+    const sourceKind = typeof resolveProjectSourceKind === 'function'
+      ? resolveProjectSourceKind({
+        ...options,
+        sourceKind: (
+          typeof explicitState?.sourceKind === 'string' && explicitState.sourceKind.trim()
+            ? explicitState.sourceKind.trim()
+            : options?.sourceKind
+        ),
+        handle,
+        fileLoad: options?.fileLoad === true || Boolean(handle),
+      })
+      : (
+        typeof options?.sourceKind === 'string' && options.sourceKind.trim()
+          ? options.sourceKind.trim()
+          : 'unknown'
+      );
+    const normalizeExternalInputToV2 = options?.fileLoad === true || options?.forceV2WorkingCopy === true;
+    const hasExplicitSourceAdapterId = Boolean(
+      explicitState
+      && Object.prototype.hasOwnProperty.call(explicitState, 'sourceStorageAdapterId')
+    ) || Object.prototype.hasOwnProperty.call(options || {}, 'sourceStorageAdapterId');
+    const sourceStorageAdapterId = normalizeExternalInputToV2
+      ? null
+      : (hasExplicitSourceAdapterId
+      ? (
+        explicitState?.sourceStorageAdapterId
+        ?? options?.sourceStorageAdapterId
+        ?? null
+      )
+      : (
+        sourceKind === 'file'
+          ? (parsedDocument?.storageAdapterId || null)
+          : null
+      ));
+    const hasExplicitLastSavedStorageAdapterId = Boolean(
+      explicitState
+      && Object.prototype.hasOwnProperty.call(explicitState, 'lastSavedStorageAdapterId')
+    ) || Object.prototype.hasOwnProperty.call(options || {}, 'lastSavedStorageAdapterId');
+    const lastSavedStorageAdapterId = normalizeExternalInputToV2
+      ? null
+      : (hasExplicitLastSavedStorageAdapterId
+      ? (
+        explicitState?.lastSavedStorageAdapterId
+        ?? options?.lastSavedStorageAdapterId
+        ?? null
+      )
+      : (
+        sourceKind === 'file'
+          ? sourceStorageAdapterId
+          : null
+      ));
+    const hasExplicitToken = Boolean(
+      explicitState
+      && Object.prototype.hasOwnProperty.call(explicitState, 'sourceProjectToken')
+      && typeof explicitState.sourceProjectToken === 'string'
+      && explicitState.sourceProjectToken.trim()
+    ) || (
+      typeof options?.sourceProjectToken === 'string'
+      && options.sourceProjectToken.trim()
+    );
+    const sourceProjectToken = hasExplicitToken
+      ? (
+        explicitState?.sourceProjectToken
+        || options?.sourceProjectToken
+        || null
+      )
+      : (
+        typeof createProjectPersistenceToken === 'function'
+          ? createProjectPersistenceToken(sourceKind)
+          : null
+      );
+    if (
+      !sourceKind
+      && sourceStorageAdapterId == null
+      && lastSavedStorageAdapterId == null
+      && sourceProjectToken == null
+    ) {
+      return null;
+    }
+    return typeof normalizeProjectPersistenceState === 'function'
+      ? normalizeProjectPersistenceState({
+        sourceStorageAdapterId,
+        sourceKind,
+        sourceProjectToken,
+        lastSavedStorageAdapterId,
+      }, null, { createToken: true })
+      : {
+        sourceStorageAdapterId,
+        sourceKind,
+        sourceProjectToken,
+        lastSavedStorageAdapterId,
+      };
+  }
+
+  function needsLegacyV2MigrationConsent(parsedDocument = null) {
+    const adapterId = typeof parsedDocument?.storageAdapterId === 'string'
+      ? parsedDocument.storageAdapterId
+      : '';
+    const packagedProjectCount = Array.isArray(parsedDocument?.sheets)
+      ? parsedDocument.sheets.filter(sheet => sheet?.project && typeof sheet.project === 'object').length
+      : 0;
+    const canvasCount = Array.isArray(parsedDocument?.snapshot?.canvases)
+      ? parsedDocument.snapshot.canvases.length
+      : 1;
+    return adapterId === 'pixieedraw-v1-json' || packagedProjectCount > 1 || canvasCount > 1;
+  }
+
+  async function confirmLegacyV2MigrationIfNeeded(parsedDocument, options = {}) {
+    if (!needsLegacyV2MigrationConsent(parsedDocument)) return true;
+    if (typeof requestLegacyV2MigrationConsent !== 'function') return false;
+    const accepted = await requestLegacyV2MigrationConsent({
+      sourceFileName: options?.sourceFileName || options?.fileName || parsedDocument?.document?.documentName || '',
+      sourceAdapterId: parsedDocument?.storageAdapterId || '',
+      projectCount: Math.max(
+        Array.isArray(parsedDocument?.sheets) ? parsedDocument.sheets.length : 1,
+        Array.isArray(parsedDocument?.snapshot?.canvases) ? parsedDocument.snapshot.canvases.length : 1
+      ),
+      multiCanvasCount: Array.isArray(parsedDocument?.snapshot?.canvases)
+        ? parsedDocument.snapshot.canvases.length
+        : 1,
+    });
+    if (!accepted && !options?.suppressAutosaveStatus) {
+      updateAutosaveStatus('V2への移行をキャンセルしました', 'warn');
+    }
+    return accepted;
   }
 
   async function loadDocumentFromText(text, handle, options = {}) {
@@ -90,7 +220,71 @@
       updateAutosaveStatus('ドキュメントの読み込みに失敗しました', 'error');
       return false;
     }
-    return await applyLoadedDocumentSnapshot(parsedDocument, options);
+    if (!await confirmLegacyV2MigrationIfNeeded(parsedDocument, options)) {
+      return false;
+    }
+    const forceV2WorkingCopy = needsLegacyV2MigrationConsent(parsedDocument)
+      || options?.forceV2WorkingCopy === true
+      || options?.fileLoad === true;
+    const sourcePersistenceState = buildLoadedProjectPersistenceState(parsedDocument, handle, {
+      ...options,
+      forceV2WorkingCopy,
+    });
+    return await applyLoadedDocumentSnapshot(parsedDocument, {
+      ...options,
+      forceV2WorkingCopy,
+      sourcePersistenceState,
+    });
+  }
+
+  async function loadDocumentFromBlob(blob, handle, options = {}) {
+    if (!ensureCurrentClientCanReplaceActiveProject({ announce: !options?.suppressAutosaveStatus })) {
+      return false;
+    }
+    if ((options?.openedFromRecent || options?.sharedProjectKey) && !options?.allowProjectMismatchLoad) {
+      try {
+        const requestedProjectId = normalizeAutosaveProjectId(String(options?.projectId || '') || '');
+        const requestedSharedKey = String(options?.sharedProjectKey || '').trim() || '';
+        const activeTab = getActiveOpenProjectTab();
+        const activeProjectId = normalizeAutosaveProjectId(activeTab?.projectId || autosaveProjectId || '');
+        const activeSharedKey = String(getOpenProjectTabSharedKey(activeTab) || '').trim() || '';
+        if (requestedProjectId && activeProjectId && requestedProjectId !== activeProjectId) {
+          return 'deferred';
+        }
+        if (requestedSharedKey && activeSharedKey && requestedSharedKey !== activeSharedKey) {
+          return 'deferred';
+        }
+      } catch (_error) {
+        // Ignore guard failures and continue to load.
+      }
+    }
+    let parsedDocument = options?.preparedSnapshot && typeof options.preparedSnapshot === 'object'
+      ? options.preparedSnapshot
+      : null;
+    if (!parsedDocument) {
+      try {
+        parsedDocument = await snapshotFromDocumentBlob(blob);
+      } catch (error) {
+        console.warn('Failed to parse document blob', error);
+        updateAutosaveStatus('ドキュメントの読み込みに失敗しました', 'error');
+        return false;
+      }
+    }
+    if (!await confirmLegacyV2MigrationIfNeeded(parsedDocument, options)) {
+      return false;
+    }
+    const forceV2WorkingCopy = needsLegacyV2MigrationConsent(parsedDocument)
+      || options?.forceV2WorkingCopy === true
+      || options?.fileLoad === true;
+    const sourcePersistenceState = buildLoadedProjectPersistenceState(parsedDocument, handle, {
+      ...options,
+      forceV2WorkingCopy,
+    });
+    return await applyLoadedDocumentSnapshot(parsedDocument, {
+      ...options,
+      forceV2WorkingCopy,
+      sourcePersistenceState,
+    });
   }
 
   async function loadDocumentFromProjectPayload(projectPayload, options = {}) {
@@ -124,10 +318,35 @@
       }
       return false;
     }
-    return await applyLoadedDocumentSnapshot(parsedDocument, options);
+    // A project restored from an IndexedDB V2 manifest is already trusted V2
+    // storage. The generic parsed-value registry may identify its JSON-shaped
+    // in-memory object as the V1 JSON adapter even though no V1 file was read.
+    // Remove only that false adapter label; real legacy sheets/canvases are
+    // still detected below and continue through the migration confirmation.
+    if (
+      Number(options?.trustedAutosaveSchemaVersion) === 2
+      && parsedDocument?.storageAdapterId === 'pixieedraw-v1-json'
+    ) {
+      parsedDocument.storageAdapterId = '';
+    }
+    if (!await confirmLegacyV2MigrationIfNeeded(parsedDocument, options)) {
+      return false;
+    }
+    const forceV2WorkingCopy = needsLegacyV2MigrationConsent(parsedDocument) || options?.forceV2WorkingCopy === true;
+    const sourcePersistenceState = options?.sourcePersistenceState && typeof options.sourcePersistenceState === 'object'
+      ? buildLoadedProjectPersistenceState(parsedDocument, null, {
+        ...options,
+        forceV2WorkingCopy,
+      })
+      : null;
+    return await applyLoadedDocumentSnapshot(parsedDocument, {
+      ...options,
+      forceV2WorkingCopy,
+      sourcePersistenceState,
+    });
   }
 
-  function restoreOpenProjectSheetsFromParsedDocument(parsedDocument = null, {
+  async function restoreOpenProjectSheetsFromParsedDocument(parsedDocument = null, {
     projectId = '',
     source = 'sheet',
     sharedProjectKey = '',
@@ -136,9 +355,48 @@
     sharedProjectStructureRevision = 0,
     sharedRoleHint = '',
     sharedAutoJoin = false,
+    sourcePersistenceState = null,
   } = {}) {
-    const sheets = Array.isArray(parsedDocument?.sheets) ? parsedDocument.sheets : [];
-    const normalizedProjectId = normalizeAutosaveProjectId(projectId || autosaveProjectId || '') || createAutosaveProjectId();
+    const packagedSheets = Array.isArray(parsedDocument?.sheets) ? parsedDocument.sheets : [];
+    // A project is now opened as one editor instance. Older V2 packages can
+    // contain several resident project tabs; their root snapshot already
+    // represents the saved active project, so do not recreate the old tab
+    // collection (which would retain every project in memory again).
+    const sheets = [];
+    if (packagedSheets.length > 1) {
+      console.info('[pixiedraw:project-normalize]', {
+        phase: 'collapse-legacy-multi-project-package',
+        sheetCount: packagedSheets.length,
+        activeSheetId: parsedDocument?.activeSheetId || '',
+      });
+    }
+    let normalizedProjectId = normalizeAutosaveProjectId(projectId || autosaveProjectId || '') || createAutosaveProjectId();
+    if (packagedSheets.length > 1) {
+      const migration = await migrateLegacyMultiProjectPackage?.({
+        sourceProjectId: normalizedProjectId,
+        sheets: packagedSheets,
+        activeSheetId: parsedDocument?.activeSheetId || '',
+      });
+      if (!migration || (migration.migrated !== true && migration.reason !== 'already-migrated')) {
+        const error = new Error(`Legacy multi-project conversion failed: ${migration?.reason || 'unknown'}`);
+        error.code = 'ERR_LEGACY_MULTI_PROJECT_CONVERSION_FAILED';
+        throw error;
+      }
+      const activeSourceSheetId = typeof parsedDocument?.activeSheetId === 'string' ? parsedDocument.activeSheetId : '';
+      const migratedActive = (migration.projects || []).find(entry => entry?.sourceSheetId === activeSourceSheetId)
+        || (migration.projects || []).find(entry => entry?.wasActive === true)
+        || (migration.projects || [])[0]
+        || null;
+      if (migratedActive?.projectId) {
+        normalizedProjectId = normalizeAutosaveProjectId(migratedActive.projectId) || normalizedProjectId;
+      }
+      console.info('[pixiedraw:project-normalize]', {
+        phase: 'legacy-multi-project-split-ready',
+        sourceProjectId: projectId || '',
+        activeProjectId: normalizedProjectId,
+        projectIds: migration.projectIds || [],
+      });
+    }
     const normalizedSharedProjectKey = SHARED_PROJECTS_ENABLED
       ? (
         normalizeMultiProjectKey(sharedProjectKey || '')
@@ -155,39 +413,84 @@
         sharedProjectStructureRevision,
         sharedRoleHint,
         sharedAutoJoin,
+        sourceStorageAdapterId: sourcePersistenceState?.sourceStorageAdapterId ?? null,
+        sourceKind: sourcePersistenceState?.sourceKind ?? 'unknown',
+        sourceProjectToken: sourcePersistenceState?.sourceProjectToken ?? null,
+        lastSavedStorageAdapterId: sourcePersistenceState?.lastSavedStorageAdapterId ?? null,
+        canonicalPayloadFormat: parsedDocument?.canonicalPayloadFormat || '',
+        canonicalSchemaVersion: parsedDocument?.canonicalSchemaVersion || 0,
+        canonicalSourceMetadata: parsedDocument?.canonicalSourceMetadata || null,
       });
       return false;
     }
     const nextTabs = sheets
-      .slice(0, MAX_PROJECT_SHEETS)
-      .map((sheet, index) => createOpenProjectSheetTabFromPackagedProject({
-        ...sheet,
-        projectId: normalizedProjectId,
-        label: typeof sheet?.label === 'string' && sheet.label.trim()
-          ? sheet.label.trim()
-          : localizeText(`シート ${index + 1}`, `Sheet ${index + 1}`),
-        source: sheet.source || source,
-        sharedProjectKey: SHARED_PROJECTS_ENABLED ? (sheet.sharedProjectKey || normalizedSharedProjectKey) : '',
-        sharedProjectBackendId: SHARED_PROJECTS_ENABLED ? (sheet.sharedProjectBackendId || sharedProjectBackendId) : '',
-        sharedProjectRevision: SHARED_PROJECTS_ENABLED ? (sheet.sharedProjectRevision || sharedProjectRevision) : 0,
-        sharedProjectStructureRevision: SHARED_PROJECTS_ENABLED ? (sheet.sharedProjectStructureRevision || sharedProjectStructureRevision) : 0,
-        sharedRoleHint: SHARED_PROJECTS_ENABLED ? (sheet.sharedRoleHint || sharedRoleHint) : '',
-        sharedAutoJoin: SHARED_PROJECTS_ENABLED && (
-          Object.prototype.hasOwnProperty.call(sheet, 'sharedAutoJoin')
-            ? sheet.sharedAutoJoin
-            : sharedAutoJoin
-        ),
-      }))
+      .map((sheet, index) => {
+        const nextTab = createOpenProjectSheetTabFromPackagedProject({
+          ...sheet,
+          projectId: normalizedProjectId,
+          label: typeof sheet?.label === 'string' && sheet.label.trim()
+            ? sheet.label.trim()
+            : localizeText(`シート ${index + 1}`, `Sheet ${index + 1}`),
+          source: sheet.source || source,
+          sharedProjectKey: SHARED_PROJECTS_ENABLED ? (sheet.sharedProjectKey || normalizedSharedProjectKey) : '',
+          sharedProjectBackendId: SHARED_PROJECTS_ENABLED ? (sheet.sharedProjectBackendId || sharedProjectBackendId) : '',
+          sharedProjectRevision: SHARED_PROJECTS_ENABLED ? (sheet.sharedProjectRevision || sharedProjectRevision) : 0,
+          sharedProjectStructureRevision: SHARED_PROJECTS_ENABLED ? (sheet.sharedProjectStructureRevision || sharedProjectStructureRevision) : 0,
+          sharedRoleHint: SHARED_PROJECTS_ENABLED ? (sheet.sharedRoleHint || sharedRoleHint) : '',
+          sharedAutoJoin: SHARED_PROJECTS_ENABLED && (
+            Object.prototype.hasOwnProperty.call(sheet, 'sharedAutoJoin')
+              ? sheet.sharedAutoJoin
+              : sharedAutoJoin
+          ),
+          sourceStorageAdapterId: sheet?.sourceStorageAdapterId ?? sourcePersistenceState?.sourceStorageAdapterId ?? null,
+          sourceKind: sheet?.sourceKind ?? sourcePersistenceState?.sourceKind ?? 'unknown',
+          sourceProjectToken: sheet?.sourceProjectToken ?? sourcePersistenceState?.sourceProjectToken ?? null,
+          lastSavedStorageAdapterId: sheet?.lastSavedStorageAdapterId ?? sourcePersistenceState?.lastSavedStorageAdapterId ?? null,
+          canonicalPayloadFormat: parsedDocument?.canonicalPayloadFormat || '',
+          canonicalSchemaVersion: parsedDocument?.canonicalSchemaVersion || 0,
+          canonicalSourceMetadata: parsedDocument?.canonicalSourceMetadata || null,
+        });
+        if (!nextTab) {
+          return null;
+        }
+        return {
+          ...nextTab,
+          residentProjectLoaded: true,
+        };
+      })
       .filter(Boolean);
     if (!nextTabs.length) {
       resetOpenProjectTabsToCurrentProject({
         source,
         projectId: normalizedProjectId,
+        sourceStorageAdapterId: sourcePersistenceState?.sourceStorageAdapterId ?? null,
+        sourceKind: sourcePersistenceState?.sourceKind ?? 'unknown',
+        sourceProjectToken: sourcePersistenceState?.sourceProjectToken ?? null,
+        lastSavedStorageAdapterId: sourcePersistenceState?.lastSavedStorageAdapterId ?? null,
+        canonicalPayloadFormat: parsedDocument?.canonicalPayloadFormat || '',
+        canonicalSchemaVersion: parsedDocument?.canonicalSchemaVersion || 0,
+        canonicalSourceMetadata: parsedDocument?.canonicalSourceMetadata || null,
       });
       return false;
     }
     const activeSheetId = typeof parsedDocument?.activeSheetId === 'string' ? parsedDocument.activeSheetId : '';
     const activeTab = nextTabs.find(tab => tab.id === activeSheetId) || nextTabs[0];
+    console.info('[sheet-restore-debug]', {
+      activeSheetId,
+      sheetIds: nextTabs.map(tab => tab?.id || ''),
+      tabs: nextTabs.map(tab => ({
+        id: tab?.id || '',
+        source: tab?.source || '',
+        fileName: tab?.fileName || '',
+        label: tab?.label || '',
+        unsaved: Boolean(tab?.unsaved),
+        updatedAt: tab?.updatedAt || '',
+        residentProjectLoaded: tab?.residentProjectLoaded === true,
+        hasProject: Boolean(tab?.project && typeof tab.project === 'object'),
+        hasDocument: Boolean(tab?.project?.document && typeof tab.project.document === 'object'),
+        hasCanvases: Array.isArray(tab?.project?.document?.canvases),
+      })),
+    });
     openProjectTabs.splice(0, openProjectTabs.length, ...nextTabs);
     activeOpenProjectTabId = activeTab?.id || nextTabs[0]?.id || '';
     suppressOpenProjectTabAutoInitialize = false;
@@ -197,16 +500,70 @@
 
   async function applyLoadedDocumentSnapshot(parsedDocument, options = {}) {
     const preservedSelectionClipboard = preserveCanvasSelectionClipboard();
-    const snapshot = parsedDocument?.snapshot || null;
+    let snapshot = parsedDocument?.snapshot || null;
     const projectSession = parsedDocument?.projectSession || null;
-    const preserveDotStats = Boolean(options?.projectId || options?.openedFromRecent || options?.preserveDotStats);
-    const dotStats = preserveDotStats ? (parsedDocument?.dotStats || null) : null;
     if (!snapshot) {
       if (!options?.suppressAutosaveStatus) {
         updateAutosaveStatus('ドキュメントの読み込みに失敗しました', 'error');
       }
       return false;
     }
+    const legacyCanvases = Array.isArray(snapshot.canvases) ? snapshot.canvases : [];
+    const hasLegacyMultiProjectSheets = Array.isArray(parsedDocument?.sheets)
+      && parsedDocument.sheets.filter(sheet => sheet?.project && typeof sheet.project === 'object').length > 1;
+    if (legacyCanvases.length > 1 && !hasLegacyMultiProjectSheets) {
+      const sourceProjectId = normalizeAutosaveProjectId(options?.projectId || '') || createAutosaveProjectId();
+      const activeCanvasId = typeof snapshot.activeCanvasId === 'string' ? snapshot.activeCanvasId : '';
+      const migration = await migrateLegacyMultiProjectPackage?.({
+        sourceProjectId,
+        sourceProject: {
+          type: 'pixieedraw-project',
+          packageVersion: 2,
+          projectLayout: 'legacy-multi-canvas',
+          document: { ...snapshot, canvases: legacyCanvases, activeCanvasId },
+          session: projectSession || {},
+          canonicalPayloadFormat: parsedDocument?.canonicalPayloadFormat || '',
+          canonicalSchemaVersion: parsedDocument?.canonicalSchemaVersion || 0,
+          canonicalSourceMetadata: parsedDocument?.canonicalSourceMetadata || null,
+        },
+        canvases: legacyCanvases,
+        activeCanvasId,
+      });
+      if (!migration || (migration.migrated !== true && migration.reason !== 'already-migrated')) {
+        const error = new Error(`Legacy multi-canvas conversion failed: ${migration?.reason || 'unknown'}`);
+        error.code = 'ERR_LEGACY_MULTI_CANVAS_CONVERSION_FAILED';
+        throw error;
+      }
+      const activeMigration = (migration.projects || []).find(entry => entry?.sourceCanvasId === activeCanvasId)
+        || (migration.projects || []).find(entry => entry?.wasActive === true)
+        || (migration.projects || [])[0]
+        || null;
+      const activeCanvas = legacyCanvases.find(canvas => canvas?.id === activeMigration?.sourceCanvasId)
+        || legacyCanvases.find(canvas => canvas?.id === activeCanvasId)
+        || legacyCanvases[0];
+      snapshot = {
+        ...snapshot,
+        width: activeCanvas.width,
+        height: activeCanvas.height,
+        frames: activeCanvas.frames,
+        activeFrame: activeCanvas.activeFrame,
+        activeLayer: activeCanvas.activeLayer,
+        mirror: activeCanvas.mirror,
+        selectionMask: activeCanvas.selectionMask || null,
+        selectionContentMask: activeCanvas.selectionContentMask || null,
+        selectionBounds: activeCanvas.selectionBounds || null,
+        activeCanvasId: activeCanvas.id,
+        canvases: [activeCanvas],
+        documentName: activeCanvas.name || snapshot.documentName,
+      };
+      options = {
+        ...options,
+        projectId: activeMigration?.projectId || sourceProjectId,
+        forceV2WorkingCopy: true,
+      };
+    }
+    const preserveDotStats = Boolean(options?.projectId || options?.openedFromRecent || options?.preserveDotStats);
+    const dotStats = preserveDotStats ? (parsedDocument?.dotStats || null) : null;
     synchronizeImportedSnapshotPalette(snapshot);
 
     autosaveRestoring = true;
@@ -250,8 +607,15 @@
               : -1,
           };
         });
-        timelapseState.enabled = projectSession.timelapse.enabled;
+        timelapseState.enabled = true;
         timelapseState.fps = projectSession.timelapse.fps;
+        if (projectSession.localViewportCanvases) {
+          localViewportCanvasState = normalizeLocalViewportCanvasState(
+            projectSession.localViewportCanvases,
+            LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE
+          );
+          localViewportCanvasLayoutResetPending = false;
+        }
       } else {
         history.past = [];
         history.future = [];
@@ -271,16 +635,22 @@
     resetExportScaleDefaults();
     syncPixfindSnapshotAfterDocumentReset();
     setTrackedProjectDotBaseline(snapshot, dotStats);
-    resetOpenedDocumentViewport({ defer: true });
+    resetOpenedDocumentViewport({
+      defer: true,
+      preserveLocalCanvasLayout: Boolean(projectSession?.localViewportCanvases),
+    });
 
     const requestedProjectId = normalizeAutosaveProjectId(options?.projectId || '');
     const requestedSharedProjectKey = normalizeMultiProjectKey(options?.sharedProjectKey || '');
     const requestedSharedProjectRevision = Math.max(0, Math.round(Number(options?.sharedProjectRevision) || 0));
     const requestedSharedProjectStructureRevision = Math.max(0, Math.round(Number(options?.sharedProjectStructureRevision) || 0));
     const activeEntryAfterLoad = recentProjectsCache.get(normalizeAutosaveProjectId(requestedProjectId || '')) || null;
+    const sourcePersistenceState = options?.sourcePersistenceState && typeof options.sourcePersistenceState === 'object'
+      ? options.sourcePersistenceState
+      : null;
     setActiveAutosaveProjectId(requestedProjectId || createAutosaveProjectId());
     if (!options?.suppressProjectSheetsRestore) {
-      restoreOpenProjectSheetsFromParsedDocument(parsedDocument, {
+      await restoreOpenProjectSheetsFromParsedDocument(parsedDocument, {
         projectId: requestedProjectId || autosaveProjectId,
         source: options?.sharedProjectKey ? 'shared-sheet' : 'sheet',
         sharedProjectKey: requestedSharedProjectKey,
@@ -289,8 +659,29 @@
         sharedProjectStructureRevision: requestedSharedProjectStructureRevision,
         sharedRoleHint: options?.sharedRoleHint || activeEntryAfterLoad?.sharedRoleHint || '',
         sharedAutoJoin: options?.sharedAutoJoin !== false && activeEntryAfterLoad?.sharedAutoJoin !== false,
+        sourcePersistenceState,
+      });
+      if (sourcePersistenceState && typeof updateActiveProjectPersistenceState === 'function') {
+        updateActiveProjectPersistenceState(sourcePersistenceState, {
+          render: false,
+          log: true,
+        });
+      }
+    } else if (sourcePersistenceState && typeof updateActiveProjectPersistenceState === 'function') {
+      updateActiveProjectPersistenceState(sourcePersistenceState, {
+        render: false,
+        log: true,
       });
     }
+    if (options?.fileLoad === true || options?.forceV2WorkingCopy === true) {
+      console.info('[pixiedraw:v2-import]', {
+        phase: 'external-input-converted-to-v2-working-copy',
+        sourceKind: sourcePersistenceState?.sourceKind || options?.sourceKind || 'file',
+        sourceAdapterId: parsedDocument?.storageAdapterId || null,
+        projectId: autosaveProjectId,
+      });
+    }
+
     const loadedQrEditPayload = Object.prototype.hasOwnProperty.call(options || {}, 'qrEditPayload')
       ? options.qrEditPayload
       : getActiveQrEditPayload();
@@ -411,9 +802,6 @@
     }
     const payload = {};
     Object.entries(getAllTimelapseTracks()).forEach(([canvasId, track]) => {
-      if (track?.operationLog?.baseSnapshot) {
-        return;
-      }
       const snapshots = serializeProjectTimelapseSnapshotList(track?.snapshots || []);
       if (!snapshots.length) {
         return;
@@ -433,6 +821,19 @@
   function normalizeSerializedTimelapseOperationEntry(entry = null) {
     if (!entry || typeof entry !== 'object') {
       return null;
+    }
+    if (entry.type === 'pixelPatchBatch' && Array.isArray(entry.entries)) {
+      const entries = entry.entries
+        .map(item => normalizeSerializedTimelapseOperationEntry(item))
+        .filter(item => item?.type === 'pixelPatch');
+      return entries.length
+        ? {
+            type: 'pixelPatchBatch',
+            at: Math.max(0, Math.round(Number(entry.at) || 0)),
+            historyLabel: String(entry.historyLabel || 'timelapseCompacted'),
+            entries,
+          }
+        : null;
     }
     if (entry.type === 'keyframe') {
       return entry.snapshot && typeof entry.snapshot === 'object'
@@ -497,6 +898,11 @@
       historyLimit,
       historyPast: serializeProjectHistoryList(history.past, historyLimit),
       historyFuture: serializeProjectHistoryList(history.future, historyLimit),
+      // Canvas positions are per-sheet workspace state, not device-only UI state.
+      localViewportCanvases: normalizeLocalViewportCanvasState(
+        localViewportCanvasState,
+        LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE
+      ),
       timelapse: {
         enabled: Boolean(timelapseState.enabled),
         fps: normalizeTimelapseFps(timelapseState.fps),
@@ -512,6 +918,10 @@
       historyLimit: normalizeProjectHistoryLimit(history.limit, DEFAULT_HISTORY_LIMIT),
       historyPast: [],
       historyFuture: [],
+      localViewportCanvases: normalizeLocalViewportCanvasState(
+        localViewportCanvasState,
+        LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE
+      ),
       timelapse: {
         enabled: Boolean(timelapseState.enabled),
         fps: normalizeTimelapseFps(timelapseState.fps),
@@ -520,8 +930,8 @@
           : {},
         operationLogsByCanvas: serializeProjectTimelapseOperationLogs({ flushPending: false }),
         deferredInAutosave: !shouldIncludeTimelapse,
-        // Timelapse is opt-in, so autosave writes track data only after a
-        // recording exists. This preserves restore counts without penalizing default sessions.
+        // Recording is always enabled. Empty track data is still omitted until
+        // the first lightweight base/operation exists.
       },
     };
   }
@@ -674,6 +1084,12 @@
       historyLimit,
       historyPast,
       historyFuture,
+      localViewportCanvases: Object.prototype.hasOwnProperty.call(payload, 'localViewportCanvases')
+        ? normalizeLocalViewportCanvasState(
+          payload.localViewportCanvases,
+          LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE
+        )
+        : null,
       timelapse: {
         enabled: Boolean(timelapsePayload.enabled),
         fps: normalizeTimelapseFps(timelapsePayload.fps),
@@ -682,39 +1098,167 @@
     };
   }
 
+  function normalizeExternalParsedProjectToCanonicalV2(parsed, storageAdapterId = '') {
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return { project: parsed, canonical: null };
+    }
+    if (parsed.canonicalPayloadFormat === 'v2') {
+      const validation = typeof validateCanonicalV2ProjectPayload === 'function'
+        ? validateCanonicalV2ProjectPayload(parsed)
+        : { ok: true };
+      if (!validation?.ok) {
+        const error = new Error(validation?.code || 'ERR_CANONICAL_V2_PROJECT_INVALID');
+        error.code = validation?.code || 'ERR_CANONICAL_V2_PROJECT_INVALID';
+        throw error;
+      }
+      return {
+        project: parsed,
+        canonical: {
+          canonicalPayloadFormat: 'v2',
+          canonicalSchemaVersion: Math.max(1, Math.round(Number(parsed.canonicalSchemaVersion) || 1)),
+          canonicalSourceMetadata: parsed.canonicalSourceMetadata && typeof parsed.canonicalSourceMetadata === 'object'
+            ? parsed.canonicalSourceMetadata
+            : null,
+        },
+      };
+    }
+    if (typeof normalizeExternalProjectToCanonicalV2 !== 'function'
+      || typeof validateCanonicalV2ProjectPayload !== 'function') {
+      return { project: parsed, canonical: null };
+    }
+    const normalized = normalizeExternalProjectToCanonicalV2({
+      sourceKind: 'file',
+      sourceAdapterId: typeof storageAdapterId === 'string' && storageAdapterId ? storageAdapterId : null,
+      decodedPayload: parsed,
+      sourceMetadata: {
+        importedFormat: storageAdapterId === 'pixieedraw-v1-json' ? 'v1-json' : 'external-project',
+      },
+    });
+    if (!normalized?.ok || !normalized.canonicalPayload) {
+      const error = new Error(normalized?.code || 'ERR_CANONICAL_V2_NORMALIZE_FAILED');
+      error.code = normalized?.code || 'ERR_CANONICAL_V2_NORMALIZE_FAILED';
+      throw error;
+    }
+    const validation = validateCanonicalV2ProjectPayload(normalized.canonicalPayload);
+    if (!validation?.ok) {
+      const error = new Error(validation?.code || 'ERR_CANONICAL_V2_PROJECT_INVALID');
+      error.code = validation?.code || 'ERR_CANONICAL_V2_PROJECT_INVALID';
+      throw error;
+    }
+    console.info('[pixiedraw:canonical-import]', {
+      phase: 'file-normalize-success',
+      sourceAdapterId: storageAdapterId || null,
+      importedFormat: normalized.canonicalPayload?.canonicalSourceMetadata?.importedFormat || 'external-project',
+      typedByteLength: normalized.metrics?.typedByteLength || 0,
+      sheetCount: normalized.metrics?.sheetCount || 0,
+      frameCount: normalized.metrics?.frameCount || 0,
+    });
+    return {
+      project: normalized.canonicalPayload,
+      canonical: {
+        canonicalPayloadFormat: 'v2',
+        canonicalSchemaVersion: Math.max(1, Math.round(Number(normalized.canonicalPayload.canonicalSchemaVersion) || 1)),
+        canonicalSourceMetadata: normalized.canonicalPayload.canonicalSourceMetadata || null,
+      },
+    };
+  }
+
   function snapshotFromDocumentText(text) {
     if (!text || typeof text !== 'string') {
       throw new Error('Document text is empty');
     }
-    const parsed = JSON.parse(text);
-    return snapshotFromParsedDocumentValue(parsed);
+    const parsedResult = typeof parseProjectStorageText === 'function'
+      ? parseProjectStorageText(text)
+      : { adapterId: '', parsed: JSON.parse(text) };
+    const parsed = parsedResult && Object.prototype.hasOwnProperty.call(parsedResult, 'parsed')
+      ? parsedResult.parsed
+      : parsedResult;
+    const canonicalized = normalizeExternalParsedProjectToCanonicalV2(parsed, parsedResult?.adapterId || '');
+    const resolved = snapshotFromParsedDocumentValue(canonicalized.project);
+    if (resolved && typeof resolved === 'object' && typeof parsedResult?.adapterId === 'string') {
+      resolved.storageAdapterId = parsedResult.adapterId;
+      Object.assign(resolved, canonicalized.canonical || {});
+    }
+    return resolved;
+  }
+
+  async function snapshotFromDocumentBlob(blob) {
+    if (!blob || typeof blob.arrayBuffer !== 'function') {
+      throw new Error('Document blob is not readable');
+    }
+    if (typeof parseProjectStorageBlob === 'function') {
+      const parsedResult = await parseProjectStorageBlob(blob);
+      const parsed = parsedResult && Object.prototype.hasOwnProperty.call(parsedResult, 'parsed')
+        ? parsedResult.parsed
+        : parsedResult;
+      const canonicalized = normalizeExternalParsedProjectToCanonicalV2(parsed, parsedResult?.adapterId || '');
+      const resolved = snapshotFromParsedDocumentValue(canonicalized.project);
+      if (resolved && typeof resolved === 'object' && typeof parsedResult?.adapterId === 'string') {
+        resolved.storageAdapterId = parsedResult.adapterId;
+        Object.assign(resolved, canonicalized.canonical || {});
+      }
+      return resolved;
+    }
+    return snapshotFromDocumentText(await blob.text());
   }
 
   function snapshotFromParsedDocumentValue(parsed) {
-    const hasPackagedDocument = Boolean(parsed && typeof parsed === 'object' && parsed.document && typeof parsed.document === 'object');
-    const payload = hasPackagedDocument ? parsed.document : parsed;
+    const parsedResult = typeof parseProjectStoragePayload === 'function'
+      ? parseProjectStoragePayload(parsed)
+      : { adapterId: '', parsed };
+    const normalizedParsed = parsedResult && Object.prototype.hasOwnProperty.call(parsedResult, 'parsed')
+      ? parsedResult.parsed
+      : parsedResult;
+    const canvasValidator = window.PiXiEEDrawModules?.projectCanvasValidationUtils
+      ?.createProjectCanvasValidationUtils?.();
+    const validateCanvasLimit = project => {
+      const result = canvasValidator?.validateCanvasCount?.(project, { maximum: 4 });
+      if (result && !result.valid) {
+        const error = new Error(result.code || 'ERR_CANVAS_LIMIT_EXCEEDED');
+        error.code = result.code || 'ERR_CANVAS_LIMIT_EXCEEDED';
+        throw error;
+      }
+    };
+    if (normalizedParsed?.document) validateCanvasLimit(normalizedParsed);
+    if (Array.isArray(normalizedParsed?.sheets)) {
+      normalizedParsed.sheets.forEach(sheet => validateCanvasLimit(sheet?.project || sheet));
+    }
+    const hasPackagedDocument = Boolean(
+      normalizedParsed
+      && typeof normalizedParsed === 'object'
+      && normalizedParsed.document
+      && typeof normalizedParsed.document === 'object'
+    );
+    const payload = hasPackagedDocument ? normalizedParsed.document : normalizedParsed;
     const snapshot = deserializeDocumentPayload(payload);
     const projectSession = hasPackagedDocument
-      ? parseProjectSessionPayload(parsed.session, snapshot?.activeCanvasId || '')
+      ? parseProjectSessionPayload(normalizedParsed.session, snapshot?.activeCanvasId || '')
       : null;
     const dotStats = hasPackagedDocument
-      ? resolvePackagedProjectDotStats(parsed)
+      ? resolvePackagedProjectDotStats(normalizedParsed)
       : null;
     const sheets = hasPackagedDocument
-      ? normalizePackagedProjectSheets(parsed.sheets, typeof parsed.activeSheetId === 'string' ? parsed.activeSheetId : '')
+      ? normalizePackagedProjectSheets(
+          normalizedParsed.sheets,
+          typeof normalizedParsed.activeSheetId === 'string' ? normalizedParsed.activeSheetId : ''
+        )
       : [];
     return {
       snapshot,
       projectSession,
       dotStats,
       sheets,
-      activeSheetId: hasPackagedDocument && typeof parsed.activeSheetId === 'string' ? parsed.activeSheetId : '',
+      activeSheetId: hasPackagedDocument && typeof normalizedParsed.activeSheetId === 'string'
+        ? normalizedParsed.activeSheetId
+        : '',
+      storageAdapterId: typeof parsedResult?.adapterId === 'string' ? parsedResult.adapterId : '',
     };
   }
 
 
         return Object.freeze({
         loadDocumentFromHandle,
+        loadDocumentFromBlob,
         loadDocumentFromText,
         loadDocumentFromProjectPayload,
         restoreOpenProjectSheetsFromParsedDocument,
@@ -733,6 +1277,7 @@
         deserializeProjectTimelapseTracks,
         deserializeProjectTimelapseOperationLogs,
         parseProjectSessionPayload,
+        snapshotFromDocumentBlob,
         snapshotFromDocumentText,
         snapshotFromParsedDocumentValue,
         });

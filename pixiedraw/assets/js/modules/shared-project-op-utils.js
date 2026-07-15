@@ -376,6 +376,13 @@
   }
 
   function captureSharedProjectRegionCommand(bounds, interactionSurface = null, historyLabel = 'selectionTransform') {
+    if (
+      typeof isSharedProjectCollaborativeMode !== 'function'
+      || !isSharedProjectCollaborativeMode()
+    ) {
+      clearSharedProjectInFlightStroke();
+      return false;
+    }
     const normalizedBounds = bounds && typeof bounds === 'object'
       ? {
         x0: Math.round(Number(bounds.x0) || 0),
@@ -397,7 +404,9 @@
       clearSharedProjectInFlightStroke();
       return;
     }
-    const target = resolveSharedProjectDrawCommandTarget(baseCommand);
+    const target = typeof resolveSharedProjectDrawCommandTarget === 'function'
+      ? resolveSharedProjectDrawCommandTarget(baseCommand)
+      : null;
     if (!target) {
       clearSharedProjectInFlightStroke();
       return;

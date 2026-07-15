@@ -31,6 +31,34 @@
 
     return ((scope) => {
       with (scope) {
+  let projectPackagePerformanceSequence = 0;
+
+  function beginProjectPackagePerformanceSpan(name, details = null) {
+    const perf = window?.performance;
+    const id = `${name}:${Date.now().toString(36)}:${++projectPackagePerformanceSequence}`;
+    const startMark = `${id}:start`;
+    try {
+      perf?.mark?.(startMark);
+    } catch (_error) {}
+    return { name, details, perf, id, startMark, startedAt: perf?.now?.() ?? Date.now() };
+  }
+
+  function endProjectPackagePerformanceSpan(span, details = null) {
+    if (!span) return;
+    const finishedAt = span.perf?.now?.() ?? Date.now();
+    const endMark = `${span.id}:end`;
+    const mergedDetails = { ...(span.details || {}), ...(details || {}) };
+    try {
+      span.perf?.mark?.(endMark);
+      span.perf?.measure?.(span.name, span.startMark, endMark);
+    } catch (_error) {}
+    console.info('[pixiedraw:performance]', {
+      phase: span.name,
+      elapsedMs: Math.round(finishedAt - span.startedAt),
+      ...mergedDetails,
+    });
+  }
+
   function resolveSnapshotThumbnailCanvasSource(snapshot) {
     if (!snapshot || typeof snapshot !== 'object') {
       return null;
@@ -208,6 +236,9 @@
     const fallbackId = activeOpenProjectTabId || openProjectTabs[0]?.id || createOpenProjectTabId();
     const activeId = activeOpenProjectTabId || fallbackId;
     const activeProjectId = normalizeAutosaveProjectId(autosaveProjectId || '') || createAutosaveProjectId();
+    const fallbackPackagedProject = activeProjectId && typeof resolveStoredLocalProjectPayloadForProjectId === 'function'
+      ? resolveStoredLocalProjectPayloadForProjectId(activeProjectId)
+      : null;
     const sourceTabs = openProjectTabs.length
       ? openProjectTabs
       : [{
@@ -218,11 +249,19 @@
         source: 'working',
         project: activePackagedProject,
       }];
-    sourceTabs.slice(0, MAX_PROJECT_SHEETS).forEach((tab, index) => {
+    sourceTabs.forEach((tab, index) => {
       const isActive = tab?.id && tab.id === activeId;
       const project = isActive && activePackagedProject
         ? activePackagedProject
-        : (tab?.project && typeof tab.project === 'object' ? tab.project : null);
+        : (
+          tab?.project && typeof tab.project === 'object'
+            ? tab.project
+            : (tab?.deferredProjectPayload && typeof tab.deferredProjectPayload === 'object'
+              ? tab.deferredProjectPayload
+              : (fallbackPackagedProject && typeof extractLocalProjectSheetPayload === 'function'
+                ? extractLocalProjectSheetPayload(fallbackPackagedProject, typeof tab?.id === 'string' ? tab.id : '')
+                : null))
+        );
       if (!project) {
         return;
       }
@@ -242,6 +281,20 @@
         project,
         unsaved: Boolean(isActive ? hasDocumentUnsavedChanges() : tab?.unsaved),
         source: tab?.source || 'sheet',
+        sourceKind: tab?.sourceKind || 'unknown',
+        sourceStorageAdapterId: tab?.sourceStorageAdapterId || null,
+        sourceProjectToken: tab?.sourceProjectToken || null,
+        sourceProjectId: tab?.sourceProjectId || null,
+        sourceSheetId: tab?.sourceSheetId || null,
+        isImportedSheet: tab?.isImportedSheet === true,
+        runtimeProjectId: tab?.runtimeProjectId || null,
+        sheetRuntimeId: tab?.sheetRuntimeId || null,
+        deferredPayloadKey: tab?.deferredPayloadKey || null,
+        sheetPersistenceKey: tab?.sheetPersistenceKey || null,
+        localPersistenceKey: tab?.localPersistenceKey || null,
+        autosaveV2SheetId: tab?.autosaveV2SheetId || null,
+        historyOwnerId: tab?.historyOwnerId || null,
+        timelapseOwnerId: tab?.timelapseOwnerId || null,
         updatedAt: project?.updatedAt || tab?.updatedAt || new Date().toISOString(),
         qrEditPayload: normalizeQrEditPayload(tab?.qrEditPayload, activeProjectId),
         ...(sheetSharedProjectKey ? {
@@ -281,24 +334,37 @@
       fileName,
       label: current?.label || localizeText('シート 1', 'Sheet 1'),
       project: activePackagedProject,
+      deferredProjectPayload: activePackagedProject,
+      deferredPayloadKey: current?.deferredPayloadKey || current?.sheetPersistenceKey || activeId,
       unsaved: hasDocumentUnsavedChanges(),
       source: current?.source || 'working',
       updatedAt: activePackagedProject.updatedAt || current?.updatedAt || new Date().toISOString(),
       qrEditPayload: normalizeQrEditPayload(current?.qrEditPayload, activeProjectId),
     };
+    const lightweightSyncedTab = typeof createLightweightLocalProjectTabState === 'function'
+      ? createLightweightLocalProjectTabState(
+        syncedTab,
+        typeof createLocalProjectEntrySignature === 'function'
+          ? createLocalProjectEntrySignature(recentProjectsCache?.get?.(activeProjectId) || null)
+          : {}
+      )
+      : syncedTab;
     if (index >= 0) {
-      openProjectTabs[index] = syncedTab;
+      openProjectTabs[index] = lightweightSyncedTab;
     } else if (!openProjectTabs.length) {
-      openProjectTabs.push(syncedTab);
+      openProjectTabs.push(lightweightSyncedTab);
     } else {
-      openProjectTabs.unshift(syncedTab);
+      openProjectTabs.unshift(lightweightSyncedTab);
     }
     activeOpenProjectTabId = activeId;
     suppressOpenProjectTabAutoInitialize = false;
     return true;
   }
 
-  function buildPackagedProjectPayload(snapshot, { session = null, updatedAt = '', includeSheets = true } = {}) {
+  // A saved PiXiEEDraw project is exactly one document.  `includeSheets` is
+  // accepted only so older call sites do not throw while they are being
+  // retired; it must never make a newly written package multi-project again.
+  function buildPackagedProjectPayload(snapshot, { session = null, updatedAt = '', includeSheets = false } = {}) {
     const resolvedDotStats = resolveTrackedProjectDotStats(snapshot);
     const payload = serializeDocumentSnapshot(snapshot);
     const packagedSession = session && typeof session === 'object'
@@ -311,11 +377,25 @@
       document: payload,
       session: packagedSession,
       updatedAt: updatedAt || new Date().toISOString(),
+      projectLayout: 'single-project',
     };
     if (resolvedDotStats) {
       packaged.dotStats = resolvedDotStats;
     }
-    if (includeSheets) {
+    // Imported-raster provenance belongs to the project envelope, not to a
+    // mutable layer. This preserves its matching data through autosave,
+    // explicit V2 saves, and later V2 exports without retaining source bytes.
+    const canonical = typeof getActiveCanonicalProjectMetadata === 'function'
+      ? getActiveCanonicalProjectMetadata()
+      : null;
+    if (canonical?.canonicalPayloadFormat === 'v2') {
+      packaged.canonicalPayloadFormat = 'v2';
+      packaged.canonicalSchemaVersion = Math.max(1, Math.round(Number(canonical.canonicalSchemaVersion) || 1));
+      packaged.canonicalSourceMetadata = canonical.canonicalSourceMetadata && typeof canonical.canonicalSourceMetadata === 'object'
+        ? canonical.canonicalSourceMetadata
+        : null;
+    }
+    if (includeSheets === 'legacy-read-only') {
       const activeSheetPackaged = buildPackagedProjectPayload(snapshot, {
         session: packagedSession,
         updatedAt: packaged.updatedAt,
@@ -335,7 +415,7 @@
     if (!packagedPayload || typeof packagedPayload !== 'object') {
       return packagedPayload;
     }
-    const expectedSheetCount = Math.min(MAX_PROJECT_SHEETS, Math.max(1, openProjectTabs.length || 1));
+    const expectedSheetCount = Math.max(1, openProjectTabs.length || 1);
     const currentSheetCount = Array.isArray(packagedPayload.sheets) ? packagedPayload.sheets.length : 0;
     if (currentSheetCount >= expectedSheetCount) {
       return packagedPayload;
@@ -355,7 +435,7 @@
   }
 
   function validatePackagedProjectSheetCountForSave(packagedPayload = null) {
-    const openSheetCount = Math.min(MAX_PROJECT_SHEETS, Math.max(1, openProjectTabs.length || 1));
+    const openSheetCount = Math.max(1, openProjectTabs.length || 1);
     const packagedSheetCount = countPackagedProjectSheets(packagedPayload);
     if (openSheetCount > 1 && packagedSheetCount < openSheetCount) {
       console.warn('[project-sheets] refusing incomplete sheet save', {
@@ -382,9 +462,9 @@
     if (previousSheets.length <= nextSheets.length || previousSheets.length <= 1) {
       return packagedPayload;
     }
-    const mergedSheets = previousSheets.slice(0, MAX_PROJECT_SHEETS).map(sheet => ({ ...sheet }));
+    const mergedSheets = previousSheets.map(sheet => ({ ...sheet }));
     const preferredActiveId = typeof packagedPayload.activeSheetId === 'string' ? packagedPayload.activeSheetId : '';
-    nextSheets.slice(0, MAX_PROJECT_SHEETS).forEach((sheet, index) => {
+    nextSheets.forEach((sheet, index) => {
       const sheetId = typeof sheet.id === 'string' ? sheet.id : '';
       let replaceIndex = sheetId ? mergedSheets.findIndex(candidate => candidate?.id === sheetId) : -1;
       if (replaceIndex < 0 && preferredActiveId) {
@@ -509,12 +589,15 @@
       skipThumbnail = false,
       thumbnailIntervalMs = LOCAL_PROJECT_THUMBNAIL_UPDATE_INTERVAL_MS,
       activateProject = true,
+      journalPayload = null,
+      savePlan: suppliedSavePlan = null,
     } = {}
   ) {
     if (!AUTOSAVE_SUPPORTED) {
       return null;
     }
-    if (!snapshot || typeof snapshot !== 'object') {
+    const journalOnlySave = suppliedSavePlan?.journalOnly === true;
+    if ((!snapshot || typeof snapshot !== 'object') && !journalOnlySave) {
       return null;
     }
     try {
@@ -543,17 +626,47 @@
           thumbnail: previousEntry?.thumbnail || null,
         });
       }
-      const packaged = packagedPayload && typeof packagedPayload === 'object'
-        ? packagedPayload
-        : buildPackagedProjectPayload(snapshot);
-      ensurePackagedProjectSheetsForSave(packaged, snapshot);
-      preserveExistingProjectSheetsForSave(packaged, previousEntry?.project || null);
-      if (!validatePackagedProjectSheetCountForSave(packaged)) {
-        throw new Error('Refusing to save incomplete project sheets');
+      const packageSpan = beginProjectPackagePerformanceSpan('pixiedraw:autosave:package', {
+        projectId: resolvedProjectId,
+      });
+      let savePlan;
+      let packaged;
+      try {
+        savePlan = suppliedSavePlan || (typeof buildActiveLocalProjectSavePlan === 'function'
+          ? buildActiveLocalProjectSavePlan({
+            projectId: resolvedProjectId,
+            snapshot,
+            packagedPayload,
+            buildPackagedProjectPayload,
+            buildAutosaveSessionPayload: buildProjectSessionPayload,
+          })
+          : null);
+        packaged = savePlan?.packagedPayload && typeof savePlan.packagedPayload === 'object'
+          ? savePlan.packagedPayload
+          : (
+            packagedPayload && typeof packagedPayload === 'object'
+              ? packagedPayload
+              : (savePlan?.journalOnly === true ? previousEntry?.project || null : buildPackagedProjectPayload(snapshot))
+          );
+        if (!packaged || typeof packaged !== 'object') {
+          throw new Error('Missing local project checkpoint for journal-only save');
+        }
+        // New local checkpoints are deliberately root-document only. Older
+        // packages containing sheets are split during read, never preserved
+        // into a subsequent save.
+        delete packaged.sheets;
+        delete packaged.sheetOrder;
+        delete packaged.activeSheetId;
+        packaged.projectLayout = 'single-project';
+      } finally {
+        endProjectPackagePerformanceSpan(packageSpan, {
+          sheetCount: countPackagedProjectSheets(packaged),
+        });
       }
-      const listSnapshot = getRecentProjectListSnapshot(packaged, snapshot);
-      const listSheet = getPackagedProjectFirstSheet(packaged);
-      const listThumbnailSheetId = typeof listSheet?.id === 'string' ? listSheet.id : '';
+      const listSnapshot = (savePlan?.journalPayload && snapshot)
+        ? snapshot
+        : (snapshotFromParsedDocumentValue(packaged)?.snapshot || snapshot);
+      const listThumbnailSheetId = '';
       const fileName = getRecentProjectEntryFileName(previousEntry, packaged, snapshot);
       const displayName = previousEntry?.name
         ? extractDocumentBaseName(previousEntry.name)
@@ -565,17 +678,28 @@
         Math.round(Number(thumbnailIntervalMs) || LOCAL_PROJECT_THUMBNAIL_UPDATE_INTERVAL_MS)
       );
       const shouldRefreshThumbnail =
-        !skipThumbnail
+        !savePlan?.journalOnly
+        && !skipThumbnail
         && (
           !previousEntry?.thumbnail
           || (listThumbnailSheetId && previousEntry?.thumbnailSheetId !== listThumbnailSheetId)
           || !Number.isFinite(previousUpdatedAt)
           || (nowTs - previousUpdatedAt >= safeThumbnailInterval)
         );
-      const thumbnail = shouldRefreshThumbnail
-        ? (await generateSnapshotThumbnail(listSnapshot || snapshot))
-        : previousEntry.thumbnail;
-      const dotStats = resolvePackagedProjectDotStats(packaged, snapshot);
+      const thumbnailSpan = beginProjectPackagePerformanceSpan('pixiedraw:autosave:thumbnail', {
+        refresh: shouldRefreshThumbnail,
+      });
+      let thumbnail;
+      try {
+        thumbnail = shouldRefreshThumbnail
+          ? (await generateSnapshotThumbnail(listSnapshot || snapshot))
+          : previousEntry.thumbnail;
+      } finally {
+        endProjectPackagePerformanceSpan(thumbnailSpan);
+      }
+      const dotStats = savePlan?.journalOnly
+        ? (previousEntry?.dotStats || null)
+        : resolvePackagedProjectDotStats(packaged, snapshot);
       const updatedEntry = {
         id: resolvedProjectId,
         accountUserId: getCurrentRecentProjectAccountUserId(),
@@ -586,6 +710,17 @@
         thumbnailSheetId: listThumbnailSheetId || '',
         project: packaged,
       };
+      const resolvedJournalPayload = journalPayload && typeof journalPayload === 'object'
+        ? journalPayload
+        : (savePlan?.journalPayload && typeof savePlan.journalPayload === 'object' ? savePlan.journalPayload : null);
+      if (resolvedJournalPayload) {
+        updatedEntry.projectJournal = resolvedJournalPayload;
+        updatedEntry.checkpointId = String(resolvedJournalPayload.checkpointId || savePlan?.checkpointId || '');
+        updatedEntry.dirtyOpCount = Math.max(
+          0,
+          Math.round(Number(resolvedJournalPayload.dirtyOpCount) || Number(savePlan?.dirtyOpCount) || 0)
+        );
+      }
       if (dotStats) {
         updatedEntry.dotStats = dotStats;
       }
@@ -601,14 +736,23 @@
         const bTime = typeof b?.updatedAt === 'string' ? b.updatedAt : '';
         return bTime.localeCompare(aTime);
       });
-      await saveRecentProjectsList(latestEntries, workingEntries);
+      const indexedDbSpan = beginProjectPackagePerformanceSpan('pixiedraw:autosave:indexeddb-write', {
+        projectId: resolvedProjectId,
+      });
+      try {
+        await saveRecentProjectsList(latestEntries, workingEntries);
+      } finally {
+        endProjectPackagePerformanceSpan(indexedDbSpan);
+      }
       const expectedSavedSheetCount = countPackagedProjectSheets(packaged);
       if (!await verifyRecentProjectSheetSave(resolvedProjectId, expectedSavedSheetCount)) {
         throw new Error(`Recent project sheet save verification failed (${expectedSavedSheetCount})`);
       }
       setRecentProjectsCache(workingEntries);
       if (dotStats) {
-        setTrackedProjectDotBaseline(snapshot, dotStats);
+        if (snapshot) {
+          setTrackedProjectDotBaseline(snapshot, dotStats);
+        }
         schedulePackagedProjectDotSync(resolvedProjectId, dotStats);
       }
       return updatedEntry;

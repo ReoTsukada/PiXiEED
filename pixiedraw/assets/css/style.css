@@ -75,8 +75,8 @@
   --ui-compact-tool-flyout-size: var(--ui-control-tile-size);
   --left-unified-tools-min-height: calc((var(--ui-control-tile-size) * 2) + 34px);
   --left-unified-color-min-height: 168px;
-  --project-tabs-height: 40px;
-  --project-tabs-mobile-height: 36px;
+  --project-tabs-height: 0px;
+  --project-tabs-mobile-height: 0px;
 }
 
 html,
@@ -193,7 +193,7 @@ body.app-ready .app {
 .startup-boot-loading {
   position: fixed;
   inset: 0;
-  z-index: 2800;
+  z-index: 19990;
   display: none;
   align-items: center;
   justify-content: center;
@@ -204,7 +204,8 @@ body.app-ready .app {
     calc(18px + var(--safe-area-left));
   pointer-events: none;
   background:
-    radial-gradient(circle at top, rgba(var(--ui-rgb-focus), 0.18), rgba(4, 10, 18, 0.88));
+    radial-gradient(circle at top, rgba(var(--ui-rgb-focus), 0.18), transparent 62%),
+    rgb(4, 10, 18);
 }
 
 body.app-preinit .startup-boot-loading {
@@ -332,11 +333,6 @@ img,
   z-index: 9999;
   width: min(360px, calc(100vw - var(--safe-area-left) - var(--safe-area-right) - 2rem));
   max-width: min(360px, calc(100vw - var(--safe-area-left) - var(--safe-area-right) - 2rem));
-  /* Keep the complete notice, including its close button, inside the visible viewport. */
-  max-height: calc(100vh - var(--safe-area-top) - var(--safe-area-bottom) - 2rem);
-  max-height: calc(100dvh - var(--safe-area-top) - var(--safe-area-bottom) - 2rem);
-  display: flex;
-  flex-direction: column;
   background: rgba(12, 20, 32, 0.94);
   border: 1px solid rgba(var(--ui-rgb), 0.35);
   border-radius: 18px;
@@ -346,10 +342,7 @@ img,
 }
 
 .update-toast__body {
-  display: flex;
-  min-height: 0;
-  flex: 1 1 auto;
-  flex-direction: column;
+  display: grid;
   gap: 0.9rem;
   padding: 1.1rem 1.2rem;
 }
@@ -359,8 +352,7 @@ img,
   color: var(--fg);
   font-size: 0.88rem;
   line-height: 1.5;
-  min-height: 0;
-  flex: 1 1 auto;
+  max-height: min(44vh, 320px);
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 6px;
@@ -440,6 +432,67 @@ img,
   to {
     opacity: 1;
     transform: translate(-50%, -50%);
+  }
+}
+
+.version-update-notice {
+  position: fixed;
+  right: calc(var(--safe-area-right) + 18px);
+  bottom: calc(var(--safe-area-bottom) + 18px);
+  z-index: 10020;
+  width: min(330px, calc(100vw - var(--safe-area-left) - var(--safe-area-right) - 32px));
+  padding: 14px;
+  border: 1px solid rgba(var(--ui-rgb), 0.45);
+  border-radius: 14px;
+  background: rgba(10, 18, 29, 0.96);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+  color: var(--fg);
+}
+
+.version-update-notice__title,
+.version-update-notice__message {
+  margin: 0;
+}
+
+.version-update-notice__title {
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.version-update-notice__message {
+  margin-top: 6px;
+  color: var(--fg-muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.version-update-notice__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.version-update-notice__button {
+  min-height: 32px;
+  padding: 5px 10px;
+  border: 1px solid rgba(var(--ui-rgb), 0.4);
+  border-radius: 8px;
+  background: rgba(24, 43, 57, 0.9);
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.version-update-notice__button:disabled {
+  cursor: default;
+  opacity: 0.58;
+}
+
+@media (max-width: 640px) {
+  .version-update-notice {
+    right: calc(var(--safe-area-right) + 10px);
+    bottom: calc(var(--safe-area-bottom) + 10px);
   }
 }
 
@@ -1548,15 +1601,20 @@ body.is-dual-left-rail:not(.is-mobile-layout) .rail--left[data-compact="false"] 
 
 body:not(.is-mobile-layout) .layout {
   --rail-resizer-offset: -8px;
-  --project-tabs-height: 34px;
+  --editor-command-lane-height: 52px;
   --workbench-line: rgba(var(--ui-rgb), 0.17);
   --workbench-line-soft: rgba(var(--ui-rgb), 0.1);
 }
 
 body:not(.is-mobile-layout) .stage {
+  top: var(--editor-command-lane-height);
   left: var(--left-stage-reserve-width);
   right: calc(var(--right-width) + var(--right-flyout-reserve, 0px));
   padding: 0;
+}
+
+body:not(.is-mobile-layout) .rail {
+  top: var(--editor-command-lane-height);
 }
 
 body:not(.is-mobile-layout) .rail-resizer {
@@ -2505,31 +2563,28 @@ body.is-right-tool-rail:not(.is-mobile-layout) .bottom-timeline-dock #panelFrame
 }
 
 body.is-right-tool-rail:not(.is-mobile-layout) .layout {
-  --project-tabs-height: 52px;
+  --editor-command-lane-height: 52px;
 }
 
-body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs {
+.editor-command-lane {
   position: relative;
   z-index: 1200;
-  flex: 0 0 var(--project-tabs-height);
-  height: var(--project-tabs-height);
+  display: none;
+  flex: 0 0 var(--editor-command-lane-height, 0px);
+  height: var(--editor-command-lane-height, 0px);
   box-sizing: border-box;
-  left: calc(12px - var(--left-stage-reserve-width));
-  width: calc(100% + var(--left-stage-reserve-width) + var(--right-width) + var(--right-flyout-reserve, 0px) - 12px);
-  margin-left: 0;
-  margin-right: 0;
   padding: 6px 4px 6px 8px;
   border: 0;
   border-bottom: 1px solid var(--workbench-line);
   background: rgba(4, 8, 13, 0.98);
 }
 
-body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs__list {
-  flex: 1 1 auto;
-  min-width: 0;
+body:not(.is-mobile-layout) .editor-command-lane {
+  display: flex;
+  width: 100%;
 }
 
-.project-tabs__actions {
+body.is-project-home-active .editor-command-lane {
   display: none;
 }
 
@@ -2537,10 +2592,11 @@ body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs__list {
   display: none;
 }
 
-body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs__actions {
+body:not(.is-mobile-layout) .editor-command-lane__actions {
   display: flex;
   order: 3;
   flex: 0 0 auto;
+  margin-left: auto;
   align-items: center;
   justify-content: flex-end;
   gap: 6px;
@@ -2548,7 +2604,7 @@ body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs__actions {
   padding-left: 8px;
 }
 
-body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs__actions .canvas-controls {
+body:not(.is-mobile-layout) .editor-command-lane__actions .canvas-controls {
   position: static;
   inset: auto;
   display: flex;
@@ -2560,44 +2616,44 @@ body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs__actions .canvas-co
   z-index: auto;
 }
 
-body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs__actions #appReloadAction {
+body:not(.is-mobile-layout) .editor-command-lane__actions #appReloadAction {
   order: 2;
   margin-left: 10px;
 }
 
-body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs__actions .canvas-controls__quick-actions {
+body:not(.is-mobile-layout) .editor-command-lane__actions .canvas-controls__quick-actions {
   display: flex;
   order: 1;
   align-items: center;
   gap: 6px;
 }
 
-body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs__actions .canvas-controls__quick-actions [data-ui-action="openLensCamera"],
-body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs__actions .canvas-controls__quick-actions [data-ui-action="openQrEditor"] {
+body:not(.is-mobile-layout) .editor-command-lane__actions .canvas-controls__quick-actions [data-ui-action="openLensCamera"],
+body:not(.is-mobile-layout) .editor-command-lane__actions .canvas-controls__quick-actions [data-ui-action="openQrEditor"] {
   display: none;
 }
 
-body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs__actions .canvas-controls__history {
+body:not(.is-mobile-layout) .editor-command-lane__actions .canvas-controls__history {
   order: 3;
 }
 
-body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs__actions #canvasControlButtons {
+body:not(.is-mobile-layout) .editor-command-lane__actions #canvasControlButtons {
   order: 1;
 }
 
-body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs__actions .canvas-clipboard-buttons {
+body:not(.is-mobile-layout) .editor-command-lane__actions .canvas-clipboard-buttons {
   display: none !important;
 }
 
-body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs__actions > .right-utility-menu {
-  order: 4;
+body:not(.is-mobile-layout) .editor-command-lane__actions > .right-utility-menu {
+  order: 99;
 }
 
-body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs__actions > .chip,
-body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs__actions > .rail-tab,
-body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs__actions > .canvas-controls .chip,
-body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs__actions > .canvas-controls .rail-tab,
-body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs__actions > .right-utility-menu > .right-utility-menu__trigger {
+body:not(.is-mobile-layout) .editor-command-lane__actions > .chip,
+body:not(.is-mobile-layout) .editor-command-lane__actions > .rail-tab,
+body:not(.is-mobile-layout) .editor-command-lane__actions > .canvas-controls .chip,
+body:not(.is-mobile-layout) .editor-command-lane__actions > .canvas-controls .rail-tab,
+body:not(.is-mobile-layout) .editor-command-lane__actions > .right-utility-menu > .right-utility-menu__trigger {
   width: 40px;
   min-width: 40px;
   height: 40px;
@@ -2605,14 +2661,14 @@ body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs__actions > .right-u
   padding: 0;
 }
 
-body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs__actions > .canvas-controls .chip,
-body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs__actions > .right-utility-menu > .right-utility-menu__trigger {
+body:not(.is-mobile-layout) .editor-command-lane__actions > .canvas-controls .chip,
+body:not(.is-mobile-layout) .editor-command-lane__actions > .right-utility-menu > .right-utility-menu__trigger {
   display: inline-grid;
   place-items: center;
 }
 
-body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs__actions > .canvas-controls .chip > img,
-body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs__actions > .right-utility-menu > .right-utility-menu__trigger > .tab-icon {
+body:not(.is-mobile-layout) .editor-command-lane__actions > .canvas-controls .chip > img,
+body:not(.is-mobile-layout) .editor-command-lane__actions > .right-utility-menu > .right-utility-menu__trigger > .tab-icon {
   display: block;
   width: 24px;
   height: 24px;
@@ -2622,7 +2678,7 @@ body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs__actions > .right-u
   object-position: center;
 }
 
-body.is-right-tool-rail:not(.is-mobile-layout) .project-tabs__actions #canvasControlButtons {
+body:not(.is-mobile-layout) .editor-command-lane__actions #canvasControlButtons {
   display: none;
 }
 
@@ -2638,9 +2694,9 @@ body.is-right-tool-rail:not(.is-mobile-layout) .right-utility-menu__trigger {
 }
 
 body.is-right-tool-rail:not(.is-mobile-layout) .right-utility-menu__popover {
-  top: calc(var(--project-tabs-height) + 8px);
+  top: calc(var(--editor-command-lane-height) + 8px);
   right: 8px;
-  max-height: min(420px, calc(100vh - var(--project-tabs-height) - 16px));
+  max-height: min(420px, calc(100vh - var(--editor-command-lane-height) - 16px));
 }
 
 body.is-right-tool-rail:not(.is-mobile-layout) .right-utility-menu__popover .rail-tabs--utility .rail-tab {
@@ -2653,7 +2709,7 @@ body.is-right-tool-rail:not(.is-mobile-layout) .right-utility-menu__popover .rai
 
 body.is-right-tool-rail:not(.is-mobile-layout) .rail--left,
 body.is-right-tool-rail:not(.is-mobile-layout) .rail--right {
-  top: var(--project-tabs-height);
+  top: var(--editor-command-lane-height);
 }
 
 body.is-right-tool-rail:not(.is-mobile-layout) .rail--left {
@@ -2931,36 +2987,6 @@ body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom
   color: var(--fg);
   background: rgba(var(--ui-rgb), 0.14);
   outline: none;
-}
-
-.project-tab-item--add {
-  max-width: none;
-  border-style: dashed;
-  border-color: rgba(var(--ui-rgb), 0.35);
-  background: rgba(8, 16, 24, 0.64);
-}
-
-.project-tab-item__add {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 28px;
-  padding: 0;
-  color: var(--fg);
-  font-size: 1.02rem;
-  line-height: 1;
-}
-
-.project-tab-item__add:hover,
-.project-tab-item__add:focus-visible {
-  background: rgba(var(--ui-rgb), 0.14);
-  outline: none;
-}
-
-.project-tab-item__add:disabled {
-  opacity: 0.38;
-  pointer-events: none;
 }
 
 .stage__canvas {
@@ -5101,6 +5127,26 @@ input[type='range']::-moz-focus-outer {
   gap: 8px;
 }
 
+.project-file-menu {
+  position: relative;
+  margin-bottom: 8px;
+}
+
+.project-file-menu__items {
+  display: grid;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.project-file-menu__items[hidden] {
+  display: none;
+}
+
+.project-file-menu__items button {
+  min-height: 36px;
+  text-align: left;
+}
+
 #panelFile .field-group--file-actions .button {
   width: 100%;
   min-height: 40px;
@@ -5257,9 +5303,7 @@ input[type='range']::-moz-focus-outer {
   display: none;
 }
 
-#panelFile .export-destination-label,
 #panelFile #autosaveStatus,
-#panelFile #exportFolderStatus,
 #panelFile #timelapseStatus,
 #panelSettings .help-text,
 #panelDetails .help-text,
@@ -5286,11 +5330,6 @@ input[type='range']::-moz-focus-outer {
   border-color: rgba(var(--ui-rgb), 0.42);
   background: rgba(var(--ui-rgb), 0.16);
   color: var(--fg);
-}
-
-#panelFile #enableAutosave,
-#panelFile #bindExportFolder {
-  margin-top: 8px;
 }
 
 #panelFile .file-contest-promo {
@@ -9105,6 +9144,61 @@ body.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data
   min-width: 0;
 }
 
+.panel-ad-mount--context {
+  margin-top: auto;
+}
+
+/* AdSense marks a final no-fill response on the ins node.  Do not leave the
+   panel-sized iframe shell behind when that happens. */
+.panel-ad.is-ad-unfilled,
+.panel-ad-mount.is-ad-unfilled,
+.export-ad.is-ad-unfilled,
+.startup-recent-card--ad.is-ad-unfilled,
+.pixieed-shared-top-ad.is-ad-unfilled,
+.ad-block.is-ad-unfilled {
+  display: none !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  max-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+#panelFile .panel-section__body,
+#panelSettings .panel-section__body,
+#panelDetails .panel-section__body {
+  min-height: 100%;
+}
+
+.panel-ad--context {
+  width: 100%;
+  min-height: clamp(48px, 8vh, 84px);
+  height: clamp(48px, 8vh, 84px);
+  max-height: clamp(48px, 8vh, 84px);
+  margin-top: 0;
+}
+
+.panel-ad--context .ad-box {
+  width: 100%;
+  min-height: 100%;
+  height: 100%;
+  max-height: 100%;
+}
+
+.panel-ad--context .ad-box ins.adsbygoogle,
+.panel-ad--context .ad-box ins.ad-seed,
+.panel-ad--context .ad-box ins.adsbygoogle iframe,
+.panel-ad--context .ad-box .adsbygoogle iframe {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-height: 100% !important;
+  height: 100% !important;
+  max-height: 100% !important;
+}
+
 .panel-ad .ad-box {
   --panel-ad-width: 180px;
   --panel-ad-height: 112px;
@@ -9166,6 +9260,28 @@ body.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data
 .rail-ad .ad-box .adsbygoogle iframe {
   max-width: 100% !important;
   box-sizing: border-box !important;
+}
+
+/* Contextual right-panel ad: one compact, flexible slot shared by File,
+   Settings and Details. Keep it inside the panel instead of reserving a rail. */
+.panel-ad--context {
+  width: 100% !important;
+  min-height: clamp(48px, 8vh, 84px) !important;
+  height: clamp(48px, 8vh, 84px) !important;
+  max-height: clamp(48px, 8vh, 84px) !important;
+  margin-top: 0 !important;
+}
+
+.panel-ad--context .ad-box,
+.panel-ad--context .ad-box ins.adsbygoogle,
+.panel-ad--context .ad-box ins.ad-seed,
+.panel-ad--context .ad-box ins.adsbygoogle iframe,
+.panel-ad--context .ad-box .adsbygoogle iframe {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-height: 100% !important;
+  height: 100% !important;
+  max-height: 100% !important;
 }
 
 /* In mobile layout, disable side-panel ad mounts completely. */
@@ -9339,6 +9455,26 @@ body.is-mobile-layout #multiSupportAdContainer {
   box-sizing: border-box !important;
 }
 
+/* The mobile shortcut lane hosts reload and history controls. Keep a bottom
+   banner above the shared navigation, and reserve both areas inside the app. */
+@media (max-width: 900px) and (orientation: portrait) {
+  body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] .app {
+    padding-bottom: calc(
+      var(--pixieed-shared-bottom-nav-offset, 0px)
+      + var(--mobile-bottom-ad-height, 0px)
+    ) !important;
+  }
+
+  body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] #mobileBottomAd {
+    bottom: var(--pixieed-shared-bottom-nav-offset, 0px);
+  }
+
+  body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] .mobile-topbar {
+    position: relative;
+    z-index: 14070;
+  }
+}
+
 #panelSettings .settings-size-row .button {
   display: inline-flex;
   width: auto;
@@ -9356,6 +9492,7 @@ body.is-project-home-active {
 }
 
 body.is-project-home-active .stage {
+  top: 0;
   z-index: 530;
 }
 
@@ -9593,6 +9730,8 @@ body.is-mobile-layout .project-home-screen__list .startup-recent-card__open {
 .startup-screen {
   position: fixed;
   inset: 0;
+  width: 100%;
+  max-width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -9601,7 +9740,7 @@ body.is-mobile-layout .project-home-screen__list .startup-recent-card__open {
     calc(24px + var(--safe-area-right))
     calc(24px + var(--safe-area-bottom))
     calc(24px + var(--safe-area-left));
-  z-index: 520;
+  z-index: 15000;
 }
 
 .startup-screen[hidden] {
@@ -9611,13 +9750,24 @@ body.is-mobile-layout .project-home-screen__list .startup-recent-card__open {
 .startup-screen__backdrop {
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at top, rgba(var(--ui-rgb-focus), 0.2), rgba(4, 8, 14, 0.93));
+  background:
+    radial-gradient(circle at top, rgba(var(--ui-rgb-focus), 0.2), transparent 62%),
+    rgb(4, 8, 14);
   backdrop-filter: none;
+}
+
+/* The project chooser owns the app surface. Only shared site chrome remains
+   above it; editor controls and the canvas stay fully covered underneath. */
+body.is-startup-active .bottom-nav,
+body.is-startup-active .pixieed-shared-top-ad {
+  z-index: 15020 !important;
 }
 
 .startup-screen__content {
   position: relative;
   width: min(100%, clamp(520px, 78vw, 1040px));
+  min-width: 0;
+  max-width: 100%;
   max-height: calc(
     var(--mobile-viewport-height)
     - var(--safe-area-top)
@@ -9704,6 +9854,239 @@ body.is-mobile-layout .project-home-screen__list .startup-recent-card__open {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.startup-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(var(--ui-rgb), 0.24);
+  border-radius: 12px;
+  background: rgba(5, 13, 23, 0.72);
+}
+
+.startup-workspace__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.startup-workspace__title {
+  margin: 0;
+  font-size: 0.92rem;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.startup-workspace__status {
+  margin: 4px 0 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.64);
+}
+
+.startup-workspace__status[data-tone='success'] {
+  color: rgba(120, 230, 172, 0.95);
+}
+
+.startup-workspace__status[data-tone='warn'] {
+  color: rgba(255, 208, 124, 0.95);
+}
+
+.startup-workspace__status[data-tone='error'] {
+  color: rgba(255, 143, 143, 0.95);
+}
+
+.startup-workspace__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.startup-workspace__actions .button {
+  min-height: 36px;
+  padding: 7px 10px;
+  font-size: 0.76rem;
+}
+
+.startup-workspace__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 7px;
+  max-height: min(34vh, 310px);
+  overflow: auto;
+}
+
+.startup-workspace__project {
+  width: 100%;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(var(--ui-rgb), 0.2);
+  border-radius: 9px;
+  background: rgba(10, 22, 32, 0.84);
+  color: rgba(255, 255, 255, 0.9);
+  text-align: left;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.startup-workspace__project:hover,
+.startup-workspace__project:focus-visible {
+  border-color: rgba(var(--ui-rgb-focus), 0.76);
+  background: rgba(var(--ui-rgb), 0.12);
+}
+
+.startup-workspace__project-name,
+.startup-workspace__project-meta {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.startup-workspace__project-thumbnail {
+  width: 58px;
+  height: 58px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(var(--ui-rgb), 0.3);
+  border-radius: 10px;
+  background:
+    linear-gradient(45deg, rgba(255, 255, 255, 0.045) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.045) 75%),
+    linear-gradient(45deg, rgba(255, 255, 255, 0.045) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.045) 75%),
+    rgba(3, 10, 18, 0.9);
+  background-position: 0 0, 5px 5px;
+  background-size: 10px 10px;
+}
+
+.startup-workspace__project-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.startup-workspace__project-thumbnail-placeholder {
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.startup-workspace__project-details {
+  min-width: 0;
+}
+
+.startup-workspace__project-name {
+  font-weight: 650;
+  font-size: 0.82rem;
+}
+
+.startup-workspace__project-meta {
+  margin-top: 4px;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 0.68rem;
+}
+
+.startup-workspace__project-certification {
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  max-width: 100%;
+  min-height: 20px;
+  margin-top: 6px;
+  padding: 2px 7px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.66);
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 0.64rem;
+  font-weight: 750;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.startup-workspace__project-certification.is-recovery {
+  border-color: rgba(255, 194, 92, 0.56);
+  color: rgba(255, 224, 166, 0.98);
+  background: rgba(126, 78, 16, 0.26);
+}
+
+.startup-workspace__project-certification.is-local {
+  border-color: rgba(var(--ui-rgb-focus), 0.5);
+  color: rgba(190, 226, 255, 0.98);
+  background: rgba(var(--ui-rgb), 0.16);
+}
+
+.startup-workspace__project-certification.is-invalid {
+  border-color: rgba(255, 112, 112, 0.58);
+  color: rgba(255, 177, 177, 0.98);
+  background: rgba(125, 31, 31, 0.25);
+}
+
+.startup-workspace__empty {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 10px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+@media (max-width: 720px) {
+  .startup-workspace__header {
+    flex-direction: column;
+  }
+
+  .startup-workspace__actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .startup-workspace__actions .button {
+    flex: 1 1 140px;
+  }
+
+  .startup-workspace__list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .startup-workspace__project {
+    grid-template-columns: 48px minmax(0, 1fr);
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .startup-workspace__project-thumbnail {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+  }
+
+  .startup-workspace__project-name {
+    font-size: 0.76rem;
+  }
+
+  .startup-workspace__project-meta {
+    margin-top: 2px;
+    font-size: 0.63rem;
+  }
+
+  .startup-workspace__project-certification {
+    min-height: 18px;
+    margin-top: 4px;
+    padding: 1px 6px;
+    font-size: 0.59rem;
+  }
 }
 
 .startup-screen__link {
@@ -9878,8 +10261,10 @@ body.is-mobile-layout .project-home-screen__list .startup-recent-card__open {
 }
 
 .startup-recent-card__ad-ins {
+  display: block;
   width: 100%;
-  min-height: 110px;
+  height: 100%;
+  min-height: 0;
 }
 
 .startup-recent-card__open:hover,
@@ -10035,6 +10420,35 @@ body.is-mobile-layout .project-home-screen__list .startup-recent-card__open {
 }
 
 @media (max-width: 430px) {
+  .startup-screen {
+    padding:
+      calc(12px + var(--safe-area-top))
+      calc(12px + var(--safe-area-right))
+      calc(12px + var(--safe-area-bottom))
+      calc(12px + var(--safe-area-left));
+  }
+
+  .startup-screen__content,
+  .startup-screen__header,
+  .startup-workspace,
+  .startup-workspace__header {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .startup-screen__title {
+    font-size: clamp(1.45rem, 8vw, 2rem);
+    overflow-wrap: anywhere;
+  }
+
+  .startup-screen__actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .startup-screen__actions #startupActionResume {
+    grid-column: auto;
+  }
+
   .project-home-screen {
     position: absolute;
     inset: var(--project-tabs-mobile-height) 0 0 0;
@@ -10638,17 +11052,6 @@ body.is-mobile-layout #newProjectDialog .modal__body {
   font-size: 0.85rem;
   line-height: 1.5;
   color: var(--fg-muted);
-}
-
-.export-destination-label {
-  margin-top: 6px;
-  padding: 6px 8px;
-  border: 1px solid rgba(var(--ui-rgb), 0.18);
-  background: rgba(8, 14, 22, 0.42);
-  font-size: 0.78rem;
-  line-height: 1.45;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
-  word-break: break-word;
 }
 
 .export-actions {
@@ -11444,6 +11847,7 @@ body.is-mobile-layout #newProjectDialog .modal__body {
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
+    min-height: 0;
   }
 
   .export-dialog-body__preview .export-preview-panel {
@@ -11457,39 +11861,41 @@ body.is-mobile-layout #newProjectDialog .modal__body {
 
   .export-dialog-body__ad .export-ad__slot {
     position: relative;
-    width: min(160px, 100%);
-    min-height: clamp(240px, 42vh, 320px);
-    height: clamp(240px, 42vh, 320px);
-    margin-left: auto;
-    margin-right: auto;
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+    flex: 1 1 auto;
+    margin: 0;
     overflow: hidden;
   }
 
   .export-dialog-body__ad .export-ad__slot .adsbygoogle,
   .export-dialog-body__ad .export-ad__slot ins.adsbygoogle {
-    position: absolute !important;
-    top: 50%;
-    left: 50%;
-    width: clamp(240px, 42vh, 320px) !important;
-    max-width: none !important;
+    position: relative !important;
+    top: auto;
+    left: auto;
+    width: 100% !important;
+    max-width: 100% !important;
     min-width: 0 !important;
-    min-height: 160px !important;
-    height: 160px !important;
-    max-height: 160px !important;
+    min-height: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
     margin: 0 !important;
-    transform: translate(-50%, -50%) rotate(90deg);
-    transform-origin: center center;
+    transform: none !important;
+    transform-origin: initial;
   }
 
   .export-dialog-body__ad .export-ad__slot .adsbygoogle iframe,
   .export-dialog-body__ad .export-ad__slot ins.adsbygoogle iframe {
-    width: clamp(240px, 42vh, 320px) !important;
-    max-width: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
     min-width: 0 !important;
-    min-height: 160px !important;
-    height: 160px !important;
-    max-height: 160px !important;
+    min-height: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
     margin: 0 !important;
+    transform: none !important;
   }
 }
 
@@ -12362,11 +12768,6 @@ body.is-mobile-layout #newProjectDialog .modal__body {
     width: 26px;
     height: 26px;
   }
-  .project-tab-item__add {
-    width: 30px;
-    height: 26px;
-    font-size: 0.96rem;
-  }
   .stage__canvas {
     position: relative;
     flex: 1 1 auto;
@@ -12469,6 +12870,7 @@ body.is-mobile-layout #newProjectDialog .modal__body {
   }
   .mobile-panel.is-active > .panel-section .panel-section__body {
     flex: 1 1 auto;
+    min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
     scrollbar-width: none;
@@ -12539,9 +12941,6 @@ body.is-mobile-layout .panel-ad-mount[hidden] {
     height: 28px;
     min-width: 28px;
     font-size: 0.78rem;
-  }
-  body.is-mobile-layout #panelFile .export-destination-label {
-    display: none;
   }
   body.is-mobile-layout #panelFile .field,
   body.is-mobile-layout #panelFile .memory-control {
@@ -13675,4 +14074,124 @@ body.is-right-tool-rail:not(.is-mobile-layout) #panelColor .palette-action-menu_
   min-width: var(--ui-control-tile-size);
   height: var(--ui-control-tile-size);
   min-height: var(--ui-control-tile-size);
+}
+
+/* Mobile ads belong to the selected drawer panel, not to a fixed footer.
+   Only the active panel owns the moved left-panel slot, so a single ad is
+   rendered at a time and never overlays the canvas or the shared navigation. */
+body.is-mobile-layout #mobileBottomAd {
+  display: none !important;
+}
+
+body.is-mobile-layout .app {
+  padding-bottom: var(--pixieed-shared-bottom-nav-offset, 68px) !important;
+}
+
+body.is-mobile-layout .mobile-panel.is-active .panel-ad-mount[data-panel-ad-mount='left'] {
+  display: block !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-height: 96px !important;
+  height: auto !important;
+  margin: 16px 0 0 !important;
+  padding: 0 0 12px !important;
+  overflow: visible !important;
+}
+
+body.is-mobile-layout .mobile-panel.is-active .panel-ad-mount[data-panel-ad-mount='left'] #leftPanelAd {
+  display: flex !important;
+  width: 100% !important;
+  min-height: 96px !important;
+  height: auto !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+body.is-mobile-layout .mobile-panel.is-active .panel-ad-mount[data-panel-ad-mount='left'] #leftPanelAdSlot,
+body.is-mobile-layout .mobile-panel.is-active .panel-ad-mount[data-panel-ad-mount='left'] #leftPanelAdSlot > ins {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  min-height: 96px !important;
+  height: 96px !important;
+  max-height: 96px !important;
+  margin: 0 auto !important;
+}
+
+body.is-mobile-layout .mobile-panel.is-active .panel-ad-mount[data-panel-ad-mount='left'] #leftPanelAdSlot > ins iframe {
+  display: block !important;
+  width: 100% !important;
+  min-height: 96px !important;
+  height: 96px !important;
+  max-height: 96px !important;
+}
+
+/* A half-height drawer is intentionally a compact control surface. Rendering
+   an iframe there would place the panel tail beneath the fixed common nav.
+   The ad becomes available as soon as the user expands that panel fully. */
+body.is-mobile-layout .mobile-drawer:not([data-mode='full']) .panel-ad-mount[data-panel-ad-mount='left'],
+body.is-mobile-layout .mobile-drawer:not([data-mode='full']) .panel-ad-mount[data-panel-ad-mount='left'] #leftPanelAd {
+  display: none !important;
+  min-height: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Diagnostic mode: modal ads are disabled independently from panel ads.
+   Do not leave an empty reserved frame while the drawer-position issue is
+   being isolated. */
+html[data-pixieed-modal-ads='false'] dialog .export-ad,
+html[data-pixieed-modal-ads='false'] #exportInterstitialDialog .export-interstitial__lead,
+html[data-pixieed-modal-ads='false'] #exportInterstitialDialog .export-interstitial__slot-wrap {
+  display: none !important;
+}
+
+html[data-pixieed-modal-ads='false'] #exportDialog .export-dialog-body {
+  grid-template-columns: minmax(260px, 0.92fr) minmax(300px, 1.08fr);
+  grid-template-areas: "settings preview";
+}
+
+@media (max-width: 760px) {
+  html[data-pixieed-modal-ads='false'] #exportDialog .export-dialog-body {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "settings"
+      "preview";
+  }
+}
+
+/* The timeline used to stretch to the drawer's whole height on mobile. Keep
+   it in normal document flow here so its final ad mount is reached by the
+   panel's own scroll area rather than spilling beneath the common nav. */
+body.is-mobile-layout .mobile-panel.is-active #panelFrames .timeline-card {
+  height: auto !important;
+  min-height: 0 !important;
+}
+
+body.is-mobile-layout .mobile-panel.is-active #panelFrames .panel-section__body {
+  scroll-padding-bottom: calc(var(--pixieed-shared-bottom-nav-offset, 68px) + 18px);
+}
+
+/* The panel section is a flex child of the fixed-height drawer.  It must be
+   allowed to shrink so the body—not the drawer—becomes the scroll viewport. */
+body.is-mobile-layout .mobile-panel.is-active > .panel-section,
+body.is-mobile-layout .mobile-panel.is-active > .panel-section .panel-section__body {
+  min-height: 0;
+}
+
+body.is-mobile-layout.is-unified-left-tools-color .mobile-panel.is-active > .panel-section[data-section='tools'] .panel-section__body,
+body.is-mobile-layout.is-unified-left-tools-color .mobile-panel.is-active > .panel-section[data-section='color'] .panel-section__body {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+body.is-mobile-layout.is-unified-left-tools-color .mobile-panel.is-active > .panel-section[data-section='tools'],
+body.is-mobile-layout.is-unified-left-tools-color .mobile-panel.is-active > .panel-section[data-section='color'] {
+  height: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
 }

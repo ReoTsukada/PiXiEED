@@ -1,5 +1,7 @@
-const APP_BUILD_VERSION = '2026.07.12-rgb-index-palette-fix1';
-const CACHE_VERSION = `pixiedraw-v${APP_BUILD_VERSION}`;
+importScripts('./assets/js/build-info.js');
+
+const APP_BUILD_VERSION = String(self.__PIXIEEDRAW_BUILD_INFO__?.buildId || 'unknown-build');
+const CACHE_VERSION = `pixieedraw-v${APP_BUILD_VERSION}`;
 const CORE_ASSETS = [
   '/pixiedraw/',
   '/pixiedraw/index.html',
@@ -7,9 +9,6 @@ const CORE_ASSETS = [
   '/pixiedraw/assets/css/style.css',
   '/pixiedraw/assets/css/local-extension-runtime.css',
   '/pixiedraw/assets/js/app.js',
-  '/pixiedraw/assets/js/modules/viewport-gesture-arbiter-utils.js',
-  '/pixiedraw/assets/js/modules/canvas-pointer-workflow-utils.js',
-  '/pixiedraw/assets/js/modules/canvas-wheel-zoom-workflow-utils.js',
   '/icon/icon-192-4.png',
   '/icon/icon-512-4.png',
   '/icon-e1_frame_01.png',
@@ -47,6 +46,7 @@ function isNetworkFirstRequest(request, url) {
     || url.pathname.endsWith('.css')
     || url.pathname.endsWith('.html')
     || url.pathname.endsWith('.webmanifest')
+    || url.pathname.endsWith('/version.json')
   ) {
     return true;
   }

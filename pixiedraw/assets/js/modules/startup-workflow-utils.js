@@ -102,17 +102,14 @@
     detectHorizontalOverflow();
   }
 
-  function openNewProjectDialog({ dismissStartup = false, appendAsTab = false, createShared = false } = {}) {
+  function openNewProjectDialog({ dismissStartup = false, createShared = false } = {}) {
     if (!ensureCurrentClientCanReplaceActiveProject()) {
       return;
     }
     const requestedSharedCreate = SHARED_PROJECTS_ENABLED && Boolean(createShared);
     const config = dom.newProject;
     if (!config) {
-      void promptNewProjectFallback({
-        appendAsTab: Boolean(appendAsTab),
-        createShared: requestedSharedCreate,
-      });
+      void promptNewProjectFallback({ createShared: requestedSharedCreate });
       return;
     }
     const dialog = config.dialog;
@@ -140,7 +137,6 @@
         }
         syncNewProjectCreateModeButtons(requestedSharedCreate ? 'shared' : 'local');
         pendingNewProjectCreateShared = requestedSharedCreate;
-        pendingNewProjectAppendAsTab = Boolean(appendAsTab) && !pendingNewProjectCreateShared;
         syncNewProjectDialogModeText();
         dialog.showModal();
         if (dismissStartup) {
@@ -156,20 +152,16 @@
         console.warn('Failed to open new project dialog', error);
       }
     }
-    pendingNewProjectAppendAsTab = false;
     pendingNewProjectCreateShared = false;
     syncNewProjectDialogModeText();
     if (dismissStartup) {
       hideStartupScreen();
     }
-    void promptNewProjectFallback({
-      appendAsTab: Boolean(appendAsTab),
-      createShared: requestedSharedCreate,
-    });
+    void promptNewProjectFallback({ createShared: requestedSharedCreate });
   }
 
   function queueNewProjectAdRender() {
-    if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) {
+    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.()) {
       return;
     }
     const dialog = dom.newProject?.dialog;
@@ -216,7 +208,11 @@
       }
       newProjectAdRequested = true;
       try {
-        (window.adsbygoogle = window.adsbygoogle || []).push({});
+        const result = window.__PIXIEEDRAW_RENDER_AD_SLOT__?.(adSlot, {
+          owner: 'new-project-dialog',
+          reason: 'dialog-open',
+        });
+        if (!result?.ok) throw new Error(result?.reason || 'ERR_AD_SLOT_RENDER_FAILED');
         adSlot.dataset.loaded = '1';
       } catch (error) {
         newProjectAdRequested = false;
@@ -236,7 +232,6 @@
 
   function closeNewProjectDialog() {
     setNewProjectPalettePresetPickerOpen(false);
-    pendingNewProjectAppendAsTab = false;
     pendingNewProjectCreateShared = false;
     syncNewProjectDialogModeText();
     const dialog = dom.newProject?.dialog;
@@ -653,7 +648,7 @@
     promptExportDirectory = false,
   } = {}) {
     clearSharedProjectCreationFailureReason();
-    const localCreated = await createNewProjectAsTab({
+    const localCreated = await createNewProject({
       name,
       width,
       height,
@@ -704,9 +699,11 @@
     if (newProjectSubmitBusy) {
       return;
     }
+    console.info('[pixiedraw:new-project]', { phase: 'new-project-submit' });
     const config = dom.newProject;
     if (config?.form && typeof config.form.reportValidity === 'function') {
       if (!config.form.reportValidity()) {
+        console.info('[pixiedraw:new-project]', { phase: 'new-project-validation-failed' });
         return;
       }
     }
@@ -726,7 +723,6 @@
         selectedCreateMode === 'shared'
         || Boolean(pendingNewProjectCreateShared)
       );
-      const shouldAppendAsTab = Boolean(pendingNewProjectAppendAsTab);
       let created = false;
       let createdLocalProject = false;
       let sharedCreationFailure = null;
@@ -747,15 +743,9 @@
             localCreated: createdLocalProject,
           };
         }
-      } else if (shouldAppendAsTab) {
-        created = await createNewProjectAsTab({
-          name,
-          width,
-          height,
-          palettePreset: palettePresetValue,
-          promptExportDirectory: false,
-        });
       } else {
+        console.info('[pixiedraw:new-project]', { phase: 'new-project-candidate-built' });
+        console.info('[pixiedraw:new-project]', { phase: 'new-project-commit-start' });
         created = await createNewProject({
           name,
           width,
@@ -765,6 +755,7 @@
         });
       }
       if (created || createdLocalProject) {
+        console.info('[pixiedraw:new-project]', { phase: 'new-project-commit-success' });
         if (config?.nameInput) {
           config.nameInput.value = extractDocumentBaseName(name);
         }
@@ -776,16 +767,32 @@
           openSharedProjectCreateFailureDialog(sharedCreationFailure);
         }
       } else if (!shouldCreateShared) {
-        window.alert(`キャンバスサイズは${MIN_CANVAS_SIZE}〜${MAX_CANVAS_SIZE}の数値で入力してください。`);
+        const invalidDimensions = !Number.isFinite(width)
+          || !Number.isFinite(height)
+          || width < MIN_CANVAS_SIZE
+          || width > MAX_CANVAS_SIZE
+          || height < MIN_CANVAS_SIZE
+          || height > MAX_CANVAS_SIZE;
+        console.info('[pixiedraw:new-project]', {
+          phase: 'new-project-failed',
+          code: invalidDimensions ? 'invalid-canvas-size' : 'project-replacement-failed',
+        });
+        window.alert(invalidDimensions
+          ? `キャンバスサイズは${MIN_CANVAS_SIZE}〜${MAX_CANVAS_SIZE}の数値で入力してください。`
+          : '新規プロジェクトを作成できませんでした。現在のプロジェクトの保存状態を確認して、もう一度お試しください。');
       } else if (sharedCreationFailure) {
         openSharedProjectCreateFailureDialog(sharedCreationFailure);
       }
+    } catch (error) {
+      console.warn('New project submit failed', error);
+      console.info('[pixiedraw:new-project]', { phase: 'new-project-failed', code: String(error?.message || error || '') });
+      throw error;
     } finally {
       newProjectSubmitBusy = false;
     }
   }
 
-  async function promptNewProjectFallback({ appendAsTab = false, createShared = false } = {}) {
+  async function promptNewProjectFallback({ createShared = false } = {}) {
     if (!ensureCurrentClientCanReplaceActiveProject()) {
       return;
     }
@@ -816,13 +823,6 @@
           localCreated: createdLocalProject,
         };
       }
-    } else if (appendAsTab) {
-      created = await createNewProjectAsTab({
-        name,
-        width,
-        height,
-        promptExportDirectory: false,
-      });
     } else {
       created = await createNewProject({
         name,
@@ -841,45 +841,11 @@
     }
   }
 
-  async function ensureExportDirectoryForNewProject() {
-    if (!EXPORT_DIRECTORY_SUPPORTED || exportDirectoryHandle) {
-      return;
-    }
-    if (pendingExportDirectoryHandle) {
-      const restored = await attemptExportDirectoryReauthorization();
-      if (restored || exportDirectoryHandle) {
-        return;
-      }
-    }
-    if (typeof window.showDirectoryPicker !== 'function') {
-      return;
-    }
-    exportDirectorySetupDismissed = false;
-    updateExportFolderStatus(
-      localizeText(
-        '新規作成: 画像/GIFの保存先フォルダを選択してください',
-        'New project: choose a folder for image/GIF exports'
-      ),
-      'info'
-    );
-    const bound = await requestExportDirectoryBinding();
-    if (!bound && !exportDirectoryHandle) {
-      updateExportFolderStatus(
-        localizeText(
-          '新規作成: 保存先フォルダは未設定のまま続行します（保存時に選択可能）',
-          'New project: continuing without a fixed export folder (you can choose on each save)'
-        ),
-        'warn'
-      );
-    }
-  }
-
   async function createNewProject({
     name,
     width,
     height,
     palettePreset = newProjectPalettePresetId,
-    promptExportDirectory = false,
     ensureTab = true,
   }) {
     if (!ensureCurrentClientCanReplaceActiveProject()) {
@@ -890,19 +856,23 @@
     if (!Number.isFinite(widthNumber) || !Number.isFinite(heightNumber)) {
       return false;
     }
-    if (promptExportDirectory) {
-      try {
-        await ensureExportDirectoryForNewProject();
-      } catch (error) {
-        console.warn('Failed to prepare export directory during new project creation', error);
-      }
-    }
     if (ensureTab) {
       const closedCurrentProject = await closeAllOpenProjectTabsForProjectReplacement({ flushAutosave: true, showHome: false });
       if (!closedCurrentProject) {
         return false;
       }
     }
+    // The active tab must be flushed before acquiring this lock. The tab lifecycle
+    // intentionally rejects replacement while a project command is locked, so
+    // locking the submit handler itself made every valid new-project request
+    // reject its own tab-close step.
+    const projectCreationLock = ensureTab
+      ? acquireProjectCommandLock({ owner: 'new-project-create', command: 'create-new-project' })
+      : null;
+    if (ensureTab && !projectCreationLock?.ok) {
+      return false;
+    }
+    try {
     const clampedWidth = clamp(Math.round(widthNumber), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
     const clampedHeight = clamp(Math.round(heightNumber), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
     const normalizedPalettePreset = normalizeNewProjectPalettePreset(
@@ -932,10 +902,8 @@
     setTrackedProjectDotBaseline(snapshot, null);
     resetOpenedDocumentViewport({ defer: true });
 
-    autosaveHandle = null;
-    pendingAutosaveHandle = null;
-    clearPendingPermissionListener();
     setActiveAutosaveProjectId(createAutosaveProjectId());
+    clearActiveLocalProjectJournal?.();
     clearActiveSharedProjectSession();
     storeMultiProjectKey('');
     syncMultiProjectKeyInputValues('', { preserveFocused: false });
@@ -956,7 +924,10 @@
       }
     }
     if (savedImmediately) {
-      updateAutosaveStatus('自動保存: 新規プロジェクトを端末内に保存しました', 'success');
+      updateAutosaveStatus(
+        localizeText('自動保存: 新規プロジェクトを端末内V2へ保存しました', 'Autosave: saved the new project to on-device V2 storage'),
+        'success'
+      );
     } else if (AUTOSAVE_SUPPORTED) {
       scheduleAutosaveSnapshot();
       updateAutosaveStatus('自動保存: 新規プロジェクトの即時保存に失敗したため再試行します', 'warn');
@@ -967,10 +938,18 @@
       resetOpenProjectTabsToCurrentProject({
         source: 'new-project',
         projectId: autosaveProjectId,
+        sourceStorageAdapterId: null,
+        sourceKind: 'new',
+        lastSavedStorageAdapterId: null,
       });
     }
     scheduleSessionPersist();
     return true;
+    } finally {
+      if (projectCreationLock?.ok) {
+        releaseProjectCommandLock({ token: projectCreationLock.token, owner: projectCreationLock.owner });
+      }
+    }
   }
 
   function createStartupQuickProjectName() {
@@ -1048,10 +1027,8 @@
     }
   }
 
-  function normalizeStartupScreenMode(mode) {
-    return mode === STARTUP_SCREEN_MODE_APPEND_TAB
-      ? STARTUP_SCREEN_MODE_APPEND_TAB
-      : STARTUP_SCREEN_MODE_DEFAULT;
+  function normalizeStartupScreenMode() {
+    return STARTUP_SCREEN_MODE_DEFAULT;
   }
 
   function setStartupScreenMode(mode) {
@@ -1062,26 +1039,21 @@
     }
   }
 
-  function isStartupScreenAppendTabMode() {
-    return startupScreenMode === STARTUP_SCREEN_MODE_APPEND_TAB;
-  }
-
   function showStartupScreen(options = {}) {
     const container = dom.startup?.screen;
     if (!container) {
       return;
     }
+    const refreshWorkspace = options?.refreshWorkspace !== false;
     hideProjectHomeScreen();
     const nextMode = normalizeStartupScreenMode(options?.mode);
     setStartupScreenMode(nextMode);
-    if (AUTOSAVE_SUPPORTED) {
-      refreshRecentProjectsUI().catch(error => {
-        console.warn('Failed to refresh recent projects', error);
-      });
-    } else if (dom.startup?.recentSection) {
-      dom.startup.recentSection.hidden = true;
-    }
     if (startupVisible) {
+      if (refreshWorkspace) {
+        void refreshStartupWorkspaceProjects({ requestPermission: false }).catch(error => {
+          console.warn('[PiXiEED workspace] project list refresh failed', error);
+        });
+      }
       return;
     }
     startupVirtualCursorState = state.showVirtualCursor;
@@ -1092,8 +1064,12 @@
     container.hidden = false;
     container.setAttribute('aria-hidden', 'false');
     document.body.classList.add('is-startup-active');
+    if (refreshWorkspace) {
+      void refreshStartupWorkspaceProjects({ requestPermission: false }).catch(error => {
+        console.warn('[PiXiEED workspace] project list refresh failed', error);
+      });
+    }
     window.requestAnimationFrame(() => {
-      queueStartupRecentAdRender();
       container.focus?.({ preventScroll: true });
       const startupTargets = [
         dom.startup?.resumeButton,
@@ -1126,7 +1102,7 @@
         slot,
       });
     });
-    if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) {
+    if (!window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.()) {
       adTargets.forEach(target => {
         if (target.container instanceof HTMLElement) {
           target.container.hidden = true;
@@ -1143,6 +1119,30 @@
         return;
       }
       container.hidden = false;
+      if (adSlot.dataset.pixieedAdCard === 'true' && adSlot.dataset.visibilityObserved !== '1') {
+        if (typeof window.IntersectionObserver === 'function') {
+          const observer = new window.IntersectionObserver(entries => {
+            if (!entries.some(entry => entry.isIntersecting)) {
+              return;
+            }
+            observer.disconnect();
+            adSlot.dataset.visibilityObserved = '1';
+            const queue = () => queueStartupRecentAdRender();
+            if (typeof window.requestIdleCallback === 'function') {
+              window.requestIdleCallback(queue, { timeout: 1200 });
+            } else {
+              window.setTimeout(queue, 0);
+            }
+          }, { root: section.closest('.startup-recent-list') || null, threshold: 0.1 });
+          observer.observe(container);
+          adSlot.dataset.visibilityObserved = 'pending';
+          return;
+        }
+        adSlot.dataset.visibilityObserved = '1';
+      }
+      if (adSlot.dataset.visibilityObserved === 'pending') {
+        return;
+      }
       if (adSlot.dataset.renderPending === '1') {
         return;
       }
@@ -1181,7 +1181,11 @@
           return;
         }
         try {
-          (window.adsbygoogle = window.adsbygoogle || []).push({});
+          const result = window.__PIXIEEDRAW_RENDER_AD_SLOT__?.(adSlot, {
+            owner: 'startup-recent',
+            reason: 'startup-recent-visible',
+          });
+          if (!result?.ok) throw new Error(result?.reason || 'ERR_AD_SLOT_RENDER_FAILED');
           adSlot.dataset.loaded = '1';
         } catch (error) {
           delete adSlot.dataset.renderPending;
@@ -1223,7 +1227,7 @@
     }
     screen.dataset.bound = 'true';
     dom.projectHomeNew?.addEventListener('click', () => {
-      openNewProjectDialog({ dismissStartup: false, appendAsTab: false });
+      openNewProjectDialog({ dismissStartup: false });
     });
     dom.projectHomeOpen?.addEventListener('click', async () => {
       const opened = await openDocumentDialog({ mode: EXTERNAL_IMPORT_MODE_NEW_PROJECT });
@@ -1353,15 +1357,10 @@
         return;
       }
       openButton.disabled = true;
-      const closedCurrentProject = await closeAllOpenProjectTabsForProjectReplacement({ flushAutosave: true, showHome: false });
-      if (!closedCurrentProject) {
-        openButton.disabled = false;
-        updateAutosaveStatus(
-          localizeText('現在のプロジェクトを保存できなかったため、切り替えを中止しました', 'Project switch was canceled because the current project could not be saved'),
-          'error'
-        );
-        return;
-      }
+      // Keep the current project alive until the selected recent project has
+      // actually been decoded. `openRecentProject` replaces the tab set only
+      // after a successful load, so a corrupt/missing V2 record cannot leave
+      // the user with an empty editor.
       const success = await openRecentProject(entry, {
         hideStartup: false,
         replaceOpenProjectTabs: true,
@@ -1385,6 +1384,28 @@
     const recentEntries = await loadRecentProjectsMetadata();
     const limitedEntries = enforceSharedRecentProjectLimit(recentEntries);
     setRecentProjectsCache(limitedEntries);
+    const navigationEntry = typeof performance?.getEntriesByType === 'function'
+      ? performance.getEntriesByType('navigation')[0]
+      : null;
+    const isSameTabReload = navigationEntry?.type === 'reload';
+    if (!isSameTabReload) {
+      const recoveryPayload = readReloadSessionSnapshotPayload();
+      if (recoveryPayload?.unsaved && !isTinyStartupSnapshot(recoveryPayload.currentSnapshot)) {
+        const action = await requestStartupRecoveryAction(recoveryPayload);
+        if (action === 'restore') {
+          const restored = restoreReloadSessionSnapshot();
+          if (restored && recoveryPayload.projectId) {
+            setActiveAutosaveProjectId(recoveryPayload.projectId);
+          }
+          return restored;
+        }
+        if (action === 'delete') {
+          clearReloadRecoveryData();
+          updateAutosaveStatus(localizeText('復帰データを削除しました', 'Recovery data deleted'), 'info');
+        }
+      }
+      return false;
+    }
     if (!limitedEntries.length) {
       return false;
     }
@@ -1400,21 +1421,6 @@
     if (!targetEntry) {
       return false;
     }
-    if (SHARED_PROJECTS_ENABLED && isSharedRecentProjectEntry(targetEntry)) {
-      storePendingSharedInvite({
-        inviteToken: targetEntry.sharedProjectInviteToken || '',
-        projectKey: targetEntry.sharedProjectKey || '',
-        requestedRole: targetEntry.sharedRoleHint || 'guest',
-        autoJoin: targetEntry.sharedAutoJoin !== false,
-        source: 'startup-reopen',
-      });
-      if (!(await ensureSharedProjectAuthenticatedStart({ requireLogin: true }))) {
-        return false;
-      }
-      if (!await ensureSharedProjectBackendSession()) {
-        return false;
-      }
-    }
     const restored = await openRecentProject(targetEntry, { hideStartup: true, silent: true });
     if (restored) {
       clearReloadTargetProjectId();
@@ -1428,98 +1434,63 @@
     return false;
   }
 
+  function requestStartupRecoveryAction(payload = null) {
+    const dialog = dom.startupRecovery?.dialog;
+    if (!(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== 'function') {
+      return Promise.resolve('later');
+    }
+    const snapshot = payload?.currentSnapshot || null;
+    const projectName = normalizeDocumentName(snapshot?.documentName || DEFAULT_DOCUMENT_NAME);
+    const savedAt = Number(payload?.at) > 0
+      ? new Date(Number(payload.at)).toLocaleString()
+      : '';
+    if (dom.startupRecovery.message) {
+      dom.startupRecovery.message.textContent = localizeText(
+        `「${projectName}」の未保存作業が端末内に残っています。`,
+        `Unsaved work for “${projectName}” remains on this device.`
+      );
+    }
+    if (dom.startupRecovery.detail) {
+      dom.startupRecovery.detail.textContent = localizeText(
+        `${savedAt ? `復帰データ: ${savedAt}。` : ''}復帰しても保存先の .pixieedraw ファイルは自動で上書きしません。`,
+        `${savedAt ? `Recovery data: ${savedAt}. ` : ''}Restoring does not automatically overwrite the destination .pixieedraw file.`
+      );
+    }
+    return new Promise(resolve => {
+      let settled = false;
+      const finish = action => {
+        if (settled) return;
+        settled = true;
+        dom.startupRecovery.later?.removeEventListener('click', onLater);
+        dom.startupRecovery.restore?.removeEventListener('click', onRestore);
+        dom.startupRecovery.delete?.removeEventListener('click', onDelete);
+        dialog.removeEventListener('cancel', onCancel);
+        dialog.removeEventListener('close', onClose);
+        if (dialog.open) dialog.close();
+        resolve(action);
+      };
+      const onLater = () => finish('later');
+      const onRestore = () => finish('restore');
+      const onDelete = () => finish('delete');
+      const onCancel = event => {
+        event.preventDefault();
+        finish('later');
+      };
+      const onClose = () => finish('later');
+      dom.startupRecovery.later?.addEventListener('click', onLater, { once: true });
+      dom.startupRecovery.restore?.addEventListener('click', onRestore, { once: true });
+      dom.startupRecovery.delete?.addEventListener('click', onDelete, { once: true });
+      dialog.addEventListener('cancel', onCancel, { once: true });
+      dialog.addEventListener('close', onClose, { once: true });
+      dialog.showModal();
+      dom.startupRecovery.restore?.focus();
+    });
+  }
+
   async function maybeRestoreSharedProjectOnStartup() {
-    if (!SHARED_PROJECTS_ENABLED) {
-      startupSharedReloadProjectKey = '';
-      startupSharedReloadRevision = 0;
-      startupSharedReloadStructureRevision = 0;
-      return false;
-    }
-    const restoredProjectKey = normalizeMultiProjectKey(startupSharedReloadProjectKey || '');
-    if (startupRestoreCancelRequested || !restoredProjectKey || readMultiInviteFromUrl()) {
-      return false;
-    }
-    setStartupProgressLabel(localizeText('共有プロジェクトへ復帰中…', 'Reopening shared project...'));
-    try {
-      const entries = await loadRecentProjectsMetadata();
-      if (startupRestoreCancelRequested) {
-        return false;
-      }
-      const limitedEntries = enforceSharedRecentProjectLimit(entries);
-      setRecentProjectsCache(limitedEntries);
-      let sharedEntry = getCurrentSharedRecentProjectEntry(restoredProjectKey);
-      if (!sharedEntry) {
-        sharedEntry = normalizeSharedRecentProjectEntry(
-          limitedEntries.find(entry => (
-            isSharedRecentProjectEntry(entry)
-            && normalizeMultiProjectKey(entry?.sharedProjectKey || '') === restoredProjectKey
-          )) || {
-            sharedProjectKey: restoredProjectKey,
-            sharedProjectId: buildSharedRecentProjectId(restoredProjectKey),
-            id: buildSharedRecentProjectId(restoredProjectKey),
-            name: restoredProjectKey,
-            sharedRoleHint: 'guest',
-            sharedAutoJoin: false,
-            sharedProjectRevision: startupSharedReloadRevision,
-            sharedProjectStructureRevision: startupSharedReloadStructureRevision,
-          }
-        );
-      }
-      if (!accountState.isLoggedIn || accountState.isAnonymous) {
-        storePendingSharedInvite({
-          inviteToken: sharedEntry?.sharedProjectInviteToken || '',
-          projectKey: restoredProjectKey,
-          requestedRole: sharedEntry?.sharedRoleHint || 'guest',
-          autoJoin: sharedEntry?.sharedAutoJoin !== false,
-          source: 'reload-shared',
-        });
-      }
-      if (!(await ensureSharedProjectAuthenticatedStart({ requireLogin: true }))) {
-        return false;
-      }
-      if (startupRestoreCancelRequested) {
-        return false;
-      }
-      await initPixieedAccount();
-      if (!await ensureSharedProjectBackendSession()) {
-        return false;
-      }
-      if (startupRestoreCancelRequested) {
-        return false;
-      }
-      await ensureNoLegacyMultiSessionForSharedProject();
-      if (startupRestoreCancelRequested) {
-        return false;
-      }
-      const opened = sharedEntry
-        ? await openSharedRecentProject(sharedEntry, {
-          hideStartup: true,
-          silent: true,
-          skipLatestRefresh: true,
-        })
-        : await openSharedProjectCanonical({
-            projectKey: restoredProjectKey,
-            requestedRole: 'guest',
-            autoJoin: false,
-            reason: 'reload-shared',
-            hideStartup: true,
-            silent: true,
-          });
-      if (opened) {
-        clearReloadTargetProjectId();
-        startupSharedReloadProjectKey = '';
-        startupSharedReloadRevision = 0;
-        startupSharedReloadStructureRevision = 0;
-        startupAutosaveRestoreProjectId = '';
-        updateAutosaveStatus(
-          localizeText('共有プロジェクト: 再読み込み前のプロジェクトへ復帰しました', 'Shared project: reopened the project from before reload'),
-          'success'
-        );
-        return true;
-      }
-    } catch (error) {
-      console.warn('Failed to reopen shared project after reload', error);
-    }
+    startupSharedReloadProjectKey = '';
+    startupSharedReloadRevision = 0;
+    startupSharedReloadStructureRevision = 0;
     return false;
   }
 
@@ -1583,24 +1554,299 @@
     setUpdateToastVisibility(false);
   }
 
+  let startupWorkspaceEntries = [];
+  let startupWorkspaceMigrationPrompted = false;
+
+  function setStartupWorkspaceStatus(message, tone = 'info') {
+    const node = dom.startup?.workspaceStatus;
+    if (!(node instanceof HTMLElement)) return;
+    node.textContent = message;
+    if (tone && tone !== 'info') {
+      node.dataset.tone = tone;
+    } else {
+      delete node.dataset.tone;
+    }
+  }
+
+  function buildDeviceLocalWorkspaceEntries(entries = []) {
+    return (Array.isArray(entries) ? entries : [])
+      .filter(entry => entry?.id && !isSharedRecentProjectEntry(entry))
+      .map(entry => ({
+        ...entry,
+        name: entry.fileName || entry.name || DEFAULT_DOCUMENT_NAME,
+        deviceLocalProject: true,
+        lastModified: Number.isFinite(Date.parse(entry.updatedAt || ''))
+          ? Date.parse(entry.updatedAt)
+          : 0,
+      }));
+  }
+
+  async function loadDeviceLocalWorkspaceEntries() {
+    return buildDeviceLocalWorkspaceEntries(await loadRecentProjectsMetadata());
+  }
+
+  function renderStartupWorkspaceProjects(entries = []) {
+    const list = dom.startup?.workspaceProjectList;
+    if (!(list instanceof HTMLElement)) return;
+    startupWorkspaceEntries = Array.isArray(entries) ? entries.slice() : [];
+    list.replaceChildren();
+    if (!startupWorkspaceEntries.length) {
+      const empty = document.createElement('p');
+      empty.className = 'startup-workspace__empty';
+      empty.textContent = localizeText('保存済みプロジェクトはありません。', 'No saved projects were found.');
+      list.appendChild(empty);
+      return;
+    }
+    startupWorkspaceEntries.forEach((entry, index) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'startup-workspace__project';
+      button.dataset.workspaceProjectIndex = String(index);
+      button.setAttribute('role', 'listitem');
+      if (entry?.deviceLocalProject !== true && entry?.migrationRecovery !== true && Number(entry?.size) === 0) {
+        button.title = localizeText(
+          'このファイルは0バイトのため開けません。端末内の元データが残っている場合は「V2移行待ち」のカードから復旧してください。ファイルは自動削除しません。',
+          'This file is empty and cannot be opened. If the original on-device data remains, recover it from the "Awaiting V2 migration" card. The file will not be deleted automatically.'
+        );
+      }
+      if (entry?.migrationRecovery === true) {
+        button.title = localizeText(
+          `V2移行を完了できませんでした。元データは削除されていません。\n${entry?.migrationErrorCode || ''}: ${entry?.migrationErrorMessage || ''}`,
+          `V2 migration could not be completed. The original data was not deleted.\n${entry?.migrationErrorCode || ''}: ${entry?.migrationErrorMessage || ''}`
+        );
+      }
+      const thumbnail = document.createElement('span');
+      thumbnail.className = 'startup-workspace__project-thumbnail';
+      thumbnail.dataset.workspaceProjectThumbnail = String(index);
+      const placeholder = document.createElement('span');
+      placeholder.className = 'startup-workspace__project-thumbnail-placeholder';
+      placeholder.textContent = 'PXD';
+      thumbnail.appendChild(placeholder);
+      if ((entry?.migrationRecovery === true || entry?.deviceLocalProject === true)
+        && typeof entry?.thumbnail === 'string'
+        && entry.thumbnail) {
+        const image = new Image();
+        image.src = entry.thumbnail;
+        image.alt = localizeText('端末内プロジェクトのサムネイル', 'Local project thumbnail');
+        image.decoding = 'async';
+        thumbnail.replaceChildren(image);
+      }
+      const details = document.createElement('span');
+      details.className = 'startup-workspace__project-details';
+      const name = document.createElement('span');
+      name.className = 'startup-workspace__project-name';
+      const displayName = String(entry?.name || DEFAULT_DOCUMENT_NAME).replace(/\.pixieedraw$/i, '');
+      name.textContent = displayName || 'PiXiEEDraw';
+      const meta = document.createElement('span');
+      meta.className = 'startup-workspace__project-meta';
+      const modified = (entry?.migrationRecovery === true || entry?.deviceLocalProject === true)
+        && typeof entry?.updatedAt === 'string'
+        ? new Date(entry.updatedAt).toLocaleString()
+        : (Number(entry?.lastModified) > 0
+            ? new Date(Number(entry.lastModified)).toLocaleString()
+            : localizeText('更新日時不明', 'Unknown date'));
+      meta.textContent = entry?.migrationRecovery === true
+        ? `${modified} / ${localizeText('端末内・V2移行待ち', 'On device · awaiting V2 migration')}`
+        : entry?.deviceLocalProject === true
+          ? `${modified} / ${localizeText('端末内保存', 'On-device storage')}`
+          : modified;
+      const certification = document.createElement('span');
+      certification.className = entry?.migrationRecovery === true
+        ? 'startup-workspace__project-certification is-recovery'
+        : 'startup-workspace__project-certification is-local';
+      certification.textContent = entry?.migrationRecovery === true
+        ? localizeText('復旧して開く', 'Open for recovery')
+        : (Number(entry?.autosaveSchemaVersion) === 2
+            ? localizeText('端末内V2', 'On-device V2')
+            : localizeText('端末内プロジェクト', 'On-device project'));
+      certification.setAttribute('aria-label', entry?.migrationRecovery === true
+        ? localizeText('端末内の元データを保持しています。開いて復旧できます。', 'The original on-device data is retained and can be opened for recovery.')
+        : localizeText(
+          'このブラウザの端末内保存から開けます。完全ファイルは手動保存できます。',
+          'This project can be opened from on-device storage. Save a complete file manually when needed.'
+        ));
+      details.append(name, meta, certification);
+      button.append(thumbnail, details);
+      list.appendChild(button);
+    });
+  }
+
+  function mergePersistedTimelapseIntoSession(session, persistedByCanvas, canvasIds = []) {
+    if (!session || typeof session !== 'object' || !persistedByCanvas || typeof persistedByCanvas !== 'object') {
+      return false;
+    }
+    const allowedCanvasIds = new Set((Array.isArray(canvasIds) ? canvasIds : []).filter(Boolean));
+    const sourceEntries = Object.entries(persistedByCanvas).filter(([canvasId]) => (
+      !allowedCanvasIds.size || allowedCanvasIds.has(canvasId)
+    ));
+    if (!sourceEntries.length) return false;
+    const timelapse = session.timelapse && typeof session.timelapse === 'object'
+      ? session.timelapse
+      : { byCanvas: {}, operationLogsByCanvas: {} };
+    if (!timelapse.byCanvas || typeof timelapse.byCanvas !== 'object') {
+      timelapse.byCanvas = {};
+    }
+    let mergedAny = false;
+    sourceEntries.forEach(([canvasId, snapshots]) => {
+      const serialized = typeof serializeProjectTimelapseSnapshotList === 'function'
+        ? serializeProjectTimelapseSnapshotList(snapshots)
+        : [];
+      if (!serialized.length) return;
+      const existing = Array.isArray(timelapse.byCanvas[canvasId]?.snapshots)
+        ? timelapse.byCanvas[canvasId].snapshots
+        : [];
+      const seen = new Set();
+      const merged = [...serialized, ...existing].filter(snapshot => {
+        const key = `${snapshot?.width || 0}x${snapshot?.height || 0}:${snapshot?.pixels || ''}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      timelapse.byCanvas[canvasId] = {
+        warningShown: true,
+        sampleStep: Math.max(1, Math.round(Number(timelapse.byCanvas[canvasId]?.sampleStep) || 1)),
+        lastCaptureToken: Number.isFinite(Number(timelapse.byCanvas[canvasId]?.lastCaptureToken))
+          ? Math.round(Number(timelapse.byCanvas[canvasId].lastCaptureToken))
+          : -1,
+        snapshots: merged,
+      };
+      mergedAny = true;
+    });
+    if (!mergedAny) return false;
+    timelapse.enabled = true;
+    timelapse.synchronization = {
+      schemaVersion: 1,
+      complete: true,
+      synchronizedAt: new Date().toISOString(),
+      persistedArchiveMerged: true,
+    };
+    session.timelapse = timelapse;
+    return true;
+  }
+
+  async function mergeFileBackedTimelapseIntoPackaged(entry, packaged) {
+    if (typeof loadPersistedTimelapseSnapshots !== 'function') return packaged;
+    // Legacy production projects may predate the separate timelapse store, or
+    // Safari may temporarily deny access to it. Missing optional archive data
+    // must not make the drawable project itself impossible to migrate.
+    const persistedByCanvas = await loadPersistedTimelapseSnapshots(entry?.id || '', { throwOnError: false });
+    if (!persistedByCanvas || !Object.keys(persistedByCanvas).length) return packaged;
+    const rootCanvasIds = Array.isArray(packaged?.document?.canvases)
+      ? packaged.document.canvases.map(canvas => canvas?.id || '').filter(Boolean)
+      : [];
+    if (!packaged.session || typeof packaged.session !== 'object') packaged.session = {};
+    mergePersistedTimelapseIntoSession(packaged.session, persistedByCanvas, rootCanvasIds);
+    if (Array.isArray(packaged.sheets)) {
+      packaged.sheets.forEach(sheet => {
+        const project = sheet?.project;
+        if (!project || typeof project !== 'object') return;
+        if (!project.session || typeof project.session !== 'object') project.session = {};
+        const canvasIds = Array.isArray(project?.document?.canvases)
+          ? project.document.canvases.map(canvas => canvas?.id || '').filter(Boolean)
+          : [];
+        mergePersistedTimelapseIntoSession(project.session, persistedByCanvas, canvasIds);
+      });
+    }
+    return packaged;
+  }
+
+  async function refreshStartupWorkspaceProjects() {
+    let migration = { migrated: 0, created: 0, failed: 0, declined: false, failedEntries: [] };
+    if (!startupWorkspaceMigrationPrompted && typeof migrateLegacyLocalProjectsToTrueV2 === 'function') {
+      migration = await migrateLegacyLocalProjectsToTrueV2({
+        confirmMigration: ({ count, candidates }) => {
+          startupWorkspaceMigrationPrompted = true;
+          const hasSplit = Array.isArray(candidates) && candidates.some(candidate => candidate?.needsSplit === true);
+          return window.confirm(localizeText(
+            `端末内にV1・旧V2プロジェクトが${count}件あります。\n\n真V2の単一プロジェクトへ変換します。${hasSplit ? '\n複数タブ・複数キャンバスは、それぞれ独立した真V2プロジェクトへ分割します。' : ''}\n変換先を端末内へ完全保存できた後だけ、元のV1・旧V2データを削除します。\n変換中は画面を閉じないでください。\n\n変換を開始しますか？`,
+            `${count} V1 or legacy V2 on-device project(s) were found.\n\nThey will be converted to true V2 single projects.${hasSplit ? '\nMultiple tabs and canvases will be split into independent true V2 projects.' : ''}\nThe original V1/legacy V2 data is deleted only after its on-device true V2 replacement is fully committed.\nKeep this page open during conversion.\n\nStart conversion?`
+          ));
+        },
+        preparePackaged: async (entry, packaged) => await mergeFileBackedTimelapseIntoPackaged(entry, packaged),
+        onProgress: ({ index, total }) => {
+          setStartupWorkspaceStatus(localizeText(
+            `端末内プロジェクトを真V2へ変換しています… ${index}/${total}`,
+            `Converting on-device projects to true V2... ${index}/${total}`
+          ));
+        },
+      });
+    }
+    const failuresById = new Map((migration.failedEntries || [])
+      .filter(failure => failure?.entry?.id)
+      .map(failure => [failure.entry.id, failure]));
+    const localEntries = (await loadDeviceLocalWorkspaceEntries()).map(entry => {
+      const failure = failuresById.get(entry.id);
+      return failure
+        ? {
+            ...entry,
+            migrationRecovery: true,
+            migrationErrorCode: failure.code || 'ERR_TRUE_V2_MIGRATION_FAILED',
+            migrationErrorMessage: failure.message || '',
+          }
+        : entry;
+    });
+    renderStartupWorkspaceProjects(localEntries);
+    const migrationSummary = migration.migrated > 0
+      ? localizeText(
+          ` 真V2移行: 元${migration.migrated}件→${migration.created}件。`,
+          ` True V2 migration: ${migration.migrated} source(s) to ${migration.created} project(s).`
+        )
+      : '';
+    setStartupWorkspaceStatus(
+      migration.failed > 0
+        ? localizeText(
+            `端末内プロジェクト${localEntries.length}件。真V2移行の未完了が${migration.failed}件あります。元データは削除していません。`,
+            `${localEntries.length} on-device project(s). ${migration.failed} true V2 migration(s) remain incomplete; original data was retained.`
+          )
+        : localizeText(
+            `端末内の真V2プロジェクトを表示しています（${localEntries.length}件）。${migrationSummary}販売前に .pixieedraw をダウンロードしてください。`,
+            `Showing ${localEntries.length} on-device true V2 project(s).${migrationSummary} Download a .pixieedraw file before sale.`
+          ),
+      migration.failed > 0 ? 'warn' : 'info'
+    );
+    return true;
+  }
+
+  function setupStartupWorkspace() {
+    const projectList = dom.startup?.workspaceProjectList;
+    if (!(projectList instanceof HTMLElement) || projectList.dataset.bound === 'true') {
+      return;
+    }
+    projectList.dataset.bound = 'true';
+    projectList.addEventListener('click', async event => {
+      const target = event.target instanceof Element
+        ? event.target.closest('button[data-workspace-project-index]')
+        : null;
+      if (!(target instanceof HTMLButtonElement)) return;
+      const entry = startupWorkspaceEntries[Number(target.dataset.workspaceProjectIndex)] || null;
+      if (entry?.deviceLocalProject !== true && entry?.migrationRecovery !== true) return;
+      target.disabled = true;
+      try {
+        const opened = await openRecentProject(entry, {
+          hideStartup: true,
+          silent: false,
+          allowProjectMismatchLoad: true,
+          replaceOpenProjectTabs: true,
+        });
+        if (opened) {
+          hideStartupScreen();
+          hideProjectHomeScreen();
+        }
+      } finally {
+        target.disabled = false;
+      }
+    });
+    void refreshStartupWorkspaceProjects();
+  }
+
   function setupStartupScreen() {
     const container = dom.startup?.screen;
     if (!container) {
       return;
     }
     bindCoreProjectActionButtons();
+    setupStartupWorkspace();
     getUpdateHistoryEntries();
-    if (dom.startup?.hint) {
-      dom.startup.hint.textContent = AUTOSAVE_SUPPORTED
-        ? localizeText(
-          '前回の作業はこの端末に自動保存されます。すぐ描くなら「最新の端末内プロジェクトを開く」を使ってください。',
-          'Your work is autosaved on this device. Use "Open Latest Local Project" to continue quickly.'
-        )
-        : localizeText(
-          'このブラウザでは自動保存が利用できません。保存/出力から手動保存してください。',
-          'Autosave is not available in this browser. Please save manually from Save / Export.'
-        );
-    }
     if (dom.startup?.quickSetupButton instanceof HTMLButtonElement) {
       if (AUTOSAVE_SUPPORTED) {
         dom.startup.quickSetupButton.textContent = localizeText('新規作成（かんたん開始）', 'New Project (Quick Start)');
@@ -1629,7 +1875,6 @@
       }
       if (event.key === 'Escape') {
         event.preventDefault();
-        hideStartupScreen();
         return;
       }
       if (event.key === 'Tab') {
@@ -1814,14 +2059,8 @@
         openButton.disabled = false;
       }
     });
-    if (AUTOSAVE_SUPPORTED) {
-      refreshRecentProjectsUI().catch(error => {
-        console.warn('Failed to refresh recent projects', error);
-      });
-      syncStartupResumeState(Array.from(recentProjectsCache.values()));
-    } else if (dom.startup?.recentSection) {
+    if (dom.startup?.recentSection) {
       dom.startup.recentSection.hidden = true;
-      syncStartupResumeState([]);
     }
   }
 
@@ -1859,7 +2098,6 @@
         markStartupScreenDismissed,
         normalizeStartupScreenMode,
         setStartupScreenMode,
-        isStartupScreenAppendTabMode,
         showStartupScreen,
         queueStartupRecentAdRender,
         hideStartupScreen,

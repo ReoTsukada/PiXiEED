@@ -45,27 +45,6 @@
       void launchLensCameraMode();
       return true;
     }
-    if (tool === TOOL_ACTION_LOCAL_CANVAS_TOGGLE) {
-      if (!MULTI_CANVAS_FEATURE_ENABLED || isVoxelExtensionModeEnabled()) {
-        updateLocalCanvasActionToolButtons();
-        return true;
-      }
-      if (!canCurrentClientEditProjectStructure({ announce: true })) {
-        if (!isSharedProjectCollaborativeMode()) {
-          announceMultiCanvasEditRestriction();
-        }
-        updateLocalCanvasActionToolButtons();
-        return true;
-      }
-      const currentCount = normalizeLocalViewportCanvasState(
-        localViewportCanvasState,
-        LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE
-      ).count;
-      const nextCount = currentCount > 0 ? 0 : 1;
-      setLocalViewportCanvasCount(nextCount, { persist: true, announce: false, recordHistory: true });
-      updateLocalCanvasActionToolButtons();
-      return true;
-    }
     if (tool === TOOL_ACTION_FLOATING_PREVIEW_TOGGLE) {
       if (isVoxelExtensionModeEnabled()) {
         updateFloatingPreviewActionToolButtons();
@@ -85,9 +64,6 @@
     }
     if (action === TOP_UI_ACTION_VIRTUAL_CURSOR_TOGGLE) {
       return runToolAction(TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE, options);
-    }
-    if (action === TOP_UI_ACTION_LOCAL_CANVAS_TOGGLE) {
-      return runToolAction(TOOL_ACTION_LOCAL_CANVAS_TOGGLE, options);
     }
     if (action === TOP_UI_ACTION_FLOATING_PREVIEW_TOGGLE) {
       return runToolAction(TOOL_ACTION_FLOATING_PREVIEW_TOGGLE, options);

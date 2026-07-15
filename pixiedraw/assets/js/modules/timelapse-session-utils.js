@@ -31,6 +31,8 @@
 
     return ((scope) => {
       with (scope) {
+  const timelapseCheckpointPendingTracks = new WeakSet();
+
   function shouldRecordLocalTimelapseOperationLog() {
     return Boolean(
       timelapseState.enabled
@@ -93,7 +95,9 @@
       const operationCount = Array.isArray(track?.operationLog?.entries)
         ? track.operationLog.entries.length + (track.operationLog.baseSnapshot ? 1 : 0)
         : 0;
-      return sum + Math.max(snapshotCount, operationCount);
+      return sum + (snapshotCount && operationCount
+        ? snapshotCount + operationCount
+        : Math.max(snapshotCount, operationCount));
     }, 0);
   }
 
@@ -102,7 +106,9 @@
     const operationCount = Array.isArray(track?.operationLog?.entries)
       ? track.operationLog.entries.length + (track.operationLog.baseSnapshot ? 1 : 0)
       : 0;
-    return Math.max(snapshotCount, operationCount);
+    return snapshotCount && operationCount
+      ? snapshotCount + operationCount
+      : Math.max(snapshotCount, operationCount);
   }
 
   function createTimelapseBaseSnapshotPayload() {
@@ -197,6 +203,187 @@
     };
   }
 
+  function compactTimelapsePixelPatchEntries(entries = []) {
+    const groups = new Map();
+    const visitEntry = entry => {
+      if (entry?.type === 'pixelPatchBatch' && Array.isArray(entry.entries)) {
+        entry.entries.forEach(visitEntry);
+        return;
+      }
+      if (entry?.type !== 'pixelPatch' || !Array.isArray(entry.changes)) {
+        return;
+      }
+      const key = [entry.canvasId, entry.frameId, entry.layerId, entry.width, entry.height].join('\u0000');
+      let group = groups.get(key);
+      if (!group) {
+        group = {
+          type: 'pixelPatch',
+          at: Math.max(0, Math.round(Number(entry.at) || 0)),
+          historyLabel: 'timelapseCompacted',
+          canvasId: entry.canvasId || '',
+          frameId: entry.frameId || '',
+          layerId: entry.layerId || '',
+          width: Math.max(1, Math.round(Number(entry.width) || 1)),
+          height: Math.max(1, Math.round(Number(entry.height) || 1)),
+          changesByIndex: new Map(),
+        };
+        groups.set(key, group);
+      }
+      group.at = Math.max(group.at, Math.max(0, Math.round(Number(entry.at) || 0)));
+      entry.changes.forEach(change => {
+        if (!change?.after) return;
+        const index = Math.max(0, Math.round(Number(change.index) || 0));
+        group.changesByIndex.set(index, { index, after: cloneTimelapsePixelPatchValue(change.after) });
+      });
+    };
+    entries.forEach(visitEntry);
+    return Array.from(groups.values()).map(group => ({
+      type: group.type,
+      at: group.at,
+      historyLabel: group.historyLabel,
+      canvasId: group.canvasId,
+      frameId: group.frameId,
+      layerId: group.layerId,
+      width: group.width,
+      height: group.height,
+      changes: Array.from(group.changesByIndex.values()),
+    })).filter(entry => entry.changes.length);
+  }
+
+  function countTimelapseOperationChanges(entries = []) {
+    let total = 0;
+    const visitEntry = entry => {
+      if (entry?.type === 'pixelPatchBatch' && Array.isArray(entry.entries)) {
+        entry.entries.forEach(visitEntry);
+        return;
+      }
+      if (entry?.type === 'pixelPatch' && Array.isArray(entry.changes)) {
+        total += entry.changes.length;
+      }
+    };
+    entries.forEach(visitEntry);
+    return total;
+  }
+
+  function checkpointTimelapseOperationLog(track, canvasId = '') {
+    const log = track?.operationLog;
+    if (!log?.baseSnapshot || !Array.isArray(log.entries) || !log.entries.length) {
+      return false;
+    }
+    const initialSnapshot = deserializeTimelapseBaseSnapshot(log.baseSnapshot);
+    const initialFrame = initialSnapshot
+      ? createTimelapseFrameEntryFromSnapshotCanvas(initialSnapshot, canvasId)
+      : null;
+    const currentFrame = createTimelapseFrameEntryFromCanvas(
+      getProjectCanvasDocumentById(canvasId) || getActiveProjectCanvasDocument()
+    );
+    if (!Array.isArray(track.snapshots)) {
+      track.snapshots = [];
+    }
+    const archiveFrames = [];
+    [initialFrame, currentFrame].forEach(frame => {
+      const last = archiveFrames[archiveFrames.length - 1] || null;
+      if (frame && (!last || !areTimelapseFrameEntriesEqual(last, frame))) {
+        archiveFrames.push(frame);
+      }
+    });
+    if (archiveFrames.length) {
+      track.snapshots = archiveFrames.slice();
+      archiveTimelapseSnapshots(canvasId, archiveFrames).then(saved => {
+        if (saved && getTimelapseTrack(canvasId) === track) {
+          track.snapshots = currentFrame ? [currentFrame] : [];
+          updateMemoryStatus();
+        }
+      });
+    }
+    const nextBaseSnapshot = createTimelapseBaseSnapshotPayload();
+    if (!nextBaseSnapshot) {
+      return false;
+    }
+    log.baseSnapshot = nextBaseSnapshot;
+    log.entries = [];
+    track.sampleStep = Math.max(1, Math.round(Number(track.sampleStep) || 1) * 2);
+    track.warningShown = true;
+    return true;
+  }
+
+  function scheduleTimelapseOperationLogCheckpoint(track, canvasId = '') {
+    if (!track || timelapseCheckpointPendingTracks.has(track)) return false;
+    timelapseCheckpointPendingTracks.add(track);
+    const run = () => {
+      timelapseCheckpointPendingTracks.delete(track);
+      if (getTimelapseTrack(canvasId) !== track) return;
+      if (checkpointTimelapseOperationLog(track, canvasId)) {
+        syncTimelapseControls();
+        updateMemoryStatus();
+      }
+    };
+    if (typeof window.requestIdleCallback === 'function') {
+      window.requestIdleCallback(run, { timeout: 1500 });
+    } else {
+      window.setTimeout(run, 0);
+    }
+    return true;
+  }
+
+  function compactTimelapseOperationLogIfNeeded(track = getActiveTimelapseTrack()) {
+    const log = track?.operationLog;
+    const entries = Array.isArray(log?.entries) ? log.entries : null;
+    const maxEntries = Math.max(20, Math.round(Number(TIMELAPSE_OPERATION_LOG_MAX_ENTRIES) || 240));
+    if (!entries) {
+      return false;
+    }
+    const maxChanges = Math.max(1024, Math.round(Number(TIMELAPSE_OPERATION_LOG_MAX_CHANGES) || 32768));
+    const initialChangeCount = countTimelapseOperationChanges(entries);
+    const activeCanvasId = getActiveProjectCanvasDocument()?.id || '';
+    if (initialChangeCount > maxChanges * 2) {
+      return checkpointTimelapseOperationLog(track, activeCanvasId);
+    }
+    if (initialChangeCount > maxChanges) {
+      scheduleTimelapseOperationLogCheckpoint(track, activeCanvasId);
+    }
+    if (entries.length <= maxEntries) {
+      return false;
+    }
+    const recentCount = Math.max(10, Math.min(
+      maxEntries - 2,
+      Math.round(Number(TIMELAPSE_OPERATION_LOG_RECENT_ENTRIES) || Math.floor(maxEntries / 2))
+    ));
+    const splitIndex = Math.max(1, entries.length - recentCount);
+    const olderEntries = entries.slice(0, splitIndex);
+    const recentEntries = entries.slice(splitIndex);
+    let lastKeyframeIndex = -1;
+    olderEntries.forEach((entry, index) => {
+      if (entry?.type === 'keyframe' && entry.snapshot) {
+        lastKeyframeIndex = index;
+      }
+    });
+    const compacted = [];
+    if (lastKeyframeIndex >= 0) {
+      compacted.push(olderEntries[lastKeyframeIndex]);
+    }
+    const patchStartIndex = lastKeyframeIndex >= 0 ? lastKeyframeIndex + 1 : 0;
+    const mergedPatches = compactTimelapsePixelPatchEntries(olderEntries.slice(patchStartIndex));
+    if (mergedPatches.length) {
+      compacted.push({
+        type: 'pixelPatchBatch',
+        at: mergedPatches.reduce((latest, entry) => Math.max(latest, entry.at), 0),
+        historyLabel: 'timelapseCompacted',
+        entries: mergedPatches,
+      });
+    }
+    log.entries = [...compacted, ...recentEntries];
+    track.sampleStep = Math.max(1, Math.round(Number(track.sampleStep) || 1) * 2);
+    track.warningShown = true;
+    const changeCount = countTimelapseOperationChanges(log.entries);
+    if (changeCount > maxChanges * 2) {
+      checkpointTimelapseOperationLog(track, getActiveProjectCanvasDocument()?.id || '');
+    } else if (changeCount > maxChanges) {
+      scheduleTimelapseOperationLogCheckpoint(track, getActiveProjectCanvasDocument()?.id || '');
+    }
+    return true;
+  }
+
   function recordTimelapseOperationLogEntry(historyEntry, historyLabel = '') {
     if (!shouldRecordLocalTimelapseOperationLog()) {
       return false;
@@ -215,6 +402,7 @@
       return false;
     }
     log.entries.push(entry);
+    compactTimelapseOperationLogIfNeeded(getTimelapseTrack(canvasId));
     syncTimelapseControls();
     updateMemoryStatus();
     return true;
@@ -418,6 +606,16 @@
       return false;
     }
     if (shouldRecordLocalTimelapseOperationLog()) {
+      const track = getTimelapseTrack(canvasId, { create: true });
+      if (Array.isArray(track?.snapshots) && track.snapshots.length > 1) {
+        const archived = track.snapshots.slice(0, -1);
+        archiveTimelapseSnapshots(canvasId, archived).then(saved => {
+          if (saved && getTimelapseTrack(canvasId) === track) {
+            track.snapshots = track.snapshots.slice(-1);
+            updateMemoryStatus();
+          }
+        });
+      }
       const initialized = Boolean(ensureTimelapseOperationLogBase(canvasId));
       if (initialized) {
         syncTimelapseControls();
@@ -492,6 +690,7 @@
 
     if (dom.controls.toggleTimelapse instanceof HTMLInputElement) {
       dom.controls.toggleTimelapse.checked = Boolean(timelapseState.enabled);
+      dom.controls.toggleTimelapse.disabled = true;
     }
     if (dom.controls.timelapseClear instanceof HTMLButtonElement) {
       dom.controls.timelapseClear.disabled = stepCount <= 0;
@@ -528,6 +727,7 @@
         track.lastCaptureToken = -1;
       }
     }
+    clearPersistedTimelapseSnapshots();
     syncTimelapseControls();
     if (!silent) {
       updateAutosaveStatus(
@@ -538,10 +738,13 @@
       );
     }
     updateMemoryStatus();
+    if (timelapseState.enabled) {
+      ensureTimelapseStartCapture();
+    }
   }
 
   function setTimelapseEnabled(enabled, { persist = true } = {}) {
-    const next = Boolean(enabled);
+    const next = true;
     if (timelapseState.enabled === next) {
       syncTimelapseControls();
       return;
@@ -549,14 +752,10 @@
     timelapseState.enabled = next;
     if (next) {
       ensureTimelapseStartCapture();
-    } else if (timelapseCaptureTimer !== null) {
-      window.clearTimeout(timelapseCaptureTimer);
-      timelapseCaptureTimer = null;
-      timelapseQueuedCanvasIds.clear();
     }
     syncTimelapseControls();
     updateAutosaveStatus(
-      next ? 'タイムラプス記録をONにしました' : 'タイムラプス記録をOFFにしました',
+      'タイムラプス記録は常時ONです',
       'info'
     );
     if (persist) {
@@ -712,6 +911,16 @@
         const nextSnapshot = deserializeTimelapseBaseSnapshot(entry.snapshot);
         if (nextSnapshot) {
           workingSnapshot = nextSnapshot;
+          pushCurrent();
+        }
+        return;
+      }
+      if (entry.type === 'pixelPatchBatch' && Array.isArray(entry.entries)) {
+        let applied = false;
+        entry.entries.forEach(patchEntry => {
+          applied = applyTimelapsePixelPatchEntry(workingSnapshot, patchEntry, canvasId) || applied;
+        });
+        if (applied) {
           pushCurrent();
         }
         return;
@@ -873,12 +1082,30 @@
     }
     flushPendingTimelapseCapture();
     const activeCanvasId = normalizeTimelapseCanvasId(getActiveProjectCanvasDocument()?.id || '');
+    const track = getTimelapseTrack(activeCanvasId);
+    const persistedByCanvas = await loadPersistedTimelapseSnapshots();
+    const archivedSnapshots = Array.isArray(persistedByCanvas?.[activeCanvasId])
+      ? persistedByCanvas[activeCanvasId].slice()
+      : [];
+    if (Array.isArray(track?.snapshots)) {
+      track.snapshots.forEach(entry => {
+        const last = archivedSnapshots[archivedSnapshots.length - 1] || null;
+        if (!last || !areTimelapseFrameEntriesEqual(last, entry)) {
+          archivedSnapshots.push(entry);
+        }
+      });
+    }
     const operationLogSnapshots = buildTimelapseExportEntriesFromOperationLog(activeCanvasId);
     if (operationLogSnapshots.length) {
-      return operationLogSnapshots;
+      operationLogSnapshots.forEach(entry => {
+        const last = archivedSnapshots[archivedSnapshots.length - 1] || null;
+        if (!last || !areTimelapseFrameEntriesEqual(last, entry)) {
+          archivedSnapshots.push(entry);
+        }
+      });
+      return archivedSnapshots;
     }
-    const track = getTimelapseTrack(activeCanvasId);
-    const snapshots = Array.isArray(track?.snapshots) ? track.snapshots.slice() : [];
+    const snapshots = archivedSnapshots;
     if (timelapseState.enabled) {
       const current = createTimelapseFrameEntryFromState();
       if (current && (!snapshots.length || !areTimelapseFrameEntriesEqual(snapshots[snapshots.length - 1], current))) {

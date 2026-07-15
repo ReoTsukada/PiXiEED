@@ -31,207 +31,79 @@
 
     return ((scope) => {
       with (scope) {
-  async function openDocumentsAsProjectTabs(items, loader, { source = 'open', tabOptions = null } = {}) {
-    if (!ensureCurrentClientCanReplaceActiveProject()) {
-      return false;
-    }
-    if (openProjectTabBusy) {
-      return false;
-    }
-    const queue = Array.isArray(items) ? items.filter(Boolean) : [];
-    if (!queue.length || typeof loader !== 'function') {
-      return false;
-    }
-    ensureOpenProjectTabsInitialized();
-    const availableSlots = Math.max(0, MAX_PROJECT_SHEETS - openProjectTabs.length);
-    if (availableSlots <= 0) {
-      updateAutosaveStatus(
-        localizeText(
-          `シートは最大 ${MAX_PROJECT_SHEETS} 枚です`,
-          `You can add up to ${MAX_PROJECT_SHEETS} sheets`
-        ),
-        'warn'
-      );
-      return false;
-    }
-    openProjectTabBusy = true;
+  let importPerformanceSequence = 0;
+
+  function beginImportPerformanceSpan(name, details = null) {
+    const perf = window?.performance;
+    const id = `${name}:${Date.now().toString(36)}:${++importPerformanceSequence}`;
+    const startMark = `${id}:start`;
     try {
-      const targets = queue.slice(0, availableSlots);
-      const truncatedCount = Math.max(0, queue.length - targets.length);
-      await persistActiveOpenProjectTab({ flushAutosave: true });
-      const parentProjectId = normalizeAutosaveProjectId(autosaveProjectId || '') || createAutosaveProjectId();
-      const parentSharedFields = buildActiveSharedProjectSheetTabFields(parentProjectId);
-      setActiveAutosaveProjectId(parentProjectId, { persist: false });
-      let openedCount = 0;
-      let failedCount = 0;
-      for (let index = 0; index < targets.length; index += 1) {
-        const item = targets[index];
-        try {
-          const directPayload = await readProjectPayloadFromOpenItem(item);
-          if (directPayload?.project && typeof directPayload.project === 'object') {
-            const directTab = await appendProjectPayloadAsOpenTab({
-              project: directPayload.project,
-              parentProjectId,
-              fileName: directPayload.fileName,
-              unsaved: directPayload.unsaved,
-              source: source || 'open',
-              tabOptions,
-            });
-            if (directTab) {
-              openedCount += 1;
-              continue;
-            }
-          }
-          const loaded = await loader(item);
-          if (loaded === 'deferred') {
-            // Loader declined to apply into the active document because the
-            // payload targets a different project/sheet. Create a new sheet from
-            // the original item so the user's explicit open action still
-            // produces a separate sheet.
-            try {
-              let packaged = null;
-              let deferredProjectId = '';
-              let deferredFileName = DEFAULT_DOCUMENT_NAME;
-              let deferredUnsaved = false;
-              // If item looks like a File/Blob with a text() method, read it
-              if (item && typeof item.text === 'function') {
-                try {
-                  const text = await item.text();
-                  packaged = tryParseJsonSafe(text);
-                  deferredFileName = normalizeDocumentName(item.name || packaged?.documentName || DEFAULT_DOCUMENT_NAME);
-                } catch (e) {
-                  packaged = null;
-                }
-              } else if (item && typeof item.getFile === 'function') {
-                // FileSystemFileHandle
-                try {
-                  const f = await item.getFile();
-                  const text = await f.text();
-                  packaged = tryParseJsonSafe(text);
-                  deferredFileName = normalizeDocumentName(f?.name || item.name || packaged?.documentName || DEFAULT_DOCUMENT_NAME);
-                } catch (e) {
-                  packaged = null;
-                }
-              } else if (item && typeof item === 'object' && item.project) {
-                packaged = item.project;
-                deferredProjectId = normalizeAutosaveProjectId(item.id || '');
-                deferredFileName = normalizeDocumentName(item.name || packaged?.documentName || DEFAULT_DOCUMENT_NAME);
-                deferredUnsaved = Boolean(item.unsaved);
-              }
-              if (packaged && typeof packaged === 'object') {
-                const appended = await appendProjectPayloadAsOpenTab({
-                  project: packaged,
-                  parentProjectId,
-                  fileName: deferredFileName,
-                  unsaved: deferredUnsaved,
-                  source: source || 'open',
-                  tabOptions,
-                });
-                if (appended) {
-                  queueProjectTabViewportReset(appended.id);
-                  openedCount += 1;
-                  continue;
-                }
-              }
-            } catch (e) {
-              console.warn('Failed to create tab from deferred loader item', e);
-              failedCount += 1;
-              continue;
-            }
-            // If we couldn't construct a tab, fall through to treat as failure
-            failedCount += 1;
-            continue;
-          }
-          if (!loaded) {
-            failedCount += 1;
-            continue;
-          }
-          if (normalizeAutosaveProjectId(autosaveProjectId || '') !== parentProjectId) {
-            setActiveAutosaveProjectId(parentProjectId, { persist: false });
-          }
-          const appended = appendOpenProjectTabFromCurrentState({
-            activate: true,
-            source: parentSharedFields ? 'shared-sheet' : source,
-            projectId: parentSharedFields?.projectId || parentProjectId,
-            ...(parentSharedFields || {}),
-            ...(tabOptions && typeof tabOptions === 'object' ? tabOptions : {}),
-          });
-          if (!appended) {
-            failedCount += 1;
-            break;
-          }
-          if (tabOptions?.qrEditPayload) {
-            activateQrEditMode({
-              ...tabOptions.qrEditPayload,
-              projectId: appended.projectId || '',
-            });
-          }
-          if (parentSharedFields) {
-            setActiveSharedProjectSession(
-              parentSharedFields.sharedProjectKey,
-              parentSharedFields.sharedProjectRevision,
-              parentSharedFields.sharedProjectStructureRevision,
-              parentSharedFields.sharedProjectBackendId
-            );
-            queueSharedProjectSheetsSnapshot('addSheet');
-          }
-          openedCount += 1;
-        } catch (error) {
-          console.warn('Failed to open project as tab', error);
-          failedCount += 1;
-        }
-      }
-      if (!openedCount) {
-        if (truncatedCount > 0 || failedCount > 0) {
-          updateAutosaveStatus(
-            localizeText(
-              `複数読み込みに失敗しました（失敗 ${failedCount} / 上限で未追加 ${truncatedCount}）`,
-              `Failed to open projects (failed ${failedCount} / skipped by limit ${truncatedCount})`
-            ),
-            'warn'
-          );
-        }
-        return false;
-      }
-      const summaryJa = `複数読み込み: 開いた ${openedCount}件`
-        + (failedCount > 0 ? ` / 失敗 ${failedCount}件` : '')
-        + (truncatedCount > 0 ? ` / 上限で未追加 ${truncatedCount}件（最大${MAX_PROJECT_SHEETS}）` : '');
-      const summaryEn = `Opened ${openedCount} project tab(s)`
-        + (failedCount > 0 ? ` / Failed ${failedCount}` : '')
-        + (truncatedCount > 0 ? ` / Skipped by limit ${truncatedCount} (max ${MAX_PROJECT_SHEETS})` : '');
-      updateAutosaveStatus(
-        localizeText(summaryJa, summaryEn),
-        (failedCount > 0 || truncatedCount > 0) ? 'warn' : 'success'
-      );
-      renderOpenProjectTabs();
-      return true;
-    } finally {
-      openProjectTabBusy = false;
-    }
+      perf?.mark?.(startMark);
+    } catch (_error) {}
+    return { name, details, perf, id, startMark, startedAt: perf?.now?.() ?? Date.now() };
+  }
+
+  function endImportPerformanceSpan(span, details = null) {
+    if (!span) return;
+    const finishedAt = span.perf?.now?.() ?? Date.now();
+    const endMark = `${span.id}:end`;
+    const mergedDetails = { ...(span.details || {}), ...(details || {}) };
+    try {
+      span.perf?.mark?.(endMark);
+      span.perf?.measure?.(span.name, span.startMark, endMark);
+    } catch (_error) {}
+    console.info('[pixiedraw:performance]', {
+      phase: span.name,
+      elapsedMs: Math.round(finishedAt - span.startedAt),
+      ...mergedDetails,
+    });
+  }
+
+  function getProjectCommandLockDescriptor(source = '', tabOptions = null) {
+    const sourceKind = String(tabOptions?.sourceKind || '');
+    if (sourceKind === 'import-gif') return { owner: 'gif-import', command: 'import-gif' };
+    if (sourceKind === 'import-image') return { owner: 'png-import', command: 'import-image' };
+    if (source === 'local-recent') return { owner: 'recent-project-open', command: 'append-recent-project' };
+    return { owner: 'project-open-input', command: 'append-project-input' };
   }
 
   async function openImageFileAsNewProject(file, { source = 'import', qrEditPayload = null } = {}) {
     if (!ensureCurrentClientCanReplaceActiveProject()) {
       return false;
     }
-    if (openProjectTabBusy) {
+    if (isProjectCommandLocked()) {
       return false;
     }
+    const lock = acquireProjectCommandLock({ owner: isGifFile?.(file) ? 'gif-import' : 'png-import', command: 'import-image-new-project' });
+    if (!lock?.ok) return false;
+    try {
     if (openProjectTabs.length && activeOpenProjectTabId) {
       const persistedCurrentProject = await persistActiveOpenProjectTab({ flushAutosave: true });
       if (!persistedCurrentProject) {
         return false;
       }
     }
-    const loaded = await loadDocumentFromImageFile(file);
-    if (!loaded) {
+    const candidate = await buildImageSheetImportCandidate(file, isGifFile?.(file) ? 'gif' : 'image');
+    if (!candidate?.project || typeof candidate.project !== 'object') {
       return false;
     }
-    const tab = resetOpenProjectTabsToCurrentProject({
-      source,
-      projectId: autosaveProjectId,
+    const loaded = await loadDocumentFromProjectPayload(candidate.project, {
+      suppressAutosaveStatus: true,
+      forceV2WorkingCopy: true,
+      sourceKind: candidate.sourceKind || 'import-image',
+      sourceProjectToken: candidate.sourceProjectToken || null,
+      sourceStorageAdapterId: null,
+      lastSavedStorageAdapterId: null,
+      sourcePersistenceState: {
+        sourceStorageAdapterId: null,
+        sourceKind: candidate.sourceKind || 'import-image',
+        sourceProjectToken: candidate.sourceProjectToken || null,
+        lastSavedStorageAdapterId: null,
+      },
       qrEditPayload,
     });
+    if (!loaded || loaded === 'deferred') return false;
+    const tab = getActiveOpenProjectTab?.() || null;
     if (qrEditPayload) {
       activateQrEditMode({
         ...qrEditPayload,
@@ -240,6 +112,9 @@
     }
     renderOpenProjectTabs();
     return true;
+    } finally {
+      releaseProjectCommandLock({ token: lock.token, owner: lock.owner });
+    }
   }
 
   async function openDocumentAsNewProject(item, { source = 'open' } = {}) {
@@ -250,12 +125,14 @@
       setMultiStatus(localizeText('参加/視聴モードでは読み込み/インポートはマスターのみ操作できます', 'In participant/viewer mode, only the master can open/import files'), 'warn');
       return false;
     }
-    if (openProjectTabBusy) {
+    if (isProjectCommandLocked()) {
       return false;
     }
 
     let file = null;
     let handle = null;
+    const lock = acquireProjectCommandLock({ owner: 'project-open-input', command: 'open-project-new' });
+    if (!lock?.ok) return false;
     try {
       if (item && typeof item.getFile === 'function') {
         handle = item;
@@ -266,21 +143,31 @@
     } catch (error) {
       console.warn('Document open failed', error);
       updateAutosaveStatus('ドキュメントを開けませんでした', 'error');
+      releaseProjectCommandLock({ token: lock.token, owner: lock.owner });
       return false;
     }
 
     if (file && isImportableImageFile(file)) {
+      releaseProjectCommandLock({ token: lock.token, owner: lock.owner });
       return await openImageFileAsNewProject(file, { source });
     }
-    if (!file || typeof file.text !== 'function') {
+    if (!file || typeof file.arrayBuffer !== 'function') {
       updateAutosaveStatus('ドキュメントを開けませんでした', 'error');
+      releaseProjectCommandLock({ token: lock.token, owner: lock.owner });
       return false;
     }
 
+    let preparedSnapshot = null;
     try {
-      const text = await file.text();
       try {
-        snapshotFromDocumentText(text);
+        if (typeof snapshotFromDocumentBlob === 'function') {
+          // Parse once before persisting the current project. The validated
+          // snapshot is handed to the actual load below, so large V1 JSON or
+          // V2 archives are not decoded and expanded a second time.
+          preparedSnapshot = await snapshotFromDocumentBlob(file);
+        } else {
+          preparedSnapshot = snapshotFromDocumentText(await file.text());
+        }
       } catch (parseError) {
         console.warn('Failed to parse document', parseError);
         updateAutosaveStatus('ドキュメントの読み込みに失敗しました', 'error');
@@ -292,7 +179,21 @@
           return false;
         }
       }
-      const loaded = await loadDocumentFromText(text, handle, { suppressAutosaveStatus: true });
+      const loaded = typeof loadDocumentFromBlob === 'function'
+        ? await loadDocumentFromBlob(file, handle, {
+          suppressAutosaveStatus: true,
+          sourceKind: 'file',
+          fileLoad: true,
+          sourceFileName: file.name || '',
+          preparedSnapshot,
+        })
+        : await loadDocumentFromText(await file.text(), handle, {
+          suppressAutosaveStatus: true,
+          sourceKind: 'file',
+          fileLoad: true,
+          sourceFileName: file.name || '',
+          preparedSnapshot,
+        });
       if (!loaded || loaded === 'deferred') {
         return false;
       }
@@ -306,6 +207,8 @@
       console.warn('Document load failed', error);
       updateAutosaveStatus('ドキュメントを開けませんでした', 'error');
       return false;
+    } finally {
+      releaseProjectCommandLock({ token: lock.token, owner: lock.owner });
     }
   }
 
@@ -327,6 +230,45 @@
     );
   }
 
+  function normalizeExternalProjectFileCandidate(project, sourceStorageAdapterId = null) {
+    if (!project || typeof project !== 'object' || Array.isArray(project)) {
+      return null;
+    }
+    if (project.canonicalPayloadFormat === 'v2') {
+      const validation = typeof validateCanonicalV2ProjectPayload === 'function'
+        ? validateCanonicalV2ProjectPayload(project)
+        : { ok: true };
+      return validation?.ok ? project : null;
+    }
+    if (typeof normalizeExternalProjectToCanonicalV2 !== 'function'
+      || typeof validateCanonicalV2ProjectPayload !== 'function') {
+      return project;
+    }
+    const normalized = normalizeExternalProjectToCanonicalV2({
+      sourceKind: 'file',
+      sourceAdapterId: typeof sourceStorageAdapterId === 'string' && sourceStorageAdapterId ? sourceStorageAdapterId : null,
+      decodedPayload: project,
+      sourceMetadata: {
+        importedFormat: sourceStorageAdapterId === 'pixieedraw-v1-json' ? 'v1-json' : 'external-project',
+      },
+    });
+    if (!normalized?.ok || !normalized.canonicalPayload) {
+      return null;
+    }
+    const validation = validateCanonicalV2ProjectPayload(normalized.canonicalPayload);
+    if (!validation?.ok) {
+      return null;
+    }
+    console.info('[pixiedraw:canonical-import]', {
+      phase: 'file-tab-normalize-success',
+      sourceAdapterId: sourceStorageAdapterId || null,
+      typedByteLength: normalized.metrics?.typedByteLength || 0,
+      sheetCount: normalized.metrics?.sheetCount || 0,
+      frameCount: normalized.metrics?.frameCount || 0,
+    });
+    return normalized.canonicalPayload;
+  }
+
   async function readProjectPayloadFromOpenItem(item) {
     if (!item) {
       return null;
@@ -336,6 +278,14 @@
         project: item.project,
         fileName: resolveOpenProjectPayloadFileName(item.project, item.name || item.fileName || DEFAULT_DOCUMENT_NAME),
         unsaved: Boolean(item.unsaved),
+        sourceStorageAdapterId: item.sourceStorageAdapterId || null,
+        sourceKind: item.sourceKind || 'unknown',
+        sourceProjectId: item.projectId || item.sourceProjectId || item.id || null,
+        sourceSheetId: item.sourceSheetId || item.sheetId || null,
+        sourceProjectToken: item.sourceProjectToken || (typeof createProjectPersistenceToken === 'function'
+          ? createProjectPersistenceToken(item.sourceKind || 'unknown')
+          : null),
+        lastSavedStorageAdapterId: item.lastSavedStorageAdapterId || null,
       };
     }
     let file = null;
@@ -351,23 +301,54 @@
       file = item;
       fallbackName = item.name || DEFAULT_DOCUMENT_NAME;
     }
-    if (!file || isImportableImageFile(file) || typeof file.text !== 'function') {
+    if (!file || isImportableImageFile(file) || typeof file.arrayBuffer !== 'function') {
       return null;
     }
-    let parsed = null;
     try {
-      parsed = tryParseJsonSafe(await file.text());
+      if (typeof parseProjectStorageBlob === 'function') {
+        const parsedResult = await parseProjectStorageBlob(file);
+        const parsed = parsedResult && Object.prototype.hasOwnProperty.call(parsedResult, 'parsed')
+          ? parsedResult.parsed
+          : parsedResult;
+        const project = normalizeExternalProjectFileCandidate(parsed, parsedResult?.adapterId || null);
+        if (project && typeof project === 'object') {
+          return {
+            project,
+            fileName: resolveOpenProjectPayloadFileName(project, fallbackName),
+            unsaved: false,
+            sourceStorageAdapterId: parsedResult?.adapterId || null,
+            sourceKind: 'file',
+            sourceProjectId: null,
+            sourceSheetId: typeof project.activeSheetId === 'string' ? project.activeSheetId : null,
+            sourceProjectToken: typeof createProjectPersistenceToken === 'function'
+              ? createProjectPersistenceToken('file')
+              : null,
+            lastSavedStorageAdapterId: parsedResult?.adapterId || null,
+          };
+        }
+        return null;
+      }
+      const parsed = tryParseJsonSafe(await file.text());
+      const project = normalizeExternalProjectFileCandidate(parsed, null);
+      if (!project || typeof project !== 'object') {
+        return null;
+      }
+      return {
+        project,
+        fileName: resolveOpenProjectPayloadFileName(project, fallbackName),
+        unsaved: false,
+        sourceStorageAdapterId: null,
+        sourceKind: 'file',
+        sourceProjectId: null,
+        sourceSheetId: typeof project.activeSheetId === 'string' ? project.activeSheetId : null,
+        sourceProjectToken: typeof createProjectPersistenceToken === 'function'
+          ? createProjectPersistenceToken('file')
+          : null,
+        lastSavedStorageAdapterId: null,
+      };
     } catch (_error) {
       return null;
     }
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      return null;
-    }
-    return {
-      project: parsed,
-      fileName: resolveOpenProjectPayloadFileName(parsed, fallbackName),
-      unsaved: false,
-    };
   }
 
   async function appendProjectPayloadAsOpenTab({
@@ -377,14 +358,20 @@
     unsaved = false,
     source = 'open',
     tabOptions = null,
+    sourceStorageAdapterId = null,
+    sourceKind = 'unknown',
+    sourceProjectToken = null,
+    lastSavedStorageAdapterId = null,
+    isImportedSheet = false,
+    canonicalPayloadFormat = '',
+    canonicalSourceMetadata = null,
   } = {}) {
     if (!project || typeof project !== 'object') {
       return null;
     }
-    const sharedFields = buildActiveSharedProjectSheetTabFields(parentProjectId);
     const normalizedParentProjectId = normalizeAutosaveProjectId(parentProjectId || autosaveProjectId || '')
       || createAutosaveProjectId();
-    const tabProjectId = sharedFields?.projectId || normalizedParentProjectId;
+    const tabProjectId = normalizedParentProjectId;
     const previousActiveId = activeOpenProjectTabId;
     const nextTab = createOpenProjectSheetTabFromPackagedProject({
       project,
@@ -392,38 +379,41 @@
       fileName,
       label: extractDocumentBaseName(fileName),
       unsaved,
-      source: sharedFields ? 'shared-sheet' : source,
+      source,
       updatedAt: project?.updatedAt || new Date().toISOString(),
       qrEditPayload: tabOptions?.qrEditPayload || null,
-      ...(sharedFields || {}),
+      sourceStorageAdapterId,
+      sourceKind,
+      sourceProjectToken,
+      lastSavedStorageAdapterId,
+      isImportedSheet,
     });
     if (!nextTab) {
       return null;
     }
+    if (canonicalPayloadFormat === 'v2') {
+      nextTab.canonicalPayloadFormat = 'v2';
+      nextTab.canonicalSchemaVersion = Math.max(1, Math.round(Number(project?.canonicalSchemaVersion) || 1));
+      nextTab.canonicalSourceMetadata = canonicalSourceMetadata && typeof canonicalSourceMetadata === 'object'
+        ? canonicalSourceMetadata
+        : null;
+    }
+    nextTab.residentProjectLoaded = true;
     openProjectTabs.push(nextTab);
     activeOpenProjectTabId = nextTab.id;
     suppressOpenProjectTabAutoInitialize = false;
     renderOpenProjectTabs();
-    const sharedLoadOptions = sharedFields
-      ? {
-        sharedProjectKey: sharedFields.sharedProjectKey,
-        sharedProjectBackendId: sharedFields.sharedProjectBackendId,
-        sharedProjectRevision: sharedFields.sharedProjectRevision,
-        sharedProjectStructureRevision: sharedFields.sharedProjectStructureRevision,
-        sharedRoleHint: sharedFields.sharedRoleHint,
-        sharedAutoJoin: sharedFields.sharedAutoJoin,
-        preserveDocumentIds: true,
-        preserveCanvasIds: true,
-        preserveFrameIds: true,
-        preserveLayerIds: true,
-      }
-      : {};
     const loaded = await loadDocumentFromProjectPayload(project, {
       projectId: tabProjectId,
       suppressAutosaveStatus: true,
       qrEditPayload: tabOptions?.qrEditPayload || null,
       suppressProjectSheetsRestore: true,
-      ...sharedLoadOptions,
+      sourcePersistenceState: {
+        sourceStorageAdapterId,
+        sourceKind,
+        sourceProjectToken,
+        lastSavedStorageAdapterId,
+      },
     });
     if (!loaded || loaded === 'deferred') {
       const insertedIndex = findOpenProjectTabIndex(nextTab.id);
@@ -436,15 +426,28 @@
       return null;
     }
     queueProjectTabViewportReset(nextTab.id);
-    if (sharedFields) {
-      queueSharedProjectSheetsSnapshot('addSheet');
-    }
     return openProjectTabs[findOpenProjectTabIndex(nextTab.id)] || nextTab;
   }
 
   async function loadRecentProjectPackagedPayload(entry) {
     if (!entry || typeof entry !== 'object') {
       return null;
+    }
+    if (Number(entry.autosaveSchemaVersion) === 2 && typeof readAutosaveV2PrimaryProject === 'function') {
+      try {
+        const restored = await readAutosaveV2PrimaryProject(entry.id);
+        if (restored && typeof restored === 'object') {
+          return restored;
+        }
+      } catch (error) {
+        console.warn('Failed to restore V2 recent project payload', error);
+      }
+    }
+    if (typeof reconstructLocalRecentProjectPayload === 'function') {
+      const reconstructed = reconstructLocalRecentProjectPayload(entry);
+      if (reconstructed && typeof reconstructed === 'object') {
+        return reconstructed;
+      }
     }
     if (entry.project && typeof entry.project === 'object') {
       return entry.project;
@@ -471,6 +474,7 @@
     updatedAt = '',
     activateOptions = {},
     skipBusyGuardOnActivate = false,
+    commandLock = null,
     ...extraTabFields
   } = {}) {
     if (!project || typeof project !== 'object') {
@@ -486,13 +490,11 @@
           skipPersistCurrent: true,
           announce: false,
           skipBusyGuard: skipBusyGuardOnActivate,
+          commandLock,
           ...activateOptions,
         });
         return activated ? existingTab : null;
       }
-    }
-    if (openProjectTabs.length >= MAX_PROJECT_SHEETS) {
-      return null;
     }
     const normalizedFileName = normalizeDocumentName(fileName || project?.documentName || DEFAULT_DOCUMENT_NAME);
     const newTabId = createOpenProjectTabId();
@@ -505,6 +507,7 @@
       unsaved: Boolean(unsaved),
       source,
       updatedAt: updatedAt || project?.updatedAt || new Date().toISOString(),
+      residentProjectLoaded: source === 'open',
       ...extraTabFields,
     };
     openProjectTabs.push(nextTab);
@@ -514,6 +517,7 @@
       skipPersistCurrent: true,
       announce: false,
       skipBusyGuard: skipBusyGuardOnActivate,
+      commandLock,
       ...activateOptions,
     });
     if (!activated) {
@@ -527,49 +531,6 @@
     return openProjectTabs[findOpenProjectTabIndex(newTabId)] || nextTab;
   }
 
-  async function createNewProjectAsTab({
-    name,
-    width,
-    height,
-    palettePreset = newProjectPalettePresetId,
-    promptExportDirectory = false,
-  }) {
-    if (openProjectTabBusy) {
-      updateAutosaveStatus(localizeText('プロジェクト切替の完了を待ってください', 'Wait for the current project switch to finish'), 'info');
-      return false;
-    }
-    ensureOpenProjectTabsInitialized();
-    const closedCurrentProject = await closeAllOpenProjectTabsForProjectReplacement({ flushAutosave: true, showHome: false });
-    if (!closedCurrentProject) {
-      return false;
-    }
-    openProjectTabBusy = true;
-    try {
-      const created = await createNewProject({
-        name,
-        width,
-        height,
-        palettePreset,
-        promptExportDirectory,
-        ensureTab: false,
-      });
-      if (!created) {
-        return false;
-      }
-      resetOpenProjectTabsToCurrentProject({
-        source: 'new-project',
-        projectId: autosaveProjectId,
-      });
-      updateAutosaveStatus(
-        localizeText('新規プロジェクトを作成しました', 'Created new project'),
-        'success'
-      );
-      return true;
-    } finally {
-      openProjectTabBusy = false;
-    }
-  }
-
   async function openRecentProjectAsTab(entry, { hideStartup = true, appendOnly = false } = {}) {
     if (!entry || typeof entry !== 'object') {
       return false;
@@ -581,14 +542,11 @@
       if (!ensureCurrentClientCanReplaceActiveProject()) {
         return false;
       }
-      const sharedEntryForTab = normalizeSharedRecentProjectEntry(entry);
-      const projectId = sharedEntryForTab
-        ? buildSharedRecentProjectId(sharedEntryForTab.sharedProjectKey || '')
-        : normalizeAutosaveProjectId(entry.id || '');
-      const latestEntry = projectId && !sharedEntryForTab
+      const projectId = normalizeAutosaveProjectId(entry.id || '');
+      const latestEntry = projectId
         ? ((await loadRecentProjectsMetadata()).find(candidate => candidate?.id === projectId) || entry)
         : entry;
-      if (openProjectTabBusy) {
+      if (isProjectCommandLocked()) {
         updateAutosaveStatus(localizeText('プロジェクト切替の完了を待ってください', 'Wait for the current project switch to finish'), 'info');
         return false;
       }
@@ -600,19 +558,10 @@
       if (existingSwitch.found) {
         return existingSwitch.switched;
       }
-      if (openProjectTabs.length >= MAX_PROJECT_SHEETS) {
-        updateAutosaveStatus(
-          localizeText(
-            `シートは最大 ${MAX_PROJECT_SHEETS} 枚です`,
-            `You can add up to ${MAX_PROJECT_SHEETS} sheets`
-          ),
-          'warn'
-        );
-        return false;
-      }
       const shouldReuseActiveTab = !appendOnly && canReuseActiveOpenProjectTabForRecentEntry(entry);
-      const source = sharedEntryForTab ? 'shared-recent' : 'local-recent';
-      openProjectTabBusy = true;
+      const source = 'local-recent';
+      const lock = acquireProjectCommandLock({ owner: 'recent-project-open', command: 'open-recent-project' });
+      if (!lock?.ok) return false;
       try {
         await persistActiveOpenProjectTab({ flushAutosave: true });
         const packaged = await loadRecentProjectPackagedPayload(latestEntry);
@@ -631,18 +580,11 @@
             source,
             updatedAt: latestEntry?.updatedAt || packaged?.updatedAt || new Date().toISOString(),
             skipBusyGuardOnActivate: true,
+            commandLock: lock,
             activateOptions: {
               skipPersistCurrent: true,
               announce: false,
             },
-            ...(sharedEntryForTab ? {
-              sharedProjectKey: sharedEntryForTab.sharedProjectKey || '',
-              sharedProjectBackendId: sharedEntryForTab.sharedProjectBackendId || '',
-              sharedProjectRevision: sharedEntryForTab.sharedProjectRevision || 0,
-              sharedProjectStructureRevision: sharedEntryForTab.sharedProjectStructureRevision || 0,
-              sharedRoleHint: sharedEntryForTab.sharedRoleHint || 'guest',
-              sharedAutoJoin: sharedEntryForTab.sharedAutoJoin !== false,
-            } : {}),
           });
           if (!nextTab) {
             return false;
@@ -652,9 +594,7 @@
             hideStartupScreen();
           }
           updateAutosaveStatus(
-            Boolean(sharedEntryForTab)
-              ? localizeText('共有プロジェクトをシートとして追加しました', 'Added shared project as a sheet')
-              : localizeText('端末内プロジェクトをシートとして追加しました', 'Added local project as a sheet'),
+            localizeText('端末内プロジェクトをシートとして追加しました', 'Added local project as a sheet'),
             'success'
           );
           return true;
@@ -671,23 +611,11 @@
           ? replaceActiveOpenProjectTabFromCurrentState({
               source,
               projectId: projectId || autosaveProjectId,
-              sharedProjectKey: sharedEntryForTab?.sharedProjectKey || '',
-              sharedProjectBackendId: sharedEntryForTab?.sharedProjectBackendId || '',
-              sharedProjectRevision: sharedEntryForTab?.sharedProjectRevision || 0,
-              sharedProjectStructureRevision: sharedEntryForTab?.sharedProjectStructureRevision || 0,
-              sharedRoleHint: sharedEntryForTab?.sharedRoleHint || 'guest',
-              sharedAutoJoin: sharedEntryForTab?.sharedAutoJoin !== false,
             })
           : appendOpenProjectTabFromCurrentState({
               activate: true,
               source,
               projectId: projectId || autosaveProjectId,
-              sharedProjectKey: sharedEntryForTab?.sharedProjectKey || '',
-              sharedProjectBackendId: sharedEntryForTab?.sharedProjectBackendId || '',
-              sharedProjectRevision: sharedEntryForTab?.sharedProjectRevision || 0,
-              sharedProjectStructureRevision: sharedEntryForTab?.sharedProjectStructureRevision || 0,
-              sharedRoleHint: sharedEntryForTab?.sharedRoleHint || 'guest',
-              sharedAutoJoin: sharedEntryForTab?.sharedAutoJoin !== false,
             });
         if (!nextTab) {
           return false;
@@ -697,14 +625,13 @@
           hideStartupScreen();
         }
         updateAutosaveStatus(
-          Boolean(sharedEntryForTab)
-            ? localizeText('共有プロジェクトをシートとして追加しました', 'Added shared project as a sheet')
-            : localizeText('端末内プロジェクトをシートとして追加しました', 'Added local project as a sheet'),
+          localizeText('端末内プロジェクトをシートとして追加しました', 'Added local project as a sheet'),
           'success'
         );
         return true;
       } finally {
-        openProjectTabBusy = false;
+        releaseProjectCommandLock({ token: lock.token, owner: lock.owner });
+        renderOpenProjectTabs();
       }
     } finally {
       if (typeof endStartupProgress === 'function') {
@@ -713,135 +640,75 @@
     }
   }
 
-  async function openDocumentDialog(options = {}) {
-    if (!ensureCurrentClientCanReplaceActiveProject()) {
-      return false;
-    }
+  async function openDocumentDialog() {
+    if (!ensureCurrentClientCanReplaceActiveProject()) return false;
     if (!canCurrentClientImportExternalData()) {
-      setMultiStatus(localizeText('参加/視聴モードでは読み込み/インポートはマスターのみ操作できます', 'In participant/viewer mode, only the master can open/import files'), 'warn');
+      setMultiStatus(
+        localizeText(
+          '参加/視聴モードでは読み込み/インポートはマスターのみ操作できます',
+          'In participant/viewer mode, only the master can open/import files'
+        ),
+        'warn'
+      );
       return false;
     }
-    const mode = normalizeExternalImportMode(options?.mode);
     if (typeof window.showOpenFilePicker === 'function') {
       try {
         const handles = await window.showOpenFilePicker({
-          multiple: mode !== EXTERNAL_IMPORT_MODE_NEW_PROJECT,
+          multiple: false,
           excludeAcceptAllOption: false,
-          types: [
-            {
-              description: '対応ファイル (PiXiEEDraw / PNG / GIF)',
-              accept: {
-                'application/json': ['.json', '.pxdraw', '.pixieedraw'],
-                'application/x-pixieedraw': ['.pixieedraw'],
-                'image/png': ['.png'],
-                'image/gif': ['.gif'],
-              },
+          types: [{
+            description: 'PiXiEEDraw project or image',
+            accept: {
+              'application/x-pixieedraw': ['.pixieedraw', '.pxdraw'],
+              'application/json': ['.json'],
+              'image/png': ['.png'],
+              'image/jpeg': ['.jpg', '.jpeg'],
+              'image/webp': ['.webp'],
+              'image/gif': ['.gif'],
             },
-          ],
+          }],
         });
-        if (!Array.isArray(handles) || !handles.length) {
-          return false;
-        }
-        if (mode === EXTERNAL_IMPORT_MODE_NEW_PROJECT) {
-          return await openDocumentAsNewProject(handles[0], { source: 'open-picker' });
-        }
-        return await openDocumentsAsProjectTabs(
-          handles,
-          async handle => loadDocumentFromHandle(handle, { suppressAutosaveStatus: true }),
-          { source: 'open-picker' }
-        );
+        if (!Array.isArray(handles) || !handles.length) return false;
+        return await openDocumentAsNewProject(handles[0], { source: 'open-picker' });
       } catch (error) {
-        if (error && error.name === 'AbortError') {
-          return false;
-        }
-        console.warn('Document open failed', error);
-        return openDocumentViaInput({ mode });
+        if (error?.name === 'AbortError') return false;
+        console.warn('Open picker failed; using file input fallback', error);
       }
     }
-    return openDocumentViaInput({ mode });
+    return openDocumentViaInput();
   }
 
-  function openDocumentViaInput(options = {}) {
-    const mode = normalizeExternalImportMode(options?.mode);
+  function openDocumentViaInput() {
     return new Promise(resolve => {
       const input = document.createElement('input');
       input.type = 'file';
-      input.multiple = mode !== EXTERNAL_IMPORT_MODE_NEW_PROJECT;
-      const acceptTypes = [
-        '.json',
-        '.pxdraw',
-        '.pixieedraw',
-        '.png',
-        '.gif',
-        'application/json',
-        'application/x-pixieedraw',
-        'image/png',
-        'image/gif',
-      ];
-      if (IS_IOS_DEVICE) {
-        acceptTypes.push('.txt', 'text/plain');
-      }
-      input.accept = acceptTypes.join(',');
-      input.style.display = 'none';
-      let settled = false;
-      const finish = success => {
-        if (settled) return;
-        settled = true;
-        resolve(Boolean(success));
-      };
+      input.accept = '.pixieedraw,.pxdraw,.json,.png,.jpg,.jpeg,.webp,.gif';
+      input.multiple = false;
+      input.hidden = true;
       const cleanup = () => {
         input.value = '';
         input.remove();
       };
       input.addEventListener('change', async () => {
-        const files = Array.from(input.files || []);
+        const file = input.files?.[0] || null;
         cleanup();
-        if (!files.length) {
-          finish(false);
+        if (!file) {
+          resolve(false);
           return;
         }
         try {
-          if (mode === EXTERNAL_IMPORT_MODE_NEW_PROJECT) {
-            const opened = await openDocumentAsNewProject(files[0], { source: 'open-input' });
-            finish(opened);
-            return;
-          }
-          const opened = await openDocumentsAsProjectTabs(
-            files,
-            async file => {
-              if (isImportableImageFile(file)) {
-                return await loadDocumentFromImageFile(file);
-              }
-              const text = await file.text();
-              return await loadDocumentFromText(text, null, { suppressAutosaveStatus: true });
-            },
-            { source: 'open-input' }
-          );
-          finish(opened);
+          resolve(await openDocumentAsNewProject(file, { source: 'open-input' }));
         } catch (error) {
-          console.warn('Document load failed', error);
-          updateAutosaveStatus('ドキュメントを開けませんでした', 'error');
-          finish(false);
+          console.warn('Document input open failed', error);
+          updateAutosaveStatus(localizeText('ファイルを開けませんでした', 'Unable to open the file'), 'error');
+          resolve(false);
         }
-      });
-      input.addEventListener('cancel', () => {
-        cleanup();
-        finish(false);
-      });
-      input.addEventListener('click', () => {
-        input.value = '';
-      });
+      }, { once: true });
       document.body.appendChild(input);
-      try {
-        input.click();
-      } catch (error) {
-        cleanup();
-        updateAutosaveStatus('ドキュメントを開けませんでした', 'error');
-        finish(false);
-      }
+      input.click();
     });
   }
-
   function isGifFile(file) {
     if (!file) return false;
     const type = typeof file.type === 'string' ? file.type.toLowerCase() : '';
@@ -929,22 +796,161 @@
     }
   }
 
-  async function loadDocumentFromImageFile(file) {
-    if (!ensureCurrentClientCanReplaceActiveProject()) {
+  async function normalizeExternalRasterSheetCandidate(project, file, metrics = {}) {
+    const kind = metrics.kind === 'gif' ? 'gif' : 'image';
+    const documentValue = project?.document && typeof project.document === 'object' ? project.document : {};
+    const sourceFileBytes = Math.max(0, Number(metrics.sourceFileBytes ?? file?.size) || 0);
+    const sourceWidth = Math.max(0, Number(metrics.sourceWidth) || Number(project?.document?.width) || Number(project?.document?.canvases?.[0]?.width) || 0);
+    const sourceHeight = Math.max(0, Number(metrics.sourceHeight) || Number(project?.document?.height) || Number(project?.document?.canvases?.[0]?.height) || 0);
+    if (typeof normalizeExternalProjectToCanonicalV2 !== 'function') {
+      return { ok: false, code: 'ERR_CANONICAL_V2_NORMALIZER_UNAVAILABLE', phase: 'normalize' };
+    }
+    if (typeof validateCanonicalV2ProjectPayload !== 'function') {
+      return { ok: false, code: 'ERR_CANONICAL_V2_VALIDATOR_UNAVAILABLE', phase: 'validate' };
+    }
+    console.info('[pixieedraw-dev:canonical-import]', {
+      phase: 'normalize-start', kind, sourceFileBytes, sourceWidth, sourceHeight,
+    });
+    const normalizeSpan = beginImportPerformanceSpan('pixiedraw:import:canonical-normalize');
+    let normalized;
+    try {
+      const sourceProvenance = typeof createRasterImportProvenance === 'function'
+        ? await createRasterImportProvenance({ file, project, kind })
+        : null;
+      normalized = normalizeExternalProjectToCanonicalV2({
+        sourceKind: kind === 'gif' ? 'import-gif' : 'import-image',
+        sourceAdapterId: null,
+        decodedPayload: project,
+        sourceMetadata: {
+          sourceMimeType: kind === 'gif' ? 'image/gif' : (typeof file?.type === 'string' ? file.type : 'image/png'),
+          sourceFileName: typeof file?.name === 'string' ? file.name : '',
+          sourceFileBytes,
+          sourceWidth,
+          sourceHeight,
+          sourceProvenance,
+          projectOriginality: typeof normalizeProjectOriginalityMetadata === 'function'
+            ? normalizeProjectOriginalityMetadata(null, kind === 'gif' ? 'import-gif' : 'import-image')
+            : null,
+          ...(kind === 'gif' ? {
+            sourceFrameCount: Math.max(1, Number(documentValue?.frames?.length) || Number(documentValue?.canvases?.[0]?.frames?.length) || 1),
+            gifLoopCount: null,
+          } : {}),
+        },
+      });
+    } finally {
+      endImportPerformanceSpan(normalizeSpan);
+    }
+    if (!normalized?.ok || !normalized.canonicalPayload) {
+      return { ok: false, code: normalized?.code || 'ERR_CANONICAL_V2_NORMALIZE_FAILED', phase: normalized?.phase || 'normalize' };
+    }
+    const validationSpan = beginImportPerformanceSpan('pixiedraw:import:canonical-validate');
+    let validation;
+    try {
+      validation = validateCanonicalV2ProjectPayload(normalized.canonicalPayload);
+    } finally {
+      endImportPerformanceSpan(validationSpan);
+    }
+    if (!validation?.ok) {
+      return { ok: false, code: validation?.code || 'ERR_CANONICAL_V2_CANDIDATE_INVALID', phase: validation?.phase || 'validate' };
+    }
+    console.info('[pixieedraw-dev:canonical-import]', {
+      phase: 'normalize-success', kind,
+      sourceFileBytes,
+      sourceWidth,
+      sourceHeight,
+      sheetCount: normalized.metrics?.sheetCount || 0,
+      canvasCount: normalized.metrics?.canvasCount || 0,
+      layerCount: normalized.metrics?.layerCount || 0,
+      frameCount: normalized.metrics?.frameCount || 0,
+      bitmapCount: normalized.metrics?.bitmapCount || 0,
+      typedByteLength: normalized.metrics?.typedByteLength || 0,
+      warningCount: normalized.metrics?.warningCount || 0,
+    });
+    return { ok: true, canonicalPayload: normalized.canonicalPayload, metrics: normalized.metrics || {} };
+  }
+
+  async function buildImageSheetImportCandidate(file, kind = 'image') {
+    // Kept as an explicit classification for the PNG-specific regression
+    // checks; canonicalization itself now covers every raster input.
+    const isPng = kind === 'image' && (() => {
+      const type = typeof file?.type === 'string' ? file.type.toLowerCase() : '';
+      const name = typeof file?.name === 'string' ? file.name.toLowerCase() : '';
+      return type === 'image/png' || name.endsWith('.png');
+    })();
+    const isGif = kind === 'gif';
+    const sourceFileBytes = Math.max(0, Number(file?.size) || 0);
+    console.info('[pixieedraw-dev:canonical-import]', { phase: 'decode-start', kind, sourceFileBytes });
+    let project = null;
+    try {
+      project = await loadDocumentFromImageFile(file, { applyToRuntime: false });
+    } catch (error) {
+      console.warn('[pixieedraw-dev:canonical-import]', { phase: 'decode-failed', kind, sourceFileBytes, code: 'ERR_EXTERNAL_DECODE_FAILED' });
+      throw error;
+    }
+    if (!project || typeof project !== 'object') {
       return false;
     }
-    deactivateQrEditMode();
+    const documentValue = project.document && typeof project.document === 'object' ? project.document : {};
+    const canvasCount = Array.isArray(documentValue.canvases) && documentValue.canvases.length
+      ? documentValue.canvases.length
+      : 1;
+    const sourceWidth = Math.max(0, Number(documentValue.width) || Number(documentValue.canvases?.[0]?.width) || 0);
+    const sourceHeight = Math.max(0, Number(documentValue.height) || Number(documentValue.canvases?.[0]?.height) || 0);
+    const normalized = await normalizeExternalRasterSheetCandidate(project, file, {
+      kind: isGif ? 'gif' : 'image', sourceFileBytes, sourceWidth, sourceHeight,
+    });
+    if (!normalized?.ok) {
+      console.warn('[pixieedraw-dev:canonical-import]', {
+        phase: 'normalize-failed', kind, sourceFileBytes, sourceWidth, sourceHeight,
+        code: normalized?.code || 'ERR_CANONICAL_V2_NORMALIZE_FAILED',
+      });
+      const error = new Error('ERR_CANONICAL_V2_CANDIDATE_INVALID');
+      error.code = 'ERR_CANONICAL_V2_CANDIDATE_INVALID';
+      error.causeCode = normalized?.code || 'ERR_CANONICAL_V2_NORMALIZE_FAILED';
+      throw error;
+    }
+    project = normalized.canonicalPayload;
+    return {
+      project,
+      fileName: normalizeDocumentName(typeof file?.name === 'string' ? file.name : DEFAULT_DOCUMENT_NAME),
+      sourceStorageAdapterId: null,
+      sourceKind: kind === 'gif' ? 'import-gif' : 'import-image',
+      sourceProjectToken: typeof createProjectPersistenceToken === 'function'
+        ? createProjectPersistenceToken(kind === 'gif' ? 'gif' : 'image')
+        : null,
+      lastSavedStorageAdapterId: null,
+      isImportedSheet: true,
+      canonicalPayloadFormat: project.canonicalPayloadFormat || '',
+    };
+  }
+
+  async function loadDocumentFromImageFile(file, { applyToRuntime = true } = {}) {
+    if (applyToRuntime && !ensureCurrentClientCanReplaceActiveProject()) {
+      return false;
+    }
+    if (applyToRuntime) {
+      deactivateQrEditMode();
+    }
     const closeLoading = beginBlockingGlobalLoading(
       localizeText('画像を読み込み中…', 'Loading image...'),
       { immediate: true }
     );
+    const importSpan = beginImportPerformanceSpan('pixiedraw:import:total', {
+      fileName: typeof file?.name === 'string' ? file.name : '',
+      fileBytes: Math.max(0, Number(file?.size) || 0),
+    });
     let importResult;
     try {
       setGlobalLoadingIndicatorLabel(localizeText('画像をデコード中…', 'Decoding image...'));
+      const decodeSpan = beginImportPerformanceSpan('pixiedraw:import:decode');
       try {
         importResult = await decodeImageFileToFrames(file);
       } catch (error) {
         throw createImageImportError('画像を読み込めませんでした', error);
+      } finally {
+        endImportPerformanceSpan(decodeSpan, {
+          frameCount: Array.isArray(importResult?.frames) ? importResult.frames.length : 0,
+        });
       }
 
       const framesData = Array.isArray(importResult?.frames) ? importResult.frames : [];
@@ -963,9 +969,21 @@
       const width = importSize.width;
       const height = importSize.height;
       setGlobalLoadingIndicatorLabel(localizeText('フルカラー画像を準備中…', 'Preparing full-color frames...'));
-      const normalizedFramesData = importSize.scaled
-        ? resizeImportFrames(framesData, width, height)
-        : framesData;
+      const resizeSpan = beginImportPerformanceSpan('pixiedraw:import:resize', {
+        sourceWidth: inferredWidth,
+        sourceHeight: inferredHeight,
+        targetWidth: width,
+        targetHeight: height,
+        scaled: importSize.scaled === true,
+      });
+      let normalizedFramesData;
+      try {
+        normalizedFramesData = importSize.scaled
+          ? resizeImportFrames(framesData, width, height)
+          : framesData;
+      } finally {
+        endImportPerformanceSpan(resizeSpan, { frameCount: framesData.length });
+      }
 
     const frames = [];
     const palette = createRgbModeDefaultPalette();
@@ -975,6 +993,12 @@
       ? { ...palette[activePaletteIndex] }
       : { r: 255, g: 255, b: 255, a: 255 };
 
+    const runtimeFramesSpan = beginImportPerformanceSpan('pixiedraw:import:runtime-frames', {
+      width,
+      height,
+      frameCount: normalizedFramesData.length,
+    });
+    try {
     normalizedFramesData.forEach((frameInfo, index) => {
       const layer = createLayer(localizeText('画像レイヤー', 'Image Layer'), width, height);
       layer.indices.fill(-1);
@@ -984,10 +1008,8 @@
         && frameInfo.imageData.width === width
         && frameInfo.imageData.height === height) {
         direct.set(frameInfo.imageData.data);
-        layer.importSourceDirect = new Uint8ClampedArray(frameInfo.imageData.data);
       } else {
         direct.fill(0);
-        layer.importSourceDirect = new Uint8ClampedArray(direct);
       }
       frames.push({
         id: crypto.randomUUID ? crypto.randomUUID() : `frame-${Date.now().toString(36)}-${index}`,
@@ -996,6 +1018,9 @@
         layers: [layer],
       });
     });
+    } finally {
+      endImportPerformanceSpan(runtimeFramesSpan, { createdFrameCount: frames.length });
+    }
 
     const activeLayerId = frames[0]?.layers[0]?.id;
     if (!activeLayerId) {
@@ -1006,7 +1031,10 @@
     const documentName = normalizeDocumentName(typeof file?.name === 'string' ? file.name : state.documentName);
     const activeToolGroup = TOOL_GROUPS[state.activeToolGroup] ? state.activeToolGroup : (TOOL_TO_GROUP[state.tool] || 'pen');
 
-    setGlobalLoadingIndicatorLabel(localizeText('プロジェクトへ反映中…', 'Applying project...'));
+    setGlobalLoadingIndicatorLabel(localizeText(
+      applyToRuntime ? 'プロジェクトへ反映中…' : 'シートを準備中…',
+      applyToRuntime ? 'Applying project...' : 'Preparing sheet...'
+    ));
     const snapshot = {
       width,
       height,
@@ -1045,7 +1073,23 @@
       activeRightTab: state.activeRightTab ?? 'frames',
     };
 
-    applyHistorySnapshot(snapshot, { forcePalettePresetSync: true, preservePersonalPreferences: false });
+    if (!applyToRuntime) {
+      if (typeof buildPackagedProjectPayload !== 'function') {
+        throw new Error('ERR_PROJECT_PAYLOAD_BUILDER_UNAVAILABLE');
+      }
+      return buildPackagedProjectPayload(snapshot, { includeSheets: false });
+    }
+
+    const applySnapshotSpan = beginImportPerformanceSpan('pixiedraw:import:apply-history-snapshot', {
+      frameCount: frames.length,
+      width,
+      height,
+    });
+    try {
+      applyHistorySnapshot(snapshot, { forcePalettePresetSync: true, preservePersonalPreferences: false });
+    } finally {
+      endImportPerformanceSpan(applySnapshotSpan);
+    }
     history.past = [];
     history.future = [];
     history.pending = null;
@@ -1057,9 +1101,6 @@
     setTrackedProjectDotBaseline(snapshot, null);
     resetOpenedDocumentViewport({ defer: true });
 
-    autosaveHandle = null;
-    pendingAutosaveHandle = null;
-    clearPendingPermissionListener();
     setActiveAutosaveProjectId(createAutosaveProjectId());
     clearActiveSharedProjectSession();
     storeMultiProjectKey('');
@@ -1080,6 +1121,9 @@
     scheduleSessionPersist();
     return true;
     } finally {
+      endImportPerformanceSpan(importSpan, {
+        frameCount: Array.isArray(importResult?.frames) ? importResult.frames.length : 0,
+      });
       closeLoading();
     }
   }
@@ -1229,21 +1273,7 @@
     }
 
     try {
-      const appendToProject = shouldAppendExternalImportToProject(payload);
-      const imported = appendToProject
-        ? await openDocumentsAsProjectTabs(
-          [file],
-          async lensFile => {
-            const loaded = await loadDocumentFromImageFile(lensFile);
-            if (!loaded) {
-              return false;
-            }
-            await ensureAutosaveForLensImport();
-            return true;
-          },
-          { source: 'lens' }
-        )
-        : await openImageFileAsNewProject(file, { source: 'lens' });
+      const imported = await openImageFileAsNewProject(file, { source: 'lens' });
       if (!imported) {
         finalizeLensImportAttempt({ clearPayload: true });
         return false;
@@ -1359,29 +1389,10 @@
         rawValue: typeof payload.rawValue === 'string' ? payload.rawValue : '',
         editSize: payload.editSize,
       };
-      const appendToProject = shouldAppendExternalImportToProject(payload);
-      const imported = appendToProject
-        ? await openDocumentsAsProjectTabs(
-          [file],
-          async qrFile => {
-            const loaded = await loadDocumentFromImageFile(qrFile);
-            if (!loaded) {
-              return false;
-            }
-            await ensureAutosaveForLensImport();
-            return true;
-          },
-          {
-            source: 'qrmaker',
-            tabOptions: {
-              qrEditPayload,
-            },
-          }
-        )
-        : await openImageFileAsNewProject(file, {
-          source: 'qrmaker',
-          qrEditPayload,
-        });
+      const imported = await openImageFileAsNewProject(file, {
+        source: 'qrmaker',
+        qrEditPayload,
+      });
       if (!imported) {
         finalizeQrImportAttempt({ clearPayload: true });
         return false;
@@ -1420,16 +1431,16 @@
 
 
   return Object.freeze({
-    openDocumentsAsProjectTabs,
     openImageFileAsNewProject,
     openDocumentAsNewProject,
     tryParseJsonSafe,
     resolveOpenProjectPayloadFileName,
     readProjectPayloadFromOpenItem,
+    normalizePngSheetCandidate: normalizeExternalRasterSheetCandidate,
+    normalizeExternalRasterSheetCandidate,
     appendProjectPayloadAsOpenTab,
     loadRecentProjectPackagedPayload,
     appendPackagedProjectTab,
-    createNewProjectAsTab,
     openRecentProjectAsTab,
     openDocumentDialog,
     openDocumentViaInput,

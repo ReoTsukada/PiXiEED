@@ -6,7 +6,6 @@
     AUTOSAVE_SUPPORTED,
     STREAMING_HIDE_MONETIZATION_UI,
     TOP_UI_ACTION_FLOATING_PREVIEW_TOGGLE,
-    TOP_UI_ACTION_LOCAL_CANVAS_TOGGLE,
     TOP_UI_ACTION_MIRROR_POPUP,
     TOP_UI_ACTION_OPEN_DETAILS_PANEL,
     TOP_UI_ACTION_VIRTUAL_CURSOR_TOGGLE,
@@ -23,7 +22,6 @@
     syncExternalToolActionButtons,
     updateMirrorActionButtons,
     updateVirtualCursorActionToolButtons,
-    updateLocalCanvasActionToolButtons,
     updateFloatingPreviewActionToolButtons,
     setLocalizedTextContent,
     setLocalizedAttribute,
@@ -39,8 +37,6 @@
     applyHelpGuideSearchFilter,
     renderMirrorToolPopover,
     syncMirrorToolPopoverControls,
-    updateExportDestinationLabel,
-    updateExportFolderButtonLabel,
     updateExportScaleHint,
     renderOpenProjectTabs,
     syncControlsWithState,
@@ -118,7 +114,6 @@
       const actionLabels = {
         [TOP_UI_ACTION_MIRROR_POPUP]: { ja: '対称', en: 'Mirror', zh: '对称' },
         [TOP_UI_ACTION_VIRTUAL_CURSOR_TOGGLE]: { ja: '仮想カーソル', en: 'Virtual Cursor', zh: '虚拟光标' },
-        [TOP_UI_ACTION_LOCAL_CANVAS_TOGGLE]: { ja: 'マルチキャンバス', en: 'Multi Canvas', zh: '多画布' },
         [TOP_UI_ACTION_FLOATING_PREVIEW_TOGGLE]: { ja: '小窓プレビュー', en: 'Floating Preview', zh: '浮动预览' },
         [TOP_UI_ACTION_OPEN_DETAILS_PANEL]: { ja: '詳細', en: 'Details', zh: '详情' },
       };
@@ -195,7 +190,6 @@
       syncExternalToolActionButtons();
       updateMirrorActionButtons();
       updateVirtualCursorActionToolButtons();
-      updateLocalCanvasActionToolButtons();
       updateFloatingPreviewActionToolButtons();
     }
   
@@ -235,8 +229,8 @@
         curve: { ja: '曲線', en: 'Curve', zh: '曲线' },
         rect: { ja: '四角', en: 'Rectangle', zh: '矩形' },
         rectFill: { ja: '塗り四角', en: 'Filled Rect', zh: '填充矩形' },
-        ellipse: { ja: '丸', en: 'Ellipse', zh: '椭圆' },
-        ellipseFill: { ja: '塗り丸', en: 'Filled Ellipse', zh: '填充椭圆' },
+        ellipse: { ja: '丸', en: 'Circle', zh: '圆' },
+        ellipseFill: { ja: '塗り丸', en: 'Filled Circle', zh: '填充圆' },
         fill: { ja: '単色塗り', en: 'Solid Fill', zh: '单色填充' },
         fillDither: { ja: 'ディザ塗り', en: 'Dither Fill', zh: '抖动填充' },
         fillGradient: { ja: 'グラデーション塗り', en: 'Gradient Fill', zh: '渐变填充' },
@@ -305,41 +299,17 @@
       }
   
       setLocalizedTextContent('.startup-screen__subtitle', 'PiXiEEDraw（ピクシードロー）でドット絵づくり・アニメ制作をはじめよう', 'Start pixel art and animation with PiXiEEDraw');
-      setLocalizedTextContent('#startupActionResume', '最新の端末内プロジェクトを開く', 'Open Latest Local Project');
       setLocalizedTextContent('#startupActionNew', '新規作成', 'New Project');
       setLocalizedTextContent('#startupActionOpen', 'ファイルを開く', 'Open File');
+      setLocalizedTextContent('#startupWorkspaceTitle', 'プロジェクト一覧', 'Projects');
+      setLocalizedTextContent('#startupWorkspaceConnect', 'PiXiEEDフォルダに接続', 'Connect PiXiEED Folder');
       setLocalizedTextContent('#startupActionSkip', 'この画面を閉じる', 'Close');
       setLocalizedTextContent('#globalLoadingIndicatorCancel', 'キャンセル', 'Cancel');
       setLocalizedTextContent('#multiInviteShare', '共有', 'Share');
-      setLocalizedAttribute('#projectTabsBar', 'aria-label', 'プロジェクト内シート', 'Project Sheets');
-      setLocalizedAttribute('#projectTabsList', 'aria-label', 'シートタブ', 'Sheet Tabs');
-      setLocalizedTextContent('#projectHomeTitle', 'プロジェクト一覧', 'Projects');
+      setLocalizedTextContent('#projectHomeTitle', 'PiXiEEDrawをはじめる', 'Start PiXiEEDraw');
       setLocalizedTextContent('#projectHomeNew', '新規作成', 'New Project');
       setLocalizedTextContent('#projectHomeOpen', 'ファイルを開く', 'Open File');
-      setLocalizedTextContent('#projectHomeAccessTitle', 'コード適用', 'Apply Codes');
-      setLocalizedTextContent('#projectHomeAccessStatus', 'コード適用は停止中です。', 'Code application is disabled.');
-      setLocalizedTextContent('#projectHomeApplyAccessCode', '適用', 'Apply');
-      setLocalizedAttribute('#projectHomeJoinProjectKey', 'placeholder', 'コード適用は停止中です', 'Code application disabled');
-      setLocalizedTextContent('#projectHomeSupporterApply', '適用', 'Apply');
-      setLocalizedTextContent('#projectHomeSupporterPurchase', '利用停止中', 'Disabled');
-      setLocalizedAttribute('#projectHomeSupporterCode', 'placeholder', 'コード適用は停止中です', 'Code application disabled');
-      setLocalizedTextContent('#projectHomeRecentProjects .project-home-screen__section-title', 'プロジェクト', 'Projects');
-      setLocalizedTextContent('#startupRecentProjects .startup-screen__recent-title', 'プロジェクト一覧', 'Projects');
-      setLocalizedTextContent('#startupRecentAdContainer .export-ad__label', '広告', 'Ad');
-      setLocalizedTextContent(
-        '#startupScreenHint',
-        AUTOSAVE_SUPPORTED
-          ? '描画内容はこの端末に自動保存され、起動時に前回データを復元できます。'
-          : 'このブラウザでは自動保存が利用できません。保存/出力から手動保存してください。',
-        AUTOSAVE_SUPPORTED
-          ? 'Your drawing is autosaved on this device and restored when you reopen.'
-          : 'Autosave is not available in this browser. Please save manually from Save / Export.'
-      );
-      setLocalizedHtmlContent(
-        '#startupLensHint',
-        '写真をドット絵変換するなら <a href="../pixiee-lens/index.html" target="_blank" rel="noopener">PiXiEELENS</a>',
-        'Convert photos to pixel art with <a href="../pixiee-lens/index.html" target="_blank" rel="noopener">PiXiEELENS</a>.'
-      );
+      setLocalizedTextContent('.project-home-screen__actions a[href="../account/index.html"]', 'PiXiEED マイページ', 'PiXiEED My Page');
       setLocalizedTextContent('#updateToastCloseBtn', '閉じる', 'Close');
   
       applyTabLocalization();
@@ -478,9 +448,6 @@
       setLocalizedTextContent('#multiAssignBan', 'BAN', 'Ban');
   
       setLocalizedTextContent('#goHomeButton span:last-child', 'ホーム', 'Home');
-      setLocalizedTextContent('#pixieedAdFreeField > span', '広告非表示', 'Ads Hidden');
-      setLocalizedTextContent('#pixieedAdFreeStatus', '広告非表示が有効です。', 'Ads are hidden.');
-      setLocalizedTextContent('#pixieedAdFreePurchase', '利用可能', 'Available');
       setLocalizedTextContent('#multiEntryAccountCard .multi-account-card__head > span', '共有プロジェクトを作成', 'Create Shared Project');
       setLocalizedTextContent('#multiFlowAccountCard .multi-account-card__head > span', '共有プロジェクトを作成', 'Create Shared Project');
       setLocalizedTextContent('#multiEntryAccountLogin', 'ログインして共有を作成', 'Sign In to Create Shared Project');
@@ -540,13 +507,6 @@
       setLocalizedToggleLabel('toggleVirtualCursor', '仮想カーソル', 'Virtual Cursor');
       setLocalizedToggleLabel('toggleFloatingPreview', '小窓プレビュー', 'Floating Preview');
       setLocalizedToggleLabel('toggleCanvasResizeHandles', 'キャンバスサイズつまみ', 'Canvas Resize Handles');
-      setLocalizedTextContent('#localCanvasCountLabel', 'キャンバス数', 'Canvas Count');
-      setLocalizedAttribute('#toggleLocalCanvas', 'aria-label', 'マルチキャンバス', 'Multi Canvas');
-      setLocalizedAttribute('#toggleLocalCanvas', 'title', 'マルチキャンバス', 'Multi Canvas');
-      setLocalizedAttribute('#removeLocalCanvas', 'aria-label', 'マルチキャンバスを減らす', 'Remove multi canvas');
-      setLocalizedAttribute('#addLocalCanvas', 'aria-label', 'マルチキャンバスを増やす', 'Add multi canvas');
-      setLocalizedAttribute('#removeLocalCanvas', 'title', 'マルチキャンバスを減らす', 'Remove multi canvas');
-      setLocalizedAttribute('#addLocalCanvas', 'title', 'マルチキャンバスを増やす', 'Add multi canvas');
       setLocalizedTextContent('#voxelExtensionTitle', 'ボクセルモード', 'Voxel Mode');
       setLocalizedToggleLabel('toggleVoxelExtensionMode', 'ボクセルモード', 'Voxel Mode');
       setLocalizedTextContent('#voxelExtensionHint', 'ON にすると Front / Back / Left / Right / Top / Bottom の6面構成へ切り替わり、小窓プレビューを自動生成します。小窓をドラッグすると左右と上下に回転できます。', 'When enabled, the workspace switches to Front / Back / Left / Right / Top / Bottom and generates the floating preview automatically. Drag the floating preview to rotate horizontally and vertically.');
@@ -598,11 +558,12 @@
   
       setLocalizedTextContent('#newProject', '新規作成', 'New Project');
       setLocalizedTextContent('#openDocument', 'ファイルを開く', 'Open File');
-      setLocalizedTextContent('#showLocalProjects', '端末内プロジェクト', 'Local Projects');
-      setLocalizedTextContent('#exportProject', '保存/出力', 'Save / Export');
+      setLocalizedTextContent('#showLocalProjects', 'プロジェクト一覧', 'Projects');
+      setLocalizedTextContent('#exportProject', '出力設定を開く', 'Open Export Settings');
       setLocalizedTextContent('#clearCanvas', 'キャンバスをクリア', 'Clear Canvas');
-      setLocalizedTextContent('.file-panel-summary .help-text:nth-child(1)', '自動保存: ON（この端末）', 'Autosave: ON (this device)');
-      setLocalizedTextContent('.file-panel-summary .help-text:nth-child(2)', '配布用の保存は「保存/出力」から手動で行います。', 'Use "Save / Export" for distributable files.');
+      setLocalizedTextContent('.file-panel-summary .help-text:nth-child(1)', '描画は端末内V2へ自動保存し、10操作ごとに差分をチェックポイントへ統合します。', 'Drawing changes are autosaved to on-device V2 storage and compacted into a checkpoint every 10 operations.');
+      setLocalizedTextContent('.file-panel-summary .help-text:nth-child(2)', '外部ファイルへは自動出力しません。画像・GIF・PiXiEEDraw形式は出力パネルからダウンロードします。', 'Files are never exported automatically. Download images, GIFs, and PiXiEEDraw files from the Export panel.');
+      setLocalizedTextContent('label[for="toggleAutosaveRequired"] span', '端末内V2自動保存（常時ON）', 'On-device V2 autosave (Always ON)');
       setLocalizedTextContent('#fileContestPromoTitle', 'コンテスト投稿', 'Contest Posting');
       setLocalizedTextContent('#fileContestPromoDescription', '保存/出力の「保存完了後にコンテスト投稿画面へ移動する」をONにすると、そのまま投稿できます。', 'Turn on "Go to contest post screen after save" to move directly to contest posting.');
       setLocalizedTextContent('#openContestFromFilePanel', 'コンテストページを見る', 'Open Contest Page');
@@ -612,7 +573,7 @@
       setLocalizedTextContent('#timelapseDescription', '記録ON時は描画履歴を自動記録します。出力は通常の「出力」ボタンから選択してください。', 'When recording is ON, drawing history is captured automatically. Export from the regular Save / Export dialog.');
       setLocalizedTextContent('#memoryClear', 'メモリ削除', 'Clear Memory');
   
-      setLocalizedTextContent('#exportDialogTitle', '保存/出力形式', 'Save / Export');
+      setLocalizedTextContent('#exportDialogTitle', '出力設定', 'Export Settings');
       setLocalizedTextContent('label[for="exportFormat"] > .export-format-label', '形式', 'Format');
       setLocalizedSelectOption(dom.exportDialog?.format, 'png', 'PNG（画像）', 'PNG (Image)');
       setLocalizedSelectOption(dom.exportDialog?.format, 'jpeg', 'JPEG（画像）', 'JPEG (Image)');
@@ -621,22 +582,24 @@
       setLocalizedSelectOption(dom.exportDialog?.format, 'gridpng', 'PNG（グリッド分割）', 'PNG (Grid Split)');
       setLocalizedSelectOption(dom.exportDialog?.format, 'gif', 'GIF（アニメーション）', 'GIF (Animation)');
       setLocalizedSelectOption(dom.exportDialog?.format, 'timelapse', 'タイムラプスGIF（記録）', 'Timelapse GIF');
-      setLocalizedSelectOption(dom.exportDialog?.format, 'project', 'プロジェクト（.pixieedraw）', 'Project (.pixieedraw)');
+      setLocalizedSelectOption(dom.exportDialog?.format, 'project', 'プロジェクト（.pixieedraw / V2）', 'Project (.pixieedraw / V2)');
       setLocalizedTextContent('label[for="exportFileNameBase"] > span', '出力名', 'Export Name');
       setLocalizedAttribute('#exportFileNameBase', 'placeholder', '例: my_artwork', 'e.g. my_artwork');
-      setLocalizedTextContent('#exportFileNameHint', '拡張子は自動で付きます。同名がある場合は .1 .2 ... を付けて保存します。', 'Extension is added automatically. If the same name exists, .1 .2 ... will be appended.');
+      setLocalizedTextContent('#exportFileNameHint', '拡張子は自動で付きます。保存先と同名処理はブラウザが案内します。', 'The extension is added automatically. Your browser handles the destination and duplicate names.');
       setLocalizedTextContent('#exportScaleControls > span', '出力倍率', 'Output Scale');
       setLocalizedTextContent('label[for="exportScaleSlider"]', '倍率 (×)', 'Scale (×)');
       setLocalizedTextContent('#exportOriginalOptionRow span:not(.export-toggle-icon)', '原寸も追加', 'Original too');
-      setLocalizedTextContent('#exportCompanionOptionRow span:not(.export-toggle-icon)', 'PiXiEEDファイルも保存', 'Save project file');
+      setLocalizedTextContent('#exportCompanionOptionRow span:not(.export-toggle-icon)', 'PiXiEEDrawもダウンロード', 'Download PiXiEEDraw too');
       setLocalizedTextContent('#exportSpriteMapCompanionOptionRow span:not(.export-toggle-icon)', 'SpriteMAP出力', 'SpriteMAP export');
+      setLocalizedTextContent('#exportGridSplitOptionRow span', 'グリッド分割', 'Grid split');
+      setLocalizedTextContent('#exportTimelapseOptionRow span', 'タイムラプスGIF', 'Timelapse GIF');
       setLocalizedTextContent('#exportContestPostOptionRow span:not(.export-toggle-icon)', 'コンテスト投稿へ移動', 'Go to contest post');
       setLocalizedTextContent('#exportSpriteMapColorSpritesRow span:not(.export-toggle-icon)', 'カラースプライト出力', 'Color sprite export');
       setLocalizedTextContent('#exportGridSettings > span', 'グリッド分割 (PNG)', 'Grid Split (PNG)');
       setLocalizedControlLabel('exportGridWidth', '幅 (px)', 'Width (px)');
       setLocalizedControlLabel('exportGridHeight', '高さ (px)', 'Height (px)');
       setLocalizedTextContent('#exportGridHint', '分割順: 右上から左へ、次の段へ進みます（右→左、上→下）。分割サイズは原寸px基準です。', 'Split order: starts at top-right, moves right-to-left, then top-to-bottom. Split size uses source pixels.');
-      setLocalizedTextContent('#confirmExport', '保存/出力', 'Save / Export');
+      setLocalizedTextContent('#confirmExport', 'この設定で出力', 'Export with These Settings');
       setLocalizedTextContent('#cancelExport', 'キャンセル', 'Cancel');
       setLocalizedTextContent('#exportAdContainer .export-ad__label', '広告', 'Ad');
       setLocalizedTextContent('#exportInterstitialTitle', '広告', 'Ad');
@@ -696,8 +659,6 @@
   
       renderMirrorToolPopover();
       syncMirrorToolPopoverControls();
-      updateExportDestinationLabel();
-      updateExportFolderButtonLabel();
       updateExportScaleHint();
       renderOpenProjectTabs();
     }
@@ -737,10 +698,6 @@
       if (dom.controls.supportTipLink instanceof HTMLElement) {
         dom.controls.supportTipLink.hidden = hidden;
         dom.controls.supportTipLink.setAttribute('aria-hidden', String(hidden));
-      }
-      if (dom.controls.adFreeField instanceof HTMLElement) {
-        dom.controls.adFreeField.hidden = hidden;
-        dom.controls.adFreeField.setAttribute('aria-hidden', String(hidden));
       }
       const spotlightTip = dom.toolSpotlight?.supportTip;
       if (spotlightTip instanceof HTMLElement) {

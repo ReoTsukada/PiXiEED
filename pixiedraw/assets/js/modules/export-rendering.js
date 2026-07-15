@@ -334,7 +334,7 @@
         includeProjectCompanion,
         archiveSuffix: 'spritemap',
         archiveShareText: includeProjectCompanion
-          ? 'SpriteMAP一式と .pixieedraw を ZIP で書き出しました'
+          ? 'SpriteMAP一式をZIPで書き出し、.pixieedrawを同期しました'
           : 'SpriteMAP一式をZIPで書き出しました',
       });
       const detailParts = [`全${frameCount}フレーム`, `配置 ${layoutLabel}`];
@@ -367,7 +367,9 @@
       if (result.exportedCount > 0) {
         markDocumentDurablySaved();
         if (result.exportedCount === result.total && !result.wasCancelled && !result.hadFailure) {
-          const companionResult = includeProjectCompanion ? 'saved' : 'skipped';
+          const companionResult = includeProjectCompanion
+            ? (result.projectCompanionResult || 'failed')
+            : 'skipped';
           if (!companionExport) {
             announceProjectCompanionSaveResult('spritemap', companionResult);
           }
@@ -541,7 +543,7 @@
         includeProjectCompanion: shouldSaveProjectCompanion('jpeg'),
         archiveSuffix: 'jpeg_frames',
         archiveShareText: shouldSaveProjectCompanion('jpeg')
-          ? 'JPEG一式と .pixieedraw を ZIP で書き出しました'
+          ? 'JPEG一式をZIPで書き出し、.pixieedrawを同期しました'
           : 'JPEG一式をZIPで書き出しました',
       });
       const detailParts = [];
@@ -576,7 +578,7 @@
         markDocumentDurablySaved();
         if (result.exportedCount === result.total && !result.wasCancelled && !result.hadFailure) {
           const companionResult = shouldSaveProjectCompanion('jpeg')
-            ? 'saved'
+            ? (result.projectCompanionResult || 'failed')
             : await maybeSaveProjectCompanionAfterExport('jpeg', {
               exportedCount: result.exportedCount,
               wasCancelled: result.wasCancelled,
@@ -643,7 +645,7 @@
         includeProjectCompanion: shouldSaveProjectCompanion('svg'),
         archiveSuffix: 'svg_frames',
         archiveShareText: shouldSaveProjectCompanion('svg')
-          ? 'SVG一式と .pixieedraw を ZIP で書き出しました'
+          ? 'SVG一式をZIPで書き出し、.pixieedrawを同期しました'
           : 'SVG一式をZIPで書き出しました',
       });
       const detailParts = [];
@@ -677,7 +679,7 @@
         markDocumentDurablySaved();
         if (result.exportedCount === result.total && !result.wasCancelled && !result.hadFailure) {
           const companionResult = shouldSaveProjectCompanion('svg')
-            ? 'saved'
+            ? (result.projectCompanionResult || 'failed')
             : await maybeSaveProjectCompanionAfterExport('svg', {
               exportedCount: result.exportedCount,
               wasCancelled: result.wasCancelled,
@@ -808,7 +810,7 @@
         includeProjectCompanion: shouldSaveProjectCompanion('gif'),
         archiveSuffix: 'gif',
         archiveShareText: shouldSaveProjectCompanion('gif')
-          ? 'GIF一式と .pixieedraw を ZIP で書き出しました'
+          ? 'GIF一式をZIPで書き出し、.pixieedrawを同期しました'
           : 'GIF一式をZIPで書き出しました',
       });
       const detailParts = [];
@@ -842,7 +844,7 @@
         let skipInterstitial = false;
         if (result.exportedCount === result.total && !result.wasCancelled && !result.hadFailure) {
           const companionResult = shouldSaveProjectCompanion('gif')
-            ? 'saved'
+            ? (result.projectCompanionResult || 'failed')
             : await maybeSaveProjectCompanionAfterExport('gif', {
               exportedCount: result.exportedCount,
               wasCancelled: result.wasCancelled,
@@ -1395,6 +1397,17 @@
     return !getExportDisabledReason(mode);
   }
 
+  function resolveSelectedExportDialogFormat(mode = '') {
+    const format = normalizeExportFormat(mode || dom.exportDialog?.format?.value || 'png');
+    if (format === 'png' && dom.exportDialog?.gridSplitToggle instanceof HTMLInputElement && dom.exportDialog.gridSplitToggle.checked) {
+      return 'gridpng';
+    }
+    if (format === 'gif' && dom.exportDialog?.timelapseToggle instanceof HTMLInputElement && dom.exportDialog.timelapseToggle.checked) {
+      return 'timelapse';
+    }
+    return format;
+  }
+
   function updateExportFormatAvailability() {
     const config = dom.exportDialog;
     const select = config?.format;
@@ -1413,14 +1426,14 @@
     });
 
     const hasAllowedMode = Boolean(firstAllowedValue);
-    const currentMode = normalizeExportFormat(select.value || 'png');
+    const currentMode = resolveSelectedExportDialogFormat();
     if (!canExportFormatInCurrentState(currentMode) && firstAllowedValue) {
       select.value = firstAllowedValue;
     }
     select.disabled = !hasAllowedMode;
 
     if (config?.confirm instanceof HTMLButtonElement) {
-      const activeMode = normalizeExportFormat(select.value || 'png');
+      const activeMode = resolveSelectedExportDialogFormat();
       const canConfirm = hasAllowedMode && canExportFormatInCurrentState(activeMode);
       config.confirm.disabled = !canConfirm;
       const reason = canConfirm ? '' : getExportDisabledReason(activeMode);
@@ -1633,7 +1646,7 @@
   }
 
   function updateExportOptionVisibility(mode) {
-    const format = normalizeExportFormat(mode || dom.exportDialog?.format?.value || 'png');
+    const format = resolveSelectedExportDialogFormat(mode);
     const scaleControls = dom.exportDialog?.scaleControls;
     if (scaleControls instanceof HTMLElement) {
       scaleControls.hidden = !doesExportFormatUseScale(format);
@@ -1679,7 +1692,7 @@
 
   function updateExportOriginalToggleUI() {
     const toggle = dom.exportDialog?.includeOriginalToggle;
-    const mode = normalizeExportFormat(dom.exportDialog?.format?.value || 'png');
+    const mode = resolveSelectedExportDialogFormat();
     const isGridMode = isGridPngExportMode(mode);
     if (toggle instanceof HTMLInputElement) {
       const canOffer = !isGridMode && canOfferOriginalCompanionExport(mode, exportScale);
@@ -1730,14 +1743,14 @@
         ? 'タイムラプスGIF'
         : (format === 'jpeg' ? 'JPEG' : String(format || '').toUpperCase()));
     if (result === 'saved') {
-      updateAutosaveStatus(`${label}出力後: PiXiEEDファイルも保存しました`, 'success');
+      updateAutosaveStatus(`${label}出力後: PiXiEEDrawファイルもダウンロードしました`, 'success');
       return;
     }
     if (result === 'cancelled') {
-      updateAutosaveStatus(`${label}出力後: PiXiEEDファイルの同時保存をキャンセルしました`, 'warn');
+      updateAutosaveStatus(`${label}出力後: PiXiEEDrawファイルのダウンロードをキャンセルしました`, 'warn');
       return;
     }
-    updateAutosaveStatus(`${label}出力後: PiXiEEDファイルの同時保存に失敗しました`, 'warn');
+    updateAutosaveStatus(`${label}出力後: PiXiEEDrawファイルのダウンロードに失敗しました`, 'warn');
   }
 
   function resolveContestUploadCanvasSizeLabel(width, height) {
@@ -2007,7 +2020,7 @@
   }
 
   function refreshExportScaleControls() {
-    const candidates = getExportScaleCandidates(dom.exportDialog?.format?.value || 'png');
+    const candidates = getExportScaleCandidates(resolveSelectedExportDialogFormat());
     applyExportScaleConstraints(candidates);
     syncExportScaleInputs();
     updateExportPreview();
@@ -2134,7 +2147,7 @@
     if (dialog instanceof HTMLDialogElement && !dialog.open) {
       return;
     }
-    const format = normalizeExportFormat(dom.exportDialog?.format?.value || 'png');
+    const format = resolveSelectedExportDialogFormat();
     try {
       const { canvas, meta } = buildExportPreviewSourceCanvas(format);
       drawExportPreviewCanvas(canvas, meta);
@@ -2334,16 +2347,27 @@
 
   async function deliverExportTasks(tasks, options = {}) {
     const normalizedTasks = Array.isArray(tasks) ? tasks.slice() : [];
-    if (options.includeProjectCompanion && doesExportFormatSupportProjectCompanion(options.mode || '')) {
-      const companionBundle = buildProjectExportBundle();
-      normalizedTasks.push({
-        blob: companionBundle.blob,
-        filename: companionBundle.filename,
-        mimeType: PROJECT_FILE_MIME_TYPE,
-        fileExtensions: [PROJECT_FILE_EXTENSION],
-        shareText: `${state.documentName} (.pixieedraw)`,
-      });
-    }
+    const shouldSyncProjectCompanion = options.includeProjectCompanion === true
+      && doesExportFormatSupportProjectCompanion(options.mode || '');
+    const finalizeDeliveryResult = async result => {
+      if (!shouldSyncProjectCompanion) {
+        return { ...result, projectCompanionResult: 'skipped' };
+      }
+      if (
+        result.exportedCount !== result.total
+        || result.wasCancelled
+        || result.hadFailure
+      ) {
+        return { ...result, projectCompanionResult: 'skipped' };
+      }
+      const projectResult = await saveProjectAsPixieedraw({ announceStatus: false });
+      return {
+        ...result,
+        projectCompanionResult: projectResult?.saved
+          ? 'saved'
+          : (projectResult?.cancelled ? 'cancelled' : 'failed'),
+      };
+    };
     const total = normalizedTasks.length;
     if (!total) {
       return { exportedCount: 0, total: 0, wasCancelled: false, hadFailure: false };
@@ -2357,11 +2381,9 @@
           fileExtensions: ['.zip'],
           shareTitle: options.shareTitle || state.documentName || 'PiXiEEDraw',
           shareText: options.archiveShareText || options.shareText || 'ZIPを書き出しました',
-          allowFilePicker: false,
-          allowBoundDirectory: false,
           preferShare: false,
           allowAnchorDownload: true,
-          forceAnchorDownload: true,
+          forceAnchorDownload: false,
           allowNativePhotoLibrary: false,
           allowNativeSave: false,
           nativeDirectory: options.nativeDirectory,
@@ -2374,16 +2396,16 @@
           case 'download':
           case 'share':
           case 'window':
-            return { exportedCount: total, total, wasCancelled: false, hadFailure: false };
+            return await finalizeDeliveryResult({ exportedCount: total, total, wasCancelled: false, hadFailure: false });
           case 'picker-cancel':
           case 'share-cancel':
-            return { exportedCount: 0, total, wasCancelled: true, hadFailure: false };
+            return await finalizeDeliveryResult({ exportedCount: 0, total, wasCancelled: true, hadFailure: false });
           default:
-            return { exportedCount: 0, total, wasCancelled: false, hadFailure: true };
+            return await finalizeDeliveryResult({ exportedCount: 0, total, wasCancelled: false, hadFailure: true });
         }
       } catch (error) {
         console.warn('ZIP export packaging failed', error);
-        return { exportedCount: 0, total, wasCancelled: false, hadFailure: true };
+        return await finalizeDeliveryResult({ exportedCount: 0, total, wasCancelled: false, hadFailure: true });
       }
     }
     let exportedCount = 0;
@@ -2396,13 +2418,11 @@
         fileExtensions: task.fileExtensions || options.fileExtensions,
         shareTitle: options.shareTitle,
         shareText: task.shareText || options.shareText,
-        allowFilePicker: options.allowFilePicker !== false,
-        allowBoundDirectory: options.allowBoundDirectory !== false,
-        preferShare: options.preferShare,
-        allowAnchorDownload: options.allowAnchorDownload,
-        forceAnchorDownload: options.forceAnchorDownload,
-        allowNativePhotoLibrary: options.allowNativePhotoLibrary,
-        allowNativeSave: options.allowNativeSave,
+        preferShare: false,
+        allowAnchorDownload: true,
+        forceAnchorDownload: false,
+        allowNativePhotoLibrary: false,
+        allowNativeSave: false,
         nativeDirectory: options.nativeDirectory,
         nativeSubdirectory: options.nativeSubdirectory,
       });
@@ -2428,78 +2448,147 @@
         break;
       }
     }
-    return { exportedCount, total, wasCancelled, hadFailure };
+    return await finalizeDeliveryResult({ exportedCount, total, wasCancelled, hadFailure });
   }
 
-  function getProjectFilePickerTypes() {
-    return [
-      {
-        description: 'PiXiEEDraw ドキュメント',
-        accept: {
-          [PROJECT_FILE_MIME_TYPE]: [PROJECT_FILE_EXTENSION],
-        },
-      },
-    ];
-  }
-
-  async function saveProjectBlobToHandle(handle, blob, snapshot) {
-    if (!handle || !(blob instanceof Blob)) {
-      return false;
-    }
-    try {
-      const granted = await ensureHandlePermission(handle, { request: true });
-      if (!granted) {
-        schedulePendingAutosavePermission(handle);
-        return false;
-      }
-      const writable = await handle.createWritable();
-      await writable.write(blob);
-      await writable.close();
-
-      autosaveHandle = handle;
-      pendingAutosaveHandle = null;
-      clearPendingPermissionListener();
-      if (dom.controls.enableAutosave) {
-        dom.controls.enableAutosave.textContent = 'ローカル自動保存（常時ON）';
-      }
-      autosaveDirty = false;
-      markDocumentDurablySaved();
-      await storeAutosaveHandle(handle);
-      const packaged = buildPackagedProjectPayload(snapshot);
-      const dotStats = resolvePackagedProjectDotStats(packaged);
-      if (dotStats) {
-        setTrackedProjectDotBaseline(snapshot, dotStats);
-      }
-      recordRecentProjectSnapshot(snapshot, packaged, {
-        projectId: autosaveProjectId || createAutosaveProjectId(),
-      }).catch(error => {
-        console.warn('Failed to update recent projects snapshot', error);
-      });
-      return true;
-    } catch (error) {
-      console.warn('Project save via file handle failed', error);
-      return false;
-    }
-  }
-
-  function buildProjectExportBundle(fileNameBase = state.documentName) {
+  async function buildProjectExportBundle(fileNameBase = state.documentName, options = {}) {
     commitHistory();
-    const snapshot = makeHistorySnapshot();
-    const session = buildProjectSessionPayload();
-    const packaged = buildPackagedProjectPayload(snapshot, { session });
-    const json = JSON.stringify(packaged);
-    const blob = new Blob([json], { type: PROJECT_FILE_MIME_TYPE });
-    const filename = createAutosaveFileName(fileNameBase || state.documentName);
+    // A sale file must be generated from the same durable on-device head that
+    // appears in Projects. Compact any remaining 1-9 replay patches before
+    // packaging, while explicitly keeping external file autosave disabled.
+    if (
+      autosaveProjectId
+      && typeof markActiveLocalProjectJournalNeedsCheckpoint === 'function'
+      && typeof markAutosaveDirty === 'function'
+      && typeof writeAutosaveSnapshot === 'function'
+    ) {
+      markActiveLocalProjectJournalNeedsCheckpoint(autosaveProjectId);
+      markAutosaveDirty();
+      const checkpointCommitted = await writeAutosaveSnapshot(true);
+      if (!checkpointCommitted) {
+        const error = new Error('On-device V2 checkpoint commit is required before project export');
+        error.code = 'ERR_ON_DEVICE_CHECKPOINT_INCOMPLETE';
+        throw error;
+      }
+    }
+    const snapshot = options?.snapshot || makeHistorySnapshot();
+    if (typeof buildProjectSessionPayloadWithPersistedTimelapse !== 'function') {
+      const error = new Error('Complete timelapse synchronization is unavailable');
+      error.code = 'ERR_TIMELAPSE_SYNC_UNAVAILABLE';
+      throw error;
+    }
+    const session = options?.session || await buildProjectSessionPayloadWithPersistedTimelapse({
+      requireComplete: true,
+    });
+    if (session?.timelapse?.synchronization?.complete !== true) {
+      const error = new Error('Complete timelapse synchronization is required');
+      error.code = 'ERR_TIMELAPSE_DATA_INCOMPLETE';
+      throw error;
+    }
+    session.projectExportIntegrity = {
+      schemaVersion: 1,
+      completeProjectSave: true,
+      autosavePolicy: 'indexeddb-checkpoint-journal',
+      autosaveRequired: true,
+      checkpointOperationInterval: 10,
+      externalFileAutosave: false,
+      autosaveDestinationConnectedBySave: false,
+      timelapseRequired: true,
+      timelapseSynchronized: session?.timelapse?.synchronization?.complete === true,
+      saleCandidateDataComplete: session?.timelapse?.synchronization?.complete === true,
+      approvalScope: 'sales-submission-only',
+      localApprovalChecked: false,
+      generatedAt: new Date().toISOString(),
+    };
+    const previewThumbnail = typeof generateSnapshotThumbnail === 'function'
+      ? await generateSnapshotThumbnail(snapshot)
+      : null;
+    const serializedProject = typeof serializeProjectStorageSnapshot === 'function'
+      ? await serializeProjectStorageSnapshot({
+          snapshot,
+          session,
+          packaged: options?.packaged || null,
+          thumbnail: previewThumbnail,
+        }, {
+          fileNameBase: fileNameBase || state.documentName,
+          // Project tabs are no longer a saved project feature. V2 files
+          // always contain the active document only.
+          includeSheets: false,
+          includeTimelapse: options?.includeTimelapse !== false,
+          useWorker: options?.useWorker !== false,
+          requireWorker: options?.requireWorker === true,
+          preferredAdapterId: options?.preferredStorageAdapterId || '',
+        })
+      : null;
+    const packaged = serializedProject?.packaged || options?.packaged || buildPackagedProjectPayload(snapshot, { session });
+    const json = typeof serializedProject?.text === 'string'
+      ? serializedProject.text
+      : JSON.stringify(packaged);
+    const blob = serializedProject?.blob instanceof Blob
+      ? serializedProject.blob
+      : new Blob([json], { type: PROJECT_FILE_MIME_TYPE });
+    const filename = typeof serializedProject?.filename === 'string' && serializedProject.filename
+      ? serializedProject.filename
+      : createAutosaveFileName(fileNameBase || state.documentName);
     return {
       snapshot,
       session,
       packaged,
       blob,
       filename,
+      storageAdapterId: typeof serializedProject?.adapterId === 'string' ? serializedProject.adapterId : '',
+      workerUsed: serializedProject?.workerUsed === true,
     };
   }
 
-  async function saveProjectAsPixieedraw(options = {}) {
+  function buildProjectFileNameBase(fileNameBase = '') {
+    const raw = String(fileNameBase || '').trim() || String(state.documentName || '').trim() || 'project';
+    return raw.replace(/\.pixieedraw$/i, '');
+  }
+
+  async function saveProjectBundleAsNewFile(bundle, options = {}) {
+    if (!(bundle?.blob instanceof Blob)) {
+      throw new Error('Project bundle blob is required');
+    }
+    const resolvedFilename = typeof bundle?.filename === 'string' && bundle.filename
+      ? bundle.filename
+      : createAutosaveFileName(buildProjectFileNameBase(state.documentName));
+    const deliveryResult = await triggerDownloadFromBlob(bundle.blob, resolvedFilename, {
+      mimeType: PROJECT_FILE_MIME_TYPE,
+      shareTitle: options?.shareTitle || `${state.documentName || 'PiXiEEDraw'} v2`,
+      shareText: options?.shareText || `${state.documentName || 'PiXiEEDraw'} (PiXiEEDraw v2)`,
+      preferShare: false,
+      allowAnchorDownload: true,
+      forceAnchorDownload: false,
+    });
+    if (deliveryResult && !String(deliveryResult).endsWith('cancel')) {
+      return {
+        saved: true,
+        cancelled: false,
+        savedAsNewFile: true,
+        filename: resolvedFilename,
+        method: String(deliveryResult),
+      };
+    }
+    if (String(deliveryResult || '').endsWith('cancel')) {
+      return {
+        saved: false,
+        cancelled: true,
+        savedAsNewFile: false,
+        filename: resolvedFilename,
+        method: '',
+      };
+    }
+    return {
+      saved: false,
+      cancelled: false,
+      savedAsNewFile: false,
+      filename: resolvedFilename,
+      method: '',
+    };
+  }
+
+  async function executeProjectSaveInternal(options = {}) {
     if (!ensureCurrentClientCanExportProject({ announce: true, format: 'project' })) {
       return { saved: false, cancelled: false, skipped: true };
     }
@@ -2510,94 +2599,172 @@
         packaged,
         blob,
         filename,
-      } = buildProjectExportBundle(options?.fileNameBase || getExportFileNameBase() || state.documentName);
-
-      const boundHandle = autosaveHandle || pendingAutosaveHandle;
-      if (!DISABLE_FILE_SYSTEM_ACCESS_SAVE && boundHandle) {
-        const savedToBound = await saveProjectBlobToHandle(boundHandle, blob, snapshot);
-        if (savedToBound) {
-          if (announceStatus) {
-            updateAutosaveStatus('手動保存: PiXiEEDファイルへ保存しました', 'success');
-          }
-          return { saved: true, cancelled: false };
+        storageAdapterId,
+        workerUsed,
+      } = await buildProjectExportBundle(
+        options?.fileNameBase || getExportFileNameBase() || state.documentName,
+        {
+          includeSheets: false,
+          includeTimelapse: options?.includeTimelapse !== false,
+          useWorker: options?.useWorker !== false,
+          requireWorker: options?.requireWorker === true,
+          preferredStorageAdapterId: 'pixieedraw-v2-zip',
         }
+      );
+      const selectedStorageAdapterId = storageAdapterId || 'pixieedraw-v2-zip';
+      if (selectedStorageAdapterId !== 'pixieedraw-v2-zip') {
+        throw new Error('True V2 project export is required');
       }
-
-      let selectedHandle = null;
-      let resolvedProjectFilename = filename;
-      if (!DISABLE_FILE_SYSTEM_ACCESS_SAVE) {
-        const uniqueFilename = await resolveUniqueExportDirectoryFilename(filename, {
-          requestPermission: true,
-        });
-        if (uniqueFilename) {
-          resolvedProjectFilename = uniqueFilename;
-          selectedHandle = await getFileHandleInExportDirectory(uniqueFilename, {
-            create: true,
-            requestPermission: true,
-          });
-        }
-      }
-      let pickerCancelled = false;
-      if (!DISABLE_FILE_SYSTEM_ACCESS_SAVE && !selectedHandle && typeof window.showSaveFilePicker === 'function') {
-        try {
-          selectedHandle = await window.showSaveFilePicker({
-            suggestedName: resolvedProjectFilename,
-            types: getProjectFilePickerTypes(),
-          });
-        } catch (error) {
-          if (error && error.name === 'AbortError') {
-            pickerCancelled = true;
-          } else {
-            console.warn('Project save picker failed', error);
-          }
-          selectedHandle = null;
-        }
-      }
-      if (selectedHandle) {
-        const savedToSelected = await saveProjectBlobToHandle(selectedHandle, blob, snapshot);
-        if (savedToSelected) {
-          if (announceStatus) {
-            updateAutosaveStatus('手動保存: PiXiEEDファイルへ保存しました', 'success');
-          }
-          return { saved: true, cancelled: false };
-        }
-      }
-      if (pickerCancelled) {
-        return { saved: false, cancelled: true };
-      }
-
-      const result = await triggerDownloadFromBlob(blob, resolvedProjectFilename, {
-        mimeType: PROJECT_FILE_MIME_TYPE,
-        fileExtensions: [PROJECT_FILE_EXTENSION],
-        shareTitle: state.documentName,
-        shareText: `${state.documentName} (PiXiEEDraw)`,
-        nativeSubdirectory: NATIVE_PROJECTS_SUBDIRECTORY,
+      const savePlan = {
+        sourceStorageAdapterId: '',
+        targetStorageAdapterId: selectedStorageAdapterId,
+        sourceKind: 'on-device',
+        isConversionSave: false,
+        isDowngradeSave: false,
+        allowSameHandleOverwrite: false,
+        forceSaveAsNewFile: true,
+        reason: 'download-only',
+      };
+      const saveResult = await saveProjectBundleAsNewFile({
+        snapshot,
+        packaged,
+        blob,
+        filename,
+        storageAdapterId: selectedStorageAdapterId,
+        workerUsed,
+      }, {
+        shareTitle: state.documentName || 'PiXiEEDraw',
+        shareText: `${state.documentName || 'PiXiEEDraw'} (PiXiEEDraw v2)`,
       });
-      if (result && !String(result).endsWith('cancel')) {
+      if (saveResult.saved) {
         markDocumentDurablySaved();
         const savedDotStats = resolvePackagedProjectDotStats(packaged);
         if (savedDotStats) {
           setTrackedProjectDotBaseline(snapshot, savedDotStats);
         }
         if (announceStatus) {
-          updateAutosaveStatus('手動保存: ファイルを書き出しました', 'success');
+          updateAutosaveStatus('手動保存: 真V2ファイルをダウンロードしました', 'success');
         }
-        return { saved: true, cancelled: false };
+        return {
+          saved: true,
+          cancelled: false,
+          savedAsNewFile: true,
+          outputKind: 'download',
+          storageAdapterId: selectedStorageAdapterId,
+          workerUsed: workerUsed === true,
+          savePlan,
+        };
       }
-      if (String(result || '').endsWith('cancel')) {
-        return { saved: false, cancelled: true };
+      if (saveResult.cancelled) {
+        return { saved: false, cancelled: true, savePlan };
       }
       if (announceStatus) {
-        updateAutosaveStatus('手動保存: ファイルを書き出せませんでした', 'error');
+        updateAutosaveStatus('手動保存: ファイルをダウンロードできませんでした', 'error');
       }
-      return { saved: false, cancelled: false };
+      return { saved: false, cancelled: false, savePlan };
     } catch (error) {
       console.error('Manual project save failed', error);
       if (announceStatus) {
-        updateAutosaveStatus('手動保存: ファイルを書き出せませんでした', 'error');
+        const timelapseSyncFailed = String(error?.code || '').startsWith('ERR_TIMELAPSE_');
+        updateAutosaveStatus(
+          timelapseSyncFailed
+            ? '手動保存: タイムラプスを完全同期できないため保存を中止しました'
+            : '手動保存: ファイルをダウンロードできませんでした',
+          'error'
+        );
       }
-      return { saved: false, cancelled: false };
+      return { saved: false, cancelled: false, error };
     }
+  }
+
+
+  function buildProjectFileCommandResult(legacyResult = null, {
+    commandMode = 'save',
+    adapterId = null,
+  } = {}) {
+    const result = legacyResult && typeof legacyResult === 'object' ? legacyResult : {};
+    const saved = result.saved === true;
+    const cancelled = result.cancelled === true;
+    const blocked = result.blocked === true;
+    const isCopy = commandMode === 'copy';
+    const savedAsNewFile = result.savedAsNewFile === true;
+    const outputKind = result.outputKind || (saved ? 'download' : 'none');
+    return {
+      ok: saved,
+      status: saved
+        ? (isCopy ? 'copy-saved' : (savedAsNewFile ? 'saved-as' : 'saved'))
+        : (cancelled ? 'cancelled' : (blocked ? 'blocked' : 'failed')),
+      reason: cancelled
+        ? 'picker-cancel'
+        : (result.savePlan?.reason || (blocked ? 'incomplete-project' : null)),
+      adapterId: result.storageAdapterId || adapterId || null,
+      outputKind,
+      bindingChanged: false,
+      dirtyChanged: result.dirtyChanged === true || (saved && !isCopy),
+      fileNameChanged: false,
+      error: result.error instanceof Error ? result.error : null,
+      legacyResult: result,
+    };
+  }
+
+  async function executeProjectSave(options = {}) {
+    const result = await executeProjectSaveInternal({ ...options, commandMode: 'save' });
+    return buildProjectFileCommandResult(result, {
+      commandMode: 'save',
+      adapterId: result?.storageAdapterId || options?.preferredStorageAdapterId || null,
+    });
+  }
+
+  async function executeProjectSaveAs(options = {}) {
+    const result = await executeProjectSaveInternal({ ...options, commandMode: 'save-as' });
+    return buildProjectFileCommandResult(result, {
+      commandMode: 'save-as',
+      adapterId: result?.storageAdapterId || options?.preferredStorageAdapterId || null,
+    });
+  }
+
+  async function executeProjectSaveCopy(options = {}) {
+    const result = await executeProjectSaveInternal({ ...options, commandMode: 'copy' });
+    return buildProjectFileCommandResult(result, {
+      commandMode: 'copy',
+      adapterId: result?.storageAdapterId || options?.preferredStorageAdapterId || null,
+    });
+  }
+
+  async function executeProjectOpen(options = {}) {
+    if (typeof openDocumentDialog !== 'function') {
+      return {
+        ok: false,
+        status: 'failed',
+        reason: 'unsupported-browser',
+        adapterId: null,
+        outputKind: 'none',
+        bindingChanged: false,
+        dirtyChanged: false,
+        fileNameChanged: false,
+        error: null,
+      };
+    }
+    const opened = await openDocumentDialog({
+      ...options,
+      mode: options?.mode || EXTERNAL_IMPORT_MODE_NEW_PROJECT,
+    });
+    return {
+      ok: opened === true,
+      status: opened === true ? 'opened' : 'cancelled',
+      reason: opened === true ? null : 'picker-cancel',
+      adapterId: null,
+      outputKind: 'none',
+      bindingChanged: false,
+      dirtyChanged: false,
+      fileNameChanged: false,
+      error: null,
+    };
+  }
+
+  // Legacy callers still receive the established saved/cancelled result shape.
+  async function saveProjectAsPixieedraw(options = {}) {
+    return await executeProjectSaveInternal({ ...options, commandMode: 'save' });
   }
 
 
@@ -2723,8 +2890,11 @@
           scaleFrameSetNearestNeighbor,
           buildSpriteMapCanvas,
           deliverExportTasks,
-          getProjectFilePickerTypes,
           buildProjectExportBundle,
+          executeProjectSave,
+          executeProjectSaveAs,
+          executeProjectSaveCopy,
+          executeProjectOpen,
           saveProjectAsPixieedraw,
         });
       }

@@ -85,12 +85,6 @@
         direct[base + 2] = 0;
         direct[base + 3] = 0;
       }
-      if (layer.importSourceDirect instanceof Uint8ClampedArray && layer.importSourceDirect.length >= base + 4) {
-        layer.importSourceDirect[base] = 0;
-        layer.importSourceDirect[base + 1] = 0;
-        layer.importSourceDirect[base + 2] = 0;
-        layer.importSourceDirect[base + 3] = 0;
-      }
       recordPendingPixelPatchAfter(layer, index);
       markHistoryDirty();
       markDirtyPixel(x, y);
@@ -109,12 +103,6 @@
           direct[base + 1] = 0;
           direct[base + 2] = 0;
           direct[base + 3] = 0;
-        }
-        if (layer.importSourceDirect instanceof Uint8ClampedArray && layer.importSourceDirect.length >= base + 4) {
-          layer.importSourceDirect[base] = 0;
-          layer.importSourceDirect[base + 1] = 0;
-          layer.importSourceDirect[base + 2] = 0;
-          layer.importSourceDirect[base + 3] = 0;
         }
         recordPendingPixelPatchAfter(layer, index);
         markHistoryDirty();
@@ -139,14 +127,6 @@
       direct[base + 1] = rgbColor.g;
       direct[base + 2] = rgbColor.b;
       direct[base + 3] = rgbColor.a;
-      if (!(layer.importSourceDirect instanceof Uint8ClampedArray) || layer.importSourceDirect.length !== direct.length) {
-        layer.importSourceDirect = new Uint8ClampedArray(direct);
-      } else {
-        layer.importSourceDirect[base] = rgbColor.r;
-        layer.importSourceDirect[base + 1] = rgbColor.g;
-        layer.importSourceDirect[base + 2] = rgbColor.b;
-        layer.importSourceDirect[base + 3] = rgbColor.a;
-      }
       recordPendingPixelPatchAfter(layer, index);
       markHistoryDirty();
       markDirtyPixel(x, y);
@@ -250,12 +230,6 @@
         direct[base + 2] = 0;
         direct[base + 3] = 0;
       }
-      if (layer.importSourceDirect instanceof Uint8ClampedArray && layer.importSourceDirect.length >= base + 4) {
-        layer.importSourceDirect[base] = 0;
-        layer.importSourceDirect[base + 1] = 0;
-        layer.importSourceDirect[base + 2] = 0;
-        layer.importSourceDirect[base + 3] = 0;
-      }
       if (markDirty) {
         recordPendingPixelPatchAfter(layer, index);
         markHistoryDirty();
@@ -279,14 +253,6 @@
     direct[base + 1] = rgba.g;
     direct[base + 2] = rgba.b;
     direct[base + 3] = rgba.a;
-    if (!(layer.importSourceDirect instanceof Uint8ClampedArray) || layer.importSourceDirect.length !== direct.length) {
-      layer.importSourceDirect = new Uint8ClampedArray(direct);
-    } else {
-      layer.importSourceDirect[base] = rgba.r;
-      layer.importSourceDirect[base + 1] = rgba.g;
-      layer.importSourceDirect[base + 2] = rgba.b;
-      layer.importSourceDirect[base + 3] = rgba.a;
-    }
     if (markDirty) {
       recordPendingPixelPatchAfter(layer, index);
       markHistoryDirty();

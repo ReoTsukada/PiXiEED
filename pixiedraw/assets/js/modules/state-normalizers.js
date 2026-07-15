@@ -44,9 +44,10 @@
       width: 220,
       height: 220,
     });
-    const MULTI_CANVAS_FEATURE_ENABLED = true;
+    // True V2 keeps one canvas per project. Older multi-canvas projects are
+    // split into independent V2 projects during the confirmed migration.
+    const MULTI_CANVAS_FEATURE_ENABLED = false;
     const LOCAL_VIEWPORT_CANVAS_SIGNED_IN_MAX_COUNT = 1;
-    const LOCAL_VIEWPORT_CANVAS_STANDARD_MAX_COUNT = 3;
     const LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE = Object.freeze({
       count: 0,
       selectedKind: 'main',
@@ -92,7 +93,6 @@
       FLOATING_PREVIEW_DEFAULT_STATE,
       MULTI_CANVAS_FEATURE_ENABLED,
       LOCAL_VIEWPORT_CANVAS_SIGNED_IN_MAX_COUNT,
-      LOCAL_VIEWPORT_CANVAS_STANDARD_MAX_COUNT,
       LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE,
     });
   }

@@ -75,6 +75,9 @@
     }
 
     function getSharedRecentProjectEntryForTab(tab = null) {
+      if (!SHARED_PROJECTS_ENABLED) {
+        return null;
+      }
       if (!tab || typeof tab !== 'object') {
         return null;
       }
@@ -212,6 +215,9 @@
     }
 
     function isSharedOpenProjectTab(tab = null) {
+      if (!SHARED_PROJECTS_ENABLED) {
+        return false;
+      }
       if (!tab || typeof tab !== 'object') {
         return false;
       }

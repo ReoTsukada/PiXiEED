@@ -608,6 +608,19 @@
       if (!pendingInvite) {
         return false;
       }
+      if (!SHARED_PROJECTS_ENABLED) {
+        clearPendingSharedInvite();
+        closeLoginPromptDialog();
+        clearMultiInviteQueryParamsFromUrl();
+        setMultiStatus(
+          localizeText(
+            '共有プロジェクトは現在利用できません。',
+            'Shared projects are currently unavailable.'
+          ),
+          'warn'
+        );
+        return false;
+      }
       await ensurePixieedAccountReady({ forceRefresh: true, silent: true });
       if (!accountState.isLoggedIn || !accountState.userId || accountState.isAnonymous) {
         return false;
@@ -963,21 +976,6 @@
     }
     accountInitPromise = (async () => {
       try {
-        if (!pixieedAdFreeSharedLimitBound && window.pixieedAdFree?.subscribe) {
-          pixieedAdFreeSharedLimitBound = true;
-          window.pixieedAdFree.subscribe(nextState => {
-            syncPixieedSupportBenefitUi(nextState);
-            if (!accountState.isLoggedIn || accountState.isAnonymous) {
-              return;
-            }
-            if (!nextState?.isReady) {
-              return;
-            }
-            enforceSharedProjectOwnershipLimit().catch(error => {
-              console.warn('Failed to enforce shared project limit after entitlement update', error);
-            });
-          });
-        }
         syncPixieedSupportBenefitUi();
         const supabase = await ensurePixieedAccountClient();
         if (!supabase) {
