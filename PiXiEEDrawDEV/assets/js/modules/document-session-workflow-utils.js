@@ -735,8 +735,9 @@
         adapterId: parsedDocument?.storageAdapterId || 'pixieedraw-v2-zip',
         boundAt: new Date().toISOString(),
       }, { log: true });
-      if (dom.controls.enableAutosave instanceof HTMLButtonElement) {
-        dom.controls.enableAutosave.textContent = localizeText('保存ファイルに自動接続中', 'Auto-connected to project file');
+      const enableAutosaveButton = dom?.controls?.enableAutosave;
+      if (typeof HTMLButtonElement !== 'undefined' && enableAutosaveButton instanceof HTMLButtonElement) {
+        enableAutosaveButton.textContent = localizeText('保存ファイルに自動接続中', 'Auto-connected to project file');
       }
       console.info('[pixiedraw-dev:file-binding]', {
         phase: 'opened-project-file-bound',
