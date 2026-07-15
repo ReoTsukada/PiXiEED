@@ -310,6 +310,10 @@
       setLocalizedTextContent('#startupActionNew', '新規作成', 'New Project');
       setLocalizedTextContent('#startupActionOpen', 'ファイルを開く', 'Open File');
       setLocalizedTextContent('.startup-screen__actions a[href="../account/index.html"]', 'PiXiEED マイページ', 'PiXiEED My Page');
+      setLocalizedTextContent('#startupWorkspaceTitle', 'PiXiEEDワークスペース', 'PiXiEED Workspace');
+      setLocalizedTextContent('#startupWorkspaceConnect', 'PiXiEEDフォルダに接続', 'Connect PiXiEED Folder');
+      setLocalizedTextContent('#startupWorkspaceRefresh', '一覧を更新', 'Refresh List');
+      setLocalizedTextContent('#startupWorkspaceReadFolder', 'フォルダを読み取る', 'Read Folder');
       setLocalizedTextContent('#startupActionSkip', 'この画面を閉じる', 'Close');
       setLocalizedTextContent('#globalLoadingIndicatorCancel', 'キャンセル', 'Cancel');
       setLocalizedTextContent('#multiInviteShare', '共有', 'Share');
@@ -585,8 +589,9 @@
       setLocalizedTextContent('#openPixieedMyPage', 'PiXiEED マイページ', 'PiXiEED My Page');
       setLocalizedTextContent('#exportProject', '出力設定を開く', 'Open Export Settings');
       setLocalizedTextContent('#clearCanvas', 'キャンバスをクリア', 'Clear Canvas');
-      setLocalizedTextContent('.file-panel-summary .help-text:nth-child(1)', '自動保存: ON（この端末）', 'Autosave: ON (this device)');
-      setLocalizedTextContent('.file-panel-summary .help-text:nth-child(2)', '配布用の保存は「保存/出力」から手動で行います。', 'Use "Save / Export" for distributable files.');
+      setLocalizedTextContent('.file-panel-summary .help-text:nth-child(1)', '自動保存とタイムラプスは常時ONです。完全ファイル同期には保存先の設定が必要です。', 'Autosave and timelapse are always ON. Set a destination to synchronize the complete project file.');
+      setLocalizedTextContent('.file-panel-summary .help-text:nth-child(2)', '画像・GIF・PiXiEEDraw形式の保存は出力パネルから行います。', 'Save images, GIFs, and PiXiEEDraw files from the Export panel.');
+      setLocalizedTextContent('label[for="toggleAutosaveRequired"] span', '自動保存（常時ON）', 'Autosave (Always ON)');
       setLocalizedTextContent('#fileContestPromoTitle', 'コンテスト投稿', 'Contest Posting');
       setLocalizedTextContent('#fileContestPromoDescription', '保存/出力の「保存完了後にコンテスト投稿画面へ移動する」をONにすると、そのまま投稿できます。', 'Turn on "Go to contest post screen after save" to move directly to contest posting.');
       setLocalizedTextContent('#openContestFromFilePanel', 'コンテストページを見る', 'Open Contest Page');
@@ -612,7 +617,7 @@
       setLocalizedTextContent('#exportScaleControls > span', '出力倍率', 'Output Scale');
       setLocalizedTextContent('label[for="exportScaleSlider"]', '倍率 (×)', 'Scale (×)');
       setLocalizedTextContent('#exportOriginalOptionRow span:not(.export-toggle-icon)', '原寸も追加', 'Original too');
-      setLocalizedTextContent('#exportCompanionOptionRow span:not(.export-toggle-icon)', 'PiXiEEDファイルも保存', 'Save project file');
+      setLocalizedTextContent('#exportCompanionOptionRow span:not(.export-toggle-icon)', 'PiXiEEDファイルも同期', 'Sync project file');
       setLocalizedTextContent('#exportSpriteMapCompanionOptionRow span:not(.export-toggle-icon)', 'SpriteMAP出力', 'SpriteMAP export');
       setLocalizedTextContent('#exportGridSplitOptionRow span', 'グリッド分割', 'Grid split');
       setLocalizedTextContent('#exportTimelapseOptionRow span', 'タイムラプスGIF', 'Timelapse GIF');
