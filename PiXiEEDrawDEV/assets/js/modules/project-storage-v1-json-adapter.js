@@ -36,9 +36,19 @@
       if (!(bytes instanceof Uint8Array) || !bytes.length || !TextDecoderCtor) {
         return false;
       }
-      const probeLength = Math.min(bytes.length, 32);
-      const probe = new TextDecoderCtor().decode(bytes.subarray(0, probeLength)).trimStart();
-      return probe.startsWith('{') || probe.startsWith('[');
+      let index = 0;
+      if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
+        index = 3;
+      }
+      while (index < bytes.length) {
+        const byte = bytes[index];
+        if (byte === 0x20 || byte === 0x09 || byte === 0x0a || byte === 0x0d) {
+          index += 1;
+          continue;
+        }
+        return byte === 0x7b || byte === 0x5b;
+      }
+      return false;
     }
 
     function parseBytes(bytes) {
