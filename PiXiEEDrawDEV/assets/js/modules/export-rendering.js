@@ -2544,11 +2544,15 @@
       saleCandidateDataComplete: session?.timelapse?.synchronization?.complete === true,
       generatedAt: new Date().toISOString(),
     };
+    const previewThumbnail = typeof generateSnapshotThumbnail === 'function'
+      ? await generateSnapshotThumbnail(snapshot)
+      : null;
     const serializedProject = typeof serializeProjectStorageSnapshot === 'function'
       ? await serializeProjectStorageSnapshot({
           snapshot,
           session,
           packaged: options?.packaged || null,
+          thumbnail: previewThumbnail,
         }, {
           fileNameBase: fileNameBase || state.documentName,
           // Project tabs are no longer a saved project feature. V2 files
