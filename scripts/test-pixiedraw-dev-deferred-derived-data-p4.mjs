@@ -22,7 +22,9 @@ assert.ok(sessionBuildIndex > noSnapshotReturnIndex, 'complete session/timelapse
 assert.match(appSource, /function scheduleAutosaveThumbnailRefresh\(projectId,/);
 assert.match(appSource, /isAutosaveInteractionBusy\(\) \|\| hasRecentSaveInteraction\(\) \|\| hasRecentViewportInteraction\(\)/);
 assert.match(appSource, /const needsInitialThumbnail = !previousEntry\?\.thumbnail/);
-assert.match(appSource, /const deferThumbnailRefresh = refreshThumbnail/);
+assert.match(appSource, /let deferThumbnailRefresh = false/);
+assert.match(appSource, /deferThumbnailRefresh = refreshThumbnail/);
+assert.match(appSource, /let deferThumbnailRefresh = false;\s*if \(journalOnly\)/);
 assert.match(appSource, /thumbnail = previousEntry\?\.thumbnail \|\| null/);
 const writeV2Body = appSource.match(/async function writeAutosaveV2Primary[\s\S]*?\n  }\n\n  async function/);
 assert.ok(writeV2Body, 'V2 writer body must be available');
