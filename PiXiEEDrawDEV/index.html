@@ -78,7 +78,7 @@
   })();
 </script>
 <script src="assets/js/modules/edition-capabilities-utils.js?v=2026.07.11-g3a-edition-ads"></script>
-<script src="assets/js/build-info.js?v=20260715-091"></script>
+<script src="assets/js/build-info.js?v=20260715-092"></script>
 <script>
   (function configurePixieedAds() {
     const shouldShowAds = typeof window.__PIXIEEDRAW_SHOULD_SHOW_ADS__ === 'function'
@@ -401,7 +401,7 @@
 
 
 
-<link href="assets/css/style.css?v=20260715-landscape-details-right1" rel="stylesheet"/>
+<link href="assets/css/style.css?v=20260715-startup-grid-no-oval1" rel="stylesheet"/>
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-4.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-4.png"/>
 <style>
@@ -878,14 +878,6 @@
 <button aria-pressed="false" class="tool-button" data-tool="ellipseFill" data-tool-group="shape" type="button">
 <img alt="塗り丸" height="32" src="assets/icons/tool-ellipse-fill.svg" width="32"/>
 <span>塗り丸</span>
-</button>
-<button aria-pressed="false" class="tool-button" data-tool="oval" data-tool-group="shape" type="button">
-<img alt="楕円" height="32" src="assets/icons/tool-ellipse.svg" width="32"/>
-<span>楕円</span>
-</button>
-<button aria-pressed="false" class="tool-button" data-tool="ovalFill" data-tool-group="shape" type="button">
-<img alt="塗り楕円" height="32" src="assets/icons/tool-ellipse-fill.svg" width="32"/>
-<span>塗り楕円</span>
 </button>
 <!-- 旧 solidShape ボタンは削除済みです -->
 <button aria-pressed="false" class="tool-button" data-tool="fill" data-tool-group="fill" type="button">
@@ -1729,8 +1721,8 @@
 <p class="shortcut-help-row" role="listitem"><span>曲線</span><span class="shortcut-help-key">C</span></p>
 <p class="shortcut-help-row" role="listitem"><span>矩形</span><span class="shortcut-help-key">R</span></p>
 <p class="shortcut-help-row" role="listitem"><span>塗り矩形</span><span class="shortcut-help-key">Shift + R</span></p>
-<p class="shortcut-help-row" role="listitem"><span>楕円</span><span class="shortcut-help-key">O</span></p>
-<p class="shortcut-help-row" role="listitem"><span>塗り楕円</span><span class="shortcut-help-key">Shift + O</span></p>
+<p class="shortcut-help-row" role="listitem"><span>丸</span><span class="shortcut-help-key">O</span></p>
+<p class="shortcut-help-row" role="listitem"><span>塗り丸</span><span class="shortcut-help-key">Shift + O</span></p>
 <p class="shortcut-help-row" role="listitem"><span>選択範囲をカスタムブラシ化</span><span class="shortcut-help-key">Shift + B（単押し）</span></p>
 <p class="shortcut-help-row" role="listitem"><span>矩形選択してブラシ化</span><span class="shortcut-help-key">Shift + B（押しながらドラッグ → Bを離す）</span></p>
 <p class="shortcut-help-row" role="listitem"><span>図形グループ呼び出し</span><span class="shortcut-help-key">U</span></p>
@@ -1830,7 +1822,7 @@
 	<script defer="" src="assets/js/modules/document-utils.js?v=2026.06.28-file-split-step5"></script>
 	<script defer="" src="assets/js/modules/document-model.js?v=20260715-v2-layer-array-recovery1"></script>
 	<script defer="" src="assets/js/modules/state-normalizers.js?v=20260715-true-v2-single-canvas-v1"></script>
-	<script defer="" src="assets/js/modules/ui-static-config.js?v=20260715-local-true-v2-cleanup1"></script>
+	<script defer="" src="assets/js/modules/ui-static-config.js?v=20260715-remove-oval1"></script>
 	<script defer="" src="assets/js/modules/geometry-utils.js?v=2026.06.30-geometry-utils-v1"></script>
 	<script defer="" src="assets/js/modules/viewport-zoom-utils.js?v=2026.06.30-viewport-zoom-v1"></script>
 	<script defer="" src="assets/js/modules/local-layer-preferences-utils.js?v=2026.06.30-local-layer-preferences-v1"></script>
@@ -1875,23 +1867,23 @@
 	<script defer="" src="assets/js/modules/reload-snapshot-utils.js?v=2026.06.30-reload-snapshot-v1"></script>
 	<script defer="" src="assets/js/modules/reload-session-workflow-utils.js?v=20260713-047"></script>
 	<script defer="" src="assets/js/modules/canvas-core-workflow-utils.js?v=2026.07.02-canvas-core-split-v1"></script>
-	<script defer="" src="assets/js/modules/canvas-drawing-workflow-utils.js?v=2026.07.14-circle-oval-v1"></script>
-	<script defer="" src="assets/js/modules/canvas-overlay-workflow-utils.js?v=2026.07.14-circle-oval-v1"></script>
+	<script defer="" src="assets/js/modules/canvas-drawing-workflow-utils.js?v=20260715-remove-oval1"></script>
+	<script defer="" src="assets/js/modules/canvas-overlay-workflow-utils.js?v=20260715-remove-oval1"></script>
 	<script defer="" src="assets/js/modules/canvas-render-workflow-utils.js?v=2026.07.02-canvas-render-split-v1"></script>
 	<script defer="" src="assets/js/modules/viewport-gesture-arbiter-utils.js?v=2026.07.12-touch-pan-bias-v9"></script>
 	<script defer="" src="assets/js/modules/canvas-zoom-workflow-utils.js?v=2026.07.11-touch-arbiter-v3"></script>
-	<script defer="" src="assets/js/modules/virtual-cursor-workflow-utils.js?v=2026.07.14-circle-oval-v1"></script>
+	<script defer="" src="assets/js/modules/virtual-cursor-workflow-utils.js?v=20260715-remove-oval1"></script>
 	<script defer="" src="assets/js/modules/canvas-wheel-zoom-workflow-utils.js?v=2026.07.12-wheel-visibility-surface-fix1"></script>
 	<script defer="" src="assets/js/modules/ios-snapshot-utils.js?v=2026.07.01-pixfind-mode-split-v1"></script>
 	<script defer="" src="assets/js/modules/update-history-utils.js?v=2026.06.28-file-split-step7"></script>
-	<script defer="" src="assets/js/modules/static-content.js?v=2026.07.11-touch-arbiter-v3"></script>
+	<script defer="" src="assets/js/modules/static-content.js?v=20260715-remove-oval1"></script>
 	<script defer="" src="assets/js/modules/binary-codecs.js?v=2026.06.28-file-split-step2"></script>
 	<script defer="" src="assets/js/modules/export-codecs.js?v=2026.06.28-file-split-step1"></script>
 	<script defer="" src="assets/vendor/jsQR.min.js?v=1.4.0"></script>
 	<script defer="" src="assets/js/modules/image-import-decode-utils.js?v=2026.07.12-gmem3a-streaming-resize1"></script>
 	<script defer="" src="assets/js/modules/palette-panel-utils.js?v=2026.07.12-direct-authority-gmem2a1"></script>
 	<script defer="" src="assets/js/modules/timeline-layers.js?v=2026.07.04-frame-pending-structure-fix1"></script>
-	<script defer="" src="assets/js/modules/ui-localization-utils.js?v=20260715-local-true-v2-cleanup1"></script>
+	<script defer="" src="assets/js/modules/ui-localization-utils.js?v=20260715-remove-oval1"></script>
 	<script defer="" src="assets/js/modules/ui-language-utils.js?v=2026.07.03-small-helper-batch-split-v1"></script>
 	<script defer="" src="assets/js/modules/scroll-input-utils.js?v=2026.07.03-small-helper-batch-split-v1"></script>
 	<script defer="" src="assets/js/modules/sprite-scale-utils.js?v=2026.06.30-zh-localization-v1"></script>
@@ -1905,14 +1897,14 @@
 	<script defer="" src="assets/js/modules/voxel-glb-utils.js?v=2026.06.30-voxel-glb-v1"></script>
 	<script defer="" src="assets/js/modules/simulation-playback-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/keyboard-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
-	<script defer="" src="assets/js/modules/canvas-pointer-workflow-utils.js?v=20260715-selection-cancel-restore-v1"></script>
+	<script defer="" src="assets/js/modules/canvas-pointer-workflow-utils.js?v=20260715-remove-oval1"></script>
 	<script defer="" src="assets/js/modules/canvas-tool-state-workflow-utils.js?v=2026.07.14-selection-keep-v1"></script>
 	<script defer="" src="assets/js/modules/export-rendering.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/dialog-setup-utils.js?v=20260714-project-v2-default1"></script>
 	<script defer="" src="assets/js/modules/canvas-resize-workflow-utils.js?v=20260713-049"></script>
 	<script defer="" src="assets/js/modules/canvas-resize-handle-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/local-viewport-canvas-workflow-utils.js?v=20260715-safari-viewport-scroll-v1"></script>
-	<script defer="" src="assets/js/modules/floating-draw-button-workflow-utils.js?v=2026.07.14-circle-oval-v1"></script>
+	<script defer="" src="assets/js/modules/floating-draw-button-workflow-utils.js?v=20260715-remove-oval1"></script>
 	<script defer="" src="assets/js/modules/selection-move-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/layout-viewport.js?v=20260715-safari-viewport-scroll-v1"></script>
 	<script defer="" src="assets/js/modules/rail-tool-ui-utils.js?v=2026.07.12-auto-dismiss-right-panels1"></script>
@@ -1931,7 +1923,7 @@
 	<script defer="" src="assets/js/modules/open-import-workflow-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/export-format-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/export-dialog-workflow-utils.js?v=20260715-local-true-v2-cleanup1"></script>
-		<script defer="" src="assets/js/modules/startup-workflow-utils.js?v=20260715-local-true-v2-cleanup1"></script>
+		<script defer="" src="assets/js/modules/startup-workflow-utils.js?v=20260715-startup-grid-no-oval1"></script>
 		<script defer="" src="assets/js/modules/recent-project-workflow-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 		<script defer="" src="assets/js/modules/project-package-workflow-utils.js?v=20260714-provenance-v1"></script>
 		<script defer="" src="assets/js/modules/project-storage-adapter-utils.js?v=20260715-legacy-project-card-recovery1"></script>
@@ -1950,8 +1942,8 @@
 	<script defer="" src="assets/js/modules/shared-project-participant-utils.js?v=2026.07.03-shared-participant-migration-fix1"></script>
 	<script defer="" src="assets/js/modules/shared-project-comment-utils.js?v=2026.07.04-shared-open-deps-fix1"></script>
 	<script defer="" src="assets/js/modules/shared-project-session-state-utils.js?v=2026.07.06-local-project-open-fix1"></script>
-	<script defer="" src="assets/js/modules/shared-project-op-utils.js?v=20260715-local-selection-guard1"></script>
-	<script defer="" src="assets/js/modules/shared-project-draw-apply-utils.js?v=2026.07.14-circle-oval-v1"></script>
+	<script defer="" src="assets/js/modules/shared-project-op-utils.js?v=20260715-remove-oval1"></script>
+	<script defer="" src="assets/js/modules/shared-project-draw-apply-utils.js?v=20260715-remove-oval1"></script>
 	<script defer="" src="assets/js/modules/shared-project-recovery-replay-utils.js?v=2026.07.04-shared-structure-queue-fix1"></script>
 	<script defer="" src="assets/js/modules/shared-project-local-journal-utils.js?v=2026.07.03-shared-local-journal-split-v1"></script>
 	<script defer="" src="assets/js/modules/shared-project-local-op-utils.js?v=2026.07.04-shared-structure-queue-fix1"></script>
@@ -1970,7 +1962,7 @@
 	<script defer="" src="assets/js/modules/pre-update-checkpoint-utils.js?v=20260712-pre-update-checkpoint-u3"></script>
 	<script defer="" src="assets/js/active-project-session-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/pixieedraw-dev-switch.js?v=2026.07.03-pixieedrawdev-switch-fix14"></script>
-	<script defer="" src="assets/js/app.js?v=20260715-091"></script>
+	<script defer="" src="assets/js/app.js?v=20260715-092"></script>
 	<script defer="" src="assets/js/modules/update-detection-utils.js?v=20260713-026"></script>
   <script>
     (function initPanelAdDocking() {
