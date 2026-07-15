@@ -17249,13 +17249,15 @@
         return loaded ? finishRecentProjectOpen('自動保存: プロジェクトを開きました') : false;
       };
       let latestPackagedProject = null;
+      let restoredFromV2Primary = false;
       if (Number(latestEntry.autosaveSchemaVersion) === 2) {
         try {
           latestPackagedProject = await readAutosaveV2PrimaryProject(projectId || latestEntry.id || '');
+          restoredFromV2Primary = Boolean(latestPackagedProject && typeof latestPackagedProject === 'object');
           console.info('[pixiedraw-dev:recent-project-open]', {
             phase: 'v2-primary-read',
             projectId: projectId || latestEntry.id || '',
-            restored: Boolean(latestPackagedProject && typeof latestPackagedProject === 'object'),
+            restored: restoredFromV2Primary,
             sheetCount: Array.isArray(latestPackagedProject?.sheets) ? latestPackagedProject.sheets.length : 0,
           });
         } catch (error) {
@@ -17270,7 +17272,16 @@
         if (latestEntry.openError === 'invalid-project-payload' && await tryOpenRecentProjectHandle()) {
           return true;
         }
-        const loaded = await loadDocumentFromText(JSON.stringify(latestPackagedProject), null, {
+        // IndexedDB V2 payloads retain typed pixel buffers. Stringifying them
+        // expands every byte into JSON object properties and can freeze Safari
+        // before the document restore even begins. Keep the payload in memory
+        // and let the parsed-value adapter preserve those typed arrays.
+        console.info('[pixiedraw-dev:recent-project-open]', {
+          phase: 'project-payload-apply-start',
+          projectId: latestEntry.id || '',
+          autosaveSchemaVersion: Number(latestEntry.autosaveSchemaVersion) || 0,
+        });
+        const loaded = await loadDocumentFromProjectPayload(latestPackagedProject, {
           projectId: latestEntry.id || '',
           suppressAutosaveStatus: true,
           openedFromRecent: true,
@@ -17278,6 +17289,18 @@
           sourceKind: 'recent',
           sourceStorageAdapterId: null,
           lastSavedStorageAdapterId: null,
+          trustedAutosaveSchemaVersion: restoredFromV2Primary ? 2 : 0,
+          sourcePersistenceState: {
+            sourceKind: 'recent',
+            sourceStorageAdapterId: null,
+            lastSavedStorageAdapterId: null,
+          },
+        });
+        console.info('[pixiedraw-dev:recent-project-open]', {
+          phase: 'project-payload-apply-complete',
+          projectId: latestEntry.id || '',
+          loaded: loaded === true,
+          deferred: loaded === 'deferred',
         });
         if (loaded === 'deferred') {
           if (Array.isArray(latestPackagedProject?.sheets) && latestPackagedProject.sheets.length > 0) {
