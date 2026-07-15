@@ -26127,14 +26127,15 @@
         return false;
       });
       console.info('[pixiedraw:startup]', { phase: 'startup-session-restore-skipped', reason: 'always-start-from-home' });
+      let openedExternalImportProject = false;
       try {
         setStartupProgressLabel(localizeText('起動内容を読込中…', 'Loading startup content...'));
-        await maybeImportLensCapture();
+        openedExternalImportProject = await maybeImportLensCapture();
       } catch (error) {
         console.warn('Lens capture bootstrap failed', error);
       }
       try {
-        await maybeImportQrCapture();
+        openedExternalImportProject = (await maybeImportQrCapture()) || openedExternalImportProject;
       } catch (error) {
         console.warn('QR import bootstrap failed', error);
       }
@@ -26147,7 +26148,13 @@
       refreshLocalizedUi();
       scheduleDeferredUiSetup();
       hideProjectHomeScreen();
-      showStartupScreen({ refreshWorkspace: false });
+      if (openedExternalImportProject) {
+        // Lens/QR returns already created a new project. Do not cover it with
+        // the normal project chooser at the end of bootstrap.
+        hideStartupScreen();
+      } else {
+        showStartupScreen({ refreshWorkspace: false });
+      }
     } finally {
       setStartupBootLoadingProgress(100, {
         label: localizeText('起動完了', 'Ready'),
