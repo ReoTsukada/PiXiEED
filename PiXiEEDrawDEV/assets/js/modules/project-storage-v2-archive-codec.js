@@ -956,6 +956,13 @@
         diagnostics.sheetCount = 0;
       }
 
+      const projectOriginality = packaged?.canonicalSourceMetadata?.projectOriginality;
+      const projectExportIntegrity = packaged?.session?.projectExportIntegrity;
+      const previewThumbnail = typeof packaged?.previewThumbnail === 'string'
+        && packaged.previewThumbnail.startsWith('data:image/')
+        && packaged.previewThumbnail.length <= 240000
+        ? packaged.previewThumbnail
+        : '';
       const manifest = {
         format: 'pixieedraw',
         version: 2,
@@ -972,6 +979,17 @@
         sheetCount: Array.isArray(projectPayload?.sheets) ? projectPayload.sheets.length : 0,
         documentName: typeof packaged?.document?.documentName === 'string' ? packaged.document.documentName : '',
         updatedAt: typeof packaged?.updatedAt === 'string' ? packaged.updatedAt : '',
+        previewThumbnail,
+        certification: {
+          schemaVersion: 1,
+          nativeCreated: projectOriginality?.saleEligibility === 'eligible'
+            && projectOriginality?.createdWith === 'pixieedraw-native'
+            && projectOriginality?.externalInputDetected !== true,
+          externalInputDetected: projectOriginality?.externalInputDetected === true,
+          completeProjectSave: projectExportIntegrity?.completeProjectSave === true,
+          timelapseSynchronized: projectExportIntegrity?.timelapseSynchronized === true,
+          saleCandidateDataComplete: projectExportIntegrity?.saleCandidateDataComplete === true,
+        },
       };
 
       const archiveTasks = [
@@ -1212,9 +1230,30 @@
       return readJsonEntry(entries, 'manifest.json');
     }
 
+    async function readManifestFromBlob(blob) {
+      if (!blob || typeof blob.slice !== 'function') {
+        throw createCodecError('ERR_NOT_ZIP_ARCHIVE', 'Project archive blob is not readable');
+      }
+      const headerBytes = new Uint8Array(await blob.slice(0, 512).arrayBuffer());
+      if (!isZipSignature(headerBytes) || headerBytes.length < 30) {
+        throw createCodecError('ERR_NOT_ZIP_ARCHIVE', 'Project archive is not a ZIP payload');
+      }
+      const view = new DataView(headerBytes.buffer, headerBytes.byteOffset, headerBytes.byteLength);
+      if (view.getUint32(0, true) !== 0x04034b50 || view.getUint16(8, true) !== 0) {
+        throw createCodecError('ERR_UNSUPPORTED_ZIP_ENTRY', 'Unsupported manifest ZIP entry');
+      }
+      const compressedSize = view.getUint32(18, true);
+      const filenameLength = view.getUint16(26, true);
+      const extraLength = view.getUint16(28, true);
+      const dataEnd = 30 + filenameLength + extraLength + compressedSize;
+      const manifestBytes = new Uint8Array(await blob.slice(0, dataEnd).arrayBuffer());
+      return await readManifestFromBytes(manifestBytes);
+    }
+
     return Object.freeze({
       canReadBytes,
       readManifestFromBytes,
+      readManifestFromBlob,
       encodePackagedProject,
       decodeArchiveBytes,
     });
