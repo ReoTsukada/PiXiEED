@@ -180,6 +180,31 @@
         });
       }
 
+      async function readManifestFromBlob(blob, options = {}) {
+        if (!isBlobLike(blob)) {
+          throw new Error('Project blob is not readable');
+        }
+        const probeBlob = typeof blob.slice === 'function' ? blob.slice(0, 16) : blob;
+        const probeBytes = new Uint8Array(await probeBlob.arrayBuffer());
+        const adapter = findReaderAdapterForBytes(probeBytes, options);
+        if (adapter && typeof adapter.readManifestFromBlob === 'function') {
+          return {
+            adapterId: adapter.id,
+            manifest: await adapter.readManifestFromBlob(blob, options),
+          };
+        }
+        if (!adapter || typeof adapter.readManifestFromBytes !== 'function') {
+          return {
+            adapterId: adapter?.id || '',
+            manifest: null,
+          };
+        }
+        return {
+          adapterId: adapter.id,
+          manifest: await adapter.readManifestFromBytes(new Uint8Array(await blob.arrayBuffer()), options),
+        };
+      }
+
       function parseParsedValue(parsed, options = {}) {
         const adapter = findReaderAdapterForParsedValue(parsed, options?.preferredAdapterId);
         if (!adapter) {
@@ -216,6 +241,7 @@
         parseText,
         parseBytes,
         parseBlob,
+        readManifestFromBlob,
         parseParsedValue,
         serializeProject,
       });
