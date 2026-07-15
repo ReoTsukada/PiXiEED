@@ -140,7 +140,7 @@
             logger?.warn?.('Project storage adapter byte probe failed', error);
           }
         }
-        return preferredAdapter || getDefaultAdapter();
+        return null;
       }
 
       async function parseBytes(bytes, options = {}) {
