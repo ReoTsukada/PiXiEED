@@ -458,6 +458,9 @@ const documentSessionUtils = window.PiXiEEDrawModules.documentSessionWorkflowUti
   parseProjectStorageText(text) {
     return registry.parseText(text);
   },
+  async requestLegacyV2MigrationConsent() {
+    return true;
+  },
   normalizeTimelapseCanvasId(canvasId, fallback = '') {
     return String(canvasId || fallback || '');
   },
@@ -633,8 +636,8 @@ assert.equal(
 );
 assert.equal(openProjectTabs.length, 1);
 assert.equal(openProjectTabs[0].sourceKind, 'file');
-assert.equal(openProjectTabs[0].sourceStorageAdapterId, V1_ADAPTER_ID);
-assert.equal(openProjectTabs[0].lastSavedStorageAdapterId, V1_ADAPTER_ID);
+assert.equal(openProjectTabs[0].sourceStorageAdapterId, null);
+assert.equal(openProjectTabs[0].lastSavedStorageAdapterId, null);
 assert.equal(openProjectTabs[0].projectSaveHandleState, 'none');
 
 assert.equal(
@@ -648,8 +651,8 @@ assert.equal(
 );
 assert.equal(openProjectTabs.length, 1);
 assert.equal(openProjectTabs[0].sourceKind, 'file');
-assert.equal(openProjectTabs[0].sourceStorageAdapterId, V2_ADAPTER_ID);
-assert.equal(openProjectTabs[0].lastSavedStorageAdapterId, V2_ADAPTER_ID);
+assert.equal(openProjectTabs[0].sourceStorageAdapterId, null);
+assert.equal(openProjectTabs[0].lastSavedStorageAdapterId, null);
 
 const newTab = resetOpenProjectTabsToCurrentProject({
   source: 'new-project',
@@ -764,7 +767,7 @@ const sharedLocalSource = fs.readFileSync(
   path.join(repoRoot, 'PiXiEEDrawDEV/assets/js/modules/shared-project-local-conversion-utils.js'),
   'utf8'
 );
-assert.match(openImportSource, /sourceKind:\s*'import-image'/);
+assert.match(openImportSource, /sourceKind:\s*candidate\.sourceKind \|\| 'import-image'/);
 assert.match(openImportSource, /sourceKind:\s*'new'/);
 assert.match(sharedLocalSource, /sourceKind:\s*'shared-local'/);
 
