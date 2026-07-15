@@ -183,6 +183,19 @@
     return adapterId === 'pixieedraw-v1-json' || packagedProjectCount > 1 || canvasCount > 1;
   }
 
+  function canBindOpenedProjectFile(parsedDocument = null, handle = null, options = {}) {
+    if (options?.bindOpenedFile !== true || !handle || typeof handle.createWritable !== 'function') {
+      return false;
+    }
+    if (needsLegacyV2MigrationConsent(parsedDocument)) {
+      return false;
+    }
+    const adapterId = typeof parsedDocument?.storageAdapterId === 'string'
+      ? parsedDocument.storageAdapterId.trim()
+      : '';
+    return adapterId === 'pixieedraw-v2-zip' || adapterId.startsWith('pixieedraw-v3');
+  }
+
   async function confirmLegacyV2MigrationIfNeeded(parsedDocument, options = {}) {
     if (!needsLegacyV2MigrationConsent(parsedDocument)) return true;
     if (typeof requestLegacyV2MigrationConsent !== 'function') return false;
@@ -240,13 +253,17 @@
       return false;
     }
     const forceV2WorkingCopy = needsLegacyV2MigrationConsent(parsedDocument) || options?.forceV2WorkingCopy === true;
+    const bindOpenedFile = canBindOpenedProjectFile(parsedDocument, handle, options);
     const sourcePersistenceState = buildLoadedProjectPersistenceState(parsedDocument, handle, {
       ...options,
       forceV2WorkingCopy,
+      projectSaveHandleState: bindOpenedFile ? 'bound' : 'none',
     });
     return await applyLoadedDocumentSnapshot(parsedDocument, {
       ...options,
       forceV2WorkingCopy,
+      bindOpenedFile,
+      openedProjectFileHandle: bindOpenedFile ? handle : null,
       sourcePersistenceState,
     });
   }
@@ -288,13 +305,17 @@
       return false;
     }
     const forceV2WorkingCopy = needsLegacyV2MigrationConsent(parsedDocument) || options?.forceV2WorkingCopy === true;
+    const bindOpenedFile = canBindOpenedProjectFile(parsedDocument, handle, options);
     const sourcePersistenceState = buildLoadedProjectPersistenceState(parsedDocument, handle, {
       ...options,
       forceV2WorkingCopy,
+      projectSaveHandleState: bindOpenedFile ? 'bound' : 'none',
     });
     return await applyLoadedDocumentSnapshot(parsedDocument, {
       ...options,
       forceV2WorkingCopy,
+      bindOpenedFile,
+      openedProjectFileHandle: bindOpenedFile ? handle : null,
       sourcePersistenceState,
     });
   }
@@ -611,7 +632,7 @@
               : -1,
           };
         });
-        timelapseState.enabled = projectSession.timelapse.enabled;
+        timelapseState.enabled = true;
         timelapseState.fps = projectSession.timelapse.fps;
         if (projectSession.localViewportCanvases) {
           localViewportCanvasState = normalizeLocalViewportCanvasState(
@@ -652,7 +673,10 @@
     const sourcePersistenceState = options?.sourcePersistenceState && typeof options.sourcePersistenceState === 'object'
       ? options.sourcePersistenceState
       : null;
-    const mustCreateUnboundV2WorkingCopy = options?.fileLoad === true || options?.forceV2WorkingCopy === true;
+    const mustCreateUnboundV2WorkingCopy = (
+      options?.forceV2WorkingCopy === true
+      || (options?.fileLoad === true && options?.bindOpenedFile !== true)
+    );
     setActiveAutosaveProjectId(requestedProjectId || createAutosaveProjectId());
     if (!options?.suppressProjectSheetsRestore) {
       await restoreOpenProjectSheetsFromParsedDocument(parsedDocument, {
@@ -692,6 +716,31 @@
         phase: 'external-input-converted-to-v2-working-copy',
         sourceKind: sourcePersistenceState?.sourceKind || options?.sourceKind || 'file',
         sourceAdapterId: parsedDocument?.storageAdapterId || null,
+        projectId: autosaveProjectId,
+      });
+    } else if (options?.bindOpenedFile === true && options?.openedProjectFileHandle) {
+      const handle = options.openedProjectFileHandle;
+      autosaveHandle = handle;
+      pendingAutosaveHandle = null;
+      clearPendingPermissionListener?.();
+      try {
+        await storeAutosaveHandle?.(handle);
+      } catch (error) {
+        console.warn('Failed to persist opened project file handle', error);
+      }
+      bindActiveProjectSaveHandle?.(handle, {
+        fileName: handle.name || state.documentName || DEFAULT_DOCUMENT_NAME,
+        handleKind: 'external-project-file',
+        permissionState: 'granted',
+        adapterId: parsedDocument?.storageAdapterId || 'pixieedraw-v2-zip',
+        boundAt: new Date().toISOString(),
+      }, { log: true });
+      if (dom.controls.enableAutosave instanceof HTMLButtonElement) {
+        dom.controls.enableAutosave.textContent = localizeText('保存ファイルに自動接続中', 'Auto-connected to project file');
+      }
+      console.info('[pixiedraw-dev:file-binding]', {
+        phase: 'opened-project-file-bound',
+        fileName: handle.name || '',
         projectId: autosaveProjectId,
       });
     }
@@ -815,9 +864,6 @@
     }
     const payload = {};
     Object.entries(getAllTimelapseTracks()).forEach(([canvasId, track]) => {
-      if (track?.operationLog?.baseSnapshot) {
-        return;
-      }
       const snapshots = serializeProjectTimelapseSnapshotList(track?.snapshots || []);
       if (!snapshots.length) {
         return;
@@ -837,6 +883,19 @@
   function normalizeSerializedTimelapseOperationEntry(entry = null) {
     if (!entry || typeof entry !== 'object') {
       return null;
+    }
+    if (entry.type === 'pixelPatchBatch' && Array.isArray(entry.entries)) {
+      const entries = entry.entries
+        .map(item => normalizeSerializedTimelapseOperationEntry(item))
+        .filter(item => item?.type === 'pixelPatch');
+      return entries.length
+        ? {
+            type: 'pixelPatchBatch',
+            at: Math.max(0, Math.round(Number(entry.at) || 0)),
+            historyLabel: String(entry.historyLabel || 'timelapseCompacted'),
+            entries,
+          }
+        : null;
     }
     if (entry.type === 'keyframe') {
       return entry.snapshot && typeof entry.snapshot === 'object'
@@ -933,8 +992,8 @@
           : {},
         operationLogsByCanvas: serializeProjectTimelapseOperationLogs({ flushPending: false }),
         deferredInAutosave: !shouldIncludeTimelapse,
-        // Timelapse is opt-in, so autosave writes track data only after a
-        // recording exists. This preserves restore counts without penalizing default sessions.
+        // Recording is always enabled. Empty track data is still omitted until
+        // the first lightweight base/operation exists.
       },
     };
   }
