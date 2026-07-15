@@ -2780,6 +2780,14 @@
     });
   }
 
+  function handleLocalViewportCanvasVisualViewportScroll() {
+    // Safari also reports a visualViewport scroll when a fixed flyout takes
+    // focus.  The canvas viewport has not been resized in that case, so do
+    // not run anchor preservation: it rewrites state.pan using transient
+    // viewport offsets.  An overlay repaint is sufficient for visual aids.
+    requestOverlayRender();
+  }
+
   function reconcileProjectCanvasesFromLocalViewportState() {
     const desiredCount = getLocalViewportCanvasCount();
     const currentCanvases = getProjectCanvasDocuments();
@@ -2840,7 +2848,7 @@
     window.addEventListener('orientationchange', handleLocalViewportCanvasViewportChange);
     if (window.visualViewport && typeof window.visualViewport.addEventListener === 'function') {
       window.visualViewport.addEventListener('resize', handleLocalViewportCanvasVisualViewportChange);
-      window.visualViewport.addEventListener('scroll', handleLocalViewportCanvasVisualViewportChange);
+      window.visualViewport.addEventListener('scroll', handleLocalViewportCanvasVisualViewportScroll);
     }
     syncLocalViewportCanvasDockVisibility({ persist: false, render: true });
   }
@@ -2945,6 +2953,7 @@
     canUseVoxelExtensionMode,
     handleLocalViewportCanvasViewportChange,
     handleLocalViewportCanvasVisualViewportChange,
+    handleLocalViewportCanvasVisualViewportScroll,
     reconcileProjectCanvasesFromLocalViewportState,
     setupLocalViewportCanvasDock,
   });
