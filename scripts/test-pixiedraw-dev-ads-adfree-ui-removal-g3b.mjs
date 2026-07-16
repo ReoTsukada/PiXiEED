@@ -12,7 +12,7 @@ const accountWorkflow = read('PiXiEEDrawDEV/assets/js/modules/pixieed-account-wo
 const localization = read('PiXiEEDrawDEV/assets/js/modules/ui-localization-utils.js');
 
 assert.doesNotMatch(index, /pixieed-adfree\.js/, 'DEV must not load the advertising-off entitlement script');
-assert.match(index, /support-checkout-panel\.js/, 'generic support and marketplace infrastructure remains available');
+assert.doesNotMatch(index, /support-checkout-panel\.js/, 'retired Stripe support UI must not load in DEV');
 assert.doesNotMatch(edition, /pixieedAdFree/, 'advertising capability must not read legacy entitlements');
 assert.doesNotMatch(benefits, /window\.pixieedAdFree/, 'support UI synchronization must not read legacy entitlements');
 assert.doesNotMatch(accountWorkflow, /window\.pixieedAdFree/, 'account initialization must not subscribe to advertising-off entitlements');
