@@ -4,25 +4,7 @@
     return;
   }
 
-  try {
-    const pathname = String(window.location.pathname || '').toLowerCase();
-    const isPixieedrawPage = /(?:^|\/)pixiedraw(?:\/|\/index\.html)?$/.test(pathname);
-    const raw = window.localStorage.getItem('pixieed_browser_adfree_cache_v1');
-    if (raw) {
-      const cached = JSON.parse(raw);
-      const entitlements = cached?.entitlements;
-      const keys = isPixieedrawPage ? ['browser_ad_free', 'pixiedraw_ad_free'] : ['browser_ad_free'];
-      const hasScopedEntitlement = keys.some(key => {
-        const expiresAt = typeof entitlements?.[key]?.expiresAt === 'string' ? entitlements[key].expiresAt : '';
-        return entitlements?.[key] && (!expiresAt || Date.parse(expiresAt) > Date.now());
-      });
-      const legacyActive = cached?.active === true && (!cached?.expiresAt || Date.parse(cached.expiresAt) > Date.now());
-      if (legacyActive || hasScopedEntitlement) {
-        window.__PIXIEED_ADS_DISABLED__ = true;
-      }
-    }
-  } catch (_error) {}
-  if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) return;
+  if (window.__PIXIEED_ADS_DISABLED__) return;
   if (window.pixieedObserveAds) return;
 
   const SLOT_SEQUENCE = ['2141591954', '9073878884', '2261515379'];
