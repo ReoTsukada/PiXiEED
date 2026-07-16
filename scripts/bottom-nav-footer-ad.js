@@ -4,67 +4,11 @@
   }
   window.__PIXIEED_FOOTER_AD_CONTROLLER__ = true;
 
-  const PIXIEED_ADFREE_SCRIPT_VERSION = '2026.05.30-support-email-claim';
   let adsScriptLoadScheduled = false;
   let maoituAdsScriptDelayApplied = false;
 
-  function buildPixieedAdFreeScriptUrl(baseUrl) {
-    const url = new URL(baseUrl, window.location.href);
-    url.searchParams.set('v', PIXIEED_ADFREE_SCRIPT_VERSION);
-    return url.href;
-  }
-
-  function isPixieedrawPageForAds() {
-    try {
-      const pathname = String(window.location.pathname || '').toLowerCase();
-      return /(?:^|\/)pixiedraw(?:\/|\/index\.html)?$/.test(pathname);
-    } catch (_error) {
-      return false;
-    }
-  }
-
-  function hasCachedAdFreeForCurrentPage() {
-    try {
-      const raw = window.localStorage.getItem('pixieed_browser_adfree_cache_v1');
-      if (!raw) return false;
-      const cached = JSON.parse(raw);
-      if (cached?.active === true) {
-        const expiresAt = typeof cached?.expiresAt === 'string' ? cached.expiresAt : '';
-        return !expiresAt || Date.parse(expiresAt) > Date.now();
-      }
-      const entitlements = cached?.entitlements;
-      if (!entitlements || typeof entitlements !== 'object') return false;
-      const keys = isPixieedrawPageForAds()
-        ? ['browser_ad_free', 'pixiedraw_ad_free']
-        : ['browser_ad_free'];
-      return keys.some(key => {
-        const expiresAt = typeof entitlements?.[key]?.expiresAt === 'string' ? entitlements[key].expiresAt : '';
-        return entitlements?.[key] && (!expiresAt || Date.parse(expiresAt) > Date.now());
-      });
-    } catch (_error) {
-      return false;
-    }
-  }
-
-  function bootstrapPixieedAdFree() {
-    if (hasCachedAdFreeForCurrentPage()) {
-      window.__PIXIEED_ADS_DISABLED__ = true;
-    }
-    if (window.pixieedAdFree || document.querySelector('script[data-pixieed-adfree="true"]')) {
-      return;
-    }
-    const currentScript = document.currentScript;
-    const script = document.createElement('script');
-    script.defer = true;
-    script.dataset.pixieedAdfree = 'true';
-    script.src = currentScript?.src
-      ? buildPixieedAdFreeScriptUrl(new URL('./pixieed-adfree.js', currentScript.src).href)
-      : buildPixieedAdFreeScriptUrl('/scripts/pixieed-adfree.js');
-    document.head.appendChild(script);
-  }
-
   function arePixieedAdsDisabled() {
-    return Boolean(window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive);
+    return Boolean(window.__PIXIEED_ADS_DISABLED__);
   }
 
   function shouldReserveFooterAdOnly() {
@@ -1024,21 +968,18 @@
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
-      bootstrapPixieedAdFree();
       injectMinimalSiteChrome();
       setupHomeBackGuard();
       setupMobileInputViewportGuard();
       syncFooterAd();
     }, { once: true });
   } else {
-    bootstrapPixieedAdFree();
     injectMinimalSiteChrome();
     setupHomeBackGuard();
     setupMobileInputViewportGuard();
     syncFooterAd();
   }
 
-  window.addEventListener('pixieed:adfreechange', syncFooterAd);
   window.addEventListener('pageshow', () => {
     syncFooterAd();
   });
