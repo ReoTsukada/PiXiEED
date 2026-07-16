@@ -43,7 +43,6 @@ function gtag(){dataLayer.push(arguments);}
   }
 })();
 </script>
-<script src="../scripts/pixieed-adfree.js"></script>
 <script>
 (() => {
   try {
@@ -1393,7 +1392,7 @@ body.is-game-active .game-shell {
   <script id="ads-lazy">
   (function() {
     if (window.pixieedObserveAds) return;
-    if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) return;
+    if (window.__PIXIEED_ADS_DISABLED__) return;
 
     const SLOT_SEQUENCE = ['2141591954','9073878884','2261515379'];
     const SLOT_KEY = 'pixieedAdSlotIndex';
