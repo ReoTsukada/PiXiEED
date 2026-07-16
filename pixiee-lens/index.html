@@ -48,7 +48,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
 <script async="" crossorigin="anonymous" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253"></script>
-<script src="../scripts/pixieed-adfree.js?v=2026.06.01-serial-code-email"></script>
 <script>
   (function configureEmbedMode() {
     try {
@@ -2350,7 +2349,7 @@
 <script id="ads-lazy">
   (function() {
     if (window.pixieedObserveAds) return;
-    if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) return;
+    if (window.__PIXIEED_ADS_DISABLED__) return;
 
     const SLOT_SEQUENCE = ['2141591954','9073878884','2261515379'];
     const SLOT_KEY = 'pixieedAdSlotIndex';
@@ -5103,7 +5102,7 @@
     }
 
     function rebuildLensBannerAd() {
-      if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) {
+      if (window.__PIXIEED_ADS_DISABLED__) {
         return;
       }
       if (!lensAdBlock) {
@@ -5634,7 +5633,7 @@
     }
 
     function rebuildCapturePreviewAd() {
-      if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) {
+      if (window.__PIXIEED_ADS_DISABLED__) {
         return;
       }
       if (!capturePreviewAd) {
@@ -5673,7 +5672,7 @@
     }
 
     function requestCapturePreviewAdRender() {
-      if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) {
+      if (window.__PIXIEED_ADS_DISABLED__) {
         return;
       }
       if (!capturePreviewAd || (capturePreviewOverlay && capturePreviewOverlay.hidden)) {
