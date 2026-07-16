@@ -1,11 +1,2 @@
-[functions.stripe-browser-adfree-checkout]
-verify_jwt = false
-
-[functions.stripe-browser-adfree-webhook]
-verify_jwt = false
-
-[functions.stores-browser-adfree-webhook]
-verify_jwt = false
-
 [functions.plaza-cleanup-expired]
 verify_jwt = false
