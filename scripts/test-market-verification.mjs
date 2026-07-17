@@ -32,7 +32,10 @@ const limitedMigration = fs.readFileSync('supabase/migrations/20260717154000_mar
 const minimumPriceMigration = fs.readFileSync('supabase/migrations/20260717160000_market_minimum_paid_listing.sql', 'utf8');
 const devGateMigration = fs.readFileSync('supabase/migrations/20260717161000_market_dev_account_gate.sql', 'utf8');
 const devAccessUi = fs.readFileSync('scripts/pixieed-dev-access.js', 'utf8');
+const accountDevToolsUi = fs.readFileSync('scripts/account-dev-tools.js', 'utf8');
 const marketDevGateUi = fs.readFileSync('market/dev-gate.js', 'utf8');
+const reviewHtml = fs.readFileSync('market/review.html', 'utf8');
+const reviewUi = fs.readFileSync('market/review.js', 'utf8');
 const stripeConnectFunction = fs.readFileSync('supabase/functions/market-stripe-connect/index.ts', 'utf8');
 const sharedMarketFunction = fs.readFileSync('supabase/functions/_shared/market-stripe.ts', 'utf8');
 const accountHtml = fs.readFileSync('account/index.html', 'utf8');
@@ -118,7 +121,7 @@ for (const pagePath of ['market/index.html', 'market/item.html', 'market/about.h
   assert.doesNotMatch(page, /dev-gate\.js/);
 }
 
-for (const pagePath of ['market/sell.html', 'market/seller.html', 'market/review.html']) {
+for (const pagePath of ['market/sell.html', 'market/seller.html']) {
   const page = fs.readFileSync(pagePath, 'utf8');
   assert.match(page, /data-pixieed-market-access="pending"/);
   assert.match(page, /data-pixieed-market-write="locked"/);
@@ -126,6 +129,14 @@ for (const pagePath of ['market/sell.html', 'market/seller.html', 'market/review
   assert.match(page, /dev-gate\.js/);
   assert.match(page, /noindex,nofollow/);
 }
+
+assert.match(reviewHtml, /data-pixieed-market-access="pending"/);
+assert.doesNotMatch(reviewHtml, /data-pixieed-market-write="locked"/);
+assert.match(reviewHtml, /pixieed-dev-access\.js/);
+assert.match(reviewHtml, /dev-gate\.js/);
+assert.match(reviewHtml, /noindex,nofollow/);
+assert.match(reviewUi, /rpc\('market_current_user_is_admin'\)/);
+assert.doesNotMatch(reviewUi, /rpc\('market_current_user_is_reviewer'\)/);
 
 for (const pagePath of ['market/index.html', 'market/item.html', 'market/sell.html', 'market/seller.html', 'market/review.html', 'market/about.html', 'market/help.html']) {
   const page = fs.readFileSync(pagePath, 'utf8');
@@ -261,7 +272,11 @@ assert.match(stripeConnectFunction, /requireMarketDevUser/);
 assert.match(sharedMarketFunction, /MARKET_LISTING_ENABLED = false/);
 assert.match(stripeConnectFunction, /if \(!MARKET_LISTING_ENABLED\)/);
 assert.match(accountHtml, /id="accountDevTools"[\s\S]*data-market-dev-only/);
-assert.doesNotMatch(accountHtml, /href="\.\.\/market\/(?:sell|seller|review)\.html"/);
+assert.match(accountHtml, /id="accountAdminTools"[\s\S]*data-market-admin-only/);
+assert.match(accountHtml, /data-market-admin-only[\s\S]*href="\.\.\/market\/review\.html"/);
+assert.doesNotMatch(accountHtml, /href="\.\.\/market\/(?:sell|seller)\.html"/);
+assert.match(accountDevToolsUi, /rpc\('market_current_user_is_admin'\)/);
+assert.match(accountDevToolsUi, /applyAdminAccess\(!error && isAdmin === true\)/);
 assert.match(sharedNav, /key: 'market'[\s\S]*path: 'market\/index\.html'/);
 assert.match(sitemap, /pixieed\.jp\/market\//);
 assert.match(marketIndexHtml, /出品準備中/);
