@@ -5,6 +5,8 @@ import vm from 'node:vm';
 const source = await readFile(new URL('../PiXiEEDrawDEV/assets/js/modules/open-import-workflow-utils.js', import.meta.url), 'utf8');
 const appSource = await readFile(new URL('../PiXiEEDrawDEV/assets/js/app.js', import.meta.url), 'utf8');
 const tabModelSource = await readFile(new URL('../PiXiEEDrawDEV/assets/js/modules/open-project-tab-model.js', import.meta.url), 'utf8');
+const documentSessionSource = await readFile(new URL('../PiXiEEDrawDEV/assets/js/modules/document-session-workflow-utils.js', import.meta.url), 'utf8');
+const indexSource = await readFile(new URL('../PiXiEEDrawDEV/index.html', import.meta.url), 'utf8');
 const context = { window: { PiXiEEDrawModules: {} }, console: { info() {}, warn() {} }, Proxy, Symbol, Object, Array, String, Number, Boolean, Set, Map, Date, Error, Math, Promise };
 vm.runInNewContext(source, context, { filename: 'open-import-workflow-utils.js' });
 
@@ -54,5 +56,41 @@ assert.match(appSource, /getActiveProjectPayload: \(tab\) => \{/);
 assert.match(appSource, /canonicalPayloadFormat: 'v2'/);
 assert.match(tabModelSource, /currentTab\?\.canonicalPayloadFormat === 'v2'/);
 assert.match(tabModelSource, /canonicalSourceMetadata: currentTab\?\.canonicalSourceMetadata/);
+
+const documentContext = {
+  window: { PiXiEEDrawModules: {} },
+  console: { info() {}, warn() {} },
+  Proxy,
+  Symbol,
+  Object,
+  Array,
+  String,
+  Number,
+  Boolean,
+  Set,
+  Map,
+  Date,
+  Error,
+  Math,
+  Promise,
+};
+vm.runInNewContext(documentSessionSource, documentContext, { filename: 'document-session-workflow-utils.js' });
+const documentUtils = documentContext.window.PiXiEEDrawModules.documentSessionWorkflowUtils.createDocumentSessionWorkflowUtils({
+  parseProjectStoragePayload: value => ({ adapterId: 'pixieedraw-v1-json', parsed: value }),
+  deserializeDocumentPayload: value => ({ ...value, activeCanvasId: 'canvas-a' }),
+  resolvePackagedProjectDotStats: () => null,
+  normalizePackagedProjectSheets: () => [],
+});
+const parsedCanonical = documentUtils.snapshotFromParsedDocumentValue(canonical);
+assert.equal(parsedCanonical.storageAdapterId, 'pixieedraw-v1-json');
+assert.equal(parsedCanonical.canonicalPayloadFormat, 'v2');
+assert.equal(parsedCanonical.canonicalSchemaVersion, 1);
+assert.deepEqual(parsedCanonical.canonicalSourceMetadata, canonical.canonicalSourceMetadata);
+assert.match(
+  documentSessionSource,
+  /Number\(options\?\.trustedAutosaveSchemaVersion\) === 2\s*\|\| parsedDocument\?\.canonicalPayloadFormat === 'v2'[\s\S]{0,180}parsedDocument\.storageAdapterId = '';/,
+  'validated canonical V2 image imports must not open the legacy migration dialog'
+);
+assert.match(indexSource, /document-session-workflow-utils\.js\?v=20260717-canonical-image-open1/);
 
 console.log('Canonical V2 E3 PNG import connection checks passed');
