@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ja" data-pixieed-market-access="pending" data-pixieed-market-write="locked">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow">
+  <title>マーケット審査 | PiXiEED</title>
+  <link rel="icon" type="image/png" href="../Market.png">
+  <link rel="stylesheet" href="../site/landing.css?v=2026.07.15-home-clear-entry1">
+  <link rel="stylesheet" href="market.css?v=2026.07.17-public-read2">
+</head>
+<body>
+  <div class="page market-page">
+    <main class="market-shell market-review-shell">
+      <header class="market-titlebar">
+        <div class="market-titlebar__title"><img src="../Market.png" alt=""><h1>マーケット審査</h1></div>
+        <a class="market-sell-button" href="index.html">マーケットへ戻る</a>
+      </header>
+      <p class="market-sell-status" id="reviewAccessStatus" aria-live="polite">権限を確認しています</p>
+      <section class="market-review-section" id="listingReviewSection" hidden>
+        <div class="account-panel__head"><h2>出品審査</h2><span id="reviewQueueCount">0件</span></div>
+        <div class="market-review-list" id="reviewQueue"></div>
+      </section>
+      <section class="market-review-section" id="sellerReviewSection" hidden>
+        <div class="account-panel__head"><h2>販売者認証</h2><span id="sellerQueueCount">0件</span></div>
+        <p class="market-review-warning">PiXiEED運営が確認資料と申請内容を照合した申請だけを承認してください。</p>
+        <div class="market-review-list" id="sellerQueue"></div>
+      </section>
+    </main>
+  </div>
+  <script src="../scripts/pixieed-dev-access.js?v=2026.07.17-market-dev1"></script>
+  <script src="dev-gate.js?v=2026.07.17-write-lock1"></script>
+  <script src="review.js?v=2026.07.17-dev-account1"></script>
+  <script src="../scripts/shared-bottom-nav.js?v=2026.07.17-market-public32"></script>
+</body>
+</html>

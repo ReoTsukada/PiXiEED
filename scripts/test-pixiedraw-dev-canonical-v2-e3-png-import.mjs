@@ -46,7 +46,8 @@ assert.equal((await validationFailure.normalizePngSheetCandidate(original, { typ
 
 assert.match(source, /const isPng = kind === 'image'/);
 assert.match(source, /project = normalized\.canonicalPayload;/);
-assert.match(source, /loaded\.sourceKind === 'import-image'\s*&& loaded\.canonicalPayloadFormat === 'v2'/);
+assert.match(source, /forceV2WorkingCopy: true/);
+assert.match(source, /canonicalPayloadFormat: project\.canonicalPayloadFormat \|\| ''/);
 assert.match(appSource, /get normalizeExternalProjectToCanonicalV2\(\) \{ return canonicalV2ProjectUtilsModule\.normalizeExternalProjectToCanonicalV2; \}/);
 assert.match(appSource, /get validateCanonicalV2ProjectPayload\(\) \{ return canonicalV2ProjectUtilsModule\.validateCanonicalV2ProjectPayload; \}/);
 assert.match(appSource, /getActiveProjectPayload: \(tab\) => \{/);

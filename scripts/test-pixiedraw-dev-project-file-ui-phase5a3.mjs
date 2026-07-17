@@ -6,21 +6,17 @@ const root = '/Users/tsukadareine/Documents/GitHub/PiXiEED';
 const html = fs.readFileSync(path.join(root, 'PiXiEEDrawDEV/index.html'), 'utf8');
 const app = fs.readFileSync(path.join(root, 'PiXiEEDrawDEV/assets/js/app.js'), 'utf8');
 
-for (const command of ['new', 'open', 'recent', 'save', 'save-as', 'copy', 'add-sheet', 'export']) {
-  assert.match(html, new RegExp(`data-project-file-command="${command}"`));
+for (const id of ['newProject', 'openDocument', 'showLocalProjects', 'exportProject']) {
+  assert.match(html, new RegExp(`id="${id}"`));
 }
-assert.doesNotMatch(html.match(/<div class="project-file-menu"[\s\S]*?<\/div>\s*<div class="field-group/m)?.[0] || '', /PiXiEELENS|QR/);
+assert.doesNotMatch(html, /id="projectFileMenuButton"|id="projectFileMenuItems"|data-project-file-command=/);
 for (const api of ['executeProjectSave', 'executeProjectSaveAs', 'executeProjectSaveCopy', 'executeProjectOpen']) {
   assert.match(app, new RegExp(`await ${api}\\(`));
 }
 assert.match(app, /projectFileCommandInFlight/);
 assert.match(app, /event\.isComposing/);
 assert.match(app, /event\.preventDefault\(\)/);
-assert.match(app, /sheetAddKind: 'project'/);
 assert.match(app, /openExportDialog\(\)/);
-const fileMenuBind = app.indexOf('  bindProjectFileMenuOnce();\n  init();');
-const persistenceGetter = app.indexOf('function getActiveProjectPersistenceState(');
-const editableTarget = app.indexOf('function isEditableTarget(');
-assert.ok(fileMenuBind > persistenceGetter, 'File menu binding follows persistence initialization');
-assert.ok(fileMenuBind > editableTarget, 'File menu binding follows editable target initialization');
+assert.match(app, /function bindCoreProjectActionButtons\(\)/);
+assert.match(app, /bindCoreProjectActionButtons\(\);/);
 console.log('PiXiEEDraw DEV Phase 5-A3 project file UI checks passed');

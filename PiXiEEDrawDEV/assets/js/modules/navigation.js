@@ -19,7 +19,7 @@
         id: EXTERNAL_TOOL_PIXIEELENS_ID,
         action: TOP_UI_ACTION_OPEN_LENS_CAMERA,
         launchUrl: 'https://pixieed.jp/pixiee-lens/index.html',
-        iconSrc: 'assets/icons/pixieelensicon_frame_01.png',
+        iconSrc: '../Camera.png',
         displayName: Object.freeze({ ja: 'PiXiEELENS', en: 'PiXiEELENS', zh: 'PiXiEELENS' }),
         actionLabel: Object.freeze({ ja: 'カメラ', en: 'Camera', zh: '相机' }),
         protocol: Object.freeze({
@@ -32,7 +32,7 @@
         id: EXTERNAL_TOOL_QR_MAKER_ID,
         action: TOP_UI_ACTION_OPEN_QR_EDITOR,
         launchUrl: 'https://pixieed.jp/qr-maker/index.html',
-        iconSrc: 'assets/icons/tool-qr-edit.svg',
+        iconSrc: '../QR.png',
         displayName: Object.freeze({ ja: 'QRコードリーダー', en: 'QR Code Reader', zh: 'QR码读取器' }),
         actionLabel: Object.freeze({ ja: 'QR編集', en: 'QR Edit', zh: 'QR编辑' }),
         protocol: Object.freeze({

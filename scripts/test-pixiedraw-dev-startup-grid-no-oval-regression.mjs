@@ -15,7 +15,7 @@ const drawing = read('PiXiEEDrawDEV/assets/js/modules/canvas-drawing-workflow-ut
 
 assert.match(startup, /String\(entry\?\.name \|\| DEFAULT_DOCUMENT_NAME\)\.replace\(\/\\\.pixieedraw\$\/i, ''\)/);
 assert.match(css, /@media \(max-width: 720px\)[\s\S]*?\.startup-workspace__list\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/);
-assert.match(html, /style\.css\?v=20260715-startup-grid-no-oval1/);
+assert.match(html, /style\.css\?v=20260715-export-preview-ad-layout1/);
 assert.match(html, /startup-workflow-utils\.js\?v=20260715-startup-grid-no-oval1/);
 assert.match(html, /data-tool="ellipse"[\s\S]*?<span>丸<\/span>/);
 assert.match(html, /data-tool="ellipseFill"[\s\S]*?<span>塗り丸<\/span>/);

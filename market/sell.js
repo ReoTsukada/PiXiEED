@@ -1,0 +1,676 @@
+(function () {
+  'use strict';
+
+  const SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
+  const MAX_FILE_COUNT = 100;
+  const MAX_DETECTION_COUNT = 300;
+  const MAX_TOTAL_BYTES = 50 * 1024 * 1024;
+  const MAX_SAMPLE_PREVIEWS = 6;
+  const packageUtils = window.PiXiEEDMarketPackage;
+  const FORMAT_ORDER = ['pixiedraw-project', 'png', 'sprite-sheet-png', 'webp', 'gif', 'apng'];
+  const FORMAT_LABELS = {
+    'pixiedraw-project': 'PiXiEEDraw',
+    png: 'PNG',
+    'sprite-sheet-png': 'PNGスプライトシート',
+    webp: 'WebP',
+    gif: 'GIF',
+    apng: 'APNG'
+  };
+  const FALLBACK_OPTIONS = [
+    { id: 'commercial-use', label: '商用・収益化利用', description: 'ゲーム、アプリ、動画、配信、広告などに利用できます。', minimum_price_yen: 500, sort_order: 10 },
+    { id: 'merchandise-use', label: 'グッズ・印刷販売', description: 'グッズや印刷物を制作して販売できます。', minimum_price_yen: 1000, sort_order: 20 },
+    { id: 'credit-omission', label: 'クレジット表記不要', description: '利用時の作者名表記を省略できます。', minimum_price_yen: 300, sort_order: 30 }
+  ];
+
+  const form = document.getElementById('listingForm');
+  const gate = document.getElementById('sellerGate');
+  const status = document.getElementById('listingStatus');
+  const $ = (id) => document.getElementById(id);
+  const sourceFiles = new Map();
+  const selectedFormats = new Set();
+  const dismissedFormats = new Set();
+  const selectedOptionIds = new Set();
+  const optionPrices = new Map();
+  const samplePreviewPaths = new Set();
+  const previewUrls = new Map();
+  let detectedEntries = [];
+  let ignoredFileCount = 0;
+  let optionCatalog = FALLBACK_OPTIONS.map((option) => ({ ...option }));
+  let detectionRun = 0;
+  let thumbnailPath = '';
+  let previewSelectionTouched = false;
+  let viewerEntries = [];
+  let viewerIndex = 0;
+  let client = null;
+  let signedInUser = null;
+  let submissionEnabled = false;
+
+  const setStatus = (value) => { status.textContent = value || ''; };
+  const yen = (value) => `${Number(value || 0).toLocaleString('ja-JP')}円`;
+  const fileSize = (bytes) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  };
+  const sha256Buffer = async (buffer) => Array.from(
+    new Uint8Array(await crypto.subtle.digest('SHA-256', buffer))
+  ).map((value) => value.toString(16).padStart(2, '0')).join('');
+  const sha256File = async (file) => sha256Buffer(await file.arrayBuffer());
+  const filePath = (file) => file._marketRelativePath || file.webkitRelativePath || file.name;
+  const listingTags = () => Array.from(new Set(String($('listingTags')?.value || '')
+    .split(/[,、#＃\n]+/)
+    .map((tag) => tag.trim().replace(/\s+/g, ' '))
+    .filter(Boolean)));
+  const isPreviewable = (entry) => entry && Boolean(entry.format) && (
+    entry.format !== 'pixiedraw-project' || entry.previewBlob instanceof Blob
+  );
+
+  function setSubmissionEnabled(enabled, label) {
+    submissionEnabled = enabled;
+    const button = $('listingSubmit');
+    button.disabled = !enabled;
+    button.textContent = label || (enabled ? '下書きを作成して審査へ送る' : 'ログイン後に出品できます');
+  }
+
+  function updatePrice() {
+    const salePrice = Math.max(0, Number($('listingPrice').value) || 0);
+    const optionPrice = optionCatalog.reduce((total, option) => (
+      selectedOptionIds.has(option.id) ? total + optionPriceFor(option) : total
+    ), 0);
+    $('listingOptionPrice').textContent = yen(optionPrice);
+    const purchasePrice = salePrice + optionPrice;
+    $('listingTotalPrice').textContent = yen(purchasePrice);
+    const minimum = $('listingLimitedEnabled').checked ? 1000 : 500;
+    $('listingTotalPrice').classList.toggle('is-below-minimum', purchasePrice < minimum);
+  }
+
+  function updateLimitedState() {
+    const enabled = $('listingLimitedEnabled').checked;
+    $('listingLimitedQuantityField').hidden = !enabled;
+    $('listingLimitedQuantity').required = enabled;
+    updatePrice();
+  }
+
+  function syncOptionPrices() {
+    const validIds = new Set(optionCatalog.map((option) => option.id));
+    Array.from(optionPrices.keys()).forEach((id) => { if (!validIds.has(id)) optionPrices.delete(id); });
+    optionCatalog.forEach((option) => {
+      const current = Number(optionPrices.get(option.id));
+      if (!Number.isInteger(current) || current < option.minimum_price_yen) optionPrices.set(option.id, option.minimum_price_yen);
+    });
+  }
+
+  function optionPriceFor(option) {
+    const value = Number(optionPrices.get(option.id));
+    return Number.isInteger(value) && value >= option.minimum_price_yen ? value : option.minimum_price_yen;
+  }
+
+  function switchCard({ title, description, meta, checked, onChange }) {
+    const label = document.createElement('label'); label.className = 'market-switch-card';
+    const copy = document.createElement('span');
+    const strong = document.createElement('strong'); strong.textContent = title;
+    const small = document.createElement('small'); small.textContent = description;
+    copy.append(strong, small);
+    const side = document.createElement('span'); side.className = 'market-switch-side';
+    if (meta) { const price = document.createElement('b'); price.textContent = meta; side.append(price); }
+    const input = document.createElement('input'); input.type = 'checkbox'; input.className = 'market-switch-input'; input.checked = checked;
+    const visual = document.createElement('i'); visual.setAttribute('aria-hidden', 'true');
+    input.addEventListener('change', () => onChange(input.checked));
+    side.append(input, visual); label.append(copy, side); return label;
+  }
+
+  function renderOptions() {
+    syncOptionPrices();
+    const validIds = new Set(optionCatalog.map((option) => option.id));
+    Array.from(selectedOptionIds).forEach((id) => { if (!validIds.has(id)) selectedOptionIds.delete(id); });
+    $('listingOptionSwitches').replaceChildren(...optionCatalog.map((option) => switchCard({
+      title: option.label,
+      description: option.description,
+      meta: `+${yen(optionPriceFor(option))}`,
+      checked: selectedOptionIds.has(option.id),
+      onChange: (checked) => {
+        if (checked) selectedOptionIds.add(option.id); else selectedOptionIds.delete(option.id);
+        renderOptionPriceFields(); updatePrice();
+      }
+    })));
+  }
+
+  function renderOptionPriceFields() {
+    syncOptionPrices();
+    const selected = optionCatalog.filter((option) => selectedOptionIds.has(option.id));
+    if (!selected.length) {
+      const empty = document.createElement('p'); empty.className = 'helper'; empty.textContent = '料金を変更するオプションをONにしてください。';
+      $('listingOptionPriceFields').replaceChildren(empty); return;
+    }
+    $('listingOptionPriceFields').replaceChildren(...selected.map((option) => {
+      const label = document.createElement('label'); label.className = 'market-option-price-field';
+      const title = document.createElement('span'); title.textContent = option.label;
+      const minimum = document.createElement('small'); minimum.textContent = `最低 ${yen(option.minimum_price_yen)}`;
+      const input = document.createElement('input'); input.type = 'number'; input.min = String(option.minimum_price_yen); input.step = '1'; input.value = String(optionPriceFor(option)); input.inputMode = 'numeric';
+      input.addEventListener('input', () => {
+        const value = Number(input.value);
+        if (Number.isInteger(value)) optionPrices.set(option.id, value);
+        input.setCustomValidity(Number.isInteger(value) && value >= option.minimum_price_yen ? '' : `${option.minimum_price_yen}円以上で設定してください。`);
+        updatePrice();
+      });
+      input.addEventListener('change', () => { renderOptions(); renderOptionPriceFields(); updatePrice(); });
+      label.append(title, minimum, input); return label;
+    }));
+  }
+
+  function activeEntries() {
+    return detectedEntries.filter((entry) => selectedFormats.has(entry.format));
+  }
+
+  function activePreviewEntries() {
+    return activeEntries().filter(isPreviewable);
+  }
+
+  function getPreviewUrl(entry) {
+    if (!entry) return '';
+    if (!previewUrls.has(entry.path)) previewUrls.set(entry.path, URL.createObjectURL(entry.previewBlob || entry.file));
+    return previewUrls.get(entry.path);
+  }
+
+  function renderFiles() {
+    const entries = activeEntries();
+    const activeBytes = entries.reduce((total, entry) => total + entry.file.size, 0);
+    const suffix = ignoredFileCount ? `／未対応 ${ignoredFileCount}件は現在出品対象外` : '';
+    $('listingFileSummary').textContent = detectedEntries.length
+      ? `${detectedEntries.length}件追加・対応 ${entries.length}件を出品・${fileSize(activeBytes)}${suffix}`
+      : `ファイルまたはフォルダを追加してください。${suffix}`;
+    $('listingFileList').replaceChildren(...detectedEntries.slice(0, 12).map((entry) => {
+      const row = document.createElement('div');
+      row.className = `market-file-row${entry.format ? (selectedFormats.has(entry.format) ? '' : ' is-excluded') : ' is-unsupported'}`;
+      const name = document.createElement('span'); name.textContent = entry.path;
+      const format = document.createElement('b'); format.textContent = entry.format ? FORMAT_LABELS[entry.format] : '未対応';
+      const size = document.createElement('small'); size.textContent = fileSize(entry.file.size);
+      row.append(name, format, size); return row;
+    }));
+    if (detectedEntries.length > 12) {
+      const more = document.createElement('p'); more.className = 'helper'; more.textContent = `ほか ${detectedEntries.length - 12}ファイル`;
+      $('listingFileList').append(more);
+    }
+  }
+
+  function ensurePreviewSelection() {
+    const entries = activePreviewEntries();
+    const paths = new Set(entries.map((entry) => entry.path));
+    if (!paths.has(thumbnailPath)) thumbnailPath = entries[0]?.path || '';
+    Array.from(samplePreviewPaths).forEach((path) => { if (!paths.has(path)) samplePreviewPaths.delete(path); });
+    if (!previewSelectionTouched && samplePreviewPaths.size === 0) {
+      entries.slice(0, 4).forEach((entry) => samplePreviewPaths.add(entry.path));
+    }
+  }
+
+  function openViewer(entries, startPath) {
+    viewerEntries = entries.filter(isPreviewable);
+    if (!viewerEntries.length) return;
+    viewerIndex = Math.max(0, viewerEntries.findIndex((entry) => entry.path === startPath));
+    renderViewer();
+    const dialog = $('listingPreviewDialog');
+    if (typeof dialog.showModal === 'function') dialog.showModal(); else dialog.setAttribute('open', '');
+  }
+
+  function renderViewer() {
+    const entry = viewerEntries[viewerIndex];
+    if (!entry) return;
+    $('listingPreviewDialogImage').src = getPreviewUrl(entry);
+    $('listingPreviewDialogImage').alt = `${entry.file.name}の試し見せ`;
+    $('listingPreviewDialogName').textContent = entry.path;
+    $('listingPreviewCounter').textContent = `${viewerIndex + 1} / ${viewerEntries.length}`;
+    $('listingPreviewPrev').disabled = viewerEntries.length < 2;
+    $('listingPreviewNext').disabled = viewerEntries.length < 2;
+  }
+
+  function renderPreviews() {
+    ensurePreviewSelection();
+    const entries = detectedEntries.filter(isPreviewable);
+    $('listingPreviewSection').hidden = entries.length === 0;
+    $('listingOpenViewMode').disabled = samplePreviewPaths.size === 0;
+    $('listingPreviewGrid').replaceChildren(...entries.map((entry) => {
+      const active = selectedFormats.has(entry.format);
+      const card = document.createElement('article');
+      card.className = `market-preview-card${active ? '' : ' is-excluded'}`;
+      const imageButton = document.createElement('button'); imageButton.type = 'button'; imageButton.className = 'market-preview-card__image'; imageButton.disabled = !active;
+      const image = new Image(); image.src = getPreviewUrl(entry); image.alt = '';
+      const format = document.createElement('span'); format.textContent = FORMAT_LABELS[entry.format];
+      imageButton.append(image, format);
+      imageButton.addEventListener('click', () => openViewer(activePreviewEntries(), entry.path));
+      const body = document.createElement('div'); body.className = 'market-preview-card__body';
+      const name = document.createElement('div'); name.className = 'market-preview-card__name'; name.textContent = entry.path;
+      const thumbnail = document.createElement('label'); thumbnail.className = 'market-preview-choice';
+      const thumbnailInput = document.createElement('input'); thumbnailInput.type = 'radio'; thumbnailInput.name = 'listingThumbnail'; thumbnailInput.checked = thumbnailPath === entry.path; thumbnailInput.disabled = !active;
+      thumbnailInput.addEventListener('change', () => { thumbnailPath = entry.path; renderPreviews(); });
+      thumbnail.append(thumbnailInput, document.createTextNode('サムネイル'));
+      const sample = document.createElement('label'); sample.className = 'market-preview-choice';
+      const sampleInput = document.createElement('input'); sampleInput.type = 'checkbox'; sampleInput.checked = samplePreviewPaths.has(entry.path); sampleInput.disabled = !active;
+      sampleInput.addEventListener('change', () => {
+        previewSelectionTouched = true;
+        if (sampleInput.checked && samplePreviewPaths.size >= MAX_SAMPLE_PREVIEWS) {
+          sampleInput.checked = false; setStatus(`試し見せは${MAX_SAMPLE_PREVIEWS}枚までです。`); return;
+        }
+        if (sampleInput.checked) samplePreviewPaths.add(entry.path); else samplePreviewPaths.delete(entry.path);
+        renderPreviews();
+      });
+      sample.append(sampleInput, document.createTextNode('試し見せに含める'));
+      body.append(name, thumbnail, sample); card.append(imageButton, body); return card;
+    }));
+  }
+
+  function renderFormats() {
+    const counts = new Map();
+    detectedEntries.forEach((entry) => { if (entry.format) counts.set(entry.format, (counts.get(entry.format) || 0) + 1); });
+    const formats = FORMAT_ORDER.filter((format) => counts.has(format));
+    $('listingFormatSwitches').replaceChildren(...formats.map((format) => switchCard({
+      title: FORMAT_LABELS[format],
+      description: `${counts.get(format)}ファイルを商品に含める`,
+      checked: selectedFormats.has(format),
+      onChange: (checked) => {
+        if (checked) { selectedFormats.add(format); dismissedFormats.delete(format); }
+        else { selectedFormats.delete(format); dismissedFormats.add(format); }
+        updateProductType(); renderFiles(); renderPreviews();
+      }
+    })));
+    if (!formats.length) {
+      const empty = document.createElement('p'); empty.className = 'helper'; empty.textContent = '対応形式はまだ検出されていません。';
+      $('listingFormatSwitches').append(empty);
+    }
+    updateProductType(); renderFiles(); renderPreviews();
+  }
+
+  function updateProductType() {
+    if (!selectedFormats.size) {
+      $('listingProductType').textContent = '商品種類はファイル追加後に自動判定されます。';
+      $('listingProductType').className = 'market-product-type-preview';
+      return;
+    }
+    const pixieeDraw = selectedFormats.has('pixiedraw-project');
+    $('listingProductType').textContent = pixieeDraw
+      ? 'PiXiEEDraw作品：編集用プロジェクトを含み、購入後にPiXiEEDrawで開けます。'
+      : '一般素材：画像・アニメーション形式をZIPで受け取る商品です。';
+    $('listingProductType').className = `market-product-type-preview ${pixieeDraw ? 'is-pixiedraw-product' : 'is-general-product'}`;
+  }
+
+  async function refreshDetectedFiles() {
+    const run = ++detectionRun;
+    const files = Array.from(sourceFiles.entries());
+    setStatus(files.length ? 'ファイル形式を判定しています...' : '');
+    const detected = [];
+    for (let index = 0; index < files.length; index += 1) {
+      const [path, file] = files[index];
+      const format = await packageUtils.detectFormat(file);
+      const previewBlob = format === 'pixiedraw-project'
+        ? await packageUtils.extractPixieeDrawPreviewPng(file)
+        : null;
+      detected.push({ path, file, format, previewBlob });
+      if (index > 0 && index % 20 === 0) setStatus(`ファイル形式を判定しています（${index + 1}/${files.length}）...`);
+    }
+    if (run !== detectionRun) return;
+    detectedEntries = detected;
+    ignoredFileCount = detected.filter((entry) => !entry.format).length;
+    new Set(detectedEntries.map((entry) => entry.format).filter(Boolean)).forEach((format) => {
+      if (!dismissedFormats.has(format)) selectedFormats.add(format);
+    });
+    Array.from(selectedFormats).forEach((format) => {
+      if (!detectedEntries.some((entry) => entry.format === format)) selectedFormats.delete(format);
+    });
+    previewUrls.forEach((url) => URL.revokeObjectURL(url)); previewUrls.clear();
+    renderFormats();
+    const previewlessProjectCount = detected.filter((entry) => entry.format === 'pixiedraw-project' && !entry.previewBlob).length;
+    setStatus([
+      ignoredFileCount ? `未対応形式 ${ignoredFileCount}件は一覧に残していますが、現在の出品には含まれません。` : '',
+      previewlessProjectCount ? `旧形式などPNGサムネイルを含まないPiXiEEDraw ${previewlessProjectCount}件はプレビューを生成できませんでした。` : ''
+    ].filter(Boolean).join(' '));
+  }
+
+  async function addFiles(additions) {
+    const normalized = Array.from(additions || []).map((item) => item?.file ? item : { file: item, path: filePath(item) }).filter((item) => item.file instanceof File);
+    if (!normalized.length) return;
+    normalized.forEach(({ file, path }) => sourceFiles.set(path || filePath(file), file));
+    if (sourceFiles.size > MAX_DETECTION_COUNT) {
+      normalized.forEach(({ file, path }) => sourceFiles.delete(path || filePath(file)));
+      setStatus(`一度に判定できるファイルは${MAX_DETECTION_COUNT}件までです。`); return;
+    }
+    await refreshDetectedFiles();
+  }
+
+  function readDirectoryEntries(reader) {
+    return new Promise((resolve, reject) => {
+      const all = [];
+      const read = () => reader.readEntries((entries) => {
+        if (!entries.length) { resolve(all); return; }
+        all.push(...entries); read();
+      }, reject);
+      read();
+    });
+  }
+
+  async function filesFromEntry(entry, prefix = '') {
+    if (!entry) return [];
+    if (entry.isFile) {
+      const file = await new Promise((resolve, reject) => entry.file(resolve, reject));
+      return [{ file, path: `${prefix}${file.name}` }];
+    }
+    if (!entry.isDirectory) return [];
+    const childPrefix = `${prefix}${entry.name}/`;
+    const children = await readDirectoryEntries(entry.createReader());
+    const nested = await Promise.allSettled(children.map((child) => filesFromEntry(child, childPrefix)));
+    return nested.filter((result) => result.status === 'fulfilled').flatMap((result) => result.value);
+  }
+
+  async function filesFromDrop(dataTransfer) {
+    const items = Array.from(dataTransfer?.items || []);
+    const handleResults = await Promise.allSettled(items.map((item) => (
+      typeof item.getAsFileSystemHandle === 'function' ? item.getAsFileSystemHandle() : null
+    )));
+    const handles = handleResults.filter((result) => result.status === 'fulfilled' && result.value).map((result) => result.value);
+    if (handles.length) {
+      const collected = await Promise.allSettled(handles.map((handle) => packageUtils.collectFilesFromHandle(handle)));
+      const files = collected.filter((result) => result.status === 'fulfilled').flatMap((result) => result.value);
+      if (files.length) return files;
+    }
+    const entries = items.map((item) => item.webkitGetAsEntry?.()).filter(Boolean);
+    if (entries.length) {
+      const collected = await Promise.allSettled(entries.map((entry) => filesFromEntry(entry)));
+      const files = collected.filter((result) => result.status === 'fulfilled').flatMap((result) => result.value);
+      if (files.length) return files;
+    }
+    return Array.from(dataTransfer?.files || []).map((file) => ({ file, path: filePath(file) }));
+  }
+
+  function clearFiles() {
+    sourceFiles.clear(); detectedEntries = []; ignoredFileCount = 0; thumbnailPath = '';
+    selectedFormats.clear(); dismissedFormats.clear(); samplePreviewPaths.clear(); previewSelectionTouched = false;
+    detectionRun += 1;
+    previewUrls.forEach((url) => URL.revokeObjectURL(url)); previewUrls.clear();
+    renderFormats(); setStatus('');
+  }
+
+  const safeSegment = (value) => {
+    const cleaned = String(value || '').normalize('NFC').replace(/[\\/#?%\u0000-\u001f]/g, '_').trim();
+    return (!cleaned || cleaned === '.' || cleaned === '..' ? 'file' : cleaned).slice(0, 120);
+  };
+  const safeRelativePath = (value) => value.split('/').filter(Boolean).map(safeSegment).join('/');
+  const storagePathFor = (userId, assetId, entry, index) => `${userId}/${assetId}/files/${String(index + 1).padStart(3, '0')}/${safeRelativePath(entry.path)}`;
+
+  async function buildPackage(entries) {
+    const files = [];
+    for (let index = 0; index < entries.length; index += 1) {
+      setStatus(`ハッシュを計算しています（${index + 1}/${entries.length}）...`);
+      const entry = entries[index];
+      files.push({
+        original_path: entry.path,
+        name: entry.file.name,
+        size: entry.file.size,
+        mime_type: entry.file.type || 'application/octet-stream',
+        format: entry.format,
+        sha256: await sha256File(entry.file)
+      });
+    }
+    const fingerprint = JSON.stringify(files.map(({ original_path, size, format, sha256 }) => ({ original_path, size, format, sha256 })));
+    return {
+      sourceHash: await sha256Buffer(new TextEncoder().encode(fingerprint)),
+      files,
+      totalBytes: entries.reduce((total, entry) => total + entry.file.size, 0)
+    };
+  }
+
+  async function loadImageSource(file) {
+    if (typeof createImageBitmap === 'function') return createImageBitmap(file);
+    const url = URL.createObjectURL(file);
+    try {
+      const image = new Image(); image.src = url; await image.decode(); return image;
+    } catch (error) {
+      URL.revokeObjectURL(url); throw error;
+    }
+  }
+
+  async function createPreviewBlob(file, { thumbnail = false, mimeType = 'image/webp' } = {}) {
+    const source = await loadImageSource(file);
+    try {
+      const sourceWidth = source.width || source.naturalWidth;
+      const sourceHeight = source.height || source.naturalHeight;
+      const maxSide = thumbnail ? 640 : 960;
+      const scale = Math.min(1, maxSide / Math.max(sourceWidth, sourceHeight));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(sourceWidth * scale));
+      canvas.height = Math.max(1, Math.round(sourceHeight * scale));
+      const context = canvas.getContext('2d', { alpha: true });
+      context.imageSmoothingEnabled = false;
+      context.drawImage(source, 0, 0, canvas.width, canvas.height);
+      if (!thumbnail) {
+        const fontSize = Math.max(14, Math.round(Math.min(canvas.width, canvas.height) / 9));
+        context.save();
+        context.translate(canvas.width / 2, canvas.height / 2); context.rotate(-Math.PI / 10);
+        context.font = `900 ${fontSize}px sans-serif`; context.textAlign = 'center'; context.textBaseline = 'middle';
+        context.lineWidth = Math.max(2, fontSize / 12); context.strokeStyle = 'rgba(0,0,0,.45)'; context.fillStyle = 'rgba(255,255,255,.48)';
+        context.strokeText('PiXiEED SAMPLE', 0, 0); context.fillText('PiXiEED SAMPLE', 0, 0); context.restore();
+      }
+      return await new Promise((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('preview conversion failed')), mimeType, .88));
+    } finally {
+      if (typeof source.close === 'function') source.close();
+      if (source instanceof HTMLImageElement && source.src.startsWith('blob:')) URL.revokeObjectURL(source.src);
+    }
+  }
+
+  function previewStorageFormat(entry) {
+    return entry?.format === 'pixiedraw-project'
+      ? { extension: 'png', mimeType: 'image/png' }
+      : { extension: 'webp', mimeType: 'image/webp' };
+  }
+
+  function bindLocalUi() {
+    form.hidden = false;
+    renderOptions(); renderFormats(); updateLimitedState(); setSubmissionEnabled(false);
+    renderOptionPriceFields();
+    const sourceDialog = $('listingSourceDialog');
+    const openSourceDialog = () => {
+      if (typeof sourceDialog.showModal === 'function') sourceDialog.showModal(); else sourceDialog.setAttribute('open', '');
+    };
+    const closeSourceDialog = () => {
+      if (typeof sourceDialog.close === 'function') sourceDialog.close(); else sourceDialog.removeAttribute('open');
+    };
+    $('listingFiles').addEventListener('change', async (event) => { await addFiles(event.target.files); event.target.value = ''; });
+    $('listingFolder').addEventListener('change', async (event) => { await addFiles(event.target.files); event.target.value = ''; });
+    $('listingSourcePicker').addEventListener('click', openSourceDialog);
+    $('listingSourceClose').addEventListener('click', closeSourceDialog);
+    $('listingChooseFiles').addEventListener('click', () => { closeSourceDialog(); $('listingFiles').click(); });
+    $('listingChooseFolder').addEventListener('click', () => { closeSourceDialog(); $('listingFolder').click(); });
+    $('listingFilesClear').addEventListener('click', clearFiles);
+    $('listingPrice').addEventListener('input', updatePrice);
+    $('listingLimitedEnabled').addEventListener('change', updateLimitedState);
+    $('listingLimitedQuantity').addEventListener('input', updatePrice);
+    const dropZone = $('listingDropZone');
+    dropZone.addEventListener('click', openSourceDialog);
+    dropZone.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault(); openSourceDialog();
+    });
+    ['dragenter', 'dragover'].forEach((type) => dropZone.addEventListener(type, (event) => {
+      event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; dropZone.classList.add('is-dragover');
+    }));
+    ['dragleave', 'dragend'].forEach((type) => dropZone.addEventListener(type, () => dropZone.classList.remove('is-dragover')));
+    dropZone.addEventListener('drop', async (event) => {
+      event.preventDefault(); dropZone.classList.remove('is-dragover');
+      setStatus('ドロップされた内容を確認しています...');
+      try { await addFiles(await filesFromDrop(event.dataTransfer)); }
+      catch (error) { setStatus(`フォルダを読み込めませんでした: ${error.message || '再度お試しください'}`); }
+    });
+    $('listingOpenViewMode').addEventListener('click', () => {
+      const entries = activePreviewEntries().filter((entry) => samplePreviewPaths.has(entry.path));
+      openViewer(entries, entries[0]?.path);
+    });
+    $('listingPreviewClose').addEventListener('click', () => $('listingPreviewDialog').close());
+    $('listingPreviewPrev').addEventListener('click', () => { viewerIndex = (viewerIndex - 1 + viewerEntries.length) % viewerEntries.length; renderViewer(); });
+    $('listingPreviewNext').addEventListener('click', () => { viewerIndex = (viewerIndex + 1) % viewerEntries.length; renderViewer(); });
+    form.addEventListener('submit', submitListing);
+  }
+
+  async function submitListing(event) {
+    event.preventDefault();
+    if (!submissionEnabled || !client || !signedInUser) {
+      setStatus('出品送信にはHTTPで開き、ログインと販売者確認を完了してください。'); return;
+    }
+    const entries = activeEntries();
+    if (!entries.length) { setStatus('出品する形式を1つ以上ONにしてください。'); return; }
+    if (entries.length > MAX_FILE_COUNT) { setStatus(`ファイルは${MAX_FILE_COUNT}件までです。`); return; }
+    const totalBytes = entries.reduce((total, entry) => total + entry.file.size, 0);
+    if (totalBytes > MAX_TOTAL_BYTES) { setStatus('1商品の合計ファイルサイズは50MBまでです。'); return; }
+    const formats = FORMAT_ORDER.filter((format) => selectedFormats.has(format) && entries.some((entry) => entry.format === format));
+    const optionIds = optionCatalog.filter((option) => selectedOptionIds.has(option.id)).map((option) => option.id);
+    const tags = listingTags();
+    if (tags.length > 8 || tags.some((tag) => Array.from(tag).length > 24)) {
+      setStatus('タグは最大8個、1個24文字以内で設定してください。'); return;
+    }
+    const salePrice = Number($('listingPrice').value);
+    if (!Number.isInteger(salePrice) || salePrice < 0) {
+      setStatus('販売料金は0円以上の整数で設定してください。'); return;
+    }
+    const optionPrice = optionCatalog.reduce((total, option) => (
+      selectedOptionIds.has(option.id) ? total + optionPriceFor(option) : total
+    ), 0);
+    const purchasePrice = salePrice + optionPrice;
+    if (purchasePrice < 500) {
+      setStatus('購入者の支払合計は500円以上にしてください。'); return;
+    }
+    if (purchasePrice > 99999999) {
+      setStatus('購入者の支払額は99,999,999円以下にしてください。'); return;
+    }
+    const limitedEnabled = $('listingLimitedEnabled').checked;
+    const limitedQuantity = Number($('listingLimitedQuantity').value);
+    if (limitedEnabled && purchasePrice < 1000) {
+      setStatus('限定販売の購入者支払額は1,000円以上にしてください。'); return;
+    }
+    if (limitedEnabled && (!Number.isInteger(limitedQuantity) || limitedQuantity < 1 || limitedQuantity > 100000)) {
+      setStatus('限定販売の先着人数は1〜100,000名で設定してください。'); return;
+    }
+
+    const button = $('listingSubmit'); button.disabled = true;
+    let uploadedPaths = [];
+    try {
+      const packageData = await buildPackage(entries);
+      const previewEntries = activePreviewEntries();
+      const thumbnailEntry = previewEntries.find((entry) => entry.path === thumbnailPath) || null;
+      const sampleEntries = previewEntries.filter((entry) => samplePreviewPaths.has(entry.path)).slice(0, MAX_SAMPLE_PREVIEWS);
+      const provenance = {
+        schema: 'pixieed-market-package/v1',
+        detection: 'automatic',
+        file_count: entries.length,
+        total_bytes: packageData.totalBytes,
+        detected_formats: formats,
+        listing_tags: tags,
+        files: packageData.files,
+        preview_selection: {
+          thumbnail_source_path: thumbnailEntry?.path || null,
+          sample_source_paths: sampleEntries.map((entry) => entry.path),
+          public_preview_kind: 'watermarked-derivative'
+        },
+        limited_sale: limitedEnabled ? { enabled: true, quantity: limitedQuantity, minimum_price_yen: 1000 } : { enabled: false }
+      };
+      setStatus('出品下書きを作成しています...');
+      const { data: assetId, error: draftError } = await client.rpc('market_create_root_asset_v3', {
+        input_title: $('listingTitle').value.trim(),
+        input_description: $('listingDescription').value.trim(),
+        input_sale_price_yen: salePrice,
+        input_derivative_sales_allowed: $('listingDerivativeAllowed').checked,
+        input_source_kind: 'external',
+        input_source_sha256: packageData.sourceHash,
+        input_asset_formats: formats,
+        input_selected_option_ids: optionIds,
+        input_option_prices: Object.fromEntries(optionCatalog.filter((option) => selectedOptionIds.has(option.id)).map((option) => [option.id, optionPriceFor(option)])),
+        input_provenance_manifest: provenance,
+        input_inherited_terms: {},
+        input_prohibited_uses: [],
+        input_change_summary: []
+      });
+      if (draftError) throw draftError;
+      const { error: tagsError } = await client.rpc('market_set_listing_tags', {
+        input_asset_id: assetId,
+        input_tags: tags
+      });
+      if (tagsError) throw tagsError;
+      const { error: limitedError } = await client.rpc('market_set_listing_limited_sale', {
+        input_asset_id: assetId,
+        input_enabled: limitedEnabled,
+        input_quantity: limitedEnabled ? limitedQuantity : null
+      });
+      if (limitedError) throw limitedError;
+
+      const storedFiles = entries.map((entry, index) => ({ entry, path: storagePathFor(signedInUser.id, assetId, entry, index), metadata: packageData.files[index] }));
+      for (let index = 0; index < storedFiles.length; index += 1) {
+        const stored = storedFiles[index]; setStatus(`ファイルを送信しています（${index + 1}/${storedFiles.length}）...`);
+        const { error: uploadError } = await client.storage.from('market-private').upload(stored.path, stored.entry.file, { upsert: false, contentType: stored.entry.file.type || 'application/octet-stream' });
+        if (uploadError) throw uploadError;
+        uploadedPaths.push(stored.path); stored.metadata.storage_path = stored.path;
+      }
+
+      let thumbnailStoragePath = null;
+      if (thumbnailEntry) {
+        setStatus('サムネイルを生成しています...');
+        const output = previewStorageFormat(thumbnailEntry);
+        const blob = await createPreviewBlob(thumbnailEntry.previewBlob || thumbnailEntry.file, { thumbnail: true, mimeType: output.mimeType });
+        thumbnailStoragePath = `${signedInUser.id}/${assetId}/previews/thumbnail.${output.extension}`;
+        const { error } = await client.storage.from('market-private').upload(thumbnailStoragePath, blob, { upsert: false, contentType: output.mimeType });
+        if (error) throw error; uploadedPaths.push(thumbnailStoragePath);
+      }
+      const sampleStoragePaths = [];
+      for (let index = 0; index < sampleEntries.length; index += 1) {
+        setStatus(`試し見せ画像を生成しています（${index + 1}/${sampleEntries.length}）...`);
+        const entry = sampleEntries[index];
+        const output = previewStorageFormat(entry);
+        const blob = await createPreviewBlob(entry.previewBlob || entry.file, { mimeType: output.mimeType });
+        const path = `${signedInUser.id}/${assetId}/previews/sample-${String(index + 1).padStart(2, '0')}.${output.extension}`;
+        const { error } = await client.storage.from('market-private').upload(path, blob, { upsert: false, contentType: output.mimeType });
+        if (error) throw error; uploadedPaths.push(path); sampleStoragePaths.push(path);
+      }
+
+      const manifestPath = `${signedInUser.id}/${assetId}/manifest.json`;
+      const manifestFile = new Blob([JSON.stringify({ ...provenance, asset_id: assetId, files: packageData.files, preview_storage: { thumbnail: thumbnailStoragePath, samples: sampleStoragePaths } }, null, 2)], { type: 'application/json' });
+      const { error: manifestError } = await client.storage.from('market-private').upload(manifestPath, manifestFile, { upsert: false, contentType: 'application/json' });
+      if (manifestError) throw manifestError; uploadedPaths.push(manifestPath);
+      const { error: attachError } = await client.rpc('market_attach_listing_package', {
+        input_asset_id: assetId,
+        input_manifest_object_path: manifestPath,
+        input_file_object_paths: storedFiles.map((stored) => stored.path),
+        input_preview_object_path: thumbnailStoragePath,
+        input_sample_preview_paths: sampleStoragePaths
+      });
+      if (attachError) throw attachError;
+
+      form.reset(); clearFiles(); selectedOptionIds.clear(); optionPrices.clear();
+      renderOptions(); renderOptionPriceFields(); updateLimitedState(); uploadedPaths = [];
+      setStatus('下書きを作成しました。サムネイルと試し見せ画像も審査後に公開されます。');
+    } catch (error) {
+      if (uploadedPaths.length) await client.storage.from('market-private').remove(uploadedPaths);
+      setStatus(`出品を作成できませんでした: ${error.message || '通信を確認してください'}`);
+    } finally {
+      button.disabled = !submissionEnabled;
+    }
+  }
+
+  async function initRemote() {
+    try {
+      const access = window.PiXiEEDMarketDevAccess ? await window.PiXiEEDMarketDevAccess.ready : null;
+      if (!access?.allowed || !access.client || !access.user) return;
+      client = access.client;
+      const user = access.user;
+      const { data: seller } = await client.from('market_seller_profiles').select('seller_status,identity_status,terms_accepted_at').maybeSingle();
+      if (!(seller?.seller_status === 'verified' && seller?.identity_status === 'verified' && seller?.terms_accepted_at)) {
+        gate.innerHTML = '出品送信には販売者登録とStripeの売上受取設定が必要です。<a href="seller.html">販売者登録へ</a>'; return;
+      }
+      const { data: canSell } = await client.rpc('market_current_user_can_sell');
+      if (!canSell) { gate.innerHTML = '出品送信には二段階認証が必要です。<a href="seller.html">二段階認証へ</a>'; return; }
+      const { data: options, error: optionError } = await client.from('market_license_options').select('id,label,description,minimum_price_yen,sort_order').eq('active', true).order('sort_order');
+      if (optionError) throw optionError;
+      optionCatalog = options || FALLBACK_OPTIONS; signedInUser = user;
+      renderOptions(); renderOptionPriceFields(); updatePrice(); gate.hidden = true; setSubmissionEnabled(true);
+    } catch (error) {
+      gate.textContent = `ファイルと価格の画面内確認は利用できますが、出品接続を開始できませんでした: ${error.message || '時間をおいて再試行してください'}`;
+    }
+  }
+
+  bindLocalUi();
+  initRemote();
+})();

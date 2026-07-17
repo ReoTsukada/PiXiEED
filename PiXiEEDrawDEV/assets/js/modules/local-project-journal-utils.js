@@ -91,8 +91,8 @@
         checkpointSequence: Math.max(0, Math.round(Number(stateValue.checkpointSequence) || 0)),
         dirtyOpCount: Math.max(0, Math.round(Number(stateValue.dirtyOpCount) || 0)),
         ops: cloneJsonValue(stateValue.ops, []) || [],
-        historyPast: normalizeHistoryEntryList(stateValue.historyPast),
-        historyFuture: normalizeHistoryEntryList(stateValue.historyFuture),
+        historyPast: [],
+        historyFuture: [],
         historyLimit: Math.max(1, Math.round(Number(stateValue.historyLimit) || Math.round(Number(history?.limit) || 30))),
       };
     }
@@ -120,8 +120,8 @@
         ops: Array.isArray(journal?.ops) ? (cloneJsonValue(journal.ops, []) || []) : [],
         dirtyOpCount: Math.max(0, Math.round(Number(journal?.dirtyOpCount) || (Array.isArray(journal?.ops) ? journal.ops.length : 0))),
         forceCheckpoint: false,
-        historyPast: normalizeHistoryEntryList(journal?.historyPast),
-        historyFuture: normalizeHistoryEntryList(journal?.historyFuture),
+        historyPast: [],
+        historyFuture: [],
         historyLimit: Math.max(1, Math.round(Number(journal?.historyLimit) || Math.round(Number(history?.limit) || 30))),
       };
     }
@@ -336,8 +336,8 @@
       const nextSession = baseProject.session && typeof baseProject.session === 'object'
         ? cloneJsonValue(baseProject.session, null)
         : buildProjectSessionPayload();
-      nextSession.historyPast = normalizeHistoryEntryList(journal.historyPast);
-      nextSession.historyFuture = normalizeHistoryEntryList(journal.historyFuture);
+      nextSession.historyPast = [];
+      nextSession.historyFuture = [];
       nextSession.historyLimit = Math.max(
         1,
         Math.round(Number(journal.historyLimit) || Number(nextSession.historyLimit) || Math.round(Number(history?.limit) || 30))
@@ -395,8 +395,8 @@
       next.ops = [];
       next.dirtyOpCount = 0;
       next.forceCheckpoint = false;
-      next.historyPast = normalizeHistoryEntryList(historyPast || history?.past || []);
-      next.historyFuture = normalizeHistoryEntryList(historyFuture || history?.future || []);
+      next.historyPast = [];
+      next.historyFuture = [];
       next.historyLimit = Math.max(1, Math.round(Number(session?.historyLimit) || Number(history?.limit) || 30));
       activeState = next;
       return next;
@@ -420,8 +420,8 @@
         return null;
       }
       const next = ensureActiveState(normalizedProjectId) || createEmptyActiveState(normalizedProjectId);
-      next.historyPast = normalizeHistoryEntryList(history?.past || []);
-      next.historyFuture = normalizeHistoryEntryList(history?.future || []);
+      next.historyPast = [];
+      next.historyFuture = [];
       next.historyLimit = Math.max(1, Math.round(Number(history?.limit) || 30));
       if (!isPixelPatchHistoryEntry(historyEntry)) {
         next.forceCheckpoint = true;
@@ -499,12 +499,13 @@
         || Boolean(currentActiveSheetId && checkpointActiveSheetId && currentActiveSheetId !== checkpointActiveSheetId);
       const hasSnapshot = Boolean(snapshot && typeof snapshot === 'object');
       if (!hasSnapshot && !useCheckpoint && next.checkpointPersisted) {
-        // A journal-only revision persists replayable pixel patches plus the
-        // lightweight history lists. Building the complete session here used
+        // A journal-only revision persists replayable document pixel patches.
+        // Undo/Redo remains in the live editor and cold-history store only.
+        // Building the complete session here used
         // to serialize every timelapse track even though that payload was
         // discarded before the V2 journal write.
-        next.historyPast = normalizeHistoryEntryList(history?.past || []);
-        next.historyFuture = normalizeHistoryEntryList(history?.future || []);
+        next.historyPast = [];
+        next.historyFuture = [];
         next.historyLimit = Math.max(1, Math.round(Number(history?.limit) || 30));
         next.dirtyOpCount = Math.max(0, next.ops.length);
         activeState = next;
@@ -522,8 +523,8 @@
       const session = typeof buildAutosaveSessionPayload === 'function'
         ? buildAutosaveSessionPayload()
         : buildProjectSessionPayload();
-      session.historyPast = normalizeHistoryEntryList(history?.past || []);
-      session.historyFuture = normalizeHistoryEntryList(history?.future || []);
+      session.historyPast = [];
+      session.historyFuture = [];
       session.historyLimit = Math.max(1, Math.round(Number(history?.limit) || Number(session.historyLimit) || 30));
       if (useCheckpoint) {
         const fullPackaged = packagedPayload && typeof packagedPayload === 'object'
@@ -537,8 +538,8 @@
         next.ops = [];
         next.dirtyOpCount = 0;
         next.forceCheckpoint = false;
-        next.historyPast = normalizeHistoryEntryList(session.historyPast);
-        next.historyFuture = normalizeHistoryEntryList(session.historyFuture);
+        next.historyPast = [];
+        next.historyFuture = [];
         next.historyLimit = Math.max(1, Math.round(Number(session.historyLimit) || 30));
         activeState = next;
         return {
@@ -559,8 +560,8 @@
         next.ops = [];
         next.dirtyOpCount = 0;
         next.forceCheckpoint = false;
-        next.historyPast = normalizeHistoryEntryList(session.historyPast);
-        next.historyFuture = normalizeHistoryEntryList(session.historyFuture);
+        next.historyPast = [];
+        next.historyFuture = [];
         next.historyLimit = Math.max(1, Math.round(Number(session.historyLimit) || 30));
         activeState = next;
         return {
@@ -570,8 +571,8 @@
           dirtyOpCount: 0,
         };
       }
-      next.historyPast = normalizeHistoryEntryList(session.historyPast);
-      next.historyFuture = normalizeHistoryEntryList(session.historyFuture);
+      next.historyPast = [];
+      next.historyFuture = [];
       next.historyLimit = Math.max(1, Math.round(Number(session.historyLimit) || 30));
       next.dirtyOpCount = Math.max(0, next.ops.length);
       activeState = next;

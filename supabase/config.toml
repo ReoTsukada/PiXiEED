@@ -1,2 +1,17 @@
 [functions.plaza-cleanup-expired]
 verify_jwt = false
+
+[functions.market-stripe-connect]
+verify_jwt = true
+
+[functions.market-create-checkout]
+verify_jwt = true
+
+[functions.market-stripe-webhook]
+verify_jwt = false
+
+[functions.market-stripe-payout]
+verify_jwt = false
+
+[functions.market-download]
+verify_jwt = true

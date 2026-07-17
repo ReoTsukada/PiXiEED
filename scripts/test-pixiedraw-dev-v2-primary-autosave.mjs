@@ -20,10 +20,11 @@ assert.match(app, /V2 autosave manifest was not committed/);
 assert.match(app, /autosaveSchemaVersion: Number\(manifest\.autosaveSchemaVersion\) \|\| 2/);
 assert.match(app, /manifestKey: manifest\.key/);
 assert.doesNotMatch(app, /const metadata = \{[\s\S]{0,800}\n\s*project:/);
-assert.match(autosave, /const useV2Primary = isAutosaveV2PrimaryEnabled\?\.\(\) === true/);
+assert.match(autosave, /if \(isAutosaveV2PrimaryEnabled\?\.\(\) !== true\) \{/);
+assert.match(autosave, /throw new Error\('On-device true V2 autosave is unavailable'\)/);
 assert.match(autosave, /isAutosaveV2JournalReady\?\.\(projectId\) === true/);
 assert.match(autosave, /savedEntry = await writeAutosaveV2Primary\(\{/);
-assert.match(autosave, /savePlan: usedV2Journal \? journalOnlySavePlan : activeSavePlan/);
+assert.match(autosave, /savePlan: useV2Journal \? journalSavePlan : activeSavePlan/);
 assert.match(openImport, /Number\(entry\.autosaveSchemaVersion\) === 2/);
 assert.match(openImport, /await readAutosaveV2PrimaryProject\(entry\.id\)/);
 

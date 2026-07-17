@@ -1,0 +1,116 @@
+.help-page {
+  max-width: 920px;
+  padding: 18px;
+}
+.help-main {
+  display: grid;
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.11);
+  border-radius: 12px;
+  background: rgba(255,255,255,.1);
+}
+.help-head,
+.help-section {
+  background: #10182c;
+}
+.help-head {
+  padding: clamp(24px, 5vw, 46px);
+  display: grid;
+  gap: 10px;
+}
+.help-head > img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+.help-head__eyebrow {
+  margin: 0;
+  color: #93c5fd;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .12em;
+}
+.help-head h1,
+.help-section h2,
+.help-section p {
+  margin: 0;
+}
+.help-head h1 {
+  font-size: clamp(28px, 5vw, 42px);
+}
+.help-head p,
+.help-section p,
+.help-card small {
+  color: #cbd5e1;
+  line-height: 1.75;
+}
+.help-section {
+  padding: clamp(18px, 4vw, 30px);
+  display: grid;
+  gap: 14px;
+}
+.help-section h2 {
+  font-size: 18px;
+}
+.help-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.help-card {
+  min-width: 0;
+  min-height: 76px;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: center;
+  gap: 11px;
+  padding: 12px;
+  border: 1px solid rgba(148,163,184,.18);
+  border-radius: 8px;
+  background: #15213a;
+  color: #f8fafc;
+  text-decoration: none;
+}
+.help-card:hover,
+.help-card:focus-visible {
+  border-color: rgba(147,197,253,.58);
+  background: #1a2b49;
+  outline: none;
+}
+.help-card img {
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+.help-card span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+.help-card strong {
+  overflow-wrap: anywhere;
+}
+.help-card small {
+  font-size: 12px;
+}
+.help-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.help-links a {
+  padding: 9px 12px;
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 7px;
+  background: #18243d;
+  font-size: 13px;
+  font-weight: 800;
+}
+@media (max-width: 600px) {
+  .help-page { padding: 8px; }
+  .help-main { border-radius: 8px; }
+  .help-grid { grid-template-columns: 1fr; }
+}

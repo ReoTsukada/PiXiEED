@@ -33,7 +33,7 @@ assert.match(appSource, /timelapseChunkStore\?\.removeProject/);
 assert.match(timelapseSource, /archiveTimelapseSnapshots\(canvasId, archiveFrames\)\.then/);
 assert.match(timelapseSource, /const persistedByCanvas = await loadPersistedTimelapseSnapshots\(\)/);
 assert.match(timelapseSource, /clearPersistedTimelapseSnapshots\(\)/);
-assert.match(autosaveSource, /await buildProjectSessionPayloadWithPersistedTimelapse\(\{\s*requireComplete: true/);
+assert.doesNotMatch(autosaveSource, /requireComplete: true/);
 assert.match(exportSource, /await buildProjectSessionPayloadWithPersistedTimelapse\(\{\s*requireComplete: true/);
 
 console.log('PiXiEEDrawDEV P8 disk-backed timelapse checks passed.');

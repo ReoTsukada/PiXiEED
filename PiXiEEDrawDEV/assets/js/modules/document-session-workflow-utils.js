@@ -581,9 +581,11 @@
       history.pending = null;
       if (projectSession) {
         history.limit = projectSession.historyLimit;
-        history.past = projectSession.historyPast;
-        history.future = projectSession.historyFuture;
-        trimHistoryStacksToLimit();
+        // A saved project is a document checkpoint, not a continuation of the
+        // previous page's undo stack. Start a fresh editing-session boundary;
+        // new operations recorded after this point remain undoable normally.
+        history.past = [];
+        history.future = [];
 
         timelapseState.tracksByCanvasId = Object.create(null);
         Object.entries(projectSession.timelapse.tracksByCanvasId || {}).forEach(([canvasId, track]) => {
@@ -648,7 +650,9 @@
     const sourcePersistenceState = options?.sourcePersistenceState && typeof options.sourcePersistenceState === 'object'
       ? options.sourcePersistenceState
       : null;
-    setActiveAutosaveProjectId(requestedProjectId || createAutosaveProjectId());
+    setActiveAutosaveProjectId(requestedProjectId || createAutosaveProjectId(), {
+      resetHistorySession: true,
+    });
     if (!options?.suppressProjectSheetsRestore) {
       await restoreOpenProjectSheetsFromParsedDocument(parsedDocument, {
         projectId: requestedProjectId || autosaveProjectId,
@@ -896,8 +900,11 @@
     const historyLimit = normalizeProjectHistoryLimit(history.limit, DEFAULT_HISTORY_LIMIT);
     return {
       historyLimit,
-      historyPast: serializeProjectHistoryList(history.past, historyLimit),
-      historyFuture: serializeProjectHistoryList(history.future, historyLimit),
+      // Undo/Redo is intentionally page-session-only. Keeping it out of saved
+      // projects makes checkpoints smaller and prevents stale document IDs from
+      // being applied after a project is opened again.
+      historyPast: [],
+      historyFuture: [],
       // Canvas positions are per-sheet workspace state, not device-only UI state.
       localViewportCanvases: normalizeLocalViewportCanvasState(
         localViewportCanvasState,
@@ -1050,8 +1057,10 @@
       return null;
     }
     const historyLimit = normalizeProjectHistoryLimit(payload.historyLimit, history.limit);
-    const historyPast = deserializeProjectHistoryList(payload.historyPast, historyLimit);
-    const historyFuture = deserializeProjectHistoryList(payload.historyFuture, historyLimit);
+    // Older files may still contain history arrays. Do not deserialize them:
+    // opening a project always starts a new undo boundary.
+    const historyPast = [];
+    const historyFuture = [];
     const timelapsePayload = payload.timelapse && typeof payload.timelapse === 'object'
       ? payload.timelapse
       : {};

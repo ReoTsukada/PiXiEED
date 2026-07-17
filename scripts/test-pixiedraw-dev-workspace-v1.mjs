@@ -134,7 +134,7 @@ assert.doesNotMatch(drawHtml, /scripts\/pixieed-workspace\.js/);
 assert.doesNotMatch(drawHtml, /id="startupActionSkip"/);
 assert.match(app, /const shouldAutoRestoreReloadSnapshot = false;/);
 assert.match(app, /phase: 'startup-session-restore-skipped'/);
-assert.match(app, /hideProjectHomeScreen\(\);\s*showStartupScreen\(\{ refreshWorkspace: false \}\);/);
+assert.match(app, /hideProjectHomeScreen\(\);\s*if \(openedExternalImportProject\) \{[\s\S]{0,300}hideStartupScreen\(\);\s*\} else \{\s*showStartupScreen\(\{ refreshWorkspace: false \}\);/);
 assert.match(startup, /setupStartupWorkspace\(\);/);
 assert.match(startup, /migrateLegacyLocalProjectsToTrueV2/);
 assert.match(startup, /loadDeviceLocalWorkspaceEntries/);

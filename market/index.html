@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>マーケット | PiXiEED</title>
+  <meta name="description" content="PiXiEEDで使えるドット絵素材と、派生制作に対応した素材を探せるマーケットです。">
+  <meta name="robots" content="index,follow">
+  <link rel="canonical" href="https://pixieed.jp/market/">
+  <link rel="icon" type="image/png" href="../Market.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../site/landing.css?v=2026.07.15-home-clear-entry1">
+  <link rel="stylesheet" href="market.css?v=2026.07.17-public-read2">
+</head>
+<body>
+  <header class="site-header" aria-label="トップナビ">
+    <div class="header-inner header-inner--app">
+      <a class="brand" href="../index.html">
+        <span class="brand-icon" id="brandAvatar"><img src="../character-dots/maousama.png" alt=""></span>
+        <span class="brand-text"><span class="brand-title">PiXiEED</span><span class="brand-sub" id="brandUser">マーケット</span></span>
+      </a>
+      <div class="market-header-actions">
+        <a href="about.html">マーケットとは</a>
+        <a href="help.html">ヘルプ</a>
+        <a class="market-header-link" href="../account/index.html">購入済み</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="page market-page">
+    <main class="market-shell">
+      <section class="market-titlebar">
+        <div class="market-titlebar__title">
+          <img src="../Market.png" alt="">
+          <h1>マーケット</h1>
+          <span class="market-count" id="marketCount">読み込み中</span>
+          <span class="market-help-tip" data-market-help>
+            <button class="market-help-tip__button" type="button" aria-label="マーケット一覧の見方" aria-describedby="marketListHelp" aria-expanded="false">?</button>
+            <span class="market-help-tip__content" id="marketListHelp" role="tooltip">カードを開くと、価格、収録形式、利用範囲、派生販売の可否を確認できます。認証バッジは確認対象が異なるため、商品詳細と利用条件も必ず確認してください。</span>
+          </span>
+        </div>
+        <span class="market-sell-button is-disabled" aria-disabled="true">出品準備中</span>
+      </section>
+
+      <section class="market-toolbar" aria-label="素材を絞り込む">
+        <label class="market-search">
+          <span class="sr-only">素材を検索</span>
+          <input id="marketSearch" type="search" placeholder="素材名・作者・キーワードで検索" autocomplete="off">
+        </label>
+        <div class="market-filters" id="marketFilters">
+          <button type="button" class="is-active" data-filter="all">すべて</button>
+          <button type="button" data-filter="pixiedraw-project">PiXiEEDraw</button>
+          <button type="button" data-filter="image">画像素材</button>
+          <button type="button" data-filter="animation">アニメーション</button>
+        </div>
+        <label class="market-sort">
+          <span class="sr-only">並び順</span>
+          <select id="marketSort">
+            <option value="new">新着順</option>
+            <option value="popular">人気順</option>
+            <option value="popular-derivatives">人気派生</option>
+            <option value="derivative-count">派生が多い順</option>
+            <option value="price-low">価格が低い順</option>
+            <option value="price-high">価格が高い順</option>
+          </select>
+        </label>
+        <details class="market-advanced-search" id="marketAdvancedSearch">
+          <summary>詳細検索</summary>
+          <div class="market-advanced-search__body">
+            <label>派生条件
+              <select id="marketDerivativeFilter">
+                <option value="all">すべて</option>
+                <option value="allowed">派生OK</option>
+                <option value="derivatives">派生作品のみ</option>
+                <option value="roots">大元作品のみ</option>
+              </select>
+            </label>
+            <label>最低価格
+              <input id="marketPriceMin" type="number" min="0" step="1" inputmode="numeric" placeholder="0">
+            </label>
+            <label>最高価格
+              <input id="marketPriceMax" type="number" min="0" step="1" inputmode="numeric" placeholder="上限なし">
+            </label>
+            <button id="marketFilterReset" type="button">条件をリセット</button>
+          </div>
+        </details>
+      </section>
+
+      <section class="market-section" id="marketItems">
+        <div class="market-grid" id="marketGrid" aria-live="polite">
+          <article class="market-empty"><img src="../Market.png" alt=""><strong>読み込み中</strong></article>
+        </div>
+      </section>
+
+      <nav class="market-info-links" aria-label="マーケット情報">
+        <a href="about.html">マーケットとは</a>
+        <a href="help.html">ヘルプ</a>
+        <a href="../terms/index.html">利用規約</a>
+        <a href="../privacy/index.html">プライバシーポリシー</a>
+      </nav>
+    </main>
+  </div>
+
+  <script src="../scripts/pixieed-dev-access.js?v=2026.07.17-market-dev1"></script>
+  <script src="local-test-products.js?v=2026.07.17-public-read2"></script>
+  <script src="favorites.js?v=2026.07.17-public-read2"></script>
+  <script src="discovery-utils.js?v=2026.07.17-social1"></script>
+  <script src="market.js?v=2026.07.17-public-read1"></script>
+  <script src="media-protection.js?v=2026.07.17-preview-protection1"></script>
+  <script src="help-tips.js?v=2026.07.17-context-help1"></script>
+  <script src="../scripts/shared-profile-header.js"></script>
+  <script src="../scripts/shared-bottom-nav.js?v=2026.07.17-market-public32"></script>
+  <script src="../scripts/pixel-art-fit.js"></script>
+</body>
+</html>

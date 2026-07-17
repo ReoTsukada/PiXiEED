@@ -13,7 +13,7 @@ const htmlSource = fs.readFileSync(path.join(root, 'PiXiEEDrawDEV/index.html'), 
 assert.match(appSource, /const shouldAutoRestoreReloadSnapshot = false;/);
 assert.match(appSource, /initializeAutosave\(\{ reusePreviousProjectId: shouldAutoRestoreReloadSnapshot \}\)/);
 assert.match(appSource, /phase: 'startup-session-restore-skipped'/);
-assert.match(appSource, /hideProjectHomeScreen\(\);\s*showStartupScreen\(\);/);
+assert.match(appSource, /hideProjectHomeScreen\(\);[\s\S]*?if \(openedExternalImportProject\)[\s\S]*?hideStartupScreen\(\);[\s\S]*?else \{\s*showStartupScreen\(\{ refreshWorkspace: false \}\);/);
 
 assert.match(autosaveSource, /const reusePreviousProjectId = options\?\.reusePreviousProjectId === true/);
 assert.match(autosaveSource, /if \(!reusePreviousProjectId\) \{[\s\S]*?setActiveAutosaveProjectId\(createAutosaveProjectId\(\)\)/);

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>商品詳細 | PiXiEEDマーケット</title>
+  <meta name="description" content="PiXiEEDマーケットの商品形式、利用条件、派生販売条件を確認できます。">
+  <meta name="robots" content="noindex,nofollow">
+  <link rel="icon" type="image/png" href="../Market.png">
+  <link rel="stylesheet" href="../site/landing.css?v=2026.07.15-home-clear-entry1">
+  <link rel="stylesheet" href="market.css?v=2026.07.17-public-read2">
+</head>
+<body>
+  <div class="page market-page">
+    <main class="market-shell market-item-shell">
+      <header class="market-titlebar">
+        <div class="market-titlebar__title"><img src="../Market.png" alt=""><h1>商品詳細</h1><span class="market-help-tip" data-market-help><button class="market-help-tip__button" type="button" aria-label="商品詳細の確認方法" aria-describedby="itemPageHelp" aria-expanded="false">?</button><span class="market-help-tip__content" id="itemPageHelp" role="tooltip">購入前に、販売料金、収録形式、利用オプション、派生販売の可否を順に確認してください。不明点がある商品は購入前にお問い合わせください。</span></span></div>
+        <a class="market-sell-button" href="index.html">一覧へ戻る</a>
+      </header>
+      <p class="market-sell-status" id="itemStatus" aria-live="polite">商品を読み込んでいます</p>
+      <article class="market-item" id="itemContent" hidden>
+        <section class="market-item__preview" id="itemPreviewFrame"><img id="itemPreview" src="../Market.png" alt="" draggable="false" data-market-protected-media="true"><span class="market-card__soldout" id="itemSoldOut" hidden>SOLD OUT</span></section>
+        <section class="market-item__body">
+          <div class="market-card__badges" id="itemBadges"></div>
+          <div class="market-item__social"><span id="itemAuthor">作者: PiXiEEDクリエイター</span><button class="market-favorite-button" id="itemFavorite" type="button" aria-pressed="false" aria-label="お気に入りに追加">♡</button></div>
+          <h2 id="itemTitle"></h2>
+          <p id="itemDescription" class="market-item__description"></p>
+          <section class="market-price-equation market-item-price-equation" aria-label="価格の内訳">
+            <div class="market-price-part"><span>作品価格</span><strong id="itemBasePrice"></strong></div><b aria-hidden="true">＋</b>
+            <div class="market-price-part"><span>追加オプション</span><strong id="itemOptionPrice"></strong></div><b aria-hidden="true">＝</b>
+            <div class="market-price-part is-total"><span>支払合計</span><strong id="itemPrice"></strong></div>
+          </section>
+          <dl class="market-item__facts">
+            <div><dt>商品種類</dt><dd id="itemProductType"></dd></div>
+            <div><dt><span class="market-heading-with-help">収録形式<span class="market-help-tip" data-market-help><button class="market-help-tip__button" type="button" aria-label="収録形式について" aria-describedby="itemFormatHelp" aria-expanded="false">?</button><span class="market-help-tip__content" id="itemFormatHelp" role="tooltip">購入後に受け取れるファイル形式です。利用するソフトや制作環境で開ける形式か確認してください。</span></span></span></dt><dd id="itemFormats"></dd></div>
+            <div><dt>販売数</dt><dd id="itemAvailability"></dd></div>
+          </dl>
+          <section class="market-item__terms">
+            <h3 class="market-heading-with-help">含まれる利用オプション<span class="market-help-tip" data-market-help><button class="market-help-tip__button" type="button" aria-label="利用オプションについて" aria-describedby="itemOptionsHelp" aria-expanded="false">?</button><span class="market-help-tip__content" id="itemOptionsHelp" role="tooltip">購入後に許可される用途です。表示されていない用途まで自動的に許可されるわけではありません。</span></span></h3>
+            <div id="itemOptions" class="market-item__option-list"></div>
+          </section>
+          <section class="market-item__terms">
+            <h3 class="market-heading-with-help">派生販売<span class="market-help-tip" data-market-help><button class="market-help-tip__button" type="button" aria-label="派生販売について" aria-describedby="itemDerivativeHelp" aria-expanded="false">?</button><span class="market-help-tip__content" id="itemDerivativeHelp" role="tooltip">「許可」の商品を購入すると、改変した作品をPiXiEED内で1商品出品できる権利が付きます。派生商品が売れると、歴代作者へロイヤリティーが分配されます。</span></span></h3>
+            <p id="itemDerivative"></p>
+          </section>
+          <section class="market-payment-guide" aria-label="購入の流れ">
+            <div class="market-payment-guide__head"><strong>購入の流れ</strong><span class="market-help-tip" data-market-help><button class="market-help-tip__button" type="button" aria-label="Stripe決済について" aria-describedby="itemStripeHelp" aria-expanded="false">?</button><span class="market-help-tip__content" id="itemStripeHelp" role="tooltip">購入時はStripeの画面へ移動します。表示された商品名と金額を確認して支払います。カード番号などの決済情報をPiXiEEDが直接保存することはありません。</span></span></div>
+            <ol class="market-payment-steps"><li>内容と金額を確認</li><li>Stripeで支払う</li><li>マイページで受取</li></ol>
+            <small>商品の支払合計は500円以上で、すべてStripeで決済します。</small>
+          </section>
+          <button class="market-purchase-button" id="itemPurchase" type="button" disabled>購入状態を確認しています</button>
+          <p class="helper" id="itemPurchaseStatus" aria-live="polite">購入状態を確認しています。</p>
+        </section>
+      </article>
+    </main>
+  </div>
+  <script src="../scripts/pixieed-dev-access.js?v=2026.07.17-market-dev1"></script>
+  <script src="local-test-products.js?v=2026.07.17-public-read2"></script>
+  <script src="favorites.js?v=2026.07.17-public-read2"></script>
+  <script src="item.js?v=2026.07.17-public-read1"></script>
+  <script src="media-protection.js?v=2026.07.17-preview-protection1"></script>
+  <script src="help-tips.js?v=2026.07.17-context-help1"></script>
+  <script src="../scripts/shared-bottom-nav.js?v=2026.07.17-market-public32"></script>
+</body>
+</html>

@@ -10,22 +10,17 @@ const imageUtils = read('PiXiEEDrawDEV/assets/js/modules/image-utils.js');
 const app = read('PiXiEEDrawDEV/assets/js/app.js');
 
 assert.match(session, /const normalizeExternalInputToV2 = options\?\.fileLoad === true \|\| options\?\.forceV2WorkingCopy === true/);
-assert.match(session, /function canBindOpenedProjectFile/);
-assert.match(session, /adapterId === 'pixieedraw-v2-zip' \|\| adapterId\.startsWith\('pixieedraw-v3'\)/);
-assert.match(session, /options\?\.fileLoad === true && options\?\.bindOpenedFile !== true/);
-assert.match(session, /autosaveHandle = null/);
-assert.match(session, /clearActiveProjectSaveHandle\?\.\(\)/);
 assert.match(session, /external-input-converted-to-v2-working-copy/);
-assert.match(session, /opened-project-file-bound/);
 assert.ok(
   session.indexOf('await restoreOpenProjectSheetsFromParsedDocument')
-    < session.indexOf('if (mustCreateUnboundV2WorkingCopy)'),
-  'external-input save binding must be cleared only after the new project session/tab mirror is restored'
+    < session.indexOf("phase: 'external-input-converted-to-v2-working-copy'"),
+  'external-input normalization must be logged only after the new project session/tab mirror is restored'
 );
 assert.match(imports, /forceV2WorkingCopy: true/);
 assert.match(imports, /sourceKind: candidate\.sourceKind \|\| 'import-image'/);
 assert.match(app, /'import-image', 'import-gif', 'mixed'/);
-assert.match(imports, /Open one project at a time/);
+assert.match(imports, /async function openImageFileAsNewProject/);
+assert.match(imports, /persistActiveOpenProjectTab\(\{ flushAutosave: true \}\)/);
 assert.match(imports, /image\/jpeg/);
 assert.match(imports, /image\/webp/);
 assert.match(imageUtils, /image\/jpeg/);

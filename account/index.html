@@ -4,7 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>マイページ | PiXiEED</title>
-  <meta name="description" content="PiXiEEDのマイページです。Googleログイン、プロフィール、アイコン、Xアカウントを管理できます。">
+  <meta name="description" content="PiXiEEDのマイページです。ログイン、プロフィール、購入済み商品、端末内プロジェクトを管理できます。">
+  <meta name="robots" content="noindex,nofollow,noai,noimageai">
   <link rel="canonical" href="https://pixieed.jp/account/">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="PiXiEED">
@@ -21,6 +22,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../site/landing.css?v=2026.07.15-home-clear-entry1">
+  <link rel="stylesheet" href="account.css?v=2026.07.17-account-auth4">
   <style>
     .account-page{
       display:grid;
@@ -130,6 +132,66 @@
       cursor:wait;
       opacity:.68;
     }
+    .account-market-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(210px,1fr));
+      gap:8px;
+      align-items:start;
+    }
+    .account-market-grid > .account-item{
+      grid-column:1 / -1;
+    }
+    .account-market-card{
+      display:grid;
+      align-content:start;
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,.1);
+      border-radius:8px;
+      background:#0b1224;
+      color:inherit;
+      transition:border-color .12s ease,transform .12s ease;
+    }
+    .account-market-card:hover,
+    .account-market-card:focus-within{
+      transform:translateY(-1px);
+      border-color:rgba(121,192,255,.52);
+    }
+    .account-market-card .market-card__preview{
+      aspect-ratio:1 / 1;
+      display:grid;
+      place-items:center;
+      overflow:hidden;
+      border-bottom:1px solid rgba(255,255,255,.08);
+      background-color:#111a30;
+      background-image:linear-gradient(45deg,rgba(255,255,255,.035) 25%,transparent 25%),linear-gradient(-45deg,rgba(255,255,255,.035) 25%,transparent 25%),linear-gradient(45deg,transparent 75%,rgba(255,255,255,.035) 75%),linear-gradient(-45deg,transparent 75%,rgba(255,255,255,.035) 75%);
+      background-size:16px 16px;
+      background-position:0 0,0 8px,8px -8px,-8px 0;
+    }
+    .account-market-card .market-card__preview img{
+      width:100%;height:100%;object-fit:contain;image-rendering:pixelated;
+    }
+    .account-market-card .market-card__body{display:grid;gap:8px;padding:10px}
+    .account-market-card .market-card__body h3{margin:0;overflow:hidden;font-size:13px;line-height:1.35;text-overflow:ellipsis;white-space:nowrap}
+    .account-market-card .market-card__author{margin:-3px 0 0;color:#9baac0;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .account-market-card .market-card__meta{display:flex;justify-content:space-between;gap:8px;align-items:center}
+    .account-market-card .market-card__badges{display:flex;flex-wrap:wrap;gap:4px}
+    .account-market-card .market-card__badges span{padding:3px 5px;border:1px solid rgba(121,192,255,.22);border-radius:4px;background:rgba(121,192,255,.08);color:#cdeaff;font-size:9px;line-height:1.2}
+    .account-market-card .market-card__badges .is-pixiedraw-product{border-color:rgba(126,240,199,.4);background:rgba(23,107,85,.22);color:#bff8e5}
+    .account-market-card .market-card__badges .is-general-product{border-color:rgba(167,139,250,.35);background:rgba(88,60,140,.2);color:#ddd2ff}
+    .account-market-card .market-card__format{overflow:hidden;color:#7ef0c7;font-size:10px;text-overflow:ellipsis;white-space:nowrap}
+    .account-market-card .market-card__price{font-size:11px;white-space:nowrap}
+    .account-market-formats{display:flex;flex-wrap:wrap;gap:5px;margin:0;padding:0;border:0}
+    .account-market-formats legend{width:100%;margin-bottom:2px;color:#94a3b8;font-size:10px}
+    .account-market-format{position:relative;cursor:pointer}
+    .account-market-format input{position:absolute;inline-size:1px;block-size:1px;opacity:0}
+    .account-market-format span{display:inline-flex;align-items:center;min-height:28px;padding:5px 7px;border:1px solid rgba(255,255,255,.14);border-radius:5px;background:rgba(255,255,255,.04);color:#cbd5e1;font-size:10px;font-weight:700}
+    .account-market-format input:checked + span{border-color:rgba(126,240,199,.58);background:rgba(126,240,199,.12);color:#bffce7}
+    .account-market-format input:focus-visible + span{outline:2px solid #79c0ff;outline-offset:2px}
+    .account-market-actions{display:grid;grid-template-columns:1fr;gap:6px}
+    .account-market-button{min-height:38px;padding:7px 9px;border:1px solid rgba(255,255,255,.18);border-radius:6px;background:#172038;color:#e5e7eb;font:800 11px/1.2 inherit;cursor:pointer}
+    .account-market-button--primary{border-color:rgba(121,192,255,.45);background:#19345c;color:#eaf5ff}
+    .account-market-button:disabled{cursor:wait;opacity:.56}
+    .account-market-status{min-height:2.6em;margin:0;color:#94a3b8;font-size:10px;line-height:1.3}
     .account-panel--profile{
       gap:12px;
     }
@@ -163,6 +225,40 @@
     .account-panel--profile .auth-actions{
       margin-top:auto;
     }
+    body[data-pixieed-account-auth="signed-out"] .account-page .account-stack > .account-panel:not(.account-panel--profile),
+    body[data-pixieed-account-auth="signed-out"] .account-page .account-stack + .account-stack{
+      display:none;
+    }
+    body[data-pixieed-account-auth="signed-out"] .account-page .profile-block--profile{
+      display:none;
+    }
+    body[data-pixieed-account-auth="signed-out"] .account-page{
+      min-height:min(680px, calc(100dvh - 180px));
+      align-content:center;
+    }
+    body[data-pixieed-account-auth="signed-out"] .account-page .account-title{
+      width:min(100%, 480px);
+      margin-inline:auto;
+      padding-inline:0;
+      text-align:center;
+    }
+    body[data-pixieed-account-auth="signed-out"] .account-page .account-grid{
+      display:block;
+      width:min(100%, 480px);
+      margin-inline:auto;
+    }
+    body[data-pixieed-account-auth="signed-out"] .account-page .account-stack{
+      display:block;
+    }
+    body[data-pixieed-account-auth="signed-out"] .account-page .account-panel--profile{
+      padding:clamp(18px, 3vw, 28px);
+    }
+    body[data-pixieed-account-auth="signed-in"] .account-page .profile-block--login{
+      display:none;
+    }
+    .account-panel--profile .logout{
+      width:100%;margin-top:4px;
+    }
     @media (max-width: 900px){
       .account-grid{grid-template-columns:1fr}
       .account-stack + .account-stack{border-left:0}
@@ -171,10 +267,19 @@
     }
   </style>
 </head>
-<body>
+<body data-pixieed-account-auth="signed-out">
+  <header class="site-header" aria-label="トップナビ">
+    <div class="header-inner header-inner--app">
+      <a class="brand" href="../index.html">
+        <span class="brand-icon" id="brandAvatar"><img src="../character-dots/maousama.png" alt=""></span>
+        <span class="brand-text"><span class="brand-title">PiXiEED</span><span class="brand-sub" id="brandUser">マイページ</span></span>
+      </a>
+      <a class="account-action account-action--quiet" href="../market/index.html">マーケット</a>
+    </div>
+  </header>
   <div class="page">
     <main class="page-shell account-page">
-      <h1 class="section-title account-title" id="accountTitle">マイページ</h1>
+      <h1 class="section-title account-title" id="accountTitle">ログイン</h1>
 
       <div class="account-grid">
         <section class="account-stack" aria-label="作品">
@@ -183,8 +288,8 @@
             <div class="account-profile-grid">
               <div class="profile-block profile-block--profile">
                 <div class="auth-section-head">
-                  <strong>プロフィール</strong>
-                  <span>表示名とアイコン</span>
+                  <strong>アカウント設定</strong>
+                  <span>PiXiEED IDに保存</span>
                 </div>
                 <div class="profile-row">
                   <button class="avatar-toggle" id="avatarToggle" type="button" aria-label="アイコンを変更" aria-expanded="false" aria-controls="avatarPanel">
@@ -195,6 +300,11 @@
                     <input class="auth-input" id="profileNickname" type="text" placeholder="なまえ" maxlength="32">
                   </label>
                 </div>
+                <label class="profile-name profile-email">
+                  <span style="font-weight:700; color:#e5e7eb;">メールアドレス</span>
+                  <input class="auth-input" id="profileEmail" type="email" readonly aria-describedby="profileEmailHelp">
+                  <small id="profileEmailHelp">ログインに使用するメールアドレスです。</small>
+                </label>
                 <div class="avatar-panel" id="avatarPanel" hidden>
                   <div class="avatar-grid" id="avatarGrid"></div>
                 </div>
@@ -202,15 +312,18 @@
                   <span style="font-weight:700; color:#e5e7eb;">X (旧Twitter)</span>
                   <input class="auth-input" id="profileX" type="url" placeholder="https://x.com/username" maxlength="200" inputmode="url">
                 </label>
+                <a class="profile-x-preview" id="profileXPreview" href="#" target="_blank" rel="noopener noreferrer" hidden>Xプロフィールを開く</a>
                 <button class="auth-btn" id="saveProfile" type="button">プロフィールを保存</button>
                 <p class="auth-status" id="authStatus"></p>
+                <span class="helper" id="linkedEmail" style="display:none;"></span>
+                <button class="auth-btn logout" id="logoutBtn" type="button" style="display:none;">ログアウト</button>
               </div>
               <div class="profile-block profile-block--login" id="pixieedSharedAuthLoginBlock">
                 <div class="auth-section-head">
-                  <strong>ログイン</strong>
-                  <span>同期</span>
+                  <strong id="authModeTitle">ログイン</strong>
+                  <span id="authModeDescription">PiXiEED IDを使う</span>
                 </div>
-                <p class="auth-login-copy">別端末でも同じプロフィールを使えます。</p>
+                <p class="auth-login-copy" id="authModeCopy">ログインすると、購入済み素材とプロフィールを安全に引き継げます。</p>
                 <div class="auth-social-grid" id="authSocialButtons">
                   <button class="auth-btn auth-btn--google" data-auth-provider="google" data-auth-label="Google" type="button">
                     <span class="auth-google-icon" aria-hidden="true">
@@ -221,19 +334,36 @@
                         <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.34l2.58-2.58C13.46.9 11.42 0 9 0A9 9 0 0 0 .94 4.94l3.02 2.34C4.67 5.16 6.66 3.58 9 3.58z"/>
                       </svg>
                     </span>
-                    <span>Googleでログイン</span>
+                    <span id="authGoogleButtonLabel">Googleで続ける</span>
                   </button>
                 </div>
-                <button class="auth-btn auth-btn--email" id="authEmailToggle" type="button">メールログインを開く</button>
-                <div id="authInputs" style="display:none; gap:8px;" data-expanded="false">
-                  <input class="auth-input" id="authEmail" type="email" placeholder="メールアドレス" autocomplete="email">
-                  <input class="auth-input" id="authPasscode" type="password" placeholder="パスコード（6〜20文字）" autocomplete="current-password">
+                <p class="auth-provider-note" id="authProviderNote">Googleを初めて使う場合も、PiXiEED IDが自動で作成されます。</p>
+                <div class="auth-mode-switch" role="tablist" aria-label="メールアカウント">
+                  <button class="auth-mode-switch__button is-active" type="button" data-auth-mode="login" role="tab" aria-selected="true">ログイン</button>
+                  <button class="auth-mode-switch__button" type="button" data-auth-mode="signup" role="tab" aria-selected="false">新規登録</button>
+                </div>
+                <div id="authInputs" style="display:grid; gap:8px;" data-expanded="true">
+                  <label class="auth-field">
+                    <span>メールアドレス</span>
+                    <input class="auth-input" id="authEmail" type="email" placeholder="name@example.com" autocomplete="email">
+                  </label>
+                  <label class="auth-field" id="authPasscodeField">
+                    <span id="authPasscodeLabel">パスワード</span>
+                    <input class="auth-input" id="authPasscode" type="password" placeholder="パスワードを入力" minlength="6" autocomplete="current-password">
+                  </label>
+                  <label class="auth-field" id="authPasscodeConfirmField" hidden>
+                    <span>パスワード（確認）</span>
+                    <input class="auth-input" id="authPasscodeConfirm" type="password" placeholder="もう一度入力" minlength="8" autocomplete="new-password">
+                  </label>
                 </div>
                 <div class="auth-actions" style="display:grid; gap:8px;">
                   <button class="auth-btn" id="authLoginBtn" type="button">ログイン</button>
                 </div>
-                <button class="auth-btn logout" id="logoutBtn" type="button" style="display:none;">ログアウト</button>
-                <span class="helper" id="linkedEmail" style="display:none;"></span>
+                <div class="auth-secondary-actions">
+                  <button class="auth-text-btn" id="authMagicLinkBtn" type="button">メールリンクでログイン</button>
+                  <button class="auth-text-btn" id="authResetBtn" type="button">パスワードを忘れた場合</button>
+                </div>
+                <p class="auth-security-note" id="authSecurityNote">ログインではアカウントは作成されません。初めての方は「新規登録」を選んでください。</p>
                 <p class="helper" id="authAccountStatus"></p>
               </div>
             </div>
@@ -259,20 +389,43 @@
           </section>
         </section>
 
-        <section class="account-stack" aria-label="購入済みQR">
-          <section class="account-panel">
-            <h2 class="section-title">購入済みQR</h2>
-            <div class="account-list" id="ownedQrList" aria-label="購入済みQR一覧">
+        <section class="account-stack" aria-label="購入済み商品とサービス">
+          <section class="account-panel" id="accountDevTools" data-market-dev-only hidden>
+            <div class="account-panel__head">
+              <h2 class="section-title">マーケットDEV</h2>
+              <span class="account-chip">DEV限定</span>
+            </div>
+            <p class="helper">DEVテスト商品を確認できます。出品・販売者設定・審査は現在準備中です。</p>
+            <div class="account-service-grid">
+              <a class="account-service" href="../market/index.html"><strong>マーケットを確認</strong><span>DEV商品と検索画面</span></a>
+            </div>
+          </section>
+          <section class="account-panel" data-market-dev-only hidden>
+            <div class="account-panel__head">
+              <h2 class="section-title">購入済み商品</h2>
+              <span class="account-chip" id="marketPurchaseCount">確認中</span>
+            </div>
+            <p class="helper">収録形式を自由に選んで1つのZIPにまとめられます。購入権が有効な商品は何度でも再出力できます。</p>
+            <div class="account-list account-market-grid" id="marketPurchaseList" aria-label="購入済み商品一覧" aria-live="polite">
               <div class="account-item">
                 <div class="account-cover">
-                  <img src="../icon/icon-192-6.png" alt="">
+                  <img src="../bought.png?v=2026.07.17-icons1" alt="">
                 </div>
                 <div class="account-item__body">
-                  <strong>まだ購入済みQRはありません</strong>
-                  <span>購入後にここへ表示されます。</span>
+                  <strong>購入履歴を確認しています</strong>
+                  <span>ログイン状態を読み込んでいます。</span>
                 </div>
-                <a class="account-action" href="../qr/index.html">設定する</a>
+                <a class="account-action" href="../market/index.html">探す</a>
               </div>
+            </div>
+          </section>
+          <section class="account-panel">
+            <div class="account-panel__head">
+              <h2 class="section-title">サービス</h2>
+            </div>
+            <div class="account-service-grid">
+              <a class="account-service" href="../market/index.html"><strong>マーケット</strong><span>素材を探す</span></a>
+              <a class="account-service" href="../qr/index.html"><strong>QR</strong><span>QRコードを作る</span></a>
             </div>
           </section>
         </section>
@@ -280,9 +433,16 @@
     </main>
   </div>
 
-  <script src="../scripts/shared-auth-panel.js?v=2026.07.03-account-login-health-v1"></script>
-  <script src="../scripts/shared-bottom-nav.js?v=2026.07.15-seamless-places2"></script>
+  <script src="../scripts/shared-auth-panel.js?v=2026.07.17-account-auth4"></script>
+  <script src="../scripts/pixieed-dev-access.js?v=2026.07.17-market-dev1"></script>
+  <script src="../scripts/account-dev-tools.js?v=2026.07.17-market-dev1"></script>
+  <script src="../scripts/shared-profile-header.js"></script>
+  <script src="../scripts/shared-bottom-nav.js?v=2026.07.17-market-public32"></script>
   <script src="../scripts/account-local-projects.js?v=2026.07.01-local-projects"></script>
+  <script src="../scripts/market-purchase-delivery.js?v=2026.07.17-all-open1"></script>
+  <script src="../scripts/account-market-purchases.js?v=2026.07.17-dev-account1"></script>
+  <script src="../market/media-protection.js?v=2026.07.17-preview-protection1"></script>
+  <script src="../scripts/account-market-seller.js?v=2026.07.17-dev-account1"></script>
   <script src="../scripts/pixel-art-fit.js"></script>
 </body>
 </html>

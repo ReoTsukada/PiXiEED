@@ -402,6 +402,19 @@
   function updateCompactRightFlyoutPosition() {
     const compactMode = isCompactRightRailMode() || isDesktopRightToolRailMode();
     const open = isCompactRightFlyoutOpen();
+    const sharedDetailsHost = document.getElementById('pixieedCommonDetailsSlot');
+    const sharedDetailsSection = dom.sections.details;
+    if (
+      state.activeRightTab === 'details'
+      && sharedDetailsHost instanceof HTMLElement
+      && sharedDetailsSection instanceof HTMLElement
+      && sharedDetailsHost.contains(sharedDetailsSection)
+    ) {
+      compactRightFlyoutLockedLeft = null;
+      clearCompactRightFlyoutStyles();
+      ensureCompactRightFlyoutPortal(false);
+      return;
+    }
     if (
       !compactMode
       || !open
@@ -910,6 +923,16 @@
     RIGHT_TAB_KEYS.forEach(key => {
       const section = dom.sections[key];
       if (!section) return;
+      const sharedDetailsHost = key === 'details'
+        ? document.getElementById('pixieedCommonDetailsSlot')
+        : null;
+      if (sharedDetailsHost instanceof HTMLElement && sharedDetailsHost.contains(section)) {
+        section.hidden = false;
+        section.setAttribute('aria-hidden', 'false');
+        section.classList.remove('is-compact-flyout', 'is-bottom-docked');
+        section.classList.add('is-active', 'pixieed-common-details__hosted-section');
+        return;
+      }
       if (key === 'frames' && framesDocked) {
         section.hidden = false;
         section.setAttribute('aria-hidden', 'false');

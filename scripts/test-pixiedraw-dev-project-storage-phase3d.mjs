@@ -597,13 +597,14 @@ async function runSingleSheetScenario() {
     session: rootSession,
   }, {
     fileNameBase: 'phase3d-single.pixieedraw',
-    preferredAdapterId: 'pixieedraw-v2-zip-experimental',
+    preferredAdapterId: 'pixieedraw-v2-zip',
     includeSheets: true,
   });
   const parsedFromV2 = await registry.parseBlob(v2Serialized.blob);
-  assert.equal(parsedFromV2.parsed.activeSheetId, 'sheet-active');
-  assert.equal(parsedFromV2.parsed.sheets.length, 1);
-  assert.equal(parsedFromV2.parsed.sheets[0].project.document.canvases.length, 2);
+  assert.equal(parsedFromV2.adapterId, 'pixieedraw-v2-zip');
+  assert.equal(parsedFromV2.parsed.activeSheetId, undefined);
+  assert.equal(parsedFromV2.parsed.sheets, undefined);
+  assert.equal(parsedFromV2.parsed.document.canvases.length, 2);
 }
 
 async function runMultiSheetScenario() {
@@ -620,7 +621,7 @@ async function runMultiSheetScenario() {
     session: rootSession,
   }, {
     fileNameBase: 'phase3d-multi.pixieedraw',
-    preferredAdapterId: 'pixieedraw-v2-zip-experimental',
+    preferredAdapterId: 'pixieedraw-v2-zip',
     includeSheets: true,
   });
 
@@ -628,46 +629,26 @@ async function runMultiSheetScenario() {
   const zipEntries = parseStoredZipEntries(v2Bytes);
   const rootProjectJson = JSON.parse(Buffer.from(zipEntries.get('project.json')).toString('utf8'));
 
-  assert.ok(zipEntries.has('sheets/sheet-active/project.json'));
-  assert.ok(zipEntries.has('sheets/sheet-active/canvases/canvas-a.json'));
-  assert.ok(zipEntries.has('sheets/sheet-active/canvases/canvas-b.json'));
-  assert.ok(zipEntries.has('sheets/sheet-extra/project.json'));
-  assert.ok(zipEntries.has('sheets/sheet-extra/canvases/canvas-c.json'));
-  assert.ok(zipEntries.has('sheets/sheet-extra/canvases/canvas-d.json'));
+  assert.ok(zipEntries.has('canvases/canvas-a.json'));
+  assert.ok(zipEntries.has('canvases/canvas-b.json'));
+  assert.ok(!Array.from(zipEntries.keys()).some(name => name.startsWith('sheets/')));
 
-  assert.equal(rootProjectJson.activeSheetId, 'sheet-active');
-  assert.equal(rootProjectJson.sheets.length, 2);
-  assert.ok(rootProjectJson.sheets.every(sheet => !Object.prototype.hasOwnProperty.call(sheet, 'project')));
-  assert.ok(rootProjectJson.sheets.every(sheet => typeof sheet.path === 'string' && sheet.path.startsWith('sheets/')));
-  assert.deepEqual(rootProjectJson.sheets[0].sharedProjectMeta, { channel: 'alpha' });
-  assert.deepEqual(rootProjectJson.sheets[1].sharedSyncState, { legacy: true });
-  assert.ok(!Object.prototype.hasOwnProperty.call(rootProjectJson, 'canvasEntries'));
+  assert.equal(rootProjectJson.activeSheetId, undefined);
+  assert.equal(rootProjectJson.sheets, undefined);
+  assert.ok(Array.isArray(rootProjectJson.canvasEntries));
   assert.ok(!Array.isArray(rootProjectJson.document?.canvases));
   assert.ok(!Array.isArray(rootProjectJson.document?.frames));
   assert.ok(!JSON.stringify(rootProjectJson).includes(encodeTypedArray(redPatch)));
 
-  const activeSheetArchive = JSON.parse(Buffer.from(zipEntries.get('sheets/sheet-active/project.json')).toString('utf8'));
-  const extraSheetArchive = JSON.parse(Buffer.from(zipEntries.get('sheets/sheet-extra/project.json')).toString('utf8'));
-  assert.ok(Array.isArray(activeSheetArchive.canvasEntries));
-  assert.ok(Array.isArray(extraSheetArchive.canvasEntries));
-  assert.ok(!Array.isArray(activeSheetArchive.document?.canvases));
-  assert.ok(!Array.isArray(extraSheetArchive.document?.canvases));
-
   const bitmapEntryNames = Array.from(zipEntries.keys()).filter(name => name.startsWith('bitmaps/'));
-  assert.equal(bitmapEntryNames.length, 5, 'expected shared bitmaps across active/non-active sheets');
+  assert.ok(bitmapEntryNames.length > 0, 'expected active-project bitmap entries');
 
   const parsedFromV2 = await registry.parseBlob(v2Serialized.blob);
-  assert.equal(parsedFromV2.adapterId, 'pixieedraw-v2-zip-experimental');
-  assert.equal(parsedFromV2.parsed.activeSheetId, 'sheet-active');
-  assert.equal(parsedFromV2.parsed.sheets.length, 2);
+  assert.equal(parsedFromV2.adapterId, 'pixieedraw-v2-zip');
+  assert.equal(parsedFromV2.parsed.activeSheetId, undefined);
+  assert.equal(parsedFromV2.parsed.sheets, undefined);
   assert.equal(parsedFromV2.parsed.document.canvases.length, 2);
   assert.equal(parsedFromV2.parsed.document.activeCanvasId, 'canvas-a');
-  assert.equal(parsedFromV2.parsed.sheets[0].project.document.canvases.length, 2);
-  assert.equal(parsedFromV2.parsed.sheets[1].project.document.canvases.length, 2);
-  assert.equal(parsedFromV2.parsed.sheets[1].project.document.activeCanvasId, 'canvas-c');
-  assert.equal(parsedFromV2.parsed.sheets[1].project.document.canvases[0].frames[0].layers.length, 2);
-  assert.equal(parsedFromV2.parsed.sheets[1].project.document.canvases[1].frames[0].layers.length, 2);
-  assert.equal(parsedFromV2.parsed.sheets[1].project.session.timelapse.enabled, true);
   assert.equal(parsedFromV2.parsed.session.timelapse.enabled, true);
   assert.equal(parsedFromV2.parsed.session.historyLimit, 24);
 
@@ -681,29 +662,11 @@ async function runMultiSheetScenario() {
     canvasA.frames[0].layers[3].importSourceDirect,
     'active importSourceDirect should roundtrip'
   );
-  assert.equal(
-    parsedFromV2.parsed.sheets[1].project.document.canvases[0].frames[0].layers[1].direct,
-    canvasC.frames[0].layers[1].direct,
-    'non-active mixed layer should roundtrip'
-  );
-  assert.equal(
-    parsedFromV2.parsed.sheets[1].project.document.canvases[1].frames[0].layers[0].direct,
-    canvasD.frames[0].layers[0].direct,
-    'non-active directOnly layer should roundtrip'
-  );
-  assert.equal(
-    parsedFromV2.parsed.sheets[1].project.document.canvases[1].frames[0].layers[1].importSourceDirect,
-    canvasD.frames[0].layers[1].importSourceDirect,
-    'non-active importSourceDirect should roundtrip'
-  );
-  assert.equal(parsedFromV2.parsed.sheets[1].project.session.historyLimit, 18);
-  assert.deepEqual(parsedFromV2.parsed.sheets[1].sharedSyncState, { legacy: true });
-
   const documentSessionUtils = createDocumentSessionUtils(registry);
   const parsedSnapshot = await documentSessionUtils.snapshotFromDocumentBlob(v2Serialized.blob);
-  assert.equal(parsedSnapshot.storageAdapterId, 'pixieedraw-v2-zip-experimental');
-  assert.equal(parsedSnapshot.activeSheetId, 'sheet-active');
-  assert.equal(parsedSnapshot.sheets.length, 2);
+  assert.equal(parsedSnapshot.storageAdapterId, 'pixieedraw-v2-zip');
+  assert.equal(parsedSnapshot.activeSheetId, '');
+  assert.deepEqual(parsedSnapshot.sheets, []);
   assert.equal(parsedSnapshot.snapshot.canvases.length, 2);
   assert.equal(parsedSnapshot.projectSession.timelapse.enabled, true);
 
@@ -713,59 +676,9 @@ async function runMultiSheetScenario() {
   };
 }
 
-async function runSanitizedSheetPathScenario() {
-  const { registry } = createAdapters();
-  const sanitizedSnapshot = {
-    ...activeDocument,
-    fixtureMode: 'phase3d-path-sheet-id',
-    documentName: 'phase3d-path-sheet-id',
-  };
-  const v2Serialized = await registry.serializeProject({
-    snapshot: sanitizedSnapshot,
-    session: rootSession,
-  }, {
-    fileNameBase: 'phase3d-path-sheet-id.pixieedraw',
-    preferredAdapterId: 'pixieedraw-v2-zip-experimental',
-    includeSheets: true,
-  });
-
-  const v2Bytes = new Uint8Array(await v2Serialized.blob.arrayBuffer());
-  const zipEntries = parseStoredZipEntries(v2Bytes);
-  const rootProjectJson = JSON.parse(Buffer.from(zipEntries.get('project.json')).toString('utf8'));
-  const unsafeSheet = rootProjectJson.sheets.find(sheet => sheet.id === 'sheet/../unsafe?name');
-  assert.ok(unsafeSheet);
-  assert.equal(unsafeSheet.path, 'sheets/sheet-..-unsafe-name/project.json');
-  assert.ok(zipEntries.has('sheets/sheet-..-unsafe-name/project.json'));
-
-  const parsedFromV2 = await registry.parseBlob(v2Serialized.blob);
-  assert.equal(parsedFromV2.parsed.sheets[1].id, 'sheet/../unsafe?name');
-}
-
-async function runDuplicateSheetIdScenario() {
-  const { registry } = createAdapters();
-  const duplicateSnapshot = {
-    ...activeDocument,
-    fixtureMode: 'phase3d-duplicate-sheet-id',
-    documentName: 'phase3d-duplicate-sheet-id',
-  };
-  await assert.rejects(
-    registry.serializeProject({
-      snapshot: duplicateSnapshot,
-      session: rootSession,
-    }, {
-      fileNameBase: 'phase3d-duplicate-sheet-id.pixieedraw',
-      preferredAdapterId: 'pixieedraw-v2-zip-experimental',
-      includeSheets: true,
-    }),
-    /Duplicate packaged project sheet id: sheet-dup/
-  );
-}
-
 await runSingleSheetScenario();
 const sizes = await runMultiSheetScenario();
-await runSanitizedSheetPathScenario();
-await runDuplicateSheetIdScenario();
 
 console.log(
-  `Phase 3-D sheet archive checks passed. v1=${sizes.v1Size} bytes, v2=${sizes.v2Size} bytes`
+  `Phase 3-D single-project archive checks passed. v1=${sizes.v1Size} bytes, v2=${sizes.v2Size} bytes`
 );

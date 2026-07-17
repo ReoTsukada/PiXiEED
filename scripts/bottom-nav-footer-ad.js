@@ -11,6 +11,10 @@
     return Boolean(window.__PIXIEED_ADS_DISABLED__);
   }
 
+  function isLocalFilePreview() {
+    return window.location.protocol === 'file:';
+  }
+
   function shouldReserveFooterAdOnly() {
     try {
       const path = String(window.location.pathname || '').toLowerCase();
@@ -448,6 +452,7 @@
   }
 
   function ensureAdsScript() {
+    if (isLocalFilePreview()) return;
     const existing = document.querySelector('script[src*="pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"]');
     if (existing) return;
     if (isMaoituPage() && window.__MAOITU_GAME_ACTIVE__) {
@@ -479,15 +484,6 @@
     document.head.appendChild(script);
   }
 
-  function isPixieeLensPage() {
-    try {
-      const path = String(window.location.pathname || '').toLowerCase();
-      return /(?:^|\/)pixiee-lens(?:\/|\/index\.html)?$/.test(path);
-    } catch (_error) {
-      return false;
-    }
-  }
-
   function isPixiedrawPage() {
     try {
       const path = String(window.location.pathname || '').toLowerCase();
@@ -495,11 +491,6 @@
     } catch (_error) {
       return false;
     }
-  }
-
-  function shouldHideSharedAdInLandscape() {
-    return document.body?.dataset?.pixieedFooterAdLandscape === 'false'
-      && window.matchMedia?.('(orientation: landscape)').matches === true;
   }
 
   function isMaoituPage() {
@@ -554,7 +545,9 @@
         left:50%;
         transform:translateX(-50%);
         width:min(640px, calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - (var(--pixieed-top-ad-inline-padding) * 2)));
-        height:clamp(50px, 7.6vw, 60px);
+        height:50px;
+        min-height:50px;
+        max-height:50px;
         box-sizing:border-box;
         z-index:14040;
         display:flex;
@@ -577,6 +570,18 @@
         max-width:none;
         display:block;
         overflow:hidden;
+      }
+      .pixieed-shared-top-ad.is-local-preview .ad-block::after{
+        content:'広告プレビュー';
+        position:absolute;
+        inset:0;
+        display:grid;
+        place-items:center;
+        color:rgba(203,213,225,.72);
+        font-size:11px;
+        font-weight:700;
+        letter-spacing:.06em;
+        pointer-events:none;
       }
       .pixieed-shared-top-ad .ad-label{
         position:absolute;
@@ -608,22 +613,16 @@
         max-height:100% !important;
       }
       body[data-pixieed-page="pixiedraw"] .app{
-        padding-top:var(--pixieed-top-ad-offset) !important;
+        padding-top:var(--pixieed-common-content-top, calc(var(--pixieed-top-ad-offset) + 48px)) !important;
       }
       body[data-pixieed-page="maoitu"] .game-shell{
-        padding-top:var(--pixieed-top-ad-offset) !important;
+        padding-top:var(--pixieed-common-content-top, calc(var(--pixieed-top-ad-offset) + 48px)) !important;
         box-sizing:border-box;
       }
       body[data-pixieed-page="pixiedraw"]{
         /* Match the landscape shared navigation rail exactly. */
         --pixieed-landscape-side-ad-width:var(--pixieed-shared-side-nav-width, 72px);
         --pixieed-landscape-side-ad-gap:var(--pixieed-shared-side-nav-gap, 6px);
-      }
-      body[data-pixieed-page="pixiedraw"] .pixieed-shared-top-ad{
-        width:calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 12px);
-        min-height:50px;
-        height:50px;
-        max-height:50px;
       }
       body[data-pixieed-page="maoitu"]{
         --pixieed-landscape-side-ad-width:clamp(96px, calc((100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 12px) / 3.2), 160px);
@@ -720,13 +719,14 @@
           max-height:100% !important;
         }
         body[data-pixieed-page="pixiedraw"] .app{
-          padding-top:0 !important;
-          padding-left:calc(env(safe-area-inset-left, 0px) + var(--pixieed-side-ad-offset)) !important;
+          padding-top:var(--pixieed-common-tabbar-height, 48px) !important;
+          padding-left:env(safe-area-inset-left, 0px) !important;
         }
         body[data-pixieed-page="maoitu"] .game-shell{
-          padding-top:0 !important;
-          padding-left:calc(env(safe-area-inset-left, 0px) + var(--pixieed-side-ad-offset)) !important;
+          padding-top:var(--pixieed-common-tabbar-height, 48px) !important;
+          padding-left:env(safe-area-inset-left, 0px) !important;
         }
+        .pixieed-shared-top-ad{display:none!important}
       }
     `;
     document.head.appendChild(style);
@@ -765,39 +765,18 @@
 
   function reserveTopSpace(reason) {
     const body = document.body;
-    if (!(body instanceof HTMLElement) || isPixieeLensPage()) return;
+    if (!(body instanceof HTMLElement)) return;
     const ad = document.querySelector('.pixieed-shared-top-ad');
-    const target = isPixiedrawPage()
-      ? document.querySelector('.app')
-      : isMaoituPage()
-        ? document.querySelector('.game-shell') || body
-        : body;
-    if (!(ad instanceof HTMLElement) || !(target instanceof HTMLElement)) {
+    if (!(ad instanceof HTMLElement)) {
       clearReservedTopSpace();
       return;
     }
     const rect = ad.getBoundingClientRect();
-    const useLandscapeSideAd = (isPixiedrawPage() || isMaoituPage()) && isLandscapeViewport();
-    let landscapeGap = 4;
-    if (useLandscapeSideAd) {
-      const rawGap = Number.parseFloat(window.getComputedStyle(ad).getPropertyValue('--pixieed-landscape-side-ad-gap'));
-      if (Number.isFinite(rawGap)) {
-        landscapeGap = rawGap;
-      }
-    }
-    const portraitGap = isPixiedrawPage() ? 4 : 12;
-    const reserved = Math.max(0, Math.ceil((useLandscapeSideAd ? rect.width : rect.height) + (useLandscapeSideAd ? landscapeGap : portraitGap)));
+    const reserved = Math.max(0, Math.ceil(rect.bottom));
     const reservedPx = `${reserved}px`;
-    document.documentElement.style.setProperty('--pixieed-top-ad-offset', useLandscapeSideAd ? '0px' : reservedPx);
-    document.documentElement.style.setProperty('--pixieed-side-ad-offset', useLandscapeSideAd ? reservedPx : '0px');
-    document.documentElement.style.setProperty('--pixieed-shared-side-ad-width', useLandscapeSideAd ? `${Math.max(0, Math.ceil(rect.width))}px` : '0px');
-    if (target.dataset.pixieedTopAdPaddingApplied !== 'true') {
-      target.dataset.pixieedTopAdPaddingApplied = 'true';
-      target.dataset.pixieedTopAdOriginalPaddingTop = window.getComputedStyle(target).paddingTop || '0px';
-    }
-    target.style.paddingTop = useLandscapeSideAd
-      ? (target.dataset.pixieedTopAdOriginalPaddingTop || '0px')
-      : `calc(${target.dataset.pixieedTopAdOriginalPaddingTop || '0px'} + ${reservedPx})`;
+    document.documentElement.style.setProperty('--pixieed-top-ad-offset', reservedPx);
+    document.documentElement.style.setProperty('--pixieed-side-ad-offset', '0px');
+    document.documentElement.style.setProperty('--pixieed-shared-side-ad-width', '0px');
     dispatchPixiedrawAdLayoutChange(reason || 'reserve-top-ad-space');
   }
 
@@ -814,14 +793,13 @@
 
   function removeTopAd() {
     document.querySelectorAll('.pixieed-shared-top-ad').forEach((node) => node.remove());
+    document.body?.classList.remove('has-pixieed-shared-top-ad');
     clearReservedTopSpace();
   }
 
   function injectTopAd() {
     if (arePixieedAdsDisabled()
-      || isPixieeLensPage()
-      || shouldHideSharedAdInLandscape()
-      || (isPixiedrawPage() && !isPixiedrawMobileChromeActive())) {
+      || isLandscapeViewport()) {
       removeTopAd();
       return;
     }
@@ -845,6 +823,9 @@
       `;
       document.body.appendChild(banner);
     }
+    const localFilePreview = isLocalFilePreview();
+    banner.classList.toggle('is-local-preview', localFilePreview);
+    document.body?.classList.add('has-pixieed-shared-top-ad');
     if (banner.dataset.pixieedInteractionGuard !== '1') {
       banner.dataset.pixieedInteractionGuard = '1';
       ['pointerdown', 'pointerup', 'click', 'touchstart', 'touchend', 'contextmenu'].forEach(type => {
@@ -925,6 +906,31 @@
       if (!(banner instanceof HTMLElement) || !banner.isConnected) {
         return;
       }
+      if (localFilePreview) return;
+      const slot = banner.querySelector('ins.adsbygoogle');
+      if (!(slot instanceof HTMLElement)
+        || slot.dataset.pixieedPushQueued === '1'
+        || slot.getAttribute('data-adsbygoogle-status') === 'done') {
+        return;
+      }
+      const slotRect = slot.getBoundingClientRect();
+      const frameRect = slot.parentElement?.getBoundingClientRect();
+      if (slotRect.width < 1 || slotRect.height < 1 || (frameRect && frameRect.width < 1)) {
+        if (banner.dataset.pixieedAdSizeObserver !== '1' && typeof ResizeObserver === 'function') {
+          banner.dataset.pixieedAdSizeObserver = '1';
+          const observer = new ResizeObserver(() => {
+            const nextRect = slot.getBoundingClientRect();
+            if (nextRect.width < 1 || nextRect.height < 1) return;
+            observer.disconnect();
+            delete banner.dataset.pixieedAdSizeObserver;
+            renderBanner();
+          });
+          observer.observe(banner);
+          observer.observe(slot);
+        }
+        return;
+      }
+      slot.dataset.pixieedPushQueued = '1';
       if (window.pixieedObserveAds) {
         window.pixieedObserveAds(banner);
       } else {
@@ -932,11 +938,11 @@
           window.adsbygoogle = window.adsbygoogle || [];
           window.adsbygoogle.push({});
         } catch (_error) {
-          // ignore
+          delete slot.dataset.pixieedPushQueued;
         }
       }
     };
-    const usesManagedPixiedrawAds = isPixiedrawPage()
+    const usesManagedPixiedrawAds = !localFilePreview && isPixiedrawPage()
       && typeof window.__PIXIEEDRAW_LOAD_ADS__ === 'function';
     if (usesManagedPixiedrawAds) {
       // PiXiEEDraw owns the external library lifecycle. The shared, rotated
@@ -950,7 +956,7 @@
           renderBanner();
         }, { once: true });
       }
-    } else {
+    } else if (!localFilePreview) {
       ensureAdsScript();
       renderBanner();
     }
@@ -994,28 +1000,31 @@
       syncFooterAd();
     }
   });
-  window.addEventListener('resize', () => {
-    if (isPixiedrawPage()) {
+  let lastLandscapeState = isLandscapeViewport();
+  const syncResponsiveAdLayout = (reason) => {
+    const nextLandscapeState = isLandscapeViewport();
+    if (nextLandscapeState !== lastLandscapeState) {
+      lastLandscapeState = nextLandscapeState;
       syncFooterAd();
       return;
     }
-    reserveTopSpace('resize-top-ad');
+    if (nextLandscapeState) {
+      removeTopAd();
+      return;
+    }
+    reserveTopSpace(reason);
+  };
+  window.addEventListener('resize', () => {
+    syncResponsiveAdLayout('resize-top-ad');
   }, { passive: true });
   window.addEventListener('orientationchange', () => {
-    if (isPixiedrawPage()) {
-      syncFooterAd();
-      return;
-    }
-    reserveTopSpace('orientation-change-top-ad');
+    lastLandscapeState = isLandscapeViewport();
+    syncFooterAd();
   }, { passive: true });
   document.addEventListener('pixiedraw:mobile-chrome-change', syncFooterAd);
   if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', () => {
-      if (isPixiedrawPage()) {
-        syncFooterAd();
-        return;
-      }
-      reserveTopSpace('visual-viewport-resize');
+      syncResponsiveAdLayout('visual-viewport-resize');
     }, { passive: true });
   }
 })();

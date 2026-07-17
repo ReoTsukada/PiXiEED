@@ -120,6 +120,18 @@
       line-height:1.2;
       letter-spacing:0.02em;
     }
+    .glossary-title{
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+    .glossary-title img{
+      width:38px;
+      height:38px;
+      flex:0 0 38px;
+      object-fit:contain;
+      image-rendering:pixelated;
+    }
     .lead{
       margin:8px 0 0;
       color:var(--sub);
@@ -252,7 +264,10 @@
   <header class="site-header" aria-label="top-nav"></header>
   <div class="page">
     <section class="card">
-      <h1>ドット絵・ピクセルアート用語集</h1>
+      <div class="glossary-title">
+        <img src="../Word.png?v=2026.07.17-icons1" alt="" aria-hidden="true">
+        <h1>ドット絵・ピクセルアート用語集</h1>
+      </div>
       <p class="lead">ドット絵とは何か、ピクセルアートとの違い、英語表現、制作でよく使う基本用語をまとめています。PiXiEEDで制作する時によく使う言葉を、基本用語・解像度・表現・アニメ・制作工程までカテゴリ別に整理しました。</p>
       <div class="top-links">
         <a class="chip" href="../pixiedraw/index.html">PiXiEEDrawを開く</a>
@@ -584,7 +599,7 @@
     })();
   </script>
   <script src="../scripts/shared-profile-header.js"></script>
-  <script src="../scripts/shared-bottom-nav.js?v=2026.07.15-seamless-places2"></script>
+  <script src="../scripts/shared-bottom-nav.js?v=2026.07.17-market-public32"></script>
   <script src="../scripts/pixel-art-fit.js"></script>
 </body>
 </html>

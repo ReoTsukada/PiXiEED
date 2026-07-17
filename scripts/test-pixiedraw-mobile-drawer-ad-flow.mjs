@@ -7,7 +7,7 @@ for (const root of ['PiXiEEDrawDEV', 'pixiedraw']) {
 
   assert.match(html, /panelBody\.appendChild\(mount\)/,
     `${root}: mobile ads remain at the end of the panel body`);
-  assert.match(html, /\['panelColor', 'panelTools', 'panelFrames', 'panelFile', 'panelSettings', 'panelDetails'\]/,
+  assert.match(html, /\['panelColor', 'panelTools', 'panelFrames', 'panelFile', 'panelSettings'\]/,
     `${root}: the unified Tools\/Color panel resolves its final Color mount first`);
   assert.doesNotMatch(html, /mobileDrawerAdSlot|mobileDrawerAdMount/,
     `${root}: no fixed drawer-footer overlay is introduced`);

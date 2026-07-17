@@ -12,7 +12,9 @@ const journalOnlyBranch = journalSource.match(
 );
 assert.ok(journalOnlyBranch, 'journal-only fast path must exist before checkpoint session creation');
 assert.doesNotMatch(journalOnlyBranch[1], /buildAutosaveSessionPayload|buildProjectSessionPayload/);
-assert.match(journalOnlyBranch[1], /history\?\.past/);
+assert.match(journalOnlyBranch[1], /next\.historyPast = \[\]/);
+assert.match(journalOnlyBranch[1], /next\.historyFuture = \[\]/);
+assert.doesNotMatch(journalOnlyBranch[1], /history\?\.(past|future)/);
 assert.match(journalOnlyBranch[1], /journalOnly: true/);
 
 const sessionBuildIndex = journalSource.indexOf("const session = typeof buildAutosaveSessionPayload");

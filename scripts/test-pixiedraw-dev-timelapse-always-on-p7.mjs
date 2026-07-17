@@ -14,7 +14,7 @@ assert.match(appSource, /TIMELAPSE_OPERATION_LOG_MAX_CHANGES = isLightweightPers
 assert.match(appSource, /timelapseState\.enabled = true;\s*if \(Number\.isFinite\(payload\.timelapseFps\)\)/);
 assert.match(indexSource, /<input checked disabled id="toggleTimelapse" type="checkbox"\/>/);
 assert.match(sessionSource, /timelapseState\.enabled = true;/);
-assert.match(autosaveSource, /timelapseState\.enabled = true;/);
+assert.doesNotMatch(autosaveSource, /timelapseState\.enabled = false;/);
 assert.match(recoverySource, /emptyTimelapse = \(\) => \(\{ enabled: true,/);
 
 assert.match(timelapseSource, /function compactTimelapseOperationLogIfNeeded/);

@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>マーケットヘルプ | PiXiEED</title>
+  <meta name="description" content="PiXiEEDマーケットの購入、出品、Stripe決済、派生販売、売上受取に関する使い方とよくある質問です。">
+  <meta name="robots" content="index,follow">
+  <link rel="canonical" href="https://pixieed.jp/market/help.html">
+  <link rel="icon" type="image/png" href="../Market.png">
+  <link rel="stylesheet" href="../site/landing.css?v=2026.07.15-home-clear-entry1">
+  <link rel="stylesheet" href="info.css?v=2026.07.17-dev-gate1">
+</head>
+<body>
+  <div class="page market-info-page">
+    <main class="market-info-main">
+      <header class="market-info-head">
+        <img src="../Market.png" alt="">
+        <p class="market-info-eyebrow">MARKET GUIDE</p>
+        <h1>マーケットヘルプ</h1>
+        <p>買う人、最初の素材を販売する人、購入した素材から派生作品を作る人。それぞれに必要な操作をまとめています。</p>
+      </header>
+
+      <section class="market-info-section">
+        <h2>現在は閲覧版です</h2>
+        <p>素材の検索、商品詳細、仕組みとヘルプを公開しています。出品・販売者登録・審査と一般ユーザーの購入はまだ利用できません。</p>
+      </section>
+
+      <nav class="market-help-jump" aria-label="ヘルプ内メニュー">
+        <a href="#buyer">購入する</a>
+        <a href="#seller">出品する</a>
+        <a href="#derivative">派生販売</a>
+        <a href="#payment">決済・売上</a>
+        <a href="#faq">よくある質問</a>
+      </nav>
+
+      <section class="market-info-section" aria-labelledby="role-title">
+        <div class="market-section-heading">
+          <span>01</span>
+          <div><h2 id="role-title">自分に合う案内を選ぶ</h2><p>同じアカウントで、購入と出品の両方を利用できます。</p></div>
+        </div>
+        <div class="market-role-grid">
+          <a class="market-role-card" href="#buyer">
+            <span class="market-role-card__icon" aria-hidden="true">↓</span>
+            <strong>素材を購入する人</strong>
+            <span>商品内容、料金、利用条件を確認して購入します。</span>
+          </a>
+          <a class="market-role-card" href="#seller">
+            <span class="market-role-card__icon" aria-hidden="true">＋</span>
+            <strong>元素材を販売する人</strong>
+            <span>ファイルと販売条件を登録し、売上の受取設定を行います。</span>
+          </a>
+          <a class="market-role-card" href="#derivative">
+            <span class="market-role-card__icon" aria-hidden="true">↗</span>
+            <strong>派生作品を販売する人</strong>
+            <span>派生販売が許可された購入素材をもとに、新しい作品を出品します。</span>
+          </a>
+        </div>
+      </section>
+
+      <section class="market-info-section" id="buyer" aria-labelledby="buyer-title">
+        <div class="market-section-heading">
+          <span>02</span>
+          <div><h2 id="buyer-title">素材を購入する</h2><p>購入前に「何が含まれるか」と「どこまで使えるか」を確認します。</p></div>
+        </div>
+        <div class="market-guide-flow" aria-label="購入の流れ">
+          <div class="market-guide-step"><b>1</b><strong>探す</strong><span>検索・形式・価格で絞り込む</span></div>
+          <span class="market-guide-arrow" aria-hidden="true">→</span>
+          <div class="market-guide-step"><b>2</b><strong>確認</strong><span>収録物・オプション・派生条件を見る</span></div>
+          <span class="market-guide-arrow" aria-hidden="true">→</span>
+          <div class="market-guide-step"><b>3</b><strong>支払う</strong><span>Stripeの画面で金額を確認する</span></div>
+          <span class="market-guide-arrow" aria-hidden="true">→</span>
+          <div class="market-guide-step"><b>4</b><strong>受け取る</strong><span>マイページの購入済み商品を開く</span></div>
+        </div>
+        <div class="market-help-columns">
+          <div class="market-checklist">
+            <h3>購入前の確認項目</h3>
+            <ul>
+              <li>サムネイルやサンプルは、必要な内容を確認できるか</li>
+              <li>PNG、GIF、WEBP、PiXiEEDrawなど、必要な形式が含まれるか</li>
+              <li>商用利用、加工、派生販売など、必要なオプションが有効か</li>
+              <li>販売価格と有料オプションを合わせた合計額に間違いがないか</li>
+            </ul>
+          </div>
+          <aside class="market-help-callout">
+            <strong>サンプルと販売ファイルは別です</strong>
+            <p>サンプルは内容確認用です。購入後に受け取るファイルやフォルダの一覧は、商品詳細の「収録内容」で確認してください。</p>
+          </aside>
+        </div>
+      </section>
+
+      <section class="market-info-section" id="payment" aria-labelledby="payment-title">
+        <div class="market-section-heading">
+          <span>03</span>
+          <div><h2 id="payment-title">Stripeの決済画面</h2><p>「Stripeで購入する」を押すと、安全な決済画面へ移動します。</p></div>
+        </div>
+        <div class="market-payment-explain">
+          <div class="market-payment-mock" role="img" aria-label="Stripe決済画面で商品名、支払額、メールアドレス、カード情報を確認する位置の例">
+            <div class="market-payment-mock__bar"><span></span><span>安全な決済ページ</span></div>
+            <div class="market-payment-mock__body">
+              <div class="market-payment-mock__summary">
+                <small>支払額</small><strong>¥1,200</strong><span>商品名と合計金額</span>
+              </div>
+              <div class="market-payment-mock__form">
+                <span class="market-mock-label">メールアドレス</span><span class="market-mock-input"></span>
+                <span class="market-mock-label">カード情報</span><span class="market-mock-input market-mock-input--card"></span>
+                <span class="market-mock-button">内容を確認して支払う</span>
+              </div>
+            </div>
+          </div>
+          <div class="market-checklist">
+            <h3>支払う直前に見る場所</h3>
+            <ol>
+              <li><strong>商品名</strong>が選んだ商品と一致している</li>
+              <li><strong>合計金額</strong>が商品詳細で確認した金額と一致している</li>
+              <li><strong>メールアドレス</strong>が受信できるものになっている</li>
+              <li>入力後、支払い完了画面が表示されるまで画面を閉じない</li>
+            </ol>
+          </div>
+        </div>
+        <aside class="market-help-callout market-help-callout--safe">
+          <strong>カード情報の取扱い</strong>
+          <p>カード情報はStripeの決済画面で入力します。PiXiEEDの画面へカード番号を保存する仕組みではありません。商品の支払合計は500円以上で、無料配布は行いません。</p>
+        </aside>
+      </section>
+
+      <section class="market-info-section" aria-labelledby="after-buy-title">
+        <div class="market-section-heading market-section-heading--small">
+          <span>04</span>
+          <div><h2 id="after-buy-title">購入後にすること</h2></div>
+        </div>
+        <div class="market-numbered-list">
+          <div><b>1</b><p><strong>マイページへ戻る</strong><span>購入時と同じPiXiEEDアカウントでログインします。</span></p></div>
+          <div><b>2</b><p><strong>購入済み商品を開く</strong><span>反映されない場合は少し待ってから、ページを再読み込みします。</span></p></div>
+          <div><b>3</b><p><strong>利用条件を再確認する</strong><span>ダウンロードした素材と一緒に、購入時のオプションや派生条件を確認します。</span></p></div>
+        </div>
+      </section>
+
+      <section class="market-info-section" id="seller" aria-labelledby="seller-title">
+        <div class="market-section-heading">
+          <span>05</span>
+          <div><h2 id="seller-title">元素材を出品する</h2><p>公開前の入力と、売上を受け取るための設定を順に行います。</p></div>
+        </div>
+        <div class="market-guide-flow market-guide-flow--seller" aria-label="出品の流れ">
+          <div class="market-guide-step"><b>1</b><strong>販売者設定</strong><span>二段階認証と販売者情報</span></div>
+          <span class="market-guide-arrow" aria-hidden="true">→</span>
+          <div class="market-guide-step"><b>2</b><strong>売上受取</strong><span>Stripeで受取口座を設定</span></div>
+          <span class="market-guide-arrow" aria-hidden="true">→</span>
+          <div class="market-guide-step"><b>3</b><strong>商品作成</strong><span>ファイル・プレビュー・価格</span></div>
+          <span class="market-guide-arrow" aria-hidden="true">→</span>
+          <div class="market-guide-step"><b>4</b><strong>確認・公開</strong><span>権利と表示内容を最終確認</span></div>
+        </div>
+        <div class="market-help-columns">
+          <div class="market-checklist">
+            <h3>出品ファイルとプレビュー</h3>
+            <ul>
+              <li>ファイルまたはフォルダをまとめて追加できます</li>
+              <li>検出した形式は自動でONになり、販売しない形式だけOFFにします</li>
+              <li>代表サムネイルは一覧と商品詳細に使われます</li>
+              <li>視聴用サンプルには、販売データそのものを含めすぎないようにします</li>
+              <li>PiXiEEDrawファイルは、PNGの確認用プレビューを生成します</li>
+            </ul>
+          </div>
+          <div class="market-checklist">
+            <h3>価格と利用オプション</h3>
+            <ul>
+              <li>入力する基本の金額は「販売価格」だけです</li>
+              <li>利用オプションはON/OFFで選び、ONの最低料金が合計へ加算されます</li>
+              <li>オプション料金を変える場合だけ「詳細設定」を開きます</li>
+              <li>公開前に、自分が販売・再配布する権利を持つことを確認します</li>
+            </ul>
+          </div>
+        </div>
+        <aside class="market-help-callout market-help-callout--warning">
+          <strong>本人確認と売上受取は別の確認です</strong>
+          <p>PiXiEEDの販売者情報は出品資格の確認に使います。売上受取に必要な情報や口座はStripe側で設定します。PiXiEED上の入力だけでは売上受取設定は完了しません。</p>
+        </aside>
+      </section>
+
+      <section class="market-info-section" id="derivative" aria-labelledby="derivative-title">
+        <div class="market-section-heading">
+          <span>06</span>
+          <div><h2 id="derivative-title">派生作品を出品する</h2><p>許可された素材から新しい作品を作り、元作品とのつながりを保ったまま販売します。</p></div>
+        </div>
+        <div class="market-lineage-flow" aria-label="元素材から派生作品、次の派生作品へ継承される流れ">
+          <div><span>ORIGINAL</span><strong>元素材</strong><small>作者 A</small></div>
+          <i aria-hidden="true">派生許可<br>＋ 購入</i>
+          <div><span>DERIVED</span><strong>派生作品</strong><small>作者 B</small></div>
+          <i aria-hidden="true">系譜を継承</i>
+          <div><span>NEXT</span><strong>次の派生</strong><small>作者 C</small></div>
+        </div>
+        <div class="market-help-columns">
+          <div class="market-checklist">
+            <h3>派生販売を始める条件</h3>
+            <ul>
+              <li>元の商品で派生販売が許可されている</li>
+              <li>対象商品を自分のアカウントで購入済みである</li>
+              <li>元素材をそのまま再配布するのではなく、新しい制作物になっている</li>
+              <li>出品時に元の商品を正しく指定する</li>
+            </ul>
+          </div>
+          <div class="market-checklist">
+            <h3>販売後の考え方</h3>
+            <ul>
+              <li>商品ページには元作品とのつながりが表示されます</li>
+              <li>売上は設定された系譜配分に従って関係作者へ配分されます</li>
+              <li>派生販売のためだけの追加ライセンス料を別に入力する必要はありません</li>
+              <li>通常利用の有料オプションは、商品価格へ合算されます</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="market-info-section" aria-labelledby="badges-title">
+        <div class="market-section-heading market-section-heading--small">
+          <span>07</span>
+          <div><h2 id="badges-title">表示と認証の見方</h2></div>
+        </div>
+        <div class="market-badge-guide">
+          <div><span class="market-demo-badge">PiXiEED認証</span><p><strong>制作経路を確認</strong><small>PiXiEED対応機能から記録された制作情報を確認できる商品です。商品の品質保証や本人確認そのものを意味する表示ではありません。</small></p></div>
+          <div><span class="market-demo-badge market-demo-badge--seller">販売者設定済み</span><p><strong>出品に必要な設定を確認</strong><small>販売者情報や必要なセキュリティ設定が完了している状態です。個々の商品内容や権利をPiXiEEDが保証する表示ではありません。</small></p></div>
+          <div><span class="market-demo-badge market-demo-badge--derived">派生作品</span><p><strong>元作品との系譜あり</strong><small>元となった商品が登録され、派生のつながりを確認できる商品です。</small></p></div>
+        </div>
+      </section>
+
+      <section class="market-info-section" aria-labelledby="sales-title">
+        <div class="market-section-heading market-section-heading--small">
+          <span>08</span>
+          <div><h2 id="sales-title">売上・返金・問題が起きた場合</h2></div>
+        </div>
+        <div class="market-help-columns">
+          <div class="market-checklist">
+            <h3>販売者の売上</h3>
+            <ul>
+              <li>売上は購入直後に受取可能になるとは限りません</li>
+              <li>保留期間、最低支払額、支払予定は販売者画面で確認します</li>
+              <li>Stripeの受取設定が未完了の場合、支払いを受け取れません</li>
+            </ul>
+          </div>
+          <div class="market-checklist">
+            <h3>購入や商品に問題がある場合</h3>
+            <ul>
+              <li>二重決済や購入履歴へ反映されない場合、再購入せずお問い合わせください</li>
+              <li>注文番号、商品名、発生日時を添えると確認が早くなります</li>
+              <li>返金可否は商品の状態と利用規約に基づいて確認されます</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="market-info-section" id="faq" aria-labelledby="faq-title">
+        <div class="market-section-heading">
+          <span>09</span>
+          <div><h2 id="faq-title">よくある質問</h2><p>項目を押すと回答が開きます。</p></div>
+        </div>
+        <div class="market-faq">
+          <details><summary>購入ボタンを押したのに決済画面が開きません</summary><p>ログイン状態と通信環境を確認し、ページを再読み込みしてください。ブラウザの戻る操作を繰り返した直後は、商品詳細からもう一度操作してください。解決しない場合は再購入せずお問い合わせください。</p></details>
+          <details><summary>支払いは完了しましたが、購入済み商品に表示されません</summary><p>決済結果の反映に少し時間がかかる場合があります。購入時と同じアカウントでログインしているか確認し、少し待ってからマイページを再読み込みしてください。</p></details>
+          <details><summary>Googleログインでも購入履歴は残りますか</summary><p>はい。同じGoogleアカウントでログインすれば、PiXiEEDアカウントに紐づいた購入履歴を確認できます。別のログイン方法で別アカウントを作らないようご注意ください。</p></details>
+          <details><summary>ファイル形式は自分で一つずつ選びますか</summary><p>追加したファイルやフォルダから形式を自動検出し、該当するスイッチをONにします。販売対象から外したい形式だけOFFにしてください。</p></details>
+          <details><summary>派生販売できる商品はどこで分かりますか</summary><p>商品詳細の「派生販売」表示で確認できます。許可表示がない商品や、購入していない商品を元に派生出品することはできません。</p></details>
+          <details><summary>出品時に住所や本名は商品ページへ公開されますか</summary><p>販売者設定で入力する情報のすべてが商品ページへそのまま公開されるわけではありません。公開項目と法令上必要な表示は、入力画面の案内と各ポリシーを確認してください。</p></details>
+          <details><summary>「？」はスマートフォンでも使えますか</summary><p>使えます。「？」をタップすると説明が開き、画面の別の場所をタップすると閉じます。パソコンではカーソルを重ねるか、Tabキーで選択しても表示できます。</p></details>
+        </div>
+      </section>
+
+      <section class="market-info-section market-support-section" aria-labelledby="support-title">
+        <div>
+          <h2 id="support-title">解決しない場合</h2>
+          <p>注文番号、商品名、使用端末、発生した操作、画面に出たメッセージを添えてご連絡ください。カード番号やパスワードは送らないでください。</p>
+        </div>
+        <a class="market-support-button" href="../contact/index.html">お問い合わせ</a>
+      </section>
+
+      <nav class="market-info-nav" aria-label="関連ページ">
+        <a href="index.html">マーケットへ戻る</a>
+        <a href="about.html">マーケットとは</a>
+        <a href="seller.html">販売者設定</a>
+        <a href="sell.html">出品する</a>
+        <a href="../terms/index.html">利用規約</a>
+        <a href="../privacy/index.html">プライバシーポリシー</a>
+      </nav>
+    </main>
+  </div>
+  <script src="../scripts/shared-bottom-nav.js?v=2026.07.17-market-public32"></script>
+</body>
+</html>

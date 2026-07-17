@@ -59,10 +59,11 @@ assert.doesNotMatch(sharedTopAd, /ins\.adsbygoogle[^\{]*\{[^}]*transform:\s*rota
   'the shared stylesheet does not directly rotate ins elements');
 assert.doesNotMatch(sharedTopAd, /iframe[^\{]*\{[^}]*transform:\s*rotate/i,
   'the shared stylesheet does not directly rotate generated iframes');
-const exportSideAd = css.slice(
-  css.indexOf('@media (min-width: 900px) and (orientation: landscape) {', css.indexOf('.export-dialog-body')),
-  css.indexOf('.mobile-topbar')
+const exportSideAdStart = css.indexOf(
+  '@media (min-width: 560px) and (orientation: landscape) {',
+  css.indexOf('.export-dialog-body'),
 );
+const exportSideAd = css.slice(exportSideAdStart, css.indexOf('.mobile-topbar', exportSideAdStart));
 assert.match(exportSideAd, /\.export-dialog-body__ad \.export-ad__slot \.(?:adsbygoogle|export-ad__slot)/);
 assert.match(exportSideAd, /\.export-dialog-body__ad \.export-ad__slot \{[\s\S]*?width: 100%;[\s\S]*?height: 100%;[\s\S]*?flex: 1 1 auto;/);
 assert.match(exportSideAd, /\.export-dialog-body__ad \.export-ad__slot \.adsbygoogle,[\s\S]*?width: 100% !important;[\s\S]*?height: 100% !important;/);

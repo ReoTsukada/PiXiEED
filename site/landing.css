@@ -57,7 +57,8 @@ body:has(.home-app) {
   max-inline-size: 100%;
 }
 body:has(.home-app) > .page {
-  max-width: 100%;
+  max-width: min(1280px, 100%);
+  margin-inline: auto;
 }
 a { color: inherit; text-decoration: none; }
 .sr-only {
@@ -2151,6 +2152,9 @@ body.project-tool-window .section {
 }
 
 @media (max-width: 720px) {
+  .home-hero-card--image {
+    min-height: clamp(270px, 78vw, 330px);
+  }
   .home-hero-slide {
     background-position: center center;
   }
@@ -2168,7 +2172,10 @@ body.project-tool-window .section {
     line-height: 1.08;
   }
   .home-hero-slide__copy {
-    display: none;
+    display: block;
+    max-width: 30ch;
+    font-size: 11px;
+    line-height: 1.45;
   }
   .home-hero-actions {
     max-width: 180px;
@@ -2300,6 +2307,9 @@ body.project-tool-window .section {
     grid-template-columns: minmax(0, 1.58fr) minmax(320px, 0.82fr);
     align-items: start;
     gap: 0;
+  }
+  .home-desktop-grid--single {
+    grid-template-columns: minmax(0, 1fr);
   }
   .home-hero-card--image {
     margin-top: 10px;
@@ -2932,5 +2942,96 @@ body:has(.home-app){
   }
   .home-app-grid--launcher .home-app-tile{
     min-height:112px;
+  }
+}
+
+/* Home hero: keep the page, artwork, and copy centered as one stable unit. */
+body:has(.home-app) > .page{
+  width:min(1120px, 100%);
+  max-width:1120px;
+  margin-inline:auto;
+  justify-items:center;
+}
+body:has(.home-app) .home-app,
+body:has(.home-app) .home-screen,
+body:has(.home-app) .home-desktop-grid,
+body:has(.home-app) .home-primary-stack{
+  width:100%;
+  max-width:1120px;
+  margin-inline:auto;
+}
+body:has(.home-app) .home-hero-slide img{
+  inset:0;
+  object-position:center center;
+  transform:none!important;
+  transition:none!important;
+  animation:none!important;
+}
+body:has(.home-app) .home-hero-slide__content{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  min-height:0;
+  display:grid;
+  place-items:end center;
+  text-align:center;
+}
+body:has(.home-app) .home-hero-surface{
+  width:min(620px, 100%);
+  max-width:620px;
+  margin-inline:auto;
+  justify-items:center;
+}
+body:has(.home-app) .home-hero-slide__title{
+  max-width:none;
+  display:grid;
+  justify-items:center;
+  gap:3px;
+}
+.home-hero-slide__brand{
+  font-family:'Fredoka','DotGothic16',system-ui,sans-serif;
+  font-size:1.28em;
+  line-height:1;
+  letter-spacing:.035em;
+}
+.home-hero-slide__tagline{
+  font-size:.64em;
+  line-height:1.2;
+  letter-spacing:0;
+}
+body:has(.home-app) .home-hero-slide__copy{
+  max-width:44ch;
+  text-align:center;
+}
+body:has(.home-app) .home-hero-tags{
+  justify-content:center;
+}
+@media (orientation:landscape){
+  body:has(.home-app) > .page,
+  body:has(.home-app) .home-app,
+  body:has(.home-app) .home-screen,
+  body:has(.home-app) .home-desktop-grid,
+  body:has(.home-app) .home-primary-stack{
+    width:min(1120px, 100%);
+    max-width:1120px;
+    margin-inline:auto;
+  }
+  body:has(.home-app) .home-hero-card--image{
+    height:clamp(300px, 62dvh, 520px);
+    min-height:300px;
+    max-height:520px;
+    aspect-ratio:auto;
+  }
+}
+@media (max-width:720px){
+  body:has(.home-app) .home-hero-surface{
+    width:min(100%, 290px);
+  }
+  body:has(.home-app) .home-hero-slide__title{
+    font-size:24px;
+  }
+  body:has(.home-app) .home-hero-slide__copy{
+    max-width:30ch;
   }
 }

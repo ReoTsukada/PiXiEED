@@ -13,6 +13,8 @@ const includeEntries = [
   'account',
   'account-deletion',
   'assets',
+  'bought.png',
+  'Camera.png',
   'character-dots',
   'contact',
   'contest',
@@ -26,6 +28,9 @@ const includeEntries = [
   'gla1_frame_01.png',
   'gla1_frame_02.png',
   'glossary',
+  'help',
+  'help.png',
+  'HOME.png',
   'icon',
   'icon-e1_frame_01.png',
   'icon-e1_frame_02.png',
@@ -35,6 +40,8 @@ const includeEntries = [
   'images',
   'index.html',
   'maoitu',
+  'market',
+  'Market.png',
   'manifest.webmanifest',
   'notes',
   'notice',
@@ -44,14 +51,18 @@ const includeEntries = [
   'portfolio',
   'privacy',
   'projects',
+  'QR.png',
+  'qr',
   'qr-maker',
   'robots.txt',
   'scripts',
   'scripts.js',
+  'Search.png',
   'site',
   'sitemap.xml',
   'styles.css',
-  'terms'
+  'terms',
+  'Word.png'
 ];
 
 async function pathExists(targetPath) {

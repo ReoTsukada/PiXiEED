@@ -27,8 +27,11 @@ assert.equal(resolveEdition('dev', { embed: true }).shouldShowAds, false, 'embed
 assert.deepEqual(resolveEdition('unexpected'), { edition: 'dev', ads: true, shouldShowAds: true });
 assert.match(editionSource, /classList\.remove\('pixieed-adfree'\)/);
 
+const exportDialogSource = read('PiXiEEDrawDEV/assets/js/modules/export-dialog-workflow-utils.js');
+assert.match(exportDialogSource, /__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__/);
+assert.doesNotMatch(exportDialogSource, /pixieedAdFree\?\.state\?\.isActive/);
+
 for (const relativePath of [
-  'PiXiEEDrawDEV/assets/js/modules/export-dialog-workflow-utils.js',
   'PiXiEEDrawDEV/assets/js/modules/startup-workflow-utils.js',
   'PiXiEEDrawDEV/assets/js/modules/recent-project-workflow-utils.js',
 ]) {

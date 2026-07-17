@@ -76,16 +76,11 @@
       return true;
     }
     if (action === TOP_UI_ACTION_OPEN_DETAILS_PANEL) {
-      if (layoutMode === 'mobilePortrait') {
-        return activateMobileTab('details', { ensureDrawer: true });
+      if (typeof window.PiXiEEDCommonTabBar?.openDetails === 'function') {
+        window.PiXiEEDCommonTabBar.openDetails();
+        return true;
       }
-      setRightTab('details');
-      if (isDesktopRightToolRailMode()) {
-        setCompactRightFlyoutOpen(true);
-        updateRightTabVisibility();
-        setRightUtilityMenuOpen(false);
-      }
-      return true;
+      return false;
     }
     return false;
   }

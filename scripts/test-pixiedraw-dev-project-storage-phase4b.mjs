@@ -5,7 +5,7 @@ import vm from 'node:vm';
 
 const repoRoot = '/Users/tsukadareine/Documents/GitHub/PiXiEED';
 const V1_ADAPTER_ID = 'pixieedraw-v1-json';
-const V2_ADAPTER_ID = 'pixieedraw-v2-zip-experimental';
+const V2_ADAPTER_ID = 'pixieedraw-v2-zip';
 const originalConsole = globalThis.console;
 
 function loadBrowserModule(relativePath) {
@@ -109,6 +109,15 @@ function createExportRenderingHarness({ flagEnabled = false } = {}) {
     buildProjectSessionPayload() {
       return session;
     },
+    async buildProjectSessionPayloadWithPersistedTimelapse() {
+      return {
+        ...session,
+        timelapse: {
+          ...session.timelapse,
+          synchronization: { complete: true },
+        },
+      };
+    },
     getExportFileNameBase() {
       return 'phase4b-sample.pixieedraw';
     },
@@ -123,7 +132,7 @@ function createExportRenderingHarness({ flagEnabled = false } = {}) {
         },
         blob: new Blob(['phase4b'], { type: PROJECT_FILE_MIME_TYPE }),
         filename: 'phase4b-sample.pixieedraw',
-        adapterId: options?.preferredAdapterId || V1_ADAPTER_ID,
+        adapterId: options?.preferredAdapterId || V2_ADAPTER_ID,
         workerUsed: options?.useWorker === true,
       };
     },
@@ -215,8 +224,8 @@ const appSource = fs.readFileSync(
   'utf8'
 );
 assert.match(appSource, /defaultAdapterId:\s*pixieeDrawV2ZipAdapter\?\.id\s*\|\|\s*pixieeDrawV1JsonAdapter\?\.id\s*\|\|\s*''/);
-assert.match(appSource, /window\.__pixieedrawSetV2ProjectSaveEnabled/);
-assert.match(appSource, /window\.__pixieedrawGetV2ProjectSaveStatus/);
+assert.doesNotMatch(appSource, /window\.__pixieedrawSetV2ProjectSaveEnabled/);
+assert.doesNotMatch(appSource, /window\.__pixieedrawGetV2ProjectSaveStatus/);
 
 const flagOffHarness = createExportRenderingHarness({ flagEnabled: false });
 const flagOffResult = await flagOffHarness.exportRenderingModule.saveProjectAsPixieedraw({
@@ -225,6 +234,8 @@ const flagOffResult = await flagOffHarness.exportRenderingModule.saveProjectAsPi
 assert.equal(flagOffResult.saved, true);
 assert.equal(flagOffResult.storageAdapterId, V2_ADAPTER_ID);
 assert.equal(flagOffHarness.serializedOptions[0]?.preferredAdapterId, V2_ADAPTER_ID);
+assert.equal(flagOffHarness.serializedOptions[0]?.includeSheets, false);
+assert.equal(flagOffHarness.serializedOptions[0]?.useWorker, true);
 assert.equal(flagOffHarness.handleCreateWritableCalls, 0);
 assert.equal(flagOffHarness.storeAutosaveHandleCalls, 0);
 assert.equal(flagOffHarness.recentProjectCalls, 0);
@@ -237,6 +248,8 @@ const flagOnResult = await flagOnHarness.exportRenderingModule.saveProjectAsPixi
 assert.equal(flagOnResult.saved, true);
 assert.equal(flagOnResult.storageAdapterId, V2_ADAPTER_ID);
 assert.equal(flagOnHarness.serializedOptions[0]?.preferredAdapterId, V2_ADAPTER_ID);
+assert.equal(flagOnHarness.serializedOptions[0]?.includeSheets, false);
+assert.equal(flagOnHarness.serializedOptions[0]?.useWorker, true);
 assert.equal(flagOnHarness.handleCreateWritableCalls, 0);
 assert.equal(flagOnHarness.storeAutosaveHandleCalls, 0);
 assert.equal(flagOnHarness.recentProjectCalls, 0);
@@ -244,18 +257,6 @@ assert.equal(flagOnHarness.triggerCalls.length, 1);
 assert.equal(flagOnHarness.triggerCalls[0]?.filename, 'phase4b-sample.pixieedraw');
 assert.equal(flagOnHarness.markDocumentDurablySavedCalls, 1);
 assert.equal(flagOnHarness.setTrackedProjectDotBaselineCalls, 1);
-assert.ok(
-  flagOnHarness.consoleCapture.info.some(entry => entry.includes('[PiXiEEDraw DEV] V2 project save flag enabled'))
-);
-assert.ok(
-  flagOnHarness.consoleCapture.info.some(entry => entry.includes(`selected adapter id: ${V2_ADAPTER_ID}`))
-);
-assert.ok(
-  flagOnHarness.consoleCapture.info.some(entry => entry.includes('save as new file: true'))
-);
-assert.ok(
-  flagOnHarness.consoleCapture.info.some(entry => entry.includes('worker used: true'))
-);
 
 globalThis.console = originalConsole;
 originalConsole.log('Phase 4-B DEV V2 project save flag checks passed.');

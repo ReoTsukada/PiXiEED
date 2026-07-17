@@ -25,7 +25,8 @@ assert.match(palette, /layer\.importSourceDirect instanceof Uint8ClampedArray/);
 assert.match(palette, /layer\.importSourceDirect = null/);
 
 assert.match(documentModel, /importSourceDirect: encodeTypedArray\(layer\.importSourceDirect\)/);
-assert.match(documentModel, /const sourceBytes = decodeBase64\(layer\.importSourceDirect\)/);
+assert.match(documentModel, /importSourceDirect = deserializeRasterTypedArray\(\s*layer\.importSourceDirect,/);
+assert.match(documentModel, /direct = promoteLegacyImportSourceDirect\(direct, importSourceDirect, pixelCount \* 4\)/);
 assert.match(history, /importSourceDirect: layer\.importSourceDirect \? compressUint8Array/);
 assert.match(codec, /normalizeBitmapPayload\(layer\.importSourceDirect/);
 assert.match(codec, /nextLayer\.importSourceDirect =/);

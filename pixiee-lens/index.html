@@ -127,7 +127,7 @@
       --lens-ad-banner-height: max(50px, calc(var(--lens-ad-banner-width) / var(--lens-ad-aspect-ratio)));
       --lens-ad-banner-gap: 6px;
       --lens-ad-banner-top: 6px;
-      --ad-header-offset: calc(var(--lens-ad-banner-height) + var(--lens-ad-banner-gap));
+      --ad-header-offset: calc(var(--pixieed-top-ad-offset, 0px) + var(--pixieed-common-tabbar-height, 48px) + 6px);
       --ad-side-offset: 0px;
     }
     * {
@@ -452,14 +452,14 @@
       overflow:hidden;
     }
     body.is-landscape {
-      --ad-header-offset: 0px;
+      --ad-header-offset: calc(var(--pixieed-top-ad-offset, 0px) + var(--pixieed-common-tabbar-height, 48px) + 6px);
       --lens-ad-banner-height: calc(var(--viewport-height) - var(--safe-top) - var(--safe-bottom) - (var(--lens-ad-inline-padding) * 2));
       --lens-ad-banner-width: clamp(
         var(--lens-ad-landscape-min-width),
         calc(var(--lens-ad-banner-height) / var(--lens-ad-landscape-aspect-ratio)),
         min(var(--lens-ad-landscape-max-width), calc(var(--viewport-width) * 0.34))
       );
-      --ad-side-offset: calc(var(--lens-ad-banner-width) + var(--lens-ad-banner-gap));
+      --ad-side-offset: 0px;
     }
     body.is-landscape .lens-ad-banner {
       top: calc(var(--vv-offset-top) + (var(--viewport-height) / 2));
@@ -497,14 +497,14 @@
     }
     @media (orientation: landscape) {
       :root {
-        --ad-header-offset: 0px;
+        --ad-header-offset: calc(var(--pixieed-top-ad-offset, 0px) + var(--pixieed-common-tabbar-height, 48px) + 6px);
         --lens-ad-banner-height: calc(var(--viewport-height) - var(--safe-top) - var(--safe-bottom) - (var(--lens-ad-inline-padding) * 2));
         --lens-ad-banner-width: clamp(
           var(--lens-ad-landscape-min-width),
           calc(var(--lens-ad-banner-height) / var(--lens-ad-landscape-aspect-ratio)),
           min(var(--lens-ad-landscape-max-width), calc(var(--viewport-width) * 0.34))
         );
-        --ad-side-offset: calc(var(--lens-ad-banner-width) + var(--lens-ad-banner-gap));
+        --ad-side-offset: 0px;
       }
       .lens-ad-banner {
         top: calc(var(--vv-offset-top) + (var(--viewport-height) / 2));
@@ -2537,15 +2537,6 @@
 <link rel="apple-touch-icon" href="/icon/PiXiEED.icon512.png"/>
 </head>
 <body>
-<div class="lens-ad-banner" aria-label="広告">
-  <div class="ad-block">
-    <ins class="adsbygoogle"
-         style="display:block"
-         data-ad-client="ca-pub-9801602250480253"
-         data-ad-slot="2141591954"></ins>
-    <small class="ad-label">広告</small>
-  </div>
-</div>
 <main>
 <video autoplay="" id="cameraFeed" muted="" playsinline=""></video>
 <canvas class="dot-canvas" hidden="" id="dotCanvas"></canvas>
@@ -12448,7 +12439,7 @@
       });
     })();
   </script>
-  <script src="../scripts/shared-bottom-nav.js?v=20260713-051" data-pixieed-footer-ad="false"></script>
+  <script src="../scripts/shared-bottom-nav.js?v=2026.07.17-market-public32"></script>
   <script src="../scripts/tool-fullscreen.js"></script>
   <script src="../scripts/pixel-art-fit.js"></script>
 </body>

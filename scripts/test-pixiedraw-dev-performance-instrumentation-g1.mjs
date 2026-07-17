@@ -24,7 +24,6 @@ for (const phase of [
   'pixiedraw-dev:autosave:total',
   'pixiedraw-dev:autosave:make-history-snapshot',
   'pixiedraw-dev:autosave:record-recent-project',
-  'pixiedraw-dev:autosave:v2-shadow-queue',
 ]) {
   assert.ok(autosave.includes(phase), `missing autosave performance phase: ${phase}`);
 }

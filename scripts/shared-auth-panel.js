@@ -34,6 +34,7 @@
   let supportsProfileXUrl = true;
   let authListenerBound = false;
   let authHealthCheckPromise = null;
+  let authMode = 'login';
   const AVATARS = [
     { id: 'mao', src: '../character-dots/maousama.png' },
     { id: 'jerin1', src: '../character-dots/Jerin1.png' },
@@ -183,7 +184,9 @@
   }
 
   function setStatus(message) {
-    const status = document.getElementById('authAccountStatus');
+    const status = document.body?.dataset.pixieedAccountAuth === 'signed-in'
+      ? document.querySelector('.account-page #authStatus') || document.getElementById('authAccountStatus')
+      : document.getElementById('authAccountStatus');
     if (status) {
       status.textContent = message || '';
     }
@@ -220,6 +223,18 @@
     }
   }
 
+  function getPasswordRecoveryRedirectUrl() {
+    try {
+      const url = new URL(window.location.href);
+      url.pathname = '/account/';
+      url.search = '';
+      url.hash = '';
+      return url.toString();
+    } catch (_error) {
+      return 'https://pixieed.jp/account/';
+    }
+  }
+
   function updateHeaderLabel() {
     const brandUser = document.getElementById('brandUser');
     if (!brandUser) return;
@@ -227,7 +242,7 @@
       brandUser.textContent = loadNickname() || supabaseUser.email;
       return;
     }
-    brandUser.textContent = loadNickname() || 'ユーザー';
+    brandUser.textContent = 'マイページ';
   }
 
   function renderAvatarChoices() {
@@ -290,6 +305,17 @@
     const xInput = document.getElementById('profileX');
     if (xInput && document.activeElement !== xInput) {
       xInput.value = xUrl;
+    }
+
+    const xPreview = document.getElementById('profileXPreview');
+    if (xPreview) {
+      xPreview.hidden = !xUrl;
+      xPreview.href = xUrl || '#';
+    }
+
+    const profileEmail = document.getElementById('profileEmail');
+    if (profileEmail) {
+      profileEmail.value = supabaseUser?.email || '';
     }
 
     renderAvatarChoices();
@@ -366,6 +392,18 @@
       return AUTH_URL_PARAM_KEYS.some((key) => hashParams.has(key));
     } catch (_error) {
       return false;
+    }
+  }
+
+  function getOAuthErrorMessage() {
+    try {
+      const url = new URL(window.location.href);
+      const queryError = url.searchParams.get('error_description') || url.searchParams.get('error');
+      if (queryError) return queryError;
+      const hash = new URLSearchParams(String(url.hash || '').replace(/^#/, ''));
+      return hash.get('error_description') || hash.get('error') || '';
+    } catch (_error) {
+      return '';
     }
   }
 
@@ -507,14 +545,18 @@
     const emailInput = document.getElementById('authEmail');
     const passInput = document.getElementById('authPasscode');
     const linkedEmail = document.getElementById('linkedEmail');
+    const magicLinkBtn = document.getElementById('authMagicLinkBtn');
+    const resetBtn = document.getElementById('authResetBtn');
     const nickname = loadNickname();
 
-    if (supabaseUser) {
+    if (supabaseUser && authMode !== 'update-password') {
       if (loginBtn) loginBtn.style.display = 'none';
       if (logoutBtn) logoutBtn.style.display = 'block';
       if (authInputs) authInputs.style.display = 'none';
       if (emailToggle) emailToggle.style.display = 'none';
       if (socialButtons) socialButtons.style.display = 'none';
+      if (magicLinkBtn) magicLinkBtn.style.display = 'none';
+      if (resetBtn) resetBtn.style.display = 'none';
       if (emailInput) {
         emailInput.value = supabaseUser.email || emailInput.value;
         emailInput.disabled = true;
@@ -529,21 +571,92 @@
       }
       setStatus(`ログイン中${supabaseUser.email ? `: ${supabaseUser.email}` : ''}${nickname ? ` / ${nickname}` : ''}`);
     } else {
-      const emailExpanded = authInputs?.dataset.expanded === 'true';
-      if (loginBtn) loginBtn.style.display = emailExpanded ? '' : 'none';
+      if (loginBtn) loginBtn.style.display = '';
       if (logoutBtn) logoutBtn.style.display = 'none';
-      if (authInputs) authInputs.style.display = emailExpanded ? 'grid' : 'none';
-      if (emailToggle) emailToggle.style.display = '';
+      if (authInputs) authInputs.style.display = 'grid';
+      if (emailToggle) emailToggle.style.display = 'none';
       if (socialButtons) socialButtons.style.display = 'grid';
+      if (magicLinkBtn) magicLinkBtn.style.display = authMode === 'login' ? '' : 'none';
+      if (resetBtn) resetBtn.style.display = authMode === 'login' ? '' : 'none';
       if (emailInput) emailInput.disabled = false;
       if (passInput) passInput.disabled = false;
       if (linkedEmail) {
         linkedEmail.style.display = 'none';
         linkedEmail.textContent = '';
       }
-      setStatus(nickname ? `ニックネーム: ${nickname}` : '');
+      setStatus('');
+      setAuthMode(authMode);
     }
     updateHeaderLabel();
+    updateAccountPageAuthState();
+  }
+
+  function setAuthMode(nextMode) {
+    authMode = ['login', 'signup', 'reset', 'update-password'].includes(nextMode) ? nextMode : 'login';
+    const isSignup = authMode === 'signup';
+    const isReset = authMode === 'reset';
+    const isUpdatePassword = authMode === 'update-password';
+    const titles = {
+      login: ['ログイン', 'PiXiEED IDを使う', 'ログインすると、購入済み素材とプロフィールを安全に引き継げます。'],
+      signup: ['新規登録', 'PiXiEED IDを作成', 'メールアドレスまたはGoogleで、無料でPiXiEED IDを作成できます。'],
+      reset: ['パスワードを再設定', 'メールで本人確認', '登録済みのメールアドレスに、再設定用のリンクを送信します。'],
+      'update-password': ['新しいパスワードを設定', '本人確認済み', '新しいパスワードを入力して、アカウントの安全を保ってください。'],
+    };
+    const [title, description, copy] = titles[authMode];
+    const titleNode = document.getElementById('authModeTitle');
+    const descriptionNode = document.getElementById('authModeDescription');
+    const copyNode = document.getElementById('authModeCopy');
+    if (titleNode) titleNode.textContent = title;
+    if (descriptionNode) descriptionNode.textContent = description;
+    if (copyNode) copyNode.textContent = copy;
+    document.querySelectorAll('[data-auth-mode]').forEach((button) => {
+      const active = button.dataset.authMode === authMode;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-selected', String(active));
+    });
+    const passcodeField = document.getElementById('authPasscodeField');
+    const passcodeConfirmField = document.getElementById('authPasscodeConfirmField');
+    const passcodeLabel = document.getElementById('authPasscodeLabel');
+    const emailInput = document.getElementById('authEmail');
+    const passcodeInput = document.getElementById('authPasscode');
+    const passcodeConfirmInput = document.getElementById('authPasscodeConfirm');
+    const socialButtons = document.getElementById('authSocialButtons');
+    const providerNote = document.getElementById('authProviderNote');
+    const securityNote = document.getElementById('authSecurityNote');
+    const googleButtonLabel = document.getElementById('authGoogleButtonLabel');
+    const loginBtn = document.getElementById('authLoginBtn');
+    const magicLinkBtn = document.getElementById('authMagicLinkBtn');
+    const resetBtn = document.getElementById('authResetBtn');
+    if (passcodeField) passcodeField.hidden = isReset;
+    if (passcodeConfirmField) passcodeConfirmField.hidden = !(isSignup || isUpdatePassword);
+    if (emailInput) emailInput.closest('.auth-field')?.toggleAttribute('hidden', isUpdatePassword);
+    if (passcodeLabel) passcodeLabel.textContent = isUpdatePassword ? '新しいパスワード' : 'パスワード';
+    if (passcodeInput) passcodeInput.autocomplete = isSignup || isUpdatePassword ? 'new-password' : 'current-password';
+    if (passcodeConfirmInput) passcodeConfirmInput.autocomplete = isSignup || isUpdatePassword ? 'new-password' : 'off';
+    if (socialButtons) socialButtons.style.display = isReset || isUpdatePassword ? 'none' : 'grid';
+    if (providerNote) providerNote.hidden = isReset || isUpdatePassword;
+    if (securityNote) {
+      securityNote.textContent = isSignup
+        ? '登録後、確認メールが届く場合があります。メール内の案内を完了してください。'
+        : isReset
+          ? 'アカウントが存在する場合のみ、再設定用リンクがメールで届きます。'
+          : isUpdatePassword
+            ? '更新後は、新しいパスワードでログインしてください。'
+            : 'ログインではアカウントは作成されません。初めての方は「新規登録」を選んでください。';
+    }
+    if (googleButtonLabel) googleButtonLabel.textContent = isSignup ? 'Googleで新規登録' : 'Googleで続ける';
+    if (loginBtn) loginBtn.textContent = isSignup ? 'アカウントを作成' : isReset ? '再設定メールを送信' : isUpdatePassword ? 'パスワードを更新' : 'ログイン';
+    if (magicLinkBtn) magicLinkBtn.style.display = authMode === 'login' ? '' : 'none';
+    if (resetBtn) resetBtn.style.display = authMode === 'login' ? '' : 'none';
+  }
+
+  function updateAccountPageAuthState() {
+    const accountPage = document.querySelector('.account-page');
+    if (!accountPage) return;
+    const signedIn = Boolean(supabaseUser) && authMode !== 'update-password';
+    document.body.dataset.pixieedAccountAuth = signedIn ? 'signed-in' : 'signed-out';
+    const title = document.getElementById('accountTitle');
+    if (title) title.textContent = signedIn ? 'マイページ' : 'ログイン';
   }
 
   async function signInWithProvider(provider, label) {
@@ -606,27 +719,37 @@
   function readAuthInputs() {
     const emailInput = document.getElementById('authEmail');
     const passInput = document.getElementById('authPasscode');
+    const passConfirmInput = document.getElementById('authPasscodeConfirm');
     return {
       email: String(emailInput?.value || '').trim(),
       passcode: String(passInput?.value || '').trim(),
+      passcodeConfirmation: String(passConfirmInput?.value || '').trim(),
     };
   }
 
   async function validateAuthInputs() {
-    const { email, passcode } = readAuthInputs();
-    if (!email) {
+    const { email, passcode, passcodeConfirmation } = readAuthInputs();
+    if (authMode !== 'update-password' && !email) {
       setStatus('メールアドレスを入力してください');
       return null;
     }
+    if (authMode === 'reset') {
+      return { email, passcode: '', passcodeConfirmation: '' };
+    }
     if (!passcode) {
-      await sendLoginLink(email);
+      setStatus('パスワードを入力してください');
       return null;
     }
-    if (passcode.length < 6 || passcode.length > 20) {
-      setStatus('パスコードは6〜20文字で入力してください');
+    const minimumLength = authMode === 'login' ? 6 : 8;
+    if (passcode.length < minimumLength) {
+      setStatus(`パスワードは${minimumLength}文字以上で入力してください`);
       return null;
     }
-    return { email, passcode };
+    if ((authMode === 'signup' || authMode === 'update-password') && passcode !== passcodeConfirmation) {
+      setStatus('確認用パスワードが一致しません');
+      return null;
+    }
+    return { email, passcode, passcodeConfirmation };
   }
 
   async function ensureAuthServiceReachable() {
@@ -644,6 +767,29 @@
         authHealthCheckPromise = null;
       });
     return authHealthCheckPromise;
+  }
+
+  async function sendPasswordResetEmail(email) {
+    if (!supabaseClient) {
+      setStatus('オンラインでログインしてください');
+      return false;
+    }
+    if (!(await ensureAuthServiceReachable())) {
+      setStatus('現在ログインサーバーに接続できません。時間をおいて再試行してください');
+      return false;
+    }
+    setStatus('再設定メールを送信しています...');
+    try {
+      const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+        redirectTo: getPasswordRecoveryRedirectUrl(),
+      });
+      if (error) throw error;
+      setStatus('アカウントが存在する場合、再設定用リンクを送信しました。メールを確認してください');
+      return true;
+    } catch (_error) {
+      setStatus('再設定メールを送信できませんでした。時間をおいて再試行してください');
+      return false;
+    }
   }
 
   async function saveProfileToServer() {
@@ -723,21 +869,40 @@
       });
     });
 
+    document.querySelectorAll('[data-auth-mode]').forEach((button) => {
+      if (button.dataset.bound === 'true') return;
+      button.dataset.bound = 'true';
+      button.addEventListener('click', () => {
+        setAuthMode(button.dataset.authMode || 'login');
+        document.getElementById('authEmail')?.focus();
+      });
+    });
+
     if (emailToggle && emailToggle.dataset.bound !== 'true') {
       emailToggle.dataset.bound = 'true';
-      emailToggle.addEventListener('click', () => {
-        const authInputs = document.getElementById('authInputs');
-        if (!authInputs) return;
-        const expanded = authInputs.dataset.expanded === 'true';
-        authInputs.dataset.expanded = expanded ? 'false' : 'true';
-        authInputs.style.display = expanded ? 'none' : 'grid';
-        emailToggle.textContent = expanded ? 'メールログインを開く' : 'メール入力を閉じる';
-        if (loginBtn) {
-          loginBtn.style.display = expanded ? 'none' : '';
-        }
-        if (!expanded) {
+      emailToggle.addEventListener('click', () => setAuthMode('login'));
+    }
+
+    const magicLinkBtn = document.getElementById('authMagicLinkBtn');
+    if (magicLinkBtn && magicLinkBtn.dataset.bound !== 'true') {
+      magicLinkBtn.dataset.bound = 'true';
+      magicLinkBtn.addEventListener('click', async () => {
+        const { email } = readAuthInputs();
+        if (!email) {
+          setStatus('メールアドレスを入力してください');
           document.getElementById('authEmail')?.focus();
+          return;
         }
+        await sendLoginLink(email);
+      });
+    }
+
+    const resetBtn = document.getElementById('authResetBtn');
+    if (resetBtn && resetBtn.dataset.bound !== 'true') {
+      resetBtn.dataset.bound = 'true';
+      resetBtn.addEventListener('click', () => {
+        setAuthMode('reset');
+        document.getElementById('authEmail')?.focus();
       });
     }
 
@@ -766,30 +931,50 @@
           setStatus('現在ログインサーバーに接続できません。時間をおいて再試行してください');
           return;
         }
-        setStatus('サインインしています...');
+        setStatus(authMode === 'signup' ? 'アカウントを作成しています...' : 'サインインしています...');
         try {
+          if (authMode === 'reset') {
+            await sendPasswordResetEmail(email);
+            return;
+          }
+          if (authMode === 'update-password') {
+            const { error } = await supabaseClient.auth.updateUser({ password: passcode });
+            if (error) throw error;
+            const { data: userData } = await supabaseClient.auth.getUser();
+            supabaseUser = userData?.user || supabaseUser;
+            setAuthMode('login');
+            await syncProfileFromServer();
+            updateAuthUi();
+            setStatus('パスワードを更新しました。このままログインを続けられます');
+            return;
+          }
+          if (authMode === 'signup') {
+            const { data, error } = await supabaseClient.auth.signUp({ email, password: passcode, options: { emailRedirectTo: getOAuthRedirectUrl() } });
+            if (error) throw error;
+            if (data?.session) {
+              setStatus('アカウントを作成しました');
+            } else {
+              setStatus('確認メールを送信しました。メールを確認してください');
+            }
+            return;
+          }
           const { error } = await supabaseClient.auth.signInWithPassword({ email, password: passcode });
           if (error) {
             if (isConfirmError(error)) {
-              await supabaseClient.auth.resend({ type: 'signup', email, options: { emailRedirectTo: window.location.href } });
+              await supabaseClient.auth.resend({ type: 'signup', email, options: { emailRedirectTo: getOAuthRedirectUrl() } });
               setStatus('確認メールを再送しました。メールを確認してください');
               return;
             }
-            const { error: signUpError } = await supabaseClient.auth.signUp({ email, password: passcode, options: { emailRedirectTo: window.location.href } });
-            if (signUpError) {
-              if (isAlreadyRegisteredError(signUpError)) {
-                setStatus('このメールは登録済みです。パスコードを確認してください');
-                return;
-              }
-              setStatus('ログイン／登録に失敗しました');
-              return;
-            }
-            setStatus('確認メールを送信しました。メールを確認してください');
-          } else {
-            setStatus('サインインしました');
+            setStatus('メールアドレスまたはパスワードを確認してください');
+            return;
           }
-        } catch (_error) {
-          setStatus('ログインに失敗しました');
+          setStatus('サインインしました');
+        } catch (error) {
+          if (authMode === 'signup' && isAlreadyRegisteredError(error)) {
+            setStatus('このメールアドレスは登録済みです。「ログイン」を選ぶか、パスワードを再設定してください');
+            return;
+          }
+          setStatus(authMode === 'signup' ? 'アカウントを作成できませんでした' : 'ログインに失敗しました');
         }
       });
     }
@@ -896,6 +1081,7 @@
     updateProfileUi();
     try {
       const supabase = await ensureSupabase();
+      const oauthErrorMessage = getOAuthErrorMessage();
       const { data } = await supabase.auth.getSession();
       let session = data?.session || null;
       if (!session && !hasOAuthParamsInUrl()) {
@@ -916,6 +1102,9 @@
             writeCachedAuthSession(null);
           }
           supabaseUser = session?.user || null;
+          if (event === 'PASSWORD_RECOVERY') {
+            setAuthMode('update-password');
+          }
           await syncProfileFromServer();
           updateAuthUi();
           maybeReturnToCaller();
@@ -923,10 +1112,15 @@
       }
       await syncProfileFromServer();
       maybeReturnToCaller();
+      if (!supabaseUser && oauthErrorMessage) {
+        maybeClearOAuthParamsFromUrl();
+        window.setTimeout(() => setStatus('ログインを完了できませんでした。もう一度お試しください'), 0);
+      }
     } catch (_error) {
       supabaseClient = null;
       window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT_PROMISE__ = null;
     }
+    setAuthMode(authMode);
     updateAuthUi();
   }
 

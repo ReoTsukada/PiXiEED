@@ -662,7 +662,7 @@
             accept: {
               'application/x-pixieedraw': ['.pixieedraw', '.pxdraw'],
               'application/json': ['.json'],
-              'image/png': ['.png'],
+              'image/png': ['.png', '.apng'],
               'image/jpeg': ['.jpg', '.jpeg'],
               'image/webp': ['.webp'],
               'image/gif': ['.gif'],
@@ -683,7 +683,7 @@
     return new Promise(resolve => {
       const input = document.createElement('input');
       input.type = 'file';
-      input.accept = '.pixieedraw,.pxdraw,.json,.png,.jpg,.jpeg,.webp,.gif';
+      input.accept = '.pixieedraw,.pxdraw,.json,.png,.apng,.jpg,.jpeg,.webp,.gif';
       input.multiple = false;
       input.hidden = true;
       const cleanup = () => {
@@ -1198,6 +1198,88 @@
     }
   }
 
+  function readMarketPurchaseTransfer(token) {
+    return new Promise((resolve, reject) => {
+      if (!window.indexedDB || !/^[a-z0-9-]{8,128}$/i.test(String(token || ''))) {
+        resolve(null);
+        return;
+      }
+      const request = window.indexedDB.open('pixieed-market-import-v1', 1);
+      request.onupgradeneeded = () => {
+        if (!request.result.objectStoreNames.contains('imports')) request.result.createObjectStore('imports', { keyPath: 'token' });
+      };
+      request.onerror = () => reject(request.error || new Error('market transfer database unavailable'));
+      request.onsuccess = () => {
+        const db = request.result;
+        const transaction = db.transaction('imports', 'readwrite');
+        const store = transaction.objectStore('imports');
+        let value = null;
+        const getRequest = store.get(token);
+        getRequest.onsuccess = () => {
+          value = getRequest.result || null;
+          store.delete(token);
+        };
+        transaction.oncomplete = () => { db.close(); resolve(value); };
+        transaction.onerror = () => { const error = transaction.error; db.close(); reject(error || new Error('market transfer read failed')); };
+        transaction.onabort = () => { const error = transaction.error; db.close(); reject(error || new Error('market transfer read aborted')); };
+      };
+    });
+  }
+
+  function clearMarketImportRequestParam() {
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('market_import');
+      window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+    } catch (_error) {}
+  }
+
+  async function maybeImportMarketPurchase() {
+    let token = '';
+    try {
+      token = new URLSearchParams(window.location.search).get('market_import') || '';
+    } catch (_error) {}
+    if (!token) return false;
+    let transfer = null;
+    try {
+      transfer = await readMarketPurchaseTransfer(token);
+    } catch (error) {
+      console.warn('Failed to read PiXiEED Market transfer', error);
+    }
+    clearMarketImportRequestParam();
+    if (!transfer || !(transfer.blob instanceof Blob)) {
+      updateAutosaveStatus('購入済み素材が見つかりませんでした。マイページからもう一度開いてください。', 'warn');
+      return false;
+    }
+    if (!Number.isFinite(Number(transfer.expiresAt)) || Date.now() > Number(transfer.expiresAt)) {
+      updateAutosaveStatus('購入済みファイルの受け渡し期限が切れました。マイページからもう一度開いてください。', 'warn');
+      return false;
+    }
+    const filename = String(transfer.filename || 'purchased.pixieedraw').split('/').pop() || 'purchased.pixieedraw';
+    let file;
+    try {
+      file = new File([transfer.blob], filename, { type: transfer.blob.type || 'application/octet-stream' });
+    } catch (_error) {
+      file = transfer.blob;
+      file.name = filename;
+    }
+    try {
+      const imported = await openDocumentAsNewProject(file, { source: 'market-purchase' });
+      if (!imported) return false;
+      hideStartupScreen();
+      hideProjectHomeScreen();
+      if (AUTOSAVE_SUPPORTED) {
+        try { await writeAutosaveSnapshot(true); } catch (error) { console.warn('Immediate autosave after market import failed', error); }
+      }
+      updateAutosaveStatus('購入済み素材をPiXiEEDrawの新規プロジェクトとして開きました', 'success');
+      return true;
+    } catch (error) {
+      console.warn('Failed to import purchased market asset', error);
+      updateAutosaveStatus('購入済み素材をPiXiEEDrawで開けませんでした', 'error');
+      return false;
+    }
+  }
+
   async function maybeImportLensCapture() {
     let shouldImport = false;
     try {
@@ -1441,6 +1523,7 @@
     fallbackRestoreAutosaveAfterQrFailure,
     setLensImportSessionFlag,
     setQrImportSessionFlag,
+    maybeImportMarketPurchase,
     maybeImportLensCapture,
     maybeImportQrCapture,
   });

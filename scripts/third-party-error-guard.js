@@ -10,7 +10,8 @@
   function isIgnoredAdsbygoogleTagError(message, filename) {
     const normalizedMessage = String(message || '');
     const normalizedFilename = String(filename || '');
-    return normalizedMessage.includes("adsbygoogle.push() error: All 'ins' elements in the DOM with class=adsbygoogle already have ads in them.")
+    return (normalizedMessage.includes("adsbygoogle.push() error: All 'ins' elements in the DOM with class=adsbygoogle already have ads in them.")
+      || normalizedMessage.includes('adsbygoogle.push() error: No slot size for availableWidth=0'))
       && /pagead\/js\/adsbygoogle\.js(?:[?#]|$)/.test(normalizedFilename);
   }
 

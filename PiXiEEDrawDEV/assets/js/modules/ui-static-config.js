@@ -68,7 +68,7 @@
     TOOL_SHORTCUT_SHAPE_GROUP,
   } = {}) {
     const LEFT_TAB_KEYS = ['tools', 'color'];
-    const RIGHT_TAB_KEYS = ['frames', 'details', 'settings', 'extensions', 'help', 'file', 'multi'];
+    const RIGHT_TAB_KEYS = ['frames', 'settings', 'extensions', 'help', 'file', 'multi'];
     const TOOL_GROUPS = {
       selection: { label: '範囲選択', tools: ['move', 'selectRect', 'selectLasso', 'selectSame'] },
       pen: { label: 'ペン', tools: ['pen'] },
@@ -119,7 +119,6 @@
       tools: 'half',
       color: 'half',
       frames: 'full',
-      details: 'full',
       settings: 'full',
       extensions: 'full',
       help: 'full',
@@ -333,7 +332,7 @@
     const RELOAD_TARGET_PROJECT_ID_KEY = 'pixieedraw:reload-target-project-id-v1';
     const RELOAD_SNAPSHOT_VERSION = 1;
     const RELOAD_SNAPSHOT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
-    const RELOAD_SNAPSHOT_MAX_HISTORY_ITEMS = 24;
+    const RELOAD_SNAPSHOT_MAX_HISTORY_ITEMS = 0;
     const RELOAD_SNAPSHOT_COMPRESS_THRESHOLD = 4096;
     const RELOAD_SNAPSHOT_MAX_SYNC_CHARS = 2 * 1024 * 1024;
     const STARTUP_SCREEN_DISMISSED_KEY = 'pixieedraw:startupScreenDismissed';

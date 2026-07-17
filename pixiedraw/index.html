@@ -82,7 +82,7 @@
 </script>
 <script>window.__PIXIEEDRAW_BUILD_EDITION__ = 'web-free';</script>
 <script src="assets/js/modules/edition-capabilities-utils.js?v=2026.07.11-g3a-edition-ads"></script>
-<script src="assets/js/build-info.js?v=20260715-098"></script>
+<script src="assets/js/build-info.js?v=20260717-099"></script>
 <script>
   (function configurePixieedAds() {
     const shouldShowAds = typeof window.__PIXIEEDRAW_SHOULD_SHOW_ADS__ === 'function'
@@ -612,11 +612,11 @@
 <span class="sr-only">ファイル</span>
 </button>
 <button aria-label="カメラ" class="chip canvas-quick-action" data-external-tool="pixieelens" data-ui-action="openLensCamera" title="カメラ" type="button">
-<img alt="" aria-hidden="true" height="20" src="assets/icons/pixieelensicon_frame_01.png" width="20"/>
+<img alt="" aria-hidden="true" height="20" src="../Camera.png" width="20"/>
 <span class="sr-only">カメラ</span>
 </button>
 <button aria-label="QR編集" class="chip canvas-quick-action" data-external-tool="qrmaker" data-ui-action="openQrEditor" title="QR編集" type="button">
-<img alt="" aria-hidden="true" height="20" src="assets/icons/tool-qr-edit.svg" width="20"/>
+<img alt="" aria-hidden="true" height="20" src="../QR.png" width="20"/>
 <span class="sr-only">QR編集</span>
 </button>
 </div>
@@ -628,10 +628,6 @@
 <div aria-label="履歴操作" class="canvas-controls__history" role="group">
 <button aria-label="元に戻す" class="chip" disabled="" id="undoAction" type="button"></button>
 <button aria-label="やり直す" class="chip" disabled="" id="redoAction" type="button"></button>
-<button aria-controls="mobilePanelDetails" aria-label="詳細" aria-pressed="false" class="chip canvas-history-action--mobile-only" data-mobile-quick-open-panel="details" data-ui-action="openDetailsPanel" title="詳細" type="button">
-<img alt="" aria-hidden="true" height="20" src="assets/icons/action-more-menu.svg" width="20"/>
-<span class="sr-only">詳細</span>
-</button>
 </div>
 <div aria-label="ズーム操作" class="canvas-control-buttons" id="canvasControlButtons" role="group">
 <button aria-label="ズームアウト" class="chip" id="canvasControlPrimary" type="button"></button>
@@ -702,12 +698,7 @@
 <div class="bottom-timeline-dock__panes" id="bottomTimelinePanes"></div>
 </section>
 <aside aria-label="ツールと詳細メニュー" class="rail rail--right rail--tools" data-collapsed="true" data-compact="true" id="rightRail">
-<div class="right-utility-menu" id="rightUtilityMenu">
-<button aria-controls="panelDetails" aria-label="詳細" class="rail-tab right-utility-menu__trigger" data-quick-right-tab="details" id="rightUtilityMenuButton" title="詳細" type="button">
-<img alt="" class="tab-icon" src="assets/icons/action-more-menu.svg"/>
-<span class="sr-only">詳細</span>
-</button>
-</div>
+<div class="right-utility-menu" hidden="" id="rightUtilityMenu"></div>
   <div class="rail-tabpanes rail-tabpanes--right-tools" id="rightToolPanes"></div>
   <div class="rail-tabpanes rail-tabpanes--right-flyouts" id="rightRailPanes"></div>
 <button aria-label="右パネルを開く / 幅を変更" class="rail-resizer rail-resizer--right" hidden="" id="resizeRightRail" type="button"></button>
@@ -781,16 +772,16 @@
 <span class="sr-only">拡張</span>
 </button>
 <button aria-controls="mobilePanelHelp" aria-hidden="true" aria-label="使い方ヘルプ" aria-selected="false" class="mobile-tab" data-mobile-tab="help" hidden="" id="mobileTabHelp" role="tab" tabindex="-1" type="button">
-<img alt="" class="tab-icon" src="assets/icons/menu-help.svg"/>
+<img alt="" class="tab-icon" src="../help.png?v=2026.07.17-icons1"/>
 <span class="sr-only">ヘルプ</span>
 </button>
 </div>
 <button aria-label="カメラ" class="mobile-tab mobile-tab--action mobile-drawer__action" data-external-tool="pixieelens" data-ui-action="openLensCamera" id="mobileActionLensCamera" title="カメラ" type="button">
-<img alt="" class="tab-icon" src="assets/icons/pixieelensicon_frame_01.png"/>
+<img alt="" class="tab-icon" src="../Camera.png"/>
 <span class="sr-only">カメラ</span>
 </button>
 <button aria-label="QR編集" class="mobile-tab mobile-tab--action mobile-drawer__action" data-external-tool="qrmaker" data-ui-action="openQrEditor" title="QR編集" type="button">
-<img alt="" class="tab-icon" src="assets/icons/tool-qr-edit.svg"/>
+<img alt="" class="tab-icon" src="../QR.png"/>
 <span class="sr-only">QR編集</span>
 </button>
 </div>
@@ -799,7 +790,6 @@
 <div aria-labelledby="mobileTabTools" class="mobile-panel" hidden="" id="mobilePanelColor" role="tabpanel"></div>
 <div aria-labelledby="mobileTabFrames" class="mobile-panel" hidden="" id="mobilePanelFrames" role="tabpanel"></div>
 <div aria-labelledby="mobileTabSettings" class="mobile-panel" hidden="" id="mobilePanelSettings" role="tabpanel"></div>
-<div aria-label="詳細" class="mobile-panel" hidden="" id="mobilePanelDetails" role="tabpanel"></div>
 <div aria-labelledby="mobileTabExtensions" class="mobile-panel" hidden="" id="mobilePanelExtensions" role="tabpanel"></div>
 <div aria-labelledby="mobileTabHelp" class="mobile-panel" hidden="" id="mobilePanelHelp" role="tabpanel"></div>
 <div aria-labelledby="mobileTabFile" class="mobile-panel" hidden="" id="mobilePanelFile" role="tabpanel"></div>
@@ -1191,51 +1181,17 @@
 <div class="panel-ad-mount" data-panel-ad-mount="left"></div>
 </div>
 </section>
-<section class="panel-section" data-section="details" id="panelDetails">
-<div class="panel-section__body">
-<div class="detail-panel">
-<div class="detail-panel__grid" aria-label="詳細操作">
-<a class="button detail-panel__action" href="../account/index.html" id="detailAccountAction" rel="noopener" target="_blank">
-<span aria-hidden="true" class="detail-panel__icon"><img alt="" src="assets/icons/ecticon_frame_01.png"/></span>
-<span id="detailAccountActionLabel">ログイン</span>
-</a>
-<a aria-hidden="true" class="button detail-panel__action" hidden href="#" id="detailSupportPurchase" rel="noopener">
-<span aria-hidden="true" class="detail-panel__icon"><img alt="" src="assets/icons/ecticon_frame_06.png"/></span>
-<span>利用可能</span>
-</a>
-<button aria-haspopup="dialog" class="button detail-panel__action" id="openShortcutHelp" type="button">
-<span aria-hidden="true" class="detail-panel__icon"><img alt="" src="assets/icons/ecticon_frame_02.png"/></span>
-<span>ショートカット一覧</span>
-</button>
-<button class="button detail-panel__action" id="openOperationHelpPanel" type="button">
-<span aria-hidden="true" class="detail-panel__icon"><img alt="" src="assets/icons/ecticon_frame_03.png"/></span>
-<span>使い方ヘルプ</span>
-</button>
-<button aria-haspopup="dialog" class="button detail-panel__action" id="openUpdateHistory" type="button">
-<span aria-hidden="true" class="detail-panel__icon"><img alt="" src="assets/icons/ecticon_frame_04.png"/></span>
-<span>更新情報</span>
-</button>
-<button class="button detail-panel__action" id="toggleLanguageMode" type="button">
-<span aria-hidden="true" class="detail-panel__icon"><img alt="" src="assets/icons/ecticon_frame_05.png"/></span>
-<span>言語</span>
-</button>
-<a class="button detail-panel__action" href="../index.html" id="goHomeButton">
-<span aria-hidden="true" class="detail-panel__icon"><img alt="" src="assets/icons/ecticon_frame_07.png"/></span>
-<span>ホーム</span>
-</a>
-</div>
-<div class="field field--list settings-account-field" id="pixieedPwaInstallField">
+<div hidden="" id="pixieedDetailActionSources">
+<button aria-haspopup="dialog" class="detail-panel__action" id="openShortcutHelp" type="button"><span>ショートカット一覧</span></button>
+<button class="detail-panel__action" id="openOperationHelpPanel" type="button"><span>使い方ヘルプ</span></button>
+<button aria-haspopup="dialog" class="detail-panel__action" id="openUpdateHistory" type="button"><span>更新情報</span></button>
+<button class="detail-panel__action" id="toggleLanguageMode" type="button"><span aria-hidden="true" class="detail-panel__text-icon">あ/A/中</span><span>言語</span></button>
+<div id="pixieedPwaInstallField">
 <span>アプリとして使う</span>
-<p class="help-text" id="pixieedPwaInstallStatus">ホーム画面やデスクトップに追加すると、PiXiEEDrawをアプリのように開けます。</p>
-<div class="field field--inline">
-<button class="chip" id="pixieedPwaInstallButton" type="button">インストール案内を開く</button>
+<p id="pixieedPwaInstallStatus">ホーム画面やデスクトップに追加すると、PiXiEEDrawをアプリのように開けます。</p>
+<button id="pixieedPwaInstallButton" type="button">インストール案内を開く</button>
 </div>
 </div>
-</div>
-<div class="panel-ad-mount panel-ad-mount--context" data-panel-ad-mount="right"></div>
-<div class="panel-ad-mount" data-panel-ad-mount="left"></div>
-</div>
-</section>
 <section class="panel-section" data-section="settings" id="panelSettings">
 <div class="panel-section__body">
 <div class="settings-size-grid">
@@ -1824,7 +1780,7 @@
 	<script defer="" src="assets/js/modules/document-utils.js?v=2026.06.28-file-split-step5"></script>
 	<script defer="" src="assets/js/modules/document-model.js?v=20260715-v2-layer-array-recovery1"></script>
 	<script defer="" src="assets/js/modules/state-normalizers.js?v=20260715-true-v2-single-canvas-v1"></script>
-	<script defer="" src="assets/js/modules/ui-static-config.js?v=20260715-remove-oval1"></script>
+	<script defer="" src="assets/js/modules/ui-static-config.js?v=20260717-session-history1"></script>
 	<script defer="" src="assets/js/modules/geometry-utils.js?v=2026.06.30-geometry-utils-v1"></script>
 	<script defer="" src="assets/js/modules/viewport-zoom-utils.js?v=2026.06.30-viewport-zoom-v1"></script>
 	<script defer="" src="assets/js/modules/local-layer-preferences-utils.js?v=2026.06.30-local-layer-preferences-v1"></script>
@@ -1837,7 +1793,7 @@
 	<script defer="" src="assets/js/modules/autosave-schema-v2-recovery-utils.js?v=20260715-timelapse-always-on-p7"></script>
 	<script defer="" src="assets/js/modules/project-storage-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/project-canvas-validation-utils.js?v=20260715-local-true-v2-cleanup1"></script>
-	<script defer="" src="assets/js/modules/navigation.js?v=2026.07.01-navigation-config-split-v1"></script>
+	<script defer="" src="assets/js/modules/navigation.js?v=2026.07.17-icons1"></script>
 	<script defer="" src="assets/js/modules/clipboard-utils.js?v=2026.07.04-shared-copy-url-fix1"></script>
 	<script defer="" src="assets/js/modules/multi-invite-utils.js?v=2026.06.29-multi-invite-split"></script>
 	<script defer="" src="assets/js/modules/timelapse-utils.js?v=2026.06.28-file-split-step6"></script>
@@ -1846,7 +1802,7 @@
 	<script defer="" src="assets/js/modules/qr-utils.js?v=2026.06.28-file-split-step3"></script>
 	<script defer="" src="assets/js/modules/qr-edit-core-utils.js?v=2026.06.30-qr-edit-core-v1"></script>
 	<script defer="" src="assets/js/modules/qr-edit-panel-utils.js?v=2026.06.29-open-project-tab-batch-v1"></script>
-	<script defer="" src="assets/js/modules/image-utils.js?v=20260713-047"></script>
+	<script defer="" src="assets/js/modules/image-utils.js?v=20260717-apng-import1"></script>
 	<script defer="" src="assets/js/modules/open-project-tab-model.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/project-command-lock-utils.js?v=2026.07.12-command-lock-r2"></script>
 	<script defer="" src="assets/js/modules/export-utils.js?v=20260715-local-true-v2-cleanup1"></script>
@@ -1858,7 +1814,7 @@
 		<script defer="" src="assets/js/modules/open-project-tab-view.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/open-project-tab-lifecycle.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/open-project-tab-interactions.js?v=20260715-local-true-v2-cleanup1"></script>
-	<script defer="" src="assets/js/modules/local-project-journal-utils.js?v=2026.07.13-file-primary-memory1"></script>
+	<script defer="" src="assets/js/modules/local-project-journal-utils.js?v=20260717-session-history1"></script>
 	<script defer="" src="assets/js/modules/pixel-patch-history-utils.js?v=2026.07.12-direct-authority-gmem2a1"></script>
 	<script defer="" src="assets/js/modules/cold-history-store-utils.js?v=20260715-cold-history-p6"></script>
 	<script defer="" src="assets/js/modules/timelapse-chunk-store-utils.js?v=20260715-timelapse-disk-p8"></script>
@@ -1867,7 +1823,7 @@
 	<script defer="" src="assets/js/modules/playback-cache-utils.js?v=2026.06.30-playback-cache-v1"></script>
 	<script defer="" src="assets/js/modules/multi-history-utils.js?v=2026.06.30-multi-history-v1"></script>
 	<script defer="" src="assets/js/modules/reload-snapshot-utils.js?v=2026.06.30-reload-snapshot-v1"></script>
-	<script defer="" src="assets/js/modules/reload-session-workflow-utils.js?v=20260713-047"></script>
+	<script defer="" src="assets/js/modules/reload-session-workflow-utils.js?v=20260717-session-history1"></script>
 	<script defer="" src="assets/js/modules/canvas-core-workflow-utils.js?v=2026.07.02-canvas-core-split-v1"></script>
 	<script defer="" src="assets/js/modules/canvas-drawing-workflow-utils.js?v=20260715-production-circle-sync1"></script>
 	<script defer="" src="assets/js/modules/canvas-overlay-workflow-utils.js?v=20260715-production-circle-sync1"></script>
@@ -1909,10 +1865,10 @@
 	<script defer="" src="assets/js/modules/floating-draw-button-workflow-utils.js?v=20260715-remove-oval1"></script>
 	<script defer="" src="assets/js/modules/selection-move-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/layout-viewport.js?v=20260715-safari-viewport-scroll-v1"></script>
-	<script defer="" src="assets/js/modules/rail-tool-ui-utils.js?v=2026.07.12-auto-dismiss-right-panels1"></script>
+	<script defer="" src="assets/js/modules/rail-tool-ui-utils.js?v=2026.07.17-common-details4"></script>
 	<script defer="" src="assets/js/modules/control-ui-utils.js?v=2026.07.01-control-ui-split-v1"></script>
 	<script defer="" src="assets/js/modules/ui-action-buttons-workflow-utils.js?v=20260715-advanced-multicanvas-v1"></script>
-	<script defer="" src="assets/js/modules/ui-action-router-workflow-utils.js?v=2026.07.03-ui-action-router-split-v1"></script>
+	<script defer="" src="assets/js/modules/ui-action-router-workflow-utils.js?v=2026.07.17-global-help22"></script>
 	<script defer="" src="assets/js/modules/canvas-control-actions-workflow-utils.js?v=2026.07.03-canvas-control-actions-split-v1"></script>
 	<script defer="" src="assets/js/modules/history-core-workflow-utils.js?v=2026.07.03-history-core-split-v1"></script>
 	<script defer="" src="assets/js/modules/history-guard-workflow-utils.js?v=2026.07.04-shared-project-disabled1"></script>
@@ -1922,7 +1878,7 @@
 	<script defer="" src="assets/js/modules/timelapse-session-utils.js?v=20260715-timelapse-disk-p8"></script>
 	<script defer="" src="assets/js/modules/autosave-workflow-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/project-provenance-utils.js?v=20260714-provenance-v1"></script>
-	<script defer="" src="assets/js/modules/open-import-workflow-utils.js?v=20260715-external-return-new-project1"></script>
+	<script defer="" src="assets/js/modules/open-import-workflow-utils.js?v=20260717-market-all-open1"></script>
 	<script defer="" src="assets/js/modules/export-format-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/export-dialog-workflow-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 		<script defer="" src="assets/js/modules/startup-workflow-utils.js?v=20260715-startup-grid-no-oval1"></script>
@@ -1934,7 +1890,7 @@
 		<script defer="" src="assets/js/modules/project-storage-v2-worker-bridge.js?v=2026.07.10-project-storage-worker1"></script>
 		<script defer="" src="assets/js/modules/project-storage-v2-zip-adapter.js?v=20260715-startup-certified-p13"></script>
 		<script defer="" src="assets/js/modules/document-serialization-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
-	<script defer="" src="assets/js/modules/document-session-workflow-utils.js?v=20260715-local-true-v2-cleanup1"></script>
+	<script defer="" src="assets/js/modules/document-session-workflow-utils.js?v=20260717-session-history1"></script>
 	<script defer="" src="assets/js/modules/recent-account-workflow-utils.js?v=2026.07.03-safe-helper-split-v1"></script>
 	<script defer="" src="assets/js/modules/pixieed-profile-local-utils.js?v=2026.07.03-safe-helper-split-v1"></script>
 	<script defer="" src="assets/js/modules/shared-recent-project-utils.js?v=2026.07.03-shared-recent-helper-split-v1"></script>
@@ -1957,14 +1913,14 @@
 	<script defer="" src="assets/js/modules/shared-project-local-conversion-utils.js?v=2026.07.08-shared-local-conversion-split-v1"></script>
 	<script defer="" src="assets/js/modules/shared-project-create-progress-utils.js?v=2026.07.03-shared-open-workflow-v1"></script>
 	<script defer="" src="assets/js/modules/startup-tail-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
-	<script defer="" src="assets/js/modules/controls-mirror.js?v=2026.07.15-embed-landscape-force2"></script>
+	<script defer="" src="assets/js/modules/controls-mirror.js?v=2026.07.17-common-details4"></script>
 	<script defer="" src="assets/js/modules/external-tool-workflow-utils.js?v=2026.07.02-external-tool-workflow-split-v1"></script>
 	<script defer="" src="assets/js/modules/canonical-v2-project-utils.js?v=20260714-originality-v1"></script>
 	<script defer="" src="assets/js/modules/local-project-v2-migration-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/pre-update-checkpoint-utils.js?v=20260712-pre-update-checkpoint-u3"></script>
 	<script defer="" src="assets/js/active-project-session-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/pixieedraw-dev-switch.js?v=2026.07.03-pixieedrawdev-switch-fix14"></script>
-	<script defer="" src="assets/js/app.js?v=20260715-098"></script>
+	<script defer="" src="assets/js/app.js?v=20260717-099"></script>
 	<script defer="" src="assets/js/modules/update-detection-utils.js?v=20260713-026"></script>
   <script>
     (function initPanelAdDocking() {
@@ -1978,7 +1934,7 @@
       };
       const sideSections = {
         left: ['panelColor', 'panelTools', 'panelFrames'],
-        right: ['panelFile', 'panelSettings', 'panelDetails'],
+        right: ['panelFile', 'panelSettings'],
       };
       const mobileMountOrigins = new WeakMap();
       if (!(ads.left instanceof HTMLElement) && !(ads.right instanceof HTMLElement)) return;
@@ -2036,7 +1992,7 @@
         // the visual end of that drawer, so it owns the common inline ad.
         // This keeps the ad after the palette rather than interrupting tools.
         const ids = side === 'left' && isMobile
-          ? ['panelColor', 'panelTools', 'panelFrames', 'panelFile', 'panelSettings', 'panelDetails']
+          ? ['panelColor', 'panelTools', 'panelFrames', 'panelFile', 'panelSettings']
           : (sideSections[side] || []);
         let fallback = null;
         let firstMount = null;
@@ -2561,7 +2517,7 @@
   </script>
 
 	<script src="../scripts/tool-fullscreen.js?v=2026.07.15-pixiedraw-fullscreen-restore1"></script>
-	<script src="../scripts/shared-bottom-nav.js?v=20260714-shared-banner-height-lock2" data-pixieed-footer-ad-landscape="false"></script>
+	<script src="../scripts/shared-bottom-nav.js?v=2026.07.17-market-public32"></script>
 	<script>
     (function initOperationHelpAd() {
       if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.()) return;

@@ -106,14 +106,15 @@ const recentWorkflow = fs.readFileSync(recentWorkflowPath, 'utf8');
 const index = fs.readFileSync(indexPath, 'utf8');
 
 assert.match(app, /function isProjectCommandLocked\(\)/);
-assert.match(app, /enabled: hasActiveProject && !isProjectCommandLocked\(\)/);
-assert.match(app, /reason: isProjectCommandLocked\(\)\s*\?\s*'command-in-flight'/);
+assert.match(app, /commandLocked: commandLock\.locked/);
+assert.match(app, /lockOwner: commandLock\.owner/);
 assert.match(importWorkflow, /acquireProjectCommandLock\(/);
 assert.match(importWorkflow, /releaseProjectCommandLock\(/);
 assert.match(tabWorkflow, /const guardedProjectTabIds = new Set\(\)/);
 assert.match(tabWorkflow, /for \(const projectTabId of guardedProjectTabIds\)/);
-assert.match(tabWorkflow, /openProjectTabBusyOwner === activationOwner/);
-assert.match(tabWorkflow, /openProjectTabBusyOwner === commandOwner/);
+assert.match(tabWorkflow, /acquireProjectCommandLock\(\{ owner: activationOwner, command: 'activate-project-sheet' \}\)/);
+assert.match(tabWorkflow, /acquireProjectCommandLock\(\{ owner: commandOwner, command: 'remove-project-sheet' \}\)/);
+assert.match(tabWorkflow, /releaseProjectCommandLock\(\{ token: lock\.token, owner: lock\.owner \}\)/);
 assert.match(startupWorkflow, /function setupStartupScreen\(\)/);
 assert.match(startupWorkflow, /function setupProjectHomeScreen\(\)/);
 assert.match(startupWorkflow, /refreshRecentProjectsUI\(\)\.catch/);
@@ -121,8 +122,8 @@ assert.match(recentWorkflow, /async function refreshRecentProjectsUI\(options = 
 assert.match(app, /setupStartupScreen\(\);\s*setupProjectHomeScreen\(\);/);
 
 const scriptVersions = [...index.matchAll(/<script[^>]+src="([^"]+)"/g)].map(match => match[1]);
-assert.ok(scriptVersions.some(value => /build-info\.js\?v=20260712-002/.test(value)));
-assert.ok(scriptVersions.some(value => /update-detection-utils\.js\?v=20260712-001/.test(value)));
-assert.ok(scriptVersions.some(value => /open-import-workflow-utils\.js\?v=2026\.07\.11-tab-availability-fix1/.test(value)));
+assert.ok(scriptVersions.some(value => /build-info\.js\?v=20260717-099/.test(value)));
+assert.ok(scriptVersions.some(value => /update-detection-utils\.js\?v=20260713-026/.test(value)));
+assert.ok(scriptVersions.some(value => /open-import-workflow-utils\.js\?v=20260717-market-all-open1/.test(value)));
 
 console.log('PiXiEEDraw DEV R1 startup / command-lock / mixed-build audit checks passed');

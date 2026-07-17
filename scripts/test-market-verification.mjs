@@ -1,0 +1,276 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+
+const migrationPath = 'supabase/migrations/20260717110000_market_seller_and_asset_verification.sql';
+const migration = fs.readFileSync(migrationPath, 'utf8');
+const mfaMigration = fs.readFileSync('supabase/migrations/20260717133000_market_free_seller_registration_mfa.sql', 'utf8');
+const paidPurchaseMigration = fs.readFileSync('supabase/migrations/20260717143000_market_paid_purchase_entitlements.sql', 'utf8');
+const purchaseIntentMigration = fs.readFileSync('supabase/migrations/20260717144000_market_purchase_intents.sql', 'utf8');
+const stripeMigration = fs.readFileSync('supabase/migrations/20260717150000_market_stripe_connect_payments.sql', 'utf8');
+const checkoutFunction = fs.readFileSync('supabase/functions/market-create-checkout/index.ts', 'utf8');
+const webhookFunction = fs.readFileSync('supabase/functions/market-stripe-webhook/index.ts', 'utf8');
+const marketUi = fs.readFileSync('market/market.js', 'utf8');
+const marketIndexHtml = fs.readFileSync('market/index.html', 'utf8');
+const itemUi = fs.readFileSync('market/item.js', 'utf8');
+const itemHtml = fs.readFileSync('market/item.html', 'utf8');
+const helpHtml = fs.readFileSync('market/help.html', 'utf8');
+const helpTips = fs.readFileSync('market/help-tips.js', 'utf8');
+const marketCss = fs.readFileSync('market/market.css', 'utf8');
+const marketDoc = fs.readFileSync('docs/inheritance-material-market-system.md', 'utf8');
+const accountPurchases = fs.readFileSync('scripts/account-market-purchases.js', 'utf8');
+const secureDeliveryMigration = fs.readFileSync('supabase/migrations/20260717152000_market_secure_purchase_delivery.sql', 'utf8');
+const secureDeliveryFunction = fs.readFileSync('supabase/functions/market-download/index.ts', 'utf8');
+const purchaseDelivery = fs.readFileSync('scripts/market-purchase-delivery.js', 'utf8');
+const productionImport = fs.readFileSync('pixiedraw/assets/js/modules/open-import-workflow-utils.js', 'utf8');
+const devImport = fs.readFileSync('PiXiEEDrawDEV/assets/js/modules/open-import-workflow-utils.js', 'utf8');
+const productionImageUtils = fs.readFileSync('pixiedraw/assets/js/modules/image-utils.js', 'utf8');
+const devImageUtils = fs.readFileSync('PiXiEEDrawDEV/assets/js/modules/image-utils.js', 'utf8');
+const termsHtml = fs.readFileSync('terms/index.html', 'utf8');
+const localTestProducts = fs.readFileSync('market/local-test-products.js', 'utf8');
+const socialMigration = fs.readFileSync('supabase/migrations/20260717153000_market_social_discovery.sql', 'utf8');
+const limitedMigration = fs.readFileSync('supabase/migrations/20260717154000_market_limited_sales.sql', 'utf8');
+const minimumPriceMigration = fs.readFileSync('supabase/migrations/20260717160000_market_minimum_paid_listing.sql', 'utf8');
+const devGateMigration = fs.readFileSync('supabase/migrations/20260717161000_market_dev_account_gate.sql', 'utf8');
+const devAccessUi = fs.readFileSync('scripts/pixieed-dev-access.js', 'utf8');
+const marketDevGateUi = fs.readFileSync('market/dev-gate.js', 'utf8');
+const stripeConnectFunction = fs.readFileSync('supabase/functions/market-stripe-connect/index.ts', 'utf8');
+const sharedMarketFunction = fs.readFileSync('supabase/functions/_shared/market-stripe.ts', 'utf8');
+const accountHtml = fs.readFileSync('account/index.html', 'utf8');
+const sharedNav = fs.readFileSync('scripts/shared-bottom-nav.js', 'utf8');
+const sitemap = fs.readFileSync('sitemap.xml', 'utf8');
+const favoritesUi = fs.readFileSync('market/favorites.js', 'utf8');
+const discoveryUi = fs.readFileSync('market/discovery-utils.js', 'utf8');
+const mediaProtection = fs.readFileSync('market/media-protection.js', 'utf8');
+const sellUi = fs.readFileSync('market/sell.js', 'utf8');
+
+const requiredFormats = [
+  'pixiedraw-project',
+  'png',
+  'webp',
+  'gif',
+  'apng',
+  'sprite-sheet-png',
+];
+
+requiredFormats.forEach((format) => {
+  assert.match(migration, new RegExp(`'${format.replaceAll('-', '\\-')}'`));
+});
+
+assert.match(migration, /create table if not exists public\.market_seller_profiles/i);
+assert.match(migration, /identity_status = 'verified'/i);
+assert.match(migration, /terms_accepted_at is not null/i);
+assert.match(migration, /email_confirmed_at is not null/i);
+assert.match(migration, /market_current_user_can_sell\(\)/i);
+assert.match(migration, /verified seller account required/i);
+assert.match(migration, /revoke all on function public\.market_create_root_asset\(/i);
+assert.match(migration, /revoke all on function public\.market_create_derivative_draft\(/i);
+assert.match(migration, /create or replace function public\.market_create_root_asset_v2\(/i);
+assert.match(migration, /create or replace function public\.market_create_derivative_draft_v2\(/i);
+assert.match(migration, /create or replace function public\.market_review_listing\(/i);
+assert.match(migration, /file_scan_status <> 'clean'/i);
+assert.match(migration, /create table if not exists public\.market_audit_log/i);
+
+['PiXiEED形式', '外部形式', '出品審査済み', '販売者確認済み'].forEach((label) => {
+  assert.ok(marketUi.includes(label), `market UI is missing verification label: ${label}`);
+  assert.ok(marketDoc.includes(label), `market document is missing verification label: ${label}`);
+});
+
+assert.match(mfaMigration, /market_current_session_has_mfa\(\)/i);
+assert.match(mfaMigration, /'aal2'/i);
+assert.match(mfaMigration, /market_submit_seller_registration/i);
+assert.match(mfaMigration, /phone_verified', false/i);
+assert.match(paidPurchaseMigration, /market_materialize_paid_purchase_v1/i);
+assert.match(paidPurchaseMigration, /market_derivative_licenses_purchase_unique/i);
+assert.match(paidPurchaseMigration, /v_series\.derivative_sales_allowed/i);
+assert.match(paidPurchaseMigration, /perform public\.market_create_royalty_ledger/i);
+assert.match(paidPurchaseMigration, /revoke all on function public\.market_materialize_paid_purchase_v1\(uuid\)[\s\S]*from public, anon, authenticated/i);
+assert.match(paidPurchaseMigration, /grant execute on function public\.market_materialize_paid_purchase_v1\(uuid\)[\s\S]*to service_role/i);
+assert.doesNotMatch(accountPurchases, /派生販売ライセンス/);
+assert.match(accountPurchases, /派生出品可能/);
+assert.match(purchaseIntentMigration, /market_create_purchase_intent_v1/i);
+assert.match(purchaseIntentMigration, /status = 'pending'/i);
+assert.match(purchaseIntentMigration, /v_asset\.sale_price_yen/i);
+assert.match(purchaseIntentMigration, /creators cannot purchase their own asset/i);
+assert.match(purchaseIntentMigration, /market_purchases\.payment_provider is null/i);
+assert.match(purchaseIntentMigration, /market_purchases\.provider_payment_id is null/i);
+assert.match(purchaseIntentMigration, /revoke all on function public\.market_create_purchase_intent_v1\(uuid\)[\s\S]*from public, anon, authenticated/i);
+assert.match(purchaseIntentMigration, /grant execute on function public\.market_create_purchase_intent_v1\(uuid\)[\s\S]*to authenticated/i);
+assert.doesNotMatch(purchaseIntentMigration, /status\s*=\s*'paid'/i);
+assert.match(itemUi, /functions\.invoke\('market-create-checkout'/);
+assert.doesNotMatch(itemUi, /\.rpc\('market_create_purchase_intent_v1'/);
+assert.doesNotMatch(itemUi, /status\s*:\s*['"]paid['"]/i);
+assert.match(checkoutFunction, /market_create_purchase_intent_v1/);
+assert.match(checkoutFunction, /market_bind_stripe_checkout_v1/);
+assert.doesNotMatch(checkoutFunction, /market_complete_free_purchase_v1/);
+assert.match(checkoutFunction, /grossAmount < 500/);
+assert.match(webhookFunction, /verifyStripeWebhook/);
+assert.match(webhookFunction, /market_complete_stripe_purchase_v1/);
+assert.match(stripeMigration, /grant execute on function public\.market_complete_stripe_purchase_v1[\s\S]*to service_role/i);
+assert.match(stripeMigration, /market_assets_stripe_charge_range/i);
+assert.match(itemHtml, /id="itemPurchaseStatus"/);
+const itemHtmlIds = new Set(Array.from(itemHtml.matchAll(/id="([^"]+)"/g), (match) => match[1]));
+const itemElementRefs = Array.from(itemUi.matchAll(/\$\('([^']+)'\)/g), (match) => match[1]);
+assert.deepEqual(Array.from(new Set(itemElementRefs.filter((id) => !itemHtmlIds.has(id)))), []);
+
+for (const pagePath of ['market/index.html', 'market/item.html', 'market/about.html', 'market/help.html']) {
+  const page = fs.readFileSync(pagePath, 'utf8');
+  assert.doesNotMatch(page, /data-pixieed-market-access="pending"/);
+  assert.doesNotMatch(page, /dev-gate\.js/);
+}
+
+for (const pagePath of ['market/sell.html', 'market/seller.html', 'market/review.html']) {
+  const page = fs.readFileSync(pagePath, 'utf8');
+  assert.match(page, /data-pixieed-market-access="pending"/);
+  assert.match(page, /data-pixieed-market-write="locked"/);
+  assert.match(page, /pixieed-dev-access\.js/);
+  assert.match(page, /dev-gate\.js/);
+  assert.match(page, /noindex,nofollow/);
+}
+
+for (const pagePath of ['market/index.html', 'market/item.html', 'market/sell.html', 'market/seller.html', 'market/review.html', 'market/about.html', 'market/help.html']) {
+  const page = fs.readFileSync(pagePath, 'utf8');
+  if (!page.includes('aria-describedby=')) continue;
+  const pageIds = new Set(Array.from(page.matchAll(/id="([^"]+)"/g), (match) => match[1]));
+  const describedByIds = Array.from(page.matchAll(/aria-describedby="([^"]+)"/g), (match) => match[1]);
+  assert.ok(describedByIds.length > 0, `${pagePath} must include contextual help`);
+  assert.deepEqual(
+    Array.from(new Set(describedByIds.filter((id) => !pageIds.has(id)))),
+    [],
+    `${pagePath} contains an unresolved contextual-help description`,
+  );
+  assert.match(page, /aria-expanded="false"/);
+  assert.match(page, /help-tips\.js/);
+}
+
+['buyer', 'seller', 'derivative', 'payment', 'faq'].forEach((section) => {
+  assert.match(helpHtml, new RegExp(`href="#${section}"`));
+  assert.match(helpHtml, new RegExp(`id="${section}"`));
+});
+assert.match(helpHtml, /market-payment-mock/);
+assert.match(helpHtml, /購入者|素材を購入する人/);
+assert.match(helpHtml, /元素材を販売する人/);
+assert.match(helpHtml, /派生作品を販売する人/);
+assert.match(helpTips, /event\.preventDefault\(\)/);
+assert.match(helpTips, /event\.key !== 'Escape'/);
+assert.match(marketCss, /\.market-help-tip:hover/);
+assert.match(marketCss, /\.market-help-tip:focus-within/);
+assert.match(marketCss, /\.market-help-tip\.is-open/);
+
+assert.match(secureDeliveryMigration, /create table if not exists public\.market_download_events/i);
+assert.match(secureDeliveryMigration, /buyer_user_id = auth\.uid\(\)/i);
+assert.match(secureDeliveryMigration, /revoke insert, update, delete[\s\S]*from public, anon, authenticated/i);
+assert.match(secureDeliveryFunction, /\.eq\("status", "paid"\)/);
+assert.match(secureDeliveryFunction, /FILE_URL_TTL_SECONDS = 60/);
+assert.match(secureDeliveryFunction, /MAX_DELIVERIES_PER_HOUR/);
+assert.match(secureDeliveryFunction, /createSignedUrl/);
+assert.match(secureDeliveryFunction, /storage_file_paths/);
+assert.match(secureDeliveryFunction, /storagePaths\[index\]/);
+assert.match(secureDeliveryFunction, /ai_training_allowed: false/);
+assert.match(secureDeliveryFunction, /PIXIEEDRAW_OPEN_FORMAT_PRIORITY/);
+assert.match(secureDeliveryFunction, /availableFiles\.some/);
+assert.match(accountPurchases, /functions\.invoke\('market-download'/);
+assert.match(accountPurchases, /選択形式をZIPで出力/);
+assert.match(accountPurchases, /PiXiEEDrawで開く/);
+assert.match(accountPurchases, /const drawButton = createButton\('PiXiEEDrawで開く'\)/);
+assert.match(accountPurchases, /SHA-256/);
+assert.match(purchaseDelivery, /indexedDB\.open\(TRANSFER_DB/);
+assert.match(purchaseDelivery, /buildZipBlob/);
+assert.match(productionImport, /maybeImportMarketPurchase/);
+assert.match(devImport, /maybeImportMarketPurchase/);
+assert.match(productionImport, /openDocumentAsNewProject\(file, \{ source: 'market-purchase' \}\)/);
+assert.match(devImport, /openDocumentAsNewProject\(file, \{ source: 'market-purchase' \}\)/);
+assert.match(productionImageUtils, /image\/apng/);
+assert.match(devImageUtils, /image\/apng/);
+assert.match(termsHtml, /購入素材にも第5-2項が適用/);
+assert.match(termsHtml, /短時間の出力制限は購入回数や恒久的な再出力回数の上限を意味しません/);
+assert.doesNotMatch(localTestProducts, /LOCAL_HOSTS/);
+assert.match(localTestProducts, /PiXiEEDDevAccess\.check\(\)/);
+assert.match(localTestProducts, /test_products.*=== '0'/);
+assert.equal((localTestProducts.match(/local_test: true/g) || []).length, 1);
+assert.equal(new Set(localTestProducts.match(/00000000-0000-4000-8000-00000000010[1-8]/g) || []).size, 8);
+assert.match(marketUi, /PiXiEEDMarketLocalTestProducts/);
+assert.match(itemUi, /DEVテスト商品/);
+assert.match(itemUi, /Stripe決済は行われません/);
+assert.match(marketUi, /popular-derivatives/);
+assert.match(marketUi, /creator_display_name/);
+assert.match(marketUi, /derivative_sales_allowed/);
+assert.match(itemUi, /itemFavorite/);
+assert.match(socialMigration, /create table if not exists public\.market_asset_favorites/i);
+assert.match(socialMigration, /market_asset_favorites_read_own/i);
+assert.match(socialMigration, /user_id = \(select auth\.uid\(\)\)/i);
+assert.match(socialMigration, /creator_display_name/i);
+assert.match(socialMigration, /market_set_listing_tags/i);
+assert.match(socialMigration, /market_assets_popular_derivative_idx/i);
+assert.match(favoritesUi, /market_asset_favorites/);
+assert.match(favoritesUi, /PiXiEEDMarketFavorites/);
+assert.match(favoritesUi, /button\.innerHTML = `<span aria-hidden="true">/);
+assert.doesNotMatch(favoritesUi, /button\.innerHTML[^\n]*<b>/);
+assert.match(marketCss, /\.market-favorite-button\s*\{[\s\S]*?background:\s*transparent;/);
+assert.match(marketCss, /\.market-favorite-button\s*\{[\s\S]*?border:\s*0;/);
+assert.match(discoveryUi, /function filterAndSortAssets/);
+assert.match(discoveryUi, /popular-derivatives/);
+assert.match(sellUi, /market_set_listing_tags/);
+assert.match(sellUi, /tags\.length > 8/);
+assert.doesNotMatch(marketUi, /market-card__tags/);
+assert.doesNotMatch(itemUi, /itemTags/);
+assert.doesNotMatch(accountPurchases, /market-card__tags/);
+assert.match(mediaProtection, /contextmenu/);
+assert.match(mediaProtection, /dragstart/);
+assert.match(mediaProtection, /controlsList\.add\('nodownload'/);
+assert.doesNotMatch(`${sellUi}\n${secureDeliveryFunction}\n${accountPurchases}`, /pixieedraw-project/);
+assert.match(localTestProducts, /PiXiEEDraw キャラクター制作テンプレート/);
+assert.doesNotMatch(localTestProducts, /pixieedraw-project/);
+assert.match(localTestProducts, /limited_quantity: 5/);
+assert.match(localTestProducts, /limited_sold_count: 5/);
+assert.match(marketUi, /PiXiEEDraw作品/);
+assert.match(marketUi, /market-card__soldout/);
+assert.match(itemUi, /label: 'SOLD OUT'/);
+assert.match(sellUi, /market_set_listing_limited_sale/);
+assert.match(sellUi, /purchasePrice < 500/);
+assert.match(sellUi, /purchasePrice < 1000/);
+assert.match(limitedMigration, /limited_quantity integer/i);
+assert.match(limitedMigration, /limited sale price must be at least 1000 yen/i);
+assert.match(limitedMigration, /market_assets_limited_minimum_price/i);
+assert.match(limitedMigration, /for update;/i);
+assert.match(limitedMigration, /provider_checkout_session_id is not null/i);
+assert.match(limitedMigration, /limited asset is sold out/i);
+assert.match(limitedMigration, /market_purchases_refresh_limited_sold_count/i);
+assert.match(minimumPriceMigration, /market listing price must be at least 500 yen/i);
+assert.match(minimumPriceMigration, /market purchase amount must be at least 500 yen/i);
+assert.match(minimumPriceMigration, /market_assets_published_minimum_price/i);
+assert.match(minimumPriceMigration, /drop function if exists public\.market_complete_free_purchase_v1\(uuid, uuid\)/i);
+assert.doesNotMatch(localTestProducts, /sale_price_yen:\s*[0-4]\d{0,2}\s*[,}]/);
+assert.match(devGateMigration, /market_current_user_is_dev\(\)/i);
+assert.match(devGateMigration, /41c3496ddd732f01ec22f1dd6c405e13/i);
+assert.match(devGateMigration, /market_listing_is_enabled\(\)[\s\S]*select false/i);
+assert.match(devGateMigration, /market_public_catalog_v1\(input_limit integer default 120\)/i);
+assert.match(devGateMigration, /market_public_asset_v1\(input_asset_id uuid\)/i);
+assert.match(devGateMigration, /security definer[\s\S]*preview_object_path'[\s\S]*\^https:\/\//i);
+assert.match(devGateMigration, /revoke all on public\.market_asset_series, public\.market_assets from public, anon, authenticated/i);
+assert.doesNotMatch(devGateMigration, /grant select on public\.market_assets to anon/i);
+assert.match(devGateMigration, /market listing is not available/i);
+assert.match(devAccessUi, /a72a00cf6492cb03cb9425327c8368ea4e1ed079388a270260e43cba004fc1df/i);
+assert.match(devAccessUi, /email_confirmed_at/);
+assert.match(marketDevGateUi, /出品機能は準備中/);
+assert.match(marketDevGateUi, /dataset\.pixieedMarketWrite === 'locked'/);
+assert.match(sharedMarketFunction, /requireMarketDevUser/);
+assert.match(sharedMarketFunction, /email_confirmed_at/);
+assert.match(checkoutFunction, /requireMarketDevUser/);
+assert.match(secureDeliveryFunction, /requireMarketDevUser/);
+assert.match(stripeConnectFunction, /requireMarketDevUser/);
+assert.match(sharedMarketFunction, /MARKET_LISTING_ENABLED = false/);
+assert.match(stripeConnectFunction, /if \(!MARKET_LISTING_ENABLED\)/);
+assert.match(accountHtml, /id="accountDevTools"[\s\S]*data-market-dev-only/);
+assert.doesNotMatch(accountHtml, /href="\.\.\/market\/(?:sell|seller|review)\.html"/);
+assert.match(sharedNav, /key: 'market'[\s\S]*path: 'market\/index\.html'/);
+assert.match(sitemap, /pixieed\.jp\/market\//);
+assert.match(marketIndexHtml, /出品準備中/);
+assert.doesNotMatch(marketIndexHtml, /href="sell\.html"/);
+assert.match(marketUi, /PiXiEEDDevAccess/);
+assert.match(marketUi, /rpc\('market_public_catalog_v1'/);
+assert.doesNotMatch(marketUi, /from\('market_assets'\)/);
+assert.match(itemUi, /rpc\('market_public_asset_v1'/);
+assert.doesNotMatch(itemUi, /from\('market_assets'\)/);
+assert.match(itemUi, /購入準備中/);
+
+console.log('Market verification guard passed.');

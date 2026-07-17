@@ -42,21 +42,11 @@
       ? getCurrentSharedRecentProjectEntry()
       : null;
     const normalizedHistoryLimit = normalizeProjectHistoryLimit(history.limit, DEFAULT_HISTORY_LIMIT);
-    const maxAvailable = Math.max(
-      Array.isArray(history.past) ? history.past.length : 0,
-      Array.isArray(history.future) ? history.future.length : 0
-    );
-    const safeMaxHistoryItems = clamp(
-      Math.round(Number(maxHistoryItems) || 0),
-      0,
-      maxAvailable
-    );
-    const past = Array.isArray(history.past) && safeMaxHistoryItems > 0
-      ? history.past.slice(Math.max(0, history.past.length - safeMaxHistoryItems))
-      : [];
-    const future = Array.isArray(history.future) && safeMaxHistoryItems > 0
-      ? history.future.slice(Math.max(0, history.future.length - safeMaxHistoryItems))
-      : [];
+    // Undo/Redo is limited to the uninterrupted page session. Reload recovery
+    // restores the current document only, keeping the payload substantially
+    // smaller and avoiding stale history across a new page instance.
+    const past = [];
+    const future = [];
     return {
       version: RELOAD_SNAPSHOT_VERSION,
       at: Date.now(),
@@ -360,7 +350,10 @@
         applyHistorySnapshot(snapshot);
         if (restoredProjectId) {
           startupAutosaveRestoreProjectId = restoredProjectId;
-          setActiveAutosaveProjectId(restoredProjectId, { persist: false });
+          setActiveAutosaveProjectId(restoredProjectId, {
+            persist: false,
+            resetHistorySession: true,
+          });
         }
         if (parsedDocument?.sheets?.length) {
           Promise.resolve(restoreOpenProjectSheetsFromParsedDocument(parsedDocument, {
@@ -513,8 +506,8 @@
     }
     applyHistorySnapshot(payload.currentSnapshot);
     history.limit = payload.historyLimit;
-    history.past = payload.past;
-    history.future = payload.future;
+    history.past = [];
+    history.future = [];
     history.pending = null;
     trimHistoryStacksToLimit();
     if (payload.unsaved) {
@@ -535,7 +528,10 @@
     const startupProjectId = resolvedSharedProjectId || resolvedProjectId;
     if (startupProjectId) {
       startupAutosaveRestoreProjectId = startupProjectId;
-      setActiveAutosaveProjectId(startupProjectId, { persist: false });
+      setActiveAutosaveProjectId(startupProjectId, {
+        persist: false,
+        resetHistorySession: true,
+      });
     }
     if (parsedProjectDocument?.sheets?.length) {
       Promise.resolve(restoreOpenProjectSheetsFromParsedDocument(parsedProjectDocument, {

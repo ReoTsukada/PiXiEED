@@ -16,11 +16,11 @@
     function isImportableImageFile(file) {
       if (!file) return false;
       const type = typeof file.type === 'string' ? file.type.toLowerCase() : '';
-      if (type === 'image/png' || type === 'image/gif' || type === 'image/jpeg' || type === 'image/webp') {
+      if (type === 'image/png' || type === 'image/apng' || type === 'image/gif' || type === 'image/jpeg' || type === 'image/webp') {
         return true;
       }
       const name = typeof file.name === 'string' ? file.name.toLowerCase() : '';
-      return name.endsWith('.png') || name.endsWith('.gif') || name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.webp');
+      return name.endsWith('.png') || name.endsWith('.apng') || name.endsWith('.gif') || name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.webp');
     }
 
     function createImageImportError(message, cause) {

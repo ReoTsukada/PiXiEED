@@ -9594,11 +9594,15 @@
   const history = { past: [], future: [], pending: null, limit: DEFAULT_HISTORY_LIMIT };
   const coldHistoryStore = window.PiXiEEDrawModules?.coldHistoryStoreUtils?.createColdHistoryStoreUtils?.({
     chunkSize: 20,
-    maxEntriesPerDirection: isLightweightPersistenceMode() ? 300 : 1000,
+    // Cold history belongs only to the current editing session. Keep every
+    // evicted drawing operation for that session instead of applying a count
+    // cap; the next project-open boundary clears it before editing resumes.
+    maxEntriesPerDirection: Number.MAX_SAFE_INTEGER,
   }) || null;
   const coldHistoryStatusCache = new Map();
   const coldHistoryStatusRequests = new Map();
   const coldHistoryRefillRequests = new Map();
+  let coldHistorySessionGeneration = 0;
 
   function getActiveColdHistoryProjectId() {
     if (isSharedProjectCollaborativeMode?.()) return '';
@@ -9617,14 +9621,40 @@
     return normalizedStatus;
   }
 
+  function resetColdHistorySession(projectId = '') {
+    const normalizedProjectId = normalizeAutosaveProjectId?.(projectId || '') || '';
+    coldHistorySessionGeneration += 1;
+    if (!normalizedProjectId || !coldHistoryStore) return false;
+    if (
+      isSharedProjectCollaborativeMode?.()
+      || (SHARED_PROJECT_ID_PREFIX && normalizedProjectId.startsWith(SHARED_PROJECT_ID_PREFIX))
+    ) {
+      return false;
+    }
+    cacheColdHistoryStatus(normalizedProjectId, { pastCount: 0, futureCount: 0 });
+    const generation = coldHistorySessionGeneration;
+    coldHistoryStore.removeProject(normalizedProjectId)
+      .then(() => {
+        if (generation !== coldHistorySessionGeneration) return null;
+        return refreshColdHistoryStatus(normalizedProjectId);
+      })
+      .catch(error => console.warn('Failed to reset file-backed history for the editing session.', error));
+    return true;
+  }
+
   function refreshColdHistoryStatus(projectId = getActiveColdHistoryProjectId()) {
     const normalizedProjectId = normalizeAutosaveProjectId?.(projectId || '') || '';
     if (!coldHistoryStore || !normalizedProjectId) return Promise.resolve(null);
     if (coldHistoryStatusRequests.has(normalizedProjectId)) {
       return coldHistoryStatusRequests.get(normalizedProjectId);
     }
+    const generation = coldHistorySessionGeneration;
     const request = coldHistoryStore.getStatus(normalizedProjectId)
-      .then(status => cacheColdHistoryStatus(normalizedProjectId, status))
+      .then(status => (
+        generation === coldHistorySessionGeneration
+          ? cacheColdHistoryStatus(normalizedProjectId, status)
+          : null
+      ))
       .catch(error => {
         console.warn('Failed to read file-backed history status.', error);
         return null;
@@ -9670,8 +9700,13 @@
       ...cached,
       [`${normalizedDirection}Count`]: (cached[`${normalizedDirection}Count`] || 0) + 1,
     });
+    const generation = coldHistorySessionGeneration;
     coldHistoryStore.push(projectId, normalizedDirection, [entry])
-      .then(status => cacheColdHistoryStatus(projectId, status))
+      .then(status => (
+        generation === coldHistorySessionGeneration && projectId === getActiveColdHistoryProjectId()
+          ? cacheColdHistoryStatus(projectId, status)
+          : null
+      ))
       .catch(error => {
         console.warn('Failed to archive evicted history entry.', error);
         refreshColdHistoryStatus(projectId);
@@ -9696,8 +9731,12 @@
     const normalizedDirection = direction === 'future' ? 'future' : 'past';
     const requestKey = `${projectId}\u0000${normalizedDirection}`;
     if (!coldHistoryStore || !projectId || coldHistoryRefillRequests.has(requestKey)) return false;
+    const generation = coldHistorySessionGeneration;
     const request = coldHistoryStore.popLatest(projectId, normalizedDirection)
       .then(entries => {
+        if (generation !== coldHistorySessionGeneration || projectId !== getActiveColdHistoryProjectId()) {
+          return [];
+        }
         const target = normalizedDirection === 'future' ? history.future : history.past;
         if (Array.isArray(entries) && entries.length) {
           target.push(...entries);
@@ -14622,6 +14661,10 @@
     return openImportWorkflowUtilsModule.maybeImportQrCapture(...args);
   }
 
+  async function maybeImportMarketPurchase(...args) {
+    return openImportWorkflowUtilsModule.maybeImportMarketPurchase(...args);
+  }
+
   async function openExportDialog(...args) {
     return exportDialogWorkflowUtilsModule.openExportDialog(...args);
   }
@@ -15846,7 +15889,7 @@
     }
   }
 
-  function setActiveAutosaveProjectId(projectId, { persist = true } = {}) {
+  function setActiveAutosaveProjectId(projectId, { persist = true, resetHistorySession = false } = {}) {
     const normalizedId = normalizeAutosaveProjectId(projectId) || createAutosaveProjectId();
     const changed = autosaveProjectId !== normalizedId;
     autosaveProjectId = normalizedId;
@@ -15859,8 +15902,8 @@
         console.warn('Failed to persist autosave project id', error);
       });
     }
-    if (changed) {
-      refreshColdHistoryStatus(normalizedId);
+    if (changed || resetHistorySession) {
+      resetColdHistorySession(normalizedId);
       restoreFloatingPreviewReferenceMediaForActiveProject().catch(error => {
         console.warn('Failed to restore floating preview reference media on project switch', error);
       });
@@ -26129,8 +26172,14 @@
       console.info('[pixiedraw:startup]', { phase: 'startup-session-restore-skipped', reason: 'always-start-from-home' });
       let openedExternalImportProject = false;
       try {
+        setStartupProgressLabel(localizeText('購入済み素材を読込中…', 'Loading purchased asset...'));
+        openedExternalImportProject = await maybeImportMarketPurchase();
+      } catch (error) {
+        console.warn('Market purchase bootstrap failed', error);
+      }
+      try {
         setStartupProgressLabel(localizeText('起動内容を読込中…', 'Loading startup content...'));
-        openedExternalImportProject = await maybeImportLensCapture();
+        openedExternalImportProject = (await maybeImportLensCapture()) || openedExternalImportProject;
       } catch (error) {
         console.warn('Lens capture bootstrap failed', error);
       }

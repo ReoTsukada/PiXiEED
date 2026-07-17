@@ -391,7 +391,12 @@
     Object.entries(layoutMap).forEach(([key, placement]) => {
       const section = dom.sections[key];
       if (!section) return;
-      const target = isMobile ? placement.mobile : placement.desktop;
+      const sharedDetailsHost = key === 'details'
+        ? document.getElementById('pixieedCommonDetailsSlot')
+        : null;
+      const target = sharedDetailsHost instanceof HTMLElement
+        ? sharedDetailsHost
+        : (isMobile ? placement.mobile : placement.desktop);
       if (!target) {
         if (isMobile) {
           section.hidden = true;
@@ -402,7 +407,13 @@
       }
       target.appendChild(section);
       section.classList.add('panel-section');
-      section.classList.toggle('panel-section--mobile', isMobile);
+      section.classList.toggle('panel-section--mobile', isMobile && !(sharedDetailsHost instanceof HTMLElement));
+      if (sharedDetailsHost instanceof HTMLElement) {
+        section.hidden = false;
+        section.setAttribute('aria-hidden', 'false');
+        section.classList.remove('is-compact-flyout', 'is-bottom-docked');
+        section.classList.add('is-active', 'pixieed-common-details__hosted-section');
+      }
     });
 
     syncBottomTimelineDockState();

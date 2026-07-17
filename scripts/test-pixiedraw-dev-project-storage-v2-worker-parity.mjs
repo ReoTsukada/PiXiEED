@@ -669,12 +669,10 @@ async function runMultiSheetTimelapseParityScenario() {
     useWorker: true,
   });
   assert.deepEqual(normalizeForCompare(workerParsed), normalizeForCompare(mainParsed));
-  assert.equal(workerParsed.activeSheetId, 'sheet-active');
-  assert.equal(workerParsed.sheets.length, 2);
-  assert.equal(workerParsed.sheets[1].source, 'shared-sheet');
-  assert.equal(workerParsed.sheets[1].sharedProjectKey, 'legacy-shared-key');
-  assert.equal(workerParsed.sheets[1].project.document.canvases.length, 2);
-  assert.equal(workerParsed.sheets[1].project.session.timelapse.enabled, true);
+  assert.equal(workerParsed.activeSheetId, undefined);
+  assert.equal(workerParsed.sheets, undefined);
+  assert.equal(workerParsed.document.canvases.length, 2);
+  assert.equal(workerParsed.session.timelapse.enabled, true);
 
   bridge.dispose();
   return workerSerialized.blob.size;
@@ -707,8 +705,6 @@ async function runMultiSheetOmitTimelapseParityScenario() {
     useWorker: true,
   });
   assertEmptyTimelapsePayload(workerParsed.session.timelapse, 12);
-  assertEmptyTimelapsePayload(workerParsed.sheets[0].project.session.timelapse, 12);
-  assertEmptyTimelapsePayload(workerParsed.sheets[1].project.session.timelapse, 8);
 
   bridge.dispose();
   return workerSerialized.blob.size;
@@ -749,5 +745,5 @@ const omitSize = await runMultiSheetOmitTimelapseParityScenario();
 await runWorkerErrorScenario();
 
 console.log(
-  `V2 worker parity checks passed. single=${singleSize} bytes, multi+timelapse=${multiSize} bytes, multi-timelapse=${omitSize} bytes`
+  `V2 worker parity checks passed. single=${singleSize} bytes, active+timelapse=${multiSize} bytes, active-timelapse=${omitSize} bytes`
 );

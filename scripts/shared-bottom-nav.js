@@ -20,7 +20,7 @@
   } else if (!currentPath.includes('/projects/') && /(?:^|\/)pixiee-lens(?:\/|\/index\.html)?$/.test(currentPath)) {
     body.dataset.pixieedPage = 'pixiee-lens';
     doc.documentElement.dataset.pixieedPage = 'pixiee-lens';
-  } else if (/(?:^|\/)maoitu(?:\/|\/index\.html)?$/.test(currentPath)) {
+  } else if (!currentPath.includes('/projects/') && /(?:^|\/)maoitu(?:\/|\/index\.html)?$/.test(currentPath)) {
     body.dataset.pixieedPage = 'maoitu';
     doc.documentElement.dataset.pixieedPage = 'maoitu';
   }
@@ -30,13 +30,9 @@
 
   applyResponsivePageState();
   injectStyles();
+  ensureCommonTabBarController();
   replaceFooter();
   replaceBottomNav();
-  if (script.dataset.pixieedFooterAdLandscape === 'false') {
-    body.dataset.pixieedFooterAdLandscape = 'false';
-  } else {
-    delete body.dataset.pixieedFooterAdLandscape;
-  }
   if (script.dataset.pixieedFooterAd !== 'false') {
     ensureFooterAdController();
   }
@@ -44,9 +40,10 @@
   function resolveCurrentTab(pathname) {
     const path = String(pathname || '').toLowerCase();
     if (path.includes('/pixiedraw/') || path.includes('/pixieedrawdev/')) return 'draw';
+    if (path.includes('/market/')) return 'market';
     if (path.includes('/qr/') || path.includes('/qr-maker/')) return 'qr';
     if (path.includes('/pixiee-lens/')) return 'camera';
-    if (/(?:^|\/)account(?:\/|\/index\.html)?$/.test(path)) return 'profile';
+    if (/(?:^|\/)account(?:\/|\/index\.html)?$/.test(path)) return '';
     return 'home';
   }
 
@@ -62,7 +59,18 @@
     const controller = doc.createElement('script');
     controller.defer = true;
     controller.dataset.pixieedFooterAdController = 'true';
-    controller.src = relHref('scripts/bottom-nav-footer-ad.js?v=2026.07.14-shared-banner-height-lock2');
+    controller.src = relHref('scripts/bottom-nav-footer-ad.js?v=2026.07.17-unified-chrome10');
+    doc.body.appendChild(controller);
+  }
+
+  function ensureCommonTabBarController() {
+    if (window.__PIXIEED_COMMON_TAB_BAR__ || doc.querySelector('script[data-pixieed-common-tab-bar="true"]')) {
+      return;
+    }
+    const controller = doc.createElement('script');
+    controller.defer = true;
+    controller.dataset.pixieedCommonTabBar = 'true';
+    controller.src = relHref('scripts/shared-tab-bar.js?v=2026.07.17-market-public32');
     doc.body.appendChild(controller);
   }
 
@@ -177,18 +185,10 @@
 
       const icon = doc.createElement('span');
       icon.className = 'icon';
-      if (entry.useAvatar) {
-        const img = doc.createElement('img');
-        img.alt = '';
-        img.src = getProfileNavAvatarSrc();
-        img.dataset.profileNavAvatar = 'true';
-        icon.appendChild(img);
-      } else {
-        const img = doc.createElement('img');
-        img.alt = '';
-        img.src = relHref(entry.icon);
-        icon.appendChild(img);
-      }
+      const img = doc.createElement('img');
+      img.alt = '';
+      img.src = relHref(entry.icon);
+      icon.appendChild(img);
 
       const label = doc.createElement('span');
       label.textContent = entry.label;
@@ -198,13 +198,13 @@
     });
 
     body.appendChild(nav);
-    syncProfileNavAvatar();
   }
 
   function getFooterLinks() {
     return [
       { label: 'PiXiEEDraw', path: 'pixiedraw/index.html' },
       { label: 'PiXiEELENS', path: 'pixiee-lens/index.html' },
+      { label: 'マーケット', path: 'market/index.html' },
       { label: 'QR', path: 'qr/index.html' },
       { label: 'まおいつ', path: 'maoitu/index.html' },
       { label: '用語集', path: 'glossary/index.html' },
@@ -217,50 +217,12 @@
 
   function getNavItems() {
     return [
-      { key: 'home', label: 'ホーム', path: 'index.html', icon: 'FooterIcon1.png' },
-      { key: 'qr', label: 'QR', path: 'qr/index.html', icon: 'pixiedraw/assets/icons/tool-qr-edit.svg' },
+      { key: 'home', label: 'ホーム', path: 'index.html', icon: 'HOME.png?v=2026.07.17-icons2' },
+      { key: 'market', label: 'マーケット', path: 'market/index.html', icon: 'Market.png' },
       { key: 'draw', label: 'PiXiEEDraw', path: 'pixiedraw/index.html', icon: 'icon/icon-192-4.png', primary: true },
-      { key: 'camera', label: 'カメラ', path: 'pixiee-lens/index.html', icon: 'pixiedraw/assets/icons/pixieelensicon_frame_01.png' },
-      { key: 'profile', label: 'マイページ', path: 'account/index.html', icon: 'character-dots/maousama.png', useAvatar: true }
+      { key: 'camera', label: 'カメラ', path: 'pixiee-lens/index.html', icon: 'Camera.png' },
+      { key: 'qr', label: 'QR', path: 'qr/index.html', icon: 'QR.png' }
     ];
-  }
-
-  function getStoredAvatarId() {
-    try {
-      const saved = String(localStorage.getItem('pixieed_avatar') || '').trim().toLowerCase();
-      if (!saved || saved === 'pixiedraw') return 'mao';
-      return saved;
-    } catch (_error) {
-      return 'mao';
-    }
-  }
-
-  function resolveAvatarSrcFromId(avatarId) {
-    const id = String(avatarId || '').trim().toLowerCase();
-    if (!id || id === 'mao') return relHref('character-dots/maousama.png');
-    if (/^jerin[1-8]$/.test(id)) return relHref(`character-dots/Jerin${id.slice(5)}.png`);
-    if (/^jellnall([1-9]|1[0-9])$/.test(id)) return relHref(`character-dots/${id.toUpperCase()}.png`);
-    if (id === 'baburin') return relHref('character-dots/baburinpng.png');
-    return relHref('character-dots/maousama.png');
-  }
-
-  function getProfileNavAvatarSrc() {
-    const savedAvatarSrc = resolveAvatarSrcFromId(getStoredAvatarId());
-    if (savedAvatarSrc) {
-      return savedAvatarSrc;
-    }
-    const brandAvatar = doc.querySelector('#brandAvatar img');
-    if (brandAvatar?.getAttribute('src')) {
-      return brandAvatar.getAttribute('src');
-    }
-    return relHref('character-dots/maousama.png');
-  }
-
-  function syncProfileNavAvatar() {
-    const src = getProfileNavAvatarSrc();
-    doc.querySelectorAll('[data-profile-nav-avatar="true"]').forEach((img) => {
-      img.setAttribute('src', src);
-    });
   }
 
   function injectStyles() {
@@ -285,9 +247,27 @@
       }
       body.pixieed-seamless-page > .page,
       body.pixieed-seamless-page > main,
+      body.pixieed-seamless-page > .page-shell,
       body.pixieed-seamless-page > .page > main,
       body.pixieed-seamless-page > .page > .page-shell{
         gap:0 !important;
+        width:100%;
+        min-width:0;
+        box-sizing:border-box;
+        margin-left:auto !important;
+        margin-right:auto !important;
+      }
+      body.pixieed-seamless-page > .page > main,
+      body.pixieed-seamless-page > .page > .page-shell,
+      body.pixieed-seamless-page > .page-shell{
+        width:100%;
+        min-width:0;
+      }
+      body.pixieed-seamless-page .header-inner,
+      body.pixieed-seamless-page .section-inner,
+      body.pixieed-seamless-page .footer-inner{
+        margin-left:auto !important;
+        margin-right:auto !important;
       }
       body.pixieed-seamless-page main > section,
       body.pixieed-seamless-page .page > section,
@@ -365,6 +345,10 @@
         padding-bottom:max(84px, calc(var(--pixieed-shared-bottom-nav-height) + 16px + env(safe-area-inset-bottom, 0px))) !important;
       }
       @media (orientation: landscape){
+        body:not([data-pixieed-page="pixiedraw"]):not([data-pixieed-page="pixiee-lens"]):not([data-pixieed-page="maoitu"]){
+          padding-right:max(76px, calc(var(--pixieed-shared-side-nav-width) + var(--pixieed-shared-side-nav-gap) + env(safe-area-inset-right, 0px))) !important;
+          padding-bottom:0 !important;
+        }
         body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"]{
           padding-bottom:0 !important;
         }
@@ -372,34 +356,52 @@
           padding-right:max(76px, calc(var(--pixieed-shared-side-nav-width) + var(--pixieed-shared-side-nav-gap) + env(safe-area-inset-right, 0px))) !important;
           padding-bottom:0 !important;
         }
-        body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] .bottom-nav{
+        body .bottom-nav{
           top:0 !important;
           right:0 !important;
           bottom:0 !important;
           left:auto !important;
           width:var(--pixieed-shared-side-nav-width) !important;
-          height:100vh !important;
-          height:100dvh !important;
-          min-height:100vh !important;
-          min-height:100dvh !important;
-          max-height:100vh !important;
-          max-height:100dvh !important;
+          height:var(--viewport-height, var(--app-height, 100dvh)) !important;
+          min-height:var(--viewport-height, var(--app-height, 100dvh)) !important;
+          max-height:var(--viewport-height, var(--app-height, 100dvh)) !important;
           flex-direction:column !important;
-          justify-content:center;
+          justify-content:center !important;
           gap:2px;
-          padding:calc(env(safe-area-inset-top, 0px) + 8px) 0 calc(env(safe-area-inset-bottom, 0px) + 8px) !important;
-          border-top:0;
+          padding:calc(var(--safe-top, env(safe-area-inset-top, 0px)) + 8px) 0 calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 8px) !important;
+          border-top:0 !important;
           border-left:1px solid rgba(255,255,255,0.08);
           box-sizing:border-box;
         }
-        body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] .bottom-nav__item{
+        .bottom-nav__item{
           width:100%;
           flex:1 1 0 !important;
           max-height:76px;
           padding:5px 2px !important;
         }
-        body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] .bottom-nav__item--primary{
+        .bottom-nav__item--primary{
           transform:none !important;
+        }
+      }
+      @media (orientation: landscape) and (max-height:380px){
+        body .bottom-nav{
+          padding-top:calc(var(--safe-top, env(safe-area-inset-top, 0px)) + 4px) !important;
+          padding-bottom:calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 4px) !important;
+        }
+        .bottom-nav__item{
+          gap:2px !important;
+          padding:2px 1px !important;
+          font-size:9px !important;
+        }
+        .bottom-nav__item .icon{
+          width:21px !important;
+          height:21px !important;
+        }
+        .bottom-nav__item--primary .icon{
+          width:36px !important;
+          height:36px !important;
+          padding:6px !important;
+          border-radius:13px !important;
         }
       }
       .pixieed-shared-footer{
@@ -450,12 +452,16 @@
         border-color:rgba(255,255,255,0.26);
         background:rgba(255,255,255,0.08);
       }
-      .bottom-nav{
-        position:fixed;
-        bottom:0;
-        left:0;
-        right:0;
-        height:var(--pixieed-shared-bottom-nav-height);
+      body .bottom-nav{
+        position:fixed!important;
+        top:auto!important;
+        bottom:0!important;
+        left:0!important;
+        right:0!important;
+        width:100%!important;
+        height:var(--pixieed-shared-bottom-nav-height)!important;
+        min-height:var(--pixieed-shared-bottom-nav-height)!important;
+        max-height:var(--pixieed-shared-bottom-nav-height)!important;
         background:rgba(11,18,36,0.96);
         border-top:1px solid rgba(255,255,255,0.08);
         display:flex;
@@ -523,22 +529,22 @@
         outline:2px solid #79c0ff;
         outline-offset:-2px;
       }
-      .bottom-nav__item[data-tab="profile"] .icon{
-        border-radius:999px;
-        overflow:hidden;
-        background:rgba(255,255,255,0.08);
-        border:1px solid rgba(255,255,255,0.16);
-        padding:2px;
+      @media (orientation:landscape){
+        body .bottom-nav{
+          top:0!important;
+          right:0!important;
+          bottom:0!important;
+          left:auto!important;
+          width:var(--pixieed-shared-side-nav-width)!important;
+          height:var(--viewport-height, var(--app-height, 100dvh))!important;
+          min-height:var(--viewport-height, var(--app-height, 100dvh))!important;
+          max-height:var(--viewport-height, var(--app-height, 100dvh))!important;
+        }
       }
     `;
     doc.head.appendChild(style);
   }
 
-  window.addEventListener('storage', (event) => {
-    if (!event.key || !event.key.startsWith('pixieed_')) return;
-    syncProfileNavAvatar();
-  });
-  window.addEventListener('pixieed:profile-updated', syncProfileNavAvatar);
   window.addEventListener('resize', applyResponsivePageState, { passive: true });
   window.addEventListener('orientationchange', applyResponsivePageState, { passive: true });
   if (window.visualViewport) {
