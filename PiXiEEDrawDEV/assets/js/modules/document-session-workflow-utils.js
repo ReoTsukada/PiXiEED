@@ -318,13 +318,16 @@
       }
       return false;
     }
-    // A project restored from an IndexedDB V2 manifest is already trusted V2
-    // storage. The generic parsed-value registry may identify its JSON-shaped
-    // in-memory object as the V1 JSON adapter even though no V1 file was read.
-    // Remove only that false adapter label; real legacy sheets/canvases are
-    // still detected below and continue through the migration confirmation.
+    // IndexedDB V2 projects and validated canonical V2 imports are already V2.
+    // The generic parsed-value registry can identify their JSON-shaped in-memory
+    // payload as the V1 JSON adapter even though no V1 file was read. Remove only
+    // that false adapter label; real legacy sheets/canvases still continue
+    // through the migration confirmation below.
     if (
-      Number(options?.trustedAutosaveSchemaVersion) === 2
+      (
+        Number(options?.trustedAutosaveSchemaVersion) === 2
+        || parsedDocument?.canonicalPayloadFormat === 'v2'
+      )
       && parsedDocument?.storageAdapterId === 'pixieedraw-v1-json'
     ) {
       parsedDocument.storageAdapterId = '';
@@ -1261,6 +1264,15 @@
         ? normalizedParsed.activeSheetId
         : '',
       storageAdapterId: typeof parsedResult?.adapterId === 'string' ? parsedResult.adapterId : '',
+      canonicalPayloadFormat: normalizedParsed?.canonicalPayloadFormat === 'v2' ? 'v2' : '',
+      canonicalSchemaVersion: normalizedParsed?.canonicalPayloadFormat === 'v2'
+        ? Math.max(1, Math.round(Number(normalizedParsed.canonicalSchemaVersion) || 1))
+        : 0,
+      canonicalSourceMetadata: normalizedParsed?.canonicalPayloadFormat === 'v2'
+        && normalizedParsed.canonicalSourceMetadata
+        && typeof normalizedParsed.canonicalSourceMetadata === 'object'
+        ? normalizedParsed.canonicalSourceMetadata
+        : null,
     };
   }
 
