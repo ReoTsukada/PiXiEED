@@ -55,6 +55,7 @@
   }
 }
 </script>
+<script src="../scripts/ad-account-control.js?v=2026.07.18-ad-permissions1"></script>
 <script src="../scripts/third-party-error-guard.js"></script>
 <script>
   (function configureEmbedMode() {
@@ -96,7 +97,7 @@
       window.__PIXIEEDRAW_MODAL_ADS_ENABLED__ === true
       && window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.() === true
     );
-    window.__PIXIEED_ADS_DISABLED__ = !shouldShowAds;
+    window.__PIXIEED_ADS_DISABLED__ = window.__PIXIEED_AD_FREE_ACCOUNT__ === true || !shouldShowAds;
     if (window.__PIXIEED_ADS_DISABLED__) {
       return;
     }
@@ -130,6 +131,13 @@
           adLoadPromise = null;
           resolve(false);
         };
+        if (window.PiXiEEDAdAccountControl) {
+          window.PiXiEEDAdAccountControl.loadAdsense().then((loaded) => {
+            if (loaded) finish();
+            else fail();
+          });
+          return;
+        }
         const existing = document.querySelector('script[src*="pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"]');
         if (existing instanceof HTMLScriptElement) {
           if (existing.dataset.pixieedReady === '1' || window.adsbygoogle) {
@@ -2517,7 +2525,7 @@
   </script>
 
 	<script src="../scripts/tool-fullscreen.js?v=2026.07.15-pixiedraw-fullscreen-restore1"></script>
-	<script src="../scripts/shared-bottom-nav.js?v=2026.07.17-market-public32"></script>
+	<script src="../scripts/shared-bottom-nav.js?v=2026.07.18-ad-permissions1"></script>
 	<script>
     (function initOperationHelpAd() {
       if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.()) return;

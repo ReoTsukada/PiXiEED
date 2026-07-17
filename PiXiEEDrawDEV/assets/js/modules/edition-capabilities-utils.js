@@ -18,7 +18,7 @@
 
   function enforceEditionAdvertising() {
     const showAds = window.__PIXIEEDRAW_SHOULD_SHOW_ADS__();
-    window.__PIXIEED_ADS_DISABLED__ = !showAds;
+    window.__PIXIEED_ADS_DISABLED__ = window.__PIXIEED_AD_FREE_ACCOUNT__ === true || !showAds;
     if (!showAds || typeof document === 'undefined') return;
     document.body?.classList.remove('pixieed-adfree');
     document.documentElement?.classList.remove('pixieed-adfree');

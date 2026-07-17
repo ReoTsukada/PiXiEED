@@ -1,10 +1,11 @@
 (function() {
+  window.PiXiEEDAdAccountControl?.refresh?.();
   if (window.location.protocol === 'file:') {
     window.pixieedObserveAds = function noopObserveAds() {};
     return;
   }
 
-  if (window.__PIXIEED_ADS_DISABLED__) return;
+  if (window.__PIXIEED_ADS_DISABLED__ || window.__PIXIEED_AD_FREE_ACCOUNT__) return;
   if (window.pixieedObserveAds) return;
 
   const SLOT_SEQUENCE = ['2141591954', '9073878884', '2261515379'];
@@ -37,6 +38,11 @@
   }
 
   function ensureAdsScript() {
+    if (window.PiXiEEDAdAccountControl) {
+      return window.PiXiEEDAdAccountControl.loadAdsense().then((loaded) => {
+        if (!loaded) throw new Error('ads disabled for this account');
+      });
+    }
     const existing = document.querySelector('script[src*="pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"]');
     if (existing?.dataset.pixieedReady === '1') {
       return Promise.resolve();

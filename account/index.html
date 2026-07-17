@@ -409,6 +409,23 @@
             <div class="account-service-grid">
               <a class="account-service" href="../market/review.html"><strong>マーケット管理を開く</strong><span>商品審査・販売者確認</span></a>
             </div>
+            <div class="account-admin-permission" aria-labelledby="adFreePermissionTitle">
+              <div>
+                <h3 id="adFreePermissionTitle">広告OFF権限</h3>
+                <p class="helper">登録済みユーザーへ広告非表示だけを付与します。管理者・DEV・購入・出品の権限は付きません。</p>
+              </div>
+              <form class="account-admin-permission__form" id="adFreeGrantForm">
+                <label class="auth-field" for="adFreeGrantEmail">
+                  対象ユーザーのメールアドレス
+                  <input class="auth-input" id="adFreeGrantEmail" type="email" inputmode="email" autocomplete="off" required placeholder="user@example.com">
+                </label>
+                <button class="account-action" id="adFreeGrantButton" type="submit">広告OFFを付与</button>
+              </form>
+              <p class="account-admin-permission__status" id="adFreeGrantStatus" role="status" aria-live="polite"></p>
+              <div class="account-admin-permission__list" id="adFreeGrantList" aria-label="広告OFF権限を持つユーザー">
+                <p class="helper">権限一覧を確認しています。</p>
+              </div>
+            </div>
           </section>
           <section class="account-panel" data-market-dev-only hidden>
             <div class="account-panel__head">
@@ -443,14 +460,15 @@
     </main>
   </div>
 
-  <script src="../scripts/shared-auth-panel.js?v=2026.07.17-account-auth4"></script>
+  <script src="../scripts/shared-auth-panel.js?v=2026.07.18-ad-permissions1"></script>
   <script src="../scripts/pixieed-dev-access.js?v=2026.07.17-market-dev1"></script>
   <script src="../scripts/account-dev-tools.js?v=2026.07.18-market-admin1"></script>
+  <script src="../scripts/account-ad-permissions.js?v=2026.07.18-ad-permissions1"></script>
   <script src="../scripts/shared-profile-header.js"></script>
-  <script src="../scripts/shared-bottom-nav.js?v=2026.07.17-market-public32"></script>
+  <script src="../scripts/shared-bottom-nav.js?v=2026.07.18-ad-permissions1"></script>
   <script src="../scripts/account-local-projects.js?v=2026.07.01-local-projects"></script>
   <script src="../scripts/market-purchase-delivery.js?v=2026.07.17-all-open1"></script>
-  <script src="../scripts/account-market-purchases.js?v=2026.07.17-dev-account1"></script>
+  <script src="../scripts/account-market-purchases.js?v=2026.07.18-admin-grant1"></script>
   <script src="../market/media-protection.js?v=2026.07.17-preview-protection1"></script>
   <script src="../scripts/account-market-seller.js?v=2026.07.17-dev-account1"></script>
   <script src="../scripts/pixel-art-fit.js"></script>

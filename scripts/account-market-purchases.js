@@ -90,13 +90,14 @@
 
   function licenseText(payload) {
     const optionIds = Array.isArray(payload.license?.selected_option_ids) ? payload.license.selected_option_ids : [];
+    const isAdminGrant = payload.purchase?.status === 'granted';
     return [
-      'PiXiEED マーケット購入素材',
+      isAdminGrant ? 'PiXiEED マーケット管理者取得素材' : 'PiXiEED マーケット購入素材',
       '',
       `商品: ${payload.asset?.title || ''}`,
-      `購入ID: ${payload.purchase?.id || ''}`,
+      `${isAdminGrant ? '管理者取得ID' : '購入ID'}: ${payload.purchase?.id || ''}`,
       `出力追跡番号: ${payload.trace_id || ''}`,
-      `購入日: ${formatDate(payload.purchase?.paid_at)}`,
+      `${isAdminGrant ? '取得日' : '購入日'}: ${formatDate(payload.purchase?.paid_at)}`,
       `選択形式: ${(payload.formats || []).map(formatLabel).join(' / ')}`,
       `購入オプション: ${optionIds.length ? optionIds.join(', ') : 'なし'}`,
       `派生出品: ${payload.license?.derivative_sales_allowed ? '商品条件に従い可能' : '不可'}`,
@@ -134,7 +135,9 @@
     productType.className = formats.includes('pixiedraw-project') ? 'is-pixiedraw-product' : 'is-general-product';
     productType.textContent = formats.includes('pixiedraw-project') ? 'PiXiEEDraw作品' : '一般素材';
     badges.appendChild(productType);
-    const paid = document.createElement('span'); paid.textContent = '購入済み'; badges.appendChild(paid);
+    const paid = document.createElement('span');
+    paid.textContent = purchase.status === 'granted' ? '管理者取得' : '購入済み';
+    badges.appendChild(paid);
     const right = purchase.derivative_listing_right;
     if (right?.status === 'active') { const badge = document.createElement('span'); badge.textContent = '派生出品可能'; badges.appendChild(badge); }
     const meta = document.createElement('div'); meta.className = 'market-card__meta';

@@ -1102,6 +1102,7 @@
             writeCachedAuthSession(null);
           }
           supabaseUser = session?.user || null;
+          window.PiXiEEDAdAccountControl?.refresh?.();
           if (event === 'PASSWORD_RECOVERY') {
             setAuthMode('update-password');
           }
@@ -1111,6 +1112,7 @@
         });
       }
       await syncProfileFromServer();
+      window.PiXiEEDAdAccountControl?.refresh?.();
       maybeReturnToCaller();
       if (!supabaseUser && oauthErrorMessage) {
         maybeClearOAuthParamsFromUrl();

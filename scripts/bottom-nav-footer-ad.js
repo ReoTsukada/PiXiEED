@@ -8,7 +8,8 @@
   let maoituAdsScriptDelayApplied = false;
 
   function arePixieedAdsDisabled() {
-    return Boolean(window.__PIXIEED_ADS_DISABLED__);
+    window.PiXiEEDAdAccountControl?.refresh?.();
+    return Boolean(window.__PIXIEED_ADS_DISABLED__ || window.__PIXIEED_AD_FREE_ACCOUNT__);
   }
 
   function isLocalFilePreview() {
@@ -452,7 +453,11 @@
   }
 
   function ensureAdsScript() {
-    if (isLocalFilePreview()) return;
+    if (isLocalFilePreview() || arePixieedAdsDisabled()) return;
+    if (window.PiXiEEDAdAccountControl) {
+      window.PiXiEEDAdAccountControl.loadAdsense();
+      return;
+    }
     const existing = document.querySelector('script[src*="pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"]');
     if (existing) return;
     if (isMaoituPage() && window.__MAOITU_GAME_ACTIVE__) {

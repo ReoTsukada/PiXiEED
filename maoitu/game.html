@@ -2,6 +2,7 @@
 
 <html lang="ja">
 <head>
+<script src="../scripts/ad-account-control.js?v=2026.07.18-ad-permissions1"></script>
 <meta content="https://pixieed.jp/maoitu/ogp.png" property="og:image"/>
 <meta charset="utf-8"/>
 <meta content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" name="viewport"/>
@@ -62,11 +63,9 @@ if (!window.__MAOITU_EMBED_MODE__) {
     project_name: PROJECT_NAME
   });
   gtag('event', 'project_open_maoitu');
-  const adsScript = document.createElement('script');
-  adsScript.async = true;
-  adsScript.crossOrigin = 'anonymous';
-  adsScript.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253';
-  document.head.appendChild(adsScript);
+  if (!window.__PIXIEED_ADS_DISABLED__ && !window.__PIXIEED_AD_FREE_ACCOUNT__) {
+    window.PiXiEEDAdAccountControl?.loadAdsense?.();
+  }
 }
 </script>
 <style>

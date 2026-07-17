@@ -1,6 +1,7 @@
 (function () {
   function arePixieedAdsDisabled() {
-    return Boolean(window.__PIXIEED_ADS_DISABLED__);
+    window.PiXiEEDAdAccountControl?.refresh?.();
+    return Boolean(window.__PIXIEED_ADS_DISABLED__ || window.__PIXIEED_AD_FREE_ACCOUNT__);
   }
 
   function init() {
@@ -1143,6 +1144,18 @@
            data-ad-slot="rotate"></ins>
     `;
     document.body.appendChild(footer);
+
+    if (window.PiXiEEDAdAccountControl) {
+      window.PiXiEEDAdAccountControl.loadAdsense().then((loaded) => {
+        if (!loaded) return;
+        if (window.pixieedObserveAds) window.pixieedObserveAds();
+        else {
+          window.adsbygoogle = window.adsbygoogle || [];
+          window.adsbygoogle.push({});
+        }
+      });
+      return;
+    }
 
     const adsScriptSelector = 'script[src*="pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"]';
     if (!document.querySelector(adsScriptSelector)) {

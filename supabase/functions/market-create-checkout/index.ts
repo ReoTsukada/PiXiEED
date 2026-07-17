@@ -25,13 +25,18 @@ serve(async (request) => {
     const admin = createAdminClient();
     const { data: ownedPurchase, error: ownedError } = await admin
       .from("market_purchases")
-      .select("id")
+      .select("id,status")
       .eq("buyer_user_id", user.id)
       .eq("asset_id", assetId)
-      .in("status", ["paid", "disputed"])
+      .in("status", ["paid", "granted", "disputed"])
       .maybeSingle();
     if (ownedError) throw ownedError;
-    if (ownedPurchase) return jsonResponse(request, { ok: false, error: "この商品は購入済みです。" }, 409);
+    if (ownedPurchase) {
+      const message = ownedPurchase.status === "granted"
+        ? "この商品は管理者として取得済みです。"
+        : "この商品は購入済みです。";
+      return jsonResponse(request, { ok: false, error: message }, 409);
+    }
 
     const { data: intent, error: intentError } = await client.rpc("market_create_purchase_intent_v1", {
       input_asset_id: assetId,

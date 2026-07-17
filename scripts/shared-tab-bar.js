@@ -534,7 +534,8 @@
     const adContainer = currentUi?.ad;
     const ad = adContainer?.querySelector('ins.adsbygoogle');
     if (!(adContainer instanceof HTMLElement) || !(ad instanceof HTMLElement)) return;
-    if (window.__PIXIEED_ADS_DISABLED__) {
+    window.PiXiEEDAdAccountControl?.refresh?.();
+    if (window.__PIXIEED_ADS_DISABLED__ || window.__PIXIEED_AD_FREE_ACCOUNT__) {
       adContainer.hidden = true;
       return;
     }
@@ -567,8 +568,22 @@
       window.requestAnimationFrame(() => window.requestAnimationFrame(render));
     };
     if (typeof window.__PIXIEEDRAW_LOAD_ADS__ === 'function') {
-      Promise.resolve(window.__PIXIEEDRAW_LOAD_ADS__()).then(scheduleRender).catch(() => {
-        delete ad.dataset.pixieedDetailsAdRequested;
+      Promise.resolve(window.__PIXIEEDRAW_LOAD_ADS__()).then((loaded) => {
+        if (loaded) scheduleRender();
+        else {
+          adContainer.hidden = true;
+          delete ad.dataset.pixieedDetailsAdRequested;
+        }
+      });
+      return;
+    }
+    if (window.PiXiEEDAdAccountControl) {
+      window.PiXiEEDAdAccountControl.loadAdsense().then((loaded) => {
+        if (loaded) scheduleRender();
+        else {
+          adContainer.hidden = true;
+          delete ad.dataset.pixieedDetailsAdRequested;
+        }
       });
       return;
     }

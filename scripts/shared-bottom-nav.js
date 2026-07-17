@@ -30,12 +30,12 @@
 
   applyResponsivePageState();
   injectStyles();
-  ensureCommonTabBarController();
   replaceFooter();
   replaceBottomNav();
-  if (script.dataset.pixieedFooterAd !== 'false') {
-    ensureFooterAdController();
-  }
+  ensureAdAccountControl(() => {
+    ensureCommonTabBarController();
+    if (script.dataset.pixieedFooterAd !== 'false') ensureFooterAdController();
+  });
 
   function resolveCurrentTab(pathname) {
     const path = String(pathname || '').toLowerCase();
@@ -59,8 +59,28 @@
     const controller = doc.createElement('script');
     controller.defer = true;
     controller.dataset.pixieedFooterAdController = 'true';
-    controller.src = relHref('scripts/bottom-nav-footer-ad.js?v=2026.07.17-unified-chrome10');
+    controller.src = relHref('scripts/bottom-nav-footer-ad.js?v=2026.07.18-ad-permissions1');
     doc.body.appendChild(controller);
+  }
+
+  function ensureAdAccountControl(ready) {
+    if (window.PiXiEEDAdAccountControl) {
+      window.PiXiEEDAdAccountControl.refresh();
+      ready();
+      return;
+    }
+    const existing = doc.querySelector('script[data-pixieed-ad-account-control="true"]');
+    if (existing) {
+      existing.addEventListener('load', ready, { once: true });
+      return;
+    }
+    const controller = doc.createElement('script');
+    controller.async = false;
+    controller.dataset.pixieedAdAccountControl = 'true';
+    controller.src = relHref('scripts/ad-account-control.js?v=2026.07.18-ad-permissions1');
+    controller.addEventListener('load', ready, { once: true });
+    controller.addEventListener('error', ready, { once: true });
+    doc.head.appendChild(controller);
   }
 
   function ensureCommonTabBarController() {
@@ -70,7 +90,7 @@
     const controller = doc.createElement('script');
     controller.defer = true;
     controller.dataset.pixieedCommonTabBar = 'true';
-    controller.src = relHref('scripts/shared-tab-bar.js?v=2026.07.17-market-public32');
+    controller.src = relHref('scripts/shared-tab-bar.js?v=2026.07.18-ad-permissions1');
     doc.body.appendChild(controller);
   }
 

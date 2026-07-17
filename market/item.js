@@ -94,12 +94,37 @@
     if (!purchaseClient || !currentAsset) return null;
     const { data } = await purchaseClient
       .from('market_purchases')
-      .select('id,status')
+      .select('id,status,payment_provider')
       .eq('asset_id', currentAsset.id)
-      .in('status', ['paid', 'disputed'])
+      .in('status', ['paid', 'granted', 'disputed'])
       .limit(1)
       .maybeSingle();
     return data || null;
+  }
+
+  async function grantAdminAccess() {
+    if (!purchaseClient || !currentAsset) return;
+    setPurchaseState({ disabled: true, label: '管理者取得を処理中', status: '無料取得権をサーバーで確認しています。' });
+    try {
+      const { data, error } = await purchaseClient.rpc('market_grant_admin_asset_access_v1', {
+        input_asset_id: currentAsset.id
+      });
+      if (error || !data?.purchase_id) throw new Error(error?.message || '管理者取得を完了できませんでした');
+      const alreadyPaid = data.status === 'paid';
+      setPurchaseState({
+        disabled: true,
+        label: alreadyPaid ? '購入済み' : '管理者取得済み',
+        status: alreadyPaid
+          ? 'この商品は購入済みです。マイページから確認できます。'
+          : '無料取得しました。販売数・限定販売枠・売上には加算されません。マイページから出力できます。'
+      });
+    } catch (error) {
+      setPurchaseState({
+        disabled: false,
+        label: '管理者として無料取得',
+        status: `管理者取得を完了できませんでした: ${error.message || '時間をおいて再試行してください'}`
+      });
+    }
   }
 
   async function waitForPaidPurchase() {
@@ -144,14 +169,6 @@
 
   async function initPurchase() {
     if (!currentAsset) return;
-    if (Number(currentAsset.sale_price_yen || 0) < 500) {
-      setPurchaseState({ disabled: true, label: '販売停止中', status: '現在の最低販売価格500円を下回るため購入できません。' });
-      return;
-    }
-    if (isSoldOut(currentAsset)) {
-      setPurchaseState({ disabled: true, label: 'SOLD OUT', status: '限定数に達したため売り切れました。商品情報は引き続き閲覧できます。' });
-      return;
-    }
     if (currentAsset.local_test === true) {
       setPurchaseState({
         disabled: true,
@@ -180,17 +197,39 @@
         $('itemPurchase').addEventListener('click', () => { window.location.href = '../account/index.html'; }, { once: true });
         return;
       }
-      if (currentAsset.creator_user_id === purchaseUser.id) {
-        setPurchaseState({ disabled: true, label: '自分の商品です', status: '出品者本人は自分の商品を購入できません。' });
-        return;
-      }
       const existingPurchase = await findExistingPurchase();
       if (existingPurchase?.status === 'paid') {
         setPurchaseState({ disabled: true, label: '購入済み', status: 'この商品は購入済みです。マイページから確認できます。' });
         return;
       }
+      if (existingPurchase?.status === 'granted') {
+        setPurchaseState({ disabled: true, label: '管理者取得済み', status: '管理者として無料取得済みです。マイページから確認できます。' });
+        return;
+      }
       if (existingPurchase?.status === 'disputed') {
         setPurchaseState({ disabled: true, label: '確認中', status: 'この購入は支払い確認中のため、再購入できません。' });
+        return;
+      }
+      const { data: isAdmin, error: adminError } = await purchaseClient.rpc('market_current_user_is_admin');
+      if (!adminError && isAdmin === true) {
+        setPurchaseState({
+          disabled: false,
+          label: '管理者として無料取得',
+          status: 'Stripe決済を行わず取得できます。販売数・限定販売枠・売上には加算されません。'
+        });
+        $('itemPurchase').addEventListener('click', grantAdminAccess);
+        return;
+      }
+      if (Number(currentAsset.sale_price_yen || 0) < 500) {
+        setPurchaseState({ disabled: true, label: '販売停止中', status: '現在の最低販売価格500円を下回るため購入できません。' });
+        return;
+      }
+      if (isSoldOut(currentAsset)) {
+        setPurchaseState({ disabled: true, label: 'SOLD OUT', status: '限定数に達したため売り切れました。商品情報は引き続き閲覧できます。' });
+        return;
+      }
+      if (currentAsset.creator_user_id === purchaseUser.id) {
+        setPurchaseState({ disabled: true, label: '自分の商品です', status: '出品者本人は自分の商品を購入できません。' });
         return;
       }
       const purchaseResult = new URLSearchParams(location.search).get('purchase');

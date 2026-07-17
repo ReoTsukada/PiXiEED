@@ -42,10 +42,10 @@ for (const filePath of listHtmlFiles(root)) {
     assert.match(html, /shared-bottom-nav\.js\?v=/, `${relativePath} is missing shared page chrome`);
   }
   if (html.includes('shared-bottom-nav.js?v=')) {
-    assert.match(html, /shared-bottom-nav\.js\?v=2026\.07\.17-market-public32/, `${relativePath} has stale shared navigation`);
+    assert.match(html, /shared-bottom-nav\.js\?v=2026\.07\.18-ad-permissions1/, `${relativePath} has stale shared navigation`);
   }
   if (html.includes('bottom-nav-footer-ad.js?v=')) {
-    assert.match(html, /bottom-nav-footer-ad\.js\?v=2026\.07\.17-unified-chrome10/, `${relativePath} has stale shared advertising chrome`);
+    assert.match(html, /bottom-nav-footer-ad\.js\?v=2026\.07\.18-ad-permissions1/, `${relativePath} has stale shared advertising chrome`);
   }
 }
 

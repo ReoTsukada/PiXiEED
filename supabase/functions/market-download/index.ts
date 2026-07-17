@@ -101,7 +101,7 @@ async function loadLibrary(request: Request, userId: string) {
     .from("market_purchases")
     .select("id,asset_id,purchase_kind,status,paid_at,created_at")
     .eq("buyer_user_id", userId)
-    .eq("status", "paid")
+    .in("status", ["paid", "granted"])
     .order("created_at", { ascending: false });
   if (purchaseError) throw purchaseError;
   if (!purchases?.length) return jsonResponse(request, { items: [] });
@@ -147,6 +147,7 @@ async function loadLibrary(request: Request, userId: string) {
       const includedFormats = safeFormats(asset.included_formats);
       return {
         id: purchase.id,
+        status: purchase.status,
         purchase_kind: purchase.purchase_kind,
         paid_at: purchase.paid_at,
         created_at: purchase.created_at,
@@ -181,10 +182,10 @@ async function authorizeDelivery(request: Request, userId: string, body: JsonRec
 
   const { data: purchase, error: purchaseError } = await admin
     .from("market_purchases")
-    .select("id,asset_id,paid_at,created_at")
+    .select("id,asset_id,status,paid_at,created_at")
     .eq("buyer_user_id", userId)
     .eq("asset_id", assetId)
-    .eq("status", "paid")
+    .in("status", ["paid", "granted"])
     .maybeSingle();
   if (purchaseError) throw purchaseError;
   if (!purchase) return jsonResponse(request, { error: "この商品の有効な購入権を確認できませんでした。" }, 403);
@@ -257,7 +258,7 @@ async function authorizeDelivery(request: Request, userId: string, body: JsonRec
 
   return jsonResponse(request, {
     asset: { id: asset.id, title: asset.title },
-    purchase: { id: purchase.id, paid_at: purchase.paid_at || purchase.created_at },
+    purchase: { id: purchase.id, status: purchase.status, paid_at: purchase.paid_at || purchase.created_at },
     kind,
     formats: requestedFormats,
     files: signedFiles,
