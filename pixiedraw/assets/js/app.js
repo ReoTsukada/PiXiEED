@@ -2536,7 +2536,11 @@
   }
 
   function getMaxSharedProjectCount(...args) {
-    return pixieedSupportBenefitUtilsModule.getMaxSharedProjectCount(...args);
+    const resolveLimit = pixieedSupportBenefitUtilsModule.getMaxSharedProjectCount;
+    if (typeof resolveLimit !== 'function') {
+      return Math.max(1, Number(SHARED_PROJECT_LIMIT_DEFAULT) || 1);
+    }
+    return resolveLimit(...args);
   }
 
   const localViewportCanvasWorkflowUtilsModule = window.PiXiEEDrawModules?.localViewportCanvasWorkflowUtils?.createLocalViewportCanvasWorkflowUtils?.({
@@ -16181,6 +16185,9 @@
   }
 
   async function ensureSharedRecentProjectsAccountSynced(...args) {
+    if (!SHARED_PROJECTS_ENABLED) {
+      return [];
+    }
     return recentProjectWorkflowUtilsModule.ensureSharedRecentProjectsAccountSynced(...args);
   }
 
@@ -24897,6 +24904,9 @@
   }
 
   async function syncSharedRecentProjectsFromAccount(...args) {
+    if (!SHARED_PROJECTS_ENABLED) {
+      return [];
+    }
     return await sharedProjectWorkflowUtilsModule.syncSharedRecentProjectsFromAccount(...args);
   }
 
