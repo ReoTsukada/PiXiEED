@@ -42,6 +42,6 @@ assert.doesNotMatch(autosave, /projectExportIntegrity\s*=\s*\{/);
 assert.match(autosave, /writeAutosaveV2Primary/);
 assert.match(exportRendering, /thumbnail:\s*previewThumbnail/);
 assert.match(html, /startup-workflow-utils\.js\?v=20260715-startup-grid-no-oval1/);
-assert.match(html, /app\.js\?v=20260717-099/);
+assert.match(html, /app\.js\?v=20260717-100/);
 
 console.log('PiXiEEDrawDEV P13 startup certified card checks passed.');
