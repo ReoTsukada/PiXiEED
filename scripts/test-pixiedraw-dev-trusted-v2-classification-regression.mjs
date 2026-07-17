@@ -6,8 +6,8 @@ const source = fs.readFileSync(path, 'utf8');
 
 assert.match(
   source,
-  /Number\(options\?\.trustedAutosaveSchemaVersion\) === 2\s*&& parsedDocument\?\.storageAdapterId === 'pixieedraw-v1-json'/,
-  'trusted IndexedDB V2 payloads must discard the false V1 JSON adapter label'
+  /Number\(options\?\.trustedAutosaveSchemaVersion\) === 2\s*\|\| parsedDocument\?\.canonicalPayloadFormat === 'v2'[\s\S]{0,120}&& parsedDocument\?\.storageAdapterId === 'pixieedraw-v1-json'/,
+  'trusted IndexedDB and canonical V2 payloads must discard the false V1 JSON adapter label'
 );
 assert.match(
   source,
