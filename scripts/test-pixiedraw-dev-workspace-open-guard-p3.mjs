@@ -25,6 +25,6 @@ assert.match(startupSource, /migrateLegacyLocalProjectsToTrueV2/);
 assert.match(indexSource, /window\.__PIXIEEDRAW_AD_DEBUG__ !== true/);
 assert.doesNotMatch(indexSource, /pixieed-workspace\.js|autosaveDestinationDialog|bindExportFolder/);
 assert.match(indexSource, /startup-workflow-utils\.js\?v=20260715-startup-grid-no-oval1/);
-assert.match(indexSource, /document-session-workflow-utils\.js\?v=20260715-local-true-v2-cleanup1/);
+assert.match(indexSource, /document-session-workflow-utils\.js\?v=20260717-canonical-image-open1/);
 
 console.log('PiXiEEDrawDEV workspace open guard checks passed');
