@@ -24,6 +24,8 @@ const dom = {
   mistakeLabel: document.getElementById('mistakeLabel'),
   canvasOriginal: document.getElementById('canvasOriginal'),
   canvasChallenge: document.getElementById('canvasChallenge'),
+  stageOriginalLabel: document.getElementById('stageOriginalLabel'),
+  stageChallengeLabel: document.getElementById('stageChallengeLabel'),
   overlayOriginal: document.getElementById('overlayOriginal'),
   overlayChallenge: document.getElementById('overlayChallenge'),
   completionOverlay: document.getElementById('completionOverlay'),
@@ -2561,6 +2563,9 @@ function setActiveScreen(target) {
     element.setAttribute('aria-hidden', String(!active));
   });
 
+  document.body.dataset.pixfindScreen = target;
+  if (dom.app) dom.app.dataset.activeScreen = target;
+
   if (target === 'game') {
     dom.app?.classList.add('is-playing');
     dom.app?.classList.toggle('is-hidden-object-mode', isHiddenObjectMode());
@@ -2614,8 +2619,8 @@ function renderPuzzles(level, mode = state.currentMode) {
   ));
   official.forEach((puzzle, idx) => {
     dom.puzzleList.append(createOfficialCard(puzzle));
-    if ((idx + 1) % 9 === 0) {
-      dom.puzzleList.append(createPuzzleAdCard());
+    if (idx === 7 && official.length >= 8) {
+      dom.puzzleList.append(createPuzzleListAd());
     }
   });
 
@@ -2635,19 +2640,22 @@ function renderPuzzles(level, mode = state.currentMode) {
   }
 }
 
-function createPuzzleAdCard() {
-  const card = document.createElement('div');
-  card.className = 'puzzle-card puzzle-card--ad';
-  card.innerHTML = `
+function createPuzzleListAd() {
+  const ad = document.createElement('aside');
+  ad.className = 'puzzle-list-ad';
+  ad.setAttribute('aria-label', '広告');
+  ad.innerHTML = `
+    <small class="puzzle-list-ad__label">広告</small>
     <div class="puzzle-ad-slot">
       <ins class="adsbygoogle"
            style="display:block"
            data-ad-client="ca-pub-9801602250480253"
-           data-ad-slot="rotate"></ins>
+           data-ad-slot="2261515379"
+           data-ad-format="auto"
+           data-full-width-responsive="true"></ins>
     </div>
-    <small class="puzzle-ad-note">広告</small>
   `;
-  return card;
+  return ad;
 }
 
 function renderGameAuthor(puzzle) {
@@ -2979,6 +2987,12 @@ function updateGameModePresentation() {
   }
   if (dom.canvasChallenge) {
     dom.canvasChallenge.setAttribute('aria-label', isHiddenObjectMode() ? 'もの探し画像' : '間違いを探す画像');
+  }
+  if (dom.stageOriginalLabel) {
+    dom.stageOriginalLabel.textContent = 'お手本';
+  }
+  if (dom.stageChallengeLabel) {
+    dom.stageChallengeLabel.textContent = isHiddenObjectMode() ? '探す絵' : '間違いを探す絵';
   }
   renderTargetPanel();
   // Hidden-object mode keeps the target panel visible, but the generic hint card can be hidden to save space.
