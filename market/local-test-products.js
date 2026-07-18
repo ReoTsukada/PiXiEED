@@ -22,6 +22,7 @@
       preview_object_path: '../character-dots/maousama.png',
       published_at: '2026-07-17T10:01:00Z',
       source_kind: 'external',
+      ai_usage_status: 'not-used',
       series: {
         required_option_price_yen: 0,
         derivative_sales_allowed: true,
@@ -43,6 +44,7 @@
       preview_object_path: '../portfolio/dots/kurage800.gif',
       published_at: '2026-07-17T10:02:00Z',
       source_kind: 'external',
+      ai_usage_status: 'used',
       series: {
         required_option_price_yen: 500,
         derivative_sales_allowed: false,
