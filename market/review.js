@@ -33,7 +33,11 @@
     const optionLabels = asset.series?.inherited_terms?.license_options?.map((option) => `${option.label} ${option.price_yen ?? option.minimum_price_yen ?? 0}円`).join(' / ') || '基本利用のみ';
     const filePaths = asset.provenance_manifest?.storage_file_paths || [];
     const samplePreviewPaths = asset.provenance_manifest?.storage_sample_preview_paths || [];
-    details.append(field('商品種類', productType), field('形式', formats), field('価格', `${asset.sale_price_yen}円`), field('限定販売', limitedSale), field('最低オプション', `${asset.series?.required_option_price_yen || 0}円`), field('利用オプション', optionLabels), field('ファイル数', `${asset.provenance_manifest?.file_count || filePaths.length || 1}件`), field('由来', asset.source_kind), field('検査', asset.file_scan_status), field('SHA-256', asset.source_sha256));
+    const aiUsage = asset.ai_usage_status === 'used' ? 'AI使用あり' : asset.ai_usage_status === 'not-used' ? 'AI使用なし' : '未申告（旧データ）';
+    const legalConfirmation = asset.legal_confirmed_at
+      ? `規約 ${asset.terms_version} / プライバシー ${asset.privacy_version} / ${new Date(asset.legal_confirmed_at).toLocaleString('ja-JP')}`
+      : '未確認（旧データ）';
+    details.append(field('商品種類', productType), field('形式', formats), field('価格', `${asset.sale_price_yen}円`), field('限定販売', limitedSale), field('最低オプション', `${asset.series?.required_option_price_yen || 0}円`), field('利用オプション', optionLabels), field('AI使用申告', aiUsage), field('規約・プライバシー確認', legalConfirmation), field('ファイル数', `${asset.provenance_manifest?.file_count || filePaths.length || 1}件`), field('由来', asset.source_kind), field('検査', asset.file_scan_status), field('SHA-256', asset.source_sha256));
     const description = document.createElement('p'); description.textContent = asset.description || '説明なし';
     const actions = document.createElement('div'); actions.className = 'market-review-actions';
     if (asset.asset_object_path) actions.append(button('非公開ファイルを確認', async () => {
@@ -82,7 +86,7 @@
     card.append(title, details, actions); return card;
   }
   async function loadAll() {
-    const { data: assets, error } = await client.from('market_assets').select('id,title,description,sale_price_yen,asset_format,included_formats,limited_quantity,source_kind,source_sha256,provenance_manifest,file_scan_status,status,asset_object_path,created_at,series:market_asset_series!market_assets_series_id_fkey(required_option_price_yen,inherited_terms)').in('status', ['draft', 'review']).order('created_at');
+    const { data: assets, error } = await client.from('market_assets').select('id,title,description,sale_price_yen,asset_format,included_formats,limited_quantity,source_kind,source_sha256,provenance_manifest,file_scan_status,status,asset_object_path,ai_usage_status,terms_version,privacy_version,legal_confirmed_at,created_at,series:market_asset_series!market_assets_series_id_fkey(required_option_price_yen,inherited_terms)').in('status', ['draft', 'review']).order('created_at');
     if (error) throw error;
     queue.replaceChildren(...(assets || []).map(renderAsset)); document.getElementById('reviewQueueCount').textContent = `${assets?.length || 0}件`;
     const { data: isAdmin } = await client.rpc('market_current_user_is_admin');
