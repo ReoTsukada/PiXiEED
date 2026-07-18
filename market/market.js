@@ -114,7 +114,7 @@
       const derivatives = document.createElement('span'); derivatives.textContent = `派生 ${Number(asset.derivative_count).toLocaleString('ja-JP')}`; stats.appendChild(derivatives);
     }
     if (asset.series?.derivative_sales_allowed === true) {
-      const allowed = document.createElement('span'); allowed.className = 'is-derivative-ok'; allowed.textContent = '派生OK'; stats.appendChild(allowed);
+      const allowed = document.createElement('span'); allowed.className = 'is-derivative-ok'; allowed.textContent = '改変・素材再販売OK'; stats.appendChild(allowed);
     }
     if (Number.isInteger(Number(asset.limited_quantity)) && Number(asset.limited_quantity) > 0) {
       const limited = document.createElement('span'); limited.className = isSoldOut(asset) ? 'is-sold-out' : 'is-limited';

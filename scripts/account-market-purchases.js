@@ -140,6 +140,7 @@
     badges.appendChild(paid);
     const right = purchase.derivative_listing_right;
     if (right?.status === 'active') { const badge = document.createElement('span'); badge.textContent = '派生出品可能'; badges.appendChild(badge); }
+    if (right?.status === 'used') { const badge = document.createElement('span'); badge.textContent = '派生出品済み'; badges.appendChild(badge); }
     const meta = document.createElement('div'); meta.className = 'market-card__meta';
     const format = document.createElement('span'); format.className = 'market-card__format'; format.textContent = formats.map(formatLabel).join(' / ');
     const date = document.createElement('strong'); date.className = 'market-card__price'; date.textContent = formatDate(purchase.paid_at || purchase.created_at);
@@ -149,8 +150,18 @@
     const legend = document.createElement('legend'); legend.textContent = 'ZIPに入れる形式';
     const switches = formats.map((entry) => createFormatSwitch(entry, true)); fieldset.append(legend, ...switches);
     const actions = document.createElement('div'); actions.className = 'account-market-actions';
-    const zipButton = createButton('選択形式をZIPで出力', 'account-market-button--primary'); actions.appendChild(zipButton);
-    const drawButton = createButton('PiXiEEDrawで開く'); actions.appendChild(drawButton);
+    const drawButton = createButton('PiXiEEDrawで開く', 'account-market-button--primary'); actions.appendChild(drawButton);
+    if (right?.status === 'active' && right?.id && right?.source_asset_id) {
+      const derivative = document.createElement('a');
+      derivative.className = 'account-market-button account-market-button--derivative';
+      derivative.href = assetUrl(`../market/sell.html?source_asset_id=${encodeURIComponent(right.source_asset_id)}&derivative_license_id=${encodeURIComponent(right.id)}`);
+      derivative.textContent = '派生作品を出品';
+      actions.appendChild(derivative);
+    }
+    const exportDetails = document.createElement('details'); exportDetails.className = 'account-market-export';
+    const exportSummary = document.createElement('summary'); exportSummary.textContent = 'ZIP出力の形式を選ぶ';
+    const zipButton = createButton('選択形式をZIPで出力');
+    exportDetails.append(exportSummary, fieldset, zipButton);
     const status = document.createElement('p'); status.className = 'account-market-status'; status.setAttribute('aria-live', 'polite');
 
     const setBusy = (busy) => {
@@ -211,7 +222,7 @@
     });
 
     body.append(title, author);
-    body.append(badges, meta, fieldset, actions, status);
+    body.append(badges, meta, actions, exportDetails, status);
     card.append(previewLink, body); return card;
   }
 

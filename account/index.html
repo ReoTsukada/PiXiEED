@@ -22,7 +22,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../site/landing.css?v=2026.07.15-home-clear-entry1">
-  <link rel="stylesheet" href="account.css?v=2026.07.18-pageview-budget1">
+  <link rel="stylesheet" href="account.css?v=2026.07.19-lineage-rewards1">
   <style>
     .account-page{
       display:grid;
@@ -280,13 +280,22 @@
   <div class="page">
     <main class="page-shell account-page">
       <h1 class="section-title account-title" id="accountTitle">ログイン</h1>
+      <nav class="account-command-bar" aria-label="マイページメニュー">
+        <a href="#accountPurchases" data-market-dev-only hidden>購入済み</a>
+        <a href="#accountPageviewRewards" id="accountPageviewRewardsLink" hidden>表示報酬</a>
+        <a href="#accountProjects">端末プロジェクト</a>
+        <a href="../market/index.html">マーケット</a>
+        <a href="#authPanel">設定</a>
+      </nav>
 
       <div class="account-grid">
         <section class="account-stack" aria-label="作品">
           <section class="account-panel account-panel--profile" id="authPanel" aria-hidden="false" aria-label="アカウント">
             <h2 class="section-title">アカウント</h2>
             <div class="account-profile-grid">
-              <div class="profile-block profile-block--profile">
+              <details class="profile-block profile-block--profile">
+                <summary class="account-settings-summary"><span>プロフィール設定</span><small>アイコン・名前・X・ログアウト</small></summary>
+                <div class="account-profile-settings">
                 <div class="auth-section-head">
                   <strong>アカウント設定</strong>
                   <span>PiXiEED IDに保存</span>
@@ -317,7 +326,8 @@
                 <p class="auth-status" id="authStatus"></p>
                 <span class="helper" id="linkedEmail" style="display:none;"></span>
                 <button class="auth-btn logout" id="logoutBtn" type="button" style="display:none;">ログアウト</button>
-              </div>
+                </div>
+              </details>
               <div class="profile-block profile-block--login" id="pixieedSharedAuthLoginBlock">
                 <div class="auth-section-head">
                   <strong id="authModeTitle">ログイン</strong>
@@ -369,7 +379,7 @@
             </div>
           </section>
 
-          <section class="account-panel">
+          <section class="account-panel" id="accountProjects">
             <div class="account-panel__head">
               <h2 class="section-title">PiXiEEDraw</h2>
               <span class="account-chip" id="localProjectCount">確認中</span>
@@ -390,6 +400,14 @@
         </section>
 
         <section class="account-stack" aria-label="購入済み商品とサービス">
+          <section class="account-panel" id="accountPageviewRewards" hidden>
+            <div class="account-panel__head">
+              <h2 class="section-title">表示ロイヤリティー</h2>
+              <span class="account-chip" id="accountPageviewRewardTotal">0円</span>
+            </div>
+            <p class="helper">自分の作品と、つながっている祖先・子孫作品の有効表示から確定した報酬です。</p>
+            <div class="account-reward-history" id="accountPageviewRewardMonths" aria-live="polite"></div>
+          </section>
           <section class="account-panel" id="accountDevTools" data-market-dev-only hidden>
             <div class="account-panel__head">
               <h2 class="section-title">マーケットDEV</h2>
@@ -425,6 +443,17 @@
                 <button class="account-action" id="pageviewRewardSave" type="submit">12か月分を保存</button>
               </form>
               <p class="account-admin-permission__status" id="pageviewRewardStatus" role="status" aria-live="polite"></p>
+              <div class="account-reward-settlement" aria-labelledby="pageviewRewardSettlementTitle">
+                <div><h3 id="pageviewRewardSettlementTitle">表示報酬を計算</h3><p class="helper">有効表示を世代数で均等に分け、同じ世代に複数作品がある場合はその世代分をさらに均等に分けます。</p></div>
+                <label class="auth-field" for="pageviewRewardSettlementMonth">対象月
+                  <input class="auth-input" id="pageviewRewardSettlementMonth" type="month" min="2025-01" max="2100-12" required>
+                </label>
+                <div class="account-reward-settlement__actions">
+                  <button class="account-action" id="pageviewRewardCalculate" type="button" disabled>試算する</button>
+                  <button class="account-action account-action--quiet" id="pageviewRewardFinalize" type="button" disabled>月次確定</button>
+                </div>
+                <p class="account-admin-permission__status" id="pageviewRewardSettlementStatus" role="status" aria-live="polite"></p>
+              </div>
             </div>
             <div class="account-admin-permission" aria-labelledby="adFreePermissionTitle">
               <div>
@@ -444,7 +473,7 @@
               </div>
             </div>
           </section>
-          <section class="account-panel" data-market-dev-only hidden>
+          <section class="account-panel" id="accountPurchases" data-market-dev-only hidden>
             <div class="account-panel__head">
               <h2 class="section-title">購入済み商品</h2>
               <span class="account-chip" id="marketPurchaseCount">確認中</span>
@@ -463,13 +492,14 @@
               </div>
             </div>
           </section>
-          <section class="account-panel">
+          <section class="account-panel account-seller-panel" id="accountSeller" data-market-dev-only hidden>
             <div class="account-panel__head">
-              <h2 class="section-title">サービス</h2>
+              <h2 class="section-title">販売</h2>
+              <span class="account-chip" id="marketSellerVerificationStatus">確認中</span>
             </div>
             <div class="account-service-grid">
-              <a class="account-service" href="../market/index.html"><strong>マーケット</strong><span>素材を探す</span></a>
-              <a class="account-service" href="../qr/index.html"><strong>QR</strong><span>QRコードを作る</span></a>
+              <a class="account-service" id="marketSellerRequest" href="../market/seller.html"><strong>販売者設定</strong><span>本人情報・二段階認証・売上受取</span></a>
+              <a class="account-service" href="../market/sell.html"><strong>大元作品を出品</strong><span>購入済み素材を元にしていない作品を登録</span></a>
             </div>
           </section>
         </section>
@@ -480,13 +510,14 @@
   <script src="../scripts/shared-auth-panel.js?v=2026.07.18-ad-permissions1"></script>
   <script src="../scripts/pixieed-dev-access.js?v=2026.07.17-market-dev1"></script>
   <script src="../scripts/account-dev-tools.js?v=2026.07.18-auth-stability1"></script>
-  <script src="../scripts/account-pageview-reward-budget.js?v=2026.07.18-budget2"></script>
+  <script src="../scripts/account-pageview-reward-budget.js?v=2026.07.19-lineage-rewards1"></script>
+  <script src="../scripts/account-pageview-rewards.js?v=2026.07.19-lineage-rewards1"></script>
   <script src="../scripts/account-ad-permissions.js?v=2026.07.18-auth-stability1"></script>
   <script src="../scripts/shared-profile-header.js"></script>
   <script src="../scripts/shared-bottom-nav.js?v=2026.07.18-ad-permissions1"></script>
   <script src="../scripts/account-local-projects.js?v=2026.07.01-local-projects"></script>
   <script src="../scripts/market-purchase-delivery.js?v=2026.07.17-all-open1"></script>
-  <script src="../scripts/account-market-purchases.js?v=2026.07.18-admin-grant1"></script>
+  <script src="../scripts/account-market-purchases.js?v=2026.07.19-derivative-entry1"></script>
   <script src="../market/media-protection.js?v=2026.07.17-preview-protection1"></script>
   <script src="../scripts/account-market-seller.js?v=2026.07.17-dev-account1"></script>
   <script src="../scripts/pixel-art-fit.js"></script>

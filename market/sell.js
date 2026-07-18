@@ -7,8 +7,8 @@
   const MAX_DETECTION_COUNT = 300;
   const MAX_TOTAL_BYTES = 50 * 1024 * 1024;
   const MAX_SAMPLE_PREVIEWS = 6;
-  const MARKET_TERMS_VERSION = '2026-07-18';
-  const MARKET_PRIVACY_VERSION = '2026-07-18';
+  const MARKET_TERMS_VERSION = '2026-07-19';
+  const MARKET_PRIVACY_VERSION = '2026-07-19';
   const packageUtils = window.PiXiEEDMarketPackage;
   const FORMAT_ORDER = ['pixiedraw-project', 'png', 'sprite-sheet-png', 'webp', 'gif', 'apng'];
   const FORMAT_LABELS = {
@@ -24,6 +24,11 @@
     { id: 'merchandise-use', label: 'グッズ・印刷販売', description: 'グッズや印刷物を制作して販売できます。', minimum_price_yen: 1000, sort_order: 20 },
     { id: 'credit-omission', label: 'クレジット表記不要', description: '利用時の作者名表記を省略できます。', minimum_price_yen: 300, sort_order: 30 }
   ];
+  const pageParams = new URLSearchParams(window.location.search);
+  const sourceAssetId = pageParams.get('source_asset_id') || '';
+  const derivativeLicenseId = pageParams.get('derivative_license_id') || '';
+  const derivativeModeRequested = pageParams.has('source_asset_id') || pageParams.has('derivative_license_id');
+  const validUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 
   const form = document.getElementById('listingForm');
   const gate = document.getElementById('sellerGate');
@@ -47,6 +52,7 @@
   let client = null;
   let signedInUser = null;
   let submissionEnabled = false;
+  let derivativeContext = null;
 
   const setStatus = (value) => { status.textContent = value || ''; };
   const yen = (value) => `${Number(value || 0).toLocaleString('ja-JP')}円`;
@@ -92,6 +98,55 @@
     $('listingLimitedQuantityField').hidden = !enabled;
     $('listingLimitedQuantity').required = enabled;
     updatePrice();
+  }
+
+  function changeSummary() {
+    const text = String($('listingChangeSummary')?.value || '').trim();
+    return text ? [{ type: 'creator-declaration', text }] : [];
+  }
+
+  async function loadDerivativeContext() {
+    if (!derivativeModeRequested) return null;
+    if (!validUuid(sourceAssetId) || !validUuid(derivativeLicenseId)) {
+      throw new Error('派生出品の親作品または派生出品権を確認できません。マイページから開き直してください。');
+    }
+    const { data: context, error: contextError } = await client.rpc('market_derivative_listing_context_v1', {
+      input_source_asset_id: sourceAssetId,
+      input_derivative_license_id: derivativeLicenseId
+    });
+    if (contextError || !context) throw contextError || new Error('派生出品情報を取得できません。');
+
+    const inheritedOptions = Array.isArray(context.inherited_terms?.license_options)
+      ? context.inherited_terms.license_options
+      : [];
+    optionCatalog = inheritedOptions.map((option, index) => ({
+      id: option.id,
+      label: option.label || option.id,
+      description: '親作品から継承される利用条件です。',
+      minimum_price_yen: Number(option.minimum_price_yen || option.price_yen || 0),
+      sort_order: index
+    }));
+    selectedOptionIds.clear(); optionPrices.clear();
+    inheritedOptions.forEach((option) => {
+      selectedOptionIds.add(option.id);
+      optionPrices.set(option.id, Number(option.price_yen ?? option.minimum_price_yen ?? 0));
+    });
+    derivativeContext = context;
+    $('listingDerivativeContext').hidden = false;
+    $('listingDerivativeSourceTitle').textContent = context.source_title || '親作品';
+    $('listingChangeSummaryField').hidden = false;
+    $('listingChangeSummary').required = true;
+    $('listingRightsLabel').textContent = '表示中の親作品を元にした派生作品であり、変更・追加内容を正しく申告しました。';
+    $('listingDerivativeAllowedCard').hidden = true;
+    $('listingDerivativeAllowed').checked = true;
+    $('listingPrice').min = String(Math.max(0, Number(context.minimum_seller_price_yen) || 0));
+    if (Number($('listingPrice').value) < Number($('listingPrice').min)) $('listingPrice').value = $('listingPrice').min;
+    $('listingOptionsTitle').textContent = '継承される利用オプション';
+    $('listingOptionsSection').disabled = true;
+    $('listingOptionDetails').hidden = true;
+    document.querySelector('.market-titlebar h1').textContent = '派生作品を出品';
+    renderOptions(); renderOptionPriceFields(); updatePrice();
+    return derivativeContext;
   }
 
   function syncOptionPrices() {
@@ -558,6 +613,9 @@
     if (!$('listingTermsConfirmed').checked || !$('listingPrivacyConfirmed').checked || !$('listingRights').checked) {
       setStatus('規約、プライバシーポリシー、出品権限の確認が必要です。'); return;
     }
+    if (derivativeModeRequested && (!derivativeContext || changeSummary().length === 0)) {
+      setStatus('派生作品は、親作品から変更・追加した内容の記載が必要です。'); return;
+    }
 
     const button = $('listingSubmit'); button.disabled = true;
     let uploadedPaths = [];
@@ -584,7 +642,24 @@
         limited_sale: limitedEnabled ? { enabled: true, quantity: limitedQuantity, minimum_price_yen: 1000 } : { enabled: false }
       };
       setStatus('出品下書きを作成しています...');
-      const { data: assetId, error: draftError } = await client.rpc('market_create_root_asset_v4', {
+      const rpcName = derivativeContext ? 'market_create_derivative_draft_v4' : 'market_create_root_asset_v5';
+      const rpcInput = derivativeContext ? {
+        input_source_asset_id: sourceAssetId,
+        input_derivative_license_id: derivativeLicenseId,
+        input_title: $('listingTitle').value.trim(),
+        input_description: $('listingDescription').value.trim(),
+        input_seller_price_yen: salePrice,
+        input_source_kind: 'external',
+        input_source_sha256: packageData.sourceHash,
+        input_asset_formats: formats,
+        input_provenance_manifest: { ...provenance, derivative_source_asset_id: sourceAssetId, derivative_listing_right_id: derivativeLicenseId },
+        input_change_summary: changeSummary(),
+        input_terms_version: MARKET_TERMS_VERSION,
+        input_privacy_version: MARKET_PRIVACY_VERSION,
+        input_ai_usage_status: aiUsageStatus,
+        input_terms_confirmed: $('listingTermsConfirmed').checked,
+        input_privacy_confirmed: $('listingPrivacyConfirmed').checked
+      } : {
         input_title: $('listingTitle').value.trim(),
         input_description: $('listingDescription').value.trim(),
         input_sale_price_yen: salePrice,
@@ -602,8 +677,10 @@
         input_privacy_version: MARKET_PRIVACY_VERSION,
         input_ai_usage_status: aiUsageStatus,
         input_terms_confirmed: $('listingTermsConfirmed').checked,
-        input_privacy_confirmed: $('listingPrivacyConfirmed').checked
-      });
+        input_privacy_confirmed: $('listingPrivacyConfirmed').checked,
+        input_original_work_confirmed: $('listingRights').checked
+      };
+      const { data: assetId, error: draftError } = await client.rpc(rpcName, rpcInput);
       if (draftError) throw draftError;
       const { error: tagsError } = await client.rpc('market_set_listing_tags', {
         input_asset_id: assetId,
@@ -684,6 +761,7 @@
       const { data: options, error: optionError } = await client.from('market_license_options').select('id,label,description,minimum_price_yen,sort_order').eq('active', true).order('sort_order');
       if (optionError) throw optionError;
       optionCatalog = options || FALLBACK_OPTIONS; signedInUser = user;
+      if (derivativeModeRequested) await loadDerivativeContext();
       renderOptions(); renderOptionPriceFields(); updatePrice(); gate.hidden = true; setSubmissionEnabled(true);
     } catch (error) {
       gate.textContent = `ファイルと価格の画面内確認は利用できますが、出品接続を開始できませんでした: ${error.message || '時間をおいて再試行してください'}`;

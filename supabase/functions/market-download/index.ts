@@ -125,7 +125,7 @@ async function loadLibrary(request: Request, userId: string) {
   const purchaseIds = purchases.map((purchase) => String(purchase.id));
   const { data: rights, error: rightError } = await admin
     .from("market_derivative_licenses")
-    .select("purchase_id,status,used_by_asset_id")
+    .select("id,purchase_id,source_asset_id,status,used_by_asset_id,used_at")
     .in("purchase_id", purchaseIds);
   if (rightError) throw rightError;
 

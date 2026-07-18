@@ -1,4 +1,6 @@
 .account-page {
+  width: min(1120px, 100%);
+  margin-inline: auto;
   padding: 18px;
   gap: 14px;
 }
@@ -9,9 +11,41 @@
 }
 
 .account-grid {
+  grid-template-columns: minmax(0, 1fr) !important;
   gap: 14px !important;
   align-items: start;
 }
+
+.account-command-bar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 12px;
+  background: #0b1224;
+}
+
+.account-command-bar a {
+  display: grid;
+  min-height: 42px;
+  padding: 7px 9px;
+  place-items: center;
+  border-radius: 7px;
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+  text-decoration: none;
+}
+
+.account-command-bar a:hover,
+.account-command-bar a:focus-visible {
+  background: rgba(121,192,255,.12);
+  color: #fff;
+}
+
+body[data-pixieed-account-auth="signed-out"] .account-command-bar { display: none; }
 
 .account-stack {
   gap: 14px !important;
@@ -21,14 +55,45 @@
   border-left: 0 !important;
 }
 
+#accountPurchases { order: -3; }
+#accountPageviewRewards { order: -3; }
+#accountSeller { order: -2; }
+#accountDevTools { order: -2; }
+#accountAdminTools { order: -1; }
+
 .account-stack > .account-panel + .account-panel {
   border-top: 1px solid rgba(255,255,255,.12) !important;
 }
 
 .account-panel {
-  border-radius: 22px !important;
-  background: linear-gradient(160deg, rgba(255,255,255,.075), rgba(255,255,255,.035)) !important;
-  box-shadow: 0 18px 50px rgba(0,0,0,.18) !important;
+  border-radius: 10px !important;
+  background: #10182c !important;
+  box-shadow: none !important;
+}
+
+.account-settings-summary {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #f8fafc;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.account-settings-summary small {
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.account-profile-settings {
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255,255,255,.08);
 }
 
 .account-action--quiet {
@@ -52,6 +117,54 @@
   border-radius: 18px;
   background: rgba(255,255,255,.045);
   transition: transform .15s ease, border-color .15s ease, background .15s ease;
+}
+
+.account-market-export {
+  border-top: 1px solid rgba(255,255,255,.08);
+  padding-top: 7px;
+}
+
+.account-market-export summary {
+  min-height: 32px;
+  color: #b9dfff;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.account-market-export[open] {
+  display: grid;
+  gap: 8px;
+}
+
+.account-reward-history { display: grid; gap: 6px; }
+.account-reward-history__row {
+  display: flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 10px;
+  border-radius: 7px;
+  background: rgba(255,255,255,.045);
+  color: #cbd5e1;
+  font-size: 12px;
+}
+.account-reward-history__row strong { color: #f8fafc; }
+
+.account-market-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  text-align: center;
+  text-decoration: none;
+}
+
+.account-market-button--derivative {
+  border-color: rgba(126,240,199,.5);
+  background: #176b55;
+  color: #effff9;
 }
 
 .account-service:hover,
@@ -204,6 +317,20 @@
   min-height: 42px;
 }
 
+.account-reward-settlement {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(140px, 190px) auto;
+  align-items: end;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255,255,255,.1);
+}
+
+.account-reward-settlement h3 { margin: 0 0 4px; font-size: 15px; }
+.account-reward-settlement__actions { display: flex; gap: 7px; }
+.account-reward-settlement__actions .account-action { min-height: 42px; white-space: nowrap; }
+.account-reward-settlement > .account-admin-permission__status { grid-column: 1 / -1; }
+
 .auth-mode-switch {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -303,10 +430,16 @@
   .account-item > .account-action,
   .account-item > .account-chip { grid-column: 2; justify-self: start; }
   .account-service-grid { grid-template-columns: 1fr; }
+  .account-command-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .account-command-bar a { min-height: 40px; }
+  .account-settings-summary { align-items: flex-start; flex-direction: column; gap: 2px; }
   .site-header .account-action--quiet { display: none; }
   .account-admin-permission__form { grid-template-columns: 1fr; }
   .account-admin-permission__form .account-action { width: 100%; }
   .account-reward-budget__toolbar { grid-template-columns: 1fr; }
   .account-reward-budget__months { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .account-reward-budget > .account-action { width: 100%; }
+  .account-reward-settlement { grid-template-columns: 1fr; }
+  .account-reward-settlement__actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .account-reward-settlement > .account-admin-permission__status { grid-column: 1; }
 }

@@ -690,6 +690,11 @@ html[data-pixieed-ad-free-account="true"] .market-ad {
 .market-sell-status, .market-listing-form { padding: 18px; background: #10182c; border-top: 1px solid rgba(255,255,255,.1); }
 .market-sell-status { color: #cbd5e1; font-size: 13px; line-height: 1.65; }
 .market-listing-form { display: grid; gap: 14px; }
+.market-derivative-context { display: grid; gap: 5px; padding: 12px; border: 1px solid rgba(126,240,199,.34); border-radius: 8px; background: rgba(23,107,85,.16); }
+.market-derivative-context[hidden] { display: none; }
+.market-derivative-context > span { color: #7ef0c7; font-size: 9px; font-weight: 900; letter-spacing: .08em; }
+.market-derivative-context > strong { color: #effff9; font-size: 14px; }
+.market-derivative-context > p { margin: 0; color: #b8d9ce; font-size: 10px; line-height: 1.55; }
 .market-listing-form label { display: grid; gap: 6px; color: #dbeafe; font-size: 12px; font-weight: 700; }
 .market-listing-form input, .market-listing-form select, .market-listing-form textarea { min-height: 38px; width: 100%; box-sizing: border-box; border: 1px solid rgba(255,255,255,.16); border-radius: 6px; padding: 8px 10px; background: #080e1c; color: #f8fafc; font: inherit; }
 .market-listing-form textarea { min-height: 100px; resize: vertical; }
@@ -711,6 +716,7 @@ html[data-pixieed-ad-free-account="true"] .market-ad {
 .market-form-section { min-width: 0; margin: 0; padding: 12px; border: 1px solid rgba(255,255,255,.12); border-radius: 8px; background: rgba(8,14,28,.55); }
 .market-form-section legend { padding: 0 5px; color: #f8fafc; font-size: 12px; font-weight: 800; }
 .market-form-section > .helper { margin: 0 0 10px; color: #94a3b8; font-size: 11px; line-height: 1.55; }
+.market-form-section:disabled { opacity: .78; }
 .market-source-buttons { display: flex; flex-wrap: wrap; gap: 7px; }
 .market-drop-zone { display: grid; min-height: 92px; margin-bottom: 9px; padding: 12px; place-content: center; gap: 5px; box-sizing: border-box; border: 1px dashed rgba(121,192,255,.42); border-radius: 8px; background: rgba(121,192,255,.05); color: #e5f2ff; text-align: center; cursor: pointer; transition: border-color .15s ease, background .15s ease, transform .15s ease; }
 .market-drop-zone strong { font-size: 12px; }

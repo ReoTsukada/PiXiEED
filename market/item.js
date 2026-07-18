@@ -55,8 +55,8 @@
     $('itemPreviewFrame').classList.toggle('is-sold-out', isSoldOut(asset));
     $('itemSoldOut').hidden = !isSoldOut(asset);
     $('itemDerivative').textContent = series.derivative_sales_allowed
-      ? '許可（追加ライセンス料なし・販売時の継承ロイヤリティーあり）'
-      : 'この商品では派生販売できません。';
+      ? 'OK（改変した素材を独立商品として再販売可能・系列ロイヤリティーあり）'
+      : 'NG（利用・改変できる範囲でも、素材または改変素材として再販売できません）';
     if (asset.local_test === true && asset.preview_object_path) {
       $('itemPreview').src = asset.preview_object_path;
     } else if (/^https?:\/\//i.test(asset.preview_object_path || '')) {
@@ -78,6 +78,7 @@
       badges.push(badge(asset.ai_usage_status === 'used' ? 'AI使用あり' : 'AI使用なし'));
     }
     $('itemBadges').replaceChildren(...badges);
+    window.PiXiEEDMarketPageviewRewards?.track?.(asset);
     $('itemOptions').replaceChildren(...(options.length ? options.map((option) => {
       const card = document.createElement('div');
       const title = document.createElement('strong'); title.textContent = option.label;
