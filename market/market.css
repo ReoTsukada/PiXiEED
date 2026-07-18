@@ -639,6 +639,15 @@ html[data-pixieed-market-access="denied"] body > #marketDevGate { visibility: vi
 .market-listing-form .market-check input { width: 16px; min-height: 16px; margin-top: 1px; }
 .market-listing-form .market-check label { color: inherit; font-weight: 400; cursor: pointer; }
 .market-listing-form .market-check a { color: #b9dfff; text-decoration: underline; text-underline-offset: 2px; }
+.market-legal-confirmations { display: grid; gap: 10px; padding: 12px; border: 1px solid rgba(185,223,255,.22); border-radius: 8px; background: rgba(12,28,47,.55); }
+.market-declaration-options { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+.market-declaration-option { display: flex; align-items: flex-start; gap: 10px; min-width: 0; padding: 12px; border: 1px solid rgba(255,255,255,.14); border-radius: 8px; background: rgba(255,255,255,.035); cursor: pointer; }
+.market-declaration-option:has(input:checked) { border-color: rgba(126,240,199,.72); background: rgba(23,107,85,.2); }
+.market-declaration-option input { flex: 0 0 auto; width: 18px; min-height: 18px; margin: 2px 0 0; accent-color: #7ef0c7; }
+.market-declaration-option span { display: grid; gap: 3px; min-width: 0; }
+.market-declaration-option strong { color: #f8fafc; font-size: 13px; }
+.market-declaration-option small { color: #94a3b8; font-size: 11px; line-height: 1.5; }
+@media (max-width: 560px) { .market-declaration-options { grid-template-columns: 1fr; } }
 .market-form-section { min-width: 0; margin: 0; padding: 12px; border: 1px solid rgba(255,255,255,.12); border-radius: 8px; background: rgba(8,14,28,.55); }
 .market-form-section legend { padding: 0 5px; color: #f8fafc; font-size: 12px; font-weight: 800; }
 .market-form-section > .helper { margin: 0 0 10px; color: #94a3b8; font-size: 11px; line-height: 1.55; }
