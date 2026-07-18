@@ -7,6 +7,8 @@
   const MAX_DETECTION_COUNT = 300;
   const MAX_TOTAL_BYTES = 50 * 1024 * 1024;
   const MAX_SAMPLE_PREVIEWS = 6;
+  const MARKET_TERMS_VERSION = '2026-07-18';
+  const MARKET_PRIVACY_VERSION = '2026-07-18';
   const packageUtils = window.PiXiEEDMarketPackage;
   const FORMAT_ORDER = ['pixiedraw-project', 'png', 'sprite-sheet-png', 'webp', 'gif', 'apng'];
   const FORMAT_LABELS = {
@@ -510,6 +512,9 @@
 
   async function submitListing(event) {
     event.preventDefault();
+    if (!form.reportValidity()) {
+      setStatus('必須項目と確認欄をすべて入力してください。'); return;
+    }
     if (!submissionEnabled || !client || !signedInUser) {
       setStatus('出品送信にはHTTPで開き、ログインと販売者確認を完了してください。'); return;
     }
@@ -546,6 +551,13 @@
     if (limitedEnabled && (!Number.isInteger(limitedQuantity) || limitedQuantity < 1 || limitedQuantity > 100000)) {
       setStatus('限定販売の先着人数は1〜100,000名で設定してください。'); return;
     }
+    const aiUsageStatus = form.querySelector('input[name="listingAiUsage"]:checked')?.value || '';
+    if (!['used', 'not-used'].includes(aiUsageStatus)) {
+      setStatus('AI使用の有無を選択してください。'); return;
+    }
+    if (!$('listingTermsConfirmed').checked || !$('listingPrivacyConfirmed').checked || !$('listingRights').checked) {
+      setStatus('規約、プライバシーポリシー、出品権限の確認が必要です。'); return;
+    }
 
     const button = $('listingSubmit'); button.disabled = true;
     let uploadedPaths = [];
@@ -560,6 +572,8 @@
         file_count: entries.length,
         total_bytes: packageData.totalBytes,
         detected_formats: formats,
+        ai_usage_status: aiUsageStatus,
+        legal_confirmation: { terms_version: MARKET_TERMS_VERSION, privacy_version: MARKET_PRIVACY_VERSION },
         listing_tags: tags,
         files: packageData.files,
         preview_selection: {
@@ -570,7 +584,7 @@
         limited_sale: limitedEnabled ? { enabled: true, quantity: limitedQuantity, minimum_price_yen: 1000 } : { enabled: false }
       };
       setStatus('出品下書きを作成しています...');
-      const { data: assetId, error: draftError } = await client.rpc('market_create_root_asset_v3', {
+      const { data: assetId, error: draftError } = await client.rpc('market_create_root_asset_v4', {
         input_title: $('listingTitle').value.trim(),
         input_description: $('listingDescription').value.trim(),
         input_sale_price_yen: salePrice,
@@ -583,7 +597,12 @@
         input_provenance_manifest: provenance,
         input_inherited_terms: {},
         input_prohibited_uses: [],
-        input_change_summary: []
+        input_change_summary: [],
+        input_terms_version: MARKET_TERMS_VERSION,
+        input_privacy_version: MARKET_PRIVACY_VERSION,
+        input_ai_usage_status: aiUsageStatus,
+        input_terms_confirmed: $('listingTermsConfirmed').checked,
+        input_privacy_confirmed: $('listingPrivacyConfirmed').checked
       });
       if (draftError) throw draftError;
       const { error: tagsError } = await client.rpc('market_set_listing_tags', {
