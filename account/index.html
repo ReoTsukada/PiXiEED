@@ -22,7 +22,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../site/landing.css?v=2026.07.15-home-clear-entry1">
-  <link rel="stylesheet" href="account.css?v=2026.07.17-account-auth4">
+  <link rel="stylesheet" href="account.css?v=2026.07.18-pageview-budget1">
   <style>
     .account-page{
       display:grid;
@@ -409,6 +409,23 @@
             <div class="account-service-grid">
               <a class="account-service" href="../market/review.html"><strong>マーケット管理を開く</strong><span>商品審査・販売者確認</span></a>
             </div>
+            <div class="account-admin-permission" aria-labelledby="pageviewRewardBudgetTitle">
+              <div>
+                <h3 id="pageviewRewardBudgetTitle">ページビュー報酬原資</h3>
+                <p class="helper">年を選び、1月〜12月の報酬原資を円単位で設定します。これは予算設定のみで、閲覧集計・分配・送金は実行しません。</p>
+              </div>
+              <form class="account-reward-budget" id="pageviewRewardBudgetForm">
+                <div class="account-reward-budget__toolbar">
+                  <label class="auth-field" for="pageviewRewardYear">対象年
+                    <input class="auth-input" id="pageviewRewardYear" type="number" min="2025" max="2100" step="1" required>
+                  </label>
+                  <div class="account-reward-budget__total"><span>年間合計</span><strong id="pageviewRewardAnnualTotal">0円</strong></div>
+                </div>
+                <div class="account-reward-budget__months" id="pageviewRewardMonths" aria-label="月別ページビュー報酬原資"></div>
+                <button class="account-action" id="pageviewRewardSave" type="submit">12か月分を保存</button>
+              </form>
+              <p class="account-admin-permission__status" id="pageviewRewardStatus" role="status" aria-live="polite"></p>
+            </div>
             <div class="account-admin-permission" aria-labelledby="adFreePermissionTitle">
               <div>
                 <h3 id="adFreePermissionTitle">広告OFF権限</h3>
@@ -462,8 +479,9 @@
 
   <script src="../scripts/shared-auth-panel.js?v=2026.07.18-ad-permissions1"></script>
   <script src="../scripts/pixieed-dev-access.js?v=2026.07.17-market-dev1"></script>
-  <script src="../scripts/account-dev-tools.js?v=2026.07.18-market-admin1"></script>
-  <script src="../scripts/account-ad-permissions.js?v=2026.07.18-ad-permissions1"></script>
+  <script src="../scripts/account-dev-tools.js?v=2026.07.18-auth-stability1"></script>
+  <script src="../scripts/account-pageview-reward-budget.js?v=2026.07.18-budget2"></script>
+  <script src="../scripts/account-ad-permissions.js?v=2026.07.18-auth-stability1"></script>
   <script src="../scripts/shared-profile-header.js"></script>
   <script src="../scripts/shared-bottom-nav.js?v=2026.07.18-ad-permissions1"></script>
   <script src="../scripts/account-local-projects.js?v=2026.07.01-local-projects"></script>
