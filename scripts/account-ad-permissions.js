@@ -10,6 +10,8 @@
 
   let client = null;
   let requestSequence = 0;
+  let authListenerBound = false;
+  const ACCESS_CHANGE_EVENTS = new Set(['SIGNED_IN', 'SIGNED_OUT', 'USER_DELETED', 'USER_UPDATED']);
 
   function setStatus(message, isError = false) {
     status.textContent = message;
@@ -104,17 +106,27 @@
     updateGrant(emailInput.value, true);
   });
 
-  async function init() {
-    if (!window.PiXiEEDDevAccess) return;
-    const access = await window.PiXiEEDDevAccess.check();
-    client = access.client || null;
-    if (!access.allowed || !client) return;
-    const { data: isAdmin, error } = await client.rpc('market_current_user_is_admin');
-    if (error || isAdmin !== true) return;
-    await loadGrants();
-    client.auth.onAuthStateChange(() => {
-      window.setTimeout(() => window.location.reload(), 0);
+  function bindAuthListener(authClient) {
+    if (!authClient || authListenerBound) return;
+    authListenerBound = true;
+    authClient.auth.onAuthStateChange((event) => {
+      if (!ACCESS_CHANGE_EVENTS.has(event)) return;
+      window.setTimeout(() => init({ refresh: true }), 0);
     });
+  }
+
+  async function init(options = {}) {
+    if (!window.PiXiEEDDevAccess) return;
+    const access = await window.PiXiEEDDevAccess.check(options);
+    const authClient = access.client || null;
+    bindAuthListener(authClient);
+    client = null;
+    requestSequence += 1;
+    if (!access.allowed || !authClient) return;
+    const { data: isAdmin, error } = await authClient.rpc('market_current_user_is_admin');
+    if (error || isAdmin !== true) return;
+    client = authClient;
+    await loadGrants();
   }
 
   init();
