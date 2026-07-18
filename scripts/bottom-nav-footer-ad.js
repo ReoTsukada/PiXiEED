@@ -507,6 +507,15 @@
     }
   }
 
+  function isPixfindPage() {
+    try {
+      const path = String(window.location.pathname || '').toLowerCase();
+      return /(?:^|\/)pixfind(?:\/|\/index\.html)?$/.test(path);
+    } catch (_error) {
+      return false;
+    }
+  }
+
   function isPixiedrawMobileChromeActive() {
     if (!isPixiedrawPage()) return false;
     const body = document.body;
@@ -755,7 +764,9 @@
       ? document.querySelector('.app')
       : isMaoituPage()
         ? document.querySelector('.game-shell') || body
-        : body;
+        : isPixfindPage()
+          ? document.querySelector('.app') || body
+          : body;
     if (!(target instanceof HTMLElement)) return;
     if (target.dataset.pixieedTopAdPaddingApplied === 'true') {
       target.style.paddingTop = target.dataset.pixieedTopAdOriginalPaddingTop || '';

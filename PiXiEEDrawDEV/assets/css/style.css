@@ -5327,36 +5327,6 @@ input[type='range']::-moz-focus-outer {
   color: var(--fg);
 }
 
-#panelFile .file-contest-promo {
-  margin-top: 2px;
-  padding: 10px;
-  border: 1px solid rgba(var(--ui-rgb), 0.24);
-  background:
-    linear-gradient(0deg, rgba(var(--ui-rgb), 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(var(--ui-rgb), 0.08) 1px, transparent 1px),
-    rgba(10, 16, 26, 0.72);
-  background-size: 12px 12px;
-}
-
-#panelFile .file-contest-promo > span {
-  display: block;
-  font-size: 0.84rem;
-  letter-spacing: 0.04em;
-}
-
-#panelFile .file-contest-promo .help-text {
-  margin: 6px 0 0;
-  font-size: 0.78rem;
-}
-
-#panelFile .file-contest-promo__actions {
-  margin-top: 8px;
-}
-
-#panelFile .file-contest-promo__actions .button {
-  width: 100%;
-}
-
 #panelFile .help-text {
   margin-top: 4px;
 }

@@ -81,7 +81,6 @@
   const indexLinkToNoteId = Object.freeze({
     'index.html': 'site',
     'notes/index.html': 'site',
-    'contest/index.html': 'site',
     'glossary/index.html': 'site',
     'portfolio/index.html': 'site',
     'pixiedraw/index.html': 'pixiedraw',

@@ -23,6 +23,9 @@
   } else if (!currentPath.includes('/projects/') && /(?:^|\/)maoitu(?:\/|\/index\.html)?$/.test(currentPath)) {
     body.dataset.pixieedPage = 'maoitu';
     doc.documentElement.dataset.pixieedPage = 'maoitu';
+  } else if (!currentPath.includes('/projects/') && /(?:^|\/)pixfind(?:\/|\/index\.html)?$/.test(currentPath)) {
+    body.dataset.pixieedPage = 'pixfind';
+    doc.documentElement.dataset.pixieedPage = 'pixfind';
   }
   if (!isStandaloneToolOrGamePage()) {
     body.classList.add('pixieed-seamless-page');
@@ -59,7 +62,7 @@
     const controller = doc.createElement('script');
     controller.defer = true;
     controller.dataset.pixieedFooterAdController = 'true';
-    controller.src = relHref('scripts/bottom-nav-footer-ad.js?v=2026.07.18-ad-permissions1');
+    controller.src = relHref('scripts/bottom-nav-footer-ad.js?v=2026.07.19-pixiedraw-ad-audit1');
     doc.body.appendChild(controller);
   }
 
@@ -102,7 +105,7 @@
     if (currentPath.includes('/projects/')) {
       return false;
     }
-    return /(?:^|\/)(?:pixiedraw|pixieedrawdev|pixiee-lens|qr|qr-maker|maoitu|contest)(?:\/|\/index\.html)?$/.test(currentPath);
+    return /(?:^|\/)(?:pixiedraw|pixieedrawdev|pixiee-lens|qr|qr-maker|maoitu|pixfind)(?:\/|\/index\.html)?$/.test(currentPath);
   }
 
   function applyResponsivePageState() {
@@ -226,6 +229,7 @@
       { label: 'PiXiEELENS', path: 'pixiee-lens/index.html' },
       { label: 'マーケット', path: 'market/index.html' },
       { label: 'QR', path: 'qr/index.html' },
+      { label: 'PiXFiND', path: 'pixfind/index.html' },
       { label: 'まおいつ', path: 'maoitu/index.html' },
       { label: '用語集', path: 'glossary/index.html' },
       { label: '企業', path: 'portfolio/index.html' },
@@ -361,11 +365,14 @@
       body[data-pixieed-page="pixiedraw"]{
         padding-bottom:0 !important;
       }
+      body[data-pixieed-page="pixfind"]{
+        padding:0 !important;
+      }
       body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] .app{
         padding-bottom:max(84px, calc(var(--pixieed-shared-bottom-nav-height) + 16px + env(safe-area-inset-bottom, 0px))) !important;
       }
       @media (orientation: landscape){
-        body:not([data-pixieed-page="pixiedraw"]):not([data-pixieed-page="pixiee-lens"]):not([data-pixieed-page="maoitu"]){
+        body:not([data-pixieed-page="pixiedraw"]):not([data-pixieed-page="pixiee-lens"]):not([data-pixieed-page="maoitu"]):not([data-pixieed-page="pixfind"]){
           padding-right:max(76px, calc(var(--pixieed-shared-side-nav-width) + var(--pixieed-shared-side-nav-gap) + env(safe-area-inset-right, 0px))) !important;
           padding-bottom:0 !important;
         }
@@ -375,6 +382,9 @@
         body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] .app{
           padding-right:max(76px, calc(var(--pixieed-shared-side-nav-width) + var(--pixieed-shared-side-nav-gap) + env(safe-area-inset-right, 0px))) !important;
           padding-bottom:0 !important;
+        }
+        body[data-pixieed-page="pixfind"] .app{
+          padding:0 !important;
         }
         body .bottom-nav{
           top:0 !important;

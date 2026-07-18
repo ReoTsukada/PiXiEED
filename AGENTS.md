@@ -36,9 +36,6 @@
 - For PiXiEEDDraw.dev split-work changes, normally run:
   - `node --check PiXiEEDDraw.dev/assets/js/app.js`
   - `node scripts/check-pixiedraw-dev-tdz.mjs`
-- For plaza changes under `contest/`, normally run:
-  - `node --check contest/assets/js/plaza.js`
-  - `node scripts/verify-plaza.mjs`
 - For Capacitor work, use `app-shell/pixieed-capacitor` as the working directory and prefer the scripts in its `package.json`.
 
 ## App Shell Notes

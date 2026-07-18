@@ -520,6 +520,7 @@
       quickSetupStatus: document.getElementById('startupQuickSetupStatus'),
       workspace: document.getElementById('startupWorkspace'),
       workspaceStatus: document.getElementById('startupWorkspaceStatus'),
+      workspaceSearch: document.getElementById('startupWorkspaceSearch'),
       workspaceProjectList: document.getElementById('startupWorkspaceProjectList'),
       recentSection: document.getElementById('startupRecentProjects'),
       recentList: document.getElementById('startupRecentList'),
@@ -569,8 +570,6 @@
       gridSplitRow: document.getElementById('exportGridSplitOptionRow'),
       timelapseToggle: document.getElementById('exportTimelapseToggle'),
       timelapseRow: document.getElementById('exportTimelapseOptionRow'),
-      contestPostToggle: document.getElementById('exportContestPostToggle'),
-      contestPostRow: document.getElementById('exportContestPostOptionRow'),
       spriteMapColorSpritesToggle: document.getElementById('exportSpriteMapColorSpritesToggle'),
       spriteMapColorSpritesRow: document.getElementById('exportSpriteMapColorSpritesRow'),
       previewCanvas: /** @type {HTMLCanvasElement|null} */ (document.getElementById('exportPreviewCanvas')),
@@ -1142,8 +1141,6 @@
     DOWNLOAD_OBJECT_URL_REVOKE_DELAY_MS,
     CAN_USE_WEB_SHARE,
     SHARE_HASHTAG,
-    CONTEST_PENDING_UPLOAD_STORAGE_KEY,
-    CONTEST_POST_PAGE_URL,
     IS_ANDROID_LINE_BROWSER,
     IOS_SNAPSHOT_SUPPORTED,
     IOS_SNAPSHOT_DB_NAME,
@@ -1645,7 +1642,6 @@
   let exportScaleUserOverride = false;
   let exportIncludeOriginalSize = false;
   let exportSaveProjectCompanion = false;
-  let exportContestPostAfterSave = false;
   let exportSaveSpriteMapCompanion = false;
   let exportColorSpritesEnabled = false;
   const EXPORT_GRID_TILE_MIN_SIZE = 1;
@@ -5996,8 +5992,6 @@
   set localizeText(value) { localizeText = value; },
   get markDocumentDurablySaved() { return markDocumentDurablySaved; },
   set markDocumentDurablySaved(value) { markDocumentDurablySaved = value; },
-  get maybeRedirectToContestPostAfterExport() { return maybeRedirectToContestPostAfterExport; },
-  set maybeRedirectToContestPostAfterExport(value) { maybeRedirectToContestPostAfterExport = value; },
   get maybeSaveProjectCompanionAfterExport() { return maybeSaveProjectCompanionAfterExport; },
   set maybeSaveProjectCompanionAfterExport(value) { maybeSaveProjectCompanionAfterExport = value; },
   get normalizeExportGridTileSize() { return normalizeExportGridTileSize; },
@@ -8427,7 +8421,7 @@
       openDocumentDialog({ mode: EXTERNAL_IMPORT_MODE_NEW_PROJECT });
     });
     bindClickHandlerOnce(dom.controls.showLocalProjects, 'coreProjectActionBound', () => {
-      showStartupScreen();
+      showStartupScreen({ refreshWorkspace: true });
     });
     bindClickHandlerOnce(dom.newProject?.button, 'coreProjectActionBound', () => {
       openNewProjectDialog();
@@ -11728,10 +11722,6 @@
   const exportRenderingModule = window.PiXiEEDrawModules?.exportRendering?.createExportRenderingModule?.({
   get $() { return $; },
   set $(value) { $ = value; },
-  get CONTEST_PENDING_UPLOAD_STORAGE_KEY() { return CONTEST_PENDING_UPLOAD_STORAGE_KEY; },
-  set CONTEST_PENDING_UPLOAD_STORAGE_KEY(value) { CONTEST_PENDING_UPLOAD_STORAGE_KEY = value; },
-  get CONTEST_POST_PAGE_URL() { return CONTEST_POST_PAGE_URL; },
-  set CONTEST_POST_PAGE_URL(value) { CONTEST_POST_PAGE_URL = value; },
   get DEFAULT_DOCUMENT_NAME() { return DEFAULT_DOCUMENT_NAME; },
   set DEFAULT_DOCUMENT_NAME(value) { DEFAULT_DOCUMENT_NAME = value; },
   get DEFAULT_LAYER_BLEND_MODE() { return DEFAULT_LAYER_BLEND_MODE; },
@@ -11850,8 +11840,6 @@
   set ensureCurrentClientCanExportProject(value) { ensureCurrentClientCanExportProject = value; },
   get exportColorSpritesEnabled() { return exportColorSpritesEnabled; },
   set exportColorSpritesEnabled(value) { exportColorSpritesEnabled = value; },
-  get exportContestPostAfterSave() { return exportContestPostAfterSave; },
-  set exportContestPostAfterSave(value) { exportContestPostAfterSave = value; },
   get exportGridTileHeight() { return exportGridTileHeight; },
   set exportGridTileHeight(value) { exportGridTileHeight = value; },
   get exportGridTileWidth() { return exportGridTileWidth; },
@@ -12050,9 +12038,6 @@
   shouldAppendColorSpritesToPrimaryExport,
   updateExportProjectCompanionToggleUI,
   updateExportSpriteMapCompanionToggleUI,
-  getContestPostAfterSaveDisabledReason,
-  canOfferContestPostAfterSave,
-  updateExportContestPostToggleUI,
   canOfferOriginalCompanionExport,
   shouldExportOriginalCompanion,
   doesExportFormatUseScale,
@@ -12060,9 +12045,7 @@
   updateExportOptionVisibility,
   updateExportOriginalToggleUI,
   announceProjectCompanionSaveResult,
-  maybeRedirectToContestPostAfterExport,
   maybeSaveProjectCompanionAfterExport,
-  resolveContestUploadCanvasSizeLabel,
   applyExportScaleConstraints,
   updateExportScaleHint,
   syncExportScaleInputs,
@@ -12091,8 +12074,6 @@
     get dom() { return dom; },
     get exportColorSpritesEnabled() { return exportColorSpritesEnabled; },
     set exportColorSpritesEnabled(value) { exportColorSpritesEnabled = value; },
-    get exportContestPostAfterSave() { return exportContestPostAfterSave; },
-    set exportContestPostAfterSave(value) { exportContestPostAfterSave = value; },
     get exportGridTileHeight() { return exportGridTileHeight; },
     set exportGridTileHeight(value) { exportGridTileHeight = value; },
     get exportGridTileWidth() { return exportGridTileWidth; },
@@ -12134,7 +12115,6 @@
     syncExportScaleInputs: (...args) => syncExportScaleInputs(...args),
     syncPixieedAccountLoginPromptLink: (...args) => syncPixieedAccountLoginPromptLink(...args),
     updateAutosaveStatus: (...args) => updateAutosaveStatus(...args),
-    updateExportContestPostToggleUI: (...args) => updateExportContestPostToggleUI(...args),
     updateExportFormatAvailability: (...args) => updateExportFormatAvailability(...args),
     updateExportOptionVisibility: (...args) => updateExportOptionVisibility(...args),
     updateExportOriginalToggleUI: (...args) => updateExportOriginalToggleUI(...args),
@@ -12287,6 +12267,7 @@
     updateAutosaveStatus,
     localizeText,
     hideStartupScreen: (...args) => hideStartupScreen(...args),
+    showStartupScreen: (...args) => showStartupScreen(...args),
     updateQrEditPanel,
     syncQrEditModeWithActivePayload,
     scheduleRecentProjectsListRender: (...args) => scheduleRecentProjectsListRender(...args),
@@ -19266,7 +19247,6 @@
         pixfindModeFirstEnableConfirmed: Boolean(pixfindModeFirstEnableConfirmed),
         exportIncludeOriginalSize: Boolean(exportIncludeOriginalSize),
         exportSaveProjectCompanion: Boolean(exportSaveProjectCompanion),
-        exportContestPostAfterSave: Boolean(exportContestPostAfterSave),
         exportSaveSpriteMapCompanion: Boolean(exportSaveSpriteMapCompanion),
         exportColorSpritesEnabled: Boolean(exportColorSpritesEnabled),
         exportGridTileWidth: normalizeExportGridTileSize(exportGridTileWidth, 8),
@@ -19497,9 +19477,6 @@
     }
     if (typeof payload.exportSaveProjectCompanion === 'boolean') {
       exportSaveProjectCompanion = payload.exportSaveProjectCompanion;
-    }
-    if (typeof payload.exportContestPostAfterSave === 'boolean') {
-      exportContestPostAfterSave = payload.exportContestPostAfterSave;
     }
     if (typeof payload.exportSaveSpriteMapCompanion === 'boolean') {
       exportSaveSpriteMapCompanion = payload.exportSaveSpriteMapCompanion;

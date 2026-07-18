@@ -30,7 +30,6 @@ This document summarizes the current repository layout and separates production-
 | `pixiedraw/` | PiXiEEDraw drawing app. |
 | `pixiee-lens/` | PiXiEELENS related pages/assets. |
 | `qr-maker/` | QR maker feature area. |
-| `contest/` | Contest pages and related assets. |
 | `projects/` | Project showcase and product routing pages. |
 | `portfolio/` | Portfolio pages/assets. |
 | `character-dots/` | Character dot assets/pages. |

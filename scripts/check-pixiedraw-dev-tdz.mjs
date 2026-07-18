@@ -1710,7 +1710,6 @@ requireInjectedGetter('timelineLayers', 'TIMELINE_CELL_SIZE');
 [
   'dom',
   'exportColorSpritesEnabled',
-  'exportContestPostAfterSave',
   'exportGridTileHeight',
   'exportGridTileWidth',
   'exportIncludeOriginalSize',
@@ -4347,7 +4346,6 @@ requireInjectedGetter('timelineLayers', 'TIMELINE_CELL_SIZE');
   'isVoxelExtensionModeEnabled',
   'localizeText',
   'markDocumentDurablySaved',
-  'maybeRedirectToContestPostAfterExport',
   'maybeSaveProjectCompanionAfterExport',
   'normalizeExportGridTileSize',
   'scaleCanvasNearestNeighbor',

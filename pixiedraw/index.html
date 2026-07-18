@@ -83,20 +83,34 @@
 </script>
 <script>window.__PIXIEEDRAW_BUILD_EDITION__ = 'web-free';</script>
 <script src="assets/js/modules/edition-capabilities-utils.js?v=2026.07.11-g3a-edition-ads"></script>
-<script src="assets/js/build-info.js?v=20260717-100"></script>
+<script src="assets/js/build-info.js?v=20260719-102"></script>
 <script>
   (function configurePixieedAds() {
     const shouldShowAds = typeof window.__PIXIEEDRAW_SHOULD_SHOW_ADS__ === 'function'
       ? window.__PIXIEEDRAW_SHOULD_SHOW_ADS__()
       : false;
-    // Modal ads use the dialog's dedicated responsive layout.  They remain
-    // separate from editor/panel ad placement.
+    // Modal ads are controlled per placement. Keep useful, non-blocking slots
+    // available while permanently excluding the retired export interstitial.
     window.__PIXIEEDRAW_MODAL_ADS_ENABLED__ = true;
     document.documentElement.dataset.pixieedModalAds = 'true';
-    window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__ = () => (
-      window.__PIXIEEDRAW_MODAL_ADS_ENABLED__ === true
-      && window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.() === true
-    );
+    window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__ = (placement = '') => {
+      if (window.__PIXIEEDRAW_MODAL_ADS_ENABLED__ !== true
+        || window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.() !== true) {
+        return false;
+      }
+      const normalizedPlacement = String(placement || '').trim().toLowerCase();
+      if (normalizedPlacement === 'export-interstitial'
+        || normalizedPlacement === 'export-interstitial-dialog') {
+        return false;
+      }
+      if (normalizedPlacement === 'export-dialog') {
+        return window.matchMedia?.('(min-width: 900px) and (min-height: 700px)').matches === true;
+      }
+      if (normalizedPlacement === 'new-project-dialog') {
+        return window.matchMedia?.('(min-height: 640px)').matches === true;
+      }
+      return true;
+    };
     window.__PIXIEED_ADS_DISABLED__ = window.__PIXIEED_AD_FREE_ACCOUNT__ === true || !shouldShowAds;
     if (window.__PIXIEED_ADS_DISABLED__) {
       return;
@@ -169,6 +183,7 @@
     const inFlightSlots = new WeakSet();
     const slotOwners = new WeakMap();
     const fillObservers = new WeakSet();
+    const visibilityObservers = new WeakMap();
 
     function getAdVisualHost(slot) {
       if (!(slot instanceof HTMLElement)) {
@@ -190,8 +205,12 @@
       const isUnfilled = status === 'unfilled';
       const visualHost = getAdVisualHost(slot);
       const mount = visualHost?.closest?.('.panel-ad-mount') || null;
-      visualHost?.classList?.toggle('is-ad-unfilled', isUnfilled);
-      mount?.classList?.toggle('is-ad-unfilled', isUnfilled);
+      const reserveSpace = visualHost?.dataset?.pixieedReserveAdSpace === 'true'
+        || mount?.dataset?.pixieedReserveAdSpace === 'true';
+      visualHost?.classList?.toggle('is-ad-unfilled-reserved', isUnfilled && reserveSpace);
+      mount?.classList?.toggle('is-ad-unfilled-reserved', isUnfilled && reserveSpace);
+      visualHost?.classList?.toggle('is-ad-unfilled', isUnfilled && !reserveSpace);
+      mount?.classList?.toggle('is-ad-unfilled', isUnfilled && !reserveSpace);
       return isUnfilled;
     }
 
@@ -258,7 +277,12 @@
         return false;
       }
       const rect = slot.getBoundingClientRect();
-      return rect.width > 0 && rect.height > 0;
+      return rect.width > 0
+        && rect.height > 0
+        && rect.right > 0
+        && rect.bottom > 0
+        && rect.left < window.innerWidth
+        && rect.top < window.innerHeight;
     }
 
     function applyResponsiveAdShape(slot) {
@@ -299,7 +323,7 @@
         return { ok: false, pushed: false, reason: 'edition-ads-disabled' };
       }
       if (slot instanceof HTMLElement && slot.closest('dialog')
-        && !window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.()) {
+        && !window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.(owner)) {
         logAdSlot('skip', slot, { owner }, 'modal-ads-disabled');
         return { ok: false, pushed: false, reason: 'modal-ads-disabled' };
       }
@@ -321,6 +345,22 @@
         return { ok: false, pushed: false, reason: 'slot-in-preload-host' };
       }
       if (!isSlotVisible(slot)) {
+        if (typeof window.IntersectionObserver === 'function' && !visibilityObservers.has(slot)) {
+          const observer = new window.IntersectionObserver(entries => {
+            if (!entries.some(entry => entry.isIntersecting) || !isSlotVisible(slot)) {
+              return;
+            }
+            observer.disconnect();
+            visibilityObservers.delete(slot);
+            renderAdSlot(slot, {
+              ...options,
+              owner,
+              reason: 'entered-viewport',
+            });
+          }, { rootMargin: '120px 0px' });
+          visibilityObservers.set(slot, observer);
+          observer.observe(slot);
+        }
         logAdSlot('skip', slot, { owner }, 'slot-not-renderable');
         return { ok: false, pushed: false, reason: 'slot-not-renderable' };
       }
@@ -412,7 +452,7 @@
 
 
 
-<link href="assets/css/style.css?v=20260715-export-preview-ad-layout1" rel="stylesheet"/>
+<link href="assets/css/style.css?v=20260719-startup-projects1" rel="stylesheet"/>
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-4.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-4.png"/>
 <style>
@@ -499,22 +539,27 @@
 <div class="startup-screen__backdrop"></div>
 <div class="startup-screen__content">
 <div class="startup-screen__header">
-<h1 class="startup-screen__title" id="startupScreenTitle">PiXiEEDraw</h1>
-<p class="startup-screen__subtitle">PiXiEEDrawでドット絵づくり・アニメ制作をはじめよう</p>
+<div class="startup-screen__heading">
+<h1 class="startup-screen__title" id="startupScreenTitle">プロジェクト</h1>
+<p class="startup-screen__subtitle">PiXiEEDraw</p>
 </div>
-<div aria-label="起動操作" class="startup-screen__actions" role="group">
+<div aria-label="プロジェクト操作" class="startup-screen__actions" role="group">
 <button class="button" id="startupActionNew" type="button">新規作成</button>
 <button class="button" id="startupActionOpen" type="button">ファイルを開く</button>
+<button class="button button--ghost" id="startupActionSkip" type="button">編集へ戻る</button>
+</div>
 </div>
 <section aria-labelledby="startupWorkspaceTitle" class="startup-workspace" id="startupWorkspace">
 <div class="startup-workspace__header">
 <div>
-<h2 class="startup-workspace__title" id="startupWorkspaceTitle">プロジェクト一覧</h2>
+<h2 class="startup-workspace__title" id="startupWorkspaceTitle">端末内プロジェクト</h2>
 <p aria-live="polite" class="startup-workspace__status" id="startupWorkspaceStatus">端末内プロジェクトを確認しています…</p>
 </div>
-<div class="startup-workspace__actions">
 </div>
-</div>
+<label class="startup-workspace__search" for="startupWorkspaceSearch">
+<span class="sr-only">プロジェクトを検索</span>
+<input autocomplete="off" id="startupWorkspaceSearch" placeholder="プロジェクト名を検索" spellcheck="false" type="search"/>
+</label>
 <div aria-live="polite" class="startup-workspace__list" id="startupWorkspaceProjectList" role="list">
 <p class="startup-workspace__empty">保存済みプロジェクトを確認しています…</p>
 </div>
@@ -566,20 +611,6 @@
 <button aria-label="左パネルを開く / 幅を変更" class="rail-resizer rail-resizer--left" hidden="" id="resizeLeftRail" type="button"></button>
 </aside>
 <main aria-label="ドットキャンバス" class="stage" id="stage">
-<section aria-labelledby="projectHomeTitle" class="project-home-screen" hidden id="projectHomeScreen" tabindex="-1">
-<div class="project-home-screen__inner">
-<header class="project-home-screen__header">
-<div>
-<h1 class="project-home-screen__title" id="projectHomeTitle">PiXiEEDrawをはじめる</h1>
-</div>
-<div aria-label="ホーム操作" class="project-home-screen__actions" role="group">
-<button class="button button--primary" id="projectHomeNew" type="button">新規作成</button>
-<button class="button" id="projectHomeOpen" type="button">ファイルを開く</button>
-<a class="button" href="../account/index.html">PiXiEED マイページ</a>
-</div>
-</header>
-</div>
-</section>
 <div class="stage__canvas" id="canvasViewport">
 <div class="stage__workspace" data-local-canvas-layout="single" id="viewportWorkspace">
 <div class="stage__main-canvas" id="mainCanvasArea">
@@ -714,14 +745,14 @@
 </div>
 <div aria-hidden="true" id="panelAdPreloadHost" style="position:fixed;left:-20000px;top:-20000px;width:320px;height:320px;overflow:hidden;opacity:0;pointer-events:none;z-index:-1;">
   <div id="leftPanelAdPreloadMount" style="width:320px;min-width:320px;max-width:320px;height:320px;min-height:320px;max-height:320px;overflow:hidden;">
-    <div aria-label="広告" class="panel-ad" id="leftPanelAd">
+    <div aria-label="広告" class="panel-ad" data-pixieed-reserve-ad-space="true" id="leftPanelAd">
     <div class="ad-box" id="leftPanelAdSlot">
     <ins class="ad-seed" data-ad-client="ca-pub-9801602250480253" data-ad-format="horizontal" data-ad-slot="3806415737" data-full-width-responsive="true" style="display:block"></ins>
     </div>
     </div>
   </div>
   <div id="rightPanelAdPreloadMount" style="width:320px;min-width:320px;max-width:320px;height:96px;min-height:96px;max-height:96px;overflow:hidden;">
-    <div aria-label="広告" class="panel-ad panel-ad--context" id="rightPanelContextAd">
+    <div aria-label="広告" class="panel-ad panel-ad--context" data-pixieed-reserve-ad-space="true" id="rightPanelContextAd">
       <div class="ad-box" id="rightPanelContextAdSlot">
         <ins class="ad-seed" data-ad-client="ca-pub-9801602250480253" data-ad-format="horizontal" data-ad-slot="1180252398" data-full-width-responsive="false" style="display:block"></ins>
       </div>
@@ -1157,6 +1188,7 @@
 <p class="help-text ui-guide-text">描画は端末内V2へ自動保存し、10操作ごとに差分をチェックポイントへ統合します。</p>
 <p class="help-text ui-guide-text">外部ファイルへは自動出力しません。画像・GIF・PiXiEEDraw形式は出力パネルからダウンロードします。</p>
 </div>
+<div class="panel-ad-mount panel-ad-mount--context" data-panel-ad-mount="right"></div>
 <label class="toggle-option" for="toggleAutosaveRequired">
 <input checked disabled id="toggleAutosaveRequired" type="checkbox"/>
 <span>端末内V2自動保存（常時ON）</span>
@@ -1185,7 +1217,6 @@
 <button class="button button--danger" id="clearCanvas" type="button">キャンバスをクリア</button>
 </div>
 </details>
-<div class="panel-ad-mount panel-ad-mount--context" data-panel-ad-mount="right"></div>
 <div class="panel-ad-mount" data-panel-ad-mount="left"></div>
 </div>
 </section>
@@ -1233,6 +1264,7 @@
 <p class="help-text ui-guide-text" id="canvasSizeHint">X/Y と倍率をまとめて調整</p>
 </div>
 </div>
+<div class="panel-ad-mount panel-ad-mount--context" data-panel-ad-mount="right"></div>
 <div class="field field--list settings-color-mode-field">
 <span>カラーモード</span>
 <div aria-label="カラーモード" class="color-mode-switch" id="settingsColorModeSwitch" role="radiogroup">
@@ -1348,7 +1380,6 @@
 </div>
 <p class="help-text ui-guide-text" id="settingsDisplayHint">背景とUI配色を切り替えます（描画色には影響しません）。</p>
 </div>
-<div class="panel-ad-mount panel-ad-mount--context" data-panel-ad-mount="right"></div>
 <div class="panel-ad-mount" data-panel-ad-mount="left"></div>
 </div>
 </section>
@@ -1379,7 +1410,7 @@
 </div>
 <div class="help-panel__list" id="helpArticleList" role="list"></div>
 <p class="help-text" hidden="" id="helpNoResults">一致する項目はありません。</p>
-<div aria-label="広告" class="export-ad operation-help__ad" id="operationHelpAdContainer">
+<div aria-label="広告" class="export-ad operation-help__ad" data-pixieed-reserve-ad-space="true" id="operationHelpAdContainer">
 <div class="export-ad__slot">
 <ins class="operation-help-ad-ins" data-ad-client="ca-pub-9801602250480253" data-ad-format="auto" data-ad-slot="2141591954" data-full-width-responsive="true" id="operationHelpAdSlot" style="display:block"></ins>
 </div>
@@ -1475,7 +1506,7 @@
 <p aria-live="polite" class="export-preview-meta" id="exportPreviewMeta">プレビュー準備中</p>
 </section>
 </div>
-<div aria-label="広告" class="export-ad export-dialog-body__ad" id="exportAdContainer">
+<div aria-label="広告" class="export-ad export-dialog-body__ad" data-pixieed-reserve-ad-space="true" id="exportAdContainer">
 <div class="export-ad__slot">
 <ins class="export-ad-ins" data-ad-client="ca-pub-9801602250480253" data-ad-format="auto" data-ad-slot="2141591954" data-full-width-responsive="true" id="exportAdSlot" style="display:block"></ins>
 </div>
@@ -1591,7 +1622,7 @@
 <option value="local">通常</option>
 </select>
 </section>
-<div aria-label="広告" class="export-ad new-project__ad" id="newProjectAdContainer">
+<div aria-label="広告" class="export-ad new-project__ad" data-pixieed-reserve-ad-space="true" id="newProjectAdContainer">
 <div class="export-ad__slot">
 <ins class="new-project-ad-ins" data-ad-client="ca-pub-9801602250480253" data-ad-format="auto" data-ad-slot="2141591954" data-full-width-responsive="true" id="newProjectAdSlot" style="display:block"></ins>
 </div>
@@ -1717,7 +1748,7 @@
 <p class="shortcut-help-row" role="listitem"><span>選択解除/移動キャンセル</span><span class="shortcut-help-key">Esc</span></p>
 </div>
 </div>
-<div aria-label="広告" class="export-ad shortcut-help__ad" id="shortcutHelpAdContainer">
+<div aria-label="広告" class="export-ad shortcut-help__ad" data-pixieed-reserve-ad-space="true" id="shortcutHelpAdContainer">
 <div class="export-ad__slot">
 <ins class="shortcut-help-ad-ins" data-ad-client="ca-pub-9801602250480253" data-ad-format="auto" data-ad-slot="2141591954" data-full-width-responsive="true" id="shortcutHelpAdSlot" style="display:block"></ins>
 </div>
@@ -1735,7 +1766,7 @@
 <div class="modal__body update-history-modal__body">
 <p class="help-text">直近1年の更新内容を表示しています。</p>
 <div class="update-history-list" id="updateHistoryList" role="list"></div>
-<div aria-label="広告" class="export-ad update-history__ad" id="updateHistoryAdContainer">
+<div aria-label="広告" class="export-ad update-history__ad" data-pixieed-reserve-ad-space="true" id="updateHistoryAdContainer">
 <div class="export-ad__slot">
 <ins class="update-history-ad-ins" data-ad-client="ca-pub-9801602250480253" data-ad-format="auto" data-ad-slot="2141591954" data-full-width-responsive="true" id="updateHistoryAdSlot" style="display:block"></ins>
 </div>
@@ -1820,7 +1851,7 @@
 	<script defer="" src="assets/js/modules/open-project-tab-helpers.js?v=2026.07.06-local-project-open-fix1"></script>
 		<script defer="" src="assets/js/modules/open-project-tab-workflow-utils.js?v=2026.07.13-v2-sheet-order-recovery3"></script>
 		<script defer="" src="assets/js/modules/open-project-tab-view.js?v=20260715-local-true-v2-cleanup1"></script>
-	<script defer="" src="assets/js/modules/open-project-tab-lifecycle.js?v=20260715-local-true-v2-cleanup1"></script>
+	<script defer="" src="assets/js/modules/open-project-tab-lifecycle.js?v=20260719-startup-projects1"></script>
 	<script defer="" src="assets/js/modules/open-project-tab-interactions.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/local-project-journal-utils.js?v=20260717-session-history1"></script>
 	<script defer="" src="assets/js/modules/pixel-patch-history-utils.js?v=2026.07.12-direct-authority-gmem2a1"></script>
@@ -1842,14 +1873,14 @@
 	<script defer="" src="assets/js/modules/canvas-wheel-zoom-workflow-utils.js?v=2026.07.12-wheel-visibility-surface-fix1"></script>
 	<script defer="" src="assets/js/modules/ios-snapshot-utils.js?v=2026.07.01-pixfind-mode-split-v1"></script>
 	<script defer="" src="assets/js/modules/update-history-utils.js?v=2026.06.28-file-split-step7"></script>
-	<script defer="" src="assets/js/modules/static-content.js?v=20260715-remove-oval1"></script>
+	<script defer="" src="assets/js/modules/static-content.js?v=20260719-startup-projects1"></script>
 	<script defer="" src="assets/js/modules/binary-codecs.js?v=2026.06.28-file-split-step2"></script>
 	<script defer="" src="assets/js/modules/export-codecs.js?v=2026.06.28-file-split-step1"></script>
 	<script defer="" src="assets/vendor/jsQR.min.js?v=1.4.0"></script>
 	<script defer="" src="assets/js/modules/image-import-decode-utils.js?v=2026.07.12-gmem3a-streaming-resize1"></script>
 	<script defer="" src="assets/js/modules/palette-panel-utils.js?v=2026.07.12-direct-authority-gmem2a1"></script>
 	<script defer="" src="assets/js/modules/timeline-layers.js?v=2026.07.04-frame-pending-structure-fix1"></script>
-	<script defer="" src="assets/js/modules/ui-localization-utils.js?v=20260715-remove-oval1"></script>
+	<script defer="" src="assets/js/modules/ui-localization-utils.js?v=20260719-startup-projects1"></script>
 	<script defer="" src="assets/js/modules/ui-language-utils.js?v=2026.07.03-small-helper-batch-split-v1"></script>
 	<script defer="" src="assets/js/modules/scroll-input-utils.js?v=2026.07.03-small-helper-batch-split-v1"></script>
 	<script defer="" src="assets/js/modules/sprite-scale-utils.js?v=2026.06.30-zh-localization-v1"></script>
@@ -1888,9 +1919,9 @@
 	<script defer="" src="assets/js/modules/project-provenance-utils.js?v=20260714-provenance-v1"></script>
 	<script defer="" src="assets/js/modules/open-import-workflow-utils.js?v=20260717-market-all-open1"></script>
 	<script defer="" src="assets/js/modules/export-format-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
-	<script defer="" src="assets/js/modules/export-dialog-workflow-utils.js?v=20260715-local-true-v2-cleanup1"></script>
-		<script defer="" src="assets/js/modules/startup-workflow-utils.js?v=20260715-startup-grid-no-oval1"></script>
-		<script defer="" src="assets/js/modules/recent-project-workflow-utils.js?v=20260715-local-true-v2-cleanup1"></script>
+	<script defer="" src="assets/js/modules/export-dialog-workflow-utils.js?v=20260719-ad-audit2"></script>
+		<script defer="" src="assets/js/modules/startup-workflow-utils.js?v=20260719-startup-projects1"></script>
+		<script defer="" src="assets/js/modules/recent-project-workflow-utils.js?v=20260719-ad-audit1"></script>
 		<script defer="" src="assets/js/modules/project-package-workflow-utils.js?v=20260714-provenance-v1"></script>
 		<script defer="" src="assets/js/modules/project-storage-adapter-utils.js?v=20260715-legacy-project-card-recovery1"></script>
 		<script defer="" src="assets/js/modules/project-storage-v1-json-adapter.js?v=20260715-legacy-project-card-recovery1"></script>
@@ -1928,7 +1959,7 @@
 	<script defer="" src="assets/js/modules/pre-update-checkpoint-utils.js?v=20260712-pre-update-checkpoint-u3"></script>
 	<script defer="" src="assets/js/active-project-session-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/pixieedraw-dev-switch.js?v=2026.07.03-pixieedrawdev-switch-fix14"></script>
-	<script defer="" src="assets/js/app.js?v=20260717-100"></script>
+	<script defer="" src="assets/js/app.js?v=20260719-102"></script>
 	<script defer="" src="assets/js/modules/update-detection-utils.js?v=20260713-026"></script>
   <script>
     (function initPanelAdDocking() {
@@ -2100,8 +2131,7 @@
       if (!window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.()) return;
       const ADS_CLIENT = 'ca-pub-9801602250480253';
       const SLOTS = [
-        { containerId: 'leftPanelAdSlot', slot: '3806415737' },
-        { containerId: 'mobileBottomAdSlot', slot: '6568310446' }
+        { containerId: 'leftPanelAdSlot', slot: '3806415737' }
       ];
       const MIN_SIDE_AD_WIDTH = 140;
       const MIN_MOBILE_BOTTOM_AD_WIDTH = 250;
@@ -2110,7 +2140,6 @@
       const resizeObserverByContainer = new WeakMap();
       let rerenderQueued = false;
       let lastAdLayoutMode = null;
-      let activeModeReloadTimer = null;
 
       function clamp(value, min, max) {
         return Math.max(min, Math.min(max, value));
@@ -2130,13 +2159,6 @@
         return isPortraitBottomOnlyMode() ? 'portrait-bottom' : 'landscape-side';
       }
 
-      function resetSlotContainer(containerId) {
-        const container = document.getElementById(containerId);
-        if (!(container instanceof HTMLElement)) return;
-        container.dataset.pixiedRetryLoop = '0';
-        container.innerHTML = '';
-      }
-
       function handleAdLayoutTransition() {
         const mode = getAdLayoutMode();
         if (lastAdLayoutMode === null) {
@@ -2145,9 +2167,7 @@
         }
         if (lastAdLayoutMode === mode) return false;
         lastAdLayoutMode = mode;
-
-        scheduleActiveModeReload(0);
-        return true;
+        return false;
       }
 
       function getCurrentModeTargetIds() {
@@ -2160,24 +2180,6 @@
           return ['leftPanelAdSlot'];
         }
         return [];
-      }
-
-      function resetCurrentModeSlots() {
-        getCurrentModeTargetIds().forEach(resetSlotContainer);
-      }
-
-      function scheduleActiveModeReload(delayMs) {
-        if (activeModeReloadTimer !== null) {
-          window.clearTimeout(activeModeReloadTimer);
-        }
-        activeModeReloadTimer = window.setTimeout(() => {
-          activeModeReloadTimer = null;
-          resetCurrentModeSlots();
-          queueAllSlotsOnce();
-          [140, 360, 760].forEach((delay) => {
-            window.setTimeout(queueAllSlotsOnce, delay);
-          });
-        }, Math.max(0, Number(delayMs) || 0));
       }
 
       function getSideAdFrameSize(container) {
@@ -2480,9 +2482,7 @@
       document.addEventListener('pixieedraw:ads-ready', queueAllSlotsOnce);
       queueAllSlots();
       window.addEventListener('resize', queueAllSlotsOnce, { passive: true });
-      window.addEventListener('orientationchange', () => {
-        scheduleActiveModeReload(40);
-      }, { passive: true });
+      window.addEventListener('orientationchange', queueAllSlotsOnce, { passive: true });
       document.addEventListener('pixiedraw:panel-ad-dock-change', queueAllSlotsOnce);
       document.addEventListener('pixiedraw:ad-layout-change', (event) => {
         const reason = event && event.detail ? String(event.detail.reason || '') : '';
@@ -2490,17 +2490,17 @@
           queueAllSlotsOnce();
           return;
         }
-        scheduleActiveModeReload(24);
+        queueAllSlotsOnce();
       });
       if (window.matchMedia) {
         const orientationMql = window.matchMedia('(orientation: portrait)');
         if (typeof orientationMql.addEventListener === 'function') {
           orientationMql.addEventListener('change', () => {
-            scheduleActiveModeReload(24);
+            queueAllSlotsOnce();
           });
         } else if (typeof orientationMql.addListener === 'function') {
           orientationMql.addListener(() => {
-            scheduleActiveModeReload(24);
+            queueAllSlotsOnce();
           });
         }
       }
@@ -2525,10 +2525,10 @@
   </script>
 
 	<script src="../scripts/tool-fullscreen.js?v=2026.07.15-pixiedraw-fullscreen-restore1"></script>
-	<script src="../scripts/shared-bottom-nav.js?v=2026.07.18-ad-permissions1"></script>
+	<script src="../scripts/shared-bottom-nav.js?v=2026.07.19-pixiedraw-ad-audit1"></script>
 	<script>
     (function initOperationHelpAd() {
-      if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.()) return;
+      if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.('operation-help-dialog')) return;
       const dialog = document.getElementById('operationHelpDialog');
       const slot = document.getElementById('operationHelpAdSlot');
       if (!(dialog instanceof HTMLDialogElement) || !(slot instanceof HTMLElement)) return;

@@ -1,0 +1,174 @@
+(function () {
+  'use strict';
+
+  const SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
+  const CLIENT_ID_STORAGE_KEY = 'pixieed_client_id';
+  const list = document.getElementById('pixfindPostList');
+  const count = document.getElementById('pixfindPostCount');
+  const currentScript = document.currentScript;
+  let renderToken = 0;
+
+  if (!list || !count) return;
+
+  function asset(relativePath) {
+    try {
+      return new URL(relativePath, currentScript?.src || window.location.href).href;
+    } catch (_error) {
+      return relativePath;
+    }
+  }
+
+  function getClientId() {
+    try {
+      return String(localStorage.getItem(CLIENT_ID_STORAGE_KEY) || window.PIXIEED_CLIENT_ID || '').trim();
+    } catch (_error) {
+      return '';
+    }
+  }
+
+  function isSignedIn() {
+    return document.body?.dataset.pixieedAccountAuth === 'signed-in';
+  }
+
+  function formatDate(value) {
+    const date = new Date(value || '');
+    if (!Number.isFinite(date.getTime())) return '公開日不明';
+    return new Intl.DateTimeFormat('ja-JP', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(date);
+  }
+
+  function getModeLabel(entry) {
+    const mode = String(entry?.game_mode || entry?.play_mode || entry?.mode || '').toLowerCase();
+    return mode === 'hidden-object' ? 'もの探し' : '間違い探し';
+  }
+
+  function renderEmpty() {
+    const item = document.createElement('div');
+    item.className = 'account-item';
+
+    const cover = document.createElement('div');
+    cover.className = 'account-cover';
+    const image = document.createElement('img');
+    image.src = asset('../icon/icon-192-2.png');
+    image.alt = '';
+    cover.appendChild(image);
+
+    const body = document.createElement('div');
+    body.className = 'account-item__body';
+    const title = document.createElement('strong');
+    title.textContent = '投稿はまだありません';
+    const description = document.createElement('span');
+    description.textContent = 'PiXFiNDで問題を作ると、ここからすぐ確認できます。';
+    body.append(title, description);
+
+    const action = document.createElement('a');
+    action.className = 'account-action';
+    action.href = asset('../pixfind/index.html#creator');
+    action.textContent = '作る';
+    item.append(cover, body, action);
+    list.replaceChildren(item);
+    count.textContent = '0件';
+  }
+
+  function createCard(entry) {
+    const puzzleId = String(entry?.id || '').trim();
+    const card = document.createElement('a');
+    card.className = 'account-pixfind-card';
+    card.href = asset(`../pixfind/index.html?puzzle=${encodeURIComponent(puzzleId)}`);
+    card.setAttribute('aria-label', `${entry?.label || 'PiXFiND'}を遊ぶ`);
+
+    const preview = document.createElement('span');
+    preview.className = 'account-pixfind-card__preview';
+    const image = document.createElement('img');
+    image.src = String(entry?.thumbnail_url || entry?.original_url || asset('../icon/icon-192-2.png'));
+    image.alt = '';
+    image.loading = 'lazy';
+    image.decoding = 'async';
+    image.draggable = false;
+    preview.appendChild(image);
+
+    const body = document.createElement('span');
+    body.className = 'account-pixfind-card__body';
+    const title = document.createElement('strong');
+    title.textContent = String(entry?.label || 'PiXFiND Puzzle');
+    const meta = document.createElement('span');
+    meta.className = 'account-pixfind-card__meta';
+    const mode = document.createElement('span');
+    mode.textContent = `${getModeLabel(entry)} ${'★'.repeat(Math.max(1, Math.min(3, Number(entry?.difficulty) || 1)))}`;
+    const date = document.createElement('span');
+    date.textContent = formatDate(entry?.created_at);
+    meta.append(mode, date);
+    body.append(title, meta);
+    card.append(preview, body);
+    return card;
+  }
+
+  function renderError() {
+    const item = document.createElement('div');
+    item.className = 'account-item';
+    const body = document.createElement('div');
+    body.className = 'account-item__body';
+    const title = document.createElement('strong');
+    title.textContent = '投稿を読み込めませんでした';
+    const description = document.createElement('span');
+    description.textContent = '通信状態を確認して、ページを再読み込みしてください。';
+    body.append(title, description);
+    item.append(body);
+    list.replaceChildren(item);
+    count.textContent = '要確認';
+  }
+
+  async function refresh() {
+    const token = ++renderToken;
+    if (!isSignedIn()) return;
+    const clientId = getClientId();
+    if (!clientId) {
+      renderEmpty();
+      return;
+    }
+
+    count.textContent = '確認中';
+    const params = new URLSearchParams({
+      select: 'id,label,difficulty,mode,game_mode,play_mode,thumbnail_url,original_url,created_at',
+      client_id: `eq.${clientId}`,
+      order: 'created_at.desc',
+      limit: '100',
+    });
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/pixfind_puzzles?${params}`, {
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          'x-client-id': clientId,
+        },
+      });
+      if (!response.ok) throw new Error(`PiXFiND posts request failed: ${response.status}`);
+      const entries = await response.json();
+      if (token !== renderToken) return;
+      if (!Array.isArray(entries) || entries.length === 0) {
+        renderEmpty();
+        return;
+      }
+      list.replaceChildren(...entries.map(createCard));
+      count.textContent = `${entries.length}件`;
+    } catch (_error) {
+      if (token === renderToken) renderError();
+    }
+  }
+
+  const authObserver = new MutationObserver(() => {
+    if (isSignedIn()) refresh();
+    else renderToken += 1;
+  });
+  authObserver.observe(document.body, { attributes: true, attributeFilter: ['data-pixieed-account-auth'] });
+  window.addEventListener('pageshow', refresh);
+  window.addEventListener('focus', refresh, { passive: true });
+  window.addEventListener('storage', (event) => {
+    if (event.key === CLIENT_ID_STORAGE_KEY) refresh();
+  });
+  window.setTimeout(refresh, 0);
+})();

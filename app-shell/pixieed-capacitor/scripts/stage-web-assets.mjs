@@ -17,7 +17,6 @@ const includeEntries = [
   'Camera.png',
   'character-dots',
   'contact',
-  'contest',
   'data',
   'events',
   'FooterIcon1.png',
@@ -46,6 +45,7 @@ const includeEntries = [
   'notes',
   'notice',
   'pixiedraw',
+  'pixfind',
   'pixiee-lens',
   'PiXiEEDogp.png',
   'portfolio',
@@ -207,6 +207,10 @@ function buildLauncherHtml() {
         <strong>PiXiEELENS</strong>
         <span>カメラ撮影からドット化して Draw へ持ち込めます。</span>
       </a>
+      <a class="action" href="./pixfind/index.html">
+        <strong>PiXFiND</strong>
+        <span>ドット絵の間違い探し・もの探しを遊んだり作ったりできます。</span>
+      </a>
       <a class="action" href="./tools.html">
         <strong>ツール一覧</strong>
         <span>PiXiEED の各ツールを確認できます。</span>
@@ -214,10 +218,6 @@ function buildLauncherHtml() {
       <a class="action" href="./public-room.html">
         <strong>公開中の部屋</strong>
         <span>みんなで一緒に描いている部屋へ参加できます。</span>
-      </a>
-      <a class="action" href="./contest/index.html">
-        <strong>コンテスト</strong>
-        <span>投稿や開催情報を確認できます。</span>
       </a>
     </section>
     <p class="meta">PiXiEED の各機能を 1 つのアプリから行き来できるホームです。</p>

@@ -150,11 +150,6 @@
         updateExportFormatAvailability();
         return;
       }
-      if (mode === 'contest') {
-        updateAutosaveStatus('コンテスト投稿は現在停止中です', 'warn');
-        closeExportDialog();
-        return;
-      }
       closeExportDialog();
       queueExportWithInterstitial(() => performExportByMode(mode));
     });
@@ -233,18 +228,6 @@
         updateExportPreview();
       });
     }
-    if (config.contestPostToggle instanceof HTMLInputElement
-      && config.contestPostToggle.dataset.bound !== 'true') {
-      config.contestPostToggle.dataset.bound = 'true';
-      config.contestPostToggle.checked = exportContestPostAfterSave;
-      config.contestPostToggle.addEventListener('change', event => {
-        exportContestPostAfterSave = Boolean(event.target.checked);
-        scheduleSessionPersist({ includeSnapshots: false });
-        updateExportContestPostToggleUI();
-        updateExportPreview();
-      });
-    }
-
     if (config.spriteMapColorSpritesToggle instanceof HTMLInputElement
       && config.spriteMapColorSpritesToggle.dataset.bound !== 'true') {
       config.spriteMapColorSpritesToggle.dataset.bound = 'true';
@@ -401,9 +384,6 @@
       closeToolSpotlightDialog();
     });
     dom.toolSpotlight?.goHome?.addEventListener('click', () => {
-      closeToolSpotlightDialog();
-    });
-    dom.toolSpotlight?.openContest?.addEventListener('click', () => {
       closeToolSpotlightDialog();
     });
     dialog.addEventListener('cancel', event => {

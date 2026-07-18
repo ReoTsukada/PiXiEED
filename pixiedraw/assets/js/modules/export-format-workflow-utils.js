@@ -269,7 +269,6 @@
       }
       if (result.exportedCount > 0) {
         markDocumentDurablySaved();
-        let skipInterstitial = false;
         if (result.exportedCount === result.total && !result.wasCancelled && !result.hadFailure) {
           const companionResult = shouldSaveProjectCompanion('png')
             ? 'saved'
@@ -278,14 +277,8 @@
               wasCancelled: result.wasCancelled,
             });
           announceProjectCompanionSaveResult('png', companionResult);
-          skipInterstitial = await maybeRedirectToContestPostAfterExport('png', {
-            primaryBlob: tasks[0]?.blob || null,
-            companionResult,
-          });
         }
-        if (!skipInterstitial) {
-          showLoginPromptAfterExport();
-        }
+        showLoginPromptAfterExport();
       }
     } catch (error) {
       console.error('PNG export failed', error);

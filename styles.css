@@ -2894,7 +2894,7 @@ body.portfolio-page main > .section:first-of-type {
   }
 }
 
-/* Project pages: align look to home/contest and hide ads */
+/* Project pages: align with the home surface and hide ads */
 body.project-page {
   font-family: 'Fredoka', 'DotGothic16', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   color: #e5e7eb;
@@ -3250,7 +3250,7 @@ body.portfolio-page.with-bottom-nav {
   padding: 20px 14px 120px;
 }
 
-/* 共通ボトムナビ（homeでも contest/tools と同じ見た目に） */
+/* 共通ボトムナビ */
 .bottom-nav{
   position:fixed;
   bottom:0;

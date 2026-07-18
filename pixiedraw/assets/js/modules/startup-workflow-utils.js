@@ -161,7 +161,7 @@
   }
 
   function queueNewProjectAdRender() {
-    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.()) {
+    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.('new-project-dialog')) {
       return;
     }
     const dialog = dom.newProject?.dialog;
@@ -1093,7 +1093,7 @@
     ];
     document.querySelectorAll('.startup-recent-card__ad-ins').forEach(slot => {
       const card = slot.closest('.startup-recent-card--ad');
-      const section = slot.closest('.startup-screen__recent, .project-home-screen__recent');
+      const section = slot.closest('.startup-screen__recent, .startup-workspace, .project-home-screen__recent');
       const screen = slot.closest('.startup-screen, .project-home-screen');
       adTargets.push({
         screen,
@@ -1119,7 +1119,8 @@
         return;
       }
       container.hidden = false;
-      if (adSlot.dataset.pixieedAdCard === 'true' && adSlot.dataset.visibilityObserved !== '1') {
+      if ((adSlot.dataset.pixieedAdCard === 'true' || adSlot.dataset.pixieedProjectFeedAd === 'true')
+        && adSlot.dataset.visibilityObserved !== '1') {
         if (typeof window.IntersectionObserver === 'function') {
           const observer = new window.IntersectionObserver(entries => {
             if (!entries.some(entry => entry.isIntersecting)) {
@@ -1133,7 +1134,7 @@
             } else {
               window.setTimeout(queue, 0);
             }
-          }, { root: section.closest('.startup-recent-list') || null, threshold: 0.1 });
+          }, { root: section.closest('.startup-recent-list, .startup-workspace__list') || null, threshold: 0.1 });
           observer.observe(container);
           adSlot.dataset.visibilityObserved = 'pending';
           return;
@@ -1555,6 +1556,7 @@
   }
 
   let startupWorkspaceEntries = [];
+  let startupWorkspaceSearchQuery = '';
   let startupWorkspaceMigrationPrompted = false;
 
   function setStartupWorkspaceStatus(message, tone = 'info') {
@@ -1589,6 +1591,11 @@
     const list = dom.startup?.workspaceProjectList;
     if (!(list instanceof HTMLElement)) return;
     startupWorkspaceEntries = Array.isArray(entries) ? entries.slice() : [];
+    const visibleEntries = startupWorkspaceSearchQuery
+      ? startupWorkspaceEntries.filter(entry => String(entry?.name || entry?.fileName || '')
+          .toLocaleLowerCase()
+          .includes(startupWorkspaceSearchQuery))
+      : startupWorkspaceEntries;
     list.replaceChildren();
     if (!startupWorkspaceEntries.length) {
       const empty = document.createElement('p');
@@ -1597,11 +1604,19 @@
       list.appendChild(empty);
       return;
     }
-    startupWorkspaceEntries.forEach((entry, index) => {
+    if (!visibleEntries.length) {
+      const empty = document.createElement('p');
+      empty.className = 'startup-workspace__empty';
+      empty.textContent = localizeText('一致するプロジェクトがありません。', 'No matching projects.');
+      list.appendChild(empty);
+      return;
+    }
+    visibleEntries.forEach((entry, visibleIndex) => {
+      const entryIndex = startupWorkspaceEntries.indexOf(entry);
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'startup-workspace__project';
-      button.dataset.workspaceProjectIndex = String(index);
+      button.dataset.workspaceProjectIndex = String(entryIndex);
       button.setAttribute('role', 'listitem');
       if (entry?.deviceLocalProject !== true && entry?.migrationRecovery !== true && Number(entry?.size) === 0) {
         button.title = localizeText(
@@ -1617,7 +1632,7 @@
       }
       const thumbnail = document.createElement('span');
       thumbnail.className = 'startup-workspace__project-thumbnail';
-      thumbnail.dataset.workspaceProjectThumbnail = String(index);
+      thumbnail.dataset.workspaceProjectThumbnail = String(entryIndex);
       const placeholder = document.createElement('span');
       placeholder.className = 'startup-workspace__project-thumbnail-placeholder';
       placeholder.textContent = 'PXD';
@@ -1668,7 +1683,33 @@
       details.append(name, meta, certification);
       button.append(thumbnail, details);
       list.appendChild(button);
+      if (!startupWorkspaceSearchQuery && visibleIndex === 3 && window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.()) {
+        const adCard = document.createElement('div');
+        adCard.className = 'startup-recent-card--ad startup-recent-ad startup-workspace__ad';
+        adCard.dataset.pixieedReserveAdSpace = 'true';
+        adCard.setAttribute('role', 'listitem');
+        adCard.setAttribute('aria-label', localizeText('広告', 'Advertisement'));
+        const frame = document.createElement('div');
+        frame.className = 'startup-recent-ad__frame';
+        const label = document.createElement('span');
+        label.className = 'startup-recent-ad__label';
+        label.textContent = localizeText('広告', 'Advertisement');
+        const ad = document.createElement('ins');
+        ad.className = 'startup-recent-card__ad-ins startup-recent-ad__slot';
+        ad.setAttribute('data-ad-client', 'ca-pub-9801602250480253');
+        ad.setAttribute('data-ad-format', 'horizontal');
+        ad.setAttribute('data-ad-slot', '2141591954');
+        ad.setAttribute('data-full-width-responsive', 'true');
+        ad.dataset.pixieedProjectFeedAd = 'true';
+        ad.style.display = 'block';
+        frame.append(label, ad);
+        adCard.appendChild(frame);
+        list.appendChild(adCard);
+      }
     });
+    if (startupVisible) {
+      window.requestAnimationFrame(() => queueStartupRecentAdRender());
+    }
   }
 
   function mergePersistedTimelapseIntoSession(session, persistedByCanvas, canvasIds = []) {
@@ -1799,8 +1840,8 @@
             `${localEntries.length} on-device project(s). ${migration.failed} true V2 migration(s) remain incomplete; original data was retained.`
           )
         : localizeText(
-            `端末内の真V2プロジェクトを表示しています（${localEntries.length}件）。${migrationSummary}販売前に .pixieedraw をダウンロードしてください。`,
-            `Showing ${localEntries.length} on-device true V2 project(s).${migrationSummary} Download a .pixieedraw file before sale.`
+            `端末内プロジェクト ${localEntries.length}件。${migrationSummary}`,
+            `${localEntries.length} on-device project(s).${migrationSummary}`
           ),
       migration.failed > 0 ? 'warn' : 'info'
     );
@@ -1813,6 +1854,10 @@
       return;
     }
     projectList.dataset.bound = 'true';
+    dom.startup?.workspaceSearch?.addEventListener('input', () => {
+      startupWorkspaceSearchQuery = String(dom.startup.workspaceSearch.value || '').trim().toLocaleLowerCase();
+      renderStartupWorkspaceProjects(startupWorkspaceEntries);
+    });
     projectList.addEventListener('click', async event => {
       const target = event.target instanceof Element
         ? event.target.closest('button[data-workspace-project-index]')

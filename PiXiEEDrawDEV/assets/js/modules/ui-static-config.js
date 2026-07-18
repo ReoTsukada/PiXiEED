@@ -404,8 +404,6 @@
       typeof navigator.canShare === 'function' &&
       typeof File === 'function';
     const SHARE_HASHTAG = '#PiXiEED';
-    const CONTEST_PENDING_UPLOAD_STORAGE_KEY = 'pixieed_contest_upload_v1';
-    const CONTEST_POST_PAGE_URL = '../contest/index.html';
     const IS_ANDROID_LINE_BROWSER =
       IS_ANDROID_DEVICE
       && /line\//i.test(USER_AGENT);
@@ -431,8 +429,6 @@
       DOWNLOAD_OBJECT_URL_REVOKE_DELAY_MS,
       CAN_USE_WEB_SHARE,
       SHARE_HASHTAG,
-      CONTEST_PENDING_UPLOAD_STORAGE_KEY,
-      CONTEST_POST_PAGE_URL,
       IS_ANDROID_LINE_BROWSER,
       IOS_SNAPSHOT_SUPPORTED,
       IOS_SNAPSHOT_DB_NAME,

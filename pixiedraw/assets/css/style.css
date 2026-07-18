@@ -5327,36 +5327,6 @@ input[type='range']::-moz-focus-outer {
   color: var(--fg);
 }
 
-#panelFile .file-contest-promo {
-  margin-top: 2px;
-  padding: 10px;
-  border: 1px solid rgba(var(--ui-rgb), 0.24);
-  background:
-    linear-gradient(0deg, rgba(var(--ui-rgb), 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(var(--ui-rgb), 0.08) 1px, transparent 1px),
-    rgba(10, 16, 26, 0.72);
-  background-size: 12px 12px;
-}
-
-#panelFile .file-contest-promo > span {
-  display: block;
-  font-size: 0.84rem;
-  letter-spacing: 0.04em;
-}
-
-#panelFile .file-contest-promo .help-text {
-  margin: 6px 0 0;
-  font-size: 0.78rem;
-}
-
-#panelFile .file-contest-promo__actions {
-  margin-top: 8px;
-}
-
-#panelFile .file-contest-promo__actions .button {
-  width: 100%;
-}
-
 #panelFile .help-text {
   margin-top: 4px;
 }
@@ -9140,11 +9110,44 @@ body.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data
 }
 
 .panel-ad-mount--context {
-  margin-top: auto;
+  margin: 12px 0 4px;
 }
 
-/* AdSense marks a final no-fill response on the ins node.  Do not leave the
-   panel-sized iframe shell behind when that happens. */
+/* AdSense marks a final no-fill response on the ins node. Eligible placements
+   keep their measured shell so late fill/no-fill responses never shift nearby
+   controls. Placements without an explicit reservation still collapse. */
+.panel-ad.is-ad-unfilled-reserved ins,
+.export-ad.is-ad-unfilled-reserved ins,
+.startup-recent-card--ad.is-ad-unfilled-reserved ins,
+.pixieed-shared-top-ad.is-ad-unfilled-reserved ins,
+.ad-block.is-ad-unfilled-reserved ins,
+.panel-ad.is-ad-unfilled-reserved iframe,
+.export-ad.is-ad-unfilled-reserved iframe,
+.startup-recent-card--ad.is-ad-unfilled-reserved iframe,
+.pixieed-shared-top-ad.is-ad-unfilled-reserved iframe,
+.ad-block.is-ad-unfilled-reserved iframe {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Account-level ad suppression removes the reservation as well. This rule is
+   intentionally local to PiXiEEDraw; other pages keep their own ad geometry. */
+html[data-pixieed-ad-free-account='true'] .panel-ad-mount,
+html[data-pixieed-ad-free-account='true'] .panel-ad,
+html[data-pixieed-ad-free-account='true'] .export-ad,
+html[data-pixieed-ad-free-account='true'] .startup-recent-card--ad {
+  display: none !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  max-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  overflow: hidden !important;
+}
+
 .panel-ad.is-ad-unfilled,
 .panel-ad-mount.is-ad-unfilled,
 .export-ad.is-ad-unfilled,
@@ -9728,13 +9731,13 @@ body.is-mobile-layout .project-home-screen__list .startup-recent-card__open {
   width: 100%;
   max-width: 100%;
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
   padding:
-    calc(24px + var(--safe-area-top))
-    calc(24px + var(--safe-area-right))
-    calc(24px + var(--safe-area-bottom))
-    calc(24px + var(--safe-area-left));
+    calc(var(--pixieed-common-content-top, var(--pixieed-top-ad-offset, 0px)) + var(--safe-area-top) + 14px)
+    calc(18px + var(--safe-area-right))
+    calc(var(--pixieed-shared-bottom-nav-height, 0px) + var(--safe-area-bottom) + 18px)
+    calc(18px + var(--safe-area-left));
   z-index: 15000;
 }
 
@@ -9746,8 +9749,10 @@ body.is-mobile-layout .project-home-screen__list .startup-recent-card__open {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at top, rgba(var(--ui-rgb-focus), 0.2), transparent 62%),
+    linear-gradient(0deg, rgba(var(--ui-rgb), 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--ui-rgb), 0.055) 1px, transparent 1px),
     rgb(4, 8, 14);
+  background-size: 10px 10px;
   backdrop-filter: none;
 }
 
@@ -9760,32 +9765,20 @@ body.is-startup-active .pixieed-shared-top-ad {
 
 .startup-screen__content {
   position: relative;
-  width: min(100%, clamp(520px, 78vw, 1040px));
+  width: min(1440px, 100%);
   min-width: 0;
   max-width: 100%;
-  max-height: calc(
-    var(--mobile-viewport-height)
-    - var(--safe-area-top)
-    - var(--safe-area-bottom)
-    - var(--mobile-bottom-ad-height, 0px)
-    - 24px
-  );
-  padding:
-    clamp(18px, 2.8vh, 28px)
-    clamp(16px, 4.6vw, 28px)
-    calc(clamp(22px, 3.2vh, 32px) + var(--mobile-bottom-ad-height, 0px))
-    clamp(16px, 4.6vw, 28px);
-  border-radius: 18px;
-  background:
-    linear-gradient(0deg, rgba(var(--ui-rgb), 0.14) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(var(--ui-rgb), 0.14) 1px, transparent 1px),
-    var(--bg-panel);
-  border: 1px solid rgba(var(--ui-rgb), 0.28);
+  height: 100%;
+  max-height: none;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  border: 0;
   box-shadow: none;
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 14px;
+  gap: 16px;
   text-align: left;
   overflow-y: auto;
   overflow-x: hidden;
@@ -9808,37 +9801,45 @@ body.is-startup-active .pixieed-shared-top-ad {
 
 .startup-screen__header {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  text-align: center;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 4px 0 12px;
+  border-bottom: 1px solid rgba(var(--ui-rgb), 0.2);
+  text-align: left;
+}
+
+.startup-screen__heading {
+  min-width: 0;
 }
 
 .startup-screen__title {
   margin: 0;
-  font-size: clamp(1.55rem, 2.2vw + 1rem, 2.3rem);
+  font-size: clamp(1.25rem, 2vw, 1.75rem);
   font-weight: 700;
   letter-spacing: 0.02em;
 }
 
 .startup-screen__subtitle {
-  margin: 0;
-  color: rgba(255, 255, 255, 0.76);
-  font-size: 0.88rem;
+  margin: 3px 0 0;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 0.76rem;
   line-height: 1.5;
 }
 
 .startup-screen__actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 8px;
-  width: 100%;
 }
 
 .startup-screen__actions .button {
-  width: 100%;
-  min-height: 46px;
-  padding: 10px 12px;
-  font-size: 0.92rem;
+  width: auto;
+  min-height: 40px;
+  padding: 8px 13px;
+  font-size: 0.84rem;
 }
 
 .startup-screen__actions #startupActionResume {
@@ -9853,12 +9854,14 @@ body.is-startup-active .pixieed-shared-top-ad {
 
 .startup-workspace {
   display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
   flex-direction: column;
-  gap: 10px;
-  padding: 12px;
-  border: 1px solid rgba(var(--ui-rgb), 0.24);
-  border-radius: 12px;
-  background: rgba(5, 13, 23, 0.72);
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .startup-workspace__header {
@@ -9872,6 +9875,28 @@ body.is-startup-active .pixieed-shared-top-ad {
   margin: 0;
   font-size: 0.92rem;
   color: rgba(255, 255, 255, 0.92);
+}
+
+.startup-workspace__search {
+  display: block;
+  width: min(460px, 100%);
+}
+
+.startup-workspace__search input {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 12px;
+  border: 1px solid rgba(var(--ui-rgb), 0.26);
+  border-radius: 8px;
+  background: rgba(8, 16, 26, 0.92);
+  color: var(--fg);
+  font: inherit;
+  outline: none;
+}
+
+.startup-workspace__search input:focus {
+  border-color: rgba(var(--ui-rgb), 0.72);
+  box-shadow: 0 0 0 2px rgba(var(--ui-rgb), 0.12);
 }
 
 .startup-workspace__status {
@@ -9909,25 +9934,25 @@ body.is-startup-active .pixieed-shared-top-ad {
 .startup-workspace__list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-  gap: 7px;
-  max-height: min(34vh, 310px);
-  overflow: auto;
+  gap: 10px;
+  max-height: none;
+  overflow: visible;
 }
 
 .startup-workspace__project {
   width: 100%;
   min-width: 0;
-  padding: 10px;
+  padding: 8px;
   border: 1px solid rgba(var(--ui-rgb), 0.2);
   border-radius: 9px;
   background: rgba(10, 22, 32, 0.84);
   color: rgba(255, 255, 255, 0.9);
   text-align: left;
   cursor: pointer;
-  display: grid;
-  grid-template-columns: 58px minmax(0, 1fr);
-  align-items: center;
-  gap: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
 }
 
 .startup-workspace__project:hover,
@@ -9945,8 +9970,9 @@ body.is-startup-active .pixieed-shared-top-ad {
 }
 
 .startup-workspace__project-thumbnail {
-  width: 58px;
-  height: 58px;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1 / 1;
   overflow: hidden;
   display: grid;
   place-items: center;
@@ -9976,11 +10002,12 @@ body.is-startup-active .pixieed-shared-top-ad {
 
 .startup-workspace__project-details {
   min-width: 0;
+  padding: 0 2px 2px;
 }
 
 .startup-workspace__project-name {
   font-weight: 650;
-  font-size: 0.82rem;
+  font-size: 0.84rem;
 }
 
 .startup-workspace__project-meta {
@@ -10030,13 +10057,43 @@ body.is-startup-active .pixieed-shared-top-ad {
 .startup-workspace__empty {
   grid-column: 1 / -1;
   margin: 0;
-  padding: 10px;
+  padding: 36px 16px;
+  border: 1px dashed rgba(var(--ui-rgb), 0.24);
+  border-radius: 8px;
+  text-align: center;
   color: rgba(255, 255, 255, 0.6);
   font-size: 0.76rem;
   line-height: 1.5;
 }
 
 @media (max-width: 720px) {
+  .startup-screen {
+    padding:
+      calc(var(--pixieed-common-content-top, var(--pixieed-top-ad-offset, 0px)) + var(--safe-area-top) + 10px)
+      calc(10px + var(--safe-area-right))
+      calc(var(--pixieed-shared-bottom-nav-height, 0px) + var(--safe-area-bottom) + 12px)
+      calc(10px + var(--safe-area-left));
+  }
+
+  .startup-screen__header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .startup-screen__actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .startup-screen__actions #startupActionSkip {
+    grid-column: 1 / -1;
+  }
+
+  .startup-screen__actions .button {
+    width: 100%;
+  }
+
   .startup-workspace__header {
     flex-direction: column;
   }
@@ -10056,14 +10113,13 @@ body.is-startup-active .pixieed-shared-top-ad {
   }
 
   .startup-workspace__project {
-    grid-template-columns: 48px minmax(0, 1fr);
-    gap: 8px;
+    display: flex;
     padding: 8px;
   }
 
   .startup-workspace__project-thumbnail {
-    width: 48px;
-    height: 48px;
+    width: 100%;
+    height: auto;
     border-radius: 8px;
   }
 
@@ -10244,22 +10300,46 @@ body.is-startup-active .pixieed-shared-top-ad {
   border-left-color: rgba(72, 158, 255, 0.9);
 }
 
-.startup-recent-card__open--ad {
-  cursor: default;
+.startup-recent-ad {
+  grid-column: 1 / -1;
+  display: block;
+  min-width: 0;
 }
 
-.startup-recent-card__thumb--ad {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(8, 14, 22, 0.9);
-}
-
-.startup-recent-card__ad-ins {
+.startup-recent-ad__frame {
+  position: relative;
   display: block;
   width: 100%;
-  height: 100%;
-  min-height: 0;
+  min-width: 0;
+  min-height: 90px;
+  height: 90px;
+  padding: 18px 8px 8px;
+  border: 1px solid rgba(var(--ui-rgb), 0.2);
+  border-radius: 8px;
+  background: rgba(8, 14, 22, 0.9);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.startup-recent-ad__label {
+  position: absolute;
+  top: 4px;
+  left: 8px;
+  color: var(--fg-muted);
+  font-size: 0.66rem;
+  line-height: 1;
+}
+
+.startup-recent-card__ad-ins,
+.startup-recent-ad__slot {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  min-height: 64px !important;
+  height: 64px !important;
+  max-height: 64px !important;
+  overflow: hidden !important;
 }
 
 .startup-recent-card__open:hover,
@@ -10417,10 +10497,10 @@ body.is-startup-active .pixieed-shared-top-ad {
 @media (max-width: 430px) {
   .startup-screen {
     padding:
-      calc(12px + var(--safe-area-top))
-      calc(12px + var(--safe-area-right))
-      calc(12px + var(--safe-area-bottom))
-      calc(12px + var(--safe-area-left));
+      calc(var(--pixieed-common-content-top, var(--pixieed-top-ad-offset, 0px)) + var(--safe-area-top) + 8px)
+      calc(8px + var(--safe-area-right))
+      calc(var(--pixieed-shared-bottom-nav-height, 0px) + var(--safe-area-bottom) + 10px)
+      calc(8px + var(--safe-area-left));
   }
 
   .startup-screen__content,
@@ -10437,11 +10517,11 @@ body.is-startup-active .pixieed-shared-top-ad {
   }
 
   .startup-screen__actions {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .startup-screen__actions #startupActionResume {
-    grid-column: auto;
+  .startup-screen__actions #startupActionSkip {
+    grid-column: 1 / -1;
   }
 
   .project-home-screen {
@@ -14176,9 +14256,7 @@ body.is-mobile-layout .mobile-panel.is-active #panelFrames .panel-ad-mount[data-
   transform: none !important;
 }
 
-/* Diagnostic mode: modal ads are disabled independently from panel ads.
-   Do not leave an empty reserved frame while the drawer-position issue is
-   being isolated. */
+/* Modal ads remain independently controllable from editor/panel ads. */
 html[data-pixieed-modal-ads='false'] dialog .export-ad,
 html[data-pixieed-modal-ads='false'] #exportInterstitialDialog .export-interstitial__lead,
 html[data-pixieed-modal-ads='false'] #exportInterstitialDialog .export-interstitial__slot-wrap {
@@ -14196,6 +14274,43 @@ html[data-pixieed-modal-ads='false'] #exportDialog .export-dialog-body {
     grid-template-areas:
       "settings"
       "preview";
+  }
+}
+
+/* The retired export interstitial must never reserve space even if legacy
+   code or restored dialog state briefly touches its DOM. */
+#exportInterstitialDialog .export-interstitial__lead,
+#exportInterstitialDialog .export-interstitial__slot-wrap {
+  display: none !important;
+}
+
+/* Export settings need enough room for settings, preview and a real ad slot.
+   On compact screens the ad is omitted instead of covering the controls. */
+@media (max-width: 899px), (max-height: 699px) {
+  #exportDialog .export-dialog-body__ad {
+    display: none !important;
+  }
+
+  #exportDialog .export-dialog-body {
+    grid-template-columns: minmax(260px, 0.92fr) minmax(300px, 1.08fr);
+    grid-template-areas: "settings preview";
+  }
+}
+
+@media (max-width: 760px) {
+  #exportDialog .export-dialog-body {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "settings"
+      "preview";
+  }
+}
+
+/* Short landscape viewports cannot fit this slot without pushing the create
+   controls offscreen. Portrait phones and normal desktop heights keep it. */
+@media (max-height: 639px) {
+  #newProjectAdContainer {
+    display: none !important;
   }
 }
 
@@ -14229,4 +14344,20 @@ body.is-mobile-layout.is-unified-left-tools-color .mobile-panel.is-active > .pan
   height: 100%;
   min-height: 0;
   flex: 1 1 auto;
+}
+
+/* The shared navigation rotates to the right edge in landscape. Reserve that
+   rail instead of keeping portrait-only bottom navigation space. */
+@media (orientation: landscape) {
+  .startup-screen {
+    padding:
+      calc(var(--pixieed-common-content-top, 48px) + var(--safe-area-top) + 10px)
+      calc(var(--pixieed-shared-side-nav-width, 72px) + var(--pixieed-shared-side-nav-gap, 6px) + var(--safe-area-right) + 12px)
+      calc(var(--safe-area-bottom) + 12px)
+      calc(var(--safe-area-left) + 12px);
+  }
+
+  .startup-screen__content {
+    scroll-padding-bottom: 16px;
+  }
 }

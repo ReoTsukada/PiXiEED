@@ -298,18 +298,16 @@
         );
       }
   
-      setLocalizedTextContent('.startup-screen__subtitle', 'PiXiEEDraw（ピクシードロー）でドット絵づくり・アニメ制作をはじめよう', 'Start pixel art and animation with PiXiEEDraw');
+      setLocalizedTextContent('#startupScreenTitle', 'プロジェクト', 'Projects');
+      setLocalizedTextContent('.startup-screen__subtitle', 'PiXiEEDraw', 'PiXiEEDraw');
       setLocalizedTextContent('#startupActionNew', '新規作成', 'New Project');
       setLocalizedTextContent('#startupActionOpen', 'ファイルを開く', 'Open File');
-      setLocalizedTextContent('#startupWorkspaceTitle', 'プロジェクト一覧', 'Projects');
+      setLocalizedTextContent('#startupWorkspaceTitle', '端末内プロジェクト', 'On-device projects');
+      setLocalizedAttribute('#startupWorkspaceSearch', 'placeholder', 'プロジェクト名を検索', 'Search projects');
       setLocalizedTextContent('#startupWorkspaceConnect', 'PiXiEEDフォルダに接続', 'Connect PiXiEED Folder');
-      setLocalizedTextContent('#startupActionSkip', 'この画面を閉じる', 'Close');
+      setLocalizedTextContent('#startupActionSkip', '編集へ戻る', 'Back to editor');
       setLocalizedTextContent('#globalLoadingIndicatorCancel', 'キャンセル', 'Cancel');
       setLocalizedTextContent('#multiInviteShare', '共有', 'Share');
-      setLocalizedTextContent('#projectHomeTitle', 'PiXiEEDrawをはじめる', 'Start PiXiEEDraw');
-      setLocalizedTextContent('#projectHomeNew', '新規作成', 'New Project');
-      setLocalizedTextContent('#projectHomeOpen', 'ファイルを開く', 'Open File');
-      setLocalizedTextContent('.project-home-screen__actions a[href="../account/index.html"]', 'PiXiEED マイページ', 'PiXiEED My Page');
       setLocalizedTextContent('#updateToastCloseBtn', '閉じる', 'Close');
   
       applyTabLocalization();
@@ -564,9 +562,6 @@
       setLocalizedTextContent('.file-panel-summary .help-text:nth-child(1)', '描画は端末内V2へ自動保存し、10操作ごとに差分をチェックポイントへ統合します。', 'Drawing changes are autosaved to on-device V2 storage and compacted into a checkpoint every 10 operations.');
       setLocalizedTextContent('.file-panel-summary .help-text:nth-child(2)', '外部ファイルへは自動出力しません。画像・GIF・PiXiEEDraw形式は出力パネルからダウンロードします。', 'Files are never exported automatically. Download images, GIFs, and PiXiEEDraw files from the Export panel.');
       setLocalizedTextContent('label[for="toggleAutosaveRequired"] span', '端末内V2自動保存（常時ON）', 'On-device V2 autosave (Always ON)');
-      setLocalizedTextContent('#fileContestPromoTitle', 'コンテスト投稿', 'Contest Posting');
-      setLocalizedTextContent('#fileContestPromoDescription', '保存/出力の「保存完了後にコンテスト投稿画面へ移動する」をONにすると、そのまま投稿できます。', 'Turn on "Go to contest post screen after save" to move directly to contest posting.');
-      setLocalizedTextContent('#openContestFromFilePanel', 'コンテストページを見る', 'Open Contest Page');
       setLocalizedTextContent('#timelapseSectionTitle', 'タイムラプス', 'Timelapse');
       setLocalizedTextContent('#timelapseClear', '記録クリア', 'Clear Record');
       setLocalizedControlLabel('timelapseFps', '再生FPS', 'Playback FPS');
@@ -593,7 +588,6 @@
       setLocalizedTextContent('#exportSpriteMapCompanionOptionRow span:not(.export-toggle-icon)', 'SpriteMAP出力', 'SpriteMAP export');
       setLocalizedTextContent('#exportGridSplitOptionRow span', 'グリッド分割', 'Grid split');
       setLocalizedTextContent('#exportTimelapseOptionRow span', 'タイムラプスGIF', 'Timelapse GIF');
-      setLocalizedTextContent('#exportContestPostOptionRow span:not(.export-toggle-icon)', 'コンテスト投稿へ移動', 'Go to contest post');
       setLocalizedTextContent('#exportSpriteMapColorSpritesRow span:not(.export-toggle-icon)', 'カラースプライト出力', 'Color sprite export');
       setLocalizedTextContent('#exportGridSettings > span', 'グリッド分割 (PNG)', 'Grid Split (PNG)');
       setLocalizedControlLabel('exportGridWidth', '幅 (px)', 'Width (px)');
@@ -635,8 +629,6 @@
       setLocalizedTextContent('#toolSpotlightLead', '出力ありがとうございます。次に遊べる・使えるツールです。', 'Thanks for exporting. Here are tools you can try next.');
       setLocalizedTextContent('#toolSpotlightLensTitle', 'PiXiEELENS', 'PiXiEELENS');
       setLocalizedTextContent('#toolSpotlightLensDesc', 'カメラ画像をドット化できるツール。撮影してそのまま編集導線につなげられます。', 'Turn camera images into pixel art and continue straight into editing.');
-      setLocalizedTextContent('#toolSpotlightContestTitle', 'PiXiEEDコンテスト', 'PiXiEED Contest');
-      setLocalizedTextContent('#toolSpotlightContestDesc', '保存した作品を投稿して、みんなの作品もチェックできます。', 'Post your saved artwork and browse creations from everyone.');
       setLocalizedTextContent('#toolSpotlightTipTitle', 'サポート', 'Support');
       setLocalizedTextContent('#toolSpotlightTipDesc', 'みんなの応援でPiXiEEDは成長することができます。', 'PiXiEED grows with everyone’s support.');
       setLocalizedTextContent('#toolSpotlightGoHome', 'ホームへ戻る', 'Back to Home');

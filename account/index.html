@@ -22,7 +22,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../site/landing.css?v=2026.07.15-home-clear-entry1">
-  <link rel="stylesheet" href="account.css?v=2026.07.19-lineage-rewards1">
   <style>
     .account-page{
       display:grid;
@@ -266,6 +265,7 @@
       .account-cover{width:64px;height:64px}
     }
   </style>
+  <link rel="stylesheet" href="account.css?v=2026.07.19-functional-ui1">
 </head>
 <body data-pixieed-account-auth="signed-out">
   <header class="site-header" aria-label="トップナビ">
@@ -279,11 +279,21 @@
   </header>
   <div class="page">
     <main class="page-shell account-page">
-      <h1 class="section-title account-title" id="accountTitle">ログイン</h1>
+      <section class="account-titlebar" aria-labelledby="accountTitle">
+        <div class="account-titlebar__title">
+          <h1 class="section-title account-title" id="accountTitle">ログイン</h1>
+        </div>
+        <div class="account-titlebar__actions">
+          <a href="../pixiedraw/index.html">新規作成</a>
+          <a href="../market/index.html">マーケット</a>
+        </div>
+      </section>
       <nav class="account-command-bar" aria-label="マイページメニュー">
+        <a href="#accountProjects">プロジェクト</a>
+        <a href="#accountPixfind">PiXFiND</a>
         <a href="#accountPurchases" data-market-dev-only hidden>購入済み</a>
-        <a href="#accountPageviewRewards" id="accountPageviewRewardsLink" hidden>表示報酬</a>
-        <a href="#accountProjects">端末プロジェクト</a>
+        <a href="#accountPageviewRewards" id="accountPageviewRewardsLink" hidden>報酬</a>
+        <a href="#accountSeller" data-market-dev-only hidden>販売</a>
         <a href="../market/index.html">マーケット</a>
         <a href="#authPanel">設定</a>
       </nav>
@@ -382,7 +392,10 @@
           <section class="account-panel" id="accountProjects">
             <div class="account-panel__head">
               <h2 class="section-title">PiXiEEDraw</h2>
-              <span class="account-chip" id="localProjectCount">確認中</span>
+              <div class="account-panel__actions">
+                <a class="account-text-action" href="../pixiedraw/index.html">新規作成</a>
+                <span class="account-chip" id="localProjectCount">確認中</span>
+              </div>
             </div>
             <div class="account-list" id="localProjectList">
               <div class="account-item">
@@ -397,6 +410,25 @@
               </div>
             </div>
           </section>
+          <section class="account-panel" id="accountPixfind">
+            <div class="account-panel__head">
+              <h2 class="section-title">投稿したPiXFiND</h2>
+              <div class="account-panel__actions">
+                <a class="account-text-action" href="../pixfind/index.html#creator">作る</a>
+                <span class="account-chip" id="pixfindPostCount">確認中</span>
+              </div>
+            </div>
+            <div class="account-pixfind-grid" id="pixfindPostList" aria-label="この端末から投稿したPiXFiND" aria-live="polite">
+              <div class="account-item">
+                <div class="account-cover"><img src="../icon/icon-192-2.png" alt=""></div>
+                <div class="account-item__body">
+                  <strong>投稿を確認しています</strong>
+                  <span>この端末から公開したPiXFiNDを読み込んでいます。</span>
+                </div>
+                <span class="account-chip">...</span>
+              </div>
+            </div>
+          </section>
         </section>
 
         <section class="account-stack" aria-label="購入済み商品とサービス">
@@ -405,7 +437,7 @@
               <h2 class="section-title">表示ロイヤリティー</h2>
               <span class="account-chip" id="accountPageviewRewardTotal">0円</span>
             </div>
-            <p class="helper">自分の作品と、つながっている祖先・子孫作品の有効表示から確定した報酬です。</p>
+            <p class="helper">作品系列の有効表示から確定した月別報酬です。</p>
             <div class="account-reward-history" id="accountPageviewRewardMonths" aria-live="polite"></div>
           </section>
           <section class="account-panel" id="accountDevTools" data-market-dev-only hidden>
@@ -413,9 +445,8 @@
               <h2 class="section-title">マーケットDEV</h2>
               <span class="account-chip">DEV限定</span>
             </div>
-            <p class="helper">DEVテスト商品を確認できます。一般ユーザー向けの出品・販売者設定は現在準備中です。</p>
             <div class="account-service-grid">
-              <a class="account-service" href="../market/index.html"><strong>マーケットを確認</strong><span>DEV商品と検索画面</span></a>
+              <a class="account-service" href="../market/index.html"><strong>マーケットを確認</strong><span>DEV商品・検索</span></a>
             </div>
           </section>
           <section class="account-panel" id="accountAdminTools" data-market-admin-only hidden>
@@ -427,6 +458,9 @@
             <div class="account-service-grid">
               <a class="account-service" href="../market/review.html"><strong>マーケット管理を開く</strong><span>商品審査・販売者確認</span></a>
             </div>
+            <details class="account-admin-console">
+              <summary><span>運営設定</span><small>報酬原資・広告OFF</small></summary>
+              <div class="account-admin-console__body">
             <div class="account-admin-permission" aria-labelledby="pageviewRewardBudgetTitle">
               <div>
                 <h3 id="pageviewRewardBudgetTitle">ページビュー報酬原資</h3>
@@ -472,13 +506,18 @@
                 <p class="helper">権限一覧を確認しています。</p>
               </div>
             </div>
+              </div>
+            </details>
           </section>
           <section class="account-panel" id="accountPurchases" data-market-dev-only hidden>
             <div class="account-panel__head">
               <h2 class="section-title">購入済み商品</h2>
-              <span class="account-chip" id="marketPurchaseCount">確認中</span>
+              <div class="account-panel__actions">
+                <a class="account-text-action" href="../market/index.html">素材を探す</a>
+                <span class="account-chip" id="marketPurchaseCount">確認中</span>
+              </div>
             </div>
-            <p class="helper">収録形式を自由に選んで1つのZIPにまとめられます。購入権が有効な商品は何度でも再出力できます。</p>
+            <p class="helper">形式を選んでZIP出力、またはPiXiEEDrawで直接開けます。</p>
             <div class="account-list account-market-grid" id="marketPurchaseList" aria-label="購入済み商品一覧" aria-live="polite">
               <div class="account-item">
                 <div class="account-cover">
@@ -516,6 +555,7 @@
   <script src="../scripts/shared-profile-header.js"></script>
   <script src="../scripts/shared-bottom-nav.js?v=2026.07.18-ad-permissions1"></script>
   <script src="../scripts/account-local-projects.js?v=2026.07.01-local-projects"></script>
+  <script src="../scripts/account-pixfind-posts.js?v=2026.07.19-pixfind1"></script>
   <script src="../scripts/market-purchase-delivery.js?v=2026.07.17-all-open1"></script>
   <script src="../scripts/account-market-purchases.js?v=2026.07.19-derivative-entry1"></script>
   <script src="../market/media-protection.js?v=2026.07.17-preview-protection1"></script>

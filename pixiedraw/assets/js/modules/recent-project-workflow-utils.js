@@ -682,54 +682,40 @@
         return null;
       }
       const card = document.createElement('article');
-      card.className = 'startup-recent-card startup-recent-card--ad';
+      card.className = 'startup-recent-card--ad startup-recent-ad';
+      card.dataset.pixieedReserveAdSpace = 'true';
       card.setAttribute('role', 'listitem');
       card.setAttribute('aria-label', localizeText('広告', 'Ad'));
       const frame = document.createElement('div');
-      frame.className = 'startup-recent-card__open startup-recent-card__open--ad';
-      const kindBadge = document.createElement('span');
-      kindBadge.className = 'startup-recent-card__kind';
-      kindBadge.textContent = localizeText('広告', 'Ad');
-      const thumb = document.createElement('div');
-      thumb.className = 'startup-recent-card__thumb startup-recent-card__thumb--ad';
+      frame.className = 'startup-recent-ad__frame';
+      const label = document.createElement('span');
+      label.className = 'startup-recent-ad__label';
+      label.textContent = localizeText('広告', 'Advertisement');
       const ad = document.createElement('ins');
-      ad.className = 'startup-recent-card__ad-ins';
+      ad.className = 'startup-recent-card__ad-ins startup-recent-ad__slot';
       ad.setAttribute('data-ad-client', 'ca-pub-9801602250480253');
-      ad.setAttribute('data-ad-format', 'rectangle');
+      ad.setAttribute('data-ad-format', 'horizontal');
       ad.setAttribute('data-ad-slot', '2141591954');
-      ad.setAttribute('data-full-width-responsive', 'false');
-      ad.dataset.pixieedAdCard = 'true';
+      ad.setAttribute('data-full-width-responsive', 'true');
+      ad.dataset.pixieedProjectFeedAd = 'true';
       ad.style.display = 'block';
-      thumb.appendChild(ad);
-      const nameNode = document.createElement('span');
-      nameNode.className = 'startup-recent-card__name';
-      nameNode.textContent = localizeText('広告', 'Ad');
-      const metaNode = document.createElement('span');
-      metaNode.className = 'startup-recent-card__meta';
-      metaNode.textContent = localizeText('PiXiEEDを支援', 'Supports PiXiEED');
-      frame.appendChild(kindBadge);
-      frame.appendChild(thumb);
-      frame.appendChild(nameNode);
-      frame.appendChild(metaNode);
+      frame.append(label, ad);
       card.appendChild(frame);
       return card;
     };
-    entries.forEach(entry => {
+    entries.forEach((entry, index) => {
       targets.forEach(target => {
         const card = createRecentProjectCard(entry);
         if (card) {
           target.list.appendChild(card);
         }
+        if (target.list === dom.projectHomeRecentList && index === 3) {
+          const adCard = createProjectHomeAdCard();
+          if (adCard) {
+            target.list.appendChild(adCard);
+          }
+        }
       });
-    });
-    targets.forEach(target => {
-      if (target.list !== dom.projectHomeRecentList) {
-        return;
-      }
-      const adCard = createProjectHomeAdCard();
-      if (adCard) {
-        target.list.appendChild(adCard);
-      }
     });
     updatePixieedAccountUi();
     syncPixieedSupportBenefitUi();

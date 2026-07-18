@@ -841,7 +841,6 @@
       }
       if (result.exportedCount > 0) {
         markDocumentDurablySaved();
-        let skipInterstitial = false;
         if (result.exportedCount === result.total && !result.wasCancelled && !result.hadFailure) {
           const companionResult = shouldSaveProjectCompanion('gif')
             ? (result.projectCompanionResult || 'failed')
@@ -850,14 +849,8 @@
               wasCancelled: result.wasCancelled,
             });
           announceProjectCompanionSaveResult('gif', companionResult);
-          skipInterstitial = await maybeRedirectToContestPostAfterExport('gif', {
-            primaryBlob: tasks[0]?.blob || null,
-            companionResult,
-          });
         }
-        if (!skipInterstitial) {
-          showLoginPromptAfterExport();
-        }
+        showLoginPromptAfterExport();
       }
     } catch (error) {
       console.error('GIF export failed', error);
@@ -1545,62 +1538,6 @@
     }
   }
 
-  function getContestPostAfterSaveDisabledReason(mode) {
-    const format = normalizeExportFormat(mode);
-    if (!canCurrentClientExportProject(format)) {
-      return getMultiExportDisabledReason(format) || localizeText(
-        `${getExportFormatLabel(format)}は現在利用できません`,
-        `${getExportFormatLabel(format)} is currently unavailable`
-      );
-    }
-    if (format === 'timelapse') {
-      return localizeText(
-        'タイムラプスGIFはコンテスト投稿への自動遷移に対応していません',
-        'Timelapse GIF does not support automatic contest redirect'
-      );
-    }
-    if (format !== 'png' && format !== 'gif') {
-      return localizeText('コンテスト自動遷移は PNG / GIF のみ対応です', 'Automatic contest redirect supports PNG/GIF only');
-    }
-    const frameCount = Array.isArray(state.frames) ? state.frames.length : 0;
-    if (frameCount <= 0) {
-      return localizeText('投稿できるフレームがありません', 'No frame available for posting');
-    }
-    return '';
-  }
-
-  function canOfferContestPostAfterSave(mode) {
-    return !getContestPostAfterSaveDisabledReason(mode);
-  }
-
-  function updateExportContestPostToggleUI() {
-    const toggle = dom.exportDialog?.contestPostToggle;
-    const mode = normalizeExportFormat(dom.exportDialog?.format?.value || 'png');
-    if (!(toggle instanceof HTMLInputElement)) {
-      if (exportContestPostAfterSave) {
-        exportContestPostAfterSave = false;
-        scheduleSessionPersist({ includeSnapshots: false });
-      }
-      return;
-    }
-    const canOffer = canOfferContestPostAfterSave(mode);
-    const reason = canOffer ? '' : getContestPostAfterSaveDisabledReason(mode);
-    const previousValue = exportContestPostAfterSave;
-    if (!canOffer) {
-      exportContestPostAfterSave = false;
-    }
-    if (previousValue !== exportContestPostAfterSave) {
-      scheduleSessionPersist({ includeSnapshots: false });
-    }
-    toggle.checked = exportContestPostAfterSave;
-    toggle.disabled = !canOffer;
-    if (reason) {
-      toggle.title = reason;
-    } else {
-      toggle.removeAttribute('title');
-    }
-  }
-
   function normalizeExportGridTileSize(value, fallback = 8) {
     const base = Number.isFinite(Number(fallback)) ? Number(fallback) : 8;
     const parsed = Math.round(Number(value));
@@ -1667,11 +1604,6 @@
     }
     updateExportSpriteMapCompanionToggleUI();
 
-    const contestRow = dom.exportDialog?.contestPostRow;
-    if (contestRow instanceof HTMLElement) {
-      contestRow.hidden = !(format === 'png' || format === 'gif');
-    }
-
     const spriteMapColorSpritesRow = dom.exportDialog?.spriteMapColorSpritesRow;
     if (spriteMapColorSpritesRow instanceof HTMLElement) {
       spriteMapColorSpritesRow.hidden = format === 'project';
@@ -1712,7 +1644,6 @@
     }
     updateExportOptionVisibility(mode);
     updateExportProjectCompanionToggleUI();
-    updateExportContestPostToggleUI();
   }
 
   async function maybeSaveProjectCompanionAfterExport(mode, { exportedCount = 0, wasCancelled = false } = {}) {
@@ -1751,146 +1682,6 @@
       return;
     }
     updateAutosaveStatus(`${label}出力後: PiXiEEDrawファイルのダウンロードに失敗しました`, 'warn');
-  }
-
-  function resolveContestUploadCanvasSizeLabel(width, height) {
-    const safeWidth = Math.max(1, Math.round(Number(width) || 1));
-    const safeHeight = Math.max(1, Math.round(Number(height) || 1));
-    if (safeWidth === safeHeight) {
-      return String(safeWidth);
-    }
-    return `${safeWidth}x${safeHeight}`;
-  }
-
-  async function buildContestUploadArtifact(mode, { primaryBlob = null } = {}) {
-    const format = normalizeExportFormat(mode);
-    if (format === 'timelapse') {
-      return null;
-    }
-    const frameCount = Array.isArray(state.frames) ? state.frames.length : 0;
-    if (frameCount <= 0) {
-      return null;
-    }
-    const width = Math.max(1, Number(state.width) || 1);
-    const height = Math.max(1, Number(state.height) || 1);
-    const selectedScale = Math.max(1, Math.floor(Number(exportScale) || 1));
-    const framePixels = compositeDocumentFrames(state.frames, width, height, state.palette);
-    if (!Array.isArray(framePixels) || !framePixels.length) {
-      return null;
-    }
-    if (frameCount === 1) {
-      let pngBlob = null;
-      const primaryType = String(primaryBlob?.type || '').toLowerCase();
-      if (primaryBlob instanceof Blob && primaryType === 'image/png') {
-        pngBlob = primaryBlob;
-      }
-      const output = scaleFramePixelsNearestNeighbor(framePixels[0], width, height, selectedScale);
-      if (!(pngBlob instanceof Blob)) {
-        const outputCanvas = createFrameCanvas(output.pixels, output.width, output.height);
-        pngBlob = await canvasToBlob(outputCanvas, 'image/png');
-      }
-      const previewCanvas = createFrameCanvas(output.pixels, output.width, output.height);
-      return {
-        blob: pngBlob,
-        format: 'png',
-        previewDataUrl: previewCanvas.toDataURL('image/png'),
-        canvasSize: resolveContestUploadCanvasSizeLabel(output.width, output.height),
-      };
-    }
-
-    let gifBlob = null;
-    const primaryType = String(primaryBlob?.type || '').toLowerCase();
-    if (primaryBlob instanceof Blob && primaryType === 'image/gif') {
-      gifBlob = primaryBlob;
-    }
-    const frameDurations = state.frames.map(frame => clamp(Math.round(Number(frame.duration) || 0), 16, 2000));
-    const scaledSet = scaleFrameSetNearestNeighbor(framePixels, width, height, selectedScale);
-    if (!(gifBlob instanceof Blob)) {
-      const gifBytes = buildGifFromPixels(
-        scaledSet.framePixels,
-        frameDurations,
-        scaledSet.width,
-        scaledSet.height
-      );
-      gifBlob = new Blob([gifBytes], { type: 'image/gif' });
-    }
-    const firstFrame = scaledSet.framePixels[0];
-    if (!(firstFrame instanceof Uint8ClampedArray)) {
-      return null;
-    }
-    const previewCanvas = createFrameCanvas(firstFrame, scaledSet.width, scaledSet.height);
-    return {
-      blob: gifBlob,
-      format: 'gif',
-      previewDataUrl: previewCanvas.toDataURL('image/png'),
-      canvasSize: resolveContestUploadCanvasSizeLabel(scaledSet.width, scaledSet.height),
-    };
-  }
-
-  async function maybeRedirectToContestPostAfterExport(mode, {
-    primaryBlob = null,
-    companionResult = 'skipped',
-  } = {}) {
-    if (!exportContestPostAfterSave) {
-      return false;
-    }
-    const reason = getContestPostAfterSaveDisabledReason(mode);
-    if (reason) {
-      updateAutosaveStatus(
-        localizeText(
-          `コンテスト投稿画面への移動をスキップしました（${reason}）`,
-          `Contest redirect skipped (${reason})`
-        ),
-        'warn'
-      );
-      return false;
-    }
-    if (companionResult === 'failed' || companionResult === 'cancelled') {
-      updateAutosaveStatus(
-        localizeText(
-          'PiXiEEDファイル保存が完了しなかったため、コンテスト投稿画面への移動を中止しました',
-          'Contest redirect canceled because companion PiXiEED save did not complete'
-        ),
-        'warn'
-      );
-      return false;
-    }
-    if (!(primaryBlob instanceof Blob)) {
-      primaryBlob = null;
-    }
-    try {
-      const artifact = await buildContestUploadArtifact(mode, { primaryBlob });
-      if (!artifact || !(artifact.blob instanceof Blob)) {
-        updateAutosaveStatus(localizeText('コンテスト投稿用データの準備に失敗しました', 'Failed to prepare contest upload data'), 'warn');
-        return false;
-      }
-      const dataUrl = await blobToDataUrl(artifact.blob);
-      if (canUseSessionStorage) {
-        try {
-          window.localStorage.setItem(CONTEST_PENDING_UPLOAD_STORAGE_KEY, JSON.stringify({
-            dataUrl,
-            previewDataUrl: artifact.previewDataUrl || '',
-            canvasSize: artifact.canvasSize || resolveContestUploadCanvasSizeLabel(state.width, state.height),
-            format: artifact.format || normalizeExportFormat(mode),
-            name: normalizeDocumentName(state.documentName || DEFAULT_DOCUMENT_NAME),
-            source: 'pixieedraw',
-            createdAt: new Date().toISOString(),
-          }));
-        } catch (storageError) {
-          console.warn('Failed to store contest pending upload payload', storageError);
-        }
-      }
-      updateAutosaveStatus(
-        localizeText('保存が完了したため、コンテスト投稿画面へ移動します…', 'Save complete. Redirecting to contest post...'),
-        'success'
-      );
-      window.location.href = CONTEST_POST_PAGE_URL;
-      return true;
-    } catch (error) {
-      console.warn('Failed to prepare contest upload payload', error);
-      updateAutosaveStatus(localizeText('コンテスト投稿画面への移動準備に失敗しました', 'Failed to prepare contest redirect'), 'warn');
-      return false;
-    }
   }
 
   function applyExportScaleConstraints(candidates) {
@@ -2856,9 +2647,6 @@
           shouldAppendColorSpritesToPrimaryExport,
           updateExportProjectCompanionToggleUI,
           updateExportSpriteMapCompanionToggleUI,
-          getContestPostAfterSaveDisabledReason,
-          canOfferContestPostAfterSave,
-          updateExportContestPostToggleUI,
           normalizeExportGridTileSize,
           getExportScaleCandidates,
           canOfferOriginalCompanionExport,
@@ -2869,8 +2657,6 @@
           updateExportOriginalToggleUI,
           maybeSaveProjectCompanionAfterExport,
           announceProjectCompanionSaveResult,
-          maybeRedirectToContestPostAfterExport,
-          resolveContestUploadCanvasSizeLabel,
           applyExportScaleConstraints,
           updateExportScaleHint,
           syncExportScaleInputs,

@@ -79,7 +79,7 @@
   }
 
   function queueExportAdRender() {
-    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.()) {
+    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.('export-dialog')) {
       return;
     }
     const dialog = dom.exportDialog?.dialog;
@@ -171,7 +171,7 @@
   }
 
   function queueShortcutHelpAdRender() {
-    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.()) {
+    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.('shortcut-help-dialog')) {
       return;
     }
     const dialog = dom.shortcutHelp?.dialog;
@@ -233,7 +233,7 @@
   }
 
   function queueUpdateHistoryAdRender() {
-    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.()) {
+    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.('update-history-dialog')) {
       return;
     }
     const dialog = dom.updateHistory?.dialog;
@@ -392,11 +392,7 @@
       return;
     }
     const tipCard = dom.toolSpotlight?.supportTip || null;
-    const contestTitle = document.getElementById('toolSpotlightContestTitle');
-    const contestCard = contestTitle instanceof HTMLElement
-      ? contestTitle.closest('.tool-spotlight-card')
-      : null;
-    const shuffled = visibleCards.filter(card => card !== tipCard && card !== contestCard);
+    const shuffled = visibleCards.filter(card => card !== tipCard);
     if (shuffled.length > 1) {
       for (let i = shuffled.length - 1; i > 0; i -= 1) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -407,10 +403,7 @@
       list.appendChild(tipCard);
     }
     shuffled.forEach(card => list.appendChild(card));
-    if (contestCard && !(contestCard.hidden || contestCard.getAttribute('aria-hidden') === 'true')) {
-      list.appendChild(contestCard);
-    }
-    const visibleSet = new Set([tipCard, contestCard, ...shuffled].filter(Boolean));
+    const visibleSet = new Set([tipCard, ...shuffled].filter(Boolean));
     cards.forEach(card => {
       if (!visibleSet.has(card)) {
         list.appendChild(card);
@@ -514,7 +507,7 @@
   }
 
   function canShowExportInterstitial() {
-    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.()) {
+    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.('export-interstitial')) {
       return false;
     }
     const dialog = dom.exportInterstitial?.dialog;
@@ -547,7 +540,7 @@
   }
 
   function queueExportInterstitialAdRender() {
-    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.()) {
+    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.('export-interstitial')) {
       return;
     }
     const dialog = dom.exportInterstitial?.dialog;
@@ -738,7 +731,7 @@
     if (!(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== 'function') {
       return false;
     }
-    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.()) {
+    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.('export-interstitial')) {
       return false;
     }
     if (dialog.open) {
@@ -769,10 +762,6 @@
       return;
     }
     const inputMode = choice.trim().toLowerCase();
-    if (inputMode === 'contest') {
-      updateAutosaveStatus('コンテスト投稿は現在停止中です', 'warn');
-      return;
-    }
     if (
       inputMode !== 'png'
       && inputMode !== 'jpg'
@@ -811,8 +800,6 @@
       await exportProjectAsGridPng();
     } else if (normalized === 'timelapse') {
       await exportTimelapseGif();
-    } else if (normalized === 'contest') {
-      updateAutosaveStatus('コンテスト投稿は現在停止中です', 'warn');
     } else if (normalized === 'project') {
       const result = await saveProjectAsPixieedraw({
         fileNameBase: getExportFileNameBase() || state.documentName,

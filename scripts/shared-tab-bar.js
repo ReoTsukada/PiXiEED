@@ -25,6 +25,7 @@
     if (/(?:^|\/)account(?:\/|\/index\.html)?$/.test(path)) return 'account';
     if (/(?:^|\/)pixiee-lens(?:\/|\/index\.html)?$/.test(path)) return 'camera';
     if (/(?:^|\/)(?:qr|qr-maker)(?:\/|\/index\.html)?$/.test(path)) return 'qr';
+    if (/(?:^|\/)pixfind(?:\/|\/index\.html)?$/.test(path)) return 'pixfind';
     if (normalizedPath === basePath || path === `${basePath === '/' ? '' : basePath}/index.html`) return 'home';
     return 'default';
   }
@@ -155,6 +156,15 @@
           { id: 'camera', label: 'カメラ', path: 'pixiee-lens/index.html', icon: 'Camera.png' },
         ],
         details: buildSupportDetails({ guideLabel: 'QRの使い方', guidePath: 'projects/qr-maker/' }),
+      };
+    }
+    if (kind === 'pixfind') {
+      return {
+        actions: [
+          { id: 'play', label: '遊ぶ', selector: '#startButton', icon: 'icon/icon-192-2.png' },
+          { id: 'create', label: '作る', selector: '#createButton', icon: 'pixiedraw/assets/icons/menu-file.svg' },
+        ],
+        details: buildSupportDetails({ includeUpdates: true }),
       };
     }
     if (kind === 'home') {
@@ -716,12 +726,26 @@
       body.has-pixieed-common-tabbar > header.site-header{
         top:calc(var(--pixieed-top-ad-offset, 0px) + var(--pixieed-common-tabbar-height))!important;
       }
-      body.has-pixieed-common-tabbar:not([data-pixieed-page='pixiedraw']):not([data-pixieed-page='pixiee-lens']):not([data-pixieed-page='maoitu']){
+      body.has-pixieed-common-tabbar:not([data-pixieed-page='pixiedraw']):not([data-pixieed-page='pixiee-lens']):not([data-pixieed-page='maoitu']):not([data-pixieed-page='pixfind']){
         padding-top:var(--pixieed-common-content-top)!important;
       }
       body[data-pixieed-page='pixiedraw'] .app,
       body[data-pixieed-page='maoitu'] .game-shell{
         padding-top:var(--pixieed-common-content-top)!important;
+      }
+      body[data-pixieed-page='pixfind'] .app{
+        width:min(1220px, 100%)!important;
+        height:calc(100% - var(--pixieed-common-content-top) - var(--pixieed-shared-bottom-nav-offset, 68px))!important;
+        min-height:0!important;
+        max-height:none!important;
+        margin-top:var(--pixieed-common-content-top)!important;
+        margin-bottom:var(--pixieed-shared-bottom-nav-offset, 68px)!important;
+        padding:0!important;
+      }
+      body[data-pixieed-page='pixfind'] .creator-overlay,
+      body[data-pixieed-page='pixfind'] .completion-overlay{
+        top:var(--pixieed-common-content-top)!important;
+        bottom:var(--pixieed-shared-bottom-nav-offset, 68px)!important;
       }
       body[data-pixieed-page='pixiedraw'] #mobileTopBar{display:none!important}
       body[data-pixieed-page='pixiedraw'] .editor-command-lane{display:none!important}
@@ -761,12 +785,24 @@
           right:calc(var(--pixieed-shared-side-nav-width, 72px) + var(--pixieed-shared-side-nav-gap, 6px));
           width:auto;
         }
-        body.has-pixieed-common-tabbar:not([data-pixieed-page='pixiedraw']):not([data-pixieed-page='pixiee-lens']):not([data-pixieed-page='maoitu']){
+        body.has-pixieed-common-tabbar:not([data-pixieed-page='pixiedraw']):not([data-pixieed-page='pixiee-lens']):not([data-pixieed-page='maoitu']):not([data-pixieed-page='pixfind']){
           padding-top:var(--pixieed-common-tabbar-height)!important;
         }
         body[data-pixieed-page='pixiedraw'] .app,
         body[data-pixieed-page='maoitu'] .game-shell{
           padding-top:var(--pixieed-common-tabbar-height)!important;
+        }
+        body[data-pixieed-page='pixfind'] .app{
+          width:calc(100% - var(--pixieed-shared-side-nav-width, 72px) - var(--pixieed-shared-side-nav-gap, 6px))!important;
+          height:calc(100% - var(--pixieed-common-tabbar-height))!important;
+          margin:var(--pixieed-common-tabbar-height) calc(var(--pixieed-shared-side-nav-width, 72px) + var(--pixieed-shared-side-nav-gap, 6px)) 0 0!important;
+          padding:0!important;
+        }
+        body[data-pixieed-page='pixfind'] .creator-overlay,
+        body[data-pixieed-page='pixfind'] .completion-overlay{
+          top:var(--pixieed-common-tabbar-height)!important;
+          right:calc(var(--pixieed-shared-side-nav-width, 72px) + var(--pixieed-shared-side-nav-gap, 6px))!important;
+          bottom:0!important;
         }
         .pixieed-common-details{
           right:calc(var(--pixieed-shared-side-nav-width, 72px) + var(--pixieed-shared-side-nav-gap, 6px));

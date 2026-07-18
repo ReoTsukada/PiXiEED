@@ -19,7 +19,6 @@ PiXiEED is a pixel art app for drawing, capturing, and sharing your work.
 - Create with PiXiEEDraw
 - Collaborate in real time with other users
 - Capture photos with PiXiEELENS and convert them into pixel art
-- Join public rooms and contests
 - Save images and project files on your device
 
 Use PiXiEED as your all-in-one home for pixel art creation on mobile and tablet.

@@ -130,7 +130,7 @@ npm run ios:export:appstore
 ## このシェルの方針
 
 - PiXiEED サイトの必要ページ群を `dist/web/` へローカル同梱します。
-- アプリ起動時は PiXiEED のホームランチャーを開き、Draw / Lens / Tools / Public Room / Contest へ移動できます。
+- アプリ起動時は PiXiEED のホームランチャーを開き、Draw / Lens / Tools / Public Room へ移動できます。
 - ネイティブ実行時は PWA インストール案内を出しません。
 - PiXiEELENS 起動は絶対 URL ではなく、同梱済みのローカルページを開きます。
 - ネイティブ実行時の PiXiEEDraw 出力画像と PiXiEELENS 撮影結果は、まず写真アプリ / Gallery への保存を試し、失敗時は端末のネイティブ Documents 領域へ保存します。
