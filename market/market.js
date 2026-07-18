@@ -140,7 +140,12 @@
       renderEmpty(assets.length ? '条件に合う素材がありません' : '公開中の素材はまだありません', assets.length ? '検索語、価格、派生条件を変えてお試しください。' : '出品された素材はここへ表示されます。');
       return;
     }
-    grid.replaceChildren(...visible.map(createCard));
+    const children = visible.map(createCard);
+    if (children.length >= 8) {
+      const listAd = window.PiXiEEDMarketAds?.createListAd?.();
+      if (listAd) children.splice(8, 0, listAd);
+    }
+    grid.replaceChildren(...children);
   }
 
   async function loadAssets() {
