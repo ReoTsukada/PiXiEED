@@ -74,6 +74,9 @@
       badges.push(badge(asset.source_kind === 'pixieed-native' ? 'PiXiEED形式' : '外部形式'), badge('出品審査済み'));
     }
     if (asset.seller_identity_verified) badges.push(badge('販売者確認済み'));
+    if (asset.ai_usage_status === 'used' || asset.ai_usage_status === 'not-used') {
+      badges.push(badge(asset.ai_usage_status === 'used' ? 'AI使用あり' : 'AI使用なし'));
+    }
     $('itemBadges').replaceChildren(...badges);
     $('itemOptions').replaceChildren(...(options.length ? options.map((option) => {
       const card = document.createElement('div');
