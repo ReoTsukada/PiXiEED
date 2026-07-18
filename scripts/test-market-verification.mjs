@@ -46,6 +46,9 @@ const favoritesUi = fs.readFileSync('market/favorites.js', 'utf8');
 const discoveryUi = fs.readFileSync('market/discovery-utils.js', 'utf8');
 const mediaProtection = fs.readFileSync('market/media-protection.js', 'utf8');
 const sellUi = fs.readFileSync('market/sell.js', 'utf8');
+const sellHtml = fs.readFileSync('market/sell.html', 'utf8');
+const listingDeclarationMigration = fs.readFileSync('supabase/migrations/20260718110000_market_listing_legal_ai_declaration.sql', 'utf8');
+const privacyHtml = fs.readFileSync('privacy/index.html', 'utf8');
 
 const requiredFormats = [
   'pixiedraw-project',
@@ -296,6 +299,26 @@ assert.match(accountHtml, /data-market-admin-only[\s\S]*href="\.\.\/market\/revi
 assert.doesNotMatch(accountHtml, /href="\.\.\/market\/(?:sell|seller)\.html"/);
 assert.match(accountDevToolsUi, /rpc\('market_current_user_is_admin'\)/);
 assert.match(accountDevToolsUi, /applyAdminAccess\(!error && isAdmin === true\)/);
+assert.match(accountDevToolsUi, /applyAccess\(\{ allowed: false \}\)/);
+assert.match(sellHtml, /id="listingTermsConfirmed"[^>]*required/);
+assert.match(sellHtml, /id="listingPrivacyConfirmed"[^>]*required/);
+assert.match(sellHtml, /name="listingAiUsage" value="not-used" required/);
+assert.match(sellHtml, /name="listingAiUsage" value="used" required/);
+assert.match(sellUi, /rpc\('market_create_root_asset_v4'/);
+assert.match(sellUi, /form\.reportValidity\(\)/);
+assert.match(sellUi, /input_terms_confirmed/);
+assert.match(sellUi, /input_privacy_confirmed/);
+assert.match(listingDeclarationMigration, /input_ai_usage_status not in \('used', 'not-used'\)/i);
+assert.match(listingDeclarationMigration, /terms and privacy confirmation required/i);
+assert.match(listingDeclarationMigration, /legal document version is outdated/i);
+assert.match(listingDeclarationMigration, /revoke all on function public\.market_create_root_asset_v3/i);
+assert.match(listingDeclarationMigration, /'ai_usage_status', asset\.ai_usage_status/i);
+assert.match(reviewUi, /AI使用申告/);
+assert.match(reviewUi, /legal_confirmed_at/);
+assert.match(termsHtml, /マーケット出品・AI使用申告/);
+assert.match(termsHtml, /最終改定日：2026年7月18日/);
+assert.match(privacyHtml, /AI使用申告/);
+assert.match(privacyHtml, /最終改定日：2026年7月18日/);
 assert.match(sharedNav, /key: 'market'[\s\S]*path: 'market\/index\.html'/);
 assert.match(sitemap, /pixieed\.jp\/market\//);
 assert.match(marketIndexHtml, /出品準備中/);
