@@ -55,6 +55,11 @@
     productType.className = isPixieeDrawProduct(asset) ? 'is-pixiedraw-product' : 'is-general-product';
     productType.textContent = isPixieeDrawProduct(asset) ? 'PiXiEEDraw作品' : '一般素材';
     badges.appendChild(productType);
+    if (asset.ai_usage_status === 'used' || asset.ai_usage_status === 'not-used') {
+      const ai = document.createElement('span');
+      ai.textContent = asset.ai_usage_status === 'used' ? 'AI使用あり' : 'AI使用なし';
+      badges.appendChild(ai);
+    }
     if (asset.local_test === true) {
       const local = document.createElement('span'); local.textContent = 'DEVテスト'; badges.appendChild(local); return badges;
     }
