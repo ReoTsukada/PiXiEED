@@ -85,6 +85,7 @@
       card.append(title, price); return card;
     }) : [Object.assign(document.createElement('p'), { textContent: '追加オプションなし' })]));
     $('itemStatus').hidden = true; $('itemContent').hidden = false;
+    window.PiXiEEDMarketAds?.showDetailAd?.();
   }
 
   function setPurchaseState({ disabled, label, status }) {
