@@ -8,6 +8,7 @@ const sell = fs.readFileSync('market/sell.js', 'utf8');
 const sellHtml = fs.readFileSync('market/sell.html', 'utf8');
 const indexHtml = fs.readFileSync('market/index.html', 'utf8');
 const itemHtml = fs.readFileSync('market/item.html', 'utf8');
+const optionPricingMigration = fs.readFileSync('supabase/migrations/20260719210000_market_option_pricing.sql', 'utf8');
 
 assert.match(migration, /market_listing_is_enabled\(\)[\s\S]*select true/i);
 assert.match(migration, /market_current_user_has_confirmed_identity\(\)/i);
@@ -34,5 +35,12 @@ assert.match(migration, /create or replace function public\.market_create_root_a
 assert.match(migration, /between 100 and 10000000/i);
 assert.match(sellHtml, /id="listingPrice" type="text"[\s\S]*list="listingPricePresets"/);
 assert.match(sellHtml, /id="listingLimitedQuantity" type="text"[\s\S]*list="listingQuantityPresets"/);
+assert.match(sellHtml, /id="listingOptionsSection"[\s\S]*id="listingLimitedEnabled"[\s\S]*id="listingDerivativeAllowed"/);
+assert.match(sellHtml, /派生許可[\s\S]*\+0円/);
+assert.match(sell, /normalizedPaidPrice/);
+assert.match(sell, /PRICE_STEP_YEN = 100/);
+assert.match(sell, /input_sale_price_yen: sellerPriceForRpc/);
+assert.match(optionPricingMigration, /market_create_root_asset_v7/i);
+assert.match(optionPricingMigration, /limited sale option price must be at least 100 yen/i);
 
 console.log('market public launch checks passed');
