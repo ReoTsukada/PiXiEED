@@ -15957,6 +15957,42 @@
     }
   }
 
+  async function loadRecentProjectMetadataById(projectId, { includeAllAccounts = false } = {}) {
+    if (!AUTOSAVE_SUPPORTED) return null;
+    const normalizedProjectId = normalizeAutosaveProjectId(projectId || '');
+    if (!normalizedProjectId) return null;
+    try {
+      const db = await openAutosaveDatabase();
+      return await new Promise((resolve, reject) => {
+        let entry = null;
+        const tx = db.transaction([RECENT_PROJECTS_STORE], 'readonly');
+        const request = tx.objectStore(RECENT_PROJECTS_STORE).get(normalizedProjectId);
+        request.onsuccess = () => {
+          entry = request.result && typeof request.result === 'object'
+            ? request.result
+            : null;
+        };
+        request.onerror = () => reject(request.error);
+        tx.oncomplete = () => {
+          db.close();
+          resolve(
+            entry && (includeAllAccounts || isRecentProjectEntryVisibleForCurrentAccount(entry))
+              ? entry
+              : null
+          );
+        };
+        tx.onerror = () => {
+          const error = tx.error;
+          db.close();
+          reject(error);
+        };
+      });
+    } catch (error) {
+      console.warn('Failed to load recent project by id', error);
+      return null;
+    }
+  }
+
   async function saveRecentProjectsList(existingEntries, nextEntries) {
     if (!AUTOSAVE_SUPPORTED) return;
     const writeTask = async () => {
@@ -16979,8 +17015,19 @@
     if (!normalizedProjectId || (!journalOnly && (!snapshot || typeof snapshot !== 'object'))) {
       return null;
     }
+    const createSkippedResult = previousEntry => previousEntry || {
+      id: normalizedProjectId,
+      autosaveSchemaVersion: 2,
+      skippedBecauseProjectChanged: true,
+    };
+    if (normalizeAutosaveProjectId(autosaveProjectId || '') !== normalizedProjectId) {
+      return createSkippedResult(null);
+    }
     const existingEntries = await loadRecentProjectsMetadata();
     const previousEntry = existingEntries.find(entry => entry?.id === normalizedProjectId) || null;
+    if (normalizeAutosaveProjectId(autosaveProjectId || '') !== normalizedProjectId) {
+      return createSkippedResult(previousEntry);
+    }
     let written;
     let projectState = null;
     let thumbnail = previousEntry?.thumbnail || null;
@@ -16989,6 +17036,9 @@
       const normalizedOps = normalizeV2PixelPatchJournalOps(savePlan?.journalPayload || null);
       if (!normalizedOps || !normalizedOps.length) {
         throw new Error('V2 journal save requires valid pixel patches');
+      }
+      if (normalizeAutosaveProjectId(autosaveProjectId || '') !== normalizedProjectId) {
+        return createSkippedResult(previousEntry);
       }
       written = await autosaveSchemaV2IndexedDbUtilsModule.writeSchemaV2JournalRevision(
         normalizedProjectId,
@@ -17010,12 +17060,26 @@
     // first thumbnail after interaction settles. The recent-project card can
     // briefly use its placeholder instead of blocking V2 durability.
     thumbnail = previousEntry?.thumbnail || null;
-    const persistedTimelapseSession = await buildProjectSessionPayloadWithPersistedTimelapse();
+    let persistedTimelapseSession;
+    try {
+      persistedTimelapseSession = await buildProjectSessionPayloadWithPersistedTimelapse({
+        projectId: normalizedProjectId,
+      });
+    } catch (error) {
+      if (error?.code === 'ERR_AUTOSAVE_PROJECT_CONTEXT_CHANGED') {
+        return createSkippedResult(previousEntry);
+      }
+      throw error;
+    }
+    if (normalizeAutosaveProjectId(autosaveProjectId || '') !== normalizedProjectId) {
+      return createSkippedResult(previousEntry);
+    }
     const packagedPayload = savePlan?.packagedPayload
       ? { ...savePlan.packagedPayload, session: persistedTimelapseSession }
       : buildPackagedProjectPayload(snapshot, {
           session: persistedTimelapseSession,
           includeSheets: false,
+          internalBinary: true,
         });
     projectState = buildAutosaveSchemaV2ExperimentalProjectState({
       projectId: normalizedProjectId,
@@ -17055,6 +17119,12 @@
     if (!journalOnly) {
       markActiveLocalProjectJournalCheckpointPersisted(normalizedProjectId);
       releasePersistedInactiveOpenProjectTabPayloads(normalizedProjectId);
+      // The committed V2 checkpoint remains self-contained. Large all-frame
+      // timelapse bases are additionally copied to the local chunk store so
+      // the live editor can release them from JavaScript memory afterwards.
+      archiveTimelapseOperationLogBases(normalizedProjectId).catch(error => {
+        console.warn('Failed to offload committed timelapse bases.', error);
+      });
     }
     return metadata;
   }
@@ -17231,7 +17301,7 @@
       const allowProjectMismatchLoad = Boolean(options.allowProjectMismatchLoad || replaceOpenProjectTabs);
       const projectId = normalizeAutosaveProjectId(entry.id || '');
       const latestEntry = projectId
-        ? ((await loadRecentProjectsMetadata()).find(candidate => candidate?.id === projectId) || entry)
+        ? ((await loadRecentProjectMetadataById(projectId)) || entry)
         : entry;
       if (isSharedRecentProjectEntry(latestEntry)) {
         if (!SHARED_PROJECTS_ENABLED) {
