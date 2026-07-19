@@ -261,7 +261,6 @@
     else if (status === 'unfilled') ins.dataset.adsRequestState = 'unfilled';
     else if (status === 'unfill-optimized') ins.dataset.adsRequestState = 'optimized';
     else if (ins.getAttribute('data-adsbygoogle-status') === 'done') ins.dataset.adsRequestState = 'requested';
-    window.PiXiEEDAdAccountControl?.syncAdFallback?.(ins);
   }
 
   async function loadAd(ins) {
@@ -283,7 +282,6 @@
     } catch (_error) {
       ins.dataset.adsLazyLoaded = '';
       ins.dataset.adsScriptBlocked = '1';
-      window.PiXiEEDAdAccountControl?.syncAdFallback?.(ins);
       return;
     }
     window.requestAnimationFrame(() => {
@@ -303,7 +301,6 @@
             return;
           }
           ins.dataset.adsRequestState = 'push-failed';
-          window.PiXiEEDAdAccountControl?.syncAdFallback?.(ins);
         }
       });
     });
