@@ -7,6 +7,7 @@ const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'u
 
 const lazy = read('scripts/ads-lazy.js');
 const account = read('scripts/ad-account-control.js');
+const sharedTopAd = read('scripts/bottom-nav-footer-ad.js');
 const drawProject = read('projects/pixiedraw/index.html');
 const lensProject = read('projects/pixiee-lens/index.html');
 const maoituProject = read('projects/maoitu/index.html');
@@ -47,25 +48,35 @@ assert.match(account, /scriptBlocked/);
 assert.match(account, /data-ads-script-blocked/);
 assert.match(account, /host\.dataset\.pixieedReserveAdSpace = 'true'/);
 assert.match(account, /html\[data-pixieed-ad-free-account='true'\] \.pixieed-ad-fallback/);
+assert.doesNotMatch(account, /pixieedLoadFailed|dataset\.pixieedReady/,
+  'AdSense script tags must not receive unsupported PiXiEED data attributes');
+assert.match(account, /__PIXIEED_ADSENSE_SCRIPT_READY__/);
+assert.match(account, /host\.classList\.remove\('is-ad-unfilled'\)/);
+
+assert.match(sharedTopAd, /banner\.dataset\.pixieedReserveAdSpace = 'true'/);
+assert.match(sharedTopAd, /if \(window\.pixieedObserveAds\) \{\s*window\.pixieedObserveAds\(banner\)/);
+assert.match(sharedTopAd, /slot\.dataset\.pixieedPushQueued = '1';\s*try \{/,
+  'the shared ad must only be marked queued immediately before the actual push');
+assert.doesNotMatch(sharedTopAd, /dataset\.pixieedReady/);
 
 assert.match(drawProject, /data-ad-slot="9073878884"/);
 assert.match(lensProject, /data-ad-slot="2261515379"/);
 assert.match(maoituProject, /data-ad-slot="9073878884"/);
 for (const html of [drawProject, lensProject, maoituProject, qrProject]) {
   assert.doesNotMatch(html, /data-ad-slot="rotate"/);
-  assert.match(html, /ads-lazy\.js\?v=2026\.07\.19-ad-lifecycle2/);
+  assert.match(html, /ads-lazy\.js\?v=20260719-shared-top-resume1/);
 }
 
 assert.doesNotMatch(lensTool, /class="ad-footer"|id="mobileBottomAd"/);
 assert.doesNotMatch(lensTool, /rebuildLensBannerAd|rebuildCapturePreviewAd|adsbygoogle\s*=.*push/);
-assert.match(pixfind, /scripts\/ads-lazy\.js\?v=2026\.07\.19-ad-lifecycle2/);
-assert.match(pixfind, /scripts\/ad-account-control\.js\?v=2026\.07\.19-ad-lifecycle2/);
+assert.match(pixfind, /scripts\/ads-lazy\.js\?v=20260719-shared-top-resume1/);
+assert.match(pixfind, /scripts\/ad-account-control\.js\?v=20260719-adsense-script-state1/);
 assert.doesNotMatch(pixfind, /SLOT_SEQUENCE|adsQueueEnqueued|pagead2\.googlesyndication\.com\/pagead\/js\/adsbygoogle\.js/);
 assert.match(pixfindApp, /data-ad-slot="2261515379"/);
 assert.match(homeScript, /data-ad-slot="9073878884"/);
 
 for (const html of sharedLazyPages) {
-  assert.match(html, /scripts\/ads-lazy\.js\?v=2026\.07\.19-ad-lifecycle2/);
+  assert.match(html, /scripts\/ads-lazy\.js\?v=20260719-shared-top-resume1/);
   assert.doesNotMatch(html, /<script id="ads-lazy"|SLOT_SEQUENCE|adsQueueEnqueued|data-ad-slot="rotate"/);
 }
 
