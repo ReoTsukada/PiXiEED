@@ -36,7 +36,7 @@
   replaceFooter();
   replaceBottomNav();
   ensureAdAccountControl(() => {
-    ensureCommonTabBarController();
+    if (!isHomePage()) ensureCommonTabBarController();
     if (script.dataset.pixieedFooterAd !== 'false') ensureFooterAdController();
   });
 
@@ -48,6 +48,12 @@
     if (path.includes('/pixiee-lens/')) return 'camera';
     if (/(?:^|\/)account(?:\/|\/index\.html)?$/.test(path)) return 'account';
     return 'home';
+  }
+
+  function isHomePage() {
+    const path = String(currentPath || '').replace(/\/+$/, '') || '/';
+    const rootPath = String(rootUrl.pathname || '/').replace(/\/+$/, '') || '/';
+    return path === rootPath || path === `${rootPath === '/' ? '' : rootPath}/index.html`;
   }
 
   function relHref(targetPath) {
@@ -569,6 +575,39 @@
           height:var(--viewport-height, var(--app-height, 100dvh))!important;
           min-height:var(--viewport-height, var(--app-height, 100dvh))!important;
           max-height:var(--viewport-height, var(--app-height, 100dvh))!important;
+        }
+      }
+      /* The home is a centered landing surface. Keep its navigation at the bottom
+         on wide displays so the right rail never shifts the content left. */
+      @media (orientation:landscape){
+        body:has(.home-app){
+          padding-right:0!important;
+          padding-bottom:max(84px, calc(var(--pixieed-shared-bottom-nav-height) + 16px + env(safe-area-inset-bottom, 0px)))!important;
+        }
+        body:has(.home-app) .bottom-nav{
+          top:auto!important;
+          right:0!important;
+          bottom:0!important;
+          left:0!important;
+          width:100%!important;
+          height:var(--pixieed-shared-bottom-nav-height)!important;
+          min-height:var(--pixieed-shared-bottom-nav-height)!important;
+          max-height:none!important;
+          flex-direction:row!important;
+          justify-content:stretch!important;
+          gap:0!important;
+          padding:6px max(10px, env(safe-area-inset-right, 0px)) calc(6px + env(safe-area-inset-bottom, 0px)) max(10px, env(safe-area-inset-left, 0px))!important;
+          border-top:1px solid rgba(255,255,255,0.08)!important;
+          border-left:0!important;
+        }
+        body:has(.home-app) .bottom-nav__item{
+          width:auto!important;
+          flex:1 1 0!important;
+          max-height:none!important;
+          padding:5px 2px!important;
+        }
+        body:has(.home-app) .bottom-nav__item--primary{
+          transform:translateY(-8px)!important;
         }
       }
     `;
