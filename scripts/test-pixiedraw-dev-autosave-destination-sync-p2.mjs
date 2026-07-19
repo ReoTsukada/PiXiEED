@@ -18,6 +18,7 @@ const counters = {
   serializes: 0,
   destinationWrites: 0,
   durableMarks: 0,
+  internalBinaryPayloads: 0,
 };
 let checkpointRequired = false;
 
@@ -95,10 +96,13 @@ const scope = {
   state: { documentName: 'project-1.pixieedraw' },
   unsavedChangeToken: 1,
   virtualCursorDrawState: { active: false },
-  buildActiveLocalProjectSavePlan: ({ snapshot }) => snapshot
-    ? { journalOnly: false, packagedPayload: { document: snapshot } }
+  buildActiveLocalProjectSavePlan: ({ snapshot, buildPackagedProjectPayload }) => snapshot
+    ? { journalOnly: false, packagedPayload: buildPackagedProjectPayload(snapshot) }
     : (checkpointRequired ? null : { journalOnly: true, journalPayload: { ops: [{ kind: 'pixel-patch' }] } }),
-  buildPackagedProjectPayload: snapshot => ({ document: snapshot }),
+  buildPackagedProjectPayload: (snapshot, options = {}) => {
+    if (options.internalBinary === true) counters.internalBinaryPayloads += 1;
+    return { document: snapshot, internalBinary: options.internalBinary === true };
+  },
   buildProjectSessionPayload: () => ({ historyLimit: 30 }),
   buildProjectSessionPayloadWithPersistedTimelapse: async () => ({
     timelapse: { synchronization: { complete: true } },
@@ -169,6 +173,7 @@ scope.unsavedChangeToken = 2;
 assert.equal(await utils.writeAutosaveSnapshot(false), true);
 assert.equal(counters.snapshots, 1, 'a checkpoint must build a full on-device snapshot immediately');
 assert.equal(counters.v2Writes, 2);
+assert.equal(counters.internalBinaryPayloads, 1, 'DEV checkpoints must preserve TypedArrays for internal V2 storage');
 assert.equal(counters.destinationWrites, 0, 'a checkpoint must not write an external file');
 assert.equal(utils.hasPendingAutosaveWork(), false);
 
