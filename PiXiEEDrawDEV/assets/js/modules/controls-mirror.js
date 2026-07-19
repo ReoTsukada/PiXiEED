@@ -1764,10 +1764,10 @@
     dom.controls.canvasClipboardCut?.addEventListener('click', handleCanvasControlClick);
 
     if (dom.controls.undoAction) {
-      dom.controls.undoAction.replaceChildren(makeIcon('action-undo', '↺', { width: 20, height: 20 }));
+      dom.controls.undoAction.replaceChildren(makeIcon('action-undo', '↺', { width: 20, height: 20, extension: 'png' }));
     }
     if (dom.controls.redoAction) {
-      dom.controls.redoAction.replaceChildren(makeIcon('action-redo', '↻', { width: 20, height: 20 }));
+      dom.controls.redoAction.replaceChildren(makeIcon('action-redo', '↻', { width: 20, height: 20, extension: 'png' }));
     }
     if (dom.controls.appReloadAction instanceof HTMLButtonElement) {
       const reloadIcon = makeIcon('action-reload', '⟳', { width: 20, height: 20, extension: 'png' });

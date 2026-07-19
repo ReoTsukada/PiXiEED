@@ -11,7 +11,7 @@
     if (profile.seller_status === 'restricted') return '制限中';
     if (profile.seller_status === 'disabled') return '利用停止';
     if (profile.identity_status === 'failed') return '再確認が必要';
-    if (profile.contact_registered_at) return 'Stripe設定待ち';
+    if (profile.contact_registered_at) return '受取設定待ち（出品可）';
     return '未登録';
   }
 

@@ -44,9 +44,9 @@
     const path = String(pathname || '').toLowerCase();
     if (path.includes('/pixiedraw/') || path.includes('/pixieedrawdev/')) return 'draw';
     if (path.includes('/market/')) return 'market';
-    if (path.includes('/qr/') || path.includes('/qr-maker/')) return 'qr';
+    if (path.includes('/qr/') || path.includes('/qr-maker/')) return '';
     if (path.includes('/pixiee-lens/')) return 'camera';
-    if (/(?:^|\/)account(?:\/|\/index\.html)?$/.test(path)) return '';
+    if (/(?:^|\/)account(?:\/|\/index\.html)?$/.test(path)) return 'account';
     return 'home';
   }
 
@@ -62,7 +62,7 @@
     const controller = doc.createElement('script');
     controller.defer = true;
     controller.dataset.pixieedFooterAdController = 'true';
-    controller.src = relHref('scripts/bottom-nav-footer-ad.js?v=2026.07.19-pixiedraw-ad-audit1');
+    controller.src = relHref('scripts/bottom-nav-footer-ad.js?v=2026.07.19-ad-lifecycle1');
     doc.body.appendChild(controller);
   }
 
@@ -80,7 +80,7 @@
     const controller = doc.createElement('script');
     controller.async = false;
     controller.dataset.pixieedAdAccountControl = 'true';
-    controller.src = relHref('scripts/ad-account-control.js?v=2026.07.18-ad-permissions1');
+    controller.src = relHref('scripts/ad-account-control.js?v=2026.07.19-ad-lifecycle1');
     controller.addEventListener('load', ready, { once: true });
     controller.addEventListener('error', ready, { once: true });
     doc.head.appendChild(controller);
@@ -93,7 +93,7 @@
     const controller = doc.createElement('script');
     controller.defer = true;
     controller.dataset.pixieedCommonTabBar = 'true';
-    controller.src = relHref('scripts/shared-tab-bar.js?v=2026.07.18-ad-permissions1');
+    controller.src = relHref('scripts/shared-tab-bar.js?v=2026.07.19-ui-icons1');
     doc.body.appendChild(controller);
   }
 
@@ -241,11 +241,11 @@
 
   function getNavItems() {
     return [
-      { key: 'home', label: 'ホーム', path: 'index.html', icon: 'HOME.png?v=2026.07.17-icons2' },
+      { key: 'home', label: 'ホーム', path: 'index.html', icon: 'HOME.png?v=2026.07.19-ui-icons1' },
       { key: 'market', label: 'マーケット', path: 'market/index.html', icon: 'Market.png' },
-      { key: 'draw', label: 'PiXiEEDraw', path: 'pixiedraw/index.html', icon: 'icon/icon-192-4.png', primary: true },
+      { key: 'draw', label: 'PiXiEEDraw', path: 'pixiedraw/index.html', icon: 'Draw.png?v=2026.07.19-ui-icons1', primary: true },
       { key: 'camera', label: 'カメラ', path: 'pixiee-lens/index.html', icon: 'Camera.png' },
-      { key: 'qr', label: 'QR', path: 'qr/index.html', icon: 'QR.png' }
+      { key: 'account', label: 'マイページ', path: 'account/index.html', icon: 'pixiedraw/assets/icons/ecticon_frame_01.png' }
     ];
   }
 

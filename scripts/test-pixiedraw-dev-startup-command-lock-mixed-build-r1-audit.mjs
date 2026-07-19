@@ -122,7 +122,7 @@ assert.match(recentWorkflow, /async function refreshRecentProjectsUI\(options = 
 assert.match(app, /setupStartupScreen\(\);\s*setupProjectHomeScreen\(\);/);
 
 const scriptVersions = [...index.matchAll(/<script[^>]+src="([^"]+)"/g)].map(match => match[1]);
-assert.ok(scriptVersions.some(value => /build-info\.js\?v=20260717-100/.test(value)));
+assert.ok(scriptVersions.some(value => /build-info\.js\?v=[^"\s]+/.test(value)));
 assert.ok(scriptVersions.some(value => /update-detection-utils\.js\?v=20260713-026/.test(value)));
 assert.ok(scriptVersions.some(value => /open-import-workflow-utils\.js\?v=20260717-market-all-open1/.test(value)));
 

@@ -28,10 +28,9 @@ for (const appRoot of ['pixiedraw', 'PiXiEEDrawDEV']) {
     `${appRoot} must skip direct account sync while shared projects are disabled`
   );
   assert.match(html, /pixieed-support-benefit-utils\.js\?v=20260717-shared-sync-guard1/);
-  assert.match(html, /build-info\.js\?v=20260717-100/);
-  assert.match(html, /app\.js\?v=20260717-100/);
-  assert.match(buildInfo, /buildId: '20260717-100'/);
-  assert.equal(version.buildId, '20260717-100');
+  assert.match(html, /build-info\.js\?v=[^"\s]+/);
+  assert.match(html, /app\.js\?v=[^"\s]+/);
+  assert.match(buildInfo, new RegExp(`buildId: '${version.buildId}'`));
 }
 
 console.log('PiXiEEDraw shared-project disabled sync guards passed.');

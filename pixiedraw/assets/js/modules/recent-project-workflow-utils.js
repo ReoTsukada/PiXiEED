@@ -709,7 +709,7 @@
         if (card) {
           target.list.appendChild(card);
         }
-        if (target.list === dom.projectHomeRecentList && index === 3) {
+        if (target.list === dom.projectHomeRecentList && (index + 1) % 8 === 0) {
           const adCard = createProjectHomeAdCard();
           if (adCard) {
             target.list.appendChild(adCard);

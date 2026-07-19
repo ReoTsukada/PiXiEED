@@ -6,6 +6,7 @@
 
   let adsScriptLoadScheduled = false;
   let maoituAdsScriptDelayApplied = false;
+  let directAdsScriptPromise = null;
 
   function arePixieedAdsDisabled() {
     window.PiXiEEDAdAccountControl?.refresh?.();
@@ -453,40 +454,62 @@
   }
 
   function ensureAdsScript() {
-    if (isLocalFilePreview() || arePixieedAdsDisabled()) return;
+    if (isLocalFilePreview() || arePixieedAdsDisabled()) return Promise.resolve(false);
     if (window.PiXiEEDAdAccountControl) {
-      window.PiXiEEDAdAccountControl.loadAdsense();
-      return;
+      return window.PiXiEEDAdAccountControl.loadAdsense();
     }
     const existing = document.querySelector('script[src*="pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"]');
-    if (existing) return;
-    if (isMaoituPage() && window.__MAOITU_GAME_ACTIVE__) {
-      window.addEventListener('maoitu:game-active-change', () => {
-        if (!window.__MAOITU_GAME_ACTIVE__) {
-          ensureAdsScript();
+    if (existing && (existing.dataset.pixieedReady === '1'
+      || window.adsbygoogle?.loaded === true
+      || document.querySelector('ins.adsbygoogle[data-adsbygoogle-status="done"]'))) {
+      existing.dataset.pixieedReady = '1';
+      return Promise.resolve(true);
+    }
+    if (directAdsScriptPromise) return directAdsScriptPromise;
+    directAdsScriptPromise = new Promise((resolve) => {
+      let settled = false;
+      let timeoutId = 0;
+      const script = existing || document.createElement('script');
+      const finish = (loaded) => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timeoutId);
+        if (loaded) script.dataset.pixieedReady = '1';
+        else {
+          directAdsScriptPromise = null;
+          if (script.isConnected && script.dataset.pixieedReady !== '1') script.remove();
         }
-      }, { once: true });
-      return;
-    }
-    if (isMaoituPage() && !adsScriptLoadScheduled && !maoituAdsScriptDelayApplied) {
-      adsScriptLoadScheduled = true;
-      maoituAdsScriptDelayApplied = true;
-      const scheduleLoad = () => {
-        adsScriptLoadScheduled = false;
-        ensureAdsScript();
+        resolve(loaded);
       };
-      if ('requestIdleCallback' in window) {
-        window.requestIdleCallback(scheduleLoad, { timeout: 1800 });
-      } else {
-        window.setTimeout(scheduleLoad, 1000);
-      }
-      return;
-    }
-    const script = document.createElement('script');
-    script.async = true;
-    script.crossOrigin = 'anonymous';
-    script.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253';
-    document.head.appendChild(script);
+      const beginLoad = () => {
+        if (isMaoituPage() && window.__MAOITU_GAME_ACTIVE__) {
+          window.addEventListener('maoitu:game-active-change', () => {
+            if (!window.__MAOITU_GAME_ACTIVE__) beginLoad();
+          }, { once: true });
+          return;
+        }
+        if (isMaoituPage() && !adsScriptLoadScheduled && !maoituAdsScriptDelayApplied) {
+          adsScriptLoadScheduled = true;
+          maoituAdsScriptDelayApplied = true;
+          const scheduleLoad = () => {
+            adsScriptLoadScheduled = false;
+            beginLoad();
+          };
+          if ('requestIdleCallback' in window) window.requestIdleCallback(scheduleLoad, { timeout: 1800 });
+          else window.setTimeout(scheduleLoad, 1000);
+          return;
+        }
+        timeoutId = window.setTimeout(() => finish(false), 15000);
+        script.async = true;
+        script.crossOrigin = 'anonymous';
+        script.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253';
+        script.addEventListener('load', () => finish(true), { once: true });
+        script.addEventListener('error', () => finish(false), { once: true });
+        if (!existing) document.head.appendChild(script);
+      };
+      beginLoad();
+    });
+    return directAdsScriptPromise;
   }
 
   function isPixiedrawPage() {
@@ -950,12 +973,20 @@
       if (window.pixieedObserveAds) {
         window.pixieedObserveAds(banner);
       } else {
-        try {
-          window.adsbygoogle = window.adsbygoogle || [];
-          window.adsbygoogle.push({});
-        } catch (_error) {
+        Promise.resolve(ensureAdsScript()).then((loaded) => {
+          if (!loaded || !slot.isConnected || slot.getAttribute('data-adsbygoogle-status') === 'done') {
+            if (!loaded) delete slot.dataset.pixieedPushQueued;
+            return;
+          }
+          try {
+            window.adsbygoogle = window.adsbygoogle || [];
+            window.adsbygoogle.push({});
+          } catch (_error) {
+            delete slot.dataset.pixieedPushQueued;
+          }
+        }).catch(() => {
           delete slot.dataset.pixieedPushQueued;
-        }
+        });
       }
     };
     const usesManagedPixiedrawAds = !localFilePreview && isPixiedrawPage()

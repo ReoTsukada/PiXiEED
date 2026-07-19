@@ -15,7 +15,7 @@ serve(async (request) => {
     return jsonResponse(request, { ok: false, error: "unauthorized" }, 401);
   }
 
-  const minimumYen = Math.max(1, Math.min(10000000, Number(Deno.env.get("MARKET_PAYOUT_MINIMUM_YEN")) || 1000));
+  const minimumYen = Math.max(1, Math.min(10000000, Number(Deno.env.get("MARKET_PAYOUT_MINIMUM_YEN")) || 5000));
   const maxBatches = Math.max(1, Math.min(100, Number(new URL(request.url).searchParams.get("limit")) || 20));
   const admin = createAdminClient();
   const transferred: Array<{ batch_id: string; transfer_id: string; amount_yen: number }> = [];

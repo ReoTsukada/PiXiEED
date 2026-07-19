@@ -1,7 +1,7 @@
 (function () {
   'use strict';
   const URL = 'https://kyyiuakrqomzlikfaire.supabase.co'; const KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
-  const $ = (id) => document.getElementById(id); let client; let factorId = ''; let enrollmentStarted = false; let sellerProfile = null;
+  const $ = (id) => document.getElementById(id); const PAYOUT_MINIMUM_YEN = 5000; let client; let factorId = ''; let enrollmentStarted = false; let sellerProfile = null; let payoutReady = false; let pendingPayoutQuote = null;
   const message = (id, value) => { $(id).textContent = value || ''; };
   async function assurance() { const { data, error } = await client.auth.mfa.getAuthenticatorAssuranceLevel(); if (error) throw error; return data; }
   async function verifiedTotpFactor() { const { data, error } = await client.auth.mfa.listFactors(); if (error) throw error; return data?.totp?.find((factor) => factor.status === 'verified') || null; }
@@ -33,7 +33,7 @@
     if (!data) return;
     $('sellerLegalName').value = data.legal_name || ''; $('sellerPostalCode').value = data.postal_code || ''; $('sellerAddress').value = data.address || ''; $('sellerPhone').value = data.phone || '';
     if (data.contact_registered_at) {
-      message('registrationStatus', data.seller_status === 'verified' ? '販売者登録は完了しています。' : '販売者情報を保存済みです。続けてStripeの売上受取設定を完了してください。');
+      message('registrationStatus', data.seller_status === 'verified' ? '販売者情報と受取設定を確認済みです。' : '販売者情報を保存済みです。出品・審査はこのまま進められます。売上を受け取る前にStripeの設定を完了してください。');
       $('stripeConnectSection').hidden = false;
       await refreshStripeStatus();
     }
@@ -49,18 +49,92 @@
     try {
       const data = await invokeStripe('status');
       if (data.onboardingStatus === 'verified') {
+        payoutReady = true;
         button.textContent = '売上受取設定済み'; button.disabled = true;
         message('stripeConnectDescription', 'Stripeの確認と売上受取設定が完了しています。');
-        message('stripeConnectStatus', '出品機能を利用できます。');
+        message('stripeConnectStatus', '売上受取設定が完了しました。');
       } else {
+        payoutReady = false;
         button.textContent = 'Stripeの登録を続ける'; button.disabled = false;
         const due = Array.isArray(data.requirementsDue) ? data.requirementsDue.length : 0;
         message('stripeConnectStatus', due ? `Stripeで${due}件の確認事項が残っています。` : 'Stripeの登録を完了してください。');
       }
     } catch (error) {
+      payoutReady = false;
       button.textContent = 'Stripeの登録を開始'; button.disabled = false;
       message('stripeConnectStatus', error.message || 'Stripeの状態を確認できませんでした');
     }
+    await refreshPayoutRequest();
+  }
+
+  function yen(value) { return `${new Intl.NumberFormat('ja-JP').format(Math.max(0, Number(value) || 0))}円`; }
+  async function refreshPayoutRequest() {
+    const section = $('payoutRequestSection'); const button = $('payoutRequestAction');
+    if (!section || !client) return;
+    section.hidden = false; button.disabled = true;
+    try {
+      const [{ data: ledger, error: ledgerError }, { data: requests, error: requestError }] = await Promise.all([
+        client.from('market_royalty_ledger').select('amount_microyen,paid_microyen,status').eq('status', 'available'),
+        client.from('market_payout_requests').select('status,requested_at,failure_message').order('requested_at', { ascending: false }).limit(1),
+      ]);
+      if (ledgerError) throw ledgerError; if (requestError) throw requestError;
+      const availableYen = Math.floor((ledger || []).reduce((total, row) => total + Math.max(0, Number(row.amount_microyen || 0) - Number(row.paid_microyen || 0)), 0) / 1000000);
+      const latest = requests?.[0];
+      if (latest?.status === 'requested' || latest?.status === 'processing') {
+        message('payoutRequestDescription', `出金申請を処理しています。対象額: ${yen(availableYen)}`);
+        message('payoutRequestStatus', 'Stripeへの送金結果を確認中です。');
+      } else if (latest?.status === 'completed') {
+        message('payoutRequestDescription', '今月の出金申請は完了しました。次の申請は翌月にできます。');
+        message('payoutRequestStatus', '送金済みの金額は出金履歴で確認できます。');
+      } else if (!payoutReady) {
+        message('payoutRequestDescription', `確定済み残高: ${yen(availableYen)}。出金前にStripeの売上受取設定を完了してください。`);
+        message('payoutRequestStatus', '出品・販売は受取設定前でも続けられます。');
+      } else if (availableYen < PAYOUT_MINIMUM_YEN) {
+        message('payoutRequestDescription', `確定済み残高: ${yen(availableYen)}。${yen(PAYOUT_MINIMUM_YEN)}以上で申請できます。`);
+        message('payoutRequestStatus', 'Stripeの入金費用を抑えるため、10,000円以上まで貯めてからの申請もおすすめします。');
+      } else {
+        message('payoutRequestDescription', `確定済み残高: ${yen(availableYen)}。申請すると全額をStripeへ自動送金します。`);
+        message('payoutRequestStatus', '出金は月1回までです。Stripeの決済・入金費用は受取人の売上から精算します。');
+        button.textContent = `${yen(availableYen)}を出金申請`; button.disabled = false;
+      }
+    } catch (error) { message('payoutRequestDescription', '確定済み残高を確認できませんでした。'); message('payoutRequestStatus', error.message || '接続エラー'); }
+  }
+  function amountRow(label, value, net = false) {
+    const term = document.createElement('dt'); term.textContent = label;
+    const amount = document.createElement('dd'); amount.textContent = typeof value === 'string' ? `${value}円` : yen(value); if (net) amount.classList.add('is-net');
+    return [term, amount];
+  }
+  function openPayoutDialog(quote) {
+    const dialog = $('payoutConfirmDialog'); const amounts = $('payoutConfirmAmounts'); pendingPayoutQuote = quote;
+    amounts.replaceChildren(
+      ...amountRow('確定済み残高', quote.gross_amount_yen),
+      ...amountRow('Stripe Transfer費用（見込み）', `-${Number(quote.transfer_fee_yen || 0)}`),
+      ...amountRow('銀行口座への入金費用（見込み）', `-${Number(quote.bank_payout_fee_yen || 0)}`),
+      ...amountRow('当月の受取口座利用料（見込み）', `-${Number(quote.active_account_fee_yen || 0)}`),
+      ...amountRow('Stripeへ送金する額', quote.transfer_amount_yen, true),
+    );
+    message('payoutConfirmReason', String(quote.reason || 'Stripeの実費を差し引いて送金します。'));
+    dialog.showModal();
+  }
+  async function showPayoutConfirmation() {
+    const button = $('payoutRequestAction'); button.disabled = true; message('payoutRequestStatus', 'Stripe費用を計算しています...');
+    try {
+      const { data: quote, error } = await client.rpc('market_quote_stripe_payout_v1');
+      if (error || !quote?.eligible) throw new Error(error?.message || '出金できる状態ではありません');
+      openPayoutDialog(quote); message('payoutRequestStatus', '内容を確認してから確定してください。');
+    } catch (error) { message('payoutRequestStatus', error.message || '出金内容を確認できませんでした'); }
+    await refreshPayoutRequest();
+  }
+  async function requestPayout() {
+    const button = $('payoutConfirmAction'); if (!pendingPayoutQuote) return;
+    button.disabled = true; message('payoutRequestStatus', 'Stripeへの送金を開始しています...');
+    try {
+      const { data, error } = await client.functions.invoke('market-request-payout', { body: {} });
+      if (error || !data?.ok) throw new Error(data?.error || error?.message || '出金申請を開始できませんでした');
+      message('payoutRequestStatus', `${yen(data.amount_yen)}をStripeへ送金しました。銀行口座への入金時期はStripeの案内に従います。`);
+    } catch (error) { message('payoutRequestStatus', error.message || '出金申請を開始できませんでした'); }
+    pendingPayoutQuote = null;
+    await refreshPayoutRequest();
   }
   async function openStripeOnboarding() {
     const button = $('stripeConnectAction'); button.disabled = true; message('stripeConnectStatus', 'Stripeの登録画面を準備しています...');
@@ -81,12 +155,17 @@
       $('sellerPageStatus').hidden = true; await prepareMfa();
       $('mfaAction').addEventListener('click', async () => { try { $('mfaAction').disabled = true; if (!enrollmentStarted && !(await verifiedTotpFactor())) await startEnrollment(); else await verifyFactor(); } catch (error) { message('mfaStatus', error.message || '二段階認証に失敗しました'); } finally { $('mfaAction').disabled = false; } });
       $('stripeConnectAction').addEventListener('click', openStripeOnboarding);
+      $('payoutRequestAction').addEventListener('click', showPayoutConfirmation);
+      $('payoutConfirmDialog').querySelector('form').addEventListener('submit', async (event) => {
+        if (event.submitter?.value !== 'confirm') { pendingPayoutQuote = null; return; }
+        event.preventDefault(); await requestPayout(); $('payoutConfirmDialog').close();
+      });
       $('sellerRegistrationForm').addEventListener('submit', async (event) => {
         event.preventDefault(); const submit = event.currentTarget.querySelector('button[type="submit"]'); submit.disabled = true; message('registrationStatus', '申請しています...');
         const { error } = await client.rpc('market_submit_seller_registration', { input_legal_name: $('sellerLegalName').value.trim(), input_postal_code: $('sellerPostalCode').value.trim(), input_address: $('sellerAddress').value.trim(), input_phone: $('sellerPhone').value.trim(), input_terms_version: 'market-terms-v1' });
         if (error) message('registrationStatus', `保存できませんでした: ${error.message}`);
         else {
-          message('registrationStatus', '販売者情報を保存しました。続けてStripeの売上受取設定を完了してください。');
+          message('registrationStatus', '販売者情報を保存しました。出品・審査は進められます。売上を受け取る前にStripeの設定を完了してください。');
           $('stripeConnectSection').hidden = false; await refreshStripeStatus();
         }
         submit.disabled = false;

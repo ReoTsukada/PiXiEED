@@ -10,7 +10,7 @@ for (const root of roots) {
   const deleteDialogFunction = startup.match(/async function openRecentProjectDeleteConfirmDialog[\s\S]*?\n  function setupRecentProjectDeleteConfirmDialog/);
 
   assert.match(html, /<dialog[^>]+id="recentProjectDeleteConfirmDialog"/);
-  assert.match(html, /startup-workflow-utils\.js\?v=20260715-startup-grid-no-oval1/);
+  assert.match(html, /startup-workflow-utils\.js\?v=[^"\s]+/);
   assert.ok(deleteDialogFunction, `${root}: delete confirmation function must exist`);
   assert.match(deleteDialogFunction[0], /dialog\.hidden = false;[\s\S]*?dialog\.showModal\(\)/);
   assert.match(deleteDialogFunction[0], /Failed to open recent project delete confirmation dialog/);

@@ -18,12 +18,14 @@ const includeEntries = [
   'character-dots',
   'contact',
   'data',
+  'Draw.png',
   'events',
   'FooterIcon1.png',
   'FooterIcon2.png',
   'FooterIcon3.png',
   'FooterIcon4.png',
   'FooterIcon5.png',
+  'File.png',
   'gla1_frame_01.png',
   'gla1_frame_02.png',
   'glossary',
@@ -54,6 +56,8 @@ const includeEntries = [
   'QR.png',
   'qr',
   'qr-maker',
+  'Redo.png',
+  'reload.png',
   'robots.txt',
   'scripts',
   'scripts.js',
@@ -61,8 +65,11 @@ const includeEntries = [
   'site',
   'sitemap.xml',
   'styles.css',
+  'setting.png',
   'terms',
-  'Word.png'
+  'Undo.png',
+  'Word.png',
+  '詳細.png'
 ];
 
 async function pathExists(targetPath) {

@@ -18,7 +18,8 @@ assert.match(index, /id="startupActionNew"[\s\S]*id="startupActionOpen"[\s\S]*id
 assert.doesNotMatch(index, /id="projectHomeScreen"|id="projectHomeRecentList"/);
 assert.match(app, /showLocalProjects[\s\S]{0,900}showStartupScreen\(\{ refreshWorkspace: true \}\)/);
 assert.match(startup, /startupWorkspaceSearchQuery/);
-assert.match(startup, /visibleIndex === 3/);
+assert.match(startup, /\(visibleIndex \+ 1\) % 8 === 0/);
+assert.doesNotMatch(startup, /visibleIndex === 3/);
 assert.match(startup, /closest\('\.startup-screen__recent, \.startup-workspace,/);
 assert.match(lifecycle, /showStartupScreen\?\.\(\{ refreshWorkspace: refresh \}\)/);
 assert.match(css, /\.startup-screen__content\s*\{[\s\S]*?width: min\(1440px, 100%\)/);

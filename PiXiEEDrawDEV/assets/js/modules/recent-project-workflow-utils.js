@@ -683,6 +683,7 @@
       }
       const card = document.createElement('article');
       card.className = 'startup-recent-card startup-recent-card--ad';
+      card.dataset.pixieedReserveAdSpace = 'true';
       card.setAttribute('role', 'listitem');
       card.setAttribute('aria-label', localizeText('広告', 'Ad'));
       const frame = document.createElement('div');
@@ -714,22 +715,19 @@
       card.appendChild(frame);
       return card;
     };
-    entries.forEach(entry => {
+    entries.forEach((entry, index) => {
       targets.forEach(target => {
         const card = createRecentProjectCard(entry);
         if (card) {
           target.list.appendChild(card);
         }
+        if (target.list === dom.projectHomeRecentList && (index + 1) % 8 === 0) {
+          const adCard = createProjectHomeAdCard();
+          if (adCard) {
+            target.list.appendChild(adCard);
+          }
+        }
       });
-    });
-    targets.forEach(target => {
-      if (target.list !== dom.projectHomeRecentList) {
-        return;
-      }
-      const adCard = createProjectHomeAdCard();
-      if (adCard) {
-        target.list.appendChild(adCard);
-      }
     });
     updatePixieedAccountUi();
     syncPixieedSupportBenefitUi();

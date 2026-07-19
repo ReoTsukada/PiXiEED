@@ -1683,7 +1683,7 @@
       details.append(name, meta, certification);
       button.append(thumbnail, details);
       list.appendChild(button);
-      if (!startupWorkspaceSearchQuery && visibleIndex === 3 && window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.()) {
+      if ((visibleIndex + 1) % 8 === 0 && window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.()) {
         const adCard = document.createElement('div');
         adCard.className = 'startup-recent-card--ad startup-recent-ad startup-workspace__ad';
         adCard.dataset.pixieedReserveAdSpace = 'true';

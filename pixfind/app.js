@@ -2619,7 +2619,7 @@ function renderPuzzles(level, mode = state.currentMode) {
   ));
   official.forEach((puzzle, idx) => {
     dom.puzzleList.append(createOfficialCard(puzzle));
-    if (idx === 7 && official.length >= 8) {
+    if ((idx + 1) % 8 === 0) {
       dom.puzzleList.append(createPuzzleListAd());
     }
   });

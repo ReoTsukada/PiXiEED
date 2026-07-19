@@ -37,9 +37,14 @@
   }
 
   const ready = (async () => {
-    const access = window.PiXiEEDDevAccess
+    const baseAccess = window.PiXiEEDDevAccess
       ? await window.PiXiEEDDevAccess.check()
-      : { allowed: false, authenticated: false, user: null, client: null };
+      : { authenticated: false, user: null, client: null };
+    const access = {
+      ...baseAccess,
+      allowed: Boolean(baseAccess.user?.email_confirmed_at),
+      authenticated: Boolean(baseAccess.user)
+    };
     const writeLocked = document.documentElement.dataset.pixieedMarketWrite === 'locked';
     if (writeLocked) {
       if (document.readyState === 'loading') {

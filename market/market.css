@@ -791,6 +791,11 @@ html[data-pixieed-ad-free-account="true"] .market-ad {
 .market-price-output { display: flex; min-height: 38px; box-sizing: border-box; padding: 8px 10px; align-items: center; border: 1px solid rgba(255,255,255,.1); border-radius: 6px; background: rgba(8,14,28,.45); color: #7ef0c7; font-size: 14px; }
 .market-minimum-price { display: grid; align-content: center; gap: 2px; min-height: 64px; padding: 8px 10px; box-sizing: border-box; border: 1px solid rgba(94,226,181,.2); border-radius: 7px; background: rgba(23,107,85,.12); }
 .market-minimum-price span, .market-minimum-price small { color: #94a3b8; font-size: 9px; }
+.market-payout-dialog { width: min(440px, calc(100vw - 32px)); border: 1px solid rgba(94,226,181,.35); border-radius: 14px; color: #e7f5ef; background: #10241d; box-shadow: 0 24px 70px rgba(0,0,0,.6); }
+.market-payout-dialog::backdrop { background: rgba(2,9,7,.72); }
+.market-payout-dialog__amounts { display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; margin: 16px 0; }
+.market-payout-dialog__amounts dt { color: #cbd5e1; }.market-payout-dialog__amounts dd { margin: 0; text-align: right; font-weight: 700; }.market-payout-dialog__amounts dd.is-net { color: #7ef0c7; font-size: 18px; }
+.market-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 .market-minimum-price strong { color: #7ef0c7; font-size: 16px; }
 .market-preview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 7px; margin-bottom: 10px; }
 .market-preview-card { display: grid; min-width: 0; overflow: hidden; border: 1px solid rgba(255,255,255,.1); border-radius: 7px; background: #0b1224; }

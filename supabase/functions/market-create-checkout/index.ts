@@ -72,15 +72,6 @@ serve(async (request) => {
 
     const asset = Array.isArray(purchase.asset) ? purchase.asset[0] : purchase.asset;
     if (!asset || asset.status !== "published") throw new Error("この商品は現在購入できません");
-    const { data: sellerPayout, error: sellerPayoutError } = await admin
-      .from("market_seller_payout_accounts")
-      .select("onboarding_status,payouts_enabled")
-      .eq("user_id", asset.creator_user_id)
-      .maybeSingle();
-    if (sellerPayoutError) throw sellerPayoutError;
-    if (sellerPayout?.onboarding_status !== "verified" || !sellerPayout?.payouts_enabled) {
-      throw new Error("販売者の売上受取設定を確認できないため、現在購入できません");
-    }
     const expiresAt = Math.max(Math.floor(Date.now() / 1000) + 1800, Math.floor(new Date(purchase.expires_at).getTime() / 1000));
     const base = siteUrl();
     const params = new URLSearchParams();

@@ -752,17 +752,13 @@
       if (!access?.allowed || !access.client || !access.user) return;
       client = access.client;
       const user = access.user;
-      const { data: seller } = await client.from('market_seller_profiles').select('seller_status,identity_status,terms_accepted_at').maybeSingle();
-      if (!(seller?.seller_status === 'verified' && seller?.identity_status === 'verified' && seller?.terms_accepted_at)) {
-        gate.innerHTML = '出品送信には販売者登録とStripeの売上受取設定が必要です。<a href="seller.html">販売者登録へ</a>'; return;
-      }
       const { data: canSell } = await client.rpc('market_current_user_can_sell');
-      if (!canSell) { gate.innerHTML = '出品送信には二段階認証が必要です。<a href="seller.html">二段階認証へ</a>'; return; }
+      if (!canSell) { gate.innerHTML = '出品送信にはメール確認済みのログインが必要です。<a href="../account/index.html">ログイン・確認へ</a>'; return; }
       const { data: options, error: optionError } = await client.from('market_license_options').select('id,label,description,minimum_price_yen,sort_order').eq('active', true).order('sort_order');
       if (optionError) throw optionError;
       optionCatalog = options || FALLBACK_OPTIONS; signedInUser = user;
       if (derivativeModeRequested) await loadDerivativeContext();
-      renderOptions(); renderOptionPriceFields(); updatePrice(); gate.hidden = true; setSubmissionEnabled(true);
+      renderOptions(); renderOptionPriceFields(); updatePrice(); gate.textContent = '商品を作成して審査へ送れます。売上受取設定は、確定済み残高が5,000円以上になる前に完了してください。'; setSubmissionEnabled(true);
     } catch (error) {
       gate.textContent = `ファイルと価格の画面内確認は利用できますが、出品接続を開始できませんでした: ${error.message || '時間をおいて再試行してください'}`;
     }

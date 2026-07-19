@@ -57,13 +57,14 @@ function runController({ remoteDisabled = false, loggedOut = false, cachedDisabl
       checkedAt: Date.now()
     }));
   }
-  const window = { addEventListener() {} };
+  const window = { addEventListener() {}, location: { href: 'https://pixieed.jp/' } };
   const context = vm.createContext({
     atob: (value) => Buffer.from(value, 'base64').toString('binary'),
     CustomEvent: class CustomEvent {},
     Document: FakeDocument,
     document,
     Element: FakeElement,
+    HTMLElement: FakeElement,
     fetch: async (url, options) => {
       fetchCalls.push({ url, options });
       return { ok: true, json: async () => remoteDisabled };
@@ -74,6 +75,7 @@ function runController({ remoteDisabled = false, loggedOut = false, cachedDisabl
     },
     MutationObserver: FakeMutationObserver,
     Promise,
+    URL,
     window,
   });
   vm.runInContext(source, context);

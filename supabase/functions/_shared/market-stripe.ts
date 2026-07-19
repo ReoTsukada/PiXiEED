@@ -2,8 +2,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.46.1";
 
 export type JsonRecord = Record<string, unknown>;
 
-const MARKET_DEV_EMAIL_SHA256 = "a72a00cf6492cb03cb9425327c8368ea4e1ed079388a270260e43cba004fc1df";
-export const MARKET_LISTING_ENABLED = false;
+export const MARKET_LISTING_ENABLED = true;
 
 const ALLOWED_ORIGINS = new Set([
   "https://pixieed.jp",
@@ -79,8 +78,8 @@ async function sha256Text(value: string): Promise<string> {
 
 export async function requireMarketDevUser(request: Request) {
   const auth = await requireUser(request);
-  if (!auth.user.email || !auth.user.email_confirmed_at || await sha256Text(auth.user.email) !== MARKET_DEV_EMAIL_SHA256) {
-    throw new Error("market DEV access required");
+  if (!auth.user.email || !auth.user.email_confirmed_at) {
+    throw new Error("confirmed login required");
   }
   return auth;
 }

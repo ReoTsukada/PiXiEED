@@ -1141,7 +1141,7 @@
       <ins class="adsbygoogle"
            style="display:block"
            data-ad-client="ca-pub-9801602250480253"
-           data-ad-slot="rotate"></ins>
+           data-ad-slot="9073878884"></ins>
     `;
     document.body.appendChild(footer);
 

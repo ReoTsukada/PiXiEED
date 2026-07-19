@@ -80,8 +80,15 @@
     const loaded = window.PiXiEEDAdAccountControl
       ? await window.PiXiEEDAdAccountControl.loadAdsense()
       : false;
-    if (!loaded || adsDisabled() || !slot.isConnected || slot.getBoundingClientRect().width < 1) return;
+    if (!loaded) {
+      slot.dataset.adsScriptBlocked = '1';
+      window.PiXiEEDAdAccountControl?.syncAdFallback?.(slot);
+      return;
+    }
+    if (adsDisabled() || !slot.isConnected || slot.getBoundingClientRect().width < 1) return;
 
+    delete slot.dataset.adsScriptBlocked;
+    slot.dataset.adsRequestState = 'requested';
     slot.dataset.marketAdPushed = 'true';
     stopResizeObserver(slot);
     try {
@@ -89,6 +96,8 @@
       window.adsbygoogle.push({});
     } catch (_error) {
       delete slot.dataset.marketAdPushed;
+      slot.dataset.adsRequestState = 'push-failed';
+      window.PiXiEEDAdAccountControl?.syncAdFallback?.(slot);
     }
   }
 
@@ -131,8 +140,19 @@
     const disabled = event.detail?.disabled === true;
     document.querySelectorAll('[data-market-ad-slot]').forEach((wrapper) => {
       wrapper.hidden = disabled;
-      if (!disabled) observe(wrapper);
+      if (!disabled) {
+        if (observedSlots.has(wrapper)) renderSlot(wrapper);
+        else observe(wrapper);
+      }
     });
+  });
+
+  window.addEventListener('online', () => {
+    document.querySelectorAll('[data-market-ad-slot]').forEach((wrapper) => renderSlot(wrapper));
+  });
+
+  window.addEventListener('pageshow', () => {
+    document.querySelectorAll('[data-market-ad-slot]').forEach((wrapper) => renderSlot(wrapper));
   });
 
   window.PiXiEEDMarketAds = Object.freeze({ createListAd, showDetailAd });

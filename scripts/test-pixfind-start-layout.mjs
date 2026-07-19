@@ -9,12 +9,13 @@ const app = fs.readFileSync(path.join(root, 'pixfind/app.js'), 'utf8');
 
 assert.match(html, /<body data-pixfind-screen="start">/);
 assert.match(html, /styles\.css\?v=2026\.07\.19-market-grid3/);
-assert.match(html, /app\.js\?v=2026\.07\.19-market-grid3/);
+assert.match(html, /app\.js\?v=2026\.07\.19-market-grid4/);
 assert.doesNotMatch(html, />他のゲーム・ツール<\/a>/);
 assert.doesNotMatch(html, /class="(?:start-ad|difficulty-ad|game-ad)"/);
 
 assert.match(app, /document\.body\.dataset\.pixfindScreen = target/);
-assert.match(app, /idx === 7 && official\.length >= 8/);
+assert.match(app, /\(idx \+ 1\) % 8 === 0/);
+assert.doesNotMatch(app, /idx === 7/);
 assert.match(app, /function createPuzzleListAd\(\)/);
 assert.match(app, /data-ad-format="auto"/);
 assert.match(app, /data-full-width-responsive="true"/);

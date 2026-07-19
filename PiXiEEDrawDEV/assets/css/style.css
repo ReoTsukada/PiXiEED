@@ -576,6 +576,7 @@ button {
   height: 18px;
   display: block;
   object-fit: contain;
+  image-rendering: pixelated;
   filter: none;
 }
 
@@ -4866,6 +4867,10 @@ body.is-rail-resizing * {
   height: var(--canvas-control-icon-size);
 }
 
+.canvas-controls .chip img {
+  image-rendering: pixelated;
+}
+
 .canvas-controls .chip:where([data-action='copy'], [data-action='paste'], [data-action='cut'], [data-action='cancelSelectionMove'], [data-action='confirmSelectionMove']) {
   font-size: 11px;
   letter-spacing: 0.01em;
@@ -9113,8 +9118,22 @@ body.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data
   margin-top: auto;
 }
 
-/* AdSense marks a final no-fill response on the ins node.  Do not leave the
-   panel-sized iframe shell behind when that happens. */
+/* Keep the measured host when a PiXiEED fallback replaces an unfilled ad. */
+.panel-ad.is-ad-unfilled-reserved ins,
+.export-ad.is-ad-unfilled-reserved ins,
+.startup-recent-card--ad.is-ad-unfilled-reserved ins,
+.pixieed-shared-top-ad.is-ad-unfilled-reserved ins,
+.ad-block.is-ad-unfilled-reserved ins,
+.panel-ad.is-ad-unfilled-reserved iframe,
+.export-ad.is-ad-unfilled-reserved iframe,
+.startup-recent-card--ad.is-ad-unfilled-reserved iframe,
+.pixieed-shared-top-ad.is-ad-unfilled-reserved iframe,
+.ad-block.is-ad-unfilled-reserved iframe {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Placements without a fallback or explicit reservation still collapse. */
 .panel-ad.is-ad-unfilled,
 .panel-ad-mount.is-ad-unfilled,
 .export-ad.is-ad-unfilled,

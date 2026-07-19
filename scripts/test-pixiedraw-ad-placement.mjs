@@ -44,7 +44,8 @@ assert.match(sharedTopAd, /data-ad-slot="2141591954"/);
 assert.match(sharedTabBar, /pixieed-common-details__ad[\s\S]*data-ad-slot="4859859838"/);
 
 assert.doesNotMatch(recentProjects, /PiXiEEDを支援|Supports PiXiEED/);
-assert.match(recentProjects, /index === 3/);
+assert.match(recentProjects, /\(index \+ 1\) % 8 === 0/);
+assert.doesNotMatch(recentProjects, /index === 3/);
 assert.match(recentProjects, /startup-recent-ad/);
 assert.match(recentProjects, /data-full-width-responsive', 'true'/);
 

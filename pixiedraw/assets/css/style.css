@@ -576,6 +576,7 @@ button {
   height: 18px;
   display: block;
   object-fit: contain;
+  image-rendering: pixelated;
   filter: none;
 }
 
@@ -4864,6 +4865,10 @@ body.is-rail-resizing * {
 .canvas-controls .chip svg {
   width: var(--canvas-control-icon-size);
   height: var(--canvas-control-icon-size);
+}
+
+.canvas-controls .chip img {
+  image-rendering: pixelated;
 }
 
 .canvas-controls .chip:where([data-action='copy'], [data-action='paste'], [data-action='cut'], [data-action='cancelSelectionMove'], [data-action='confirmSelectionMove']) {

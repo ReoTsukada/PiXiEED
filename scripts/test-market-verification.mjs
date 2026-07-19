@@ -130,7 +130,7 @@ for (const pagePath of ['market/index.html', 'market/item.html', 'market/about.h
 for (const pagePath of ['market/sell.html', 'market/seller.html']) {
   const page = fs.readFileSync(pagePath, 'utf8');
   assert.match(page, /data-pixieed-market-access="pending"/);
-  assert.match(page, /data-pixieed-market-write="locked"/);
+  assert.doesNotMatch(page, /data-pixieed-market-write="locked"/);
   assert.match(page, /pixieed-dev-access\.js/);
   assert.match(page, /dev-gate\.js/);
   assert.match(page, /noindex,nofollow/);
@@ -295,7 +295,7 @@ assert.match(sharedMarketFunction, /email_confirmed_at/);
 assert.match(checkoutFunction, /requireMarketDevUser/);
 assert.match(secureDeliveryFunction, /requireMarketDevUser/);
 assert.match(stripeConnectFunction, /requireMarketDevUser/);
-assert.match(sharedMarketFunction, /MARKET_LISTING_ENABLED = false/);
+assert.match(sharedMarketFunction, /MARKET_LISTING_ENABLED = true/);
 assert.match(stripeConnectFunction, /if \(!MARKET_LISTING_ENABLED\)/);
 assert.match(accountHtml, /id="accountDevTools"[\s\S]*data-market-dev-only/);
 assert.match(accountHtml, /id="accountAdminTools"[\s\S]*data-market-admin-only/);
@@ -336,8 +336,8 @@ assert.match(privacyHtml, /AI使用申告/);
 assert.match(privacyHtml, /最終改定日：2026年7月19日/);
 assert.match(sharedNav, /key: 'market'[\s\S]*path: 'market\/index\.html'/);
 assert.match(sitemap, /pixieed\.jp\/market\//);
-assert.match(marketIndexHtml, /出品準備中/);
-assert.doesNotMatch(marketIndexHtml, /href="sell\.html"/);
+assert.match(marketIndexHtml, /href="sell\.html"/);
+assert.doesNotMatch(marketIndexHtml, /出品準備中/);
 assert.match(marketUi, /PiXiEEDDevAccess/);
 assert.match(marketUi, /rpc\('market_public_catalog_v1'/);
 assert.doesNotMatch(marketUi, /from\('market_assets'\)/);

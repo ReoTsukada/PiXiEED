@@ -70,7 +70,7 @@ using (
 );
 
 create or replace function public.market_next_stripe_payout_batch_v1(
-  input_minimum_yen integer default 1000
+  input_minimum_yen integer default 5000
 )
 returns jsonb
 language plpgsql
