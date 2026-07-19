@@ -7,6 +7,8 @@
   const MAX_DETECTION_COUNT = 300;
   const MAX_TOTAL_BYTES = 50 * 1024 * 1024;
   const MAX_SAMPLE_PREVIEWS = 6;
+  const LISTING_DRAFT_DB = 'pixieed-market-listing-drafts';
+  const LISTING_DRAFT_STORE = 'drafts';
   const MARKET_TERMS_VERSION = '2026-07-19';
   const MARKET_PRIVACY_VERSION = '2026-07-19';
   const packageUtils = window.PiXiEEDMarketPackage;
@@ -53,6 +55,9 @@
   let signedInUser = null;
   let submissionEnabled = false;
   let derivativeContext = null;
+  let listingDraftKey = '';
+  let listingDraftLoaded = false;
+  let listingDraftSaveTimer = 0;
 
   const setStatus = (value) => { status.textContent = value || ''; };
   const yen = (value) => `${Number(value || 0).toLocaleString('ja-JP')}円`;
@@ -73,6 +78,106 @@
   const isPreviewable = (entry) => entry && Boolean(entry.format) && (
     entry.format !== 'pixiedraw-project' || entry.previewBlob instanceof Blob
   );
+
+  function openListingDraftDatabase() {
+    return new Promise((resolve, reject) => {
+      if (!window.indexedDB) { reject(new Error('このブラウザでは端末保存を利用できません')); return; }
+      const request = window.indexedDB.open(LISTING_DRAFT_DB, 1);
+      request.onupgradeneeded = () => request.result.createObjectStore(LISTING_DRAFT_STORE, { keyPath: 'key' });
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error || new Error('端末保存を開けませんでした'));
+    });
+  }
+
+  async function readListingDraft() {
+    if (!listingDraftKey) return null;
+    const database = await openListingDraftDatabase();
+    try {
+      return await new Promise((resolve, reject) => {
+        const request = database.transaction(LISTING_DRAFT_STORE, 'readonly').objectStore(LISTING_DRAFT_STORE).get(listingDraftKey);
+        request.onsuccess = () => resolve(request.result || null);
+        request.onerror = () => reject(request.error || new Error('端末保存を読み込めませんでした'));
+      });
+    } finally { database.close(); }
+  }
+
+  function listingDraftSnapshot() {
+    const fields = ['listingTitle', 'listingDescription', 'listingTags', 'listingPrice', 'listingLimitedQuantity', 'listingChangeSummary'];
+    const values = Object.fromEntries(fields.map((id) => [id, $(id)?.value || '']));
+    return {
+      key: listingDraftKey,
+      savedAt: Date.now(),
+      values,
+      checks: Object.fromEntries(['listingLimitedEnabled', 'listingDerivativeAllowed', 'listingTermsConfirmed', 'listingPrivacyConfirmed', 'listingRights']
+        .map((id) => [id, Boolean($(id)?.checked)])),
+      aiUsage: form.querySelector('input[name="listingAiUsage"]:checked')?.value || '',
+      files: Array.from(sourceFiles.entries()).map(([path, file]) => ({ path, file })),
+      selectedFormats: Array.from(selectedFormats),
+      dismissedFormats: Array.from(dismissedFormats),
+      selectedOptionIds: Array.from(selectedOptionIds),
+      optionPrices: Array.from(optionPrices.entries()),
+      thumbnailPath,
+      samplePreviewPaths: Array.from(samplePreviewPaths),
+      previewSelectionTouched
+    };
+  }
+
+  async function saveListingDraft() {
+    if (!listingDraftLoaded || !listingDraftKey) return;
+    const database = await openListingDraftDatabase();
+    try {
+      await new Promise((resolve, reject) => {
+        const request = database.transaction(LISTING_DRAFT_STORE, 'readwrite').objectStore(LISTING_DRAFT_STORE).put(listingDraftSnapshot());
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error || new Error('端末保存に失敗しました'));
+      });
+    } finally { database.close(); }
+  }
+
+  function scheduleListingDraftSave() {
+    if (!listingDraftLoaded || !listingDraftKey) return;
+    window.clearTimeout(listingDraftSaveTimer);
+    listingDraftSaveTimer = window.setTimeout(() => {
+      saveListingDraft().catch(() => {});
+    }, 350);
+  }
+
+  async function deleteListingDraft() {
+    window.clearTimeout(listingDraftSaveTimer);
+    if (!listingDraftKey) return;
+    const database = await openListingDraftDatabase();
+    try {
+      await new Promise((resolve, reject) => {
+        const request = database.transaction(LISTING_DRAFT_STORE, 'readwrite').objectStore(LISTING_DRAFT_STORE).delete(listingDraftKey);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error || new Error('端末保存を削除できませんでした'));
+      });
+    } finally { database.close(); }
+  }
+
+  async function restoreListingDraft() {
+    let draft;
+    try { draft = await readListingDraft(); } catch (error) { return; }
+    if (!draft) { listingDraftLoaded = true; return; }
+    const values = draft.values || {};
+    Object.entries(values).forEach(([id, value]) => { if ($(id)) $(id).value = String(value ?? ''); });
+    Object.entries(draft.checks || {}).forEach(([id, checked]) => { if ($(id)) $(id).checked = Boolean(checked); });
+    const aiUsage = form.querySelector(`input[name="listingAiUsage"][value="${draft.aiUsage}"]`);
+    if (aiUsage) aiUsage.checked = true;
+    sourceFiles.clear();
+    (draft.files || []).forEach(({ path, file }) => { if (file instanceof File) sourceFiles.set(path || filePath(file), file); });
+    selectedFormats.clear(); (draft.selectedFormats || []).forEach((value) => selectedFormats.add(value));
+    dismissedFormats.clear(); (draft.dismissedFormats || []).forEach((value) => dismissedFormats.add(value));
+    selectedOptionIds.clear(); (draft.selectedOptionIds || []).forEach((value) => selectedOptionIds.add(value));
+    optionPrices.clear(); (draft.optionPrices || []).forEach(([id, value]) => optionPrices.set(id, Number(value)));
+    thumbnailPath = String(draft.thumbnailPath || '');
+    samplePreviewPaths.clear(); (draft.samplePreviewPaths || []).forEach((value) => samplePreviewPaths.add(value));
+    previewSelectionTouched = Boolean(draft.previewSelectionTouched);
+    updateLimitedState(); renderOptions(); renderOptionPriceFields(); updatePrice();
+    await refreshDetectedFiles();
+    listingDraftLoaded = true;
+    setStatus('端末に保存された出品下書きを復元しました。');
+  }
 
   function setSubmissionEnabled(enabled, label) {
     submissionEnabled = enabled;
@@ -188,7 +293,7 @@
       checked: selectedOptionIds.has(option.id),
       onChange: (checked) => {
         if (checked) selectedOptionIds.add(option.id); else selectedOptionIds.delete(option.id);
-        renderOptionPriceFields(); updatePrice();
+        renderOptionPriceFields(); updatePrice(); scheduleListingDraftSave();
       }
     })));
   }
@@ -209,7 +314,7 @@
         const value = Number(input.value);
         if (Number.isInteger(value)) optionPrices.set(option.id, value);
         input.setCustomValidity(Number.isInteger(value) && value >= option.minimum_price_yen ? '' : `${option.minimum_price_yen}円以上で設定してください。`);
-        updatePrice();
+        updatePrice(); scheduleListingDraftSave();
       });
       input.addEventListener('change', () => { renderOptions(); renderOptionPriceFields(); updatePrice(); });
       label.append(title, minimum, input); return label;
@@ -299,7 +404,7 @@
       const name = document.createElement('div'); name.className = 'market-preview-card__name'; name.textContent = entry.path;
       const thumbnail = document.createElement('label'); thumbnail.className = 'market-preview-choice';
       const thumbnailInput = document.createElement('input'); thumbnailInput.type = 'radio'; thumbnailInput.name = 'listingThumbnail'; thumbnailInput.checked = thumbnailPath === entry.path; thumbnailInput.disabled = !active;
-      thumbnailInput.addEventListener('change', () => { thumbnailPath = entry.path; renderPreviews(); });
+      thumbnailInput.addEventListener('change', () => { thumbnailPath = entry.path; renderPreviews(); scheduleListingDraftSave(); });
       thumbnail.append(thumbnailInput, document.createTextNode('サムネイル'));
       const sample = document.createElement('label'); sample.className = 'market-preview-choice';
       const sampleInput = document.createElement('input'); sampleInput.type = 'checkbox'; sampleInput.checked = samplePreviewPaths.has(entry.path); sampleInput.disabled = !active;
@@ -309,7 +414,7 @@
           sampleInput.checked = false; setStatus(`試し見せは${MAX_SAMPLE_PREVIEWS}枚までです。`); return;
         }
         if (sampleInput.checked) samplePreviewPaths.add(entry.path); else samplePreviewPaths.delete(entry.path);
-        renderPreviews();
+        renderPreviews(); scheduleListingDraftSave();
       });
       sample.append(sampleInput, document.createTextNode('試し見せに含める'));
       body.append(name, thumbnail, sample); card.append(imageButton, body); return card;
@@ -327,7 +432,7 @@
       onChange: (checked) => {
         if (checked) { selectedFormats.add(format); dismissedFormats.delete(format); }
         else { selectedFormats.delete(format); dismissedFormats.add(format); }
-        updateProductType(); renderFiles(); renderPreviews();
+        updateProductType(); renderFiles(); renderPreviews(); scheduleListingDraftSave();
       }
     })));
     if (!formats.length) {
@@ -390,7 +495,7 @@
       normalized.forEach(({ file, path }) => sourceFiles.delete(path || filePath(file)));
       setStatus(`一度に判定できるファイルは${MAX_DETECTION_COUNT}件までです。`); return;
     }
-    await refreshDetectedFiles();
+    await refreshDetectedFiles(); scheduleListingDraftSave();
   }
 
   function readDirectoryEntries(reader) {
@@ -442,7 +547,7 @@
     selectedFormats.clear(); dismissedFormats.clear(); samplePreviewPaths.clear(); previewSelectionTouched = false;
     detectionRun += 1;
     previewUrls.forEach((url) => URL.revokeObjectURL(url)); previewUrls.clear();
-    renderFormats(); setStatus('');
+    renderFormats(); setStatus(''); scheduleListingDraftSave();
   }
 
   const safeSegment = (value) => {
@@ -536,9 +641,11 @@
     $('listingChooseFiles').addEventListener('click', () => { closeSourceDialog(); $('listingFiles').click(); });
     $('listingChooseFolder').addEventListener('click', () => { closeSourceDialog(); $('listingFolder').click(); });
     $('listingFilesClear').addEventListener('click', clearFiles);
-    $('listingPrice').addEventListener('input', updatePrice);
-    $('listingLimitedEnabled').addEventListener('change', updateLimitedState);
-    $('listingLimitedQuantity').addEventListener('input', updatePrice);
+    $('listingPrice').addEventListener('input', () => { updatePrice(); scheduleListingDraftSave(); });
+    $('listingLimitedEnabled').addEventListener('change', () => { updateLimitedState(); scheduleListingDraftSave(); });
+    $('listingLimitedQuantity').addEventListener('input', () => { updatePrice(); scheduleListingDraftSave(); });
+    form.addEventListener('input', scheduleListingDraftSave);
+    form.addEventListener('change', scheduleListingDraftSave);
     const dropZone = $('listingDropZone');
     dropZone.addEventListener('click', openSourceDialog);
     dropZone.addEventListener('keydown', (event) => {
@@ -750,6 +857,7 @@
 
       form.reset(); clearFiles(); selectedOptionIds.clear(); optionPrices.clear();
       renderOptions(); renderOptionPriceFields(); updateLimitedState(); uploadedPaths = [];
+      await deleteListingDraft();
       setStatus(aiUsageStatus === 'used' || derivativeContext
         ? '出品を審査へ送りました。確認後に公開されます。'
         : '出品を公開しました。');
@@ -777,7 +885,9 @@
       if (optionError) throw optionError;
       optionCatalog = options || FALLBACK_OPTIONS; signedInUser = user;
       if (derivativeModeRequested) await loadDerivativeContext();
-      renderOptions(); renderOptionPriceFields(); updatePrice(); gate.textContent = '商品を作成して審査へ送れます。売上受取設定は、確定済み残高が5,000円以上になる前に完了してください。'; setSubmissionEnabled(true);
+      listingDraftKey = `v1:${signedInUser.id}:${derivativeModeRequested ? `${sourceAssetId}:${derivativeLicenseId}` : 'root'}`;
+      await restoreListingDraft();
+      renderOptions(); renderOptionPriceFields(); updatePrice(); gate.textContent = '商品を作成して審査へ送れます。入力内容とファイルはこの端末に自動保存されます。'; setSubmissionEnabled(true);
     } catch (error) {
       gate.textContent = `ファイルと価格の画面内確認は利用できますが、出品接続を開始できませんでした: ${error.message || '時間をおいて再試行してください'}`;
     }
