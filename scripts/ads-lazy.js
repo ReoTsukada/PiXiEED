@@ -35,14 +35,17 @@
       });
     }
     const existing = document.querySelector('script[src*="pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"]');
-    if (existing?.dataset.pixieedReady === '1') {
+    if (existing && (window.__PIXIEED_ADSENSE_SCRIPT_READY__ === true
+      || window.adsbygoogle?.loaded === true
+      || document.querySelector('ins.adsbygoogle[data-adsbygoogle-status="done"]'))) {
+      window.__PIXIEED_ADSENSE_SCRIPT_READY__ = true;
       return Promise.resolve();
     }
     if (adsScriptPromise) return adsScriptPromise;
     adsScriptPromise = new Promise((resolve, reject) => {
       const script = existing || document.createElement('script');
       const handleLoad = () => {
-        script.dataset.pixieedReady = '1';
+        window.__PIXIEED_ADSENSE_SCRIPT_READY__ = true;
         resolve();
       };
       const handleError = () => {
