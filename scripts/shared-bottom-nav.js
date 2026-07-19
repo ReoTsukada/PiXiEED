@@ -62,7 +62,7 @@
     const controller = doc.createElement('script');
     controller.defer = true;
     controller.dataset.pixieedFooterAdController = 'true';
-    controller.src = relHref('scripts/bottom-nav-footer-ad.js?v=2026.07.19-ad-lifecycle1');
+    controller.src = relHref('scripts/bottom-nav-footer-ad.js?v=20260719-shared-top-resume1');
     doc.body.appendChild(controller);
   }
 
@@ -80,7 +80,7 @@
     const controller = doc.createElement('script');
     controller.async = false;
     controller.dataset.pixieedAdAccountControl = 'true';
-    controller.src = relHref('scripts/ad-account-control.js?v=2026.07.19-ad-lifecycle1');
+    controller.src = relHref('scripts/ad-account-control.js?v=20260719-adsense-script-state1');
     controller.addEventListener('load', ready, { once: true });
     controller.addEventListener('error', ready, { once: true });
     doc.head.appendChild(controller);
