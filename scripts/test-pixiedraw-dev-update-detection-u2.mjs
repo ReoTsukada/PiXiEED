@@ -50,7 +50,7 @@ function createResponse(manifest, status = 200) {
   return { ok: status >= 200 && status < 300, status, json: async () => manifest };
 }
 
-function createHarness({ fetchImpl, online = true } = {}) {
+function createHarness({ fetchImpl, online = true, protocol = 'https:' } = {}) {
   const notices = new Map();
   const fakeDocument = {
     getElementById(id) {
@@ -59,6 +59,7 @@ function createHarness({ fetchImpl, online = true } = {}) {
     },
   };
   const fakeWindow = {
+    location: { protocol },
     navigator: { onLine: online },
     setTimeout,
     clearTimeout,
@@ -153,6 +154,16 @@ assert.equal(status.reason, 'timeout');
 detector = createHarness({ fetchImpl: async () => createResponse(baseManifest), online: false });
 status = await detector.check({ force: true });
 assert.equal(status.status, 'offline');
+
+let fileFetchCount = 0;
+detector = createHarness({
+  protocol: 'file:',
+  fetchImpl: async () => { fileFetchCount += 1; return createResponse(baseManifest); },
+});
+status = await detector.check({ force: true });
+assert.equal(status.status, 'unavailable');
+assert.equal(status.reason, 'unsupported-protocol');
+assert.equal(fileFetchCount, 0, 'file:// must not fetch version.json');
 
 let fetchCount = 0;
 let resolveFetch;
