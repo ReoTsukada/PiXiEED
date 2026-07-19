@@ -5,6 +5,7 @@
   const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
   const grid = document.getElementById('marketGrid');
   const count = document.getElementById('marketCount');
+  const sellButton = document.getElementById('marketSellButton');
   const search = document.getElementById('marketSearch');
   const filters = document.getElementById('marketFilters');
   const sort = document.getElementById('marketSort');
@@ -154,6 +155,7 @@
     const access = window.PiXiEEDDevAccess
       ? await window.PiXiEEDDevAccess.check()
       : { allowed: false, client: null };
+    if (sellButton) sellButton.hidden = access.allowed !== true;
     if (!access.client) {
       renderEmpty('マーケットを読み込めませんでした', '通信状態を確認して再読み込みしてください。');
       return;
