@@ -3008,6 +3008,31 @@ body:has(.home-app) .home-hero-slide__copy{
 body:has(.home-app) .home-hero-tags{
   justify-content:center;
 }
+/* Keep the hero copy in the intentionally open, dark area at the left.
+   The position stays the same at every viewport size and avoids the artwork
+   and characters concentrated through the centre and right of the image. */
+body:has(.home-app) .home-hero-slide__content{
+  place-items:end start;
+  padding:clamp(16px, 3vw, 38px);
+  text-align:left;
+}
+body:has(.home-app) .home-hero-surface{
+  width:min(430px, 42%);
+  max-width:430px;
+  margin-inline:0;
+  justify-items:start;
+}
+body:has(.home-app) .home-hero-slide__title{
+  justify-items:start;
+}
+body:has(.home-app) .home-hero-slide__copy{
+  max-width:38ch;
+  text-align:left;
+}
+body:has(.home-app) .home-hero-tags{
+  display:flex;
+  justify-content:flex-start;
+}
 @media (orientation:landscape){
   body:has(.home-app) .home-app,
   body:has(.home-app) .home-screen,
@@ -3024,9 +3049,16 @@ body:has(.home-app) .home-hero-tags{
     aspect-ratio:auto;
   }
 }
+/* The home no longer has a desktop sidebar. Keep this after the 1180px
+   desktop-grid rule so a phantom second column cannot shift the content. */
+@media (min-width:1180px){
+  body:has(.home-app) .home-desktop-grid--single{
+    grid-template-columns:minmax(0, 1fr);
+  }
+}
 @media (max-width:720px){
   body:has(.home-app) .home-hero-surface{
-    width:min(100%, 290px);
+    width:min(260px, 76%);
   }
   body:has(.home-app) .home-hero-slide__title{
     font-size:24px;
