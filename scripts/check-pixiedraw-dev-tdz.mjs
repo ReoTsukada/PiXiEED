@@ -3168,6 +3168,7 @@ requireInjectedGetter('timelineLayers', 'TIMELINE_CELL_SIZE');
   'upsertSharedRecentProjectEntry',
   'waitForSharedOpenRetry',
   'clamp',
+  'createProjectCanvasDocument',
   'enforceMobileSpectatorTabLock',
   'updateExportFormatAvailability',
   'updateExportOriginalToggleUI',
