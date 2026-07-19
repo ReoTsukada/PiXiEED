@@ -110,8 +110,7 @@ assert.doesNotMatch(source, /rgaydm03|3917bf57/i, 'an administrator identity mus
 assert.match(source, /site_current_user_ad_free/);
 assert.match(source, /loadAdsense/);
 assert.match(source, /__PIXIEED_DISABLE_AUTO_ADS__/);
-assert.match(source, /const projectFeedFrame = ins\.closest\('\.startup-recent-ad__frame'\)/);
-assert.match(source, /\.startup-recent-ad__frame > \.pixieed-ad-fallback\{position:absolute/);
-assert.doesNotMatch(source, /min-height:56px;height:100%;box-sizing:border-box/);
+assert.doesNotMatch(source, /pixieed-ad-fallback|PiXiEED内のおすすめ/);
+assert.doesNotMatch(source, /syncAdFallback|observeAdFallback|ensureAdFallback/);
 
 console.log('Ad account control guard passed.');
