@@ -42,7 +42,7 @@
       : { authenticated: false, user: null, client: null };
     const access = {
       ...baseAccess,
-      allowed: Boolean(baseAccess.user?.email_confirmed_at),
+      allowed: baseAccess.allowed === true,
       authenticated: Boolean(baseAccess.user)
     };
     const writeLocked = document.documentElement.dataset.pixieedMarketWrite === 'locked';
