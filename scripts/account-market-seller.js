@@ -46,8 +46,8 @@
 
   async function init() {
     try {
-      const devAccess = window.PiXiEEDDevAccess ? await window.PiXiEEDDevAccess.check() : null;
-      if (!devAccess?.allowed) return;
+      const marketAccess = window.PiXiEEDMarketAccess ? await window.PiXiEEDMarketAccess.check() : null;
+      if (!marketAccess?.client) return;
       const client = await waitForClient();
       if (!client) throw new Error('Supabase client unavailable');
       await render(client);

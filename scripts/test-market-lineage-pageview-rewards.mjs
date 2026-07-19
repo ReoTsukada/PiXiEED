@@ -33,7 +33,8 @@ assert.match(derivativeMigration, /the original package cannot be reposted uncha
 assert.match(tracker, /REQUIRED_VISIBLE_SECONDS = 10/);
 assert.match(tracker, /document\.visibilityState !== 'visible'/);
 assert.match(tracker, /document\.hasFocus\(\)/);
-assert.match(tracker, /asset\.local_test === true/);
+assert.doesNotMatch(tracker, /asset\.local_test === true/);
+assert.match(tracker, /PiXiEEDMarketAccess/);
 assert.match(tracker, /market_record_valid_pageview_v1/);
 assert.match(item, /PiXiEEDMarketPageviewRewards\?\.track/);
 assert.match(itemHtml, /pageview-rewards\.js/);

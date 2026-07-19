@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../site/landing.css?v=2026.07.15-home-clear-entry1">
-  <link rel="stylesheet" href="market.css?v=2026.07.19-derivative-only1">
+  <link rel="stylesheet" href="market.css?v=2026.07.19-public-market1">
 </head>
 <body>
   <header class="site-header" aria-label="トップナビ">
@@ -41,7 +41,7 @@
             <span class="market-help-tip__content" id="marketListHelp" role="tooltip">カードを開くと、価格、収録形式、利用範囲、派生販売の可否を確認できます。認証バッジは確認対象が異なるため、商品詳細と利用条件も必ず確認してください。</span>
           </span>
         </div>
-        <a class="market-sell-button" id="marketSellButton" href="sell.html" hidden>出品する</a>
+        <a class="market-sell-button" id="marketSellButton" href="sell.html">出品する</a>
       </section>
 
       <section class="market-toolbar" aria-label="素材を絞り込む">
@@ -78,10 +78,10 @@
               </select>
             </label>
             <label>最低価格
-              <input id="marketPriceMin" type="number" min="0" step="1" inputmode="numeric" placeholder="0">
+              <input id="marketPriceMin" type="text" inputmode="numeric" pattern="[0-9]*" list="marketPricePresets" placeholder="0">
             </label>
             <label>最高価格
-              <input id="marketPriceMax" type="number" min="0" step="1" inputmode="numeric" placeholder="上限なし">
+              <input id="marketPriceMax" type="text" inputmode="numeric" pattern="[0-9]*" list="marketPricePresets" placeholder="上限なし">
             </label>
             <button id="marketFilterReset" type="button">条件をリセット</button>
           </div>
@@ -103,13 +103,14 @@
     </main>
   </div>
 
+  <datalist id="marketPricePresets"><option value="500"><option value="1000"><option value="3000"><option value="5000"><option value="10000"><option value="30000"><option value="100000"><option value="1000000"><option value="99999999"></datalist>
+
   <script src="../scripts/ad-account-control.js?v=20260719-no-ad-fallback1"></script>
-  <script src="../scripts/pixieed-dev-access.js?v=2026.07.17-market-dev1"></script>
-  <script src="local-test-products.js?v=2026.07.17-public-read2"></script>
+  <script src="../scripts/pixieed-market-access.js?v=2026.07.19-public-market1"></script>
   <script src="favorites.js?v=2026.07.17-public-read2"></script>
   <script src="discovery-utils.js?v=2026.07.17-social1"></script>
   <script src="market-ads.js?v=2026.07.19-no-ad-fallback1"></script>
-  <script src="market.js?v=2026.07.19-listing-withdrawal1"></script>
+  <script src="market.js?v=2026.07.19-public-market1"></script>
   <script src="media-protection.js?v=2026.07.17-preview-protection1"></script>
   <script src="help-tips.js?v=2026.07.17-context-help1"></script>
   <script src="../scripts/shared-profile-header.js"></script>

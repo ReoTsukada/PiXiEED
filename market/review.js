@@ -99,9 +99,9 @@
   }
   async function init() {
     try {
-      const devAccess = window.PiXiEEDMarketDevAccess ? await window.PiXiEEDMarketDevAccess.ready : null;
-      if (!devAccess?.allowed || !devAccess.client) return;
-      client = devAccess.client;
+      const marketAccess = window.PiXiEEDMarketPageAccess ? await window.PiXiEEDMarketPageAccess.ready : null;
+      if (!marketAccess?.allowed || !marketAccess.client) return;
+      client = marketAccess.client;
       const { data: isAdmin, error: adminError } = await client.rpc('market_current_user_is_admin');
       if (adminError || !isAdmin) { access.textContent = 'この画面を利用する管理者権限がありません。'; return; }
       access.hidden = true; document.getElementById('listingReviewSection').hidden = false; await loadAll();

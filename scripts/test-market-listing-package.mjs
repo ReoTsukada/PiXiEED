@@ -55,7 +55,7 @@ const item = fs.readFileSync(new URL('../market/item.js', import.meta.url), 'utf
 const listingMigration = fs.readFileSync(new URL('../supabase/migrations/20260717140000_market_auto_formats_and_license_options.sql', import.meta.url), 'utf8');
 const sharedAd = fs.readFileSync(new URL('./bottom-nav-footer-ad.js', import.meta.url), 'utf8');
 assert.match(sell, /bindLocalUi\(\);\s*initRemote\(\);/);
-assert.match(sell, /PiXiEEDMarketDevAccess/);
+assert.match(sell, /PiXiEEDMarketPageAccess/);
 assert.match(sell, /access\?\.allowed/);
 assert.match(sell, /webkitGetAsEntry/);
 assert.match(sell, /getAsFileSystemHandle/);

@@ -251,8 +251,8 @@
 
   async function init() {
     try {
-      const devAccess = window.PiXiEEDDevAccess ? await window.PiXiEEDDevAccess.check() : null;
-      if (!devAccess?.allowed) return;
+      const marketAccess = window.PiXiEEDMarketAccess ? await window.PiXiEEDMarketAccess.check() : null;
+      if (!marketAccess?.client) return;
       let client = null;
       for (let attempt = 0; attempt < 50 && !client; attempt += 1) {
         client = window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT__ || null;

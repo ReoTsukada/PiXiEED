@@ -149,7 +149,7 @@
   }
   async function init() {
     try {
-      const access = window.PiXiEEDMarketDevAccess ? await window.PiXiEEDMarketDevAccess.ready : null;
+      const access = window.PiXiEEDMarketPageAccess ? await window.PiXiEEDMarketPageAccess.ready : null;
       if (!access?.allowed || !access.client || !access.user) return;
       client = access.client;
       $('sellerPageStatus').hidden = true; await prepareMfa();

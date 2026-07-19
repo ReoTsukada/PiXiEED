@@ -4,7 +4,7 @@ import {
   errorMessage,
   jsonResponse,
   readJson,
-  requireMarketDevUser,
+  requireMarketUser,
   stringArray,
   stringValue,
   type JsonRecord,
@@ -279,14 +279,14 @@ Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(request) });
   if (request.method !== "POST") return jsonResponse(request, { error: "method not allowed" }, 405);
   try {
-    const { user } = await requireMarketDevUser(request);
+    const { user } = await requireMarketUser(request);
     const body = await readJson(request);
     if (stringValue(body.action) === "library") return await loadLibrary(request, user.id);
     if (stringValue(body.action) === "authorize") return await authorizeDelivery(request, user.id, body);
     return jsonResponse(request, { error: "unknown action" }, 400);
   } catch (error) {
     const message = errorMessage(error, "購入済み素材を準備できませんでした");
-    const status = /DEV access/i.test(message) ? 403 : /login|required|confirmed/i.test(message) ? 401 : 500;
+    const status = /login|required|confirmed/i.test(message) ? 401 : 500;
     return jsonResponse(request, { error: message }, status);
   }
 });

@@ -4,7 +4,7 @@ import {
   errorMessage,
   jsonResponse,
   readJson,
-  requireMarketDevUser,
+  requireMarketUser,
   siteUrl,
   stringValue,
   stripeRequest,
@@ -17,7 +17,7 @@ serve(async (request) => {
   if (request.method !== "POST") return jsonResponse(request, { ok: false, error: "method not allowed" }, 405);
 
   try {
-    const { client, user } = await requireMarketDevUser(request);
+    const { client, user } = await requireMarketUser(request);
     const body = await readJson(request);
     const assetId = stringValue(body.asset_id);
     if (!UUID_PATTERN.test(assetId)) return jsonResponse(request, { ok: false, error: "商品を特定できません。" }, 400);

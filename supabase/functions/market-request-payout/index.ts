@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import {
-  createAdminClient, errorMessage, jsonResponse, requireMarketDevUser,
+  createAdminClient, errorMessage, jsonResponse, requireMarketUser,
   stringValue, stripeRequest,
 } from "../_shared/market-stripe.ts";
 
@@ -13,7 +13,7 @@ serve(async (request) => {
   let requestId = "";
   let transferFinalized = false;
   try {
-    const { client } = await requireMarketDevUser(request);
+    const { client } = await requireMarketUser(request);
     const { data: requested, error: requestError } = await client.rpc("market_request_stripe_payout_v1", {
       input_minimum_yen: MINIMUM_YEN,
     });

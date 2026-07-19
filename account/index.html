@@ -482,15 +482,6 @@
             <p class="helper">作品系列の有効表示から確定した月別報酬です。</p>
             <div class="account-reward-history" id="accountPageviewRewardMonths" aria-live="polite"></div>
           </section>
-          <section class="account-panel" id="accountDevTools" data-account-tab="settings" data-market-dev-only hidden>
-            <div class="account-panel__head">
-              <h2 class="section-title">マーケットDEV</h2>
-              <span class="account-chip">DEV限定</span>
-            </div>
-            <div class="account-service-grid">
-              <a class="account-service" href="../market/index.html"><strong>マーケットを確認</strong><span>DEV商品・検索</span></a>
-            </div>
-          </section>
           <section class="account-panel account-panel--wide" id="accountAdminTools" data-account-tab="settings" data-market-admin-only hidden>
             <div class="account-panel__head">
               <h2 class="section-title">管理者メニュー</h2>
@@ -551,7 +542,7 @@
               </div>
             </details>
           </section>
-          <section class="account-panel account-collection" id="accountPurchases" data-account-tab="library" data-account-collection data-market-dev-only hidden>
+          <section class="account-panel account-collection" id="accountPurchases" data-account-tab="library" data-account-collection hidden>
             <div class="account-panel__head">
               <div>
                 <p class="account-eyebrow">PURCHASES</p>
@@ -576,7 +567,7 @@
               </div>
             </div>
           </section>
-          <section class="account-panel account-collection" id="accountListings" data-account-tab="library" data-account-collection data-market-dev-only hidden>
+          <section class="account-panel account-collection" id="accountListings" data-account-tab="library" data-account-collection hidden>
             <div class="account-panel__head">
               <div>
                 <p class="account-eyebrow">LISTINGS</p>
@@ -619,7 +610,7 @@
               </div>
             </div>
           </section>
-          <section class="account-panel account-seller-panel" id="accountSeller" data-account-tab="rewards" data-market-dev-only hidden>
+          <section class="account-panel account-seller-panel" id="accountSeller" data-account-tab="rewards" hidden>
             <div class="account-panel__head">
               <h2 class="section-title">販売</h2>
               <span class="account-chip" id="marketSellerVerificationStatus">確認中</span>
@@ -637,8 +628,8 @@
   <script src="../scripts/shared-auth-panel.js?v=2026.07.18-ad-permissions1"></script>
   <script src="../scripts/account-dashboard.js?v=2026.07.19-account-library1"></script>
   <script src="../scripts/account-collections.js?v=2026.07.19-account-library2"></script>
-  <script src="../scripts/pixieed-dev-access.js?v=2026.07.17-market-dev1"></script>
-  <script src="../scripts/account-dev-tools.js?v=2026.07.18-auth-stability1"></script>
+  <script src="../scripts/pixieed-market-access.js?v=2026.07.19-public-market1"></script>
+  <script src="../scripts/account-market-admin-tools.js?v=2026.07.19-public-market1"></script>
   <script src="../scripts/account-pageview-reward-budget.js?v=2026.07.19-lineage-rewards1"></script>
   <script src="../scripts/account-pageview-rewards.js?v=2026.07.19-lineage-rewards1"></script>
   <script src="../scripts/account-ad-permissions.js?v=2026.07.18-auth-stability1"></script>

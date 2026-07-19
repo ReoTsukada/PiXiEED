@@ -201,8 +201,8 @@
 
   async function init() {
     try {
-      const access = window.PiXiEEDDevAccess ? await window.PiXiEEDDevAccess.check() : null;
-      if (!access?.allowed || !access.client) return;
+      const access = window.PiXiEEDMarketAccess ? await window.PiXiEEDMarketAccess.check() : null;
+      if (!access?.client) return;
       await render(access.client);
       access.client.auth.onAuthStateChange(() => window.setTimeout(() => render(access.client), 0));
     } catch (_error) {

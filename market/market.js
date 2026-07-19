@@ -5,7 +5,6 @@
   const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
   const grid = document.getElementById('marketGrid');
   const count = document.getElementById('marketCount');
-  const sellButton = document.getElementById('marketSellButton');
   const search = document.getElementById('marketSearch');
   const filters = document.getElementById('marketFilters');
   const sort = document.getElementById('marketSort');
@@ -17,8 +16,6 @@
   const fallbackIcon = '../assets/icons/Market.png';
   const favorites = window.PiXiEEDMarketFavorites;
   const discovery = window.PiXiEEDMarketDiscovery;
-  const localTestCatalog = window.PiXiEEDMarketLocalTestProducts || null;
-  let localTestProducts = [];
   let assets = [];
   let activeFilter = 'all';
 
@@ -62,9 +59,6 @@
       ai.textContent = asset.ai_usage_status === 'used' ? 'AI使用あり' : 'AI使用なし';
       badges.appendChild(ai);
     }
-    if (asset.local_test === true) {
-      const local = document.createElement('span'); local.textContent = 'DEVテスト'; badges.appendChild(local); return badges;
-    }
     if (asset.verification_status === 'verified') {
       const source = document.createElement('span'); source.textContent = asset.source_kind === 'pixieed-native' ? 'PiXiEED形式' : '外部形式';
       const review = document.createElement('span'); review.textContent = '出品審査済み'; badges.append(source, review);
@@ -86,16 +80,13 @@
   function createCard(asset) {
     const card = document.createElement('article'); card.className = 'market-card';
     card.classList.toggle('is-sold-out', isSoldOut(asset));
-    if (asset.local_test === true) card.dataset.localTestProduct = 'true';
     const href = `item.html?id=${encodeURIComponent(asset.id)}`;
     const preview = document.createElement('div'); preview.className = 'market-card__preview';
     const previewLink = document.createElement('a'); previewLink.href = href;
     previewLink.setAttribute('aria-label', `${asset.title || '名称未設定の素材'}の商品詳細`);
     const image = new Image();
     const previewUrl = asset.preview_url || asset.preview_object_path;
-    image.src = asset.local_test === true && previewUrl
-      ? previewUrl
-      : (/^https?:\/\//i.test(previewUrl || '') ? previewUrl : fallbackIcon);
+    image.src = /^https?:\/\//i.test(previewUrl || '') ? previewUrl : fallbackIcon;
     image.alt = ''; image.draggable = false; image.dataset.marketProtectedMedia = 'true'; previewLink.appendChild(image); preview.appendChild(previewLink);
     if (isSoldOut(asset)) {
       const soldOut = document.createElement('span'); soldOut.className = 'market-card__soldout'; soldOut.textContent = 'SOLD OUT';
@@ -168,25 +159,21 @@
   }
 
   async function loadAssets() {
-    const access = window.PiXiEEDDevAccess
-      ? await window.PiXiEEDDevAccess.check()
+    const access = window.PiXiEEDMarketAccess
+      ? await window.PiXiEEDMarketAccess.check()
       : { allowed: false, client: null };
-    if (sellButton) sellButton.hidden = access.allowed !== true;
     if (!access.client) {
       renderEmpty('マーケットを読み込めませんでした', '通信状態を確認して再読み込みしてください。');
       return;
     }
-    await localTestCatalog?.ready;
-    localTestProducts = Array.isArray(localTestCatalog?.products) ? [...localTestCatalog.products] : [];
     try {
       const { data, error } = await access.client.rpc('market_public_catalog_v1', { input_limit: 120 });
       if (error) throw error;
       const remoteAssets = Array.isArray(data) ? data : [];
       await loadPreviewUrls(access.client, remoteAssets);
-      const localIds = new Set(localTestProducts.map((asset) => asset.id));
-      assets = [...localTestProducts, ...remoteAssets.filter((asset) => !localIds.has(asset.id))];
+      assets = remoteAssets;
     } catch (_error) {
-      assets = [...localTestProducts];
+      assets = [];
     }
     await favorites?.prepare?.(assets);
     render();

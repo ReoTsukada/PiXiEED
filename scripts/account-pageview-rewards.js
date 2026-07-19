@@ -25,8 +25,8 @@
 
   async function init(refresh = false) {
     try {
-      if (!window.PiXiEEDDevAccess) return;
-      const access = await window.PiXiEEDDevAccess.check({ refresh });
+      if (!window.PiXiEEDMarketAccess) return;
+      const access = await window.PiXiEEDMarketAccess.check({ refresh });
       if (!listenerBound && access?.client) {
         listenerBound = true;
         access.client.auth.onAuthStateChange(() => window.setTimeout(() => init(true), 0));

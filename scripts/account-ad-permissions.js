@@ -116,8 +116,8 @@
   }
 
   async function init(options = {}) {
-    if (!window.PiXiEEDDevAccess) return;
-    const access = await window.PiXiEEDDevAccess.check(options);
+    if (!window.PiXiEEDMarketAccess) return;
+    const access = await window.PiXiEEDMarketAccess.check(options);
     const authClient = access.client || null;
     bindAuthListener(authClient);
     client = null;

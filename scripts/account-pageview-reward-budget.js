@@ -198,14 +198,14 @@
       }
     }
     updateAnnualTotal();
-    if (!window.PiXiEEDDevAccess) return;
-    const access = await window.PiXiEEDDevAccess.check(options);
+    if (!window.PiXiEEDMarketAccess) return;
+    const access = await window.PiXiEEDMarketAccess.check(options);
     const authClient = access.client || null;
     bindAuthListener(authClient);
     client = null;
     calculateButton.disabled = true; finalizeButton.disabled = true;
     requestSequence += 1;
-    if (!access.allowed || !authClient) return;
+    if (!authClient) return;
     const { data: isAdmin, error } = await authClient.rpc('market_current_user_is_admin');
     if (error || isAdmin !== true) return;
     client = authClient;

@@ -5,7 +5,7 @@ import {
   jsonResponse,
   MARKET_LISTING_ENABLED,
   readJson,
-  requireMarketDevUser,
+  requireMarketUser,
   siteUrl,
   stringValue,
   stripeRequest,
@@ -20,7 +20,7 @@ serve(async (request) => {
   }
 
   try {
-    const { user } = await requireMarketDevUser(request);
+    const { user } = await requireMarketUser(request);
     const body = await readJson(request);
     const action = stringValue(body.action) || "onboard";
     const admin = createAdminClient();

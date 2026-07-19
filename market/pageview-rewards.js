@@ -33,7 +33,7 @@
     submitted = true;
     window.clearInterval(timer);
     try {
-      const access = window.PiXiEEDDevAccess ? await window.PiXiEEDDevAccess.check() : null;
+      const access = window.PiXiEEDMarketAccess ? await window.PiXiEEDMarketAccess.check() : null;
       if (!access?.client) return;
       const viewerKeyHash = await sha256(viewerSecret());
       if (!viewerKeyHash) return;
@@ -54,7 +54,7 @@
   }
 
   function track(asset) {
-    if (!asset?.id || asset.local_test === true || trackedAssetId) return;
+    if (!asset?.id || trackedAssetId) return;
     trackedAssetId = String(asset.id);
     timer = window.setInterval(tick, 1000);
   }

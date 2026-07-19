@@ -12,7 +12,6 @@
   let currentAsset = null;
   let purchaseClient = null;
   let purchaseUser = null;
-  const localTestCatalog = window.PiXiEEDMarketLocalTestProducts || null;
   const favorites = window.PiXiEEDMarketFavorites;
 
   function assetFormats(asset) {
@@ -61,9 +60,7 @@
       ? 'OK（改変した素材を独立商品として再販売可能・系列ロイヤリティーあり）'
       : 'NG（利用・改変できる範囲でも、素材または改変素材として再販売できません）';
     const previewUrl = asset.preview_url || asset.preview_object_path;
-    if (asset.local_test === true && previewUrl) {
-      $('itemPreview').src = previewUrl;
-    } else if (/^https?:\/\//i.test(previewUrl || '')) {
+    if (/^https?:\/\//i.test(previewUrl || '')) {
       $('itemPreview').src = previewUrl;
     }
     $('itemPreview').alt = `${asset.title || '商品'}のプレビュー`;
@@ -72,9 +69,7 @@
     const productBadge = badge(isPixieeDrawProduct(asset) ? 'PiXiEEDraw作品' : '一般素材');
     productBadge.className = isPixieeDrawProduct(asset) ? 'is-pixiedraw-product' : 'is-general-product';
     const badges = [productBadge];
-    if (asset.local_test === true) {
-      badges.push(badge('DEVテスト'));
-    } else if (asset.verification_status === 'verified') {
+    if (asset.verification_status === 'verified') {
       badges.push(badge(asset.source_kind === 'pixieed-native' ? 'PiXiEED形式' : '外部形式'), badge('出品審査済み'));
     }
     if (asset.seller_identity_verified) badges.push(badge('販売者確認済み'));
@@ -86,8 +81,11 @@
     $('itemOptions').replaceChildren(...(options.length ? options.map((option) => {
       const card = document.createElement('div');
       const title = document.createElement('strong'); title.textContent = option.label;
+      const description = document.createElement('small'); description.textContent = option.description || '';
       const price = document.createElement('span'); price.textContent = `料金 ${yen(option.price_yen ?? option.minimum_price_yen)}`;
-      card.append(title, price); return card;
+      card.append(title);
+      if (description.textContent) card.append(description);
+      card.append(price); return card;
     }) : [Object.assign(document.createElement('p'), { textContent: '追加オプションなし' })]));
     $('itemStatus').hidden = true; $('itemContent').hidden = false;
     window.PiXiEEDMarketAds?.showDetailAd?.();
@@ -178,25 +176,12 @@
 
   async function initPurchase() {
     if (!currentAsset) return;
-    if (currentAsset.local_test === true) {
-      setPurchaseState({
-        disabled: true,
-        label: 'DEVテスト商品',
-        status: '表示確認用の商品です。Supabaseへの登録やStripe決済は行われません。'
-      });
-      return;
-    }
-    const devAccess = window.PiXiEEDDevAccess ? await window.PiXiEEDDevAccess.check() : { allowed: false };
-    if (!devAccess.allowed) {
-      setPurchaseState({ disabled: true, label: '購入準備中', status: '現在はマーケットの閲覧のみ利用できます。' });
-      return;
-    }
     if (window.location.protocol === 'file:') {
       setPurchaseState({ disabled: true, label: 'HTTPで購入確認できます', status: 'ローカルファイル表示ではログイン状態を確認できません。' });
       return;
     }
     try {
-      if (!purchaseClient) throw new Error('DEV access client unavailable');
+      if (!purchaseClient) throw new Error('market client unavailable');
       if (!purchaseUser) {
         const { data: { user } } = await purchaseClient.auth.getUser();
         purchaseUser = user || null;
@@ -267,8 +252,8 @@
   }
 
   async function load() {
-    const access = window.PiXiEEDDevAccess
-      ? await window.PiXiEEDDevAccess.check()
+    const access = window.PiXiEEDMarketAccess
+      ? await window.PiXiEEDMarketAccess.check()
       : { allowed: false, client: null, user: null };
     if (!access.client) {
       $('itemStatus').textContent = '商品を読み込めませんでした。通信状態を確認して再読み込みしてください。';
@@ -276,17 +261,9 @@
     }
     purchaseClient = access.client;
     purchaseUser = access.user || null;
-    await localTestCatalog?.ready;
     const id = new URLSearchParams(location.search).get('id');
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id || '')) {
       $('itemStatus').textContent = '商品を特定できませんでした。マーケット一覧から開き直してください。'; return;
-    }
-    const localTestAsset = localTestCatalog?.getById?.(id) || null;
-    if (localTestAsset) {
-      await favorites?.prepare?.([localTestAsset]);
-      render(localTestAsset);
-      await initPurchase();
-      return;
     }
     try {
       const { data: asset, error } = await purchaseClient.rpc('market_public_asset_v1', { input_asset_id: id });
