@@ -12,8 +12,12 @@
   window.PIXIEEDRAW_EDITION_CAPABILITIES = capabilities;
   // Embed mode is a display context, not an entitlement. No account, purchase,
   // storage, or remote API state participates in this decision.
+  const isWebProtocol = () => (
+    window.location?.protocol === 'http:' || window.location?.protocol === 'https:'
+  );
+
   window.__PIXIEEDRAW_SHOULD_SHOW_ADS__ = () => (
-    capabilities.ads && window.__PIXIEED_EMBED_MODE__ !== true
+    capabilities.ads && isWebProtocol() && window.__PIXIEED_EMBED_MODE__ !== true
   );
 
   function enforceEditionAdvertising() {
