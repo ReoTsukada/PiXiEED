@@ -66,6 +66,34 @@ function makeSnapshot(layersByFrame, width = 32, height = 16) {
   };
 }
 
+function makeMixedStorageVisualLayer(width, height, scale) {
+  const indices = new Int16Array(width * height).fill(-1);
+  const direct = new Uint8ClampedArray(width * height * 4);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const index = y * width + x;
+      const base = index * 4;
+      const nativeX = Math.floor(x / scale);
+      const nativeY = Math.floor(y / scale);
+      const paletteIndex = ((nativeX + nativeY) & 1) + 1;
+      const color = paletteIndex === 1 ? [12, 34, 56, 255] : [78, 90, 123, 255];
+      direct.set(color, base);
+      // Alternate storage within the same visible block. The old detector
+      // treated the x=1 INDEX/direct seam as a real one-pixel transition.
+      if ((x + y) & 1) {
+        indices[index] = paletteIndex;
+      }
+    }
+  }
+  return {
+    id: 'mixed-storage-layer',
+    indices,
+    direct,
+    importSourceDirect: new Uint8ClampedArray(direct),
+    directOnly: true,
+  };
+}
+
 const mixedScaleSnapshot = makeSnapshot([
   [makeDirectLayer(32, 16, 8, 1)],
   [makeDirectLayer(32, 16, 4, 2)],
@@ -104,6 +132,64 @@ assert.equal(notOptimized.optimized, false);
 assert.equal(notOptimized.reason, 'pixel-factor-one');
 assert.equal(onePixelSnapshot.width, 32, 'a single 1px detail prevents automatic resize');
 
+const mixedStorageSnapshot = makeSnapshot([[makeMixedStorageVisualLayer(32, 16, 8)]]);
+mixedStorageSnapshot.palette = [
+  { r: 0, g: 0, b: 0, a: 0 },
+  { r: 12, g: 34, b: 56, a: 255 },
+  { r: 78, g: 90, b: 123, a: 255 },
+];
+const mixedStorageOptimized = await scaleApi.optimizeSnapshotIntegerScale(mixedStorageSnapshot, {
+  minimumPixelCount: 0,
+  yieldIntervalMs: 1_000_000,
+});
+assert.equal(mixedStorageOptimized.optimized, true);
+assert.equal(mixedStorageOptimized.factor, 8, 'visually identical INDEX/direct pixels must share one scale key');
+assert.equal(mixedStorageSnapshot.width, 4);
+assert.equal(mixedStorageSnapshot.height, 2);
+assert.equal(
+  mixedStorageSnapshot.frames[0].layers[0].importSourceDirect,
+  null,
+  'successful resize must release the legacy full-resolution import buffer'
+);
+
+const duplicatePaletteIndices = new Int16Array(32 * 16);
+for (let y = 0; y < 16; y += 1) {
+  for (let x = 0; x < 32; x += 1) {
+    const nativeX = Math.floor(x / 8);
+    const nativeY = Math.floor(y / 8);
+    if ((nativeX + nativeY) & 1) {
+      duplicatePaletteIndices[y * 32 + x] = ((x + y) & 1) ? 3 : 4;
+    } else {
+      duplicatePaletteIndices[y * 32 + x] = ((x + y) & 1) ? 1 : 2;
+    }
+  }
+}
+const duplicateIndexSnapshot = makeSnapshot([[
+  {
+    id: 'duplicate-index-layer',
+    indices: duplicatePaletteIndices,
+    direct: null,
+    importSourceDirect: null,
+    directOnly: false,
+  },
+]]);
+duplicateIndexSnapshot.colorMode = 'indexed';
+duplicateIndexSnapshot.palette = [
+  { r: 0, g: 0, b: 0, a: 0 },
+  { r: 12, g: 34, b: 56, a: 255 },
+  { r: 12, g: 34, b: 56, a: 255 },
+  { r: 78, g: 90, b: 123, a: 255 },
+  { r: 78, g: 90, b: 123, a: 255 },
+];
+const duplicateIndexOptimized = await scaleApi.optimizeSnapshotIntegerScale(duplicateIndexSnapshot, {
+  minimumPixelCount: 0,
+  yieldIntervalMs: 1_000_000,
+});
+assert.equal(duplicateIndexOptimized.optimized, true);
+assert.equal(duplicateIndexOptimized.factor, 8, 'duplicate palette slots with identical RGBA must not create false 1px detail');
+assert.equal(duplicateIndexSnapshot.width, 4);
+assert.equal(duplicateIndexSnapshot.height, 2);
+
 const selectedSnapshot = makeSnapshot([[makeDirectLayer(32, 16, 8, 4)]]);
 selectedSnapshot.selectionMask = new Uint8Array(32 * 16);
 selectedSnapshot.selectionMask[0] = 1;
@@ -140,6 +226,11 @@ const indexedLayer = {
     255, 0, 0, 255,
     0, 0, 255, 255,
   ]),
+  importSourceDirect: new Uint8ClampedArray([
+    255, 0, 0, 255,
+    255, 0, 0, 255,
+    0, 0, 255, 255,
+  ]),
   directOnly: true,
 };
 const indexedSnapshot = {
@@ -153,7 +244,51 @@ const paletteResult = paletteApi.synchronizeImportedSnapshotPalette(indexedSnaps
 assert.equal(paletteResult.addedCount, 2);
 assert.deepEqual(Array.from(indexedLayer.indices), [1, 1, 2]);
 assert.equal(indexedLayer.direct, null);
+assert.equal(indexedLayer.importSourceDirect, null);
 assert.equal(paletteApi.getPackedPaletteColorKey(255, 0, 0, 255), 0xff0000ff);
+assert.equal(paletteApi.getPackedPaletteColorKey(9, 8, 7, 0), 0x09080700);
+
+const alreadyIndexedLayer = {
+  indices: new Int16Array([1]),
+  direct: new Uint8ClampedArray([99, 88, 77, 255]),
+  importSourceDirect: new Uint8ClampedArray([66, 55, 44, 255]),
+  directOnly: false,
+};
+paletteApi.synchronizeImportedSnapshotPalette({
+  colorMode: 'indexed',
+  palette: [{ r: 0, g: 0, b: 0, a: 0 }, { r: 12, g: 34, b: 56, a: 255 }],
+  frames: [{ layers: [alreadyIndexedLayer] }],
+});
+assert.equal(alreadyIndexedLayer.direct, null, 'fully indexed layers must release a stale direct RGBA copy');
+assert.equal(alreadyIndexedLayer.importSourceDirect, null, 'fully indexed layers must release the legacy RGBA copy');
+
+const legacyRgbLayer = {
+  indices: new Int16Array([-1]),
+  direct: new Uint8ClampedArray([10, 20, 30, 255]),
+  importSourceDirect: new Uint8ClampedArray([1, 2, 3, 255]),
+  directOnly: true,
+};
+paletteApi.synchronizeImportedSnapshotPalette({
+  colorMode: 'rgb',
+  palette: [],
+  frames: [{ layers: [legacyRgbLayer] }],
+});
+assert.deepEqual(Array.from(legacyRgbLayer.direct), [10, 20, 30, 255]);
+assert.equal(legacyRgbLayer.importSourceDirect, null, 'RGB restore keeps current direct pixels but releases legacy source copy');
+
+const legacyOnlyRgbLayer = {
+  indices: new Int16Array([-1]),
+  direct: null,
+  importSourceDirect: new Uint8ClampedArray([40, 50, 60, 255]),
+  directOnly: true,
+};
+paletteApi.synchronizeImportedSnapshotPalette({
+  colorMode: 'rgb',
+  palette: [],
+  frames: [{ layers: [legacyOnlyRgbLayer] }],
+});
+assert.deepEqual(Array.from(legacyOnlyRgbLayer.direct), [40, 50, 60, 255]);
+assert.equal(legacyOnlyRgbLayer.importSourceDirect, null, 'legacy-only RGB restores through direct before releasing its duplicate field');
 
 const appSource = fs.readFileSync(appPath, 'utf8');
 const modelSource = fs.readFileSync(modelPath, 'utf8');

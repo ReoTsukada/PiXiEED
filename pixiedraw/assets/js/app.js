@@ -1684,7 +1684,127 @@
   const timelapseChunkStore = window.PiXiEEDrawModules?.timelapseChunkStoreUtils?.createTimelapseChunkStoreUtils?.({
     maxSnapshotsPerCanvas: TIMELAPSE_MAX_STEPS,
   }) || null;
+  const TIMELAPSE_DISK_BASE_MIN_PIXEL_PLANES = 256 * 256 * 48;
   const pendingTimelapseArchiveWrites = new Set();
+
+  function getProjectPixelPlaneCountForTimelapseDiskBase() {
+    let documents = [];
+    try {
+      documents = typeof getProjectCanvasDocuments === 'function'
+        ? getProjectCanvasDocuments()
+        : [];
+    } catch (error) {
+      documents = [];
+    }
+    if (!Array.isArray(documents) || !documents.length) {
+      documents = [{
+        width: state.width,
+        height: state.height,
+        frames: state.frames,
+      }];
+    }
+    return documents.reduce((projectTotal, document) => {
+      const width = Math.max(1, Math.round(Number(document?.width) || 1));
+      const height = Math.max(1, Math.round(Number(document?.height) || 1));
+      const frames = Array.isArray(document?.frames) && document.frames.length
+        ? document.frames
+        : [null];
+      const layerPlaneCount = frames.reduce((frameTotal, frame) => {
+        const layers = Array.isArray(frame?.layers) && frame.layers.length ? frame.layers.length : 1;
+        return frameTotal + layers;
+      }, 0);
+      return projectTotal + (width * height * Math.max(1, layerPlaneCount));
+    }, 0);
+  }
+
+  function shouldUseDiskBackedTimelapseBase() {
+    return getProjectPixelPlaneCountForTimelapseDiskBase() >= TIMELAPSE_DISK_BASE_MIN_PIXEL_PLANES;
+  }
+
+  async function loadPersistedTimelapseProject(projectId = autosaveProjectId, options = {}) {
+    const normalizedProjectId = normalizeAutosaveProjectId?.(projectId || '') || '';
+    if (!timelapseChunkStore || !normalizedProjectId) {
+      return { projectId: normalizedProjectId, byCanvas: {}, baseSnapshotsByCanvas: {} };
+    }
+    try {
+      const stored = await timelapseChunkStore.readProject(normalizedProjectId);
+      return {
+        projectId: normalizedProjectId,
+        byCanvas: stored?.byCanvas && typeof stored.byCanvas === 'object' ? stored.byCanvas : {},
+        baseSnapshotsByCanvas: stored?.baseSnapshotsByCanvas
+          && typeof stored.baseSnapshotsByCanvas === 'object'
+          ? stored.baseSnapshotsByCanvas
+          : {},
+      };
+    } catch (error) {
+      console.warn('Failed to load archived timelapse data.', error);
+      if (options?.throwOnError === true) {
+        throw error;
+      }
+      return { projectId: normalizedProjectId, byCanvas: {}, baseSnapshotsByCanvas: {} };
+    }
+  }
+
+  async function loadPersistedTimelapseBaseSnapshot(
+    canvasId = '',
+    projectId = autosaveProjectId,
+    options = {}
+  ) {
+    const stored = await loadPersistedTimelapseProject(projectId, options);
+    const canvasKey = String(canvasId || '').trim();
+    return canvasKey && stored.baseSnapshotsByCanvas?.[canvasKey]
+      ? stored.baseSnapshotsByCanvas[canvasKey]
+      : null;
+  }
+
+  function archiveTimelapseOperationLogBase(
+    canvasId = '',
+    operationLog = null,
+    projectId = autosaveProjectId
+  ) {
+    const normalizedProjectId = normalizeAutosaveProjectId?.(projectId || '') || '';
+    const activeProjectId = normalizeAutosaveProjectId?.(autosaveProjectId || '') || '';
+    const canvasKey = String(canvasId || '').trim();
+    const baseSnapshot = operationLog?.baseSnapshot || null;
+    if (
+      !timelapseChunkStore
+      || !normalizedProjectId
+      || normalizedProjectId !== activeProjectId
+      || !canvasKey
+      || !baseSnapshot
+      || !shouldUseDiskBackedTimelapseBase()
+    ) {
+      return Promise.resolve(false);
+    }
+    const write = timelapseChunkStore.writeBaseSnapshot(normalizedProjectId, canvasKey, baseSnapshot)
+      .then(result => {
+        const succeeded = result !== false;
+        if (succeeded && operationLog.baseSnapshot === baseSnapshot) {
+          operationLog.baseSnapshotStored = true;
+          operationLog.baseSnapshotStorageCanvasId = canvasKey;
+          operationLog.baseSnapshotStorageProjectId = normalizedProjectId;
+          operationLog.baseSnapshot = null;
+          updateMemoryStatus?.();
+        }
+        return succeeded;
+      })
+      .catch(error => {
+        console.warn('Failed to archive timelapse operation-log base.', error);
+        return false;
+      });
+    pendingTimelapseArchiveWrites.add(write);
+    write.finally(() => pendingTimelapseArchiveWrites.delete(write));
+    return write;
+  }
+
+  function archiveTimelapseOperationLogBases(projectId = autosaveProjectId) {
+    const tracks = timelapseState?.tracksByCanvasId && typeof timelapseState.tracksByCanvasId === 'object'
+      ? timelapseState.tracksByCanvasId
+      : {};
+    return Promise.all(Object.entries(tracks).map(([canvasId, track]) =>
+      archiveTimelapseOperationLogBase(canvasId, track?.operationLog || null, projectId)
+    ));
+  }
 
   function archiveTimelapseSnapshots(canvasId = '', snapshots = []) {
     const projectId = normalizeAutosaveProjectId?.(autosaveProjectId || '') || '';
@@ -1716,18 +1836,8 @@
   }
 
   async function loadPersistedTimelapseSnapshots(projectId = autosaveProjectId, options = {}) {
-    const normalizedProjectId = normalizeAutosaveProjectId?.(projectId || '') || '';
-    if (!timelapseChunkStore || !normalizedProjectId) return {};
-    try {
-      const stored = await timelapseChunkStore.readProject(normalizedProjectId);
-      return stored?.byCanvas && typeof stored.byCanvas === 'object' ? stored.byCanvas : {};
-    } catch (error) {
-      console.warn('Failed to load archived timelapse snapshots.', error);
-      if (options?.throwOnError === true) {
-        throw error;
-      }
-      return {};
-    }
+    const stored = await loadPersistedTimelapseProject(projectId, options);
+    return stored.byCanvas;
   }
 
   function clearPersistedTimelapseSnapshots(projectId = autosaveProjectId) {
@@ -5387,6 +5497,8 @@
   set applyExportScaleConstraints(value) { applyExportScaleConstraints = value; },
   get archiveTimelapseSnapshots() { return archiveTimelapseSnapshots; },
   set archiveTimelapseSnapshots(value) { archiveTimelapseSnapshots = value; },
+  get archiveTimelapseOperationLogBase() { return archiveTimelapseOperationLogBase; },
+  set archiveTimelapseOperationLogBase(value) { archiveTimelapseOperationLogBase = value; },
   get applyLayerPatchPayloadToLayer() { return applyLayerPatchPayloadToLayer; },
   set applyLayerPatchPayloadToLayer(value) { applyLayerPatchPayloadToLayer = value; },
   get buildGifFromPixels() { return buildGifFromPixels; },
@@ -5443,6 +5555,8 @@
   set localizeText(value) { localizeText = value; },
   get loadPersistedTimelapseSnapshots() { return loadPersistedTimelapseSnapshots; },
   set loadPersistedTimelapseSnapshots(value) { loadPersistedTimelapseSnapshots = value; },
+  get loadPersistedTimelapseBaseSnapshot() { return loadPersistedTimelapseBaseSnapshot; },
+  set loadPersistedTimelapseBaseSnapshot(value) { loadPersistedTimelapseBaseSnapshot = value; },
   get makeHistorySnapshot() { return makeHistorySnapshot; },
   set makeHistorySnapshot(value) { makeHistorySnapshot = value; },
   get markDocumentDurablySaved() { return markDocumentDurablySaved; },
@@ -5655,6 +5769,8 @@
   const openImportWorkflowUtilsModule = window.PiXiEEDrawModules?.openImportWorkflowUtils?.createOpenImportWorkflowUtils?.({
   get AUTOSAVE_SUPPORTED() { return AUTOSAVE_SUPPORTED; },
   set AUTOSAVE_SUPPORTED(value) { AUTOSAVE_SUPPORTED = value; },
+  get COLOR_MODE_INDEX() { return COLOR_MODE_INDEX; },
+  set COLOR_MODE_INDEX(value) { COLOR_MODE_INDEX = value; },
   get COLOR_MODE_RGB() { return COLOR_MODE_RGB; },
   set COLOR_MODE_RGB(value) { COLOR_MODE_RGB = value; },
   get DEFAULT_DOCUMENT_NAME() { return DEFAULT_DOCUMENT_NAME; },
@@ -5825,6 +5941,8 @@
   set loadDocumentFromText(value) { loadDocumentFromText = value; },
   get loadRecentProjectsMetadata() { return loadRecentProjectsMetadata; },
   set loadRecentProjectsMetadata(value) { loadRecentProjectsMetadata = value; },
+  get loadRecentProjectMetadataById() { return loadRecentProjectMetadataById; },
+  set loadRecentProjectMetadataById(value) { loadRecentProjectMetadataById = value; },
   get parseProjectStorageBlob() { return parseProjectStorageBlob; },
   set parseProjectStorageBlob(value) { parseProjectStorageBlob = value; },
   get readProjectStorageManifestFromBlob() { return readProjectStorageManifestFromBlob; },
@@ -6051,6 +6169,8 @@
   set exportInterstitialAdRequested(value) { exportInterstitialAdRequested = value; },
   get exportProjectAsGif() { return exportProjectAsGif; },
   set exportProjectAsGif(value) { exportProjectAsGif = value; },
+  get exportProjectAsAllFormatsZip() { return exportProjectAsAllFormatsZip; },
+  set exportProjectAsAllFormatsZip(value) { exportProjectAsAllFormatsZip = value; },
   get exportProjectAsGlb() { return exportProjectAsGlb; },
   set exportProjectAsGlb(value) { exportProjectAsGlb = value; },
   get exportProjectAsGridPng() { return exportProjectAsGridPng; },
@@ -10648,6 +10768,18 @@
       ? performance.getEntriesByType('resource')
       : [];
     const resourceDiagnostics = collectPixieeDrawResourceDiagnostics();
+    const residentTabPayloadCount = openProjectTabs.filter(tab => Boolean(
+      tab?.project && typeof tab.project === 'object'
+      || tab?.deferredProjectPayload && typeof tab.deferredProjectPayload === 'object'
+    )).length;
+    const activeTab = openProjectTabs.find(tab => tab?.id === activeOpenProjectTabId) || null;
+    const timelapseTracks = Object.values(timelapseState?.tracksByCanvasId || {});
+    const residentTimelapseBaseCount = timelapseTracks.filter(track => Boolean(
+      track?.operationLog?.baseSnapshot
+    )).length;
+    const diskBackedTimelapseBaseCount = timelapseTracks.filter(track => Boolean(
+      track?.operationLog?.baseSnapshotStored && !track?.operationLog?.baseSnapshot
+    )).length;
     const diagnostics = {
       editorMiB: Object.fromEntries(Object.entries(editor).map(([key, value]) => [key, bytesToMiB(value)])),
       heapMiB: heap && Object.fromEntries(Object.entries(heap).map(([key, value]) => [key, bytesToMiB(value)])),
@@ -10660,6 +10792,14 @@
         timelapseSteps: getAllTimelapseStepCount?.() || 0,
         openTabCount: openProjectTabs.length,
         activeTabId: activeOpenProjectTabId || '',
+        residentTabPayloadCount,
+        activeTabHasResidentPayload: Boolean(
+          activeTab?.project && typeof activeTab.project === 'object'
+          || activeTab?.deferredProjectPayload && typeof activeTab.deferredProjectPayload === 'object'
+        ),
+        residentTimelapseBaseCount,
+        diskBackedTimelapseBaseCount,
+        timelapseDiskBaseEligible: shouldUseDiskBackedTimelapseBase(),
       },
       page: {
         homeVisible: Boolean(projectHomeVisible),
@@ -12065,6 +12205,7 @@
   buildExportPreviewSourceCanvas,
   updateExportPreview,
   createFrameCanvas,
+  canvasRegionToBlob,
   scaleCanvasNearestNeighbor,
   buildGridRowSegmentsTopToBottom,
   buildGridColumnSegmentsRightToLeft,
@@ -12458,10 +12599,12 @@
     syncActiveProjectSessionDirty('document-durably-saved');
   }
 
-  function resetDocumentUnsavedChanges() {
+  function resetDocumentUnsavedChanges({ syncSession = true } = {}) {
     unsavedChangeToken = 0;
     durableSaveToken = 0;
-    syncActiveProjectSessionDirty('document-reset-clean');
+    if (syncSession) {
+      syncActiveProjectSessionDirty('document-reset-clean');
+    }
   }
 
   function hasDocumentUnsavedChanges() {
@@ -15269,16 +15412,140 @@
     return documentSessionWorkflowUtilsModule.buildAutosaveSessionPayload(...args);
   }
 
+  function createAutosaveContextChangedError(expectedProjectId = '') {
+    const error = new Error(`Autosave project context changed: ${expectedProjectId}`);
+    error.code = 'ERR_AUTOSAVE_PROJECT_CONTEXT_CHANGED';
+    return error;
+  }
+
+  function assertAutosaveProjectContext(expectedProjectId = '', expectedTracks = null) {
+    const activeProjectId = normalizeAutosaveProjectId(autosaveProjectId || '');
+    if (
+      !expectedProjectId
+      || activeProjectId !== expectedProjectId
+      || (expectedTracks && getAllTimelapseTracks() !== expectedTracks)
+    ) {
+      throw createAutosaveContextChangedError(expectedProjectId);
+    }
+  }
+
+  function resolveTimelapseBaseFromPackagedProject(packaged = null, canvasId = '') {
+    const logs = packaged?.session?.timelapse?.operationLogsByCanvas;
+    if (!logs || typeof logs !== 'object' || Array.isArray(logs)) return null;
+    if (logs[canvasId]?.baseSnapshot) return logs[canvasId].baseSnapshot;
+    const candidates = Object.values(logs).filter(log => log?.baseSnapshot);
+    return candidates.length === 1 ? candidates[0].baseSnapshot : null;
+  }
+
+  async function repairUnavailableTimelapseBase({
+    projectId = '',
+    canvasId = '',
+    log = null,
+    allowCurrentStateReset = false,
+  } = {}) {
+    if (!log || typeof log !== 'object') return null;
+    try {
+      const packaged = await readAutosaveV2PrimaryProject(projectId);
+      const recoveredBase = resolveTimelapseBaseFromPackagedProject(packaged, canvasId);
+      if (recoveredBase) {
+        log.baseSnapshot = recoveredBase;
+        log.baseSnapshotStored = false;
+        log.baseSnapshotStorageCanvasId = '';
+        log.baseSnapshotStorageProjectId = '';
+        console.info('[pixiedraw:timelapse-base-repair]', {
+          phase: 'recovered-from-v2-checkpoint',
+          projectId,
+          canvasId,
+        });
+        return recoveredBase;
+      }
+    } catch (error) {
+      console.warn('Failed to recover timelapse base from V2 checkpoint.', error);
+    }
+    if (!allowCurrentStateReset) return null;
+    // The artwork remains authoritative. If both the chunk-store copy and the
+    // previous V2 base are unavailable, restart only the timelapse operation
+    // history from the current document so autosave itself can recover.
+    log.baseSnapshot = null;
+    log.baseSnapshotStored = false;
+    log.baseSnapshotStorageCanvasId = '';
+    log.baseSnapshotStorageProjectId = '';
+    log.entries = [];
+    const repairedLog = ensureTimelapseOperationLogBase(canvasId);
+    if (repairedLog?.baseSnapshot) {
+      console.warn('[pixiedraw:timelapse-base-repair]', {
+        phase: 'reset-from-current-document',
+        projectId,
+        canvasId,
+      });
+      return repairedLog.baseSnapshot;
+    }
+    return null;
+  }
+
   async function buildProjectSessionPayloadWithPersistedTimelapse(options = {}) {
     const requireComplete = options?.requireComplete === true;
+    const contextProjectId = normalizeAutosaveProjectId(options?.projectId || autosaveProjectId || '');
+    assertAutosaveProjectContext(contextProjectId);
     timelapseState.enabled = true;
     ensureTimelapseStartCapture();
     flushPendingTimelapseCapture({ force: true });
+    const tracks = getAllTimelapseTracks();
     await waitForPendingTimelapseArchiveWrites({ requireSuccess: requireComplete });
-    const session = buildProjectSessionPayload();
-    const persistedByCanvas = await loadPersistedTimelapseSnapshots(autosaveProjectId, {
-      throwOnError: requireComplete,
+    assertAutosaveProjectContext(contextProjectId, tracks);
+    const needsStoredBase = Object.values(tracks).some(track => Boolean(
+      track?.operationLog?.baseSnapshotStored && !track?.operationLog?.baseSnapshot
+    ));
+    const persisted = await loadPersistedTimelapseProject(contextProjectId, {
+      // If a live operation log points at its disk base, a failed read must not
+      // overwrite the previous complete V2 checkpoint with an incomplete one.
+      throwOnError: requireComplete || needsStoredBase,
     });
+    assertAutosaveProjectContext(contextProjectId, tracks);
+    const temporarilyHydrated = [];
+    let session;
+    try {
+      for (const [canvasId, track] of Object.entries(tracks)) {
+        const log = track?.operationLog && typeof track.operationLog === 'object'
+          ? track.operationLog
+          : null;
+        if (!log?.baseSnapshotStored || log.baseSnapshot) continue;
+        const storageCanvasId = log.baseSnapshotStorageCanvasId || canvasId;
+        const storageProjectId = normalizeAutosaveProjectId(
+          log.baseSnapshotStorageProjectId || contextProjectId
+        );
+        let storedBase = storageProjectId === contextProjectId
+          ? (persisted.baseSnapshotsByCanvas?.[storageCanvasId] || null)
+          : await loadPersistedTimelapseBaseSnapshot(storageCanvasId, storageProjectId);
+        assertAutosaveProjectContext(contextProjectId, tracks);
+        if (!storedBase) {
+          storedBase = await repairUnavailableTimelapseBase({
+            projectId: contextProjectId,
+            canvasId,
+            log,
+            allowCurrentStateReset: !requireComplete,
+          });
+          assertAutosaveProjectContext(contextProjectId, tracks);
+        }
+        if (!storedBase) {
+          const error = new Error(`Disk-backed timelapse base is unavailable: ${canvasId}`);
+          error.code = 'ERR_TIMELAPSE_BASE_UNAVAILABLE';
+          throw error;
+        }
+        log.baseSnapshot = storedBase;
+        if (log.baseSnapshotStored) {
+          temporarilyHydrated.push({ log, baseSnapshot: storedBase });
+        }
+      }
+      session = buildProjectSessionPayload();
+    } finally {
+      temporarilyHydrated.forEach(({ log, baseSnapshot }) => {
+        if (log?.baseSnapshotStored && log.baseSnapshot === baseSnapshot) {
+          log.baseSnapshot = null;
+        }
+      });
+    }
+    const persistedByCanvas = persisted.byCanvas;
     const timelapse = session?.timelapse;
     if (!timelapse || !persistedByCanvas || typeof persistedByCanvas !== 'object') {
       if (requireComplete) {
@@ -15959,6 +16226,42 @@
     }
   }
 
+  async function loadRecentProjectMetadataById(projectId, { includeAllAccounts = false } = {}) {
+    if (!AUTOSAVE_SUPPORTED) return null;
+    const normalizedProjectId = normalizeAutosaveProjectId(projectId || '');
+    if (!normalizedProjectId) return null;
+    try {
+      const db = await openAutosaveDatabase();
+      return await new Promise((resolve, reject) => {
+        let entry = null;
+        const tx = db.transaction([RECENT_PROJECTS_STORE], 'readonly');
+        const request = tx.objectStore(RECENT_PROJECTS_STORE).get(normalizedProjectId);
+        request.onsuccess = () => {
+          entry = request.result && typeof request.result === 'object'
+            ? request.result
+            : null;
+        };
+        request.onerror = () => reject(request.error);
+        tx.oncomplete = () => {
+          db.close();
+          resolve(
+            entry && (includeAllAccounts || isRecentProjectEntryVisibleForCurrentAccount(entry))
+              ? entry
+              : null
+          );
+        };
+        tx.onerror = () => {
+          const error = tx.error;
+          db.close();
+          reject(error);
+        };
+      });
+    } catch (error) {
+      console.warn('Failed to load recent project by id', error);
+      return null;
+    }
+  }
+
   async function saveRecentProjectsList(existingEntries, nextEntries) {
     if (!AUTOSAVE_SUPPORTED) return;
     const writeTask = async () => {
@@ -16396,6 +16699,13 @@
     if (restored?.manifest?.key) {
       autosaveV2CheckpointReadyProjectIds.add(normalizeAutosaveProjectId(projectId || ''));
     }
+    console.info('[pixiedraw:v2-read]', {
+      phase: 'read-complete',
+      projectId: normalizeAutosaveProjectId(projectId || ''),
+      revision: Math.max(0, Math.round(Number(restored?.manifest?.revision) || 0)),
+      fastPathUsed: restored?.fastPathUsed === true,
+      fallbackUsed: restored?.fallbackUsed === true,
+    });
     return restored?.packaged && typeof restored.packaged === 'object' ? restored.packaged : null;
   }
 
@@ -16981,8 +17291,19 @@
     if (!normalizedProjectId || (!journalOnly && (!snapshot || typeof snapshot !== 'object'))) {
       return null;
     }
+    const createSkippedResult = previousEntry => previousEntry || {
+      id: normalizedProjectId,
+      autosaveSchemaVersion: 2,
+      skippedBecauseProjectChanged: true,
+    };
+    if (normalizeAutosaveProjectId(autosaveProjectId || '') !== normalizedProjectId) {
+      return createSkippedResult(null);
+    }
     const existingEntries = await loadRecentProjectsMetadata();
     const previousEntry = existingEntries.find(entry => entry?.id === normalizedProjectId) || null;
+    if (normalizeAutosaveProjectId(autosaveProjectId || '') !== normalizedProjectId) {
+      return createSkippedResult(previousEntry);
+    }
     let written;
     let projectState = null;
     let thumbnail = previousEntry?.thumbnail || null;
@@ -16991,6 +17312,9 @@
       const normalizedOps = normalizeV2PixelPatchJournalOps(savePlan?.journalPayload || null);
       if (!normalizedOps || !normalizedOps.length) {
         throw new Error('V2 journal save requires valid pixel patches');
+      }
+      if (normalizeAutosaveProjectId(autosaveProjectId || '') !== normalizedProjectId) {
+        return createSkippedResult(previousEntry);
       }
       written = await autosaveSchemaV2IndexedDbUtilsModule.writeSchemaV2JournalRevision(
         normalizedProjectId,
@@ -17012,12 +17336,26 @@
     // first thumbnail after interaction settles. The recent-project card can
     // briefly use its placeholder instead of blocking V2 durability.
     thumbnail = previousEntry?.thumbnail || null;
-    const persistedTimelapseSession = await buildProjectSessionPayloadWithPersistedTimelapse();
+    let persistedTimelapseSession;
+    try {
+      persistedTimelapseSession = await buildProjectSessionPayloadWithPersistedTimelapse({
+        projectId: normalizedProjectId,
+      });
+    } catch (error) {
+      if (error?.code === 'ERR_AUTOSAVE_PROJECT_CONTEXT_CHANGED') {
+        return createSkippedResult(previousEntry);
+      }
+      throw error;
+    }
+    if (normalizeAutosaveProjectId(autosaveProjectId || '') !== normalizedProjectId) {
+      return createSkippedResult(previousEntry);
+    }
     const packagedPayload = savePlan?.packagedPayload
       ? { ...savePlan.packagedPayload, session: persistedTimelapseSession }
       : buildPackagedProjectPayload(snapshot, {
           session: persistedTimelapseSession,
           includeSheets: false,
+          internalBinary: true,
         });
     projectState = buildAutosaveSchemaV2ExperimentalProjectState({
       projectId: normalizedProjectId,
@@ -17057,6 +17395,12 @@
     if (!journalOnly) {
       markActiveLocalProjectJournalCheckpointPersisted(normalizedProjectId);
       releasePersistedInactiveOpenProjectTabPayloads(normalizedProjectId);
+      // The committed V2 checkpoint remains self-contained. Large all-frame
+      // timelapse bases are additionally copied to the local chunk store so
+      // the live editor can release them from JavaScript memory afterwards.
+      archiveTimelapseOperationLogBases(normalizedProjectId).catch(error => {
+        console.warn('Failed to offload committed timelapse bases.', error);
+      });
     }
     return metadata;
   }
@@ -17233,7 +17577,7 @@
       const allowProjectMismatchLoad = Boolean(options.allowProjectMismatchLoad || replaceOpenProjectTabs);
       const projectId = normalizeAutosaveProjectId(entry.id || '');
       const latestEntry = projectId
-        ? ((await loadRecentProjectsMetadata()).find(candidate => candidate?.id === projectId) || entry)
+        ? ((await loadRecentProjectMetadataById(projectId)) || entry)
         : entry;
       if (isSharedRecentProjectEntry(latestEntry)) {
         if (!SHARED_PROJECTS_ENABLED) {
@@ -17278,6 +17622,9 @@
       let restoredFromV2Primary = false;
       if (Number(latestEntry.autosaveSchemaVersion) === 2) {
         try {
+          const v2ReadStartedAt = typeof performance !== 'undefined' && typeof performance.now === 'function'
+            ? performance.now()
+            : Date.now();
           latestPackagedProject = await readAutosaveV2PrimaryProject(projectId || latestEntry.id || '');
           restoredFromV2Primary = Boolean(latestPackagedProject && typeof latestPackagedProject === 'object');
           console.info('[pixiedraw:recent-project-open]', {
@@ -17285,6 +17632,11 @@
             projectId: projectId || latestEntry.id || '',
             restored: restoredFromV2Primary,
             sheetCount: Array.isArray(latestPackagedProject?.sheets) ? latestPackagedProject.sheets.length : 0,
+            elapsedMs: Math.max(0, Math.round((
+              typeof performance !== 'undefined' && typeof performance.now === 'function'
+                ? performance.now()
+                : Date.now()
+            ) - v2ReadStartedAt)),
           });
         } catch (error) {
           console.warn('Failed to read V2 recent project payload', error);
@@ -17307,6 +17659,9 @@
           projectId: latestEntry.id || '',
           autosaveSchemaVersion: Number(latestEntry.autosaveSchemaVersion) || 0,
         });
+        const payloadApplyStartedAt = typeof performance !== 'undefined' && typeof performance.now === 'function'
+          ? performance.now()
+          : Date.now();
         const loaded = await loadDocumentFromProjectPayload(latestPackagedProject, {
           projectId: latestEntry.id || '',
           suppressAutosaveStatus: true,
@@ -17327,6 +17682,11 @@
           projectId: latestEntry.id || '',
           loaded: loaded === true,
           deferred: loaded === 'deferred',
+          elapsedMs: Math.max(0, Math.round((
+            typeof performance !== 'undefined' && typeof performance.now === 'function'
+              ? performance.now()
+              : Date.now()
+          ) - payloadApplyStartedAt)),
         });
         if (loaded === 'deferred') {
           if (Array.isArray(latestPackagedProject?.sheets) && latestPackagedProject.sheets.length > 0) {
@@ -17493,6 +17853,10 @@
 
   async function exportProjectAsGif(...args) {
     return exportRenderingModule.exportProjectAsGif(...args);
+  }
+
+  async function exportProjectAsAllFormatsZip(...args) {
+    return exportRenderingModule.exportProjectAsAllFormatsZip(...args);
   }
 
   async function exportProjectAsGridPng(...args) {

@@ -182,6 +182,9 @@
       const bytes = view instanceof Uint8Array
         ? view
         : new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
+      if (typeof bytes.toBase64 === 'function') {
+        return bytes.toBase64();
+      }
       let binary = '';
       const chunkSize = 0x8000;
       for (let i = 0; i < bytes.length; i += chunkSize) {
@@ -195,6 +198,9 @@
         return new Uint8Array(0);
       }
       try {
+        if (typeof Uint8Array.fromBase64 === 'function') {
+          return Uint8Array.fromBase64(value);
+        }
         const binary = window.atob(value);
         const length = binary.length;
         const bytes = new Uint8Array(length);

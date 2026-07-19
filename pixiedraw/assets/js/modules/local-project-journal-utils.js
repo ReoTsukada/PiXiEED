@@ -36,6 +36,13 @@
       if (value === undefined) {
         return fallback;
       }
+      if (typeof structuredClone === 'function') {
+        try {
+          return structuredClone(value);
+        } catch (_error) {
+          // Fall through for legacy values that structured clone cannot copy.
+        }
+      }
       try {
         return JSON.parse(JSON.stringify(value));
       } catch (_error) {
@@ -153,7 +160,7 @@
         type: PROJECT_PACKAGE_TYPE,
         packageVersion: PROJECT_PACKAGE_VERSION,
         version: DOCUMENT_FILE_VERSION,
-        document: serializeDocumentSnapshot(snapshot),
+        document: serializeDocumentSnapshot(snapshot, { preserveTypedArrays: true }),
         session: packagedSession,
         updatedAt: updatedAt || new Date().toISOString(),
       };

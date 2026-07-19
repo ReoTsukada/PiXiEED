@@ -1675,14 +1675,22 @@
       }
       const pixelCount = layer.indices.length;
       const expectedLength = pixelCount * 4;
-      const direct = layer.direct instanceof Uint8ClampedArray && layer.direct.length === expectedLength
+      let direct = layer.direct instanceof Uint8ClampedArray && layer.direct.length === expectedLength
         ? layer.direct
         : null;
+      if (
+        !direct
+        && layer.importSourceDirect instanceof Uint8ClampedArray
+        && layer.importSourceDirect.length === expectedLength
+      ) {
+        direct = layer.importSourceDirect;
+        layer.direct = direct;
+      }
       if (!direct) {
         layer.direct = null;
+        layer.importSourceDirect = null;
         return;
       }
-      let convertedLayer = false;
       for (let i = 0; i < pixelCount; i += 1) {
         if (layer.indices[i] >= 0) {
           continue;
@@ -1710,13 +1718,16 @@
           direct[base + 2] = 0;
           direct[base + 3] = 0;
           convertedPixels += 1;
-          convertedLayer = true;
         }
       }
-      if (colorMode === COLOR_MODE_INDEX && convertedLayer) {
+      if (colorMode === COLOR_MODE_INDEX) {
         layer.direct = null;
         layer.directOnly = false;
       }
+      // direct/indices are the current editable source of truth. The legacy
+      // import buffer is accepted at ingress but must not remain as a second
+      // full-resolution RGBA copy in memory or subsequent saves.
+      layer.importSourceDirect = null;
     });
 
     if (!palette.length) {

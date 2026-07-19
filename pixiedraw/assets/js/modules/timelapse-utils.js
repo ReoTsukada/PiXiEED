@@ -22,6 +22,10 @@
     function createEmptyTimelapseTrack() {
       return {
         snapshots: [],
+        // Saved preview frames remain encoded until timelapse playback/export.
+        // Keeping them lazy avoids expanding every historical RGBA frame while
+        // the user is only trying to open and edit the artwork.
+        serializedSnapshots: [],
         operationLog: null,
         warningShown: false,
         sampleStep: 1,
@@ -33,6 +37,9 @@
       return {
         version: 1,
         baseSnapshot: null,
+        baseSnapshotStored: false,
+        baseSnapshotStorageCanvasId: '',
+        baseSnapshotStorageProjectId: '',
         entries: [],
       };
     }

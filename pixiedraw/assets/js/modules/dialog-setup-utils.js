@@ -174,7 +174,6 @@
         refreshExportScaleControls();
         updateExportFormatAvailability();
         updateExportOriginalToggleUI();
-        updateExportPreview();
       });
     }
     [config.gridSplitToggle, config.timelapseToggle].forEach(toggle => {
@@ -186,7 +185,6 @@
         syncFormatOptions();
         refreshExportScaleControls();
         updateExportOriginalToggleUI();
-        updateExportPreview();
       });
     });
     if (config.fileNameInput instanceof HTMLInputElement && config.fileNameInput.dataset.bound !== 'true') {
@@ -225,7 +223,6 @@
         scheduleSessionPersist({ includeSnapshots: false });
         refreshExportScaleControls();
         updateExportOptionVisibility(config.format?.value || 'png');
-        updateExportPreview();
       });
     }
     if (config.spriteMapColorSpritesToggle instanceof HTMLInputElement
@@ -237,7 +234,6 @@
         scheduleSessionPersist({ includeSnapshots: false });
         refreshExportScaleControls();
         updateExportOptionVisibility(config.format?.value || 'png');
-        updateExportPreview();
       });
     }
 

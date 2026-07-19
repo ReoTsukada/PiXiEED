@@ -8,12 +8,18 @@ const css = fs.readFileSync(path.join(root, 'pixfind/styles.css'), 'utf8');
 const app = fs.readFileSync(path.join(root, 'pixfind/app.js'), 'utf8');
 
 assert.match(html, /<body data-pixfind-screen="start">/);
-assert.match(html, /styles\.css\?v=2026\.07\.19-market-grid3/);
-assert.match(html, /app\.js\?v=2026\.07\.19-market-grid4/);
+assert.match(html, /styles\.css\?v=2026\.07\.19-game-first-layout1/);
+assert.match(html, /app\.js\?v=2026\.07\.19-game-zoom5/);
 assert.doesNotMatch(html, />他のゲーム・ツール<\/a>/);
 assert.doesNotMatch(html, /class="(?:start-ad|difficulty-ad|game-ad)"/);
 
 assert.match(app, /document\.body\.dataset\.pixfindScreen = target/);
+assert.match(app, /const ZOOM_WHEEL_STEP_BASE = 1\.25;/);
+assert.match(app, /event\.preventDefault\(\);\s*const deltaModeScale = event\.deltaMode === 1/s);
+assert.doesNotMatch(app, /if \(!event\.ctrlKey\) \{\s*return;\s*\}/s);
+assert.match(app, /Only stop panning when the full image would leave that viewport/);
+assert.match(app, /frame\.addEventListener\('wheel', handleWheel/);
+assert.match(app, /frame\.setPointerCapture\(event\.pointerId\)/);
 assert.match(app, /\(idx \+ 1\) % 8 === 0/);
 assert.doesNotMatch(app, /idx === 7/);
 assert.match(app, /function createPuzzleListAd\(\)/);
@@ -30,5 +36,8 @@ assert.match(css, /\.puzzle-card,\s*\.puzzle-card--official \{[^}]*overflow: hid
 assert.match(css, /\.puzzle-card__actions \{[^}]*repeat\(2, minmax\(0, 1fr\)\)/s);
 assert.match(css, /\.puzzle-list-ad \{[^}]*grid-column: 1 \/ -1;/s);
 assert.match(css, /body\[data-pixieed-page="pixfind"\] \.pixieed-common-tabbar \{[^}]*left: 0 !important;[^}]*right: 0 !important;/s);
+assert.match(css, /\/\* Game-first board: the two images always share the available game surface\. \*\//);
+assert.match(css, /\.screen--game \.game-layout \{[^}]*grid-template-rows: repeat\(2, minmax\(0, 1fr\)\);/s);
+assert.match(css, /\.screen--game \{[^}]*overflow: hidden !important;/s);
 
 console.log('PiXFiND start layout checks passed.');

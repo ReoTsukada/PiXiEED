@@ -364,9 +364,16 @@
   // A saved PiXiEEDraw project is exactly one document.  `includeSheets` is
   // accepted only so older call sites do not throw while they are being
   // retired; it must never make a newly written package multi-project again.
-  function buildPackagedProjectPayload(snapshot, { session = null, updatedAt = '', includeSheets = false } = {}) {
+  function buildPackagedProjectPayload(snapshot, {
+    session = null,
+    updatedAt = '',
+    includeSheets = false,
+    internalBinary = false,
+  } = {}) {
     const resolvedDotStats = resolveTrackedProjectDotStats(snapshot);
-    const payload = serializeDocumentSnapshot(snapshot);
+    const payload = serializeDocumentSnapshot(snapshot, {
+      preserveTypedArrays: internalBinary === true,
+    });
     const packagedSession = session && typeof session === 'object'
       ? session
       : buildProjectSessionPayload();
@@ -400,6 +407,7 @@
         session: packagedSession,
         updatedAt: packaged.updatedAt,
         includeSheets: false,
+        internalBinary,
       });
       syncActiveProjectSheetForPackagedSave(activeSheetPackaged, snapshot);
       const projectSheets = buildProjectSheetsPayload(activeSheetPackaged);

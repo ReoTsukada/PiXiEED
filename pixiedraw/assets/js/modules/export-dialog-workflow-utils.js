@@ -782,13 +782,15 @@
 
   async function performExportByMode(mode) {
     const normalized = normalizeExportFormat(mode || 'png');
-    if (normalized !== 'spritemap' && shouldSaveSpriteMapCompanion(normalized)) {
+    if (normalized !== 'spritemap' && normalized !== 'allzip' && shouldSaveSpriteMapCompanion(normalized)) {
       await exportProjectAsSpriteMap({
         companionExport: true,
         includeProjectCompanion: false,
       });
     }
-    if (normalized === 'gif') {
+    if (normalized === 'allzip') {
+      await exportProjectAsAllFormatsZip();
+    } else if (normalized === 'gif') {
       await exportProjectAsGif();
     } else if (normalized === 'jpeg') {
       await exportProjectAsJpeg();

@@ -737,7 +737,7 @@
       }
       body[data-pixieed-page='pixfind'] .app{
         width:min(1220px, 100%)!important;
-        height:calc(100% - var(--pixieed-common-content-top) - var(--pixieed-shared-bottom-nav-offset, 68px))!important;
+        height:calc(var(--app-height) - var(--pixieed-common-content-top) - var(--pixieed-shared-bottom-nav-offset, 68px))!important;
         min-height:0!important;
         max-height:none!important;
         margin-top:var(--pixieed-common-content-top)!important;
@@ -796,7 +796,7 @@
         }
         body[data-pixieed-page='pixfind'] .app{
           width:calc(100% - var(--pixieed-shared-side-nav-width, 72px) - var(--pixieed-shared-side-nav-gap, 6px))!important;
-          height:calc(100% - var(--pixieed-common-tabbar-height))!important;
+          height:calc(var(--app-height) - var(--pixieed-common-tabbar-height))!important;
           margin:var(--pixieed-common-tabbar-height) calc(var(--pixieed-shared-side-nav-width, 72px) + var(--pixieed-shared-side-nav-gap, 6px)) 0 0!important;
           padding:0!important;
         }

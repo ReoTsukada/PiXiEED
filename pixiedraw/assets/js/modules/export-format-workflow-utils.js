@@ -43,7 +43,7 @@
     }
     try {
       const selectedFrameIndex = clamp(Math.round(Number(state.activeFrame) || 0), 0, Math.max(0, frameCount - 1));
-      const candidates = getExportScaleCandidates();
+      const candidates = getExportScaleCandidates(undefined, { allowFullScan: true });
       const selectedScale = applyExportScaleConstraints(candidates);
       syncExportScaleInputs();
       const colorSpriteArea = buildColorSpriteAppendAreaForCurrentExport('gridpng');
@@ -188,7 +188,7 @@
     }
     try {
       const isVoxelComposite = isVoxelExtensionModeEnabled();
-      const candidates = getExportScaleCandidates();
+      const candidates = getExportScaleCandidates(undefined, { allowFullScan: true });
       const selectedScale = applyExportScaleConstraints(candidates);
       syncExportScaleInputs();
       const includeOriginal = shouldExportOriginalCompanion('png', selectedScale);
@@ -297,7 +297,7 @@
     try {
       const width = Math.max(1, Math.round(Number(voxelExtensionPreviewMeta.width) || 1));
       const height = Math.max(1, Math.round(Number(voxelExtensionPreviewMeta.height) || 1));
-      const candidates = getExportScaleCandidates('voxelpreview');
+      const candidates = getExportScaleCandidates('voxelpreview', { allowFullScan: true });
       const selectedScale = applyExportScaleConstraints(candidates);
       syncExportScaleInputs();
       const baseCanvas = createFrameCanvas(voxelExtensionPreviewPixels, width, height);
