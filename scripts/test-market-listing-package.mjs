@@ -53,6 +53,7 @@ const sell = fs.readFileSync(new URL('../market/sell.js', import.meta.url), 'utf
 const sellHtml = fs.readFileSync(new URL('../market/sell.html', import.meta.url), 'utf8');
 const item = fs.readFileSync(new URL('../market/item.js', import.meta.url), 'utf8');
 const listingMigration = fs.readFileSync(new URL('../supabase/migrations/20260717140000_market_auto_formats_and_license_options.sql', import.meta.url), 'utf8');
+const optionPricingMigration = fs.readFileSync(new URL('../supabase/migrations/20260719210000_market_option_pricing.sql', import.meta.url), 'utf8');
 const sharedAd = fs.readFileSync(new URL('./bottom-nav-footer-ad.js', import.meta.url), 'utf8');
 assert.match(sell, /bindLocalUi\(\);\s*initRemote\(\);/);
 assert.match(sell, /PiXiEEDMarketPageAccess/);
@@ -80,7 +81,8 @@ const sellHtmlIds = new Set(Array.from(sellHtml.matchAll(/id="([^"]+)"/g), (matc
 const sellElementRefs = Array.from(sell.matchAll(/\$\('([^']+)'\)/g), (match) => match[1]);
 assert.deepEqual(Array.from(new Set(sellElementRefs.filter((id) => !sellHtmlIds.has(id)))), []);
 assert.match(sell, /input_option_prices:/);
-assert.match(sell, /input_sale_price_yen: salePrice/);
+assert.match(sell, /input_sale_price_yen: sellerPriceForRpc/);
+assert.match(sell, /market_create_root_asset_v7/);
 assert.doesNotMatch(sell, /input_base_use_price_yen/);
 assert.doesNotMatch(sell, /input_derivative_license_price_yen/);
 assert.match(item, /改変した素材を独立商品として再販売可能/);
@@ -90,6 +92,8 @@ assert.match(listingMigration, /option price must be an integer between its mini
 assert.match(listingMigration, /input_option_prices jsonb/);
 assert.doesNotMatch(listingMigration, /input_base_use_price_yen/);
 assert.match(listingMigration, /input_sale_price_yen \+ v_required_option_price/);
+assert.match(optionPricingMigration, /market_create_root_asset_v7/);
+assert.match(optionPricingMigration, /100 yen increments/i);
 assert.match(sharedAd, /window\.location\.protocol === 'file:'/);
 assert.match(sharedAd, /slotRect\.width < 1 \|\| slotRect\.height < 1/);
 
