@@ -619,6 +619,8 @@
 
     const button = $('listingSubmit'); button.disabled = true;
     let uploadedPaths = [];
+    let assetId = null;
+    let submissionStep = '下書き作成';
     try {
       const packageData = await buildPackage(entries);
       const previewEntries = activePreviewEntries();
@@ -680,13 +682,16 @@
         input_privacy_confirmed: $('listingPrivacyConfirmed').checked,
         input_original_work_confirmed: $('listingRights').checked
       };
-      const { data: assetId, error: draftError } = await client.rpc(rpcName, rpcInput);
+      const { data: createdAssetId, error: draftError } = await client.rpc(rpcName, rpcInput);
       if (draftError) throw draftError;
+      assetId = createdAssetId;
+      submissionStep = 'タグ設定';
       const { error: tagsError } = await client.rpc('market_set_listing_tags', {
         input_asset_id: assetId,
         input_tags: tags
       });
       if (tagsError) throw tagsError;
+      submissionStep = '限定販売設定';
       const { error: limitedError } = await client.rpc('market_set_listing_limited_sale', {
         input_asset_id: assetId,
         input_enabled: limitedEnabled,
@@ -694,6 +699,7 @@
       });
       if (limitedError) throw limitedError;
 
+      submissionStep = 'ファイル送信';
       const storedFiles = entries.map((entry, index) => ({ entry, path: storagePathFor(signedInUser.id, assetId, entry, index), metadata: packageData.files[index] }));
       for (let index = 0; index < storedFiles.length; index += 1) {
         const stored = storedFiles[index]; setStatus(`ファイルを送信しています（${index + 1}/${storedFiles.length}）...`);
@@ -726,21 +732,34 @@
       const manifestFile = new Blob([JSON.stringify({ ...provenance, asset_id: assetId, files: packageData.files, preview_storage: { thumbnail: thumbnailStoragePath, samples: sampleStoragePaths } }, null, 2)], { type: 'application/json' });
       const { error: manifestError } = await client.storage.from('market-private').upload(manifestPath, manifestFile, { upsert: false, contentType: 'application/json' });
       if (manifestError) throw manifestError; uploadedPaths.push(manifestPath);
-      const { error: attachError } = await client.rpc('market_attach_listing_package', {
+      submissionStep = '送信確定';
+      const attachInput = {
         input_asset_id: assetId,
         input_manifest_object_path: manifestPath,
         input_file_object_paths: storedFiles.map((stored) => stored.path),
         input_preview_object_path: thumbnailStoragePath,
         input_sample_preview_paths: sampleStoragePaths
-      });
+      };
+      let attachError = null;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        ({ error: attachError } = await client.rpc('market_attach_listing_package', attachInput));
+        if (!attachError) break;
+        await new Promise((resolve) => window.setTimeout(resolve, 700 * (attempt + 1)));
+      }
       if (attachError) throw attachError;
 
       form.reset(); clearFiles(); selectedOptionIds.clear(); optionPrices.clear();
       renderOptions(); renderOptionPriceFields(); updateLimitedState(); uploadedPaths = [];
-      setStatus('下書きを作成しました。サムネイルと試し見せ画像も審査後に公開されます。');
+      setStatus(aiUsageStatus === 'used' || derivativeContext
+        ? '出品を審査へ送りました。確認後に公開されます。'
+        : '出品を公開しました。');
     } catch (error) {
-      if (uploadedPaths.length) await client.storage.from('market-private').remove(uploadedPaths);
-      setStatus(`出品を作成できませんでした: ${error.message || '通信を確認してください'}`);
+      if (!assetId && uploadedPaths.length) await client.storage.from('market-private').remove(uploadedPaths);
+      if (assetId) {
+        setStatus(`下書きは作成済みです（ID: ${assetId}）。${submissionStep}で応答を確認できませんでした。重複送信はせず、このIDを添えて連絡してください: ${error.message || '通信を確認してください'}`);
+      } else {
+        setStatus(`出品を作成できませんでした: ${error.message || '通信を確認してください'}`);
+      }
     } finally {
       button.disabled = !submissionEnabled;
     }
