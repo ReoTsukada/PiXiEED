@@ -14,7 +14,7 @@
   const priceMax = document.getElementById('marketPriceMax');
   const filterReset = document.getElementById('marketFilterReset');
   const advancedSearch = document.getElementById('marketAdvancedSearch');
-  const fallbackIcon = '../Market.png';
+  const fallbackIcon = '../assets/icons/Market.png';
   const favorites = window.PiXiEEDMarketFavorites;
   const discovery = window.PiXiEEDMarketDiscovery;
   const localTestCatalog = window.PiXiEEDMarketLocalTestProducts || null;

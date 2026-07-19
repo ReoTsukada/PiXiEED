@@ -40,7 +40,7 @@
 
   function safePreview(value) {
     const preview = String(value || '').trim();
-    return /^https:\/\//i.test(preview) ? preview : asset('../Market.png');
+    return /^https:\/\//i.test(preview) ? preview : asset('../assets/icons/Market.png');
   }
 
   function renderMessage(titleText, detailText) {
@@ -49,7 +49,7 @@
     const cover = document.createElement('div');
     cover.className = 'account-cover';
     const image = new Image();
-    image.src = asset('../Market.png');
+    image.src = asset('../assets/icons/Market.png');
     image.alt = '';
     cover.appendChild(image);
     const body = document.createElement('div');

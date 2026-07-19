@@ -11,11 +11,11 @@ const CORE_ASSETS = [
   '/pixiedraw/assets/js/app.js',
   '/icon/icon-192-4.png',
   '/icon/icon-512-4.png',
-  '/icon-e1_frame_01.png',
-  '/icon-e1_frame_02.png',
-  '/icon-e1_frame_03.png',
-  '/icon-e1_frame_04.png',
-  '/icon-e1_frame_05.png',
+  '/assets/icons/icon-e1_frame_01.png',
+  '/assets/icons/icon-e1_frame_02.png',
+  '/assets/icons/icon-e1_frame_03.png',
+  '/assets/icons/icon-e1_frame_04.png',
+  '/assets/icons/icon-e1_frame_05.png',
 ];
 
 self.addEventListener('install', event => {

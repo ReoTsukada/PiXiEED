@@ -14,7 +14,7 @@
       gate = document.createElement('main');
       gate.id = 'marketDevGate';
       gate.className = 'market-dev-gate';
-      const icon = new Image(); icon.src = new URL('../Market.png', window.location.href).href; icon.alt = '';
+      const icon = new Image(); icon.src = new URL('../assets/icons/Market.png', window.location.href).href; icon.alt = '';
       const label = document.createElement('span'); label.className = 'market-dev-gate__label'; label.textContent = writeLocked ? 'COMING SOON' : 'DEVELOPMENT ACCESS';
       const title = document.createElement('h1'); title.textContent = writeLocked ? '出品機能は準備中です' : 'この機能はDEV限定公開中です';
       const copy = document.createElement('p');

@@ -241,10 +241,10 @@
 
   function getNavItems() {
     return [
-      { key: 'home', label: 'ホーム', path: 'index.html', icon: 'HOME.png?v=2026.07.19-ui-icons1' },
-      { key: 'market', label: 'マーケット', path: 'market/index.html', icon: 'Market.png' },
-      { key: 'draw', label: 'PiXiEEDraw', path: 'pixiedraw/index.html', icon: 'Draw.png?v=2026.07.19-ui-icons1', primary: true },
-      { key: 'camera', label: 'カメラ', path: 'pixiee-lens/index.html', icon: 'Camera.png' },
+      { key: 'home', label: 'ホーム', path: 'index.html', icon: 'assets/icons/HOME.png?v=2026.07.19-ui-icons1' },
+      { key: 'market', label: 'マーケット', path: 'market/index.html', icon: 'assets/icons/Market.png' },
+      { key: 'draw', label: 'PiXiEEDraw', path: 'pixiedraw/index.html', icon: 'assets/icons/Draw.png?v=2026.07.19-ui-icons1', primary: true },
+      { key: 'camera', label: 'カメラ', path: 'pixiee-lens/index.html', icon: 'assets/icons/Camera.png' },
       { key: 'account', label: 'マイページ', path: 'account/index.html', icon: 'pixiedraw/assets/icons/ecticon_frame_01.png' }
     ];
   }

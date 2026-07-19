@@ -32,7 +32,7 @@
     const item = document.createElement('article');
     item.className = 'account-item';
     const cover = document.createElement('div'); cover.className = 'account-cover';
-    const image = new Image(); image.src = assetUrl('../Market.png'); image.alt = ''; cover.appendChild(image);
+    const image = new Image(); image.src = assetUrl('../assets/icons/Market.png'); image.alt = ''; cover.appendChild(image);
     const body = document.createElement('div'); body.className = 'account-item__body';
     const title = document.createElement('strong'); title.textContent = titleText;
     const detail = document.createElement('span'); detail.textContent = detailText;
@@ -126,7 +126,7 @@
     const card = document.createElement('article'); card.className = 'market-card account-market-card';
     const previewLink = document.createElement('a'); previewLink.className = 'market-card__preview';
     previewLink.href = assetUrl(`../market/item.html?id=${encodeURIComponent(product.id || '')}`);
-    const image = new Image(); image.src = product.preview_url || assetUrl('../Market.png'); image.alt = ''; image.draggable = false; image.dataset.marketProtectedMedia = 'true'; previewLink.appendChild(image);
+    const image = new Image(); image.src = product.preview_url || assetUrl('../assets/icons/Market.png'); image.alt = ''; image.draggable = false; image.dataset.marketProtectedMedia = 'true'; previewLink.appendChild(image);
     const body = document.createElement('div'); body.className = 'market-card__body';
     const title = document.createElement('h3'); title.textContent = product.title || '購入済み素材';
     const author = document.createElement('p'); author.className = 'market-card__author'; author.textContent = `作者 ${product.creator_display_name || 'PiXiEEDクリエイター'}`;
