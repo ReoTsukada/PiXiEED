@@ -659,7 +659,11 @@
       deleteButton.type = 'button';
       deleteButton.className = 'startup-recent-card__delete';
       deleteButton.dataset.startupRecentDeleteId = entry.id;
-      deleteButton.textContent = '×';
+      const deleteIcon = document.createElement('img');
+      deleteIcon.src = '../assets/icons/delete.png';
+      deleteIcon.alt = '';
+      deleteIcon.setAttribute('aria-hidden', 'true');
+      deleteButton.appendChild(deleteIcon);
       deleteButton.title = isSharedEntry
         ? localizeText('共有プロジェクト一覧から外す', 'Remove shared project from list')
         : localizeText('端末内プロジェクトを削除', 'Delete local project');

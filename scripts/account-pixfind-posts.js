@@ -112,22 +112,25 @@
     open.href = puzzleUrl;
     open.textContent = '開く';
     const share = document.createElement('button');
-    share.className = 'account-card-action';
+    share.className = 'account-card-action account-card-action--share';
     share.type = 'button';
-    share.textContent = 'リンクをコピー';
+    share.title = 'リンクをコピー';
     share.setAttribute('aria-label', `${entry?.label || 'PiXFiND'}のリンクをコピー`);
     share.addEventListener('click', async () => {
       share.disabled = true;
       try {
         if (!window.PiXiEEDAccountShare) throw new Error('share-unavailable');
         await window.PiXiEEDAccountShare.copyLink(puzzleUrl);
-        share.textContent = 'コピーしました';
+        share.classList.add('is-success');
+        share.setAttribute('aria-label', `${entry?.label || 'PiXFiND'}のリンクをコピーしました`);
       } catch (_error) {
-        share.textContent = 'コピーできません';
+        share.classList.add('is-error');
+        share.setAttribute('aria-label', `${entry?.label || 'PiXFiND'}のリンクをコピーできませんでした`);
       }
       window.setTimeout(() => {
         share.disabled = false;
-        share.textContent = 'リンクをコピー';
+        share.classList.remove('is-success', 'is-error');
+        share.setAttribute('aria-label', `${entry?.label || 'PiXFiND'}のリンクをコピー`);
       }, 1800);
     });
     actions.append(open, share);

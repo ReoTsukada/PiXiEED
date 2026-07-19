@@ -14,8 +14,11 @@
     webp: 'WebP',
     gif: 'GIF',
     apng: 'APNG',
-    'sprite-sheet-png': 'PNGスプライトシート'
+    'sprite-sheet-png': 'PNGスプライトシート',
+    'gif-frames-png': 'GIF → 各フレームPNG',
+    'gif-spritemap-png': 'GIF → SpriteMAP＋カラーマップ'
   };
+  const GIF_DERIVED_FORMATS = new Set(['gif-frames-png', 'gif-spritemap-png']);
   let renderToken = 0;
 
   const formatLabel = (value) => FORMAT_LABELS[String(value || '')] || String(value || 'ファイル');
@@ -69,6 +72,12 @@
     const results = new Array(files.length);
     let nextIndex = 0;
     let completed = 0;
+    const declaredBytes = files.reduce((sum, file) => sum + Math.max(0, Number(file?.size) || 0), 0);
+    const workerCount = declaredBytes >= 64 * 1024 * 1024
+      ? 1
+      : declaredBytes >= 16 * 1024 * 1024
+        ? Math.min(2, files.length)
+        : Math.min(4, files.length);
     async function worker() {
       while (nextIndex < files.length) {
         const index = nextIndex; nextIndex += 1;
@@ -84,7 +93,7 @@
         completed += 1; onProgress?.(completed, files.length);
       }
     }
-    await Promise.all(Array.from({ length: Math.min(4, files.length) }, () => worker()));
+    await Promise.all(Array.from({ length: workerCount }, () => worker()));
     return results;
   }
 
@@ -98,7 +107,7 @@
       `${isAdminGrant ? '管理者取得ID' : '購入ID'}: ${payload.purchase?.id || ''}`,
       `出力追跡番号: ${payload.trace_id || ''}`,
       `${isAdminGrant ? '取得日' : '購入日'}: ${formatDate(payload.purchase?.paid_at)}`,
-      `選択形式: ${(payload.formats || []).map(formatLabel).join(' / ')}`,
+      `選択形式: ${(payload.output_modes || payload.formats || []).map(formatLabel).join(' / ')}`,
       `購入オプション: ${optionIds.length ? optionIds.join(', ') : 'なし'}`,
       `派生出品: ${payload.license?.derivative_sales_allowed ? '商品条件に従い可能' : '不可'}`,
       '',
@@ -108,11 +117,13 @@
     ].join('\n');
   }
 
-  function createFormatSwitch(format, selected) {
+  function createFormatSwitch(format, selected, description = '') {
     const label = document.createElement('label'); label.className = 'account-market-format';
     const input = document.createElement('input'); input.type = 'checkbox'; input.value = format; input.checked = selected;
-    const text = document.createElement('span'); text.textContent = formatLabel(format);
-    label.append(input, text); return label;
+    const copy = document.createElement('span'); copy.className = 'account-market-format__copy';
+    const text = document.createElement('strong'); text.textContent = formatLabel(format); copy.appendChild(text);
+    if (description) { const detail = document.createElement('small'); detail.textContent = description; copy.appendChild(detail); }
+    label.append(input, copy); return label;
   }
 
   function createButton(label, className = '') {
@@ -148,7 +159,14 @@
 
     const fieldset = document.createElement('fieldset'); fieldset.className = 'account-market-formats';
     const legend = document.createElement('legend'); legend.textContent = 'ZIPに入れる形式';
-    const switches = formats.map((entry) => createFormatSwitch(entry, true)); fieldset.append(legend, ...switches);
+    const switches = formats.map((entry) => createFormatSwitch(entry, true));
+    if (formats.includes('gif')) {
+      switches.push(
+        createFormatSwitch('gif-frames-png', false, 'GIFを分解し、全フレームを連番PNGで収録'),
+        createFormatSwitch('gif-spritemap-png', false, '全フレームを1枚に配置し、PNG・JSONのカラーマップを同梱')
+      );
+    }
+    fieldset.append(legend, ...switches);
     const actions = document.createElement('div'); actions.className = 'account-market-actions';
     const drawButton = createButton('PiXiEEDrawで開く', 'account-market-button--primary'); actions.appendChild(drawButton);
     if (right?.status === 'active' && right?.id && right?.source_asset_id) {
@@ -178,24 +196,56 @@
       if (!selected.length) { status.textContent = '出力する形式を1つ以上選択してください。'; return; }
       setBusy(true); status.textContent = '安全な出力を準備しています…';
       try {
-        const payload = await invoke(client, { action: 'authorize', kind: 'zip', asset_id: product.id, formats: selected });
+        const sourceFormats = Array.from(new Set(selected.map((format) => GIF_DERIVED_FORMATS.has(format) ? 'gif' : format)));
+        const payload = await invoke(client, { action: 'authorize', kind: 'zip', asset_id: product.id, formats: sourceFormats });
         const downloaded = await fetchDeliveredFiles(payload.files || [], (done, total) => { status.textContent = `ファイルを確認しています（${done}/${total}）…`; });
-        status.textContent = 'ZIPを作成しています…';
+        const tasks = downloaded
+          .filter((file) => selected.includes(file.format))
+          .map((file) => ({ filename: file.original_path || file.name, blob: file.blob }));
+        const gifFiles = downloaded.filter((file) => file.format === 'gif');
+        if (selected.includes('gif-frames-png')) {
+          for (let index = 0; index < gifFiles.length; index += 1) {
+            const file = gifFiles[index];
+            const generated = await delivery.buildGifFramePngTasks(file.blob, file.original_path || file.name, (done, total) => {
+              status.textContent = `GIFを各フレームPNGへ変換しています（${index + 1}/${gifFiles.length}・${done}/${total}）…`;
+            });
+            tasks.push(...generated);
+          }
+        }
+        if (selected.includes('gif-spritemap-png')) {
+          for (let index = 0; index < gifFiles.length; index += 1) {
+            const file = gifFiles[index];
+            const generated = await delivery.buildGifSpriteMapTasks(file.blob, file.original_path || file.name, (done, total) => {
+              status.textContent = `GIFのSpriteMAPを作成しています（${index + 1}/${gifFiles.length}・${done}/${total}）…`;
+            });
+            tasks.push(...generated);
+          }
+        }
+        const deliveryPayload = { ...payload, output_modes: selected };
         const manifest = {
           schema: 'pixieed-market-delivery/v1',
           asset: payload.asset,
           purchase: payload.purchase,
           trace_id: payload.trace_id,
           formats: payload.formats,
+          output_modes: selected,
           license: payload.license,
-          files: downloaded.map(({ url, blob, ...file }) => file)
+          files: downloaded.map(({ url, blob, ...file }) => file),
+          generated_files: tasks.filter((task) => !downloaded.some((file) => (file.original_path || file.name) === task.filename)).map((task) => ({
+            name: task.filename,
+            size: task.blob.size,
+            mime_type: task.blob.type || 'application/octet-stream'
+          }))
         };
-        const tasks = downloaded.map((file) => ({ filename: file.original_path || file.name, blob: file.blob }));
         tasks.push(
-          { filename: 'PiXiEED-LICENSE.txt', blob: new Blob([licenseText(payload)], { type: 'text/plain;charset=utf-8' }) },
+          { filename: 'PiXiEED-LICENSE.txt', blob: new Blob([licenseText(deliveryPayload)], { type: 'text/plain;charset=utf-8' }) },
           { filename: 'PiXiEED-MANIFEST.json', blob: new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' }) }
         );
-        const zip = await delivery.buildZipBlob(tasks);
+        status.textContent = 'ZIPを作成しています…';
+        const zip = await delivery.buildZipBlob(tasks, ({ fileIndex, fileCount, processedBytes, totalBytes }) => {
+          const percent = totalBytes > 0 ? Math.min(100, Math.round((processedBytes / totalBytes) * 100)) : 100;
+          status.textContent = `ZIPを作成しています（${fileIndex}/${fileCount}・${percent}%）…`;
+        });
         delivery.saveBlob(zip, `${safeArchiveName(product.title)}.zip`);
         status.textContent = 'ZIPを出力しました。購入済み商品はいつでも再出力できます。';
       } catch (error) {

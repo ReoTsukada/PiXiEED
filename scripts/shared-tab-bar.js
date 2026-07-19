@@ -131,7 +131,7 @@
         ],
         details: [
           { label: 'ヘルプ', path: 'help/index.html', icon: 'assets/icons/help.png?v=2026.07.17-icons1' },
-          { label: 'アカウント削除', path: 'account-deletion/index.html', icon: 'pixiedraw/assets/icons/action-delete.svg' },
+          { label: 'アカウント削除', path: 'account-deletion/index.html', icon: 'assets/icons/delete.png?v=2026.07.19-ui-icons1' },
           { label: 'お問い合わせ', path: 'contact/index.html', icon: 'pixiedraw/assets/icons/talk.png' },
           { label: '利用規約', path: 'terms/index.html', icon: 'assets/icons/Terms.png?v=2026.07.19-icons1' },
           { label: 'プライバシー', path: 'privacy/index.html', icon: 'assets/icons/Privacy-Policy.png?v=2026.07.19-icons2' },

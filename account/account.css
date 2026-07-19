@@ -496,6 +496,16 @@ body[data-pixieed-account-auth="signed-in"] .account-panel[data-account-tab="set
   gap: 6px;
 }
 .account-card-actions--listing { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.account-card-actions--listing .account-card-action {
+  width: 100%;
+  height: 32px;
+  min-width: 0;
+  min-height: 32px;
+  box-sizing: border-box;
+  align-self: stretch;
+  justify-self: stretch;
+  padding: 0;
+}
 .account-card-actions--single { grid-template-columns: 1fr; }
 
 .account-card-action {
@@ -517,9 +527,35 @@ body[data-pixieed-account-auth="signed-in"] .account-panel[data-account-tab="set
 .account-card-action:focus-visible { border-color: rgba(121,192,255,.72); background: rgba(121,192,255,.17); }
 .account-card-action:disabled { cursor: not-allowed; opacity: .46; }
 .account-card-action--primary { background: #19345c; color: #fff; }
-.account-card-action--danger { border-color: rgba(248,113,113,.4); background: rgba(127,29,29,.22); color: #fecaca; }
+.account-card-action--market,
+.account-card-action--delete {
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 15px 15px;
+  image-rendering: pixelated;
+}
+.account-card-action--market { background-image: url('../assets/icons/Market.png'); }
+.account-card-action--delete { background-image: url('../assets/icons/delete.png'); }
+.account-card-action--share {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  box-sizing: border-box;
+  align-self: center;
+  padding: 0;
+  justify-self: center;
+  background-image: url('../assets/icons/share.png');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 15px 15px;
+  image-rendering: pixelated;
+}
+.account-card-action--share.is-success { border-color: rgba(52,211,153,.72); background-color: rgba(6,95,70,.36); }
+.account-card-action--share.is-error { border-color: rgba(248,113,113,.72); background-color: rgba(127,29,29,.36); }
+.account-card-action--danger { border-color: rgba(248,113,113,.4); background-color: rgba(127,29,29,.22); color: #fecaca; }
 .account-card-action--danger:hover,
-.account-card-action--danger:focus-visible { border-color: rgba(248,113,113,.78); background: rgba(127,29,29,.4); }
+.account-card-action--danger:focus-visible { border-color: rgba(248,113,113,.78); background-color: rgba(127,29,29,.4); }
 
 .account-listing-card__status {
   position: absolute;
@@ -628,6 +664,39 @@ body[data-pixieed-account-auth="signed-out"] .account-panel--profile > .section-
   display: grid;
   gap: 8px;
 }
+
+.account-market-formats {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 8px;
+  border: 1px solid rgba(121,192,255,.2);
+  border-radius: 7px;
+}
+
+.account-market-formats legend {
+  padding-inline: 4px;
+  color: #b9dfff;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.account-market-format {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  min-width: 0;
+  padding: 6px 7px;
+  border-radius: 6px;
+  background: rgba(255,255,255,.045);
+  color: #e6f3ff;
+  cursor: pointer;
+}
+
+.account-market-format input { margin-top: 2px; }
+.account-market-format__copy { display: grid; min-width: 0; gap: 2px; }
+.account-market-format__copy strong { font-size: 10px; line-height: 1.35; }
+.account-market-format__copy small { color: #9fb4c8; font-size: 9px; line-height: 1.45; }
 
 .account-reward-history { display: grid; gap: 6px; }
 .account-reward-history__row {
@@ -979,4 +1048,5 @@ body[data-pixieed-account-auth="signed-out"] .account-panel--profile > .section-
   .account-chart-legend { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .account-chart-legend button { justify-content: flex-start; }
   .account-card-actions { grid-template-columns: 1fr; }
+  .account-card-actions--listing { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }

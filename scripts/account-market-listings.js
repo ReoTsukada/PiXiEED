@@ -115,40 +115,43 @@
     actions.className = 'account-card-actions account-card-actions--listing';
     if (published) {
       const open = document.createElement('a');
-      open.className = 'account-card-action account-card-action--primary';
+      open.className = 'account-card-action account-card-action--primary account-card-action--market';
       open.href = publicUrl;
-      open.textContent = '商品を見る';
+      open.title = '商品を見る';
+      open.setAttribute('aria-label', `${titleText}の商品を見る`);
       actions.appendChild(open);
     }
     const share = document.createElement('button');
-    share.className = 'account-card-action';
+    share.className = 'account-card-action account-card-action--share';
     share.type = 'button';
     share.disabled = !published;
-    share.textContent = published ? 'リンクをコピー' : '公開後に共有';
+    share.title = published ? 'リンクをコピー' : '公開後に共有できます';
     share.setAttribute('aria-label', published ? `${titleText}のリンクをコピー` : `${titleText}は公開後に共有できます`);
-    if (!published) actions.classList.add('account-card-actions--single');
     share.addEventListener('click', async () => {
       share.disabled = true;
       try {
         if (!window.PiXiEEDAccountShare) throw new Error('share-unavailable');
         await window.PiXiEEDAccountShare.copyLink(publicUrl);
-        share.textContent = 'コピーしました';
+        share.classList.add('is-success');
+        share.setAttribute('aria-label', `${titleText}のリンクをコピーしました`);
         if (shareStatus) shareStatus.textContent = `「${titleText}」の商品リンクをコピーしました。`;
       } catch (_error) {
-        share.textContent = 'コピーできません';
+        share.classList.add('is-error');
+        share.setAttribute('aria-label', `${titleText}のリンクをコピーできませんでした`);
         if (shareStatus) shareStatus.textContent = 'リンクをコピーできませんでした。';
       }
       window.setTimeout(() => {
         share.disabled = false;
-        share.textContent = 'リンクをコピー';
+        share.classList.remove('is-success', 'is-error');
+        share.setAttribute('aria-label', `${titleText}のリンクをコピー`);
       }, 1800);
     });
     actions.appendChild(share);
     if (published && !withdrawn) {
       const withdraw = document.createElement('button');
-      withdraw.className = 'account-card-action account-card-action--danger';
+      withdraw.className = 'account-card-action account-card-action--danger account-card-action--delete';
       withdraw.type = 'button';
-      withdraw.textContent = '取り下げる';
+      withdraw.title = '取り下げる';
       withdraw.setAttribute('aria-label', `${titleText}を取り下げる`);
       withdraw.addEventListener('click', async () => {
         const confirmed = window.confirm(
@@ -156,12 +159,12 @@
         );
         if (!confirmed) return;
         withdraw.disabled = true;
-        withdraw.textContent = '取り下げ中';
+        withdraw.setAttribute('aria-label', `${titleText}を取り下げています`);
         if (shareStatus) shareStatus.textContent = `「${titleText}」を取り下げています。`;
         const { error } = await client.rpc('market_withdraw_my_listing_v1', { input_asset_id: id });
         if (error) {
           withdraw.disabled = false;
-          withdraw.textContent = '取り下げる';
+          withdraw.setAttribute('aria-label', `${titleText}を取り下げる`);
           if (shareStatus) shareStatus.textContent = withdrawalErrorMessage(error);
           return;
         }
