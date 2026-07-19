@@ -19,6 +19,26 @@
     GifReader,
   } = {}) {
 
+    const integerScaleSampleGrid = Math.max(1, Math.floor(Number(IMPORT_INTEGER_SCALE_SAMPLE_GRID) || 8));
+    const resolveImageImportCheckFrameIndexes = typeof getImageImportCheckFrameIndexes === 'function'
+      ? getImageImportCheckFrameIndexes
+      : (frameCount) => {
+          const count = Math.max(0, Math.floor(Number(frameCount) || 0));
+          return count ? Array.from(new Set([0, Math.floor((count - 1) / 2), count - 1])) : [];
+        };
+    const resolveGreatestCommonDivisor = typeof getGreatestCommonDivisor === 'function'
+      ? getGreatestCommonDivisor
+      : (first, second) => {
+          let left = Math.abs(Math.floor(Number(first) || 0));
+          let right = Math.abs(Math.floor(Number(second) || 0));
+          while (right) {
+            const remainder = left % right;
+            left = right;
+            right = remainder;
+          }
+          return left;
+        };
+
     function quickCheckImageDataNearestUpscale(imageData, factor) {
       if (!imageData || !(imageData.data instanceof Uint8ClampedArray)) {
         return false;
@@ -30,8 +50,8 @@
         return false;
       }
       const data = imageData.data;
-      const sampleCols = Math.max(1, Math.min(IMPORT_INTEGER_SCALE_SAMPLE_GRID, Math.floor(width / scale)));
-      const sampleRows = Math.max(1, Math.min(IMPORT_INTEGER_SCALE_SAMPLE_GRID, Math.floor(height / scale)));
+      const sampleCols = Math.max(1, Math.min(integerScaleSampleGrid, Math.floor(width / scale)));
+      const sampleRows = Math.max(1, Math.min(integerScaleSampleGrid, Math.floor(height / scale)));
       const stepX = width / sampleCols;
       const stepY = height / sampleRows;
       for (let row = 0; row < sampleRows; row += 1) {
@@ -56,15 +76,15 @@
     }
   
   
-    function isImageDataNearestNeighborUpscaled(imageData, factor) {
+    function inspectImageDataNearestNeighborUpscale(imageData, factor) {
       if (!imageData || !(imageData.data instanceof Uint8ClampedArray)) {
-        return false;
+        return { valid: false, hasInterBlockDifference: false };
       }
       const width = Math.max(1, Math.floor(Number(imageData.width) || 0));
       const height = Math.max(1, Math.floor(Number(imageData.height) || 0));
       const scale = Math.max(1, Math.floor(Number(factor) || 1));
       if (scale <= 1 || width % scale !== 0 || height % scale !== 0) {
-        return false;
+        return { valid: false, hasInterBlockDifference: false };
       }
       const data = imageData.data;
       let hasInterBlockDifference = false;
@@ -109,14 +129,20 @@
                 || data[pixelBase + 2] !== b
                 || data[pixelBase + 3] !== a
               ) {
-                return false;
+                return { valid: false, hasInterBlockDifference: false };
               }
               pixelBase += 4;
             }
           }
         }
       }
-      return hasInterBlockDifference;
+      return { valid: true, hasInterBlockDifference };
+    }
+
+
+    function isImageDataNearestNeighborUpscaled(imageData, factor) {
+      const inspection = inspectImageDataNearestNeighborUpscale(imageData, factor);
+      return inspection.valid && inspection.hasInterBlockDifference;
     }
   
   
@@ -126,11 +152,11 @@
       }
       const sourceWidth = Math.max(1, Math.floor(Number(width) || 0));
       const sourceHeight = Math.max(1, Math.floor(Number(height) || 0));
-      const gcd = getGreatestCommonDivisor(sourceWidth, sourceHeight);
+      const gcd = resolveGreatestCommonDivisor(sourceWidth, sourceHeight);
       if (gcd < 2) {
         return 1;
       }
-      const frameIndexes = getImageImportCheckFrameIndexes(frames.length);
+      const frameIndexes = resolveImageImportCheckFrameIndexes(frames.length);
       if (!frameIndexes.length) {
         return 1;
       }
@@ -151,15 +177,18 @@
           continue;
         }
         let fullValid = true;
+        let hasInterBlockDifference = false;
         for (let i = 0; i < frameIndexes.length; i += 1) {
           const frameInfo = frames[frameIndexes[i]];
           const imageData = frameInfo?.imageData;
-          if (!isImageDataNearestNeighborUpscaled(imageData, factor)) {
+          const inspection = inspectImageDataNearestNeighborUpscale(imageData, factor);
+          if (!inspection.valid) {
             fullValid = false;
             break;
           }
+          hasInterBlockDifference ||= inspection.hasInterBlockDifference;
         }
-        if (fullValid) {
+        if (fullValid && hasInterBlockDifference) {
           return factor;
         }
       }
@@ -185,6 +214,107 @@
       const imageData = ctx2d.createImageData(width, height);
       imageData.data.set(pixels);
       return imageData;
+    }
+
+
+    function createIntegerDownscaledImageDataFromPixels(pixels, sourceWidth, sourceHeight, factor) {
+      const scale = Math.max(1, Math.floor(Number(factor) || 1));
+      const width = Math.max(1, Math.floor(sourceWidth / scale));
+      const height = Math.max(1, Math.floor(sourceHeight / scale));
+      if (scale <= 1) {
+        return createImageDataFromPixels(new Uint8ClampedArray(pixels), sourceWidth, sourceHeight);
+      }
+      const output = new Uint8ClampedArray(width * height * 4);
+      for (let y = 0; y < height; y += 1) {
+        const sourceRow = (y * scale) * sourceWidth;
+        const outputRow = y * width;
+        for (let x = 0; x < width; x += 1) {
+          const sourceBase = (sourceRow + (x * scale)) * 4;
+          const outputBase = (outputRow + x) * 4;
+          output[outputBase] = pixels[sourceBase];
+          output[outputBase + 1] = pixels[sourceBase + 1];
+          output[outputBase + 2] = pixels[sourceBase + 2];
+          output[outputBase + 3] = pixels[sourceBase + 3];
+        }
+      }
+      return createImageDataFromPixels(output, width, height);
+    }
+
+
+    function detectGifCommonIntegerScale(reader, width, height, frameCount) {
+      let commonFactor = resolveGreatestCommonDivisor(width, height);
+      let hasInterBlockDifference = false;
+      visitGifCompositedFrames(reader, width, height, frameCount, ({ pixels }) => {
+        if (commonFactor <= 1) return;
+        for (let y = 0; y < height && commonFactor > 1; y += 1) {
+          for (let x = 0; x < width && commonFactor > 1; x += 1) {
+            const base = ((y * width) + x) * 4;
+            if (x > 0) {
+              const left = base - 4;
+              if (
+                pixels[base] !== pixels[left]
+                || pixels[base + 1] !== pixels[left + 1]
+                || pixels[base + 2] !== pixels[left + 2]
+                || pixels[base + 3] !== pixels[left + 3]
+              ) {
+                hasInterBlockDifference = true;
+                commonFactor = resolveGreatestCommonDivisor(commonFactor, x);
+              }
+            }
+            if (y > 0 && commonFactor > 1) {
+              const top = base - (width * 4);
+              if (
+                pixels[base] !== pixels[top]
+                || pixels[base + 1] !== pixels[top + 1]
+                || pixels[base + 2] !== pixels[top + 2]
+                || pixels[base + 3] !== pixels[top + 3]
+              ) {
+                hasInterBlockDifference = true;
+                commonFactor = resolveGreatestCommonDivisor(commonFactor, y);
+              }
+            }
+          }
+        }
+      });
+      return hasInterBlockDifference ? Math.max(1, commonFactor) : 1;
+    }
+
+
+    function visitGifCompositedFrames(reader, width, height, frameCount, visitor) {
+      const pixels = new Uint8ClampedArray(width * height * 4);
+      const restoreBuffer = new Uint8ClampedArray(pixels.length);
+      const backgroundColor = typeof reader.getBackgroundColor === 'function' ? reader.getBackgroundColor() : null;
+      const backgroundIndex = typeof reader.getBackgroundIndex === 'function' ? reader.getBackgroundIndex() : null;
+      let previousFrameInfo = null;
+
+      if (backgroundColor && backgroundColor.a > 0) {
+        fillGifCanvas(pixels, backgroundColor);
+      } else {
+        pixels.fill(0);
+      }
+
+      for (let index = 0; index < frameCount; index += 1) {
+        const info = reader.frameInfo(index);
+        if (previousFrameInfo) {
+          if (previousFrameInfo.disposal === 2) {
+            const fillColor = resolveDisposalFillColor(previousFrameInfo, backgroundColor, backgroundIndex);
+            clearGifFrameRect(pixels, width, height, previousFrameInfo, fillColor);
+          } else if (previousFrameInfo.disposal === 3) {
+            pixels.set(restoreBuffer);
+          }
+        }
+        if (info.disposal === 3) restoreBuffer.set(pixels);
+        reader.decodeAndBlitFrameRGBA(index, pixels);
+        const delayHundredths = Number(info.delay);
+        visitor({
+          index,
+          pixels,
+          duration: Number.isFinite(delayHundredths) && delayHundredths > 0
+            ? delayHundredths * 10
+            : DEFAULT_IMPORT_FRAME_DURATION,
+        });
+        previousFrameInfo = info;
+      }
     }
   
   
@@ -497,52 +627,37 @@
       if (!Number.isFinite(frameCount) || frameCount <= 0) {
         throw createImageImportError('GIFにフレームが含まれていません');
       }
-      const pixels = new Uint8ClampedArray(width * height * 4);
-      const restoreBuffer = new Uint8ClampedArray(pixels.length);
-      const backgroundColor = typeof reader.getBackgroundColor === 'function' ? reader.getBackgroundColor() : null;
-      const backgroundIndex = typeof reader.getBackgroundIndex === 'function' ? reader.getBackgroundIndex() : null;
+      const integerScaleFactor = detectGifCommonIntegerScale(reader, width, height, frameCount);
+
+      const targetWidth = Math.max(1, Math.floor(width / integerScaleFactor));
+      const targetHeight = Math.max(1, Math.floor(height / integerScaleFactor));
       const frames = [];
-      let previousFrameInfo = null;
-  
-      if (backgroundColor && backgroundColor.a > 0) {
-        fillGifCanvas(pixels, backgroundColor);
-      } else {
-        pixels.fill(0);
-      }
-  
-      for (let i = 0; i < frameCount; i += 1) {
-        const info = reader.frameInfo(i);
-  
-        if (previousFrameInfo) {
-          if (previousFrameInfo.disposal === 2) {
-            const fillColor = resolveDisposalFillColor(previousFrameInfo, backgroundColor, backgroundIndex);
-            clearGifFrameRect(pixels, width, height, previousFrameInfo, fillColor);
-          } else if (previousFrameInfo.disposal === 3) {
-            pixels.set(restoreBuffer);
-          }
+      visitGifCompositedFrames(reader, width, height, frameCount, ({ pixels, duration }) => {
+        if (integerScaleFactor > 1) {
+          const inspection = inspectImageDataNearestNeighborUpscale(
+            { data: pixels, width, height },
+            integerScaleFactor
+          );
+          if (!inspection.valid) throw createImageImportError('GIFの整数倍構造を全フレームで確認できませんでした');
         }
-  
-        if (info.disposal === 3) {
-          restoreBuffer.set(pixels);
-        }
-  
-        reader.decodeAndBlitFrameRGBA(i, pixels);
-        const framePixels = new Uint8ClampedArray(pixels);
-        const delayHundredths = Number(info.delay);
         frames.push({
-          imageData: new ImageData(framePixels, width, height),
-          duration: Number.isFinite(delayHundredths) && delayHundredths > 0
-            ? delayHundredths * 10
-            : DEFAULT_IMPORT_FRAME_DURATION,
+          imageData: createIntegerDownscaledImageDataFromPixels(
+            pixels,
+            width,
+            height,
+            integerScaleFactor
+          ),
+          duration,
         });
-  
-        previousFrameInfo = info;
-      }
-  
+      });
+
       return {
         frames,
-        width,
-        height,
+        width: targetWidth,
+        height: targetHeight,
+        sourceWidth: width,
+        sourceHeight: height,
+        integerScaleFactor,
         loopCount: typeof reader.loopCount === 'function' ? reader.loopCount() : null,
       };
     }

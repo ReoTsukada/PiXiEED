@@ -95,6 +95,96 @@ assert.equal(animatedReader.loopCount(), 0);
 assert.deepEqual(Array.from({ length: animatedReader.numFrames() }, (_, index) => animatedReader.frameInfo(index).disposal), [0, 2, 3]);
 assert.deepEqual(Array.from(decodedAnimated.frames, frame => frame.duration), [20, 40, 70]);
 
+const upscaledOutput = new Uint8Array(4096);
+const upscaledWriter = new GifWriter(upscaledOutput, 4, 2, {
+  palette: [0x000000, 0xff0000, 0x00ff00, 0x0000ff],
+  loop: 0,
+});
+upscaledWriter.addFrame(0, 0, 4, 2, new Uint8Array([
+  1, 1, 2, 2,
+  1, 1, 2, 2,
+]), { delay: 8, disposal: 0 });
+upscaledWriter.addFrame(0, 0, 4, 2, new Uint8Array([
+  2, 2, 3, 3,
+  2, 2, 3, 3,
+]), { delay: 14, disposal: 0 });
+const upscaledGifBytes = upscaledOutput.slice(0, upscaledWriter.end());
+const decodedUpscaled = decodeGifWithReader(upscaledGifBytes);
+assert.equal(decodedUpscaled.sourceWidth, 4);
+assert.equal(decodedUpscaled.sourceHeight, 2);
+assert.equal(decodedUpscaled.width, 2);
+assert.equal(decodedUpscaled.height, 1);
+assert.equal(decodedUpscaled.integerScaleFactor, 2);
+assert.equal(decodedUpscaled.frames.length, 2, 'spatial optimization must preserve every GIF frame');
+assert.deepEqual(Array.from(decodedUpscaled.frames, frame => frame.duration), [80, 140]);
+assert.deepEqual(Array.from(decodedUpscaled.frames[0].imageData.data), [255, 0, 0, 255, 0, 255, 0, 255]);
+
+const mixedScaleOutput = new Uint8Array(8192);
+const mixedScaleWriter = new GifWriter(mixedScaleOutput, 8, 4, {
+  palette: [0x000000, 0xff0000, 0x00ff00, 0x0000ff],
+  loop: 0,
+});
+mixedScaleWriter.addFrame(0, 0, 8, 4, new Uint8Array([
+  1, 1, 1, 1, 2, 2, 2, 2,
+  1, 1, 1, 1, 2, 2, 2, 2,
+  1, 1, 1, 1, 2, 2, 2, 2,
+  1, 1, 1, 1, 2, 2, 2, 2,
+]), { delay: 10, disposal: 0 });
+mixedScaleWriter.addFrame(0, 0, 8, 4, new Uint8Array([
+  1, 1, 2, 2, 3, 3, 2, 2,
+  1, 1, 2, 2, 3, 3, 2, 2,
+  2, 2, 3, 3, 1, 1, 3, 3,
+  2, 2, 3, 3, 1, 1, 3, 3,
+]), { delay: 10, disposal: 0 });
+const mixedScaleGifBytes = mixedScaleOutput.slice(0, mixedScaleWriter.end());
+const decodedMixedScale = decodeGifWithReader(mixedScaleGifBytes);
+assert.equal(decodedMixedScale.integerScaleFactor, 2, '8x and 4x-style frames use only their exact common scale');
+assert.equal(decodedMixedScale.width, 4);
+assert.equal(decodedMixedScale.height, 2);
+
+const inconsistentScaleOutput = new Uint8Array(8192);
+const inconsistentScaleWriter = new GifWriter(inconsistentScaleOutput, 8, 4, {
+  palette: [0x000000, 0xff0000, 0x00ff00, 0x0000ff],
+  loop: 0,
+});
+inconsistentScaleWriter.addFrame(0, 0, 8, 4, new Uint8Array([
+  1, 1, 1, 1, 2, 2, 2, 2,
+  1, 1, 1, 1, 2, 2, 2, 2,
+  1, 1, 1, 1, 2, 2, 2, 2,
+  1, 1, 1, 1, 2, 2, 2, 2,
+]), { delay: 10, disposal: 0 });
+inconsistentScaleWriter.addFrame(0, 0, 8, 4, new Uint8Array([
+  1, 2, 1, 2, 1, 2, 1, 2,
+  2, 1, 2, 1, 2, 1, 2, 1,
+  1, 2, 1, 2, 1, 2, 1, 2,
+  2, 1, 2, 1, 2, 1, 2, 1,
+]), { delay: 10, disposal: 0 });
+const inconsistentScaleGifBytes = inconsistentScaleOutput.slice(0, inconsistentScaleWriter.end());
+const decodedInconsistentScale = decodeGifWithReader(inconsistentScaleGifBytes);
+assert.equal(decodedInconsistentScale.integerScaleFactor, 1, 'one native-pixel frame disables unsafe spatial optimization');
+assert.equal(decodedInconsistentScale.width, 8);
+assert.equal(decodedInconsistentScale.height, 4);
+
+const manyFrameOutput = new Uint8Array(65536);
+const manyFrameWriter = new GifWriter(manyFrameOutput, 4, 2, {
+  palette: [0x000000, 0xff0000, 0x00ff00, 0x0000ff],
+  loop: 0,
+});
+for (let frameIndex = 0; frameIndex < 204; frameIndex += 1) {
+  manyFrameWriter.addFrame(0, 0, 4, 2, new Uint8Array(frameIndex % 2 === 0 ? [
+    1, 1, 2, 2,
+    1, 1, 2, 2,
+  ] : [
+    2, 2, 3, 3,
+    2, 2, 3, 3,
+  ]), { delay: 10, disposal: 0 });
+}
+const manyFrameGifBytes = manyFrameOutput.slice(0, manyFrameWriter.end());
+const decodedManyFrames = decodeGifWithReader(manyFrameGifBytes);
+assert.equal(decodedManyFrames.integerScaleFactor, 2);
+assert.equal(decodedManyFrames.frames.length, 204, '204 source frames must remain 204 optimized frames');
+assert.equal(decodedManyFrames.frames.every(frame => frame.imageData.width === 2 && frame.imageData.height === 1), true);
+
 const animatedDuplicateFixture = fixture({
   loopCount: 0,
   frames: [

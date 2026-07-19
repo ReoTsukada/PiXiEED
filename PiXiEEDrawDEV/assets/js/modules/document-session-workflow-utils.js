@@ -567,7 +567,60 @@
     }
     const preserveDotStats = Boolean(options?.projectId || options?.openedFromRecent || options?.preserveDotStats);
     const dotStats = preserveDotStats ? (parsedDocument?.dotStats || null) : null;
+    let nativeScaleOptimization = { optimized: false, factor: 1, reason: 'not-checked' };
+    const scaleOptimizer = window.PiXiEEDrawModules?.snapshotIntegerScaleUtils?.optimizeSnapshotIntegerScale;
+    const hasTimelapseEdits = Object.values(projectSession?.timelapse?.tracksByCanvasId || {}).some(track => (
+      (Array.isArray(track?.snapshots) && track.snapshots.length > 0)
+      || (Array.isArray(track?.operationLog?.entries) && track.operationLog.entries.length > 0)
+    ));
+    const isSharedProjectLoad = Boolean(
+      options?.sharedProjectKey
+      || String(options?.projectId || '').startsWith(SHARED_PROJECT_ID_PREFIX)
+    );
+    let hasArchivedTimelapse = false;
+    if (
+      typeof scaleOptimizer === 'function'
+      && !hasTimelapseEdits
+      && !isSharedProjectLoad
+      && options?.projectId
+      && typeof loadPersistedTimelapseSnapshots === 'function'
+    ) {
+      const persistedTimelapse = await loadPersistedTimelapseSnapshots(options.projectId, { throwOnError: false });
+      hasArchivedTimelapse = Object.values(persistedTimelapse || {}).some(entries => (
+        Array.isArray(entries) && entries.length > 0
+      ));
+    }
+    if (
+      typeof scaleOptimizer === 'function'
+      && !hasTimelapseEdits
+      && !hasArchivedTimelapse
+      && !isSharedProjectLoad
+    ) {
+      let optimizationStatusAnnounced = false;
+      nativeScaleOptimization = await scaleOptimizer(snapshot, {
+        onProgress: () => {
+          if (!optimizationStatusAnnounced && !options?.suppressAutosaveStatus) {
+            optimizationStatusAnnounced = true;
+            updateAutosaveStatus('ドット倍率を確認しています…', 'info');
+          }
+        },
+      });
+    } else if (hasTimelapseEdits || hasArchivedTimelapse) {
+      nativeScaleOptimization = {
+        optimized: false,
+        factor: 1,
+        reason: 'timelapse-history-preserved',
+      };
+    }
     synchronizeImportedSnapshotPalette(snapshot);
+    if (nativeScaleOptimization.optimized && projectSession?.timelapse?.tracksByCanvasId) {
+      const optimizedBaseSnapshot = serializeDocumentSnapshot(snapshot);
+      Object.values(projectSession.timelapse.tracksByCanvasId).forEach(track => {
+        if (track?.operationLog && Array.isArray(track.operationLog.entries) && !track.operationLog.entries.length) {
+          track.operationLog.baseSnapshot = optimizedBaseSnapshot;
+        }
+      });
+    }
 
     autosaveRestoring = true;
     try {
@@ -726,7 +779,12 @@
     scheduleSessionPersist();
     scheduleAutosaveSnapshot();
     if (!options?.suppressAutosaveStatus) {
-      if (options?.openedFromRecent) {
+      if (nativeScaleOptimization.optimized) {
+        updateAutosaveStatus(
+          `自動保存: ${nativeScaleOptimization.factor}倍の拡大ドットを${nativeScaleOptimization.width}×${nativeScaleOptimization.height}pxへ最適化しました`,
+          'success'
+        );
+      } else if (options?.openedFromRecent) {
         updateAutosaveStatus('自動保存: 端末内プロジェクトを読み込みました', 'success');
       } else {
         updateAutosaveStatus('自動保存: 読み込み内容を端末内に保存します', 'info');

@@ -1014,6 +1014,32 @@ body[data-pixieed-account-auth="signed-out"] .account-panel--profile > .section-
   .account-titlebar__actions a { min-height: 32px; padding-inline: 8px; }
   .account-title { padding: 0 !important; }
   .account-grid { grid-template-columns: minmax(0, 1fr) !important; gap: 6px !important; }
+  .account-collection-grid,
+  .account-pixfind-grid,
+  .account-market-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .account-project-card__body,
+  .account-listing-card__body,
+  .account-pixfind-card__body,
+  .account-market-card .market-card__body {
+    gap: 5px;
+    padding: 7px;
+  }
+  .account-project-card__body strong,
+  .account-listing-card__body strong,
+  .account-pixfind-card__body strong,
+  .account-market-card .market-card__body h3 { font-size: 10px; }
+  .account-market-card .market-card__meta {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .account-market-card .market-card__price { font-size: 10px; }
+  .account-market-card .market-card__badges span { font-size: 8px; }
+  .account-market-card .account-market-actions { display: grid; gap: 5px; }
+  .account-market-card .account-market-button { width: 100%; min-width: 0; white-space: normal; }
   .account-stack { gap: 6px !important; }
   .account-panel { padding: 10px !important; border-radius: 7px !important; }
   .account-collection .account-panel__head { align-items: flex-start; }
@@ -1047,6 +1073,7 @@ body[data-pixieed-account-auth="signed-out"] .account-panel--profile > .section-
   .account-summary-card { min-height: 112px; }
   .account-chart-legend { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .account-chart-legend button { justify-content: flex-start; }
-  .account-card-actions { grid-template-columns: 1fr; }
+  .account-card-actions { grid-template-columns: minmax(0, 1fr) 32px; }
+  .account-card-actions--single { grid-template-columns: 1fr; }
   .account-card-actions--listing { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }

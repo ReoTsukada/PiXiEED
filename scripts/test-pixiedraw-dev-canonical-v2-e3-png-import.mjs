@@ -91,6 +91,6 @@ assert.match(
   /Number\(options\?\.trustedAutosaveSchemaVersion\) === 2\s*\|\| parsedDocument\?\.canonicalPayloadFormat === 'v2'[\s\S]{0,180}parsedDocument\.storageAdapterId = '';/,
   'validated canonical V2 image imports must not open the legacy migration dialog'
 );
-assert.match(indexSource, /document-session-workflow-utils\.js\?v=20260717-canonical-image-open1/);
+assert.match(indexSource, /document-session-workflow-utils\.js\?v=20260719-existing-project-scale1/);
 
 console.log('Canonical V2 E3 PNG import connection checks passed');

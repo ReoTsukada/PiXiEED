@@ -31,15 +31,15 @@
   }
 
   function readableError(error) {
-    const message = String(error?.message || '報酬原資を処理できませんでした。');
+    const message = String(error?.message || '表示報酬予算を処理できませんでした。');
     if (/admin permission/i.test(message)) return 'この操作に必要な管理者権限がありません。';
     if (/between 2025 and 2100/i.test(message)) return '対象年は2025年〜2100年で指定してください。';
     if (/12 monthly reward amounts/i.test(message)) return '1月〜12月の金額をすべて入力してください。';
-    if (/monthly reward amount/i.test(message)) return '月別原資は0円〜1,000,000,000円の整数で入力してください。';
-    if (/monthly reward budget is not configured/i.test(message)) return '対象月の報酬原資を先に保存してください。';
+    if (/monthly reward amount/i.test(message)) return '月別予算は0円〜1,000,000,000円の整数で入力してください。';
+    if (/monthly reward budget is not configured/i.test(message)) return '対象月の表示報酬予算を先に保存してください。';
     if (/only after it ends/i.test(message)) return '月次確定は対象月が終了してから実行できます。';
     if (/already finalized/i.test(message)) return 'この月の表示報酬は確定済みです。';
-    if (/function .* does not exist|schema cache/i.test(message)) return '報酬原資用のDB更新がまだ反映されていません。';
+    if (/function .* does not exist|schema cache/i.test(message)) return '表示報酬予算用のDB更新がまだ反映されていません。';
     return message;
   }
 
@@ -118,7 +118,7 @@
   yearInput.addEventListener('change', async () => {
     const nextYear = Number(yearInput.value);
     if (!yearInput.reportValidity()) return;
-    if (hasUnsavedChanges() && !window.confirm('保存していない月別原資を破棄して、別の年を開きますか？')) {
+    if (hasUnsavedChanges() && !window.confirm('保存していない月別予算を破棄して、別の年を開きますか？')) {
       yearInput.value = String(loadedYear);
       return;
     }
@@ -131,7 +131,7 @@
     const year = Number(yearInput.value);
     const amounts = monthlyAmounts();
     const total = Object.values(amounts).reduce((sum, amount) => sum + amount, 0);
-    if (!window.confirm(`${year}年のページビュー報酬原資を年間合計${yen(total)}で保存しますか？\nこの操作だけでは分配・送金されません。`)) return;
+    if (!window.confirm(`${year}年の表示報酬予算を年間合計${yen(total)}で保存しますか？\n原資はPiXiEEDの売上の一部です。この操作だけでは配分・送金されません。`)) return;
 
     saveButton.disabled = true;
     setStatus(`${year}年の12か月分を保存しています。`);
@@ -145,7 +145,7 @@
       return;
     }
     renderYear(data);
-    setStatus(`${year}年の月別報酬原資を保存しました。年間合計は${yen(data?.annual_total_yen)}です。`);
+    setStatus(`${year}年の月別表示報酬予算を保存しました。年間合計は${yen(data?.annual_total_yen)}です。`);
   });
 
   function settlementParts() {

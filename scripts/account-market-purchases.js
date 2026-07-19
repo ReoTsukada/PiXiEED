@@ -162,8 +162,8 @@
     const switches = formats.map((entry) => createFormatSwitch(entry, true));
     if (formats.includes('gif')) {
       switches.push(
-        createFormatSwitch('gif-frames-png', false, 'GIFを分解し、全フレームを連番PNGで収録'),
-        createFormatSwitch('gif-spritemap-png', false, '全フレームを1枚に配置し、PNG・JSONのカラーマップを同梱')
+        createFormatSwitch('gif-frames-png', false, '拡大ドット絵は1px単位へ自動補正し、全フレームを連番PNGで収録'),
+        createFormatSwitch('gif-spritemap-png', false, '1px単位へ自動補正した全フレームを配置し、PNG・JSONのカラーマップを同梱')
       );
     }
     fieldset.append(legend, ...switches);

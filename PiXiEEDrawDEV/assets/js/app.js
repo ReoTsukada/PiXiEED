@@ -6851,6 +6851,8 @@
   set localViewportCanvasState(value) { localViewportCanvasState = value; },
   get localizeText() { return localizeText; },
   set localizeText(value) { localizeText = value; },
+  get loadPersistedTimelapseSnapshots() { return loadPersistedTimelapseSnapshots; },
+  set loadPersistedTimelapseSnapshots(value) { loadPersistedTimelapseSnapshots = value; },
   get markAutosaveDirty() { return markAutosaveDirty; },
   set markAutosaveDirty(value) { markAutosaveDirty = value; },
   get migrateLegacyMultiProjectPackage() { return migrateLegacyMultiProjectPackage; },
@@ -9092,7 +9094,10 @@
     }
   }
   applyUiTheme(state.uiTheme, { persist: false });
-  state.colorMode = normalizeColorMode(state.colorMode, COLOR_MODE_INDEX);
+  // Color mode belongs to the document, not to the previous UI session.
+  // A blank startup canvas always begins indexed; loading a saved snapshot
+  // later restores that document's own RGB/indexed mode in applyHistorySnapshot.
+  state.colorMode = COLOR_MODE_INDEX;
   state.mirror = normalizeMirrorAxisState(state.mirror, state.width, state.height);
   updateGridDecorations();
   const pointerState = createPointerState();

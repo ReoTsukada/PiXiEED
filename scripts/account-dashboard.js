@@ -25,7 +25,7 @@
 
   const SERIES = Object.freeze({
     sales: { key: 'sales_microyen', label: '販売収益', color: '#60a5fa' },
-    lineage: { key: 'lineage_microyen', label: '派生報酬', color: '#a78bfa' },
+    lineage: { key: 'lineage_microyen', label: '継承ロイヤリティー', color: '#a78bfa' },
     pageview: { key: 'pageview_microyen', label: '表示報酬', color: '#34d399' }
   });
 

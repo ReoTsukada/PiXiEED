@@ -964,17 +964,26 @@
         throw createImageImportError('画像サイズが不正です');
       }
 
-      const integerScaleFactor = detectNearestNeighborIntegerScaleForFrames(framesData, inferredWidth, inferredHeight);
+      const decodedIntegerScaleFactor = Math.max(1, Math.floor(Number(importResult?.integerScaleFactor) || 1));
+      const integerScaleFactor = decodedIntegerScaleFactor > 1
+        ? 1
+        : detectNearestNeighborIntegerScaleForFrames(framesData, inferredWidth, inferredHeight);
       const importSize = resolveImageImportTargetSize(inferredWidth, inferredHeight, { integerScaleFactor });
       const width = importSize.width;
       const height = importSize.height;
+      const originalSourceWidth = Math.max(inferredWidth, Number(importResult?.sourceWidth) || 0);
+      const originalSourceHeight = Math.max(inferredHeight, Number(importResult?.sourceHeight) || 0);
+      const effectiveIntegerScaleFactor = decodedIntegerScaleFactor > 1
+        ? decodedIntegerScaleFactor
+        : importSize.integerScaleFactor;
+      const importWasScaled = decodedIntegerScaleFactor > 1 || importSize.scaled;
       setGlobalLoadingIndicatorLabel(localizeText('フルカラー画像を準備中…', 'Preparing full-color frames...'));
       const resizeSpan = beginImportPerformanceSpan('pixiedraw-dev:import:resize', {
-        sourceWidth: inferredWidth,
-        sourceHeight: inferredHeight,
+        sourceWidth: originalSourceWidth,
+        sourceHeight: originalSourceHeight,
         targetWidth: width,
         targetHeight: height,
-        scaled: importSize.scaled === true,
+        scaled: importWasScaled,
       });
       let normalizedFramesData;
       try {
@@ -1017,8 +1026,14 @@
         duration: normalizeImportFrameDuration(frameInfo?.duration),
         layers: [layer],
       });
+      if (frameInfo && typeof frameInfo === 'object') frameInfo.imageData = null;
+      normalizedFramesData[index] = null;
     });
     } finally {
+      normalizedFramesData.forEach((frameInfo, index) => {
+        if (frameInfo && typeof frameInfo === 'object') frameInfo.imageData = null;
+        normalizedFramesData[index] = null;
+      });
       endImportPerformanceSpan(runtimeFramesSpan, { createdFrameCount: frames.length });
     }
 
@@ -1107,12 +1122,12 @@
     syncMultiProjectKeyInputValues('', { preserveFocused: false });
     markAutosaveDirty();
     scheduleAutosaveSnapshot();
-    if (importSize.scaled) {
-      const integerScaleLabel = importSize.integerScaleFactor > 1
-        ? ` / 整数倍縮小 x${importSize.integerScaleFactor}`
+    if (importWasScaled) {
+      const integerScaleLabel = effectiveIntegerScaleFactor > 1
+        ? ` / 整数倍縮小 x${effectiveIntegerScaleFactor}`
         : '';
       updateAutosaveStatus(
-        `画像をRGBカラーで読み込みました (${importSize.sourceWidth}x${importSize.sourceHeight} → ${width}x${height}${integerScaleLabel}) / 端末内へ自動保存します`,
+        `画像をRGBカラーで読み込みました (${originalSourceWidth}x${originalSourceHeight} → ${width}x${height}${integerScaleLabel}) / 端末内へ自動保存します`,
         'success'
       );
     } else {

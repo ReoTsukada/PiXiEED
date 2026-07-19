@@ -249,6 +249,143 @@
     return { columns, rows: Math.max(1, Math.ceil(frameCount / columns)) };
   }
 
+  function greatestCommonDivisor(first, second) {
+    let left = Math.abs(Math.floor(Number(first) || 0));
+    let right = Math.abs(Math.floor(Number(second) || 0));
+    while (right) {
+      const remainder = left % right;
+      left = right;
+      right = remainder;
+    }
+    return left;
+  }
+
+  function inspectNearestNeighborScale(pixels, width, height, factor) {
+    const scale = Math.max(1, Math.floor(Number(factor) || 1));
+    if (!(pixels instanceof Uint8ClampedArray) || scale <= 1 || width % scale || height % scale) {
+      return { valid: false, hasInterBlockDifference: false };
+    }
+    let hasInterBlockDifference = false;
+    const rowStride = width * 4;
+    for (let blockY = 0; blockY < height; blockY += scale) {
+      for (let blockX = 0; blockX < width; blockX += scale) {
+        const blockBase = (blockY * width + blockX) * 4;
+        const red = pixels[blockBase];
+        const green = pixels[blockBase + 1];
+        const blue = pixels[blockBase + 2];
+        const alpha = pixels[blockBase + 3];
+        if (!hasInterBlockDifference && blockX >= scale) {
+          const leftBase = blockBase - (scale * 4);
+          hasInterBlockDifference = pixels[leftBase] !== red
+            || pixels[leftBase + 1] !== green
+            || pixels[leftBase + 2] !== blue
+            || pixels[leftBase + 3] !== alpha;
+        }
+        if (!hasInterBlockDifference && blockY >= scale) {
+          const topBase = blockBase - (scale * rowStride);
+          hasInterBlockDifference = pixels[topBase] !== red
+            || pixels[topBase + 1] !== green
+            || pixels[topBase + 2] !== blue
+            || pixels[topBase + 3] !== alpha;
+        }
+        for (let localY = 0; localY < scale; localY += 1) {
+          let pixelBase = ((blockY + localY) * width + blockX) * 4;
+          for (let localX = 0; localX < scale; localX += 1) {
+            if (
+              pixels[pixelBase] !== red
+              || pixels[pixelBase + 1] !== green
+              || pixels[pixelBase + 2] !== blue
+              || pixels[pixelBase + 3] !== alpha
+            ) {
+              return { valid: false, hasInterBlockDifference: false };
+            }
+            pixelBase += 4;
+          }
+        }
+      }
+    }
+    return { valid: true, hasInterBlockDifference };
+  }
+
+  async function detectGifIntegerScale(reader, width, height, frameCount) {
+    let commonFactor = greatestCommonDivisor(width, height);
+    let hasInterBlockDifference = false;
+    await visitCompositedGifFrames(reader, width, height, frameCount, ({ pixels }) => {
+      if (commonFactor <= 1) return;
+      for (let y = 0; y < height && commonFactor > 1; y += 1) {
+        for (let x = 0; x < width && commonFactor > 1; x += 1) {
+          const base = ((y * width) + x) * 4;
+          if (x > 0) {
+            const left = base - 4;
+            if (
+              pixels[base] !== pixels[left]
+              || pixels[base + 1] !== pixels[left + 1]
+              || pixels[base + 2] !== pixels[left + 2]
+              || pixels[base + 3] !== pixels[left + 3]
+            ) {
+              hasInterBlockDifference = true;
+              commonFactor = greatestCommonDivisor(commonFactor, x);
+            }
+          }
+          if (y > 0 && commonFactor > 1) {
+            const top = base - (width * 4);
+            if (
+              pixels[base] !== pixels[top]
+              || pixels[base + 1] !== pixels[top + 1]
+              || pixels[base + 2] !== pixels[top + 2]
+              || pixels[base + 3] !== pixels[top + 3]
+            ) {
+              hasInterBlockDifference = true;
+              commonFactor = greatestCommonDivisor(commonFactor, y);
+            }
+          }
+        }
+      }
+    });
+    return hasInterBlockDifference ? Math.max(1, commonFactor) : 1;
+  }
+
+  function downscaleGifPixels(pixels, sourceWidth, sourceHeight, factor) {
+    const scale = Math.max(1, Math.floor(Number(factor) || 1));
+    if (scale <= 1) return new Uint8ClampedArray(pixels);
+    const width = Math.max(1, Math.floor(sourceWidth / scale));
+    const height = Math.max(1, Math.floor(sourceHeight / scale));
+    const output = new Uint8ClampedArray(width * height * 4);
+    for (let y = 0; y < height; y += 1) {
+      const sourceRow = (y * scale) * sourceWidth;
+      const outputRow = y * width;
+      for (let x = 0; x < width; x += 1) {
+        const sourceBase = (sourceRow + (x * scale)) * 4;
+        const outputBase = (outputRow + x) * 4;
+        output[outputBase] = pixels[sourceBase];
+        output[outputBase + 1] = pixels[sourceBase + 1];
+        output[outputBase + 2] = pixels[sourceBase + 2];
+        output[outputBase + 3] = pixels[sourceBase + 3];
+      }
+    }
+    return output;
+  }
+
+  async function visitCompositedGifFrames(reader, width, height, frameCount, onFrame, { yieldBetweenFrames = true } = {}) {
+    const pixels = new Uint8ClampedArray(width * height * 4);
+    const restore = new Uint8ClampedArray(pixels.length);
+    const backgroundColor = typeof reader.getBackgroundColor === 'function' ? reader.getBackgroundColor() : null;
+    const backgroundIndex = typeof reader.getBackgroundIndex === 'function' ? reader.getBackgroundIndex() : null;
+    fillPixels(pixels, backgroundColor?.a > 0 ? backgroundColor : null);
+    let previous = null;
+    for (let index = 0; index < frameCount; index += 1) {
+      const info = reader.frameInfo(index);
+      if (previous?.disposal === 2) clearGifRect(pixels, width, height, previous, disposalFillColor(previous, backgroundColor, backgroundIndex));
+      else if (previous?.disposal === 3) pixels.set(restore);
+      if (info.disposal === 3) restore.set(pixels);
+      reader.decodeAndBlitFrameRGBA(index, pixels);
+      const durationMs = Math.max(10, (Math.max(0, Number(info.delay) || 0) || 10) * 10);
+      await onFrame({ pixels, frameIndex: index, frameCount, durationMs });
+      previous = info;
+      if (yieldBetweenFrames) await yieldToBrowser();
+    }
+  }
+
   async function visitGifFrames(blob, onFrame, onProgress) {
     const bytes = new Uint8Array(await blob.arrayBuffer());
     let reader;
@@ -262,27 +399,35 @@
     const frameCount = Math.max(0, Number(reader.numFrames()) || 0);
     if (!width || !height || !frameCount) throw new Error('GIFに出力できるフレームがありません。');
     if (frameCount > GIF_MAX_FRAMES) throw new Error(`GIFのフレーム数が多すぎます（最大${GIF_MAX_FRAMES}枚）。`);
-    const pixels = new Uint8ClampedArray(width * height * 4);
-    const restore = new Uint8ClampedArray(pixels.length);
-    const backgroundColor = typeof reader.getBackgroundColor === 'function' ? reader.getBackgroundColor() : null;
-    const backgroundIndex = typeof reader.getBackgroundIndex === 'function' ? reader.getBackgroundIndex() : null;
-    fillPixels(pixels, backgroundColor?.a > 0 ? backgroundColor : null);
-    let previous = null;
+    const integerScaleFactor = await detectGifIntegerScale(reader, width, height, frameCount);
+    const targetWidth = Math.max(1, Math.floor(width / integerScaleFactor));
+    const targetHeight = Math.max(1, Math.floor(height / integerScaleFactor));
     const durations = [];
-    for (let index = 0; index < frameCount; index += 1) {
-      const info = reader.frameInfo(index);
-      if (previous?.disposal === 2) clearGifRect(pixels, width, height, previous, disposalFillColor(previous, backgroundColor, backgroundIndex));
-      else if (previous?.disposal === 3) pixels.set(restore);
-      if (info.disposal === 3) restore.set(pixels);
-      reader.decodeAndBlitFrameRGBA(index, pixels);
-      const durationMs = Math.max(10, (Math.max(0, Number(info.delay) || 0) || 10) * 10);
+    await visitCompositedGifFrames(reader, width, height, frameCount, async ({ pixels, frameIndex, durationMs }) => {
+      if (integerScaleFactor > 1 && !inspectNearestNeighborScale(pixels, width, height, integerScaleFactor).valid) {
+        throw new Error('GIFの整数倍構造を全フレームで確認できませんでした。');
+      }
       durations.push(durationMs);
-      await onFrame({ pixels, width, height, frameIndex: index, frameCount, durationMs });
-      onProgress?.(index + 1, frameCount);
-      previous = info;
-      await yieldToBrowser();
-    }
-    return { width, height, frameCount, durations, loopCount: typeof reader.loopCount === 'function' ? reader.loopCount() : null };
+      await onFrame({
+        pixels: downscaleGifPixels(pixels, width, height, integerScaleFactor),
+        width: targetWidth,
+        height: targetHeight,
+        frameIndex,
+        frameCount,
+        durationMs,
+      });
+      onProgress?.(frameIndex + 1, frameCount);
+    });
+    return {
+      width: targetWidth,
+      height: targetHeight,
+      sourceWidth: width,
+      sourceHeight: height,
+      integerScaleFactor,
+      frameCount,
+      durations,
+      loopCount: typeof reader.loopCount === 'function' ? reader.loopCount() : null,
+    };
   }
 
   async function buildGifFramePngTasks(blob, filename, onProgress) {

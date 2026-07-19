@@ -265,7 +265,7 @@
       .account-cover{width:64px;height:64px}
     }
   </style>
-  <link rel="stylesheet" href="account.css?v=2026.07.19-gif-export2">
+  <link rel="stylesheet" href="account.css?v=2026.07.19-mobile-cards2">
 </head>
 <body data-pixieed-account-auth="signed-out">
   <header class="site-header" aria-label="トップナビ">
@@ -300,7 +300,7 @@
             <div>
               <p class="account-eyebrow">REVENUE ANALYTICS</p>
               <h2 class="section-title" id="accountRewardDashboardTitle">売上・報酬の推移</h2>
-              <p class="helper">販売収益、祖先作品として受け取った派生報酬、確定した表示報酬を分けて表示します。</p>
+              <p class="helper">販売収益、祖先作品として受け取った継承ロイヤリティー、確定した表示報酬を分けて表示します。</p>
             </div>
             <label class="account-chart-period">表示期間
               <select id="accountRewardPeriod">
@@ -317,12 +317,12 @@
               <small id="accountSummarySalesMeta">直近12か月</small>
             </article>
             <article class="account-summary-card account-summary-card--lineage">
-              <span>派生による報酬</span>
+              <span>継承ロイヤリティー</span>
               <strong id="accountSummaryLineage">0円</strong>
               <small id="accountSummaryLineageMeta">直近12か月</small>
             </article>
             <article class="account-summary-card account-summary-card--views">
-              <span>視聴回数による報酬</span>
+              <span>有効表示による報酬</span>
               <strong id="accountSummaryPageview">0円</strong>
               <small id="accountSummaryViews">有効表示 0回</small>
             </article>
@@ -335,12 +335,12 @@
           <p class="account-dashboard-status" id="accountOverviewStatus" role="status" aria-live="polite">報酬データを確認しています。</p>
           <div class="account-chart-legend" aria-label="表示する系列">
             <button class="is-active" type="button" data-account-chart-series="sales" aria-pressed="true"><i aria-hidden="true"></i>販売収益</button>
-            <button class="is-active" type="button" data-account-chart-series="lineage" aria-pressed="true"><i aria-hidden="true"></i>派生報酬</button>
+            <button class="is-active" type="button" data-account-chart-series="lineage" aria-pressed="true"><i aria-hidden="true"></i>継承ロイヤリティー</button>
             <button class="is-active" type="button" data-account-chart-series="pageview" aria-pressed="true"><i aria-hidden="true"></i>表示報酬</button>
             <button class="is-active" type="button" data-account-chart-series="views" aria-pressed="true"><i aria-hidden="true"></i>有効表示数</button>
           </div>
           <div class="account-chart-shell" id="accountRewardChartShell">
-            <canvas id="accountRewardChart" role="img" aria-label="月別の販売収益、派生報酬、表示報酬、有効表示数のグラフ"></canvas>
+            <canvas id="accountRewardChart" role="img" aria-label="月別の販売収益、継承ロイヤリティー、表示報酬、有効表示数のグラフ"></canvas>
             <div class="account-chart-tooltip" id="accountRewardChartTooltip" hidden></div>
             <div class="account-chart-empty" id="accountRewardChartEmpty">報酬データを確認しています。</div>
           </div>
@@ -348,7 +348,7 @@
             <summary>月別の数値を表で確認</summary>
             <div class="account-chart-table-scroll">
               <table class="account-chart-table">
-                <thead><tr><th scope="col">月</th><th scope="col">販売収益</th><th scope="col">派生報酬</th><th scope="col">表示報酬</th><th scope="col">有効表示</th></tr></thead>
+                <thead><tr><th scope="col">月</th><th scope="col">販売収益</th><th scope="col">継承ロイヤリティー</th><th scope="col">表示報酬</th><th scope="col">有効表示</th></tr></thead>
                 <tbody id="accountRewardChartTable"></tbody>
               </table>
             </div>
@@ -476,7 +476,7 @@
         <section class="account-stack" aria-label="購入済み商品とサービス">
           <section class="account-panel" id="accountPageviewRewards" data-account-tab="rewards" hidden>
             <div class="account-panel__head">
-              <h2 class="section-title">表示ロイヤリティー</h2>
+              <h2 class="section-title">表示報酬</h2>
               <span class="account-chip" id="accountPageviewRewardTotal">0円</span>
             </div>
             <p class="helper">作品系列の有効表示から確定した月別報酬です。</p>
@@ -492,12 +492,12 @@
               <a class="account-service" href="../market/review.html"><strong>マーケット管理を開く</strong><span>商品審査・販売者確認</span></a>
             </div>
             <details class="account-admin-console">
-              <summary><span>運営設定</span><small>報酬原資・広告OFF</small></summary>
+              <summary><span>運営設定</span><small>売上連動報酬・広告OFF</small></summary>
               <div class="account-admin-console__body">
             <div class="account-admin-permission" aria-labelledby="pageviewRewardBudgetTitle">
               <div>
-                <h3 id="pageviewRewardBudgetTitle">ページビュー報酬原資</h3>
-                <p class="helper">年を選び、1月〜12月の報酬原資を円単位で設定します。これは予算設定のみで、閲覧集計・分配・送金は実行しません。</p>
+                <h3 id="pageviewRewardBudgetTitle">表示報酬の月次予算</h3>
+                <p class="helper">PiXiEEDの売上の一部を表示報酬として還元するため、年を選び、1月〜12月の月次予算を円単位で設定します。これは予算設定のみで、閲覧集計・配分・送金は実行しません。</p>
               </div>
               <form class="account-reward-budget" id="pageviewRewardBudgetForm">
                 <div class="account-reward-budget__toolbar">
@@ -506,7 +506,7 @@
                   </label>
                   <div class="account-reward-budget__total"><span>年間合計</span><strong id="pageviewRewardAnnualTotal">0円</strong></div>
                 </div>
-                <div class="account-reward-budget__months" id="pageviewRewardMonths" aria-label="月別ページビュー報酬原資"></div>
+                <div class="account-reward-budget__months" id="pageviewRewardMonths" aria-label="月別表示報酬予算"></div>
                 <button class="account-action" id="pageviewRewardSave" type="submit">12か月分を保存</button>
               </form>
               <p class="account-admin-permission__status" id="pageviewRewardStatus" role="status" aria-live="polite"></p>
@@ -599,6 +599,7 @@
                 <button class="account-text-action account-collection-toggle" type="button" data-account-collection-toggle aria-controls="pixfindPostList" aria-expanded="false" hidden>全て見る</button>
               </div>
             </div>
+            <p class="helper">有効プレイ数を記録しています。将来のプレイ報酬はPiXiEEDの売上の一部を原資とし、月次配分の実装後に金額を表示します。</p>
             <div class="account-pixfind-grid account-collection-grid" id="pixfindPostList" data-account-collection-list aria-label="この端末から投稿したPiXFiND" aria-live="polite">
               <div class="account-item">
                 <div class="account-cover"><img src="../icon/icon-192-2.png" alt=""></div>
@@ -626,11 +627,11 @@
   </div>
 
   <script src="../scripts/shared-auth-panel.js?v=2026.07.18-ad-permissions1"></script>
-  <script src="../scripts/account-dashboard.js?v=2026.07.19-account-library1"></script>
+  <script src="../scripts/account-dashboard.js?v=2026.07.19-reward-terms1"></script>
   <script src="../scripts/account-collections.js?v=2026.07.19-account-library2"></script>
   <script src="../scripts/pixieed-market-access.js?v=2026.07.19-public-market1"></script>
   <script src="../scripts/account-market-admin-tools.js?v=2026.07.19-public-market1"></script>
-  <script src="../scripts/account-pageview-reward-budget.js?v=2026.07.19-lineage-rewards1"></script>
+  <script src="../scripts/account-pageview-reward-budget.js?v=2026.07.19-reward-terms1"></script>
   <script src="../scripts/account-pageview-rewards.js?v=2026.07.19-lineage-rewards1"></script>
   <script src="../scripts/account-ad-permissions.js?v=2026.07.18-auth-stability1"></script>
   <script src="../scripts/shared-profile-header.js"></script>
@@ -638,8 +639,8 @@
   <script src="../scripts/account-local-projects.js?v=2026.07.19-account-library1"></script>
   <script src="../scripts/account-pixfind-posts.js?v=2026.07.19-account-library1"></script>
   <script src="../pixiedraw/assets/js/modules/color-codec-utils.js?v=2026.06.30-color-codec-v1"></script>
-  <script src="../scripts/market-purchase-delivery.js?v=2026.07.19-gif-export2"></script>
-  <script src="../scripts/account-market-purchases.js?v=2026.07.19-gif-export2"></script>
+  <script src="../scripts/market-purchase-delivery.js?v=2026.07.19-gif-native-scale1"></script>
+  <script src="../scripts/account-market-purchases.js?v=2026.07.19-gif-native-scale1"></script>
   <script src="../scripts/account-market-listings.js?v=2026.07.19-listing-withdrawal1"></script>
   <script src="../market/media-protection.js?v=2026.07.17-preview-protection1"></script>
   <script src="../scripts/account-market-seller.js?v=2026.07.17-dev-account1"></script>

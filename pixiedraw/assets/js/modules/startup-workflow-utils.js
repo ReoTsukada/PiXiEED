@@ -1061,8 +1061,9 @@
       setVirtualCursorEnabled(false, { persist: false });
     }
     startupVisible = true;
+    container.inert = false;
     container.hidden = false;
-    container.setAttribute('aria-hidden', 'false');
+    container.removeAttribute('aria-hidden');
     document.body.classList.add('is-startup-active');
     if (refreshWorkspace) {
       void refreshStartupWorkspaceProjects({ requestPermission: false }).catch(error => {
@@ -1207,8 +1208,18 @@
     }
     markStartupScreenDismissed();
     startupVisible = false;
+    const activeElement = document.activeElement;
+    if (activeElement instanceof HTMLElement && container.contains(activeElement)) {
+      if (dom.stage instanceof HTMLElement) {
+        dom.stage.focus({ preventScroll: true });
+      }
+      if (container.contains(document.activeElement)) {
+        activeElement.blur();
+      }
+    }
+    container.inert = true;
     container.hidden = true;
-    container.setAttribute('aria-hidden', 'true');
+    container.removeAttribute('aria-hidden');
     document.body.classList.remove('is-startup-active');
     if (startupVirtualCursorState === true) {
       setVirtualCursorEnabled(true, { persist: false });

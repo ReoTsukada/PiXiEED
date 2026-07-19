@@ -3,7 +3,9 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { detectFormat, collectFilesFromHandle, extractPixieeDrawPreviewPng } = require('../market/listing-package-utils.js');
+globalThis.window = globalThis;
+await import('../pixiedraw/assets/js/modules/color-codec-utils.js');
+const { detectFormat, collectFilesFromHandle, extractPixieeDrawPreviewPng, optimizeGifIntegerScale } = require('../market/listing-package-utils.js');
 const file = (name, bytes, type = '') => new File([Uint8Array.from(bytes)], name, { type });
 const png = [137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 0, 73, 72, 68, 82];
 
@@ -16,6 +18,71 @@ assert.equal(await detectFormat(file('image.webp', [82, 73, 70, 70, 0, 0, 0, 0, 
 assert.equal(await detectFormat(file('project.pixieedraw', [80, 75, 3, 4])), 'pixiedraw-project');
 assert.equal(await detectFormat(file('fake.png', [1, 2, 3, 4])), null);
 assert.equal(await detectFormat(file('unsupported.psd', [56, 66, 80, 83])), null);
+
+const clamp = (value, min, max) => Math.min(max, Math.max(min, Number(value) || 0));
+const gifCodec = window.PiXiEEDrawModules.colorCodecUtils.createColorCodecUtils({
+  clamp,
+  MAX_IMPORTED_PALETTE_COLORS: 256,
+});
+const rgbaFrame = (rows) => new Uint8ClampedArray(rows.flatMap((row) => row.flatMap((color) => color)));
+const red = [255, 0, 0, 255];
+const green = [0, 255, 0, 255];
+const blue = [0, 0, 255, 255];
+const yellow = [255, 255, 0, 255];
+const upscaledFrames = [
+  rgbaFrame([
+    [red, red, blue, blue],
+    [red, red, blue, blue],
+  ]),
+  rgbaFrame([
+    [green, green, yellow, yellow],
+    [green, green, yellow, yellow],
+  ]),
+];
+const upscaledGif = new File([
+  gifCodec.buildGifFromPixels(upscaledFrames, [80, 140], 4, 2, { loopCount: 3, preserveTiming: true })
+], 'upscaled.gif', { type: 'image/gif' });
+const optimizedGif = await optimizeGifIntegerScale(upscaledGif);
+assert.equal(optimizedGif.optimized, true);
+assert.equal(optimizedGif.integerScaleFactor, 2);
+assert.equal(optimizedGif.sourceWidth, 4);
+assert.equal(optimizedGif.sourceHeight, 2);
+assert.equal(optimizedGif.width, 2);
+assert.equal(optimizedGif.height, 1);
+assert.equal(optimizedGif.frameCount, 2);
+assert.equal(optimizedGif.loopCount, 3);
+assert.equal(optimizedGif.durationMs, 220);
+const optimizedReader = new gifCodec.GifReader(new Uint8Array(await optimizedGif.file.arrayBuffer()));
+assert.equal(optimizedReader.width, 2);
+assert.equal(optimizedReader.height, 1);
+assert.equal(optimizedReader.numFrames(), 2);
+assert.equal(optimizedReader.loopCount(), 3);
+
+const scaleFourFrame = rgbaFrame(Array.from({ length: 4 }, () => [
+  red, red, red, red, blue, blue, blue, blue,
+]));
+const scaleTwoFrame = rgbaFrame([
+  [red, red, green, green, blue, blue, yellow, yellow],
+  [red, red, green, green, blue, blue, yellow, yellow],
+  [yellow, yellow, blue, blue, green, green, red, red],
+  [yellow, yellow, blue, blue, green, green, red, red],
+]);
+const mixedScaleGif = new File([
+  gifCodec.buildGifFromPixels([scaleFourFrame, scaleTwoFrame], [100, 100], 8, 4, { preserveTiming: true })
+], 'mixed-scale.gif', { type: 'image/gif' });
+const optimizedMixedScale = await optimizeGifIntegerScale(mixedScaleGif);
+assert.equal(optimizedMixedScale.optimized, true);
+assert.equal(optimizedMixedScale.integerScaleFactor, 2, 'all frames use their greatest common exact scale');
+assert.equal(optimizedMixedScale.width, 4);
+assert.equal(optimizedMixedScale.height, 2);
+
+const nativeGif = new File([
+  gifCodec.buildGifFromPixels([new Uint8ClampedArray([...red, ...blue])], [100], 2, 1, { preserveTiming: true })
+], 'native.gif', { type: 'image/gif' });
+const unchangedNativeGif = await optimizeGifIntegerScale(nativeGif);
+assert.equal(unchangedNativeGif.optimized, false);
+assert.equal(unchangedNativeGif.reason, 'native-scale');
+assert.equal(unchangedNativeGif.file, nativeGif);
 
 const nestedFile = file('nested.txt', [1, 2, 3], 'text/plain');
 const nestedHandle = { kind: 'file', name: nestedFile.name, getFile: async () => nestedFile };
@@ -61,6 +128,9 @@ assert.match(sell, /access\?\.allowed/);
 assert.match(sell, /webkitGetAsEntry/);
 assert.match(sell, /getAsFileSystemHandle/);
 assert.match(sell, /extractPixieeDrawPreviewPng/);
+assert.match(sell, /optimizeGifIntegerScale/);
+assert.match(sell, /sourceOptimizations/);
+assert.match(sell, /source_sha256: sourceSha256/);
 assert.match(sell, /previewStorageFormat/);
 assert.match(sell, /mimeType: 'image\/png'/);
 assert.match(sell, /detectedEntries = detected;/);
@@ -74,6 +144,10 @@ assert.match(sellHtml, /id="listingOptionPriceFields"/);
 assert.match(sellHtml, /id="listingSourcePicker"/);
 assert.match(sellHtml, /id="listingSourceDialog"/);
 assert.match(sellHtml, /id="listingTotalPrice"/);
+const colorCodecScriptIndex = sellHtml.indexOf('color-codec-utils.js');
+const listingPackageScriptIndex = sellHtml.indexOf('listing-package-utils.js');
+const sellScriptIndex = sellHtml.indexOf('sell.js');
+assert.ok(colorCodecScriptIndex >= 0 && colorCodecScriptIndex < listingPackageScriptIndex && listingPackageScriptIndex < sellScriptIndex);
 assert.doesNotMatch(sellHtml, /id="listingBasePrice"/);
 assert.doesNotMatch(sellHtml, /id="listingMinimumPrice"/);
 assert.doesNotMatch(sellHtml, /id="listingDerivativePrice"/);

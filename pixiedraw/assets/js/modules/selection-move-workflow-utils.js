@@ -1450,6 +1450,30 @@
     return lookup;
   }
 
+  function getPackedPaletteColorKey(r, g, b, a) {
+    return (
+      ((Number(r) & 255) * 0x1000000)
+      + ((Number(g) & 255) << 16)
+      + ((Number(b) & 255) << 8)
+      + (Number(a) & 255)
+    ) >>> 0;
+  }
+
+  function buildPackedPaletteColorLookup(palette) {
+    const lookup = new Map();
+    if (!Array.isArray(palette)) {
+      return lookup;
+    }
+    for (let index = 0; index < palette.length; index += 1) {
+      const color = palette[index];
+      const key = getPackedPaletteColorKey(color?.r, color?.g, color?.b, color?.a);
+      if (!lookup.has(key)) {
+        lookup.set(key, index);
+      }
+    }
+    return lookup;
+  }
+
   function buildLayerColorDataForPaletteSync(layer, palette) {
     if (!(layer?.indices instanceof Int16Array)) {
       return null;
@@ -1638,7 +1662,9 @@
     const palette = Array.isArray(snapshot.palette)
       ? snapshot.palette.map(color => normalizeColorValue(color))
       : [];
-    const paletteLookup = buildPaletteColorLookup(palette);
+    // This path can visit hundreds of millions of pixels. A packed numeric key
+    // avoids per-pixel objects, string creation, and duplicate normalization.
+    const paletteLookup = buildPackedPaletteColorLookup(palette);
     const colorMode = normalizeColorMode(snapshot.colorMode, COLOR_MODE_INDEX);
     let addedCount = 0;
     let convertedPixels = 0;
@@ -1666,17 +1692,19 @@
         if (alpha <= 0) {
           continue;
         }
-        const result = ensurePaletteColor(palette, paletteLookup, {
-          r: direct[base],
-          g: direct[base + 1],
-          b: direct[base + 2],
-          a: alpha,
-        });
-        if (result.added) {
+        const red = direct[base];
+        const green = direct[base + 1];
+        const blue = direct[base + 2];
+        const key = getPackedPaletteColorKey(red, green, blue, alpha);
+        let paletteIndex = paletteLookup.get(key);
+        if (!Number.isInteger(paletteIndex) || paletteIndex < 0) {
+          paletteIndex = palette.length;
+          palette.push({ r: red, g: green, b: blue, a: alpha });
+          paletteLookup.set(key, paletteIndex);
           addedCount += 1;
         }
         if (colorMode === COLOR_MODE_INDEX) {
-          layer.indices[i] = result.paletteIndex;
+          layer.indices[i] = paletteIndex;
           direct[base] = 0;
           direct[base + 1] = 0;
           direct[base + 2] = 0;
@@ -2147,6 +2175,8 @@
     getPaletteColorDistanceScore,
     findNearestPaletteIndexForColor,
     buildPaletteColorLookup,
+    getPackedPaletteColorKey,
+    buildPackedPaletteColorLookup,
     buildLayerColorDataForPaletteSync,
     limitSnapshotPaletteColors,
     limitCurrentDocumentPaletteColors,

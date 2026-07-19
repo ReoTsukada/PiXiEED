@@ -24,18 +24,21 @@ assert.match(accountHtml, /id="accountAdminTools"[\s\S]*data-market-admin-only/)
 assert.match(accountHtml, /id="pageviewRewardBudgetForm"/);
 assert.match(accountHtml, /id="pageviewRewardYear"[^>]*min="2025"[^>]*max="2100"/);
 assert.match(accountHtml, /id="pageviewRewardAnnualTotal"/);
-assert.match(accountHtml, /閲覧集計・分配・送金は実行しません/);
+assert.match(accountHtml, /PiXiEEDの売上の一部を表示報酬として還元/);
+assert.match(accountHtml, /閲覧集計・配分・送金は実行しません/);
 assert.match(accountHtml, /account-pageview-reward-budget\.js/);
 
 assert.match(accountUi, /for \(let month = 1; month <= 12; month \+= 1\)/);
 assert.match(accountUi, /rpc\('market_current_user_is_admin'\)/);
 assert.match(accountUi, /rpc\('market_admin_get_pageview_reward_year_v1'/);
 assert.match(accountUi, /rpc\('market_admin_set_pageview_reward_year_v1'/);
-assert.match(accountUi, /この操作だけでは分配・送金されません/);
+assert.match(accountUi, /原資はPiXiEEDの売上の一部です/);
+assert.match(accountUi, /この操作だけでは配分・送金されません/);
 assert.match(accountUi, /hasUnsavedChanges/);
 assert.match(accountCss, /\.account-reward-budget__months[\s\S]*grid-template-columns: repeat\(3/);
 assert.match(accountCss, /@media \(max-width: 680px\)[\s\S]*\.account-reward-budget__months[\s\S]*repeat\(2/);
-assert.match(marketDoc, /## ページビュー報酬原資/);
-assert.match(marketDoc, /閲覧集計、無効閲覧の除外、作者別配分、残高計上、Stripe送金とは分離/);
+assert.match(marketDoc, /## 15\. 表示報酬/);
+assert.match(marketDoc, /表示報酬はPiXiEEDの売上の一部を原資/);
+assert.match(marketDoc, /PiXiEEDの売上の一部を原資/);
 
 console.log('Market page-view reward budget guard passed.');

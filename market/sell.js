@@ -43,6 +43,7 @@
   const status = document.getElementById('listingStatus');
   const $ = (id) => document.getElementById(id);
   const sourceFiles = new Map();
+  const sourceOptimizations = new Map();
   const selectedFormats = new Set();
   const dismissedFormats = new Set();
   const selectedOptionIds = new Set();
@@ -130,6 +131,7 @@
         .map((id) => [id, Boolean($(id)?.checked)])),
       aiUsage: form.querySelector('input[name="listingAiUsage"]:checked')?.value || '',
       files: Array.from(sourceFiles.entries()).map(([path, file]) => ({ path, file })),
+      fileOptimizations: Array.from(sourceOptimizations.entries()),
       selectedFormats: Array.from(selectedFormats),
       dismissedFormats: Array.from(dismissedFormats),
       selectedOptionIds: Array.from(selectedOptionIds),
@@ -187,6 +189,12 @@
     if (aiUsage) aiUsage.checked = true;
     sourceFiles.clear();
     (draft.files || []).forEach(({ path, file }) => { if (file instanceof File) sourceFiles.set(path || filePath(file), file); });
+    sourceOptimizations.clear();
+    (draft.fileOptimizations || []).forEach(([path, optimization]) => {
+      if (typeof path === 'string' && optimization && typeof optimization === 'object') {
+        sourceOptimizations.set(path, { ...optimization });
+      }
+    });
     selectedFormats.clear(); (draft.selectedFormats || []).forEach((value) => selectedFormats.add(value));
     dismissedFormats.clear(); (draft.dismissedFormats || []).forEach((value) => dismissedFormats.add(value));
     selectedOptionIds.clear(); (draft.selectedOptionIds || []).forEach((value) => selectedOptionIds.add(value));
@@ -482,7 +490,10 @@
       row.className = `market-file-row${entry.format ? (selectedFormats.has(entry.format) ? '' : ' is-excluded') : ' is-unsupported'}`;
       const name = document.createElement('span'); name.textContent = entry.path;
       const format = document.createElement('b'); format.textContent = entry.format ? FORMAT_LABELS[entry.format] : '未対応';
-      const size = document.createElement('small'); size.textContent = fileSize(entry.file.size);
+      const size = document.createElement('small');
+      size.textContent = entry.optimization
+        ? `${fileSize(entry.file.size)}・${entry.optimization.integer_scale_factor}倍縮小済み`
+        : fileSize(entry.file.size);
       row.append(name, format, size); return row;
     }));
     if (detectedEntries.length > 12) {
@@ -595,13 +606,60 @@
     const files = Array.from(sourceFiles.entries());
     setStatus(files.length ? 'ファイル形式を判定しています...' : '');
     const detected = [];
+    const optimizationMessages = [];
+    const optimizationWarnings = [];
     for (let index = 0; index < files.length; index += 1) {
-      const [path, file] = files[index];
+      const [path, sourceFile] = files[index];
+      let file = sourceFile;
       const format = await packageUtils.detectFormat(file);
+      let optimization = sourceOptimizations.get(path) || null;
+      if (format === 'gif' && !optimization && typeof packageUtils.optimizeGifIntegerScale === 'function') {
+        try {
+          setStatus(`GIFを1px単位で確認しています（${index + 1}/${files.length}）...`);
+          const result = await packageUtils.optimizeGifIntegerScale(file, {
+            onProgress: ({ phase, completed, total }) => {
+              const action = phase === 'encode' ? '適正化しています' : '全フレームを確認しています';
+              setStatus(`GIFを${action}（${completed}/${total}）...`);
+            }
+          });
+          if (run !== detectionRun || sourceFiles.get(path) !== sourceFile) return;
+          if (result.optimized) {
+            const sourceSha256 = await sha256File(file);
+            if (run !== detectionRun || sourceFiles.get(path) !== sourceFile) return;
+            file = result.file;
+            optimization = {
+              kind: result.reason,
+              source_width: result.sourceWidth,
+              source_height: result.sourceHeight,
+              output_width: result.width,
+              output_height: result.height,
+              integer_scale_factor: result.integerScaleFactor,
+              frame_count: result.frameCount,
+              loop_count: result.loopCount,
+              duration_ms: result.durationMs,
+              source_size: result.sourceBytes,
+              output_size: result.outputBytes,
+              source_sha256: sourceSha256
+            };
+            sourceFiles.set(path, file);
+            sourceOptimizations.set(path, optimization);
+            optimizationMessages.push(
+              `${path}: ${result.sourceWidth}x${result.sourceHeight} → ${result.width}x${result.height}（${result.integerScaleFactor}倍）`
+            );
+          } else if (result.reason === 'verification-failed') {
+            optimizationWarnings.push(`${path}: 再生成結果を完全一致で確認できなかったため元GIFを使用します。`);
+          }
+        } catch (error) {
+          optimizationWarnings.push(`${path}: GIF最適化を適用できなかったため元GIFを使用します（${error.message || '解析エラー'}）。`);
+        }
+      } else if (format !== 'gif') {
+        sourceOptimizations.delete(path);
+        optimization = null;
+      }
       const previewBlob = format === 'pixiedraw-project'
         ? await packageUtils.extractPixieeDrawPreviewPng(file)
         : null;
-      detected.push({ path, file, format, previewBlob });
+      detected.push({ path, file, format, previewBlob, optimization });
       if (index > 0 && index % 20 === 0) setStatus(`ファイル形式を判定しています（${index + 1}/${files.length}）...`);
     }
     if (run !== detectionRun) return;
@@ -617,6 +675,8 @@
     renderFormats();
     const previewlessProjectCount = detected.filter((entry) => entry.format === 'pixiedraw-project' && !entry.previewBlob).length;
     setStatus([
+      optimizationMessages.length ? `GIFをアップロード前に1px単位へ適正化しました。${optimizationMessages.join(' ')}` : '',
+      ...optimizationWarnings,
       ignoredFileCount ? `未対応形式 ${ignoredFileCount}件は一覧に残していますが、現在の出品には含まれません。` : '',
       previewlessProjectCount ? `旧形式などPNGサムネイルを含まないPiXiEEDraw ${previewlessProjectCount}件はプレビューを生成できませんでした。` : ''
     ].filter(Boolean).join(' '));
@@ -625,7 +685,11 @@
   async function addFiles(additions) {
     const normalized = Array.from(additions || []).map((item) => item?.file ? item : { file: item, path: filePath(item) }).filter((item) => item.file instanceof File);
     if (!normalized.length) return;
-    normalized.forEach(({ file, path }) => sourceFiles.set(path || filePath(file), file));
+    normalized.forEach(({ file, path }) => {
+      const normalizedPath = path || filePath(file);
+      sourceFiles.set(normalizedPath, file);
+      sourceOptimizations.delete(normalizedPath);
+    });
     if (sourceFiles.size > MAX_DETECTION_COUNT) {
       normalized.forEach(({ file, path }) => sourceFiles.delete(path || filePath(file)));
       setStatus(`一度に判定できるファイルは${MAX_DETECTION_COUNT}件までです。`); return;
@@ -679,6 +743,7 @@
 
   function clearFiles() {
     sourceFiles.clear(); detectedEntries = []; ignoredFileCount = 0; thumbnailPath = '';
+    sourceOptimizations.clear();
     selectedFormats.clear(); dismissedFormats.clear(); samplePreviewPaths.clear(); previewSelectionTouched = false;
     detectionRun += 1;
     previewUrls.forEach((url) => URL.revokeObjectURL(url)); previewUrls.clear();
@@ -703,7 +768,8 @@
         size: entry.file.size,
         mime_type: entry.file.type || 'application/octet-stream',
         format: entry.format,
-        sha256: await sha256File(entry.file)
+        sha256: await sha256File(entry.file),
+        ...(entry.optimization ? { optimization: { ...entry.optimization } } : {})
       });
     }
     const fingerprint = JSON.stringify(files.map(({ original_path, size, format, sha256 }) => ({ original_path, size, format, sha256 })));

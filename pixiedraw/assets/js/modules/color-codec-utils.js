@@ -10,10 +10,16 @@
     MAX_IMPORTED_PALETTE_COLORS,
   } = {}) {
 
-    function buildGifFromPixels(framePixels, frameDurations, width, height) {
+    function buildGifFromPixels(framePixels, frameDurations, width, height, options = {}) {
       const { palette, indexedFrames, transparentIndex } = buildIndexedFramesForGif(framePixels, width, height);
       const gifPalette = ensureGifPalette(palette);
-      const writerBaseOptions = { loop: 0, palette: gifPalette };
+      const writerBaseOptions = { palette: gifPalette };
+      const hasExplicitLoopCount = Object.prototype.hasOwnProperty.call(options, 'loopCount');
+      const requestedLoopCount = hasExplicitLoopCount ? options.loopCount : 0;
+      if (Number.isInteger(requestedLoopCount) && requestedLoopCount >= 0 && requestedLoopCount <= 65535) {
+        writerBaseOptions.loop = requestedLoopCount;
+      }
+      const preserveTiming = options?.preserveTiming === true;
       const estimatedSize = Math.max(width * height * indexedFrames.length * 4 + gifPalette.length * 6 + 2048, 4096);
       let bufferSize = estimatedSize;
       for (let attempt = 0; attempt < 4; attempt += 1) {
@@ -21,8 +27,10 @@
         try {
           const writer = new GifWriter(buffer, width, height, writerBaseOptions);
           indexedFrames.forEach((indexedPixels, index) => {
-            const durationMs = clamp(Math.round(Number(frameDurations[index]) || 0), 16, 2000);
-            const delayHundredths = clamp(Math.round(durationMs / 10), 2, 65535);
+            const durationMs = preserveTiming
+              ? clamp(Math.round(Number(frameDurations[index]) || 0), 10, 655350)
+              : clamp(Math.round(Number(frameDurations[index]) || 0), 16, 2000);
+            const delayHundredths = clamp(Math.round(durationMs / 10), preserveTiming ? 1 : 2, 65535);
             const hasTransparency = transparentIndex !== null;
             const frameOptions = {
               delay: delayHundredths,

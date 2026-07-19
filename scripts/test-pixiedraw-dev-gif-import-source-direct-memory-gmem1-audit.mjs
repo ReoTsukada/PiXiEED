@@ -13,8 +13,8 @@ const history = read('PiXiEEDrawDEV/assets/js/modules/history-snapshot-workflow-
 const codec = read('PiXiEEDrawDEV/assets/js/modules/project-storage-v2-archive-codec.js');
 const decoder = read('PiXiEEDrawDEV/assets/js/modules/image-import-decode-utils.js');
 
-// G-MEM-1 findings remain pinned while G-MEM-2 establishes the direct-only
-// runtime shape for new external raster imports.
+// New external raster imports remain direct-only, and the GIF decoder must
+// inspect every composited frame without retaining source-size frame copies.
 assert.match(importWorkflow, /direct\.set\(frameInfo\.imageData\.data\)/);
 assert.doesNotMatch(importWorkflow, /layer\.importSourceDirect\s*=/);
 
@@ -33,24 +33,36 @@ assert.match(codec, /nextLayer\.importSourceDirect =/);
 
 assert.match(decoder, /const pixels = new Uint8ClampedArray\(width \* height \* 4\)/);
 assert.match(decoder, /const restoreBuffer = new Uint8ClampedArray\(pixels\.length\)/);
-assert.match(decoder, /const framePixels = new Uint8ClampedArray\(pixels\)/);
+assert.match(decoder, /detectGifCommonIntegerScale\(reader, width, height, frameCount\)/);
+assert.match(decoder, /createIntegerDownscaledImageDataFromPixels\(/);
+assert.doesNotMatch(decoder, /const framePixels = new Uint8ClampedArray\(pixels\)/);
+assert.doesNotMatch(decoder, /const sampledFrames = \[\]/);
+assert.match(importWorkflow, /frameInfo\.imageData = null/);
+assert.match(importWorkflow, /normalizedFramesData\[index\] = null/);
 
-const estimate = ({ width, height, frames }) => {
-  const frameBytes = width * height * 4;
+const estimate = ({ width, height, frames, factor }) => {
+  const sourceFrameBytes = width * height * 4;
+  const targetWidth = width / factor;
+  const targetHeight = height / factor;
+  const targetFrameBytes = targetWidth * targetHeight * 4;
   return {
-    frameBytes,
-    completedBytes: frameBytes * frames,
-    directBytes: frameBytes * frames,
-    importSourceBytes: frameBytes * frames,
-    compositionBytes: frameBytes * 2,
+    sourceFrameBytes,
+    targetFrameBytes,
+    sampledSourceBytes: 0,
+    compositionBytes: sourceFrameBytes * 2,
+    optimizedDirectBytes: targetFrameBytes * frames,
+    optimizedIndexBytes: targetWidth * targetHeight * 2 * frames,
+    importSourceBytes: 0,
   };
 };
-assert.deepEqual(estimate({ width: 512, height: 512, frames: 60 }), {
-  frameBytes: 1048576,
-  completedBytes: 62914560,
-  directBytes: 62914560,
-  importSourceBytes: 62914560,
-  compositionBytes: 2097152,
+assert.deepEqual(estimate({ width: 1280, height: 960, frames: 204, factor: 4 }), {
+  sourceFrameBytes: 4915200,
+  targetFrameBytes: 307200,
+  sampledSourceBytes: 0,
+  compositionBytes: 9830400,
+  optimizedDirectBytes: 62668800,
+  optimizedIndexBytes: 31334400,
+  importSourceBytes: 0,
 });
 
 console.log('G-MEM-1 importSourceDirect audit checks passed.');
