@@ -82,7 +82,6 @@
       : false;
     if (!loaded) {
       slot.dataset.adsScriptBlocked = '1';
-      window.PiXiEEDAdAccountControl?.syncAdFallback?.(slot);
       return;
     }
     if (adsDisabled() || !slot.isConnected || slot.getBoundingClientRect().width < 1) return;
@@ -97,7 +96,6 @@
     } catch (_error) {
       delete slot.dataset.marketAdPushed;
       slot.dataset.adsRequestState = 'push-failed';
-      window.PiXiEEDAdAccountControl?.syncAdFallback?.(slot);
     }
   }
 
