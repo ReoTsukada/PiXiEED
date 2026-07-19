@@ -45,7 +45,7 @@ for (const filePath of listHtmlFiles(root)) {
     assert.match(html, /shared-bottom-nav\.js\?v=2026\.07\.19-ad-lifecycle1/, `${relativePath} has stale shared navigation`);
   }
   if (html.includes('bottom-nav-footer-ad.js?v=')) {
-    assert.match(html, /bottom-nav-footer-ad\.js\?v=2026\.07\.19-ad-lifecycle1/, `${relativePath} has stale shared advertising chrome`);
+    assert.match(html, /bottom-nav-footer-ad\.js\?v=20260719-shared-top-resume1/, `${relativePath} has stale shared advertising chrome`);
   }
 }
 
