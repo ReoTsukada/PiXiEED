@@ -489,10 +489,16 @@
       }
 
       updateAutosaveStatus('自動保存: 端末内V2へ差分保存中…');
+      // DEVの端末内V2保存は外部ファイル互換用の配列化を必要としない。
+      // TypedArrayを保持して、本番と同じ軽量な内部チェックポイント経路にする。
+      const buildInternalAutosavePayload = (snapshotValue, options = {}) => buildPackagedProjectPayload(
+        snapshotValue,
+        { ...options, internalBinary: true }
+      );
       const journalSavePlan = buildActiveLocalProjectSavePlan?.({
         projectId,
         snapshot: null,
-        buildPackagedProjectPayload,
+        buildPackagedProjectPayload: buildInternalAutosavePayload,
         buildAutosaveSessionPayload: buildProjectSessionPayload,
       }) || null;
       const normalizedJournalOps = journalSavePlan?.journalOnly === true
@@ -529,7 +535,7 @@
         activeSavePlan = buildActiveLocalProjectSavePlan?.({
           projectId,
           snapshot,
-          buildPackagedProjectPayload,
+          buildPackagedProjectPayload: buildInternalAutosavePayload,
           buildAutosaveSessionPayload: buildProjectSessionPayload,
         }) || null;
       }
@@ -557,7 +563,7 @@
           activeSavePlan = buildActiveLocalProjectSavePlan?.({
             projectId,
             snapshot,
-            buildPackagedProjectPayload,
+            buildPackagedProjectPayload: buildInternalAutosavePayload,
             buildAutosaveSessionPayload: buildProjectSessionPayload,
           }) || null;
           useV2Journal = false;
