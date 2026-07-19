@@ -7137,6 +7137,8 @@
   set connectMultiSessionAs(value) { connectMultiSessionAs = value; },
   get createSharedProjectSnapshotTitle() { return createSharedProjectSnapshotTitle; },
   set createSharedProjectSnapshotTitle(value) { createSharedProjectSnapshotTitle = value; },
+  get createProjectCanvasDocument() { return createProjectCanvasDocument; },
+  set createProjectCanvasDocument(value) { createProjectCanvasDocument = value; },
   get dom() { return dom; },
   set dom(value) { dom = value; },
   get ensureActiveSharedProjectRealtimeChannel() { return ensureActiveSharedProjectRealtimeChannel; },
