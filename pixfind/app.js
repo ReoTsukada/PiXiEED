@@ -195,8 +195,10 @@ const MAX_MISTAKES = 3;
 const TAP_MAX_MOVEMENT_PX = 8;
 const TAP_MAX_DURATION_MS = 320;
 const ZOOM_MIN_SCALE = 1;
-const ZOOM_MAX_SCALE = 3.2;
-const ZOOM_WHEEL_STEP = 0.12;
+const ZOOM_MAX_SCALE = 20;
+const ZOOM_STEPS = Object.freeze([1, 1.25, 1.5, 2, 2.5, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20]);
+const ZOOM_WHEEL_STEP_BASE = 1.25;
+const ZOOM_WHEEL_RAW_RESET_MS = 160;
 const GAME_MODE_SPOT_DIFFERENCE = 'spot-difference';
 const GAME_MODE_HIDDEN_OBJECT = 'hidden-object';
 const DEFAULT_GAME_MODE = GAME_MODE_SPOT_DIFFERENCE;
@@ -3979,6 +3981,15 @@ function createCanvasInteractionController(canvas, overlay, onTap, onTransform) 
     minScale: ZOOM_MIN_SCALE,
     maxScale: ZOOM_MAX_SCALE,
   };
+  let wheelRawScale = null;
+  let wheelRawResetTimer = null;
+
+  function normalizeZoomScale(value, fallback = controllerState.scale) {
+    const numeric = clamp(Number(value) || Number(fallback) || config.minScale, config.minScale, config.maxScale);
+    return ZOOM_STEPS.reduce((closest, step) => (
+      Math.abs(step - numeric) < Math.abs(closest - numeric) ? step : closest
+    ), ZOOM_STEPS[0]);
+  }
 
   function applyTransform({ sync = true } = {}) {
     const transform = `translate3d(${controllerState.offsetX}px, ${controllerState.offsetY}px, 0) scale(${controllerState.scale})`;
@@ -4000,13 +4011,26 @@ function createCanvasInteractionController(canvas, overlay, onTap, onTransform) 
   function clampOffsets() {
     const frameWidth = frame.clientWidth || canvas.clientWidth || 0;
     const frameHeight = frame.clientHeight || canvas.clientHeight || 0;
-    if (!frameWidth || !frameHeight) {
+    const canvasWidth = canvas.clientWidth || frameWidth;
+    const canvasHeight = canvas.clientHeight || frameHeight;
+    if (!frameWidth || !frameHeight || !canvasWidth || !canvasHeight) {
       controllerState.offsetX = 0;
       controllerState.offsetY = 0;
       return;
     }
-    const maxOffsetX = Math.max(0, (frameWidth * (controllerState.scale - 1)) / 2);
-    const maxOffsetY = Math.max(0, (frameHeight * (controllerState.scale - 1)) / 2);
+    // Match PiXiEEDraw's visibility-first viewport rule: panning is free until
+    // it would move the complete image outside the frame. Keep a meaningful
+    // Keep 20% of the viewport covered on each axis so the board cannot get lost off-screen.
+    const getMaxOffset = (frameSize, canvasSize) => {
+      const scaledSize = canvasSize * controllerState.scale;
+      const minimumVisible = Math.min(
+        scaledSize,
+        Math.max(1, frameSize * 0.2)
+      );
+      return Math.max(0, ((frameSize + scaledSize) / 2) - minimumVisible);
+    };
+    const maxOffsetX = getMaxOffset(frameWidth, canvasWidth);
+    const maxOffsetY = getMaxOffset(frameHeight, canvasHeight);
     controllerState.offsetX = clamp(controllerState.offsetX, -maxOffsetX, maxOffsetX);
     controllerState.offsetY = clamp(controllerState.offsetY, -maxOffsetY, maxOffsetY);
   }
@@ -4104,7 +4128,12 @@ function createCanvasInteractionController(canvas, overlay, onTap, onTransform) 
         controllerState.offsetX -= (scaleChange - 1) * centerX;
         controllerState.offsetY -= (scaleChange - 1) * centerY;
       }
-      clampOffsets();
+      // While expanding, preserve the pinch focus exactly. A clamp here makes
+      // the image feel like it hits an invisible wall before reaching the
+      // user's fingers. Shrinking still returns the image to its safe bounds.
+      if (nextScale <= prevScale) {
+        clampOffsets();
+      }
       applyTransform();
       controllerState.tapCandidate = null;
     } else if (controllerState.pointers.size === 1) {
@@ -4171,14 +4200,24 @@ function createCanvasInteractionController(canvas, overlay, onTap, onTransform) 
   }
 
   function handleWheel(event) {
-    if (!event.ctrlKey) {
-      return;
-    }
     event.preventDefault();
+    const deltaModeScale = event.deltaMode === 1 ? 16 : (event.deltaMode === 2 ? 180 : 1);
+    const normalizedDelta = clamp(event.deltaY * deltaModeScale, -600, 600);
+    const wheelSteps = normalizedDelta / 100;
+    if (!Number.isFinite(wheelSteps) || Math.abs(wheelSteps) < 0.001) return;
+
     const prevScale = controllerState.scale;
-    const delta = -event.deltaY * ZOOM_WHEEL_STEP;
-    const factor = Math.exp(delta);
-    const nextScale = clamp(prevScale * factor, config.minScale, config.maxScale);
+    const rawScale = Number.isFinite(wheelRawScale) ? wheelRawScale : prevScale;
+    wheelRawScale = clamp(rawScale * Math.pow(ZOOM_WHEEL_STEP_BASE, -wheelSteps), config.minScale, config.maxScale);
+    if (wheelRawResetTimer !== null) {
+      window.clearTimeout(wheelRawResetTimer);
+    }
+    wheelRawResetTimer = window.setTimeout(() => {
+      wheelRawScale = null;
+      wheelRawResetTimer = null;
+    }, ZOOM_WHEEL_RAW_RESET_MS);
+
+    const nextScale = normalizeZoomScale(wheelRawScale, prevScale);
     if (nextScale === prevScale) {
       return;
     }
@@ -4189,7 +4228,12 @@ function createCanvasInteractionController(canvas, overlay, onTap, onTransform) 
     controllerState.scale = nextScale;
     controllerState.offsetX -= (scaleChange - 1) * relativeX;
     controllerState.offsetY -= (scaleChange - 1) * relativeY;
-    clampOffsets();
+    // Keep the pointer under the same image point while zooming in. Because
+    // the pointer is on the image, this cannot move the whole board away;
+    // bounds are re-applied on zoom-out and on every pan gesture.
+    if (nextScale <= prevScale) {
+      clampOffsets();
+    }
     applyTransform();
   }
 
