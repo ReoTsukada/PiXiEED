@@ -754,6 +754,9 @@ html[data-pixieed-ad-free-account="true"] .market-ad {
 .market-file-row b { color: #7ef0c7; font-size: 9px; }
 .market-file-row small { color: #94a3b8; font-size: 9px; }
 .market-switch-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.market-switch-contents { display: contents; }
+.market-option-toggle-block { display: grid; min-width: 0; align-content: start; gap: 7px; }
+.market-option-toggle-block > .market-switch-card { width: 100%; box-sizing: border-box; }
 .market-switch-card { position: relative; display: flex !important; min-width: 0; min-height: 58px; padding: 9px 10px; flex-direction: row !important; align-items: center; justify-content: space-between; gap: 10px !important; border: 1px solid rgba(255,255,255,.1); border-radius: 7px; background: #0b1224; cursor: pointer; }
 .market-switch-card > span:first-child { display: grid; min-width: 0; gap: 3px; }
 .market-switch-card strong { color: #e5f2ff; font-size: 11px; line-height: 1.35; }
@@ -775,6 +778,7 @@ html[data-pixieed-ad-free-account="true"] .market-ad {
 .market-standalone-switch > .market-switch-toggle { margin-left: auto; }
 .market-limited-sale { display: grid; gap: 8px; }
 .market-limited-quantity { display: grid !important; grid-template-columns: minmax(0, 1fr) minmax(100px, 160px); align-items: center; gap: 5px 12px !important; padding: 9px 10px; border: 1px solid rgba(250,204,107,.24); border-radius: 7px; background: rgba(111,72,18,.12); }
+.market-limited-quantity[hidden] { display: none !important; }
 .market-limited-quantity input { width: 100%; box-sizing: border-box; }
 .market-limited-quantity small { grid-column: 1 / -1; color: #b9a77a; font-size: 9px; }
 .market-product-type-preview { margin: 0; padding: 8px 9px; border: 1px solid rgba(255,255,255,.1); border-radius: 6px; color: #aebbd0; font-size: 10px; line-height: 1.5; }
