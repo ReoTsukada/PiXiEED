@@ -55,7 +55,7 @@
   }
 }
 </script>
-<script src="../scripts/ad-account-control.js?v=20260719-project-ad-fallback1"></script>
+<script src="../scripts/ad-account-control.js?v=20260719-adsense-script-state1"></script>
 <script src="../scripts/third-party-error-guard.js"></script>
 <script>
   (function configureEmbedMode() {
@@ -154,7 +154,10 @@
         }
         const existing = document.querySelector('script[src*="pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"]');
         if (existing instanceof HTMLScriptElement) {
-          if (existing.dataset.pixieedReady === '1' || window.adsbygoogle) {
+          if (window.__PIXIEED_ADSENSE_SCRIPT_READY__ === true
+            || window.adsbygoogle?.loaded === true
+            || document.querySelector('ins.adsbygoogle[data-adsbygoogle-status="done"]')) {
+            window.__PIXIEED_ADSENSE_SCRIPT_READY__ = true;
             finish();
             return;
           }
@@ -167,7 +170,7 @@
         script.crossOrigin = 'anonymous';
         script.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253';
         script.addEventListener('load', () => {
-          script.dataset.pixieedReady = '1';
+          window.__PIXIEED_ADSENSE_SCRIPT_READY__ = true;
           finish();
         }, { once: true });
         script.addEventListener('error', fail, { once: true });
