@@ -261,12 +261,12 @@
     const existing = document.querySelector('script[src*="pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"]');
     const runtimeReady = Boolean(
       existing
-      && (existing.dataset.pixieedReady === '1'
+      && (window.__PIXIEED_ADSENSE_SCRIPT_READY__ === true
         || window.adsbygoogle?.loaded === true
         || document.querySelector('ins.adsbygoogle[data-adsbygoogle-status="done"]'))
     );
     if (runtimeReady) {
-      existing.dataset.pixieedReady = '1';
+      window.__PIXIEED_ADSENSE_SCRIPT_READY__ = true;
       syncAdsenseAvailability(true);
       return true;
     }
@@ -279,11 +279,10 @@
         if (settled) return;
         settled = true;
         window.clearTimeout(timeoutId);
-        if (loaded) script.dataset.pixieedReady = '1';
+        if (loaded) window.__PIXIEED_ADSENSE_SCRIPT_READY__ = true;
         else {
           adsensePromise = null;
-          script.dataset.pixieedLoadFailed = '1';
-          if (script.isConnected && script.dataset.pixieedReady !== '1') script.remove();
+          if (window.__PIXIEED_ADSENSE_SCRIPT_READY__ !== true && script.isConnected) script.remove();
         }
         syncAdsenseAvailability(loaded);
         done(loaded);
@@ -292,7 +291,6 @@
       script.async = true;
       script.crossOrigin = 'anonymous';
       script.src = ADSENSE_SRC;
-      script.dataset.pixieedLoadFailed = '';
       script.addEventListener('load', () => finish(true), { once: true });
       script.addEventListener('error', () => finish(false), { once: true });
       if (!existing) document.head.appendChild(script);
@@ -406,7 +404,18 @@
       || requestState === 'push-failed'
       || scriptBlocked
     );
-    if (shouldShow) host.dataset.pixieedReserveAdSpace = 'true';
+    if (shouldShow) {
+      host.dataset.pixieedReserveAdSpace = 'true';
+      host.classList.remove('is-ad-unfilled');
+      host.classList.add('is-ad-unfilled-reserved');
+      const mount = host.closest('.panel-ad-mount');
+      mount?.classList.remove('is-ad-unfilled');
+      mount?.classList.add('is-ad-unfilled-reserved');
+    } else if (status !== 'unfilled' && status !== 'unfill-optimized') {
+      host.classList.remove('is-ad-unfilled', 'is-ad-unfilled-reserved');
+      const mount = host.closest('.panel-ad-mount');
+      mount?.classList.remove('is-ad-unfilled', 'is-ad-unfilled-reserved');
+    }
     const fallback = shouldShow
       ? ensureAdFallback(ins)
       : host.querySelector(':scope > .pixieed-ad-fallback');
