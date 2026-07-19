@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 
 const root = new URL('../', import.meta.url);
 const read = path => readFile(new URL(path, root), 'utf8');
-const [index, css, app, startup, lifecycle, workflow, devIndex, devWorkflow] = await Promise.all([
+const [index, css, app, startup, lifecycle, workflow, devIndex, devWorkflow, lensIndex] = await Promise.all([
   read('pixiedraw/index.html'),
   read('pixiedraw/assets/css/style.css'),
   read('pixiedraw/assets/js/app.js'),
@@ -12,6 +12,7 @@ const [index, css, app, startup, lifecycle, workflow, devIndex, devWorkflow] = a
   read('pixiedraw/assets/js/modules/open-project-tab-workflow-utils.js'),
   read('PiXiEEDrawDEV/index.html'),
   read('PiXiEEDrawDEV/assets/js/modules/open-project-tab-workflow-utils.js'),
+  read('pixiee-lens/index.html'),
 ]);
 
 assert.match(index, /id="startupScreen"[\s\S]*id="startupScreenTitle">プロジェクト</);
@@ -19,6 +20,9 @@ assert.match(index, /id="startupWorkspaceSearch"/);
 assert.match(index, /id="startupWorkspaceProjectList"/);
 assert.match(index, /id="startupActionNew"[\s\S]*id="startupActionOpen"[\s\S]*id="startupActionSkip"/);
 assert.doesNotMatch(index, /id="projectHomeScreen"|id="projectHomeRecentList"/);
+assert.doesNotMatch(index, /id="updateToast"|id="updateToastCloseBtn"|class="update-toast"/);
+assert.doesNotMatch(devIndex, /id="updateToast"|id="updateToastCloseBtn"|class="update-toast"/);
+assert.doesNotMatch(lensIndex, /id="updateToast"|id="updateToastCloseBtn"|class="update-toast"|pixiee-lens:update-toast-hidden/);
 assert.match(app, /showLocalProjects[\s\S]{0,900}showStartupScreen\(\{ refreshWorkspace: true \}\)/);
 assert.match(startup, /startupWorkspaceSearchQuery/);
 assert.match(startup, /\(visibleIndex \+ 1\) % 8 === 0/);
