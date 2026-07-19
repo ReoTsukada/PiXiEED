@@ -3168,7 +3168,7 @@ function getFullscreenElement() {
 function updateFullscreenButton() {
   const active = getFullscreenElement() === dom.app;
   if (!dom.fullscreenButton) return;
-  const label = active ? '全画面を終了' : '全画面';
+  const label = active ? '縮小' : '拡大';
   dom.fullscreenButton.textContent = label;
   dom.fullscreenButton.setAttribute('aria-label', label);
   dom.fullscreenButton.title = label;
@@ -3184,20 +3184,21 @@ async function toggleGameFullscreen() {
       } else if (document.webkitExitFullscreen) {
         document.webkitExitFullscreen();
       }
-      return;
-    }
-    if (dom.app.requestFullscreen) {
+    } else if (dom.app.requestFullscreen) {
       await dom.app.requestFullscreen();
     } else if (dom.app.webkitRequestFullscreen) {
       dom.app.webkitRequestFullscreen();
     } else {
       setHint('このブラウザでは全画面表示を利用できません。');
     }
+    handleFullscreenChange();
   } catch (error) {
     console.warn('fullscreen request failed', error);
     setHint('全画面表示を開始できませんでした。');
   }
 }
+
+window.PiXiEEDGameFullscreen = Object.freeze({ toggle: toggleGameFullscreen });
 
 function handleFullscreenChange() {
   updateFullscreenButton();

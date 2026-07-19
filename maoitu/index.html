@@ -1393,7 +1393,7 @@ body.is-game-active .game-shell {
   <script src="../scripts/ads-lazy.js?v=20260719-no-ad-fallback1"></script>
 <link rel="apple-touch-icon" href="/icon/PiXiEED.icon512.png"/>
 </head>
-<body>
+<body data-pixieed-fullscreen-action="tabbar">
 <main class="start-screen">
   <section class="start-panel" aria-labelledby="startTitle">
     <header class="start-header">
@@ -1629,6 +1629,7 @@ initRankingUI({
   window.__rankingController = ctrl;
 });
 </script>
+  <button aria-pressed="false" hidden id="fullscreenButton" type="button">拡大</button>
   <script src="../scripts/shared-bottom-nav.js?v=2026.07.19-ad-lifecycle1"></script>
   <script src="../scripts/tool-fullscreen.js"></script>
   <script src="../scripts/pixel-art-fit.js"></script>
