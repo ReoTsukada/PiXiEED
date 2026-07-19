@@ -2737,53 +2737,6 @@ body[data-pixfind-screen]:not([data-pixfind-screen="start"]) > .pixieed-shared-f
   display: none;
 }
 
-/* Keep the shared chrome fixed, but make the PiXFiND footer a normal document-end section. */
-html[data-pixieed-page="pixfind"],
-body[data-pixieed-page="pixfind"] {
-  height: auto !important;
-  min-height: var(--app-height);
-  max-height: none !important;
-  overflow-x: hidden !important;
-  overflow-y: auto !important;
-}
-
-body[data-pixieed-page="pixfind"] > .app {
-  height: calc(var(--app-height) - var(--pixieed-common-content-top, 0px) - var(--pixieed-shared-bottom-nav-offset, 68px)) !important;
-  min-height: 320px;
-  max-height: none !important;
-  margin-top: var(--pixieed-common-content-top, 0px) !important;
-  margin-bottom: 0 !important;
-}
-
-body[data-pixieed-page="pixfind"] > .pixieed-shared-footer,
-body[data-pixfind-screen]:not([data-pixfind-screen="start"]) > .pixieed-shared-footer {
-  position: relative !important;
-  z-index: 1;
-  left: auto !important;
-  right: auto !important;
-  bottom: auto !important;
-  display: flex !important;
-  width: 100% !important;
-  max-width: none !important;
-  min-height: 0;
-  margin: 0 !important;
-  padding: 0.85rem max(0.8rem, env(safe-area-inset-right, 0px)) calc(var(--pixieed-shared-bottom-nav-offset, 68px) + 0.85rem) max(0.8rem, env(safe-area-inset-left, 0px)) !important;
-  background: linear-gradient(180deg, rgba(237, 242, 251, 0.92), rgba(226, 234, 247, 0.98));
-  border-top: 1px solid rgba(44, 56, 88, 0.1);
-}
-
-body[data-pixieed-page="pixfind"] > .pixieed-shared-footer .pixieed-shared-footer__copy {
-  display: block;
-}
-
-@media (orientation: landscape) {
-  body[data-pixieed-page="pixfind"] > .pixieed-shared-footer {
-    width: calc(100% - var(--pixieed-shared-side-nav-width, 72px) - var(--pixieed-shared-side-nav-gap, 6px)) !important;
-    margin-right: calc(var(--pixieed-shared-side-nav-width, 72px) + var(--pixieed-shared-side-nav-gap, 6px)) !important;
-    padding-bottom: 0.85rem !important;
-  }
-}
-
 @media (orientation: landscape) {
   body[data-pixfind-screen="start"] > .pixieed-shared-footer {
     right: calc(var(--pixieed-shared-side-nav-width, 72px) + var(--pixieed-shared-side-nav-gap, 6px));
