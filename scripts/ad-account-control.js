@@ -307,11 +307,11 @@
     style.textContent = `
       .pixieed-ad-fallback[hidden]{display:none!important}
       .pixieed-ad-fallback{
-        width:100%;min-width:0;min-height:56px;height:100%;box-sizing:border-box;
+        width:100%;min-width:0;min-height:56px;box-sizing:border-box;
         display:flex;align-items:center;justify-content:center;
       }
       .pixieed-ad-fallback__link{
-        width:100%;min-width:0;min-height:56px;height:100%;box-sizing:border-box;
+        width:100%;min-width:0;min-height:56px;box-sizing:border-box;
         display:flex;align-items:center;justify-content:center;gap:10px;
         padding:9px 12px;border:1px solid rgba(148,163,184,.2);border-radius:12px;
         background:linear-gradient(135deg,rgba(15,23,42,.92),rgba(30,41,59,.9));
@@ -332,6 +332,8 @@
       .pixieed-shared-top-ad .pixieed-ad-fallback__eyebrow{font-size:8px}
       .pixieed-shared-top-ad .pixieed-ad-fallback__title{font-size:11px}
       .pixieed-common-details__ad .pixieed-ad-fallback{min-height:220px}
+      .startup-recent-ad__frame > .pixieed-ad-fallback{position:absolute;inset:18px 8px 8px;min-height:0}
+      .startup-recent-ad__frame > .pixieed-ad-fallback .pixieed-ad-fallback__link{min-height:0;height:100%}
       html[data-pixieed-ad-free-account='true'] .pixieed-ad-fallback{display:none!important}
     `;
     (document.head || document.documentElement).appendChild(style);
@@ -339,6 +341,8 @@
 
   function resolveAdFallbackHost(ins) {
     if (!(ins instanceof HTMLElement)) return null;
+    const projectFeedFrame = ins.closest('.startup-recent-ad__frame');
+    if (projectFeedFrame instanceof HTMLElement) return projectFeedFrame;
     return ins.closest([
       '.pixieed-common-details__ad',
       '.market-ad',
