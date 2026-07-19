@@ -43,7 +43,7 @@ assert.match(css, /body\[data-pixieed-page="pixfind"\] \.pixieed-common-tabbar \
 assert.match(css, /\/\* Game-first board: the two images always share the available game surface\. \*\//);
 assert.match(css, /\.screen--game \.game-layout \{[^}]*grid-template-rows: repeat\(2, minmax\(0, 1fr\)\);/s);
 assert.match(css, /\.screen--game \{[^}]*overflow: hidden !important;/s);
-assert.match(commonTabBar, /id: 'fullscreen', label: '拡大', selector: '#fullscreenButton', icon: '拡大\.png', iconWhenPressed: '縮小\.png', mirrorState: true, mode: 'fullscreen', fullscreenController: 'game', placement: 'leading'/);
+assert.match(commonTabBar, /id: 'fullscreen', label: '拡大', selector: '#fullscreenButton', icon: 'expand\.png', iconWhenPressed: 'shrink\.png', mirrorState: true, mode: 'fullscreen', fullscreenController: 'game', placement: 'leading'/);
 assert.match(commonTabBar, /if \(kind === 'maoitu'\)/);
 assert.match(commonTabBar, /if \(item\.iconWhenPressed\)/);
 assert.match(commonTabBar, /const leadingActions = state\.actions\.filter\(\(item\) => item\?\.placement === 'leading'\)/);
