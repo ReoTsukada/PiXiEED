@@ -50,6 +50,7 @@ const sellHtml = fs.readFileSync('market/sell.html', 'utf8');
 const listingDeclarationMigration = fs.readFileSync('supabase/migrations/20260718110000_market_listing_legal_ai_declaration.sql', 'utf8');
 const privacyHtml = fs.readFileSync('privacy/index.html', 'utf8');
 const derivativeEnforcementMigration = fs.readFileSync('supabase/migrations/20260719090000_market_derivative_only_enforcement.sql', 'utf8');
+const devProductionGateMigration = fs.readFileSync('supabase/migrations/20260719140000_market_dev_production_gate.sql', 'utf8');
 
 const requiredFormats = [
   'pixiedraw-project',
@@ -290,13 +291,26 @@ assert.match(devAccessUi, /a72a00cf6492cb03cb9425327c8368ea4e1ed079388a270260e43
 assert.match(devAccessUi, /email_confirmed_at/);
 assert.match(marketDevGateUi, /出品機能は準備中/);
 assert.match(marketDevGateUi, /dataset\.pixieedMarketWrite === 'locked'/);
+assert.match(marketDevGateUi, /allowed: baseAccess\.allowed === true/);
+assert.doesNotMatch(marketDevGateUi, /allowed: Boolean\(baseAccess\.user\?\.email_confirmed_at\)/);
 assert.match(sharedMarketFunction, /requireMarketDevUser/);
 assert.match(sharedMarketFunction, /email_confirmed_at/);
+assert.match(sharedMarketFunction, /MARKET_DEV_EMAIL_SHA256/);
+assert.match(sharedMarketFunction, /emailHash !== MARKET_DEV_EMAIL_SHA256/);
 assert.match(checkoutFunction, /requireMarketDevUser/);
 assert.match(secureDeliveryFunction, /requireMarketDevUser/);
 assert.match(stripeConnectFunction, /requireMarketDevUser/);
 assert.match(sharedMarketFunction, /MARKET_LISTING_ENABLED = true/);
 assert.match(stripeConnectFunction, /if \(!MARKET_LISTING_ENABLED\)/);
+assert.match(devProductionGateMigration, /market_listing_is_enabled\(\)[\s\S]*market_current_user_is_dev\(\)/i);
+assert.match(devProductionGateMigration, /market_current_user_can_sell\(\)[\s\S]*market_current_user_is_dev\(\)/i);
+assert.match(devProductionGateMigration, /market_current_user_is_admin\(\)[\s\S]*market_current_user_is_dev\(\)/i);
+assert.match(devProductionGateMigration, /market_private_upload_own[\s\S]*market_current_user_can_sell\(\)/i);
+assert.match(devProductionGateMigration, /market_seller_profiles_dev_write_gate/i);
+assert.match(devProductionGateMigration, /market DEV access required/i);
+assert.match(devProductionGateMigration, /invalid admin market grant/i);
+assert.match(marketIndexHtml, /id="marketSellButton"[^>]*hidden/);
+assert.match(marketUi, /sellButton\.hidden = access\.allowed !== true/);
 assert.match(accountHtml, /id="accountDevTools"[\s\S]*data-market-dev-only/);
 assert.match(accountHtml, /id="accountAdminTools"[\s\S]*data-market-admin-only/);
 assert.match(accountHtml, /data-market-admin-only[\s\S]*href="\.\.\/market\/review\.html"/);
