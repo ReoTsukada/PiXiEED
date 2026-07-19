@@ -9118,7 +9118,7 @@ body.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data
   margin-top: auto;
 }
 
-/* Keep the measured host when a PiXiEED fallback replaces an unfilled ad. */
+/* Keep explicitly reserved ad hosts stable after an unfilled response. */
 .panel-ad.is-ad-unfilled-reserved ins,
 .export-ad.is-ad-unfilled-reserved ins,
 .startup-recent-card--ad.is-ad-unfilled-reserved ins,
@@ -9133,7 +9133,7 @@ body.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data
   pointer-events: none !important;
 }
 
-/* Placements without a fallback or explicit reservation still collapse. */
+/* Placements without an explicit reservation still collapse. */
 .panel-ad.is-ad-unfilled,
 .panel-ad-mount.is-ad-unfilled,
 .export-ad.is-ad-unfilled,
