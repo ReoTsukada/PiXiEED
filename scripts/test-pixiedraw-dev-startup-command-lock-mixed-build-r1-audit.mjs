@@ -123,7 +123,7 @@ assert.match(app, /setupStartupScreen\(\);\s*setupProjectHomeScreen\(\);/);
 
 const scriptVersions = [...index.matchAll(/<script[^>]+src="([^"]+)"/g)].map(match => match[1]);
 assert.ok(scriptVersions.some(value => /build-info\.js\?v=[^"\s]+/.test(value)));
-assert.ok(scriptVersions.some(value => /update-detection-utils\.js\?v=20260713-026/.test(value)));
+assert.ok(scriptVersions.some(value => /update-detection-utils\.js\?v=20260719-file-protocol1/.test(value)));
 assert.ok(scriptVersions.some(value => /open-import-workflow-utils\.js\?v=20260717-market-all-open1/.test(value)));
 
 console.log('PiXiEEDraw DEV R1 startup / command-lock / mixed-build audit checks passed');
