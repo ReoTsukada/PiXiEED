@@ -608,6 +608,9 @@
     }
     const previousActiveId = activeOpenProjectTabId;
     if (targetId === previousActiveId) {
+      // A project can already be active while a fixed home layer remains
+      // visible after an interrupted restore. A re-open must reveal it.
+      hideProjectHomeScreen();
       return true;
     }
     const targetIndex = findOpenProjectTabIndex(targetId);
@@ -828,6 +831,9 @@
         runtimeProjectId: target?.runtimeProjectId || '',
         deferredPayloadKey: target?.deferredPayloadKey || target?.sheetPersistenceKey || '',
       });
+      // Keep the successful activation path responsible for clearing the home
+      // layer, regardless of whether it came from recent files or an import.
+      hideProjectHomeScreen();
       renderOpenProjectTabs();
       if (announce) {
         updateAutosaveStatus(
