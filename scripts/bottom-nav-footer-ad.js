@@ -459,10 +459,10 @@
       return window.PiXiEEDAdAccountControl.loadAdsense();
     }
     const existing = document.querySelector('script[src*="pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"]');
-    if (existing && (existing.dataset.pixieedReady === '1'
+    if (existing && (window.__PIXIEED_ADSENSE_SCRIPT_READY__ === true
       || window.adsbygoogle?.loaded === true
       || document.querySelector('ins.adsbygoogle[data-adsbygoogle-status="done"]'))) {
-      existing.dataset.pixieedReady = '1';
+      window.__PIXIEED_ADSENSE_SCRIPT_READY__ = true;
       return Promise.resolve(true);
     }
     if (directAdsScriptPromise) return directAdsScriptPromise;
@@ -474,10 +474,10 @@
         if (settled) return;
         settled = true;
         window.clearTimeout(timeoutId);
-        if (loaded) script.dataset.pixieedReady = '1';
+        if (loaded) window.__PIXIEED_ADSENSE_SCRIPT_READY__ = true;
         else {
           directAdsScriptPromise = null;
-          if (script.isConnected && script.dataset.pixieedReady !== '1') script.remove();
+          if (window.__PIXIEED_ADSENSE_SCRIPT_READY__ !== true && script.isConnected) script.remove();
         }
         resolve(loaded);
       };
@@ -864,6 +864,7 @@
     }
     const localFilePreview = isLocalFilePreview();
     banner.classList.toggle('is-local-preview', localFilePreview);
+    banner.dataset.pixieedReserveAdSpace = 'true';
     document.body?.classList.add('has-pixieed-shared-top-ad');
     if (banner.dataset.pixieedInteractionGuard !== '1') {
       banner.dataset.pixieedInteractionGuard = '1';
@@ -969,7 +970,6 @@
         }
         return;
       }
-      slot.dataset.pixieedPushQueued = '1';
       if (window.pixieedObserveAds) {
         window.pixieedObserveAds(banner);
       } else {
@@ -978,6 +978,7 @@
             if (!loaded) delete slot.dataset.pixieedPushQueued;
             return;
           }
+          slot.dataset.pixieedPushQueued = '1';
           try {
             window.adsbygoogle = window.adsbygoogle || [];
             window.adsbygoogle.push({});
