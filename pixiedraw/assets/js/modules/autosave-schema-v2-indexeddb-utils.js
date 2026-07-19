@@ -20,6 +20,13 @@
       with (scope) {
         function cloneJsonValue(value, fallback = null) {
           if (value === undefined) return fallback;
+          if (typeof globalThis.structuredClone === 'function') {
+            try {
+              return globalThis.structuredClone(value);
+            } catch (_error) {
+              // Keep the legacy JSON fallback for non-cloneable metadata.
+            }
+          }
           try {
             return JSON.parse(JSON.stringify(value));
           } catch (_error) {
@@ -282,9 +289,128 @@
           }
         }
 
+        function getManifestReferencedKeys(manifest = null) {
+          if (!manifest || typeof manifest !== 'object') {
+            return { checkpointKeys: [], journalKeys: [], thumbnailKey: '' };
+          }
+          if (manifest.projectLayout === 'single-project' && manifest.project) {
+            return {
+              checkpointKeys: [manifest.project?.checkpointRef?.key].filter(Boolean),
+              journalKeys: [manifest.project?.journalRef?.key].filter(Boolean),
+              thumbnailKey: manifest.thumbnailRef?.key || '',
+            };
+          }
+          const sheets = Array.isArray(manifest.sheets) ? manifest.sheets : [];
+          return {
+            checkpointKeys: sheets.map(sheet => sheet?.checkpointRef?.key).filter(Boolean),
+            journalKeys: sheets.map(sheet => sheet?.journalRef?.key).filter(Boolean),
+            thumbnailKey: manifest.thumbnailRef?.key || '',
+          };
+        }
+
+        async function readSchemaRecordByKey(storeName, key) {
+          if (!key) return null;
+          const db = await openSchemaV2Database();
+          try {
+            ensureStoresExist(db);
+            const tx = db.transaction([storeName], 'readonly');
+            const request = tx.objectStore(storeName).get(key);
+            const [value] = await Promise.all([
+              requestValue(request),
+              waitForTransaction(tx, db),
+            ]);
+            return value && typeof value === 'object' ? value : null;
+          } catch (error) {
+            try { db.close(); } catch (_error) {}
+            throw error;
+          }
+        }
+
+        async function loadCurrentProjectSchemaRecords(projectId) {
+          assertSchemaDependencies();
+          const id = normalizeProjectId(projectId);
+          if (!id) throw new Error('Autosave schema V2 projectId is required');
+          const current = await readCurrentManifestReference(id);
+          if (!current?.manifestKey) {
+            throw new Error('Autosave schema V2 current manifest reference is unavailable');
+          }
+          const manifest = await readSchemaRecordByKey(
+            LOCAL_PROJECT_MANIFESTS_STORE,
+            current.manifestKey
+          );
+          if (!manifest || manifest.projectId !== id) {
+            throw new Error('Autosave schema V2 current manifest is unavailable');
+          }
+          const referenced = getManifestReferencedKeys(manifest);
+          const db = await openSchemaV2Database();
+          try {
+            ensureStoresExist(db);
+            const storeNames = [
+              LOCAL_PROJECT_SHEET_CHECKPOINTS_STORE,
+              LOCAL_PROJECT_JOURNALS_STORE,
+              LOCAL_PROJECT_THUMBNAILS_STORE,
+            ];
+            const tx = db.transaction(storeNames, 'readonly');
+            const checkpointStore = tx.objectStore(LOCAL_PROJECT_SHEET_CHECKPOINTS_STORE);
+            const journalStore = tx.objectStore(LOCAL_PROJECT_JOURNALS_STORE);
+            const thumbnailStore = tx.objectStore(LOCAL_PROJECT_THUMBNAILS_STORE);
+            const checkpointRequests = referenced.checkpointKeys.map(key => requestValue(checkpointStore.get(key)));
+            const journalRequests = referenced.journalKeys.map(key => requestValue(journalStore.get(key)));
+            const thumbnailRequest = referenced.thumbnailKey
+              ? requestValue(thumbnailStore.get(referenced.thumbnailKey))
+              : Promise.resolve(null);
+            const [checkpoints, journals, thumbnail] = await Promise.all([
+              Promise.all(checkpointRequests),
+              Promise.all(journalRequests),
+              thumbnailRequest,
+              waitForTransaction(tx, db),
+            ]);
+            return {
+              current,
+              manifest,
+              checkpoints: checkpoints.filter(record => record && typeof record === 'object'),
+              journals: journals.filter(record => record && typeof record === 'object'),
+              thumbnail: thumbnail && typeof thumbnail === 'object' ? thumbnail : null,
+            };
+          } catch (error) {
+            try { db.close(); } catch (_error) {}
+            throw error;
+          }
+        }
+
         async function readSchemaV2Project(projectId, { revision = 0 } = {}) {
-          const records = await loadAllProjectSchemaRecords(projectId);
           const requestedRevision = Math.max(0, Math.round(Number(revision) || 0));
+          if (!requestedRevision) {
+            try {
+              const currentRecords = await loadCurrentProjectSchemaRecords(projectId);
+              const checkpoints = new Map(currentRecords.checkpoints.map(record => [record.key, record]));
+              const journals = new Map(currentRecords.journals.map(record => [record.key, record]));
+              const packaged = autosaveSchemaV2Utils.restoreSchemaV2Manifest(
+                currentRecords.manifest,
+                checkpoints,
+                journals,
+                { trustDetachedCheckpointRecords: true }
+              );
+              return {
+                packaged,
+                manifest: currentRecords.manifest,
+                fallbackUsed: false,
+                fastPathUsed: true,
+                current: currentRecords.current,
+                thumbnail: currentRecords.thumbnail?.value || null,
+              };
+            } catch (error) {
+              console.warn('[pixiedraw:v2-read]', {
+                phase: 'current-revision-fast-path-fallback',
+                projectId: normalizeProjectId(projectId),
+                error: error?.message || String(error),
+              });
+            }
+          }
+          // Recovery and explicitly requested revisions intentionally keep the
+          // exhaustive path. It reads retained immutable revisions and verifies
+          // their complete checksums before choosing a fallback.
+          const records = await loadAllProjectSchemaRecords(projectId);
           const eligibleManifests = requestedRevision
             ? records.manifests.filter(record => Math.round(Number(record?.revision) || 0) <= requestedRevision)
             : records.manifests;
@@ -302,6 +428,7 @@
           const restored = autosaveSchemaV2Utils.restoreSchemaV2WithFallback(store, recentEntry);
           return {
             ...restored,
+            fastPathUsed: false,
             current: records.current,
             thumbnail: records.thumbnails.find(entry => entry?.key === restored.manifest?.thumbnailRef?.key)?.value || null,
           };
@@ -389,6 +516,7 @@
           commitSchemaV2Bundle,
           writeSchemaV2Project,
           writeSchemaV2JournalRevision,
+          loadCurrentProjectSchemaRecords,
           loadAllProjectSchemaRecords,
           readSchemaV2Project,
           cleanupSchemaV2Revisions,

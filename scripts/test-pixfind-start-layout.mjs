@@ -9,7 +9,7 @@ const app = fs.readFileSync(path.join(root, 'pixfind/app.js'), 'utf8');
 
 assert.match(html, /<body data-pixfind-screen="start">/);
 assert.match(html, /styles\.css\?v=2026\.07\.19-game-first-layout1/);
-assert.match(html, /app\.js\?v=2026\.07\.19-game-zoom4/);
+assert.match(html, /app\.js\?v=2026\.07\.19-game-zoom5/);
 assert.doesNotMatch(html, />他のゲーム・ツール<\/a>/);
 assert.doesNotMatch(html, /class="(?:start-ad|difficulty-ad|game-ad)"/);
 
@@ -17,10 +17,9 @@ assert.match(app, /document\.body\.dataset\.pixfindScreen = target/);
 assert.match(app, /const ZOOM_WHEEL_STEP_BASE = 1\.25;/);
 assert.match(app, /event\.preventDefault\(\);\s*const deltaModeScale = event\.deltaMode === 1/s);
 assert.doesNotMatch(app, /if \(!event\.ctrlKey\) \{\s*return;\s*\}/s);
-assert.match(app, /visibility-first viewport rule/);
-assert.match(app, /frameSize \* 0\.2/);
-assert.match(app, /While expanding, preserve the pinch focus exactly/);
-assert.match(app, /Keep the pointer under the same image point while zooming in/);
+assert.match(app, /Only stop panning when the full image would leave that viewport/);
+assert.match(app, /frame\.addEventListener\('wheel', handleWheel/);
+assert.match(app, /frame\.setPointerCapture\(event\.pointerId\)/);
 assert.match(app, /\(idx \+ 1\) % 8 === 0/);
 assert.doesNotMatch(app, /idx === 7/);
 assert.match(app, /function createPuzzleListAd\(\)/);

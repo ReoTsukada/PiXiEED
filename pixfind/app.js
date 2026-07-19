@@ -4018,14 +4018,13 @@ function createCanvasInteractionController(canvas, overlay, onTap, onTransform) 
       controllerState.offsetY = 0;
       return;
     }
-    // Match PiXiEEDraw's visibility-first viewport rule: panning is free until
-    // it would move the complete image outside the frame. Keep a meaningful
-    // Keep 20% of the viewport covered on each axis so the board cannot get lost off-screen.
+    // The viewport, rather than opaque pixels, defines the interaction area.
+    // Only stop panning when the full image would leave that viewport.
     const getMaxOffset = (frameSize, canvasSize) => {
       const scaledSize = canvasSize * controllerState.scale;
       const minimumVisible = Math.min(
         scaledSize,
-        Math.max(1, frameSize * 0.2)
+        1
       );
       return Math.max(0, ((frameSize + scaledSize) / 2) - minimumVisible);
     };
@@ -4074,7 +4073,7 @@ function createCanvasInteractionController(canvas, overlay, onTap, onTransform) 
     if (event.pointerType === 'touch' || event.pointerType === 'pen') {
       event.preventDefault();
     }
-    canvas.setPointerCapture(event.pointerId);
+    frame.setPointerCapture(event.pointerId);
     controllerState.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
     if (controllerState.pointers.size === 1) {
       controllerState.tapCandidate = {
@@ -4128,12 +4127,7 @@ function createCanvasInteractionController(canvas, overlay, onTap, onTransform) 
         controllerState.offsetX -= (scaleChange - 1) * centerX;
         controllerState.offsetY -= (scaleChange - 1) * centerY;
       }
-      // While expanding, preserve the pinch focus exactly. A clamp here makes
-      // the image feel like it hits an invisible wall before reaching the
-      // user's fingers. Shrinking still returns the image to its safe bounds.
-      if (nextScale <= prevScale) {
-        clampOffsets();
-      }
+      clampOffsets();
       applyTransform();
       controllerState.tapCandidate = null;
     } else if (controllerState.pointers.size === 1) {
@@ -4156,8 +4150,8 @@ function createCanvasInteractionController(canvas, overlay, onTap, onTransform) 
   function handlePointerUp(event) {
     const point = controllerState.pointers.get(event.pointerId) ?? { x: event.clientX, y: event.clientY };
     controllerState.pointers.delete(event.pointerId);
-    if (canvas.hasPointerCapture(event.pointerId)) {
-      canvas.releasePointerCapture(event.pointerId);
+    if (frame.hasPointerCapture(event.pointerId)) {
+      frame.releasePointerCapture(event.pointerId);
     }
 
     let shouldTap = false;
@@ -4183,7 +4177,12 @@ function createCanvasInteractionController(canvas, overlay, onTap, onTransform) 
 
     controllerState.tapCandidate = null;
 
-    if (shouldTap && typeof onTap === 'function') {
+    const canvasRect = canvas.getBoundingClientRect();
+    const isInsideImageBounds = event.clientX >= canvasRect.left
+      && event.clientX <= canvasRect.right
+      && event.clientY >= canvasRect.top
+      && event.clientY <= canvasRect.bottom;
+    if (shouldTap && isInsideImageBounds && typeof onTap === 'function') {
       onTap(event);
     }
   }
@@ -4194,8 +4193,8 @@ function createCanvasInteractionController(canvas, overlay, onTap, onTransform) 
     controllerState.lastPanPoint = null;
     controllerState.initialScale = controllerState.scale;
     controllerState.initialDistance = 0;
-    if (canvas.hasPointerCapture(event.pointerId)) {
-      canvas.releasePointerCapture(event.pointerId);
+    if (frame.hasPointerCapture(event.pointerId)) {
+      frame.releasePointerCapture(event.pointerId);
     }
   }
 
@@ -4228,21 +4227,16 @@ function createCanvasInteractionController(canvas, overlay, onTap, onTransform) 
     controllerState.scale = nextScale;
     controllerState.offsetX -= (scaleChange - 1) * relativeX;
     controllerState.offsetY -= (scaleChange - 1) * relativeY;
-    // Keep the pointer under the same image point while zooming in. Because
-    // the pointer is on the image, this cannot move the whole board away;
-    // bounds are re-applied on zoom-out and on every pan gesture.
-    if (nextScale <= prevScale) {
-      clampOffsets();
-    }
+    clampOffsets();
     applyTransform();
   }
 
-  canvas.addEventListener('pointerdown', handlePointerDown);
-  canvas.addEventListener('pointermove', handlePointerMove);
-  canvas.addEventListener('pointerup', handlePointerUp);
-  canvas.addEventListener('pointercancel', handlePointerCancel);
-  canvas.addEventListener('lostpointercapture', handlePointerCancel);
-  canvas.addEventListener('wheel', handleWheel, { passive: false });
+  frame.addEventListener('pointerdown', handlePointerDown);
+  frame.addEventListener('pointermove', handlePointerMove);
+  frame.addEventListener('pointerup', handlePointerUp);
+  frame.addEventListener('pointercancel', handlePointerCancel);
+  frame.addEventListener('lostpointercapture', handlePointerCancel);
+  frame.addEventListener('wheel', handleWheel, { passive: false });
 
   applyTransform();
 

@@ -84,6 +84,7 @@
         projectId: normalizedProjectId,
         source: 'initial',
         label: localizeText('シート 1', 'Sheet 1'),
+        metadataOnly: true,
       });
       openProjectTabs.push(initialTab);
       setActiveOpenProjectTabId?.(initialTab.id);
@@ -364,6 +365,7 @@
         source: options.source || 'working',
         projectId: options.projectId || getAutosaveProjectId?.(),
         label: options.label || localizeText('シート 1', 'Sheet 1'),
+        metadataOnly: true,
         sharedProjectKey: SHARED_PROJECTS_ENABLED ? options.sharedProjectKey : '',
         sharedProjectBackendId: SHARED_PROJECTS_ENABLED ? options.sharedProjectBackendId : '',
         sharedProjectRevision: SHARED_PROJECTS_ENABLED ? options.sharedProjectRevision : 0,

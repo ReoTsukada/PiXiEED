@@ -20,6 +20,14 @@
       if (value === undefined) {
         return fallback;
       }
+      if (typeof structuredClone === 'function') {
+        try {
+          return structuredClone(value);
+        } catch (_error) {
+          // Legacy values can contain non-cloneable runtime fields. The JSON
+          // fallback below keeps the previous compatibility behavior.
+        }
+      }
       try {
         return JSON.parse(JSON.stringify(value));
       } catch (_error) {
@@ -30,6 +38,23 @@
     function stableStringify(value) {
       if (value === null || typeof value !== 'object') {
         return JSON.stringify(value);
+      }
+      if (ArrayBuffer.isView(value)) {
+        const bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+        let hash = 0x811c9dc5;
+        for (let index = 0; index < bytes.length; index += 1) {
+          hash ^= bytes[index];
+          hash = Math.imul(hash, 0x01000193);
+        }
+        return JSON.stringify({
+          $typedArray: value.constructor?.name || 'TypedArray',
+          length: Number(value.length) || 0,
+          byteLength: value.byteLength,
+          checksum: `fnv1a-${(hash >>> 0).toString(16).padStart(8, '0')}`,
+        });
+      }
+      if (value instanceof ArrayBuffer) {
+        return stableStringify(new Uint8Array(value));
       }
       if (Array.isArray(value)) {
         return `[${value.map(item => stableStringify(item)).join(',')}]`;
@@ -65,6 +90,9 @@
     }
 
     function sanitizeRuntimeValues(value) {
+      if (ArrayBuffer.isView(value) || value instanceof ArrayBuffer) {
+        return value;
+      }
       if (Array.isArray(value)) {
         return value.map(item => sanitizeRuntimeValues(item));
       }
@@ -526,10 +554,15 @@
 
     function decodeStoredLayerArray(value, key, length) {
       if (Array.isArray(value)) {
-        return value.slice(0, length);
+        const Type = key === 'indices' ? Int16Array : Uint8ClampedArray;
+        return new Type(value.slice(0, length));
       }
       if (ArrayBuffer.isView(value)) {
-        return Array.from(value).slice(0, length);
+        const Type = key === 'indices' ? Int16Array : Uint8ClampedArray;
+        if (value instanceof Type && value.length === length) {
+          return value;
+        }
+        return new Type(Array.from(value).slice(0, length));
       }
       if (typeof value === 'string' && value.length > 0 && typeof globalThis.atob === 'function') {
         try {
@@ -542,10 +575,10 @@
             if (bytes.byteLength !== length * Int16Array.BYTES_PER_ELEMENT) return null;
             const copy = new Uint8Array(bytes.byteLength);
             copy.set(bytes);
-            return Array.from(new Int16Array(copy.buffer));
+            return new Int16Array(copy.buffer);
           }
           if (bytes.byteLength !== length) return null;
-          return Array.from(bytes);
+          return new Uint8ClampedArray(bytes);
         } catch (_error) {
           return null;
         }
@@ -555,11 +588,14 @@
 
     function ensureLayerArray(layer, key, length) {
       const fillValue = key === 'indices' ? -1 : 0;
+      const Type = key === 'indices' ? Int16Array : Uint8ClampedArray;
       const decoded = decodeStoredLayerArray(layer[key], key, length);
-      layer[key] = decoded || new Array(length).fill(fillValue);
-      while (layer[key].length < length) {
-        layer[key].push(fillValue);
+      if (decoded && decoded.length === length) {
+        layer[key] = decoded;
+        return layer[key];
       }
+      layer[key] = new Type(length);
+      if (fillValue !== 0) layer[key].fill(fillValue);
       return layer[key];
     }
 
@@ -615,8 +651,15 @@
       return true;
     }
 
-    function replaySheetJournal(checkpoint, journal) {
-      const project = sanitizeRuntimeValues(cloneJsonValue(checkpoint?.project, null));
+    function replaySheetJournal(checkpoint, journal, options = {}) {
+      // IndexedDB already returns a detached structured clone. The normal open
+      // path can safely replay its small journal directly into that value. A
+      // JSON round-trip here used to duplicate the complete all-frame project
+      // before any frame could be shown, which was especially expensive for
+      // large GIF projects.
+      const project = options?.useDetachedCheckpointProject === true
+        ? checkpoint?.project
+        : sanitizeRuntimeValues(cloneJsonValue(checkpoint?.project, null));
       if (!project || !journal || !hasValidChecksum(journal)) {
         return { project, applied: false, reason: 'invalid-journal' };
       }
@@ -625,19 +668,34 @@
       }
       for (const op of journal.ops) {
         if (!applyPixelPatch(project, op)) {
-          return { project: sanitizeRuntimeValues(cloneJsonValue(checkpoint.project, null)), applied: false, reason: 'journal-replay-failed' };
+          return {
+            project: options?.useDetachedCheckpointProject === true
+              ? null
+              : sanitizeRuntimeValues(cloneJsonValue(checkpoint.project, null)),
+            applied: false,
+            reason: 'journal-replay-failed',
+          };
         }
       }
       return { project, applied: journal.ops.length > 0, reason: '' };
     }
 
-    function restoreSchemaV2Manifest(manifest, checkpointsByKey, journalsByKey) {
+    function restoreSchemaV2Manifest(manifest, checkpointsByKey, journalsByKey, options = {}) {
+      const trustDetachedCheckpointRecords = options?.trustDetachedCheckpointRecords === true;
       if (!hasValidChecksum(manifest) || manifest?.autosaveSchemaVersion !== AUTOSAVE_SCHEMA_VERSION) {
         throw new Error('Invalid autosave schema V2 manifest');
       }
       if (manifest.projectLayout === 'single-project' && manifest.project?.checkpointRef?.key) {
         const checkpoint = checkpointsByKey.get(manifest.project.checkpointRef.key) || null;
-        if (!checkpoint || !hasValidChecksum(checkpoint)) {
+        const checkpointChecksumMatches = Boolean(
+          checkpoint
+          && checkpoint.checksum === manifest.project.checkpointRef?.checksum
+        );
+        if (
+          !checkpoint
+          || !checkpointChecksumMatches
+          || (!trustDetachedCheckpointRecords && !hasValidChecksum(checkpoint))
+        ) {
           throw new Error('Autosave schema V2 project checkpoint missing or corrupt');
         }
         const checkpointRevision = Math.max(1, Math.round(Number(manifest.project.checkpointRef?.revision) || 0));
@@ -659,7 +717,12 @@
         ) {
           throw new Error('Autosave schema V2 project journal revision mismatch');
         }
-        const replayed = replaySheetJournal(checkpoint, journal);
+        const replayed = replaySheetJournal(checkpoint, journal, {
+          useDetachedCheckpointProject: trustDetachedCheckpointRecords,
+        });
+        if (!replayed.project) {
+          throw new Error('Autosave schema V2 project journal replay failed');
+        }
         const project = replayed.project && typeof replayed.project === 'object' ? replayed.project : {};
         delete project.sheets;
         delete project.sheetOrder;
@@ -682,7 +745,16 @@
       for (const sheetId of sheetOrder) {
         const sheet = manifest.sheets.find(item => item?.id === sheetId);
         const checkpoint = sheet ? checkpointsByKey.get(sheet.checkpointRef?.key) : null;
-        if (!sheet || !checkpoint || !hasValidChecksum(checkpoint)) {
+        const checkpointChecksumMatches = Boolean(
+          checkpoint
+          && checkpoint.checksum === sheet?.checkpointRef?.checksum
+        );
+        if (
+          !sheet
+          || !checkpoint
+          || !checkpointChecksumMatches
+          || (!trustDetachedCheckpointRecords && !hasValidChecksum(checkpoint))
+        ) {
           throw new Error(`Autosave schema V2 checkpoint missing or corrupt: ${sheetId}`);
         }
         const checkpointRevision = Math.max(1, Math.round(Number(sheet.checkpointRef?.revision) || 0));
@@ -706,7 +778,12 @@
         ) {
           throw new Error(`Autosave schema V2 journal revision mismatch: ${sheetId}`);
         }
-        const replayed = replaySheetJournal(checkpoint, journal);
+        const replayed = replaySheetJournal(checkpoint, journal, {
+          useDetachedCheckpointProject: trustDetachedCheckpointRecords,
+        });
+        if (!replayed.project) {
+          throw new Error(`Autosave schema V2 journal replay failed: ${sheetId}`);
+        }
         sheets.push({
           id: sheetId,
           fileName: sheet.fileName,
@@ -861,9 +938,11 @@
       let total = 0;
       const scanLayer = layer => {
         if (!layer || typeof layer !== 'object') return;
-        if (Array.isArray(layer.indices)) total += layer.indices.length * 2;
-        if (Array.isArray(layer.direct)) total += layer.direct.length;
-        if (Array.isArray(layer.importSourceDirect)) total += layer.importSourceDirect.length;
+        if (Array.isArray(layer.indices) || ArrayBuffer.isView(layer.indices)) total += layer.indices.length * 2;
+        if (Array.isArray(layer.direct) || ArrayBuffer.isView(layer.direct)) total += layer.direct.length;
+        if (Array.isArray(layer.importSourceDirect) || ArrayBuffer.isView(layer.importSourceDirect)) {
+          total += layer.importSourceDirect.length;
+        }
       };
       const scanCanvas = canvas => (canvas?.frames || []).forEach(frame => (frame?.layers || []).forEach(scanLayer));
       const documentPayload = project?.document || {};

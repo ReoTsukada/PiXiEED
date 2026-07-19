@@ -39,6 +39,29 @@
           return left;
         };
 
+    function areRgbaPixelsVisuallyEqual(data, firstBase, secondBase) {
+      const firstAlpha = data[firstBase + 3];
+      const secondAlpha = data[secondBase + 3];
+      if (firstAlpha === 0 && secondAlpha === 0) {
+        return true;
+      }
+      return (
+        data[firstBase] === data[secondBase]
+        && data[firstBase + 1] === data[secondBase + 1]
+        && data[firstBase + 2] === data[secondBase + 2]
+        && firstAlpha === secondAlpha
+      );
+    }
+
+    function packExactRgbaColor(data, base) {
+      return (
+        (data[base] * 0x1000000)
+        + (data[base + 1] * 0x10000)
+        + (data[base + 2] * 0x100)
+        + data[base + 3]
+      ) >>> 0;
+    }
+
     function quickCheckImageDataNearestUpscale(imageData, factor) {
       if (!imageData || !(imageData.data instanceof Uint8ClampedArray)) {
         return false;
@@ -62,12 +85,7 @@
           const blockX = Math.floor(sampleX / scale) * scale;
           const sampleBase = (sampleY * width + sampleX) * 4;
           const blockBase = (blockY * width + blockX) * 4;
-          if (
-            data[sampleBase] !== data[blockBase]
-            || data[sampleBase + 1] !== data[blockBase + 1]
-            || data[sampleBase + 2] !== data[blockBase + 2]
-            || data[sampleBase + 3] !== data[blockBase + 3]
-          ) {
+          if (!areRgbaPixelsVisuallyEqual(data, sampleBase, blockBase)) {
             return false;
           }
         }
@@ -92,30 +110,16 @@
       for (let blockY = 0; blockY < height; blockY += scale) {
         for (let blockX = 0; blockX < width; blockX += scale) {
           const blockBase = (blockY * width + blockX) * 4;
-          const r = data[blockBase];
-          const g = data[blockBase + 1];
-          const b = data[blockBase + 2];
-          const a = data[blockBase + 3];
           if (!hasInterBlockDifference) {
             if (blockX >= scale) {
               const leftBase = blockBase - (scale * 4);
-              if (
-                data[leftBase] !== r
-                || data[leftBase + 1] !== g
-                || data[leftBase + 2] !== b
-                || data[leftBase + 3] !== a
-              ) {
+              if (!areRgbaPixelsVisuallyEqual(data, leftBase, blockBase)) {
                 hasInterBlockDifference = true;
               }
             }
             if (!hasInterBlockDifference && blockY >= scale) {
               const topBase = blockBase - (scale * stride);
-              if (
-                data[topBase] !== r
-                || data[topBase + 1] !== g
-                || data[topBase + 2] !== b
-                || data[topBase + 3] !== a
-              ) {
+              if (!areRgbaPixelsVisuallyEqual(data, topBase, blockBase)) {
                 hasInterBlockDifference = true;
               }
             }
@@ -123,12 +127,7 @@
           for (let localY = 0; localY < scale; localY += 1) {
             let pixelBase = ((blockY + localY) * width + blockX) * 4;
             for (let localX = 0; localX < scale; localX += 1) {
-              if (
-                data[pixelBase] !== r
-                || data[pixelBase + 1] !== g
-                || data[pixelBase + 2] !== b
-                || data[pixelBase + 3] !== a
-              ) {
+              if (!areRgbaPixelsVisuallyEqual(data, pixelBase, blockBase)) {
                 return { valid: false, hasInterBlockDifference: false };
               }
               pixelBase += 4;
@@ -251,24 +250,14 @@
             const base = ((y * width) + x) * 4;
             if (x > 0) {
               const left = base - 4;
-              if (
-                pixels[base] !== pixels[left]
-                || pixels[base + 1] !== pixels[left + 1]
-                || pixels[base + 2] !== pixels[left + 2]
-                || pixels[base + 3] !== pixels[left + 3]
-              ) {
+              if (!areRgbaPixelsVisuallyEqual(pixels, base, left)) {
                 hasInterBlockDifference = true;
                 commonFactor = resolveGreatestCommonDivisor(commonFactor, x);
               }
             }
             if (y > 0 && commonFactor > 1) {
               const top = base - (width * 4);
-              if (
-                pixels[base] !== pixels[top]
-                || pixels[base + 1] !== pixels[top + 1]
-                || pixels[base + 2] !== pixels[top + 2]
-                || pixels[base + 3] !== pixels[top + 3]
-              ) {
+              if (!areRgbaPixelsVisuallyEqual(pixels, base, top)) {
                 hasInterBlockDifference = true;
                 commonFactor = resolveGreatestCommonDivisor(commonFactor, y);
               }
@@ -517,6 +506,76 @@
         reduced: sourceColorCount > palette.length,
         sourceColorCount,
       };
+    }
+
+
+    function buildExactIndexedPaletteFromImageFrames(frameDataList, maxColors = MAX_IMPORTED_PALETTE_COLORS) {
+      const frames = Array.isArray(frameDataList) ? frameDataList : [];
+      const normalizedMaxColors = clamp(
+        Math.round(Number(maxColors) || MAX_IMPORTED_PALETTE_COLORS),
+        1,
+        MAX_IMPORTED_PALETTE_COLORS
+      );
+      const palette = [];
+      const colorToIndex = new Map();
+      for (let frameIndex = 0; frameIndex < frames.length; frameIndex += 1) {
+        const data = frames[frameIndex]?.imageData?.data;
+        if (!(data instanceof Uint8ClampedArray)) {
+          return null;
+        }
+        for (let base = 0; base + 3 < data.length; base += 4) {
+          if (data[base + 3] === 0) {
+            continue;
+          }
+          const key = packExactRgbaColor(data, base);
+          if (colorToIndex.has(key)) {
+            continue;
+          }
+          if (palette.length >= normalizedMaxColors) {
+            return null;
+          }
+          const paletteIndex = palette.length;
+          colorToIndex.set(key, paletteIndex);
+          palette.push({
+            r: data[base],
+            g: data[base + 1],
+            b: data[base + 2],
+            a: data[base + 3],
+          });
+        }
+      }
+      if (!palette.length) {
+        // Transparency is stored as -1 in INDEX layers. Keep an opaque color
+        // selected so a completely transparent import can be drawn on
+        // immediately without turning the pen into an eraser.
+        palette.push({ r: 0, g: 0, b: 0, a: 255 });
+      }
+      return {
+        palette,
+        colorToIndex,
+        sourceColorCount: colorToIndex.size,
+      };
+    }
+
+
+    function writeExactIndexedPixelsFromRgba(data, indices, colorToIndex) {
+      if (!(data instanceof Uint8ClampedArray) || !(indices instanceof Int16Array) || !(colorToIndex instanceof Map)) {
+        return false;
+      }
+      const pixelCount = Math.min(indices.length, Math.floor(data.length / 4));
+      indices.fill(-1);
+      for (let pixelIndex = 0; pixelIndex < pixelCount; pixelIndex += 1) {
+        const base = pixelIndex * 4;
+        if (data[base + 3] === 0) {
+          continue;
+        }
+        const paletteIndex = colorToIndex.get(packExactRgbaColor(data, base));
+        if (!Number.isInteger(paletteIndex) || paletteIndex < 0) {
+          return false;
+        }
+        indices[pixelIndex] = paletteIndex;
+      }
+      return true;
     }
   
   
@@ -806,6 +865,8 @@
       resizeImageDataNearest,
       resizeImportFrames,
       buildIndexedPaletteFromFrameDataList,
+      buildExactIndexedPaletteFromImageFrames,
+      writeExactIndexedPixelsFromRgba,
       decodeImageFileToFrames,
       decodeGifFileToFrames,
       decodeGifWithImageDecoder,

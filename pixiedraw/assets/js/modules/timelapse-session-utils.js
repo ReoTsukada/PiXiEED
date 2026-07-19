@@ -91,9 +91,12 @@
 
   function getAllTimelapseStepCount() {
     return Object.values(getAllTimelapseTracks()).reduce((sum, track) => {
-      const snapshotCount = Array.isArray(track?.snapshots) ? track.snapshots.length : 0;
+      const snapshotCount = (Array.isArray(track?.snapshots) ? track.snapshots.length : 0)
+        + (Array.isArray(track?.serializedSnapshots) ? track.serializedSnapshots.length : 0);
       const operationCount = Array.isArray(track?.operationLog?.entries)
-        ? track.operationLog.entries.length + (track.operationLog.baseSnapshot ? 1 : 0)
+        ? track.operationLog.entries.length + (
+          track.operationLog.baseSnapshot || track.operationLog.baseSnapshotStored ? 1 : 0
+        )
         : 0;
       return sum + (snapshotCount && operationCount
         ? snapshotCount + operationCount
@@ -102,9 +105,12 @@
   }
 
   function getTimelapseTrackStepCount(track = null) {
-    const snapshotCount = Array.isArray(track?.snapshots) ? track.snapshots.length : 0;
+    const snapshotCount = (Array.isArray(track?.snapshots) ? track.snapshots.length : 0)
+      + (Array.isArray(track?.serializedSnapshots) ? track.serializedSnapshots.length : 0);
     const operationCount = Array.isArray(track?.operationLog?.entries)
-      ? track.operationLog.entries.length + (track.operationLog.baseSnapshot ? 1 : 0)
+      ? track.operationLog.entries.length + (
+        track.operationLog.baseSnapshot || track.operationLog.baseSnapshotStored ? 1 : 0
+      )
       : 0;
     return snapshotCount && operationCount
       ? snapshotCount + operationCount
@@ -139,10 +145,57 @@
     if (!track.operationLog || typeof track.operationLog !== 'object') {
       track.operationLog = createEmptyTimelapseOperationLog();
     }
-    if (!track.operationLog.baseSnapshot) {
+    if (!track.operationLog.baseSnapshot && !track.operationLog.baseSnapshotStored) {
       track.operationLog.baseSnapshot = createTimelapseBaseSnapshotPayload();
     }
-    return track.operationLog.baseSnapshot ? track.operationLog : null;
+    return track.operationLog.baseSnapshot || track.operationLog.baseSnapshotStored
+      ? track.operationLog
+      : null;
+  }
+
+  async function hydrateTimelapseOperationLogBase(canvasId = getActiveProjectCanvasDocument()?.id || '') {
+    const resolvedCanvasId = normalizeTimelapseCanvasId(canvasId);
+    const track = getTimelapseTrack(resolvedCanvasId);
+    const log = track?.operationLog && typeof track.operationLog === 'object'
+      ? track.operationLog
+      : null;
+    if (!track || !log) {
+      return null;
+    }
+    if (log.baseSnapshot) {
+      return { track, log, baseSnapshot: log.baseSnapshot, hydrated: false };
+    }
+    if (!log.baseSnapshotStored || typeof loadPersistedTimelapseBaseSnapshot !== 'function') {
+      return null;
+    }
+    const baseSnapshot = await loadPersistedTimelapseBaseSnapshot(
+      log.baseSnapshotStorageCanvasId || resolvedCanvasId,
+      log.baseSnapshotStorageProjectId || undefined
+    );
+    if (
+      !baseSnapshot
+      || getTimelapseTrack(resolvedCanvasId) !== track
+      || track.operationLog !== log
+      || log.baseSnapshot
+    ) {
+      return log.baseSnapshot
+        ? { track, log, baseSnapshot: log.baseSnapshot, hydrated: false }
+        : null;
+    }
+    log.baseSnapshot = baseSnapshot;
+    return { track, log, baseSnapshot, hydrated: true };
+  }
+
+  function releaseHydratedTimelapseOperationLogBase(hydration = null) {
+    if (
+      hydration?.hydrated !== true
+      || !hydration.log?.baseSnapshotStored
+      || hydration.log.baseSnapshot !== hydration.baseSnapshot
+    ) {
+      return false;
+    }
+    hydration.log.baseSnapshot = null;
+    return true;
   }
 
   function cloneTimelapsePixelPatchValue(value = null) {
@@ -301,21 +354,47 @@
       return false;
     }
     log.baseSnapshot = nextBaseSnapshot;
+    log.baseSnapshotStored = false;
+    log.baseSnapshotStorageCanvasId = '';
+    log.baseSnapshotStorageProjectId = '';
     log.entries = [];
     track.sampleStep = Math.max(1, Math.round(Number(track.sampleStep) || 1) * 2);
     track.warningShown = true;
     return true;
   }
 
+  async function checkpointTimelapseOperationLogWithStoredBase(track, canvasId = '') {
+    const resolvedCanvasId = normalizeTimelapseCanvasId(canvasId);
+    const hydration = await hydrateTimelapseOperationLogBase(resolvedCanvasId);
+    if (!hydration || getTimelapseTrack(resolvedCanvasId) !== track) {
+      return false;
+    }
+    const checkpointed = checkpointTimelapseOperationLog(track, resolvedCanvasId);
+    if (!checkpointed) {
+      releaseHydratedTimelapseOperationLogBase(hydration);
+      return false;
+    }
+    if (typeof archiveTimelapseOperationLogBase === 'function') {
+      await archiveTimelapseOperationLogBase(resolvedCanvasId, track.operationLog);
+    }
+    return true;
+  }
+
   function scheduleTimelapseOperationLogCheckpoint(track, canvasId = '') {
     if (!track || timelapseCheckpointPendingTracks.has(track)) return false;
     timelapseCheckpointPendingTracks.add(track);
-    const run = () => {
-      timelapseCheckpointPendingTracks.delete(track);
-      if (getTimelapseTrack(canvasId) !== track) return;
-      if (checkpointTimelapseOperationLog(track, canvasId)) {
+    const run = async () => {
+      try {
+        if (getTimelapseTrack(canvasId) !== track) return;
+        if (!await checkpointTimelapseOperationLogWithStoredBase(track, canvasId)) {
+          return;
+        }
         syncTimelapseControls();
         updateMemoryStatus();
+      } catch (error) {
+        console.warn('Failed to checkpoint disk-backed timelapse operation log', error);
+      } finally {
+        timelapseCheckpointPendingTracks.delete(track);
       }
     };
     if (typeof window.requestIdleCallback === 'function') {
@@ -337,7 +416,7 @@
     const initialChangeCount = countTimelapseOperationChanges(entries);
     const activeCanvasId = getActiveProjectCanvasDocument()?.id || '';
     if (initialChangeCount > maxChanges * 2) {
-      return checkpointTimelapseOperationLog(track, activeCanvasId);
+      return scheduleTimelapseOperationLogCheckpoint(track, activeCanvasId);
     }
     if (initialChangeCount > maxChanges) {
       scheduleTimelapseOperationLogCheckpoint(track, activeCanvasId);
@@ -377,7 +456,7 @@
     track.warningShown = true;
     const changeCount = countTimelapseOperationChanges(log.entries);
     if (changeCount > maxChanges * 2) {
-      checkpointTimelapseOperationLog(track, getActiveProjectCanvasDocument()?.id || '');
+      scheduleTimelapseOperationLogCheckpoint(track, getActiveProjectCanvasDocument()?.id || '');
     } else if (changeCount > maxChanges) {
       scheduleTimelapseOperationLogCheckpoint(track, getActiveProjectCanvasDocument()?.id || '');
     }
@@ -438,10 +517,20 @@
     timelapseState.tracksByCanvasId = {
       [activeCanvasId]: {
         snapshots: Array.isArray(bestTrack.snapshots) ? bestTrack.snapshots.slice() : [],
+        serializedSnapshots: Array.isArray(bestTrack.serializedSnapshots)
+          ? bestTrack.serializedSnapshots.slice()
+          : [],
         operationLog: bestTrack.operationLog && typeof bestTrack.operationLog === 'object'
           ? {
               version: 1,
               baseSnapshot: bestTrack.operationLog.baseSnapshot || null,
+              baseSnapshotStored: Boolean(bestTrack.operationLog.baseSnapshotStored),
+              baseSnapshotStorageCanvasId: typeof bestTrack.operationLog.baseSnapshotStorageCanvasId === 'string'
+                ? bestTrack.operationLog.baseSnapshotStorageCanvasId
+                : '',
+              baseSnapshotStorageProjectId: typeof bestTrack.operationLog.baseSnapshotStorageProjectId === 'string'
+                ? bestTrack.operationLog.baseSnapshotStorageProjectId
+                : '',
               entries: Array.isArray(bestTrack.operationLog.entries)
                 ? bestTrack.operationLog.entries
                   .map(entry => normalizeSerializedTimelapseOperationEntry(entry))
@@ -633,6 +722,9 @@
     if (track && Array.isArray(track.snapshots) && track.snapshots.length > 0) {
       return false;
     }
+    if (track && Array.isArray(track.serializedSnapshots) && track.serializedSnapshots.length > 0) {
+      return false;
+    }
     return captureTimelapseFrameFromState(resolvedCanvasId);
   }
 
@@ -721,6 +813,9 @@
       const track = getTimelapseTrack(activeCanvasId);
       if (track) {
         track.snapshots.length = 0;
+        if (Array.isArray(track.serializedSnapshots)) {
+          track.serializedSnapshots.length = 0;
+        }
         track.operationLog = null;
         track.warningShown = false;
         track.sampleStep = 1;
@@ -1087,6 +1182,14 @@
     const archivedSnapshots = Array.isArray(persistedByCanvas?.[activeCanvasId])
       ? persistedByCanvas[activeCanvasId].slice()
       : [];
+    if (Array.isArray(track?.serializedSnapshots)) {
+      track.serializedSnapshots.forEach(entry => {
+        const last = archivedSnapshots[archivedSnapshots.length - 1] || null;
+        if (!last || !areTimelapseFrameEntriesEqual(last, entry)) {
+          archivedSnapshots.push(entry);
+        }
+      });
+    }
     if (Array.isArray(track?.snapshots)) {
       track.snapshots.forEach(entry => {
         const last = archivedSnapshots[archivedSnapshots.length - 1] || null;
@@ -1095,7 +1198,13 @@
         }
       });
     }
-    const operationLogSnapshots = buildTimelapseExportEntriesFromOperationLog(activeCanvasId);
+    const operationLogHydration = await hydrateTimelapseOperationLogBase(activeCanvasId);
+    let operationLogSnapshots = [];
+    try {
+      operationLogSnapshots = buildTimelapseExportEntriesFromOperationLog(activeCanvasId);
+    } finally {
+      releaseHydratedTimelapseOperationLogBase(operationLogHydration);
+    }
     if (operationLogSnapshots.length) {
       operationLogSnapshots.forEach(entry => {
         const last = archivedSnapshots[archivedSnapshots.length - 1] || null;
@@ -1127,7 +1236,7 @@
 
     try {
       updateAutosaveStatus('タイムラプスGIFを書き出し中…', 'info');
-      const candidates = getExportScaleCandidates();
+      const candidates = getExportScaleCandidates(undefined, { allowFullScan: true });
       const selectedScale = applyExportScaleConstraints(candidates);
       syncExportScaleInputs();
       const targetWidth = Math.max(1, Number(state.width) || 1);
@@ -1271,6 +1380,8 @@
     getTimelapseTrackStepCount,
     createTimelapseBaseSnapshotPayload,
     ensureTimelapseOperationLogBase,
+    hydrateTimelapseOperationLogBase,
+    releaseHydratedTimelapseOperationLogBase,
     cloneTimelapsePixelPatchValue,
     createTimelapseOperationEntryFromPixelPatch,
     createTimelapseOperationKeyframeEntry,

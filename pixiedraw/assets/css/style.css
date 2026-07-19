@@ -14015,6 +14015,11 @@ body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom
   padding: 3px 4px;
 }
 
+body.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock #panelFrames .timeline-card {
+  width: 100%;
+  min-width: 0;
+}
+
 body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data-compact="true"] #panelFrames .timeline-card {
   grid-template-columns: max-content max-content minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
@@ -14077,6 +14082,8 @@ body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom
   align-items: center;
   gap: 6px;
   padding: 4px;
+  width: 100%;
+  min-width: 0;
 }
 
 body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data-compact="true"] #panelFrames .timeline-toolbar,
@@ -14101,6 +14108,9 @@ body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom
 body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data-compact="true"] #panelFrames .timeline-matrix {
   margin-left: calc(var(--timeline-cell-size) * -2);
   min-width: max-content;
+  height: var(--timeline-cell-size);
+  min-height: var(--timeline-cell-size);
+  grid-template-rows: var(--timeline-cell-size) !important;
 }
 
 body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data-compact="true"] #panelFrames .timeline-cell--corner,

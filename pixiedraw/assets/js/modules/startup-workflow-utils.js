@@ -895,18 +895,31 @@
     history.pending = null;
     clearTimelapseRecording({ silent: true, scope: 'all' });
     ensureTimelapseStartCapture();
-    resetDocumentUnsavedChanges();
+    // The old tab/session still points at the project that was just closed.
+    // Reset the new document's dirty tokens without mirroring them until the
+    // new autosave id, tab, and active-project session are committed together.
+    resetDocumentUnsavedChanges({ syncSession: false });
     updateHistoryButtons();
     resetExportScaleDefaults();
     syncPixfindSnapshotAfterDocumentReset();
     setTrackedProjectDotBaseline(snapshot, null);
     resetOpenedDocumentViewport({ defer: true });
 
-    setActiveAutosaveProjectId(createAutosaveProjectId());
+    const newProjectId = createAutosaveProjectId();
+    setActiveAutosaveProjectId(newProjectId);
     clearActiveLocalProjectJournal?.();
     clearActiveSharedProjectSession();
     storeMultiProjectKey('');
     syncMultiProjectKeyInputValues('', { preserveFocused: false });
+    if (ensureTab) {
+      resetOpenProjectTabsToCurrentProject({
+        source: 'new-project',
+        projectId: newProjectId,
+        sourceStorageAdapterId: null,
+        sourceKind: 'new',
+        lastSavedStorageAdapterId: null,
+      });
+    }
     markAutosaveDirty();
     if (AUTOSAVE_SUPPORTED && autosaveWriteTimer !== null) {
       window.clearTimeout(autosaveWriteTimer);
@@ -933,15 +946,6 @@
       updateAutosaveStatus('自動保存: 新規プロジェクトの即時保存に失敗したため再試行します', 'warn');
     } else {
       updateAutosaveStatus('自動保存: このブラウザでは利用できません', 'warn');
-    }
-    if (ensureTab) {
-      resetOpenProjectTabsToCurrentProject({
-        source: 'new-project',
-        projectId: autosaveProjectId,
-        sourceStorageAdapterId: null,
-        sourceKind: 'new',
-        lastSavedStorageAdapterId: null,
-      });
     }
     scheduleSessionPersist();
     return true;
