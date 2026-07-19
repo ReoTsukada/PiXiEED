@@ -191,6 +191,12 @@
       state.currentBuildId = buildInfo.buildId;
       state.edition = buildInfo.edition;
       state.manifestUrl = manifestUrl;
+      const protocol = String(windowRef.location?.protocol || '');
+      if (protocol && protocol !== 'http:' && protocol !== 'https:') {
+        setStatus('unavailable', 'unsupported-protocol');
+        log('skipped', 'unsupported-protocol');
+        return { ...state };
+      }
       if (windowRef.navigator?.onLine === false) {
         setStatus('offline', 'navigator-offline');
         log('offline', 'navigator-offline');
