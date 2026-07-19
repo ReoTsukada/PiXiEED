@@ -790,6 +790,33 @@
     }
   }
 
+  function drawPreviewWatermark(context, width, height) {
+    const shortestSide = Math.min(width, height);
+    const fontSize = Math.max(9, Math.min(18, Math.round(shortestSide / 48)));
+    const label = 'PiXiEED SAMPLE';
+    context.save();
+    context.translate(width / 2, height / 2);
+    context.rotate(-Math.PI / 10);
+    context.font = `800 ${fontSize}px sans-serif`;
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    const labelWidth = context.measureText(label).width;
+    const stepX = Math.max(labelWidth + fontSize * 1.5, fontSize * 7);
+    const stepY = Math.max(fontSize * 3.1, 28);
+    const diagonal = Math.ceil(Math.hypot(width, height));
+    context.lineWidth = Math.max(1, fontSize / 14);
+    context.strokeStyle = 'rgba(0,0,0,.22)';
+    context.fillStyle = 'rgba(255,255,255,.26)';
+    for (let y = -diagonal; y <= diagonal; y += stepY) {
+      const offset = Math.round((y / stepY)) % 2 ? stepX / 2 : 0;
+      for (let x = -diagonal - stepX; x <= diagonal + stepX; x += stepX) {
+        context.strokeText(label, x + offset, y);
+        context.fillText(label, x + offset, y);
+      }
+    }
+    context.restore();
+  }
+
   async function createPreviewBlob(file, { thumbnail = false, mimeType = 'image/webp' } = {}) {
     const source = await loadImageSource(file);
     try {
@@ -803,14 +830,8 @@
       const context = canvas.getContext('2d', { alpha: true });
       context.imageSmoothingEnabled = false;
       context.drawImage(source, 0, 0, canvas.width, canvas.height);
-      if (!thumbnail) {
-        const fontSize = Math.max(14, Math.round(Math.min(canvas.width, canvas.height) / 9));
-        context.save();
-        context.translate(canvas.width / 2, canvas.height / 2); context.rotate(-Math.PI / 10);
-        context.font = `900 ${fontSize}px sans-serif`; context.textAlign = 'center'; context.textBaseline = 'middle';
-        context.lineWidth = Math.max(2, fontSize / 12); context.strokeStyle = 'rgba(0,0,0,.45)'; context.fillStyle = 'rgba(255,255,255,.48)';
-        context.strokeText('PiXiEED SAMPLE', 0, 0); context.fillText('PiXiEED SAMPLE', 0, 0); context.restore();
-      }
+      // 一覧サムネイルも含め、購入前に配る画像は必ず高密度の透かし入りにする。
+      drawPreviewWatermark(context, canvas.width, canvas.height);
       return await new Promise((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('preview conversion failed')), mimeType, .88));
     } finally {
       if (typeof source.close === 'function') source.close();

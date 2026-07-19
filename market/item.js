@@ -14,6 +14,13 @@
   let purchaseUser = null;
   const favorites = window.PiXiEEDMarketFavorites;
 
+  function currentAssetId() {
+    const queryId = new URLSearchParams(location.search).get('id');
+    if (queryId) return queryId;
+    const match = location.pathname.match(/\/market\/items\/([0-9a-f-]{36})\/?$/i);
+    return match?.[1] || '';
+  }
+
   function assetFormats(asset) {
     return Array.isArray(asset?.included_formats) && asset.included_formats.length ? asset.included_formats : [asset?.asset_format];
   }
@@ -38,6 +45,8 @@
     const formats = assetFormats(asset);
     const options = series.inherited_terms?.license_options || [];
     document.title = `${asset.title} | PiXiEEDマーケット`;
+    const canonical = document.querySelector('link[rel="canonical"]');
+    if (canonical) canonical.href = `https://pixieed.jp/market/items/${encodeURIComponent(asset.id)}/`;
     $('itemTitle').textContent = asset.title || '名称未設定の素材';
     $('itemDescription').textContent = asset.description || '説明はありません。';
     $('itemPrice').textContent = yen(asset.sale_price_yen);
@@ -261,7 +270,7 @@
     }
     purchaseClient = access.client;
     purchaseUser = access.user || null;
-    const id = new URLSearchParams(location.search).get('id');
+    const id = currentAssetId();
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id || '')) {
       $('itemStatus').textContent = '商品を特定できませんでした。マーケット一覧から開き直してください。'; return;
     }
