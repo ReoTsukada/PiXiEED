@@ -162,7 +162,7 @@
         actions: [
           { id: 'play', label: '遊ぶ', selector: '#startButton', icon: 'icon/icon-192-2.png' },
           { id: 'create', label: '作る', selector: '#createButton', icon: 'assets/icons/File.png?v=2026.07.19-ui-icons1' },
-          { id: 'fullscreen', label: '拡大', selector: '#fullscreenButton', icon: '拡大.png', iconWhenPressed: '縮小.png', mirrorState: true, mode: 'fullscreen', fullscreenController: 'game', placement: 'leading' },
+          { id: 'fullscreen', label: '拡大', selector: '#fullscreenButton', icon: 'expand.png', iconWhenPressed: 'shrink.png', mirrorState: true, mode: 'fullscreen', fullscreenController: 'game', placement: 'leading' },
         ],
         details: buildSupportDetails({ includeUpdates: true }),
       };
@@ -171,7 +171,7 @@
       return {
         actions: [
           { id: 'play', label: '遊ぶ', selector: '#playBtn', cloneIcon: true },
-          { id: 'fullscreen', label: '拡大', selector: '#fullscreenButton', icon: '拡大.png', iconWhenPressed: '縮小.png', mirrorState: true, mode: 'fullscreen', fullscreenController: 'tool', placement: 'leading' },
+          { id: 'fullscreen', label: '拡大', selector: '#fullscreenButton', icon: 'expand.png', iconWhenPressed: 'shrink.png', mirrorState: true, mode: 'fullscreen', fullscreenController: 'tool', placement: 'leading' },
         ],
         details: buildSupportDetails({ includeUpdates: true }),
       };
