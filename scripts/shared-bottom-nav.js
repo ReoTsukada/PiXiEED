@@ -80,7 +80,7 @@
     const controller = doc.createElement('script');
     controller.async = false;
     controller.dataset.pixieedAdAccountControl = 'true';
-    controller.src = relHref('scripts/ad-account-control.js?v=20260719-adsense-script-state1');
+    controller.src = relHref('scripts/ad-account-control.js?v=20260719-no-ad-fallback1');
     controller.addEventListener('load', ready, { once: true });
     controller.addEventListener('error', ready, { once: true });
     doc.head.appendChild(controller);
