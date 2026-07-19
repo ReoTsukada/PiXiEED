@@ -49,6 +49,8 @@ const dom = {
   creatorDifficultyButtons: [],
   creatorOriginalInput: document.getElementById('creatorOriginalInput'),
   creatorDiffInput: document.getElementById('creatorDiffInput'),
+  creatorOriginalDropzone: document.getElementById('creatorOriginalDropzone'),
+  creatorDiffDropzone: document.getElementById('creatorDiffDropzone'),
   creatorPreviewOriginal: document.getElementById('creatorPreviewOriginal'),
   creatorPreviewDiff: document.getElementById('creatorPreviewDiff'),
   creatorExportButton: document.getElementById('creatorExport'),
@@ -631,8 +633,52 @@ function setupCreator() {
 
   dom.creatorOriginalInput?.addEventListener('change', handleCreatorFileChange);
   dom.creatorDiffInput?.addEventListener('change', handleCreatorFileChange);
+  setupCreatorFileDropzone(dom.creatorOriginalDropzone, dom.creatorOriginalInput);
+  setupCreatorFileDropzone(dom.creatorDiffDropzone, dom.creatorDiffInput);
 
   resetCreatorForm();
+}
+
+function setupCreatorFileDropzone(dropzone, input) {
+  if (!dropzone || !input) return;
+  const setDragging = active => dropzone.classList.toggle('is-dragging', active);
+  ['dragenter', 'dragover'].forEach(type => {
+    dropzone.addEventListener(type, event => {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'copy';
+      setDragging(true);
+    });
+  });
+  ['dragleave', 'dragend'].forEach(type => {
+    dropzone.addEventListener(type, event => {
+      if (type === 'dragleave' && event.relatedTarget && dropzone.contains(event.relatedTarget)) return;
+      setDragging(false);
+    });
+  });
+  dropzone.addEventListener('drop', event => {
+    event.preventDefault();
+    setDragging(false);
+    const file = Array.from(event.dataTransfer?.files || []).find(isSupportedCreatorImageFile);
+    if (!file) {
+      setCreatorStatus('PNG、JPEG、WebP画像をドロップしてください。', 'error');
+      return;
+    }
+    try {
+      const transfer = new DataTransfer();
+      transfer.items.add(file);
+      input.files = transfer.files;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    } catch (error) {
+      console.warn('creator file drop failed', error);
+      setCreatorStatus('画像の追加に失敗しました。クリックして選択してください。', 'error');
+    }
+  });
+}
+
+function isSupportedCreatorImageFile(file) {
+  if (!(file instanceof File)) return false;
+  return ['image/png', 'image/jpeg', 'image/webp'].includes(file.type)
+    || /\.(?:png|jpe?g|webp)$/i.test(file.name);
 }
 
 function isCreatorOverlayOpen() {
@@ -818,7 +864,7 @@ function setCreatorMode(mode, silent = false) {
       : '同じサイズの2枚の画像を選ぶと差分を自動検出します。';
   }
   if (dom.creatorDiffLabelText) {
-    dom.creatorDiffLabelText.textContent = isHiddenMode ? '探し物レイヤー' : '間違い画像';
+    dom.creatorDiffLabelText.textContent = isHiddenMode ? '探し物レイヤーを追加' : '間違い画像を追加';
   }
   if (dom.creatorPreviewDiffCaption) {
     dom.creatorPreviewDiffCaption.textContent = isHiddenMode ? '探し物レイヤー' : '間違い';
