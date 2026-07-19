@@ -1380,98 +1380,6 @@
       -webkit-user-select: none;
       image-rendering: pixelated;
     }
-    .stamp-panel {
-      gap: 12px;
-    }
-    .stamp-panel__hint {
-      margin: 0;
-      font-size: 0.8rem;
-      color: rgba(231, 238, 255, 0.7);
-      letter-spacing: 0.04em;
-      text-align: left;
-    }
-    .stamp-panel__grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
-      gap: 6px;
-      max-height: min(360px, max(120px, calc(var(--viewport-height) - 260px)));
-      overflow-y: auto;
-      padding-right: 4px;
-      overscroll-behavior: contain;
-      scrollbar-width: thin;
-      scrollbar-color: rgba(123, 207, 255, 0.35) transparent;
-    }
-    .stamp-panel__grid::-webkit-scrollbar {
-      width: 6px;
-    }
-    .stamp-panel__grid::-webkit-scrollbar-track {
-      background: transparent;
-    }
-    .stamp-panel__grid::-webkit-scrollbar-thumb {
-      background: rgba(123, 207, 255, 0.35);
-      border-radius: 999px;
-    }
-    .stamp-panel__empty {
-      font-size: 0.8rem;
-      color: rgba(231, 238, 255, 0.65);
-      text-align: center;
-      padding: 16px;
-      border: 1px dashed rgba(123, 207, 255, 0.45);
-      border-radius: 12px;
-      letter-spacing: 0.06em;
-    }
-    .stamp-button {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0;
-      border-radius: 0;
-      background: rgba(26, 30, 38, 0.95);
-      border: 1px solid rgba(86, 104, 140, 0.65);
-      box-shadow: 0 10px 24px rgba(5, 8, 18, 0.45);
-      color: inherit;
-      aspect-ratio: 1 / 1;
-      width: 100%;
-      transition: transform 0.16s ease, background 0.16s ease;
-    }
-    .stamp-button.is-loading {
-      opacity: 0.6;
-      cursor: progress;
-      transform: none;
-    }
-    .stamp-button:hover,
-    .stamp-button:focus-visible {
-      background: rgba(42, 48, 60, 0.95);
-      transform: translateY(-1px);
-      outline: none;
-      box-shadow: 0 12px 28px rgba(5, 8, 18, 0.45);
-    }
-    .stamp-button:active {
-      transform: translateY(1px) scale(0.96);
-      box-shadow: 0 6px 18px rgba(5, 8, 18, 0.38);
-    }
-    .stamp-button__preview {
-      width: 100%;
-      height: 100%;
-      border-radius: 0;
-      background: radial-gradient(circle at 30% 30%, rgba(72, 82, 104, 0.9), rgba(32, 36, 46, 0.9));
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0;
-      box-shadow: inset 0 1px 4px rgba(255, 255, 255, 0.12), inset 0 8px 18px rgba(0, 0, 0, 0.4);
-    }
-    .stamp-button__preview img {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      border-radius: 0;
-      image-rendering: pixelated;
-      display: block;
-      pointer-events: none;
-      user-select: none;
-      -webkit-user-select: none;
-    }
     .pill {
       display: inline-flex;
       align-items: center;
@@ -2298,11 +2206,7 @@
 <img alt="" aria-hidden="true" class="control-icon control-icon--native-pixel" draggable="false" src="../assets/icons/File.png?v=2026.07.19-ui-icons1"/>
 <span class="icon-button__label visually-hidden">画像を読み込む</span>
 </button>
-<button aria-controls="stampPanel" aria-expanded="false" aria-label="スタンプを開く" class="icon-button" id="stampBtn" type="button">
-<img alt="" aria-hidden="true" class="control-icon" draggable="false" src="./icon-stamp.svg"/>
-<span class="icon-button__label visually-hidden">スタンプを開く</span>
-</button>
-<button aria-label="ドット絵を閉じる" class="icon-button icon-button--ghost" id="clearPixelBtn" type="button">
+<button aria-hidden="true" aria-label="読み込みを取り消す" class="icon-button icon-button--ghost" disabled id="clearPixelBtn" type="button">
 <svg aria-hidden="true" class="control-icon" shape-rendering="crispEdges" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
 <rect fill="#FFFFFF" height="6" width="2" x="2" y="0"></rect>
 <rect fill="#FFFFFF" height="6" width="2" x="20" y="0"></rect>
@@ -2344,7 +2248,7 @@
 <rect fill="#FFFFFF" height="2" width="1" x="0" y="20"></rect>
 <rect fill="#FFFFFF" height="2" width="1" x="23" y="20"></rect>
 </svg>
-<span class="icon-button__label visually-hidden">ドット絵を閉じる</span>
+<span class="icon-button__label visually-hidden">読み込みを取り消す</span>
 </button>
 </div>
 <div aria-label="カメラ操作" class="hud-top__actions hud-top__actions--right" role="group">
@@ -2414,13 +2318,6 @@
 </ol>
 </div>
 </div>
-<div class="hud-top__panel-wrap hud-top__panel-wrap--left">
-<div class="menu-panel stamp-panel" hidden="" id="stampPanel">
-<p class="stamp-panel__hint">スタンプを選択すると画面に追加されます。</p>
-<div aria-label="スタンプ一覧" class="stamp-panel__grid" id="stampList" role="group"></div>
-<p class="stamp-panel__empty" hidden="" id="stampEmptyMessage">スタンプがまだ登録されていません。</p>
-</div>
-</div>
 <div class="hud-top__panel-wrap hud-top__panel-wrap--right">
 <div class="menu-panel camera-settings-panel" hidden="" id="cameraSettingsPanel">
 <div aria-label="カメラ基本設定" class="controls controls--camera" role="group">
@@ -2477,7 +2374,7 @@
 </div>
 <div class="hud-bottom">
 <div class="hud-bottom__menus">
-<div class="menu-panel dot-settings-panel" hidden="" id="paletteMenu">
+<div class="menu-panel dot-settings-panel" hidden="" id="dotSettingsPanel">
 <div class="dot-settings-panel__row">
 <label class="select-control" for="colorDepthSelect">
 <span class="select-control__label">色数</span>
@@ -2491,8 +2388,6 @@
 </label>
 </div>
 <div aria-hidden="true" class="palette-display" id="paletteDisplay"></div>
-</div>
-<div class="menu-panel dot-settings-panel" hidden="" id="dotSettingsPanel">
 <div class="dot-settings-panel__row">
 <label class="select-control" for="dotScaleSelect">
 <span class="select-control__label">撮影サイズ（基準）</span>
@@ -2526,9 +2421,9 @@
 </div>
 <div aria-label="操作" class="hud-bottom__actions" role="group">
 <div class="hud-bottom__actions-group hud-bottom__actions-group--left">
-<button aria-label="ドット設定を開く" aria-pressed="true" class="icon-button" id="dotModeBtn" type="button">
+<button aria-label="ドット・色設定を開く" aria-pressed="true" class="icon-button" id="dotModeBtn" type="button">
 <img alt="" aria-hidden="true" class="control-icon" draggable="false" src="./icon-dotmode.svg"/>
-<span class="icon-button__label visually-hidden">ドット設定</span>
+<span class="icon-button__label visually-hidden">ドット・色設定</span>
 </button>
 </div>
 <div class="hud-bottom__center">
@@ -2563,12 +2458,7 @@
 </button>
 </div>
 </div>
-<div class="hud-bottom__actions-group hud-bottom__actions-group--right">
-<button aria-controls="paletteMenu" aria-expanded="false" aria-label="パレット設定を開く" class="icon-button" id="paletteMenuBtn" type="button">
-<img alt="" aria-hidden="true" class="control-icon" src="../projects/pixiee-lens/palette.svg"/>
-<span class="icon-button__label visually-hidden">パレット設定</span>
-</button>
-</div>
+<div class="hud-bottom__actions-group hud-bottom__actions-group--right"></div>
 </div>
 <div aria-hidden="true" class="hud-landscape-capture"></div>
 </div>
@@ -2642,10 +2532,6 @@
     const cameraSettingsBtn = document.getElementById('cameraSettingsBtn');
     const cameraSettingsPanel = document.getElementById('cameraSettingsPanel');
     const cameraSettingsResetBtn = document.getElementById('cameraSettingsResetBtn');
-    const stampBtn = document.getElementById('stampBtn');
-    const stampPanel = document.getElementById('stampPanel');
-    const stampList = document.getElementById('stampList');
-    const stampEmptyMessage = document.getElementById('stampEmptyMessage');
     const pixelArtBtn = document.getElementById('pixelArtBtn');
     const clearPixelBtn = document.getElementById('clearPixelBtn');
     const dotModeBtn = document.getElementById('dotModeBtn');
@@ -2655,7 +2541,6 @@
       ? Array.from(gifCaptureGauge.querySelectorAll('.gif-capture-gauge__segment'))
       : [];
     const gifCaptureGaugeValue = document.getElementById('gifCaptureGaugeValue');
-    const paletteMenuBtn = document.getElementById('paletteMenuBtn');
     const pixelArtInput = document.getElementById('pixelArtInput');
     const pixelPreview = document.getElementById('pixelPreview');
     const qrReadout = document.getElementById('qrReadout');
@@ -2937,7 +2822,6 @@
     const aspectShadeBottom = document.getElementById('aspectShadeBottom');
     const aspectShadeLeft = document.getElementById('aspectShadeLeft');
     const aspectShadeRight = document.getElementById('aspectShadeRight');
-    const paletteMenu = document.getElementById('paletteMenu');
     const hudTop = document.querySelector('.hud-top');
     const hudBottom = document.querySelector('.hud-bottom');
     const hudBottomCenter = document.querySelector('.hud-bottom__center');
@@ -2954,11 +2838,6 @@
     if (paletteDisplay) {
       ['pointerdown', 'mousedown', 'touchstart', 'click'].forEach((type) => {
         paletteDisplay.addEventListener(type, (event) => event.stopPropagation());
-      });
-    }
-    if (stampPanel) {
-      ['pointerdown', 'mousedown', 'touchstart', 'click'].forEach((type) => {
-        stampPanel.addEventListener(type, (event) => event.stopPropagation());
       });
     }
 
@@ -2984,11 +2863,6 @@
         dotModeBtn.setAttribute('aria-disabled', 'true');
         dotModeBtn.title = 'ドット設定はこのブラウザで利用できません';
       }
-      if (paletteMenuBtn) {
-        paletteMenuBtn.disabled = true;
-        paletteMenuBtn.setAttribute('aria-disabled', 'true');
-        paletteMenuBtn.title = 'パレット設定はこのブラウザで利用できません';
-      }
       setSelectEnabled(dotScaleSelect, false);
       setSelectEnabled(gifFpsSelect, false);
       setSelectEnabled(colorDepthSelect, false);
@@ -3012,11 +2886,6 @@
         dotModeBtn.disabled = false;
         dotModeBtn.removeAttribute('aria-disabled');
         dotModeBtn.removeAttribute('title');
-      }
-      if (paletteMenuBtn) {
-        paletteMenuBtn.disabled = false;
-        paletteMenuBtn.removeAttribute('aria-disabled');
-        paletteMenuBtn.removeAttribute('title');
       }
       if (paletteToggleBtn) {
         paletteToggleBtn.disabled = false;
@@ -3051,20 +2920,6 @@
       whiteBalance: 'colorTemperature',
       zoom: 'zoom'
     };
-    const STAMP_LIBRARY = Object.freeze([
-      { id: 'st-glass', label: 'グラス', src: './stamps/st-glass.png' },
-      { id: 'st-megane', label: 'めがね', src: './stamps/st-megane.png' },
-      { id: 'st-mao1', label: 'フェイス 1', src: './stamps/st-mao1.png' },
-      { id: 'st-mao2', label: 'フェイス 2', src: './stamps/st-mao2.png' },
-      { id: 'wst-kira', label: 'キラキラ（カラー）', src: './stamps/wst-kira.png', hueAdjustable: true },
-      { id: 'wst-star', label: '星（カラー）', src: './stamps/wst-star.png', hueAdjustable: true },
-      { id: 'wst-dot', label: 'ドット（カラー）', src: './stamps/wst-dot.png', hueAdjustable: true },
-      { id: 'wst-heart', label: 'ハート（カラー）', src: './stamps/wst-heart.png', hueAdjustable: true },
-      { id: 'wst-supe', label: 'スペード（カラー）', src: './stamps/wst-supe.png', hueAdjustable: true },
-      { id: 'wst-sizuku', label: 'しずく（カラー）', src: './stamps/wst-sizuku.png', hueAdjustable: true },
-      { id: 'wst-tira', label: 'ティアラ（カラー）', src: './stamps/wst-tira.png', hueAdjustable: true },
-      { id: 'wst-kurabu', label: 'クラブ（カラー）', src: './stamps/wst-kurabu.png', hueAdjustable: true }
-    ]);
     const QR_SCAN_BASE_SIZE = 640;
     const QR_SCAN_MAX_SIZE = 960;
     const QR_SCAN_MIN_SIZE = 320;
@@ -3194,8 +3049,6 @@
     let qrScanBoostUntil = 0;
 
     const menus = {
-      palette: { button: paletteMenuBtn, panel: paletteMenu },
-      stamps: { button: stampBtn, panel: stampPanel },
       cameraSettings: { button: cameraSettingsBtn, panel: cameraSettingsPanel }
     };
     let openMenuKey = null;
@@ -4519,89 +4372,6 @@
       }
     }
 
-    function updateStampEmptyState(isEmpty) {
-      if (stampList) {
-        stampList.hidden = Boolean(isEmpty);
-      }
-      if (stampEmptyMessage) {
-        stampEmptyMessage.hidden = !isEmpty;
-      }
-    }
-
-    async function handleStampSelection(stamp, button) {
-      if (!stamp || !stamp.src) {
-        return;
-      }
-      const targetButton = button || null;
-      if (targetButton) {
-        targetButton.disabled = true;
-        targetButton.classList.add('is-loading');
-      }
-      try {
-        const result = await createOverlayFromImageSource(stamp.src, { stamp });
-        if (!result) {
-          throw new Error('Failed to create overlay from stamp');
-        }
-        closeMenu('stamps');
-      } catch (error) {
-        console.error('スタンプの読み込みに失敗しました', error);
-        setStatus('スタンプを読み込めませんでした');
-      } finally {
-        if (targetButton) {
-          targetButton.disabled = false;
-          targetButton.classList.remove('is-loading');
-        }
-      }
-    }
-
-    function populateStampPanel() {
-      if (!stampList) {
-        return;
-      }
-      stampList.textContent = '';
-      const stamps = Array.isArray(STAMP_LIBRARY) ? STAMP_LIBRARY : [];
-      if (!stamps.length) {
-        updateStampEmptyState(true);
-        return;
-      }
-      stamps.forEach((stamp) => {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'stamp-button';
-        button.dataset.stampId = stamp.id || '';
-        button.setAttribute('aria-label', `スタンプ ${stamp.label || stamp.id || ''}`.trim());
-        const preview = document.createElement('span');
-        preview.className = 'stamp-button__preview';
-        const image = document.createElement('img');
-        image.decoding = 'async';
-        image.loading = 'lazy';
-        image.src = stamp.src;
-        image.alt = '';
-        image.draggable = false;
-        image.addEventListener('error', () => {
-          if (button.parentElement === stampList) {
-            stampList.removeChild(button);
-            updateStampEmptyState(!stampList.querySelector('.stamp-button'));
-          }
-        });
-        preview.appendChild(image);
-        button.appendChild(preview);
-        if (stamp.hueAdjustable) {
-          button.dataset.hueAdjustable = 'true';
-        }
-        ['pointerdown', 'mousedown', 'touchstart'].forEach((type) => {
-          button.addEventListener(type, (event) => event.stopPropagation(), { passive: false });
-        });
-        button.addEventListener('click', (event) => {
-          event.stopPropagation();
-          void handleStampSelection(stamp, button);
-        });
-        stampList.appendChild(button);
-      });
-      updateStampEmptyState(!stampList.querySelector('.stamp-button'));
-    }
-
-    populateStampPanel();
     initializeCameraSettingsUI();
 
     function setSelectEnabled(selectElement, enabled) {
@@ -4683,21 +4453,11 @@
         entry.panel.classList.add('is-open');
         entry.panel.hidden = false;
         entry.button.setAttribute('aria-expanded', 'true');
-        if (key === 'palette' && !paletteToggleBtn) {
-          if (!paletteDisplayEnabled && state.dotMode && depthUsesPalette(state.colorDepth)) {
-            setPaletteDisplayEnabled(true);
-          } else if (paletteDisplayEnabled) {
-            updatePaletteDisplay(true);
-          }
-        }
         openMenuKey = key;
       } else {
         entry.panel.classList.remove('is-open');
         entry.panel.hidden = true;
         entry.button.setAttribute('aria-expanded', 'false');
-        if (key === 'palette' && paletteToggleBtn && paletteDisplayEnabled) {
-          setPaletteDisplayEnabled(false);
-        }
         if (openMenuKey === key) {
           openMenuKey = null;
         }
@@ -6146,6 +5906,18 @@
       pixelArtBtn.classList.toggle('is-active', hasPhotoSource);
       pixelArtBtn.setAttribute('aria-pressed', hasPhotoSource ? 'true' : 'false');
       setIconButtonLabel(pixelArtBtn, hasPhotoSource ? 'カメラに戻る' : '画像を読み込む');
+      updateImportedFileUndoButton();
+    }
+
+    function updateImportedFileUndoButton() {
+      if (!clearPixelBtn) {
+        return;
+      }
+      const canUndo = Boolean(photoSourceImage || overlays.length > 0);
+      clearPixelBtn.classList.toggle('is-visible', canUndo);
+      clearPixelBtn.setAttribute('aria-hidden', canUndo ? 'false' : 'true');
+      clearPixelBtn.disabled = !canUndo;
+      setIconButtonLabel(clearPixelBtn, '読み込みを取り消す');
     }
 
     function clearPhotoSource({ announce = true } = {}) {
@@ -7991,9 +7763,7 @@
       });
       const hasOverlays = overlays.length > 0;
       pixelPreview.hidden = !hasOverlays;
-      clearPixelBtn.classList.toggle('is-visible', hasOverlays);
-      clearPixelBtn.setAttribute('aria-hidden', hasOverlays ? 'false' : 'true');
-      clearPixelBtn.disabled = !hasOverlays;
+      updateImportedFileUndoButton();
       updateZoomControlMode(activeOverlay);
       refreshOverlayStatus();
     }
@@ -8697,9 +8467,7 @@
         setActiveOverlay(overlays[overlays.length - 1]);
       } else {
         pixelPreview.hidden = true;
-        clearPixelBtn.classList.remove('is-visible');
-        clearPixelBtn.setAttribute('aria-hidden', 'true');
-        clearPixelBtn.disabled = true;
+        updateImportedFileUndoButton();
         updateZoomControlMode(null);
         refreshOverlayStatus();
       }
@@ -8713,24 +8481,17 @@
       removeOverlay(activeOverlay);
     }
 
-    function createOverlayFromImageSource(imageSrc, { objectUrl = null, stamp = null } = {}) {
+    function createOverlayFromImageSource(imageSrc, { objectUrl = null } = {}) {
       if (!imageSrc) {
         return Promise.resolve(false);
       }
       return new Promise((resolve) => {
-        const initialHue = clampHueValue(
-          stamp && Number.isFinite(Number(stamp.defaultHue)) ? Number(stamp.defaultHue) : COLOR_CONTROL_DEFAULTS.hue
-        );
-        const initialSaturation = clampSaturationValue(
-          stamp && Number.isFinite(Number(stamp.defaultSaturation))
-            ? Number(stamp.defaultSaturation)
-            : COLOR_CONTROL_DEFAULTS.saturation
-        );
+        const initialHue = clampHueValue(COLOR_CONTROL_DEFAULTS.hue);
+        const initialSaturation = clampSaturationValue(COLOR_CONTROL_DEFAULTS.saturation);
         const overlay = {
           id: `overlay-${Date.now()}-${Math.random().toString(16).slice(2)}`,
           objectUrl,
-          stampId: stamp && stamp.id ? String(stamp.id) : null,
-          hueAdjustable: Boolean(stamp && stamp.hueAdjustable),
+          hueAdjustable: false,
           hue: initialHue,
           saturation: initialSaturation,
           hasImage: false,
@@ -8753,9 +8514,6 @@
 
         if (overlay.elements && overlay.elements.wrap) {
           overlay.elements.wrap.dataset.overlayId = overlay.id;
-          if (overlay.stampId) {
-            overlay.elements.wrap.dataset.stampId = overlay.stampId;
-          }
           if (overlay.hueAdjustable) {
             overlay.elements.wrap.dataset.hueAdjustable = 'true';
           } else {
@@ -8796,9 +8554,7 @@
           }
           setOverlayScale(overlay, overlay.scale);
           overlay.elements.wrap.classList.add('is-active');
-          clearPixelBtn.classList.add('is-visible');
-          clearPixelBtn.setAttribute('aria-hidden', 'false');
-          clearPixelBtn.disabled = false;
+          updateImportedFileUndoButton();
           applyOverlayColorTransform(overlay);
           refreshOverlayStatus();
           resolve(true);
@@ -8915,7 +8671,11 @@
     clearPixelBtn.addEventListener('click', (event) => {
       event.stopPropagation();
       closeAllMenus();
-      clearActiveOverlay();
+      if (photoSourceImage) {
+        clearPhotoSource();
+      } else {
+        clearActiveOverlay();
+      }
     });
 
     if (qrReadout) {
@@ -8998,20 +8758,6 @@
           hideCameraStartOverlay();
         }
         await startCamera();
-      });
-    }
-
-    if (paletteMenuBtn) {
-      paletteMenuBtn.addEventListener('click', (event) => {
-        event.stopPropagation();
-        toggleMenu('palette');
-      });
-    }
-
-    if (stampBtn) {
-      stampBtn.addEventListener('click', (event) => {
-        event.stopPropagation();
-        toggleMenu('stamps');
       });
     }
 
@@ -11642,9 +11388,7 @@
       if (pixelArtBtn.contains(event.target) || clearPixelBtn.contains(event.target)) {
         return;
       }
-      if ((zoomControl && zoomControl.contains(event.target))
-        || (stampBtn && stampBtn.contains(event.target))
-        || (stampPanel && stampPanel.contains(event.target))) {
+      if (zoomControl && zoomControl.contains(event.target)) {
         return;
       }
       const clickedOverlay = overlays.find((overlay) => overlay.elements.wrap.contains(event.target));

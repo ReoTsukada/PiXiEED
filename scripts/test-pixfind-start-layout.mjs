@@ -6,6 +6,9 @@ const root = path.resolve(import.meta.dirname, '..');
 const html = fs.readFileSync(path.join(root, 'pixfind/index.html'), 'utf8');
 const css = fs.readFileSync(path.join(root, 'pixfind/styles.css'), 'utf8');
 const app = fs.readFileSync(path.join(root, 'pixfind/app.js'), 'utf8');
+const commonTabBar = fs.readFileSync(path.join(root, 'scripts/shared-tab-bar.js'), 'utf8');
+const toolFullscreen = fs.readFileSync(path.join(root, 'scripts/tool-fullscreen.js'), 'utf8');
+const maoitu = fs.readFileSync(path.join(root, 'maoitu/index.html'), 'utf8');
 
 assert.match(html, /<body data-pixfind-screen="start">/);
 assert.match(html, /styles\.css\?v=2026\.07\.19-game-first-layout1/);
@@ -20,6 +23,7 @@ assert.doesNotMatch(app, /if \(!event\.ctrlKey\) \{\s*return;\s*\}/s);
 assert.match(app, /Only stop panning when the full image would leave that viewport/);
 assert.match(app, /frame\.addEventListener\('wheel', handleWheel/);
 assert.match(app, /frame\.setPointerCapture\(event\.pointerId\)/);
+assert.match(app, /const label = active \? '縮小' : '拡大';/);
 assert.match(app, /\(idx \+ 1\) % 8 === 0/);
 assert.doesNotMatch(app, /idx === 7/);
 assert.match(app, /function createPuzzleListAd\(\)/);
@@ -39,5 +43,14 @@ assert.match(css, /body\[data-pixieed-page="pixfind"\] \.pixieed-common-tabbar \
 assert.match(css, /\/\* Game-first board: the two images always share the available game surface\. \*\//);
 assert.match(css, /\.screen--game \.game-layout \{[^}]*grid-template-rows: repeat\(2, minmax\(0, 1fr\)\);/s);
 assert.match(css, /\.screen--game \{[^}]*overflow: hidden !important;/s);
+assert.match(commonTabBar, /id: 'fullscreen', label: '拡大', selector: '#fullscreenButton', icon: '拡大\.png', iconWhenPressed: '縮小\.png', mirrorState: true, mode: 'fullscreen', fullscreenController: 'game', placement: 'leading'/);
+assert.match(commonTabBar, /if \(kind === 'maoitu'\)/);
+assert.match(commonTabBar, /if \(item\.iconWhenPressed\)/);
+assert.match(commonTabBar, /const leadingActions = state\.actions\.filter\(\(item\) => item\?\.placement === 'leading'\)/);
+assert.match(toolFullscreen, /dataset\.pixieedFullscreenAction === 'tabbar'/);
+assert.match(toolFullscreen, /active \? '縮小' : '拡大'/);
+assert.match(toolFullscreen, /window\.PiXiEEDToolFullscreen = Object\.freeze\(\{ toggle: toggleFullscreen \}\)/);
+assert.match(maoitu, /<body data-pixieed-fullscreen-action="tabbar">/);
+assert.match(maoitu, /<button aria-pressed="false" hidden id="fullscreenButton" type="button">拡大<\/button>/);
 
 console.log('PiXFiND start layout checks passed.');

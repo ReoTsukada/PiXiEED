@@ -6,7 +6,9 @@
     fullscreenIntent = params.get('fullscreen') === '1';
   } catch (_error) {}
 
-  if (document.getElementById('pixieedToolFullscreen')) return;
+  const useCommonTabAction = document.body?.dataset.pixieedFullscreenAction === 'tabbar';
+  const existingCommonAction = document.getElementById('fullscreenButton');
+  if (document.getElementById('pixieedToolFullscreen') || (useCommonTabAction && !(existingCommonAction instanceof HTMLButtonElement))) return;
 
   const style = document.createElement('style');
   style.id = 'pixieed-tool-fullscreen-style';
@@ -29,12 +31,15 @@
   `;
   document.head.appendChild(style);
 
-  const button = document.createElement('button');
-  button.id = 'pixieedToolFullscreen';
-  button.type = 'button';
-  button.textContent = 'フルスクリーン';
-  button.setAttribute('aria-label', 'フルスクリーンで使う');
-  document.body.appendChild(button);
+  const button = useCommonTabAction ? existingCommonAction : document.createElement('button');
+  if (!useCommonTabAction) {
+    button.id = 'pixieedToolFullscreen';
+    button.type = 'button';
+    document.body.appendChild(button);
+  }
+  button.hidden = useCommonTabAction;
+  button.textContent = useCommonTabAction ? '拡大' : 'フルスクリーン';
+  button.setAttribute('aria-label', useCommonTabAction ? '拡大' : 'フルスクリーンで使う');
   if (fullscreenIntent) {
     button.classList.add('is-requested');
     button.textContent = 'タップして全画面';
@@ -43,12 +48,17 @@
   const sync = () => {
     const active = document.fullscreenElement === document.documentElement;
     document.body.classList.toggle('pixieed-tool-is-fullscreen', active);
-    button.textContent = active ? 'フルスクリーンを終了' : (fullscreenIntent ? 'タップしてフルスクリーン' : 'フルスクリーン');
+    button.textContent = useCommonTabAction
+      ? (active ? '縮小' : '拡大')
+      : (active ? 'フルスクリーンを終了' : (fullscreenIntent ? 'タップしてフルスクリーン' : 'フルスクリーン'));
     button.classList.toggle('is-requested', !active && fullscreenIntent);
-    button.setAttribute('aria-label', active ? 'フルスクリーンを終了' : 'フルスクリーンで使う');
+    button.setAttribute('aria-label', useCommonTabAction
+      ? (active ? '縮小' : '拡大')
+      : (active ? 'フルスクリーンを終了' : 'フルスクリーンで使う'));
+    button.setAttribute('aria-pressed', String(active));
   };
 
-  button.addEventListener('click', async () => {
+  async function toggleFullscreen() {
     try {
       if (document.fullscreenElement) await document.exitFullscreen();
       else await document.documentElement.requestFullscreen();
@@ -56,7 +66,10 @@
       button.textContent = '全画面にできません';
       window.setTimeout(sync, 1800);
     }
-  });
+  }
+
+  window.PiXiEEDToolFullscreen = Object.freeze({ toggle: toggleFullscreen });
+  button.addEventListener('click', toggleFullscreen);
   document.addEventListener('fullscreenchange', sync);
   sync();
 })();

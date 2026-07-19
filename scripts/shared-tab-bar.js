@@ -26,6 +26,7 @@
     if (/(?:^|\/)pixiee-lens(?:\/|\/index\.html)?$/.test(path)) return 'camera';
     if (/(?:^|\/)(?:qr|qr-maker)(?:\/|\/index\.html)?$/.test(path)) return 'qr';
     if (/(?:^|\/)pixfind(?:\/|\/index\.html)?$/.test(path)) return 'pixfind';
+    if (/(?:^|\/)maoitu(?:\/|\/index\.html)?$/.test(path)) return 'maoitu';
     if (normalizedPath === basePath || path === `${basePath === '/' ? '' : basePath}/index.html`) return 'home';
     return 'default';
   }
@@ -142,10 +143,8 @@
       return {
         actions: [
           { id: 'file', label: '画像を読み込む', selector: '#pixelArtBtn', cloneIcon: true, mirrorState: true },
-          { id: 'stamp', label: 'スタンプ', selector: '#stampBtn', cloneIcon: true, mirrorState: true },
-          { id: 'clear', label: '画像・スタンプを消す', selector: '#clearPixelBtn', cloneIcon: true, mirrorState: true, mirrorVisibility: true },
-          { id: 'dots', label: 'ドット設定', selector: '#dotModeBtn', cloneIcon: true, mirrorState: true },
-          { id: 'color', label: 'カラー', selector: '#paletteMenuBtn', cloneIcon: true, mirrorState: true },
+          { id: 'clear', label: '読み込みを取り消す', selector: '#clearPixelBtn', cloneIcon: true, mirrorState: true, mirrorVisibility: true },
+          { id: 'dots', label: 'ドット・色設定', selector: '#dotModeBtn', cloneIcon: true, mirrorState: true },
           { id: 'camera-switch', label: 'カメラ切り替え', selector: '#cameraActionBtn', cloneIcon: true, mirrorState: true },
           { id: 'settings', label: 'カメラ設定', selector: '#cameraSettingsBtn', cloneIcon: true, mirrorState: true, placement: 'trailing' },
         ],
@@ -163,7 +162,16 @@
         actions: [
           { id: 'play', label: '遊ぶ', selector: '#startButton', icon: 'icon/icon-192-2.png' },
           { id: 'create', label: '作る', selector: '#createButton', icon: 'assets/icons/File.png?v=2026.07.19-ui-icons1' },
-          { id: 'fullscreen', label: '全画面', selector: '#fullscreenButton', mirrorState: true, placement: 'trailing' },
+          { id: 'fullscreen', label: '拡大', selector: '#fullscreenButton', icon: '拡大.png', iconWhenPressed: '縮小.png', mirrorState: true, mode: 'fullscreen', fullscreenController: 'game', placement: 'leading' },
+        ],
+        details: buildSupportDetails({ includeUpdates: true }),
+      };
+    }
+    if (kind === 'maoitu') {
+      return {
+        actions: [
+          { id: 'play', label: '遊ぶ', selector: '#playBtn', cloneIcon: true },
+          { id: 'fullscreen', label: '拡大', selector: '#fullscreenButton', icon: '拡大.png', iconWhenPressed: '縮小.png', mirrorState: true, mode: 'fullscreen', fullscreenController: 'tool', placement: 'leading' },
         ],
         details: buildSupportDetails({ includeUpdates: true }),
       };
@@ -414,10 +422,12 @@
   }
 
   function renderActions(currentUi) {
-    const contextualActions = state.actions.filter((item) => item?.id !== 'reload' && item?.placement !== 'trailing');
+    const leadingActions = state.actions.filter((item) => item?.placement === 'leading');
+    const contextualActions = state.actions.filter((item) => item?.id !== 'reload' && item?.placement !== 'leading' && item?.placement !== 'trailing');
     const trailingActions = state.actions.filter((item) => item?.placement === 'trailing');
     currentUi.leadingActions.replaceChildren(
       createActionControl(state.reloadAction, 'pixieed-common-tabbar__button'),
+      ...leadingActions.map((item) => createActionControl(item, 'pixieed-common-tabbar__button')),
     );
     currentUi.actions.replaceChildren(...contextualActions.map((item) => (
       createActionControl(item, 'pixieed-common-tabbar__button')
@@ -450,6 +460,15 @@
     if (item.mode === 'reload') {
       window.location.reload();
       return;
+    }
+    if (item.mode === 'fullscreen') {
+      const controller = item.fullscreenController === 'game'
+        ? window.PiXiEEDGameFullscreen
+        : window.PiXiEEDToolFullscreen;
+      if (typeof controller?.toggle === 'function') {
+        controller.toggle();
+        return;
+      }
     }
     const target = item.selector ? document.querySelector(item.selector) : null;
     if (!(target instanceof HTMLElement)) return;
@@ -501,6 +520,11 @@
         const nextIcon = cloneTargetIcon(item.selector);
         const currentIcon = control.querySelector('.pixieed-common-tabbar__icon');
         if (nextIcon && currentIcon) currentIcon.replaceWith(nextIcon);
+      }
+      if (item.iconWhenPressed) {
+        const icon = control.querySelector('img.pixieed-common-tabbar__icon');
+        const pressed = target.getAttribute('aria-pressed') === 'true';
+        if (icon) icon.src = href(pressed ? item.iconWhenPressed : item.icon);
       }
       if (item.mirrorVisibility) {
         control.hidden = target.hidden || target.getAttribute('aria-hidden') === 'true';
