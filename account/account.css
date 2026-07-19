@@ -495,6 +495,7 @@ body[data-pixieed-account-auth="signed-in"] .account-panel[data-account-tab="set
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
 }
+.account-card-actions--listing { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .account-card-actions--single { grid-template-columns: 1fr; }
 
 .account-card-action {
@@ -516,6 +517,9 @@ body[data-pixieed-account-auth="signed-in"] .account-panel[data-account-tab="set
 .account-card-action:focus-visible { border-color: rgba(121,192,255,.72); background: rgba(121,192,255,.17); }
 .account-card-action:disabled { cursor: not-allowed; opacity: .46; }
 .account-card-action--primary { background: #19345c; color: #fff; }
+.account-card-action--danger { border-color: rgba(248,113,113,.4); background: rgba(127,29,29,.22); color: #fecaca; }
+.account-card-action--danger:hover,
+.account-card-action--danger:focus-visible { border-color: rgba(248,113,113,.78); background: rgba(127,29,29,.4); }
 
 .account-listing-card__status {
   position: absolute;
@@ -531,6 +535,7 @@ body[data-pixieed-account-auth="signed-in"] .account-panel[data-account-tab="set
 }
 
 .account-listing-card__status.is-published { border-color: rgba(52,211,153,.45); color: #a7f3d0; }
+.account-listing-card__status.is-withdrawn { border-color: rgba(248,113,113,.55); color: #fecaca; }
 .account-share-status { margin: 0; color: #a7f3d0; font-size: 10px; }
 .account-share-status:empty { display: none; }
 

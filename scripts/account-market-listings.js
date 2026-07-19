@@ -63,10 +63,19 @@
     list.replaceChildren(item);
   }
 
-  function createCard(entry) {
+  function withdrawalErrorMessage(error) {
+    const message = String(error?.message || '');
+    if (/active checkout/i.test(message)) {
+      return '購入手続き中の方がいるため、決済が完了または期限切れになってから再度お試しください。';
+    }
+    return '取り下げできませんでした。時間をおいて再度お試しください。';
+  }
+
+  function createCard(entry, client) {
     const id = String(entry?.id || '').trim();
     const titleText = String(entry?.title || '出品物');
     const published = entry?.status === 'published';
+    const withdrawn = published && Boolean(entry?.withdrawn_at);
     const publicUrl = asset(`../market/item.html?id=${encodeURIComponent(id)}`);
     const card = document.createElement('article');
     card.className = 'account-listing-card';
@@ -85,8 +94,8 @@
     image.draggable = false;
     image.dataset.marketProtectedMedia = 'true';
     const status = document.createElement('span');
-    status.className = `account-listing-card__status${published ? ' is-published' : ''}`;
-    status.textContent = STATUS_LABELS[entry?.status] || '確認中';
+    status.className = `account-listing-card__status${published && !withdrawn ? ' is-published' : ''}${withdrawn ? ' is-withdrawn' : ''}`;
+    status.textContent = withdrawn ? 'SOLD OUT' : (STATUS_LABELS[entry?.status] || '確認中');
     preview.append(image, status);
 
     const body = document.createElement('div');
@@ -103,7 +112,7 @@
     meta.append(price, date);
 
     const actions = document.createElement('div');
-    actions.className = 'account-card-actions';
+    actions.className = 'account-card-actions account-card-actions--listing';
     if (published) {
       const open = document.createElement('a');
       open.className = 'account-card-action account-card-action--primary';
@@ -135,6 +144,32 @@
       }, 1800);
     });
     actions.appendChild(share);
+    if (published && !withdrawn) {
+      const withdraw = document.createElement('button');
+      withdraw.className = 'account-card-action account-card-action--danger';
+      withdraw.type = 'button';
+      withdraw.textContent = '取り下げる';
+      withdraw.setAttribute('aria-label', `${titleText}を取り下げる`);
+      withdraw.addEventListener('click', async () => {
+        const confirmed = window.confirm(
+          `「${titleText}」を取り下げますか？\n\n商品はSOLD OUT表示になり、新規購入を停止します。購入済みの利用権、派生設定、報酬は維持されます。`
+        );
+        if (!confirmed) return;
+        withdraw.disabled = true;
+        withdraw.textContent = '取り下げ中';
+        if (shareStatus) shareStatus.textContent = `「${titleText}」を取り下げています。`;
+        const { error } = await client.rpc('market_withdraw_my_listing_v1', { input_asset_id: id });
+        if (error) {
+          withdraw.disabled = false;
+          withdraw.textContent = '取り下げる';
+          if (shareStatus) shareStatus.textContent = withdrawalErrorMessage(error);
+          return;
+        }
+        if (shareStatus) shareStatus.textContent = `「${titleText}」を取り下げ、SOLD OUTにしました。`;
+        await render(client);
+      });
+      actions.appendChild(withdraw);
+    }
     body.append(title, meta, actions);
     card.append(preview, body);
     return card;
@@ -161,7 +196,7 @@
       renderMessage('出品物はまだありません', '作品を商品として登録すると、ここへ並びます。');
       return;
     }
-    list.replaceChildren(...entries.map(createCard));
+    list.replaceChildren(...entries.map((entry) => createCard(entry, client)));
   }
 
   async function init() {

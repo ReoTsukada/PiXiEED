@@ -24,6 +24,7 @@
   }
 
   function isSoldOut(asset) {
+    if (asset?.withdrawn_at) return true;
     const quantity = Number(asset?.limited_quantity);
     return Number.isInteger(quantity) && quantity > 0 && Number(asset?.limited_sold_count || 0) >= quantity;
   }
@@ -49,7 +50,9 @@
       : '一般素材（画像・アニメーション）';
     const limitedQuantity = Number(asset.limited_quantity);
     const limitedSold = Math.max(0, Number(asset.limited_sold_count || 0));
-    $('itemAvailability').textContent = Number.isInteger(limitedQuantity) && limitedQuantity > 0
+    $('itemAvailability').textContent = asset.withdrawn_at
+      ? '出品者による取り下げ・売り切れ'
+      : Number.isInteger(limitedQuantity) && limitedQuantity > 0
       ? (isSoldOut(asset) ? `先着${limitedQuantity.toLocaleString('ja-JP')}名・売り切れ` : `先着${limitedQuantity.toLocaleString('ja-JP')}名・残り${Math.max(0, limitedQuantity - limitedSold).toLocaleString('ja-JP')}`)
       : '販売数の制限なし';
     $('itemPreviewFrame').classList.toggle('is-sold-out', isSoldOut(asset));
@@ -159,10 +162,10 @@
       window.location.assign(data.url);
     } catch (error) {
       if (/sold out|売り切れ/i.test(error?.message || '')) {
-        currentAsset.limited_sold_count = currentAsset.limited_quantity;
+        currentAsset.withdrawn_at = currentAsset.withdrawn_at || new Date().toISOString();
         $('itemPreviewFrame').classList.add('is-sold-out');
         $('itemSoldOut').hidden = false;
-        setPurchaseState({ disabled: true, label: 'SOLD OUT', status: '限定数に達したため売り切れました。' });
+        setPurchaseState({ disabled: true, label: 'SOLD OUT', status: 'この商品は売り切れました。商品情報は引き続き閲覧できます。' });
         return;
       }
       setPurchaseState({
@@ -216,6 +219,16 @@
         setPurchaseState({ disabled: true, label: '確認中', status: 'この購入は支払い確認中のため、再購入できません。' });
         return;
       }
+      if (isSoldOut(currentAsset)) {
+        setPurchaseState({
+          disabled: true,
+          label: 'SOLD OUT',
+          status: currentAsset.withdrawn_at
+            ? '出品者により取り下げられました。購入済みの利用権と派生関係は維持されます。'
+            : '限定数に達したため売り切れました。商品情報は引き続き閲覧できます。'
+        });
+        return;
+      }
       const { data: isAdmin, error: adminError } = await purchaseClient.rpc('market_current_user_is_admin');
       if (!adminError && isAdmin === true) {
         setPurchaseState({
@@ -228,10 +241,6 @@
       }
       if (Number(currentAsset.sale_price_yen || 0) < 500) {
         setPurchaseState({ disabled: true, label: '販売停止中', status: '現在の最低販売価格500円を下回るため購入できません。' });
-        return;
-      }
-      if (isSoldOut(currentAsset)) {
-        setPurchaseState({ disabled: true, label: 'SOLD OUT', status: '限定数に達したため売り切れました。商品情報は引き続き閲覧できます。' });
         return;
       }
       if (currentAsset.creator_user_id === purchaseUser.id) {

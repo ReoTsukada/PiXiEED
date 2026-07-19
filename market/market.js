@@ -38,6 +38,7 @@
   }
 
   function isSoldOut(asset) {
+    if (asset?.withdrawn_at) return true;
     const quantity = Number(asset?.limited_quantity);
     return Number.isInteger(quantity) && quantity > 0 && Number(asset?.limited_sold_count || 0) >= quantity;
   }
@@ -118,7 +119,10 @@
     if (asset.series?.derivative_sales_allowed === true) {
       const allowed = document.createElement('span'); allowed.className = 'is-derivative-ok'; allowed.textContent = '改変・素材再販売OK'; stats.appendChild(allowed);
     }
-    if (Number.isInteger(Number(asset.limited_quantity)) && Number(asset.limited_quantity) > 0) {
+    if (asset.withdrawn_at) {
+      const withdrawn = document.createElement('span'); withdrawn.className = 'is-sold-out'; withdrawn.textContent = '出品取り下げ・売り切れ';
+      stats.appendChild(withdrawn);
+    } else if (Number.isInteger(Number(asset.limited_quantity)) && Number(asset.limited_quantity) > 0) {
       const limited = document.createElement('span'); limited.className = isSoldOut(asset) ? 'is-sold-out' : 'is-limited';
       const remaining = Math.max(0, Number(asset.limited_quantity) - Number(asset.limited_sold_count || 0));
       limited.textContent = isSoldOut(asset) ? '限定・売り切れ' : `先着${Number(asset.limited_quantity).toLocaleString('ja-JP')}名・残り${remaining.toLocaleString('ja-JP')}`;

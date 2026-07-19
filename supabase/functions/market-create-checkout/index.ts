@@ -53,7 +53,7 @@ serve(async (request) => {
 
     const { data: purchase, error: purchaseError } = await admin
       .from("market_purchases")
-      .select("id,buyer_user_id,status,gross_amount_yen,provider_checkout_session_id,expires_at,asset:market_assets!market_purchases_asset_id_fkey(id,title,status,creator_user_id)")
+      .select("id,buyer_user_id,status,gross_amount_yen,provider_checkout_session_id,expires_at,asset:market_assets!market_purchases_asset_id_fkey(id,title,status,creator_user_id,withdrawn_at)")
       .eq("id", purchaseId)
       .single();
     if (purchaseError) throw purchaseError;
@@ -71,7 +71,7 @@ serve(async (request) => {
     }
 
     const asset = Array.isArray(purchase.asset) ? purchase.asset[0] : purchase.asset;
-    if (!asset || asset.status !== "published") throw new Error("この商品は現在購入できません");
+    if (!asset || asset.status !== "published" || asset.withdrawn_at) throw new Error("この商品は売り切れました");
     const expiresAt = Math.max(Math.floor(Date.now() / 1000) + 1800, Math.floor(new Date(purchase.expires_at).getTime() / 1000));
     const base = siteUrl();
     const params = new URLSearchParams();
