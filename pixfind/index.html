@@ -400,11 +400,15 @@
 </div>
 </div>
 <div class="creator-files">
-<label class="creator-file">お手本画像
-<input accept="image/png,image/jpeg,image/webp" id="creatorOriginalInput" type="file"/>
+<label class="creator-file creator-dropzone" id="creatorOriginalDropzone">
+<input accept="image/png,image/jpeg,image/webp" class="creator-file__input" id="creatorOriginalInput" type="file"/>
+<span class="creator-file__title">お手本画像を追加</span>
+<span class="creator-file__hint">クリック／タップ、またはここへドロップ</span>
 </label>
-<label class="creator-file"><span id="creatorDiffLabelText">間違い画像</span>
-<input accept="image/png,image/jpeg,image/webp" id="creatorDiffInput" type="file"/>
+<label class="creator-file creator-dropzone" id="creatorDiffDropzone">
+<input accept="image/png,image/jpeg,image/webp" class="creator-file__input" id="creatorDiffInput" type="file"/>
+<span class="creator-file__title" id="creatorDiffLabelText">間違い画像を追加</span>
+<span class="creator-file__hint">クリック／タップ、またはここへドロップ</span>
 </label>
 </div>
 </div>
