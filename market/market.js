@@ -91,9 +91,10 @@
     const previewLink = document.createElement('a'); previewLink.href = href;
     previewLink.setAttribute('aria-label', `${asset.title || '名称未設定の素材'}の商品詳細`);
     const image = new Image();
-    image.src = asset.local_test === true && asset.preview_object_path
-      ? asset.preview_object_path
-      : (/^https?:\/\//i.test(asset.preview_object_path || '') ? asset.preview_object_path : fallbackIcon);
+    const previewUrl = asset.preview_url || asset.preview_object_path;
+    image.src = asset.local_test === true && previewUrl
+      ? previewUrl
+      : (/^https?:\/\//i.test(previewUrl || '') ? previewUrl : fallbackIcon);
     image.alt = ''; image.draggable = false; image.dataset.marketProtectedMedia = 'true'; previewLink.appendChild(image); preview.appendChild(previewLink);
     if (isSoldOut(asset)) {
       const soldOut = document.createElement('span'); soldOut.className = 'market-card__soldout'; soldOut.textContent = 'SOLD OUT';
@@ -151,6 +152,17 @@
     grid.replaceChildren(...children);
   }
 
+  async function loadPreviewUrls(client, remoteAssets) {
+    const assetIds = remoteAssets.map((asset) => String(asset?.id || '')).filter(Boolean);
+    if (!assetIds.length) return;
+    const { data, error } = await client.functions.invoke('market-public-preview', { body: { asset_ids: assetIds } });
+    if (error || !data?.previews || typeof data.previews !== 'object') return;
+    remoteAssets.forEach((asset) => {
+      const previewUrl = data.previews[asset.id];
+      if (typeof previewUrl === 'string' && /^https?:\/\//i.test(previewUrl)) asset.preview_url = previewUrl;
+    });
+  }
+
   async function loadAssets() {
     const access = window.PiXiEEDDevAccess
       ? await window.PiXiEEDDevAccess.check()
@@ -166,6 +178,7 @@
       const { data, error } = await access.client.rpc('market_public_catalog_v1', { input_limit: 120 });
       if (error) throw error;
       const remoteAssets = Array.isArray(data) ? data : [];
+      await loadPreviewUrls(access.client, remoteAssets);
       const localIds = new Set(localTestProducts.map((asset) => asset.id));
       assets = [...localTestProducts, ...remoteAssets.filter((asset) => !localIds.has(asset.id))];
     } catch (_error) {

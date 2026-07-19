@@ -1543,16 +1543,14 @@
       color: rgba(255, 255, 255, 0.5);
     }
     .icon-button--ghost {
+      display: none;
       background: transparent;
       border-color: transparent;
       box-shadow: none;
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 0.18s ease, background 0.18s ease, border-color 0.18s ease;
     }
     .icon-button--ghost.is-visible {
+      display: inline-flex;
       pointer-events: auto;
-      opacity: 1;
       background: rgba(123, 207, 255, 0.2);
       border-color: rgba(123, 207, 255, 0.35);
       box-shadow: 0 12px 32px rgba(0, 0, 0, 0.32);
@@ -1798,6 +1796,12 @@
     .control-icon path {
       fill: currentColor;
       opacity: 0.88;
+    }
+    .control-icon--native-pixel {
+      width: 21px;
+      height: 21px;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
     }
     .visually-hidden {
       position: absolute;
@@ -2291,22 +2295,7 @@
 <div class="hud-top__bar">
 <div aria-label="ドット絵コントロール" class="hud-top__actions" role="group">
 <button aria-label="画像を読み込む" class="icon-button" id="pixelArtBtn" type="button">
-<svg aria-hidden="true" class="control-icon" shape-rendering="crispEdges" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-<rect fill="#FFFFFF" height="1" width="14" x="1" y="0"></rect>
-<rect fill="#FFFFFF" height="1" width="2" x="0" y="1"></rect>
-<rect fill="#FFFFFF" height="1" width="2" x="14" y="1"></rect>
-<rect fill="#FFFFFF" height="21" width="1" x="0" y="2"></rect>
-<rect fill="#FFFFFF" height="2" width="1" x="15" y="2"></rect>
-<rect fill="#FFFFFF" height="1" width="7" x="16" y="3"></rect>
-<rect fill="#FFFFFF" height="1" width="2" x="22" y="4"></rect>
-<rect fill="#FFFFFF" height="18" width="1" x="23" y="5"></rect>
-<rect fill="#FFFFFF" height="1" width="22" x="1" y="9"></rect>
-<rect fill="#FFFFFF" height="1" width="1" x="1" y="10"></rect>
-<rect fill="#FFFFFF" height="1" width="1" x="22" y="10"></rect>
-<rect fill="#FFFFFF" height="2" width="1" x="1" y="22"></rect>
-<rect fill="#FFFFFF" height="2" width="1" x="22" y="22"></rect>
-<rect fill="#FFFFFF" height="1" width="20" x="2" y="23"></rect>
-</svg>
+<img alt="" aria-hidden="true" class="control-icon control-icon--native-pixel" draggable="false" src="../File.png?v=2026.07.19-ui-icons1"/>
 <span class="icon-button__label visually-hidden">画像を読み込む</span>
 </button>
 <button aria-controls="stampPanel" aria-expanded="false" aria-label="スタンプを開く" class="icon-button" id="stampBtn" type="button">
@@ -2400,7 +2389,7 @@
 <span class="icon-button__label visually-hidden">再接続</span>
 </button>
 <button aria-controls="cameraSettingsPanel" aria-expanded="false" aria-label="カメラ設定" class="icon-button" id="cameraSettingsBtn" type="button">
-<img alt="" aria-hidden="true" class="control-icon" src="./icon-setting.svg"/>
+<img alt="" aria-hidden="true" class="control-icon control-icon--native-pixel" draggable="false" src="../assets/icons/Settings.png?v=2026.07.19-icons2"/>
 <span class="icon-button__label visually-hidden">カメラ設定</span>
 </button>
 </div>

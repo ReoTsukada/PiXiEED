@@ -406,6 +406,23 @@
           logAdSlot('skip', slot, { owner }, 'already-initialized-by-adsense');
           return { ok: true, pushed: false, reason: 'already-initialized-by-adsense' };
         }
+        if (slot.dataset.pixiedAdRetryCount !== '1'
+          && slot.dataset.pixiedAdRetryScheduled !== '1'
+          && !slot.getAttribute('data-ad-status')
+          && !slot.getAttribute('data-adsbygoogle-status')) {
+          slot.dataset.pixiedAdRetryCount = '1';
+          slot.dataset.pixiedAdRetryScheduled = '1';
+          window.setTimeout(() => {
+            delete slot.dataset.pixiedAdRetryScheduled;
+            if (!slot.isConnected
+              || slot.getAttribute('data-ad-status')
+              || slot.getAttribute('data-adsbygoogle-status')
+              || !isSlotVisible(slot)) {
+              return;
+            }
+            renderAdSlot(slot, { ...options, owner, reason: 'one-safe-retry' });
+          }, 5000);
+        }
         logAdSlot('error', slot, { owner }, message);
         return { ok: false, pushed: false, reason: 'push-failed' };
       } finally {
@@ -857,7 +874,7 @@
 <span class="tool-group-label">仮想カーソル</span>
 </button>
 <button aria-label="小窓プレビュー" aria-pressed="false" class="tool-group-button tool-group-button--action" data-ui-action="floatingPreviewToggle" title="小窓プレビュー" type="button">
-<img alt="" aria-hidden="true" class="tool-group-icon" height="20" src="assets/icons/action-preview.svg" width="20"/>
+<img alt="" aria-hidden="true" class="tool-group-icon" height="21" src="../assets/icons/Preview.png?v=2026.07.19-icons2" width="21"/>
 <span class="tool-group-label">小窓プレビュー</span>
 </button>
 </div>

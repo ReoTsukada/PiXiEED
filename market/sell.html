@@ -18,7 +18,7 @@
         <p>親作品と派生出品権は固定されています。この出品を大元作品へ変更することはできません。</p>
       </section>
       <fieldset class="market-form-section" id="listingFilesSection">
-        <legend><span class="market-heading-with-help">出品ファイル<span class="market-help-tip" data-market-help><button class="market-help-tip__button" type="button" aria-label="出品ファイルについて" aria-describedby="sellFilesHelp" aria-expanded="false">?</button><span class="market-help-tip__content" id="sellFilesHelp" role="tooltip">1商品に含めるファイルやフォルダをまとめて追加します。元ファイルは非公開領域へ保存され、購入前にはサムネイルと試し見せ画像だけを表示します。</span></span></span></legend>
+        <legend><span class="market-heading-with-help">出品ファイル<span class="market-help-tip" data-market-help><button class="market-help-tip__button" type="button" aria-label="出品ファイルについて" aria-describedby="sellFilesHelp" aria-expanded="false">?</button><span class="market-help-tip__content" id="sellFilesHelp" role="tooltip">1商品に含めるファイルやフォルダをまとめて追加します。元ファイルは非公開領域へ保存され、購入前にはサムネイルと購入前プレビューだけを表示します。</span></span></span></legend>
         <div class="market-drop-zone" id="listingDropZone" role="button" tabindex="0" aria-label="ファイルまたはフォルダを追加">
           <strong>ここへファイル・フォルダをドロップ</strong>
           <span>または下のボタンから選択</span>
@@ -40,8 +40,8 @@
         <div id="listingFormatSwitches" class="market-switch-list"></div>
       </fieldset>
       <fieldset class="market-form-section" id="listingPreviewSection" hidden>
-        <legend><span class="market-heading-with-help">サムネイル・試し見せ<span class="market-help-tip" data-market-help><button class="market-help-tip__button" type="button" aria-label="公開プレビューについて" aria-describedby="sellPreviewHelp" aria-expanded="false">?</button><span class="market-help-tip__content" id="sellPreviewHelp" role="tooltip">サムネイルは一覧の代表画像、試し見せは購入前の確認画像です。元データそのものは公開せず、透かし付き画像を生成します。PiXiEEDrawファイルは埋め込みPNGプレビューを使います。</span></span></span></legend>
-        <p class="helper">サムネイルを1枚、試し見せを最大6枚選択できます。公開用には元ファイルではなく透かし付き確認画像を生成します。</p>
+        <legend><span class="market-heading-with-help">サムネイル・購入前プレビュー<span class="market-help-tip" data-market-help><button class="market-help-tip__button" type="button" aria-label="公開プレビューについて" aria-describedby="sellPreviewHelp" aria-expanded="false">?</button><span class="market-help-tip__content" id="sellPreviewHelp" role="tooltip">サムネイルは一覧の代表画像、購入前プレビューは購入前に内容を確認する画像です。元データそのものは公開せず、透かし付き画像を生成します。PiXiEEDrawファイルは埋め込みPNGプレビューを使います。</span></span></span></legend>
+        <p class="helper">サムネイルを1枚、購入前プレビューを最大6枚選択できます。公開用には元ファイルではなく透かし付き確認画像を生成します。</p>
         <div id="listingPreviewGrid" class="market-preview-grid"></div>
         <button id="listingOpenViewMode" class="market-file-button is-subtle" type="button">購入者の視聴モードを確認</button>
       </fieldset>

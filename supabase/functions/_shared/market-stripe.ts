@@ -16,7 +16,7 @@ export function corsHeaders(request: Request): HeadersInit {
   const origin = request.headers.get("origin") || "";
   return {
     "access-control-allow-origin": ALLOWED_ORIGINS.has(origin) ? origin : "https://pixieed.jp",
-    "access-control-allow-headers": "authorization, x-client-info, apikey, content-type",
+    "access-control-allow-headers": "authorization, x-client-info, x-client-id, apikey, content-type",
     "access-control-allow-methods": "POST, OPTIONS",
     vary: "Origin",
   };

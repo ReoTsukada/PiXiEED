@@ -65,10 +65,8 @@ const includeEntries = [
   'site',
   'sitemap.xml',
   'styles.css',
-  'setting.png',
   'terms',
   'Undo.png',
-  'Word.png',
   '詳細.png'
 ];
 

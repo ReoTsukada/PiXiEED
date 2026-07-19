@@ -8,6 +8,7 @@ const dom = {
   gameBackButton: document.getElementById('gameBackButton'),
   backToTitleButton: document.getElementById('backButton'),
   resetButton: document.getElementById('resetButton'),
+  fullscreenButton: document.getElementById('fullscreenButton'),
   deletePuzzleButton: document.getElementById('deletePuzzleButton'),
   difficultyChips: Array.from(document.querySelectorAll('[data-difficulty]')),
   modeChips: Array.from(document.querySelectorAll('[data-game-mode]')),
@@ -539,6 +540,13 @@ async function init() {
     if (!state.currentPuzzle) return;
     resetRound();
   });
+
+  dom.fullscreenButton?.addEventListener('click', () => {
+    toggleGameFullscreen();
+  });
+
+  document.addEventListener('fullscreenchange', handleFullscreenChange);
+  document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
 
   dom.deletePuzzleButton?.addEventListener('click', () => {
     handleDeleteCurrentPuzzle();
@@ -2598,6 +2606,7 @@ function setActiveScreen(target) {
     dom.app?.classList.toggle('is-hidden-object-mode', isHiddenObjectMode());
     document.body.classList.add('is-playing');
     requestAnimationFrame(() => {
+      updateGameFrameSize();
       fitCanvasesToFrame();
       clearMarkers();
       state.differences.filter(region => region.found).forEach(region => renderMarker(region));
@@ -2954,6 +2963,9 @@ async function handleDeleteCurrentPuzzle() {
 function prepareGameBoard(originalImage, challengeImage, diffResult, metadata = null) {
   const activeMode = normalizeGameMode(metadata?.mode ?? state.currentMode);
   state.imageSize = { width: originalImage.width, height: originalImage.height };
+  if (dom.app && originalImage.width > 0 && originalImage.height > 0) {
+    dom.app.style.setProperty('--game-image-ratio', String(originalImage.width / originalImage.height));
+  }
   const orderedRegions = [...diffResult.regions].sort((a, b) => (
     a.minY - b.minY || a.minX - b.minX
   ));
@@ -3079,8 +3091,81 @@ function fitCanvasesToFrame() {
   refreshZoomBounds();
 }
 
+function updateGameFrameSize() {
+  if (!dom.app || !state.imageSize.width || !state.imageSize.height) return;
+  const isLandscape = window.matchMedia?.('(orientation: landscape)').matches;
+  if (!isLandscape) {
+    dom.app.style.removeProperty('--game-frame-width');
+    dom.app.style.removeProperty('--game-frame-height');
+    return;
+  }
+  const visibleStage = isHiddenObjectMode()
+    ? document.querySelector('.game-layout .stage--challenge')
+    : document.querySelector('.game-layout .stage--original');
+  if (!visibleStage) return;
+  const stageWidth = visibleStage.clientWidth;
+  const stageHeight = visibleStage.clientHeight;
+  const ratio = state.imageSize.width / state.imageSize.height;
+  if (!stageWidth || !stageHeight || !Number.isFinite(ratio) || ratio <= 0) return;
+  const width = Math.max(1, Math.floor(Math.min(stageWidth, stageHeight * ratio)));
+  const height = Math.max(1, Math.floor(width / ratio));
+  dom.app.style.setProperty('--game-frame-width', `${width}px`);
+  dom.app.style.setProperty('--game-frame-height', `${height}px`);
+}
+
+function getFullscreenElement() {
+  return document.fullscreenElement || document.webkitFullscreenElement || null;
+}
+
+function updateFullscreenButton() {
+  const active = getFullscreenElement() === dom.app;
+  if (!dom.fullscreenButton) return;
+  const label = active ? '全画面を終了' : '全画面';
+  dom.fullscreenButton.textContent = label;
+  dom.fullscreenButton.setAttribute('aria-label', label);
+  dom.fullscreenButton.title = label;
+  dom.fullscreenButton.setAttribute('aria-pressed', String(active));
+}
+
+async function toggleGameFullscreen() {
+  if (!dom.app) return;
+  try {
+    if (getFullscreenElement()) {
+      if (document.exitFullscreen) {
+        await document.exitFullscreen();
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      }
+      return;
+    }
+    if (dom.app.requestFullscreen) {
+      await dom.app.requestFullscreen();
+    } else if (dom.app.webkitRequestFullscreen) {
+      dom.app.webkitRequestFullscreen();
+    } else {
+      setHint('このブラウザでは全画面表示を利用できません。');
+    }
+  } catch (error) {
+    console.warn('fullscreen request failed', error);
+    setHint('全画面表示を開始できませんでした。');
+  }
+}
+
+function handleFullscreenChange() {
+  updateFullscreenButton();
+  requestAnimationFrame(() => {
+    setViewportVars();
+    updateGameFrameSize();
+    fitCanvasesToFrame();
+    clearMarkers();
+    state.differences.filter(region => region.found).forEach(region => renderMarker(region));
+    paintAllMissMarkers();
+  });
+}
+
 window.addEventListener('resize', () => {
   setViewportVars();
+  updateGameFrameSize();
   fitCanvasesToFrame();
   clearMarkers();
   state.differences.filter(region => region.found).forEach(region => renderMarker(region));
@@ -3128,6 +3213,13 @@ function resetRound() {
 }
 
 function leaveGame(targetScreen) {
+  if (getFullscreenElement()) {
+    if (document.exitFullscreen) {
+      document.exitFullscreen().catch(() => {});
+    } else if (document.webkitExitFullscreen) {
+      document.webkitExitFullscreen();
+    }
+  }
   stopTimer();
   window.PiXiEEDCreatorPlayRewards?.stop();
   clearMarkers();

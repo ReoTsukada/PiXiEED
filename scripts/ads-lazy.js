@@ -9,6 +9,7 @@
   if (window.pixieedObserveAds) return;
 
   const DEFAULT_INLINE_SLOT = '9073878884';
+  const SAFE_RETRY_DELAY_MS = 5000;
   const PAGE_SLOT_BY_PATH = Object.freeze({
     '/projects/pixiedraw/': '9073878884',
     '/projects/pixiee-lens/': '2261515379',
@@ -263,11 +264,31 @@
     else if (ins.getAttribute('data-adsbygoogle-status') === 'done') ins.dataset.adsRequestState = 'requested';
   }
 
+  function scheduleOneSafeRetry(ins) {
+    if (!(ins instanceof HTMLElement)
+      || ins.dataset.adsRetryCount === '1'
+      || ins.dataset.adsRetryScheduled === '1'
+      || isReady(ins)
+      || ins.getAttribute('data-ad-status')) {
+      return;
+    }
+    ins.dataset.adsRetryCount = '1';
+    ins.dataset.adsRetryScheduled = '1';
+    window.setTimeout(() => {
+      delete ins.dataset.adsRetryScheduled;
+      if (!ins.isConnected || isReady(ins) || ins.getAttribute('data-ad-status')) return;
+      delete ins.dataset.adsLazyLoaded;
+      delete ins.dataset.adsScriptBlocked;
+      delete ins.dataset.adsRequestState;
+      loadAd(ins);
+    }, SAFE_RETRY_DELAY_MS);
+  }
+
   async function loadAd(ins) {
     if (!(ins instanceof HTMLElement)) return;
     syncAdOutcome(ins);
     if (['pending', '1'].includes(ins.dataset.adsLazyLoaded)
-      || ['requested', 'filled', 'unfilled', 'optimized', 'push-failed'].includes(ins.dataset.adsRequestState)
+      || ['requested', 'filled', 'unfilled', 'optimized', 'push-failed', 'retry-scheduled'].includes(ins.dataset.adsRequestState)
       || isReady(ins)) return;
     if (ins.dataset.adsScriptBlocked === '1') return;
     if (!isRenderable(ins)) {
@@ -282,6 +303,8 @@
     } catch (_error) {
       ins.dataset.adsLazyLoaded = '';
       ins.dataset.adsScriptBlocked = '1';
+      ins.dataset.adsRequestState = 'retry-scheduled';
+      scheduleOneSafeRetry(ins);
       return;
     }
     window.requestAnimationFrame(() => {
@@ -300,7 +323,9 @@
             syncAdOutcome(ins);
             return;
           }
-          ins.dataset.adsRequestState = 'push-failed';
+          ins.dataset.adsRequestState = 'retry-scheduled';
+          delete ins.dataset.adsLazyLoaded;
+          scheduleOneSafeRetry(ins);
         }
       });
     });

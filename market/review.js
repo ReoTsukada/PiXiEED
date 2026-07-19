@@ -50,7 +50,7 @@
       if (error || !data?.signedUrl) return window.alert('確認用URLを作成できませんでした');
       window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
     })));
-    samplePreviewPaths.forEach((path, index) => actions.append(button(`試し見せ ${index + 1}を確認`, async () => {
+    samplePreviewPaths.forEach((path, index) => actions.append(button(`購入前プレビュー ${index + 1}を確認`, async () => {
       const { data, error } = await client.storage.from('market-private').createSignedUrl(path, 60);
       if (error || !data?.signedUrl) return window.alert('確認用URLを作成できませんでした');
       window.open(data.signedUrl, '_blank', 'noopener,noreferrer');

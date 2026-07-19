@@ -34,6 +34,7 @@
     const {
       guideLabel = '',
       guidePath = '',
+      guideIcon = 'help.png?v=2026.07.17-icons1',
       includeMarketHelp = false,
       includeUpdates = false,
     } = options;
@@ -41,20 +42,20 @@
       { label: 'QR', path: 'qr/index.html', icon: 'QR.png' },
     ];
     if (guideLabel && guidePath) {
-      items.push({ label: guideLabel, path: guidePath, icon: 'help.png?v=2026.07.17-icons1' });
+      items.push({ label: guideLabel, path: guidePath, icon: guideIcon });
     }
     items.push({ label: 'ヘルプ', path: 'help/index.html', icon: 'help.png?v=2026.07.17-icons1' });
     if (includeMarketHelp) {
       items.push({ label: 'マーケットヘルプ', path: 'market/help.html', icon: 'help.png?v=2026.07.17-icons1' });
     }
     if (includeUpdates) {
-      items.push({ label: '開発ノート', path: 'notes/index.html', icon: 'pixiedraw/assets/icons/action-preview.svg' });
+      items.push({ label: '開発ノート', path: 'notes/index.html', icon: 'assets/icons/Development-Notes.png?v=2026.07.19-icons2' });
     }
     items.push(
-      { label: '用語集', path: 'glossary/index.html', icon: 'Word.png?v=2026.07.17-icons1' },
+      { label: '用語集', path: 'glossary/index.html', icon: 'assets/icons/Word.png?v=2026.07.19-icons2' },
       { label: 'お問い合わせ', path: 'contact/index.html', icon: 'pixiedraw/assets/icons/talk.png' },
-      { label: '利用規約', path: 'terms/index.html', icon: 'File.png?v=2026.07.19-ui-icons1' },
-      { label: 'プライバシー', path: 'privacy/index.html', icon: 'pixiedraw/assets/icons/action-visibility-on.svg' },
+      { label: '利用規約', path: 'terms/index.html', icon: 'assets/icons/Terms.png?v=2026.07.19-icons1' },
+      { label: 'プライバシー', path: 'privacy/index.html', icon: 'assets/icons/Privacy-Policy.png?v=2026.07.19-icons2' },
     );
     return items;
   }
@@ -92,7 +93,7 @@
       return {
         actions: [
           { id: 'file', label: 'ファイル', selector: '[data-quick-right-tab="file"]', icon: 'File.png?v=2026.07.19-ui-icons1' },
-          { id: 'settings', label: '設定', selector: '[data-quick-right-tab="settings"]', icon: 'setting.png?v=2026.07.19-ui-icons1' },
+          { id: 'settings', label: '設定', selector: '[data-quick-right-tab="settings"]', icon: 'assets/icons/Settings.png?v=2026.07.19-icons2' },
           { id: 'camera', label: 'カメラ', selector: '[data-ui-action="openLensCamera"]', icon: 'Camera.png', gapBefore: true },
           { id: 'qr', label: 'QR編集', selector: '[data-ui-action="openQrEditor"]', icon: 'QR.png' },
           { id: 'undo', label: '元に戻す', selector: '#undoAction', icon: 'Undo.png?v=2026.07.19-ui-icons1', mirrorDisabled: true, placement: 'trailing' },
@@ -114,12 +115,12 @@
           { id: 'purchases', label: '購入済み', path: 'account/index.html#marketPurchaseList', icon: 'bought.png?v=2026.07.17-icons1' },
         ],
         details: [
-          { label: 'マーケットとは', path: 'market/about.html' },
+          { label: 'マーケットとは', path: 'market/about.html', icon: 'Market.png?v=2026.07.19-ui-icons1' },
           { label: 'ヘルプ', path: 'help/index.html', icon: 'help.png?v=2026.07.17-icons1' },
           { label: 'マーケットヘルプ', path: 'market/help.html', icon: 'help.png?v=2026.07.17-icons1' },
           { label: 'お問い合わせ', path: 'contact/index.html', icon: 'pixiedraw/assets/icons/talk.png' },
-          { label: '利用規約', path: 'terms/index.html' },
-          { label: 'プライバシーポリシー', path: 'privacy/index.html' },
+          { label: '利用規約', path: 'terms/index.html', icon: 'assets/icons/Terms.png?v=2026.07.19-icons1' },
+          { label: 'プライバシーポリシー', path: 'privacy/index.html', icon: 'assets/icons/Privacy-Policy.png?v=2026.07.19-icons2' },
         ],
       };
     }
@@ -132,8 +133,8 @@
           { label: 'ヘルプ', path: 'help/index.html', icon: 'help.png?v=2026.07.17-icons1' },
           { label: 'アカウント削除', path: 'account-deletion/index.html', icon: 'pixiedraw/assets/icons/action-delete.svg' },
           { label: 'お問い合わせ', path: 'contact/index.html', icon: 'pixiedraw/assets/icons/talk.png' },
-          { label: '利用規約', path: 'terms/index.html', icon: 'File.png?v=2026.07.19-ui-icons1' },
-          { label: 'プライバシー', path: 'privacy/index.html', icon: 'pixiedraw/assets/icons/action-visibility-on.svg' },
+          { label: '利用規約', path: 'terms/index.html', icon: 'assets/icons/Terms.png?v=2026.07.19-icons1' },
+          { label: 'プライバシー', path: 'privacy/index.html', icon: 'assets/icons/Privacy-Policy.png?v=2026.07.19-icons2' },
         ],
       };
     }
@@ -153,10 +154,7 @@
     }
     if (kind === 'qr') {
       return {
-        actions: [
-          { id: 'draw', label: 'Draw', path: 'pixiedraw/index.html', icon: 'Draw.png?v=2026.07.19-ui-icons1' },
-          { id: 'camera', label: 'カメラ', path: 'pixiee-lens/index.html', icon: 'Camera.png' },
-        ],
+        actions: [],
         details: buildSupportDetails({ guideLabel: 'QRの使い方', guidePath: 'projects/qr-maker/' }),
       };
     }
@@ -165,18 +163,18 @@
         actions: [
           { id: 'play', label: '遊ぶ', selector: '#startButton', icon: 'icon/icon-192-2.png' },
           { id: 'create', label: '作る', selector: '#createButton', icon: 'File.png?v=2026.07.19-ui-icons1' },
+          { id: 'fullscreen', label: '全画面', selector: '#fullscreenButton', mirrorState: true, placement: 'trailing' },
         ],
         details: buildSupportDetails({ includeUpdates: true }),
       };
     }
     if (kind === 'home') {
       return {
-        actions: [
-          { id: 'draw', label: 'Draw', path: 'pixiedraw/index.html', icon: 'Draw.png?v=2026.07.19-ui-icons1' },
-        ],
+        actions: [],
         details: buildSupportDetails({
           guideLabel: 'はじめての使い方',
           guidePath: 'projects/pixiedraw/',
+          guideIcon: 'assets/icons/Beginner.png?v=2026.07.19-icons1',
           includeMarketHelp: false,
           includeUpdates: true,
         }),

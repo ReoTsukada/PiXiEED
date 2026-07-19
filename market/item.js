@@ -57,10 +57,11 @@
     $('itemDerivative').textContent = series.derivative_sales_allowed
       ? 'OK（改変した素材を独立商品として再販売可能・系列ロイヤリティーあり）'
       : 'NG（利用・改変できる範囲でも、素材または改変素材として再販売できません）';
-    if (asset.local_test === true && asset.preview_object_path) {
-      $('itemPreview').src = asset.preview_object_path;
-    } else if (/^https?:\/\//i.test(asset.preview_object_path || '')) {
-      $('itemPreview').src = asset.preview_object_path;
+    const previewUrl = asset.preview_url || asset.preview_object_path;
+    if (asset.local_test === true && previewUrl) {
+      $('itemPreview').src = previewUrl;
+    } else if (/^https?:\/\//i.test(previewUrl || '')) {
+      $('itemPreview').src = previewUrl;
     }
     $('itemPreview').alt = `${asset.title || '商品'}のプレビュー`;
     $('itemAuthor').textContent = `作者: ${asset.creator_display_name || 'PiXiEEDクリエイター'}`;
@@ -282,6 +283,9 @@
       const { data: asset, error } = await purchaseClient.rpc('market_public_asset_v1', { input_asset_id: id });
       if (error) throw error;
       if (!asset) { $('itemStatus').textContent = 'この商品は公開されていないか、見つかりません。'; return; }
+      const { data: previewData } = await purchaseClient.functions.invoke('market-public-preview', { body: { asset_ids: [asset.id] } });
+      const previewUrl = previewData?.previews?.[asset.id];
+      if (typeof previewUrl === 'string' && /^https?:\/\//i.test(previewUrl)) asset.preview_url = previewUrl;
       await favorites?.prepare?.([asset]);
       render(asset);
       await initPurchase();

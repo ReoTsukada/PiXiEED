@@ -252,6 +252,7 @@
 <button class="button button--ghost button--compact" id="gameBackButton" type="button">問題選択</button>
 <button class="button button--ghost button--compact" id="backButton" type="button">タイトル</button>
 <button class="button button--primary button--compact" id="resetButton" type="button">もう一度</button>
+<button aria-pressed="false" hidden="" id="fullscreenButton" type="button">全画面</button>
 <button class="button button--ghost button--compact button--danger" id="deletePuzzleButton" type="button" hidden="">削除</button>
 </div>
 </div>
@@ -307,6 +308,81 @@
 </div>
 </div>
 </header>
+<section aria-labelledby="creatorGuideTitle" class="creator-guide">
+<div class="creator-guide__heading">
+<span class="creator-guide__badge">はじめての方へ</span>
+<h3 id="creatorGuideTitle">3ステップで問題を作れます</h3>
+</div>
+<ol class="creator-guide__steps">
+<li class="creator-guide__step">
+<span aria-hidden="true" class="creator-guide__number">1</span>
+<svg aria-hidden="true" class="creator-guide__picture" viewBox="0 0 88 58"><rect x="5" y="7" width="38" height="43" rx="5" fill="#eaf2ff" stroke="#5e84c9" stroke-width="3"/><circle cx="17" cy="18" r="5" fill="#ffd867"/><path d="M9 44 23 29l8 9 5-5 5 11Z" fill="#7cc6a5"/><path d="M50 29h31" stroke="#ff6f8d" stroke-linecap="round" stroke-width="4"/><path d="m74 21 8 8-8 8" fill="none" stroke="#ff6f8d" stroke-linecap="round" stroke-linejoin="round" stroke-width="4"/></svg>
+<div><strong>画像を用意</strong><span>基本はPNGで保存（JPEGは色の差分が出やすい）</span></div>
+</li>
+<li class="creator-guide__step">
+<span aria-hidden="true" class="creator-guide__number">2</span>
+<svg aria-hidden="true" class="creator-guide__picture" viewBox="0 0 88 58"><rect x="7" y="11" width="27" height="34" rx="5" fill="#eaf2ff" stroke="#5e84c9" stroke-width="3"/><rect x="26" y="7" width="27" height="34" rx="5" fill="#fff0f4" stroke="#ff6f8d" stroke-width="3"/><circle cx="40" cy="19" r="4" fill="#ffd867"/><path d="M30 35 39 25l8 10" fill="none" stroke="#7cc6a5" stroke-linecap="round" stroke-linejoin="round" stroke-width="4"/><path d="M61 16h20M61 29h14M61 42h18" stroke="#73809b" stroke-linecap="round" stroke-width="4"/></svg>
+<div><strong>種類を選んで追加</strong><span>タイトルは任意。下の2つの画像欄から選択</span></div>
+</li>
+<li class="creator-guide__step">
+<span aria-hidden="true" class="creator-guide__number">3</span>
+<svg aria-hidden="true" class="creator-guide__picture" viewBox="0 0 88 58"><rect x="9" y="8" width="70" height="42" rx="10" fill="#fff0f4" stroke="#ff6f8d" stroke-width="3"/><path d="m26 30 9 9 25-21" fill="none" stroke="#49a97c" stroke-linecap="round" stroke-linejoin="round" stroke-width="5"/></svg>
+<div><strong>確認して公開</strong><span>2枚目を選ぶと自動解析。検出数を確認して公開</span></div>
+</li>
+</ol>
+<div class="creator-guide__modes">
+<article class="creator-guide__mode">
+<svg aria-hidden="true" viewBox="0 0 76 44"><rect x="4" y="6" width="29" height="32" rx="4" fill="#eaf2ff" stroke="#5e84c9" stroke-width="3"/><rect x="42" y="6" width="29" height="32" rx="4" fill="#fff0f4" stroke="#ff6f8d" stroke-width="3"/><circle cx="56" cy="18" r="5" fill="#ffd867"/></svg>
+<p><strong>間違い探し</strong><span>お手本画像と、少し変えた間違い画像を1枚ずつ。<b>2枚は同じ大きさ</b>にします。</span></p>
+</article>
+<article class="creator-guide__mode">
+<svg aria-hidden="true" viewBox="0 0 76 44"><rect x="4" y="6" width="29" height="32" rx="4" fill="#eaf2ff" stroke="#5e84c9" stroke-width="3"/><rect x="42" y="6" width="29" height="32" rx="4" fill="#fff" stroke="#667085" stroke-width="3"/><circle cx="56" cy="22" r="8" fill="#202938"/></svg>
+<p><strong>もの探し</strong><span>元画像と、<b>白地に黒で探す物だけ描いた画像</b>を1枚ずつ用意します。</span></p>
+</article>
+</div>
+<details class="creator-guide__details">
+<summary>詳しく見る <span>ピクセルでの作り方</span></summary>
+<div class="creator-guide__details-body">
+<section class="creator-guide__rule">
+<h4>間違い探し：近い差分は1つにまとまります</h4>
+<p>色・透明度が1ピクセルでも違う場所が差分です。<b>判定サイズが64px以下では、差分同士が縦横の合計で4px以内</b>だと、1つの間違いとして数えられます。</p>
+<div class="creator-guide__examples">
+<figure class="creator-pixel-example">
+<svg aria-label="3ピクセルの空きをはさんだ2つの差分は1つにまとまる例" role="img" viewBox="0 0 168 48"><rect class="creator-pixel-example__changed" x="4" y="14" width="20" height="20"/><rect x="28" y="14" width="20" height="20"/><rect x="52" y="14" width="20" height="20"/><rect x="76" y="14" width="20" height="20"/><rect class="creator-pixel-example__changed" x="100" y="14" width="20" height="20"/><path d="M4 7h116" stroke="#ff6f8d" stroke-width="2"/><path d="m113 2 7 5-7 5" fill="none" stroke="#ff6f8d" stroke-width="2"/></svg>
+<figcaption><strong>■ □ □ □ ■</strong><span>空き3px → 1つの間違い</span></figcaption>
+</figure>
+<figure class="creator-pixel-example">
+<svg aria-label="4ピクセルの空きをはさんだ2つの差分は別々になる例" role="img" viewBox="0 0 168 48"><rect class="creator-pixel-example__changed" x="4" y="14" width="20" height="20"/><rect x="28" y="14" width="20" height="20"/><rect x="52" y="14" width="20" height="20"/><rect x="76" y="14" width="20" height="20"/><rect x="100" y="14" width="20" height="20"/><rect class="creator-pixel-example__changed" x="124" y="14" width="20" height="20"/><path d="M4 7h140" stroke="#49a97c" stroke-width="2" stroke-dasharray="4 3"/></svg>
+<figcaption><strong>■ □ □ □ □ ■</strong><span>空き4px → 別の間違い</span></figcaption>
+</figure>
+</div>
+<p class="creator-guide__tip">例：キャラクターを少し移動すると、元の場所と移動先の両方が差分になります。他の間違いとは、差分の端から<b>空き4px以上</b>あけると混ざりません。斜めの距離も「横＋縦」で判定されます。</p>
+<div class="creator-guide__distance-table" role="table" aria-label="判定サイズごとの間違い探し差分の必要な空き">
+<span role="row"><b role="cell">判定サイズの短辺</b><b role="cell">1つにまとまる距離</b><b role="cell">別にする空き</b></span>
+<span role="row"><span role="cell">64px以下</span><span role="cell">4px以内</span><span role="cell">4px以上</span></span>
+<span role="row"><span role="cell">65〜256px</span><span role="cell">8px以内</span><span role="cell">8px以上</span></span>
+<span role="row"><span role="cell">257px以上</span><span role="cell">12px以内</span><span role="cell">12px以上</span></span>
+</div>
+<p class="creator-guide__tip">判定サイズは、画像を選んだ後に表示される「サイズ」を見てください。拡大したドット絵は、このサイズが元ファイルより小さくなることがあります。</p>
+</section>
+<section class="creator-guide__rule">
+<h4>もの探し：黒い探し物は白地に描きます</h4>
+<p>2枚目は、<b>白い背景に探し物だけを黒で描いた画像</b>にします。黒い部分が1つの探し物です。角で触れているだけでも同じ1つとしてつながります。</p>
+<div class="creator-guide__examples">
+<figure class="creator-pixel-example">
+<svg aria-label="黒い探し物の間に白い空きが1ピクセルで近すぎる例" role="img" viewBox="0 0 120 48"><rect class="creator-pixel-example__object" x="4" y="14" width="20" height="20"/><rect x="28" y="14" width="20" height="20"/><rect class="creator-pixel-example__object" x="52" y="14" width="20" height="20"/><path d="M4 7h68" stroke="#e94e73" stroke-width="2"/></svg>
+<figcaption><strong>■ □ ■</strong><span>空き1px → 近すぎてエラー</span></figcaption>
+</figure>
+<figure class="creator-pixel-example">
+<svg aria-label="黒い探し物の間に白い空きが2ピクセルで問題ない例" role="img" viewBox="0 0 120 48"><rect class="creator-pixel-example__object" x="4" y="14" width="20" height="20"/><rect x="28" y="14" width="20" height="20"/><rect x="52" y="14" width="20" height="20"/><rect class="creator-pixel-example__object" x="76" y="14" width="20" height="20"/><path d="M4 7h92" stroke="#49a97c" stroke-width="2" stroke-dasharray="4 3"/></svg>
+<figcaption><strong>■ □ □ ■</strong><span>空き2px → 別々の探し物</span></figcaption>
+</figure>
+</div>
+<p class="creator-guide__tip">黒はRGBすべて72以下で判定します。白地を基本にし、ぼかし・半透明・グレーの輪郭は使わないでください。元画像とレイヤー画像の大きさも必ず同じにします。</p>
+</section>
+</div>
+</details>
+</section>
 <form class="creator-form" id="creatorForm" novalidate="">
 <div class="creator-fields">
 <label class="creator-label">タイトル
@@ -368,7 +444,7 @@
 <script src="../scripts/creator-play-rewards.js?v=2026.07.19-play-rewards1"></script>
 <script defer="" src="app.js?v=2026.07.19-play-rewards1"></script>
 <script src="../scripts/shared-profile-header.js"></script>
-<script src="../scripts/shared-bottom-nav.js?v=2026.07.19-ad-lifecycle1"></script>
+<script data-pixieed-footer-ad="false" src="../scripts/shared-bottom-nav.js?v=2026.07.19-ad-lifecycle1"></script>
 <script src="../scripts/pixel-art-fit.js"></script>
 </body>
 </html>

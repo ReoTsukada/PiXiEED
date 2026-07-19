@@ -379,7 +379,7 @@
     const entry = viewerEntries[viewerIndex];
     if (!entry) return;
     $('listingPreviewDialogImage').src = getPreviewUrl(entry);
-    $('listingPreviewDialogImage').alt = `${entry.file.name}の試し見せ`;
+    $('listingPreviewDialogImage').alt = `${entry.file.name}の購入前プレビュー`;
     $('listingPreviewDialogName').textContent = entry.path;
     $('listingPreviewCounter').textContent = `${viewerIndex + 1} / ${viewerEntries.length}`;
     $('listingPreviewPrev').disabled = viewerEntries.length < 2;
@@ -411,12 +411,12 @@
       sampleInput.addEventListener('change', () => {
         previewSelectionTouched = true;
         if (sampleInput.checked && samplePreviewPaths.size >= MAX_SAMPLE_PREVIEWS) {
-          sampleInput.checked = false; setStatus(`試し見せは${MAX_SAMPLE_PREVIEWS}枚までです。`); return;
+          sampleInput.checked = false; setStatus(`購入前プレビューは${MAX_SAMPLE_PREVIEWS}枚までです。`); return;
         }
         if (sampleInput.checked) samplePreviewPaths.add(entry.path); else samplePreviewPaths.delete(entry.path);
         renderPreviews(); scheduleListingDraftSave();
       });
-      sample.append(sampleInput, document.createTextNode('試し見せに含める'));
+      sample.append(sampleInput, document.createTextNode('購入前プレビューに含める'));
       body.append(name, thumbnail, sample); card.append(imageButton, body); return card;
     }));
   }
@@ -826,7 +826,7 @@
       }
       const sampleStoragePaths = [];
       for (let index = 0; index < sampleEntries.length; index += 1) {
-        setStatus(`試し見せ画像を生成しています（${index + 1}/${sampleEntries.length}）...`);
+        setStatus(`購入前プレビューを生成しています（${index + 1}/${sampleEntries.length}）...`);
         const entry = sampleEntries[index];
         const output = previewStorageFormat(entry);
         const blob = await createPreviewBlob(entry.previewBlob || entry.file, { mimeType: output.mimeType });

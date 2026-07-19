@@ -953,6 +953,25 @@
         || slot.getAttribute('data-adsbygoogle-status') === 'done') {
         return;
       }
+      const scheduleOneSafeRetry = () => {
+        if (slot.dataset.pixieedAdRetryCount === '1'
+          || slot.dataset.pixieedAdRetryScheduled === '1'
+          || slot.getAttribute('data-ad-status')
+          || slot.getAttribute('data-adsbygoogle-status')) {
+          return;
+        }
+        slot.dataset.pixieedAdRetryCount = '1';
+        slot.dataset.pixieedAdRetryScheduled = '1';
+        window.setTimeout(() => {
+          delete slot.dataset.pixieedAdRetryScheduled;
+          if (!slot.isConnected
+            || slot.getAttribute('data-ad-status')
+            || slot.getAttribute('data-adsbygoogle-status')) {
+            return;
+          }
+          renderBanner();
+        }, 5000);
+      };
       const slotRect = slot.getBoundingClientRect();
       const frameRect = slot.parentElement?.getBoundingClientRect();
       if (slotRect.width < 1 || slotRect.height < 1 || (frameRect && frameRect.width < 1)) {
@@ -975,7 +994,10 @@
       } else {
         Promise.resolve(ensureAdsScript()).then((loaded) => {
           if (!loaded || !slot.isConnected || slot.getAttribute('data-adsbygoogle-status') === 'done') {
-            if (!loaded) delete slot.dataset.pixieedPushQueued;
+            if (!loaded) {
+              delete slot.dataset.pixieedPushQueued;
+              scheduleOneSafeRetry();
+            }
             return;
           }
           slot.dataset.pixieedPushQueued = '1';
@@ -984,9 +1006,11 @@
             window.adsbygoogle.push({});
           } catch (_error) {
             delete slot.dataset.pixieedPushQueued;
+            scheduleOneSafeRetry();
           }
         }).catch(() => {
           delete slot.dataset.pixieedPushQueued;
+          scheduleOneSafeRetry();
         });
       }
     };

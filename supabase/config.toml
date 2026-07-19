@@ -15,3 +15,6 @@ verify_jwt = false
 
 [functions.market-download]
 verify_jwt = true
+
+[functions.market-public-preview]
+verify_jwt = false
