@@ -14358,15 +14358,18 @@ body.is-mobile-layout .mobile-panel.is-active > .panel-section .panel-section__b
 
 body.is-mobile-layout.is-unified-left-tools-color .mobile-panel.is-active > .panel-section[data-section='tools'] .panel-section__body,
 body.is-mobile-layout.is-unified-left-tools-color .mobile-panel.is-active > .panel-section[data-section='color'] .panel-section__body {
-  flex: 1 1 auto;
+  /* In portrait full-drawer mode these two sections share one scrolling
+     panel.  Let each keep its content height; otherwise the tools section
+     consumes a full drawer height and leaves a large dead gap before color. */
+  flex: 0 0 auto;
   min-height: 0;
 }
 
 body.is-mobile-layout.is-unified-left-tools-color .mobile-panel.is-active > .panel-section[data-section='tools'],
 body.is-mobile-layout.is-unified-left-tools-color .mobile-panel.is-active > .panel-section[data-section='color'] {
-  height: 100%;
+  height: auto;
   min-height: 0;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
 }
 
 /* The shared navigation rotates to the right edge in landscape. Reserve that
