@@ -2945,20 +2945,21 @@ body:has(.home-app){
   }
 }
 
-/* Home hero: keep the page, artwork, and copy centered as one stable unit. */
+/* Home layout: fill the available body width, then center the bounded content. */
 body:has(.home-app) > .page{
-  width:min(1120px, 100%);
-  max-width:1120px;
-  margin-inline:auto;
+  width:100%;
+  max-width:none;
+  margin-inline:0;
   justify-items:center;
 }
 body:has(.home-app) .home-app,
 body:has(.home-app) .home-screen,
 body:has(.home-app) .home-desktop-grid,
 body:has(.home-app) .home-primary-stack{
-  width:100%;
+  width:min(1120px, 100%);
   max-width:1120px;
-  margin-inline:auto;
+  margin-inline:auto!important;
+  justify-self:center;
 }
 body:has(.home-app) .home-hero-slide img{
   inset:0;
@@ -3008,7 +3009,6 @@ body:has(.home-app) .home-hero-tags{
   justify-content:center;
 }
 @media (orientation:landscape){
-  body:has(.home-app) > .page,
   body:has(.home-app) .home-app,
   body:has(.home-app) .home-screen,
   body:has(.home-app) .home-desktop-grid,

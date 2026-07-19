@@ -76,13 +76,14 @@
 
   function createCard(entry) {
     const puzzleId = String(entry?.id || '').trim();
-    const card = document.createElement('a');
+    const puzzleUrl = asset(`../pixfind/index.html?puzzle=${encodeURIComponent(puzzleId)}`);
+    const card = document.createElement('article');
     card.className = 'account-pixfind-card';
-    card.href = asset(`../pixfind/index.html?puzzle=${encodeURIComponent(puzzleId)}`);
-    card.setAttribute('aria-label', `${entry?.label || 'PiXFiND'}を遊ぶ`);
 
-    const preview = document.createElement('span');
+    const preview = document.createElement('a');
     preview.className = 'account-pixfind-card__preview';
+    preview.href = puzzleUrl;
+    preview.setAttribute('aria-label', `${entry?.label || 'PiXFiND'}を遊ぶ`);
     const image = document.createElement('img');
     image.src = String(entry?.thumbnail_url || entry?.original_url || asset('../icon/icon-192-2.png'));
     image.alt = '';
@@ -91,7 +92,7 @@
     image.draggable = false;
     preview.appendChild(image);
 
-    const body = document.createElement('span');
+    const body = document.createElement('div');
     body.className = 'account-pixfind-card__body';
     const title = document.createElement('strong');
     title.textContent = String(entry?.label || 'PiXFiND Puzzle');
@@ -104,7 +105,33 @@
     const plays = document.createElement('span');
     plays.textContent = `プレイ ${Math.max(0, Number(entry?.valid_play_count) || 0).toLocaleString('ja-JP')}回`;
     meta.append(mode, plays, date);
-    body.append(title, meta);
+    const actions = document.createElement('div');
+    actions.className = 'account-card-actions';
+    const open = document.createElement('a');
+    open.className = 'account-card-action account-card-action--primary';
+    open.href = puzzleUrl;
+    open.textContent = '開く';
+    const share = document.createElement('button');
+    share.className = 'account-card-action';
+    share.type = 'button';
+    share.textContent = 'リンクをコピー';
+    share.setAttribute('aria-label', `${entry?.label || 'PiXFiND'}のリンクをコピー`);
+    share.addEventListener('click', async () => {
+      share.disabled = true;
+      try {
+        if (!window.PiXiEEDAccountShare) throw new Error('share-unavailable');
+        await window.PiXiEEDAccountShare.copyLink(puzzleUrl);
+        share.textContent = 'コピーしました';
+      } catch (_error) {
+        share.textContent = 'コピーできません';
+      }
+      window.setTimeout(() => {
+        share.disabled = false;
+        share.textContent = 'リンクをコピー';
+      }, 1800);
+    });
+    actions.append(open, share);
+    body.append(title, meta, actions);
     card.append(preview, body);
     return card;
   }

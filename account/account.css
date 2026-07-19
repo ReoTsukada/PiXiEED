@@ -12,9 +12,10 @@
 }
 
 .account-grid {
-  grid-template-columns: minmax(280px, .78fr) minmax(0, 1.42fr) !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   gap: 8px !important;
-  align-items: start;
+  align-items: stretch;
+  justify-items: stretch;
 }
 
 .account-titlebar {
@@ -53,6 +54,8 @@
   font-weight: 800;
   text-decoration: none;
   white-space: nowrap;
+  cursor: pointer;
+  font-family: inherit;
 }
 .account-titlebar__actions a:hover,
 .account-titlebar__actions a:focus-visible,
@@ -77,7 +80,7 @@
 }
 .account-command-bar::-webkit-scrollbar { display: none; }
 
-.account-command-bar a {
+.account-command-bar button {
   display: inline-flex;
   min-width: max-content;
   min-height: 34px;
@@ -86,17 +89,25 @@
   justify-content: center;
   padding: 5px 10px;
   border-radius: 5px;
-  color: #cbd5e1;
   font-size: 12px;
   font-weight: 800;
   text-align: center;
-  text-decoration: none;
+  border: 0;
+  color: #cbd5e1;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
 }
 
-.account-command-bar a:hover,
-.account-command-bar a:focus-visible {
+.account-command-bar button:hover,
+.account-command-bar button:focus-visible,
+.account-command-bar button.is-active {
   background: rgba(121,192,255,.12);
   color: #fff;
+}
+
+.account-command-bar button.is-active {
+  box-shadow: inset 0 0 0 1px rgba(121,192,255,.28);
 }
 
 body[data-pixieed-account-auth="signed-out"] .account-command-bar { display: none; }
@@ -105,14 +116,31 @@ body[data-pixieed-account-auth="signed-out"] .account-command-bar { display: non
   gap: 8px !important;
 }
 
+body[data-pixieed-account-auth="signed-in"] .account-stack {
+  display: contents;
+}
+
+[data-account-tab]:not(.is-account-tab-active) {
+  display: none !important;
+}
+
+body[data-pixieed-account-auth="signed-out"] [data-account-tab] {
+  display: none !important;
+}
+
+body[data-pixieed-account-auth="signed-out"] #authPanel {
+  display: grid !important;
+}
+
 .account-stack + .account-stack {
   border-left: 0 !important;
 }
 
-#accountProjects { order: -10; }
-#accountPixfind { order: -9; }
+#accountProjects { order: -40; }
+#accountPurchases { order: -39; }
+#accountListings { order: -38; }
+#accountPixfind { order: -37; }
 #authPanel { order: -8; }
-#accountPurchases { order: -10; }
 #accountPageviewRewards { order: -9; }
 #accountSeller { order: -8; }
 #accountDevTools { order: -7; }
@@ -130,6 +158,196 @@ body[data-pixieed-account-auth="signed-out"] .account-command-bar { display: non
   box-shadow: none !important;
 }
 
+body[data-pixieed-account-auth="signed-in"] .account-panel[data-account-tab="library"],
+body[data-pixieed-account-auth="signed-in"] .account-panel[data-account-tab="rewards"],
+body[data-pixieed-account-auth="signed-in"] .account-panel[data-account-tab="settings"] {
+  min-height: 280px;
+}
+
+.account-panel--wide {
+  grid-column: 1 / -1;
+}
+
+.account-eyebrow {
+  margin: 0 0 3px;
+  color: #79c0ff;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .18em;
+}
+
+.account-reward-dashboard {
+  min-height: 0 !important;
+}
+
+.account-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-rows: 1fr;
+  gap: 8px;
+}
+
+.account-summary-card {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 132px;
+  height: 100%;
+  align-content: space-between;
+  gap: 8px;
+  padding: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 8px;
+  background: #0b1224;
+}
+
+.account-summary-card::before {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: var(--summary-color, #79c0ff);
+  content: "";
+}
+
+.account-summary-card--sales { --summary-color: #60a5fa; }
+.account-summary-card--lineage { --summary-color: #a78bfa; }
+.account-summary-card--views { --summary-color: #34d399; }
+.account-summary-card--balance { --summary-color: #fbbf24; }
+.account-summary-card span { color: #cbd5e1; font-size: 11px; font-weight: 800; }
+.account-summary-card strong { overflow-wrap: anywhere; color: #fff; font-size: clamp(21px, 3vw, 30px); line-height: 1; }
+.account-summary-card small { color: #94a3b8; font-size: 10px; line-height: 1.4; }
+
+.account-dashboard-status {
+  min-height: 1.4em;
+  margin: 0;
+  color: #94a3b8;
+  font-size: 10px;
+}
+
+.account-dashboard-status.is-error { color: #fca5a5; }
+
+.account-reward-dashboard__head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.account-reward-dashboard__head .section-title { margin: 0; }
+.account-reward-dashboard__head .helper { margin: 5px 0 0; }
+
+.account-chart-period {
+  display: grid;
+  flex: 0 0 auto;
+  gap: 4px;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.account-chart-period select {
+  min-height: 36px;
+  padding: 6px 30px 6px 10px;
+  border: 1px solid rgba(121,192,255,.3);
+  border-radius: 6px;
+  color: #eaf5ff;
+  background: #111c33;
+  font: 800 12px/1 inherit;
+}
+
+.account-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.account-chart-legend button {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 6px;
+  color: #94a3b8;
+  background: rgba(255,255,255,.03);
+  font: 800 10px/1 inherit;
+  cursor: pointer;
+}
+
+.account-chart-legend button.is-active { color: #f8fafc; background: rgba(255,255,255,.08); }
+.account-chart-legend button:not(.is-active) { opacity: .48; }
+.account-chart-legend i { width: 9px; height: 9px; border-radius: 2px; background: var(--series-color); }
+.account-chart-legend [data-account-chart-series="sales"] { --series-color: #60a5fa; }
+.account-chart-legend [data-account-chart-series="lineage"] { --series-color: #a78bfa; }
+.account-chart-legend [data-account-chart-series="pageview"] { --series-color: #34d399; }
+.account-chart-legend [data-account-chart-series="views"] { --series-color: #fbbf24; }
+
+.account-chart-shell {
+  position: relative;
+  min-height: 360px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(17,28,51,.96), rgba(9,15,29,.96));
+  touch-action: pan-y;
+}
+
+.account-chart-shell canvas {
+  display: block;
+  width: 100%;
+  height: 360px;
+}
+
+.account-chart-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  color: #94a3b8;
+  font-size: 12px;
+  text-align: center;
+}
+
+.account-chart-tooltip {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  min-width: 164px;
+  gap: 4px;
+  padding: 9px 10px;
+  border: 1px solid rgba(148,163,184,.28);
+  border-radius: 7px;
+  color: #e5e7eb;
+  background: rgba(4,9,19,.94);
+  box-shadow: 0 10px 26px rgba(0,0,0,.32);
+  font-size: 10px;
+  line-height: 1.4;
+  pointer-events: none;
+}
+
+.account-chart-tooltip[hidden],
+.account-chart-empty[hidden] {
+  display: none;
+}
+
+.account-chart-tooltip strong { margin-bottom: 2px; color: #fff; font-size: 11px; }
+.account-chart-tooltip span { display: flex; justify-content: space-between; gap: 14px; }
+.account-chart-tooltip b { font-weight: 900; }
+
+.account-chart-table-details { border-top: 1px solid rgba(255,255,255,.08); }
+.account-chart-table-details > summary { min-height: 38px; padding-top: 10px; color: #b9dfff; font-size: 10px; font-weight: 800; cursor: pointer; }
+.account-chart-table-scroll { max-height: 320px; overflow: auto; }
+.account-chart-table { width: 100%; border-collapse: collapse; color: #cbd5e1; font-size: 10px; text-align: right; }
+.account-chart-table th,
+.account-chart-table td { padding: 7px 8px; border-bottom: 1px solid rgba(255,255,255,.07); white-space: nowrap; }
+.account-chart-table th:first-child,
+.account-chart-table td:first-child { position: sticky; left: 0; text-align: left; background: #10182c; }
+.account-chart-table thead th { position: sticky; top: 0; z-index: 1; color: #e5e7eb; background: #111c33; }
+.account-chart-table thead th:first-child { z-index: 2; }
+
 .account-panel > .section-title,
 .account-panel__head .section-title { font-size: clamp(16px, 2vw, 20px); }
 .account-panel > .helper { margin: -4px 0 0; font-size: 10px; line-height: 1.45; }
@@ -144,57 +362,93 @@ body[data-pixieed-account-auth="signed-out"] .account-command-bar { display: non
 .account-chip { padding: 4px 7px; border-radius: 5px; font-size: 10px; }
 .account-cover { border-radius: 6px !important; }
 .account-cover img { width: 100% !important; height: 100% !important; object-fit: contain; }
-#localProjectList,
-#marketPurchaseList {
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(148,163,184,.38) transparent;
-}
-#localProjectList { max-height: min(52vh, 520px); overflow-y: auto; }
-#marketPurchaseList { max-height: min(74vh, 820px); overflow-y: auto; padding-right: 2px; }
 
-.account-pixfind-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 8px;
-  max-height: min(52vh, 520px);
-  padding-right: 2px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(148,163,184,.38) transparent;
-}
-
-.account-pixfind-grid > .account-item { grid-column: 1 / -1; }
-
-.account-pixfind-card {
-  display: grid;
+.account-collection {
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
+  min-height: 520px !important;
+  box-sizing: border-box;
+  align-self: stretch;
+}
+
+.account-collection-grid,
+.account-pixfind-grid,
+.account-market-grid {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
+  gap: 10px;
+  align-items: start;
+  align-content: start;
+  overflow: visible;
+}
+
+.account-collection-grid > .account-item { grid-column: 1 / -1; }
+.account-collection-grid.is-collapsed > :nth-child(n + 5) { display: none !important; }
+.account-collection-toggle[hidden] { display: none !important; }
+
+.account-collection .account-panel__head {
+  min-width: 0;
+  min-height: 58px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+.account-collection .account-panel__head > div:first-child { min-width: 0; }
+.account-collection .account-panel__actions { min-width: 0; flex-wrap: wrap; }
+
+.account-project-card,
+.account-pixfind-card,
+.account-listing-card {
+  display: grid;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  align-content: start;
   overflow: hidden;
   border: 1px solid rgba(255,255,255,.1);
-  border-radius: 7px;
+  border-radius: 8px;
   background: #0b1224;
   color: #f8fafc;
-  text-decoration: none;
   transition: border-color .12s ease, transform .12s ease;
 }
 
+.account-project-card:hover,
+.account-project-card:focus-within,
 .account-pixfind-card:hover,
-.account-pixfind-card:focus-visible {
-  border-color: rgba(255,111,141,.7);
+.account-pixfind-card:focus-within,
+.account-listing-card:hover,
+.account-listing-card:focus-within {
+  border-color: rgba(121,192,255,.58);
   outline: none;
   transform: translateY(-1px);
 }
 
+.account-project-card__preview,
+.account-listing-card__preview,
 .account-pixfind-card__preview {
+  position: relative;
   aspect-ratio: 1 / 1;
   display: grid;
+  width: 100%;
   place-items: center;
   overflow: hidden;
   border-bottom: 1px solid rgba(255,255,255,.08);
-  background: #eef2fb;
+  background-color: #111a30;
+  background-image:
+    linear-gradient(45deg, rgba(255,255,255,.035) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(255,255,255,.035) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(255,255,255,.035) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(255,255,255,.035) 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  text-decoration: none;
 }
 
+.account-project-card__preview img,
+.account-listing-card__preview img,
 .account-pixfind-card__preview img {
   width: 100%;
   height: 100%;
@@ -204,13 +458,17 @@ body[data-pixieed-account-auth="signed-out"] .account-command-bar { display: non
   -webkit-user-drag: none;
 }
 
+.account-project-card__body,
+.account-listing-card__body,
 .account-pixfind-card__body {
   display: grid;
-  gap: 5px;
+  gap: 7px;
   min-width: 0;
-  padding: 8px;
+  padding: 9px;
 }
 
+.account-project-card__body strong,
+.account-listing-card__body strong,
 .account-pixfind-card__body strong {
   overflow: hidden;
   font-size: 12px;
@@ -219,14 +477,72 @@ body[data-pixieed-account-auth="signed-out"] .account-command-bar { display: non
   white-space: nowrap;
 }
 
+.account-project-card__meta,
+.account-listing-card__meta,
 .account-pixfind-card__meta {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
+  gap: 5px 8px;
   color: #94a3b8;
   font-size: 9px;
   line-height: 1.3;
+}
+
+.account-card-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.account-card-actions--single { grid-template-columns: 1fr; }
+
+.account-card-action {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 8px;
+  border: 1px solid rgba(121,192,255,.3);
+  border-radius: 6px;
+  background: rgba(121,192,255,.08);
+  color: #dceeff;
+  font: 800 10px/1.2 inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.account-card-action:hover,
+.account-card-action:focus-visible { border-color: rgba(121,192,255,.72); background: rgba(121,192,255,.17); }
+.account-card-action:disabled { cursor: not-allowed; opacity: .46; }
+.account-card-action--primary { background: #19345c; color: #fff; }
+
+.account-listing-card__status {
+  position: absolute;
+  top: 7px;
+  left: 7px;
+  padding: 3px 6px;
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 5px;
+  background: rgba(4,9,19,.84);
+  color: #e5e7eb;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.account-listing-card__status.is-published { border-color: rgba(52,211,153,.45); color: #a7f3d0; }
+.account-share-status { margin: 0; color: #a7f3d0; font-size: 10px; }
+.account-share-status:empty { display: none; }
+
+.account-market-card {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.account-pixfind-card {
+  text-decoration: none;
 }
 
 .account-settings-summary {
@@ -614,6 +930,8 @@ body[data-pixieed-account-auth="signed-out"] .account-panel--profile > .section-
 @media (max-width: 980px) {
   .account-grid { grid-template-columns: minmax(0, 1fr) !important; }
   .account-service-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .account-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .account-panel--wide { grid-column: 1; }
 }
 
 @media (max-width: 680px) {
@@ -624,15 +942,15 @@ body[data-pixieed-account-auth="signed-out"] .account-panel--profile > .section-
   .account-grid { grid-template-columns: minmax(0, 1fr) !important; gap: 6px !important; }
   .account-stack { gap: 6px !important; }
   .account-panel { padding: 10px !important; border-radius: 7px !important; }
+  .account-collection .account-panel__head { align-items: flex-start; }
+  .account-collection .account-panel__actions { flex-wrap: wrap; }
   .account-item { grid-template-columns: 56px minmax(0, 1fr) !important; }
   .account-cover { width: 56px !important; height: 56px !important; }
   .account-item > .account-action,
   .account-item > .account-chip { grid-column: 2; justify-self: start; }
-  #localProjectList,
-  #marketPurchaseList { max-height: none; overflow: visible; }
   .account-service-grid { grid-template-columns: 1fr; }
   .account-command-bar { display: flex; }
-  .account-command-bar a { min-height: 34px; flex: 0 0 auto; }
+  .account-command-bar button { min-height: 34px; flex: 0 0 auto; }
   .account-settings-summary { align-items: flex-start; flex-direction: column; gap: 2px; }
   .site-header .account-action--quiet { display: none; }
   .account-admin-permission__form { grid-template-columns: 1fr; }
@@ -643,4 +961,17 @@ body[data-pixieed-account-auth="signed-out"] .account-panel--profile > .section-
   .account-reward-settlement { grid-template-columns: 1fr; }
   .account-reward-settlement__actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .account-reward-settlement > .account-admin-permission__status { grid-column: 1; }
+  .account-reward-dashboard__head { align-items: stretch; flex-direction: column; }
+  .account-chart-period { width: 100%; }
+  .account-chart-period select { width: 100%; }
+  .account-chart-shell { min-height: 300px; }
+  .account-chart-shell canvas { height: 300px; }
+}
+
+@media (max-width: 460px) {
+  .account-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .account-summary-card { min-height: 112px; }
+  .account-chart-legend { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .account-chart-legend button { justify-content: flex-start; }
+  .account-card-actions { grid-template-columns: 1fr; }
 }

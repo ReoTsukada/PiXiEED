@@ -93,7 +93,7 @@
     const controller = doc.createElement('script');
     controller.defer = true;
     controller.dataset.pixieedCommonTabBar = 'true';
-    controller.src = relHref('scripts/shared-tab-bar.js?v=2026.07.19-ui-icons1');
+    controller.src = relHref('scripts/shared-tab-bar.js?v=2026.07.19-details-ad-responsive1');
     doc.body.appendChild(controller);
   }
 

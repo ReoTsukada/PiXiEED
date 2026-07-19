@@ -9,7 +9,8 @@ const landingCss = fs.readFileSync(path.join(root, 'site/landing.css'), 'utf8');
 
 assert.match(sharedNav, /body\.pixieed-seamless-page > \.page[\s\S]*margin-left:auto !important;[\s\S]*margin-right:auto !important;/);
 assert.match(sharedNav, /\.header-inner,[\s\S]*\.section-inner,[\s\S]*\.footer-inner[\s\S]*margin-left:auto !important;/);
-assert.match(landingCss, /body:has\(\.home-app\) > \.page\s*{[\s\S]*max-width:\s*min\(1280px, 100%\);[\s\S]*margin-inline:\s*auto;/);
+assert.match(landingCss, /\/\* Home layout: fill the available body width, then center the bounded content\. \*\/[\s\S]*body:has\(\.home-app\) > \.page\s*{[\s\S]*width:\s*100%;[\s\S]*max-width:\s*none;[\s\S]*margin-inline:\s*0;[\s\S]*justify-items:\s*center;/);
+assert.match(landingCss, /body:has\(\.home-app\) \.home-app,[\s\S]*width:\s*min\(1120px, 100%\);[\s\S]*margin-inline:\s*auto!important;[\s\S]*justify-self:\s*center;/);
 
 assert.match(sharedAds, /function isLandscapeViewport\(\)/);
 assert.match(sharedAds, /if \(arePixieedAdsDisabled\(\)\s*\|\|\s*isLandscapeViewport\(\)\)/);

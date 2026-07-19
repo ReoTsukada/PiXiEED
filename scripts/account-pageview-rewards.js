@@ -5,7 +5,7 @@
   const link = document.getElementById('accountPageviewRewardsLink');
   const total = document.getElementById('accountPageviewRewardTotal');
   const months = document.getElementById('accountPageviewRewardMonths');
-  if (!panel || !link || !total || !months) return;
+  if (!panel || !total || !months) return;
 
   const yenFromMicroyen = (value) => `${(Number(value || 0) / 1000000).toLocaleString('ja-JP', { maximumFractionDigits: 6 })}円`;
   let listenerBound = false;
@@ -19,7 +19,8 @@
       const amount = document.createElement('strong'); amount.textContent = yenFromMicroyen(entry.amount_microyen);
       row.append(label, amount); return row;
     }) : [Object.assign(document.createElement('p'), { className: 'helper', textContent: '確定した表示報酬はまだありません。' })]));
-    panel.hidden = false; link.hidden = false;
+    panel.hidden = false;
+    if (link) link.hidden = false;
   }
 
   async function init(refresh = false) {
@@ -31,7 +32,9 @@
         access.client.auth.onAuthStateChange(() => window.setTimeout(() => init(true), 0));
       }
       if (!access?.authenticated || !access.client) {
-        panel.hidden = true; link.hidden = true; return;
+        panel.hidden = true;
+        if (link) link.hidden = true;
+        return;
       }
       const { data, error } = await access.client.rpc('market_my_pageview_rewards_v1');
       if (error || !data) return;

@@ -42,6 +42,10 @@ assert.match(sharedTopAd, /arePixieedAdsDisabled\(\)[\s\S]*\|\| isLandscapeViewp
 assert.doesNotMatch(sharedTopAd, /arePixieedAdsDisabled\(\)[\s\S]{0,80}\|\| isPixiedrawPage\(\)/);
 assert.match(sharedTopAd, /data-ad-slot="2141591954"/);
 assert.match(sharedTabBar, /pixieed-common-details__ad[\s\S]*data-ad-slot="4859859838"/);
+assert.match(sharedTabBar, /\.pixieed-common-details__ad\{[\s\S]{0,220}width:calc\(100% \+ 20px\);min-height:100px/);
+assert.match(sharedTabBar, /\.pixieed-common-details__ad ins\.adsbygoogle\{[\s\S]{0,260}min-height:100px!important/);
+assert.doesNotMatch(sharedTabBar, /\.pixieed-common-details__ad\{[^}]*aspect-ratio/);
+assert.doesNotMatch(sharedTabBar, /\.pixieed-common-details__ad ins\.adsbygoogle iframe\{[^}]*height:100%/);
 
 assert.doesNotMatch(recentProjects, /PiXiEEDを支援|Supports PiXiEED/);
 assert.match(recentProjects, /\(index \+ 1\) % 8 === 0/);

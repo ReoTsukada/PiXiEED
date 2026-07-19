@@ -265,7 +265,7 @@
       .account-cover{width:64px;height:64px}
     }
   </style>
-  <link rel="stylesheet" href="account.css?v=2026.07.19-functional-ui1">
+  <link rel="stylesheet" href="account.css?v=2026.07.19-account-library2">
 </head>
 <body data-pixieed-account-auth="signed-out">
   <header class="site-header" aria-label="トップナビ">
@@ -288,19 +288,76 @@
           <a href="../market/index.html">マーケット</a>
         </div>
       </section>
-      <nav class="account-command-bar" aria-label="マイページメニュー">
-        <a href="#accountProjects">プロジェクト</a>
-        <a href="#accountPixfind">PiXFiND</a>
-        <a href="#accountPurchases" data-market-dev-only hidden>購入済み</a>
-        <a href="#accountPageviewRewards" id="accountPageviewRewardsLink" hidden>報酬</a>
-        <a href="#accountSeller" data-market-dev-only hidden>販売</a>
-        <a href="../market/index.html">マーケット</a>
-        <a href="#authPanel">設定</a>
+      <nav class="account-command-bar" aria-label="マイページの表示切替">
+        <button class="is-active" type="button" data-account-tab-target="library" aria-pressed="true">作品・購入</button>
+        <button type="button" data-account-tab-target="rewards" aria-pressed="false">売上・報酬</button>
+        <button type="button" data-account-tab-target="settings" aria-pressed="false">設定</button>
       </nav>
 
       <div class="account-grid">
+        <section class="account-panel account-panel--wide account-reward-dashboard" id="accountRewardDashboard" data-account-tab="rewards" aria-labelledby="accountRewardDashboardTitle">
+          <div class="account-reward-dashboard__head">
+            <div>
+              <p class="account-eyebrow">REVENUE ANALYTICS</p>
+              <h2 class="section-title" id="accountRewardDashboardTitle">売上・報酬の推移</h2>
+              <p class="helper">販売収益、祖先作品として受け取った派生報酬、確定した表示報酬を分けて表示します。</p>
+            </div>
+            <label class="account-chart-period">表示期間
+              <select id="accountRewardPeriod">
+                <option value="6">6か月</option>
+                <option value="12" selected>12か月</option>
+                <option value="24">24か月</option>
+              </select>
+            </label>
+          </div>
+          <div class="account-summary-grid" aria-live="polite">
+            <article class="account-summary-card account-summary-card--sales">
+              <span>販売による受取</span>
+              <strong id="accountSummarySales">0円</strong>
+              <small id="accountSummarySalesMeta">直近12か月</small>
+            </article>
+            <article class="account-summary-card account-summary-card--lineage">
+              <span>派生による報酬</span>
+              <strong id="accountSummaryLineage">0円</strong>
+              <small id="accountSummaryLineageMeta">直近12か月</small>
+            </article>
+            <article class="account-summary-card account-summary-card--views">
+              <span>視聴回数による報酬</span>
+              <strong id="accountSummaryPageview">0円</strong>
+              <small id="accountSummaryViews">有効表示 0回</small>
+            </article>
+            <article class="account-summary-card account-summary-card--balance">
+              <span>出金可能な残高</span>
+              <strong id="accountSummaryBalance">0円</strong>
+              <small id="accountSummaryPending">保留中 0円</small>
+            </article>
+          </div>
+          <p class="account-dashboard-status" id="accountOverviewStatus" role="status" aria-live="polite">報酬データを確認しています。</p>
+          <div class="account-chart-legend" aria-label="表示する系列">
+            <button class="is-active" type="button" data-account-chart-series="sales" aria-pressed="true"><i aria-hidden="true"></i>販売収益</button>
+            <button class="is-active" type="button" data-account-chart-series="lineage" aria-pressed="true"><i aria-hidden="true"></i>派生報酬</button>
+            <button class="is-active" type="button" data-account-chart-series="pageview" aria-pressed="true"><i aria-hidden="true"></i>表示報酬</button>
+            <button class="is-active" type="button" data-account-chart-series="views" aria-pressed="true"><i aria-hidden="true"></i>有効表示数</button>
+          </div>
+          <div class="account-chart-shell" id="accountRewardChartShell">
+            <canvas id="accountRewardChart" role="img" aria-label="月別の販売収益、派生報酬、表示報酬、有効表示数のグラフ"></canvas>
+            <div class="account-chart-tooltip" id="accountRewardChartTooltip" hidden></div>
+            <div class="account-chart-empty" id="accountRewardChartEmpty">報酬データを確認しています。</div>
+          </div>
+          <details class="account-chart-table-details">
+            <summary>月別の数値を表で確認</summary>
+            <div class="account-chart-table-scroll">
+              <table class="account-chart-table">
+                <thead><tr><th scope="col">月</th><th scope="col">販売収益</th><th scope="col">派生報酬</th><th scope="col">表示報酬</th><th scope="col">有効表示</th></tr></thead>
+                <tbody id="accountRewardChartTable"></tbody>
+              </table>
+            </div>
+          </details>
+          <p class="account-dashboard-status" id="accountRewardDashboardStatus" role="status" aria-live="polite"></p>
+        </section>
+
         <section class="account-stack" aria-label="作品">
-          <section class="account-panel account-panel--profile" id="authPanel" aria-hidden="false" aria-label="アカウント">
+          <section class="account-panel account-panel--profile" id="authPanel" data-account-tab="settings" aria-hidden="false" aria-label="アカウント">
             <h2 class="section-title">アカウント</h2>
             <div class="account-profile-grid">
               <details class="profile-block profile-block--profile">
@@ -389,15 +446,19 @@
             </div>
           </section>
 
-          <section class="account-panel" id="accountProjects">
+          <section class="account-panel account-collection" id="accountProjects" data-account-tab="library" data-account-collection>
             <div class="account-panel__head">
-              <h2 class="section-title">PiXiEEDraw</h2>
+              <div>
+                <p class="account-eyebrow">PIXIEEDRAW</p>
+                <h2 class="section-title">作品</h2>
+              </div>
               <div class="account-panel__actions">
                 <a class="account-text-action" href="../pixiedraw/index.html">新規作成</a>
                 <span class="account-chip" id="localProjectCount">確認中</span>
+                <button class="account-text-action account-collection-toggle" type="button" data-account-collection-toggle aria-controls="localProjectList" aria-expanded="false" hidden>全て見る</button>
               </div>
             </div>
-            <div class="account-list" id="localProjectList">
+            <div class="account-list account-collection-grid" id="localProjectList" data-account-collection-list>
               <div class="account-item">
                 <div class="account-cover">
                   <img src="../icon/icon-192-4.png" alt="">
@@ -410,29 +471,10 @@
               </div>
             </div>
           </section>
-          <section class="account-panel" id="accountPixfind">
-            <div class="account-panel__head">
-              <h2 class="section-title">投稿したPiXFiND</h2>
-              <div class="account-panel__actions">
-                <a class="account-text-action" href="../pixfind/index.html#creator">作る</a>
-                <span class="account-chip" id="pixfindPostCount">確認中</span>
-              </div>
-            </div>
-            <div class="account-pixfind-grid" id="pixfindPostList" aria-label="この端末から投稿したPiXFiND" aria-live="polite">
-              <div class="account-item">
-                <div class="account-cover"><img src="../icon/icon-192-2.png" alt=""></div>
-                <div class="account-item__body">
-                  <strong>投稿を確認しています</strong>
-                  <span>この端末から公開したPiXFiNDを読み込んでいます。</span>
-                </div>
-                <span class="account-chip">...</span>
-              </div>
-            </div>
-          </section>
         </section>
 
         <section class="account-stack" aria-label="購入済み商品とサービス">
-          <section class="account-panel" id="accountPageviewRewards" hidden>
+          <section class="account-panel" id="accountPageviewRewards" data-account-tab="rewards" hidden>
             <div class="account-panel__head">
               <h2 class="section-title">表示ロイヤリティー</h2>
               <span class="account-chip" id="accountPageviewRewardTotal">0円</span>
@@ -440,7 +482,7 @@
             <p class="helper">作品系列の有効表示から確定した月別報酬です。</p>
             <div class="account-reward-history" id="accountPageviewRewardMonths" aria-live="polite"></div>
           </section>
-          <section class="account-panel" id="accountDevTools" data-market-dev-only hidden>
+          <section class="account-panel" id="accountDevTools" data-account-tab="settings" data-market-dev-only hidden>
             <div class="account-panel__head">
               <h2 class="section-title">マーケットDEV</h2>
               <span class="account-chip">DEV限定</span>
@@ -449,7 +491,7 @@
               <a class="account-service" href="../market/index.html"><strong>マーケットを確認</strong><span>DEV商品・検索</span></a>
             </div>
           </section>
-          <section class="account-panel" id="accountAdminTools" data-market-admin-only hidden>
+          <section class="account-panel account-panel--wide" id="accountAdminTools" data-account-tab="settings" data-market-admin-only hidden>
             <div class="account-panel__head">
               <h2 class="section-title">管理者メニュー</h2>
               <span class="account-chip">管理者限定</span>
@@ -509,16 +551,19 @@
               </div>
             </details>
           </section>
-          <section class="account-panel" id="accountPurchases" data-market-dev-only hidden>
+          <section class="account-panel account-collection" id="accountPurchases" data-account-tab="library" data-account-collection data-market-dev-only hidden>
             <div class="account-panel__head">
-              <h2 class="section-title">購入済み商品</h2>
+              <div>
+                <p class="account-eyebrow">PURCHASES</p>
+                <h2 class="section-title">購入したもの</h2>
+              </div>
               <div class="account-panel__actions">
                 <a class="account-text-action" href="../market/index.html">素材を探す</a>
                 <span class="account-chip" id="marketPurchaseCount">確認中</span>
+                <button class="account-text-action account-collection-toggle" type="button" data-account-collection-toggle aria-controls="marketPurchaseList" aria-expanded="false" hidden>全て見る</button>
               </div>
             </div>
-            <p class="helper">形式を選んでZIP出力、またはPiXiEEDrawで直接開けます。</p>
-            <div class="account-list account-market-grid" id="marketPurchaseList" aria-label="購入済み商品一覧" aria-live="polite">
+            <div class="account-list account-market-grid account-collection-grid" id="marketPurchaseList" data-account-collection-list aria-label="購入済み商品一覧" aria-live="polite">
               <div class="account-item">
                 <div class="account-cover">
                   <img src="../bought.png?v=2026.07.17-icons1" alt="">
@@ -531,7 +576,50 @@
               </div>
             </div>
           </section>
-          <section class="account-panel account-seller-panel" id="accountSeller" data-market-dev-only hidden>
+          <section class="account-panel account-collection" id="accountListings" data-account-tab="library" data-account-collection data-market-dev-only hidden>
+            <div class="account-panel__head">
+              <div>
+                <p class="account-eyebrow">LISTINGS</p>
+                <h2 class="section-title">出品物</h2>
+              </div>
+              <div class="account-panel__actions">
+                <a class="account-text-action" href="../market/sell.html">新しく出品</a>
+                <span class="account-chip" id="marketListingCount">確認中</span>
+                <button class="account-text-action account-collection-toggle" type="button" data-account-collection-toggle aria-controls="marketListingList" aria-expanded="false" hidden>全て見る</button>
+              </div>
+            </div>
+            <div class="account-list account-market-grid account-collection-grid" id="marketListingList" data-account-collection-list aria-label="自分の出品物一覧" aria-live="polite">
+              <div class="account-item">
+                <div class="account-cover"><img src="../Market.png" alt=""></div>
+                <div class="account-item__body"><strong>出品物を確認しています</strong><span>ログイン状態を読み込んでいます。</span></div>
+              </div>
+            </div>
+            <p class="account-share-status" id="marketListingShareStatus" role="status" aria-live="polite"></p>
+          </section>
+          <section class="account-panel account-collection" id="accountPixfind" data-account-tab="library" data-account-collection>
+            <div class="account-panel__head">
+              <div>
+                <p class="account-eyebrow">PIXfind</p>
+                <h2 class="section-title">投稿したもの</h2>
+              </div>
+              <div class="account-panel__actions">
+                <a class="account-text-action" href="../pixfind/index.html#creator">作る</a>
+                <span class="account-chip" id="pixfindPostCount">確認中</span>
+                <button class="account-text-action account-collection-toggle" type="button" data-account-collection-toggle aria-controls="pixfindPostList" aria-expanded="false" hidden>全て見る</button>
+              </div>
+            </div>
+            <div class="account-pixfind-grid account-collection-grid" id="pixfindPostList" data-account-collection-list aria-label="この端末から投稿したPiXFiND" aria-live="polite">
+              <div class="account-item">
+                <div class="account-cover"><img src="../icon/icon-192-2.png" alt=""></div>
+                <div class="account-item__body">
+                  <strong>投稿を確認しています</strong>
+                  <span>この端末から公開したPiXFiNDを読み込んでいます。</span>
+                </div>
+                <span class="account-chip">...</span>
+              </div>
+            </div>
+          </section>
+          <section class="account-panel account-seller-panel" id="accountSeller" data-account-tab="rewards" data-market-dev-only hidden>
             <div class="account-panel__head">
               <h2 class="section-title">販売</h2>
               <span class="account-chip" id="marketSellerVerificationStatus">確認中</span>
@@ -547,6 +635,8 @@
   </div>
 
   <script src="../scripts/shared-auth-panel.js?v=2026.07.18-ad-permissions1"></script>
+  <script src="../scripts/account-dashboard.js?v=2026.07.19-account-library1"></script>
+  <script src="../scripts/account-collections.js?v=2026.07.19-account-library2"></script>
   <script src="../scripts/pixieed-dev-access.js?v=2026.07.17-market-dev1"></script>
   <script src="../scripts/account-dev-tools.js?v=2026.07.18-auth-stability1"></script>
   <script src="../scripts/account-pageview-reward-budget.js?v=2026.07.19-lineage-rewards1"></script>
@@ -554,10 +644,11 @@
   <script src="../scripts/account-ad-permissions.js?v=2026.07.18-auth-stability1"></script>
   <script src="../scripts/shared-profile-header.js"></script>
   <script src="../scripts/shared-bottom-nav.js?v=2026.07.19-ad-lifecycle1"></script>
-  <script src="../scripts/account-local-projects.js?v=2026.07.01-local-projects"></script>
-  <script src="../scripts/account-pixfind-posts.js?v=2026.07.19-play-rewards1"></script>
+  <script src="../scripts/account-local-projects.js?v=2026.07.19-account-library1"></script>
+  <script src="../scripts/account-pixfind-posts.js?v=2026.07.19-account-library1"></script>
   <script src="../scripts/market-purchase-delivery.js?v=2026.07.17-all-open1"></script>
   <script src="../scripts/account-market-purchases.js?v=2026.07.19-derivative-entry1"></script>
+  <script src="../scripts/account-market-listings.js?v=2026.07.19-account-library1"></script>
   <script src="../market/media-protection.js?v=2026.07.17-preview-protection1"></script>
   <script src="../scripts/account-market-seller.js?v=2026.07.17-dev-account1"></script>
   <script src="../scripts/pixel-art-fit.js"></script>

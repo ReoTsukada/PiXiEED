@@ -228,11 +228,11 @@
     const projectId = normalizeAutosaveProjectId(entry.id || '');
     const displayName = extractDocumentBaseName(entry.fileName || entry.name || DEFAULT_DOCUMENT_BASENAME);
     const item = document.createElement('article');
-    item.className = 'account-item';
+    item.className = 'account-project-card';
     item.setAttribute('role', 'listitem');
 
     const cover = document.createElement('div');
-    cover.className = 'account-cover';
+    cover.className = 'account-project-card__preview';
     const img = new Image();
     img.alt = `${displayName} のプレビュー`;
     img.decoding = 'async';
@@ -242,22 +242,26 @@
     cover.appendChild(img);
 
     const body = document.createElement('div');
-    body.className = 'account-item__body';
+    body.className = 'account-project-card__body';
     const title = document.createElement('strong');
     title.textContent = displayName;
     title.title = displayName;
-    const meta = document.createElement('span');
+    const meta = document.createElement('div');
+    meta.className = 'account-project-card__meta';
     meta.textContent = `${formatSavedAt(entry.updatedAt)} ・ 端末内保存`;
-    body.append(title, meta);
+    const actions = document.createElement('div');
+    actions.className = 'account-card-actions account-card-actions--single';
 
     const action = document.createElement('button');
-    action.className = 'account-action';
+    action.className = 'account-card-action account-card-action--primary';
     action.type = 'button';
     action.textContent = '開く';
     action.dataset.localProjectOpenId = projectId;
     action.setAttribute('aria-label', `${displayName} をPiXiEEDrawで開く`);
+    actions.appendChild(action);
+    body.append(title, meta, actions);
 
-    item.append(cover, body, action);
+    item.append(cover, body);
     return item;
   }
 
