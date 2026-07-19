@@ -501,6 +501,7 @@ function getRoundStartHint() {
 
 async function init() {
   ensureClientId();
+  await claimMyPublishedPuzzles();
   setActiveScreen('start');
   updateProgressLabel();
   setHint(getDifficultySelectionHint());
@@ -1804,11 +1805,36 @@ function ensureClientId() {
 }
 
 function supabaseHeaders() {
+  const token = getStoredSupabaseAccessToken();
   return {
     apikey: SUPABASE_ANON_KEY,
-    Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    Authorization: `Bearer ${token || SUPABASE_ANON_KEY}`,
     'x-client-id': clientId || '',
   };
+}
+
+function getStoredSupabaseAccessToken() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem('sb-kyyiuakrqomzlikfaire-auth-token') || 'null');
+    const token = parsed?.access_token || parsed?.session?.access_token || parsed?.currentSession?.access_token || '';
+    const payload = JSON.parse(atob(String(token).split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return Number(payload?.exp || 0) * 1000 > Date.now() + 30000 ? token : '';
+  } catch (_) {
+    return '';
+  }
+}
+
+async function claimMyPublishedPuzzles() {
+  if (!getStoredSupabaseAccessToken() || !clientId || isLocalFileProtocol()) return;
+  try {
+    await fetch(`${SUPABASE_REST_URL}/rpc/pixfind_claim_my_puzzles_v1`, {
+      method: 'POST',
+      headers: { ...supabaseHeaders(), 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+  } catch (_) {
+    // Creator attribution is retried on the next visit and never blocks play.
+  }
 }
 
 function parseMissingColumn(detail) {
@@ -2246,6 +2272,7 @@ function normalizePublishedPuzzleEntry(entry, fallback = null) {
     authorUrl: resolveAuthorUrl(source),
     authorAvatar: resolveAuthorAvatar(source),
     clientId: source.client_id ?? source.clientId ?? null,
+    validPlayCount: Math.max(0, Number(source.valid_play_count ?? source.validPlayCount) || 0),
     original,
     diff,
     mode,
@@ -2725,6 +2752,7 @@ function createOfficialCard(puzzle) {
       <h4 class="puzzle-card__title">${puzzle.label}</h4>
       ${puzzle.description ? `<p class="puzzle-card__description">${puzzle.description}</p>` : ''}
       <span class="puzzle-card__mode">${modeMeta.label}</span>
+      <span class="puzzle-card__mode">プレイ ${Number(puzzle.validPlayCount || 0).toLocaleString('ja-JP')}回</span>
       <span class="puzzle-card__author">
         <img class="author-avatar" src="${authorAvatar}" alt="" aria-hidden="true"/>
         ${authorUrl
@@ -2888,6 +2916,7 @@ async function startOfficialPuzzle(puzzle) {
     updateDeleteButton(metadata);
     setActiveScreen('game');
     resetRound();
+    window.PiXiEEDCreatorPlayRewards?.track('pixfind', metadata.id);
   } catch (error) {
     console.error(error);
     setHint('パズルの読み込みに失敗しました。');
@@ -3100,6 +3129,7 @@ function resetRound() {
 
 function leaveGame(targetScreen) {
   stopTimer();
+  window.PiXiEEDCreatorPlayRewards?.stop();
   clearMarkers();
   resetAllZoomTransforms();
   clearCanvas(ctx.original, dom.canvasOriginal);

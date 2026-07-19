@@ -101,7 +101,9 @@
     mode.textContent = `${getModeLabel(entry)} ${'★'.repeat(Math.max(1, Math.min(3, Number(entry?.difficulty) || 1)))}`;
     const date = document.createElement('span');
     date.textContent = formatDate(entry?.created_at);
-    meta.append(mode, date);
+    const plays = document.createElement('span');
+    plays.textContent = `プレイ ${Math.max(0, Number(entry?.valid_play_count) || 0).toLocaleString('ja-JP')}回`;
+    meta.append(mode, plays, date);
     body.append(title, meta);
     card.append(preview, body);
     return card;
@@ -133,7 +135,7 @@
 
     count.textContent = '確認中';
     const params = new URLSearchParams({
-      select: 'id,label,difficulty,mode,game_mode,play_mode,thumbnail_url,original_url,created_at',
+      select: 'id,label,difficulty,mode,game_mode,play_mode,thumbnail_url,original_url,valid_play_count,created_at',
       client_id: `eq.${clientId}`,
       order: 'created_at.desc',
       limit: '100',
