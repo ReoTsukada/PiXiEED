@@ -52,7 +52,7 @@
       span.perf?.mark?.(endMark);
       span.perf?.measure?.(span.name, span.startMark, endMark);
     } catch (_error) {}
-    console.info('[pixiedraw-dev:performance]', {
+    console.info('[pixiedraw:performance]', {
       phase: span.name,
       elapsedMs: Math.round(finishedAt - span.startedAt),
       ...mergedDetails,
@@ -463,7 +463,7 @@
 
     autosaveWriteInFlight = true;
     autosaveWriteQueued = false;
-    const autosaveSpan = beginAutosavePerformanceSpan('pixiedraw-dev:autosave:total', { projectId });
+    const autosaveSpan = beginAutosavePerformanceSpan('pixiedraw:autosave:total', { projectId });
     try {
       if (shouldUseLightweightSharedProjectLocalSave(projectId)) {
         updateAutosaveStatus('自動保存: 共有プロジェクトの復帰情報を保存中…');
@@ -489,8 +489,6 @@
       }
 
       updateAutosaveStatus('自動保存: 端末内V2へ差分保存中…');
-      // DEVの端末内V2保存は外部ファイル互換用の配列化を必要としない。
-      // TypedArrayを保持して、本番と同じ軽量な内部チェックポイント経路にする。
       const buildInternalAutosavePayload = (snapshotValue, options = {}) => buildPackagedProjectPayload(
         snapshotValue,
         { ...options, internalBinary: true }
@@ -515,7 +513,7 @@
           return snapshot;
         }
         const snapshotSpan = beginAutosavePerformanceSpan(
-          'pixiedraw-dev:autosave:make-history-snapshot',
+          'pixiedraw:autosave:make-history-snapshot',
           { skipped: false }
         );
         try {
@@ -543,7 +541,7 @@
       const dirtyGenerationAtStart = autosaveDirtyGeneration;
       const unsavedTokenAtStart = unsavedChangeToken;
       let savedEntry = null;
-      const recordSpan = beginAutosavePerformanceSpan('pixiedraw-dev:autosave:record-recent-project');
+      const recordSpan = beginAutosavePerformanceSpan('pixiedraw:autosave:record-recent-project');
       try {
         try {
           savedEntry = await writeAutosaveV2Primary({
