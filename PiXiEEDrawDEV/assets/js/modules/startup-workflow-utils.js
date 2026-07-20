@@ -1566,7 +1566,6 @@
   }
 
   let startupWorkspaceEntries = [];
-  let startupWorkspaceMigrationPrompted = false;
 
   function setStartupWorkspaceStatus(message, tone = 'info') {
     const node = dom.startup?.workspaceStatus;
@@ -1762,58 +1761,16 @@
   }
 
   async function refreshStartupWorkspaceProjects() {
-    let migration = { migrated: 0, created: 0, failed: 0, declined: false, failedEntries: [] };
-    if (!startupWorkspaceMigrationPrompted && typeof migrateLegacyLocalProjectsToTrueV2 === 'function') {
-      migration = await migrateLegacyLocalProjectsToTrueV2({
-        confirmMigration: ({ count, candidates }) => {
-          startupWorkspaceMigrationPrompted = true;
-          const hasSplit = Array.isArray(candidates) && candidates.some(candidate => candidate?.needsSplit === true);
-          return window.confirm(localizeText(
-            `端末内にV1・旧V2プロジェクトが${count}件あります。\n\n真V2の単一プロジェクトへ変換します。${hasSplit ? '\n複数タブ・複数キャンバスは、それぞれ独立した真V2プロジェクトへ分割します。' : ''}\n変換先を端末内へ完全保存できた後だけ、元のV1・旧V2データを削除します。\n変換中は画面を閉じないでください。\n\n変換を開始しますか？`,
-            `${count} V1 or legacy V2 on-device project(s) were found.\n\nThey will be converted to true V2 single projects.${hasSplit ? '\nMultiple tabs and canvases will be split into independent true V2 projects.' : ''}\nThe original V1/legacy V2 data is deleted only after its on-device true V2 replacement is fully committed.\nKeep this page open during conversion.\n\nStart conversion?`
-          ));
-        },
-        preparePackaged: async (entry, packaged) => await mergeFileBackedTimelapseIntoPackaged(entry, packaged),
-        onProgress: ({ index, total }) => {
-          setStartupWorkspaceStatus(localizeText(
-            `端末内プロジェクトを真V2へ変換しています… ${index}/${total}`,
-            `Converting on-device projects to true V2... ${index}/${total}`
-          ));
-        },
-      });
-    }
-    const failuresById = new Map((migration.failedEntries || [])
-      .filter(failure => failure?.entry?.id)
-      .map(failure => [failure.entry.id, failure]));
-    const localEntries = (await loadDeviceLocalWorkspaceEntries()).map(entry => {
-      const failure = failuresById.get(entry.id);
-      return failure
-        ? {
-            ...entry,
-            migrationRecovery: true,
-            migrationErrorCode: failure.code || 'ERR_TRUE_V2_MIGRATION_FAILED',
-            migrationErrorMessage: failure.message || '',
-          }
-        : entry;
-    });
+    // Startup must be ready before examining saved projects. The previous
+    // migration scan decoded every local entry during bootstrap, which could
+    // leave the initial screen stuck on older or incomplete V2 records.
+    const localEntries = await loadDeviceLocalWorkspaceEntries();
     renderStartupWorkspaceProjects(localEntries);
-    const migrationSummary = migration.migrated > 0
-      ? localizeText(
-          ` 真V2移行: 元${migration.migrated}件→${migration.created}件。`,
-          ` True V2 migration: ${migration.migrated} source(s) to ${migration.created} project(s).`
-        )
-      : '';
     setStartupWorkspaceStatus(
-      migration.failed > 0
-        ? localizeText(
-            `端末内プロジェクト${localEntries.length}件。真V2移行の未完了が${migration.failed}件あります。元データは削除していません。`,
-            `${localEntries.length} on-device project(s). ${migration.failed} true V2 migration(s) remain incomplete; original data was retained.`
-          )
-        : localizeText(
-            `端末内の真V2プロジェクトを表示しています（${localEntries.length}件）。${migrationSummary}販売前に .pixieedraw をダウンロードしてください。`,
-            `Showing ${localEntries.length} on-device true V2 project(s).${migrationSummary} Download a .pixieedraw file before sale.`
-          ),
-      migration.failed > 0 ? 'warn' : 'info'
+      localizeText(
+        `端末内プロジェクトを表示しています（${localEntries.length}件）。`,
+        `Showing ${localEntries.length} on-device project(s).`
+      )
     );
     return true;
   }
@@ -1847,7 +1804,15 @@
         target.disabled = false;
       }
     });
-    void refreshStartupWorkspaceProjects();
+    // Cards are metadata-only. Never decode project payloads or start legacy
+    // migration from this list, so the project chooser stays responsive.
+    void refreshStartupWorkspaceProjects().catch(error => {
+      console.warn('[pixiedraw-dev:startup] project list refresh failed', error);
+      setStartupWorkspaceStatus(localizeText(
+        '保存済みプロジェクトを確認できませんでした。',
+        'Saved projects could not be checked.'
+      ), 'warn');
+    });
   }
 
   function setupStartupScreen() {
@@ -1857,6 +1822,9 @@
     }
     bindCoreProjectActionButtons();
     setupStartupWorkspace();
+    dom.startup?.projectsButton?.addEventListener('click', () => {
+      void refreshStartupWorkspaceProjects();
+    });
     getUpdateHistoryEntries();
     if (dom.startup?.quickSetupButton instanceof HTMLButtonElement) {
       if (AUTOSAVE_SUPPORTED) {
