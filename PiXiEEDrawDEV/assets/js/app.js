@@ -13460,14 +13460,14 @@
     if (window.location.protocol === 'file:') {
       return;
     }
-    const isLocalProductionDraw =
-      /\/pixiedraw(?:\/|$)/.test(window.location.pathname || '')
+    const isLocalDevDraw =
+      /\/PiXiEEDrawDEV(?:\/|$)/.test(window.location.pathname || '')
       && /^(localhost|127\.0\.0\.1|::1)$/.test(window.location.hostname || '');
-    if (isLocalProductionDraw) {
+    if (isLocalDevDraw) {
       if (typeof navigator.serviceWorker.getRegistrations === 'function') {
         navigator.serviceWorker.getRegistrations().then(registrations => {
           registrations.forEach(registration => {
-            if (typeof registration?.scope === 'string' && registration.scope.includes('/pixiedraw/')) {
+            if (typeof registration?.scope === 'string' && registration.scope.includes('/PiXiEEDrawDEV/')) {
               registration.unregister().catch(() => {});
             }
           });
@@ -13476,7 +13476,7 @@
       if (typeof window.caches !== 'undefined' && typeof window.caches.keys === 'function') {
         window.caches.keys().then(keys => (
           Promise.all(keys
-            .filter(key => /^pixieedraw-v/.test(key))
+            .filter(key => /^pixieedrawdev-v/.test(key) || key.includes('PiXiEEDrawDEV'))
             .map(key => window.caches.delete(key)))
         )).catch(() => {});
       }
@@ -13492,7 +13492,7 @@
       if (suppressControllerChangeReloadUntil && Date.now() <= suppressControllerChangeReloadUntil) {
         return;
       }
-      console.info('[pixiedraw:update]', {
+      console.info('[pixiedraw-dev:update]', {
         phase: 'service-worker-controllerchange',
         reason: 'controller-changed-without-reload',
         startupReady,
