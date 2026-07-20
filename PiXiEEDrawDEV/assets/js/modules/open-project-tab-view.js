@@ -141,7 +141,7 @@
       homeButton.appendChild(homeName);
       homeItem.appendChild(homeButton);
       list.appendChild(homeItem);
-      // PiXiEEDrawDEV now keeps one project per editor instance. This area is
+      // PiXiEEDraw now keeps one project per editor instance. This area is
       // a project indicator, not a resident multi-project tab strip.
       const activeTab = openProjectTabs.find(tab => tab?.id === activeOpenProjectTabId)
         || openProjectTabs[0]
