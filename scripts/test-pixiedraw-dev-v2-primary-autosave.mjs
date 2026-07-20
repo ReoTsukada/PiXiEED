@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const root = '/Users/tsukadareine/Documents/GitHub/PiXiEED';
+const root = process.cwd();
 const read = relative => fs.readFileSync(path.join(root, relative), 'utf8');
 const app = read('PiXiEEDrawDEV/assets/js/app.js');
 const autosave = read('PiXiEEDrawDEV/assets/js/modules/autosave-workflow-utils.js');
