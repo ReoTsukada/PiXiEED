@@ -1,14 +1,14 @@
 importScripts('./assets/js/build-info.js');
 
 const APP_BUILD_VERSION = String(self.__PIXIEEDRAW_BUILD_INFO__?.buildId || 'unknown-build');
-const CACHE_VERSION = `pixieedraw-v${APP_BUILD_VERSION}`;
+const CACHE_VERSION = `pixieedrawdev-v${APP_BUILD_VERSION}`;
 const CORE_ASSETS = [
-  '/pixiedraw/',
-  '/pixiedraw/index.html',
-  '/pixiedraw/manifest.webmanifest',
-  '/pixiedraw/assets/css/style.css',
-  '/pixiedraw/assets/css/local-extension-runtime.css',
-  '/pixiedraw/assets/js/app.js',
+  '/PiXiEEDrawDEV/',
+  '/PiXiEEDrawDEV/index.html',
+  '/PiXiEEDrawDEV/manifest.webmanifest',
+  '/PiXiEEDrawDEV/assets/css/style.css',
+  '/PiXiEEDrawDEV/assets/css/local-extension-runtime.css',
+  '/PiXiEEDrawDEV/assets/js/app.js',
   '/icon/icon-192-4.png',
   '/icon/icon-512-4.png',
   '/assets/icons/icon-e1_frame_01.png',
@@ -55,8 +55,8 @@ function isNetworkFirstRequest(request, url) {
 
 function offlineFallbackResponse(request) {
   if (request.mode === 'navigate') {
-    return caches.match('/pixiedraw/index.html').then(cached => (
-      cached || new Response('PiXiEEDraw is offline.', {
+    return caches.match('/PiXiEEDrawDEV/index.html').then(cached => (
+      cached || new Response('PiXiEEDrawDEV is offline.', {
         status: 503,
         statusText: 'Service Unavailable',
         headers: { 'Content-Type': 'text/plain; charset=utf-8' },
@@ -78,7 +78,7 @@ self.addEventListener('fetch', event => {
   if (url.origin !== self.location.origin) {
     return;
   }
-  if (!url.pathname.startsWith('/pixiedraw/')) {
+  if (!url.pathname.startsWith('/PiXiEEDrawDEV/')) {
     return;
   }
 
