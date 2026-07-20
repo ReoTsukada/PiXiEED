@@ -105,6 +105,7 @@
           { label: 'ショートカット一覧', selector: '#openShortcutHelp', icon: 'pixiedraw/assets/icons/ecticon_frame_02.png' },
           { label: '使い方ヘルプ', selector: '#openOperationHelpPanel', icon: 'assets/icons/help.png?v=2026.07.17-icons1' },
           { label: '更新情報', selector: '#openUpdateHistory', icon: 'pixiedraw/assets/icons/ecticon_frame_04.png' },
+          { label: 'アプリとして使う', selector: '#pixieedPwaInstallButton', icon: 'assets/icons/Draw.png?v=2026.07.19-ui-icons1', mirrorDisabled: true },
           { label: '言語', selector: '#toggleLanguageMode', icon: 'pixiedraw/assets/icons/ecticon_frame_05.png', keepOpen: true },
           ...buildSupportDetails(),
         ],

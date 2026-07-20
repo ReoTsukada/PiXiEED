@@ -24,7 +24,7 @@
     #pixieedToolFullscreen.is-requested{animation:pixieedFullscreenPulse 1.1s ease-in-out infinite}
     @keyframes pixieedFullscreenPulse{50%{transform:scale(1.05);background:rgba(37,135,229,.94)}}
     html:fullscreen #pixieedToolFullscreen{bottom:calc(12px + env(safe-area-inset-bottom, 0px))}
-    html:fullscreen .bottom-nav,html:fullscreen .pixieed-shared-top-ad,html:fullscreen .pixieed-shared-footer,
+    html:fullscreen .bottom-nav,html:fullscreen .pixieed-shared-footer,
     html:fullscreen .ad-footer,html:fullscreen .ad-banner,html:fullscreen .panel-ad,html:fullscreen .panel-ad-mount,
     html:fullscreen #mobileBottomAd,html:fullscreen .lens-ad-banner,html:fullscreen .capture-preview__ad{display:none!important}
     @media (orientation:landscape){#pixieedToolFullscreen{bottom:calc(12px + env(safe-area-inset-bottom, 0px))}}

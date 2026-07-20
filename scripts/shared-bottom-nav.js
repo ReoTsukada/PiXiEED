@@ -99,7 +99,7 @@
     const controller = doc.createElement('script');
     controller.defer = true;
     controller.dataset.pixieedCommonTabBar = 'true';
-    controller.src = relHref('scripts/shared-tab-bar.js?v=2026.07.20-draw-actions3');
+    controller.src = relHref('scripts/shared-tab-bar.js?v=2026.07.20-draw-pwa1');
     doc.body.appendChild(controller);
   }
 
