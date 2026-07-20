@@ -109,7 +109,7 @@
     let channel = null;
 
     function log(phase, reason = '') {
-      console.info('[pixiedraw-dev:update]', {
+      console.info('[pixiedraw:update]', {
         phase,
         currentVersion: state.currentVersion,
         availableVersion: state.availableVersion,
