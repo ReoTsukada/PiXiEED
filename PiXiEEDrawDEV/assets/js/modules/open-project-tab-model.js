@@ -65,7 +65,14 @@
       });
     }
 
-    function buildOpenProjectTabPayloadFromCurrentState() {
+    function buildOpenProjectTabPayloadFromCurrentState({ metadataOnly = false } = {}) {
+      if (metadataOnly) {
+        return {
+          fileName: normalizeDocumentName(state.documentName || DEFAULT_DOCUMENT_NAME),
+          project: null,
+          unsaved: hasDocumentUnsavedChanges(),
+        };
+      }
       const snapshot = makeHistorySnapshot();
       const session = buildProjectSessionPayload();
       const packaged = buildPackagedProjectPayload(snapshot, { session, includeSheets: false });
@@ -77,7 +84,7 @@
     }
 
     function createOpenProjectTabFromCurrentState(options = {}) {
-      const payload = buildOpenProjectTabPayloadFromCurrentState();
+      const payload = buildOpenProjectTabPayloadFromCurrentState(options);
       const normalizedProjectId = normalizeAutosaveProjectId(options.projectId || getAutosaveProjectId?.())
         || createAutosaveProjectId();
       const tabId = options.tabId || createOpenProjectTabId();
