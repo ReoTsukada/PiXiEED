@@ -52,7 +52,7 @@
       span.perf?.mark?.(endMark);
       span.perf?.measure?.(span.name, span.startMark, endMark);
     } catch (_error) {}
-    console.info('[pixiedraw-dev:performance]', {
+    console.info('[pixiedraw:performance]', {
       phase: span.name,
       elapsedMs: Math.round(finishedAt - span.startedAt),
       ...mergedDetails,
@@ -259,7 +259,7 @@
     if (!validation?.ok) {
       return null;
     }
-    console.info('[pixiedraw-dev:canonical-import]', {
+    console.info('[pixiedraw:canonical-import]', {
       phase: 'file-tab-normalize-success',
       sourceAdapterId: sourceStorageAdapterId || null,
       typedByteLength: normalized.metrics?.typedByteLength || 0,
@@ -544,7 +544,9 @@
       }
       const projectId = normalizeAutosaveProjectId(entry.id || '');
       const latestEntry = projectId
-        ? ((await loadRecentProjectsMetadata()).find(candidate => candidate?.id === projectId) || entry)
+        ? ((typeof loadRecentProjectMetadataById === 'function'
+            ? await loadRecentProjectMetadataById(projectId)
+            : (await loadRecentProjectsMetadata()).find(candidate => candidate?.id === projectId)) || entry)
         : entry;
       if (isProjectCommandLocked()) {
         updateAutosaveStatus(localizeText('プロジェクト切替の完了を待ってください', 'Wait for the current project switch to finish'), 'info');
@@ -760,6 +762,8 @@
     resizeImageDataNearest,
     resizeImportFrames,
     buildIndexedPaletteFromFrameDataList,
+    buildExactIndexedPaletteFromImageFrames,
+    writeExactIndexedPixelsFromRgba,
     decodeImageFileToFrames,
     decodeGifFileToFrames,
     decodeGifWithImageDecoder,
@@ -811,7 +815,7 @@
     console.info('[pixieedraw-dev:canonical-import]', {
       phase: 'normalize-start', kind, sourceFileBytes, sourceWidth, sourceHeight,
     });
-    const normalizeSpan = beginImportPerformanceSpan('pixiedraw-dev:import:canonical-normalize');
+    const normalizeSpan = beginImportPerformanceSpan('pixiedraw:import:canonical-normalize');
     let normalized;
     try {
       const sourceProvenance = typeof createRasterImportProvenance === 'function'
@@ -843,7 +847,7 @@
     if (!normalized?.ok || !normalized.canonicalPayload) {
       return { ok: false, code: normalized?.code || 'ERR_CANONICAL_V2_NORMALIZE_FAILED', phase: normalized?.phase || 'normalize' };
     }
-    const validationSpan = beginImportPerformanceSpan('pixiedraw-dev:import:canonical-validate');
+    const validationSpan = beginImportPerformanceSpan('pixiedraw:import:canonical-validate');
     let validation;
     try {
       validation = validateCanonicalV2ProjectPayload(normalized.canonicalPayload);
@@ -935,14 +939,14 @@
       localizeText('画像を読み込み中…', 'Loading image...'),
       { immediate: true }
     );
-    const importSpan = beginImportPerformanceSpan('pixiedraw-dev:import:total', {
+    const importSpan = beginImportPerformanceSpan('pixiedraw:import:total', {
       fileName: typeof file?.name === 'string' ? file.name : '',
       fileBytes: Math.max(0, Number(file?.size) || 0),
     });
     let importResult;
     try {
       setGlobalLoadingIndicatorLabel(localizeText('画像をデコード中…', 'Decoding image...'));
-      const decodeSpan = beginImportPerformanceSpan('pixiedraw-dev:import:decode');
+      const decodeSpan = beginImportPerformanceSpan('pixiedraw:import:decode');
       try {
         importResult = await decodeImageFileToFrames(file);
       } catch (error) {
@@ -978,7 +982,7 @@
         : importSize.integerScaleFactor;
       const importWasScaled = decodedIntegerScaleFactor > 1 || importSize.scaled;
       setGlobalLoadingIndicatorLabel(localizeText('フルカラー画像を準備中…', 'Preparing full-color frames...'));
-      const resizeSpan = beginImportPerformanceSpan('pixiedraw-dev:import:resize', {
+      const resizeSpan = beginImportPerformanceSpan('pixiedraw:import:resize', {
         sourceWidth: originalSourceWidth,
         sourceHeight: originalSourceHeight,
         targetWidth: width,
@@ -995,30 +999,53 @@
       }
 
     const frames = [];
-    const palette = createRgbModeDefaultPalette();
-    const activePaletteIndex = clamp(2, 0, Math.max(0, palette.length - 1));
+    const exactIndexedImport = isGifFile(file)
+      && typeof buildExactIndexedPaletteFromImageFrames === 'function'
+      && typeof writeExactIndexedPixelsFromRgba === 'function'
+      ? buildExactIndexedPaletteFromImageFrames(normalizedFramesData, MAX_IMPORTED_PALETTE_COLORS)
+      : null;
+    const importedAsExactIndex = Boolean(exactIndexedImport?.palette?.length);
+    const palette = importedAsExactIndex
+      ? exactIndexedImport.palette
+      : createRgbModeDefaultPalette();
+    const activePaletteIndex = importedAsExactIndex
+      ? 0
+      : clamp(2, 0, Math.max(0, palette.length - 1));
     const secondaryPaletteIndex = clamp(1, 0, Math.max(0, palette.length - 1));
     const activeRgb = palette[activePaletteIndex]
       ? { ...palette[activePaletteIndex] }
       : { r: 255, g: 255, b: 255, a: 255 };
 
-    const runtimeFramesSpan = beginImportPerformanceSpan('pixiedraw-dev:import:runtime-frames', {
+    const runtimeFramesSpan = beginImportPerformanceSpan('pixiedraw:import:runtime-frames', {
       width,
       height,
       frameCount: normalizedFramesData.length,
     });
     try {
     normalizedFramesData.forEach((frameInfo, index) => {
-      const layer = createLayer(localizeText('画像レイヤー', 'Image Layer'), width, height);
-      layer.indices.fill(-1);
-      layer.directOnly = true;
-      const direct = ensureLayerDirect(layer, width, height);
-      if (frameInfo?.imageData?.data instanceof Uint8ClampedArray
+      const layer = createLayer(localizeText('画像レイヤー', 'Image Layer'), width, height, palette);
+      const hasExpectedPixels = frameInfo?.imageData?.data instanceof Uint8ClampedArray
         && frameInfo.imageData.width === width
-        && frameInfo.imageData.height === height) {
-        direct.set(frameInfo.imageData.data);
+        && frameInfo.imageData.height === height;
+      if (importedAsExactIndex) {
+        const indexed = hasExpectedPixels
+          && writeExactIndexedPixelsFromRgba(
+            frameInfo.imageData.data,
+            layer.indices,
+            exactIndexedImport.colorToIndex
+          );
+        if (!indexed) {
+          throw createImageImportError('GIFのINDEXカラー変換に失敗しました');
+        }
       } else {
-        direct.fill(0);
+        layer.indices.fill(-1);
+        layer.directOnly = true;
+        const direct = ensureLayerDirect(layer, width, height);
+        if (hasExpectedPixels) {
+          direct.set(frameInfo.imageData.data);
+        } else {
+          direct.fill(0);
+        }
       }
       frames.push({
         id: crypto.randomUUID ? crypto.randomUUID() : `frame-${Date.now().toString(36)}-${index}`,
@@ -1034,7 +1061,11 @@
         if (frameInfo && typeof frameInfo === 'object') frameInfo.imageData = null;
         normalizedFramesData[index] = null;
       });
-      endImportPerformanceSpan(runtimeFramesSpan, { createdFrameCount: frames.length });
+      endImportPerformanceSpan(runtimeFramesSpan, {
+        createdFrameCount: frames.length,
+        colorMode: importedAsExactIndex ? COLOR_MODE_INDEX : COLOR_MODE_RGB,
+        paletteSize: importedAsExactIndex ? palette.length : 0,
+      });
     }
 
     const activeLayerId = frames[0]?.layers[0]?.id;
@@ -1062,7 +1093,7 @@
       activePaletteIndex,
       secondaryPaletteIndex,
       activeRgb,
-      colorMode: COLOR_MODE_RGB,
+      colorMode: importedAsExactIndex ? COLOR_MODE_INDEX : COLOR_MODE_RGB,
       frames,
       activeFrame: 0,
       activeLayer: activeLayerId,
@@ -1092,10 +1123,10 @@
       if (typeof buildPackagedProjectPayload !== 'function') {
         throw new Error('ERR_PROJECT_PAYLOAD_BUILDER_UNAVAILABLE');
       }
-      return buildPackagedProjectPayload(snapshot, { includeSheets: false });
+      return buildPackagedProjectPayload(snapshot, { session: {}, includeSheets: false });
     }
 
-    const applySnapshotSpan = beginImportPerformanceSpan('pixiedraw-dev:import:apply-history-snapshot', {
+    const applySnapshotSpan = beginImportPerformanceSpan('pixiedraw:import:apply-history-snapshot', {
       frameCount: frames.length,
       width,
       height,
@@ -1122,16 +1153,17 @@
     syncMultiProjectKeyInputValues('', { preserveFocused: false });
     markAutosaveDirty();
     scheduleAutosaveSnapshot();
+    const importColorModeLabel = importedAsExactIndex ? 'INDEXカラー' : 'RGBカラー';
     if (importWasScaled) {
       const integerScaleLabel = effectiveIntegerScaleFactor > 1
         ? ` / 整数倍縮小 x${effectiveIntegerScaleFactor}`
         : '';
       updateAutosaveStatus(
-        `画像をRGBカラーで読み込みました (${originalSourceWidth}x${originalSourceHeight} → ${width}x${height}${integerScaleLabel}) / 端末内へ自動保存します`,
+        `画像を${importColorModeLabel}で読み込みました (${originalSourceWidth}x${originalSourceHeight} → ${width}x${height}${integerScaleLabel}) / 端末内へ自動保存します`,
         'success'
       );
     } else {
-      updateAutosaveStatus('画像をRGBカラーで読み込みました / 端末内へ自動保存します', 'success');
+      updateAutosaveStatus(`画像を${importColorModeLabel}で読み込みました / 端末内へ自動保存します`, 'success');
     }
     scheduleSessionPersist();
     return true;

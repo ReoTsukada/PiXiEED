@@ -535,7 +535,8 @@
 </script>
 <link rel="apple-touch-icon" href="/icon/icon-512-4.png"/>
 </head>
-<body class="app-preinit">
+<body class="app-preinit" data-pixieed-fullscreen-action="tabbar">
+  <button aria-pressed="false" hidden id="fullscreenButton" type="button">拡大</button>
 <div aria-atomic="true" aria-live="polite" class="startup-boot-loading" id="startupBootLoading" role="status">
 <div class="startup-boot-loading__panel">
 <p class="startup-boot-loading__title">PiXiEEDraw</p>
@@ -2531,7 +2532,7 @@
   </script>
 
 	<script src="../scripts/tool-fullscreen.js?v=2026.07.15-pixiedraw-fullscreen-restore1"></script>
-	<script src="../scripts/shared-bottom-nav.js?v=2026.07.19-ad-lifecycle1"></script>
+	<script src="../scripts/shared-bottom-nav.js?v=2026.07.20-draw-fullscreen1"></script>
 	<script>
     (function initOperationHelpAd() {
       if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.('operation-help-dialog')) return;

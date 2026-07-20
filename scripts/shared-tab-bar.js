@@ -99,6 +99,7 @@
           { id: 'qr', label: 'QR編集', selector: '[data-ui-action="openQrEditor"]', icon: 'assets/icons/QR.png' },
           { id: 'undo', label: '元に戻す', selector: '#undoAction', icon: 'assets/icons/Undo.png?v=2026.07.19-ui-icons1', mirrorDisabled: true, placement: 'trailing' },
           { id: 'redo', label: 'やり直す', selector: '#redoAction', icon: 'assets/icons/Redo.png?v=2026.07.19-ui-icons1', mirrorDisabled: true, placement: 'trailing' },
+          { id: 'fullscreen', label: '拡大', selector: '#fullscreenButton', icon: 'expand.png', iconWhenPressed: 'shrink.png', mirrorState: true, mode: 'fullscreen', fullscreenController: 'tool', placement: 'trailing' },
         ],
         details: [
           { label: 'ショートカット一覧', selector: '#openShortcutHelp', icon: 'pixiedraw/assets/icons/ecticon_frame_02.png' },

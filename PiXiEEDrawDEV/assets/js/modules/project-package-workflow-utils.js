@@ -52,7 +52,7 @@
       span.perf?.mark?.(endMark);
       span.perf?.measure?.(span.name, span.startMark, endMark);
     } catch (_error) {}
-    console.info('[pixiedraw-dev:performance]', {
+    console.info('[pixiedraw:performance]', {
       phase: span.name,
       elapsedMs: Math.round(finishedAt - span.startedAt),
       ...mergedDetails,
@@ -364,9 +364,16 @@
   // A saved PiXiEEDraw project is exactly one document.  `includeSheets` is
   // accepted only so older call sites do not throw while they are being
   // retired; it must never make a newly written package multi-project again.
-  function buildPackagedProjectPayload(snapshot, { session = null, updatedAt = '', includeSheets = false } = {}) {
+  function buildPackagedProjectPayload(snapshot, {
+    session = null,
+    updatedAt = '',
+    includeSheets = false,
+    internalBinary = false,
+  } = {}) {
     const resolvedDotStats = resolveTrackedProjectDotStats(snapshot);
-    const payload = serializeDocumentSnapshot(snapshot);
+    const payload = serializeDocumentSnapshot(snapshot, {
+      preserveTypedArrays: internalBinary === true,
+    });
     const packagedSession = session && typeof session === 'object'
       ? session
       : buildProjectSessionPayload();
@@ -400,6 +407,7 @@
         session: packagedSession,
         updatedAt: packaged.updatedAt,
         includeSheets: false,
+        internalBinary,
       });
       syncActiveProjectSheetForPackagedSave(activeSheetPackaged, snapshot);
       const projectSheets = buildProjectSheetsPayload(activeSheetPackaged);
@@ -626,7 +634,7 @@
           thumbnail: previousEntry?.thumbnail || null,
         });
       }
-      const packageSpan = beginProjectPackagePerformanceSpan('pixiedraw-dev:autosave:package', {
+      const packageSpan = beginProjectPackagePerformanceSpan('pixiedraw:autosave:package', {
         projectId: resolvedProjectId,
       });
       let savePlan;
@@ -686,7 +694,7 @@
           || !Number.isFinite(previousUpdatedAt)
           || (nowTs - previousUpdatedAt >= safeThumbnailInterval)
         );
-      const thumbnailSpan = beginProjectPackagePerformanceSpan('pixiedraw-dev:autosave:thumbnail', {
+      const thumbnailSpan = beginProjectPackagePerformanceSpan('pixiedraw:autosave:thumbnail', {
         refresh: shouldRefreshThumbnail,
       });
       let thumbnail;
@@ -736,7 +744,7 @@
         const bTime = typeof b?.updatedAt === 'string' ? b.updatedAt : '';
         return bTime.localeCompare(aTime);
       });
-      const indexedDbSpan = beginProjectPackagePerformanceSpan('pixiedraw-dev:autosave:indexeddb-write', {
+      const indexedDbSpan = beginProjectPackagePerformanceSpan('pixiedraw:autosave:indexeddb-write', {
         projectId: resolvedProjectId,
       });
       try {

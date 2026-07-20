@@ -31,7 +31,18 @@
 
     return ((scope) => {
       with (scope) {
-  function serializeDocumentSnapshot(snapshot) {
+  function serializeRasterForDocument(value, { preserveTypedArrays = false } = {}) {
+    if (!value) {
+      return preserveTypedArrays ? null : '';
+    }
+    if (preserveTypedArrays && ArrayBuffer.isView(value)) {
+      return value;
+    }
+    return encodeTypedArray(value);
+  }
+
+  function serializeDocumentSnapshot(snapshot, options = {}) {
+    const preserveTypedArrays = options?.preserveTypedArrays === true;
     const palette = snapshot.palette.map(color => normalizeColorValue(color));
     const maxPaletteIndex = Math.max(0, palette.length - 1);
     const activePaletteIndex = clamp(
@@ -54,8 +65,12 @@
         activeFrame: canvas.activeFrame,
         activeLayer: canvas.activeLayer,
         mirror: normalizeMirrorAxisState(canvas.mirror, canvas.width, canvas.height),
-        selectionMask: canvas.selectionMask ? encodeTypedArray(canvas.selectionMask) : null,
-        selectionContentMask: canvas.selectionContentMask ? encodeTypedArray(canvas.selectionContentMask) : null,
+        selectionMask: canvas.selectionMask
+          ? serializeRasterForDocument(canvas.selectionMask, { preserveTypedArrays })
+          : null,
+        selectionContentMask: canvas.selectionContentMask
+          ? serializeRasterForDocument(canvas.selectionContentMask, { preserveTypedArrays })
+          : null,
         selectionBounds: canvas.selectionBounds ? { ...canvas.selectionBounds } : null,
         frames: canvas.frames.map(frame => ({
           id: frame.id,
@@ -63,7 +78,7 @@
           duration: frame.duration,
           voxelPreviewYawDeg: normalizeVoxelPreviewYawDegrees(frame?.voxelPreviewYawDeg),
           voxelPreviewPitchDeg: normalizeVoxelPreviewPitchDegrees(frame?.voxelPreviewPitchDeg),
-          layers: frame.layers.map(layer => serializeLayerForDocument(layer)),
+          layers: frame.layers.map(layer => serializeLayerForDocument(layer, { preserveTypedArrays })),
         })),
       }))
       : null;
@@ -79,7 +94,7 @@
         duration: frame.duration,
         voxelPreviewYawDeg: normalizeVoxelPreviewYawDegrees(frame?.voxelPreviewYawDeg),
         voxelPreviewPitchDeg: normalizeVoxelPreviewPitchDegrees(frame?.voxelPreviewPitchDeg),
-        layers: frame.layers.map(layer => serializeLayerForDocument(layer)),
+        layers: frame.layers.map(layer => serializeLayerForDocument(layer, { preserveTypedArrays })),
       })),
       activeFrame: snapshot.activeFrame,
       activeLayer: snapshot.activeLayer,
@@ -88,8 +103,12 @@
       secondaryPaletteIndex,
       activeRgb: normalizeColorValue(snapshot.activeRgb || palette[activePaletteIndex] || palette[0] || { r: 0, g: 0, b: 0, a: 0 }),
       mirror: normalizeMirrorAxisState(snapshot.mirror, snapshot.width, snapshot.height),
-      selectionMask: snapshot.selectionMask ? encodeTypedArray(snapshot.selectionMask) : null,
-      selectionContentMask: snapshot.selectionContentMask ? encodeTypedArray(snapshot.selectionContentMask) : null,
+      selectionMask: snapshot.selectionMask
+        ? serializeRasterForDocument(snapshot.selectionMask, { preserveTypedArrays })
+        : null,
+      selectionContentMask: snapshot.selectionContentMask
+        ? serializeRasterForDocument(snapshot.selectionContentMask, { preserveTypedArrays })
+        : null,
       selectionBounds: snapshot.selectionBounds ? { ...snapshot.selectionBounds } : null,
       documentName: normalizeDocumentName(snapshot.documentName),
       dualLeftRail: false,
@@ -116,7 +135,28 @@
     return serialized;
   }
 
-  function deserializeDocumentPayload(payload) {
+  function deserializeSelectionMask(value, pixelCount, { reuseTypedArrays = false } = {}) {
+    if (value instanceof Uint8Array && value.length === pixelCount) {
+      return reuseTypedArrays ? value : new Uint8Array(value);
+    }
+    if (ArrayBuffer.isView(value) && value.length === pixelCount) {
+      return new Uint8Array(value);
+    }
+    if (Array.isArray(value) && value.length === pixelCount) {
+      return new Uint8Array(value);
+    }
+    if (typeof value === 'string' && value.length > 0) {
+      const bytes = decodeBase64(value);
+      if (bytes.length === pixelCount) {
+        return new Uint8Array(bytes);
+      }
+    }
+    return null;
+  }
+
+  function deserializeDocumentPayload(payload, options = {}) {
+    const reuseTypedArrays = options?.reuseTypedArrays === true;
+    const trustStoredLayerFlags = options?.trustStoredLayerFlags === true;
     if (!payload || typeof payload !== 'object') {
       throw new Error('Invalid document payload');
     }
@@ -149,7 +189,8 @@
         `layer-${frameIndex}-${layerIndex}`,
         getDefaultLayerName(layerIndex + 1),
         width,
-        height
+        height,
+        { reuseTypedArrays, trustStoredLayerFlags }
       ));
       return {
         id: typeof frame.id === 'string' ? frame.id : `frame-${frameIndex + 1}`,
@@ -168,22 +209,12 @@
       activeLayerId = activeFrame.layers[activeFrame.layers.length - 1].id;
     }
 
-    let selectionMask = null;
-    if (typeof payload.selectionMask === 'string') {
-      const maskBytes = decodeBase64(payload.selectionMask);
-      if (maskBytes.length === pixelCount) {
-        selectionMask = new Uint8Array(maskBytes.length);
-        selectionMask.set(maskBytes);
-      }
-    }
-    let selectionContentMask = null;
-    if (typeof payload.selectionContentMask === 'string') {
-      const contentMaskBytes = decodeBase64(payload.selectionContentMask);
-      if (contentMaskBytes.length === pixelCount) {
-        selectionContentMask = new Uint8Array(contentMaskBytes.length);
-        selectionContentMask.set(contentMaskBytes);
-      }
-    }
+    const selectionMask = deserializeSelectionMask(payload.selectionMask, pixelCount, { reuseTypedArrays });
+    const selectionContentMask = deserializeSelectionMask(
+      payload.selectionContentMask,
+      pixelCount,
+      { reuseTypedArrays }
+    );
 
     const selectionBounds = validateBoundsObject(payload.selectionBounds);
     const activeTool = normalizeToolId(payload.tool, state.tool);
@@ -308,7 +339,8 @@
             `layer-${canvasIndex}-${frameIndex}-${layerIndex}`,
             getDefaultLayerName(layerIndex + 1),
             canvasWidth,
-            canvasHeight
+            canvasHeight,
+            { reuseTypedArrays, trustStoredLayerFlags }
           ));
           return {
             id: typeof frame.id === 'string' ? frame.id : `frame-${canvasIndex}-${frameIndex + 1}`,
@@ -331,22 +363,16 @@
         if (!activeFrameForCanvas.layers.some(layer => layer.id === activeLayerIdForCanvas)) {
           activeLayerIdForCanvas = activeFrameForCanvas.layers[activeFrameForCanvas.layers.length - 1].id;
         }
-        let canvasSelectionMask = null;
-        if (typeof canvas?.selectionMask === 'string') {
-          const maskBytes = decodeBase64(canvas.selectionMask);
-          if (maskBytes.length === canvasPixelCount) {
-            canvasSelectionMask = new Uint8Array(maskBytes.length);
-            canvasSelectionMask.set(maskBytes);
-          }
-        }
-        let canvasSelectionContentMask = null;
-        if (typeof canvas?.selectionContentMask === 'string') {
-          const contentMaskBytes = decodeBase64(canvas.selectionContentMask);
-          if (contentMaskBytes.length === canvasPixelCount) {
-            canvasSelectionContentMask = new Uint8Array(contentMaskBytes.length);
-            canvasSelectionContentMask.set(contentMaskBytes);
-          }
-        }
+        const canvasSelectionMask = deserializeSelectionMask(
+          canvas?.selectionMask,
+          canvasPixelCount,
+          { reuseTypedArrays }
+        );
+        const canvasSelectionContentMask = deserializeSelectionMask(
+          canvas?.selectionContentMask,
+          canvasPixelCount,
+          { reuseTypedArrays }
+        );
         return {
           id: typeof canvas?.id === 'string' && canvas.id ? canvas.id : `canvas-${canvasIndex + 1}`,
           name: typeof canvas?.name === 'string' && canvas.name.trim() ? canvas.name : getDefaultProjectCanvasName(canvasIndex + 1),

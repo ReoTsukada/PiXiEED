@@ -19,12 +19,25 @@
   }
 
   function packRgba(r, g, b, a) {
+    const alpha = Number(a) & 255;
+    // Invisible RGB values under fully transparent pixels are not editable
+    // visual detail and must not prevent lossless integer-scale detection.
+    if (alpha === 0) {
+      return 0;
+    }
     return (
       ((Number(r) & 255) * 0x1000000)
       + ((Number(g) & 255) << 16)
       + ((Number(b) & 255) << 8)
-      + (Number(a) & 255)
+      + alpha
     ) >>> 0;
+  }
+
+  function buildPaletteVisualKeys(palette) {
+    if (!Array.isArray(palette)) {
+      return [];
+    }
+    return palette.map(color => packRgba(color?.r, color?.g, color?.b, color?.a));
   }
 
   function getSnapshotCanvases(snapshot) {
@@ -92,12 +105,13 @@
     return null;
   }
 
-  function getPixelKey(layer, direct, index) {
+  function getPixelKey(layer, direct, paletteVisualKeys, index) {
     const paletteIndex = layer.indices[index];
     if (paletteIndex >= 0) {
-      // Negative keys keep indexed identity separate from direct RGBA values.
-      // Duplicate palette colors can still carry intentional editable indices.
-      return -paletteIndex - 1;
+      // Integer-scale optimization is lossless in rendered pixels. Duplicate
+      // palette slots and INDEX/direct storage seams are not visible detail,
+      // so compare the actual RGBA color for every raster layer.
+      return paletteVisualKeys[paletteIndex] ?? 0;
     }
     if (!direct) {
       return 0;
@@ -136,6 +150,7 @@
         : DEFAULT_YIELD_INTERVAL_MS
     );
     const canvases = getSnapshotCanvases(snapshot);
+    const paletteVisualKeys = buildPaletteVisualKeys(snapshot?.palette);
     if (!canvases.length) {
       return { optimizable: false, factor: 1, reason: 'no-canvas', totalPixelCount: 0 };
     }
@@ -204,20 +219,48 @@
           let leftKey = 0;
           const rowOffset = y * entry.width;
           for (let x = 0; x < entry.width; x += 1) {
-            const key = getPixelKey(layer, direct, rowOffset + x);
+            const key = getPixelKey(
+              layer,
+              direct,
+              paletteVisualKeys,
+              rowOffset + x
+            );
             if (x > 0 && key !== leftKey) {
               transitionFound = true;
               factor = greatestCommonDivisor(factor, x);
+              if (factor <= 1) {
+                return {
+                  optimizable: false,
+                  factor: 1,
+                  reason: 'pixel-factor-one',
+                  totalPixelCount,
+                  failureCanvasIndex: canvasIndex,
+                  failureLayerIndex: layerIndex,
+                  failureX: x,
+                  failureY: y,
+                  failureAxis: 'x',
+                };
+              }
             }
             if (y > 0 && key !== previousRow[x]) {
               transitionFound = true;
               factor = greatestCommonDivisor(factor, y);
+              if (factor <= 1) {
+                return {
+                  optimizable: false,
+                  factor: 1,
+                  reason: 'pixel-factor-one',
+                  totalPixelCount,
+                  failureCanvasIndex: canvasIndex,
+                  failureLayerIndex: layerIndex,
+                  failureX: x,
+                  failureY: y,
+                  failureAxis: 'y',
+                };
+              }
             }
             previousRow[x] = key;
             leftKey = key;
-          }
-          if (factor <= 1) {
-            return { optimizable: false, factor: 1, reason: 'pixel-factor-one', totalPixelCount };
           }
           if (yieldIntervalMs >= 0 && now() - lastYieldAt >= yieldIntervalMs) {
             options.onProgress?.({
@@ -266,7 +309,17 @@
 
   function applySnapshotIntegerScale(snapshot, inspection) {
     if (!inspection?.optimizable || inspection.factor <= 1 || !Array.isArray(inspection.canvasEntries)) {
-      return { optimized: false, factor: 1, reason: inspection?.reason || 'not-optimizable' };
+      return {
+        optimized: false,
+        factor: 1,
+        reason: inspection?.reason || 'not-optimizable',
+        totalPixelCount: Math.max(0, Math.round(Number(inspection?.totalPixelCount) || 0)),
+        failureCanvasIndex: Number.isInteger(inspection?.failureCanvasIndex) ? inspection.failureCanvasIndex : -1,
+        failureLayerIndex: Number.isInteger(inspection?.failureLayerIndex) ? inspection.failureLayerIndex : -1,
+        failureX: Number.isInteger(inspection?.failureX) ? inspection.failureX : -1,
+        failureY: Number.isInteger(inspection?.failureY) ? inspection.failureY : -1,
+        failureAxis: inspection?.failureAxis || '',
+      };
     }
     const factor = inspection.factor;
     let sourceByteEstimate = 0;

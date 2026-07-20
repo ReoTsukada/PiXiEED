@@ -2338,6 +2338,17 @@
       axis = 'x';
       delta = deltaY;
     }
+    // The compact desktop timeline only exposes frame headers. A normal mouse
+    // wheel therefore needs to advance the horizontal frame strip whenever
+    // there is no real vertical timeline range to consume the gesture.
+    if (
+      axis === 'y'
+      && getTimelineMatrixViewportMaxScroll(viewport, 'y') <= 0
+      && getTimelineMatrixViewportMaxScroll(viewport, 'x') > 0
+    ) {
+      axis = 'x';
+      delta = deltaY;
+    }
     if (!scrollTimelineMatrixViewport(viewport, axis, delta)) {
       return;
     }

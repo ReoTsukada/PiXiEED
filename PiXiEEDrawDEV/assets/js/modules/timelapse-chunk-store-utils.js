@@ -31,6 +31,22 @@
       transaction.onerror = () => reject(transaction.error || new Error('IndexedDB transaction failed.'));
     });
 
+    function normalizeRecord(record = null, projectId = '') {
+      const source = record && typeof record === 'object' ? record : {};
+      return {
+        ...source,
+        projectId: normalizeId(source.projectId || projectId),
+        byCanvas: source.byCanvas && typeof source.byCanvas === 'object' && !Array.isArray(source.byCanvas)
+          ? source.byCanvas
+          : {},
+        baseSnapshotsByCanvas: source.baseSnapshotsByCanvas
+          && typeof source.baseSnapshotsByCanvas === 'object'
+          && !Array.isArray(source.baseSnapshotsByCanvas)
+          ? source.baseSnapshotsByCanvas
+          : {},
+      };
+    }
+
     async function openDatabase() {
       if (!indexedDBApi || typeof indexedDBApi.open !== 'function') return null;
       if (!databasePromise) {
@@ -53,6 +69,7 @@
     }
 
     function appendAndThin(record, canvasId, snapshots) {
+      record = normalizeRecord(record, record?.projectId || '');
       const list = Array.isArray(record.byCanvas[canvasId]) ? record.byCanvas[canvasId] : [];
       snapshots.forEach(snapshot => {
         if (snapshot) list.push(clone(snapshot));
@@ -76,14 +93,40 @@
       return enqueue(async () => {
         const database = await openDatabase();
         if (!database) {
-          const record = fallback.get(projectKey) || { projectId: projectKey, byCanvas: {}, updatedAt: '' };
+          const record = normalizeRecord(fallback.get(projectKey), projectKey);
           fallback.set(projectKey, appendAndThin(record, canvasKey, values));
           return true;
         }
         const transaction = database.transaction(STORE_NAME, 'readwrite');
         const store = transaction.objectStore(STORE_NAME);
-        const record = (await requestResult(store.get(projectKey))) || { projectId: projectKey, byCanvas: {}, updatedAt: '' };
+        const record = normalizeRecord(await requestResult(store.get(projectKey)), projectKey);
         store.put(appendAndThin(record, canvasKey, values));
+        await transactionDone(transaction);
+        return true;
+      });
+    }
+
+    async function writeBaseSnapshot(projectId, canvasId, baseSnapshot = null) {
+      const projectKey = normalizeId(projectId);
+      const canvasKey = normalizeId(canvasId);
+      if (!projectKey || !canvasKey || !baseSnapshot || typeof baseSnapshot !== 'object') return false;
+      return enqueue(async () => {
+        const database = await openDatabase();
+        if (!database) {
+          const record = normalizeRecord(fallback.get(projectKey), projectKey);
+          record.baseSnapshotsByCanvas[canvasKey] = clone(baseSnapshot);
+          record.updatedAt = new Date().toISOString();
+          fallback.set(projectKey, record);
+          return true;
+        }
+        const transaction = database.transaction(STORE_NAME, 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const record = normalizeRecord(await requestResult(store.get(projectKey)), projectKey);
+        // IndexedDB performs its own structured clone. Avoid building another
+        // full JavaScript copy of a large all-frame baseline before put().
+        record.baseSnapshotsByCanvas[canvasKey] = baseSnapshot;
+        record.updatedAt = new Date().toISOString();
+        store.put(record);
         await transactionDone(transaction);
         return true;
       });
@@ -91,13 +134,14 @@
 
     async function readProject(projectId) {
       const projectKey = normalizeId(projectId);
-      if (!projectKey) return { projectId: '', byCanvas: {} };
+      if (!projectKey) return normalizeRecord(null, '');
       await queue;
       const database = await openDatabase();
-      if (!database) return clone(fallback.get(projectKey) || { projectId: projectKey, byCanvas: {} });
+      if (!database) return clone(normalizeRecord(fallback.get(projectKey), projectKey));
       const transaction = database.transaction(STORE_NAME, 'readonly');
       const value = await requestResult(transaction.objectStore(STORE_NAME).get(projectKey));
-      return clone(value || { projectId: projectKey, byCanvas: {} });
+      // Values returned by IndexedDB are already detached structured clones.
+      return normalizeRecord(value, projectKey);
     }
 
     async function removeProject(projectId) {
@@ -113,7 +157,13 @@
       });
     }
 
-    return Object.freeze({ appendSnapshots, readProject, removeProject, flush: () => queue });
+    return Object.freeze({
+      appendSnapshots,
+      writeBaseSnapshot,
+      readProject,
+      removeProject,
+      flush: () => queue,
+    });
   }
 
   root.timelapseChunkStoreUtils = Object.freeze({ createTimelapseChunkStoreUtils });

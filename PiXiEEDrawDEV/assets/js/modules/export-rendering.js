@@ -315,7 +315,7 @@
       return { exportedCount: 0, total: 0, wasCancelled: false, hadFailure: true };
     }
     try {
-      const candidates = getExportScaleCandidates('spritemap');
+      const candidates = getExportScaleCandidates('spritemap', { allowFullScan: true });
       const selectedScale = applyExportScaleConstraints(candidates);
       syncExportScaleInputs();
       const includeOriginal = shouldExportOriginalCompanion('spritemap', selectedScale);
@@ -495,7 +495,7 @@
       return;
     }
     try {
-      const candidates = getExportScaleCandidates();
+      const candidates = getExportScaleCandidates(undefined, { allowFullScan: true });
       const selectedScale = applyExportScaleConstraints(candidates);
       syncExportScaleInputs();
       const includeOriginal = shouldExportOriginalCompanion('jpeg', selectedScale);
@@ -603,7 +603,7 @@
       return;
     }
     try {
-      const candidates = getExportScaleCandidates();
+      const candidates = getExportScaleCandidates(undefined, { allowFullScan: true });
       const selectedScale = applyExportScaleConstraints(candidates);
       syncExportScaleInputs();
       const includeOriginal = shouldExportOriginalCompanion('svg', selectedScale);
@@ -768,7 +768,7 @@
       return;
     }
     try {
-      const candidates = getExportScaleCandidates();
+      const candidates = getExportScaleCandidates(undefined, { allowFullScan: true });
       const selectedScale = applyExportScaleConstraints(candidates);
       syncExportScaleInputs();
       const includeOriginal = shouldExportOriginalCompanion('gif', selectedScale);
@@ -855,6 +855,145 @@
     } catch (error) {
       console.error('GIF export failed', error);
       updateAutosaveStatus('GIFの書き出しに失敗しました', 'error');
+    }
+  }
+
+  async function exportProjectAsAllFormatsZip() {
+    if (!ensureCurrentClientCanExportProject({ announce: true, format: 'allzip' })) {
+      return { exportedCount: 0, total: 0, wasCancelled: false, hadFailure: true };
+    }
+    if (!canExportFormatInCurrentState('project')) {
+      updateAutosaveStatus(
+        localizeText(
+          '全形式ZIPには .pixieedraw プロジェクトを含めるため、プロジェクト保存を利用できる状態が必要です',
+          'All formats ZIP requires project export to be available'
+        ),
+        'warn'
+      );
+      return { exportedCount: 0, total: 0, wasCancelled: false, hadFailure: true };
+    }
+    const sourceFrameSet = buildExportFrameSet();
+    if (!sourceFrameSet?.frameCount || !Array.isArray(sourceFrameSet.framePixels)) {
+      updateAutosaveStatus(localizeText('ZIPへまとめるフレームがありません', 'No frames are available for the ZIP bundle'), 'warn');
+      return { exportedCount: 0, total: 0, wasCancelled: false, hadFailure: true };
+    }
+
+    try {
+      updateAutosaveStatus(localizeText('全形式ZIPを準備中…', 'Preparing all formats ZIP…'), 'info');
+      // The final ZIP may need every frame, but it is intentionally generated
+      // only after the user confirms export; dialog preview never does this.
+      const candidates = getExportScaleCandidates('allzip', { allowFullScan: true });
+      const selectedScale = applyExportScaleConstraints(candidates);
+      syncExportScaleInputs();
+      const primaryFrameSet = appendColorSpriteAreaToFrameSet(sourceFrameSet, 'allzip');
+      const { width, height, framePixels, frameDurations, frameCount } = primaryFrameSet;
+      const tasks = [];
+      const frameDigits = Math.max(2, String(frameCount).length);
+      const addTask = (task, folder) => {
+        tasks.push({
+          ...task,
+          // ZIP entries are flat because the lightweight ZIP writer sanitizes
+          // path separators. A format prefix keeps every generated file unique.
+          filename: `${folder}_${task.filename}`,
+        });
+      };
+
+      for (let frameIndex = 0; frameIndex < frameCount; frameIndex += 1) {
+        const pixels = framePixels[frameIndex];
+        const frameCanvas = createFrameCanvas(pixels, width, height);
+        const scaledCanvas = scaleCanvasNearestNeighbor(frameCanvas, selectedScale);
+        const suffix = `frame_${String(frameIndex + 1).padStart(frameDigits, '0')}${selectedScale > 1 ? `_x${selectedScale}` : ''}`;
+        const pngBlob = await canvasToBlob(scaledCanvas, 'image/png');
+        if (!pngBlob) throw new Error('Failed to create PNG for all formats ZIP');
+        addTask({ blob: pngBlob, filename: createExportFileName('png', suffix), mimeType: 'image/png' }, 'PNG');
+
+        const jpegCanvas = createJpegCanvasFromSourceCanvas(scaledCanvas);
+        const jpegBlob = await canvasToBlob(jpegCanvas, 'image/jpeg', 0.92);
+        if (!jpegBlob) throw new Error('Failed to create JPEG for all formats ZIP');
+        addTask({ blob: jpegBlob, filename: createExportFileName('jpg', suffix), mimeType: 'image/jpeg' }, 'JPEG');
+
+        const svgBlob = buildSvgBlobFromPixels(pixels, width, height, selectedScale);
+        addTask({ blob: svgBlob, filename: createExportFileName('svg', suffix), mimeType: 'image/svg+xml' }, 'SVG');
+        if ((frameIndex + 1) % 4 === 0) {
+          await new Promise(resolve => window.setTimeout(resolve, 0));
+        }
+      }
+
+      const scaledGif = scaleFrameSetNearestNeighbor(framePixels, width, height, selectedScale);
+      const gifBytes = buildGifFromPixels(scaledGif.framePixels, frameDurations, scaledGif.width, scaledGif.height);
+      addTask({
+        blob: new Blob([gifBytes], { type: 'image/gif' }),
+        filename: createExportFileName('gif', selectedScale > 1 ? `animation_x${selectedScale}` : 'animation'),
+        mimeType: 'image/gif',
+      }, 'GIF');
+
+      const spriteMapPlan = buildSpriteMapExportPlan(sourceFrameSet.framePixels, sourceFrameSet.width, sourceFrameSet.height, state.palette, {
+        includeColorSprites: exportColorSpritesEnabled,
+      });
+      const spriteMap = buildSpriteMapCanvas(spriteMapPlan.framePixels, sourceFrameSet.width, sourceFrameSet.height, {
+        scale: selectedScale,
+        columns: spriteMapPlan.columns,
+        rows: spriteMapPlan.rows,
+        placements: spriteMapPlan.placements,
+      });
+      const spriteMapBlob = await canvasToBlob(spriteMap.canvas, 'image/png');
+      if (!spriteMapBlob) throw new Error('Failed to create SpriteMAP for all formats ZIP');
+      addTask({
+        blob: spriteMapBlob,
+        filename: createExportFileName('png', selectedScale > 1 ? `spritemap_x${selectedScale}` : 'spritemap'),
+        mimeType: 'image/png',
+      }, 'SPRITEMAP');
+
+      const projectBundle = await buildProjectExportBundle(
+        getExportFileNameBase() || state.documentName,
+        {
+          includeSheets: false,
+          includeTimelapse: true,
+          useWorker: true,
+          preferredStorageAdapterId: 'pixieedraw-v2-zip',
+        }
+      );
+      if (!(projectBundle?.blob instanceof Blob) || !projectBundle?.filename) {
+        throw new Error('Failed to create PiXiEEDraw project for all formats ZIP');
+      }
+      addTask({
+        blob: projectBundle.blob,
+        filename: projectBundle.filename,
+        mimeType: PROJECT_FILE_MIME_TYPE,
+      }, 'PROJECT');
+
+      const result = await deliverExportTasks(tasks, {
+        mimeType: 'application/zip',
+        fileExtensions: ['.zip'],
+        shareTitle: state.documentName || 'PiXiEEDraw',
+        shareText: localizeText('全形式をZIPへまとめました', 'Bundled all formats into ZIP'),
+        mode: 'allzip',
+        archiveSuffix: 'all_formats',
+        archiveShareText: localizeText('PNG・GIF・SVG・JPEG・SpriteMAP・PiXiEEDrawをZIPへまとめました', 'Bundled PNG, GIF, SVG, JPEG, SpriteMAP, and PiXiEEDraw into ZIP'),
+      });
+      if (result.exportedCount === result.total && !result.wasCancelled && !result.hadFailure) {
+        markDocumentDurablySaved();
+        updateAutosaveStatus(
+          localizeText(`全形式ZIPを書き出しました（${frameCount}フレーム / ${tasks.length}ファイル）`, `Exported all formats ZIP (${frameCount} frames / ${tasks.length} files)`),
+          'success'
+        );
+        showLoginPromptAfterExport();
+      } else if (result.wasCancelled) {
+        updateAutosaveStatus(localizeText('全形式ZIPの書き出しをキャンセルしました', 'All formats ZIP export was canceled'), 'warn');
+      } else {
+        updateAutosaveStatus(localizeText('全形式ZIPの書き出しに失敗しました', 'All formats ZIP export failed'), 'error');
+      }
+      return result;
+    } catch (error) {
+      console.error('All formats ZIP export failed', error);
+      const timelapseSyncFailed = String(error?.code || '').startsWith('ERR_TIMELAPSE_');
+      updateAutosaveStatus(
+        timelapseSyncFailed
+          ? localizeText('全形式ZIP: タイムラプスを完全同期できないため中止しました', 'All formats ZIP stopped because timelapse could not be synchronized')
+          : localizeText('全形式ZIPの書き出しに失敗しました', 'All formats ZIP export failed'),
+        'error'
+      );
+      return { exportedCount: 0, total: 0, wasCancelled: false, hadFailure: true, error };
     }
   }
 
@@ -1282,6 +1421,86 @@
     return output;
   }
 
+  // The export dialog is a settings surface, not the exporter itself.  Never
+  // build every animation frame (or a full-size SpriteMAP) merely to refresh
+  // this small preview canvas.  Sampling keeps the visual result useful while
+  // bounding work for large animations.
+  function compositeFramePixelsForExportPreview(frame, width, height, palette, maxEdge = 256) {
+    const sourceWidth = Math.max(1, Math.floor(Number(width) || 1));
+    const sourceHeight = Math.max(1, Math.floor(Number(height) || 1));
+    const sourcePixelCount = sourceWidth * sourceHeight;
+    const scale = Math.min(1, Math.max(1, Math.floor(Number(maxEdge) || 256)) / Math.max(sourceWidth, sourceHeight));
+    const previewWidth = Math.max(1, Math.round(sourceWidth * scale));
+    const previewHeight = Math.max(1, Math.round(sourceHeight * scale));
+    const output = new Uint8ClampedArray(previewWidth * previewHeight * 4);
+    if (!frame || !Array.isArray(frame.layers)) {
+      return { pixels: output, width: previewWidth, height: previewHeight };
+    }
+
+    const sourceXFor = x => Math.min(sourceWidth - 1, Math.floor(((x + 0.5) * sourceWidth) / previewWidth));
+    const sourceYFor = y => Math.min(sourceHeight - 1, Math.floor(((y + 0.5) * sourceHeight) / previewHeight));
+    frame.layers.forEach(layer => {
+      if (!layer || layer.visible === false) {
+        return;
+      }
+      const opacity = normalizeLayerOpacity(layer.opacity);
+      if (opacity <= 0) {
+        return;
+      }
+      const blendMode = normalizeLayerBlendMode(layer.blendMode);
+      const indices = layer.indices instanceof Int16Array && layer.indices.length >= sourcePixelCount
+        ? layer.indices
+        : null;
+      const direct = layer.direct instanceof Uint8ClampedArray && layer.direct.length >= sourcePixelCount * 4
+        ? layer.direct
+        : null;
+      for (let previewY = 0; previewY < previewHeight; previewY += 1) {
+        const sourceY = sourceYFor(previewY);
+        for (let previewX = 0; previewX < previewWidth; previewX += 1) {
+          const sourceX = sourceXFor(previewX);
+          const sourceIndex = (sourceY * sourceWidth) + sourceX;
+          const outputIndex = ((previewY * previewWidth) + previewX) * 4;
+          let color = null;
+          if (isSimulationLayer(layer)) {
+            color = resolveSimulationPixelColor(layer, sourceIndex, sourceWidth, sourceHeight, {
+              r: output[outputIndex],
+              g: output[outputIndex + 1],
+              b: output[outputIndex + 2],
+              a: output[outputIndex + 3],
+            });
+          } else {
+            const paletteIndex = indices ? indices[sourceIndex] : -1;
+            if (paletteIndex >= 0 && palette?.[paletteIndex]) {
+              color = palette[paletteIndex];
+            } else if (direct) {
+              const directIndex = sourceIndex * 4;
+              color = {
+                r: direct[directIndex],
+                g: direct[directIndex + 1],
+                b: direct[directIndex + 2],
+                a: direct[directIndex + 3],
+              };
+            }
+          }
+          if (!color || !Number.isFinite(color.a) || color.a <= 0) {
+            continue;
+          }
+          compositeLayerPixelNormalized(
+            output,
+            outputIndex,
+            color.r,
+            color.g,
+            color.b,
+            color.a,
+            opacity,
+            blendMode
+          );
+        }
+      }
+    });
+    return { pixels: output, width: previewWidth, height: previewHeight };
+  }
+
   const exportPlanningUtils = window.PiXiEEDrawModules?.exportPlanningUtils?.createExportPlanningUtils?.({
     MAX_EXPORT_DIMENSION,
     MAX_EXPORT_SCALE_OPTIONS,
@@ -1318,6 +1537,7 @@
     if (normalized === 'voxelpreview' || normalized === 'voxel-preview' || normalized === 'previewpng') return 'voxelpreview';
     if (normalized === 'glb') return 'glb';
     if (normalized === 'spritemap' || normalized === 'sprite-map' || normalized === 'spritesheet' || normalized === 'sprite-sheet') return 'spritemap';
+    if (normalized === 'allzip' || normalized === 'all-zip' || normalized === 'bundle') return 'allzip';
     if (normalized === 'png') return 'png';
     if (normalized === 'gridpng' || normalized === 'grid') return 'gridpng';
     if (normalized === 'project') return 'project';
@@ -1331,6 +1551,7 @@
     if (normalized === 'voxelpreview') return localizeText('立体プレビューPNG', 'Voxel Preview PNG');
     if (normalized === 'glb') return 'GLB';
     if (normalized === 'spritemap') return 'SpriteMAP';
+    if (normalized === 'allzip') return localizeText('全形式ZIP', 'All formats ZIP');
     if (normalized === 'gridpng') return localizeText('PNG（グリッド分割）', 'PNG (Grid Split)');
     if (normalized === 'gif') return 'GIF';
     if (normalized === 'timelapse') return localizeText('タイムラプスGIF', 'Timelapse GIF');
@@ -1561,6 +1782,7 @@
   function doesExportFormatUseScale(mode) {
     const format = normalizeExportFormat(mode);
     return format === 'png'
+      || format === 'allzip'
       || format === 'voxelpreview'
       || format === 'jpeg'
       || format === 'svg'
@@ -1886,50 +2108,37 @@
     const normalizedFormat = normalizeExportFormat(format);
     const outputScale = Math.max(1, Math.floor(Number(exportScale) || 1));
     const activeFrameIndex = clamp(Math.round(Number(state.activeFrame) || 0), 0, frames.length - 1);
-    const framePixels = compositeDocumentFrames(frames, width, height, state.palette);
-    if (normalizedFormat === 'spritemap' || shouldSaveSpriteMapCompanion(normalizedFormat)) {
-      const plan = buildSpriteMapExportPlan(framePixels, width, height, state.palette, {
-        includeColorSprites: exportColorSpritesEnabled,
-      });
-      const spriteMap = buildSpriteMapCanvas(plan.framePixels, width, height, {
-        scale: 1,
-        columns: plan.columns,
-        rows: plan.rows,
-        placements: plan.placements,
-      });
-      const outputWidth = spriteMap.sheetWidth * outputScale;
-      const outputHeight = spriteMap.sheetHeight * outputScale;
+    const activePreview = compositeFramePixelsForExportPreview(
+      frames[activeFrameIndex] || frames[0],
+      width,
+      height,
+      state.palette
+    );
+    const frameCanvas = createFrameCanvas(activePreview.pixels, activePreview.width, activePreview.height);
+    const previewSizeLabel = activePreview.width === width && activePreview.height === height
+      ? ''
+      : ` / preview ${activePreview.width}x${activePreview.height}px`;
+    if (normalizedFormat === 'spritemap' || normalizedFormat === 'allzip' || shouldSaveSpriteMapCompanion(normalizedFormat)) {
+      const layout = computeSpriteSheetLayout(frames.length);
+      const outputWidth = width * layout.columns * outputScale;
+      const outputHeight = height * layout.rows * outputScale;
       return {
-        canvas: spriteMap.canvas,
-        meta: `SpriteMAP ${plan.columns}x${plan.rows} / ${outputWidth}x${outputHeight}px${plan.colorSpriteCount > 0 ? ` / 色${plan.usedColorCount}` : ''}`,
+        canvas: frameCanvas,
+        meta: `${normalizedFormat === 'allzip' ? 'All formats ZIP' : 'SpriteMAP'} / SpriteMAP ${layout.columns}x${layout.rows} / ${outputWidth}x${outputHeight}px / Frame ${activeFrameIndex + 1}/${frames.length}${previewSizeLabel}`,
       };
     }
     if (shouldAppendColorSpritesToPrimaryExport(normalizedFormat)) {
-      const colorSpriteArea = buildColorSpriteAppendAreaFromFramePixels(framePixels, width, height, state.palette);
-      if (!colorSpriteArea) {
-        return {
-          canvas: createBlankExportPreviewCanvas(width, height),
-          meta: localizeText('使用色がありません', 'No used colors'),
-        };
-      }
-      const activePixels = framePixels[activeFrameIndex] || framePixels[0];
-      const appended = appendColorSpriteAreaToFramePixels(activePixels, width, height, colorSpriteArea);
-      const frameCanvas = createFrameCanvas(appended.pixels, appended.width, appended.height);
-      const outputWidth = appended.width * outputScale;
-      const outputHeight = appended.height * outputScale;
       return {
         canvas: frameCanvas,
-        meta: `${getExportFormatLabel(normalizedFormat)} + Color sprites ${colorSpriteArea.colorCount}色 / ${outputWidth}x${outputHeight}px`,
+        meta: `${getExportFormatLabel(normalizedFormat)} + Color sprites / ${width * outputScale}x${height * outputScale}px / Frame ${activeFrameIndex + 1}/${frames.length}${previewSizeLabel}`,
       };
     }
-    const activePixels = framePixels[activeFrameIndex] || framePixels[0];
-    const frameCanvas = createFrameCanvas(activePixels, width, height);
     const formatLabel = getExportFormatLabel(normalizedFormat);
     const outputWidth = width * outputScale;
     const outputHeight = height * outputScale;
     return {
       canvas: frameCanvas,
-      meta: `${formatLabel} / Frame ${activeFrameIndex + 1}/${frames.length} / ${outputWidth}x${outputHeight}px`,
+      meta: `${formatLabel} / Frame ${activeFrameIndex + 1}/${frames.length} / ${outputWidth}x${outputHeight}px${previewSizeLabel}`,
     };
   }
 
@@ -2608,6 +2817,7 @@
           appendColorSpriteAreaToStillFrameSet,
           appendColorSpriteAreaToFrameSet,
           exportProjectAsSpriteMap,
+          exportProjectAsAllFormatsZip,
           exportProjectAsJpeg,
           exportProjectAsSvg,
           exportProjectAsGlb,
@@ -2669,6 +2879,7 @@
           buildExportPreviewSourceCanvas,
           updateExportPreview,
           createFrameCanvas,
+          canvasRegionToBlob,
           scaleCanvasNearestNeighbor,
           buildGridRowSegmentsTopToBottom,
           buildGridColumnSegmentsRightToLeft,

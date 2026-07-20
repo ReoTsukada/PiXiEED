@@ -79,7 +79,7 @@
   }
 
   function queueExportAdRender() {
-    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.()) {
+    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.('export-dialog')) {
       return;
     }
     const dialog = dom.exportDialog?.dialog;
@@ -171,7 +171,7 @@
   }
 
   function queueShortcutHelpAdRender() {
-    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.()) {
+    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.('shortcut-help-dialog')) {
       return;
     }
     const dialog = dom.shortcutHelp?.dialog;
@@ -233,7 +233,7 @@
   }
 
   function queueUpdateHistoryAdRender() {
-    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.()) {
+    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.('update-history-dialog')) {
       return;
     }
     const dialog = dom.updateHistory?.dialog;
@@ -507,7 +507,7 @@
   }
 
   function canShowExportInterstitial() {
-    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.()) {
+    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.('export-interstitial')) {
       return false;
     }
     const dialog = dom.exportInterstitial?.dialog;
@@ -540,7 +540,7 @@
   }
 
   function queueExportInterstitialAdRender() {
-    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.()) {
+    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.('export-interstitial')) {
       return;
     }
     const dialog = dom.exportInterstitial?.dialog;
@@ -731,7 +731,7 @@
     if (!(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== 'function') {
       return false;
     }
-    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.()) {
+    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.('export-interstitial')) {
       return false;
     }
     if (dialog.open) {
@@ -782,13 +782,15 @@
 
   async function performExportByMode(mode) {
     const normalized = normalizeExportFormat(mode || 'png');
-    if (normalized !== 'spritemap' && shouldSaveSpriteMapCompanion(normalized)) {
+    if (normalized !== 'spritemap' && normalized !== 'allzip' && shouldSaveSpriteMapCompanion(normalized)) {
       await exportProjectAsSpriteMap({
         companionExport: true,
         includeProjectCompanion: false,
       });
     }
-    if (normalized === 'gif') {
+    if (normalized === 'allzip') {
+      await exportProjectAsAllFormatsZip();
+    } else if (normalized === 'gif') {
       await exportProjectAsGif();
     } else if (normalized === 'jpeg') {
       await exportProjectAsJpeg();

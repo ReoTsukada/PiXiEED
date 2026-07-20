@@ -781,7 +781,18 @@
       )));
     }
 
-    function serializeLayerForDocument(layer) {
+    function serializeLayerTypedArray(value, { preserveTypedArrays = false } = {}) {
+      if (!value) {
+        return preserveTypedArrays ? null : '';
+      }
+      if (preserveTypedArrays && ArrayBuffer.isView(value)) {
+        return value;
+      }
+      return encodeTypedArray(value);
+    }
+
+    function serializeLayerForDocument(layer, options = {}) {
+      const preserveTypedArrays = options?.preserveTypedArrays === true;
       if (isSimulationLayer(layer)) {
         return {
           id: layer.id,
@@ -790,17 +801,17 @@
           visible: layer.visible !== false,
           opacity: normalizeLayerOpacity(layer.opacity),
           blendMode: normalizeLayerBlendMode(layer.blendMode),
-          elementMap: encodeTypedArray(layer.elementMap),
-          sourceColorMap: encodeTypedArray(layer.sourceColorMap),
-          velXMap: encodeTypedArray(layer.velXMap),
-          velYMap: encodeTypedArray(layer.velYMap),
-          lifeMap: encodeTypedArray(layer.lifeMap),
-          tempMap: encodeTypedArray(layer.tempMap),
-          lightMap: encodeTypedArray(layer.lightMap),
-          depthMap: encodeTypedArray(layer.depthMap),
-          airMap: encodeTypedArray(layer.airMap),
-          auxMap: encodeTypedArray(layer.auxMap),
-          activeMap: encodeTypedArray(layer.activeMap),
+          elementMap: serializeLayerTypedArray(layer.elementMap, { preserveTypedArrays }),
+          sourceColorMap: serializeLayerTypedArray(layer.sourceColorMap, { preserveTypedArrays }),
+          velXMap: serializeLayerTypedArray(layer.velXMap, { preserveTypedArrays }),
+          velYMap: serializeLayerTypedArray(layer.velYMap, { preserveTypedArrays }),
+          lifeMap: serializeLayerTypedArray(layer.lifeMap, { preserveTypedArrays }),
+          tempMap: serializeLayerTypedArray(layer.tempMap, { preserveTypedArrays }),
+          lightMap: serializeLayerTypedArray(layer.lightMap, { preserveTypedArrays }),
+          depthMap: serializeLayerTypedArray(layer.depthMap, { preserveTypedArrays }),
+          airMap: serializeLayerTypedArray(layer.airMap, { preserveTypedArrays }),
+          auxMap: serializeLayerTypedArray(layer.auxMap, { preserveTypedArrays }),
+          activeMap: serializeLayerTypedArray(layer.activeMap, { preserveTypedArrays }),
           settings: JSON.stringify(normalizeSimulationSettings(layer.settings)),
           waterStyle: serializeSimulationStyleForDocument(layer.elementStyle?.[SIM_ELEMENT_WATER]),
           fireStyle: serializeSimulationStyleForDocument(layer.elementStyle?.[SIM_ELEMENT_FIRE]),
@@ -815,14 +826,23 @@
         visible: layer.visible !== false,
         opacity: normalizeLayerOpacity(layer.opacity),
         blendMode: normalizeLayerBlendMode(layer.blendMode),
-        indices: encodeTypedArray(layer.indices),
-        direct: encodeTypedArray(layer.direct),
-        importSourceDirect: encodeTypedArray(layer.importSourceDirect),
+        indices: serializeLayerTypedArray(layer.indices, { preserveTypedArrays }),
+        direct: serializeLayerTypedArray(layer.direct, { preserveTypedArrays }),
+        importSourceDirect: serializeLayerTypedArray(layer.importSourceDirect, { preserveTypedArrays }),
         directOnly: Boolean(layer.directOnly),
       };
     }
 
-    function deserializeSimulationTypedArray(value, Type, expectedLength) {
+    function deserializeSimulationTypedArray(value, Type, expectedLength, { reuseTypedArrays = false } = {}) {
+      if (value instanceof Type && value.length === expectedLength) {
+        return reuseTypedArrays ? value : new Type(value);
+      }
+      if (Array.isArray(value) || ArrayBuffer.isView(value)) {
+        if (value.length !== expectedLength) {
+          throw new Error('Simulation layer typed array mismatch');
+        }
+        return new Type(value);
+      }
       if (typeof value !== 'string') {
         return new Type(expectedLength);
       }
@@ -840,6 +860,7 @@
     function deserializeRasterTypedArray(value, Type, expectedLength, mismatchMessage, {
       allowMissing = false,
       fillValue = 0,
+      reuseTypedArrays = false,
     } = {}) {
       if (typeof value === 'string' && value.length > 0) {
         const bytes = decodeBase64(value);
@@ -853,6 +874,12 @@
         const output = new Type(expectedLength);
         output.set(view);
         return output;
+      }
+      if (value instanceof Type) {
+        if (value.length !== expectedLength) {
+          throw new Error(mismatchMessage);
+        }
+        return reuseTypedArrays ? value : new Type(value);
       }
       if (Array.isArray(value) || ArrayBuffer.isView(value)) {
         if (value.length !== expectedLength) {
@@ -870,7 +897,17 @@
       throw new Error('Layer is missing index data');
     }
 
-    function deserializeLayerFromDocument(layer, pixelCount, fallbackId, fallbackName, width = state.width, height = state.height) {
+    function deserializeLayerFromDocument(
+      layer,
+      pixelCount,
+      fallbackId,
+      fallbackName,
+      width = state.width,
+      height = state.height,
+      options = {}
+    ) {
+      const reuseTypedArrays = options?.reuseTypedArrays === true;
+      const trustStoredLayerFlags = options?.trustStoredLayerFlags === true;
       if (layer?.type === SIM_LAYER_TYPE) {
         const simLayer = createSimulationLayer(fallbackName, width, height);
         simLayer.id = typeof layer.id === 'string' ? layer.id : fallbackId;
@@ -878,17 +915,18 @@
         simLayer.visible = layer.visible !== false;
         simLayer.opacity = normalizeLayerOpacity(layer.opacity);
         simLayer.blendMode = normalizeLayerBlendMode(layer.blendMode);
-        simLayer.elementMap = deserializeSimulationTypedArray(layer.elementMap, Uint8Array, pixelCount);
-        simLayer.sourceColorMap = deserializeSimulationTypedArray(layer.sourceColorMap, Uint8ClampedArray, pixelCount * 4);
-        simLayer.velXMap = deserializeSimulationTypedArray(layer.velXMap, Int8Array, pixelCount);
-        simLayer.velYMap = deserializeSimulationTypedArray(layer.velYMap, Int8Array, pixelCount);
-        simLayer.lifeMap = deserializeSimulationTypedArray(layer.lifeMap, Uint8Array, pixelCount);
-        simLayer.tempMap = deserializeSimulationTypedArray(layer.tempMap, Uint16Array, pixelCount);
-        simLayer.lightMap = deserializeSimulationTypedArray(layer.lightMap, Uint8Array, pixelCount);
-        simLayer.depthMap = deserializeSimulationTypedArray(layer.depthMap, Uint8Array, pixelCount);
-        simLayer.airMap = deserializeSimulationTypedArray(layer.airMap, Uint8Array, pixelCount);
-        simLayer.auxMap = deserializeSimulationTypedArray(layer.auxMap, Uint8Array, pixelCount);
-        simLayer.activeMap = deserializeSimulationTypedArray(layer.activeMap, Uint8Array, pixelCount);
+        const typedOptions = { reuseTypedArrays };
+        simLayer.elementMap = deserializeSimulationTypedArray(layer.elementMap, Uint8Array, pixelCount, typedOptions);
+        simLayer.sourceColorMap = deserializeSimulationTypedArray(layer.sourceColorMap, Uint8ClampedArray, pixelCount * 4, typedOptions);
+        simLayer.velXMap = deserializeSimulationTypedArray(layer.velXMap, Int8Array, pixelCount, typedOptions);
+        simLayer.velYMap = deserializeSimulationTypedArray(layer.velYMap, Int8Array, pixelCount, typedOptions);
+        simLayer.lifeMap = deserializeSimulationTypedArray(layer.lifeMap, Uint8Array, pixelCount, typedOptions);
+        simLayer.tempMap = deserializeSimulationTypedArray(layer.tempMap, Uint16Array, pixelCount, typedOptions);
+        simLayer.lightMap = deserializeSimulationTypedArray(layer.lightMap, Uint8Array, pixelCount, typedOptions);
+        simLayer.depthMap = deserializeSimulationTypedArray(layer.depthMap, Uint8Array, pixelCount, typedOptions);
+        simLayer.airMap = deserializeSimulationTypedArray(layer.airMap, Uint8Array, pixelCount, typedOptions);
+        simLayer.auxMap = deserializeSimulationTypedArray(layer.auxMap, Uint8Array, pixelCount, typedOptions);
+        simLayer.activeMap = deserializeSimulationTypedArray(layer.activeMap, Uint8Array, pixelCount, typedOptions);
         simLayer.settings = normalizeSimulationSettings(typeof layer.settings === 'string' ? JSON.parse(layer.settings) : layer.settings);
         simLayer.elementStyle = {
           [SIM_ELEMENT_WATER]: parseSimulationStyleFromDocument(layer.waterStyle, SIM_ELEMENT_WATER),
@@ -910,7 +948,7 @@
         Int16Array,
         pixelCount,
         'Layer pixel data mismatch',
-        { allowMissing: hasDirectPayload, fillValue: -1 }
+        { allowMissing: hasDirectPayload, fillValue: -1, reuseTypedArrays }
       );
       let direct = null;
       if (hasDirectPayload) {
@@ -918,7 +956,8 @@
           layer.direct,
           Uint8ClampedArray,
           pixelCount * 4,
-          'Layer direct pixel data mismatch'
+          'Layer direct pixel data mismatch',
+          { reuseTypedArrays }
         );
       }
       let importSourceDirect = null;
@@ -931,7 +970,8 @@
             layer.importSourceDirect,
             Uint8ClampedArray,
             pixelCount * 4,
-            'Layer import source pixel data mismatch'
+            'Layer import source pixel data mismatch',
+            { reuseTypedArrays }
           );
         } catch (_error) {
           importSourceDirect = null;
@@ -947,7 +987,9 @@
         indices,
         direct,
         importSourceDirect,
-        directOnly: inferDirectOnlyLayer(layer, indices, direct),
+        directOnly: trustStoredLayerFlags && typeof layer.directOnly === 'boolean'
+          ? layer.directOnly
+          : inferDirectOnlyLayer(layer, indices, direct),
       };
     }
 

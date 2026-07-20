@@ -208,17 +208,21 @@
     }
   
   
-    function getExportScaleCandidates(mode = dom.exportDialog?.format?.value || 'png') {
+    function getExportScaleCandidates(mode = dom.exportDialog?.format?.value || 'png', { allowFullScan = false } = {}) {
       const format = normalizeExportFormat(mode);
       const frameCount = Array.isArray(state.frames) ? state.frames.length : 0;
       const frameWidth = Math.max(1, state.width);
       const frameHeight = Math.max(1, state.height);
-      const includeSpriteMapSheet = (format === 'spritemap' || shouldSaveSpriteMapCompanion(format)) && frameCount > 0;
+      const includeSpriteMapSheet = (format === 'spritemap' || format === 'allzip' || shouldSaveSpriteMapCompanion(format)) && frameCount > 0;
       const includeColorSpriteSheet = !includeSpriteMapSheet && shouldAppendColorSpritesToPrimaryExport(format) && frameCount > 0;
-      const sourceFramePixels = (includeSpriteMapSheet || includeColorSpriteSheet)
+      // Dialog changes must not composite every animation frame just to decide
+      // a scale slider range. Full colour-sprite dimensions are calculated
+      // only after the user actually starts an export.
+      const shouldScanAllFrames = allowFullScan === true && (includeSpriteMapSheet || includeColorSpriteSheet);
+      const sourceFramePixels = shouldScanAllFrames
         ? compositeDocumentFrames(state.frames, frameWidth, frameHeight, state.palette)
         : null;
-      const spriteMapPlan = includeSpriteMapSheet
+      const spriteMapPlan = shouldScanAllFrames && includeSpriteMapSheet
         ? buildSpriteMapExportPlan(
           sourceFramePixels,
           frameWidth,
@@ -227,17 +231,22 @@
           { includeColorSprites: getExportColorSpritesEnabled() }
         )
         : null;
-      const colorSpritePlan = includeColorSpriteSheet
+      const colorSpritePlan = shouldScanAllFrames && includeColorSpriteSheet
         ? buildColorSpriteExportPlanFromFramePixels(sourceFramePixels, frameWidth, frameHeight, state.palette)
         : null;
       const hasColorSpriteAppend = Boolean(colorSpritePlan?.spriteCount && colorSpritePlan.framePixels.length);
-      const { columns, rows } = spriteMapPlan || colorSpritePlan || computeSpriteSheetLayout(frameCount);
+      const estimatedLayout = computeSpriteSheetLayout(frameCount);
+      const { columns, rows } = spriteMapPlan || colorSpritePlan || estimatedLayout;
       const sheetWidth = spriteMapPlan
         ? Math.max(frameWidth, spriteMapPlan.sheetWidth)
-        : (hasColorSpriteAppend ? frameWidth + colorSpritePlan.sheetWidth : frameWidth);
+        : (hasColorSpriteAppend ? frameWidth + colorSpritePlan.sheetWidth : (
+          includeSpriteMapSheet ? frameWidth * estimatedLayout.columns : frameWidth
+        ));
       const sheetHeight = spriteMapPlan
         ? Math.max(frameHeight, spriteMapPlan.sheetHeight)
-        : (hasColorSpriteAppend ? Math.max(frameHeight, colorSpritePlan.sheetHeight) : frameHeight);
+        : (hasColorSpriteAppend ? Math.max(frameHeight, colorSpritePlan.sheetHeight) : (
+          includeSpriteMapSheet ? frameHeight * estimatedLayout.rows : frameHeight
+        ));
       const maxScaleWidth = Math.floor(MAX_EXPORT_DIMENSION / sheetWidth);
       const maxScaleHeight = Math.floor(MAX_EXPORT_DIMENSION / sheetHeight);
       const maxScale = Math.max(1, Math.min(

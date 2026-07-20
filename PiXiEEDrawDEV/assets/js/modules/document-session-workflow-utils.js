@@ -309,8 +309,16 @@
       }
     }
     let parsedDocument = null;
+    const trustedAutosaveSchemaVersion = Number(options?.trustedAutosaveSchemaVersion) === 2 ? 2 : 0;
+    const parseStartedAt = typeof performance !== 'undefined' && typeof performance.now === 'function'
+      ? performance.now()
+      : Date.now();
     try {
-      parsedDocument = snapshotFromParsedDocumentValue(projectPayload);
+        parsedDocument = snapshotFromParsedDocumentValue(projectPayload, {
+          deferTimelapseSnapshots: trustedAutosaveSchemaVersion === 2,
+          reuseTypedArrays: trustedAutosaveSchemaVersion === 2,
+          trustStoredLayerFlags: trustedAutosaveSchemaVersion === 2,
+        });
     } catch (error) {
       console.warn('Failed to parse in-memory project payload', error);
       if (!options?.suppressAutosaveStatus) {
@@ -318,6 +326,15 @@
       }
       return false;
     }
+    console.info('[pixiedraw:open-apply]', {
+      phase: 'payload-deserialize-complete',
+      trustedAutosaveSchemaVersion,
+      elapsedMs: Math.max(0, Math.round((
+        typeof performance !== 'undefined' && typeof performance.now === 'function'
+          ? performance.now()
+          : Date.now()
+      ) - parseStartedAt)),
+    });
     // IndexedDB V2 projects and validated canonical V2 imports are already V2.
     // The generic parsed-value registry can identify their JSON-shaped in-memory
     // payload as the V1 JSON adapter even though no V1 file was read. Remove only
@@ -367,7 +384,7 @@
     // collection (which would retain every project in memory again).
     const sheets = [];
     if (packagedSheets.length > 1) {
-      console.info('[pixiedraw-dev:project-normalize]', {
+      console.info('[pixiedraw:project-normalize]', {
         phase: 'collapse-legacy-multi-project-package',
         sheetCount: packagedSheets.length,
         activeSheetId: parsedDocument?.activeSheetId || '',
@@ -393,7 +410,7 @@
       if (migratedActive?.projectId) {
         normalizedProjectId = normalizeAutosaveProjectId(migratedActive.projectId) || normalizedProjectId;
       }
-      console.info('[pixiedraw-dev:project-normalize]', {
+      console.info('[pixiedraw:project-normalize]', {
         phase: 'legacy-multi-project-split-ready',
         sourceProjectId: projectId || '',
         activeProjectId: normalizedProjectId,
@@ -571,6 +588,7 @@
     const scaleOptimizer = window.PiXiEEDrawModules?.snapshotIntegerScaleUtils?.optimizeSnapshotIntegerScale;
     const hasTimelapseEdits = Object.values(projectSession?.timelapse?.tracksByCanvasId || {}).some(track => (
       (Array.isArray(track?.snapshots) && track.snapshots.length > 0)
+      || (Array.isArray(track?.serializedSnapshots) && track.serializedSnapshots.length > 0)
       || (Array.isArray(track?.operationLog?.entries) && track.operationLog.entries.length > 0)
     ));
     const isSharedProjectLoad = Boolean(
@@ -612,7 +630,33 @@
         reason: 'timelapse-history-preserved',
       };
     }
-    synchronizeImportedSnapshotPalette(snapshot);
+    if (Number(options?.trustedAutosaveSchemaVersion) === 2) {
+      console.info('[pixiedraw:open-apply]', {
+        phase: 'trusted-v2-palette-scan-skipped',
+      });
+    } else {
+      synchronizeImportedSnapshotPalette(snapshot);
+    }
+    console.info('[pixiedraw:native-scale]', {
+      optimized: nativeScaleOptimization.optimized === true,
+      factor: Math.max(1, Math.round(Number(nativeScaleOptimization.factor) || 1)),
+      reason: nativeScaleOptimization.reason || '',
+      sourceWidth: Math.max(0, Math.round(Number(nativeScaleOptimization.sourceWidth) || 0)),
+      sourceHeight: Math.max(0, Math.round(Number(nativeScaleOptimization.sourceHeight) || 0)),
+      width: Math.max(0, Math.round(Number(nativeScaleOptimization.width) || 0)),
+      height: Math.max(0, Math.round(Number(nativeScaleOptimization.height) || 0)),
+      sourceByteEstimate: Math.max(0, Math.round(Number(nativeScaleOptimization.sourceByteEstimate) || 0)),
+      targetByteEstimate: Math.max(0, Math.round(Number(nativeScaleOptimization.targetByteEstimate) || 0)),
+      failureCanvasIndex: Number.isInteger(nativeScaleOptimization.failureCanvasIndex)
+        ? nativeScaleOptimization.failureCanvasIndex
+        : -1,
+      failureLayerIndex: Number.isInteger(nativeScaleOptimization.failureLayerIndex)
+        ? nativeScaleOptimization.failureLayerIndex
+        : -1,
+      failureX: Number.isInteger(nativeScaleOptimization.failureX) ? nativeScaleOptimization.failureX : -1,
+      failureY: Number.isInteger(nativeScaleOptimization.failureY) ? nativeScaleOptimization.failureY : -1,
+      failureAxis: nativeScaleOptimization.failureAxis || '',
+    });
     if (nativeScaleOptimization.optimized && projectSession?.timelapse?.tracksByCanvasId) {
       const optimizedBaseSnapshot = serializeDocumentSnapshot(snapshot);
       Object.values(projectSession.timelapse.tracksByCanvasId).forEach(track => {
@@ -647,6 +691,9 @@
         Object.entries(projectSession.timelapse.tracksByCanvasId || {}).forEach(([canvasId, track]) => {
           timelapseState.tracksByCanvasId[canvasId] = {
             snapshots: Array.isArray(track?.snapshots) ? track.snapshots.slice() : [],
+            serializedSnapshots: Array.isArray(track?.serializedSnapshots)
+              ? track.serializedSnapshots.slice()
+              : [],
             operationLog: track?.operationLog && typeof track.operationLog === 'object'
               ? {
                   version: 1,
@@ -734,7 +781,7 @@
       });
     }
     if (options?.fileLoad === true || options?.forceV2WorkingCopy === true) {
-      console.info('[pixiedraw-dev:v2-import]', {
+      console.info('[pixiedraw:v2-import]', {
         phase: 'external-input-converted-to-v2-working-copy',
         sourceKind: sourcePersistenceState?.sourceKind || options?.sourceKind || 'file',
         sourceAdapterId: parsedDocument?.storageAdapterId || null,
@@ -867,7 +914,20 @@
     }
     const payload = {};
     Object.entries(getAllTimelapseTracks()).forEach(([canvasId, track]) => {
-      const snapshots = serializeProjectTimelapseSnapshotList(track?.snapshots || []);
+      const deferredSnapshots = Array.isArray(track?.serializedSnapshots)
+        ? track.serializedSnapshots.filter(entry => (
+            entry
+            && typeof entry === 'object'
+            && Math.max(1, Math.round(Number(entry.width) || 0)) > 0
+            && Math.max(1, Math.round(Number(entry.height) || 0)) > 0
+            && typeof entry.pixels === 'string'
+            && entry.pixels.length > 0
+          ))
+        : [];
+      const snapshots = [
+        ...deferredSnapshots,
+        ...serializeProjectTimelapseSnapshotList(track?.snapshots || []),
+      ];
       if (!snapshots.length) {
         return;
       }
@@ -1063,7 +1123,7 @@
     return restored;
   }
 
-  function deserializeProjectTimelapseTracks(byCanvas, fallbackCanvasId = '') {
+  function deserializeProjectTimelapseTracks(byCanvas, fallbackCanvasId = '', options = {}) {
     const restored = Object.create(null);
     if (!byCanvas || typeof byCanvas !== 'object' || Array.isArray(byCanvas)) {
       return restored;
@@ -1073,12 +1133,24 @@
       if (!resolvedCanvasId || !trackPayload || typeof trackPayload !== 'object') {
         return;
       }
-      const snapshots = deserializeProjectTimelapseSnapshots(trackPayload.snapshots);
-      if (!snapshots.length) {
+      const deferSnapshots = options?.deferSnapshots === true;
+      const serializedSnapshots = deferSnapshots && Array.isArray(trackPayload.snapshots)
+        ? trackPayload.snapshots.filter(entry => (
+            entry
+            && typeof entry === 'object'
+            && typeof entry.pixels === 'string'
+            && entry.pixels.length > 0
+          ))
+        : [];
+      const snapshots = deferSnapshots
+        ? []
+        : deserializeProjectTimelapseSnapshots(trackPayload.snapshots);
+      if (!snapshots.length && !serializedSnapshots.length) {
         return;
       }
       restored[resolvedCanvasId] = {
         snapshots,
+        serializedSnapshots,
         warningShown: Boolean(trackPayload.warningShown),
         sampleStep: Math.max(1, Math.round(Number(trackPayload.sampleStep) || 1)),
         lastCaptureToken: Number.isFinite(Number(trackPayload.lastCaptureToken))
@@ -1113,7 +1185,7 @@
     return restored;
   }
 
-  function parseProjectSessionPayload(payload, fallbackCanvasId = '') {
+  function parseProjectSessionPayload(payload, fallbackCanvasId = '', options = {}) {
     if (!payload || typeof payload !== 'object') {
       return null;
     }
@@ -1125,7 +1197,11 @@
     const timelapsePayload = payload.timelapse && typeof payload.timelapse === 'object'
       ? payload.timelapse
       : {};
-    const timelapseTracksByCanvasId = deserializeProjectTimelapseTracks(timelapsePayload.byCanvas, fallbackCanvasId);
+    const timelapseTracksByCanvasId = deserializeProjectTimelapseTracks(
+      timelapsePayload.byCanvas,
+      fallbackCanvasId,
+      { deferSnapshots: options?.deferTimelapseSnapshots === true }
+    );
     const timelapseOperationLogsByCanvasId = deserializeProjectTimelapseOperationLogs(
       timelapsePayload.operationLogsByCanvas,
       fallbackCanvasId
@@ -1137,11 +1213,23 @@
       timelapseTracksByCanvasId[canvasId].operationLog = operationLog;
     });
     if (!Object.keys(timelapseTracksByCanvasId).length) {
-      const legacySnapshots = deserializeProjectTimelapseSnapshots(timelapsePayload.snapshots);
+      const deferredLegacySnapshots = options?.deferTimelapseSnapshots === true
+        && Array.isArray(timelapsePayload.snapshots)
+        ? timelapsePayload.snapshots.filter(entry => (
+            entry
+            && typeof entry === 'object'
+            && typeof entry.pixels === 'string'
+            && entry.pixels.length > 0
+          ))
+        : [];
+      const legacySnapshots = options?.deferTimelapseSnapshots === true
+        ? []
+        : deserializeProjectTimelapseSnapshots(timelapsePayload.snapshots);
       const resolvedCanvasId = normalizeTimelapseCanvasId(fallbackCanvasId);
-      if (legacySnapshots.length && resolvedCanvasId) {
+      if ((legacySnapshots.length || deferredLegacySnapshots.length) && resolvedCanvasId) {
         timelapseTracksByCanvasId[resolvedCanvasId] = {
           snapshots: legacySnapshots,
+          serializedSnapshots: deferredLegacySnapshots,
           warningShown: Boolean(timelapsePayload.warningShown),
           sampleStep: Math.max(1, Math.round(Number(timelapsePayload.sampleStep) || 1)),
           lastCaptureToken: Number.isFinite(Number(timelapsePayload.lastCaptureToken))
@@ -1215,7 +1303,7 @@
       error.code = validation?.code || 'ERR_CANONICAL_V2_PROJECT_INVALID';
       throw error;
     }
-    console.info('[pixiedraw-dev:canonical-import]', {
+    console.info('[pixiedraw:canonical-import]', {
       phase: 'file-normalize-success',
       sourceAdapterId: storageAdapterId || null,
       importedFormat: normalized.canonicalPayload?.canonicalSourceMetadata?.importedFormat || 'external-project',
@@ -1272,7 +1360,7 @@
     return snapshotFromDocumentText(await blob.text());
   }
 
-  function snapshotFromParsedDocumentValue(parsed) {
+  function snapshotFromParsedDocumentValue(parsed, options = {}) {
     const parsedResult = typeof parseProjectStoragePayload === 'function'
       ? parseProjectStoragePayload(parsed)
       : { adapterId: '', parsed };
@@ -1300,9 +1388,16 @@
       && typeof normalizedParsed.document === 'object'
     );
     const payload = hasPackagedDocument ? normalizedParsed.document : normalizedParsed;
-    const snapshot = deserializeDocumentPayload(payload);
+    const snapshot = deserializeDocumentPayload(payload, {
+      reuseTypedArrays: options?.reuseTypedArrays === true,
+      trustStoredLayerFlags: options?.trustStoredLayerFlags === true,
+    });
     const projectSession = hasPackagedDocument
-      ? parseProjectSessionPayload(normalizedParsed.session, snapshot?.activeCanvasId || '')
+      ? parseProjectSessionPayload(
+          normalizedParsed.session,
+          snapshot?.activeCanvasId || '',
+          { deferTimelapseSnapshots: options?.deferTimelapseSnapshots === true }
+        )
       : null;
     const dotStats = hasPackagedDocument
       ? resolvePackagedProjectDotStats(normalizedParsed)
