@@ -38,6 +38,7 @@
     updateAutosaveStatus,
     localizeText,
     hideStartupScreen,
+    showStartupScreen,
     updateQrEditPanel,
     syncQrEditModeWithActivePayload,
     scheduleRecentProjectsListRender,
@@ -83,6 +84,7 @@
         projectId: normalizedProjectId,
         source: 'initial',
         label: localizeText('シート 1', 'Sheet 1'),
+        metadataOnly: true,
       });
       openProjectTabs.push(initialTab);
       setActiveOpenProjectTabId?.(initialTab.id);
@@ -95,6 +97,12 @@
 
     function setProjectHomeVisible(nextVisible = true, { refresh = false } = {}) {
       const screen = dom.projectHomeScreen;
+      if (nextVisible && !(screen instanceof HTMLElement)) {
+        setProjectHomeVisibleState?.(false);
+        document.body.classList.remove('is-project-home-active');
+        showStartupScreen?.({ refreshWorkspace: refresh });
+        return;
+      }
       setProjectHomeVisibleState?.(Boolean(nextVisible));
       const projectHomeVisible = Boolean(getProjectHomeVisible?.());
       if (screen instanceof HTMLElement) {
@@ -117,6 +125,10 @@
     }
 
     function showProjectHomeScreen(options = {}) {
+      if (!(dom.projectHomeScreen instanceof HTMLElement)) {
+        showStartupScreen?.({ refreshWorkspace: options?.refresh !== false });
+        return;
+      }
       if (getStartupVisible?.()) {
         hideStartupScreen?.();
       }
@@ -353,6 +365,7 @@
         source: options.source || 'working',
         projectId: options.projectId || getAutosaveProjectId?.(),
         label: options.label || localizeText('シート 1', 'Sheet 1'),
+        metadataOnly: true,
         sharedProjectKey: SHARED_PROJECTS_ENABLED ? options.sharedProjectKey : '',
         sharedProjectBackendId: SHARED_PROJECTS_ENABLED ? options.sharedProjectBackendId : '',
         sharedProjectRevision: SHARED_PROJECTS_ENABLED ? options.sharedProjectRevision : 0,
