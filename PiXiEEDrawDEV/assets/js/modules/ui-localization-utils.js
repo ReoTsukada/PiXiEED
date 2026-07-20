@@ -301,6 +301,7 @@
       setLocalizedTextContent('.startup-screen__subtitle', 'PiXiEEDraw（ピクシードロー）でドット絵づくり・アニメ制作をはじめよう', 'Start pixel art and animation with PiXiEEDraw');
       setLocalizedTextContent('#startupActionNew', '新規作成', 'New Project');
       setLocalizedTextContent('#startupActionOpen', 'ファイルを開く', 'Open File');
+      setLocalizedTextContent('#startupActionProjects', '一覧を更新', 'Refresh List');
       setLocalizedTextContent('#startupWorkspaceTitle', 'プロジェクト一覧', 'Projects');
       setLocalizedTextContent('#startupWorkspaceConnect', 'PiXiEEDフォルダに接続', 'Connect PiXiEED Folder');
       setLocalizedTextContent('#startupActionSkip', 'この画面を閉じる', 'Close');
