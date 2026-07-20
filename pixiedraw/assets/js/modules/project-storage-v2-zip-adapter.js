@@ -6,8 +6,8 @@
   const root = window.PiXiEEDrawModules = window.PiXiEEDrawModules || {};
 
   function createPixieeDrawV2ZipAdapter({
-    PROJECT_FILE_EXTENSION = '.pixieedraw',
-    PROJECT_FILE_MIME_TYPE = 'application/x-pixieedraw',
+    PROJECT_FILE_EXTENSION = '.pxd',
+    PROJECT_FILE_MIME_TYPE = 'application/x-pixieed-pxd',
     PROJECT_PACKAGE_TYPE = 'pixieedraw-project',
     buildPackagedProjectPayload,
     createAutosaveFileName,
@@ -29,7 +29,9 @@
     useWorkerByDefault = false,
     console: logger = console,
   } = {}) {
-    const ADAPTER_ID = 'pixieedraw-v2-zip';
+    // The PXD writer is the sole normal save route. Its reader still accepts
+    // old PiXiEEDraw V2 archives through the archive codec.
+    const ADAPTER_ID = 'pxd-v2-zip';
 
     function normalizeCodecError(error) {
       if (error instanceof Error) {

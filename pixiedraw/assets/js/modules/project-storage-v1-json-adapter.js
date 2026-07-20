@@ -6,8 +6,8 @@
   const root = window.PiXiEEDrawModules = window.PiXiEEDrawModules || {};
 
   function createPixieeDrawV1JsonAdapter({
-    PROJECT_FILE_EXTENSION = '.pixieedraw',
-    PROJECT_FILE_MIME_TYPE = 'application/x-pixieedraw',
+    PROJECT_FILE_EXTENSION = '.pxd',
+    PROJECT_FILE_MIME_TYPE = 'application/x-pixieed-pxd',
     PROJECT_PACKAGE_TYPE = 'pixieedraw-project',
     buildPackagedProjectPayload,
     createAutosaveFileName,

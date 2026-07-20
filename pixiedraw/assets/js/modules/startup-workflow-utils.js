@@ -1468,8 +1468,8 @@
     }
     if (dom.startupRecovery.detail) {
       dom.startupRecovery.detail.textContent = localizeText(
-        `${savedAt ? `復帰データ: ${savedAt}。` : ''}復帰しても保存先の .pixieedraw ファイルは自動で上書きしません。`,
-        `${savedAt ? `Recovery data: ${savedAt}. ` : ''}Restoring does not automatically overwrite the destination .pixieedraw file.`
+        `${savedAt ? `復帰データ: ${savedAt}。` : ''}復帰しても保存先の .pxd ファイルは自動で上書きしません。`,
+        `${savedAt ? `Recovery data: ${savedAt}. ` : ''}Restoring does not automatically overwrite the destination .pxd file.`
       );
     }
     return new Promise(resolve => {
@@ -1665,7 +1665,7 @@
       details.className = 'startup-workspace__project-details';
       const name = document.createElement('span');
       name.className = 'startup-workspace__project-name';
-      const displayName = String(entry?.name || DEFAULT_DOCUMENT_NAME).replace(/\.pixieedraw$/i, '');
+      const displayName = String(entry?.name || DEFAULT_DOCUMENT_NAME).replace(/\.(?:pxd|pixieedraw|pxdraw)$/i, '');
       name.textContent = displayName || 'PiXiEEDraw';
       const meta = document.createElement('span');
       meta.className = 'startup-workspace__project-meta';

@@ -780,9 +780,12 @@
     queueExportWithInterstitial(() => performExportByMode(normalized));
   }
 
-  async function performExportByMode(mode) {
+  async function performExportByMode(mode, { selectedFormats = null } = {}) {
     const normalized = normalizeExportFormat(mode || 'png');
-    if (normalized !== 'spritemap' && normalized !== 'allzip' && shouldSaveSpriteMapCompanion(normalized)) {
+    const includeTimelapse = normalized !== 'project'
+      && dom.exportDialog?.timelapseToggle instanceof HTMLInputElement
+      && dom.exportDialog.timelapseToggle.checked;
+    if (normalized !== 'spritemap' && normalized !== 'allzip' && normalized !== 'batchzip' && shouldSaveSpriteMapCompanion(normalized)) {
       await exportProjectAsSpriteMap({
         companionExport: true,
         includeProjectCompanion: false,
@@ -790,12 +793,18 @@
     }
     if (normalized === 'allzip') {
       await exportProjectAsAllFormatsZip();
+    } else if (normalized === 'batchzip') {
+      await exportProjectAsAllFormatsZip({
+        selectedFormats: Array.isArray(selectedFormats) ? selectedFormats : getSelectedBatchZipFormats(),
+      });
     } else if (normalized === 'gif') {
       await exportProjectAsGif();
     } else if (normalized === 'jpeg') {
       await exportProjectAsJpeg();
     } else if (normalized === 'svg') {
       await exportProjectAsSvg();
+    } else if (normalized === 'spritemap') {
+      await exportProjectAsSpriteMap();
     } else if (normalized === 'glb') {
       await exportProjectAsGlb();
     } else if (normalized === 'gridpng') {
@@ -811,6 +820,9 @@
       }
     } else {
       await exportProjectAsPng();
+    }
+    if (includeTimelapse) {
+      await exportTimelapseGif();
     }
   }
 

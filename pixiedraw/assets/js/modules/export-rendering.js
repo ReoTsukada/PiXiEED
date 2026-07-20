@@ -100,8 +100,8 @@
   }
 
   async function buildSpriteMapExportTasks({
-    scale = exportScale,
-    includeOriginal = shouldExportOriginalCompanion('spritemap', scale),
+    scale = 1,
+    includeOriginal = false,
   } = {}) {
     const frameCount = state.frames.length;
     if (!frameCount) {
@@ -315,13 +315,9 @@
       return { exportedCount: 0, total: 0, wasCancelled: false, hadFailure: true };
     }
     try {
-      const candidates = getExportScaleCandidates('spritemap', { allowFullScan: true });
-      const selectedScale = applyExportScaleConstraints(candidates);
-      syncExportScaleInputs();
-      const includeOriginal = shouldExportOriginalCompanion('spritemap', selectedScale);
       const spriteMapExport = await buildSpriteMapExportTasks({
-        scale: selectedScale,
-        includeOriginal,
+        scale: 1,
+        includeOriginal: false,
       });
       const { tasks, layoutLabel, spriteMapPlan } = spriteMapExport;
 
@@ -334,19 +330,13 @@
         includeProjectCompanion,
         archiveSuffix: 'spritemap',
         archiveShareText: includeProjectCompanion
-          ? 'SpriteMAP一式をZIPで書き出し、.pixieedrawを同期しました'
+          ? 'SpriteMAP一式をZIPで書き出し、.pxdを同期しました'
           : 'SpriteMAP一式をZIPで書き出しました',
       });
       const detailParts = [`全${frameCount}フレーム`, `配置 ${layoutLabel}`];
       if (spriteMapPlan.colorSpriteCount > 0) {
         detailParts.push(`使用色 ${spriteMapPlan.usedColorCount}色`);
         detailParts.push(`色スプライト ${spriteMapPlan.colorSpriteCount}枚`);
-      }
-      if (selectedScale > 1) {
-        detailParts.push(`×${selectedScale}`);
-      }
-      if (includeOriginal) {
-        detailParts.push('原寸も追加');
       }
       const detail = detailParts.length ? ` (${detailParts.join(' / ')})` : '';
 
@@ -543,7 +533,7 @@
         includeProjectCompanion: shouldSaveProjectCompanion('jpeg'),
         archiveSuffix: 'jpeg_frames',
         archiveShareText: shouldSaveProjectCompanion('jpeg')
-          ? 'JPEG一式をZIPで書き出し、.pixieedrawを同期しました'
+          ? 'JPEG一式をZIPで書き出し、.pxdを同期しました'
           : 'JPEG一式をZIPで書き出しました',
       });
       const detailParts = [];
@@ -645,7 +635,7 @@
         includeProjectCompanion: shouldSaveProjectCompanion('svg'),
         archiveSuffix: 'svg_frames',
         archiveShareText: shouldSaveProjectCompanion('svg')
-          ? 'SVG一式をZIPで書き出し、.pixieedrawを同期しました'
+          ? 'SVG一式をZIPで書き出し、.pxdを同期しました'
           : 'SVG一式をZIPで書き出しました',
       });
       const detailParts = [];
@@ -810,7 +800,7 @@
         includeProjectCompanion: shouldSaveProjectCompanion('gif'),
         archiveSuffix: 'gif',
         archiveShareText: shouldSaveProjectCompanion('gif')
-          ? 'GIF一式をZIPで書き出し、.pixieedrawを同期しました'
+          ? 'GIF一式をZIPで書き出し、.pxdを同期しました'
           : 'GIF一式をZIPで書き出しました',
       });
       const detailParts = [];
@@ -858,35 +848,87 @@
     }
   }
 
-  async function exportProjectAsAllFormatsZip() {
-    if (!ensureCurrentClientCanExportProject({ announce: true, format: 'allzip' })) {
+  const ALL_ZIP_EXPORT_FORMATS = Object.freeze(['png', 'gif', 'svg', 'jpeg', 'spritemap', 'gridpng', 'project']);
+
+  function getSelectedBatchZipFormats() {
+    const padChoices = Array.isArray(dom.exportDialog?.formatChoices)
+      ? dom.exportDialog.formatChoices
+      : [];
+    const padSelected = padChoices
+      .filter(choice => choice instanceof HTMLButtonElement && choice.getAttribute('aria-pressed') === 'true' && !choice.disabled)
+      .map(choice => String(choice.dataset.exportFormatChoice || '').trim().toLowerCase())
+      .filter(format => ALL_ZIP_EXPORT_FORMATS.includes(format));
+    if (padSelected.length) {
+      return [...new Set(padSelected)];
+    }
+    const toggles = Array.isArray(dom.exportDialog?.batchFormatToggles)
+      ? dom.exportDialog.batchFormatToggles
+      : [];
+    const selected = toggles
+      .filter(toggle => toggle instanceof HTMLInputElement && toggle.checked && !toggle.disabled)
+      .map(toggle => String(toggle.value || '').trim().toLowerCase())
+      .filter(format => ALL_ZIP_EXPORT_FORMATS.includes(format));
+    return [...new Set(selected)];
+  }
+
+  function normalizeZipExportFormats(selectedFormats) {
+    if (!Array.isArray(selectedFormats)) {
+      return [...ALL_ZIP_EXPORT_FORMATS];
+    }
+    const selected = selectedFormats
+      .map(format => String(format || '').trim().toLowerCase())
+      .filter(format => ALL_ZIP_EXPORT_FORMATS.includes(format));
+    return [...new Set(selected)];
+  }
+
+  async function exportProjectAsAllFormatsZip({ selectedFormats = null } = {}) {
+    const formats = normalizeZipExportFormats(selectedFormats);
+    const isSelectedBatchZip = Array.isArray(selectedFormats);
+    const exportMode = isSelectedBatchZip ? 'batchzip' : 'allzip';
+    const zipLabel = isSelectedBatchZip
+      ? localizeText('選択形式ZIP', 'Selected formats ZIP')
+      : localizeText('全形式ZIP', 'All formats ZIP');
+    if (!formats.length) {
+      updateAutosaveStatus(localizeText('ZIPに含める形式を1つ以上選択してください', 'Select at least one format for the ZIP'), 'warn');
       return { exportedCount: 0, total: 0, wasCancelled: false, hadFailure: true };
     }
-    if (!canExportFormatInCurrentState('project')) {
+    if (!ensureCurrentClientCanExportProject({ announce: true, format: exportMode })) {
+      return { exportedCount: 0, total: 0, wasCancelled: false, hadFailure: true };
+    }
+    if (formats.includes('project') && !canExportFormatInCurrentState('project')) {
       updateAutosaveStatus(
         localizeText(
-          '全形式ZIPには .pixieedraw プロジェクトを含めるため、プロジェクト保存を利用できる状態が必要です',
-          'All formats ZIP requires project export to be available'
+          'PiXiEEDrawプロジェクトを含めるには、プロジェクト保存を利用できる状態が必要です',
+          'Including PiXiEEDraw requires project export to be available'
         ),
         'warn'
       );
       return { exportedCount: 0, total: 0, wasCancelled: false, hadFailure: true };
     }
-    const sourceFrameSet = buildExportFrameSet();
-    if (!sourceFrameSet?.frameCount || !Array.isArray(sourceFrameSet.framePixels)) {
+    const needsFrames = formats.some(format => format !== 'project');
+    const hasScalableFormat = formats.some(format => (
+      format === 'png' || format === 'gif' || format === 'svg' || format === 'jpeg'
+    ));
+    const sourceFrameSet = needsFrames ? buildExportFrameSet() : null;
+    if (needsFrames && (!sourceFrameSet?.frameCount || !Array.isArray(sourceFrameSet.framePixels))) {
       updateAutosaveStatus(localizeText('ZIPへまとめるフレームがありません', 'No frames are available for the ZIP bundle'), 'warn');
       return { exportedCount: 0, total: 0, wasCancelled: false, hadFailure: true };
     }
 
     try {
-      updateAutosaveStatus(localizeText('全形式ZIPを準備中…', 'Preparing all formats ZIP…'), 'info');
+      updateAutosaveStatus(localizeText(`${zipLabel}を準備中…`, `Preparing ${zipLabel}…`), 'info');
       // The final ZIP may need every frame, but it is intentionally generated
       // only after the user confirms export; dialog preview never does this.
-      const candidates = getExportScaleCandidates('allzip', { allowFullScan: true });
-      const selectedScale = applyExportScaleConstraints(candidates);
+      const candidates = hasScalableFormat
+        ? getExportScaleCandidates(exportMode, { allowFullScan: true })
+        : [1];
+      const selectedScale = hasScalableFormat ? applyExportScaleConstraints(candidates) : 1;
       syncExportScaleInputs();
-      const primaryFrameSet = appendColorSpriteAreaToFrameSet(sourceFrameSet, 'allzip');
-      const { width, height, framePixels, frameDurations, frameCount } = primaryFrameSet;
+      const primaryFrameSet = needsFrames
+        ? appendColorSpriteAreaToFrameSet(sourceFrameSet, exportMode)
+        : null;
+      const { width = 0, height = 0, framePixels = [], frameDurations = [], frameCount = 0 } = primaryFrameSet || {};
+      const includeOriginal = hasScalableFormat && shouldExportOriginalCompanion(exportMode, selectedScale);
       const tasks = [];
       const frameDigits = Math.max(2, String(frameCount).length);
       const addTask = (task, folder) => {
@@ -898,99 +940,143 @@
         });
       };
 
-      for (let frameIndex = 0; frameIndex < frameCount; frameIndex += 1) {
+      const needsStillFrames = formats.includes('png') || formats.includes('jpeg') || formats.includes('svg');
+      for (let frameIndex = 0; needsStillFrames && frameIndex < frameCount; frameIndex += 1) {
         const pixels = framePixels[frameIndex];
-        const frameCanvas = createFrameCanvas(pixels, width, height);
-        const scaledCanvas = scaleCanvasNearestNeighbor(frameCanvas, selectedScale);
-        const suffix = `frame_${String(frameIndex + 1).padStart(frameDigits, '0')}${selectedScale > 1 ? `_x${selectedScale}` : ''}`;
-        const pngBlob = await canvasToBlob(scaledCanvas, 'image/png');
-        if (!pngBlob) throw new Error('Failed to create PNG for all formats ZIP');
-        addTask({ blob: pngBlob, filename: createExportFileName('png', suffix), mimeType: 'image/png' }, 'PNG');
-
-        const jpegCanvas = createJpegCanvasFromSourceCanvas(scaledCanvas);
-        const jpegBlob = await canvasToBlob(jpegCanvas, 'image/jpeg', 0.92);
-        if (!jpegBlob) throw new Error('Failed to create JPEG for all formats ZIP');
-        addTask({ blob: jpegBlob, filename: createExportFileName('jpg', suffix), mimeType: 'image/jpeg' }, 'JPEG');
-
-        const svgBlob = buildSvgBlobFromPixels(pixels, width, height, selectedScale);
-        addTask({ blob: svgBlob, filename: createExportFileName('svg', suffix), mimeType: 'image/svg+xml' }, 'SVG');
+        const needsRasterCanvas = formats.includes('png') || formats.includes('jpeg');
+        const scales = includeOriginal ? [selectedScale, 1] : [selectedScale];
+        for (const scale of [...new Set(scales)]) {
+          const suffix = `frame_${String(frameIndex + 1).padStart(frameDigits, '0')}${scale > 1 ? `_x${scale}` : '_x1'}`;
+          const scaledCanvas = needsRasterCanvas
+            ? scaleCanvasNearestNeighbor(createFrameCanvas(pixels, width, height), scale)
+            : null;
+          if (formats.includes('png')) {
+            const pngBlob = await canvasToBlob(scaledCanvas, 'image/png');
+            if (!pngBlob) throw new Error('Failed to create PNG for ZIP');
+            addTask({ blob: pngBlob, filename: createExportFileName('png', suffix), mimeType: 'image/png' }, 'PNG');
+          }
+          if (formats.includes('jpeg')) {
+            const jpegCanvas = createJpegCanvasFromSourceCanvas(scaledCanvas);
+            const jpegBlob = await canvasToBlob(jpegCanvas, 'image/jpeg', 0.92);
+            if (!jpegBlob) throw new Error('Failed to create JPEG for ZIP');
+            addTask({ blob: jpegBlob, filename: createExportFileName('jpg', suffix), mimeType: 'image/jpeg' }, 'JPEG');
+          }
+          if (formats.includes('svg')) {
+            const svgBlob = buildSvgBlobFromPixels(pixels, width, height, scale);
+            addTask({ blob: svgBlob, filename: createExportFileName('svg', suffix), mimeType: 'image/svg+xml' }, 'SVG');
+          }
+        }
         if ((frameIndex + 1) % 4 === 0) {
           await new Promise(resolve => window.setTimeout(resolve, 0));
         }
       }
 
-      const scaledGif = scaleFrameSetNearestNeighbor(framePixels, width, height, selectedScale);
-      const gifBytes = buildGifFromPixels(scaledGif.framePixels, frameDurations, scaledGif.width, scaledGif.height);
-      addTask({
-        blob: new Blob([gifBytes], { type: 'image/gif' }),
-        filename: createExportFileName('gif', selectedScale > 1 ? `animation_x${selectedScale}` : 'animation'),
-        mimeType: 'image/gif',
-      }, 'GIF');
-
-      const spriteMapPlan = buildSpriteMapExportPlan(sourceFrameSet.framePixels, sourceFrameSet.width, sourceFrameSet.height, state.palette, {
-        includeColorSprites: exportColorSpritesEnabled,
-      });
-      const spriteMap = buildSpriteMapCanvas(spriteMapPlan.framePixels, sourceFrameSet.width, sourceFrameSet.height, {
-        scale: selectedScale,
-        columns: spriteMapPlan.columns,
-        rows: spriteMapPlan.rows,
-        placements: spriteMapPlan.placements,
-      });
-      const spriteMapBlob = await canvasToBlob(spriteMap.canvas, 'image/png');
-      if (!spriteMapBlob) throw new Error('Failed to create SpriteMAP for all formats ZIP');
-      addTask({
-        blob: spriteMapBlob,
-        filename: createExportFileName('png', selectedScale > 1 ? `spritemap_x${selectedScale}` : 'spritemap'),
-        mimeType: 'image/png',
-      }, 'SPRITEMAP');
-
-      const projectBundle = await buildProjectExportBundle(
-        getExportFileNameBase() || state.documentName,
-        {
-          includeSheets: false,
-          includeTimelapse: true,
-          useWorker: true,
-          preferredStorageAdapterId: 'pixieedraw-v2-zip',
+      if (formats.includes('gif')) {
+        for (const scale of [...new Set(includeOriginal ? [selectedScale, 1] : [selectedScale])]) {
+          const scaledGif = scaleFrameSetNearestNeighbor(framePixels, width, height, scale);
+          const gifBytes = buildGifFromPixels(scaledGif.framePixels, frameDurations, scaledGif.width, scaledGif.height);
+          addTask({
+            blob: new Blob([gifBytes], { type: 'image/gif' }),
+            filename: createExportFileName('gif', `animation_x${scale}`),
+            mimeType: 'image/gif',
+          }, 'GIF');
         }
-      );
-      if (!(projectBundle?.blob instanceof Blob) || !projectBundle?.filename) {
-        throw new Error('Failed to create PiXiEEDraw project for all formats ZIP');
       }
-      addTask({
-        blob: projectBundle.blob,
-        filename: projectBundle.filename,
-        mimeType: PROJECT_FILE_MIME_TYPE,
-      }, 'PROJECT');
+
+      if (formats.includes('spritemap')) {
+        const spriteMapPlan = buildSpriteMapExportPlan(sourceFrameSet.framePixels, sourceFrameSet.width, sourceFrameSet.height, state.palette, {
+          includeColorSprites: exportColorSpritesEnabled,
+        });
+        const spriteMap = buildSpriteMapCanvas(spriteMapPlan.framePixels, sourceFrameSet.width, sourceFrameSet.height, {
+          scale: 1,
+          columns: spriteMapPlan.columns,
+          rows: spriteMapPlan.rows,
+          placements: spriteMapPlan.placements,
+        });
+        const spriteMapBlob = await canvasToBlob(spriteMap.canvas, 'image/png');
+        if (!spriteMapBlob) throw new Error('Failed to create SpriteMAP for ZIP');
+        addTask({
+          blob: spriteMapBlob,
+          filename: createExportFileName('png', 'spritemap_x1'),
+          mimeType: 'image/png',
+        }, 'SPRITEMAP');
+      }
+
+      if (formats.includes('gridpng')) {
+        const gridFrameSet = appendColorSpriteAreaToFrameSet(sourceFrameSet, 'gridpng');
+        const gridWidth = normalizeExportGridTileSize(exportGridTileWidth, 8);
+        const gridHeight = normalizeExportGridTileSize(exportGridTileHeight, 8);
+        const rowSegments = buildGridRowSegmentsTopToBottom(gridFrameSet.height, gridHeight);
+        const columnSegments = buildGridColumnSegmentsRightToLeft(gridFrameSet.width, gridWidth);
+        const rowDigits = Math.max(2, String(rowSegments.length).length);
+        const columnDigits = Math.max(2, String(columnSegments.length).length);
+        for (let frameIndex = 0; frameIndex < gridFrameSet.frameCount; frameIndex += 1) {
+          const frameCanvas = createFrameCanvas(gridFrameSet.framePixels[frameIndex], gridFrameSet.width, gridFrameSet.height);
+          for (let rowIndex = 0; rowIndex < rowSegments.length; rowIndex += 1) {
+            for (let columnIndex = 0; columnIndex < columnSegments.length; columnIndex += 1) {
+              const row = rowSegments[rowIndex];
+              const column = columnSegments[columnIndex];
+              const gridBlob = await canvasRegionToBlob(frameCanvas, column.start, row.start, column.size, row.size, 'image/png');
+              addTask({
+                blob: gridBlob,
+                filename: createExportFileName('png', `grid_frame_${String(frameIndex + 1).padStart(frameDigits, '0')}_r${String(rowIndex + 1).padStart(rowDigits, '0')}_c${String(columnIndex + 1).padStart(columnDigits, '0')}_x1`),
+                mimeType: 'image/png',
+              }, 'GRIDPNG');
+            }
+          }
+        }
+      }
+
+      if (formats.includes('project')) {
+        const projectBundle = await buildProjectExportBundle(
+          getExportFileNameBase() || state.documentName,
+          {
+            includeSheets: false,
+            includeTimelapse: true,
+            useWorker: true,
+            preferredStorageAdapterId: 'pxd-v2-zip',
+          }
+        );
+        if (!(projectBundle?.blob instanceof Blob) || !projectBundle?.filename) {
+          throw new Error('Failed to create PiXiEEDraw project for ZIP');
+        }
+        addTask({
+          blob: projectBundle.blob,
+          filename: projectBundle.filename,
+          mimeType: PROJECT_FILE_MIME_TYPE,
+        }, 'PROJECT');
+      }
 
       const result = await deliverExportTasks(tasks, {
         mimeType: 'application/zip',
         fileExtensions: ['.zip'],
+        forceZip: true,
         shareTitle: state.documentName || 'PiXiEEDraw',
-        shareText: localizeText('全形式をZIPへまとめました', 'Bundled all formats into ZIP'),
-        mode: 'allzip',
-        archiveSuffix: 'all_formats',
-        archiveShareText: localizeText('PNG・GIF・SVG・JPEG・SpriteMAP・PiXiEEDrawをZIPへまとめました', 'Bundled PNG, GIF, SVG, JPEG, SpriteMAP, and PiXiEEDraw into ZIP'),
+        shareText: localizeText(`${zipLabel}をZIPへまとめました`, `Bundled ${zipLabel}`),
+        mode: exportMode,
+        archiveSuffix: isSelectedBatchZip ? 'selected_formats' : 'all_formats',
+        archiveShareText: localizeText(`${formats.join('・')} をZIPへまとめました`, `Bundled ${formats.join(', ')} into ZIP`),
       });
       if (result.exportedCount === result.total && !result.wasCancelled && !result.hadFailure) {
         markDocumentDurablySaved();
         updateAutosaveStatus(
-          localizeText(`全形式ZIPを書き出しました（${frameCount}フレーム / ${tasks.length}ファイル）`, `Exported all formats ZIP (${frameCount} frames / ${tasks.length} files)`),
+          localizeText(`${zipLabel}を書き出しました（${frameCount}フレーム / ${tasks.length}ファイル）`, `Exported ${zipLabel} (${frameCount} frames / ${tasks.length} files)`),
           'success'
         );
         showLoginPromptAfterExport();
       } else if (result.wasCancelled) {
-        updateAutosaveStatus(localizeText('全形式ZIPの書き出しをキャンセルしました', 'All formats ZIP export was canceled'), 'warn');
+        updateAutosaveStatus(localizeText(`${zipLabel}の書き出しをキャンセルしました`, `${zipLabel} export was canceled`), 'warn');
       } else {
-        updateAutosaveStatus(localizeText('全形式ZIPの書き出しに失敗しました', 'All formats ZIP export failed'), 'error');
+        updateAutosaveStatus(localizeText(`${zipLabel}の書き出しに失敗しました`, `${zipLabel} export failed`), 'error');
       }
       return result;
     } catch (error) {
-      console.error('All formats ZIP export failed', error);
+      console.error('ZIP export failed', error);
       const timelapseSyncFailed = String(error?.code || '').startsWith('ERR_TIMELAPSE_');
       updateAutosaveStatus(
         timelapseSyncFailed
-          ? localizeText('全形式ZIP: タイムラプスを完全同期できないため中止しました', 'All formats ZIP stopped because timelapse could not be synchronized')
-          : localizeText('全形式ZIPの書き出しに失敗しました', 'All formats ZIP export failed'),
+          ? localizeText(`${zipLabel}: タイムラプスを完全同期できないため中止しました`, `${zipLabel} stopped because timelapse could not be synchronized`)
+          : localizeText(`${zipLabel}の書き出しに失敗しました`, `${zipLabel} export failed`),
         'error'
       );
       return { exportedCount: 0, total: 0, wasCancelled: false, hadFailure: true, error };
@@ -1538,6 +1624,7 @@
     if (normalized === 'glb') return 'glb';
     if (normalized === 'spritemap' || normalized === 'sprite-map' || normalized === 'spritesheet' || normalized === 'sprite-sheet') return 'spritemap';
     if (normalized === 'allzip' || normalized === 'all-zip' || normalized === 'bundle') return 'allzip';
+    if (normalized === 'batchzip' || normalized === 'batch-zip' || normalized === 'selectedzip' || normalized === 'selected-zip') return 'batchzip';
     if (normalized === 'png') return 'png';
     if (normalized === 'gridpng' || normalized === 'grid') return 'gridpng';
     if (normalized === 'project') return 'project';
@@ -1551,6 +1638,7 @@
     if (normalized === 'voxelpreview') return localizeText('立体プレビューPNG', 'Voxel Preview PNG');
     if (normalized === 'glb') return 'GLB';
     if (normalized === 'spritemap') return 'SpriteMAP';
+    if (normalized === 'batchzip') return localizeText('選択形式ZIP', 'Selected formats ZIP');
     if (normalized === 'allzip') return localizeText('全形式ZIP', 'All formats ZIP');
     if (normalized === 'gridpng') return localizeText('PNG（グリッド分割）', 'PNG (Grid Split)');
     if (normalized === 'gif') return 'GIF';
@@ -1604,7 +1692,11 @@
   }
 
   function getExportDisabledReason(mode = 'png') {
-    return getMultiExportDisabledReason(mode) || getFormatSpecificExportDisabledReason(mode);
+    const format = normalizeExportFormat(mode);
+    if (format === 'batchzip' && !getSelectedBatchZipFormats().length) {
+      return localizeText('ZIPに含める形式を1つ以上選択してください', 'Select at least one format for the ZIP');
+    }
+    return getMultiExportDisabledReason(format) || getFormatSpecificExportDisabledReason(format);
   }
 
   function canExportFormatInCurrentState(mode = 'png') {
@@ -1612,14 +1704,7 @@
   }
 
   function resolveSelectedExportDialogFormat(mode = '') {
-    const format = normalizeExportFormat(mode || dom.exportDialog?.format?.value || 'png');
-    if (format === 'png' && dom.exportDialog?.gridSplitToggle instanceof HTMLInputElement && dom.exportDialog.gridSplitToggle.checked) {
-      return 'gridpng';
-    }
-    if (format === 'gif' && dom.exportDialog?.timelapseToggle instanceof HTMLInputElement && dom.exportDialog.timelapseToggle.checked) {
-      return 'timelapse';
-    }
-    return format;
+    return normalizeExportFormat(mode || dom.exportDialog?.format?.value || 'png');
   }
 
   function updateExportFormatAvailability() {
@@ -1628,11 +1713,16 @@
     if (!(select instanceof HTMLSelectElement)) {
       return;
     }
+    updateBatchZipFormatOptions();
+    const isSelectableFormat = mode => {
+      const format = normalizeExportFormat(mode);
+      return !(getMultiExportDisabledReason(format) || getFormatSpecificExportDisabledReason(format));
+    };
     const options = Array.from(select.options || []);
     let firstAllowedValue = '';
     options.forEach(option => {
       const mode = normalizeExportFormat(option.value || 'png');
-      const allowed = canExportFormatInCurrentState(mode);
+      const allowed = isSelectableFormat(mode);
       option.disabled = !allowed;
       if (allowed && !firstAllowedValue) {
         firstAllowedValue = option.value || mode;
@@ -1641,7 +1731,7 @@
 
     const hasAllowedMode = Boolean(firstAllowedValue);
     const currentMode = resolveSelectedExportDialogFormat();
-    if (!canExportFormatInCurrentState(currentMode) && firstAllowedValue) {
+    if (!isSelectableFormat(currentMode) && firstAllowedValue) {
       select.value = firstAllowedValue;
     }
     select.disabled = !hasAllowedMode;
@@ -1657,6 +1747,48 @@
         config.confirm.removeAttribute('title');
       }
     }
+    updateExportFormatPadState();
+  }
+
+  function updateExportFormatPadState() {
+    const config = dom.exportDialog;
+    const selectedFormat = normalizeExportFormat(config?.format?.value || 'png');
+    const optionByFormat = new Map(
+      Array.from(config?.format?.options || []).map(option => [normalizeExportFormat(option.value), option])
+    );
+    const choices = Array.isArray(config?.formatChoices) ? config.formatChoices : [];
+    const selectedPadFormats = choices
+      .filter(choice => choice instanceof HTMLButtonElement && choice.getAttribute('aria-pressed') === 'true')
+      .map(choice => normalizeExportFormat(choice.dataset.exportFormatChoice));
+    const activeFormats = selectedFormat === 'batchzip'
+      ? selectedPadFormats
+      : [selectedFormat];
+    if (activeFormats.length > 1) {
+      if (config?.padConsole instanceof HTMLElement) config.padConsole.dataset.exportTone = 'batchzip';
+      if (config?.dialog instanceof HTMLElement) config.dialog.dataset.exportTone = 'batchzip';
+    }
+    choices.forEach(choice => {
+      if (!(choice instanceof HTMLButtonElement)) {
+        return;
+      }
+      const format = normalizeExportFormat(choice.dataset.exportFormatChoice);
+      const active = activeFormats.includes(format);
+      const option = optionByFormat.get(format);
+      choice.disabled = Boolean(option?.disabled);
+      choice.setAttribute('aria-pressed', String(active));
+      choice.classList.toggle('is-active', active);
+      if (option?.disabled && option.title) {
+        choice.title = option.title;
+      } else {
+        choice.removeAttribute('title');
+      }
+      if (active && activeFormats.length === 1 && config?.padConsole instanceof HTMLElement) {
+        config.padConsole.dataset.exportTone = choice.dataset.exportTone || format;
+      }
+      if (active && activeFormats.length === 1 && config?.dialog instanceof HTMLElement) {
+        config.dialog.dataset.exportTone = choice.dataset.exportTone || format;
+      }
+    });
   }
 
   function isGridPngExportMode(mode) {
@@ -1680,7 +1812,7 @@
   }
 
   function shouldSaveProjectCompanion(mode) {
-    return exportSaveProjectCompanion && canOfferProjectCompanionExport(mode);
+    return false;
   }
 
   function canOfferSpriteMapCompanionExport(mode) {
@@ -1695,7 +1827,7 @@
   }
 
   function shouldSaveSpriteMapCompanion(mode) {
-    return exportSaveSpriteMapCompanion && canOfferSpriteMapCompanionExport(mode);
+    return false;
   }
 
   function canOfferColorSpriteExport(mode) {
@@ -1711,7 +1843,6 @@
 
   function shouldAppendColorSpritesToPrimaryExport(mode) {
     return exportColorSpritesEnabled
-      && !shouldSaveSpriteMapCompanion(mode)
       && canOfferColorSpriteExport(mode);
   }
 
@@ -1771,8 +1902,13 @@
   function canOfferOriginalCompanionExport(mode, scale = exportScale) {
     const format = normalizeExportFormat(mode);
     const normalizedScale = Math.max(1, Math.floor(Number(scale) || 1));
+    if (format === 'batchzip') {
+      return normalizedScale > 1 && getSelectedBatchZipFormats().some(selectedFormat => (
+        selectedFormat === 'png' || selectedFormat === 'gif' || selectedFormat === 'jpeg' || selectedFormat === 'svg'
+      ));
+    }
     return normalizedScale > 1
-      && (format === 'png' || format === 'voxelpreview' || format === 'jpeg' || format === 'svg' || format === 'spritemap' || format === 'gif');
+      && (format === 'png' || format === 'voxelpreview' || format === 'jpeg' || format === 'svg' || format === 'gif');
   }
 
   function shouldExportOriginalCompanion(mode, scale = exportScale) {
@@ -1781,14 +1917,17 @@
 
   function doesExportFormatUseScale(mode) {
     const format = normalizeExportFormat(mode);
+    if (format === 'batchzip') {
+      return getSelectedBatchZipFormats().some(selectedFormat => (
+        selectedFormat === 'png' || selectedFormat === 'gif' || selectedFormat === 'jpeg' || selectedFormat === 'svg'
+      ));
+    }
     return format === 'png'
       || format === 'allzip'
       || format === 'voxelpreview'
       || format === 'jpeg'
       || format === 'svg'
-      || format === 'spritemap'
       || format === 'gif'
-      || format === 'gridpng'
       || format === 'timelapse';
   }
 
@@ -1806,6 +1945,13 @@
 
   function updateExportOptionVisibility(mode) {
     const format = resolveSelectedExportDialogFormat(mode);
+    const isBatchZip = format === 'batchzip';
+    const isZipBundle = isBatchZip || format === 'allzip';
+    const batchFormatOptions = dom.exportDialog?.batchFormatOptions;
+    if (batchFormatOptions instanceof HTMLElement) {
+      batchFormatOptions.hidden = !isBatchZip;
+    }
+    updateBatchZipFormatOptions();
     const scaleControls = dom.exportDialog?.scaleControls;
     if (scaleControls instanceof HTMLElement) {
       scaleControls.hidden = !doesExportFormatUseScale(format);
@@ -1822,13 +1968,19 @@
 
     const companionRow = dom.exportDialog?.saveProjectCompanionRow;
     if (companionRow instanceof HTMLElement) {
-      companionRow.hidden = !doesExportFormatSupportProjectCompanion(format);
+      companionRow.hidden = isBatchZip || !doesExportFormatSupportProjectCompanion(format);
     }
     updateExportSpriteMapCompanionToggleUI();
 
+    const spriteMapCompanionRow = dom.exportDialog?.saveSpriteMapCompanionRow;
+    if (spriteMapCompanionRow instanceof HTMLElement && isZipBundle) {
+      spriteMapCompanionRow.hidden = true;
+    }
+
     const spriteMapColorSpritesRow = dom.exportDialog?.spriteMapColorSpritesRow;
     if (spriteMapColorSpritesRow instanceof HTMLElement) {
-      spriteMapColorSpritesRow.hidden = format === 'project';
+      spriteMapColorSpritesRow.hidden = format === 'project'
+        || (isBatchZip && !getSelectedBatchZipFormats().some(selectedFormat => selectedFormat !== 'project'));
     }
     const spriteMapColorSpritesToggle = dom.exportDialog?.spriteMapColorSpritesToggle;
     if (spriteMapColorSpritesToggle instanceof HTMLInputElement) {
@@ -1844,12 +1996,32 @@
     }
   }
 
+  function updateBatchZipFormatOptions() {
+    const toggles = Array.isArray(dom.exportDialog?.batchFormatToggles)
+      ? dom.exportDialog.batchFormatToggles
+      : [];
+    toggles.forEach(toggle => {
+      if (!(toggle instanceof HTMLInputElement)) {
+        return;
+      }
+      const format = normalizeExportFormat(toggle.value);
+      const unavailableReason = getMultiExportDisabledReason(format) || getFormatSpecificExportDisabledReason(format);
+      toggle.disabled = Boolean(unavailableReason);
+      if (toggle.disabled) {
+        toggle.checked = false;
+        toggle.title = unavailableReason;
+      } else {
+        toggle.removeAttribute('title');
+      }
+    });
+  }
+
   function updateExportOriginalToggleUI() {
     const toggle = dom.exportDialog?.includeOriginalToggle;
     const mode = resolveSelectedExportDialogFormat();
     const isGridMode = isGridPngExportMode(mode);
     if (toggle instanceof HTMLInputElement) {
-      const canOffer = !isGridMode && canOfferOriginalCompanionExport(mode, exportScale);
+      const canOffer = canOfferOriginalCompanionExport(mode, exportScale);
       toggle.checked = exportIncludeOriginalSize;
       toggle.disabled = !canOffer;
     }
@@ -2002,7 +2174,23 @@
     }
 
     updateExportScaleHint();
+    updateExportScalePadState();
     updateExportOriginalToggleUI();
+  }
+
+  function updateExportScalePadState() {
+    const choices = Array.isArray(dom.exportDialog?.scaleChoices) ? dom.exportDialog.scaleChoices : [];
+    choices.forEach(choice => {
+      if (!(choice instanceof HTMLButtonElement)) {
+        return;
+      }
+      const scale = Math.max(1, Math.round(Number(choice.dataset.exportScaleChoice) || 1));
+      const available = scale <= Math.max(1, exportMaxScale || 1);
+      const active = scale === exportScale;
+      choice.disabled = !available;
+      choice.setAttribute('aria-pressed', String(active));
+      choice.classList.toggle('is-active', active);
+    });
   }
 
   function syncExportGridInputs() {
@@ -2044,6 +2232,190 @@
     if (meta instanceof HTMLElement) {
       meta.textContent = text;
     }
+  }
+
+  function getExportPreviewOutputCards(mode) {
+    const format = normalizeExportFormat(mode);
+    const selectedFormats = format === 'batchzip'
+      ? getSelectedBatchZipFormats()
+      : (format === 'allzip' ? ALL_ZIP_EXPORT_FORMATS : [format]);
+    const scalableFormats = new Set(['png', 'gif', 'svg', 'jpeg', 'voxelpreview']);
+    const cards = [];
+    const add = (label, detail, marker, tone = '', previewType = 'frame') => {
+      cards.push({ label, detail, marker, tone, previewType });
+    };
+
+    selectedFormats.forEach(selectedFormat => {
+      const normalized = normalizeExportFormat(selectedFormat);
+      if (normalized === 'project') {
+        add('PiXiEEDraw', '.pxd 編集データ', 'FILE', 'project', 'project');
+        return;
+      }
+      if (normalized === 'spritemap') {
+        add('SpriteMAP', '全フレームを PNG ×1 で配置', 'MAP', 'spritemap', 'spritemap');
+        return;
+      }
+      if (normalized === 'gridpng') {
+        add('グリッドPNG', '分割タイルを PNG ×1 で配置', 'GRID', 'gridpng', 'grid');
+        return;
+      }
+      const label = getExportFormatLabel(normalized);
+      const scale = scalableFormats.has(normalized) ? Math.max(1, exportScale) : 1;
+      add(label, `メイン出力・倍率 ×${scale}`, label, normalized, 'frame');
+    });
+
+    if (shouldExportOriginalCompanion(format, exportScale)) {
+      add('原寸 ×1', 'メイン画像と並べて追加', '×1', 'original', 'frame');
+    }
+    if (shouldAppendColorSpritesToPrimaryExport(format)) {
+      add('カラースプライト', '画像に合成して追加', 'CLR', 'color', 'color');
+    }
+    if (dom.exportDialog?.timelapseToggle instanceof HTMLInputElement
+      && dom.exportDialog.timelapseToggle.checked) {
+      add('タイムラプスGIF', '記録済みの工程を追加出力', 'REC', 'gif', 'frame');
+    }
+    return cards;
+  }
+
+  function createExportPreviewThumbnailCanvas(sourceCanvas, maxEdge = 42) {
+    const sourceWidth = Math.max(1, Math.floor(Number(sourceCanvas?.width) || 1));
+    const sourceHeight = Math.max(1, Math.floor(Number(sourceCanvas?.height) || 1));
+    const scale = Math.min(1, Math.max(1, Math.floor(Number(maxEdge) || 42)) / Math.max(sourceWidth, sourceHeight));
+    const canvas = createBlankExportPreviewCanvas(
+      Math.max(1, Math.round(sourceWidth * scale)),
+      Math.max(1, Math.round(sourceHeight * scale))
+    );
+    const context = canvas.getContext('2d');
+    if (!context || !(sourceCanvas instanceof HTMLCanvasElement)) {
+      return canvas;
+    }
+    context.imageSmoothingEnabled = false;
+    context.drawImage(sourceCanvas, 0, 0, canvas.width, canvas.height);
+    return canvas;
+  }
+
+  function createGridExportPreviewThumbnail(previewData) {
+    const sourceCanvas = previewData?.thumbnailCanvas;
+    const canvas = createExportPreviewThumbnailCanvas(sourceCanvas);
+    const context = canvas.getContext('2d');
+    if (!context || !(sourceCanvas instanceof HTMLCanvasElement)) {
+      return canvas;
+    }
+    const sourceWidth = Math.max(1, sourceCanvas.width);
+    const sourceHeight = Math.max(1, sourceCanvas.height);
+    const frameWidth = Math.max(1, Number(previewData?.frameWidth) || sourceWidth);
+    const frameHeight = Math.max(1, Number(previewData?.frameHeight) || sourceHeight);
+    const scaleX = canvas.width / sourceWidth;
+    const scaleY = canvas.height / sourceHeight;
+    context.save();
+    context.strokeStyle = 'rgba(229, 255, 238, 0.92)';
+    context.lineWidth = 1;
+    context.setLineDash([2, 1]);
+    buildGridColumnSegmentsRightToLeft(frameWidth, exportGridTileWidth).forEach(segment => {
+      const x = Math.round(segment.start * (sourceWidth / frameWidth) * scaleX) + 0.5;
+      context.beginPath();
+      context.moveTo(x, 0);
+      context.lineTo(x, canvas.height);
+      context.stroke();
+    });
+    buildGridRowSegmentsTopToBottom(frameHeight, exportGridTileHeight).forEach(segment => {
+      const y = Math.round(segment.start * (sourceHeight / frameHeight) * scaleY) + 0.5;
+      context.beginPath();
+      context.moveTo(0, y);
+      context.lineTo(canvas.width, y);
+      context.stroke();
+    });
+    context.restore();
+    return canvas;
+  }
+
+  function createColorSpriteExportPreviewThumbnail(previewData) {
+    const activePreview = previewData?.activePreview;
+    if (!(activePreview?.pixels instanceof Uint8ClampedArray)) {
+      return createExportPreviewThumbnailCanvas(previewData?.thumbnailCanvas);
+    }
+    const colors = collectUsedColorsFromFramePixels([activePreview.pixels], state.palette);
+    const colorSprites = buildColorSpriteFramesFromColors(
+      colors,
+      Math.max(1, Math.min(16, activePreview.width)),
+      Math.max(1, Math.min(16, activePreview.height))
+    );
+    if (!colorSprites.framePixels.length) {
+      return createExportPreviewThumbnailCanvas(previewData?.thumbnailCanvas);
+    }
+    const visibleSpriteCount = Math.min(4, colorSprites.framePixels.length);
+    const sheet = createBlankExportPreviewCanvas(
+      Math.max(1, Math.min(16, activePreview.width)),
+      Math.max(1, Math.min(16, activePreview.height)) * visibleSpriteCount
+    );
+    const context = sheet.getContext('2d');
+    if (!context) {
+      return sheet;
+    }
+    for (let index = 0; index < visibleSpriteCount; index += 1) {
+      context.putImageData(
+        new ImageData(colorSprites.framePixels[index], sheet.width, Math.max(1, Math.min(16, activePreview.height))),
+        0,
+        index * Math.max(1, Math.min(16, activePreview.height))
+      );
+    }
+    return createExportPreviewThumbnailCanvas(sheet);
+  }
+
+  function createExportPreviewOutputVisual(card, previewData) {
+    if (card.previewType === 'project') {
+      return null;
+    }
+    if (card.previewType === 'spritemap') {
+      return createExportPreviewThumbnailCanvas(previewData?.spriteMapCanvas || previewData?.thumbnailCanvas);
+    }
+    if (card.previewType === 'grid') {
+      return createGridExportPreviewThumbnail(previewData);
+    }
+    if (card.previewType === 'color') {
+      return createColorSpriteExportPreviewThumbnail(previewData);
+    }
+    return createExportPreviewThumbnailCanvas(previewData?.thumbnailCanvas);
+  }
+
+  function renderExportPreviewOutputs(mode, previewData = null) {
+    const container = dom.exportDialog?.previewOutputs;
+    if (!(container instanceof HTMLElement)) {
+      return;
+    }
+    container.replaceChildren();
+    const cards = getExportPreviewOutputCards(mode);
+    if (!cards.length) {
+      container.hidden = true;
+      return;
+    }
+    container.hidden = false;
+    cards.forEach(card => {
+      const item = document.createElement('div');
+      item.className = 'export-preview-output';
+      if (card.tone) {
+        item.dataset.exportTone = card.tone;
+      }
+      const visual = createExportPreviewOutputVisual(card, previewData);
+      const marker = visual instanceof HTMLCanvasElement
+        ? visual
+        : document.createElement('span');
+      marker.className = visual instanceof HTMLCanvasElement
+        ? 'export-preview-output__thumbnail'
+        : 'export-preview-output__marker';
+      if (!(visual instanceof HTMLCanvasElement)) {
+        marker.textContent = card.marker;
+      }
+      const copy = document.createElement('span');
+      copy.className = 'export-preview-output__copy';
+      const label = document.createElement('strong');
+      label.textContent = card.label;
+      const detail = document.createElement('small');
+      detail.textContent = card.detail;
+      copy.append(label, detail);
+      item.append(marker, copy);
+      container.append(item);
+    });
   }
 
   function drawExportPreviewCanvas(sourceCanvas, metaText = '') {
@@ -2095,14 +2467,62 @@
     return canvas;
   }
 
+  function buildLightweightSpriteMapPreviewCanvas(frames, width, height) {
+    const safeFrames = Array.isArray(frames) ? frames : [];
+    const layout = computeSpriteSheetLayout(safeFrames.length);
+    // 100 frames becomes a 10 x 10 map of at most 40px cells: a small,
+    // representative canvas rather than a full-size export in the dialog.
+    const cellMaxEdge = 40;
+    const first = compositeFramePixelsForExportPreview(
+      safeFrames[0] || null,
+      width,
+      height,
+      state.palette,
+      cellMaxEdge
+    );
+    const canvas = createBlankExportPreviewCanvas(
+      Math.max(1, first.width * layout.columns),
+      Math.max(1, first.height * layout.rows)
+    );
+    const context = canvas.getContext('2d');
+    if (!context) {
+      return { canvas, layout, cellWidth: first.width, cellHeight: first.height };
+    }
+    context.imageSmoothingEnabled = false;
+    for (let frameIndex = 0; frameIndex < safeFrames.length; frameIndex += 1) {
+      const thumbnail = frameIndex === 0
+        ? first
+        : compositeFramePixelsForExportPreview(
+            safeFrames[frameIndex],
+            width,
+            height,
+            state.palette,
+            cellMaxEdge
+          );
+      const column = frameIndex % layout.columns;
+      const row = Math.floor(frameIndex / layout.columns);
+      context.putImageData(
+        new ImageData(thumbnail.pixels, thumbnail.width, thumbnail.height),
+        column * first.width,
+        row * first.height
+      );
+    }
+    return { canvas, layout, cellWidth: first.width, cellHeight: first.height };
+  }
+
   function buildExportPreviewSourceCanvas(format) {
-    const frames = Array.isArray(state.frames) ? state.frames : [];
+    const frames = getCurrentExportFrames();
     const width = Math.max(1, state.width);
     const height = Math.max(1, state.height);
     if (!frames.length) {
       return {
         canvas: createBlankExportPreviewCanvas(width, height),
         meta: localizeText('フレームがありません', 'No frames'),
+        thumbnailCanvas: createBlankExportPreviewCanvas(1, 1),
+        spriteMapCanvas: null,
+        activePreview: null,
+        frameWidth: width,
+        frameHeight: height,
       };
     }
     const normalizedFormat = normalizeExportFormat(format);
@@ -2118,27 +2538,52 @@
     const previewSizeLabel = activePreview.width === width && activePreview.height === height
       ? ''
       : ` / preview ${activePreview.width}x${activePreview.height}px`;
-    if (normalizedFormat === 'spritemap' || normalizedFormat === 'allzip' || shouldSaveSpriteMapCompanion(normalizedFormat)) {
-      const layout = computeSpriteSheetLayout(frames.length);
-      const outputWidth = width * layout.columns * outputScale;
-      const outputHeight = height * layout.rows * outputScale;
+    const batchFormats = normalizedFormat === 'batchzip' ? getSelectedBatchZipFormats() : [];
+    const includesSpriteMap = normalizedFormat === 'spritemap'
+      || normalizedFormat === 'allzip'
+      || batchFormats.includes('spritemap')
+      || shouldSaveSpriteMapCompanion(normalizedFormat);
+    if (includesSpriteMap) {
+      const previewMap = buildLightweightSpriteMapPreviewCanvas(frames, width, height);
+      const outputWidth = width * previewMap.layout.columns;
+      const outputHeight = height * previewMap.layout.rows;
+      const label = normalizedFormat === 'allzip'
+        ? 'All formats ZIP'
+        : (normalizedFormat === 'batchzip' ? `Selected ZIP (${batchFormats.join(', ') || 'none'})` : 'SpriteMAP');
       return {
-        canvas: frameCanvas,
-        meta: `${normalizedFormat === 'allzip' ? 'All formats ZIP' : 'SpriteMAP'} / SpriteMAP ${layout.columns}x${layout.rows} / ${outputWidth}x${outputHeight}px / Frame ${activeFrameIndex + 1}/${frames.length}${previewSizeLabel}`,
+        canvas: previewMap.canvas,
+        meta: `${label} / SpriteMAP ${previewMap.layout.columns}x${previewMap.layout.rows} / 出力 ${outputWidth}x${outputHeight}px / 軽量プレビュー ${previewMap.cellWidth}x${previewMap.cellHeight}px × ${frames.length}フレーム`,
+        thumbnailCanvas: frameCanvas,
+        spriteMapCanvas: previewMap.canvas,
+        activePreview,
+        frameWidth: width,
+        frameHeight: height,
       };
     }
     if (shouldAppendColorSpritesToPrimaryExport(normalizedFormat)) {
       return {
         canvas: frameCanvas,
         meta: `${getExportFormatLabel(normalizedFormat)} + Color sprites / ${width * outputScale}x${height * outputScale}px / Frame ${activeFrameIndex + 1}/${frames.length}${previewSizeLabel}`,
+        thumbnailCanvas: frameCanvas,
+        spriteMapCanvas: null,
+        activePreview,
+        frameWidth: width,
+        frameHeight: height,
       };
     }
-    const formatLabel = getExportFormatLabel(normalizedFormat);
+    const formatLabel = normalizedFormat === 'batchzip'
+      ? `Selected ZIP (${batchFormats.join(', ') || 'none'})`
+      : getExportFormatLabel(normalizedFormat);
     const outputWidth = width * outputScale;
     const outputHeight = height * outputScale;
     return {
       canvas: frameCanvas,
       meta: `${formatLabel} / Frame ${activeFrameIndex + 1}/${frames.length} / ${outputWidth}x${outputHeight}px${previewSizeLabel}`,
+      thumbnailCanvas: frameCanvas,
+      spriteMapCanvas: null,
+      activePreview,
+      frameWidth: width,
+      frameHeight: height,
     };
   }
 
@@ -2149,11 +2594,14 @@
     }
     const format = resolveSelectedExportDialogFormat();
     try {
-      const { canvas, meta } = buildExportPreviewSourceCanvas(format);
+      const previewData = buildExportPreviewSourceCanvas(format);
+      const { canvas, meta } = previewData;
       drawExportPreviewCanvas(canvas, meta);
+      renderExportPreviewOutputs(format, previewData);
     } catch (error) {
       console.warn('Failed to update export preview', error);
       drawExportPreviewCanvas(createBlankExportPreviewCanvas(1, 1), localizeText('プレビューを更新できませんでした', 'Preview unavailable'));
+      renderExportPreviewOutputs(format);
     }
   }
 
@@ -2372,7 +2820,7 @@
     if (!total) {
       return { exportedCount: 0, total: 0, wasCancelled: false, hadFailure: false };
     }
-    if (total > 1) {
+    if (total > 1 || options.forceZip) {
       try {
         const zipBlob = await buildZipBlobFromTasks(normalizedTasks);
         const zipFilename = createExportFileName('zip', options.archiveSuffix || 'export_bundle');
@@ -2543,7 +2991,7 @@
 
   function buildProjectFileNameBase(fileNameBase = '') {
     const raw = String(fileNameBase || '').trim() || String(state.documentName || '').trim() || 'project';
-    return raw.replace(/\.pixieedraw$/i, '');
+    return raw.replace(/\.(?:pxd|pixieedraw|pxdraw)$/i, '');
   }
 
   async function saveProjectBundleAsNewFile(bundle, options = {}) {
@@ -2608,11 +3056,11 @@
           includeTimelapse: options?.includeTimelapse !== false,
           useWorker: options?.useWorker !== false,
           requireWorker: options?.requireWorker === true,
-          preferredStorageAdapterId: 'pixieedraw-v2-zip',
+          preferredStorageAdapterId: 'pxd-v2-zip',
         }
       );
-      const selectedStorageAdapterId = storageAdapterId || 'pixieedraw-v2-zip';
-      if (selectedStorageAdapterId !== 'pixieedraw-v2-zip') {
+      const selectedStorageAdapterId = storageAdapterId || 'pxd-v2-zip';
+      if (selectedStorageAdapterId !== 'pxd-v2-zip') {
         throw new Error('True V2 project export is required');
       }
       const savePlan = {
@@ -2831,6 +3279,7 @@
           getCurrentExportFrames,
           buildStillExportFrameSet,
           buildExportFrameSet,
+          getSelectedBatchZipFormats,
           getSimulationActiveLayer,
           updateSimulationElementPaletteUi,
           buildSimulationElementPaletteButtons,

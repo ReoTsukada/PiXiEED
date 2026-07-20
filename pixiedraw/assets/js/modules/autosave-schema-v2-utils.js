@@ -141,7 +141,7 @@
       delete project.activeSheetId;
       return {
         id,
-        fileName: normalizeString(value.fileName, project?.document?.documentName || `${id}.pixieedraw`),
+        fileName: normalizeString(value.fileName, project?.document?.documentName || `${id}.pxd`),
         label: normalizeString(value.label, `Sheet ${index + 1}`),
         source,
         project,
@@ -211,7 +211,7 @@
       delete project.activeSheetId;
       project.projectLayout = 'single-project';
       return {
-        fileName: normalizeString(value.fileName, project?.document?.documentName || 'PiXiEEDraw.pixieedraw'),
+        fileName: normalizeString(value.fileName, project?.document?.documentName || 'PiXiEEDraw.pxd'),
         source: normalizeSourceMetadata(value.source || value),
         project,
       };

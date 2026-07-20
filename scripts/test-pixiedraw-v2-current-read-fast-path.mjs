@@ -57,7 +57,7 @@ try {
     const createProject = (revision, documentName) => ({
       projectId: 'large-project',
       name: documentName,
-      fileName: `${documentName}.pixieedraw`,
+      fileName: `${documentName}.pxd`,
       updatedAt: `2026-07-19T00:00:0${revision}Z`,
       sourceKind: 'recent',
       project: {

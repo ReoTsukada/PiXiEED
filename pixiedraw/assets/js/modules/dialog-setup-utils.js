@@ -107,26 +107,22 @@
     const dialog = config.dialog;
     const supportsDialog = dialog && typeof dialog.showModal === 'function';
     const resolveSelectedExportMode = () => {
-      const format = normalizeExportFormat(config.format?.value || 'png');
-      if (format === 'png' && config.gridSplitToggle instanceof HTMLInputElement && config.gridSplitToggle.checked) {
-        return 'gridpng';
-      }
-      if (format === 'gif' && config.timelapseToggle instanceof HTMLInputElement && config.timelapseToggle.checked) {
-        return 'timelapse';
-      }
-      return format;
+      return normalizeExportFormat(config.format?.value || 'png');
+    };
+    const getSelectedExportFormatsSnapshot = () => {
+      return (Array.isArray(config.formatChoices) ? config.formatChoices : [])
+        .filter(choice => choice instanceof HTMLButtonElement && choice.getAttribute('aria-pressed') === 'true' && !choice.disabled)
+        .map(choice => normalizeExportFormat(choice.dataset.exportFormatChoice || ''))
+        .filter(format => format && format !== 'batchzip' && format !== 'allzip');
     };
     const syncFormatOptions = () => {
       const format = normalizeExportFormat(config.format?.value || 'png');
-      const gridAvailable = format === 'png';
-      const timelapseAvailable = format === 'gif';
-      if (config.gridSplitRow instanceof HTMLElement) {
-        config.gridSplitRow.hidden = !gridAvailable;
-      }
-      if (config.gridSplitToggle instanceof HTMLInputElement) {
-        config.gridSplitToggle.disabled = !gridAvailable;
-        if (!gridAvailable) config.gridSplitToggle.checked = false;
-      }
+      const selectedFormats = (Array.isArray(config.formatChoices) ? config.formatChoices : [])
+        .filter(choice => choice instanceof HTMLButtonElement && choice.getAttribute('aria-pressed') === 'true')
+        .map(choice => String(choice.dataset.exportFormatChoice || ''));
+      const effectiveFormats = selectedFormats.length ? selectedFormats : [format];
+      const hasVisualFormat = effectiveFormats.some(value => value !== 'project');
+      const timelapseAvailable = hasVisualFormat;
       if (config.timelapseRow instanceof HTMLElement) {
         config.timelapseRow.hidden = !timelapseAvailable;
       }
@@ -151,7 +147,20 @@
         return;
       }
       closeExportDialog();
-      queueExportWithInterstitial(() => performExportByMode(mode));
+      const selectedFormats = mode === 'batchzip' ? getSelectedExportFormatsSnapshot() : null;
+      const includeTimelapse = mode !== 'project'
+        && config.timelapseToggle instanceof HTMLInputElement
+        && config.timelapseToggle.checked;
+      queueExportWithInterstitial(async () => {
+        if (mode === 'batchzip') {
+          const result = await exportProjectAsAllFormatsZip({ selectedFormats });
+          if (includeTimelapse) {
+            await exportTimelapseGif();
+          }
+          return result;
+        }
+        return performExportByMode(mode, { selectedFormats });
+      });
     });
     bind(config.cancel, () => {
       closeExportDialog();
@@ -176,7 +185,62 @@
         updateExportOriginalToggleUI();
       });
     }
-    [config.gridSplitToggle, config.timelapseToggle].forEach(toggle => {
+    (Array.isArray(config.formatChoices) ? config.formatChoices : []).forEach(choice => {
+      if (!(choice instanceof HTMLButtonElement) || choice.dataset.bound === 'true') {
+        return;
+      }
+      choice.dataset.bound = 'true';
+      choice.addEventListener('click', () => {
+        if (!(config.format instanceof HTMLSelectElement) || choice.disabled) {
+          return;
+        }
+        const format = String(choice.dataset.exportFormatChoice || 'png');
+        const selected = (Array.isArray(config.formatChoices) ? config.formatChoices : [])
+          .filter(item => item instanceof HTMLButtonElement && item.getAttribute('aria-pressed') === 'true')
+          .map(item => String(item.dataset.exportFormatChoice || ''));
+        const isSelected = choice.getAttribute('aria-pressed') === 'true';
+        const next = isSelected
+          ? selected.filter(value => value !== format)
+          : [...selected, format];
+        if (!next.length) {
+          return;
+        }
+        (Array.isArray(config.formatChoices) ? config.formatChoices : []).forEach(item => {
+          if (!(item instanceof HTMLButtonElement)) {
+            return;
+          }
+          const active = next.includes(String(item.dataset.exportFormatChoice || ''));
+          item.setAttribute('aria-pressed', String(active));
+          item.classList.toggle('is-active', active);
+        });
+        config.format.value = next.length === 1 ? next[0] : 'batchzip';
+        config.format.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    });
+    if (config.formatHelpButton instanceof HTMLButtonElement
+      && config.formatHelp instanceof HTMLElement
+      && config.formatHelpButton.dataset.bound !== 'true') {
+      config.formatHelpButton.dataset.bound = 'true';
+      config.formatHelpButton.addEventListener('click', () => {
+        const open = config.formatHelp.hidden;
+        config.formatHelp.hidden = !open;
+        config.formatHelpButton.setAttribute('aria-expanded', String(open));
+      });
+    }
+    (Array.isArray(config.scaleChoices) ? config.scaleChoices : []).forEach(choice => {
+      if (!(choice instanceof HTMLButtonElement) || choice.dataset.bound === 'true') {
+        return;
+      }
+      choice.dataset.bound = 'true';
+      choice.addEventListener('click', () => {
+        if (choice.disabled) {
+          return;
+        }
+        exportScaleUserOverride = true;
+        setExportScale(choice.dataset.exportScaleChoice || 1);
+      });
+    });
+    [config.timelapseToggle].forEach(toggle => {
       if (!(toggle instanceof HTMLInputElement) || toggle.dataset.bound === 'true') {
         return;
       }
@@ -184,6 +248,16 @@
       toggle.addEventListener('change', () => {
         syncFormatOptions();
         refreshExportScaleControls();
+        updateExportOriginalToggleUI();
+      });
+    });
+    (Array.isArray(config.batchFormatToggles) ? config.batchFormatToggles : []).forEach(toggle => {
+      if (!(toggle instanceof HTMLInputElement) || toggle.dataset.bound === 'true') {
+        return;
+      }
+      toggle.dataset.bound = 'true';
+      toggle.addEventListener('change', () => {
+        updateExportFormatAvailability();
         updateExportOriginalToggleUI();
       });
     });
@@ -212,17 +286,6 @@
         scheduleSessionPersist({ includeSnapshots: false });
         updateExportProjectCompanionToggleUI();
         updateExportPreview();
-      });
-    }
-    if (config.saveSpriteMapCompanionToggle instanceof HTMLInputElement
-      && config.saveSpriteMapCompanionToggle.dataset.bound !== 'true') {
-      config.saveSpriteMapCompanionToggle.dataset.bound = 'true';
-      config.saveSpriteMapCompanionToggle.checked = exportSaveSpriteMapCompanion;
-      config.saveSpriteMapCompanionToggle.addEventListener('change', event => {
-        exportSaveSpriteMapCompanion = Boolean(event.target.checked);
-        scheduleSessionPersist({ includeSnapshots: false });
-        refreshExportScaleControls();
-        updateExportOptionVisibility(config.format?.value || 'png');
       });
     }
     if (config.spriteMapColorSpritesToggle instanceof HTMLInputElement

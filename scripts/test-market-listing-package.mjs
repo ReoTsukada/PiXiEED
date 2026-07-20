@@ -5,7 +5,7 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 globalThis.window = globalThis;
 await import('../pixiedraw/assets/js/modules/color-codec-utils.js');
-const { detectFormat, collectFilesFromHandle, extractPixieeDrawPreviewPng, optimizeGifIntegerScale } = require('../market/listing-package-utils.js');
+const { detectFormat, collectFilesFromHandle, extractPixieeDrawPreviewPng, optimizeGifIntegerScale, readRasterDimensions } = require('../market/listing-package-utils.js');
 const file = (name, bytes, type = '') => new File([Uint8Array.from(bytes)], name, { type });
 const png = [137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 0, 73, 72, 68, 82];
 
@@ -16,8 +16,12 @@ assert.equal(await detectFormat(file('animation.apng', png)), 'apng');
 assert.equal(await detectFormat(file('animation.gif', [71, 73, 70, 56, 57, 97])), 'gif');
 assert.equal(await detectFormat(file('image.webp', [82, 73, 70, 70, 0, 0, 0, 0, 87, 69, 66, 80])), 'webp');
 assert.equal(await detectFormat(file('project.pixieedraw', [80, 75, 3, 4])), 'pixiedraw-project');
+assert.equal(await detectFormat(file('project.pxd', [80, 75, 3, 4])), 'pixiedraw-project');
+assert.equal(await detectFormat(file('legacy.pxdraw', [80, 75, 3, 4])), 'pixiedraw-project');
 assert.equal(await detectFormat(file('fake.png', [1, 2, 3, 4])), null);
 assert.equal(await detectFormat(file('unsupported.psd', [56, 66, 80, 83])), null);
+assert.deepEqual(await readRasterDimensions(file('small.png', [...png, 0, 0, 2, 0, 0, 0, 1, 0])), { width: 512, height: 256 });
+assert.deepEqual(await readRasterDimensions(file('small.gif', [71, 73, 70, 56, 57, 97, 0, 2, 0, 1])), { width: 512, height: 256 });
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, Number(value) || 0));
 const gifCodec = window.PiXiEEDrawModules.colorCodecUtils.createColorCodecUtils({
@@ -102,7 +106,7 @@ const legacyPreview = await extractPixieeDrawPreviewPng(new File([
 ], 'legacy.pixieedraw'));
 assert.equal(legacyPreview?.type, 'image/png');
 
-const zipText = JSON.stringify({ format: 'pixieedraw', version: 2, previewThumbnail: previewDataUrl });
+const zipText = JSON.stringify({ format: 'pxd', version: 2, previewThumbnail: previewDataUrl });
 const zipName = new TextEncoder().encode('manifest.json');
 const zipData = new TextEncoder().encode(zipText);
 const zipHeader = new Uint8Array(30 + zipName.length);
@@ -113,8 +117,19 @@ zipView.setUint32(18, zipData.length, true);
 zipView.setUint32(22, zipData.length, true);
 zipView.setUint16(26, zipName.length, true);
 zipHeader.set(zipName, 30);
-const v2Preview = await extractPixieeDrawPreviewPng(new File([zipHeader, zipData], 'v2.pixieedraw'));
+const v2Preview = await extractPixieeDrawPreviewPng(new File([zipHeader, zipData], 'v2.pxd'));
 assert.equal(v2Preview?.type, 'image/png');
+const legacyZipData = new TextEncoder().encode(JSON.stringify({ format: 'pixieedraw', version: 2, previewThumbnail: previewDataUrl }));
+const legacyZipHeader = new Uint8Array(30 + zipName.length);
+const legacyZipView = new DataView(legacyZipHeader.buffer);
+legacyZipView.setUint32(0, 0x04034b50, true);
+legacyZipView.setUint16(8, 0, true);
+legacyZipView.setUint32(18, legacyZipData.length, true);
+legacyZipView.setUint32(22, legacyZipData.length, true);
+legacyZipView.setUint16(26, zipName.length, true);
+legacyZipHeader.set(zipName, 30);
+const legacyV2Preview = await extractPixieeDrawPreviewPng(new File([legacyZipHeader, legacyZipData], 'legacy-v2.pixieedraw'));
+assert.equal(legacyV2Preview?.type, 'image/png');
 
 const sell = fs.readFileSync(new URL('../market/sell.js', import.meta.url), 'utf8');
 const sellHtml = fs.readFileSync(new URL('../market/sell.html', import.meta.url), 'utf8');
@@ -137,6 +152,9 @@ assert.match(sell, /detectedEntries = detected;/);
 assert.match(sell, /現在出品対象外/);
 assert.match(sell, /PiXiEED SAMPLE/);
 assert.match(sell, /MAX_SAMPLE_PREVIEWS = 6/);
+assert.match(sell, /MAX_RASTER_DIMENSION = 512/);
+assert.match(sell, /readRasterDimensions/);
+assert.match(sell, /512×512pxを超える画像素材/);
 assert.match(sellHtml, /id="listingDropZone"/);
 assert.match(sellHtml, /id="listingPreviewGrid"/);
 assert.match(sellHtml, /id="listingOptionDetails"/);

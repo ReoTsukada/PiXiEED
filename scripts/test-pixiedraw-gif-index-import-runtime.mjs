@@ -127,7 +127,7 @@ let layerSequence = 0;
 const openImportUtils = context.window.PiXiEEDrawModules.openImportWorkflowUtils.createOpenImportWorkflowUtils({
   COLOR_MODE_INDEX: 'index',
   COLOR_MODE_RGB: 'rgb',
-  DEFAULT_DOCUMENT_NAME: 'Untitled.pixieedraw',
+  DEFAULT_DOCUMENT_NAME: 'Untitled.pxd',
   DEFAULT_GROUP_TOOL: { pen: 'pen' },
   DEFAULT_IMPORT_FRAME_DURATION: 100,
   DEFAULT_UI_THEME: 'dark',

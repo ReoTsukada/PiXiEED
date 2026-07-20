@@ -544,7 +544,7 @@
         transaction.objectStore(TRANSFER_STORE).put({
           token,
           blob,
-          filename: normalizePath(metadata.filename, 'purchased.pixieedraw').split('/').pop(),
+          filename: normalizePath(metadata.filename, 'purchased.pxd').split('/').pop(),
           assetId: String(metadata.assetId || ''),
           traceId: String(metadata.traceId || ''),
           createdAt: Date.now(),

@@ -195,15 +195,15 @@
       points: {
         ja: [
           'ファイルパネルの「保存/出力」から形式を選んで保存します。',
-          'PNG/JPEG/SVG/GIF/タイムラプスGIF/.pixieedraw に対応しています。',
+          'PNG/JPEG/SVG/GIF/タイムラプスGIF/.pxd に対応しています。',
         ],
         en: [
           'Open Save/Export from the File panel and choose a format.',
-          'Supported: PNG/JPEG/SVG/GIF/Timelapse GIF/.pixieedraw.',
+          'Supported: PNG/JPEG/SVG/GIF/Timelapse GIF/.pxd.',
         ],
         zh: [
           '从文件面板打开“保存/导出”并选择格式。',
-          '支持 PNG/JPEG/SVG/GIF/延时GIF/.pixieedraw。',
+          '支持 PNG/JPEG/SVG/GIF/延时GIF/.pxd。',
         ],
       },
     }),
@@ -656,7 +656,7 @@
     'Overlay': '叠加',
     'PNG (Grid Split)': 'PNG（网格分割）',
     'PNG (Image)': 'PNG（图像）',
-    'Project (.pixieedraw)': '项目（.pixieedraw）',
+    'Project (.pxd)': '项目（.pxd）',
     'SVG (Image)': 'SVG（图像）',
     'Screen': '滤色',
     'Shared': '共享',

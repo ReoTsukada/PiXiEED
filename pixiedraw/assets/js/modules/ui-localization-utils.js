@@ -569,15 +569,22 @@
       setLocalizedTextContent('#memoryClear', 'メモリ削除', 'Clear Memory');
   
       setLocalizedTextContent('#exportDialogTitle', '出力設定', 'Export Settings');
-      setLocalizedTextContent('label[for="exportFormat"] > .export-format-label', '形式', 'Format');
+      setLocalizedTextContent('#exportFormatPadTitle', '出力形式', 'Export format');
       setLocalizedSelectOption(dom.exportDialog?.format, 'png', 'PNG（画像）', 'PNG (Image)');
       setLocalizedSelectOption(dom.exportDialog?.format, 'jpeg', 'JPEG（画像）', 'JPEG (Image)');
+      setLocalizedSelectOption(dom.exportDialog?.format, 'spritemap', 'SpriteMAP（並び画像）', 'SpriteMAP (Sprite sheet)');
       setLocalizedSelectOption(dom.exportDialog?.format, 'svg', 'SVG（画像）', 'SVG (Image)');
       setLocalizedSelectOption(dom.exportDialog?.format, 'glb', 'GLB（推奨 / 3Dボクセル）', 'GLB (Recommended / 3D Voxel)');
       setLocalizedSelectOption(dom.exportDialog?.format, 'gridpng', 'PNG（グリッド分割）', 'PNG (Grid Split)');
       setLocalizedSelectOption(dom.exportDialog?.format, 'gif', 'GIF（アニメーション）', 'GIF (Animation)');
+      setLocalizedSelectOption(dom.exportDialog?.format, 'batchzip', '選択形式ZIP', 'Selected formats ZIP');
+      setLocalizedSelectOption(dom.exportDialog?.format, 'allzip', '全形式ZIP（時間・容量大）', 'All formats ZIP (Large)');
       setLocalizedSelectOption(dom.exportDialog?.format, 'timelapse', 'タイムラプスGIF（記録）', 'Timelapse GIF');
-      setLocalizedSelectOption(dom.exportDialog?.format, 'project', 'プロジェクト（.pixieedraw / V2）', 'Project (.pixieedraw / V2)');
+      setLocalizedSelectOption(dom.exportDialog?.format, 'project', 'プロジェクト（.pxd / V2）', 'Project (.pxd / V2)');
+      setLocalizedTextContent('#exportBatchFormatOptions legend', 'ZIPに含める形式', 'Formats to include');
+      setLocalizedTextContent('#exportBatchFormatHint', '必要な形式だけを1つのZIPにまとめます。選ばないGIF・SVG・JPEGは生成しません。', 'Bundle only the formats you select. GIF, SVG, and JPEG are not generated unless selected.');
+      setLocalizedAttribute('#exportFormatHelpButton', 'aria-label', '出力形式の説明を開く', 'Open export format help');
+      setLocalizedTextContent('#exportFormatHelp strong', '使い方', 'How it works');
       setLocalizedTextContent('label[for="exportFileNameBase"] > span', '出力名', 'Export Name');
       setLocalizedAttribute('#exportFileNameBase', 'placeholder', '例: my_artwork', 'e.g. my_artwork');
       setLocalizedTextContent('#exportFileNameHint', '拡張子は自動で付きます。保存先と同名処理はブラウザが案内します。', 'The extension is added automatically. Your browser handles the destination and duplicate names.');

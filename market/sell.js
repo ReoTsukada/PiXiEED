@@ -6,6 +6,7 @@
   const MAX_FILE_COUNT = 100;
   const MAX_DETECTION_COUNT = 300;
   const MAX_TOTAL_BYTES = 50 * 1024 * 1024;
+  const MAX_RASTER_DIMENSION = 512;
   const MAX_SAMPLE_PREVIEWS = 6;
   const MAX_TAGS = 5;
   const MAX_CUSTOM_OPTIONS = 10;
@@ -20,13 +21,14 @@
   const packageUtils = window.PiXiEEDMarketPackage;
   const FORMAT_ORDER = ['pixiedraw-project', 'png', 'sprite-sheet-png', 'webp', 'gif', 'apng'];
   const FORMAT_LABELS = {
-    'pixiedraw-project': 'PiXiEEDraw',
+    'pixiedraw-project': 'PiXiEEDraw（PXD）',
     png: 'PNG',
     'sprite-sheet-png': 'PNGスプライトシート',
     webp: 'WebP',
     gif: 'GIF',
     apng: 'APNG'
   };
+  const RASTER_FORMATS = new Set(['png', 'sprite-sheet-png', 'webp', 'gif', 'apng']);
   const FALLBACK_OPTIONS = [
     { id: 'commercial-use', label: '商用・収益化利用', description: 'ゲーム、アプリ、動画、配信、広告などに利用できます。', minimum_price_yen: 500, sort_order: 10 },
     { id: 'merchandise-use', label: 'グッズ・印刷販売', description: 'グッズや印刷物を制作して販売できます。', minimum_price_yen: 1000, sort_order: 20 },
@@ -97,6 +99,17 @@
   const isPreviewable = (entry) => entry && Boolean(entry.format) && (
     entry.format !== 'pixiedraw-project' || entry.previewBlob instanceof Blob
   );
+  const isRasterEntry = (entry) => RASTER_FORMATS.has(entry?.format);
+  const rasterDimensionError = (entry) => {
+    const width = Math.max(0, Number(entry?.dimensions?.width) || 0);
+    const height = Math.max(0, Number(entry?.dimensions?.height) || 0);
+    if (!isRasterEntry(entry)) return '';
+    if (!width || !height) return '画像サイズを確認できませんでした。';
+    if (width > MAX_RASTER_DIMENSION || height > MAX_RASTER_DIMENSION) {
+      return `画像素材は最大${MAX_RASTER_DIMENSION}×${MAX_RASTER_DIMENSION}pxです（${width}×${height}px）。`;
+    }
+    return '';
+  };
 
   function openListingDraftDatabase() {
     return new Promise((resolve, reject) => {
@@ -489,7 +502,7 @@
       const row = document.createElement('div');
       row.className = `market-file-row${entry.format ? (selectedFormats.has(entry.format) ? '' : ' is-excluded') : ' is-unsupported'}`;
       const name = document.createElement('span'); name.textContent = entry.path;
-      const format = document.createElement('b'); format.textContent = entry.format ? FORMAT_LABELS[entry.format] : '未対応';
+      const format = document.createElement('b'); format.textContent = entry.format ? FORMAT_LABELS[entry.format] : (entry.rejectionReason || '未対応');
       const size = document.createElement('small');
       size.textContent = entry.optimization
         ? `${fileSize(entry.file.size)}・${entry.optimization.integer_scale_factor}倍縮小済み`
@@ -656,10 +669,17 @@
         sourceOptimizations.delete(path);
         optimization = null;
       }
-      const previewBlob = format === 'pixiedraw-project'
+      const dimensions = RASTER_FORMATS.has(format)
+        ? await packageUtils.readRasterDimensions(file)
+        : null;
+      const rejectionReason = RASTER_FORMATS.has(format)
+        ? rasterDimensionError({ format, dimensions })
+        : '';
+      const acceptedFormat = rejectionReason ? null : format;
+      const previewBlob = acceptedFormat === 'pixiedraw-project'
         ? await packageUtils.extractPixieeDrawPreviewPng(file)
         : null;
-      detected.push({ path, file, format, previewBlob, optimization });
+      detected.push({ path, file, format: acceptedFormat, previewBlob, optimization, dimensions, rejectionReason });
       if (index > 0 && index % 20 === 0) setStatus(`ファイル形式を判定しています（${index + 1}/${files.length}）...`);
     }
     if (run !== detectionRun) return;
@@ -674,10 +694,12 @@
     previewUrls.forEach((url) => URL.revokeObjectURL(url)); previewUrls.clear();
     renderFormats();
     const previewlessProjectCount = detected.filter((entry) => entry.format === 'pixiedraw-project' && !entry.previewBlob).length;
+    const oversizedRasterEntries = detected.filter((entry) => entry.rejectionReason).length;
     setStatus([
       optimizationMessages.length ? `GIFをアップロード前に1px単位へ適正化しました。${optimizationMessages.join(' ')}` : '',
       ...optimizationWarnings,
       ignoredFileCount ? `未対応形式 ${ignoredFileCount}件は一覧に残していますが、現在の出品には含まれません。` : '',
+      oversizedRasterEntries ? `512×512pxを超える画像素材 ${oversizedRasterEntries}件は出品に含められません。` : '',
       previewlessProjectCount ? `旧形式などPNGサムネイルを含まないPiXiEEDraw ${previewlessProjectCount}件はプレビューを生成できませんでした。` : ''
     ].filter(Boolean).join(' '));
   }
@@ -925,6 +947,8 @@
     }
     const entries = activeEntries();
     if (!entries.length) { setStatus('出品する形式を1つ以上ONにしてください。'); return; }
+    const invalidRaster = entries.find((entry) => rasterDimensionError(entry));
+    if (invalidRaster) { setStatus(`${invalidRaster.path}: ${rasterDimensionError(invalidRaster)}`); return; }
     if (entries.length > MAX_FILE_COUNT) { setStatus(`ファイルは${MAX_FILE_COUNT}件までです。`); return; }
     const totalBytes = entries.reduce((total, entry) => total + entry.file.size, 0);
     if (totalBytes > MAX_TOTAL_BYTES) { setStatus('1商品の合計ファイルサイズは50MBまでです。'); return; }

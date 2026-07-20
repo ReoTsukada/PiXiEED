@@ -839,10 +839,10 @@
         : 'pixieedraw-project';
       const fileExtension = typeof options?.fileExtension === 'string' && options.fileExtension
         ? options.fileExtension
-        : '.pixieedraw';
+        : '.pxd';
       const mimeType = typeof options?.mimeType === 'string' && options.mimeType
         ? options.mimeType
-        : 'application/x-pixieedraw';
+        : 'application/x-pixieed-pxd';
       // New V2 archives have a single root project. The option remains
       // accepted for old callers but cannot re-enable the retired layout.
       const includeSheets = false;
@@ -964,7 +964,7 @@
         ? packaged.previewThumbnail
         : '';
       const manifest = {
-        format: 'pixieedraw',
+        format: 'pxd',
         version: 2,
         storageAdapterId: adapterId,
         packageType: packaged?.type || packageType,
@@ -1160,7 +1160,8 @@
     async function restoreArchiveProject(entries) {
       const manifest = readJsonEntry(entries, 'manifest.json');
       const projectPayload = readJsonEntry(entries, 'project.json');
-      if (manifest?.format !== 'pixieedraw' || Number(manifest?.version) !== 2) {
+      const archiveFormat = typeof manifest?.format === 'string' ? manifest.format : '';
+      if (!['pxd', 'pixieedraw'].includes(archiveFormat) || Number(manifest?.version) !== 2) {
         throw createCodecError('ERR_UNSUPPORTED_ARCHIVE_MANIFEST', 'Unsupported PiXiEEDraw archive manifest');
       }
       const sheetManifests = Array.isArray(projectPayload?.sheets)

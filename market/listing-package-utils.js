@@ -19,6 +19,45 @@
   const DEFAULT_GIF_FRAME_DURATION = 100;
   let gifCodec = null;
 
+  function readUint24LittleEndian(bytes, offset) {
+    return (bytes[offset] || 0) | ((bytes[offset + 1] || 0) << 8) | ((bytes[offset + 2] || 0) << 16);
+  }
+
+  function readWebpDimensions(bytes) {
+    if (!hasSignature(bytes, [82, 73, 70, 70]) || bytes[8] !== 87 || bytes[9] !== 69 || bytes[10] !== 66 || bytes[11] !== 80) {
+      return null;
+    }
+    const chunk = String.fromCharCode(bytes[12] || 0, bytes[13] || 0, bytes[14] || 0, bytes[15] || 0);
+    if (chunk === 'VP8X' && bytes.length >= 30) {
+      return { width: readUint24LittleEndian(bytes, 24) + 1, height: readUint24LittleEndian(bytes, 27) + 1 };
+    }
+    if (chunk === 'VP8L' && bytes.length >= 25 && bytes[20] === 0x2f) {
+      const packed = (bytes[21] || 0) | ((bytes[22] || 0) << 8) | ((bytes[23] || 0) << 16) | ((bytes[24] || 0) << 24);
+      return { width: (packed & 0x3fff) + 1, height: ((packed >>> 14) & 0x3fff) + 1 };
+    }
+    if (chunk === 'VP8 ' && bytes.length >= 30 && bytes[23] === 0x9d && bytes[24] === 0x01 && bytes[25] === 0x2a) {
+      return {
+        width: (((bytes[27] || 0) << 8) | (bytes[26] || 0)) & 0x3fff,
+        height: (((bytes[29] || 0) << 8) | (bytes[28] || 0)) & 0x3fff,
+      };
+    }
+    return null;
+  }
+
+  async function readRasterDimensions(file) {
+    if (!file || typeof file.slice !== 'function') return null;
+    const bytes = new Uint8Array(await file.slice(0, 64).arrayBuffer());
+    if (hasSignature(bytes, PNG_SIGNATURE) && bytes.length >= 24) {
+      const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+      return { width: view.getUint32(16, false), height: view.getUint32(20, false) };
+    }
+    if (hasSignature(bytes, [71, 73, 70, 56]) && bytes.length >= 10) {
+      const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+      return { width: view.getUint16(6, true), height: view.getUint16(8, true) };
+    }
+    return readWebpDimensions(bytes);
+  }
+
   async function detectFormat(file) {
     const extension = extensionOf(file);
     const bytes = new Uint8Array(await file.slice(0, Math.min(file.size, 2 * 1024 * 1024)).arrayBuffer());
@@ -27,7 +66,9 @@
     const isWebp = hasSignature(bytes, [82, 73, 70, 70])
       && bytes[8] === 87 && bytes[9] === 69 && bytes[10] === 66 && bytes[11] === 80;
 
-    if (extension === 'pixieedraw') return 'pixiedraw-project';
+    // .pxd is the current PiXiEEDraw extension. Keep the prior extension as
+    // a read-only compatibility alias for existing creators and purchasers.
+    if (extension === 'pxd' || extension === 'pixieedraw' || extension === 'pxdraw') return 'pixiedraw-project';
     if (extension === 'gif' && isGif) return 'gif';
     if (extension === 'webp' && isWebp) return 'webp';
     if ((extension === 'png' || extension === 'apng') && isPng) {
@@ -116,7 +157,7 @@
       const manifestBytes = findStoredZipEntry(headerBytes, 'manifest.json');
       if (!manifestBytes) return null;
       try { parsed = JSON.parse(decodeText(manifestBytes)); } catch (_error) { return null; }
-      if (parsed?.format !== 'pixieedraw' || Number(parsed?.version) !== 2) return null;
+      if (!['pxd', 'pixieedraw'].includes(parsed?.format) || Number(parsed?.version) !== 2) return null;
     } else {
       try { parsed = JSON.parse(await file.text()); } catch (_error) { return null; }
     }
@@ -420,5 +461,5 @@
     };
   }
 
-  return { detectFormat, collectFilesFromHandle, extractPixieeDrawPreviewPng, optimizeGifIntegerScale };
+  return { detectFormat, collectFilesFromHandle, extractPixieeDrawPreviewPng, optimizeGifIntegerScale, readRasterDimensions };
 });

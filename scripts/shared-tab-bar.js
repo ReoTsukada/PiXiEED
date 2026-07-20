@@ -99,7 +99,7 @@
           { id: 'qr', label: 'QR編集', selector: '[data-ui-action="openQrEditor"]', icon: 'assets/icons/QR.png' },
           { id: 'undo', label: '元に戻す', selector: '#undoAction', icon: 'assets/icons/Undo.png?v=2026.07.19-ui-icons1', mirrorDisabled: true, placement: 'trailing' },
           { id: 'redo', label: 'やり直す', selector: '#redoAction', icon: 'assets/icons/Redo.png?v=2026.07.19-ui-icons1', mirrorDisabled: true, placement: 'trailing' },
-          { id: 'fullscreen', label: '拡大', selector: '#fullscreenButton', icon: 'expand.png', iconWhenPressed: 'shrink.png', mirrorState: true, mode: 'fullscreen', fullscreenController: 'tool', placement: 'trailing' },
+          { id: 'fullscreen', label: '拡大', selector: '#fullscreenButton', icon: '拡大.png', iconWhenPressed: '縮小.png', mirrorState: true, mode: 'fullscreen', fullscreenController: 'tool', placement: 'leading' },
         ],
         details: [
           { label: 'ショートカット一覧', selector: '#openShortcutHelp', icon: 'pixiedraw/assets/icons/ecticon_frame_02.png' },
@@ -423,11 +423,13 @@
   }
 
   function renderActions(currentUi) {
-    const leadingActions = state.actions.filter((item) => item?.placement === 'leading');
-    const contextualActions = state.actions.filter((item) => item?.id !== 'reload' && item?.placement !== 'leading' && item?.placement !== 'trailing');
-    const trailingActions = state.actions.filter((item) => item?.placement === 'trailing');
+    const isFullscreenAction = (item) => item?.id === 'fullscreen' || item?.mode === 'fullscreen';
+    const fullscreenActions = state.actions.filter(isFullscreenAction);
+    const leadingActions = state.actions.filter((item) => item?.placement === 'leading' && !isFullscreenAction(item));
+    const contextualActions = state.actions.filter((item) => item?.id !== 'reload' && !isFullscreenAction(item) && item?.placement !== 'leading' && item?.placement !== 'trailing');
+    const trailingActions = state.actions.filter((item) => !isFullscreenAction(item) && item?.placement === 'trailing');
     currentUi.leadingActions.replaceChildren(
-      createActionControl(state.reloadAction, 'pixieed-common-tabbar__button'),
+      ...fullscreenActions.map((item) => createActionControl(item, 'pixieed-common-tabbar__button')),
       ...leadingActions.map((item) => createActionControl(item, 'pixieed-common-tabbar__button')),
     );
     currentUi.actions.replaceChildren(...contextualActions.map((item) => (
@@ -442,8 +444,9 @@
     const myPage = { label: 'マイページ', path: 'account/index.html', icon: 'pixiedraw/assets/icons/ecticon_frame_01.png' };
     const fallbackIcon = 'assets/icons/詳細.png?v=2026.07.19-ui-icons1';
     const currentPathname = new URL(window.location.href).pathname.replace(/\/+$/, '') || '/';
-    const items = [myPage, ...state.details.filter((item) => {
-      if (!item?.path || item.path === 'account/index.html') return false;
+    const items = [myPage, state.reloadAction, ...state.details.filter((item) => {
+      if (!item || item.path === 'account/index.html') return false;
+      if (!item.path) return true;
       const itemPathname = new URL(href(item.path)).pathname.replace(/\/+$/, '') || '/';
       return itemPathname !== currentPathname;
     })]

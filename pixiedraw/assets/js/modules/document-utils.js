@@ -19,7 +19,9 @@
       }
       const removableExtensions = [
         PROJECT_FILE_EXTENSION,
+        '.pixieedraw',
         '.pxdraw',
+        '.pxd',
         '.json',
         '.txt',
         '.png',

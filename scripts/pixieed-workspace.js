@@ -16,7 +16,7 @@
   const PICKER_ID = 'pixieed-workspace';
   const PROJECTS_DIRECTORY = 'Projects';
   const EXPORTS_DIRECTORY = 'Exports';
-  const PROJECT_EXTENSION = '.pixieedraw';
+  const PROJECT_EXTENSION = '.pxd';
 
   let cachedWorkspaceHandle = null;
   let pendingWorkspaceHandle = null;

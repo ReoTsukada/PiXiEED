@@ -253,7 +253,7 @@ try {
   await page.waitForSelector('#exportDialog[open]', { timeout: 10_000 });
   await page.selectOption('#exportFormat', 'project');
   const download = await confirmExportAndWaitForDownload();
-  assert.match(download.suggestedFilename(), /\.pixieedraw$/i);
+  assert.match(download.suggestedFilename(), /\.pxd$/i);
 
   const afterExport = await readStableDiskBackedDiagnostics();
   assert.equal(afterExport.activeDocument.residentTimelapseBaseCount, 0);

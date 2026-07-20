@@ -5,10 +5,12 @@ import vm from 'node:vm';
 const root = new URL('../', import.meta.url);
 const storeUrl = new URL('pixiedraw/assets/js/modules/timelapse-chunk-store-utils.js', root);
 const sessionUrl = new URL('pixiedraw/assets/js/modules/timelapse-session-utils.js', root);
+const colorCodecUrl = new URL('pixiedraw/assets/js/modules/color-codec-utils.js', root);
 const appUrl = new URL('pixiedraw/assets/js/app.js', root);
-const [storeSource, sessionSource, appSource] = await Promise.all([
+const [storeSource, sessionSource, colorCodecSource, appSource] = await Promise.all([
   readFile(storeUrl, 'utf8'),
   readFile(sessionUrl, 'utf8'),
+  readFile(colorCodecUrl, 'utf8'),
   readFile(appUrl, 'utf8'),
 ]);
 
@@ -109,6 +111,90 @@ assert.equal(session.releaseHydratedTimelapseOperationLogBase(hydration), true);
 assert.equal(operationLog.baseSnapshot, null);
 assert.equal(operationLog.baseSnapshotStored, true);
 
+const operationLogFrameState = {
+  enabled: true,
+  tracksByCanvasId: {
+    'canvas-1': {
+      snapshots: [],
+      serializedSnapshots: [],
+      operationLog: {
+        version: 1,
+        baseSnapshot: {
+          width: 1,
+          height: 1,
+          activeFrame: 0,
+          palette: [],
+          frames: [{ marker: 1, layers: [] }],
+        },
+        entries: [],
+      },
+    },
+  },
+  fps: 12,
+};
+const activeCanvas = {
+  id: 'canvas-1',
+  width: 1,
+  height: 1,
+  activeFrame: 0,
+  frames: [{ marker: 2, layers: [] }],
+};
+const finalFrameSession = sessionWindow.PiXiEEDrawModules.timelapseSessionUtils.createTimelapseSessionUtils({
+  timelapseState: operationLogFrameState,
+  activeSharedProjectKey: '',
+  multiState: { connected: false },
+  isSharedProjectCollaborativeMode: () => false,
+  getActiveProjectCanvasDocument: () => activeCanvas,
+  getProjectCanvasDocumentById: () => activeCanvas,
+  normalizeTimelapseCanvasId: value => String(value || 'canvas-1'),
+  createEmptyTimelapseTrack: () => ({ snapshots: [], serializedSnapshots: [], operationLog: null }),
+  createEmptyTimelapseOperationLog: () => ({ version: 1, baseSnapshot: null, entries: [] }),
+  timelapseQueuedCanvasIds: new Set(),
+  timelapseCaptureTimer: null,
+  flushPendingTimelapseCapture: () => false,
+  loadPersistedTimelapseSnapshots: async () => ({}),
+  deserializeDocumentPayload: payload => structuredClone(payload),
+  compositeFramePixels: frame => new Uint8ClampedArray([Number(frame?.marker) || 0, 0, 0, 255]),
+  compressUint8Array: value => value,
+  decodeUint8Data: value => value,
+  clamp: (value, min, max) => Math.max(min, Math.min(max, value)),
+  state: { palette: [], backgroundMode: 'dark' },
+});
+const finalFrames = await finalFrameSession.buildTimelapseExportEntries();
+assert.equal(
+  JSON.stringify(finalFrames.map(frameEntry => Array.from(frameEntry.pixels))),
+  JSON.stringify([[1, 0, 0, 255], [2, 0, 0, 255]]),
+  'operation-log exports must end with the live canvas state'
+);
+assert.equal(
+  JSON.stringify(finalFrameSession.flattenTimelapseGifFramesForPlayback([
+    new Uint8ClampedArray([255, 0, 0, 255]),
+    new Uint8ClampedArray([0, 0, 0, 0]),
+  ]).map(frameEntry => Array.from(frameEntry))),
+  JSON.stringify([[255, 0, 0, 255], [19, 24, 34, 255]]),
+  'timelapse GIF frames must replace erased transparent pixels with the playback background'
+);
+
+const codecWindow = { PiXiEEDrawModules: {} };
+vm.runInNewContext(colorCodecSource, { window: codecWindow }, { filename: colorCodecUrl.pathname });
+const codec = codecWindow.PiXiEEDrawModules.colorCodecUtils.createColorCodecUtils({
+  clamp: (value, min, max) => Math.max(min, Math.min(max, value)),
+  MAX_IMPORTED_PALETTE_COLORS: 256,
+});
+const playbackGifFrames = finalFrameSession.flattenTimelapseGifFramesForPlayback([
+  new Uint8ClampedArray([255, 0, 0, 255]),
+  new Uint8ClampedArray([0, 0, 0, 0]),
+]);
+const playbackGif = codec.buildGifFromPixels(playbackGifFrames, [500, 500], 1, 1);
+const playbackReader = new codec.GifReader(playbackGif);
+const playbackFinalFrame = new Uint8ClampedArray(4);
+playbackReader.decodeAndBlitFrameRGBA(1, playbackFinalFrame);
+assert.equal(
+  JSON.stringify(Array.from(playbackFinalFrame)),
+  JSON.stringify([19, 24, 34, 255]),
+  'encoded timelapse GIFs must show the erased pixel as the playback background'
+);
+
 assert.match(appSource, /TIMELAPSE_DISK_BASE_MIN_PIXEL_PLANES = 256 \* 256 \* 48/);
 assert.match(appSource, /writeBaseSnapshot\(normalizedProjectId, canvasKey, baseSnapshot\)/);
 assert.match(appSource, /normalizedProjectId !== activeProjectId/);
@@ -120,5 +206,6 @@ assert.match(appSource, /archiveTimelapseOperationLogBases\(normalizedProjectId\
 assert.match(appSource, /residentTimelapseBaseCount/);
 assert.match(appSource, /diskBackedTimelapseBaseCount/);
 assert.match(sessionSource, /try \{[\s\S]{0,180}buildTimelapseExportEntriesFromOperationLog[\s\S]{0,180}finally \{/);
+assert.match(sessionSource, /appendCurrentTimelapseStateEntry\(archivedSnapshots\);/);
 
 console.log('PiXiEEDraw disk-backed timelapse base checks passed.');

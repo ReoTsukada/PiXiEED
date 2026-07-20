@@ -18,7 +18,7 @@ const model = window.PiXiEEDrawModules.documentModel.createDocumentModel({
   DEFAULT_CANVAS_SIZE: 1,
   MIN_CANVAS_SIZE: 1,
   MAX_CANVAS_SIZE: 4096,
-  DEFAULT_DOCUMENT_NAME: 'project.pixieedraw',
+  DEFAULT_DOCUMENT_NAME: 'project.pxd',
   DEFAULT_ONION_SKIN: {},
   DEFAULT_UI_THEME: 'default',
   SELECT_SAME_MODE_CONNECTED: 'connected',

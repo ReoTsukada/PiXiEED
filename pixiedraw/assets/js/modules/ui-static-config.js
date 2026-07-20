@@ -279,8 +279,10 @@
     const SPRITE_SCALE_MIN = 0.2;
     const SPRITE_SCALE_EPSILON = 1e-6;
     const MAX_IMAGE_IMPORT_SOURCE_SIZE = 2000;
-    const PROJECT_FILE_EXTENSION = '.pixieedraw';
-    const PROJECT_FILE_MIME_TYPE = 'application/x-pixieedraw';
+    // PXD is the current user-facing extension. The payload remains V2 so
+    // existing .pixieedraw files keep opening without conversion.
+    const PROJECT_FILE_EXTENSION = '.pxd';
+    const PROJECT_FILE_MIME_TYPE = 'application/x-pixieed-pxd';
     const PROJECT_PACKAGE_TYPE = 'pixieedraw-project';
     const PROJECT_PACKAGE_VERSION = 2;
     const MAX_IMPORTED_PALETTE_COLORS = 256;

@@ -1166,12 +1166,57 @@
     return snapshots;
   }
 
+  function appendCurrentTimelapseStateEntry(entries = []) {
+    if (!Array.isArray(entries) || !timelapseState.enabled) {
+      return false;
+    }
+    const current = createTimelapseFrameEntryFromState();
+    const last = entries[entries.length - 1] || null;
+    if (!current || (last && areTimelapseFrameEntriesEqual(last, current))) {
+      return false;
+    }
+    entries.push(current);
+    return true;
+  }
+
+  function getTimelapseGifBackground() {
+    if (state?.backgroundMode === 'light') {
+      return { r: 246, g: 248, b: 252 };
+    }
+    if (state?.backgroundMode === 'pink') {
+      return { r: 255, g: 235, b: 244 };
+    }
+    return { r: 19, g: 24, b: 34 };
+  }
+
+  function flattenTimelapseGifFramesForPlayback(framePixels = []) {
+    const background = getTimelapseGifBackground();
+    return Array.isArray(framePixels)
+      ? framePixels.map(source => {
+          const pixels = new Uint8ClampedArray(source || 0);
+          for (let index = 0; index < pixels.length; index += 4) {
+            const alpha = pixels[index + 3] / 255;
+            if (alpha >= 1) {
+              continue;
+            }
+            const inverseAlpha = 1 - alpha;
+            pixels[index] = Math.round((pixels[index] * alpha) + (background.r * inverseAlpha));
+            pixels[index + 1] = Math.round((pixels[index + 1] * alpha) + (background.g * inverseAlpha));
+            pixels[index + 2] = Math.round((pixels[index + 2] * alpha) + (background.b * inverseAlpha));
+            pixels[index + 3] = 255;
+          }
+          return pixels;
+        })
+      : [];
+  }
+
   async function buildTimelapseExportEntries() {
     if (activeSharedProjectKey) {
       const sharedSnapshots = await buildSharedProjectTimelapseExportEntries(
         getActiveProjectCanvasDocument()?.id || ''
       );
       if (sharedSnapshots.length) {
+        appendCurrentTimelapseStateEntry(sharedSnapshots);
         return sharedSnapshots;
       }
     }
@@ -1212,15 +1257,14 @@
           archivedSnapshots.push(entry);
         }
       });
+      // An operation log can be compacted or have its most recent commit still
+      // pending when export is requested. Always close the GIF with the live
+      // canvas state instead of returning the last reconstructed log entry.
+      appendCurrentTimelapseStateEntry(archivedSnapshots);
       return archivedSnapshots;
     }
     const snapshots = archivedSnapshots;
-    if (timelapseState.enabled) {
-      const current = createTimelapseFrameEntryFromState();
-      if (current && (!snapshots.length || !areTimelapseFrameEntriesEqual(snapshots[snapshots.length - 1], current))) {
-        snapshots.push(current);
-      }
-    }
+    appendCurrentTimelapseStateEntry(snapshots);
     return snapshots;
   }
 
@@ -1283,8 +1327,12 @@
         timelapseFrameSet.height,
         selectedScale
       );
+      // GIF transparency does not reliably clear pixels from a previous frame
+      // in browser players. Timelapse frames are therefore flattened against
+      // the current editor background, so erasing is replayed correctly.
+      const gifFramePixels = flattenTimelapseGifFramesForPlayback(scaledSet.framePixels);
       const gifBytes = buildGifFromPixels(
-        scaledSet.framePixels,
+        gifFramePixels,
         frameDurations,
         scaledSet.width,
         scaledSet.height
@@ -1303,7 +1351,7 @@
         includeProjectCompanion: shouldSaveProjectCompanion('timelapse'),
         archiveSuffix: 'timelapse',
         archiveShareText: shouldSaveProjectCompanion('timelapse')
-          ? 'タイムラプスGIFと .pixieedraw を ZIP で書き出しました'
+          ? 'タイムラプスGIFと .pxd を ZIP で書き出しました'
           : 'タイムラプスGIF一式をZIPで書き出しました',
       });
 
@@ -1412,6 +1460,8 @@
     resolveSharedTimelapsePatchTarget,
     applySharedTimelapseOpToSnapshot,
     buildSharedProjectTimelapseExportEntries,
+    appendCurrentTimelapseStateEntry,
+    flattenTimelapseGifFramesForPlayback,
     buildTimelapseExportEntries,
     exportTimelapseGif,
     updateAnimationFpsDisplay,

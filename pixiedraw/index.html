@@ -1432,64 +1432,78 @@
 <div class="modal__body export-dialog-body">
 <div class="export-dialog-body__settings">
 <div class="field field--list">
-<label class="field field--compact export-format-field" for="exportFormat">
-<span class="export-format-label sr-only">形式</span>
+<label class="field field--compact export-name-field" for="exportFileNameBase">
+<span class="export-field-label">出力名</span>
+<input aria-label="出力名" autocomplete="off" id="exportFileNameBase" placeholder="例: my_artwork" spellcheck="false" title="拡張子は自動で付きます" type="text"/>
+</label>
+<section aria-labelledby="exportFormatPadTitle" class="export-pad-console" data-export-tone="png" id="exportPadConsole">
+<div class="export-pad-console__heading">
+<div>
+<span class="export-pad-console__eyebrow">1. 形式を選ぶ</span>
+<h3 id="exportFormatPadTitle">出力形式</h3>
+</div>
+<button aria-controls="exportFormatHelp" aria-expanded="false" aria-label="出力形式の説明を開く" class="export-pad-help-button" id="exportFormatHelpButton" type="button">?</button>
+</div>
+<p class="export-pad-console__lead">複数選べます。1つなら単体出力、2つ以上なら選んだ形式だけを1つのZIPにまとめます。</p>
+<div aria-label="出力形式。複数選択可能" class="export-format-pad-grid" role="group">
+<button aria-pressed="true" class="export-format-pad is-active" data-export-format-choice="png" data-export-tone="png" type="button"><span>PNG</span><small>画像</small></button>
+<button aria-pressed="false" class="export-format-pad" data-export-format-choice="gif" data-export-tone="gif" type="button"><span>GIF</span><small>アニメ</small></button>
+<button aria-pressed="false" class="export-format-pad" data-export-format-choice="svg" data-export-tone="svg" type="button"><span>SVG</span><small>ベクター</small></button>
+<button aria-pressed="false" class="export-format-pad" data-export-format-choice="jpeg" data-export-tone="jpeg" type="button"><span>JPEG</span><small>軽量画像</small></button>
+<button aria-pressed="false" class="export-format-pad" data-export-format-choice="spritemap" data-export-tone="spritemap" type="button"><span>SpriteMAP</span><small>並び画像</small></button>
+<button aria-pressed="false" class="export-format-pad" data-export-format-choice="gridpng" data-export-tone="gridpng" type="button"><span>グリッドPNG</span><small>分割・×1固定</small></button>
+<button aria-pressed="false" class="export-format-pad" data-export-format-choice="project" data-export-tone="project" type="button"><span>PiXiEEDraw</span><small>現在の編集データ</small></button>
+</div>
+<div class="export-format-help" hidden id="exportFormatHelp">
+<strong>使い方</strong><span>形式を1つ以上選び、倍率を指定してから「この設定で出力」を押します。複数選択時はZIPになります。PiXiEEDrawは、常に今編集中のプロジェクトデータです。</span>
+</div>
+</section>
+<label class="sr-only" for="exportFormat">
+<span class="export-format-label">出力形式</span>
 <select id="exportFormat">
 <option value="png">PNG（画像）</option>
 <option value="gif">GIF（アニメーション）</option>
 <option value="svg">SVG（画像）</option>
 <option value="jpeg">JPEG（画像）</option>
-<option value="allzip">全形式ZIP（PNG / GIF / SVG / JPEG / SpriteMAP / プロジェクト）</option>
-<option value="project">プロジェクト（.pixieedraw / V2）</option>
+<option value="spritemap">SpriteMAP（並び画像）</option>
+<option value="gridpng">グリッドPNG（分割・原寸）</option>
+<option hidden value="batchzip">選択形式ZIP</option>
+<option hidden value="allzip">全形式ZIP</option>
+<option value="project">プロジェクト（.pxd / V2）</option>
 </select>
 </label>
-<label class="field field--compact export-name-field" for="exportFileNameBase">
-<span class="sr-only">出力名</span>
-<input aria-label="出力名" autocomplete="off" id="exportFileNameBase" placeholder="例: my_artwork" spellcheck="false" title="拡張子は自動で付きます" type="text"/>
-</label>
-<div id="exportScaleControls">
-<span class="sr-only">出力倍率</span>
-<div class="scale-controls">
-<div class="scale-control scale-control--wide">
-<label class="sr-only" for="exportScaleSlider">倍率 (×)</label>
-<input aria-label="出力倍率" id="exportScaleSlider" max="1" min="1" step="1" title="出力倍率" type="range" value="1"/>
-<input aria-label="出力倍率" data-stepper="true" id="exportScaleInput" inputmode="numeric" min="1" title="出力倍率" type="number" value="1"/>
+<section aria-labelledby="exportScaleTitle" class="export-scale-pads" id="exportScaleControls">
+<div class="export-pad-section__heading"><span class="export-pad-console__eyebrow">2. 倍率を選ぶ</span><h3 id="exportScaleTitle">出力倍率</h3></div>
+<div aria-label="出力倍率" class="export-scale-pad-grid">
+<button aria-pressed="true" data-export-scale-choice="1" type="button">×1</button>
+<button aria-pressed="false" data-export-scale-choice="2" type="button">×2</button>
+<button aria-pressed="false" data-export-scale-choice="4" type="button">×4</button>
+<button aria-pressed="false" data-export-scale-choice="8" type="button">×8</button>
 </div>
-</div>
-</div>
+<label class="export-custom-scale" for="exportScaleInput"><span>任意の倍率</span><input aria-label="出力倍率" data-stepper="true" id="exportScaleInput" inputmode="numeric" min="1" title="出力倍率" type="number" value="1"/></label>
+</section>
 <div class="export-option-icons" aria-label="追加オプション">
-<span class="export-option-icons__label sr-only">追加オプション</span>
+<span class="export-option-icons__label">3. 追加オプション</span>
 <label class="toggle-option export-original-toggle export-icon-toggle" for="exportIncludeOriginalToggle" id="exportOriginalOptionRow" title="原寸も追加">
 <input id="exportIncludeOriginalToggle" type="checkbox"/>
 <span aria-hidden="true" class="export-toggle-icon"><img alt="" decoding="async" src="../assets/icons/icon-e1_frame_04.png"/></span>
-<span>原寸も追加</span>
-</label>
-<label class="toggle-option export-icon-toggle" for="exportSaveProjectCompanionToggle" id="exportCompanionOptionRow" title="PiXiEEDrawファイルもダウンロード">
-<input id="exportSaveProjectCompanionToggle" type="checkbox"/>
-<span aria-hidden="true" class="export-toggle-icon"><img alt="" decoding="async" src="../assets/icons/icon-e1_frame_01.png"/></span>
-<span>PiXiEEDrawもダウンロード</span>
-</label>
-<label class="toggle-option export-icon-toggle" for="exportSpriteMapCompanionToggle" id="exportSpriteMapCompanionOptionRow" title="SpriteMAP出力">
-<input id="exportSpriteMapCompanionToggle" type="checkbox"/>
-<span aria-hidden="true" class="export-toggle-icon"><img alt="" decoding="async" src="../assets/icons/icon-e1_frame_02.png"/></span>
-<span>SpriteMAP出力</span>
-</label>
-<label class="toggle-option export-icon-toggle" for="exportGridSplitToggle" id="exportGridSplitOptionRow" title="PNGをタイル単位に分割して出力">
-<input id="exportGridSplitToggle" type="checkbox"/>
-<span>グリッド分割</span>
-</label>
-<label class="toggle-option export-icon-toggle" for="exportTimelapseToggle" id="exportTimelapseOptionRow" title="記録済みの描画工程をGIFで出力">
-<input id="exportTimelapseToggle" type="checkbox"/>
-<span>タイムラプスGIF</span>
+<span>原寸を追加</span>
 </label>
 <label class="toggle-option export-spritemap-option export-icon-toggle" for="exportSpriteMapColorSpritesToggle" id="exportSpriteMapColorSpritesRow" title="カラースプライト出力">
 <input id="exportSpriteMapColorSpritesToggle" type="checkbox"/>
 <span aria-hidden="true" class="export-toggle-icon"><img alt="" decoding="async" src="../assets/icons/icon-e1_frame_03.png"/></span>
-<span>カラースプライト出力</span>
+<span>カラースプライトを合成</span>
 </label>
 </div>
+<section aria-label="記録出力" class="export-timelapse-output" id="exportTimelapseOptionRow">
+<span class="export-option-icons__label">記録出力</span>
+<label class="toggle-option export-icon-toggle" for="exportTimelapseToggle" title="記録済みの描画工程をGIFで出力">
+<input id="exportTimelapseToggle" type="checkbox"/>
+<span>タイムラプスGIFを追加</span>
+</label>
+</section>
 <div class="field field--inline" hidden id="exportGridSettings">
-<span class="sr-only">グリッド分割 (PNG)</span>
+<span class="export-option-icons__label">グリッドPNGの分割サイズ</span>
 <label class="field field--compact">
 <span class="sr-only">幅 (px)</span>
 <input aria-label="グリッド幅" id="exportGridWidth" inputmode="numeric" min="1" placeholder="幅" step="1" title="グリッド幅" type="number" value="8"/>
@@ -1510,6 +1524,7 @@
 <canvas aria-label="出力プレビュー" height="160" id="exportPreviewCanvas" width="240"></canvas>
 </div>
 <p aria-live="polite" class="export-preview-meta" id="exportPreviewMeta">プレビュー準備中</p>
+<div aria-label="出力されるファイル" class="export-preview-outputs" id="exportPreviewOutputs"></div>
 </section>
 </div>
 <div aria-label="広告" class="export-ad export-dialog-body__ad" data-pixieed-reserve-ad-space="true" id="exportAdContainer">
@@ -1663,7 +1678,7 @@
 </header>
 <div class="modal__body">
 <p id="startupRecoveryMessage">前回の未保存作業が端末内に残っています。</p>
-<p class="help-text" id="startupRecoveryDetail">復帰しても保存先の .pixieedraw ファイルは自動で上書きしません。</p>
+<p class="help-text" id="startupRecoveryDetail">復帰しても保存先の .pxd ファイルは自動で上書きしません。</p>
 </div>
 <footer class="modal__footer">
 <button class="button button--danger" id="startupRecoveryDelete" type="button">復帰データを削除</button>
@@ -1822,17 +1837,17 @@
 	<script defer="" src="assets/js/modules/palette-preset-workflow-utils.js?v=2026.07.02-palette-preset-workflow-split-v1"></script>
 	<script defer="" src="assets/js/modules/color-codec-utils.js?v=2026.06.30-color-codec-v1"></script>
 	<script defer="" src="assets/js/modules/export-delivery-utils.js?v=20260715-local-true-v2-cleanup1"></script>
-	<script defer="" src="assets/js/modules/document-utils.js?v=2026.06.28-file-split-step5"></script>
+	<script defer="" src="assets/js/modules/document-utils.js?v=20260720-pxd1"></script>
 	<script defer="" src="assets/js/modules/document-model.js?v=20260719-open-typed1"></script>
 	<script defer="" src="assets/js/modules/state-normalizers.js?v=20260715-true-v2-single-canvas-v1"></script>
-	<script defer="" src="assets/js/modules/ui-static-config.js?v=20260717-session-history1"></script>
+	<script defer="" src="assets/js/modules/ui-static-config.js?v=20260720-pxd2"></script>
 	<script defer="" src="assets/js/modules/geometry-utils.js?v=2026.06.30-geometry-utils-v1"></script>
 	<script defer="" src="assets/js/modules/viewport-zoom-utils.js?v=2026.06.30-viewport-zoom-v1"></script>
 	<script defer="" src="assets/js/modules/local-layer-preferences-utils.js?v=2026.06.30-local-layer-preferences-v1"></script>
 	<script defer="" src="assets/js/modules/dom-utils.js?v=2026.06.28-file-split-step3"></script>
 	<script defer="" src="assets/js/modules/storage-utils.js?v=2026.06.28-file-split-step3"></script>
 	<script defer="" src="assets/js/modules/autosave-database-utils.js?v=2026.07.02-startup-helper-split-v1"></script>
-	<script defer="" src="assets/js/modules/autosave-schema-v2-utils.js?v=20260719-open-typed1"></script>
+	<script defer="" src="assets/js/modules/autosave-schema-v2-utils.js?v=20260720-pxd1"></script>
 	<script defer="" src="assets/js/modules/autosave-schema-v2-indexeddb-utils.js?v=20260719-open-typed1"></script>
 	<script defer="" src="assets/js/modules/autosave-schema-v2-restore-preview-utils.js?v=20260713-047"></script>
 	<script defer="" src="assets/js/modules/autosave-schema-v2-recovery-utils.js?v=20260715-timelapse-always-on-p7"></script>
@@ -1851,7 +1866,7 @@
 	<script defer="" src="assets/js/modules/open-project-tab-model.js?v=20260719-active-metadata1"></script>
 	<script defer="" src="assets/js/modules/project-command-lock-utils.js?v=2026.07.12-command-lock-r2"></script>
 	<script defer="" src="assets/js/modules/export-utils.js?v=20260715-local-true-v2-cleanup1"></script>
-	<script defer="" src="assets/js/modules/export-normalizer-utils.js?v=20260719-export-bundle1"></script>
+	<script defer="" src="assets/js/modules/export-normalizer-utils.js?v=20260720-export-batchzip1"></script>
 	<script defer="" src="assets/js/modules/export-session.js?v=2026.06.29-document-model-export-session-fix2"></script>
 	<script defer="" src="assets/js/modules/pixieed-support-benefit-utils.js?v=20260717-shared-sync-guard1"></script>
 	<script defer="" src="assets/js/modules/open-project-tab-helpers.js?v=2026.07.06-local-project-open-fix1"></script>
@@ -1879,14 +1894,14 @@
 	<script defer="" src="assets/js/modules/canvas-wheel-zoom-workflow-utils.js?v=2026.07.12-wheel-visibility-surface-fix1"></script>
 	<script defer="" src="assets/js/modules/ios-snapshot-utils.js?v=2026.07.01-pixfind-mode-split-v1"></script>
 	<script defer="" src="assets/js/modules/update-history-utils.js?v=2026.06.28-file-split-step7"></script>
-	<script defer="" src="assets/js/modules/static-content.js?v=20260719-startup-projects1"></script>
+	<script defer="" src="assets/js/modules/static-content.js?v=20260720-pxd1"></script>
 	<script defer="" src="assets/js/modules/binary-codecs.js?v=20260719-open-typed1"></script>
 	<script defer="" src="assets/js/modules/export-codecs.js?v=2026.06.28-file-split-step1"></script>
 	<script defer="" src="assets/vendor/jsQR.min.js?v=1.4.0"></script>
 	<script defer="" src="assets/js/modules/image-import-decode-utils.js?v=2026.07.19-gif-index-lightweight2"></script>
 	<script defer="" src="assets/js/modules/palette-panel-utils.js?v=2026.07.12-direct-authority-gmem2a1"></script>
 	<script defer="" src="assets/js/modules/timeline-layers.js?v=2026.07.19-pc-scroll1"></script>
-	<script defer="" src="assets/js/modules/ui-localization-utils.js?v=20260719-startup-projects1"></script>
+	<script defer="" src="assets/js/modules/ui-localization-utils.js?v=20260720-pxd1"></script>
 	<script defer="" src="assets/js/modules/ui-language-utils.js?v=2026.07.03-small-helper-batch-split-v1"></script>
 	<script defer="" src="assets/js/modules/scroll-input-utils.js?v=2026.07.03-small-helper-batch-split-v1"></script>
 	<script defer="" src="assets/js/modules/sprite-scale-utils.js?v=2026.06.30-zh-localization-v1"></script>
@@ -1902,8 +1917,8 @@
 	<script defer="" src="assets/js/modules/keyboard-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/canvas-pointer-workflow-utils.js?v=20260715-production-circle-sync1"></script>
 	<script defer="" src="assets/js/modules/canvas-tool-state-workflow-utils.js?v=2026.07.14-selection-keep-v1"></script>
-	<script defer="" src="assets/js/modules/export-rendering.js?v=20260719-export-bundle1"></script>
-	<script defer="" src="assets/js/modules/dialog-setup-utils.js?v=20260719-export-preview-once1"></script>
+	<script defer="" src="assets/js/modules/export-rendering.js?v=20260720-pxd2"></script>
+	<script defer="" src="assets/js/modules/dialog-setup-utils.js?v=20260720-export-batch-direct1"></script>
 	<script defer="" src="assets/js/modules/canvas-resize-workflow-utils.js?v=20260713-049"></script>
 	<script defer="" src="assets/js/modules/canvas-resize-handle-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/local-viewport-canvas-workflow-utils.js?v=20260715-safari-viewport-scroll-v1"></script>
@@ -1921,20 +1936,20 @@
 	<script defer="" src="assets/js/modules/curve-workflow-utils.js?v=2026.07.03-curve-workflow-split-v1"></script>
 	<script defer="" src="assets/js/modules/canvas-grid-workflow-utils.js?v=2026.07.03-grid-workflow-split-v1"></script>
 	<script defer="" src="assets/js/modules/timeline-navigation-workflow-utils.js?v=2026.07.03-size-timeline-split-v1"></script>
-	<script defer="" src="assets/js/modules/timelapse-session-utils.js?v=20260719-open-fast1"></script>
+	<script defer="" src="assets/js/modules/timelapse-session-utils.js?v=20260720-timelapse-gif-replay1"></script>
 	<script defer="" src="assets/js/modules/autosave-workflow-utils.js?v=20260719-open-typed1"></script>
 	<script defer="" src="assets/js/modules/project-provenance-utils.js?v=20260714-provenance-v1"></script>
-	<script defer="" src="assets/js/modules/open-import-workflow-utils.js?v=20260719-open-fast1"></script>
-	<script defer="" src="assets/js/modules/export-format-workflow-utils.js?v=20260719-export-bundle1"></script>
-	<script defer="" src="assets/js/modules/export-dialog-workflow-utils.js?v=20260719-export-bundle1"></script>
-		<script defer="" src="assets/js/modules/startup-workflow-utils.js?v=20260719-project-session-handoff1"></script>
+	<script defer="" src="assets/js/modules/open-import-workflow-utils.js?v=20260720-pxd2"></script>
+	<script defer="" src="assets/js/modules/export-format-workflow-utils.js?v=20260720-export-grid-format1"></script>
+	<script defer="" src="assets/js/modules/export-dialog-workflow-utils.js?v=20260720-export-batch-snapshot1"></script>
+		<script defer="" src="assets/js/modules/startup-workflow-utils.js?v=20260720-pxd1"></script>
 		<script defer="" src="assets/js/modules/recent-project-workflow-utils.js?v=20260719-ad-audit2"></script>
 		<script defer="" src="assets/js/modules/project-package-workflow-utils.js?v=20260719-open-typed1"></script>
 		<script defer="" src="assets/js/modules/project-storage-adapter-utils.js?v=20260715-legacy-project-card-recovery1"></script>
-		<script defer="" src="assets/js/modules/project-storage-v1-json-adapter.js?v=20260715-legacy-project-card-recovery1"></script>
-		<script defer="" src="assets/js/modules/project-storage-v2-archive-codec.js?v=20260715-local-true-v2-cleanup1"></script>
+		<script defer="" src="assets/js/modules/project-storage-v1-json-adapter.js?v=20260720-pxd2"></script>
+		<script defer="" src="assets/js/modules/project-storage-v2-archive-codec.js?v=20260720-pxd2"></script>
 		<script defer="" src="assets/js/modules/project-storage-v2-worker-bridge.js?v=2026.07.10-project-storage-worker1"></script>
-		<script defer="" src="assets/js/modules/project-storage-v2-zip-adapter.js?v=20260715-startup-certified-p13"></script>
+		<script defer="" src="assets/js/modules/project-storage-v2-zip-adapter.js?v=20260720-pxd2"></script>
 		<script defer="" src="assets/js/modules/document-serialization-utils.js?v=20260719-open-typed1"></script>
 	<script defer="" src="assets/js/modules/document-session-workflow-utils.js?v=20260719-open-typed1"></script>
 	<script defer="" src="assets/js/modules/recent-account-workflow-utils.js?v=2026.07.03-safe-helper-split-v1"></script>
@@ -1965,7 +1980,7 @@
 	<script defer="" src="assets/js/modules/local-project-v2-migration-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/pre-update-checkpoint-utils.js?v=20260712-pre-update-checkpoint-u3"></script>
 	<script defer="" src="assets/js/active-project-session-utils.js?v=20260715-local-true-v2-cleanup1"></script>
-	<script defer="" src="assets/js/app.js?v=20260719-113"></script>
+	<script defer="" src="assets/js/app.js?v=20260720-pxd2"></script>
 	<script defer="" src="assets/js/modules/update-detection-utils.js?v=20260719-file-protocol1"></script>
   <script>
     (function initPanelAdDocking() {
@@ -2531,7 +2546,7 @@
   </script>
 
 	<script src="../scripts/tool-fullscreen.js?v=2026.07.15-pixiedraw-fullscreen-restore1"></script>
-	<script src="../scripts/shared-bottom-nav.js?v=2026.07.20-draw-fullscreen1"></script>
+	<script src="../scripts/shared-bottom-nav.js?v=2026.07.20-draw-actions3"></script>
 	<script>
     (function initOperationHelpAd() {
       if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.('operation-help-dialog')) return;

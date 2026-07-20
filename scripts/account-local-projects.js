@@ -10,7 +10,7 @@
   const RECENT_PROJECT_STORAGE_LOCAL = 'local';
   const RELOAD_TARGET_PROJECT_ID_KEY = 'pixieedraw:reload-target-project-id-v1';
   const AUTOSAVE_ACTIVE_PROJECT_SYNC_KEY = 'pixieedraw:active-project-sync';
-  const PROJECT_FILE_EXTENSION = '.pixieedraw';
+  const PROJECT_FILE_EXTENSION = '.pxd';
   const DEFAULT_DOCUMENT_BASENAME = '無題のドット絵';
   let localProjectsRenderToken = 0;
 
@@ -46,6 +46,7 @@
     }
     const removableExtensions = [
       PROJECT_FILE_EXTENSION,
+      '.pixieedraw',
       '.pxdraw',
       '.json',
       '.txt',

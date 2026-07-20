@@ -50,6 +50,7 @@
     if (normalized === 'glb') return 'glb';
     if (normalized === 'spritemap' || normalized === 'sprite-map' || normalized === 'spritesheet' || normalized === 'sprite-sheet') return 'spritemap';
     if (normalized === 'allzip' || normalized === 'all-zip' || normalized === 'bundle') return 'allzip';
+    if (normalized === 'batchzip' || normalized === 'batch-zip' || normalized === 'selectedzip' || normalized === 'selected-zip') return 'batchzip';
     if (normalized === 'png') return 'png';
     if (normalized === 'gridpng' || normalized === 'grid') return 'gridpng';
     if (normalized === 'projectv2experimental' || normalized === 'project-v2-experimental' || normalized === 'projectv2' || normalized === 'project-v2') return 'project';

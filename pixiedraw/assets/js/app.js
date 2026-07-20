@@ -555,11 +555,18 @@
       form: document.getElementById('exportDialogForm'),
       confirm: document.getElementById('confirmExport'),
       format: document.getElementById('exportFormat'),
+      padConsole: document.getElementById('exportPadConsole'),
+      formatChoices: Array.from(document.querySelectorAll('[data-export-format-choice]')),
+      formatHelpButton: document.getElementById('exportFormatHelpButton'),
+      formatHelp: document.getElementById('exportFormatHelp'),
       fileNameInput: document.getElementById('exportFileNameBase'),
       cancel: document.getElementById('cancelExport'),
       scaleControls: document.getElementById('exportScaleControls'),
       scaleSlider: document.getElementById('exportScaleSlider'),
       scaleInput: document.getElementById('exportScaleInput'),
+      scaleChoices: Array.from(document.querySelectorAll('[data-export-scale-choice]')),
+      batchFormatOptions: document.getElementById('exportBatchFormatOptions'),
+      batchFormatToggles: Array.from(document.querySelectorAll('[data-export-batch-format]')),
       includeOriginalToggle: document.getElementById('exportIncludeOriginalToggle'),
       includeOriginalRow: document.getElementById('exportOriginalOptionRow'),
       saveProjectCompanionToggle: document.getElementById('exportSaveProjectCompanionToggle'),
@@ -574,6 +581,7 @@
       spriteMapColorSpritesRow: document.getElementById('exportSpriteMapColorSpritesRow'),
       previewCanvas: /** @type {HTMLCanvasElement|null} */ (document.getElementById('exportPreviewCanvas')),
       previewMeta: document.getElementById('exportPreviewMeta'),
+      previewOutputs: document.getElementById('exportPreviewOutputs'),
       gridSettings: document.getElementById('exportGridSettings'),
       gridWidthInput: document.getElementById('exportGridWidth'),
       gridHeightInput: document.getElementById('exportGridHeight'),
@@ -6171,6 +6179,8 @@
   set exportProjectAsGif(value) { exportProjectAsGif = value; },
   get exportProjectAsAllFormatsZip() { return exportProjectAsAllFormatsZip; },
   set exportProjectAsAllFormatsZip(value) { exportProjectAsAllFormatsZip = value; },
+  get getSelectedBatchZipFormats() { return getSelectedBatchZipFormats; },
+  set getSelectedBatchZipFormats(value) { getSelectedBatchZipFormats = value; },
   get exportProjectAsGlb() { return exportProjectAsGlb; },
   set exportProjectAsGlb(value) { exportProjectAsGlb = value; },
   get exportProjectAsGridPng() { return exportProjectAsGridPng; },
@@ -9699,7 +9709,7 @@
     if (preferred) {
       return preferred;
     }
-    return 'pixieedraw-v2-zip';
+    return 'pxd-v2-zip';
   }
 
   function isProjectStorageConversionSave(sourceStorageAdapterId, targetStorageAdapterId) {
@@ -12171,6 +12181,7 @@
   compositeFramePixels,
   resetExportScaleDefaults,
   getExportFormatLabel,
+  getSelectedBatchZipFormats,
   canExportVoxelGlbInCurrentState,
   getFormatSpecificExportDisabledReason,
   getExportDisabledReason,
@@ -12248,6 +12259,8 @@
     closeToolSpotlightDialog: (...args) => closeToolSpotlightDialog(...args),
     closeUpdateHistoryDialog: (...args) => closeUpdateHistoryDialog(...args),
     ensureCurrentClientCanExportProject: (...args) => ensureCurrentClientCanExportProject(...args),
+    exportProjectAsAllFormatsZip: (...args) => exportProjectAsAllFormatsZip(...args),
+    exportTimelapseGif: (...args) => exportTimelapseGif(...args),
     normalizeExportFormat: (...args) => normalizeExportFormat(...args),
     normalizeExportGridTileSize: (...args) => normalizeExportGridTileSize(...args),
     performExportByMode: (...args) => performExportByMode(...args),
@@ -16755,7 +16768,7 @@
           ? sourceSheet.id.trim()
           : `legacy-sheet-${sheetIndex + 1}`;
         const baseName = typeof sheetDocument.documentName === 'string' && sheetDocument.documentName.trim()
-          ? sheetDocument.documentName.trim().replace(/\.pixieedraw$/i, '')
+          ? sheetDocument.documentName.trim().replace(/\.(?:pxd|pixieedraw|pxdraw)$/i, '')
           : `移行プロジェクト ${sheetIndex + 1}`;
         sheetCanvases.forEach((canvas, canvasIndex) => {
           const sourceCanvasId = typeof canvas.id === 'string' && canvas.id.trim()
@@ -16813,7 +16826,7 @@
           ? canvas.name.trim()
           : `キャンバス ${index + 1}`;
         const baseName = typeof baseDocument.documentName === 'string' && baseDocument.documentName.trim()
-          ? baseDocument.documentName.trim().replace(/\.pixieedraw$/i, '')
+          ? baseDocument.documentName.trim().replace(/\.(?:pxd|pixieedraw|pxdraw)$/i, '')
           : '移行プロジェクト';
         return {
           id: `canvas:${sourceCanvasId}`,
@@ -16893,7 +16906,7 @@
           fileName,
           project: sourceProject,
           sourceKind: 'legacy-local-migration',
-          sourceStorageAdapterId: 'pixieedraw-v2-zip',
+          sourceStorageAdapterId: 'pxd-v2-zip',
           sourceProjectToken: sourceSheet?.sourceProjectToken || '',
           thumbnail: null,
           dotStats: sourceProject?.dotStats || null,
@@ -17123,7 +17136,7 @@
               updatedAt: normalizedProject.updatedAt || new Date().toISOString(),
               project: normalizedProject,
               sourceKind: 'legacy-local-migration',
-              sourceStorageAdapterId: 'pixieedraw-v2-zip',
+              sourceStorageAdapterId: 'pxd-v2-zip',
               sourceProjectToken: '',
               thumbnail: entry.thumbnail || null,
               dotStats: normalizedProject.dotStats || entry.dotStats || null,

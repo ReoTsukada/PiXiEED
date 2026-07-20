@@ -16,10 +16,10 @@ const calls = {
 };
 const model = window.PiXiEEDrawModules.openProjectTabModel.createOpenProjectTabModel({
   SHARED_PROJECTS_ENABLED: false,
-  state: { documentName: 'current.pixieedraw' },
+  state: { documentName: 'current.pxd' },
   makeHistorySnapshot() {
     calls.snapshot += 1;
-    return { documentName: 'current.pixieedraw' };
+    return { documentName: 'current.pxd' };
   },
   buildProjectSessionPayload() {
     calls.session += 1;
@@ -29,15 +29,15 @@ const model = window.PiXiEEDrawModules.openProjectTabModel.createOpenProjectTabM
     calls.package += 1;
     return { type: 'pixieedraw-project', updatedAt: '2026-07-19T00:00:00.000Z' };
   },
-  normalizeDocumentName: value => String(value || 'untitled.pixieedraw'),
-  DEFAULT_DOCUMENT_NAME: 'untitled.pixieedraw',
+  normalizeDocumentName: value => String(value || 'untitled.pxd'),
+  DEFAULT_DOCUMENT_NAME: 'untitled.pxd',
   hasDocumentUnsavedChanges: () => false,
   normalizeAutosaveProjectId: value => String(value || ''),
   getAutosaveProjectId: () => 'local-active',
   createAutosaveProjectId: () => 'local-created',
   recentProjectsCache: new Map(),
   createOpenProjectTabId: () => 'project-tab-active',
-  extractDocumentBaseName: value => String(value || '').replace(/\.pixieedraw$/i, ''),
+  extractDocumentBaseName: value => String(value || '').replace(/\.(?:pxd|pixieedraw)$/i, ''),
   createLightweightLocalProjectTabState(tab) {
     return {
       ...tab,
@@ -66,7 +66,7 @@ const metadataOnlyTab = model.createOpenProjectTabFromCurrentState({
 
 assert.deepEqual(calls, { snapshot: 0, session: 0, package: 0 });
 assert.equal(metadataOnlyTab.projectId, 'local-metadata');
-assert.equal(metadataOnlyTab.fileName, 'current.pixieedraw');
+assert.equal(metadataOnlyTab.fileName, 'current.pxd');
 assert.equal(metadataOnlyTab.project, null);
 assert.equal(metadataOnlyTab.deferredProjectPayload, null);
 assert.equal(metadataOnlyTab.residentProjectLoaded, false);

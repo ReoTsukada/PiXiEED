@@ -43,9 +43,7 @@
     }
     try {
       const selectedFrameIndex = clamp(Math.round(Number(state.activeFrame) || 0), 0, Math.max(0, frameCount - 1));
-      const candidates = getExportScaleCandidates(undefined, { allowFullScan: true });
-      const selectedScale = applyExportScaleConstraints(candidates);
-      syncExportScaleInputs();
+      const selectedScale = 1;
       const colorSpriteArea = buildColorSpriteAppendAreaForCurrentExport('gridpng');
       exportGridTileWidth = normalizeExportGridTileSize(exportGridTileWidth, 8);
       exportGridTileHeight = normalizeExportGridTileSize(exportGridTileHeight, 8);
@@ -55,8 +53,8 @@
         'gridpng',
         colorSpriteArea
       );
-      // Grid split size is defined in source pixels, then mapped to export scale.
-      // This keeps tile count stable even when export scale is > 1.
+      // GridPNG is always source-pixel scale (×1), so every tile maps directly
+      // to the configured grid dimensions.
       const rowSegments = buildGridRowSegmentsTopToBottom(firstStillFrame.height, exportGridTileHeight);
       const columnSegments = buildGridColumnSegmentsRightToLeft(firstStillFrame.width, exportGridTileWidth);
       const tileCountPerFrame = rowSegments.length * columnSegments.length;
@@ -123,7 +121,7 @@
         includeProjectCompanion: shouldSaveProjectCompanion('gridpng'),
         archiveSuffix: 'gridpng_frames',
         archiveShareText: shouldSaveProjectCompanion('gridpng')
-          ? 'グリッド分割PNG一式と .pixieedraw を ZIP で書き出しました'
+          ? 'グリッド分割PNG一式と .pxd を ZIP で書き出しました'
           : 'グリッド分割PNG一式をZIPで書き出しました',
       });
       const exportedCount = result.exportedCount;
@@ -234,7 +232,7 @@
         includeProjectCompanion: shouldSaveProjectCompanion('png'),
         archiveSuffix: 'png_frames',
         archiveShareText: shouldSaveProjectCompanion('png')
-          ? (isVoxelComposite ? 'PNG一式と .pixieedraw を ZIP で書き出しました（立体表示）' : 'PNG一式と .pixieedraw を ZIP で書き出しました')
+          ? (isVoxelComposite ? 'PNG一式と .pxd を ZIP で書き出しました（立体表示）' : 'PNG一式と .pxd を ZIP で書き出しました')
           : (isVoxelComposite ? 'PNG一式をZIPで書き出しました（立体表示）' : 'PNG一式をZIPで書き出しました'),
       });
       const detailParts = [];

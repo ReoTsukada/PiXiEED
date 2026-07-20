@@ -662,6 +662,7 @@
           types: [{
             description: 'PiXiEEDraw project or image',
             accept: {
+              'application/x-pixieed-pxd': ['.pxd'],
               'application/x-pixieedraw': ['.pixieedraw', '.pxdraw'],
               'application/json': ['.json'],
               'image/png': ['.png', '.apng'],
@@ -685,7 +686,7 @@
     return new Promise(resolve => {
       const input = document.createElement('input');
       input.type = 'file';
-      input.accept = '.pixieedraw,.pxdraw,.json,.png,.apng,.jpg,.jpeg,.webp,.gif';
+      input.accept = '.pxd,.pixieedraw,.pxdraw,.json,.png,.apng,.jpg,.jpeg,.webp,.gif';
       input.multiple = false;
       input.hidden = true;
       const cleanup = () => {
@@ -1302,7 +1303,7 @@
       updateAutosaveStatus('購入済みファイルの受け渡し期限が切れました。マイページからもう一度開いてください。', 'warn');
       return false;
     }
-    const filename = String(transfer.filename || 'purchased.pixieedraw').split('/').pop() || 'purchased.pixieedraw';
+    const filename = String(transfer.filename || 'purchased.pxd').split('/').pop() || 'purchased.pxd';
     let file;
     try {
       file = new File([transfer.blob], filename, { type: transfer.blob.type || 'application/octet-stream' });
