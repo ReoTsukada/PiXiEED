@@ -515,6 +515,7 @@
       resumeHint: document.getElementById('startupResumeHint'),
       newButton: document.getElementById('startupActionNew'),
       openButton: document.getElementById('startupActionOpen'),
+      projectsButton: document.getElementById('startupActionProjects'),
       quickSetupButton: document.getElementById('startupActionQuickSetup'),
       skipButton: document.getElementById('startupActionSkip'),
       quickSetupStatus: document.getElementById('startupQuickSetupStatus'),
