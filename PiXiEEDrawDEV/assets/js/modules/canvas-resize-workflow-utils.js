@@ -207,8 +207,8 @@
     scheduleSessionPersist();
     updateCanvasResizeControls({ normalizeValues: true });
     const resizeFinishedAt = typeof performance?.now === 'function' ? performance.now() : Date.now();
-    console.info('[pixiedraw-dev:performance]', {
-      phase: 'pixiedraw-dev:canvas-resize',
+    console.info('[pixiedraw:performance]', {
+      phase: 'pixiedraw:canvas-resize',
       from: { width: previousWidth, height: previousHeight },
       to: { width: nextWidth, height: nextHeight },
       frameCount: Array.isArray(state.frames) ? state.frames.length : 0,
