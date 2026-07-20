@@ -298,19 +298,16 @@
         );
       }
   
-      setLocalizedTextContent('.startup-screen__subtitle', 'PiXiEEDraw（ピクシードロー）でドット絵づくり・アニメ制作をはじめよう', 'Start pixel art and animation with PiXiEEDraw');
+      setLocalizedTextContent('#startupScreenTitle', 'プロジェクト', 'Projects');
+      setLocalizedTextContent('.startup-screen__subtitle', 'PiXiEEDraw', 'PiXiEEDraw');
       setLocalizedTextContent('#startupActionNew', '新規作成', 'New Project');
       setLocalizedTextContent('#startupActionOpen', 'ファイルを開く', 'Open File');
-      setLocalizedTextContent('#startupActionProjects', '一覧を更新', 'Refresh List');
-      setLocalizedTextContent('#startupWorkspaceTitle', 'プロジェクト一覧', 'Projects');
+      setLocalizedTextContent('#startupWorkspaceTitle', '端末内プロジェクト', 'On-device projects');
+      setLocalizedAttribute('#startupWorkspaceSearch', 'placeholder', 'プロジェクト名を検索', 'Search projects');
       setLocalizedTextContent('#startupWorkspaceConnect', 'PiXiEEDフォルダに接続', 'Connect PiXiEED Folder');
-      setLocalizedTextContent('#startupActionSkip', 'この画面を閉じる', 'Close');
+      setLocalizedTextContent('#startupActionSkip', '編集へ戻る', 'Back to editor');
       setLocalizedTextContent('#globalLoadingIndicatorCancel', 'キャンセル', 'Cancel');
       setLocalizedTextContent('#multiInviteShare', '共有', 'Share');
-      setLocalizedTextContent('#projectHomeTitle', 'PiXiEEDrawDEVをはじめる', 'Start PiXiEEDrawDEV');
-      setLocalizedTextContent('#projectHomeNew', '新規作成', 'New Project');
-      setLocalizedTextContent('#projectHomeOpen', 'ファイルを開く', 'Open File');
-      setLocalizedTextContent('.project-home-screen__actions a[href="../account/index.html"]', 'PiXiEED マイページ', 'PiXiEED My Page');
       setLocalizedTextContent('#updateToastCloseBtn', '閉じる', 'Close');
   
       applyTabLocalization();
