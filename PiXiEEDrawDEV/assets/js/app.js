@@ -515,12 +515,12 @@
       resumeHint: document.getElementById('startupResumeHint'),
       newButton: document.getElementById('startupActionNew'),
       openButton: document.getElementById('startupActionOpen'),
-      projectsButton: document.getElementById('startupActionProjects'),
       quickSetupButton: document.getElementById('startupActionQuickSetup'),
       skipButton: document.getElementById('startupActionSkip'),
       quickSetupStatus: document.getElementById('startupQuickSetupStatus'),
       workspace: document.getElementById('startupWorkspace'),
       workspaceStatus: document.getElementById('startupWorkspaceStatus'),
+      workspaceSearch: document.getElementById('startupWorkspaceSearch'),
       workspaceProjectList: document.getElementById('startupWorkspaceProjectList'),
       recentSection: document.getElementById('startupRecentProjects'),
       recentList: document.getElementById('startupRecentList'),
@@ -5738,7 +5738,7 @@
   const projectProvenanceUtilsModule = window.PiXiEEDrawModules?.projectProvenanceUtils?.createProjectProvenanceUtils?.() || {};
   const projectCommandLockManager = window.PiXiEEDrawModules?.projectCommandLockUtils
     ?.createProjectCommandLockManager?.({
-      onDiagnostic: details => console.info('[pixiedraw-dev:command-lock]', details),
+      onDiagnostic: details => console.info('[pixiedraw:command-lock]', details),
     });
   function inspectProjectCommandLock() {
     return projectCommandLockManager?.inspect?.() || {
@@ -8545,7 +8545,7 @@
       openDocumentDialog({ mode: EXTERNAL_IMPORT_MODE_NEW_PROJECT });
     });
     bindClickHandlerOnce(dom.controls.showLocalProjects, 'coreProjectActionBound', () => {
-      showStartupScreen();
+      showStartupScreen({ refreshWorkspace: true });
     });
     bindClickHandlerOnce(dom.newProject?.button, 'coreProjectActionBound', () => {
       openNewProjectDialog();
@@ -9487,7 +9487,7 @@
     if (!result.ok) {
       activeProjectSessionMismatchCount += 1;
       const logger = allowTransientMismatch ? console.warn : console.error;
-      logger('[pixiedraw-dev:active-project-session-mismatch]', result);
+      logger('[pixiedraw:active-project-session-mismatch]', result);
     }
     return result;
   }
@@ -9520,7 +9520,7 @@
     if (!result.ok) {
       activeProjectSessionMismatchCount += 1;
       const logger = allowTransientMismatch ? console.warn : console.error;
-      logger('[pixiedraw-dev:active-project-session-metadata-mismatch]', result);
+      logger('[pixiedraw:active-project-session-metadata-mismatch]', result);
     }
     return result;
   }
@@ -9534,7 +9534,7 @@
     const next = activeProjectSessionUtils.replaceActiveProjectSession?.(activeProjectSession, input) || null;
     const validation = activeProjectSessionUtils.validateActiveProjectSession?.(next) || { ok: false, errors: ['session-utils-unavailable'] };
     if (!validation.ok) {
-      console.error('[pixiedraw-dev:active-project-session-invalid]', {
+      console.error('[pixiedraw:active-project-session-invalid]', {
         phase,
         errors: validation.errors || [],
         candidate: getActiveProjectSessionDebugSummary(next),
@@ -9562,7 +9562,7 @@
     const next = activeProjectSessionUtils.updateActiveProjectSession?.(activeProjectSession, patch || {}) || null;
     const validation = activeProjectSessionUtils.validateActiveProjectSession?.(next) || { ok: false, errors: ['session-utils-unavailable'] };
     if (!validation.ok) {
-      console.error('[pixiedraw-dev:active-project-session-invalid]', {
+      console.error('[pixiedraw:active-project-session-invalid]', {
         phase,
         errors: validation.errors || [],
         candidate: getActiveProjectSessionDebugSummary(next),
@@ -9599,7 +9599,7 @@
       if (stateFromSession) {
         return stateFromSession;
       }
-      console.warn('[pixiedraw-dev:active-project-session-invalid]', {
+      console.warn('[pixiedraw:active-project-session-invalid]', {
         phase: 'get-active-project-persistence-state',
         errors: activeProjectSessionUtils.validateActiveProjectSession?.(activeProjectSession)?.errors || [],
       });
@@ -10749,7 +10749,7 @@
         Object.entries(byOrigin).sort((left, right) => right[1] - left[1]).slice(0, 12)
       ),
     };
-    console.info('[pixiedraw-dev:resource-diagnostics]', diagnostics);
+    console.info('[pixiedraw:resource-diagnostics]', diagnostics);
     return diagnostics;
   }
 
@@ -10768,6 +10768,18 @@
       ? performance.getEntriesByType('resource')
       : [];
     const resourceDiagnostics = collectPixieeDrawResourceDiagnostics();
+    const residentTabPayloadCount = openProjectTabs.filter(tab => Boolean(
+      tab?.project && typeof tab.project === 'object'
+      || tab?.deferredProjectPayload && typeof tab.deferredProjectPayload === 'object'
+    )).length;
+    const activeTab = openProjectTabs.find(tab => tab?.id === activeOpenProjectTabId) || null;
+    const timelapseTracks = Object.values(timelapseState?.tracksByCanvasId || {});
+    const residentTimelapseBaseCount = timelapseTracks.filter(track => Boolean(
+      track?.operationLog?.baseSnapshot
+    )).length;
+    const diskBackedTimelapseBaseCount = timelapseTracks.filter(track => Boolean(
+      track?.operationLog?.baseSnapshotStored && !track?.operationLog?.baseSnapshot
+    )).length;
     const diagnostics = {
       editorMiB: Object.fromEntries(Object.entries(editor).map(([key, value]) => [key, bytesToMiB(value)])),
       heapMiB: heap && Object.fromEntries(Object.entries(heap).map(([key, value]) => [key, bytesToMiB(value)])),
@@ -10780,6 +10792,14 @@
         timelapseSteps: getAllTimelapseStepCount?.() || 0,
         openTabCount: openProjectTabs.length,
         activeTabId: activeOpenProjectTabId || '',
+        residentTabPayloadCount,
+        activeTabHasResidentPayload: Boolean(
+          activeTab?.project && typeof activeTab.project === 'object'
+          || activeTab?.deferredProjectPayload && typeof activeTab.deferredProjectPayload === 'object'
+        ),
+        residentTimelapseBaseCount,
+        diskBackedTimelapseBaseCount,
+        timelapseDiskBaseEligible: shouldUseDiskBackedTimelapseBase(),
       },
       page: {
         homeVisible: Boolean(projectHomeVisible),
@@ -10805,7 +10825,7 @@
         diagnostics.userAgentMemoryError = error?.name || error?.message || 'unavailable';
       }
     }
-    console.info('[pixiedraw-dev:memory-diagnostics]', diagnostics);
+    console.info('[pixiedraw:memory-diagnostics]', diagnostics);
     return diagnostics;
   }
 
@@ -12579,10 +12599,12 @@
     syncActiveProjectSessionDirty('document-durably-saved');
   }
 
-  function resetDocumentUnsavedChanges() {
+  function resetDocumentUnsavedChanges({ syncSession = true } = {}) {
     unsavedChangeToken = 0;
     durableSaveToken = 0;
-    syncActiveProjectSessionDirty('document-reset-clean');
+    if (syncSession) {
+      syncActiveProjectSessionDirty('document-reset-clean');
+    }
   }
 
   function hasDocumentUnsavedChanges() {
@@ -13438,14 +13460,14 @@
     if (window.location.protocol === 'file:') {
       return;
     }
-    const isLocalDevDraw =
-      /\/PiXiEEDrawDEV(?:\/|$)/.test(window.location.pathname || '')
+    const isLocalProductionDraw =
+      /\/pixiedraw(?:\/|$)/.test(window.location.pathname || '')
       && /^(localhost|127\.0\.0\.1|::1)$/.test(window.location.hostname || '');
-    if (isLocalDevDraw) {
+    if (isLocalProductionDraw) {
       if (typeof navigator.serviceWorker.getRegistrations === 'function') {
         navigator.serviceWorker.getRegistrations().then(registrations => {
           registrations.forEach(registration => {
-            if (typeof registration?.scope === 'string' && registration.scope.includes('/PiXiEEDrawDEV/')) {
+            if (typeof registration?.scope === 'string' && registration.scope.includes('/pixiedraw/')) {
               registration.unregister().catch(() => {});
             }
           });
@@ -13454,7 +13476,7 @@
       if (typeof window.caches !== 'undefined' && typeof window.caches.keys === 'function') {
         window.caches.keys().then(keys => (
           Promise.all(keys
-            .filter(key => /^pixieedrawdev-v/.test(key) || key.includes('PiXiEEDrawDEV'))
+            .filter(key => /^pixieedraw-v/.test(key))
             .map(key => window.caches.delete(key)))
         )).catch(() => {});
       }
@@ -13470,7 +13492,7 @@
       if (suppressControllerChangeReloadUntil && Date.now() <= suppressControllerChangeReloadUntil) {
         return;
       }
-      console.info('[pixiedraw-dev:update]', {
+      console.info('[pixiedraw:update]', {
         phase: 'service-worker-controllerchange',
         reason: 'controller-changed-without-reload',
         startupReady,
@@ -13686,8 +13708,8 @@
     if (shouldWarn) {
       const accepted = window.confirm(
         localizeText(
-          'PiXiEEDrawDEVを閉じますか？\n作業内容は端末内に自動保存されますが、保存中の内容は失われる場合があります。',
-          'Close PiXiEEDrawDEV?\nYour work is autosaved locally, but in-progress changes may still be lost.'
+          'PiXiEEDrawを閉じますか？\n作業内容は端末内に自動保存されますが、保存中の内容は失われる場合があります。',
+          'Close PiXiEEDraw?\nYour work is autosaved locally, but in-progress changes may still be lost.'
         )
       );
       if (!accepted) {
@@ -15228,7 +15250,7 @@
         : `「${name}」は${isV1 ? 'V1' : '旧V2'}形式です。単一のV2プロジェクトへ移行します。`;
     }
     if (dom.legacyProjectMigration.detail) {
-      dom.legacyProjectMigration.detail.textContent = '移行後はV2だけを端末内プロジェクトとして使用します。選択した元ファイル、PNG、GIFなどの元データは削除・上書きせず、PiXiEEDrawDEVからも参照を保持しません。';
+      dom.legacyProjectMigration.detail.textContent = '移行後はV2だけを端末内プロジェクトとして使用します。選択した元ファイル、PNG、GIFなどの元データは削除・上書きせず、PiXiEEDrawからも参照を保持しません。';
     }
     return await new Promise(resolve => {
       let settled = false;
@@ -16565,7 +16587,7 @@
       released += 1;
     });
     if (released) {
-      console.info('[pixiedraw-dev:memory]', {
+      console.info('[pixiedraw:memory]', {
         phase: 'inactive-tab-payloads-released',
         projectId: normalizedProjectId,
         released,
@@ -16677,6 +16699,13 @@
     if (restored?.manifest?.key) {
       autosaveV2CheckpointReadyProjectIds.add(normalizeAutosaveProjectId(projectId || ''));
     }
+    console.info('[pixiedraw:v2-read]', {
+      phase: 'read-complete',
+      projectId: normalizeAutosaveProjectId(projectId || ''),
+      revision: Math.max(0, Math.round(Number(restored?.manifest?.revision) || 0)),
+      fastPathUsed: restored?.fastPathUsed === true,
+      fallbackUsed: restored?.fallbackUsed === true,
+    });
     return restored?.packaged && typeof restored.packaged === 'object' ? restored.packaged : null;
   }
 
@@ -16963,7 +16992,7 @@
           sourceOriginalSheetId: String(entry?.legacyMultiCanvasSourceSheetId || ''),
         }))
         .filter(entry => entry.projectId && entry.sourceSheetId);
-      console.info('[pixiedraw-dev:project-normalize]', {
+      console.info('[pixiedraw:project-normalize]', {
         phase: 'legacy-multi-project-split-success',
         sourceProjectId: normalizedSourceProjectId,
         sourceSheetCount: sourceSheets.length,
@@ -17136,7 +17165,7 @@
             code: classifyLocalV2MigrationError(error),
             message: String(error?.message || error || 'True V2 migration failed'),
           });
-          console.warn('[pixiedraw-dev:local-v2-migration]', {
+          console.warn('[pixiedraw:local-v2-migration]', {
             phase: 'failed',
             projectId: entry?.id || '',
             error,
@@ -17151,7 +17180,7 @@
           console.warn('Failed to refresh recent projects after true V2 migration', error);
         });
       }
-      console.info('[pixiedraw-dev:local-v2-migration]', {
+      console.info('[pixiedraw:local-v2-migration]', {
         phase: 'complete',
         sourceCount: candidates.length,
         migrated,
@@ -17593,13 +17622,21 @@
       let restoredFromV2Primary = false;
       if (Number(latestEntry.autosaveSchemaVersion) === 2) {
         try {
+          const v2ReadStartedAt = typeof performance !== 'undefined' && typeof performance.now === 'function'
+            ? performance.now()
+            : Date.now();
           latestPackagedProject = await readAutosaveV2PrimaryProject(projectId || latestEntry.id || '');
           restoredFromV2Primary = Boolean(latestPackagedProject && typeof latestPackagedProject === 'object');
-          console.info('[pixiedraw-dev:recent-project-open]', {
+          console.info('[pixiedraw:recent-project-open]', {
             phase: 'v2-primary-read',
             projectId: projectId || latestEntry.id || '',
             restored: restoredFromV2Primary,
             sheetCount: Array.isArray(latestPackagedProject?.sheets) ? latestPackagedProject.sheets.length : 0,
+            elapsedMs: Math.max(0, Math.round((
+              typeof performance !== 'undefined' && typeof performance.now === 'function'
+                ? performance.now()
+                : Date.now()
+            ) - v2ReadStartedAt)),
           });
         } catch (error) {
           console.warn('Failed to read V2 recent project payload', error);
@@ -17617,11 +17654,14 @@
         // expands every byte into JSON object properties and can freeze Safari
         // before the document restore even begins. Keep the payload in memory
         // and let the parsed-value adapter preserve those typed arrays.
-        console.info('[pixiedraw-dev:recent-project-open]', {
+        console.info('[pixiedraw:recent-project-open]', {
           phase: 'project-payload-apply-start',
           projectId: latestEntry.id || '',
           autosaveSchemaVersion: Number(latestEntry.autosaveSchemaVersion) || 0,
         });
+        const payloadApplyStartedAt = typeof performance !== 'undefined' && typeof performance.now === 'function'
+          ? performance.now()
+          : Date.now();
         const loaded = await loadDocumentFromProjectPayload(latestPackagedProject, {
           projectId: latestEntry.id || '',
           suppressAutosaveStatus: true,
@@ -17637,11 +17677,16 @@
             lastSavedStorageAdapterId: null,
           },
         });
-        console.info('[pixiedraw-dev:recent-project-open]', {
+        console.info('[pixiedraw:recent-project-open]', {
           phase: 'project-payload-apply-complete',
           projectId: latestEntry.id || '',
           loaded: loaded === true,
           deferred: loaded === 'deferred',
+          elapsedMs: Math.max(0, Math.round((
+            typeof performance !== 'undefined' && typeof performance.now === 'function'
+              ? performance.now()
+              : Date.now()
+          ) - payloadApplyStartedAt)),
         });
         if (loaded === 'deferred') {
           if (Array.isArray(latestPackagedProject?.sheets) && latestPackagedProject.sheets.length > 0) {
@@ -26418,7 +26463,7 @@
 
   async function init() {
     startupReady = false;
-    console.info('[pixiedraw-dev:startup]', { phase: 'startup-bootstrap-start' });
+    console.info('[pixiedraw:startup]', { phase: 'startup-bootstrap-start' });
     startupRestoreCancelRequested = false;
     setStartupBootLoadingProgress(0, {
       label: localizeText('起動準備中…', 'Preparing startup...'),
@@ -26472,17 +26517,17 @@
       setupMirrorGuideResizeObserver();
       setupMirrorToolPopover();
       setupKeyboard();
-      console.info('[pixiedraw-dev:startup]', { phase: 'startup-workflows-created' });
+      console.info('[pixiedraw:startup]', { phase: 'startup-workflows-created' });
       updateDocumentMetadata();
       setupStartupScreen();
       setupProjectHomeScreen();
-      console.info('[pixiedraw-dev:startup]', { phase: 'startup-listeners-bound' });
+      console.info('[pixiedraw:startup]', { phase: 'startup-listeners-bound' });
       hydratePixieedAccountFromLocalCache();
       void initPixieedAccount().catch(error => {
         console.warn('Account bootstrap failed', error);
         return false;
       });
-      console.info('[pixiedraw-dev:startup]', { phase: 'startup-session-restore-skipped', reason: 'always-start-from-home' });
+      console.info('[pixiedraw:startup]', { phase: 'startup-session-restore-skipped', reason: 'always-start-from-home' });
       let openedExternalImportProject = false;
       try {
         setStartupProgressLabel(localizeText('購入済み素材を読込中…', 'Loading purchased asset...'));
@@ -26555,9 +26600,9 @@
         recentProjectCount: recentProjectsCache.size,
         hasActiveProject: Boolean(activeOpenProjectTabId),
       };
-      console.info('[pixiedraw-dev:startup]', startupStatus);
+      console.info('[pixiedraw:startup]', startupStatus);
       if (commandLock.locked) {
-        console.warn('[pixiedraw-dev:startup]', { ...startupStatus, code: 'ERR_STARTUP_READY_WITH_COMMAND_LOCK' });
+        console.warn('[pixiedraw:startup]', { ...startupStatus, code: 'ERR_STARTUP_READY_WITH_COMMAND_LOCK' });
       }
     }
   }
