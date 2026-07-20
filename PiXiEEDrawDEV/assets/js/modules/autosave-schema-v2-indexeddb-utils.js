@@ -400,7 +400,7 @@
                 thumbnail: currentRecords.thumbnail?.value || null,
               };
             } catch (error) {
-              console.warn('[pixiedraw-dev:v2-read]', {
+              console.warn('[pixiedraw:v2-read]', {
                 phase: 'current-revision-fast-path-fallback',
                 projectId: normalizeProjectId(projectId),
                 error: error?.message || String(error),
