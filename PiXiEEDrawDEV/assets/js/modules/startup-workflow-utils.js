@@ -161,7 +161,7 @@
   }
 
   function queueNewProjectAdRender() {
-    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.()) {
+    if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.('new-project-dialog')) {
       return;
     }
     const dialog = dom.newProject?.dialog;
@@ -699,11 +699,11 @@
     if (newProjectSubmitBusy) {
       return;
     }
-    console.info('[pixiedraw-dev:new-project]', { phase: 'new-project-submit' });
+    console.info('[pixiedraw:new-project]', { phase: 'new-project-submit' });
     const config = dom.newProject;
     if (config?.form && typeof config.form.reportValidity === 'function') {
       if (!config.form.reportValidity()) {
-        console.info('[pixiedraw-dev:new-project]', { phase: 'new-project-validation-failed' });
+        console.info('[pixiedraw:new-project]', { phase: 'new-project-validation-failed' });
         return;
       }
     }
@@ -744,8 +744,8 @@
           };
         }
       } else {
-        console.info('[pixiedraw-dev:new-project]', { phase: 'new-project-candidate-built' });
-        console.info('[pixiedraw-dev:new-project]', { phase: 'new-project-commit-start' });
+        console.info('[pixiedraw:new-project]', { phase: 'new-project-candidate-built' });
+        console.info('[pixiedraw:new-project]', { phase: 'new-project-commit-start' });
         created = await createNewProject({
           name,
           width,
@@ -755,7 +755,7 @@
         });
       }
       if (created || createdLocalProject) {
-        console.info('[pixiedraw-dev:new-project]', { phase: 'new-project-commit-success' });
+        console.info('[pixiedraw:new-project]', { phase: 'new-project-commit-success' });
         if (config?.nameInput) {
           config.nameInput.value = extractDocumentBaseName(name);
         }
@@ -773,7 +773,7 @@
           || width > MAX_CANVAS_SIZE
           || height < MIN_CANVAS_SIZE
           || height > MAX_CANVAS_SIZE;
-        console.info('[pixiedraw-dev:new-project]', {
+        console.info('[pixiedraw:new-project]', {
           phase: 'new-project-failed',
           code: invalidDimensions ? 'invalid-canvas-size' : 'project-replacement-failed',
         });
@@ -785,7 +785,7 @@
       }
     } catch (error) {
       console.warn('New project submit failed', error);
-      console.info('[pixiedraw-dev:new-project]', { phase: 'new-project-failed', code: String(error?.message || error || '') });
+      console.info('[pixiedraw:new-project]', { phase: 'new-project-failed', code: String(error?.message || error || '') });
       throw error;
     } finally {
       newProjectSubmitBusy = false;
@@ -895,18 +895,31 @@
     history.pending = null;
     clearTimelapseRecording({ silent: true, scope: 'all' });
     ensureTimelapseStartCapture();
-    resetDocumentUnsavedChanges();
+    // The old tab/session still points at the project that was just closed.
+    // Reset the new document's dirty tokens without mirroring them until the
+    // new autosave id, tab, and active-project session are committed together.
+    resetDocumentUnsavedChanges({ syncSession: false });
     updateHistoryButtons();
     resetExportScaleDefaults();
     syncPixfindSnapshotAfterDocumentReset();
     setTrackedProjectDotBaseline(snapshot, null);
     resetOpenedDocumentViewport({ defer: true });
 
-    setActiveAutosaveProjectId(createAutosaveProjectId());
+    const newProjectId = createAutosaveProjectId();
+    setActiveAutosaveProjectId(newProjectId);
     clearActiveLocalProjectJournal?.();
     clearActiveSharedProjectSession();
     storeMultiProjectKey('');
     syncMultiProjectKeyInputValues('', { preserveFocused: false });
+    if (ensureTab) {
+      resetOpenProjectTabsToCurrentProject({
+        source: 'new-project',
+        projectId: newProjectId,
+        sourceStorageAdapterId: null,
+        sourceKind: 'new',
+        lastSavedStorageAdapterId: null,
+      });
+    }
     markAutosaveDirty();
     if (AUTOSAVE_SUPPORTED && autosaveWriteTimer !== null) {
       window.clearTimeout(autosaveWriteTimer);
@@ -933,15 +946,6 @@
       updateAutosaveStatus('自動保存: 新規プロジェクトの即時保存に失敗したため再試行します', 'warn');
     } else {
       updateAutosaveStatus('自動保存: このブラウザでは利用できません', 'warn');
-    }
-    if (ensureTab) {
-      resetOpenProjectTabsToCurrentProject({
-        source: 'new-project',
-        projectId: autosaveProjectId,
-        sourceStorageAdapterId: null,
-        sourceKind: 'new',
-        lastSavedStorageAdapterId: null,
-      });
     }
     scheduleSessionPersist();
     return true;
@@ -1094,7 +1098,7 @@
     ];
     document.querySelectorAll('.startup-recent-card__ad-ins').forEach(slot => {
       const card = slot.closest('.startup-recent-card--ad');
-      const section = slot.closest('.startup-screen__recent, .project-home-screen__recent');
+      const section = slot.closest('.startup-screen__recent, .startup-workspace, .project-home-screen__recent');
       const screen = slot.closest('.startup-screen, .project-home-screen');
       adTargets.push({
         screen,
@@ -1120,7 +1124,8 @@
         return;
       }
       container.hidden = false;
-      if (adSlot.dataset.pixieedAdCard === 'true' && adSlot.dataset.visibilityObserved !== '1') {
+      if ((adSlot.dataset.pixieedAdCard === 'true' || adSlot.dataset.pixieedProjectFeedAd === 'true')
+        && adSlot.dataset.visibilityObserved !== '1') {
         if (typeof window.IntersectionObserver === 'function') {
           const observer = new window.IntersectionObserver(entries => {
             if (!entries.some(entry => entry.isIntersecting)) {
@@ -1134,7 +1139,7 @@
             } else {
               window.setTimeout(queue, 0);
             }
-          }, { root: section.closest('.startup-recent-list') || null, threshold: 0.1 });
+          }, { root: section.closest('.startup-recent-list, .startup-workspace__list') || null, threshold: 0.1 });
           observer.observe(container);
           adSlot.dataset.visibilityObserved = 'pending';
           return;
@@ -1566,6 +1571,8 @@
   }
 
   let startupWorkspaceEntries = [];
+  let startupWorkspaceSearchQuery = '';
+  let startupWorkspaceMigrationPrompted = false;
 
   function setStartupWorkspaceStatus(message, tone = 'info') {
     const node = dom.startup?.workspaceStatus;
@@ -1599,6 +1606,11 @@
     const list = dom.startup?.workspaceProjectList;
     if (!(list instanceof HTMLElement)) return;
     startupWorkspaceEntries = Array.isArray(entries) ? entries.slice() : [];
+    const visibleEntries = startupWorkspaceSearchQuery
+      ? startupWorkspaceEntries.filter(entry => String(entry?.name || entry?.fileName || '')
+          .toLocaleLowerCase()
+          .includes(startupWorkspaceSearchQuery))
+      : startupWorkspaceEntries;
     list.replaceChildren();
     if (!startupWorkspaceEntries.length) {
       const empty = document.createElement('p');
@@ -1607,11 +1619,19 @@
       list.appendChild(empty);
       return;
     }
-    startupWorkspaceEntries.forEach((entry, index) => {
+    if (!visibleEntries.length) {
+      const empty = document.createElement('p');
+      empty.className = 'startup-workspace__empty';
+      empty.textContent = localizeText('一致するプロジェクトがありません。', 'No matching projects.');
+      list.appendChild(empty);
+      return;
+    }
+    visibleEntries.forEach((entry, visibleIndex) => {
+      const entryIndex = startupWorkspaceEntries.indexOf(entry);
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'startup-workspace__project';
-      button.dataset.workspaceProjectIndex = String(index);
+      button.dataset.workspaceProjectIndex = String(entryIndex);
       button.setAttribute('role', 'listitem');
       if (entry?.deviceLocalProject !== true && entry?.migrationRecovery !== true && Number(entry?.size) === 0) {
         button.title = localizeText(
@@ -1627,7 +1647,7 @@
       }
       const thumbnail = document.createElement('span');
       thumbnail.className = 'startup-workspace__project-thumbnail';
-      thumbnail.dataset.workspaceProjectThumbnail = String(index);
+      thumbnail.dataset.workspaceProjectThumbnail = String(entryIndex);
       const placeholder = document.createElement('span');
       placeholder.className = 'startup-workspace__project-thumbnail-placeholder';
       placeholder.textContent = 'PXD';
@@ -1678,7 +1698,33 @@
       details.append(name, meta, certification);
       button.append(thumbnail, details);
       list.appendChild(button);
+      if ((visibleIndex + 1) % 8 === 0 && window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.()) {
+        const adCard = document.createElement('div');
+        adCard.className = 'startup-recent-card--ad startup-recent-ad startup-workspace__ad';
+        adCard.dataset.pixieedReserveAdSpace = 'true';
+        adCard.setAttribute('role', 'listitem');
+        adCard.setAttribute('aria-label', localizeText('広告', 'Advertisement'));
+        const frame = document.createElement('div');
+        frame.className = 'startup-recent-ad__frame';
+        const label = document.createElement('span');
+        label.className = 'startup-recent-ad__label';
+        label.textContent = localizeText('広告', 'Advertisement');
+        const ad = document.createElement('ins');
+        ad.className = 'startup-recent-card__ad-ins startup-recent-ad__slot';
+        ad.setAttribute('data-ad-client', 'ca-pub-9801602250480253');
+        ad.setAttribute('data-ad-format', 'horizontal');
+        ad.setAttribute('data-ad-slot', '2141591954');
+        ad.setAttribute('data-full-width-responsive', 'true');
+        ad.dataset.pixieedProjectFeedAd = 'true';
+        ad.style.display = 'block';
+        frame.append(label, ad);
+        adCard.appendChild(frame);
+        list.appendChild(adCard);
+      }
     });
+    if (startupVisible) {
+      window.requestAnimationFrame(() => queueStartupRecentAdRender());
+    }
   }
 
   function mergePersistedTimelapseIntoSession(session, persistedByCanvas, canvasIds = []) {
@@ -1761,16 +1807,58 @@
   }
 
   async function refreshStartupWorkspaceProjects() {
-    // Startup must be ready before examining saved projects. The previous
-    // migration scan decoded every local entry during bootstrap, which could
-    // leave the initial screen stuck on older or incomplete V2 records.
-    const localEntries = await loadDeviceLocalWorkspaceEntries();
+    let migration = { migrated: 0, created: 0, failed: 0, declined: false, failedEntries: [] };
+    if (!startupWorkspaceMigrationPrompted && typeof migrateLegacyLocalProjectsToTrueV2 === 'function') {
+      migration = await migrateLegacyLocalProjectsToTrueV2({
+        confirmMigration: ({ count, candidates }) => {
+          startupWorkspaceMigrationPrompted = true;
+          const hasSplit = Array.isArray(candidates) && candidates.some(candidate => candidate?.needsSplit === true);
+          return window.confirm(localizeText(
+            `端末内にV1・旧V2プロジェクトが${count}件あります。\n\n真V2の単一プロジェクトへ変換します。${hasSplit ? '\n複数タブ・複数キャンバスは、それぞれ独立した真V2プロジェクトへ分割します。' : ''}\n変換先を端末内へ完全保存できた後だけ、元のV1・旧V2データを削除します。\n変換中は画面を閉じないでください。\n\n変換を開始しますか？`,
+            `${count} V1 or legacy V2 on-device project(s) were found.\n\nThey will be converted to true V2 single projects.${hasSplit ? '\nMultiple tabs and canvases will be split into independent true V2 projects.' : ''}\nThe original V1/legacy V2 data is deleted only after its on-device true V2 replacement is fully committed.\nKeep this page open during conversion.\n\nStart conversion?`
+          ));
+        },
+        preparePackaged: async (entry, packaged) => await mergeFileBackedTimelapseIntoPackaged(entry, packaged),
+        onProgress: ({ index, total }) => {
+          setStartupWorkspaceStatus(localizeText(
+            `端末内プロジェクトを真V2へ変換しています… ${index}/${total}`,
+            `Converting on-device projects to true V2... ${index}/${total}`
+          ));
+        },
+      });
+    }
+    const failuresById = new Map((migration.failedEntries || [])
+      .filter(failure => failure?.entry?.id)
+      .map(failure => [failure.entry.id, failure]));
+    const localEntries = (await loadDeviceLocalWorkspaceEntries()).map(entry => {
+      const failure = failuresById.get(entry.id);
+      return failure
+        ? {
+            ...entry,
+            migrationRecovery: true,
+            migrationErrorCode: failure.code || 'ERR_TRUE_V2_MIGRATION_FAILED',
+            migrationErrorMessage: failure.message || '',
+          }
+        : entry;
+    });
     renderStartupWorkspaceProjects(localEntries);
+    const migrationSummary = migration.migrated > 0
+      ? localizeText(
+          ` 真V2移行: 元${migration.migrated}件→${migration.created}件。`,
+          ` True V2 migration: ${migration.migrated} source(s) to ${migration.created} project(s).`
+        )
+      : '';
     setStartupWorkspaceStatus(
-      localizeText(
-        `端末内プロジェクトを表示しています（${localEntries.length}件）。`,
-        `Showing ${localEntries.length} on-device project(s).`
-      )
+      migration.failed > 0
+        ? localizeText(
+            `端末内プロジェクト${localEntries.length}件。真V2移行の未完了が${migration.failed}件あります。元データは削除していません。`,
+            `${localEntries.length} on-device project(s). ${migration.failed} true V2 migration(s) remain incomplete; original data was retained.`
+          )
+        : localizeText(
+            `端末内プロジェクト ${localEntries.length}件。${migrationSummary}`,
+            `${localEntries.length} on-device project(s).${migrationSummary}`
+          ),
+      migration.failed > 0 ? 'warn' : 'info'
     );
     return true;
   }
@@ -1781,6 +1869,10 @@
       return;
     }
     projectList.dataset.bound = 'true';
+    dom.startup?.workspaceSearch?.addEventListener('input', () => {
+      startupWorkspaceSearchQuery = String(dom.startup.workspaceSearch.value || '').trim().toLocaleLowerCase();
+      renderStartupWorkspaceProjects(startupWorkspaceEntries);
+    });
     projectList.addEventListener('click', async event => {
       const target = event.target instanceof Element
         ? event.target.closest('button[data-workspace-project-index]')
@@ -1804,15 +1896,7 @@
         target.disabled = false;
       }
     });
-    // Cards are metadata-only. Never decode project payloads or start legacy
-    // migration from this list, so the project chooser stays responsive.
-    void refreshStartupWorkspaceProjects().catch(error => {
-      console.warn('[pixiedraw-dev:startup] project list refresh failed', error);
-      setStartupWorkspaceStatus(localizeText(
-        '保存済みプロジェクトを確認できませんでした。',
-        'Saved projects could not be checked.'
-      ), 'warn');
-    });
+    void refreshStartupWorkspaceProjects();
   }
 
   function setupStartupScreen() {
@@ -1822,9 +1906,6 @@
     }
     bindCoreProjectActionButtons();
     setupStartupWorkspace();
-    dom.startup?.projectsButton?.addEventListener('click', () => {
-      void refreshStartupWorkspaceProjects();
-    });
     getUpdateHistoryEntries();
     if (dom.startup?.quickSetupButton instanceof HTMLButtonElement) {
       if (AUTOSAVE_SUPPORTED) {
