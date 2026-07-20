@@ -9,7 +9,6 @@ const lazyAds = fs.readFileSync('scripts/ads-lazy.js', 'utf8');
 const legacyAds = fs.readFileSync('scripts.js', 'utf8');
 const detailsAds = fs.readFileSync('scripts/shared-tab-bar.js', 'utf8');
 const productionDraw = fs.readFileSync('pixiedraw/index.html', 'utf8');
-const devDraw = fs.readFileSync('PiXiEEDrawDEV/index.html', 'utf8');
 
 assert.match(migration, /create table if not exists public\.site_ad_free_grants/i);
 assert.match(migration, /alter table public\.site_ad_free_grants enable row level security/i);
@@ -33,7 +32,7 @@ assert.match(accountUi, /window\.confirm/);
 
 assert.match(adControl, /rest\/v1\/rpc\/site_current_user_ad_free/);
 assert.doesNotMatch(adControl, /rgaydm03|3917bf57/i);
-for (const loader of [lazyAds, legacyAds, detailsAds, productionDraw, devDraw]) {
+for (const loader of [lazyAds, legacyAds, detailsAds, productionDraw]) {
   assert.match(loader, /PiXiEEDAdAccountControl\.loadAdsense/);
 }
 

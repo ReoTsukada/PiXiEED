@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-const roots = ['PiXiEEDrawDEV', 'pixiedraw'];
+const roots = ['pixiedraw'];
 
 for (const root of roots) {
   const html = fs.readFileSync(`${root}/index.html`, 'utf8');
@@ -18,4 +18,4 @@ for (const root of roots) {
   assert.match(css, /body\.is-project-home-active \.modal\[open\]\s*\{[\s\S]{0,100}z-index:\s*20010/s);
 }
 
-console.log('Project delete dialog visibility checks passed for DEV and production');
+console.log('PiXiEEDraw project delete dialog visibility checks passed.');

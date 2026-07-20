@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-for (const root of ['PiXiEEDrawDEV', 'pixiedraw']) {
+for (const root of ['pixiedraw']) {
   const html = fs.readFileSync(`${root}/index.html`, 'utf8');
   const css = fs.readFileSync(`${root}/assets/css/style.css`, 'utf8');
 

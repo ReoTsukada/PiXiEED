@@ -9,7 +9,6 @@ const market = read('market/market.js');
 const pixfind = read('pixfind/app.js');
 const drawRecent = read('pixiedraw/assets/js/modules/recent-project-workflow-utils.js');
 const drawStartup = read('pixiedraw/assets/js/modules/startup-workflow-utils.js');
-const drawDevRecent = read('PiXiEEDrawDEV/assets/js/modules/recent-project-workflow-utils.js');
 
 assert.match(market, /\(index \+ 1\) % 8 !== 0/);
 assert.doesNotMatch(market, /children\.splice\(8/);
@@ -20,7 +19,5 @@ assert.doesNotMatch(drawRecent, /index === 3/);
 assert.match(drawStartup, /\(visibleIndex \+ 1\) % 8 === 0/);
 assert.doesNotMatch(drawStartup, /visibleIndex === 3/);
 assert.doesNotMatch(drawStartup, /!startupWorkspaceSearchQuery && \(visibleIndex \+ 1\) % 8/);
-assert.match(drawDevRecent, /\(index \+ 1\) % 8 === 0/);
-assert.match(drawDevRecent, /dataset\.pixieedReserveAdSpace = 'true'/);
 
 console.log('Card feed ad interval guards passed.');

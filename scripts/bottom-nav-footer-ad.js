@@ -515,7 +515,7 @@
   function isPixiedrawPage() {
     try {
       const path = String(window.location.pathname || '').toLowerCase();
-      return /(?:^|\/)(?:pixiedraw|pixieedrawdev)(?:\/|\/index\.html)?$/.test(path);
+      return /(?:^|\/)pixiedraw(?:\/|\/index\.html)?$/.test(path);
     } catch (_error) {
       return false;
     }

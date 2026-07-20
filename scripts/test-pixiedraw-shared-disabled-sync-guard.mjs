@@ -5,7 +5,7 @@ import path from 'node:path';
 const root = '/Users/tsukadareine/Documents/GitHub/PiXiEED';
 const read = relativePath => fs.readFileSync(path.join(root, relativePath), 'utf8');
 
-for (const appRoot of ['pixiedraw', 'PiXiEEDrawDEV']) {
+for (const appRoot of ['pixiedraw']) {
   const app = read(`${appRoot}/assets/js/app.js`);
   const html = read(`${appRoot}/index.html`);
   const buildInfo = read(`${appRoot}/assets/js/build-info.js`);
