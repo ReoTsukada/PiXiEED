@@ -172,6 +172,7 @@
   function deserializeDocumentPayload(payload, options = {}) {
     const reuseTypedArrays = options?.reuseTypedArrays === true;
     const trustStoredLayerFlags = options?.trustStoredLayerFlags === true;
+    const recoverTruncatedRasterLayers = options?.recoverTruncatedRasterLayers === true;
     if (!payload || typeof payload !== 'object') {
       throw new Error('Invalid document payload');
     }
@@ -205,7 +206,7 @@
         getDefaultLayerName(layerIndex + 1),
         width,
         height,
-        { reuseTypedArrays, trustStoredLayerFlags }
+        { reuseTypedArrays, trustStoredLayerFlags, recoverTruncatedRasterLayers }
       ));
       return {
         id: typeof frame.id === 'string' ? frame.id : `frame-${frameIndex + 1}`,
@@ -355,7 +356,7 @@
             getDefaultLayerName(layerIndex + 1),
             canvasWidth,
             canvasHeight,
-            { reuseTypedArrays, trustStoredLayerFlags }
+            { reuseTypedArrays, trustStoredLayerFlags, recoverTruncatedRasterLayers }
           ));
           return {
             id: typeof frame.id === 'string' ? frame.id : `frame-${canvasIndex}-${frameIndex + 1}`,
