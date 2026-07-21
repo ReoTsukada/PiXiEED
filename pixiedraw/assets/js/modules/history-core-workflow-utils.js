@@ -140,11 +140,11 @@ function commitHistory() {
       }
       history.future.length = 0;
       trimHistoryToByteBudget?.();
-      if (isLargeDocumentPerformanceMode()) {
-        scheduleAutosaveSnapshot();
-      } else {
-        requestImmediateAutosaveSnapshot();
-      }
+      // A committed history entry is the durability boundary. Persist its V2
+      // journal immediately even for large documents; the autosave workflow
+      // serializes overlapping writes and falls back to checkpoints only for
+      // structural operations.
+      requestImmediateAutosaveSnapshot();
       handleMultiLocalCommit(pendingLabel);
     }
     history.pending = null;
