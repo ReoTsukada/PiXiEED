@@ -73,6 +73,11 @@ assert.match(rendering, /choice\.getAttribute\('aria-pressed'\) === 'true'/, 'se
 assert.match(rendering, /forceZip: true/, 'a selected ZIP with one format must still be delivered as a ZIP');
 assert.match(app, /async function exportProjectAsAllFormatsZip\(\.\.\.args\)/);
 assert.match(app, /get exportProjectAsAllFormatsZip\(\) \{ return exportProjectAsAllFormatsZip; \}/);
+assert.match(
+  app,
+  /get rollbackPixelPatchHistoryPending\(\) \{ return rollbackPixelPatchHistoryPending; \}/,
+  'history rollback must receive the pending pixel-patch rollback helper'
+);
 assert.match(dialogWorkflow, /normalized === 'allzip'[\s\S]{0,100}await exportProjectAsAllFormatsZip\(\)/);
 assert.match(dialogWorkflow, /normalized === 'batchzip'[\s\S]{0,220}selectedFormats: Array\.isArray\(selectedFormats\) \? selectedFormats : getSelectedBatchZipFormats\(\)/);
 assert.match(dialog, /const getSelectedExportFormatsSnapshot = \(\) =>/, 'selected export pads must be snapshotted before the dialog closes');
@@ -98,6 +103,6 @@ assert.match(index, /export-rendering\.js\?v=20260721-runtime-index8-output1/);
 assert.match(index, /dialog-setup-utils\.js\?v=20260720-export-batch-direct1/);
 assert.match(index, /export-dialog-workflow-utils\.js\?v=20260720-export-batch-snapshot1/);
 assert.match(index, /export-normalizer-utils\.js\?v=20260720-export-batchzip1/);
-assert.match(index, /app\.js\?v=20260721-115/);
+assert.match(index, /app\.js\?v=20260721-117/);
 
 console.log('PiXiEEDraw export runtime wiring and preview-cost checks passed');
