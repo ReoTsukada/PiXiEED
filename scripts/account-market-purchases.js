@@ -301,6 +301,16 @@
 
   async function init() {
     try {
+      if (window.location.origin === 'null') {
+        count.textContent = 'ローカル直開き';
+        renderMessage(
+          '購入履歴はローカルファイルから開けません',
+          'account/index.html を直接開かず、PiXiEED のWebサイトまたは http://localhost:8000/ から開いてください。',
+          'PiXiEEDを開く',
+          'https://pixieed.jp/account/'
+        );
+        return;
+      }
       const marketAccess = window.PiXiEEDMarketAccess ? await window.PiXiEEDMarketAccess.check() : null;
       if (!marketAccess?.client) return;
       let client = null;
