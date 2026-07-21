@@ -34,9 +34,28 @@
           const allowed = Boolean(user && !user.is_anonymous && user.email && user.email_confirmed_at);
           return { allowed, authenticated: Boolean(user), user, client, error: error || null };
         } catch (error) {
-          // Public catalog calls do not require Auth. Keep the usable anon
-          // client when /auth/v1/user is temporarily unreachable.
-          return { allowed: false, authenticated: false, user: null, client, error };
+          // Public catalog calls do not require Auth. For gated pages, a
+          // locally cached, still-valid session is enough to render the page;
+          // every privileged market RPC still verifies the JWT server-side.
+          let cachedUser = null;
+          try {
+            const { data } = await client.auth.getSession();
+            cachedUser = data?.session?.user || null;
+          } catch (_sessionError) {}
+          const allowed = Boolean(
+            cachedUser
+            && !cachedUser.is_anonymous
+            && cachedUser.email
+            && cachedUser.email_confirmed_at
+          );
+          return {
+            allowed,
+            authenticated: Boolean(cachedUser),
+            user: cachedUser,
+            client,
+            error,
+            usingCachedSession: allowed,
+          };
         }
       } catch (error) {
         return { allowed: false, authenticated: false, user: null, client: null, error };
