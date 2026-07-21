@@ -162,6 +162,9 @@
       if (!isPixelPatchHistoryEntry(pending) || !(pending.changesByIndex instanceof Map)) {
         return null;
       }
+      if (pending.compressedSelectionMove && typeof pending.compressedSelectionMove === 'object') {
+        return pending.compressedSelectionMove;
+      }
       const changes = [];
       pending.changesByIndex.forEach(change => {
         if (!change || !change.before || !change.after || pixelPatchValuesEqual(change.before, change.after)) {
@@ -254,6 +257,9 @@
     }
 
     function applyPixelPatchHistoryEntry(entry, direction = 'undo') {
+      if (entry?.kind === 'selection-move-compressed') {
+        return applyCompressedSelectionMoveHistoryEntry(entry, direction);
+      }
       const target = resolvePixelPatchHistoryTarget(entry);
       const changes = Array.isArray(entry?.changes) ? entry.changes : [];
       if (!target || !changes.length) {
@@ -310,9 +316,153 @@
       return true;
     }
 
+    // Large selection moves used to retain one { before, after } object per
+    // pixel. Keep the same undo/redo semantics, but express the move as typed
+    // source and destination buffers instead. This is intentionally a
+    // pixel-patch history entry so existing history plumbing can handle it.
+    function applyCompressedSelectionMoveHistoryEntry(entry, direction = 'undo') {
+      const target = resolvePixelPatchHistoryTarget(entry);
+      const sourceMask = entry?.sourceMask;
+      const sourceIndices = entry?.sourceIndices;
+      const sourceDirect = entry?.sourceDirect;
+      const targetPositions = entry?.targetPositions;
+      const targetBeforeIndices = entry?.targetBeforeIndices;
+      const targetAfterIndices = entry?.targetAfterIndices;
+      const targetBeforeDirect = entry?.targetBeforeDirect;
+      const targetAfterDirect = entry?.targetAfterDirect;
+      const moveWidth = Math.max(0, Math.round(Number(entry?.moveWidth) || 0));
+      const moveHeight = Math.max(0, Math.round(Number(entry?.moveHeight) || 0));
+      const sourceX = Math.round(Number(entry?.sourceX) || 0);
+      const sourceY = Math.round(Number(entry?.sourceY) || 0);
+      if (
+        !target
+        || !(sourceMask instanceof Uint8Array)
+        || !isRasterIndexArray(sourceIndices)
+        || moveWidth <= 0
+        || moveHeight <= 0
+        || sourceMask.length !== moveWidth * moveHeight
+        || sourceIndices.length !== sourceMask.length
+        || !(targetPositions instanceof Int32Array)
+        || !isRasterIndexArray(targetBeforeIndices)
+        || !isRasterIndexArray(targetAfterIndices)
+        || targetBeforeIndices.length !== targetPositions.length
+        || targetAfterIndices.length !== targetPositions.length
+      ) {
+        return false;
+      }
+      const layerDirect = target.layer.direct instanceof Uint8ClampedArray ? target.layer.direct : null;
+      const useAfter = direction === 'redo';
+      let dirtyX0 = target.width;
+      let dirtyY0 = target.height;
+      let dirtyX1 = -1;
+      let dirtyY1 = -1;
+      const noteDirtyIndex = index => {
+        const x = index % target.width;
+        const y = Math.floor(index / target.width);
+        if (x < dirtyX0) dirtyX0 = x;
+        if (y < dirtyY0) dirtyY0 = y;
+        if (x > dirtyX1) dirtyX1 = x;
+        if (y > dirtyY1) dirtyY1 = y;
+      };
+      const writeDirect = (index, pixels, valueOffset) => {
+        if (!(pixels instanceof Uint8ClampedArray) || pixels.length < (valueOffset + 1) * 4) {
+          return;
+        }
+        const direct = layerDirect || ensureLayerDirect(target.layer, target.width, target.height);
+        const base = index * 4;
+        const valueBase = valueOffset * 4;
+        direct[base] = pixels[valueBase];
+        direct[base + 1] = pixels[valueBase + 1];
+        direct[base + 2] = pixels[valueBase + 2];
+        direct[base + 3] = pixels[valueBase + 3];
+      };
+      const clearSource = () => {
+        const transparent = target.layer.indices instanceof Uint8Array ? 0 : -1;
+        for (let localIndex = 0; localIndex < sourceMask.length; localIndex += 1) {
+          if (sourceMask[localIndex] !== 1) continue;
+          const x = sourceX + (localIndex % moveWidth);
+          const y = sourceY + Math.floor(localIndex / moveWidth);
+          if (x < 0 || y < 0 || x >= target.width || y >= target.height) continue;
+          const index = y * target.width + x;
+          target.layer.indices[index] = transparent;
+          if (layerDirect && index * 4 + 3 < layerDirect.length) {
+            const base = index * 4;
+            layerDirect[base] = 0;
+            layerDirect[base + 1] = 0;
+            layerDirect[base + 2] = 0;
+            layerDirect[base + 3] = 0;
+          }
+          noteDirtyIndex(index);
+        }
+      };
+      const restoreSource = () => {
+        for (let localIndex = 0; localIndex < sourceMask.length; localIndex += 1) {
+          if (sourceMask[localIndex] !== 1) continue;
+          const x = sourceX + (localIndex % moveWidth);
+          const y = sourceY + Math.floor(localIndex / moveWidth);
+          if (x < 0 || y < 0 || x >= target.width || y >= target.height) continue;
+          const index = y * target.width + x;
+          target.layer.indices[index] = sourceIndices[localIndex];
+          if (sourceDirect instanceof Uint8ClampedArray && sourceDirect.length >= (localIndex + 1) * 4) {
+            const direct = layerDirect || ensureLayerDirect(target.layer, target.width, target.height);
+            const sourceBase = localIndex * 4;
+            const base = index * 4;
+            direct[base] = sourceDirect[sourceBase];
+            direct[base + 1] = sourceDirect[sourceBase + 1];
+            direct[base + 2] = sourceDirect[sourceBase + 2];
+            direct[base + 3] = sourceDirect[sourceBase + 3];
+          }
+          noteDirtyIndex(index);
+        }
+      };
+      if (useAfter) {
+        clearSource();
+        for (let i = 0; i < targetPositions.length; i += 1) {
+          const index = targetPositions[i];
+          if (index < 0 || index >= target.layer.indices.length) continue;
+          target.layer.indices[index] = targetAfterIndices[i];
+          if (targetAfterDirect instanceof Uint8ClampedArray) {
+            writeDirect(index, targetAfterDirect, i);
+          }
+          noteDirtyIndex(index);
+        }
+      } else {
+        for (let i = 0; i < targetPositions.length; i += 1) {
+          const index = targetPositions[i];
+          if (index < 0 || index >= target.layer.indices.length) continue;
+          target.layer.indices[index] = targetBeforeIndices[i];
+          if (targetBeforeDirect instanceof Uint8ClampedArray) {
+            writeDirect(index, targetBeforeDirect, i);
+          }
+          noteDirtyIndex(index);
+        }
+        restoreSource();
+      }
+      if (dirtyX1 < dirtyX0 || dirtyY1 < dirtyY0) {
+        return false;
+      }
+      refreshLayerDirectOnlyFlag(target.layer);
+      invalidateFillPreviewCache();
+      invalidateOnionSkinCache();
+      clearPlaybackFrameCache();
+      const activeCanvasId = String(getActiveProjectCanvasDocument()?.id || '');
+      if (activeCanvasId && activeCanvasId === String(target.canvasDoc?.id || '')) {
+        markDirtyRect?.(dirtyX0, dirtyY0, dirtyX1, dirtyY1);
+        requestRender();
+      }
+      requestOverlayRender();
+      if (multiState.connected || Boolean(getActiveSharedProjectKey?.()) || isSharedProjectCollaborativeMode()) {
+        renderAllProjectCanvasSurfaces();
+      }
+      return true;
+    }
+
     function rollbackPixelPatchHistoryPending(pending) {
       if (!isPixelPatchHistoryEntry(pending) || !(pending.changesByIndex instanceof Map)) {
         return false;
+      }
+      if (pending.compressedSelectionMove?.kind === 'selection-move-compressed') {
+        return applyCompressedSelectionMoveHistoryEntry(pending.compressedSelectionMove, 'undo');
       }
       const changes = [];
       pending.changesByIndex.forEach(change => {
