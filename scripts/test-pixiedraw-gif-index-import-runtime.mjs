@@ -42,7 +42,7 @@ for (const [filePath, filename] of [
 }
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
-const { GifWriter, GifReader } = context.window.PiXiEEDrawModules.colorCodecUtils.createColorCodecUtils({ clamp });
+const { GifWriter, GifReader, quantizeRgbaColorEntriesWithMapping } = context.window.PiXiEEDrawModules.colorCodecUtils.createColorCodecUtils({ clamp });
 const decodeUtils = context.window.PiXiEEDrawModules.imageImportDecodeUtils.createImageImportDecodeUtils({
   DEFAULT_IMPORT_FRAME_DURATION: 100,
   IMPORT_INTEGER_SCALE_SAMPLE_GRID: 8,
@@ -89,6 +89,32 @@ assert.equal(
   true
 );
 assert.deepEqual(Array.from(exactIndices), [1, 2, -1]);
+
+const indexedDecodeUtils = context.window.PiXiEEDrawModules.imageImportDecodeUtils.createImageImportDecodeUtils({
+  MAX_IMPORTED_PALETTE_COLORS: 256,
+  clamp,
+  quantizeRgbaColorEntriesWithMapping,
+  normalizeColorValue: color => ({
+    r: Math.max(0, Math.min(255, Math.round(Number(color?.r) || 0))),
+    g: Math.max(0, Math.min(255, Math.round(Number(color?.g) || 0))),
+    b: Math.max(0, Math.min(255, Math.round(Number(color?.b) || 0))),
+    a: Math.max(0, Math.min(255, Math.round(Number(color?.a) || 0))),
+  }),
+  getPaletteColorKey: color => `${color.r},${color.g},${color.b},${color.a}`,
+  findNearestPaletteColorIndexByRgba: () => 0,
+  resolveTransparentStoragePaletteIndex: () => -1,
+});
+const photoPixels = new Uint8ClampedArray(300 * 4);
+for (let index = 0; index < 300; index += 1) {
+  const base = index * 4;
+  photoPixels[base] = index & 0xff;
+  photoPixels[base + 1] = (index * 29) & 0xff;
+  photoPixels[base + 2] = (index * 61) & 0xff;
+  photoPixels[base + 3] = 255;
+}
+const quantizedPhoto = indexedDecodeUtils.buildIndexedPaletteFromFrameDataList([photoPixels], 255);
+assert.ok(quantizedPhoto.palette.length <= 255, 'photo imports reserve one Uint8 index for transparency');
+assert.equal(quantizedPhoto.frameIndices[0].length, 300, 'every photo pixel receives an indexed palette mapping');
 
 const tooManyColors = new Uint8ClampedArray(257 * 4);
 for (let index = 0; index < 257; index += 1) {
@@ -303,7 +329,8 @@ assert.ok(indexedRuntimeBytes < formerRgbRuntimeBytes / 5);
 
 const importSource = fs.readFileSync(importPath, 'utf8');
 const appSource = fs.readFileSync(appPath, 'utf8');
-assert.match(importSource, /buildExactIndexedPaletteFromImageFrames\(normalizedFramesData, MAX_IMPORTED_PALETTE_COLORS\)/);
+assert.match(importSource, /buildIndexedPaletteFromFrameDataList\(indexedSourceFrames, MAX_IMPORTED_PALETTE_COLORS - 1\)/);
+assert.match(importSource, /No direct RGBA layer buffer is retained after this point/);
 assert.match(importSource, /buildPackagedProjectPayload\(snapshot, \{ session: \{\}, includeSheets: false \}\)/);
 const openImportScopeStart = appSource.indexOf('const openImportWorkflowUtilsModule');
 const openImportScopeEnd = appSource.indexOf('const {', openImportScopeStart);
