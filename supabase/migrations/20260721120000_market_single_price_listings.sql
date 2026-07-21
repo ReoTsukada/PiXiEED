@@ -50,7 +50,7 @@ begin
     raise exception 'sale price must be at least 500 yen and use 100 yen increments';
   end if;
   if jsonb_typeof(coalesce(input_option_prices, '{}'::jsonb)) <> 'object'
-     or jsonb_object_length(coalesce(input_option_prices, '{}'::jsonb)) <> 0 then
+     or coalesce(input_option_prices, '{}'::jsonb) <> '{}'::jsonb then
     raise exception 'license options are included in the listing price and cannot have separate prices';
   end if;
   if jsonb_typeof(coalesce(input_custom_options, '[]'::jsonb)) <> 'array'
