@@ -1023,19 +1023,28 @@
       }
 
     const frames = [];
+    // All raster imports become indexed at ingress. Reserve Uint8 index 0 for
+    // transparency, then quantize visible RGBA colors into the remaining 255
+    // palette slots. No direct RGBA layer buffer is retained after this point.
     const exactIndexedImport = isGifFile(file)
       && typeof buildExactIndexedPaletteFromImageFrames === 'function'
       && typeof writeExactIndexedPixelsFromRgba === 'function'
       ? buildExactIndexedPaletteFromImageFrames(normalizedFramesData, MAX_IMPORTED_PALETTE_COLORS)
       : null;
-    const importedAsExactIndex = Boolean(exactIndexedImport?.palette?.length);
-    const palette = importedAsExactIndex
-      ? exactIndexedImport.palette
-      : createRgbModeDefaultPalette();
-    const activePaletteIndex = importedAsExactIndex
-      ? 0
-      : clamp(2, 0, Math.max(0, palette.length - 1));
-    const secondaryPaletteIndex = clamp(1, 0, Math.max(0, palette.length - 1));
+    const indexedSourceFrames = normalizedFramesData.map(frameInfo => frameInfo?.imageData?.data || null);
+    const indexedPaletteImport = !exactIndexedImport && typeof buildIndexedPaletteFromFrameDataList === 'function'
+      ? buildIndexedPaletteFromFrameDataList(indexedSourceFrames, MAX_IMPORTED_PALETTE_COLORS - 1)
+      : null;
+    if (!exactIndexedImport && (!indexedPaletteImport?.palette?.length || !Array.isArray(indexedPaletteImport.frameIndices))) {
+      throw createImageImportError('画像のINDEXカラー変換に失敗しました');
+    }
+    const palette = exactIndexedImport?.palette || [
+      { r: 0, g: 0, b: 0, a: 0 },
+      ...indexedPaletteImport.palette.slice(0, MAX_IMPORTED_PALETTE_COLORS - 1),
+    ];
+    const importedAsIndexed = palette.length > 1;
+    const activePaletteIndex = clamp(1, 0, Math.max(0, palette.length - 1));
+    const secondaryPaletteIndex = 0;
     const activeRgb = palette[activePaletteIndex]
       ? { ...palette[activePaletteIndex] }
       : { r: 255, g: 255, b: 255, a: 255 };
@@ -1060,15 +1069,26 @@
       const hasExpectedPixels = frameInfo?.imageData?.data instanceof Uint8ClampedArray
         && frameInfo.imageData.width === width
         && frameInfo.imageData.height === height;
-      if (importedAsExactIndex) {
-        const indexed = hasExpectedPixels
-          && writeExactIndexedPixelsFromRgba(
-            frameInfo.imageData.data,
-            layer.indices,
-            exactIndexedImport.colorToIndex
-          );
-        if (!indexed) {
-          throw createImageImportError('GIFのINDEXカラー変換に失敗しました');
+      if (importedAsIndexed) {
+        if (exactIndexedImport) {
+          const indexed = hasExpectedPixels
+            && writeExactIndexedPixelsFromRgba(
+              frameInfo.imageData.data,
+              layer.indices,
+              exactIndexedImport.colorToIndex
+            );
+          if (!indexed) {
+            throw createImageImportError('GIFのINDEXカラー変換に失敗しました');
+          }
+        } else {
+          const sourceIndices = indexedPaletteImport.frameIndices[index];
+          if (!(sourceIndices instanceof Int16Array) || sourceIndices.length !== width * height) {
+            throw createImageImportError('画像のINDEXカラー変換に失敗しました');
+          }
+          for (let pixelIndex = 0; pixelIndex < sourceIndices.length; pixelIndex += 1) {
+            const paletteIndex = sourceIndices[pixelIndex];
+            layer.indices[pixelIndex] = paletteIndex >= 0 ? paletteIndex + 1 : 0;
+          }
         }
         if (index > 0 && typeof compactRasterLayerIndicesToTiles === 'function') {
           compactRasterLayerIndicesToTiles(layer, palette, width, height, previousIndexedLayer);
@@ -1076,20 +1096,6 @@
           compactRasterLayerIndices(layer, palette, width * height);
         }
         previousIndexedLayer = layer;
-      } else {
-        layer.indices.fill(layer.indices instanceof Uint8Array ? 0 : -1);
-        if (index > 0) {
-          // RGB frames already carry their pixels in `direct`. Keep inactive
-          // index planes implicit until the user selects one for editing.
-          layer.indices = layer.indices instanceof Uint8Array ? new Uint8Array(0) : new Int16Array(0);
-        }
-        layer.directOnly = true;
-        const direct = ensureLayerDirect(layer, width, height);
-        if (hasExpectedPixels) {
-          direct.set(frameInfo.imageData.data);
-        } else {
-          direct.fill(0);
-        }
       }
       frames.push({
         id: crypto.randomUUID ? crypto.randomUUID() : `frame-${Date.now().toString(36)}-${index}`,
@@ -1107,8 +1113,8 @@
       });
       endImportPerformanceSpan(runtimeFramesSpan, {
         createdFrameCount: frames.length,
-        colorMode: importedAsExactIndex ? COLOR_MODE_INDEX : COLOR_MODE_RGB,
-        paletteSize: importedAsExactIndex ? palette.length : 0,
+        colorMode: COLOR_MODE_INDEX,
+        paletteSize: palette.length,
       });
     }
 
@@ -1141,7 +1147,7 @@
       activePaletteIndex,
       secondaryPaletteIndex,
       activeRgb,
-      colorMode: importedAsExactIndex ? COLOR_MODE_INDEX : COLOR_MODE_RGB,
+      colorMode: COLOR_MODE_INDEX,
       frames,
       activeFrame: 0,
       activeLayer: activeLayerId,
@@ -1201,7 +1207,7 @@
     syncMultiProjectKeyInputValues('', { preserveFocused: false });
     markAutosaveDirty();
     scheduleAutosaveSnapshot();
-    const importColorModeLabel = importedAsExactIndex ? 'INDEXカラー' : 'RGBカラー';
+    const importColorModeLabel = 'INDEXカラー';
     if (importWasScaled) {
       const integerScaleLabel = effectiveIntegerScaleFactor > 1
         ? ` / 整数倍縮小 x${effectiveIntegerScaleFactor}`
