@@ -9,6 +9,10 @@ const history = fs.readFileSync(
   new URL('../pixiedraw/assets/js/modules/history-core-workflow-utils.js', import.meta.url),
   'utf8'
 );
+const localJournal = fs.readFileSync(
+  new URL('../pixiedraw/assets/js/modules/local-project-journal-utils.js', import.meta.url),
+  'utf8'
+);
 
 const immediateStart = autosave.indexOf('function requestImmediateAutosaveSnapshot()');
 const immediateEnd = autosave.indexOf('\n  function isAutosaveInteractionBusy()', immediateStart);
@@ -21,7 +25,7 @@ assert.doesNotMatch(immediate, /isLightweightPersistenceMode\(\)/, 'lightweight 
 
 assert.match(
   autosave,
-  /const flushCommittedChange = autosaveCommittedFlushQueued;[\s\S]{0,260}queueMicrotask\(\(\) => requestImmediateAutosaveSnapshot\(\)\)/,
+  /const flushCommittedChange = autosaveCommittedFlushQueued;[\s\S]{0,360}Promise\.resolve\(\)\.then\(\(\) => requestImmediateAutosaveSnapshot\(\)\)/,
   'a change committed during an in-flight write must flush immediately afterwards'
 );
 
@@ -31,5 +35,11 @@ assert.ok(commitStart >= 0 && commitEnd > commitStart, 'history commit function 
 const commit = history.slice(commitStart, commitEnd);
 assert.match(commit, /requestImmediateAutosaveSnapshot\(\)/);
 assert.doesNotMatch(commit, /if \(isLargeDocumentPerformanceMode\(\)\)/, 'large documents must retain the committed journal flush');
+assert.match(localJournal, /LOCAL_PROJECT_LARGE_PIXEL_PATCH_MAX_CHANGES = 32768/);
+assert.match(
+  localJournal,
+  /historyEntry\.changes\.length > LOCAL_PROJECT_LARGE_PIXEL_PATCH_MAX_CHANGES[\s\S]{0,180}next\.forceCheckpoint = true/,
+  'large pixel patches must checkpoint instead of expanding the journal'
+);
 
 console.log('PiXiEEDraw committed journal autosave checks passed');
