@@ -139,6 +139,78 @@ assert.strictEqual(restored.direct, direct, 'trusted V2 restore must reuse direc
 assert.equal(restored.directOnly, true, 'trusted V2 restore must use the stored direct-only flag');
 assert.equal(decodeCalls, legacyDecodeCalls, 'trusted TypedArray restore must not add Base64 decoding');
 
+const runtimeDirect = new Uint8ClampedArray(pixelCount * 4);
+runtimeDirect.set([90, 80, 70, 255], 0);
+const deferredRuntimeLayer = {
+  id: 'runtime-direct-layer',
+  name: 'Runtime direct layer',
+  visible: true,
+  opacity: 1,
+  blendMode: 'normal',
+  indices: new Uint8Array(0),
+  indicesEncoding: 'uint8-palette-zero-transparent-v2',
+  direct: runtimeDirect,
+  importSourceDirect: null,
+  directOnly: true,
+};
+const serializedDeferredRuntime = model.serializeLayerForDocument(deferredRuntimeLayer, {
+  preserveTypedArrays: true,
+  width: 512,
+  height: 512,
+});
+assert.ok(serializedDeferredRuntime.indices instanceof Uint8Array, 'deferred runtime indices stay Uint8');
+assert.equal(serializedDeferredRuntime.indices.length, pixelCount, 'deferred direct layer must serialize a full index buffer');
+assert.equal(serializedDeferredRuntime.indicesEncoding, 'uint8-palette-zero-transparent-v2');
+const restoredDeferredRuntime = model.deserializeLayerFromDocument(
+  serializedDeferredRuntime,
+  pixelCount,
+  'runtime-direct-layer',
+  'Runtime direct layer',
+  512,
+  512,
+  { trustStoredLayerFlags: true }
+);
+assert.ok(restoredDeferredRuntime.indices instanceof Uint8Array, 'serialized runtime indices restore as Uint8');
+assert.equal(restoredDeferredRuntime.indices.length, pixelCount, 'restored runtime index buffer keeps canvas size');
+assert.deepEqual(Array.from(restoredDeferredRuntime.direct.subarray(0, 4)), [90, 80, 70, 255]);
+
+const malformedBuild116Runtime = {
+  ...serializedDeferredRuntime,
+  indices: new Int16Array(pixelCount).fill(-1),
+  indicesEncoding: 'uint8-palette-zero-transparent-v2',
+};
+const recoveredBuild116Runtime = model.deserializeLayerFromDocument(
+  malformedBuild116Runtime,
+  pixelCount,
+  'runtime-direct-layer',
+  'Runtime direct layer',
+  512,
+  512,
+  { trustStoredLayerFlags: true }
+);
+assert.ok(recoveredBuild116Runtime.indices instanceof Uint8Array, 'Build 116 runtime payloads recover to Uint8');
+assert.equal(recoveredBuild116Runtime.indices.length, pixelCount, 'Build 116 recovery restores full index buffer');
+assert.equal(recoveredBuild116Runtime.indices[0], 0, 'legacy transparent marker is recovered as runtime transparency');
+
+const recoveredBuild116EncodedRuntime = model.deserializeLayerFromDocument(
+  {
+    ...malformedBuild116Runtime,
+    indices: Buffer.from(
+      malformedBuild116Runtime.indices.buffer,
+      malformedBuild116Runtime.indices.byteOffset,
+      malformedBuild116Runtime.indices.byteLength
+    ).toString('base64'),
+  },
+  pixelCount,
+  'runtime-direct-layer',
+  'Runtime direct layer',
+  512,
+  512,
+  { trustStoredLayerFlags: true }
+);
+assert.ok(recoveredBuild116EncodedRuntime.indices instanceof Uint8Array, 'encoded Build 116 payloads recover to Uint8');
+assert.equal(recoveredBuild116EncodedRuntime.indices.length, pixelCount, 'encoded Build 116 recovery restores full index buffer');
+
 console.log(JSON.stringify({
   pixelCount,
   typedByteLength: indices.byteLength + direct.byteLength,
@@ -148,4 +220,7 @@ console.log(JSON.stringify({
   internalDirectType: internal.direct.constructor.name,
   externalIndicesType: typeof external.indices,
   externalDirectType: typeof external.direct,
+  deferredRuntimeIndexLength: serializedDeferredRuntime.indices.length,
+  recoveredBuild116IndexLength: recoveredBuild116Runtime.indices.length,
+  recoveredBuild116EncodedIndexLength: recoveredBuild116EncodedRuntime.indices.length,
 }, null, 2));
