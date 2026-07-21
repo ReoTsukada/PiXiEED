@@ -4296,6 +4296,8 @@
   set getScopedStorageKey(value) { getScopedStorageKey = value; },
   get hasDocumentUnsavedChanges() { return hasDocumentUnsavedChanges; },
   set hasDocumentUnsavedChanges(value) { hasDocumentUnsavedChanges = value; },
+  get HISTORY_ENTRY_TYPE_PIXEL_PATCH() { return HISTORY_ENTRY_TYPE_PIXEL_PATCH; },
+  set HISTORY_ENTRY_TYPE_PIXEL_PATCH(value) { HISTORY_ENTRY_TYPE_PIXEL_PATCH = value; },
   get history() { return history; },
   set history(value) { history = value; },
   get isCurrentProjectSharedEntry() { return isCurrentProjectSharedEntry; },
