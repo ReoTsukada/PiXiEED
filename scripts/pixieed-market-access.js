@@ -17,10 +17,32 @@
     if (!clientPromise) {
       clientPromise = import('https://esm.sh/@supabase/supabase-js@2.46.1?bundle')
         .then(({ createClient }) => createClient(SUPABASE_URL, SUPABASE_KEY, {
-          auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: AUTH_STORAGE_KEY }
-        }));
+          auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: AUTH_STORAGE_KEY },
+          global: { headers: { 'x-client-id': getClientId() } }
+        }))
+        .then((client) => {
+          window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT__ = client;
+          return client;
+        });
+      // Set this before the module import finishes. Other page modules can
+      // then await this exact client instead of creating a second GoTrueClient.
+      window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT_PROMISE__ = clientPromise;
     }
     return clientPromise;
+  }
+
+  function getClientId() {
+    try {
+      const key = 'pixieed_client_id';
+      const existing = window.localStorage.getItem(key) || window.PIXIEED_CLIENT_ID || '';
+      if (existing) return existing;
+      const created = `guest-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+      window.localStorage.setItem(key, created);
+      window.PIXIEED_CLIENT_ID = created;
+      return created;
+    } catch (_error) {
+      return 'browser';
+    }
   }
 
   async function check(options = {}) {
