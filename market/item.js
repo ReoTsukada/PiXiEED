@@ -160,6 +160,15 @@
     setPurchaseState({ disabled: true, label: '支払い確認中', status: 'Stripeからの確認を待っています。しばらくしてからマイページを確認してください。' });
   }
 
+  async function reconcilePaidPurchase() {
+    if (!purchaseClient || !currentAsset) return false;
+    const { data, error } = await purchaseClient.functions.invoke('market-reconcile-purchase', {
+      body: { asset_id: currentAsset.id }
+    });
+    if (error || !data?.ok) throw new Error(data?.error || await functionErrorMessage(error, '購入済み決済を照合できませんでした'));
+    return data.reconciled === true;
+  }
+
   async function createPurchaseIntent() {
     if (!purchaseClient || !purchaseUser || !currentAsset) return;
     setPurchaseState({ disabled: true, label: 'Stripeを開いています', status: '商品と販売料金をサーバーで確認しています。' });
@@ -250,6 +259,16 @@
       if (purchaseResult === 'success') {
         setPurchaseState({ disabled: true, label: '支払いを確認しています', status: 'Stripeから購入結果を確認しています。購入済みへの反映には少し時間がかかる場合があります。' });
         await waitForPaidPurchase();
+        const purchaseAfterWait = await findExistingPurchase();
+        if (purchaseAfterWait?.status !== 'paid') {
+          setPurchaseState({ disabled: true, label: '決済を照合しています', status: 'Webhook未到達の決済を安全に照合しています。' });
+          await reconcilePaidPurchase();
+          const reconciledPurchase = await findExistingPurchase();
+          if (reconciledPurchase?.status === 'paid') {
+            setPurchaseState({ disabled: true, label: '購入済み', status: '決済を確認し、購入済み商品へ追加しました。マイページから確認できます。' });
+            return;
+          }
+        }
         return;
       }
       setPurchaseState({
