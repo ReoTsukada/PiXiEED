@@ -103,6 +103,6 @@ assert.match(index, /export-rendering\.js\?v=20260721-runtime-index8-output1/);
 assert.match(index, /dialog-setup-utils\.js\?v=20260720-export-batch-direct1/);
 assert.match(index, /export-dialog-workflow-utils\.js\?v=20260720-export-batch-snapshot1/);
 assert.match(index, /export-normalizer-utils\.js\?v=20260720-export-batchzip1/);
-assert.match(index, /app\.js\?v=20260721-117/);
+assert.match(index, /app\.js\?v=20260721-122/);
 
 console.log('PiXiEEDraw export runtime wiring and preview-cost checks passed');
