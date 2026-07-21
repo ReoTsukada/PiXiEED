@@ -318,6 +318,10 @@
           deferTimelapseSnapshots: trustedAutosaveSchemaVersion === 2,
           reuseTypedArrays: trustedAutosaveSchemaVersion === 2,
           trustStoredLayerFlags: trustedAutosaveSchemaVersion === 2,
+          // IndexedDB V2 checkpoints can be interrupted while their typed
+          // index plane is being replaced. Keep readable pixels and restore
+          // the missing tail as transparent instead of rejecting the project.
+          recoverTruncatedRasterLayers: trustedAutosaveSchemaVersion === 2,
         });
     } catch (error) {
       console.warn('Failed to parse in-memory project payload', error);
@@ -1391,6 +1395,7 @@
     const snapshot = deserializeDocumentPayload(payload, {
       reuseTypedArrays: options?.reuseTypedArrays === true,
       trustStoredLayerFlags: options?.trustStoredLayerFlags === true,
+      recoverTruncatedRasterLayers: options?.recoverTruncatedRasterLayers === true,
     });
     const projectSession = hasPackagedDocument
       ? parseProjectSessionPayload(
