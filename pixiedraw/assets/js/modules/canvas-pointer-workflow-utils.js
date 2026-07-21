@@ -1041,8 +1041,7 @@
 
     const selectionMask = state.selectionMask;
     const hasSelection = Boolean(selectionMask && selectionMaskHasPixels(selectionMask));
-    const selectionHit = hasSelection && isPositionInCurrentSelection(position);
-    const selectionInteractionHit = selectionHit;
+    const selectionInteractionHit = hasSelection && isPositionInCurrentSelectionInteractionArea(position);
     const isSelectionTool = activeTool === 'selectRect' || activeTool === 'selectLasso' || activeTool === 'selectSame' || activeTool === 'move';
     const pendingMoveState = !pointerState.active
       ? (getPendingSelectionMoveState() || state.pendingPasteMoveState)
@@ -1050,12 +1049,13 @@
     if (!pendingMoveState) {
       pointerState.selectionMove = null;
     }
-    const pendingSelectionHit = Boolean(pendingMoveState && isPositionInMoveState(position, pendingMoveState));
+    const pendingSelectionHit = Boolean(
+      pendingMoveState && isPositionInMoveVisualBounds(position, pendingMoveState)
+    );
     if (pendingMoveState) {
-      // Source mask stays in state until the floating selection is committed.
-      // It must not keep the old, now-empty source area draggable: only the
-      // visible moved preview continues the move. Every other click commits
-      // the pixels and clears the selection, matching Aseprite's behavior.
+      // Keep the floating selection active for its complete visible rectangle.
+      // This includes transparent pixels and interior holes, so an in-bounds
+      // press cannot accidentally commit or cancel the selection.
       if (isSelectionTool && pendingSelectionHit) {
         const moved = beginSelectionMove(event, position, { reuseOffset: true });
         if (moved) {
@@ -1882,7 +1882,7 @@
   }
 
   function isPositionInCurrentSelectionInteractionArea(position) {
-    return isPositionInCurrentSelection(position);
+    return isPositionInCurrentSelectionBounds(position);
   }
 
   function isPositionInMoveState(position, moveState) {
@@ -2319,9 +2319,15 @@
         const base = canvasIndex * 4;
         recordPendingPixelPatchBefore(layer, canvasIndex);
         const previousIndex = layer.indices[canvasIndex];
+        const previousPaletteIndex = typeof getStoredRasterLayerPaletteIndex === 'function'
+          ? getStoredRasterLayerPaletteIndex(layer, canvasIndex)
+          : previousIndex;
+        const previousDirect = layerDirect && base + 3 < layerDirect.length
+          ? [layerDirect[base], layerDirect[base + 1], layerDirect[base + 2], layerDirect[base + 3]]
+          : null;
         let previousAlpha = 0;
-        if (previousIndex >= 0 && state.palette[previousIndex]) {
-          previousAlpha = state.palette[previousIndex].a;
+        if (previousPaletteIndex >= 0 && state.palette[previousPaletteIndex] && state.palette[previousPaletteIndex].a > 0) {
+          previousAlpha = state.palette[previousPaletteIndex].a;
         } else if (layerDirect) {
           previousAlpha = layerDirect[base + 3];
         }
@@ -2329,6 +2335,7 @@
           ? getRasterLayerTransparentStorageValue(layer)
           : -1;
         let nextIndex = transparentValue;
+        let nextPaletteIndex = -1;
         let nextAlpha = 0;
         if (restoreIndices) {
           nextIndex = restoreIndices[localIndex] ?? transparentValue;
@@ -2336,6 +2343,9 @@
         } else {
           layer.indices[canvasIndex] = transparentValue;
         }
+        nextPaletteIndex = typeof getStoredRasterLayerPaletteIndex === 'function'
+          ? getStoredRasterLayerPaletteIndex(layer, canvasIndex)
+          : nextIndex;
         if (layerDirect) {
           if (restoreDirect) {
             const localBase = localIndex * 4;
@@ -2343,16 +2353,16 @@
             layerDirect[base + 1] = restoreDirect[localBase + 1];
             layerDirect[base + 2] = restoreDirect[localBase + 2];
             layerDirect[base + 3] = restoreDirect[localBase + 3];
-            if (nextIndex >= 0 && state.palette[nextIndex]) {
-              nextAlpha = writePaletteColorToDirectPixel(layerDirect, base, nextIndex);
+            if (nextPaletteIndex >= 0 && state.palette[nextPaletteIndex]) {
+              nextAlpha = writePaletteColorToDirectPixel(layerDirect, base, nextPaletteIndex);
             } else {
               nextAlpha = restoreDirect[localBase + 3];
             }
           } else {
-            nextAlpha = nextIndex >= 0
-              ? writePaletteColorToDirectPixel(layerDirect, base, nextIndex)
+            nextAlpha = nextPaletteIndex >= 0
+              ? writePaletteColorToDirectPixel(layerDirect, base, nextPaletteIndex)
               : 0;
-            if (nextIndex < 0) {
+            if (nextPaletteIndex < 0) {
               clearDirectPixel(layerDirect, base);
             }
           }
@@ -2363,7 +2373,13 @@
             nextAlpha = 0;
           }
         }
-        if (layer.indices[canvasIndex] !== previousIndex || nextAlpha !== previousAlpha) {
+        const directChanged = previousDirect && (
+          previousDirect[0] !== layerDirect[base]
+          || previousDirect[1] !== layerDirect[base + 1]
+          || previousDirect[2] !== layerDirect[base + 2]
+          || previousDirect[3] !== layerDirect[base + 3]
+        );
+        if (layer.indices[canvasIndex] !== previousIndex || nextAlpha !== previousAlpha || directChanged) {
           modified = true;
         }
         recordPendingPixelPatchAfter(layer, canvasIndex);
