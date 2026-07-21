@@ -40,6 +40,7 @@
     CANCELLED_UNTIL_ALL_UP: 'cancelled-until-all-up',
   });
   const VIEWPORT_GESTURE_CONFIG = viewportGestureArbiter.VIEWPORT_GESTURE_CONFIG || {};
+  const COMPRESSED_SELECTION_MOVE_MIN_PIXELS = 32768;
 
   function detachPointerListeners() {
     window.removeEventListener('pointermove', handlePointerMove);
@@ -2245,6 +2246,7 @@
       // rather than replacing it with a post-paste selectionMove snapshot.
       if (!moveState.fromPastePlacement) {
         beginHistory('selectionMove');
+        prepareCompressedSelectionMoveHistory(moveState);
       }
       clearSelectionSourcePixels(moveState);
     }
@@ -2286,6 +2288,59 @@
     return true;
   }
 
+  function prepareCompressedSelectionMoveHistory(moveState) {
+    if (
+      !moveState
+      || moveState.fromPastePlacement
+      || moveState.restoreIndices
+      || moveState.restoreDirect
+      || moveState.compressedSelectionMoveHistory
+      || !(history.pending?.changesByIndex instanceof Map)
+    ) {
+      return false;
+    }
+    const moveWidth = Math.max(0, Math.round(Number(moveState.width) || 0));
+    const moveHeight = Math.max(0, Math.round(Number(moveState.height) || 0));
+    const sourceMask = getSelectionMoveContentMask(moveState);
+    const sourceIndices = moveState.indices;
+    if (
+      moveWidth * moveHeight <= COMPRESSED_SELECTION_MOVE_MIN_PIXELS
+      || !(sourceMask instanceof Uint8Array)
+      || sourceMask.length !== moveWidth * moveHeight
+      || !(sourceIndices instanceof Int16Array || sourceIndices instanceof Uint8Array)
+    ) {
+      return false;
+    }
+    const IndexArray = sourceIndices instanceof Uint8Array ? Uint8Array : Int16Array;
+    moveState.compressedSelectionMoveHistory = {
+      __historyEntryType: HISTORY_ENTRY_TYPE_PIXEL_PATCH,
+      version: 2,
+      kind: 'selection-move-compressed',
+      historyLabel: history.pending.label || 'selectionMove',
+      canvasId: history.pending.canvasId,
+      frameId: history.pending.frameId,
+      layerId: history.pending.layerId,
+      width: history.pending.width,
+      height: history.pending.height,
+      sourceX: Math.round(Number(moveState.bounds?.x0) || 0),
+      sourceY: Math.round(Number(moveState.bounds?.y0) || 0),
+      moveWidth,
+      moveHeight,
+      sourceMask,
+      sourceIndices,
+      sourceDirect: moveState.direct instanceof Uint8ClampedArray ? moveState.direct : null,
+      targetPositions: new Int32Array(0),
+      targetBeforeIndices: new IndexArray(0),
+      targetAfterIndices: new IndexArray(0),
+      targetBeforeDirect: null,
+      targetAfterDirect: null,
+    };
+    // Store the source-only form immediately so Escape/cancel can restore the
+    // cleared source without rebuilding per-pixel patch objects.
+    history.pending.compressedSelectionMove = moveState.compressedSelectionMoveHistory;
+    return true;
+  }
+
   function clearSelectionSourcePixels(moveState, options = {}) {
     const { layer, bounds, width, height } = moveState;
     const useSelectionMask = Boolean(options && options.useSelectionMask);
@@ -2317,7 +2372,9 @@
         if (canvasX < 0 || canvasY < 0 || canvasX >= state.width || canvasY >= state.height) continue;
         const canvasIndex = canvasY * state.width + canvasX;
         const base = canvasIndex * 4;
-        recordPendingPixelPatchBefore(layer, canvasIndex);
+        if (!moveState.compressedSelectionMoveHistory) {
+          recordPendingPixelPatchBefore(layer, canvasIndex);
+        }
         const previousIndex = layer.indices[canvasIndex];
         const previousPaletteIndex = typeof getStoredRasterLayerPaletteIndex === 'function'
           ? getStoredRasterLayerPaletteIndex(layer, canvasIndex)
@@ -2382,7 +2439,9 @@
         if (layer.indices[canvasIndex] !== previousIndex || nextAlpha !== previousAlpha || directChanged) {
           modified = true;
         }
-        recordPendingPixelPatchAfter(layer, canvasIndex);
+        if (!moveState.compressedSelectionMoveHistory) {
+          recordPendingPixelPatchAfter(layer, canvasIndex);
+        }
       }
     }
     if (modified) {
@@ -2488,6 +2547,13 @@
         ? 'selectionTransform'
         : 'selectionMove'
     );
+    if (
+      moveState.compressedSelectionMoveHistory
+      && history.pending
+      && moveState.compressedSelectionMoveHistory.targetPositions instanceof Int32Array
+    ) {
+      history.pending.compressedSelectionMove = moveState.compressedSelectionMoveHistory;
+    }
     markHistoryDirty();
     requestRender();
     requestOverlayRender();
@@ -2615,6 +2681,11 @@
     const targetDirect = (sourceDirectHasVisiblePixels || contentHasDirectPixels || existingTargetDirect)
       ? (existingTargetDirect || ensureLayerDirect(layer))
       : null;
+    const compressedMove = moveState.compressedSelectionMoveHistory || null;
+    const compressedTargetPositions = compressedMove ? [] : null;
+    const compressedTargetBeforeIndices = compressedMove ? [] : null;
+    const compressedTargetBeforeDirect = compressedMove && targetDirect ? [] : null;
+    const compressedTargetSeen = compressedMove ? new Set() : null;
 
     for (let i = 0; i < contentEntries.length; i += 1) {
       const entry = contentEntries[i];
@@ -2637,7 +2708,23 @@
           ? getRasterLayerTransparentStorageValue(layer)
           : -1)
         : indices[sourceIndex];
-      recordPendingPixelPatchBefore(layer, targetIndex);
+      if (compressedMove) {
+        if (!compressedTargetSeen.has(targetIndex)) {
+          compressedTargetSeen.add(targetIndex);
+          compressedTargetPositions.push(targetIndex);
+          compressedTargetBeforeIndices.push(layer.indices[targetIndex]);
+          if (compressedTargetBeforeDirect) {
+            compressedTargetBeforeDirect.push(
+              targetDirect[targetBase],
+              targetDirect[targetBase + 1],
+              targetDirect[targetBase + 2],
+              targetDirect[targetBase + 3]
+            );
+          }
+        }
+      } else {
+        recordPendingPixelPatchBefore(layer, targetIndex);
+      }
       layer.indices[targetIndex] = nextPaletteIndex;
       newContentMask[targetIndex] = 1;
       if (targetDirect) {
@@ -2665,7 +2752,41 @@
       if (!placed) {
         placed = true;
       }
-      recordPendingPixelPatchAfter(layer, targetIndex);
+      if (!compressedMove) {
+        recordPendingPixelPatchAfter(layer, targetIndex);
+      }
+    }
+    if (compressedMove) {
+      const count = compressedTargetPositions.length;
+      const IndexArray = layer.indices instanceof Uint8Array ? Uint8Array : Int16Array;
+      const targetPositions = new Int32Array(count);
+      const targetBeforeIndices = new IndexArray(count);
+      const targetAfterIndices = new IndexArray(count);
+      const targetBeforeDirect = compressedTargetBeforeDirect ? new Uint8ClampedArray(count * 4) : null;
+      const targetAfterDirect = compressedTargetBeforeDirect ? new Uint8ClampedArray(count * 4) : null;
+      for (let i = 0; i < count; i += 1) {
+        const targetIndex = compressedTargetPositions[i];
+        targetPositions[i] = targetIndex;
+        targetBeforeIndices[i] = compressedTargetBeforeIndices[i];
+        targetAfterIndices[i] = layer.indices[targetIndex];
+        if (targetBeforeDirect && targetAfterDirect) {
+          const base = i * 4;
+          const targetBase = targetIndex * 4;
+          targetBeforeDirect[base] = compressedTargetBeforeDirect[base];
+          targetBeforeDirect[base + 1] = compressedTargetBeforeDirect[base + 1];
+          targetBeforeDirect[base + 2] = compressedTargetBeforeDirect[base + 2];
+          targetBeforeDirect[base + 3] = compressedTargetBeforeDirect[base + 3];
+          targetAfterDirect[base] = targetDirect[targetBase];
+          targetAfterDirect[base + 1] = targetDirect[targetBase + 1];
+          targetAfterDirect[base + 2] = targetDirect[targetBase + 2];
+          targetAfterDirect[base + 3] = targetDirect[targetBase + 3];
+        }
+      }
+      compressedMove.targetPositions = targetPositions;
+      compressedMove.targetBeforeIndices = targetBeforeIndices;
+      compressedMove.targetAfterIndices = targetAfterIndices;
+      compressedMove.targetBeforeDirect = targetBeforeDirect;
+      compressedMove.targetAfterDirect = targetAfterDirect;
     }
     if (placed) {
       refreshLayerDirectOnlyFlag(layer);
@@ -2960,7 +3081,7 @@
     if (!(mask instanceof Uint8Array) || width <= 0 || height <= 0 || mask.length !== width * height) {
       return [];
     }
-    if (width * height > SELECTION_TRANSFORM_LARGE_PREVIEW_MAX_PIXELS) {
+    if (width * height > Math.min(SELECTION_TRANSFORM_LARGE_PREVIEW_MAX_PIXELS, 32768)) {
       return [
         0, 0, width, 0,
         width, 0, width, height,
