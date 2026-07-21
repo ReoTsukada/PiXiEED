@@ -102,7 +102,7 @@
           { id: 'fullscreen', label: '拡大', selector: '#fullscreenButton', icon: '拡大.png', iconWhenPressed: '縮小.png', mirrorState: true, mode: 'fullscreen', fullscreenController: 'tool', placement: 'leading' },
         ],
         details: [
-          { label: 'ショートカット一覧', selector: '#openShortcutHelp', icon: 'pixiedraw/assets/icons/ecticon_frame_02.png' },
+          { label: 'ショートカット一覧', selector: '#openShortcutHelp', icon: 'pixiedraw/assets/icons/short_cut.png?v=20260721-icons1' },
           { label: '使い方ヘルプ', selector: '#openOperationHelpPanel', icon: 'assets/icons/help.png?v=2026.07.17-icons1' },
           { label: '更新情報', selector: '#openUpdateHistory', icon: 'pixiedraw/assets/icons/ecticon_frame_04.png' },
           { label: 'アプリとして使う', selector: '#pixieedPwaInstallButton', icon: 'assets/icons/Draw.png?v=2026.07.19-ui-icons1', mirrorDisabled: true },
