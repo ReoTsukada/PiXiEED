@@ -80,6 +80,11 @@
     return pixelCount > 0 && pixelCount <= SELECTION_TRANSFORM_LARGE_PREVIEW_MAX_PIXELS;
   }
 
+  // These lists only avoid scanning the local mask again during a later
+  // transform/finalize. For large selections, keeping millions of JavaScript
+  // numbers is slower and more memory-hungry than that later linear scan.
+  const SELECTION_MOVE_SOURCE_INDEX_LIST_LIMIT = 32768;
+
   function createSelectionMoveState(layer, bounds, mask, sourceContentMask = null) {
     if (!layer || !bounds || !mask) {
       return null;
@@ -95,13 +100,15 @@
     const localContentMask = new Uint8Array(size);
     const localIndices = createSelectionIndexArray(layer, size);
     const transparentValue = getSelectionTransparentValue(layer);
-    const localDirect = new Uint8ClampedArray(size * 4);
-    const selectedSourceIndices = [];
-    const contentSourceIndices = [];
+    const layerDirect = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
+    // Indexed layers do not need an RGBA copy. Avoid allocating four extra
+    // bytes per selected cell before the user has moved anything.
+    const localDirect = layerDirect ? new Uint8ClampedArray(size * 4) : null;
+    let selectedSourceIndices = [];
+    let contentSourceIndices = [];
     const shouldCreatePreviewBitmap = shouldCreateSelectionMoveBitmapPreview(width, height);
     const imageData = shouldCreatePreviewBitmap ? createBlankImageData(width, height) : null;
 
-    const layerDirect = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
     const hasSourceContentMask = sourceContentMask instanceof Uint8Array && sourceContentMask.length === mask.length;
 
     for (let y = 0; y < height; y += 1) {
@@ -121,18 +128,10 @@
           const paletteIndex = typeof getStoredRasterLayerPaletteIndex === 'function'
             ? getStoredRasterLayerPaletteIndex(layer, canvasIndex)
             : layer.indices[canvasIndex];
-          const fallbackColor = {
-            r: layerDirect ? layerDirect[canvasBase] : 0,
-            g: layerDirect ? layerDirect[canvasBase + 1] : 0,
-            b: layerDirect ? layerDirect[canvasBase + 2] : 0,
-            a: layerDirect ? layerDirect[canvasBase + 3] : 0,
-          };
-          const sourceColor = paletteIndex >= 0 && state.palette[paletteIndex]
-            ? state.palette[paletteIndex]
-            : fallbackColor;
+          const paletteColor = paletteIndex >= 0 ? state.palette[paletteIndex] : null;
           const hasContent = hasSourceContentMask
             ? sourceContentMask[canvasIndex] === 1
-            : (Number(sourceColor?.a) || 0) > 0;
+            : (paletteColor ? Number(paletteColor.a) > 0 : Boolean(layerDirect && layerDirect[canvasBase + 3] > 0));
           // Direct-color pixels do not have a palette index. Preserve the
           // layer's native transparent sentinel here: Int16 uses -1 while the
           // new Uint8 runtime uses 0. Coercing Int16 direct pixels to 0 makes
@@ -140,23 +139,18 @@
           localIndices[localIndex] = hasContent && paletteIndex >= 0
             ? paletteIndex
             : transparentValue;
-          if (layerDirect) {
+          if (layerDirect && localDirect) {
             localDirect[localBase] = hasContent ? layerDirect[canvasBase] : 0;
             localDirect[localBase + 1] = hasContent ? layerDirect[canvasBase + 1] : 0;
             localDirect[localBase + 2] = hasContent ? layerDirect[canvasBase + 2] : 0;
             localDirect[localBase + 3] = hasContent ? layerDirect[canvasBase + 3] : 0;
-          } else {
-            localDirect[localBase] = 0;
-            localDirect[localBase + 1] = 0;
-            localDirect[localBase + 2] = 0;
-            localDirect[localBase + 3] = 0;
           }
           if (imageData) {
             if (hasContent) {
-              imageData.data[localBase] = sourceColor.r;
-              imageData.data[localBase + 1] = sourceColor.g;
-              imageData.data[localBase + 2] = sourceColor.b;
-              imageData.data[localBase + 3] = sourceColor.a;
+              imageData.data[localBase] = paletteColor ? paletteColor.r : (layerDirect ? layerDirect[canvasBase] : 0);
+              imageData.data[localBase + 1] = paletteColor ? paletteColor.g : (layerDirect ? layerDirect[canvasBase + 1] : 0);
+              imageData.data[localBase + 2] = paletteColor ? paletteColor.b : (layerDirect ? layerDirect[canvasBase + 2] : 0);
+              imageData.data[localBase + 3] = paletteColor ? paletteColor.a : (layerDirect ? layerDirect[canvasBase + 3] : 0);
             } else {
               imageData.data[localBase] = 0;
               imageData.data[localBase + 1] = 0;
@@ -166,9 +160,19 @@
           }
           if (hasContent) {
             localContentMask[localIndex] = 1;
-            contentSourceIndices.push(localIndex);
+            if (contentSourceIndices) {
+              contentSourceIndices.push(localIndex);
+              if (contentSourceIndices.length > SELECTION_MOVE_SOURCE_INDEX_LIST_LIMIT) {
+                contentSourceIndices = null;
+              }
+            }
           }
-          selectedSourceIndices.push(localIndex);
+          if (selectedSourceIndices) {
+            selectedSourceIndices.push(localIndex);
+            if (selectedSourceIndices.length > SELECTION_MOVE_SOURCE_INDEX_LIST_LIMIT) {
+              selectedSourceIndices = null;
+            }
+          }
         } else {
           localIndices[localIndex] = transparentValue;
           if (imageData) {
