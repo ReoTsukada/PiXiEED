@@ -47,8 +47,8 @@ serve(async (request) => {
     if (!UUID_PATTERN.test(purchaseId) || !Number.isInteger(grossAmount) || grossAmount < 0) {
       throw new Error("購入内容を準備できませんでした");
     }
-    if (grossAmount < 100 || grossAmount > 99999999) {
-      throw new Error("購入できる金額は100円以上99,999,999円以下です");
+    if (grossAmount < 500 || grossAmount > 99999999) {
+      throw new Error("購入できる金額は500円以上99,999,999円以下です");
     }
 
     const { data: purchase, error: purchaseError } = await admin

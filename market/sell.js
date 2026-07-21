@@ -10,7 +10,7 @@
   const MAX_SAMPLE_PREVIEWS = 6;
   const MAX_TAGS = 5;
   const MAX_CUSTOM_OPTIONS = 10;
-  const MIN_PAID_PRICE_YEN = 100;
+  const MIN_LISTING_PRICE_YEN = 500;
   const PRICE_STEP_YEN = 100;
   const MAX_LISTING_PRICE_YEN = 99999900;
   const MAX_OPTION_PRICE_YEN = 10000000;
@@ -30,9 +30,9 @@
   };
   const RASTER_FORMATS = new Set(['png', 'sprite-sheet-png', 'webp', 'gif', 'apng']);
   const FALLBACK_OPTIONS = [
-    { id: 'commercial-use', label: '商用・収益化利用', description: 'ゲーム、アプリ、動画、配信、広告などに利用できます。', minimum_price_yen: 500, sort_order: 10 },
-    { id: 'merchandise-use', label: 'グッズ・印刷販売', description: 'グッズや印刷物を制作して販売できます。', minimum_price_yen: 1000, sort_order: 20 },
-    { id: 'credit-omission', label: 'クレジット表記不要', description: '利用時の作者名表記を省略できます。', minimum_price_yen: 300, sort_order: 30 }
+    { id: 'commercial-use', label: '商用・収益化利用', description: 'ゲーム、アプリ、動画、配信、広告などに利用できます。', minimum_price_yen: 0, sort_order: 10 },
+    { id: 'merchandise-use', label: 'グッズ・印刷販売', description: 'グッズや印刷物を制作して販売できます。', minimum_price_yen: 0, sort_order: 20 },
+    { id: 'credit-omission', label: 'クレジット表記不要', description: '利用時の作者名表記を省略できます。', minimum_price_yen: 0, sort_order: 30 }
   ];
   const pageParams = new URLSearchParams(window.location.search);
   const sourceAssetId = pageParams.get('source_asset_id') || '';
@@ -52,7 +52,7 @@
   const optionPrices = new Map();
   const listingTagValues = [];
   let customOptions = [];
-  let limitedOptionPrice = MIN_PAID_PRICE_YEN;
+  let limitedOptionPrice = 0;
   const samplePreviewPaths = new Set();
   const previewUrls = new Map();
   let detectedEntries = [];
@@ -88,8 +88,8 @@
     const normalized = String(value ?? '').replace(/[,，\s]/g, '');
     return /^[0-9]+$/.test(normalized) ? Number(normalized) : NaN;
   };
-  const minimumPrice = (value = MIN_PAID_PRICE_YEN) => Math.ceil(Math.max(MIN_PAID_PRICE_YEN, Number(value) || 0) / PRICE_STEP_YEN) * PRICE_STEP_YEN;
-  const normalizedPaidPrice = (value, minimum = MIN_PAID_PRICE_YEN, maximum = MAX_OPTION_PRICE_YEN) => {
+  const minimumPrice = (value = 0) => Math.ceil(Math.max(0, Number(value) || 0) / PRICE_STEP_YEN) * PRICE_STEP_YEN;
+  const normalizedPaidPrice = (value, minimum = 0, maximum = MAX_OPTION_PRICE_YEN) => {
     const floor = minimumPrice(minimum);
     const ceiling = Math.floor(maximum / PRICE_STEP_YEN) * PRICE_STEP_YEN;
     const parsed = integerValue(value);
@@ -212,18 +212,18 @@
     dismissedFormats.clear(); (draft.dismissedFormats || []).forEach((value) => dismissedFormats.add(value));
     selectedOptionIds.clear(); (draft.selectedOptionIds || []).forEach((value) => selectedOptionIds.add(value));
     optionPrices.clear(); (draft.optionPrices || []).forEach(([id, value]) => optionPrices.set(id, Number(value)));
-    limitedOptionPrice = normalizedPaidPrice(draft.limitedOptionPrice, MIN_PAID_PRICE_YEN, MAX_OPTION_PRICE_YEN);
+    limitedOptionPrice = 0;
     listingTagValues.splice(0, listingTagValues.length, ...(draft.tags || []).slice(0, MAX_TAGS));
     customOptions = Array.isArray(draft.customOptions)
       ? draft.customOptions.slice(0, MAX_CUSTOM_OPTIONS).map((option) => ({
         ...option,
-        price_yen: normalizedPaidPrice(option.price_yen, MIN_PAID_PRICE_YEN, MAX_OPTION_PRICE_YEN)
+        price_yen: 0
       }))
       : [];
     thumbnailPath = String(draft.thumbnailPath || '');
     samplePreviewPaths.clear(); (draft.samplePreviewPaths || []).forEach((value) => samplePreviewPaths.add(value));
     previewSelectionTouched = Boolean(draft.previewSelectionTouched);
-    renderTags(); updateLimitedState(); renderOptions(); renderOptionPriceFields(); renderCustomOptions(); updatePrice();
+    customOptions = []; renderTags(); updateLimitedState(); renderOptions(); updatePrice();
     await refreshDetectedFiles();
     listingDraftLoaded = true;
     setStatus('端末に保存された出品下書きを復元しました。');
@@ -238,18 +238,10 @@
 
   function updatePrice() {
     const salePrice = Math.max(0, integerValue($('listingPrice').value) || 0);
-    const optionPrice = optionCatalog.reduce((total, option) => (
-      selectedOptionIds.has(option.id) ? total + optionPriceFor(option) : total
-    ), 0) + customOptions.reduce((total, option) => total + option.price_yen, 0)
-      + ($('listingLimitedEnabled').checked ? limitedOptionPrice : 0);
-    $('listingOptionPrice').textContent = yen(optionPrice);
-    $('listingLimitedPriceLabel').textContent = `+${yen(limitedOptionPrice)}`;
-    const purchasePrice = salePrice + optionPrice;
-    $('listingTotalPrice').textContent = yen(purchasePrice);
-    $('listingTotalPrice').classList.toggle('is-below-minimum', purchasePrice < MIN_PAID_PRICE_YEN);
+    $('listingLimitedPriceLabel').textContent = '価格に含む';
   }
 
-  function normalizePriceInput(input, minimum = MIN_PAID_PRICE_YEN, maximum = MAX_OPTION_PRICE_YEN) {
+  function normalizePriceInput(input, minimum = 0, maximum = MAX_OPTION_PRICE_YEN) {
     const value = normalizedPaidPrice(input.value, minimum, maximum);
     input.value = String(value);
     input.setCustomValidity('');
@@ -259,7 +251,7 @@
   function populatePricePresets() {
     const appendValues = (list, maximum) => {
       const values = [];
-      for (let value = MIN_PAID_PRICE_YEN; value <= 10000; value += PRICE_STEP_YEN) values.push(value);
+      for (let value = MIN_LISTING_PRICE_YEN; value <= 10000; value += PRICE_STEP_YEN) values.push(value);
       [20000, 30000, 50000, 100000, 300000, 500000, 1000000, maximum].forEach((value) => {
         if (value <= maximum && !values.includes(value)) values.push(value);
       });
@@ -299,36 +291,6 @@
     if (listingTagValues.some((value) => value.toLowerCase() === tag.toLowerCase())) { input.value = ''; return; }
     if (listingTagValues.length >= MAX_TAGS) { setStatus('タグは最大5個です。'); return; }
     listingTagValues.push(tag); input.value = ''; renderTags(); scheduleListingDraftSave();
-  }
-
-  function renderCustomOptions() {
-    $('listingCustomOptionList').replaceChildren(...(customOptions.length ? customOptions.map((option) => {
-      const card = document.createElement('article'); card.className = 'market-custom-option-card';
-      const copy = document.createElement('span');
-      const title = document.createElement('strong'); title.textContent = option.label;
-      const description = document.createElement('small'); description.textContent = option.description || '説明なし';
-      copy.append(title, description);
-      const price = document.createElement('b'); price.textContent = `+${yen(option.price_yen)}`;
-      const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = '削除'; remove.className = 'market-file-button is-subtle';
-      remove.addEventListener('click', () => {
-        customOptions = customOptions.filter((entry) => entry.id !== option.id);
-        renderCustomOptions(); updatePrice(); scheduleListingDraftSave();
-      });
-      card.append(copy, price, remove); return card;
-    }) : [Object.assign(document.createElement('p'), { className: 'helper', textContent: 'カスタムオプションはまだありません。' })]));
-  }
-
-  function addCustomOption() {
-    if (customOptions.length >= MAX_CUSTOM_OPTIONS) { setStatus(`カスタムオプションは最大${MAX_CUSTOM_OPTIONS}件です。`); return; }
-    const label = String($('listingCustomOptionLabel').value || '').trim().replace(/\s+/g, ' ');
-    const description = String($('listingCustomOptionDescription').value || '').trim().replace(/\s+/g, ' ');
-    const price = normalizePriceInput($('listingCustomOptionPrice'), MIN_PAID_PRICE_YEN, MAX_OPTION_PRICE_YEN);
-    if (!label) { setStatus('カスタムオプション名を入力してください。'); return; }
-    if (!Number.isInteger(price) || price < MIN_PAID_PRICE_YEN || price > MAX_OPTION_PRICE_YEN) { setStatus('カスタムオプション料金は100〜10,000,000円で設定してください。'); return; }
-    if (customOptions.some((option) => option.label.toLowerCase() === label.toLowerCase())) { setStatus('同じ名前のカスタムオプションがあります。'); return; }
-    customOptions.push({ id: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`, label, description, price_yen: price });
-    $('listingCustomOptionLabel').value = ''; $('listingCustomOptionDescription').value = ''; $('listingCustomOptionPrice').value = '100';
-    renderCustomOptions(); updatePrice(); scheduleListingDraftSave();
   }
 
   function updateLimitedState() {
@@ -378,10 +340,9 @@
     $('listingRightsLabel').textContent = '表示中の親作品を元にした派生作品であり、変更・追加内容を正しく申告しました。';
     $('listingDerivativeAllowed').checked = true;
     $('listingDerivativeAllowed').disabled = true;
-    $('listingPrice').min = String(minimumPrice(context.minimum_seller_price_yen));
+    $('listingPrice').min = String(Math.max(MIN_LISTING_PRICE_YEN, minimumPrice(context.minimum_seller_price_yen)));
     if (Number($('listingPrice').value) < Number($('listingPrice').min)) $('listingPrice').value = $('listingPrice').min;
     $('listingOptionsTitle').textContent = '継承される利用オプション';
-    $('listingCustomOptions').hidden = true;
     document.querySelector('.market-titlebar h1').textContent = '派生作品を出品';
     renderOptions(); renderOptionPriceFields(); updatePrice();
     return derivativeContext;
@@ -391,16 +352,12 @@
     const validIds = new Set(optionCatalog.map((option) => option.id));
     Array.from(optionPrices.keys()).forEach((id) => { if (!validIds.has(id)) optionPrices.delete(id); });
     optionCatalog.forEach((option) => {
-      const current = Number(optionPrices.get(option.id));
-      const minimum = minimumPrice(option.minimum_price_yen);
-      if (!Number.isInteger(current) || current < minimum || current % PRICE_STEP_YEN !== 0) optionPrices.set(option.id, minimum);
+      optionPrices.set(option.id, 0);
     });
   }
 
   function optionPriceFor(option) {
-    const value = Number(optionPrices.get(option.id));
-    const minimum = minimumPrice(option.minimum_price_yen);
-    return Number.isInteger(value) && value >= minimum && value % PRICE_STEP_YEN === 0 ? value : minimum;
+    return 0;
   }
 
   function switchCard({ title, description, meta, checked, disabled = false, onChange }) {
@@ -424,58 +381,17 @@
     $('listingOptionSwitches').replaceChildren(...optionCatalog.map((option) => switchCard({
       title: option.label,
       description: option.description,
-      meta: `+${yen(optionPriceFor(option))}`,
+      meta: '価格に含む',
       checked: selectedOptionIds.has(option.id),
       disabled: Boolean(derivativeContext),
       onChange: (checked) => {
         if (checked) selectedOptionIds.add(option.id); else selectedOptionIds.delete(option.id);
-        renderOptionPriceFields(); updatePrice(); scheduleListingDraftSave();
+        updatePrice(); scheduleListingDraftSave();
       }
     })));
   }
 
-  function renderOptionPriceFields() {
-    syncOptionPrices();
-    const selected = derivativeContext ? [] : optionCatalog.filter((option) => selectedOptionIds.has(option.id));
-    const fields = selected.map((option) => {
-      const label = document.createElement('label'); label.className = 'market-option-price-field';
-      const title = document.createElement('span'); title.textContent = option.label;
-      const minimumValue = minimumPrice(option.minimum_price_yen);
-      const minimum = document.createElement('small'); minimum.textContent = `最低 ${yen(minimumValue)}・100円単位`;
-      const input = document.createElement('input'); input.type = 'text'; input.inputMode = 'numeric'; input.pattern = '[0-9]*'; input.maxLength = 8; input.setAttribute('list', 'listingOptionPricePresets'); input.value = String(optionPriceFor(option));
-      input.addEventListener('input', () => {
-        const value = integerValue(input.value);
-        if (Number.isInteger(value)) optionPrices.set(option.id, value);
-        updatePrice(); scheduleListingDraftSave();
-      });
-      input.addEventListener('change', () => {
-        optionPrices.set(option.id, normalizePriceInput(input, minimumValue, MAX_OPTION_PRICE_YEN));
-        renderOptions(); renderOptionPriceFields(); updatePrice(); scheduleListingDraftSave();
-      });
-      label.append(title, minimum, input); return label;
-    });
-    if ($('listingLimitedEnabled').checked) {
-      const label = document.createElement('label'); label.className = 'market-option-price-field';
-      const title = document.createElement('span'); title.textContent = '限定販売';
-      const minimum = document.createElement('small'); minimum.textContent = '最低 100円・100円単位';
-      const input = document.createElement('input'); input.type = 'text'; input.inputMode = 'numeric'; input.pattern = '[0-9]*'; input.maxLength = 8; input.setAttribute('list', 'listingOptionPricePresets'); input.value = String(limitedOptionPrice);
-      input.addEventListener('input', () => {
-        const value = integerValue(input.value);
-        if (Number.isInteger(value)) limitedOptionPrice = value;
-        updatePrice(); scheduleListingDraftSave();
-      });
-      input.addEventListener('change', () => {
-        limitedOptionPrice = normalizePriceInput(input, MIN_PAID_PRICE_YEN, MAX_OPTION_PRICE_YEN);
-        renderOptionPriceFields(); updatePrice(); scheduleListingDraftSave();
-      });
-      label.append(title, minimum, input); fields.unshift(label);
-    }
-    if (!fields.length) {
-      const empty = document.createElement('p'); empty.className = 'helper'; empty.textContent = '料金を変更するオプションをONにしてください。';
-      $('listingOptionPriceFields').replaceChildren(empty); return;
-    }
-    $('listingOptionPriceFields').replaceChildren(...fields);
-  }
+  function renderOptionPriceFields() {}
 
   function activeEntries() {
     return detectedEntries.filter((entry) => selectedFormats.has(entry.format));
@@ -871,7 +787,7 @@
     form.hidden = false;
     populatePricePresets();
     renderOptions(); renderFormats(); updateLimitedState(); setSubmissionEnabled(false);
-    renderOptionPriceFields(); renderTags(); renderCustomOptions();
+    renderTags();
     const sourceDialog = $('listingSourceDialog');
     const openSourceDialog = () => {
       if (typeof sourceDialog.showModal === 'function') sourceDialog.showModal(); else sourceDialog.setAttribute('open', '');
@@ -888,7 +804,7 @@
     $('listingFilesClear').addEventListener('click', clearFiles);
     $('listingPrice').addEventListener('input', () => { updatePrice(); scheduleListingDraftSave(); });
     $('listingPrice').addEventListener('change', () => {
-      normalizePriceInput($('listingPrice'), Number($('listingPrice').min) || MIN_PAID_PRICE_YEN, MAX_LISTING_PRICE_YEN);
+      normalizePriceInput($('listingPrice'), Number($('listingPrice').min) || MIN_LISTING_PRICE_YEN, MAX_LISTING_PRICE_YEN);
       updatePrice(); scheduleListingDraftSave();
     });
     $('listingLimitedEnabled').addEventListener('change', () => { updateLimitedState(); scheduleListingDraftSave(); });
@@ -898,7 +814,6 @@
       if (event.key !== 'Enter' && event.key !== ',' && event.key !== '、') return;
       event.preventDefault(); addTag();
     });
-    $('listingCustomOptionAdd').addEventListener('click', addCustomOption);
     form.addEventListener('input', scheduleListingDraftSave);
     form.addEventListener('change', scheduleListingDraftSave);
     const dropZone = $('listingDropZone');
@@ -929,16 +844,13 @@
 
   async function submitListing(event) {
     event.preventDefault();
-    const salePriceMinimum = Number($('listingPrice').min) || MIN_PAID_PRICE_YEN;
+    const salePriceMinimum = Number($('listingPrice').min) || MIN_LISTING_PRICE_YEN;
     normalizePriceInput($('listingPrice'), salePriceMinimum, MAX_LISTING_PRICE_YEN);
     optionCatalog.forEach((option) => {
-      if (selectedOptionIds.has(option.id)) optionPrices.set(option.id, normalizedPaidPrice(optionPriceFor(option), option.minimum_price_yen, MAX_OPTION_PRICE_YEN));
+      if (selectedOptionIds.has(option.id)) optionPrices.set(option.id, 0);
     });
-    customOptions = customOptions.map((option) => ({
-      ...option,
-      price_yen: normalizedPaidPrice(option.price_yen, MIN_PAID_PRICE_YEN, MAX_OPTION_PRICE_YEN)
-    }));
-    limitedOptionPrice = normalizedPaidPrice(limitedOptionPrice, MIN_PAID_PRICE_YEN, MAX_OPTION_PRICE_YEN);
+    customOptions = [];
+    limitedOptionPrice = 0;
     if (!form.reportValidity()) {
       setStatus('必須項目と確認欄をすべて入力してください。'); return;
     }
@@ -960,15 +872,11 @@
     }
     const salePrice = integerValue($('listingPrice').value);
     if (!Number.isInteger(salePrice) || salePrice < salePriceMinimum || salePrice > MAX_LISTING_PRICE_YEN || salePrice % PRICE_STEP_YEN !== 0) {
-      setStatus(`作品価格は${yen(salePriceMinimum)}以上、100円単位で設定してください。`); return;
+      setStatus(`販売価格は${yen(salePriceMinimum)}以上、100円単位で設定してください。`); return;
     }
-    const optionPrice = optionCatalog.reduce((total, option) => (
-      selectedOptionIds.has(option.id) ? total + optionPriceFor(option) : total
-    ), 0) + (derivativeContext ? 0 : customOptions.reduce((total, option) => total + option.price_yen, 0))
-      + ($('listingLimitedEnabled').checked ? limitedOptionPrice : 0);
-    const purchasePrice = salePrice + optionPrice;
-    if (purchasePrice < MIN_PAID_PRICE_YEN || purchasePrice % PRICE_STEP_YEN !== 0) {
-      setStatus('購入者の支払合計は100円以上、100円単位で設定してください。'); return;
+    const purchasePrice = salePrice;
+    if (purchasePrice < MIN_LISTING_PRICE_YEN || purchasePrice % PRICE_STEP_YEN !== 0) {
+      setStatus('販売価格は500円以上、100円単位で設定してください。'); return;
     }
     if (purchasePrice > 99999999) {
       setStatus('購入者の支払額は99,999,999円以下にしてください。'); return;
@@ -1013,11 +921,11 @@
           sample_source_paths: sampleEntries.map((entry) => entry.path),
           public_preview_kind: 'watermarked-derivative'
         },
-        limited_sale: limitedEnabled ? { enabled: true, quantity: limitedQuantity, option_price_yen: limitedOptionPrice, minimum_price_yen: 100 } : { enabled: false }
+        limited_sale: limitedEnabled ? { enabled: true, quantity: limitedQuantity, option_price_yen: 0, minimum_price_yen: 0 } : { enabled: false }
       };
       setStatus('出品下書きを作成しています...');
-      const rpcName = derivativeContext ? 'market_create_derivative_draft_v4' : 'market_create_root_asset_v7';
-      const sellerPriceForRpc = salePrice + (limitedEnabled ? limitedOptionPrice : 0);
+      const rpcName = derivativeContext ? 'market_create_derivative_draft_v5' : 'market_create_root_asset_v8';
+      const sellerPriceForRpc = salePrice;
       const rpcInput = derivativeContext ? {
         input_source_asset_id: sourceAssetId,
         input_derivative_license_id: derivativeLicenseId,
@@ -1043,7 +951,7 @@
         input_source_sha256: packageData.sourceHash,
         input_asset_formats: formats,
         input_selected_option_ids: optionIds,
-        input_option_prices: Object.fromEntries(optionCatalog.filter((option) => selectedOptionIds.has(option.id)).map((option) => [option.id, optionPriceFor(option)])),
+        input_option_prices: {},
         input_provenance_manifest: provenance,
         input_inherited_terms: {},
         input_prohibited_uses: [],
@@ -1054,7 +962,7 @@
         input_terms_confirmed: $('listingTermsConfirmed').checked,
         input_privacy_confirmed: $('listingPrivacyConfirmed').checked,
         input_original_work_confirmed: $('listingRights').checked,
-        input_custom_options: customOptions.map(({ label, description, price_yen }) => ({ label, description, price_yen }))
+        input_custom_options: []
       };
       const { data: createdAssetId, error: draftError } = await client.rpc(rpcName, rpcInput);
       if (draftError) throw draftError;
@@ -1122,8 +1030,8 @@
       }
       if (attachError) throw attachError;
 
-      form.reset(); clearFiles(); selectedOptionIds.clear(); optionPrices.clear(); listingTagValues.length = 0; customOptions = []; limitedOptionPrice = MIN_PAID_PRICE_YEN;
-      renderTags(); renderCustomOptions(); renderOptions(); renderOptionPriceFields(); updateLimitedState(); uploadedPaths = [];
+      form.reset(); $('listingPrice').value = String(MIN_LISTING_PRICE_YEN); clearFiles(); selectedOptionIds.clear(); optionPrices.clear(); listingTagValues.length = 0; customOptions = []; limitedOptionPrice = 0;
+      renderTags(); renderOptions(); updateLimitedState(); uploadedPaths = [];
       await deleteListingDraft();
       setStatus(aiUsageStatus === 'used' || derivativeContext
         ? '出品を審査へ送りました。確認後に公開されます。'
