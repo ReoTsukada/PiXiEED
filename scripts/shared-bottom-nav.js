@@ -36,7 +36,7 @@
   replaceFooter();
   replaceBottomNav();
   ensureAdAccountControl(() => {
-    if (!isHomePage()) ensureCommonTabBarController();
+    ensureCommonTabBarController();
     if (script.dataset.pixieedFooterAd !== 'false') ensureFooterAdController();
   });
 
@@ -99,7 +99,7 @@
     const controller = doc.createElement('script');
     controller.defer = true;
     controller.dataset.pixieedCommonTabBar = 'true';
-    controller.src = relHref('scripts/shared-tab-bar.js?v=2026.07.20-draw-pwa1');
+    controller.src = relHref('scripts/shared-tab-bar.js?v=20260721-common-actions1');
     doc.body.appendChild(controller);
   }
 
