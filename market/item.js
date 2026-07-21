@@ -51,8 +51,6 @@
     $('itemDescription').textContent = asset.description || '説明はありません。';
     $('itemPrice').textContent = yen(asset.sale_price_yen);
     $('itemFormats').textContent = formats.map((format) => labels[format] || format).join(' / ');
-    $('itemOptionPrice').textContent = yen(series.required_option_price_yen);
-    $('itemBasePrice').textContent = yen(Math.max(0, Number(asset.sale_price_yen || 0) - Number(series.required_option_price_yen || 0)));
     $('itemProductType').textContent = isPixieeDrawProduct(asset)
       ? 'PiXiEEDraw作品（編集用プロジェクト入り）'
       : '一般素材（画像・アニメーション）';
@@ -91,10 +89,9 @@
       const card = document.createElement('div');
       const title = document.createElement('strong'); title.textContent = option.label;
       const description = document.createElement('small'); description.textContent = option.description || '';
-      const price = document.createElement('span'); price.textContent = `料金 ${yen(option.price_yen ?? option.minimum_price_yen)}`;
       card.append(title);
       if (description.textContent) card.append(description);
-      card.append(price); return card;
+      return card;
     }) : [Object.assign(document.createElement('p'), { textContent: '追加オプションなし' })]));
     $('itemStatus').hidden = true; $('itemContent').hidden = false;
     window.PiXiEEDMarketAds?.showDetailAd?.();
