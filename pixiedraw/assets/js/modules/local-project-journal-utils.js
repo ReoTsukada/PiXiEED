@@ -35,6 +35,9 @@
     localizeText,
   } = {}) {
     let activeState = null;
+    // Large selection moves are cheaper and safer as typed V2 checkpoints
+    // than as hundreds of thousands of JSON journal patch objects.
+    const LOCAL_PROJECT_LARGE_PIXEL_PATCH_MAX_CHANGES = 32768;
 
     function cloneJsonValue(value, fallback = null) {
       if (value === undefined) {
@@ -686,6 +689,23 @@
       next.historyLimit = Math.max(1, Math.round(Number(history?.limit) || 30));
       const layerAddOp = createLayerAddJournalOp(historyEntry);
       const frameAddOp = createFrameAddJournalOp(historyEntry);
+      // The runtime command is compact typed data, but V2 journal replay does
+      // not need to duplicate it: persist the post-move typed checkpoint at
+      // this durability boundary instead.
+      if (historyEntry?.kind === 'selection-move-compressed') {
+        next.forceCheckpoint = true;
+        activeState = next;
+        return next;
+      }
+      if (
+        isPixelPatchHistoryEntry(historyEntry)
+        && Array.isArray(historyEntry.changes)
+        && historyEntry.changes.length > LOCAL_PROJECT_LARGE_PIXEL_PATCH_MAX_CHANGES
+      ) {
+        next.forceCheckpoint = true;
+        activeState = next;
+        return next;
+      }
       if (!isPixelPatchHistoryEntry(historyEntry) && !layerAddOp && !frameAddOp) {
         next.forceCheckpoint = true;
         activeState = next;
