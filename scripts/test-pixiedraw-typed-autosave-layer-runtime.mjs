@@ -211,6 +211,93 @@ const recoveredBuild116EncodedRuntime = model.deserializeLayerFromDocument(
 assert.ok(recoveredBuild116EncodedRuntime.indices instanceof Uint8Array, 'encoded Build 116 payloads recover to Uint8');
 assert.equal(recoveredBuild116EncodedRuntime.indices.length, pixelCount, 'encoded Build 116 recovery restores full index buffer');
 
+const unmarkedRuntimeLayer = model.deserializeLayerFromDocument(
+  {
+    ...serializedDeferredRuntime,
+    indices: new Uint8Array(pixelCount),
+    indicesEncoding: undefined,
+  },
+  pixelCount,
+  'runtime-direct-layer',
+  'Runtime direct layer',
+  512,
+  512,
+  { trustStoredLayerFlags: true }
+);
+assert.equal(
+  unmarkedRuntimeLayer.indicesEncoding,
+  'uint8-palette-zero-transparent-v2',
+  'unmarked direct-color Uint8 payloads recover as runtime V2 indices'
+);
+assert.equal(unmarkedRuntimeLayer.indices.length, pixelCount, 'unmarked runtime indices restore at canvas size');
+
+const damagedDirectIndexLayer = model.deserializeLayerFromDocument(
+  {
+    ...serializedDeferredRuntime,
+    indices: new Uint8Array([0]),
+    indicesEncoding: undefined,
+  },
+  pixelCount,
+  'runtime-direct-layer',
+  'Runtime direct layer',
+  512,
+  512,
+  { trustStoredLayerFlags: true }
+);
+assert.equal(
+  damagedDirectIndexLayer.indicesEncoding,
+  'uint8-palette-zero-transparent-v2',
+  'damaged direct-color index maps rebuild as V2 transparent runtime indices'
+);
+assert.deepEqual(
+  Array.from(damagedDirectIndexLayer.direct.subarray(0, 4)),
+  [90, 80, 70, 255],
+  'damaged direct-color index maps retain the authoritative visible RGBA data'
+);
+
+const unmarkedEncodedRuntimeLayer = model.deserializeLayerFromDocument(
+  {
+    ...serializedDeferredRuntime,
+    indices: Buffer.from(new Uint8Array(pixelCount)).toString('base64'),
+    indicesEncoding: undefined,
+  },
+  pixelCount,
+  'runtime-direct-layer',
+  'Runtime direct layer',
+  512,
+  512,
+  { trustStoredLayerFlags: true }
+);
+assert.equal(
+  unmarkedEncodedRuntimeLayer.indicesEncoding,
+  'uint8-palette-zero-transparent-v2',
+  'Base64 unmarked direct-color Uint8 payloads recover as runtime V2 indices'
+);
+assert.equal(unmarkedEncodedRuntimeLayer.indices.length, pixelCount, 'unmarked Base64 runtime indices restore at canvas size');
+
+const unmarkedCompactLayer = model.deserializeLayerFromDocument(
+  {
+    id: 'unmarked-compact-layer',
+    name: 'Unmarked compact layer',
+    visible: true,
+    opacity: 1,
+    blendMode: 'normal',
+    indices: new Uint8Array([0, 1, 0, 1]),
+  },
+  4,
+  'unmarked-compact-layer',
+  'Unmarked compact layer',
+  2,
+  2,
+  { trustStoredLayerFlags: true }
+);
+assert.equal(
+  unmarkedCompactLayer.indicesEncoding,
+  'uint8-zero-transparent-v1',
+  'unmarked non-direct Uint8 payloads retain compact V1 palette semantics'
+);
+assert.deepEqual(Array.from(unmarkedCompactLayer.indices), [0, 1, 0, 1]);
+
 console.log(JSON.stringify({
   pixelCount,
   typedByteLength: indices.byteLength + direct.byteLength,
