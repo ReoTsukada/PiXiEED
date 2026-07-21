@@ -58,7 +58,11 @@ function commitHistory() {
     if (history.pending.dirty) {
       const historyEntry = isPixelPatchHistoryEntry(history.pending)
         ? finalizePixelPatchHistoryEntry(history.pending)
-        : setHistoryEntryLabel(history.pending.before, pendingLabel);
+        : (isLayerAddHistoryEntry(history.pending)
+          ? finalizeLayerAddHistoryEntry(history.pending)
+          : (isFrameAddHistoryEntry(history.pending)
+            ? finalizeFrameAddHistoryEntry(history.pending)
+            : setHistoryEntryLabel(history.pending.before, pendingLabel)));
       if (!historyEntry) {
         history.pending = null;
         updateHistoryButtons();
@@ -230,6 +234,46 @@ function undo() {
     }
     const previous = history.past.pop();
     const historyLabel = getHistoryEntryLabel(previous);
+    if (isFrameAddHistoryEntry(previous)) {
+      history.future.push(previous);
+      if (history.future.length > history.limit) {
+        archiveEvictedHistoryEntry('future', history.future.shift());
+      }
+      if (!applyFrameAddHistoryEntry(previous, 'undo')) {
+        history.future.pop();
+        history.past.push(previous);
+        return;
+      }
+      updateHistoryButtons();
+      markAutosaveDirty();
+      markDocumentUnsavedChange();
+      markActiveLocalProjectJournalNeedsCheckpoint?.(
+        normalizeAutosaveProjectId?.(autosaveProjectId || '') || ''
+      );
+      scheduleAutosaveSnapshot();
+      scheduleQrEditReadabilityCheck();
+      return;
+    }
+    if (isLayerAddHistoryEntry(previous)) {
+      history.future.push(previous);
+      if (history.future.length > history.limit) {
+        archiveEvictedHistoryEntry('future', history.future.shift());
+      }
+      if (!applyLayerAddHistoryEntry(previous, 'undo')) {
+        history.future.pop();
+        history.past.push(previous);
+        return;
+      }
+      updateHistoryButtons();
+      markAutosaveDirty();
+      markDocumentUnsavedChange();
+      markActiveLocalProjectJournalNeedsCheckpoint?.(
+        normalizeAutosaveProjectId?.(autosaveProjectId || '') || ''
+      );
+      scheduleAutosaveSnapshot();
+      scheduleQrEditReadabilityCheck();
+      return;
+    }
     if (isPixelPatchHistoryEntry(previous)) {
       history.future.push(previous);
       if (history.future.length > history.limit) {
@@ -397,6 +441,46 @@ function redo() {
     }
     const next = history.future.pop();
     const historyLabel = getHistoryEntryLabel(next);
+    if (isFrameAddHistoryEntry(next)) {
+      history.past.push(next);
+      if (history.past.length > history.limit) {
+        archiveEvictedHistoryEntry('past', history.past.shift());
+      }
+      if (!applyFrameAddHistoryEntry(next, 'redo')) {
+        history.past.pop();
+        history.future.push(next);
+        return;
+      }
+      updateHistoryButtons();
+      markAutosaveDirty();
+      markDocumentUnsavedChange();
+      markActiveLocalProjectJournalNeedsCheckpoint?.(
+        normalizeAutosaveProjectId?.(autosaveProjectId || '') || ''
+      );
+      scheduleAutosaveSnapshot();
+      scheduleQrEditReadabilityCheck();
+      return;
+    }
+    if (isLayerAddHistoryEntry(next)) {
+      history.past.push(next);
+      if (history.past.length > history.limit) {
+        archiveEvictedHistoryEntry('past', history.past.shift());
+      }
+      if (!applyLayerAddHistoryEntry(next, 'redo')) {
+        history.past.pop();
+        history.future.push(next);
+        return;
+      }
+      updateHistoryButtons();
+      markAutosaveDirty();
+      markDocumentUnsavedChange();
+      markActiveLocalProjectJournalNeedsCheckpoint?.(
+        normalizeAutosaveProjectId?.(autosaveProjectId || '') || ''
+      );
+      scheduleAutosaveSnapshot();
+      scheduleQrEditReadabilityCheck();
+      return;
+    }
     if (isPixelPatchHistoryEntry(next)) {
       history.past.push(next);
       if (history.past.length > history.limit) {
@@ -482,6 +566,16 @@ function redo() {
   }
 
 function rollbackPendingHistory({ reRender = true } = {}) {
+    if (isLayerAddHistoryEntry(history.pending)) {
+      const rolledBack = applyLayerAddHistoryEntry(history.pending, 'undo');
+      history.pending = null;
+      updateHistoryButtons();
+      if (rolledBack) {
+        markAutosaveDirty();
+        markDocumentUnsavedChange();
+      }
+      return rolledBack;
+    }
     if (isPixelPatchHistoryEntry(history.pending)) {
       const rolledBack = rollbackPixelPatchHistoryPending(history.pending);
       history.pending = null;

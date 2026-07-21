@@ -150,14 +150,27 @@
     }
     if (getProjectCanvasCount() <= 1) {
       const preferredLayerId = state.activeLayer;
-      return frame.layers.find(layer => layer.id === preferredLayerId) || frame.layers[frame.layers.length - 1];
+      const layer = frame.layers.find(layer => layer.id === preferredLayerId) || frame.layers[frame.layers.length - 1];
+      if (typeof materializeRasterLayerIndices === 'function') {
+        materializeRasterLayerIndices(layer, state.width, state.height, state.palette);
+      }
+      return layer;
     }
     const canvasDoc = getActiveProjectCanvasDocument();
     const isActiveCanvas = Boolean(canvasDoc?.id) && canvasDoc.id === (getActiveProjectCanvasDocument()?.id || '');
     const preferredLayerId = isActiveCanvas
       ? (state.activeLayer || canvasDoc?.activeLayer)
       : (canvasDoc?.activeLayer || state.activeLayer);
-    return frame.layers.find(layer => layer.id === preferredLayerId) || frame.layers[frame.layers.length - 1];
+    const layer = frame.layers.find(layer => layer.id === preferredLayerId) || frame.layers[frame.layers.length - 1];
+    if (typeof materializeRasterLayerIndices === 'function') {
+      materializeRasterLayerIndices(
+        layer,
+        Math.max(1, Math.round(Number(canvasDoc?.width) || Number(state.width) || 1)),
+        Math.max(1, Math.round(Number(canvasDoc?.height) || Number(state.height) || 1)),
+        state.palette
+      );
+    }
+    return layer;
   }
 
   function getActiveLayerIndex() {

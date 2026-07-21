@@ -90,7 +90,26 @@
         virtualCursorDrawState.lastPosition = null;
         virtualCursorDrawState.currentPosition = null;
       }
-      invalidateActiveCanvasCompositeRenderState({ clearHover: false });
+      invalidateActiveCanvasCompositeRenderState({ clearHover: false, preserveFrameCache: true });
+      getProjectCanvasDocuments().forEach(canvasDoc => {
+        if (!canvasDoc || !Array.isArray(canvasDoc.frames) || !canvasDoc.frames.length) {
+          return;
+        }
+        const previousFrame = canvasDoc.frames[clamp(previousIndex, 0, canvasDoc.frames.length - 1)];
+        const nextFrame = canvasDoc.frames[clamp(normalizedIndex, 0, canvasDoc.frames.length - 1)];
+        // Playback must only advance the cursor and render. Compacting the
+        // previous frame here scans its full pixel buffer on every tick and
+        // can make large GIF/PXD animations appear completely stopped.
+        if (!state.playback?.isPlaying && typeof compactInactiveRasterFrameIndices === 'function') {
+          compactInactiveRasterFrameIndices(
+            previousFrame,
+            canvasDoc.width,
+            canvasDoc.height,
+            state.palette,
+            nextFrame
+          );
+        }
+      });
     }
     getProjectCanvasDocuments().forEach(canvasDoc => {
       if (!canvasDoc || !Array.isArray(canvasDoc.frames) || !canvasDoc.frames.length) {
@@ -225,7 +244,7 @@
     }
     const changed = previousFrame !== normalizedFrameIndex || previousLayer !== targetLayer.id;
     if (changed) {
-      invalidateActiveCanvasCompositeRenderState();
+      invalidateActiveCanvasCompositeRenderState({ preserveFrameCache: true });
     }
     if (persist) {
       scheduleSessionPersist({ includeSnapshots: false, includeReloadSnapshot: false });

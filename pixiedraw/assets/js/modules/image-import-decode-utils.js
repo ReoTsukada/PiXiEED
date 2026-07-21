@@ -244,7 +244,7 @@
       let commonFactor = resolveGreatestCommonDivisor(width, height);
       let hasInterBlockDifference = false;
       visitGifCompositedFrames(reader, width, height, frameCount, ({ pixels }) => {
-        if (commonFactor <= 1) return;
+        if (commonFactor <= 1) return false;
         for (let y = 0; y < height && commonFactor > 1; y += 1) {
           for (let x = 0; x < width && commonFactor > 1; x += 1) {
             const base = ((y * width) + x) * 4;
@@ -264,6 +264,10 @@
             }
           }
         }
+        // Once this reaches one, no later frame can restore an integer scale.
+        // Stop the preflight pass here; the actual import pass below still
+        // decodes every frame and preserves the full GIF exactly.
+        return commonFactor > 1;
       });
       return hasInterBlockDifference ? Math.max(1, commonFactor) : 1;
     }
@@ -295,7 +299,7 @@
         if (info.disposal === 3) restoreBuffer.set(pixels);
         reader.decodeAndBlitFrameRGBA(index, pixels);
         const delayHundredths = Number(info.delay);
-        visitor({
+        const shouldContinue = visitor({
           index,
           pixels,
           duration: Number.isFinite(delayHundredths) && delayHundredths > 0
@@ -303,6 +307,7 @@
             : DEFAULT_IMPORT_FRAME_DURATION,
         });
         previousFrameInfo = info;
+        if (shouldContinue === false) break;
       }
     }
   
@@ -516,7 +521,7 @@
         1,
         MAX_IMPORTED_PALETTE_COLORS
       );
-      const palette = [];
+      const palette = [{ r: 0, g: 0, b: 0, a: 0 }];
       const colorToIndex = new Map();
       for (let frameIndex = 0; frameIndex < frames.length; frameIndex += 1) {
         const data = frames[frameIndex]?.imageData?.data;
@@ -544,10 +549,9 @@
           });
         }
       }
-      if (!palette.length) {
-        // Transparency is stored as -1 in INDEX layers. Keep an opaque color
-        // selected so a completely transparent import can be drawn on
-        // immediately without turning the pen into an eraser.
+      if (palette.length === 1) {
+        // Runtime index 0 is reserved for transparency. Keep one opaque color
+        // available so a completely transparent import can be drawn on.
         palette.push({ r: 0, g: 0, b: 0, a: 255 });
       }
       return {
@@ -559,11 +563,15 @@
 
 
     function writeExactIndexedPixelsFromRgba(data, indices, colorToIndex) {
-      if (!(data instanceof Uint8ClampedArray) || !(indices instanceof Int16Array) || !(colorToIndex instanceof Map)) {
+      if (
+        !(data instanceof Uint8ClampedArray)
+        || !(indices instanceof Int16Array || indices instanceof Uint8Array)
+        || !(colorToIndex instanceof Map)
+      ) {
         return false;
       }
       const pixelCount = Math.min(indices.length, Math.floor(data.length / 4));
-      indices.fill(-1);
+      indices.fill(indices instanceof Uint8Array ? 0 : -1);
       for (let pixelIndex = 0; pixelIndex < pixelCount; pixelIndex += 1) {
         const base = pixelIndex * 4;
         if (data[base + 3] === 0) {

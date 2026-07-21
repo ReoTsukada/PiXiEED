@@ -552,7 +552,7 @@
           });
         } catch (error) {
           const emptyJournalRevision = useV2Journal
-            && /journal revision requires at least one changed (sheet|project)|journal save requires valid pixel patches/i.test(String(error?.message || ''));
+            && /journal revision requires at least one changed (sheet|project)|journal save requires valid replayable operations/i.test(String(error?.message || ''));
           if (!emptyJournalRevision) {
             throw error;
           }

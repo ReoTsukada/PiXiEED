@@ -43,6 +43,7 @@
 
   function serializeDocumentSnapshot(snapshot, options = {}) {
     const preserveTypedArrays = options?.preserveTypedArrays === true;
+    const compactIndicesForStorage = preserveTypedArrays && options?.compactIndicesForStorage === true;
     const palette = snapshot.palette.map(color => normalizeColorValue(color));
     const maxPaletteIndex = Math.max(0, palette.length - 1);
     const activePaletteIndex = clamp(
@@ -78,7 +79,13 @@
           duration: frame.duration,
           voxelPreviewYawDeg: normalizeVoxelPreviewYawDegrees(frame?.voxelPreviewYawDeg),
           voxelPreviewPitchDeg: normalizeVoxelPreviewPitchDegrees(frame?.voxelPreviewPitchDeg),
-          layers: frame.layers.map(layer => serializeLayerForDocument(layer, { preserveTypedArrays })),
+          layers: frame.layers.map(layer => serializeLayerForDocument(layer, {
+            preserveTypedArrays,
+            compactIndicesForStorage,
+            width: canvas.width,
+            height: canvas.height,
+            palette,
+          })),
         })),
       }))
       : null;
@@ -94,7 +101,13 @@
         duration: frame.duration,
         voxelPreviewYawDeg: normalizeVoxelPreviewYawDegrees(frame?.voxelPreviewYawDeg),
         voxelPreviewPitchDeg: normalizeVoxelPreviewPitchDegrees(frame?.voxelPreviewPitchDeg),
-        layers: frame.layers.map(layer => serializeLayerForDocument(layer, { preserveTypedArrays })),
+        layers: frame.layers.map(layer => serializeLayerForDocument(layer, {
+          preserveTypedArrays,
+          compactIndicesForStorage,
+          width: snapshot.width,
+          height: snapshot.height,
+          palette,
+        })),
       })),
       activeFrame: snapshot.activeFrame,
       activeLayer: snapshot.activeLayer,
@@ -127,7 +140,9 @@
     }
     if (snapshot.playback && typeof snapshot.playback === 'object') {
       serialized.playback = {
-        isPlaying: Boolean(snapshot.playback.isPlaying),
+        // Playback is transient UI state. Persisting true creates a restored
+        // project with no requestAnimationFrame loop behind the flag.
+        isPlaying: false,
         lastFrame: Number(snapshot.playback.lastFrame) || 0,
         loop: snapshot.playback.loop !== false,
       };
@@ -307,7 +322,7 @@
       dualLeftRail: false,
       playback: typeof payload.playback === 'object' && payload.playback
         ? {
-          isPlaying: Boolean(payload.playback.isPlaying),
+          isPlaying: false,
           lastFrame: Number(payload.playback.lastFrame) || 0,
           loop: payload.playback.loop !== false,
         }

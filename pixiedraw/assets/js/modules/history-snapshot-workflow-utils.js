@@ -361,7 +361,9 @@
       return;
     }
 
-    const sourceIndices = moveState.indices instanceof Int16Array ? moveState.indices : null;
+    const sourceIndices = moveState.indices instanceof Int16Array || moveState.indices instanceof Uint8Array
+      ? moveState.indices
+      : null;
     const sourceDirect = moveState.direct instanceof Uint8ClampedArray ? moveState.direct : null;
     const moveWidth = Math.max(0, Number(moveState.width) || 0);
     const moveHeight = Math.max(0, Number(moveState.height) || 0);
@@ -375,9 +377,13 @@
       return;
     }
 
-    let targetIndices = targetLayer.indices instanceof Int16Array ? targetLayer.indices : null;
+    const useRuntimeUint8 = typeof isRuntimeUint8LayerIndices === 'function'
+      && isRuntimeUint8LayerIndices(targetLayer);
+    let targetIndices = targetLayer.indices instanceof Int16Array || targetLayer.indices instanceof Uint8Array
+      ? targetLayer.indices
+      : null;
     if (!targetIndices || targetIndices.length !== pixelCount) {
-      targetIndices = new Int16Array(pixelCount);
+      targetIndices = useRuntimeUint8 ? new Uint8Array(pixelCount) : new Int16Array(pixelCount).fill(-1);
       if (targetLayer.indices && targetLayer.indices.length === pixelCount) {
         targetIndices.set(targetLayer.indices);
       }

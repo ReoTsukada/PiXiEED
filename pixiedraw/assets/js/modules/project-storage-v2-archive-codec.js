@@ -24,6 +24,10 @@
     decompressBytes = null,
     digestBytes = null,
   } = {}) {
+    // PXD's compact indexed-pixel representation. Runtime editing still
+    // accepts legacy Int16/-1 buffers during the migration, but archive files
+    // can store 0=transparent and 1..255=opaque palette entries in one byte.
+    const PXD_INDEX_ENCODING = 'pxd-index8-zero-transparent-v1';
     function createCodecError(code, message, extras = {}) {
       const error = new Error(message);
       error.code = code;
@@ -424,13 +428,203 @@
         return null;
       }
       const bytes = decodeBase64(indicesBase64);
-      if (!(bytes instanceof Uint8Array) || bytes.length !== pixelCount * 2) {
+      if (!(bytes instanceof Uint8Array)) {
+        return null;
+      }
+      if (bytes.length === pixelCount) {
+        const output = new Int16Array(pixelCount);
+        for (let index = 0; index < pixelCount; index += 1) {
+          output[index] = bytes[index] === 0 ? -1 : bytes[index];
+        }
+        return output;
+      }
+      if (bytes.length !== pixelCount * 2) {
         return null;
       }
       const view = new Int16Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 2);
       const output = new Int16Array(view.length);
       output.set(view);
       return output;
+    }
+
+    function decodeLegacyInt16Indices(value, pixelCount) {
+      if (typeof value !== 'string' || !value.length || typeof decodeBase64 !== 'function') {
+        return null;
+      }
+      const bytes = decodeBase64(value);
+      if (!(bytes instanceof Uint8Array) || bytes.length !== pixelCount * 2) {
+        return null;
+      }
+      const source = new Int16Array(bytes.buffer, bytes.byteOffset, pixelCount);
+      const output = new Int16Array(pixelCount);
+      output.set(source);
+      return output;
+    }
+
+    function buildCompactPxdPalette(sourcePalette = []) {
+      if (!Array.isArray(sourcePalette) || sourcePalette.length === 0) {
+        return null;
+      }
+      const palette = [{ r: 0, g: 0, b: 0, a: 0 }];
+      const remap = new Int16Array(sourcePalette.length);
+      remap.fill(-1);
+      for (let sourceIndex = 0; sourceIndex < sourcePalette.length; sourceIndex += 1) {
+        const color = sourcePalette[sourceIndex] && typeof sourcePalette[sourceIndex] === 'object'
+          ? sourcePalette[sourceIndex]
+          : null;
+        if (!color || Number(color.a) <= 0) {
+          remap[sourceIndex] = 0;
+          continue;
+        }
+        // One byte has 0 reserved for transparency, so do not silently
+        // quantize a 256th opaque color while saving a project.
+        if (palette.length >= 256) {
+          return null;
+        }
+        remap[sourceIndex] = palette.length;
+        palette.push(cloneJsonValue(color) || { r: 0, g: 0, b: 0, a: 255 });
+      }
+      return { palette, remap };
+    }
+
+    function remapPaletteSelection(value, remap, fallback = 0) {
+      const sourceIndex = Math.round(Number(value));
+      if (!Number.isInteger(sourceIndex) || sourceIndex < 0 || sourceIndex >= remap.length) {
+        return fallback;
+      }
+      const mapped = remap[sourceIndex];
+      return mapped >= 0 ? mapped : fallback;
+    }
+
+    function compactCanvasIndicesForPxd(canvas, remap) {
+      if (!canvas || !Array.isArray(canvas.frames)) {
+        return false;
+      }
+      const width = Math.max(1, Math.round(Number(canvas.width) || 1));
+      const height = Math.max(1, Math.round(Number(canvas.height) || 1));
+      const pixelCount = width * height;
+      for (const frame of canvas.frames) {
+        const layers = Array.isArray(frame?.layers) ? frame.layers : [];
+        for (const layer of layers) {
+          if (!layer || typeof layer !== 'object' || layer.type === 'simulation') {
+            continue;
+          }
+          if (layer.indicesImplicitTransparent === true && !layer.direct && !layer.importSourceDirect) {
+            layer.indices = encodeTypedArray(new Uint8Array(0));
+            continue;
+          }
+          const indices = decodeLegacyInt16Indices(layer.indices, pixelCount);
+          if (!(indices instanceof Int16Array)) {
+            return false;
+          }
+          const compact = new Uint8Array(pixelCount);
+          for (let pixelIndex = 0; pixelIndex < pixelCount; pixelIndex += 1) {
+            const sourceIndex = indices[pixelIndex];
+            if (sourceIndex < 0) {
+              compact[pixelIndex] = 0;
+              continue;
+            }
+            if (sourceIndex >= remap.length || remap[sourceIndex] < 0) {
+              // A malformed palette reference must not be converted into
+              // transparency during save. Keep the legacy representation so
+              // that recovery can still inspect the original data.
+              return false;
+            }
+            compact[pixelIndex] = remap[sourceIndex];
+          }
+          layer.indices = encodeTypedArray(compact);
+        }
+      }
+      return true;
+    }
+
+    function compactDocumentIndicesForPxd(documentPayload = null) {
+      if (!documentPayload || typeof documentPayload !== 'object' || typeof encodeTypedArray !== 'function') {
+        return null;
+      }
+      const compactPalette = buildCompactPxdPalette(documentPayload.palette);
+      if (!compactPalette) {
+        return null;
+      }
+      const nextDocument = cloneJsonValue(documentPayload) || {};
+      const { palette, remap } = compactPalette;
+      const canvases = Array.isArray(nextDocument.canvases) && nextDocument.canvases.length
+        ? nextDocument.canvases
+        : [{
+            width: nextDocument.width,
+            height: nextDocument.height,
+            frames: nextDocument.frames,
+          }];
+      if (!canvases.every(canvas => compactCanvasIndicesForPxd(canvas, remap))) {
+        return null;
+      }
+      nextDocument.palette = palette;
+      nextDocument.activePaletteIndex = remapPaletteSelection(nextDocument.activePaletteIndex, remap, 0);
+      nextDocument.secondaryPaletteIndex = remapPaletteSelection(nextDocument.secondaryPaletteIndex, remap, 0);
+      nextDocument.pixelIndexEncoding = PXD_INDEX_ENCODING;
+      if (Array.isArray(nextDocument.canvases) && nextDocument.canvases.length) {
+        const activeCanvasId = typeof nextDocument.activeCanvasId === 'string' ? nextDocument.activeCanvasId : '';
+        const activeCanvas = nextDocument.canvases.find(canvas => canvas?.id === activeCanvasId) || nextDocument.canvases[0];
+        if (activeCanvas) {
+          nextDocument.frames = cloneJsonValue(activeCanvas.frames || []);
+        }
+      }
+      return nextDocument;
+    }
+
+    function restoreCompactPxdIndices(documentPayload = null) {
+      if (!documentPayload || documentPayload.pixelIndexEncoding !== PXD_INDEX_ENCODING || typeof encodeTypedArray !== 'function') {
+        return documentPayload;
+      }
+      const nextDocument = cloneJsonValue(documentPayload) || {};
+      const canvases = Array.isArray(nextDocument.canvases) && nextDocument.canvases.length
+        ? nextDocument.canvases
+        : [{
+            width: nextDocument.width,
+            height: nextDocument.height,
+            frames: nextDocument.frames,
+          }];
+      const restored = canvases.every(canvas => {
+        const width = Math.max(1, Math.round(Number(canvas?.width) || 1));
+        const height = Math.max(1, Math.round(Number(canvas?.height) || 1));
+        const pixelCount = width * height;
+        return (Array.isArray(canvas?.frames) ? canvas.frames : []).every(frame => (
+          (Array.isArray(frame?.layers) ? frame.layers : []).every(layer => {
+            if (!layer || typeof layer !== 'object' || layer.type === 'simulation') {
+              return true;
+            }
+            if (layer.indicesImplicitTransparent === true && !layer.direct && !layer.importSourceDirect) {
+              layer.indices = encodeTypedArray(new Int16Array(0));
+              return true;
+            }
+            if (typeof layer.indices !== 'string' || typeof decodeBase64 !== 'function') {
+              return false;
+            }
+            const compact = decodeBase64(layer.indices);
+            if (!(compact instanceof Uint8Array) || compact.length !== pixelCount) {
+              return false;
+            }
+            const indices = new Int16Array(pixelCount);
+            for (let pixelIndex = 0; pixelIndex < pixelCount; pixelIndex += 1) {
+              indices[pixelIndex] = compact[pixelIndex] === 0 ? -1 : compact[pixelIndex];
+            }
+            layer.indices = encodeTypedArray(indices);
+            return true;
+          })
+        ));
+      });
+      if (!restored) {
+        return documentPayload;
+      }
+      if (Array.isArray(nextDocument.canvases) && nextDocument.canvases.length) {
+        const activeCanvasId = typeof nextDocument.activeCanvasId === 'string' ? nextDocument.activeCanvasId : '';
+        const activeCanvas = nextDocument.canvases.find(canvas => canvas?.id === activeCanvasId) || nextDocument.canvases[0];
+        if (activeCanvas) {
+          nextDocument.frames = cloneJsonValue(activeCanvas.frames || []);
+        }
+      }
+      delete nextDocument.pixelIndexEncoding;
+      return nextDocument;
     }
 
     function decodeRgbaBase64(base64, expectedLength) {
@@ -677,7 +871,9 @@
       diagnostics,
       { adapterId = '', basePath = '', stripSheets = true, includeTimelapse = true } = {}
     ) {
-      const documentPayload = packagedProject?.document;
+      const sourceDocumentPayload = packagedProject?.document;
+      const compactDocumentPayload = compactDocumentIndicesForPxd(sourceDocumentPayload);
+      const documentPayload = compactDocumentPayload || sourceDocumentPayload;
       if (!documentPayload || typeof documentPayload !== 'object') {
         throw createCodecError('ERR_INVALID_PROJECT_PAYLOAD', 'Packaged project document is missing');
       }
@@ -718,6 +914,9 @@
         ...baseDocument,
         activeCanvasId: activeCanvasId || (canvasEntries[0]?.id || ''),
       };
+      if (compactDocumentPayload) {
+        projectPayload.document.pixelIndexEncoding = PXD_INDEX_ENCODING;
+      }
       if (stripSheets) {
         delete projectPayload.sheets;
         delete projectPayload.activeSheetId;
@@ -1072,9 +1271,13 @@
 
       nextLayer.directOnly = Boolean(layer.directOnly);
       if (typeof nextLayer.indices !== 'string' && typeof encodeTypedArray === 'function') {
-        const transparentIndices = new Int16Array(width * height);
-        transparentIndices.fill(-1);
-        nextLayer.indices = encodeTypedArray(transparentIndices);
+        if (nextLayer.indicesImplicitTransparent === true && !nextLayer.direct && !nextLayer.importSourceDirect) {
+          nextLayer.indices = encodeTypedArray(new Int16Array(0));
+        } else {
+          const transparentIndices = new Int16Array(width * height);
+          transparentIndices.fill(-1);
+          nextLayer.indices = encodeTypedArray(transparentIndices);
+        }
       }
       return nextLayer;
     }
@@ -1142,7 +1345,7 @@
       delete packaged.hadCanvases;
       delete packaged.canvasEntries;
       packaged.session = restoreSessionFromArchive(projectPayload?.session, entries);
-      packaged.document = baseDocument;
+      packaged.document = restoreCompactPxdIndices(baseDocument);
       return packaged;
     }
 

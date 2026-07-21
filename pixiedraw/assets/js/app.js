@@ -390,8 +390,6 @@
       timelapseClear: document.getElementById('timelapseClear'),
       timelapseFps: document.getElementById('timelapseFps'),
       timelapseStatus: document.getElementById('timelapseStatus'),
-      memoryUsage: document.getElementById('memoryUsage'),
-      memoryClear: document.getElementById('memoryClear'),
       floatingPreviewPlay: document.getElementById('floatingPreviewPlay'),
       floatingPreviewStop: document.getElementById('floatingPreviewStop'),
       selectionTransformMenu: document.getElementById('selectionTransformMenu'),
@@ -3244,6 +3242,8 @@
   set focusUnifiedLeftContext(value) { focusUnifiedLeftContext = value; },
   get getProjectCanvasDocuments() { return getProjectCanvasDocuments; },
   set getProjectCanvasDocuments(value) { getProjectCanvasDocuments = value; },
+  get getStoredRasterLayerPaletteIndex() { return getStoredRasterLayerPaletteIndex; },
+  get isRuntimeUint8LayerIndices() { return documentModel.isRuntimeUint8LayerIndices; },
   get getProjectCanvasSurfaceEntries() { return getProjectCanvasSurfaceEntries; },
   set getProjectCanvasSurfaceEntries(value) { getProjectCanvasSurfaceEntries = value; },
   get handlePointerCancel() { return handlePointerCancel; },
@@ -3461,6 +3461,7 @@
   get getActiveProjectCanvasDocument() { return getActiveProjectCanvasDocument; },
   get getProjectCanvasActiveFrame() { return getProjectCanvasActiveFrame; },
   get getProjectCanvasCount() { return getProjectCanvasCount; },
+  get materializeRasterLayerIndices() { return materializeRasterLayerIndices; },
   get state() { return state; },
   }) || {};
 
@@ -3478,6 +3479,79 @@
 
   function getActiveLayerIndex(...args) {
     return canvasCoreWorkflowUtilsModule.getActiveLayerIndex(...args);
+  }
+
+  function materializeRasterLayerIndices(...args) {
+    return documentModel.materializeLayerIndices(...args);
+  }
+
+  function compactRasterLayerIndices(...args) {
+    return documentModel.compactLayerIndices(...args);
+  }
+
+  function compactRasterLayerIndicesToTiles(...args) {
+    return documentModel.compactLayerIndicesToTiles(...args);
+  }
+
+  function getStoredRasterLayerPaletteIndex(...args) {
+    return documentModel.getStoredLayerPaletteIndex(...args);
+  }
+
+  function getRasterLayerTransparentStorageValue(layer) {
+    return documentModel.isRuntimeUint8LayerIndices(layer) ? 0 : -1;
+  }
+
+  function materializeAllCompactRasterLayerIndices() {
+    getProjectCanvasDocuments().forEach(canvasDoc => {
+      const width = Math.max(1, Math.round(Number(canvasDoc?.width) || Number(state.width) || 1));
+      const height = Math.max(1, Math.round(Number(canvasDoc?.height) || Number(state.height) || 1));
+      (Array.isArray(canvasDoc?.frames) ? canvasDoc.frames : []).forEach(frame => {
+        (Array.isArray(frame?.layers) ? frame.layers : []).forEach(layer => {
+          if (
+            documentModel.isCompactLayerIndices(layer, width * height)
+            || documentModel.isTiledLayerIndices(layer, width * height)
+          ) {
+            documentModel.materializeLayerIndices(layer, width, height, state.palette);
+          }
+        });
+      });
+    });
+  }
+
+  function compactInactiveRasterFrameIndices(frame, width, height, palette = state.palette, baseFrame = null) {
+    if (!frame || !Array.isArray(frame.layers)) {
+      return false;
+    }
+    const expectedLength = Math.max(1, Math.round(Number(width) || 1))
+      * Math.max(1, Math.round(Number(height) || 1));
+    let changed = false;
+    frame.layers.forEach((layer, layerIndex) => {
+      if (!layer || isSimulationLayer(layer)) {
+        return;
+      }
+      if (layer.directOnly === true && layer.direct instanceof Uint8ClampedArray) {
+        const keepRuntimeUint8 = layer.indices instanceof Uint8Array
+          || layer.indicesEncoding === 'uint8-palette-zero-transparent-v2';
+        if (layer.indices.length !== 0 || (keepRuntimeUint8 && !(layer.indices instanceof Uint8Array))) {
+          layer.indices = keepRuntimeUint8 ? new Uint8Array(0) : new Int16Array(0);
+          if (keepRuntimeUint8) {
+            layer.indicesEncoding = 'uint8-palette-zero-transparent-v2';
+          } else {
+            delete layer.indicesEncoding;
+          }
+          changed = true;
+        }
+        return;
+      }
+      changed = documentModel.compactLayerIndicesToTiles(
+        layer,
+        palette,
+        Math.max(1, Math.round(Number(width) || 1)),
+        Math.max(1, Math.round(Number(height) || 1)),
+        Array.isArray(baseFrame?.layers) ? baseFrame.layers[layerIndex] : null
+      ) || changed;
+    });
+    return changed;
   }
 
   const canvasDrawingWorkflowUtilsModule = window.PiXiEEDrawModules?.canvasDrawingWorkflowUtils?.createCanvasDrawingWorkflowUtils?.({
@@ -3516,6 +3590,7 @@
   get getEffectiveBrushShape() { return getEffectiveBrushShape; },
   get getLayerPixelMatchState() { return getLayerPixelMatchState; },
   get getMirroredPointSet() { return getMirroredPointSet; },
+  get getRasterLayerTransparentStorageValue() { return getRasterLayerTransparentStorageValue; },
   get isCustomBrushData() { return isCustomBrushData; },
   get isGradientFillStyle() { return isGradientFillStyle; },
   get isIndexColorMode() { return isIndexColorMode; },
@@ -3725,6 +3800,9 @@
   set getViewportVisibilityTargetSurface(value) { getViewportVisibilityTargetSurface = value; },
   get getSelectionMoveContentMask() { return getSelectionMoveContentMask; },
   set getSelectionMoveContentMask(value) { getSelectionMoveContentMask = value; },
+  get getRasterLayerTransparentStorageValue() { return getRasterLayerTransparentStorageValue; },
+  get getStoredRasterLayerPaletteIndex() { return getStoredRasterLayerPaletteIndex; },
+  get isRuntimeUint8LayerIndices() { return documentModel.isRuntimeUint8LayerIndices; },
   get getSelectionMoveTransformState() { return getSelectionMoveTransformState; },
   set getSelectionMoveTransformState(value) { getSelectionMoveTransformState = value; },
   get getSelectionMoveVisualBounds() { return getSelectionMoveVisualBounds; },
@@ -4578,6 +4656,7 @@
   }
 
   const canvasRenderWorkflowUtilsModule = window.PiXiEEDrawModules?.canvasRenderWorkflowUtils?.createCanvasRenderWorkflowUtils?.({
+  get canvasCompositeFrameCache() { return canvasCompositeFrameCache; },
   get DEFAULT_LAYER_BLEND_MODE() { return DEFAULT_LAYER_BLEND_MODE; },
   set DEFAULT_LAYER_BLEND_MODE(value) { DEFAULT_LAYER_BLEND_MODE = value; },
   get activeCanvasSurface() { return activeCanvasSurface; },
@@ -4600,6 +4679,8 @@
   set getDisplayedLayerPreviewOpacity(value) { getDisplayedLayerPreviewOpacity = value; },
   get getDisplayedLayerVisibility() { return getDisplayedLayerVisibility; },
   set getDisplayedLayerVisibility(value) { getDisplayedLayerVisibility = value; },
+  get getStoredRasterLayerPaletteIndex() { return getStoredRasterLayerPaletteIndex; },
+  set getStoredRasterLayerPaletteIndex(value) { getStoredRasterLayerPaletteIndex = value; },
   get getPlaybackFrameImageData() { return getPlaybackFrameImageData; },
   set getPlaybackFrameImageData(value) { getPlaybackFrameImageData = value; },
   get isSimulationLayer() { return isSimulationLayer; },
@@ -4663,6 +4744,14 @@
 
   function markCanvasDirty(...args) {
     return canvasRenderWorkflowUtilsModule.markCanvasDirty(...args);
+  }
+
+  function clearCanvasCompositeFrameCache(...args) {
+    return canvasRenderWorkflowUtilsModule.clearCanvasCompositeFrameCache(...args);
+  }
+
+  function getCanvasCompositeFrameCacheStats(...args) {
+    return canvasRenderWorkflowUtilsModule.getCanvasCompositeFrameCacheStats(...args);
   }
 
   function requestRender(...args) {
@@ -4808,8 +4897,6 @@
   set hideStartupScreen(value) { hideStartupScreen = value; },
   get hydratePixieedAccountFromLocalCache() { return hydratePixieedAccountFromLocalCache; },
   set hydratePixieedAccountFromLocalCache(value) { hydratePixieedAccountFromLocalCache = value; },
-  get initMemoryMonitor() { return initMemoryMonitor; },
-  set initMemoryMonitor(value) { initMemoryMonitor = value; },
   get initPixieedAccount() { return initPixieedAccount; },
   set initPixieedAccount(value) { initPixieedAccount = value; },
   get initPwaInstallSupport() { return initPwaInstallSupport; },
@@ -5881,6 +5968,10 @@
   set createAutosaveProjectId(value) { createAutosaveProjectId = value; },
   get createLayer() { return createLayer; },
   set createLayer(value) { createLayer = value; },
+  get compactRasterLayerIndices() { return compactRasterLayerIndices; },
+  set compactRasterLayerIndices(value) { compactRasterLayerIndices = value; },
+  get compactRasterLayerIndicesToTiles() { return compactRasterLayerIndicesToTiles; },
+  set compactRasterLayerIndicesToTiles(value) { compactRasterLayerIndicesToTiles = value; },
   get createNewProject() { return createNewProject; },
   set createNewProject(value) { createNewProject = value; },
   get createOpenProjectSheetTabFromPackagedProject() { return createOpenProjectSheetTabFromPackagedProject; },
@@ -6197,6 +6288,8 @@
   set exportTimelapseGif(value) { exportTimelapseGif = value; },
   get getExportFileNameBase() { return getExportFileNameBase; },
   set getExportFileNameBase(value) { getExportFileNameBase = value; },
+  get getStoredRasterLayerPaletteIndex() { return getStoredRasterLayerPaletteIndex; },
+  set getStoredRasterLayerPaletteIndex(value) { getStoredRasterLayerPaletteIndex = value; },
   get isDesktopRightToolRailMode() { return isDesktopRightToolRailMode; },
   set isDesktopRightToolRailMode(value) { isDesktopRightToolRailMode = value; },
   get layoutMode() { return layoutMode; },
@@ -6748,7 +6841,7 @@
   }) || null;
 
   const projectStorageV2WorkerBridge = window.PiXiEEDrawModules?.projectStorageV2WorkerBridge?.createProjectStorageV2WorkerBridge?.({
-    workerUrl: 'assets/js/workers/project-storage-v2.worker.js?v=20260713-047',
+    workerUrl: 'assets/js/workers/project-storage-v2.worker.js?v=20260720-pxd3',
     console,
   }) || null;
 
@@ -8040,6 +8133,13 @@
     createInitialState,
     createInitialVirtualCursor,
     createLayer,
+    isImplicitTransparentLayerIndices,
+    isCompactLayerIndices,
+    isTiledLayerIndices,
+    getStoredLayerPaletteIndex,
+    compactLayerIndices,
+    compactLayerIndicesToTiles,
+    materializeLayerIndices,
     ensureLayerDirect,
     isSimulationLayer,
     cloneSimulationColor,
@@ -9915,6 +10015,11 @@
   let selectionMaskCacheIdCounter = 1;
   const HISTORY_DRAW_TOOLS = new Set(['pen', 'eraser', 'line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill', ...FILL_TOOL_SET]);
   const HISTORY_ENTRY_TYPE_PIXEL_PATCH = 'pixelPatch';
+  // Adding a layer to an animation creates one blank layer per frame.  A full
+  // document snapshot for that purely structural change is prohibitively
+  // expensive for long GIF imports, so keep a small reversible operation.
+  const HISTORY_ENTRY_TYPE_LAYER_ADD = 'layerAdd';
+  const HISTORY_ENTRY_TYPE_FRAME_ADD = 'frameAdd';
   const PIXEL_PATCH_HISTORY_LABELS = new Set([
     'pen',
     'eraser',
@@ -9970,8 +10075,6 @@
     resolve: null,
     closing: false,
   };
-  const MEMORY_MONITOR_INTERVAL = 5000;
-  const MEMORY_WARNING_DEFAULT = 250 * 1024 * 1024;
   const MIN_HISTORY_LIMIT = 20;
   const HISTORY_MEMORY_BUDGET_BYTES = isLightweightPersistenceMode()
     ? 24 * 1024 * 1024
@@ -10111,6 +10214,13 @@
     colorHistoryDirty: false,
   };
   let dirtyRegion = null;
+  const canvasCompositeFrameCache = {
+    byFrame: new Map(),
+    bytes: 0,
+    maxBytes: 24 * 1024 * 1024,
+    hits: 0,
+    misses: 0,
+  };
   let canvasControlMode = 'zoom';
   /** @type {any} */
   const canvasControlActionsWorkflowUtilsModule = window.PiXiEEDrawModules?.canvasControlActionsWorkflowUtils?.createCanvasControlActionsWorkflowUtils?.({
@@ -10676,29 +10786,18 @@
   }
 
   const memoryUtils = window.PiXiEEDrawModules?.memoryUtils?.createMemoryUtils?.({
-    dom,
     state,
     history,
     DEFAULT_HISTORY_LIMIT,
-    MEMORY_MONITOR_INTERVAL,
-    MEMORY_WARNING_DEFAULT,
-    MIN_HISTORY_LIMIT,
     HISTORY_MEMORY_BUDGET_BYTES,
     estimateEncodedByteLength,
     isPixelPatchHistoryEntry: (...args) => isPixelPatchHistoryEntry(...args),
     finalizePixelPatchHistoryEntry: (...args) => finalizePixelPatchHistoryEntry(...args),
     getAllTimelapseTracks,
-    getAllTimelapseStepCount,
-    getActiveTimelapseTrack,
-    clearTimelapseRecording,
-    fillPreviewCache,
     updateHistoryButtons: (...args) => updateHistoryButtons(...args),
     archiveEvictedHistoryEntry: (...args) => archiveEvictedHistoryEntry(...args),
-    markAutosaveDirty: (...args) => markAutosaveDirty(...args),
-    scheduleAutosaveSnapshot: (...args) => scheduleAutosaveSnapshot(...args),
-    localizeText,
-    formatBytes,
     normalizeProjectHistoryLimit,
+    getCanvasCompositeCacheBytes: () => getCanvasCompositeFrameCacheStats().bytes,
   }) || {};
   const {
     bytesForLayer,
@@ -10707,13 +10806,9 @@
     estimateHistoryBytes,
     estimateTimelapseBytes,
     getMemoryUsageBreakdown,
-    trimHistoryForMemoryIfNeeded,
     trimHistoryToByteBudget,
-    computeMemoryThresholds,
     updateMemoryStatus,
-    clearMemoryUsage,
     trimHistoryStacksToLimit,
-    initMemoryMonitor,
   } = memoryUtils;
 
   function bytesToMiB(value) {
@@ -10810,6 +10905,7 @@
         residentTimelapseBaseCount,
         diskBackedTimelapseBaseCount,
         timelapseDiskBaseEligible: shouldUseDiskBackedTimelapseBase(),
+        canvasCompositeCache: getCanvasCompositeFrameCacheStats(),
       },
       page: {
         homeVisible: Boolean(projectHomeVisible),
@@ -11113,7 +11209,9 @@
       state.playback = { ...snapshot.playback };
     }
     state.playback = {
-      isPlaying: Boolean(state.playback?.isPlaying),
+      // History/project restore must never resume a stale playing flag without
+      // an active animation-frame loop.
+      isPlaying: false,
       lastFrame: Number(state.playback?.lastFrame) || 0,
       loop: state.playback?.loop !== false,
     };
@@ -12035,6 +12133,7 @@
   set getDisplayedLayerPreviewOpacity(value) { getDisplayedLayerPreviewOpacity = value; },
   get getDisplayedLayerVisibility() { return getDisplayedLayerVisibility; },
   set getDisplayedLayerVisibility(value) { getDisplayedLayerVisibility = value; },
+  get getStoredRasterLayerPaletteIndex() { return getStoredRasterLayerPaletteIndex; },
   get getExportFileNameBase() { return getExportFileNameBase; },
   set getExportFileNameBase(value) { getExportFileNameBase = value; },
   get getExportScaleCandidates() { return getExportScaleCandidates; },
@@ -12579,11 +12678,210 @@
       history.pending = pixelPatchPending;
       return;
     }
+    clearCanvasCompositeFrameCache();
+    if (
+      label === 'addLayer'
+      && !multiState.connected
+      && !activeSharedProjectKey
+      && !isSharedProjectCollaborativeMode()
+      && !isVoxelExtensionModeEnabled()
+    ) {
+      history.pending = {
+        __historyEntryType: HISTORY_ENTRY_TYPE_LAYER_ADD,
+        dirty: false,
+        label,
+        canvasId: getActiveProjectCanvasDocument()?.id || '',
+        activeFrameBefore: state.activeFrame,
+        activeLayerBefore: state.activeLayer,
+        activeLayerAfter: null,
+        layers: [],
+      };
+      return;
+    }
+    if (
+      label === 'addFrame'
+      && !multiState.connected
+      && !activeSharedProjectKey
+      && !isSharedProjectCollaborativeMode()
+      && !isVoxelExtensionModeEnabled()
+    ) {
+      history.pending = {
+        __historyEntryType: HISTORY_ENTRY_TYPE_FRAME_ADD,
+        dirty: false,
+        label,
+        canvasId: getActiveProjectCanvasDocument()?.id || '',
+        activeFrameBefore: state.activeFrame,
+        activeLayerBefore: state.activeLayer,
+        activeFrameAfter: null,
+        activeLayerAfter: null,
+        frames: [],
+      };
+      return;
+    }
+    // Structural and palette-wide operations still use legacy snapshot
+    // writers. Expand compact GIF frames once before those operations so all
+    // existing mutation code keeps its established Int16/-1 semantics.
+    materializeAllCompactRasterLayerIndices();
     history.pending = {
       before: compressHistorySnapshot(makeHistorySnapshot({ clonePixelData: false })),
       dirty: false,
       label,
     };
+  }
+
+  function isLayerAddHistoryEntry(entry) {
+    return Boolean(entry && entry.__historyEntryType === HISTORY_ENTRY_TYPE_LAYER_ADD);
+  }
+
+  function recordPendingLayerAddHistoryLayer(frame, layer, index) {
+    if (!isLayerAddHistoryEntry(history.pending) || !frame || !layer) {
+      return false;
+    }
+    history.pending.layers.push({
+      frameId: typeof frame.id === 'string' ? frame.id : '',
+      layerId: typeof layer.id === 'string' ? layer.id : '',
+      index: Math.max(0, Math.round(Number(index) || 0)),
+      layer,
+    });
+    return true;
+  }
+
+  function finalizeLayerAddHistoryEntry(pending) {
+    if (!isLayerAddHistoryEntry(pending) || !pending.dirty || !Array.isArray(pending.layers) || !pending.layers.length) {
+      return null;
+    }
+    return {
+      __historyEntryType: HISTORY_ENTRY_TYPE_LAYER_ADD,
+      version: 1,
+      historyLabel: pending.label,
+      canvasId: pending.canvasId,
+      activeFrameBefore: pending.activeFrameBefore,
+      activeLayerBefore: pending.activeLayerBefore,
+      activeLayerAfter: pending.activeLayerAfter,
+      layers: pending.layers,
+    };
+  }
+
+  function applyLayerAddHistoryEntry(entry, direction = 'undo') {
+    if (!isLayerAddHistoryEntry(entry) || !Array.isArray(entry.layers) || !entry.layers.length) {
+      return false;
+    }
+    const undoing = direction === 'undo';
+    let changed = false;
+    entry.layers.forEach(layerEntry => {
+      const frame = state.frames.find(candidate => candidate?.id === layerEntry.frameId);
+      if (!frame || !Array.isArray(frame.layers) || !layerEntry.layerId) {
+        return;
+      }
+      const currentIndex = frame.layers.findIndex(layer => layer?.id === layerEntry.layerId);
+      if (undoing) {
+        if (currentIndex >= 0) {
+          frame.layers.splice(currentIndex, 1);
+          changed = true;
+        }
+        return;
+      }
+      if (currentIndex >= 0 || !layerEntry.layer) {
+        return;
+      }
+      const insertIndex = clamp(layerEntry.index, 0, frame.layers.length);
+      frame.layers.splice(insertIndex, 0, layerEntry.layer);
+      changed = true;
+    });
+    if (!changed) {
+      return false;
+    }
+    state.activeFrame = clamp(
+      Math.round(Number(entry.activeFrameBefore) || 0),
+      0,
+      Math.max(0, state.frames.length - 1)
+    );
+    const activeFrame = state.frames[state.activeFrame];
+    const preferredLayerId = undoing ? entry.activeLayerBefore : entry.activeLayerAfter;
+    state.activeLayer = activeFrame?.layers?.some(layer => layer?.id === preferredLayerId)
+      ? preferredLayerId
+      : (activeFrame?.layers?.[activeFrame.layers.length - 1]?.id || null);
+    invalidateActiveCanvasCompositeRenderState();
+    renderFrameList();
+    renderLayerList();
+    requestRender();
+    requestOverlayRender();
+    return true;
+  }
+
+  function isFrameAddHistoryEntry(entry) {
+    return Boolean(entry && entry.__historyEntryType === HISTORY_ENTRY_TYPE_FRAME_ADD);
+  }
+
+  function recordPendingFrameAddHistoryFrame(frame, index) {
+    if (!isFrameAddHistoryEntry(history.pending) || !frame) {
+      return false;
+    }
+    history.pending.frames.push({
+      frameId: typeof frame.id === 'string' ? frame.id : '',
+      index: Math.max(0, Math.round(Number(index) || 0)),
+      frame,
+    });
+    return true;
+  }
+
+  function finalizeFrameAddHistoryEntry(pending) {
+    if (!isFrameAddHistoryEntry(pending) || !pending.dirty || !Array.isArray(pending.frames) || !pending.frames.length) {
+      return null;
+    }
+    return {
+      __historyEntryType: HISTORY_ENTRY_TYPE_FRAME_ADD,
+      version: 1,
+      historyLabel: pending.label,
+      canvasId: pending.canvasId,
+      activeFrameBefore: pending.activeFrameBefore,
+      activeLayerBefore: pending.activeLayerBefore,
+      activeFrameAfter: pending.activeFrameAfter,
+      activeLayerAfter: pending.activeLayerAfter,
+      frames: pending.frames,
+    };
+  }
+
+  function applyFrameAddHistoryEntry(entry, direction = 'undo') {
+    if (!isFrameAddHistoryEntry(entry) || !Array.isArray(entry.frames) || !entry.frames.length) {
+      return false;
+    }
+    const undoing = direction === 'undo';
+    let changed = false;
+    entry.frames.forEach(frameEntry => {
+      if (!frameEntry?.frameId) return;
+      const currentIndex = state.frames.findIndex(frame => frame?.id === frameEntry.frameId);
+      if (undoing) {
+        if (currentIndex >= 0 && state.frames.length > 1) {
+          state.frames.splice(currentIndex, 1);
+          changed = true;
+        }
+        return;
+      }
+      if (currentIndex >= 0 || !frameEntry.frame) return;
+      state.frames.splice(clamp(frameEntry.index, 0, state.frames.length), 0, frameEntry.frame);
+      changed = true;
+    });
+    if (!changed || !state.frames.length) {
+      return false;
+    }
+    const preferredFrameIndex = undoing ? entry.activeFrameBefore : entry.activeFrameAfter;
+    state.activeFrame = clamp(
+      Math.round(Number(preferredFrameIndex) || 0),
+      0,
+      state.frames.length - 1
+    );
+    const activeFrame = state.frames[state.activeFrame];
+    const preferredLayerId = undoing ? entry.activeLayerBefore : entry.activeLayerAfter;
+    state.activeLayer = activeFrame?.layers?.some(layer => layer?.id === preferredLayerId)
+      ? preferredLayerId
+      : (activeFrame?.layers?.[activeFrame.layers.length - 1]?.id || null);
+    invalidateActiveCanvasCompositeRenderState();
+    renderFrameList();
+    renderLayerList();
+    requestRender();
+    requestOverlayRender();
+    return true;
   }
 
   function discardPendingHistory() {
@@ -13794,10 +14092,17 @@
     getPlaybackFrameImageData,
   } = playbackCacheUtils;
 
-  function invalidateActiveCanvasCompositeRenderState({ clearHover = true } = {}) {
+  function invalidateActiveCanvasCompositeRenderState({ clearHover = true, preserveFrameCache = false } = {}) {
     invalidateFillPreviewCache();
     invalidateOnionSkinCache();
-    clearPlaybackFrameCache();
+    // Frame changes are the normal playback hot path. Keep the prepared
+    // nearby-frame cache alive until playback explicitly stops.
+    if (!state.playback.isPlaying) {
+      clearPlaybackFrameCache();
+    }
+    if (!preserveFrameCache) {
+      clearCanvasCompositeFrameCache();
+    }
     markCanvasDirty();
     if (clearHover) {
       hoverPixel = null;
@@ -13826,6 +14131,10 @@
   set applyHistorySnapshotForSharedLocalCell(value) { applyHistorySnapshotForSharedLocalCell = value; },
   get applyPixelPatchHistoryEntry() { return applyPixelPatchHistoryEntry; },
   set applyPixelPatchHistoryEntry(value) { applyPixelPatchHistoryEntry = value; },
+  get applyLayerAddHistoryEntry() { return applyLayerAddHistoryEntry; },
+  set applyLayerAddHistoryEntry(value) { applyLayerAddHistoryEntry = value; },
+  get applyFrameAddHistoryEntry() { return applyFrameAddHistoryEntry; },
+  set applyFrameAddHistoryEntry(value) { applyFrameAddHistoryEntry = value; },
   get cancelPendingCurveInteraction() { return cancelPendingCurveInteraction; },
   set cancelPendingCurveInteraction(value) { cancelPendingCurveInteraction = value; },
   get cancelPendingSelectionMove() { return cancelPendingSelectionMove; },
@@ -13844,6 +14153,10 @@
   set dom(value) { dom = value; },
   get finalizePixelPatchHistoryEntry() { return finalizePixelPatchHistoryEntry; },
   set finalizePixelPatchHistoryEntry(value) { finalizePixelPatchHistoryEntry = value; },
+  get finalizeLayerAddHistoryEntry() { return finalizeLayerAddHistoryEntry; },
+  set finalizeLayerAddHistoryEntry(value) { finalizeLayerAddHistoryEntry = value; },
+  get finalizeFrameAddHistoryEntry() { return finalizeFrameAddHistoryEntry; },
+  set finalizeFrameAddHistoryEntry(value) { finalizeFrameAddHistoryEntry = value; },
   get getActiveProjectCanvasDocument() { return getActiveProjectCanvasDocument; },
   set getActiveProjectCanvasDocument(value) { getActiveProjectCanvasDocument = value; },
   get getActiveTimelapseTrack() { return getActiveTimelapseTrack; },
@@ -13880,6 +14193,10 @@
   set isMultiMasterMode(value) { isMultiMasterMode = value; },
   get isPixelPatchHistoryEntry() { return isPixelPatchHistoryEntry; },
   set isPixelPatchHistoryEntry(value) { isPixelPatchHistoryEntry = value; },
+  get isLayerAddHistoryEntry() { return isLayerAddHistoryEntry; },
+  set isLayerAddHistoryEntry(value) { isLayerAddHistoryEntry = value; },
+  get isFrameAddHistoryEntry() { return isFrameAddHistoryEntry; },
+  set isFrameAddHistoryEntry(value) { isFrameAddHistoryEntry = value; },
   get isSharedProjectCollaborativeMode() { return isSharedProjectCollaborativeMode; },
   set isSharedProjectCollaborativeMode(value) { isSharedProjectCollaborativeMode = value; },
   get isVoxelExtensionModeEnabled() { return isVoxelExtensionModeEnabled; },
@@ -14989,6 +15306,8 @@
   set clamp(value) { clamp = value; },
   get commitHistory() { return commitHistory; },
   set commitHistory(value) { commitHistory = value; },
+  get compactInactiveRasterFrameIndices() { return compactInactiveRasterFrameIndices; },
+  set compactInactiveRasterFrameIndices(value) { compactInactiveRasterFrameIndices = value; },
   get enforceGuestAssignedLayerSelection() { return enforceGuestAssignedLayerSelection; },
   set enforceGuestAssignedLayerSelection(value) { enforceGuestAssignedLayerSelection = value; },
   get getActiveFrame() { return getActiveFrame; },
@@ -15170,6 +15489,7 @@
       });
     } else {
       const sourceLayers = baseFrame.layers;
+      const insertIndex = state.activeFrame + 1;
       const newFrame = createFrame(
         getDefaultFrameName(nextFrameNumber),
         sourceLayers,
@@ -15185,12 +15505,19 @@
       if (duplicate) {
         newFrame.name = getDefaultFrameName(nextFrameNumber);
       }
-      state.frames.splice(state.activeFrame + 1, 0, newFrame);
+      state.frames.splice(insertIndex, 0, newFrame);
+      if (!duplicate) {
+        recordPendingFrameAddHistoryFrame(newFrame, insertIndex);
+      }
     }
     clearPendingMultiAssignmentMoveRequests();
     state.activeFrame += 1;
     const nextActiveFrame = getActiveFrame();
     state.activeLayer = nextActiveFrame?.layers?.[nextActiveFrame.layers.length - 1]?.id || state.activeLayer;
+    if (isFrameAddHistoryEntry(history.pending)) {
+      history.pending.activeFrameAfter = state.activeFrame;
+      history.pending.activeLayerAfter = state.activeLayer;
+    }
     markCanvasDirty();
     markHistoryDirty();
     scheduleSessionPersist();
@@ -16514,8 +16841,12 @@
     createAutosaveProjectId,
     snapshotFromParsedDocumentValue,
     serializeDocumentSnapshot,
+    serializeLayerForDocument,
+    deserializeLayerFromDocument,
     buildProjectSessionPayload,
     isPixelPatchHistoryEntry,
+    isLayerAddHistoryEntry,
+    isFrameAddHistoryEntry,
     getProjectCanvasDocuments,
     getActiveProjectCanvasDocument,
     getActiveOpenProjectTabId: () => activeOpenProjectTabId,
@@ -17324,7 +17655,7 @@
     if (journalOnly) {
       const normalizedOps = normalizeV2PixelPatchJournalOps(savePlan?.journalPayload || null);
       if (!normalizedOps || !normalizedOps.length) {
-        throw new Error('V2 journal save requires valid pixel patches');
+        throw new Error('V2 journal save requires valid replayable operations');
       }
       if (normalizeAutosaveProjectId(autosaveProjectId || '') !== normalizedProjectId) {
         return createSkippedResult(previousEntry);
@@ -18853,6 +19184,8 @@
   set markCanvasDirty(value) { markCanvasDirty = value; },
   get markHistoryDirty() { return markHistoryDirty; },
   set markHistoryDirty(value) { markHistoryDirty = value; },
+  get recordPendingLayerAddHistoryLayer() { return recordPendingLayerAddHistoryLayer; },
+  set recordPendingLayerAddHistoryLayer(value) { recordPendingLayerAddHistoryLayer = value; },
   get multiState() { return multiState; },
   set multiState(value) { multiState = value; },
   get normalizeFpsValue() { return normalizeFpsValue; },
@@ -23651,7 +23984,9 @@
     hash = mixUint32Hash(hash, layer.visible === false ? 0 : 1);
     hash = mixUint32Hash(hash, Math.round(normalizeLayerOpacity(layer.opacity) * 1000));
     hash = mixTextHash(hash, normalizeLayerBlendMode(layer.blendMode));
-    const indices = layer.indices instanceof Int16Array ? layer.indices : null;
+    const indices = layer.indices instanceof Int16Array || layer.indices instanceof Uint8Array
+      ? layer.indices
+      : null;
     const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
     if (indices) {
       hash = mixUint32Hash(hash, indices.length);

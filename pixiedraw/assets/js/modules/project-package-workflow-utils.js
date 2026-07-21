@@ -373,6 +373,7 @@
     const resolvedDotStats = resolveTrackedProjectDotStats(snapshot);
     const payload = serializeDocumentSnapshot(snapshot, {
       preserveTypedArrays: internalBinary === true,
+      compactIndicesForStorage: internalBinary === true,
     });
     const packagedSession = session && typeof session === 'object'
       ? session

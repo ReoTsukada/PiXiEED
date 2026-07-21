@@ -32,6 +32,11 @@ assert.match(
   /updateExportPreview,\s*createFrameCanvas,\s*canvasRegionToBlob,\s*scaleCanvasNearestNeighbor,/,
   'export-rendering must publish canvasRegionToBlob'
 );
+assert.match(
+  app,
+  /get getStoredRasterLayerPaletteIndex\(\) \{ return getStoredRasterLayerPaletteIndex; \},[\s\S]{0,300}get getExportFileNameBase/,
+  'playback/export compositor must receive the runtime Uint8 palette-index reader'
+);
 const previewStart = rendering.indexOf('function buildExportPreviewSourceCanvas(format)');
 const previewEnd = rendering.indexOf('\n  function updateExportPreview()', previewStart);
 assert.ok(previewStart >= 0 && previewEnd > previewStart, 'export preview source builder must exist');
@@ -89,10 +94,10 @@ assert.match(rendering, /function renderExportPreviewOutputs\(mode, previewData 
 assert.match(rendering, /function createExportPreviewOutputVisual\(card, previewData\)/, 'output cards must use lightweight real-content thumbnails');
 assert.match(rendering, /add\('PiXiEEDraw', '\.pxd 編集データ'/, 'project export must be named as a .pxd file in the preview');
 assert.match(rendering, /add\('SpriteMAP', '全フレームを PNG ×1 で配置'/, 'SpriteMAP preview must state its fixed ×1 placement');
-assert.match(index, /export-rendering\.js\?v=20260720-pxd2/);
+assert.match(index, /export-rendering\.js\?v=20260721-runtime-index8-output1/);
 assert.match(index, /dialog-setup-utils\.js\?v=20260720-export-batch-direct1/);
 assert.match(index, /export-dialog-workflow-utils\.js\?v=20260720-export-batch-snapshot1/);
 assert.match(index, /export-normalizer-utils\.js\?v=20260720-export-batchzip1/);
-assert.match(index, /app\.js\?v=20260720-pxd2/);
+assert.match(index, /app\.js\?v=20260721-playback-state1/);
 
 console.log('PiXiEEDraw export runtime wiring and preview-cost checks passed');

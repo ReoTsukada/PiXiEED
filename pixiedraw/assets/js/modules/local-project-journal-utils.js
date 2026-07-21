@@ -20,8 +20,12 @@
     createAutosaveProjectId,
     snapshotFromParsedDocumentValue,
     serializeDocumentSnapshot,
+    serializeLayerForDocument,
+    deserializeLayerFromDocument,
     buildProjectSessionPayload,
     isPixelPatchHistoryEntry,
+    isLayerAddHistoryEntry,
+    isFrameAddHistoryEntry,
     getProjectCanvasDocuments,
     getActiveProjectCanvasDocument,
     getActiveOpenProjectTabId,
@@ -167,6 +171,28 @@
     }
 
     function ensureTypedLayerBuffers(layer, length) {
+      if (layer?.indicesEncoding === 'uint8-palette-zero-transparent-v2') {
+        if (!(layer.indices instanceof Uint8Array) || layer.indices.length !== length) {
+          const source = layer.indices instanceof Uint8Array ? layer.indices : new Uint8Array(0);
+          const next = new Uint8Array(length);
+          next.set(source.subarray(0, Math.min(source.length, length)));
+          layer.indices = next;
+        }
+        return;
+      }
+      if (layer?.indicesEncoding === 'uint8-zero-transparent-v1' && layer.indices instanceof Uint8Array) {
+        const expanded = new Int16Array(length);
+        expanded.fill(-1);
+        const copyLength = Math.min(length, layer.indices.length);
+        for (let index = 0; index < copyLength; index += 1) {
+          expanded[index] = layer.indices[index] === 0 ? -1 : layer.indices[index] - 1;
+        }
+        layer.indices = expanded;
+        if (layer.indicesEncoding !== 'uint8-palette-zero-transparent-v2') {
+          delete layer.indicesEncoding;
+        }
+        return;
+      }
       if (!(layer.indices instanceof Int16Array) || layer.indices.length !== length) {
         const indices = Array.isArray(layer.indices)
           ? layer.indices
@@ -276,6 +302,230 @@
       return changed;
     }
 
+    function createLayerAddJournalOp(historyEntry = null) {
+      if (!isLayerAddHistoryEntry?.(historyEntry) || !Array.isArray(historyEntry.layers) || !historyEntry.layers.length) {
+        return null;
+      }
+      const canvasId = String(historyEntry.canvasId || '');
+      const canvases = Array.isArray(getProjectCanvasDocuments?.()) ? getProjectCanvasDocuments() : [];
+      const canvasDoc = canvases.find(canvas => canvas?.id === canvasId) || getActiveProjectCanvasDocument?.() || null;
+      const width = Math.max(1, Math.round(Number(canvasDoc?.width) || Number(state?.width) || 1));
+      const height = Math.max(1, Math.round(Number(canvasDoc?.height) || Number(state?.height) || 1));
+      const palette = Array.isArray(canvasDoc?.palette) ? canvasDoc.palette : state?.palette;
+      const layers = historyEntry.layers.map(layerEntry => {
+        if (!layerEntry?.layer || typeof serializeLayerForDocument !== 'function') {
+          return null;
+        }
+        const layer = serializeLayerForDocument(layerEntry.layer, {
+          preserveTypedArrays: true,
+          width,
+          height,
+          palette,
+        });
+        // addLayer creates a transparent layer. Persist its structure without
+        // allocating or cloning width x height pixel buffers.
+        layer.indices = null;
+        layer.indicesImplicitTransparent = true;
+        if (layer.indicesEncoding !== 'uint8-palette-zero-transparent-v2') {
+          delete layer.indicesEncoding;
+        }
+        layer.direct = null;
+        layer.importSourceDirect = null;
+        layer.directOnly = false;
+        return {
+          frameId: String(layerEntry.frameId || ''),
+          layerId: String(layerEntry.layerId || layer.id || ''),
+          index: Math.max(0, Math.round(Number(layerEntry.index) || 0)),
+          layer,
+        };
+      }).filter(Boolean);
+      if (!layers.length || layers.length !== historyEntry.layers.length) {
+        return null;
+      }
+      return {
+        kind: 'layer-add',
+        historyLabel: String(historyEntry.historyLabel || 'addLayer'),
+        canvasId,
+        activeFrame: Math.max(0, Math.round(Number(historyEntry.activeFrameBefore) || 0)),
+        activeLayer: String(historyEntry.activeLayerAfter || ''),
+        layers,
+      };
+    }
+
+    function applyLayerAddToSnapshot(snapshot, op = null) {
+      if (!snapshot || op?.kind !== 'layer-add' || !Array.isArray(op.layers) || !op.layers.length) {
+        return false;
+      }
+      const canvases = getSnapshotCanvasList(snapshot);
+      const canvasDoc = canvases.find(canvas => canvas?.id === op.canvasId) || canvases[0] || null;
+      if (!canvasDoc || !Array.isArray(canvasDoc.frames) || typeof deserializeLayerFromDocument !== 'function') {
+        return false;
+      }
+      const width = Math.max(1, Math.round(Number(canvasDoc.width) || 1));
+      const height = Math.max(1, Math.round(Number(canvasDoc.height) || 1));
+      const pixelCount = width * height;
+      let changed = false;
+      for (const layerEntry of op.layers) {
+        const frame = canvasDoc.frames.find(item => item?.id === layerEntry?.frameId) || null;
+        if (!frame || !Array.isArray(frame.layers) || !layerEntry?.layerId || !layerEntry?.layer) {
+          return false;
+        }
+        if (frame.layers.some(layer => layer?.id === layerEntry.layerId)) {
+          continue;
+        }
+        const layer = deserializeLayerFromDocument(
+          layerEntry.layer,
+          pixelCount,
+          layerEntry.layerId,
+          String(layerEntry.layer?.name || 'Layer'),
+          width,
+          height,
+          { reuseTypedArrays: true, trustStoredLayerFlags: true }
+        );
+        frame.layers.splice(
+          Math.min(Math.max(0, Math.round(Number(layerEntry.index) || 0)), frame.layers.length),
+          0,
+          layer
+        );
+        changed = true;
+      }
+      if (!changed) {
+        return false;
+      }
+      canvasDoc.activeFrame = Math.min(Math.max(0, Math.round(Number(op.activeFrame) || 0)), canvasDoc.frames.length - 1);
+      const activeFrame = canvasDoc.frames[canvasDoc.activeFrame];
+      if (activeFrame?.layers?.some(layer => layer?.id === op.activeLayer)) {
+        canvasDoc.activeLayer = op.activeLayer;
+      }
+      if (snapshot === canvasDoc || !Array.isArray(snapshot.canvases)) {
+        snapshot.activeFrame = canvasDoc.activeFrame;
+        snapshot.activeLayer = canvasDoc.activeLayer;
+      }
+      return true;
+    }
+
+    function createFrameAddJournalOp(historyEntry = null) {
+      if (!isFrameAddHistoryEntry?.(historyEntry) || !Array.isArray(historyEntry.frames) || !historyEntry.frames.length) {
+        return null;
+      }
+      const canvasId = String(historyEntry.canvasId || '');
+      const canvases = Array.isArray(getProjectCanvasDocuments?.()) ? getProjectCanvasDocuments() : [];
+      const canvasDoc = canvases.find(canvas => canvas?.id === canvasId) || getActiveProjectCanvasDocument?.() || null;
+      const width = Math.max(1, Math.round(Number(canvasDoc?.width) || Number(state?.width) || 1));
+      const height = Math.max(1, Math.round(Number(canvasDoc?.height) || Number(state?.height) || 1));
+      const palette = Array.isArray(canvasDoc?.palette) ? canvasDoc.palette : state?.palette;
+      const frames = historyEntry.frames.map(frameEntry => {
+        const frame = frameEntry?.frame;
+        if (!frame || !Array.isArray(frame.layers) || !frame.layers.length || typeof serializeLayerForDocument !== 'function') {
+          return null;
+        }
+        const layers = frame.layers.map(sourceLayer => {
+          const layer = serializeLayerForDocument(sourceLayer, {
+            preserveTypedArrays: true,
+            width,
+            height,
+            palette,
+          });
+          if (layer?.type) {
+            return layer;
+          }
+          // addFrame creates transparent layers that mirror only the source
+          // layer structure. Keep their pixel planes implicit.
+          layer.indices = null;
+          layer.indicesImplicitTransparent = true;
+          if (layer.indicesEncoding !== 'uint8-palette-zero-transparent-v2') {
+            delete layer.indicesEncoding;
+          }
+          layer.direct = null;
+          layer.importSourceDirect = null;
+          layer.directOnly = false;
+          return layer;
+        });
+        if (layers.some(layer => layer?.type)) {
+          return null;
+        }
+        return {
+          frameId: String(frameEntry.frameId || frame.id || ''),
+          index: Math.max(0, Math.round(Number(frameEntry.index) || 0)),
+          frame: {
+            id: String(frame.id || frameEntry.frameId || ''),
+            name: String(frame.name || ''),
+            duration: Math.max(1, Number(frame.duration) || 100),
+            voxelPreviewYawDeg: Number(frame.voxelPreviewYawDeg) || 0,
+            voxelPreviewPitchDeg: Number(frame.voxelPreviewPitchDeg) || 0,
+            layers,
+          },
+        };
+      }).filter(Boolean);
+      if (!frames.length || frames.length !== historyEntry.frames.length) {
+        return null;
+      }
+      return {
+        kind: 'frame-add',
+        historyLabel: String(historyEntry.historyLabel || 'addFrame'),
+        canvasId,
+        activeFrame: Math.max(0, Math.round(Number(historyEntry.activeFrameAfter) || 0)),
+        activeLayer: String(historyEntry.activeLayerAfter || ''),
+        frames,
+      };
+    }
+
+    function applyFrameAddToSnapshot(snapshot, op = null) {
+      if (!snapshot || op?.kind !== 'frame-add' || !Array.isArray(op.frames) || !op.frames.length) {
+        return false;
+      }
+      const canvases = getSnapshotCanvasList(snapshot);
+      const canvasDoc = canvases.find(canvas => canvas?.id === op.canvasId) || canvases[0] || null;
+      if (!canvasDoc || !Array.isArray(canvasDoc.frames) || typeof deserializeLayerFromDocument !== 'function') {
+        return false;
+      }
+      const width = Math.max(1, Math.round(Number(canvasDoc.width) || 1));
+      const height = Math.max(1, Math.round(Number(canvasDoc.height) || 1));
+      const pixelCount = width * height;
+      let changed = false;
+      for (const frameEntry of op.frames) {
+        if (!frameEntry?.frameId || !frameEntry?.frame || !Array.isArray(frameEntry.frame.layers)) {
+          return false;
+        }
+        if (canvasDoc.frames.some(frame => frame?.id === frameEntry.frameId)) {
+          continue;
+        }
+        const frame = {
+          id: frameEntry.frameId,
+          name: String(frameEntry.frame.name || ''),
+          duration: Math.max(1, Number(frameEntry.frame.duration) || 100),
+          voxelPreviewYawDeg: Number(frameEntry.frame.voxelPreviewYawDeg) || 0,
+          voxelPreviewPitchDeg: Number(frameEntry.frame.voxelPreviewPitchDeg) || 0,
+          layers: frameEntry.frame.layers.map((layer, layerIndex) => deserializeLayerFromDocument(
+            layer,
+            pixelCount,
+            String(layer?.id || `layer-${layerIndex + 1}`),
+            String(layer?.name || `Layer ${layerIndex + 1}`),
+            width,
+            height,
+            { reuseTypedArrays: true, trustStoredLayerFlags: true }
+          )),
+        };
+        canvasDoc.frames.splice(
+          Math.min(Math.max(0, Math.round(Number(frameEntry.index) || 0)), canvasDoc.frames.length),
+          0,
+          frame
+        );
+        changed = true;
+      }
+      if (!changed) return false;
+      canvasDoc.activeFrame = Math.min(Math.max(0, Math.round(Number(op.activeFrame) || 0)), canvasDoc.frames.length - 1);
+      const activeFrame = canvasDoc.frames[canvasDoc.activeFrame];
+      if (activeFrame?.layers?.some(layer => layer?.id === op.activeLayer)) {
+        canvasDoc.activeLayer = op.activeLayer;
+      }
+      if (snapshot === canvasDoc || !Array.isArray(snapshot.canvases)) {
+        snapshot.activeFrame = canvasDoc.activeFrame;
+        snapshot.activeLayer = canvasDoc.activeLayer;
+      }
+      return true;
+    }
+
     function patchPackagedProjectRootDocument(packagedProject = null, snapshot = null, session = null, updatedAt = '') {
       if (!packagedProject || typeof packagedProject !== 'object' || !snapshot || typeof snapshot !== 'object') {
         return packagedProject;
@@ -338,6 +588,10 @@
       journal.ops.forEach(op => {
         if (op?.kind === 'pixel-patch' && op?.historyEntry) {
           applyPixelPatchToSnapshot(snapshot, op.historyEntry, 'redo');
+        } else if (op?.kind === 'layer-add') {
+          applyLayerAddToSnapshot(snapshot, op);
+        } else if (op?.kind === 'frame-add') {
+          applyFrameAddToSnapshot(snapshot, op);
         }
       });
       const nextSession = baseProject.session && typeof baseProject.session === 'object'
@@ -430,16 +684,18 @@
       next.historyPast = [];
       next.historyFuture = [];
       next.historyLimit = Math.max(1, Math.round(Number(history?.limit) || 30));
-      if (!isPixelPatchHistoryEntry(historyEntry)) {
+      const layerAddOp = createLayerAddJournalOp(historyEntry);
+      const frameAddOp = createFrameAddJournalOp(historyEntry);
+      if (!isPixelPatchHistoryEntry(historyEntry) && !layerAddOp && !frameAddOp) {
         next.forceCheckpoint = true;
         activeState = next;
         return next;
       }
-      next.ops.push({
-        kind: 'pixel-patch',
-        historyLabel: String(historyLabel || historyEntry.historyLabel || ''),
-        historyEntry: cloneJsonValue(historyEntry, null),
-      });
+      next.ops.push(layerAddOp || frameAddOp || {
+          kind: 'pixel-patch',
+          historyLabel: String(historyLabel || historyEntry.historyLabel || ''),
+          historyEntry: cloneJsonValue(historyEntry, null),
+        });
       if (next.ops.length > Math.max(1, Math.round(Number(LOCAL_PROJECT_CHECKPOINT_HISTORY_INTERVAL) || 30))) {
         next.forceCheckpoint = true;
       }
@@ -457,6 +713,34 @@
       const normalized = [];
       for (let opIndex = 0; opIndex < wrappedOps.length; opIndex += 1) {
         const wrapped = wrappedOps[opIndex];
+        if (wrapped?.kind === 'layer-add') {
+          if (!Array.isArray(wrapped.layers) || !wrapped.layers.length) {
+            return null;
+          }
+          normalized.push({
+            sequence: opIndex + 1,
+            kind: 'layer-add',
+            canvasId: String(wrapped.canvasId || ''),
+            activeFrame: Math.max(0, Math.round(Number(wrapped.activeFrame) || 0)),
+            activeLayer: String(wrapped.activeLayer || ''),
+            layers: cloneJsonValue(wrapped.layers, []),
+          });
+          continue;
+        }
+        if (wrapped?.kind === 'frame-add') {
+          if (!Array.isArray(wrapped.frames) || !wrapped.frames.length) {
+            return null;
+          }
+          normalized.push({
+            sequence: opIndex + 1,
+            kind: 'frame-add',
+            canvasId: String(wrapped.canvasId || ''),
+            activeFrame: Math.max(0, Math.round(Number(wrapped.activeFrame) || 0)),
+            activeLayer: String(wrapped.activeLayer || ''),
+            frames: cloneJsonValue(wrapped.frames, []),
+          });
+          continue;
+        }
         const entry = wrapped?.kind === 'pixel-patch' ? wrapped.historyEntry : null;
         if (!entry || !isPixelPatchHistoryEntry(entry) || !Array.isArray(entry.changes) || !entry.changes.length) {
           return null;

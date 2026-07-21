@@ -81,6 +81,10 @@
     applyPixelFrameBackground,
     debounce,
   } = {}) {
+    const isRasterIndexArray = value => value instanceof Int16Array || value instanceof Uint8Array;
+    const getTransparentStoredValue = indices => indices instanceof Uint8Array ? 0 : -1;
+    const isStoredTransparent = (indices, value) => indices instanceof Uint8Array ? value === 0 : value < 0;
+
     let palettePresetPickerPointerBound = false;
     let palettePresetPickerEscapeBound = false;
     let palettePresetPickerViewportBound = false;
@@ -239,7 +243,7 @@
       let addedCount = 0;
       let touchedLayers = 0;
       forEachProjectCanvasLayer(({ layer }) => {
-        if (!(layer?.indices instanceof Int16Array)) {
+        if (!isRasterIndexArray(layer?.indices)) {
           return;
         }
         const indices = layer.indices;
@@ -254,7 +258,7 @@
         }
         let layerTouched = false;
         for (let i = 0; i < pixelCount; i += 1) {
-          if (indices[i] >= 0) {
+          if (!isStoredTransparent(indices, indices[i])) {
             continue;
           }
           const base = i * 4;
@@ -295,7 +299,7 @@
     function convertCurrentDocumentRgbPixelsToIndexedPalette() {
       const layerEntries = [];
       forEachProjectCanvasLayer(({ layer }) => {
-        if (!(layer?.indices instanceof Int16Array)) {
+        if (!isRasterIndexArray(layer?.indices)) {
           return;
         }
         const colorData = buildLayerColorDataPreferDirect(layer, state.palette);
@@ -341,7 +345,9 @@
         if (!(extractedIndices instanceof Int16Array) || extractedIndices.length !== layer.indices.length) {
           return;
         }
-        const nextIndices = new Int16Array(layer.indices.length).fill(-1);
+        const nextIndices = layer.indices instanceof Uint8Array
+          ? new Uint8Array(layer.indices.length)
+          : new Int16Array(layer.indices.length).fill(-1);
         let touchedLayer = false;
         for (let i = 0; i < nextIndices.length; i += 1) {
           const sourceIndex = extractedIndices[i];
@@ -486,7 +492,7 @@
   
   
     function buildLayerColorDataPreferDirect(layer, palette) {
-      if (!(layer?.indices instanceof Int16Array)) {
+      if (!isRasterIndexArray(layer?.indices)) {
         return null;
       }
       const pixelCount = layer.indices.length;
@@ -574,7 +580,7 @@
       let convertedPixels = 0;
       let touchedLayers = 0;
       forEachProjectCanvasLayer(({ canvasDoc, layer }) => {
-        if (!(layer?.indices instanceof Int16Array)) {
+        if (!isRasterIndexArray(layer?.indices)) {
           return;
         }
         const indices = layer.indices;
@@ -585,7 +591,7 @@
         let layerTouched = false;
         for (let i = 0; i < indices.length; i += 1) {
           const paletteIndex = indices[i];
-          if (paletteIndex < 0) {
+          if (isStoredTransparent(indices, paletteIndex)) {
             continue;
           }
           const base = i * 4;
@@ -602,7 +608,7 @@
             direct[base + 2] = 0;
             direct[base + 3] = 0;
           }
-          indices[i] = -1;
+          indices[i] = getTransparentStoredValue(indices);
           convertedPixels += 1;
           layerTouched = true;
         }
@@ -656,11 +662,11 @@
     function projectHasIndexedPixels() {
       let hasIndexedPixels = false;
       forEachProjectCanvasLayer(({ layer }) => {
-        if (hasIndexedPixels || !(layer?.indices instanceof Int16Array)) {
+        if (hasIndexedPixels || !isRasterIndexArray(layer?.indices)) {
           return;
         }
         for (let index = 0; index < layer.indices.length; index += 1) {
-          if (layer.indices[index] >= 0) {
+          if (!isStoredTransparent(layer.indices, layer.indices[index])) {
             hasIndexedPixels = true;
             break;
           }
@@ -706,7 +712,7 @@
       let indexedLayerCount = 0;
       let directLayerCount = 0;
       forEachProjectCanvasLayer(({ layer }) => {
-        if (layer?.indices instanceof Int16Array) {
+        if (isRasterIndexArray(layer?.indices)) {
           indexedLayerCount += 1;
         }
         if (layer?.direct instanceof Uint8ClampedArray || layer?.importSourceDirect instanceof Uint8ClampedArray) {
@@ -1202,7 +1208,7 @@
       let remappedPixels = 0;
       let touchedLayers = 0;
       forEachProjectCanvasLayer(({ canvasDoc, layer }) => {
-        if (!(layer?.indices instanceof Int16Array)) {
+        if (!isRasterIndexArray(layer?.indices)) {
           return;
         }
         const indices = layer.indices;
@@ -1238,14 +1244,14 @@
           }
           if (!sourceColor) {
             if (mode === COLOR_MODE_INDEX) {
-              indices[pixelIndex] = -1;
+              indices[pixelIndex] = getTransparentStoredValue(indices);
             } else if (nextDirect instanceof Uint8ClampedArray) {
               const base = pixelIndex * 4;
               nextDirect[base] = 0;
               nextDirect[base + 1] = 0;
               nextDirect[base + 2] = 0;
               nextDirect[base + 3] = 0;
-              indices[pixelIndex] = -1;
+              indices[pixelIndex] = getTransparentStoredValue(indices);
             }
             continue;
           }
@@ -1271,7 +1277,7 @@
               nextDirect[base + 1] = mappedColor.g;
               nextDirect[base + 2] = mappedColor.b;
               nextDirect[base + 3] = mappedColor.a;
-              indices[pixelIndex] = -1;
+              indices[pixelIndex] = getTransparentStoredValue(indices);
               layerTouched = true;
             }
           }

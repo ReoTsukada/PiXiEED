@@ -2277,7 +2277,7 @@
       beginHistory('clearCanvas');
       state.frames.forEach(frame => {
         frame.layers.forEach(layer => {
-          layer.indices.fill(-1);
+          layer.indices.fill(layer.indices instanceof Uint8Array ? 0 : -1);
           if (layer.direct instanceof Uint8ClampedArray) {
             layer.direct.fill(0);
             layer.direct = null;

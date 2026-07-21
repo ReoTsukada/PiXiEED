@@ -646,7 +646,6 @@
     }
     deferredUiSetupDone = true;
     setupReferenceOverlay();
-    initMemoryMonitor();
   }
 
   function scheduleDeferredUiSetup() {

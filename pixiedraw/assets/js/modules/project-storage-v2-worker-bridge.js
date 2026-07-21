@@ -9,6 +9,7 @@
     workerUrl = '',
     WorkerCtor = typeof Worker === 'function' ? Worker : null,
     workerFactory = null,
+    location = typeof window !== 'undefined' ? window.location : null,
     BlobCtor = typeof Blob === 'function' ? Blob : null,
     console: logger = console,
   } = {}) {
@@ -17,7 +18,15 @@
     const pending = new Map();
 
     function isSupported() {
-      return Boolean(workerUrl && (typeof workerFactory === 'function' || WorkerCtor));
+      if (!workerUrl || typeof workerFactory === 'function') {
+        return Boolean(workerUrl && typeof workerFactory === 'function');
+      }
+      // A normal Worker cannot load a local script when PiXiEEDraw is opened
+      // directly from Finder (file://, origin "null"). Do not attempt it: the
+      // archive codec runs on the main thread in that supported local mode.
+      const protocol = typeof location?.protocol === 'string' ? location.protocol : '';
+      const origin = typeof location?.origin === 'string' ? location.origin : '';
+      return Boolean(WorkerCtor && protocol !== 'file:' && origin !== 'null');
     }
 
     function normalizeWorkerError(error = null) {

@@ -31,6 +31,19 @@
 
     return ((scope) => {
       with (scope) {
+  function isRasterIndexArray(value) {
+    return value instanceof Int16Array || value instanceof Uint8Array;
+  }
+
+  function createSelectionIndexArray(layer, size) {
+    const useUint8 = typeof isRuntimeUint8LayerIndices === 'function' && isRuntimeUint8LayerIndices(layer);
+    return useUint8 ? new Uint8Array(size) : new Int16Array(size).fill(-1);
+  }
+
+  function getSelectionTransparentValue(layer) {
+    return typeof isRuntimeUint8LayerIndices === 'function' && isRuntimeUint8LayerIndices(layer) ? 0 : -1;
+  }
+
   function buildSelectionMoveContentMask(mask, moveStateLike) {
     if (!(mask instanceof Uint8Array)) {
       return null;
@@ -80,7 +93,8 @@
     const size = width * height;
     const localMask = new Uint8Array(size);
     const localContentMask = new Uint8Array(size);
-    const localIndices = new Int16Array(size);
+    const localIndices = createSelectionIndexArray(layer, size);
+    const transparentValue = getSelectionTransparentValue(layer);
     const localDirect = new Uint8ClampedArray(size * 4);
     const selectedSourceIndices = [];
     const contentSourceIndices = [];
@@ -104,7 +118,9 @@
         const canvasBase = canvasIndex * 4;
         const localBase = localIndex * 4;
         if (selected) {
-          const paletteIndex = layer.indices[canvasIndex];
+          const paletteIndex = typeof getStoredRasterLayerPaletteIndex === 'function'
+            ? getStoredRasterLayerPaletteIndex(layer, canvasIndex)
+            : layer.indices[canvasIndex];
           const fallbackColor = {
             r: layerDirect ? layerDirect[canvasBase] : 0,
             g: layerDirect ? layerDirect[canvasBase + 1] : 0,
@@ -117,7 +133,7 @@
           const hasContent = hasSourceContentMask
             ? sourceContentMask[canvasIndex] === 1
             : (Number(sourceColor?.a) || 0) > 0;
-          localIndices[localIndex] = hasContent ? paletteIndex : -1;
+          localIndices[localIndex] = hasContent ? Math.max(0, paletteIndex) : transparentValue;
           if (layerDirect) {
             localDirect[localBase] = hasContent ? layerDirect[canvasBase] : 0;
             localDirect[localBase + 1] = hasContent ? layerDirect[canvasBase + 1] : 0;
@@ -148,7 +164,7 @@
           }
           selectedSourceIndices.push(localIndex);
         } else {
-          localIndices[localIndex] = -1;
+          localIndices[localIndex] = transparentValue;
           if (imageData) {
             imageData.data[localBase] = 0;
             imageData.data[localBase + 1] = 0;
@@ -203,8 +219,7 @@
     const size = width * height;
     const localMask = new Uint8Array(size);
     const localContentMask = new Uint8Array(size);
-    const localIndices = new Int16Array(size);
-    localIndices.fill(-1);
+    const localIndices = new Uint8Array(size);
     const localDirect = new Uint8ClampedArray(size * 4);
     const selectedSourceIndices = [];
     const contentSourceIndices = [];
@@ -477,7 +492,7 @@
         direct[sourceBase + 3],
       ];
     }
-    const indices = moveState.indices instanceof Int16Array ? moveState.indices : null;
+    const indices = isRasterIndexArray(moveState.indices) ? moveState.indices : null;
     const paletteIndex = indices && sourceIndex < indices.length ? indices[sourceIndex] : -1;
     const color = paletteIndex >= 0 ? state.palette[paletteIndex] : null;
     return color ? [color.r, color.g, color.b, color.a] : [0, 0, 0, 0];
@@ -1038,12 +1053,12 @@
       return null;
     }
 
-    const indices = new Int16Array(size);
-    indices.fill(-1);
+    const useUint8 = moveState.indices instanceof Uint8Array;
+    const indices = useUint8 ? new Uint8Array(size) : new Int16Array(size).fill(-1);
     const direct = new Uint8ClampedArray(size * 4);
     const imageData = createBlankImageData(width, height);
     const outputData = imageData?.data instanceof Uint8ClampedArray ? imageData.data : null;
-    const sourceIndices = moveState.indices instanceof Int16Array ? moveState.indices : null;
+    const sourceIndices = isRasterIndexArray(moveState.indices) ? moveState.indices : null;
     const sourceDirect = moveState.direct instanceof Uint8ClampedArray ? moveState.direct : null;
     const sourceImageData = moveState.imageData?.data instanceof Uint8ClampedArray ? moveState.imageData.data : null;
 
@@ -1066,7 +1081,7 @@
       const localBase = localIndex * 4;
       const sourceBase = sourceIndex * 4;
       if (Array.isArray(entry.rgba) && entry.rgba.length >= 4) {
-        indices[localIndex] = -1;
+        indices[localIndex] = useUint8 ? 0 : -1;
         direct[localBase] = clamp(Math.round(Number(entry.rgba[0]) || 0), 0, 255);
         direct[localBase + 1] = clamp(Math.round(Number(entry.rgba[1]) || 0), 0, 255);
         direct[localBase + 2] = clamp(Math.round(Number(entry.rgba[2]) || 0), 0, 255);
@@ -1267,7 +1282,7 @@
             data[base + 3] = 0;
             continue;
           }
-          const paletteIndex = indices instanceof Int16Array ? indices[i] : -1;
+          const paletteIndex = isRasterIndexArray(indices) ? indices[i] : -1;
           if (paletteIndex >= 0 && palette[paletteIndex]) {
             const color = palette[paletteIndex];
             data[base] = color.r;
@@ -1297,7 +1312,7 @@
           if (mask[localIndex] !== 1) {
             continue;
           }
-          const paletteIndex = indices instanceof Int16Array ? indices[localIndex] : -1;
+          const paletteIndex = isRasterIndexArray(indices) ? indices[localIndex] : -1;
           let r = 0;
           let g = 0;
           let b = 0;
@@ -1347,7 +1362,7 @@
     for (let i = 0; i < size; i += 1) {
       const base = i * 4;
       if (mask[i] === 1) {
-        const paletteIndex = indices instanceof Int16Array ? indices[i] : -1;
+        const paletteIndex = isRasterIndexArray(indices) ? indices[i] : -1;
         let r = 0;
         let g = 0;
         let b = 0;
@@ -1475,7 +1490,7 @@
   }
 
   function buildLayerColorDataForPaletteSync(layer, palette) {
-    if (!(layer?.indices instanceof Int16Array)) {
+    if (!isRasterIndexArray(layer?.indices)) {
       return null;
     }
     const pixelCount = layer.indices.length;
@@ -1485,7 +1500,9 @@
       : null;
     for (let i = 0; i < pixelCount; i += 1) {
       const base = i * 4;
-      const paletteIndex = layer.indices[i];
+      const paletteIndex = typeof getStoredRasterLayerPaletteIndex === 'function'
+        ? getStoredRasterLayerPaletteIndex(layer, i)
+        : layer.indices[i];
       if (paletteIndex >= 0 && Array.isArray(palette) && palette[paletteIndex]) {
         const color = normalizeColorValue(palette[paletteIndex]);
         data[base] = color.r;
@@ -1521,7 +1538,7 @@
     const maxOpaqueColors = normalizedMaxColors - 1;
     const layerEntries = [];
     forEachSnapshotCanvasLayer(snapshot, ({ layer }) => {
-      if (!(layer?.indices instanceof Int16Array)) {
+      if (!isRasterIndexArray(layer?.indices)) {
         return;
       }
       const colorData = buildLayerColorDataForPaletteSync(layer, palette);
@@ -1563,7 +1580,7 @@
     const colorMode = normalizeColorMode(snapshot.colorMode, COLOR_MODE_INDEX);
     let layerEntryIndex = 0;
     forEachSnapshotCanvasLayer(snapshot, ({ layer }) => {
-      if (!(layer?.indices instanceof Int16Array)) {
+      if (!isRasterIndexArray(layer?.indices)) {
         return;
       }
       const extractedIndices = Array.isArray(extraction.frameIndices)
@@ -1574,9 +1591,12 @@
         return;
       }
       if (colorMode === COLOR_MODE_INDEX) {
-        const remapped = new Int16Array(extractedIndices.length).fill(-1);
+        const runtimeUint8 = typeof isRuntimeUint8LayerIndices === 'function' && isRuntimeUint8LayerIndices(layer);
+        const remapped = runtimeUint8
+          ? new Uint8Array(extractedIndices.length)
+          : new Int16Array(extractedIndices.length).fill(-1);
         for (let i = 0; i < extractedIndices.length; i += 1) {
-          remapped[i] = extractedIndices[i] >= 0 ? extractedIndices[i] + 1 : -1;
+          remapped[i] = extractedIndices[i] >= 0 ? extractedIndices[i] + 1 : (runtimeUint8 ? 0 : -1);
         }
         layer.indices = remapped;
         layer.direct = null;
@@ -1587,18 +1607,27 @@
         ? layer.direct
         : null;
       if (!direct) {
-        const remapped = new Int16Array(extractedIndices.length).fill(-1);
+        const runtimeUint8 = typeof isRuntimeUint8LayerIndices === 'function' && isRuntimeUint8LayerIndices(layer);
+        const remapped = runtimeUint8
+          ? new Uint8Array(extractedIndices.length)
+          : new Int16Array(extractedIndices.length).fill(-1);
         for (let i = 0; i < extractedIndices.length; i += 1) {
-          remapped[i] = extractedIndices[i] >= 0 ? extractedIndices[i] + 1 : -1;
+          remapped[i] = extractedIndices[i] >= 0 ? extractedIndices[i] + 1 : (runtimeUint8 ? 0 : -1);
         }
         layer.indices = remapped;
         layer.direct = null;
         layer.directOnly = false;
         return;
       }
-      const remappedIndices = new Int16Array(layer.indices);
+      const runtimeUint8 = typeof isRuntimeUint8LayerIndices === 'function' && isRuntimeUint8LayerIndices(layer);
+      const remappedIndices = runtimeUint8 ? new Uint8Array(layer.indices) : new Int16Array(layer.indices);
       for (let i = 0; i < remappedIndices.length; i += 1) {
-        remappedIndices[i] = layer.indices[i] >= 0 && extractedIndices[i] >= 0 ? extractedIndices[i] + 1 : -1;
+        const sourcePaletteIndex = typeof getStoredRasterLayerPaletteIndex === 'function'
+          ? getStoredRasterLayerPaletteIndex(layer, i)
+          : layer.indices[i];
+        remappedIndices[i] = sourcePaletteIndex >= 0 && extractedIndices[i] >= 0
+          ? extractedIndices[i] + 1
+          : (runtimeUint8 ? 0 : -1);
       }
       layer.indices = remappedIndices;
     });
@@ -1670,7 +1699,7 @@
     let convertedPixels = 0;
 
     forEachSnapshotCanvasLayer(snapshot, ({ layer }) => {
-      if (!(layer?.indices instanceof Int16Array)) {
+      if (!isRasterIndexArray(layer?.indices)) {
         return;
       }
       const pixelCount = layer.indices.length;
@@ -1692,7 +1721,10 @@
         return;
       }
       for (let i = 0; i < pixelCount; i += 1) {
-        if (layer.indices[i] >= 0) {
+        const storedPaletteIndex = typeof getStoredRasterLayerPaletteIndex === 'function'
+          ? getStoredRasterLayerPaletteIndex(layer, i)
+          : layer.indices[i];
+        if (storedPaletteIndex >= 0) {
           continue;
         }
         const base = i * 4;
@@ -1761,14 +1793,14 @@
     targetPalette = state.palette,
   } = {}) {
     if (
-      !(indices instanceof Int16Array)
+      !isRasterIndexArray(indices)
       || !(mask instanceof Uint8Array)
       || mask.length !== indices.length
     ) {
       return { indices, addedCount: 0 };
     }
     const sourcePalette = Array.isArray(clip?.palette) ? clip.palette : null;
-    const remappedIndices = new Int16Array(indices);
+    const remappedIndices = indices instanceof Uint8Array ? new Uint8Array(indices) : new Int16Array(indices);
     const palette = Array.isArray(targetPalette) ? targetPalette : state.palette;
     const paletteLookup = buildPaletteColorLookup(palette);
     const sourceIndexMap = new Map();
@@ -1866,9 +1898,9 @@
     const mask = clip.mask instanceof Uint8Array && clip.mask.length === size
       ? new Uint8Array(clip.mask)
       : new Uint8Array(size);
-    const indices = clip.indices instanceof Int16Array && clip.indices.length === size
-      ? new Int16Array(clip.indices)
-      : new Int16Array(size);
+    const indices = isRasterIndexArray(clip.indices) && clip.indices.length === size
+      ? (clip.indices instanceof Uint8Array ? new Uint8Array(clip.indices) : new Int16Array(clip.indices))
+      : new Uint8Array(size);
     const direct = clip.direct instanceof Uint8ClampedArray && clip.direct.length === size * 4
       ? new Uint8ClampedArray(clip.direct)
       : new Uint8ClampedArray(size * 4);
@@ -1903,9 +1935,9 @@
     const contentMask = clip.contentMask instanceof Uint8Array && clip.contentMask.length === size
       ? new Uint8Array(clip.contentMask)
       : null;
-    let indices = clip.indices instanceof Int16Array && clip.indices.length === size
-      ? new Int16Array(clip.indices)
-      : new Int16Array(size);
+    let indices = isRasterIndexArray(clip.indices) && clip.indices.length === size
+      ? (clip.indices instanceof Uint8Array ? new Uint8Array(clip.indices) : new Int16Array(clip.indices))
+      : createSelectionIndexArray(layer, size);
     const direct = clip.direct instanceof Uint8ClampedArray && clip.direct.length === size * 4
       ? new Uint8ClampedArray(clip.direct)
       : new Uint8ClampedArray(size * 4);
@@ -1973,7 +2005,8 @@
       return { indices: null, direct: null };
     }
     const size = snappedWidth * snappedHeight;
-    const indices = new Int16Array(size);
+    const indices = createSelectionIndexArray(layer, size);
+    const transparentValue = getSelectionTransparentValue(layer);
     let direct = null;
     const layerDirect = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
     if (layerDirect) {
@@ -1985,7 +2018,7 @@
         const canvasX = bounds.x0 + x;
         const canvasY = bounds.y0 + y;
         if (canvasX < 0 || canvasY < 0 || canvasX >= state.width || canvasY >= state.height) {
-          indices[localIndex] = -1;
+          indices[localIndex] = transparentValue;
           if (direct) {
             const localBase = localIndex * 4;
             direct[localBase] = 0;
@@ -2026,7 +2059,9 @@
     for (let y = 0; y < height; y += 1) {
       for (let x = 0; x < width; x += 1) {
         const idx = y * width + x;
-        const paletteIndex = layer.indices[idx];
+        const paletteIndex = typeof getStoredRasterLayerPaletteIndex === 'function'
+          ? getStoredRasterLayerPaletteIndex(layer, idx)
+          : layer.indices[idx];
         let alpha = 0;
         if (paletteIndex >= 0 && palette[paletteIndex]) {
           alpha = palette[paletteIndex].a;
@@ -2051,8 +2086,10 @@
     const moveHeight = bounds.y1 - bounds.y0 + 1;
     const size = moveWidth * moveHeight;
     const mask = new Uint8Array(size);
-    const indices = new Int16Array(size);
+    const indices = createSelectionIndexArray(layer, size);
+    const transparentValue = getSelectionTransparentValue(layer);
     const direct = new Uint8ClampedArray(size * 4);
+    const contentSourceIndices = [];
     const shouldCreatePreviewBitmap = shouldCreateSelectionMoveBitmapPreview(moveWidth, moveHeight);
     const imageData = shouldCreatePreviewBitmap ? createBlankImageData(moveWidth, moveHeight) : null;
 
@@ -2062,12 +2099,14 @@
         const canvasY = bounds.y0 + y;
         const canvasIndex = canvasY * width + canvasX;
         const localIndex = y * moveWidth + x;
-        const paletteIndex = layer.indices[canvasIndex];
+        const paletteIndex = typeof getStoredRasterLayerPaletteIndex === 'function'
+          ? getStoredRasterLayerPaletteIndex(layer, canvasIndex)
+          : layer.indices[canvasIndex];
         const canvasBase = canvasIndex * 4;
         const localBase = localIndex * 4;
         let hasPixel = false;
         if (paletteIndex >= 0) {
-          indices[localIndex] = paletteIndex;
+          indices[localIndex] = layer.indices[canvasIndex];
           hasPixel = true;
           if (layerDirect) {
             direct[localBase] = layerDirect[canvasBase];
@@ -2088,7 +2127,7 @@
             imageData.data[localBase + 3] = 0;
           }
         } else if (layerDirect && layerDirect[canvasBase + 3] > 0) {
-          indices[localIndex] = -1;
+          indices[localIndex] = transparentValue;
           direct[localBase] = layerDirect[canvasBase];
           direct[localBase + 1] = layerDirect[canvasBase + 1];
           direct[localBase + 2] = layerDirect[canvasBase + 2];
@@ -2101,7 +2140,7 @@
             imageData.data[localBase + 3] = direct[localBase + 3];
           }
         } else {
-          indices[localIndex] = -1;
+          indices[localIndex] = transparentValue;
           if (imageData) {
             imageData.data[localBase] = 0;
             imageData.data[localBase + 1] = 0;
@@ -2111,6 +2150,7 @@
         }
         if (hasPixel) {
           mask[localIndex] = 1;
+          contentSourceIndices.push(localIndex);
         }
       }
     }
@@ -2126,10 +2166,13 @@
       width: moveWidth,
       height: moveHeight,
       mask,
+      contentMask: new Uint8Array(mask),
       indices,
       direct,
       imageData,
       previewCanvas,
+      selectedSourceIndices: contentSourceIndices.slice(),
+      contentSourceIndices,
       offset: { x: 0, y: 0 },
       hasCleared: false,
       committed: false,

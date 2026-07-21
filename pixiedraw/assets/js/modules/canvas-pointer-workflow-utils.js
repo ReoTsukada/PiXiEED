@@ -553,7 +553,10 @@
     }
     if (pixelBaseline?.layer) {
       const baselineLayer = pixelBaseline.layer;
-      if (baselineLayer.indices instanceof Int16Array && pixelBaseline.indices instanceof Int16Array) {
+      if (
+        (baselineLayer.indices instanceof Int16Array || baselineLayer.indices instanceof Uint8Array)
+        && pixelBaseline.indices?.constructor === baselineLayer.indices.constructor
+      ) {
         baselineLayer.indices.set(pixelBaseline.indices);
       }
       if (pixelBaseline.direct instanceof Uint8ClampedArray) {
@@ -895,7 +898,9 @@
     ) {
       pointerState.touchPixelBaseline = {
         layer,
-        indices: layer.indices instanceof Int16Array ? new Int16Array(layer.indices) : null,
+        indices: layer.indices instanceof Uint8Array
+          ? new Uint8Array(layer.indices)
+          : (layer.indices instanceof Int16Array ? new Int16Array(layer.indices) : null),
         direct: layer.direct instanceof Uint8ClampedArray ? new Uint8ClampedArray(layer.direct) : null,
         directOnly: Boolean(layer.directOnly),
       };
@@ -1936,7 +1941,9 @@
     if (!moveState || !Number.isInteger(sourceIndex) || sourceIndex < 0) {
       return 0;
     }
-    const indices = moveState.indices instanceof Int16Array ? moveState.indices : null;
+    const indices = moveState.indices instanceof Int16Array || moveState.indices instanceof Uint8Array
+      ? moveState.indices
+      : null;
     const direct = moveState.direct instanceof Uint8ClampedArray ? moveState.direct : null;
     const paletteIndex = indices && sourceIndex < indices.length ? indices[sourceIndex] : -1;
     if (paletteIndex >= 0 && Array.isArray(state.palette) && state.palette[paletteIndex]) {
@@ -2289,7 +2296,9 @@
     if (!(mask instanceof Uint8Array) || mask.length !== (width * height)) {
       return;
     }
-    const restoreIndices = moveState.restoreIndices instanceof Int16Array ? moveState.restoreIndices : null;
+    const restoreIndices = moveState.restoreIndices instanceof Int16Array || moveState.restoreIndices instanceof Uint8Array
+      ? moveState.restoreIndices
+      : null;
     const restoreDirect = moveState.restoreDirect instanceof Uint8ClampedArray ? moveState.restoreDirect : null;
     let layerDirect = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
     if (!layerDirect && restoreDirect) {
@@ -2313,13 +2322,16 @@
         } else if (layerDirect) {
           previousAlpha = layerDirect[base + 3];
         }
-        let nextIndex = -1;
+        const transparentValue = typeof getRasterLayerTransparentStorageValue === 'function'
+          ? getRasterLayerTransparentStorageValue(layer)
+          : -1;
+        let nextIndex = transparentValue;
         let nextAlpha = 0;
         if (restoreIndices) {
-          nextIndex = restoreIndices[localIndex] ?? -1;
+          nextIndex = restoreIndices[localIndex] ?? transparentValue;
           layer.indices[canvasIndex] = nextIndex;
         } else {
-          layer.indices[canvasIndex] = -1;
+          layer.indices[canvasIndex] = transparentValue;
         }
         if (layerDirect) {
           if (restoreDirect) {
@@ -2601,7 +2613,11 @@
       const targetIndex = (targetY * state.width) + targetX;
       const targetBase = targetIndex * 4;
       const sourceBase = sourceIndex * 4;
-      const nextPaletteIndex = hasEntryRgba ? -1 : indices[sourceIndex];
+      const nextPaletteIndex = hasEntryRgba
+        ? (typeof getRasterLayerTransparentStorageValue === 'function'
+          ? getRasterLayerTransparentStorageValue(layer)
+          : -1)
+        : indices[sourceIndex];
       recordPendingPixelPatchBefore(layer, targetIndex);
       layer.indices[targetIndex] = nextPaletteIndex;
       newContentMask[targetIndex] = 1;
@@ -2821,7 +2837,9 @@
     const sourceImageData = moveState.imageData && moveState.imageData.data instanceof Uint8ClampedArray
       ? moveState.imageData.data
       : null;
-    const sourceIndices = moveState.indices instanceof Int16Array ? moveState.indices : null;
+    const sourceIndices = moveState.indices instanceof Int16Array || moveState.indices instanceof Uint8Array
+      ? moveState.indices
+      : null;
     const sourceDirect = moveState.direct instanceof Uint8ClampedArray ? moveState.direct : null;
     const outputData = imageData && imageData.data instanceof Uint8ClampedArray ? imageData.data : null;
 
@@ -4284,7 +4302,9 @@
     if (!layer) return false;
     if (x < 0 || y < 0 || x >= state.width || y >= state.height) return false;
     const idx = y * state.width + x;
-    const paletteIndex = layer.indices instanceof Int16Array ? layer.indices[idx] : -1;
+    const paletteIndex = layer.indices instanceof Int16Array || layer.indices instanceof Uint8Array
+      ? layer.indices[idx]
+      : -1;
     if (paletteIndex >= 0) {
       const paletteColor = Array.isArray(state.palette) ? state.palette[paletteIndex] : null;
       if (paletteColor && (Number(paletteColor.a) || 0) > 0) {
@@ -4300,7 +4320,9 @@
     if (!layer || !Number.isInteger(idx) || idx < 0) {
       return null;
     }
-    const indices = layer.indices instanceof Int16Array ? layer.indices : null;
+    const indices = layer.indices instanceof Int16Array || layer.indices instanceof Uint8Array
+      ? layer.indices
+      : null;
     const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
     const transparentStorageIndex = resolveTransparentStoragePaletteIndex();
     const paletteIndex = indices ? indices[idx] : -1;

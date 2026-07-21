@@ -596,7 +596,7 @@
     }
     let resolved = snapshot;
     const sampleIndices = snapshot?.frames?.[0]?.layers?.[0]?.indices;
-    if (!(sampleIndices instanceof Int16Array)) {
+    if (!(sampleIndices instanceof Int16Array || sampleIndices instanceof Uint8Array)) {
       try {
         resolved = decompressHistorySnapshot(snapshot);
       } catch (error) {
@@ -938,7 +938,7 @@
     const layer = Array.isArray(frame?.layers)
       ? frame.layers.find(item => typeof entry?.layerId === 'string' && item?.id === entry.layerId) || null
       : null;
-    if (!layer || !(layer.indices instanceof Int16Array)) {
+    if (!layer || !(layer.indices instanceof Int16Array || layer.indices instanceof Uint8Array)) {
       return null;
     }
     const width = Math.max(1, Math.round(Number(canvas.width) || Number(entry?.width) || 1));

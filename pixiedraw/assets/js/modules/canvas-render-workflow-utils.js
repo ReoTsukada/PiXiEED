@@ -35,6 +35,105 @@
     requestRender();
   }
 
+  function getCanvasCompositeFrameCacheKey(frame = getActiveFrame()) {
+    if (!frame?.id) return '';
+    const canvasId = getActiveProjectCanvasDocument()?.id || 'canvas';
+    return `${canvasId}:${frame.id}`;
+  }
+
+  function getCanvasCompositeVisualKey(frame, width, height) {
+    const paletteKey = (Array.isArray(state.palette) ? state.palette : [])
+      .map(color => `${color?.r || 0},${color?.g || 0},${color?.b || 0},${color?.a || 0}`)
+      .join(';');
+    const layerKey = (Array.isArray(frame?.layers) ? frame.layers : [])
+      .map(layer => [
+        layer?.id || '',
+        getDisplayedLayerVisibility(layer, true) ? 1 : 0,
+        getDisplayedLayerPreviewOpacity(layer, 1),
+        normalizeLayerBlendMode(layer?.blendMode),
+        layer?.directOnly === true ? 1 : 0,
+        isSimulationLayer(layer) ? 1 : 0,
+      ].join(':'))
+      .join('|');
+    return `${width}x${height}|${paletteKey}|${layerKey}`;
+  }
+
+  function deleteCanvasCompositeFrameCacheEntry(cacheKey) {
+    if (!cacheKey || !canvasCompositeFrameCache?.byFrame?.has(cacheKey)) {
+      return false;
+    }
+    const entry = canvasCompositeFrameCache.byFrame.get(cacheKey);
+    canvasCompositeFrameCache.byFrame.delete(cacheKey);
+    canvasCompositeFrameCache.bytes = Math.max(
+      0,
+      canvasCompositeFrameCache.bytes - Math.max(0, Number(entry?.bytes) || 0)
+    );
+    return true;
+  }
+
+  function invalidateCanvasCompositeFrameCacheEntry(frame = getActiveFrame()) {
+    return deleteCanvasCompositeFrameCacheEntry(getCanvasCompositeFrameCacheKey(frame));
+  }
+
+  function clearCanvasCompositeFrameCache({ resetStats = false } = {}) {
+    canvasCompositeFrameCache.byFrame.clear();
+    canvasCompositeFrameCache.bytes = 0;
+    if (resetStats) {
+      canvasCompositeFrameCache.hits = 0;
+      canvasCompositeFrameCache.misses = 0;
+    }
+  }
+
+  function getCanvasCompositeFrameCacheStats() {
+    return {
+      entries: canvasCompositeFrameCache.byFrame.size,
+      bytes: Math.max(0, Number(canvasCompositeFrameCache.bytes) || 0),
+      maxBytes: Math.max(0, Number(canvasCompositeFrameCache.maxBytes) || 0),
+      hits: Math.max(0, Number(canvasCompositeFrameCache.hits) || 0),
+      misses: Math.max(0, Number(canvasCompositeFrameCache.misses) || 0),
+    };
+  }
+
+  function readCanvasCompositeFrameCache(frame, width, height) {
+    const cacheKey = getCanvasCompositeFrameCacheKey(frame);
+    if (!cacheKey) return null;
+    const entry = canvasCompositeFrameCache.byFrame.get(cacheKey) || null;
+    const visualKey = getCanvasCompositeVisualKey(frame, width, height);
+    if (!entry || entry.visualKey !== visualKey || entry.width !== width || entry.height !== height) {
+      if (entry) deleteCanvasCompositeFrameCacheEntry(cacheKey);
+      canvasCompositeFrameCache.misses += 1;
+      return null;
+    }
+    canvasCompositeFrameCache.byFrame.delete(cacheKey);
+    canvasCompositeFrameCache.byFrame.set(cacheKey, entry);
+    canvasCompositeFrameCache.hits += 1;
+    return entry.imageData;
+  }
+
+  function writeCanvasCompositeFrameCache(frame, width, height, imageData) {
+    const cacheKey = getCanvasCompositeFrameCacheKey(frame);
+    if (!cacheKey || !imageData?.data || imageData.data.length !== width * height * 4) {
+      return false;
+    }
+    deleteCanvasCompositeFrameCacheEntry(cacheKey);
+    const bytes = imageData.data.byteLength;
+    const entry = {
+      width,
+      height,
+      bytes,
+      visualKey: getCanvasCompositeVisualKey(frame, width, height),
+      imageData,
+    };
+    canvasCompositeFrameCache.byFrame.set(cacheKey, entry);
+    canvasCompositeFrameCache.bytes += bytes;
+    const maxBytes = Math.max(bytes, Number(canvasCompositeFrameCache.maxBytes) || 0);
+    while (canvasCompositeFrameCache.bytes > maxBytes && canvasCompositeFrameCache.byFrame.size > 1) {
+      const oldestKey = canvasCompositeFrameCache.byFrame.keys().next().value;
+      deleteCanvasCompositeFrameCacheEntry(oldestKey);
+    }
+    return true;
+  }
+
   function markDirtyRect(x0, y0, x1, y1) {
     const width = state.width;
     const height = state.height;
@@ -48,6 +147,7 @@
     if (right < left || bottom < top) {
       return;
     }
+    invalidateCanvasCompositeFrameCacheEntry();
     if (!dirtyRegion) {
       dirtyRegion = { x0: left, y0: top, x1: right, y1: bottom };
       return;
@@ -150,8 +250,17 @@
       && pending.y0 <= 0
       && pending.x1 >= width - 1
       && pending.y1 >= height - 1;
+    const activeFrame = getActiveFrame();
+    if (fullCanvasPending && !state.playback.isPlaying) {
+      const cachedImage = readCanvasCompositeFrameCache(activeFrame, width, height);
+      if (cachedImage) {
+        ctx.drawing.putImageData(cachedImage, 0, 0);
+        refreshSecondaryCanvasSurfaces();
+        return;
+      }
+    }
     if (fullCanvasPending) {
-      const visibleLayers = (getActiveFrame()?.layers || []).filter(layer => (
+      const visibleLayers = (activeFrame?.layers || []).filter(layer => (
         layer
         && getDisplayedLayerVisibility(layer, true)
         && getDisplayedLayerPreviewOpacity(layer, 1) > 0
@@ -164,7 +273,9 @@
           && getDisplayedLayerPreviewOpacity(layer, 1) >= 1
           && normalizeLayerBlendMode(layer.blendMode) === DEFAULT_LAYER_BLEND_MODE
           && !isSimulationLayer(layer)) {
-          ctx.drawing.putImageData(new ImageData(new Uint8ClampedArray(direct.subarray(0, width * height * 4)), width, height), 0, 0);
+          const directImage = new ImageData(new Uint8ClampedArray(direct.subarray(0, width * height * 4)), width, height);
+          ctx.drawing.putImageData(directImage, 0, 0);
+          writeCanvasCompositeFrameCache(activeFrame, width, height, directImage);
           refreshSecondaryCanvasSurfaces();
           return;
         }
@@ -182,7 +293,7 @@
     const image = ctx.drawing.createImageData(regionWidth, regionHeight);
     const data = image.data;
 
-    const layers = getActiveFrame()?.layers || [];
+    const layers = activeFrame?.layers || [];
     const palette = state.palette;
     for (let l = 0; l < layers.length; l += 1) {
       const layer = layers[l];
@@ -194,14 +305,15 @@
         continue;
       }
       const layerBlendMode = normalizeLayerBlendMode(layer.blendMode);
-      const layerIndices = layer.indices instanceof Int16Array ? layer.indices : null;
       const layerDirect = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
       for (let py = y0; py <= y1; py += 1) {
         const rowOffset = (py - y0) * regionWidth * 4;
         const layerRow = py * width;
         for (let px = x0; px <= x1; px += 1) {
           const pixelIndex = layerRow + px;
-          const paletteIndex = layerIndices ? layerIndices[pixelIndex] : -1;
+          const paletteIndex = typeof getStoredRasterLayerPaletteIndex === 'function'
+            ? getStoredRasterLayerPaletteIndex(layer, pixelIndex)
+            : (layer.indices instanceof Int16Array ? layer.indices[pixelIndex] : -1);
           let srcR;
           let srcG;
           let srcB;
@@ -230,6 +342,9 @@
     }
 
     ctx.drawing.putImageData(image, x0, y0);
+    if (fullCanvasPending && !state.playback.isPlaying) {
+      writeCanvasCompositeFrameCache(activeFrame, width, height, image);
+    }
     refreshSecondaryCanvasSurfaces();
   }
 
@@ -254,6 +369,9 @@
     markDirtyRect,
     markDirtyPixel,
     markCanvasDirty,
+    invalidateCanvasCompositeFrameCacheEntry,
+    clearCanvasCompositeFrameCache,
+    getCanvasCompositeFrameCacheStats,
     takeDirtyRegion,
     requestRender,
     renderCanvas,

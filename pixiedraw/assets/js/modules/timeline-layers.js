@@ -1147,10 +1147,16 @@
       state.frames.forEach((frame, frameIndex) => {
         const targetIndex = Math.min(insertIndex, frame.layers.length);
         const name = getDefaultLayerName(frame.layers.length + 1);
-        const newLayer = createLayer(name, state.width, state.height);
+        const newLayer = createLayer(name, state.width, state.height, null, {
+          deferPixelAllocation: frameIndex !== state.activeFrame,
+        });
         frame.layers.splice(targetIndex, 0, newLayer);
+        recordPendingLayerAddHistoryLayer(frame, newLayer, targetIndex);
         if (frameIndex === state.activeFrame) {
           state.activeLayer = newLayer.id;
+          if (history.pending?.__historyEntryType === 'layerAdd') {
+            history.pending.activeLayerAfter = newLayer.id;
+          }
         }
       });
       clearPendingMultiAssignmentMoveRequests();
@@ -1629,7 +1635,13 @@
   }
 
   function startPlayback() {
-    if (state.playback.isPlaying) return;
+    if (state.playback.isPlaying && playbackHandle != null) return;
+    // Repair projects restored from older files/autosaves that persisted only
+    // isPlaying=true without a live requestAnimationFrame handle.
+    if (state.playback.isPlaying) {
+      state.playback.isPlaying = false;
+      clearPlaybackFrameCache();
+    }
     if (!Array.isArray(state.frames) || !state.frames.length) {
       return;
     }
@@ -2771,6 +2783,233 @@
     });
   }
 
+  function patchTimelineMatrixActiveState(container, activeFrameIndex, activeLayerRow, layerCount) {
+    if (!container?.childElementCount) {
+      return false;
+    }
+    const frameHeaders = container.querySelectorAll('.timeline-cell--frame-header[data-timeline-frame-index]');
+    const onionFrameIndexes = getOnionSkinFrameIndexes();
+    const isFrameSelectionMode = timelineSelection.mode === TIMELINE_SELECTION_MODE_FRAME;
+    const isLayerSelectionMode = timelineSelection.mode === TIMELINE_SELECTION_MODE_LAYER;
+    const isSlotSelectionMode = timelineSelection.mode === TIMELINE_SELECTION_MODE_SLOT;
+    const frameCount = Array.isArray(state.frames) ? state.frames.length : 0;
+    frameHeaders.forEach(header => {
+      const frameIndex = Number.parseInt(header.dataset.timelineFrameIndex || '', 10);
+      const isActiveFrame = frameIndex === activeFrameIndex;
+      const isSelectedFrame = isFrameSelectionMode && timelineSelection.frameIndexes.has(frameIndex);
+      const isOnionFrame = onionFrameIndexes.has(frameIndex);
+      header.classList.toggle('is-active-frame', isActiveFrame);
+      header.classList.toggle('is-multi-selected-frame', isSelectedFrame);
+      header.classList.toggle('is-structure-selected', isSelectedFrame);
+      header.classList.toggle('is-structure-selected-frame', isSelectedFrame);
+      header.classList.toggle('is-structure-selection-top', isSelectedFrame);
+      header.classList.toggle(
+        'is-structure-selection-left',
+        isSelectedFrame && !timelineSelection.frameIndexes.has(frameIndex - 1)
+      );
+      header.classList.toggle(
+        'is-structure-selection-right',
+        isSelectedFrame && !timelineSelection.frameIndexes.has(frameIndex + 1)
+      );
+      header.classList.toggle('is-onion-frame', isOnionFrame);
+      header.classList.toggle('is-onion-frame-start', isOnionFrame && !onionFrameIndexes.has(frameIndex - 1));
+      header.classList.toggle('is-onion-frame-end', isOnionFrame && !onionFrameIndexes.has(frameIndex + 1));
+      applyTimelineCellFrame(header, isActiveFrame ? 'frameHeaderActive' : 'frameHeader');
+      const button = header.querySelector('.timeline-frame-button');
+      if (button) {
+        applyTimelineSlotFrame(button, isActiveFrame ? 'active' : 'default');
+      }
+    });
+
+    const rowVisibilityByIndex = new Map();
+    container.querySelectorAll('.timeline-cell--layer-visibility[data-layer-row-index] .timeline-visibility')
+      .forEach(control => {
+        const rowIndex = Number.parseInt(control.dataset.layerRowIndex || '', 10);
+        if (Number.isFinite(rowIndex)) {
+          rowVisibilityByIndex.set(rowIndex, control.getAttribute('aria-pressed') !== 'false');
+        }
+      });
+    const layerHeaders = container.querySelectorAll(
+      '.timeline-cell--layer[data-layer-row-index]'
+    );
+    layerHeaders.forEach(header => {
+      const rowIndex = Number.parseInt(header.dataset.layerRowIndex || '', 10);
+      const layerTrackIndex = Number.parseInt(header.dataset.timelineLayerIndex || '', 10);
+      const isActiveLayer = rowIndex === activeLayerRow && !header.classList.contains('is-placeholder');
+      const isSelectedLayer = isLayerSelectionMode
+        && Number.isFinite(layerTrackIndex)
+        && timelineSelection.layerIndexes.has(layerTrackIndex);
+      header.classList.toggle('is-active-layer', isActiveLayer);
+      header.classList.toggle('is-multi-selected-layer', isSelectedLayer);
+      header.classList.toggle('is-structure-selected', isSelectedLayer);
+      header.classList.toggle('is-structure-selected-layer', isSelectedLayer);
+      header.classList.toggle(
+        'is-structure-selection-left',
+        isSelectedLayer && header.classList.contains('timeline-cell--layer-visibility')
+      );
+      header.classList.toggle(
+        'is-structure-selection-top',
+        isSelectedLayer && !timelineSelection.layerIndexes.has(layerTrackIndex + 1)
+      );
+      header.classList.toggle(
+        'is-structure-selection-bottom',
+        isSelectedLayer && !timelineSelection.layerIndexes.has(layerTrackIndex - 1)
+      );
+      const rowVisible = rowVisibilityByIndex.get(rowIndex) !== false;
+      const layerVariant = header.classList.contains('is-placeholder')
+        ? 'layerPlaceholder'
+        : isActiveLayer
+          ? (rowVisible ? 'layerActive' : 'layerActiveHidden')
+          : (rowVisible ? 'layer' : 'layerHidden');
+      applyTimelineCellFrame(header, layerVariant);
+    });
+
+    const bodyCells = container.querySelectorAll(
+      '.timeline-cell--body[data-timeline-frame-index][data-layer-row-index]'
+    );
+    bodyCells.forEach(cell => {
+      const frameIndex = Number.parseInt(cell.dataset.timelineFrameIndex || '', 10);
+      const rowIndex = Number.parseInt(cell.dataset.layerRowIndex || '', 10);
+      const layerIndex = Number.parseInt(cell.dataset.timelineLayerIndex || '', 10);
+      const isActiveFrameColumn = frameIndex === activeFrameIndex;
+      const isActiveLayerRow = rowIndex === activeLayerRow;
+      const isSelectedFrame = isFrameSelectionMode && timelineSelection.frameIndexes.has(frameIndex);
+      const isSelectedLayer = isLayerSelectionMode
+        && Number.isFinite(layerIndex)
+        && timelineSelection.layerIndexes.has(layerIndex);
+      const isOnionFrame = onionFrameIndexes.has(frameIndex);
+      const slot = cell.querySelector('.timeline-slot');
+      const isEmptyCell = !slot || slot.classList.contains('is-disabled');
+      const isHiddenCell = Boolean(slot?.classList.contains('is-hidden'));
+      const isActiveCell = Boolean(
+        slot
+        && isActiveFrameColumn
+        && slot.dataset.timelineLayerId === state.activeLayer
+      );
+      cell.classList.toggle('is-active-frame-column', isActiveFrameColumn);
+      cell.classList.toggle('is-active-layer-row', isActiveLayerRow);
+      cell.classList.toggle('is-active-cell', isActiveCell);
+      cell.classList.toggle('is-onion-frame', isOnionFrame);
+      cell.classList.toggle('is-onion-frame-start', isOnionFrame && !onionFrameIndexes.has(frameIndex - 1));
+      cell.classList.toggle('is-onion-frame-end', isOnionFrame && !onionFrameIndexes.has(frameIndex + 1));
+      cell.classList.toggle('is-onion-frame-bottom', isOnionFrame && rowIndex === layerCount - 1);
+      cell.classList.toggle('is-structure-selected', isSelectedFrame || isSelectedLayer);
+      cell.classList.toggle('is-structure-selected-frame', isSelectedFrame);
+      cell.classList.toggle('is-structure-selected-layer', isSelectedLayer);
+      cell.classList.toggle(
+        'is-structure-selection-left',
+        isSelectedFrame && !timelineSelection.frameIndexes.has(frameIndex - 1)
+      );
+      cell.classList.toggle(
+        'is-structure-selection-right',
+        (isSelectedFrame && !timelineSelection.frameIndexes.has(frameIndex + 1))
+          || (isSelectedLayer && frameIndex === frameCount - 1)
+      );
+      cell.classList.toggle(
+        'is-structure-selection-top',
+        isSelectedLayer && !timelineSelection.layerIndexes.has(layerIndex + 1)
+      );
+      cell.classList.toggle(
+        'is-structure-selection-bottom',
+        (isSelectedFrame && rowIndex === layerCount - 1)
+          || (isSelectedLayer && !timelineSelection.layerIndexes.has(layerIndex - 1))
+      );
+      if (slot && !isEmptyCell) {
+        const isSelectedSlot = isSlotSelectionMode
+          && timelineSelection.slotKeys.has(createTimelineSlotKey(frameIndex, layerIndex));
+        slot.classList.toggle('is-active', isActiveCell);
+        slot.classList.toggle('is-selected', isSelectedSlot);
+        cell.classList.toggle('is-selected-slot-cell', isSelectedSlot);
+        applyTimelineSlotFrame(slot, isActiveCell ? 'active' : (isHiddenCell ? 'hidden' : 'default'));
+      } else {
+        cell.classList.remove('is-selected-slot-cell');
+      }
+      applyTimelineCellFrame(cell, getTimelineBodyVariant({
+        isEmpty: isEmptyCell,
+        isActiveLayerRow,
+        isActiveFrameColumn,
+        isActiveCell,
+        isHidden: isHiddenCell,
+      }));
+    });
+    return true;
+  }
+
+  function syncTimelineElementFromTemplate(target, template) {
+    if (!(target instanceof Element) || !(template instanceof Element)) {
+      return false;
+    }
+    Array.from(target.attributes).forEach(attribute => {
+      if (!template.hasAttribute(attribute.name)) {
+        target.removeAttribute(attribute.name);
+      }
+    });
+    Array.from(template.attributes).forEach(attribute => {
+      if (target.getAttribute(attribute.name) !== attribute.value) {
+        target.setAttribute(attribute.name, attribute.value);
+      }
+    });
+
+    const targetChildren = Array.from(target.childNodes);
+    const templateChildren = Array.from(template.childNodes);
+    const compatible = targetChildren.length === templateChildren.length
+      && targetChildren.every((child, index) => (
+        child.nodeType === templateChildren[index].nodeType
+        && child.nodeName === templateChildren[index].nodeName
+      ));
+    if (!compatible) {
+      target.replaceChildren(...templateChildren);
+      return true;
+    }
+    targetChildren.forEach((child, index) => {
+      const source = templateChildren[index];
+      if (child.nodeType === Node.TEXT_NODE) {
+        if (child.nodeValue !== source.nodeValue) {
+          child.nodeValue = source.nodeValue;
+        }
+      } else if (child instanceof Element && source instanceof Element) {
+        syncTimelineElementFromTemplate(child, source);
+      }
+    });
+    return true;
+  }
+
+  function reconcileTimelineMatrixChildren(container, fragment) {
+    if (!(container instanceof Element) || !(fragment instanceof DocumentFragment)) {
+      return false;
+    }
+    const previousScrollLeft = container.scrollLeft;
+    const previousScrollTop = container.scrollTop;
+    const existingByKey = new Map();
+    const existingChildren = Array.from(container.children);
+    existingChildren.forEach(child => {
+      const key = String(child.dataset?.timelineNodeKey || '');
+      if (key && !existingByKey.has(key)) {
+        existingByKey.set(key, child);
+      }
+    });
+    const retained = new Set();
+    Array.from(fragment.children).forEach(template => {
+      const key = String(template.dataset?.timelineNodeKey || '');
+      const existing = key ? existingByKey.get(key) : null;
+      if (existing) {
+        syncTimelineElementFromTemplate(existing, template);
+        container.appendChild(existing);
+        retained.add(existing);
+      } else {
+        container.appendChild(template);
+      }
+    });
+    existingChildren.forEach(child => {
+      if (!retained.has(child)) {
+        child.remove();
+      }
+    });
+    container.scrollLeft = previousScrollLeft;
+    container.scrollTop = previousScrollTop;
+    return true;
+  }
+
   function renderTimelineMatrix() {
     const container = dom.controls.timelineMatrix;
     if (!container) return;
@@ -2824,21 +3063,9 @@
       activeLayerRow = 0;
     }
 
-    const timelineKeyParts = [`f:${frameCount}`, `af:${activeFrameIndex}`, `al:${state.activeLayer || ''}`];
-    if (onionFrameIndexes.size) {
-      timelineKeyParts.push(`on:${Array.from(onionFrameIndexes).join(',')}`);
-    } else {
-      timelineKeyParts.push('on:');
-    }
-    if (isFrameSelectionMode) {
-      timelineKeyParts.push(`sel:frame:${Array.from(timelineSelection.frameIndexes).sort((a, b) => a - b).join(',')}`);
-    } else if (timelineSelection.mode === TIMELINE_SELECTION_MODE_LAYER) {
-      timelineKeyParts.push(`sel:layer:${Array.from(timelineSelection.layerIndexes).sort((a, b) => a - b).join(',')}`);
-    } else if (isSlotSelectionMode) {
-      timelineKeyParts.push(`sel:slot:${Array.from(timelineSelection.slotKeys).sort().join(',')}`);
-    } else {
-      timelineKeyParts.push('sel:none');
-    }
+    // Active frame/layer selection does not change the matrix structure.
+    // Keep it out of this key so normal navigation can reuse the existing DOM.
+    const timelineKeyParts = [`f:${frameCount}`];
     timelineKeyParts.push(`gm:${guestMoveMode}`);
     if (pendingGuestMovePreview) {
       timelineKeyParts.push(`gp:${pendingGuestMovePreview.canvasId}:${pendingGuestMovePreview.frameIndex}:${pendingGuestMovePreview.trackIndex}:${pendingGuestMovePreview.version}`);
@@ -2876,6 +3103,7 @@
     }
     const nextTimelineRenderKey = timelineKeyParts.join('|');
     if (timelineMatrixRenderKey === nextTimelineRenderKey && container.childElementCount > 0) {
+      patchTimelineMatrixActiveState(container, activeFrameIndex, activeLayerRow, layerCount);
       syncAnimationFpsDisplayFromState();
       syncActiveLayerSettingsUI();
       syncActiveFrameSettingsUI();
@@ -2883,7 +3111,6 @@
     }
     timelineMatrixRenderKey = nextTimelineRenderKey;
 
-    container.innerHTML = '';
     const cellSizePx = `${TIMELINE_CELL_SIZE}px`;
     container.style.setProperty('--timeline-cell-size', cellSizePx);
     const layerHeaderColumnCount = 2;
@@ -2902,6 +3129,7 @@
     corner.style.gridRow = '1';
     corner.setAttribute('role', 'columnheader');
     corner.setAttribute('aria-label', localizeText('タイムライン', 'Timeline'));
+    corner.dataset.timelineNodeKey = 'corner';
     applyTimelineCellFrame(corner, 'corner');
     fragment.appendChild(corner);
 
@@ -2913,6 +3141,9 @@
       header.style.gridColumn = String(col);
       header.style.gridRow = '1';
       header.setAttribute('role', 'columnheader');
+      header.dataset.timelineFrameIndex = String(frameIndex);
+      header.dataset.timelineFrameId = String(frame.id || '');
+      header.dataset.timelineNodeKey = `frame:${String(frame.id || frameIndex)}`;
       if (frameIndex === activeFrameIndex) {
         header.classList.add('is-active-frame');
       }
@@ -2978,6 +3209,7 @@
       rowVisibilityCell.style.gridRow = String(row);
       rowVisibilityCell.setAttribute('role', 'gridcell');
       rowVisibilityCell.dataset.layerRowIndex = String(rowIndex);
+      rowVisibilityCell.dataset.timelineLayerIndex = String(layerTrackIndex);
       const rowHeader = document.createElement('div');
       rowHeader.className = 'timeline-cell timeline-cell--layer timeline-cell--layer-main';
       rowHeader.classList.add('pixel-frame');
@@ -2985,6 +3217,7 @@
       rowHeader.style.gridRow = String(row);
       rowHeader.setAttribute('role', 'rowheader');
       rowHeader.dataset.layerRowIndex = String(rowIndex);
+      rowHeader.dataset.timelineLayerIndex = String(layerTrackIndex);
       const rowVisibility = getLayerVisibilityForRow(rowIndex);
 
       if (rowIndex === activeLayerRow) {
@@ -3015,6 +3248,8 @@
       if (layer) {
         rowVisibilityCell.dataset.layerId = layer.id;
         rowHeader.dataset.layerId = layer.id;
+        rowVisibilityCell.dataset.timelineNodeKey = `layer-visibility:${layer.id}`;
+        rowHeader.dataset.timelineNodeKey = `layer-main:${layer.id}`;
         const visibilityToggle = document.createElement('button');
         visibilityToggle.type = 'button';
         visibilityToggle.className = 'timeline-visibility';
@@ -3052,6 +3287,8 @@
         }
         rowHeader.appendChild(tag);
       } else {
+        rowVisibilityCell.dataset.timelineNodeKey = `layer-visibility:placeholder:${rowIndex}`;
+        rowHeader.dataset.timelineNodeKey = `layer-main:placeholder:${rowIndex}`;
         rowVisibilityCell.classList.add('is-placeholder');
         rowVisibilityCell.setAttribute('aria-hidden', 'true');
         rowHeader.classList.add('is-placeholder');
@@ -3077,6 +3314,9 @@
         cell.style.gridColumn = String(col);
         cell.style.gridRow = String(row);
         cell.setAttribute('role', 'gridcell');
+        cell.dataset.timelineFrameIndex = String(frameIndex);
+        cell.dataset.timelineFrameId = String(frame.id || '');
+        cell.dataset.layerRowIndex = String(rowIndex);
 
         if (rowIndex === activeLayerRow) {
           cell.classList.add('is-active-layer-row');
@@ -3101,6 +3341,7 @@
         const frameLayers = reversedLayersByFrame[frameIndex];
         const targetLayer = frameLayers[rowIndex];
         const layerIndex = frame.layers.length - 1 - rowIndex;
+        cell.dataset.timelineLayerIndex = String(layerIndex);
         const isSelectedSlot = isSlotSelectionMode
           && hasTimelineLayerIndex(frameIndex, layerIndex)
           && timelineSelection.slotKeys.has(createTimelineSlotKey(frameIndex, layerIndex));
@@ -3139,6 +3380,7 @@
         }
 
         if (!targetLayer) {
+          cell.dataset.timelineNodeKey = `body:${String(frame.id || frameIndex)}:placeholder:${rowIndex}`;
           isEmptyCell = true;
           cell.classList.add('is-empty');
           const placeholder = document.createElement('span');
@@ -3148,6 +3390,8 @@
           applyTimelineSlotFrame(placeholder, 'disabled');
           cell.appendChild(placeholder);
         } else {
+          cell.dataset.timelineLayerId = String(targetLayer.id || '');
+          cell.dataset.timelineNodeKey = `body:${String(frame.id || frameIndex)}:${String(targetLayer.id || layerIndex)}`;
           const slot = document.createElement('button');
           slot.type = 'button';
           slot.className = 'timeline-slot';
@@ -3255,7 +3499,7 @@
       });
     }
 
-    container.appendChild(fragment);
+    reconcileTimelineMatrixChildren(container, fragment);
 
     syncAnimationFpsDisplayFromState();
     syncActiveLayerSettingsUI();

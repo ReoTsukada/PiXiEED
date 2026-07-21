@@ -1443,11 +1443,13 @@
         singleDirectLayer = null;
         continue;
       }
-      const indices = layer.indices instanceof Int16Array && layer.indices.length >= pixelCount ? layer.indices : null;
       let hasIndexedPixels = false;
-      if (indices && layer.directOnly !== true) {
+      if (layer.directOnly !== true) {
         for (let i = 0; i < pixelCount; i += 1) {
-          if (indices[i] >= 0) {
+          const paletteIndex = typeof getStoredRasterLayerPaletteIndex === 'function'
+            ? getStoredRasterLayerPaletteIndex(layer, i)
+            : (layer.indices instanceof Int16Array ? layer.indices[i] : -1);
+          if (paletteIndex >= 0) {
             hasIndexedPixels = true;
             break;
           }
@@ -1474,10 +1476,11 @@
         return;
       }
       const layerBlendMode = normalizeLayerBlendMode(layer.blendMode);
-      const indices = layer.indices instanceof Int16Array && layer.indices.length >= pixelCount ? layer.indices : null;
       const direct = layer.direct instanceof Uint8ClampedArray && layer.direct.length >= pixelCount * 4 ? layer.direct : null;
       for (let i = 0; i < pixelCount; i += 1) {
-        const paletteIndex = indices ? indices[i] : -1;
+        const paletteIndex = typeof getStoredRasterLayerPaletteIndex === 'function'
+          ? getStoredRasterLayerPaletteIndex(layer, i)
+          : (layer.indices instanceof Int16Array ? layer.indices[i] : -1);
         let srcR;
         let srcG;
         let srcB;
@@ -1534,9 +1537,6 @@
         return;
       }
       const blendMode = normalizeLayerBlendMode(layer.blendMode);
-      const indices = layer.indices instanceof Int16Array && layer.indices.length >= sourcePixelCount
-        ? layer.indices
-        : null;
       const direct = layer.direct instanceof Uint8ClampedArray && layer.direct.length >= sourcePixelCount * 4
         ? layer.direct
         : null;
@@ -1555,7 +1555,9 @@
               a: output[outputIndex + 3],
             });
           } else {
-            const paletteIndex = indices ? indices[sourceIndex] : -1;
+            const paletteIndex = typeof getStoredRasterLayerPaletteIndex === 'function'
+              ? getStoredRasterLayerPaletteIndex(layer, sourceIndex)
+              : (layer.indices instanceof Int16Array ? layer.indices[sourceIndex] : -1);
             if (paletteIndex >= 0 && palette?.[paletteIndex]) {
               color = palette[paletteIndex];
             } else if (direct) {

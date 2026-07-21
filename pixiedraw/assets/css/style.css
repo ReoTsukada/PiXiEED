@@ -13350,8 +13350,7 @@ body.is-mobile-layout .panel-ad-mount[hidden] {
     min-width: 28px;
     font-size: 0.78rem;
   }
-  body.is-mobile-layout #panelFile .field,
-  body.is-mobile-layout #panelFile .memory-control {
+  body.is-mobile-layout #panelFile .field {
     margin-bottom: 6px;
   }
   body.is-mobile-layout #panelFile #timelapseDescription,
@@ -13983,10 +13982,50 @@ body.is-mobile-layout .panel-ad-mount[hidden] {
   pointer-events: auto;
 }
 
+.global-loading-indicator__content {
+  width: 100%;
+}
+
+.global-loading-indicator__brand,
+.global-loading-indicator__state,
+.global-loading-indicator__hint {
+  display: none;
+}
+
+.global-loading-indicator.global-loading-indicator--blocking .global-loading-indicator__content {
+  width: min(420px, calc(100vw - 48px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.global-loading-indicator.global-loading-indicator--blocking .global-loading-indicator__brand,
+.global-loading-indicator.global-loading-indicator--blocking .global-loading-indicator__state,
+.global-loading-indicator.global-loading-indicator--blocking .global-loading-indicator__hint {
+  display: block;
+  width: 100%;
+  text-align: center;
+}
+
+.global-loading-indicator.global-loading-indicator--blocking .global-loading-indicator__brand {
+  color: rgba(var(--ui-rgb-focus), 0.96);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.global-loading-indicator.global-loading-indicator--blocking .global-loading-indicator__state {
+  margin-top: 16px;
+  color: rgba(var(--ui-rgb), 0.7);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
 .global-loading-indicator.global-loading-indicator--blocking .global-loading-indicator__label,
 .global-loading-indicator.global-loading-indicator--blocking .global-loading-indicator__bar,
 .global-loading-indicator.global-loading-indicator--blocking .global-loading-indicator__cancel {
-  width: min(420px, calc(100vw - 48px));
+  width: 100%;
 }
 
 .global-loading-indicator.global-loading-indicator--blocking .global-loading-indicator__label {
@@ -14000,6 +14039,13 @@ body.is-mobile-layout .panel-ad-mount[hidden] {
   margin-top: 14px;
   height: 10px;
   border-width: 1px;
+}
+
+.global-loading-indicator.global-loading-indicator--blocking .global-loading-indicator__hint {
+  margin-top: 12px;
+  color: rgba(var(--ui-rgb), 0.68);
+  font-size: 11px;
+  line-height: 1.55;
 }
 
 .global-loading-indicator__cancel {

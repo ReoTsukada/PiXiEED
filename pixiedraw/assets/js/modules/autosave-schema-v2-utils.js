@@ -589,6 +589,51 @@
     function ensureLayerArray(layer, key, length) {
       const fillValue = key === 'indices' ? -1 : 0;
       const Type = key === 'indices' ? Int16Array : Uint8ClampedArray;
+      if (key === 'indices' && layer?.indicesEncoding === 'uint8-palette-zero-transparent-v2') {
+        let runtimeIndices = null;
+        if (layer.indices instanceof Uint8Array) {
+          runtimeIndices = layer.indices;
+        } else if (typeof layer.indices === 'string' && typeof globalThis.atob === 'function') {
+          try {
+            const binary = globalThis.atob(layer.indices);
+            runtimeIndices = new Uint8Array(binary.length);
+            for (let index = 0; index < binary.length; index += 1) {
+              runtimeIndices[index] = binary.charCodeAt(index) & 0xff;
+            }
+          } catch (_error) {
+            runtimeIndices = null;
+          }
+        }
+        if (runtimeIndices instanceof Uint8Array && runtimeIndices.length === length) {
+          layer.indices = runtimeIndices;
+          return runtimeIndices;
+        }
+      }
+      if (key === 'indices' && layer?.indicesEncoding === 'uint8-zero-transparent-v1') {
+        let compact = null;
+        if (layer.indices instanceof Uint8Array) {
+          compact = layer.indices;
+        } else if (typeof layer.indices === 'string' && typeof globalThis.atob === 'function') {
+          try {
+            const binary = globalThis.atob(layer.indices);
+            compact = new Uint8Array(binary.length);
+            for (let index = 0; index < binary.length; index += 1) {
+              compact[index] = binary.charCodeAt(index) & 0xff;
+            }
+          } catch (_error) {
+            compact = null;
+          }
+        }
+        if (compact instanceof Uint8Array && compact.length === length) {
+          const expanded = new Int16Array(length);
+          for (let index = 0; index < length; index += 1) {
+            expanded[index] = compact[index] === 0 ? -1 : compact[index] - 1;
+          }
+          layer.indices = expanded;
+          delete layer.indicesEncoding;
+          return expanded;
+        }
+      }
       const decoded = decodeStoredLayerArray(layer[key], key, length);
       if (decoded && decoded.length === length) {
         layer[key] = decoded;
@@ -637,6 +682,93 @@
       return true;
     }
 
+    function applyLayerAdd(project, op) {
+      if (!op || op.kind !== 'layer-add' || !Array.isArray(op.layers) || !op.layers.length) {
+        return false;
+      }
+      const canvas = resolveDocumentCanvas(project, normalizeString(op.canvasId));
+      if (!canvas || !Array.isArray(canvas.frames) || !canvas.frames.length) {
+        return false;
+      }
+      let changed = false;
+      for (const layerEntry of op.layers) {
+        const frame = canvas.frames.find(item => item?.id === layerEntry?.frameId) || null;
+        const layerId = normalizeString(layerEntry?.layerId || layerEntry?.layer?.id);
+        if (!frame || !Array.isArray(frame.layers) || !layerId || !layerEntry?.layer) {
+          return false;
+        }
+        if (frame.layers.some(layer => layer?.id === layerId)) {
+          continue;
+        }
+        const layer = sanitizeRuntimeValues(cloneJsonValue(layerEntry.layer, null));
+        if (!layer || typeof layer !== 'object') {
+          return false;
+        }
+        layer.id = layerId;
+        const insertIndex = Math.min(
+          Math.max(0, Math.round(Number(layerEntry.index) || 0)),
+          frame.layers.length
+        );
+        frame.layers.splice(insertIndex, 0, layer);
+        changed = true;
+      }
+      if (!changed) {
+        return false;
+      }
+      canvas.activeFrame = Math.min(
+        Math.max(0, Math.round(Number(op.activeFrame) || 0)),
+        canvas.frames.length - 1
+      );
+      const activeFrame = canvas.frames[canvas.activeFrame];
+      if (activeFrame?.layers?.some(layer => layer?.id === op.activeLayer)) {
+        canvas.activeLayer = op.activeLayer;
+      }
+      return true;
+    }
+
+    function applyFrameAdd(project, op) {
+      if (!op || op.kind !== 'frame-add' || !Array.isArray(op.frames) || !op.frames.length) {
+        return false;
+      }
+      const canvas = resolveDocumentCanvas(project, normalizeString(op.canvasId));
+      if (!canvas || !Array.isArray(canvas.frames)) {
+        return false;
+      }
+      let changed = false;
+      for (const frameEntry of op.frames) {
+        const frameId = normalizeString(frameEntry?.frameId || frameEntry?.frame?.id);
+        if (!frameId || !frameEntry?.frame || !Array.isArray(frameEntry.frame.layers) || !frameEntry.frame.layers.length) {
+          return false;
+        }
+        if (canvas.frames.some(frame => frame?.id === frameId)) {
+          continue;
+        }
+        const frame = sanitizeRuntimeValues(cloneJsonValue(frameEntry.frame, null));
+        if (!frame || typeof frame !== 'object') {
+          return false;
+        }
+        frame.id = frameId;
+        canvas.frames.splice(
+          Math.min(Math.max(0, Math.round(Number(frameEntry.index) || 0)), canvas.frames.length),
+          0,
+          frame
+        );
+        changed = true;
+      }
+      if (!changed || !canvas.frames.length) {
+        return false;
+      }
+      canvas.activeFrame = Math.min(
+        Math.max(0, Math.round(Number(op.activeFrame) || 0)),
+        canvas.frames.length - 1
+      );
+      const activeFrame = canvas.frames[canvas.activeFrame];
+      if (activeFrame?.layers?.some(layer => layer?.id === op.activeLayer)) {
+        canvas.activeLayer = op.activeLayer;
+      }
+      return true;
+    }
+
     function validateJournalSequence(journal) {
       if (!journal || !Array.isArray(journal.ops)) {
         return false;
@@ -667,7 +799,12 @@
         return { project, applied: false, reason: 'journal-base-or-sequence-mismatch' };
       }
       for (const op of journal.ops) {
-        if (!applyPixelPatch(project, op)) {
+        const applied = op?.kind === 'pixel-patch'
+          ? applyPixelPatch(project, op)
+          : (op?.kind === 'layer-add'
+            ? applyLayerAdd(project, op)
+            : (op?.kind === 'frame-add' ? applyFrameAdd(project, op) : false));
+        if (!applied) {
           return {
             project: options?.useDetachedCheckpointProject === true
               ? null

@@ -30,6 +30,8 @@
     requestOverlayRender,
     renderAllProjectCanvasSurfaces,
   } = {}) {
+    const isRasterIndexArray = value => value instanceof Int16Array || value instanceof Uint8Array;
+
     function isPixelPatchHistoryEntry(entry) {
       return Boolean(entry && typeof entry === 'object' && entry.__historyEntryType === HISTORY_ENTRY_TYPE_PIXEL_PATCH);
     }
@@ -45,7 +47,7 @@
         return false;
       }
       const layer = getActiveLayer();
-      return Boolean(layer && !isSimulationLayer(layer) && layer.indices instanceof Int16Array);
+      return Boolean(layer && !isSimulationLayer(layer) && isRasterIndexArray(layer.indices));
     }
 
     function createPixelPatchHistoryPending(label) {
@@ -54,7 +56,7 @@
       const layer = getActiveLayer();
       const width = Math.max(1, Math.round(Number(canvasDoc?.width) || Number(state.width) || 1));
       const height = Math.max(1, Math.round(Number(canvasDoc?.height) || Number(state.height) || 1));
-      if (!canvasDoc?.id || !frame?.id || !layer?.id || !(layer.indices instanceof Int16Array)) {
+      if (!canvasDoc?.id || !frame?.id || !layer?.id || !isRasterIndexArray(layer.indices)) {
         return null;
       }
       return {
@@ -90,7 +92,7 @@
           ]
         : null;
       return {
-        paletteIndex: layer?.indices instanceof Int16Array && safeIndex < layer.indices.length
+        paletteIndex: isRasterIndexArray(layer?.indices) && safeIndex < layer.indices.length
           ? Math.round(Number(layer.indices[safeIndex]) || 0)
           : -1,
         direct,
@@ -198,7 +200,7 @@
       const layer = Array.isArray(frame?.layers)
         ? (frame.layers.find(item => item?.id === entry.layerId) || null)
         : null;
-      if (!canvasDoc || !frame || !layer || isSimulationLayer(layer) || !(layer.indices instanceof Int16Array)) {
+      if (!canvasDoc || !frame || !layer || isSimulationLayer(layer) || !isRasterIndexArray(layer.indices)) {
         return null;
       }
       const width = Math.max(1, Math.round(Number(canvasDoc.width) || Number(entry.width) || 1));
@@ -210,7 +212,7 @@
     }
 
     function writeLayerPixelPatchValue(layer, index, value, width, height) {
-      if (!layer || !(layer.indices instanceof Int16Array) || !value) {
+      if (!layer || !isRasterIndexArray(layer.indices) || !value) {
         return false;
       }
       const safeIndex = Math.max(0, Math.round(Number(index) || 0));

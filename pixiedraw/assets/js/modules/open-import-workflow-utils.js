@@ -157,9 +157,14 @@
       return false;
     }
 
+    const closeLoading = beginBlockingGlobalLoading(
+      localizeText('ファイルを解析中…', 'Analyzing file...'),
+      { immediate: true }
+    );
     let preparedSnapshot = null;
     try {
       try {
+        setGlobalLoadingIndicatorLabel(localizeText('ファイル形式を確認中…', 'Checking file format...'));
         if (typeof snapshotFromDocumentBlob === 'function') {
           // Parse once before persisting the current project. The validated
           // snapshot is handed to the actual load below, so large V1 JSON or
@@ -174,11 +179,13 @@
         return false;
       }
       if (openProjectTabs.length && activeOpenProjectTabId) {
+        setGlobalLoadingIndicatorLabel(localizeText('現在のプロジェクトを保存中…', 'Saving current project...'));
         const persistedCurrentProject = await persistActiveOpenProjectTab({ flushAutosave: true });
         if (!persistedCurrentProject) {
           return false;
         }
       }
+      setGlobalLoadingIndicatorLabel(localizeText('編集プロジェクトを復元中…', 'Restoring editable project...'));
       const loaded = typeof loadDocumentFromBlob === 'function'
         ? await loadDocumentFromBlob(file, handle, {
           suppressAutosaveStatus: true,
@@ -208,6 +215,7 @@
       updateAutosaveStatus('ドキュメントを開けませんでした', 'error');
       return false;
     } finally {
+      closeLoading();
       releaseProjectCommandLock({ token: lock.token, owner: lock.owner });
     }
   }
@@ -936,8 +944,12 @@
     if (applyToRuntime) {
       deactivateQrEditMode();
     }
+    const importingGif = Boolean(isGifFile?.(file));
     const closeLoading = beginBlockingGlobalLoading(
-      localizeText('画像を読み込み中…', 'Loading image...'),
+      localizeText(
+        importingGif ? 'GIFファイルを読み込み中…' : '画像ファイルを読み込み中…',
+        importingGif ? 'Loading GIF...' : 'Loading image...'
+      ),
       { immediate: true }
     );
     const importSpan = beginImportPerformanceSpan('pixiedraw:import:total', {
@@ -946,7 +958,10 @@
     });
     let importResult;
     try {
-      setGlobalLoadingIndicatorLabel(localizeText('画像をデコード中…', 'Decoding image...'));
+      setGlobalLoadingIndicatorLabel(localizeText(
+        importingGif ? 'GIFを展開中…' : '画像をデコード中…',
+        importingGif ? 'Expanding GIF frames...' : 'Decoding image...'
+      ));
       const decodeSpan = beginImportPerformanceSpan('pixiedraw:import:decode');
       try {
         importResult = await decodeImageFileToFrames(file);
@@ -962,6 +977,7 @@
       if (!framesData.length) {
         throw createImageImportError('画像を読み込めませんでした');
       }
+      const frameCountLabel = `${framesData.length}${localizeText('フレーム', ' frames')}`;
 
       const inferredWidth = Number(importResult?.width ?? framesData[0]?.imageData?.width ?? 0);
       const inferredHeight = Number(importResult?.height ?? framesData[0]?.imageData?.height ?? 0);
@@ -982,7 +998,14 @@
         ? decodedIntegerScaleFactor
         : importSize.integerScaleFactor;
       const importWasScaled = decodedIntegerScaleFactor > 1 || importSize.scaled;
-      setGlobalLoadingIndicatorLabel(localizeText('フルカラー画像を準備中…', 'Preparing full-color frames...'));
+      setGlobalLoadingIndicatorLabel(localizeText(
+        importingGif
+          ? `GIFを最適化中…（${frameCountLabel}）`
+          : 'フルカラー画像を準備中…',
+        importingGif
+          ? `Optimizing GIF (${frameCountLabel})...`
+          : 'Preparing full-color frames...'
+      ));
       const resizeSpan = beginImportPerformanceSpan('pixiedraw:import:resize', {
         sourceWidth: originalSourceWidth,
         sourceHeight: originalSourceHeight,
@@ -1022,6 +1045,15 @@
       height,
       frameCount: normalizedFramesData.length,
     });
+    setGlobalLoadingIndicatorLabel(localizeText(
+      importingGif
+        ? `編集用データを作成中…（${frameCountLabel}）`
+        : '編集用データを作成中…',
+      importingGif
+        ? `Creating editable frames (${frameCountLabel})...`
+        : 'Creating editable image data...'
+    ));
+    let previousIndexedLayer = null;
     try {
     normalizedFramesData.forEach((frameInfo, index) => {
       const layer = createLayer(localizeText('画像レイヤー', 'Image Layer'), width, height, palette);
@@ -1038,8 +1070,19 @@
         if (!indexed) {
           throw createImageImportError('GIFのINDEXカラー変換に失敗しました');
         }
+        if (index > 0 && typeof compactRasterLayerIndicesToTiles === 'function') {
+          compactRasterLayerIndicesToTiles(layer, palette, width, height, previousIndexedLayer);
+        } else if (index > 0 && typeof compactRasterLayerIndices === 'function') {
+          compactRasterLayerIndices(layer, palette, width * height);
+        }
+        previousIndexedLayer = layer;
       } else {
-        layer.indices.fill(-1);
+        layer.indices.fill(layer.indices instanceof Uint8Array ? 0 : -1);
+        if (index > 0) {
+          // RGB frames already carry their pixels in `direct`. Keep inactive
+          // index planes implicit until the user selects one for editing.
+          layer.indices = layer.indices instanceof Uint8Array ? new Uint8Array(0) : new Int16Array(0);
+        }
         layer.directOnly = true;
         const direct = ensureLayerDirect(layer, width, height);
         if (hasExpectedPixels) {
@@ -1079,8 +1122,12 @@
     const activeToolGroup = TOOL_GROUPS[state.activeToolGroup] ? state.activeToolGroup : (TOOL_TO_GROUP[state.tool] || 'pen');
 
     setGlobalLoadingIndicatorLabel(localizeText(
-      applyToRuntime ? 'プロジェクトへ反映中…' : 'シートを準備中…',
-      applyToRuntime ? 'Applying project...' : 'Preparing sheet...'
+      applyToRuntime
+        ? (importingGif ? `プロジェクトへ反映中…（${frameCountLabel}）` : 'プロジェクトへ反映中…')
+        : 'シートを準備中…',
+      applyToRuntime
+        ? (importingGif ? `Applying project (${frameCountLabel})...` : 'Applying project...')
+        : 'Preparing sheet...'
     ));
     const snapshot = {
       width,

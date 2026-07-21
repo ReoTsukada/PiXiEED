@@ -72,6 +72,7 @@
     const base = index * 4;
     let direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
     const transparentStorageIndex = resolveTransparentStoragePaletteIndex();
+    const transparentLayerValue = getRasterLayerTransparentStorageValue(layer);
     recordPendingPixelPatchBefore(layer, index);
 
     if (pointerState.tool === 'eraser') {
@@ -109,7 +110,7 @@
         markDirtyPixel(x, y);
         return;
       }
-      const hasSameIndex = layer.indices[index] === -1;
+      const hasSameIndex = layer.indices[index] === transparentLayerValue;
       if (hasSameIndex && direct) {
         const sameColor = direct[base] === rgbColor.r
           && direct[base + 1] === rgbColor.g
@@ -122,7 +123,7 @@
       if (!direct) {
         direct = ensureLayerDirect(layer);
       }
-      layer.indices[index] = -1;
+      layer.indices[index] = transparentLayerValue;
       direct[base] = rgbColor.r;
       direct[base + 1] = rgbColor.g;
       direct[base + 2] = rgbColor.b;
@@ -155,7 +156,7 @@
       if (!direct) {
         direct = ensureLayerDirect(layer);
       }
-      const sameColor = layer.indices[index] === -1
+      const sameColor = layer.indices[index] === transparentLayerValue
         && direct[base] === drawColor.r
         && direct[base + 1] === drawColor.g
         && direct[base + 2] === drawColor.b
@@ -163,7 +164,7 @@
       if (sameColor) {
         return;
       }
-      layer.indices[index] = -1;
+      layer.indices[index] = transparentLayerValue;
       direct[base] = drawColor.r;
       direct[base + 1] = drawColor.g;
       direct[base + 2] = drawColor.b;
@@ -217,6 +218,7 @@
     const base = index * 4;
     let direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
     const transparentStorageIndex = resolveTransparentStoragePaletteIndex();
+    const transparentLayerValue = getRasterLayerTransparentStorageValue(layer);
     recordPendingPixelPatchBefore(layer, index);
     if (rgba.a <= 0 && transparentStorageIndex >= 0) {
       const alreadyTransparent = layer.indices[index] === transparentStorageIndex && (!direct || direct[base + 3] === 0);
@@ -240,7 +242,7 @@
     if (!direct) {
       direct = ensureLayerDirect(layer, canvasWidth, canvasHeight);
     }
-    const sameColor = layer.indices[index] === -1
+    const sameColor = layer.indices[index] === transparentLayerValue
       && direct[base] === rgba.r
       && direct[base + 1] === rgba.g
       && direct[base + 2] === rgba.b
@@ -248,7 +250,7 @@
     if (sameColor) {
       return false;
     }
-    layer.indices[index] = -1;
+    layer.indices[index] = transparentLayerValue;
     direct[base] = rgba.r;
     direct[base + 1] = rgba.g;
     direct[base + 2] = rgba.b;
@@ -735,7 +737,9 @@
     const fillMode = normalizeSelectSameMode(state.selectSameMode, SELECT_SAME_MODE_CONNECTED);
     const paletteIndex = indexMode ? resolveDrawPaletteIndex(paletteIndexOverride) : -1;
     const drawRgbColor = indexMode ? null : normalizeColorValue(getActiveDrawColor(undefined, paletteIndexOverride));
-    const indices = layer.indices instanceof Int16Array ? layer.indices : null;
+    const indices = layer.indices instanceof Int16Array || layer.indices instanceof Uint8Array
+      ? layer.indices
+      : null;
     const startIdx = y * width + x;
     const matchState = getLayerPixelMatchState(layer, startIdx);
     if (!matchState) {
@@ -884,7 +888,9 @@
       if (layerOpacity <= 0) {
         continue;
       }
-      const indices = layer.indices instanceof Int16Array ? layer.indices : null;
+      const indices = layer.indices instanceof Int16Array || layer.indices instanceof Uint8Array
+        ? layer.indices
+        : null;
       const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
       const paletteIndex = indices ? indices[pixelIndex] : -1;
       let srcR = 0;

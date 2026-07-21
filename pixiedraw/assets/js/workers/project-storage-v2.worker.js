@@ -6,7 +6,7 @@
     if (typeof importScripts !== 'function') {
       throw new Error('importScripts is required for project storage worker bootstrap');
     }
-    importScripts('../modules/project-storage-v2-archive-codec.js?v=20260713-047');
+    importScripts('../modules/project-storage-v2-archive-codec.js?v=20260720-pxd3');
   }
 
   function encodeTypedArray(view) {

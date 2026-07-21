@@ -69,6 +69,11 @@
     cloneImageData,
     MIN_ZOOM_SCALE,
   } = {}) {
+    const COMPACT_LAYER_INDEX_ENCODING = 'uint8-zero-transparent-v1';
+    const TILED_LAYER_INDEX_ENCODING = 'uint8-tiled-zero-transparent-v1';
+    const RUNTIME_LAYER_INDEX_ENCODING = 'uint8-palette-zero-transparent-v2';
+    const COMPACT_LAYER_TILE_SIZE = 32;
+    const COMPACT_LAYER_TILE_MIN_PIXELS = 4096;
     function createInitialState(options = {}) {
       const preferredWidth = EMBED_CONFIG.initialWidth ?? EMBED_CONFIG.width ?? DEFAULT_CANVAS_SIZE;
       const preferredHeight =
@@ -193,19 +198,369 @@
       }
     }
 
-    function createLayer(name, width, height, paletteOverride = null) {
+    function createLayer(name, width, height, paletteOverride = null, options = {}) {
       const size = width * height;
-      const transparentIndex = getTransparentPaletteIndex(getLayerCreationPalette(paletteOverride));
+      const deferPixelAllocation = options?.deferPixelAllocation === true;
+      const palette = getLayerCreationPalette(paletteOverride);
+      const useUint8Runtime = Array.isArray(palette)
+        && palette.length > 0
+        && palette.length <= 256
+        && Number(palette[0]?.a) <= 0;
       return {
         id: crypto.randomUUID ? crypto.randomUUID() : `layer-${Math.random().toString(36).slice(2)}`,
         name,
         visible: true,
         opacity: 1,
         blendMode: DEFAULT_LAYER_BLEND_MODE,
-        indices: new Int16Array(size).fill(transparentIndex >= 0 ? transparentIndex : -1),
+        // A zero-length Int16 array is the runtime sentinel for a completely
+        // transparent, not-yet-edited layer. It avoids allocating width ×
+        // height × 2 bytes for every inactive frame when a layer track is
+        // added. Active editing and serialization materialize it first.
+        indices: deferPixelAllocation
+          ? (useUint8Runtime ? new Uint8Array(0) : new Int16Array(0))
+          : (useUint8Runtime ? new Uint8Array(size) : new Int16Array(size).fill(-1)),
+        ...(useUint8Runtime ? { indicesEncoding: RUNTIME_LAYER_INDEX_ENCODING } : {}),
         direct: null,
         importSourceDirect: null,
       };
+    }
+
+    function isImplicitTransparentLayerIndices(indices, expectedLength = null) {
+      if (!(indices instanceof Int16Array || indices instanceof Uint8Array) || indices.length !== 0) {
+        return false;
+      }
+      return expectedLength == null || Math.max(0, Math.round(Number(expectedLength) || 0)) > 0;
+    }
+
+    function isCompactLayerIndices(layer, expectedLength = null) {
+      if (!layer || layer.indicesEncoding !== COMPACT_LAYER_INDEX_ENCODING || !(layer.indices instanceof Uint8Array)) {
+        return false;
+      }
+      return expectedLength == null || layer.indices.length === Math.max(0, Math.round(Number(expectedLength) || 0));
+    }
+
+    function isRuntimeUint8LayerIndices(layer, expectedLength = null) {
+      if (!layer || layer.indicesEncoding !== RUNTIME_LAYER_INDEX_ENCODING || !(layer.indices instanceof Uint8Array)) {
+        return false;
+      }
+      return expectedLength == null || layer.indices.length === Math.max(0, Math.round(Number(expectedLength) || 0));
+    }
+
+    function isTiledLayerIndices(layer, expectedLength = null) {
+      if (
+        !layer
+        || layer.indicesEncoding !== TILED_LAYER_INDEX_ENCODING
+        || !Array.isArray(layer.indicesTiles)
+        || !(layer.indices instanceof Uint8Array)
+        || layer.indices.length !== 0
+      ) {
+        return false;
+      }
+      const width = Math.max(0, Math.round(Number(layer.indicesWidth) || 0));
+      const height = Math.max(0, Math.round(Number(layer.indicesHeight) || 0));
+      const tileSize = Math.max(1, Math.round(Number(layer.indicesTileSize) || COMPACT_LAYER_TILE_SIZE));
+      const tileCols = Math.ceil(width / tileSize);
+      const tileRows = Math.ceil(height / tileSize);
+      if (!width || !height || layer.indicesTiles.length !== tileCols * tileRows) {
+        return false;
+      }
+      const firstTile = layer.indicesTiles[0];
+      const lastTile = layer.indicesTiles[layer.indicesTiles.length - 1];
+      if (
+        !(firstTile instanceof Uint8Array)
+        || firstTile.length !== tileSize * tileSize
+        || !(lastTile instanceof Uint8Array)
+        || lastTile.length !== tileSize * tileSize
+      ) {
+        return false;
+      }
+      return expectedLength == null || width * height === Math.max(0, Math.round(Number(expectedLength) || 0));
+    }
+
+    function clearTiledLayerIndexMetadata(layer) {
+      if (!layer) return;
+      delete layer.indicesTiles;
+      delete layer.indicesWidth;
+      delete layer.indicesHeight;
+      delete layer.indicesTileSize;
+    }
+
+    function getTiledLayerStoredValue(layer, pixelIndex) {
+      if (!isTiledLayerIndices(layer)) {
+        return 0;
+      }
+      const width = layer.indicesWidth;
+      const height = layer.indicesHeight;
+      const safeIndex = Math.round(Number(pixelIndex));
+      if (!Number.isFinite(safeIndex) || safeIndex < 0 || safeIndex >= width * height) {
+        return 0;
+      }
+      const tileSize = layer.indicesTileSize;
+      const x = safeIndex % width;
+      const y = Math.floor(safeIndex / width);
+      const tileCols = Math.ceil(width / tileSize);
+      const tileIndex = Math.floor(y / tileSize) * tileCols + Math.floor(x / tileSize);
+      const localIndex = (y % tileSize) * tileSize + (x % tileSize);
+      return layer.indicesTiles[tileIndex]?.[localIndex] || 0;
+    }
+
+    function getStoredLayerPaletteIndex(layer, pixelIndex) {
+      if (isRuntimeUint8LayerIndices(layer)) {
+        const stored = layer.indices[pixelIndex];
+        return stored === 0 || !Number.isFinite(stored) ? -1 : stored;
+      }
+      if (isTiledLayerIndices(layer)) {
+        const stored = getTiledLayerStoredValue(layer, pixelIndex);
+        return stored === 0 ? -1 : stored - 1;
+      }
+      if (isCompactLayerIndices(layer)) {
+        const stored = layer.indices[pixelIndex];
+        return stored === 0 || !Number.isFinite(stored) ? -1 : stored - 1;
+      }
+      if (layer?.indices instanceof Int16Array) {
+        const stored = layer.indices[pixelIndex];
+        return Number.isFinite(stored) ? stored : -1;
+      }
+      return -1;
+    }
+
+    function compactLayerIndices(layer, paletteOverride = null, expectedLength = null) {
+      const indices = layer?.indices;
+      if (!layer || !(indices instanceof Int16Array) || indices.length === 0) {
+        return false;
+      }
+      if (expectedLength != null && indices.length !== Math.max(0, Math.round(Number(expectedLength) || 0))) {
+        return false;
+      }
+      const palette = getLayerCreationPalette(paletteOverride) || [];
+      const compact = new Uint8Array(indices.length);
+      for (let pixelIndex = 0; pixelIndex < indices.length; pixelIndex += 1) {
+        const paletteIndex = indices[pixelIndex];
+        const color = paletteIndex >= 0 ? palette[paletteIndex] : null;
+        if (paletteIndex < 0 || (color && Number(color.a) <= 0)) {
+          compact[pixelIndex] = 0;
+          continue;
+        }
+        if (paletteIndex >= 255) {
+          return false;
+        }
+        compact[pixelIndex] = paletteIndex + 1;
+      }
+      layer.indices = compact;
+      layer.indicesEncoding = COMPACT_LAYER_INDEX_ENCODING;
+      clearTiledLayerIndexMetadata(layer);
+      return true;
+    }
+
+    function createCompactLayerIndicesForStorage(layer, paletteOverride = null, expectedLength = null) {
+      const indices = layer?.indices;
+      const safeExpectedLength = expectedLength == null
+        ? null
+        : Math.max(0, Math.round(Number(expectedLength) || 0));
+      if (
+        !layer
+        || !(indices instanceof Int16Array)
+        || indices.length === 0
+        || (safeExpectedLength != null && indices.length !== safeExpectedLength)
+      ) {
+        return null;
+      }
+      const palette = getLayerCreationPalette(paletteOverride) || [];
+      const compact = new Uint8Array(indices.length);
+      for (let pixelIndex = 0; pixelIndex < indices.length; pixelIndex += 1) {
+        const paletteIndex = indices[pixelIndex];
+        const color = paletteIndex >= 0 ? palette[paletteIndex] : null;
+        if (paletteIndex < 0 || (color && Number(color.a) <= 0)) {
+          compact[pixelIndex] = 0;
+          continue;
+        }
+        // 0 is reserved for transparency. A document using opaque palette
+        // index 255 cannot be represented losslessly in this encoding, so its
+        // layer remains Int16 instead of silently changing the color.
+        if (paletteIndex >= 255) {
+          return null;
+        }
+        compact[pixelIndex] = paletteIndex + 1;
+      }
+      return compact;
+    }
+
+    function compactLayerIndicesToTiles(layer, paletteOverride, width, height, baseLayer = null) {
+      const safeWidth = Math.max(1, Math.round(Number(width) || 1));
+      const safeHeight = Math.max(1, Math.round(Number(height) || 1));
+      const expectedLength = safeWidth * safeHeight;
+      if (expectedLength < COMPACT_LAYER_TILE_MIN_PIXELS) {
+        return compactLayerIndices(layer, paletteOverride, expectedLength);
+      }
+      if (!layer || !(layer.indices instanceof Int16Array) || layer.indices.length !== expectedLength) {
+        return false;
+      }
+      const palette = getLayerCreationPalette(paletteOverride) || [];
+      const tileSize = COMPACT_LAYER_TILE_SIZE;
+      const tileCols = Math.ceil(safeWidth / tileSize);
+      const tileRows = Math.ceil(safeHeight / tileSize);
+      const tileLength = tileSize * tileSize;
+      const tiles = [];
+      const tilePool = new Map();
+      const baseIsTiled = isTiledLayerIndices(baseLayer, expectedLength)
+        && baseLayer.indicesWidth === safeWidth
+        && baseLayer.indicesHeight === safeHeight
+        && baseLayer.indicesTileSize === tileSize;
+      const tilesEqual = (left, right) => {
+        if (!(left instanceof Uint8Array) || !(right instanceof Uint8Array) || left.length !== right.length) {
+          return false;
+        }
+        for (let index = 0; index < left.length; index += 1) {
+          if (left[index] !== right[index]) return false;
+        }
+        return true;
+      };
+      const hashTile = tile => {
+        let hash = 2166136261;
+        for (let index = 0; index < tile.length; index += 1) {
+          hash ^= tile[index];
+          hash = Math.imul(hash, 16777619);
+        }
+        return hash >>> 0;
+      };
+      for (let tileY = 0; tileY < tileRows; tileY += 1) {
+        for (let tileX = 0; tileX < tileCols; tileX += 1) {
+          const tile = new Uint8Array(tileLength);
+          for (let localY = 0; localY < tileSize; localY += 1) {
+            const y = tileY * tileSize + localY;
+            if (y >= safeHeight) break;
+            for (let localX = 0; localX < tileSize; localX += 1) {
+              const x = tileX * tileSize + localX;
+              if (x >= safeWidth) break;
+              const paletteIndex = layer.indices[y * safeWidth + x];
+              const color = paletteIndex >= 0 ? palette[paletteIndex] : null;
+              if (paletteIndex < 0 || (color && Number(color.a) <= 0)) {
+                continue;
+              }
+              if (paletteIndex >= 255) {
+                return false;
+              }
+              tile[localY * tileSize + localX] = paletteIndex + 1;
+            }
+          }
+          const tileIndex = tileY * tileCols + tileX;
+          const baseTile = baseIsTiled ? baseLayer.indicesTiles[tileIndex] : null;
+          if (baseTile && tilesEqual(tile, baseTile)) {
+            tiles.push(baseTile);
+            continue;
+          }
+          const hash = hashTile(tile);
+          const pooledTiles = tilePool.get(hash) || [];
+          const pooledTile = pooledTiles.find(candidate => tilesEqual(tile, candidate));
+          if (pooledTile) {
+            tiles.push(pooledTile);
+          } else {
+            pooledTiles.push(tile);
+            tilePool.set(hash, pooledTiles);
+            tiles.push(tile);
+          }
+        }
+      }
+      layer.indices = new Uint8Array(0);
+      layer.indicesEncoding = TILED_LAYER_INDEX_ENCODING;
+      layer.indicesTiles = tiles;
+      layer.indicesWidth = safeWidth;
+      layer.indicesHeight = safeHeight;
+      layer.indicesTileSize = tileSize;
+      return true;
+    }
+
+    function flattenTiledLayerIndices(layer) {
+      if (!isTiledLayerIndices(layer)) {
+        return null;
+      }
+      const output = new Uint8Array(layer.indicesWidth * layer.indicesHeight);
+      for (let pixelIndex = 0; pixelIndex < output.length; pixelIndex += 1) {
+        output[pixelIndex] = getTiledLayerStoredValue(layer, pixelIndex);
+      }
+      return output;
+    }
+
+    function createExpandedLayerIndices(layer, width, height, paletteOverride = null) {
+      const size = Math.max(0, Math.floor(Number(width) || 0))
+        * Math.max(0, Math.floor(Number(height) || 0));
+      const output = new Int16Array(size).fill(-1);
+      if (isRuntimeUint8LayerIndices(layer, size)) {
+        for (let pixelIndex = 0; pixelIndex < size; pixelIndex += 1) {
+          output[pixelIndex] = layer.indices[pixelIndex] === 0 ? -1 : layer.indices[pixelIndex];
+        }
+      } else if (isCompactLayerIndices(layer, size)) {
+        for (let pixelIndex = 0; pixelIndex < size; pixelIndex += 1) {
+          output[pixelIndex] = layer.indices[pixelIndex] === 0 ? -1 : layer.indices[pixelIndex] - 1;
+        }
+      } else if (isTiledLayerIndices(layer, size)) {
+        for (let pixelIndex = 0; pixelIndex < size; pixelIndex += 1) {
+          const stored = getTiledLayerStoredValue(layer, pixelIndex);
+          output[pixelIndex] = stored === 0 ? -1 : stored - 1;
+        }
+      } else if (layer?.indices instanceof Int16Array && layer.indices.length > 0) {
+        output.set(layer.indices.subarray(0, Math.min(output.length, layer.indices.length)));
+      }
+      return output;
+    }
+
+    function materializeLayerIndices(layer, width, height, paletteOverride = null) {
+      if (!layer || isSimulationLayer(layer)) {
+        return null;
+      }
+      const size = Math.max(0, Math.floor(Number(width) || 0))
+        * Math.max(0, Math.floor(Number(height) || 0));
+      if (layer.indices instanceof Int16Array && layer.indices.length === size) {
+        return layer.indices;
+      }
+      if (isRuntimeUint8LayerIndices(layer, size)) {
+        return layer.indices;
+      }
+      if (layer.indicesEncoding === RUNTIME_LAYER_INDEX_ENCODING && layer.indices instanceof Uint8Array) {
+        const indices = new Uint8Array(size);
+        indices.set(layer.indices.subarray(0, Math.min(size, layer.indices.length)));
+        layer.indices = indices;
+        return indices;
+      }
+      const indices = createExpandedLayerIndices(layer, width, height, paletteOverride);
+      layer.indices = indices;
+      delete layer.indicesEncoding;
+      clearTiledLayerIndexMetadata(layer);
+      return indices;
+    }
+
+    function cloneStoredLayerIndices(layer, { clonePixelData = true } = {}) {
+      if (isTiledLayerIndices(layer)) {
+        return new Uint8Array(0);
+      }
+      if (isCompactLayerIndices(layer)) {
+        return clonePixelData ? new Uint8Array(layer.indices) : layer.indices;
+      }
+      if (isRuntimeUint8LayerIndices(layer)) {
+        return clonePixelData ? new Uint8Array(layer.indices) : layer.indices;
+      }
+      if (layer?.indices instanceof Int16Array) {
+        return clonePixelData ? new Int16Array(layer.indices) : layer.indices;
+      }
+      if (Array.isArray(layer?.indices)) {
+        return new Int16Array(layer.indices);
+      }
+      return new Int16Array(0);
+    }
+
+    function copyTiledLayerIndexMetadata(source, target, { clonePixelData = true } = {}) {
+      if (!isTiledLayerIndices(source) || !target) {
+        return false;
+      }
+      const clonedTiles = clonePixelData
+        ? source.indicesTiles.map(tile => new Uint8Array(tile))
+        : source.indicesTiles.slice();
+      target.indicesEncoding = TILED_LAYER_INDEX_ENCODING;
+      target.indicesTiles = clonedTiles;
+      target.indicesWidth = source.indicesWidth;
+      target.indicesHeight = source.indicesHeight;
+      target.indicesTileSize = source.indicesTileSize;
+      return true;
     }
 
     function ensureLayerDirect(layer, width = state.width, height = state.height) {
@@ -403,17 +758,22 @@
         return cloneSimulationLayer(baseLayer, width, height, { copyPixels });
       }
       const size = width * height;
+      const useRuntimeUint8 = isRuntimeUint8LayerIndices(baseLayer)
+        || baseLayer?.indicesEncoding === RUNTIME_LAYER_INDEX_ENCODING;
       const layer = {
         id: crypto.randomUUID ? crypto.randomUUID() : `layer-${Math.random().toString(36).slice(2)}`,
         name: baseLayer.name,
         visible: baseLayer.visible,
         opacity: normalizeLayerOpacity(baseLayer.opacity),
         blendMode: normalizeLayerBlendMode(baseLayer.blendMode),
-        indices: new Int16Array(size).fill(-1),
+        indices: useRuntimeUint8 ? new Uint8Array(size) : new Int16Array(size).fill(-1),
+        ...(useRuntimeUint8 ? { indicesEncoding: RUNTIME_LAYER_INDEX_ENCODING } : {}),
         direct: null,
         directOnly: Boolean(baseLayer.directOnly),
       };
       if (copyPixels && baseLayer.indices instanceof Int16Array) {
+        layer.indices.set(baseLayer.indices);
+      } else if (copyPixels && useRuntimeUint8 && baseLayer.indices instanceof Uint8Array) {
         layer.indices.set(baseLayer.indices);
       }
       const directSource = baseLayer.direct instanceof Uint8ClampedArray
@@ -489,7 +849,10 @@
             resized.visible = layer?.visible !== false;
             resized.opacity = normalizeLayerOpacity(layer?.opacity);
             resized.blendMode = normalizeLayerBlendMode(layer?.blendMode);
-            const sourceIndices = layer?.indices instanceof Int16Array ? layer.indices : null;
+            const sourceIndices = layer?.indices instanceof Int16Array || layer?.indices instanceof Uint8Array
+              ? layer.indices
+              : null;
+            const transparentValue = isRuntimeUint8LayerIndices(resized) ? 0 : -1;
             const sourceDirect = layer?.direct instanceof Uint8ClampedArray ? layer.direct : null;
             const targetDirect = sourceDirect ? ensureLayerDirect(resized, targetWidth, targetHeight) : null;
             const copyWidth = Math.min(sourceWidth, targetWidth);
@@ -498,7 +861,9 @@
               for (let x = 0; x < copyWidth; x += 1) {
                 const srcIndex = (y * sourceWidth) + x;
                 const dstIndex = (y * targetWidth) + x;
-                resized.indices[dstIndex] = sourceIndices && srcIndex < sourceIndices.length ? sourceIndices[srcIndex] : -1;
+                resized.indices[dstIndex] = sourceIndices && srcIndex < sourceIndices.length
+                  ? sourceIndices[srcIndex]
+                  : transparentValue;
                 if (sourceDirect && targetDirect) {
                   const srcBase = srcIndex * 4;
                   const dstBase = dstIndex * 4;
@@ -569,8 +934,9 @@
         return sim;
       }
       const size = Math.max(0, Math.floor(width) || 0) * Math.max(0, Math.floor(height) || 0);
-      const indices = new Int16Array(size).fill(-1);
-      if (layer.indices instanceof Int16Array) {
+      const runtimeUint8 = isRuntimeUint8LayerIndices(layer);
+      const indices = runtimeUint8 ? new Uint8Array(size) : new Int16Array(size).fill(-1);
+      if (layer.indices instanceof Int16Array || layer.indices instanceof Uint8Array) {
         indices.set(layer.indices.subarray(0, Math.min(indices.length, layer.indices.length)));
       }
       let direct = null;
@@ -590,6 +956,7 @@
         opacity: normalizeLayerOpacity(layer.opacity),
         blendMode: normalizeLayerBlendMode(layer.blendMode),
         indices,
+        ...(runtimeUint8 ? { indicesEncoding: RUNTIME_LAYER_INDEX_ENCODING } : {}),
         direct,
         importSourceDirect,
         directOnly: Boolean(layer.directOnly),
@@ -607,8 +974,15 @@
       layer.visible = snapshot?.visible !== false;
       layer.opacity = normalizeLayerOpacity(snapshot?.opacity);
       layer.blendMode = normalizeLayerBlendMode(snapshot?.blendMode);
-      if (snapshot?.indices instanceof Int16Array) {
-        layer.indices.set(snapshot.indices.subarray(0, Math.min(layer.indices.length, snapshot.indices.length)));
+      if (snapshot?.indices instanceof Int16Array || snapshot?.indices instanceof Uint8Array) {
+        const sourceIndices = snapshot.indices;
+        if (layer.indices instanceof Uint8Array && sourceIndices instanceof Int16Array) {
+          for (let index = 0; index < Math.min(layer.indices.length, sourceIndices.length); index += 1) {
+            layer.indices[index] = sourceIndices[index] >= 0 ? sourceIndices[index] : 0;
+          }
+        } else {
+          layer.indices.set(sourceIndices.subarray(0, Math.min(layer.indices.length, sourceIndices.length)));
+        }
       }
       if (snapshot?.direct instanceof Uint8ClampedArray) {
         const direct = ensureLayerDirect(layer, width, height);
@@ -684,7 +1058,16 @@
 	          nextLayer.opacity = normalizeLayerOpacity(layer?.opacity);
 	          nextLayer.blendMode = normalizeLayerBlendMode(layer?.blendMode);
 	          nextLayer.directOnly = Boolean(layer?.directOnly);
-            if (clonePixelData && layer?.indices instanceof Int16Array) {
+            if (isTiledLayerIndices(layer)) {
+              nextLayer.indices = cloneStoredLayerIndices(layer, { clonePixelData });
+              copyTiledLayerIndexMetadata(layer, nextLayer, { clonePixelData });
+            } else if (isCompactLayerIndices(layer)) {
+              nextLayer.indices = cloneStoredLayerIndices(layer, { clonePixelData });
+              nextLayer.indicesEncoding = COMPACT_LAYER_INDEX_ENCODING;
+            } else if (isRuntimeUint8LayerIndices(layer)) {
+              nextLayer.indices = cloneStoredLayerIndices(layer, { clonePixelData });
+              nextLayer.indicesEncoding = RUNTIME_LAYER_INDEX_ENCODING;
+            } else if (clonePixelData && layer?.indices instanceof Int16Array) {
               nextLayer.indices.set(layer.indices.subarray(0, Math.min(nextLayer.indices.length, layer.indices.length)));
             } else if (!clonePixelData && layer?.indices instanceof Int16Array) {
               nextLayer.indices = layer.indices;
@@ -716,16 +1099,24 @@
       if (isSimulationLayer(layer)) {
         return cloneSimulationLayer(layer, state.width, state.height, { copyPixels: clonePixelData });
       }
+      const compactIndices = isCompactLayerIndices(layer);
+      const tiledIndices = isTiledLayerIndices(layer);
+      const runtimeUint8Indices = isRuntimeUint8LayerIndices(layer);
       const clonedLayer = {
         id: layer.id,
         name: layer.name,
         visible: layer.visible,
         opacity: normalizeLayerOpacity(layer.opacity),
 	      blendMode: normalizeLayerBlendMode(layer.blendMode),
-	      indices: clonePixelData ? new Int16Array(layer.indices) : layer.indices,
+	      indices: cloneStoredLayerIndices(layer, { clonePixelData }),
+	      ...(compactIndices ? { indicesEncoding: COMPACT_LAYER_INDEX_ENCODING } : {}),
+	      ...(runtimeUint8Indices ? { indicesEncoding: RUNTIME_LAYER_INDEX_ENCODING } : {}),
 	      direct: null,
 	      directOnly: Boolean(layer.directOnly),
       };
+      if (tiledIndices) {
+        copyTiledLayerIndexMetadata(layer, clonedLayer, { clonePixelData });
+      }
       if (layer.direct instanceof Uint8ClampedArray) {
         clonedLayer.direct = clonePixelData ? new Uint8ClampedArray(layer.direct) : layer.direct;
       } else if (ArrayBuffer.isView(layer.direct)) {
@@ -755,11 +1146,14 @@
     }
 
     function hasOnlyEmptyLayerIndices(indices) {
-      if (!(indices instanceof Int16Array)) {
+      if (!(indices instanceof Int16Array || indices instanceof Uint8Array)) {
         return false;
       }
+      if (indices.length === 0) {
+        return true;
+      }
       for (let i = 0; i < indices.length; i += 1) {
-        if (indices[i] >= 0) {
+        if (indices instanceof Uint8Array ? indices[i] !== 0 : indices[i] >= 0) {
           return false;
         }
       }
@@ -793,6 +1187,7 @@
 
     function serializeLayerForDocument(layer, options = {}) {
       const preserveTypedArrays = options?.preserveTypedArrays === true;
+      const compactIndicesForStorage = preserveTypedArrays && options?.compactIndicesForStorage === true;
       if (isSimulationLayer(layer)) {
         return {
           id: layer.id,
@@ -820,13 +1215,81 @@
           lightStyle: serializeSimulationStyleForDocument(layer.elementStyle?.[SIM_ELEMENT_LIGHT]),
         };
       }
+      const expectedLength = Math.max(0, Math.floor(Number(options?.width) || 0))
+        * Math.max(0, Math.floor(Number(options?.height) || 0));
+      let serializableIndices = layer.indices;
+      const compactIndices = isCompactLayerIndices(layer, expectedLength);
+      const tiledIndices = isTiledLayerIndices(layer, expectedLength);
+      const runtimeUint8Indices = isRuntimeUint8LayerIndices(layer, expectedLength);
+      let createdCompactStorageIndices = false;
+      const preserveImplicitTransparency = preserveTypedArrays
+        && expectedLength > 0
+        && !compactIndices
+        && !tiledIndices
+        && isImplicitTransparentLayerIndices(layer.indices, expectedLength)
+        && !(layer.direct instanceof Uint8ClampedArray)
+        && !(layer.importSourceDirect instanceof Uint8ClampedArray);
+      if (preserveImplicitTransparency) {
+        serializableIndices = null;
+      } else if (tiledIndices && preserveTypedArrays) {
+        // Checkpoints retain the established contiguous compact encoding.
+        // Runtime tile sharing remains untouched and is rebuilt as frames are
+        // visited after restore.
+        serializableIndices = flattenTiledLayerIndices(layer);
+      } else if (runtimeUint8Indices && preserveTypedArrays) {
+        serializableIndices = layer.indices;
+      } else if (runtimeUint8Indices && !preserveTypedArrays) {
+        serializableIndices = createExpandedLayerIndices(
+          layer,
+          options?.width,
+          options?.height,
+          Array.isArray(options?.palette) ? options.palette : null
+        );
+      } else if (compactIndicesForStorage) {
+        const compactStorageIndices = createCompactLayerIndicesForStorage(
+          layer,
+          Array.isArray(options?.palette) ? options.palette : null,
+          expectedLength
+        );
+        if (compactStorageIndices) {
+          serializableIndices = compactStorageIndices;
+          createdCompactStorageIndices = true;
+        }
+      } else if (compactIndices && !preserveTypedArrays) {
+        serializableIndices = createExpandedLayerIndices(
+          layer,
+          options?.width,
+          options?.height,
+          Array.isArray(options?.palette) ? options.palette : null
+        );
+      } else if (tiledIndices && !preserveTypedArrays) {
+        serializableIndices = createExpandedLayerIndices(
+          layer,
+          options?.width,
+          options?.height,
+          Array.isArray(options?.palette) ? options.palette : null
+        );
+      } else if (
+        expectedLength > 0
+        && !compactIndices
+        && !tiledIndices
+        && isImplicitTransparentLayerIndices(layer.indices, expectedLength)
+      ) {
+        serializableIndices = new Int16Array(expectedLength).fill(-1);
+      }
       return {
         id: layer.id,
         name: layer.name,
         visible: layer.visible !== false,
         opacity: normalizeLayerOpacity(layer.opacity),
         blendMode: normalizeLayerBlendMode(layer.blendMode),
-        indices: serializeLayerTypedArray(layer.indices, { preserveTypedArrays }),
+        indices: serializeLayerTypedArray(serializableIndices, { preserveTypedArrays }),
+        ...(preserveImplicitTransparency ? { indicesImplicitTransparent: true } : {}),
+        ...((runtimeUint8Indices || layer.indicesEncoding === RUNTIME_LAYER_INDEX_ENCODING) && preserveTypedArrays
+          ? { indicesEncoding: RUNTIME_LAYER_INDEX_ENCODING }
+          : ((compactIndices || tiledIndices || createdCompactStorageIndices) && preserveTypedArrays
+            ? { indicesEncoding: COMPACT_LAYER_INDEX_ENCODING }
+            : {})),
         direct: serializeLayerTypedArray(layer.direct, { preserveTypedArrays }),
         importSourceDirect: serializeLayerTypedArray(layer.importSourceDirect, { preserveTypedArrays }),
         directOnly: Boolean(layer.directOnly),
@@ -943,13 +1406,31 @@
       const hasDirectPayload = (typeof layer.direct === 'string' && layer.direct.length > 0)
         || Array.isArray(layer.direct)
         || ArrayBuffer.isView(layer.direct);
-      const indices = deserializeRasterTypedArray(
-        layer.indices,
-        Int16Array,
-        pixelCount,
-        'Layer pixel data mismatch',
-        { allowMissing: hasDirectPayload, fillValue: -1, reuseTypedArrays }
-      );
+      const hasImplicitTransparentIndices = layer.indicesImplicitTransparent === true && !hasDirectPayload;
+      const hasCompactIndices = layer.indicesEncoding === COMPACT_LAYER_INDEX_ENCODING;
+      const hasRuntimeUint8Indices = layer.indicesEncoding === RUNTIME_LAYER_INDEX_ENCODING;
+      let indices = null;
+      if (hasImplicitTransparentIndices) {
+        indices = hasRuntimeUint8Indices ? new Uint8Array(0) : new Int16Array(0);
+      } else if (hasCompactIndices || hasRuntimeUint8Indices) {
+        const compactBytes = typeof layer.indices === 'string'
+          ? decodeBase64(layer.indices)
+          : layer.indices;
+        if (!(compactBytes instanceof Uint8Array) || compactBytes.length !== pixelCount) {
+          throw new Error('Layer compact pixel data mismatch');
+        }
+        indices = reuseTypedArrays && compactBytes instanceof Uint8Array
+          ? compactBytes
+          : new Uint8Array(compactBytes);
+      } else {
+        indices = deserializeRasterTypedArray(
+            layer.indices,
+            Int16Array,
+            pixelCount,
+            'Layer pixel data mismatch',
+            { allowMissing: hasDirectPayload, fillValue: -1, reuseTypedArrays }
+          );
+      }
       let direct = null;
       if (hasDirectPayload) {
         direct = deserializeRasterTypedArray(
@@ -985,6 +1466,8 @@
         opacity: normalizeLayerOpacity(layer.opacity),
         blendMode: normalizeLayerBlendMode(layer.blendMode),
         indices,
+        ...(hasCompactIndices ? { indicesEncoding: COMPACT_LAYER_INDEX_ENCODING } : {}),
+        ...(hasRuntimeUint8Indices ? { indicesEncoding: RUNTIME_LAYER_INDEX_ENCODING } : {}),
         direct,
         importSourceDirect,
         directOnly: trustStoredLayerFlags && typeof layer.directOnly === 'boolean'
@@ -1223,7 +1706,9 @@
         height,
         mask: clip.mask instanceof Uint8Array ? new Uint8Array(clip.mask) : new Uint8Array(size),
         contentMask: clip.contentMask instanceof Uint8Array ? new Uint8Array(clip.contentMask) : null,
-        indices: clip.indices instanceof Int16Array ? new Int16Array(clip.indices) : new Int16Array(size),
+        indices: clip.indices instanceof Uint8Array
+          ? new Uint8Array(clip.indices)
+          : (clip.indices instanceof Int16Array ? new Int16Array(clip.indices) : new Uint8Array(size)),
         direct: clip.direct instanceof Uint8ClampedArray ? new Uint8ClampedArray(clip.direct) : new Uint8ClampedArray(size * 4),
         palette: Array.isArray(clip.palette) ? clip.palette.map(color => normalizeColorValue(color)) : [],
         bounds: clip.bounds ? { ...clip.bounds } : { x0: 0, y0: 0, x1: width - 1, y1: height - 1 },
@@ -1259,18 +1744,29 @@
           duration: frame.duration,
           voxelPreviewYawDeg: normalizeVoxelPreviewYawDegrees(frame?.voxelPreviewYawDeg),
           voxelPreviewPitchDeg: normalizeVoxelPreviewPitchDegrees(frame?.voxelPreviewPitchDeg),
-          layers: frame.layers.map(layer => ({
-            id: layer.id,
-            name: layer.name,
-            visible: layer.visible,
-            opacity: normalizeLayerOpacity(layer.opacity),
-            blendMode: normalizeLayerBlendMode(layer.blendMode),
-	          indices: clonePixelData ? new Int16Array(layer.indices) : layer.indices,
-	          direct: layer.direct instanceof Uint8ClampedArray
-	            ? (clonePixelData ? new Uint8ClampedArray(layer.direct) : layer.direct)
-	            : null,
-	          directOnly: Boolean(layer.directOnly),
-	        })),
+          layers: frame.layers.map(layer => {
+            const compactIndices = isCompactLayerIndices(layer);
+            const tiledIndices = isTiledLayerIndices(layer);
+            const runtimeUint8Indices = isRuntimeUint8LayerIndices(layer);
+            const snapshotLayer = {
+              id: layer.id,
+              name: layer.name,
+              visible: layer.visible,
+              opacity: normalizeLayerOpacity(layer.opacity),
+              blendMode: normalizeLayerBlendMode(layer.blendMode),
+              indices: cloneStoredLayerIndices(layer, { clonePixelData }),
+              ...(compactIndices ? { indicesEncoding: COMPACT_LAYER_INDEX_ENCODING } : {}),
+              ...(runtimeUint8Indices ? { indicesEncoding: RUNTIME_LAYER_INDEX_ENCODING } : {}),
+              direct: layer.direct instanceof Uint8ClampedArray
+                ? (clonePixelData ? new Uint8ClampedArray(layer.direct) : layer.direct)
+                : null,
+              directOnly: Boolean(layer.directOnly),
+            };
+            if (tiledIndices) {
+              copyTiledLayerIndexMetadata(layer, snapshotLayer, { clonePixelData });
+            }
+            return snapshotLayer;
+          }),
         })),
         activeFrame: resolved.activeFrame,
         activeLayer: resolved.activeLayer,
@@ -1329,6 +1825,15 @@
       createInitialState,
       createInitialVirtualCursor,
       createLayer,
+      isImplicitTransparentLayerIndices,
+      isCompactLayerIndices,
+      isRuntimeUint8LayerIndices,
+      isTiledLayerIndices,
+      getStoredLayerPaletteIndex,
+      compactLayerIndices,
+      createCompactLayerIndicesForStorage,
+      compactLayerIndicesToTiles,
+      materializeLayerIndices,
       ensureLayerDirect,
       isSimulationLayer,
       cloneSimulationColor,

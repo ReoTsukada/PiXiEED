@@ -73,8 +73,9 @@ const exactFrames = [{
 }];
 const exactPalette = decodeUtils.buildExactIndexedPaletteFromImageFrames(exactFrames, 256);
 assert.ok(exactPalette);
-assert.equal(exactPalette.palette.length, 2);
+assert.equal(exactPalette.palette.length, 3);
 assert.deepEqual(Array.from(exactPalette.palette, color => ({ ...color })), [
+  { r: 0, g: 0, b: 0, a: 0 },
   { r: 255, g: 0, b: 0, a: 255 },
   { r: 0, g: 255, b: 0, a: 255 },
 ]);
@@ -87,7 +88,7 @@ assert.equal(
   ),
   true
 );
-assert.deepEqual(Array.from(exactIndices), [0, 1, -1]);
+assert.deepEqual(Array.from(exactIndices), [1, 2, -1]);
 
 const tooManyColors = new Uint8ClampedArray(257 * 4);
 for (let index = 0; index < 257; index += 1) {
@@ -121,6 +122,53 @@ for (let frameIndex = 0; frameIndex < 100; frameIndex += 1) {
 }
 const gifBytes = gifOutput.slice(0, gifWriter.end());
 
+const nonIntegerGifOutput = new Uint8Array(65536);
+const nonIntegerGifWriter = new GifWriter(nonIntegerGifOutput, 4, 2, {
+  palette: [0x000000, 0xff0000, 0x00ff00, 0x0000ff],
+  loop: 0,
+});
+for (let frameIndex = 0; frameIndex < 100; frameIndex += 1) {
+  const pixels = frameIndex === 0
+    ? new Uint8Array([
+        1, 2, 3, 1,
+        3, 1, 2, 3,
+      ])
+    : new Uint8Array([
+        1, 1, 2, 2,
+        1, 1, 2, 2,
+      ]);
+  nonIntegerGifWriter.addFrame(0, 0, 4, 2, pixels, { delay: 10, disposal: 0 });
+}
+const nonIntegerGifBytes = nonIntegerGifOutput.slice(0, nonIntegerGifWriter.end());
+
+let gifFrameDecodeCount = 0;
+function TrackingGifReader(bytes) {
+  const reader = new GifReader(bytes);
+  const decodeAndBlitFrameRGBA = reader.decodeAndBlitFrameRGBA.bind(reader);
+  reader.decodeAndBlitFrameRGBA = (...args) => {
+    gifFrameDecodeCount += 1;
+    return decodeAndBlitFrameRGBA(...args);
+  };
+  return reader;
+}
+const trackingDecodeUtils = context.window.PiXiEEDrawModules.imageImportDecodeUtils.createImageImportDecodeUtils({
+  DEFAULT_IMPORT_FRAME_DURATION: 100,
+  IMPORT_INTEGER_SCALE_SAMPLE_GRID: 8,
+  MAX_IMPORTED_PALETTE_COLORS: 256,
+  clamp,
+  createImageImportError: message => new Error(message),
+  GifReader: TrackingGifReader,
+});
+const nonIntegerGif = trackingDecodeUtils.decodeGifWithReader(nonIntegerGifBytes);
+assert.equal(nonIntegerGif.frames.length, 100);
+assert.equal(nonIntegerGif.integerScaleFactor, 1);
+assert.equal(nonIntegerGif.frames[1].imageData.width, 4, 'later integer-scaled frames must retain the shared full GIF size');
+assert.equal(
+  gifFrameDecodeCount,
+  101,
+  'a mixed-scale GIF confirmed as non-integer-scaled on its first frame must not pre-decode every remaining frame'
+);
+
 let packagedSnapshot = null;
 let packagedOptions = null;
 let layerSequence = 0;
@@ -148,12 +196,33 @@ const openImportUtils = context.window.PiXiEEDrawModules.openImportWorkflowUtils
     packagedOptions = options;
     return { document: snapshot, session: options.session };
   },
+  compactRasterLayerIndices: (layer, palette, expectedLength) => {
+    if (!(layer?.indices instanceof Int16Array) || layer.indices.length !== expectedLength) {
+      return false;
+    }
+    const compact = new Uint8Array(expectedLength);
+    for (let pixelIndex = 0; pixelIndex < expectedLength; pixelIndex += 1) {
+      const paletteIndex = layer.indices[pixelIndex];
+      const color = paletteIndex >= 0 ? palette[paletteIndex] : null;
+      if (paletteIndex < 0 || (color && Number(color.a) <= 0)) {
+        compact[pixelIndex] = 0;
+      } else if (paletteIndex >= 255) {
+        return false;
+      } else {
+        compact[pixelIndex] = paletteIndex + 1;
+      }
+    }
+    layer.indices = compact;
+    layer.indicesEncoding = 'uint8-zero-transparent-v1';
+    return true;
+  },
   createLayer: (name, width, height) => ({
     id: `layer-${++layerSequence}`,
     name,
     visible: true,
     opacity: 1,
-    indices: new Int16Array(width * height).fill(-1),
+    indices: new Uint8Array(width * height),
+    indicesEncoding: 'uint8-palette-zero-transparent-v2',
     direct: null,
     importSourceDirect: null,
   }),
@@ -209,9 +278,17 @@ assert.equal(packagedSnapshot.width, 2);
 assert.equal(packagedSnapshot.height, 1);
 assert.equal(packagedSnapshot.frames.length, 100);
 assert.equal(packagedSnapshot.frames.every(frame => frame.layers[0].direct === null), true);
-assert.equal(packagedSnapshot.frames.every(frame => frame.layers[0].indices instanceof Int16Array), true);
-assert.equal(packagedSnapshot.frames.every(frame => frame.layers[0].indices.byteLength === 4), true);
-assert.equal(packagedSnapshot.palette.length, 3);
+assert.equal(packagedSnapshot.frames.every(frame => frame.layers[0].indices instanceof Uint8Array), true);
+assert.equal(packagedSnapshot.frames.every(frame => frame.layers[0].indices.byteLength === 2), true);
+assert.equal(packagedSnapshot.frames.every(
+  frame => frame.layers[0].indicesEncoding === 'uint8-palette-zero-transparent-v2'
+), true);
+assert.deepEqual(
+  Array.from(packagedSnapshot.frames[1].layers[0].indices),
+  [2, 3],
+  'GIF runtime pixels must reserve zero for transparency and store visible palette indices directly'
+);
+assert.equal(packagedSnapshot.palette.length, 4);
 assert.equal(packagedOptions.includeSheets, false);
 assert.equal(Object.keys(packagedOptions.session).length, 0, 'new raster projects must not inherit the previous project session');
 
@@ -220,9 +297,9 @@ const indexedRuntimeBytes = packagedSnapshot.frames.reduce(
   0
 );
 const formerRgbRuntimeBytes = packagedSnapshot.frames.length * packagedSnapshot.width * packagedSnapshot.height * 6;
-assert.equal(indexedRuntimeBytes, 400);
+assert.equal(indexedRuntimeBytes, 200);
 assert.equal(formerRgbRuntimeBytes, 1200);
-assert.equal(indexedRuntimeBytes * 3, formerRgbRuntimeBytes);
+assert.ok(indexedRuntimeBytes < formerRgbRuntimeBytes / 5);
 
 const importSource = fs.readFileSync(importPath, 'utf8');
 const appSource = fs.readFileSync(appPath, 'utf8');
@@ -232,5 +309,7 @@ const openImportScopeStart = appSource.indexOf('const openImportWorkflowUtilsMod
 const openImportScopeEnd = appSource.indexOf('const {', openImportScopeStart);
 const openImportScopeSource = appSource.slice(openImportScopeStart, openImportScopeEnd);
 assert.match(openImportScopeSource, /get COLOR_MODE_INDEX\(\)/);
+assert.match(openImportScopeSource, /get compactRasterLayerIndices\(\)/);
+assert.match(openImportScopeSource, /get compactRasterLayerIndicesToTiles\(\)/);
 
 console.log('PiXiEEDraw GIF exact-index import runtime checks passed');

@@ -566,8 +566,7 @@
       setLocalizedTextContent('#timelapseClear', '記録クリア', 'Clear Record');
       setLocalizedControlLabel('timelapseFps', '再生FPS', 'Playback FPS');
       setLocalizedTextContent('#timelapseDescription', '記録ON時は描画履歴を自動記録します。出力は通常の「出力」ボタンから選択してください。', 'When recording is ON, drawing history is captured automatically. Export from the regular Save / Export dialog.');
-      setLocalizedTextContent('#memoryClear', 'メモリ削除', 'Clear Memory');
-  
+
       setLocalizedTextContent('#exportDialogTitle', '出力設定', 'Export Settings');
       setLocalizedTextContent('#exportFormatPadTitle', '出力形式', 'Export format');
       setLocalizedSelectOption(dom.exportDialog?.format, 'png', 'PNG（画像）', 'PNG (Image)');

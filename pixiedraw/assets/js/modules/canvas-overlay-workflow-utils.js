@@ -856,7 +856,9 @@
     if (!matchState) {
       return [];
     }
-    const indices = layer.indices instanceof Int16Array ? layer.indices : null;
+    const indices = layer.indices instanceof Int16Array || layer.indices instanceof Uint8Array
+      ? layer.indices
+      : null;
     const indexMode = isIndexColorMode();
     const fillMode = normalizeSelectSameMode(state.selectSameMode, SELECT_SAME_MODE_CONNECTED);
     const fillStyle = normalizeFillStyle(options.fillStyle, getActiveFillStyle());
