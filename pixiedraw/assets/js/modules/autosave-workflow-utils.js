@@ -613,7 +613,9 @@
         autosaveWriteQueued = false;
         autosaveCommittedFlushQueued = false;
         if (flushCommittedChange) {
-          queueMicrotask(() => requestImmediateAutosaveSnapshot());
+          // The scoped module proxy can expose queueMicrotask as an unbound
+          // Window method. Promise callbacks do not require a receiver.
+          Promise.resolve().then(() => requestImmediateAutosaveSnapshot());
         } else {
           scheduleAutosaveSnapshot();
         }
