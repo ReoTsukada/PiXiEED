@@ -744,7 +744,7 @@ html[data-pixieed-ad-free-account="true"] .market-ad {
 .market-price-part.is-total { border-color: rgba(94,226,181,.38); background: rgba(23,107,85,.17); }
 .market-price-part.is-total strong { color: #dffcf2; font-size: 18px; }
 .market-price-note { margin: -3px 0 0; text-align: right; }
-.market-item-price-equation { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1.15fr); }
+.market-item-price-equation { grid-template-columns: minmax(0, 1fr); }
 .market-file-list { display: grid; gap: 4px; max-height: 210px; overflow: auto; }
 .market-file-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; min-height: 30px; padding: 5px 7px; border-radius: 5px; background: rgba(255,255,255,.04); }
 .market-file-row.is-excluded { opacity: .42; text-decoration: line-through; }
