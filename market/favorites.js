@@ -29,8 +29,14 @@
     if (!ids.length) return;
     const client = await getClient();
     if (!client) return;
-    const { data: { user } } = await client.auth.getUser();
-    currentUser = user || null;
+    try {
+      const { data: { user } } = await client.auth.getUser();
+      currentUser = user || null;
+    } catch (_error) {
+      // Favorites are optional on the public catalog. Do not let a transient
+      // Auth endpoint failure prevent anonymous browsing.
+      currentUser = null;
+    }
     if (!currentUser) return;
     const { data, error } = await client.from('market_asset_favorites').select('asset_id').in('asset_id', ids);
     if (!error) (data || []).forEach((row) => remoteFavoriteIds.add(row.asset_id));
@@ -61,8 +67,13 @@
       const client = await getClient();
       if (!client) return;
       if (!currentUser) {
-        const { data: { user } } = await client.auth.getUser();
-        currentUser = user || null;
+        try {
+          const { data: { user } } = await client.auth.getUser();
+          currentUser = user || null;
+        } catch (_error) {
+          button.title = 'ログイン状態を確認できませんでした。通信状態を確認してもう一度お試しください。';
+          return;
+        }
       }
       if (!currentUser) {
         window.location.href = new URL('../account/index.html', window.location.href).href;
