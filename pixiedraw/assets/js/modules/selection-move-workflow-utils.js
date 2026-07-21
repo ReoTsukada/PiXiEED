@@ -133,7 +133,13 @@
           const hasContent = hasSourceContentMask
             ? sourceContentMask[canvasIndex] === 1
             : (Number(sourceColor?.a) || 0) > 0;
-          localIndices[localIndex] = hasContent ? Math.max(0, paletteIndex) : transparentValue;
+          // Direct-color pixels do not have a palette index. Preserve the
+          // layer's native transparent sentinel here: Int16 uses -1 while the
+          // new Uint8 runtime uses 0. Coercing Int16 direct pixels to 0 makes
+          // the renderer prefer palette[0] and drops their actual RGBA color.
+          localIndices[localIndex] = hasContent && paletteIndex >= 0
+            ? paletteIndex
+            : transparentValue;
           if (layerDirect) {
             localDirect[localBase] = hasContent ? layerDirect[canvasBase] : 0;
             localDirect[localBase + 1] = hasContent ? layerDirect[canvasBase + 1] : 0;
