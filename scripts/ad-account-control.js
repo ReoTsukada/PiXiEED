@@ -43,7 +43,10 @@
     const accessToken = value.access_token || value.session?.access_token || value.currentSession?.access_token || '';
     const payload = decodeJwtPayload(accessToken);
     const userId = user?.id || payload?.sub || '';
-    if (!userId || !accessToken) return null;
+    // A stale token only produces a 401 here. Treat it as signed out and let
+    // the shared auth client refresh it before the next permission check.
+    const expiresAt = Number(payload?.exp || 0);
+    if (!userId || !accessToken || (expiresAt && expiresAt * 1000 <= Date.now())) return null;
     return { userId: String(userId), accessToken: String(accessToken) };
   }
 
