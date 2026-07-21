@@ -61,7 +61,7 @@
       button.setAttribute('aria-label', controlLabel);
       button.setAttribute('title', controlLabel);
       if (icon instanceof HTMLImageElement) {
-        icon.src = 'assets/icons/tool-cursor.png';
+        icon.src = 'assets/icons/cursor.png?v=20260721-icons1';
         icon.alt = '仮想カーソル';
       }
       if (label) {
