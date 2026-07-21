@@ -34,7 +34,7 @@ assert.match(
   /function resetDocumentUnsavedChanges\(\{ syncSession = true \} = \{\}\) \{[\s\S]{0,180}if \(syncSession\) \{[\s\S]{0,100}syncActiveProjectSessionDirty\('document-reset-clean'\);/,
   'ordinary clean resets must still mirror session dirtiness by default'
 );
-assert.match(index, /startup-workflow-utils\.js\?v=20260719-project-session-handoff1/);
-assert.match(index, /app\.js\?v=20260719-113/);
+assert.match(index, /startup-workflow-utils\.js\?v=20260720-pxd1/);
+assert.match(index, /app\.js\?v=20260721-114/);
 
 console.log('PiXiEEDraw new-project session identity handoff checks passed');
