@@ -475,7 +475,7 @@
     }
     const imageData = moveState.imageData?.data instanceof Uint8ClampedArray ? moveState.imageData.data : null;
     const sourceBase = sourceIndex * 4;
-    if (imageData && sourceBase + 3 < imageData.length) {
+    if (imageData && sourceBase + 3 < imageData.length && imageData[sourceBase + 3] > 0) {
       return [
         imageData[sourceBase],
         imageData[sourceBase + 1],
@@ -1283,7 +1283,7 @@
             continue;
           }
           const paletteIndex = isRasterIndexArray(indices) ? indices[i] : -1;
-          if (paletteIndex >= 0 && palette[paletteIndex]) {
+          if (paletteIndex >= 0 && palette[paletteIndex] && Number(palette[paletteIndex].a) > 0) {
             const color = palette[paletteIndex];
             data[base] = color.r;
             data[base + 1] = color.g;
@@ -1317,7 +1317,7 @@
           let g = 0;
           let b = 0;
           let a = 0;
-          if (paletteIndex >= 0 && palette[paletteIndex]) {
+          if (paletteIndex >= 0 && palette[paletteIndex] && Number(palette[paletteIndex].a) > 0) {
             const color = palette[paletteIndex];
             r = color.r;
             g = color.g;
@@ -1367,7 +1367,7 @@
         let g = 0;
         let b = 0;
         let a = 0;
-        if (paletteIndex >= 0 && palette[paletteIndex]) {
+        if (paletteIndex >= 0 && palette[paletteIndex] && Number(palette[paletteIndex].a) > 0) {
           const color = palette[paletteIndex];
           r = color.r;
           g = color.g;
@@ -1503,7 +1503,7 @@
       const paletteIndex = typeof getStoredRasterLayerPaletteIndex === 'function'
         ? getStoredRasterLayerPaletteIndex(layer, i)
         : layer.indices[i];
-      if (paletteIndex >= 0 && Array.isArray(palette) && palette[paletteIndex]) {
+      if (paletteIndex >= 0 && Array.isArray(palette) && palette[paletteIndex] && Number(palette[paletteIndex].a) > 0) {
         const color = normalizeColorValue(palette[paletteIndex]);
         data[base] = color.r;
         data[base + 1] = color.g;
@@ -1806,17 +1806,62 @@
     const sourceIndexMap = new Map();
     let addedCount = 0;
     const useNearestPalette = strategy === 'nearest-existing';
+    const mapDirectPixel = (pixelIndex) => {
+      if (!(direct instanceof Uint8ClampedArray)) {
+        return -1;
+      }
+      const base = pixelIndex * 4;
+      if (base + 3 >= direct.length || direct[base + 3] <= 0) {
+        return -1;
+      }
+      const directColor = normalizeColorValue({
+        r: direct[base],
+        g: direct[base + 1],
+        b: direct[base + 2],
+        a: direct[base + 3],
+      });
+      const directKey = getPaletteColorKey(directColor);
+      let mappedIndex = paletteLookup.get(directKey);
+      if (!Number.isInteger(mappedIndex) || mappedIndex < 0) {
+        if (useNearestPalette) {
+          mappedIndex = findNearestPaletteIndexForColor(directColor, palette, state.activePaletteIndex);
+        }
+        if (!Number.isInteger(mappedIndex) || mappedIndex < 0) {
+          const result = ensurePaletteColor(palette, paletteLookup, directColor);
+          mappedIndex = result.paletteIndex;
+          if (result.added) {
+            addedCount += 1;
+          }
+        }
+      }
+      direct[base] = 0;
+      direct[base + 1] = 0;
+      direct[base + 2] = 0;
+      direct[base + 3] = 0;
+      return mappedIndex;
+    };
     for (let i = 0; i < remappedIndices.length; i += 1) {
       if (mask[i] !== 1) {
         continue;
       }
       const sourceIndex = remappedIndices[i];
+      const sourceColor = sourcePalette && sourcePalette[sourceIndex]
+        ? normalizeColorValue(sourcePalette[sourceIndex])
+        : null;
+      const directBase = i * 4;
+      const hasVisibleDirect = direct instanceof Uint8ClampedArray
+        && directBase + 3 < direct.length
+        && direct[directBase + 3] > 0;
+      if (hasVisibleDirect && (sourceIndex < 0 || !sourceColor || sourceColor.a <= 0)) {
+        const mappedDirectIndex = mapDirectPixel(i);
+        if (mappedDirectIndex >= 0) {
+          remappedIndices[i] = mappedDirectIndex;
+        }
+        continue;
+      }
       if (sourceIndex >= 0) {
         let mappedIndex = sourceIndexMap.get(sourceIndex);
         if (!Number.isInteger(mappedIndex)) {
-          const sourceColor = sourcePalette && sourcePalette[sourceIndex]
-            ? normalizeColorValue(sourcePalette[sourceIndex])
-            : null;
           if (sourceColor) {
             const sourceKey = getPaletteColorKey(sourceColor);
             const existingIndex = paletteLookup.get(sourceKey);
@@ -1846,44 +1891,10 @@
         remappedIndices[i] = mappedIndex;
         continue;
       }
-      if (!(direct instanceof Uint8ClampedArray)) {
-        continue;
+      const mappedDirectIndex = mapDirectPixel(i);
+      if (mappedDirectIndex >= 0) {
+        remappedIndices[i] = mappedDirectIndex;
       }
-      const base = i * 4;
-      if (base + 3 >= direct.length || direct[base + 3] <= 0) {
-        continue;
-      }
-      const directColor = normalizeColorValue({
-        r: direct[base],
-        g: direct[base + 1],
-        b: direct[base + 2],
-        a: direct[base + 3],
-      });
-      const directKey = getPaletteColorKey(directColor);
-      let mappedIndex = paletteLookup.get(directKey);
-      if (!Number.isInteger(mappedIndex) || mappedIndex < 0) {
-        if (useNearestPalette) {
-          mappedIndex = findNearestPaletteIndexForColor(directColor, palette, state.activePaletteIndex);
-          if (!Number.isInteger(mappedIndex) || mappedIndex < 0) {
-            const result = ensurePaletteColor(palette, paletteLookup, directColor);
-            mappedIndex = result.paletteIndex;
-            if (result.added) {
-              addedCount += 1;
-            }
-          }
-        } else {
-          const result = ensurePaletteColor(palette, paletteLookup, directColor);
-          mappedIndex = result.paletteIndex;
-          if (result.added) {
-            addedCount += 1;
-          }
-        }
-      }
-      remappedIndices[i] = mappedIndex;
-      direct[base] = 0;
-      direct[base + 1] = 0;
-      direct[base + 2] = 0;
-      direct[base + 3] = 0;
     }
     return { indices: remappedIndices, addedCount };
   }
