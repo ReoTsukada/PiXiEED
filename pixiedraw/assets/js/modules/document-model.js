@@ -1221,6 +1221,10 @@
       const compactIndices = isCompactLayerIndices(layer, expectedLength);
       const tiledIndices = isTiledLayerIndices(layer, expectedLength);
       const runtimeUint8Indices = isRuntimeUint8LayerIndices(layer, expectedLength);
+      const hasDeferredRuntimeUint8Indices = expectedLength > 0
+        && layer?.indicesEncoding === RUNTIME_LAYER_INDEX_ENCODING
+        && layer.indices instanceof Uint8Array
+        && layer.indices.length === 0;
       let createdCompactStorageIndices = false;
       const preserveImplicitTransparency = preserveTypedArrays
         && expectedLength > 0
@@ -1231,6 +1235,11 @@
         && !(layer.importSourceDirect instanceof Uint8ClampedArray);
       if (preserveImplicitTransparency) {
         serializableIndices = null;
+      } else if (hasDeferredRuntimeUint8Indices) {
+        // A direct-color layer can still use deferred indices. Its direct RGBA
+        // data needs a full runtime index buffer when persisted, otherwise the
+        // runtime encoding marker cannot be restored safely.
+        serializableIndices = new Uint8Array(expectedLength);
       } else if (tiledIndices && preserveTypedArrays) {
         // Checkpoints retain the established contiguous compact encoding.
         // Runtime tile sharing remains untouched and is rebuilt as frames are
@@ -1277,6 +1286,13 @@
       ) {
         serializableIndices = new Int16Array(expectedLength).fill(-1);
       }
+      const serializedRuntimeUint8Indices = preserveTypedArrays
+        && (
+          (serializableIndices instanceof Uint8Array
+            && serializableIndices.length === expectedLength
+            && (runtimeUint8Indices || hasDeferredRuntimeUint8Indices))
+          || (preserveImplicitTransparency && hasDeferredRuntimeUint8Indices)
+        );
       return {
         id: layer.id,
         name: layer.name,
@@ -1285,7 +1301,7 @@
         blendMode: normalizeLayerBlendMode(layer.blendMode),
         indices: serializeLayerTypedArray(serializableIndices, { preserveTypedArrays }),
         ...(preserveImplicitTransparency ? { indicesImplicitTransparent: true } : {}),
-        ...((runtimeUint8Indices || layer.indicesEncoding === RUNTIME_LAYER_INDEX_ENCODING) && preserveTypedArrays
+        ...(serializedRuntimeUint8Indices
           ? { indicesEncoding: RUNTIME_LAYER_INDEX_ENCODING }
           : ((compactIndices || tiledIndices || createdCompactStorageIndices) && preserveTypedArrays
             ? { indicesEncoding: COMPACT_LAYER_INDEX_ENCODING }
@@ -1416,12 +1432,42 @@
         const compactBytes = typeof layer.indices === 'string'
           ? decodeBase64(layer.indices)
           : layer.indices;
-        if (!(compactBytes instanceof Uint8Array) || compactBytes.length !== pixelCount) {
+        if (compactBytes instanceof Uint8Array && compactBytes.length === pixelCount) {
+          indices = reuseTypedArrays ? compactBytes : new Uint8Array(compactBytes);
+        } else if (
+          hasRuntimeUint8Indices
+          && compactBytes instanceof Uint8Array
+          && compactBytes.length === 0
+        ) {
+          // Build 116 could persist a deferred runtime buffer beside direct
+          // color data. It is semantically a fully transparent index map.
+          indices = new Uint8Array(pixelCount);
+        } else if (
+          hasRuntimeUint8Indices
+          && compactBytes instanceof Int16Array
+          && compactBytes.length === pixelCount
+        ) {
+          // Recover the short-lived malformed runtime marker emitted before
+          // deferred direct-color layers were materialized during save.
+          indices = new Uint8Array(pixelCount);
+          for (let pixelIndex = 0; pixelIndex < pixelCount; pixelIndex += 1) {
+            indices[pixelIndex] = compactBytes[pixelIndex] > 0 ? Math.min(255, compactBytes[pixelIndex]) : 0;
+          }
+        } else if (
+          hasRuntimeUint8Indices
+          && compactBytes instanceof Uint8Array
+          && compactBytes.length === pixelCount * Int16Array.BYTES_PER_ELEMENT
+        ) {
+          const aligned = new Uint8Array(compactBytes.byteLength);
+          aligned.set(compactBytes);
+          const legacyIndices = new Int16Array(aligned.buffer);
+          indices = new Uint8Array(pixelCount);
+          for (let pixelIndex = 0; pixelIndex < pixelCount; pixelIndex += 1) {
+            indices[pixelIndex] = legacyIndices[pixelIndex] > 0 ? Math.min(255, legacyIndices[pixelIndex]) : 0;
+          }
+        } else {
           throw new Error('Layer compact pixel data mismatch');
         }
-        indices = reuseTypedArrays && compactBytes instanceof Uint8Array
-          ? compactBytes
-          : new Uint8Array(compactBytes);
       } else {
         indices = deserializeRasterTypedArray(
             layer.indices,
