@@ -8,7 +8,7 @@
     return account.href;
   }
 
-  function mountDenied(authenticated) {
+  function mountDenied(authenticated, error = null) {
     let gate = document.getElementById('marketAccessGate');
     if (gate) return;
     gate = document.createElement('main');
@@ -16,13 +16,17 @@
     gate.className = 'market-access-gate';
     const icon = new Image(); icon.src = new URL('../assets/icons/Market.png', window.location.href).href; icon.alt = '';
     const label = document.createElement('span'); label.className = 'market-access-gate__label'; label.textContent = 'MARKET ACCOUNT';
-    const title = document.createElement('h1'); title.textContent = authenticated ? 'メール確認が必要です' : 'ログインして利用してください';
+    const title = document.createElement('h1'); title.textContent = error
+      ? 'ログイン状態を確認できません'
+      : (authenticated ? 'メール確認が必要です' : 'ログインして利用してください');
     const copy = document.createElement('p');
-    copy.textContent = authenticated
-      ? '出品・購入にはメール確認済みのアカウントが必要です。'
-      : 'マーケットの出品・購入・販売者設定は、ログインすると利用できます。';
+    copy.textContent = error
+      ? '通信状態を確認してから、もう一度お試しください。'
+      : (authenticated
+        ? '出品・購入にはメール確認済みのアカウントが必要です。'
+        : 'マーケットの出品・購入・販売者設定は、ログインすると利用できます。');
     const actions = document.createElement('div'); actions.className = 'market-access-gate__actions';
-    const primary = document.createElement('a'); primary.href = accountUrl(); primary.textContent = authenticated ? '確認・アカウント設定へ' : 'ログインする';
+    const primary = document.createElement('a'); primary.href = error ? window.location.href : accountUrl(); primary.textContent = error ? '再読み込み' : (authenticated ? '確認・アカウント設定へ' : 'ログインする');
     const secondary = document.createElement('a'); secondary.href = new URL('./index.html', window.location.href).href; secondary.textContent = 'マーケットを見る'; secondary.className = 'is-subtle';
     actions.append(primary, secondary); gate.append(icon, label, title, copy, actions); document.body.appendChild(gate);
     document.documentElement.dataset.pixieedMarketAccess = 'denied';
@@ -39,7 +43,7 @@
     if (document.readyState === 'loading') {
       await new Promise((resolve) => document.addEventListener('DOMContentLoaded', resolve, { once: true }));
     }
-    mountDenied(access.authenticated);
+    mountDenied(access.authenticated, access.error);
     return access;
   })();
 
