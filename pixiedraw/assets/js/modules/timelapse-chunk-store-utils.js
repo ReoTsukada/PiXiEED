@@ -6,15 +6,22 @@
   function createTimelapseChunkStoreUtils({
     indexedDBApi = window.indexedDB,
     databaseName = 'pixieedraw-timelapse-v1',
-    databaseVersion = 1,
+    databaseVersion = 2,
     maxSnapshotsPerCanvas = 120,
   } = {}) {
-    const STORE_NAME = 'projects';
-    const fallback = new Map();
+    // V1 kept every timelapse payload in one project record. A large base
+    // snapshot made IndexedDB clone the whole record on every write. Keep V1
+    // read-only for migration and write chunks/bases to separate V2 stores.
+    const LEGACY_STORE_NAME = 'projects';
+    const CHUNK_STORE_NAME = 'projectChunks';
+    const BASE_STORE_NAME = 'baseSnapshots';
+    const fallbackChunks = new Map();
+    const fallbackBases = new Map();
     let databasePromise = null;
     let queue = Promise.resolve();
 
     const normalizeId = value => String(value || '').trim();
+    const makeBaseKey = (projectId, canvasId) => `${normalizeId(projectId)}:${normalizeId(canvasId)}`;
     const clone = value => typeof structuredClone === 'function' ? structuredClone(value) : value;
     const enqueue = task => {
       const next = queue.then(task, task);
@@ -53,8 +60,15 @@
         databasePromise = new Promise((resolve, reject) => {
           const request = indexedDBApi.open(databaseName, databaseVersion);
           request.onupgradeneeded = () => {
-            if (!request.result.objectStoreNames.contains(STORE_NAME)) {
-              request.result.createObjectStore(STORE_NAME, { keyPath: 'projectId' });
+            if (!request.result.objectStoreNames.contains(LEGACY_STORE_NAME)) {
+              request.result.createObjectStore(LEGACY_STORE_NAME, { keyPath: 'projectId' });
+            }
+            if (!request.result.objectStoreNames.contains(CHUNK_STORE_NAME)) {
+              request.result.createObjectStore(CHUNK_STORE_NAME, { keyPath: 'projectId' });
+            }
+            if (!request.result.objectStoreNames.contains(BASE_STORE_NAME)) {
+              const baseStore = request.result.createObjectStore(BASE_STORE_NAME, { keyPath: 'key' });
+              baseStore.createIndex('projectId', 'projectId', { unique: false });
             }
           };
           request.onsuccess = () => resolve(request.result);
@@ -93,12 +107,12 @@
       return enqueue(async () => {
         const database = await openDatabase();
         if (!database) {
-          const record = normalizeRecord(fallback.get(projectKey), projectKey);
-          fallback.set(projectKey, appendAndThin(record, canvasKey, values));
+          const record = normalizeRecord(fallbackChunks.get(projectKey), projectKey);
+          fallbackChunks.set(projectKey, appendAndThin(record, canvasKey, values));
           return true;
         }
-        const transaction = database.transaction(STORE_NAME, 'readwrite');
-        const store = transaction.objectStore(STORE_NAME);
+        const transaction = database.transaction(CHUNK_STORE_NAME, 'readwrite');
+        const store = transaction.objectStore(CHUNK_STORE_NAME);
         const record = normalizeRecord(await requestResult(store.get(projectKey)), projectKey);
         store.put(appendAndThin(record, canvasKey, values));
         await transactionDone(transaction);
@@ -113,20 +127,25 @@
       return enqueue(async () => {
         const database = await openDatabase();
         if (!database) {
-          const record = normalizeRecord(fallback.get(projectKey), projectKey);
-          record.baseSnapshotsByCanvas[canvasKey] = clone(baseSnapshot);
-          record.updatedAt = new Date().toISOString();
-          fallback.set(projectKey, record);
+          fallbackBases.set(makeBaseKey(projectKey, canvasKey), {
+            key: makeBaseKey(projectKey, canvasKey),
+            projectId: projectKey,
+            canvasId: canvasKey,
+            snapshot: clone(baseSnapshot),
+            updatedAt: new Date().toISOString(),
+          });
           return true;
         }
-        const transaction = database.transaction(STORE_NAME, 'readwrite');
-        const store = transaction.objectStore(STORE_NAME);
-        const record = normalizeRecord(await requestResult(store.get(projectKey)), projectKey);
-        // IndexedDB performs its own structured clone. Avoid building another
-        // full JavaScript copy of a large all-frame baseline before put().
-        record.baseSnapshotsByCanvas[canvasKey] = baseSnapshot;
-        record.updatedAt = new Date().toISOString();
-        store.put(record);
+        const transaction = database.transaction(BASE_STORE_NAME, 'readwrite');
+        // IndexedDB now clones only this one base snapshot, never the project
+        // chunk record or an unrelated historical base.
+        transaction.objectStore(BASE_STORE_NAME).put({
+          key: makeBaseKey(projectKey, canvasKey),
+          projectId: projectKey,
+          canvasId: canvasKey,
+          snapshot: baseSnapshot,
+          updatedAt: new Date().toISOString(),
+        });
         await transactionDone(transaction);
         return true;
       });
@@ -137,11 +156,38 @@
       if (!projectKey) return normalizeRecord(null, '');
       await queue;
       const database = await openDatabase();
-      if (!database) return clone(normalizeRecord(fallback.get(projectKey), projectKey));
-      const transaction = database.transaction(STORE_NAME, 'readonly');
-      const value = await requestResult(transaction.objectStore(STORE_NAME).get(projectKey));
-      // Values returned by IndexedDB are already detached structured clones.
-      return normalizeRecord(value, projectKey);
+      if (!database) {
+        const chunks = normalizeRecord(fallbackChunks.get(projectKey), projectKey);
+        const bases = {};
+        fallbackBases.forEach(record => {
+          if (record?.projectId === projectKey && record.canvasId) {
+            bases[record.canvasId] = clone(record.snapshot);
+          }
+        });
+        return { ...chunks, baseSnapshotsByCanvas: bases };
+      }
+      const transaction = database.transaction([CHUNK_STORE_NAME, BASE_STORE_NAME], 'readonly');
+      const chunksRequest = transaction.objectStore(CHUNK_STORE_NAME).get(projectKey);
+      const baseIndex = transaction.objectStore(BASE_STORE_NAME).index('projectId');
+      const basesRequest = baseIndex.getAll(projectKey);
+      const [chunkValue, baseValues] = await Promise.all([
+        requestResult(chunksRequest),
+        requestResult(basesRequest),
+      ]);
+      const bases = {};
+      (Array.isArray(baseValues) ? baseValues : []).forEach(record => {
+        if (record?.canvasId && record.snapshot && typeof record.snapshot === 'object') {
+          bases[String(record.canvasId)] = record.snapshot;
+        }
+      });
+      // Prefer the V2 stores as soon as either one contains data. V1 remains
+      // readable for projects that have never been written in V2.
+      if (chunkValue || Object.keys(bases).length) {
+        return { ...normalizeRecord(chunkValue, projectKey), baseSnapshotsByCanvas: bases };
+      }
+      const legacyTransaction = database.transaction(LEGACY_STORE_NAME, 'readonly');
+      const legacyValue = await requestResult(legacyTransaction.objectStore(LEGACY_STORE_NAME).get(projectKey));
+      return normalizeRecord(legacyValue, projectKey);
     }
 
     async function removeProject(projectId) {
@@ -149,9 +195,23 @@
       if (!projectKey) return false;
       return enqueue(async () => {
         const database = await openDatabase();
-        if (!database) return fallback.delete(projectKey);
-        const transaction = database.transaction(STORE_NAME, 'readwrite');
-        transaction.objectStore(STORE_NAME).delete(projectKey);
+        if (!database) {
+          const removedChunks = fallbackChunks.delete(projectKey);
+          let removedBases = false;
+          fallbackBases.forEach((record, key) => {
+            if (record?.projectId === projectKey) {
+              fallbackBases.delete(key);
+              removedBases = true;
+            }
+          });
+          return removedChunks || removedBases;
+        }
+        const lookupTransaction = database.transaction(BASE_STORE_NAME, 'readonly');
+        const baseKeys = await requestResult(lookupTransaction.objectStore(BASE_STORE_NAME).index('projectId').getAllKeys(projectKey));
+        const transaction = database.transaction([LEGACY_STORE_NAME, CHUNK_STORE_NAME, BASE_STORE_NAME], 'readwrite');
+        transaction.objectStore(LEGACY_STORE_NAME).delete(projectKey);
+        transaction.objectStore(CHUNK_STORE_NAME).delete(projectKey);
+        baseKeys.forEach(key => transaction.objectStore(BASE_STORE_NAME).delete(key));
         await transactionDone(transaction);
         return true;
       });
