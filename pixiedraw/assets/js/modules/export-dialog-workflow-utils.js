@@ -607,16 +607,22 @@
     if (typeof action !== 'function') {
       return;
     }
-    try {
-      const result = action();
-      if (result && typeof result.then === 'function') {
-        result.catch(error => {
-          console.warn('Export action failed', error);
-        });
-      }
-    } catch (error) {
-      console.warn('Export action failed', error);
-    }
+    const closeLoading = beginBlockingGlobalLoading(
+      localizeText('書き出しを準備中…', 'Preparing export...'),
+      { immediate: true }
+    );
+    // Let the browser paint the blocking surface before a large synchronous
+    // canvas/ZIP build starts. Without this yield the DOM state changes, but
+    // the user never gets a frame in which the loading UI is visible.
+    Promise.resolve()
+      .then(() => new Promise(resolve => window.requestAnimationFrame(resolve)))
+      .then(() => action())
+      .catch(error => {
+        console.warn('Export action failed', error);
+      })
+      .finally(() => {
+        closeLoading?.();
+      });
   }
 
   function closeExportInterstitial({ runPendingExport = false } = {}) {
@@ -782,47 +788,57 @@
 
   async function performExportByMode(mode, { selectedFormats = null } = {}) {
     const normalized = normalizeExportFormat(mode || 'png');
+    const closeLoading = beginBlockingGlobalLoading(
+      localizeText('書き出しを準備中…', 'Preparing export...'),
+      { immediate: true }
+    );
     const includeTimelapse = normalized !== 'project'
       && dom.exportDialog?.timelapseToggle instanceof HTMLInputElement
       && dom.exportDialog.timelapseToggle.checked;
-    if (normalized !== 'spritemap' && normalized !== 'allzip' && normalized !== 'batchzip' && shouldSaveSpriteMapCompanion(normalized)) {
-      await exportProjectAsSpriteMap({
-        companionExport: true,
-        includeProjectCompanion: false,
-      });
-    }
-    if (normalized === 'allzip') {
-      await exportProjectAsAllFormatsZip();
-    } else if (normalized === 'batchzip') {
-      await exportProjectAsAllFormatsZip({
-        selectedFormats: Array.isArray(selectedFormats) ? selectedFormats : getSelectedBatchZipFormats(),
-      });
-    } else if (normalized === 'gif') {
-      await exportProjectAsGif();
-    } else if (normalized === 'jpeg') {
-      await exportProjectAsJpeg();
-    } else if (normalized === 'svg') {
-      await exportProjectAsSvg();
-    } else if (normalized === 'spritemap') {
-      await exportProjectAsSpriteMap();
-    } else if (normalized === 'glb') {
-      await exportProjectAsGlb();
-    } else if (normalized === 'gridpng') {
-      await exportProjectAsGridPng();
-    } else if (normalized === 'timelapse') {
-      await exportTimelapseGif();
-    } else if (normalized === 'project') {
-      const result = await saveProjectAsPixieedraw({
-        fileNameBase: getExportFileNameBase() || state.documentName,
-      });
-      if (result?.saved) {
-        showLoginPromptAfterExport();
+    try {
+      setGlobalLoadingIndicatorLabel(localizeText('書き出し中…', 'Exporting...'));
+      if (normalized !== 'spritemap' && normalized !== 'allzip' && normalized !== 'batchzip' && shouldSaveSpriteMapCompanion(normalized)) {
+        await exportProjectAsSpriteMap({
+          companionExport: true,
+          includeProjectCompanion: false,
+        });
       }
-    } else {
-      await exportProjectAsPng();
-    }
-    if (includeTimelapse) {
-      await exportTimelapseGif();
+      if (normalized === 'allzip') {
+        await exportProjectAsAllFormatsZip();
+      } else if (normalized === 'batchzip') {
+        await exportProjectAsAllFormatsZip({
+          selectedFormats: Array.isArray(selectedFormats) ? selectedFormats : getSelectedBatchZipFormats(),
+        });
+      } else if (normalized === 'gif') {
+        await exportProjectAsGif();
+      } else if (normalized === 'jpeg') {
+        await exportProjectAsJpeg();
+      } else if (normalized === 'svg') {
+        await exportProjectAsSvg();
+      } else if (normalized === 'spritemap') {
+        await exportProjectAsSpriteMap();
+      } else if (normalized === 'glb') {
+        await exportProjectAsGlb();
+      } else if (normalized === 'gridpng') {
+        await exportProjectAsGridPng();
+      } else if (normalized === 'timelapse') {
+        await exportTimelapseGif();
+      } else if (normalized === 'project') {
+        const result = await saveProjectAsPixieedraw({
+          fileNameBase: getExportFileNameBase() || state.documentName,
+        });
+        if (result?.saved) {
+          showLoginPromptAfterExport();
+        }
+      } else {
+        await exportProjectAsPng();
+      }
+      if (includeTimelapse) {
+        setGlobalLoadingIndicatorLabel(localizeText('タイムラプスを書き出し中…', 'Exporting timelapse...'));
+        await exportTimelapseGif();
+      }
+    } finally {
+      closeLoading?.();
     }
   }
 
