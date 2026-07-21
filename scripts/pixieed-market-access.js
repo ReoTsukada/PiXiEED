@@ -28,10 +28,16 @@
     accessPromise = (async () => {
       try {
         const client = await getClient();
-        const { data, error } = await client.auth.getUser();
-        const user = error ? null : data?.user || null;
-        const allowed = Boolean(user && !user.is_anonymous && user.email && user.email_confirmed_at);
-        return { allowed, authenticated: Boolean(user), user, client, error: error || null };
+        try {
+          const { data, error } = await client.auth.getUser();
+          const user = error ? null : data?.user || null;
+          const allowed = Boolean(user && !user.is_anonymous && user.email && user.email_confirmed_at);
+          return { allowed, authenticated: Boolean(user), user, client, error: error || null };
+        } catch (error) {
+          // Public catalog calls do not require Auth. Keep the usable anon
+          // client when /auth/v1/user is temporarily unreachable.
+          return { allowed: false, authenticated: false, user: null, client, error };
+        }
       } catch (error) {
         return { allowed: false, authenticated: false, user: null, client: null, error };
       }
