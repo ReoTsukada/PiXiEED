@@ -126,6 +126,13 @@ const legacyDirectMove = selectionWorkflow.createSelectionMoveState(
 assert.equal(legacyDirectMove.indices[0], -1, 'Int16 direct-color selection keeps -1 transparency sentinel');
 assert.equal(legacyDirectMove.contentMask[0], 1, 'visible direct-color selection remains move content');
 
+const indexedMove = selectionWorkflow.createSelectionMoveState(
+  { id: 'indexed-layer', indices: new Int16Array([1, -1, -1, -1]), direct: null },
+  { x0: 0, y0: 0, x1: 1, y1: 1 },
+  new Uint8Array([1, 0, 0, 0])
+);
+assert.equal(indexedMove.direct, null, 'indexed selection moves do not allocate an unused RGBA copy');
+
 const layer = {
   id: 'direct-layer',
   indices: new Uint8Array([0, 0, 0, 0]),
@@ -196,5 +203,16 @@ assert.deepEqual(
   [90, 80, 70, 255],
   'runtime transparent index must not overwrite restored direct color'
 );
+
+state.width = 256;
+state.height = 256;
+const largeSelectionMove = selectionWorkflow.createSelectionMoveState(
+  { id: 'large-indexed-layer', indices: new Int16Array(256 * 256).fill(1), direct: null },
+  { x0: 0, y0: 0, x1: 255, y1: 255 },
+  new Uint8Array(256 * 256).fill(1)
+);
+assert.equal(largeSelectionMove.direct, null, 'large indexed selections still avoid an RGBA copy');
+assert.equal(largeSelectionMove.selectedSourceIndices, null, 'large selections do not allocate a huge JS index list at pointer-down');
+assert.equal(largeSelectionMove.contentSourceIndices, null, 'large visible selections do not allocate a second JS index list');
 
 console.log('PiXiEEDraw direct-color selection move checks passed');
