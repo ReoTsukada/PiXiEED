@@ -1947,7 +1947,10 @@
     const direct = moveState.direct instanceof Uint8ClampedArray ? moveState.direct : null;
     const paletteIndex = indices && sourceIndex < indices.length ? indices[sourceIndex] : -1;
     if (paletteIndex >= 0 && Array.isArray(state.palette) && state.palette[paletteIndex]) {
-      return Number(state.palette[paletteIndex].a) || 0;
+      const paletteAlpha = Number(state.palette[paletteIndex].a) || 0;
+      if (paletteAlpha > 0) {
+        return paletteAlpha;
+      }
     }
     if (direct) {
       const base = sourceIndex * 4;
