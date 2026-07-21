@@ -1340,11 +1340,38 @@
       allowMissing = false,
       fillValue = 0,
       reuseTypedArrays = false,
+      recoverTruncated = false,
     } = {}) {
+      const recoverPartialRaster = source => {
+        if (!recoverTruncated) {
+          return null;
+        }
+        const output = new Type(expectedLength);
+        if (fillValue !== 0) output.fill(fillValue);
+        if (!source) {
+          return output;
+        }
+        const copyLength = Math.min(expectedLength, source.length || 0);
+        if (copyLength > 0) {
+          output.set(source.subarray ? source.subarray(0, copyLength) : Array.from(source).slice(0, copyLength));
+        }
+        console.warn('Recovered a truncated raster layer buffer while opening an autosave.', {
+          expectedLength,
+          actualLength: source.length || 0,
+          mismatchMessage,
+        });
+        return output;
+      };
       if (typeof value === 'string' && value.length > 0) {
         const bytes = decodeBase64(value);
         const itemSize = Type.BYTES_PER_ELEMENT || 1;
         if (bytes.length !== expectedLength * itemSize) {
+          const wholeItemLength = Math.floor(bytes.length / itemSize);
+          if (recoverTruncated && wholeItemLength >= 0) {
+            const aligned = new Uint8Array(wholeItemLength * itemSize);
+            aligned.set(bytes.subarray(0, aligned.length));
+            return recoverPartialRaster(new Type(aligned.buffer));
+          }
           throw new Error(mismatchMessage);
         }
         const aligned = new Uint8Array(bytes.byteLength);
@@ -1356,12 +1383,16 @@
       }
       if (value instanceof Type) {
         if (value.length !== expectedLength) {
+          const recovered = recoverPartialRaster(value);
+          if (recovered) return recovered;
           throw new Error(mismatchMessage);
         }
         return reuseTypedArrays ? value : new Type(value);
       }
       if (Array.isArray(value) || ArrayBuffer.isView(value)) {
         if (value.length !== expectedLength) {
+          const recovered = recoverPartialRaster(value);
+          if (recovered) return recovered;
           throw new Error(mismatchMessage);
         }
         const output = new Type(expectedLength);
@@ -1387,6 +1418,7 @@
     ) {
       const reuseTypedArrays = options?.reuseTypedArrays === true;
       const trustStoredLayerFlags = options?.trustStoredLayerFlags === true;
+      const recoverTruncatedRasterLayers = options?.recoverTruncatedRasterLayers === true;
       if (layer?.type === SIM_LAYER_TYPE) {
         const simLayer = createSimulationLayer(fallbackName, width, height);
         simLayer.id = typeof layer.id === 'string' ? layer.id : fallbackId;
@@ -1423,8 +1455,8 @@
         || Array.isArray(layer.direct)
         || ArrayBuffer.isView(layer.direct);
       const hasImplicitTransparentIndices = layer.indicesImplicitTransparent === true && !hasDirectPayload;
-      const hasCompactIndices = layer.indicesEncoding === COMPACT_LAYER_INDEX_ENCODING;
-      const hasRuntimeUint8Indices = layer.indicesEncoding === RUNTIME_LAYER_INDEX_ENCODING;
+      let hasCompactIndices = layer.indicesEncoding === COMPACT_LAYER_INDEX_ENCODING;
+      let hasRuntimeUint8Indices = layer.indicesEncoding === RUNTIME_LAYER_INDEX_ENCODING;
       let indices = null;
       if (hasImplicitTransparentIndices) {
         indices = hasRuntimeUint8Indices ? new Uint8Array(0) : new Int16Array(0);
@@ -1469,13 +1501,60 @@
           throw new Error('Layer compact pixel data mismatch');
         }
       } else {
-        indices = deserializeRasterTypedArray(
-            layer.indices,
-            Int16Array,
-            pixelCount,
-            'Layer pixel data mismatch',
-            { allowMissing: hasDirectPayload, fillValue: -1, reuseTypedArrays }
-          );
+        // Some early V2 in-memory snapshots kept the Uint8 pixel data but
+        // omitted its encoding marker. Do not parse those bytes as Int16: the
+        // byte length is intentionally half-sized and would otherwise prevent
+        // the whole project from opening. Direct-color layers came from the
+        // V2 runtime representation; other unmarked Uint8 payloads retain the
+        // established compact storage representation.
+        let unmarkedBytes = layer.indices instanceof Uint8Array ? layer.indices : null;
+        let decodedLegacyIndices = null;
+        if (typeof layer.indices === 'string' && layer.indices.length > 0) {
+          const decodedBytes = decodeBase64(layer.indices);
+          if (decodedBytes.length === pixelCount) {
+            unmarkedBytes = decodedBytes;
+          } else if (decodedBytes.length === pixelCount * Int16Array.BYTES_PER_ELEMENT) {
+            const aligned = new Uint8Array(decodedBytes.byteLength);
+            aligned.set(decodedBytes);
+            decodedLegacyIndices = new Int16Array(aligned.buffer, 0, pixelCount);
+          }
+        }
+        if (unmarkedBytes instanceof Uint8Array && unmarkedBytes.length === pixelCount) {
+          indices = reuseTypedArrays && layer.indices instanceof Uint8Array
+            ? layer.indices
+            : new Uint8Array(unmarkedBytes);
+          if (hasDirectPayload || layer.directOnly === true) {
+            hasRuntimeUint8Indices = true;
+          } else {
+            hasCompactIndices = true;
+          }
+        } else if (decodedLegacyIndices) {
+          indices = new Int16Array(decodedLegacyIndices);
+        } else if (hasDirectPayload) {
+          // Direct RGBA is the authoritative visible data for this recovery
+          // case. A damaged auxiliary index map must not prevent the project
+          // from opening or erase the direct-color layer; rebuild it as the
+          // V2 transparent runtime map instead.
+          indices = new Uint8Array(pixelCount);
+          hasCompactIndices = false;
+          hasRuntimeUint8Indices = true;
+        } else {
+          indices = deserializeRasterTypedArray(
+              layer.indices,
+              Int16Array,
+              pixelCount,
+              'Layer pixel data mismatch',
+              {
+                allowMissing: hasDirectPayload,
+                fillValue: -1,
+                reuseTypedArrays,
+                // Only the V2 autosave path opts into this. A partial index
+                // plane has no self-describing size, but its intact prefix is
+                // still recoverable; the remainder must be transparent.
+                recoverTruncated: recoverTruncatedRasterLayers,
+              }
+            );
+        }
       }
       let direct = null;
       if (hasDirectPayload) {
