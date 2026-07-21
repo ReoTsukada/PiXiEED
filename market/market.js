@@ -13,6 +13,7 @@
   const priceMax = document.getElementById('marketPriceMax');
   const filterReset = document.getElementById('marketFilterReset');
   const advancedSearch = document.getElementById('marketAdvancedSearch');
+  const sellButton = document.getElementById('marketSellButton');
   const fallbackIcon = '../assets/icons/Market.png';
   const favorites = window.PiXiEEDMarketFavorites;
   const discovery = window.PiXiEEDMarketDiscovery;
@@ -193,6 +194,26 @@
     activeFilter = 'all';
     filters.querySelectorAll('button').forEach((button) => button.classList.toggle('is-active', button.dataset.filter === 'all'));
     render();
+  });
+  sellButton?.addEventListener('click', async (event) => {
+    event.preventDefault();
+    const targetUrl = new URL(sellButton.href, window.location.href);
+    const access = window.PiXiEEDMarketAccess
+      ? await window.PiXiEEDMarketAccess.check({ refresh: true })
+      : { allowed: false };
+    if (access.allowed) {
+      window.location.assign(targetUrl.href);
+      return;
+    }
+    const shouldLogin = window.confirm(
+      '出品するにはログインが必要です。\nログインページへ進みますか？'
+    );
+    if (!shouldLogin) {
+      return;
+    }
+    const accountUrl = new URL('../account/index.html', window.location.href);
+    accountUrl.searchParams.set('returnTo', targetUrl.href);
+    window.location.assign(accountUrl.href);
   });
   loadAssets();
 })();
