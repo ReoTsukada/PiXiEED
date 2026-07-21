@@ -76,9 +76,9 @@ try {
   await page.waitForTimeout(2_500);
   assert.match(
     await page.locator('script[src*="assets/js/app.js"]').getAttribute('src'),
-    /app\.js\?v=20260721-115/
+    /app\.js\?v=20260721-117/
   );
-  assert.equal(await page.evaluate(() => window.__PIXIEEDRAW_BUILD_ID__), '20260721-115');
+  assert.equal(await page.evaluate(() => window.__PIXIEEDRAW_BUILD_ID__), '20260721-117');
 
   const fileChooserPromise = page.waitForEvent('filechooser', { timeout: 10_000 });
   await page.locator('#startupActionOpen').click({ timeout: 5_000 });
