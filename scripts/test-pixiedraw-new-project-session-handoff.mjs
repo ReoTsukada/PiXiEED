@@ -35,6 +35,6 @@ assert.match(
   'ordinary clean resets must still mirror session dirtiness by default'
 );
 assert.match(index, /startup-workflow-utils\.js\?v=20260720-pxd1/);
-assert.match(index, /app\.js\?v=20260721-115/);
+assert.match(index, /app\.js\?v=20260721-117/);
 
 console.log('PiXiEEDraw new-project session identity handoff checks passed');
