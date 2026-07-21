@@ -14155,6 +14155,8 @@
   set dom(value) { dom = value; },
   get finalizePixelPatchHistoryEntry() { return finalizePixelPatchHistoryEntry; },
   set finalizePixelPatchHistoryEntry(value) { finalizePixelPatchHistoryEntry = value; },
+  get rollbackPixelPatchHistoryPending() { return rollbackPixelPatchHistoryPending; },
+  set rollbackPixelPatchHistoryPending(value) { rollbackPixelPatchHistoryPending = value; },
   get finalizeLayerAddHistoryEntry() { return finalizeLayerAddHistoryEntry; },
   set finalizeLayerAddHistoryEntry(value) { finalizeLayerAddHistoryEntry = value; },
   get finalizeFrameAddHistoryEntry() { return finalizeFrameAddHistoryEntry; },
