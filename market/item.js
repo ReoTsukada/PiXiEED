@@ -103,6 +103,14 @@
     $('itemPurchaseStatus').textContent = status;
   }
 
+  async function functionErrorMessage(error, fallback) {
+    try {
+      const payload = await error?.context?.clone?.().json?.();
+      if (payload?.error) return String(payload.error);
+    } catch (_error) {}
+    return String(error?.message || fallback);
+  }
+
   async function findExistingPurchase() {
     if (!purchaseClient || !currentAsset) return null;
     const { data } = await purchaseClient
@@ -160,7 +168,7 @@
         body: { asset_id: currentAsset.id }
       });
       if (error || !data?.ok) {
-        throw new Error(data?.error || error?.message || 'Stripe購入画面を開始できませんでした');
+        throw new Error(data?.error || await functionErrorMessage(error, 'Stripe購入画面を開始できませんでした'));
       }
       if (!/^https:\/\/checkout\.stripe\.com\//i.test(data?.url || '')) throw new Error('Stripe購入画面を確認できませんでした');
       window.location.assign(data.url);
