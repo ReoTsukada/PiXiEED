@@ -32,6 +32,10 @@
     return ((scope) => {
       with (scope) {
   let autosavePerformanceSequence = 0;
+  // A committed history entry must reach IndexedDB before the normal debounce
+  // window resumes. This also carries an immediate flush across an in-flight
+  // write, so a fast second stroke is not left waiting for the next interval.
+  let autosaveCommittedFlushQueued = false;
 
   function beginAutosavePerformanceSpan(name, details = null) {
     const perf = window?.performance;
@@ -305,9 +309,9 @@
     if (!AUTOSAVE_SUPPORTED || autosaveRestoring || !autosaveDirty) {
       return;
     }
-    if (isLightweightPersistenceMode()) {
+    autosaveCommittedFlushQueued = true;
+    if (autosaveWriteInFlight) {
       autosaveWriteQueued = true;
-      scheduleAutosaveSnapshot();
       return;
     }
     writeAutosaveSnapshot(true).catch(error => {
@@ -605,8 +609,16 @@
       autosaveWriteInFlight = false;
       releaseAutosaveTabLock();
       if (autosaveWriteQueued || autosaveDirty) {
+        const flushCommittedChange = autosaveCommittedFlushQueued;
         autosaveWriteQueued = false;
-        scheduleAutosaveSnapshot();
+        autosaveCommittedFlushQueued = false;
+        if (flushCommittedChange) {
+          queueMicrotask(() => requestImmediateAutosaveSnapshot());
+        } else {
+          scheduleAutosaveSnapshot();
+        }
+      } else {
+        autosaveCommittedFlushQueued = false;
       }
     }
   }
