@@ -14,6 +14,8 @@ assert.match(generator, /og:image/);
 assert.match(generator, /twitter:card/);
 assert.match(generator, /share\.png/);
 assert.match(generator, /sharp/);
+assert.match(generator, /shareFrameForeground/);
+assert.match(generator, /黒い台紙だけを透明化/);
 assert.match(generator, /market-seo-items:start/);
 assert.match(generator, /@type': 'Product'/);
 assert.match(item, /\/market\/items\//);
