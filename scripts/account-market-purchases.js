@@ -136,7 +136,7 @@
     const formats = Array.from(new Set(Array.isArray(product.included_formats) ? product.included_formats : [product.asset_format])).filter(Boolean);
     const card = document.createElement('article'); card.className = 'market-card account-market-card';
     const previewLink = document.createElement('a'); previewLink.className = 'market-card__preview';
-    previewLink.href = assetUrl(`../market/item.html?id=${encodeURIComponent(product.id || '')}`);
+    previewLink.href = assetUrl(`../market/items/${encodeURIComponent(product.id || '')}/`);
     const image = new Image(); image.src = product.preview_url || assetUrl('../assets/icons/Market.png'); image.alt = ''; image.draggable = false; image.dataset.marketProtectedMedia = 'true'; previewLink.appendChild(image);
     const body = document.createElement('div'); body.className = 'market-card__body';
     const title = document.createElement('h3'); title.textContent = product.title || '購入済み素材';
