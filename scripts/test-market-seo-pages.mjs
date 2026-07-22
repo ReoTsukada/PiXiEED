@@ -5,6 +5,7 @@ const generator = fs.readFileSync('scripts/generate-market-seo-pages.mjs', 'utf8
 const item = fs.readFileSync('market/item.js', 'utf8');
 const migration = fs.readFileSync('supabase/migrations/20260720100000_market_public_seo_catalog.sql', 'utf8');
 const sell = fs.readFileSync('market/sell.js', 'utf8');
+const workflow = fs.readFileSync('.github/workflows/generate-market-ogp.yml', 'utf8');
 
 assert.match(generator, /application\/ld\+json/);
 assert.match(generator, /market_public_seo_catalog_v1/);
@@ -24,4 +25,8 @@ assert.match(migration, /asset\.withdrawn_at is null/);
 assert.match(sell, /function drawPreviewWatermark/);
 assert.match(sell, /for \(let y = -diagonal/);
 assert.match(sell, /drawPreviewWatermark\(context, canvas\.width, canvas\.height\)/);
+assert.match(workflow, /cron: '\*\/5 \* \* \* \*'/);
+assert.match(workflow, /npm ci/);
+assert.match(workflow, /node scripts\/generate-market-seo-pages\.mjs/);
+assert.match(workflow, /git add market\/items sitemap\.xml/);
 console.log('market SEO page checks passed');
