@@ -8,6 +8,9 @@
   const MAX_TOTAL_BYTES = 50 * 1024 * 1024;
   const MAX_RASTER_DIMENSION = 512;
   const MAX_SAMPLE_PREVIEWS = 6;
+  const PREVIEW_WATERMARK_FONT_SIZE = 16;
+  const PREVIEW_WATERMARK_STEP_X = 132;
+  const PREVIEW_WATERMARK_STEP_Y = 50;
   const MAX_TAGS = 5;
   const MAX_CUSTOM_OPTIONS = 10;
   const MIN_LISTING_PRICE_YEN = 500;
@@ -729,8 +732,10 @@
   }
 
   function drawPreviewWatermark(context, width, height) {
-    const shortestSide = Math.min(width, height);
-    const fontSize = Math.max(9, Math.min(18, Math.round(shortestSide / 48)));
+    // 画像サイズに合わせて文字を縮めると、16pxなどの小さなドット絵では
+    // 透かし自体がピクセル化して作品を荒らす。公開プレビューの出力解像度と
+    // 透かしの文字・間隔を固定し、表示する作品だけをニアレストネイバーで拡大する。
+    const fontSize = PREVIEW_WATERMARK_FONT_SIZE;
     const label = 'PiXiEED SAMPLE';
     context.save();
     context.translate(width / 2, height / 2);
@@ -739,8 +744,8 @@
     context.textAlign = 'center';
     context.textBaseline = 'middle';
     const labelWidth = context.measureText(label).width;
-    const stepX = Math.max(labelWidth + fontSize * 1.5, fontSize * 7);
-    const stepY = Math.max(fontSize * 3.1, 28);
+    const stepX = Math.max(labelWidth + fontSize * 1.5, PREVIEW_WATERMARK_STEP_X);
+    const stepY = PREVIEW_WATERMARK_STEP_Y;
     const diagonal = Math.ceil(Math.hypot(width, height));
     context.lineWidth = Math.max(1, fontSize / 14);
     context.strokeStyle = 'rgba(0,0,0,.22)';
@@ -761,7 +766,9 @@
       const sourceWidth = source.width || source.naturalWidth;
       const sourceHeight = source.height || source.naturalHeight;
       const maxSide = thumbnail ? 640 : 960;
-      const scale = Math.min(1, maxSide / Math.max(sourceWidth, sourceHeight));
+      // 小さい素材も公開プレビューでは一定の解像度まで拡大する。
+      // 元絵の補間はしないため、ドットはくっきり保たれる。
+      const scale = maxSide / Math.max(sourceWidth, sourceHeight);
       const canvas = document.createElement('canvas');
       canvas.width = Math.max(1, Math.round(sourceWidth * scale));
       canvas.height = Math.max(1, Math.round(sourceHeight * scale));
