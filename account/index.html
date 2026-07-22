@@ -265,7 +265,7 @@
       .account-cover{width:64px;height:64px}
     }
   </style>
-  <link rel="stylesheet" href="account.css?v=20260722-profile-always1">
+  <link rel="stylesheet" href="account.css?v=20260722-auth-form1">
 </head>
 <body data-pixieed-account-auth="signed-out">
   <header class="site-header" aria-label="トップナビ">
@@ -422,30 +422,32 @@
                   <button class="auth-mode-switch__button is-active" type="button" data-auth-mode="login" role="tab" aria-selected="true">ログイン</button>
                   <button class="auth-mode-switch__button" type="button" data-auth-mode="signup" role="tab" aria-selected="false">新規作成</button>
                 </div>
-                <div id="authInputs" style="display:grid; gap:8px;" data-expanded="true">
-                  <label class="auth-field">
-                    <span>メールアドレス</span>
-                    <input class="auth-input" id="authEmail" type="email" placeholder="name@example.com" autocomplete="email">
-                  </label>
-                  <label class="auth-field" id="authPasscodeField">
-                    <span id="authPasscodeLabel">パスワード</span>
-                    <input class="auth-input" id="authPasscode" type="password" placeholder="パスワードを入力" minlength="6" autocomplete="current-password">
-                  </label>
-                  <label class="auth-field" id="authPasscodeConfirmField" hidden>
-                    <span>パスワード（確認）</span>
-                    <input class="auth-input" id="authPasscodeConfirm" type="password" placeholder="もう一度入力" minlength="8" autocomplete="new-password">
-                  </label>
-                </div>
-                <div class="auth-actions" style="display:grid; gap:8px;">
-                  <button class="auth-btn" id="authLoginBtn" type="button">メールアドレスとパスワードでログイン</button>
-                </div>
-                <div class="auth-secondary-actions">
-                  <button class="auth-text-btn" id="authMagicLinkBtn" type="button">メールにログインリンクを送る（パスワード不要）</button>
-                  <button class="auth-text-btn" id="authResetBtn" type="button">パスワードを忘れた場合</button>
-                </div>
-                <p class="helper auth-link-guide" id="authMagicLinkGuide">メールアドレスを入力して送信後、届いたメールのリンクを開くだけでログインできます。</p>
-                <p class="auth-security-note" id="authSecurityNote">ログイン後は、この端末で次回もログイン状態を保持します。共有端末では必ずログアウトしてください。</p>
-                <p class="helper" id="authAccountStatus"></p>
+                <form class="auth-form" id="authForm" novalidate>
+                  <div id="authInputs" style="display:grid; gap:8px;" data-expanded="true">
+                    <label class="auth-field">
+                      <span>メールアドレス</span>
+                      <input class="auth-input" id="authEmail" type="email" placeholder="name@example.com" autocomplete="email">
+                    </label>
+                    <label class="auth-field" id="authPasscodeField">
+                      <span id="authPasscodeLabel">パスワード</span>
+                      <input class="auth-input" id="authPasscode" type="password" placeholder="パスワードを入力" minlength="6" autocomplete="current-password">
+                    </label>
+                    <label class="auth-field" id="authPasscodeConfirmField" hidden>
+                      <span>パスワード（確認）</span>
+                      <input class="auth-input" id="authPasscodeConfirm" type="password" placeholder="もう一度入力" minlength="8" autocomplete="new-password">
+                    </label>
+                  </div>
+                  <div class="auth-actions" style="display:grid; gap:8px;">
+                    <button class="auth-btn" id="authLoginBtn" type="submit">メールアドレスとパスワードでログイン</button>
+                  </div>
+                  <div class="auth-secondary-actions">
+                    <button class="auth-text-btn" id="authMagicLinkBtn" type="button">メールにログインリンクを送る（パスワード不要）</button>
+                    <button class="auth-text-btn" id="authResetBtn" type="button">パスワードを忘れた場合</button>
+                  </div>
+                  <p class="helper auth-link-guide" id="authMagicLinkGuide">メールアドレスを入力して送信後、届いたメールのリンクを開くだけでログインできます。</p>
+                  <p class="auth-security-note" id="authSecurityNote">ログイン後は、この端末で次回もログイン状態を保持します。共有端末では必ずログアウトしてください。</p>
+                  <p class="helper" id="authAccountStatus"></p>
+                </form>
               </div>
             </div>
           </section>
@@ -630,8 +632,8 @@
     </main>
   </div>
 
-  <script src="../scripts/shared-auth-panel.js?v=20260722-signin-transition1"></script>
-  <script src="../scripts/account-dashboard.js?v=20260722-settings-default1"></script>
+  <script src="../scripts/shared-auth-panel.js?v=20260722-auth-form1"></script>
+  <script src="../scripts/account-dashboard.js?v=20260722-sales-reconcile1"></script>
   <script src="../scripts/account-collections.js?v=2026.07.19-account-library2"></script>
   <script src="../scripts/pixieed-market-access.js?v=20260721-shared-client1"></script>
   <script src="../scripts/account-market-admin-tools.js?v=2026.07.19-public-market1"></script>
