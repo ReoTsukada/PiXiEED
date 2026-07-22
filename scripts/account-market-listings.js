@@ -76,7 +76,7 @@
     const titleText = String(entry?.title || '出品物');
     const published = entry?.status === 'published';
     const withdrawn = published && Boolean(entry?.withdrawn_at);
-    const publicUrl = asset(`../market/item.html?id=${encodeURIComponent(id)}`);
+    const publicUrl = asset(`../market/items/${encodeURIComponent(id)}/`);
     const card = document.createElement('article');
     card.className = 'account-listing-card';
 
