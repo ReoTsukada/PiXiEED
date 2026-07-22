@@ -368,6 +368,12 @@
         scheduleDraw();
         return;
       }
+      try {
+        const { data: reconciled } = await client.functions.invoke('market-reconcile-my-sales', { body: {} });
+        if (Number(reconciled?.reconciled || 0) > 0) responseCache.clear();
+      } catch (_ignored) {
+        // The dashboard itself remains usable if Stripe reconciliation is temporarily unavailable.
+      }
       if (!force && responseCache.has(range)) {
         renderDashboard(responseCache.get(range));
         return;
