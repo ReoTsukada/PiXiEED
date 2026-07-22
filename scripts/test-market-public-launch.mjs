@@ -29,14 +29,14 @@ assert.match(sellHtml, /id="listingPreviewSection"[\s\S]*id="listingChangeSummar
 assert.match(sellHtml, /id="listingTagInput"/);
 assert.match(sell, /MAX_TAGS = 5/);
 assert.match(sell, /market-tag-chip/);
-assert.match(sellHtml, /id="listingCustomOptionPrice"[\s\S]*value="100"/);
-assert.match(sell, /input_custom_options/);
+assert.doesNotMatch(sellHtml, /listingCustomOptionPrice/);
+assert.match(sell, /input_custom_options:\s*\[\]/);
 assert.match(migration, /create or replace function public\.market_create_root_asset_v6/i);
 assert.match(migration, /between 100 and 10000000/i);
 assert.match(sellHtml, /id="listingPrice" type="text"[\s\S]*list="listingPricePresets"/);
 assert.match(sellHtml, /id="listingLimitedQuantity" type="text"[\s\S]*list="listingQuantityPresets"/);
 assert.match(sellHtml, /id="listingOptionsSection"[\s\S]*id="listingLimitedEnabled"[\s\S]*id="listingDerivativeAllowed"/);
-assert.match(sellHtml, /派生許可[\s\S]*\+0円/);
+assert.match(sellHtml, /派生許可[\s\S]*価格に含む/);
 assert.match(sell, /normalizedPaidPrice/);
 assert.match(sell, /PRICE_STEP_YEN = 100/);
 assert.match(sell, /input_sale_price_yen: sellerPriceForRpc/);
