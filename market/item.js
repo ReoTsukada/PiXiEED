@@ -39,26 +39,67 @@
     const node = document.createElement('span'); node.textContent = text; return node;
   }
 
-  function renderSamplePreviews(asset) {
-    const urls = Array.isArray(asset.sample_preview_urls)
-      ? asset.sample_preview_urls.filter((url) => /^https?:\/\//i.test(url || ''))
-      : [];
+  function externalProfileUrl(value) {
+    const url = String(value || '').trim();
+    return /^https?:\/\//i.test(url) ? url : '';
+  }
+
+  async function copyCurrentAssetUrl() {
+    if (!currentAsset) return;
+    const url = document.querySelector('link[rel="canonical"]')?.href || window.location.href;
+    try {
+      if (navigator.clipboard?.writeText && window.isSecureContext) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        const input = document.createElement('textarea');
+        input.value = url;
+        input.setAttribute('readonly', '');
+        input.style.cssText = 'position:fixed;opacity:0;pointer-events:none;';
+        document.body.appendChild(input);
+        input.select();
+        const copied = document.execCommand('copy');
+        input.remove();
+        if (!copied) throw new Error('copy_failed');
+      }
+      window.alert('商品URLをコピーしました');
+    } catch (_error) {
+      window.alert('URLをコピーできませんでした。ブラウザの設定を確認して、もう一度お試しください。');
+    }
+  }
+
+  function renderSamplePreviews(asset, previewUrl) {
+    const urls = [previewUrl, ...(Array.isArray(asset.sample_preview_urls) ? asset.sample_preview_urls : [])]
+      .filter((url) => /^https?:\/\//i.test(url || ''))
+      .filter((url, index, all) => all.indexOf(url) === index);
     const container = $('itemSamplePreviews');
-    container.hidden = urls.length === 0;
+    const controls = $('itemPreviewControls');
+    const toggle = $('itemPreviewModeToggle');
+    const hasSamples = urls.length > 1;
+    controls.hidden = !hasSamples;
+    container.hidden = true;
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.textContent = '試聴モード';
     container.replaceChildren(...urls.map((url, index) => {
       const button = document.createElement('button'); button.type = 'button';
       button.className = 'market-item__sample-preview';
-      button.setAttribute('aria-label', `購入前プレビュー ${index + 1} を表示`);
+      button.classList.toggle('is-active', url === previewUrl);
+      button.setAttribute('aria-label', index === 0 ? 'サムネイルを表示' : `試聴プレビュー ${index} を表示`);
       const image = new Image(); image.src = url; image.alt = ''; image.loading = 'lazy'; image.decoding = 'async';
       image.draggable = false; image.dataset.marketProtectedMedia = 'true';
       button.appendChild(image);
       button.addEventListener('click', () => {
         $('itemPreview').src = url;
-        $('itemPreview').alt = `${asset.title || '商品'}の購入前プレビュー ${index + 1}`;
+        $('itemPreview').alt = index === 0 ? `${asset.title || '商品'}のサムネイル` : `${asset.title || '商品'}の試聴プレビュー ${index}`;
         container.querySelectorAll('button').forEach((node) => node.classList.toggle('is-active', node === button));
       });
       return button;
     }));
+    toggle.onclick = () => {
+      const isOpen = container.hidden;
+      container.hidden = !isOpen;
+      toggle.setAttribute('aria-expanded', String(isOpen));
+      toggle.textContent = isOpen ? '試聴モードを閉じる' : '試聴モード';
+    };
   }
 
   function render(asset) {
@@ -93,8 +134,22 @@
       $('itemPreview').src = previewUrl;
     }
     $('itemPreview').alt = `${asset.title || '商品'}のプレビュー`;
-    renderSamplePreviews(asset);
-    $('itemAuthor').textContent = `作者: ${asset.creator_display_name || 'PiXiEEDクリエイター'}`;
+    renderSamplePreviews(asset, previewUrl);
+    $('itemShare').onclick = () => { copyCurrentAssetUrl(); };
+    const author = $('itemAuthor');
+    author.textContent = `作者: ${asset.creator_display_name || 'PiXiEEDクリエイター'}`;
+    const profileUrl = externalProfileUrl(asset.creator_profile_url);
+    if (profileUrl) {
+      author.href = profileUrl;
+      author.target = '_blank';
+      author.rel = 'noopener noreferrer';
+      author.setAttribute('aria-label', `${asset.creator_display_name || '作者'}のプロフィールを開く`);
+    } else {
+      author.removeAttribute('href');
+      author.removeAttribute('target');
+      author.removeAttribute('rel');
+      author.removeAttribute('aria-label');
+    }
     favorites?.bind?.($('itemFavorite'), asset);
     const productBadge = badge(isPixieeDrawProduct(asset) ? 'PiXiEEDraw作品' : '一般素材');
     productBadge.className = isPixieeDrawProduct(asset) ? 'is-pixiedraw-product' : 'is-general-product';
