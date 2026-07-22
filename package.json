@@ -1,0 +1,8 @@
+{
+  "name": "pixieed-site-tools",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "sharp": "^0.34.5"
+  }
+}
