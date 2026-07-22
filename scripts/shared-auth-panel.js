@@ -571,7 +571,7 @@
         linkedEmail.style.display = 'inline-flex';
         linkedEmail.textContent = supabaseUser.email ? `紐付け済み: ${supabaseUser.email}` : '紐付け済み';
       }
-      setStatus(`ログイン中${supabaseUser.email ? `: ${supabaseUser.email}` : ''}${nickname ? ` / ${nickname}` : ''}`);
+      setStatus(`ログイン中${supabaseUser.email ? `: ${supabaseUser.email}` : ''}${nickname ? ` / ${nickname}` : ''}。この端末では次回もログイン状態を保持します。`);
     } else {
       if (loginBtn) loginBtn.style.display = '';
       if (logoutBtn) logoutBtn.style.display = 'none';
@@ -591,6 +591,21 @@
     }
     updateHeaderLabel();
     updateAccountPageAuthState();
+  }
+
+  function showSignedInAccount(session) {
+    if (!session?.user) return false;
+    // メールログインの成功レスポンスには session が含まれる。認証イベントや
+    // プロフィール同期を待たずにマイページへ切り替え、待機したままにしない。
+    writeCachedAuthSession(session);
+    supabaseUser = session.user;
+    window.PiXiEEDAdAccountControl?.refresh?.();
+    updateAuthUi();
+    maybeReturnToCaller();
+    window.setTimeout(() => {
+      void syncProfileFromServer().finally(() => updateAuthUi());
+    }, 0);
+    return true;
   }
 
   function setAuthMode(nextMode) {
@@ -645,12 +660,12 @@
     }
     if (securityNote) {
       securityNote.textContent = isSignup
-        ? '登録後、確認メールが届く場合があります。メール内の案内を完了してください。'
+        ? '作成後は、この端末で次回もログイン状態を保持します。確認メールが届く場合は、メール内の案内を完了してください。'
         : isReset
           ? 'アカウントが存在する場合のみ、再設定用リンクがメールで届きます。'
           : isUpdatePassword
             ? '更新後は、新しいパスワードでログインしてください。'
-            : 'ログインではアカウントは作成されません。初めての方は「新規登録」を選んでください。';
+            : 'ログイン後は、この端末で次回もログイン状態を保持します。共有端末では必ずログアウトしてください。';
     }
     if (googleButtonLabel) googleButtonLabel.textContent = isSignup ? 'Googleで新規作成' : 'Googleでログイン';
     if (loginBtn) loginBtn.textContent = isSignup ? 'メールアドレスで新規作成' : isReset ? '再設定メールを送信' : isUpdatePassword ? 'パスワードを更新' : 'メールアドレスとパスワードでログイン';
@@ -984,13 +999,13 @@
             const { data, error } = await supabaseClient.auth.signUp({ email, password: passcode, options: { emailRedirectTo: getOAuthRedirectUrl() } });
             if (error) throw error;
             if (data?.session) {
-              setStatus('アカウントを作成しました');
+              showSignedInAccount(data.session);
             } else {
               setStatus('確認メールを送信しました。メールを確認してください');
             }
             return;
           }
-          const { error } = await supabaseClient.auth.signInWithPassword({ email, password: passcode });
+          const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password: passcode });
           if (error) {
             if (isConfirmError(error)) {
               await supabaseClient.auth.resend({ type: 'signup', email, options: { emailRedirectTo: getOAuthRedirectUrl() } });
@@ -1000,7 +1015,9 @@
             setStatus('メールアドレスまたはパスワードを確認してください');
             return;
           }
-          setStatus('サインインしました');
+          if (!showSignedInAccount(data?.session)) {
+            setStatus('サインインは完了しました。マイページを更新しています...');
+          }
         } catch (error) {
           if (authMode === 'signup' && isAlreadyRegisteredError(error)) {
             setStatus('このメールアドレスは登録済みです。「ログイン」を選ぶか、パスワードを再設定してください');
@@ -1138,6 +1155,10 @@
           if (event === 'PASSWORD_RECOVERY') {
             setAuthMode('update-password');
           }
+          // プロフィール同期は通信待ちになることがあるため、ログイン済み表示を
+          // 先に反映する。同期完了後に表示内容だけを更新する。
+          updateAuthUi();
+          maybeReturnToCaller();
           await syncProfileFromServer();
           updateAuthUi();
           maybeReturnToCaller();
