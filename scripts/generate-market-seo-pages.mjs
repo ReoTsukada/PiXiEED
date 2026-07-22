@@ -50,7 +50,7 @@ function replaceElement(html, id, content) {
   return html.replace(pattern, `$1${content}$3`);
 }
 
-function staticPage(template, asset, { ogImageUrl, previewImagePath }) {
+function staticPage(template, asset, { ogImageUrl }) {
   const title = text(asset.title, 'PiXiEEDマーケット素材');
   const description = text(asset.description, `${title}のドット絵素材。形式と利用条件をPiXiEEDマーケットで確認できます。`);
   const metaTitle = attributeText(title);
@@ -99,9 +99,6 @@ function staticPage(template, asset, { ogImageUrl, previewImagePath }) {
     ? 'OK（改変した素材を独立商品として再販売可能・系列ロイヤリティーあり）'
     : 'NG（利用・改変できる範囲でも、素材または改変素材として再販売できません）');
   html = replaceElement(html, 'itemAvailability', soldOut ? '売り切れ' : '販売中');
-  if (previewImagePath) {
-    html = html.replace(/(<img id="itemPreview" src=")[^"]+/, `$1${previewImagePath}`);
-  }
   return html;
 }
 
@@ -211,7 +208,7 @@ async function main() {
       console.warn(`Could not generate a share image for ${asset.id}: ${error.message}`);
     }
     const ogImageUrl = previewImagePath ? `${itemUrl(asset.id)}${previewImagePath}` : fallbackShareImageUrl;
-    await fs.writeFile(path.join(directory, 'index.html'), staticPage(template, asset, { ogImageUrl, previewImagePath }));
+    await fs.writeFile(path.join(directory, 'index.html'), staticPage(template, asset, { ogImageUrl }));
   }));
   await updateSitemap(assets);
   console.log(`Generated ${assets.length} market SEO page(s) and updated sitemap.xml.`);

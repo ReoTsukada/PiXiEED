@@ -73,9 +73,7 @@
       .filter((url, index, all) => all.indexOf(url) === index);
     const container = $('itemSamplePreviews');
     const controls = $('itemPreviewControls');
-    const frame = $('itemPreviewFrame');
     controls.hidden = urls.length === 0;
-    frame.classList.remove('is-sample-preview');
     container.replaceChildren(...urls.map((url, index) => {
       const button = document.createElement('button'); button.type = 'button';
       button.className = 'market-item__sample-preview';
@@ -87,7 +85,6 @@
       button.addEventListener('click', () => {
         $('itemPreview').src = url;
         $('itemPreview').alt = index === 0 ? `${asset.title || '商品'}のサムネイル` : `${asset.title || '商品'}の試聴プレビュー ${index}`;
-        frame.classList.toggle('is-sample-preview', index > 0);
         container.querySelectorAll('button').forEach((node) => node.classList.toggle('is-active', node === button));
       });
       return button;
