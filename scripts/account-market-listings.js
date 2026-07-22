@@ -97,7 +97,7 @@
     context.restore();
   }
 
-  async function fixedPreviewBlob(sourceBlob, { thumbnail = false } = {}) {
+  async function fixedPreviewBlob(sourceBlob, { thumbnail = false, watermark = thumbnail } = {}) {
     const image = await loadImage(sourceBlob);
     const sourceWidth = image.naturalWidth || image.width;
     const sourceHeight = image.naturalHeight || image.height;
@@ -109,8 +109,9 @@
     const context = canvas.getContext('2d', { alpha: true });
     context.imageSmoothingEnabled = false;
     context.drawImage(image, 0, 0, canvas.width, canvas.height);
-    // 元ファイルから再生成し、サムネイルと試聴へ同じ固定サイズ透かしを一度だけ焼き込む。
-    drawFixedWatermark(context, canvas.width, canvas.height);
+    // 試聴はビューア上で固定サイズ透かしを重ねるため、ここでは拡大済みの
+    // ドット絵だけを生成する。サムネイルは従来どおり焼き込み透かし。
+    if (watermark) drawFixedWatermark(context, canvas.width, canvas.height);
     return new Promise((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('preview_conversion_failed')), 'image/webp', .9));
   }
 
@@ -133,7 +134,7 @@
       uploadedPaths.push(thumbnailPath);
       const samplePaths = [];
       for (let index = 0; index < sourceBlobs.length; index += 1) {
-        const sampleBlob = await fixedPreviewBlob(sourceBlobs[index], { thumbnail: false });
+        const sampleBlob = await fixedPreviewBlob(sourceBlobs[index], { thumbnail: false, watermark: false });
         const samplePath = `${basePath}/sample-${String(index + 1).padStart(2, '0')}.webp`;
         result = await client.storage.from('market-private').upload(samplePath, sampleBlob, { upsert: false, contentType: 'image/webp' });
         if (result.error) throw result.error;

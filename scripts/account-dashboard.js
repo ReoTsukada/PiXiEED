@@ -336,7 +336,7 @@
       chartEmpty.textContent = hasData ? '' : 'この期間に確定した売上・報酬・有効表示はまだありません。';
     }
     setStatus(overviewStatus, hasData ? `直近${months}か月の確定データと暫定有効表示です。` : '確定した売上・報酬はまだありません。');
-    setStatus(dashboardStatus, '暫定有効表示は10秒以上の記録済み閲覧です。月次確定後に確定値・表示報酬へ反映します。');
+    setStatus(dashboardStatus, '暫定有効表示は5秒以上の記録済み閲覧です。月次確定後に確定値・表示報酬へ反映します。');
     hoveredIndex = -1;
     if (chartTooltip) chartTooltip.hidden = true;
     scheduleDraw();

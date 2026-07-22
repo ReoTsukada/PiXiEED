@@ -2,7 +2,7 @@
   'use strict';
 
   const VIEWER_KEY_STORAGE = 'pixieed:market-viewer-key:v1';
-  const REQUIRED_VISIBLE_SECONDS = 10;
+  const REQUIRED_VISIBLE_SECONDS = 5;
   let trackedAssetId = '';
   let visibleSeconds = 0;
   let timer = 0;

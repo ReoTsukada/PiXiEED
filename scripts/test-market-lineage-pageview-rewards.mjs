@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const migration = fs.readFileSync('supabase/migrations/20260719100000_market_lineage_pageview_rewards.sql', 'utf8');
+const fiveSecondMigration = fs.readFileSync('supabase/migrations/20260722122010_market_valid_view_5_seconds_and_tag_suggestions.sql', 'utf8');
 const derivativeMigration = fs.readFileSync('supabase/migrations/20260719090000_market_derivative_only_enforcement.sql', 'utf8');
 const tracker = fs.readFileSync('market/pageview-rewards.js', 'utf8');
 const item = fs.readFileSync('market/item.js', 'utf8');
@@ -16,6 +17,8 @@ const privacy = fs.readFileSync('privacy/index.html', 'utf8');
 assert.match(migration, /create table if not exists public\.market_pageview_events/i);
 assert.match(migration, /unique \(asset_id, view_day, viewer_key_hash\)/i);
 assert.match(migration, /dwell_seconds between 10 and 3600/i);
+assert.match(fiveSecondMigration, /dwell_seconds between 5 and 3600/i);
+assert.match(fiveSecondMigration, /market_tag_suggestions_v1/i);
 assert.match(migration, /auth\.uid\(\) = v_asset\.creator_user_id/i);
 assert.match(migration, /daily-view-limit/i);
 assert.match(migration, /market_admin_calculate_pageview_rewards_v1/i);
@@ -30,7 +33,7 @@ assert.match(migration, /market_my_pageview_rewards_v1/i);
 assert.match(migration, /grant execute on function public\.market_record_valid_pageview_v1[\s\S]*to anon, authenticated/i);
 assert.match(derivativeMigration, /the original package cannot be reposted unchanged/i);
 
-assert.match(tracker, /REQUIRED_VISIBLE_SECONDS = 10/);
+assert.match(tracker, /REQUIRED_VISIBLE_SECONDS = 5/);
 assert.match(tracker, /document\.visibilityState !== 'visible'/);
 assert.match(tracker, /document\.hasFocus\(\)/);
 assert.doesNotMatch(tracker, /asset\.local_test === true/);

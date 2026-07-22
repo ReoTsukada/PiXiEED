@@ -13,6 +13,11 @@
   let purchaseClient = null;
   let purchaseUser = null;
   const favorites = window.PiXiEEDMarketFavorites;
+  const RELATED_PAGE_SIZE = 9;
+  const RELATED_MAX = 18;
+  let relatedSets = {};
+  let relatedKind = 'derivative';
+  let relatedLimit = RELATED_PAGE_SIZE;
 
   function currentAssetId() {
     const queryId = new URLSearchParams(location.search).get('id');
@@ -73,7 +78,9 @@
       .filter((url, index, all) => all.indexOf(url) === index);
     const container = $('itemSamplePreviews');
     const controls = $('itemPreviewControls');
+    const frame = $('itemPreviewFrame');
     controls.hidden = urls.length === 0;
+    frame.classList.remove('is-sample-preview');
     container.replaceChildren(...urls.map((url, index) => {
       const button = document.createElement('button'); button.type = 'button';
       button.className = 'market-item__sample-preview';
@@ -85,6 +92,7 @@
       button.addEventListener('click', () => {
         $('itemPreview').src = url;
         $('itemPreview').alt = index === 0 ? `${asset.title || '商品'}のサムネイル` : `${asset.title || '商品'}の試聴プレビュー ${index}`;
+        frame.classList.toggle('is-sample-preview', index > 0);
         container.querySelectorAll('button').forEach((node) => node.classList.toggle('is-active', node === button));
       });
       return button;
@@ -171,6 +179,60 @@
     }) : [Object.assign(document.createElement('p'), { textContent: '追加オプションなし' })]));
     $('itemStatus').hidden = true; $('itemContent').hidden = false;
     window.PiXiEEDMarketAds?.showDetailAd?.();
+  }
+
+  function relatedCard(asset) {
+    const card = document.createElement('article'); card.className = 'market-card';
+    const link = document.createElement('a'); link.href = `/market/items/${encodeURIComponent(asset.id)}/`;
+    const preview = document.createElement('div'); preview.className = 'market-card__preview';
+    const image = new Image(); image.src = asset.preview_url || '../assets/icons/Market.png'; image.alt = ''; image.loading = 'lazy'; image.decoding = 'async'; image.draggable = false; image.dataset.marketProtectedMedia = 'true';
+    preview.append(image); link.append(preview);
+    const body = document.createElement('div'); body.className = 'market-card__body';
+    const title = document.createElement('h3'); title.textContent = asset.title || '名称未設定の素材';
+    const author = document.createElement('p'); author.className = 'market-card__author'; author.textContent = `作者 ${asset.creator_display_name || 'PiXiEEDクリエイター'}`;
+    const price = document.createElement('strong'); price.className = 'market-card__price'; price.textContent = yen(asset.sale_price_yen);
+    body.append(title, author, price); link.append(body); card.append(link); return card;
+  }
+
+  function renderRelated() {
+    const section = $('itemRelated'); const grid = $('itemRelatedGrid');
+    const assets = (relatedSets[relatedKind] || []).slice(0, relatedLimit);
+    section.hidden = !assets.length;
+    if (!assets.length) return;
+    document.querySelectorAll('[data-related-kind]').forEach((button) => {
+      const active = button.dataset.relatedKind === relatedKind;
+      button.classList.toggle('is-active', active); button.setAttribute('aria-selected', String(active));
+    });
+    const nodes = [];
+    assets.forEach((asset, index) => {
+      nodes.push(relatedCard(asset));
+      if ((index + 1) % 3 === 0 && index + 1 < assets.length) {
+        const ad = window.PiXiEEDMarketAds?.createListAd?.(); if (ad) { ad.classList.add('market-ad--related'); nodes.push(ad); }
+      }
+    });
+    grid.replaceChildren(...nodes);
+    $('itemRelatedMore').hidden = (relatedSets[relatedKind] || []).length <= relatedLimit;
+  }
+
+  async function loadRelated(asset) {
+    const { data, error } = await purchaseClient.rpc('market_public_catalog_v1', { input_limit: 120 });
+    if (error || !Array.isArray(data)) return;
+    const others = data.filter((entry) => entry?.id && entry.id !== asset.id);
+    const tags = new Set((asset.tags || []).map((tag) => String(tag).toLowerCase()));
+    const sortPopular = (left, right) => (Number(right.favorite_count || 0) + Number(right.derivative_count || 0) * 2) - (Number(left.favorite_count || 0) + Number(left.derivative_count || 0) * 2);
+    relatedSets = {
+      derivative: others.filter((entry) => entry.parent_asset_id === asset.id),
+      popular: [...others].sort(sortPopular),
+      creator: others.filter((entry) => entry.creator_display_name && entry.creator_display_name === asset.creator_display_name),
+      tags: others.filter((entry) => (entry.tags || []).some((tag) => tags.has(String(tag).toLowerCase())))
+    };
+    const ids = Array.from(new Set(Object.values(relatedSets).flat().slice(0, RELATED_MAX).map((entry) => entry.id)));
+    if (ids.length) {
+      const { data: previews } = await purchaseClient.functions.invoke('market-public-preview', { body: { asset_ids: ids } });
+      Object.values(relatedSets).flat().forEach((entry) => { const url = previews?.previews?.[entry.id]; if (/^https?:\/\//i.test(url || '')) entry.preview_url = url; });
+    }
+    relatedKind = relatedSets.derivative.length ? 'derivative' : relatedSets.tags.length ? 'tags' : relatedSets.creator.length ? 'creator' : 'popular';
+    renderRelated();
   }
 
   function setPurchaseState({ disabled, label, status }) {
@@ -415,10 +477,15 @@
       purchaseUser = access.user || null;
       await initPurchase();
       await previewTask;
+      void loadRelated(asset);
     } catch (_error) {
       $('itemStatus').textContent = '商品を読み込めませんでした。時間をおいて再試行してください。';
     }
   }
 
+  document.querySelectorAll('[data-related-kind]').forEach((button) => button.addEventListener('click', () => {
+    relatedKind = button.dataset.relatedKind || 'popular'; relatedLimit = RELATED_PAGE_SIZE; renderRelated();
+  }));
+  $('itemRelatedMore')?.addEventListener('click', () => { relatedLimit = Math.min(RELATED_MAX, relatedLimit + RELATED_PAGE_SIZE); renderRelated(); });
   load();
 })();

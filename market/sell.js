@@ -54,6 +54,7 @@
   const selectedOptionIds = new Set();
   const optionPrices = new Map();
   const listingTagValues = [];
+  const tagSuggestionValues = new Map();
   let customOptions = [];
   let limitedOptionPrice = 0;
   const samplePreviewPaths = new Set();
@@ -268,6 +269,32 @@
     return String(value || '').replace(/^[#＃]+/, '').trim().replace(/\s+/g, ' ');
   }
 
+  let tagSuggestionTimer = 0;
+  async function updateTagSuggestions() {
+    const input = $('listingTagInput');
+    const query = normalizedTag(input.value);
+    if (!client || !query) {
+      $('listingTagSuggestions').replaceChildren();
+      return;
+    }
+    const { data, error } = await client.rpc('market_tag_suggestions_v1', {
+      input_query: query, input_limit: 12
+    });
+    if (error || input.value !== query) return;
+    tagSuggestionValues.clear();
+    const values = (Array.isArray(data) ? data : [])
+      .map((row) => normalizedTag(row?.tag))
+      .filter(Boolean)
+      .filter((tag, index, all) => all.indexOf(tag) === index);
+    values.forEach((tag) => tagSuggestionValues.set(tag.toLowerCase(), tag));
+    $('listingTagSuggestions').replaceChildren(...values.map((tag) => Object.assign(document.createElement('option'), { value: tag })));
+  }
+
+  function scheduleTagSuggestions() {
+    window.clearTimeout(tagSuggestionTimer);
+    tagSuggestionTimer = window.setTimeout(() => { void updateTagSuggestions(); }, 140);
+  }
+
   function renderTags() {
     $('listingTags').value = listingTagValues.join(',');
     $('listingTagInput').disabled = listingTagValues.length >= MAX_TAGS;
@@ -288,12 +315,13 @@
 
   function addTag() {
     const input = $('listingTagInput');
-    const tag = normalizedTag(input.value);
+    const typed = normalizedTag(input.value);
+    const tag = tagSuggestionValues.get(typed.toLowerCase()) || typed;
     if (!tag) return;
     if (Array.from(tag).length > 24) { setStatus('タグは1個24文字以内です。'); return; }
     if (listingTagValues.some((value) => value.toLowerCase() === tag.toLowerCase())) { input.value = ''; return; }
     if (listingTagValues.length >= MAX_TAGS) { setStatus('タグは最大5個です。'); return; }
-    listingTagValues.push(tag); input.value = ''; renderTags(); scheduleListingDraftSave();
+    listingTagValues.push(tag); input.value = ''; $('listingTagSuggestions').replaceChildren(); renderTags(); scheduleListingDraftSave();
   }
 
   function updateLimitedState() {
@@ -760,7 +788,7 @@
     context.restore();
   }
 
-  async function createPreviewBlob(file, { thumbnail = false, mimeType = 'image/webp' } = {}) {
+  async function createPreviewBlob(file, { thumbnail = false, watermark = thumbnail, mimeType = 'image/webp' } = {}) {
     const source = await loadImageSource(file);
     try {
       const sourceWidth = source.width || source.naturalWidth;
@@ -775,9 +803,9 @@
       const context = canvas.getContext('2d', { alpha: true });
       context.imageSmoothingEnabled = false;
       context.drawImage(source, 0, 0, canvas.width, canvas.height);
-      // 元ファイルから作り直し、サムネイル・試聴とも同一の固定サイズ透かしを
-      // 画像へ一度だけ焼き込む。表示時の透かしは重ねない。
-      drawPreviewWatermark(context, canvas.width, canvas.height);
+      // サムネイルだけは画像に焼き込む。試聴はドット絵の拡大後にビューアへ
+      // 固定サイズで重ねるため、素材データへは透かしを含めない。
+      if (watermark) drawPreviewWatermark(context, canvas.width, canvas.height);
       return await new Promise((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('preview conversion failed')), mimeType, .88));
     } finally {
       if (typeof source.close === 'function') source.close();
@@ -818,6 +846,8 @@
     $('listingLimitedEnabled').addEventListener('change', () => { updateLimitedState(); scheduleListingDraftSave(); });
     $('listingLimitedQuantity').addEventListener('input', () => { updatePrice(); scheduleListingDraftSave(); });
     $('listingTagAdd').addEventListener('click', addTag);
+    $('listingTagInput').addEventListener('input', scheduleTagSuggestions);
+    $('listingTagInput').addEventListener('change', scheduleTagSuggestions);
     $('listingTagInput').addEventListener('keydown', (event) => {
       if (event.key !== 'Enter' && event.key !== ',' && event.key !== '、') return;
       event.preventDefault(); addTag();
@@ -1012,7 +1042,7 @@
         setStatus(`購入前プレビューを生成しています（${index + 1}/${sampleEntries.length}）...`);
         const entry = sampleEntries[index];
         const output = previewStorageFormat(entry);
-        const blob = await createPreviewBlob(entry.previewBlob || entry.file, { mimeType: output.mimeType });
+        const blob = await createPreviewBlob(entry.previewBlob || entry.file, { watermark: false, mimeType: output.mimeType });
         const path = `${signedInUser.id}/${assetId}/previews/sample-${String(index + 1).padStart(2, '0')}.${output.extension}`;
         const { error } = await client.storage.from('market-private').upload(path, blob, { upsert: false, contentType: output.mimeType });
         if (error) throw error; uploadedPaths.push(path); sampleStoragePaths.push(path);
