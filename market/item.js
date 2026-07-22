@@ -73,12 +73,7 @@
       .filter((url, index, all) => all.indexOf(url) === index);
     const container = $('itemSamplePreviews');
     const controls = $('itemPreviewControls');
-    const toggle = $('itemPreviewModeToggle');
-    const hasSamples = urls.length > 1;
-    controls.hidden = !hasSamples;
-    container.hidden = true;
-    toggle.setAttribute('aria-expanded', 'false');
-    toggle.textContent = '試聴モード';
+    controls.hidden = urls.length === 0;
     container.replaceChildren(...urls.map((url, index) => {
       const button = document.createElement('button'); button.type = 'button';
       button.className = 'market-item__sample-preview';
@@ -94,12 +89,6 @@
       });
       return button;
     }));
-    toggle.onclick = () => {
-      const isOpen = container.hidden;
-      container.hidden = !isOpen;
-      toggle.setAttribute('aria-expanded', String(isOpen));
-      toggle.textContent = isOpen ? '試聴モードを閉じる' : '試聴モード';
-    };
   }
 
   function render(asset) {
@@ -138,7 +127,7 @@
     $('itemShare').onclick = () => { copyCurrentAssetUrl(); };
     const author = $('itemAuthor');
     author.textContent = `作者: ${asset.creator_display_name || 'PiXiEEDクリエイター'}`;
-    const profileUrl = externalProfileUrl(asset.creator_profile_url);
+    const profileUrl = externalProfileUrl(asset.creator_profile_url || asset.creator_x_url || asset.x_url);
     if (profileUrl) {
       author.href = profileUrl;
       author.target = '_blank';
