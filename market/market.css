@@ -888,6 +888,9 @@ html[data-pixieed-ad-free-account="true"] .market-ad {
 .market-item__preview-column { display: grid; align-content: start; min-width: 0; border-right: 1px solid rgba(255,255,255,.1); background: #0b1224; }
 .market-item__preview { position: relative; display: grid; min-height: 420px; place-items: center; overflow: hidden; background-color: #0b1224; background-image: linear-gradient(45deg, rgba(255,255,255,.035) 25%, transparent 25%), linear-gradient(-45deg, rgba(255,255,255,.035) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, rgba(255,255,255,.035) 75%), linear-gradient(-45deg, transparent 75%, rgba(255,255,255,.035) 75%); background-size: 18px 18px; background-position: 0 0, 0 9px, 9px -9px, -9px 0; }
 .market-item__preview img { width: min(90%, 440px); height: min(90%, 440px); object-fit: contain; image-rendering: pixelated; }
+/* 試聴画像は元の画素数に左右されない固定CSSサイズの透かしを重ねる。
+   16px素材を表示拡大しても、透かしを画像の画素へ焼き込まず鮮明に保つ。 */
+.market-item__preview.is-sample-preview::after { content: ''; position: absolute; z-index: 2; inset: 0; pointer-events: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='132' height='50' viewBox='0 0 132 50'%3E%3Ctext x='66' y='27' text-anchor='middle' transform='rotate(-10 66 25)' font-family='sans-serif' font-size='16' font-weight='800' fill='%23ffffff' fill-opacity='.26' stroke='%23000000' stroke-opacity='.22' stroke-width='1'%3EPiXiEED SAMPLE%3C/text%3E%3C/svg%3E"); background-size: 132px 50px; }
 .market-item__preview-controls { display: grid; gap: 7px; padding: 10px; border-top: 1px solid rgba(255,255,255,.1); background: #10182c; }
 .market-item__preview-controls strong { color: #dffcf2; font-size: 11px; }
 .market-item__sample-previews { display: flex; max-width: 100%; gap: 6px; padding: 6px; overflow-x: auto; border: 1px solid rgba(255,255,255,.16); border-radius: 8px; background: rgba(11,18,36,.88); }
