@@ -32,7 +32,7 @@
   let supabaseClient = null;
   let supabaseUser = null;
   let initPromise = null;
-  let supportsProfileXUrl = true;
+  let supportsProfileUrl = true;
   let authListenerBound = false;
   let authHealthCheckPromise = null;
   let authMode = 'login';
@@ -118,7 +118,7 @@
     return asset(avatar.src);
   }
 
-  function normalizeXUrl(value) {
+  function normalizeProfileUrl(value) {
     const raw = String(value || '').trim();
     if (!raw) return '';
     if (/^https?:\/\//i.test(raw)) {
@@ -135,33 +135,24 @@
         return '';
       }
     }
-    const handle = raw.replace(/^@+/, '').trim();
-    if (!handle) return '';
-    const candidate = /^(x\.com|twitter\.com)\//i.test(handle)
-      ? `https://${handle}`
-      : `https://x.com/${handle}`;
+    return '';
+  }
+
+  function loadProfileUrl() {
     try {
-      return new URL(candidate).toString();
+      return localStorage.getItem('pixieed_profile_url') || localStorage.getItem('pixieed_x_url') || '';
     } catch (_error) {
       return '';
     }
   }
 
-  function loadXUrl() {
+  function saveProfileUrl(value) {
     try {
-      return localStorage.getItem('pixieed_x_url') || '';
-    } catch (_error) {
-      return '';
-    }
-  }
-
-  function saveXUrl(value) {
-    try {
-      const normalized = normalizeXUrl(value);
+      const normalized = normalizeProfileUrl(value);
       if (normalized) {
-        localStorage.setItem('pixieed_x_url', normalized);
+        localStorage.setItem('pixieed_profile_url', normalized);
       } else {
-        localStorage.removeItem('pixieed_x_url');
+        localStorage.removeItem('pixieed_profile_url');
       }
     } catch (_error) {}
   }
@@ -318,7 +309,7 @@
 
   function updateProfileUi() {
     const nickname = loadNickname();
-    const xUrl = loadXUrl();
+    const profileUrl = loadProfileUrl();
     const avatarSrc = getAvatarSrc();
 
     const brandAvatar = document.querySelector('#brandAvatar img');
@@ -342,13 +333,13 @@
 
     const xInput = document.getElementById('profileX');
     if (xInput && document.activeElement !== xInput) {
-      xInput.value = xUrl;
+      xInput.value = profileUrl;
     }
 
     const xPreview = document.getElementById('profileXPreview');
     if (xPreview) {
-      xPreview.hidden = !xUrl;
-      xPreview.href = xUrl || '#';
+      xPreview.hidden = !profileUrl;
+      xPreview.href = profileUrl || '#';
     }
 
     const profileEmail = document.getElementById('profileEmail');
@@ -564,15 +555,15 @@
     try {
       let query = supabaseClient
         .from('user_profiles')
-        .select('nickname, avatar, x_url')
+        .select('nickname, avatar, profile_url, x_url')
         .eq('id', supabaseUser.id)
         .maybeSingle();
       let result = await query;
-      if (result.error && supportsProfileXUrl && isMissingColumn(result.error, 'x_url')) {
-        supportsProfileXUrl = false;
+      if (result.error && supportsProfileUrl && isMissingColumn(result.error, 'profile_url')) {
+        supportsProfileUrl = false;
         result = await supabaseClient
           .from('user_profiles')
-          .select('nickname, avatar')
+          .select('nickname, avatar, x_url')
           .eq('id', supabaseUser.id)
           .maybeSingle();
       }
@@ -586,8 +577,8 @@
       if (typeof profile.avatar === 'string' && profile.avatar.trim()) {
         saveAvatar(profile.avatar.trim());
       }
-      if (supportsProfileXUrl && typeof profile.x_url === 'string') {
-        saveXUrl(profile.x_url);
+      if (typeof (profile.profile_url || profile.x_url) === 'string') {
+        saveProfileUrl(profile.profile_url || profile.x_url);
       }
     } catch (_error) {
       // keep local profile when online sync fails
@@ -982,12 +973,13 @@
       id: supabaseUser.id,
       nickname: String(nicknameInput?.value || '').trim() || null,
       avatar: loadAvatar() || null,
-      x_url: normalizeXUrl(xInput?.value || '') || null,
+      profile_url: normalizeProfileUrl(xInput?.value || '') || null,
     };
     let result = await supabaseClient.from('user_profiles').upsert(payload);
-    if (result.error && supportsProfileXUrl && isMissingColumn(result.error, 'x_url')) {
-      supportsProfileXUrl = false;
-      delete payload.x_url;
+    if (result.error && supportsProfileUrl && isMissingColumn(result.error, 'profile_url')) {
+      supportsProfileUrl = false;
+      delete payload.profile_url;
+      payload.x_url = normalizeProfileUrl(xInput?.value || '') || null;
       result = await supabaseClient.from('user_profiles').upsert(payload);
     }
     if (result.error) {
@@ -1218,7 +1210,7 @@
         const nicknameInput = document.getElementById('profileNickname');
         const xInput = document.getElementById('profileX');
         saveNickname(nicknameInput?.value || '');
-        saveXUrl(xInput?.value || '');
+        saveProfileUrl(xInput?.value || '');
         updateProfileUi();
         window.dispatchEvent(new CustomEvent('pixieed:profile-updated'));
         await syncMaoituRankingProfile().catch(() => false);
