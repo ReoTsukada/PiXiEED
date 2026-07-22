@@ -73,7 +73,9 @@
       .filter((url, index, all) => all.indexOf(url) === index);
     const container = $('itemSamplePreviews');
     const controls = $('itemPreviewControls');
+    const frame = $('itemPreviewFrame');
     controls.hidden = urls.length === 0;
+    frame.classList.remove('is-sample-preview');
     container.replaceChildren(...urls.map((url, index) => {
       const button = document.createElement('button'); button.type = 'button';
       button.className = 'market-item__sample-preview';
@@ -85,10 +87,23 @@
       button.addEventListener('click', () => {
         $('itemPreview').src = url;
         $('itemPreview').alt = index === 0 ? `${asset.title || '商品'}のサムネイル` : `${asset.title || '商品'}の試聴プレビュー ${index}`;
+        frame.classList.toggle('is-sample-preview', index > 0);
         container.querySelectorAll('button').forEach((node) => node.classList.toggle('is-active', node === button));
       });
       return button;
     }));
+  }
+
+  // 商品本文は署名付きプレビューURLやログイン確認を待たずに表示する。
+  // プレビューURLだけは後から届くため、この小さな更新に閉じ込めて、
+  // ページ全体の再描画・イベント再登録を発生させない。
+  function renderPreviewMedia(asset) {
+    const previewUrl = asset.preview_url || asset.preview_object_path;
+    if (/^https?:\/\//i.test(previewUrl || '')) {
+      $('itemPreview').src = previewUrl;
+    }
+    $('itemPreview').alt = `${asset.title || '商品'}のプレビュー`;
+    renderSamplePreviews(asset, previewUrl);
   }
 
   function render(asset) {
@@ -118,12 +133,7 @@
     $('itemDerivative').textContent = series.derivative_sales_allowed
       ? 'OK（改変した素材を独立商品として再販売可能・系列ロイヤリティーあり）'
       : 'NG（利用・改変できる範囲でも、素材または改変素材として再販売できません）';
-    const previewUrl = asset.preview_url || asset.preview_object_path;
-    if (/^https?:\/\//i.test(previewUrl || '')) {
-      $('itemPreview').src = previewUrl;
-    }
-    $('itemPreview').alt = `${asset.title || '商品'}のプレビュー`;
-    renderSamplePreviews(asset, previewUrl);
+    renderPreviewMedia(asset);
     $('itemShare').onclick = () => { copyCurrentAssetUrl(); };
     const author = $('itemAuthor');
     author.textContent = `作者: ${asset.creator_display_name || 'PiXiEEDクリエイター'}`;
@@ -363,15 +373,18 @@
   }
 
   async function load() {
-    const access = window.PiXiEEDMarketAccess
-      ? await window.PiXiEEDMarketAccess.check()
-      : { allowed: false, client: null, user: null };
-    if (!access.client) {
+    const marketAccess = window.PiXiEEDMarketAccess;
+    // ログイン確認は最初に開始するが、公開商品の取得を止めない。
+    // getUser() は回線状況によって遅くなるため、公開RPCと並行させる。
+    const accessPromise = marketAccess
+      ? marketAccess.check()
+      : Promise.resolve({ allowed: false, client: null, user: null });
+    const client = marketAccess ? await marketAccess.getClient().catch(() => null) : null;
+    if (!client) {
       $('itemStatus').textContent = '商品を読み込めませんでした。通信状態を確認して再読み込みしてください。';
       return;
     }
-    purchaseClient = access.client;
-    purchaseUser = access.user || null;
+    purchaseClient = client;
     const id = currentAssetId();
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id || '')) {
       $('itemStatus').textContent = '商品を特定できませんでした。マーケット一覧から開き直してください。'; return;
@@ -380,13 +393,26 @@
       const { data: asset, error } = await purchaseClient.rpc('market_public_asset_v1', { input_asset_id: id });
       if (error) throw error;
       if (!asset) { $('itemStatus').textContent = 'この商品は公開されていないか、見つかりません。'; return; }
-      const { data: previewData } = await purchaseClient.functions.invoke('market-public-preview', { body: { asset_ids: [asset.id] } });
-      const previewUrl = previewData?.previews?.[asset.id];
-      if (typeof previewUrl === 'string' && /^https?:\/\//i.test(previewUrl)) asset.preview_url = previewUrl;
-      if (Array.isArray(previewData?.samples?.[asset.id])) asset.sample_preview_urls = previewData.samples[asset.id];
-      await favorites?.prepare?.([asset]);
+
+      // 本文・価格・販売状況を最優先で出す。お気に入りと署名付き画像は
+      // 補助情報なので、通信待ちでこの表示を遅らせない。
       render(asset);
+
+      void favorites?.prepare?.([asset]);
+      const previewTask = purchaseClient.functions.invoke('market-public-preview', { body: { asset_ids: [asset.id] } })
+        .then(({ data: previewData }) => {
+          const previewUrl = previewData?.previews?.[asset.id];
+          if (typeof previewUrl === 'string' && /^https?:\/\//i.test(previewUrl)) asset.preview_url = previewUrl;
+          if (Array.isArray(previewData?.samples?.[asset.id])) asset.sample_preview_urls = previewData.samples[asset.id];
+          renderPreviewMedia(asset);
+        })
+        .catch(() => {});
+
+      // 購入ボタンだけはログイン確認後に確定する。商品閲覧は常に可能。
+      const access = await accessPromise;
+      purchaseUser = access.user || null;
       await initPurchase();
+      await previewTask;
     } catch (_error) {
       $('itemStatus').textContent = '商品を読み込めませんでした。時間をおいて再試行してください。';
     }
