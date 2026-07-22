@@ -1307,6 +1307,17 @@
         writeCachedAuthSession(session);
         maybeClearOAuthParamsFromUrl();
       }
+      // マイページは保存済みセッションを読めた時点で先にログイン済みへ切り替える。
+      // プロフィール同期はネットワーク待ちになるため、初期画面を止めずに後続で更新する。
+      if (supabaseUser) {
+        updateAuthUi();
+        window.PiXiEEDAdAccountControl?.refresh?.();
+        maybeReturnToCaller();
+        void syncProfileFromServer().then(() => {
+          updateAuthUi();
+          maybeReturnToCaller();
+        });
+      }
       if (!authListenerBound) {
         authListenerBound = true;
         supabase.auth.onAuthStateChange(async (event, session) => {
@@ -1337,9 +1348,9 @@
           maybeReturnToCaller();
         });
       }
-      await syncProfileFromServer();
+      if (!supabaseUser) await syncProfileFromServer();
       window.PiXiEEDAdAccountControl?.refresh?.();
-      maybeReturnToCaller();
+      if (!supabaseUser) maybeReturnToCaller();
       if (!supabaseUser && !oauthErrorMessage && readPendingSignup() && document.getElementById('authSignupPending')) {
         authMode = 'signup-pending';
       }
