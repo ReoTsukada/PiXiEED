@@ -4,8 +4,10 @@
   const list = document.getElementById('marketListingList');
   const count = document.getElementById('marketListingCount');
   const shareStatus = document.getElementById('marketListingShareStatus');
+  const rebuildButton = document.getElementById('marketRebuildPreviews');
   const currentScript = document.currentScript;
   let renderToken = 0;
+  let rebuildInProgress = false;
 
   if (!list || !count) return;
 
@@ -41,6 +43,149 @@
   function safePreview(value) {
     const preview = String(value || '').trim();
     return /^https:\/\//i.test(preview) ? preview : asset('../assets/icons/Market.png');
+  }
+
+  function imageSourcePaths(entry) {
+    const files = Array.isArray(entry?.files) ? entry.files : [];
+    const storagePaths = Array.isArray(entry?.storage_file_paths) ? entry.storage_file_paths : [];
+    const sourceByOriginalPath = new Map(files.map((file, index) => [String(file?.original_path || ''), String(storagePaths[index] || '')]));
+    const selected = entry?.preview_selection || {};
+    const requested = [selected.thumbnail_source_path, ...(Array.isArray(selected.sample_source_paths) ? selected.sample_source_paths : [])]
+      .map((path) => String(path || ''))
+      .filter(Boolean);
+    const paths = requested.map((path) => sourceByOriginalPath.get(path)).filter((path) => /^.+\/.+/.test(path || ''));
+    if (paths.length) return [...new Set(paths)];
+    return storagePaths.filter((path) => /\.(png|webp|gif|apng|jpe?g)$/i.test(String(path || ''))).slice(0, 6);
+  }
+
+  async function loadImage(blob) {
+    const url = URL.createObjectURL(blob);
+    try {
+      const image = new Image();
+      image.src = url;
+      await image.decode();
+      return image;
+    } catch (error) {
+      throw error;
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  function drawFixedWatermark(context, width, height) {
+    const label = 'PiXiEED SAMPLE';
+    const fontSize = 16;
+    const stepX = 132;
+    const stepY = 50;
+    context.save();
+    context.translate(width / 2, height / 2);
+    context.rotate(-Math.PI / 10);
+    context.font = `800 ${fontSize}px sans-serif`;
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    const diagonal = Math.ceil(Math.hypot(width, height));
+    context.lineWidth = Math.max(1, fontSize / 14);
+    context.strokeStyle = 'rgba(0,0,0,.22)';
+    context.fillStyle = 'rgba(255,255,255,.26)';
+    for (let y = -diagonal; y <= diagonal; y += stepY) {
+      const offset = Math.round(y / stepY) % 2 ? stepX / 2 : 0;
+      for (let x = -diagonal - stepX; x <= diagonal + stepX; x += stepX) {
+        context.strokeText(label, x + offset, y);
+        context.fillText(label, x + offset, y);
+      }
+    }
+    context.restore();
+  }
+
+  async function fixedPreviewBlob(sourceBlob, thumbnail) {
+    const image = await loadImage(sourceBlob);
+    const sourceWidth = image.naturalWidth || image.width;
+    const sourceHeight = image.naturalHeight || image.height;
+    const maxSide = thumbnail ? 640 : 960;
+    const scale = maxSide / Math.max(sourceWidth, sourceHeight);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(sourceWidth * scale));
+    canvas.height = Math.max(1, Math.round(sourceHeight * scale));
+    const context = canvas.getContext('2d', { alpha: true });
+    context.imageSmoothingEnabled = false;
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    drawFixedWatermark(context, canvas.width, canvas.height);
+    return new Promise((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('preview_conversion_failed')), 'image/webp', .9));
+  }
+
+  async function rebuildListingPreviews(client, user, entry, revision) {
+    const sourcePaths = imageSourcePaths(entry);
+    if (!sourcePaths.length) throw new Error('元画像が見つかりません');
+    const uploadedPaths = [];
+    try {
+      const sourceBlobs = [];
+      for (const path of sourcePaths) {
+        const { data, error } = await client.storage.from('market-private').download(path);
+        if (error || !data) throw error || new Error('元画像を読み込めません');
+        sourceBlobs.push(data);
+      }
+      const basePath = `${user.id}/${entry.id}/previews/fixed-v2-${revision}`;
+      const thumbnailBlob = await fixedPreviewBlob(sourceBlobs[0], true);
+      const thumbnailPath = `${basePath}/thumbnail.webp`;
+      let result = await client.storage.from('market-private').upload(thumbnailPath, thumbnailBlob, { upsert: false, contentType: 'image/webp' });
+      if (result.error) throw result.error;
+      uploadedPaths.push(thumbnailPath);
+      const samplePaths = [];
+      for (let index = 0; index < sourceBlobs.length; index += 1) {
+        const sampleBlob = await fixedPreviewBlob(sourceBlobs[index], false);
+        const samplePath = `${basePath}/sample-${String(index + 1).padStart(2, '0')}.webp`;
+        result = await client.storage.from('market-private').upload(samplePath, sampleBlob, { upsert: false, contentType: 'image/webp' });
+        if (result.error) throw result.error;
+        uploadedPaths.push(samplePath); samplePaths.push(samplePath);
+      }
+      const { error } = await client.rpc('market_replace_my_listing_previews_v1', {
+        input_asset_id: entry.id,
+        input_preview_object_path: thumbnailPath,
+        input_sample_preview_paths: samplePaths
+      });
+      if (error) throw error;
+    } catch (error) {
+      if (uploadedPaths.length) await client.storage.from('market-private').remove(uploadedPaths);
+      throw error;
+    }
+  }
+
+  async function rebuildAllPreviews(client) {
+    if (rebuildInProgress) return;
+    const { data: sessionData } = await client.auth.getSession();
+    const user = sessionData?.session?.user;
+    if (!user) return;
+    const { data, error } = await client.rpc('market_my_listing_preview_sources_v1');
+    if (error) throw error;
+    const entries = Array.isArray(data) ? data : [];
+    if (!entries.length) {
+      if (shareStatus) shareStatus.textContent = '再生成できる公開中の出品はありません。';
+      return;
+    }
+    if (!window.confirm(`公開中の${entries.length}件を固定サイズ透かし版へ更新します。\n元ファイルと今のプレビューは残ります。続けますか？`)) return;
+    rebuildInProgress = true;
+    rebuildButton.disabled = true;
+    let complete = 0;
+    const skipped = [];
+    const revision = Date.now();
+    try {
+      for (const entry of entries) {
+        if (shareStatus) shareStatus.textContent = `透かしを再生成しています（${complete + 1}/${entries.length}）: ${entry.title || '出品物'}`;
+        try {
+          await rebuildListingPreviews(client, user, entry, `${revision}-${complete + 1}`);
+          complete += 1;
+        } catch (_error) {
+          skipped.push(entry.title || '名称未設定');
+        }
+      }
+      if (shareStatus) shareStatus.textContent = skipped.length
+        ? `${complete}件を更新しました。${skipped.join('、')}は対応画像を確認してください。`
+        : `${complete}件すべてを固定サイズ透かし版へ更新しました。`;
+      await render(client);
+    } finally {
+      rebuildInProgress = false;
+      rebuildButton.disabled = false;
+    }
   }
 
   function renderMessage(titleText, detailText) {
@@ -194,6 +339,7 @@
     if (token !== renderToken) return;
     if (error) throw error;
     const entries = Array.isArray(data) ? data : [];
+    if (rebuildButton) rebuildButton.hidden = !entries.some((entry) => entry?.status === 'published');
     count.textContent = `${entries.length}件`;
     if (!entries.length) {
       renderMessage('出品物はまだありません', '作品を商品として登録すると、ここへ並びます。');
@@ -207,6 +353,14 @@
       const access = window.PiXiEEDMarketAccess ? await window.PiXiEEDMarketAccess.check() : null;
       if (!access?.client) return;
       await render(access.client);
+      if (rebuildButton && rebuildButton.dataset.bound !== 'true') {
+        rebuildButton.dataset.bound = 'true';
+        rebuildButton.addEventListener('click', () => {
+          rebuildAllPreviews(access.client).catch((error) => {
+            if (shareStatus) shareStatus.textContent = `透かしを更新できませんでした: ${error?.message || '通信を確認してください'}`;
+          });
+        });
+      }
       access.client.auth.onAuthStateChange(() => window.setTimeout(() => render(access.client), 0));
     } catch (_error) {
       count.textContent = '取得失敗';
