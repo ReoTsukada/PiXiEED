@@ -36,7 +36,13 @@ serve(async (request) => {
       .maybeSingle();
     if (purchaseError) throw purchaseError;
     if (!purchase) return jsonResponse(request, { ok: false, error: "照合できる購入手続きがありません。" }, 404);
-    if (purchase.status === "paid") return jsonResponse(request, { ok: true, reconciled: false, purchase_id: purchase.id });
+    if (purchase.status === "paid") {
+      const { error: materializeError } = await admin.rpc("market_materialize_paid_purchase_v1", {
+        input_purchase_id: purchase.id,
+      });
+      if (materializeError) throw materializeError;
+      return jsonResponse(request, { ok: true, reconciled: false, repaired: true, purchase_id: purchase.id });
+    }
     if (purchase.status !== "pending" || purchase.payment_provider !== "stripe") {
       return jsonResponse(request, { ok: false, error: "この購入手続きは照合できない状態です。" }, 409);
     }

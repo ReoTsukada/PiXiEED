@@ -73,12 +73,12 @@
     if (!section || !client) return;
     section.hidden = false; button.disabled = true;
     try {
-      const [{ data: ledger, error: ledgerError }, { data: requests, error: requestError }] = await Promise.all([
-        client.from('market_royalty_ledger').select('amount_microyen,paid_microyen,status').eq('status', 'available'),
+      const [{ data: quote, error: quoteError }, { data: requests, error: requestError }] = await Promise.all([
+        client.rpc('market_quote_stripe_payout_v1'),
         client.from('market_payout_requests').select('status,requested_at,failure_message').order('requested_at', { ascending: false }).limit(1),
       ]);
-      if (ledgerError) throw ledgerError; if (requestError) throw requestError;
-      const availableYen = Math.floor((ledger || []).reduce((total, row) => total + Math.max(0, Number(row.amount_microyen || 0) - Number(row.paid_microyen || 0)), 0) / 1000000);
+      if (quoteError) throw quoteError; if (requestError) throw requestError;
+      const availableYen = Math.max(0, Number(quote?.gross_amount_yen || 0));
       const latest = requests?.[0];
       if (latest?.status === 'requested' || latest?.status === 'processing') {
         message('payoutRequestDescription', `出金申請を処理しています。対象額: ${yen(availableYen)}`);
@@ -87,13 +87,13 @@
         message('payoutRequestDescription', '今月の出金申請は完了しました。次の申請は翌月にできます。');
         message('payoutRequestStatus', '送金済みの金額は出金履歴で確認できます。');
       } else if (!payoutReady) {
-        message('payoutRequestDescription', `確定済み残高: ${yen(availableYen)}。出金前にStripeの売上受取設定を完了してください。`);
+        message('payoutRequestDescription', `確定済み残高（販売・継承・表示報酬）: ${yen(availableYen)}。出金前にStripeの売上受取設定を完了してください。`);
         message('payoutRequestStatus', '出品・販売は受取設定前でも続けられます。');
       } else if (availableYen < PAYOUT_MINIMUM_YEN) {
-        message('payoutRequestDescription', `確定済み残高: ${yen(availableYen)}。${yen(PAYOUT_MINIMUM_YEN)}以上で申請できます。`);
+        message('payoutRequestDescription', `確定済み残高（販売・継承・表示報酬）: ${yen(availableYen)}。${yen(PAYOUT_MINIMUM_YEN)}以上で申請できます。`);
         message('payoutRequestStatus', 'Stripeの入金費用を抑えるため、10,000円以上まで貯めてからの申請もおすすめします。');
       } else {
-        message('payoutRequestDescription', `確定済み残高: ${yen(availableYen)}。申請すると全額をStripeへ自動送金します。`);
+        message('payoutRequestDescription', `確定済み残高（販売・継承・表示報酬）: ${yen(availableYen)}。申請すると全額をStripeへ自動送金します。`);
         message('payoutRequestStatus', '出金は月1回までです。Stripeの決済・入金費用は受取人の売上から精算します。');
         button.textContent = `${yen(availableYen)}を出金申請`; button.disabled = false;
       }
@@ -107,7 +107,7 @@
   function openPayoutDialog(quote) {
     const dialog = $('payoutConfirmDialog'); const amounts = $('payoutConfirmAmounts'); pendingPayoutQuote = quote;
     amounts.replaceChildren(
-      ...amountRow('確定済み残高', quote.gross_amount_yen),
+      ...amountRow('確定済み残高（販売・継承・表示報酬）', quote.gross_amount_yen),
       ...amountRow('Stripe Transfer費用（見込み）', `-${Number(quote.transfer_fee_yen || 0)}`),
       ...amountRow('銀行口座への入金費用（見込み）', `-${Number(quote.bank_payout_fee_yen || 0)}`),
       ...amountRow('当月の受取口座利用料（見込み）', `-${Number(quote.active_account_fee_yen || 0)}`),

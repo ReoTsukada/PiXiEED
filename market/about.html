@@ -23,7 +23,7 @@
   <meta name="twitter:image:alt" content="PiXiEEDマーケット">
   <link rel="icon" type="image/png" href="../assets/icons/Market.png">
   <link rel="stylesheet" href="../site/landing.css?v=2026.07.15-home-clear-entry1">
-  <link rel="stylesheet" href="info.css?v=20260722-market-fees1">
+  <link rel="stylesheet" href="info.css?v=20260722-market-rewards-payout1">
 </head>
 <body>
   <div class="page market-info-page">
@@ -73,6 +73,7 @@
               <li>出品審査・不正利用対策・返金や問題発生時の対応</li>
               <li>素材の安全な配信・保管、マーケットとPiXiEEDrawの開発</li>
               <li>販売者サポート、Stripe Connectによる売上受取と運営コスト</li>
+              <li>月次の表示報酬予算（有効表示に応じた作者への還元）</li>
             </ul>
           </div>
         </div>
@@ -80,6 +81,21 @@
         <div class="market-fee-formula">
           <strong>作者・ロイヤリティ原資 ＝ 販売額 − Stripe決済実費 − PiXiEED手数料</strong>
           <span>派生作品では、この原資を派生作者と親作品の作者へ配分します。ロイヤリティを別の手数料として上乗せしません。</span>
+        </div>
+
+        <div class="market-reward-compare" aria-label="継承ロイヤリティと表示報酬の違い">
+          <article>
+            <span>売れたとき</span>
+            <h3>継承ロイヤリティ</h3>
+            <p>派生商品が購入されたとき、作者・ロイヤリティ原資の中から、派生作者と親作品の作者へ系譜に沿って配分します。</p>
+            <small>購入のたびに発生。商品価格へ追加請求せず、表示報酬とも別です。</small>
+          </article>
+          <article>
+            <span>見られたとき</span>
+            <h3>表示報酬<br><em>（表示ロイヤリティ）</em></h3>
+            <p>商品詳細が前面で10秒以上表示された有効表示を、月ごとの表示報酬予算の中で、表示作品と直系系列へ配分します。</p>
+            <small>予算が未設定・0円の月は発生しません。月次確定後、販売収益・継承ロイヤリティと合算して同じStripe出金残高へ加わります。</small>
+          </article>
         </div>
 
         <div class="market-fee-table-wrap" role="region" aria-label="PiXiEEDの累進販売手数料表" tabindex="0">

@@ -377,6 +377,33 @@
 .market-fee-use li + li { margin-top: 5px; }
 .market-fee-formula { border-color: rgba(112,215,255,.35); background: rgba(112,215,255,.07); }
 .market-fee-formula strong { color: #d9f3ff; font-size: 13px; }
+.market-reward-compare {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.market-reward-compare article {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 17px;
+  border: 1px solid var(--market-info-border);
+  border-radius: 10px;
+  background: var(--market-info-card);
+}
+.market-reward-compare article:first-child { border-top: 3px solid #caa0ff; }
+.market-reward-compare article:last-child { border-top: 3px solid #62e6a7; }
+.market-reward-compare article > span {
+  color: #9be4ff;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .1em;
+}
+.market-reward-compare h3 { color: #f8fafc; font-size: 15px; }
+.market-reward-compare h3 em { color: #aebbd0; font-size: 11px; font-style: normal; font-weight: 700; }
+.market-reward-compare p,
+.market-reward-compare small { color: #aebbd0; font-size: 12px; line-height: 1.65; }
+.market-reward-compare small { padding-top: 8px; border-top: 1px solid var(--market-info-border); }
 .market-fee-table-wrap { overflow-x: auto; border: 1px solid var(--market-info-border); border-radius: 10px; }
 .market-fee-table { width: 100%; min-width: 440px; border-collapse: collapse; background: var(--market-info-card); }
 .market-fee-table th,
@@ -490,7 +517,8 @@
   .market-guide-step { min-height: 72px; }
   .market-help-columns,
   .market-payment-explain,
-  .market-fee-use { grid-template-columns: 1fr; }
+  .market-fee-use,
+  .market-reward-compare { grid-template-columns: 1fr; }
   .market-lineage-flow {
     grid-template-columns: 1fr;
   }

@@ -223,6 +223,10 @@
       }
       const existingPurchase = await findExistingPurchase();
       if (existingPurchase?.status === 'paid') {
+        // Re-run the idempotent server-side materializer. This repairs a
+        // historic paid purchase whose earlier webhook marked it paid before
+        // its royalty ledger was created.
+        try { await reconcilePaidPurchase(); } catch (_ignored) {}
         setPurchaseState({ disabled: true, label: '購入済み', status: 'この商品は購入済みです。マイページから確認できます。' });
         return;
       }

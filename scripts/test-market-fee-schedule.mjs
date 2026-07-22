@@ -39,6 +39,10 @@ assert.match(migration, /least\(input_gross_amount_yen, 50000\).*0\.02/is);
 assert.match(migration, /greatest\(input_gross_amount_yen - 50000, 0\).*0\.01/is);
 assert.match(about, /販売額の 0\.5%/);
 assert.match(about, /残りのPiXiEED手数料の使い道/);
+assert.match(about, /継承ロイヤリティ/);
+assert.match(about, /表示報酬[\s\S]*表示ロイヤリティ/);
+assert.match(about, /前面で10秒以上表示/);
+assert.match(about, /継承ロイヤリティと合算して同じStripe出金残高へ加わります/);
 assert.match(about, /価格が境界を1円超えても、手数料総額が下がることはありません/);
 
 console.log('market progressive fee schedule checks passed');
