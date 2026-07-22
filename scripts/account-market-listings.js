@@ -97,7 +97,7 @@
     context.restore();
   }
 
-  async function fixedPreviewBlob(sourceBlob, thumbnail) {
+  async function fixedPreviewBlob(sourceBlob, { thumbnail = false, watermark = thumbnail } = {}) {
     const image = await loadImage(sourceBlob);
     const sourceWidth = image.naturalWidth || image.width;
     const sourceHeight = image.naturalHeight || image.height;
@@ -109,7 +109,9 @@
     const context = canvas.getContext('2d', { alpha: true });
     context.imageSmoothingEnabled = false;
     context.drawImage(image, 0, 0, canvas.width, canvas.height);
-    drawFixedWatermark(context, canvas.width, canvas.height);
+    // サムネイルは従来どおり焼き込み透かし。試聴は詳細画面で表示する
+    // 新しい固定サイズ透かしだけにして、旧画像の透かしを残さない。
+    if (watermark) drawFixedWatermark(context, canvas.width, canvas.height);
     return new Promise((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('preview_conversion_failed')), 'image/webp', .9));
   }
 
@@ -125,14 +127,14 @@
         sourceBlobs.push(data);
       }
       const basePath = `${user.id}/${entry.id}/previews/fixed-v2-${revision}`;
-      const thumbnailBlob = await fixedPreviewBlob(sourceBlobs[0], true);
+      const thumbnailBlob = await fixedPreviewBlob(sourceBlobs[0], { thumbnail: true, watermark: true });
       const thumbnailPath = `${basePath}/thumbnail.webp`;
       let result = await client.storage.from('market-private').upload(thumbnailPath, thumbnailBlob, { upsert: false, contentType: 'image/webp' });
       if (result.error) throw result.error;
       uploadedPaths.push(thumbnailPath);
       const samplePaths = [];
       for (let index = 0; index < sourceBlobs.length; index += 1) {
-        const sampleBlob = await fixedPreviewBlob(sourceBlobs[index], false);
+        const sampleBlob = await fixedPreviewBlob(sourceBlobs[index], { thumbnail: false, watermark: false });
         const samplePath = `${basePath}/sample-${String(index + 1).padStart(2, '0')}.webp`;
         result = await client.storage.from('market-private').upload(samplePath, sampleBlob, { upsert: false, contentType: 'image/webp' });
         if (result.error) throw result.error;
@@ -162,7 +164,7 @@
       if (shareStatus) shareStatus.textContent = '再生成できる公開中の出品はありません。';
       return;
     }
-    if (!window.confirm(`公開中の${entries.length}件を固定サイズ透かし版へ更新します。\n元ファイルと今のプレビューは残ります。続けますか？`)) return;
+    if (!window.confirm(`公開中の${entries.length}件を再生成します。\nサムネイルは透かし入り、試聴は新しい固定透かしだけにします。元ファイルと今のプレビューは残ります。続けますか？`)) return;
     rebuildInProgress = true;
     rebuildButton.disabled = true;
     let complete = 0;
@@ -180,7 +182,7 @@
       }
       if (shareStatus) shareStatus.textContent = skipped.length
         ? `${complete}件を更新しました。${skipped.join('、')}は対応画像を確認してください。`
-        : `${complete}件すべてを固定サイズ透かし版へ更新しました。`;
+        : `${complete}件すべてを更新しました。サムネイルは透かし入り、試聴は新しい固定透かしのみです。`;
       await render(client);
     } finally {
       rebuildInProgress = false;

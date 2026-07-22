@@ -760,7 +760,7 @@
     context.restore();
   }
 
-  async function createPreviewBlob(file, { thumbnail = false, mimeType = 'image/webp' } = {}) {
+  async function createPreviewBlob(file, { thumbnail = false, watermark = thumbnail, mimeType = 'image/webp' } = {}) {
     const source = await loadImageSource(file);
     try {
       const sourceWidth = source.width || source.naturalWidth;
@@ -775,8 +775,9 @@
       const context = canvas.getContext('2d', { alpha: true });
       context.imageSmoothingEnabled = false;
       context.drawImage(source, 0, 0, canvas.width, canvas.height);
-      // 一覧サムネイルも含め、購入前に配る画像は必ず高密度の透かし入りにする。
-      drawPreviewWatermark(context, canvas.width, canvas.height);
+      // 一覧サムネイルだけは画像自体に透かしを焼き込む。試聴画像は
+      // 詳細画面の固定サイズオーバーレイだけを使い、旧透かしとの二重表示を防ぐ。
+      if (watermark) drawPreviewWatermark(context, canvas.width, canvas.height);
       return await new Promise((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('preview conversion failed')), mimeType, .88));
     } finally {
       if (typeof source.close === 'function') source.close();
@@ -1011,7 +1012,7 @@
         setStatus(`購入前プレビューを生成しています（${index + 1}/${sampleEntries.length}）...`);
         const entry = sampleEntries[index];
         const output = previewStorageFormat(entry);
-        const blob = await createPreviewBlob(entry.previewBlob || entry.file, { mimeType: output.mimeType });
+        const blob = await createPreviewBlob(entry.previewBlob || entry.file, { watermark: false, mimeType: output.mimeType });
         const path = `${signedInUser.id}/${assetId}/previews/sample-${String(index + 1).padStart(2, '0')}.${output.extension}`;
         const { error } = await client.storage.from('market-private').upload(path, blob, { upsert: false, contentType: output.mimeType });
         if (error) throw error; uploadedPaths.push(path); sampleStoragePaths.push(path);

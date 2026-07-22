@@ -443,9 +443,10 @@
 
   function renderDetails(container) {
     const myPage = { label: 'マイページ', path: 'account/index.html', icon: 'pixiedraw/assets/icons/ecticon_frame_01.png' };
+    const notifications = { id: 'notifications', label: '通知', mode: 'notifications', icon: 'assets/icons/詳細.png?v=2026.07.19-ui-icons1' };
     const fallbackIcon = 'assets/icons/詳細.png?v=2026.07.19-ui-icons1';
     const currentPathname = new URL(window.location.href).pathname.replace(/\/+$/, '') || '/';
-    const items = [myPage, state.reloadAction, ...state.details.filter((item) => {
+    const items = [myPage, notifications, state.reloadAction, ...state.details.filter((item) => {
       if (!item || item.path === 'account/index.html') return false;
       if (!item.path) return true;
       const itemPathname = new URL(href(item.path)).pathname.replace(/\/+$/, '') || '/';
@@ -462,6 +463,10 @@
   }
 
   function runTargetAction(item) {
+    if (item.mode === 'notifications') {
+      document.dispatchEvent(new CustomEvent('pixieed:open-notifications'));
+      return;
+    }
     if (item.mode === 'reload') {
       window.location.reload();
       return;
@@ -741,6 +746,9 @@
         display:-webkit-box;width:100%;min-width:0;max-width:100%;padding:0;font-size:12px;font-weight:800;line-height:1.35;
         white-space:normal;overflow:hidden;overflow-wrap:anywhere;word-break:normal;-webkit-box-orient:vertical;-webkit-line-clamp:2;
       }
+      [data-common-action="notifications"]{position:relative}
+      .pixieed-notification-badge{display:none;position:absolute;top:9px;left:35px;width:9px;height:9px;border-radius:50%;background:#ff3b54;box-shadow:0 0 0 2px rgba(7,13,27,.96)}
+      [data-common-action="notifications"][data-has-unread="true"] .pixieed-notification-badge{display:block}
       .pixieed-common-details__ad{
         width:calc(100% + 20px);min-height:100px;margin:12px -10px -10px;overflow:hidden;background:#050a14;
       }

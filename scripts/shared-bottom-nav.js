@@ -93,13 +93,27 @@
   }
 
   function ensureCommonTabBarController() {
-    if (window.__PIXIEED_COMMON_TAB_BAR__ || doc.querySelector('script[data-pixieed-common-tab-bar="true"]')) {
+    if (window.__PIXIEED_COMMON_TAB_BAR__) {
+      ensureNotificationController();
+      return;
+    }
+    if (doc.querySelector('script[data-pixieed-common-tab-bar="true"]')) {
       return;
     }
     const controller = doc.createElement('script');
-    controller.defer = true;
+    controller.async = false;
     controller.dataset.pixieedCommonTabBar = 'true';
-    controller.src = relHref('scripts/shared-tab-bar.js?v=20260721-common-actions1');
+    controller.src = relHref('scripts/shared-tab-bar.js?v=20260722-notifications1');
+    controller.addEventListener('load', ensureNotificationController, { once: true });
+    doc.body.appendChild(controller);
+  }
+
+  function ensureNotificationController() {
+    if (window.__PIXIEED_NOTIFICATION_CONTROLLER__ || doc.querySelector('script[data-pixieed-notification-controller="true"]')) return;
+    const controller = doc.createElement('script');
+    controller.async = false;
+    controller.dataset.pixieedNotificationController = 'true';
+    controller.src = relHref('scripts/shared-notifications.js?v=20260722-market-notifications1');
     doc.body.appendChild(controller);
   }
 

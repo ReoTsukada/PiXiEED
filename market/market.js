@@ -94,7 +94,9 @@
     const previewLink = document.createElement('a'); previewLink.href = href;
     previewLink.setAttribute('aria-label', `${asset.title || '名称未設定の素材'}の商品詳細`);
     const image = new Image();
-    const previewUrl = asset.preview_url || asset.preview_object_path;
+    // カタログRPCに含まれる元画像URLは使わない。必ず公開プレビュー関数が
+    // 発行した、透かし入りサムネイルの署名URLへ置き換えてから表示する。
+    const previewUrl = asset.marketPreviewReady ? asset.preview_url : '';
     image.src = /^https?:\/\//i.test(previewUrl || '') ? previewUrl : fallbackIcon;
     image.alt = ''; image.draggable = false; image.loading = 'lazy'; image.decoding = 'async';
     image.dataset.marketProtectedMedia = 'true'; previewLink.appendChild(image); preview.appendChild(previewLink);
@@ -189,7 +191,10 @@
       targets.forEach((asset) => {
         requestedPreviewIds.add(asset.id);
         const previewUrl = data.previews[asset.id];
-        if (typeof previewUrl === 'string' && /^https?:\/\//i.test(previewUrl)) asset.preview_url = previewUrl;
+        if (typeof previewUrl === 'string' && /^https?:\/\//i.test(previewUrl)) {
+          asset.preview_url = previewUrl;
+          asset.marketPreviewReady = true;
+        }
       });
       return true;
     } finally {

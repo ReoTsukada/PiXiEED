@@ -98,7 +98,9 @@
   // プレビューURLだけは後から届くため、この小さな更新に閉じ込めて、
   // ページ全体の再描画・イベント再登録を発生させない。
   function renderPreviewMedia(asset) {
-    const previewUrl = asset.preview_url || asset.preview_object_path;
+    // 元画像URLが混ざっていても公開しない。market-public-preview が返す
+    // 透かし入りサムネイルだけをメインビューへ渡す。
+    const previewUrl = asset.marketPreviewReady ? asset.preview_url : '';
     if (/^https?:\/\//i.test(previewUrl || '')) {
       $('itemPreview').src = previewUrl;
     }
@@ -402,7 +404,10 @@
       const previewTask = purchaseClient.functions.invoke('market-public-preview', { body: { asset_ids: [asset.id] } })
         .then(({ data: previewData }) => {
           const previewUrl = previewData?.previews?.[asset.id];
-          if (typeof previewUrl === 'string' && /^https?:\/\//i.test(previewUrl)) asset.preview_url = previewUrl;
+          if (typeof previewUrl === 'string' && /^https?:\/\//i.test(previewUrl)) {
+            asset.preview_url = previewUrl;
+            asset.marketPreviewReady = true;
+          }
           if (Array.isArray(previewData?.samples?.[asset.id])) asset.sample_preview_urls = previewData.samples[asset.id];
           renderPreviewMedia(asset);
         })
