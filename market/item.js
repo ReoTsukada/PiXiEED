@@ -72,8 +72,9 @@
     }
   }
 
-  function renderSamplePreviews(asset, previewUrl) {
-    const urls = [previewUrl, ...(Array.isArray(asset.sample_preview_urls) ? asset.sample_preview_urls : [])]
+  function renderSamplePreviews(asset) {
+    // メインのサムネイルはここへ重複表示しない。試聴で選択された画像だけを並べる。
+    const urls = (Array.isArray(asset.sample_preview_urls) ? asset.sample_preview_urls : [])
       .filter((url) => /^https?:\/\//i.test(url || ''))
       .filter((url, index, all) => all.indexOf(url) === index);
     const container = $('itemSamplePreviews');
@@ -84,15 +85,16 @@
     container.replaceChildren(...urls.map((url, index) => {
       const button = document.createElement('button'); button.type = 'button';
       button.className = 'market-item__sample-preview';
-      button.classList.toggle('is-active', url === previewUrl);
-      button.setAttribute('aria-label', index === 0 ? 'サムネイルを表示' : `試聴プレビュー ${index} を表示`);
+      button.setAttribute('aria-label', `試聴プレビュー ${index + 1} を表示`);
       const image = new Image(); image.src = url; image.alt = ''; image.loading = 'lazy'; image.decoding = 'async';
       image.draggable = false; image.dataset.marketProtectedMedia = 'true';
       button.appendChild(image);
       button.addEventListener('click', () => {
         $('itemPreview').src = url;
-        $('itemPreview').alt = index === 0 ? `${asset.title || '商品'}のサムネイル` : `${asset.title || '商品'}の試聴プレビュー ${index}`;
-        frame.classList.toggle('is-sample-preview', index > 0);
+        $('itemPreview').alt = `${asset.title || '商品'}の試聴プレビュー ${index + 1}`;
+        // 旧プレビューだけは保護のため表示レイヤーを残す。baked-v4 は画像内に
+        // 焼き込み済みなので二重に重ねない。
+        frame.classList.toggle('is-sample-preview', asset.sample_watermark_baked !== true);
         container.querySelectorAll('button').forEach((node) => node.classList.toggle('is-active', node === button));
       });
       return button;
@@ -110,7 +112,7 @@
       $('itemPreview').src = previewUrl;
     }
     $('itemPreview').alt = `${asset.title || '商品'}のプレビュー`;
-    renderSamplePreviews(asset, previewUrl);
+    renderSamplePreviews(asset);
   }
 
   function render(asset) {
@@ -468,6 +470,7 @@
             asset.marketPreviewReady = true;
           }
           if (Array.isArray(previewData?.samples?.[asset.id])) asset.sample_preview_urls = previewData.samples[asset.id];
+          asset.sample_watermark_baked = previewData?.sample_watermark_baked?.[asset.id] === true;
           renderPreviewMedia(asset);
         })
         .catch(() => {});

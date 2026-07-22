@@ -145,7 +145,7 @@
       uploadedPaths.push(thumbnailPath);
       const samplePaths = [];
       for (let index = 0; index < selection.samplePaths.length; index += 1) {
-        const sampleBlob = await fixedPreviewBlob(sourceBlobs.get(selection.samplePaths[index]), { thumbnail: false, watermark: false });
+        const sampleBlob = await fixedPreviewBlob(sourceBlobs.get(selection.samplePaths[index]), { thumbnail: false, watermark: true });
         const samplePath = `${basePath}/sample-${String(index + 1).padStart(2, '0')}.webp`;
         result = await client.storage.from('market-private').upload(samplePath, sampleBlob, { upsert: false, contentType: 'image/webp' });
         if (result.error) throw result.error;
@@ -244,7 +244,7 @@
             const samples = [];
             for (let index = 0; index < selection.samplePaths.length; index += 1) {
               const path = `${base}/sample-${String(index + 1).padStart(2, '0')}.webp`;
-              const { error: uploadError } = await client.storage.from('market-private').upload(path, await fixedPreviewBlob(blobs.get(selection.samplePaths[index]), { thumbnail: false, watermark: false }), { contentType: 'image/webp', upsert: false });
+              const { error: uploadError } = await client.storage.from('market-private').upload(path, await fixedPreviewBlob(blobs.get(selection.samplePaths[index]), { thumbnail: false, watermark: true }), { contentType: 'image/webp', upsert: false });
               if (uploadError) throw uploadError;
               uploadedPaths.push(path);
               samples.push(path);

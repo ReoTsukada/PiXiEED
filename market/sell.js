@@ -957,7 +957,8 @@
         preview_selection: {
           thumbnail_source_path: thumbnailEntry?.path || null,
           sample_source_paths: sampleEntries.map((entry) => entry.path),
-          public_preview_kind: 'watermarked-derivative'
+          public_preview_kind: 'baked-fixed-size-watermark',
+          watermark_version: 'baked-v4'
         },
         limited_sale: limitedEnabled ? { enabled: true, quantity: limitedQuantity, option_price_yen: 0, minimum_price_yen: 0 } : { enabled: false }
       };
@@ -1042,7 +1043,9 @@
         setStatus(`購入前プレビューを生成しています（${index + 1}/${sampleEntries.length}）...`);
         const entry = sampleEntries[index];
         const output = previewStorageFormat(entry);
-        const blob = await createPreviewBlob(entry.previewBlob || entry.file, { watermark: false, mimeType: output.mimeType });
+        // ドット絵を先に960pxまでニアレストネイバー拡大してから、固定サイズの
+        // 透かしを画像へ一度だけ焼き込む。表示レイヤーには依存しない。
+        const blob = await createPreviewBlob(entry.previewBlob || entry.file, { watermark: true, mimeType: output.mimeType });
         const path = `${signedInUser.id}/${assetId}/previews/sample-${String(index + 1).padStart(2, '0')}.${output.extension}`;
         const { error } = await client.storage.from('market-private').upload(path, blob, { upsert: false, contentType: output.mimeType });
         if (error) throw error; uploadedPaths.push(path); sampleStoragePaths.push(path);

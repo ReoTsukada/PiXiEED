@@ -25,6 +25,12 @@ function samplePreviewPaths(asset: AssetRow) {
     : [];
 }
 
+function hasBakedSampleWatermark(asset: AssetRow) {
+  const selection = asset.provenance_manifest?.preview_selection;
+  return typeof selection === "object" && selection !== null
+    && (selection as Record<string, unknown>).watermark_version === "baked-v4";
+}
+
 async function previewUrl(admin: ReturnType<typeof createAdminClient>, path: string) {
   if (/^https:\/\//i.test(path)) return path;
   const { data, error } = await admin.storage.from(BUCKET).createSignedUrl(path, PREVIEW_URL_TTL_SECONDS);
@@ -63,7 +69,10 @@ Deno.serve(async (request) => {
       }));
       return [asset.id, urls.filter(Boolean)] as const;
     }))).filter(([, urls]) => urls.length > 0));
-    return jsonResponse(request, { previews, samples, expires_in: PREVIEW_URL_TTL_SECONDS });
+    const sample_watermark_baked = Object.fromEntries(((data || []) as AssetRow[])
+      .filter((asset) => hasBakedSampleWatermark(asset))
+      .map((asset) => [asset.id, true]));
+    return jsonResponse(request, { previews, samples, sample_watermark_baked, expires_in: PREVIEW_URL_TTL_SECONDS });
   } catch (error) {
     return jsonResponse(request, { error: errorMessage(error, "公開プレビューを準備できませんでした") }, 500);
   }
