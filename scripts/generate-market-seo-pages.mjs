@@ -79,6 +79,7 @@ function staticPage(template, asset, { ogImageUrl, previewImagePath }) {
   let html = template
     .replaceAll('../', '../../')
     .replace('href="index.html"', 'href="../../index.html"')
+    .replace('href="./"', 'href="../../"')
     .replace(/(href|src)="(market\.css|favorites\.js|market-ads\.js|pageview-rewards\.js|item\.js|media-protection\.js|help-tips\.js)/g, '$1="../../$2')
     .replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(metaTitle)} | PiXiEEDマーケット</title>`)
     .replace(/<meta name="description" content="[^"]*">/, `<meta name="description" content="${escapeHtml(metaDescription)}">`)
