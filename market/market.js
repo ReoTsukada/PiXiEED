@@ -88,8 +88,8 @@
   function createCard(asset) {
     const card = document.createElement('article'); card.className = 'market-card';
     card.classList.toggle('is-sold-out', isSoldOut(asset));
-    // 新規出品の静的SEOページは公開時点では未生成のため、常設の詳細画面へ遷移する。
-    const href = `item.html?id=${encodeURIComponent(asset.id)}`;
+    // 共有・検索は個別OGPを持つ静的URLへ統一する。公開後5分以内に生成される。
+    const href = `items/${encodeURIComponent(asset.id)}/`;
     const preview = document.createElement('div'); preview.className = 'market-card__preview';
     const previewLink = document.createElement('a'); previewLink.href = href;
     previewLink.setAttribute('aria-label', `${asset.title || '名称未設定の素材'}の商品詳細`);
