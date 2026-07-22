@@ -12,6 +12,7 @@ const adsJs = read('market/market-ads.js');
 const css = read('market/market.css');
 
 assert.match(marketHtml, /market-ads\.js/);
+assert.match(marketHtml, /<script defer src="market\.js\?v=20260722-fast-initial-render1">/);
 assert.match(itemHtml, /market-ads\.js/);
 assert.match(itemHtml, /data-ad-slot="9279466474"/);
 assert.match(itemHtml, /data-ad-client="ca-pub-9801602250480253"/);
