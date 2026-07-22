@@ -443,7 +443,7 @@
 
   function renderDetails(container) {
     const myPage = { label: 'マイページ', path: 'account/index.html', icon: 'pixiedraw/assets/icons/ecticon_frame_01.png' };
-    const notifications = { id: 'notifications', label: '通知', mode: 'notifications', icon: 'assets/icons/詳細.png?v=2026.07.19-ui-icons1' };
+    const notifications = { id: 'notifications', label: '通知', mode: 'notifications', icon: 'bell.png?v=20260722-bell1' };
     const fallbackIcon = 'assets/icons/詳細.png?v=2026.07.19-ui-icons1';
     const currentPathname = new URL(window.location.href).pathname.replace(/\/+$/, '') || '/';
     const items = [myPage, notifications, state.reloadAction, ...state.details.filter((item) => {
