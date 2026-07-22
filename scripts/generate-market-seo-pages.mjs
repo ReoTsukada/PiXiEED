@@ -6,6 +6,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import sharp from 'sharp';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const siteUrl = 'https://pixieed.jp';
@@ -13,6 +14,7 @@ const supabaseUrl = 'https://kyyiuakrqomzlikfaire.supabase.co';
 const anonKey = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
 const itemTemplatePath = path.join(root, 'market/item.html');
 const itemsRoot = path.join(root, 'market/items');
+const shareFramePath = path.join(root, 'PiXiEEDMarket.png');
 const sitemapPath = path.join(root, 'sitemap.xml');
 const sitemapStart = '  <!-- market-seo-items:start -->';
 const sitemapEnd = '  <!-- market-seo-items:end -->';
@@ -22,8 +24,12 @@ const escapeHtml = (value) => String(value ?? '')
   .replaceAll('"', '&quot;').replaceAll("'", '&#39;');
 const escapeJson = (value) => JSON.stringify(value).replaceAll('<', '\\u003c').replaceAll('>', '\\u003e').replaceAll('&', '\\u0026');
 const text = (value, fallback = '') => String(value ?? '').trim() || fallback;
+const attributeText = (value) => text(value).replace(/\s+/g, ' ');
 const itemUrl = (id) => `${siteUrl}/market/items/${encodeURIComponent(id)}/`;
 const yen = (value) => `${Number(value || 0).toLocaleString('ja-JP')}円`;
+const fallbackShareImageUrl = `${siteUrl}/PiXiEEDogp.png`;
+const publicPreviewEndpoint = `${supabaseUrl}/functions/v1/market-public-preview`;
+const previewMaxIds = 120;
 
 function formats(asset) {
   const values = Array.isArray(asset.included_formats) && asset.included_formats.length
@@ -43,9 +49,11 @@ function replaceElement(html, id, content) {
   return html.replace(pattern, `$1${content}$3`);
 }
 
-function staticPage(template, asset) {
+function staticPage(template, asset, { ogImageUrl, previewImagePath }) {
   const title = text(asset.title, 'PiXiEEDマーケット素材');
   const description = text(asset.description, `${title}のドット絵素材。形式と利用条件をPiXiEEDマーケットで確認できます。`);
+  const metaTitle = attributeText(title);
+  const metaDescription = attributeText(description);
   const format = formats(asset);
   const soldOut = isSoldOut(asset);
   const series = asset.series || {};
@@ -70,17 +78,16 @@ function staticPage(template, asset) {
   let html = template
     .replaceAll('../', '../../')
     .replace('href="index.html"', 'href="../../index.html"')
-    .replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(title)} | PiXiEEDマーケット</title>`)
-    .replace(/<meta name="description" content="[^"]*">/, `<meta name="description" content="${escapeHtml(description)}">`)
+    .replace(/(href|src)="(market\.css|favorites\.js|market-ads\.js|pageview-rewards\.js|item\.js|media-protection\.js|help-tips\.js)/g, '$1="../../$2')
+    .replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(metaTitle)} | PiXiEEDマーケット</title>`)
+    .replace(/<meta name="description" content="[^"]*">/, `<meta name="description" content="${escapeHtml(metaDescription)}">`)
     .replace('<meta name="robots" content="noindex,nofollow">', '<meta name="robots" content="index,follow">')
-    .replace('  <link rel="icon"', `  <link rel="canonical" href="${url}">\n  <script type="application/ld+json">${escapeJson(product)}</script>\n  <script id="marketSeoAsset" type="application/json">${escapeJson(asset)}</script>\n  <link rel="icon"`)
+    .replace('  <link rel="icon"', `  <link rel="canonical" href="${url}">\n  <meta property="og:type" content="product">\n  <meta property="og:site_name" content="PiXiEEDマーケット">\n  <meta property="og:title" content="${escapeHtml(metaTitle)}">\n  <meta property="og:description" content="${escapeHtml(metaDescription)}">\n  <meta property="og:url" content="${url}">\n  <meta property="og:image" content="${ogImageUrl}">\n  <meta property="og:image:width" content="1536">\n  <meta property="og:image:height" content="1024">\n  <meta name="twitter:card" content="summary_large_image">\n  <meta name="twitter:title" content="${escapeHtml(metaTitle)}">\n  <meta name="twitter:description" content="${escapeHtml(metaDescription)}">\n  <meta name="twitter:image" content="${ogImageUrl}">\n  <script type="application/ld+json">${escapeJson(product)}</script>\n  <script id="marketSeoAsset" type="application/json">${escapeJson(asset)}</script>\n  <link rel="icon"`)
     .replace('<article class="market-item" id="itemContent" hidden>', '<article class="market-item" id="itemContent">')
     .replace('<p class="market-sell-status" id="itemStatus" aria-live="polite">商品を読み込んでいます</p>', '<p class="market-sell-status" id="itemStatus" aria-live="polite" hidden>商品を読み込んでいます</p>');
   html = replaceElement(html, 'itemTitle', escapeHtml(title));
   html = replaceElement(html, 'itemDescription', escapeHtml(description));
   html = replaceElement(html, 'itemPrice', escapeHtml(yen(asset.sale_price_yen)));
-  html = replaceElement(html, 'itemBasePrice', escapeHtml(yen(Math.max(0, Number(asset.sale_price_yen || 0) - Number(series.required_option_price_yen || 0)))));
-  html = replaceElement(html, 'itemOptionPrice', escapeHtml(yen(series.required_option_price_yen)));
   html = replaceElement(html, 'itemFormats', escapeHtml(format));
   html = replaceElement(html, 'itemProductType', escapeHtml(format.includes('PiXiEEDraw') ? 'PiXiEEDraw作品（編集用プロジェクト入り）' : '一般素材（画像・アニメーション）'));
   html = replaceElement(html, 'itemAuthor', `作者: ${escapeHtml(text(asset.creator_display_name, 'PiXiEEDクリエイター'))}`);
@@ -88,6 +95,9 @@ function staticPage(template, asset) {
     ? 'OK（改変した素材を独立商品として再販売可能・系列ロイヤリティーあり）'
     : 'NG（利用・改変できる範囲でも、素材または改変素材として再販売できません）');
   html = replaceElement(html, 'itemAvailability', soldOut ? '売り切れ' : '販売中');
+  if (previewImagePath) {
+    html = html.replace(/(<img id="itemPreview" src=")[^"]+/, `$1${previewImagePath}`);
+  }
   return html;
 }
 
@@ -112,13 +122,60 @@ async function updateSitemap(assets) {
   await fs.writeFile(sitemapPath, next);
 }
 
+async function getPreviewUrls(assetIds) {
+  const previews = {};
+  for (let index = 0; index < assetIds.length; index += previewMaxIds) {
+    const response = await fetch(publicPreviewEndpoint, {
+      method: 'POST',
+      headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ asset_ids: assetIds.slice(index, index + previewMaxIds) })
+    });
+    if (!response.ok) throw new Error(`market-public-preview failed: ${response.status} ${await response.text()}`);
+    const data = await response.json();
+    Object.assign(previews, data?.previews || {});
+  }
+  return previews;
+}
+
+async function writeShareImage(directory, previewUrl) {
+  if (!previewUrl) return null;
+  const response = await fetch(previewUrl);
+  if (!response.ok) throw new Error(`preview download failed: ${response.status}`);
+  const preview = Buffer.from(await response.arrayBuffer());
+  const [frameMeta, previewMeta] = await Promise.all([sharp(shareFramePath).metadata(), sharp(preview).metadata()]);
+  if (!frameMeta.width || !frameMeta.height || !previewMeta.width || !previewMeta.height) throw new Error('share image dimensions are unavailable');
+
+  // 左上のリボンを避けた台紙の内側に、ドットをぼかさず収める。
+  const bounds = {
+    left: Math.round(frameMeta.width * 0.14), top: Math.round(frameMeta.height * 0.38),
+    width: Math.round(frameMeta.width * 0.72), height: Math.round(frameMeta.height * 0.48)
+  };
+  const scale = Math.min(bounds.width / previewMeta.width, bounds.height / previewMeta.height);
+  const width = Math.max(1, Math.round(previewMeta.width * scale));
+  const height = Math.max(1, Math.round(previewMeta.height * scale));
+  const image = await sharp(preview).resize(width, height, { kernel: sharp.kernel.nearest }).png().toBuffer();
+  await sharp(shareFramePath)
+    .composite([{ input: image, left: bounds.left + Math.round((bounds.width - width) / 2), top: bounds.top + Math.round((bounds.height - height) / 2) }])
+    .png()
+    .toFile(path.join(directory, 'share.png'));
+  return 'share.png';
+}
+
 async function main() {
   const [template, assets] = await Promise.all([fs.readFile(itemTemplatePath, 'utf8'), getAssets()]);
+  const previews = await getPreviewUrls(assets.map((asset) => asset.id));
   await fs.mkdir(itemsRoot, { recursive: true });
   await Promise.all(assets.map(async (asset) => {
     const directory = path.join(itemsRoot, asset.id);
     await fs.mkdir(directory, { recursive: true });
-    await fs.writeFile(path.join(directory, 'index.html'), staticPage(template, asset));
+    let previewImagePath = null;
+    try {
+      previewImagePath = await writeShareImage(directory, previews[asset.id]);
+    } catch (error) {
+      console.warn(`Could not generate a share image for ${asset.id}: ${error.message}`);
+    }
+    const ogImageUrl = previewImagePath ? `${itemUrl(asset.id)}${previewImagePath}` : fallbackShareImageUrl;
+    await fs.writeFile(path.join(directory, 'index.html'), staticPage(template, asset, { ogImageUrl, previewImagePath }));
   }));
   await updateSitemap(assets);
   console.log(`Generated ${assets.length} market SEO page(s) and updated sitemap.xml.`);
