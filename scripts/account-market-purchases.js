@@ -265,7 +265,7 @@
           traceId: payload.trace_id
         });
         status.textContent = 'PiXiEEDrawを開きます…';
-        window.location.assign(assetUrl(`../pixiedraw/index.html?market_import=${encodeURIComponent(token)}`));
+        window.location.assign(assetUrl(`../pixiedraw/?market_import=${encodeURIComponent(token)}`));
       } catch (error) {
         status.textContent = error.message || 'PiXiEEDrawで開けませんでした。'; setBusy(false);
       }
@@ -282,7 +282,7 @@
     if (token !== renderToken) return;
     if (!sessionData?.session?.user) {
       count.textContent = '未ログイン';
-      renderMessage('ログインすると購入済み商品を確認できます', '上のアカウント欄からログインしてください。', 'マーケットを見る', '../market/index.html'); return;
+      renderMessage('ログインすると購入済み商品を確認できます', '上のアカウント欄からログインしてください。', 'マーケットを見る', '../market/'); return;
     }
     try {
       const data = await invoke(client, { action: 'library' });
@@ -290,12 +290,12 @@
       const purchases = Array.isArray(data.items) ? data.items : [];
       count.textContent = `${purchases.length}件`;
       if (!purchases.length) {
-        renderMessage('購入済み商品はありません', 'マーケットで購入した素材がここへ並びます。', '素材を探す', '../market/index.html'); return;
+        renderMessage('購入済み商品はありません', 'マーケットで購入した素材がここへ並びます。', '素材を探す', '../market/'); return;
       }
       list.replaceChildren(...purchases.map((purchase) => createCard(client, purchase)));
     } catch (error) {
       count.textContent = '取得失敗';
-      renderMessage('購入済み商品を読み込めませんでした', error.message || '時間をおいて再試行してください。', 'マーケットを見る', '../market/index.html');
+      renderMessage('購入済み商品を読み込めませんでした', error.message || '時間をおいて再試行してください。', 'マーケットを見る', '../market/');
     }
   }
 
@@ -324,7 +324,7 @@
       client.auth.onAuthStateChange(() => window.setTimeout(() => render(client), 0));
     } catch (_error) {
       count.textContent = '準備中';
-      renderMessage('購入履歴は準備中です', 'ログイン機能の接続後に自動で表示されます。', 'マーケットを見る', '../market/index.html');
+      renderMessage('購入履歴は準備中です', 'ログイン機能の接続後に自動で表示されます。', 'マーケットを見る', '../market/');
     }
   }
 
