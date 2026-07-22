@@ -56,7 +56,9 @@
       .map((path) => String(path || ''))
       .filter(Boolean);
     const paths = requested.map((path) => sourceByOriginalPath.get(path)).filter((path) => /^.+\/.+/.test(path || ''));
-    if (paths.length) return [...new Set(paths)];
+    // 公開できる試聴は最大6枚。大量セットでもサムネイル用の先頭画像と
+    // 試聴用の先頭6枚だけを使い、登録処理が上限超過で失敗しないようにする。
+    if (paths.length) return [...new Set(paths)].slice(0, 6);
     return storagePaths.filter((path) => /\.(png|webp|gif|apng|jpe?g)$/i.test(String(path || ''))).slice(0, 6);
   }
 
