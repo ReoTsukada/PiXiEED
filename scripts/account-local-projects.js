@@ -286,7 +286,10 @@
     }
     writeRestoreKey(RELOAD_TARGET_PROJECT_ID_KEY, normalizedId);
     writeRestoreKey(AUTOSAVE_ACTIVE_PROJECT_SYNC_KEY, normalizedId);
-    window.location.href = asset('../pixiedraw/index.html');
+    // Keep the storage keys as a fallback for older PiXiEEDraw builds, but
+    // use an explicit URL request so a normal navigation opens this exact
+    // project instead of showing the default project chooser.
+    window.location.href = asset(`../pixiedraw/?project=${encodeURIComponent(normalizedId)}`);
   }
 
   async function renderLocalProjects() {
