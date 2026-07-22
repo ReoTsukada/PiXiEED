@@ -1,0 +1,52 @@
+name: Generate market OGP pages
+
+on:
+  schedule:
+    # GitHub Actions のcron最小間隔。公開済み商品のみを安全に取り込む。
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: generate-market-ogp
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the published branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install OGP generator dependencies
+        run: npm ci
+
+      - name: Generate published product pages and share images
+        run: node scripts/generate-market-seo-pages.mjs
+
+      - name: Verify generated market pages
+        run: |
+          node scripts/test-market-seo-pages.mjs
+          git diff --check
+
+      - name: Commit only generated market OGP files
+        run: |
+          if git diff --quiet -- market/items sitemap.xml; then
+            echo "No published market changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add market/items sitemap.xml
+          git commit -m "Generate market OGP pages"
+          git push origin HEAD:main
