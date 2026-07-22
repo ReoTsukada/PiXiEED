@@ -1148,6 +1148,66 @@ body[data-pixieed-account-auth="signed-out"] .account-panel--profile > .section-
   text-underline-offset: 3px;
 }
 
+/* プロフィールは一目で編集対象が分かる一枚のカードにする。 */
+body[data-pixieed-account-auth="signed-in"] #authPanel {
+  max-width: 680px;
+  justify-self: start;
+}
+
+body[data-pixieed-account-auth="signed-in"] #authPanel .account-profile-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+body[data-pixieed-account-auth="signed-in"] #authPanel .profile-block--profile {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  background: #0b1224;
+  border-color: rgba(121,192,255,.22);
+}
+
+body[data-pixieed-account-auth="signed-in"] #authPanel .account-settings-heading small,
+body[data-pixieed-account-auth="signed-in"] #authPanel .auth-signed-in-notice,
+body[data-pixieed-account-auth="signed-in"] #authPanel .profile-email,
+body[data-pixieed-account-auth="signed-in"] #authPanel #linkedEmail {
+  display: none !important;
+}
+
+body[data-pixieed-account-auth="signed-in"] #authPanel .account-profile-settings {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: end;
+}
+
+body[data-pixieed-account-auth="signed-in"] #authPanel .profile-row {
+  grid-column: 1 / -1;
+}
+
+body[data-pixieed-account-auth="signed-in"] #authPanel .profile-name {
+  gap: 5px;
+}
+
+body[data-pixieed-account-auth="signed-in"] #authPanel #saveProfile {
+  grid-column: 1;
+  min-height: 42px;
+}
+
+body[data-pixieed-account-auth="signed-in"] #authPanel #logoutBtn {
+  grid-column: 2;
+  min-height: 42px;
+  margin: 0;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,.16);
+}
+
+@media (max-width: 680px) {
+  body[data-pixieed-account-auth="signed-in"] #authPanel { max-width: none; width: 100%; }
+  body[data-pixieed-account-auth="signed-in"] #authPanel .account-profile-settings { grid-template-columns: 1fr; }
+  body[data-pixieed-account-auth="signed-in"] #authPanel #saveProfile,
+  body[data-pixieed-account-auth="signed-in"] #authPanel #logoutBtn { grid-column: 1; width: 100%; }
+}
+
 @media (max-width: 980px) {
   .account-grid { grid-template-columns: minmax(0, 1fr) !important; }
   .account-service-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
