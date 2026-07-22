@@ -77,8 +77,8 @@ serve(async (request) => {
     const params = new URLSearchParams();
     params.set("mode", "payment");
     params.set("client_reference_id", purchaseId);
-    params.set("success_url", `${base}/market/item.html?id=${encodeURIComponent(assetId)}&purchase=success&session_id={CHECKOUT_SESSION_ID}`);
-    params.set("cancel_url", `${base}/market/item.html?id=${encodeURIComponent(assetId)}&purchase=cancelled`);
+    params.set("success_url", `${base}/market/items/${encodeURIComponent(assetId)}/?purchase=success&session_id={CHECKOUT_SESSION_ID}`);
+    params.set("cancel_url", `${base}/market/items/${encodeURIComponent(assetId)}/?purchase=cancelled`);
     params.set("expires_at", String(expiresAt));
     params.set("locale", "ja");
     if (user.email) params.set("customer_email", user.email);
