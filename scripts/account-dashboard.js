@@ -80,12 +80,9 @@
   function savedTab() {
     const fromHash = tabFromHash();
     if (fromHash) return fromHash;
-    try {
-      const saved = localStorage.getItem(TAB_STORAGE_KEY) || '';
-      return TAB_NAMES.has(saved) ? saved : 'library';
-    } catch (_error) {
-      return 'library';
-    }
+    // マイページを開いた直後は、ログインとアカウント設定がある設定タブを
+    // 常に最初に表示する。ページ内の選択はその閲覧中だけ維持する。
+    return 'settings';
   }
 
   function setActiveTab(nextTab, options) {
