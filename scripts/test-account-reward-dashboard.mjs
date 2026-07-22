@@ -8,6 +8,7 @@ const collections = fs.readFileSync('scripts/account-collections.js', 'utf8');
 const listings = fs.readFileSync('scripts/account-market-listings.js', 'utf8');
 const pixfindPosts = fs.readFileSync('scripts/account-pixfind-posts.js', 'utf8');
 const migration = fs.readFileSync('supabase/migrations/20260719170000_market_reward_dashboard.sql', 'utf8');
+const provisionalMigration = fs.readFileSync('supabase/migrations/20260722034739_market_provisional_pageview_dashboard.sql', 'utf8');
 const listingsMigration = fs.readFileSync('supabase/migrations/20260719180000_market_my_listings.sql', 'utf8');
 
 for (const tab of ['library', 'rewards', 'settings']) {
@@ -57,7 +58,11 @@ assert.match(migration, /ledger\.lineage_depth = 0/);
 assert.match(migration, /ledger\.lineage_depth > 0/);
 assert.match(migration, /max\(allocation\.source_view_count\)/);
 assert.match(migration, /run\.status = 'finalized'/);
+assert.match(provisionalMigration, /provisional_valid_view_count/);
+assert.match(provisionalMigration, /from public\.market_pageview_events event/);
 assert.match(migration, /ledger\.status <> 'reversed'/);
 assert.match(migration, /grant execute on function public\.market_my_reward_dashboard_v1\(integer\)[\s\S]*to authenticated/);
+assert.match(dashboard, /暫定/);
+assert.match(dashboard, /provisional_valid_view_count/);
 
 console.log('Account reward dashboard guards passed.');
