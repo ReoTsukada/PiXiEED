@@ -30,6 +30,7 @@ const yen = (value) => `${Number(value || 0).toLocaleString('ja-JP')}円`;
 const fallbackShareImageUrl = `${siteUrl}/PiXiEEDogp.png`;
 const publicPreviewEndpoint = `${supabaseUrl}/functions/v1/market-public-preview`;
 const previewMaxIds = 120;
+const shareRibbonPolygon = [[0.146, 0.059], [0.333, 0.059], [0.031, 0.372], [0.031, 0.21]];
 
 function formats(asset) {
   const values = Array.isArray(asset.included_formats) && asset.included_formats.length
@@ -137,25 +138,56 @@ async function getPreviewUrls(assetIds) {
   return previews;
 }
 
-async function writeShareImage(directory, previewUrl) {
+function isInsidePolygon(x, y, polygon) {
+  let inside = false;
+  for (let current = 0, previous = polygon.length - 1; current < polygon.length; previous = current++) {
+    const [currentX, currentY] = polygon[current];
+    const [previousX, previousY] = polygon[previous];
+    if ((currentY > y) !== (previousY > y) && x < ((previousX - currentX) * (y - currentY)) / (previousY - currentY) + currentX) inside = !inside;
+  }
+  return inside;
+}
+
+async function shareFrameForeground() {
+  const { data, info } = await sharp(shareFramePath).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const ribbon = shareRibbonPolygon.map(([x, y]) => [x * info.width, y * info.height]);
+  for (let y = 0; y < info.height; y += 1) {
+    for (let x = 0; x < info.width; x += 1) {
+      const offset = (y * info.width + x) * info.channels;
+      const isBlack = data[offset] < 14 && data[offset + 1] < 14 && data[offset + 2] < 14;
+      // 黒い台紙だけを透明化し、リボン上の黒文字は残す。
+      if (isBlack && !isInsidePolygon(x, y, ribbon)) data[offset + 3] = 0;
+    }
+  }
+  return {
+    width: info.width,
+    height: info.height,
+    image: await sharp(data, { raw: info }).png().toBuffer()
+  };
+}
+
+async function writeShareImage(directory, previewUrl, frame) {
   if (!previewUrl) return null;
   const response = await fetch(previewUrl);
   if (!response.ok) throw new Error(`preview download failed: ${response.status}`);
   const preview = Buffer.from(await response.arrayBuffer());
-  const [frameMeta, previewMeta] = await Promise.all([sharp(shareFramePath).metadata(), sharp(preview).metadata()]);
-  if (!frameMeta.width || !frameMeta.height || !previewMeta.width || !previewMeta.height) throw new Error('share image dimensions are unavailable');
+  const previewMeta = await sharp(preview).metadata();
+  if (!previewMeta.width || !previewMeta.height) throw new Error('share image dimensions are unavailable');
 
-  // 左上のリボンを避けた台紙の内側に、ドットをぼかさず収める。
+  // 内枠を最大限使い、リボンと枠線は前面の台紙で保護する。
   const bounds = {
-    left: Math.round(frameMeta.width * 0.14), top: Math.round(frameMeta.height * 0.38),
-    width: Math.round(frameMeta.width * 0.72), height: Math.round(frameMeta.height * 0.48)
+    left: Math.round(frame.width * 0.09), top: Math.round(frame.height * 0.12),
+    width: Math.round(frame.width * 0.82), height: Math.round(frame.height * 0.76)
   };
   const scale = Math.min(bounds.width / previewMeta.width, bounds.height / previewMeta.height);
   const width = Math.max(1, Math.round(previewMeta.width * scale));
   const height = Math.max(1, Math.round(previewMeta.height * scale));
   const image = await sharp(preview).resize(width, height, { kernel: sharp.kernel.nearest }).png().toBuffer();
-  await sharp(shareFramePath)
-    .composite([{ input: image, left: bounds.left + Math.round((bounds.width - width) / 2), top: bounds.top + Math.round((bounds.height - height) / 2) }])
+  await sharp({ create: { width: frame.width, height: frame.height, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+    .composite([
+      { input: image, left: bounds.left + Math.round((bounds.width - width) / 2), top: bounds.top + Math.round((bounds.height - height) / 2) },
+      { input: frame.image }
+    ])
     .png()
     .toFile(path.join(directory, 'share.png'));
   return 'share.png';
@@ -164,13 +196,14 @@ async function writeShareImage(directory, previewUrl) {
 async function main() {
   const [template, assets] = await Promise.all([fs.readFile(itemTemplatePath, 'utf8'), getAssets()]);
   const previews = await getPreviewUrls(assets.map((asset) => asset.id));
+  const frame = await shareFrameForeground();
   await fs.mkdir(itemsRoot, { recursive: true });
   await Promise.all(assets.map(async (asset) => {
     const directory = path.join(itemsRoot, asset.id);
     await fs.mkdir(directory, { recursive: true });
     let previewImagePath = null;
     try {
-      previewImagePath = await writeShareImage(directory, previews[asset.id]);
+      previewImagePath = await writeShareImage(directory, previews[asset.id], frame);
     } catch (error) {
       console.warn(`Could not generate a share image for ${asset.id}: ${error.message}`);
     }
