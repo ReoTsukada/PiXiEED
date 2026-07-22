@@ -23,7 +23,7 @@
     const script = document.createElement('script');
     script.defer = true;
     script.dataset.pixieedSharedAuth = 'true';
-    script.src = asset('./shared-auth-panel.js?v=2026.07.18-ad-permissions1');
+    script.src = asset('./shared-auth-panel.js?v=20260722-auth-choices1');
     document.head.appendChild(script);
   }
 
