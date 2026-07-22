@@ -255,6 +255,23 @@
     body[data-pixieed-account-auth="signed-in"] .account-page .profile-block--login{
       display:none;
     }
+    body[data-pixieed-account-auth="checking"] .account-page .account-stack > .account-panel:not(.account-panel--profile),
+    body[data-pixieed-account-auth="checking"] .account-page .account-stack + .account-stack,
+    body[data-pixieed-account-auth="checking"] .account-page .profile-block--profile{
+      display:none;
+    }
+    body[data-pixieed-account-auth="checking"] .account-page .account-grid,
+    body[data-pixieed-account-auth="checking"] .account-page .account-titlebar{
+      width:min(100%, 480px);
+      margin-inline:auto;
+    }
+    body[data-pixieed-account-auth="checking"] .account-page .account-title{
+      padding-inline:0;
+      text-align:center;
+    }
+    body[data-pixieed-account-auth="checking"] .account-page .account-stack{display:block;}
+    body[data-pixieed-account-auth="checking"] .account-page .account-panel--profile{padding:clamp(18px, 3vw, 28px);}
+    body[data-pixieed-account-auth="checking"] .profile-block--login > :not(.auth-session-check){display:none;}
     .account-panel--profile .logout{
       width:100%;margin-top:4px;
     }
@@ -265,9 +282,9 @@
       .account-cover{width:64px;height:64px}
     }
   </style>
-  <link rel="stylesheet" href="account.css?v=20260722-auth-form1">
+  <link rel="stylesheet" href="account.css?v=20260722-auth-prod-layout1">
 </head>
-<body data-pixieed-account-auth="signed-out">
+<body data-pixieed-account-auth="checking">
   <header class="site-header" aria-label="トップナビ">
     <div class="header-inner header-inner--app">
       <a class="brand" href="../index.html">
@@ -281,7 +298,7 @@
     <main class="page-shell account-page">
       <section class="account-titlebar" aria-labelledby="accountTitle">
         <div class="account-titlebar__title">
-          <h1 class="section-title account-title" id="accountTitle">ログイン</h1>
+          <h1 class="section-title account-title" id="accountTitle">マイページ</h1>
         </div>
         <div class="account-titlebar__actions">
           <a href="../pixiedraw/?new_project=1">新規作成</a>
@@ -365,6 +382,7 @@
                   <strong id="profileSettingsTitle">プロフィール設定</strong>
                   <small>アイコン・名前・X・ログアウト</small>
                 </div>
+                <p class="auth-signed-in-notice" id="authSignedInNotice" role="status" aria-live="polite" hidden></p>
                 <div class="account-profile-settings">
                 <div class="auth-section-head">
                   <strong>アカウント設定</strong>
@@ -399,20 +417,25 @@
                 </div>
               </section>
               <div class="profile-block profile-block--login" id="pixieedSharedAuthLoginBlock">
+                <p class="auth-session-check" id="authSessionCheck" role="status" aria-live="polite">ログイン状態を確認しています…</p>
                 <div class="auth-section-head">
                   <strong id="authModeTitle">ログイン</strong>
                   <span id="authModeDescription">PiXiEED IDを使う</span>
                 </div>
                 <p class="auth-login-copy" id="authModeCopy">すでにアカウントをお持ちの方は、ログイン方法を選んでください。</p>
+                <div class="auth-signup-pending" id="authSignupPending" hidden aria-live="polite">
+                  <strong>確認メールを送信しました</strong>
+                  <p id="authSignupPendingMessage">メール内の「アカウントを確認」リンクを開くと、新規作成が完了します。</p>
+                  <div class="auth-simple-actions">
+                    <button class="auth-btn" id="authResendSignupBtn" type="button">確認メールを再送する</button>
+                    <button class="auth-btn auth-btn--subtle" type="button" data-auth-mode="login">確認済みならログイン</button>
+                  </div>
+                  <button class="auth-text-btn" type="button" data-auth-mode="signup" data-auth-clear-pending="true">別のメールアドレスを使う</button>
+                </div>
                 <div class="auth-social-grid" id="authSocialButtons">
                   <button class="auth-btn auth-btn--google" data-auth-provider="google" data-auth-label="Google" type="button">
                     <span class="auth-google-icon" aria-hidden="true">
-                      <svg viewBox="0 0 18 18" focusable="false">
-                        <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/>
-                        <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.33-1.58-5.04-3.7H.94v2.34A9 9 0 0 0 9 18z"/>
-                        <path fill="#FBBC05" d="M3.96 10.72A5.4 5.4 0 0 1 3.68 9c0-.6.1-1.18.28-1.72V4.94H.94A9 9 0 0 0 0 9c0 1.45.34 2.82.94 4.06l3.02-2.34z"/>
-                        <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.34l2.58-2.58C13.46.9 11.42 0 9 0A9 9 0 0 0 .94 4.94l3.02 2.34C4.67 5.16 6.66 3.58 9 3.58z"/>
-                      </svg>
+                      <svg viewBox="0 0 18 18" focusable="false"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.33-1.58-5.04-3.7H.94v2.34A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.96 10.72A5.4 5.4 0 0 1 3.68 9c0-.6.1-1.18.28-1.72V4.94H.94A9 9 0 0 0 0 9c0 1.45.34 2.82.94 4.06l3.02-2.34z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.34l2.58-2.58C13.46.9 11.42 0 9 0A9 9 0 0 0 .94 4.94l3.02 2.34C4.67 5.16 6.66 3.58 9 3.58z"/></svg>
                     </span>
                     <span id="authGoogleButtonLabel">Googleでログイン</span>
                   </button>
@@ -422,6 +445,7 @@
                   <button class="auth-mode-switch__button is-active" type="button" data-auth-mode="login" role="tab" aria-selected="true">ログイン</button>
                   <button class="auth-mode-switch__button" type="button" data-auth-mode="signup" role="tab" aria-selected="false">新規作成</button>
                 </div>
+                <button class="auth-btn auth-btn--email" id="authEmailToggle" type="button">メールアドレスでログイン</button>
                 <form class="auth-form" id="authForm" novalidate>
                   <div id="authInputs" style="display:grid; gap:8px;" data-expanded="true">
                     <label class="auth-field">
@@ -431,10 +455,6 @@
                     <label class="auth-field" id="authPasscodeField">
                       <span id="authPasscodeLabel">パスワード</span>
                       <input class="auth-input" id="authPasscode" type="password" placeholder="パスワードを入力" minlength="6" autocomplete="current-password">
-                    </label>
-                    <label class="auth-field" id="authPasscodeConfirmField" hidden>
-                      <span>パスワード（確認）</span>
-                      <input class="auth-input" id="authPasscodeConfirm" type="password" placeholder="もう一度入力" minlength="8" autocomplete="new-password">
                     </label>
                   </div>
                   <div class="auth-actions" style="display:grid; gap:8px;">
@@ -632,7 +652,7 @@
     </main>
   </div>
 
-  <script src="../scripts/shared-auth-panel.js?v=20260722-auth-form1"></script>
+  <script src="../scripts/shared-auth-panel.js?v=20260722-auth-prod-layout1"></script>
   <script src="../scripts/account-dashboard.js?v=20260722-provisional-views1"></script>
   <script src="../scripts/account-collections.js?v=2026.07.19-account-library2"></script>
   <script src="../scripts/pixieed-market-access.js?v=20260721-shared-client1"></script>
@@ -646,8 +666,8 @@
   <script src="../scripts/account-pixfind-posts.js?v=2026.07.19-account-library1"></script>
   <script src="../pixiedraw/assets/js/modules/color-codec-utils.js?v=2026.06.30-color-codec-v1"></script>
   <script src="../scripts/market-purchase-delivery.js?v=20260720-pxd2"></script>
-  <script src="../scripts/account-market-purchases.js?v=20260721-local-origin1"></script>
-  <script src="../scripts/account-market-listings.js?v=2026.07.19-listing-withdrawal1"></script>
+  <script src="../scripts/account-market-purchases.js?v=20260722-item-url-fallback1"></script>
+  <script src="../scripts/account-market-listings.js?v=20260722-item-url-fallback1"></script>
   <script src="../market/media-protection.js?v=2026.07.17-preview-protection1"></script>
   <script src="../scripts/account-market-seller.js?v=2026.07.17-dev-account1"></script>
   <script src="../scripts/pixel-art-fit.js"></script>
