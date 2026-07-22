@@ -319,6 +319,74 @@
 .market-numbered-list p { display: grid; gap: 4px; }
 .market-numbered-list strong { color: #f8fafc; font-size: 13px; }
 .market-numbered-list span { color: #aebbd0; font-size: 11px; line-height: 1.5; }
+.market-fee-flow {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: clamp(15px, 3vw, 24px);
+  border: 1px solid rgba(112,215,255,.3);
+  border-radius: 12px;
+  background: linear-gradient(145deg, rgba(112,215,255,.1), rgba(98,230,167,.04));
+}
+.market-fee-flow__source,
+.market-fee-flow__split > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--market-info-border);
+  border-radius: 9px;
+  background: rgba(9,17,32,.78);
+}
+.market-fee-flow__source { width: min(100%, 320px); text-align: center; }
+.market-fee-flow span { color: #9be4ff; font-size: 10px; font-weight: 900; letter-spacing: .08em; }
+.market-fee-flow strong { color: #f8fafc; font-size: 14px; }
+.market-fee-flow small { color: #aebbd0; font-size: 11px; line-height: 1.5; }
+.market-fee-flow__arrow { color: var(--market-info-accent); font-size: 22px; line-height: 1; }
+.market-fee-flow__split {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 100%;
+  gap: 9px;
+}
+.market-fee-flow__platform { border-color: rgba(112,215,255,.58) !important; background: rgba(112,215,255,.12) !important; }
+.market-fee-use {
+  display: grid;
+  grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr);
+  gap: 12px;
+}
+.market-fee-use > div,
+.market-fee-formula,
+.market-fee-example {
+  display: grid;
+  gap: 7px;
+  padding: 16px;
+  border: 1px solid var(--market-info-border);
+  border-radius: 10px;
+  background: var(--market-info-card);
+}
+.market-fee-use__donation { border-left: 3px solid #62e6a7 !important; }
+.market-fee-use__donation > span { color: #8ef0bd; font-size: 12px; font-weight: 900; }
+.market-fee-use__donation strong,
+.market-fee-use__operations strong { color: #f8fafc; font-size: 14px; }
+.market-fee-use p,
+.market-fee-use li,
+.market-fee-formula span,
+.market-fee-example p { color: #aebbd0; font-size: 12px; line-height: 1.65; }
+.market-fee-use ul { margin: 0; padding-left: 1.25em; }
+.market-fee-use li + li { margin-top: 5px; }
+.market-fee-formula { border-color: rgba(112,215,255,.35); background: rgba(112,215,255,.07); }
+.market-fee-formula strong { color: #d9f3ff; font-size: 13px; }
+.market-fee-table-wrap { overflow-x: auto; border: 1px solid var(--market-info-border); border-radius: 10px; }
+.market-fee-table { width: 100%; min-width: 440px; border-collapse: collapse; background: var(--market-info-card); }
+.market-fee-table th,
+.market-fee-table td { padding: 10px 14px; border-bottom: 1px solid var(--market-info-border); text-align: left; font-size: 12px; }
+.market-fee-table th { background: #18243d; color: #d9f3ff; font-size: 11px; }
+.market-fee-table td { color: #cbd5e1; }
+.market-fee-table td:last-child { color: #8ef0bd; font-weight: 900; }
+.market-fee-table tr:last-child td { border-bottom: 0; }
+.market-fee-example { border-left: 3px solid #f7c56b; }
+.market-fee-example strong { color: #fff2cc; font-size: 13px; }
 .market-lineage-flow {
   display: grid;
   grid-template-columns: minmax(110px,1fr) auto minmax(110px,1fr) auto minmax(110px,1fr);
@@ -421,10 +489,12 @@
   }
   .market-guide-step { min-height: 72px; }
   .market-help-columns,
-  .market-payment-explain { grid-template-columns: 1fr; }
+  .market-payment-explain,
+  .market-fee-use { grid-template-columns: 1fr; }
   .market-lineage-flow {
     grid-template-columns: 1fr;
   }
+  .market-fee-flow__split { grid-template-columns: 1fr; }
   .market-lineage-flow > i::after { content: " ↓"; }
   .market-payment-mock__body { min-height: 230px; }
 }

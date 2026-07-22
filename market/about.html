@@ -9,7 +9,7 @@
   <link rel="canonical" href="https://pixieed.jp/market/about.html">
   <link rel="icon" type="image/png" href="../assets/icons/Market.png">
   <link rel="stylesheet" href="../site/landing.css?v=2026.07.15-home-clear-entry1">
-  <link rel="stylesheet" href="info.css?v=2026.07.19-public-market1">
+  <link rel="stylesheet" href="info.css?v=20260722-market-fees1">
 </head>
 <body>
   <div class="page market-info-page">
@@ -30,6 +30,65 @@
       <section class="market-info-section">
         <h2>派生素材</h2>
         <p>派生販売が許可された素材は、必要なライセンスを取得することで改変作品として出品できます。元素材との関係と引き継ぐ条件は記録されます。</p>
+      </section>
+      <section class="market-info-section" id="fees" aria-labelledby="fees-title">
+        <div class="market-section-heading">
+          <span>料金</span>
+          <div><h2 id="fees-title">販売手数料とお金の流れ</h2><p>購入者が支払うのは商品ページに表示された価格だけです。PiXiEEDの手数料は、販売額が高くなるほど段階的に下がります。</p></div>
+        </div>
+
+        <div class="market-fee-flow" aria-label="販売額からStripe決済実費とPiXiEED手数料を控除し、残額を作者とロイヤリティへ分配する流れ">
+          <div class="market-fee-flow__source"><span>購入者</span><strong>表示価格を支払う</strong><small>追加の購入者手数料なし</small></div>
+          <span class="market-fee-flow__arrow" aria-hidden="true">↓</span>
+          <div class="market-fee-flow__split">
+            <div><span>決済実費</span><strong>Stripe</strong><small>決済手段ごとの実費</small></div>
+            <div class="market-fee-flow__platform"><span>PiXiEED手数料</span><strong>累進 10% → 1%</strong><small>価格帯の超過分だけに適用</small></div>
+            <div><span>作者分配原資</span><strong>作者・ロイヤリティ</strong><small>残額を系譜に沿って配分</small></div>
+          </div>
+        </div>
+
+        <div class="market-fee-use">
+          <div class="market-fee-use__donation">
+            <span>販売額の 0.5%</span>
+            <strong>環境・資源保全へ</strong>
+            <p>PiXiEED手数料の中から拠出します。作者・ロイヤリティの取り分を追加で減らしません。</p>
+          </div>
+          <div class="market-fee-use__operations">
+            <strong>残りのPiXiEED手数料の使い道</strong>
+            <ul>
+              <li>出品審査・不正利用対策・返金や問題発生時の対応</li>
+              <li>素材の安全な配信・保管、マーケットとPiXiEEDrawの開発</li>
+              <li>販売者サポート、Stripe Connectによる売上受取と運営コスト</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="market-fee-formula">
+          <strong>作者・ロイヤリティ原資 ＝ 販売額 − Stripe決済実費 − PiXiEED手数料</strong>
+          <span>派生作品では、この原資を派生作者と親作品の作者へ配分します。ロイヤリティを別の手数料として上乗せしません。</span>
+        </div>
+
+        <div class="market-fee-table-wrap" role="region" aria-label="PiXiEEDの累進販売手数料表" tabindex="0">
+          <table class="market-fee-table">
+            <thead><tr><th scope="col">販売額の範囲</th><th scope="col">その範囲のPiXiEED手数料</th></tr></thead>
+            <tbody>
+              <tr><td>500〜1,000円</td><td>10%</td></tr>
+              <tr><td>1,001〜2,000円</td><td>9%</td></tr>
+              <tr><td>2,001〜3,000円</td><td>8%</td></tr>
+              <tr><td>3,001〜5,000円</td><td>7%</td></tr>
+              <tr><td>5,001〜8,000円</td><td>6%</td></tr>
+              <tr><td>8,001〜12,000円</td><td>5%</td></tr>
+              <tr><td>12,001〜20,000円</td><td>4%</td></tr>
+              <tr><td>20,001〜30,000円</td><td>3%</td></tr>
+              <tr><td>30,001〜50,000円</td><td>2%</td></tr>
+              <tr><td>50,001円以上</td><td>1%</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="market-fee-example">
+          <strong>例：8,000円の商品</strong>
+          <p>最初の1,000円の10%、次の1,000円の9%…と各段階を合計します。PiXiEED手数料は590円（実効約7.38%）です。価格が境界を1円超えても、手数料総額が下がることはありません。</p>
+        </div>
       </section>
       <section class="market-info-section">
         <h2>購入済み商品</h2>

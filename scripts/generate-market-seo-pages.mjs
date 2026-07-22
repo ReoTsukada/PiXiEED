@@ -77,7 +77,9 @@ function staticPage(template, asset, { ogImageUrl, previewImagePath }) {
     }
   };
   let html = template
-    .replaceAll('../', '../../')
+    // 商品詳細は /market/items/{id}/ に出力するため、サイト直下の
+    // assets/site/scripts は market/ を越えて 3 階層戻る必要がある。
+    .replace(/(href|src)="\.\.\/(assets|site|scripts)\//g, '$1="../../../$2/')
     .replace('href="index.html"', 'href="../../index.html"')
     .replace('href="./"', 'href="../../"')
     .replace(/(href|src)="(market\.css|favorites\.js|market-ads\.js|pageview-rewards\.js|item\.js|media-protection\.js|help-tips\.js)/g, '$1="../../$2')
