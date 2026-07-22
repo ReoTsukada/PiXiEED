@@ -887,15 +887,23 @@ html[data-pixieed-ad-free-account="true"] .market-ad {
 .market-item { display: grid; grid-template-columns: minmax(260px, .85fr) minmax(0, 1.15fr); min-height: 0; background: #10182c; }
 .market-item__preview { position: relative; display: grid; min-height: 420px; place-items: center; overflow: hidden; border-right: 1px solid rgba(255,255,255,.1); background-color: #0b1224; background-image: linear-gradient(45deg, rgba(255,255,255,.035) 25%, transparent 25%), linear-gradient(-45deg, rgba(255,255,255,.035) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, rgba(255,255,255,.035) 75%), linear-gradient(-45deg, transparent 75%, rgba(255,255,255,.035) 75%); background-size: 18px 18px; background-position: 0 0, 0 9px, 9px -9px, -9px 0; }
 .market-item__preview img { width: min(90%, 440px); height: min(90%, 440px); object-fit: contain; image-rendering: pixelated; }
-.market-item__sample-previews { position: absolute; right: 10px; bottom: 10px; display: flex; max-width: calc(100% - 20px); gap: 6px; padding: 6px; overflow-x: auto; border: 1px solid rgba(255,255,255,.16); border-radius: 8px; background: rgba(11,18,36,.88); }
+.market-item__preview-controls { position: absolute; right: 10px; bottom: 10px; display: grid; justify-items: end; gap: 6px; max-width: calc(100% - 20px); }
+.market-item__sample-previews { display: flex; max-width: 100%; gap: 6px; padding: 6px; overflow-x: auto; border: 1px solid rgba(255,255,255,.16); border-radius: 8px; background: rgba(11,18,36,.88); }
 .market-item__sample-preview { flex: 0 0 auto; width: 46px; height: 46px; padding: 0; overflow: hidden; border: 1px solid rgba(255,255,255,.2); border-radius: 5px; background: #0b1224; cursor: pointer; }
 .market-item__sample-preview:hover, .market-item__sample-preview:focus-visible, .market-item__sample-preview.is-active { border-color: #5ee2b5; outline: none; }
 .market-item__sample-preview img { display: block; width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+.market-item__preview-mode-toggle { min-height: 32px; padding: 0 12px; border: 1px solid rgba(94,226,181,.5); border-radius: 6px; background: rgba(11,18,36,.94); color: #dffcf2; font: inherit; font-size: 11px; font-weight: 800; cursor: pointer; }
+.market-item__preview-mode-toggle:hover, .market-item__preview-mode-toggle:focus-visible { border-color: #5ee2b5; background: #173d39; outline: none; }
 .market-item__body { display: grid; align-content: start; gap: 14px; padding: 20px; }
 .market-item__body h2, .market-item__body h3, .market-item__body p { margin: 0; }
 .market-item__body h2 { font-size: clamp(18px, 3vw, 25px); }
 .market-item__description { color: #cbd5e1; font-size: 12px; line-height: 1.75; white-space: pre-wrap; }
 .market-item__social { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: #aebbd0; font-size: 11px; }
+.market-item__social a { color: inherit; text-decoration: none; }
+.market-item__social a[href]:not([href="#"]) { color: #9ae6c8; text-decoration: underline; text-underline-offset: 3px; }
+.market-item__social-actions { display: flex; align-items: center; gap: 6px; }
+.market-item__share-button { min-height: 28px; padding: 0 9px; border: 1px solid rgba(255,255,255,.2); border-radius: 5px; background: rgba(255,255,255,.06); color: #dbeafe; font: inherit; font-size: 10px; font-weight: 800; cursor: pointer; }
+.market-item__share-button:hover, .market-item__share-button:focus-visible { border-color: #8bbcff; background: rgba(80,145,255,.18); outline: none; }
 .market-item__facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin: 0; }
 .market-item__facts div { padding: 9px; border-radius: 6px; background: rgba(255,255,255,.04); }
 .market-item__facts dt { color: #94a3b8; font-size: 9px; }
