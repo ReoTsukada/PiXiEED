@@ -5,6 +5,8 @@
   const count = document.getElementById('marketListingCount');
   const shareStatus = document.getElementById('marketListingShareStatus');
   const rebuildButton = document.getElementById('marketRebuildPreviews');
+  const rebuildAllButton = document.getElementById('marketRebuildAllPreviews');
+  const globalRebuildStatus = document.getElementById('marketGlobalPreviewRebuildStatus');
   const currentScript = document.currentScript;
   let renderToken = 0;
   let rebuildInProgress = false;
@@ -190,6 +192,79 @@
     }
   }
 
+  async function rebuildEveryListing(client) {
+    if (!rebuildAllButton || rebuildInProgress) return;
+    if (!window.confirm('全出品の公開プレビューを再生成します。販売元ファイルは変更されず、旧プレビューも残ります。続けますか？')) return;
+    const { data, error } = await client.rpc('market_admin_preview_rebuild_targets_v1');
+    if (error) throw error;
+    const targets = Array.isArray(data) ? data : [];
+    if (!targets.length) {
+      if (globalRebuildStatus) {
+        globalRebuildStatus.hidden = false;
+        globalRebuildStatus.textContent = '再生成できる公開中の商品はありません。';
+      }
+      return;
+    }
+    rebuildInProgress = true;
+    rebuildAllButton.disabled = true;
+    let complete = 0;
+    const skipped = [];
+    const revision = Date.now();
+    try {
+      for (const target of targets) {
+        if (globalRebuildStatus) {
+          globalRebuildStatus.hidden = false;
+          globalRebuildStatus.textContent = `全商品を再生成しています（${complete + skipped.length + 1}/${targets.length}）: ${target.title || '出品物'}`;
+        }
+        try {
+          const paths = imageSourcePaths(target);
+          if (!paths.length) throw new Error('source_image_not_found');
+          const blobs = [];
+          for (const path of paths) {
+            const { data: blob, error: downloadError } = await client.storage.from('market-private').download(path);
+            if (downloadError || !blob) throw downloadError || new Error('source_download_failed');
+            blobs.push(blob);
+          }
+          const base = `${target.creator_user_id}/${target.id}/previews/global-v3/${revision}-${complete + skipped.length + 1}`;
+          const uploadedPaths = [];
+          try {
+            const thumbPath = `${base}/thumbnail.webp`;
+            const { error: thumbError } = await client.storage.from('market-private').upload(thumbPath, await fixedPreviewBlob(blobs[0], { thumbnail: true }), { contentType: 'image/webp', upsert: false });
+            if (thumbError) throw thumbError;
+            uploadedPaths.push(thumbPath);
+            const samples = [];
+            for (let index = 0; index < blobs.length; index += 1) {
+              const path = `${base}/sample-${String(index + 1).padStart(2, '0')}.webp`;
+              const { error: uploadError } = await client.storage.from('market-private').upload(path, await fixedPreviewBlob(blobs[index], { thumbnail: false, watermark: false }), { contentType: 'image/webp', upsert: false });
+              if (uploadError) throw uploadError;
+              uploadedPaths.push(path);
+              samples.push(path);
+            }
+            const { error: replaceError } = await client.rpc('market_admin_replace_listing_previews_v1', {
+              input_asset_id: target.id,
+              input_preview_object_path: thumbPath,
+              input_sample_preview_paths: samples
+            });
+            if (replaceError) throw replaceError;
+          } catch (error) {
+            if (uploadedPaths.length) await client.storage.from('market-private').remove(uploadedPaths);
+            throw error;
+          }
+          complete += 1;
+        } catch (_error) {
+          skipped.push(target.title || '名称未設定');
+        }
+      }
+      if (globalRebuildStatus) globalRebuildStatus.textContent = skipped.length
+        ? `${complete}件を再生成しました。${skipped.join('、')}は元画像を確認してください。`
+        : `公開中の${complete}件すべてを再生成しました。`;
+      await render(client);
+    } finally {
+      rebuildInProgress = false;
+      rebuildAllButton.disabled = false;
+    }
+  }
+
   function renderMessage(titleText, detailText) {
     const item = document.createElement('div');
     item.className = 'account-item';
@@ -362,6 +437,22 @@
             if (shareStatus) shareStatus.textContent = `透かしを更新できませんでした: ${error?.message || '通信を確認してください'}`;
           });
         });
+      }
+      if (rebuildAllButton && rebuildAllButton.dataset.bound !== 'true') {
+        const { data: isAdmin, error } = await access.client.rpc('market_current_user_is_admin');
+        if (!error && isAdmin) {
+          rebuildAllButton.dataset.bound = 'true';
+          rebuildAllButton.addEventListener('click', () => {
+            rebuildEveryListing(access.client).catch((error) => {
+              if (globalRebuildStatus) {
+                globalRebuildStatus.hidden = false;
+                globalRebuildStatus.textContent = `全商品を更新できませんでした: ${error?.message || '通信を確認してください'}`;
+              }
+            });
+          });
+        } else {
+          rebuildAllButton.hidden = true;
+        }
       }
       access.client.auth.onAuthStateChange(() => window.setTimeout(() => render(access.client), 0));
     } catch (_error) {

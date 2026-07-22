@@ -512,7 +512,9 @@
             <p class="helper">管理者権限を確認したアカウントだけが、商品と販売者の審査画面を利用できます。</p>
             <div class="account-service-grid">
               <a class="account-service" href="../market/review.html"><strong>マーケット管理を開く</strong><span>商品審査・販売者確認</span></a>
+              <button class="account-service" id="marketRebuildAllPreviews" type="button"><strong>全商品のプレビューを再生成</strong><span>元ファイルは変更せず、新しい公開プレビューだけを作成</span></button>
             </div>
+            <p class="helper" id="marketGlobalPreviewRebuildStatus" aria-live="polite" hidden></p>
             <details class="account-admin-console">
               <summary><span>運営設定</span><small>売上連動報酬・広告OFF</small></summary>
               <div class="account-admin-console__body">
@@ -664,7 +666,7 @@
   <script src="../pixiedraw/assets/js/modules/color-codec-utils.js?v=2026.06.30-color-codec-v1"></script>
   <script src="../scripts/market-purchase-delivery.js?v=20260720-pxd2"></script>
   <script src="../scripts/account-market-purchases.js?v=20260722-item-url-fallback1"></script>
-  <script src="../scripts/account-market-listings.js?v=20260722-sample-overlay2"></script>
+  <script src="../scripts/account-market-listings.js?v=20260722-global-preview-rebuild1"></script>
   <script src="../market/media-protection.js?v=2026.07.17-preview-protection1"></script>
   <script src="../scripts/account-market-seller.js?v=2026.07.17-dev-account1"></script>
   <script src="../scripts/pixel-art-fit.js"></script>
