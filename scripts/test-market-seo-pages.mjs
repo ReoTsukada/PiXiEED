@@ -25,6 +25,8 @@ assert.match(migration, /asset\.withdrawn_at is null/);
 assert.match(sell, /function drawPreviewWatermark/);
 assert.match(sell, /for \(let y = -diagonal/);
 assert.match(sell, /drawPreviewWatermark\(context, canvas\.width, canvas\.height\)/);
+assert.match(sell, /const PREVIEW_WATERMARK_FONT_SIZE = 16/);
+assert.match(sell, /const scale = maxSide \/ Math\.max\(sourceWidth, sourceHeight\)/);
 assert.match(workflow, /cron: '\*\/5 \* \* \* \*'/);
 assert.match(workflow, /actions\/checkout@v5/);
 assert.match(workflow, /actions\/setup-node@v5/);
