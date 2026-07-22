@@ -265,7 +265,7 @@
       .account-cover{width:64px;height:64px}
     }
   </style>
-  <link rel="stylesheet" href="account.css?v=20260722-auth-choices1">
+  <link rel="stylesheet" href="account.css?v=20260722-profile-always1">
 </head>
 <body data-pixieed-account-auth="signed-out">
   <header class="site-header" aria-label="トップナビ">
@@ -360,8 +360,11 @@
           <section class="account-panel account-panel--profile" id="authPanel" data-account-tab="settings" aria-hidden="false" aria-label="アカウント">
             <h2 class="section-title">アカウント</h2>
             <div class="account-profile-grid">
-              <details class="profile-block profile-block--profile">
-                <summary class="account-settings-summary"><span>プロフィール設定</span><small>アイコン・名前・X・ログアウト</small></summary>
+              <section class="profile-block profile-block--profile" aria-labelledby="profileSettingsTitle">
+                <div class="account-settings-heading">
+                  <strong id="profileSettingsTitle">プロフィール設定</strong>
+                  <small>アイコン・名前・X・ログアウト</small>
+                </div>
                 <div class="account-profile-settings">
                 <div class="auth-section-head">
                   <strong>アカウント設定</strong>
@@ -394,7 +397,7 @@
                 <span class="helper" id="linkedEmail" style="display:none;"></span>
                 <button class="auth-btn logout" id="logoutBtn" type="button" style="display:none;">ログアウト</button>
                 </div>
-              </details>
+              </section>
               <div class="profile-block profile-block--login" id="pixieedSharedAuthLoginBlock">
                 <div class="auth-section-head">
                   <strong id="authModeTitle">ログイン</strong>
@@ -441,7 +444,7 @@
                   <button class="auth-text-btn" id="authResetBtn" type="button">パスワードを忘れた場合</button>
                 </div>
                 <p class="helper auth-link-guide" id="authMagicLinkGuide">メールアドレスを入力して送信後、届いたメールのリンクを開くだけでログインできます。</p>
-                <p class="auth-security-note" id="authSecurityNote">ログインではアカウントは作成されません。初めての方は「新規登録」を選んでください。</p>
+                <p class="auth-security-note" id="authSecurityNote">ログイン後は、この端末で次回もログイン状態を保持します。共有端末では必ずログアウトしてください。</p>
                 <p class="helper" id="authAccountStatus"></p>
               </div>
             </div>
@@ -627,7 +630,7 @@
     </main>
   </div>
 
-  <script src="../scripts/shared-auth-panel.js?v=20260722-auth-choices1"></script>
+  <script src="../scripts/shared-auth-panel.js?v=20260722-signin-transition1"></script>
   <script src="../scripts/account-dashboard.js?v=20260722-settings-default1"></script>
   <script src="../scripts/account-collections.js?v=2026.07.19-account-library2"></script>
   <script src="../scripts/pixieed-market-access.js?v=20260721-shared-client1"></script>
