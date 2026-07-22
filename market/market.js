@@ -108,7 +108,15 @@
     const body = document.createElement('div'); body.className = 'market-card__body';
     const title = document.createElement('h3');
     const titleLink = document.createElement('a'); titleLink.href = href; titleLink.textContent = asset.title || '名称未設定の素材'; title.appendChild(titleLink);
-    const author = document.createElement('p'); author.className = 'market-card__author'; author.textContent = `作者 ${asset.creator_display_name || 'PiXiEEDクリエイター'}`;
+    const author = document.createElement('p'); author.className = 'market-card__author';
+    const authorName = asset.creator_display_name || 'PiXiEEDクリエイター';
+    const profileUrl = /^https?:\/\//i.test(String(asset.creator_profile_url || '').trim()) ? String(asset.creator_profile_url).trim() : '';
+    if (profileUrl) {
+      const link = document.createElement('a'); link.href = profileUrl; link.target = '_blank'; link.rel = 'noopener noreferrer';
+      link.textContent = `作者 ${authorName}`; link.setAttribute('aria-label', `${authorName}のプロフィールを開く`); author.appendChild(link);
+    } else {
+      author.textContent = `作者 ${authorName}`;
+    }
     const badges = createVerificationBadges(asset);
     const meta = document.createElement('div'); meta.className = 'market-card__meta';
     const format = document.createElement('span'); format.className = 'market-card__format'; format.textContent = assetFormats(asset).map(formatLabel).join(' / ');
