@@ -26819,6 +26819,87 @@
     return await startupTailWorkflowUtilsModule.runStartupTaskWithTimeout(...args);
   }
 
+  function readStartupProjectRequest() {
+    try {
+      const url = new URL(window.location.href);
+      const projectId = normalizeAutosaveProjectId(url.searchParams.get('project') || '');
+      const createNewProject = url.searchParams.get('new_project') === '1';
+      if (!projectId && !createNewProject) {
+        return null;
+      }
+      // This is an instruction for the current launch only. Removing it keeps
+      // refreshes on the normal safe startup path after the project is open.
+      url.searchParams.delete('project');
+      url.searchParams.delete('new_project');
+      window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+      return { projectId, createNewProject: !projectId && createNewProject };
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  async function maybeOpenStartupProjectRequest() {
+    const request = readStartupProjectRequest();
+    if (!request) {
+      return false;
+    }
+    if (request.projectId) {
+      try {
+        const entries = await loadRecentProjectsMetadata();
+        setRecentProjectsCache(entries);
+        const entry = entries.find(candidate => (
+          normalizeAutosaveProjectId(candidate?.id || '') === request.projectId
+        ));
+        if (!entry) {
+          clearReloadTargetProjectId();
+          updateAutosaveStatus(
+            localizeText('指定された端末内プロジェクトが見つかりませんでした。', 'The requested local project was not found.'),
+            'warn'
+          );
+          return false;
+        }
+        const opened = await openRecentProject(entry, {
+          hideStartup: true,
+          silent: false,
+          allowProjectMismatchLoad: true,
+          replaceOpenProjectTabs: true,
+        });
+        if (opened) {
+          clearReloadTargetProjectId();
+        }
+        return opened;
+      } catch (error) {
+        console.warn('Requested local project bootstrap failed', error);
+        updateAutosaveStatus(
+          localizeText('端末内プロジェクトを開けませんでした。', 'Unable to open the local project.'),
+          'error'
+        );
+        return false;
+      }
+    }
+    try {
+      const created = await createNewProject({
+        name: DEFAULT_DOCUMENT_NAME,
+        width: DEFAULT_CANVAS_SIZE,
+        height: DEFAULT_CANVAS_SIZE,
+      });
+      if (!created) {
+        updateAutosaveStatus(
+          localizeText('新規プロジェクトを作成できませんでした。', 'Unable to create a new project.'),
+          'error'
+        );
+      }
+      return created;
+    } catch (error) {
+      console.warn('Requested new project bootstrap failed', error);
+      updateAutosaveStatus(
+        localizeText('新規プロジェクトを作成できませんでした。', 'Unable to create a new project.'),
+        'error'
+      );
+      return false;
+    }
+  }
+
   async function init() {
     startupReady = false;
     console.info('[pixiedraw:startup]', { phase: 'startup-bootstrap-start' });
@@ -26904,6 +26985,15 @@
       } catch (error) {
         console.warn('QR import bootstrap failed', error);
       }
+      let openedRequestedProject = false;
+      if (!openedExternalImportProject) {
+        try {
+          setStartupProgressLabel(localizeText('プロジェクトを開いています…', 'Opening project...'));
+          openedRequestedProject = await maybeOpenStartupProjectRequest();
+        } catch (error) {
+          console.warn('Requested project bootstrap failed', error);
+        }
+      }
       setStartupProgressLabel(localizeText('起動を完了しています…', 'Finalizing startup...'));
       setStartupBootLoadingProgress(97, {
         label: localizeText('起動を完了しています…', 'Finalizing startup...'),
@@ -26913,9 +27003,9 @@
       refreshLocalizedUi();
       scheduleDeferredUiSetup();
       hideProjectHomeScreen();
-      if (openedExternalImportProject) {
-        // Lens/QR returns already created a new project. Do not cover it with
-        // the normal project chooser at the end of bootstrap.
+      if (openedExternalImportProject || openedRequestedProject) {
+        // External imports and explicit My Page requests already opened a
+        // project. Do not cover it with the normal project chooser.
         hideStartupScreen();
       } else {
         showStartupScreen({ refreshWorkspace: false });
