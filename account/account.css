@@ -586,7 +586,7 @@ body[data-pixieed-account-auth="signed-in"] .account-panel[data-account-tab="set
   text-decoration: none;
 }
 
-.account-settings-summary {
+.account-settings-heading {
   display: flex;
   min-height: 44px;
   align-items: center;
@@ -595,10 +595,9 @@ body[data-pixieed-account-auth="signed-in"] .account-panel[data-account-tab="set
   color: #f8fafc;
   font-size: 13px;
   font-weight: 800;
-  cursor: pointer;
 }
 
-.account-settings-summary small {
+.account-settings-heading small {
   color: #94a3b8;
   font-size: 10px;
   font-weight: 500;
@@ -1058,7 +1057,7 @@ body[data-pixieed-account-auth="signed-out"] .account-panel--profile > .section-
   .account-service-grid { grid-template-columns: 1fr; }
   .account-command-bar { display: flex; }
   .account-command-bar button { min-height: 34px; flex: 0 0 auto; }
-  .account-settings-summary { align-items: flex-start; flex-direction: column; gap: 2px; }
+  .account-settings-heading { align-items: flex-start; flex-direction: column; gap: 2px; }
   .site-header .account-action--quiet { display: none; }
   .account-admin-permission__form { grid-template-columns: 1fr; }
   .account-admin-permission__form .account-action { width: 100%; }
