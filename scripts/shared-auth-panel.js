@@ -896,7 +896,7 @@
   }
 
   function bindControls() {
-    const loginBtn = document.getElementById('authLoginBtn');
+    const authForm = document.getElementById('authForm');
     const logoutBtn = document.getElementById('logoutBtn');
     const emailToggle = document.getElementById('authEmailToggle');
     const saveBtn = document.getElementById('saveProfile');
@@ -964,9 +964,10 @@
       });
     }
 
-    if (loginBtn && loginBtn.dataset.bound !== 'true') {
-      loginBtn.dataset.bound = 'true';
-      loginBtn.addEventListener('click', async () => {
+    if (authForm && authForm.dataset.bound !== 'true') {
+      authForm.dataset.bound = 'true';
+      authForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
         if (!supabaseClient) {
           setStatus('オンラインでログインしてください');
           return;
@@ -1094,17 +1095,19 @@
           <span>Googleでログイン</span>
         </button>
       </div>
-      <button class="auth-btn auth-btn--email" id="authEmailToggle" type="button">メールログインを開く</button>
-      <div id="authInputs" style="display:none; gap:8px;" data-expanded="false">
-        <input class="auth-input" id="authEmail" type="email" placeholder="メールアドレス" autocomplete="email">
-        <input class="auth-input" id="authPasscode" type="password" placeholder="パスコード（6〜20文字）" autocomplete="current-password">
-      </div>
-      <div class="auth-actions" style="display:grid; gap:8px;">
-        <button class="auth-btn" id="authLoginBtn" type="button">ログイン</button>
-      </div>
-      <button class="auth-btn logout" id="logoutBtn" type="button" style="display:none;">ログアウト</button>
-      <span class="helper" id="linkedEmail" style="display:none;"></span>
-      <p class="helper" id="authAccountStatus" style="margin:0;"></p>
+      <form class="auth-form" id="authForm" novalidate>
+        <button class="auth-btn auth-btn--email" id="authEmailToggle" type="button">メールログインを開く</button>
+        <div id="authInputs" style="display:none; gap:8px;" data-expanded="false">
+          <input class="auth-input" id="authEmail" type="email" placeholder="メールアドレス" autocomplete="email">
+          <input class="auth-input" id="authPasscode" type="password" placeholder="パスコード（6〜20文字）" autocomplete="current-password">
+        </div>
+        <div class="auth-actions" style="display:grid; gap:8px;">
+          <button class="auth-btn" id="authLoginBtn" type="submit">ログイン</button>
+        </div>
+        <button class="auth-btn logout" id="logoutBtn" type="button" style="display:none;">ログアウト</button>
+        <span class="helper" id="linkedEmail" style="display:none;"></span>
+        <p class="helper" id="authAccountStatus" style="margin:0;"></p>
+      </form>
     `;
     const profileBlock = statusNode?.closest('.profile-block') || panel.querySelector('.profile-block--profile');
     if (card && profileBlock && profileBlock.parentElement === card) {
