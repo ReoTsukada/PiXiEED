@@ -110,7 +110,8 @@
     const titleLink = document.createElement('a'); titleLink.href = href; titleLink.textContent = asset.title || '名称未設定の素材'; title.appendChild(titleLink);
     const author = document.createElement('p'); author.className = 'market-card__author';
     const authorName = asset.creator_display_name || 'PiXiEEDクリエイター';
-    const profileUrl = /^https?:\/\//i.test(String(asset.creator_profile_url || '').trim()) ? String(asset.creator_profile_url).trim() : '';
+    const profileUrlValue = asset.creator_profile_url || asset.creator_x_url || asset.x_url || '';
+    const profileUrl = /^https?:\/\//i.test(String(profileUrlValue).trim()) ? String(profileUrlValue).trim() : '';
     if (profileUrl) {
       const link = document.createElement('a'); link.href = profileUrl; link.target = '_blank'; link.rel = 'noopener noreferrer';
       link.textContent = `作者 ${authorName}`; link.setAttribute('aria-label', `${authorName}のプロフィールを開く`); author.appendChild(link);
