@@ -948,6 +948,141 @@ body[data-pixieed-account-auth="signed-out"] .account-panel--profile > .section-
   box-shadow: 0 1px 6px rgba(0,0,0,.18);
 }
 
+.auth-session-check {
+  margin: 0;
+  color: #bfdbfe;
+  font-size: 13px;
+  text-align: center;
+}
+
+.auth-signed-in-notice {
+  margin: 0;
+  padding: 9px 10px;
+  border: 1px solid rgba(74,222,128,.35);
+  border-radius: 7px;
+  background: rgba(22,101,52,.16);
+  color: #dcfce7;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
+.auth-welcome,
+.auth-signup-pending {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid rgba(121,192,255,.24);
+  border-radius: 9px;
+  background: rgba(15,23,42,.34);
+}
+
+.auth-welcome p,
+.auth-signup-pending p {
+  margin: 0;
+  color: #cbd5e1;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.auth-welcome .auth-welcome__status { color: #fde68a; font-size: 11px; }
+.auth-welcome__status:empty { display: none; }
+
+.auth-signup-pending strong { color: #bbf7d0; font-size: 14px; }
+
+.auth-welcome__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.auth-simple-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 0;
+  color: #94a3b8;
+  font-size: 10px;
+  text-align: center;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(255,255,255,.12);
+}
+
+.auth-inline-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.auth-inline-actions .auth-text-btn {
+  min-height: 28px;
+  font-size: 11px;
+}
+
+.auth-alternate-panel {
+  display: grid;
+  gap: 7px;
+  padding: 11px 12px;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 8px;
+  background: rgba(15,23,42,.26);
+}
+
+.auth-alternate-panel strong {
+  color: #dbeafe;
+  font-size: 12px;
+}
+
+.auth-alternate-panel p { margin: 0; }
+
+.auth-alternate-panel--quiet {
+  gap: 5px;
+  background: transparent;
+}
+
+.auth-route-switch {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 8px;
+  margin: 0;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.auth-route-switch a {
+  color: #bfdbfe;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.auth-btn--subtle {
+  color: #dbeafe !important;
+  background: rgba(255,255,255,.08) !important;
+  border: 1px solid rgba(255,255,255,.16) !important;
+}
+
+.auth-guest-link {
+  color: #bfdbfe;
+  font-size: 12px;
+  text-align: center;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .auth-field {
   display: grid;
   gap: 5px;
