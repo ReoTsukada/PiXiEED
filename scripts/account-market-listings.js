@@ -47,19 +47,26 @@
     return /^https:\/\//i.test(preview) ? preview : asset('../assets/icons/Market.png');
   }
 
-  function imageSourcePaths(entry) {
+  function previewSourceSelection(entry) {
     const files = Array.isArray(entry?.files) ? entry.files : [];
     const storagePaths = Array.isArray(entry?.storage_file_paths) ? entry.storage_file_paths : [];
     const sourceByOriginalPath = new Map(files.map((file, index) => [String(file?.original_path || ''), String(storagePaths[index] || '')]));
     const selected = entry?.preview_selection || {};
-    const requested = [selected.thumbnail_source_path, ...(Array.isArray(selected.sample_source_paths) ? selected.sample_source_paths : [])]
+    const toStoragePath = (path) => sourceByOriginalPath.get(String(path || '')) || '';
+    const hasSavedSelection = Object.prototype.hasOwnProperty.call(selected, 'thumbnail_source_path')
+      || Array.isArray(selected.sample_source_paths);
+    const thumbnailPath = toStoragePath(selected.thumbnail_source_path);
+    const samplePaths = (Array.isArray(selected.sample_source_paths) ? selected.sample_source_paths : [])
       .map((path) => String(path || ''))
-      .filter(Boolean);
-    const paths = requested.map((path) => sourceByOriginalPath.get(path)).filter((path) => /^.+\/.+/.test(path || ''));
-    // 公開できる試聴は最大6枚。大量セットでもサムネイル用の先頭画像と
-    // 試聴用の先頭6枚だけを使い、登録処理が上限超過で失敗しないようにする。
-    if (paths.length) return [...new Set(paths)].slice(0, 6);
-    return storagePaths.filter((path) => /\.(png|webp|gif|apng|jpe?g)$/i.test(String(path || ''))).slice(0, 6);
+      .map(toStoragePath)
+      .filter((path) => /^.+\/.+/.test(path))
+      .filter((path, index, paths) => paths.indexOf(path) === index)
+      .slice(0, 6);
+    // 保存済み選択がある商品は、サムネイルと試聴を完全に別々に扱う。
+    // サムネイルを試聴へ勝手に追加したり、未選択の画像を補完しない。
+    if (hasSavedSelection) return { thumbnailPath: thumbnailPath || samplePaths[0] || '', samplePaths };
+    const fallbackPaths = storagePaths.filter((path) => /\.(png|webp|gif|apng|jpe?g)$/i.test(String(path || ''))).slice(0, 6);
+    return { thumbnailPath: fallbackPaths[0] || '', samplePaths: fallbackPaths };
   }
 
   async function loadImage(blob) {
@@ -120,25 +127,25 @@
   }
 
   async function rebuildListingPreviews(client, user, entry, revision) {
-    const sourcePaths = imageSourcePaths(entry);
-    if (!sourcePaths.length) throw new Error('元画像が見つかりません');
+    const selection = previewSourceSelection(entry);
+    if (!selection.thumbnailPath) throw new Error('サムネイルの元画像が見つかりません');
     const uploadedPaths = [];
     try {
-      const sourceBlobs = [];
-      for (const path of sourcePaths) {
+      const sourceBlobs = new Map();
+      for (const path of new Set([selection.thumbnailPath, ...selection.samplePaths])) {
         const { data, error } = await client.storage.from('market-private').download(path);
         if (error || !data) throw error || new Error('元画像を読み込めません');
-        sourceBlobs.push(data);
+        sourceBlobs.set(path, data);
       }
       const basePath = `${user.id}/${entry.id}/previews/fixed-v2-${revision}`;
-      const thumbnailBlob = await fixedPreviewBlob(sourceBlobs[0], { thumbnail: true });
+      const thumbnailBlob = await fixedPreviewBlob(sourceBlobs.get(selection.thumbnailPath), { thumbnail: true });
       const thumbnailPath = `${basePath}/thumbnail.webp`;
       let result = await client.storage.from('market-private').upload(thumbnailPath, thumbnailBlob, { upsert: false, contentType: 'image/webp' });
       if (result.error) throw result.error;
       uploadedPaths.push(thumbnailPath);
       const samplePaths = [];
-      for (let index = 0; index < sourceBlobs.length; index += 1) {
-        const sampleBlob = await fixedPreviewBlob(sourceBlobs[index], { thumbnail: false, watermark: false });
+      for (let index = 0; index < selection.samplePaths.length; index += 1) {
+        const sampleBlob = await fixedPreviewBlob(sourceBlobs.get(selection.samplePaths[index]), { thumbnail: false, watermark: false });
         const samplePath = `${basePath}/sample-${String(index + 1).padStart(2, '0')}.webp`;
         result = await client.storage.from('market-private').upload(samplePath, sampleBlob, { upsert: false, contentType: 'image/webp' });
         if (result.error) throw result.error;
@@ -219,25 +226,25 @@
           globalRebuildStatus.textContent = `全商品を再生成しています（${complete + skipped.length + 1}/${targets.length}）: ${target.title || '出品物'}`;
         }
         try {
-          const paths = imageSourcePaths(target);
-          if (!paths.length) throw new Error('source_image_not_found');
-          const blobs = [];
-          for (const path of paths) {
+          const selection = previewSourceSelection(target);
+          if (!selection.thumbnailPath) throw new Error('thumbnail_source_not_found');
+          const blobs = new Map();
+          for (const path of new Set([selection.thumbnailPath, ...selection.samplePaths])) {
             const { data: blob, error: downloadError } = await client.storage.from('market-private').download(path);
             if (downloadError || !blob) throw downloadError || new Error('source_download_failed');
-            blobs.push(blob);
+            blobs.set(path, blob);
           }
           const base = `${target.creator_user_id}/${target.id}/previews/global-v3/${revision}-${complete + skipped.length + 1}`;
           const uploadedPaths = [];
           try {
             const thumbPath = `${base}/thumbnail.webp`;
-            const { error: thumbError } = await client.storage.from('market-private').upload(thumbPath, await fixedPreviewBlob(blobs[0], { thumbnail: true }), { contentType: 'image/webp', upsert: false });
+            const { error: thumbError } = await client.storage.from('market-private').upload(thumbPath, await fixedPreviewBlob(blobs.get(selection.thumbnailPath), { thumbnail: true }), { contentType: 'image/webp', upsert: false });
             if (thumbError) throw thumbError;
             uploadedPaths.push(thumbPath);
             const samples = [];
-            for (let index = 0; index < blobs.length; index += 1) {
+            for (let index = 0; index < selection.samplePaths.length; index += 1) {
               const path = `${base}/sample-${String(index + 1).padStart(2, '0')}.webp`;
-              const { error: uploadError } = await client.storage.from('market-private').upload(path, await fixedPreviewBlob(blobs[index], { thumbnail: false, watermark: false }), { contentType: 'image/webp', upsert: false });
+              const { error: uploadError } = await client.storage.from('market-private').upload(path, await fixedPreviewBlob(blobs.get(selection.samplePaths[index]), { thumbnail: false, watermark: false }), { contentType: 'image/webp', upsert: false });
               if (uploadError) throw uploadError;
               uploadedPaths.push(path);
               samples.push(path);
