@@ -265,7 +265,7 @@
       .account-cover{width:64px;height:64px}
     }
   </style>
-  <link rel="stylesheet" href="account.css?v=2026.07.19-mobile-cards2">
+  <link rel="stylesheet" href="account.css?v=20260722-auth-choices1">
 </head>
 <body data-pixieed-account-auth="signed-out">
   <header class="site-header" aria-label="トップナビ">
@@ -289,9 +289,9 @@
         </div>
       </section>
       <nav class="account-command-bar" aria-label="マイページの表示切替">
-        <button class="is-active" type="button" data-account-tab-target="library" aria-pressed="true">作品・購入</button>
+        <button type="button" data-account-tab-target="library" aria-pressed="false">作品・購入</button>
         <button type="button" data-account-tab-target="rewards" aria-pressed="false">売上・報酬</button>
-        <button type="button" data-account-tab-target="settings" aria-pressed="false">設定</button>
+        <button class="is-active" type="button" data-account-tab-target="settings" aria-pressed="true">設定</button>
       </nav>
 
       <div class="account-grid">
@@ -400,7 +400,7 @@
                   <strong id="authModeTitle">ログイン</strong>
                   <span id="authModeDescription">PiXiEED IDを使う</span>
                 </div>
-                <p class="auth-login-copy" id="authModeCopy">ログインすると、購入済み素材とプロフィールを安全に引き継げます。</p>
+                <p class="auth-login-copy" id="authModeCopy">すでにアカウントをお持ちの方は、ログイン方法を選んでください。</p>
                 <div class="auth-social-grid" id="authSocialButtons">
                   <button class="auth-btn auth-btn--google" data-auth-provider="google" data-auth-label="Google" type="button">
                     <span class="auth-google-icon" aria-hidden="true">
@@ -411,13 +411,13 @@
                         <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.34l2.58-2.58C13.46.9 11.42 0 9 0A9 9 0 0 0 .94 4.94l3.02 2.34C4.67 5.16 6.66 3.58 9 3.58z"/>
                       </svg>
                     </span>
-                    <span id="authGoogleButtonLabel">Googleで続ける</span>
+                    <span id="authGoogleButtonLabel">Googleでログイン</span>
                   </button>
                 </div>
-                <p class="auth-provider-note" id="authProviderNote">Googleを初めて使う場合も、PiXiEED IDが自動で作成されます。</p>
+                <p class="auth-provider-note" id="authProviderNote">Googleアカウントをお持ちなら、パスワードを入力せずログインできます。</p>
                 <div class="auth-mode-switch" role="tablist" aria-label="メールアカウント">
                   <button class="auth-mode-switch__button is-active" type="button" data-auth-mode="login" role="tab" aria-selected="true">ログイン</button>
-                  <button class="auth-mode-switch__button" type="button" data-auth-mode="signup" role="tab" aria-selected="false">新規登録</button>
+                  <button class="auth-mode-switch__button" type="button" data-auth-mode="signup" role="tab" aria-selected="false">新規作成</button>
                 </div>
                 <div id="authInputs" style="display:grid; gap:8px;" data-expanded="true">
                   <label class="auth-field">
@@ -434,12 +434,13 @@
                   </label>
                 </div>
                 <div class="auth-actions" style="display:grid; gap:8px;">
-                  <button class="auth-btn" id="authLoginBtn" type="button">ログイン</button>
+                  <button class="auth-btn" id="authLoginBtn" type="button">メールアドレスとパスワードでログイン</button>
                 </div>
                 <div class="auth-secondary-actions">
-                  <button class="auth-text-btn" id="authMagicLinkBtn" type="button">メールリンクでログイン</button>
+                  <button class="auth-text-btn" id="authMagicLinkBtn" type="button">メールにログインリンクを送る（パスワード不要）</button>
                   <button class="auth-text-btn" id="authResetBtn" type="button">パスワードを忘れた場合</button>
                 </div>
+                <p class="helper auth-link-guide" id="authMagicLinkGuide">メールアドレスを入力して送信後、届いたメールのリンクを開くだけでログインできます。</p>
                 <p class="auth-security-note" id="authSecurityNote">ログインではアカウントは作成されません。初めての方は「新規登録」を選んでください。</p>
                 <p class="helper" id="authAccountStatus"></p>
               </div>
@@ -626,8 +627,8 @@
     </main>
   </div>
 
-  <script src="../scripts/shared-auth-panel.js?v=20260721-shared-client1"></script>
-  <script src="../scripts/account-dashboard.js?v=2026.07.19-reward-terms1"></script>
+  <script src="../scripts/shared-auth-panel.js?v=20260722-auth-choices1"></script>
+  <script src="../scripts/account-dashboard.js?v=20260722-settings-default1"></script>
   <script src="../scripts/account-collections.js?v=2026.07.19-account-library2"></script>
   <script src="../scripts/pixieed-market-access.js?v=20260721-shared-client1"></script>
   <script src="../scripts/account-market-admin-tools.js?v=2026.07.19-public-market1"></script>
