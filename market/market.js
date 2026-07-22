@@ -81,7 +81,7 @@
   function createCard(asset) {
     const card = document.createElement('article'); card.className = 'market-card';
     card.classList.toggle('is-sold-out', isSoldOut(asset));
-    const href = `item.html?id=${encodeURIComponent(asset.id)}`;
+    const href = `items/${encodeURIComponent(asset.id)}/`;
     const preview = document.createElement('div'); preview.className = 'market-card__preview';
     const previewLink = document.createElement('a'); previewLink.href = href;
     previewLink.setAttribute('aria-label', `${asset.title || '名称未設定の素材'}の商品詳細`);
