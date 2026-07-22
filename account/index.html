@@ -306,9 +306,9 @@
         </div>
       </section>
       <nav class="account-command-bar" aria-label="マイページの表示切替">
-        <button type="button" data-account-tab-target="library" aria-pressed="false">作品・購入</button>
-        <button type="button" data-account-tab-target="rewards" aria-pressed="false">売上・報酬</button>
-        <button class="is-active" type="button" data-account-tab-target="settings" aria-pressed="true">設定</button>
+        <button type="button" data-account-tab-target="library" aria-pressed="false">作品</button>
+        <button type="button" data-account-tab-target="rewards" aria-pressed="false">売上</button>
+        <button class="is-active" type="button" data-account-tab-target="settings" aria-pressed="true">プロフィール</button>
       </nav>
 
       <div class="account-grid">
@@ -375,19 +375,15 @@
 
         <section class="account-stack" aria-label="作品">
           <section class="account-panel account-panel--profile" id="authPanel" data-account-tab="settings" aria-hidden="false" aria-label="アカウント">
-            <h2 class="section-title">アカウント</h2>
+            <h2 class="section-title">プロフィール</h2>
             <div class="account-profile-grid">
               <section class="profile-block profile-block--profile" aria-labelledby="profileSettingsTitle">
                 <div class="account-settings-heading">
-                  <strong id="profileSettingsTitle">プロフィール設定</strong>
-                  <small>アイコン・名前・X・ログアウト</small>
+                  <strong id="profileSettingsTitle">自分の表示</strong>
+                  <small>アイコン・名前・公開リンク</small>
                 </div>
                 <p class="auth-signed-in-notice" id="authSignedInNotice" role="status" aria-live="polite" hidden></p>
                 <div class="account-profile-settings">
-                <div class="auth-section-head">
-                  <strong>アカウント設定</strong>
-                  <span>PiXiEED IDに保存</span>
-                </div>
                 <div class="profile-row">
                   <button class="avatar-toggle" id="avatarToggle" type="button" aria-label="アイコンを変更" aria-expanded="false" aria-controls="avatarPanel">
                     <span class="avatar-toggle__img" id="avatarPreview"></span>
@@ -400,7 +396,7 @@
                 <label class="profile-name profile-email">
                   <span style="font-weight:700; color:#e5e7eb;">メールアドレス</span>
                   <input class="auth-input" id="profileEmail" type="email" readonly aria-describedby="profileEmailHelp">
-                  <small id="profileEmailHelp">ログインに使用するメールアドレスです。</small>
+                  <small id="profileEmailHelp">ログイン用メールアドレス</small>
                 </label>
                 <div class="avatar-panel" id="avatarPanel" hidden>
                   <div class="avatar-grid" id="avatarGrid"></div>
