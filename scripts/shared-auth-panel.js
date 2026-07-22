@@ -35,6 +35,8 @@
   let authListenerBound = false;
   let authHealthCheckPromise = null;
   let authMode = 'login';
+  let magicLinkCooldownUntil = 0;
+  let magicLinkTimerId = 0;
   const AVATARS = [
     { id: 'mao', src: '../character-dots/maousama.png' },
     { id: 'jerin1', src: '../character-dots/Jerin1.png' },
@@ -597,8 +599,8 @@
     const isReset = authMode === 'reset';
     const isUpdatePassword = authMode === 'update-password';
     const titles = {
-      login: ['ログイン', 'PiXiEED IDを使う', 'ログインすると、購入済み素材とプロフィールを安全に引き継げます。'],
-      signup: ['新規登録', 'PiXiEED IDを作成', 'メールアドレスまたはGoogleで、無料でPiXiEED IDを作成できます。'],
+      login: ['ログイン', 'すでにアカウントをお持ちの方', 'メールアドレスとパスワード、またはメールに届くリンクでログインできます。'],
+      signup: ['新規作成', '初めてPiXiEEDを使う方', 'Googleまたはメールアドレスで、無料のPiXiEED IDを作成できます。'],
       reset: ['パスワードを再設定', 'メールで本人確認', '登録済みのメールアドレスに、再設定用のリンクを送信します。'],
       'update-password': ['新しいパスワードを設定', '本人確認済み', '新しいパスワードを入力して、アカウントの安全を保ってください。'],
     };
@@ -627,6 +629,7 @@
     const loginBtn = document.getElementById('authLoginBtn');
     const magicLinkBtn = document.getElementById('authMagicLinkBtn');
     const resetBtn = document.getElementById('authResetBtn');
+    const magicLinkGuide = document.getElementById('authMagicLinkGuide');
     if (passcodeField) passcodeField.hidden = isReset;
     if (passcodeConfirmField) passcodeConfirmField.hidden = !(isSignup || isUpdatePassword);
     if (emailInput) emailInput.closest('.auth-field')?.toggleAttribute('hidden', isUpdatePassword);
@@ -634,7 +637,12 @@
     if (passcodeInput) passcodeInput.autocomplete = isSignup || isUpdatePassword ? 'new-password' : 'current-password';
     if (passcodeConfirmInput) passcodeConfirmInput.autocomplete = isSignup || isUpdatePassword ? 'new-password' : 'off';
     if (socialButtons) socialButtons.style.display = isReset || isUpdatePassword ? 'none' : 'grid';
-    if (providerNote) providerNote.hidden = isReset || isUpdatePassword;
+    if (providerNote) {
+      providerNote.hidden = isReset || isUpdatePassword;
+      providerNote.textContent = isSignup
+        ? 'Googleを初めて使う場合も、PiXiEED IDが自動で作成されます。'
+        : 'Googleアカウントをお持ちなら、パスワードを入力せずログインできます。';
+    }
     if (securityNote) {
       securityNote.textContent = isSignup
         ? '登録後、確認メールが届く場合があります。メール内の案内を完了してください。'
@@ -644,10 +652,12 @@
             ? '更新後は、新しいパスワードでログインしてください。'
             : 'ログインではアカウントは作成されません。初めての方は「新規登録」を選んでください。';
     }
-    if (googleButtonLabel) googleButtonLabel.textContent = isSignup ? 'Googleで新規登録' : 'Googleで続ける';
-    if (loginBtn) loginBtn.textContent = isSignup ? 'アカウントを作成' : isReset ? '再設定メールを送信' : isUpdatePassword ? 'パスワードを更新' : 'ログイン';
+    if (googleButtonLabel) googleButtonLabel.textContent = isSignup ? 'Googleで新規作成' : 'Googleでログイン';
+    if (loginBtn) loginBtn.textContent = isSignup ? 'メールアドレスで新規作成' : isReset ? '再設定メールを送信' : isUpdatePassword ? 'パスワードを更新' : 'メールアドレスとパスワードでログイン';
     if (magicLinkBtn) magicLinkBtn.style.display = authMode === 'login' ? '' : 'none';
     if (resetBtn) resetBtn.style.display = authMode === 'login' ? '' : 'none';
+    if (magicLinkGuide) magicLinkGuide.hidden = authMode !== 'login';
+    updateMagicLinkAction();
   }
 
   function updateAccountPageAuthState() {
@@ -668,22 +678,12 @@
       setStatus('Googleログインは公開URLまたはローカルサーバーで利用してください');
       return;
     }
-    if (!(await ensureAuthServiceReachable())) {
-      setStatus('現在ログインサーバーに接続できません。時間をおいて再試行してください');
-      return;
-    }
     setStatus(`${label}へ移動しています...`);
     try {
       const { error } = await supabaseClient.auth.signInWithOAuth({
         provider,
         options: {
           redirectTo: getOAuthRedirectUrl(),
-          queryParams: provider === 'google'
-            ? {
-                access_type: 'offline',
-                prompt: 'select_account',
-              }
-            : undefined,
         },
       });
       if (error) throw error;
@@ -705,15 +705,47 @@
     try {
       const { error } = await supabaseClient.auth.signInWithOtp({
         email,
-        options: { emailRedirectTo: window.location.href },
+        options: { emailRedirectTo: window.location.href, shouldCreateUser: false },
       });
       if (error) throw error;
-      setStatus('ログインリンクを送信しました。メールを確認してください');
+      magicLinkCooldownUntil = Date.now() + 60_000;
+      updateMagicLinkAction(email);
+      setStatus(`${email} にログインリンクを送信しました。メール内のリンクを開いてください。`);
       return true;
-    } catch (_error) {
-      setStatus('ログインリンクの送信に失敗しました');
+    } catch (error) {
+      const message = String(error?.message || '').toLowerCase();
+      if (message.includes('rate') || message.includes('too many') || message.includes('429')) {
+        magicLinkCooldownUntil = Date.now() + 60_000;
+        updateMagicLinkAction(email);
+        setStatus('送信直後は再送できません。60秒ほど待ってから、もう一度お試しください。');
+        return false;
+      }
+      setStatus('ログインリンクを送信できませんでした。メールアドレスと通信状態を確認してください。');
       return false;
     }
+  }
+
+  function updateMagicLinkAction(sentEmail = '') {
+    const button = document.getElementById('authMagicLinkBtn');
+    const guide = document.getElementById('authMagicLinkGuide');
+    if (!button) return;
+    if (magicLinkTimerId) {
+      window.clearTimeout(magicLinkTimerId);
+      magicLinkTimerId = 0;
+    }
+    const remainingSeconds = Math.ceil((magicLinkCooldownUntil - Date.now()) / 1000);
+    if (remainingSeconds > 0) {
+      button.disabled = true;
+      button.textContent = `再送まで ${remainingSeconds}秒`;
+      if (guide) guide.textContent = `${sentEmail ? `${sentEmail} に送信済みです。` : ''}メール内のログインリンクを開いてください。`;
+      magicLinkTimerId = window.setTimeout(() => updateMagicLinkAction(sentEmail), 1000);
+      return;
+    }
+    button.disabled = false;
+    button.textContent = magicLinkCooldownUntil ? 'ログインリンクを再送する' : 'メールにログインリンクを送る（パスワード不要）';
+    if (guide) guide.textContent = magicLinkCooldownUntil
+      ? 'メールが見当たらない場合は、迷惑メール・プロモーションタブも確認してから再送してください。'
+      : 'メールアドレスを入力して送信後、届いたメールのリンクを開くだけでログインできます。';
   }
 
   function readAuthInputs() {
