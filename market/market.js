@@ -17,8 +17,15 @@
   const fallbackIcon = '../assets/icons/Market.png';
   const favorites = window.PiXiEEDMarketFavorites;
   const discovery = window.PiXiEEDMarketDiscovery;
+  const INITIAL_RENDER_COUNT = 24;
+  const RENDER_STEP = 24;
   let assets = [];
   let activeFilter = 'all';
+  let renderLimit = INITIAL_RENDER_COUNT;
+  let catalogClient = null;
+  let loadMoreObserver = null;
+  const requestedPreviewIds = new Set();
+  const pendingPreviewIds = new Set();
 
   function formatPrice(value) {
     const amount = Number(value);
@@ -88,7 +95,8 @@
     const image = new Image();
     const previewUrl = asset.preview_url || asset.preview_object_path;
     image.src = /^https?:\/\//i.test(previewUrl || '') ? previewUrl : fallbackIcon;
-    image.alt = ''; image.draggable = false; image.dataset.marketProtectedMedia = 'true'; previewLink.appendChild(image); preview.appendChild(previewLink);
+    image.alt = ''; image.draggable = false; image.loading = 'lazy'; image.decoding = 'async';
+    image.dataset.marketProtectedMedia = 'true'; previewLink.appendChild(image); preview.appendChild(previewLink);
     if (isSoldOut(asset)) {
       const soldOut = document.createElement('span'); soldOut.className = 'market-card__soldout'; soldOut.textContent = 'SOLD OUT';
       preview.appendChild(soldOut);
@@ -127,72 +135,135 @@
     card.append(preview, body); return card;
   }
 
-  function render() {
-    const visible = discovery.filterAndSortAssets(assets, {
+  function visibleAssets() {
+    return discovery.filterAndSortAssets(assets, {
       query: search?.value || '', format: activeFilter, tag: 'all',
       derivative: derivativeFilter?.value || 'all', sort: sort?.value || 'new',
       priceMin: priceMin?.value || '', priceMax: priceMax?.value || ''
     });
-    count.textContent = visible.length === assets.length ? `${visible.length}件` : `${visible.length}/${assets.length}件`;
+  }
+
+  function resetRenderLimit() {
+    renderLimit = INITIAL_RENDER_COUNT;
+  }
+
+  function observeLoadMore(marker) {
+    loadMoreObserver?.disconnect();
+    if (!(marker instanceof HTMLElement)) return;
+    if (typeof IntersectionObserver !== 'function') {
+      marker.hidden = false;
+      marker.addEventListener('click', () => { renderLimit += RENDER_STEP; render(); }, { once: true });
+      return;
+    }
+    loadMoreObserver = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return;
+      loadMoreObserver?.disconnect();
+      renderLimit += RENDER_STEP;
+      render();
+    }, { rootMargin: '700px 0px' });
+    loadMoreObserver.observe(marker);
+  }
+
+  async function loadPreviewUrls(client, candidates) {
+    const targets = candidates.filter((asset) => {
+      const id = String(asset?.id || '');
+      return id && !requestedPreviewIds.has(id) && !pendingPreviewIds.has(id);
+    });
+    if (!client || !targets.length) return false;
+    targets.forEach((asset) => pendingPreviewIds.add(asset.id));
+    try {
+      const { data, error } = await client.functions.invoke('market-public-preview', {
+        body: { asset_ids: targets.map((asset) => asset.id) }
+      });
+      if (error || !data?.previews || typeof data.previews !== 'object') return false;
+      targets.forEach((asset) => {
+        requestedPreviewIds.add(asset.id);
+        const previewUrl = data.previews[asset.id];
+        if (typeof previewUrl === 'string' && /^https?:\/\//i.test(previewUrl)) asset.preview_url = previewUrl;
+      });
+      return true;
+    } finally {
+      targets.forEach((asset) => pendingPreviewIds.delete(asset.id));
+    }
+  }
+
+  function requestVisiblePreviews(visible) {
+    if (!catalogClient) return;
+    void loadPreviewUrls(catalogClient, visible).then((updated) => {
+      if (updated) render();
+    });
+  }
+
+  function render() {
+    const visible = visibleAssets();
+    const shown = visible.slice(0, renderLimit);
+    count.textContent = shown.length === visible.length ? `${visible.length}件` : `${shown.length}/${visible.length}件`;
     if (!visible.length) {
       renderEmpty(assets.length ? '条件に合う素材がありません' : '公開中の素材はまだありません', assets.length ? '検索語、価格、派生条件を変えてお試しください。' : '出品された素材はここへ表示されます。');
       return;
     }
     const children = [];
-    visible.forEach((asset, index) => {
+    shown.forEach((asset, index) => {
       children.push(createCard(asset));
       if ((index + 1) % 8 !== 0) return;
       const listAd = window.PiXiEEDMarketAds?.createListAd?.();
       if (listAd) children.push(listAd);
     });
+    if (shown.length < visible.length) {
+      const marker = document.createElement('button');
+      marker.type = 'button'; marker.className = 'market-load-more'; marker.textContent = '続きを読み込む';
+      marker.setAttribute('aria-label', `残り${visible.length - shown.length}件を読み込む`);
+      children.push(marker);
+      window.requestAnimationFrame(() => observeLoadMore(marker));
+    } else {
+      loadMoreObserver?.disconnect();
+    }
     grid.replaceChildren(...children);
-  }
-
-  async function loadPreviewUrls(client, remoteAssets) {
-    const assetIds = remoteAssets.map((asset) => String(asset?.id || '')).filter(Boolean);
-    if (!assetIds.length) return;
-    const { data, error } = await client.functions.invoke('market-public-preview', { body: { asset_ids: assetIds } });
-    if (error || !data?.previews || typeof data.previews !== 'object') return;
-    remoteAssets.forEach((asset) => {
-      const previewUrl = data.previews[asset.id];
-      if (typeof previewUrl === 'string' && /^https?:\/\//i.test(previewUrl)) asset.preview_url = previewUrl;
-    });
+    requestVisiblePreviews(shown);
   }
 
   async function loadAssets() {
-    const access = window.PiXiEEDMarketAccess
-      ? await window.PiXiEEDMarketAccess.check()
-      : { allowed: false, client: null };
-    if (!access.client) {
+    // 公開一覧は認証不要。ログイン確認を待たずに商品カードを先に出す。
+    const client = window.PiXiEEDMarketAccess
+      ? await window.PiXiEEDMarketAccess.getClient().catch(() => null)
+      : null;
+    if (!client) {
       renderEmpty('マーケットを読み込めませんでした', '通信状態を確認して再読み込みしてください。');
       return;
     }
     try {
-      const { data, error } = await access.client.rpc('market_public_catalog_v1', { input_limit: 120 });
+      const { data, error } = await client.rpc('market_public_catalog_v1', { input_limit: 120 });
       if (error) throw error;
       const remoteAssets = Array.isArray(data) ? data : [];
-      await loadPreviewUrls(access.client, remoteAssets);
       assets = remoteAssets;
+      catalogClient = client;
+      render();
+      // お気に入りだけは初期描画を妨げない後続処理にする。
+      void Promise.resolve(favorites?.prepare?.(remoteAssets)).then(() => {
+        if (assets === remoteAssets) render();
+      });
     } catch (_error) {
       assets = [];
+      render();
     }
-    await favorites?.prepare?.(assets);
-    render();
   }
 
-  search?.addEventListener('input', render);
-  sort?.addEventListener('change', () => { if (sort.value === 'popular-derivatives') advancedSearch.open = true; render(); });
-  derivativeFilter?.addEventListener('change', render);
-  priceMin?.addEventListener('input', render); priceMax?.addEventListener('input', render);
+  search?.addEventListener('input', () => { resetRenderLimit(); render(); });
+  sort?.addEventListener('change', () => { if (sort.value === 'popular-derivatives') advancedSearch.open = true; resetRenderLimit(); render(); });
+  derivativeFilter?.addEventListener('change', () => { resetRenderLimit(); render(); });
+  priceMin?.addEventListener('input', () => { resetRenderLimit(); render(); });
+  priceMax?.addEventListener('input', () => { resetRenderLimit(); render(); });
   filters?.addEventListener('click', (event) => {
     const button = event.target.closest('button[data-filter]'); if (!button) return;
     activeFilter = button.dataset.filter || 'all';
-    filters.querySelectorAll('button').forEach((item) => item.classList.toggle('is-active', item === button)); render();
+    filters.querySelectorAll('button').forEach((item) => item.classList.toggle('is-active', item === button));
+    resetRenderLimit(); render();
   });
   filterReset?.addEventListener('click', () => {
     search.value = ''; sort.value = 'new'; derivativeFilter.value = 'all'; priceMin.value = ''; priceMax.value = '';
     activeFilter = 'all';
     filters.querySelectorAll('button').forEach((button) => button.classList.toggle('is-active', button.dataset.filter === 'all'));
+    resetRenderLimit();
     render();
   });
   sellButton?.addEventListener('click', async (event) => {
