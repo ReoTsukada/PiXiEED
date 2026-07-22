@@ -80,6 +80,12 @@
 }
 .account-command-bar::-webkit-scrollbar { display: none; }
 
+.auth-form {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
 .account-command-bar button {
   display: inline-flex;
   min-width: max-content;
