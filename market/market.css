@@ -686,6 +686,23 @@ html[data-pixieed-ad-free-account="true"] .market-ad {
   font-size: 13px;
 }
 
+.market-load-more {
+  grid-column: 1 / -1;
+  min-height: 48px;
+  margin: 4px 0 12px;
+  border: 1px solid rgba(126,240,199,.35);
+  border-radius: 8px;
+  background: rgba(23,107,85,.14);
+  color: #bff8e5;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.market-load-more:hover,
+.market-load-more:focus-visible { background: rgba(23,107,85,.28); }
+
 .market-sell-shell { max-width: 760px; grid-template-rows: auto auto 1fr; }
 .market-sell-status, .market-listing-form { padding: 18px; background: #10182c; border-top: 1px solid rgba(255,255,255,.1); }
 .market-sell-status { color: #cbd5e1; font-size: 13px; line-height: 1.65; }
