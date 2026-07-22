@@ -8,6 +8,12 @@ const sell = fs.readFileSync('market/sell.js', 'utf8');
 
 assert.match(generator, /application\/ld\+json/);
 assert.match(generator, /market_public_seo_catalog_v1/);
+assert.match(generator, /market-public-preview/);
+assert.match(generator, /PiXiEEDMarket\.png/);
+assert.match(generator, /og:image/);
+assert.match(generator, /twitter:card/);
+assert.match(generator, /share\.png/);
+assert.match(generator, /sharp/);
 assert.match(generator, /market-seo-items:start/);
 assert.match(generator, /@type': 'Product'/);
 assert.match(item, /\/market\/items\//);
