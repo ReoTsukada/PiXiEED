@@ -103,6 +103,13 @@
     $('itemPurchaseStatus').textContent = status;
   }
 
+  function accountLoginUrl() {
+    const account = new URL('/account/', window.location.origin);
+    account.searchParams.set('returnTo', window.location.href);
+    account.hash = 'authPanel';
+    return account.href;
+  }
+
   async function functionErrorMessage(error, fallback) {
     try {
       const payload = await error?.context?.clone?.().json?.();
@@ -211,7 +218,7 @@
       }
       if (!purchaseUser) {
         setPurchaseState({ disabled: false, label: 'ログインして購入', status: '購入手続きにはログインが必要です。' });
-        $('itemPurchase').addEventListener('click', () => { window.location.href = '../account/index.html'; }, { once: true });
+        $('itemPurchase').addEventListener('click', () => { window.location.assign(accountLoginUrl()); }, { once: true });
         return;
       }
       const existingPurchase = await findExistingPurchase();
