@@ -958,7 +958,7 @@
           thumbnail_source_path: thumbnailEntry?.path || null,
           sample_source_paths: sampleEntries.map((entry) => entry.path),
           public_preview_kind: 'baked-fixed-size-watermark',
-          watermark_version: 'baked-v4'
+          watermark_version: 'baked-v5'
         },
         limited_sale: limitedEnabled ? { enabled: true, quantity: limitedQuantity, option_price_yen: 0, minimum_price_yen: 0 } : { enabled: false }
       };

@@ -92,7 +92,7 @@
       button.addEventListener('click', () => {
         $('itemPreview').src = url;
         $('itemPreview').alt = `${asset.title || '商品'}の試聴プレビュー ${index + 1}`;
-        // 旧プレビューだけは保護のため表示レイヤーを残す。baked-v4 は画像内に
+        // 旧プレビューだけは保護のため表示レイヤーを残す。baked-v5 は画像内に
         // 焼き込み済みなので二重に重ねない。
         frame.classList.toggle('is-sample-preview', asset.sample_watermark_baked !== true);
         container.querySelectorAll('button').forEach((node) => node.classList.toggle('is-active', node === button));

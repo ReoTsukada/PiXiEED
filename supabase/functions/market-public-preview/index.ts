@@ -28,7 +28,7 @@ function samplePreviewPaths(asset: AssetRow) {
 function hasBakedSampleWatermark(asset: AssetRow) {
   const selection = asset.provenance_manifest?.preview_selection;
   return typeof selection === "object" && selection !== null
-    && (selection as Record<string, unknown>).watermark_version === "baked-v4";
+    && (selection as Record<string, unknown>).watermark_version === "baked-v5";
 }
 
 async function previewUrl(admin: ReturnType<typeof createAdminClient>, path: string) {
