@@ -26,6 +26,8 @@ assert.match(sell, /function drawPreviewWatermark/);
 assert.match(sell, /for \(let y = -diagonal/);
 assert.match(sell, /drawPreviewWatermark\(context, canvas\.width, canvas\.height\)/);
 assert.match(workflow, /cron: '\*\/5 \* \* \* \*'/);
+assert.match(workflow, /actions\/checkout@v5/);
+assert.match(workflow, /actions\/setup-node@v5/);
 assert.match(workflow, /npm ci/);
 assert.match(workflow, /node scripts\/generate-market-seo-pages\.mjs/);
 assert.match(workflow, /git add market\/items sitemap\.xml/);
