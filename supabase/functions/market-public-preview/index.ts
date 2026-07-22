@@ -15,7 +15,15 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3
 type AssetRow = {
   id: string;
   preview_object_path: string | null;
+  provenance_manifest: Record<string, unknown> | null;
 };
+
+function samplePreviewPaths(asset: AssetRow) {
+  const values = asset.provenance_manifest?.storage_sample_preview_paths;
+  return Array.isArray(values)
+    ? values.filter((path): path is string => typeof path === "string" && path.length > 0).slice(0, 6)
+    : [];
+}
 
 async function previewUrl(admin: ReturnType<typeof createAdminClient>, path: string) {
   if (/^https:\/\//i.test(path)) return path;
@@ -36,7 +44,7 @@ Deno.serve(async (request) => {
     const admin = createAdminClient();
     const { data, error } = await admin
       .from("market_assets")
-      .select("id,preview_object_path")
+      .select("id,preview_object_path,provenance_manifest")
       .in("id", assetIds)
       .eq("status", "published");
     if (error) throw error;
@@ -49,7 +57,13 @@ Deno.serve(async (request) => {
         return [asset.id, ""] as const;
       }
     }))).filter(([, url]) => Boolean(url)));
-    return jsonResponse(request, { previews, expires_in: PREVIEW_URL_TTL_SECONDS });
+    const samples = Object.fromEntries((await Promise.all(((data || []) as AssetRow[]).map(async (asset) => {
+      const urls = await Promise.all(samplePreviewPaths(asset).map(async (path) => {
+        try { return await previewUrl(admin, path); } catch (_error) { return ""; }
+      }));
+      return [asset.id, urls.filter(Boolean)] as const;
+    }))).filter(([, urls]) => urls.length > 0));
+    return jsonResponse(request, { previews, samples, expires_in: PREVIEW_URL_TTL_SECONDS });
   } catch (error) {
     return jsonResponse(request, { error: errorMessage(error, "公開プレビューを準備できませんでした") }, 500);
   }

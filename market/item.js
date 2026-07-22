@@ -39,6 +39,28 @@
     const node = document.createElement('span'); node.textContent = text; return node;
   }
 
+  function renderSamplePreviews(asset) {
+    const urls = Array.isArray(asset.sample_preview_urls)
+      ? asset.sample_preview_urls.filter((url) => /^https?:\/\//i.test(url || ''))
+      : [];
+    const container = $('itemSamplePreviews');
+    container.hidden = urls.length === 0;
+    container.replaceChildren(...urls.map((url, index) => {
+      const button = document.createElement('button'); button.type = 'button';
+      button.className = 'market-item__sample-preview';
+      button.setAttribute('aria-label', `購入前プレビュー ${index + 1} を表示`);
+      const image = new Image(); image.src = url; image.alt = ''; image.loading = 'lazy'; image.decoding = 'async';
+      image.draggable = false; image.dataset.marketProtectedMedia = 'true';
+      button.appendChild(image);
+      button.addEventListener('click', () => {
+        $('itemPreview').src = url;
+        $('itemPreview').alt = `${asset.title || '商品'}の購入前プレビュー ${index + 1}`;
+        container.querySelectorAll('button').forEach((node) => node.classList.toggle('is-active', node === button));
+      });
+      return button;
+    }));
+  }
+
   function render(asset) {
     currentAsset = asset;
     const series = asset.series || {};
@@ -71,6 +93,7 @@
       $('itemPreview').src = previewUrl;
     }
     $('itemPreview').alt = `${asset.title || '商品'}のプレビュー`;
+    renderSamplePreviews(asset);
     $('itemAuthor').textContent = `作者: ${asset.creator_display_name || 'PiXiEEDクリエイター'}`;
     favorites?.bind?.($('itemFavorite'), asset);
     const productBadge = badge(isPixieeDrawProduct(asset) ? 'PiXiEEDraw作品' : '一般素材');
@@ -316,6 +339,7 @@
       const { data: previewData } = await purchaseClient.functions.invoke('market-public-preview', { body: { asset_ids: [asset.id] } });
       const previewUrl = previewData?.previews?.[asset.id];
       if (typeof previewUrl === 'string' && /^https?:\/\//i.test(previewUrl)) asset.preview_url = previewUrl;
+      if (Array.isArray(previewData?.samples?.[asset.id])) asset.sample_preview_urls = previewData.samples[asset.id];
       await favorites?.prepare?.([asset]);
       render(asset);
       await initPurchase();
