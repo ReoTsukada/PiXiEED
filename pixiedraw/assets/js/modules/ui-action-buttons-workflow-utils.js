@@ -32,8 +32,8 @@
     return ((scope) => {
       with (scope) {
   function updateVirtualCursorActionToolButtons() {
-    const available = true;
-    const enabled = Boolean(state.showVirtualCursor);
+    const available = layoutMode === 'mobilePortrait';
+    const enabled = available && Boolean(state.showVirtualCursor);
     const toggleButtons = Array.from(document.querySelectorAll(`.tool-button[data-tool="${TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE}"], [data-ui-action="${TOP_UI_ACTION_VIRTUAL_CURSOR_TOGGLE}"]`));
     toggleButtons.forEach(button => {
       if (button instanceof HTMLButtonElement) {
