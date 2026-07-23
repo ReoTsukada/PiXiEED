@@ -144,7 +144,7 @@
         showPixelGuides: true,
         mirror: createInitialMirrorState(initialWidth, initialHeight),
         showVirtualCursor: false,
-  danmakuEnabled: true,
+  danmakuEnabled: false,
         virtualCursorButtonScale: DEFAULT_FLOATING_DRAW_BUTTON_SCALE,
         floatingPreview: normalizeFloatingPreviewState(
           requestedFloatingPreview,
