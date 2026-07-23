@@ -286,7 +286,7 @@
     state.onionSkin = normalizeOnionSkinState(preferences.onionSkin);
     state.activeLeftTab = LEFT_TAB_KEYS.includes(preferences.activeLeftTab) ? preferences.activeLeftTab : 'tools';
     state.activeRightTab = RIGHT_TAB_KEYS.includes(preferences.activeRightTab) ? preferences.activeRightTab : 'frames';
-    state.danmakuEnabled = preferences.danmakuEnabled !== false;
+    state.danmakuEnabled = false;
     localLayerVisibilityById = deserializeLocalLayerVisibilityMap(
       preferences.layerVisibilityById,
       localLayerVisibilityById
