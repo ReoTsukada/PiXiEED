@@ -103,7 +103,7 @@
     const controller = doc.createElement('script');
     controller.async = false;
     controller.dataset.pixieedCommonTabBar = 'true';
-    controller.src = relHref('scripts/shared-tab-bar.js?v=20260722-notifications2');
+    controller.src = relHref('scripts/shared-tab-bar.js?v=20260723-camera-fullscreen1');
     controller.addEventListener('load', ensureNotificationController, { once: true });
     doc.body.appendChild(controller);
   }
