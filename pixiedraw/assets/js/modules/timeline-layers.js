@@ -3122,17 +3122,6 @@
 
     const fragment = document.createDocumentFragment();
 
-    const corner = document.createElement('div');
-    corner.className = 'timeline-cell timeline-cell--corner';
-    corner.classList.add('pixel-frame');
-    corner.style.gridColumn = `1 / span ${layerHeaderColumnCount}`;
-    corner.style.gridRow = '1';
-    corner.setAttribute('role', 'columnheader');
-    corner.setAttribute('aria-label', localizeText('タイムライン', 'Timeline'));
-    corner.dataset.timelineNodeKey = 'corner';
-    applyTimelineCellFrame(corner, 'corner');
-    fragment.appendChild(corner);
-
     frames.forEach((frame, frameIndex) => {
       const col = frameIndex + frameColumnStart;
       const header = document.createElement('div');
