@@ -136,29 +136,19 @@
   
   
     function syncColorModeControls() {
-      const currentMode = normalizeColorMode(state.colorMode, COLOR_MODE_INDEX);
-      state.colorMode = currentMode;
-      const multiPaletteIsolation = isMultiPaletteIsolationEnabled();
+      const currentMode = COLOR_MODE_INDEX;
+      state.colorMode = COLOR_MODE_INDEX;
       if (dom.controls.colorModeIndexLabel instanceof HTMLElement) {
-        dom.controls.colorModeIndexLabel.textContent = multiPaletteIsolation
-          ? localizeText('ローカルインデックス', 'Local Indexed')
-          : localizeText('インデックスカラー', 'Indexed Color');
+        dom.controls.colorModeIndexLabel.textContent = localizeText('インデックスカラー', 'Indexed Color');
       }
       if (dom.controls.colorModeRgbLabel instanceof HTMLElement) {
-        dom.controls.colorModeRgbLabel.textContent = multiPaletteIsolation
-          ? localizeText('ローカルRGB', 'Local RGB')
-          : localizeText('RGBカラー', 'RGB Color');
+        dom.controls.colorModeRgbLabel.textContent = localizeText('インデックスカラー', 'Indexed Color');
       }
       if (dom.controls.colorModeHint instanceof HTMLElement) {
-        dom.controls.colorModeHint.textContent = multiPaletteIsolation
-          ? localizeText(
-            '共同制作中は色モードとパレットは各自ローカルです。既存ピクセルの色替えは行われません。',
-            'During collab, color mode and palette are local to each user. Existing pixels are not recolored.'
-          )
-          : localizeText(
-            'インデックスカラーとRGBカラーを切り替えます。',
-            'Switch between indexed color and RGB color.'
-          );
+        dom.controls.colorModeHint.textContent = localizeText(
+          'インデックスカラー（最大256色）で描画します。',
+          'Draw with indexed color (up to 256 colors).'
+        );
       }
       if (Array.isArray(dom.controls.colorMode)) {
         dom.controls.colorMode.forEach(input => {
@@ -226,9 +216,7 @@
         paletteIndexField.setAttribute('aria-hidden', String(!isIndexMode));
         const paletteIndexLabel = paletteIndexField.querySelector('span');
         if (paletteIndexLabel instanceof HTMLElement) {
-          paletteIndexLabel.textContent = multiPaletteIsolation
-            ? localizeText('ローカル番号', 'Local Slot')
-            : localizeText('インデックス', 'Index');
+          paletteIndexLabel.textContent = localizeText('インデックス', 'Index');
         }
       }
     }
