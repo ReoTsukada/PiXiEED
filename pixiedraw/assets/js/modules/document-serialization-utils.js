@@ -242,8 +242,9 @@
     const brushShape = requestedBrushShape === BRUSH_SHAPE_CUSTOM && !customBrush
       ? BRUSH_SHAPE_SQUARE
       : requestedBrushShape;
-    const inferredColorMode = frameListHasDirectPixelData(frames) ? COLOR_MODE_RGB : state.colorMode;
-    const colorMode = normalizeColorMode(payload.colorMode, inferredColorMode);
+    // RGB is a legacy import format. Direct pixels are converted to the
+    // indexed palette when the snapshot is applied.
+    const colorMode = COLOR_MODE_INDEX;
     const fallbackActivePaletteIndex = clamp(
       Number.isFinite(state.activePaletteIndex) ? Math.round(state.activePaletteIndex) : 0,
       0,
