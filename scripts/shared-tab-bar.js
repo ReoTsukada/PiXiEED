@@ -146,7 +146,6 @@
         actions: [
           { id: 'file', label: '画像を読み込む', selector: '#pixelArtBtn', cloneIcon: true, mirrorState: true },
           { id: 'clear', label: '読み込みを取り消す', selector: '#clearPixelBtn', cloneIcon: true, mirrorState: true, mirrorVisibility: true },
-          { id: 'dots', label: 'ドット・色設定', selector: '#dotModeBtn', cloneIcon: true, mirrorState: true },
           { id: 'camera-switch', label: 'カメラ切り替え', selector: '#cameraActionBtn', cloneIcon: true, mirrorState: true },
           { id: 'settings', label: 'カメラ設定', selector: '#cameraSettingsBtn', cloneIcon: true, mirrorState: true, placement: 'trailing' },
         ],
