@@ -255,6 +255,16 @@
       : normalizeColorValue(state.palette[secondaryPaletteIndex] || state.activeRgb);
     button.style.setProperty('--floating-draw-button-primary-color', toCssColor(primaryColor));
     button.style.setProperty('--floating-draw-button-secondary-color', toCssColor(secondaryColor));
+    const primaryIsBright = getColorPerceivedLightness(primaryColor) >= 152;
+    const secondaryIsBright = getColorPerceivedLightness(secondaryColor) >= 152;
+    button.style.setProperty(
+      '--floating-draw-button-primary-text-color',
+      primaryIsBright ? 'rgba(16, 22, 30, 0.94)' : 'rgba(248, 252, 255, 0.96)'
+    );
+    button.style.setProperty(
+      '--floating-draw-button-secondary-text-color',
+      secondaryIsBright ? 'rgba(16, 22, 30, 0.94)' : 'rgba(248, 252, 255, 0.96)'
+    );
     const averageLightness = (
       getColorPerceivedLightness(primaryColor) + getColorPerceivedLightness(secondaryColor)
     ) / 2;
