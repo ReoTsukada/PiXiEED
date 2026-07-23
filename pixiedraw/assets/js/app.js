@@ -11123,7 +11123,12 @@
         state.brushShape = BRUSH_SHAPE_SQUARE;
       }
     }
-    state.colorMode = normalizeColorMode(snapshot.colorMode, state.colorMode);
+    const shouldConvertLegacyRgb = (
+      normalizeColorMode(snapshot.colorMode, COLOR_MODE_INDEX) === COLOR_MODE_RGB
+      || frameListHasDirectPixelData(snapshot.frames)
+      || (Array.isArray(snapshot.canvases) && snapshot.canvases.some(canvas => frameListHasDirectPixelData(canvas?.frames)))
+    );
+    state.colorMode = COLOR_MODE_INDEX;
     state.palette = snapshot.palette.map(color => normalizeColorValue(color));
     state.activePaletteIndex = normalizePaletteIndex(snapshot.activePaletteIndex, state.activePaletteIndex);
     state.secondaryPaletteIndex = normalizePaletteIndex(
@@ -11161,6 +11166,9 @@
     } else {
       state.activeFrame = 0;
       state.activeLayer = null;
+    }
+    if (shouldConvertLegacyRgb) {
+      convertCurrentDocumentRgbPixelsToIndexedPalette();
     }
     if (Object.prototype.hasOwnProperty.call(snapshot, 'selectionMask')) {
       state.selectionMask = snapshot.selectionMask ? new Uint8Array(snapshot.selectionMask) : null;
@@ -20126,9 +20134,7 @@
     if (typeof payload.showChecker === 'boolean') {
       state.showChecker = payload.showChecker;
     }
-    if (typeof payload.danmakuEnabled === 'boolean') {
-      state.danmakuEnabled = payload.danmakuEnabled;
-    }
+    state.danmakuEnabled = false;
     state.dualLeftRail = false;
     leftDualSizing.tools = LEFT_DUAL_MIN_COLUMN_WIDTH;
     if (Number.isFinite(payload.leftUnifiedToolsRatio)) {
@@ -20146,7 +20152,7 @@
       state.onionSkin = normalizeOnionSkinState(payload.onionSkin);
     }
     setVirtualCursorButtonScale(state.virtualCursorButtonScale, { persist: false, clampPosition: false });
-    state.colorMode = normalizeColorMode(payload.colorMode, state.colorMode);
+    state.colorMode = COLOR_MODE_INDEX;
     if (Object.prototype.hasOwnProperty.call(payload, 'activeRgb')) {
       state.activeRgb = normalizeColorValue(payload.activeRgb);
     } else {
