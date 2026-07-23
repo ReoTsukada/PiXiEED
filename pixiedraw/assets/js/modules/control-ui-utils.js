@@ -173,9 +173,9 @@
 
   function syncVirtualCursorControlVisibility(options = {}) {
     const { syncToggle = true } = options;
-    const available = true;
-    const showVirtualCursorOptions = Boolean(state.showVirtualCursor);
-    const showMobileVirtualCursorOptions = layoutMode === 'mobilePortrait' && showVirtualCursorOptions;
+    const available = layoutMode === 'mobilePortrait';
+    const showVirtualCursorOptions = available && Boolean(state.showVirtualCursor);
+    const showMobileVirtualCursorOptions = showVirtualCursorOptions;
     if (syncToggle && dom.controls.toggleVirtualCursor instanceof HTMLInputElement) {
       dom.controls.toggleVirtualCursor.checked = showVirtualCursorOptions;
     }
