@@ -465,7 +465,7 @@
 
   function setVirtualCursorEnabled(enabled, options = {}) {
     const { persist = true, updateControl = true } = options;
-    const next = Boolean(enabled);
+    const next = layoutMode === 'mobilePortrait' && Boolean(enabled);
     const prev = state.showVirtualCursor;
 
     if (updateControl && dom.controls.toggleVirtualCursor instanceof HTMLInputElement) {
