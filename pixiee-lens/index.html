@@ -734,11 +734,16 @@
       align-items: center;
       justify-content: center;
       min-width: clamp(60px, 18vw, 96px);
-      height: clamp(60px, 18vw, 96px);
+      height: auto;
+      flex-direction: column;
+      gap: 6px;
       pointer-events: auto;
       margin-bottom: 0;
     }
     body.is-landscape .hud-bottom__capture-slot {
+      display: none;
+    }
+    body.is-landscape .capture-hint {
       display: none;
     }
     .hud-landscape-capture {
@@ -808,12 +813,12 @@
       max-width: 220px;
       margin-inline: auto;
       pointer-events: auto;
-      transition: transform 0.22s ease, opacity 0.22s ease;
+      transition: none;
       transform-origin: center top;
     }
     .zoom-meter.is-collapsed {
-      opacity: 0.8;
-      transform: translateY(6px) scaleY(0.74);
+      opacity: 1;
+      transform: none;
     }
     .zoom-meter.is-expanded {
       opacity: 1;
@@ -830,7 +835,7 @@
       user-select: none;
     }
     .zoom-meter.is-collapsed .zoom-meter__tape {
-      padding: 12px 10px;
+      padding: 18px 12px;
     }
     .zoom-meter__tape::before {
       content: '';
@@ -874,7 +879,7 @@
       align-items: center;
       gap: clamp(5px, 1.1vw, 9px);
       transform: translateX(0);
-      transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: none;
       padding: 6px 0;
       will-change: transform;
       pointer-events: none;
@@ -905,8 +910,8 @@
       transform: translateX(-50%);
     }
     .zoom-meter.is-collapsed .zoom-meter__scale-value {
-      transform: scale(0.86);
-      font-size: 0.85rem;
+      transform: none;
+      font-size: 0.95rem;
     }
     .zoom-meter.is-collapsed .zoom-meter__scale-value::after {
       height: 6px;
@@ -931,8 +936,8 @@
       background: rgba(231, 238, 255, 0.42);
     }
     .zoom-meter.is-collapsed .zoom-meter__scale-value--major {
-      font-size: 0.94rem;
-      transform: scale(0.95);
+      font-size: 1.05rem;
+      transform: none;
     }
     .zoom-meter__slider {
       position: absolute;
@@ -1432,6 +1437,20 @@
       position: relative;
       color: var(--fg);
     }
+    .icon-button--labeled {
+      width: 64px;
+      height: 64px;
+      flex-direction: column;
+      gap: 3px;
+      padding: 7px 4px;
+    }
+    .icon-button--labeled .icon-button__label {
+      display: block;
+      font-size: 0.65rem;
+      line-height: 1;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
     .icon-button:hover:enabled {
       transform: translateY(-1px);
       background: rgba(123, 207, 255, 0.28);
@@ -1558,6 +1577,46 @@
     .camera-settings-panel {
       gap: 12px;
     }
+    .settings-tabs {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+      padding-bottom: 4px;
+    }
+    .settings-tab-button {
+      min-height: 36px;
+      border: 1px solid rgba(123, 207, 255, 0.25);
+      border-radius: 9px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      letter-spacing: 0.04em;
+    }
+    .settings-tab-button.is-active {
+      background: rgba(123, 207, 255, 0.3);
+      border-color: rgba(123, 207, 255, 0.68);
+      color: var(--fg);
+    }
+    .settings-tab {
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .settings-tab.is-active {
+      display: flex;
+    }
+    .camera-settings-panel__advanced {
+      border-top: 1px solid rgba(123, 207, 255, 0.2);
+      padding-top: 10px;
+    }
+    .camera-settings-panel__advanced > summary {
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 0.82rem;
+      letter-spacing: 0.05em;
+    }
+    .camera-settings-panel__advanced .controls--camera {
+      margin-top: 12px;
+    }
     .controls--camera {
       display: flex;
       flex-direction: column;
@@ -1646,6 +1705,14 @@
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 10px;
+    }
+    .capture-hint {
+      color: rgba(231, 238, 255, 0.78);
+      font-size: 0.68rem;
+      line-height: 1;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
     }
     .camera-settings__navigation .option-button {
       display: inline-flex;
@@ -2042,7 +2109,7 @@
       }
       .hud-bottom__capture-slot {
         min-width: clamp(56px, 24vw, 84px);
-        height: clamp(56px, 24vw, 84px);
+        height: auto;
       }
       .hud-bottom__center {
         width: clamp(160px, 60vw, 220px);
@@ -2202,9 +2269,9 @@
 <div class="hud-top">
 <div class="hud-top__bar">
 <div aria-label="ドット絵コントロール" class="hud-top__actions" role="group">
-<button aria-label="画像を読み込む" class="icon-button" id="pixelArtBtn" type="button">
+<button aria-label="画像を読み込む" class="icon-button icon-button--labeled" id="pixelArtBtn" type="button">
 <img alt="" aria-hidden="true" class="control-icon control-icon--native-pixel" draggable="false" src="../assets/icons/File.png?v=2026.07.19-ui-icons1"/>
-<span class="icon-button__label visually-hidden">画像を読み込む</span>
+<span class="icon-button__label">画像</span>
 </button>
 <button aria-hidden="true" aria-label="読み込みを取り消す" class="icon-button icon-button--ghost" disabled id="clearPixelBtn" type="button">
 <svg aria-hidden="true" class="control-icon" shape-rendering="crispEdges" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -2292,9 +2359,9 @@
 </svg>
 <span class="icon-button__label visually-hidden">再接続</span>
 </button>
-<button aria-controls="cameraSettingsPanel" aria-expanded="false" aria-label="カメラ設定" class="icon-button" id="cameraSettingsBtn" type="button">
+<button aria-controls="cameraSettingsPanel" aria-expanded="false" aria-label="カメラ設定" class="icon-button icon-button--labeled" id="cameraSettingsBtn" type="button">
 <img alt="" aria-hidden="true" class="control-icon control-icon--native-pixel" draggable="false" src="../assets/icons/Settings.png?v=2026.07.19-icons2"/>
-<span class="icon-button__label visually-hidden">カメラ設定</span>
+<span class="icon-button__label">設定</span>
 </button>
 </div>
 </div>
@@ -2320,34 +2387,18 @@
 </div>
 <div class="hud-top__panel-wrap hud-top__panel-wrap--right">
 <div class="menu-panel camera-settings-panel" hidden="" id="cameraSettingsPanel">
-<div aria-label="カメラ基本設定" class="controls controls--camera" role="group">
+<div aria-label="設定の種類" class="settings-tabs" role="tablist">
+<button aria-controls="cameraSettingsTab" aria-selected="true" class="settings-tab-button is-active" data-settings-tab="camera" id="cameraSettingsTabButton" role="tab" type="button">カメラ</button>
+<button aria-controls="dotSettingsPanel" aria-selected="false" class="settings-tab-button" data-settings-tab="dot" id="dotSettingsTabButton" role="tab" type="button">ドット</button>
+</div>
+<section aria-labelledby="cameraSettingsTabButton" class="settings-tab is-active" id="cameraSettingsTab" role="tabpanel">
+<div aria-label="よく使うカメラ設定" class="controls controls--camera" role="group">
 <label class="slider-control">
 <span class="slider-control__label-row">
 <span class="slider-control__label">明るさ</span>
 <span class="slider-control__value" data-setting-value="brightness">0</span>
 </span>
 <input data-setting="brightness" id="cameraSettingBrightness" max="100" min="-100" step="1" type="range" value="0"/>
-</label>
-<label class="slider-control">
-<span class="slider-control__label-row">
-<span class="slider-control__label">露光</span>
-<span class="slider-control__value" data-setting-value="exposure">0</span>
-</span>
-<input data-setting="exposure" id="cameraSettingExposure" max="100" min="-100" step="1" type="range" value="0"/>
-</label>
-<label class="slider-control">
-<span class="slider-control__label-row">
-<span class="slider-control__label">彩度</span>
-<span class="slider-control__value" data-setting-value="saturation">0</span>
-</span>
-<input data-setting="saturation" id="cameraSettingSaturation" max="100" min="-100" step="1" type="range" value="0"/>
-</label>
-<label class="slider-control">
-<span class="slider-control__label-row">
-<span class="slider-control__label">シャドウ</span>
-<span class="slider-control__value" data-setting-value="shadows">0</span>
-</span>
-<input data-setting="shadows" id="cameraSettingShadows" max="100" min="-100" step="1" type="range" value="0"/>
 </label>
 <label class="slider-control">
 <span class="slider-control__label-row">
@@ -2358,32 +2409,50 @@
 </label>
 <label class="slider-control">
 <span class="slider-control__label-row">
+<span class="slider-control__label">彩度</span>
+<span class="slider-control__value" data-setting-value="saturation">0</span>
+</span>
+<input data-setting="saturation" id="cameraSettingSaturation" max="100" min="-100" step="1" type="range" value="0"/>
+</label>
+</div>
+<details class="camera-settings-panel__advanced">
+<summary>詳細な色調整</summary>
+<div aria-label="詳細なカメラ設定" class="controls controls--camera" role="group">
+<label class="slider-control">
+<span class="slider-control__label-row">
+<span class="slider-control__label">シャドウ</span>
+<span class="slider-control__value" data-setting-value="shadows">0</span>
+</span>
+<input data-setting="shadows" id="cameraSettingShadows" max="100" min="-100" step="1" type="range" value="0"/>
+</label>
+<label class="slider-control">
+<span class="slider-control__label-row">
+<span class="slider-control__label">露光</span>
+<span class="slider-control__value" data-setting-value="exposure">0</span>
+</span>
+<input data-setting="exposure" id="cameraSettingExposure" max="100" min="-100" step="1" type="range" value="0"/>
+</label>
+<label class="slider-control">
+<span class="slider-control__label-row">
 <span class="slider-control__label">ホワイトバランス</span>
 <span class="slider-control__value" data-setting-value="whiteBalance">0</span>
 </span>
 <input data-setting="whiteBalance" id="cameraSettingWhiteBalance" max="100" min="-100" step="1" type="range" value="0"/>
 </label>
 </div>
+</details>
 <button class="option-button camera-settings__reset" id="cameraSettingsResetBtn" type="button">設定をリセット</button>
-<div aria-label="ページ移動" class="camera-settings__navigation" role="group">
-<a class="option-button camera-settings__link--home" href="../index.html">ホームへ</a>
-<a class="option-button camera-settings__link--tools" href="../index.html#projects">他ツール一覧</a>
-</div>
-</div>
-</div>
-</div>
-<div class="hud-bottom">
-<div class="hud-bottom__menus">
-<div class="menu-panel dot-settings-panel" hidden="" id="dotSettingsPanel">
+</section>
+<section aria-labelledby="dotSettingsTabButton" class="settings-tab dot-settings-panel" hidden="" id="dotSettingsPanel" role="tabpanel">
 <div class="dot-settings-panel__row">
 <label class="select-control" for="colorDepthSelect">
 <span class="select-control__label">色数</span>
 <select id="colorDepthSelect" name="colorDepth">
-<option value="full">フルカラー</option>
-<option value="256">8BIT（256色）</option>
-<option value="16">4BIT（16色）</option>
-<option selected="" value="4">2BIT（4色）</option>
 <option value="2">1BIT（2色）</option>
+<option selected="" value="4">2BIT（4色）</option>
+<option value="8">3BIT（8色）</option>
+<option value="16">4BIT（16色）</option>
+<option value="full">フルカラー</option>
 </select>
 </label>
 </div>
@@ -2417,15 +2486,12 @@
 <div class="dot-settings-panel__row">
 <button aria-label="グラデーション方法を切り替え" aria-pressed="true" class="option-button gradient-toggle is-active" id="gradientToggleBtn" type="button">グラデーション: ディザリング</button>
 </div>
+</section>
 </div>
 </div>
+</div>
+<div class="hud-bottom">
 <div aria-label="操作" class="hud-bottom__actions" role="group">
-<div class="hud-bottom__actions-group hud-bottom__actions-group--left">
-<button aria-label="ドット・色設定を開く" aria-pressed="true" class="icon-button" id="dotModeBtn" type="button">
-<img alt="" aria-hidden="true" class="control-icon" draggable="false" src="./icon-dotmode.svg"/>
-<span class="icon-button__label visually-hidden">ドット・色設定</span>
-</button>
-</div>
 <div class="hud-bottom__center">
 <div class="zoom-meter is-collapsed" hidden="" id="zoomControl">
 <div class="zoom-meter__tape">
@@ -2456,6 +2522,7 @@
 <button aria-label="撮影（長押しでGIF）" class="capture-button" id="captureBtn" type="button">
 <img alt="" aria-hidden="true" class="capture-button__icon" draggable="false" src="./icon-capture.svg"/>
 </button>
+<span class="capture-hint">タップ: 写真　長押し: GIF</span>
 </div>
 </div>
 <div class="hud-bottom__actions-group hud-bottom__actions-group--right"></div>
@@ -2534,7 +2601,7 @@
     const cameraSettingsResetBtn = document.getElementById('cameraSettingsResetBtn');
     const pixelArtBtn = document.getElementById('pixelArtBtn');
     const clearPixelBtn = document.getElementById('clearPixelBtn');
-    const dotModeBtn = document.getElementById('dotModeBtn');
+    const settingsTabButtons = Array.from(document.querySelectorAll('[data-settings-tab]'));
     const captureBtn = document.getElementById('captureBtn');
     const gifCaptureGauge = document.getElementById('gifCaptureGauge');
     const gifCaptureGaugeSegments = gifCaptureGauge
@@ -2643,6 +2710,7 @@
     let zoomMeterLastAppliedIndex = -1;
     const zoomMeterDrag = {
       active: false,
+      hasMoved: false,
       pointerId: null,
       startClientX: 0,
       startTranslate: 0,
@@ -2858,11 +2926,6 @@
     });
 
     if (!dotCanvasCtx) {
-      if (dotModeBtn) {
-        dotModeBtn.disabled = true;
-        dotModeBtn.setAttribute('aria-disabled', 'true');
-        dotModeBtn.title = 'ドット設定はこのブラウザで利用できません';
-      }
       setSelectEnabled(dotScaleSelect, false);
       setSelectEnabled(gifFpsSelect, false);
       setSelectEnabled(colorDepthSelect, false);
@@ -2881,11 +2944,6 @@
       if (gradientToggleBtn) {
         gradientToggleBtn.disabled = false;
         gradientToggleBtn.removeAttribute('aria-disabled');
-      }
-      if (dotModeBtn) {
-        dotModeBtn.disabled = false;
-        dotModeBtn.removeAttribute('aria-disabled');
-        dotModeBtn.removeAttribute('title');
       }
       if (paletteToggleBtn) {
         paletteToggleBtn.disabled = false;
@@ -2998,7 +3056,6 @@
     let cameraZoomCapability = null;
     let cameraZoomCapabilityKnown = false;
     let cameraStatusMessage = '';
-    let dotScalePanelOpen = false;
     const dotState = {
       frameHandle: null,
       width: 0,
@@ -4110,6 +4167,7 @@
         zoomMeterCollapseTimeout = null;
       }
       zoomMeterDrag.active = true;
+      zoomMeterDrag.hasMoved = false;
       zoomMeterDrag.pointerId = event.pointerId;
       if (zoomMeterTape && typeof zoomMeterTape.setPointerCapture === 'function') {
         zoomMeterTape.setPointerCapture(event.pointerId);
@@ -4117,7 +4175,6 @@
       zoomMeterDrag.startTranslate = zoomScaleTranslate;
       zoomMeterDrag.startClientX = event.clientX;
       zoomMeterDrag.samples = [{ time: event.timeStamp, x: event.clientX }];
-      updateZoomScaleActiveFromLayout({ commit: false });
       window.addEventListener('pointermove', handleZoomMeterPointerMove);
       window.addEventListener('pointerup', handleZoomMeterPointerUp);
       window.addEventListener('pointercancel', handleZoomMeterPointerUp);
@@ -4129,6 +4186,10 @@
       }
       event.preventDefault();
       const delta = event.clientX - zoomMeterDrag.startClientX;
+      if (!zoomMeterDrag.hasMoved && Math.abs(delta) < 8) {
+        return;
+      }
+      zoomMeterDrag.hasMoved = true;
       setZoomScaleTranslate(zoomMeterDrag.startTranslate + delta, { animate: false });
       clampZoomScaleTranslate({ animate: false });
       updateZoomScaleActiveFromLayout({ commit: true, animate: false });
@@ -4207,7 +4268,9 @@
         return;
       }
       event.preventDefault();
+      const hasMoved = zoomMeterDrag.hasMoved;
       zoomMeterDrag.active = false;
+      zoomMeterDrag.hasMoved = false;
       zoomMeterDrag.pointerId = null;
       if (zoomMeterTape && typeof zoomMeterTape.releasePointerCapture === 'function') {
         try {
@@ -4220,14 +4283,9 @@
       window.removeEventListener('pointerup', handleZoomMeterPointerUp);
       window.removeEventListener('pointercancel', handleZoomMeterPointerUp);
 
-      const velocity = computeZoomDragVelocity(event.timeStamp);
       zoomMeterDrag.samples = [];
-
-      if (Math.abs(velocity) > 0.18) {
-        startZoomMeterInertia(velocity);
-      } else {
-        finalizeZoomMeterPosition({ animate: true });
-        scheduleZoomMeterCollapse();
+      if (hasMoved) {
+        finalizeZoomMeterPosition({ animate: false });
       }
     }
 
@@ -4420,28 +4478,24 @@
       return Math.max(20, Math.round(1000 / safeFps));
     }
 
-    function setDotScalePanelOpen(open) {
-      if (!dotSettingsPanel) {
-        dotScalePanelOpen = false;
-        return;
+    function setSettingsTab(tab) {
+      const nextTab = tab === 'dot' ? 'dot' : 'camera';
+      const cameraTab = document.getElementById('cameraSettingsTab');
+      if (cameraTab) {
+        const active = nextTab === 'camera';
+        cameraTab.hidden = !active;
+        cameraTab.classList.toggle('is-active', active);
       }
-      const desired = Boolean(open && state.dotMode);
-      dotScalePanelOpen = desired;
-      dotSettingsPanel.hidden = !desired;
-      dotSettingsPanel.classList.toggle('is-open', desired);
-      if (dotModeBtn) {
-        dotModeBtn.setAttribute('aria-expanded', desired ? 'true' : 'false');
+      if (dotSettingsPanel) {
+        const active = nextTab === 'dot';
+        dotSettingsPanel.hidden = !active;
+        dotSettingsPanel.classList.toggle('is-active', active);
       }
-      if (desired) {
-        openMenuKey = 'dotScale';
-      } else if (openMenuKey === 'dotScale') {
-        openMenuKey = null;
-      }
-    }
-
-    function setDotSettingsOpen(open) {
-      const desired = Boolean(open);
-      setDotScalePanelOpen(desired);
+      settingsTabButtons.forEach((button) => {
+        const active = button.dataset.settingsTab === nextTab;
+        button.classList.toggle('is-active', active);
+        button.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
     }
 
     function setMenuOpen(key, open) {
@@ -4465,9 +4519,6 @@
     }
 
     function closeAllMenus(exceptKey = null) {
-      if (exceptKey !== 'dotScale') {
-        setDotSettingsOpen(false);
-      }
       Object.keys(menus).forEach((key) => {
         if (key !== exceptKey) {
           setMenuOpen(key, false);
@@ -4476,31 +4527,11 @@
     }
 
     function openMenuExclusive(key) {
-      if (key === 'dotScale') {
-        if (!state.dotMode) {
-          return;
-        }
-        closeAllMenus('dotScale');
-        setDotSettingsOpen(true);
-        return;
-      }
       closeAllMenus(key);
       setMenuOpen(key, true);
     }
 
     function toggleMenu(key) {
-      if (key === 'dotScale') {
-        if (!state.dotMode) {
-          return;
-        }
-        const isOpen = dotScalePanelOpen && dotSettingsPanel && !dotSettingsPanel.hidden;
-        if (isOpen) {
-          setDotSettingsOpen(false);
-        } else {
-          openMenuExclusive('dotScale');
-        }
-        return;
-      }
       const entry = menus[key];
       if (!entry || !entry.panel) {
         return;
@@ -4514,10 +4545,6 @@
     }
 
     function closeMenu(key) {
-      if (key === 'dotScale') {
-        setDotSettingsOpen(false);
-        return;
-      }
       setMenuOpen(key, false);
     }
 
@@ -5612,10 +5639,10 @@
         let depthLabel;
         if (state.colorDepth === 'full') {
           depthLabel = 'フルカラー';
-        } else if (state.colorDepth === '256') {
-          depthLabel = '8BIT（256色）';
         } else if (state.colorDepth === '16') {
           depthLabel = '4BIT（16色）';
+        } else if (state.colorDepth === '8') {
+          depthLabel = '3BIT（8色）';
         } else if (state.colorDepth === '4') {
           depthLabel = '2BIT（4色）';
         } else if (state.colorDepth === '2') {
@@ -5635,10 +5662,9 @@
     const ASPECT_LAYOUT_BUTTON_GAP = 12;
     const ASPECT_LAYOUT_MIN_SIZE = 120;
 
-    const COLOR_DEPTHS = ['full', '256', '16', '4', '2'];
+    const COLOR_DEPTHS = ['full', '16', '8', '4', '2'];
     const PALETTELESS_DEPTHS = Object.freeze({
-      full: true,
-      '256': true
+      full: true
     });
     const GRADIENT_MODE_LABELS = {
       none: 'なし',
@@ -6874,8 +6900,6 @@
       return selected.map(({ r, g, b }) => ({ r, g, b }));
     }
 
-
-
     function buildPaletteFromImage(imageData, desired, depth) {
       const bins = new Map();
       const data = imageData.data;
@@ -7349,12 +7373,6 @@
     }
 
     function updateDotModeUI() {
-      if (dotModeBtn) {
-        dotModeBtn.classList.add('is-active');
-        dotModeBtn.setAttribute('aria-pressed', 'true');
-        setIconButtonLabel(dotModeBtn, 'ドット設定を開く');
-      }
-      setDotSettingsOpen(dotScalePanelOpen && state.dotMode);
       if (dotScaleSelect) {
         const value = String(normalizeDotSize(state.dotScale));
         if (dotScaleSelect.value !== value) {
@@ -8850,11 +8868,6 @@
       applyCameraSettingsBatch(smoothedSettings);
       setStatus('タップ位置を基準に自動調整しました');
     }
-
-    if (video) {
-      video.addEventListener('pointerdown', handleTapAutoAdjust);
-    }
-
     if (paletteToggleBtn) {
       paletteToggleBtn.addEventListener('click', (event) => {
         event.stopPropagation();
@@ -8882,17 +8895,12 @@
       });
     }
 
-    if (dotModeBtn) {
-      dotModeBtn.addEventListener('click', (event) => {
+    settingsTabButtons.forEach((button) => {
+      button.addEventListener('click', (event) => {
         event.stopPropagation();
-        setDotMode(true);
-        if (dotScalePanelOpen && dotSettingsPanel && !dotSettingsPanel.hidden) {
-          closeAllMenus();
-        } else {
-          openMenuExclusive('dotScale');
-        }
+        setSettingsTab(button.dataset.settingsTab);
       });
-    }
+    });
 
     function getVideoCoverSourceRect(viewportWidth, viewportHeight) {
       if (!video) {
@@ -11353,22 +11361,13 @@
       });
     }
 
+
     pixelPreview.addEventListener('click', (event) => {
       event.stopPropagation();
     });
 
     document.addEventListener('click', (event) => {
       if (!openMenuKey) {
-        return;
-      }
-      if (openMenuKey === 'dotScale') {
-        if (!dotSettingsPanel || !dotModeBtn) {
-          openMenuKey = null;
-          return;
-        }
-        if (!dotSettingsPanel.contains(event.target) && !dotModeBtn.contains(event.target)) {
-          setDotSettingsOpen(false);
-        }
         return;
       }
       const entry = menus[openMenuKey];
