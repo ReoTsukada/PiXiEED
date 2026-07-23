@@ -333,97 +333,75 @@
       voxelExtension: normalizeVoxelExtensionState(payload.voxelExtension, VOXEL_EXTENSION_DEFAULT_STATE),
     };
     if (Array.isArray(payload.canvases) && payload.canvases.length) {
-      const canvases = payload.canvases.map((canvas, canvasIndex) => {
-        const canvasWidth = clamp(
-          Math.round(Number(canvas?.width) || width),
-          1,
-          4096
-        );
-        const canvasHeight = clamp(
-          Math.round(Number(canvas?.height) || height),
-          1,
-          4096
-        );
+      const resolvedActiveCanvasId = typeof payload.activeCanvasId === 'string' && payload.activeCanvasId
+        ? payload.activeCanvasId
+        : (payload.canvases[0]?.id || '');
+      const selectedCanvasIndex = Math.max(
+        0,
+        payload.canvases.findIndex(canvas => canvas?.id === resolvedActiveCanvasId)
+      );
+      const selectedCanvas = payload.canvases[selectedCanvasIndex] || payload.canvases[0];
+      if (selectedCanvas) {
+        const canvasWidth = clamp(Math.round(Number(selectedCanvas.width) || width), 1, 4096);
+        const canvasHeight = clamp(Math.round(Number(selectedCanvas.height) || height), 1, 4096);
         const canvasPixelCount = canvasWidth * canvasHeight;
-        const frameList = Array.isArray(canvas?.frames) && canvas.frames.length ? canvas.frames : framesSource;
+        const frameList = Array.isArray(selectedCanvas.frames) && selectedCanvas.frames.length
+          ? selectedCanvas.frames
+          : framesSource;
         const deserializedFrames = frameList.map((frame, frameIndex) => {
           if (!frame || !Array.isArray(frame.layers) || !frame.layers.length) {
-            throw new Error(`Canvas ${canvasIndex} frame ${frameIndex} has no layers`);
+            throw new Error(`Canvas ${selectedCanvasIndex} frame ${frameIndex} has no layers`);
           }
-          const layers = frame.layers.map((layer, layerIndex) => deserializeLayerFromDocument(
-            layer,
-            canvasPixelCount,
-            `layer-${canvasIndex}-${frameIndex}-${layerIndex}`,
-            getDefaultLayerName(layerIndex + 1),
-            canvasWidth,
-            canvasHeight,
-            { reuseTypedArrays, trustStoredLayerFlags, recoverTruncatedRasterLayers }
-          ));
           return {
-            id: typeof frame.id === 'string' ? frame.id : `frame-${canvasIndex}-${frameIndex + 1}`,
+            id: typeof frame.id === 'string' ? frame.id : `frame-${selectedCanvasIndex}-${frameIndex + 1}`,
             name: typeof frame.name === 'string' ? frame.name : getDefaultFrameName(frameIndex + 1),
             duration: clamp(Number(frame.duration) || 1000 / 12, 16, 2000),
             voxelPreviewYawDeg: normalizeVoxelPreviewYawDegrees(frame?.voxelPreviewYawDeg),
             voxelPreviewPitchDeg: normalizeVoxelPreviewPitchDegrees(frame?.voxelPreviewPitchDeg),
-            layers,
+            layers: frame.layers.map((layer, layerIndex) => deserializeLayerFromDocument(
+              layer,
+              canvasPixelCount,
+              `layer-${selectedCanvasIndex}-${frameIndex}-${layerIndex}`,
+              getDefaultLayerName(layerIndex + 1),
+              canvasWidth,
+              canvasHeight,
+              { reuseTypedArrays, trustStoredLayerFlags, recoverTruncatedRasterLayers }
+            )),
           };
         });
-        const activeFrameIndexForCanvas = clamp(
-          Math.round(Number(canvas?.activeFrame) || 0),
+        const selectedActiveFrame = clamp(
+          Math.round(Number(selectedCanvas.activeFrame) || 0),
           0,
           deserializedFrames.length - 1
         );
-        const activeFrameForCanvas = deserializedFrames[activeFrameIndexForCanvas];
-        let activeLayerIdForCanvas = typeof canvas?.activeLayer === 'string'
-          ? canvas.activeLayer
-          : activeFrameForCanvas.layers[activeFrameForCanvas.layers.length - 1].id;
-        if (!activeFrameForCanvas.layers.some(layer => layer.id === activeLayerIdForCanvas)) {
-          activeLayerIdForCanvas = activeFrameForCanvas.layers[activeFrameForCanvas.layers.length - 1].id;
-        }
-        const canvasSelectionMask = deserializeSelectionMask(
-          canvas?.selectionMask,
+        const activeCanvasFrame = deserializedFrames[selectedActiveFrame];
+        const requestedLayerId = typeof selectedCanvas.activeLayer === 'string'
+          ? selectedCanvas.activeLayer
+          : '';
+        const selectedActiveLayer = activeCanvasFrame.layers.some(layer => layer.id === requestedLayerId)
+          ? requestedLayerId
+          : activeCanvasFrame.layers[activeCanvasFrame.layers.length - 1].id;
+        activeCanvasSnapshot.width = canvasWidth;
+        activeCanvasSnapshot.height = canvasHeight;
+        activeCanvasSnapshot.scale = normalizeProjectCanvasViewScale(
+          selectedCanvas.viewScale,
+          activeCanvasSnapshot.scale || MIN_ZOOM_SCALE
+        );
+        activeCanvasSnapshot.frames = deserializedFrames;
+        activeCanvasSnapshot.activeFrame = selectedActiveFrame;
+        activeCanvasSnapshot.activeLayer = selectedActiveLayer;
+        activeCanvasSnapshot.mirror = normalizeMirrorAxisState(selectedCanvas.mirror, canvasWidth, canvasHeight);
+        activeCanvasSnapshot.selectionMask = deserializeSelectionMask(
+          selectedCanvas.selectionMask,
           canvasPixelCount,
           { reuseTypedArrays }
         );
-        const canvasSelectionContentMask = deserializeSelectionMask(
-          canvas?.selectionContentMask,
+        activeCanvasSnapshot.selectionContentMask = deserializeSelectionMask(
+          selectedCanvas.selectionContentMask,
           canvasPixelCount,
           { reuseTypedArrays }
         );
-        return {
-          id: typeof canvas?.id === 'string' && canvas.id ? canvas.id : `canvas-${canvasIndex + 1}`,
-          name: typeof canvas?.name === 'string' && canvas.name.trim() ? canvas.name : getDefaultProjectCanvasName(canvasIndex + 1),
-          width: canvasWidth,
-          height: canvasHeight,
-          viewScale: normalizeProjectCanvasViewScale(canvas?.viewScale, activeCanvasSnapshot.scale || 8),
-          frames: deserializedFrames,
-          activeFrame: activeFrameIndexForCanvas,
-          activeLayer: activeLayerIdForCanvas,
-          mirror: normalizeMirrorAxisState(canvas?.mirror, canvasWidth, canvasHeight),
-          selectionMask: canvasSelectionMask,
-          selectionContentMask: canvasSelectionContentMask,
-          selectionBounds: validateBoundsObject(canvas?.selectionBounds),
-        };
-      });
-      const resolvedActiveCanvasId = typeof payload.activeCanvasId === 'string' && payload.activeCanvasId
-        ? payload.activeCanvasId
-        : (canvases[0]?.id || '');
-      if (MULTI_CANVAS_FEATURE_ENABLED) {
-        activeCanvasSnapshot.canvases = canvases;
-        activeCanvasSnapshot.activeCanvasId = resolvedActiveCanvasId;
-      }
-      const selectedCanvas = canvases.find(canvas => canvas?.id === resolvedActiveCanvasId) || canvases[0];
-      if (selectedCanvas) {
-        activeCanvasSnapshot.width = selectedCanvas.width;
-        activeCanvasSnapshot.height = selectedCanvas.height;
-        activeCanvasSnapshot.scale = normalizeProjectCanvasViewScale(selectedCanvas.viewScale, activeCanvasSnapshot.scale || MIN_ZOOM_SCALE);
-        activeCanvasSnapshot.frames = selectedCanvas.frames;
-        activeCanvasSnapshot.activeFrame = selectedCanvas.activeFrame;
-        activeCanvasSnapshot.activeLayer = selectedCanvas.activeLayer;
-        activeCanvasSnapshot.mirror = normalizeMirrorAxisState(selectedCanvas.mirror, selectedCanvas.width, selectedCanvas.height);
-        activeCanvasSnapshot.selectionMask = selectedCanvas.selectionMask;
-        activeCanvasSnapshot.selectionContentMask = selectedCanvas.selectionContentMask;
-        activeCanvasSnapshot.selectionBounds = selectedCanvas.selectionBounds;
+        activeCanvasSnapshot.selectionBounds = validateBoundsObject(selectedCanvas.selectionBounds);
       }
     }
     return activeCanvasSnapshot;

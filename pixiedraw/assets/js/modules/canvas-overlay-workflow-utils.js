@@ -31,6 +31,31 @@
 
     return ((scope) => {
       with (scope) {
+  let selectionDashRefreshTimer = null;
+  const SELECTION_DASH_REFRESH_INTERVAL_MS = 120;
+
+  function canRenderSelectionOutlineAsSvg() {
+    return typeof SVGSVGElement !== 'undefined' && typeof SVGPathElement !== 'undefined';
+  }
+
+  function scheduleSelectionDashRefresh() {
+    if (selectionDashRefreshTimer !== null) {
+      return;
+    }
+    selectionDashRefreshTimer = window.setTimeout(() => {
+      selectionDashRefreshTimer = null;
+      requestOverlayRender();
+    }, SELECTION_DASH_REFRESH_INTERVAL_MS);
+  }
+
+  function cancelSelectionDashRefresh() {
+    if (selectionDashRefreshTimer === null) {
+      return;
+    }
+    window.clearTimeout(selectionDashRefreshTimer);
+    selectionDashRefreshTimer = null;
+  }
+
   function clearVirtualCursorCanvas() {
     if (!ctx.virtual) {
       return;
@@ -261,6 +286,7 @@
     }
     const { width, height } = state;
     if (state.playback.isPlaying) {
+      cancelSelectionDashRefresh();
       resizeVirtualCursorCanvas();
       clearVirtualCursorCanvas();
       if (ctx.overlay) {
@@ -292,9 +318,14 @@
     if (ctx.overlay) {
       ctx.overlay.clearRect(0, 0, width, height);
     }
+    // All supported browsers use the SVG outline path below. Keeping a
+    // high-resolution fallback canvas alive meant clearing up to 2048² pixels
+    // every animation frame while a selection existed, even though it was not
+    // visible. Only allocate it for the legacy fallback path.
+    const useSvgSelectionOutline = canRenderSelectionOutlineAsSvg();
     if (ctx.selection) {
       const selectionCanvas = dom.canvases.selection;
-      if (hasSelectionOutline) {
+      if (hasSelectionOutline && !useSvgSelectionOutline) {
         ensureSelectionCanvasResolution(Math.max(Number(state.scale) || MIN_ZOOM_SCALE, MIN_ZOOM_SCALE));
         const clearWidth = selectionCanvas ? selectionCanvas.width : width * state.scale;
         const clearHeight = selectionCanvas ? selectionCanvas.height : height * state.scale;
@@ -315,6 +346,7 @@
     if (hasSelectionOutline) {
       updateSelectionDashAnimation(now);
     } else {
+      cancelSelectionDashRefresh();
       resetSelectionDashAnimation();
       clearSelectionOutlineSvg();
     }
@@ -413,7 +445,10 @@
     }
 
     if (hasSelectionOutline) {
-      requestOverlayRender();
+      // The dash does not need a 60fps full-canvas redraw. Pointer events
+      // still request immediate updates while the user drags; idle animation
+      // is intentionally capped to keep editing responsive.
+      scheduleSelectionDashRefresh();
     }
   }
 
@@ -984,8 +1019,13 @@
     if (!mask) return;
     const { width, height } = state;
     const bounds = state.selectionBounds;
+    const usePixelOutline = state.selectionOutlineMode === 'pixel';
     strokeSelectionPath((pathCtx, scale) => {
-      if (width * height > SELECTION_TRANSFORM_LARGE_PREVIEW_MAX_PIXELS && bounds) {
+      // The selection data remains pixel-perfect. For broad selections the
+      // visible marching-ants line is intentionally reduced to its bounds:
+      // tracing every selected pixel into an SVG path is expensive and does
+      // not provide useful detail at that scale.
+      if (!usePixelOutline && bounds) {
         traceSelectionBoundsOutline(pathCtx, bounds, scale);
       } else {
         traceSelectionOutline(pathCtx, mask, width, height, scale);
@@ -994,6 +1034,14 @@
   }
 
   function syncSelectionOutlineToViewportTransform() {
+    const pendingMove = getPendingSelectionMoveState();
+    if (pendingMove && pendingMove.hasCleared) {
+      // During a move, state.selectionMask still describes the source. Zoom
+      // and pan must keep drawing the pending destination instead of briefly
+      // restoring a ghost outline at the cleared source position.
+      drawSelectionMovePreview(pendingMove);
+      return;
+    }
     const preview = pointerState.selectionPreview;
     if (preview && pointerState.tool === 'selectLasso') {
       drawLassoPreview(preview.points);

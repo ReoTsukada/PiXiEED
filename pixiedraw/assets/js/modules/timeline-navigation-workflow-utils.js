@@ -77,6 +77,11 @@
       : clamp(Math.round(nextIndex), 0, length - 1);
     const previousIndex = state.activeFrame;
     const previousLayerId = state.activeLayer;
+    // A selection is bound to one timeline cell. Commit/clear it before
+    // changing frames so a later operation can never affect another frame.
+    if (previousIndex !== normalizedIndex && state.selectionMask) {
+      clearSelection();
+    }
     state.activeFrame = normalizedIndex;
     if (previousIndex !== normalizedIndex) {
       if (pointerState.active) {
@@ -236,6 +241,9 @@
       syncUi: false,
       broadcastPresence: false,
     });
+    if (previousLayer !== targetLayer.id && state.selectionMask) {
+      clearSelection();
+    }
     state.activeLayer = targetLayer.id;
     const activeCanvasDoc = getActiveProjectCanvasDocument();
     if (activeCanvasDoc) {
@@ -329,6 +337,11 @@
       return getActiveLayer();
     }
     const previousLayerId = state.activeLayer;
+    // Likewise, a selection never carries over to another layer in the same
+    // frame. This keeps all canvas tools scoped to the active layer-frame.
+    if (previousLayerId !== nextLayer.id && state.selectionMask) {
+      clearSelection();
+    }
     state.activeLayer = nextLayer.id;
     const activeCanvasDoc = getActiveProjectCanvasDocument();
     if (activeCanvasDoc) {

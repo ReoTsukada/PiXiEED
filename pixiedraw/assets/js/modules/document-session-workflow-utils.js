@@ -258,19 +258,40 @@
         // Ignore guard failures and continue to load.
       }
     }
+    const openPerformance = window.PiXiEEDrawOpenPerformance;
+    const ownsPerformanceTrace = !openPerformance?.getActiveId?.();
+    const openPerformanceId = ownsPerformanceTrace
+      ? (openPerformance?.start?.({
+          source: 'external-file',
+          autosaveSchemaVersion: 0,
+          inputBytes: Math.max(0, Math.round(Number(blob?.size) || 0)),
+        }) || '')
+      : '';
     let parsedDocument = options?.preparedSnapshot && typeof options.preparedSnapshot === 'object'
       ? options.preparedSnapshot
       : null;
     if (!parsedDocument) {
+      const fileDecodeStage = openPerformance?.beginStage?.('external-file-decode');
       try {
         parsedDocument = await snapshotFromDocumentBlob(blob);
+        openPerformance?.endStage?.(fileDecodeStage);
       } catch (error) {
+        openPerformance?.endStage?.(fileDecodeStage, { failed: true });
+        if (openPerformanceId) {
+          openPerformance?.abort?.(openPerformanceId, {
+            reason: 'external-file-decode-failed',
+            errorCode: error?.code || '',
+          });
+        }
         console.warn('Failed to parse document blob', error);
         updateAutosaveStatus('ドキュメントの読み込みに失敗しました', 'error');
         return false;
       }
     }
     if (!await confirmLegacyV2MigrationIfNeeded(parsedDocument, options)) {
+      if (openPerformanceId) {
+        openPerformance?.abort?.(openPerformanceId, { reason: 'migration-declined' });
+      }
       return false;
     }
     const forceV2WorkingCopy = needsLegacyV2MigrationConsent(parsedDocument)
@@ -280,11 +301,32 @@
       ...options,
       forceV2WorkingCopy,
     });
-    return await applyLoadedDocumentSnapshot(parsedDocument, {
-      ...options,
-      forceV2WorkingCopy,
-      sourcePersistenceState,
-    });
+    let loaded = false;
+    try {
+      loaded = await applyLoadedDocumentSnapshot(parsedDocument, {
+        ...options,
+        forceV2WorkingCopy,
+        sourcePersistenceState,
+      });
+    } catch (error) {
+      if (openPerformanceId) {
+        openPerformance?.abort?.(openPerformanceId, {
+          reason: 'apply-exception',
+          errorCode: error?.code || '',
+        });
+      }
+      throw error;
+    }
+    if (openPerformanceId) {
+      if (loaded && loaded !== 'deferred') {
+        openPerformance?.finishAfterPaint?.(openPerformanceId, { status: 'success' });
+      } else {
+        openPerformance?.abort?.(openPerformanceId, {
+          reason: loaded === 'deferred' ? 'deferred' : 'apply-failed',
+        });
+      }
+    }
+    return loaded;
   }
 
   async function loadDocumentFromProjectPayload(projectPayload, options = {}) {
@@ -309,6 +351,8 @@
       }
     }
     let parsedDocument = null;
+    const openPerformance = window.PiXiEEDrawOpenPerformance;
+    const deserializeStage = openPerformance?.beginStage?.('payload-deserialize');
     const trustedAutosaveSchemaVersion = Number(options?.trustedAutosaveSchemaVersion) === 2 ? 2 : 0;
     const parseStartedAt = typeof performance !== 'undefined' && typeof performance.now === 'function'
       ? performance.now()
@@ -324,12 +368,18 @@
           recoverTruncatedRasterLayers: trustedAutosaveSchemaVersion === 2,
         });
     } catch (error) {
+      openPerformance?.endStage?.(deserializeStage, {
+        failed: true,
+        trustedAutosaveSchemaVersion,
+      });
       console.warn('Failed to parse in-memory project payload', error);
       if (!options?.suppressAutosaveStatus) {
         updateAutosaveStatus('ドキュメントの読み込みに失敗しました', 'error');
       }
       return false;
     }
+    openPerformance?.endStage?.(deserializeStage, { trustedAutosaveSchemaVersion });
+    openPerformance?.annotateDocument?.(parsedDocument?.snapshot);
     console.info('[pixiedraw:open-apply]', {
       phase: 'payload-deserialize-complete',
       trustedAutosaveSchemaVersion,
@@ -396,11 +446,20 @@
     }
     let normalizedProjectId = normalizeAutosaveProjectId(projectId || autosaveProjectId || '') || createAutosaveProjectId();
     if (packagedSheets.length > 1) {
-      const migration = await migrateLegacyMultiProjectPackage?.({
-        sourceProjectId: normalizedProjectId,
-        sheets: packagedSheets,
-        activeSheetId: parsedDocument?.activeSheetId || '',
-      });
+      const legacySplitStage = window.PiXiEEDrawOpenPerformance?.beginStage?.('legacy-project-split');
+      let migration = null;
+      try {
+        migration = await migrateLegacyMultiProjectPackage?.({
+          sourceProjectId: normalizedProjectId,
+          sheets: packagedSheets,
+          activeSheetId: parsedDocument?.activeSheetId || '',
+        });
+      } finally {
+        window.PiXiEEDrawOpenPerformance?.endStage?.(legacySplitStage, {
+          sourceProjectCount: packagedSheets.length,
+          createdProjectCount: migration?.projectIds?.length || 0,
+        });
+      }
       if (!migration || (migration.migrated !== true && migration.reason !== 'already-migrated')) {
         const error = new Error(`Legacy multi-project conversion failed: ${migration?.reason || 'unknown'}`);
         error.code = 'ERR_LEGACY_MULTI_PROJECT_CONVERSION_FAILED';
@@ -538,21 +597,30 @@
     if (legacyCanvases.length > 1 && !hasLegacyMultiProjectSheets) {
       const sourceProjectId = normalizeAutosaveProjectId(options?.projectId || '') || createAutosaveProjectId();
       const activeCanvasId = typeof snapshot.activeCanvasId === 'string' ? snapshot.activeCanvasId : '';
-      const migration = await migrateLegacyMultiProjectPackage?.({
-        sourceProjectId,
-        sourceProject: {
-          type: 'pixieedraw-project',
-          packageVersion: 2,
-          projectLayout: 'legacy-multi-canvas',
-          document: { ...snapshot, canvases: legacyCanvases, activeCanvasId },
-          session: projectSession || {},
-          canonicalPayloadFormat: parsedDocument?.canonicalPayloadFormat || '',
-          canonicalSchemaVersion: parsedDocument?.canonicalSchemaVersion || 0,
-          canonicalSourceMetadata: parsedDocument?.canonicalSourceMetadata || null,
-        },
-        canvases: legacyCanvases,
-        activeCanvasId,
-      });
+      const legacyCanvasSplitStage = window.PiXiEEDrawOpenPerformance?.beginStage?.('legacy-canvas-split');
+      let migration = null;
+      try {
+        migration = await migrateLegacyMultiProjectPackage?.({
+          sourceProjectId,
+          sourceProject: {
+            type: 'pixieedraw-project',
+            packageVersion: 2,
+            projectLayout: 'legacy-multi-canvas',
+            document: { ...snapshot, canvases: legacyCanvases, activeCanvasId },
+            session: projectSession || {},
+            canonicalPayloadFormat: parsedDocument?.canonicalPayloadFormat || '',
+            canonicalSchemaVersion: parsedDocument?.canonicalSchemaVersion || 0,
+            canonicalSourceMetadata: parsedDocument?.canonicalSourceMetadata || null,
+          },
+          canvases: legacyCanvases,
+          activeCanvasId,
+        });
+      } finally {
+        window.PiXiEEDrawOpenPerformance?.endStage?.(legacyCanvasSplitStage, {
+          sourceCanvasCount: legacyCanvases.length,
+          createdProjectCount: migration?.projectIds?.length || 0,
+        });
+      }
       if (!migration || (migration.migrated !== true && migration.reason !== 'already-migrated')) {
         const error = new Error(`Legacy multi-canvas conversion failed: ${migration?.reason || 'unknown'}`);
         error.code = 'ERR_LEGACY_MULTI_CANVAS_CONVERSION_FAILED';
@@ -607,7 +675,9 @@
       && options?.projectId
       && typeof loadPersistedTimelapseSnapshots === 'function'
     ) {
+      const timelapseLookupStage = openPerformance?.beginStage?.('timelapse-archive-lookup');
       const persistedTimelapse = await loadPersistedTimelapseSnapshots(options.projectId, { throwOnError: false });
+      openPerformance?.endStage?.(timelapseLookupStage);
       hasArchivedTimelapse = Object.values(persistedTimelapse || {}).some(entries => (
         Array.isArray(entries) && entries.length > 0
       ));
@@ -619,6 +689,7 @@
       && !isSharedProjectLoad
     ) {
       let optimizationStatusAnnounced = false;
+      const scaleOptimizationStage = openPerformance?.beginStage?.('integer-scale-inspection');
       nativeScaleOptimization = await scaleOptimizer(snapshot, {
         onProgress: () => {
           if (!optimizationStatusAnnounced && !options?.suppressAutosaveStatus) {
@@ -626,6 +697,11 @@
             updateAutosaveStatus('ドット倍率を確認しています…', 'info');
           }
         },
+      });
+      openPerformance?.endStage?.(scaleOptimizationStage, {
+        optimized: nativeScaleOptimization?.optimized === true,
+        factor: Math.max(1, Math.round(Number(nativeScaleOptimization?.factor) || 1)),
+        reason: nativeScaleOptimization?.reason || '',
       });
     } else if (hasTimelapseEdits || hasArchivedTimelapse) {
       nativeScaleOptimization = {
@@ -670,18 +746,24 @@
       });
     }
 
+    let snapshotApplyResult = null;
     autosaveRestoring = true;
     try {
-      applyHistorySnapshot(snapshot, {
-        forcePalettePresetSync: true,
-        preserveView: Boolean(options?.preserveView),
-        preserveDocumentIds: Boolean(
-          options?.preserveDocumentIds
-          || options?.preserveCanvasIds
-          || options?.preserveFrameIds
-          || options?.preserveLayerIds
-        ),
-      });
+      const applySnapshotStage = openPerformance?.beginStage?.('snapshot-apply-total');
+      try {
+        snapshotApplyResult = applyHistorySnapshot(snapshot, {
+          forcePalettePresetSync: true,
+          preserveView: Boolean(options?.preserveView),
+          preserveDocumentIds: Boolean(
+            options?.preserveDocumentIds
+            || options?.preserveCanvasIds
+            || options?.preserveFrameIds
+            || options?.preserveLayerIds
+          ),
+        });
+      } finally {
+        openPerformance?.endStage?.(applySnapshotStage);
+      }
       history.pending = null;
       if (projectSession) {
         history.limit = projectSession.historyLimit;
@@ -691,31 +773,9 @@
         history.past = [];
         history.future = [];
 
+        // Legacy full-document operation logs are intentionally not hydrated.
+        // New recording uses lightweight debounced visible-frame snapshots.
         timelapseState.tracksByCanvasId = Object.create(null);
-        Object.entries(projectSession.timelapse.tracksByCanvasId || {}).forEach(([canvasId, track]) => {
-          timelapseState.tracksByCanvasId[canvasId] = {
-            snapshots: Array.isArray(track?.snapshots) ? track.snapshots.slice() : [],
-            serializedSnapshots: Array.isArray(track?.serializedSnapshots)
-              ? track.serializedSnapshots.slice()
-              : [],
-            operationLog: track?.operationLog && typeof track.operationLog === 'object'
-              ? {
-                  version: 1,
-                  baseSnapshot: track.operationLog.baseSnapshot || null,
-                  entries: Array.isArray(track.operationLog.entries)
-                    ? track.operationLog.entries
-                      .map(entry => normalizeSerializedTimelapseOperationEntry(entry))
-                      .filter(Boolean)
-                    : [],
-                }
-              : null,
-            warningShown: Boolean(track?.warningShown),
-            sampleStep: Math.max(1, Math.round(Number(track?.sampleStep) || 1)),
-            lastCaptureToken: Number.isFinite(Number(track?.lastCaptureToken))
-              ? Math.round(Number(track.lastCaptureToken))
-              : -1,
-          };
-        });
         timelapseState.enabled = true;
         timelapseState.fps = projectSession.timelapse.fps;
         if (projectSession.localViewportCanvases) {
@@ -731,7 +791,6 @@
         clearTimelapseRecording({ silent: true, scope: 'all' });
       }
       reconcileTimelapseTracksForSingleCanvas();
-      ensureTimelapseStartCapture();
     } finally {
       autosaveRestoring = false;
     }
@@ -826,9 +885,31 @@
     } else if (!requestedSharedProjectId) {
       clearActiveSharedProjectSession();
     }
-    markAutosaveDirty();
     scheduleSessionPersist();
-    scheduleAutosaveSnapshot();
+    if (snapshotApplyResult?.legacyRgbMigrationComplete === true) {
+      markAutosaveDirty();
+      markActiveLocalProjectJournalNeedsCheckpoint?.(autosaveProjectId);
+      console.info('[pixiedraw:rgb-migration]', {
+        phase: 'checkpoint-requested',
+        projectId: autosaveProjectId,
+        remainingDirectPixelData: false,
+      });
+      requestImmediateAutosaveSnapshot?.();
+    } else if (
+      options?.openedFromRecent === true
+      && Number(options?.trustedAutosaveSchemaVersion) === 2
+      && nativeScaleOptimization.optimized !== true
+      && options?.fileLoad !== true
+      && options?.forceV2WorkingCopy !== true
+    ) {
+      console.info('[pixiedraw:autosave]', {
+        phase: 'clean-v2-open-save-skipped',
+        projectId: autosaveProjectId,
+      });
+    } else {
+      markAutosaveDirty();
+      scheduleAutosaveSnapshot();
+    }
     if (!options?.suppressAutosaveStatus) {
       if (nativeScaleOptimization.optimized) {
         updateAutosaveStatus(
@@ -906,6 +987,7 @@
       snapshots.push({
         width: resolved.width,
         height: resolved.height,
+        frameId: typeof entry.frameId === 'string' ? entry.frameId : '',
         pixels: encodeTypedArray(resolved.pixels),
       });
     });
@@ -1006,17 +1088,23 @@
     const payload = {};
     Object.entries(getAllTimelapseTracks()).forEach(([canvasId, track]) => {
       const log = track?.operationLog && typeof track.operationLog === 'object' ? track.operationLog : null;
-      if (!log?.baseSnapshot || !Array.isArray(log.entries)) {
+      if (!log || !Array.isArray(log.entries)) {
         return;
       }
       const entries = log.entries
         .map(entry => normalizeSerializedTimelapseOperationEntry(entry))
         .filter(Boolean);
-      payload[canvasId] = {
-        version: 1,
-        baseSnapshot: log.baseSnapshot,
-        entries,
-      };
+      payload[canvasId] = log.version === 2
+        ? {
+            version: 2,
+            visualBaseSnapshotIndex: Math.max(0, Math.round(Number(log.visualBaseSnapshotIndex) || 0)),
+            visualBaseFrameId: typeof log.visualBaseFrameId === 'string' ? log.visualBaseFrameId : '',
+            entries,
+          }
+        : (log.baseSnapshot
+          ? { version: 1, baseSnapshot: log.baseSnapshot, entries }
+          : null);
+      if (!payload[canvasId]) delete payload[canvasId];
     });
     return payload;
   }
@@ -1118,6 +1206,7 @@
         restored.push({
           width,
           height,
+          frameId: typeof entry.frameId === 'string' ? entry.frameId : '',
           pixels: compressUint8Array(pixels, { clamped: true }),
         });
       } catch (error) {
@@ -1172,7 +1261,7 @@
     }
     Object.entries(byCanvas).forEach(([canvasId, logPayload]) => {
       const resolvedCanvasId = normalizeTimelapseCanvasId(canvasId, fallbackCanvasId);
-      if (!resolvedCanvasId || !logPayload || typeof logPayload !== 'object' || !logPayload.baseSnapshot) {
+      if (!resolvedCanvasId || !logPayload || typeof logPayload !== 'object') {
         return;
       }
       const entries = Array.isArray(logPayload.entries)
@@ -1180,11 +1269,17 @@
           .map(entry => normalizeSerializedTimelapseOperationEntry(entry))
           .filter(Boolean)
         : [];
-      restored[resolvedCanvasId] = {
-        version: 1,
-        baseSnapshot: logPayload.baseSnapshot,
-        entries,
-      };
+      restored[resolvedCanvasId] = Number(logPayload.version) === 2
+        ? {
+            version: 2,
+            visualBaseSnapshotIndex: Math.max(0, Math.round(Number(logPayload.visualBaseSnapshotIndex) || 0)),
+            visualBaseFrameId: typeof logPayload.visualBaseFrameId === 'string' ? logPayload.visualBaseFrameId : '',
+            entries,
+          }
+        : (logPayload.baseSnapshot
+          ? { version: 1, baseSnapshot: logPayload.baseSnapshot, entries }
+          : null);
+      if (!restored[resolvedCanvasId]) delete restored[resolvedCanvasId];
     });
     return restored;
   }

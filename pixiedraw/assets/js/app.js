@@ -127,7 +127,6 @@
       extensions: document.getElementById('panelExtensions'),
       help: document.getElementById('panelHelp'),
       file: document.getElementById('panelFile'),
-      multi: document.getElementById('panelMulti'),
     },
     canvases: {
       stack: document.getElementById('canvasStack'),
@@ -140,19 +139,13 @@
     viewportWorkspace: document.getElementById('viewportWorkspace'),
     mainCanvasArea: document.getElementById('mainCanvasArea'),
     mainCanvasSurfaceBadge: document.getElementById('mainCanvasSurfaceBadge'),
-    localCanvasDock: document.getElementById('localCanvasDock'),
     canvasResizePreview: document.getElementById('canvasResizePreview'),
     canvasResizeHandleStart: document.getElementById('canvasResizeHandleStart'),
     canvasResizeHandleCorner: document.getElementById('canvasResizeHandleCorner'),
-    projectTabsBar: document.getElementById('projectTabsBar'),
-    projectTabsStatusSlot: document.getElementById('projectTabsStatusSlot'),
-    projectTabsList: document.getElementById('projectTabsList'),
     editorCommandLaneActions: document.getElementById('editorCommandLaneActions'),
     projectHomeScreen: document.getElementById('projectHomeScreen'),
     projectHomeNew: document.getElementById('projectHomeNew'),
     projectHomeOpen: document.getElementById('projectHomeOpen'),
-    projectHomeJoinProjectKey: document.getElementById('projectHomeJoinProjectKey'),
-    projectHomeApplyAccessCode: document.getElementById('projectHomeApplyAccessCode'),
     projectHomeRecentSection: document.getElementById('projectHomeRecentProjects'),
     projectHomeRecentList: document.getElementById('projectHomeRecentList'),
     mirrorToolPopover: document.getElementById('mirrorToolPopover'),
@@ -539,10 +532,6 @@
       palettePresetPicker: document.getElementById('newProjectPalettePresetPicker'),
       palettePresetPickerButton: document.getElementById('newProjectPalettePresetPickerButton'),
       palettePresetPickerMenu: document.getElementById('newProjectPalettePresetPickerMenu'),
-      createMode: document.getElementById('newProjectCreateMode'),
-      modeLocal: document.getElementById('newProjectModeLocal'),
-      modeShared: document.getElementById('newProjectModeShared'),
-      modeButtons: Array.from(document.querySelectorAll('#newProjectDialog [data-create-mode]')),
       adContainer: document.getElementById('newProjectAdContainer'),
       adSlot: document.getElementById('newProjectAdSlot'),
       cancel: document.getElementById('cancelNewProject'),
@@ -1664,11 +1653,13 @@
   const TIMELAPSE_DEFAULT_FPS = 12;
   const TIMELAPSE_MIN_FPS = 1;
   const TIMELAPSE_MAX_FPS = 60;
-  const TIMELAPSE_MAX_STEPS = 120;
+  // Lightweight visual timelapse: retain a small sequence of rendered canvas
+  // states, not a replayable clone of the entire editable document.
+  const TIMELAPSE_MAX_STEPS = 60;
   const TIMELAPSE_OPERATION_LOG_MAX_ENTRIES = isLightweightPersistenceMode() ? 120 : 240;
   const TIMELAPSE_OPERATION_LOG_RECENT_ENTRIES = isLightweightPersistenceMode() ? 60 : 120;
   const TIMELAPSE_OPERATION_LOG_MAX_CHANGES = isLightweightPersistenceMode() ? 8192 : 32768;
-  const TIMELAPSE_CAPTURE_DEBOUNCE_MS = isLightweightPersistenceMode() ? 1000 : 48;
+  const TIMELAPSE_CAPTURE_DEBOUNCE_MS = 800;
   const timelapseUtils = window.PiXiEEDrawModules?.timelapseUtils?.createTimelapseUtils?.({
     TIMELAPSE_DEFAULT_FPS,
     TIMELAPSE_MIN_FPS,
@@ -5604,6 +5595,8 @@
   set clamp(value) { clamp = value; },
   get compositeFramePixels() { return compositeFramePixels; },
   set compositeFramePixels(value) { compositeFramePixels = value; },
+  get ctx() { return ctx; },
+  set ctx(value) { ctx = value; },
   get clearPersistedTimelapseSnapshots() { return clearPersistedTimelapseSnapshots; },
   set clearPersistedTimelapseSnapshots(value) { clearPersistedTimelapseSnapshots = value; },
   get compressUint8Array() { return compressUint8Array; },
@@ -7085,6 +7078,8 @@
   set loadPersistedTimelapseSnapshots(value) { loadPersistedTimelapseSnapshots = value; },
   get markAutosaveDirty() { return markAutosaveDirty; },
   set markAutosaveDirty(value) { markAutosaveDirty = value; },
+  get markActiveLocalProjectJournalNeedsCheckpoint() { return markActiveLocalProjectJournalNeedsCheckpoint; },
+  set markActiveLocalProjectJournalNeedsCheckpoint(value) { markActiveLocalProjectJournalNeedsCheckpoint = value; },
   get migrateLegacyMultiProjectPackage() { return migrateLegacyMultiProjectPackage; },
   set migrateLegacyMultiProjectPackage(value) { migrateLegacyMultiProjectPackage = value; },
   get normalizeAutosaveProjectId() { return normalizeAutosaveProjectId; },
@@ -7123,6 +7118,8 @@
   set reconcileTimelapseTracksForSingleCanvas(value) { reconcileTimelapseTracksForSingleCanvas = value; },
   get requestLegacyV2MigrationConsent() { return requestLegacyV2MigrationConsent; },
   set requestLegacyV2MigrationConsent(value) { requestLegacyV2MigrationConsent = value; },
+  get requestImmediateAutosaveSnapshot() { return requestImmediateAutosaveSnapshot; },
+  set requestImmediateAutosaveSnapshot(value) { requestImmediateAutosaveSnapshot = value; },
   get renderOpenProjectTabs() { return renderOpenProjectTabs; },
   set renderOpenProjectTabs(value) { renderOpenProjectTabs = value; },
   get resetDocumentUnsavedChanges() { return resetDocumentUnsavedChanges; },
@@ -11046,6 +11043,9 @@
       preserveSharedProjectDocumentIdentity = false,
     } = {}
   ) {
+    const openPerformance = window.PiXiEEDrawOpenPerformance;
+    let legacyRgbMigrationResult = null;
+    const projectDataStage = openPerformance?.beginStage?.('project-data-clone');
     snapshot = preserveSharedProjectDocumentIdentity
       ? remapSharedProjectHistorySnapshotIdentity(snapshot)
       : snapshot;
@@ -11145,6 +11145,19 @@
       voxelPreviewPitchDeg: normalizeVoxelPreviewPitchDegrees(frame?.voxelPreviewPitchDeg),
       layers: frame.layers.map(layer => cloneLayerForSnapshot(layer)),
     }));
+    // `replaceProjectCanvasDocuments()` and the assignment above intentionally
+    // clone the incoming pixels independently. Legacy RGB conversion walks the
+    // project-canvas documents, while persistence snapshots read `state.frames`.
+    // Point the active single-canvas document at the authoritative editing
+    // frames before conversion so the indexed result is also persisted and is
+    // not recomputed on every project open.
+    const activeProjectCanvasForLoadedFrames = getActiveProjectCanvasDocument();
+    if (activeProjectCanvasForLoadedFrames) {
+      activeProjectCanvasForLoadedFrames.frames = state.frames;
+    }
+    openPerformance?.endStage?.(projectDataStage, {
+      frameCount: state.frames.length,
+    });
     const frameCount = Array.isArray(state.frames) ? state.frames.length : 0;
     const requestedActiveFrame = Object.prototype.hasOwnProperty.call(snapshot, 'activeFrame')
       ? snapshot.activeFrame
@@ -11167,8 +11180,24 @@
       state.activeFrame = 0;
       state.activeLayer = null;
     }
+    if (activeProjectCanvasForLoadedFrames) {
+      activeProjectCanvasForLoadedFrames.activeFrame = state.activeFrame;
+      activeProjectCanvasForLoadedFrames.activeLayer = state.activeLayer;
+    }
     if (shouldConvertLegacyRgb) {
-      convertCurrentDocumentRgbPixelsToIndexedPalette();
+      const rgbConversionStage = openPerformance?.beginStage?.('rgb-to-indexed-conversion');
+      try {
+        const conversionResult = convertCurrentDocumentRgbPixelsToIndexedPalette();
+        legacyRgbMigrationResult = conversionResult;
+        openPerformance?.endStage?.(rgbConversionStage, {
+          convertedPixels: Math.max(0, Math.round(Number(conversionResult?.convertedPixels) || 0)),
+          paletteSize: Math.max(0, Math.round(Number(conversionResult?.paletteSize) || state.palette.length)),
+          remainingDirectPixelData: frameListHasDirectPixelData(state.frames),
+        });
+      } catch (error) {
+        openPerformance?.endStage?.(rgbConversionStage, { failed: true });
+        throw error;
+      }
     }
     if (Object.prototype.hasOwnProperty.call(snapshot, 'selectionMask')) {
       state.selectionMask = snapshot.selectionMask ? new Uint8Array(snapshot.selectionMask) : null;
@@ -11267,8 +11296,11 @@
     ensureLocalViewportCanvasEntries();
     bindActiveCanvasSurface(getProjectCanvasSurfaceForIndex(getActiveProjectCanvasIndex()) || mainViewportCanvasSurface);
 
+    const canvasRenderStage = openPerformance?.beginStage?.('initial-canvas-render');
     resizeCanvases();
     renderAllProjectCanvasSurfaces();
+    openPerformance?.endStage?.(canvasRenderStage);
+    const timelineRenderStage = openPerformance?.beginStage?.('timeline-dom-render');
     if (shouldDeferTimelineMatrixRender(state.frames)) {
       timelineMatrixRenderKey = '';
       scheduleDeferredTimelineMatrixRender();
@@ -11276,6 +11308,10 @@
       renderFrameList();
     }
     renderLayerList();
+    openPerformance?.endStage?.(timelineRenderStage, {
+      deferred: shouldDeferTimelineMatrixRender(state.frames),
+      frameCount: state.frames.length,
+    });
     renderPalette();
     syncPaletteInputs();
     applyUiTheme(state.uiTheme, { persist: false, syncControl: false });
@@ -11297,6 +11333,14 @@
     if (isMultiMasterMode() && !multiState.applyRemoteInProgress) {
       scheduleMultiSessionStateBroadcast({ immediate: false });
     }
+    return {
+      legacyRgbMigrated: Boolean(shouldConvertLegacyRgb),
+      legacyRgbMigrationComplete: Boolean(
+        shouldConvertLegacyRgb
+        && !frameListHasDirectPixelData(state.frames)
+      ),
+      legacyRgbMigrationResult,
+    };
   }
 
   const exportSession = window.PiXiEEDrawModules?.exportSession?.createExportSession?.({
@@ -12685,7 +12729,7 @@
   function beginHistory(label) {
     if (history.pending) return;
     if (shouldRecordLocalTimelapseOperationLog()) {
-      ensureTimelapseOperationLogBase(getActiveProjectCanvasDocument()?.id || '');
+      scheduleTimelapseOperationLogBase(getActiveProjectCanvasDocument()?.id || '');
     }
     const pixelPatchPending = canUsePixelPatchHistory(label)
       ? createPixelPatchHistoryPending(label)
@@ -13548,24 +13592,62 @@
     return sharedProjectSessionStateUtilsModule.canPersistActiveSharedProjectDocument(...args);
   }
 
-  function markAutosaveDirty(...args) {
-    return sharedProjectSessionStateUtilsModule.markAutosaveDirty(...args);
+  function markAutosaveDirty() {
+    autosaveDirty = true;
+    autosaveDirtyGeneration += 1;
   }
 
-  function handleAutosavePageHide(...args) {
-    return sharedProjectSessionStateUtilsModule.handleAutosavePageHide(...args);
+  function persistLocalStateBeforePageExit() {
+    if (RELOAD_SNAPSHOT_ENABLED) {
+      persistReloadSessionSnapshot();
+      persistReloadProjectFallback();
+      persistReloadTargetProjectId();
+    }
+    if (canUseSessionStorage) {
+      persistSessionState();
+    }
+    flushPendingTimelapseCapture({ force: true });
+    flushAutosaveSnapshotOnLifecycle({ force: true });
   }
 
-  function handleAutosaveVisibilityChange(...args) {
-    return sharedProjectSessionStateUtilsModule.handleAutosaveVisibilityChange(...args);
+  function handleAutosavePageHide() {
+    persistLocalStateBeforePageExit();
   }
 
-  function scheduleAppReload(...args) {
-    return sharedProjectSessionStateUtilsModule.scheduleAppReload(...args);
+  function handleAutosaveVisibilityChange() {
+    if (document.visibilityState === 'hidden') {
+      persistLocalStateBeforePageExit();
+    }
   }
 
-  function requestManualAppReload(...args) {
-    return sharedProjectSessionStateUtilsModule.requestManualAppReload(...args);
+  function scheduleAppReload() {
+    if (appReloadInProgress) {
+      return;
+    }
+    appReloadInProgress = true;
+    try {
+      persistCriticalSessionStateForNavigation();
+    } catch (_error) {}
+    try {
+      armMobileBackBeforeUnloadBypass();
+    } catch (_error) {}
+    window.setTimeout(() => {
+      try {
+        window.location.reload();
+      } catch (_error) {
+        window.location.href = window.location.href;
+      }
+    }, 120);
+  }
+
+  function requestManualAppReload() {
+    try {
+      persistCriticalSessionStateForNavigation();
+      flushAutosaveSnapshotOnLifecycle({ force: true });
+    } catch (error) {
+      console.warn('Failed to persist state before manual reload', error);
+    }
+    scheduleAppReload();
   }
 
   function markSharedProjectTrafficActivity(...args) {
@@ -14233,6 +14315,8 @@
   set queueSharedProjectCurrentSnapshotCapture(value) { queueSharedProjectCurrentSnapshotCapture = value; },
   get recordTimelapseOperationLogEntry() { return recordTimelapseOperationLogEntry; },
   set recordTimelapseOperationLogEntry(value) { recordTimelapseOperationLogEntry = value; },
+  get scheduleTimelapseOperationLogBase() { return scheduleTimelapseOperationLogBase; },
+  set scheduleTimelapseOperationLogBase(value) { scheduleTimelapseOperationLogBase = value; },
   get requestImmediateAutosaveSnapshot() { return requestImmediateAutosaveSnapshot; },
   set requestImmediateAutosaveSnapshot(value) { requestImmediateAutosaveSnapshot = value; },
   get scheduleAutosaveSnapshot() { return scheduleAutosaveSnapshot; },
@@ -15240,6 +15324,10 @@
     return timelapseSessionUtilsModule.recordTimelapseOperationLogEntry(...args);
   }
 
+  function scheduleTimelapseOperationLogBase(...args) {
+    return timelapseSessionUtilsModule.scheduleTimelapseOperationLogBase(...args);
+  }
+
   function reconcileTimelapseTracksForSingleCanvas(...args) {
     return timelapseSessionUtilsModule.reconcileTimelapseTracksForSingleCanvas(...args);
   }
@@ -15322,6 +15410,8 @@
   set canSelectSharedProjectTimelineCell(value) { canSelectSharedProjectTimelineCell = value; },
   get clamp() { return clamp; },
   set clamp(value) { clamp = value; },
+  get clearSelection() { return clearSelection; },
+  set clearSelection(value) { clearSelection = value; },
   get commitHistory() { return commitHistory; },
   set commitHistory(value) { commitHistory = value; },
   get compactInactiveRasterFrameIndices() { return compactInactiveRasterFrameIndices; },
@@ -15845,7 +15935,11 @@
     const requireComplete = options?.requireComplete === true;
     const contextProjectId = normalizeAutosaveProjectId(options?.projectId || autosaveProjectId || '');
     assertAutosaveProjectContext(contextProjectId);
-    timelapseState.enabled = true;
+    if (!requireComplete) {
+      // Avoid disk-backed operation-log hydration on autosave. The lightweight
+      // recorder keeps only debounced visible-frame snapshots in this session.
+      return buildProjectSessionPayload();
+    }
     ensureTimelapseStartCapture();
     flushPendingTimelapseCapture({ force: true });
     const tracks = getAllTimelapseTracks();
@@ -17934,6 +18028,9 @@
     if (!ensureCurrentClientCanReplaceActiveProject({ announce: !silent })) {
       return false;
     }
+    const openPerformance = window.PiXiEEDrawOpenPerformance;
+    let openPerformanceId = '';
+    let openPerformanceCompletionScheduled = false;
     try {
       const replaceOpenProjectTabs = options.replaceOpenProjectTabs === true || openProjectTabs.length === 0;
       const allowProjectMismatchLoad = Boolean(options.allowProjectMismatchLoad || replaceOpenProjectTabs);
@@ -17953,12 +18050,22 @@
           silent,
         });
       }
+      openPerformanceId = openPerformance?.start?.({
+        source: Number(latestEntry.autosaveSchemaVersion) === 2 ? 'indexeddb-v2' : 'recent-local',
+        autosaveSchemaVersion: Number(latestEntry.autosaveSchemaVersion) || 0,
+      }) || '';
       const finishRecentProjectOpen = (message = '自動保存: 端末内プロジェクトを開きました') => {
         if (!silent) {
           updateAutosaveStatus(message, 'success');
         }
         if (hideStartupOnSuccess) {
           hideStartupScreen();
+        }
+        if (openPerformanceId) {
+          openPerformanceCompletionScheduled = openPerformance?.finishAfterPaint?.(
+            openPerformanceId,
+            { status: 'success' }
+          ) === true;
         }
         return true;
       };
@@ -18133,10 +18240,27 @@
       return false;
     } catch (error) {
       console.warn('Failed to open recent project', error);
+      if (openPerformanceId) {
+        openPerformance?.abort?.(openPerformanceId, {
+          reason: 'exception',
+          errorCode: error?.code || '',
+        });
+        openPerformanceCompletionScheduled = true;
+      }
       if (!silent) {
         updateAutosaveStatus('プロジェクトを開けませんでした', 'error');
       }
       return false;
+    } finally {
+      if (
+        openPerformanceId
+        && !openPerformanceCompletionScheduled
+        && openPerformance?.isPending?.(openPerformanceId)
+      ) {
+        openPerformance?.abort?.(openPerformanceId, {
+          reason: 'open-returned-without-success',
+        });
+      }
     }
   }
 
@@ -19949,10 +20073,6 @@
           state.floatingPreview,
           FLOATING_PREVIEW_DEFAULT_STATE
         ),
-        localViewportCanvases: normalizeLocalViewportCanvasState(
-          localViewportCanvasState,
-          LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE
-        ),
         layerVisibilityById: serializeLocalLayerVisibilityMap(localLayerVisibilityById),
         layerPreviewOpacityById: serializeLocalLayerPreviewOpacityMap(localLayerPreviewOpacityById),
         showChecker: Boolean(state.showChecker),
@@ -19988,21 +20108,6 @@
         exportGridTileHeight: normalizeExportGridTileSize(exportGridTileHeight, 8),
         timelapseEnabled: Boolean(timelapseState.enabled),
         timelapseFps: normalizeTimelapseFps(timelapseState.fps),
-        multiMaxGuests: normalizeMultiMaxGuests(multiState.maxGuests, MULTI_DEFAULT_GUEST_LIMIT),
-        multiRoomVisibility: normalizeMultiRoomVisibility(
-          multiState.roomVisibility,
-          MULTI_DEFAULT_ROOM_VISIBILITY
-        ),
-        multiJoinPolicy: normalizeMultiJoinPolicy(
-          multiState.joinPolicy,
-          MULTI_DEFAULT_JOIN_POLICY
-        ),
-        multiParticipantFreeCellMove: Boolean(multiState.participantFreeCellMove),
-        multiMasterOpsMode: Boolean(multiState.masterOpsMode),
-        multiExportPermission: normalizeMultiExportPermission(
-          multiState.exportPermission,
-          MULTI_DEFAULT_EXPORT_PERMISSION
-        ),
       };
       window.localStorage.setItem(getScopedStorageKey(SESSION_STORAGE_KEY), JSON.stringify(snapshot));
     } catch (error) {
@@ -20226,33 +20331,6 @@
     timelapseState.enabled = true;
     if (Number.isFinite(payload.timelapseFps)) {
       timelapseState.fps = normalizeTimelapseFps(payload.timelapseFps);
-    }
-    if (Number.isFinite(payload.multiMaxGuests)) {
-      multiState.maxGuests = normalizeMultiMaxGuests(payload.multiMaxGuests, multiState.maxGuests);
-    }
-    if (typeof payload.multiRoomVisibility === 'string') {
-      multiState.roomVisibility = normalizeMultiRoomVisibility(
-        payload.multiRoomVisibility,
-        multiState.roomVisibility
-      );
-    }
-    if (typeof payload.multiJoinPolicy === 'string') {
-      multiState.joinPolicy = normalizeMultiJoinPolicy(
-        payload.multiJoinPolicy,
-        multiState.joinPolicy
-      );
-    }
-    if (typeof payload.multiParticipantFreeCellMove === 'boolean') {
-      multiState.participantFreeCellMove = payload.multiParticipantFreeCellMove;
-    }
-    if (typeof payload.multiMasterOpsMode === 'boolean') {
-      multiState.masterOpsMode = payload.multiMasterOpsMode;
-    }
-    if (typeof payload.multiExportPermission === 'string') {
-      multiState.exportPermission = normalizeMultiExportPermission(
-        payload.multiExportPermission,
-        multiState.exportPermission
-      );
     }
     if (state.showVirtualCursor && !virtualCursor) {
       virtualCursor = createInitialVirtualCursor();
@@ -26730,12 +26808,7 @@
     return sharedProjectRealtimeUtilsModule.handleMultiLocalCommit(...args);
   }
 
-  function setupMultiModeControls(...args) {
-    if (!SHARED_PROJECTS_ENABLED && readMultiInviteFromUrl()) {
-      showSharedProjectSunsetDialog();
-    }
-    return undefined;
-  }
+  function setupMultiModeControls() {}
 
   window.pixelFrameUtils = Object.freeze({
     createImage: createPixelFrameImage,

@@ -379,18 +379,38 @@
         }
 
         async function readSchemaV2Project(projectId, { revision = 0 } = {}) {
+          const openPerformance = window.PiXiEEDrawOpenPerformance;
           const requestedRevision = Math.max(0, Math.round(Number(revision) || 0));
           if (!requestedRevision) {
+            const indexedDbStage = openPerformance?.beginStage?.('indexeddb-current-records');
+            let indexedDbStageEnded = false;
+            let restoreStage = null;
             try {
               const currentRecords = await loadCurrentProjectSchemaRecords(projectId);
+              openPerformance?.endStage?.(indexedDbStage, {
+                checkpointCount: currentRecords.checkpoints.length,
+                journalCount: currentRecords.journals.length,
+              });
+              indexedDbStageEnded = true;
               const checkpoints = new Map(currentRecords.checkpoints.map(record => [record.key, record]));
               const journals = new Map(currentRecords.journals.map(record => [record.key, record]));
+              restoreStage = openPerformance?.beginStage?.('journal-restore');
               const packaged = autosaveSchemaV2Utils.restoreSchemaV2Manifest(
                 currentRecords.manifest,
                 checkpoints,
                 journals,
                 { trustDetachedCheckpointRecords: true }
               );
+              const journalOperationCount = currentRecords.journals.reduce((sum, journal) => (
+                sum + (Array.isArray(journal?.ops) ? journal.ops.length : 0)
+              ), 0);
+              openPerformance?.endStage?.(restoreStage, { journalOperationCount });
+              openPerformance?.annotate?.({
+                fastPathUsed: true,
+                fallbackUsed: false,
+                revision: Math.max(0, Math.round(Number(currentRecords.manifest?.revision) || 0)),
+                journalOperationCount,
+              });
               return {
                 packaged,
                 manifest: currentRecords.manifest,
@@ -400,6 +420,20 @@
                 thumbnail: currentRecords.thumbnail?.value || null,
               };
             } catch (error) {
+              if (!indexedDbStageEnded) {
+                openPerformance?.endStage?.(indexedDbStage, {
+                  failed: true,
+                  errorCode: error?.code || '',
+                });
+              }
+              openPerformance?.endStage?.(restoreStage, {
+                failed: true,
+                errorCode: error?.code || '',
+              });
+              openPerformance?.annotate?.({
+                fastPathUsed: false,
+                fallbackUsed: true,
+              });
               console.warn('[pixiedraw:v2-read]', {
                 phase: 'current-revision-fast-path-fallback',
                 projectId: normalizeProjectId(projectId),
@@ -410,7 +444,13 @@
           // Recovery and explicitly requested revisions intentionally keep the
           // exhaustive path. It reads retained immutable revisions and verifies
           // their complete checksums before choosing a fallback.
+          const fallbackReadStage = openPerformance?.beginStage?.('indexeddb-fallback-all-revisions');
           const records = await loadAllProjectSchemaRecords(projectId);
+          openPerformance?.endStage?.(fallbackReadStage, {
+            manifestCount: records.manifests.length,
+            checkpointCount: records.checkpoints.length,
+            journalCount: records.journals.length,
+          });
           const eligibleManifests = requestedRevision
             ? records.manifests.filter(record => Math.round(Number(record?.revision) || 0) <= requestedRevision)
             : records.manifests;
@@ -425,7 +465,18 @@
               : (records.current?.manifestKey || ''),
           };
           const store = { manifests, checkpoints, journals };
+          const fallbackRestoreStage = openPerformance?.beginStage?.('journal-fallback-restore');
           const restored = autosaveSchemaV2Utils.restoreSchemaV2WithFallback(store, recentEntry);
+          const journalOperationCount = records.journals.reduce((sum, journal) => (
+            sum + (Array.isArray(journal?.ops) ? journal.ops.length : 0)
+          ), 0);
+          openPerformance?.endStage?.(fallbackRestoreStage, { journalOperationCount });
+          openPerformance?.annotate?.({
+            fastPathUsed: false,
+            fallbackUsed: true,
+            revision: Math.max(0, Math.round(Number(restored?.manifest?.revision) || 0)),
+            journalOperationCount,
+          });
           return {
             ...restored,
             fastPathUsed: false,

@@ -1976,24 +1976,6 @@ body.is-bottom-timeline-docked:not(.is-mobile-layout) .stage {
   padding: 0;
 }
 
-body.is-bottom-timeline-docked:not(.is-mobile-layout) .project-tabs {
-  border: 0;
-  border-bottom: 1px solid var(--workbench-line-soft);
-  margin-left: 0;
-  margin-right: 0;
-  padding: 4px;
-  background: rgba(4, 8, 13, 0.74);
-}
-
-body.is-bottom-timeline-docked:not(.is-mobile-layout) .project-tabs__list {
-  gap: 4px;
-}
-
-body.is-bottom-timeline-docked:not(.is-mobile-layout) .project-tab-item {
-  border-color: var(--workbench-line);
-  background: rgba(7, 14, 22, 0.58);
-}
-
 body.is-bottom-timeline-docked:not(.is-mobile-layout) .stage__canvas {
   border: 0;
   background:
@@ -2841,150 +2823,6 @@ body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom
 }
 
 
-.project-tabs {
-  position: relative;
-  z-index: 531;
-  flex: 0 0 var(--project-tabs-height);
-  height: var(--project-tabs-height);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 0;
-  margin-left: 0;
-  margin-right: 0;
-  padding: 6px 8px 4px;
-  border: 1px solid var(--border);
-  border-bottom: 0;
-  background:
-    linear-gradient(0deg, rgba(var(--ui-rgb), 0.07) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(var(--ui-rgb), 0.07) 1px, transparent 1px),
-    rgba(6, 12, 18, 0.94);
-  background-size: 6px 6px;
-  overflow: hidden;
-}
-
-.project-tabs__status-slot {
-  display: inline-flex;
-  align-items: center;
-  flex: 0 0 auto;
-  order: 2;
-}
-
-.project-tabs__status-slot[hidden] {
-  display: none !important;
-}
-
-.project-tabs__list {
-  display: flex;
-  align-items: center;
-  flex: 1 1 auto;
-  order: 1;
-  gap: 6px;
-  width: auto;
-  min-width: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(var(--ui-rgb), 0.5) rgba(4, 9, 16, 0.55);
-  overscroll-behavior-x: contain;
-}
-
-.project-tabs .shared-status-indicator {
-  min-height: 28px;
-  height: 28px;
-}
-
-.project-tabs .shared-status-indicator__recover {
-  min-height: 24px;
-  height: 24px;
-}
-
-.project-tabs__list::-webkit-scrollbar {
-  height: 6px;
-}
-
-.project-tabs__list::-webkit-scrollbar-track {
-  background: rgba(4, 9, 16, 0.55);
-}
-
-.project-tabs__list::-webkit-scrollbar-thumb {
-  background: rgba(var(--ui-rgb), 0.5);
-}
-
-.project-tab-item {
-  display: inline-flex;
-  align-items: center;
-  min-width: 0;
-  max-width: 240px;
-  border: 1px solid rgba(var(--ui-rgb), 0.25);
-  background: rgba(9, 18, 28, 0.86);
-}
-
-.project-tab-item.is-active {
-  border-color: rgba(var(--ui-rgb-focus), 0.82);
-  background:
-    linear-gradient(180deg, rgba(var(--ui-rgb-focus), 0.18), rgba(var(--ui-rgb), 0.08)),
-    rgba(12, 26, 36, 0.98);
-  box-shadow:
-    0 0 0 1px rgba(var(--ui-rgb-focus), 0.2) inset,
-    0 0 14px rgba(var(--ui-rgb-focus), 0.34),
-    0 0 24px rgba(var(--ui-rgb), 0.14);
-}
-
-.project-tab-item--home {
-  flex: 0 0 auto;
-  max-width: 116px;
-  border-color: rgba(var(--ui-rgb-focus), 0.45);
-}
-
-.project-tab-item__button {
-  display: inline-flex;
-  align-items: center;
-  min-width: 0;
-  max-width: 196px;
-  height: 28px;
-  padding: 0 10px;
-  color: var(--fg);
-}
-
-.project-tab-item.is-active .project-tab-item__button {
-  color: #f2fff9;
-  font-weight: 800;
-  text-shadow: 0 0 10px rgba(var(--ui-rgb-focus), 0.44);
-}
-
-.project-tab-item__button--home {
-  max-width: 96px;
-  font-weight: 700;
-}
-
-.project-tab-item__name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.72rem;
-  line-height: 1.2;
-}
-
-.project-tab-item__close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-left: 1px solid rgba(var(--ui-rgb), 0.18);
-  color: var(--fg-muted);
-  font-size: 0.92rem;
-  line-height: 1;
-}
-
-.project-tab-item__close:hover,
-.project-tab-item__close:focus-visible {
-  color: var(--fg);
-  background: rgba(var(--ui-rgb), 0.14);
-  outline: none;
-}
-
 .stage__canvas {
   flex: 1;
   position: relative;
@@ -3165,14 +3003,6 @@ body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom
 
 .canvas-resize-handle:focus-visible {
   outline: none;
-}
-
-.local-canvas-dock {
-  display: contents;
-}
-
-.local-canvas-dock.is-hidden {
-  display: none;
 }
 
 .local-canvas-surface {
@@ -10988,31 +10818,6 @@ body.is-project-home-active .modal[open] {
   min-height: 46px;
 }
 
-.new-project__mode-switch {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0;
-  border: 1px solid rgba(var(--ui-rgb), 0.45);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-}
-
-.new-project__mode-button {
-  min-height: 46px;
-  border: 0;
-  border-radius: 0;
-  background: rgba(3, 9, 16, 0.9);
-}
-
-.new-project__mode-button + .new-project__mode-button {
-  border-left: 1px solid rgba(var(--ui-rgb), 0.35);
-}
-
-.new-project__mode-button.is-active {
-  background: linear-gradient(180deg, rgba(93, 255, 228, 0.3), rgba(50, 170, 166, 0.22));
-  color: #cafff9;
-}
-
 .new-project__ad {
   margin-top: 0;
 }
@@ -11125,14 +10930,6 @@ body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] .update-h
 }
 
 @media (orientation: landscape) {
-  body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] .project-tabs {
-    margin-left: 0;
-  }
-
-  body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"].is-right-tool-rail:not(.is-mobile-layout) .project-tabs {
-    margin-left: 0;
-  }
-
   body[data-pixieed-page="pixiedraw"][data-pixieed-mobile-chrome="true"] .modal[open] {
     inset:
       calc(var(--safe-area-top) + var(--pixieed-top-ad-offset, 0px))
@@ -13195,23 +12992,6 @@ body.is-mobile-layout #newProjectDialog .modal__body {
     flex-direction: column;
     align-items: stretch;
     justify-content: flex-start;
-  }
-  .project-tabs {
-    flex-basis: var(--project-tabs-mobile-height);
-    height: var(--project-tabs-mobile-height);
-    padding: 2px 6px 0;
-  }
-  .project-tab-item {
-    max-width: 180px;
-  }
-  .project-tab-item__button {
-    max-width: 138px;
-    height: 26px;
-    padding: 0 8px;
-  }
-  .project-tab-item__close {
-    width: 26px;
-    height: 26px;
   }
   .stage__canvas {
     position: relative;

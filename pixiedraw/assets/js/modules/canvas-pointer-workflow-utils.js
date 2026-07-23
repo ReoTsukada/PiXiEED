@@ -1947,7 +1947,7 @@
       : null;
     const direct = moveState.direct instanceof Uint8ClampedArray ? moveState.direct : null;
     const paletteIndex = indices && sourceIndex < indices.length ? indices[sourceIndex] : -1;
-    if (paletteIndex >= 0 && Array.isArray(state.palette) && state.palette[paletteIndex]) {
+    if (paletteIndex > 0 && Array.isArray(state.palette) && state.palette[paletteIndex]) {
       const paletteAlpha = Number(state.palette[paletteIndex].a) || 0;
       if (paletteAlpha > 0) {
         return paletteAlpha;
@@ -2000,7 +2000,7 @@
     if (!(direct instanceof Uint8ClampedArray) || base < 0 || base + 3 >= direct.length) {
       return 0;
     }
-    const color = Number.isInteger(paletteIndex) && paletteIndex >= 0
+    const color = Number.isInteger(paletteIndex) && paletteIndex > 0
       ? state.palette[paletteIndex]
       : null;
     if (!color) {
@@ -2363,7 +2363,30 @@
       layerDirect = ensureLayerDirect(layer);
     }
     let modified = false;
-    for (let y = 0; y < height; y += 1) {
+    const canBulkClear = Boolean(
+      moveState.compressedSelectionMoveHistory
+      && moveState.rectangularFullMask
+      && !restoreIndices
+      && !restoreDirect
+      && !layerDirect
+      && layer.indices instanceof Uint8Array
+    );
+    if (canBulkClear) {
+      const transparentValue = typeof getRasterLayerTransparentStorageValue === 'function'
+        ? getRasterLayerTransparentStorageValue(layer)
+        : 0;
+      for (let y = 0; y < height; y += 1) {
+        const canvasY = bounds.y0 + y;
+        if (canvasY < 0 || canvasY >= state.height) continue;
+        const startX = Math.max(0, bounds.x0);
+        const endX = Math.min(state.width, bounds.x0 + width);
+        if (endX > startX) {
+          layer.indices.fill(transparentValue, (canvasY * state.width) + startX, (canvasY * state.width) + endX);
+          modified = true;
+        }
+      }
+    }
+    for (let y = 0; y < height && !canBulkClear; y += 1) {
       for (let x = 0; x < width; x += 1) {
         const localIndex = y * width + x;
         if (mask[localIndex] !== 1) continue;
@@ -2510,6 +2533,7 @@
         state.selectionMask = result.mask;
         state.selectionContentMask = result.contentMask;
         state.selectionBounds = result.bounds;
+        state.selectionOutlineMode = moveState.outlineMode === 'pixel' ? 'pixel' : 'bounds';
         if (internalClipboard.selection && result.bounds) {
           internalClipboard.selection.bounds = { ...result.bounds };
         }
@@ -2517,6 +2541,7 @@
         state.selectionMask = null;
         state.selectionContentMask = null;
         state.selectionBounds = null;
+        state.selectionOutlineMode = null;
       }
     } else {
       if (applySelection) {
@@ -2525,6 +2550,7 @@
         state.selectionMask = null;
         state.selectionContentMask = null;
         state.selectionBounds = null;
+        state.selectionOutlineMode = null;
       }
     }
 
@@ -2839,7 +2865,13 @@
       const previewCanvas = transformedRender?.previewCanvas || moveState.previewCanvas;
       if (previewCanvas) {
         try {
-          ctx.overlay.drawImage(previewCanvas, originX, originY);
+          ctx.overlay.drawImage(
+            previewCanvas,
+            originX,
+            originY,
+            Math.max(1, Number(transformedRender?.width ?? moveState.width) || 1),
+            Math.max(1, Number(transformedRender?.height ?? moveState.height) || 1)
+          );
           rendered = true;
         } catch (error) {
           if (transformedRender) {
@@ -3016,7 +3048,7 @@
       }
       if (sourceIndices && sourceIndex < sourceIndices.length) {
         const paletteIndex = sourceIndices[sourceIndex];
-        if (paletteIndex >= 0 && state.palette[paletteIndex]) {
+        if (paletteIndex > 0 && state.palette[paletteIndex]) {
           const color = state.palette[paletteIndex];
           outputData[outputBase] = color.r;
           outputData[outputBase + 1] = color.g;
@@ -3068,10 +3100,15 @@
     if (!moveState) {
       return [];
     }
+    const width = Math.max(0, Math.floor(Number(moveState.width) || 0));
+    const height = Math.max(0, Math.floor(Number(moveState.height) || 0));
+    if (moveState.outlineMode !== 'pixel') {
+      return width > 0 && height > 0
+        ? [0, 0, width, 0, width, 0, width, height, width, height, 0, height, 0, height, 0, 0]
+        : [];
+    }
     if (!Array.isArray(moveState.outlineSegments)) {
       const mask = moveState.mask;
-      const width = Math.max(0, Math.floor(Number(moveState.width) || 0));
-      const height = Math.max(0, Math.floor(Number(moveState.height) || 0));
       moveState.outlineSegments = buildSelectionMoveOutlineSegments(mask, width, height);
     }
     return moveState.outlineSegments;
@@ -4330,6 +4367,7 @@
     state.selectionMask = mask;
     state.selectionContentMask = null;
     state.selectionBounds = bounds;
+    state.selectionOutlineMode = 'bounds';
     updateCanvasControlButtons();
     requestOverlayRender();
   }
@@ -4367,6 +4405,7 @@
     state.selectionMask = mask;
     state.selectionContentMask = null;
     state.selectionBounds = bounds;
+    state.selectionOutlineMode = 'bounds';
     updateCanvasControlButtons();
     requestOverlayRender();
   }
@@ -4434,6 +4473,7 @@
     state.selectionMask = mask;
     state.selectionContentMask = null;
     state.selectionBounds = bounds;
+    state.selectionOutlineMode = 'bounds';
     updateCanvasControlButtons();
     requestOverlayRender();
   }
@@ -4445,7 +4485,9 @@
     const paletteIndex = layer.indices instanceof Int16Array || layer.indices instanceof Uint8Array
       ? layer.indices[idx]
       : -1;
-    if (paletteIndex >= 0) {
+    // Indexed runtime reserves 0 for the background. It is never selectable
+    // as painted content, regardless of a legacy palette[0] alpha value.
+    if (paletteIndex > 0) {
       const paletteColor = Array.isArray(state.palette) ? state.palette[paletteIndex] : null;
       if (paletteColor && (Number(paletteColor.a) || 0) > 0) {
         return true;
@@ -4466,7 +4508,12 @@
     const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
     const transparentStorageIndex = resolveTransparentStoragePaletteIndex();
     const paletteIndex = indices ? indices[idx] : -1;
-    if (paletteIndex >= 0) {
+    const directAlpha = direct instanceof Uint8ClampedArray ? direct[(idx * 4) + 3] : 0;
+    if (paletteIndex === 0 && directAlpha <= 0) {
+      // Background is not a same-color-select target.
+      return null;
+    }
+    if (paletteIndex > 0) {
       const color = state.palette[paletteIndex];
       if (!color) {
         return null;
@@ -4489,24 +4536,12 @@
       };
     }
     if (!(direct instanceof Uint8ClampedArray)) {
-      return transparentStorageIndex >= 0 || paletteIndex < 0
-        ? {
-          indices,
-          direct,
-          transparent: true,
-          transparentIndex: transparentStorageIndex,
-        }
-        : null;
+      return null;
     }
     const base = idx * 4;
     const alpha = direct[base + 3];
     if (alpha <= 0) {
-      return {
-        indices,
-        direct,
-        transparent: true,
-        transparentIndex: transparentStorageIndex,
-      };
+      return null;
     }
     return {
       indices,
@@ -4535,7 +4570,7 @@
       const base = idx * 4;
       return direct[base + 3] <= 0;
     }
-    if (paletteIndex >= 0) {
+    if (paletteIndex > 0) {
       const color = state.palette[paletteIndex];
       return Boolean(
         color
@@ -4634,6 +4669,9 @@
     state.selectionMask = mask;
     state.selectionContentMask = null;
     state.selectionBounds = bounds;
+    // Only same-color selection needs to communicate disconnected pixel
+    // regions. Rectangles and lassos use a lightweight bounds outline.
+    state.selectionOutlineMode = 'pixel';
     updateCanvasControlButtons();
     requestOverlayRender();
   }
@@ -4662,6 +4700,7 @@
     state.selectionMask = null;
     state.selectionContentMask = null;
     state.selectionBounds = null;
+    state.selectionOutlineMode = null;
     state.pendingPasteMoveState = null;
     pointerState.selectionMove = null;
     pointerState.lastSelectionMove = null;

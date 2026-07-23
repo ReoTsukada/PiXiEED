@@ -102,23 +102,14 @@ function commitHistory() {
         );
       }
       const recordedTimelapseOperation = recordTimelapseOperationLogEntry(historyEntry, pendingLabel);
-      const activeTimelapseTrack = getActiveTimelapseTrack();
-      if (
-        !recordedTimelapseOperation
-        &&
-        !isPixelPatchHistoryEntry(historyEntry)
-        && timelapseState.enabled
-        && (!activeTimelapseTrack || activeTimelapseTrack.snapshots.length === 0)
-      ) {
-        const startEntry = createTimelapseFrameEntryFromSnapshot(historyEntry);
-        if (startEntry) {
-          const track = getActiveTimelapseTrack({ create: true });
-          track.snapshots.push(startEntry);
-          thinTimelapseSnapshotsIfNeeded(track);
-        }
-      }
       if (!recordedTimelapseOperation) {
-        scheduleTimelapseCaptureFromState();
+        scheduleTimelapseCaptureFromState({
+          frameIds: Array.isArray(historyEntry?.frameIds)
+            ? historyEntry.frameIds.filter(frameId => typeof frameId === 'string' && frameId)
+            : (typeof historyEntry?.frameId === 'string' && historyEntry.frameId
+              ? [historyEntry.frameId]
+              : null),
+        });
       }
       if (activeSharedProjectKey) {
         const sharedOpType = classifySharedProjectOpType(pendingLabel);

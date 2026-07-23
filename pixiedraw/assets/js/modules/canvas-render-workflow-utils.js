@@ -279,6 +279,41 @@
           refreshSecondaryCanvasSurfaces();
           return;
         }
+        // Indexed-only projects normally use this compact Uint8 plane. Avoid
+        // the generic compositor's per-pixel function calls when the active
+        // frame is just one ordinary indexed layer.
+        const indexed = layer.indices instanceof Uint8Array
+          && layer.indicesEncoding === 'uint8-palette-zero-transparent-v2'
+          && layer.indices.length >= width * height;
+        if (
+          indexed
+          && !direct
+          && getDisplayedLayerPreviewOpacity(layer, 1) >= 1
+          && normalizeLayerBlendMode(layer.blendMode) === DEFAULT_LAYER_BLEND_MODE
+          && !isSimulationLayer(layer)
+        ) {
+          const indexedImage = ctx.drawing.createImageData(width, height);
+          const indexedPixels = layer.indices;
+          const indexedPalette = Array.isArray(state.palette) ? state.palette : [];
+          const output = indexedImage.data;
+          for (let pixelIndex = 0, base = 0; pixelIndex < width * height; pixelIndex += 1, base += 4) {
+            // The compact indexed format reserves 0 for the background. Do
+            // not render it even when a legacy palette accidentally has an
+            // opaque color in slot zero.
+            const paletteIndex = indexedPixels[pixelIndex];
+            if (paletteIndex === 0) continue;
+            const color = indexedPalette[paletteIndex];
+            if (!color || Number(color.a) <= 0) continue;
+            output[base] = color.r;
+            output[base + 1] = color.g;
+            output[base + 2] = color.b;
+            output[base + 3] = color.a;
+          }
+          ctx.drawing.putImageData(indexedImage, 0, 0);
+          writeCanvasCompositeFrameCache(activeFrame, width, height, indexedImage);
+          refreshSecondaryCanvasSurfaces();
+          return;
+        }
       }
     }
     const x0 = clamp(pending.x0, 0, width - 1);

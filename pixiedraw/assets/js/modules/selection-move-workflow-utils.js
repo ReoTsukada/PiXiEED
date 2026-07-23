@@ -80,6 +80,57 @@
     return pixelCount > 0 && pixelCount <= SELECTION_TRANSFORM_LARGE_PREVIEW_MAX_PIXELS;
   }
 
+  function canUseDisplayedSelectionMovePreview(layer) {
+    const frame = Array.isArray(state.frames) ? state.frames[state.activeFrame] : null;
+    const layers = Array.isArray(frame?.layers) ? frame.layers : [];
+    // The displayed canvas is an exact crop only when this layer is the sole
+    // visible normal layer. Multi-layer and blended artwork keeps the existing
+    // data-model preview path for correctness.
+    return layers.length === 1
+      && layers[0] === layer
+      && layer?.visible !== false
+      && Number(layer?.opacity ?? 1) >= 1
+      && (!layer?.blendMode || layer.blendMode === 'normal')
+      && ctx?.drawing?.canvas instanceof HTMLCanvasElement;
+  }
+
+  function createMovePreviewCanvasFromDisplayedCanvas(bounds, width, height) {
+    const sourceCanvas = ctx?.drawing?.canvas;
+    if (!(sourceCanvas instanceof HTMLCanvasElement)) {
+      return null;
+    }
+    try {
+      // The source pixels are never reduced. Only the temporary drag surface
+      // follows a zoomed-out viewport, where one screen pixel represents more
+      // than one artwork pixel anyway.
+      const cacheScale = Math.min(1, Math.max(0.05, Number(state.scale) || 1));
+      const cacheWidth = Math.max(1, Math.round(width * cacheScale));
+      const cacheHeight = Math.max(1, Math.round(height * cacheScale));
+      const canvas = document.createElement('canvas');
+      canvas.width = cacheWidth;
+      canvas.height = cacheHeight;
+      const previewCtx = canvas.getContext('2d');
+      if (!previewCtx) return null;
+      previewCtx.imageSmoothingEnabled = false;
+      // drawImage is a browser-side surface copy. Unlike the former ImageData
+      // construction it does not convert every indexed pixel in JavaScript.
+      previewCtx.drawImage(
+        sourceCanvas,
+        Math.max(0, Math.round(Number(bounds?.x0) || 0)),
+        Math.max(0, Math.round(Number(bounds?.y0) || 0)),
+        width,
+        height,
+        0,
+        0,
+        cacheWidth,
+        cacheHeight
+      );
+      return canvas;
+    } catch (error) {
+      return null;
+    }
+  }
+
   // These lists only avoid scanning the local mask again during a later
   // transform/finalize. For large selections, keeping millions of JavaScript
   // numbers is slower and more memory-hungry than that later linear scan.
@@ -107,9 +158,78 @@
     let selectedSourceIndices = [];
     let contentSourceIndices = [];
     const shouldCreatePreviewBitmap = shouldCreateSelectionMoveBitmapPreview(width, height);
-    const imageData = shouldCreatePreviewBitmap ? createBlankImageData(width, height) : null;
+    const useDisplayedPreview = shouldCreatePreviewBitmap && canUseDisplayedSelectionMovePreview(layer);
+    const imageData = shouldCreatePreviewBitmap && !useDisplayedPreview ? createBlankImageData(width, height) : null;
 
     const hasSourceContentMask = sourceContentMask instanceof Uint8Array && sourceContentMask.length === mask.length;
+
+    // Rectangular selections on the indexed runtime are common for sprite
+    // sheets. Copy their planes in rows rather than resolving palette values
+    // for every selected pixel in JavaScript.
+    const canFastCopy = !layerDirect
+      && typeof isRuntimeUint8LayerIndices === 'function'
+      && isRuntimeUint8LayerIndices(layer);
+    if (canFastCopy) {
+      let fullySelected = true;
+      for (let y = 0; y < height && fullySelected; y += 1) {
+        const canvasOffset = (bounds.y0 + y) * state.width + bounds.x0;
+        for (let x = 0; x < width; x += 1) {
+          if (mask[canvasOffset + x] !== 1) {
+            fullySelected = false;
+            break;
+          }
+        }
+      }
+      if (fullySelected) {
+        for (let y = 0; y < height; y += 1) {
+          const canvasOffset = (bounds.y0 + y) * state.width + bounds.x0;
+          const localOffset = y * width;
+          localMask.fill(1, localOffset, localOffset + width);
+          localIndices.set(layer.indices.subarray(canvasOffset, canvasOffset + width), localOffset);
+          if (hasSourceContentMask) {
+            localContentMask.set(sourceContentMask.subarray(canvasOffset, canvasOffset + width), localOffset);
+          } else {
+            for (let x = 0; x < width; x += 1) {
+              // Runtime Uint8 reserves zero for transparent pixels.
+              localContentMask[localOffset + x] = localIndices[localOffset + x] === 0 ? 0 : 1;
+            }
+          }
+        }
+        const previewCanvas = useDisplayedPreview
+          ? createMovePreviewCanvasFromDisplayedCanvas(bounds, width, height)
+          : (shouldCreatePreviewBitmap
+            ? createMovePreviewCanvasFromPixels(width, height, localMask, localIndices, null)
+            : null);
+        return {
+          layer,
+          bounds: { ...bounds },
+          width,
+          height,
+          mask: localMask,
+          contentMask: localContentMask,
+          indices: localIndices,
+          direct: null,
+          imageData: null,
+          previewCanvas,
+          selectedSourceIndices: null,
+          contentSourceIndices: null,
+          rectangularFullMask: true,
+          outlineMode: state.selectionOutlineMode === 'pixel' ? 'pixel' : 'bounds',
+          offset: { x: 0, y: 0 },
+          hasCleared: false,
+          committed: false,
+          applySelectionOnFinalize: true,
+          transformRotationDeg: 0,
+          transformFlipHorizontal: false,
+          transformFlipVertical: false,
+          transformScaleX: 1,
+          transformScaleY: 1,
+          transformedEntryCache: null,
+          transformedContentEntryCache: null,
+          transformedPreviewRenderCache: null,
+        };
+      }
+    }
 
     for (let y = 0; y < height; y += 1) {
       for (let x = 0; x < width; x += 1) {
@@ -128,7 +248,7 @@
           const paletteIndex = typeof getStoredRasterLayerPaletteIndex === 'function'
             ? getStoredRasterLayerPaletteIndex(layer, canvasIndex)
             : layer.indices[canvasIndex];
-          const paletteColor = paletteIndex >= 0 ? state.palette[paletteIndex] : null;
+          const paletteColor = paletteIndex > 0 ? state.palette[paletteIndex] : null;
           const hasContent = hasSourceContentMask
             ? sourceContentMask[canvasIndex] === 1
             : (paletteColor ? Number(paletteColor.a) > 0 : Boolean(layerDirect && layerDirect[canvasBase + 3] > 0));
@@ -136,7 +256,7 @@
           // layer's native transparent sentinel here: Int16 uses -1 while the
           // new Uint8 runtime uses 0. Coercing Int16 direct pixels to 0 makes
           // the renderer prefer palette[0] and drops their actual RGBA color.
-          localIndices[localIndex] = hasContent && paletteIndex >= 0
+          localIndices[localIndex] = hasContent && paletteIndex > 0
             ? paletteIndex
             : transparentValue;
           if (layerDirect && localDirect) {
@@ -185,10 +305,12 @@
       }
     }
 
-    const previewCanvas = shouldCreatePreviewBitmap
-      ? (createMovePreviewCanvasFromImageData(imageData)
-        || createMovePreviewCanvasFromPixels(width, height, localMask, localIndices, localDirect))
-      : null;
+    const previewCanvas = useDisplayedPreview
+      ? createMovePreviewCanvasFromDisplayedCanvas(bounds, width, height)
+      : (shouldCreatePreviewBitmap
+        ? (createMovePreviewCanvasFromImageData(imageData)
+          || createMovePreviewCanvasFromPixels(width, height, localMask, localIndices, localDirect))
+        : null);
     return {
       layer,
       bounds: { ...bounds },
@@ -202,6 +324,8 @@
       previewCanvas,
       selectedSourceIndices,
       contentSourceIndices,
+      rectangularFullMask: false,
+      outlineMode: state.selectionOutlineMode === 'pixel' ? 'pixel' : 'bounds',
       offset: { x: 0, y: 0 },
       hasCleared: false,
       committed: false,
@@ -504,7 +628,7 @@
     }
     const indices = isRasterIndexArray(moveState.indices) ? moveState.indices : null;
     const paletteIndex = indices && sourceIndex < indices.length ? indices[sourceIndex] : -1;
-    const color = paletteIndex >= 0 ? state.palette[paletteIndex] : null;
+    const color = paletteIndex > 0 ? state.palette[paletteIndex] : null;
     return color ? [color.r, color.g, color.b, color.a] : [0, 0, 0, 0];
   }
 
@@ -1293,7 +1417,7 @@
             continue;
           }
           const paletteIndex = isRasterIndexArray(indices) ? indices[i] : -1;
-          if (paletteIndex >= 0 && palette[paletteIndex] && Number(palette[paletteIndex].a) > 0) {
+          if (paletteIndex > 0 && palette[paletteIndex] && Number(palette[paletteIndex].a) > 0) {
             const color = palette[paletteIndex];
             data[base] = color.r;
             data[base + 1] = color.g;
@@ -1327,7 +1451,7 @@
           let g = 0;
           let b = 0;
           let a = 0;
-          if (paletteIndex >= 0 && palette[paletteIndex] && Number(palette[paletteIndex].a) > 0) {
+          if (paletteIndex > 0 && palette[paletteIndex] && Number(palette[paletteIndex].a) > 0) {
             const color = palette[paletteIndex];
             r = color.r;
             g = color.g;
@@ -1377,7 +1501,7 @@
         let g = 0;
         let b = 0;
         let a = 0;
-        if (paletteIndex >= 0 && palette[paletteIndex] && Number(palette[paletteIndex].a) > 0) {
+        if (paletteIndex > 0 && palette[paletteIndex] && Number(palette[paletteIndex].a) > 0) {
           const color = palette[paletteIndex];
           r = color.r;
           g = color.g;
@@ -2084,13 +2208,13 @@
           ? getStoredRasterLayerPaletteIndex(layer, idx)
           : layer.indices[idx];
         let alpha = 0;
-        if (paletteIndex >= 0 && palette[paletteIndex]) {
+        if (paletteIndex > 0 && palette[paletteIndex]) {
           alpha = palette[paletteIndex].a;
         } else if (layerDirect) {
           const base = idx * 4;
           alpha = layerDirect[base + 3];
         }
-        if (paletteIndex >= 0 || alpha > 0) {
+        if (paletteIndex > 0 || alpha > 0) {
           if (x < bounds.x0) bounds.x0 = x;
           if (y < bounds.y0) bounds.y0 = y;
           if (x > bounds.x1) bounds.x1 = x;
@@ -2126,7 +2250,7 @@
         const canvasBase = canvasIndex * 4;
         const localBase = localIndex * 4;
         let hasPixel = false;
-        if (paletteIndex >= 0) {
+        if (paletteIndex > 0) {
           indices[localIndex] = layer.indices[canvasIndex];
           hasPixel = true;
           if (layerDirect) {

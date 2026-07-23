@@ -32,20 +32,16 @@
     return ((scope) => {
       with (scope) {
   const timelapseCheckpointPendingTracks = new WeakSet();
+  const timelapseQueuedFrameIdsByCanvasId = new Map();
+  let timelapseCaptureIdleHandle = null;
 
   function shouldRecordLocalTimelapseOperationLog() {
-    return Boolean(
-      timelapseState.enabled
-      && !activeSharedProjectKey
-      && !multiState.connected
-      && !isSharedProjectCollaborativeMode()
-    );
+    return Boolean(timelapseState.enabled && !activeSharedProjectKey);
   }
 
   function shouldCaptureTimelapseSnapshotsFromState() {
     return Boolean(
       timelapseState.enabled
-      && !shouldRecordLocalTimelapseOperationLog()
       && !activeSharedProjectKey
     );
   }
@@ -151,6 +147,51 @@
     return track.operationLog.baseSnapshot || track.operationLog.baseSnapshotStored
       ? track.operationLog
       : null;
+  }
+
+  function scheduleTimelapseOperationLogBase(canvasId = getActiveProjectCanvasDocument()?.id || '') {
+    if (!shouldRecordLocalTimelapseOperationLog()) {
+      return false;
+    }
+    const resolvedCanvasId = normalizeTimelapseCanvasId(canvasId);
+    const track = getTimelapseTrack(resolvedCanvasId, { create: true });
+    if (!track) {
+      return false;
+    }
+    if (track.operationLog?.version === 2) {
+      return true;
+    }
+    // Legacy operation logs still need their stored document base. Do not
+    // replace them while they are readable.
+    if (track.operationLog?.baseSnapshot || track.operationLog?.baseSnapshotStored) {
+      return false;
+    }
+    const canvasDoc = getProjectCanvasDocumentById(resolvedCanvasId) || getActiveProjectCanvasDocument();
+    const frame = Array.isArray(canvasDoc?.frames)
+      ? canvasDoc.frames[canvasDoc.activeFrame] || canvasDoc.frames[0]
+      : null;
+    // A visual delta can only be reconstructed accurately for the simple
+    // single-layer frame. Other edits continue through the snapshot recorder.
+    if (!frame || !Array.isArray(frame.layers) || frame.layers.length !== 1) {
+      return false;
+    }
+    const base = createTimelapseFrameEntryFromCanvas(canvasDoc);
+    if (!base) {
+      return false;
+    }
+    if (!Array.isArray(track.snapshots)) {
+      track.snapshots = [];
+    }
+    const visualBaseSnapshotIndex = (Array.isArray(track.serializedSnapshots) ? track.serializedSnapshots.length : 0)
+      + track.snapshots.length;
+    track.snapshots.push(base);
+    track.operationLog = {
+      version: 2,
+      visualBaseSnapshotIndex,
+      visualBaseFrameId: frame.id || '',
+      entries: [],
+    };
+    return true;
   }
 
   async function hydrateTimelapseOperationLogBase(canvasId = getActiveProjectCanvasDocument()?.id || '') {
@@ -470,18 +511,31 @@
     const canvasId = isPixelPatchHistoryEntry(historyEntry)
       ? historyEntry.canvasId
       : getActiveProjectCanvasDocument()?.id || '';
-    const log = ensureTimelapseOperationLogBase(canvasId);
+    const track = getTimelapseTrack(canvasId, { create: true });
+    const log = track?.operationLog;
     if (!log || !Array.isArray(log.entries)) {
+      scheduleTimelapseOperationLogBase(canvasId);
       return false;
     }
-    const entry = isPixelPatchHistoryEntry(historyEntry)
-      ? createTimelapseOperationEntryFromPixelPatch(historyEntry, historyLabel)
-      : createTimelapseOperationKeyframeEntry(historyLabel);
+    if (log.version !== 2) {
+      return false;
+    }
+    // Only small, ordinary strokes are stored as pixel deltas. Flood fills,
+    // selection moves, transforms and structure changes use the debounced
+    // visible-frame recorder instead of growing a massive patch log.
+    if (!isPixelPatchHistoryEntry(historyEntry) || historyEntry.frameId !== log.visualBaseFrameId) {
+      return false;
+    }
+    const entry = createTimelapseOperationEntryFromPixelPatch(historyEntry, historyLabel);
     if (!entry) {
       return false;
     }
+    const maxDeltaPixels = 8192;
+    if (entry.changes.length > maxDeltaPixels) {
+      return false;
+    }
     log.entries.push(entry);
-    compactTimelapseOperationLogIfNeeded(getTimelapseTrack(canvasId));
+    compactTimelapseOperationLogIfNeeded(track);
     syncTimelapseControls();
     updateMemoryStatus();
     return true;
@@ -521,22 +575,38 @@
           ? bestTrack.serializedSnapshots.slice()
           : [],
         operationLog: bestTrack.operationLog && typeof bestTrack.operationLog === 'object'
-          ? {
-              version: 1,
-              baseSnapshot: bestTrack.operationLog.baseSnapshot || null,
-              baseSnapshotStored: Boolean(bestTrack.operationLog.baseSnapshotStored),
-              baseSnapshotStorageCanvasId: typeof bestTrack.operationLog.baseSnapshotStorageCanvasId === 'string'
-                ? bestTrack.operationLog.baseSnapshotStorageCanvasId
-                : '',
-              baseSnapshotStorageProjectId: typeof bestTrack.operationLog.baseSnapshotStorageProjectId === 'string'
-                ? bestTrack.operationLog.baseSnapshotStorageProjectId
-                : '',
-              entries: Array.isArray(bestTrack.operationLog.entries)
-                ? bestTrack.operationLog.entries
-                  .map(entry => normalizeSerializedTimelapseOperationEntry(entry))
-                  .filter(Boolean)
-                : [],
-            }
+          ? (bestTrack.operationLog.version === 2
+            ? {
+                version: 2,
+                visualBaseSnapshotIndex: Math.max(
+                  0,
+                  Math.round(Number(bestTrack.operationLog.visualBaseSnapshotIndex) || 0)
+                ),
+                visualBaseFrameId: typeof bestTrack.operationLog.visualBaseFrameId === 'string'
+                  ? bestTrack.operationLog.visualBaseFrameId
+                  : '',
+                entries: Array.isArray(bestTrack.operationLog.entries)
+                  ? bestTrack.operationLog.entries
+                    .map(entry => normalizeSerializedTimelapseOperationEntry(entry))
+                    .filter(Boolean)
+                  : [],
+              }
+            : {
+                version: 1,
+                baseSnapshot: bestTrack.operationLog.baseSnapshot || null,
+                baseSnapshotStored: Boolean(bestTrack.operationLog.baseSnapshotStored),
+                baseSnapshotStorageCanvasId: typeof bestTrack.operationLog.baseSnapshotStorageCanvasId === 'string'
+                  ? bestTrack.operationLog.baseSnapshotStorageCanvasId
+                  : '',
+                baseSnapshotStorageProjectId: typeof bestTrack.operationLog.baseSnapshotStorageProjectId === 'string'
+                  ? bestTrack.operationLog.baseSnapshotStorageProjectId
+                  : '',
+                entries: Array.isArray(bestTrack.operationLog.entries)
+                  ? bestTrack.operationLog.entries
+                    .map(entry => normalizeSerializedTimelapseOperationEntry(entry))
+                    .filter(Boolean)
+                  : [],
+              })
           : null,
         warningShown: Boolean(bestTrack.warningShown),
         sampleStep: Math.max(1, Math.round(Number(bestTrack.sampleStep) || 1)),
@@ -564,25 +634,82 @@
         timelapseQueuedCanvasIds.delete(canvasId);
       }
     });
+    Array.from(timelapseQueuedFrameIdsByCanvasId.keys()).forEach(canvasId => {
+      if (!validCanvasIds.has(canvasId)) {
+        timelapseQueuedFrameIdsByCanvasId.delete(canvasId);
+      }
+    });
   }
 
-  function createTimelapseFrameEntryFromCanvas(canvasDoc = getActiveProjectCanvasDocument()) {
-    const width = Math.max(1, Number(canvasDoc?.width) || 1);
-    const height = Math.max(1, Number(canvasDoc?.height) || 1);
+  function createTimelapseFrameEntryFromCanvas(canvasDoc = getActiveProjectCanvasDocument(), frameId = '') {
+    const sourceWidth = Math.max(1, Number(canvasDoc?.width) || 1);
+    const sourceHeight = Math.max(1, Number(canvasDoc?.height) || 1);
     const frames = Array.isArray(canvasDoc?.frames) ? canvasDoc.frames : [];
     if (!frames.length) {
       return null;
     }
-    const frameIndex = clamp(Math.round(Number(canvasDoc?.activeFrame) || 0), 0, frames.length - 1);
+    const requestedFrameIndex = typeof frameId === 'string' && frameId
+      ? frames.findIndex(candidate => candidate?.id === frameId)
+      : -1;
+    const frameIndex = requestedFrameIndex >= 0
+      ? requestedFrameIndex
+      : clamp(Math.round(Number(canvasDoc?.activeFrame) || 0), 0, frames.length - 1);
     const frame = frames[frameIndex];
     if (!frame) {
       return null;
     }
-    const pixels = compositeFramePixels(frame, width, height, state.palette);
+    // The drawing surface has already been composited for the user. Reuse it
+    // instead of re-compositing every layer again on the debounce timer.
+    // This path is intentionally limited to the active canvas, so switching
+    // documents cannot capture pixels from the wrong surface.
+    let sourcePixels = null;
+    const activeCanvasId = getActiveProjectCanvasDocument()?.id || '';
+    if (
+      canvasDoc?.id === activeCanvasId
+      && frameIndex === Math.round(Number(canvasDoc?.activeFrame) || 0)
+      && ctx?.drawing
+      && ctx.drawing.canvas?.width === sourceWidth
+      && ctx.drawing.canvas?.height === sourceHeight
+    ) {
+      try {
+        sourcePixels = new Uint8ClampedArray(
+          ctx.drawing.getImageData(0, 0, sourceWidth, sourceHeight).data
+        );
+      } catch (error) {
+        // Canvas readback can be unavailable on a platform surface. The
+        // data-model composite below remains a correct compatibility fallback.
+      }
+    }
+    if (!sourcePixels) {
+      sourcePixels = compositeFramePixels(frame, sourceWidth, sourceHeight, state.palette);
+    }
+    const maxEdge = 512;
+    const shrinkFactor = Math.min(1, maxEdge / Math.max(sourceWidth, sourceHeight));
+    const width = Math.max(1, Math.round(sourceWidth * shrinkFactor));
+    const height = Math.max(1, Math.round(sourceHeight * shrinkFactor));
+    let pixels = sourcePixels;
+    if (width !== sourceWidth || height !== sourceHeight) {
+      pixels = new Uint8ClampedArray(width * height * 4);
+      for (let y = 0; y < height; y += 1) {
+        const sourceY = Math.min(sourceHeight - 1, Math.floor((y * sourceHeight) / height));
+        for (let x = 0; x < width; x += 1) {
+          const sourceX = Math.min(sourceWidth - 1, Math.floor((x * sourceWidth) / width));
+          const sourceBase = ((sourceY * sourceWidth) + sourceX) * 4;
+          const targetBase = ((y * width) + x) * 4;
+          pixels[targetBase] = sourcePixels[sourceBase];
+          pixels[targetBase + 1] = sourcePixels[sourceBase + 1];
+          pixels[targetBase + 2] = sourcePixels[sourceBase + 2];
+          pixels[targetBase + 3] = sourcePixels[sourceBase + 3];
+        }
+      }
+    }
     return {
       width,
       height,
-      pixels: compressUint8Array(pixels, { clamped: true }),
+      frameId: typeof frame?.id === 'string' ? frame.id : '',
+      // RLE compression is deferred to project serialization. Doing it inside
+      // a post-stroke timer blocked drawing for hundreds of milliseconds.
+      pixels: pixels instanceof Uint8ClampedArray ? pixels : new Uint8ClampedArray(pixels),
     };
   }
 
@@ -655,19 +782,19 @@
     return true;
   }
 
-  function captureTimelapseFrameFromState(canvasId = getActiveProjectCanvasDocument()?.id || '') {
+  function captureTimelapseFrameFromState(canvasId = getActiveProjectCanvasDocument()?.id || '', frameId = '') {
     if (!shouldCaptureTimelapseSnapshotsFromState()) {
       return false;
     }
     const resolvedCanvasId = normalizeTimelapseCanvasId(canvasId);
     const canvasDoc = getProjectCanvasDocumentById(resolvedCanvasId) || getActiveProjectCanvasDocument();
-    const entry = createTimelapseFrameEntryFromCanvas(canvasDoc);
+    const entry = createTimelapseFrameEntryFromCanvas(canvasDoc, frameId);
     if (!entry) {
       return false;
     }
     const track = getTimelapseTrack(resolvedCanvasId, { create: true });
-    const lastEntry = Array.isArray(track.snapshots) && track.snapshots.length
-      ? track.snapshots[track.snapshots.length - 1]
+    const lastEntry = Array.isArray(track.snapshots)
+      ? [...track.snapshots].reverse().find(candidate => (candidate?.frameId || '') === (entry.frameId || '')) || null
       : null;
     if (lastEntry && areTimelapseFrameEntriesEqual(lastEntry, entry)) {
       track.lastCaptureToken = unsavedChangeToken;
@@ -705,11 +832,9 @@
           }
         });
       }
-      const initialized = Boolean(ensureTimelapseOperationLogBase(canvasId));
-      if (initialized) {
-        syncTimelapseControls();
-      }
-      return initialized;
+      const scheduled = scheduleTimelapseOperationLogBase(canvasId);
+      syncTimelapseControls();
+      return scheduled;
     }
     if (!shouldCaptureTimelapseSnapshotsFromState()) {
       return false;
@@ -729,6 +854,10 @@
   }
 
   function flushPendingTimelapseCapture({ force = false } = {}) {
+    if (timelapseCaptureIdleHandle !== null && typeof window.cancelIdleCallback === 'function') {
+      window.cancelIdleCallback(timelapseCaptureIdleHandle);
+      timelapseCaptureIdleHandle = null;
+    }
     const queuedCanvasIds = Array.from(timelapseQueuedCanvasIds);
     if (timelapseCaptureTimer !== null) {
       window.clearTimeout(timelapseCaptureTimer);
@@ -743,12 +872,17 @@
     }
     let captured = false;
     queuedCanvasIds.forEach(canvasId => {
-      captured = captureTimelapseFrameFromState(canvasId) || captured;
+      const frameIds = Array.from(timelapseQueuedFrameIdsByCanvasId.get(canvasId) || []);
+      if (!frameIds.length) frameIds.push('');
+      frameIds.forEach(frameId => {
+        captured = captureTimelapseFrameFromState(canvasId, frameId) || captured;
+      });
     });
+    timelapseQueuedFrameIdsByCanvasId.clear();
     return captured;
   }
 
-  function scheduleTimelapseCaptureFromState({ immediate = false, canvasId = getActiveProjectCanvasDocument()?.id || '' } = {}) {
+  function scheduleTimelapseCaptureFromState({ immediate = false, canvasId = getActiveProjectCanvasDocument()?.id || '', frameIds = null } = {}) {
     if (!shouldCaptureTimelapseSnapshotsFromState()) {
       return;
     }
@@ -757,6 +891,15 @@
       return;
     }
     timelapseQueuedCanvasIds.add(resolvedCanvasId);
+    const queuedFrameIds = timelapseQueuedFrameIdsByCanvasId.get(resolvedCanvasId) || new Set();
+    const activeCanvas = getActiveProjectCanvasDocument();
+    const requestedFrameIds = Array.isArray(frameIds)
+      ? frameIds
+      : [activeCanvas?.frames?.[activeCanvas?.activeFrame]?.id || ''];
+    requestedFrameIds.forEach(frameId => {
+      if (typeof frameId === 'string') queuedFrameIds.add(frameId);
+    });
+    timelapseQueuedFrameIdsByCanvasId.set(resolvedCanvasId, queuedFrameIds);
     if (immediate) {
       flushPendingTimelapseCapture();
       return;
@@ -766,7 +909,15 @@
     }
     timelapseCaptureTimer = window.setTimeout(() => {
       timelapseCaptureTimer = null;
-      flushPendingTimelapseCapture();
+      const run = () => {
+        timelapseCaptureIdleHandle = null;
+        flushPendingTimelapseCapture();
+      };
+      if (typeof window.requestIdleCallback === 'function') {
+        timelapseCaptureIdleHandle = window.requestIdleCallback(run, { timeout: 2000 });
+      } else {
+        window.setTimeout(run, 0);
+      }
     }, TIMELAPSE_CAPTURE_DEBOUNCE_MS);
   }
 
@@ -800,16 +951,22 @@
   }
 
   function clearTimelapseRecording({ silent = false, scope = 'active' } = {}) {
+    if (timelapseCaptureIdleHandle !== null && typeof window.cancelIdleCallback === 'function') {
+      window.cancelIdleCallback(timelapseCaptureIdleHandle);
+      timelapseCaptureIdleHandle = null;
+    }
     if (timelapseCaptureTimer !== null) {
       window.clearTimeout(timelapseCaptureTimer);
       timelapseCaptureTimer = null;
     }
     if (scope === 'all') {
       timelapseQueuedCanvasIds.clear();
+      timelapseQueuedFrameIdsByCanvasId.clear();
       timelapseState.tracksByCanvasId = Object.create(null);
     } else {
       const activeCanvasId = normalizeTimelapseCanvasId(getActiveProjectCanvasDocument()?.id || '');
       timelapseQueuedCanvasIds.delete(activeCanvasId);
+      timelapseQueuedFrameIdsByCanvasId.delete(activeCanvasId);
       const track = getTimelapseTrack(activeCanvasId);
       if (track) {
         track.snapshots.length = 0;
@@ -982,6 +1139,37 @@
   function buildTimelapseExportEntriesFromOperationLog(canvasId = getActiveProjectCanvasDocument()?.id || '') {
     const track = getTimelapseTrack(canvasId);
     const log = track?.operationLog && typeof track.operationLog === 'object' ? track.operationLog : null;
+    if (log?.version === 2 && Array.isArray(log.entries)) {
+      const baseIndex = Math.max(0, Math.round(Number(log.visualBaseSnapshotIndex) || 0));
+      const visualFrames = [
+        ...(Array.isArray(track?.serializedSnapshots) ? track.serializedSnapshots : []),
+        ...(Array.isArray(track?.snapshots) ? track.snapshots : []),
+      ];
+      const base = resolveTimelapseFrameEntry(visualFrames[baseIndex]);
+      if (!base) return [];
+      const workingPixels = new Uint8ClampedArray(base.pixels);
+      const snapshots = [{ width: base.width, height: base.height, pixels: new Uint8ClampedArray(workingPixels) }];
+      const palette = Array.isArray(state.palette) ? state.palette : [];
+      log.entries.forEach(entry => {
+        if (entry?.type !== 'pixelPatch' || !Array.isArray(entry.changes)) return;
+        let changed = false;
+        entry.changes.forEach(change => {
+          const pixelIndex = Math.max(0, Math.round(Number(change?.index) || 0));
+          const baseOffset = pixelIndex * 4;
+          if (baseOffset + 3 >= workingPixels.length || !change?.after) return;
+          const direct = Array.isArray(change.after.direct) ? change.after.direct : null;
+          const color = direct || palette[Math.round(Number(change.after.paletteIndex) || 0)] || null;
+          if (!color) return;
+          workingPixels[baseOffset] = color[0] ?? color.r ?? 0;
+          workingPixels[baseOffset + 1] = color[1] ?? color.g ?? 0;
+          workingPixels[baseOffset + 2] = color[2] ?? color.b ?? 0;
+          workingPixels[baseOffset + 3] = color[3] ?? color.a ?? 0;
+          changed = true;
+        });
+        if (changed) snapshots.push({ width: base.width, height: base.height, pixels: new Uint8ClampedArray(workingPixels) });
+      });
+      return snapshots;
+    }
     if (!log?.baseSnapshot || !Array.isArray(log.entries)) {
       return [];
     }
@@ -1434,6 +1622,7 @@
     createTimelapseOperationEntryFromPixelPatch,
     createTimelapseOperationKeyframeEntry,
     recordTimelapseOperationLogEntry,
+    scheduleTimelapseOperationLogBase,
     reconcileTimelapseTracksForSingleCanvas,
     pruneTimelapseTracksToExistingCanvases,
     createTimelapseFrameEntryFromCanvas,

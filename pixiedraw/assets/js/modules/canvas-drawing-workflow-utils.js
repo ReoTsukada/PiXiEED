@@ -897,7 +897,7 @@
       let srcG = 0;
       let srcB = 0;
       let srcA = 0;
-      if (paletteIndex >= 0) {
+      if (paletteIndex > 0) {
         const color = state.palette[paletteIndex];
         if (!color) {
           continue;
@@ -958,7 +958,7 @@
 
   function sampleLayerColor(layer, x, y) {
     const idx = y * state.width + x;
-    if (layer.indices[idx] >= 0) {
+    if (layer.indices[idx] > 0) {
       return { type: 'index', index: layer.indices[idx] };
     }
     const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
