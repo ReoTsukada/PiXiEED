@@ -519,14 +519,17 @@
       setLocalizedToggleLabel('mirrorAxisDiagonalB', '斜め対称 (/)', 'Diagonal Mirror (/)');
       setLocalizedTextContent('#mirrorAxisHelp', 'ミラーモード中はキャンバス周囲の＋で対称軸をON/OFFし、ONの軸はそのままドラッグして位置を動かせます。', 'When mirror mode is on, use the + handles around the canvas to turn axes on or off. Drag an active + handle to move that axis.');
       setLocalizedTextContent('.virtual-cursor-scale__label', '仮想カーソルボタンサイズ', 'Virtual Cursor Button Size');
-      setLocalizedTextContent('#mobileDrawHelp', 'スマホ描画: 仮想カーソルをONにしてキャンバスをドラッグでカーソル移動、「描画」ボタン長押しで描画します（左半分=主色 / 右半分=副色）。選択範囲を移動する時は「移動」ツール、または選択ツールのまま選択範囲上で描画ボタンを長押しし、もう1本の指でキャンバスをドラッグします。2本指ドラッグ/ピンチで移動と拡大縮小ができます。', 'Mobile draw: turn on Virtual Cursor, drag the canvas to move the cursor, and long-press Draw to paint (left half = primary / right half = secondary). To move a selection, use Move, or keep a selection tool active, hold Draw on the selected area, and drag the canvas with a second finger. Use two fingers to pan and pinch zoom.');
+      setLocalizedTextContent('#mobileDrawHelp', 'スマホ描画: 仮想カーソルをONにしてキャンバスをドラッグでカーソル移動。描画ボタンは左=主色、右=副色です。長押しで描画し、ドラッグするとボタンを移動できます。選択範囲を移動する時は「移動」ツール、または選択ツールのまま選択範囲上で描画ボタンを長押しし、もう1本の指でキャンバスをドラッグします。2本指ドラッグ/ピンチで移動と拡大縮小ができます。', 'Mobile draw: turn on Virtual Cursor and drag the canvas to move the cursor. The left half of Draw uses the primary color and the right half uses the secondary color. Long-press to draw; drag the button to move it. To move a selection, use Move, or keep a selection tool active, hold Draw on the selected area, and drag the canvas with a second finger. Use two fingers to pan and pinch zoom.');
       setLocalizedTextContent('#settingsDisplayHint', '背景とUI配色を切り替えます（描画色には影響しません）。', 'Switch the background and UI colors (does not change drawing colors).');
       setLocalizedAttribute('#toggleBackgroundMode', 'aria-label', '背景色を切り替え', 'Change background color');
       setLocalizedAttribute('#toggleBackgroundMode', 'title', '背景色を切り替え', 'Change background color');
       updatePixieedAccountUi();
   
-      setLocalizedTextContent('#floatingDrawButton', '描画', 'Draw');
-      setLocalizedAttribute('#floatingDrawButton', 'aria-label', '描画ボタン（左=主色 / 右=副色）', 'Draw button (left = primary / right = secondary)');
+      setLocalizedTextContent('#floatingDrawButton .floating-draw-button__side--primary .floating-draw-button__side-key', '左', 'Left');
+      setLocalizedTextContent('#floatingDrawButton .floating-draw-button__side--primary .floating-draw-button__side-label', '主', 'Primary');
+      setLocalizedTextContent('#floatingDrawButton .floating-draw-button__side--secondary .floating-draw-button__side-key', '右', 'Right');
+      setLocalizedTextContent('#floatingDrawButton .floating-draw-button__side--secondary .floating-draw-button__side-label', '副', 'Secondary');
+      setLocalizedAttribute('#floatingDrawButton', 'aria-label', '描画ボタン。左半分で主色、右半分で副色を描画', 'Draw button. Left half uses the primary color; right half uses the secondary color.');
       setLocalizedAttribute('#floatingMovePad', 'aria-label', '選択範囲移動', 'Selection Move Pad');
       setLocalizedAttribute('#floatingMovePad [data-move-pad-dir="up"]', 'aria-label', '選択範囲を上へ移動', 'Move selection up');
       setLocalizedAttribute('#floatingMovePad [data-move-pad-dir="left"]', 'aria-label', '選択範囲を左へ移動', 'Move selection left');
