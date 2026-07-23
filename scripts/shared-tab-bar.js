@@ -144,6 +144,7 @@
     if (kind === 'camera') {
       return {
         actions: [
+          { id: 'fullscreen', label: '拡大', selector: '#fullscreenButton', icon: '拡大.png', iconWhenPressed: '縮小.png', mirrorState: true, mode: 'fullscreen', fullscreenController: 'tool', placement: 'leading' },
           { id: 'file', label: '画像を読み込む', selector: '#pixelArtBtn', cloneIcon: true, mirrorState: true },
           { id: 'clear', label: '読み込みを取り消す', selector: '#clearPixelBtn', cloneIcon: true, mirrorState: true, mirrorVisibility: true },
           { id: 'camera-switch', label: 'カメラ切り替え', selector: '#cameraActionBtn', cloneIcon: true, mirrorState: true },

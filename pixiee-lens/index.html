@@ -2456,18 +2456,36 @@
 </select>
 </label>
 </div>
+<div class="dot-settings-panel__row">
+<label class="select-control" for="paletteModeSelect">
+<span class="select-control__label">パレット</span>
+<select id="paletteModeSelect" name="paletteMode">
+<option value="source">画像由来</option>
+<option selected="" value="gameboy">GB固定4色</option>
+</select>
+</label>
+</div>
 <div aria-hidden="true" class="palette-display" id="paletteDisplay"></div>
+<div class="dot-settings-panel__row">
+<label class="slider-control" for="surfaceSimplifyRange">
+<span class="slider-control__label-row">
+<span class="slider-control__label">面化</span>
+<span class="slider-control__value" id="surfaceSimplifyValue">55%</span>
+</span>
+<input id="surfaceSimplifyRange" max="100" min="0" step="5" type="range" value="55"/>
+</label>
+</div>
 <div class="dot-settings-panel__row">
 <label class="select-control" for="dotScaleSelect">
 <span class="select-control__label">撮影サイズ（基準）</span>
 <select id="dotScaleSelect" name="dotScale">
 <option value="16">16*16 PX</option>
 <option value="32">32*32 PX</option>
-<option selected="" value="64">64*64 PX</option>
+<option value="64">64*64 PX</option>
 <option value="96">96*96 PX</option>
 <option value="128">128*128 PX</option>
 <option value="160">160*160 PX</option>
-<option value="256">256*256 PX</option>
+<option selected="" value="256">256*256 PX</option>
 </select>
 </label>
 </div>
@@ -2570,7 +2588,7 @@
       <div class="capture-preview__image-wrap">
         <img alt="撮影した画像のプレビュー" id="capturePreviewImage" loading="lazy"/>
       </div>
-      <p class="capture-preview__info" id="capturePreviewInfo">画像は自動保存されます。保存されない場合は「共有する」または長押しで保存してください。</p>
+      <p class="capture-preview__info" id="capturePreviewInfo">画像・GIFは撮影後に自動でダウンロードされます。</p>
       <div class="capture-preview__ad">
         <ins class="adsbygoogle"
              style="display:block"
@@ -2685,7 +2703,7 @@
     const GIF_CAPTURE_MAX_OPTIMIZE_ATTEMPTS = 14;
     const GIF_CAPTURE_PIXEL_RATIO_CAP = 1;
     const DOT_SIZE_PRESETS = Object.freeze([16, 32, 64, 96, 128, 160, 256]);
-    const DOT_SIZE_DEFAULT = 64;
+    const DOT_SIZE_DEFAULT = 256;
     const LEGACY_DOT_SCALE_TO_SIZE = Object.freeze({
       1: 256,
       2: 128,
@@ -2902,6 +2920,9 @@
     const gifFpsSelect = document.getElementById('gifFpsSelect');
     const gradientToggleBtn = document.getElementById('gradientToggleBtn');
     const colorDepthSelect = document.getElementById('colorDepthSelect');
+    const paletteModeSelect = document.getElementById('paletteModeSelect');
+    const surfaceSimplifyRange = document.getElementById('surfaceSimplifyRange');
+    const surfaceSimplifyValue = document.getElementById('surfaceSimplifyValue');
 
     if (paletteDisplay) {
       ['pointerdown', 'mousedown', 'touchstart', 'click'].forEach((type) => {
@@ -2929,6 +2950,8 @@
       setSelectEnabled(dotScaleSelect, false);
       setSelectEnabled(gifFpsSelect, false);
       setSelectEnabled(colorDepthSelect, false);
+      setSelectEnabled(paletteModeSelect, false);
+      setSelectEnabled(surfaceSimplifyRange, false);
       if (gradientToggleBtn) {
         gradientToggleBtn.disabled = true;
         gradientToggleBtn.setAttribute('aria-disabled', 'true');
@@ -2941,6 +2964,8 @@
       setSelectEnabled(dotScaleSelect, true);
       setSelectEnabled(gifFpsSelect, true);
       setSelectEnabled(colorDepthSelect, true);
+      setSelectEnabled(paletteModeSelect, true);
+      setSelectEnabled(surfaceSimplifyRange, true);
       if (gradientToggleBtn) {
         gradientToggleBtn.disabled = false;
         gradientToggleBtn.removeAttribute('aria-disabled');
@@ -3007,7 +3032,9 @@
       dotScale: DOT_SIZE_DEFAULT,
       gifCaptureFps: GIF_CAPTURE_DEFAULT_FPS,
       colorDepth: '4',
+      paletteMode: 'gameboy',
       gradientMode: 'dither',
+      surfaceSimplify: 55,
       cameraSettings: { ...CAMERA_SETTING_DEFAULTS }
     };
 
@@ -6953,6 +6980,177 @@
       return refined.map(({ r, g, b }) => ({ r, g, b }));
     }
 
+    function buildSourcePalette(imageData, desired) {
+      // Image-derived palettes need roles, rather than simply averaging the
+      // most common RGB values.  The optional black/white anchors preserve
+      // real deep shadows and highlights; the remaining slots become the
+      // representative material colours (sky, skin, hair, clothes, etc.).
+      const bins = new Map();
+      const { data } = imageData;
+      for (let index = 0; index < data.length; index += 4) {
+        const rIndex = getColorBinIndex(data[index]);
+        const gIndex = getColorBinIndex(data[index + 1]);
+        const bIndex = getColorBinIndex(data[index + 2]);
+        const key = (rIndex << 8) | (gIndex << 4) | bIndex;
+        const bin = bins.get(key) || {
+          r: binIndexToColorValue(rIndex),
+          g: binIndexToColorValue(gIndex),
+          b: binIndexToColorValue(bIndex),
+          count: 0
+        };
+        bin.count += 1;
+        bins.set(key, bin);
+      }
+      const colors = Array.from(bins.values()).sort((a, b) => b.count - a.count);
+      const size = Math.min(Math.max(2, Number(desired) || 4), colors.length);
+      if (!size) return [];
+
+      const totalPixels = Math.max(1, data.length / 4);
+      const luma = (color) => 0.2126 * color.r + 0.7152 * color.g + 0.0722 * color.b;
+      const distance = (a, b) => 0.25 * (a.r - b.r) ** 2 + 0.60 * (a.g - b.g) ** 2 + 0.15 * (a.b - b.b) ** 2;
+      const roleCoverage = (predicate) => colors.reduce((sum, color) => sum + (predicate(luma(color)) ? color.count : 0), 0) / totalPixels;
+      const centers = [];
+      const locked = [];
+
+      // Do not manufacture black or white for a tiny speck of noise.  When
+      // either is visibly present, keep it exact so the image retains a crisp
+      // value range instead of turning into uniformly muted averages.
+      if (roleCoverage((value) => value <= 40) >= 0.012 && centers.length < size) {
+        centers.push({ ...BLACK_COLOR });
+        locked.push(true);
+      }
+      if (roleCoverage((value) => value >= 216) >= 0.012 && centers.length < size) {
+        centers.push({ ...WHITE_COLOR });
+        locked.push(true);
+      }
+
+      // Seed remaining entries from frequent, well-separated source colours.
+      // This gives a blue background and a skin tone separate slots instead
+      // of spending every entry on almost-identical shades of the background.
+      while (centers.length < size) {
+        let next = null;
+        let bestScore = -1;
+        for (const color of colors) {
+          const separation = centers.length
+            ? Math.sqrt(Math.min(...centers.map((center) => distance(color, center))))
+            : 96;
+          const score = Math.sqrt(color.count) * (0.35 + separation / 96);
+          if (score > bestScore) {
+            bestScore = score;
+            next = color;
+          }
+        }
+        if (!next) break;
+        centers.push({ r: next.r, g: next.g, b: next.b });
+        locked.push(false);
+      }
+
+      const assignments = new Array(colors.length).fill(0);
+      for (let pass = 0; pass < 4; pass += 1) {
+        const sums = centers.map(() => ({ r: 0, g: 0, b: 0, count: 0 }));
+        colors.forEach((color, colorIndex) => {
+          let target = 0;
+          let bestDistance = Number.POSITIVE_INFINITY;
+          centers.forEach((center, centerIndex) => {
+            const value = distance(color, center);
+            if (value < bestDistance) {
+              bestDistance = value;
+              target = centerIndex;
+            }
+          });
+          assignments[colorIndex] = target;
+          if (!locked[target]) {
+            sums[target].r += color.r * color.count;
+            sums[target].g += color.g * color.count;
+            sums[target].b += color.b * color.count;
+            sums[target].count += color.count;
+          }
+        });
+        sums.forEach((sum, index) => {
+          if (!locked[index] && sum.count) {
+            centers[index] = {
+              r: clampByte(sum.r / sum.count),
+              g: clampByte(sum.g / sum.count),
+              b: clampByte(sum.b / sum.count)
+            };
+          }
+        });
+      }
+
+      // Snap each material centre back to a well-used real source bin.  It
+      // avoids synthetic in-between hues while retaining the shade grouping
+      // obtained from the clustering pass above.
+      centers.forEach((center, centerIndex) => {
+        if (locked[centerIndex]) return;
+        let representative = null;
+        let bestScore = Number.POSITIVE_INFINITY;
+        colors.forEach((color, colorIndex) => {
+          if (assignments[colorIndex] !== centerIndex) return;
+          const score = distance(color, center) - Math.min(2400, Math.log2(color.count + 1) * 260);
+          if (score < bestScore) {
+            bestScore = score;
+            representative = color;
+          }
+        });
+        if (representative) {
+          centers[centerIndex] = { r: representative.r, g: representative.g, b: representative.b };
+        }
+      });
+
+      // A palette slot should not be spent on a barely different shade that
+      // is already represented by a more frequently used colour.  Keep the
+      // best-supported entry of each close group, then only refill from a
+      // genuinely separated source colour.  This is especially important at
+      // 2BIT/3BIT where two similar blues can otherwise consume half of the
+      // available palette.
+      const minimumSeparation = size <= 4 ? 46 : size <= 8 ? 34 : 24;
+      const centerUsage = centers.map((_, centerIndex) => colors.reduce(
+        (sum, color, colorIndex) => sum + (assignments[colorIndex] === centerIndex ? color.count : 0),
+        0
+      ));
+      const selected = [];
+      const orderedCenters = centers.map((center, index) => ({ center, index }))
+        .sort((first, second) => {
+          if (locked[first.index] !== locked[second.index]) return locked[first.index] ? -1 : 1;
+          return centerUsage[second.index] - centerUsage[first.index];
+        });
+      orderedCenters.forEach(({ center, index }) => {
+        const isTooClose = selected.some((picked) => Math.sqrt(distance(center, picked)) < minimumSeparation);
+        if (!isTooClose || locked[index]) {
+          selected.push(center);
+        }
+      });
+      while (selected.length < size) {
+        let candidate = null;
+        let candidateScore = -1;
+        colors.forEach((color) => {
+          const separation = selected.length
+            ? Math.sqrt(Math.min(...selected.map((picked) => distance(color, picked))))
+            : minimumSeparation;
+          if (separation < minimumSeparation) return;
+          const score = Math.sqrt(color.count) * (0.5 + separation / minimumSeparation);
+          if (score > candidateScore) {
+            candidateScore = score;
+            candidate = color;
+          }
+        });
+        if (!candidate) break;
+        selected.push({ r: candidate.r, g: candidate.g, b: candidate.b });
+      }
+      return selected;
+    }
+
+    function createEdgeMap(imageData) {
+      const { width, height, data } = imageData;
+      const edges = new Float32Array(width * height);
+      const luma = (index) => 0.2126 * data[index] + 0.7152 * data[index + 1] + 0.0722 * data[index + 2];
+      for (let y = 1; y < height - 1; y += 1) for (let x = 1; x < width - 1; x += 1) {
+        const index = (y * width + x) * 4;
+        edges[y * width + x] = Math.min(1, (Math.abs(luma(index + 4) - luma(index - 4)) + Math.abs(luma(index + width * 4) - luma(index - width * 4))) / 180);
+      }
+      return edges;
+    }
+
     function shouldRebuildPalette(depth, desired) {
       if (depth !== paletteState.depth || desired !== paletteState.desired) {
         return true;
@@ -7002,8 +7200,87 @@
       }
     }
 
+    function applySurfaceSimplify(imageData, edgeMap, palette) {
+      const strength = Math.max(0, Math.min(100, Number(state.surfaceSimplify) || 0));
+      const passes = strength < 20 ? 0 : strength < 60 ? 1 : strength < 85 ? 2 : 3;
+      const { width, height, data } = imageData;
+      if (!passes || width < 3 || height < 3) return;
+      const requiredWeight = strength < 34 ? 6 : strength < 67 ? 5 : 4;
+      const maxColorDistance = 24 + strength * 0.45;
+      const colorDistance = (first, second) => Math.sqrt(0.25 * (first.r - second.r) ** 2 + 0.60 * (first.g - second.g) ** 2 + 0.15 * (first.b - second.b) ** 2);
+      for (let pass = 0; pass < passes; pass += 1) {
+        const source = new Uint8ClampedArray(data);
+        for (let y = 1; y < height - 1; y += 1) {
+          for (let x = 1; x < width - 1; x += 1) {
+            const index = (y * width + x) * 4;
+            const pixel = y * width + x;
+            if (edgeMap[pixel] > (strength < 75 ? 0.28 : 0.42)) continue;
+            const neighbors = [[index - 4, 2], [index + 4, 2], [index - width * 4, 2], [index + width * 4, 2], [index - width * 4 - 4, 1], [index - width * 4 + 4, 1], [index + width * 4 - 4, 1], [index + width * 4 + 4, 1]];
+            const groups = new Map();
+            neighbors.forEach(([neighbor, weight]) => {
+              const key = `${source[neighbor]}/${source[neighbor + 1]}/${source[neighbor + 2]}`;
+              groups.set(key, (groups.get(key) || 0) + weight);
+            });
+            const dominant = [...groups.entries()].sort((first, second) => second[1] - first[1]).find(([, count]) => count >= requiredWeight)?.[0];
+            if (!dominant) continue;
+            const [r, g, b] = dominant.split('/').map(Number);
+            if (source[index] === r && source[index + 1] === g && source[index + 2] === b) continue;
+            if (colorDistance({ r: source[index], g: source[index + 1], b: source[index + 2] }, { r, g, b }) > maxColorDistance) continue;
+            data[index] = r; data[index + 1] = g; data[index + 2] = b;
+          }
+        }
+      }
+    }
+
+    function removeSmallRegions(imageData, edgeMap) {
+      const strength = Math.max(0, Math.min(100, Number(state.surfaceSimplify) || 0));
+      const maxSize = strength < 25 ? 0 : strength < 50 ? 1 : strength < 75 ? 2 : strength < 95 ? 3 : 5;
+      const { width, height, data } = imageData;
+      // Connected-component scans are intentionally reserved for strong
+      // cleanup on small canvases. Running a full flood fill per live frame
+      // at 256px costs more than the visible benefit at normal strengths.
+      if (!maxSize || strength < 75 || width > 160 || height > 160) return;
+      const visited = new Uint8Array(width * height);
+      const sameColor = (first, second) => data[first] === data[second] && data[first + 1] === data[second + 1] && data[first + 2] === data[second + 2];
+      for (let pixel = 0; pixel < width * height; pixel += 1) {
+        if (visited[pixel]) continue;
+        const start = pixel * 4;
+        const region = [];
+        const stack = [pixel];
+        const border = new Map();
+        let edgeTotal = 0;
+        while (stack.length) {
+          const current = stack.pop();
+          if (visited[current]) continue;
+          visited[current] = 1;
+          region.push(current);
+          edgeTotal += edgeMap[current];
+          const x = current % width;
+          const y = (current / width) | 0;
+          [[-1, 0], [1, 0], [0, -1], [0, 1]].forEach(([dx, dy]) => {
+            const xx = x + dx; const yy = y + dy;
+            if (xx < 0 || xx >= width || yy < 0 || yy >= height) return;
+            const neighbor = yy * width + xx;
+            const neighborIndex = neighbor * 4;
+            if (sameColor(start, neighborIndex)) {
+              if (!visited[neighbor]) stack.push(neighbor);
+            } else {
+              const key = `${data[neighborIndex]}/${data[neighborIndex + 1]}/${data[neighborIndex + 2]}`;
+              border.set(key, (border.get(key) || 0) + 1);
+            }
+          });
+        }
+        if (region.length <= maxSize && edgeTotal / region.length < 0.24 && border.size) {
+          const [color] = [...border.entries()].sort((first, second) => second[1] - first[1])[0];
+          const [r, g, b] = color.split('/').map(Number);
+          region.forEach((entry) => { const index = entry * 4; data[index] = r; data[index + 1] = g; data[index + 2] = b; });
+        }
+      }
+    }
+
     function applyColorDepth(imageData) {
       const depth = state.colorDepth || '4';
+      const edgeMap = createEdgeMap(imageData);
       applyPreAverage(imageData);
       boostSaturation(imageData);
       applyContrastToImageData(imageData);
@@ -7018,12 +7295,13 @@
         return;
       }
       const timestamp = typeof performance !== 'undefined' ? performance.now() : Date.now();
-      if (depth === '4') {
+      const useSourcePalette = state.paletteMode === 'source';
+      if (depth === '4' && state.paletteMode !== 'source') {
         const needsUpdate = paletteState.depth !== '4'
           || paletteState.colors.length !== FIXED_FOUR_COLOR_PALETTE.length
           || paletteState.originalColors.length !== FIXED_FOUR_COLOR_PALETTE.length;
         if (needsUpdate) {
-          applyNewPaletteColors(FIXED_FOUR_COLOR_PALETTE);
+          applyNewPaletteColors(useSourcePalette ? buildSourcePalette(imageData, 4) : FIXED_FOUR_COLOR_PALETTE);
           paletteState.depth = '4';
           paletteState.desired = FIXED_FOUR_COLOR_PALETTE.length;
           paletteState.lastUpdated = timestamp;
@@ -7034,7 +7312,7 @@
           || paletteState.colors.length !== FIXED_TWO_COLOR_PALETTE.length
           || paletteState.originalColors.length !== FIXED_TWO_COLOR_PALETTE.length;
         if (needsUpdate) {
-          applyNewPaletteColors(FIXED_TWO_COLOR_PALETTE);
+          applyNewPaletteColors(useSourcePalette ? buildSourcePalette(imageData, 2) : FIXED_TWO_COLOR_PALETTE);
           paletteState.depth = '2';
           paletteState.desired = FIXED_TWO_COLOR_PALETTE.length;
           paletteState.lastUpdated = timestamp;
@@ -7112,7 +7390,7 @@
       } else {
         const desiredColors = Math.max(2, Number(depth) || 4);
         if (shouldRebuildPalette(depth, desiredColors)) {
-          let palette = buildPaletteFromImage(imageData, desiredColors, depth);
+          const palette = useSourcePalette ? buildSourcePalette(imageData, desiredColors) : buildPaletteFromImage(imageData, desiredColors, depth);
           applyNewPaletteColors(palette);
           paletteState.depth = depth;
           paletteState.desired = desiredColors;
@@ -7133,18 +7411,20 @@
 
       const findNearestColor = (r, g, b, key) => {
         const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-        if (depth !== '4' && luminance < 48) {
-          cache.set(key, BLACK_COLOR);
-          return BLACK_COLOR;
-        }
-        if (depth !== '4' && luminance > 224) {
-          cache.set(key, WHITE_COLOR);
-          return WHITE_COLOR;
-        }
-        if (depth === '4' && luminance < FOUR_COLOR_DARK_THRESHOLD) {
-          const darkest = palette[palette.length - 1] || { r: 0, g: 0, b: 0 };
-          cache.set(key, darkest);
-          return darkest;
+        if (!useSourcePalette) {
+          if (depth !== '4' && luminance < 48) {
+            cache.set(key, BLACK_COLOR);
+            return BLACK_COLOR;
+          }
+          if (depth !== '4' && luminance > 224) {
+            cache.set(key, WHITE_COLOR);
+            return WHITE_COLOR;
+          }
+          if (depth === '4' && luminance < FOUR_COLOR_DARK_THRESHOLD) {
+            const darkest = palette[palette.length - 1] || { r: 0, g: 0, b: 0 };
+            cache.set(key, darkest);
+            return darkest;
+          }
         }
         let cached = cache.get(key);
         if (cached) {
@@ -7172,8 +7452,8 @@
         let r = data[i];
         let g = data[i + 1];
         let b = data[i + 2];
+        const pixelIndex = i >> 2;
         if (useDither) {
-          const pixelIndex = i >> 2;
           const x = pixelIndex % width;
           const y = (pixelIndex / width) | 0;
           const threshold = DITHER_MATRIX_4X4[((y & 3) << 2) | (x & 3)];
@@ -7191,6 +7471,8 @@
         data[i + 1] = nearest.g;
         data[i + 2] = nearest.b;
       }
+      applySurfaceSimplify(imageData, edgeMap, palette);
+      removeSmallRegions(imageData, edgeMap);
     }
 
     function captureCurrentSourceImageData(targetWidth, targetHeight) {
@@ -7243,7 +7525,7 @@
       const depth = typeof depthValue === 'string' && depthValue ? depthValue : (state.colorDepth || '4');
       const timestamp = typeof performance !== 'undefined' ? performance.now() : Date.now();
 
-      if (depth === '4') {
+      if (depth === '4' && state.paletteMode !== 'source') {
         applyNewPaletteColors(FIXED_FOUR_COLOR_PALETTE);
         paletteState.depth = '4';
         paletteState.desired = FIXED_FOUR_COLOR_PALETTE.length;
@@ -7254,7 +7536,7 @@
         return true;
       }
 
-      if (depth === '2') {
+      if (depth === '2' && state.paletteMode !== 'source') {
         applyNewPaletteColors(FIXED_TWO_COLOR_PALETTE);
         paletteState.depth = '2';
         paletteState.desired = FIXED_TWO_COLOR_PALETTE.length;
@@ -7282,7 +7564,9 @@
       applyContrastToImageData(sourceImageData);
       liftShadows(sourceImageData);
 
-      const palette = buildPaletteFromImage(sourceImageData, desiredColors, depth);
+      const palette = state.paletteMode === 'source'
+        ? buildSourcePalette(sourceImageData, desiredColors)
+        : buildPaletteFromImage(sourceImageData, desiredColors, depth);
       if (!palette || !palette.length) {
         return false;
       }
@@ -8895,6 +9179,26 @@
       });
     }
 
+    if (surfaceSimplifyRange) {
+      ['mousedown', 'touchstart', 'pointerdown', 'click'].forEach((type) => {
+        surfaceSimplifyRange.addEventListener(type, (event) => event.stopPropagation());
+      });
+      surfaceSimplifyRange.addEventListener('input', () => {
+        state.surfaceSimplify = Math.max(0, Math.min(100, Number(surfaceSimplifyRange.value) || 0));
+        if (surfaceSimplifyValue) surfaceSimplifyValue.textContent = `${state.surfaceSimplify}%`;
+      });
+    }
+
+    if (paletteModeSelect) {
+      ['mousedown', 'touchstart', 'pointerdown', 'click'].forEach((type) => {
+        paletteModeSelect.addEventListener(type, (event) => event.stopPropagation());
+      });
+      paletteModeSelect.addEventListener('change', () => {
+        state.paletteMode = paletteModeSelect.value === 'source' ? 'source' : 'gameboy';
+        clearPaletteState();
+      });
+    }
+
     settingsTabButtons.forEach((button) => {
       button.addEventListener('click', (event) => {
         event.stopPropagation();
@@ -10049,7 +10353,6 @@
       const autoShareOnMobile = options.autoShareOnMobile !== false && options.autoShareOnIOS !== false;
       const { blob, dataUrl, cssWidth, cssHeight, width, height } = result;
       const supportsDownloadAttr = 'download' in HTMLAnchorElement.prototype;
-      const shouldAvoidAnchorDownload = isIOSDevice && isStandaloneApp;
       const drawPayload = enableDrawImport
         ? await createDrawImportPayload(result, filename, options.drawPayloadOptions || {})
         : null;
@@ -10068,13 +10371,25 @@
         }
         const shareFile = new File([blob], filename, { type: mimeType });
         const canShareFiles = typeof navigator.share === 'function' && (!navigator.canShare || navigator.canShare({ files: [shareFile] }));
-        const pickerResult = await saveBlobWithFilePicker(blob, filename, mimeType);
-        if (pickerResult === 'cancel') {
-          return false;
-        }
-        const pickerSaved = pickerResult === 'saved' || pickerResult === 'native' || pickerResult === 'gallery';
         let autoShareSucceeded = false;
-        const shouldAutoShare = !pickerSaved && autoShareOnMobile && isIOSDevice && canShareFiles;
+        // GIFの長押し終了時はすでにユーザー操作の文脈外になるため、
+        // File System Access API の権限要求をここで行うと SecurityError になる。
+        // PiXiEEDrawと同様に、生成済みBlobをそのままダウンロードする。
+        const downloaded = supportsDownloadAttr;
+        if (downloaded) {
+          const downloadUrl = URL.createObjectURL(blob);
+          const anchor = document.createElement('a');
+          anchor.href = downloadUrl;
+          anchor.download = filename;
+          anchor.rel = 'noopener';
+          anchor.style.position = 'absolute';
+          anchor.style.left = '-9999px';
+          document.body.appendChild(anchor);
+          anchor.click();
+          document.body.removeChild(anchor);
+          setTimeout(() => URL.revokeObjectURL(downloadUrl), DOWNLOAD_OBJECT_URL_REVOKE_DELAY_MS);
+        }
+        const shouldAutoShare = !downloaded && autoShareOnMobile && isIOSDevice && canShareFiles;
         if (shouldAutoShare) {
           try {
             await navigator.share({
@@ -10090,33 +10405,10 @@
             // continue to fallback preview
           }
         }
-        if (pickerResult === 'gallery') {
+        if (downloaded) {
           infoMessage = drawPayload
-            ? '写真アプリへ保存しました。「PiXiEEDrawで編集」で続けて編集できます。'
-            : `${formatLabel}を写真アプリへ保存しました。`;
-        } else if (pickerResult === 'native') {
-          infoMessage = drawPayload
-            ? '端末ファイルへ保存しました。「PiXiEEDrawで編集」で続けて編集できます。'
-            : `${formatLabel}を端末ファイルへ保存しました。`;
-        } else if (pickerSaved) {
-          infoMessage = drawPayload
-            ? 'ファイルへ保存しました。「PiXiEEDrawで編集」で続けて編集できます。'
-            : `${formatLabel}をファイルへ保存しました。`;
-        } else if (supportsDownloadAttr && !autoShareSucceeded && !shouldAvoidAnchorDownload) {
-          const downloadUrl = URL.createObjectURL(blob);
-          const anchor = document.createElement('a');
-          anchor.href = downloadUrl;
-          anchor.download = filename;
-          anchor.rel = 'noopener';
-          anchor.style.position = 'absolute';
-          anchor.style.left = '-9999px';
-          document.body.appendChild(anchor);
-          anchor.click();
-          document.body.removeChild(anchor);
-          setTimeout(() => URL.revokeObjectURL(downloadUrl), DOWNLOAD_OBJECT_URL_REVOKE_DELAY_MS);
-          infoMessage = drawPayload
-            ? '画像を自動的に保存しました。「PiXiEEDrawで編集」で続けて編集できます。'
-            : `${formatLabel}を自動的に保存しました。`;
+            ? `${formatLabel}をダウンロードしました。「PiXiEEDrawで編集」で続けて編集できます。`
+            : `${formatLabel}をダウンロードしました。`;
         } else if (canShareFiles) {
           if (autoShareSucceeded) {
             infoMessage = drawPayload
@@ -10959,7 +11251,9 @@
         height: frameSize.height,
         palette: gifPalette,
         frames: [firstFrame],
-        rafId: 0
+        rafId: 0,
+        sampleTimerId: 0,
+        samplePending: false
       };
       gifCaptureSession = session;
       if (captureBtn) {
@@ -10983,14 +11277,22 @@
           void stopGifCaptureSession({ reason: 'timeout' });
           return;
         }
-        if (timestamp - session.lastFrameAt >= session.frameDelayMs) {
-          const frame = captureGifIndexedFrame(session);
+        if (!session.samplePending && timestamp - session.lastFrameAt >= session.frameDelayMs) {
           session.lastFrameAt = timestamp;
-          if (!frame) {
-            void stopGifCaptureSession({ cancelled: true, reason: 'capture-error' });
-            return;
-          }
-          session.frames.push(frame);
+          session.samplePending = true;
+          // ImageDataの採取と量子化は重いため、描画フレーム内ではなく
+          // 別タスクに逃がす。HUDのrequestAnimationFrameを止めない。
+          session.sampleTimerId = window.setTimeout(() => {
+            session.sampleTimerId = 0;
+            session.samplePending = false;
+            if (!session.active) return;
+            const frame = captureGifIndexedFrame(session);
+            if (!frame) {
+              void stopGifCaptureSession({ cancelled: true, reason: 'capture-error' });
+              return;
+            }
+            session.frames.push(frame);
+          }, 0);
         }
         session.rafId = window.requestAnimationFrame(tick);
       };
@@ -11006,6 +11308,9 @@
       session.active = false;
       if (session.rafId) {
         window.cancelAnimationFrame(session.rafId);
+      }
+      if (session.sampleTimerId) {
+        window.clearTimeout(session.sampleTimerId);
       }
       gifCaptureSession = null;
       updateGifCaptureGauge(GIF_CAPTURE_MAX_DURATION_MS, GIF_CAPTURE_MAX_DURATION_MS);
@@ -11740,7 +12045,8 @@
       });
     })();
   </script>
-  <script src="../scripts/shared-bottom-nav.js?v=20260722-notifications2"></script>
+  <button aria-pressed="false" hidden id="fullscreenButton" type="button">拡大</button>
+  <script src="../scripts/shared-bottom-nav.js?v=20260723-camera-fullscreen1"></script>
   <script src="../scripts/tool-fullscreen.js"></script>
   <script src="../scripts/pixel-art-fit.js"></script>
 </body>
