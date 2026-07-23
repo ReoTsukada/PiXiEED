@@ -4183,6 +4183,8 @@ body.is-canvas-surface-moving .mirror-guides {
   --floating-draw-button-secondary-overlay: rgba(255, 255, 255, 0);
   --floating-draw-button-divider-color: rgba(255, 255, 255, 0.42);
   --floating-draw-button-text-color: rgba(248, 252, 255, 0.96);
+  --floating-draw-button-primary-text-color: rgba(248, 252, 255, 0.96);
+  --floating-draw-button-secondary-text-color: rgba(248, 252, 255, 0.96);
   position: fixed;
   top: 0;
   left: 0;
@@ -4190,8 +4192,11 @@ body.is-canvas-surface-moving .mirror-guides {
   transform:
     translate(var(--floating-draw-button-x), var(--floating-draw-button-y))
     scale(var(--floating-draw-button-scale));
-  padding: 10px 20px;
-  min-width: 86px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 0;
+  min-width: 96px;
+  min-height: 48px;
   background:
     linear-gradient(
       90deg,
@@ -4208,7 +4213,6 @@ body.is-canvas-surface-moving .mirror-guides {
       var(--floating-draw-button-secondary-color) 100%
     );
   color: var(--floating-draw-button-text-color);
-  font-weight: 600;
   border: 1px solid rgba(255, 168, 82, 0.78);
   border-radius: 0;
   box-shadow: none;
@@ -4218,6 +4222,44 @@ body.is-canvas-surface-moving .mirror-guides {
   overflow: hidden;
   z-index: 2000;
   text-shadow: none;
+}
+
+.floating-draw-button__side {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-width: 0;
+  min-height: 46px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.floating-draw-button__side--primary {
+  color: var(--floating-draw-button-primary-text-color);
+}
+
+.floating-draw-button__side--secondary {
+  color: var(--floating-draw-button-secondary-text-color);
+}
+
+.floating-draw-button__side-key {
+  font-size: 0.56rem;
+  font-weight: 600;
+  opacity: 0.82;
+}
+
+.floating-draw-button__side-label {
+  font-size: 0.92rem;
+  letter-spacing: 0.08em;
+}
+
+body:not(.is-mobile-layout) [data-ui-action='virtualCursorToggle'] {
+  display: none !important;
 }
 
 body.is-mobile-layout .qr-edit-panel {
@@ -8051,20 +8093,12 @@ body.is-mobile-layout .mobile-draw-help {
   border-left-color: var(--timeline-structure-selection-color);
 }
 
-.timeline-cell--corner,
 .timeline-cell--frame-header {
   position: sticky;
   top: 0;
   backdrop-filter: none;
   z-index: 4;
   justify-content: center;
-}
-
-.timeline-cell--corner {
-  left: 0;
-  z-index: 6;
-  min-width: calc(var(--timeline-cell-size) * 2);
-  max-width: calc(var(--timeline-cell-size) * 2);
 }
 
 .timeline-cell--layer {
@@ -8871,7 +8905,7 @@ body.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data
 
 #panelSettings .settings-size-controls--canvas {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(104px, 0.9fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(96px, 0.9fr);
   gap: 8px;
   align-items: end;
 }
@@ -8915,22 +8949,25 @@ body.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data
 }
 
 #panelSettings .settings-size-row--combined .sprite-scale-stepper {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) 28px;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
+  width: 100%;
   min-width: 0;
 }
 
 #panelSettings .settings-size-row--combined .sprite-scale-stepper input[type='number'] {
-  width: 62px;
+  width: 100%;
+  min-width: 0;
   min-height: 40px;
   padding: 4px 8px;
   text-align: center;
 }
 
 #panelSettings .settings-size-row--combined .sprite-scale-stepper .number-stepper__btn {
-  width: 40px;
-  min-width: 40px;
+  width: 28px;
+  min-width: 28px;
   height: 40px;
   min-height: 40px;
   padding: 0;
@@ -13508,7 +13545,7 @@ body.is-mobile-layout .panel-ad-mount[hidden] {
     padding: 5px;
   }
   body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelSettings .settings-size-controls--canvas {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(96px, 0.9fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(72px, 0.9fr);
     gap: 4px;
   }
   body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelSettings .canvas-size-stepper input[type='number'],
@@ -13519,13 +13556,13 @@ body.is-mobile-layout .panel-ad-mount[hidden] {
   }
   body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelSettings .sprite-scale-stepper {
     display: grid;
-    grid-template-columns: 32px minmax(40px, 1fr) 32px;
+    grid-template-columns: 24px minmax(0, 1fr) 24px;
     gap: 2px;
     min-width: 0;
   }
   body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelSettings .sprite-scale-stepper .number-stepper__btn {
-    width: 32px;
-    min-width: 32px;
+    width: 24px;
+    min-width: 24px;
     height: 34px;
     min-height: 34px;
     padding: 0;
@@ -13708,7 +13745,7 @@ body.is-mobile-layout .panel-ad-mount[hidden] {
   }
 
   #panelSettings .settings-size-controls--canvas {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(92px, 0.9fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(88px, 0.9fr);
     gap: 5px;
   }
 
@@ -13717,14 +13754,14 @@ body.is-mobile-layout .panel-ad-mount[hidden] {
   }
 
   #panelSettings .settings-size-row--combined .sprite-scale-stepper input[type='number'] {
-    width: 44px;
+    width: 100%;
     min-height: 38px;
     padding: 4px 6px;
   }
 
   #panelSettings .settings-size-row--combined .sprite-scale-stepper .number-stepper__btn {
-    width: 38px;
-    min-width: 38px;
+    width: 24px;
+    min-width: 24px;
     height: 38px;
     min-height: 38px;
   }
@@ -14479,7 +14516,6 @@ body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom
   grid-template-rows: var(--timeline-cell-size) !important;
 }
 
-body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data-compact="true"] #panelFrames .timeline-cell--corner,
 body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data-compact="true"] #panelFrames .timeline-cell--layer,
 body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data-compact="true"] #panelFrames .timeline-cell--body {
   display: none;

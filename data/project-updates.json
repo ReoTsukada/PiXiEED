@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-23T05:45:10.179Z",
+  "generatedAt": "2026-07-23T12:24:16.706Z",
   "projects": [
     {
       "id": "site",
@@ -9,7 +9,7 @@
         {
           "date": "2026-07-23",
           "items": [
-            "画面を更新"
+            "画面 / ドキュメントを更新"
           ]
         },
         {
@@ -62,6 +62,12 @@
       "url": "/projects/pixiedraw/",
       "entries": [
         {
+          "date": "2026-07-23",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
           "date": "2026-07-22",
           "items": [
             "画面 / 機能を更新"
@@ -101,12 +107,6 @@
           "date": "2026-07-16",
           "items": [
             "画面を更新"
-          ]
-        },
-        {
-          "date": "2026-07-15",
-          "items": [
-            "設定 / 画面 / 機能 / スタイルを更新"
           ]
         }
       ]
@@ -172,6 +172,12 @@
       "url": "/projects/qr-maker/",
       "entries": [
         {
+          "date": "2026-07-23",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
           "date": "2026-07-22",
           "items": [
             "画面を更新"
@@ -212,12 +218,6 @@
           "items": [
             "画面を更新"
           ]
-        },
-        {
-          "date": "2026-07-07",
-          "items": [
-            "画面を更新"
-          ]
         }
       ]
     }
@@ -230,12 +230,24 @@
           "id": "site",
           "name": "PiXiEED 全体",
           "url": "/index.html",
+          "summary": "画面 / ドキュメントを更新"
+        },
+        {
+          "id": "pixiedraw",
+          "name": "PiXiEEDraw",
+          "url": "/projects/pixiedraw/",
           "summary": "画面を更新"
         },
         {
           "id": "pixiee-lens",
           "name": "PiXiEELENS",
           "url": "/projects/pixiee-lens/",
+          "summary": "画面を更新"
+        },
+        {
+          "id": "qr-maker",
+          "name": "QRコードメーカー",
+          "url": "/projects/qr-maker/",
           "summary": "画面を更新"
         }
       ]
