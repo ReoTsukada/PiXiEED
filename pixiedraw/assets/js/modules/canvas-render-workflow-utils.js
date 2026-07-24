@@ -178,12 +178,23 @@
     // to a whole-canvas view does not require a second full-layer composite.
     if (!dirtyRegion) {
       dirtyRegion = { x0: left, y0: top, x1: right, y1: bottom };
-      return;
+    } else {
+      if (left < dirtyRegion.x0) dirtyRegion.x0 = left;
+      if (top < dirtyRegion.y0) dirtyRegion.y0 = top;
+      if (right > dirtyRegion.x1) dirtyRegion.x1 = right;
+      if (bottom > dirtyRegion.y1) dirtyRegion.y1 = bottom;
     }
-    if (left < dirtyRegion.x0) dirtyRegion.x0 = left;
-    if (top < dirtyRegion.y0) dirtyRegion.y0 = top;
-    if (right > dirtyRegion.x1) dirtyRegion.x1 = right;
-    if (bottom > dirtyRegion.y1) dirtyRegion.y1 = bottom;
+    // A full-canvas edit (for example, filling a transparent background)
+    // cannot patch the retained composite because renderCanvas would otherwise
+    // take its full-frame cache shortcut before recomposing the dirty pixels.
+    if (
+      dirtyRegion.x0 === 0
+      && dirtyRegion.y0 === 0
+      && dirtyRegion.x1 === width - 1
+      && dirtyRegion.y1 === height - 1
+    ) {
+      invalidateCanvasCompositeFrameCacheEntry();
+    }
   }
 
   function markDirtyPixel(x, y) {
