@@ -44,6 +44,76 @@
   const DEFERRED_LARGE_BRUSH_SIZE = 12;
   const BRUSH_APPLY_FRAME_MIN_SIZE = 3;
 
+  function readLayerPaletteIndex(layer, pixelIndex) {
+    if (typeof getStoredRasterLayerPaletteIndex === 'function') {
+      return getStoredRasterLayerPaletteIndex(layer, pixelIndex);
+    }
+    if (
+      (layer?.indices instanceof Int16Array || layer?.indices instanceof Uint8Array)
+      && pixelIndex >= 0
+      && pixelIndex < layer.indices.length
+    ) {
+      const value = layer.indices[pixelIndex];
+      return layer.indices instanceof Uint8Array && value === 0 ? -1 : value;
+    }
+    return -1;
+  }
+
+  function clonePointerRasterTiles(tiles) {
+    if (tiles instanceof Map) {
+      return new Map(Array.from(tiles.entries(), ([tileIndex, tile]) => ([
+        tileIndex,
+        tile instanceof Uint8Array ? new Uint8Array(tile) : tile,
+      ])));
+    }
+    if (Array.isArray(tiles)) {
+      return tiles.map(tile => tile instanceof Uint8Array ? new Uint8Array(tile) : tile);
+    }
+    return null;
+  }
+
+  function captureTouchPixelBaseline(layer) {
+    if (!layer) return null;
+    return {
+      layer,
+      indices: layer.indices instanceof Uint8Array
+        ? new Uint8Array(layer.indices)
+        : (layer.indices instanceof Int16Array ? new Int16Array(layer.indices) : null),
+      indicesEncoding: layer.indicesEncoding,
+      indicesTiles: clonePointerRasterTiles(layer.indicesTiles),
+      indicesWidth: layer.indicesWidth,
+      indicesHeight: layer.indicesHeight,
+      indicesTileSize: layer.indicesTileSize,
+      direct: layer.direct instanceof Uint8ClampedArray ? new Uint8ClampedArray(layer.direct) : null,
+      directOnly: Boolean(layer.directOnly),
+    };
+  }
+
+  function restoreTouchPixelBaseline(pixelBaseline) {
+    const layer = pixelBaseline?.layer;
+    if (!layer) return false;
+    if (pixelBaseline.indices instanceof Uint8Array) {
+      layer.indices = new Uint8Array(pixelBaseline.indices);
+    } else if (pixelBaseline.indices instanceof Int16Array) {
+      layer.indices = new Int16Array(pixelBaseline.indices);
+    }
+    if (pixelBaseline.indicesEncoding === undefined) delete layer.indicesEncoding;
+    else layer.indicesEncoding = pixelBaseline.indicesEncoding;
+    if (pixelBaseline.indicesTiles === null) delete layer.indicesTiles;
+    else layer.indicesTiles = clonePointerRasterTiles(pixelBaseline.indicesTiles);
+    if (pixelBaseline.indicesWidth === undefined) delete layer.indicesWidth;
+    else layer.indicesWidth = pixelBaseline.indicesWidth;
+    if (pixelBaseline.indicesHeight === undefined) delete layer.indicesHeight;
+    else layer.indicesHeight = pixelBaseline.indicesHeight;
+    if (pixelBaseline.indicesTileSize === undefined) delete layer.indicesTileSize;
+    else layer.indicesTileSize = pixelBaseline.indicesTileSize;
+    layer.direct = pixelBaseline.direct instanceof Uint8ClampedArray
+      ? new Uint8ClampedArray(pixelBaseline.direct)
+      : null;
+    layer.directOnly = Boolean(pixelBaseline.directOnly);
+    return true;
+  }
+
   function shouldDeferLargeBrushStroke() {
     return (pointerState.tool === 'pen' || pointerState.tool === 'eraser')
       && Math.max(1, Math.round(Number(state.brushSize) || 1)) >= DEFERRED_LARGE_BRUSH_SIZE;
@@ -580,26 +650,7 @@
       updateColorTabSwatch();
     }
     if (pixelBaseline?.layer) {
-      const baselineLayer = pixelBaseline.layer;
-      if (
-        (baselineLayer.indices instanceof Int16Array || baselineLayer.indices instanceof Uint8Array)
-        && pixelBaseline.indices?.constructor === baselineLayer.indices.constructor
-      ) {
-        if (pixelBaseline.indices.length === 0) {
-          baselineLayer.indices = new pixelBaseline.indices.constructor(0);
-        } else {
-          baselineLayer.indices.set(pixelBaseline.indices);
-        }
-      }
-      if (pixelBaseline.direct instanceof Uint8ClampedArray) {
-        if (!(baselineLayer.direct instanceof Uint8ClampedArray) || baselineLayer.direct.length !== pixelBaseline.direct.length) {
-          baselineLayer.direct = new Uint8ClampedArray(pixelBaseline.direct.length);
-        }
-        baselineLayer.direct.set(pixelBaseline.direct);
-      } else {
-        baselineLayer.direct = null;
-      }
-      baselineLayer.directOnly = Boolean(pixelBaseline.directOnly);
+      restoreTouchPixelBaseline(pixelBaseline);
       requestRender();
       requestOverlayRender();
     }
@@ -928,14 +979,7 @@
       && HISTORY_DRAW_TOOLS.has(state.tool)
       && layer
     ) {
-      pointerState.touchPixelBaseline = {
-        layer,
-        indices: layer.indices instanceof Uint8Array
-          ? new Uint8Array(layer.indices)
-          : (layer.indices instanceof Int16Array ? new Int16Array(layer.indices) : null),
-        direct: layer.direct instanceof Uint8ClampedArray ? new Uint8ClampedArray(layer.direct) : null,
-        directOnly: Boolean(layer.directOnly),
-      };
+      pointerState.touchPixelBaseline = captureTouchPixelBaseline(layer);
     }
     const shouldExtendSelection = Boolean(
       event.shiftKey
@@ -1197,7 +1241,6 @@
     pointerState.brushApplyFrame = null;
     pointerState.preview = null;
     pointerState.selectionPreview = null;
-
     if (HISTORY_DRAW_TOOLS.has(activeTool)) {
       beginHistory(activeTool);
     }
@@ -4530,7 +4573,6 @@
     const {
       append = false,
       cellSize = SELECT_RECT_GRID_CELL_SIZE,
-      selectionShapeMode = state.selectionShapeMode,
     } = options || {};
     const boundsRect = getSelectionGridRectPixelBounds(startCell, endCell, cellSize);
     if (!boundsRect) {
@@ -4549,7 +4591,6 @@
     const { mask, bounds, hasBaseSelection } = createSelectionAccumulator({ append });
     for (let y = boundsRect.y0; y <= boundsRect.y1; y += 1) {
       for (let x = boundsRect.x0; x <= boundsRect.x1; x += 1) {
-        if (!shouldIncludeShapeSelectionPixel(layer, x, y, selectionShapeMode)) continue;
         markSelectionMaskPixel(mask, bounds, x, y);
       }
     }
@@ -4563,6 +4604,10 @@
 
     hideSelectionTransformMenu();
     state.selectionMask = mask;
+    // Resolve painted content when copy/move begins. Keeping this null lets
+    // pixels drawn into an initially transparent selected cell be included,
+    // while createSelectionMoveState still excludes transparent clipboard
+    // cells from destination writes.
     state.selectionContentMask = null;
     state.selectionBounds = bounds;
     state.selectionOutlineMode = 'bounds';
@@ -4571,7 +4616,7 @@
   }
 
   function createSelectionRect(start, end, options = {}) {
-    const { append = false, selectionShapeMode = state.selectionShapeMode } = options || {};
+    const { append = false } = options || {};
     const layer = getActiveLayer();
     if (!layer) {
       if (!append) {
@@ -4587,7 +4632,6 @@
 
     for (let y = y0; y <= y1; y += 1) {
       for (let x = x0; x <= x1; x += 1) {
-        if (!shouldIncludeShapeSelectionPixel(layer, x, y, selectionShapeMode)) continue;
         markSelectionMaskPixel(mask, bounds, x, y);
       }
     }
@@ -4680,12 +4724,8 @@
     if (!layer) return false;
     if (x < 0 || y < 0 || x >= state.width || y >= state.height) return false;
     const idx = y * state.width + x;
-    const paletteIndex = layer.indices instanceof Int16Array || layer.indices instanceof Uint8Array
-      ? layer.indices[idx]
-      : -1;
-    // Indexed runtime reserves 0 for the background. It is never selectable
-    // as painted content, regardless of a legacy palette[0] alpha value.
-    if (paletteIndex > 0) {
+    const paletteIndex = readLayerPaletteIndex(layer, idx);
+    if (paletteIndex >= 0) {
       const paletteColor = Array.isArray(state.palette) ? state.palette[paletteIndex] : null;
       if (paletteColor && (Number(paletteColor.a) || 0) > 0) {
         return true;
@@ -4700,40 +4740,36 @@
     if (!layer || !Number.isInteger(idx) || idx < 0) {
       return null;
     }
-    const indices = layer.indices instanceof Int16Array || layer.indices instanceof Uint8Array
-      ? layer.indices
-      : null;
     const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
-    const paletteIndex = indices ? indices[idx] : -1;
+    const paletteIndex = readLayerPaletteIndex(layer, idx);
     const directAlpha = direct instanceof Uint8ClampedArray ? direct[(idx * 4) + 3] : 0;
-    if ((paletteIndex === 0 || paletteIndex < 0) && directAlpha <= 0) {
-      // Runtime index 0 (and the legacy negative sentinel) is transparent,
-      // not an untouchable canvas backdrop. Keeping it as a transparent
-      // match lets Fill and Select Same start in an empty region without ever
-      // rendering palette[0] as painted content.
+    if (paletteIndex < 0 && directAlpha <= 0) {
       return {
-        indices,
+        layer,
         direct,
+        paletteIndex,
         transparent: true,
-        transparentIndex: 0,
+        transparentIndex: paletteIndex,
       };
     }
-    if (paletteIndex > 0) {
+    if (paletteIndex >= 0) {
       const color = state.palette[paletteIndex];
       if (!color) {
         return null;
       }
       if (color.a <= 0) {
         return {
-          indices,
+          layer,
           direct,
+          paletteIndex,
           transparent: true,
           transparentIndex: paletteIndex,
         };
       }
       return {
-        indices,
+        layer,
         direct,
+        paletteIndex,
         r: color.r,
         g: color.g,
         b: color.b,
@@ -4749,8 +4785,9 @@
       return null;
     }
     return {
-      indices,
+      layer,
       direct,
+      paletteIndex,
       r: direct[base],
       g: direct[base + 1],
       b: direct[base + 2],
@@ -4762,14 +4799,11 @@
     if (!matchState || !Number.isInteger(idx) || idx < 0) {
       return false;
     }
-    const paletteIndex = matchState.indices ? matchState.indices[idx] : -1;
+    const paletteIndex = readLayerPaletteIndex(matchState.layer, idx);
     if (matchState.transparent) {
       const directAlpha = matchState.direct instanceof Uint8ClampedArray
         ? matchState.direct[(idx * 4) + 3]
         : 0;
-      if (paletteIndex === 0) {
-        return directAlpha <= 0;
-      }
       if (paletteIndex >= 0) {
         const color = state.palette[paletteIndex];
         return Boolean(color && color.a <= 0 && directAlpha <= 0);
@@ -4781,7 +4815,7 @@
       const base = idx * 4;
       return direct[base + 3] <= 0;
     }
-    if (paletteIndex > 0) {
+    if (paletteIndex >= 0) {
       const color = state.palette[paletteIndex];
       return Boolean(
         color
