@@ -99,7 +99,7 @@
           { id: 'qr', label: 'QR編集', selector: '[data-ui-action="openQrEditor"]', icon: 'assets/icons/QR.png' },
           { id: 'undo', label: '元に戻す', selector: '#undoAction', icon: 'assets/icons/Undo.png?v=2026.07.19-ui-icons1', mirrorDisabled: true, placement: 'trailing' },
           { id: 'redo', label: 'やり直す', selector: '#redoAction', icon: 'assets/icons/Redo.png?v=2026.07.19-ui-icons1', mirrorDisabled: true, placement: 'trailing' },
-          { id: 'fullscreen', label: '拡大', selector: '#fullscreenButton', icon: '拡大.png', iconWhenPressed: '縮小.png', mirrorState: true, mode: 'fullscreen', fullscreenController: 'tool', placement: 'leading' },
+          { id: 'fullscreen', label: '拡大', selector: '#fullscreenButton', icon: 'pixiedraw/assets/icons/zoomup.svg', iconWhenPressed: 'pixiedraw/assets/icons/zoomdown.svg', mirrorState: true, mode: 'fullscreen', fullscreenController: 'tool', placement: 'leading' },
         ],
         details: [
           { label: 'ショートカット一覧', selector: '#openShortcutHelp', icon: 'pixiedraw/assets/icons/short_cut.png?v=20260721-icons1' },
@@ -144,7 +144,7 @@
     if (kind === 'camera') {
       return {
         actions: [
-          { id: 'fullscreen', label: '拡大', selector: '#fullscreenButton', icon: '拡大.png', iconWhenPressed: '縮小.png', mirrorState: true, mode: 'fullscreen', fullscreenController: 'tool', placement: 'leading' },
+          { id: 'fullscreen', label: '拡大', selector: '#fullscreenButton', icon: 'pixiedraw/assets/icons/zoomup.svg', iconWhenPressed: 'pixiedraw/assets/icons/zoomdown.svg', mirrorState: true, mode: 'fullscreen', fullscreenController: 'tool', placement: 'leading' },
           { id: 'file', label: '画像を読み込む', selector: '#pixelArtBtn', cloneIcon: true, mirrorState: true },
           { id: 'clear', label: '読み込みを取り消す', selector: '#clearPixelBtn', cloneIcon: true, mirrorState: true, mirrorVisibility: true },
           { id: 'camera-switch', label: 'カメラ切り替え', selector: '#cameraActionBtn', cloneIcon: true, mirrorState: true },
@@ -164,7 +164,7 @@
         actions: [
           { id: 'play', label: '遊ぶ', selector: '#startButton', icon: 'icon/icon-192-2.png' },
           { id: 'create', label: '作る', selector: '#createButton', icon: 'assets/icons/File.png?v=2026.07.19-ui-icons1' },
-          { id: 'fullscreen', label: '拡大', selector: '#fullscreenButton', icon: '拡大.png', iconWhenPressed: '縮小.png', mirrorState: true, mode: 'fullscreen', fullscreenController: 'game', placement: 'leading' },
+          { id: 'fullscreen', label: '拡大', selector: '#fullscreenButton', icon: 'pixiedraw/assets/icons/zoomup.svg', iconWhenPressed: 'pixiedraw/assets/icons/zoomdown.svg', mirrorState: true, mode: 'fullscreen', fullscreenController: 'game', placement: 'leading' },
         ],
         details: buildSupportDetails({ includeUpdates: true }),
       };
@@ -173,7 +173,7 @@
       return {
         actions: [
           { id: 'play', label: '遊ぶ', selector: '#playBtn', cloneIcon: true },
-          { id: 'fullscreen', label: '拡大', selector: '#fullscreenButton', icon: '拡大.png', iconWhenPressed: '縮小.png', mirrorState: true, mode: 'fullscreen', fullscreenController: 'tool', placement: 'leading' },
+          { id: 'fullscreen', label: '拡大', selector: '#fullscreenButton', icon: 'pixiedraw/assets/icons/zoomup.svg', iconWhenPressed: 'pixiedraw/assets/icons/zoomdown.svg', mirrorState: true, mode: 'fullscreen', fullscreenController: 'tool', placement: 'leading' },
         ],
         details: buildSupportDetails({ includeUpdates: true }),
       };
@@ -250,7 +250,7 @@
     detailButton.setAttribute('aria-label', '詳細');
     detailButton.setAttribute('aria-expanded', 'false');
     detailButton.setAttribute('aria-controls', 'pixieedCommonDetailsPanel');
-    detailButton.append(createIcon('assets/icons/詳細.png?v=2026.07.19-ui-icons1'), createSrOnlyLabel('詳細'));
+    detailButton.append(createIcon('pixiedraw/assets/icons/action-more-menu.svg'), createSrOnlyLabel('詳細'));
 
     const layer = document.createElement('div');
     layer.className = 'pixieed-common-details-layer';
@@ -375,7 +375,42 @@
     icon.src = href(path);
     icon.alt = '';
     icon.setAttribute('aria-hidden', 'true');
+    icon.addEventListener('error', () => {
+      icon.replaceWith(createInlineFallbackIcon(path));
+    }, { once: true });
     optimizeIconRendering(icon, path);
+    return icon;
+  }
+
+  function createInlineFallbackIcon(path) {
+    const namespace = 'http://www.w3.org/2000/svg';
+    const icon = document.createElementNS(namespace, 'svg');
+    const source = String(path || '').toLowerCase();
+    icon.classList.add('pixieed-common-tabbar__icon', 'pixieed-common-tabbar__icon--smooth');
+    icon.setAttribute('viewBox', '0 0 24 24');
+    icon.setAttribute('fill', 'none');
+    icon.setAttribute('stroke', 'currentColor');
+    icon.setAttribute('stroke-width', '2');
+    icon.setAttribute('stroke-linecap', 'round');
+    icon.setAttribute('stroke-linejoin', 'round');
+    icon.setAttribute('aria-hidden', 'true');
+    const add = (tag, attributes) => {
+      const node = document.createElementNS(namespace, tag);
+      Object.entries(attributes).forEach(([key, value]) => node.setAttribute(key, value));
+      icon.append(node);
+    };
+    if (source.includes('bell')) {
+      add('path', { d: 'M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9' });
+      add('path', { d: 'M10 22h4' });
+    } else if (source.includes('zoomup')) {
+      add('circle', { cx: '10.5', cy: '10.5', r: '6.5' });
+      add('path', { d: 'M10.5 7v7M7 10.5h7M16 16l5 5' });
+    } else if (source.includes('zoomdown')) {
+      add('circle', { cx: '10.5', cy: '10.5', r: '6.5' });
+      add('path', { d: 'M7 10.5h7M16 16l5 5' });
+    } else {
+      add('path', { d: 'M5 7h14M5 12h14M5 17h14' });
+    }
     return icon;
   }
 
@@ -443,8 +478,8 @@
 
   function renderDetails(container) {
     const myPage = { label: 'マイページ', path: 'account/index.html', icon: 'pixiedraw/assets/icons/ecticon_frame_01.png' };
-    const notifications = { id: 'notifications', label: '通知', mode: 'notifications', icon: 'bell.png?v=20260722-bell1' };
-    const fallbackIcon = 'assets/icons/詳細.png?v=2026.07.19-ui-icons1';
+    const notifications = { id: 'notifications', label: '通知', mode: 'notifications', icon: 'bell.png?v=20260724-icon-paths1' };
+    const fallbackIcon = 'pixiedraw/assets/icons/action-more-menu.svg';
     const currentPathname = new URL(window.location.href).pathname.replace(/\/+$/, '') || '/';
     const items = [myPage, notifications, state.reloadAction, ...state.details.filter((item) => {
       if (!item || item.path === 'account/index.html') return false;
