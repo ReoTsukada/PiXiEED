@@ -2221,12 +2221,20 @@ function normalizePublishTask(task) {
   const difficulty = normalizeDifficulty(task.difficulty);
   const authorName = task.authorName || getCreatorNickname();
   const authorXUrl = task.authorXUrl || getCreatorXUrl();
-  const targets = normalizePuzzleTargets(task.targets);
   const clientIdValue = task.clientId || clientId || null;
   const authorAvatar = task.authorAvatar || getCreatorAvatarId();
   const size = task.size && Number.isFinite(task.size.width) && Number.isFinite(task.size.height)
     ? task.size
     : { width: 0, height: 0 };
+  const labels = normalizePuzzleTargets(task.targets);
+  const rawTargets = Array.isArray(task.targets) ? task.targets : [];
+  const targets = labels.map((label, index) => {
+    const raw = rawTargets[index];
+    const marker = raw && typeof raw === 'object'
+      ? normalizeMarkerRegions([raw.marker], size.width, size.height)[0]
+      : null;
+    return marker ? { label, marker } : label;
+  });
   return {
     puzzleId,
     title,
@@ -2440,9 +2448,8 @@ function normalizePublishedPuzzleEntry(entry, fallback = null) {
   const original = normalizeComparableUrl(source.original_url ?? source.original ?? null);
   const diff = normalizeComparableUrl(source.diff_url ?? source.diff ?? null);
   if (!isPlayablePuzzleAssetUrl(original) || !isPlayablePuzzleAssetUrl(diff)) return null;
-  const targets = normalizePuzzleTargets(
-    source.targets ?? source.target_items ?? source.targetItems ?? source.items,
-  );
+  const rawTargets = source.targets ?? source.target_items ?? source.targetItems ?? source.items;
+  const targets = normalizePuzzleTargets(rawTargets);
   const mode = resolvePuzzleMode(
     source.mode ?? source.game_mode ?? source.play_mode,
     targets,
@@ -2463,7 +2470,8 @@ function normalizePublishedPuzzleEntry(entry, fallback = null) {
     diff,
     mode,
     targets,
-    markerRegions: normalizePuzzleMarkerRegions(source.targets ?? source.target_items ?? source.targetItems ?? source.items),
+    rawTargets,
+    markerRegions: normalizePuzzleMarkerRegions(rawTargets),
     thumbnail: resolvePuzzleThumbnail(mode, original, diff, explicitThumbnail),
     shareUrl: source.share_url ?? source.shareUrl ?? null,
     source: 'published',
@@ -3039,7 +3047,7 @@ async function startOfficialPuzzle(puzzle) {
     let normalizedChallenge;
     let hiddenPairInfo = null;
     const markerRegions = normalizePuzzleMarkerRegions(
-      puzzle.targets,
+      puzzle.rawTargets ?? puzzle.targets,
       rawOriginal.width,
       rawOriginal.height,
     );
