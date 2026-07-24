@@ -1001,9 +1001,6 @@
     if (!matchState) {
       return [];
     }
-    const indices = layer.indices instanceof Int16Array || layer.indices instanceof Uint8Array
-      ? layer.indices
-      : null;
     const indexMode = isIndexColorMode();
     const fillMode = normalizeSelectSameMode(state.selectSameMode, SELECT_SAME_MODE_CONNECTED);
     const fillStyle = normalizeFillStyle(options.fillStyle, getActiveFillStyle());
@@ -1012,7 +1009,9 @@
       ? normalizePaletteIndex(state.activePaletteIndex, state.activePaletteIndex)
       : -1;
     const drawRgbColor = indexMode ? null : normalizeColorValue(getActiveDrawColor());
-    const targetIndex = indices ? indices[startIdx] : -1;
+    const targetIndex = Number.isInteger(matchState.paletteIndex)
+      ? matchState.paletteIndex
+      : -1;
     if (!gradientFill && indexMode && targetIndex >= 0 && targetIndex === paletteIndex) {
       return [];
     }
