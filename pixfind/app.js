@@ -9,7 +9,6 @@ const dom = {
   backToTitleButton: document.getElementById('backButton'),
   resetButton: document.getElementById('resetButton'),
   fullscreenButton: document.getElementById('fullscreenButton'),
-  deletePuzzleButton: document.getElementById('deletePuzzleButton'),
   difficultyChips: Array.from(document.querySelectorAll('[data-difficulty]')),
   modeChips: Array.from(document.querySelectorAll('[data-game-mode]')),
   modeDescription: document.getElementById('modeDescription'),
@@ -50,13 +49,25 @@ const dom = {
   creatorDifficultyButtons: [],
   creatorOriginalInput: document.getElementById('creatorOriginalInput'),
   creatorDiffInput: document.getElementById('creatorDiffInput'),
+  creatorOriginalPicker: document.getElementById('creatorOriginalPicker'),
+  creatorDiffPicker: document.getElementById('creatorDiffPicker'),
+  creatorOriginalFilePreview: document.getElementById('creatorOriginalFilePreview'),
+  creatorDiffFilePreview: document.getElementById('creatorDiffFilePreview'),
   creatorOriginalDropzone: document.getElementById('creatorOriginalDropzone'),
   creatorDiffDropzone: document.getElementById('creatorDiffDropzone'),
   creatorMarkerWorkspace: document.getElementById('creatorMarkerWorkspace'),
-  creatorMarkerOpen: document.getElementById('creatorMarkerOpen'),
-  creatorMarkerFrame: document.getElementById('creatorMarkerFrame'),
+  creatorMarkerReplace: document.getElementById('creatorMarkerReplace'),
+  creatorMarkerViewport: document.getElementById('creatorMarkerViewport'),
+  creatorMarkerStage: document.getElementById('creatorMarkerStage'),
+  creatorMarkerSourceCanvas: document.getElementById('creatorMarkerSourceCanvas'),
+  creatorMarkerCanvas: document.getElementById('creatorMarkerCanvas'),
+  creatorMarkerZoomOut: document.getElementById('creatorMarkerZoomOut'),
+  creatorMarkerZoomReset: document.getElementById('creatorMarkerZoomReset'),
+  creatorMarkerZoomIn: document.getElementById('creatorMarkerZoomIn'),
+  creatorMarkerUndo: document.getElementById('creatorMarkerUndo'),
   creatorPreviewOriginal: document.getElementById('creatorPreviewOriginal'),
   creatorPreviewDiff: document.getElementById('creatorPreviewDiff'),
+  creatorPreview: document.getElementById('creatorPreview'),
   creatorExportButton: document.getElementById('creatorExport'),
   creatorStatus: document.getElementById('creatorStatus'),
   creatorSummary: document.getElementById('creatorSummary'),
@@ -80,6 +91,11 @@ const ctx = {
 const creatorCtx = {
   original: dom.creatorPreviewOriginal?.getContext('2d') ?? null,
   diff: dom.creatorPreviewDiff?.getContext('2d') ?? null,
+};
+
+const creatorMarkerCtx = {
+  source: dom.creatorMarkerSourceCanvas?.getContext('2d') ?? null,
+  overlay: dom.creatorMarkerCanvas?.getContext('2d') ?? null,
 };
 
 [creatorCtx.original, creatorCtx.diff].forEach(context => {
@@ -302,6 +318,9 @@ const creatorState = {
 
 let creatorLastFocused = null;
 let creatorAnalysisToken = 0;
+let creatorPreviewToken = 0;
+const creatorDroppedFiles = new WeakMap();
+const creatorMarkerView = { scale: 1, fitScale: 1, pan: { x: 0, y: 0 }, pointerId: null, activeIndex: -1, image: null };
 let clientId = null;
 
 const SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
@@ -583,9 +602,6 @@ async function init() {
   document.addEventListener('fullscreenchange', handleFullscreenChange);
   document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
 
-  dom.deletePuzzleButton?.addEventListener('click', () => {
-    handleDeleteCurrentPuzzle();
-  });
 
   initializeCanvasInteractions();
   setupCreator();
@@ -665,10 +681,18 @@ function setupCreator() {
     });
   });
 
-  dom.creatorOriginalInput?.addEventListener('change', handleCreatorFileChange);
-  dom.creatorDiffInput?.addEventListener('change', handleCreatorFileChange);
-  dom.creatorMarkerOpen?.addEventListener('click', openCreatorMarkerEditor);
-  window.addEventListener('message', handleCreatorMarkerMessage);
+  dom.creatorOriginalInput?.addEventListener('change', () => {
+    creatorDroppedFiles.delete(dom.creatorOriginalInput);
+    handleCreatorFileChange();
+  });
+  dom.creatorDiffInput?.addEventListener('change', () => {
+    creatorDroppedFiles.delete(dom.creatorDiffInput);
+    handleCreatorFileChange();
+  });
+  dom.creatorOriginalPicker?.addEventListener('click', () => dom.creatorOriginalInput?.click());
+  dom.creatorDiffPicker?.addEventListener('click', () => dom.creatorDiffInput?.click());
+  dom.creatorMarkerReplace?.addEventListener('click', () => dom.creatorOriginalInput?.click());
+  setupCreatorMarkerEditor();
   setupCreatorFileDropzone(dom.creatorOriginalDropzone, dom.creatorOriginalInput);
   setupCreatorFileDropzone(dom.creatorDiffDropzone, dom.creatorDiffInput);
 
@@ -699,16 +723,13 @@ function setupCreatorFileDropzone(dropzone, input) {
       setCreatorStatus('PNG、JPEG、WebP画像をドロップしてください。', 'error');
       return;
     }
-    try {
-      const transfer = new DataTransfer();
-      transfer.items.add(file);
-      input.files = transfer.files;
-      input.dispatchEvent(new Event('change', { bubbles: true }));
-    } catch (error) {
-      console.warn('creator file drop failed', error);
-      setCreatorStatus('画像の追加に失敗しました。クリックして選択してください。', 'error');
-    }
+    creatorDroppedFiles.set(input, file);
+    handleCreatorFileChange();
   });
+}
+
+function getCreatorInputFile(input) {
+  return input?.files?.[0] ?? creatorDroppedFiles.get(input) ?? null;
 }
 
 function isSupportedCreatorImageFile(file) {
@@ -765,6 +786,10 @@ function resetCreatorForm() {
   creatorState.targetLabels = [];
   creatorState.markerRegions = [];
   creatorState.activeTargetIndex = -1;
+  creatorDroppedFiles.delete(dom.creatorOriginalInput);
+  creatorDroppedFiles.delete(dom.creatorDiffInput);
+  setCreatorDropzonePreview(dom.creatorOriginalDropzone, dom.creatorOriginalFilePreview, '');
+  setCreatorDropzonePreview(dom.creatorDiffDropzone, dom.creatorDiffFilePreview, '');
   setCreatorMode(creatorState.mode, true);
   clearCreatorPreview();
   renderCreatorTargetFields(0);
@@ -816,8 +841,8 @@ async function restorePendingCreatorUpload() {
 }
 
 function handleCreatorFileChange() {
-  creatorState.originalFile = dom.creatorOriginalInput?.files?.[0] ?? null;
-  creatorState.diffFile = dom.creatorDiffInput?.files?.[0] ?? null;
+  creatorState.originalFile = getCreatorInputFile(dom.creatorOriginalInput);
+  creatorState.diffFile = getCreatorInputFile(dom.creatorDiffInput);
   creatorAnalysisToken += 1;
   creatorState.originalImage = null;
   creatorState.diffImage = null;
@@ -833,6 +858,7 @@ function handleCreatorFileChange() {
     dom.creatorSummary.hidden = true;
   }
   clearCreatorPreview();
+  updateCreatorDropzonePreviews();
   if (isHiddenObjectMode(creatorState.mode) && creatorState.originalFile) {
     prepareHiddenObjectMarkerSource();
     return;
@@ -842,6 +868,32 @@ function handleCreatorFileChange() {
     return;
   }
   handleCreatorAnalyze();
+}
+
+function setCreatorDropzonePreview(dropzone, preview, dataUrl) {
+  if (!dropzone || !preview) return;
+  const hasPreview = Boolean(dataUrl);
+  dropzone.classList.toggle('has-preview', hasPreview);
+  preview.hidden = !hasPreview;
+  preview.src = hasPreview ? dataUrl : '';
+}
+
+async function updateCreatorDropzonePreviews() {
+  const token = ++creatorPreviewToken;
+  const originalFile = creatorState.originalFile;
+  const diffFile = creatorState.diffFile;
+  const readPreview = (dataUrl, file) => dataUrl
+    ? Promise.resolve(dataUrl)
+    : file
+    ? readFileAsDataUrl(file).catch(() => '')
+    : Promise.resolve('');
+  const [originalDataUrl, diffDataUrl] = await Promise.all([
+    readPreview(creatorState.originalDataUrl, originalFile),
+    readPreview(creatorState.diffDataUrl, diffFile),
+  ]);
+  if (token !== creatorPreviewToken) return;
+  setCreatorDropzonePreview(dom.creatorOriginalDropzone, dom.creatorOriginalFilePreview, originalDataUrl || '');
+  setCreatorDropzonePreview(dom.creatorDiffDropzone, dom.creatorDiffFilePreview, diffDataUrl || '');
 }
 
 function setCreatorDifficulty(level, silent = false) {
@@ -901,22 +953,24 @@ function setCreatorMode(mode, silent = false) {
 
   if (dom.creatorDescription) {
     dom.creatorDescription.textContent = isHiddenMode
-      ? '画像を1枚選び、専用マーカー編集で探す場所を登録します。'
+      ? '画像を1枚選び、その画像の上で探す場所を直接登録します。'
       : '同じサイズの2枚の画像を選ぶと差分を自動検出します。';
   }
   if (dom.creatorDiffLabelText) {
     dom.creatorDiffLabelText.textContent = '間違い画像を追加';
   }
   if (dom.creatorPreviewDiffCaption) {
-    dom.creatorPreviewDiffCaption.textContent = isHiddenMode ? '探し物レイヤー' : '間違い';
+    dom.creatorPreviewDiffCaption.textContent = isHiddenMode ? 'マークした画像' : '間違い';
   }
   if (dom.creatorModeNote) {
     dom.creatorModeNote.textContent = isHiddenMode
-      ? '画像を1枚選んだ後、マーカー編集で探す場所を原寸ピクセル座標に登録します。番号ごとに探し物名を入力してください。'
+      ? '画像を1枚追加すると、その画像上で直接探す場所をマークできます。番号ごとに探し物名を入力してください。'
       : '公開すると問題カタログに追加されます。';
   }
   if (dom.creatorDiffDropzone) dom.creatorDiffDropzone.hidden = isHiddenMode;
-  if (dom.creatorMarkerWorkspace) dom.creatorMarkerWorkspace.hidden = !isHiddenMode;
+  if (dom.creatorPreview) dom.creatorPreview.hidden = isHiddenMode;
+  if (dom.creatorMarkerWorkspace) dom.creatorMarkerWorkspace.hidden = !isHiddenMode || !creatorState.originalFile;
+  dom.creatorOriginalDropzone?.classList.toggle('is-marker-editor', isHiddenMode && Boolean(creatorState.originalFile));
 
   if (!isHiddenMode) {
     creatorState.targetLabels = [];
@@ -1039,7 +1093,7 @@ function updateCreatorPublishAvailability() {
 }
 
 async function prepareHiddenObjectMarkerSource() {
-  const originalFile = dom.creatorOriginalInput?.files?.[0] ?? null;
+  const originalFile = creatorState.originalFile ?? getCreatorInputFile(dom.creatorOriginalInput);
   if (!originalFile) return;
   const token = ++creatorAnalysisToken;
   setCreatorStatus('画像を準備しています…');
@@ -1057,31 +1111,147 @@ async function prepareHiddenObjectMarkerSource() {
     creatorState.markerRegions = [];
     creatorState.targetLabels = [];
     creatorState.size = { width: normalized.width, height: normalized.height };
+    updateCreatorDropzonePreviews();
+    if (dom.creatorMarkerWorkspace) dom.creatorMarkerWorkspace.hidden = false;
+    dom.creatorOriginalDropzone?.classList.add('is-marker-editor');
     clearCreatorPreview();
     drawCreatorPreview();
     renderCreatorTargetFields(0);
     updateCreatorSummary(null);
     updateCreatorPublishAvailability();
-    setCreatorStatus('マーカー編集を開き、探してもらう場所を追加してください。');
+    setCreatorStatus('画像上をタップして、探す場所を直接マークしてください。');
+    requestAnimationFrame(() => {
+      fitCreatorMarkerView();
+      renderCreatorMarkerEditor();
+    });
   } catch (error) {
     console.warn('hidden object marker source failed', error);
     setCreatorStatus('画像の読み込みに失敗しました。', 'error');
   }
 }
 
-function openCreatorMarkerEditor() {
-  if (!creatorState.originalDataUrl || !dom.creatorMarkerFrame?.contentWindow) {
-    setCreatorStatus('先に画像を1枚選んでください。', 'error');
-    return;
+function setupCreatorMarkerEditor() {
+  const viewport = dom.creatorMarkerViewport;
+  if (!viewport) return;
+  viewport.addEventListener('pointerdown', event => {
+    if (!creatorState.originalImage) return;
+    viewport.setPointerCapture?.(event.pointerId);
+    const point = getCreatorMarkerPoint(event);
+    const index = creatorState.markerRegions.findIndex(marker => Math.hypot(marker.x - point.x, marker.y - point.y) <= marker.radius + 4);
+    creatorMarkerView.pointerId = event.pointerId;
+    creatorMarkerView.activeIndex = index;
+    if (index < 0) {
+      syncCreatorMarkerRegions([...creatorState.markerRegions, { x: point.x, y: point.y, radius: 8 }]);
+      creatorMarkerView.activeIndex = creatorState.markerRegions.length - 1;
+    }
+    event.preventDefault();
+  });
+  viewport.addEventListener('pointermove', event => {
+    if (creatorMarkerView.pointerId !== event.pointerId || creatorMarkerView.activeIndex < 0) return;
+    const point = getCreatorMarkerPoint(event);
+    const next = creatorState.markerRegions.map(marker => ({ ...marker }));
+    next[creatorMarkerView.activeIndex] = { ...next[creatorMarkerView.activeIndex], x: point.x, y: point.y };
+    syncCreatorMarkerRegions(next);
+    event.preventDefault();
+  });
+  const endPointer = event => {
+    if (creatorMarkerView.pointerId === event.pointerId) {
+      creatorMarkerView.pointerId = null;
+      creatorMarkerView.activeIndex = -1;
+    }
+  };
+  viewport.addEventListener('pointerup', endPointer);
+  viewport.addEventListener('pointercancel', endPointer);
+  viewport.addEventListener('wheel', event => {
+    if (!creatorState.originalImage) return;
+    event.preventDefault();
+    const previous = creatorMarkerView.scale;
+    const next = clamp(previous * (event.deltaY < 0 ? 1.06 : 0.94), creatorMarkerView.fitScale, creatorMarkerView.fitScale * 16);
+    const rect = viewport.getBoundingClientRect();
+    setCreatorMarkerScale(next, event.clientX - rect.left, event.clientY - rect.top, previous);
+  }, { passive: false });
+  dom.creatorMarkerZoomIn?.addEventListener('click', () => changeCreatorMarkerScale(1.25));
+  dom.creatorMarkerZoomOut?.addEventListener('click', () => changeCreatorMarkerScale(0.8));
+  dom.creatorMarkerZoomReset?.addEventListener('click', fitCreatorMarkerView);
+  dom.creatorMarkerUndo?.addEventListener('click', () => syncCreatorMarkerRegions(creatorState.markerRegions.slice(0, -1)));
+}
+
+function getCreatorMarkerPoint(event) {
+  const rect = dom.creatorMarkerViewport.getBoundingClientRect();
+  const width = Math.max(1, creatorState.size.width);
+  const height = Math.max(1, creatorState.size.height);
+  return {
+    x: clamp(Math.round((event.clientX - rect.left - creatorMarkerView.pan.x) / creatorMarkerView.scale), 0, width - 1),
+    y: clamp(Math.round((event.clientY - rect.top - creatorMarkerView.pan.y) / creatorMarkerView.scale), 0, height - 1),
+  };
+}
+
+function changeCreatorMarkerScale(factor) {
+  if (!creatorState.originalImage) return;
+  const viewport = dom.creatorMarkerViewport;
+  if (!viewport) return;
+  const next = clamp(creatorMarkerView.scale * factor, creatorMarkerView.fitScale, creatorMarkerView.fitScale * 16);
+  setCreatorMarkerScale(next, viewport.clientWidth / 2, viewport.clientHeight / 2);
+}
+
+function setCreatorMarkerScale(nextScale, anchorX, anchorY, previousScale = creatorMarkerView.scale) {
+  if (!Number.isFinite(nextScale) || !Number.isFinite(previousScale) || previousScale <= 0) return;
+  creatorMarkerView.pan.x = anchorX - (anchorX - creatorMarkerView.pan.x) * (nextScale / previousScale);
+  creatorMarkerView.pan.y = anchorY - (anchorY - creatorMarkerView.pan.y) * (nextScale / previousScale);
+  creatorMarkerView.scale = nextScale;
+  renderCreatorMarkerEditor();
+}
+
+function fitCreatorMarkerView() {
+  const viewport = dom.creatorMarkerViewport;
+  if (!viewport || !creatorState.size.width || !creatorState.size.height) return;
+  creatorMarkerView.fitScale = Math.max(0.01, Math.min((viewport.clientWidth - 16) / creatorState.size.width, (viewport.clientHeight - 16) / creatorState.size.height));
+  creatorMarkerView.scale = creatorMarkerView.fitScale;
+  centerCreatorMarkerView();
+}
+
+function centerCreatorMarkerView() {
+  const viewport = dom.creatorMarkerViewport;
+  if (!viewport || !creatorState.size.width || !creatorState.size.height) return;
+  creatorMarkerView.pan.x = Math.max(8, (viewport.clientWidth - creatorState.size.width * creatorMarkerView.scale) / 2);
+  creatorMarkerView.pan.y = Math.max(8, (viewport.clientHeight - creatorState.size.height * creatorMarkerView.scale) / 2);
+  renderCreatorMarkerEditor();
+}
+
+function renderCreatorMarkerEditor() {
+  const image = creatorState.originalImage;
+  const source = dom.creatorMarkerSourceCanvas;
+  const overlay = dom.creatorMarkerCanvas;
+  if (!image || !source || !overlay || !creatorMarkerCtx.source || !creatorMarkerCtx.overlay) return;
+  const sourceChanged = creatorMarkerView.image !== image || source.width !== image.width || source.height !== image.height;
+  if (sourceChanged) {
+    source.width = overlay.width = image.width;
+    source.height = overlay.height = image.height;
+    creatorMarkerView.image = image;
   }
-  dom.creatorMarkerFrame.contentWindow.postMessage({
-    type: 'pixfind-marker-source',
-    imageDataUrl: creatorState.originalDataUrl,
-    width: creatorState.size.width,
-    height: creatorState.size.height,
-    markers: creatorState.markerRegions,
-  }, '*');
-  dom.creatorMarkerFrame.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  if (dom.creatorMarkerStage) {
+    dom.creatorMarkerStage.style.width = `${image.width}px`;
+    dom.creatorMarkerStage.style.height = `${image.height}px`;
+    dom.creatorMarkerStage.style.transform = `translate(${creatorMarkerView.pan.x}px, ${creatorMarkerView.pan.y}px) scale(${creatorMarkerView.scale})`;
+  }
+  if (sourceChanged) {
+    creatorMarkerCtx.source.imageSmoothingEnabled = false;
+    creatorMarkerCtx.source.clearRect(0, 0, image.width, image.height);
+    creatorMarkerCtx.source.drawImage(image, 0, 0);
+  }
+  creatorMarkerCtx.overlay.clearRect(0, 0, image.width, image.height);
+  creatorState.markerRegions.forEach((marker, index) => {
+    creatorMarkerCtx.overlay.beginPath();
+    creatorMarkerCtx.overlay.arc(marker.x, marker.y, marker.radius, 0, Math.PI * 2);
+    creatorMarkerCtx.overlay.fillStyle = 'rgba(255, 85, 103, 0.22)';
+    creatorMarkerCtx.overlay.fill();
+    creatorMarkerCtx.overlay.strokeStyle = 'rgba(255, 88, 108, 0.98)';
+    creatorMarkerCtx.overlay.lineWidth = Math.max(1, 2 / creatorMarkerView.scale);
+    creatorMarkerCtx.overlay.stroke();
+    creatorMarkerCtx.overlay.fillStyle = '#ffffff';
+    creatorMarkerCtx.overlay.font = `${Math.max(10, 12 / creatorMarkerView.scale)}px sans-serif`;
+    creatorMarkerCtx.overlay.fillText(String(index + 1), marker.x + marker.radius + 2, marker.y - marker.radius - 2);
+  });
 }
 
 function normalizeMarkerRegions(rawMarkers, width = creatorState.size.width, height = creatorState.size.height) {
@@ -1106,9 +1276,8 @@ function normalizeMarkerRegions(rawMarkers, width = creatorState.size.width, hei
   });
 }
 
-function handleCreatorMarkerMessage(event) {
-  if (event.source !== dom.creatorMarkerFrame?.contentWindow || event.data?.type !== 'pixfind-marker-change') return;
-  const regions = normalizeMarkerRegions(event.data.markers);
+function syncCreatorMarkerRegions(rawMarkers) {
+  const regions = normalizeMarkerRegions(rawMarkers);
   creatorState.markerRegions = regions;
   creatorState.diffResult = regions.length ? { regions } : null;
   creatorState.targetLabels = Array.from({ length: regions.length }, (_, index) => creatorState.targetLabels[index] || '');
@@ -1117,6 +1286,7 @@ function handleCreatorMarkerMessage(event) {
   updateCreatorSummary(creatorState.diffResult, creatorState.size.width, creatorState.size.height);
   updateCreatorPublishAvailability();
   setCreatorStatus(regions.length ? `${regions.length}箇所を登録しました。名前を入力して公開できます。` : '探す場所を1箇所以上登録してください。');
+  renderCreatorMarkerEditor();
 }
 
 function updateCreatorSummary(diffResult, width, height) {
@@ -1202,8 +1372,8 @@ async function handleCreatorAnalyze() {
     await prepareHiddenObjectMarkerSource();
     return;
   }
-  const originalFile = dom.creatorOriginalInput?.files?.[0] ?? null;
-  const diffFile = dom.creatorDiffInput?.files?.[0] ?? null;
+  const originalFile = creatorState.originalFile ?? getCreatorInputFile(dom.creatorOriginalInput);
+  const diffFile = creatorState.diffFile ?? getCreatorInputFile(dom.creatorDiffInput);
   if (!originalFile || !diffFile) {
     setCreatorStatus('画像を選択してください。', 'error');
     return;
@@ -1814,38 +1984,6 @@ async function repairLegacyPublishedPuzzleAssets(entry, fallback = null) {
     diff_url: nextDiff || updated.diff_url || updated.diff || '',
     thumbnail_url: nextThumbnail || updated.thumbnail_url || updated.thumbnail || '',
   };
-}
-
-async function deletePublishedPuzzle(id, { clientIdValue = null } = {}) {
-  if (!id) return null;
-  const params = new URLSearchParams({
-    id: `eq.${id}`,
-  });
-  if (clientIdValue) {
-    params.set('client_id', `eq.${clientIdValue}`);
-  }
-  let response;
-  try {
-    response = await fetch(`${SUPABASE_REST_URL}/${SUPABASE_TABLE}?${params.toString()}`, {
-      method: 'DELETE',
-      headers: {
-        ...supabaseHeaders(),
-        'Content-Type': 'application/json',
-        Prefer: 'return=representation',
-      },
-    });
-  } catch (error) {
-    markSupabaseMaintenanceFromError(error);
-    throw error;
-  }
-  if (!response.ok) {
-    const detail = await response.text();
-    markSupabaseMaintenanceFromError(null, response.status);
-    throw buildSupabaseError(`delete failed: ${response.status} ${detail}`, response.status, detail);
-  }
-  const data = await response.json();
-  noteSupabaseSuccess();
-  return Array.isArray(data) ? data[0] : null;
 }
 
 function mergePuzzles(list, puzzle) {
@@ -2912,21 +3050,6 @@ function renderGameAuthor(puzzle) {
   }
 }
 
-function canDeletePuzzle(puzzle) {
-  if (!puzzle) return false;
-  if (puzzle.source !== 'published') return false;
-  ensureClientId();
-  if (!puzzle.clientId || !clientId) return false;
-  return puzzle.clientId === clientId;
-}
-
-function updateDeleteButton(puzzle) {
-  const btn = dom.deletePuzzleButton;
-  if (!btn) return;
-  const show = canDeletePuzzle(puzzle);
-  btn.hidden = !show;
-}
-
 function createOfficialCard(puzzle) {
   const card = document.createElement('article');
   const badgeText = puzzle.badge ?? '公式';
@@ -3119,41 +3242,12 @@ async function startOfficialPuzzle(puzzle) {
     );
     dom.gameTitle.textContent = metadata.name;
     renderGameAuthor(metadata);
-    updateDeleteButton(metadata);
     setActiveScreen('game');
     resetRound();
     window.PiXiEEDCreatorPlayRewards?.track('pixfind', metadata.id);
   } catch (error) {
     console.error(error);
     setHint('パズルの読み込みに失敗しました。');
-  }
-}
-
-async function handleDeleteCurrentPuzzle() {
-  const puzzle = state.currentPuzzle;
-  if (!canDeletePuzzle(puzzle)) {
-    setHint('このパズルは削除できません。');
-    return;
-  }
-  if (!confirm('このパズルを削除しますか？')) {
-    return;
-  }
-  setHint('削除しています...');
-  try {
-    ensureClientId();
-    const canDeleteByClient = puzzle.clientId && clientId && puzzle.clientId === clientId;
-    await deletePublishedPuzzle(puzzle.id, {
-      clientIdValue: canDeleteByClient ? clientId : null,
-    });
-    state.officialPuzzles = state.officialPuzzles.filter(entry => entry.id !== puzzle.id);
-    const published = state.officialPuzzles.filter(entry => entry.source === 'published');
-    savePublishedCache(published);
-    renderPuzzles(state.currentDifficulty, state.currentMode);
-    leaveGame('difficulty');
-    setHint('パズルを削除しました。');
-  } catch (error) {
-    console.warn('delete puzzle failed', error);
-    setHint('削除に失敗しました。');
   }
 }
 
@@ -3428,7 +3522,6 @@ function leaveGame(targetScreen) {
   hideFailureOverlay();
   state.currentPuzzle = null;
   renderGameAuthor(null);
-  updateDeleteButton(null);
   state.activeMode = state.currentMode;
   state.differences = [];
   state.hiddenTargets = [];
@@ -4028,7 +4121,14 @@ function hasPixelInHiddenRegion(region, x, y) {
 }
 
 function isPointInsideHiddenObjectRegion(region, x, y, padding = HIDDEN_OBJECT_HIT_PADDING) {
-  if (!region || !region.mask) return false;
+  if (!region) return false;
+  const centerX = Number(region.centerX ?? region.x);
+  const centerY = Number(region.centerY ?? region.y);
+  const radius = Number(region.radius);
+  if (Number.isFinite(centerX) && Number.isFinite(centerY) && Number.isFinite(radius) && radius > 0) {
+    return Math.hypot(Number(x) - centerX, Number(y) - centerY) <= radius + Math.max(0, Number(padding) || 0);
+  }
+  if (!region.mask) return isPointInsideRegion(region, x, y);
   const px = Math.round(x);
   const py = Math.round(y);
   const span = Math.max(0, Math.floor(padding));
