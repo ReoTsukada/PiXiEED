@@ -11,8 +11,10 @@ const toolFullscreen = fs.readFileSync(path.join(root, 'scripts/tool-fullscreen.
 const maoitu = fs.readFileSync(path.join(root, 'maoitu/index.html'), 'utf8');
 
 assert.match(html, /<body data-pixfind-screen="start">/);
-assert.match(html, /styles\.css\?v=20260724-creator-modal-layer11/);
-assert.match(css, /creator-overlay \{[\s\S]*z-index: 14090;/);
+assert.match(html, /styles\.css\?v=20260724-panel-safe-area12/);
+assert.match(css, /creator-overlay \{[\s\S]*z-index: 950;/);
+assert.match(css, /creator-panel \{[\s\S]*max-height: 100%;/);
+assert.match(css, /Do not add those bar dimensions twice/);
 assert.match(html, /app\.js\?v=20260724-game-creator-zoom11/);
 assert.match(html, /class="puzzle-gallery pixfind-catalog"/);
 assert.match(html, /id="creatorMarkerViewport"/);
@@ -95,7 +97,8 @@ assert.match(css, /\/\* Game-first board: the two images always share the availa
 assert.match(css, /\.screen--game \.game-layout \{[^}]*grid-template-rows: repeat\(2, minmax\(0, 1fr\)\);/s);
 assert.match(css, /\.screen--game \{[^}]*overflow: hidden !important;/s);
 assert.match(css, /Shared navigation-aware game geometry\. Canvas zoom\/pan stays inside these surfaces\./);
-assert.match(css, /body\[data-pixieed-page="pixfind"\] \.screen--game \{[^}]*pixieed-common-content-top/s);
+assert.match(css, /body\[data-pixieed-page="pixfind"\] \.screen--game \{[^}]*padding-top: max\(0\.35rem, var\(--safe-top\)\);/s);
+assert.match(css, /\.screen--game \{[^}]*padding-top: max\(0\.25rem, var\(--safe-top\)\) !important;/s);
 assert.match(css, /Pixel-art zoom stays sharp/);
 assert.match(css, /Game navigation belongs to the shared action bar/);
 assert.match(css, /grid-template-columns: clamp\(172px, 19vw, 266px\) minmax\(0, 1fr\) clamp\(172px, 19vw, 266px\)/);
