@@ -72,8 +72,13 @@
     const COMPACT_LAYER_INDEX_ENCODING = 'uint8-zero-transparent-v1';
     const TILED_LAYER_INDEX_ENCODING = 'uint8-tiled-zero-transparent-v1';
     const RUNTIME_LAYER_INDEX_ENCODING = 'uint8-palette-zero-transparent-v2';
+    const RASTER_MODEL_COPY_ON_WRITE_VERSION = 1;
     const COMPACT_LAYER_TILE_SIZE = 32;
     const COMPACT_LAYER_TILE_MIN_PIXELS = 4096;
+    // Runtime-only ownership information. This is deliberately kept out of
+    // project payloads: a restored project starts with independently decoded
+    // buffers and only creates shared ownership when a frame is duplicated.
+    const sharedRasterLayers = new WeakSet();
     function createInitialState(options = {}) {
       const preferredWidth = EMBED_CONFIG.initialWidth ?? EMBED_CONFIG.width ?? DEFAULT_CANVAS_SIZE;
       const preferredHeight =
@@ -124,7 +129,13 @@
       const brushShape = requestedShape === BRUSH_SHAPE_CUSTOM && !customBrush
         ? BRUSH_SHAPE_SQUARE
         : requestedShape;
-      const layers = [createLayer(getDefaultLayerName(1), initialWidth, initialHeight, palette)];
+      const layers = [createLayer(
+        getDefaultLayerName(1),
+        initialWidth,
+        initialHeight,
+        palette,
+        { deferPixelAllocation: true }
+      )];
       const frames = [createFrame(getDefaultFrameName(1), layers, initialWidth, initialHeight)];
 
       return {
@@ -176,6 +187,9 @@
         pendingPasteMoveState: null,
         playback: { isPlaying: false, lastFrame: 0, loop: true },
         documentName: normalizeDocumentName(requestedName),
+        // Only documents created by this build opt into the new raster model.
+        // Older projects have no marker and therefore retain legacy cloning.
+        rasterModelVersion: RASTER_MODEL_COPY_ON_WRITE_VERSION,
       };
     }
 
@@ -250,7 +264,7 @@
       if (
         !layer
         || layer.indicesEncoding !== TILED_LAYER_INDEX_ENCODING
-        || !Array.isArray(layer.indicesTiles)
+        || !(Array.isArray(layer.indicesTiles) || layer.indicesTiles instanceof Map)
         || !(layer.indices instanceof Uint8Array)
         || layer.indices.length !== 0
       ) {
@@ -261,18 +275,35 @@
       const tileSize = Math.max(1, Math.round(Number(layer.indicesTileSize) || COMPACT_LAYER_TILE_SIZE));
       const tileCols = Math.ceil(width / tileSize);
       const tileRows = Math.ceil(height / tileSize);
-      if (!width || !height || layer.indicesTiles.length !== tileCols * tileRows) {
+      if (!width || !height) {
         return false;
       }
-      const firstTile = layer.indicesTiles[0];
-      const lastTile = layer.indicesTiles[layer.indicesTiles.length - 1];
-      if (
-        !(firstTile instanceof Uint8Array)
-        || firstTile.length !== tileSize * tileSize
-        || !(lastTile instanceof Uint8Array)
-        || lastTile.length !== tileSize * tileSize
-      ) {
-        return false;
+      if (layer.indicesTiles instanceof Map) {
+        for (const [tileIndex, tile] of layer.indicesTiles.entries()) {
+          if (
+            !Number.isInteger(tileIndex)
+            || tileIndex < 0
+            || tileIndex >= tileCols * tileRows
+            || !(tile instanceof Uint8Array)
+            || tile.length !== tileSize * tileSize
+          ) {
+            return false;
+          }
+        }
+      } else {
+        if (layer.indicesTiles.length !== tileCols * tileRows) {
+          return false;
+        }
+        const firstTile = layer.indicesTiles[0];
+        const lastTile = layer.indicesTiles[layer.indicesTiles.length - 1];
+        if (
+          !(firstTile instanceof Uint8Array)
+          || firstTile.length !== tileSize * tileSize
+          || !(lastTile instanceof Uint8Array)
+          || lastTile.length !== tileSize * tileSize
+        ) {
+          return false;
+        }
       }
       return expectedLength == null || width * height === Math.max(0, Math.round(Number(expectedLength) || 0));
     }
@@ -301,7 +332,79 @@
       const tileCols = Math.ceil(width / tileSize);
       const tileIndex = Math.floor(y / tileSize) * tileCols + Math.floor(x / tileSize);
       const localIndex = (y % tileSize) * tileSize + (x % tileSize);
-      return layer.indicesTiles[tileIndex]?.[localIndex] || 0;
+      const tile = layer.indicesTiles instanceof Map
+        ? layer.indicesTiles.get(tileIndex)
+        : layer.indicesTiles[tileIndex];
+      return tile?.[localIndex] || 0;
+    }
+
+    function getLayerRuntimeStoredIndex(layer, pixelIndex) {
+      if (isTiledLayerIndices(layer)) {
+        const stored = getTiledLayerStoredValue(layer, pixelIndex);
+        return stored === 0 ? 0 : stored - 1;
+      }
+      if (
+        (layer?.indices instanceof Int16Array || layer?.indices instanceof Uint8Array)
+        && pixelIndex >= 0
+        && pixelIndex < layer.indices.length
+      ) {
+        return layer.indices[pixelIndex];
+      }
+      return layer?.indices instanceof Uint8Array ? 0 : -1;
+    }
+
+    function setLayerRuntimeStoredIndex(layer, pixelIndex, value) {
+      if (!layer || !Number.isInteger(pixelIndex) || pixelIndex < 0) {
+        return false;
+      }
+      if (!isTiledLayerIndices(layer)) {
+        if (
+          !(layer.indices instanceof Int16Array || layer.indices instanceof Uint8Array)
+          || pixelIndex >= layer.indices.length
+        ) {
+          return false;
+        }
+        layer.indices[pixelIndex] = value;
+        return true;
+      }
+      const width = layer.indicesWidth;
+      const height = layer.indicesHeight;
+      if (pixelIndex >= width * height || !(layer.indicesTiles instanceof Map)) {
+        return false;
+      }
+      const tileSize = layer.indicesTileSize;
+      const x = pixelIndex % width;
+      const y = Math.floor(pixelIndex / width);
+      const tileCols = Math.ceil(width / tileSize);
+      const tileIndex = Math.floor(y / tileSize) * tileCols + Math.floor(x / tileSize);
+      const localIndex = (y % tileSize) * tileSize + (x % tileSize);
+      const normalized = Math.round(Number(value) || 0);
+      if (normalized >= 255) {
+        return false;
+      }
+      const stored = normalized <= 0 ? 0 : normalized + 1;
+      let tile = layer.indicesTiles.get(tileIndex) || null;
+      if (stored === 0 && !tile) {
+        return true;
+      }
+      if (!tile) {
+        tile = new Uint8Array(tileSize * tileSize);
+        layer.indicesTiles.set(tileIndex, tile);
+      }
+      tile[localIndex] = stored;
+      if (stored === 0) {
+        let hasContent = false;
+        for (let index = 0; index < tile.length; index += 1) {
+          if (tile[index] !== 0) {
+            hasContent = true;
+            break;
+          }
+        }
+        if (!hasContent) {
+          layer.indicesTiles.delete(tileIndex);
+        }
+      }
+      return true;
     }
 
     function getStoredLayerPaletteIndex(layer, pixelIndex) {
@@ -400,7 +503,8 @@
       const tileCols = Math.ceil(safeWidth / tileSize);
       const tileRows = Math.ceil(safeHeight / tileSize);
       const tileLength = tileSize * tileSize;
-      const tiles = [];
+      const useSparseTiles = Number(state?.rasterModelVersion) >= RASTER_MODEL_COPY_ON_WRITE_VERSION;
+      const tiles = useSparseTiles ? new Map() : [];
       const tilePool = new Map();
       const baseIsTiled = isTiledLayerIndices(baseLayer, expectedLength)
         && baseLayer.indicesWidth === safeWidth
@@ -426,6 +530,7 @@
       for (let tileY = 0; tileY < tileRows; tileY += 1) {
         for (let tileX = 0; tileX < tileCols; tileX += 1) {
           const tile = new Uint8Array(tileLength);
+          let hasContent = false;
           for (let localY = 0; localY < tileSize; localY += 1) {
             const y = tileY * tileSize + localY;
             if (y >= safeHeight) break;
@@ -441,23 +546,43 @@
                 return false;
               }
               tile[localY * tileSize + localX] = paletteIndex + 1;
+              hasContent = true;
             }
           }
           const tileIndex = tileY * tileCols + tileX;
-          const baseTile = baseIsTiled ? baseLayer.indicesTiles[tileIndex] : null;
+          if (!hasContent && useSparseTiles) {
+            continue;
+          }
+          const baseTile = baseIsTiled
+            ? (baseLayer.indicesTiles instanceof Map
+              ? baseLayer.indicesTiles.get(tileIndex)
+              : baseLayer.indicesTiles[tileIndex])
+            : null;
           if (baseTile && tilesEqual(tile, baseTile)) {
-            tiles.push(baseTile);
+            if (useSparseTiles) {
+              tiles.set(tileIndex, baseTile);
+            } else {
+              tiles.push(baseTile);
+            }
             continue;
           }
           const hash = hashTile(tile);
           const pooledTiles = tilePool.get(hash) || [];
           const pooledTile = pooledTiles.find(candidate => tilesEqual(tile, candidate));
           if (pooledTile) {
-            tiles.push(pooledTile);
+            if (useSparseTiles) {
+              tiles.set(tileIndex, pooledTile);
+            } else {
+              tiles.push(pooledTile);
+            }
           } else {
             pooledTiles.push(tile);
             tilePool.set(hash, pooledTiles);
-            tiles.push(tile);
+            if (useSparseTiles) {
+              tiles.set(tileIndex, tile);
+            } else {
+              tiles.push(tile);
+            }
           }
         }
       }
@@ -520,13 +645,88 @@
         const indices = new Uint8Array(size);
         indices.set(layer.indices.subarray(0, Math.min(size, layer.indices.length)));
         layer.indices = indices;
+        sharedRasterLayers.delete(layer);
         return indices;
       }
       const indices = createExpandedLayerIndices(layer, width, height, paletteOverride);
       layer.indices = indices;
       delete layer.indicesEncoding;
       clearTiledLayerIndexMetadata(layer);
+      sharedRasterLayers.delete(layer);
       return indices;
+    }
+
+    function markSharedRasterLayers(source, target) {
+      if (!source || !target || source === target) {
+        return;
+      }
+      sharedRasterLayers.add(source);
+      sharedRasterLayers.add(target);
+    }
+
+    function detachSharedLayerRaster(layer) {
+      if (!layer || !sharedRasterLayers.has(layer) || isSimulationLayer(layer)) {
+        return false;
+      }
+      if (isTiledLayerIndices(layer) && layer.indicesTiles instanceof Map) {
+        layer.indicesTiles = new Map(Array.from(layer.indicesTiles.entries(), ([tileIndex, tile]) => ([
+          tileIndex,
+          new Uint8Array(tile),
+        ])));
+      } else if (isTiledLayerIndices(layer)) {
+        // Tiled data is expanded into a new buffer by materialization, so
+        // copying every shared tile first would only duplicate work.
+        materializeLayerIndices(
+          layer,
+          layer.indicesWidth,
+          layer.indicesHeight,
+          Array.isArray(state?.palette) ? state.palette : null
+        );
+      } else if (layer.indices instanceof Int16Array) {
+        layer.indices = new Int16Array(layer.indices);
+      } else if (layer.indices instanceof Uint8Array) {
+        layer.indices = new Uint8Array(layer.indices);
+      }
+      if (layer.direct instanceof Uint8ClampedArray) {
+        layer.direct = new Uint8ClampedArray(layer.direct);
+      }
+      if (layer.importSourceDirect instanceof Uint8ClampedArray) {
+        layer.importSourceDirect = new Uint8ClampedArray(layer.importSourceDirect);
+      }
+      sharedRasterLayers.delete(layer);
+      return true;
+    }
+
+    function ensureSparseWritableLayerIndices(layer, width, height) {
+      if (
+        !layer
+        || isSimulationLayer(layer)
+        || Number(state?.rasterModelVersion) < RASTER_MODEL_COPY_ON_WRITE_VERSION
+        || (Array.isArray(state?.palette) && state.palette.length > 255)
+      ) {
+        return false;
+      }
+      detachSharedLayerRaster(layer);
+      if (isTiledLayerIndices(layer) && layer.indicesTiles instanceof Map) {
+        return true;
+      }
+      const safeWidth = Math.max(1, Math.round(Number(width) || 1));
+      const safeHeight = Math.max(1, Math.round(Number(height) || 1));
+      if (!isImplicitTransparentLayerIndices(layer.indices, safeWidth * safeHeight)) {
+        return false;
+      }
+      layer.indices = new Uint8Array(0);
+      layer.indicesEncoding = TILED_LAYER_INDEX_ENCODING;
+      layer.indicesTiles = new Map();
+      layer.indicesWidth = safeWidth;
+      layer.indicesHeight = safeHeight;
+      layer.indicesTileSize = COMPACT_LAYER_TILE_SIZE;
+      return true;
+    }
+
+    function ensureWritableLayerIndices(layer, width, height, paletteOverride = null) {
+      detachSharedLayerRaster(layer);
+      return materializeLayerIndices(layer, width, height, paletteOverride);
     }
 
     function cloneStoredLayerIndices(layer, { clonePixelData = true } = {}) {
@@ -552,9 +752,14 @@
       if (!isTiledLayerIndices(source) || !target) {
         return false;
       }
-      const clonedTiles = clonePixelData
-        ? source.indicesTiles.map(tile => new Uint8Array(tile))
-        : source.indicesTiles.slice();
+      const clonedTiles = source.indicesTiles instanceof Map
+        ? new Map(Array.from(source.indicesTiles.entries(), ([tileIndex, tile]) => ([
+          tileIndex,
+          clonePixelData ? new Uint8Array(tile) : tile,
+        ])))
+        : (clonePixelData
+          ? source.indicesTiles.map(tile => new Uint8Array(tile))
+          : source.indicesTiles.slice());
       target.indicesEncoding = TILED_LAYER_INDEX_ENCODING;
       target.indicesTiles = clonedTiles;
       target.indicesWidth = source.indicesWidth;
@@ -564,6 +769,7 @@
     }
 
     function ensureLayerDirect(layer, width = state.width, height = state.height) {
+      detachSharedLayerRaster(layer);
       const length = Math.max(0, Math.floor(width) || 0) * Math.max(0, Math.floor(height) || 0) * 4;
       if (!(layer.direct instanceof Uint8ClampedArray) || layer.direct.length !== length) {
         layer.direct = new Uint8ClampedArray(length);
@@ -753,24 +959,49 @@
       return createLayerFromClipboardSnapshot(snapshot, width, height);
     }
 
-    function cloneLayer(baseLayer, width, height, { copyPixels = true } = {}) {
+    function cloneLayer(
+      baseLayer,
+      width,
+      height,
+      { copyPixels = true, sharePixels = false, deferPixelAllocation = false } = {}
+    ) {
       if (isSimulationLayer(baseLayer)) {
         return cloneSimulationLayer(baseLayer, width, height, { copyPixels });
       }
       const size = width * height;
       const useRuntimeUint8 = isRuntimeUint8LayerIndices(baseLayer)
         || baseLayer?.indicesEncoding === RUNTIME_LAYER_INDEX_ENCODING;
+      const useSharedPixels = copyPixels && sharePixels;
+      const preserveImplicitTransparency = copyPixels
+        && isImplicitTransparentLayerIndices(baseLayer?.indices, size);
       const layer = {
         id: crypto.randomUUID ? crypto.randomUUID() : `layer-${Math.random().toString(36).slice(2)}`,
         name: baseLayer.name,
         visible: baseLayer.visible,
         opacity: normalizeLayerOpacity(baseLayer.opacity),
         blendMode: normalizeLayerBlendMode(baseLayer.blendMode),
-        indices: useRuntimeUint8 ? new Uint8Array(size) : new Int16Array(size).fill(-1),
+        indices: preserveImplicitTransparency || (!copyPixels && deferPixelAllocation)
+          ? (useRuntimeUint8 ? new Uint8Array(0) : new Int16Array(0))
+          : (useRuntimeUint8 ? new Uint8Array(size) : new Int16Array(size).fill(-1)),
         ...(useRuntimeUint8 ? { indicesEncoding: RUNTIME_LAYER_INDEX_ENCODING } : {}),
         direct: null,
         directOnly: Boolean(baseLayer.directOnly),
       };
+      if (useSharedPixels) {
+        layer.indices = baseLayer.indices;
+        if (isTiledLayerIndices(baseLayer)) {
+          copyTiledLayerIndexMetadata(baseLayer, layer, { clonePixelData: false });
+        }
+        if (baseLayer?.indicesEncoding) {
+          layer.indicesEncoding = baseLayer.indicesEncoding;
+        }
+        layer.direct = baseLayer.direct instanceof Uint8ClampedArray ? baseLayer.direct : null;
+        layer.importSourceDirect = baseLayer.importSourceDirect instanceof Uint8ClampedArray
+          ? baseLayer.importSourceDirect
+          : null;
+        markSharedRasterLayers(baseLayer, layer);
+        return layer;
+      }
       if (copyPixels && baseLayer.indices instanceof Int16Array) {
         layer.indices.set(baseLayer.indices);
       } else if (copyPixels && useRuntimeUint8 && baseLayer.indices instanceof Uint8Array) {
@@ -784,6 +1015,23 @@
         direct.set(directSource.subarray(0, Math.min(direct.length, directSource.length)));
       }
       return layer;
+    }
+
+    function cloneFrameWithSharedRaster(frame, width = state.width, height = state.height) {
+      if (!frame || !Array.isArray(frame.layers)) {
+        return null;
+      }
+      return {
+        id: crypto.randomUUID ? crypto.randomUUID() : `frame-${Math.random().toString(36).slice(2)}`,
+        name: typeof frame.name === 'string' ? frame.name : getDefaultFrameName(1),
+        duration: Number.isFinite(frame.duration) && frame.duration > 0 ? frame.duration : (1000 / 12),
+        voxelPreviewYawDeg: normalizeVoxelPreviewYawDegrees(frame?.voxelPreviewYawDeg),
+        voxelPreviewPitchDeg: normalizeVoxelPreviewPitchDegrees(frame?.voxelPreviewPitchDeg),
+        layers: frame.layers.map(layer => cloneGenericLayer(layer, width, height, {
+          copyPixels: true,
+          sharePixels: !isSimulationLayer(layer),
+        })),
+      };
     }
 
     function resizeProjectCanvasFrames(canvasDoc, width, height) {
@@ -886,14 +1134,17 @@
     }
 
     function createFrame(name, layers, width, height, options = {}) {
-      const { copyPixels = true } = options || {};
+      const { copyPixels = true, deferPixelAllocation = false } = options || {};
       return {
         id: crypto.randomUUID ? crypto.randomUUID() : `frame-${Math.random().toString(36).slice(2)}`,
         name,
         duration: 1000 / 12,
         voxelPreviewYawDeg: VOXEL_EXTENSION_DEFAULT_YAW_DEG,
         voxelPreviewPitchDeg: VOXEL_EXTENSION_PREVIEW_ELEVATION_DEG,
-        layers: layers.map(layer => cloneLayer(layer, width ?? state.width, height ?? state.height, { copyPixels })),
+        layers: layers.map(layer => cloneLayer(layer, width ?? state.width, height ?? state.height, {
+          copyPixels,
+          deferPixelAllocation,
+        })),
       };
     }
 
@@ -1067,6 +1318,13 @@
             } else if (isRuntimeUint8LayerIndices(layer)) {
               nextLayer.indices = cloneStoredLayerIndices(layer, { clonePixelData });
               nextLayer.indicesEncoding = RUNTIME_LAYER_INDEX_ENCODING;
+            } else if (isImplicitTransparentLayerIndices(layer?.indices, width * height)) {
+              nextLayer.indices = layer.indices instanceof Uint8Array
+                ? new Uint8Array(0)
+                : new Int16Array(0);
+              if (layer?.indicesEncoding === RUNTIME_LAYER_INDEX_ENCODING) {
+                nextLayer.indicesEncoding = RUNTIME_LAYER_INDEX_ENCODING;
+              }
             } else if (clonePixelData && layer?.indices instanceof Int16Array) {
               nextLayer.indices.set(layer.indices.subarray(0, Math.min(nextLayer.indices.length, layer.indices.length)));
             } else if (!clonePixelData && layer?.indices instanceof Int16Array) {
@@ -1955,10 +2213,15 @@
       isRuntimeUint8LayerIndices,
       isTiledLayerIndices,
       getStoredLayerPaletteIndex,
+      getLayerRuntimeStoredIndex,
+      setLayerRuntimeStoredIndex,
       compactLayerIndices,
       createCompactLayerIndicesForStorage,
       compactLayerIndicesToTiles,
       materializeLayerIndices,
+      ensureWritableLayerIndices,
+      ensureSparseWritableLayerIndices,
+      detachSharedLayerRaster,
       ensureLayerDirect,
       isSimulationLayer,
       cloneSimulationColor,
@@ -1970,6 +2233,7 @@
       cloneGenericLayer,
       createGenericLayerFromSnapshot,
       cloneLayer,
+      cloneFrameWithSharedRaster,
       resizeProjectCanvasFrames,
       createFrame,
       snapshotLayerForClipboard,

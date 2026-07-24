@@ -31,6 +31,54 @@
 
     return ((scope) => {
       with (scope) {
+  function readLayerRuntimeIndex(layer, index) {
+    return typeof getRasterLayerRuntimeStoredIndex === 'function'
+      ? getRasterLayerRuntimeStoredIndex(layer, index)
+      : layer?.indices?.[index];
+  }
+
+  function writeLayerRuntimeIndex(layer, index, value) {
+    if (typeof setRasterLayerRuntimeStoredIndex === 'function') {
+      return setRasterLayerRuntimeStoredIndex(layer, index, value);
+    }
+    if (layer?.indices && index >= 0 && index < layer.indices.length) {
+      layer.indices[index] = value;
+      return true;
+    }
+    return false;
+  }
+
+  let rasterBatchDepth = 0;
+  let rasterBatchBounds = null;
+  function beginRasterBatch() { rasterBatchDepth += 1; }
+  function endRasterBatch() {
+    rasterBatchDepth = Math.max(0, rasterBatchDepth - 1);
+    if (rasterBatchDepth || !rasterBatchBounds) return;
+    const bounds = rasterBatchBounds;
+    rasterBatchBounds = null;
+    markDirtyRect(bounds.x0, bounds.y0, bounds.x1, bounds.y1);
+  }
+  function noteRasterPixelDirty(x, y) {
+    if (!rasterBatchDepth) { markDirtyPixel(x, y); return; }
+    if (!rasterBatchBounds) rasterBatchBounds = { x0: x, y0: y, x1: x, y1: y };
+    else {
+      rasterBatchBounds.x0 = Math.min(rasterBatchBounds.x0, x); rasterBatchBounds.y0 = Math.min(rasterBatchBounds.y0, y);
+      rasterBatchBounds.x1 = Math.max(rasterBatchBounds.x1, x); rasterBatchBounds.y1 = Math.max(rasterBatchBounds.y1, y);
+    }
+  }
+  function noteRasterRectDirty(x0, y0, x1, y1) {
+    if (!rasterBatchDepth) { markDirtyRect(x0, y0, x1, y1); return; }
+    if (!rasterBatchBounds) rasterBatchBounds = { x0, y0, x1, y1 };
+    else {
+      rasterBatchBounds.x0 = Math.min(rasterBatchBounds.x0, x0); rasterBatchBounds.y0 = Math.min(rasterBatchBounds.y0, y0);
+      rasterBatchBounds.x1 = Math.max(rasterBatchBounds.x1, x1); rasterBatchBounds.y1 = Math.max(rasterBatchBounds.y1, y1);
+    }
+  }
+  function withRasterBatch(callback) {
+    beginRasterBatch();
+    try { return callback(); } finally { endRasterBatch(); }
+  }
+
   function setPixel(layer, x, y, paletteIndexOverride) {
     if (!layer) {
       return;
@@ -76,10 +124,10 @@
     recordPendingPixelPatchBefore(layer, index);
 
     if (pointerState.tool === 'eraser') {
-      if (layer.indices[index] === transparentStorageIndex && (!direct || direct[base + 3] === 0)) {
+      if (readLayerRuntimeIndex(layer, index) === transparentStorageIndex && (!direct || direct[base + 3] === 0)) {
         return;
       }
-      layer.indices[index] = transparentStorageIndex;
+      writeLayerRuntimeIndex(layer, index, transparentStorageIndex);
       if (direct) {
         direct[base] = 0;
         direct[base + 1] = 0;
@@ -88,17 +136,17 @@
       }
       recordPendingPixelPatchAfter(layer, index);
       markHistoryDirty();
-      markDirtyPixel(x, y);
+      noteRasterPixelDirty(x, y);
       return;
     }
 
     if (isRgbColorMode()) {
       const rgbColor = normalizeColorValue(getActiveDrawColor(undefined, paletteIndexOverride));
       if (rgbColor.a <= 0 && transparentStorageIndex >= 0) {
-        if (layer.indices[index] === transparentStorageIndex && (!direct || direct[base + 3] === 0)) {
+        if (readLayerRuntimeIndex(layer, index) === transparentStorageIndex && (!direct || direct[base + 3] === 0)) {
           return;
         }
-        layer.indices[index] = transparentStorageIndex;
+        writeLayerRuntimeIndex(layer, index, transparentStorageIndex);
         if (direct) {
           direct[base] = 0;
           direct[base + 1] = 0;
@@ -107,10 +155,10 @@
         }
         recordPendingPixelPatchAfter(layer, index);
         markHistoryDirty();
-        markDirtyPixel(x, y);
+        noteRasterPixelDirty(x, y);
         return;
       }
-      const hasSameIndex = layer.indices[index] === transparentLayerValue;
+      const hasSameIndex = readLayerRuntimeIndex(layer, index) === transparentLayerValue;
       if (hasSameIndex && direct) {
         const sameColor = direct[base] === rgbColor.r
           && direct[base + 1] === rgbColor.g
@@ -123,14 +171,14 @@
       if (!direct) {
         direct = ensureLayerDirect(layer);
       }
-      layer.indices[index] = transparentLayerValue;
+      writeLayerRuntimeIndex(layer, index, transparentLayerValue);
       direct[base] = rgbColor.r;
       direct[base + 1] = rgbColor.g;
       direct[base + 2] = rgbColor.b;
       direct[base + 3] = rgbColor.a;
       recordPendingPixelPatchAfter(layer, index);
       markHistoryDirty();
-      markDirtyPixel(x, y);
+      noteRasterPixelDirty(x, y);
       return;
     }
 
@@ -138,10 +186,10 @@
     if (isMultiPaletteIsolationEnabled()) {
       const drawColor = normalizeColorValue(getActiveDrawColor(undefined, paletteIndex));
       if (drawColor.a <= 0 && transparentStorageIndex >= 0) {
-        if (layer.indices[index] === transparentStorageIndex && (!direct || direct[base + 3] === 0)) {
+        if (readLayerRuntimeIndex(layer, index) === transparentStorageIndex && (!direct || direct[base + 3] === 0)) {
           return;
         }
-        layer.indices[index] = transparentStorageIndex;
+        writeLayerRuntimeIndex(layer, index, transparentStorageIndex);
         if (direct) {
           direct[base] = 0;
           direct[base + 1] = 0;
@@ -150,13 +198,13 @@
         }
         recordPendingPixelPatchAfter(layer, index);
         markHistoryDirty();
-        markDirtyPixel(x, y);
+        noteRasterPixelDirty(x, y);
         return;
       }
       if (!direct) {
         direct = ensureLayerDirect(layer);
       }
-      const sameColor = layer.indices[index] === transparentLayerValue
+      const sameColor = readLayerRuntimeIndex(layer, index) === transparentLayerValue
         && direct[base] === drawColor.r
         && direct[base + 1] === drawColor.g
         && direct[base + 2] === drawColor.b
@@ -164,20 +212,20 @@
       if (sameColor) {
         return;
       }
-      layer.indices[index] = transparentLayerValue;
+      writeLayerRuntimeIndex(layer, index, transparentLayerValue);
       direct[base] = drawColor.r;
       direct[base + 1] = drawColor.g;
       direct[base + 2] = drawColor.b;
       direct[base + 3] = drawColor.a;
       recordPendingPixelPatchAfter(layer, index);
       markHistoryDirty();
-      markDirtyPixel(x, y);
+      noteRasterPixelDirty(x, y);
       return;
     }
-    if (layer.indices[index] === paletteIndex) {
+    if (readLayerRuntimeIndex(layer, index) === paletteIndex) {
       return;
     }
-    layer.indices[index] = paletteIndex;
+    writeLayerRuntimeIndex(layer, index, paletteIndex);
     layer.directOnly = false;
     if (direct) {
       direct[base] = 0;
@@ -187,7 +235,7 @@
     }
     recordPendingPixelPatchAfter(layer, index);
     markHistoryDirty();
-    markDirtyPixel(x, y);
+    noteRasterPixelDirty(x, y);
   }
 
   function setLayerPixelDirectColorSingle(layer, x, y, color, { canvasDoc = null, respectSelection = true, markDirty = true } = {}) {
@@ -221,11 +269,11 @@
     const transparentLayerValue = getRasterLayerTransparentStorageValue(layer);
     recordPendingPixelPatchBefore(layer, index);
     if (rgba.a <= 0 && transparentStorageIndex >= 0) {
-      const alreadyTransparent = layer.indices[index] === transparentStorageIndex && (!direct || direct[base + 3] === 0);
+      const alreadyTransparent = readLayerRuntimeIndex(layer, index) === transparentStorageIndex && (!direct || direct[base + 3] === 0);
       if (alreadyTransparent) {
         return false;
       }
-      layer.indices[index] = transparentStorageIndex;
+      writeLayerRuntimeIndex(layer, index, transparentStorageIndex);
       if (direct) {
         direct[base] = 0;
         direct[base + 1] = 0;
@@ -235,14 +283,14 @@
       if (markDirty) {
         recordPendingPixelPatchAfter(layer, index);
         markHistoryDirty();
-        markDirtyPixel(x, y);
+        noteRasterPixelDirty(x, y);
       }
       return true;
     }
     if (!direct) {
       direct = ensureLayerDirect(layer, canvasWidth, canvasHeight);
     }
-    const sameColor = layer.indices[index] === transparentLayerValue
+    const sameColor = readLayerRuntimeIndex(layer, index) === transparentLayerValue
       && direct[base] === rgba.r
       && direct[base + 1] === rgba.g
       && direct[base + 2] === rgba.b
@@ -250,7 +298,7 @@
     if (sameColor) {
       return false;
     }
-    layer.indices[index] = transparentLayerValue;
+    writeLayerRuntimeIndex(layer, index, transparentLayerValue);
     direct[base] = rgba.r;
     direct[base + 1] = rgba.g;
     direct[base + 2] = rgba.b;
@@ -258,7 +306,7 @@
     if (markDirty) {
       recordPendingPixelPatchAfter(layer, index);
       markHistoryDirty();
-      markDirtyPixel(x, y);
+      noteRasterPixelDirty(x, y);
     }
     return true;
   }
@@ -391,15 +439,83 @@
     }
   }
 
+  function stampLargeSnapshotBrush(layer, cx, cy) {
+    if (!isRasterTilePatchPending?.() || !layer || !isIndexColorMode() || isMultiPaletteIsolationEnabled() || isMirrorEnabledForTool(pointerState.tool || state.tool)) {
+      return false;
+    }
+    const canvas = getActiveProjectCanvasDocument();
+    const width = Math.max(1, Math.round(Number(canvas?.width) || Number(state.width) || 1));
+    const height = Math.max(1, Math.round(Number(canvas?.height) || Number(state.height) || 1));
+    const tool = pointerState.tool || state.tool;
+    const paletteIndex = tool === 'eraser' ? resolveTransparentStoragePaletteIndex() : resolveDrawPaletteIndex();
+    const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
+    const shape = getEffectiveBrushShape();
+    const brushSize = clamp(Math.round(state.brushSize || 1), 1, 64);
+    const offsets = getBrushOffsets(brushSize, shape);
+    let captureX0 = width; let captureY0 = height; let captureX1 = -1; let captureY1 = -1;
+    if (shape !== BRUSH_SHAPE_CUSTOM) {
+      const halfDown = Math.floor(brushSize / 2);
+      const halfUp = Math.ceil(brushSize / 2);
+      captureX0 = Math.max(0, cx - halfDown);
+      captureY0 = Math.max(0, cy - halfDown);
+      captureX1 = Math.min(width - 1, cx + halfUp - 1);
+      captureY1 = Math.min(height - 1, cy + halfUp - 1);
+    } else {
+      for (let i = 0; i < offsets.length; i += 1) {
+        const x = cx + offsets[i].dx; const y = cy + offsets[i].dy;
+        if (x < 0 || y < 0 || x >= width || y >= height) continue;
+        if (x < captureX0) captureX0 = x; if (x > captureX1) captureX1 = x;
+        if (y < captureY0) captureY0 = y; if (y > captureY1) captureY1 = y;
+      }
+    }
+    if (captureX1 >= captureX0 && captureY1 >= captureY0) {
+      capturePendingRasterTilesForRect?.(layer, captureX0, captureY0, captureX1, captureY1);
+    }
+    let x0 = width; let y0 = height; let x1 = -1; let y1 = -1;
+    const indexBuffer = layer.indices instanceof Int16Array || layer.indices instanceof Uint8Array
+      ? layer.indices
+      : null;
+    const selectionMask = state.selectionMask instanceof Uint8Array ? state.selectionMask : null;
+    for (let i = 0; i < offsets.length; i += 1) {
+      const x = cx + offsets[i].dx;
+      const y = cy + offsets[i].dy;
+      if (x < 0 || y < 0 || x >= width || y >= height) continue;
+      const index = (y * width) + x;
+      if (selectionMask && selectionMask[index] !== 1) continue;
+      const base = index * 4;
+      const currentIndex = indexBuffer ? indexBuffer[index] : readLayerRuntimeIndex(layer, index);
+      if (currentIndex === paletteIndex && (!direct || direct[base + 3] === 0)) continue;
+      if (indexBuffer) indexBuffer[index] = paletteIndex;
+      else writeLayerRuntimeIndex(layer, index, paletteIndex);
+      if (direct) { direct[base] = 0; direct[base + 1] = 0; direct[base + 2] = 0; direct[base + 3] = 0; }
+      if (x < x0) x0 = x; if (x > x1) x1 = x;
+      if (y < y0) y0 = y; if (y > y1) y1 = y;
+    }
+    if (x1 < x0 || y1 < y0) return true;
+    layer.directOnly = false;
+    markHistoryDirty();
+    noteRasterRectDirty(x0, y0, x1, y1);
+    return true;
+  }
+
   function stampBrush(layer, cx, cy) {
-    forEachBrushOffset((dx, dy) => setPixel(layer, cx + dx, cy + dy));
+    if (stampLargeSnapshotBrush(layer, cx, cy)) return;
+    return withRasterBatch(() => forEachBrushOffset((dx, dy) => setPixel(layer, cx + dx, cy + dy)));
   }
 
   function drawLine(start, end) {
     const layer = getActiveLayer();
     if (!layer) return;
     const points = bresenhamLine(start.x, start.y, end.x, end.y);
-    points.forEach(point => stampBrush(layer, point.x, point.y));
+    const brushSize = Math.max(1, Math.round(Number(state.brushSize) || 1));
+    const stampStride = brushSize >= 12 ? Math.max(1, Math.floor(brushSize / 5)) : 1;
+    withRasterBatch(() => {
+      for (let index = 0; index < points.length; index += stampStride) {
+        stampBrush(layer, points[index].x, points[index].y);
+      }
+      const last = points[points.length - 1];
+      if (last && (points.length - 1) % stampStride !== 0) stampBrush(layer, last.x, last.y);
+    });
     requestRender();
   }
 
@@ -412,9 +528,16 @@
     const y1 = Math.max(start.y, end.y);
     const activeTool = pointerState.tool || state.tool;
     const brushSize = clamp(Math.round(state.brushSize || 1), 1, 64);
+    const centerStep = brushSize >= 12 ? Math.max(1, Math.floor(brushSize / 5)) : 1;
     const hasMirror = isMirrorEnabledForTool(activeTool);
     const brushShape = getEffectiveBrushShape();
+    const forEachCenter = (from, to, callback) => {
+      let last = null;
+      for (let value = from; value <= to; value += centerStep) { callback(value); last = value; }
+      if (last !== to) callback(to);
+    };
 
+    withRasterBatch(() => {
     if (filled) {
       if (brushSize === 1 && brushShape === BRUSH_SHAPE_SQUARE && !hasMirror) {
         for (let y = y0; y <= y1; y += 1) {
@@ -422,24 +545,20 @@
             setPixelSingle(layer, x, y);
           }
         }
-        requestRender();
         return;
       }
-      for (let y = y0; y <= y1; y += 1) {
-        for (let x = x0; x <= x1; x += 1) {
-          stampBrush(layer, x, y);
-        }
-      }
+      forEachCenter(y0, y1, y => forEachCenter(x0, x1, x => stampBrush(layer, x, y)));
     } else {
-      for (let x = x0; x <= x1; x += 1) {
+      forEachCenter(x0, x1, x => {
         stampBrush(layer, x, y0);
         stampBrush(layer, x, y1);
-      }
-      for (let y = y0; y <= y1; y += 1) {
+      });
+      forEachCenter(y0, y1, y => {
         stampBrush(layer, x0, y);
         stampBrush(layer, x1, y);
-      }
+      });
     }
+    });
     requestRender();
   }
 
@@ -455,7 +574,15 @@
       requestRender();
       return;
     }
-    drawEllipsePixels(x0, y0, x1, y1, filled, (x, y) => stampBrush(layer, x, y));
+    const brushSize = clamp(Math.round(state.brushSize || 1), 1, 64);
+    const stampStride = brushSize >= 12 ? Math.max(1, Math.floor(brushSize / 5)) : 1;
+    let pixelCount = 0;
+    let lastPoint = null;
+    withRasterBatch(() => drawEllipsePixels(x0, y0, x1, y1, filled, (x, y) => {
+      lastPoint = { x, y };
+      if ((pixelCount++ % stampStride) === 0) stampBrush(layer, x, y);
+    }));
+    if (lastPoint && ((pixelCount - 1) % stampStride) !== 0) stampBrush(layer, lastPoint.x, lastPoint.y);
     requestRender();
   }
 
@@ -684,28 +811,105 @@
       return pixels;
     }
 
+    // Scanline flood fill keeps the work stack proportional to boundaries,
+    // rather than pushing four neighbours for every painted pixel.
     const visited = new Uint8Array(width * height);
     const stack = [x, y];
+    const canVisit = (px, py) => {
+      if (px < 0 || py < 0 || px >= width || py >= height) return false;
+      const idx = py * width + px;
+      return !visited[idx]
+        && (!selectionMask || selectionMask[idx] === 1)
+        && layerPixelMatchesMatchState(matchState, idx);
+    };
     while (stack.length > 0) {
       const py = stack.pop();
       const px = stack.pop();
-      if (!Number.isFinite(px) || !Number.isFinite(py)) continue;
-      if (px < 0 || py < 0 || px >= width || py >= height) continue;
-      const idx = py * width + px;
-      if (visited[idx]) continue;
-      visited[idx] = 1;
-      if (selectionMask && selectionMask[idx] !== 1) continue;
-      if (!layerPixelMatchesMatchState(matchState, idx)) continue;
-      if (pushPixel(idx)) {
-        markFillPreviewPixelsTruncated(pixels);
-        return pixels;
+      if (!Number.isFinite(px) || !Number.isFinite(py) || !canVisit(px, py)) continue;
+      let left = px;
+      let right = px;
+      while (left > 0 && canVisit(left - 1, py)) left -= 1;
+      while (right + 1 < width && canVisit(right + 1, py)) right += 1;
+      let aboveOpen = false;
+      let belowOpen = false;
+      for (let runX = left; runX <= right; runX += 1) {
+        const idx = py * width + runX;
+        visited[idx] = 1;
+        if (pushPixel(idx)) {
+          markFillPreviewPixelsTruncated(pixels);
+          return pixels;
+        }
+        const canVisitAbove = canVisit(runX, py - 1);
+        if (canVisitAbove && !aboveOpen) stack.push(runX, py - 1);
+        aboveOpen = canVisitAbove;
+        const canVisitBelow = canVisit(runX, py + 1);
+        if (canVisitBelow && !belowOpen) stack.push(runX, py + 1);
+        belowOpen = canVisitBelow;
       }
-      stack.push(px + 1, py);
-      stack.push(px - 1, py);
-      stack.push(px, py + 1);
-      stack.push(px, py - 1);
     }
     return pixels;
+  }
+
+  function collectSolidFillTargetRuns(layer, x, y, { fillMode = state.selectSameMode, selectionMask = state.selectionMask } = {}) {
+    if (!layer) return new Int32Array(0);
+    const width = Math.max(1, Number(state.width) || 1);
+    const height = Math.max(1, Number(state.height) || 1);
+    if (x < 0 || y < 0 || x >= width || y >= height) return new Int32Array(0);
+    const startIndex = y * width + x;
+    if (selectionMask && selectionMask[startIndex] !== 1) return new Int32Array(0);
+    const matchState = getLayerPixelMatchState(layer, startIndex);
+    if (!matchState) return new Int32Array(0);
+    const normalizedMode = normalizeSelectSameMode(fillMode, SELECT_SAME_MODE_CONNECTED);
+    const runs = [];
+    if (normalizedMode === SELECT_SAME_MODE_GLOBAL) {
+      for (let py = 0; py < height; py += 1) {
+        const rowStart = py * width;
+        let px = 0;
+        while (px < width) {
+          const index = rowStart + px;
+          if ((selectionMask && selectionMask[index] !== 1) || !layerPixelMatchesMatchState(matchState, index)) { px += 1; continue; }
+          const start = index;
+          px += 1;
+          while (px < width) {
+            const nextIndex = rowStart + px;
+            if ((selectionMask && selectionMask[nextIndex] !== 1) || !layerPixelMatchesMatchState(matchState, nextIndex)) break;
+            px += 1;
+          }
+          runs.push(start, px - (start - rowStart));
+        }
+      }
+      return new Int32Array(runs);
+    }
+    // One bit per logical pixel is substantially smaller than an array of
+    // objects; more importantly, the output stays one run per scanline.
+    const visited = new Uint8Array(width * height);
+    const stack = [x, y];
+    const canVisit = (px, py) => {
+      if (px < 0 || py < 0 || px >= width || py >= height) return false;
+      const index = py * width + px;
+      return !visited[index] && (!selectionMask || selectionMask[index] === 1) && layerPixelMatchesMatchState(matchState, index);
+    };
+    while (stack.length) {
+      const py = stack.pop();
+      const px = stack.pop();
+      if (!canVisit(px, py)) continue;
+      let left = px; let right = px;
+      while (left > 0 && canVisit(left - 1, py)) left -= 1;
+      while (right + 1 < width && canVisit(right + 1, py)) right += 1;
+      runs.push((py * width) + left, right - left + 1);
+      let aboveOpen = false; let belowOpen = false;
+      for (let runX = left; runX <= right; runX += 1) {
+        const index = py * width + runX;
+        visited[index] = 1;
+        const above = canVisit(runX, py - 1);
+        if (above && !aboveOpen) stack.push(runX, py - 1);
+        aboveOpen = above;
+        const below = canVisit(runX, py + 1);
+        if (below && !belowOpen) stack.push(runX, py + 1);
+        belowOpen = below;
+      }
+    }
+    return new Int32Array(runs);
   }
 
   function applyGradientFillPixel(layer, x, y, context) {
@@ -721,6 +925,123 @@
       return true;
     }
     return setLayerPixelDirectColorSingle(layer, x, y, pixel.color);
+  }
+
+  function applySolidIndexFillPixels(layer, pixels, paletteIndex) {
+    if (!layer || !Array.isArray(pixels) || !pixels.length) {
+      return false;
+    }
+    const width = Math.max(1, Number(state.width) || 1);
+    const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
+    // Capture the old cells once as typed scanline runs before mutation. This
+    // is deliberately scoped to the active layer/frame, unlike a document
+    // snapshot, and avoids creating one history object per filled pixel.
+    const fillPatch = preparePendingSolidFillPatch?.(layer, pixels, paletteIndex) || null;
+    let changed = false;
+    let x0 = width;
+    let y0 = Math.max(1, Number(state.height) || 1);
+    let x1 = -1;
+    let y1 = -1;
+    for (let offset = 0; offset < pixels.length; offset += 1) {
+      const index = pixels[offset];
+      if (!Number.isInteger(index) || index < 0) {
+        continue;
+      }
+      if (readLayerRuntimeIndex(layer, index) === paletteIndex && (!direct || direct[(index * 4) + 3] === 0)) {
+        continue;
+      }
+      if (!fillPatch) recordPendingPixelPatchBefore(layer, index);
+      writeLayerRuntimeIndex(layer, index, paletteIndex);
+      if (direct) {
+        const base = index * 4;
+        direct[base] = 0;
+        direct[base + 1] = 0;
+        direct[base + 2] = 0;
+        direct[base + 3] = 0;
+      }
+      if (!fillPatch) recordPendingPixelPatchAfter(layer, index);
+      const x = index % width;
+      const y = Math.floor(index / width);
+      if (x < x0) x0 = x;
+      if (x > x1) x1 = x;
+      if (y < y0) y0 = y;
+      if (y > y1) y1 = y;
+      changed = true;
+    }
+    if (!changed) {
+      return false;
+    }
+    layer.directOnly = false;
+    markHistoryDirty();
+    markDirtyRect(x0, y0, x1, y1);
+    return true;
+  }
+
+  function applySolidIndexFillRuns(layer, runs, paletteIndex) {
+    if (!layer || !(runs instanceof Int32Array) || !runs.length) return false;
+    const width = Math.max(1, Number(state.width) || 1);
+    const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
+    const layerPixelCount = (layer.indices instanceof Int16Array || layer.indices instanceof Uint8Array)
+      ? layer.indices.length
+      : (width * Math.max(1, Number(state.height) || 1));
+    const fillPatch = preparePendingSolidFillRuns?.(layer, runs, paletteIndex) || null;
+    let changed = false;
+    let x0 = width; let y0 = Math.max(1, Number(state.height) || 1); let x1 = -1; let y1 = -1;
+    for (let offset = 0; offset + 1 < runs.length; offset += 2) {
+      const start = Math.max(0, runs[offset]);
+      const end = Math.min(layerPixelCount, start + Math.max(0, runs[offset + 1]));
+      if (fillPatch && (layer.indices instanceof Int16Array || layer.indices instanceof Uint8Array)) {
+        // The history helper has already captured the old values.  A typed
+        // array fill maps to the platform's contiguous-memory fast path,
+        // which is the important difference for a 1000px-wide bucket fill.
+        layer.indices.fill(paletteIndex, start, end);
+        if (direct) direct.fill(0, start * 4, end * 4);
+      } else {
+        for (let index = start; index < end; index += 1) {
+          if (!fillPatch) recordPendingPixelPatchBefore(layer, index);
+          writeLayerRuntimeIndex(layer, index, paletteIndex);
+          if (direct) direct.fill(0, index * 4, (index * 4) + 4);
+          if (!fillPatch) recordPendingPixelPatchAfter(layer, index);
+        }
+      }
+      if (end > start) {
+        const row = Math.floor(start / width);
+        x0 = Math.min(x0, start % width); x1 = Math.max(x1, (end - 1) % width);
+        y0 = Math.min(y0, row); y1 = Math.max(y1, row);
+        changed = true;
+      }
+    }
+    if (!changed) return false;
+    layer.directOnly = false;
+    markHistoryDirty();
+    markDirtyRect(x0, y0, x1, y1);
+    return true;
+  }
+
+  function prepareLargeIndexedFillTileHistory(layer, pixels) {
+    // Solid fills use denser scanline runs. Gradient/dither fills need a
+    // different final value per pixel, so their compact history is the set of
+    // touched 64px tiles instead of a giant per-pixel Map.
+    if (!layer || !Array.isArray(pixels) || pixels.length < 4096) return false;
+    if (!promotePendingPixelPatchToRasterTiles?.()) return false;
+    const width = Math.max(1, Number(state.width) || 1);
+    let x0 = width;
+    let y0 = Math.max(1, Number(state.height) || 1);
+    let x1 = -1;
+    let y1 = -1;
+    for (let i = 0; i < pixels.length; i += 1) {
+      const index = pixels[i];
+      if (!Number.isInteger(index) || index < 0) continue;
+      const px = index % width;
+      const py = Math.floor(index / width);
+      if (px < x0) x0 = px;
+      if (px > x1) x1 = px;
+      if (py < y0) y0 = py;
+      if (py > y1) y1 = py;
+    }
+    return x1 >= x0 && y1 >= y0
+      ? Boolean(capturePendingRasterTilesForRect?.(layer, x0, y0, x1, y1))
+      : false;
   }
 
   function floodFill(x, y, paletteIndexOverride, options = {}) {
@@ -762,6 +1083,33 @@
     }
     const selectionMask = state.selectionMask;
 
+    // The ordinary indexed fill path is the common Aseprite-style bucket
+    // operation. Resolve the region first, then mutate and dirty it in one
+    // batch so a large fill does not perform render bookkeeping per pixel.
+    if (indexMode && !gradientFill && !isMultiPaletteIsolationEnabled() && !isMirrorEnabledForTool('fill')) {
+      const runs = collectSolidFillTargetRuns(layer, x, y, {
+        fillMode,
+        selectionMask,
+      });
+      if (applySolidIndexFillRuns(layer, runs, paletteIndex)) {
+        requestRender();
+        return;
+      }
+      // Keep Fill available for older/restored raster payloads whose runtime
+      // storage cannot be represented by the compact scanline-run path. This
+      // is deliberately a correctness fallback; normal indexed documents use
+      // the faster path above.
+      const fallbackPixels = collectFillTargetPixels(layer, x, y, {
+        fillMode,
+        selectionMask,
+        limit: Number.POSITIVE_INFINITY,
+      });
+      if (applySolidIndexFillPixels(layer, fallbackPixels, paletteIndex)) {
+        requestRender();
+      }
+      return;
+    }
+
     if (gradientFill) {
       const start = normalizeFillGradientPoint(options.start, { x, y });
       const end = normalizeFillGradientPoint(options.end, start);
@@ -769,6 +1117,9 @@
       const pixels = collectFillTargetPixels(layer, x, y, { fillMode, selectionMask, limit: Number.POSITIVE_INFINITY });
       if (!pixels || !pixels.length) {
         return;
+      }
+      if (indexMode && !isMultiPaletteIsolationEnabled() && !isMirrorEnabledForTool('fill')) {
+        prepareLargeIndexedFillTileHistory(layer, pixels);
       }
       const context = {
         fillStyle,
@@ -958,8 +1309,9 @@
 
   function sampleLayerColor(layer, x, y) {
     const idx = y * state.width + x;
-    if (layer.indices[idx] > 0) {
-      return { type: 'index', index: layer.indices[idx] };
+    const paletteIndex = readLayerRuntimeIndex(layer, idx);
+    if (paletteIndex > 0) {
+      return { type: 'index', index: paletteIndex };
     }
     const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
     const base = idx * 4;
@@ -1018,6 +1370,11 @@
     interpolateFillGradientColor,
     resolveFillGradientPixel,
     collectFillTargetPixels,
+    collectSolidFillTargetRuns,
+    applySolidIndexFillPixels,
+    applySolidIndexFillRuns,
+    prepareLargeIndexedFillTileHistory,
+    withRasterBatch,
     applyGradientFillPixel,
     floodFill,
     sampleColor,

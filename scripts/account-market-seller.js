@@ -7,11 +7,12 @@
 
   function labelForSeller(profile, payout) {
     if (!profile) return '未申請';
-    if (profile.seller_status === 'verified' && profile.identity_status === 'verified' && payout?.onboarding_status === 'verified' && payout?.payouts_enabled) return '販売者確認済み';
+    if (profile.seller_status === 'verified' && profile.identity_status === 'verified' && payout?.onboarding_status === 'verified' && payout?.payouts_enabled) return '販売者・受取設定済み';
+    if (profile.seller_status === 'verified' && profile.identity_status === 'verified') return '販売者許可済み・受取設定待ち';
     if (profile.seller_status === 'restricted') return '制限中';
     if (profile.seller_status === 'disabled') return '利用停止';
-    if (profile.identity_status === 'failed') return '再確認が必要';
-    if (profile.contact_registered_at) return '受取設定待ち（出品可）';
+    if (profile.identity_status === 'failed') return '販売者情報の再送信が必要';
+    if (profile.contact_registered_at) return '販売者情報を送信済み';
     return '未登録';
   }
 
@@ -40,8 +41,15 @@
       client.from('market_seller_payout_accounts').select('onboarding_status,payouts_enabled').maybeSingle()
     ]);
     status.textContent = error || payoutError ? '公開準備中' : labelForSeller(data, payout);
-    const verified = data?.seller_status === 'verified' && data?.identity_status === 'verified' && payout?.onboarding_status === 'verified' && payout?.payouts_enabled;
-    if (requestButton) requestButton.hidden = Boolean(verified);
+    const approved = data?.seller_status === 'verified' && data?.identity_status === 'verified';
+    const readyForPayout = approved && payout?.onboarding_status === 'verified' && payout?.payouts_enabled;
+    if (requestButton) {
+      requestButton.hidden = Boolean(readyForPayout);
+      if (approved && !readyForPayout) {
+        requestButton.querySelector('strong').textContent = '売上受取を設定';
+        requestButton.querySelector('span').textContent = '販売者情報は許可済みです。次はStripe設定です。';
+      }
+    }
   }
 
   async function init() {

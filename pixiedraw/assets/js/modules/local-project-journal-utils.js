@@ -305,6 +305,29 @@
       return changed;
     }
 
+    function applyRasterTilePatchToSnapshot(snapshot, historyEntry = null, direction = 'redo') {
+      const target = resolveSnapshotPatchTarget(snapshot, historyEntry);
+      const tiles = Array.isArray(historyEntry?.tiles) ? historyEntry.tiles : [];
+      if (!target || !tiles.length) return false;
+      const useAfter = direction === 'redo';
+      let changed = false;
+      tiles.forEach(tile => {
+        const indices = useAfter ? tile?.afterIndices : tile?.beforeIndices;
+        const direct = useAfter ? tile?.afterDirect : tile?.beforeDirect;
+        if (!(indices instanceof Int16Array || indices instanceof Uint8Array) || indices.length !== tile.width * tile.height) return;
+        for (let row = 0; row < tile.height; row += 1) {
+          const destinationStart = ((tile.y + row) * target.width) + tile.x;
+          const sourceStart = row * tile.width;
+          target.layer.indices.set(indices.subarray(sourceStart, sourceStart + tile.width), destinationStart);
+          if (target.layer.direct instanceof Uint8ClampedArray && direct instanceof Uint8ClampedArray) {
+            target.layer.direct.set(direct.subarray(sourceStart * 4, (sourceStart + tile.width) * 4), destinationStart * 4);
+          }
+        }
+        changed = true;
+      });
+      return changed;
+    }
+
     function createLayerAddJournalOp(historyEntry = null) {
       if (!isLayerAddHistoryEntry?.(historyEntry) || !Array.isArray(historyEntry.layers) || !historyEntry.layers.length) {
         return null;
@@ -591,6 +614,8 @@
       journal.ops.forEach(op => {
         if (op?.kind === 'pixel-patch' && op?.historyEntry) {
           applyPixelPatchToSnapshot(snapshot, op.historyEntry, 'redo');
+        } else if (op?.kind === 'raster-tile-patch' && op?.historyEntry) {
+          applyRasterTilePatchToSnapshot(snapshot, op.historyEntry, 'redo');
         } else if (op?.kind === 'layer-add') {
           applyLayerAddToSnapshot(snapshot, op);
         } else if (op?.kind === 'frame-add') {
@@ -706,6 +731,19 @@
         activeState = next;
         return next;
       }
+      if (historyEntry?.kind === 'raster-tile-patch' && Array.isArray(historyEntry.tiles) && historyEntry.tiles.length) {
+        next.ops.push({
+          kind: 'raster-tile-patch',
+          historyLabel: String(historyLabel || historyEntry.historyLabel || ''),
+          historyEntry: cloneJsonValue(historyEntry, null),
+        });
+        if (next.ops.length > Math.max(1, Math.round(Number(LOCAL_PROJECT_CHECKPOINT_HISTORY_INTERVAL) || 30))) {
+          next.forceCheckpoint = true;
+        }
+        next.dirtyOpCount = next.ops.length;
+        activeState = next;
+        return next;
+      }
       if (!isPixelPatchHistoryEntry(historyEntry) && !layerAddOp && !frameAddOp) {
         next.forceCheckpoint = true;
         activeState = next;
@@ -758,6 +796,17 @@
             activeFrame: Math.max(0, Math.round(Number(wrapped.activeFrame) || 0)),
             activeLayer: String(wrapped.activeLayer || ''),
             frames: cloneJsonValue(wrapped.frames, []),
+          });
+          continue;
+        }
+        if (wrapped?.kind === 'raster-tile-patch') {
+          const entry = wrapped.historyEntry;
+          if (!entry || entry.kind !== 'raster-tile-patch' || !Array.isArray(entry.tiles) || !entry.tiles.length) return null;
+          normalized.push({
+            sequence: opIndex + 1,
+            kind: 'raster-tile-patch',
+            canvasId: String(entry.canvasId || ''), frameId: String(entry.frameId || ''), layerId: String(entry.layerId || ''),
+            tiles: cloneJsonValue(entry.tiles, []),
           });
           continue;
         }

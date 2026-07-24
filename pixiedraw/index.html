@@ -472,7 +472,7 @@
 
 
 
-<link href="assets/css/style.css?v=20260721-memory-monitor-off1" rel="stylesheet"/>
+<link href="assets/css/style.css?v=20260724-timeline-axis1" rel="stylesheet"/>
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-4.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-4.png"/>
 <style>
@@ -1219,7 +1219,7 @@
 <div hidden="" id="pixieedDetailActionSources">
 <button aria-haspopup="dialog" class="detail-panel__action" id="openShortcutHelp" type="button"><span>ショートカット一覧</span></button>
 <button class="detail-panel__action" id="openOperationHelpPanel" type="button"><span>使い方ヘルプ</span></button>
-<button aria-haspopup="dialog" class="detail-panel__action" id="openUpdateHistory" type="button"><span>更新情報</span></button>
+<button aria-haspopup="dialog" class="detail-panel__action" data-update-history-action="true" id="openUpdateHistory" type="button"><span>更新情報</span><span aria-label="新着メッセージ" class="detail-panel__notice" data-update-history-notice="true" hidden="">新着</span></button>
 <button class="detail-panel__action" id="toggleLanguageMode" type="button"><span aria-hidden="true" class="detail-panel__text-icon">あ/A/中</span><span>言語</span></button>
 <div id="pixieedPwaInstallField">
 <span>アプリとして使う</span>
@@ -1743,6 +1743,11 @@
 <div class="modal__body update-history-modal__body">
 <p class="help-text">直近1年の更新内容を表示しています。</p>
 <div class="update-history-list" id="updateHistoryList" role="list"></div>
+<section class="update-history-feedback" aria-label="フィードバック">
+<p>最新のアップデートがあります。更新内容は右上の詳細パネルから「更新情報」をご確認ください。</p>
+<p>もし不具合が生じた場合には、フィードバックをいただけますとありがたいです。</p>
+<a class="button update-history-feedback__button" href="../contact/index.html?source=pixiedraw-update" id="updateHistoryFeedback">フィードバックを送る</a>
+</section>
 <div aria-label="広告" class="export-ad update-history__ad" data-pixieed-reserve-ad-space="true" id="updateHistoryAdContainer">
 <div class="export-ad__slot">
 <ins class="update-history-ad-ins" data-ad-client="ca-pub-9801602250480253" data-ad-format="auto" data-ad-slot="2141591954" data-full-width-responsive="true" id="updateHistoryAdSlot" style="display:block"></ins>
@@ -1794,7 +1799,7 @@
 	<script defer="" src="assets/js/modules/color-codec-utils.js?v=2026.06.30-color-codec-v1"></script>
 	<script defer="" src="assets/js/modules/export-delivery-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/document-utils.js?v=20260720-pxd1"></script>
-	<script defer="" src="assets/js/modules/document-model.js?v=20260721-runtime-index8-5"></script>
+	<script defer="" src="assets/js/modules/document-model.js?v=20260724-cow-raster4"></script>
 	<script defer="" src="assets/js/modules/state-normalizers.js?v=20260715-true-v2-single-canvas-v1"></script>
 	<script defer="" src="assets/js/modules/ui-static-config.js?v=20260720-pxd2"></script>
 	<script defer="" src="assets/js/modules/geometry-utils.js?v=2026.06.30-geometry-utils-v1"></script>
@@ -1830,19 +1835,19 @@
 		<script defer="" src="assets/js/modules/open-project-tab-view.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/open-project-tab-lifecycle.js?v=20260719-active-metadata1"></script>
 	<script defer="" src="assets/js/modules/open-project-tab-interactions.js?v=20260715-local-true-v2-cleanup1"></script>
-	<script defer="" src="assets/js/modules/local-project-journal-utils.js?v=20260721-runtime-index8-2"></script>
-	<script defer="" src="assets/js/modules/pixel-patch-history-utils.js?v=20260721-compressed-selection-move1"></script>
+	<script defer="" src="assets/js/modules/local-project-journal-utils.js?v=20260724-raster-tile-journal1"></script>
+	<script defer="" src="assets/js/modules/pixel-patch-history-utils.js?v=20260724-fill-runs-direct1"></script>
 	<script defer="" src="assets/js/modules/cold-history-store-utils.js?v=20260715-cold-history-p6"></script>
 	<script defer="" src="assets/js/modules/timelapse-chunk-store-utils.js?v=20260721-timelapse-separated-records1"></script>
-	<script defer="" src="assets/js/modules/history-snapshot-workflow-utils.js?v=2026.07.21-runtime-index8-1"></script>
-	<script defer="" src="assets/js/modules/memory-utils.js?v=20260721-monitor-cleanup1"></script>
-	<script defer="" src="assets/js/modules/playback-cache-utils.js?v=2026.06.30-playback-cache-v1"></script>
+	<script defer="" src="assets/js/modules/history-snapshot-workflow-utils.js?v=20260724-cow-raster1"></script>
+	<script defer="" src="assets/js/modules/memory-utils.js?v=20260724-cow-raster3"></script>
+	<script defer="" src="assets/js/modules/playback-cache-utils.js?v=20260724-presentation-proxy1"></script>
 	<script defer="" src="assets/js/modules/reload-snapshot-utils.js?v=2026.06.30-reload-snapshot-v1"></script>
 	<script defer="" src="assets/js/modules/reload-session-workflow-utils.js?v=20260717-session-history1"></script>
-	<script defer="" src="assets/js/modules/canvas-core-workflow-utils.js?v=20260720-lazy-layer1"></script>
-	<script defer="" src="assets/js/modules/canvas-drawing-workflow-utils.js?v=20260724-background-index-zero1"></script>
-	<script defer="" src="assets/js/modules/canvas-overlay-workflow-utils.js?v=20260724-selection-outline-mode1"></script>
-	<script defer="" src="assets/js/modules/canvas-render-workflow-utils.js?v=20260724-background-index-zero1"></script>
+	<script defer="" src="assets/js/modules/canvas-core-workflow-utils.js?v=20260724-cow-raster2"></script>
+	<script defer="" src="assets/js/modules/canvas-drawing-workflow-utils.js?v=20260724-fill-fallback2"></script>
+	<script defer="" src="assets/js/modules/canvas-overlay-workflow-utils.js?v=20260724-brush-preview-tail1"></script>
+	<script defer="" src="assets/js/modules/canvas-render-workflow-utils.js?v=20260724-dirty-composite-cache1"></script>
 	<script defer="" src="assets/js/modules/viewport-gesture-arbiter-utils.js?v=2026.07.12-touch-pan-bias-v9"></script>
 	<script defer="" src="assets/js/modules/canvas-zoom-workflow-utils.js?v=2026.07.11-touch-arbiter-v3"></script>
 	<script defer="" src="assets/js/modules/virtual-cursor-workflow-utils.js?v=20260715-remove-oval1"></script>
@@ -1855,8 +1860,8 @@
 	<script defer="" src="assets/vendor/jsQR.min.js?v=1.4.0"></script>
 	<script defer="" src="assets/js/modules/image-import-decode-utils.js?v=20260721-runtime-index8-2"></script>
 	<script defer="" src="assets/js/modules/palette-panel-utils.js?v=20260721-runtime-index8-2"></script>
-	<script defer="" src="assets/js/modules/timeline-layers.js?v=20260721-playback-state1"></script>
-	<script defer="" src="assets/js/modules/ui-localization-utils.js?v=20260721-memory-monitor-off1"></script>
+	<script defer="" src="assets/js/modules/timeline-layers.js?v=20260724-timeline-axis-click1"></script>
+	<script defer="" src="assets/js/modules/ui-localization-utils.js?v=20260724-update-notice1"></script>
 	<script defer="" src="assets/js/modules/ui-language-utils.js?v=2026.07.03-small-helper-batch-split-v1"></script>
 	<script defer="" src="assets/js/modules/scroll-input-utils.js?v=2026.07.03-small-helper-batch-split-v1"></script>
 	<script defer="" src="assets/js/modules/sprite-scale-utils.js?v=2026.06.30-zh-localization-v1"></script>
@@ -1864,10 +1869,10 @@
 	<script defer="" src="assets/js/modules/export-planning-utils.js?v=20260719-export-bundle1"></script>
 	<script defer="" src="assets/js/modules/retired-extension-compat.js?v=20260721-voxel-retired1"></script>
 	<script defer="" src="assets/js/modules/floating-draw-controls-utils.js?v=2026.07.01-floating-draw-controls-v1"></script>
-	<script defer="" src="assets/js/modules/floating-preview-panel-utils.js?v=2026.07.01-floating-preview-v1"></script>
+	<script defer="" src="assets/js/modules/floating-preview-panel-utils.js?v=20260724-lowres-navigator1"></script>
 	<script defer="" src="assets/js/modules/simulation-playback-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/keyboard-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
-	<script defer="" src="assets/js/modules/canvas-pointer-workflow-utils.js?v=20260724-background-index-zero2"></script>
+	<script defer="" src="assets/js/modules/canvas-pointer-workflow-utils.js?v=20260724-brush-frame-batch1"></script>
 	<script defer="" src="assets/js/modules/canvas-tool-state-workflow-utils.js?v=2026.07.14-selection-keep-v1"></script>
 	<script defer="" src="assets/js/modules/export-rendering.js?v=20260721-runtime-index8-output1"></script>
 	<script defer="" src="assets/js/modules/dialog-setup-utils.js?v=20260720-export-batch-direct1"></script>
@@ -1883,7 +1888,7 @@
 	<script defer="" src="assets/js/modules/ui-action-buttons-workflow-utils.js?v=20260721-icons1"></script>
 	<script defer="" src="assets/js/modules/ui-action-router-workflow-utils.js?v=2026.07.17-global-help22"></script>
 	<script defer="" src="assets/js/modules/canvas-control-actions-workflow-utils.js?v=2026.07.03-canvas-control-actions-split-v1"></script>
-	<script defer="" src="assets/js/modules/history-core-workflow-utils.js?v=20260724-frame-snapshot1"></script>
+	<script defer="" src="assets/js/modules/history-core-workflow-utils.js?v=20260724-raster-autosave-defer1"></script>
 	<script defer="" src="assets/js/modules/history-guard-workflow-utils.js?v=2026.07.04-shared-project-disabled1"></script>
 	<script defer="" src="assets/js/modules/curve-workflow-utils.js?v=2026.07.03-curve-workflow-split-v1"></script>
 	<script defer="" src="assets/js/modules/canvas-grid-workflow-utils.js?v=2026.07.03-grid-workflow-split-v1"></script>
@@ -1902,7 +1907,7 @@
 		<script defer="" src="assets/js/modules/project-storage-v2-archive-codec.js?v=20260720-pxd3"></script>
 		<script defer="" src="assets/js/modules/project-storage-v2-worker-bridge.js?v=20260720-file-guard1"></script>
 		<script defer="" src="assets/js/modules/project-storage-v2-zip-adapter.js?v=20260720-pxd2"></script>
-		<script defer="" src="assets/js/modules/document-serialization-utils.js?v=20260721-playback-state1"></script>
+		<script defer="" src="assets/js/modules/document-serialization-utils.js?v=20260724-cow-raster1"></script>
 	<script defer="" src="assets/js/modules/document-session-workflow-utils.js?v=20260724-frame-snapshot1"></script>
 	<script defer="" src="assets/js/modules/recent-account-workflow-utils.js?v=2026.07.03-safe-helper-split-v1"></script>
 	<script defer="" src="assets/js/modules/pixieed-profile-local-utils.js?v=2026.07.03-safe-helper-split-v1"></script>
@@ -1921,7 +1926,7 @@
 	<script defer="" src="assets/js/modules/local-project-v2-migration-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/pre-update-checkpoint-utils.js?v=20260712-pre-update-checkpoint-u3"></script>
 	<script defer="" src="assets/js/active-project-session-utils.js?v=20260715-local-true-v2-cleanup1"></script>
-	<script defer="" src="assets/js/app.js?v=20260724-146"></script>
+	<script defer="" src="assets/js/app.js?v=20260724-158-fill-cache1"></script>
 	<script defer="" src="assets/js/modules/update-detection-utils.js?v=20260719-file-protocol1"></script>
   <script>
     (function initPanelAdDocking() {

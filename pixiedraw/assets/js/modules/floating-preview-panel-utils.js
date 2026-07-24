@@ -31,6 +31,62 @@
 
     return ((scope) => {
       with (scope) {
+  // Navigator-style previews must stay bounded.  The panel is CSS-sized, so
+  // allocating it at document resolution duplicates an 8K canvas and a full
+  // RGBA composite merely to display a small overview.
+  const FLOATING_PREVIEW_MAX_EDGE = 512;
+
+  function compositeFloatingPreviewPixels(frame, sourceWidth, sourceHeight, palette) {
+    const scale = Math.min(1, FLOATING_PREVIEW_MAX_EDGE / Math.max(sourceWidth, sourceHeight));
+    const width = Math.max(1, Math.round(sourceWidth * scale));
+    const height = Math.max(1, Math.round(sourceHeight * scale));
+    const output = new Uint8ClampedArray(width * height * 4);
+    if (!frame || !Array.isArray(frame.layers)) return { pixels: output, width, height };
+    const sourceXFor = x => Math.min(sourceWidth - 1, Math.floor(((x + 0.5) * sourceWidth) / width));
+    const sourceYFor = y => Math.min(sourceHeight - 1, Math.floor(((y + 0.5) * sourceHeight) / height));
+    frame.layers.forEach(layer => {
+      if (!layer || !getDisplayedLayerVisibility(layer, true)) return;
+      const opacity = getDisplayedLayerPreviewOpacity(layer, 1);
+      if (opacity <= 0) return;
+      const blendMode = normalizeLayerBlendMode(layer.blendMode);
+      const direct = layer.direct instanceof Uint8ClampedArray
+        && layer.direct.length >= sourceWidth * sourceHeight * 4
+        ? layer.direct
+        : null;
+      for (let previewY = 0; previewY < height; previewY += 1) {
+        const sourceY = sourceYFor(previewY);
+        for (let previewX = 0; previewX < width; previewX += 1) {
+          const sourceX = sourceXFor(previewX);
+          const sourceIndex = (sourceY * sourceWidth) + sourceX;
+          const outputIndex = ((previewY * width) + previewX) * 4;
+          let color = null;
+          if (isSimulationLayer(layer)) {
+            color = resolveSimulationPixelColor(layer, sourceIndex, sourceWidth, sourceHeight, {
+              r: output[outputIndex], g: output[outputIndex + 1],
+              b: output[outputIndex + 2], a: output[outputIndex + 3],
+            });
+          } else {
+            const paletteIndex = getStoredRasterLayerPaletteIndex(layer, sourceIndex);
+            if (paletteIndex >= 0 && palette?.[paletteIndex]) {
+              color = palette[paletteIndex];
+            } else if (direct) {
+              const directIndex = sourceIndex * 4;
+              color = {
+                r: direct[directIndex], g: direct[directIndex + 1],
+                b: direct[directIndex + 2], a: direct[directIndex + 3],
+              };
+            }
+          }
+          if (!color || !Number.isFinite(color.a) || color.a <= 0) continue;
+          compositeLayerPixelNormalized(
+            output, outputIndex, color.r, color.g, color.b, color.a, opacity, blendMode
+          );
+        }
+      }
+    });
+    return { pixels: output, width, height };
+  }
+
   function getFloatingPreviewViewportSize() {
     const host = dom.canvasViewport;
     if (!(host instanceof HTMLElement)) {
@@ -91,6 +147,7 @@
       fitFloatingPreviewCanvasToPanel();
       updateFloatingPreviewPanelPlaybackButtons();
       applyFloatingPreviewMediaTransform();
+      if (nextTab === 'preview') renderFloatingPreviewPanel();
     }
     if (nextTab === 'reference' && requestFilePicker && dom.floatingPreviewReferenceInput instanceof HTMLInputElement) {
       dom.floatingPreviewReferenceInput.click();
@@ -727,13 +784,20 @@
     if (panel.hidden || (!state.floatingPreview?.enabled && !isVoxelExtensionModeEnabled())) {
       return;
     }
+    if (!isFloatingVoxelPreviewActive() && normalizeFloatingPreviewTab(floatingPreviewReferenceState.tab) !== 'preview') {
+      return;
+    }
     const isVoxelPreview = isFloatingVoxelPreviewActive();
-    const width = isVoxelPreview
+    const sourceWidth = isVoxelPreview
       ? Math.max(1, Math.round(Number(voxelExtensionPreviewMeta?.width) || 1))
       : Math.max(1, Math.round(Number(state.width) || 1));
-    const height = isVoxelPreview
+    const sourceHeight = isVoxelPreview
       ? Math.max(1, Math.round(Number(voxelExtensionPreviewMeta?.height) || 1))
       : Math.max(1, Math.round(Number(state.height) || 1));
+    const preview = isVoxelPreview
+      ? { pixels: voxelExtensionPreviewPixels, width: sourceWidth, height: sourceHeight }
+      : compositeFloatingPreviewPixels(getActiveFrame(), sourceWidth, sourceHeight, state.palette);
+    const { pixels, width, height } = preview;
     if (canvas.width !== width || canvas.height !== height) {
       canvas.width = width;
       canvas.height = height;
@@ -746,12 +810,6 @@
       }
       floatingPreviewCtx.imageSmoothingEnabled = false;
     }
-    const pixels = isVoxelPreview
-      ? voxelExtensionPreviewPixels
-      : compositeFramePixels(getActiveFrame(), width, height, state.palette, {
-        useLocalLayerPreviewVisibility: true,
-        useLocalLayerPreviewOpacity: true,
-      });
     let imageData = null;
     try {
       imageData = new ImageData(pixels, width, height);

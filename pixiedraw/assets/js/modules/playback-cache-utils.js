@@ -67,7 +67,9 @@
       if (!(pixels instanceof Uint8ClampedArray) || pixels.length !== width * height * 4) {
         return null;
       }
-      const imageData = ctx.drawing.createImageData(width, height);
+      // Playback cache stores logical document pixels. Do not allocate it
+      // from the zoom-dependent presentation canvas.
+      const imageData = new ImageData(width, height);
       imageData.data.set(pixels);
       return imageData;
     }

@@ -576,11 +576,21 @@
     }
     const insertIndex = selectedFrameIndexes[selectedFrameIndexes.length - 1] + 1;
     const preferredLayerIndex = getActiveLayerIndex();
+    const useCopyOnWriteRaster = Number(state.rasterModelVersion) >= 1
+      && typeof cloneFrameWithSharedRaster === 'function';
     const duplicatedFrames = selectedFrameIndexes
-      .map(index => snapshotFrameForClipboard(state.frames[index], state.width, state.height))
+      .map(index => {
+        const sourceFrame = state.frames[index];
+        if (useCopyOnWriteRaster) {
+          return cloneFrameWithSharedRaster(sourceFrame, state.width, state.height);
+        }
+        const snapshot = snapshotFrameForClipboard(sourceFrame, state.width, state.height);
+        return snapshot
+          ? createFrameFromClipboardSnapshot(snapshot, state.width, state.height)
+          : null;
+      })
       .filter(Boolean)
-      .map((snapshot, offset) => {
-        const frame = createFrameFromClipboardSnapshot(snapshot, state.width, state.height);
+      .map((frame, offset) => {
         frame.name = getDefaultFrameName(insertIndex + offset + 1);
         return frame;
       });
@@ -1148,7 +1158,8 @@
         const targetIndex = Math.min(insertIndex, frame.layers.length);
         const name = getDefaultLayerName(frame.layers.length + 1);
         const newLayer = createLayer(name, state.width, state.height, null, {
-          deferPixelAllocation: frameIndex !== state.activeFrame,
+          deferPixelAllocation: Number(state.rasterModelVersion) >= 1
+            || frameIndex !== state.activeFrame,
         });
         frame.layers.splice(targetIndex, 0, newLayer);
         recordPendingLayerAddHistoryLayer(frame, newLayer, targetIndex);
@@ -2350,17 +2361,10 @@
       axis = 'x';
       delta = deltaY;
     }
-    // The compact desktop timeline only exposes frame headers. A normal mouse
-    // wheel therefore needs to advance the horizontal frame strip whenever
-    // there is no real vertical timeline range to consume the gesture.
-    if (
-      axis === 'y'
-      && getTimelineMatrixViewportMaxScroll(viewport, 'y') <= 0
-      && getTimelineMatrixViewportMaxScroll(viewport, 'x') > 0
-    ) {
-      axis = 'x';
-      delta = deltaY;
-    }
+    // Keep the matrix axes literal: vertical input scrolls layers and
+    // horizontal input scrolls frames. Do not silently reinterpret a wheel
+    // gesture as horizontal merely because the current vertical range is at
+    // an edge (or temporarily has no overflow).
     if (!scrollTimelineMatrixViewport(viewport, axis, delta)) {
       return;
     }
@@ -2399,7 +2403,7 @@
       viewport.addEventListener('pointercancel', handleTimelineMatrixViewportPointerUp, { passive: true });
     }
     container.addEventListener('click', event => {
-      if (Date.now() > timelineMatrixViewportPan.suppressClickUntil) {
+      if (Date.now() < timelineMatrixViewportPan.suppressClickUntil) {
         return;
       }
       event.preventDefault();

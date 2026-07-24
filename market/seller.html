@@ -10,6 +10,10 @@
 <body><div class="page market-page"><main class="market-shell market-sell-shell">
   <header class="market-titlebar"><div class="market-titlebar__title"><img src="../assets/icons/Market.png" alt=""><h1>売上受取設定</h1><span class="market-help-tip" data-market-help><button class="market-help-tip__button" type="button" aria-label="売上受取設定について" aria-describedby="sellerPageHelp" aria-expanded="false">?</button><span class="market-help-tip__content" id="sellerPageHelp" role="tooltip">出品と商品審査はStripe設定前でも進められます。売上を受け取る前に、Stripeの本人情報と受取口座を設定してください。</span></span></div><a class="market-sell-button" href="../account/index.html">マイページへ戻る</a></header>
   <p class="market-sell-status" id="sellerPageStatus" aria-live="polite">ログイン状態を確認しています</p>
+  <section class="market-listing-form market-seller-progress" id="sellerProgressSection" hidden>
+    <h2 id="sellerProgressTitle">販売者設定の状態</h2>
+    <p class="helper" id="sellerProgressDescription" aria-live="polite"></p>
+  </section>
   <section class="market-listing-form" id="mfaSection" hidden>
     <h2 class="market-heading-with-help">1. 二段階認証<span class="market-help-tip" data-market-help><button class="market-help-tip__button" type="button" aria-label="二段階認証について" aria-describedby="sellerMfaHelp" aria-expanded="false">?</button><span class="market-help-tip__content" id="sellerMfaHelp" role="tooltip">パスワードだけでログインされた場合の不正出品を防ぎます。認証アプリに表示される6桁コードを使用し、SMS料金は発生しません。復旧情報は安全に保管してください。</span></span></h2><p class="helper" id="mfaDescription">認証アプリでアカウントを保護します。</p>
     <div class="market-mfa-qr" id="mfaQr" hidden></div>
@@ -23,7 +27,7 @@
     <label>住所<input id="sellerAddress" required maxlength="300" autocomplete="street-address"></label>
     <label>電話番号（連絡先・認証は行いません）<input id="sellerPhone" required inputmode="tel" maxlength="18" autocomplete="tel"></label>
     <label class="market-check"><input id="sellerTerms" type="checkbox" required> <span><a href="../terms/index.html" target="_blank" rel="noopener">利用規約</a>と<a href="../privacy/index.html" target="_blank" rel="noopener">販売者情報の取扱い</a>に同意します。</span></label>
-    <button class="market-sell-button" type="submit">販売者情報を保存</button><p class="helper" id="registrationStatus"></p>
+    <button class="market-sell-button" type="submit">販売者情報を送信して自動許可</button><p class="helper" id="registrationStatus"></p>
   </form>
   <section class="market-listing-form market-stripe-card" id="stripeConnectSection" hidden>
     <h2 class="market-heading-with-help">3. 売上受取設定<span class="market-help-tip" data-market-help><button class="market-help-tip__button" type="button" aria-label="Stripeの売上受取設定について" aria-describedby="sellerStripeHelp" aria-expanded="false">?</button><span class="market-help-tip__content" id="sellerStripeHelp" role="tooltip">Stripeの画面で本人情報と受取口座を登録します。出品・審査・販売はこの設定前でも進められますが、5,000円以上の売上を受け取る前に完了してください。</span></span></h2>
@@ -46,5 +50,5 @@
       <div class="market-dialog-actions"><button class="market-sell-button is-subtle" value="cancel" type="submit">戻る</button><button class="market-sell-button" id="payoutConfirmAction" value="confirm" type="submit">内容を確定して送金</button></div>
     </form>
   </dialog>
-</main></div><script src="../scripts/pixieed-market-access.js?v=20260721-auth-network-fallback2"></script><script src="access-gate.js?v=20260721-auth-network-fallback2"></script><script src="seller.js?v=20260722-pageview-payout1"></script><script src="help-tips.js?v=2026.07.17-context-help1"></script><script src="../scripts/shared-bottom-nav.js?v=20260723-camera-fullscreen1"></script></body>
+</main></div><script src="../scripts/pixieed-market-access.js?v=20260721-auth-network-fallback2"></script><script src="access-gate.js?v=20260721-auth-network-fallback2"></script><script src="seller.js?v=20260724-auto-approval1"></script><script src="help-tips.js?v=2026.07.17-context-help1"></script><script src="../scripts/shared-bottom-nav.js?v=20260723-camera-fullscreen1"></script></body>
 </html>

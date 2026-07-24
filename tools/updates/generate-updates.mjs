@@ -42,6 +42,14 @@ const PROJECTS = [
 const MAX_PROJECT_DATES = 8;
 const MAX_RECENT_DATES = 8;
 
+// Keep release-facing notes precise when a broad refactor would otherwise be
+// reduced to generic file categories by the automatic history summary.
+const ENTRY_SUMMARY_OVERRIDES = Object.freeze({
+  pixiedraw: Object.freeze({
+    '2026-07-24': '描画・塗りつぶし・貼り付け・小窓プレビューを軽量化し、大きなキャンバスでの操作性を改善',
+  }),
+});
+
 function normalizePath(value) {
   return String(value || '').replace(/\\/g, '/').replace(/^\.?\//, '');
 }
@@ -117,7 +125,7 @@ function parseGitLog(text) {
   return commits.filter((entry) => entry.date);
 }
 
-function buildProjectEntries(commits) {
+function buildProjectEntries(project, commits) {
   const grouped = new Map();
   commits.forEach((commit) => {
     const date = safeDate(commit.date);
@@ -131,7 +139,10 @@ function buildProjectEntries(commits) {
     .slice(0, MAX_PROJECT_DATES)
     .map((entry) => ({
       date: entry.date,
-      items: [summarizePaths(Array.from(entry.files))]
+      items: [
+        ENTRY_SUMMARY_OVERRIDES[project.id]?.[entry.date]
+        || summarizePaths(Array.from(entry.files))
+      ]
     }));
 }
 
@@ -168,7 +179,7 @@ async function main() {
       id: project.id,
       name: project.name,
       url: project.url,
-      entries: buildProjectEntries(commits)
+      entries: buildProjectEntries(project, commits)
     });
   }
 

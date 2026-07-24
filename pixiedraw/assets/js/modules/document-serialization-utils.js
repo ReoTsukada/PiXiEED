@@ -124,6 +124,7 @@
         : null,
       selectionBounds: snapshot.selectionBounds ? { ...snapshot.selectionBounds } : null,
       documentName: normalizeDocumentName(snapshot.documentName),
+      rasterModelVersion: Math.max(0, Math.round(Number(snapshot.rasterModelVersion) || 0)),
       dualLeftRail: false,
       voxelExtension: normalizeVoxelExtensionState(snapshot.voxelExtension, VOXEL_EXTENSION_DEFAULT_STATE),
     };
@@ -330,6 +331,7 @@
         }
         : { isPlaying: false, lastFrame: 0, loop: true },
       documentName,
+      rasterModelVersion: Math.max(0, Math.round(Number(payload.rasterModelVersion) || 0)),
       voxelExtension: normalizeVoxelExtensionState(payload.voxelExtension, VOXEL_EXTENSION_DEFAULT_STATE),
     };
     if (Array.isArray(payload.canvases) && payload.canvases.length) {

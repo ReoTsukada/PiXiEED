@@ -41,6 +41,29 @@
   });
   const VIEWPORT_GESTURE_CONFIG = viewportGestureArbiter.VIEWPORT_GESTURE_CONFIG || {};
   const COMPRESSED_SELECTION_MOVE_MIN_PIXELS = 32768;
+  const DEFERRED_LARGE_BRUSH_SIZE = 12;
+  const BRUSH_APPLY_FRAME_MIN_SIZE = 3;
+
+  function shouldDeferLargeBrushStroke() {
+    return (pointerState.tool === 'pen' || pointerState.tool === 'eraser')
+      && Math.max(1, Math.round(Number(state.brushSize) || 1)) >= DEFERRED_LARGE_BRUSH_SIZE;
+  }
+
+  function flushQueuedBrushPath({ force = false } = {}) {
+    pointerState.brushApplyFrame = null;
+    if ((!force && !pointerState.active) || (pointerState.tool !== 'pen' && pointerState.tool !== 'eraser')) return;
+    const cursor = Math.max(0, Math.floor(Number(pointerState.brushApplyCursor) || 0));
+    const path = Array.isArray(pointerState.path) ? pointerState.path : [];
+    if (path.length <= cursor) return;
+    const segmentStart = Math.max(0, cursor - 1);
+    applyBrushPath(path.slice(segmentStart));
+    pointerState.brushApplyCursor = path.length;
+  }
+
+  function scheduleQueuedBrushPath() {
+    if (pointerState.brushApplyFrame !== null && pointerState.brushApplyFrame !== undefined) return;
+    pointerState.brushApplyFrame = window.requestAnimationFrame(flushQueuedBrushPath);
+  }
 
   function detachPointerListeners() {
     window.removeEventListener('pointermove', handlePointerMove);
@@ -82,6 +105,8 @@
     pointerState.current = null;
     pointerState.last = null;
     pointerState.path = [];
+    pointerState.brushApplyCursor = 0;
+    pointerState.brushApplyFrame = null;
     pointerState.shapeDrag = null;
     pointerState.preview = null;
     pointerState.selectionPreview = null;
@@ -124,6 +149,8 @@
     pointerState.current = null;
     pointerState.last = null;
     pointerState.path = [];
+    pointerState.brushApplyCursor = 0;
+    pointerState.brushApplyFrame = null;
     pointerState.shapeDrag = null;
     pointerState.preview = null;
     pointerState.selectionPreview = null;
@@ -558,7 +585,11 @@
         (baselineLayer.indices instanceof Int16Array || baselineLayer.indices instanceof Uint8Array)
         && pixelBaseline.indices?.constructor === baselineLayer.indices.constructor
       ) {
-        baselineLayer.indices.set(pixelBaseline.indices);
+        if (pixelBaseline.indices.length === 0) {
+          baselineLayer.indices = new pixelBaseline.indices.constructor(0);
+        } else {
+          baselineLayer.indices.set(pixelBaseline.indices);
+        }
       }
       if (pixelBaseline.direct instanceof Uint8ClampedArray) {
         if (!(baselineLayer.direct instanceof Uint8ClampedArray) || baselineLayer.direct.length !== pixelBaseline.direct.length) {
@@ -1040,6 +1071,11 @@
 
     pointerState.selectionClearedOnDown = false;
 
+    // A large paste initially keeps its selection mask in the pasted bounds,
+    // rather than allocating another full-document Uint8Array.  The first
+    // canvas interaction that needs pixel-precise selection hit testing turns
+    // that compact mask into the normal document mask.
+    materializeDeferredPasteSelectionMask();
     const selectionMask = state.selectionMask;
     const hasSelection = Boolean(selectionMask && selectionMaskHasPixels(selectionMask));
     const selectionInteractionHit = hasSelection && isPositionInCurrentSelectionInteractionArea(position);
@@ -1157,6 +1193,8 @@
     pointerState.current = position;
     pointerState.last = position;
     pointerState.path = position ? [position] : [];
+    pointerState.brushApplyCursor = 0;
+    pointerState.brushApplyFrame = null;
     pointerState.preview = null;
     pointerState.selectionPreview = null;
 
@@ -1217,7 +1255,13 @@
       pointerState.preview = { start: position, end: position, points: [position] };
     } else {
       beginSharedProjectStrokeCapture(activeTool, position, interactionSurface);
-      applyBrushStroke(position.x, position.y, position.x, position.y);
+      if (shouldDeferLargeBrushStroke()) {
+        pointerState.preview = { kind: 'deferredBrushStroke', points: pointerState.path };
+        requestOverlayRender();
+      } else {
+        applyBrushStroke(position.x, position.y, position.x, position.y);
+        pointerState.brushApplyCursor = pointerState.path.length;
+      }
     }
 
     window.addEventListener('pointermove', handlePointerMove);
@@ -1303,7 +1347,17 @@
 
     if (pointerState.tool === 'pen' || pointerState.tool === 'eraser') {
       appendSharedProjectStrokePoint(position);
-      applyBrushStroke(pointerState.last.x, pointerState.last.y, position.x, position.y);
+      if (shouldDeferLargeBrushStroke()) {
+        pointerState.preview = { kind: 'deferredBrushStroke', points: pointerState.path };
+        requestOverlayRender();
+      } else {
+        if (Math.max(1, Math.round(Number(state.brushSize) || 1)) >= BRUSH_APPLY_FRAME_MIN_SIZE) {
+          scheduleQueuedBrushPath();
+        } else {
+          applyBrushStroke(pointerState.last.x, pointerState.last.y, position.x, position.y);
+          pointerState.brushApplyCursor = pointerState.path.length;
+        }
+      }
       pointerState.last = position;
     } else if (FILL_TOOLS.has(pointerState.tool)) {
       const last = pointerState.last;
@@ -1485,7 +1539,11 @@
 
     const shapeStart = pointerState.preview?.start || pointerState.start;
     const shapeEnd = pointerState.preview?.end || pointerState.current;
-    if (tool === 'line') {
+    if ((tool === 'pen' || tool === 'eraser') && pointerState.preview?.kind === 'deferredBrushStroke') {
+      applyBrushPath(pointerState.path);
+    } else if (tool === 'pen' || tool === 'eraser') {
+      flushQueuedBrushPath({ force: true });
+    } else if (tool === 'line') {
       captureSharedProjectShapeCommand(tool, shapeStart, shapeEnd, pointerState.surface);
       drawLine(shapeStart, shapeEnd);
     } else if (tool === 'rect') {
@@ -1592,6 +1650,8 @@
     pointerState.selectionClearedOnDown = false;
     pointerState.selectionExtendOnDown = false;
     pointerState.path = [];
+    pointerState.brushApplyCursor = 0;
+    pointerState.brushApplyFrame = null;
     pointerState.shapeDrag = null;
     pointerState.surface = null;
     flushActiveProjectCanvasUiSync();
@@ -2202,6 +2262,16 @@
         'info'
       );
     }
+    // Indexed clipboard data can use compact tile diffs. Preserve the exact
+    // direct-colour path when the paste needs to create an RGBA buffer.
+    const pastePixelCount = width * height;
+    const pasteHasVisibleDirectPixels = selectionDirectHasVisiblePixels(
+      moveState.direct,
+      getSelectionMoveContentMask(moveState) || moveState.mask
+    );
+    if (paletteExpansionCount === 0 && !pasteHasVisibleDirectPixels && pastePixelCount >= 4096) {
+      promotePendingPixelPatchToRasterTiles?.();
+    }
     const restoreSnapshot = createPasteRestoreSnapshot(layer, bounds, width, height);
     moveState.restoreIndices = restoreSnapshot.indices;
     moveState.restoreDirect = restoreSnapshot.direct;
@@ -2211,13 +2281,16 @@
     moveState.offset.y = 0;
     moveState.hasCleared = false;
     state.pendingPasteMoveState = moveState;
-    const result = placeSelectionPixels(moveState, 0, 0);
+    const deferSelectionMask = (state.width * state.height) >= (1024 * 1024)
+      && pastePixelCount >= 4096;
+    const result = placeSelectionPixels(moveState, 0, 0, { deferSelectionMask });
     let success = false;
     if (result.placed && result.bounds) {
       markHistoryDirty();
       state.selectionMask = result.mask;
       state.selectionContentMask = result.contentMask;
       state.selectionBounds = result.bounds;
+      moveState.deferredSelectionMask = result.deferredSelectionMask || null;
       internalClipboard.selection.bounds = { ...result.bounds };
       markDirtyRect(result.bounds.x0, result.bounds.y0, result.bounds.x1, result.bounds.y1);
       requestRender();
@@ -2354,6 +2427,7 @@
     if (!(mask instanceof Uint8Array) || mask.length !== (width * height)) {
       return;
     }
+    capturePendingRasterTilesForRect?.(layer, bounds.x0, bounds.y0, bounds.x0 + width - 1, bounds.y0 + height - 1);
     const restoreIndices = moveState.restoreIndices instanceof Int16Array || moveState.restoreIndices instanceof Uint8Array
       ? moveState.restoreIndices
       : null;
@@ -2644,7 +2718,43 @@
     requestOverlayRender();
   }
 
-  function placeSelectionPixels(moveState, offsetX, offsetY, { requireFullyInBounds = false } = {}) {
+  function materializeDeferredPasteSelectionMask() {
+    const moveState = state.pendingPasteMoveState;
+    const deferred = moveState?.deferredSelectionMask;
+    if (!deferred || !deferred.bounds || !(deferred.mask instanceof Uint8Array)) {
+      return false;
+    }
+    const pixelCount = state.width * state.height;
+    const mask = new Uint8Array(pixelCount);
+    const contentMask = new Uint8Array(pixelCount);
+    const bounds = deferred.bounds;
+    const localWidth = Math.max(0, Math.floor(deferred.width) || 0);
+    const localHeight = Math.max(0, Math.floor(deferred.height) || 0);
+    for (let y = 0; y < localHeight; y += 1) {
+      const targetY = bounds.y0 + y;
+      if (targetY < 0 || targetY >= state.height) continue;
+      const localRow = y * localWidth;
+      const targetRow = targetY * state.width;
+      for (let x = 0; x < localWidth; x += 1) {
+        const targetX = bounds.x0 + x;
+        if (targetX < 0 || targetX >= state.width) continue;
+        const localIndex = localRow + x;
+        const targetIndex = targetRow + targetX;
+        if (deferred.mask[localIndex]) mask[targetIndex] = 1;
+        if (deferred.contentMask?.[localIndex]) contentMask[targetIndex] = 1;
+      }
+    }
+    state.selectionMask = mask;
+    state.selectionContentMask = contentMask;
+    state.selectionBounds = { ...bounds };
+    moveState.deferredSelectionMask = null;
+    return true;
+  }
+
+  function placeSelectionPixels(moveState, offsetX, offsetY, {
+    requireFullyInBounds = false,
+    deferSelectionMask = false,
+  } = {}) {
     const { layer, bounds, indices, direct } = moveState;
     const transformedSelection = buildSelectionMoveTransformedEntries(moveState);
     const transformedContent = buildSelectionMoveTransformedEntries(moveState, {
@@ -2671,8 +2781,10 @@
         }
       }
     }
-    const newMask = new Uint8Array(state.width * state.height);
-    const newContentMask = new Uint8Array(state.width * state.height);
+    const newMask = deferSelectionMask ? null : new Uint8Array(state.width * state.height);
+    const newContentMask = deferSelectionMask ? null : new Uint8Array(state.width * state.height);
+    const selectionPositions = deferSelectionMask ? [] : null;
+    const contentPositions = deferSelectionMask ? [] : null;
     const newBounds = { x0: state.width, y0: state.height, x1: -1, y1: -1 };
     let placed = false;
     let clippedCount = 0;
@@ -2685,11 +2797,19 @@
         continue;
       }
       const targetIndex = (targetY * state.width) + targetX;
-      newMask[targetIndex] = 1;
+      if (selectionPositions) {
+        selectionPositions.push(targetIndex);
+      } else {
+        newMask[targetIndex] = 1;
+      }
       if (targetX < newBounds.x0) newBounds.x0 = targetX;
       if (targetY < newBounds.y0) newBounds.y0 = targetY;
       if (targetX > newBounds.x1) newBounds.x1 = targetX;
       if (targetY > newBounds.y1) newBounds.y1 = targetY;
+    }
+
+    if (newBounds.x0 <= newBounds.x1 && newBounds.y0 <= newBounds.y1) {
+      capturePendingRasterTilesForRect?.(layer, newBounds.x0, newBounds.y0, newBounds.x1, newBounds.y1);
     }
 
     let contentHasDirectPixels = false;
@@ -2752,7 +2872,11 @@
         recordPendingPixelPatchBefore(layer, targetIndex);
       }
       layer.indices[targetIndex] = nextPaletteIndex;
-      newContentMask[targetIndex] = 1;
+      if (contentPositions) {
+        contentPositions.push(targetIndex);
+      } else {
+        newContentMask[targetIndex] = 1;
+      }
       if (targetDirect) {
         if (hasEntryRgba) {
           targetDirect[targetBase] = clamp(Math.round(Number(entry.rgba[0]) || 0), 0, 255);
@@ -2829,11 +2953,37 @@
       };
     }
 
+    let deferredSelectionMask = null;
+    if (selectionPositions && newBounds.x0 <= newBounds.x1 && newBounds.y0 <= newBounds.y1) {
+      const localWidth = (newBounds.x1 - newBounds.x0) + 1;
+      const localHeight = (newBounds.y1 - newBounds.y0) + 1;
+      const localMask = new Uint8Array(localWidth * localHeight);
+      const localContentMask = new Uint8Array(localWidth * localHeight);
+      const copyPositions = (positions, target) => {
+        for (let i = 0; i < positions.length; i += 1) {
+          const position = positions[i];
+          const x = position % state.width;
+          const y = Math.floor(position / state.width);
+          target[((y - newBounds.y0) * localWidth) + (x - newBounds.x0)] = 1;
+        }
+      };
+      copyPositions(selectionPositions, localMask);
+      copyPositions(contentPositions, localContentMask);
+      deferredSelectionMask = {
+        bounds: { ...newBounds },
+        width: localWidth,
+        height: localHeight,
+        mask: localMask,
+        contentMask: localContentMask,
+      };
+    }
+
     return {
       placed: true,
       mask: newMask,
       contentMask: newContentMask,
       bounds: newBounds,
+      deferredSelectionMask,
       clippedCount,
       blockedByBounds: false,
     };
@@ -4142,7 +4292,55 @@
     const layer = getActiveLayer();
     if (!layer) return;
     const points = bresenhamLine(x0, y0, x1, y1);
-    points.forEach(point => stampBrush(layer, point.x, point.y));
+    // Large opaque stamps overlap heavily when emitted for every travelled
+    // pixel. Keep the stroke continuous, but space its centres well inside
+    // the brush diameter so a 30px brush does not redraw the same cells 30x.
+    const brushSize = Math.max(1, Math.round(Number(state.brushSize) || 1));
+    const stampStride = brushSize >= 12 ? Math.max(1, Math.floor(brushSize / 5)) : 1;
+    withRasterBatch(() => {
+      for (let index = 0; index < points.length; index += stampStride) {
+        const point = points[index];
+        stampBrush(layer, point.x, point.y);
+      }
+      const last = points[points.length - 1];
+      if (last && (points.length - 1) % stampStride !== 0) {
+        stampBrush(layer, last.x, last.y);
+      }
+    });
+    requestRender();
+  }
+
+  function applyBrushPath(path) {
+    const layer = getActiveLayer();
+    if (!layer || !Array.isArray(path) || !path.length) return;
+    const brushSize = Math.max(1, Math.round(Number(state.brushSize) || 1));
+    const stampStride = brushSize >= DEFERRED_LARGE_BRUSH_SIZE ? Math.max(1, Math.floor(brushSize / 5)) : 1;
+    const minDistanceSq = stampStride * stampStride;
+    let lastStamp = null;
+    const stampIfNeeded = point => {
+      if (!point) return;
+      const dx = lastStamp ? point.x - lastStamp.x : Infinity;
+      const dy = lastStamp ? point.y - lastStamp.y : Infinity;
+      if (!lastStamp || (dx * dx) + (dy * dy) >= minDistanceSq) {
+        stampBrush(layer, point.x, point.y);
+        lastStamp = point;
+      }
+    };
+    withRasterBatch(() => {
+      stampIfNeeded(path[0]);
+      for (let segmentIndex = 1; segmentIndex < path.length; segmentIndex += 1) {
+        const previous = path[segmentIndex - 1];
+        const current = path[segmentIndex];
+        const points = bresenhamLine(previous.x, previous.y, current.x, current.y);
+        for (let pointIndex = 1; pointIndex < points.length; pointIndex += 1) {
+          stampIfNeeded(points[pointIndex]);
+        }
+      }
+      const finalPoint = path[path.length - 1];
+      if (finalPoint && (!lastStamp || finalPoint.x !== lastStamp.x || finalPoint.y !== lastStamp.y)) {
+        stampBrush(layer, finalPoint.x, finalPoint.y);
+      }
+    });
     requestRender();
   }
 
@@ -4506,12 +4704,19 @@
       ? layer.indices
       : null;
     const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
-    const transparentStorageIndex = resolveTransparentStoragePaletteIndex();
     const paletteIndex = indices ? indices[idx] : -1;
     const directAlpha = direct instanceof Uint8ClampedArray ? direct[(idx * 4) + 3] : 0;
-    if (paletteIndex === 0 && directAlpha <= 0) {
-      // Background is not a same-color-select target.
-      return null;
+    if ((paletteIndex === 0 || paletteIndex < 0) && directAlpha <= 0) {
+      // Runtime index 0 (and the legacy negative sentinel) is transparent,
+      // not an untouchable canvas backdrop. Keeping it as a transparent
+      // match lets Fill and Select Same start in an empty region without ever
+      // rendering palette[0] as painted content.
+      return {
+        indices,
+        direct,
+        transparent: true,
+        transparentIndex: 0,
+      };
     }
     if (paletteIndex > 0) {
       const color = state.palette[paletteIndex];
@@ -4559,9 +4764,15 @@
     }
     const paletteIndex = matchState.indices ? matchState.indices[idx] : -1;
     if (matchState.transparent) {
+      const directAlpha = matchState.direct instanceof Uint8ClampedArray
+        ? matchState.direct[(idx * 4) + 3]
+        : 0;
+      if (paletteIndex === 0) {
+        return directAlpha <= 0;
+      }
       if (paletteIndex >= 0) {
         const color = state.palette[paletteIndex];
-        return Boolean(color && color.a <= 0);
+        return Boolean(color && color.a <= 0 && directAlpha <= 0);
       }
       const direct = matchState.direct;
       if (!(direct instanceof Uint8ClampedArray)) {
@@ -5057,6 +5268,7 @@
           completeSelectionTransformInteraction,
           toggleSelectionMoveFlip,
           applyBrushStroke,
+          applyBrushPath,
           resolveDrawPaletteIndex,
           normalizeSelectionBoundsForState,
           computeSelectionBoundsFromMask,

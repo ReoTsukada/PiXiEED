@@ -26,14 +26,18 @@
       const indices = layer.indices;
       const direct = layer.direct;
       let indicesBytes = estimateEncodedByteLength(indices, 2);
-      if (Array.isArray(layer.indicesTiles)) {
-        indicesBytes = layer.indicesTiles.reduce((total, tile) => {
-          if (!(tile instanceof Uint8Array)) return total;
+      if (Array.isArray(layer.indicesTiles) || layer.indicesTiles instanceof Map) {
+        const tiles = layer.indicesTiles instanceof Map
+          ? layer.indicesTiles.values()
+          : layer.indicesTiles;
+        indicesBytes = 0;
+        for (const tile of tiles) {
+          if (!(tile instanceof Uint8Array)) continue;
           const buffer = tile.buffer;
-          if (seenIndexBuffers && seenIndexBuffers.has(buffer)) return total;
+          if (seenIndexBuffers && seenIndexBuffers.has(buffer)) continue;
           seenIndexBuffers?.add(buffer);
-          return total + tile.byteLength;
-        }, 0);
+          indicesBytes += tile.byteLength;
+        }
       }
       const directBytes = estimateEncodedByteLength(direct, 1);
       return indicesBytes + directBytes;

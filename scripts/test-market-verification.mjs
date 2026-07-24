@@ -49,6 +49,7 @@ const derivativeEnforcementMigration = fs.readFileSync('supabase/migrations/2026
 const publicLaunchMigration = fs.readFileSync('supabase/migrations/20260719200000_market_public_launch_custom_options.sql', 'utf8');
 const optionPricingMigration = fs.readFileSync('supabase/migrations/20260719210000_market_option_pricing.sql', 'utf8');
 const singlePriceMigration = fs.readFileSync('supabase/migrations/20260721120000_market_single_price_listings.sql', 'utf8');
+const sellerAutoApprovalMigration = fs.readFileSync('supabase/migrations/20260724110000_market_seller_auto_approval.sql', 'utf8');
 
 const requiredFormats = [
   'pixiedraw-project',
@@ -86,6 +87,9 @@ assert.match(mfaMigration, /market_current_session_has_mfa\(\)/i);
 assert.match(mfaMigration, /'aal2'/i);
 assert.match(mfaMigration, /market_submit_seller_registration/i);
 assert.match(mfaMigration, /phone_verified', false/i);
+assert.match(sellerAutoApprovalMigration, /aal2 mfa session required for initial seller registration/i);
+assert.match(sellerAutoApprovalMigration, /seller_status, identity_status[\s\S]*'verified', 'verified'/i);
+assert.match(sellerAutoApprovalMigration, /seller_registration_auto_approved/i);
 assert.match(paidPurchaseMigration, /market_materialize_paid_purchase_v1/i);
 assert.match(paidPurchaseMigration, /market_derivative_licenses_purchase_unique/i);
 assert.match(paidPurchaseMigration, /v_series\.derivative_sales_allowed/i);

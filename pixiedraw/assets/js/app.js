@@ -517,8 +517,6 @@
       recentList: document.getElementById('startupRecentList'),
       recentAdContainer: document.getElementById('startupRecentAdContainer'),
       recentAdSlot: document.getElementById('startupRecentAdSlot'),
-      updateToast: document.getElementById('updateToast'),
-      updateToastCloseButton: document.getElementById('updateToastCloseBtn'),
     },
     newProject: {
       button: document.getElementById('newProject'),
@@ -890,6 +888,79 @@
     selection: dom.canvases.selection?.getContext('2d', { willReadFrequently: true }) || null,
     virtual: dom.canvases.virtualCursor?.getContext('2d') || null,
   };
+  // Keep the editable raster at its native resolution, but do not force the
+  // browser to present a 4K/8K backing surface when it is zoomed far out.
+  // The proxy is display-only: input coordinates, document pixels, history,
+  // and the offscreen render target all remain in logical document pixels.
+  const canvasPresentationProxy = {
+    active: false,
+    canvas: null,
+    context: null,
+    width: 0,
+    height: 0,
+  };
+
+  function getCanvasPresentationScale(width = state?.width, height = state?.height, zoom = state?.scale) {
+    const safeWidth = Math.max(1, Math.round(Number(width) || 1));
+    const safeHeight = Math.max(1, Math.round(Number(height) || 1));
+    const pixelCount = safeWidth * safeHeight;
+    const displayScale = Math.max(0.01, Number(zoom) || 1);
+    if (pixelCount < 1024 * 1024 || displayScale >= 1) return 1;
+    // At most a 2048px presentation edge. This follows the actual zoom
+    // level, so a fully visible 8192px document at 12.5% uses ~1024px.
+    return Math.min(1, displayScale, 2048 / Math.max(safeWidth, safeHeight));
+  }
+
+  function syncCanvasPresentationProxy(width = state?.width, height = state?.height, zoom = state?.scale) {
+    const safeWidth = Math.max(1, Math.round(Number(width) || 1));
+    const safeHeight = Math.max(1, Math.round(Number(height) || 1));
+    const scale = getCanvasPresentationScale(safeWidth, safeHeight, zoom);
+    const active = scale < 1;
+    canvasPresentationProxy.active = active;
+    if (!active) return { active: false, width: safeWidth, height: safeHeight, scale: 1 };
+    const displayWidth = Math.max(1, Math.round(safeWidth * scale));
+    const displayHeight = Math.max(1, Math.round(safeHeight * scale));
+    if (!(canvasPresentationProxy.canvas instanceof HTMLCanvasElement)) {
+      canvasPresentationProxy.canvas = document.createElement('canvas');
+      canvasPresentationProxy.context = canvasPresentationProxy.canvas.getContext('2d', { willReadFrequently: true });
+    }
+    const backing = canvasPresentationProxy.canvas;
+    if (backing.width !== safeWidth) backing.width = safeWidth;
+    if (backing.height !== safeHeight) backing.height = safeHeight;
+    canvasPresentationProxy.context = backing.getContext('2d', { willReadFrequently: true });
+    if (canvasPresentationProxy.context) canvasPresentationProxy.context.imageSmoothingEnabled = false;
+    canvasPresentationProxy.width = safeWidth;
+    canvasPresentationProxy.height = safeHeight;
+    return { active: true, width: displayWidth, height: displayHeight, scale };
+  }
+
+  function getCanvasRenderContext() {
+    return canvasPresentationProxy.active && canvasPresentationProxy.context
+      ? canvasPresentationProxy.context
+      : ctx.drawing;
+  }
+
+  function presentCanvasRenderOutput(region = null) {
+    if (!canvasPresentationProxy.active || !ctx.drawing || !canvasPresentationProxy.canvas) return;
+    const source = canvasPresentationProxy.canvas;
+    const sourceWidth = Math.max(1, canvasPresentationProxy.width);
+    const sourceHeight = Math.max(1, canvasPresentationProxy.height);
+    const targetWidth = Math.max(1, dom.canvases.drawing?.width || 1);
+    const targetHeight = Math.max(1, dom.canvases.drawing?.height || 1);
+    const x0 = region ? Math.max(0, Math.floor(region.x0)) : 0;
+    const y0 = region ? Math.max(0, Math.floor(region.y0)) : 0;
+    const x1 = region ? Math.min(sourceWidth - 1, Math.ceil(region.x1)) : sourceWidth - 1;
+    const y1 = region ? Math.min(sourceHeight - 1, Math.ceil(region.y1)) : sourceHeight - 1;
+    if (x1 < x0 || y1 < y0) return;
+    const dx0 = Math.floor((x0 / sourceWidth) * targetWidth);
+    const dy0 = Math.floor((y0 / sourceHeight) * targetHeight);
+    const dx1 = Math.min(targetWidth, Math.ceil(((x1 + 1) / sourceWidth) * targetWidth));
+    const dy1 = Math.min(targetHeight, Math.ceil(((y1 + 1) / sourceHeight) * targetHeight));
+    if (dx1 <= dx0 || dy1 <= dy0) return;
+    ctx.drawing.imageSmoothingEnabled = false;
+    ctx.drawing.clearRect(dx0, dy0, dx1 - dx0, dy1 - dy0);
+    ctx.drawing.drawImage(source, x0, y0, x1 - x0 + 1, y1 - y0 + 1, dx0, dy0, dx1 - dx0, dy1 - dy0);
+  }
 
   let selectionDisplayScale = MIN_ZOOM_SCALE;
   let selectionRenderScale = MIN_ZOOM_SCALE;
@@ -3476,6 +3547,22 @@
     return documentModel.materializeLayerIndices(...args);
   }
 
+  function ensureWritableRasterLayerIndices(...args) {
+    return documentModel.ensureWritableLayerIndices(...args);
+  }
+
+  function ensureSparseWritableRasterLayerIndices(...args) {
+    return documentModel.ensureSparseWritableLayerIndices(...args);
+  }
+
+  function getRasterLayerRuntimeStoredIndex(...args) {
+    return documentModel.getLayerRuntimeStoredIndex(...args);
+  }
+
+  function setRasterLayerRuntimeStoredIndex(...args) {
+    return documentModel.setLayerRuntimeStoredIndex(...args);
+  }
+
   function compactRasterLayerIndices(...args) {
     return documentModel.compactLayerIndices(...args);
   }
@@ -3582,14 +3669,19 @@
   get getLayerPixelMatchState() { return getLayerPixelMatchState; },
   get getMirroredPointSet() { return getMirroredPointSet; },
   get getRasterLayerTransparentStorageValue() { return getRasterLayerTransparentStorageValue; },
+  get getRasterLayerRuntimeStoredIndex() { return getRasterLayerRuntimeStoredIndex; },
   get isCustomBrushData() { return isCustomBrushData; },
   get isGradientFillStyle() { return isGradientFillStyle; },
   get isIndexColorMode() { return isIndexColorMode; },
+  get capturePendingRasterTilesForRect() { return capturePendingRasterTilesForRect; },
+  get promotePendingPixelPatchToRasterTiles() { return promotePendingPixelPatchToRasterTiles; },
+  get isRasterTilePatchPending() { return () => history.pending?.kind === 'raster-tile-patch-pending'; },
   get isMirrorEnabledForTool() { return isMirrorEnabledForTool; },
   get isMultiPaletteIsolationEnabled() { return isMultiPaletteIsolationEnabled; },
   get isRgbColorMode() { return isRgbColorMode; },
   get isSimulationLayer() { return isSimulationLayer; },
   get layerPixelMatchesMatchState() { return layerPixelMatchesMatchState; },
+  get markDirtyRect() { return markDirtyRect; },
   get markDirtyPixel() { return markDirtyPixel; },
   get markFillPreviewPixelsTruncated() { return markFillPreviewPixelsTruncated; },
   get markHistoryDirty() { return markHistoryDirty; },
@@ -3599,6 +3691,8 @@
   get normalizePaletteIndex() { return normalizePaletteIndex; },
   get normalizeSelectSameMode() { return normalizeSelectSameMode; },
   get pointerState() { return pointerState; },
+  get preparePendingSolidFillPatch() { return preparePendingSolidFillPatch; },
+  get preparePendingSolidFillRuns() { return preparePendingSolidFillRuns; },
   get recordPendingPixelPatchAfter() { return recordPendingPixelPatchAfter; },
   get recordPendingPixelPatchBefore() { return recordPendingPixelPatchBefore; },
   get requestRender() { return requestRender; },
@@ -3606,6 +3700,7 @@
   get resolveTransparentStoragePaletteIndex() { return resolveTransparentStoragePaletteIndex; },
   get setActivePaletteIndex() { return setActivePaletteIndex; },
   get setActiveRgbColor() { return setActiveRgbColor; },
+  get setRasterLayerRuntimeStoredIndex() { return setRasterLayerRuntimeStoredIndex; },
   get simulationEditorState() { return simulationEditorState; },
   get state() { return state; },
   get updateColorTabSwatch() { return updateColorTabSwatch; },
@@ -3626,6 +3721,10 @@
 
   function stampBrush(...args) {
     return canvasDrawingWorkflowUtilsModule.stampBrush(...args);
+  }
+
+  function withRasterBatch(...args) {
+    return canvasDrawingWorkflowUtilsModule.withRasterBatch(...args);
   }
 
   function drawLine(...args) {
@@ -3683,6 +3782,8 @@
   set appendSharedProjectStrokePoint(value) { appendSharedProjectStrokePoint = value; },
   get beginHistory() { return beginHistory; },
   set beginHistory(value) { beginHistory = value; },
+  get promotePendingPixelPatchToRasterTiles() { return promotePendingPixelPatchToRasterTiles; },
+  set promotePendingPixelPatchToRasterTiles(value) { promotePendingPixelPatchToRasterTiles = value; },
   get beginSharedProjectStrokeCapture() { return beginSharedProjectStrokeCapture; },
   set beginSharedProjectStrokeCapture(value) { beginSharedProjectStrokeCapture = value; },
   get buildSelectionMoveTransformedEntries() { return buildSelectionMoveTransformedEntries; },
@@ -3697,6 +3798,8 @@
   set captureSharedProjectRegionCommand(value) { captureSharedProjectRegionCommand = value; },
   get captureSharedProjectShapeCommand() { return captureSharedProjectShapeCommand; },
   set captureSharedProjectShapeCommand(value) { captureSharedProjectShapeCommand = value; },
+  get capturePendingRasterTilesForRect() { return capturePendingRasterTilesForRect; },
+  set capturePendingRasterTilesForRect(value) { capturePendingRasterTilesForRect = value; },
   get captureVirtualCursorPointer() { return captureVirtualCursorPointer; },
   set captureVirtualCursorPointer(value) { captureVirtualCursorPointer = value; },
   get clearHoveredProjectCanvas() { return clearHoveredProjectCanvas; },
@@ -3960,6 +4063,8 @@
   set snapshotSelectionForClipboard(value) { snapshotSelectionForClipboard = value; },
   get stampBrush() { return stampBrush; },
   set stampBrush(value) { stampBrush = value; },
+  get withRasterBatch() { return withRasterBatch; },
+  set withRasterBatch(value) { withRasterBatch = value; },
   get state() { return state; },
   set state(value) { state = value; },
   get strokeSelectionPath() { return strokeSelectionPath; },
@@ -4662,6 +4767,10 @@
   set compositeSimulationLayerRegion(value) { compositeSimulationLayerRegion = value; },
   get ctx() { return ctx; },
   set ctx(value) { ctx = value; },
+  get getCanvasRenderContext() { return getCanvasRenderContext; },
+  set getCanvasRenderContext(value) { getCanvasRenderContext = value; },
+  get presentCanvasRenderOutput() { return presentCanvasRenderOutput; },
+  set presentCanvasRenderOutput(value) { presentCanvasRenderOutput = value; },
   get dirtyRegion() { return dirtyRegion; },
   set dirtyRegion(value) { dirtyRegion = value; },
   get getActiveFrame() { return getActiveFrame; },
@@ -8142,9 +8251,14 @@
     isCompactLayerIndices,
     isTiledLayerIndices,
     getStoredLayerPaletteIndex,
+    getLayerRuntimeStoredIndex,
+    setLayerRuntimeStoredIndex,
     compactLayerIndices,
     compactLayerIndicesToTiles,
     materializeLayerIndices,
+    ensureWritableLayerIndices,
+    ensureSparseWritableLayerIndices,
+    detachSharedLayerRaster,
     ensureLayerDirect,
     isSimulationLayer,
     cloneSimulationColor,
@@ -8156,6 +8270,7 @@
     cloneGenericLayer,
     createGenericLayerFromSnapshot,
     cloneLayer,
+    cloneFrameWithSharedRaster,
     resizeProjectCanvasFrames,
     createFrame,
     snapshotLayerForClipboard,
@@ -10007,7 +10122,9 @@
   const EMPTY_FILL_PREVIEW_PIXELS = Object.freeze([]);
   const FILL_PREVIEW_TRUNCATED_FLAG = '__pixieedFillPreviewTruncated';
   // Skip overly large fill preview regions to keep interaction responsive.
-  const FILL_PREVIEW_MAX_PIXELS = 32768;
+  // A fill preview is a single overlay operation, not a 32 Ki-pixel brush.
+  // Keep a normal 1024x1024 canvas whole for both connected and global modes.
+  const FILL_PREVIEW_MAX_PIXELS = 1048577;
   const FILL_PREVIEW_MIRROR_DEDUP_MAX_PIXELS = 8192;
   const FILL_PREVIEW_CACHE_BACKFILL_MAX_PIXELS = 4096;
   const fillPreviewCache = { contextKey: null, byPixel: null };
@@ -10040,6 +10157,27 @@
     'selectionPastePixels',
     ...FILL_TOOL_SET,
   ]);
+  const SPARSE_RASTER_DRAW_HISTORY_LABELS = new Set([
+    'pen',
+    'eraser',
+    'line',
+    'curve',
+    'rect',
+    'rectFill',
+    'ellipse',
+    'ellipseFill',
+  ]);
+  const LARGE_RASTER_TILE_HISTORY_LABELS = new Set([
+    'pen',
+    'eraser',
+    'line',
+    'curve',
+    'rect',
+    'rectFill',
+    'ellipse',
+    'ellipseFill',
+  ]);
+  const LARGE_RASTER_TILE_BRUSH_SIZE = 12;
   const MULTI_SCOPED_HISTORY_LABELS = new Set([
     ...HISTORY_DRAW_TOOLS,
     'selectionCut',
@@ -10051,6 +10189,21 @@
   ]);
   const MULTI_LAYER_PATCH_HISTORY_LABELS = new Set(MULTI_SCOPED_HISTORY_LABELS);
   const MULTI_PALETTE_HISTORY_LABELS = new Set(['paletteAdd', 'paletteRemove', 'paletteReorder', 'paletteColor', 'paletteApplyPreset']);
+  const COPY_ON_WRITE_METADATA_ONLY_HISTORY_LABELS = new Set([
+    'addLayer',
+    'addSimulationLayer',
+    'duplicateLayer',
+    'pasteLayer',
+    'removeLayer',
+    'duplicateFrame',
+    'pasteFrame',
+    'addFrame',
+    'removeFrame',
+    'setAllFrameFps',
+    'setLayerBlendMode',
+    'setOnionSkin',
+    'toggleOnionSkin',
+  ]);
   const SHARED_PROJECT_STRUCTURE_HISTORY_LABELS = new Set([
     'addSheet',
     'addLayer',
@@ -11090,6 +11243,7 @@
     }
     state.width = snapshot.width;
     state.height = snapshot.height;
+    state.rasterModelVersion = Math.max(0, Math.round(Number(snapshot.rasterModelVersion) || 0));
     if (!preserveView) {
       state.scale = normalizeZoomScale(snapshot.scale, state.scale || MIN_ZOOM_SCALE);
       rememberViewportZoomRatioFromScale(state.scale);
@@ -11916,20 +12070,26 @@
     get voxelExtensionPreviewPixels() { return voxelExtensionPreviewPixels; },
     get voxelExtensionState() { return voxelExtensionState; },
     set voxelExtensionState(value) { voxelExtensionState = value; },
-    compositeFramePixels: (...args) => compositeFramePixels(...args),
+    compositeLayerPixelNormalized: (...args) => compositeLayerPixelNormalized(...args),
+    getDisplayedLayerPreviewOpacity: (...args) => getDisplayedLayerPreviewOpacity(...args),
+    getDisplayedLayerVisibility: (...args) => getDisplayedLayerVisibility(...args),
     getActiveFrame: (...args) => getActiveFrame(...args),
     getViewportBounds: (...args) => getViewportBounds(...args),
+    getStoredRasterLayerPaletteIndex: (...args) => getStoredRasterLayerPaletteIndex(...args),
+    isSimulationLayer: (...args) => isSimulationLayer(...args),
     isVoxelExtensionModeEnabled: (...args) => isVoxelExtensionModeEnabled(...args),
     loadFloatingPreviewReferenceMediaForProject: (...args) => loadFloatingPreviewReferenceMediaForProject(...args),
     localizeText: (...args) => localizeText(...args),
     markAutosaveDirty: (...args) => markAutosaveDirty(...args),
     normalizeAutosaveProjectId: (...args) => normalizeAutosaveProjectId(...args),
     normalizeFloatingPreviewState: (...args) => normalizeFloatingPreviewState(...args),
+    normalizeLayerBlendMode: (...args) => normalizeLayerBlendMode(...args),
     normalizeVoxelExtensionState: (...args) => normalizeVoxelExtensionState(...args),
     persistFloatingPreviewReferenceMediaForProject: (...args) => persistFloatingPreviewReferenceMediaForProject(...args),
     renderFloatingPreviewGizmo: (...args) => renderFloatingPreviewGizmo(...args),
     requestOverlayRender: (...args) => requestOverlayRender(...args),
     requestRender: (...args) => requestRender(...args),
+    resolveSimulationPixelColor: (...args) => resolveSimulationPixelColor(...args),
     scheduleAutosaveSnapshot: (...args) => scheduleAutosaveSnapshot(...args),
     scheduleSessionPersist: (...args) => scheduleSessionPersist(...args),
     setVoxelPreviewOrientationForFrameIndex: (...args) => setVoxelPreviewOrientationForFrameIndex(...args),
@@ -12700,6 +12860,8 @@
     isSimulationLayer,
     getProjectCanvasDocumentById,
     ensureLayerDirect,
+    getRasterLayerRuntimeStoredIndex,
+    setRasterLayerRuntimeStoredIndex,
     clamp,
     refreshLayerDirectOnlyFlag,
     invalidateFillPreviewCache,
@@ -12714,11 +12876,16 @@
     isPixelPatchHistoryEntry,
     canUsePixelPatchHistory,
     createPixelPatchHistoryPending,
+    createRasterTilePatchPending,
+    promotePendingPixelPatchToRasterTiles,
+    capturePendingRasterTilesForRect,
     captureLayerPixelPatchValue,
     pixelPatchValuesEqual,
     getPendingPixelPatchChange,
     recordPendingPixelPatchBefore,
     recordPendingPixelPatchAfter,
+    preparePendingSolidFillPatch,
+    preparePendingSolidFillRuns,
     finalizePixelPatchHistoryEntry,
     resolvePixelPatchHistoryTarget,
     writeLayerPixelPatchValue,
@@ -12731,12 +12898,39 @@
     if (shouldRecordLocalTimelapseOperationLog()) {
       scheduleTimelapseOperationLogBase(getActiveProjectCanvasDocument()?.id || '');
     }
+    // Flood fills begin as a layer/frame-scoped pixel transaction. The fill
+    // path converts it to typed scanline runs before mutation, avoiding both
+    // per-cell JS Maps and a whole-document snapshot.
     const pixelPatchPending = canUsePixelPatchHistory(label)
       ? createPixelPatchHistoryPending(label)
       : null;
     if (pixelPatchPending) {
-      history.pending = pixelPatchPending;
+      if (Number(state.rasterModelVersion) >= 1) {
+        const activeLayer = getActiveLayer();
+        if (activeLayer && !isSimulationLayer(activeLayer)) {
+          const sparseReady = SPARSE_RASTER_DRAW_HISTORY_LABELS.has(label)
+            && ensureSparseWritableRasterLayerIndices(activeLayer, state.width, state.height);
+          if (!sparseReady) {
+            ensureWritableRasterLayerIndices(activeLayer, state.width, state.height, state.palette);
+          }
+        }
+      }
+      const brushSize = Math.max(1, Math.round(Number(state.brushSize) || 1));
+      const useRasterTilePatch = LARGE_RASTER_TILE_HISTORY_LABELS.has(label)
+        && brushSize >= LARGE_RASTER_TILE_BRUSH_SIZE;
+      history.pending = useRasterTilePatch
+        ? (createRasterTilePatchPending(label) || pixelPatchPending)
+        : pixelPatchPending;
       return;
+    }
+    if (
+      Number(state.rasterModelVersion) >= 1
+      && !COPY_ON_WRITE_METADATA_ONLY_HISTORY_LABELS.has(label)
+    ) {
+      state.frames.forEach(frame => {
+        if (!Array.isArray(frame?.layers)) return;
+        frame.layers.forEach(layer => detachSharedLayerRaster(layer));
+      });
     }
     clearCanvasCompositeFrameCache();
     if (
@@ -15598,13 +15792,21 @@
     } else {
       const sourceLayers = baseFrame.layers;
       const insertIndex = state.activeFrame + 1;
-      const newFrame = createFrame(
-        getDefaultFrameName(nextFrameNumber),
-        sourceLayers,
-        state.width,
-        state.height,
-        { copyPixels: duplicate }
-      );
+      const useCopyOnWriteDuplicate = duplicate
+        && Number(state.rasterModelVersion) >= 1
+        && typeof cloneFrameWithSharedRaster === 'function';
+      const newFrame = useCopyOnWriteDuplicate
+        ? cloneFrameWithSharedRaster(baseFrame, state.width, state.height)
+        : createFrame(
+          getDefaultFrameName(nextFrameNumber),
+          sourceLayers,
+          state.width,
+          state.height,
+          {
+            copyPixels: duplicate,
+            deferPixelAllocation: !duplicate && Number(state.rasterModelVersion) >= 1,
+          }
+        );
       if (Number.isFinite(baseFrame.duration) && baseFrame.duration > 0) {
         newFrame.duration = baseFrame.duration;
       }
@@ -19250,6 +19452,8 @@
   set commitHistory(value) { commitHistory = value; },
   get createFrameFromClipboardSnapshot() { return createFrameFromClipboardSnapshot; },
   set createFrameFromClipboardSnapshot(value) { createFrameFromClipboardSnapshot = value; },
+  get cloneFrameWithSharedRaster() { return cloneFrameWithSharedRaster; },
+  set cloneFrameWithSharedRaster(value) { cloneFrameWithSharedRaster = value; },
   get createLayer() { return createLayer; },
   set createLayer(value) { createLayer = value; },
   get createLayerFromClipboardSnapshot() { return createLayerFromClipboardSnapshot; },
@@ -19841,6 +20045,9 @@
     syncActiveProjectCanvasViewScale();
     const { width, height } = state;
     const scale = getPixelAlignedCanvasDisplayScale(state.scale);
+    const presentation = syncCanvasPresentationProxy(width, height, scale);
+    const drawingBufferWidth = presentation.width;
+    const drawingBufferHeight = presentation.height;
     state.mirror = normalizeMirrorAxisState(state.mirror, width, height);
     const drawingCanvas = dom.canvases.drawing;
     const overlayCanvas = dom.canvases.overlay;
@@ -19849,20 +20056,20 @@
     let drawingReset = false;
     let overlayReset = false;
 
-    if (drawingCanvas.width !== width) {
-      drawingCanvas.width = width;
+    if (drawingCanvas.width !== drawingBufferWidth) {
+      drawingCanvas.width = drawingBufferWidth;
       drawingReset = true;
     }
-    if (drawingCanvas.height !== height) {
-      drawingCanvas.height = height;
+    if (drawingCanvas.height !== drawingBufferHeight) {
+      drawingCanvas.height = drawingBufferHeight;
       drawingReset = true;
     }
-    if (overlayCanvas.width !== width) {
-      overlayCanvas.width = width;
+    if (overlayCanvas.width !== drawingBufferWidth) {
+      overlayCanvas.width = drawingBufferWidth;
       overlayReset = true;
     }
-    if (overlayCanvas.height !== height) {
-      overlayCanvas.height = height;
+    if (overlayCanvas.height !== drawingBufferHeight) {
+      overlayCanvas.height = drawingBufferHeight;
       overlayReset = true;
     }
     if (ctx.drawing) {
@@ -19870,6 +20077,7 @@
     }
     if (ctx.overlay) {
       ctx.overlay.imageSmoothingEnabled = false;
+      ctx.overlay.setTransform(presentation.scale, 0, 0, presentation.scale, 0, 0);
     }
     if (ctx.selection) {
       ctx.selection.imageSmoothingEnabled = false;
@@ -27021,6 +27229,7 @@
       setupExportInterstitialDialog();
       setupLoginPromptDialog();
       setupUpdateHistoryDialog();
+      exportDialogWorkflowUtilsModule.syncUpdateHistoryNotice?.();
       setupToolSpotlightDialog();
       setupRecentProjectDeleteConfirmDialog();
       setupShareStartConfirmDialog();

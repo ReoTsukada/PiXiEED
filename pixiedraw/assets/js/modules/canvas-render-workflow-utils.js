@@ -115,8 +115,16 @@
     if (!cacheKey || !imageData?.data || imageData.data.length !== width * height * 4) {
       return false;
     }
-    deleteCanvasCompositeFrameCacheEntry(cacheKey);
     const bytes = imageData.data.byteLength;
+    const maxBytes = Math.max(0, Number(canvasCompositeFrameCache.maxBytes) || 0);
+    // A full 8K RGBA composite is hundreds of MB.  It must never enlarge the
+    // cache budget just because it is the only frame: keep the display proxy
+    // and dirty-region renderer, but do not retain a second giant snapshot.
+    if (!maxBytes || bytes > maxBytes) {
+      deleteCanvasCompositeFrameCacheEntry(cacheKey);
+      return false;
+    }
+    deleteCanvasCompositeFrameCacheEntry(cacheKey);
     const entry = {
       width,
       height,
@@ -126,10 +134,28 @@
     };
     canvasCompositeFrameCache.byFrame.set(cacheKey, entry);
     canvasCompositeFrameCache.bytes += bytes;
-    const maxBytes = Math.max(bytes, Number(canvasCompositeFrameCache.maxBytes) || 0);
     while (canvasCompositeFrameCache.bytes > maxBytes && canvasCompositeFrameCache.byFrame.size > 1) {
       const oldestKey = canvasCompositeFrameCache.byFrame.keys().next().value;
       deleteCanvasCompositeFrameCacheEntry(oldestKey);
+    }
+    return true;
+  }
+
+  function patchCanvasCompositeFrameCache(frame, width, height, imageData, x0, y0) {
+    const cacheKey = getCanvasCompositeFrameCacheKey(frame);
+    const entry = cacheKey ? canvasCompositeFrameCache.byFrame.get(cacheKey) : null;
+    if (!entry || entry.width !== width || entry.height !== height || entry.visualKey !== getCanvasCompositeVisualKey(frame, width, height)) {
+      return false;
+    }
+    const regionWidth = Math.max(0, Math.round(Number(imageData?.width) || 0));
+    const regionHeight = Math.max(0, Math.round(Number(imageData?.height) || 0));
+    if (!regionWidth || !regionHeight || !(imageData?.data instanceof Uint8ClampedArray)) return false;
+    const target = entry.imageData?.data;
+    if (!(target instanceof Uint8ClampedArray)) return false;
+    for (let row = 0; row < regionHeight; row += 1) {
+      const sourceStart = row * regionWidth * 4;
+      const targetStart = ((y0 + row) * width + x0) * 4;
+      target.set(imageData.data.subarray(sourceStart, sourceStart + regionWidth * 4), targetStart);
     }
     return true;
   }
@@ -147,7 +173,9 @@
     if (right < left || bottom < top) {
       return;
     }
-    invalidateCanvasCompositeFrameCacheEntry();
+    // Keep an existing full composite alive for ordinary pixel edits. The
+    // renderer patches the dirty rows after it recomposes them, so returning
+    // to a whole-canvas view does not require a second full-layer composite.
     if (!dirtyRegion) {
       dirtyRegion = { x0: left, y0: top, x1: right, y1: bottom };
       return;
@@ -179,6 +207,7 @@
       dirtyRegion = null;
       return;
     }
+    invalidateCanvasCompositeFrameCacheEntry();
     dirtyRegion = { x0: 0, y0: 0, x1: width - 1, y1: height - 1 };
   }
 
@@ -216,9 +245,14 @@
   }
 
   function renderCanvas() {
-    if (!ctx.drawing) {
+    const renderCtx = getCanvasRenderContext?.() || ctx.drawing;
+    if (!renderCtx) {
       return;
     }
+    const finishRender = region => {
+      presentCanvasRenderOutput?.(region);
+      refreshSecondaryCanvasSurfaces();
+    };
     if (isVoxelExtensionModeEnabled()) {
       syncVoxelExtensionPreviewFromSource({ updateViewport: false });
     }
@@ -241,8 +275,8 @@
     if (state.playback.isPlaying) {
       const frameImage = getPlaybackFrameImageData(state.activeFrame);
       if (frameImage) {
-        ctx.drawing.putImageData(frameImage, 0, 0);
-        refreshSecondaryCanvasSurfaces();
+        renderCtx.putImageData(frameImage, 0, 0);
+        finishRender();
         return;
       }
     }
@@ -254,8 +288,8 @@
     if (fullCanvasPending && !state.playback.isPlaying) {
       const cachedImage = readCanvasCompositeFrameCache(activeFrame, width, height);
       if (cachedImage) {
-        ctx.drawing.putImageData(cachedImage, 0, 0);
-        refreshSecondaryCanvasSurfaces();
+        renderCtx.putImageData(cachedImage, 0, 0);
+        finishRender();
         return;
       }
     }
@@ -265,6 +299,17 @@
         && getDisplayedLayerVisibility(layer, true)
         && getDisplayedLayerPreviewOpacity(layer, 1) > 0
       ));
+      const isImplicitlyEmptyFrame = visibleLayers.length === 0 || visibleLayers.every(layer => (
+        !isSimulationLayer(layer)
+        && (layer.indices instanceof Int16Array || layer.indices instanceof Uint8Array)
+        && layer.indices.length === 0
+        && !(layer.direct instanceof Uint8ClampedArray && layer.direct.length > 0)
+      ));
+      if (isImplicitlyEmptyFrame) {
+        renderCtx.clearRect(0, 0, width, height);
+        finishRender();
+        return;
+      }
       if (visibleLayers.length === 1) {
         const layer = visibleLayers[0];
         const direct = layer.direct instanceof Uint8ClampedArray && layer.direct.length >= width * height * 4 ? layer.direct : null;
@@ -274,9 +319,9 @@
           && normalizeLayerBlendMode(layer.blendMode) === DEFAULT_LAYER_BLEND_MODE
           && !isSimulationLayer(layer)) {
           const directImage = new ImageData(new Uint8ClampedArray(direct.subarray(0, width * height * 4)), width, height);
-          ctx.drawing.putImageData(directImage, 0, 0);
+          renderCtx.putImageData(directImage, 0, 0);
           writeCanvasCompositeFrameCache(activeFrame, width, height, directImage);
-          refreshSecondaryCanvasSurfaces();
+          finishRender();
           return;
         }
         // Indexed-only projects normally use this compact Uint8 plane. Avoid
@@ -292,7 +337,7 @@
           && normalizeLayerBlendMode(layer.blendMode) === DEFAULT_LAYER_BLEND_MODE
           && !isSimulationLayer(layer)
         ) {
-          const indexedImage = ctx.drawing.createImageData(width, height);
+          const indexedImage = renderCtx.createImageData(width, height);
           const indexedPixels = layer.indices;
           const indexedPalette = Array.isArray(state.palette) ? state.palette : [];
           const output = indexedImage.data;
@@ -309,9 +354,9 @@
             output[base + 2] = color.b;
             output[base + 3] = color.a;
           }
-          ctx.drawing.putImageData(indexedImage, 0, 0);
+          renderCtx.putImageData(indexedImage, 0, 0);
           writeCanvasCompositeFrameCache(activeFrame, width, height, indexedImage);
-          refreshSecondaryCanvasSurfaces();
+          finishRender();
           return;
         }
       }
@@ -325,7 +370,7 @@
     }
     const regionWidth = x1 - x0 + 1;
     const regionHeight = y1 - y0 + 1;
-    const image = ctx.drawing.createImageData(regionWidth, regionHeight);
+    const image = renderCtx.createImageData(regionWidth, regionHeight);
     const data = image.data;
 
     const layers = activeFrame?.layers || [];
@@ -376,11 +421,12 @@
       }
     }
 
-    ctx.drawing.putImageData(image, x0, y0);
+    renderCtx.putImageData(image, x0, y0);
+    patchCanvasCompositeFrameCache(activeFrame, width, height, image, x0, y0);
     if (fullCanvasPending && !state.playback.isPlaying) {
       writeCanvasCompositeFrameCache(activeFrame, width, height, image);
     }
-    refreshSecondaryCanvasSurfaces();
+    finishRender({ x0, y0, x1, y1 });
   }
 
   function requestOverlayRender() {

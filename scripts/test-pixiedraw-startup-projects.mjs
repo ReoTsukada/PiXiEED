@@ -24,7 +24,7 @@ assert.doesNotMatch(lensIndex, /id="updateToast"|id="updateToastCloseBtn"|class=
 for (const html of [index]) {
   assert.match(html, /id="stage" tabindex="-1"/);
 }
-assert.match(index, /startup-workflow-utils\.js\?v=20260719-project-session-handoff1/);
+assert.match(index, /startup-workflow-utils\.js\?v=20260720-pxd1/);
 for (const source of [startup]) {
   assert.match(source, /container\.inert = false;[\s\S]{0,100}container\.hidden = false;[\s\S]{0,100}container\.removeAttribute\('aria-hidden'\);/);
   assert.match(source, /container\.contains\(activeElement\)[\s\S]{0,280}dom\.stage\.focus\(\{ preventScroll: true \}\);[\s\S]{0,280}container\.inert = true;[\s\S]{0,100}container\.hidden = true;/);

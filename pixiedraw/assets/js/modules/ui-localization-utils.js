@@ -457,7 +457,8 @@
       setLocalizedAttribute('#supportTipLink', 'aria-label', 'サポート', 'Support');
       setLocalizedTextContent('#openOperationHelpPanel span:last-child', '使い方ヘルプ', 'Help');
       setLocalizedTextContent('#openShortcutHelp span:last-child', 'ショートカット一覧', 'Keyboard Shortcuts');
-      setLocalizedTextContent('#openUpdateHistory span:last-child', '更新情報', 'Updates');
+      setLocalizedTextContent('#openUpdateHistory > span:first-child', '更新情報', 'Updates');
+      setLocalizedTextContent('#openUpdateHistory .detail-panel__notice', '新着', 'New');
       setLocalizedTextContent('#pixieedAccountLabel', 'アカウント', 'Account');
       setLocalizedTextContent('#pixieedAccountLogin', 'ログイン', 'Sign In');
       setLocalizedTextContent('#pixieedAccountLogout', 'ログアウト', 'Sign Out');

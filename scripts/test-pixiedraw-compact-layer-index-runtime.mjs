@@ -32,8 +32,9 @@ const palette = [
   { r: 255, g: 0, b: 0, a: 255 },
   { r: 0, g: 255, b: 0, a: 255 },
 ];
+const modelState = { width: 2, height: 2, palette, rasterModelVersion: 1 };
 const model = context.window.PiXiEEDrawModules.documentModel.createDocumentModel({
-  state: { width: 2, height: 2, palette },
+  state: modelState,
   DEFAULT_LAYER_BLEND_MODE: 'normal',
   SIM_LAYER_TYPE: 'simulation',
   clamp: (value, min, max) => Math.min(max, Math.max(min, value)),
@@ -120,25 +121,24 @@ assert.equal(fullPaletteLayer.indices instanceof Int16Array, true);
 assert.deepEqual(Array.from(fullPaletteLayer.indices), [255]);
 
 const tiledBase = {
-  indices: new Int16Array(64 * 64),
+  indices: new Int16Array(64 * 64).fill(-1),
 };
 assert.equal(model.compactLayerIndicesToTiles(tiledBase, palette, 64, 64), true);
 assert.equal(tiledBase.indicesEncoding, 'uint8-tiled-zero-transparent-v1');
-assert.equal(tiledBase.indicesTiles.length, 4);
-assert.equal(new Set(tiledBase.indicesTiles.map(tile => tile.buffer)).size, 1);
+assert.equal(tiledBase.indicesTiles.constructor.name, 'Map');
+assert.equal(tiledBase.indicesTiles.size, 0);
 
 const tiledNext = {
-  indices: new Int16Array(64 * 64),
+  indices: new Int16Array(64 * 64).fill(-1),
 };
 tiledNext.indices[0] = 1;
 assert.equal(model.compactLayerIndicesToTiles(tiledNext, palette, 64, 64, tiledBase), true);
 assert.equal(tiledNext.indicesEncoding, 'uint8-tiled-zero-transparent-v1');
-assert.notEqual(tiledNext.indicesTiles[0], tiledBase.indicesTiles[0]);
-assert.equal(tiledNext.indicesTiles[1], tiledBase.indicesTiles[1]);
-assert.equal(tiledNext.indicesTiles[2], tiledBase.indicesTiles[2]);
-assert.equal(tiledNext.indicesTiles[3], tiledBase.indicesTiles[3]);
+assert.equal(tiledNext.indicesTiles.constructor.name, 'Map');
+assert.equal(tiledNext.indicesTiles.size, 1);
+assert.equal(tiledNext.indicesTiles.has(0), true);
 assert.equal(model.getStoredLayerPaletteIndex(tiledNext, 0), 1);
-assert.equal(model.getStoredLayerPaletteIndex(tiledNext, 63), 0);
+assert.equal(model.getStoredLayerPaletteIndex(tiledNext, 63), -1);
 
 const tiledStored = model.serializeLayerForDocument(tiledNext, {
   preserveTypedArrays: true,
@@ -150,7 +150,25 @@ assert.equal(tiledStored.indices instanceof Uint8Array, true);
 assert.equal(tiledStored.indices.length, 64 * 64);
 assert.equal(tiledStored.indicesEncoding, 'uint8-zero-transparent-v1');
 assert.equal(tiledStored.indices[0], 2);
-assert.equal(tiledStored.indices[63], 1);
+assert.equal(tiledStored.indices[63], 0);
+
+const sparseLargeLayer = {
+  indices: new Int16Array(1024 * 1024).fill(-1),
+};
+sparseLargeLayer.indices[0] = 1;
+assert.equal(model.compactLayerIndicesToTiles(sparseLargeLayer, palette, 1024, 1024), true);
+assert.equal(sparseLargeLayer.indicesTiles.constructor.name, 'Map');
+assert.equal(sparseLargeLayer.indicesTiles.size, 1);
+assert.equal(sparseLargeLayer.indicesTiles.get(0).byteLength, 32 * 32);
+
+modelState.rasterModelVersion = 0;
+const legacyTiledLayer = {
+  indices: new Int16Array(64 * 64).fill(-1),
+};
+assert.equal(model.compactLayerIndicesToTiles(legacyTiledLayer, palette, 64, 64), true);
+assert.equal(Array.isArray(legacyTiledLayer.indicesTiles), true);
+assert.equal(legacyTiledLayer.indicesTiles.length, 4);
+modelState.rasterModelVersion = 1;
 
 const memory = context.window.PiXiEEDrawModules.memoryUtils.createMemoryUtils({
   dom: { controls: {} },
@@ -189,16 +207,62 @@ const memory = context.window.PiXiEEDrawModules.memoryUtils.createMemoryUtils({
 });
 assert.equal(
   memory.estimateStateBytes(),
-  (32 * 32 * 2) + (palette.length * 16),
+  (32 * 32) + (palette.length * 16),
   'shared tile buffers must be counted once in the memory indicator'
 );
 assert.equal(memory.getMemoryUsageBreakdown().compositeCache, 4096);
 assert.equal(memory.getMemoryUsageBreakdown().total, memory.estimateStateBytes() + 4096);
 
+const cowSourceLayer = {
+  id: 'cow-source-layer',
+  name: 'COW Source',
+  visible: true,
+  opacity: 1,
+  blendMode: 'normal',
+  indices: new Int16Array([0, 1, -1, 0]),
+  direct: null,
+  importSourceDirect: null,
+  directOnly: false,
+};
+const cowFrame = model.cloneFrameWithSharedRaster({
+  id: 'cow-source-frame',
+  name: 'COW Frame',
+  duration: 100,
+  layers: [cowSourceLayer],
+}, 2, 2);
+const cowClonedLayer = cowFrame.layers[0];
+assert.equal(cowClonedLayer.indices, cowSourceLayer.indices, 'frame duplication must initially share its raster');
+model.ensureWritableLayerIndices(cowClonedLayer, 2, 2, palette);
+assert.notEqual(cowClonedLayer.indices, cowSourceLayer.indices, 'first edit must detach the duplicated raster');
+cowClonedLayer.indices[0] = 1;
+assert.equal(cowSourceLayer.indices[0], 0, 'editing a duplicate must not alter its source frame');
+
+const emptyFrame = model.createFrame('Empty Frame', [cowSourceLayer], 2, 2, {
+  copyPixels: false,
+  deferPixelAllocation: true,
+});
+const emptyLayer = emptyFrame.layers[0];
+assert.equal(emptyLayer.indices.length, 0, 'a new empty frame must not allocate a full raster');
+model.ensureWritableLayerIndices(emptyLayer, 2, 2, palette);
+assert.equal(emptyLayer.indices.length, 4, 'the empty raster must materialize at the first edit boundary');
+
+const sparseActiveLayer = {
+  indices: new Uint8Array(0),
+  indicesEncoding: 'uint8-palette-zero-transparent-v2',
+};
+assert.equal(model.ensureSparseWritableLayerIndices(sparseActiveLayer, 64, 64), true);
+assert.equal(sparseActiveLayer.indicesTiles.constructor.name, 'Map');
+assert.equal(model.setLayerRuntimeStoredIndex(sparseActiveLayer, 65, 1), true);
+assert.equal(model.getLayerRuntimeStoredIndex(sparseActiveLayer, 65), 1);
+assert.equal(model.getStoredLayerPaletteIndex(sparseActiveLayer, 65), 1);
+assert.equal(sparseActiveLayer.indicesTiles.size, 1);
+assert.equal(model.setLayerRuntimeStoredIndex(sparseActiveLayer, 65, 0), true);
+assert.equal(sparseActiveLayer.indicesTiles.size, 0, 'erasing the last pixel must release the empty tile');
+
 const tiledMaterialized = model.materializeLayerIndices(tiledNext, 64, 64, palette);
 assert.equal(tiledMaterialized instanceof Int16Array, true);
 assert.equal(tiledMaterialized[0], 1);
-assert.equal(tiledMaterialized[63], 0);
+assert.equal(tiledMaterialized[63], -1);
 assert.equal(Object.hasOwn(tiledNext, 'indicesTiles'), false);
 
 const navigationState = {

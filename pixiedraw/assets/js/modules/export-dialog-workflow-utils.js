@@ -310,6 +310,45 @@
     getUpdateHistoryEntries,
   } = updateHistoryUtils;
 
+  const UPDATE_HISTORY_LAST_READ_KEY = 'pixieedraw:update-history-last-read-id';
+
+  function getLatestUpdateHistoryEntry() {
+    const entries = getUpdateHistoryEntries();
+    return entries[0] || null;
+  }
+
+  function syncUpdateHistoryNotice() {
+    const latest = getLatestUpdateHistoryEntry();
+    let lastReadId = '';
+    if (canUseSessionStorage) {
+      try {
+        lastReadId = window.localStorage.getItem(UPDATE_HISTORY_LAST_READ_KEY) || '';
+      } catch (error) {
+        // Keep the notice visible when storage is unavailable.
+      }
+    }
+    const unread = Boolean(latest?.id) && latest.id !== lastReadId;
+    document.querySelectorAll('[data-update-history-notice]').forEach(notice => {
+      if (!(notice instanceof HTMLElement)) return;
+      notice.hidden = !unread;
+      notice.setAttribute('aria-hidden', String(!unread));
+    });
+    document.querySelectorAll('[data-update-history-action]').forEach(button => {
+      button.dataset.hasUpdateNotice = unread ? 'true' : 'false';
+    });
+    return unread;
+  }
+
+  function markLatestUpdateHistoryRead() {
+    const latest = getLatestUpdateHistoryEntry();
+    if (!latest?.id || !canUseSessionStorage) return;
+    try {
+      window.localStorage.setItem(UPDATE_HISTORY_LAST_READ_KEY, latest.id);
+    } catch (error) {
+      // Ignore storage errors; the notice simply remains visible.
+    }
+  }
+
   function renderUpdateHistoryPanel() {
     const list = dom.updateHistory?.list;
     if (!(list instanceof HTMLElement)) {
@@ -359,6 +398,8 @@
       return;
     }
     renderUpdateHistoryPanel();
+    markLatestUpdateHistoryRead();
+    syncUpdateHistoryNotice();
     if (dialog.open) {
       return;
     }
@@ -852,6 +893,7 @@
     queueShortcutHelpAdRender,
     queueUpdateHistoryAdRender,
     renderUpdateHistoryPanel,
+    syncUpdateHistoryNotice,
     openUpdateHistoryDialog,
     closeUpdateHistoryDialog,
     shuffleToolSpotlightCards,

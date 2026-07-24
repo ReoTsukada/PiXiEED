@@ -71,6 +71,7 @@
       onionSkin: normalizeOnionSkinState(state.onionSkin),
       dualLeftRail: false,
       documentName: state.documentName,
+      rasterModelVersion: Math.max(0, Math.round(Number(state.rasterModelVersion) || 0)),
       voxelExtension: normalizeVoxelExtensionState(voxelExtensionState, VOXEL_EXTENSION_DEFAULT_STATE),
     };
 
@@ -601,6 +602,7 @@
       onionSkin: normalizeOnionSkinState(snapshot.onionSkin),
       dualLeftRail: false,
       documentName: snapshot.documentName,
+      rasterModelVersion: Math.max(0, Math.round(Number(snapshot.rasterModelVersion) || 0)),
       voxelExtension: normalizeVoxelExtensionState(snapshot.voxelExtension, VOXEL_EXTENSION_DEFAULT_STATE),
     };
     if (Object.prototype.hasOwnProperty.call(snapshot, 'activeFrame')) {
@@ -780,6 +782,7 @@
       onionSkin: normalizeOnionSkinState(snapshot.onionSkin),
       dualLeftRail: false,
       documentName: snapshot.documentName,
+      rasterModelVersion: Math.max(0, Math.round(Number(snapshot.rasterModelVersion) || 0)),
       voxelExtension: normalizeVoxelExtensionState(snapshot.voxelExtension, VOXEL_EXTENSION_DEFAULT_STATE),
     };
     if (Object.prototype.hasOwnProperty.call(snapshot, 'activeFrame')) {

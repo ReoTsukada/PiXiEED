@@ -135,7 +135,16 @@ function commitHistory() {
       // journal immediately even for large documents; the autosave workflow
       // serializes overlapping writes and falls back to checkpoints only for
       // structural operations.
-      requestImmediateAutosaveSnapshot();
+      // Raster runs/tiles are already appended to the local journal. Starting
+      // IndexedDB serialization inside pointerup made the visible application
+      // feel slow; let the current frame present first, then save shortly.
+      const isDeferredRasterSave = historyEntry?.kind === 'raster-tile-patch'
+        || historyEntry?.kind === 'solid-fill-runs';
+      if (isDeferredRasterSave) {
+        scheduleAutosaveSnapshot({ delayMs: 220 });
+      } else {
+        requestImmediateAutosaveSnapshot();
+      }
       handleMultiLocalCommit(pendingLabel);
     }
     history.pending = null;

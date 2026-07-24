@@ -3,6 +3,27 @@
   const URL = 'https://kyyiuakrqomzlikfaire.supabase.co'; const KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
   const $ = (id) => document.getElementById(id); const PAYOUT_MINIMUM_YEN = 5000; let client; let factorId = ''; let enrollmentStarted = false; let sellerProfile = null; let payoutReady = false; let pendingPayoutQuote = null;
   const message = (id, value) => { $(id).textContent = value || ''; };
+  const hasSubmittedRegistration = (profile) => Boolean(profile?.contact_registered_at && profile?.mfa_confirmed_at);
+  const isApprovedSeller = (profile) => profile?.seller_status === 'verified' && profile?.identity_status === 'verified';
+  const canResubmitRegistration = (profile) => profile?.identity_status === 'failed' || profile?.seller_status === 'restricted';
+  function showProgress(profile) {
+    const section = $('sellerProgressSection');
+    if (!hasSubmittedRegistration(profile)) { section.hidden = true; return; }
+    section.hidden = false;
+    if (isApprovedSeller(profile)) {
+      message('sellerProgressTitle', '販売者情報は自動許可済みです');
+      message('sellerProgressDescription', '販売者情報の再入力や二段階認証は必要ありません。次は売上を受け取るためのStripe設定です。');
+    } else if (profile.identity_status === 'failed') {
+      message('sellerProgressTitle', '販売者情報の再確認が必要です');
+      message('sellerProgressDescription', profile.restricted_reason || '入力内容を確認して、もう一度送信してください。');
+    } else if (profile.seller_status === 'disabled') {
+      message('sellerProgressTitle', '販売者設定を利用できません');
+      message('sellerProgressDescription', profile.restricted_reason || 'サポートへお問い合わせください。');
+    } else {
+      message('sellerProgressTitle', '販売者情報は送信済みです');
+      message('sellerProgressDescription', '確認結果を反映しています。完了後は売上受取設定へ進めます。');
+    }
+  }
   async function assurance() { const { data, error } = await client.auth.mfa.getAuthenticatorAssuranceLevel(); if (error) throw error; return data; }
   async function verifiedTotpFactor() { const { data, error } = await client.auth.mfa.listFactors(); if (error) throw error; return data?.totp?.find((factor) => factor.status === 'verified') || null; }
   async function startEnrollment() {
@@ -27,16 +48,24 @@
     if (factor) { factorId = factor.id; $('mfaAction').textContent = 'コードを確認'; message('mfaDescription', '認証アプリに表示されたコードを入力してください。'); }
   }
   async function loadProfile() {
-    const { data, error } = await client.from('market_seller_profiles').select('legal_name,postal_code,address,phone,seller_status,terms_accepted_at,contact_registered_at,mfa_confirmed_at').maybeSingle();
+    const { data, error } = await client.from('market_seller_profiles').select('legal_name,postal_code,address,phone,seller_status,identity_status,restricted_reason,terms_accepted_at,contact_registered_at,mfa_confirmed_at').maybeSingle();
     if (error) throw error;
     sellerProfile = data || null;
-    if (!data) return;
+    showProgress(data);
+    if (!data) return false;
     $('sellerLegalName').value = data.legal_name || ''; $('sellerPostalCode').value = data.postal_code || ''; $('sellerAddress').value = data.address || ''; $('sellerPhone').value = data.phone || '';
-    if (data.contact_registered_at) {
-      message('registrationStatus', data.seller_status === 'verified' ? '販売者情報と受取設定を確認済みです。' : '販売者情報を保存済みです。出品・審査はこのまま進められます。売上を受け取る前にStripeの設定を完了してください。');
+    if (hasSubmittedRegistration(data) && isApprovedSeller(data)) {
+      $('mfaSection').hidden = true; $('sellerRegistrationForm').hidden = true;
+      message('registrationStatus', '販売者情報は自動許可済みです。');
       $('stripeConnectSection').hidden = false;
       await refreshStripeStatus();
+      return true;
     }
+    if (hasSubmittedRegistration(data) && !canResubmitRegistration(data)) {
+      $('mfaSection').hidden = true; $('sellerRegistrationForm').hidden = true;
+      return true;
+    }
+    return false;
   }
   async function invokeStripe(action) {
     const { data, error } = await client.functions.invoke('market-stripe-connect', { body: { action } });
@@ -152,7 +181,8 @@
       const access = window.PiXiEEDMarketPageAccess ? await window.PiXiEEDMarketPageAccess.ready : null;
       if (!access?.allowed || !access.client || !access.user) return;
       client = access.client;
-      $('sellerPageStatus').hidden = true; await prepareMfa();
+      $('sellerPageStatus').hidden = true;
+      if (!(await loadProfile())) await prepareMfa();
       $('mfaAction').addEventListener('click', async () => { try { $('mfaAction').disabled = true; if (!enrollmentStarted && !(await verifiedTotpFactor())) await startEnrollment(); else await verifyFactor(); } catch (error) { message('mfaStatus', error.message || '二段階認証に失敗しました'); } finally { $('mfaAction').disabled = false; } });
       $('stripeConnectAction').addEventListener('click', openStripeOnboarding);
       $('payoutRequestAction').addEventListener('click', showPayoutConfirmation);
@@ -165,8 +195,8 @@
         const { error } = await client.rpc('market_submit_seller_registration', { input_legal_name: $('sellerLegalName').value.trim(), input_postal_code: $('sellerPostalCode').value.trim(), input_address: $('sellerAddress').value.trim(), input_phone: $('sellerPhone').value.trim(), input_terms_version: 'market-terms-v1' });
         if (error) message('registrationStatus', `保存できませんでした: ${error.message}`);
         else {
-          message('registrationStatus', '販売者情報を保存しました。出品・審査は進められます。売上を受け取る前にStripeの設定を完了してください。');
-          $('stripeConnectSection').hidden = false; await refreshStripeStatus();
+          message('registrationStatus', '販売者情報を送信し、自動許可しました。');
+          await loadProfile();
         }
         submit.disabled = false;
       });
