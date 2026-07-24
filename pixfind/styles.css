@@ -1165,7 +1165,9 @@ body.is-playing {
   padding: var(--screen-padding-top) var(--screen-padding-right) var(--screen-padding-bottom) var(--screen-padding-left);
   background: rgba(18, 22, 38, 0.65);
   backdrop-filter: blur(6px);
-  z-index: 950;
+  /* A creator session is modal. Keep it above the shared action and
+     navigation bars so they cannot cover the bottom controls or intercept taps. */
+  z-index: 14090;
 }
 
 .creator-panel {
