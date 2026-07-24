@@ -3,6 +3,8 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 
 const modulePath = new URL('../pixiedraw/assets/js/modules/document-model.js', import.meta.url);
+const canvasCorePath = new URL('../pixiedraw/assets/js/modules/canvas-core-workflow-utils.js', import.meta.url);
+const selectionMovePath = new URL('../pixiedraw/assets/js/modules/selection-move-workflow-utils.js', import.meta.url);
 const timelineNavigationPath = new URL('../pixiedraw/assets/js/modules/timeline-navigation-workflow-utils.js', import.meta.url);
 const memoryUtilsPath = new URL('../pixiedraw/assets/js/modules/memory-utils.js', import.meta.url);
 const documentFixture = {};
@@ -23,6 +25,8 @@ const context = {
 };
 vm.createContext(context);
 vm.runInContext(fs.readFileSync(modulePath, 'utf8'), context, { filename: 'document-model.js' });
+vm.runInContext(fs.readFileSync(canvasCorePath, 'utf8'), context, { filename: 'canvas-core-workflow-utils.js' });
+vm.runInContext(fs.readFileSync(selectionMovePath, 'utf8'), context, { filename: 'selection-move-workflow-utils.js' });
 vm.runInContext(fs.readFileSync(timelineNavigationPath, 'utf8'), context, {
   filename: 'timeline-navigation-workflow-utils.js',
 });
@@ -298,6 +302,64 @@ assert.equal(model.getStoredLayerPaletteIndex(sparseActiveLayer, 65), 1);
 assert.equal(sparseActiveLayer.indicesTiles.size, 1);
 assert.equal(model.setLayerRuntimeStoredIndex(sparseActiveLayer, 65, 0), true);
 assert.equal(sparseActiveLayer.indicesTiles.size, 0, 'erasing the last pixel must release the empty tile');
+
+const editableTiledLayer = {
+  id: 'editable-tiled-layer',
+  indices: new Uint8Array(0),
+  indicesEncoding: 'uint8-palette-zero-transparent-v2',
+};
+assert.equal(model.ensureSparseWritableLayerIndices(editableTiledLayer, 64, 64), true);
+assert.equal(model.setLayerRuntimeStoredIndex(editableTiledLayer, 65, 1), true);
+const editableState = {
+  width: 64,
+  height: 64,
+  palette,
+  rasterModelVersion: 1,
+  activeFrame: 0,
+  activeLayer: editableTiledLayer.id,
+  frames: [{ id: 'editable-frame', layers: [editableTiledLayer] }],
+};
+const canvasCore = context.window.PiXiEEDrawModules.canvasCoreWorkflowUtils.createCanvasCoreWorkflowUtils({
+  state: editableState,
+  DEFAULT_LAYER_BLEND_MODE: 'normal',
+  clamp: (value, min, max) => Math.min(max, Math.max(min, value)),
+  getProjectCanvasCount: () => 1,
+  materializeRasterLayerIndices: (layer, width, height, colors) => model.materializeLayerIndices(layer, width, height, colors),
+});
+assert.equal(canvasCore.getActiveLayer(), editableTiledLayer);
+assert.equal(editableTiledLayer.indices instanceof Int16Array, true, 'the active editing layer must expose a full transparent-index plane');
+assert.equal(editableTiledLayer.indices.length, 64 * 64);
+assert.equal(editableTiledLayer.indices[65], 1);
+assert.equal(editableTiledLayer.indices[0], -1);
+
+const tiledMoveLayer = {
+  id: 'tiled-move-layer',
+  visible: true,
+  opacity: 1,
+  blendMode: 'normal',
+  indices: new Uint8Array(0),
+  indicesEncoding: 'uint8-palette-zero-transparent-v2',
+  direct: null,
+};
+assert.equal(model.ensureSparseWritableLayerIndices(tiledMoveLayer, 64, 64), true);
+assert.equal(model.setLayerRuntimeStoredIndex(tiledMoveLayer, 65, 1), true);
+const selectionMove = context.window.PiXiEEDrawModules.selectionMoveWorkflowUtils.createSelectionMoveWorkflowUtils({
+  state: { width: 64, height: 64, palette, scale: 1, frames: [], activeFrame: 0 },
+  SELECTION_TRANSFORM_LARGE_PREVIEW_MAX_PIXELS: 0,
+  getStoredRasterLayerPaletteIndex: model.getStoredLayerPaletteIndex,
+  isRuntimeUint8LayerIndices: model.isRuntimeUint8LayerIndices,
+});
+const tiledLayerMoveState = selectionMove.createLayerMoveState(tiledMoveLayer);
+assert.deepEqual(
+  [
+    tiledLayerMoveState?.bounds?.x0,
+    tiledLayerMoveState?.bounds?.y0,
+    tiledLayerMoveState?.bounds?.x1,
+    tiledLayerMoveState?.bounds?.y1,
+  ],
+  [1, 1, 1, 1]
+);
+assert.equal(tiledLayerMoveState?.indices?.[0], 1, 'layer move must preserve a painted tiled palette index');
 
 const tiledMaterialized = model.materializeLayerIndices(tiledNext, 64, 64, palette);
 assert.equal(tiledMaterialized instanceof Int16Array, true);
