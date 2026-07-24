@@ -67,7 +67,7 @@
 <link href="https://fonts.googleapis.com" rel="preconnect"/>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
 <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700&amp;display=swap" rel="stylesheet"/>
-<link href="styles.css?v=20260724-unified-catalog1" rel="stylesheet"/>
+<link href="styles.css?v=20260724-game-layout5" rel="stylesheet"/>
 <script src="../scripts/ad-account-control.js?v=20260719-no-ad-fallback1"></script>
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-2.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-2.png"/>
@@ -231,7 +231,6 @@
 <button class="button button--ghost button--compact" id="backButton" type="button">タイトル</button>
 <button class="button button--primary button--compact" id="resetButton" type="button">もう一度</button>
 <button aria-pressed="false" hidden="" id="fullscreenButton" type="button">全画面</button>
-<button class="button button--ghost button--compact button--danger" id="deletePuzzleButton" type="button" hidden="">削除</button>
 </div>
 </div>
 </header>
@@ -276,7 +275,7 @@
 </button>
 <button aria-pressed="false" class="creator-mode-chip" data-creator-mode="hidden-object" type="button">
 <strong>もの探し</strong>
-<span>元画像 + 探し物レイヤー</span>
+<span>画像へ直接マーカーを置く形式</span>
 </button>
 </div>
 <div class="creator-draw-links">
@@ -315,7 +314,7 @@
 </article>
 <article class="creator-guide__mode">
 <svg aria-hidden="true" viewBox="0 0 76 44"><rect x="4" y="6" width="29" height="32" rx="4" fill="#eaf2ff" stroke="#5e84c9" stroke-width="3"/><rect x="42" y="6" width="29" height="32" rx="4" fill="#fff" stroke="#667085" stroke-width="3"/><circle cx="56" cy="22" r="8" fill="#202938"/></svg>
-<p><strong>もの探し</strong><span>元画像と、<b>白地に黒で探す物だけ描いた画像</b>を1枚ずつ用意します。</span></p>
+<p><strong>もの探し</strong><span>画像を1枚選び、<b>その画像上で探す場所を直接マーク</b>します。</span></p>
 </article>
 </div>
 <details class="creator-guide__details">
@@ -344,8 +343,8 @@
 <p class="creator-guide__tip">判定サイズは、画像を選んだ後に表示される「サイズ」を見てください。拡大したドット絵は、このサイズが元ファイルより小さくなることがあります。</p>
 </section>
 <section class="creator-guide__rule">
-<h4>もの探し：黒い探し物は白地に描きます</h4>
-<p>2枚目は、<b>白い背景に探し物だけを黒で描いた画像</b>にします。黒い部分が1つの探し物です。角で触れているだけでも同じ1つとしてつながります。</p>
+<h4>もの探し：画像の上で直接マークします</h4>
+<p>画像を追加すると、その場で探してもらう場所に半透明の赤いマーカーを置けます。マーカーの中心と範囲は、元画像のピクセル座標として保存されます。</p>
 <div class="creator-guide__examples">
 <figure class="creator-pixel-example">
 <svg aria-label="黒い探し物の間に白い空きが1ピクセルで近すぎる例" role="img" viewBox="0 0 120 48"><rect class="creator-pixel-example__object" x="4" y="14" width="20" height="20"/><rect x="28" y="14" width="20" height="20"/><rect class="creator-pixel-example__object" x="52" y="14" width="20" height="20"/><path d="M4 7h68" stroke="#e94e73" stroke-width="2"/></svg>
@@ -356,7 +355,7 @@
 <figcaption><strong>■ □ □ ■</strong><span>空き2px → 別々の探し物</span></figcaption>
 </figure>
 </div>
-<p class="creator-guide__tip">黒はRGBすべて72以下で判定します。白地を基本にし、ぼかし・半透明・グレーの輪郭は使わないでください。元画像とレイヤー画像の大きさも必ず同じにします。</p>
+<p class="creator-guide__tip">画像を拡大・縮小しても、登録される位置は元画像のピクセル座標です。小さな対象は拡大してからマークしてください。</p>
 </section>
 </div>
 </details>
@@ -378,24 +377,25 @@
 </div>
 </div>
 <div class="creator-files">
-<label class="creator-file creator-dropzone" id="creatorOriginalDropzone">
+<div class="creator-file creator-dropzone" id="creatorOriginalDropzone">
 <input accept="image/png,image/jpeg,image/webp" class="creator-file__input" id="creatorOriginalInput" type="file"/>
-<span class="creator-file__title">お手本画像を追加</span>
-<span class="creator-file__hint">クリック／タップ、またはここへドロップ</span>
-</label>
-<label class="creator-file creator-dropzone" id="creatorDiffDropzone">
+<button class="creator-file__picker" id="creatorOriginalPicker" type="button"><span class="creator-file__title">お手本画像を追加</span><span class="creator-file__hint">クリック／タップ、またはここへドロップ</span></button>
+<img alt="選択したお手本画像のプレビュー" class="creator-file__preview" hidden="" id="creatorOriginalFilePreview"/>
+<div class="creator-marker-workspace" hidden="" id="creatorMarkerWorkspace">
+<div class="creator-marker-workspace__head"><strong>画像上で探す場所をマーク</strong><button class="button button--ghost button--compact" id="creatorMarkerReplace" type="button">画像を変更</button></div>
+<div class="creator-marker-toolbar" aria-label="マーカー編集操作"><button id="creatorMarkerZoomOut" type="button" aria-label="縮小">−</button><button class="creator-marker-reset" id="creatorMarkerZoomReset" type="button" aria-label="位置をリセット" title="位置をリセット"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 1-2.35-5.65L20 8"></path><path d="M20 4v4h-4"></path></svg></button><button id="creatorMarkerZoomIn" type="button" aria-label="拡大">＋</button><button id="creatorMarkerUndo" type="button">ひとつ戻す</button></div>
+<div class="creator-marker-viewport" id="creatorMarkerViewport"><div class="creator-marker-stage" id="creatorMarkerStage"><canvas aria-hidden="true" id="creatorMarkerSourceCanvas"></canvas><canvas aria-label="画像上に探す場所をマーク" id="creatorMarkerCanvas"></canvas></div></div>
+<p>画像を直接タップしてマーカーを追加。ドラッグで移動、ホイール・ピンチで拡大縮小できます。</p>
+</div>
+</div>
+<div class="creator-file creator-dropzone" id="creatorDiffDropzone">
 <input accept="image/png,image/jpeg,image/webp" class="creator-file__input" id="creatorDiffInput" type="file"/>
-<span class="creator-file__title" id="creatorDiffLabelText">間違い画像を追加</span>
-<span class="creator-file__hint">クリック／タップ、またはここへドロップ</span>
-</label>
-</div>
-<div class="creator-marker-workspace" id="creatorMarkerWorkspace" hidden="">
-<div class="creator-marker-workspace__head"><strong>探す場所をマーク</strong><button class="button button--primary button--compact" id="creatorMarkerOpen" type="button">マーカー編集を開く</button></div>
-<p>画像上をタップして、探してもらう場所を原寸ピクセル座標で登録します。</p>
-<iframe id="creatorMarkerFrame" title="もの探しマーカー編集" sandbox="allow-scripts" src="marker-editor.html"></iframe>
+<button class="creator-file__picker" id="creatorDiffPicker" type="button"><span class="creator-file__title" id="creatorDiffLabelText">間違い画像を追加</span><span class="creator-file__hint">クリック／タップ、またはここへドロップ</span></button>
+<img alt="選択した間違い画像のプレビュー" class="creator-file__preview" hidden="" id="creatorDiffFilePreview"/>
 </div>
 </div>
-<div class="creator-preview">
+</div>
+<div class="creator-preview" id="creatorPreview">
 <figure class="creator-preview-frame">
 <canvas aria-label="お手本画像のプレビュー" id="creatorPreviewOriginal"></canvas>
 <figcaption class="creator-preview-label">お手本</figcaption>
@@ -429,7 +429,7 @@
 </div>
 <script defer="" src="assets/puzzles/manifest.js"></script>
 <script src="../scripts/creator-play-rewards.js?v=2026.07.19-play-rewards1"></script>
-<script defer="" src="app.js?v=20260724-unified-catalog-marker1"></script>
+<script defer="" src="app.js?v=20260724-game-layout5"></script>
 <script src="../scripts/shared-profile-header.js"></script>
 <script data-pixieed-footer-ad="false" src="../scripts/shared-bottom-nav.js?v=20260724-icon-paths1"></script>
 <script src="../scripts/pixel-art-fit.js"></script>
