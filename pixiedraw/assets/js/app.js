@@ -3693,6 +3693,7 @@
   get getMirroredPointSet() { return getMirroredPointSet; },
   get getRasterLayerTransparentStorageValue() { return getRasterLayerTransparentStorageValue; },
   get getRasterLayerRuntimeStoredIndex() { return getRasterLayerRuntimeStoredIndex; },
+  get getStoredRasterLayerPaletteIndex() { return getStoredRasterLayerPaletteIndex; },
   get isCustomBrushData() { return isCustomBrushData; },
   get isGradientFillStyle() { return isGradientFillStyle; },
   get isIndexColorMode() { return isIndexColorMode; },
