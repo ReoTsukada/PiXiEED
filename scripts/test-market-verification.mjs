@@ -50,6 +50,8 @@ const publicLaunchMigration = fs.readFileSync('supabase/migrations/2026071920000
 const optionPricingMigration = fs.readFileSync('supabase/migrations/20260719210000_market_option_pricing.sql', 'utf8');
 const singlePriceMigration = fs.readFileSync('supabase/migrations/20260721120000_market_single_price_listings.sql', 'utf8');
 const sellerAutoApprovalMigration = fs.readFileSync('supabase/migrations/20260724110000_market_seller_auto_approval.sql', 'utf8');
+const wantPostsMigration = fs.readFileSync('supabase/migrations/20260724044823_market_want_posts.sql', 'utf8');
+const wantPostsUi = fs.readFileSync('market/market-want-posts.js', 'utf8');
 
 const requiredFormats = [
   'pixiedraw-project',
@@ -63,6 +65,31 @@ const requiredFormats = [
 requiredFormats.forEach((format) => {
   assert.match(migration, new RegExp(`'${format.replaceAll('-', '\\-')}'`));
 });
+
+assert.match(marketIndexHtml, /id="marketWantPostInput"[^>]*maxlength="25"/);
+assert.match(marketIndexHtml, /id="marketWantPostFields" hidden/);
+assert.match(marketIndexHtml, /id="marketWantPostToggle"[^>]*aria-expanded="false"/);
+assert.match(marketIndexHtml, /id="marketWantPostsTitle">欲しい素材</);
+assert.match(marketIndexHtml, /id="marketWantPostCancel">閉じる</);
+assert.match(marketIndexHtml, /id="marketQuickActionsToggle"[^>]*aria-controls="marketQuickActionsMenu"/);
+assert.match(marketIndexHtml, /id="marketSellButton" href="sell\.html"/);
+assert.match(wantPostsMigration, /create table if not exists public\.market_want_posts/i);
+assert.match(wantPostsMigration, /char_length\(body\) between 1 and 25/i);
+assert.match(wantPostsMigration, /body !~ E'\[\\\\r\\\\n\]'/i);
+assert.match(wantPostsMigration, /'32×32PXの4方向歩行素体'/);
+assert.match(wantPostsMigration, /'ほのぼのとした街のアセット'/);
+assert.match(wantPostsMigration, /returns table \(body text, created_at timestamptz\)/i);
+assert.match(wantPostsMigration, /timezone\('Asia\/Tokyo', now\(\)\)::date/i);
+assert.match(wantPostsMigration, /order by md5\(post\.id::text/i);
+assert.match(wantPostsMigration, /limit 1/i);
+assert.match(wantPostsMigration, /grant execute on function public\.market_public_want_posts_v1\(\) to anon, authenticated/i);
+assert.match(wantPostsMigration, /grant execute on function public\.market_create_want_post_v1\(text\) to authenticated/i);
+assert.match(wantPostsUi, /market_create_want_post_v1/);
+assert.match(wantPostsUi, /market_public_want_posts_v1/);
+assert.match(wantPostsUi, /scheduleDailyRefresh/);
+assert.match(wantPostsUi, /togglePostFields/);
+assert.match(wantPostsUi, /panel\.dataset\.mode = shouldOpen \? 'compose' : 'featured'/);
+assert.match(marketUi, /setQuickActionsOpen/);
 
 assert.match(migration, /create table if not exists public\.market_seller_profiles/i);
 assert.match(migration, /identity_status = 'verified'/i);

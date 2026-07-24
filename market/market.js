@@ -14,6 +14,9 @@
   const filterReset = document.getElementById('marketFilterReset');
   const advancedSearch = document.getElementById('marketAdvancedSearch');
   const sellButton = document.getElementById('marketSellButton');
+  const quickActions = document.getElementById('marketQuickActions');
+  const quickActionsToggle = document.getElementById('marketQuickActionsToggle');
+  const quickActionsMenu = document.getElementById('marketQuickActionsMenu');
   const fallbackIcon = '../assets/icons/Market.png';
   const favorites = window.PiXiEEDMarketFavorites;
   const discovery = window.PiXiEEDMarketDiscovery;
@@ -280,6 +283,19 @@
     filters.querySelectorAll('button').forEach((button) => button.classList.toggle('is-active', button.dataset.filter === 'all'));
     resetRenderLimit();
     render();
+  });
+  function setQuickActionsOpen(isOpen) {
+    if (!quickActionsToggle || !quickActionsMenu) return;
+    quickActionsMenu.hidden = !isOpen;
+    quickActionsToggle.setAttribute('aria-expanded', String(isOpen));
+  }
+  quickActionsToggle?.addEventListener('click', () => setQuickActionsOpen(quickActionsMenu?.hidden));
+  quickActionsMenu?.addEventListener('click', () => setQuickActionsOpen(false));
+  document.addEventListener('click', (event) => {
+    if (quickActions && event.target instanceof Node && !quickActions.contains(event.target)) setQuickActionsOpen(false);
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') setQuickActionsOpen(false);
   });
   sellButton?.addEventListener('click', async (event) => {
     event.preventDefault();
