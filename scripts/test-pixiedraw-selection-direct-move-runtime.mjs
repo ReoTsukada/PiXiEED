@@ -11,6 +11,7 @@ const context = {
   Math,
   Uint8Array,
   Uint8ClampedArray,
+  HTMLElement: class HTMLElement {},
   console,
   window: { PiXiEEDrawModules: {} },
 };
@@ -28,6 +29,7 @@ const palette = [
 ];
 const state = { width: 2, height: 2, palette };
 const pointerState = { lastSelectionMove: null };
+let activeLayer = null;
 let dirtyRectCount = 0;
 let renderCount = 0;
 let historyDirtyCount = 0;
@@ -36,7 +38,16 @@ const workflow = context.window.PiXiEEDrawModules.canvasPointerWorkflowUtils
   .createCanvasPointerWorkflowUtils({
     state,
     pointerState,
+    dom: { controls: { selectionTransformMenu: null } },
+    selectionTransformUi: {
+      hoverHandleId: '',
+      menuVisible: false,
+      menuHandleId: '',
+      menuLocalX: null,
+      menuLocalY: null,
+    },
     clamp: (value, min, max) => Math.max(min, Math.min(max, value)),
+    getActiveLayer: () => activeLayer,
     getSelectionMoveContentMask: moveState => moveState.contentMask,
     getSelectionMoveVisualBounds: moveState => ({
       x0: moveState.bounds.x0 + (Number(moveState.offset?.x) || 0),
@@ -46,13 +57,27 @@ const workflow = context.window.PiXiEEDrawModules.canvasPointerWorkflowUtils
     }),
     buildSelectionMoveTransformedEntries: (moveState, options = {}) => {
       const sourceMask = options.sourceMask || moveState.mask;
-      const sourceIndex = sourceMask === moveState.contentMask ? 0 : 0;
+      const entries = [];
+      let x0 = moveState.width;
+      let y0 = moveState.height;
+      let x1 = -1;
+      let y1 = -1;
+      for (let sourceIndex = 0; sourceIndex < sourceMask.length; sourceIndex += 1) {
+        if (sourceMask[sourceIndex] !== 1) continue;
+        const x = sourceIndex % moveState.width;
+        const y = Math.floor(sourceIndex / moveState.width);
+        entries.push({ x, y, sourceIndex });
+        x0 = Math.min(x0, x);
+        y0 = Math.min(y0, y);
+        x1 = Math.max(x1, x);
+        y1 = Math.max(y1, y);
+      }
       return {
-        entries: sourceMask[0] === 1 ? [{ x: 0, y: 0, sourceIndex }] : [],
-        bounds: sourceMask[0] === 1 ? { x0: 0, y0: 0, x1: 0, y1: 0 } : null,
-        mask: sourceMask[0] === 1 ? new Uint8Array([1]) : null,
-        width: sourceMask[0] === 1 ? 1 : 0,
-        height: sourceMask[0] === 1 ? 1 : 0,
+        entries,
+        bounds: entries.length ? { x0, y0, x1, y1 } : null,
+        mask: entries.length ? new Uint8Array(sourceMask) : null,
+        width: entries.length ? x1 - x0 + 1 : 0,
+        height: entries.length ? y1 - y0 + 1 : 0,
       };
     },
     getStoredRasterLayerPaletteIndex: (layer, index) => layer.indices[index] === 0 ? -1 : layer.indices[index],
@@ -67,8 +92,32 @@ const workflow = context.window.PiXiEEDrawModules.canvasPointerWorkflowUtils
     markHistoryDirty: () => { historyDirtyCount += 1; },
     markDirtyRect: () => { dirtyRectCount += 1; },
     requestRender: () => { renderCount += 1; },
+    requestOverlayRender: () => {},
     updateCanvasControlButtons: () => {},
   });
+
+activeLayer = {
+  id: 'rect-selection-layer',
+  indices: new Uint8Array([
+    1, 0,
+    0, 0,
+  ]),
+  indicesEncoding: 'uint8-palette-zero-transparent-v2',
+  direct: null,
+};
+workflow.createSelectionRect({ x: 0, y: 0 }, { x: 1, y: 1 });
+assert.deepEqual(
+  Array.from(state.selectionMask),
+  [1, 1, 1, 1],
+  'rect selection must include every transparent and painted cell inside its bounds'
+);
+assert.equal(
+  state.selectionContentMask,
+  null,
+  'rect selection must defer content sampling so later drawing inside transparent selected cells is included'
+);
+const rectSelectionMask = new Uint8Array(state.selectionMask);
+const rectSelectionBounds = { ...state.selectionBounds };
 
 state.selectionMask = new Uint8Array([
   1, 0,
@@ -108,6 +157,19 @@ const selectionWorkflow = context.window.PiXiEEDrawModules.selectionMoveWorkflow
     SELECTION_TRANSFORM_LARGE_PREVIEW_MAX_PIXELS: 4096,
   });
 
+activeLayer.indices[1] = 1;
+const freshlyDrawnRectMove = selectionWorkflow.createSelectionMoveState(
+  activeLayer,
+  rectSelectionBounds,
+  rectSelectionMask,
+  null
+);
+assert.deepEqual(
+  Array.from(freshlyDrawnRectMove.contentMask),
+  [1, 1, 0, 0],
+  'copy/move must sample content after pen drawing and still exclude untouched transparent selected cells'
+);
+
 const legacyDirectLayer = {
   id: 'legacy-direct-layer',
   indices: new Int16Array([-1, -1, -1, -1]),
@@ -132,6 +194,32 @@ const indexedMove = selectionWorkflow.createSelectionMoveState(
   new Uint8Array([1, 0, 0, 0])
 );
 assert.equal(indexedMove.direct, null, 'indexed selection moves do not allocate an unused RGBA copy');
+
+const protectedDestinationLayer = {
+  id: 'protected-destination-layer',
+  indices: new Uint8Array([2, 2, 2, 2]),
+  indicesEncoding: 'uint8-palette-zero-transparent-v2',
+  direct: null,
+  directOnly: false,
+};
+const protectedPasteState = {
+  layer: protectedDestinationLayer,
+  bounds: { x0: 0, y0: 0, x1: 1, y1: 1 },
+  width: 2,
+  height: 2,
+  mask: new Uint8Array([1, 1, 1, 1]),
+  contentMask: new Uint8Array([1, 0, 0, 0]),
+  indices: new Uint8Array([1, 0, 0, 0]),
+  direct: null,
+  offset: { x: 0, y: 0 },
+};
+const protectedPasteResult = workflow.placeSelectionPixels(protectedPasteState, 0, 0);
+assert.equal(protectedPasteResult.placed, true);
+assert.deepEqual(
+  Array.from(protectedDestinationLayer.indices),
+  [1, 2, 2, 2],
+  'transparent cells in a rectangular clipboard selection must not erase painted destination pixels'
+);
 
 const layer = {
   id: 'direct-layer',
