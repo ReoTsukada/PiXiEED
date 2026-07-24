@@ -501,6 +501,7 @@ body[data-pixieed-account-auth="signed-in"] .account-panel[data-account-tab="set
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
 }
+.account-pixfind-card .account-card-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .account-card-actions--listing { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .account-card-actions--listing .account-card-action {
   width: 100%;
@@ -1281,6 +1282,7 @@ body[data-pixieed-account-auth="signed-in"] #authPanel #logoutBtn {
   .account-chart-legend { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .account-chart-legend button { justify-content: flex-start; }
   .account-card-actions { grid-template-columns: minmax(0, 1fr) 32px; }
+  .account-pixfind-card .account-card-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .account-card-actions--single { grid-template-columns: 1fr; }
   .account-card-actions--listing { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
