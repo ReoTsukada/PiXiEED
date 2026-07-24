@@ -7,6 +7,7 @@ const dom = {
   difficultyBackButton: document.getElementById('difficultyBackButton'),
   gameBackButton: document.getElementById('gameBackButton'),
   resetButton: document.getElementById('resetButton'),
+  zoomResetButton: document.getElementById('zoomResetButton'),
   fullscreenButton: document.getElementById('fullscreenButton'),
   difficultyChips: Array.from(document.querySelectorAll('[data-difficulty]')),
   modeChips: Array.from(document.querySelectorAll('[data-game-mode]')),
@@ -226,11 +227,11 @@ const MAX_MISTAKES = 3;
 const TAP_MAX_MOVEMENT_PX = 8;
 const TAP_MAX_DURATION_MS = 320;
 const ZOOM_MIN_SCALE = 1;
-const ZOOM_MAX_SCALE = 20;
-// Integer scales keep a pixel-art canvas on a stable physical-pixel grid.
-const ZOOM_STEPS = Object.freeze([1, 2, 3, 4, 6, 8, 10, 12, 16, 20]);
-const ZOOM_WHEEL_STEP_BASE = 1.25;
-const ZOOM_WHEEL_RAW_RESET_MS = 160;
+// The displayed canvas is already fitted to its frame at 1x.  Keep game
+// gestures continuous from that fitted view, just like the marker editor.
+const ZOOM_MAX_SCALE = 16;
+const GAME_ZOOM_IN_FACTOR = 1.06;
+const GAME_ZOOM_OUT_FACTOR = 0.94;
 const GAME_MODE_SPOT_DIFFERENCE = 'spot-difference';
 const GAME_MODE_HIDDEN_OBJECT = 'hidden-object';
 const DEFAULT_GAME_MODE = GAME_MODE_SPOT_DIFFERENCE;
@@ -601,6 +602,10 @@ async function init() {
   dom.resetButton?.addEventListener('click', () => {
     if (!state.currentPuzzle) return;
     resetRound();
+  });
+
+  dom.zoomResetButton?.addEventListener('click', () => {
+    resetAllZoomTransforms();
   });
 
   dom.resultRetryButton?.addEventListener('click', () => {
@@ -2986,6 +2991,7 @@ function updatePixfindTabBarActions(screen) {
     tabBar.setActions([
       { id: 'puzzle-list', label: '問題選択', selector: '#gameBackButton', icon: 'Back.png' },
       { id: 'retry', label: 'もう一度', selector: '#resetButton', icon: 'onemore.png' },
+      { id: 'reset-view', label: '表示リセット', selector: '#zoomResetButton', icon: '../assets/icons/reload.png' },
       { id: 'fullscreen', label: '拡大', selector: '#fullscreenButton', icon: '拡大.png', iconWhenPressed: '縮小.png', mirrorState: true, mode: 'fullscreen', fullscreenController: 'game', placement: 'leading' },
     ]);
     return;
@@ -4409,15 +4415,6 @@ function createCanvasInteractionController(canvas, overlay, onTap, onTransform) 
     minScale: ZOOM_MIN_SCALE,
     maxScale: ZOOM_MAX_SCALE,
   };
-  let wheelRawScale = null;
-  let wheelRawResetTimer = null;
-
-  function normalizeZoomScale(value, fallback = controllerState.scale) {
-    const numeric = clamp(Number(value) || Number(fallback) || config.minScale, config.minScale, config.maxScale);
-    return ZOOM_STEPS.reduce((closest, step) => (
-      Math.abs(step - numeric) < Math.abs(closest - numeric) ? step : closest
-    ), ZOOM_STEPS[0]);
-  }
 
   function applyTransform({ sync = true } = {}) {
     const transform = `translate3d(${controllerState.offsetX}px, ${controllerState.offsetY}px, 0) scale(${controllerState.scale})`;
@@ -4463,6 +4460,14 @@ function createCanvasInteractionController(canvas, overlay, onTap, onTransform) 
     const previousScale = controllerState.scale;
     const normalizedScale = clamp(nextScale, config.minScale, config.maxScale);
     if (!Number.isFinite(normalizedScale) || normalizedScale === previousScale) return false;
+    // Returning to the fitted scale also returns the image to the centre.
+    // This makes a zoom-out gesture recover the initial game view predictably.
+    if (normalizedScale <= config.minScale + 0.0001) {
+      controllerState.scale = config.minScale;
+      controllerState.offsetX = 0;
+      controllerState.offsetY = 0;
+      return true;
+    }
     const scaleChange = normalizedScale / previousScale;
     // Keep the image pixel under the pinch/wheel focal point fixed, including
     // when the image was already panned before the next zoom gesture.
@@ -4551,7 +4556,7 @@ function createCanvasInteractionController(canvas, overlay, onTap, onTransform) 
       }
       const distance = calculatePointerDistance(first, second);
       const rawScale = controllerState.initialScale * (distance / controllerState.initialDistance);
-      const nextScale = normalizeZoomScale(rawScale, controllerState.scale);
+      const nextScale = clamp(rawScale, config.minScale, config.maxScale);
       if (!Number.isFinite(nextScale) || Number.isNaN(nextScale)) {
         return;
       }
@@ -4571,7 +4576,7 @@ function createCanvasInteractionController(canvas, overlay, onTap, onTransform) 
           controllerState.tapCandidate = null;
         }
       }
-      if (controllerState.scale > 1) {
+      if (controllerState.scale > config.minScale + 0.0001) {
         updatePan(point);
       } else {
         controllerState.lastPanPoint = { x: point.x, y: point.y };
@@ -4634,21 +4639,13 @@ function createCanvasInteractionController(canvas, overlay, onTap, onTransform) 
     event.preventDefault();
     const deltaModeScale = event.deltaMode === 1 ? 16 : (event.deltaMode === 2 ? 180 : 1);
     const normalizedDelta = clamp(event.deltaY * deltaModeScale, -600, 600);
-    const wheelSteps = normalizedDelta / 100;
-    if (!Number.isFinite(wheelSteps) || Math.abs(wheelSteps) < 0.001) return;
-
+    if (!Number.isFinite(normalizedDelta) || Math.abs(normalizedDelta) < 0.001) return;
     const previousScale = controllerState.scale;
-    const rawScale = Number.isFinite(wheelRawScale) ? wheelRawScale : previousScale;
-    wheelRawScale = clamp(rawScale * Math.pow(ZOOM_WHEEL_STEP_BASE, -wheelSteps), config.minScale, config.maxScale);
-    if (wheelRawResetTimer !== null) {
-      window.clearTimeout(wheelRawResetTimer);
-    }
-    wheelRawResetTimer = window.setTimeout(() => {
-      wheelRawScale = null;
-      wheelRawResetTimer = null;
-    }, ZOOM_WHEEL_RAW_RESET_MS);
-
-    const nextScale = normalizeZoomScale(wheelRawScale, previousScale);
+    const nextScale = clamp(
+      previousScale * (normalizedDelta < 0 ? GAME_ZOOM_IN_FACTOR : GAME_ZOOM_OUT_FACTOR),
+      config.minScale,
+      config.maxScale,
+    );
     if (nextScale === previousScale) {
       return;
     }
