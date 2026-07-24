@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>PiXFiND マーカー編集</title>
+<link rel="stylesheet" href="marker-editor.css">
+<main class="marker-editor">
+  <header><strong>マーカー編集</strong><span id="status">画像を受け取ると編集できます</span></header>
+  <div class="toolbar"><button id="zoomOut" type="button">−</button><button id="zoomReset" type="button">100%</button><button id="zoomIn" type="button">＋</button><button id="undo" type="button">ひとつ戻す</button></div>
+  <div class="viewport" id="viewport"><canvas id="canvas" aria-label="画像上に探す場所をマーク"></canvas></div>
+  <p>タップ: マーカー追加　/　ドラッグ: 移動　/　ホイール・ピンチ: 拡大縮小</p>
+</main>
+<script src="marker-editor.js"></script>
