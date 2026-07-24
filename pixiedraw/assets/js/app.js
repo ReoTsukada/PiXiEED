@@ -1190,10 +1190,33 @@
     return uiLanguageUtilsModule.localizeUiThemePresetLabel(...arguments);
   }
 
+  function scheduleLegacyProjectReopenNotice() {
+    let alreadySeen = false;
+    try {
+      alreadySeen = window.localStorage.getItem(LEGACY_PROJECT_REOPEN_NOTICE_SEEN_KEY) === '1';
+    } catch (error) {
+      // Storage can be unavailable in private browsing. Show the notice rather
+      // than hiding an important recovery instruction.
+    }
+    if (alreadySeen) return;
+    try {
+      window.localStorage.setItem(LEGACY_PROJECT_REOPEN_NOTICE_SEEN_KEY, '1');
+    } catch (error) {
+      // The notice remains safe to show even if it cannot be remembered.
+    }
+    window.setTimeout(() => {
+      window.alert(localizeText(
+        '今回の修正により、最初にプロジェクトを開いた時だけ、描画情報が消えたように見えたり、色が変更されてしまう不具合が起きています。\n\nもし消えてしまった方がおりましたら、プロジェクトを一度開き直してください。\n\nそして万が一色が変更されてしまった方がおりましたら、色の調整をもう一度行っていただく場合がございます。大変申し訳ございません。',
+        'After this update, only the first project open may temporarily make artwork appear missing or colors appear changed. If this happens, please open the project once more. If colors were changed, you may need to adjust them again. We sincerely apologize.'
+      ));
+    }, 0);
+  }
+
   setDocumentLanguage();
   let sessionPersistHandle = null;
   let sessionPersistIdleHandle = null;
   let sessionPersistIncludeReloadSnapshot = false;
+  const LEGACY_PROJECT_REOPEN_NOTICE_SEEN_KEY = 'pixieedraw:legacy-project-reopen-notice:20260724-render-refresh1';
   let lastSaveInteractionAt = 0;
   let lastViewportInteractionAt = 0;
   const runtimeStaticConfig = window.PiXiEEDrawModules?.uiStaticConfig?.createRuntimeStaticConfig?.() || {};
@@ -27336,6 +27359,7 @@
         document.body.classList.add('app-ready');
       }
       startupReady = true;
+      scheduleLegacyProjectReopenNotice();
       if (typeof window !== 'undefined') {
         window.__PIXIEEDRAW_EDITOR_READY__ = true;
         Promise.resolve(window.__PIXIEEDRAW_LOAD_ADS__?.())

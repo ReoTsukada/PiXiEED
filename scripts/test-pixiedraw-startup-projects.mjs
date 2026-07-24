@@ -26,7 +26,7 @@ for (const html of [index]) {
 }
 assert.match(index, /startup-workflow-utils\.js\?v=20260720-pxd1/);
 assert.match(index, /document-model\.js\?v=20260724-legacy-cow-migration1/);
-assert.match(index, /app\.js\?v=20260724-159-legacy-cow-migration1/);
+assert.match(index, /app\.js\?v=20260724-161-legacy-project-reopen-notice1/);
 assert.match(index, /timeline-layers\.js\?v=20260724-timeline-tap-sync10/);
 assert.match(index, /retired-collaboration-compat\.js\?v=20260724-timeline-selection2/);
 for (const source of [startup]) {
@@ -85,6 +85,8 @@ function verifyStartupDismissFocus(source) {
 verifyStartupDismissFocus(startup);
 assert.match(app, /showLocalProjects[\s\S]{0,900}showStartupScreen\(\{ refreshWorkspace: true \}\)/);
 assert.match(app, /upgradeLegacyRasterDocumentsToCopyOnWrite[\s\S]{0,900}legacyRasterMigrationResult/);
+assert.match(app, /LEGACY_PROJECT_REOPEN_NOTICE_SEEN_KEY[\s\S]{0,1200}window\.alert\([\s\S]{0,900}プロジェクトを一度開き直してください[\s\S]{0,450}色の調整をもう一度行っていただく場合がございます/);
+assert.match(app, /startupReady = true;[\s\S]{0,100}scheduleLegacyProjectReopenNotice\(\)/);
 assert.match(app, /timelineMatrixViewportPan = \{[\s\S]{0,120}startedOnControl: false/);
 assert.match(await read('pixiedraw\/assets\/js\/modules\/timeline-layers.js'), /activationThreshold[\s\S]{0,220}startedOnControl/);
 assert.match(startup, /startupWorkspaceSearchQuery/);
