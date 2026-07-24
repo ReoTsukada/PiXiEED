@@ -1165,15 +1165,15 @@ body.is-playing {
   padding: var(--screen-padding-top) var(--screen-padding-right) var(--screen-padding-bottom) var(--screen-padding-left);
   background: rgba(18, 22, 38, 0.65);
   backdrop-filter: blur(6px);
-  /* A creator session is modal. Keep it above the shared action and
-     navigation bars so they cannot cover the bottom controls or intercept taps. */
-  z-index: 14090;
+  /* The shared bars remain usable. Their own geometry narrows this overlay
+     below the action bar and beside/above the navigation rather than hiding it. */
+  z-index: 950;
 }
 
 .creator-panel {
   position: relative;
   width: min(980px, 100%);
-  max-height: calc(var(--app-height) - var(--screen-padding-top) - var(--screen-padding-bottom));
+  max-height: 100%;
   background: var(--panel);
   border-radius: 28px;
   box-shadow: var(--panel-shadow);
@@ -2194,7 +2194,8 @@ body.is-playing {
 
   .creator-panel {
     padding: clamp(0.75rem, 2.6vmin, 1.1rem);
-    height: calc(var(--app-height) - var(--screen-padding-top) - var(--screen-padding-bottom));
+    height: 100%;
+    max-height: 100%;
     grid-template-rows: auto auto minmax(0, 1fr);
     gap: 0.5rem;
   }
@@ -2369,12 +2370,15 @@ body.is-playing {
 /* Shared navigation-aware game geometry. Canvas zoom/pan stays inside these surfaces. */
 body[data-pixieed-page="pixfind"] .screen--difficulty,
 body[data-pixieed-page="pixfind"] .screen--game {
-  padding-top: max(var(--screen-padding-top), calc(var(--pixieed-common-content-top, 0px) + 0.45rem));
+  /* PiXFiND's app is already positioned below the shared action bar. */
+  padding-top: max(0.35rem, var(--safe-top));
 }
 
 body[data-pixieed-page="pixfind"] .creator-overlay {
-  padding-top: max(var(--screen-padding-top), calc(var(--pixieed-common-content-top, 0px) + 0.45rem));
-  padding-bottom: max(var(--screen-padding-bottom), calc(var(--pixieed-shared-bottom-nav-offset, 68px) + 0.45rem));
+  /* shared-tab-bar.js already moves the overlay between the top action bar
+     and the bottom/right navigation. Do not add those bar dimensions twice. */
+  padding-top: max(0.45rem, var(--safe-top));
+  padding-bottom: max(0.45rem, var(--safe-bottom));
 }
 
 /* Pixel-art zoom stays sharp: the canvas is scaled as nearest-neighbour pixels. */
@@ -2391,7 +2395,7 @@ body[data-pixieed-page="pixfind"] .creator-overlay {
 }
 
 .screen--game {
-  padding-top: max(0.2rem, calc(var(--pixieed-common-content-top, 0px) + 0.12rem)) !important;
+  padding-top: max(0.25rem, var(--safe-top)) !important;
 }
 
 .screen--game .game-header {
