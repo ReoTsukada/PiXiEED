@@ -23,14 +23,55 @@ vm.runInThisContext(
 );
 
 const state = {
+  width: 3,
+  height: 2,
   palette: [
     { r: 0, g: 0, b: 0, a: 0 },
     { r: 255, g: 32, b: 32, a: 255 },
     { r: 32, g: 144, b: 255, a: 255 },
   ],
 };
+const getStoredRasterLayerPaletteIndex = (layer, index) => {
+  if (layer?.indicesTiles instanceof Map) {
+    const width = Math.max(1, Number(layer.indicesWidth) || state.width);
+    const tileSize = Math.max(1, Number(layer.indicesTileSize) || 32);
+    const x = index % width;
+    const y = Math.floor(index / width);
+    const tileCols = Math.ceil(width / tileSize);
+    const tileIndex = Math.floor(y / tileSize) * tileCols + Math.floor(x / tileSize);
+    const localIndex = (y % tileSize) * tileSize + (x % tileSize);
+    const stored = layer.indicesTiles.get(tileIndex)?.[localIndex] || 0;
+    return stored === 0 ? -1 : stored - 1;
+  }
+  const stored = layer?.indices?.[index];
+  if (layer?.indices instanceof Uint8Array) {
+    return stored > 0 ? stored : -1;
+  }
+  return Number.isFinite(stored) ? stored : -1;
+};
+const setRasterLayerRuntimeStoredIndex = (layer, index, value) => {
+  if (!(layer?.indicesTiles instanceof Map)) {
+    layer.indices[index] = value;
+    return true;
+  }
+  const width = Math.max(1, Number(layer.indicesWidth) || state.width);
+  const tileSize = Math.max(1, Number(layer.indicesTileSize) || 32);
+  const x = index % width;
+  const y = Math.floor(index / width);
+  const tileCols = Math.ceil(width / tileSize);
+  const tileIndex = Math.floor(y / tileSize) * tileCols + Math.floor(x / tileSize);
+  const localIndex = (y % tileSize) * tileSize + (x % tileSize);
+  let tile = layer.indicesTiles.get(tileIndex);
+  if (!tile) {
+    tile = new Uint8Array(tileSize * tileSize);
+    layer.indicesTiles.set(tileIndex, tile);
+  }
+  tile[localIndex] = value <= 0 ? 0 : value + 1;
+  return true;
+};
 const utils = window.PiXiEEDrawModules.canvasPointerWorkflowUtils.createCanvasPointerWorkflowUtils({
   state,
+  getStoredRasterLayerPaletteIndex,
   window,
   Uint8Array,
   Int16Array,
@@ -54,6 +95,24 @@ const directTransparent = utils.getLayerPixelMatchState(directLayer, 0);
 assert.equal(directTransparent?.transparent, true, 'legacy transparent pixels must be fill/select targets');
 assert.equal(utils.layerPixelMatchesMatchState(directTransparent, 0), true);
 
+const tiledPixels = new Uint8Array(32 * 32);
+tiledPixels[0] = 2;
+const tiledLayer = {
+  indices: new Uint8Array(0),
+  indicesEncoding: 'uint8-tiled-zero-transparent-v1',
+  indicesTiles: new Map([[0, tiledPixels]]),
+  indicesWidth: 3,
+  indicesHeight: 2,
+  indicesTileSize: 32,
+  direct: null,
+};
+assert.equal(utils.layerHasDrawablePixel(tiledLayer, 0, 0), true, 'selection tools must see a painted tiled pixel');
+assert.equal(utils.layerHasDrawablePixel(tiledLayer, 1, 0), false, 'selection tools must keep an empty tiled pixel transparent');
+const tiledMatch = utils.getLayerPixelMatchState(tiledLayer, 0);
+assert.equal(tiledMatch?.paletteIndex, 1);
+assert.equal(utils.layerPixelMatchesMatchState(tiledMatch, 0), true);
+assert.equal(utils.layerPixelMatchesMatchState(tiledMatch, 1), false);
+
 const fillState = {
   width: 3,
   height: 2,
@@ -76,7 +135,9 @@ const drawing = window.PiXiEEDrawModules.canvasDrawingWorkflowUtils.createCanvas
   Number,
   Math,
   getActiveLayer: () => fillLayer,
+  getActiveFrame: () => ({ layers: [fillLayer] }),
   getActiveProjectCanvasDocument: () => fillState,
+  getStoredRasterLayerPaletteIndex,
   isIndexColorMode: () => true,
   isRgbColorMode: () => false,
   isMultiPaletteIsolationEnabled: () => false,
@@ -87,8 +148,11 @@ const drawing = window.PiXiEEDrawModules.canvasDrawingWorkflowUtils.createCanvas
   layerPixelMatchesMatchState: utils.layerPixelMatchesMatchState,
   isMirrorEnabledForTool: () => false,
   isSimulationLayer: () => false,
-  writeLayerRuntimeIndex: (layer, index, value) => { layer.indices[index] = value; return true; },
-  readLayerRuntimeIndex: (layer, index) => layer.indices[index],
+  getRasterLayerRuntimeStoredIndex: (layer, index) => {
+    const paletteIndex = getStoredRasterLayerPaletteIndex(layer, index);
+    return paletteIndex >= 0 ? paletteIndex : 0;
+  },
+  setRasterLayerRuntimeStoredIndex,
   preparePendingSolidFillPatch: () => { preparedPatchCalls += 1; return {}; },
   preparePendingSolidFillRuns: () => { preparedPatchCalls += 1; return {}; },
   recordPendingPixelPatchBefore: (_layer, index) => {
@@ -104,12 +168,55 @@ const drawing = window.PiXiEEDrawModules.canvasDrawingWorkflowUtils.createCanvas
   SELECT_SAME_MODE_GLOBAL: 'global',
   normalizeFillStyle: value => value,
   normalizeColorValue: value => value,
+  getDisplayedLayerVisibility: () => true,
+  getDisplayedLayerPreviewOpacity: () => 1,
+  normalizeLayerBlendMode: value => value || 'normal',
+  compositeLayerPixelNormalized: (data, offset, r, g, b, a) => {
+    data[offset] = r; data[offset + 1] = g; data[offset + 2] = b; data[offset + 3] = a;
+  },
+  findNearestPaletteIndexForColor: color => fillState.palette.findIndex(candidate => (
+    candidate.r === color.r
+    && candidate.g === color.g
+    && candidate.b === color.b
+    && candidate.a === color.a
+  )),
+  colorsMatchRgba: (left, right) => left?.r === right?.r
+    && left?.g === right?.g
+    && left?.b === right?.b
+    && left?.a === right?.a,
   isGradientFillStyle: () => false,
 });
 drawing.floodFill(0, 0, 1);
 assert.deepEqual(Array.from(fillLayer.indices), [1, 1, 2, 1, 1, 2], 'connected Fill must replace an index-0 background without crossing a colored boundary');
 assert.equal(historyDirtyCalls, 1, 'a fill must commit history once');
 assert.equal(dirtyRects.length, 1, 'a fill must dirty one bounding rectangle');
+
+fillState.width = 3;
+fillState.height = 2;
+const sparseFillTile = new Uint8Array(32 * 32);
+sparseFillTile[2] = 3;
+sparseFillTile[34] = 3;
+fillLayer = {
+  indices: new Uint8Array(0),
+  indicesEncoding: 'uint8-tiled-zero-transparent-v1',
+  indicesTiles: new Map([[0, sparseFillTile]]),
+  indicesWidth: 3,
+  indicesHeight: 2,
+  indicesTileSize: 32,
+  direct: null,
+  directOnly: false,
+};
+const sampledTiledColor = drawing.sampleCompositeColor(0, 0);
+assert.equal(sampledTiledColor.color, null, 'eyedropper must keep a transparent tiled pixel empty');
+drawing.floodFill(0, 0, 1);
+assert.deepEqual(
+  [0, 1, 2, 3, 4, 5].map(index => getStoredRasterLayerPaletteIndex(fillLayer, index)),
+  [1, 1, 2, 1, 1, 2],
+  'Fill must paint a transparent tiled region without crossing existing content'
+);
+const sampledFilledColor = drawing.sampleCompositeColor(0, 0);
+assert.equal(sampledFilledColor.mode, 'index', 'eyedropper must recognize a color painted into tiled storage');
+assert.equal(sampledFilledColor.index, 1);
 
 fillLayer = { indices: new Uint8Array([2, 2, 1, 2, 1, 2]), direct: null, directOnly: false };
 fillState.selectSameMode = 'connected';
