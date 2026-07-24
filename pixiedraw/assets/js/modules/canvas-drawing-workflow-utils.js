@@ -981,16 +981,24 @@
     if (!layer || !(runs instanceof Int32Array) || !runs.length) return false;
     const width = Math.max(1, Number(state.width) || 1);
     const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
-    const layerPixelCount = (layer.indices instanceof Int16Array || layer.indices instanceof Uint8Array)
+    const canvasPixelCount = width * Math.max(1, Number(state.height) || 1);
+    const layerPixelCount = (
+      (layer.indices instanceof Int16Array || layer.indices instanceof Uint8Array)
+      && layer.indices.length > 0
+    )
       ? layer.indices.length
-      : (width * Math.max(1, Number(state.height) || 1));
+      : canvasPixelCount;
     const fillPatch = preparePendingSolidFillRuns?.(layer, runs, paletteIndex) || null;
     let changed = false;
     let x0 = width; let y0 = Math.max(1, Number(state.height) || 1); let x1 = -1; let y1 = -1;
     for (let offset = 0; offset + 1 < runs.length; offset += 2) {
       const start = Math.max(0, runs[offset]);
       const end = Math.min(layerPixelCount, start + Math.max(0, runs[offset + 1]));
-      if (fillPatch && (layer.indices instanceof Int16Array || layer.indices instanceof Uint8Array)) {
+      if (
+        fillPatch
+        && (layer.indices instanceof Int16Array || layer.indices instanceof Uint8Array)
+        && layer.indices.length >= layerPixelCount
+      ) {
         // The history helper has already captured the old values.  A typed
         // array fill maps to the platform's contiguous-memory fast path,
         // which is the important difference for a 1000px-wide bucket fill.
@@ -1058,15 +1066,14 @@
     const fillMode = normalizeSelectSameMode(state.selectSameMode, SELECT_SAME_MODE_CONNECTED);
     const paletteIndex = indexMode ? resolveDrawPaletteIndex(paletteIndexOverride) : -1;
     const drawRgbColor = indexMode ? null : normalizeColorValue(getActiveDrawColor(undefined, paletteIndexOverride));
-    const indices = layer.indices instanceof Int16Array || layer.indices instanceof Uint8Array
-      ? layer.indices
-      : null;
     const startIdx = y * width + x;
     const matchState = getLayerPixelMatchState(layer, startIdx);
     if (!matchState) {
       return;
     }
-    const targetIndex = indices ? indices[startIdx] : -1;
+    const targetIndex = Number.isInteger(matchState.paletteIndex)
+      ? matchState.paletteIndex
+      : readLayerRuntimeIndex(layer, startIdx);
     if (!gradientFill && indexMode && targetIndex >= 0 && targetIndex === paletteIndex) {
       return;
     }
@@ -1239,16 +1246,15 @@
       if (layerOpacity <= 0) {
         continue;
       }
-      const indices = layer.indices instanceof Int16Array || layer.indices instanceof Uint8Array
-        ? layer.indices
-        : null;
       const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
-      const paletteIndex = indices ? indices[pixelIndex] : -1;
+      const paletteIndex = typeof getStoredRasterLayerPaletteIndex === 'function'
+        ? getStoredRasterLayerPaletteIndex(layer, pixelIndex)
+        : readLayerRuntimeIndex(layer, pixelIndex);
       let srcR = 0;
       let srcG = 0;
       let srcB = 0;
       let srcA = 0;
-      if (paletteIndex > 0) {
+      if (paletteIndex >= 0) {
         const color = state.palette[paletteIndex];
         if (!color) {
           continue;
