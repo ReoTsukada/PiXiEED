@@ -11,8 +11,9 @@ const toolFullscreen = fs.readFileSync(path.join(root, 'scripts/tool-fullscreen.
 const maoitu = fs.readFileSync(path.join(root, 'maoitu/index.html'), 'utf8');
 
 assert.match(html, /<body data-pixfind-screen="start">/);
-assert.match(html, /styles\.css\?v=20260724-result-panel10/);
-assert.match(html, /app\.js\?v=20260724-result-panel10/);
+assert.match(html, /styles\.css\?v=20260724-creator-modal-layer11/);
+assert.match(css, /creator-overlay \{[\s\S]*z-index: 14090;/);
+assert.match(html, /app\.js\?v=20260724-game-creator-zoom11/);
 assert.match(html, /class="puzzle-gallery pixfind-catalog"/);
 assert.match(html, /id="creatorMarkerViewport"/);
 assert.match(html, /id="creatorMarkerSourceCanvas"/);
@@ -33,7 +34,8 @@ assert.doesNotMatch(html, /class="(?:start-ad|difficulty-ad|game-ad)"/);
 assert.doesNotMatch(html, /deletePuzzleButton/);
 
 assert.match(app, /document\.body\.dataset\.pixfindScreen = target/);
-assert.match(app, /const ZOOM_WHEEL_STEP_BASE = 1\.25;/);
+assert.match(app, /const GAME_ZOOM_IN_FACTOR = 1\.06;/);
+assert.match(app, /const GAME_ZOOM_OUT_FACTOR = 0\.94;/);
 assert.match(app, /const HIDDEN_OBJECT_TARGET_LIMIT = 10;/);
 assert.match(app, /orderedRegions\.slice\(0, HIDDEN_OBJECT_TARGET_LIMIT\)/);
 assert.match(app, /function updatePixfindTabBarActions\(screen\)/);
@@ -42,6 +44,7 @@ assert.match(app, /event\.preventDefault\(\);\s*const deltaModeScale = event\.de
 assert.doesNotMatch(app, /if \(!event\.ctrlKey\) \{\s*return;\s*\}/s);
 assert.match(app, /keep the frame fully covered instead of allowing a 1px edge/);
 assert.match(app, /function zoomAroundFramePoint\(nextScale, framePointX, framePointY\)/);
+assert.match(app, /Returning to the fitted scale also returns the image to the centre/);
 assert.match(app, /return Math\.max\(0, \(scaledSize - frameSize\) \/ 2\);/);
 assert.doesNotMatch(app, /minimumVisible/);
 assert.match(app, /frame\.addEventListener\('wheel', handleWheel/);
