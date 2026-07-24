@@ -258,6 +258,12 @@ html[data-pixieed-market-access="denied"] body > #marketDevGate { visibility: vi
 .market-quick-actions__toggle { width: 50px; height: 50px; padding: 0 0 3px; border: 3px solid #f8fafc; border-radius: 12px; background: #635bff; box-shadow: 4px 4px 0 rgba(2,6,23,.9); color: #fff; font: 900 34px/1 system-ui, sans-serif; cursor: pointer; transition: transform .14s ease, background .14s ease; }
 .market-quick-actions__toggle:hover, .market-quick-actions__toggle:focus-visible { background: #7c75ff; outline: 0; transform: translate(-1px, -1px); }
 .market-quick-actions__toggle[aria-expanded="true"] { background: #273249; transform: rotate(45deg); }
+@media (orientation: landscape) {
+  .market-quick-actions {
+    right: calc(var(--pixieed-shared-side-nav-width, 76px) + 16px + env(safe-area-inset-right, 0px));
+    bottom: max(16px, env(safe-area-inset-bottom, 0px));
+  }
+}
 
 .market-count {
   color: #94a3b8;
