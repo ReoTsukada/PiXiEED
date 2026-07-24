@@ -453,6 +453,22 @@ body.is-playing {
   text-underline-offset: 2px;
 }
 
+/* Unified catalog: retains PiXFiND's controls while using a functional,
+   marketplace-like responsive card grid. */
+.pixfind-catalog { width:min(1180px,100%); margin:0 auto; }
+.pixfind-catalog__head { display:flex; align-items:end; justify-content:space-between; gap:1rem; margin-bottom:1rem; }
+.pixfind-catalog__head .tagline { margin:0 0 .2rem; color:var(--text-muted); font-size:.72rem; letter-spacing:.14em; }
+.pixfind-catalog .puzzle-list { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:14px; align-items:stretch; }
+.pixfind-catalog .puzzle-card { display:grid; grid-template-areas:'thumb' 'body' 'actions'; grid-template-rows:auto 1fr auto; min-width:0; }
+.pixfind-catalog .puzzle-card__thumb { aspect-ratio:1 / .72; }
+.pixfind-catalog .puzzle-card__meta { flex-direction:column; }
+.pixfind-catalog .puzzle-list-ad { grid-column:1 / -1; width:100%; }
+.creator-marker-workspace { display:grid; gap:.6rem; padding:.75rem; border:1px solid rgba(255,111,141,.42); border-radius:14px; background:rgba(255,247,249,.82); }
+.creator-marker-workspace__head { display:flex; align-items:center; justify-content:space-between; gap:.6rem; }
+.creator-marker-workspace p { margin:0; color:var(--text-muted); font-size:.8rem; }
+.creator-marker-workspace iframe { width:100%; min-height:390px; border:0; border-radius:10px; background:#101725; }
+@media (max-width:620px){.pixfind-catalog__head{align-items:center}.pixfind-catalog .puzzle-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.pixfind-catalog .puzzle-card__title{font-size:.95rem}.creator-marker-workspace iframe{min-height:330px}}
+
 .author-avatar {
   width: 18px;
   height: 18px;
