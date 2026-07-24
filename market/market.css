@@ -252,7 +252,7 @@ html[data-pixieed-market-access="denied"] body > #marketDevGate { visibility: vi
 .market-quick-actions { position: fixed; z-index: 70; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(var(--pixieed-shared-bottom-nav-offset, 0px) + 16px); display: grid; justify-items: end; gap: 9px; }
 .market-quick-actions__menu { display: grid; justify-items: end; gap: 7px; }
 .market-quick-actions__menu[hidden] { display: none; }
-.market-quick-actions__choice { min-height: 34px; padding: 7px 11px; border: 2px solid #c5d8f6; border-radius: 6px; background: #19345c; box-shadow: 3px 3px 0 rgba(2,6,23,.88); color: #f8fafc; font: 800 11px/1.2 'DotGothic16', monospace; text-decoration: none; cursor: pointer; }
+.market-quick-actions__choice { display: inline-grid; width: 112px; min-height: 48px; box-sizing: border-box; padding: 8px; place-items: center; border: 2px solid #c5d8f6; border-radius: 8px; background: #19345c; box-shadow: 3px 3px 0 rgba(2,6,23,.88); color: #f8fafc; font: 800 13px/1.2 'DotGothic16', monospace; text-decoration: none; cursor: pointer; }
 .market-quick-actions__choice.is-sell { border-color: #a7f3d0; background: #176b55; }
 .market-quick-actions__choice.is-post { border-color: #bfdbfe; }
 .market-quick-actions__toggle { width: 50px; height: 50px; padding: 0 0 3px; border: 3px solid #f8fafc; border-radius: 12px; background: #635bff; box-shadow: 4px 4px 0 rgba(2,6,23,.9); color: #fff; font: 900 34px/1 system-ui, sans-serif; cursor: pointer; transition: transform .14s ease, background .14s ease; }
