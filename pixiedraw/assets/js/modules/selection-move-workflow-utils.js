@@ -248,7 +248,7 @@
           const paletteIndex = typeof getStoredRasterLayerPaletteIndex === 'function'
             ? getStoredRasterLayerPaletteIndex(layer, canvasIndex)
             : layer.indices[canvasIndex];
-          const paletteColor = paletteIndex > 0 ? state.palette[paletteIndex] : null;
+          const paletteColor = paletteIndex >= 0 ? state.palette[paletteIndex] : null;
           const hasContent = hasSourceContentMask
             ? sourceContentMask[canvasIndex] === 1
             : (paletteColor ? Number(paletteColor.a) > 0 : Boolean(layerDirect && layerDirect[canvasBase + 3] > 0));
@@ -256,7 +256,7 @@
           // layer's native transparent sentinel here: Int16 uses -1 while the
           // new Uint8 runtime uses 0. Coercing Int16 direct pixels to 0 makes
           // the renderer prefer palette[0] and drops their actual RGBA color.
-          localIndices[localIndex] = hasContent && paletteIndex > 0
+          localIndices[localIndex] = hasContent && paletteIndex >= 0
             ? paletteIndex
             : transparentValue;
           if (layerDirect && localDirect) {
@@ -2174,7 +2174,10 @@
           continue;
         }
         const canvasIndex = canvasY * state.width + canvasX;
-        indices[localIndex] = layer.indices[canvasIndex];
+        const paletteIndex = typeof getStoredRasterLayerPaletteIndex === 'function'
+          ? getStoredRasterLayerPaletteIndex(layer, canvasIndex)
+          : layer.indices[canvasIndex];
+        indices[localIndex] = paletteIndex >= 0 ? paletteIndex : transparentValue;
         if (direct) {
           const localBase = localIndex * 4;
           const canvasBase = canvasIndex * 4;
@@ -2208,13 +2211,13 @@
           ? getStoredRasterLayerPaletteIndex(layer, idx)
           : layer.indices[idx];
         let alpha = 0;
-        if (paletteIndex > 0 && palette[paletteIndex]) {
+        if (paletteIndex >= 0 && palette[paletteIndex]) {
           alpha = palette[paletteIndex].a;
         } else if (layerDirect) {
           const base = idx * 4;
           alpha = layerDirect[base + 3];
         }
-        if (paletteIndex > 0 || alpha > 0) {
+        if (alpha > 0) {
           if (x < bounds.x0) bounds.x0 = x;
           if (y < bounds.y0) bounds.y0 = y;
           if (x > bounds.x1) bounds.x1 = x;
@@ -2250,8 +2253,8 @@
         const canvasBase = canvasIndex * 4;
         const localBase = localIndex * 4;
         let hasPixel = false;
-        if (paletteIndex > 0) {
-          indices[localIndex] = layer.indices[canvasIndex];
+        if (paletteIndex >= 0 && palette[paletteIndex] && Number(palette[paletteIndex].a) > 0) {
+          indices[localIndex] = paletteIndex;
           hasPixel = true;
           if (layerDirect) {
             direct[localBase] = layerDirect[canvasBase];
