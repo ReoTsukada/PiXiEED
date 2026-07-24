@@ -37,6 +37,7 @@ const dom = {
   hintMessage: document.getElementById('hintMessage'),
   creatorOverlay: document.getElementById('creatorOverlay'),
   creatorOpenButton: document.getElementById('createButton'),
+  catalogCreateButton: document.getElementById('catalogCreateButton'),
   creatorCloseButton: document.getElementById('creatorClose'),
   creatorForm: document.getElementById('creatorForm'),
   creatorDescription: document.getElementById('creatorDescription'),
@@ -51,6 +52,9 @@ const dom = {
   creatorDiffInput: document.getElementById('creatorDiffInput'),
   creatorOriginalDropzone: document.getElementById('creatorOriginalDropzone'),
   creatorDiffDropzone: document.getElementById('creatorDiffDropzone'),
+  creatorMarkerWorkspace: document.getElementById('creatorMarkerWorkspace'),
+  creatorMarkerOpen: document.getElementById('creatorMarkerOpen'),
+  creatorMarkerFrame: document.getElementById('creatorMarkerFrame'),
   creatorPreviewOriginal: document.getElementById('creatorPreviewOriginal'),
   creatorPreviewDiff: document.getElementById('creatorPreviewDiff'),
   creatorExportButton: document.getElementById('creatorExport'),
@@ -292,6 +296,7 @@ const creatorState = {
   diffResult: null,
   size: { width: 0, height: 0 },
   targetLabels: [],
+  markerRegions: [],
   activeTargetIndex: -1,
 };
 
@@ -479,6 +484,32 @@ function normalizePuzzleTargets(rawTargets) {
     .filter(Boolean);
 }
 
+function normalizePuzzleMarkerRegions(rawTargets, width = 0, height = 0) {
+  let source = rawTargets;
+  if (typeof source === 'string') {
+    try { source = JSON.parse(source); } catch (_) { return []; }
+  }
+  if (!Array.isArray(source)) return [];
+  const markers = source.map(target => target?.marker ?? target?.region ?? null);
+  if (Number(width) > 0 && Number(height) > 0) {
+    return normalizeMarkerRegions(markers, width, height);
+  }
+  return markers.filter(Boolean).map((marker) => {
+    const x = Math.max(0, Math.round(Number(marker?.x ?? marker?.centerX) || 0));
+    const y = Math.max(0, Math.round(Number(marker?.y ?? marker?.centerY) || 0));
+    const radius = Math.max(2, Math.round(Number(marker?.radius) || 8));
+    return {
+      x, y, radius,
+      minX: Math.max(0, Math.round(Number(marker?.minX) || x - radius)),
+      maxX: Math.max(0, Math.round(Number(marker?.maxX) || x + radius)),
+      minY: Math.max(0, Math.round(Number(marker?.minY) || y - radius)),
+      maxY: Math.max(0, Math.round(Number(marker?.maxY) || y + radius)),
+      centerX: x,
+      centerY: y,
+    };
+  });
+}
+
 function buildHiddenTargets(regions, labels = []) {
   return regions.map((region, index) => ({
     id: `target-${index + 1}`,
@@ -606,6 +637,7 @@ function setupCreator() {
   dom.creatorOpenButton.addEventListener('click', () => {
     openCreatorOverlay();
   });
+  dom.catalogCreateButton?.addEventListener('click', () => openCreatorOverlay());
 
   dom.creatorCloseButton?.addEventListener('click', () => {
     closeCreatorOverlay();
@@ -635,6 +667,8 @@ function setupCreator() {
 
   dom.creatorOriginalInput?.addEventListener('change', handleCreatorFileChange);
   dom.creatorDiffInput?.addEventListener('change', handleCreatorFileChange);
+  dom.creatorMarkerOpen?.addEventListener('click', openCreatorMarkerEditor);
+  window.addEventListener('message', handleCreatorMarkerMessage);
   setupCreatorFileDropzone(dom.creatorOriginalDropzone, dom.creatorOriginalInput);
   setupCreatorFileDropzone(dom.creatorDiffDropzone, dom.creatorDiffInput);
 
@@ -729,6 +763,7 @@ function resetCreatorForm() {
   creatorState.diffResult = null;
   creatorState.size = { width: 0, height: 0 };
   creatorState.targetLabels = [];
+  creatorState.markerRegions = [];
   creatorState.activeTargetIndex = -1;
   setCreatorMode(creatorState.mode, true);
   clearCreatorPreview();
@@ -798,6 +833,10 @@ function handleCreatorFileChange() {
     dom.creatorSummary.hidden = true;
   }
   clearCreatorPreview();
+  if (isHiddenObjectMode(creatorState.mode) && creatorState.originalFile) {
+    prepareHiddenObjectMarkerSource();
+    return;
+  }
   if (!creatorState.originalFile || !creatorState.diffFile) {
     setCreatorStatus('');
     return;
@@ -862,20 +901,22 @@ function setCreatorMode(mode, silent = false) {
 
   if (dom.creatorDescription) {
     dom.creatorDescription.textContent = isHiddenMode
-      ? '元画像と探し物レイヤー（白地に黒で探し物を塗った2値画像）から探し物を自動検出します。'
+      ? '画像を1枚選び、専用マーカー編集で探す場所を登録します。'
       : '同じサイズの2枚の画像を選ぶと差分を自動検出します。';
   }
   if (dom.creatorDiffLabelText) {
-    dom.creatorDiffLabelText.textContent = isHiddenMode ? '探し物レイヤーを追加' : '間違い画像を追加';
+    dom.creatorDiffLabelText.textContent = '間違い画像を追加';
   }
   if (dom.creatorPreviewDiffCaption) {
     dom.creatorPreviewDiffCaption.textContent = isHiddenMode ? '探し物レイヤー' : '間違い';
   }
   if (dom.creatorModeNote) {
     dom.creatorModeNote.textContent = isHiddenMode
-      ? '探し物レイヤーは白地に黒で作成してください。検出した番号ごとに探し物名を入力すると、ゲーム画面に #番号付きで表示されます。'
-      : '公開するとオンライン公開され、難易度一覧に追加されます。';
+      ? '画像を1枚選んだ後、マーカー編集で探す場所を原寸ピクセル座標に登録します。番号ごとに探し物名を入力してください。'
+      : '公開すると問題カタログに追加されます。';
   }
+  if (dom.creatorDiffDropzone) dom.creatorDiffDropzone.hidden = isHiddenMode;
+  if (dom.creatorMarkerWorkspace) dom.creatorMarkerWorkspace.hidden = !isHiddenMode;
 
   if (!isHiddenMode) {
     creatorState.targetLabels = [];
@@ -894,7 +935,9 @@ function setCreatorMode(mode, silent = false) {
   clearCreatorPreview();
   updateCreatorPublishAvailability();
 
-  if (creatorState.originalFile && creatorState.diffFile) {
+  if (isHiddenMode && creatorState.originalFile) {
+    prepareHiddenObjectMarkerSource();
+  } else if (creatorState.originalFile && creatorState.diffFile) {
     handleCreatorAnalyze();
   } else {
     setCreatorStatus('');
@@ -988,12 +1031,92 @@ function updateCreatorPublishAvailability() {
   const hasAnalysis = Boolean(
     creatorState.diffResult &&
     creatorState.originalFile &&
-    creatorState.diffFile &&
     creatorState.originalDataUrl &&
-    creatorState.diffDataUrl,
+    (isHiddenObjectMode(creatorState.mode) || (creatorState.diffFile && creatorState.diffDataUrl)),
   );
   const canPublish = hasAnalysis && areCreatorTargetLabelsComplete();
   setCreatorActionsEnabled(canPublish);
+}
+
+async function prepareHiddenObjectMarkerSource() {
+  const originalFile = dom.creatorOriginalInput?.files?.[0] ?? null;
+  if (!originalFile) return;
+  const token = ++creatorAnalysisToken;
+  setCreatorStatus('画像を準備しています…');
+  try {
+    const raw = await loadImageFromFile(originalFile);
+    const normalized = await normalizePixelImage(raw.image, raw.dataUrl);
+    if (token !== creatorAnalysisToken) return;
+    creatorState.originalFile = originalFile;
+    creatorState.diffFile = null;
+    creatorState.originalImage = normalized.image;
+    creatorState.diffImage = normalized.image;
+    creatorState.originalDataUrl = normalized.dataUrl;
+    creatorState.diffDataUrl = normalized.dataUrl;
+    creatorState.diffResult = null;
+    creatorState.markerRegions = [];
+    creatorState.targetLabels = [];
+    creatorState.size = { width: normalized.width, height: normalized.height };
+    clearCreatorPreview();
+    drawCreatorPreview();
+    renderCreatorTargetFields(0);
+    updateCreatorSummary(null);
+    updateCreatorPublishAvailability();
+    setCreatorStatus('マーカー編集を開き、探してもらう場所を追加してください。');
+  } catch (error) {
+    console.warn('hidden object marker source failed', error);
+    setCreatorStatus('画像の読み込みに失敗しました。', 'error');
+  }
+}
+
+function openCreatorMarkerEditor() {
+  if (!creatorState.originalDataUrl || !dom.creatorMarkerFrame?.contentWindow) {
+    setCreatorStatus('先に画像を1枚選んでください。', 'error');
+    return;
+  }
+  dom.creatorMarkerFrame.contentWindow.postMessage({
+    type: 'pixfind-marker-source',
+    imageDataUrl: creatorState.originalDataUrl,
+    width: creatorState.size.width,
+    height: creatorState.size.height,
+    markers: creatorState.markerRegions,
+  }, '*');
+  dom.creatorMarkerFrame.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function normalizeMarkerRegions(rawMarkers, width = creatorState.size.width, height = creatorState.size.height) {
+  if (!Array.isArray(rawMarkers)) return [];
+  const safeWidth = Math.max(1, Math.round(Number(width) || 1));
+  const safeHeight = Math.max(1, Math.round(Number(height) || 1));
+  return rawMarkers.map((marker) => {
+    const x = clamp(Math.round(Number(marker?.x) || 0), 0, safeWidth - 1);
+    const y = clamp(Math.round(Number(marker?.y) || 0), 0, safeHeight - 1);
+    const radius = clamp(Math.round(Number(marker?.radius) || 8), 2, Math.max(safeWidth, safeHeight));
+    return {
+      x,
+      y,
+      radius,
+      minX: clamp(x - radius, 0, safeWidth - 1),
+      maxX: clamp(x + radius, 0, safeWidth - 1),
+      minY: clamp(y - radius, 0, safeHeight - 1),
+      maxY: clamp(y + radius, 0, safeHeight - 1),
+      centerX: x,
+      centerY: y,
+    };
+  });
+}
+
+function handleCreatorMarkerMessage(event) {
+  if (event.source !== dom.creatorMarkerFrame?.contentWindow || event.data?.type !== 'pixfind-marker-change') return;
+  const regions = normalizeMarkerRegions(event.data.markers);
+  creatorState.markerRegions = regions;
+  creatorState.diffResult = regions.length ? { regions } : null;
+  creatorState.targetLabels = Array.from({ length: regions.length }, (_, index) => creatorState.targetLabels[index] || '');
+  drawCreatorPreview();
+  renderCreatorTargetFields(regions.length);
+  updateCreatorSummary(creatorState.diffResult, creatorState.size.width, creatorState.size.height);
+  updateCreatorPublishAvailability();
+  setCreatorStatus(regions.length ? `${regions.length}箇所を登録しました。名前を入力して公開できます。` : '探す場所を1箇所以上登録してください。');
 }
 
 function updateCreatorSummary(diffResult, width, height) {
@@ -1075,6 +1198,10 @@ function drawCreatorRegionIndexBadge(context, region, index, isActive, canvasWid
 }
 
 async function handleCreatorAnalyze() {
+  if (isHiddenObjectMode(creatorState.mode)) {
+    await prepareHiddenObjectMarkerSource();
+    return;
+  }
   const originalFile = dom.creatorOriginalInput?.files?.[0] ?? null;
   const diffFile = dom.creatorDiffInput?.files?.[0] ?? null;
   if (!originalFile || !diffFile) {
@@ -1217,8 +1344,8 @@ async function handleCreatorAnalyze() {
 }
 
 async function handleCreatorPublish() {
-  if (!creatorState.diffResult || !creatorState.originalFile || !creatorState.diffFile) {
-    setCreatorStatus('公開には差分の自動判定が必要です。', 'error');
+  if (!creatorState.diffResult || !creatorState.originalFile || (!isHiddenObjectMode(creatorState.mode) && !creatorState.diffFile)) {
+    setCreatorStatus('公開には差分または探す場所の登録が必要です。', 'error');
     return;
   }
   if (!areCreatorTargetLabelsComplete()) {
@@ -1228,7 +1355,10 @@ async function handleCreatorPublish() {
 
   ensureClientId();
   const mode = normalizeGameMode(creatorState.mode);
-  const targets = getCreatorTargetLabels();
+  const targetLabels = getCreatorTargetLabels();
+  const targets = mode === GAME_MODE_HIDDEN_OBJECT
+    ? targetLabels.map((label, index) => ({ label, marker: creatorState.markerRegions[index] || null }))
+    : targetLabels;
   const title = dom.creatorTitleInput?.value.trim() || 'カスタムパズル';
   const slug = getCreatorSlug();
   const difficulty = creatorState.difficulty;
@@ -1269,7 +1399,7 @@ async function handleCreatorPublish() {
   try {
     const [originalUpload, diffUpload] = await Promise.all([
       buildUploadPayload(creatorState.originalDataUrl, creatorState.originalFile),
-      buildUploadPayload(creatorState.diffDataUrl, creatorState.diffFile),
+      buildUploadPayload(creatorState.diffDataUrl, creatorState.diffFile || creatorState.originalFile),
     ]);
     if (!originalUpload || !diffUpload) {
       throw new Error('upload payload missing');
@@ -2333,6 +2463,7 @@ function normalizePublishedPuzzleEntry(entry, fallback = null) {
     diff,
     mode,
     targets,
+    markerRegions: normalizePuzzleMarkerRegions(source.targets ?? source.target_items ?? source.targetItems ?? source.items),
     thumbnail: resolvePuzzleThumbnail(mode, original, diff, explicitThumbnail),
     shareUrl: source.share_url ?? source.shareUrl ?? null,
     source: 'published',
@@ -2697,9 +2828,9 @@ function renderPuzzles(level, mode = state.currentMode) {
   if (!dom.puzzleList) return;
   dom.puzzleList.innerHTML = '';
 
-  const normalizedMode = normalizeGameMode(mode);
-  const official = state.officialPuzzles.filter(puzzle => (
-    puzzle.difficulty === level && normalizeGameMode(puzzle.mode) === normalizedMode
+  const official = [...state.officialPuzzles].sort((left, right) => (
+    Number(right.validPlayCount || 0) - Number(left.validPlayCount || 0)
+    || Number(right.difficulty || 0) - Number(left.difficulty || 0)
   ));
   official.forEach((puzzle, idx) => {
     dom.puzzleList.append(createOfficialCard(puzzle));
@@ -2711,7 +2842,7 @@ function renderPuzzles(level, mode = state.currentMode) {
   if (!official.length) {
     const info = document.createElement('p');
     info.className = 'section-subtitle';
-    info.textContent = `${getGameModeMeta(normalizedMode).label}の公式パズルはまだありません。`;
+    info.textContent = '公開されている問題はまだありません。';
     dom.puzzleList.append(info);
   }
 
@@ -2907,7 +3038,15 @@ async function startOfficialPuzzle(puzzle) {
     let normalizedOriginal;
     let normalizedChallenge;
     let hiddenPairInfo = null;
-    if (mode === GAME_MODE_HIDDEN_OBJECT) {
+    const markerRegions = normalizePuzzleMarkerRegions(
+      puzzle.targets,
+      rawOriginal.width,
+      rawOriginal.height,
+    );
+    if (mode === GAME_MODE_HIDDEN_OBJECT && markerRegions.length) {
+      normalizedOriginal = await normalizePixelImage(rawOriginal, null);
+      normalizedChallenge = normalizedOriginal;
+    } else if (mode === GAME_MODE_HIDDEN_OBJECT) {
       hiddenPairInfo = await normalizeHiddenModePair({
         originalImage: rawOriginal,
         originalDataUrl: null,
@@ -2937,7 +3076,9 @@ async function startOfficialPuzzle(puzzle) {
       return;
     }
 
-    const diffResult = mode === GAME_MODE_HIDDEN_OBJECT
+    const diffResult = mode === GAME_MODE_HIDDEN_OBJECT && markerRegions.length
+      ? { regions: markerRegions, tooClosePair: null }
+      : mode === GAME_MODE_HIDDEN_OBJECT
       ? computeHiddenObjectRegions(challengeImage, { minDistance: CREATOR_HIDDEN_OBJECT_MIN_DISTANCE })
       : computeDifferenceRegions(originalImage, challengeImage, { difficulty: puzzle.difficulty });
     if (!diffResult || !diffResult.regions.length) {
