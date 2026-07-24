@@ -39,6 +39,7 @@ assert.match(app, /const GAME_ZOOM_OUT_FACTOR = 0\.94;/);
 assert.match(app, /const HIDDEN_OBJECT_TARGET_LIMIT = 10;/);
 assert.match(app, /orderedRegions\.slice\(0, HIDDEN_OBJECT_TARGET_LIMIT\)/);
 assert.match(app, /function updatePixfindTabBarActions\(screen\)/);
+assert.match(app, /id: 'reset-view', label: '表示リセット', selector: '#zoomResetButton', icon: 'reset_x1\.png'/);
 assert.match(app, /targetPanelSecondary/);
 assert.match(app, /event\.preventDefault\(\);\s*const deltaModeScale = event\.deltaMode === 1/s);
 assert.doesNotMatch(app, /if \(!event\.ctrlKey\) \{\s*return;\s*\}/s);
