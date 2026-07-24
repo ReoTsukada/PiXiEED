@@ -31,6 +31,14 @@
     return document.body?.dataset.pixieedAccountAuth === 'signed-in';
   }
 
+  async function getAccessContext() {
+    const client = window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT__
+      || await window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT_PROMISE__?.catch(() => null);
+    const result = await client?.auth?.getSession?.();
+    const session = result?.data?.session || null;
+    return { token: session?.access_token || SUPABASE_ANON_KEY, userId: session?.user?.id || '' };
+  }
+
   function formatDate(value) {
     const date = new Date(value || '');
     if (!Number.isFinite(date.getTime())) return '公開日不明';
@@ -133,7 +141,26 @@
         share.setAttribute('aria-label', `${entry?.label || 'PiXFiND'}のリンクをコピー`);
       }, 1800);
     });
-    actions.append(open, share);
+    const remove = document.createElement('button');
+    remove.className = 'account-card-action account-card-action--delete';
+    remove.type = 'button';
+    remove.title = '作品を削除';
+    remove.setAttribute('aria-label', `${entry?.label || 'PiXFiND'}を削除`);
+    remove.addEventListener('click', async () => {
+      if (!puzzleId || !window.confirm(`「${entry?.label || 'この作品'}」を削除しますか？`)) return;
+      remove.disabled = true;
+      try {
+        await deletePost(puzzleId);
+        card.remove();
+        const remaining = list.querySelectorAll('.account-pixfind-card').length;
+        count.textContent = `${remaining}件`;
+        if (!remaining) renderEmpty();
+      } catch (_error) {
+        remove.disabled = false;
+        window.alert('削除に失敗しました。ログイン状態を確認して、もう一度お試しください。');
+      }
+    });
+    actions.append(open, share, remove);
     body.append(title, meta, actions);
     card.append(preview, body);
     return card;
@@ -154,27 +181,59 @@
     count.textContent = '要確認';
   }
 
+  async function deletePost(puzzleId) {
+    const clientId = getClientId();
+    const access = await getAccessContext();
+    if (!access.userId && !clientId) throw new Error('ownership-missing');
+    const params = new URLSearchParams({ id: `eq.${puzzleId}` });
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/pixfind_puzzles?${params}`, {
+      method: 'DELETE',
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${access.token}`,
+        'x-client-id': clientId,
+        Prefer: 'return=representation',
+      },
+    });
+    if (!response.ok) throw new Error(`delete failed: ${response.status}`);
+  }
+
   async function refresh() {
     const token = ++renderToken;
     if (!isSignedIn()) return;
     const clientId = getClientId();
-    if (!clientId) {
+    const access = await getAccessContext();
+    if (!access.userId && !clientId) {
       renderEmpty();
       return;
     }
 
     count.textContent = '確認中';
+    if (access.userId && clientId) {
+      await fetch(`${SUPABASE_URL}/rest/v1/rpc/pixfind_claim_my_puzzles_v1`, {
+        method: 'POST',
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${access.token}`,
+          'x-client-id': clientId,
+          'Content-Type': 'application/json',
+        },
+        body: '{}',
+      }).catch(() => {});
+    }
     const params = new URLSearchParams({
       select: 'id,label,difficulty,mode,game_mode,play_mode,thumbnail_url,original_url,valid_play_count,created_at',
-      client_id: `eq.${clientId}`,
       order: 'created_at.desc',
       limit: '100',
     });
+    if (access.userId && clientId) params.set('or', `(creator_user_id.eq.${access.userId},client_id.eq.${clientId})`);
+    else if (access.userId) params.set('creator_user_id', `eq.${access.userId}`);
+    else params.set('client_id', `eq.${clientId}`);
     try {
       const response = await fetch(`${SUPABASE_URL}/rest/v1/pixfind_puzzles?${params}`, {
         headers: {
           apikey: SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          Authorization: `Bearer ${access.token}`,
           'x-client-id': clientId,
         },
       });
