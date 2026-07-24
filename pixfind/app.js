@@ -6,7 +6,6 @@ const dom = {
   startButton: document.getElementById('startButton'),
   difficultyBackButton: document.getElementById('difficultyBackButton'),
   gameBackButton: document.getElementById('gameBackButton'),
-  backToTitleButton: document.getElementById('backButton'),
   resetButton: document.getElementById('resetButton'),
   fullscreenButton: document.getElementById('fullscreenButton'),
   difficultyChips: Array.from(document.querySelectorAll('[data-difficulty]')),
@@ -30,9 +29,19 @@ const dom = {
   overlayChallenge: document.getElementById('overlayChallenge'),
   completionOverlay: document.getElementById('completionOverlay'),
   failureOverlay: document.getElementById('failureOverlay'),
+  resultRank: document.getElementById('resultRank'),
+  resultTime: document.getElementById('resultTime'),
+  resultFound: document.getElementById('resultFound'),
+  resultMiss: document.getElementById('resultMiss'),
+  resultMessage: document.getElementById('resultMessage'),
+  resultRetryButton: document.getElementById('resultRetryButton'),
+  resultPuzzleListButton: document.getElementById('resultPuzzleListButton'),
+  resultShareButton: document.getElementById('resultShareButton'),
   targetPanel: document.getElementById('targetPanel'),
   targetCurrent: document.getElementById('targetCurrent'),
   targetList: document.getElementById('targetList'),
+  targetPanelSecondary: document.getElementById('targetPanelSecondary'),
+  targetListSecondary: document.getElementById('targetListSecondary'),
   hintMessage: document.getElementById('hintMessage'),
   creatorOverlay: document.getElementById('creatorOverlay'),
   creatorOpenButton: document.getElementById('createButton'),
@@ -202,6 +211,8 @@ const REGION_MERGE_DISTANCE_BY_DIFFICULTY = {
 const CREATOR_MERGE_DISTANCE = REGION_MERGE_DISTANCE_BY_DIFFICULTY[2];
 const CREATOR_HIDDEN_OBJECT_MIN_DISTANCE = 2; // Require at least 2 empty pixels between objects.
 const HIDDEN_OBJECT_HIT_PADDING = 1;
+const HIDDEN_OBJECT_TARGET_LIMIT = 10;
+const HIDDEN_OBJECT_PRIMARY_TARGET_LIMIT = 5;
 const HIDDEN_OBJECT_LAYER_ALPHA_THRESHOLD = 12;
 const HIDDEN_OBJECT_LAYER_BLACK_THRESHOLD = 72;
 const HIDDEN_OBJECT_ALPHA_FALLBACK_MAX_COVERAGE = 0.95;
@@ -216,7 +227,8 @@ const TAP_MAX_MOVEMENT_PX = 8;
 const TAP_MAX_DURATION_MS = 320;
 const ZOOM_MIN_SCALE = 1;
 const ZOOM_MAX_SCALE = 20;
-const ZOOM_STEPS = Object.freeze([1, 1.25, 1.5, 2, 2.5, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20]);
+// Integer scales keep a pixel-art canvas on a stable physical-pixel grid.
+const ZOOM_STEPS = Object.freeze([1, 2, 3, 4, 6, 8, 10, 12, 16, 20]);
 const ZOOM_WHEEL_STEP_BASE = 1.25;
 const ZOOM_WHEEL_RAW_RESET_MS = 160;
 const GAME_MODE_SPOT_DIFFERENCE = 'spot-difference';
@@ -586,13 +598,24 @@ async function init() {
     leaveGame('difficulty');
   });
 
-  dom.backToTitleButton?.addEventListener('click', () => {
-    leaveGame('start');
-  });
-
   dom.resetButton?.addEventListener('click', () => {
     if (!state.currentPuzzle) return;
     resetRound();
+  });
+
+  dom.resultRetryButton?.addEventListener('click', () => {
+    if (!state.currentPuzzle) return;
+    hideCompletionOverlay();
+    resetRound();
+  });
+
+  dom.resultPuzzleListButton?.addEventListener('click', () => {
+    hideCompletionOverlay();
+    leaveGame('difficulty');
+  });
+
+  dom.resultShareButton?.addEventListener('click', () => {
+    if (state.currentPuzzle) sharePuzzle(state.currentPuzzle);
   });
 
   dom.fullscreenButton?.addEventListener('click', () => {
@@ -604,6 +627,7 @@ async function init() {
 
 
   initializeCanvasInteractions();
+  requestAnimationFrame(() => updatePixfindTabBarActions(document.body.dataset.pixfindScreen || 'start'));
   setupCreator();
   await restorePendingCreatorUpload();
   if (window.location.hash === '#creator' && !isCreatorOverlayOpen()) {
@@ -874,6 +898,11 @@ function setCreatorDropzonePreview(dropzone, preview, dataUrl) {
   if (!dropzone || !preview) return;
   const hasPreview = Boolean(dataUrl);
   dropzone.classList.toggle('has-preview', hasPreview);
+  const picker = dropzone.querySelector('.creator-file__picker');
+  const title = picker?.querySelector('.creator-file__title');
+  if (title) {
+    title.textContent = hasPreview ? '画像を変更' : (picker?.dataset.emptyLabel || title.textContent);
+  }
   preview.hidden = !hasPreview;
   preview.src = hasPreview ? dataUrl : '';
 }
@@ -957,7 +986,7 @@ function setCreatorMode(mode, silent = false) {
       : '同じサイズの2枚の画像を選ぶと差分を自動検出します。';
   }
   if (dom.creatorDiffLabelText) {
-    dom.creatorDiffLabelText.textContent = '間違い画像を追加';
+    dom.creatorDiffLabelText.textContent = creatorState.diffFile ? '画像を変更' : '間違い画像を追加';
   }
   if (dom.creatorPreviewDiffCaption) {
     dom.creatorPreviewDiffCaption.textContent = isHiddenMode ? 'マークした画像' : '間違い';
@@ -968,7 +997,7 @@ function setCreatorMode(mode, silent = false) {
       : '公開すると問題カタログに追加されます。';
   }
   if (dom.creatorDiffDropzone) dom.creatorDiffDropzone.hidden = isHiddenMode;
-  if (dom.creatorPreview) dom.creatorPreview.hidden = isHiddenMode;
+  if (dom.creatorPreview) dom.creatorPreview.hidden = true;
   if (dom.creatorMarkerWorkspace) dom.creatorMarkerWorkspace.hidden = !isHiddenMode || !creatorState.originalFile;
   dom.creatorOriginalDropzone?.classList.toggle('is-marker-editor', isHiddenMode && Boolean(creatorState.originalFile));
 
@@ -1141,6 +1170,11 @@ function setupCreatorMarkerEditor() {
     creatorMarkerView.pointerId = event.pointerId;
     creatorMarkerView.activeIndex = index;
     if (index < 0) {
+      if (creatorState.markerRegions.length >= HIDDEN_OBJECT_TARGET_LIMIT) {
+        setCreatorStatus(`探し物は最大${HIDDEN_OBJECT_TARGET_LIMIT}個までです。`, 'error');
+        creatorMarkerView.activeIndex = -1;
+        return;
+      }
       syncCreatorMarkerRegions([...creatorState.markerRegions, { x: point.x, y: point.y, radius: 8 }]);
       creatorMarkerView.activeIndex = creatorState.markerRegions.length - 1;
     }
@@ -1277,7 +1311,7 @@ function normalizeMarkerRegions(rawMarkers, width = creatorState.size.width, hei
 }
 
 function syncCreatorMarkerRegions(rawMarkers) {
-  const regions = normalizeMarkerRegions(rawMarkers);
+  const regions = normalizeMarkerRegions(rawMarkers).slice(0, HIDDEN_OBJECT_TARGET_LIMIT);
   creatorState.markerRegions = regions;
   creatorState.diffResult = regions.length ? { regions } : null;
   creatorState.targetLabels = Array.from({ length: regions.length }, (_, index) => creatorState.targetLabels[index] || '');
@@ -2925,6 +2959,7 @@ function setActiveScreen(target) {
 
   document.body.dataset.pixfindScreen = target;
   if (dom.app) dom.app.dataset.activeScreen = target;
+  updatePixfindTabBarActions(target);
 
   if (target === 'game') {
     dom.app?.classList.add('is-playing');
@@ -2942,6 +2977,24 @@ function setActiveScreen(target) {
     dom.app?.classList.remove('is-hidden-object-mode');
     document.body.classList.remove('is-playing');
   }
+}
+
+function updatePixfindTabBarActions(screen) {
+  const tabBar = window.PiXiEEDCommonTabBar;
+  if (!tabBar?.setActions) return;
+  if (screen === 'game') {
+    tabBar.setActions([
+      { id: 'puzzle-list', label: '問題選択', selector: '#gameBackButton', icon: 'Back.png' },
+      { id: 'retry', label: 'もう一度', selector: '#resetButton', icon: 'onemore.png' },
+      { id: 'fullscreen', label: '拡大', selector: '#fullscreenButton', icon: '拡大.png', iconWhenPressed: '縮小.png', mirrorState: true, mode: 'fullscreen', fullscreenController: 'game', placement: 'leading' },
+    ]);
+    return;
+  }
+  tabBar.setActions([
+    { id: 'play', label: '遊ぶ', selector: '#startButton', icon: 'icon/icon-192-2.png' },
+    { id: 'create', label: '作る', selector: '#createButton', icon: 'assets/icons/File.png?v=2026.07.19-ui-icons1' },
+    { id: 'fullscreen', label: '拡大', selector: '#fullscreenButton', icon: '拡大.png', iconWhenPressed: '縮小.png', mirrorState: true, mode: 'fullscreen', fullscreenController: 'game', placement: 'leading' },
+  ]);
 }
 
 function selectGameMode(mode) {
@@ -3260,7 +3313,10 @@ function prepareGameBoard(originalImage, challengeImage, diffResult, metadata = 
   const orderedRegions = [...diffResult.regions].sort((a, b) => (
     a.minY - b.minY || a.minX - b.minX
   ));
-  state.differences = orderedRegions.map((region, index) => ({
+  const playableRegions = activeMode === GAME_MODE_HIDDEN_OBJECT
+    ? orderedRegions.slice(0, HIDDEN_OBJECT_TARGET_LIMIT)
+    : orderedRegions;
+  state.differences = playableRegions.map((region, index) => ({
     ...region,
     id: `region-${index}`,
     found: false,
@@ -3343,7 +3399,9 @@ function renderTargetPanel() {
   if (!dom.targetPanel || !dom.targetCurrent || !dom.targetList) return;
   const enabled = isHiddenObjectMode() && state.hiddenTargets.length > 0;
   dom.targetPanel.hidden = !enabled;
+  if (dom.targetPanelSecondary) dom.targetPanelSecondary.hidden = true;
   dom.targetList.innerHTML = '';
+  if (dom.targetListSecondary) dom.targetListSecondary.innerHTML = '';
   if (!enabled) {
     dom.targetCurrent.textContent = '-';
     return;
@@ -3352,12 +3410,19 @@ function renderTargetPanel() {
   dom.targetCurrent.textContent = remaining > 0
     ? `残り ${remaining} 個`
     : 'コンプリート！';
-  state.hiddenTargets.forEach((target, index) => {
+  const appendTarget = (list, target, index) => {
+    if (!list) return;
     const item = document.createElement('li');
     item.className = `target-list__item${target.found ? ' is-found' : ''}`;
     item.textContent = formatTargetDisplayLabel(target.label, index);
-    dom.targetList.append(item);
-  });
+    list.append(item);
+  };
+  state.hiddenTargets
+    .slice(0, HIDDEN_OBJECT_PRIMARY_TARGET_LIMIT)
+    .forEach((target, index) => appendTarget(dom.targetList, target, index));
+  const secondaryTargets = state.hiddenTargets.slice(HIDDEN_OBJECT_PRIMARY_TARGET_LIMIT, HIDDEN_OBJECT_TARGET_LIMIT);
+  secondaryTargets.forEach((target, offset) => appendTarget(dom.targetListSecondary, target, offset + HIDDEN_OBJECT_PRIMARY_TARGET_LIMIT));
+  if (dom.targetPanelSecondary && secondaryTargets.length) dom.targetPanelSecondary.hidden = false;
 }
 
 function fitCanvasesToFrame() {
@@ -3572,7 +3637,7 @@ function processCanvasSelection(targetCanvas, x, y) {
       return;
     }
     targetForRegion.found = true;
-    registerFound(region);
+    registerFound(region, targetCanvas, x, y);
     renderTargetPanel();
     if (state.found >= state.total) {
       completeRound('すべてのアイテムを見つけました！');
@@ -3583,7 +3648,7 @@ function processCanvasSelection(targetCanvas, x, y) {
     return;
   }
 
-  registerFound(region);
+  registerFound(region, targetCanvas, x, y);
   if (state.found >= state.total) {
     completeRound('全ての間違いを発見しました！おめでとうございます。');
   } else {
@@ -3591,17 +3656,20 @@ function processCanvasSelection(targetCanvas, x, y) {
   }
 }
 
-function registerFound(region) {
+function registerFound(region, targetCanvas, imageX, imageY) {
   region.found = true;
   state.found += 1;
   updateProgressLabel();
   renderMarker(region);
+  renderSuccessBurst(targetCanvas, imageX, imageY, region);
   renderGlobalFlash();
   playSuccessSound();
 }
 
 function registerMiss(targetCanvas, x, y, message) {
   addMissMarker(targetCanvas, x, y);
+  renderMissImpact(targetCanvas, x, y);
+  playFailureSound();
   state.mistakes = Math.min(state.mistakes + 1, MAX_MISTAKES);
   updateMistakeLabel();
   if (state.mistakes >= MAX_MISTAKES) {
@@ -3623,6 +3691,8 @@ function completeRound(message) {
   state.roundCompleted = true;
   stopTimer();
   setHint(message);
+  renderCompletionConfetti();
+  playClearSound();
   showCompletionOverlay();
 }
 
@@ -3677,6 +3747,70 @@ function addMissMarker(canvas, imageX, imageY) {
   const record = { target, x: imageX, y: imageY };
   state.missMarkers.push(record);
   paintMissMarker(record);
+}
+
+function getOverlayPoint(canvas, overlay, imageX, imageY) {
+  if (!canvas || !overlay || !state.imageSize.width || !state.imageSize.height) return null;
+  const displayWidth = canvas.clientWidth;
+  const displayHeight = canvas.clientHeight;
+  const overlayWidth = overlay.clientWidth;
+  const overlayHeight = overlay.clientHeight;
+  if (!displayWidth || !displayHeight || !overlayWidth || !overlayHeight) return null;
+  const offsetX = (overlayWidth - displayWidth) / 2;
+  const offsetY = (overlayHeight - displayHeight) / 2;
+  return {
+    x: offsetX + Number(imageX || 0) * (displayWidth / state.imageSize.width),
+    y: offsetY + Number(imageY || 0) * (displayHeight / state.imageSize.height),
+  };
+}
+
+function renderSuccessBurst(canvas, imageX, imageY, region) {
+  const overlay = canvas === dom.canvasOriginal ? dom.overlayOriginal : dom.overlayChallenge;
+  const fallbackX = region.minX + (region.maxX - region.minX + 1) / 2;
+  const fallbackY = region.minY + (region.maxY - region.minY + 1) / 2;
+  const point = getOverlayPoint(canvas, overlay, Number.isFinite(imageX) ? imageX : fallbackX, Number.isFinite(imageY) ? imageY : fallbackY);
+  if (!overlay || !point) return;
+  const burst = document.createElement('div');
+  burst.className = 'hit-burst';
+  burst.style.left = `${point.x}px`;
+  burst.style.top = `${point.y}px`;
+  const colors = ['#ff5d8f', '#ffca4a', '#42d6bd', '#5ea5ff', '#ffffff'];
+  for (let index = 0; index < 16; index += 1) {
+    const angle = ((Math.PI * 2 * index) / 16) + ((Math.random() - 0.5) * 0.24);
+    const distance = 30 + Math.random() * 42;
+    const piece = document.createElement('i');
+    piece.className = 'hit-burst__piece';
+    piece.style.setProperty('--burst-x', `${Math.cos(angle) * distance}px`);
+    piece.style.setProperty('--burst-y', `${Math.sin(angle) * distance - 18}px`);
+    piece.style.setProperty('--burst-rotate', `${Math.round(Math.random() * 260 - 130)}deg`);
+    piece.style.setProperty('--burst-color', colors[index % colors.length]);
+    piece.style.setProperty('--burst-delay', `${Math.round(Math.random() * 45)}ms`);
+    burst.append(piece);
+  }
+  const label = document.createElement('strong');
+  label.className = 'hit-burst__label';
+  label.textContent = 'NICE!';
+  burst.append(label);
+  overlay.append(burst);
+  window.setTimeout(() => burst.remove(), 920);
+}
+
+function renderMissImpact(canvas, imageX, imageY) {
+  const overlay = canvas === dom.canvasOriginal ? dom.overlayOriginal : dom.overlayChallenge;
+  const point = getOverlayPoint(canvas, overlay, imageX, imageY);
+  if (!overlay || !point) return;
+  const impact = document.createElement('div');
+  impact.className = 'miss-impact';
+  impact.style.left = `${point.x}px`;
+  impact.style.top = `${point.y}px`;
+  overlay.append(impact);
+  dom.gameScreen?.classList.remove('is-miss-shaking');
+  void dom.gameScreen?.offsetWidth;
+  dom.gameScreen?.classList.add('is-miss-shaking');
+  window.setTimeout(() => {
+    impact.remove();
+    dom.gameScreen?.classList.remove('is-miss-shaking');
+  }, 540);
 }
 
 function paintMissMarker(record) {
@@ -3736,18 +3870,62 @@ function renderGlobalFlash() {
 
 function showCompletionOverlay() {
   if (!dom.completionOverlay) return;
+  updateResultPanel();
   dom.completionOverlay.classList.add('is-visible');
   dom.completionOverlay.setAttribute('aria-hidden', 'false');
+  dom.completionOverlay.removeAttribute('inert');
   clearTimeout(state.completionTimeout ?? undefined);
-  state.completionTimeout = window.setTimeout(() => {
-    hideCompletionOverlay();
-  }, 2200);
+  state.completionTimeout = null;
+}
+
+function updateResultPanel() {
+  const elapsedMs = state.startTimestamp == null ? 0 : Math.max(0, performance.now() - state.startTimestamp);
+  const total = Math.max(0, state.total);
+  const found = Math.max(0, state.found);
+  const misses = Math.max(0, state.mistakes);
+  const seconds = Math.floor(elapsedMs / 1000);
+  const rank = misses === 0 && seconds <= Math.max(30, total * 20)
+    ? 'PERFECT'
+    : misses <= 1
+    ? 'GREAT'
+    : 'CLEAR';
+  if (dom.resultRank) dom.resultRank.textContent = rank;
+  if (dom.resultTime) dom.resultTime.textContent = formatTime(elapsedMs);
+  if (dom.resultFound) dom.resultFound.textContent = `${found} / ${total}`;
+  if (dom.resultMiss) dom.resultMiss.textContent = `${misses} / ${MAX_MISTAKES}`;
+  if (dom.resultMessage) {
+    dom.resultMessage.textContent = rank === 'PERFECT'
+      ? 'ノーミスクリア！完璧です。'
+      : rank === 'GREAT'
+      ? 'すばらしい発見力です！'
+      : 'すべてのポイントを見つけました！';
+  }
+}
+
+function renderCompletionConfetti() {
+  const overlay = dom.completionOverlay;
+  if (!overlay) return;
+  overlay.querySelector('.completion-confetti')?.remove();
+  const confetti = document.createElement('div');
+  confetti.className = 'completion-confetti';
+  const colors = ['#ff5d8f', '#ffca4a', '#42d6bd', '#5ea5ff', '#b48cff', '#ffffff'];
+  for (let index = 0; index < 42; index += 1) {
+    const piece = document.createElement('i');
+    piece.style.setProperty('--confetti-left', `${Math.round(Math.random() * 100)}%`);
+    piece.style.setProperty('--confetti-drift', `${Math.round(-56 + Math.random() * 112)}px`);
+    piece.style.setProperty('--confetti-delay', `${Math.round(Math.random() * 280)}ms`);
+    piece.style.setProperty('--confetti-rotate', `${Math.round(Math.random() * 360)}deg`);
+    piece.style.setProperty('--confetti-color', colors[index % colors.length]);
+    confetti.append(piece);
+  }
+  overlay.append(confetti);
 }
 
 function hideCompletionOverlay() {
   if (!dom.completionOverlay) return;
   dom.completionOverlay.classList.remove('is-visible');
   dom.completionOverlay.setAttribute('aria-hidden', 'true');
+  dom.completionOverlay.setAttribute('inert', '');
   clearTimeout(state.completionTimeout ?? undefined);
   state.completionTimeout = null;
 }
@@ -4373,7 +4551,7 @@ function createCanvasInteractionController(canvas, overlay, onTap, onTransform) 
       }
       const distance = calculatePointerDistance(first, second);
       const rawScale = controllerState.initialScale * (distance / controllerState.initialDistance);
-      const nextScale = clamp(rawScale, config.minScale, config.maxScale);
+      const nextScale = normalizeZoomScale(rawScale, controllerState.scale);
       if (!Number.isFinite(nextScale) || Number.isNaN(nextScale)) {
         return;
       }
@@ -5190,6 +5368,33 @@ function playSuccessSound() {
   const now = ctxAudio.currentTime;
   createBeep(ctxAudio, 880, now, 0.12);
   createBeep(ctxAudio, 988, now + 0.15, 0.12);
+}
+
+function playFailureSound() {
+  if (!('AudioContext' in window || 'webkitAudioContext' in window)) return;
+  if (!state.audioContext) {
+    const AudioContextCls = window.AudioContext || window.webkitAudioContext;
+    state.audioContext = new AudioContextCls();
+  }
+  const ctxAudio = state.audioContext;
+  if (!ctxAudio) return;
+  if (ctxAudio.state === 'suspended') ctxAudio.resume().catch(() => {});
+  createBeep(ctxAudio, 180, ctxAudio.currentTime, 0.12);
+}
+
+function playClearSound() {
+  if (!('AudioContext' in window || 'webkitAudioContext' in window)) return;
+  if (!state.audioContext) {
+    const AudioContextCls = window.AudioContext || window.webkitAudioContext;
+    state.audioContext = new AudioContextCls();
+  }
+  const ctxAudio = state.audioContext;
+  if (!ctxAudio) return;
+  if (ctxAudio.state === 'suspended') ctxAudio.resume().catch(() => {});
+  const now = ctxAudio.currentTime;
+  createBeep(ctxAudio, 1046, now, 0.11);
+  createBeep(ctxAudio, 1318, now + 0.12, 0.14);
+  createBeep(ctxAudio, 1568, now + 0.28, 0.2);
 }
 
 function createBeep(audioContext, frequency, startTime, duration) {

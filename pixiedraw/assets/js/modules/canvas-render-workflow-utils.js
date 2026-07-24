@@ -301,6 +301,7 @@
       ));
       const isImplicitlyEmptyFrame = visibleLayers.length === 0 || visibleLayers.every(layer => (
         !isSimulationLayer(layer)
+        && !isTiledLayerIndices(layer)
         && (layer.indices instanceof Int16Array || layer.indices instanceof Uint8Array)
         && layer.indices.length === 0
         && !(layer.direct instanceof Uint8ClampedArray && layer.direct.length > 0)

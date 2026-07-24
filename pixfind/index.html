@@ -67,7 +67,7 @@
 <link href="https://fonts.googleapis.com" rel="preconnect"/>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
 <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700&amp;display=swap" rel="stylesheet"/>
-<link href="styles.css?v=20260724-game-layout5" rel="stylesheet"/>
+<link href="styles.css?v=20260724-result-panel10" rel="stylesheet"/>
 <script src="../scripts/ad-account-control.js?v=20260719-no-ad-fallback1"></script>
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-2.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-2.png"/>
@@ -228,7 +228,6 @@
 <div class="game-header-slot game-header-slot--right">
 <div class="game-controls">
 <button class="button button--ghost button--compact" id="gameBackButton" type="button">問題選択</button>
-<button class="button button--ghost button--compact" id="backButton" type="button">タイトル</button>
 <button class="button button--primary button--compact" id="resetButton" type="button">もう一度</button>
 <button aria-pressed="false" hidden="" id="fullscreenButton" type="button">全画面</button>
 </div>
@@ -255,6 +254,10 @@
 <p class="target-panel__lead">見つけるお題</p>
 <p class="target-panel__current" id="targetCurrent">-</p>
 <ul class="target-list" id="targetList"></ul>
+</section>
+<section aria-live="polite" class="target-panel target-panel--secondary" hidden="" id="targetPanelSecondary">
+<p class="target-panel__lead">見つけるお題（続き）</p>
+<ul class="target-list" id="targetListSecondary"></ul>
 </section>
 <div class="hint-card">
 <p id="hintMessage"></p>
@@ -379,7 +382,7 @@
 <div class="creator-files">
 <div class="creator-file creator-dropzone" id="creatorOriginalDropzone">
 <input accept="image/png,image/jpeg,image/webp" class="creator-file__input" id="creatorOriginalInput" type="file"/>
-<button class="creator-file__picker" id="creatorOriginalPicker" type="button"><span class="creator-file__title">お手本画像を追加</span><span class="creator-file__hint">クリック／タップ、またはここへドロップ</span></button>
+<button class="creator-file__picker" data-empty-label="お手本画像を追加" id="creatorOriginalPicker" type="button"><span class="creator-file__title">お手本画像を追加</span><span class="creator-file__hint">クリック／タップ、またはここへドロップ</span></button>
 <img alt="選択したお手本画像のプレビュー" class="creator-file__preview" hidden="" id="creatorOriginalFilePreview"/>
 <div class="creator-marker-workspace" hidden="" id="creatorMarkerWorkspace">
 <div class="creator-marker-workspace__head"><strong>画像上で探す場所をマーク</strong><button class="button button--ghost button--compact" id="creatorMarkerReplace" type="button">画像を変更</button></div>
@@ -390,12 +393,12 @@
 </div>
 <div class="creator-file creator-dropzone" id="creatorDiffDropzone">
 <input accept="image/png,image/jpeg,image/webp" class="creator-file__input" id="creatorDiffInput" type="file"/>
-<button class="creator-file__picker" id="creatorDiffPicker" type="button"><span class="creator-file__title" id="creatorDiffLabelText">間違い画像を追加</span><span class="creator-file__hint">クリック／タップ、またはここへドロップ</span></button>
+<button class="creator-file__picker" data-empty-label="間違い画像を追加" id="creatorDiffPicker" type="button"><span class="creator-file__title" id="creatorDiffLabelText">間違い画像を追加</span><span class="creator-file__hint">クリック／タップ、またはここへドロップ</span></button>
 <img alt="選択した間違い画像のプレビュー" class="creator-file__preview" hidden="" id="creatorDiffFilePreview"/>
 </div>
 </div>
 </div>
-<div class="creator-preview" id="creatorPreview">
+<div class="creator-preview" hidden="" id="creatorPreview">
 <figure class="creator-preview-frame">
 <canvas aria-label="お手本画像のプレビュー" id="creatorPreviewOriginal"></canvas>
 <figcaption class="creator-preview-label">お手本</figcaption>
@@ -421,17 +424,32 @@
 </form>
 </div>
 </div>
-<div aria-hidden="true" class="completion-overlay" id="completionOverlay">
-<span>Great!</span>
+<div aria-hidden="true" class="completion-overlay" id="completionOverlay" inert="">
+<section aria-labelledby="resultTitle" class="result-panel" role="dialog">
+<p class="result-panel__eyebrow">PUZZLE COMPLETE</p>
+<h2 id="resultTitle">CLEAR!</h2>
+<p class="result-panel__rank" id="resultRank">PERFECT</p>
+<div aria-label="今回の結果" class="result-panel__stats">
+<div><span>TIME</span><strong id="resultTime">00:00</strong></div>
+<div><span>FOUND</span><strong id="resultFound">0 / 0</strong></div>
+<div><span>MISS</span><strong id="resultMiss">0 / 3</strong></div>
+</div>
+<p class="result-panel__message" id="resultMessage">すべて発見しました！</p>
+<div class="result-panel__actions">
+<button class="button button--primary" id="resultRetryButton" type="button">もう一度</button>
+<button class="button button--ghost" id="resultPuzzleListButton" type="button">問題選択</button>
+<button class="button button--ghost" id="resultShareButton" type="button">シェア</button>
+</div>
+</section>
 </div>
 <div aria-hidden="true" class="completion-overlay completion-overlay--failure" id="failureOverlay">
-<span>Miss!</span>
+<span>TRY AGAIN</span>
 </div>
 <script defer="" src="assets/puzzles/manifest.js"></script>
 <script src="../scripts/creator-play-rewards.js?v=2026.07.19-play-rewards1"></script>
-<script defer="" src="app.js?v=20260724-game-zoom-clamp6"></script>
+<script defer="" src="app.js?v=20260724-result-panel10"></script>
 <script src="../scripts/shared-profile-header.js"></script>
-<script data-pixieed-footer-ad="false" src="../scripts/shared-bottom-nav.js?v=20260724-icon-paths1"></script>
+<script data-pixieed-footer-ad="false" src="../scripts/shared-bottom-nav.js?v=20260724-fullscreen-icons2"></script>
 <script src="../scripts/pixel-art-fit.js"></script>
 </body>
 </html>

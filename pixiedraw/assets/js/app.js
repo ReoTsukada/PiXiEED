@@ -4810,6 +4810,7 @@
   set getPlaybackFrameImageData(value) { getPlaybackFrameImageData = value; },
   get isSimulationLayer() { return isSimulationLayer; },
   set isSimulationLayer(value) { isSimulationLayer = value; },
+  get isTiledLayerIndices() { return documentModel.isTiledLayerIndices; },
   get isVoxelExtensionModeEnabled() { return isVoxelExtensionModeEnabled; },
   set isVoxelExtensionModeEnabled(value) { isVoxelExtensionModeEnabled = value; },
   get isVoxelPreviewCanvasId() { return isVoxelPreviewCanvasId; },

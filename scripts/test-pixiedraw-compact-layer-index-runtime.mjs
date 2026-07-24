@@ -349,4 +349,60 @@ assert.equal(navigationState.activeFrame, 1);
 assert.equal(navigationState.activeLayer, 'layer-2');
 assert.deepEqual(compactedFrames, [navigationState.frames[0]]);
 
+const canvasRenderPath = new URL('../pixiedraw/assets/js/modules/canvas-render-workflow-utils.js', import.meta.url);
+vm.runInContext(fs.readFileSync(canvasRenderPath, 'utf8'), context, {
+  filename: 'canvas-render-workflow-utils.js',
+});
+const renderLayer = {
+  id: 'tiled-render-layer',
+  visible: true,
+  opacity: 1,
+  blendMode: 'normal',
+  indices: new Uint8Array(0),
+  indicesEncoding: 'uint8-tiled-zero-transparent-v1',
+  direct: null,
+  directOnly: false,
+};
+assert.equal(model.ensureSparseWritableLayerIndices(renderLayer, 64, 64), true);
+assert.equal(model.setLayerRuntimeStoredIndex(renderLayer, 65, 1), true);
+const renderedImages = [];
+let clearedTiledRender = false;
+const renderContext = {
+  clearRect: () => { clearedTiledRender = true; },
+  createImageData: (width, height) => ({ width, height, data: new Uint8ClampedArray(width * height * 4) }),
+  putImageData: image => renderedImages.push(image),
+};
+const renderFrame = { id: 'tiled-render-frame', layers: [renderLayer] };
+const renderer = context.window.PiXiEEDrawModules.canvasRenderWorkflowUtils
+  .createCanvasRenderWorkflowUtils({
+    canvasCompositeFrameCache: { byFrame: new Map(), bytes: 0, maxBytes: 0, hits: 0, misses: 0 },
+    DEFAULT_LAYER_BLEND_MODE: 'normal',
+    clamp: (value, min, max) => Math.min(max, Math.max(min, value)),
+    compositeLayerPixelNormalized: (data, offset, r, g, b, a) => {
+      data[offset] = r; data[offset + 1] = g; data[offset + 2] = b; data[offset + 3] = a;
+    },
+    compositeSimulationLayerRegion: noOp,
+    ctx: { drawing: renderContext },
+    getCanvasRenderContext: () => renderContext,
+    presentCanvasRenderOutput: noOp,
+    dirtyRegion: { x0: 0, y0: 0, x1: 63, y1: 63 },
+    getActiveFrame: () => renderFrame,
+    getActiveProjectCanvasDocument: () => ({ id: 'tiled-render-canvas', width: 64, height: 64 }),
+    getDisplayedLayerPreviewOpacity: () => 1,
+    getDisplayedLayerVisibility: () => true,
+    getStoredRasterLayerPaletteIndex: model.getStoredLayerPaletteIndex,
+    getPlaybackFrameImageData: () => null,
+    isSimulationLayer: () => false,
+    isTiledLayerIndices: model.isTiledLayerIndices,
+    isVoxelExtensionModeEnabled: () => false,
+    isVoxelPreviewCanvasId: () => false,
+    normalizeLayerBlendMode: value => value || 'normal',
+    refreshSecondaryCanvasSurfaces: noOp,
+    state: { width: 64, height: 64, palette, playback: { isPlaying: false } },
+  });
+renderer.renderCanvas();
+assert.equal(clearedTiledRender, false, 'a non-empty tiled layer must not be mistaken for an empty frame');
+assert.equal(renderedImages.length, 1);
+assert.equal(renderedImages[0].data[(65 * 4) + 3], 255, 'the tiled pixel must remain visible after redraw');
+
 console.log('PiXiEEDraw compact layer index runtime checks passed');

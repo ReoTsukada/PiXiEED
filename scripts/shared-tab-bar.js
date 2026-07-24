@@ -99,7 +99,7 @@
           { id: 'qr', label: 'QR編集', selector: '[data-ui-action="openQrEditor"]', icon: 'assets/icons/QR.png' },
           { id: 'undo', label: '元に戻す', selector: '#undoAction', icon: 'assets/icons/Undo.png?v=2026.07.19-ui-icons1', mirrorDisabled: true, placement: 'trailing' },
           { id: 'redo', label: 'やり直す', selector: '#redoAction', icon: 'assets/icons/Redo.png?v=2026.07.19-ui-icons1', mirrorDisabled: true, placement: 'trailing' },
-          { id: 'fullscreen', label: '拡大', selector: '#fullscreenButton', icon: 'pixiedraw/assets/icons/zoomup.svg', iconWhenPressed: 'pixiedraw/assets/icons/zoomdown.svg', mirrorState: true, mode: 'fullscreen', fullscreenController: 'tool', placement: 'leading' },
+          { id: 'fullscreen', label: '拡大', selector: '#fullscreenButton', icon: '拡大.png', iconWhenPressed: '縮小.png', mirrorState: true, mode: 'fullscreen', fullscreenController: 'tool', placement: 'leading' },
         ],
         details: [
           { label: 'ショートカット一覧', selector: '#openShortcutHelp', icon: 'pixiedraw/assets/icons/short_cut.png?v=20260721-icons1' },
@@ -144,7 +144,7 @@
     if (kind === 'camera') {
       return {
         actions: [
-          { id: 'fullscreen', label: '拡大', selector: '#fullscreenButton', icon: 'pixiedraw/assets/icons/zoomup.svg', iconWhenPressed: 'pixiedraw/assets/icons/zoomdown.svg', mirrorState: true, mode: 'fullscreen', fullscreenController: 'tool', placement: 'leading' },
+          { id: 'fullscreen', label: '拡大', selector: '#fullscreenButton', icon: '拡大.png', iconWhenPressed: '縮小.png', mirrorState: true, mode: 'fullscreen', fullscreenController: 'tool', placement: 'leading' },
           { id: 'file', label: '画像を読み込む', selector: '#pixelArtBtn', cloneIcon: true, mirrorState: true },
           { id: 'clear', label: '読み込みを取り消す', selector: '#clearPixelBtn', cloneIcon: true, mirrorState: true, mirrorVisibility: true },
           { id: 'camera-switch', label: 'カメラ切り替え', selector: '#cameraActionBtn', cloneIcon: true, mirrorState: true },
@@ -164,7 +164,7 @@
         actions: [
           { id: 'play', label: '遊ぶ', selector: '#startButton', icon: 'icon/icon-192-2.png' },
           { id: 'create', label: '作る', selector: '#createButton', icon: 'assets/icons/File.png?v=2026.07.19-ui-icons1' },
-          { id: 'fullscreen', label: '拡大', selector: '#fullscreenButton', icon: 'pixiedraw/assets/icons/zoomup.svg', iconWhenPressed: 'pixiedraw/assets/icons/zoomdown.svg', mirrorState: true, mode: 'fullscreen', fullscreenController: 'game', placement: 'leading' },
+          { id: 'fullscreen', label: '拡大', selector: '#fullscreenButton', icon: '拡大.png', iconWhenPressed: '縮小.png', mirrorState: true, mode: 'fullscreen', fullscreenController: 'game', placement: 'leading' },
         ],
         details: buildSupportDetails({ includeUpdates: true }),
       };
@@ -173,7 +173,7 @@
       return {
         actions: [
           { id: 'play', label: '遊ぶ', selector: '#playBtn', cloneIcon: true },
-          { id: 'fullscreen', label: '拡大', selector: '#fullscreenButton', icon: 'pixiedraw/assets/icons/zoomup.svg', iconWhenPressed: 'pixiedraw/assets/icons/zoomdown.svg', mirrorState: true, mode: 'fullscreen', fullscreenController: 'tool', placement: 'leading' },
+          { id: 'fullscreen', label: '拡大', selector: '#fullscreenButton', icon: '拡大.png', iconWhenPressed: '縮小.png', mirrorState: true, mode: 'fullscreen', fullscreenController: 'tool', placement: 'leading' },
         ],
         details: buildSupportDetails({ includeUpdates: true }),
       };
