@@ -466,8 +466,16 @@ body.is-playing {
 .creator-marker-workspace { display:grid; gap:.6rem; padding:.75rem; border:1px solid rgba(255,111,141,.42); border-radius:14px; background:rgba(255,247,249,.82); }
 .creator-marker-workspace__head { display:flex; align-items:center; justify-content:space-between; gap:.6rem; }
 .creator-marker-workspace p { margin:0; color:var(--text-muted); font-size:.8rem; }
-.creator-marker-workspace iframe { width:100%; min-height:390px; border:0; border-radius:10px; background:#101725; }
-@media (max-width:620px){.pixfind-catalog__head{align-items:center}.pixfind-catalog .puzzle-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.pixfind-catalog .puzzle-card__title{font-size:.95rem}.creator-marker-workspace iframe{min-height:330px}}
+.creator-marker-toolbar { display:flex; flex-wrap:wrap; gap:.4rem; }
+.creator-marker-toolbar button { border:1px solid rgba(94,132,201,.5); border-radius:8px; padding:.42rem .65rem; color:var(--text); background:#fff; font:inherit; font-size:.8rem; font-weight:700; cursor:pointer; }
+.creator-marker-toolbar button:hover,.creator-marker-toolbar button:focus-visible { border-color:rgba(233,78,115,.8); background:#fff0f4; }
+.creator-marker-toolbar .creator-marker-reset { display:grid; place-items:center; width:32px; padding:0; }
+.creator-marker-reset svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
+.creator-marker-viewport { height:min(54vh,520px); overflow:hidden; border:1px solid rgba(94,132,201,.5); border-radius:10px; background:#101725; touch-action:none; }
+.creator-marker-stage { position:relative; transform-origin:0 0; }
+.creator-marker-stage canvas { position:absolute; inset:0; display:block; image-rendering:pixelated; }
+#creatorMarkerCanvas { pointer-events:none; }
+@media (max-width:620px){.pixfind-catalog__head{align-items:center}.pixfind-catalog .puzzle-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.pixfind-catalog .puzzle-card__title{font-size:.95rem}.creator-marker-viewport{height:min(48vh,390px)}}
 
 .author-avatar {
   width: 18px;
@@ -1567,6 +1575,7 @@ body.is-playing {
 }
 
 .creator-dropzone {
+  position: relative;
   min-height: 128px;
   place-content: center;
   padding: 1rem;
@@ -1591,10 +1600,54 @@ body.is-playing {
 
 .creator-file__input {
   position: absolute;
-  inline-size: 1px;
-  block-size: 1px;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
   opacity: 0;
   pointer-events: none;
+}
+
+.creator-file__picker {
+  display: grid;
+  gap: 0.4rem;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+}
+
+.creator-file__preview {
+  display: block;
+  width: 100%;
+  max-height: 300px;
+  border-radius: 10px;
+  object-fit: contain;
+  background: rgba(16, 23, 37, 0.08);
+  image-rendering: pixelated;
+}
+
+.creator-dropzone.has-preview {
+  min-height: 0;
+  padding: 0.55rem;
+  border-style: solid;
+}
+
+.creator-dropzone.has-preview .creator-file__picker {
+  padding: 0.4rem 0.5rem;
+}
+
+.creator-dropzone.is-marker-editor {
+  display: block;
+  padding: 0.55rem;
+}
+
+.creator-dropzone.is-marker-editor .creator-file__picker,
+.creator-dropzone.is-marker-editor .creator-file__preview {
+  display: none;
 }
 
 .creator-file__title {
@@ -1606,6 +1659,10 @@ body.is-playing {
 .creator-file__hint {
   font-size: 0.78rem;
   line-height: 1.45;
+}
+
+.creator-dropzone.is-marker-editor .creator-marker-workspace {
+  margin: 0;
 }
 
 .creator-input {
@@ -2018,10 +2075,6 @@ body.is-playing {
     padding-inline: 0.7rem;
   }
 
-  #deletePuzzleButton {
-    grid-column: 1 / -1;
-  }
-
   .status-card {
     justify-content: center;
     min-width: 0;
@@ -2220,6 +2273,46 @@ body.is-playing {
   }
 }
 
+/* Shared navigation-aware game geometry. Canvas zoom/pan stays inside these surfaces. */
+body[data-pixieed-page="pixfind"] .screen--difficulty,
+body[data-pixieed-page="pixfind"] .screen--game {
+  padding-top: max(var(--screen-padding-top), calc(var(--pixieed-common-content-top, 0px) + 0.45rem));
+}
+
+body[data-pixieed-page="pixfind"] .creator-overlay {
+  padding-top: max(var(--screen-padding-top), calc(var(--pixieed-common-content-top, 0px) + 0.45rem));
+  padding-bottom: max(var(--screen-padding-bottom), calc(var(--pixieed-shared-bottom-nav-offset, 68px) + 0.45rem));
+}
+
+@media (orientation: portrait) {
+  .screen--game {
+    grid-template-rows: auto minmax(0, 1fr) !important;
+    min-height: 0;
+  }
+
+  .screen--game .game-layout {
+    min-height: 0;
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+  }
+
+  .screen--game .game-controls { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (orientation: landscape) {
+  .screen--game {
+    grid-template-rows: auto minmax(0, 1fr) !important;
+    min-height: 0;
+  }
+
+  .screen--game .game-layout {
+    min-height: 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .screen--game .game-controls { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
 @media (max-width: 900px) and (orientation: landscape) {
   .screen--game {
     grid-template-rows: auto minmax(0, 1fr) auto;
@@ -2237,10 +2330,6 @@ body.is-playing {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     width: 100%;
-  }
-
-  #deletePuzzleButton {
-    grid-column: 1 / -1;
   }
 
   .game-controls .button {
@@ -2396,10 +2485,6 @@ body.is-playing {
     min-height: 34px;
     padding: 0.28rem 0.22rem;
     font-size: 0.6rem;
-  }
-
-  #deletePuzzleButton {
-    grid-column: 1 / -1;
   }
 
   .game-layout {
@@ -3219,5 +3304,55 @@ body[data-pixieed-page="pixfind"] .pixieed-common-tabbar {
 
   .screen--game .game-layout {
     gap: 0.35rem;
+  }
+}
+
+/* Use the shared footer as normal document content instead of pinning it above PiXFiND. */
+body[data-pixfind-screen="start"] {
+  height: auto;
+  min-height: var(--app-height);
+  max-height: none;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+
+body[data-pixfind-screen="start"] > .app {
+  height: var(--app-height);
+  min-height: var(--app-height);
+}
+
+body[data-pixfind-screen="start"] .screen--start {
+  padding-bottom: var(--screen-padding-bottom);
+  overflow-y: auto;
+}
+
+body[data-pixfind-screen="start"] > .pixieed-shared-footer {
+  position: static;
+  z-index: auto;
+  width: 100%;
+  max-width: none;
+  min-height: 0;
+  margin: 0;
+  padding: 18px max(14px, env(safe-area-inset-right, 0px)) calc(18px + var(--pixieed-shared-bottom-nav-offset, 68px)) max(14px, env(safe-area-inset-left, 0px));
+}
+
+/* The right-side landscape navigation must never cover PiXFiND controls or scrollable panels. */
+@media (orientation: landscape) {
+  body[data-pixieed-page="pixfind"] > .app {
+    width: calc(100% - var(--pixieed-shared-side-nav-width, 72px) - var(--pixieed-shared-side-nav-gap, 6px));
+    max-width: 1220px;
+    margin-left: 0;
+    margin-right: calc(var(--pixieed-shared-side-nav-width, 72px) + var(--pixieed-shared-side-nav-gap, 6px));
+  }
+
+  body[data-pixieed-page="pixfind"] .screen,
+  body[data-pixieed-page="pixfind"] .creator-overlay {
+    padding-right: max(var(--screen-padding-right), env(safe-area-inset-right, 0px));
+  }
+
+  body[data-pixfind-screen="start"] > .pixieed-shared-footer {
+    width: calc(100% - var(--pixieed-shared-side-nav-width, 72px));
+    padding-bottom: 18px;
   }
 }
