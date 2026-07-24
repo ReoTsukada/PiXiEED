@@ -4268,20 +4268,31 @@ function createCanvasInteractionController(canvas, overlay, onTap, onTransform) 
       controllerState.offsetY = 0;
       return;
     }
-    // The viewport, rather than opaque pixels, defines the interaction area.
-    // Only stop panning when the full image would leave that viewport.
+    // The game frame is the viewport. At 1x it is locked in place; when
+    // magnified, keep the frame fully covered instead of allowing a 1px edge
+    // of the image to remain visible.
     const getMaxOffset = (frameSize, canvasSize) => {
       const scaledSize = canvasSize * controllerState.scale;
-      const minimumVisible = Math.min(
-        scaledSize,
-        1
-      );
-      return Math.max(0, ((frameSize + scaledSize) / 2) - minimumVisible);
+      return Math.max(0, (scaledSize - frameSize) / 2);
     };
     const maxOffsetX = getMaxOffset(frameWidth, canvasWidth);
     const maxOffsetY = getMaxOffset(frameHeight, canvasHeight);
     controllerState.offsetX = clamp(controllerState.offsetX, -maxOffsetX, maxOffsetX);
     controllerState.offsetY = clamp(controllerState.offsetY, -maxOffsetY, maxOffsetY);
+  }
+
+  function zoomAroundFramePoint(nextScale, framePointX, framePointY) {
+    const previousScale = controllerState.scale;
+    const normalizedScale = clamp(nextScale, config.minScale, config.maxScale);
+    if (!Number.isFinite(normalizedScale) || normalizedScale === previousScale) return false;
+    const scaleChange = normalizedScale / previousScale;
+    // Keep the image pixel under the pinch/wheel focal point fixed, including
+    // when the image was already panned before the next zoom gesture.
+    controllerState.offsetX = framePointX - ((framePointX - controllerState.offsetX) * scaleChange);
+    controllerState.offsetY = framePointY - ((framePointY - controllerState.offsetY) * scaleChange);
+    controllerState.scale = normalizedScale;
+    clampOffsets();
+    return true;
   }
 
   function updatePan(point) {
@@ -4360,25 +4371,18 @@ function createCanvasInteractionController(canvas, overlay, onTap, onTransform) 
       if (controllerState.initialDistance <= 0) {
         return;
       }
-      const prevScale = controllerState.scale;
       const distance = calculatePointerDistance(first, second);
       const rawScale = controllerState.initialScale * (distance / controllerState.initialDistance);
       const nextScale = clamp(rawScale, config.minScale, config.maxScale);
       if (!Number.isFinite(nextScale) || Number.isNaN(nextScale)) {
         return;
       }
-      const scaleChange = prevScale ? nextScale / prevScale : 1;
-      controllerState.scale = nextScale;
-
-      if (scaleChange && Number.isFinite(scaleChange) && !Number.isNaN(scaleChange)) {
-        const frameRect = frame.getBoundingClientRect();
-        const centerX = ((first.x + second.x) / 2) - (frameRect.left + frameRect.width / 2);
-        const centerY = ((first.y + second.y) / 2) - (frameRect.top + frameRect.height / 2);
-        controllerState.offsetX -= (scaleChange - 1) * centerX;
-        controllerState.offsetY -= (scaleChange - 1) * centerY;
+      const frameRect = frame.getBoundingClientRect();
+      const centerX = ((first.x + second.x) / 2) - (frameRect.left + frameRect.width / 2);
+      const centerY = ((first.y + second.y) / 2) - (frameRect.top + frameRect.height / 2);
+      if (zoomAroundFramePoint(nextScale, centerX, centerY)) {
+        applyTransform();
       }
-      clampOffsets();
-      applyTransform();
       controllerState.tapCandidate = null;
     } else if (controllerState.pointers.size === 1) {
       const point = controllerState.pointers.get(event.pointerId);
@@ -4455,8 +4459,8 @@ function createCanvasInteractionController(canvas, overlay, onTap, onTransform) 
     const wheelSteps = normalizedDelta / 100;
     if (!Number.isFinite(wheelSteps) || Math.abs(wheelSteps) < 0.001) return;
 
-    const prevScale = controllerState.scale;
-    const rawScale = Number.isFinite(wheelRawScale) ? wheelRawScale : prevScale;
+    const previousScale = controllerState.scale;
+    const rawScale = Number.isFinite(wheelRawScale) ? wheelRawScale : previousScale;
     wheelRawScale = clamp(rawScale * Math.pow(ZOOM_WHEEL_STEP_BASE, -wheelSteps), config.minScale, config.maxScale);
     if (wheelRawResetTimer !== null) {
       window.clearTimeout(wheelRawResetTimer);
@@ -4466,19 +4470,16 @@ function createCanvasInteractionController(canvas, overlay, onTap, onTransform) 
       wheelRawResetTimer = null;
     }, ZOOM_WHEEL_RAW_RESET_MS);
 
-    const nextScale = normalizeZoomScale(wheelRawScale, prevScale);
-    if (nextScale === prevScale) {
+    const nextScale = normalizeZoomScale(wheelRawScale, previousScale);
+    if (nextScale === previousScale) {
       return;
     }
     const frameRect = frame.getBoundingClientRect();
     const relativeX = event.clientX - (frameRect.left + frameRect.width / 2);
     const relativeY = event.clientY - (frameRect.top + frameRect.height / 2);
-    const scaleChange = nextScale / prevScale;
-    controllerState.scale = nextScale;
-    controllerState.offsetX -= (scaleChange - 1) * relativeX;
-    controllerState.offsetY -= (scaleChange - 1) * relativeY;
-    clampOffsets();
-    applyTransform();
+    if (zoomAroundFramePoint(nextScale, relativeX, relativeY)) {
+      applyTransform();
+    }
   }
 
   frame.addEventListener('pointerdown', handlePointerDown);
