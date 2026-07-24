@@ -11,8 +11,10 @@ const toolFullscreen = fs.readFileSync(path.join(root, 'scripts/tool-fullscreen.
 const maoitu = fs.readFileSync(path.join(root, 'maoitu/index.html'), 'utf8');
 
 assert.match(html, /<body data-pixfind-screen="start">/);
-assert.match(html, /styles\.css\?v=2026\.07\.19-game-first-layout1/);
-assert.match(html, /app\.js\?v=2026\.07\.19-game-zoom5/);
+assert.match(html, /styles\.css\?v=20260724-unified-catalog1/);
+assert.match(html, /app\.js\?v=20260724-unified-catalog-marker1/);
+assert.match(html, /class="puzzle-gallery pixfind-catalog"/);
+assert.match(html, /id="creatorMarkerFrame"[^>]*sandbox="allow-scripts"[^>]*src="marker-editor\.html"/);
 assert.doesNotMatch(html, />他のゲーム・ツール<\/a>/);
 assert.doesNotMatch(html, /class="(?:start-ad|difficulty-ad|game-ad)"/);
 
@@ -27,6 +29,9 @@ assert.match(app, /const label = active \? '縮小' : '拡大';/);
 assert.match(app, /\(idx \+ 1\) % 8 === 0/);
 assert.doesNotMatch(app, /idx === 7/);
 assert.match(app, /function createPuzzleListAd\(\)/);
+assert.match(app, /function openCreatorMarkerEditor\(\)/);
+assert.match(app, /function normalizeMarkerRegions\(/);
+assert.match(app, /pixfind-marker-change/);
 assert.match(app, /data-ad-format="auto"/);
 assert.match(app, /data-full-width-responsive="true"/);
 assert.doesNotMatch(app, /createPuzzleAdCard/);
