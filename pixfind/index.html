@@ -67,7 +67,7 @@
 <link href="https://fonts.googleapis.com" rel="preconnect"/>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
 <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700&amp;display=swap" rel="stylesheet"/>
-<link href="styles.css?v=2026.07.19-game-first-layout1" rel="stylesheet"/>
+<link href="styles.css?v=20260724-unified-catalog1" rel="stylesheet"/>
 <script src="../scripts/ad-account-control.js?v=20260719-no-ad-fallback1"></script>
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-2.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-2.png"/>
@@ -186,33 +186,11 @@
 <header class="difficulty-header">
 <button class="button button--ghost button--compact" id="difficultyBackButton" type="button">タイトルにもどる</button>
 </header>
-<div aria-label="ゲームモードの選択" class="mode-selector" role="tablist">
-<button aria-pressed="true" class="mode-chip" data-game-mode="spot-difference" type="button">
-<strong>間違い探し</strong>
-<span>2枚を見比べて違いを探す</span>
-</button>
-<button aria-pressed="false" class="mode-chip" data-game-mode="hidden-object" type="button">
-<strong>もの探し</strong>
-<span>指定アイテムを探す</span>
-</button>
+<div class="puzzle-gallery pixfind-catalog">
+<div class="pixfind-catalog__head">
+<div><p class="tagline">PUZZLE CATALOG</p><h2 class="section-title">すべての問題</h2></div>
+<button class="button button--primary button--compact" id="catalogCreateButton" type="button">問題を投稿</button>
 </div>
-<p class="section-subtitle mode-description" id="modeDescription">2枚の画像の違いをすべて探してください。</p>
-<div aria-label="難易度の選択" class="difficulty-selector" role="tablist">
-<button aria-pressed="true" class="difficulty-chip" data-difficulty="1" type="button">
-<strong>★☆☆</strong>
-<span>まずはここから</span>
-</button>
-<button aria-pressed="false" class="difficulty-chip" data-difficulty="2" type="button">
-<strong>★★☆</strong>
-<span>目を慣らして挑戦</span>
-</button>
-<button aria-pressed="false" class="difficulty-chip" data-difficulty="3" type="button">
-<strong>★★★</strong>
-<span>見逃し厳禁の上級者向け</span>
-</button>
-</div>
-<div class="puzzle-gallery">
-<h3 class="section-title">公式パズル</h3>
 <div class="puzzle-list" id="puzzleList"></div>
 </div>
 </section>
@@ -411,6 +389,11 @@
 <span class="creator-file__hint">クリック／タップ、またはここへドロップ</span>
 </label>
 </div>
+<div class="creator-marker-workspace" id="creatorMarkerWorkspace" hidden="">
+<div class="creator-marker-workspace__head"><strong>探す場所をマーク</strong><button class="button button--primary button--compact" id="creatorMarkerOpen" type="button">マーカー編集を開く</button></div>
+<p>画像上をタップして、探してもらう場所を原寸ピクセル座標で登録します。</p>
+<iframe id="creatorMarkerFrame" title="もの探しマーカー編集" sandbox="allow-scripts" src="marker-editor.html"></iframe>
+</div>
 </div>
 <div class="creator-preview">
 <figure class="creator-preview-frame">
@@ -446,7 +429,7 @@
 </div>
 <script defer="" src="assets/puzzles/manifest.js"></script>
 <script src="../scripts/creator-play-rewards.js?v=2026.07.19-play-rewards1"></script>
-<script defer="" src="app.js?v=2026.07.19-game-zoom5"></script>
+<script defer="" src="app.js?v=20260724-unified-catalog-marker1"></script>
 <script src="../scripts/shared-profile-header.js"></script>
 <script data-pixieed-footer-ad="false" src="../scripts/shared-bottom-nav.js?v=20260724-product-update-notice1"></script>
 <script src="../scripts/pixel-art-fit.js"></script>
