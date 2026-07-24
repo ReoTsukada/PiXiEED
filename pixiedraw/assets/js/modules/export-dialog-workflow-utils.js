@@ -410,6 +410,10 @@
     });
   }
 
+  document.addEventListener('pixieed:open-update-history', () => {
+    openUpdateHistoryDialog();
+  });
+
   function closeUpdateHistoryDialog() {
     const dialog = dom.updateHistory?.dialog;
     if (dialog instanceof HTMLDialogElement && dialog.open) {

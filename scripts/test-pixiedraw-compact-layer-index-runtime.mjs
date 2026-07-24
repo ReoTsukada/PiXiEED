@@ -170,6 +170,46 @@ assert.equal(Array.isArray(legacyTiledLayer.indicesTiles), true);
 assert.equal(legacyTiledLayer.indicesTiles.length, 4);
 modelState.rasterModelVersion = 1;
 
+const legacyMigrationLayer = {
+  indices: new Int16Array(64 * 64).fill(-1),
+  direct: null,
+  directOnly: false,
+};
+legacyMigrationLayer.indices[0] = 0;
+legacyMigrationLayer.indices[2048] = 1;
+modelState.rasterModelVersion = 0;
+const legacyMigration = model.upgradeLegacyRasterDocumentsToCopyOnWrite([{
+  width: 64,
+  height: 64,
+  frames: [{ layers: [legacyMigrationLayer] }],
+}], palette);
+assert.equal(legacyMigration.migrated, true);
+assert.equal(legacyMigration.verified, true);
+assert.equal(legacyMigration.reason, 'verified');
+assert.equal(legacyMigration.convertedLayers, 1);
+assert.equal(modelState.rasterModelVersion, 1);
+assert.equal(legacyMigrationLayer.indicesTiles.constructor.name, 'Map');
+assert.equal(model.getStoredLayerPaletteIndex(legacyMigrationLayer, 0), 0);
+assert.equal(model.getStoredLayerPaletteIndex(legacyMigrationLayer, 2048), 1);
+assert.equal(model.getStoredLayerPaletteIndex(legacyMigrationLayer, 1), -1);
+
+const incompatiblePalette = Array.from({ length: 256 }, (_, index) => ({ r: index, g: index, b: index, a: 255 }));
+const incompatibleLayer = { indices: new Int16Array([1]), direct: null, directOnly: false };
+modelState.rasterModelVersion = 0;
+const incompatibleMigration = model.upgradeLegacyRasterDocumentsToCopyOnWrite([{
+  width: 1,
+  height: 1,
+  frames: [{ layers: [incompatibleLayer] }],
+}], incompatiblePalette);
+assert.equal(incompatibleMigration.migrated, false);
+assert.equal(incompatibleMigration.verified, false);
+assert.equal(incompatibleMigration.reason, 'palette-too-large');
+assert.equal(incompatibleMigration.convertedLayers, 0);
+assert.equal(modelState.rasterModelVersion, 0);
+assert.equal(incompatibleLayer.indices instanceof Int16Array, true);
+assert.equal(incompatibleLayer.indices[0], 1);
+modelState.rasterModelVersion = 1;
+
 const memory = context.window.PiXiEEDrawModules.memoryUtils.createMemoryUtils({
   dom: { controls: {} },
   state: {

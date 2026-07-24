@@ -7,6 +7,12 @@
   const SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
   const AUTH_STORAGE_KEY = 'sb-kyyiuakrqomzlikfaire-auth-token';
+  // Product updates are public announcements rather than account-bound rows.
+  // Keep their read state on this device so the common notification button can
+  // surface them even before a visitor signs in.
+  const UPDATE_NOTICE_STORAGE_KEY = 'pixieed:notifications:last-read-product-update';
+  const UPDATE_FEED_PATH = 'data/project-updates.json';
+  const UPDATE_PROJECT_ID = 'pixiedraw';
   const script = document.currentScript;
   const rootUrl = new URL('../', script?.src || window.location.href);
   let clientPromise = null;
@@ -14,6 +20,11 @@
   let channel = null;
   let panel = null;
   let list = null;
+  let latestProductUpdate = null;
+  let latestRows = [];
+  let latestSignedIn = false;
+  let hasUnreadAccountNotification = false;
+  let hasUnreadProductUpdate = false;
 
   function href(path) {
     return new URL(path, rootUrl).href;
@@ -45,6 +56,60 @@
     badge.className = 'pixieed-notification-badge';
     badge.setAttribute('aria-hidden', 'true');
     button.append(badge);
+  }
+
+  function syncBadge() {
+    setBadge(hasUnreadAccountNotification || hasUnreadProductUpdate);
+  }
+
+  function getProductUpdateKey(update) {
+    if (!update) return '';
+    return `${String(update.date || '')}:${String(update.summary || '')}`;
+  }
+
+  function readLastProductUpdateKey() {
+    try {
+      return window.localStorage.getItem(UPDATE_NOTICE_STORAGE_KEY) || '';
+    } catch (error) {
+      return '';
+    }
+  }
+
+  function markProductUpdateRead() {
+    const key = getProductUpdateKey(latestProductUpdate);
+    if (!key) return;
+    try {
+      window.localStorage.setItem(UPDATE_NOTICE_STORAGE_KEY, key);
+    } catch (error) {
+      // Storage can be disabled. Leave the announcement unread in that case.
+    }
+    hasUnreadProductUpdate = false;
+    syncBadge();
+  }
+
+  function parseLatestProductUpdate(payload) {
+    const project = Array.isArray(payload?.projects)
+      ? payload.projects.find((entry) => entry?.id === UPDATE_PROJECT_ID)
+      : null;
+    const entry = Array.isArray(project?.entries) ? project.entries[0] : null;
+    const summary = Array.isArray(entry?.items) ? entry.items.filter(Boolean).join(' ') : '';
+    if (!entry?.date || !summary) return null;
+    return { date: String(entry.date), summary };
+  }
+
+  async function refreshProductUpdateNotice() {
+    if (window.location.protocol === 'file:') return;
+    try {
+      const response = await fetch(href(UPDATE_FEED_PATH), { cache: 'no-store' });
+      if (!response.ok) return;
+      latestProductUpdate = parseLatestProductUpdate(await response.json());
+      const key = getProductUpdateKey(latestProductUpdate);
+      hasUnreadProductUpdate = Boolean(key) && key !== readLastProductUpdateKey();
+      syncBadge();
+      render(latestRows, latestSignedIn);
+    } catch (error) {
+      // Account notifications remain available if the public update feed is offline.
+    }
   }
 
   function itemText(row) {
@@ -79,15 +144,45 @@
     notificationButton()?.focus({ preventScroll: true });
   }
 
+  function renderProductUpdate() {
+    if (!latestProductUpdate) return null;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `pixieed-notification pixieed-notification--product-update${hasUnreadProductUpdate ? ' is-unread' : ''}`;
+    button.textContent = '最新のアップデートがあります';
+    button.addEventListener('click', () => {
+      markProductUpdateRead();
+      if (/\/pixiedraw(?:\/|$)/.test(window.location.pathname || '')) {
+        document.dispatchEvent(new CustomEvent('pixieed:open-update-history'));
+        close();
+        return;
+      }
+      window.location.href = href('pixiedraw/');
+    });
+    return button;
+  }
+
   function render(rows, signedIn) {
     createPanel();
+    latestRows = Array.isArray(rows) ? rows : [];
+    latestSignedIn = Boolean(signedIn);
     list.replaceChildren();
+    const productUpdate = renderProductUpdate();
+    if (productUpdate) list.append(productUpdate);
     if (!signedIn) {
-      list.textContent = '通知を見るにはログインしてください。';
+      const message = document.createElement('p');
+      message.textContent = productUpdate
+        ? '個別の通知を見るにはログインしてください。'
+        : '通知を見るにはログインしてください。';
+      list.append(message);
       return;
     }
     if (!rows.length) {
-      list.textContent = '新しい通知はありません。通知は1か月で自動的に消えます。';
+      const message = document.createElement('p');
+      message.textContent = productUpdate
+        ? '個別の新しい通知はありません。通知は1か月で自動的に消えます。'
+        : '新しい通知はありません。通知は1か月で自動的に消えます。';
+      list.append(message);
       return;
     }
     rows.forEach((row) => {
@@ -106,17 +201,18 @@
 
   async function refresh(options = {}) {
     const client = await getClient();
-    if (!client) { setBadge(false); render([], false); return; }
+    if (!client) { hasUnreadAccountNotification = false; syncBadge(); render([], false); return; }
     const { data: { user } } = await client.auth.getUser().catch(() => ({ data: {} }));
     currentUserId = user?.id || '';
-    if (!currentUserId) { setBadge(false); render([], false); return; }
+    if (!currentUserId) { hasUnreadAccountNotification = false; syncBadge(); render([], false); return; }
     const { data, error } = await client.from('market_user_notifications')
       .select('id,kind,asset_id,title,count,read_at,created_at,expires_at')
       .gt('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false })
       .limit(50);
     const rows = error ? [] : (data || []);
-    setBadge(rows.some((row) => !row.read_at));
+    hasUnreadAccountNotification = rows.some((row) => !row.read_at);
+    syncBadge();
     render(rows, true);
     if (!options.skipChannel) subscribe(client);
   }
@@ -138,7 +234,8 @@
     if (client && currentUserId) {
       await client.from('market_user_notifications').update({ read_at: new Date().toISOString() })
         .eq('recipient_user_id', currentUserId).is('read_at', null);
-      setBadge(false);
+      hasUnreadAccountNotification = false;
+      syncBadge();
     }
   }
 
@@ -150,6 +247,7 @@
 
   injectStyles();
   document.addEventListener('pixieed:open-notifications', () => { void open(); });
+  void refreshProductUpdateNotice();
   getClient().then((client) => {
     if (!client) return;
     client.auth.onAuthStateChange(() => { channel = null; void refresh(); });

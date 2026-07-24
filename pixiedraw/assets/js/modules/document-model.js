@@ -729,6 +729,100 @@
       return materializeLayerIndices(layer, width, height, paletteOverride);
     }
 
+    function captureLayerRasterStorage(layer) {
+      return {
+        indices: layer.indices,
+        indicesEncoding: layer.indicesEncoding,
+        indicesTiles: layer.indicesTiles,
+        indicesWidth: layer.indicesWidth,
+        indicesHeight: layer.indicesHeight,
+        indicesTileSize: layer.indicesTileSize,
+      };
+    }
+
+    function restoreLayerRasterStorage(layer, snapshot) {
+      layer.indices = snapshot.indices;
+      if (snapshot.indicesEncoding === undefined) delete layer.indicesEncoding;
+      else layer.indicesEncoding = snapshot.indicesEncoding;
+      if (snapshot.indicesTiles === undefined) delete layer.indicesTiles;
+      else layer.indicesTiles = snapshot.indicesTiles;
+      if (snapshot.indicesWidth === undefined) delete layer.indicesWidth;
+      else layer.indicesWidth = snapshot.indicesWidth;
+      if (snapshot.indicesHeight === undefined) delete layer.indicesHeight;
+      else layer.indicesHeight = snapshot.indicesHeight;
+      if (snapshot.indicesTileSize === undefined) delete layer.indicesTileSize;
+      else layer.indicesTileSize = snapshot.indicesTileSize;
+    }
+
+    function layerStorageMatchesExpandedIndices(layer, expectedIndices) {
+      if (!(expectedIndices instanceof Int16Array)) return false;
+      for (let pixelIndex = 0; pixelIndex < expectedIndices.length; pixelIndex += 1) {
+        if (getStoredLayerPaletteIndex(layer, pixelIndex) !== expectedIndices[pixelIndex]) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    // This is intentionally an in-memory migration. The caller only asks the
+    // normal persistence flow to save after every layer has round-tripped
+    // through the new storage representation without changing a single pixel.
+    function upgradeLegacyRasterDocumentsToCopyOnWrite(documents, paletteOverride = null) {
+      if (Number(state?.rasterModelVersion) >= RASTER_MODEL_COPY_ON_WRITE_VERSION) {
+        return { migrated: false, verified: true, reason: 'already-current', convertedLayers: 0 };
+      }
+      const palette = getLayerCreationPalette(paletteOverride) || [];
+      // The compact indexed representation reserves zero for transparency and
+      // can represent palette indices 0..254 without loss. Keep uncommon
+      // larger palettes on the legacy path rather than remapping colours.
+      if (palette.length > 255) {
+        return { migrated: false, verified: false, reason: 'palette-too-large', convertedLayers: 0 };
+      }
+      const targets = [];
+      (Array.isArray(documents) ? documents : []).forEach(documentEntry => {
+        const width = Math.max(1, Math.round(Number(documentEntry?.width) || 1));
+        const height = Math.max(1, Math.round(Number(documentEntry?.height) || 1));
+        (Array.isArray(documentEntry?.frames) ? documentEntry.frames : []).forEach(frame => {
+          (Array.isArray(frame?.layers) ? frame.layers : []).forEach(layer => {
+            if (!layer || isSimulationLayer(layer) || (layer.directOnly && layer.direct instanceof Uint8ClampedArray)) {
+              return;
+            }
+            targets.push({ layer, width, height, snapshot: captureLayerRasterStorage(layer) });
+          });
+        });
+      });
+      if (!targets.length) {
+        state.rasterModelVersion = RASTER_MODEL_COPY_ON_WRITE_VERSION;
+        return { migrated: true, verified: true, reason: 'no-indexed-layers', convertedLayers: 0 };
+      }
+      const previousVersion = state.rasterModelVersion;
+      try {
+        state.rasterModelVersion = RASTER_MODEL_COPY_ON_WRITE_VERSION;
+        targets.forEach(target => {
+          const expectedIndices = createExpandedLayerIndices(target.layer, target.width, target.height, palette);
+          target.layer.indices = expectedIndices;
+          delete target.layer.indicesEncoding;
+          clearTiledLayerIndexMetadata(target.layer);
+          if (!compactLayerIndicesToTiles(target.layer, palette, target.width, target.height)) {
+            throw new Error('legacy-raster-compaction-failed');
+          }
+          if (!layerStorageMatchesExpandedIndices(target.layer, expectedIndices)) {
+            throw new Error('legacy-raster-verification-failed');
+          }
+        });
+        return { migrated: true, verified: true, reason: 'verified', convertedLayers: targets.length };
+      } catch (error) {
+        targets.forEach(target => restoreLayerRasterStorage(target.layer, target.snapshot));
+        state.rasterModelVersion = previousVersion;
+        return {
+          migrated: false,
+          verified: false,
+          reason: error instanceof Error ? error.message : 'legacy-raster-migration-failed',
+          convertedLayers: 0,
+        };
+      }
+    }
+
     function cloneStoredLayerIndices(layer, { clonePixelData = true } = {}) {
       if (isTiledLayerIndices(layer)) {
         return new Uint8Array(0);
@@ -2221,6 +2315,7 @@
       materializeLayerIndices,
       ensureWritableLayerIndices,
       ensureSparseWritableLayerIndices,
+      upgradeLegacyRasterDocumentsToCopyOnWrite,
       detachSharedLayerRaster,
       ensureLayerDirect,
       isSimulationLayer,

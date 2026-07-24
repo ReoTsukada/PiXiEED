@@ -1224,16 +1224,21 @@
         return;
       }
       const removeIndex = clamp(getActiveLayerIndex(), 0, Number.MAX_SAFE_INTEGER);
-      const simulatedCanvases = cloneProjectCanvasDocumentsForStructureChange();
-      const simulatedCanvas = simulatedCanvases[getActiveProjectCanvasIndex()] || null;
-      simulatedCanvas?.frames?.forEach(frame => {
-        const targetIndex = clamp(removeIndex, 0, Math.max(0, (frame.layers?.length || 1) - 1));
-        if (Array.isArray(frame.layers) && frame.layers.length > 1) {
-          frame.layers.splice(targetIndex, 1);
+      if (isSharedProjectCollaborativeMode()) {
+        const simulatedCanvases = cloneProjectCanvasDocumentsForStructureChange();
+        if (!Array.isArray(simulatedCanvases)) {
+          return;
         }
-      });
-      if (!canNormalizeMultiAssignmentsForCanvasDocuments(simulatedCanvases, { announce: true })) {
-        return;
+        const simulatedCanvas = simulatedCanvases[getActiveProjectCanvasIndex()] || null;
+        simulatedCanvas?.frames?.forEach(frame => {
+          const targetIndex = clamp(removeIndex, 0, Math.max(0, (frame.layers?.length || 1) - 1));
+          if (Array.isArray(frame.layers) && frame.layers.length > 1) {
+            frame.layers.splice(targetIndex, 1);
+          }
+        });
+        if (!canNormalizeMultiAssignmentsForCanvasDocuments(simulatedCanvases, { announce: true })) {
+          return;
+        }
       }
       if (!settlePendingHistoryBeforeTimelineStructureChange()) {
         return;
@@ -1391,13 +1396,18 @@
         return;
       }
       if (state.frames.length <= 1) return;
-      const simulatedCanvases = cloneProjectCanvasDocumentsForStructureChange();
-      const simulatedCanvas = simulatedCanvases[getActiveProjectCanvasIndex()] || null;
-      if (Array.isArray(simulatedCanvas?.frames) && simulatedCanvas.frames.length > 1) {
-        simulatedCanvas.frames.splice(clamp(state.activeFrame, 0, simulatedCanvas.frames.length - 1), 1);
-      }
-      if (!canNormalizeMultiAssignmentsForCanvasDocuments(simulatedCanvases, { announce: true })) {
-        return;
+      if (isSharedProjectCollaborativeMode()) {
+        const simulatedCanvases = cloneProjectCanvasDocumentsForStructureChange();
+        if (!Array.isArray(simulatedCanvases)) {
+          return;
+        }
+        const simulatedCanvas = simulatedCanvases[getActiveProjectCanvasIndex()] || null;
+        if (Array.isArray(simulatedCanvas?.frames) && simulatedCanvas.frames.length > 1) {
+          simulatedCanvas.frames.splice(clamp(state.activeFrame, 0, simulatedCanvas.frames.length - 1), 1);
+        }
+        if (!canNormalizeMultiAssignmentsForCanvasDocuments(simulatedCanvases, { announce: true })) {
+          return;
+        }
       }
       clearPendingMultiAssignmentMoveRequests();
       clearTimelineSelection();
@@ -2247,6 +2257,7 @@
     }
     timelineMatrixViewportPan.active = false;
     timelineMatrixViewportPan.moved = false;
+    timelineMatrixViewportPan.startedOnControl = false;
     timelineMatrixViewportPan.axis = '';
     timelineMatrixViewportPan.pointerId = null;
     timelineMatrixViewportPan.startX = 0;
@@ -2278,6 +2289,8 @@
     timelineMatrixViewportPan.startScrollLeft = viewport.scrollLeft;
     timelineMatrixViewportPan.startScrollTop = viewport.scrollTop;
     timelineMatrixViewportPan.captureTarget = viewport;
+    const startTarget = event.target instanceof Element ? event.target : null;
+    timelineMatrixViewportPan.startedOnControl = Boolean(startTarget?.closest('button, input, select, textarea, label'));
   }
 
   function handleTimelineMatrixViewportPointerMove(event) {
@@ -2301,7 +2314,15 @@
     const absX = Math.abs(deltaX);
     const absY = Math.abs(deltaY);
     if (!timelineMatrixViewportPan.axis) {
-      if (Math.max(absX, absY) < 6) {
+      // A tap on a frame/layer cell often includes a few pixels of finger
+      // drift. Keep it a tap until the motion is clearly intended as a
+      // timeline scroll; otherwise the subsequent click is suppressed and
+      // the active frame/layer never changes.
+      const activationThreshold = timelineMatrixViewportPan.startedOnControl
+        && event.pointerType !== 'mouse'
+        ? 14
+        : 6;
+      if (Math.max(absX, absY) < activationThreshold) {
         return;
       }
       timelineMatrixViewportPan.axis = absX >= absY ? 'x' : 'y';
@@ -2337,7 +2358,22 @@
     ) {
       return;
     }
-    clearTimelineMatrixViewportPan({ suppressClick: timelineMatrixViewportPan.moved });
+    const wasPan = timelineMatrixViewportPan.moved;
+    const wasControlTap = timelineMatrixViewportPan.startedOnControl
+      && event.pointerType !== 'mouse'
+      && !wasPan;
+    const tapTarget = wasControlTap && event.target instanceof Element
+      ? event.target.closest('button')
+      : null;
+    clearTimelineMatrixViewportPan({ suppressClick: wasPan });
+    if (tapTarget instanceof HTMLButtonElement && viewport.contains(tapTarget)) {
+      // `touch-action: none` is necessary for literal horizontal/vertical
+      // timeline scrolling, but some mobile browsers then omit the synthetic
+      // click for a perfectly valid tap. Trigger the same delegated click
+      // path on pointer-up and consume a possible duplicate native click.
+      tapTarget.click();
+      timelineMatrixViewportPan.suppressClickUntil = Date.now() + 250;
+    }
   }
 
   function handleTimelineMatrixViewportWheel(event) {
@@ -2388,6 +2424,64 @@
     return true;
   }
 
+  function canUseDirectTimelineSelection() {
+    // A local document must always be navigable. A stale retired multi-user
+    // role must not turn ordinary frame/layer buttons into move-request-only
+    // controls.
+    return !isSharedProjectCollaborativeMode();
+  }
+
+  function selectTimelineSlotDirectly(frameIndex, layerIndex, { append = false } = {}) {
+    if (!canUseDirectTimelineSelection()) return false;
+    setActiveFrameOnLayerTrack(frameIndex, layerIndex, { persist: false, render: true, syncUi: true });
+    if (append) {
+      setTimelineSlotSelection(frameIndex, layerIndex, { append: true });
+    } else {
+      clearTimelineSelection();
+    }
+    scheduleSessionPersist({ includeSnapshots: false, includeReloadSnapshot: false });
+    scheduleTimelineMatrixRenderSoon();
+    scheduleSharedProjectCellPresenceBroadcast('slot');
+    return true;
+  }
+
+  function selectTimelineLayerDirectly(layerIndex, { append = false } = {}) {
+    if (!canUseDirectTimelineSelection()) return false;
+    setActiveLayerTrackIndex(layerIndex, {
+      persist: false,
+      render: true,
+      syncUi: true,
+      respectSharedCellOccupancy: false,
+    });
+    setTimelineLayerSelection(layerIndex, { append });
+    scheduleSessionPersist({ includeSnapshots: false, includeReloadSnapshot: false });
+    scheduleTimelineMatrixRenderSoon();
+    scheduleSharedProjectCellPresenceBroadcast('layer');
+    return true;
+  }
+
+  function selectTimelineFrameDirectly(frameIndex, { append = false } = {}) {
+    if (!canUseDirectTimelineSelection()) return false;
+    const currentFrame = getActiveFrame();
+    const currentLayers = currentFrame ? currentFrame.layers.slice().reverse() : [];
+    const activeLayerRow = currentLayers.findIndex(layer => layer.id === state.activeLayer);
+    const candidateLayers = state.frames[frameIndex]?.layers?.slice().reverse() || [];
+    const nextLayer = candidateLayers[activeLayerRow] || candidateLayers[candidateLayers.length - 1] || candidateLayers[0];
+    setTimelineFrameSelection(frameIndex, { append });
+    if (nextLayer) {
+      const nextTrackIndex = state.frames[frameIndex]?.layers?.findIndex(layer => layer?.id === nextLayer.id) ?? -1;
+      if (nextTrackIndex >= 0) {
+        setActiveFrameOnLayerTrack(frameIndex, nextTrackIndex, { persist: false, render: true, syncUi: true });
+      }
+    } else {
+      setActiveFrameIndex(frameIndex, { persist: false, render: true, syncUi: true, broadcastPresence: false });
+    }
+    scheduleSessionPersist({ includeSnapshots: false, includeReloadSnapshot: false });
+    scheduleTimelineMatrixRenderSoon();
+    scheduleSharedProjectCellPresenceBroadcast('frame');
+    return true;
+  }
+
   function bindTimelineMatrixInteractions() {
     const container = dom.controls.timelineMatrix;
     if (!container || timelineMatrixInteractionBound) {
@@ -2403,13 +2497,13 @@
       viewport.addEventListener('pointercancel', handleTimelineMatrixViewportPointerUp, { passive: true });
     }
     container.addEventListener('click', event => {
+      // Ignore the native click that can follow an actual drag. Do this in
+      // the normal delegated handler rather than capture phase: capture
+      // previously swallowed ordinary frame/layer taps before selection.
       if (Date.now() < timelineMatrixViewportPan.suppressClickUntil) {
+        event.preventDefault();
         return;
       }
-      event.preventDefault();
-      event.stopImmediatePropagation();
-    }, true);
-    container.addEventListener('click', event => {
       const target = event.target instanceof Element ? event.target.closest('button') : null;
       if (!(target instanceof HTMLButtonElement) || !container.contains(target)) {
         return;
@@ -2443,7 +2537,7 @@
           requestOverlayRender();
           return;
         }
-        if (!canSelectSharedProjectTimelineCell(state.activeFrame, layerId)) {
+        if (isSharedProjectCollaborativeMode() && !canSelectSharedProjectTimelineCell(state.activeFrame, layerId)) {
           renderTimelineMatrix();
           return;
         }
@@ -2495,7 +2589,7 @@
         } else {
           const candidateLayers = state.frames[frameIndex]?.layers?.slice().reverse() || [];
           const nextLayer = candidateLayers[activeLayerRow] || candidateLayers[candidateLayers.length - 1] || candidateLayers[0];
-          if (nextLayer && !canSelectSharedProjectTimelineCell(frameIndex, nextLayer.id)) {
+          if (nextLayer && isSharedProjectCollaborativeMode() && !canSelectSharedProjectTimelineCell(frameIndex, nextLayer.id)) {
             renderTimelineMatrix();
             return;
           }
@@ -2546,7 +2640,7 @@
           requestOverlayRender();
           return;
         }
-        if (!canSelectSharedProjectTimelineCell(frameIndex, layerId)) {
+        if (isSharedProjectCollaborativeMode() && !canSelectSharedProjectTimelineCell(frameIndex, layerId)) {
           renderTimelineMatrix();
           return;
         }
@@ -3184,6 +3278,12 @@
       if (pendingGuestMovePreview && pendingGuestMovePreview.frameIndex === frameIndex) {
         button.classList.add('is-pending-target');
       }
+      button.addEventListener('click', event => {
+        if (!selectTimelineFrameDirectly(Number.parseInt(button.dataset.timelineFrameIndex || '', 10), { append: event.shiftKey })) {
+          return;
+        }
+        event.stopPropagation();
+      });
 
       header.appendChild(button);
       applyTimelineSlotFrame(button, frameIndex === activeFrameIndex ? 'active' : 'default');
@@ -3278,6 +3378,12 @@
         if (pendingGuestMovePreview && pendingGuestMovePreview.trackIndex === layerTrackIndex) {
           tag.classList.add('is-pending-target');
         }
+        tag.addEventListener('click', event => {
+          if (!selectTimelineLayerDirectly(Number.parseInt(tag.dataset.timelineLayerIndex || '', 10), { append: event.shiftKey })) {
+            return;
+          }
+          event.stopPropagation();
+        });
         rowHeader.appendChild(tag);
       } else {
         rowVisibilityCell.dataset.timelineNodeKey = `layer-visibility:placeholder:${rowIndex}`;
@@ -3464,6 +3570,16 @@
             slot.classList.add('is-selected');
             cell.classList.add('is-selected-slot-cell');
           }
+          slot.addEventListener('click', event => {
+            if (!selectTimelineSlotDirectly(
+              Number.parseInt(slot.dataset.timelineFrameIndex || '', 10),
+              Number.parseInt(slot.dataset.timelineLayerIndex || '', 10),
+              { append: event.shiftKey }
+            )) {
+              return;
+            }
+            event.stopPropagation();
+          });
           const marker = document.createElement('span');
           marker.className = 'timeline-slot__marker';
           marker.setAttribute('aria-hidden', 'true');

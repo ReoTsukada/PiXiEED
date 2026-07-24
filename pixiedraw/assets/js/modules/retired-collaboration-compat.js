@@ -13,6 +13,13 @@
         if (typeof property !== 'string') {
           return undefined;
         }
+        // Collaboration is retired in the production editor, but ordinary
+        // single-user timeline selection must remain available. Returning the
+        // generic `can* => false` fallback here made every frame/layer cell
+        // appear forbidden even when no shared project existed.
+        if (property === 'canSelectSharedProjectTimelineCell') {
+          return () => true;
+        }
         if (
           property === 'beginGlobalLoading'
           || property === 'beginBlockingGlobalLoading'

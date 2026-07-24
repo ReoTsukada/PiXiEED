@@ -113,7 +113,7 @@
     const controller = doc.createElement('script');
     controller.async = false;
     controller.dataset.pixieedNotificationController = 'true';
-    controller.src = relHref('scripts/shared-notifications.js?v=20260722-market-notifications1');
+    controller.src = relHref('scripts/shared-notifications.js?v=20260724-product-update-notice1');
     doc.body.appendChild(controller);
   }
 

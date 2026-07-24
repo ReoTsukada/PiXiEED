@@ -8258,6 +8258,7 @@
     materializeLayerIndices,
     ensureWritableLayerIndices,
     ensureSparseWritableLayerIndices,
+    upgradeLegacyRasterDocumentsToCopyOnWrite,
     detachSharedLayerRaster,
     ensureLayerDirect,
     isSimulationLayer,
@@ -10311,6 +10312,7 @@
   const timelineMatrixViewportPan = {
     active: false,
     moved: false,
+    startedOnControl: false,
     axis: '',
     pointerId: null,
     startX: 0,
@@ -11353,6 +11355,27 @@
         throw error;
       }
     }
+    // Old local projects were intentionally kept on their existing raster
+    // model. Upgrade them lazily on open now, but only after every indexed
+    // layer has been losslessly round-tripped in memory. A failed verification
+    // restores the original buffers and leaves the project on its legacy path.
+    let legacyRasterMigrationResult = null;
+    if (Number(state.rasterModelVersion) < 1 && typeof upgradeLegacyRasterDocumentsToCopyOnWrite === 'function') {
+      const rasterMigrationStage = openPerformance?.beginStage?.('legacy-raster-copy-on-write-migration');
+      const documents = getProjectCanvasDocuments().map(canvas => ({
+        width: canvas?.width || state.width,
+        height: canvas?.height || state.height,
+        frames: canvas?.frames || [],
+      }));
+      if (!documents.length) {
+        documents.push({ width: state.width, height: state.height, frames: state.frames });
+      }
+      legacyRasterMigrationResult = upgradeLegacyRasterDocumentsToCopyOnWrite(documents, state.palette);
+      if (legacyRasterMigrationResult?.migrated) {
+        snapshot.rasterModelVersion = state.rasterModelVersion;
+      }
+      openPerformance?.endStage?.(rasterMigrationStage, legacyRasterMigrationResult || { skipped: true });
+    }
     if (Object.prototype.hasOwnProperty.call(snapshot, 'selectionMask')) {
       state.selectionMask = snapshot.selectionMask ? new Uint8Array(snapshot.selectionMask) : null;
     } else {
@@ -11494,6 +11517,9 @@
         && !frameListHasDirectPixelData(state.frames)
       ),
       legacyRgbMigrationResult,
+      legacyRasterMigrated: Boolean(legacyRasterMigrationResult?.migrated),
+      legacyRasterMigrationVerified: Boolean(legacyRasterMigrationResult?.verified),
+      legacyRasterMigrationResult,
     };
   }
 

@@ -25,6 +25,10 @@ for (const html of [index]) {
   assert.match(html, /id="stage" tabindex="-1"/);
 }
 assert.match(index, /startup-workflow-utils\.js\?v=20260720-pxd1/);
+assert.match(index, /document-model\.js\?v=20260724-legacy-cow-migration1/);
+assert.match(index, /app\.js\?v=20260724-159-legacy-cow-migration1/);
+assert.match(index, /timeline-layers\.js\?v=20260724-timeline-tap-sync10/);
+assert.match(index, /retired-collaboration-compat\.js\?v=20260724-timeline-selection2/);
 for (const source of [startup]) {
   assert.match(source, /container\.inert = false;[\s\S]{0,100}container\.hidden = false;[\s\S]{0,100}container\.removeAttribute\('aria-hidden'\);/);
   assert.match(source, /container\.contains\(activeElement\)[\s\S]{0,280}dom\.stage\.focus\(\{ preventScroll: true \}\);[\s\S]{0,280}container\.inert = true;[\s\S]{0,100}container\.hidden = true;/);
@@ -80,6 +84,9 @@ function verifyStartupDismissFocus(source) {
 
 verifyStartupDismissFocus(startup);
 assert.match(app, /showLocalProjects[\s\S]{0,900}showStartupScreen\(\{ refreshWorkspace: true \}\)/);
+assert.match(app, /upgradeLegacyRasterDocumentsToCopyOnWrite[\s\S]{0,900}legacyRasterMigrationResult/);
+assert.match(app, /timelineMatrixViewportPan = \{[\s\S]{0,120}startedOnControl: false/);
+assert.match(await read('pixiedraw\/assets\/js\/modules\/timeline-layers.js'), /activationThreshold[\s\S]{0,220}startedOnControl/);
 assert.match(startup, /startupWorkspaceSearchQuery/);
 assert.match(startup, /\(visibleIndex \+ 1\) % 8 === 0/);
 assert.doesNotMatch(startup, /visibleIndex === 3/);
