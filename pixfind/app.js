@@ -2991,7 +2991,7 @@ function updatePixfindTabBarActions(screen) {
     tabBar.setActions([
       { id: 'puzzle-list', label: '問題選択', selector: '#gameBackButton', icon: 'Back.png' },
       { id: 'retry', label: 'もう一度', selector: '#resetButton', icon: 'onemore.png' },
-      { id: 'reset-view', label: '表示リセット', selector: '#zoomResetButton', icon: '../assets/icons/reload.png' },
+      { id: 'reset-view', label: '表示リセット', selector: '#zoomResetButton', icon: 'reset_x1.png' },
       { id: 'fullscreen', label: '拡大', selector: '#fullscreenButton', icon: '拡大.png', iconWhenPressed: '縮小.png', mirrorState: true, mode: 'fullscreen', fullscreenController: 'game', placement: 'leading' },
     ]);
     return;
