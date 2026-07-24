@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-24T15:11:06.548Z",
+  "generatedAt": "2026-07-24T15:11:08.098Z",
   "projects": [
     {
       "id": "site",
@@ -62,6 +62,12 @@
       "url": "/projects/pixiedraw/",
       "entries": [
         {
+          "date": "2026-07-25",
+          "items": [
+            "機能を更新"
+          ]
+        },
+        {
           "date": "2026-07-24",
           "items": [
             "描画・塗りつぶし・貼り付け・小窓プレビューを軽量化し、大きなキャンバスでの操作性を改善"
@@ -101,12 +107,6 @@
           "date": "2026-07-18",
           "items": [
             "機能 / 画面を更新"
-          ]
-        },
-        {
-          "date": "2026-07-17",
-          "items": [
-            "設定 / 画面 / 機能を更新"
           ]
         }
       ]
@@ -223,6 +223,17 @@
     }
   ],
   "recentByDate": [
+    {
+      "date": "2026-07-25",
+      "updates": [
+        {
+          "id": "pixiedraw",
+          "name": "PiXiEEDraw",
+          "url": "/projects/pixiedraw/",
+          "summary": "機能を更新"
+        }
+      ]
+    },
     {
       "date": "2026-07-24",
       "updates": [
@@ -393,35 +404,6 @@
           "name": "PiXiEEDraw",
           "url": "/projects/pixiedraw/",
           "summary": "機能 / 画面を更新"
-        },
-        {
-          "id": "pixiee-lens",
-          "name": "PiXiEELENS",
-          "url": "/projects/pixiee-lens/",
-          "summary": "画面を更新"
-        },
-        {
-          "id": "qr-maker",
-          "name": "QRコードメーカー",
-          "url": "/projects/qr-maker/",
-          "summary": "画面を更新"
-        }
-      ]
-    },
-    {
-      "date": "2026-07-17",
-      "updates": [
-        {
-          "id": "site",
-          "name": "PiXiEED 全体",
-          "url": "/index.html",
-          "summary": "SEO / 画面 / ドキュメントを更新"
-        },
-        {
-          "id": "pixiedraw",
-          "name": "PiXiEEDraw",
-          "url": "/projects/pixiedraw/",
-          "summary": "設定 / 画面 / 機能を更新"
         },
         {
           "id": "pixiee-lens",

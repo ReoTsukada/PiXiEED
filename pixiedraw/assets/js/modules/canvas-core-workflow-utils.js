@@ -151,10 +151,7 @@
     if (getProjectCanvasCount() <= 1) {
       const preferredLayerId = state.activeLayer;
       const layer = frame.layers.find(layer => layer.id === preferredLayerId) || frame.layers[frame.layers.length - 1];
-      if (
-        Number(state.rasterModelVersion) < 1
-        && typeof materializeRasterLayerIndices === 'function'
-      ) {
+      if (typeof materializeRasterLayerIndices === 'function') {
         materializeRasterLayerIndices(layer, state.width, state.height, state.palette);
       }
       return layer;
@@ -165,10 +162,7 @@
       ? (state.activeLayer || canvasDoc?.activeLayer)
       : (canvasDoc?.activeLayer || state.activeLayer);
     const layer = frame.layers.find(layer => layer.id === preferredLayerId) || frame.layers[frame.layers.length - 1];
-    if (
-      Number(state.rasterModelVersion) < 1
-      && typeof materializeRasterLayerIndices === 'function'
-    ) {
+    if (typeof materializeRasterLayerIndices === 'function') {
       materializeRasterLayerIndices(
         layer,
         Math.max(1, Math.round(Number(canvasDoc?.width) || Number(state.width) || 1)),
