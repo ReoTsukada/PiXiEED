@@ -89,11 +89,45 @@
     </main>
   </div>
   <script src="../../../scripts/ad-account-control.js?v=20260719-no-ad-fallback1"></script>
+  <script>
+    // Public product data does not require an authenticated Supabase client.
+    // Start this request while the remaining page scripts are still loading.
+    (() => {
+      const queryId = new URLSearchParams(location.search).get('id');
+      const pathId = location.pathname.match(/\/market\/items\/([0-9a-f-]{36})\/?$/i)?.[1];
+      const id = queryId || pathId || '';
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id || '')) return;
+      window.__PIXIEED_MARKET_PUBLIC_ASSET_PROMISE__ = fetch('https://kyyiuakrqomzlikfaire.supabase.co/rest/v1/rpc/market_public_asset_v1', {
+        method: 'POST',
+        headers: {
+          apikey: 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4',
+          Authorization: 'Bearer sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ input_asset_id: id })
+      }).then(async (response) => {
+        if (!response.ok) throw new Error(`market_public_asset_v1 failed: ${response.status}`);
+        return response.json();
+      });
+      window.__PIXIEED_MARKET_PUBLIC_PREVIEW_PROMISE__ = fetch('https://kyyiuakrqomzlikfaire.supabase.co/functions/v1/market-public-preview', {
+        method: 'POST',
+        headers: {
+          apikey: 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4',
+          Authorization: 'Bearer sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ asset_ids: [id] })
+      }).then(async (response) => {
+        if (!response.ok) throw new Error(`market-public-preview failed: ${response.status}`);
+        return response.json();
+      });
+    })();
+  </script>
   <script src="../../../scripts/pixieed-market-access.js?v=20260721-auth-network-fallback2"></script>
   <script src="../../favorites.js?v=20260721-auth-network-fallback1"></script>
   <script src="../../market-ads.js?v=2026.07.19-no-ad-fallback1"></script>
   <script src="../../pageview-rewards.js?v=2026.07.19-lineage-rewards1"></script>
-  <script src="../../item.js?v=20260722-baked-sample1"></script>
+  <script src="../../item.js?v=20260725-fast-preview2"></script>
   <script src="../../media-protection.js?v=2026.07.17-preview-protection1"></script>
   <script src="../../help-tips.js?v=2026.07.17-context-help1"></script>
   <script src="../../../scripts/shared-bottom-nav.js?v=20260724-fullscreen-icons2"></script>

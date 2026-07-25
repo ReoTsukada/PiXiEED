@@ -26,6 +26,51 @@
     return match?.[1] || '';
   }
 
+  function embeddedSeoAsset(id) {
+    const node = document.getElementById('marketSeoAsset');
+    if (!node?.textContent) return null;
+    try {
+      const asset = JSON.parse(node.textContent);
+      return String(asset?.id || '') === id ? asset : null;
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  async function loadPublicAsset(id) {
+    const embedded = embeddedSeoAsset(id);
+    if (embedded) return embedded;
+    const pending = window.__PIXIEED_MARKET_PUBLIC_ASSET_PROMISE__;
+    if (pending) return pending;
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/market_public_asset_v1`, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ input_asset_id: id })
+    });
+    if (!response.ok) throw new Error(`market_public_asset_v1 failed: ${response.status}`);
+    return response.json();
+  }
+
+  async function loadPublicPreview(assetId) {
+    const pending = window.__PIXIEED_MARKET_PUBLIC_PREVIEW_PROMISE__;
+    if (pending) return pending;
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/market-public-preview`, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ asset_ids: [assetId] })
+    });
+    if (!response.ok) throw new Error(`market-public-preview failed: ${response.status}`);
+    return response.json();
+  }
+
   function assetFormats(asset) {
     return Array.isArray(asset?.included_formats) && asset.included_formats.length ? asset.included_formats : [asset?.asset_format];
   }
@@ -437,33 +482,27 @@
 
   async function load() {
     const marketAccess = window.PiXiEEDMarketAccess;
-    // ログイン確認は最初に開始するが、公開商品の取得を止めない。
-    // getUser() は回線状況によって遅くなるため、公開RPCと並行させる。
-    const accessPromise = marketAccess
-      ? marketAccess.check()
-      : Promise.resolve({ allowed: false, client: null, user: null });
-    const client = marketAccess ? await marketAccess.getClient().catch(() => null) : null;
-    if (!client) {
-      $('itemStatus').textContent = '商品を読み込めませんでした。通信状態を確認して再読み込みしてください。';
-      return;
-    }
-    purchaseClient = client;
     const id = currentAssetId();
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id || '')) {
       $('itemStatus').textContent = '商品を特定できませんでした。マーケット一覧から開き直してください。'; return;
     }
+    // Start auth in parallel, but do not make public product rendering wait
+    // for the Supabase ESM client or a getUser() round trip.
+    const accessPromise = marketAccess
+      ? marketAccess.check()
+      : Promise.resolve({ allowed: false, client: null, user: null });
     try {
-      const { data: asset, error } = await purchaseClient.rpc('market_public_asset_v1', { input_asset_id: id });
-      if (error) throw error;
+      const asset = await loadPublicAsset(id);
       if (!asset) { $('itemStatus').textContent = 'この商品は公開されていないか、見つかりません。'; return; }
 
       // 本文・価格・販売状況を最優先で出す。お気に入りと署名付き画像は
       // 補助情報なので、通信待ちでこの表示を遅らせない。
       render(asset);
 
-      void favorites?.prepare?.([asset]);
-      const previewTask = purchaseClient.functions.invoke('market-public-preview', { body: { asset_ids: [asset.id] } })
-        .then(({ data: previewData }) => {
+      // A signed preview is also public, so it can be fetched in parallel
+      // with the client/auth bootstrap rather than waiting behind it.
+      const previewTask = loadPublicPreview(asset.id)
+        .then((previewData) => {
           const previewUrl = previewData?.previews?.[asset.id];
           if (typeof previewUrl === 'string' && /^https?:\/\//i.test(previewUrl)) {
             asset.preview_url = previewUrl;
@@ -474,6 +513,15 @@
           renderPreviewMedia(asset);
         })
         .catch(() => {});
+
+      const client = marketAccess ? await marketAccess.getClient().catch(() => null) : null;
+      if (!client) {
+        setPurchaseState({ disabled: true, label: '購入状態を確認できません', status: '通信状態を確認して再読み込みしてください。' });
+        return;
+      }
+      purchaseClient = client;
+
+      void favorites?.prepare?.([asset]);
 
       // 購入ボタンだけはログイン確認後に確定する。商品閲覧は常に可能。
       const access = await accessPromise;

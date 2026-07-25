@@ -8,6 +8,7 @@ const sell = fs.readFileSync('market/sell.js', 'utf8');
 const sellHtml = fs.readFileSync('market/sell.html', 'utf8');
 const indexHtml = fs.readFileSync('market/index.html', 'utf8');
 const itemHtml = fs.readFileSync('market/item.html', 'utf8');
+const itemJs = fs.readFileSync('market/item.js', 'utf8');
 const optionPricingMigration = fs.readFileSync('supabase/migrations/20260719210000_market_option_pricing.sql', 'utf8');
 
 assert.match(migration, /market_listing_is_enabled\(\)[\s\S]*select true/i);
@@ -24,6 +25,14 @@ assert.equal(fs.existsSync('market/dev-gate.js'), false);
 assert.equal(fs.existsSync('scripts/pixieed-dev-access.js'), false);
 assert.doesNotMatch(indexHtml, /local-test-products/);
 assert.doesNotMatch(itemHtml, /local-test-products/);
+assert.match(itemHtml, /__PIXIEED_MARKET_PUBLIC_ASSET_PROMISE__/);
+assert.match(itemHtml, /__PIXIEED_MARKET_PUBLIC_PREVIEW_PROMISE__/);
+assert.match(itemHtml, /market_public_asset_v1/);
+assert.match(itemJs, /function embeddedSeoAsset\(id\)/);
+assert.match(itemJs, /function loadPublicAsset\(id\)/);
+assert.match(itemJs, /const asset = await loadPublicAsset\(id\)/);
+assert.match(itemJs, /function loadPublicPreview\(assetId\)/);
+assert.match(itemJs, /const previewTask = loadPublicPreview\(asset\.id\)/);
 
 assert.match(sellHtml, /id="listingPreviewSection"[\s\S]*id="listingChangeSummaryField"/);
 assert.match(sellHtml, /id="listingTagInput"/);
