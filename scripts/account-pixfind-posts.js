@@ -85,6 +85,12 @@
   function createCard(entry) {
     const puzzleId = String(entry?.id || '').trim();
     const puzzleUrl = asset(`../pixfind/index.html?puzzle=${encodeURIComponent(puzzleId)}`);
+    // The game URL is kept for opening the puzzle immediately.  Sharing must
+    // use the static post page, whose server-rendered metadata points to this
+    // puzzle's own OGP image instead of the common PiXFiND OGP.
+    const shareUrl = puzzleId
+      ? `https://pixieed.jp/pixfind/puzzles/${encodeURIComponent(puzzleId)}/`
+      : puzzleUrl;
     const card = document.createElement('article');
     card.className = 'account-pixfind-card';
 
@@ -128,7 +134,7 @@
       share.disabled = true;
       try {
         if (!window.PiXiEEDAccountShare) throw new Error('share-unavailable');
-        await window.PiXiEEDAccountShare.copyLink(puzzleUrl);
+        await window.PiXiEEDAccountShare.copyLink(shareUrl);
         share.classList.add('is-success');
         share.setAttribute('aria-label', `${entry?.label || 'PiXFiND'}のリンクをコピーしました`);
       } catch (_error) {

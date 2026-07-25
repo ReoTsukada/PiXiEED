@@ -3707,6 +3707,21 @@ body[data-pixfind-screen="start"] > .pixieed-shared-footer {
   padding: 18px max(14px, env(safe-area-inset-right, 0px)) calc(18px + var(--pixieed-shared-bottom-nav-offset, 68px)) max(14px, env(safe-area-inset-left, 0px));
 }
 
+/* The catalog must use one scroll surface.  A nested, non-overflowing list
+   used to consume touch swipes and prevent the difficulty screen from
+   reaching its final cards above the fixed shared navigation. */
+body[data-pixieed-page="pixfind"] .screen--difficulty {
+  padding-bottom: calc(var(--screen-padding-bottom) + var(--pixieed-shared-bottom-nav-offset, 68px));
+  overscroll-behavior-y: auto;
+}
+
+body[data-pixieed-page="pixfind"] .screen--difficulty .puzzle-list {
+  overflow: visible;
+  overscroll-behavior-y: auto;
+  -webkit-overflow-scrolling: auto;
+  padding-bottom: 0;
+}
+
 /* The right-side landscape navigation must never cover PiXFiND controls or scrollable panels. */
 @media (orientation: landscape) {
   body[data-pixieed-page="pixfind"] > .app {
