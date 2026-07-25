@@ -15569,6 +15569,10 @@
     return timelapseSessionUtilsModule.recordTimelapseOperationLogEntry(...args);
   }
 
+  function recordTimelapseCanvasResize(...args) {
+    return timelapseSessionUtilsModule.recordTimelapseCanvasResize(...args);
+  }
+
   function scheduleTimelapseOperationLogBase(...args) {
     return timelapseSessionUtilsModule.scheduleTimelapseOperationLogBase(...args);
   }
@@ -19369,10 +19373,14 @@
   set requestOverlayRender(value) { requestOverlayRender = value; },
   get requestRender() { return requestRender; },
   set requestRender(value) { requestRender = value; },
+  get recordTimelapseCanvasResize() { return recordTimelapseCanvasResize; },
+  set recordTimelapseCanvasResize(value) { recordTimelapseCanvasResize = value; },
   get rescaleMirrorPivotForCanvas() { return rescaleMirrorPivotForCanvas; },
   set rescaleMirrorPivotForCanvas(value) { rescaleMirrorPivotForCanvas = value; },
   get resizeCanvases() { return resizeCanvases; },
   set resizeCanvases(value) { resizeCanvases = value; },
+  get scheduleTimelapseCaptureFromState() { return scheduleTimelapseCaptureFromState; },
+  set scheduleTimelapseCaptureFromState(value) { scheduleTimelapseCaptureFromState = value; },
   get rollbackPendingHistory() { return rollbackPendingHistory; },
   set rollbackPendingHistory(value) { rollbackPendingHistory = value; },
   get scheduleSessionPersist() { return scheduleSessionPersist; },
