@@ -1444,6 +1444,10 @@ body.is-playing {
   background: rgba(255, 255, 255, 0.65);
 }
 
+.creator-guide__mode:not([hidden]) {
+  grid-column: 1 / -1;
+}
+
 .creator-guide__mode svg {
   width: 52px;
   height: auto;

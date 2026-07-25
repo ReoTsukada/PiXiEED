@@ -1,0 +1,47 @@
+name: Generate PiXFiND OGP pages
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: generate-pixfind-ogp-pages
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the published branch
+        uses: actions/checkout@v5
+        with:
+          ref: main
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Generate published PiXFiND OGP pages
+        run: node scripts/generate-pixfind-ogp-pages.mjs
+
+      - name: Verify generated PiXFiND OGP pages
+        run: |
+          node scripts/test-pixfind-ogp-pages.mjs
+          git diff --check
+
+      - name: Commit generated PiXFiND OGP pages
+        run: |
+          if git diff --quiet -- pixfind/puzzles; then
+            echo "No PiXFiND OGP changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pixfind/puzzles
+          git commit -m "Generate PiXFiND OGP pages"
+          git push origin HEAD:main

@@ -50,6 +50,7 @@ const dom = {
   creatorCloseButton: document.getElementById('creatorClose'),
   creatorForm: document.getElementById('creatorForm'),
   creatorDescription: document.getElementById('creatorDescription'),
+  creatorGuideTitle: document.getElementById('creatorGuideTitle'),
   creatorModeButtons: Array.from(document.querySelectorAll('[data-creator-mode]')),
   creatorDiffLabelText: document.getElementById('creatorDiffLabelText'),
   creatorPreviewDiffCaption: document.getElementById('creatorPreviewDiffCaption'),
@@ -345,11 +346,9 @@ const SUPABASE_REST_URL = `${SUPABASE_URL}/rest/v1`;
 const SUPABASE_STORAGE_URL = `${SUPABASE_URL}/storage/v1/object`;
 const LEGACY_CONTEST_PUBLIC_BASE = `${SUPABASE_STORAGE_URL}/public/${LEGACY_CONTEST_BUCKET}`;
 const PIXFIND_SHARE_BASE_URL = 'https://pixieed.jp/pixfind/';
-const PIXFIND_SHARE_OGP_WIDTH = 1200;
-const PIXFIND_SHARE_OGP_HEIGHT = 630;
-const PIXFIND_SHARE_PADDING = 56;
-const PIXFIND_SHARE_GAP = 36;
-const PIXFIND_SHARE_TITLE_SIZE = 32;
+const PIXFIND_SHARE_OGP_WIDTH = 1280;
+const PIXFIND_SHARE_OGP_HEIGHT = 720;
+const PIXFIND_SHARE_OGP_SQUARE_SIZE = 1200;
 const SUPABASE_MAINTENANCE_KEY = 'pixieed_supabase_maintenance';
 const PUBLISHED_CACHE_KEY = 'pixfind_published_cache';
 const SHARE_QUEUE_KEY = 'pixfind_share_queue';
@@ -990,6 +989,14 @@ function setCreatorMode(mode, silent = false) {
       ? '画像を1枚選び、その画像の上で探す場所を直接登録します。'
       : '同じサイズの2枚の画像を選ぶと差分を自動検出します。';
   }
+  if (dom.creatorGuideTitle) {
+    dom.creatorGuideTitle.textContent = isHiddenMode
+      ? 'もの探しを3ステップで作れます'
+      : '間違い探しを3ステップで作れます';
+  }
+  document.querySelectorAll('[data-creator-guide-mode]').forEach(element => {
+    element.hidden = normalizeGameMode(element.dataset.creatorGuideMode) !== normalizedMode;
+  });
   if (dom.creatorDiffLabelText) {
     dom.creatorDiffLabelText.textContent = creatorState.diffFile ? '画像を変更' : '間違い画像を追加';
   }
@@ -1658,12 +1665,27 @@ async function handleCreatorPublish() {
       renderPuzzles(state.currentDifficulty, state.currentMode);
     }
 
-    const shareUrl = createShareUrl(normalized ?? { id: puzzleId, slug, source: 'published' });
+    let ogpReady = false;
+    try {
+      await uploadPuzzleShareAssets({
+        puzzleId,
+        title,
+        mode,
+        originalImage: creatorState.originalImage,
+        diffImage: creatorState.diffImage,
+      });
+      ogpReady = true;
+    } catch (error) {
+      console.warn('puzzle OGP upload failed', puzzleId, error);
+      queueShareTask({ puzzleId, title, mode, originalDataUrl: creatorState.originalDataUrl, diffDataUrl: creatorState.diffDataUrl });
+    }
+
+    const shareUrl = createShareUrl(normalized ?? { id: puzzleId, slug, source: 'published' }, { ogp: ogpReady });
     const shareMessage = `${shareUrl}\n${SHARE_HASHTAG}`;
     if (navigator.clipboard?.writeText) {
       try {
         await navigator.clipboard.writeText(shareMessage);
-        setCreatorStatus('公開しました。共有リンクをコピーしました。');
+        setCreatorStatus(ogpReady ? '公開しました。OGP付きの共有リンクをコピーしました。' : '公開しました。OGPは後で自動生成されます。共有リンクをコピーしました。');
       } catch (_) {
         window.prompt('公開しました。共有リンクをコピーしてください。', shareMessage);
         setCreatorStatus('公開しました。');
@@ -2530,6 +2552,17 @@ async function publishQueuedTask(task) {
     renderPuzzles(state.currentDifficulty, state.currentMode);
   }
 
+  try {
+    const [originalImage, diffImage] = await Promise.all([
+      loadImageFromDataUrl(originalDataUrl),
+      loadImageFromDataUrl(diffDataUrl),
+    ]);
+    await uploadPuzzleShareAssets({ puzzleId, title, mode, originalImage, diffImage });
+  } catch (error) {
+    console.warn('queued puzzle OGP upload failed', puzzleId, error);
+    queueShareTask({ puzzleId, title, mode, originalDataUrl, diffDataUrl });
+  }
+
   return normalizedEntry;
 }
 
@@ -2607,8 +2640,20 @@ function queueShareTask(task) {
 async function flushShareQueue() {
   const queue = loadShareQueue();
   if (!queue.length) return;
-  // Puzzle share URLs are now always `?puzzle=...`; legacy queued OGP jobs can be discarded.
-  saveShareQueue([]);
+  const remaining = [];
+  for (const task of queue) {
+    try {
+      const [originalImage, diffImage] = await Promise.all([
+        loadImageFromDataUrl(task.originalDataUrl),
+        loadImageFromDataUrl(task.diffDataUrl),
+      ]);
+      await uploadPuzzleShareAssets({ ...task, originalImage, diffImage });
+    } catch (error) {
+      console.warn('queued puzzle OGP upload failed', task.puzzleId, error);
+      remaining.push(task);
+    }
+  }
+  saveShareQueue(remaining);
 }
 
 function getSupabasePublicUrl(path) {
@@ -2865,7 +2910,10 @@ function normalizePuzzleEntry(entry) {
   };
 }
 
-function createShareUrl(puzzle) {
+function createShareUrl(puzzle, { ogp = true } = {}) {
+  if (ogp && puzzle?.source === 'published' && puzzle?.id) {
+    return getPixfindShareHtmlUrl(puzzle.id);
+  }
   const url = new URL(window.location.href);
   const shareId = puzzle?.source === 'published' ? puzzle.id : (puzzle.slug ?? puzzle.id);
   if (shareId) {
@@ -4851,16 +4899,6 @@ function escapeHtml(value) {
   ));
 }
 
-function truncateText(ctx, text, maxWidth) {
-  let output = String(text ?? '');
-  if (!output) return '';
-  if (ctx.measureText(output).width <= maxWidth) return output;
-  while (output.length > 1 && ctx.measureText(`${output}…`).width > maxWidth) {
-    output = output.slice(0, -1);
-  }
-  return output.length > 1 ? `${output}…` : output;
-}
-
 function getPixfindShareTargetUrl(puzzleId) {
   if (!puzzleId) return PIXFIND_SHARE_BASE_URL;
   const url = new URL(PIXFIND_SHARE_BASE_URL);
@@ -4870,7 +4908,7 @@ function getPixfindShareTargetUrl(puzzleId) {
 
 function getPixfindShareHtmlUrl(puzzleId) {
   if (!puzzleId) return null;
-  return getSupabasePublicUrl(`puzzles/${puzzleId}/share.html`);
+  return `${PIXFIND_SHARE_BASE_URL}puzzles/${encodeURIComponent(puzzleId)}/`;
 }
 
 function getPixfindOgpImageUrl(puzzleId) {
@@ -4878,49 +4916,9 @@ function getPixfindOgpImageUrl(puzzleId) {
   return getSupabasePublicUrl(`puzzles/${puzzleId}/ogp.png`);
 }
 
-function buildShareHtml({
-  title,
-  description,
-  imageUrl,
-  shareUrl,
-  targetUrl,
-  siteName = 'PiXFiND',
-  ogWidth = PIXFIND_SHARE_OGP_WIDTH,
-  ogHeight = PIXFIND_SHARE_OGP_HEIGHT,
-}) {
-  const safeTitle = escapeHtml(title);
-  const safeDescription = escapeHtml(description);
-  const safeImage = escapeHtml(imageUrl);
-  const safeShareUrl = escapeHtml(shareUrl);
-  const safeTargetUrl = escapeHtml(targetUrl);
-  return `<!doctype html>
-<html lang="ja">
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>${safeTitle}</title>
-  <meta name="description" content="${safeDescription}"/>
-  <meta property="og:type" content="website"/>
-  <meta property="og:title" content="${safeTitle}"/>
-  <meta property="og:description" content="${safeDescription}"/>
-  <meta property="og:image" content="${safeImage}"/>
-  <meta property="og:image:width" content="${ogWidth}"/>
-  <meta property="og:image:height" content="${ogHeight}"/>
-  <meta property="og:url" content="${safeShareUrl}"/>
-  <meta property="og:site_name" content="${escapeHtml(siteName)}"/>
-  <meta name="twitter:card" content="summary_large_image"/>
-  <meta name="twitter:title" content="${safeTitle}"/>
-  <meta name="twitter:description" content="${safeDescription}"/>
-  <meta name="twitter:image" content="${safeImage}"/>
-  <meta http-equiv="refresh" content="0; url=${safeTargetUrl}"/>
-  <link rel="canonical" href="${safeTargetUrl}"/>
-  <style>body{margin:0;font-family:sans-serif;background:#0f172a;color:#e2e8f0;display:flex;align-items:center;justify-content:center;min-height:100vh;min-height:100dvh}</style>
-</head>
-<body>
-  <p>Redirecting...</p>
-  <script>window.location.replace('${safeTargetUrl}');</script>
-</body>
-</html>`;
+function getPixfindOgpSquareImageUrl(puzzleId) {
+  if (!puzzleId) return null;
+  return getSupabasePublicUrl(`puzzles/${puzzleId}/ogp-square.png`);
 }
 
 function drawContainImage(ctx, image, x, y, width, height) {
@@ -4945,73 +4943,62 @@ function canvasToBlob(canvas, type = 'image/png') {
   });
 }
 
-async function createPuzzleOgpBlob({ title, originalImage, diffImage }) {
+function drawPostedPuzzleOgp(ctx, { mode, originalImage, diffImage, width, height }) {
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, width, height);
+  const padding = Math.max(8, Math.round(Math.min(width, height) * 0.012));
+  if (isHiddenObjectMode(mode)) {
+    drawContainImage(ctx, originalImage, padding, padding, width - padding * 2, height - padding * 2);
+  } else if (height > width * 0.9) {
+    const gap = padding;
+    const imageHeight = (height - padding * 2 - gap) / 2;
+    drawContainImage(ctx, originalImage, padding, padding, width - padding * 2, imageHeight);
+    drawContainImage(ctx, diffImage, padding, padding + imageHeight + gap, width - padding * 2, imageHeight);
+  } else {
+    const gap = padding;
+    const imageWidth = (width - padding * 2 - gap) / 2;
+    drawContainImage(ctx, originalImage, padding, padding, imageWidth, height - padding * 2);
+    drawContainImage(ctx, diffImage, padding + imageWidth + gap, padding, imageWidth, height - padding * 2);
+  }
+}
+
+async function createPuzzleOgpBlob({ mode, originalImage, diffImage, width = PIXFIND_SHARE_OGP_WIDTH, height = PIXFIND_SHARE_OGP_HEIGHT }) {
   if (!originalImage || !diffImage) return null;
   const canvas = document.createElement('canvas');
-  canvas.width = PIXFIND_SHARE_OGP_WIDTH;
-  canvas.height = PIXFIND_SHARE_OGP_HEIGHT;
+  canvas.width = width;
+  canvas.height = height;
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
-
-  const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-  gradient.addColorStop(0, '#111827');
-  gradient.addColorStop(1, '#1f2937');
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  ctx.fillStyle = '#f8fafc';
-  ctx.font = `600 ${PIXFIND_SHARE_TITLE_SIZE}px "M PLUS Rounded 1c", sans-serif`;
-  ctx.textBaseline = 'top';
-  const maxTitleWidth = canvas.width - PIXFIND_SHARE_PADDING * 2;
-  const titleText = truncateText(ctx, title || 'PiXFiND', maxTitleWidth);
-  ctx.fillText(titleText, PIXFIND_SHARE_PADDING, PIXFIND_SHARE_PADDING);
-
-  const top = PIXFIND_SHARE_PADDING + PIXFIND_SHARE_TITLE_SIZE + 20;
-  const availableHeight = canvas.height - top - PIXFIND_SHARE_PADDING;
-  const availableWidth = canvas.width - PIXFIND_SHARE_PADDING * 2 - PIXFIND_SHARE_GAP;
-  const slotWidth = availableWidth / 2;
-
-  const leftX = PIXFIND_SHARE_PADDING;
-  const rightX = PIXFIND_SHARE_PADDING + slotWidth + PIXFIND_SHARE_GAP;
-  const slotY = top;
-
-  ctx.fillStyle = 'rgba(255,255,255,0.12)';
-  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
-  ctx.lineWidth = 2;
-  ctx.fillRect(leftX, slotY, slotWidth, availableHeight);
-  ctx.strokeRect(leftX, slotY, slotWidth, availableHeight);
-  ctx.fillRect(rightX, slotY, slotWidth, availableHeight);
-  ctx.strokeRect(rightX, slotY, slotWidth, availableHeight);
-
-  drawContainImage(ctx, originalImage, leftX, slotY, slotWidth, availableHeight);
-  drawContainImage(ctx, diffImage, rightX, slotY, slotWidth, availableHeight);
+  drawPostedPuzzleOgp(ctx, { mode, originalImage, diffImage, width, height });
 
   return await canvasToBlob(canvas, 'image/png');
 }
 
-async function uploadPuzzleShareAssets({ puzzleId, title, originalImage, diffImage }) {
+async function uploadPuzzleShareAssets({ puzzleId, mode, originalImage, diffImage }) {
   if (!puzzleId || !originalImage || !diffImage) return null;
-  const ogpBlob = await createPuzzleOgpBlob({ title, originalImage, diffImage });
-  if (!ogpBlob) return null;
+  const [ogpBlob, squareOgpBlob] = await Promise.all([
+    createPuzzleOgpBlob({ mode, originalImage, diffImage }),
+    createPuzzleOgpBlob({
+      mode,
+      originalImage,
+      diffImage,
+      width: PIXFIND_SHARE_OGP_SQUARE_SIZE,
+      height: PIXFIND_SHARE_OGP_SQUARE_SIZE,
+    }),
+  ]);
+  if (!ogpBlob || !squareOgpBlob) return null;
 
   const ogpPath = `puzzles/${puzzleId}/ogp.png`;
-  const sharePath = `puzzles/${puzzleId}/share.html`;
+  const squareOgpPath = `puzzles/${puzzleId}/ogp-square.png`;
   const ogpUrl = getPixfindOgpImageUrl(puzzleId);
+  const squareOgpUrl = getPixfindOgpSquareImageUrl(puzzleId);
   const shareUrl = getPixfindShareHtmlUrl(puzzleId);
-  const targetUrl = getPixfindShareTargetUrl(puzzleId);
-  const description = '2枚の画像を見比べて、間違いを探そう。';
 
-  await uploadPuzzleFile(ogpPath, ogpBlob, 'image/png');
-  const html = buildShareHtml({
-    title: `PiXFiND | ${title || 'パズル'}`,
-    description,
-    imageUrl: ogpUrl,
-    shareUrl,
-    targetUrl,
-  });
-  const htmlBlob = new Blob([html], { type: 'text/html' });
-  await uploadPuzzleFile(sharePath, htmlBlob, 'text/html');
-  return { shareUrl, ogpUrl };
+  await Promise.all([
+    uploadPuzzleFile(ogpPath, ogpBlob, 'image/png'),
+    uploadPuzzleFile(squareOgpPath, squareOgpBlob, 'image/png'),
+  ]);
+  return { shareUrl, ogpUrl, squareOgpUrl };
 }
 
 async function normalizePixelImage(image, fallbackDataUrl, options = {}) {

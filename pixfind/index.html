@@ -292,9 +292,9 @@
 <section aria-labelledby="creatorGuideTitle" class="creator-guide">
 <div class="creator-guide__heading">
 <span class="creator-guide__badge">はじめての方へ</span>
-<h3 id="creatorGuideTitle">3ステップで問題を作れます</h3>
+<h3 id="creatorGuideTitle">間違い探しを3ステップで作れます</h3>
 </div>
-<ol class="creator-guide__steps">
+<ol class="creator-guide__steps" data-creator-guide-mode="spot-difference">
 <li class="creator-guide__step">
 <span aria-hidden="true" class="creator-guide__number">1</span>
 <svg aria-hidden="true" class="creator-guide__picture" viewBox="0 0 88 58"><rect x="5" y="7" width="38" height="43" rx="5" fill="#eaf2ff" stroke="#5e84c9" stroke-width="3"/><circle cx="17" cy="18" r="5" fill="#ffd867"/><path d="M9 44 23 29l8 9 5-5 5 11Z" fill="#7cc6a5"/><path d="M50 29h31" stroke="#ff6f8d" stroke-linecap="round" stroke-width="4"/><path d="m74 21 8 8-8 8" fill="none" stroke="#ff6f8d" stroke-linecap="round" stroke-linejoin="round" stroke-width="4"/></svg>
@@ -311,12 +311,29 @@
 <div><strong>確認して公開</strong><span>2枚目を選ぶと自動解析。検出数を確認して公開</span></div>
 </li>
 </ol>
+<ol class="creator-guide__steps" data-creator-guide-mode="hidden-object" hidden="">
+<li class="creator-guide__step">
+<span aria-hidden="true" class="creator-guide__number">1</span>
+<svg aria-hidden="true" class="creator-guide__picture" viewBox="0 0 88 58"><rect x="15" y="7" width="46" height="43" rx="5" fill="#eaf2ff" stroke="#5e84c9" stroke-width="3"/><circle cx="29" cy="19" r="5" fill="#ffd867"/><path d="M19 44 34 28l10 10 7-7 6 13Z" fill="#7cc6a5"/></svg>
+<div><strong>画像を1枚用意</strong><span>探し物を入れたPNG画像を選びます</span></div>
+</li>
+<li class="creator-guide__step">
+<span aria-hidden="true" class="creator-guide__number">2</span>
+<svg aria-hidden="true" class="creator-guide__picture" viewBox="0 0 88 58"><rect x="15" y="7" width="46" height="43" rx="5" fill="#eaf2ff" stroke="#5e84c9" stroke-width="3"/><circle cx="45" cy="28" r="10" fill="none" stroke="#ff6f8d" stroke-width="4"/><path d="m52 35 11 11" stroke="#ff6f8d" stroke-linecap="round" stroke-width="4"/></svg>
+<div><strong>探す場所をマーク</strong><span>画像を直接タップして対象を登録</span></div>
+</li>
+<li class="creator-guide__step">
+<span aria-hidden="true" class="creator-guide__number">3</span>
+<svg aria-hidden="true" class="creator-guide__picture" viewBox="0 0 88 58"><rect x="9" y="8" width="70" height="42" rx="10" fill="#fff0f4" stroke="#ff6f8d" stroke-width="3"/><path d="m26 30 9 9 25-21" fill="none" stroke="#49a97c" stroke-linecap="round" stroke-linejoin="round" stroke-width="5"/></svg>
+<div><strong>名前を付けて公開</strong><span>探し物ごとの名前を入力して完成</span></div>
+</li>
+</ol>
 <div class="creator-guide__modes">
-<article class="creator-guide__mode">
+<article class="creator-guide__mode" data-creator-guide-mode="spot-difference">
 <svg aria-hidden="true" viewBox="0 0 76 44"><rect x="4" y="6" width="29" height="32" rx="4" fill="#eaf2ff" stroke="#5e84c9" stroke-width="3"/><rect x="42" y="6" width="29" height="32" rx="4" fill="#fff0f4" stroke="#ff6f8d" stroke-width="3"/><circle cx="56" cy="18" r="5" fill="#ffd867"/></svg>
 <p><strong>間違い探し</strong><span>お手本画像と、少し変えた間違い画像を1枚ずつ。<b>2枚は同じ大きさ</b>にします。</span></p>
 </article>
-<article class="creator-guide__mode">
+<article class="creator-guide__mode" data-creator-guide-mode="hidden-object" hidden="">
 <svg aria-hidden="true" viewBox="0 0 76 44"><rect x="4" y="6" width="29" height="32" rx="4" fill="#eaf2ff" stroke="#5e84c9" stroke-width="3"/><rect x="42" y="6" width="29" height="32" rx="4" fill="#fff" stroke="#667085" stroke-width="3"/><circle cx="56" cy="22" r="8" fill="#202938"/></svg>
 <p><strong>もの探し</strong><span>画像を1枚選び、<b>その画像上で探す場所を直接マーク</b>します。</span></p>
 </article>
@@ -324,7 +341,7 @@
 <details class="creator-guide__details">
 <summary>詳しく見る <span>ピクセルでの作り方</span></summary>
 <div class="creator-guide__details-body">
-<section class="creator-guide__rule">
+<section class="creator-guide__rule" data-creator-guide-mode="spot-difference">
 <h4>間違い探し：近い差分は1つにまとまります</h4>
 <p>色・透明度が1ピクセルでも違う場所が差分です。<b>判定サイズが64px以下では、差分同士が縦横の合計で4px以内</b>だと、1つの間違いとして数えられます。</p>
 <div class="creator-guide__examples">
@@ -346,7 +363,7 @@
 </div>
 <p class="creator-guide__tip">判定サイズは、画像を選んだ後に表示される「サイズ」を見てください。拡大したドット絵は、このサイズが元ファイルより小さくなることがあります。</p>
 </section>
-<section class="creator-guide__rule">
+<section class="creator-guide__rule" data-creator-guide-mode="hidden-object" hidden="">
 <h4>もの探し：画像の上で直接マークします</h4>
 <p>画像を追加すると、その場で探してもらう場所に半透明の赤いマーカーを置けます。マーカーの中心と範囲は、元画像のピクセル座標として保存されます。</p>
 <div class="creator-guide__examples">
@@ -448,7 +465,7 @@
 </div>
 <script defer="" src="assets/puzzles/manifest.js"></script>
 <script src="../scripts/creator-play-rewards.js?v=2026.07.19-play-rewards1"></script>
-<script defer="" src="app.js?v=20260724-game-creator-zoom11"></script>
+<script defer="" src="app.js?v=20260725-puzzle-ogp2"></script>
 <script src="../scripts/shared-profile-header.js"></script>
 <script data-pixieed-footer-ad="false" src="../scripts/shared-bottom-nav.js?v=20260724-fullscreen-icons2"></script>
 <script src="../scripts/pixel-art-fit.js"></script>

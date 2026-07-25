@@ -15,7 +15,7 @@ assert.match(html, /styles\.css\?v=20260724-panel-safe-area12/);
 assert.match(css, /creator-overlay \{[\s\S]*z-index: 950;/);
 assert.match(css, /creator-panel \{[\s\S]*max-height: 100%;/);
 assert.match(css, /Do not add those bar dimensions twice/);
-assert.match(html, /app\.js\?v=20260724-game-creator-zoom11/);
+assert.match(html, /app\.js\?v=20260725-puzzle-ogp2/);
 assert.match(html, /class="puzzle-gallery pixfind-catalog"/);
 assert.match(html, /id="creatorMarkerViewport"/);
 assert.match(html, /id="creatorMarkerSourceCanvas"/);
