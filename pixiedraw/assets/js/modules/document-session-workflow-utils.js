@@ -988,6 +988,7 @@
         width: resolved.width,
         height: resolved.height,
         frameId: typeof entry.frameId === 'string' ? entry.frameId : '',
+        resizeRevision: Math.max(0, Math.round(Number(entry.resizeRevision) || 0)),
         pixels: encodeTypedArray(resolved.pixels),
       });
     });
@@ -1023,6 +1024,14 @@
         lastCaptureToken: Number.isFinite(Number(track?.lastCaptureToken))
           ? Math.round(Number(track.lastCaptureToken))
           : -1,
+        resizeRevision: Math.max(0, Math.round(Number(track?.resizeRevision) || 0)),
+        resizeEvents: Array.isArray(track?.resizeEvents)
+          ? track.resizeEvents.map(event => ({
+            revision: Math.max(1, Math.round(Number(event?.revision) || 0)),
+            offsetX: Math.round(Number(event?.offsetX) || 0),
+            offsetY: Math.round(Number(event?.offsetY) || 0),
+          })).filter(event => event.revision > 0)
+          : [],
         snapshots,
       };
     });
@@ -1207,6 +1216,7 @@
           width,
           height,
           frameId: typeof entry.frameId === 'string' ? entry.frameId : '',
+          resizeRevision: Math.max(0, Math.round(Number(entry.resizeRevision) || 0)),
           pixels: compressUint8Array(pixels, { clamped: true }),
         });
       } catch (error) {
@@ -1249,6 +1259,14 @@
         lastCaptureToken: Number.isFinite(Number(trackPayload.lastCaptureToken))
           ? Math.round(Number(trackPayload.lastCaptureToken))
           : -1,
+        resizeRevision: Math.max(0, Math.round(Number(trackPayload.resizeRevision) || 0)),
+        resizeEvents: Array.isArray(trackPayload.resizeEvents)
+          ? trackPayload.resizeEvents.map(event => ({
+            revision: Math.max(1, Math.round(Number(event?.revision) || 0)),
+            offsetX: Math.round(Number(event?.offsetX) || 0),
+            offsetY: Math.round(Number(event?.offsetY) || 0),
+          })).filter(event => event.revision > 0)
+          : [],
       };
     });
     return restored;
