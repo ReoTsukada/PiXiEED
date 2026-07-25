@@ -30,6 +30,10 @@
         warningShown: false,
         sampleStep: 1,
         lastCaptureToken: -1,
+        // Preserve the coordinate system of each captured frame. Resize
+        // offsets are applied only when producing the GIF.
+        resizeRevision: 0,
+        resizeEvents: [],
       };
     }
 
