@@ -63,6 +63,7 @@
     }
     const existing = timelapseState.tracksByCanvasId[resolvedCanvasId];
     if (existing) {
+      normalizeTimelapseTrackResizeMetadata(existing);
       return existing;
     }
     if (!create) {
@@ -71,6 +72,50 @@
     const track = createEmptyTimelapseTrack();
     timelapseState.tracksByCanvasId[resolvedCanvasId] = track;
     return track;
+  }
+
+  function normalizeTimelapseTrackResizeMetadata(track = null) {
+    if (!track || typeof track !== 'object') {
+      return null;
+    }
+    const normalizedEvents = (Array.isArray(track.resizeEvents) ? track.resizeEvents : [])
+      .map(event => ({
+        revision: Math.max(1, Math.round(Number(event?.revision) || 0)),
+        offsetX: Math.round(Number(event?.offsetX) || 0),
+        offsetY: Math.round(Number(event?.offsetY) || 0),
+      }))
+      .filter(event => event.revision > 0)
+      .sort((left, right) => left.revision - right.revision);
+    track.resizeEvents = normalizedEvents;
+    track.resizeRevision = Math.max(
+      0,
+      Math.round(Number(track.resizeRevision) || 0),
+      ...normalizedEvents.map(event => event.revision)
+    );
+    return track;
+  }
+
+  function recordTimelapseCanvasResize({
+    canvasId = getActiveProjectCanvasDocument()?.id || '',
+    offsetX = 0,
+    offsetY = 0,
+  } = {}) {
+    if (!timelapseState.enabled || activeSharedProjectKey) {
+      return false;
+    }
+    const track = getTimelapseTrack(canvasId, { create: true });
+    if (!track) {
+      return false;
+    }
+    normalizeTimelapseTrackResizeMetadata(track);
+    const revision = track.resizeRevision + 1;
+    track.resizeEvents.push({
+      revision,
+      offsetX: Math.round(Number(offsetX) || 0),
+      offsetY: Math.round(Number(offsetY) || 0),
+    });
+    track.resizeRevision = revision;
+    return true;
   }
 
   function getActiveTimelapseTrack(options = {}) {
@@ -703,10 +748,12 @@
         }
       }
     }
+    const track = getTimelapseTrack(canvasDoc?.id || '', { create: false });
     return {
       width,
       height,
       frameId: typeof frame?.id === 'string' ? frame.id : '',
+      resizeRevision: Math.max(0, Math.round(Number(track?.resizeRevision) || 0)),
       // RLE compression is deferred to project serialization. Doing it inside
       // a post-stroke timer blocked drawing for hundreds of milliseconds.
       pixels: pixels instanceof Uint8ClampedArray ? pixels : new Uint8ClampedArray(pixels),
@@ -1038,6 +1085,43 @@
     };
   }
 
+  function getTimelapseFrameExportOffset(track, resizeRevision = 0) {
+    const normalizedTrack = normalizeTimelapseTrackResizeMetadata(track);
+    const revision = Math.max(0, Math.round(Number(resizeRevision) || 0));
+    return (normalizedTrack?.resizeEvents || []).reduce((offset, event) => {
+      if (event.revision > revision) {
+        offset.x += event.offsetX;
+        offset.y += event.offsetY;
+      }
+      return offset;
+    }, { x: 0, y: 0 });
+  }
+
+  function placeTimelapseFrameOnExportCanvas(entry, targetWidth, targetHeight, track = null) {
+    const resolved = resolveTimelapseFrameEntry(entry);
+    const width = Math.max(1, Math.round(Number(targetWidth) || 1));
+    const height = Math.max(1, Math.round(Number(targetHeight) || 1));
+    if (!resolved) {
+      return null;
+    }
+    const pixels = new Uint8ClampedArray(width * height * 4);
+    const offset = getTimelapseFrameExportOffset(track, entry?.resizeRevision);
+    const sourceStartX = Math.max(0, -offset.x);
+    const sourceStartY = Math.max(0, -offset.y);
+    const sourceEndX = Math.min(resolved.width, width - offset.x);
+    const sourceEndY = Math.min(resolved.height, height - offset.y);
+    for (let sourceY = sourceStartY; sourceY < sourceEndY; sourceY += 1) {
+      const targetY = sourceY + offset.y;
+      const sourceStart = ((sourceY * resolved.width) + sourceStartX) * 4;
+      const targetStart = ((targetY * width) + sourceStartX + offset.x) * 4;
+      const length = Math.max(0, sourceEndX - sourceStartX) * 4;
+      if (length > 0) {
+        pixels.set(resolved.pixels.subarray(sourceStart, sourceStart + length), targetStart);
+      }
+    }
+    return pixels;
+  }
+
   function getSnapshotCanvasForTimelapse(snapshot = null, canvasId = '') {
     if (!snapshot || typeof snapshot !== 'object') {
       return null;
@@ -1072,9 +1156,11 @@
     }
     const palette = Array.isArray(snapshot?.palette) ? snapshot.palette : state.palette;
     const pixels = compositeFramePixels(frame, width, height, palette);
+    const track = getTimelapseTrack(canvas?.id || canvasId, { create: false });
     return {
       width,
       height,
+      resizeRevision: Math.max(0, Math.round(Number(track?.resizeRevision) || 0)),
       pixels: compressUint8Array(pixels, { clamped: true }),
     };
   }
@@ -1148,7 +1234,8 @@
       const base = resolveTimelapseFrameEntry(visualFrames[baseIndex]);
       if (!base) return [];
       const workingPixels = new Uint8ClampedArray(base.pixels);
-      const snapshots = [{ width: base.width, height: base.height, pixels: new Uint8ClampedArray(workingPixels) }];
+      const resizeRevision = Math.max(0, Math.round(Number(visualFrames[baseIndex]?.resizeRevision) || 0));
+      const snapshots = [{ width: base.width, height: base.height, resizeRevision, pixels: new Uint8ClampedArray(workingPixels) }];
       const palette = Array.isArray(state.palette) ? state.palette : [];
       log.entries.forEach(entry => {
         if (entry?.type !== 'pixelPatch' || !Array.isArray(entry.changes)) return;
@@ -1166,7 +1253,7 @@
           workingPixels[baseOffset + 3] = color[3] ?? color.a ?? 0;
           changed = true;
         });
-        if (changed) snapshots.push({ width: base.width, height: base.height, pixels: new Uint8ClampedArray(workingPixels) });
+        if (changed) snapshots.push({ width: base.width, height: base.height, resizeRevision, pixels: new Uint8ClampedArray(workingPixels) });
       });
       return snapshots;
     }
@@ -1474,22 +1561,17 @@
       const targetWidth = Math.max(1, Number(state.width) || 1);
       const targetHeight = Math.max(1, Number(state.height) || 1);
       const framePixels = [];
-      let skippedSizeMismatch = 0;
       let skippedInvalid = 0;
+      const activeCanvasId = normalizeTimelapseCanvasId(getActiveProjectCanvasDocument()?.id || '');
+      const track = getTimelapseTrack(activeCanvasId);
 
       for (let i = 0; i < snapshots.length; i += 1) {
-        const resolved = resolveTimelapseFrameEntry(snapshots[i]);
-        if (!resolved) {
+        const pixels = placeTimelapseFrameOnExportCanvas(snapshots[i], targetWidth, targetHeight, track);
+        if (!pixels) {
           skippedInvalid += 1;
           continue;
         }
-        const width = resolved.width;
-        const height = resolved.height;
-        if (width !== targetWidth || height !== targetHeight) {
-          skippedSizeMismatch += 1;
-          continue;
-        }
-        framePixels.push(resolved.pixels);
+        framePixels.push(pixels);
       }
 
       if (!framePixels.length) {
@@ -1550,7 +1632,7 @@
       if (timelapseFrameSet.colorSpriteCount > 0) {
         detailParts.push(`カラースプライト ${timelapseFrameSet.usedColorCount}色`);
       }
-      const skipped = skippedSizeMismatch + skippedInvalid;
+      const skipped = skippedInvalid;
       if (skipped > 0) {
         detailParts.push(`除外 ${skipped}`);
       }
@@ -1609,6 +1691,8 @@
     shouldCaptureTimelapseSnapshotsFromState,
     normalizeTimelapseCanvasId,
     getTimelapseTrack,
+    normalizeTimelapseTrackResizeMetadata,
+    recordTimelapseCanvasResize,
     getActiveTimelapseTrack,
     getAllTimelapseTracks,
     getActiveTimelapseStepCount,
@@ -1638,6 +1722,8 @@
     clearTimelapseRecording,
     setTimelapseEnabled,
     resolveTimelapseFrameEntry,
+    getTimelapseFrameExportOffset,
+    placeTimelapseFrameOnExportCanvas,
     getSnapshotCanvasForTimelapse,
     createTimelapseFrameEntryFromSnapshotCanvas,
     resolveTimelapsePixelPatchTarget,
