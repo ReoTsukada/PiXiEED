@@ -1685,7 +1685,7 @@ async function handleCreatorPublish() {
     if (navigator.clipboard?.writeText) {
       try {
         await navigator.clipboard.writeText(shareMessage);
-        setCreatorStatus(ogpReady ? '公開しました。OGP付きの共有リンクをコピーしました。' : '公開しました。OGPは後で自動生成されます。共有リンクをコピーしました。');
+        setCreatorStatus(ogpReady ? '公開しました。投稿別OGPページは数分以内に準備されます。共有リンクをコピーしました。' : '公開しました。OGPは後で自動生成されます。共有リンクをコピーしました。');
       } catch (_) {
         window.prompt('公開しました。共有リンクをコピーしてください。', shareMessage);
         setCreatorStatus('公開しました。');
