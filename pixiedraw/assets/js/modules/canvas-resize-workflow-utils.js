@@ -168,7 +168,16 @@
     const previousWidth = state.width;
     const previousHeight = state.height;
     const scale = getPixelAlignedCanvasDisplayScale(state.scale);
-    beginHistory('resizeCanvas');
+    // Canvas dimensions are not an Undo/Redo entry for a local project. A
+    // shared project still uses the existing structural history transport so
+    // peers receive the resize operation.
+    const shouldUseHistoryTransport = isSharedProjectCollaborativeMode();
+    if (shouldUseHistoryTransport) {
+      beginHistory('resizeCanvas');
+    }
+    // Resize remains an explicit timelapse boundary so pre-resize work is
+    // retained in GIF export.
+    scheduleTimelapseCaptureFromState({ immediate: true });
     const historyPreparedAt = typeof performance?.now === 'function' ? performance.now() : Date.now();
     resizeAllLayers(nextWidth, nextHeight, {
       offsetX: Math.round(Number(contentOffsetX) || 0),
@@ -202,7 +211,16 @@
     clearSelection();
     requestRender();
     requestOverlayRender();
-    commitHistory();
+    if (!shouldUseHistoryTransport) {
+      recordTimelapseCanvasResize({
+        offsetX: Math.round(Number(contentOffsetX) || 0),
+        offsetY: Math.round(Number(contentOffsetY) || 0),
+      });
+    }
+    scheduleTimelapseCaptureFromState();
+    if (shouldUseHistoryTransport) {
+      commitHistory();
+    }
     const historyCommittedAt = typeof performance?.now === 'function' ? performance.now() : Date.now();
     scheduleSessionPersist();
     updateCanvasResizeControls({ normalizeValues: true });
