@@ -1090,11 +1090,8 @@
             layer.indices[pixelIndex] = paletteIndex >= 0 ? paletteIndex + 1 : 0;
           }
         }
-        if (index > 0 && typeof compactRasterLayerIndicesToTiles === 'function') {
-          compactRasterLayerIndicesToTiles(layer, palette, width, height, previousIndexedLayer);
-        } else if (index > 0 && typeof compactRasterLayerIndices === 'function') {
-          compactRasterLayerIndices(layer, palette, width * height);
-        }
+        // All imported frames remain editable Uint8 layers. Storage-only
+        // compact forms must never re-enter the editing runtime.
         previousIndexedLayer = layer;
       }
       frames.push({
