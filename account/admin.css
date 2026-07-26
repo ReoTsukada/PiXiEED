@@ -1,0 +1,12 @@
+.admin-page { width: min(920px, calc(100% - 24px)); margin: 28px auto; }
+.admin-access, .admin-content { display: grid; gap: 16px; }
+.admin-access { padding: 20px; border: 1px solid rgba(148,163,184,.25); border-radius: 12px; background: #0b1224; }
+.admin-access h1, .admin-access p, .admin-heading h1 { margin: 0; }
+.admin-access p { color: #a8b6cc; }
+.admin-content { grid-template-columns: minmax(0, 1fr); }
+.admin-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.admin-heading h1 { font-size: clamp(22px, 4vw, 30px); }
+[data-market-admin-only][hidden] { display: none !important; }
+.admin-content .account-panel { display: grid; gap: 14px; padding: 18px !important; }
+.admin-content h2 { margin: 0; font-size: 18px; }
+@media (max-width: 560px) { .admin-page { width: min(100% - 16px, 920px); margin-block: 12px; } .admin-heading { align-items: flex-start; flex-direction: column; } }
