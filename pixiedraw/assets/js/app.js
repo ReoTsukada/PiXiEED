@@ -6553,6 +6553,8 @@
   set ensureTimelapseStartCapture(value) { ensureTimelapseStartCapture = value; },
   get exportProjectToPixfind() { return exportProjectToPixfind; },
   set exportProjectToPixfind(value) { exportProjectToPixfind = value; },
+  get exportProjectToMarket() { return exportProjectToMarket; },
+  set exportProjectToMarket(value) { exportProjectToMarket = value; },
   get extractDocumentBaseName() { return extractDocumentBaseName; },
   set extractDocumentBaseName(value) { extractDocumentBaseName = value; },
   get getCurrentSharedRecentProjectEntry() { return getCurrentSharedRecentProjectEntry; },
@@ -18583,6 +18585,54 @@
 
   function exportProjectToPixfind() {
     return pixfindModeUtilsModule.exportProjectToPixfind();
+  }
+
+  async function exportProjectToMarket() {
+    if (!ensureCurrentClientCanExportProject({ announce: true, format: 'project' })) return false;
+    if (!window.indexedDB || typeof window.File !== 'function') {
+      updateAutosaveStatus('このブラウザでは販売用プロジェクト転送を利用できません。PXDを保存してからマーケットで追加してください。', 'warn');
+      return false;
+    }
+    try {
+      updateAutosaveStatus('販売用PXDを準備しています…', 'info');
+      const snapshot = makeHistorySnapshot({ clonePixelData: true });
+      const [session, thumbnail] = await Promise.all([
+        buildProjectSessionPayloadWithPersistedTimelapse({ projectId: autosaveProjectId }),
+        generateSnapshotThumbnail(snapshot),
+      ]);
+      const packaged = buildPackagedProjectPayload(snapshot, { session, includeSheets: false, internalBinary: true });
+      const serialized = await serializeProjectStorageSnapshot({ snapshot, session, packaged, thumbnail }, {
+        fileNameBase: state.documentName || DEFAULT_DOCUMENT_NAME,
+        includeTimelapse: true,
+      });
+      if (!(serialized?.blob instanceof Blob)) throw new Error('PXD archive was not created');
+      const file = new File([serialized.blob], serialized.filename || 'PiXiEEDraw.pxd', {
+        type: serialized.mimeType || 'application/vnd.pixieed.pxd',
+      });
+      const transferId = typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      await new Promise((resolve, reject) => {
+        const request = indexedDB.open('pixieed-market-project-transfers', 1);
+        request.onupgradeneeded = () => request.result.createObjectStore('transfers', { keyPath: 'id' });
+        request.onerror = () => reject(request.error || new Error('transfer storage unavailable'));
+        request.onsuccess = () => {
+          const database = request.result;
+          const transaction = database.transaction('transfers', 'readwrite');
+          transaction.objectStore('transfers').put({ id: transferId, file, createdAt: Date.now(), expiresAt: Date.now() + (15 * 60 * 1000) });
+          transaction.oncomplete = () => { database.close(); resolve(); };
+          transaction.onerror = () => { database.close(); reject(transaction.error || new Error('transfer storage write failed')); };
+        };
+      });
+      const url = new URL('../market/sell.html', window.location.href);
+      url.searchParams.set('project_transfer', transferId);
+      window.location.assign(url.href);
+      return true;
+    } catch (error) {
+      console.warn('Failed to prepare PiXiEEDraw market transfer', error);
+      updateAutosaveStatus('販売用PXDを準備できませんでした。PXDを保存してからマーケットで追加してください。', 'error');
+      return false;
+    }
   }
 
   async function exportProjectAsSpriteMap(...args) {
