@@ -3724,7 +3724,7 @@ function getFullscreenElement() {
 }
 
 function updateFullscreenButton() {
-  const active = getFullscreenElement() === dom.app;
+  const active = getFullscreenElement() === document.documentElement;
   if (!dom.fullscreenButton) return;
   const label = active ? '縮小' : '拡大';
   dom.fullscreenButton.textContent = label;
@@ -3742,10 +3742,12 @@ async function toggleGameFullscreen() {
       } else if (document.webkitExitFullscreen) {
         document.webkitExitFullscreen();
       }
-    } else if (dom.app.requestFullscreen) {
-      await dom.app.requestFullscreen();
-    } else if (dom.app.webkitRequestFullscreen) {
-      dom.app.webkitRequestFullscreen();
+    // Creator and result overlays are siblings of .app.  Fullscreen must own
+    // the document root so those panels and their effects remain visible.
+    } else if (document.documentElement.requestFullscreen) {
+      await document.documentElement.requestFullscreen();
+    } else if (document.documentElement.webkitRequestFullscreen) {
+      document.documentElement.webkitRequestFullscreen();
     } else {
       setHint('このブラウザでは全画面表示を利用できません。');
     }
