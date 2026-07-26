@@ -764,6 +764,57 @@
       return true;
     }
 
+    // Editing always uses the current Uint8 representation: 0 is the
+    // background slot and 1..255 are the unchanged project palette indexes.
+    // Older Int16, V1 compact, and tiled data are decoded through the one
+    // logical accessor before replacing the source buffers. Failure restores
+    // every original buffer, so opening a project never depends on migration.
+    function normalizeRasterDocumentsToRuntimeUint8(documents, paletteOverride = null) {
+      const palette = getLayerCreationPalette(paletteOverride) || [];
+      const targets = [];
+      (Array.isArray(documents) ? documents : []).forEach(documentEntry => {
+        const width = Math.max(1, Math.round(Number(documentEntry?.width) || 1));
+        const height = Math.max(1, Math.round(Number(documentEntry?.height) || 1));
+        (Array.isArray(documentEntry?.frames) ? documentEntry.frames : []).forEach(frame => {
+          (Array.isArray(frame?.layers) ? frame.layers : []).forEach(layer => {
+            if (!layer || isSimulationLayer(layer)) return;
+            targets.push({ layer, width, height, snapshot: captureLayerRasterStorage(layer) });
+          });
+        });
+      });
+      try {
+        for (const target of targets) {
+          const pixelCount = target.width * target.height;
+          const expected = new Int16Array(pixelCount).fill(-1);
+          for (let index = 0; index < pixelCount; index += 1) {
+            expected[index] = getStoredLayerPaletteIndex(target.layer, index);
+          }
+          const indices = new Uint8Array(pixelCount);
+          for (let index = 0; index < pixelCount; index += 1) {
+            const paletteIndex = expected[index];
+            if (paletteIndex < 0) continue;
+            if (paletteIndex === 0 && Number(palette[0]?.a) > 0) {
+              throw new Error('opaque-background-index');
+            }
+            if (paletteIndex > 255) throw new Error('palette-index-out-of-range');
+            indices[index] = paletteIndex;
+          }
+          target.layer.indices = indices;
+          target.layer.indicesEncoding = RUNTIME_LAYER_INDEX_ENCODING;
+          clearTiledLayerIndexMetadata(target.layer);
+          for (let index = 0; index < pixelCount; index += 1) {
+            if (getStoredLayerPaletteIndex(target.layer, index) !== expected[index]) {
+              throw new Error('pixel-verification-failed');
+            }
+          }
+        }
+      } catch (error) {
+        targets.forEach(target => restoreLayerRasterStorage(target.layer, target.snapshot));
+        return { converted: 0, verified: false, reason: String(error?.message || 'conversion-failed') };
+      }
+      return { converted: targets.length, verified: true, reason: 'verified' };
+    }
+
     // This is intentionally an in-memory migration. The caller only asks the
     // normal persistence flow to save after every layer has round-tripped
     // through the new storage representation without changing a single pixel.
@@ -2315,6 +2366,7 @@
       materializeLayerIndices,
       ensureWritableLayerIndices,
       ensureSparseWritableLayerIndices,
+      normalizeRasterDocumentsToRuntimeUint8,
       upgradeLegacyRasterDocumentsToCopyOnWrite,
       detachSharedLayerRaster,
       ensureLayerDirect,
