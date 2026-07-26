@@ -332,8 +332,9 @@ assert.match(adminPageGateUi, /deny\('この画面は運営管理者だけが利
 assert.match(ownerPasscodeMigration, /site_owner_admin_passcode enable row level security/i);
 assert.match(ownerPasscodeMigration, /crypt\(v_passcode, gen_salt\('bf', 12\)\)/i);
 assert.match(ownerPasscodeMigration, /site_owner_admin_verify_passcode/i);
-assert.match(accountHtml, /id="accountOwnerTapTarget"/);
+assert.match(accountHtml, /data-account-tab-target="settings"/);
 assert.match(ownerEntryUi, /REQUIRED_TAPS = 10/);
+assert.match(ownerEntryUi, /\[data-account-tab-target="settings"\]/);
 assert.match(ownerEntryUi, /site_owner_admin_verify_passcode/);
 assert.doesNotMatch(accountHtml, /マーケットDEV|DEV商品・検索/);
 assert.match(sellHtml, /id="listingTermsConfirmed"[^>]*required/);
