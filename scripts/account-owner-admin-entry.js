@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  const target = document.getElementById('accountOwnerTapTarget');
+  const target = document.querySelector('[data-account-tab-target="settings"]');
   const REQUIRED_TAPS = 10;
   const TAP_WINDOW_MS = 6000;
   const UNLOCK_KEY = 'pixieed:owner-admin-unlock-until:v1';
