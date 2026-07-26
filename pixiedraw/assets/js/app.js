@@ -3620,6 +3620,14 @@
   }
 
   function compactInactiveRasterFrameIndices(frame, width, height, palette = state.palette, baseFrame = null) {
+    // Keep every editable frame in the same current Uint8 representation.
+    // If an old/tiled frame reaches navigation, normalize it transactionally
+    // instead of compacting it again.
+    if (frame && typeof documentModel.normalizeRasterDocumentsToRuntimeUint8 === 'function') {
+      return documentModel.normalizeRasterDocumentsToRuntimeUint8([
+        { width, height, frames: [frame] },
+      ], palette).verified;
+    }
     if (!frame || !Array.isArray(frame.layers)) {
       return false;
     }
@@ -11379,6 +11387,19 @@
         openPerformance?.endStage?.(rgbConversionStage, { failed: true });
         throw error;
       }
+    }
+    const currentRasterDocuments = getProjectCanvasDocuments().map(canvas => ({
+      width: canvas?.width || state.width,
+      height: canvas?.height || state.height,
+      frames: canvas?.frames || [],
+    }));
+    const currentRasterResult = documentModel.normalizeRasterDocumentsToRuntimeUint8(
+      currentRasterDocuments,
+      state.palette
+    );
+    if (currentRasterResult.verified) {
+      state.rasterModelVersion = 1;
+      snapshot.rasterModelVersion = 1;
     }
     // Old local projects were intentionally kept on their existing raster
     // model. Upgrade them lazily on open now, but only after every indexed
@@ -19345,6 +19366,9 @@
   set dom(value) { dom = value; },
   get ensureLayerDirect() { return ensureLayerDirect; },
   set ensureLayerDirect(value) { ensureLayerDirect = value; },
+  get isCompactLayerIndices() { return documentModel.isCompactLayerIndices; },
+  get isRuntimeUint8LayerIndices() { return documentModel.isRuntimeUint8LayerIndices; },
+  get isTiledLayerIndices() { return documentModel.isTiledLayerIndices; },
   get getMaxSpriteMultiplier() { return getMaxSpriteMultiplier; },
   set getMaxSpriteMultiplier(value) { getMaxSpriteMultiplier = value; },
   get getNearestSpriteScaleOption() { return getNearestSpriteScaleOption; },
@@ -19365,6 +19389,7 @@
   set lockedCanvasWidth(value) { lockedCanvasWidth = value; },
   get markHistoryDirty() { return markHistoryDirty; },
   set markHistoryDirty(value) { markHistoryDirty = value; },
+  get materializeLayerIndices() { return documentModel.materializeLayerIndices; },
   get normalizeLayerBlendMode() { return normalizeLayerBlendMode; },
   set normalizeLayerBlendMode(value) { normalizeLayerBlendMode = value; },
   get normalizeLayerOpacity() { return normalizeLayerOpacity; },
