@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>運営管理 | PiXiEED</title>
+  <meta name="robots" content="noindex,nofollow,noai,noimageai">
+  <link rel="icon" type="image/png" href="../character-dots/maousama.png">
+  <link rel="stylesheet" href="../site/landing.css?v=2026.07.15-home-clear-entry1">
+  <link rel="stylesheet" href="account.css?v=20260726-admin-visibility1">
+  <link rel="stylesheet" href="admin.css?v=20260726-owner-admin1">
+</head>
+<body>
+  <main class="admin-page">
+    <section class="admin-access" id="adminAccess" aria-live="polite">
+      <h1>運営管理</h1>
+      <p>権限を確認しています。</p>
+    </section>
+
+    <section class="admin-content" id="adminContent" data-market-admin-only hidden>
+      <header class="admin-heading">
+        <div><p class="account-eyebrow">PRIVATE OPERATOR CONSOLE</p><h1>運営管理</h1></div>
+        <a class="account-text-action" href="../market/review.html">商品・販売者の審査</a>
+      </header>
+
+      <section class="account-panel account-admin-permission" aria-labelledby="pageviewRewardBudgetTitle">
+        <div>
+          <h2 id="pageviewRewardBudgetTitle">表示報酬の月次予算</h2>
+          <p class="helper">PiXiEEDの売上の一部を表示報酬として還元するための予算設定です。配分・送金は実行しません。</p>
+        </div>
+        <form class="account-reward-budget" id="pageviewRewardBudgetForm">
+          <div class="account-reward-budget__toolbar">
+            <label class="auth-field" for="pageviewRewardYear">対象年<input class="auth-input" id="pageviewRewardYear" type="number" min="2025" max="2100" step="1" required></label>
+            <div class="account-reward-budget__total"><span>年間合計</span><strong id="pageviewRewardAnnualTotal">0円</strong></div>
+          </div>
+          <div class="account-reward-budget__months" id="pageviewRewardMonths" aria-label="月別表示報酬予算"></div>
+          <button class="account-action" id="pageviewRewardSave" type="submit">12か月分を保存</button>
+        </form>
+        <p class="account-admin-permission__status" id="pageviewRewardStatus" role="status" aria-live="polite"></p>
+        <div class="account-reward-settlement" aria-labelledby="pageviewRewardSettlementTitle">
+          <div><h2 id="pageviewRewardSettlementTitle">表示報酬を計算</h2><p class="helper">確定前に試算し、対象月の終了後にのみ月次確定できます。</p></div>
+          <label class="auth-field" for="pageviewRewardSettlementMonth">対象月<input class="auth-input" id="pageviewRewardSettlementMonth" type="month" min="2025-01" max="2100-12" required></label>
+          <div class="account-reward-settlement__actions"><button class="account-action" id="pageviewRewardCalculate" type="button" disabled>試算する</button><button class="account-action account-action--quiet" id="pageviewRewardFinalize" type="button" disabled>月次確定</button></div>
+          <p class="account-admin-permission__status" id="pageviewRewardSettlementStatus" role="status" aria-live="polite"></p>
+        </div>
+      </section>
+
+      <section class="account-panel account-admin-permission" aria-labelledby="adFreePermissionTitle">
+        <div><h2 id="adFreePermissionTitle">広告OFF権限</h2><p class="helper">広告非表示だけを付与します。管理者・DEV・購入・出品の権限は付きません。</p></div>
+        <form class="account-admin-permission__form" id="adFreeGrantForm">
+          <label class="auth-field" for="adFreeGrantEmail">対象ユーザーのメールアドレス<input class="auth-input" id="adFreeGrantEmail" type="email" inputmode="email" autocomplete="off" required placeholder="user@example.com"></label>
+          <button class="account-action" id="adFreeGrantButton" type="submit">広告OFFを付与</button>
+        </form>
+        <p class="account-admin-permission__status" id="adFreeGrantStatus" role="status" aria-live="polite"></p>
+        <div class="account-admin-permission__list" id="adFreeGrantList" aria-label="広告OFF権限を持つユーザー"><p class="helper">権限一覧を確認しています。</p></div>
+      </section>
+    </section>
+  </main>
+  <script src="../scripts/pixieed-market-access.js?v=20260721-shared-client1"></script>
+  <script src="../scripts/admin-page-gate.js?v=20260726-owner-admin1"></script>
+  <script src="../scripts/account-pageview-reward-budget.js?v=2026.07.19-reward-terms1"></script>
+  <script src="../scripts/account-ad-permissions.js?v=2026.07.18-auth-stability1"></script>
+</body>
+</html>
