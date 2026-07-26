@@ -4,6 +4,7 @@
   const accessNotice = document.getElementById('adminAccess');
   const content = document.getElementById('adminContent');
   const ACCESS_CHANGE_EVENTS = new Set(['SIGNED_IN', 'SIGNED_OUT', 'USER_DELETED', 'USER_UPDATED']);
+  const UNLOCK_KEY = 'pixieed:owner-admin-unlock-until:v1';
   let refreshSequence = 0;
   let listenerBound = false;
 
@@ -18,6 +19,8 @@
     if (!window.PiXiEEDMarketAccess || !content) return deny('この画面を開く権限を確認できません。');
     const access = await window.PiXiEEDMarketAccess.check(options);
     if (sequence !== refreshSequence) return;
+    const unlockUntil = Number(sessionStorage.getItem(UNLOCK_KEY) || 0);
+    if (!(unlockUntil > Date.now())) return deny('マイページを10回タップし、運営管理用パスコードを入力してください。');
     if (!access.allowed || !access.client) return deny('この画面は運営管理者だけが利用できます。');
     const { data: isAdmin, error } = await access.client.rpc('site_current_user_is_owner_admin');
     if (sequence !== refreshSequence) return;
