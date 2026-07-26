@@ -331,6 +331,7 @@ const creatorState = {
 };
 
 let creatorLastFocused = null;
+let creatorEditPost = null;
 let creatorAnalysisToken = 0;
 let creatorPreviewToken = 0;
 const creatorDroppedFiles = new WeakMap();
@@ -634,6 +635,7 @@ async function init() {
   requestAnimationFrame(() => updatePixfindTabBarActions(document.body.dataset.pixfindScreen || 'start'));
   setupCreator();
   await restorePendingCreatorUpload();
+  await openCreatorEditFromUrl();
   if (window.location.hash === '#creator' && !isCreatorOverlayOpen()) {
     openCreatorOverlay();
   }
@@ -783,6 +785,60 @@ function openCreatorOverlay() {
   }
 }
 
+async function fileFromPuzzleUrl(url, filename) {
+  const response = await fetch(url, { cache: 'no-store' });
+  if (!response.ok) throw new Error(`image fetch failed: ${response.status}`);
+  const blob = await response.blob();
+  return new File([blob], filename, { type: blob.type || 'image/png' });
+}
+
+async function openCreatorEditFromUrl() {
+  const editId = new URLSearchParams(window.location.search).get('edit');
+  if (!editId || !/^pixfind-(?:sd|ho)-[a-z0-9-]+$/i.test(editId)) return;
+  try {
+    ensureClientId();
+    const entry = await fetchPublishedPuzzleById(editId);
+    if (!entry) throw new Error('post not found');
+    const mode = normalizeGameMode(entry.mode || entry.game_mode || entry.play_mode);
+    const [originalFile, diffFile] = await Promise.all([
+      fileFromPuzzleUrl(entry.original_url, `${editId}-original.png`),
+      mode === GAME_MODE_HIDDEN_OBJECT
+        ? Promise.resolve(null)
+        : fileFromPuzzleUrl(entry.diff_url, `${editId}-diff.png`),
+    ]);
+    resetCreatorForm();
+    creatorEditPost = { id: editId, mode };
+    if (dom.creatorExportButton) dom.creatorExportButton.textContent = '更新する';
+    if (dom.creatorTitleInput) dom.creatorTitleInput.value = entry.label || '';
+    if (dom.creatorSlugInput) dom.creatorSlugInput.value = entry.slug || '';
+    setCreatorMode(mode, true);
+    creatorState.targetLabels = normalizePuzzleTargets(entry.targets || []);
+    creatorDroppedFiles.set(dom.creatorOriginalInput, originalFile);
+    creatorState.originalFile = originalFile;
+    if (diffFile) {
+      creatorDroppedFiles.set(dom.creatorDiffInput, diffFile);
+      creatorState.diffFile = diffFile;
+    }
+    openCreatorOverlay();
+    if (mode === GAME_MODE_HIDDEN_OBJECT) {
+      await prepareHiddenObjectMarkerSource();
+      creatorState.markerRegions = normalizePuzzleMarkerRegions(entry.targets || []);
+      creatorState.diffResult = { regions: creatorState.markerRegions };
+      renderCreatorTargetFields(creatorState.markerRegions.length);
+      drawCreatorPreview();
+      updateCreatorPublishAvailability();
+    } else {
+      await handleCreatorAnalyze();
+    }
+    setCreatorStatus('投稿を再編集しています。画像を差し替える場合は、画像を選び直して再判定してください。');
+  } catch (error) {
+    console.warn('Could not open post editor', error);
+    creatorEditPost = null;
+    openCreatorOverlay();
+    setCreatorStatus('投稿を読み込めませんでした。投稿者としてログインしてから、もう一度お試しください。', 'error');
+  }
+}
+
 function closeCreatorOverlay() {
   if (!dom.creatorOverlay) return;
   dom.creatorOverlay.hidden = true;
@@ -814,6 +870,8 @@ function resetCreatorForm() {
   creatorState.targetLabels = [];
   creatorState.markerRegions = [];
   creatorState.activeTargetIndex = -1;
+  creatorEditPost = null;
+  if (dom.creatorExportButton) dom.creatorExportButton.textContent = '公開する';
   creatorDroppedFiles.delete(dom.creatorOriginalInput);
   creatorDroppedFiles.delete(dom.creatorDiffInput);
   setCreatorDropzonePreview(dom.creatorOriginalDropzone, dom.creatorOriginalFilePreview, '');
@@ -1578,7 +1636,8 @@ async function handleCreatorPublish() {
   const title = dom.creatorTitleInput?.value.trim() || 'カスタムパズル';
   const slug = getCreatorSlug();
   const difficulty = creatorState.difficulty;
-  const puzzleId = createPuzzleId(mode);
+  const isEditing = Boolean(creatorEditPost?.id);
+  const puzzleId = creatorEditPost?.id || createPuzzleId(mode);
   const authorName = getCreatorNickname();
   const authorXUrl = getCreatorXUrl();
   const authorAvatar = getCreatorAvatarId();
@@ -1624,8 +1683,8 @@ async function handleCreatorPublish() {
     const diffPath = `puzzles/${puzzleId}/diff.${diffUpload.extension}`;
 
     const [originalUrl, diffUrl] = await Promise.all([
-      uploadPuzzleFile(originalPath, originalUpload.blob, originalUpload.mimeType),
-      uploadPuzzleFile(diffPath, diffUpload.blob, diffUpload.mimeType),
+      uploadPuzzleFile(originalPath, originalUpload.blob, originalUpload.mimeType, { upsert: isEditing }),
+      uploadPuzzleFile(diffPath, diffUpload.blob, diffUpload.mimeType, { upsert: isEditing }),
     ]);
 
     const payload = {
@@ -1646,7 +1705,7 @@ async function handleCreatorPublish() {
     if (mode === GAME_MODE_HIDDEN_OBJECT && targets.length) {
       payload.targets = targets;
     }
-    if (clientIdValue) {
+    if (clientIdValue && !isEditing) {
       payload.client_id = clientIdValue;
     }
     if (authorXUrl) {
@@ -1656,7 +1715,9 @@ async function handleCreatorPublish() {
       payload.author_avatar = authorAvatar;
     }
 
-    const inserted = await insertPublishedPuzzle(payload);
+    const inserted = isEditing
+      ? await updatePublishedPuzzle(puzzleId, payload)
+      : await insertPublishedPuzzle(payload);
     const normalized = normalizePublishedPuzzleEntry(inserted ?? payload, payload);
     if (normalized) {
       state.officialPuzzles = mergePuzzles(state.officialPuzzles, normalized);
@@ -1685,7 +1746,9 @@ async function handleCreatorPublish() {
     if (navigator.clipboard?.writeText) {
       try {
         await navigator.clipboard.writeText(shareMessage);
-        setCreatorStatus(ogpReady ? '公開しました。投稿別OGPページは数分以内に準備されます。共有リンクをコピーしました。' : '公開しました。OGPは後で自動生成されます。共有リンクをコピーしました。');
+        setCreatorStatus(isEditing
+          ? (ogpReady ? '投稿を更新しました。投稿別OGPも更新されます。共有リンクをコピーしました。' : '投稿を更新しました。OGPは後で自動更新されます。共有リンクをコピーしました。')
+          : (ogpReady ? '公開しました。投稿別OGPページは数分以内に準備されます。共有リンクをコピーしました。' : '公開しました。OGPは後で自動生成されます。共有リンクをコピーしました。'));
       } catch (_) {
         window.prompt('公開しました。共有リンクをコピーしてください。', shareMessage);
         setCreatorStatus('公開しました。');
@@ -1801,7 +1864,7 @@ function encodeStoragePath(path) {
   return path.split('/').map(segment => encodeURIComponent(segment)).join('/');
 }
 
-async function uploadPuzzleFile(path, body, contentType = null) {
+async function uploadPuzzleFile(path, body, contentType = null, { upsert = false } = {}) {
   if (!body) {
     throw new Error('upload body is missing');
   }
@@ -1815,6 +1878,7 @@ async function uploadPuzzleFile(path, body, contentType = null) {
       headers: {
         ...supabaseHeaders(),
         'Content-Type': contentType || body.type || 'application/octet-stream',
+        ...(upsert ? { 'x-upsert': 'true' } : {}),
       },
       body,
     });
@@ -4995,8 +5059,8 @@ async function uploadPuzzleShareAssets({ puzzleId, mode, originalImage, diffImag
   const shareUrl = getPixfindShareHtmlUrl(puzzleId);
 
   await Promise.all([
-    uploadPuzzleFile(ogpPath, ogpBlob, 'image/png'),
-    uploadPuzzleFile(squareOgpPath, squareOgpBlob, 'image/png'),
+    uploadPuzzleFile(ogpPath, ogpBlob, 'image/png', { upsert: true }),
+    uploadPuzzleFile(squareOgpPath, squareOgpBlob, 'image/png', { upsert: true }),
   ]);
   return { shareUrl, ogpUrl, squareOgpUrl };
 }

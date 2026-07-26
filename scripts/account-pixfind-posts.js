@@ -125,6 +125,11 @@
     open.className = 'account-card-action account-card-action--primary';
     open.href = puzzleUrl;
     open.textContent = '開く';
+    const edit = document.createElement('a');
+    edit.className = 'account-card-action';
+    edit.href = asset(`../pixfind/index.html?edit=${encodeURIComponent(puzzleId)}#creator`);
+    edit.textContent = '編集';
+    edit.setAttribute('aria-label', `${entry?.label || 'PiXFiND'}を再編集`);
     const share = document.createElement('button');
     share.className = 'account-card-action account-card-action--share';
     share.type = 'button';
@@ -166,7 +171,7 @@
         window.alert('削除に失敗しました。ログイン状態を確認して、もう一度お試しください。');
       }
     });
-    actions.append(open, share, remove);
+    actions.append(open, edit, share, remove);
     body.append(title, meta, actions);
     card.append(preview, body);
     return card;
