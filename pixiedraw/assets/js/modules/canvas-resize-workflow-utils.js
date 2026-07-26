@@ -363,10 +363,35 @@
     const copyWidth = Math.max(0, sourceEndX - sourceStartX);
     state.frames.forEach(frame => {
       frame.layers = frame.layers.map(layer => {
-        const resized = createLayer(layer.name, width, height);
+        // Imported GIF frames and inactive cels can use compact/tiled backing
+        // storage. Their `indices` buffer is intentionally empty, with the
+        // actual pixels held in `indicesTiles`; copying that buffer directly
+        // turns the resized image into a transparent layer. A resize already
+        // creates a new dense raster, so materialize only those source layers
+        // before the fast row copy below.
+        if (
+          isCompactLayerIndices(layer, sourceWidth * sourceHeight)
+          || isTiledLayerIndices(layer, sourceWidth * sourceHeight)
+        ) {
+          materializeLayerIndices(layer, sourceWidth, sourceHeight, state.palette);
+        }
+        const sourceUsesRuntimeUint8 = isRuntimeUint8LayerIndices(layer, sourceWidth * sourceHeight);
+        const resized = createLayer(
+          layer.name,
+          width,
+          height,
+          // Preserve the source storage encoding. Compact/tiled layers are
+          // materialized as Int16, while imported indexed images remain in
+          // their Uint8 runtime representation.
+          sourceUsesRuntimeUint8 ? state.palette : []
+        );
         resized.id = layer.id;
         const sourceDirect = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
         const targetDirect = sourceDirect ? ensureLayerDirect(resized, width, height) : null;
+        const sourceImportDirect = layer.importSourceDirect instanceof Uint8ClampedArray
+          ? layer.importSourceDirect
+          : null;
+        const targetImportDirect = sourceImportDirect ? new Uint8ClampedArray(width * height * 4) : null;
         if (copyWidth > 0 && sourceEndY > sourceStartY) {
           for (let sourceY = sourceStartY; sourceY < sourceEndY; sourceY += 1) {
             const destinationY = sourceY + shiftY;
@@ -383,11 +408,23 @@
                 destinationByteIndex
               );
             }
+            if (sourceImportDirect && targetImportDirect) {
+              const sourceByteIndex = sourceIndex * 4;
+              const destinationByteIndex = destinationIndex * 4;
+              targetImportDirect.set(
+                sourceImportDirect.subarray(sourceByteIndex, sourceByteIndex + (copyWidth * 4)),
+                destinationByteIndex
+              );
+            }
           }
         }
         resized.visible = layer.visible;
         resized.opacity = normalizeLayerOpacity(layer.opacity);
         resized.blendMode = normalizeLayerBlendMode(layer.blendMode);
+        resized.directOnly = layer.directOnly === true;
+        if (targetImportDirect) {
+          resized.importSourceDirect = targetImportDirect;
+        }
         return resized;
       });
     });
@@ -409,7 +446,22 @@
 
     state.frames.forEach(frame => {
       frame.layers = frame.layers.map(layer => {
-        const scaled = createLayer(layer.name, newWidth, newHeight);
+        // Sprite scaling has the same requirement as canvas resizing: an
+        // imported compact/tiled layer stores its visible pixels outside of
+        // `indices`. Materialize it before nearest-neighbor sampling.
+        if (
+          isCompactLayerIndices(layer, originalWidth * originalHeight)
+          || isTiledLayerIndices(layer, originalWidth * originalHeight)
+        ) {
+          materializeLayerIndices(layer, originalWidth, originalHeight, state.palette);
+        }
+        const sourceUsesRuntimeUint8 = isRuntimeUint8LayerIndices(layer, originalWidth * originalHeight);
+        const scaled = createLayer(
+          layer.name,
+          newWidth,
+          newHeight,
+          sourceUsesRuntimeUint8 ? state.palette : []
+        );
         scaled.id = layer.id;
         scaled.visible = layer.visible;
         scaled.opacity = normalizeLayerOpacity(layer.opacity);
@@ -420,6 +472,12 @@
         const hasDirect = layer.direct instanceof Uint8ClampedArray;
         const sourceDirect = hasDirect ? layer.direct : null;
         const targetDirect = hasDirect ? ensureLayerDirect(scaled, newWidth, newHeight) : null;
+        const sourceImportDirect = layer.importSourceDirect instanceof Uint8ClampedArray
+          ? layer.importSourceDirect
+          : null;
+        const targetImportDirect = sourceImportDirect
+          ? new Uint8ClampedArray(newWidth * newHeight * 4)
+          : null;
 
         for (let y = 0; y < newHeight; y += 1) {
           const srcY = Math.min(originalHeight - 1, Math.floor((y * den) / num));
@@ -438,9 +496,21 @@
               targetDirect[baseDst + 2] = sourceDirect[baseSrc + 2];
               targetDirect[baseDst + 3] = sourceDirect[baseSrc + 3];
             }
+            if (targetImportDirect && sourceImportDirect) {
+              const baseSrc = srcIndex * 4;
+              const baseDst = destIndex * 4;
+              targetImportDirect[baseDst] = sourceImportDirect[baseSrc];
+              targetImportDirect[baseDst + 1] = sourceImportDirect[baseSrc + 1];
+              targetImportDirect[baseDst + 2] = sourceImportDirect[baseSrc + 2];
+              targetImportDirect[baseDst + 3] = sourceImportDirect[baseSrc + 3];
+            }
           }
         }
 
+        scaled.directOnly = layer.directOnly === true;
+        if (targetImportDirect) {
+          scaled.importSourceDirect = targetImportDirect;
+        }
         return scaled;
       });
     });
