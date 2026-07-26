@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const migration = fs.readFileSync('supabase/migrations/20260718120000_market_pageview_reward_budgets.sql', 'utf8');
-const accountHtml = fs.readFileSync('account/index.html', 'utf8');
+const adminHtml = fs.readFileSync('account/admin.html', 'utf8');
 const accountUi = fs.readFileSync('scripts/account-pageview-reward-budget.js', 'utf8');
 const accountCss = fs.readFileSync('account/account.css', 'utf8');
 const marketDoc = fs.readFileSync('docs/inheritance-material-market-system.md', 'utf8');
@@ -20,14 +20,15 @@ assert.match(migration, /revoke all on public\.market_pageview_reward_budgets fr
 assert.match(migration, /grant execute on function public\.market_admin_get_pageview_reward_year_v1\(integer\)[\s\S]*to authenticated/i);
 assert.match(migration, /grant execute on function public\.market_admin_set_pageview_reward_year_v1\(integer, jsonb\)[\s\S]*to authenticated/i);
 
-assert.match(accountHtml, /id="accountAdminTools"[\s\S]*data-market-admin-only/);
+assert.doesNotMatch(fs.readFileSync('account/index.html', 'utf8'), /id="accountAdminTools"/);
+assert.match(adminHtml, /id="adminContent"[\s\S]*data-market-admin-only[\s\S]*hidden/);
 assert.match(accountCss, /\[data-market-admin-only\]\[hidden\]\s*\{\s*display:\s*none\s*!important/);
-assert.match(accountHtml, /id="pageviewRewardBudgetForm"/);
-assert.match(accountHtml, /id="pageviewRewardYear"[^>]*min="2025"[^>]*max="2100"/);
-assert.match(accountHtml, /id="pageviewRewardAnnualTotal"/);
-assert.match(accountHtml, /PiXiEEDの売上の一部を表示報酬として還元/);
-assert.match(accountHtml, /閲覧集計・配分・送金は実行しません/);
-assert.match(accountHtml, /account-pageview-reward-budget\.js/);
+assert.match(adminHtml, /id="pageviewRewardBudgetForm"/);
+assert.match(adminHtml, /id="pageviewRewardYear"[^>]*min="2025"[^>]*max="2100"/);
+assert.match(adminHtml, /id="pageviewRewardAnnualTotal"/);
+assert.match(adminHtml, /PiXiEEDの売上の一部を表示報酬として還元/);
+assert.match(adminHtml, /配分・送金は実行しません/);
+assert.match(adminHtml, /account-pageview-reward-budget\.js/);
 
 assert.match(accountUi, /for \(let month = 1; month <= 12; month \+= 1\)/);
 assert.match(accountUi, /rpc\('market_current_user_is_admin'\)/);
