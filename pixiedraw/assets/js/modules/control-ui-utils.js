@@ -173,7 +173,7 @@
 
   function syncVirtualCursorControlVisibility(options = {}) {
     const { syncToggle = true } = options;
-    const available = layoutMode === 'mobilePortrait';
+    const available = true;
     const showVirtualCursorOptions = available && Boolean(state.showVirtualCursor);
     const showMobileVirtualCursorOptions = showVirtualCursorOptions;
     if (syncToggle && dom.controls.toggleVirtualCursor instanceof HTMLInputElement) {

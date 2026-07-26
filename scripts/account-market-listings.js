@@ -47,6 +47,35 @@
     return /^https:\/\//i.test(preview) ? preview : asset('../assets/icons/Market.png');
   }
 
+  function isPrivatePreviewPath(value) {
+    const path = String(value || '').trim();
+    return path.length > 3
+      && !path.includes('..')
+      && !/^[a-z][a-z0-9+.-]*:/i.test(path)
+      && /^[^/]+\/.+/.test(path);
+  }
+
+  async function hydrateListingPreviewUrls(entries, client) {
+    const sourceEntries = Array.isArray(entries) ? entries : [];
+    return await Promise.all(sourceEntries.map(async (entry) => {
+      if (/^https:\/\//i.test(String(entry?.preview_url || '').trim())) {
+        return entry;
+      }
+      const previewPath = String(entry?.preview_object_path || '').trim();
+      if (!isPrivatePreviewPath(previewPath)) {
+        return entry;
+      }
+      const { data, error } = await client.storage
+        .from('market-private')
+        .createSignedUrl(previewPath, 60 * 60);
+      if (error || !data?.signedUrl) {
+        console.warn('Failed to create listing preview URL', error);
+        return entry;
+      }
+      return { ...entry, preview_url: data.signedUrl };
+    }));
+  }
+
   function previewSourceSelection(entry) {
     const files = Array.isArray(entry?.files) ? entry.files : [];
     const storagePaths = Array.isArray(entry?.storage_file_paths) ? entry.storage_file_paths : [];
@@ -324,6 +353,11 @@
     image.decoding = 'async';
     image.draggable = false;
     image.dataset.marketProtectedMedia = 'true';
+    image.addEventListener('error', () => {
+      if (image.dataset.previewFallback === 'true') return;
+      image.dataset.previewFallback = 'true';
+      image.src = asset('../assets/icons/Market.png');
+    });
     const status = document.createElement('span');
     status.className = `account-listing-card__status${published && !withdrawn ? ' is-published' : ''}${withdrawn ? ' is-withdrawn' : ''}`;
     status.textContent = withdrawn ? 'SOLD OUT' : (STATUS_LABELS[entry?.status] || '確認中');
@@ -424,7 +458,8 @@
     const { data, error } = await client.rpc('market_my_listings_v1');
     if (token !== renderToken) return;
     if (error) throw error;
-    const entries = Array.isArray(data) ? data : [];
+    const entries = await hydrateListingPreviewUrls(Array.isArray(data) ? data : [], client);
+    if (token !== renderToken) return;
     if (rebuildButton) rebuildButton.hidden = !entries.some((entry) => entry?.status === 'published');
     count.textContent = `${entries.length}件`;
     if (!entries.length) {

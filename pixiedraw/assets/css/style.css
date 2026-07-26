@@ -4095,10 +4095,6 @@ body.is-canvas-surface-moving .mirror-guides {
   letter-spacing: 0.08em;
 }
 
-body:not(.is-mobile-layout) [data-ui-action='virtualCursorToggle'] {
-  display: none !important;
-}
-
 body.is-mobile-layout .qr-edit-panel {
   top: calc(var(--mobile-safe-area-top) + var(--mobile-topbar-height) + var(--project-tabs-mobile-height) + 58px);
   right: calc(var(--mobile-safe-area-right) + 8px);

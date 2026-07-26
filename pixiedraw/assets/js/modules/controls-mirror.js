@@ -465,7 +465,9 @@
 
   function setVirtualCursorEnabled(enabled, options = {}) {
     const { persist = true, updateControl = true } = options;
-    const next = layoutMode === 'mobilePortrait' && Boolean(enabled);
+    // The virtual cursor is useful with a mouse/keyboard too.  Keep its
+    // enabled state independent from the current responsive layout.
+    const next = Boolean(enabled);
     const prev = state.showVirtualCursor;
 
     if (updateControl && dom.controls.toggleVirtualCursor instanceof HTMLInputElement) {

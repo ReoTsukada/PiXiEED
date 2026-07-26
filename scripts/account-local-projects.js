@@ -6,6 +6,10 @@
   const AUTOSAVE_STORE_NAME = 'handles';
   const RECENT_PROJECTS_STORE = 'recentProjects';
   const SHARED_LOCAL_OP_JOURNAL_STORE = 'sharedLocalOpJournal';
+  const AUTOSAVE_V2_DB_NAME = 'pixieedraw-autosave-v2-experimental';
+  const AUTOSAVE_V2_CURRENT_MANIFESTS_STORE = 'localProjectCurrentManifests';
+  const AUTOSAVE_V2_MANIFESTS_STORE = 'localProjectManifests';
+  const AUTOSAVE_V2_THUMBNAILS_STORE = 'localProjectThumbnails';
   const RECENT_PROJECT_STORAGE_SHARED = 'shared';
   const RECENT_PROJECT_STORAGE_LOCAL = 'local';
   const RELOAD_TARGET_PROJECT_ID_KEY = 'pixieedraw:reload-target-project-id-v1';
@@ -142,6 +146,64 @@
     });
   }
 
+  function requestValue(request) {
+    return new Promise((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error || new Error('IndexedDB request failed'));
+    });
+  }
+
+  async function loadV2Thumbnails(projectIds) {
+    const ids = new Set((Array.isArray(projectIds) ? projectIds : [])
+      .map(normalizeAutosaveProjectId)
+      .filter(Boolean));
+    if (!ids.size || !('indexedDB' in window)) return new Map();
+    const db = await new Promise((resolve, reject) => {
+      const request = indexedDB.open(AUTOSAVE_V2_DB_NAME);
+      request.onupgradeneeded = () => {
+        // My Page is a reader. Do not create an empty V2 database on devices
+        // that have never used PiXiEEDraw.
+        request.transaction?.abort();
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error || new Error('V2 thumbnail database is unavailable'));
+    });
+    try {
+      const required = [
+        AUTOSAVE_V2_CURRENT_MANIFESTS_STORE,
+        AUTOSAVE_V2_MANIFESTS_STORE,
+        AUTOSAVE_V2_THUMBNAILS_STORE,
+      ];
+      if (required.some(store => !db.objectStoreNames.contains(store))) return new Map();
+      const tx = db.transaction(required, 'readonly');
+      const transactionDone = new Promise((resolve, reject) => {
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error || new Error('V2 thumbnail transaction failed'));
+        tx.onabort = () => reject(tx.error || new Error('V2 thumbnail transaction aborted'));
+      });
+      const currentStore = tx.objectStore(AUTOSAVE_V2_CURRENT_MANIFESTS_STORE);
+      const manifestStore = tx.objectStore(AUTOSAVE_V2_MANIFESTS_STORE);
+      const thumbnailStore = tx.objectStore(AUTOSAVE_V2_THUMBNAILS_STORE);
+      const currentRefs = await Promise.all([...ids].map(id => requestValue(currentStore.get(id))));
+      const manifests = await Promise.all(currentRefs.map(ref => (
+        ref?.manifestKey ? requestValue(manifestStore.get(ref.manifestKey)) : Promise.resolve(null)
+      )));
+      const thumbnails = await Promise.all(manifests.map(manifest => (
+        manifest?.thumbnailRef?.key ? requestValue(thumbnailStore.get(manifest.thumbnailRef.key)) : Promise.resolve(null)
+      )));
+      await transactionDone;
+      const result = new Map();
+      thumbnails.forEach((record, index) => {
+        const value = typeof record?.value === 'string' ? record.value : '';
+        const id = normalizeAutosaveProjectId(currentRefs[index]?.projectId || '');
+        if (id && value) result.set(id, value);
+      });
+      return result;
+    } finally {
+      db.close();
+    }
+  }
+
   async function loadLocalProjectEntries() {
     const db = await openAutosaveDatabase();
     if (!db.objectStoreNames.contains(RECENT_PROJECTS_STORE)) {
@@ -159,7 +221,7 @@
       request.onerror = () => reject(request.error);
       tx.oncomplete = () => {
         db.close();
-        resolve(entries
+        const localEntries = entries
           .filter((entry) => {
             if (!entry || typeof entry !== 'object') {
               return false;
@@ -173,7 +235,17 @@
             const leftTime = typeof left?.updatedAt === 'string' ? left.updatedAt : '';
             const rightTime = typeof right?.updatedAt === 'string' ? right.updatedAt : '';
             return rightTime.localeCompare(leftTime);
-          }));
+          });
+        const missingV2ThumbnailIds = localEntries
+          .filter(entry => Number(entry?.autosaveSchemaVersion) === 2 && !entry?.thumbnail)
+          .map(entry => entry.id);
+        loadV2Thumbnails(missingV2ThumbnailIds)
+          .then(thumbnails => {
+            resolve(localEntries.map(entry => thumbnails.has(entry.id)
+              ? { ...entry, thumbnail: thumbnails.get(entry.id) }
+              : entry));
+          })
+          .catch(() => resolve(localEntries));
       };
       tx.onerror = () => {
         const error = tx.error;

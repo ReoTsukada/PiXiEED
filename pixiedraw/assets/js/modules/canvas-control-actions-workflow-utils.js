@@ -92,7 +92,6 @@
     if (dom.controls.selectionOutline8Action instanceof HTMLButtonElement) {
       dom.controls.selectionOutline8Action.disabled = disableOutline;
     }
-    const isMobilePortraitLayout = layoutMode === 'mobilePortrait';
     const nextMode = movePending
       ? 'selectionMove'
       : ((hasSelection || hasClipboard) ? 'clipboard' : 'zoom');
@@ -130,12 +129,12 @@
     }
     if (dom.controls.canvasControlButtons instanceof HTMLElement) {
       dom.controls.canvasControlButtons.classList.toggle('is-clipboard-mode', !isZoomMode);
-      const showFloatingSelectionActions = isMobilePortraitLayout
-        ? (canvasControlMode === 'selectionMove')
-        : (
-          isSelectionToolActive
-          && (canvasControlMode === 'clipboard' || canvasControlMode === 'selectionMove')
-        );
+      // A completed selection must expose its editing controls regardless of
+      // form factor.  Previously mobile portrait only showed these controls
+      // while a selection was already being moved, which made a fresh range
+      // selection look as if copy/cut were unavailable.
+      const showFloatingSelectionActions = isSelectionToolActive
+        && (canvasControlMode === 'clipboard' || canvasControlMode === 'selectionMove');
       dom.controls.canvasControlButtons.classList.toggle(
         'is-mobile-selection-actions-visible',
         showFloatingSelectionActions

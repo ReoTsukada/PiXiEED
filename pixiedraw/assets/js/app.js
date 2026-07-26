@@ -18054,10 +18054,20 @@
       || !Number.isFinite(previousUpdatedAt)
       || now - previousUpdatedAt >= Math.max(0, Math.round(Number(thumbnailIntervalMs) || 0));
     deferThumbnailRefresh = refreshThumbnail;
-    // Keep checkpoint persistence on the critical path and refresh even the
-    // first thumbnail after interaction settles. The recent-project card can
-    // briefly use its placeholder instead of blocking V2 durability.
-    thumbnail = previousEntry?.thumbnail || null;
+    // A project must have one durable thumbnail from its first checkpoint.
+    // Deferring the first render meant a quick close or uninterrupted drawing
+    // session could leave the project list with a permanent placeholder. The
+    // preview is small and generated once here; later refreshes stay deferred
+    // according to the normal thumbnail interval.
+    if (needsInitialThumbnail) {
+      try {
+        thumbnail = await generateSnapshotThumbnail(snapshot);
+      } catch (error) {
+        console.warn('Initial autosave thumbnail generation failed', error);
+        thumbnail = null;
+      }
+      deferThumbnailRefresh = !thumbnail;
+    }
     let persistedTimelapseSession;
     try {
       persistedTimelapseSession = await buildProjectSessionPayloadWithPersistedTimelapse({

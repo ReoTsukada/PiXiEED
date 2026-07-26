@@ -14,7 +14,7 @@ assert.match(tabBar, /label: 'アプリとして使う', selector: '#pixieedPwaI
 assert.match(tabBar, /const fullscreenActions = state\.actions\.filter\(isFullscreenAction\);/);
 assert.match(tabBar, /\[myPage, state\.reloadAction, \.\.\.state\.details\.filter/);
 assert.doesNotMatch(tabBar, /createActionControl\(state\.reloadAction, 'pixieed-common-tabbar__button'\)/);
-assert.match(bottomNav, /shared-tab-bar\.js\?v=2026\.07\.20-draw-pwa1/);
+assert.match(bottomNav, /shared-tab-bar\.js\?v=20260726-selection-actions1/);
 assert.doesNotMatch(fullscreen, /html:fullscreen \.bottom-nav,html:fullscreen \.pixieed-shared-top-ad/);
 
 console.log('PiXiEEDraw fullscreen common-action checks passed.');
