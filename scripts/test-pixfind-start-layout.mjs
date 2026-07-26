@@ -17,7 +17,7 @@ assert.match(css, /creator-panel \{[\s\S]*max-height: 100%;/);
 assert.match(css, /Do not add those bar dimensions twice/);
 assert.match(css, /The catalog must use one scroll surface/);
 assert.match(css, /screen--difficulty \.puzzle-list \{[\s\S]*overflow: visible/);
-assert.match(html, /app\.js\?v=20260726-creator-complete-panel1/);
+assert.match(html, /app\.js\?v=20260726-document-fullscreen1/);
 assert.match(html, /class="puzzle-gallery pixfind-catalog"/);
 assert.match(html, /id="creatorMarkerViewport"/);
 assert.match(html, /id="creatorMarkerSourceCanvas"/);
@@ -133,6 +133,9 @@ assert.match(app, /function renderSuccessBurst\(canvas, imageX, imageY, region\)
 assert.match(app, /function renderMissImpact\(canvas, imageX, imageY\)/);
 assert.match(app, /function renderCompletionConfetti\(\)/);
 assert.match(app, /function updateResultPanel\(\)/);
+assert.match(app, /Fullscreen must own\s+\/\/ the document root so those panels and their effects remain visible\./);
+assert.match(app, /document\.documentElement\.requestFullscreen/);
+assert.match(app, /getFullscreenElement\(\) === document\.documentElement/);
 assert.match(app, /icon: 'Back\.png'/);
 assert.match(app, /icon: 'onemore\.png'/);
 assert.doesNotMatch(html, /id="backButton"/);
@@ -140,5 +143,6 @@ assert.match(css, /\.hit-burst__piece/);
 assert.match(css, /\.miss-impact/);
 assert.match(css, /\.completion-confetti/);
 assert.match(css, /\.result-panel \{/);
+assert.match(css, /html:fullscreen \.app/);
 
 console.log('PiXFiND start layout checks passed.');
