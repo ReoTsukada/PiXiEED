@@ -74,7 +74,7 @@
     const id = String(window.location.hash || '').slice(1);
     if (id === 'accountProjects' || id === 'accountPixfind' || id === 'accountPurchases' || id === 'accountListings') return 'library';
     if (id === 'accountPageviewRewards' || id === 'accountSeller' || id === 'accountRewardDashboard') return 'rewards';
-    if (id === 'authPanel' || id === 'accountDevTools' || id === 'accountAdminTools') return 'settings';
+    if (id === 'authPanel' || id === 'accountDevTools') return 'settings';
     return '';
   }
 
