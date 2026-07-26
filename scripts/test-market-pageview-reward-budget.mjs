@@ -21,6 +21,7 @@ assert.match(migration, /grant execute on function public\.market_admin_get_page
 assert.match(migration, /grant execute on function public\.market_admin_set_pageview_reward_year_v1\(integer, jsonb\)[\s\S]*to authenticated/i);
 
 assert.match(accountHtml, /id="accountAdminTools"[\s\S]*data-market-admin-only/);
+assert.match(accountCss, /\[data-market-admin-only\]\[hidden\]\s*\{\s*display:\s*none\s*!important/);
 assert.match(accountHtml, /id="pageviewRewardBudgetForm"/);
 assert.match(accountHtml, /id="pageviewRewardYear"[^>]*min="2025"[^>]*max="2100"/);
 assert.match(accountHtml, /id="pageviewRewardAnnualTotal"/);
