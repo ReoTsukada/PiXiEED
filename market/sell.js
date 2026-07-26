@@ -41,6 +41,7 @@
   const sourceAssetId = pageParams.get('source_asset_id') || '';
   const derivativeLicenseId = pageParams.get('derivative_license_id') || '';
   const derivativeModeRequested = pageParams.has('source_asset_id') || pageParams.has('derivative_license_id');
+  const projectTransferId = pageParams.get('project_transfer') || '';
   const validUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 
   const form = document.getElementById('listingForm');
@@ -454,7 +455,17 @@
       size.textContent = entry.optimization
         ? `${fileSize(entry.file.size)}・${entry.optimization.integer_scale_factor}倍縮小済み`
         : fileSize(entry.file.size);
-      row.append(name, format, size); return row;
+      const remove = document.createElement('button');
+      remove.type = 'button'; remove.className = 'market-file-row__remove';
+      remove.textContent = '外す';
+      remove.setAttribute('aria-label', `${entry.path} を出品ファイルから外す`);
+      remove.addEventListener('click', async () => {
+        sourceFiles.delete(entry.path);
+        sourceOptimizations.delete(entry.path);
+        await refreshDetectedFiles();
+        scheduleListingDraftSave();
+      });
+      row.append(name, format, size, remove); return row;
     }));
     if (detectedEntries.length > 12) {
       const more = document.createElement('p'); more.className = 'helper'; more.textContent = `ほか ${detectedEntries.length - 12}ファイル`;
@@ -880,6 +891,37 @@
     form.addEventListener('submit', submitListing);
   }
 
+  async function consumePixieeDrawProjectTransfer() {
+    if (!projectTransferId || !window.indexedDB) return false;
+    const transfer = await new Promise((resolve, reject) => {
+      const request = indexedDB.open('pixieed-market-project-transfers', 1);
+      request.onupgradeneeded = () => request.result.createObjectStore('transfers', { keyPath: 'id' });
+      request.onerror = () => reject(request.error || new Error('販売用PXDを読み出せませんでした'));
+      request.onsuccess = () => {
+        const database = request.result;
+        const transaction = database.transaction('transfers', 'readwrite');
+        const store = transaction.objectStore('transfers');
+        const getRequest = store.get(projectTransferId);
+        getRequest.onsuccess = () => {
+          const value = getRequest.result || null;
+          store.delete(projectTransferId);
+          transaction.oncomplete = () => { database.close(); resolve(value); };
+        };
+        getRequest.onerror = () => { database.close(); reject(getRequest.error || new Error('販売用PXDを読み出せませんでした')); };
+        transaction.onerror = () => { database.close(); reject(transaction.error || new Error('販売用PXDを削除できませんでした')); };
+      };
+    });
+    if (!(transfer?.file instanceof File) || Number(transfer.expiresAt) < Date.now()) {
+      setStatus('販売用PXDの引き継ぎ期限が切れました。PiXiEEDrawからもう一度「販売する」を押してください。');
+      return false;
+    }
+    await addFiles([{ file: transfer.file, path: transfer.file.name }]);
+    if (!$('listingTitle').value.trim()) $('listingTitle').value = transfer.file.name.replace(/\.(?:pxd|pixieedraw|pxdraw)$/i, '');
+    setStatus('PiXiEEDrawからPXDを受け取りました。埋め込みPNGからサムネイルと購入前プレビューを選べます。');
+    window.history.replaceState({}, '', `${location.pathname}${location.hash}`);
+    return true;
+  }
+
   async function submitListing(event) {
     event.preventDefault();
     const salePriceMinimum = Number($('listingPrice').min) || MIN_LISTING_PRICE_YEN;
@@ -1110,5 +1152,8 @@
   }
 
   bindLocalUi();
+  consumePixieeDrawProjectTransfer().catch((error) => {
+    setStatus(`販売用PXDを受け取れませんでした: ${error.message || '再度お試しください'}`);
+  });
   initRemote();
 })();
