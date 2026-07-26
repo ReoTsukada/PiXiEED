@@ -28,7 +28,7 @@ const socialMigration = fs.readFileSync('supabase/migrations/20260717153000_mark
 const limitedMigration = fs.readFileSync('supabase/migrations/20260717154000_market_limited_sales.sql', 'utf8');
 const minimumPriceMigration = fs.readFileSync('supabase/migrations/20260717160000_market_minimum_paid_listing.sql', 'utf8');
 const adminGrantMigration = fs.readFileSync('supabase/migrations/20260718090000_market_admin_complimentary_access.sql', 'utf8');
-const accountAdminToolsUi = fs.readFileSync('scripts/account-market-admin-tools.js', 'utf8');
+const adminPageGateUi = fs.readFileSync('scripts/admin-page-gate.js', 'utf8');
 const marketAccessUi = fs.readFileSync('scripts/pixieed-market-access.js', 'utf8');
 const marketAccessGateUi = fs.readFileSync('market/access-gate.js', 'utf8');
 const reviewHtml = fs.readFileSync('market/review.html', 'utf8');
@@ -36,6 +36,7 @@ const reviewUi = fs.readFileSync('market/review.js', 'utf8');
 const stripeConnectFunction = fs.readFileSync('supabase/functions/market-stripe-connect/index.ts', 'utf8');
 const sharedMarketFunction = fs.readFileSync('supabase/functions/_shared/market-stripe.ts', 'utf8');
 const accountHtml = fs.readFileSync('account/index.html', 'utf8');
+const adminHtml = fs.readFileSync('account/admin.html', 'utf8');
 const sharedNav = fs.readFileSync('scripts/shared-bottom-nav.js', 'utf8');
 const sitemap = fs.readFileSync('sitemap.xml', 'utf8');
 const favoritesUi = fs.readFileSync('market/favorites.js', 'utf8');
@@ -52,6 +53,7 @@ const singlePriceMigration = fs.readFileSync('supabase/migrations/20260721120000
 const sellerAutoApprovalMigration = fs.readFileSync('supabase/migrations/20260724110000_market_seller_auto_approval.sql', 'utf8');
 const wantPostsMigration = fs.readFileSync('supabase/migrations/20260724044823_market_want_posts.sql', 'utf8');
 const wantPostsUi = fs.readFileSync('market/market-want-posts.js', 'utf8');
+const ownerAdminMigration = fs.readFileSync('supabase/migrations/20260726043945_owner_only_admin_console.sql', 'utf8');
 
 const requiredFormats = [
   'pixiedraw-project',
@@ -313,12 +315,18 @@ assert.match(publicLaunchMigration, /market_private_upload_own[\s\S]*market_curr
 assert.doesNotMatch(publicLaunchMigration, /market DEV access required/i);
 assert.match(publicLaunchMigration, /invalid admin market grant/i);
 assert.match(marketIndexHtml, /id="marketSellButton"[^>]*href="sell\.html"/);
-assert.match(accountHtml, /id="accountAdminTools"[\s\S]*data-market-admin-only/);
-assert.match(accountHtml, /data-market-admin-only[\s\S]*href="\.\.\/market\/review\.html"/);
+assert.doesNotMatch(accountHtml, /id="accountAdminTools"/);
+assert.match(adminHtml, /id="adminContent"[\s\S]*data-market-admin-only[\s\S]*hidden/);
+assert.match(adminHtml, /href="\.\.\/market\/review\.html"/);
 assert.match(accountHtml, /id="accountSeller"[\s\S]*href="\.\.\/market\/seller\.html"[\s\S]*href="\.\.\/market\/sell\.html"/);
 assert.doesNotMatch(accountHtml, /id="account(?:Purchases|Listings|Seller)"[^>]*data-market-dev-only/);
-assert.match(accountAdminToolsUi, /rpc\('market_current_user_is_admin'\)/);
-assert.match(accountAdminToolsUi, /applyAdminAccess\(!error && isAdmin === true\)/);
+assert.match(ownerAdminMigration, /create table if not exists public\.site_owner_access/i);
+assert.match(ownerAdminMigration, /alter table public\.site_owner_access enable row level security/i);
+assert.match(ownerAdminMigration, /create or replace function public\.site_current_user_is_owner_admin\(\)/i);
+assert.match(ownerAdminMigration, /create or replace function public\.market_current_user_is_admin\(\)[\s\S]*site_current_user_is_owner_admin/i);
+assert.match(adminPageGateUi, /rpc\('site_current_user_is_owner_admin'\)/);
+assert.match(adminPageGateUi, /content\.hidden = false/);
+assert.match(adminPageGateUi, /deny\('この画面は運営管理者だけが利用できます。'\)/);
 assert.doesNotMatch(accountHtml, /マーケットDEV|DEV商品・検索/);
 assert.match(sellHtml, /id="listingTermsConfirmed"[^>]*required/);
 assert.match(sellHtml, /id="listingPrivacyConfirmed"[^>]*required/);
