@@ -54,6 +54,8 @@ const sellerAutoApprovalMigration = fs.readFileSync('supabase/migrations/2026072
 const wantPostsMigration = fs.readFileSync('supabase/migrations/20260724044823_market_want_posts.sql', 'utf8');
 const wantPostsUi = fs.readFileSync('market/market-want-posts.js', 'utf8');
 const ownerAdminMigration = fs.readFileSync('supabase/migrations/20260726043945_owner_only_admin_console.sql', 'utf8');
+const ownerPasscodeMigration = fs.readFileSync('supabase/migrations/20260726045232_owner_admin_passcode_gate.sql', 'utf8');
+const ownerEntryUi = fs.readFileSync('scripts/account-owner-admin-entry.js', 'utf8');
 
 const requiredFormats = [
   'pixiedraw-project',
@@ -327,6 +329,12 @@ assert.match(ownerAdminMigration, /create or replace function public\.market_cur
 assert.match(adminPageGateUi, /rpc\('site_current_user_is_owner_admin'\)/);
 assert.match(adminPageGateUi, /content\.hidden = false/);
 assert.match(adminPageGateUi, /deny\('この画面は運営管理者だけが利用できます。'\)/);
+assert.match(ownerPasscodeMigration, /site_owner_admin_passcode enable row level security/i);
+assert.match(ownerPasscodeMigration, /crypt\(v_passcode, gen_salt\('bf', 12\)\)/i);
+assert.match(ownerPasscodeMigration, /site_owner_admin_verify_passcode/i);
+assert.match(accountHtml, /id="accountOwnerTapTarget"/);
+assert.match(ownerEntryUi, /REQUIRED_TAPS = 10/);
+assert.match(ownerEntryUi, /site_owner_admin_verify_passcode/);
 assert.doesNotMatch(accountHtml, /マーケットDEV|DEV商品・検索/);
 assert.match(sellHtml, /id="listingTermsConfirmed"[^>]*required/);
 assert.match(sellHtml, /id="listingPrivacyConfirmed"[^>]*required/);
