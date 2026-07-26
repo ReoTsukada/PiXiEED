@@ -414,12 +414,19 @@
     }
   }
 
-  function openRecentProjectMarket(entry) {
-    if (!entry?.id) return;
-    const url = new URL('../market/sell.html', window.location.href);
-    url.searchParams.set('source', 'pixiedraw');
-    url.searchParams.set('project', entry.id);
-    window.location.assign(url.href);
+  async function openRecentProjectMarket(entry, actionButton) {
+    if (!entry?.id || !(actionButton instanceof HTMLButtonElement)) return;
+    actionButton.disabled = true;
+    try {
+      const opened = await openRecentProject(entry, { hideStartup: false, replaceOpenProjectTabs: true });
+      if (!opened) {
+        setProjectHomeVisible(true, { refresh: false });
+        return;
+      }
+      await exportProjectToMarket();
+    } finally {
+      actionButton.disabled = false;
+    }
   }
 
   function openShareStartConfirmDialog() {
@@ -1792,7 +1799,7 @@
       const marketButton = source.closest('button[data-workspace-project-market-index]');
       if (marketButton instanceof HTMLButtonElement) {
         const entry = startupWorkspaceEntries[Number(marketButton.dataset.workspaceProjectMarketIndex)] || null;
-        if (entry) openRecentProjectMarket(entry);
+        if (entry) await openRecentProjectMarket(entry, marketButton);
         return;
       }
       const deleteButton = source.closest('button[data-workspace-project-delete-index]');
