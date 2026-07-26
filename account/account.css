@@ -130,6 +130,13 @@ body[data-pixieed-account-auth="signed-in"] .account-stack {
   display: none !important;
 }
 
+/* `hidden` alone loses to the shared panel display rule in some cascades.
+   Keep operator-only controls out of the settings tab until the server-backed
+   admin check explicitly removes the attribute. */
+[data-market-admin-only][hidden] {
+  display: none !important;
+}
+
 body[data-pixieed-account-auth="signed-out"] [data-account-tab] {
   display: none !important;
 }
