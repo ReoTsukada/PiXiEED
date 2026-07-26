@@ -1,3 +1,5 @@
+create extension if not exists pgcrypto;
+
 create table if not exists public.site_owner_admin_passcode (
   singleton boolean primary key default true check (singleton),
   passcode_hash text not null,
@@ -14,7 +16,7 @@ returns boolean language sql stable security definer set search_path = public as
 $$;
 
 create or replace function public.site_owner_admin_set_passcode(input_passcode text)
-returns void language plpgsql security definer set search_path = public as $$
+returns void language plpgsql security definer set search_path = public, extensions as $$
 declare v_passcode text := coalesce(input_passcode, '');
 begin
   if not public.site_current_user_is_owner_admin() then raise exception 'owner admin permission required'; end if;
@@ -26,7 +28,7 @@ end;
 $$;
 
 create or replace function public.site_owner_admin_verify_passcode(input_passcode text)
-returns boolean language sql stable security definer set search_path = public as $$
+returns boolean language sql stable security definer set search_path = public, extensions as $$
   select public.site_current_user_is_owner_admin()
     and exists (
       select 1 from public.site_owner_admin_passcode
