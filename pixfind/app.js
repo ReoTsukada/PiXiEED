@@ -3559,12 +3559,13 @@ function prepareGameBoard(originalImage, challengeImage, diffResult, metadata = 
   if (dom.app && originalImage.width > 0 && originalImage.height > 0) {
     dom.app.style.setProperty('--game-image-ratio', String(originalImage.width / originalImage.height));
   }
-  const orderedRegions = [...diffResult.regions].sort((a, b) => (
-    a.minY - b.minY || a.minX - b.minX
-  ));
   const playableRegions = activeMode === GAME_MODE_HIDDEN_OBJECT
-    ? orderedRegions.slice(0, HIDDEN_OBJECT_TARGET_LIMIT)
-    : orderedRegions;
+    // Creator markers and target labels are paired by their creation order.
+    // Do not reorder only the regions here, or #1 would point at #2's label.
+    ? diffResult.regions.slice(0, HIDDEN_OBJECT_TARGET_LIMIT)
+    : [...diffResult.regions].sort((a, b) => (
+      a.minY - b.minY || a.minX - b.minX
+    ));
   state.differences = playableRegions.map((region, index) => ({
     ...region,
     id: `region-${index}`,
