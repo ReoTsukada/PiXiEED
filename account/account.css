@@ -10,6 +10,7 @@
   font-size: clamp(20px, 3vw, 28px);
   letter-spacing: .02em;
 }
+.account-owner-tap-target { border: 0; color: inherit; background: transparent; font-family: inherit; cursor: pointer; }
 
 .account-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
