@@ -827,16 +827,26 @@ body.is-playing {
   aspect-ratio: var(--game-image-ratio, 1 / 1);
 }
 
-.app:fullscreen,
-.app:-webkit-full-screen {
+html:fullscreen,
+html:-webkit-full-screen {
+  background: var(--bg);
+}
+
+html:fullscreen body[data-pixieed-page="pixfind"],
+html:-webkit-full-screen body[data-pixieed-page="pixfind"] {
+  background: var(--bg);
+}
+
+html:fullscreen .app,
+html:-webkit-full-screen .app {
   width: 100%;
   max-width: none;
   height: 100%;
   background: var(--bg);
 }
 
-.app:fullscreen .screen--game,
-.app:-webkit-full-screen .screen--game {
+html:fullscreen .screen--game,
+html:-webkit-full-screen .screen--game {
   padding: max(0.6rem, var(--safe-top)) max(0.6rem, var(--safe-right)) max(0.6rem, var(--safe-bottom)) max(0.6rem, var(--safe-left));
 }
 
