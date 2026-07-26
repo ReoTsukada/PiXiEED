@@ -75,6 +75,7 @@ const dom = {
   creatorDiffPicker: document.getElementById('creatorDiffPicker'),
   creatorOriginalFilePreview: document.getElementById('creatorOriginalFilePreview'),
   creatorDiffFilePreview: document.getElementById('creatorDiffFilePreview'),
+  creatorDiffPreviewOverlay: document.getElementById('creatorDiffPreviewOverlay'),
   creatorOriginalDropzone: document.getElementById('creatorOriginalDropzone'),
   creatorDiffDropzone: document.getElementById('creatorDiffDropzone'),
   creatorMarkerWorkspace: document.getElementById('creatorMarkerWorkspace'),
@@ -1551,12 +1552,58 @@ function updateCreatorSummary(diffResult, width, height) {
 function clearCreatorPreview() {
   clearCanvas(creatorCtx.original, dom.creatorPreviewOriginal);
   clearCanvas(creatorCtx.diff, dom.creatorPreviewDiff);
+  clearCreatorDiffPreviewOverlay();
 }
 
 function drawCreatorPreview() {
   if (!creatorState.originalImage || !creatorState.diffImage) return;
   drawCreatorPreviewCanvas(creatorCtx.original, dom.creatorPreviewOriginal, creatorState.originalImage, creatorState.diffResult);
   drawCreatorPreviewCanvas(creatorCtx.diff, dom.creatorPreviewDiff, creatorState.diffImage, creatorState.diffResult);
+  drawCreatorDiffPreviewOverlay();
+}
+
+function clearCreatorDiffPreviewOverlay() {
+  const overlay = dom.creatorDiffPreviewOverlay;
+  if (!overlay) return;
+  overlay.replaceChildren();
+  overlay.setAttribute('hidden', '');
+  overlay.removeAttribute('viewBox');
+}
+
+function drawCreatorDiffPreviewOverlay() {
+  const overlay = dom.creatorDiffPreviewOverlay;
+  const image = creatorState.diffImage;
+  const diffResult = creatorState.diffResult;
+  if (!overlay || !image || !diffResult?.regions?.length || isHiddenObjectMode(creatorState.mode)) {
+    clearCreatorDiffPreviewOverlay();
+    return;
+  }
+
+  const svgNamespace = 'http://www.w3.org/2000/svg';
+  const strokeWidth = Math.max(2, Math.round(Math.min(image.width, image.height) / 160));
+  overlay.replaceChildren();
+  overlay.setAttribute('viewBox', `0 0 ${image.width} ${image.height}`);
+
+  diffResult.regions.forEach(region => {
+    const width = region.maxX - region.minX + 1;
+    const height = region.maxY - region.minY + 1;
+    const centerX = region.minX + width / 2;
+    const centerY = region.minY + height / 2;
+    const radius = Math.max(strokeWidth * 4, Math.hypot(width, height) / 2 + strokeWidth * 3);
+    const circle = document.createElementNS(svgNamespace, 'circle');
+    circle.setAttribute('cx', String(centerX));
+    circle.setAttribute('cy', String(centerY));
+    circle.setAttribute('r', String(radius));
+    circle.setAttribute('fill', 'none');
+    circle.setAttribute('stroke', '#e3466f');
+    circle.setAttribute('stroke-width', String(strokeWidth + 1));
+    circle.setAttribute('vector-effect', 'non-scaling-stroke');
+    circle.style.filter = 'drop-shadow(0 0 1px rgba(255, 255, 255, 0.98))';
+    overlay.append(circle);
+  });
+  // SVG does not reliably reflect `.hidden = false` back to the HTML
+  // attribute, while the global `[hidden]` rule uses !important.
+  overlay.removeAttribute('hidden');
 }
 
 function drawCreatorPreviewCanvas(context, canvas, image, diffResult) {
@@ -1577,12 +1624,24 @@ function drawCreatorPreviewCanvas(context, canvas, image, diffResult) {
     context.lineWidth = isActive ? strokeWidth + 1 : strokeWidth;
     context.strokeStyle = isActive ? 'rgba(227, 70, 111, 0.98)' : 'rgba(255, 111, 141, 0.88)';
     context.fillStyle = isActive ? 'rgba(255, 111, 141, 0.34)' : 'rgba(255, 111, 141, 0.2)';
-    context.fillRect(region.minX, region.minY, width, height);
-    context.strokeRect(region.minX, region.minY, width, height);
 
     if (hiddenMode) {
+      context.fillRect(region.minX, region.minY, width, height);
+      context.strokeRect(region.minX, region.minY, width, height);
       drawCreatorRegionIndexBadge(context, region, index, isActive, canvas.width, canvas.height);
+      return;
     }
+
+    // Difference detection produces rectangular bounds, but the preview is a
+    // player-facing guide: use an enclosing circle so each found difference is
+    // clearly indicated without suggesting the changed pixels are rectangular.
+    const centerX = region.minX + width / 2;
+    const centerY = region.minY + height / 2;
+    const radius = Math.max(strokeWidth * 2, Math.hypot(width, height) / 2 + strokeWidth * 1.5);
+    context.beginPath();
+    context.arc(centerX, centerY, radius, 0, Math.PI * 2);
+    context.fill();
+    context.stroke();
   });
 }
 
@@ -4231,7 +4290,9 @@ function computeDifferenceRegions(originalImage, challengeImage, options = {}) {
   const offscreen = document.createElement('canvas');
   offscreen.width = width;
   offscreen.height = height;
-  const ctxOff = offscreen.getContext('2d');
+  // This canvas is used only for pixel readback during difference analysis.
+  // Prefer CPU-backed storage to avoid repeated getImageData warnings/slowness.
+  const ctxOff = offscreen.getContext('2d', { willReadFrequently: true });
   if (!ctxOff) return null;
 
   ctxOff.drawImage(originalImage, 0, 0);

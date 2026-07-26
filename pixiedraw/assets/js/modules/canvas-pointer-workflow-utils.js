@@ -673,6 +673,7 @@
         startDistance: pointerState.touchGestureStartDistance,
         currentCentroid: metrics.centroid,
         currentDistance: metrics.distance,
+        movementAnalysis: getTouchGestureMovementAnalysis(),
         elapsedMs: performance.now() - (Number(pointerState.touchGestureStartedAt) || performance.now()),
         config: VIEWPORT_GESTURE_CONFIG,
       });

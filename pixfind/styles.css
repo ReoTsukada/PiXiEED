@@ -1720,6 +1720,16 @@ html:-webkit-full-screen .screen--game {
   image-rendering: pixelated;
 }
 
+.creator-diff-preview-overlay {
+  position: absolute;
+  z-index: 1;
+  inset: 0.38rem;
+  width: calc(100% - 0.76rem);
+  height: calc(100% - 0.76rem);
+  overflow: visible;
+  pointer-events: none;
+}
+
 .creator-dropzone.has-preview {
   min-height: 168px;
   padding: 0.38rem;

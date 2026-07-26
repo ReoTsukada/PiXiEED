@@ -78,7 +78,10 @@
     const moveState = pointerState.selectionMove;
     const movePending = Boolean(moveState && moveState.hasCleared);
     const hasSelection = selectionMaskHasPixels(state.selectionMask);
-    const hasClipboard = Boolean(internalClipboard.selection);
+    // Both canvas selections and timeline frame/layer copies can be pasted.
+    // Treat either payload as clipboard content so the paste action remains
+    // available after a copy or cut changes the current selection.
+    const hasClipboard = Boolean(internalClipboard.selection || internalClipboard.timeline);
     const isSelectionToolActive = TOOL_TO_GROUP[state.tool] === 'selection';
     const disableOutline = (
       !hasSelection

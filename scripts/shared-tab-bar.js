@@ -99,7 +99,7 @@
           { id: 'qr', label: 'QR編集', selector: '[data-ui-action="openQrEditor"]', icon: 'assets/icons/QR.png' },
           { id: 'copy', label: 'コピー', selector: '#canvasClipboardCopy', icon: 'pixiedraw/assets/icons/action-copy.png?v=20260726-clipboard-actions1', mirrorState: true, mirrorVisibility: true, placement: 'trailing' },
           { id: 'cut', label: 'カット', selector: '#canvasClipboardCut', icon: 'pixiedraw/assets/icons/action-cut.png?v=20260726-clipboard-actions1', mirrorState: true, mirrorVisibility: true, placement: 'trailing' },
-          { id: 'virtual-cursor', label: '仮想カーソル', selector: '[data-ui-action="virtualCursorToggle"]', icon: 'pixiedraw/assets/icons/cursor.png?v=20260721-icons1', mirrorState: true, placement: 'trailing' },
+          { id: 'paste', label: 'ペースト', selector: '#canvasClipboardPaste', icon: 'pixiedraw/assets/icons/action-paste.png?v=20260726-clipboard-actions1', mirrorState: true, mirrorVisibility: true, placement: 'trailing' },
           { id: 'undo', label: '元に戻す', selector: '#undoAction', icon: 'assets/icons/Undo.png?v=2026.07.19-ui-icons1', mirrorDisabled: true, placement: 'trailing' },
           { id: 'redo', label: 'やり直す', selector: '#redoAction', icon: 'assets/icons/Redo.png?v=2026.07.19-ui-icons1', mirrorDisabled: true, placement: 'trailing' },
           { id: 'fullscreen', label: '拡大', selector: '#fullscreenButton', icon: '拡大.png', iconWhenPressed: '縮小.png', mirrorState: true, mode: 'fullscreen', fullscreenController: 'tool', placement: 'leading' },

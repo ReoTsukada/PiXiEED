@@ -368,6 +368,7 @@
         ),
         'info'
       );
+      updateCanvasControlButtons();
       return true;
     }
 
@@ -392,6 +393,7 @@
         ),
         'info'
       );
+      updateCanvasControlButtons();
       return true;
     }
 

@@ -256,6 +256,35 @@
     if (!cell) {
       return false;
     }
+    // Match a desktop pointer-down: an outside click first commits a floating
+    // selection, clears its outline, and consumes that click. It must not also
+    // draw or begin a new selection on the same press.
+    const pendingSelectionMove = getPendingSelectionMoveState();
+    if (
+      pendingSelectionMove
+      && !isPositionInMoveVisualBounds(cell, pendingSelectionMove)
+      && confirmPendingSelectionMove({ allowOutOfBoundsClip: true })
+    ) {
+      resetPointerStateForVirtualCursor();
+      hoverPixel = null;
+      virtualCursorDrawState.active = true;
+      virtualCursorDrawState.tool = 'selectionDismiss';
+      virtualCursorDrawState.historyStarted = false;
+      virtualCursorDrawState.lastPosition = null;
+      virtualCursorDrawState.startPosition = { ...cell };
+      virtualCursorDrawState.currentPosition = { ...cell };
+      virtualCursorDrawState.path = [{ ...cell }];
+      virtualCursorDrawState.points = [{ ...cell }];
+      virtualCursorDrawState.selectionClearedOnStart = true;
+      virtualCursorDrawState.curveStage = null;
+      pointerState.tool = 'selectionDismiss';
+      pointerState.start = { ...cell };
+      pointerState.current = { ...cell };
+      pointerState.last = { ...cell };
+      pointerState.path = [{ ...cell }];
+      requestOverlayRender();
+      return true;
+    }
     const requiresLayer = HISTORY_DRAW_TOOLS.has(activeTool);
     if (requiresLayer) {
       if (isMultiSpectatorMode()) {
@@ -289,6 +318,9 @@
     virtualCursorDrawState.path = [{ ...cell }];
     virtualCursorDrawState.points = [{ ...cell }];
     virtualCursorDrawState.selectionClearedOnStart = false;
+    virtualCursorDrawState.selectionStartCursorPosition = VIRTUAL_CURSOR_SELECTION_TOOLS.has(sessionTool)
+      ? { x: Number(virtualCursor.x), y: Number(virtualCursor.y) }
+      : null;
     virtualCursorDrawState.curveStage = null;
 
     pointerState.tool = sessionTool;
@@ -327,11 +359,6 @@
     }
 
     if (VIRTUAL_CURSOR_SELECTION_TOOLS.has(sessionTool)) {
-      if (state.selectionMask) {
-        clearSelection();
-        virtualCursorDrawState.selectionClearedOnStart = true;
-        pointerState.selectionClearedOnDown = true;
-      }
       const preview = {
         start: { ...virtualCursorDrawState.startPosition },
         end: { ...virtualCursorDrawState.currentPosition },
@@ -586,19 +613,31 @@
       }
     } else if (VIRTUAL_CURSOR_SELECTION_TOOLS.has(tool)) {
       if (commit) {
-        const pathLength = virtualCursorDrawState.path.length;
-        if (tool === 'selectRect') {
+        const selectionStart = virtualCursorDrawState.selectionStartCursorPosition;
+        const selectionMoved = Boolean(
+          selectionStart
+          && Number.isFinite(selectionStart.x)
+          && Number.isFinite(selectionStart.y)
+          && virtualCursor
+          && Math.max(
+            Math.abs(Number(virtualCursor.x) - selectionStart.x),
+            Math.abs(Number(virtualCursor.y) - selectionStart.y)
+          ) >= 0.5
+        );
+        if (!selectionMoved) {
+          clearSelection();
+        } else if (tool === 'selectRect') {
           const start = virtualCursorDrawState.startPosition;
           const end = virtualCursorDrawState.currentPosition;
-          if (start && end && !(virtualCursorDrawState.selectionClearedOnStart && pathLength <= 1)) {
-            createSelectionRect(start, end);
+          if (start && end) {
+            createSelectionRect(start, end, { append: true });
             actionPerformed = true;
           }
         } else if (tool === 'selectLasso') {
           const points = pointerState.selectionPreview?.points || virtualCursorDrawState.points || [];
           const effectivePoints = points.map(point => ({ ...point })).filter(Boolean);
-          if (effectivePoints.length > 1 && !(virtualCursorDrawState.selectionClearedOnStart && effectivePoints.length <= 1)) {
-            createSelectionLasso(effectivePoints);
+          if (effectivePoints.length > 1) {
+            createSelectionLasso(effectivePoints, { append: true });
             actionPerformed = true;
           }
         }
@@ -644,6 +683,7 @@
     virtualCursorDrawState.path = [];
     virtualCursorDrawState.points = [];
     virtualCursorDrawState.selectionClearedOnStart = false;
+    virtualCursorDrawState.selectionStartCursorPosition = null;
     virtualCursorDrawState.curveStage = null;
     requestOverlayRender();
   }

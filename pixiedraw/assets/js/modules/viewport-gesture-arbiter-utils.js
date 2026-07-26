@@ -26,6 +26,9 @@
     MIN_PINCH_START_DISTANCE_PX: 8,
     PAN_DOMINANCE_RATIO: 1,
     ZOOM_DOMINANCE_RATIO: 1.08,
+    PAN_DIRECTION_DOT_MIN: 0.45,
+    PAN_VECTOR_BALANCE_MIN: 0.25,
+    ZOOM_OPPOSING_DIRECTION_DOT_MAX: -0.15,
     GESTURE_DECISION_TIMEOUT_MS: 80,
     MIN_FRAME_SCALE_FACTOR: 0.75,
     MAX_FRAME_SCALE_FACTOR: 1.333333,
@@ -53,6 +56,7 @@
     currentCentroid,
     currentDistance,
     elapsedMs = 0,
+    movementAnalysis = null,
     config = VIEWPORT_GESTURE_CONFIG,
   } = {}) {
     const panDisplacement = startCentroid && currentCentroid
@@ -73,19 +77,48 @@
       zoomDistanceChange / Math.max(config.ZOOM_DISTANCE_SLOP_PX, Number.EPSILON),
       zoomRatioChange / Math.max(config.ZOOM_RATIO_SLOP, Number.EPSILON)
     );
+    const firstMotion = Math.max(0, Number(movementAnalysis?.firstDistance) || 0);
+    const secondMotion = Math.max(0, Number(movementAnalysis?.secondDistance) || 0);
+    const bothTouchesMoved = firstMotion >= config.TOUCH_SLOP_PX
+      && secondMotion >= config.TOUCH_SLOP_PX;
+    const sameDirectionPan = bothTouchesMoved
+      && Number(movementAnalysis?.normalizedDot) >= config.PAN_DIRECTION_DOT_MIN
+      && Number(movementAnalysis?.balance) >= config.PAN_VECTOR_BALANCE_MIN;
+    const opposingDirectionZoom = bothTouchesMoved
+      && Number(movementAnalysis?.normalizedDot) <= config.ZOOM_OPPOSING_DIRECTION_DOT_MAX;
+    // A stationary supporting finger is a normal pinch pattern.  Conversely,
+    // two fingers that have both travelled together must remain a pan even if
+    // their spacing jitters a few pixels.
+    const singleFingerPinch = zoomCandidate && !bothTouchesMoved
+      && Math.max(firstMotion, secondMotion) >= config.TOUCH_SLOP_PX;
     let mode = GestureMode.TOUCH_UNDECIDED;
-    if (panCandidate && panScore >= zoomScore * config.PAN_DOMINANCE_RATIO) {
+    if (sameDirectionPan && panCandidate) {
       mode = GestureMode.TOUCH_PAN;
-    } else if (zoomCandidate && zoomScore >= panScore * config.ZOOM_DOMINANCE_RATIO) {
+    } else if (zoomCandidate && (opposingDirectionZoom || singleFingerPinch)) {
+      mode = GestureMode.TOUCH_ZOOM;
+    } else if (panCandidate && !movementAnalysis && panScore >= zoomScore * config.PAN_DOMINANCE_RATIO) {
+      mode = GestureMode.TOUCH_PAN;
+    } else if (zoomCandidate && !movementAnalysis && zoomScore >= panScore * config.ZOOM_DOMINANCE_RATIO) {
       mode = GestureMode.TOUCH_ZOOM;
     } else if (elapsedMs >= config.GESTURE_DECISION_TIMEOUT_MS) {
-      if (panCandidate && !zoomCandidate) mode = GestureMode.TOUCH_PAN;
-      else if (zoomCandidate && !panCandidate) mode = GestureMode.TOUCH_ZOOM;
-      else if (panCandidate && zoomCandidate) mode = zoomScore > panScore
-        ? GestureMode.TOUCH_ZOOM
-        : GestureMode.TOUCH_PAN;
+      // Direction remains the tie-breaker after the short decision window.
+      // When the motion is still ambiguous, favor a translating centroid over
+      // a distance-only fluctuation so ordinary two-finger drags keep panning.
+      if (opposingDirectionZoom || singleFingerPinch) mode = GestureMode.TOUCH_ZOOM;
+      else if (panCandidate) mode = GestureMode.TOUCH_PAN;
+      else if (zoomCandidate) mode = GestureMode.TOUCH_ZOOM;
     }
-    return { mode, panDisplacement, zoomDistanceChange, zoomRatioChange, panScore, zoomScore };
+    return {
+      mode,
+      panDisplacement,
+      zoomDistanceChange,
+      zoomRatioChange,
+      panScore,
+      zoomScore,
+      sameDirectionPan,
+      opposingDirectionZoom,
+      singleFingerPinch,
+    };
   }
 
   function calculateTouchPan(startPan, startCentroid, currentCentroid) {
