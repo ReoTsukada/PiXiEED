@@ -472,7 +472,7 @@
 
 
 
-<link href="assets/css/style.css?v=20260724-timeline-axis1" rel="stylesheet"/>
+<link href="assets/css/style.css?v=20260726-puzzle-frame-picker1" rel="stylesheet"/>
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-4.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-4.png"/>
 <style>
@@ -669,9 +669,9 @@
 </button>
 </div>
 <div aria-label="コピー・ペースト・カット" aria-hidden="true" class="canvas-clipboard-buttons" id="canvasClipboardButtons" role="group">
-<button aria-label="コピー" class="chip" data-action="copy" id="canvasClipboardCopy" type="button">C</button>
-<button aria-label="ペースト" class="chip" data-action="paste" id="canvasClipboardPaste" type="button">P</button>
-<button aria-label="カット" class="chip" data-action="cut" id="canvasClipboardCut" type="button">X</button>
+<button aria-label="コピー" class="chip" data-action="copy" id="canvasClipboardCopy" title="コピー" type="button"><img alt="" aria-hidden="true" src="assets/icons/action-copy.png?v=20260726-clipboard-actions1"/><span class="sr-only">コピー</span></button>
+<button aria-label="カット" class="chip" data-action="cut" id="canvasClipboardCut" title="カット" type="button"><img alt="" aria-hidden="true" src="assets/icons/action-cut.png?v=20260726-clipboard-actions1"/><span class="sr-only">カット</span></button>
+<button aria-label="ペースト" class="chip" data-action="paste" id="canvasClipboardPaste" title="ペースト" type="button"><img alt="" aria-hidden="true" src="assets/icons/action-paste.png?v=20260726-clipboard-actions1"/><span class="sr-only">ペースト</span></button>
 </div>
 <div aria-label="履歴操作" class="canvas-controls__history" role="group">
 <button aria-label="元に戻す" class="chip" disabled="" id="undoAction" type="button"></button>
@@ -1197,14 +1197,10 @@
 <button class="button button--primary" id="exportProject" type="button">出力設定を開く</button>
 </div>
 <div class="file-panel-summary">
-<p class="help-text ui-guide-text">描画は端末内V2へ自動保存し、10操作ごとに差分をチェックポイントへ統合します。</p>
+<p class="help-text ui-guide-text">描画内容はこの端末に自動保存されます。</p>
 <p class="help-text ui-guide-text">外部ファイルへは自動出力しません。画像・GIF・PiXiEEDraw形式は出力パネルからダウンロードします。</p>
 </div>
 <div class="panel-ad-mount panel-ad-mount--context" data-panel-ad-mount="right"></div>
-<label class="toggle-option" for="toggleAutosaveRequired">
-<input checked disabled id="toggleAutosaveRequired" type="checkbox"/>
-<span>端末内V2自動保存（常時ON）</span>
-</label>
 <p aria-live="polite" class="help-text" id="autosaveStatus"></p>
 <p aria-live="polite" class="help-text" id="projectFileStatus">未保存</p>
 <details class="file-danger-zone">
@@ -1819,7 +1815,7 @@
 	<script defer="" src="assets/js/modules/clipboard-utils.js?v=2026.07.04-shared-copy-url-fix1"></script>
 	<script defer="" src="assets/js/modules/timelapse-utils.js?v=20260725-resize-timelapse1"></script>
 	<script defer="" src="assets/js/modules/import-utils.js?v=2026.06.29-import-transfer-split"></script>
-	<script defer="" src="assets/js/modules/pixfind-mode-utils.js?v=2026.07.01-pixfind-mode-split-v1"></script>
+	<script defer="" src="assets/js/modules/pixfind-mode-utils.js?v=20260726-puzzle-png-v1"></script>
 	<script defer="" src="assets/js/modules/qr-utils.js?v=2026.06.28-file-split-step3"></script>
 	<script defer="" src="assets/js/modules/qr-edit-core-utils.js?v=2026.06.30-qr-edit-core-v1"></script>
 	<script defer="" src="assets/js/modules/qr-edit-panel-utils.js?v=2026.06.29-open-project-tab-batch-v1"></script>
@@ -1861,7 +1857,7 @@
 	<script defer="" src="assets/js/modules/image-import-decode-utils.js?v=20260721-runtime-index8-2"></script>
 	<script defer="" src="assets/js/modules/palette-panel-utils.js?v=20260721-runtime-index8-2"></script>
 	<script defer="" src="assets/js/modules/timeline-layers.js?v=20260724-timeline-tap-sync10"></script>
-	<script defer="" src="assets/js/modules/ui-localization-utils.js?v=20260724-update-notice1"></script>
+	<script defer="" src="assets/js/modules/ui-localization-utils.js?v=20260726-on-device-copy1"></script>
 	<script defer="" src="assets/js/modules/ui-language-utils.js?v=2026.07.03-small-helper-batch-split-v1"></script>
 	<script defer="" src="assets/js/modules/scroll-input-utils.js?v=2026.07.03-small-helper-batch-split-v1"></script>
 	<script defer="" src="assets/js/modules/sprite-scale-utils.js?v=2026.06.30-zh-localization-v1"></script>
@@ -1887,20 +1883,20 @@
 	<script defer="" src="assets/js/modules/control-ui-utils.js?v=2026.07.01-control-ui-split-v1"></script>
 	<script defer="" src="assets/js/modules/ui-action-buttons-workflow-utils.js?v=20260721-icons1"></script>
 	<script defer="" src="assets/js/modules/ui-action-router-workflow-utils.js?v=2026.07.17-global-help22"></script>
-	<script defer="" src="assets/js/modules/canvas-control-actions-workflow-utils.js?v=2026.07.03-canvas-control-actions-split-v1"></script>
+	<script defer="" src="assets/js/modules/canvas-control-actions-workflow-utils.js?v=20260726-clipboard-actions1"></script>
 	<script defer="" src="assets/js/modules/history-core-workflow-utils.js?v=20260724-raster-autosave-defer1"></script>
 	<script defer="" src="assets/js/modules/history-guard-workflow-utils.js?v=2026.07.04-shared-project-disabled1"></script>
 	<script defer="" src="assets/js/modules/curve-workflow-utils.js?v=2026.07.03-curve-workflow-split-v1"></script>
 	<script defer="" src="assets/js/modules/canvas-grid-workflow-utils.js?v=2026.07.03-grid-workflow-split-v1"></script>
 	<script defer="" src="assets/js/modules/timeline-navigation-workflow-utils.js?v=20260724-active-cell-selection1"></script>
 	<script defer="" src="assets/js/modules/timelapse-session-utils.js?v=20260725-resize-timelapse1"></script>
-	<script defer="" src="assets/js/modules/autosave-workflow-utils.js?v=20260721-committed-journal2"></script>
+		<script defer="" src="assets/js/modules/autosave-workflow-utils.js?v=20260726-on-device-copy1"></script>
 	<script defer="" src="assets/js/modules/project-provenance-utils.js?v=20260714-provenance-v1"></script>
 	<script defer="" src="assets/js/modules/open-import-workflow-utils.js?v=20260721-indexed-raster-import1"></script>
 	<script defer="" src="assets/js/modules/export-format-workflow-utils.js?v=20260720-export-grid-format1"></script>
-	<script defer="" src="assets/js/modules/export-dialog-workflow-utils.js?v=20260721-export-loading-paint1"></script>
-		<script defer="" src="assets/js/modules/startup-workflow-utils.js?v=20260720-pxd1"></script>
-		<script defer="" src="assets/js/modules/recent-project-workflow-utils.js?v=20260719-ad-audit2"></script>
+	<script defer="" src="assets/js/modules/export-dialog-workflow-utils.js?v=20260726-export-loading-paint2"></script>
+		<script defer="" src="assets/js/modules/startup-workflow-utils.js?v=20260726-workspace-project-actions1"></script>
+		<script defer="" src="assets/js/modules/recent-project-workflow-utils.js?v=20260726-project-card-actions2"></script>
 		<script defer="" src="assets/js/modules/project-package-workflow-utils.js?v=20260721-autosave-index8-1"></script>
 		<script defer="" src="assets/js/modules/project-storage-adapter-utils.js?v=20260715-legacy-project-card-recovery1"></script>
 		<script defer="" src="assets/js/modules/project-storage-v1-json-adapter.js?v=20260720-pxd2"></script>
@@ -1926,7 +1922,7 @@
 	<script defer="" src="assets/js/modules/local-project-v2-migration-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/pre-update-checkpoint-utils.js?v=20260712-pre-update-checkpoint-u3"></script>
 	<script defer="" src="assets/js/active-project-session-utils.js?v=20260715-local-true-v2-cleanup1"></script>
-	<script defer="" src="assets/js/app.js?v=20260724-editable-transparent1"></script>
+	<script defer="" src="assets/js/app.js?v=20260726-project-card-actions2"></script>
 	<script defer="" src="assets/js/modules/update-detection-utils.js?v=20260719-file-protocol1"></script>
   <script>
     (function initPanelAdDocking() {

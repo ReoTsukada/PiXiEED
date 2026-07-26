@@ -150,7 +150,9 @@
         String(!showFloatingSelectionActions)
       );
     }
-    const showClipboardCopyCut = isSelectionToolActive && hasSelection;
+    // A finished selection stays editable even after switching tools. Keep
+    // its copy/cut actions in the command bar until it is actually cleared.
+    const showClipboardCopyCut = hasSelection;
     const showClipboardPaste = hasClipboard;
     const canUseClipboardStrip = showClipboardCopyCut || showClipboardPaste;
     if (dom.controls.canvasClipboardButtons instanceof HTMLElement) {

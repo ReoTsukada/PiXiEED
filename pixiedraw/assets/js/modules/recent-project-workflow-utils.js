@@ -513,222 +513,9 @@
     }
   }
 
-  function renderRecentProjectsList(entries) {
-    console.info('[pixiedraw:recent-projects]', {
-      phase: 'recent-projects-render-start',
-      count: Array.isArray(entries) ? entries.length : 0,
-      hasContainer: Boolean(dom.startup?.recentList || dom.projectHomeRecentList),
-      containerHidden: Boolean(dom.startup?.recentSection?.hidden && dom.projectHomeRecentSection?.hidden),
-      code: '',
-    });
-    const hasEntries = Array.isArray(entries) && entries.length > 0;
-    const targets = [
-      {
-        section: dom.startup?.recentSection,
-        list: dom.startup?.recentList,
-        titleSelector: '.startup-screen__recent-title',
-        title: localizeText('端末内プロジェクト（自動保存）', 'Local Projects (Autosave)'),
-      },
-      {
-        section: dom.projectHomeRecentSection,
-        list: dom.projectHomeRecentList,
-        titleSelector: '.project-home-screen__section-title',
-        title: localizeText('プロジェクト', 'Projects'),
-      },
-    ].filter(target => target.section instanceof HTMLElement && target.list instanceof HTMLElement);
-    if (!targets.length) {
-      // Recent projects remain durable local metadata even when this view is
-      // not mounted yet.
-      return;
-    }
-    const renderProjectHomeEmptyState = target => {
-      const titleNode = target.section.querySelector(target.titleSelector);
-      if (titleNode instanceof HTMLElement) {
-        titleNode.textContent = target.title;
-      }
-      target.list.innerHTML = '';
-      const empty = document.createElement('p');
-      empty.className = 'startup-recent-list__empty';
-      empty.textContent = localizeText(
-        'まだプロジェクトがありません。',
-        'No projects yet.'
-      );
-      target.list.appendChild(empty);
-      target.section.hidden = false;
-    };
-    if (!AUTOSAVE_SUPPORTED || !hasEntries) {
-      targets.forEach(target => {
-        if (target.list === dom.projectHomeRecentList) {
-          if (
-            !hasEntries
-            && recentProjectsCache instanceof Map
-            && recentProjectsCache.size > 0
-            && target.list.children.length > 0
-          ) {
-            target.section.hidden = false;
-            return;
-          }
-          renderProjectHomeEmptyState(target);
-          return;
-        }
-        target.section.hidden = true;
-      });
-      updatePixieedAccountUi();
-      syncPixieedSupportBenefitUi();
-      console.info('[pixiedraw:recent-projects]', { phase: 'recent-projects-render-success', count: Array.isArray(entries) ? entries.length : 0, hasContainer: true, containerHidden: Boolean(dom.startup?.recentSection?.hidden), code: '' });
-      return;
-    }
-    targets.forEach(target => {
-      const titleNode = target.section.querySelector(target.titleSelector);
-      if (titleNode instanceof HTMLElement) {
-        titleNode.textContent = target.title;
-      }
-      target.section.hidden = false;
-    });
-    targets.forEach(target => {
-      target.list.innerHTML = '';
-    });
-    const createRecentProjectCard = entry => {
-      if (!entry || !entry.id) {
-        return null;
-      }
-      const isSharedEntry = isSharedRecentProjectEntry(entry);
-      const sharedRoleHint = typeof entry.sharedRoleHint === 'string' ? entry.sharedRoleHint.trim() : '';
-      const sharedMembershipRole = typeof entry.sharedProjectMembershipRole === 'string'
-        ? entry.sharedProjectMembershipRole.trim()
-        : '';
-      const isOwnedSharedEntry = isSharedEntry && (
-        isOwnedSharedRecentProjectEntry(entry)
-        || sharedRoleHint === 'master'
-        || sharedMembershipRole === 'owner'
-      );
-      const projectKind = isSharedEntry
-        ? (isOwnedSharedEntry ? 'shared-owned' : 'shared-joined')
-        : 'local';
-      const projectKindLabel = projectKind === 'shared-owned'
-        ? localizeText('自分の共有プロジェクト', 'Shared project you own')
-        : projectKind === 'shared-joined'
-          ? localizeText('参加した共有プロジェクト', 'Joined shared project')
-          : localizeText('端末内プロジェクト', 'Local project');
-      const displayLabel = extractDocumentBaseName(entry.fileName || entry.name || DEFAULT_DOCUMENT_NAME);
-      const card = document.createElement('article');
-      card.className = 'startup-recent-card';
-      card.dataset.projectId = entry.id;
-      card.dataset.projectStorageKind = getRecentProjectStorageKind(entry);
-      card.dataset.projectKind = projectKind;
-      card.setAttribute('role', 'listitem');
-      const openButton = document.createElement('button');
-      openButton.type = 'button';
-      openButton.className = 'startup-recent-card__open';
-      openButton.dataset.startupRecentOpenId = entry.id;
-      openButton.dataset.projectKind = projectKind;
-      openButton.setAttribute('aria-label', localizeText(`${displayLabel} を開く`, `Open ${displayLabel}`));
-      const kindBadge = document.createElement('span');
-      kindBadge.className = 'startup-recent-card__kind';
-      kindBadge.title = projectKindLabel;
-      kindBadge.setAttribute('aria-label', projectKindLabel);
-      const thumb = document.createElement('div');
-      thumb.className = 'startup-recent-card__thumb';
-      if (entry.thumbnail) {
-        const img = new Image();
-        img.src = entry.thumbnail;
-        img.alt = localizeText(
-          `${displayLabel || 'プロジェクト'} のプレビュー`,
-          `${displayLabel || 'Project'} preview`
-        );
-        img.decoding = 'async';
-        thumb.appendChild(img);
-      } else {
-        const placeholder = document.createElement('span');
-        placeholder.className = 'startup-recent-card__thumb-placeholder';
-        placeholder.textContent = localizeText('プレビューなし', 'No Preview');
-        thumb.appendChild(placeholder);
-      }
-      const nameNode = document.createElement('span');
-      nameNode.className = 'startup-recent-card__name';
-      nameNode.textContent = displayLabel;
-      nameNode.title = displayLabel;
-      const metaNode = document.createElement('span');
-      metaNode.className = 'startup-recent-card__meta';
-      const updatedAt = Date.parse(entry.updatedAt || '');
-      const updatedLabel = Number.isFinite(updatedAt)
-        ? formatUpdateHistoryDate(updatedAt, localizeText('保存時刻不明', 'Saved time unavailable'))
-        : localizeText('保存時刻不明', 'Saved time unavailable');
-      metaNode.textContent = updatedLabel;
-      const deleteButton = document.createElement('button');
-      deleteButton.type = 'button';
-      deleteButton.className = 'startup-recent-card__delete';
-      deleteButton.dataset.startupRecentDeleteId = entry.id;
-      const deleteIcon = document.createElement('img');
-      deleteIcon.src = '../assets/icons/delete.png';
-      deleteIcon.alt = '';
-      deleteIcon.setAttribute('aria-hidden', 'true');
-      deleteButton.appendChild(deleteIcon);
-      deleteButton.title = isSharedEntry
-        ? localizeText('共有プロジェクト一覧から外す', 'Remove shared project from list')
-        : localizeText('端末内プロジェクトを削除', 'Delete local project');
-      deleteButton.setAttribute(
-        'aria-label',
-        isSharedEntry
-          ? localizeText(`${displayLabel} を一覧から外す`, `Remove ${displayLabel} from list`)
-          : localizeText(`${displayLabel} を削除`, `Delete ${displayLabel}`)
-      );
-      openButton.appendChild(kindBadge);
-      openButton.appendChild(thumb);
-      openButton.appendChild(nameNode);
-      openButton.appendChild(metaNode);
-      card.appendChild(openButton);
-      card.appendChild(deleteButton);
-      return card;
-    };
-    const createProjectHomeAdCard = () => {
-      if (!window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.()) {
-        return null;
-      }
-      const card = document.createElement('article');
-      card.className = 'startup-recent-card--ad startup-recent-ad';
-      card.dataset.pixieedReserveAdSpace = 'true';
-      card.setAttribute('role', 'listitem');
-      card.setAttribute('aria-label', localizeText('広告', 'Ad'));
-      const frame = document.createElement('div');
-      frame.className = 'startup-recent-ad__frame';
-      const label = document.createElement('span');
-      label.className = 'startup-recent-ad__label';
-      label.textContent = localizeText('広告', 'Advertisement');
-      const ad = document.createElement('ins');
-      ad.className = 'startup-recent-card__ad-ins startup-recent-ad__slot';
-      ad.setAttribute('data-ad-client', 'ca-pub-9801602250480253');
-      ad.setAttribute('data-ad-format', 'horizontal');
-      ad.setAttribute('data-ad-slot', '2141591954');
-      ad.setAttribute('data-full-width-responsive', 'true');
-      ad.dataset.pixieedProjectFeedAd = 'true';
-      ad.style.display = 'block';
-      frame.append(label, ad);
-      card.appendChild(frame);
-      return card;
-    };
-    entries.forEach((entry, index) => {
-      targets.forEach(target => {
-        const card = createRecentProjectCard(entry);
-        if (card) {
-          target.list.appendChild(card);
-        }
-        if (target.list === dom.projectHomeRecentList && (index + 1) % 8 === 0) {
-          const adCard = createProjectHomeAdCard();
-          if (adCard) {
-            target.list.appendChild(adCard);
-          }
-        }
-      });
-    });
-    updatePixieedAccountUi();
-    syncPixieedSupportBenefitUi();
-    if (startupVisible || projectHomeVisible) {
-      window.requestAnimationFrame(() => {
-        queueStartupRecentAdRender();
-      });
-    }
-    console.info('[pixiedraw:recent-projects]', { phase: 'recent-projects-render-success', count: entries.length, hasContainer: true, containerHidden: false, code: '' });
+  function renderRecentProjectsList() {
+    // Project cards are rendered exclusively by startupWorkspaceProjectList.
+    // The former startup/project-home duplicate lists were removed.
   }
 
   async function ensureSharedRecentProjectsAccountSynced({ force = false } = {}) {
@@ -768,30 +555,11 @@
   }
 
   async function refreshRecentProjectsUI(options = {}) {
-    console.info('[pixiedraw:recent-projects]', { phase: 'recent-projects-load-start', count: 0, hasContainer: Boolean(dom.startup?.recentList || dom.projectHomeRecentList), containerHidden: Boolean(dom.startup?.recentSection?.hidden && dom.projectHomeRecentSection?.hidden), code: '' });
-    const hasRecentList = (
-      (dom.startup?.recentSection instanceof HTMLElement && dom.startup?.recentList instanceof HTMLElement)
-      || (dom.projectHomeRecentSection instanceof HTMLElement && dom.projectHomeRecentList instanceof HTMLElement)
-    );
-    if (!hasRecentList) {
-      // The editor deliberately has no local-project list. Project browsing
-      // lives in PiXiEED My Page, so a missing list is an expected UI shape,
-      // not a storage failure.
-      console.info('[pixiedraw:recent-projects]', { phase: 'recent-projects-load-skipped', count: recentProjectsCache.size, hasContainer: false, containerHidden: true, code: 'RECENT_UI_REMOVED' });
-      return;
-    }
+    console.info('[pixiedraw:recent-projects]', { phase: 'recent-projects-load-start', count: 0, code: '' });
     if (!AUTOSAVE_SUPPORTED) {
       recentProjectsCache.clear();
-      [dom.startup?.recentList, dom.projectHomeRecentList].forEach(list => {
-        if (list instanceof HTMLElement) {
-          list.innerHTML = '';
-        }
-      });
-      if (dom.startup?.recentSection instanceof HTMLElement) {
-        dom.startup.recentSection.hidden = true;
-      }
       renderRecentProjectsList([]);
-      console.info('[pixiedraw:recent-projects]', { phase: 'recent-projects-load-success', count: 0, hasContainer: true, containerHidden: true, code: 'AUTOSAVE_UNSUPPORTED' });
+      console.info('[pixiedraw:recent-projects]', { phase: 'recent-projects-load-success', count: 0, code: 'AUTOSAVE_UNSUPPORTED' });
       return;
     }
     if (options?.syncSharedFromAccount !== false) {
@@ -804,7 +572,7 @@
     const shouldSanitize = options?.sanitize !== false;
     if (shouldSanitize) {
       await sanitizeRecentProjectsStore({ announce: false });
-      console.info('[pixiedraw:recent-projects]', { phase: 'recent-projects-load-success', count: recentProjectsCache.size, hasContainer: true, containerHidden: Boolean(dom.startup?.recentSection?.hidden), code: 'SANITIZED' });
+      console.info('[pixiedraw:recent-projects]', { phase: 'recent-projects-load-success', count: recentProjectsCache.size, code: 'SANITIZED' });
       return;
     }
     const entries = await loadRecentProjectsMetadata();
@@ -813,7 +581,7 @@
       await saveRecentProjectsList(entries, limitedEntries);
     }
     setRecentProjectsCache(limitedEntries);
-    console.info('[pixiedraw:recent-projects]', { phase: 'recent-projects-load-success', count: limitedEntries.length, hasContainer: true, containerHidden: Boolean(dom.startup?.recentSection?.hidden), code: '' });
+    console.info('[pixiedraw:recent-projects]', { phase: 'recent-projects-load-success', count: limitedEntries.length, code: '' });
   }
 
 

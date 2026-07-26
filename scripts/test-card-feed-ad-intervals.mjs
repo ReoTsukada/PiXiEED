@@ -14,7 +14,9 @@ assert.match(market, /\(index \+ 1\) % 8 !== 0/);
 assert.doesNotMatch(market, /children\.splice\(8/);
 assert.match(pixfind, /\(idx \+ 1\) % 8 === 0/);
 assert.doesNotMatch(pixfind, /idx === 7/);
-assert.match(drawRecent, /\(index \+ 1\) % 8 === 0/);
+// PiXiEEDraw now renders project cards only in the startup workspace. The
+// retired duplicate recent-project renderer intentionally has no ad cadence.
+assert.doesNotMatch(drawRecent, /\(index \+ 1\) % 8 === 0/);
 assert.doesNotMatch(drawRecent, /index === 3/);
 assert.match(drawStartup, /\(visibleIndex \+ 1\) % 8 === 0/);
 assert.doesNotMatch(drawStartup, /visibleIndex === 3/);

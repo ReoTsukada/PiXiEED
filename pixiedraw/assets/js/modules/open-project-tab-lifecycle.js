@@ -96,57 +96,19 @@
     }
 
     function setProjectHomeVisible(nextVisible = true, { refresh = false } = {}) {
-      const screen = dom.projectHomeScreen;
-      if (nextVisible && !(screen instanceof HTMLElement)) {
-        setProjectHomeVisibleState?.(false);
-        document.body.classList.remove('is-project-home-active');
-        showStartupScreen?.({ refreshWorkspace: refresh });
-        return;
-      }
-      setProjectHomeVisibleState?.(Boolean(nextVisible));
-      const projectHomeVisible = Boolean(getProjectHomeVisible?.());
-      if (screen instanceof HTMLElement) {
-        screen.hidden = !projectHomeVisible;
-        screen.setAttribute('aria-hidden', projectHomeVisible ? 'false' : 'true');
-      }
-      document.body.classList.toggle('is-project-home-active', projectHomeVisible);
+      setProjectHomeVisibleState?.(false);
+      document.body.classList.remove('is-project-home-active');
       renderOpenProjectTabs?.();
-      if (projectHomeVisible) {
-        updateQrEditPanel?.();
-      } else {
-        syncQrEditModeWithActivePayload?.();
-      }
-      if (!projectHomeVisible) {
-        return;
-      }
-      window.requestAnimationFrame(() => {
-        screen?.focus?.({ preventScroll: true });
-      });
+      syncQrEditModeWithActivePayload?.();
+      if (nextVisible) showStartupScreen?.({ refreshWorkspace: refresh });
     }
 
     function showProjectHomeScreen(options = {}) {
-      if (!(dom.projectHomeScreen instanceof HTMLElement)) {
-        showStartupScreen?.({ refreshWorkspace: options?.refresh !== false });
-        return;
-      }
-      if (getStartupVisible?.()) {
-        hideStartupScreen?.();
-      }
-      setProjectHomeVisible(true, {
-        refresh: options?.refresh !== false,
-      });
+      showStartupScreen?.({ refreshWorkspace: options?.refresh !== false });
     }
 
     function hideProjectHomeScreen() {
-      const screen = dom?.projectHomeScreen;
-      const visiblyOpen = screen instanceof HTMLElement && screen.hidden === false;
-      const classStillActive = document.body?.classList.contains('is-project-home-active') === true;
-      // A startup transition or interstitial can leave the home DOM visible
-      // after its state flag changed. Clear the actual layer as well, or it
-      // continues to sit above project tabs and intercepts their clicks.
-      if (!getProjectHomeVisible?.() && !visiblyOpen && !classStillActive) {
-        return;
-      }
+      if (!getProjectHomeVisible?.() && !document.body?.classList.contains('is-project-home-active')) return;
       setProjectHomeVisible(false);
     }
 

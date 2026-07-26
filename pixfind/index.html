@@ -442,6 +442,20 @@
 </form>
 </div>
 </div>
+<div aria-hidden="true" class="completion-overlay creator-complete-overlay" hidden="" id="creatorCompleteOverlay" inert="">
+<section aria-labelledby="creatorCompleteTitle" class="creator-complete-panel" role="dialog" aria-modal="true">
+<button aria-label="閉じる" class="creator-complete-panel__close" id="creatorCompleteClose" type="button">×</button>
+<div class="creator-complete-panel__hero" aria-hidden="true"><span>✓</span></div>
+<div class="creator-complete-panel__body">
+<p class="creator-complete-panel__eyebrow">YOUR PUZZLE IS LIVE</p>
+<h2 id="creatorCompleteTitle">作成しました！</h2>
+<p class="creator-complete-panel__message"><strong id="creatorCompletePuzzleTitle">カスタムパズル</strong>を公開しました。みんなにシェアして、さっそく遊んでみましょう。</p>
+<div class="creator-complete-panel__preview"><img alt="公開した問題のプレビュー" id="creatorCompletePreview"/><div><span id="creatorCompleteMode">間違い探し</span><strong id="creatorCompleteCount">0 箇所</strong></div></div>
+<div class="creator-complete-panel__actions"><button class="button button--primary" id="creatorCompletePlay" type="button">この問題で遊ぶ</button><button class="button button--outline" id="creatorCompleteShare" type="button">シェアする</button><button class="button button--ghost" id="creatorCompleteCopy" type="button">リンクをコピー</button></div>
+<div class="creator-complete-panel__secondary-actions"><button class="button button--ghost button--compact" id="creatorCompleteCreateAnother" type="button">続けて作る</button><button class="button button--ghost button--compact" id="creatorCompleteCatalog" type="button">問題一覧へ</button></div>
+</div>
+</section>
+</div>
 <div aria-hidden="true" class="completion-overlay" id="completionOverlay" inert="">
 <section aria-labelledby="resultTitle" class="result-panel" role="dialog">
 <p class="result-panel__eyebrow">PUZZLE COMPLETE</p>
@@ -465,7 +479,7 @@
 </div>
 <script defer="" src="assets/puzzles/manifest.js"></script>
 <script src="../scripts/creator-play-rewards.js?v=2026.07.19-play-rewards1"></script>
-<script defer="" src="app.js?v=20260726-post-edit1"></script>
+<script defer="" src="app.js?v=20260726-creator-complete-panel1"></script>
 <script src="../scripts/shared-profile-header.js"></script>
 <script data-pixieed-footer-ad="false" src="../scripts/shared-bottom-nav.js?v=20260724-fullscreen-icons2"></script>
 <script src="../scripts/pixel-art-fit.js"></script>

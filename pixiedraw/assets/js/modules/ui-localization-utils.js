@@ -563,9 +563,8 @@
       setLocalizedTextContent('#showLocalProjects', 'プロジェクト一覧', 'Projects');
       setLocalizedTextContent('#exportProject', '出力設定を開く', 'Open Export Settings');
       setLocalizedTextContent('#clearCanvas', 'キャンバスをクリア', 'Clear Canvas');
-      setLocalizedTextContent('.file-panel-summary .help-text:nth-child(1)', '描画は端末内V2へ自動保存し、10操作ごとに差分をチェックポイントへ統合します。', 'Drawing changes are autosaved to on-device V2 storage and compacted into a checkpoint every 10 operations.');
+      setLocalizedTextContent('.file-panel-summary .help-text:nth-child(1)', '描画内容はこの端末に自動保存されます。', 'Drawing changes are autosaved on this device.');
       setLocalizedTextContent('.file-panel-summary .help-text:nth-child(2)', '外部ファイルへは自動出力しません。画像・GIF・PiXiEEDraw形式は出力パネルからダウンロードします。', 'Files are never exported automatically. Download images, GIFs, and PiXiEEDraw files from the Export panel.');
-      setLocalizedTextContent('label[for="toggleAutosaveRequired"] span', '端末内V2自動保存（常時ON）', 'On-device V2 autosave (Always ON)');
       setLocalizedTextContent('#timelapseSectionTitle', 'タイムラプス', 'Timelapse');
       setLocalizedTextContent('#timelapseClear', '記録クリア', 'Clear Record');
       setLocalizedControlLabel('timelapseFps', '再生FPS', 'Playback FPS');

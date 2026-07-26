@@ -2120,16 +2120,6 @@
       });
     }
 
-    dom.controls.togglePixfindMode?.addEventListener('change', event => {
-      if (!(event.target instanceof HTMLInputElement)) {
-        return;
-      }
-      const accepted = setPixfindModeEnabled(Boolean(event.target.checked));
-      if (!accepted) {
-        updatePixfindModeUI();
-      }
-    });
-
     dom.controls.openShortcutHelp?.addEventListener('click', () => {
       openShortcutHelpDialog();
     });

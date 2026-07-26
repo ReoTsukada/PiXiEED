@@ -24,9 +24,9 @@ assert.doesNotMatch(lensIndex, /id="updateToast"|id="updateToastCloseBtn"|class=
 for (const html of [index]) {
   assert.match(html, /id="stage" tabindex="-1"/);
 }
-assert.match(index, /startup-workflow-utils\.js\?v=20260720-pxd1/);
+assert.match(index, /startup-workflow-utils\.js\?v=20260726-workspace-project-actions1/);
 assert.match(index, /document-model\.js\?v=20260724-legacy-cow-migration1/);
-assert.match(index, /app\.js\?v=20260724-161-legacy-project-reopen-notice1/);
+assert.match(index, /app\.js\?v=20260726-project-card-actions2/);
 assert.match(index, /timeline-layers\.js\?v=20260724-timeline-tap-sync10/);
 assert.match(index, /retired-collaboration-compat\.js\?v=20260724-timeline-selection2/);
 for (const source of [startup]) {

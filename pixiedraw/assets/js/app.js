@@ -143,11 +143,6 @@
     canvasResizeHandleStart: document.getElementById('canvasResizeHandleStart'),
     canvasResizeHandleCorner: document.getElementById('canvasResizeHandleCorner'),
     editorCommandLaneActions: document.getElementById('editorCommandLaneActions'),
-    projectHomeScreen: document.getElementById('projectHomeScreen'),
-    projectHomeNew: document.getElementById('projectHomeNew'),
-    projectHomeOpen: document.getElementById('projectHomeOpen'),
-    projectHomeRecentSection: document.getElementById('projectHomeRecentProjects'),
-    projectHomeRecentList: document.getElementById('projectHomeRecentList'),
     mirrorToolPopover: document.getElementById('mirrorToolPopover'),
     mirrorGuides: document.getElementById('mirrorGuides'),
     mirrorGuideLines: Array.from(document.querySelectorAll('.mirror-guide[data-mirror-axis]')),
@@ -360,9 +355,6 @@
       openDocument: document.getElementById('openDocument'),
       showLocalProjects: document.getElementById('showLocalProjects'),
       exportProject: document.getElementById('exportProject'),
-      togglePixfindMode: document.getElementById('togglePixfindMode'),
-      togglePixfindHelp: document.getElementById('togglePixfindHelp'),
-      pixfindHelpText: document.getElementById('pixfindHelpText'),
       toggleLanguageMode: document.getElementById('toggleLanguageMode'),
       operationHelpDialog: document.getElementById('operationHelpDialog'),
       openOperationHelpPanel: document.getElementById('openOperationHelpPanel'),
@@ -513,10 +505,6 @@
       workspaceStatus: document.getElementById('startupWorkspaceStatus'),
       workspaceSearch: document.getElementById('startupWorkspaceSearch'),
       workspaceProjectList: document.getElementById('startupWorkspaceProjectList'),
-      recentSection: document.getElementById('startupRecentProjects'),
-      recentList: document.getElementById('startupRecentList'),
-      recentAdContainer: document.getElementById('startupRecentAdContainer'),
-      recentAdSlot: document.getElementById('startupRecentAdSlot'),
     },
     newProject: {
       button: document.getElementById('newProject'),
@@ -5190,8 +5178,6 @@
   set setupPaletteActionMenus(value) { setupPaletteActionMenus = value; },
   get setupPaletteEditor() { return setupPaletteEditor; },
   set setupPaletteEditor(value) { setupPaletteEditor = value; },
-  get setupProjectHomeScreen() { return setupProjectHomeScreen; },
-  set setupProjectHomeScreen(value) { setupProjectHomeScreen = value; },
   get setupQrEditModeControls() { return setupQrEditModeControls; },
   set setupQrEditModeControls(value) { setupQrEditModeControls = value; },
   get setupRecentProjectDeleteConfirmDialog() { return setupRecentProjectDeleteConfirmDialog; },
@@ -6565,6 +6551,8 @@
   set ensureSharedProjectBackendSession(value) { ensureSharedProjectBackendSession = value; },
   get ensureTimelapseStartCapture() { return ensureTimelapseStartCapture; },
   set ensureTimelapseStartCapture(value) { ensureTimelapseStartCapture = value; },
+  get exportProjectToPixfind() { return exportProjectToPixfind; },
+  set exportProjectToPixfind(value) { exportProjectToPixfind = value; },
   get extractDocumentBaseName() { return extractDocumentBaseName; },
   set extractDocumentBaseName(value) { extractDocumentBaseName = value; },
   get getCurrentSharedRecentProjectEntry() { return getCurrentSharedRecentProjectEntry; },
@@ -6707,6 +6695,8 @@
   set setNewProjectPalettePresetPickerOpen(value) { setNewProjectPalettePresetPickerOpen = value; },
   get setProjectHomeVisible() { return setProjectHomeVisible; },
   set setProjectHomeVisible(value) { setProjectHomeVisible = value; },
+  get setPixfindModeEnabled() { return setPixfindModeEnabled; },
+  set setPixfindModeEnabled(value) { setPixfindModeEnabled = value; },
   get setRecentProjectsCache() { return setRecentProjectsCache; },
   set setRecentProjectsCache(value) { setRecentProjectsCache = value; },
   get setStartupProgressLabel() { return setStartupProgressLabel; },
@@ -8825,8 +8815,8 @@
 
   function refreshProjectFileStatus() {
     updateProjectFileStatus(hasDocumentUnsavedChanges?.()
-      ? '端末内V2へ自動保存中・ファイルは手動ダウンロード'
-      : '端末内V2へ保存済み・ファイルは手動ダウンロード');
+      ? '端末内へ自動保存中・ファイルは手動ダウンロード'
+      : '端末内へ保存済み・ファイルは手動ダウンロード');
   }
 
   function announceProjectFileCommandResult(result) {
@@ -16078,10 +16068,6 @@
     return startupWorkflowUtilsModule.hideStartupScreen(...args);
   }
 
-  function setupProjectHomeScreen(...args) {
-    return startupWorkflowUtilsModule.setupProjectHomeScreen(...args);
-  }
-
   async function maybeRestoreAutosaveProjectOnStartup(...args) {
     return startupWorkflowUtilsModule.maybeRestoreAutosaveProjectOnStartup(...args);
   }
@@ -20390,8 +20376,6 @@
         bottomTimelineHeight: normalizeBottomTimelineHeight(bottomTimelineSizing.height),
         mobileDrawerMode: normalizeMobileDrawerMode(mobileDrawerState.mode),
         documentName: state.documentName,
-        pixfindMode: Boolean(pixfindModeEnabled),
-        pixfindModeFirstEnableConfirmed: Boolean(pixfindModeFirstEnableConfirmed),
         exportIncludeOriginalSize: Boolean(exportIncludeOriginalSize),
         exportSaveProjectCompanion: Boolean(exportSaveProjectCompanion),
         exportSaveSpriteMapCompanion: Boolean(exportSaveSpriteMapCompanion),
@@ -20593,14 +20577,6 @@
     }
     if (typeof payload.documentName === 'string') {
       state.documentName = normalizeDocumentName(payload.documentName);
-    }
-    if (typeof payload.pixfindMode === 'boolean') {
-      pixfindModeEnabled = payload.pixfindMode;
-    }
-    if (typeof payload.pixfindModeFirstEnableConfirmed === 'boolean') {
-      pixfindModeFirstEnableConfirmed = payload.pixfindModeFirstEnableConfirmed;
-    } else if (pixfindModeEnabled) {
-      pixfindModeFirstEnableConfirmed = true;
     }
     if (typeof payload.exportIncludeOriginalSize === 'boolean') {
       exportIncludeOriginalSize = payload.exportIncludeOriginalSize;
@@ -27331,7 +27307,6 @@
       console.info('[pixiedraw:startup]', { phase: 'startup-workflows-created' });
       updateDocumentMetadata();
       setupStartupScreen();
-      setupProjectHomeScreen();
       console.info('[pixiedraw:startup]', { phase: 'startup-listeners-bound' });
       hydratePixieedAccountFromLocalCache();
       void initPixieedAccount().catch(error => {

@@ -395,6 +395,33 @@
     });
   }
 
+  async function openRecentProjectForPixfind(entry, actionButton) {
+    if (!entry?.id || !(actionButton instanceof HTMLButtonElement)) return;
+    actionButton.disabled = true;
+    try {
+      const opened = await openRecentProject(entry, {
+        hideStartup: false,
+        replaceOpenProjectTabs: true,
+      });
+      if (!opened) {
+        setProjectHomeVisible(true, { refresh: false });
+        return;
+      }
+      hideProjectHomeScreen();
+      exportProjectToPixfind();
+    } finally {
+      actionButton.disabled = false;
+    }
+  }
+
+  function openRecentProjectMarket(entry) {
+    if (!entry?.id) return;
+    const url = new URL('../market/sell.html', window.location.href);
+    url.searchParams.set('source', 'pixiedraw');
+    url.searchParams.set('project', entry.id);
+    window.location.assign(url.href);
+  }
+
   function openShareStartConfirmDialog() {
     return new Promise(resolve => {
       if (!SHARED_PROJECTS_ENABLED) {
@@ -938,7 +965,7 @@
     }
     if (savedImmediately) {
       updateAutosaveStatus(
-        localizeText('自動保存: 新規プロジェクトを端末内V2へ保存しました', 'Autosave: saved the new project to on-device V2 storage'),
+        localizeText('自動保存: 新規プロジェクトを端末内へ保存しました', 'Autosave: saved the new project on this device'),
         'success'
       );
     } else if (AUTOSAVE_SUPPORTED) {
@@ -1088,14 +1115,7 @@
   }
 
   function queueStartupRecentAdRender() {
-    const adTargets = [
-      {
-        screen: dom.startup?.screen,
-        section: dom.startup?.recentSection,
-        container: dom.startup?.recentAdContainer,
-        slot: dom.startup?.recentAdSlot,
-      },
-    ];
+    const adTargets = [];
     document.querySelectorAll('.startup-recent-card__ad-ins').forEach(slot => {
       const card = slot.closest('.startup-recent-card--ad');
       const section = slot.closest('.startup-screen__recent, .startup-workspace, .project-home-screen__recent');
@@ -1234,160 +1254,6 @@
       lensImportRequested = false;
     }
     setStartupScreenMode(STARTUP_SCREEN_MODE_DEFAULT);
-  }
-
-  function setupProjectHomeScreen() {
-    const screen = dom.projectHomeScreen;
-    if (!(screen instanceof HTMLElement) || screen.dataset.bound === 'true') {
-      return;
-    }
-    screen.dataset.bound = 'true';
-    dom.projectHomeNew?.addEventListener('click', () => {
-      openNewProjectDialog({ dismissStartup: false });
-    });
-    dom.projectHomeOpen?.addEventListener('click', async () => {
-      const opened = await openDocumentDialog({ mode: EXTERNAL_IMPORT_MODE_NEW_PROJECT });
-      if (opened) {
-        hideProjectHomeScreen();
-      }
-    });
-    dom.controls.projectHomeApplyAccessCode?.addEventListener('click', async () => {
-      const openedShared = SHARED_PROJECTS_ENABLED
-        ? await openSharedProjectFromHomeInput()
-        : false;
-      if (openedShared) {
-        return;
-      }
-      updateAutosaveStatus(
-        localizeText('コード適用は現在停止中です。', 'Code application is currently disabled.'),
-        'info'
-      );
-    });
-    dom.projectHomeRecentList?.addEventListener('click', async event => {
-      const target = event.target instanceof Element ? event.target : null;
-      if (!target) {
-        return;
-      }
-      const deleteButton = target.closest('button[data-startup-recent-delete-id]');
-      if (deleteButton instanceof HTMLButtonElement) {
-        event.preventDefault();
-        event.stopPropagation();
-        const projectId = deleteButton.dataset.startupRecentDeleteId || '';
-        if (!projectId) {
-          return;
-        }
-        const entry = recentProjectsCache.get(projectId) || null;
-        const displayLabel = extractDocumentBaseName(entry?.fileName || entry?.name || DEFAULT_DOCUMENT_NAME);
-        const isSharedEntry = isSharedRecentProjectEntry(entry);
-        const ownsSharedProject = isSharedEntry
-          ? await resolveSharedRecentProjectOwnedByCurrentUser(entry)
-          : false;
-        const accepted = await openRecentProjectDeleteConfirmDialog(entry, {
-          deletesOwnedSharedProject: ownsSharedProject,
-        });
-        if (!accepted) {
-          return;
-        }
-        const card = deleteButton.closest('.startup-recent-card');
-        const openButton = card instanceof HTMLElement
-          ? card.querySelector('button[data-startup-recent-open-id]')
-          : null;
-        deleteButton.disabled = true;
-        if (openButton instanceof HTMLButtonElement) {
-          openButton.disabled = true;
-        }
-        try {
-          let deletedSharedProjectBackend = false;
-          if (isSharedEntry && ownsSharedProject) {
-            deletedSharedProjectBackend = await deleteOwnedSharedProjectFromBackend(entry);
-            if (!deletedSharedProjectBackend) {
-              hideSharedProjectFromRecentSync(entry?.sharedProjectKey || '');
-            }
-          }
-          const deletesOwnedSharedProject = isSharedEntry && deletedSharedProjectBackend;
-          if (isSharedEntry && !deletesOwnedSharedProject) {
-            hideSharedProjectFromRecentSync(entry?.sharedProjectKey || '');
-          }
-          const removed = await removeRecentProjectEntry(projectId);
-          if (removed) {
-            if (deletesOwnedSharedProject && isSharedEntry) {
-              await purgeDeletedSharedProjectLocalReferences(entry?.sharedProjectKey || '', projectId);
-            }
-            updateAutosaveStatus(
-              deletesOwnedSharedProject
-                ? localizeText(
-                  `共有プロジェクトを削除しました (${displayLabel})`,
-                  `Deleted shared project (${displayLabel})`
-                )
-                : isSharedEntry
-                  ? localizeText(
-                    `共有プロジェクトを一覧から外しました (${displayLabel})`,
-                    `Removed shared project from list (${displayLabel})`
-                  )
-                  : localizeText(
-                    `端末内プロジェクトを削除しました (${displayLabel})`,
-                    `Deleted local project (${displayLabel})`
-                  ),
-              'info'
-            );
-            if (deletesOwnedSharedProject) {
-              await enforceSharedProjectOwnershipLimit();
-            }
-          } else if (deletesOwnedSharedProject && isSharedEntry) {
-            await purgeDeletedSharedProjectLocalReferences(entry?.sharedProjectKey || '', projectId);
-            await enforceSharedProjectOwnershipLimit();
-          } else if (AUTOSAVE_SUPPORTED) {
-            refreshRecentProjectsUI().catch(error => {
-              console.warn('Failed to refresh recent projects', error);
-            });
-          }
-        } catch (error) {
-          console.warn('Failed to remove recent project', error);
-          updateAutosaveStatus(
-            localizeText(
-              '端末内プロジェクトを削除できませんでした',
-              'Failed to delete local project'
-            ),
-            'error'
-          );
-          deleteButton.disabled = false;
-          if (openButton instanceof HTMLButtonElement) {
-            openButton.disabled = false;
-          }
-        }
-        return;
-      }
-
-      const openButton = target.closest('button[data-startup-recent-open-id]');
-      if (!(openButton instanceof HTMLButtonElement)) {
-        return;
-      }
-      const projectId = openButton.dataset.startupRecentOpenId || '';
-      const entry = projectId ? recentProjectsCache.get(projectId) : null;
-      if (!entry) {
-        if (AUTOSAVE_SUPPORTED) {
-          refreshRecentProjectsUI().catch(error => {
-            console.warn('Failed to refresh recent projects', error);
-          });
-        }
-        return;
-      }
-      openButton.disabled = true;
-      // Keep the current project alive until the selected recent project has
-      // actually been decoded. `openRecentProject` replaces the tab set only
-      // after a successful load, so a corrupt/missing V2 record cannot leave
-      // the user with an empty editor.
-      const success = await openRecentProject(entry, {
-        hideStartup: false,
-        replaceOpenProjectTabs: true,
-      });
-      if (success) {
-        hideProjectHomeScreen();
-      } else {
-        openButton.disabled = false;
-        setProjectHomeVisible(true, { refresh: false });
-      }
-    });
   }
 
   async function maybeRestoreAutosaveProjectOnStartup() {
@@ -1628,19 +1494,21 @@
     }
     visibleEntries.forEach((entry, visibleIndex) => {
       const entryIndex = startupWorkspaceEntries.indexOf(entry);
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'startup-workspace__project';
-      button.dataset.workspaceProjectIndex = String(entryIndex);
-      button.setAttribute('role', 'listitem');
+      const card = document.createElement('article');
+      card.className = 'startup-workspace__project';
+      card.setAttribute('role', 'listitem');
+      const openButton = document.createElement('button');
+      openButton.type = 'button';
+      openButton.className = 'startup-workspace__project-open';
+      openButton.dataset.workspaceProjectOpenIndex = String(entryIndex);
       if (entry?.deviceLocalProject !== true && entry?.migrationRecovery !== true && Number(entry?.size) === 0) {
-        button.title = localizeText(
+        openButton.title = localizeText(
           'このファイルは0バイトのため開けません。端末内の元データが残っている場合は「V2移行待ち」のカードから復旧してください。ファイルは自動削除しません。',
           'This file is empty and cannot be opened. If the original on-device data remains, recover it from the "Awaiting V2 migration" card. The file will not be deleted automatically.'
         );
       }
       if (entry?.migrationRecovery === true) {
-        button.title = localizeText(
+        openButton.title = localizeText(
           `V2移行を完了できませんでした。元データは削除されていません。\n${entry?.migrationErrorCode || ''}: ${entry?.migrationErrorMessage || ''}`,
           `V2 migration could not be completed. The original data was not deleted.\n${entry?.migrationErrorCode || ''}: ${entry?.migrationErrorMessage || ''}`
         );
@@ -1680,24 +1548,48 @@
         : entry?.deviceLocalProject === true
           ? `${modified} / ${localizeText('端末内保存', 'On-device storage')}`
           : modified;
-      const certification = document.createElement('span');
-      certification.className = entry?.migrationRecovery === true
-        ? 'startup-workspace__project-certification is-recovery'
-        : 'startup-workspace__project-certification is-local';
-      certification.textContent = entry?.migrationRecovery === true
-        ? localizeText('復旧して開く', 'Open for recovery')
-        : (Number(entry?.autosaveSchemaVersion) === 2
-            ? localizeText('端末内V2', 'On-device V2')
-            : localizeText('端末内プロジェクト', 'On-device project'));
-      certification.setAttribute('aria-label', entry?.migrationRecovery === true
-        ? localizeText('端末内の元データを保持しています。開いて復旧できます。', 'The original on-device data is retained and can be opened for recovery.')
-        : localizeText(
-          'このブラウザの端末内保存から開けます。完全ファイルは手動保存できます。',
-          'This project can be opened from on-device storage. Save a complete file manually when needed.'
-        ));
-      details.append(name, meta, certification);
-      button.append(thumbnail, details);
-      list.appendChild(button);
+      details.append(name, meta);
+      if (entry?.migrationRecovery === true) {
+        const recovery = document.createElement('span');
+        recovery.className = 'startup-workspace__project-certification is-recovery';
+        recovery.textContent = localizeText('復旧して開く', 'Open for recovery');
+        details.appendChild(recovery);
+      }
+      openButton.append(thumbnail, details);
+      card.appendChild(openButton);
+      if (entry?.deviceLocalProject === true) {
+        const actions = document.createElement('div');
+        actions.className = 'startup-workspace__project-actions';
+        const pixfindButton = document.createElement('button');
+        pixfindButton.type = 'button';
+        pixfindButton.className = 'startup-workspace__project-action is-pixfind';
+        pixfindButton.dataset.workspaceProjectPixfindIndex = String(entryIndex);
+        pixfindButton.textContent = localizeText('パズルにする', 'Make a puzzle');
+        const marketButton = document.createElement('button');
+        marketButton.type = 'button';
+        marketButton.className = 'startup-workspace__project-action is-market';
+        marketButton.dataset.workspaceProjectMarketIndex = String(entryIndex);
+        marketButton.textContent = localizeText('販売する', 'Sell');
+        const menuButton = document.createElement('button');
+        menuButton.type = 'button';
+        menuButton.className = 'startup-workspace__project-menu-button';
+        menuButton.dataset.workspaceProjectMenuIndex = String(entryIndex);
+        menuButton.textContent = '…';
+        menuButton.setAttribute('aria-label', localizeText(`${displayName} のその他の操作`, `More actions for ${displayName}`));
+        menuButton.setAttribute('aria-expanded', 'false');
+        const menu = document.createElement('div');
+        menu.className = 'startup-workspace__project-menu';
+        menu.hidden = true;
+        const deleteButton = document.createElement('button');
+        deleteButton.type = 'button';
+        deleteButton.className = 'startup-workspace__project-delete';
+        deleteButton.dataset.workspaceProjectDeleteIndex = String(entryIndex);
+        deleteButton.textContent = localizeText('削除', 'Delete');
+        menu.appendChild(deleteButton);
+        actions.append(pixfindButton, marketButton, menuButton, menu);
+        card.appendChild(actions);
+      }
+      list.appendChild(card);
       if ((visibleIndex + 1) % 8 === 0 && window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.()) {
         const adCard = document.createElement('div');
         adCard.className = 'startup-recent-card--ad startup-recent-ad startup-workspace__ad';
@@ -1874,11 +1766,49 @@
       renderStartupWorkspaceProjects(startupWorkspaceEntries);
     });
     projectList.addEventListener('click', async event => {
-      const target = event.target instanceof Element
-        ? event.target.closest('button[data-workspace-project-index]')
-        : null;
+      const source = event.target instanceof Element ? event.target : null;
+      if (!source) return;
+      const menuButton = source.closest('button[data-workspace-project-menu-index]');
+      if (menuButton instanceof HTMLButtonElement) {
+        const card = menuButton.closest('.startup-workspace__project');
+        const menu = card?.querySelector('.startup-workspace__project-menu');
+        if (menu instanceof HTMLElement) {
+          const willOpen = menu.hidden;
+          projectList.querySelectorAll('.startup-workspace__project-menu').forEach(candidate => {
+            if (candidate instanceof HTMLElement) candidate.hidden = true;
+          });
+          projectList.querySelectorAll('button[data-workspace-project-menu-index]').forEach(candidate => candidate.setAttribute('aria-expanded', 'false'));
+          menu.hidden = !willOpen;
+          menuButton.setAttribute('aria-expanded', String(willOpen));
+        }
+        return;
+      }
+      const pixfindButton = source.closest('button[data-workspace-project-pixfind-index]');
+      if (pixfindButton instanceof HTMLButtonElement) {
+        const entry = startupWorkspaceEntries[Number(pixfindButton.dataset.workspaceProjectPixfindIndex)] || null;
+        if (entry) await openRecentProjectForPixfind(entry, pixfindButton);
+        return;
+      }
+      const marketButton = source.closest('button[data-workspace-project-market-index]');
+      if (marketButton instanceof HTMLButtonElement) {
+        const entry = startupWorkspaceEntries[Number(marketButton.dataset.workspaceProjectMarketIndex)] || null;
+        if (entry) openRecentProjectMarket(entry);
+        return;
+      }
+      const deleteButton = source.closest('button[data-workspace-project-delete-index]');
+      if (deleteButton instanceof HTMLButtonElement) {
+        const entry = startupWorkspaceEntries[Number(deleteButton.dataset.workspaceProjectDeleteIndex)] || null;
+        if (!entry?.id) return;
+        const name = extractDocumentBaseName(entry.fileName || entry.name || DEFAULT_DOCUMENT_NAME);
+        if (!window.confirm(localizeText(`端末内プロジェクト「${name}」を削除しますか？`, `Delete on-device project "${name}"?`))) return;
+        deleteButton.disabled = true;
+        await removeRecentProjectEntry(entry.id);
+        await refreshStartupWorkspaceProjects();
+        return;
+      }
+      const target = source.closest('button[data-workspace-project-open-index]');
       if (!(target instanceof HTMLButtonElement)) return;
-      const entry = startupWorkspaceEntries[Number(target.dataset.workspaceProjectIndex)] || null;
+      const entry = startupWorkspaceEntries[Number(target.dataset.workspaceProjectOpenIndex)] || null;
       if (entry?.deviceLocalProject !== true && entry?.migrationRecovery !== true) return;
       target.disabled = true;
       try {
@@ -1995,133 +1925,6 @@
     dom.globalLoadingIndicatorCancel?.addEventListener('click', () => {
       cancelStartupRestoreProgress('loading-indicator-cancel');
     });
-    dom.startup?.recentList?.addEventListener('click', async event => {
-      const target = event.target instanceof Element ? event.target : null;
-      if (!target) {
-        return;
-      }
-      const deleteButton = target.closest('button[data-startup-recent-delete-id]');
-      if (deleteButton instanceof HTMLButtonElement) {
-        event.preventDefault();
-        event.stopPropagation();
-        const projectId = deleteButton.dataset.startupRecentDeleteId || '';
-        if (!projectId) {
-          return;
-        }
-        const entry = recentProjectsCache.get(projectId) || null;
-        const displayLabel = extractDocumentBaseName(entry?.fileName || entry?.name || DEFAULT_DOCUMENT_NAME);
-        const isSharedEntry = isSharedRecentProjectEntry(entry);
-        const ownsSharedProject = isSharedEntry
-          ? await resolveSharedRecentProjectOwnedByCurrentUser(entry)
-          : false;
-        const accepted = await openRecentProjectDeleteConfirmDialog(entry, {
-          deletesOwnedSharedProject: ownsSharedProject,
-        });
-        if (!accepted) {
-          return;
-        }
-        const card = deleteButton.closest('.startup-recent-card');
-        const openButton = card instanceof HTMLElement
-          ? card.querySelector('button[data-startup-recent-open-id]')
-          : null;
-        deleteButton.disabled = true;
-        if (openButton instanceof HTMLButtonElement) {
-          openButton.disabled = true;
-        }
-        try {
-          let deletedSharedProjectBackend = false;
-          if (isSharedEntry && ownsSharedProject) {
-            deletedSharedProjectBackend = await deleteOwnedSharedProjectFromBackend(entry);
-            if (!deletedSharedProjectBackend) {
-              hideSharedProjectFromRecentSync(entry?.sharedProjectKey || '');
-            }
-          }
-          const deletesOwnedSharedProject = isSharedEntry && deletedSharedProjectBackend;
-          if (isSharedEntry && !deletesOwnedSharedProject) {
-            hideSharedProjectFromRecentSync(entry?.sharedProjectKey || '');
-          }
-          const removed = await removeRecentProjectEntry(projectId);
-          if (removed) {
-            if (deletesOwnedSharedProject && isSharedEntry) {
-              await purgeDeletedSharedProjectLocalReferences(entry?.sharedProjectKey || '', projectId);
-            }
-            updateAutosaveStatus(
-              deletesOwnedSharedProject
-                ? localizeText(
-                  `共有プロジェクトを削除しました (${displayLabel})`,
-                  `Deleted shared project (${displayLabel})`
-                )
-                : isSharedEntry
-                  ? localizeText(
-                    `共有プロジェクトを一覧から外しました (${displayLabel})`,
-                    `Removed shared project from list (${displayLabel})`
-                  )
-                : localizeText(
-                  `端末内プロジェクトを削除しました (${displayLabel})`,
-                  `Deleted local project (${displayLabel})`
-                ),
-              'info'
-            );
-            if (deletesOwnedSharedProject) {
-              await enforceSharedProjectOwnershipLimit();
-            }
-          } else if (deletesOwnedSharedProject && isSharedEntry) {
-            await purgeDeletedSharedProjectLocalReferences(entry?.sharedProjectKey || '', projectId);
-            await enforceSharedProjectOwnershipLimit();
-          } else if (AUTOSAVE_SUPPORTED) {
-            refreshRecentProjectsUI().catch(error => {
-              console.warn('Failed to refresh recent projects', error);
-            });
-          }
-        } catch (error) {
-          console.warn('Failed to remove recent project', error);
-          updateAutosaveStatus(
-            localizeText(
-              '端末内プロジェクトを削除できませんでした',
-              'Failed to delete local project'
-            ),
-            'error'
-          );
-          deleteButton.disabled = false;
-          if (openButton instanceof HTMLButtonElement) {
-            openButton.disabled = false;
-          }
-        }
-        return;
-      }
-
-      const openButton = target.closest('button[data-startup-recent-open-id]');
-      if (!(openButton instanceof HTMLButtonElement)) {
-        return;
-      }
-      const projectId = openButton.dataset.startupRecentOpenId || '';
-      const entry = projectId ? recentProjectsCache.get(projectId) : null;
-      if (!entry) {
-        if (AUTOSAVE_SUPPORTED) {
-          refreshRecentProjectsUI().catch(error => {
-            console.warn('Failed to refresh recent projects', error);
-          });
-        }
-        return;
-      }
-      openButton.disabled = true;
-      const closedCurrentProject = await closeAllOpenProjectTabsForProjectReplacement({ flushAutosave: true, showHome: false });
-      if (!closedCurrentProject) {
-        openButton.disabled = false;
-        updateAutosaveStatus(
-          localizeText('現在のプロジェクトを保存できなかったため、切り替えを中止しました', 'Project switch was canceled because the current project could not be saved'),
-          'error'
-        );
-        return;
-      }
-      const success = await openRecentProject(entry, { hideStartup: true, silent: true });
-      if (!success) {
-        openButton.disabled = false;
-      }
-    });
-    if (dom.startup?.recentSection) {
-      dom.startup.recentSection.hidden = true;
-    }
   }
 
 
@@ -2161,7 +1964,6 @@
         showStartupScreen,
         queueStartupRecentAdRender,
         hideStartupScreen,
-        setupProjectHomeScreen,
         maybeRestoreAutosaveProjectOnStartup,
         maybeRestoreSharedProjectOnStartup,
         hasSeenUpdateToast,

@@ -4,10 +4,11 @@ import { readFile } from 'node:fs/promises';
 const root = new URL('../', import.meta.url);
 const read = (path) => readFile(new URL(path, root), 'utf8');
 
-const [index, css, recentProjects, sharedTopAd, sharedTabBar] = await Promise.all([
+const [index, css, recentProjects, startupWorkflow, sharedTopAd, sharedTabBar] = await Promise.all([
   read('pixiedraw/index.html'),
   read('pixiedraw/assets/css/style.css'),
   read('pixiedraw/assets/js/modules/recent-project-workflow-utils.js'),
+  read('pixiedraw/assets/js/modules/startup-workflow-utils.js'),
   read('scripts/bottom-nav-footer-ad.js'),
   read('scripts/shared-tab-bar.js'),
 ]);
@@ -48,9 +49,10 @@ assert.doesNotMatch(sharedTabBar, /\.pixieed-common-details__ad\{[^}]*aspect-rat
 assert.doesNotMatch(sharedTabBar, /\.pixieed-common-details__ad ins\.adsbygoogle iframe\{[^}]*height:100%/);
 
 assert.doesNotMatch(recentProjects, /PiXiEEDを支援|Supports PiXiEED/);
-assert.match(recentProjects, /\(index \+ 1\) % 8 === 0/);
-assert.doesNotMatch(recentProjects, /index === 3/);
-assert.match(recentProjects, /startup-recent-ad/);
-assert.match(recentProjects, /data-full-width-responsive', 'true'/);
+assert.doesNotMatch(recentProjects, /\(index \+ 1\) % 8 === 0/);
+assert.match(startupWorkflow, /\(visibleIndex \+ 1\) % 8 === 0/);
+assert.doesNotMatch(startupWorkflow, /visibleIndex === 3/);
+assert.match(startupWorkflow, /startup-recent-ad/);
+assert.match(startupWorkflow, /data-full-width-responsive', 'true'/);
 
 console.log('PiXiEEDraw ad placement guards passed.');

@@ -216,7 +216,7 @@
       return;
     }
 
-    updateAutosaveStatus('自動保存: 端末内V2を確認中…');
+    updateAutosaveStatus('自動保存: 端末内保存を確認中…');
 
     try {
       const reloadRestoreProjectId = normalizeAutosaveProjectId(
@@ -242,7 +242,7 @@
         updateAutosaveStatus(
           recentEntries.length
             ? '自動保存: 保存済みプロジェクトを選んで開けます'
-            : '自動保存: 新規作成後、端末内V2へ保存します',
+            : '自動保存: 新規作成後、端末内へ保存します',
           'info'
         );
         return;
@@ -257,7 +257,7 @@
       updateAutosaveStatus(
         recentEntries.length
           ? '自動保存: 保存済みプロジェクトを開けます'
-          : '自動保存: 新規作成後、端末内V2へ保存します',
+          : '自動保存: 新規作成後、端末内へ保存します',
         'info'
       );
     } catch (error) {
@@ -492,7 +492,7 @@
         return true;
       }
 
-      updateAutosaveStatus('自動保存: 端末内V2へ差分保存中…');
+      updateAutosaveStatus('自動保存: 端末内へ保存中…');
       const buildInternalAutosavePayload = (snapshotValue, options = {}) => buildPackagedProjectPayload(
         snapshotValue,
         { ...options, internalBinary: true }
@@ -598,7 +598,7 @@
       pruneInactiveCanvasDirectCaches?.();
       updateAutosaveStatus(
         localizeText(
-          '自動保存: 端末内V2へ保存済み（完全ファイルは手動保存できます）',
+          '自動保存: 端末内へ保存済み（完全ファイルは手動保存できます）',
           'Autosave: saved to on-device V2 storage (complete file can be saved manually)'
         ),
         'success'
@@ -635,7 +635,7 @@
     }
     markAutosaveDirty();
     scheduleAutosaveSnapshot();
-    updateAutosaveStatus('PiXiEELENS の取り込みを端末内V2へ保存します', 'info');
+    updateAutosaveStatus('PiXiEELENS の取り込みを端末内へ保存します', 'info');
   }
 
   return Object.freeze({

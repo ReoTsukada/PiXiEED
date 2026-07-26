@@ -659,8 +659,7 @@
     // Let the browser paint the blocking surface before a large synchronous
     // canvas/ZIP build starts. Without this yield the DOM state changes, but
     // the user never gets a frame in which the loading UI is visible.
-    Promise.resolve()
-      .then(() => new Promise(resolve => window.requestAnimationFrame(resolve)))
+    waitForBlockingLoadingPaint()
       .then(() => action())
       .catch(error => {
         console.warn('Export action failed', error);
@@ -668,6 +667,17 @@
       .finally(() => {
         closeLoading?.();
       });
+  }
+
+  function waitForBlockingLoadingPaint() {
+    // A single rAF runs before the corresponding paint. Two frames guarantee
+    // that the blocking panel is visible before synchronous canvas/ZIP work
+    // can monopolize the main thread.
+    return new Promise(resolve => {
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(resolve);
+      });
+    });
   }
 
   function closeExportInterstitial({ runPendingExport = false } = {}) {
@@ -841,6 +851,9 @@
       && dom.exportDialog?.timelapseToggle instanceof HTMLInputElement
       && dom.exportDialog.timelapseToggle.checked;
     try {
+      // `beginBlockingGlobalLoading()` only changes DOM state. Wait until it
+      // has been painted before starting work that may block the main thread.
+      await waitForBlockingLoadingPaint();
       setGlobalLoadingIndicatorLabel(localizeText('書き出し中…', 'Exporting...'));
       if (normalized !== 'spritemap' && normalized !== 'allzip' && normalized !== 'batchzip' && shouldSaveSpriteMapCompanion(normalized)) {
         await exportProjectAsSpriteMap({

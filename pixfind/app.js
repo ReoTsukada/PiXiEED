@@ -45,6 +45,17 @@ const dom = {
   targetListSecondary: document.getElementById('targetListSecondary'),
   hintMessage: document.getElementById('hintMessage'),
   creatorOverlay: document.getElementById('creatorOverlay'),
+  creatorCompleteOverlay: document.getElementById('creatorCompleteOverlay'),
+  creatorCompleteClose: document.getElementById('creatorCompleteClose'),
+  creatorCompletePuzzleTitle: document.getElementById('creatorCompletePuzzleTitle'),
+  creatorCompletePreview: document.getElementById('creatorCompletePreview'),
+  creatorCompleteMode: document.getElementById('creatorCompleteMode'),
+  creatorCompleteCount: document.getElementById('creatorCompleteCount'),
+  creatorCompletePlay: document.getElementById('creatorCompletePlay'),
+  creatorCompleteShare: document.getElementById('creatorCompleteShare'),
+  creatorCompleteCopy: document.getElementById('creatorCompleteCopy'),
+  creatorCompleteCreateAnother: document.getElementById('creatorCompleteCreateAnother'),
+  creatorCompleteCatalog: document.getElementById('creatorCompleteCatalog'),
   creatorOpenButton: document.getElementById('createButton'),
   catalogCreateButton: document.getElementById('catalogCreateButton'),
   creatorCloseButton: document.getElementById('creatorClose'),
@@ -332,6 +343,8 @@ const creatorState = {
 
 let creatorLastFocused = null;
 let creatorEditPost = null;
+let creatorPublishedPuzzle = null;
+let creatorCompleteLastFocused = null;
 let creatorAnalysisToken = 0;
 let creatorPreviewToken = 0;
 const creatorDroppedFiles = new WeakMap();
@@ -355,6 +368,9 @@ const PUBLISHED_CACHE_KEY = 'pixfind_published_cache';
 const SHARE_QUEUE_KEY = 'pixfind_share_queue';
 const SHARE_QUEUE_LIMIT = 20;
 const PENDING_CREATOR_UPLOAD_KEY = 'pixfind_creator_upload_v1';
+const PENDING_DRAW_TRANSFER_KEY = 'pixfind_creator_transfer_v2';
+const DRAW_TRANSFER_DB = 'pixieed-pixfind-transfer';
+const DRAW_TRANSFER_STORE = 'payloads';
 const PUBLISH_QUEUE_KEY = 'pixfind_publish_queue';
 const PUBLISH_QUEUE_LIMIT = 10;
 const PUBLISH_QUEUE_RETRY_MS = 60000;
@@ -634,6 +650,7 @@ async function init() {
   initializeCanvasInteractions();
   requestAnimationFrame(() => updatePixfindTabBarActions(document.body.dataset.pixfindScreen || 'start'));
   setupCreator();
+  setupCreatorCompletePanel();
   await restorePendingCreatorUpload();
   await openCreatorEditFromUrl();
   if (window.location.hash === '#creator' && !isCreatorOverlayOpen()) {
@@ -663,6 +680,11 @@ async function init() {
       if (isCreatorOverlayOpen()) {
         event.preventDefault();
         closeCreatorOverlay();
+        return;
+      }
+      if (isCreatorCompletePanelOpen()) {
+        event.preventDefault();
+        closeCreatorCompletePanel();
         return;
       }
       if (dom.gameScreen && !dom.gameScreen.hidden) {
@@ -727,6 +749,74 @@ function setupCreator() {
   setupCreatorFileDropzone(dom.creatorDiffDropzone, dom.creatorDiffInput);
 
   resetCreatorForm();
+}
+
+function setupCreatorCompletePanel() {
+  if (!dom.creatorCompleteOverlay) return;
+  dom.creatorCompleteClose?.addEventListener('click', closeCreatorCompletePanel);
+  dom.creatorCompleteOverlay.addEventListener('click', event => {
+    if (event.target === dom.creatorCompleteOverlay) closeCreatorCompletePanel();
+  });
+  dom.creatorCompletePlay?.addEventListener('click', async () => {
+    if (!creatorPublishedPuzzle) return;
+    closeCreatorCompletePanel({ restoreFocus: false });
+    await startOfficialPuzzle(creatorPublishedPuzzle);
+  });
+  dom.creatorCompleteShare?.addEventListener('click', () => creatorPublishedPuzzle && sharePuzzle(creatorPublishedPuzzle));
+  dom.creatorCompleteCopy?.addEventListener('click', copyCreatorPublishedLink);
+  dom.creatorCompleteCreateAnother?.addEventListener('click', () => {
+    closeCreatorCompletePanel({ restoreFocus: false });
+    resetCreatorForm();
+    openCreatorOverlay();
+  });
+  dom.creatorCompleteCatalog?.addEventListener('click', () => {
+    closeCreatorCompletePanel({ restoreFocus: false });
+    setActiveScreen('difficulty');
+  });
+}
+
+function isCreatorCompletePanelOpen() {
+  return Boolean(dom.creatorCompleteOverlay && !dom.creatorCompleteOverlay.hidden);
+}
+
+function openCreatorCompletePanel(puzzle, { isEditing = false } = {}) {
+  if (!dom.creatorCompleteOverlay || !puzzle) return;
+  creatorPublishedPuzzle = puzzle;
+  creatorCompleteLastFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const targetCount = isHiddenObjectMode(puzzle.mode) ? normalizePuzzleTargets(puzzle.targets).length : 0;
+  dom.creatorCompletePuzzleTitle.textContent = puzzle.label || 'カスタムパズル';
+  dom.creatorCompleteMode.textContent = getGameModeMeta(puzzle.mode).label;
+  dom.creatorCompleteCount.textContent = targetCount ? `${targetCount} 個の探し物` : `難易度 ${createStarLabel(puzzle.difficulty)}`;
+  dom.creatorCompletePreview.src = puzzle.thumbnail || puzzle.diff || puzzle.original || PUZZLE_PLACEHOLDER_DATA_URL;
+  if (dom.creatorCompleteCopy) dom.creatorCompleteCopy.textContent = 'リンクをコピー';
+  dom.creatorCompleteOverlay.querySelector('#creatorCompleteTitle').textContent = isEditing ? '更新しました！' : '作成しました！';
+  dom.creatorCompleteOverlay.hidden = false;
+  dom.creatorCompleteOverlay.inert = false;
+  dom.creatorCompleteOverlay.setAttribute('aria-hidden', 'false');
+  requestAnimationFrame(() => dom.creatorCompleteOverlay?.classList.add('is-visible'));
+  dom.creatorCompletePlay?.focus();
+}
+
+function closeCreatorCompletePanel({ restoreFocus = true } = {}) {
+  if (!dom.creatorCompleteOverlay) return;
+  dom.creatorCompleteOverlay.classList.remove('is-visible');
+  dom.creatorCompleteOverlay.hidden = true;
+  dom.creatorCompleteOverlay.inert = true;
+  dom.creatorCompleteOverlay.setAttribute('aria-hidden', 'true');
+  if (restoreFocus && creatorCompleteLastFocused?.isConnected) creatorCompleteLastFocused.focus();
+  creatorCompleteLastFocused = null;
+}
+
+async function copyCreatorPublishedLink() {
+  if (!creatorPublishedPuzzle) return;
+  const shareMessage = `${createShareUrl(creatorPublishedPuzzle)}\n${SHARE_HASHTAG}`;
+  try {
+    if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable');
+    await navigator.clipboard.writeText(shareMessage);
+    if (dom.creatorCompleteCopy) dom.creatorCompleteCopy.textContent = 'コピーしました！';
+  } catch (_) {
+    window.prompt('共有リンクをコピーしてください。', shareMessage);
+  }
 }
 
 function setupCreatorFileDropzone(dropzone, input) {
@@ -887,27 +977,66 @@ function resetCreatorForm() {
   updateCreatorPublishAvailability();
 }
 
+async function takePendingDrawTransfer() {
+  let transferRef;
+  try {
+    transferRef = JSON.parse(localStorage.getItem(PENDING_DRAW_TRANSFER_KEY) || 'null');
+    localStorage.removeItem(PENDING_DRAW_TRANSFER_KEY);
+  } catch (error) {
+    return null;
+  }
+  if (!transferRef?.id || !window.indexedDB) return null;
+  return await new Promise(resolve => {
+    const request = window.indexedDB.open(DRAW_TRANSFER_DB, 1);
+    request.onerror = () => resolve(null);
+    request.onsuccess = () => {
+      const transaction = request.result.transaction(DRAW_TRANSFER_STORE, 'readwrite');
+      const store = transaction.objectStore(DRAW_TRANSFER_STORE);
+      const getRequest = store.get(transferRef.id);
+      getRequest.onerror = () => resolve(null);
+      getRequest.onsuccess = () => {
+        const payload = getRequest.result || null;
+        if (payload) store.delete(transferRef.id);
+        resolve(payload);
+      };
+    };
+  });
+}
+
 async function restorePendingCreatorUpload() {
   let payload;
+  let transferredImages = null;
   try {
-    const raw = localStorage.getItem(PENDING_CREATOR_UPLOAD_KEY);
-    if (!raw) return;
-    localStorage.removeItem(PENDING_CREATOR_UPLOAD_KEY);
-    payload = JSON.parse(raw);
+    const transfer = await takePendingDrawTransfer();
+    if (Array.isArray(transfer?.imageBlobs) && transfer.imageBlobs.every(blob => blob instanceof Blob)) {
+      payload = transfer.metadata || {};
+      transferredImages = transfer.imageBlobs.map((blob, index) => new File(
+        [blob],
+        `pixieedraw-artwork-${index + 1}.png`,
+        { type: 'image/png' }
+      ));
+    } else {
+      const raw = localStorage.getItem(PENDING_CREATOR_UPLOAD_KEY);
+      if (!raw) return;
+      localStorage.removeItem(PENDING_CREATOR_UPLOAD_KEY);
+      payload = JSON.parse(raw);
+    }
   } catch (error) {
     console.warn('pending creator upload parse failed', error);
     return;
   }
   const originalDataUrl = payload?.originalDataUrl;
   const diffDataUrl = payload?.diffDataUrl;
-  if (!originalDataUrl || !diffDataUrl) return;
+  const isHiddenObjectUpload = normalizeGameMode(payload?.mode) === GAME_MODE_HIDDEN_OBJECT;
+  if (!originalDataUrl && !transferredImages?.[0]) return;
   const suffix = payload?.canvasSize ? `${payload.canvasSize}px` : 'image';
-  const [originalFile, diffFile] = await Promise.all([
-    dataUrlToFile(originalDataUrl, `pixfind-${suffix}-original.png`),
-    dataUrlToFile(diffDataUrl, `pixfind-${suffix}-diff.png`),
-  ]);
-  if (!originalFile || !diffFile) return;
+  const originalFile = transferredImages?.[0] || await dataUrlToFile(originalDataUrl, `pixfind-${suffix}-original.png`);
+  const diffFile = isHiddenObjectUpload
+    ? null
+    : transferredImages?.[1] || (diffDataUrl ? await dataUrlToFile(diffDataUrl, `pixfind-${suffix}-diff.png`) : null);
+  if (!originalFile || (!isHiddenObjectUpload && diffDataUrl && !diffFile)) return;
   resetCreatorForm();
+  setCreatorMode(isHiddenObjectUpload ? GAME_MODE_HIDDEN_OBJECT : GAME_MODE_SPOT_DIFFERENCE, true);
   openCreatorOverlay();
   const originalInput = dom.creatorOriginalInput;
   const diffInput = dom.creatorDiffInput;
@@ -916,14 +1045,29 @@ async function restorePendingCreatorUpload() {
     const originalTransfer = new DataTransfer();
     originalTransfer.items.add(originalFile);
     originalInput.files = originalTransfer.files;
-    const diffTransfer = new DataTransfer();
-    diffTransfer.items.add(diffFile);
-    diffInput.files = diffTransfer.files;
+    if (diffFile) {
+      const diffTransfer = new DataTransfer();
+      diffTransfer.items.add(diffFile);
+      diffInput.files = diffTransfer.files;
+    }
   } catch (error) {
     console.warn('creator file inject failed', error);
     return;
   }
   handleCreatorFileChange();
+  if (payload?.isAnimation) {
+    if (isHiddenObjectUpload) await prepareHiddenObjectMarkerSource();
+    const selected = Array.isArray(payload.sourceFrameIndexes)
+      ? payload.sourceFrameIndexes.map(index => Number(index) + 1).join('・')
+      : String(Number(payload.sourceFrameIndex) + 1);
+    setCreatorStatus(`アニメーション作品の${selected}コマ目を、静止画として読み込みました。`);
+  } else if (transferredImages) {
+    setCreatorStatus(
+      isHiddenObjectUpload
+        ? 'PiXiEEDrawの1枚を読み込みました。もの探しを作れます。'
+        : 'PiXiEEDrawの2枚を読み込みました。間違い探しを作れます。'
+    );
+  }
 }
 
 function handleCreatorFileChange() {
@@ -1741,23 +1885,10 @@ async function handleCreatorPublish() {
       queueShareTask({ puzzleId, title, mode, originalDataUrl: creatorState.originalDataUrl, diffDataUrl: creatorState.diffDataUrl });
     }
 
-    const shareUrl = createShareUrl(normalized ?? { id: puzzleId, slug, source: 'published' }, { ogp: ogpReady });
-    const shareMessage = `${shareUrl}\n${SHARE_HASHTAG}`;
-    if (navigator.clipboard?.writeText) {
-      try {
-        await navigator.clipboard.writeText(shareMessage);
-        setCreatorStatus(isEditing
-          ? (ogpReady ? '投稿を更新しました。投稿別OGPも更新されます。共有リンクをコピーしました。' : '投稿を更新しました。OGPは後で自動更新されます。共有リンクをコピーしました。')
-          : (ogpReady ? '公開しました。投稿別OGPページは数分以内に準備されます。共有リンクをコピーしました。' : '公開しました。OGPは後で自動生成されます。共有リンクをコピーしました。'));
-      } catch (_) {
-        window.prompt('公開しました。共有リンクをコピーしてください。', shareMessage);
-        setCreatorStatus('公開しました。');
-      }
-    } else {
-      window.prompt('公開しました。共有リンクをコピーしてください。', shareMessage);
-      setCreatorStatus('公開しました。');
-    }
+    const createdPuzzle = normalized ?? normalizePublishedPuzzleEntry(payload, payload);
+    if (!createdPuzzle) throw new Error('published puzzle could not be normalized');
     closeCreatorOverlay();
+    openCreatorCompletePanel(createdPuzzle, { isEditing });
   } catch (error) {
     console.error(error);
     if (isPermissionError(error)) {
