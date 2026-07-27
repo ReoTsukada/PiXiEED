@@ -1032,7 +1032,6 @@
           getExportFileNameBase() || state.documentName,
           {
             includeSheets: false,
-            includeTimelapse: true,
             useWorker: true,
             preferredStorageAdapterId: 'pxd-v2-zip',
           }
@@ -1072,11 +1071,8 @@
       return result;
     } catch (error) {
       console.error('ZIP export failed', error);
-      const timelapseSyncFailed = String(error?.code || '').startsWith('ERR_TIMELAPSE_');
       updateAutosaveStatus(
-        timelapseSyncFailed
-          ? localizeText(`${zipLabel}: タイムラプスを完全同期できないため中止しました`, `${zipLabel} stopped because timelapse could not be synchronized`)
-          : localizeText(`${zipLabel}の書き出しに失敗しました`, `${zipLabel} export failed`),
+        localizeText(`${zipLabel}の書き出しに失敗しました`, `${zipLabel} export failed`),
         'error'
       );
       return { exportedCount: 0, total: 0, wasCancelled: false, hadFailure: true, error };
@@ -1619,7 +1615,6 @@
   function normalizeExportFormat(mode) {
     const normalized = String(mode || '').trim().toLowerCase();
     if (normalized === 'gif') return 'gif';
-    if (normalized === 'timelapse') return 'timelapse';
     if (normalized === 'jpeg' || normalized === 'jpg') return 'jpeg';
     if (normalized === 'svg') return 'svg';
     if (normalized === 'voxelpreview' || normalized === 'voxel-preview' || normalized === 'previewpng') return 'voxelpreview';
@@ -1644,7 +1639,6 @@
     if (normalized === 'allzip') return localizeText('全形式ZIP', 'All formats ZIP');
     if (normalized === 'gridpng') return localizeText('PNG（グリッド分割）', 'PNG (Grid Split)');
     if (normalized === 'gif') return 'GIF';
-    if (normalized === 'timelapse') return localizeText('タイムラプスGIF', 'Timelapse GIF');
     if (normalized === 'project') return localizeText('プロジェクト保存', 'Project Save');
     return 'PNG';
   }
@@ -1805,8 +1799,7 @@
       || format === 'svg'
       || format === 'spritemap'
       || format === 'gif'
-      || format === 'gridpng'
-      || format === 'timelapse';
+      || format === 'gridpng';
     if (!supportsCompanionFormat) {
       return false;
     }
@@ -1929,8 +1922,7 @@
       || format === 'voxelpreview'
       || format === 'jpeg'
       || format === 'svg'
-      || format === 'gif'
-      || format === 'timelapse';
+      || format === 'gif';
   }
 
   function doesExportFormatSupportProjectCompanion(mode) {
@@ -1941,8 +1933,7 @@
       || format === 'svg'
       || format === 'spritemap'
       || format === 'gif'
-      || format === 'gridpng'
-      || format === 'timelapse';
+      || format === 'gridpng';
   }
 
   function updateExportOptionVisibility(mode) {
@@ -2066,9 +2057,7 @@
     const format = normalizeExportFormat(mode);
     const label = format === 'gridpng'
       ? 'グリッド分割PNG'
-      : (format === 'timelapse'
-        ? 'タイムラプスGIF'
-        : (format === 'jpeg' ? 'JPEG' : String(format || '').toUpperCase()));
+      : (format === 'jpeg' ? 'JPEG' : String(format || '').toUpperCase());
     if (result === 'saved') {
       updateAutosaveStatus(`${label}出力後: PiXiEEDrawファイルもダウンロードしました`, 'success');
       return;
@@ -2271,10 +2260,6 @@
     }
     if (shouldAppendColorSpritesToPrimaryExport(format)) {
       add('カラースプライト', '画像に合成して追加', 'CLR', 'color', 'color');
-    }
-    if (dom.exportDialog?.timelapseToggle instanceof HTMLInputElement
-      && dom.exportDialog.timelapseToggle.checked) {
-      add('タイムラプスGIF', '記録済みの工程を追加出力', 'REC', 'gif', 'frame');
     }
     return cards;
   }
@@ -2922,19 +2907,7 @@
       }
     }
     const snapshot = options?.snapshot || makeHistorySnapshot();
-    if (typeof buildProjectSessionPayloadWithPersistedTimelapse !== 'function') {
-      const error = new Error('Complete timelapse synchronization is unavailable');
-      error.code = 'ERR_TIMELAPSE_SYNC_UNAVAILABLE';
-      throw error;
-    }
-    const session = options?.session || await buildProjectSessionPayloadWithPersistedTimelapse({
-      requireComplete: true,
-    });
-    if (session?.timelapse?.synchronization?.complete !== true) {
-      const error = new Error('Complete timelapse synchronization is required');
-      error.code = 'ERR_TIMELAPSE_DATA_INCOMPLETE';
-      throw error;
-    }
+    const session = options?.session || buildProjectSessionPayload();
     session.projectExportIntegrity = {
       schemaVersion: 1,
       completeProjectSave: true,
@@ -2943,9 +2916,7 @@
       checkpointOperationInterval: 10,
       externalFileAutosave: false,
       autosaveDestinationConnectedBySave: false,
-      timelapseRequired: true,
-      timelapseSynchronized: session?.timelapse?.synchronization?.complete === true,
-      saleCandidateDataComplete: session?.timelapse?.synchronization?.complete === true,
+      saleCandidateDataComplete: true,
       approvalScope: 'sales-submission-only',
       localApprovalChecked: false,
       generatedAt: new Date().toISOString(),
@@ -2964,7 +2935,6 @@
           // Project tabs are no longer a saved project feature. V2 files
           // always contain the active document only.
           includeSheets: false,
-          includeTimelapse: options?.includeTimelapse !== false,
           useWorker: options?.useWorker !== false,
           requireWorker: options?.requireWorker === true,
           preferredAdapterId: options?.preferredStorageAdapterId || '',
@@ -3055,7 +3025,6 @@
         options?.fileNameBase || getExportFileNameBase() || state.documentName,
         {
           includeSheets: false,
-          includeTimelapse: options?.includeTimelapse !== false,
           useWorker: options?.useWorker !== false,
           requireWorker: options?.requireWorker === true,
           preferredStorageAdapterId: 'pxd-v2-zip',
@@ -3115,11 +3084,8 @@
     } catch (error) {
       console.error('Manual project save failed', error);
       if (announceStatus) {
-        const timelapseSyncFailed = String(error?.code || '').startsWith('ERR_TIMELAPSE_');
         updateAutosaveStatus(
-          timelapseSyncFailed
-            ? '手動保存: タイムラプスを完全同期できないため保存を中止しました'
-            : '手動保存: ファイルをダウンロードできませんでした',
+          '手動保存: ファイルをダウンロードできませんでした',
           'error'
         );
       }

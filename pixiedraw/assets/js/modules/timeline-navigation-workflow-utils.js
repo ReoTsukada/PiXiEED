@@ -60,6 +60,18 @@
     updateAnimationFpsDisplay(clampedFps, nextDuration);
   }
 
+  function getLayerByTrackId(frame, trackId) {
+    if (!frame || !Array.isArray(frame.layers) || typeof trackId !== 'string' || !trackId) {
+      return null;
+    }
+    return frame.layers.find(layer => layer?.trackId === trackId) || null;
+  }
+
+  function getActiveLayerTrackId(frame = getActiveFrame()) {
+    const layer = frame?.layers?.find(item => item?.id === state.activeLayer) || null;
+    return typeof layer?.trackId === 'string' && layer.trackId ? layer.trackId : '';
+  }
+
   function setActiveFrameIndex(nextIndex, {
     wrap = false,
     persist = true,
@@ -123,14 +135,22 @@
       canvasDoc.activeFrame = clamp(normalizedIndex, 0, canvasDoc.frames.length - 1);
       const targetFrame = canvasDoc.frames[canvasDoc.activeFrame];
       if (targetFrame && Array.isArray(targetFrame.layers) && !targetFrame.layers.some(layer => layer?.id === canvasDoc.activeLayer)) {
-        canvasDoc.activeLayer = targetFrame.layers[targetFrame.layers.length - 1]?.id || targetFrame.layers[0]?.id || canvasDoc.activeLayer;
+        const previousFrame = canvasDoc.frames[clamp(previousIndex, 0, canvasDoc.frames.length - 1)];
+        const previousLayer = previousFrame?.layers?.find(layer => layer?.id === canvasDoc.activeLayer) || null;
+        const correspondingLayer = getLayerByTrackId(targetFrame, previousLayer?.trackId);
+        canvasDoc.activeLayer = correspondingLayer?.id
+          || targetFrame.layers[targetFrame.layers.length - 1]?.id
+          || targetFrame.layers[0]?.id
+          || canvasDoc.activeLayer;
       }
     });
     const frame = frames[normalizedIndex];
     if (frame && (!frame.layers.some(layer => layer.id === state.activeLayer) || !state.activeLayer)) {
-      const lastLayer = frame.layers[frame.layers.length - 1];
-      if (lastLayer) {
-        state.activeLayer = lastLayer.id;
+      const previousFrame = frames[clamp(previousIndex, 0, frames.length - 1)] || null;
+      const targetLayer = getLayerByTrackId(frame, getActiveLayerTrackId(previousFrame))
+        || frame.layers[frame.layers.length - 1];
+      if (targetLayer) {
+        state.activeLayer = targetLayer.id;
       }
     }
     const activeCanvasDoc = getActiveProjectCanvasDocument();
@@ -201,11 +221,11 @@
     const normalizedIndex = wrap
       ? ((Math.round(nextIndex) % frames.length) + frames.length) % frames.length
       : clamp(Math.round(nextIndex), 0, frames.length - 1);
-    const currentFrame = getActiveFrame();
-    const currentLayers = currentFrame ? currentFrame.layers.slice().reverse() : [];
-    const activeLayerRow = currentLayers.findIndex(layer => layer.id === state.activeLayer);
-    const candidateLayers = frames[normalizedIndex]?.layers?.slice().reverse() || [];
-    const nextLayer = candidateLayers[activeLayerRow] || candidateLayers[candidateLayers.length - 1] || candidateLayers[0];
+    const activeTrackId = getActiveLayerTrackId();
+    const candidateLayers = frames[normalizedIndex]?.layers || [];
+    const nextLayer = getLayerByTrackId(frames[normalizedIndex], activeTrackId)
+      || candidateLayers[candidateLayers.length - 1]
+      || candidateLayers[0];
     if (respectSharedCellOccupancy && nextLayer && !canSelectSharedProjectTimelineCell(normalizedIndex, nextLayer.id)) {
       scheduleTimelineMatrixRenderSoon();
       return;
@@ -228,7 +248,10 @@
       return false;
     }
     const normalizedTrackIndex = clamp(Math.round(Number(trackIndex) || 0), 0, targetFrame.layers.length - 1);
-    const targetLayer = targetFrame.layers[normalizedTrackIndex] || targetFrame.layers[targetFrame.layers.length - 1] || targetFrame.layers[0];
+    const requestedTrackId = targetFrame.layers[normalizedTrackIndex]?.trackId || '';
+    const targetLayer = getLayerByTrackId(targetFrame, requestedTrackId)
+      || targetFrame.layers[targetFrame.layers.length - 1]
+      || targetFrame.layers[0];
     if (!targetLayer?.id) {
       return false;
     }
@@ -276,8 +299,7 @@
     if (!Array.isArray(frames) || !frames.length) {
       return false;
     }
-    const currentTrackIndex = getActiveLayerTrackIndex();
-    const fallbackTrackIndex = Math.max(0, Math.round(Number(currentTrackIndex) || 0));
+    const activeTrackId = getActiveLayerTrackId();
     const firstTarget = edge === 'end' ? frames.length - 1 : 0;
     const direction = edge === 'end' ? -1 : 1;
     const candidateIndexes = [];
@@ -290,20 +312,18 @@
       if (!layers.length) {
         continue;
       }
-      const trackIndex = clamp(fallbackTrackIndex, 0, layers.length - 1);
-      const layer = layers[trackIndex] || null;
+      const layer = getLayerByTrackId(frame, activeTrackId) || null;
       if (!layer?.id) {
         continue;
       }
       if (!canSelectSharedProjectTimelineCell(frameIndex, layer.id, { announce: false })) {
         continue;
       }
-      return setActiveFrameOnLayerTrack(frameIndex, trackIndex);
+      return setActiveFrameOnLayerTrack(frameIndex, layers.indexOf(layer));
     }
     const edgeFrame = frames[firstTarget] || null;
     const edgeLayers = Array.isArray(edgeFrame?.layers) ? edgeFrame.layers : [];
-    const edgeTrackIndex = clamp(fallbackTrackIndex, 0, Math.max(0, edgeLayers.length - 1));
-    const occupiedLayer = edgeLayers[edgeTrackIndex] || null;
+    const occupiedLayer = getLayerByTrackId(edgeFrame, activeTrackId) || null;
     if (occupiedLayer?.id) {
       canSelectSharedProjectTimelineCell(firstTarget, occupiedLayer.id, { announce: true });
     } else {
@@ -386,6 +406,8 @@
     applyFpsToAllFrames,
     setActiveFrameIndex,
     stepActiveFrame,
+    getLayerByTrackId,
+    getActiveLayerTrackId,
     setActiveFrameOnLayerTrack,
     jumpToTimelineEdgeOnActiveLayer,
     setActiveLayerTrackIndex,

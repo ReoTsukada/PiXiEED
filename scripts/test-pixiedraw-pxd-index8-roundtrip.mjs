@@ -80,7 +80,7 @@ try {
         activePaletteIndex: 0,
         secondaryPaletteIndex: 1,
       },
-      session: { timelapse: { enabled: false, fps: 12, byCanvas: {}, operationLogsByCanvas: {} } },
+      session: {},
     });
 
     const compactSource = makeProject({
@@ -90,6 +90,9 @@ try {
       ],
       indices: new Int16Array([-1, 0, 1, -1]),
     });
+    // Old saves can carry retired recording data. New archives must omit it,
+    // while reading the artwork must still succeed.
+    compactSource.session.timelapse = { enabled: true, byCanvas: { legacy: {} } };
     const compactEncoded = await codec.encodePackagedProject(compactSource, { adapterId: 'pxd-v2-zip' });
     const compactDecoded = await codec.decodeArchiveBytes(
       new Uint8Array(await compactEncoded.blob.arrayBuffer()),
@@ -146,6 +149,8 @@ try {
       compactDecodedPalette: compactDecoded.packaged.document.palette,
       compactDecodedIndices: decodeInt16(compactDecoded.packaged.document.frames[0].layers[0].indices),
       compactActivePaletteIndex: compactDecoded.packaged.document.activePaletteIndex,
+      compactArchiveHasRetiredRecording: Object.hasOwn(compactEncoded.archiveProject.session, 'timelapse'),
+      compactDecodedHasRetiredRecording: Object.hasOwn(compactDecoded.packaged.session, 'timelapse'),
       fullEncoding: fullEncoded.archiveProject.document.pixelIndexEncoding || '',
       fullDecodedPaletteLength: fullDecoded.packaged.document.palette.length,
       fullDecodedIndices: decodeInt16(fullDecoded.packaged.document.frames[0].layers[0].indices),
@@ -168,6 +173,8 @@ try {
   ]);
   assert.deepEqual(result.compactDecodedIndices, [-1, 1, 2, -1]);
   assert.equal(result.compactActivePaletteIndex, 1);
+  assert.equal(result.compactArchiveHasRetiredRecording, false);
+  assert.equal(result.compactDecodedHasRetiredRecording, false);
   assert.equal(result.fullEncoding, '');
   assert.equal(result.fullDecodedPaletteLength, 256);
   assert.deepEqual(result.fullDecodedIndices, [255, 0, -1, 100]);

@@ -175,9 +175,6 @@
     if (shouldUseHistoryTransport) {
       beginHistory('resizeCanvas');
     }
-    // Resize remains an explicit timelapse boundary so pre-resize work is
-    // retained in GIF export.
-    scheduleTimelapseCaptureFromState({ immediate: true });
     const historyPreparedAt = typeof performance?.now === 'function' ? performance.now() : Date.now();
     resizeAllLayers(nextWidth, nextHeight, {
       offsetX: Math.round(Number(contentOffsetX) || 0),
@@ -211,13 +208,6 @@
     clearSelection();
     requestRender();
     requestOverlayRender();
-    if (!shouldUseHistoryTransport) {
-      recordTimelapseCanvasResize({
-        offsetX: Math.round(Number(contentOffsetX) || 0),
-        offsetY: Math.round(Number(contentOffsetY) || 0),
-      });
-    }
-    scheduleTimelapseCaptureFromState();
     if (shouldUseHistoryTransport) {
       commitHistory();
     }
@@ -383,7 +373,8 @@
           // Preserve the source storage encoding. Compact/tiled layers are
           // materialized as Int16, while imported indexed images remain in
           // their Uint8 runtime representation.
-          sourceUsesRuntimeUint8 ? state.palette : []
+          sourceUsesRuntimeUint8 ? state.palette : [],
+          { trackId: layer.trackId }
         );
         resized.id = layer.id;
         const sourceDirect = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
@@ -460,7 +451,8 @@
           layer.name,
           newWidth,
           newHeight,
-          sourceUsesRuntimeUint8 ? state.palette : []
+          sourceUsesRuntimeUint8 ? state.palette : [],
+          { trackId: layer.trackId }
         );
         scaled.id = layer.id;
         scaled.visible = layer.visible;

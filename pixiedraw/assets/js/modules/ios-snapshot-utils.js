@@ -259,7 +259,6 @@
       history.past = [];
       history.future = [];
       history.pending = null;
-      clearTimelapseRecording({ silent: true, scope: 'all' });
       resetDocumentUnsavedChanges();
       updateMemoryStatus();
       setTrackedProjectDotBaseline(snapshot, null);

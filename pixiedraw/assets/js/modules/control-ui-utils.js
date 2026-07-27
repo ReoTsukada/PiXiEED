@@ -655,7 +655,6 @@
     syncActiveFrameSettingsUI();
     updatePixfindModeUI();
     updateExportOriginalToggleUI();
-    syncTimelapseControls();
     updateMirrorGuideHandles();
     updateCanvasResizeHandlePosition();
     syncCanvasResizeHandleVisibility();

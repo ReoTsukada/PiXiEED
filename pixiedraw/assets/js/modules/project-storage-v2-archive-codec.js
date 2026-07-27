@@ -333,93 +333,21 @@
       return Boolean(value && typeof value === 'object' && !Array.isArray(value));
     }
 
-    function buildEmptyTimelapsePayload(source = null) {
-      const fps = Math.max(1, Math.round(Number(source?.fps) || 12));
-      return {
-        enabled: false,
-        fps,
-        byCanvas: {},
-        operationLogsByCanvas: {},
-      };
-    }
-
-    function normalizeTimelapseArchivePayload(payload, { strict = false } = {}) {
-      if (!isPlainObject(payload)) {
-        if (strict) {
-          throw createCodecError('ERR_INVALID_TIMELAPSE_PAYLOAD', 'Invalid timelapse archive payload');
-        }
-        return buildEmptyTimelapsePayload();
-      }
-      const byCanvas = isPlainObject(payload.byCanvas)
-        ? cloneJsonValue(payload.byCanvas)
-        : null;
-      const operationLogsByCanvas = isPlainObject(payload.operationLogsByCanvas)
-        ? cloneJsonValue(payload.operationLogsByCanvas)
-        : null;
-      if (strict && (!byCanvas || !operationLogsByCanvas)) {
-        throw createCodecError('ERR_INVALID_TIMELAPSE_PAYLOAD', 'Invalid timelapse archive payload shape');
-      }
-      return {
-        enabled: Boolean(payload.enabled),
-        fps: Math.max(1, Math.round(Number(payload.fps) || 12)),
-        byCanvas: byCanvas || {},
-        operationLogsByCanvas: operationLogsByCanvas || {},
-      };
-    }
-
-    function buildTimelapseArchivePath(basePath = '') {
-      return `${basePath}timelapse/session.json`;
-    }
-
-    function buildTimelapseArchiveMetadata(timelapsePath = '', { included = false } = {}) {
-      if (included === true) {
-        return {
-          version: 1,
-          included: true,
-          path: timelapsePath,
-        };
-      }
-      return {
-        version: 1,
-        included: false,
-      };
-    }
-
-    function splitSessionForArchive(sessionPayload, { basePath = '', includeTimelapse = true } = {}) {
+    function splitSessionForArchive(sessionPayload) {
       const nextSession = cloneJsonValue(sessionPayload) || {};
-      const sourceTimelapse = normalizeTimelapseArchivePayload(nextSession.timelapse, { strict: false });
-      const timelapsePath = buildTimelapseArchivePath(basePath);
-      nextSession.timelapse = buildEmptyTimelapsePayload(sourceTimelapse);
-      nextSession.timelapseArchive = buildTimelapseArchiveMetadata(timelapsePath, {
-        included: includeTimelapse === true,
-      });
+      delete nextSession.timelapse;
+      delete nextSession.timelapseArchive;
       return {
         sessionPayload: nextSession,
-        timelapseTask: includeTimelapse === true
-          ? {
-              filename: timelapsePath,
-              blob: createJsonBlob(sourceTimelapse),
-            }
-          : null,
       };
     }
 
     function restoreSessionFromArchive(sessionPayload, entries) {
       const nextSession = cloneJsonValue(sessionPayload) || {};
-      const fallbackTimelapse = buildEmptyTimelapsePayload(nextSession.timelapse);
-      const archiveMeta = isPlainObject(nextSession.timelapseArchive)
-        ? nextSession.timelapseArchive
-        : null;
+      // Legacy optional recording data is ignored; artwork is authoritative.
+      void entries;
+      delete nextSession.timelapse;
       delete nextSession.timelapseArchive;
-      if (archiveMeta?.included === true) {
-        if (typeof archiveMeta.path !== 'string' || !archiveMeta.path) {
-          throw createCodecError('ERR_INVALID_TIMELAPSE_PAYLOAD', 'Timelapse archive reference is missing path');
-        }
-        const timelapsePayload = readJsonEntry(entries, archiveMeta.path);
-        nextSession.timelapse = normalizeTimelapseArchivePayload(timelapsePayload, { strict: true });
-        return nextSession;
-      }
-      nextSession.timelapse = fallbackTimelapse;
       return nextSession;
     }
 
@@ -869,7 +797,7 @@
       packagedProject,
       bitmapTasksByHash,
       diagnostics,
-      { adapterId = '', basePath = '', stripSheets = true, includeTimelapse = true } = {}
+      { adapterId = '', basePath = '', stripSheets = true } = {}
     ) {
       const sourceDocumentPayload = packagedProject?.document;
       const compactDocumentPayload = compactDocumentIndicesForPxd(sourceDocumentPayload);
@@ -905,10 +833,7 @@
       projectPayload.storageAdapterId = adapterId || '';
       projectPayload.hadCanvases = hadCanvases;
       projectPayload.canvasEntries = canvasEntries;
-      const splitSession = splitSessionForArchive(projectPayload.session, {
-        basePath,
-        includeTimelapse,
-      });
+      const splitSession = splitSessionForArchive(projectPayload.session);
       projectPayload.session = splitSession.sessionPayload;
       projectPayload.document = {
         ...baseDocument,
@@ -928,7 +853,6 @@
           filename: entry.path,
           blob: createJsonBlob(entry.payload),
         })),
-        timelapseTasks: splitSession.timelapseTask ? [splitSession.timelapseTask] : [],
         activeCanvasId: projectPayload.document.activeCanvasId,
       };
     }
@@ -998,16 +922,6 @@
       return count;
     }
 
-    function resolveTimelapseIncluded(projectPayload = null) {
-      if (projectPayload?.session?.timelapseArchive?.included === true) {
-        return true;
-      }
-      if (!Array.isArray(projectPayload?.sheets)) {
-        return false;
-      }
-      return projectPayload.sheets.some(sheet => sheet?.project?.session?.timelapseArchive?.included === true);
-    }
-
     function assertPackagedCanvasLimit(packaged) {
       const documents = [];
       if (packaged?.document && typeof packaged.document === 'object') documents.push(packaged.document);
@@ -1045,13 +959,11 @@
       // New V2 archives have a single root project. The option remains
       // accepted for old callers but cannot re-enable the retired layout.
       const includeSheets = false;
-      const includeTimelapse = options?.includeTimelapse !== false;
       const bitmapTasksByHash = new Map();
       const diagnostics = {
         bitmapCount: 0,
         dedupedBitmapCount: 0,
         sheetCount: 0,
-        timelapseIncluded: includeTimelapse,
         bitmapReferenceCount: 0,
       };
       let projectPayload = null;
@@ -1093,7 +1005,6 @@
             adapterId,
             basePath: sheetDirectory,
             stripSheets: true,
-            includeTimelapse,
           });
           sheetTasks.push(
             {
@@ -1101,7 +1012,6 @@
               blob: createJsonBlob(serializedSheet.projectPayload),
             },
             ...serializedSheet.canvasTasks,
-            ...serializedSheet.timelapseTasks,
           );
           sheetManifests.push(buildSheetArchiveManifestEntry(sheet, {
             sheetId,
@@ -1125,7 +1035,6 @@
         delete projectPayload.canvasEntries;
         const splitRootSession = splitSessionForArchive(projectPayload.session, {
           basePath: '',
-          includeTimelapse,
         });
         projectPayload.session = splitRootSession.sessionPayload;
         projectPayload.document = {
@@ -1137,19 +1046,16 @@
         activeCanvasId = rootActiveCanvasId;
         tasks = [
           ...sheetTasks,
-          ...(splitRootSession.timelapseTask ? [splitRootSession.timelapseTask] : []),
         ];
       } else {
         const serializedRoot = await serializePackagedProjectBody(packaged, bitmapTasksByHash, diagnostics, {
           adapterId,
           basePath: '',
           stripSheets: true,
-          includeTimelapse,
         });
         projectPayload = serializedRoot.projectPayload;
         tasks = [
           ...serializedRoot.canvasTasks,
-          ...serializedRoot.timelapseTasks,
         ];
         activeCanvasId = serializedRoot.activeCanvasId;
         diagnostics.sheetCount = 0;
@@ -1189,7 +1095,6 @@
             && projectOriginality?.externalInputDetected !== true,
           externalInputDetected: projectOriginality?.externalInputDetected === true,
           completeProjectSave: projectExportIntegrity?.completeProjectSave === true,
-          timelapseSynchronized: projectExportIntegrity?.timelapseSynchronized === true,
           saleCandidateDataComplete: projectExportIntegrity?.saleCandidateDataComplete === true,
         },
       };
@@ -1432,7 +1337,6 @@
         diagnostics: {
           sheetCount: Array.isArray(restored.archiveProject?.sheets) ? restored.archiveProject.sheets.length : 0,
           bitmapCount: countArchiveBitmaps(entries),
-          timelapseIncluded: resolveTimelapseIncluded(restored.archiveProject),
         },
       };
     }

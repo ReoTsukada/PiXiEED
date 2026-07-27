@@ -170,6 +170,55 @@
     return null;
   }
 
+  function createLayerTrackId() {
+    return crypto.randomUUID
+      ? crypto.randomUUID()
+      : `track-${Math.random().toString(36).slice(2)}`;
+  }
+
+  // Old PXD/autosave payloads predate `trackId`; their only track information
+  // is the layer position. Normalize that relation once at load time. Newer
+  // payloads keep their persisted ID when it is valid, but a malformed
+  // duplicate or mixed payload is still repaired to one ID per position.
+  function normalizeFrameLayerTrackIds(frames) {
+    if (!Array.isArray(frames) || !frames.length) {
+      return;
+    }
+    const maxLayerCount = frames.reduce(
+      (max, frame) => Math.max(max, Array.isArray(frame?.layers) ? frame.layers.length : 0),
+      0
+    );
+    const trackIdsByIndex = [];
+    const usedTrackIds = new Set();
+    for (let layerIndex = 0; layerIndex < maxLayerCount; layerIndex += 1) {
+      let trackId = '';
+      for (const frame of frames) {
+        const candidate = frame?.layers?.[layerIndex]?.trackId;
+        if (typeof candidate === 'string' && candidate && !usedTrackIds.has(candidate)) {
+          trackId = candidate;
+          break;
+        }
+      }
+      if (!trackId) {
+        do {
+          trackId = createLayerTrackId();
+        } while (usedTrackIds.has(trackId));
+      }
+      usedTrackIds.add(trackId);
+      trackIdsByIndex[layerIndex] = trackId;
+    }
+    frames.forEach(frame => {
+      if (!Array.isArray(frame?.layers)) {
+        return;
+      }
+      frame.layers.forEach((layer, layerIndex) => {
+        if (layer && trackIdsByIndex[layerIndex]) {
+          layer.trackId = trackIdsByIndex[layerIndex];
+        }
+      });
+    });
+  }
+
   function deserializeDocumentPayload(payload, options = {}) {
     const reuseTypedArrays = options?.reuseTypedArrays === true;
     const trustStoredLayerFlags = options?.trustStoredLayerFlags === true;
@@ -218,6 +267,7 @@
         layers,
       };
     });
+    normalizeFrameLayerTrackIds(frames);
 
     const activeFrameIndex = clamp(Math.round(Number(payload.activeFrame) || 0), 0, frames.length - 1);
     const activeFrame = frames[activeFrameIndex];
@@ -371,6 +421,7 @@
             )),
           };
         });
+        normalizeFrameLayerTrackIds(deserializedFrames);
         const selectedActiveFrame = clamp(
           Math.round(Number(selectedCanvas.activeFrame) || 0),
           0,

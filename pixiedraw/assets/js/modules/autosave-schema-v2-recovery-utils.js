@@ -4,7 +4,6 @@
 
   function createAutosaveSchemaV2RecoveryUtils() {
     const clone = value => JSON.parse(JSON.stringify(value));
-    const emptyTimelapse = () => ({ enabled: true, fps: 12, byCanvas: {}, operationLogsByCanvas: {} });
 
     function sanitizeProject(project) {
       const next = project && typeof project === 'object' ? project : {};
@@ -15,7 +14,6 @@
       if (!Array.isArray(session.historyPast) || !Array.isArray(session.historyFuture)) {
         next.session = { ...session, historyPast: [], historyFuture: [], recoveryWarning: 'history-reset' };
       }
-      if (!next.session.timelapse || typeof next.session.timelapse !== 'object') next.session.timelapse = emptyTimelapse();
       delete next.projectSaveHandle;
       delete next.projectSaveHandleMeta;
       delete next.autosaveHandle;

@@ -145,7 +145,6 @@
           sheetRuntimeId: typeof options.sheetRuntimeId === 'string' && options.sheetRuntimeId ? options.sheetRuntimeId : `${tabId}:runtime`,
           sheetPersistenceKey: typeof options.sheetPersistenceKey === 'string' && options.sheetPersistenceKey ? options.sheetPersistenceKey : `${tabId}:persistence`,
           historyOwnerId: typeof options.historyOwnerId === 'string' && options.historyOwnerId ? options.historyOwnerId : `${tabId}:history`,
-          timelapseOwnerId: typeof options.timelapseOwnerId === 'string' && options.timelapseOwnerId ? options.timelapseOwnerId : `${tabId}:timelapse`,
           ...persistenceState,
         };
         const entrySignature = typeof createLocalProjectEntrySignature === 'function'
@@ -316,7 +315,6 @@
       localPersistenceKey = '',
       autosaveV2SheetId = '',
       historyOwnerId = '',
-      timelapseOwnerId = '',
       canonicalPayloadFormat = '',
       canonicalSchemaVersion = 0,
       canonicalSourceMetadata = null,
@@ -359,7 +357,6 @@
         localPersistenceKey: typeof localPersistenceKey === 'string' && localPersistenceKey ? localPersistenceKey : `${id || 'sheet'}:local`,
         autosaveV2SheetId: typeof autosaveV2SheetId === 'string' && autosaveV2SheetId ? autosaveV2SheetId : `${id || 'sheet'}:autosave-v2`,
         historyOwnerId: typeof historyOwnerId === 'string' && historyOwnerId ? historyOwnerId : `${id || 'sheet'}:history`,
-        timelapseOwnerId: typeof timelapseOwnerId === 'string' && timelapseOwnerId ? timelapseOwnerId : `${id || 'sheet'}:timelapse`,
         canonicalPayloadFormat: canonicalPayloadFormat === 'v2' || project?.canonicalPayloadFormat === 'v2' ? 'v2' : '',
         canonicalSchemaVersion: Math.max(0, Math.round(Number(canonicalSchemaVersion || project?.canonicalSchemaVersion) || 0)),
         canonicalSourceMetadata: canonicalSourceMetadata && typeof canonicalSourceMetadata === 'object'
@@ -419,7 +416,6 @@
           localPersistenceKey: typeof sheet.localPersistenceKey === 'string' && sheet.localPersistenceKey ? sheet.localPersistenceKey : `${uniqueId}:local`,
           autosaveV2SheetId: typeof sheet.autosaveV2SheetId === 'string' && sheet.autosaveV2SheetId ? sheet.autosaveV2SheetId : `${uniqueId}:autosave-v2`,
           historyOwnerId: typeof sheet.historyOwnerId === 'string' && sheet.historyOwnerId ? sheet.historyOwnerId : `${uniqueId}:history`,
-          timelapseOwnerId: typeof sheet.timelapseOwnerId === 'string' && sheet.timelapseOwnerId ? sheet.timelapseOwnerId : `${uniqueId}:timelapse`,
           ...persistenceState,
           ...(sheetSharedProjectKey ? {
             sharedProjectKey: sheetSharedProjectKey,

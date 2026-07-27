@@ -117,19 +117,6 @@
     };
     const syncFormatOptions = () => {
       const format = normalizeExportFormat(config.format?.value || 'png');
-      const selectedFormats = (Array.isArray(config.formatChoices) ? config.formatChoices : [])
-        .filter(choice => choice instanceof HTMLButtonElement && choice.getAttribute('aria-pressed') === 'true')
-        .map(choice => String(choice.dataset.exportFormatChoice || ''));
-      const effectiveFormats = selectedFormats.length ? selectedFormats : [format];
-      const hasVisualFormat = effectiveFormats.some(value => value !== 'project');
-      const timelapseAvailable = hasVisualFormat;
-      if (config.timelapseRow instanceof HTMLElement) {
-        config.timelapseRow.hidden = !timelapseAvailable;
-      }
-      if (config.timelapseToggle instanceof HTMLInputElement) {
-        config.timelapseToggle.disabled = !timelapseAvailable;
-        if (!timelapseAvailable) config.timelapseToggle.checked = false;
-      }
     };
     const bind = (element, handler) => {
       if (element) {
@@ -148,16 +135,9 @@
       }
       closeExportDialog();
       const selectedFormats = mode === 'batchzip' ? getSelectedExportFormatsSnapshot() : null;
-      const includeTimelapse = mode !== 'project'
-        && config.timelapseToggle instanceof HTMLInputElement
-        && config.timelapseToggle.checked;
       queueExportWithInterstitial(async () => {
         if (mode === 'batchzip') {
-          const result = await exportProjectAsAllFormatsZip({ selectedFormats });
-          if (includeTimelapse) {
-            await exportTimelapseGif();
-          }
-          return result;
+          return await exportProjectAsAllFormatsZip({ selectedFormats });
         }
         return performExportByMode(mode, { selectedFormats });
       });
@@ -238,17 +218,6 @@
         }
         exportScaleUserOverride = true;
         setExportScale(choice.dataset.exportScaleChoice || 1);
-      });
-    });
-    [config.timelapseToggle].forEach(toggle => {
-      if (!(toggle instanceof HTMLInputElement) || toggle.dataset.bound === 'true') {
-        return;
-      }
-      toggle.dataset.bound = 'true';
-      toggle.addEventListener('change', () => {
-        syncFormatOptions();
-        refreshExportScaleControls();
-        updateExportOriginalToggleUI();
       });
     });
     (Array.isArray(config.batchFormatToggles) ? config.batchFormatToggles : []).forEach(toggle => {

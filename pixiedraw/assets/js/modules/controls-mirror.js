@@ -2094,34 +2094,6 @@
       openExportDialog();
     });
 
-    if (dom.controls.timelapseClear instanceof HTMLButtonElement) {
-      dom.controls.timelapseClear.addEventListener('click', () => {
-        clearTimelapseRecording();
-      });
-    }
-    const handleTimelapseToggleInput = event => {
-      if (!(event.target instanceof HTMLInputElement)) {
-        return;
-      }
-      setTimelapseEnabled(Boolean(event.target.checked));
-    };
-    dom.controls.toggleTimelapse?.addEventListener('change', handleTimelapseToggleInput);
-    dom.controls.toggleTimelapse?.addEventListener('input', handleTimelapseToggleInput);
-    if (dom.controls.toggleTimelapse instanceof HTMLInputElement) {
-      dom.controls.toggleTimelapse.checked = Boolean(timelapseState.enabled);
-    }
-    if (dom.controls.timelapseFps instanceof HTMLInputElement) {
-      dom.controls.timelapseFps.addEventListener('input', event => {
-        timelapseState.fps = normalizeTimelapseFps(event.target.value);
-        syncTimelapseControls();
-      });
-      dom.controls.timelapseFps.addEventListener('change', event => {
-        timelapseState.fps = normalizeTimelapseFps(event.target.value);
-        syncTimelapseControls();
-        scheduleSessionPersist({ includeSnapshots: false });
-      });
-    }
-
     dom.controls.openShortcutHelp?.addEventListener('click', () => {
       openShortcutHelpDialog();
     });
@@ -2294,7 +2266,6 @@
     setupMultiModeControls();
     setPixfindHelpExpanded(false);
     syncControlsWithState();
-    syncTimelapseControls();
     updateSpriteScaleControlLimits();
     updateCanvasResizeControls({ normalizeValues: true });
     applyEmbedGuardrails();

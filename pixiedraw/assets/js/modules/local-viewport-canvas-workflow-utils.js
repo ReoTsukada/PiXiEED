@@ -427,32 +427,6 @@
     return true;
   }
 
-  function remapTimelapseSingleCanvasId(previousCanvasId = '', nextCanvasId = '') {
-    const previousId = typeof previousCanvasId === 'string' ? previousCanvasId.trim() : '';
-    const nextId = typeof nextCanvasId === 'string' ? nextCanvasId.trim() : '';
-    if (!previousId || !nextId || previousId === nextId) {
-      return false;
-    }
-    let changed = false;
-    const previousTrack = timelapseState.tracksByCanvasId?.[previousId] || null;
-    if (previousTrack) {
-      const nextTrack = timelapseState.tracksByCanvasId?.[nextId] || null;
-      const previousCount = getTimelapseTrackStepCount(previousTrack);
-      const nextCount = getTimelapseTrackStepCount(nextTrack);
-      if (!nextTrack || previousCount > nextCount) {
-        timelapseState.tracksByCanvasId[nextId] = previousTrack;
-      }
-      delete timelapseState.tracksByCanvasId[previousId];
-      changed = true;
-    }
-    if (timelapseQueuedCanvasIds.has(previousId)) {
-      timelapseQueuedCanvasIds.delete(previousId);
-      timelapseQueuedCanvasIds.add(nextId);
-      changed = true;
-    }
-    return changed;
-  }
-
   function adoptSingleProjectCanvasId(requestedCanvasId = '') {
     const normalizedCanvasId = normalizeSharedProjectCanvasId(requestedCanvasId);
     if (!normalizedCanvasId) {
@@ -534,12 +508,10 @@
     registerSharedProjectCanvasAlias(previousCanvasId, resolvedCanvasId);
     registerSharedProjectCanvasAlias(normalizedCanvasId, resolvedCanvasId);
     const layerSnapshotsRemapped = remapSharedProjectLayerSnapshotCanvasId(previousCanvasId, resolvedCanvasId);
-    const timelapseRemapped = remapTimelapseSingleCanvasId(previousCanvasId, resolvedCanvasId);
     syncProjectCanvasSurfaceDocumentRefs();
     normalizeMultiAssignmentsForCurrentDocument();
     prunePendingMultiAssignmentMoveRequests();
     pruneMultiHistoryCanvases();
-    pruneTimelapseTracksToExistingCanvases();
     clearCanvasScreenMetricsCache();
     invalidateFillPreviewCache();
     invalidateOnionSkinCache();
@@ -564,7 +536,6 @@
       identitySource: activeSharedProjectCanvasIdentitySource || '',
       aliasCount: sharedProjectCanvasAliases.size,
       layerSnapshotsRemapped,
-      timelapseRemapped,
     });
     return soleCanvas;
   }
@@ -709,7 +680,6 @@
     normalizeMultiAssignmentsForCurrentDocument();
     prunePendingMultiAssignmentMoveRequests();
     pruneMultiHistoryCanvases();
-    pruneTimelapseTracksToExistingCanvases();
     committedProjectCanvasId = getActiveProjectCanvasDocument()?.id || committedProjectCanvasId || '';
     hoveredProjectCanvasId = '';
     clearCanvasScreenMetricsCache();
@@ -2847,7 +2817,6 @@
     initializeSharedProjectCanvasIdentityFromCurrentDocument,
     resolveSharedProjectCanvasAlias,
     remapSharedProjectLayerSnapshotCanvasId,
-    remapTimelapseSingleCanvasId,
     adoptSingleProjectCanvasId,
     getActiveProjectCanvasDocument,
     getActiveProjectCanvasIndex,

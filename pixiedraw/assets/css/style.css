@@ -5195,7 +5195,6 @@ input[type='range']::-moz-focus-outer {
 }
 
 #panelFile #autosaveStatus,
-#panelFile #timelapseStatus,
 #panelSettings .help-text,
 #panelDetails .help-text,
 #panelMulti .help-text {
@@ -11245,8 +11244,7 @@ body.is-mobile-layout #newProjectDialog .modal__body {
 #exportGridSettings,
 .export-pad-console,
 .export-batch-format-options,
-.export-option-icons,
-.export-timelapse-output {
+.export-option-icons {
   grid-column: 1 / -1;
 }
 
@@ -11693,18 +11691,6 @@ body.is-mobile-layout #newProjectDialog .modal__body {
   padding: 10px;
   border: 1px solid rgba(var(--ui-rgb), 0.18);
   background: rgba(6, 12, 20, 0.74);
-}
-
-.export-timelapse-output {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 2px;
-  padding: 10px;
-  border: 1px solid rgba(var(--export-neon), 0.28);
-  background: linear-gradient(135deg, rgba(var(--export-neon), 0.08), transparent 48%), rgba(6, 12, 20, 0.74);
 }
 
 .export-option-icons__label {
@@ -13378,7 +13364,6 @@ body.is-mobile-layout .panel-ad-mount[hidden] {
   body.is-mobile-layout #panelFile .field {
     margin-bottom: 6px;
   }
-  body.is-mobile-layout #panelFile #timelapseDescription,
   body.is-mobile-layout #panelFile .file-danger-zone {
     display: none;
   }

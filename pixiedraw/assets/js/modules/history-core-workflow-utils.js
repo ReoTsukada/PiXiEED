@@ -60,9 +60,11 @@ function commitHistory() {
         ? finalizePixelPatchHistoryEntry(history.pending)
         : (isLayerAddHistoryEntry(history.pending)
           ? finalizeLayerAddHistoryEntry(history.pending)
-          : (isFrameAddHistoryEntry(history.pending)
-            ? finalizeFrameAddHistoryEntry(history.pending)
-            : setHistoryEntryLabel(history.pending.before, pendingLabel)));
+          : (isLayerRemoveHistoryEntry(history.pending)
+            ? finalizeLayerRemoveHistoryEntry(history.pending)
+            : (isFrameAddHistoryEntry(history.pending)
+              ? finalizeFrameAddHistoryEntry(history.pending)
+              : setHistoryEntryLabel(history.pending.before, pendingLabel))));
       if (!historyEntry) {
         history.pending = null;
         updateHistoryButtons();
@@ -100,16 +102,6 @@ function commitHistory() {
           historyEntry,
           pendingLabel
         );
-      }
-      const recordedTimelapseOperation = recordTimelapseOperationLogEntry(historyEntry, pendingLabel);
-      if (!recordedTimelapseOperation) {
-        scheduleTimelapseCaptureFromState({
-          frameIds: Array.isArray(historyEntry?.frameIds)
-            ? historyEntry.frameIds.filter(frameId => typeof frameId === 'string' && frameId)
-            : (typeof historyEntry?.frameId === 'string' && historyEntry.frameId
-              ? [historyEntry.frameId]
-              : null),
-        });
       }
       if (activeSharedProjectKey) {
         const sharedOpType = classifySharedProjectOpType(pendingLabel);
@@ -260,6 +252,26 @@ function undo() {
         archiveEvictedHistoryEntry('future', history.future.shift());
       }
       if (!applyLayerAddHistoryEntry(previous, 'undo')) {
+        history.future.pop();
+        history.past.push(previous);
+        return;
+      }
+      updateHistoryButtons();
+      markAutosaveDirty();
+      markDocumentUnsavedChange();
+      markActiveLocalProjectJournalNeedsCheckpoint?.(
+        normalizeAutosaveProjectId?.(autosaveProjectId || '') || ''
+      );
+      scheduleAutosaveSnapshot();
+      scheduleQrEditReadabilityCheck();
+      return;
+    }
+    if (isLayerRemoveHistoryEntry(previous)) {
+      history.future.push(previous);
+      if (history.future.length > history.limit) {
+        archiveEvictedHistoryEntry('future', history.future.shift());
+      }
+      if (!applyLayerRemoveHistoryEntry(previous, 'undo')) {
         history.future.pop();
         history.past.push(previous);
         return;
@@ -481,6 +493,26 @@ function redo() {
       scheduleQrEditReadabilityCheck();
       return;
     }
+    if (isLayerRemoveHistoryEntry(next)) {
+      history.past.push(next);
+      if (history.past.length > history.limit) {
+        archiveEvictedHistoryEntry('past', history.past.shift());
+      }
+      if (!applyLayerRemoveHistoryEntry(next, 'redo')) {
+        history.past.pop();
+        history.future.push(next);
+        return;
+      }
+      updateHistoryButtons();
+      markAutosaveDirty();
+      markDocumentUnsavedChange();
+      markActiveLocalProjectJournalNeedsCheckpoint?.(
+        normalizeAutosaveProjectId?.(autosaveProjectId || '') || ''
+      );
+      scheduleAutosaveSnapshot();
+      scheduleQrEditReadabilityCheck();
+      return;
+    }
     if (isPixelPatchHistoryEntry(next)) {
       history.past.push(next);
       if (history.past.length > history.limit) {
@@ -568,6 +600,16 @@ function redo() {
 function rollbackPendingHistory({ reRender = true } = {}) {
     if (isLayerAddHistoryEntry(history.pending)) {
       const rolledBack = applyLayerAddHistoryEntry(history.pending, 'undo');
+      history.pending = null;
+      updateHistoryButtons();
+      if (rolledBack) {
+        markAutosaveDirty();
+        markDocumentUnsavedChange();
+      }
+      return rolledBack;
+    }
+    if (isLayerRemoveHistoryEntry(history.pending)) {
+      const rolledBack = applyLayerRemoveHistoryEntry(history.pending, 'undo');
       history.pending = null;
       updateHistoryButtons();
       if (rolledBack) {

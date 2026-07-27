@@ -29,6 +29,7 @@ const baseProject = {
       duration: 100,
       layers: [{
         id: 'layer-base',
+        trackId: 'track-base',
         name: 'Layer 1',
         visible: true,
         opacity: 1,
@@ -52,6 +53,7 @@ const checkpointBundle = schema.createSchemaV2Revision({
 const checkpoint = checkpointBundle.checkpoints[0];
 const addedLayer = {
   id: 'layer-added',
+  trackId: 'track-added',
   name: 'Layer 2',
   visible: true,
   opacity: 1,
@@ -105,6 +107,7 @@ const restored = schema.restoreSchemaV2Manifest(
 
 assert.equal(restored.document.frames[0].layers.length, 2);
 assert.equal(restored.document.frames[0].layers[1].id, 'layer-added');
+assert.equal(restored.document.frames[0].layers[1].trackId, 'track-added');
 assert.equal(restored.document.frames[0].layers[1].indices, null);
 assert.equal(restored.document.frames[0].layers[1].indicesImplicitTransparent, true);
 assert.equal(restored.document.frames.length, 2);
@@ -112,6 +115,8 @@ assert.equal(restored.document.frames[1].id, 'frame-2');
 assert.equal(restored.document.frames[1].layers.length, 2);
 assert.equal(restored.document.frames[1].layers[0].indices, null);
 assert.equal(restored.document.frames[1].layers[0].indicesImplicitTransparent, true);
+assert.equal(restored.document.frames[1].layers[0].trackId, 'track-base');
+assert.equal(restored.document.frames[1].layers[1].trackId, 'track-added');
 assert.equal(restored.document.activeFrame, 1);
 assert.equal(restored.document.activeLayer, 'frame-2-layer-2');
 assert.equal(

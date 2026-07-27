@@ -106,6 +106,68 @@
     return Boolean(frame && Array.isArray(frame.layers) && layerIndex < frame.layers.length);
   }
 
+  function getLayerByTrackId(frame, trackId) {
+    if (!frame || !Array.isArray(frame.layers) || typeof trackId !== 'string' || !trackId) {
+      return null;
+    }
+    return frame.layers.find(layer => layer?.trackId === trackId) || null;
+  }
+
+  function getActiveLayerTrackId() {
+    const frame = getActiveFrame();
+    const layer = frame?.layers?.find(item => item?.id === state.activeLayer) || null;
+    return typeof layer?.trackId === 'string' && layer.trackId ? layer.trackId : '';
+  }
+
+  function getLayerTrackIdForRow(rowIndex) {
+    const activeFrame = getActiveFrame();
+    const layerIndex = Array.isArray(activeFrame?.layers)
+      ? activeFrame.layers.length - 1 - rowIndex
+      : -1;
+    return typeof activeFrame?.layers?.[layerIndex]?.trackId === 'string'
+      ? activeFrame.layers[layerIndex].trackId
+      : '';
+  }
+
+  // A layer row is a shared timeline track. Older/imported documents can
+  // contain fewer layers in one frame, which otherwise turns that row into a
+  // disabled placeholder and makes positional layer operations unsafe.
+  function repairLayerTracksAcrossFrames() {
+    const frames = Array.isArray(state.frames) ? state.frames : [];
+    const canonicalFrame = frames.reduce((current, frame) => {
+      if (!frame || !Array.isArray(frame.layers)) return current;
+      if (!current || frame.layers.length > current.layers.length) return frame;
+      return current;
+    }, null);
+    const targetCount = canonicalFrame?.layers?.length || 0;
+    if (!targetCount) return 0;
+    let repairedCount = 0;
+    frames.forEach((frame, frameIndex) => {
+      if (!frame || !Array.isArray(frame.layers)) return;
+      while (frame.layers.length < targetCount) {
+        const trackIndex = frame.layers.length;
+        const template = canonicalFrame.layers[trackIndex] || null;
+        const name = typeof template?.name === 'string' && template.name.trim()
+          ? template.name
+          : getDefaultLayerName(trackIndex + 1);
+        const layer = typeof isSimulationLayer === 'function' && isSimulationLayer(template)
+          ? createSimulationLayer(name, state.width, state.height, { trackId: template?.trackId })
+          : createLayer(name, state.width, state.height, null, {
+              trackId: template?.trackId,
+              deferPixelAllocation: Number(state.rasterModelVersion) >= 1 || frameIndex !== state.activeFrame,
+            });
+        if (template) {
+          layer.visible = template.visible !== false;
+          layer.opacity = Number.isFinite(Number(template.opacity)) ? Number(template.opacity) : layer.opacity;
+          layer.blendMode = template.blendMode || layer.blendMode;
+        }
+        frame.layers.push(layer);
+        repairedCount += 1;
+      }
+    });
+    return repairedCount;
+  }
+
   function normalizeTimelineSelectionState() {
     let changed = false;
     if (timelineSelection.mode === TIMELINE_SELECTION_MODE_FRAME) {
@@ -497,12 +559,16 @@
       tracks.forEach((track, offset) => {
         const layerSnapshots = Array.isArray(track?.layers) ? track.layers : [];
         const fallbackLayerSnapshot = layerSnapshots.find(Boolean) || null;
+        let addedTrackId = '';
         state.frames.forEach((frame, frameIndex) => {
           if (!frame || !Array.isArray(frame.layers)) {
             return;
           }
           const sourceLayerSnapshot = layerSnapshots[frameIndex] || fallbackLayerSnapshot;
-          const newLayer = createLayerFromClipboardSnapshot(sourceLayerSnapshot, state.width, state.height);
+          const newLayer = createLayerFromClipboardSnapshot(sourceLayerSnapshot, state.width, state.height, {
+            trackId: addedTrackId,
+          });
+          addedTrackId = newLayer.trackId;
           frame.layers.splice(insertIndex + offset, 0, newLayer);
         });
       });
@@ -663,12 +729,16 @@
     trackSnapshots.forEach((track, offset) => {
       const layerSnapshots = Array.isArray(track?.layers) ? track.layers : [];
       const fallbackLayerSnapshot = layerSnapshots.find(Boolean) || null;
+      let addedTrackId = '';
       state.frames.forEach((frame, frameIndex) => {
         if (!frame || !Array.isArray(frame.layers)) {
           return;
         }
         const sourceLayerSnapshot = layerSnapshots[frameIndex] || fallbackLayerSnapshot;
-        const newLayer = createLayerFromClipboardSnapshot(sourceLayerSnapshot, state.width, state.height);
+        const newLayer = createLayerFromClipboardSnapshot(sourceLayerSnapshot, state.width, state.height, {
+          trackId: addedTrackId,
+        });
+        addedTrackId = newLayer.trackId;
         frame.layers.splice(insertIndex + offset, 0, newLayer);
       });
     });
@@ -767,6 +837,14 @@
     if (!Array.isArray(selectedIndexes) || !selectedIndexes.length || layerCount <= 1 || !Number.isInteger(offset) || offset === 0) {
       return { moved: false, selectedIndexes: [] };
     }
+    const trackOrder = activeFrame.layers.map(layer => layer?.trackId || '');
+    if (trackOrder.some(trackId => !trackId) || new Set(trackOrder).size !== trackOrder.length) {
+      updateAutosaveStatus(localizeText('レイヤー軌道の整合性を確認できません', 'Layer-track integrity could not be verified'), 'warn');
+      return { moved: false, selectedIndexes: [] };
+    }
+    // Resolve all selected UI indexes once, then apply the operation by track
+    // identity. Frames are allowed to arrive in a different order; a completed
+    // structure operation normalizes them to the selected active-frame order.
     const selectedFlags = new Array(layerCount).fill(false);
     selectedIndexes.forEach(index => {
       if (Number.isInteger(index) && index >= 0 && index < layerCount) {
@@ -779,14 +857,9 @@
         if (!selectedFlags[layerIndex] || selectedFlags[layerIndex - 1]) {
           continue;
         }
-        state.frames.forEach(frame => {
-          if (!frame || !Array.isArray(frame.layers) || layerIndex >= frame.layers.length) {
-            return;
-          }
-          const previousLayer = frame.layers[layerIndex - 1];
-          frame.layers[layerIndex - 1] = frame.layers[layerIndex];
-          frame.layers[layerIndex] = previousLayer;
-        });
+        const previousTrackId = trackOrder[layerIndex - 1];
+        trackOrder[layerIndex - 1] = trackOrder[layerIndex];
+        trackOrder[layerIndex] = previousTrackId;
         selectedFlags[layerIndex - 1] = true;
         selectedFlags[layerIndex] = false;
         moved = true;
@@ -796,19 +869,41 @@
         if (!selectedFlags[layerIndex] || selectedFlags[layerIndex + 1]) {
           continue;
         }
-        state.frames.forEach(frame => {
-          if (!frame || !Array.isArray(frame.layers) || layerIndex + 1 >= frame.layers.length) {
-            return;
-          }
-          const nextLayer = frame.layers[layerIndex + 1];
-          frame.layers[layerIndex + 1] = frame.layers[layerIndex];
-          frame.layers[layerIndex] = nextLayer;
-        });
+        const nextTrackId = trackOrder[layerIndex + 1];
+        trackOrder[layerIndex + 1] = trackOrder[layerIndex];
+        trackOrder[layerIndex] = nextTrackId;
         selectedFlags[layerIndex + 1] = true;
         selectedFlags[layerIndex] = false;
         moved = true;
       }
     }
+    if (!moved) {
+      return { moved: false, selectedIndexes: [] };
+    }
+    // Validate first so a malformed frame can never cause a positional
+    // fallback or a partially-applied reorder.
+    const frameTrackMaps = [];
+    for (const frame of state.frames) {
+      if (!frame || !Array.isArray(frame.layers)) {
+        return { moved: false, selectedIndexes: [] };
+      }
+      const byTrackId = new Map();
+      for (const layer of frame.layers) {
+        if (!layer?.trackId || byTrackId.has(layer.trackId)) {
+          updateAutosaveStatus(localizeText('レイヤー軌道の欠損または重複を検出しました', 'Missing or duplicate layer track detected'), 'warn');
+          return { moved: false, selectedIndexes: [] };
+        }
+        byTrackId.set(layer.trackId, layer);
+      }
+      if (trackOrder.some(trackId => !byTrackId.has(trackId)) || byTrackId.size !== trackOrder.length) {
+        updateAutosaveStatus(localizeText('レイヤー軌道がフレーム間で一致しません', 'Layer tracks do not match across frames'), 'warn');
+        return { moved: false, selectedIndexes: [] };
+      }
+      frameTrackMaps.push({ frame, byTrackId });
+    }
+    frameTrackMaps.forEach(({ frame, byTrackId }) => {
+      frame.layers = trackOrder.map(trackId => byTrackId.get(trackId));
+    });
     const nextSelection = [];
     selectedFlags.forEach((isSelected, index) => {
       if (isSelected) {
@@ -841,7 +936,7 @@
     const layerEnd = offset < 0 ? maxLayerCount : -1;
     const layerStep = offset < 0 ? 1 : -1;
     for (let layerIndex = layerStart; layerIndex !== layerEnd; layerIndex += layerStep) {
-      if (offset < 0) {
+    if (offset < 0) {
         for (let frameIndex = 1; frameIndex < frameCount; frameIndex += 1) {
           const sourceKey = createTimelineSlotKey(frameIndex, layerIndex);
           const targetKey = createTimelineSlotKey(frameIndex - 1, layerIndex);
@@ -1054,18 +1149,18 @@
     if (!activeFrame) return;
     const currentIndex = getActiveLayerIndex();
     if (currentIndex < 0) return;
-    const targetIndex = clamp(currentIndex + offset, 0, activeFrame.layers.length - 1);
-    if (targetIndex === currentIndex) return;
+    const activeTrackId = getActiveLayerTrackId();
     beginHistory(offset < 0 ? 'moveLayerUp' : 'moveLayerDown');
-    state.frames.forEach(frame => {
-      if (currentIndex < 0 || currentIndex >= frame.layers.length) return;
-      const [layer] = frame.layers.splice(currentIndex, 1);
-      frame.layers.splice(targetIndex, 0, layer);
-    });
+    const moveResult = moveLayerIndexesByOffset([currentIndex], offset);
+    if (!moveResult.moved) {
+      history.pending = null;
+      return;
+    }
     clearPendingMultiAssignmentMoveRequests();
     const updatedFrame = getActiveFrame();
-    if (updatedFrame && updatedFrame.layers[targetIndex]) {
-      state.activeLayer = updatedFrame.layers[targetIndex].id;
+    const updatedActiveLayer = getLayerByTrackId(updatedFrame, activeTrackId);
+    if (updatedActiveLayer) {
+      state.activeLayer = updatedActiveLayer.id;
     }
     markHistoryDirty();
     scheduleSessionPersist();
@@ -1156,13 +1251,16 @@
       clearTimelineSelection();
       beginHistory('addLayer');
       const insertIndex = clamp(getActiveLayerIndex() + 1, 0, Number.MAX_SAFE_INTEGER);
+      let addedTrackId = '';
       state.frames.forEach((frame, frameIndex) => {
         const targetIndex = Math.min(insertIndex, frame.layers.length);
         const name = getDefaultLayerName(frame.layers.length + 1);
         const newLayer = createLayer(name, state.width, state.height, null, {
+          trackId: addedTrackId,
           deferPixelAllocation: Number(state.rasterModelVersion) >= 1
             || frameIndex !== state.activeFrame,
         });
+        addedTrackId = newLayer.trackId;
         frame.layers.splice(targetIndex, 0, newLayer);
         recordPendingLayerAddHistoryLayer(frame, newLayer, targetIndex);
         if (frameIndex === state.activeFrame) {
@@ -1197,10 +1295,12 @@
       clearTimelineSelection();
       beginHistory('addSimulationLayer');
       const insertIndex = clamp(getActiveLayerIndex() + 1, 0, Number.MAX_SAFE_INTEGER);
+      let addedTrackId = '';
       state.frames.forEach((frame, frameIndex) => {
         const targetIndex = Math.min(insertIndex, frame.layers.length);
         const name = `${getDefaultLayerName(frame.layers.length + 1)} Sim`;
-        const newLayer = createSimulationLayer(name, state.width, state.height);
+        const newLayer = createSimulationLayer(name, state.width, state.height, { trackId: addedTrackId });
+        addedTrackId = newLayer.trackId;
         frame.layers.splice(targetIndex, 0, newLayer);
         if (frameIndex === state.activeFrame) {
           state.activeLayer = newLayer.id;
@@ -1222,10 +1322,30 @@
         }
         return;
       }
+      const repairedLayerTrackCount = repairLayerTracksAcrossFrames();
+      if (repairedLayerTrackCount > 0) {
+        markHistoryDirty();
+        scheduleSessionPersist();
+      }
       if (!state.frames.every(frame => frame.layers.length > 1)) {
+        updateAutosaveStatus(
+          localizeText('最後のレイヤーは削除できません', 'The final layer cannot be deleted'),
+          'warn'
+        );
         return;
       }
       const removeIndex = clamp(getActiveLayerIndex(), 0, Number.MAX_SAFE_INTEGER);
+      const activeFrameBeforeRemove = getActiveFrame();
+      const removeTrackId = activeFrameBeforeRemove?.layers?.[removeIndex]?.trackId || '';
+      if (!removeTrackId) {
+        updateAutosaveStatus(localizeText('削除するレイヤー軌道を特定できません', 'The layer track to delete could not be identified'), 'warn');
+        return;
+      }
+      const missingTrackFrame = state.frames.find(frame => !getLayerByTrackId(frame, removeTrackId));
+      if (missingTrackFrame) {
+        updateAutosaveStatus(localizeText('レイヤー軌道が不足しているため削除を中止しました', 'Layer track is missing; deletion was cancelled'), 'warn');
+        return;
+      }
       if (isSharedProjectCollaborativeMode()) {
         const simulatedCanvases = cloneProjectCanvasDocumentsForStructureChange();
         if (!Array.isArray(simulatedCanvases)) {
@@ -1233,8 +1353,10 @@
         }
         const simulatedCanvas = simulatedCanvases[getActiveProjectCanvasIndex()] || null;
         simulatedCanvas?.frames?.forEach(frame => {
-          const targetIndex = clamp(removeIndex, 0, Math.max(0, (frame.layers?.length || 1) - 1));
-          if (Array.isArray(frame.layers) && frame.layers.length > 1) {
+          const targetIndex = Array.isArray(frame?.layers)
+            ? frame.layers.findIndex(layer => layer?.trackId === removeTrackId)
+            : -1;
+          if (targetIndex >= 0 && frame.layers.length > 1) {
             frame.layers.splice(targetIndex, 1);
           }
         });
@@ -1249,12 +1371,19 @@
       clearTimelineSelection();
       beginHistory('removeLayer');
       state.frames.forEach(frame => {
-        const targetIndex = Math.min(removeIndex, frame.layers.length - 1);
-        frame.layers.splice(targetIndex, 1);
+        const targetIndex = frame.layers.findIndex(layer => layer?.trackId === removeTrackId);
+        if (targetIndex >= 0) {
+          const [removedLayer] = frame.layers.splice(targetIndex, 1);
+          recordPendingLayerRemoveHistoryLayer(frame, removedLayer, targetIndex);
+        }
       });
       const activeFrame = getActiveFrame();
       const nextIndex = clamp(removeIndex - 1, 0, activeFrame.layers.length - 1);
       state.activeLayer = activeFrame.layers[nextIndex].id;
+      if (history.pending?.__historyEntryType === 'layerRemove') {
+        history.pending.activeFrameAfter = state.activeFrame;
+        history.pending.activeLayerAfter = state.activeLayer;
+      }
       markHistoryDirty();
       scheduleSessionPersist();
       renderFrameList();
@@ -1878,11 +2007,15 @@
   }
 
   function getLayerVisibilityForRow(rowIndex) {
+    const trackId = getLayerTrackIdForRow(rowIndex);
+    if (!trackId) {
+      return true;
+    }
     for (let frameIndex = 0; frameIndex < state.frames.length; frameIndex += 1) {
       const frame = state.frames[frameIndex];
-      const layerIndex = frame.layers.length - 1 - rowIndex;
-      if (layerIndex >= 0 && layerIndex < frame.layers.length) {
-        return getDisplayedLayerVisibility(frame.layers[layerIndex], true);
+      const layer = getLayerByTrackId(frame, trackId);
+      if (layer) {
+        return getDisplayedLayerVisibility(layer, true);
       }
     }
     return true;
@@ -1890,27 +2023,25 @@
 
   function setLayerVisibilityForRow(rowIndex, visible) {
     const nextVisible = visible !== false;
+    const trackId = getLayerTrackIdForRow(rowIndex);
+    if (!trackId) {
+      return;
+    }
     let needsChange = false;
     state.frames.forEach(frame => {
-      const layerIndex = frame.layers.length - 1 - rowIndex;
-      if (layerIndex >= 0 && layerIndex < frame.layers.length) {
-        const targetLayer = frame.layers[layerIndex];
-        if (targetLayer && getDisplayedLayerVisibility(targetLayer, true) !== nextVisible) {
-          needsChange = true;
-        }
+      const targetLayer = getLayerByTrackId(frame, trackId);
+      if (targetLayer && getDisplayedLayerVisibility(targetLayer, true) !== nextVisible) {
+        needsChange = true;
       }
     });
     if (!needsChange) {
       return;
     }
     state.frames.forEach(frame => {
-      const layerIndex = frame.layers.length - 1 - rowIndex;
-      if (layerIndex >= 0 && layerIndex < frame.layers.length) {
-        const targetLayer = frame.layers[layerIndex];
-        if (targetLayer && getDisplayedLayerVisibility(targetLayer, true) !== nextVisible) {
-          targetLayer.visible = nextVisible;
-          rememberLocalLayerVisibility(targetLayer.id, nextVisible);
-        }
+      const targetLayer = getLayerByTrackId(frame, trackId);
+      if (targetLayer && getDisplayedLayerVisibility(targetLayer, true) !== nextVisible) {
+        targetLayer.visible = nextVisible;
+        rememberLocalLayerVisibility(targetLayer.id, nextVisible);
       }
     });
     clearPlaybackFrameCache();
@@ -1938,11 +2069,16 @@
     if (!Number.isInteger(layerIndex) || layerIndex < 0 || typeof callback !== 'function') {
       return;
     }
+    const activeFrame = getActiveFrame();
+    const trackId = activeFrame?.layers?.[layerIndex]?.trackId || '';
+    if (!trackId) {
+      return;
+    }
     state.frames.forEach((frame, frameIndex) => {
       if (!frame || !Array.isArray(frame.layers)) {
         return;
       }
-      const layer = frame.layers[layerIndex];
+      const layer = getLayerByTrackId(frame, trackId);
       if (!layer) {
         return;
       }
@@ -2464,14 +2600,13 @@
 
   function selectTimelineFrameDirectly(frameIndex, { append = false } = {}) {
     if (!canUseDirectTimelineSelection()) return false;
-    const currentFrame = getActiveFrame();
-    const currentLayers = currentFrame ? currentFrame.layers.slice().reverse() : [];
-    const activeLayerRow = currentLayers.findIndex(layer => layer.id === state.activeLayer);
-    const candidateLayers = state.frames[frameIndex]?.layers?.slice().reverse() || [];
-    const nextLayer = candidateLayers[activeLayerRow] || candidateLayers[candidateLayers.length - 1] || candidateLayers[0];
+    const candidateLayers = state.frames[frameIndex]?.layers || [];
+    const nextLayer = getLayerByTrackId(state.frames[frameIndex], getActiveLayerTrackId())
+      || candidateLayers[candidateLayers.length - 1]
+      || candidateLayers[0];
     setTimelineFrameSelection(frameIndex, { append });
     if (nextLayer) {
-      const nextTrackIndex = state.frames[frameIndex]?.layers?.findIndex(layer => layer?.id === nextLayer.id) ?? -1;
+      const nextTrackIndex = state.frames[frameIndex]?.layers?.findIndex(layer => layer?.trackId === nextLayer.trackId) ?? -1;
       if (nextTrackIndex >= 0) {
         setActiveFrameOnLayerTrack(frameIndex, nextTrackIndex, { persist: false, render: true, syncUi: true });
       }
@@ -2568,13 +2703,13 @@
         if (!Number.isFinite(frameIndex) || frameIndex < 0 || frameIndex >= state.frames.length) {
           return;
         }
-        const currentFrame = getActiveFrame();
-        const currentLayers = currentFrame ? currentFrame.layers.slice().reverse() : [];
-        const activeLayerRow = currentLayers.findIndex(layer => layer.id === state.activeLayer);
+        const activeTrackId = getActiveLayerTrackId();
         if (isMultiAssignedCellRestrictedEditorMode()) {
           if (isMultiGuestMode()) {
-            const candidateLayers = state.frames[frameIndex]?.layers?.slice().reverse() || [];
-            const nextLayer = candidateLayers[activeLayerRow] || candidateLayers[candidateLayers.length - 1] || candidateLayers[0];
+            const candidateLayers = state.frames[frameIndex]?.layers || [];
+            const nextLayer = getLayerByTrackId(state.frames[frameIndex], activeTrackId)
+              || candidateLayers[candidateLayers.length - 1]
+              || candidateLayers[0];
             const nextTrackIndex = nextLayer
               ? (state.frames[frameIndex]?.layers?.findIndex(layer => layer?.id === nextLayer.id) ?? -1)
               : -1;
@@ -2589,8 +2724,10 @@
           setActiveFrameIndex(frameIndex, { persist: false, render: false, syncUi: false });
           enforceGuestAssignedLayerSelection({ announce: false });
         } else {
-          const candidateLayers = state.frames[frameIndex]?.layers?.slice().reverse() || [];
-          const nextLayer = candidateLayers[activeLayerRow] || candidateLayers[candidateLayers.length - 1] || candidateLayers[0];
+          const candidateLayers = state.frames[frameIndex]?.layers || [];
+          const nextLayer = getLayerByTrackId(state.frames[frameIndex], activeTrackId)
+            || candidateLayers[candidateLayers.length - 1]
+            || candidateLayers[0];
           if (nextLayer && isSharedProjectCollaborativeMode() && !canSelectSharedProjectTimelineCell(frameIndex, nextLayer.id)) {
             renderTimelineMatrix();
             return;
@@ -3120,6 +3257,11 @@
     timelineMatrixRenderDirty = false;
     bindTimelineMatrixInteractions();
 
+    const repairedLayerTrackCount = repairLayerTracksAcrossFrames();
+    if (repairedLayerTrackCount > 0) {
+      markHistoryDirty();
+      scheduleSessionPersist();
+    }
     const frames = state.frames;
     const frameCount = frames.length;
     if (!frameCount) {
@@ -3645,6 +3787,10 @@
           buildMultiAssignmentTimelineCellMap,
           parseTimelineSlotKey,
           hasTimelineLayerIndex,
+          getLayerByTrackId,
+          getActiveLayerTrackId,
+          getLayerTrackIdForRow,
+          repairLayerTracksAcrossFrames,
           normalizeTimelineSelectionState,
           clearTimelineSelection,
           clearTimelineSelectionForCanvasInteraction,

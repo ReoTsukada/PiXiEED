@@ -191,7 +191,7 @@
     Object.freeze({
       id: 'save-export',
       title: { ja: '保存・出力', en: 'Save & Export', zh: '保存与导出' },
-      keywords: { ja: 'PNG JPEG SVG GIF タイムラプス プロジェクト 保存', en: 'png jpeg svg gif timelapse project export save', zh: 'PNG JPEG SVG GIF 延时 项目 保存 导出' },
+      keywords: { ja: 'PNG JPEG SVG GIF プロジェクト 保存', en: 'png jpeg svg gif project export save', zh: 'PNG JPEG SVG GIF 项目 保存 导出' },
       points: {
         ja: [
           'ファイルパネルの「保存/出力」から形式を選んで保存します。',
@@ -199,7 +199,7 @@
         ],
         en: [
           'Open Save/Export from the File panel and choose a format.',
-          'Supported: PNG/JPEG/SVG/GIF/Timelapse GIF/.pxd.',
+          'Supported: PNG/JPEG/SVG/GIF/.pxd.',
         ],
         zh: [
           '从文件面板打开“保存/导出”并选择格式。',
@@ -696,7 +696,6 @@
     'Screen': '滤色',
     'Shared': '共享',
     'Soft Light': '柔光',
-    'Timelapse GIF': '延时GIF',
     'ON にすると Front / Back / Left / Right / Top / Bottom の6面構成へ切り替わり、小窓プレビューを自動生成します。小窓をドラッグすると左右と上下に回転できます。': '开启后会切换为 Front / Back / Left / Right / Top / Bottom 六面结构，并自动生成浮动预览。拖动浮动预览可左右和上下旋转。',
     'PiXiEEDraw（ピクシードロー）でドット絵づくり・共同制作・アニメ制作をはじめよう': '用 PiXiEEDraw 开始制作像素画、协作创作和动画。',
     'PiXiEEDファイルも同期': '同时同步PiXiEED文件',

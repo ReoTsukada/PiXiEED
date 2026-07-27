@@ -92,7 +92,6 @@ try {
         },
         session: {
           historyLimit: 30,
-          timelapse: { enabled: false, fps: 12, byCanvas: {}, operationLogsByCanvas: {} },
         },
       },
       journalOps: [],

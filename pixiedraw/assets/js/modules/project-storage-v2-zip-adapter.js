@@ -116,7 +116,6 @@
       // The archive codec still accepts the option for old callers, but V2
       // writing is permanently one-project.
       const includeSheets = false;
-      const includeTimelapse = options?.includeTimelapse !== false;
       const snapshot = projectState?.snapshot || null;
       const session = projectState?.session || null;
       const packagedSource = projectState?.packaged && typeof projectState.packaged === 'object'
@@ -139,7 +138,6 @@
           fileExtension: PROJECT_FILE_EXTENSION,
           mimeType: PROJECT_FILE_MIME_TYPE,
           includeSheets,
-          includeTimelapse,
         };
         let result = null;
         let workerUsed = false;

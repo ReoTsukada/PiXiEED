@@ -511,7 +511,6 @@
       setLocalizedTextContent('#voxelExtensionHint', 'ON にすると Front / Back / Left / Right / Top / Bottom の6面構成へ切り替わり、小窓プレビューを自動生成します。小窓をドラッグすると左右と上下に回転できます。', 'When enabled, the workspace switches to Front / Back / Left / Right / Top / Bottom and generates the floating preview automatically. Drag the floating preview to rotate horizontally and vertically.');
       setLocalizedAttribute('#toggleVoxelExtensionMode', 'aria-label', 'ボクセルモード', 'Voxel mode');
       setLocalizedControlLabel('voxelDisplayPx', '表示PX', 'Display PX');
-      setLocalizedToggleLabel('toggleTimelapse', 'タイムラプス記録', 'Timelapse Recording');
       setLocalizedToggleLabel('toggleOnionSkin', 'オニオンスキン', 'Onion Skin');
       setLocalizedToggleLabel('toggleMirrorMode', 'ミラーモード', 'Mirror Mode');
       setLocalizedToggleLabel('mirrorAxisVertical', '左右対称', 'Vertical Mirror');
@@ -565,10 +564,6 @@
       setLocalizedTextContent('#clearCanvas', 'キャンバスをクリア', 'Clear Canvas');
       setLocalizedTextContent('.file-panel-summary .help-text:nth-child(1)', '描画内容はこの端末に自動保存されます。', 'Drawing changes are autosaved on this device.');
       setLocalizedTextContent('.file-panel-summary .help-text:nth-child(2)', '外部ファイルへは自動出力しません。画像・GIF・PiXiEEDraw形式は出力パネルからダウンロードします。', 'Files are never exported automatically. Download images, GIFs, and PiXiEEDraw files from the Export panel.');
-      setLocalizedTextContent('#timelapseSectionTitle', 'タイムラプス', 'Timelapse');
-      setLocalizedTextContent('#timelapseClear', '記録クリア', 'Clear Record');
-      setLocalizedControlLabel('timelapseFps', '再生FPS', 'Playback FPS');
-      setLocalizedTextContent('#timelapseDescription', '記録ON時は描画履歴を自動記録します。出力は通常の「出力」ボタンから選択してください。', 'When recording is ON, drawing history is captured automatically. Export from the regular Save / Export dialog.');
 
       setLocalizedTextContent('#exportDialogTitle', '出力設定', 'Export Settings');
       setLocalizedTextContent('#exportFormatPadTitle', '出力形式', 'Export format');
@@ -581,7 +576,6 @@
       setLocalizedSelectOption(dom.exportDialog?.format, 'gif', 'GIF（アニメーション）', 'GIF (Animation)');
       setLocalizedSelectOption(dom.exportDialog?.format, 'batchzip', '選択形式ZIP', 'Selected formats ZIP');
       setLocalizedSelectOption(dom.exportDialog?.format, 'allzip', '全形式ZIP（時間・容量大）', 'All formats ZIP (Large)');
-      setLocalizedSelectOption(dom.exportDialog?.format, 'timelapse', 'タイムラプスGIF（記録）', 'Timelapse GIF');
       setLocalizedSelectOption(dom.exportDialog?.format, 'project', 'プロジェクト（.pxd / V2）', 'Project (.pxd / V2)');
       setLocalizedTextContent('#exportBatchFormatOptions legend', 'ZIPに含める形式', 'Formats to include');
       setLocalizedTextContent('#exportBatchFormatHint', '必要な形式だけを1つのZIPにまとめます。選ばないGIF・SVG・JPEGは生成しません。', 'Bundle only the formats you select. GIF, SVG, and JPEG are not generated unless selected.');
@@ -596,7 +590,6 @@
       setLocalizedTextContent('#exportCompanionOptionRow span:not(.export-toggle-icon)', 'PiXiEEDrawもダウンロード', 'Download PiXiEEDraw too');
       setLocalizedTextContent('#exportSpriteMapCompanionOptionRow span:not(.export-toggle-icon)', 'SpriteMAP出力', 'SpriteMAP export');
       setLocalizedTextContent('#exportGridSplitOptionRow span', 'グリッド分割', 'Grid split');
-      setLocalizedTextContent('#exportTimelapseOptionRow span', 'タイムラプスGIF', 'Timelapse GIF');
       setLocalizedTextContent('#exportSpriteMapColorSpritesRow span:not(.export-toggle-icon)', 'カラースプライト出力', 'Color sprite export');
       setLocalizedTextContent('#exportGridSettings > span', 'グリッド分割 (PNG)', 'Grid Split (PNG)');
       setLocalizedControlLabel('exportGridWidth', '幅 (px)', 'Width (px)');

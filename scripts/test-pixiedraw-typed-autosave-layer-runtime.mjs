@@ -298,6 +298,46 @@ assert.equal(
 );
 assert.deepEqual(Array.from(unmarkedCompactLayer.indices), [0, 1, 0, 1]);
 
+const trackedLayer = model.createLayer('Tracked layer', 2, 2, null, { trackId: 'track-main' });
+const clonedTrackedLayer = model.cloneLayer(trackedLayer, 2, 2);
+assert.equal(trackedLayer.trackId, 'track-main', 'a new layer accepts its persistent track identity');
+assert.equal(clonedTrackedLayer.trackId, 'track-main', 'a frame-cell clone keeps its track identity');
+assert.notEqual(clonedTrackedLayer.id, trackedLayer.id, 'a frame-cell clone still receives a distinct cell id');
+const serializedTrackedLayer = model.serializeLayerForDocument(trackedLayer, {
+  preserveTypedArrays: true,
+  width: 2,
+  height: 2,
+});
+assert.equal(serializedTrackedLayer.trackId, 'track-main', 'checkpoint serialization persists the track identity');
+const restoredTrackedLayer = model.deserializeLayerFromDocument(
+  serializedTrackedLayer,
+  4,
+  'fallback-layer',
+  'Tracked layer',
+  2,
+  2,
+  { trustStoredLayerFlags: true }
+);
+assert.equal(restoredTrackedLayer.trackId, 'track-main', 'checkpoint restore retains the track identity');
+const trackedLayerClipboard = model.snapshotLayerForClipboard(trackedLayer, 2, 2);
+const pastedTrackedLayer = model.createLayerFromClipboardSnapshot(trackedLayerClipboard, 2, 2);
+assert.notEqual(
+  pastedTrackedLayer.trackId,
+  'track-main',
+  'pasting a layer creates a new track instead of aliasing the source track'
+);
+const trackedFrameClipboard = model.snapshotFrameForClipboard({
+  name: 'Tracked frame',
+  duration: 100,
+  layers: [trackedLayer],
+}, 2, 2);
+const pastedTrackedFrame = model.createFrameFromClipboardSnapshot(trackedFrameClipboard, 2, 2);
+assert.equal(
+  pastedTrackedFrame.layers[0].trackId,
+  'track-main',
+  'pasting a frame keeps its corresponding layer-track identity'
+);
+
 console.log(JSON.stringify({
   pixelCount,
   typedByteLength: indices.byteLength + direct.byteLength,
@@ -310,4 +350,5 @@ console.log(JSON.stringify({
   deferredRuntimeIndexLength: serializedDeferredRuntime.indices.length,
   recoveredBuild116IndexLength: recoveredBuild116Runtime.indices.length,
   recoveredBuild116EncodedIndexLength: recoveredBuild116EncodedRuntime.indices.length,
+  trackId: restoredTrackedLayer.trackId,
 }, null, 2));

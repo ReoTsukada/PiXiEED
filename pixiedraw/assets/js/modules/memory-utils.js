@@ -13,7 +13,6 @@
     estimateEncodedByteLength,
     isPixelPatchHistoryEntry,
     finalizePixelPatchHistoryEntry,
-    getAllTimelapseTracks,
     updateHistoryButtons,
     archiveEvictedHistoryEntry = () => false,
     normalizeProjectHistoryLimit,
@@ -108,38 +107,6 @@
       return list.reduce((sum, snapshot) => sum + estimateSnapshotBytes(snapshot), 0);
     }
 
-    function estimateTimelapseBytes() {
-      let total = 0;
-      Object.values(getAllTimelapseTracks()).forEach(track => {
-        const snapshots = Array.isArray(track?.snapshots) ? track.snapshots : [];
-        snapshots.forEach(entry => {
-          if (!entry || typeof entry !== 'object') {
-            return;
-          }
-          total += estimateEncodedByteLength(entry.pixels, 1);
-          total += 16;
-        });
-        const log = track?.operationLog && typeof track.operationLog === 'object' ? track.operationLog : null;
-        if (log?.baseSnapshot) {
-          try {
-            total += JSON.stringify(log.baseSnapshot).length * 2;
-          } catch (error) {
-            total += 0;
-          }
-        }
-        if (Array.isArray(log?.entries)) {
-          log.entries.forEach(entry => {
-            try {
-              total += JSON.stringify(entry).length * 2;
-            } catch (error) {
-              total += 0;
-            }
-          });
-        }
-      });
-      return total;
-    }
-
     function getMemoryUsageBreakdown() {
       const current = estimateStateBytes();
       const past = estimateHistoryBytes(history.past);
@@ -147,16 +114,14 @@
       const pending = isPixelPatchHistoryEntry(history.pending)
         ? estimateSnapshotBytes(finalizePixelPatchHistoryEntry(history.pending))
         : (history.pending && history.pending.before ? estimateSnapshotBytes(history.pending.before) : 0);
-      const timelapse = estimateTimelapseBytes();
       const compositeCache = Math.max(0, Number(getCanvasCompositeCacheBytes()) || 0);
       return {
         current,
         past,
         future,
         pending,
-        timelapse,
         compositeCache,
-        total: current + past + future + pending + timelapse + compositeCache,
+        total: current + past + future + pending + compositeCache,
       };
     }
 
@@ -211,7 +176,6 @@
       estimateStateBytes,
       estimateSnapshotBytes,
       estimateHistoryBytes,
-      estimateTimelapseBytes,
       getMemoryUsageBreakdown,
       trimHistoryToByteBudget,
       updateMemoryStatus,

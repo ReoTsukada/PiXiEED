@@ -222,6 +222,12 @@
         && Number(palette[0]?.a) <= 0;
       return {
         id: crypto.randomUUID ? crypto.randomUUID() : `layer-${Math.random().toString(36).slice(2)}`,
+        // `id` is frame-local. The shared timeline identity is kept in
+        // `trackId`, so duplicated frames receive a new cell id but retain
+        // their layer-track association.
+        trackId: typeof options?.trackId === 'string' && options.trackId
+          ? options.trackId
+          : (crypto.randomUUID ? crypto.randomUUID() : `track-${Math.random().toString(36).slice(2)}`),
         name,
         visible: true,
         opacity: 1,
@@ -995,10 +1001,13 @@
       };
     }
 
-    function createSimulationLayer(name, width, height) {
+    function createSimulationLayer(name, width, height, options = {}) {
       const size = Math.max(1, Math.floor(width) || 1) * Math.max(1, Math.floor(height) || 1);
       return {
         id: crypto.randomUUID ? crypto.randomUUID() : `layer-${Math.random().toString(36).slice(2)}`,
+        trackId: typeof options?.trackId === 'string' && options.trackId
+          ? options.trackId
+          : (crypto.randomUUID ? crypto.randomUUID() : `track-${Math.random().toString(36).slice(2)}`),
         type: SIM_LAYER_TYPE,
         name,
         visible: true,
@@ -1027,7 +1036,9 @@
     }
 
     function cloneSimulationLayer(baseLayer, width, height, { copyPixels = true } = {}) {
-      const layer = createSimulationLayer(baseLayer?.name || getDefaultLayerName(1), width, height);
+      const layer = createSimulationLayer(baseLayer?.name || getDefaultLayerName(1), width, height, {
+        trackId: baseLayer?.trackId,
+      });
       layer.visible = baseLayer?.visible !== false;
       layer.opacity = normalizeLayerOpacity(baseLayer?.opacity);
       layer.blendMode = normalizeLayerBlendMode(baseLayer?.blendMode);
@@ -1068,9 +1079,13 @@
         : cloneLayer(baseLayer, width, height, options);
     }
 
-    function createGenericLayerFromSnapshot(snapshot, width, height) {
+    function createGenericLayerFromSnapshot(snapshot, width, height, options = {}) {
       if (snapshot?.type === SIM_LAYER_TYPE) {
-        const layer = createSimulationLayer(snapshot.name || getDefaultLayerName(1), width, height);
+        const layer = createSimulationLayer(snapshot.name || getDefaultLayerName(1), width, height, {
+          trackId: typeof options?.trackId === 'string' && options.trackId
+            ? options.trackId
+            : (options?.preserveTrackId === true ? snapshot?.trackId : ''),
+        });
         layer.visible = snapshot?.visible !== false;
         layer.opacity = normalizeLayerOpacity(snapshot?.opacity);
         layer.blendMode = normalizeLayerBlendMode(snapshot?.blendMode);
@@ -1101,7 +1116,7 @@
         };
         return layer;
       }
-      return createLayerFromClipboardSnapshot(snapshot, width, height);
+      return createLayerFromClipboardSnapshot(snapshot, width, height, options);
     }
 
     function cloneLayer(
@@ -1121,6 +1136,9 @@
         && isImplicitTransparentLayerIndices(baseLayer?.indices, size);
       const layer = {
         id: crypto.randomUUID ? crypto.randomUUID() : `layer-${Math.random().toString(36).slice(2)}`,
+        trackId: typeof baseLayer?.trackId === 'string' && baseLayer.trackId
+          ? baseLayer.trackId
+          : (crypto.randomUUID ? crypto.randomUUID() : `track-${Math.random().toString(36).slice(2)}`),
         name: baseLayer.name,
         visible: baseLayer.visible,
         opacity: normalizeLayerOpacity(baseLayer.opacity),
@@ -1198,7 +1216,9 @@
           ...frame,
           layers: frame.layers.map(layer => {
             if (isSimulationLayer(layer)) {
-              const resizedSimulation = createSimulationLayer(layer?.name || getDefaultLayerName(1), targetWidth, targetHeight);
+              const resizedSimulation = createSimulationLayer(layer?.name || getDefaultLayerName(1), targetWidth, targetHeight, {
+                trackId: layer?.trackId,
+              });
               resizedSimulation.id = layer?.id || resizedSimulation.id;
               resizedSimulation.visible = layer?.visible !== false;
               resizedSimulation.opacity = normalizeLayerOpacity(layer?.opacity);
@@ -1237,7 +1257,9 @@
               }
               return resizedSimulation;
             }
-            const resized = createLayer(layer?.name || getDefaultLayerName(1), targetWidth, targetHeight);
+            const resized = createLayer(layer?.name || getDefaultLayerName(1), targetWidth, targetHeight, null, {
+              trackId: layer?.trackId,
+            });
             resized.id = layer?.id || resized.id;
             resized.visible = layer?.visible !== false;
             resized.opacity = normalizeLayerOpacity(layer?.opacity);
@@ -1298,7 +1320,9 @@
         return null;
       }
       if (isSimulationLayer(layer)) {
-        const sim = createSimulationLayer(typeof layer.name === 'string' ? layer.name : getDefaultLayerName(1), width, height);
+        const sim = createSimulationLayer(typeof layer.name === 'string' ? layer.name : getDefaultLayerName(1), width, height, {
+          trackId: layer?.trackId,
+        });
         sim.visible = layer.visible !== false;
         sim.opacity = normalizeLayerOpacity(layer.opacity);
         sim.blendMode = normalizeLayerBlendMode(layer.blendMode);
@@ -1347,6 +1371,7 @@
       }
       direct = promoteLegacyImportSourceDirect(direct, importSourceDirect, size * 4);
       return {
+        trackId: typeof layer.trackId === 'string' ? layer.trackId : '',
         name: typeof layer.name === 'string' ? layer.name : getDefaultLayerName(1),
         visible: layer.visible !== false,
         opacity: normalizeLayerOpacity(layer.opacity),
@@ -1359,14 +1384,18 @@
       };
     }
 
-    function createLayerFromClipboardSnapshot(snapshot, width = state.width, height = state.height) {
+    function createLayerFromClipboardSnapshot(snapshot, width = state.width, height = state.height, options = {}) {
       if (snapshot?.type === SIM_LAYER_TYPE) {
-        return createGenericLayerFromSnapshot(snapshot, width, height);
+        return createGenericLayerFromSnapshot(snapshot, width, height, options);
       }
       const layerName = typeof snapshot?.name === 'string' && snapshot.name.trim()
         ? snapshot.name.trim()
         : getDefaultLayerName(1);
-      const layer = createLayer(layerName, width, height);
+      const layer = createLayer(layerName, width, height, null, {
+        trackId: typeof options?.trackId === 'string' && options.trackId
+          ? options.trackId
+          : (options?.preserveTrackId === true ? snapshot?.trackId : ''),
+      });
       layer.visible = snapshot?.visible !== false;
       layer.opacity = normalizeLayerOpacity(snapshot?.opacity);
       layer.blendMode = normalizeLayerBlendMode(snapshot?.blendMode);
@@ -1411,7 +1440,7 @@
         ? snapshot.name.trim()
         : getDefaultFrameName(1);
       const layers = Array.isArray(snapshot?.layers) && snapshot.layers.length
-        ? snapshot.layers.map(layer => createLayerFromClipboardSnapshot(layer, width, height))
+        ? snapshot.layers.map(layer => createLayerFromClipboardSnapshot(layer, width, height, { preserveTrackId: true }))
         : [createLayer(getDefaultLayerName(1), width, height)];
       return {
         id: crypto.randomUUID ? crypto.randomUUID() : `frame-${Math.random().toString(36).slice(2)}`,
@@ -1442,7 +1471,9 @@
             const nextLayer = createLayer(
               typeof layer?.name === 'string' ? layer.name : getDefaultLayerName(layerIndex + 1),
               width,
-              height
+              height,
+              null,
+              { trackId: layer?.trackId }
             );
             nextLayer.id = typeof layer?.id === 'string' && layer.id
               ? layer.id
@@ -1507,6 +1538,7 @@
       const runtimeUint8Indices = isRuntimeUint8LayerIndices(layer);
       const clonedLayer = {
         id: layer.id,
+        trackId: typeof layer.trackId === 'string' ? layer.trackId : '',
         name: layer.name,
         visible: layer.visible,
         opacity: normalizeLayerOpacity(layer.opacity),
@@ -1594,6 +1626,7 @@
       if (isSimulationLayer(layer)) {
         return {
           id: layer.id,
+          trackId: typeof layer.trackId === 'string' ? layer.trackId : '',
           type: SIM_LAYER_TYPE,
           name: layer.name,
           visible: layer.visible !== false,
@@ -1698,6 +1731,7 @@
         );
       return {
         id: layer.id,
+        trackId: typeof layer.trackId === 'string' ? layer.trackId : '',
         name: layer.name,
         visible: layer.visible !== false,
         opacity: normalizeLayerOpacity(layer.opacity),
@@ -1825,6 +1859,7 @@
       if (layer?.type === SIM_LAYER_TYPE) {
         const simLayer = createSimulationLayer(fallbackName, width, height);
         simLayer.id = typeof layer.id === 'string' ? layer.id : fallbackId;
+        simLayer.trackId = typeof layer.trackId === 'string' ? layer.trackId : simLayer.trackId;
         simLayer.name = typeof layer.name === 'string' ? layer.name : fallbackName;
         simLayer.visible = layer.visible !== false;
         simLayer.opacity = normalizeLayerOpacity(layer.opacity);
@@ -1989,6 +2024,7 @@
       direct = promoteLegacyImportSourceDirect(direct, importSourceDirect, pixelCount * 4);
       return {
         id: typeof layer.id === 'string' ? layer.id : fallbackId,
+        trackId: typeof layer.trackId === 'string' ? layer.trackId : '',
         name: typeof layer.name === 'string' ? layer.name : fallbackName,
         visible: layer.visible !== false,
         opacity: normalizeLayerOpacity(layer.opacity),

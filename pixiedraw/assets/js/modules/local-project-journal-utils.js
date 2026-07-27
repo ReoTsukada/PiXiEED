@@ -861,9 +861,6 @@
       if (!hasSnapshot && !useCheckpoint && next.checkpointPersisted) {
         // A journal-only revision persists replayable document pixel patches.
         // Undo/Redo remains in the live editor and cold-history store only.
-        // Building the complete session here used
-        // to serialize every timelapse track even though that payload was
-        // discarded before the V2 journal write.
         next.historyPast = [];
         next.historyFuture = [];
         next.historyLimit = Math.max(1, Math.round(Number(history?.limit) || 30));

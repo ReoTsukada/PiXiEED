@@ -847,9 +847,6 @@
       localizeText('書き出しを準備中…', 'Preparing export...'),
       { immediate: true }
     );
-    const includeTimelapse = normalized !== 'project'
-      && dom.exportDialog?.timelapseToggle instanceof HTMLInputElement
-      && dom.exportDialog.timelapseToggle.checked;
     try {
       // `beginBlockingGlobalLoading()` only changes DOM state. Wait until it
       // has been painted before starting work that may block the main thread.
@@ -879,8 +876,6 @@
         await exportProjectAsGlb();
       } else if (normalized === 'gridpng') {
         await exportProjectAsGridPng();
-      } else if (normalized === 'timelapse') {
-        await exportTimelapseGif();
       } else if (normalized === 'project') {
         const result = await saveProjectAsPixieedraw({
           fileNameBase: getExportFileNameBase() || state.documentName,
@@ -890,10 +885,6 @@
         }
       } else {
         await exportProjectAsPng();
-      }
-      if (includeTimelapse) {
-        setGlobalLoadingIndicatorLabel(localizeText('タイムラプスを書き出し中…', 'Exporting timelapse...'));
-        await exportTimelapseGif();
       }
     } finally {
       closeLoading?.();

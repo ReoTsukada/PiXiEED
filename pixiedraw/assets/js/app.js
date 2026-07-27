@@ -350,7 +350,6 @@
       virtualCursorButtonScale: document.getElementById('virtualCursorButtonScale'),
       virtualCursorButtonScaleValue: document.getElementById('virtualCursorButtonScaleValue'),
       virtualCursorScale: document.getElementById('virtualCursorScale'),
-      toggleTimelapse: document.getElementById('toggleTimelapse'),
       mobileDrawHelp: document.getElementById('mobileDrawHelp'),
       openDocument: document.getElementById('openDocument'),
       showLocalProjects: document.getElementById('showLocalProjects'),
@@ -372,9 +371,6 @@
       pixfindActionReason: document.getElementById('pixfindActionReason'),
       clearCanvas: document.getElementById('clearCanvas'),
       autosaveStatus: document.getElementById('autosaveStatus'),
-      timelapseClear: document.getElementById('timelapseClear'),
-      timelapseFps: document.getElementById('timelapseFps'),
-      timelapseStatus: document.getElementById('timelapseStatus'),
       floatingPreviewPlay: document.getElementById('floatingPreviewPlay'),
       floatingPreviewStop: document.getElementById('floatingPreviewStop'),
       selectionTransformMenu: document.getElementById('selectionTransformMenu'),
@@ -548,8 +544,6 @@
       saveSpriteMapCompanionRow: document.getElementById('exportSpriteMapCompanionOptionRow'),
       gridSplitToggle: document.getElementById('exportGridSplitToggle'),
       gridSplitRow: document.getElementById('exportGridSplitOptionRow'),
-      timelapseToggle: document.getElementById('exportTimelapseToggle'),
-      timelapseRow: document.getElementById('exportTimelapseOptionRow'),
       spriteMapColorSpritesToggle: document.getElementById('exportSpriteMapColorSpritesToggle'),
       spriteMapColorSpritesRow: document.getElementById('exportSpriteMapColorSpritesRow'),
       previewCanvas: /** @type {HTMLCanvasElement|null} */ (document.getElementById('exportPreviewCanvas')),
@@ -1732,203 +1726,13 @@
   let exportAdRequested = false;
   let exportInterstitialAdRequested = false;
   let pendingExportAction = null;
-  const TIMELAPSE_DEFAULT_FPS = 12;
-  const TIMELAPSE_MIN_FPS = 1;
-  const TIMELAPSE_MAX_FPS = 60;
-  // Lightweight visual timelapse: retain a small sequence of rendered canvas
-  // states, not a replayable clone of the entire editable document.
-  const TIMELAPSE_MAX_STEPS = 60;
-  const TIMELAPSE_OPERATION_LOG_MAX_ENTRIES = isLightweightPersistenceMode() ? 120 : 240;
-  const TIMELAPSE_OPERATION_LOG_RECENT_ENTRIES = isLightweightPersistenceMode() ? 60 : 120;
-  const TIMELAPSE_OPERATION_LOG_MAX_CHANGES = isLightweightPersistenceMode() ? 8192 : 32768;
-  const TIMELAPSE_CAPTURE_DEBOUNCE_MS = 800;
-  const timelapseUtils = window.PiXiEEDrawModules?.timelapseUtils?.createTimelapseUtils?.({
-    TIMELAPSE_DEFAULT_FPS,
-    TIMELAPSE_MIN_FPS,
-    TIMELAPSE_MAX_FPS,
-    clamp,
-  }) || {};
-  const {
-    normalizeTimelapseFps,
-    createEmptyTimelapseTrack,
-    createEmptyTimelapseOperationLog,
-    normalizeFpsValue,
-    getDurationFromFps,
-  } = timelapseUtils;
-  const timelapseState = {
-    enabled: true,
-    tracksByCanvasId: Object.create(null),
-    fps: TIMELAPSE_DEFAULT_FPS,
-  };
-  const timelapseChunkStore = window.PiXiEEDrawModules?.timelapseChunkStoreUtils?.createTimelapseChunkStoreUtils?.({
-    maxSnapshotsPerCanvas: TIMELAPSE_MAX_STEPS,
-  }) || null;
-  const TIMELAPSE_DISK_BASE_MIN_PIXEL_PLANES = 256 * 256 * 48;
-  const pendingTimelapseArchiveWrites = new Set();
-
-  function getProjectPixelPlaneCountForTimelapseDiskBase() {
-    let documents = [];
-    try {
-      documents = typeof getProjectCanvasDocuments === 'function'
-        ? getProjectCanvasDocuments()
-        : [];
-    } catch (error) {
-      documents = [];
-    }
-    if (!Array.isArray(documents) || !documents.length) {
-      documents = [{
-        width: state.width,
-        height: state.height,
-        frames: state.frames,
-      }];
-    }
-    return documents.reduce((projectTotal, document) => {
-      const width = Math.max(1, Math.round(Number(document?.width) || 1));
-      const height = Math.max(1, Math.round(Number(document?.height) || 1));
-      const frames = Array.isArray(document?.frames) && document.frames.length
-        ? document.frames
-        : [null];
-      const layerPlaneCount = frames.reduce((frameTotal, frame) => {
-        const layers = Array.isArray(frame?.layers) && frame.layers.length ? frame.layers.length : 1;
-        return frameTotal + layers;
-      }, 0);
-      return projectTotal + (width * height * Math.max(1, layerPlaneCount));
-    }, 0);
+  function normalizeFpsValue(value) {
+    return Math.max(1, Math.min(60, Math.round(Number(value) || 12)));
   }
 
-  function shouldUseDiskBackedTimelapseBase() {
-    return getProjectPixelPlaneCountForTimelapseDiskBase() >= TIMELAPSE_DISK_BASE_MIN_PIXEL_PLANES;
+  function getDurationFromFps(fps) {
+    return 1000 / normalizeFpsValue(fps);
   }
-
-  async function loadPersistedTimelapseProject(projectId = autosaveProjectId, options = {}) {
-    const normalizedProjectId = normalizeAutosaveProjectId?.(projectId || '') || '';
-    if (!timelapseChunkStore || !normalizedProjectId) {
-      return { projectId: normalizedProjectId, byCanvas: {}, baseSnapshotsByCanvas: {} };
-    }
-    try {
-      const stored = await timelapseChunkStore.readProject(normalizedProjectId);
-      return {
-        projectId: normalizedProjectId,
-        byCanvas: stored?.byCanvas && typeof stored.byCanvas === 'object' ? stored.byCanvas : {},
-        baseSnapshotsByCanvas: stored?.baseSnapshotsByCanvas
-          && typeof stored.baseSnapshotsByCanvas === 'object'
-          ? stored.baseSnapshotsByCanvas
-          : {},
-      };
-    } catch (error) {
-      console.warn('Failed to load archived timelapse data.', error);
-      if (options?.throwOnError === true) {
-        throw error;
-      }
-      return { projectId: normalizedProjectId, byCanvas: {}, baseSnapshotsByCanvas: {} };
-    }
-  }
-
-  async function loadPersistedTimelapseBaseSnapshot(
-    canvasId = '',
-    projectId = autosaveProjectId,
-    options = {}
-  ) {
-    const stored = await loadPersistedTimelapseProject(projectId, options);
-    const canvasKey = String(canvasId || '').trim();
-    return canvasKey && stored.baseSnapshotsByCanvas?.[canvasKey]
-      ? stored.baseSnapshotsByCanvas[canvasKey]
-      : null;
-  }
-
-  function archiveTimelapseOperationLogBase(
-    canvasId = '',
-    operationLog = null,
-    projectId = autosaveProjectId
-  ) {
-    const normalizedProjectId = normalizeAutosaveProjectId?.(projectId || '') || '';
-    const activeProjectId = normalizeAutosaveProjectId?.(autosaveProjectId || '') || '';
-    const canvasKey = String(canvasId || '').trim();
-    const baseSnapshot = operationLog?.baseSnapshot || null;
-    if (
-      !timelapseChunkStore
-      || !normalizedProjectId
-      || normalizedProjectId !== activeProjectId
-      || !canvasKey
-      || !baseSnapshot
-      || !shouldUseDiskBackedTimelapseBase()
-    ) {
-      return Promise.resolve(false);
-    }
-    const write = timelapseChunkStore.writeBaseSnapshot(normalizedProjectId, canvasKey, baseSnapshot)
-      .then(result => {
-        const succeeded = result !== false;
-        if (succeeded && operationLog.baseSnapshot === baseSnapshot) {
-          operationLog.baseSnapshotStored = true;
-          operationLog.baseSnapshotStorageCanvasId = canvasKey;
-          operationLog.baseSnapshotStorageProjectId = normalizedProjectId;
-          operationLog.baseSnapshot = null;
-          updateMemoryStatus?.();
-        }
-        return succeeded;
-      })
-      .catch(error => {
-        console.warn('Failed to archive timelapse operation-log base.', error);
-        return false;
-      });
-    pendingTimelapseArchiveWrites.add(write);
-    write.finally(() => pendingTimelapseArchiveWrites.delete(write));
-    return write;
-  }
-
-  function archiveTimelapseOperationLogBases(projectId = autosaveProjectId) {
-    const tracks = timelapseState?.tracksByCanvasId && typeof timelapseState.tracksByCanvasId === 'object'
-      ? timelapseState.tracksByCanvasId
-      : {};
-    return Promise.all(Object.entries(tracks).map(([canvasId, track]) =>
-      archiveTimelapseOperationLogBase(canvasId, track?.operationLog || null, projectId)
-    ));
-  }
-
-  function archiveTimelapseSnapshots(canvasId = '', snapshots = []) {
-    const projectId = normalizeAutosaveProjectId?.(autosaveProjectId || '') || '';
-    if (!timelapseChunkStore || !projectId || !canvasId || !Array.isArray(snapshots) || !snapshots.length) {
-      return Promise.resolve(false);
-    }
-    const write = timelapseChunkStore.appendSnapshots(projectId, canvasId, snapshots)
-      .then(result => result !== false)
-      .catch(error => {
-        console.warn('Failed to archive timelapse snapshots.', error);
-        return false;
-      });
-    pendingTimelapseArchiveWrites.add(write);
-    write.finally(() => pendingTimelapseArchiveWrites.delete(write));
-    return write;
-  }
-
-  async function waitForPendingTimelapseArchiveWrites({ requireSuccess = false } = {}) {
-    const pending = Array.from(pendingTimelapseArchiveWrites);
-    if (!pending.length) return true;
-    const results = await Promise.all(pending);
-    const succeeded = results.every(Boolean);
-    if (!succeeded && requireSuccess) {
-      const error = new Error('Timelapse archive synchronization failed');
-      error.code = 'ERR_TIMELAPSE_ARCHIVE_SYNC_FAILED';
-      throw error;
-    }
-    return succeeded;
-  }
-
-  async function loadPersistedTimelapseSnapshots(projectId = autosaveProjectId, options = {}) {
-    const stored = await loadPersistedTimelapseProject(projectId, options);
-    return stored.byCanvas;
-  }
-
-  function clearPersistedTimelapseSnapshots(projectId = autosaveProjectId) {
-    const normalizedProjectId = normalizeAutosaveProjectId?.(projectId || '') || '';
-    if (!timelapseChunkStore || !normalizedProjectId) return Promise.resolve(false);
-    return timelapseChunkStore.removeProject(normalizedProjectId).catch(error => {
-      console.warn('Failed to clear archived timelapse snapshots.', error);
-      return false;
-    });
-  }
-  let timelapseCaptureTimer = null;
-  const timelapseQueuedCanvasIds = new Set();
   let pixfindModeEnabled = false;
   let pixfindModeFirstEnableConfirmed = false;
   const pixfindModeUtilsModule = window.PiXiEEDrawModules?.pixfindModeUtils?.createPixfindModeUtils?.({
@@ -2829,8 +2633,6 @@
   set getPixelAlignedCanvasDisplayScale(value) { getPixelAlignedCanvasDisplayScale = value; },
   get getPointerPosition() { return getPointerPosition; },
   set getPointerPosition(value) { getPointerPosition = value; },
-  get getTimelapseTrackStepCount() { return getTimelapseTrackStepCount; },
-  set getTimelapseTrackStepCount(value) { getTimelapseTrackStepCount = value; },
   get getViewportVisibilityTargetSurface() { return getViewportVisibilityTargetSurface; },
   set getViewportVisibilityTargetSurface(value) { getViewportVisibilityTargetSurface = value; },
   get getVoxelCanvasDisplayLabel() { return getVoxelCanvasDisplayLabel; },
@@ -2911,8 +2713,6 @@
   set pruneMultiHistoryCanvases(value) { pruneMultiHistoryCanvases = value; },
   get prunePendingMultiAssignmentMoveRequests() { return prunePendingMultiAssignmentMoveRequests; },
   set prunePendingMultiAssignmentMoveRequests(value) { prunePendingMultiAssignmentMoveRequests = value; },
-  get pruneTimelapseTracksToExistingCanvases() { return pruneTimelapseTracksToExistingCanvases; },
-  set pruneTimelapseTracksToExistingCanvases(value) { pruneTimelapseTracksToExistingCanvases = value; },
   get refreshInactiveProjectCanvasSurfacesSoon() { return refreshInactiveProjectCanvasSurfacesSoon; },
   set refreshInactiveProjectCanvasSurfacesSoon(value) { refreshInactiveProjectCanvasSurfacesSoon = value; },
   get renderFloatingPreviewPanel() { return renderFloatingPreviewPanel; },
@@ -2955,10 +2755,6 @@
   set syncVoxelExtensionCanvasBadges(value) { syncVoxelExtensionCanvasBadges = value; },
   get syncVoxelExtensionPreviewFromSource() { return syncVoxelExtensionPreviewFromSource; },
   set syncVoxelExtensionPreviewFromSource(value) { syncVoxelExtensionPreviewFromSource = value; },
-  get timelapseQueuedCanvasIds() { return timelapseQueuedCanvasIds; },
-  set timelapseQueuedCanvasIds(value) { timelapseQueuedCanvasIds = value; },
-  get timelapseState() { return timelapseState; },
-  set timelapseState(value) { timelapseState = value; },
   get updateAutosaveStatus() { return updateAutosaveStatus; },
   set updateAutosaveStatus(value) { updateAutosaveStatus = value; },
   get updateCanvasResizeHandlePosition() { return updateCanvasResizeHandlePosition; },
@@ -5640,8 +5436,6 @@
   set syncMultiControls(value) { syncMultiControls = value; },
   get syncQrEditModeWithActivePayload() { return syncQrEditModeWithActivePayload; },
   set syncQrEditModeWithActivePayload(value) { syncQrEditModeWithActivePayload = value; },
-  get syncTimelapseControls() { return syncTimelapseControls; },
-  set syncTimelapseControls(value) { syncTimelapseControls = value; },
   get syncVoxelExtensionModeUi() { return syncVoxelExtensionModeUi; },
   set syncVoxelExtensionModeUi(value) { syncVoxelExtensionModeUi = value; },
   get toolButtons() { return toolButtons; },
@@ -5686,141 +5480,6 @@
   set updateRightTabVisibility(value) { updateRightTabVisibility = value; },
   get updateVirtualCursorActionToolButtons() { return updateVirtualCursorActionToolButtons; },
   set updateVirtualCursorActionToolButtons(value) { updateVirtualCursorActionToolButtons = value; },
-  }) || {};
-
-  const timelapseSessionUtilsModule = window.PiXiEEDrawModules?.timelapseSessionUtils?.createTimelapseSessionUtils?.({
-  get MAX_IMPORTED_PALETTE_COLORS() { return MAX_IMPORTED_PALETTE_COLORS; },
-  set MAX_IMPORTED_PALETTE_COLORS(value) { MAX_IMPORTED_PALETTE_COLORS = value; },
-  // Deprecated split-module contract. It intentionally has no sheet limit.
-  get MAX_PROJECT_SHEETS() { return undefined; },
-  get TIMELAPSE_CAPTURE_DEBOUNCE_MS() { return TIMELAPSE_CAPTURE_DEBOUNCE_MS; },
-  set TIMELAPSE_CAPTURE_DEBOUNCE_MS(value) { TIMELAPSE_CAPTURE_DEBOUNCE_MS = value; },
-  get TIMELAPSE_MAX_STEPS() { return TIMELAPSE_MAX_STEPS; },
-  set TIMELAPSE_MAX_STEPS(value) { TIMELAPSE_MAX_STEPS = value; },
-  get TIMELAPSE_OPERATION_LOG_MAX_ENTRIES() { return TIMELAPSE_OPERATION_LOG_MAX_ENTRIES; },
-  set TIMELAPSE_OPERATION_LOG_MAX_ENTRIES(value) { TIMELAPSE_OPERATION_LOG_MAX_ENTRIES = value; },
-  get TIMELAPSE_OPERATION_LOG_RECENT_ENTRIES() { return TIMELAPSE_OPERATION_LOG_RECENT_ENTRIES; },
-  set TIMELAPSE_OPERATION_LOG_RECENT_ENTRIES(value) { TIMELAPSE_OPERATION_LOG_RECENT_ENTRIES = value; },
-  get TIMELAPSE_OPERATION_LOG_MAX_CHANGES() { return TIMELAPSE_OPERATION_LOG_MAX_CHANGES; },
-  set TIMELAPSE_OPERATION_LOG_MAX_CHANGES(value) { TIMELAPSE_OPERATION_LOG_MAX_CHANGES = value; },
-  get activeSharedProjectKey() { return activeSharedProjectKey; },
-  set activeSharedProjectKey(value) { activeSharedProjectKey = value; },
-  get announceProjectCompanionSaveResult() { return announceProjectCompanionSaveResult; },
-  set announceProjectCompanionSaveResult(value) { announceProjectCompanionSaveResult = value; },
-  get appendColorSpriteAreaToFrameSet() { return appendColorSpriteAreaToFrameSet; },
-  set appendColorSpriteAreaToFrameSet(value) { appendColorSpriteAreaToFrameSet = value; },
-  get applyExportScaleConstraints() { return applyExportScaleConstraints; },
-  set applyExportScaleConstraints(value) { applyExportScaleConstraints = value; },
-  get archiveTimelapseSnapshots() { return archiveTimelapseSnapshots; },
-  set archiveTimelapseSnapshots(value) { archiveTimelapseSnapshots = value; },
-  get archiveTimelapseOperationLogBase() { return archiveTimelapseOperationLogBase; },
-  set archiveTimelapseOperationLogBase(value) { archiveTimelapseOperationLogBase = value; },
-  get applyLayerPatchPayloadToLayer() { return applyLayerPatchPayloadToLayer; },
-  set applyLayerPatchPayloadToLayer(value) { applyLayerPatchPayloadToLayer = value; },
-  get buildGifFromPixels() { return buildGifFromPixels; },
-  set buildGifFromPixels(value) { buildGifFromPixels = value; },
-  get clamp() { return clamp; },
-  set clamp(value) { clamp = value; },
-  get compositeFramePixels() { return compositeFramePixels; },
-  set compositeFramePixels(value) { compositeFramePixels = value; },
-  get ctx() { return ctx; },
-  set ctx(value) { ctx = value; },
-  get clearPersistedTimelapseSnapshots() { return clearPersistedTimelapseSnapshots; },
-  set clearPersistedTimelapseSnapshots(value) { clearPersistedTimelapseSnapshots = value; },
-  get compressUint8Array() { return compressUint8Array; },
-  set compressUint8Array(value) { compressUint8Array = value; },
-  get createEmptyTimelapseOperationLog() { return createEmptyTimelapseOperationLog; },
-  set createEmptyTimelapseOperationLog(value) { createEmptyTimelapseOperationLog = value; },
-  get createEmptyTimelapseTrack() { return createEmptyTimelapseTrack; },
-  set createEmptyTimelapseTrack(value) { createEmptyTimelapseTrack = value; },
-  get createExportFileName() { return createExportFileName; },
-  set createExportFileName(value) { createExportFileName = value; },
-  get decodeUint8Data() { return decodeUint8Data; },
-  set decodeUint8Data(value) { decodeUint8Data = value; },
-  get decompressHistorySnapshot() { return decompressHistorySnapshot; },
-  set decompressHistorySnapshot(value) { decompressHistorySnapshot = value; },
-  get deliverExportTasks() { return deliverExportTasks; },
-  set deliverExportTasks(value) { deliverExportTasks = value; },
-  get deserializeDocumentPayload() { return deserializeDocumentPayload; },
-  set deserializeDocumentPayload(value) { deserializeDocumentPayload = value; },
-  get dom() { return dom; },
-  set dom(value) { dom = value; },
-  get ensureCurrentClientCanExportProject() { return ensureCurrentClientCanExportProject; },
-  set ensureCurrentClientCanExportProject(value) { ensureCurrentClientCanExportProject = value; },
-  get extractSharedProjectOpPayload() { return extractSharedProjectOpPayload; },
-  set extractSharedProjectOpPayload(value) { extractSharedProjectOpPayload = value; },
-  get fetchSharedProjectOpsSince() { return fetchSharedProjectOpsSince; },
-  set fetchSharedProjectOpsSince(value) { fetchSharedProjectOpsSince = value; },
-  get getActiveFrame() { return getActiveFrame; },
-  set getActiveFrame(value) { getActiveFrame = value; },
-  get getActiveProjectCanvasDocument() { return getActiveProjectCanvasDocument; },
-  set getActiveProjectCanvasDocument(value) { getActiveProjectCanvasDocument = value; },
-  get getExportScaleCandidates() { return getExportScaleCandidates; },
-  set getExportScaleCandidates(value) { getExportScaleCandidates = value; },
-  get getProjectCanvasCount() { return getProjectCanvasCount; },
-  set getProjectCanvasCount(value) { getProjectCanvasCount = value; },
-  get getProjectCanvasDocumentById() { return getProjectCanvasDocumentById; },
-  set getProjectCanvasDocumentById(value) { getProjectCanvasDocumentById = value; },
-  get getProjectCanvasDocuments() { return getProjectCanvasDocuments; },
-  set getProjectCanvasDocuments(value) { getProjectCanvasDocuments = value; },
-  get getSharedProjectOpSeq() { return getSharedProjectOpSeq; },
-  set getSharedProjectOpSeq(value) { getSharedProjectOpSeq = value; },
-  get isPixelPatchHistoryEntry() { return isPixelPatchHistoryEntry; },
-  set isPixelPatchHistoryEntry(value) { isPixelPatchHistoryEntry = value; },
-  get isSharedProjectCollaborativeMode() { return isSharedProjectCollaborativeMode; },
-  set isSharedProjectCollaborativeMode(value) { isSharedProjectCollaborativeMode = value; },
-  get localizeText() { return localizeText; },
-  set localizeText(value) { localizeText = value; },
-  get loadPersistedTimelapseSnapshots() { return loadPersistedTimelapseSnapshots; },
-  set loadPersistedTimelapseSnapshots(value) { loadPersistedTimelapseSnapshots = value; },
-  get loadPersistedTimelapseBaseSnapshot() { return loadPersistedTimelapseBaseSnapshot; },
-  set loadPersistedTimelapseBaseSnapshot(value) { loadPersistedTimelapseBaseSnapshot = value; },
-  get makeHistorySnapshot() { return makeHistorySnapshot; },
-  set makeHistorySnapshot(value) { makeHistorySnapshot = value; },
-  get markDocumentDurablySaved() { return markDocumentDurablySaved; },
-  set markDocumentDurablySaved(value) { markDocumentDurablySaved = value; },
-  get maybeSaveProjectCompanionAfterExport() { return maybeSaveProjectCompanionAfterExport; },
-  set maybeSaveProjectCompanionAfterExport(value) { maybeSaveProjectCompanionAfterExport = value; },
-  get multiState() { return multiState; },
-  set multiState(value) { multiState = value; },
-  get normalizeColorValue() { return normalizeColorValue; },
-  set normalizeColorValue(value) { normalizeColorValue = value; },
-  get normalizeFpsValue() { return normalizeFpsValue; },
-  set normalizeFpsValue(value) { normalizeFpsValue = value; },
-  get normalizeMultiProjectKey() { return normalizeMultiProjectKey; },
-  set normalizeMultiProjectKey(value) { normalizeMultiProjectKey = value; },
-  get normalizeSerializedTimelapseOperationEntry() { return normalizeSerializedTimelapseOperationEntry; },
-  set normalizeSerializedTimelapseOperationEntry(value) { normalizeSerializedTimelapseOperationEntry = value; },
-  get normalizeTimelapseFps() { return normalizeTimelapseFps; },
-  set normalizeTimelapseFps(value) { normalizeTimelapseFps = value; },
-  get scaleFrameSetNearestNeighbor() { return scaleFrameSetNearestNeighbor; },
-  set scaleFrameSetNearestNeighbor(value) { scaleFrameSetNearestNeighbor = value; },
-  get scheduleSessionPersist() { return scheduleSessionPersist; },
-  set scheduleSessionPersist(value) { scheduleSessionPersist = value; },
-  get serializeDocumentSnapshot() { return serializeDocumentSnapshot; },
-  set serializeDocumentSnapshot(value) { serializeDocumentSnapshot = value; },
-  get shouldSaveProjectCompanion() { return shouldSaveProjectCompanion; },
-  set shouldSaveProjectCompanion(value) { shouldSaveProjectCompanion = value; },
-  get showLoginPromptAfterExport() { return showLoginPromptAfterExport; },
-  set showLoginPromptAfterExport(value) { showLoginPromptAfterExport = value; },
-  get snapshotFromParsedDocumentValue() { return snapshotFromParsedDocumentValue; },
-  set snapshotFromParsedDocumentValue(value) { snapshotFromParsedDocumentValue = value; },
-  get state() { return state; },
-  set state(value) { state = value; },
-  get syncExportScaleInputs() { return syncExportScaleInputs; },
-  set syncExportScaleInputs(value) { syncExportScaleInputs = value; },
-  get timelapseCaptureTimer() { return timelapseCaptureTimer; },
-  set timelapseCaptureTimer(value) { timelapseCaptureTimer = value; },
-  get timelapseQueuedCanvasIds() { return timelapseQueuedCanvasIds; },
-  set timelapseQueuedCanvasIds(value) { timelapseQueuedCanvasIds = value; },
-  get timelapseState() { return timelapseState; },
-  set timelapseState(value) { timelapseState = value; },
-  get updateAutosaveStatus() { return updateAutosaveStatus; },
-  set updateAutosaveStatus(value) { updateAutosaveStatus = value; },
-  get updateMemoryStatus() { return updateMemoryStatus; },
-  set updateMemoryStatus(value) { updateMemoryStatus = value; },
-  get writeLayerPixelPatchValue() { return writeLayerPixelPatchValue; },
-  set writeLayerPixelPatchValue(value) { writeLayerPixelPatchValue = value; },
   }) || {};
 
   const autosaveWorkflowUtilsModule = window.PiXiEEDrawModules?.autosaveWorkflowUtils?.createAutosaveWorkflowUtils?.({
@@ -6079,8 +5738,6 @@
   set clearActiveSharedProjectSession(value) { clearActiveSharedProjectSession = value; },
   get clearLensImportRequestParam() { return clearLensImportRequestParam; },
   set clearLensImportRequestParam(value) { clearLensImportRequestParam = value; },
-  get clearTimelapseRecording() { return clearTimelapseRecording; },
-  set clearTimelapseRecording(value) { clearTimelapseRecording = value; },
   get closeAllOpenProjectTabsForProjectReplacement() { return closeAllOpenProjectTabsForProjectReplacement; },
   set closeAllOpenProjectTabsForProjectReplacement(value) { closeAllOpenProjectTabsForProjectReplacement = value; },
   get reconstructLocalRecentProjectPayload() { return reconstructLocalRecentProjectPayload; },
@@ -6409,8 +6066,6 @@
   set exportProjectAsSpriteMap(value) { exportProjectAsSpriteMap = value; },
   get exportProjectAsSvg() { return exportProjectAsSvg; },
   set exportProjectAsSvg(value) { exportProjectAsSvg = value; },
-  get exportTimelapseGif() { return exportTimelapseGif; },
-  set exportTimelapseGif(value) { exportTimelapseGif = value; },
   get getExportFileNameBase() { return getExportFileNameBase; },
   set getExportFileNameBase(value) { getExportFileNameBase = value; },
   get getStoredRasterLayerPaletteIndex() { return getStoredRasterLayerPaletteIndex; },
@@ -6521,8 +6176,6 @@
   set clearReloadTargetProjectId(value) { clearReloadTargetProjectId = value; },
   get clearReloadRecoveryData() { return clearReloadRecoveryData; },
   set clearReloadRecoveryData(value) { clearReloadRecoveryData = value; },
-  get clearTimelapseRecording() { return clearTimelapseRecording; },
-  set clearTimelapseRecording(value) { clearTimelapseRecording = value; },
   get closeAllOpenProjectTabsForProjectReplacement() { return closeAllOpenProjectTabsForProjectReplacement; },
   set closeAllOpenProjectTabsForProjectReplacement(value) { closeAllOpenProjectTabsForProjectReplacement = value; },
   get closeGlobalHistoryConfirmDialog() { return closeGlobalHistoryConfirmDialog; },
@@ -6549,8 +6202,6 @@
   set ensureSharedProjectAuthenticatedStart(value) { ensureSharedProjectAuthenticatedStart = value; },
   get ensureSharedProjectBackendSession() { return ensureSharedProjectBackendSession; },
   set ensureSharedProjectBackendSession(value) { ensureSharedProjectBackendSession = value; },
-  get ensureTimelapseStartCapture() { return ensureTimelapseStartCapture; },
-  set ensureTimelapseStartCapture(value) { ensureTimelapseStartCapture = value; },
   get exportProjectToPixfind() { return exportProjectToPixfind; },
   set exportProjectToPixfind(value) { exportProjectToPixfind = value; },
   get exportProjectToMarket() { return exportProjectToMarket; },
@@ -6587,8 +6238,6 @@
   set lensImportRequested(value) { lensImportRequested = value; },
   get loadRecentProjectPackagedPayload() { return loadRecentProjectPackagedPayload; },
   set loadRecentProjectPackagedPayload(value) { loadRecentProjectPackagedPayload = value; },
-  get loadPersistedTimelapseSnapshots() { return loadPersistedTimelapseSnapshots; },
-  set loadPersistedTimelapseSnapshots(value) { loadPersistedTimelapseSnapshots = value; },
   get loadRecentProjectsMetadata() { return loadRecentProjectsMetadata; },
   set loadRecentProjectsMetadata(value) { loadRecentProjectsMetadata = value; },
   get parseProjectStorageBlob() { return parseProjectStorageBlob; },
@@ -6677,8 +6326,6 @@
   set scheduleAutosaveSnapshot(value) { scheduleAutosaveSnapshot = value; },
   get serializeProjectStorageSnapshot() { return serializeProjectStorageSnapshot; },
   set serializeProjectStorageSnapshot(value) { serializeProjectStorageSnapshot = value; },
-  get serializeProjectTimelapseSnapshotList() { return serializeProjectTimelapseSnapshotList; },
-  set serializeProjectTimelapseSnapshotList(value) { serializeProjectTimelapseSnapshotList = value; },
   get snapshotFromParsedDocumentValue() { return snapshotFromParsedDocumentValue; },
   set snapshotFromParsedDocumentValue(value) { snapshotFromParsedDocumentValue = value; },
   get generateSnapshotThumbnail() { return generateSnapshotThumbnail; },
@@ -7146,10 +6793,6 @@
   set clamp(value) { clamp = value; },
   get clearActiveSharedProjectSession() { return clearActiveSharedProjectSession; },
   set clearActiveSharedProjectSession(value) { clearActiveSharedProjectSession = value; },
-  get clearTimelapseRecording() { return clearTimelapseRecording; },
-  set clearTimelapseRecording(value) { clearTimelapseRecording = value; },
-  get cloneTimelapsePixelPatchValue() { return cloneTimelapsePixelPatchValue; },
-  set cloneTimelapsePixelPatchValue(value) { cloneTimelapsePixelPatchValue = value; },
   get compressHistorySnapshot() { return compressHistorySnapshot; },
   set compressHistorySnapshot(value) { compressHistorySnapshot = value; },
   get compressUint8Array() { return compressUint8Array; },
@@ -7158,8 +6801,6 @@
   set createAutosaveProjectId(value) { createAutosaveProjectId = value; },
   get createProjectPersistenceToken() { return createProjectPersistenceToken; },
   set createProjectPersistenceToken(value) { createProjectPersistenceToken = value; },
-  get createEmptyTimelapseTrack() { return createEmptyTimelapseTrack; },
-  set createEmptyTimelapseTrack(value) { createEmptyTimelapseTrack = value; },
   get createOpenProjectSheetTabFromPackagedProject() { return createOpenProjectSheetTabFromPackagedProject; },
   set createOpenProjectSheetTabFromPackagedProject(value) { createOpenProjectSheetTabFromPackagedProject = value; },
   get decodeBase64() { return decodeBase64; },
@@ -7174,18 +6815,10 @@
   set encodeTypedArray(value) { encodeTypedArray = value; },
   get ensureCurrentClientCanReplaceActiveProject() { return ensureCurrentClientCanReplaceActiveProject; },
   set ensureCurrentClientCanReplaceActiveProject(value) { ensureCurrentClientCanReplaceActiveProject = value; },
-  get ensureTimelapseStartCapture() { return ensureTimelapseStartCapture; },
-  set ensureTimelapseStartCapture(value) { ensureTimelapseStartCapture = value; },
-  get flushPendingTimelapseCapture() { return flushPendingTimelapseCapture; },
-  set flushPendingTimelapseCapture(value) { flushPendingTimelapseCapture = value; },
   get getActiveOpenProjectTab() { return getActiveOpenProjectTab; },
   set getActiveOpenProjectTab(value) { getActiveOpenProjectTab = value; },
   get getActiveQrEditPayload() { return getActiveQrEditPayload; },
   set getActiveQrEditPayload(value) { getActiveQrEditPayload = value; },
-  get getAllTimelapseStepCount() { return getAllTimelapseStepCount; },
-  set getAllTimelapseStepCount(value) { getAllTimelapseStepCount = value; },
-  get getAllTimelapseTracks() { return getAllTimelapseTracks; },
-  set getAllTimelapseTracks(value) { getAllTimelapseTracks = value; },
   get getOpenProjectTabSharedKey() { return getOpenProjectTabSharedKey; },
   set getOpenProjectTabSharedKey(value) { getOpenProjectTabSharedKey = value; },
   get getSharedProjectKeyFromProjectId() { return getSharedProjectKeyFromProjectId; },
@@ -7208,8 +6841,6 @@
   set localViewportCanvasState(value) { localViewportCanvasState = value; },
   get localizeText() { return localizeText; },
   set localizeText(value) { localizeText = value; },
-  get loadPersistedTimelapseSnapshots() { return loadPersistedTimelapseSnapshots; },
-  set loadPersistedTimelapseSnapshots(value) { loadPersistedTimelapseSnapshots = value; },
   get markAutosaveDirty() { return markAutosaveDirty; },
   set markAutosaveDirty(value) { markAutosaveDirty = value; },
   get markActiveLocalProjectJournalNeedsCheckpoint() { return markActiveLocalProjectJournalNeedsCheckpoint; },
@@ -7238,18 +6869,12 @@
   set parseProjectStorageText(value) { parseProjectStorageText = value; },
   get validateCanonicalV2ProjectPayload() { return canonicalV2ProjectUtilsModule.validateCanonicalV2ProjectPayload; },
   set validateCanonicalV2ProjectPayload(value) { canonicalV2ProjectUtilsModule.validateCanonicalV2ProjectPayload = value; },
-  get normalizeTimelapseCanvasId() { return normalizeTimelapseCanvasId; },
-  set normalizeTimelapseCanvasId(value) { normalizeTimelapseCanvasId = value; },
-  get normalizeTimelapseFps() { return normalizeTimelapseFps; },
-  set normalizeTimelapseFps(value) { normalizeTimelapseFps = value; },
   get openProjectTabs() { return openProjectTabs; },
   set openProjectTabs(value) { openProjectTabs = value; },
   get preserveCanvasSelectionClipboard() { return preserveCanvasSelectionClipboard; },
   set preserveCanvasSelectionClipboard(value) { preserveCanvasSelectionClipboard = value; },
   get recentProjectsCache() { return recentProjectsCache; },
   set recentProjectsCache(value) { recentProjectsCache = value; },
-  get reconcileTimelapseTracksForSingleCanvas() { return reconcileTimelapseTracksForSingleCanvas; },
-  set reconcileTimelapseTracksForSingleCanvas(value) { reconcileTimelapseTracksForSingleCanvas = value; },
   get requestLegacyV2MigrationConsent() { return requestLegacyV2MigrationConsent; },
   set requestLegacyV2MigrationConsent(value) { requestLegacyV2MigrationConsent = value; },
   get requestImmediateAutosaveSnapshot() { return requestImmediateAutosaveSnapshot; },
@@ -7268,8 +6893,6 @@
   set resolveProjectSourceKind(value) { resolveProjectSourceKind = value; },
   get resolvePackagedProjectDotStats() { return resolvePackagedProjectDotStats; },
   set resolvePackagedProjectDotStats(value) { resolvePackagedProjectDotStats = value; },
-  get resolveTimelapseFrameEntry() { return resolveTimelapseFrameEntry; },
-  set resolveTimelapseFrameEntry(value) { resolveTimelapseFrameEntry = value; },
   get restoreCanvasSelectionClipboard() { return restoreCanvasSelectionClipboard; },
   set restoreCanvasSelectionClipboard(value) { restoreCanvasSelectionClipboard = value; },
   get scheduleAutosaveSnapshot() { return scheduleAutosaveSnapshot; },
@@ -7294,10 +6917,6 @@
   set synchronizeImportedSnapshotPalette(value) { synchronizeImportedSnapshotPalette = value; },
   get syncPixfindSnapshotAfterDocumentReset() { return syncPixfindSnapshotAfterDocumentReset; },
   set syncPixfindSnapshotAfterDocumentReset(value) { syncPixfindSnapshotAfterDocumentReset = value; },
-  get syncTimelapseControls() { return syncTimelapseControls; },
-  set syncTimelapseControls(value) { syncTimelapseControls = value; },
-  get timelapseState() { return timelapseState; },
-  set timelapseState(value) { timelapseState = value; },
   get trimHistoryStacksToLimit() { return trimHistoryStacksToLimit; },
   set trimHistoryStacksToLimit(value) { trimHistoryStacksToLimit = value; },
   get updateAutosaveStatus() { return updateAutosaveStatus; },
@@ -10174,6 +9793,9 @@
   // document snapshot for that purely structural change is prohibitively
   // expensive for long GIF imports, so keep a small reversible operation.
   const HISTORY_ENTRY_TYPE_LAYER_ADD = 'layerAdd';
+  // Removing a layer track must retain every frame-local cell verbatim so
+  // undo never relies on a coincident array position or recreates IDs.
+  const HISTORY_ENTRY_TYPE_LAYER_REMOVE = 'layerRemove';
   const HISTORY_ENTRY_TYPE_FRAME_ADD = 'frameAdd';
   const PIXEL_PATCH_HISTORY_LABELS = new Set([
     'pen',
@@ -10985,7 +10607,6 @@
     estimateEncodedByteLength,
     isPixelPatchHistoryEntry: (...args) => isPixelPatchHistoryEntry(...args),
     finalizePixelPatchHistoryEntry: (...args) => finalizePixelPatchHistoryEntry(...args),
-    getAllTimelapseTracks,
     updateHistoryButtons: (...args) => updateHistoryButtons(...args),
     archiveEvictedHistoryEntry: (...args) => archiveEvictedHistoryEntry(...args),
     normalizeProjectHistoryLimit,
@@ -10996,7 +10617,6 @@
     estimateStateBytes,
     estimateSnapshotBytes,
     estimateHistoryBytes,
-    estimateTimelapseBytes,
     getMemoryUsageBreakdown,
     trimHistoryToByteBudget,
     updateMemoryStatus,
@@ -11053,7 +10673,7 @@
   async function collectPixieeDrawMemoryDiagnostics() {
     const editor = typeof getMemoryUsageBreakdown === 'function'
       ? getMemoryUsageBreakdown()
-      : { current: 0, past: 0, future: 0, pending: 0, timelapse: 0, total: 0 };
+      : { current: 0, past: 0, future: 0, pending: 0, total: 0 };
     const heap = performance?.memory && typeof performance.memory === 'object'
       ? {
           usedJsHeapSize: Number(performance.memory.usedJSHeapSize) || 0,
@@ -11070,13 +10690,6 @@
       || tab?.deferredProjectPayload && typeof tab.deferredProjectPayload === 'object'
     )).length;
     const activeTab = openProjectTabs.find(tab => tab?.id === activeOpenProjectTabId) || null;
-    const timelapseTracks = Object.values(timelapseState?.tracksByCanvasId || {});
-    const residentTimelapseBaseCount = timelapseTracks.filter(track => Boolean(
-      track?.operationLog?.baseSnapshot
-    )).length;
-    const diskBackedTimelapseBaseCount = timelapseTracks.filter(track => Boolean(
-      track?.operationLog?.baseSnapshotStored && !track?.operationLog?.baseSnapshot
-    )).length;
     const diagnostics = {
       editorMiB: Object.fromEntries(Object.entries(editor).map(([key, value]) => [key, bytesToMiB(value)])),
       heapMiB: heap && Object.fromEntries(Object.entries(heap).map(([key, value]) => [key, bytesToMiB(value)])),
@@ -11086,7 +10699,6 @@
         frameCount: Array.isArray(state.frames) ? state.frames.length : 0,
         historyPast: history.past.length,
         historyFuture: history.future.length,
-        timelapseSteps: getAllTimelapseStepCount?.() || 0,
         openTabCount: openProjectTabs.length,
         activeTabId: activeOpenProjectTabId || '',
         residentTabPayloadCount,
@@ -11094,9 +10706,6 @@
           activeTab?.project && typeof activeTab.project === 'object'
           || activeTab?.deferredProjectPayload && typeof activeTab.deferredProjectPayload === 'object'
         ),
-        residentTimelapseBaseCount,
-        diskBackedTimelapseBaseCount,
-        timelapseDiskBaseEligible: shouldUseDiskBackedTimelapseBase(),
         canvasCompositeCache: getCanvasCompositeFrameCacheStats(),
       },
       page: {
@@ -12334,8 +11943,6 @@
   set buildPackagedProjectPayload(value) { buildPackagedProjectPayload = value; },
   get buildProjectSessionPayload() { return buildProjectSessionPayload; },
   set buildProjectSessionPayload(value) { buildProjectSessionPayload = value; },
-  get buildProjectSessionPayloadWithPersistedTimelapse() { return buildProjectSessionPayloadWithPersistedTimelapse; },
-  set buildProjectSessionPayloadWithPersistedTimelapse(value) { buildProjectSessionPayloadWithPersistedTimelapse = value; },
   get buildSpriteMapExportPlan() { return buildSpriteMapExportPlan; },
   set buildSpriteMapExportPlan(value) { buildSpriteMapExportPlan = value; },
   get buildVoxelGlbBinaryFromCanvases() { return buildVoxelGlbBinaryFromCanvases; },
@@ -12650,7 +12257,6 @@
     closeUpdateHistoryDialog: (...args) => closeUpdateHistoryDialog(...args),
     ensureCurrentClientCanExportProject: (...args) => ensureCurrentClientCanExportProject(...args),
     exportProjectAsAllFormatsZip: (...args) => exportProjectAsAllFormatsZip(...args),
-    exportTimelapseGif: (...args) => exportTimelapseGif(...args),
     normalizeExportFormat: (...args) => normalizeExportFormat(...args),
     normalizeExportGridTileSize: (...args) => normalizeExportGridTileSize(...args),
     performExportByMode: (...args) => performExportByMode(...args),
@@ -12966,9 +12572,6 @@
 
   function beginHistory(label) {
     if (history.pending) return;
-    if (shouldRecordLocalTimelapseOperationLog()) {
-      scheduleTimelapseOperationLogBase(getActiveProjectCanvasDocument()?.id || '');
-    }
     // Flood fills begin as a layer/frame-scoped pixel transaction. The fill
     // path converts it to typed scanline runs before mutation, avoiding both
     // per-cell JS Maps and a whole-document snapshot.
@@ -13019,6 +12622,27 @@
         activeFrameBefore: state.activeFrame,
         activeLayerBefore: state.activeLayer,
         activeLayerAfter: null,
+        layers: [],
+      };
+      return;
+    }
+    if (
+      label === 'removeLayer'
+      && !multiState.connected
+      && !activeSharedProjectKey
+      && !isSharedProjectCollaborativeMode()
+      && !isVoxelExtensionModeEnabled()
+    ) {
+      history.pending = {
+        __historyEntryType: HISTORY_ENTRY_TYPE_LAYER_REMOVE,
+        dirty: false,
+        label,
+        canvasId: getActiveProjectCanvasDocument()?.id || '',
+        activeFrameBefore: state.activeFrame,
+        activeLayerBefore: state.activeLayer,
+        activeFrameAfter: null,
+        activeLayerAfter: null,
+        trackId: '',
         layers: [],
       };
       return;
@@ -13118,6 +12742,108 @@
     }
     state.activeFrame = clamp(
       Math.round(Number(entry.activeFrameBefore) || 0),
+      0,
+      Math.max(0, state.frames.length - 1)
+    );
+    const activeFrame = state.frames[state.activeFrame];
+    const preferredLayerId = undoing ? entry.activeLayerBefore : entry.activeLayerAfter;
+    state.activeLayer = activeFrame?.layers?.some(layer => layer?.id === preferredLayerId)
+      ? preferredLayerId
+      : (activeFrame?.layers?.[activeFrame.layers.length - 1]?.id || null);
+    invalidateActiveCanvasCompositeRenderState();
+    renderFrameList();
+    renderLayerList();
+    requestRender();
+    requestOverlayRender();
+    return true;
+  }
+
+  function isLayerRemoveHistoryEntry(entry) {
+    return Boolean(entry && entry.__historyEntryType === HISTORY_ENTRY_TYPE_LAYER_REMOVE);
+  }
+
+  function recordPendingLayerRemoveHistoryLayer(frame, layer, index) {
+    if (!isLayerRemoveHistoryEntry(history.pending) || !frame || !layer) {
+      return false;
+    }
+    const trackId = typeof layer.trackId === 'string' ? layer.trackId : '';
+    if (!trackId) return false;
+    if (history.pending.trackId && history.pending.trackId !== trackId) {
+      return false;
+    }
+    history.pending.trackId = trackId;
+    history.pending.layers.push({
+      frameId: typeof frame.id === 'string' ? frame.id : '',
+      layerId: typeof layer.id === 'string' ? layer.id : '',
+      trackId,
+      previousIndex: Math.max(0, Math.round(Number(index) || 0)),
+      layer,
+    });
+    return true;
+  }
+
+  function finalizeLayerRemoveHistoryEntry(pending) {
+    if (
+      !isLayerRemoveHistoryEntry(pending)
+      || !pending.dirty
+      || !pending.trackId
+      || !Array.isArray(pending.layers)
+      || !pending.layers.length
+    ) {
+      return null;
+    }
+    return {
+      __historyEntryType: HISTORY_ENTRY_TYPE_LAYER_REMOVE,
+      version: 1,
+      historyLabel: pending.label,
+      canvasId: pending.canvasId,
+      activeFrameBefore: pending.activeFrameBefore,
+      activeLayerBefore: pending.activeLayerBefore,
+      activeFrameAfter: pending.activeFrameAfter,
+      activeLayerAfter: pending.activeLayerAfter,
+      trackId: pending.trackId,
+      layers: pending.layers,
+    };
+  }
+
+  function applyLayerRemoveHistoryEntry(entry, direction = 'undo') {
+    if (
+      !isLayerRemoveHistoryEntry(entry)
+      || !entry.trackId
+      || !Array.isArray(entry.layers)
+      || !entry.layers.length
+    ) {
+      return false;
+    }
+    const undoing = direction === 'undo';
+    let changed = false;
+    for (const layerEntry of entry.layers) {
+      const frame = state.frames.find(candidate => candidate?.id === layerEntry.frameId);
+      if (!frame || !Array.isArray(frame.layers) || !layerEntry.layerId || !layerEntry.layer) {
+        return false;
+      }
+      const existingIndex = frame.layers.findIndex(layer => layer?.trackId === entry.trackId);
+      if (undoing) {
+        // A collision is an invariant violation: never overwrite another cell
+        // merely because it happens to occupy the former array position.
+        if (existingIndex >= 0) return false;
+        frame.layers.splice(
+          clamp(layerEntry.previousIndex, 0, frame.layers.length),
+          0,
+          layerEntry.layer
+        );
+        changed = true;
+        continue;
+      }
+      if (existingIndex < 0 || frame.layers[existingIndex]?.id !== layerEntry.layerId) {
+        return false;
+      }
+      frame.layers.splice(existingIndex, 1);
+      changed = true;
+    }
+    if (!changed) return false;
+    state.activeFrame = clamp(
+      Math.round(Number(undoing ? entry.activeFrameBefore : entry.activeFrameAfter) || 0),
       0,
       Math.max(0, state.frames.length - 1)
     );
@@ -13459,8 +13185,6 @@
   set ensureSharedProjectSessionHeartbeat(value) { ensureSharedProjectSessionHeartbeat = value; },
   get flushAutosaveSnapshotOnLifecycle() { return flushAutosaveSnapshotOnLifecycle; },
   set flushAutosaveSnapshotOnLifecycle(value) { flushAutosaveSnapshotOnLifecycle = value; },
-  get flushPendingTimelapseCapture() { return flushPendingTimelapseCapture; },
-  set flushPendingTimelapseCapture(value) { flushPendingTimelapseCapture = value; },
   get getActiveFrame() { return getActiveFrame; },
   set getActiveFrame(value) { getActiveFrame = value; },
   get getActiveLayerIndex() { return getActiveLayerIndex; },
@@ -13871,7 +13595,6 @@
     if (canUseSessionStorage) {
       persistSessionState();
     }
-    flushPendingTimelapseCapture({ force: true });
     flushAutosaveSnapshotOnLifecycle({ force: true });
   }
 
@@ -14259,7 +13982,6 @@
   function persistCriticalSessionStateForNavigation() {
     const largeDocumentMode = isLargeDocumentPerformanceMode();
     if (!largeDocumentMode) {
-      flushPendingTimelapseCapture({ force: true });
       flushAutosaveSnapshotOnLifecycle({ force: true });
     } else {
       persistReloadTargetProjectId();
@@ -14496,6 +14218,8 @@
   set applyPixelPatchHistoryEntry(value) { applyPixelPatchHistoryEntry = value; },
   get applyLayerAddHistoryEntry() { return applyLayerAddHistoryEntry; },
   set applyLayerAddHistoryEntry(value) { applyLayerAddHistoryEntry = value; },
+  get applyLayerRemoveHistoryEntry() { return applyLayerRemoveHistoryEntry; },
+  set applyLayerRemoveHistoryEntry(value) { applyLayerRemoveHistoryEntry = value; },
   get applyFrameAddHistoryEntry() { return applyFrameAddHistoryEntry; },
   set applyFrameAddHistoryEntry(value) { applyFrameAddHistoryEntry = value; },
   get cancelPendingCurveInteraction() { return cancelPendingCurveInteraction; },
@@ -14508,8 +14232,6 @@
   set clearPlaybackFrameCache(value) { clearPlaybackFrameCache = value; },
   get compressHistorySnapshot() { return compressHistorySnapshot; },
   set compressHistorySnapshot(value) { compressHistorySnapshot = value; },
-  get createTimelapseFrameEntryFromSnapshot() { return createTimelapseFrameEntryFromSnapshot; },
-  set createTimelapseFrameEntryFromSnapshot(value) { createTimelapseFrameEntryFromSnapshot = value; },
   get decompressHistorySnapshot() { return decompressHistorySnapshot; },
   set decompressHistorySnapshot(value) { decompressHistorySnapshot = value; },
   get dom() { return dom; },
@@ -14520,12 +14242,12 @@
   set rollbackPixelPatchHistoryPending(value) { rollbackPixelPatchHistoryPending = value; },
   get finalizeLayerAddHistoryEntry() { return finalizeLayerAddHistoryEntry; },
   set finalizeLayerAddHistoryEntry(value) { finalizeLayerAddHistoryEntry = value; },
+  get finalizeLayerRemoveHistoryEntry() { return finalizeLayerRemoveHistoryEntry; },
+  set finalizeLayerRemoveHistoryEntry(value) { finalizeLayerRemoveHistoryEntry = value; },
   get finalizeFrameAddHistoryEntry() { return finalizeFrameAddHistoryEntry; },
   set finalizeFrameAddHistoryEntry(value) { finalizeFrameAddHistoryEntry = value; },
   get getActiveProjectCanvasDocument() { return getActiveProjectCanvasDocument; },
   set getActiveProjectCanvasDocument(value) { getActiveProjectCanvasDocument = value; },
-  get getActiveTimelapseTrack() { return getActiveTimelapseTrack; },
-  set getActiveTimelapseTrack(value) { getActiveTimelapseTrack = value; },
   get getHistoryEntryLabel() { return getHistoryEntryLabel; },
   set getHistoryEntryLabel(value) { getHistoryEntryLabel = value; },
   get getMultiHistoryBucket() { return getMultiHistoryBucket; },
@@ -14560,6 +14282,8 @@
   set isPixelPatchHistoryEntry(value) { isPixelPatchHistoryEntry = value; },
   get isLayerAddHistoryEntry() { return isLayerAddHistoryEntry; },
   set isLayerAddHistoryEntry(value) { isLayerAddHistoryEntry = value; },
+  get isLayerRemoveHistoryEntry() { return isLayerRemoveHistoryEntry; },
+  set isLayerRemoveHistoryEntry(value) { isLayerRemoveHistoryEntry = value; },
   get isFrameAddHistoryEntry() { return isFrameAddHistoryEntry; },
   set isFrameAddHistoryEntry(value) { isFrameAddHistoryEntry = value; },
   get isSharedProjectCollaborativeMode() { return isSharedProjectCollaborativeMode; },
@@ -14578,10 +14302,6 @@
   set noteActiveLocalProjectHistoryEntry(value) { noteActiveLocalProjectHistoryEntry = value; },
   get queueSharedProjectCurrentSnapshotCapture() { return queueSharedProjectCurrentSnapshotCapture; },
   set queueSharedProjectCurrentSnapshotCapture(value) { queueSharedProjectCurrentSnapshotCapture = value; },
-  get recordTimelapseOperationLogEntry() { return recordTimelapseOperationLogEntry; },
-  set recordTimelapseOperationLogEntry(value) { recordTimelapseOperationLogEntry = value; },
-  get scheduleTimelapseOperationLogBase() { return scheduleTimelapseOperationLogBase; },
-  set scheduleTimelapseOperationLogBase(value) { scheduleTimelapseOperationLogBase = value; },
   get requestImmediateAutosaveSnapshot() { return requestImmediateAutosaveSnapshot; },
   set requestImmediateAutosaveSnapshot(value) { requestImmediateAutosaveSnapshot = value; },
   get scheduleAutosaveSnapshot() { return scheduleAutosaveSnapshot; },
@@ -14598,8 +14318,6 @@
   set scheduleQrEditReadabilityCheck(value) { scheduleQrEditReadabilityCheck = value; },
   get scheduleSessionPersist() { return scheduleSessionPersist; },
   set scheduleSessionPersist(value) { scheduleSessionPersist = value; },
-  get scheduleTimelapseCaptureFromState() { return scheduleTimelapseCaptureFromState; },
-  set scheduleTimelapseCaptureFromState(value) { scheduleTimelapseCaptureFromState = value; },
   get setHistoryEntryLabel() { return setHistoryEntryLabel; },
   set setHistoryEntryLabel(value) { setHistoryEntryLabel = value; },
   get markActiveLocalProjectJournalNeedsCheckpoint() { return markActiveLocalProjectJournalNeedsCheckpoint; },
@@ -14610,10 +14328,6 @@
   set shouldPersistSharedProjectSnapshotForHistoryLabel(value) { shouldPersistSharedProjectSnapshotForHistoryLabel = value; },
   get state() { return state; },
   set state(value) { state = value; },
-  get thinTimelapseSnapshotsIfNeeded() { return thinTimelapseSnapshotsIfNeeded; },
-  set thinTimelapseSnapshotsIfNeeded(value) { thinTimelapseSnapshotsIfNeeded = value; },
-  get timelapseState() { return timelapseState; },
-  set timelapseState(value) { timelapseState = value; },
   get trimHistoryToByteBudget() { return trimHistoryToByteBudget; },
   set trimHistoryToByteBudget(value) { trimHistoryToByteBudget = value; },
   get updateMemoryStatus() { return updateMemoryStatus; },
@@ -15375,8 +15089,6 @@
     set IOS_SNAPSHOT_WRITE_DELAY(value) { IOS_SNAPSHOT_WRITE_DELAY = value; },
     get applyHistorySnapshot() { return applyHistorySnapshot; },
     set applyHistorySnapshot(value) { applyHistorySnapshot = value; },
-    get clearTimelapseRecording() { return clearTimelapseRecording; },
-    set clearTimelapseRecording(value) { clearTimelapseRecording = value; },
     get deserializeDocumentPayload() { return deserializeDocumentPayload; },
     set deserializeDocumentPayload(value) { deserializeDocumentPayload = value; },
     get history() { return history; },
@@ -15553,116 +15265,21 @@
     return exportDialogWorkflowUtilsModule.performExportByMode(...args);
   }
 
-  function shouldRecordLocalTimelapseOperationLog(...args) {
-    return timelapseSessionUtilsModule.shouldRecordLocalTimelapseOperationLog(...args);
+  function updateAnimationFpsDisplay(fps, durationMs) {
+    if (dom.controls.animationFps) {
+      dom.controls.animationFps.value = String(normalizeFpsValue(fps));
+    }
+    if (dom.controls.animationFpsMs) {
+      dom.controls.animationFpsMs.textContent = String(Math.max(1, Math.round(Number(durationMs) || 0))) + "ms";
+    }
   }
 
-  function normalizeTimelapseCanvasId(...args) {
-    return timelapseSessionUtilsModule.normalizeTimelapseCanvasId(...args);
-  }
-
-  function getActiveTimelapseTrack(...args) {
-    return timelapseSessionUtilsModule.getActiveTimelapseTrack(...args);
-  }
-
-  function getAllTimelapseTracks(...args) {
-    return timelapseSessionUtilsModule.getAllTimelapseTracks(...args);
-  }
-
-  function getAllTimelapseStepCount(...args) {
-    return timelapseSessionUtilsModule.getAllTimelapseStepCount(...args);
-  }
-
-  function getTimelapseTrackStepCount(...args) {
-    return timelapseSessionUtilsModule.getTimelapseTrackStepCount(...args);
-  }
-
-  function ensureTimelapseOperationLogBase(...args) {
-    return timelapseSessionUtilsModule.ensureTimelapseOperationLogBase(...args);
-  }
-
-  function cloneTimelapsePixelPatchValue(...args) {
-    return timelapseSessionUtilsModule.cloneTimelapsePixelPatchValue(...args);
-  }
-
-  function recordTimelapseOperationLogEntry(...args) {
-    return timelapseSessionUtilsModule.recordTimelapseOperationLogEntry(...args);
-  }
-
-  function recordTimelapseCanvasResize(...args) {
-    return timelapseSessionUtilsModule.recordTimelapseCanvasResize(...args);
-  }
-
-  function scheduleTimelapseOperationLogBase(...args) {
-    return timelapseSessionUtilsModule.scheduleTimelapseOperationLogBase(...args);
-  }
-
-  function reconcileTimelapseTracksForSingleCanvas(...args) {
-    return timelapseSessionUtilsModule.reconcileTimelapseTracksForSingleCanvas(...args);
-  }
-
-  function pruneTimelapseTracksToExistingCanvases(...args) {
-    return timelapseSessionUtilsModule.pruneTimelapseTracksToExistingCanvases(...args);
-  }
-
-  function createTimelapseFrameEntryFromSnapshot(...args) {
-    return timelapseSessionUtilsModule.createTimelapseFrameEntryFromSnapshot(...args);
-  }
-
-  function thinTimelapseSnapshotsIfNeeded(...args) {
-    return timelapseSessionUtilsModule.thinTimelapseSnapshotsIfNeeded(...args);
-  }
-
-  function ensureTimelapseStartCapture(...args) {
-    return timelapseSessionUtilsModule.ensureTimelapseStartCapture(...args);
-  }
-
-  function flushPendingTimelapseCapture(...args) {
-    return timelapseSessionUtilsModule.flushPendingTimelapseCapture(...args);
-  }
-
-  function scheduleTimelapseCaptureFromState(...args) {
-    return timelapseSessionUtilsModule.scheduleTimelapseCaptureFromState(...args);
-  }
-
-  function syncTimelapseControls(...args) {
-    return timelapseSessionUtilsModule.syncTimelapseControls(...args);
-  }
-
-  function clearTimelapseRecording(...args) {
-    return timelapseSessionUtilsModule.clearTimelapseRecording(...args);
-  }
-
-  function setTimelapseEnabled(...args) {
-    return timelapseSessionUtilsModule.setTimelapseEnabled(...args);
-  }
-
-  function resolveTimelapseFrameEntry(...args) {
-    return timelapseSessionUtilsModule.resolveTimelapseFrameEntry(...args);
-  }
-
-  async function fetchSharedProjectOpsForTimelapse(...args) {
-    return timelapseSessionUtilsModule.fetchSharedProjectOpsForTimelapse(...args);
-  }
-
-  async function buildSharedProjectTimelapseExportEntries(...args) {
-    return timelapseSessionUtilsModule.buildSharedProjectTimelapseExportEntries(...args);
-  }
-
-  async function buildTimelapseExportEntries(...args) {
-    return timelapseSessionUtilsModule.buildTimelapseExportEntries(...args);
-  }
-
-  async function exportTimelapseGif(...args) {
-    return timelapseSessionUtilsModule.exportTimelapseGif(...args);
-  }
-
-  function updateAnimationFpsDisplay(...args) {
-    return timelapseSessionUtilsModule.updateAnimationFpsDisplay(...args);
-  }
-
-  function syncAnimationFpsDisplayFromState(...args) {
-    return timelapseSessionUtilsModule.syncAnimationFpsDisplayFromState(...args);
+  function syncAnimationFpsDisplayFromState() {
+    const frame = getActiveFrame();
+    const duration = frame && Number.isFinite(frame.duration) && frame.duration > 0
+      ? frame.duration
+      : getDurationFromFps(12);
+    updateAnimationFpsDisplay(normalizeFpsValue(Math.round(1000 / duration)), duration);
   }
 
   /** @type {any} */
@@ -16117,215 +15734,12 @@
     return documentSessionWorkflowUtilsModule.normalizeProjectHistoryLimit(...args);
   }
 
-  function normalizeSerializedTimelapseOperationEntry(...args) {
-    return documentSessionWorkflowUtilsModule.normalizeSerializedTimelapseOperationEntry(...args);
-  }
-
-  function serializeProjectTimelapseSnapshotList(...args) {
-    return documentSessionWorkflowUtilsModule.serializeProjectTimelapseSnapshotList(...args);
-  }
-
   function buildProjectSessionPayload(...args) {
     return documentSessionWorkflowUtilsModule.buildProjectSessionPayload(...args);
   }
 
   function buildAutosaveSessionPayload(...args) {
     return documentSessionWorkflowUtilsModule.buildAutosaveSessionPayload(...args);
-  }
-
-  function createAutosaveContextChangedError(expectedProjectId = '') {
-    const error = new Error(`Autosave project context changed: ${expectedProjectId}`);
-    error.code = 'ERR_AUTOSAVE_PROJECT_CONTEXT_CHANGED';
-    return error;
-  }
-
-  function assertAutosaveProjectContext(expectedProjectId = '', expectedTracks = null) {
-    const activeProjectId = normalizeAutosaveProjectId(autosaveProjectId || '');
-    if (
-      !expectedProjectId
-      || activeProjectId !== expectedProjectId
-      || (expectedTracks && getAllTimelapseTracks() !== expectedTracks)
-    ) {
-      throw createAutosaveContextChangedError(expectedProjectId);
-    }
-  }
-
-  function resolveTimelapseBaseFromPackagedProject(packaged = null, canvasId = '') {
-    const logs = packaged?.session?.timelapse?.operationLogsByCanvas;
-    if (!logs || typeof logs !== 'object' || Array.isArray(logs)) return null;
-    if (logs[canvasId]?.baseSnapshot) return logs[canvasId].baseSnapshot;
-    const candidates = Object.values(logs).filter(log => log?.baseSnapshot);
-    return candidates.length === 1 ? candidates[0].baseSnapshot : null;
-  }
-
-  async function repairUnavailableTimelapseBase({
-    projectId = '',
-    canvasId = '',
-    log = null,
-    allowCurrentStateReset = false,
-  } = {}) {
-    if (!log || typeof log !== 'object') return null;
-    try {
-      const packaged = await readAutosaveV2PrimaryProject(projectId);
-      const recoveredBase = resolveTimelapseBaseFromPackagedProject(packaged, canvasId);
-      if (recoveredBase) {
-        log.baseSnapshot = recoveredBase;
-        log.baseSnapshotStored = false;
-        log.baseSnapshotStorageCanvasId = '';
-        log.baseSnapshotStorageProjectId = '';
-        console.info('[pixiedraw:timelapse-base-repair]', {
-          phase: 'recovered-from-v2-checkpoint',
-          projectId,
-          canvasId,
-        });
-        return recoveredBase;
-      }
-    } catch (error) {
-      console.warn('Failed to recover timelapse base from V2 checkpoint.', error);
-    }
-    if (!allowCurrentStateReset) return null;
-    // The artwork remains authoritative. If both the chunk-store copy and the
-    // previous V2 base are unavailable, restart only the timelapse operation
-    // history from the current document so autosave itself can recover.
-    log.baseSnapshot = null;
-    log.baseSnapshotStored = false;
-    log.baseSnapshotStorageCanvasId = '';
-    log.baseSnapshotStorageProjectId = '';
-    log.entries = [];
-    const repairedLog = ensureTimelapseOperationLogBase(canvasId);
-    if (repairedLog?.baseSnapshot) {
-      console.warn('[pixiedraw:timelapse-base-repair]', {
-        phase: 'reset-from-current-document',
-        projectId,
-        canvasId,
-      });
-      return repairedLog.baseSnapshot;
-    }
-    return null;
-  }
-
-  async function buildProjectSessionPayloadWithPersistedTimelapse(options = {}) {
-    const requireComplete = options?.requireComplete === true;
-    const contextProjectId = normalizeAutosaveProjectId(options?.projectId || autosaveProjectId || '');
-    assertAutosaveProjectContext(contextProjectId);
-    if (!requireComplete) {
-      // Avoid disk-backed operation-log hydration on autosave. The lightweight
-      // recorder keeps only debounced visible-frame snapshots in this session.
-      return buildProjectSessionPayload();
-    }
-    ensureTimelapseStartCapture();
-    flushPendingTimelapseCapture({ force: true });
-    const tracks = getAllTimelapseTracks();
-    await waitForPendingTimelapseArchiveWrites({ requireSuccess: requireComplete });
-    assertAutosaveProjectContext(contextProjectId, tracks);
-    const needsStoredBase = Object.values(tracks).some(track => Boolean(
-      track?.operationLog?.baseSnapshotStored && !track?.operationLog?.baseSnapshot
-    ));
-    const persisted = await loadPersistedTimelapseProject(contextProjectId, {
-      // If a live operation log points at its disk base, a failed read must not
-      // overwrite the previous complete V2 checkpoint with an incomplete one.
-      throwOnError: requireComplete || needsStoredBase,
-    });
-    assertAutosaveProjectContext(contextProjectId, tracks);
-    const temporarilyHydrated = [];
-    let session;
-    try {
-      for (const [canvasId, track] of Object.entries(tracks)) {
-        const log = track?.operationLog && typeof track.operationLog === 'object'
-          ? track.operationLog
-          : null;
-        if (!log?.baseSnapshotStored || log.baseSnapshot) continue;
-        const storageCanvasId = log.baseSnapshotStorageCanvasId || canvasId;
-        const storageProjectId = normalizeAutosaveProjectId(
-          log.baseSnapshotStorageProjectId || contextProjectId
-        );
-        let storedBase = storageProjectId === contextProjectId
-          ? (persisted.baseSnapshotsByCanvas?.[storageCanvasId] || null)
-          : await loadPersistedTimelapseBaseSnapshot(storageCanvasId, storageProjectId);
-        assertAutosaveProjectContext(contextProjectId, tracks);
-        if (!storedBase) {
-          storedBase = await repairUnavailableTimelapseBase({
-            projectId: contextProjectId,
-            canvasId,
-            log,
-            allowCurrentStateReset: !requireComplete,
-          });
-          assertAutosaveProjectContext(contextProjectId, tracks);
-        }
-        if (!storedBase) {
-          const error = new Error(`Disk-backed timelapse base is unavailable: ${canvasId}`);
-          error.code = 'ERR_TIMELAPSE_BASE_UNAVAILABLE';
-          throw error;
-        }
-        log.baseSnapshot = storedBase;
-        if (log.baseSnapshotStored) {
-          temporarilyHydrated.push({ log, baseSnapshot: storedBase });
-        }
-      }
-      session = buildProjectSessionPayload();
-    } finally {
-      temporarilyHydrated.forEach(({ log, baseSnapshot }) => {
-        if (log?.baseSnapshotStored && log.baseSnapshot === baseSnapshot) {
-          log.baseSnapshot = null;
-        }
-      });
-    }
-    const persistedByCanvas = persisted.byCanvas;
-    const timelapse = session?.timelapse;
-    if (!timelapse || !persistedByCanvas || typeof persistedByCanvas !== 'object') {
-      if (requireComplete) {
-        const error = new Error('Timelapse session is unavailable');
-        error.code = 'ERR_TIMELAPSE_SESSION_UNAVAILABLE';
-        throw error;
-      }
-      return session;
-    }
-    if (!timelapse.byCanvas || typeof timelapse.byCanvas !== 'object') {
-      timelapse.byCanvas = {};
-    }
-    Object.entries(persistedByCanvas).forEach(([canvasId, snapshots]) => {
-      const serialized = serializeProjectTimelapseSnapshotList(snapshots);
-      if (!serialized.length) return;
-      const existing = timelapse.byCanvas[canvasId]?.snapshots || [];
-      const seen = new Set();
-      const merged = [...serialized, ...existing].filter(entry => {
-        const key = `${entry?.width || 0}x${entry?.height || 0}:${entry?.pixels || ''}`;
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
-      while (merged.length > TIMELAPSE_MAX_STEPS) {
-        for (let index = merged.length - 2; index >= 1 && merged.length > TIMELAPSE_MAX_STEPS; index -= 2) {
-          merged.splice(index, 1);
-        }
-      }
-      timelapse.byCanvas[canvasId] = {
-        warningShown: true,
-        sampleStep: Math.max(1, Math.round(Number(timelapse.byCanvas[canvasId]?.sampleStep) || 1)),
-        lastCaptureToken: Number.isFinite(Number(timelapse.byCanvas[canvasId]?.lastCaptureToken))
-          ? Math.round(Number(timelapse.byCanvas[canvasId].lastCaptureToken))
-          : -1,
-        snapshots: merged,
-      };
-    });
-    const hasTimelapseData = Object.values(timelapse.byCanvas || {}).some(track =>
-      Array.isArray(track?.snapshots) && track.snapshots.length > 0
-    ) || Object.values(timelapse.operationLogsByCanvas || {}).some(log =>
-      log?.baseSnapshot && Array.isArray(log?.entries)
-    );
-    timelapse.enabled = true;
-    timelapse.synchronization = {
-      schemaVersion: 1,
-      complete: hasTimelapseData,
-      synchronizedAt: new Date().toISOString(),
-      persistedArchiveMerged: true,
-    };
-    if (requireComplete && !hasTimelapseData) {
-      const error = new Error('Complete timelapse data is required for project export');
-      error.code = 'ERR_TIMELAPSE_DATA_INCOMPLETE';
-      throw error;
-    }
-    return session;
   }
 
   function snapshotFromDocumentText(...args) {
@@ -17941,10 +17355,6 @@
         console.warn('Failed to remove file-backed history for deleted project.', error);
         return false;
       }),
-      timelapseChunkStore?.removeProject?.(normalizedProjectId).catch(error => {
-        console.warn('Failed to remove file-backed timelapse for deleted project.', error);
-        return false;
-      }),
     ]);
     coldHistoryStatusCache.delete(normalizedProjectId);
     return removedProject;
@@ -18075,24 +17485,14 @@
       }
       deferThumbnailRefresh = !thumbnail;
     }
-    let persistedTimelapseSession;
-    try {
-      persistedTimelapseSession = await buildProjectSessionPayloadWithPersistedTimelapse({
-        projectId: normalizedProjectId,
-      });
-    } catch (error) {
-      if (error?.code === 'ERR_AUTOSAVE_PROJECT_CONTEXT_CHANGED') {
-        return createSkippedResult(previousEntry);
-      }
-      throw error;
-    }
+    const session = buildProjectSessionPayload();
     if (normalizeAutosaveProjectId(autosaveProjectId || '') !== normalizedProjectId) {
       return createSkippedResult(previousEntry);
     }
     const packagedPayload = savePlan?.packagedPayload
-      ? { ...savePlan.packagedPayload, session: persistedTimelapseSession }
+      ? { ...savePlan.packagedPayload, session }
       : buildPackagedProjectPayload(snapshot, {
-          session: persistedTimelapseSession,
+          session,
           includeSheets: false,
           internalBinary: true,
         });
@@ -18134,12 +17534,6 @@
     if (!journalOnly) {
       markActiveLocalProjectJournalCheckpointPersisted(normalizedProjectId);
       releasePersistedInactiveOpenProjectTabPayloads(normalizedProjectId);
-      // The committed V2 checkpoint remains self-contained. Large all-frame
-      // timelapse bases are additionally copied to the local chunk store so
-      // the live editor can release them from JavaScript memory afterwards.
-      archiveTimelapseOperationLogBases(normalizedProjectId).catch(error => {
-        console.warn('Failed to offload committed timelapse bases.', error);
-      });
     }
     return metadata;
   }
@@ -18614,13 +18008,12 @@
       updateAutosaveStatus('販売用PXDを準備しています…', 'info');
       const snapshot = makeHistorySnapshot({ clonePixelData: true });
       const [session, thumbnail] = await Promise.all([
-        buildProjectSessionPayloadWithPersistedTimelapse({ projectId: autosaveProjectId }),
+        buildProjectSessionPayload(),
         generateSnapshotThumbnail(snapshot),
       ]);
       const packaged = buildPackagedProjectPayload(snapshot, { session, includeSheets: false, internalBinary: true });
       const serialized = await serializeProjectStorageSnapshot({ snapshot, session, packaged, thumbnail }, {
         fileNameBase: state.documentName || DEFAULT_DOCUMENT_NAME,
-        includeTimelapse: true,
       });
       if (!(serialized?.blob instanceof Blob)) throw new Error('PXD archive was not created');
       const file = new File([serialized.blob], serialized.filename || 'PiXiEEDraw.pxd', {
@@ -18947,8 +18340,6 @@
   set clampMirrorAxisX(value) { clampMirrorAxisX = value; },
   get clampMirrorAxisY() { return clampMirrorAxisY; },
   set clampMirrorAxisY(value) { clampMirrorAxisY = value; },
-  get clearTimelapseRecording() { return clearTimelapseRecording; },
-  set clearTimelapseRecording(value) { clearTimelapseRecording = value; },
   get clientX() { return clientX; },
   set clientX(value) { clientX = value; },
   get clientY() { return clientY; },
@@ -19109,8 +18500,6 @@
   set normalizeSelectSameMode(value) { normalizeSelectSameMode = value; },
   get normalizeSelectionShapeMode() { return normalizeSelectionShapeMode; },
   set normalizeSelectionShapeMode(value) { normalizeSelectionShapeMode = value; },
-  get normalizeTimelapseFps() { return normalizeTimelapseFps; },
-  set normalizeTimelapseFps(value) { normalizeTimelapseFps = value; },
   get normalizeUiTheme() { return normalizeUiTheme; },
   set normalizeUiTheme(value) { normalizeUiTheme = value; },
   get normalizeVoxelExtensionState() { return normalizeVoxelExtensionState; },
@@ -19225,8 +18614,6 @@
   set setRailWidth(value) { setRailWidth = value; },
   get setRightUtilityMenuOpen() { return setRightUtilityMenuOpen; },
   set setRightUtilityMenuOpen(value) { setRightUtilityMenuOpen = value; },
-  get setTimelapseEnabled() { return setTimelapseEnabled; },
-  set setTimelapseEnabled(value) { setTimelapseEnabled = value; },
   get setUiLanguage() { return setUiLanguage; },
   set setUiLanguage(value) { setUiLanguage = value; },
   get setVirtualCursorButtonScale() { return setVirtualCursorButtonScale; },
@@ -19277,8 +18664,6 @@
   set syncSelectSameModeControls(value) { syncSelectSameModeControls = value; },
   get syncSelectionShapeModeControls() { return syncSelectionShapeModeControls; },
   set syncSelectionShapeModeControls(value) { syncSelectionShapeModeControls = value; },
-  get syncTimelapseControls() { return syncTimelapseControls; },
-  set syncTimelapseControls(value) { syncTimelapseControls = value; },
   get syncVirtualCursorControlVisibility() { return syncVirtualCursorControlVisibility; },
   set syncVirtualCursorControlVisibility(value) { syncVirtualCursorControlVisibility = value; },
   get syncVoxelExtensionModeUi() { return syncVoxelExtensionModeUi; },
@@ -19289,8 +18674,6 @@
   set syncZoomControls(value) { syncZoomControls = value; },
   get tab() { return tab; },
   set tab(value) { tab = value; },
-  get timelapseState() { return timelapseState; },
-  set timelapseState(value) { timelapseState = value; },
   get tool() { return tool; },
   set tool(value) { tool = value; },
   get updateAutosaveStatus() { return updateAutosaveStatus; },
@@ -19451,14 +18834,10 @@
   set requestOverlayRender(value) { requestOverlayRender = value; },
   get requestRender() { return requestRender; },
   set requestRender(value) { requestRender = value; },
-  get recordTimelapseCanvasResize() { return recordTimelapseCanvasResize; },
-  set recordTimelapseCanvasResize(value) { recordTimelapseCanvasResize = value; },
   get rescaleMirrorPivotForCanvas() { return rescaleMirrorPivotForCanvas; },
   set rescaleMirrorPivotForCanvas(value) { rescaleMirrorPivotForCanvas = value; },
   get resizeCanvases() { return resizeCanvases; },
   set resizeCanvases(value) { resizeCanvases = value; },
-  get scheduleTimelapseCaptureFromState() { return scheduleTimelapseCaptureFromState; },
-  set scheduleTimelapseCaptureFromState(value) { scheduleTimelapseCaptureFromState = value; },
   get rollbackPendingHistory() { return rollbackPendingHistory; },
   set rollbackPendingHistory(value) { rollbackPendingHistory = value; },
   get scheduleSessionPersist() { return scheduleSessionPersist; },
@@ -19669,6 +19048,8 @@
   set markHistoryDirty(value) { markHistoryDirty = value; },
   get recordPendingLayerAddHistoryLayer() { return recordPendingLayerAddHistoryLayer; },
   set recordPendingLayerAddHistoryLayer(value) { recordPendingLayerAddHistoryLayer = value; },
+  get recordPendingLayerRemoveHistoryLayer() { return recordPendingLayerRemoveHistoryLayer; },
+  set recordPendingLayerRemoveHistoryLayer(value) { recordPendingLayerRemoveHistoryLayer = value; },
   get multiState() { return multiState; },
   set multiState(value) { multiState = value; },
   get normalizeFpsValue() { return normalizeFpsValue; },
@@ -20449,8 +19830,6 @@
         exportColorSpritesEnabled: Boolean(exportColorSpritesEnabled),
         exportGridTileWidth: normalizeExportGridTileSize(exportGridTileWidth, 8),
         exportGridTileHeight: normalizeExportGridTileSize(exportGridTileHeight, 8),
-        timelapseEnabled: Boolean(timelapseState.enabled),
-        timelapseFps: normalizeTimelapseFps(timelapseState.fps),
       };
       window.localStorage.setItem(getScopedStorageKey(SESSION_STORAGE_KEY), JSON.stringify(snapshot));
     } catch (error) {
@@ -20662,10 +20041,6 @@
     }
     if (Number.isFinite(payload.exportGridTileHeight)) {
       exportGridTileHeight = normalizeExportGridTileSize(payload.exportGridTileHeight, exportGridTileHeight);
-    }
-    timelapseState.enabled = true;
-    if (Number.isFinite(payload.timelapseFps)) {
-      timelapseState.fps = normalizeTimelapseFps(payload.timelapseFps);
     }
     if (state.showVirtualCursor && !virtualCursor) {
       virtualCursor = createInitialVirtualCursor();
@@ -22253,7 +21628,6 @@
     history.past = [];
     history.future = [];
     history.pending = null;
-    clearTimelapseRecording({ silent: true, scope: 'all' });
     if (wasUnsaved) {
       markDocumentUnsavedChange();
     } else {
@@ -26871,8 +26245,6 @@
   set restoreMultiLocalSnapshotBeforeReplica(value) { restoreMultiLocalSnapshotBeforeReplica = value; },
   get createInitialState() { return createInitialState; },
   set createInitialState(value) { createInitialState = value; },
-  get clearTimelapseRecording() { return clearTimelapseRecording; },
-  set clearTimelapseRecording(value) { clearTimelapseRecording = value; },
   get resetDocumentUnsavedChanges() { return resetDocumentUnsavedChanges; },
   set resetDocumentUnsavedChanges(value) { resetDocumentUnsavedChanges = value; },
   get writeAutosaveSnapshot() { return writeAutosaveSnapshot; },

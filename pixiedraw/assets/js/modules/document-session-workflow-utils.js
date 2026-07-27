@@ -359,7 +359,6 @@
       : Date.now();
     try {
         parsedDocument = snapshotFromParsedDocumentValue(projectPayload, {
-          deferTimelapseSnapshots: trustedAutosaveSchemaVersion === 2,
           reuseTypedArrays: trustedAutosaveSchemaVersion === 2,
           trustStoredLayerFlags: trustedAutosaveSchemaVersion === 2,
           // IndexedDB V2 checkpoints can be interrupted while their typed
@@ -658,34 +657,12 @@
     const dotStats = preserveDotStats ? (parsedDocument?.dotStats || null) : null;
     let nativeScaleOptimization = { optimized: false, factor: 1, reason: 'not-checked' };
     const scaleOptimizer = window.PiXiEEDrawModules?.snapshotIntegerScaleUtils?.optimizeSnapshotIntegerScale;
-    const hasTimelapseEdits = Object.values(projectSession?.timelapse?.tracksByCanvasId || {}).some(track => (
-      (Array.isArray(track?.snapshots) && track.snapshots.length > 0)
-      || (Array.isArray(track?.serializedSnapshots) && track.serializedSnapshots.length > 0)
-      || (Array.isArray(track?.operationLog?.entries) && track.operationLog.entries.length > 0)
-    ));
     const isSharedProjectLoad = Boolean(
       options?.sharedProjectKey
       || String(options?.projectId || '').startsWith(SHARED_PROJECT_ID_PREFIX)
     );
-    let hasArchivedTimelapse = false;
     if (
       typeof scaleOptimizer === 'function'
-      && !hasTimelapseEdits
-      && !isSharedProjectLoad
-      && options?.projectId
-      && typeof loadPersistedTimelapseSnapshots === 'function'
-    ) {
-      const timelapseLookupStage = openPerformance?.beginStage?.('timelapse-archive-lookup');
-      const persistedTimelapse = await loadPersistedTimelapseSnapshots(options.projectId, { throwOnError: false });
-      openPerformance?.endStage?.(timelapseLookupStage);
-      hasArchivedTimelapse = Object.values(persistedTimelapse || {}).some(entries => (
-        Array.isArray(entries) && entries.length > 0
-      ));
-    }
-    if (
-      typeof scaleOptimizer === 'function'
-      && !hasTimelapseEdits
-      && !hasArchivedTimelapse
       && !isSharedProjectLoad
     ) {
       let optimizationStatusAnnounced = false;
@@ -703,12 +680,6 @@
         factor: Math.max(1, Math.round(Number(nativeScaleOptimization?.factor) || 1)),
         reason: nativeScaleOptimization?.reason || '',
       });
-    } else if (hasTimelapseEdits || hasArchivedTimelapse) {
-      nativeScaleOptimization = {
-        optimized: false,
-        factor: 1,
-        reason: 'timelapse-history-preserved',
-      };
     }
     if (Number(options?.trustedAutosaveSchemaVersion) === 2) {
       console.info('[pixiedraw:open-apply]', {
@@ -737,15 +708,6 @@
       failureY: Number.isInteger(nativeScaleOptimization.failureY) ? nativeScaleOptimization.failureY : -1,
       failureAxis: nativeScaleOptimization.failureAxis || '',
     });
-    if (nativeScaleOptimization.optimized && projectSession?.timelapse?.tracksByCanvasId) {
-      const optimizedBaseSnapshot = serializeDocumentSnapshot(snapshot);
-      Object.values(projectSession.timelapse.tracksByCanvasId).forEach(track => {
-        if (track?.operationLog && Array.isArray(track.operationLog.entries) && !track.operationLog.entries.length) {
-          track.operationLog.baseSnapshot = optimizedBaseSnapshot;
-        }
-      });
-    }
-
     let snapshotApplyResult = null;
     autosaveRestoring = true;
     try {
@@ -773,11 +735,6 @@
         history.past = [];
         history.future = [];
 
-        // Legacy full-document operation logs are intentionally not hydrated.
-        // New recording uses lightweight debounced visible-frame snapshots.
-        timelapseState.tracksByCanvasId = Object.create(null);
-        timelapseState.enabled = true;
-        timelapseState.fps = projectSession.timelapse.fps;
         if (projectSession.localViewportCanvases) {
           localViewportCanvasState = normalizeLocalViewportCanvasState(
             projectSession.localViewportCanvases,
@@ -788,14 +745,11 @@
       } else {
         history.past = [];
         history.future = [];
-        clearTimelapseRecording({ silent: true, scope: 'all' });
       }
-      reconcileTimelapseTracksForSingleCanvas();
     } finally {
       autosaveRestoring = false;
     }
 
-    syncTimelapseControls();
     updateHistoryButtons();
     updateMemoryStatus();
     restoreCanvasSelectionClipboard(preservedSelectionClipboard);
@@ -974,150 +928,6 @@
     return serialized;
   }
 
-  function serializeProjectTimelapseSnapshotList(list) {
-    if (!Array.isArray(list) || !list.length) {
-      return [];
-    }
-    const snapshots = [];
-    list.forEach(entry => {
-      const resolved = resolveTimelapseFrameEntry(entry);
-      if (!resolved) {
-        return;
-      }
-      snapshots.push({
-        width: resolved.width,
-        height: resolved.height,
-        frameId: typeof entry.frameId === 'string' ? entry.frameId : '',
-        resizeRevision: Math.max(0, Math.round(Number(entry.resizeRevision) || 0)),
-        pixels: encodeTypedArray(resolved.pixels),
-      });
-    });
-    return snapshots;
-  }
-
-  function serializeProjectTimelapseTracks({ flushPending = true } = {}) {
-    if (flushPending) {
-      flushPendingTimelapseCapture({ force: true });
-    }
-    const payload = {};
-    Object.entries(getAllTimelapseTracks()).forEach(([canvasId, track]) => {
-      const deferredSnapshots = Array.isArray(track?.serializedSnapshots)
-        ? track.serializedSnapshots.filter(entry => (
-            entry
-            && typeof entry === 'object'
-            && Math.max(1, Math.round(Number(entry.width) || 0)) > 0
-            && Math.max(1, Math.round(Number(entry.height) || 0)) > 0
-            && typeof entry.pixels === 'string'
-            && entry.pixels.length > 0
-          ))
-        : [];
-      const snapshots = [
-        ...deferredSnapshots,
-        ...serializeProjectTimelapseSnapshotList(track?.snapshots || []),
-      ];
-      if (!snapshots.length) {
-        return;
-      }
-      payload[canvasId] = {
-        warningShown: Boolean(track?.warningShown),
-        sampleStep: Math.max(1, Math.round(Number(track?.sampleStep) || 1)),
-        lastCaptureToken: Number.isFinite(Number(track?.lastCaptureToken))
-          ? Math.round(Number(track.lastCaptureToken))
-          : -1,
-        resizeRevision: Math.max(0, Math.round(Number(track?.resizeRevision) || 0)),
-        resizeEvents: Array.isArray(track?.resizeEvents)
-          ? track.resizeEvents.map(event => ({
-            revision: Math.max(1, Math.round(Number(event?.revision) || 0)),
-            offsetX: Math.round(Number(event?.offsetX) || 0),
-            offsetY: Math.round(Number(event?.offsetY) || 0),
-          })).filter(event => event.revision > 0)
-          : [],
-        snapshots,
-      };
-    });
-    return payload;
-  }
-
-  function normalizeSerializedTimelapseOperationEntry(entry = null) {
-    if (!entry || typeof entry !== 'object') {
-      return null;
-    }
-    if (entry.type === 'pixelPatchBatch' && Array.isArray(entry.entries)) {
-      const entries = entry.entries
-        .map(item => normalizeSerializedTimelapseOperationEntry(item))
-        .filter(item => item?.type === 'pixelPatch');
-      return entries.length
-        ? {
-            type: 'pixelPatchBatch',
-            at: Math.max(0, Math.round(Number(entry.at) || 0)),
-            historyLabel: String(entry.historyLabel || 'timelapseCompacted'),
-            entries,
-          }
-        : null;
-    }
-    if (entry.type === 'keyframe') {
-      return entry.snapshot && typeof entry.snapshot === 'object'
-        ? {
-            type: 'keyframe',
-            at: Math.max(0, Math.round(Number(entry.at) || 0)),
-            historyLabel: String(entry.historyLabel || ''),
-            snapshot: entry.snapshot,
-          }
-        : null;
-    }
-    if (entry.type !== 'pixelPatch' || !Array.isArray(entry.changes) || !entry.changes.length) {
-      return null;
-    }
-    const changes = entry.changes
-      .map(change => ({
-        index: Math.max(0, Math.round(Number(change?.index) || 0)),
-        after: cloneTimelapsePixelPatchValue(change?.after),
-      }))
-      .filter(change => change.after);
-    if (!changes.length) {
-      return null;
-    }
-    return {
-      type: 'pixelPatch',
-      at: Math.max(0, Math.round(Number(entry.at) || 0)),
-      historyLabel: String(entry.historyLabel || ''),
-      canvasId: typeof entry.canvasId === 'string' ? entry.canvasId : '',
-      frameId: typeof entry.frameId === 'string' ? entry.frameId : '',
-      layerId: typeof entry.layerId === 'string' ? entry.layerId : '',
-      width: Math.max(1, Math.round(Number(entry.width) || 1)),
-      height: Math.max(1, Math.round(Number(entry.height) || 1)),
-      changes,
-    };
-  }
-
-  function serializeProjectTimelapseOperationLogs({ flushPending = true } = {}) {
-    if (flushPending) {
-      flushPendingTimelapseCapture({ force: true });
-    }
-    const payload = {};
-    Object.entries(getAllTimelapseTracks()).forEach(([canvasId, track]) => {
-      const log = track?.operationLog && typeof track.operationLog === 'object' ? track.operationLog : null;
-      if (!log || !Array.isArray(log.entries)) {
-        return;
-      }
-      const entries = log.entries
-        .map(entry => normalizeSerializedTimelapseOperationEntry(entry))
-        .filter(Boolean);
-      payload[canvasId] = log.version === 2
-        ? {
-            version: 2,
-            visualBaseSnapshotIndex: Math.max(0, Math.round(Number(log.visualBaseSnapshotIndex) || 0)),
-            visualBaseFrameId: typeof log.visualBaseFrameId === 'string' ? log.visualBaseFrameId : '',
-            entries,
-          }
-        : (log.baseSnapshot
-          ? { version: 1, baseSnapshot: log.baseSnapshot, entries }
-          : null);
-      if (!payload[canvasId]) delete payload[canvasId];
-    });
-    return payload;
-  }
-
   function buildProjectSessionPayload() {
     const historyLimit = normalizeProjectHistoryLimit(history.limit, DEFAULT_HISTORY_LIMIT);
     return {
@@ -1132,17 +942,10 @@
         localViewportCanvasState,
         LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE
       ),
-      timelapse: {
-        enabled: Boolean(timelapseState.enabled),
-        fps: normalizeTimelapseFps(timelapseState.fps),
-        byCanvas: serializeProjectTimelapseTracks(),
-        operationLogsByCanvas: serializeProjectTimelapseOperationLogs({ flushPending: false }),
-      },
     };
   }
 
-  function buildAutosaveSessionPayload({ includeTimelapse = getAllTimelapseStepCount() > 0 } = {}) {
-    const shouldIncludeTimelapse = Boolean(includeTimelapse);
+  function buildAutosaveSessionPayload() {
     return {
       historyLimit: normalizeProjectHistoryLimit(history.limit, DEFAULT_HISTORY_LIMIT),
       historyPast: [],
@@ -1151,17 +954,6 @@
         localViewportCanvasState,
         LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE
       ),
-      timelapse: {
-        enabled: Boolean(timelapseState.enabled),
-        fps: normalizeTimelapseFps(timelapseState.fps),
-        byCanvas: shouldIncludeTimelapse
-          ? serializeProjectTimelapseTracks()
-          : {},
-        operationLogsByCanvas: serializeProjectTimelapseOperationLogs({ flushPending: false }),
-        deferredInAutosave: !shouldIncludeTimelapse,
-        // Recording is always enabled. Empty track data is still omitted until
-        // the first lightweight base/operation exists.
-      },
     };
   }
 
@@ -1190,118 +982,6 @@
     return restored;
   }
 
-  function deserializeProjectTimelapseSnapshots(list) {
-    if (!Array.isArray(list) || !list.length) {
-      return [];
-    }
-    const restored = [];
-    for (let index = 0; index < list.length; index += 1) {
-      const entry = list[index];
-      if (!entry || typeof entry !== 'object') {
-        continue;
-      }
-      const width = Math.max(1, Math.floor(Number(entry.width) || 0));
-      const height = Math.max(1, Math.floor(Number(entry.height) || 0));
-      if (!width || !height || typeof entry.pixels !== 'string' || !entry.pixels.length) {
-        continue;
-      }
-      try {
-        const raw = decodeBase64(entry.pixels);
-        if (raw.length !== width * height * 4) {
-          continue;
-        }
-        const pixels = new Uint8ClampedArray(raw.length);
-        pixels.set(raw);
-        restored.push({
-          width,
-          height,
-          frameId: typeof entry.frameId === 'string' ? entry.frameId : '',
-          resizeRevision: Math.max(0, Math.round(Number(entry.resizeRevision) || 0)),
-          pixels: compressUint8Array(pixels, { clamped: true }),
-        });
-      } catch (error) {
-        // Ignore invalid timelapse entries.
-      }
-    }
-    return restored;
-  }
-
-  function deserializeProjectTimelapseTracks(byCanvas, fallbackCanvasId = '', options = {}) {
-    const restored = Object.create(null);
-    if (!byCanvas || typeof byCanvas !== 'object' || Array.isArray(byCanvas)) {
-      return restored;
-    }
-    Object.entries(byCanvas).forEach(([canvasId, trackPayload]) => {
-      const resolvedCanvasId = normalizeTimelapseCanvasId(canvasId, fallbackCanvasId);
-      if (!resolvedCanvasId || !trackPayload || typeof trackPayload !== 'object') {
-        return;
-      }
-      const deferSnapshots = options?.deferSnapshots === true;
-      const serializedSnapshots = deferSnapshots && Array.isArray(trackPayload.snapshots)
-        ? trackPayload.snapshots.filter(entry => (
-            entry
-            && typeof entry === 'object'
-            && typeof entry.pixels === 'string'
-            && entry.pixels.length > 0
-          ))
-        : [];
-      const snapshots = deferSnapshots
-        ? []
-        : deserializeProjectTimelapseSnapshots(trackPayload.snapshots);
-      if (!snapshots.length && !serializedSnapshots.length) {
-        return;
-      }
-      restored[resolvedCanvasId] = {
-        snapshots,
-        serializedSnapshots,
-        warningShown: Boolean(trackPayload.warningShown),
-        sampleStep: Math.max(1, Math.round(Number(trackPayload.sampleStep) || 1)),
-        lastCaptureToken: Number.isFinite(Number(trackPayload.lastCaptureToken))
-          ? Math.round(Number(trackPayload.lastCaptureToken))
-          : -1,
-        resizeRevision: Math.max(0, Math.round(Number(trackPayload.resizeRevision) || 0)),
-        resizeEvents: Array.isArray(trackPayload.resizeEvents)
-          ? trackPayload.resizeEvents.map(event => ({
-            revision: Math.max(1, Math.round(Number(event?.revision) || 0)),
-            offsetX: Math.round(Number(event?.offsetX) || 0),
-            offsetY: Math.round(Number(event?.offsetY) || 0),
-          })).filter(event => event.revision > 0)
-          : [],
-      };
-    });
-    return restored;
-  }
-
-  function deserializeProjectTimelapseOperationLogs(byCanvas, fallbackCanvasId = '') {
-    const restored = Object.create(null);
-    if (!byCanvas || typeof byCanvas !== 'object' || Array.isArray(byCanvas)) {
-      return restored;
-    }
-    Object.entries(byCanvas).forEach(([canvasId, logPayload]) => {
-      const resolvedCanvasId = normalizeTimelapseCanvasId(canvasId, fallbackCanvasId);
-      if (!resolvedCanvasId || !logPayload || typeof logPayload !== 'object') {
-        return;
-      }
-      const entries = Array.isArray(logPayload.entries)
-        ? logPayload.entries
-          .map(entry => normalizeSerializedTimelapseOperationEntry(entry))
-          .filter(Boolean)
-        : [];
-      restored[resolvedCanvasId] = Number(logPayload.version) === 2
-        ? {
-            version: 2,
-            visualBaseSnapshotIndex: Math.max(0, Math.round(Number(logPayload.visualBaseSnapshotIndex) || 0)),
-            visualBaseFrameId: typeof logPayload.visualBaseFrameId === 'string' ? logPayload.visualBaseFrameId : '',
-            entries,
-          }
-        : (logPayload.baseSnapshot
-          ? { version: 1, baseSnapshot: logPayload.baseSnapshot, entries }
-          : null);
-      if (!restored[resolvedCanvasId]) delete restored[resolvedCanvasId];
-    });
-    return restored;
-  }
-
   function parseProjectSessionPayload(payload, fallbackCanvasId = '', options = {}) {
     if (!payload || typeof payload !== 'object') {
       return null;
@@ -1311,50 +991,6 @@
     // opening a project always starts a new undo boundary.
     const historyPast = [];
     const historyFuture = [];
-    const timelapsePayload = payload.timelapse && typeof payload.timelapse === 'object'
-      ? payload.timelapse
-      : {};
-    const timelapseTracksByCanvasId = deserializeProjectTimelapseTracks(
-      timelapsePayload.byCanvas,
-      fallbackCanvasId,
-      { deferSnapshots: options?.deferTimelapseSnapshots === true }
-    );
-    const timelapseOperationLogsByCanvasId = deserializeProjectTimelapseOperationLogs(
-      timelapsePayload.operationLogsByCanvas,
-      fallbackCanvasId
-    );
-    Object.entries(timelapseOperationLogsByCanvasId).forEach(([canvasId, operationLog]) => {
-      if (!timelapseTracksByCanvasId[canvasId]) {
-        timelapseTracksByCanvasId[canvasId] = createEmptyTimelapseTrack();
-      }
-      timelapseTracksByCanvasId[canvasId].operationLog = operationLog;
-    });
-    if (!Object.keys(timelapseTracksByCanvasId).length) {
-      const deferredLegacySnapshots = options?.deferTimelapseSnapshots === true
-        && Array.isArray(timelapsePayload.snapshots)
-        ? timelapsePayload.snapshots.filter(entry => (
-            entry
-            && typeof entry === 'object'
-            && typeof entry.pixels === 'string'
-            && entry.pixels.length > 0
-          ))
-        : [];
-      const legacySnapshots = options?.deferTimelapseSnapshots === true
-        ? []
-        : deserializeProjectTimelapseSnapshots(timelapsePayload.snapshots);
-      const resolvedCanvasId = normalizeTimelapseCanvasId(fallbackCanvasId);
-      if ((legacySnapshots.length || deferredLegacySnapshots.length) && resolvedCanvasId) {
-        timelapseTracksByCanvasId[resolvedCanvasId] = {
-          snapshots: legacySnapshots,
-          serializedSnapshots: deferredLegacySnapshots,
-          warningShown: Boolean(timelapsePayload.warningShown),
-          sampleStep: Math.max(1, Math.round(Number(timelapsePayload.sampleStep) || 1)),
-          lastCaptureToken: Number.isFinite(Number(timelapsePayload.lastCaptureToken))
-            ? Math.round(Number(timelapsePayload.lastCaptureToken))
-            : -1,
-        };
-      }
-    }
     return {
       historyLimit,
       historyPast,
@@ -1365,11 +1001,6 @@
           LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE
         )
         : null,
-      timelapse: {
-        enabled: Boolean(timelapsePayload.enabled),
-        fps: normalizeTimelapseFps(timelapsePayload.fps),
-        tracksByCanvasId: timelapseTracksByCanvasId,
-      },
     };
   }
 
@@ -1514,7 +1145,6 @@
       ? parseProjectSessionPayload(
           normalizedParsed.session,
           snapshot?.activeCanvasId || '',
-          { deferTimelapseSnapshots: options?.deferTimelapseSnapshots === true }
         )
       : null;
     const dotStats = hasPackagedDocument
@@ -1558,16 +1188,9 @@
         normalizeProjectHistoryLimit,
         serializeProjectHistorySnapshot,
         serializeProjectHistoryList,
-        serializeProjectTimelapseSnapshotList,
-        serializeProjectTimelapseTracks,
-        normalizeSerializedTimelapseOperationEntry,
-        serializeProjectTimelapseOperationLogs,
         buildProjectSessionPayload,
         buildAutosaveSessionPayload,
         deserializeProjectHistoryList,
-        deserializeProjectTimelapseSnapshots,
-        deserializeProjectTimelapseTracks,
-        deserializeProjectTimelapseOperationLogs,
         parseProjectSessionPayload,
         snapshotFromDocumentBlob,
         snapshotFromDocumentText,

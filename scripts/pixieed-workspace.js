@@ -322,7 +322,6 @@
 
   function resolveDerivedExportCategory(filename) {
     const normalized = String(filename || '').toLowerCase();
-    if (normalized.includes('timelapse')) return 'Timelapse';
     if (normalized.endsWith('.png')) return normalized.includes('spritemap') ? 'SpriteMAP' : 'PNG';
     if (normalized.endsWith('.jpg') || normalized.endsWith('.jpeg')) return 'JPEG';
     if (normalized.endsWith('.gif')) return 'GIF';

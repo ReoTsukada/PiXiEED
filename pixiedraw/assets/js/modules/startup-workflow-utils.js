@@ -927,8 +927,6 @@
     history.past = [];
     history.future = [];
     history.pending = null;
-    clearTimelapseRecording({ silent: true, scope: 'all' });
-    ensureTimelapseStartCapture();
     // The old tab/session still points at the project that was just closed.
     // Reset the new document's dirty tokens without mirroring them until the
     // new autosave id, tab, and active-project session are committed together.
@@ -1626,85 +1624,6 @@
     }
   }
 
-  function mergePersistedTimelapseIntoSession(session, persistedByCanvas, canvasIds = []) {
-    if (!session || typeof session !== 'object' || !persistedByCanvas || typeof persistedByCanvas !== 'object') {
-      return false;
-    }
-    const allowedCanvasIds = new Set((Array.isArray(canvasIds) ? canvasIds : []).filter(Boolean));
-    const sourceEntries = Object.entries(persistedByCanvas).filter(([canvasId]) => (
-      !allowedCanvasIds.size || allowedCanvasIds.has(canvasId)
-    ));
-    if (!sourceEntries.length) return false;
-    const timelapse = session.timelapse && typeof session.timelapse === 'object'
-      ? session.timelapse
-      : { byCanvas: {}, operationLogsByCanvas: {} };
-    if (!timelapse.byCanvas || typeof timelapse.byCanvas !== 'object') {
-      timelapse.byCanvas = {};
-    }
-    let mergedAny = false;
-    sourceEntries.forEach(([canvasId, snapshots]) => {
-      const serialized = typeof serializeProjectTimelapseSnapshotList === 'function'
-        ? serializeProjectTimelapseSnapshotList(snapshots)
-        : [];
-      if (!serialized.length) return;
-      const existing = Array.isArray(timelapse.byCanvas[canvasId]?.snapshots)
-        ? timelapse.byCanvas[canvasId].snapshots
-        : [];
-      const seen = new Set();
-      const merged = [...serialized, ...existing].filter(snapshot => {
-        const key = `${snapshot?.width || 0}x${snapshot?.height || 0}:${snapshot?.pixels || ''}`;
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
-      timelapse.byCanvas[canvasId] = {
-        warningShown: true,
-        sampleStep: Math.max(1, Math.round(Number(timelapse.byCanvas[canvasId]?.sampleStep) || 1)),
-        lastCaptureToken: Number.isFinite(Number(timelapse.byCanvas[canvasId]?.lastCaptureToken))
-          ? Math.round(Number(timelapse.byCanvas[canvasId].lastCaptureToken))
-          : -1,
-        snapshots: merged,
-      };
-      mergedAny = true;
-    });
-    if (!mergedAny) return false;
-    timelapse.enabled = true;
-    timelapse.synchronization = {
-      schemaVersion: 1,
-      complete: true,
-      synchronizedAt: new Date().toISOString(),
-      persistedArchiveMerged: true,
-    };
-    session.timelapse = timelapse;
-    return true;
-  }
-
-  async function mergeFileBackedTimelapseIntoPackaged(entry, packaged) {
-    if (typeof loadPersistedTimelapseSnapshots !== 'function') return packaged;
-    // Legacy production projects may predate the separate timelapse store, or
-    // Safari may temporarily deny access to it. Missing optional archive data
-    // must not make the drawable project itself impossible to migrate.
-    const persistedByCanvas = await loadPersistedTimelapseSnapshots(entry?.id || '', { throwOnError: false });
-    if (!persistedByCanvas || !Object.keys(persistedByCanvas).length) return packaged;
-    const rootCanvasIds = Array.isArray(packaged?.document?.canvases)
-      ? packaged.document.canvases.map(canvas => canvas?.id || '').filter(Boolean)
-      : [];
-    if (!packaged.session || typeof packaged.session !== 'object') packaged.session = {};
-    mergePersistedTimelapseIntoSession(packaged.session, persistedByCanvas, rootCanvasIds);
-    if (Array.isArray(packaged.sheets)) {
-      packaged.sheets.forEach(sheet => {
-        const project = sheet?.project;
-        if (!project || typeof project !== 'object') return;
-        if (!project.session || typeof project.session !== 'object') project.session = {};
-        const canvasIds = Array.isArray(project?.document?.canvases)
-          ? project.document.canvases.map(canvas => canvas?.id || '').filter(Boolean)
-          : [];
-        mergePersistedTimelapseIntoSession(project.session, persistedByCanvas, canvasIds);
-      });
-    }
-    return packaged;
-  }
-
   async function refreshStartupWorkspaceProjects() {
     let migration = { migrated: 0, created: 0, failed: 0, declined: false, failedEntries: [] };
     if (!startupWorkspaceMigrationPrompted && typeof migrateLegacyLocalProjectsToTrueV2 === 'function') {
@@ -1717,7 +1636,6 @@
             `${count} V1 or legacy V2 on-device project(s) were found.\n\nThey will be converted to true V2 single projects.${hasSplit ? '\nMultiple tabs and canvases will be split into independent true V2 projects.' : ''}\nThe original V1/legacy V2 data is deleted only after its on-device true V2 replacement is fully committed.\nKeep this page open during conversion.\n\nStart conversion?`
           ));
         },
-        preparePackaged: async (entry, packaged) => await mergeFileBackedTimelapseIntoPackaged(entry, packaged),
         onProgress: ({ index, total }) => {
           setStartupWorkspaceStatus(localizeText(
             `端末内プロジェクトを真V2へ変換しています… ${index}/${total}`,

@@ -300,7 +300,6 @@ assert.match(appSource, /blank startup canvas always begins indexed[\s\S]{0,220}
 assert.match(appSource, /state\.colorMode = normalizeColorMode\(snapshot\.colorMode, state\.colorMode\);/);
 assert.match(serializationSource, /normalizeColorMode\(payload\.colorMode, inferredColorMode\)/);
 assert.match(sessionSource, /scaleOptimizer\(snapshot,[\s\S]{0,800}synchronizeImportedSnapshotPalette\(snapshot\);/);
-assert.match(sessionSource, /hasTimelapseEdits[\s\S]{0,900}hasArchivedTimelapse/);
 assert.ok(
   indexSource.indexOf('snapshot-integer-scale-utils.js') < indexSource.indexOf('document-session-workflow-utils.js'),
   'integer scale utility loads before project session restore'

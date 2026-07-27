@@ -506,6 +506,7 @@
           layers: frame.layers.map(layer => isSimulationLayer(layer)
             ? {
               id: layer.id,
+              trackId: typeof layer.trackId === 'string' ? layer.trackId : '',
               type: SIM_LAYER_TYPE,
               name: layer.name,
               visible: layer.visible,
@@ -527,6 +528,7 @@
             }
             : {
               id: layer.id,
+              trackId: typeof layer.trackId === 'string' ? layer.trackId : '',
               name: layer.name,
               visible: layer.visible,
               opacity: normalizeLayerOpacity(layer.opacity),
@@ -557,6 +559,7 @@
         layers: frame.layers.map(layer => isSimulationLayer(layer)
           ? {
             id: layer.id,
+            trackId: typeof layer.trackId === 'string' ? layer.trackId : '',
             type: SIM_LAYER_TYPE,
             name: layer.name,
             visible: layer.visible,
@@ -578,6 +581,7 @@
           }
           : {
             id: layer.id,
+            trackId: typeof layer.trackId === 'string' ? layer.trackId : '',
             name: layer.name,
             visible: layer.visible,
             opacity: normalizeLayerOpacity(layer.opacity),
@@ -682,6 +686,7 @@
             if (layer?.type === SIM_LAYER_TYPE) {
               const simLayer = createSimulationLayer(layer.name || getDefaultLayerName(1), canvas.width, canvas.height);
               simLayer.id = layer.id;
+              simLayer.trackId = typeof layer.trackId === 'string' ? layer.trackId : simLayer.trackId;
               simLayer.visible = layer.visible !== false;
               simLayer.opacity = normalizeLayerOpacity(layer.opacity);
               simLayer.blendMode = normalizeLayerBlendMode(layer.blendMode);
@@ -702,6 +707,7 @@
             }
             return {
               id: layer.id,
+              trackId: typeof layer.trackId === 'string' ? layer.trackId : '',
               name: layer.name,
               visible: layer.visible,
               opacity: normalizeLayerOpacity(layer.opacity),
@@ -737,6 +743,7 @@
           if (layer?.type === SIM_LAYER_TYPE) {
             const simLayer = createSimulationLayer(layer.name || getDefaultLayerName(1), snapshot.width, snapshot.height);
             simLayer.id = layer.id;
+            simLayer.trackId = typeof layer.trackId === 'string' ? layer.trackId : simLayer.trackId;
             simLayer.visible = layer.visible !== false;
             simLayer.opacity = normalizeLayerOpacity(layer.opacity);
             simLayer.blendMode = normalizeLayerBlendMode(layer.blendMode);
@@ -757,6 +764,7 @@
           }
           return {
             id: layer.id,
+            trackId: typeof layer.trackId === 'string' ? layer.trackId : '',
             name: layer.name,
             visible: layer.visible,
             opacity: normalizeLayerOpacity(layer.opacity),

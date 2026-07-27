@@ -294,7 +294,6 @@
         localPersistenceKey: tab?.localPersistenceKey || null,
         autosaveV2SheetId: tab?.autosaveV2SheetId || null,
         historyOwnerId: tab?.historyOwnerId || null,
-        timelapseOwnerId: tab?.timelapseOwnerId || null,
         updatedAt: project?.updatedAt || tab?.updatedAt || new Date().toISOString(),
         qrEditPayload: normalizeQrEditPayload(tab?.qrEditPayload, activeProjectId),
         ...(sheetSharedProjectKey ? {
