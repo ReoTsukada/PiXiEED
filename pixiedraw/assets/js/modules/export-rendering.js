@@ -1430,7 +1430,7 @@
         continue;
       }
       drawableLayerCount += 1;
-      if (drawableLayerCount > 1 || isSimulationLayer(layer)) {
+      if (drawableLayerCount > 1) {
         singleDirectLayer = null;
         break;
       }
@@ -1465,10 +1465,6 @@
         ? getDisplayedLayerPreviewOpacity(layer, 1)
         : normalizeLayerOpacity(layer?.opacity);
       if (!layer || (!includeHiddenLayers && !layerVisible) || layerOpacity <= 0) {
-        return;
-      }
-      if (isSimulationLayer(layer)) {
-        compositeSimulationLayerRegion(output, frame, layer, width, height, 0, 0, width - 1, height - 1);
         return;
       }
       const layerBlendMode = normalizeLayerBlendMode(layer.blendMode);
@@ -1543,28 +1539,19 @@
           const sourceIndex = (sourceY * sourceWidth) + sourceX;
           const outputIndex = ((previewY * previewWidth) + previewX) * 4;
           let color = null;
-          if (isSimulationLayer(layer)) {
-            color = resolveSimulationPixelColor(layer, sourceIndex, sourceWidth, sourceHeight, {
-              r: output[outputIndex],
-              g: output[outputIndex + 1],
-              b: output[outputIndex + 2],
-              a: output[outputIndex + 3],
-            });
-          } else {
-            const paletteIndex = typeof getStoredRasterLayerPaletteIndex === 'function'
-              ? getStoredRasterLayerPaletteIndex(layer, sourceIndex)
-              : (layer.indices instanceof Int16Array ? layer.indices[sourceIndex] : -1);
-            if (paletteIndex >= 0 && palette?.[paletteIndex]) {
-              color = palette[paletteIndex];
-            } else if (direct) {
-              const directIndex = sourceIndex * 4;
-              color = {
-                r: direct[directIndex],
-                g: direct[directIndex + 1],
-                b: direct[directIndex + 2],
-                a: direct[directIndex + 3],
-              };
-            }
+          const paletteIndex = typeof getStoredRasterLayerPaletteIndex === 'function'
+            ? getStoredRasterLayerPaletteIndex(layer, sourceIndex)
+            : (layer.indices instanceof Int16Array ? layer.indices[sourceIndex] : -1);
+          if (paletteIndex >= 0 && palette?.[paletteIndex]) {
+            color = palette[paletteIndex];
+          } else if (direct) {
+            const directIndex = sourceIndex * 4;
+            color = {
+              r: direct[directIndex],
+              g: direct[directIndex + 1],
+              b: direct[directIndex + 2],
+              a: direct[directIndex + 3],
+            };
           }
           if (!color || !Number.isFinite(color.a) || color.a <= 0) {
             continue;
@@ -2012,7 +1999,8 @@
   function updateExportOriginalToggleUI() {
     const toggle = dom.exportDialog?.includeOriginalToggle;
     const mode = resolveSelectedExportDialogFormat();
-    const isGridMode = isGridPngExportMode(mode);
+    const isGridMode = isGridPngExportMode(mode)
+      || getSelectedBatchZipFormats().includes('gridpng');
     if (toggle instanceof HTMLInputElement) {
       const canOffer = canOfferOriginalCompanionExport(mode, exportScale);
       toggle.checked = exportIncludeOriginalSize;

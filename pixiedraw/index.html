@@ -1408,7 +1408,7 @@
 <button aria-pressed="false" class="export-format-pad" data-export-format-choice="svg" data-export-tone="svg" type="button"><span>SVG</span><small>ベクター</small></button>
 <button aria-pressed="false" class="export-format-pad" data-export-format-choice="jpeg" data-export-tone="jpeg" type="button"><span>JPEG</span><small>軽量画像</small></button>
 <button aria-pressed="false" class="export-format-pad" data-export-format-choice="spritemap" data-export-tone="spritemap" type="button"><span>SpriteMAP</span><small>並び画像</small></button>
-<button aria-pressed="false" class="export-format-pad" data-export-format-choice="gridpng" data-export-tone="gridpng" type="button"><span>グリッドPNG</span><small>分割・×1固定</small></button>
+<button aria-pressed="false" class="export-format-pad" data-export-format-choice="gridpng" data-export-tone="gridpng" type="button"><span>グリッドPNG</span><small>任意pxで分割</small></button>
 <button aria-pressed="false" class="export-format-pad" data-export-format-choice="project" data-export-tone="project" type="button"><span>PiXiEEDraw</span><small>現在の編集データ</small></button>
 </div>
 <div class="export-format-help" hidden id="exportFormatHelp">
@@ -1453,13 +1453,13 @@
 </label>
 </div>
 <div class="field field--inline" hidden id="exportGridSettings">
-<span class="export-option-icons__label">グリッドPNGの分割サイズ</span>
+<span class="export-option-icons__label">1枚ごとの出力サイズ（px）</span>
 <label class="field field--compact">
-<span class="sr-only">幅 (px)</span>
+<span>幅 (px)</span>
 <input aria-label="グリッド幅" id="exportGridWidth" inputmode="numeric" min="1" placeholder="幅" step="1" title="グリッド幅" type="number" value="8"/>
 </label>
 <label class="field field--compact">
-<span class="sr-only">高さ (px)</span>
+<span>高さ (px)</span>
 <input aria-label="グリッド高さ" id="exportGridHeight" inputmode="numeric" min="1" placeholder="高さ" step="1" title="グリッド高さ" type="number" value="8"/>
 </label>
 </div>
@@ -1853,7 +1853,6 @@
 	<script defer="" src="assets/js/modules/retired-extension-compat.js?v=20260721-voxel-retired1"></script>
 	<script defer="" src="assets/js/modules/floating-draw-controls-utils.js?v=2026.07.01-floating-draw-controls-v1"></script>
 	<script defer="" src="assets/js/modules/floating-preview-panel-utils.js?v=20260724-lowres-navigator1"></script>
-	<script defer="" src="assets/js/modules/simulation-playback-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/keyboard-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/canvas-pointer-workflow-utils.js?v=20260724-selection-rect-full1"></script>
 	<script defer="" src="assets/js/modules/canvas-tool-state-workflow-utils.js?v=2026.07.14-selection-keep-v1"></script>

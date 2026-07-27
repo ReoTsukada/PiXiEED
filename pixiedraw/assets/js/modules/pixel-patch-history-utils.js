@@ -17,7 +17,6 @@
     getActiveLayer,
     getActiveProjectCanvasDocument,
     getActiveFrame,
-    isSimulationLayer,
     getProjectCanvasDocumentById,
     ensureLayerDirect,
     getRasterLayerRuntimeStoredIndex,
@@ -49,7 +48,7 @@
         return false;
       }
       const layer = getActiveLayer();
-      return Boolean(layer && !isSimulationLayer(layer) && isRasterIndexArray(layer.indices));
+      return Boolean(layer && isRasterIndexArray(layer.indices));
     }
 
     function createPixelPatchHistoryPending(label) {
@@ -239,7 +238,6 @@
         || pending?.kind === 'raster-tile-patch-pending'
         || !(pending?.changesByIndex instanceof Map)
         || !layer
-        || isSimulationLayer(layer)
       ) {
         return null;
       }
@@ -482,7 +480,7 @@
       const layer = Array.isArray(frame?.layers)
         ? (frame.layers.find(item => item?.id === entry.layerId) || null)
         : null;
-      if (!canvasDoc || !frame || !layer || isSimulationLayer(layer) || !isRasterIndexArray(layer.indices)) {
+      if (!canvasDoc || !frame || !layer || !isRasterIndexArray(layer.indices)) {
         return null;
       }
       const width = Math.max(1, Math.round(Number(canvasDoc.width) || Number(entry.width) || 1));

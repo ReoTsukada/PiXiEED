@@ -13749,14 +13749,6 @@ body.is-mobile-layout .panel-ad-mount[hidden] {
     font-size: 0.84rem;
   }
 
-  #panelSettings #applyCanvasResize {
-    width: 100%;
-    justify-content: center;
-    min-height: 38px;
-    padding: 6px 8px;
-    font-size: 0.78rem;
-  }
-
   #panelSettings .settings-size-row .button {
     padding: 6px 10px;
     font-size: 0.8rem;

@@ -112,10 +112,6 @@
     ) {
       return;
     }
-    if (isSimulationLayer(layer)) {
-      setSimulationPixelSingle(layer, x, y);
-      return;
-    }
     const index = y * canvasWidth + x;
     const base = index * 4;
     let direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
@@ -258,10 +254,6 @@
     ) {
       return false;
     }
-    if (isSimulationLayer(layer)) {
-      setSimulationPixelSingle(layer, x, y);
-      return true;
-    }
     const rgba = normalizeColorValue(color);
     const base = index * 4;
     let direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
@@ -309,89 +301,6 @@
       noteRasterPixelDirty(x, y);
     }
     return true;
-  }
-
-  function activateSimulationCell(layer, index) {
-    if (!isSimulationLayer(layer) || !Number.isInteger(index) || index < 0 || index >= layer.activeMap.length) {
-      return;
-    }
-    layer.activeMap[index] = 1;
-  }
-
-  function activateSimulationAround(layer, x, y, radius = 1) {
-    if (!isSimulationLayer(layer)) {
-      return;
-    }
-    for (let dy = -radius; dy <= radius; dy += 1) {
-      for (let dx = -radius; dx <= radius; dx += 1) {
-        const nx = x + dx;
-        const ny = y + dy;
-        if (nx < 0 || ny < 0 || nx >= state.width || ny >= state.height) continue;
-        activateSimulationCell(layer, (ny * state.width) + nx);
-      }
-    }
-  }
-
-  function seedSimulationElementState(layer, index, element) {
-    if (!isSimulationLayer(layer)) {
-      return;
-    }
-    if (element === SIM_ELEMENT_FIRE) {
-      layer.lifeMap[index] = 28;
-      layer.tempMap[index] = 760;
-    } else if (element === SIM_ELEMENT_SMOKE) {
-      layer.lifeMap[index] = 48;
-      layer.tempMap[index] = 140;
-    } else if (element === SIM_ELEMENT_WATER) {
-      layer.lifeMap[index] = 0;
-      layer.tempMap[index] = 0;
-      layer.auxMap[index] = 4;
-    } else if (element === SIM_ELEMENT_LIGHT) {
-      layer.lightMap[index] = 255;
-    } else {
-      layer.lifeMap[index] = 0;
-      layer.tempMap[index] = 0;
-      layer.lightMap[index] = 0;
-    }
-  }
-
-  function setSimulationPixelSingle(layer, x, y) {
-    const index = (y * state.width) + x;
-    const color = normalizeColorValue(getActiveDrawColor());
-    const colorBase = index * 4;
-    const mode = simulationEditorState.paintMode;
-    if (pointerState.tool === 'eraser') {
-      layer.elementMap[index] = SIM_ELEMENT_EMPTY;
-      layer.sourceColorMap[colorBase] = 0;
-      layer.sourceColorMap[colorBase + 1] = 0;
-      layer.sourceColorMap[colorBase + 2] = 0;
-      layer.sourceColorMap[colorBase + 3] = 0;
-      layer.velXMap[index] = 0;
-      layer.velYMap[index] = 0;
-      layer.lifeMap[index] = 0;
-      layer.tempMap[index] = 0;
-      layer.lightMap[index] = 0;
-      activateSimulationAround(layer, x, y, 2);
-      markHistoryDirty();
-      markDirtyPixel(x, y);
-      return;
-    }
-    if (mode === SIM_PAINT_MODE_DEPTH) {
-      layer.depthMap[index] = clamp(Math.round(Number(simulationEditorState.depthValue) || 0), 0, 255);
-    } else if (mode === SIM_PAINT_MODE_AIR) {
-      layer.airMap[index] = clamp(Math.round(Number(simulationEditorState.airValue) || 0), 0, 255);
-    } else {
-      const element = clamp(Math.round(Number(simulationEditorState.element) || 0), 0, SIM_ELEMENT_LIGHT);
-      layer.elementMap[index] = element;
-      layer.sourceColorMap[colorBase] = color.r;
-      layer.sourceColorMap[colorBase + 1] = color.g;
-      layer.sourceColorMap[colorBase + 2] = color.b;
-      layer.sourceColorMap[colorBase + 3] = color.a;
-      seedSimulationElementState(layer, index, element);
-    }
-    activateSimulationAround(layer, x, y, 2);
-    markHistoryDirty();
-    markDirtyPixel(x, y);
   }
 
   function getBrushOffsets(size, shapeOverride = state.brushShape) {
@@ -1359,10 +1268,6 @@
     setPixel,
     setPixelSingle,
     setLayerPixelDirectColorSingle,
-    activateSimulationCell,
-    activateSimulationAround,
-    seedSimulationElementState,
-    setSimulationPixelSingle,
     getBrushOffsets,
     forEachBrushOffset,
     stampBrush,

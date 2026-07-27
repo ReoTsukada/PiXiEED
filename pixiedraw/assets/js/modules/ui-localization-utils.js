@@ -470,7 +470,6 @@
       setLocalizedTextContent('#settingsSizeTitle', 'サイズ', 'Size');
       setLocalizedControlLabel('canvasWidth', 'X', 'X');
       setLocalizedControlLabel('canvasHeight', 'Y', 'Y');
-      setLocalizedTextContent('#applyCanvasResize', '確定', 'Apply');
       setLocalizedTextContent('#canvasSizeHint', 'X/Y と倍率をまとめて調整', 'Adjust X/Y and scale together.');
       setLocalizedControlLabel('spriteScaleInput', '倍率', 'Scale');
       setLocalizedTextContent('#applySpriteScale', '適用', 'Apply');
@@ -591,7 +590,7 @@
       setLocalizedTextContent('#exportSpriteMapCompanionOptionRow span:not(.export-toggle-icon)', 'SpriteMAP出力', 'SpriteMAP export');
       setLocalizedTextContent('#exportGridSplitOptionRow span', 'グリッド分割', 'Grid split');
       setLocalizedTextContent('#exportSpriteMapColorSpritesRow span:not(.export-toggle-icon)', 'カラースプライト出力', 'Color sprite export');
-      setLocalizedTextContent('#exportGridSettings > span', 'グリッド分割 (PNG)', 'Grid Split (PNG)');
+      setLocalizedTextContent('#exportGridSettings > .export-option-icons__label', '1枚ごとの出力サイズ（px）', 'Output size per image (px)');
       setLocalizedControlLabel('exportGridWidth', '幅 (px)', 'Width (px)');
       setLocalizedControlLabel('exportGridHeight', '高さ (px)', 'Height (px)');
       setLocalizedTextContent('#exportGridHint', '分割順: 右上から左へ、次の段へ進みます（右→左、上→下）。分割サイズは原寸px基準です。', 'Split order: starts at top-right, moves right-to-left, then top-to-bottom. Split size uses source pixels.');

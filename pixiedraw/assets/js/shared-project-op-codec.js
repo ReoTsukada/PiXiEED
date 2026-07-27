@@ -52,7 +52,7 @@
         return 'layer-patch';
       }
       if (normalizedType === 'structure') {
-        if (normalizedLabel === 'addLayer' || normalizedLabel === 'addSimulationLayer' || normalizedLabel === 'duplicateLayer' || normalizedLabel === 'pasteLayer') return 'add-layer';
+        if (normalizedLabel === 'addLayer' || normalizedLabel === 'duplicateLayer' || normalizedLabel === 'pasteLayer') return 'add-layer';
         if (normalizedLabel === 'removeLayer') return 'remove-layer';
         if (normalizedLabel === 'moveLayer' || normalizedLabel === 'reorderLayer') return 'move-layer';
         if (normalizedLabel === 'duplicateFrame' || normalizedLabel === 'pasteFrame' || normalizedLabel === 'addFrame') return 'add-frame';

@@ -150,12 +150,10 @@
         const name = typeof template?.name === 'string' && template.name.trim()
           ? template.name
           : getDefaultLayerName(trackIndex + 1);
-        const layer = typeof isSimulationLayer === 'function' && isSimulationLayer(template)
-          ? createSimulationLayer(name, state.width, state.height, { trackId: template?.trackId })
-          : createLayer(name, state.width, state.height, null, {
-              trackId: template?.trackId,
-              deferPixelAllocation: Number(state.rasterModelVersion) >= 1 || frameIndex !== state.activeFrame,
-            });
+        const layer = createLayer(name, state.width, state.height, null, {
+          trackId: template?.trackId,
+          deferPixelAllocation: Number(state.rasterModelVersion) >= 1 || frameIndex !== state.activeFrame,
+        });
         if (template) {
           layer.visible = template.visible !== false;
           layer.opacity = Number.isFinite(Number(template.opacity)) ? Number(template.opacity) : layer.opacity;
@@ -1280,41 +1278,6 @@
       commitHistory();
     });
 
-    dom.controls.addSimulationLayer?.addEventListener('click', () => {
-      if (!canCurrentClientEditProjectStructure({ announce: true })) {
-        if (!isSharedProjectCollaborativeMode()) {
-          setMultiStatus(localizeText('参加/視聴モードではレイヤー追加はマスターのみ操作できます', 'In participant/viewer mode, only the master can add layers'), 'warn');
-        }
-        return;
-      }
-      const activeFrame = getActiveFrame();
-      if (!activeFrame) return;
-      if (!settlePendingHistoryBeforeTimelineStructureChange()) {
-        return;
-      }
-      clearTimelineSelection();
-      beginHistory('addSimulationLayer');
-      const insertIndex = clamp(getActiveLayerIndex() + 1, 0, Number.MAX_SAFE_INTEGER);
-      let addedTrackId = '';
-      state.frames.forEach((frame, frameIndex) => {
-        const targetIndex = Math.min(insertIndex, frame.layers.length);
-        const name = `${getDefaultLayerName(frame.layers.length + 1)} Sim`;
-        const newLayer = createSimulationLayer(name, state.width, state.height, { trackId: addedTrackId });
-        addedTrackId = newLayer.trackId;
-        frame.layers.splice(targetIndex, 0, newLayer);
-        if (frameIndex === state.activeFrame) {
-          state.activeLayer = newLayer.id;
-        }
-      });
-      markHistoryDirty();
-      scheduleSessionPersist();
-      renderFrameList();
-      renderLayerList();
-      requestRender();
-      requestOverlayRender();
-      commitHistory();
-    });
-
     dom.controls.removeLayer?.addEventListener('click', () => {
       if (!canCurrentClientEditProjectStructure({ announce: true })) {
         if (!isSharedProjectCollaborativeMode()) {
@@ -1392,116 +1355,6 @@
       requestOverlayRender();
       commitHistory();
     });
-
-    const bindSimulationNumber = (control, apply, output = null, suffix = '') => {
-      if (!(control instanceof HTMLInputElement)) return;
-      control.addEventListener('input', () => {
-        const layer = getSimulationActiveLayer();
-        if (!layer) return;
-        const value = Number(control.value);
-        apply(layer, value);
-        if (output) output.textContent = `${Math.round(value)}${suffix}`;
-        markHistoryDirty();
-        requestRender();
-      });
-    };
-    if (dom.controls.simulationPaintMode instanceof HTMLSelectElement) {
-      dom.controls.simulationPaintMode.addEventListener('change', () => {
-        simulationEditorState.paintMode = dom.controls.simulationPaintMode.value;
-      });
-    }
-    if (dom.controls.simulationElement instanceof HTMLSelectElement) {
-      dom.controls.simulationElement.addEventListener('change', () => {
-        simulationEditorState.element = clamp(Math.round(Number(dom.controls.simulationElement.value) || 0), 0, SIM_ELEMENT_LIGHT);
-        updateSimulationElementPaletteUi();
-      });
-    }
-    buildSimulationElementPaletteButtons(dom.controls.leftSimulationElementPalette);
-    if (dom.controls.simulationShowLeftPalette instanceof HTMLInputElement) {
-      dom.controls.simulationShowLeftPalette.addEventListener('change', () => {
-        simulationEditorState.showLeftPalette = dom.controls.simulationShowLeftPalette.checked;
-        updateSimulationElementPaletteUi();
-      });
-    }
-    bindSimulationNumber(dom.controls.simulationDepthValue, (_layer, value) => {
-      simulationEditorState.depthValue = clamp(Math.round(value), 0, 255);
-    }, dom.controls.simulationDepthValueOut);
-    bindSimulationNumber(dom.controls.simulationAirValue, (_layer, value) => {
-      simulationEditorState.airValue = clamp(Math.round(value), 0, 255);
-    }, dom.controls.simulationAirValueOut);
-    bindSimulationNumber(dom.controls.simulationAtmosphereStrength, (layer, value) => {
-      layer.settings.atmosphereStrength = clamp(Number(value) / 100, 0, 1);
-      if (dom.controls.simulationAtmosphereStrengthValue) {
-        dom.controls.simulationAtmosphereStrengthValue.textContent = `${Math.round(value)}%`;
-      }
-    });
-    bindSimulationNumber(dom.controls.simulationWaterMixStrength, (layer, value) => {
-      layer.elementStyle[SIM_ELEMENT_WATER] = normalizeSimulationStyle(SIM_ELEMENT_WATER, {
-        ...layer.elementStyle[SIM_ELEMENT_WATER],
-        mixStrength: clamp(Number(value) / 100, 0, 1),
-      });
-      if (dom.controls.simulationWaterMixStrengthValue) {
-        dom.controls.simulationWaterMixStrengthValue.textContent = `${Math.round(value)}%`;
-      }
-    });
-    if (dom.controls.simulationAtmosphereEnabled instanceof HTMLInputElement) {
-      dom.controls.simulationAtmosphereEnabled.addEventListener('change', () => {
-        const layer = getSimulationActiveLayer();
-        if (!layer) return;
-        layer.settings.atmosphereEnabled = dom.controls.simulationAtmosphereEnabled.checked;
-        syncActiveLayerSettingsUI();
-        markHistoryDirty();
-        requestRender();
-      });
-    }
-    const bindSimulationSelectStyle = (control, element) => {
-      if (!(control instanceof HTMLSelectElement)) return;
-      control.addEventListener('change', () => {
-        const layer = getSimulationActiveLayer();
-        if (!layer) return;
-        layer.elementStyle[element] = normalizeSimulationStyle(element, {
-          ...layer.elementStyle[element],
-          displayMode: control.value,
-        });
-        markHistoryDirty();
-        requestRender();
-      });
-    };
-    bindSimulationSelectStyle(dom.controls.simulationWaterDisplayMode, SIM_ELEMENT_WATER);
-    bindSimulationSelectStyle(dom.controls.simulationFireDisplayMode, SIM_ELEMENT_FIRE);
-    bindSimulationSelectStyle(dom.controls.simulationMetalDisplayMode, SIM_ELEMENT_METAL);
-    const bindSimulationColor = (control, key) => {
-      if (!(control instanceof HTMLInputElement)) return;
-      control.addEventListener('input', () => {
-        const layer = getSimulationActiveLayer();
-        if (!layer) return;
-        const hex = String(control.value || '').replace('#', '');
-        if (hex.length !== 6) return;
-        layer.elementStyle[SIM_ELEMENT_WATER] = normalizeSimulationStyle(SIM_ELEMENT_WATER, {
-          ...layer.elementStyle[SIM_ELEMENT_WATER],
-          palette: {
-            ...(layer.elementStyle[SIM_ELEMENT_WATER]?.palette || {}),
-            [key]: {
-              r: parseInt(hex.slice(0, 2), 16),
-              g: parseInt(hex.slice(2, 4), 16),
-              b: parseInt(hex.slice(4, 6), 16),
-              a: 255,
-            },
-          },
-        });
-        markHistoryDirty();
-        requestRender();
-      });
-    };
-    bindSimulationColor(dom.controls.simulationWaterShallow, 'shallow');
-    bindSimulationColor(dom.controls.simulationWaterMid, 'mid');
-    bindSimulationColor(dom.controls.simulationWaterDeep, 'deep');
-    bindSimulationColor(dom.controls.simulationWaterFoam, 'foam');
-    bindSimulationColor(dom.controls.simulationWaterHighlight, 'highlight');
-    if (dom.controls.leftSimulationElementPaletteWrap instanceof HTMLElement) {
-      dom.controls.leftSimulationElementPaletteWrap.hidden = true;
-    }
-    updateSimulationElementPaletteUi();
 
     dom.controls.moveLayerUp?.addEventListener('click', () => {
       moveActiveLayer(-1);
@@ -1926,7 +1779,6 @@
     }
     const playbackLockedControls = [
       dom.controls.addLayer,
-      dom.controls.addSimulationLayer,
       dom.controls.removeLayer,
       dom.controls.addFrame,
       dom.controls.removeFrame,
@@ -1953,7 +1805,6 @@
   function applyTimelineToolbarFrames() {
     const configs = [
       { element: dom.controls.addLayer, variant: 'add' },
-      { element: dom.controls.addSimulationLayer, variant: 'add' },
       { element: dom.controls.removeLayer, variant: 'remove' },
       { element: dom.controls.addFrame, variant: 'add' },
       { element: dom.controls.removeFrame, variant: 'remove' },
@@ -2142,7 +1993,6 @@
       ? (frame.layers.find(item => item.id === state.activeLayer) || frame.layers[frame.layers.length - 1] || null)
       : null;
     const hasLayer = Boolean(layer);
-    const isSimLayer = isSimulationLayer(layer);
     const opacityControl = dom.controls.layerOpacity;
     const blendControl = dom.controls.layerBlendMode;
     const targetLabel = dom.controls.layerSettingsTarget;
@@ -2152,7 +2002,7 @@
 
     if (targetLabel) {
       targetLabel.textContent = hasLayer
-        ? localizeText(`対象: ${layer.name}${isSimLayer ? ' [Sim]' : ''}`, `Target: ${layer.name}${isSimLayer ? ' [Sim]' : ''}`)
+        ? localizeText(`対象: ${layer.name}`, `Target: ${layer.name}`)
         : localizeText('対象: なし', 'Target: None');
     }
     if (opacityControl instanceof HTMLInputElement) {
@@ -2163,44 +2013,6 @@
     if (blendControl instanceof HTMLSelectElement) {
       blendControl.disabled = !hasLayer;
       blendControl.value = normalizedBlendMode;
-    }
-    if (dom.controls.simulationLayerSettings instanceof HTMLElement) {
-      dom.controls.simulationLayerSettings.hidden = true;
-    }
-    if (false && isSimLayer) {
-      const waterStyle = normalizeSimulationStyle(SIM_ELEMENT_WATER, layer.elementStyle?.[SIM_ELEMENT_WATER]);
-      if (dom.controls.simulationLayerTarget) dom.controls.simulationLayerTarget.textContent = `${layer.name} [simulation]`;
-      if (dom.controls.simulationPaintMode) dom.controls.simulationPaintMode.value = simulationEditorState.paintMode;
-      if (dom.controls.simulationElement) dom.controls.simulationElement.value = String(simulationEditorState.element);
-      if (dom.controls.simulationDepthValue) dom.controls.simulationDepthValue.value = String(simulationEditorState.depthValue);
-      if (dom.controls.simulationAirValue) dom.controls.simulationAirValue.value = String(simulationEditorState.airValue);
-      if (dom.controls.simulationAtmosphereEnabled instanceof HTMLInputElement) {
-        dom.controls.simulationAtmosphereEnabled.checked = layer.settings.atmosphereEnabled !== false;
-      }
-      if (dom.controls.simulationAtmosphereEnabledValue) {
-        dom.controls.simulationAtmosphereEnabledValue.textContent = layer.settings.atmosphereEnabled !== false ? 'ON' : 'OFF';
-      }
-      if (dom.controls.simulationShowLeftPalette instanceof HTMLInputElement) {
-        dom.controls.simulationShowLeftPalette.checked = simulationEditorState.showLeftPalette;
-      }
-      const atmospherePercent = clamp(Math.round((Number(layer.settings.atmosphereStrength) || 0) * 100), 0, 100);
-      if (dom.controls.simulationAtmosphereStrength) dom.controls.simulationAtmosphereStrength.value = String(atmospherePercent);
-      if (dom.controls.simulationAtmosphereStrengthValue) dom.controls.simulationAtmosphereStrengthValue.textContent = `${atmospherePercent}%`;
-      if (dom.controls.simulationWaterDisplayMode) dom.controls.simulationWaterDisplayMode.value = waterStyle.displayMode;
-      const waterMixPercent = clamp(Math.round(waterStyle.mixStrength * 100), 0, 100);
-      if (dom.controls.simulationWaterMixStrength) dom.controls.simulationWaterMixStrength.value = String(waterMixPercent);
-      if (dom.controls.simulationWaterMixStrengthValue) dom.controls.simulationWaterMixStrengthValue.textContent = `${waterMixPercent}%`;
-      const toHex = color => `#${[color.r, color.g, color.b].map(v => clamp(Math.round(v), 0, 255).toString(16).padStart(2, '0')).join('')}`;
-      if (dom.controls.simulationWaterShallow) dom.controls.simulationWaterShallow.value = toHex(waterStyle.palette.shallow);
-      if (dom.controls.simulationWaterMid) dom.controls.simulationWaterMid.value = toHex(waterStyle.palette.mid);
-      if (dom.controls.simulationWaterDeep) dom.controls.simulationWaterDeep.value = toHex(waterStyle.palette.deep);
-      if (dom.controls.simulationWaterFoam) dom.controls.simulationWaterFoam.value = toHex(waterStyle.palette.foam);
-      if (dom.controls.simulationWaterHighlight) dom.controls.simulationWaterHighlight.value = toHex(waterStyle.palette.highlight);
-      if (dom.controls.simulationFireDisplayMode) dom.controls.simulationFireDisplayMode.value = normalizeSimulationDisplayMode(layer.elementStyle?.[SIM_ELEMENT_FIRE]?.displayMode, SIM_MIXED);
-      if (dom.controls.simulationMetalDisplayMode) dom.controls.simulationMetalDisplayMode.value = normalizeSimulationDisplayMode(layer.elementStyle?.[SIM_ELEMENT_METAL]?.displayMode, SIM_MIXED);
-      if (dom.controls.simulationDepthValueOut) dom.controls.simulationDepthValueOut.textContent = String(simulationEditorState.depthValue);
-      if (dom.controls.simulationAirValueOut) dom.controls.simulationAirValueOut.textContent = String(simulationEditorState.airValue);
-      updateSimulationElementPaletteUi();
     }
   }
 

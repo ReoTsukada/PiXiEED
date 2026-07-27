@@ -503,7 +503,7 @@
           duration: frame.duration,
           voxelPreviewYawDeg: normalizeVoxelPreviewYawDegrees(frame?.voxelPreviewYawDeg),
           voxelPreviewPitchDeg: normalizeVoxelPreviewPitchDegrees(frame?.voxelPreviewPitchDeg),
-          layers: frame.layers.map(layer => isSimulationLayer(layer)
+          layers: frame.layers.filter(layer => !isSimulationLayer(layer)).map(layer => isSimulationLayer(layer)
             ? {
               id: layer.id,
               trackId: typeof layer.trackId === 'string' ? layer.trackId : '',
@@ -556,7 +556,7 @@
         duration: frame.duration,
         voxelPreviewYawDeg: normalizeVoxelPreviewYawDegrees(frame?.voxelPreviewYawDeg),
         voxelPreviewPitchDeg: normalizeVoxelPreviewPitchDegrees(frame?.voxelPreviewPitchDeg),
-        layers: frame.layers.map(layer => isSimulationLayer(layer)
+        layers: frame.layers.filter(layer => !isSimulationLayer(layer)).map(layer => isSimulationLayer(layer)
           ? {
             id: layer.id,
             trackId: typeof layer.trackId === 'string' ? layer.trackId : '',
@@ -682,7 +682,7 @@
           duration: frame.duration,
           voxelPreviewYawDeg: normalizeVoxelPreviewYawDegrees(frame?.voxelPreviewYawDeg),
           voxelPreviewPitchDeg: normalizeVoxelPreviewPitchDegrees(frame?.voxelPreviewPitchDeg),
-          layers: frame.layers.map(layer => {
+          layers: frame.layers.filter(layer => layer?.type !== 'simulation').map(layer => {
             if (layer?.type === SIM_LAYER_TYPE) {
               const simLayer = createSimulationLayer(layer.name || getDefaultLayerName(1), canvas.width, canvas.height);
               simLayer.id = layer.id;
@@ -739,7 +739,7 @@
         duration: frame.duration,
         voxelPreviewYawDeg: normalizeVoxelPreviewYawDegrees(frame?.voxelPreviewYawDeg),
         voxelPreviewPitchDeg: normalizeVoxelPreviewPitchDegrees(frame?.voxelPreviewPitchDeg),
-        layers: frame.layers.map(layer => {
+        layers: frame.layers.filter(layer => layer?.type !== 'simulation').map(layer => {
           if (layer?.type === SIM_LAYER_TYPE) {
             const simLayer = createSimulationLayer(layer.name || getDefaultLayerName(1), snapshot.width, snapshot.height);
             simLayer.id = layer.id;

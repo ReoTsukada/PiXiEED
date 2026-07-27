@@ -265,33 +265,6 @@
       layerOpacityValue: document.getElementById('layerOpacityValue'),
       layerBlendMode: document.getElementById('layerBlendMode'),
       layerSettingsTarget: document.getElementById('layerSettingsTarget'),
-      simulationLayerSettings: document.getElementById('simulationLayerSettings'),
-      simulationLayerTarget: document.getElementById('simulationLayerTarget'),
-      simulationPaintMode: document.getElementById('simulationPaintMode'),
-      simulationElement: document.getElementById('simulationElement'),
-      simulationElementPalette: document.getElementById('simulationElementPalette'),
-      leftSimulationElementPaletteWrap: document.getElementById('leftSimulationElementPaletteWrap'),
-      leftSimulationElementPalette: document.getElementById('leftSimulationElementPalette'),
-      simulationDepthValue: document.getElementById('simulationDepthValue'),
-      simulationDepthValueOut: document.getElementById('simulationDepthValueOut'),
-      simulationAirValue: document.getElementById('simulationAirValue'),
-      simulationAirValueOut: document.getElementById('simulationAirValueOut'),
-      simulationAtmosphereEnabled: document.getElementById('simulationAtmosphereEnabled'),
-      simulationAtmosphereEnabledValue: document.getElementById('simulationAtmosphereEnabledValue'),
-      simulationShowLeftPalette: document.getElementById('simulationShowLeftPalette'),
-      simulationShowLeftPaletteValue: document.getElementById('simulationShowLeftPaletteValue'),
-      simulationAtmosphereStrength: document.getElementById('simulationAtmosphereStrength'),
-      simulationAtmosphereStrengthValue: document.getElementById('simulationAtmosphereStrengthValue'),
-      simulationWaterDisplayMode: document.getElementById('simulationWaterDisplayMode'),
-      simulationWaterMixStrength: document.getElementById('simulationWaterMixStrength'),
-      simulationWaterMixStrengthValue: document.getElementById('simulationWaterMixStrengthValue'),
-      simulationWaterShallow: document.getElementById('simulationWaterShallow'),
-      simulationWaterMid: document.getElementById('simulationWaterMid'),
-      simulationWaterDeep: document.getElementById('simulationWaterDeep'),
-      simulationWaterFoam: document.getElementById('simulationWaterFoam'),
-      simulationWaterHighlight: document.getElementById('simulationWaterHighlight'),
-      simulationFireDisplayMode: document.getElementById('simulationFireDisplayMode'),
-      simulationMetalDisplayMode: document.getElementById('simulationMetalDisplayMode'),
       frameSettingsTarget: document.getElementById('frameSettingsTarget'),
       onionSkinEnabled: document.getElementById('onionSkinEnabled'),
       onionSkinEnabledValue: document.getElementById('onionSkinEnabledValue'),
@@ -302,7 +275,6 @@
       onionOpacity: document.getElementById('onionOpacity'),
       onionOpacityValue: document.getElementById('onionOpacityValue'),
       addLayer: document.getElementById('addLayer'),
-      addSimulationLayer: document.getElementById('addSimulationLayer'),
       removeLayer: document.getElementById('removeLayer'),
       moveLayerUp: document.getElementById('moveLayerUp'),
       moveLayerDown: document.getElementById('moveLayerDown'),
@@ -324,7 +296,6 @@
       canvasWidthIncrement: document.getElementById('canvasWidthIncrement'),
       canvasHeightDecrement: document.getElementById('canvasHeightDecrement'),
       canvasHeightIncrement: document.getElementById('canvasHeightIncrement'),
-      applyCanvasResize: document.getElementById('applyCanvasResize'),
       toggleChecker: document.getElementById('toggleChecker'),
       togglePixelPreview: document.getElementById('togglePixelPreview'),
       toggleVirtualCursor: document.getElementById('toggleVirtualCursor'),
@@ -3419,7 +3390,7 @@
       * Math.max(1, Math.round(Number(height) || 1));
     let changed = false;
     frame.layers.forEach((layer, layerIndex) => {
-      if (!layer || isSimulationLayer(layer)) {
+      if (!layer) {
         return;
       }
       if (layer.directOnly === true && layer.direct instanceof Uint8ClampedArray) {
@@ -3455,14 +3426,6 @@
   get FILL_STYLE_DITHER_GRADIENT() { return FILL_STYLE_DITHER_GRADIENT; },
   get SELECT_SAME_MODE_CONNECTED() { return SELECT_SAME_MODE_CONNECTED; },
   get SELECT_SAME_MODE_GLOBAL() { return SELECT_SAME_MODE_GLOBAL; },
-  get SIM_ELEMENT_EMPTY() { return SIM_ELEMENT_EMPTY; },
-  get SIM_ELEMENT_FIRE() { return SIM_ELEMENT_FIRE; },
-  get SIM_ELEMENT_LIGHT() { return SIM_ELEMENT_LIGHT; },
-  get SIM_ELEMENT_SMOKE() { return SIM_ELEMENT_SMOKE; },
-  get SIM_ELEMENT_WATER() { return SIM_ELEMENT_WATER; },
-  get SIM_PAINT_MODE_AIR() { return SIM_PAINT_MODE_AIR; },
-  get SIM_PAINT_MODE_DEPTH() { return SIM_PAINT_MODE_DEPTH; },
-  get activateSimulationAround() { return activateSimulationAround; },
   get bresenhamLine() { return bresenhamLine; },
   get brushCircleOffsetCache() { return brushCircleOffsetCache; },
   set brushCircleOffsetCache(value) { brushCircleOffsetCache = value; },
@@ -3495,7 +3458,6 @@
   get isMirrorEnabledForTool() { return isMirrorEnabledForTool; },
   get isMultiPaletteIsolationEnabled() { return isMultiPaletteIsolationEnabled; },
   get isRgbColorMode() { return isRgbColorMode; },
-  get isSimulationLayer() { return isSimulationLayer; },
   get layerPixelMatchesMatchState() { return layerPixelMatchesMatchState; },
   get markDirtyRect() { return markDirtyRect; },
   get markDirtyPixel() { return markDirtyPixel; },
@@ -3517,15 +3479,10 @@
   get setActivePaletteIndex() { return setActivePaletteIndex; },
   get setActiveRgbColor() { return setActiveRgbColor; },
   get setRasterLayerRuntimeStoredIndex() { return setRasterLayerRuntimeStoredIndex; },
-  get simulationEditorState() { return simulationEditorState; },
   get state() { return state; },
   get updateColorTabSwatch() { return updateColorTabSwatch; },
   get updatePaletteSelectionState() { return updatePaletteSelectionState; },
   }) || {};
-
-  function activateSimulationAround(...args) {
-    return canvasDrawingWorkflowUtilsModule.activateSimulationAround(...args);
-  }
 
   function getBrushOffsets(...args) {
     return canvasDrawingWorkflowUtilsModule.getBrushOffsets(...args);
@@ -4579,8 +4536,6 @@
   set clamp(value) { clamp = value; },
   get compositeLayerPixelNormalized() { return compositeLayerPixelNormalized; },
   set compositeLayerPixelNormalized(value) { compositeLayerPixelNormalized = value; },
-  get compositeSimulationLayerRegion() { return compositeSimulationLayerRegion; },
-  set compositeSimulationLayerRegion(value) { compositeSimulationLayerRegion = value; },
   get ctx() { return ctx; },
   set ctx(value) { ctx = value; },
   get getCanvasRenderContext() { return getCanvasRenderContext; },
@@ -4601,8 +4556,6 @@
   set getStoredRasterLayerPaletteIndex(value) { getStoredRasterLayerPaletteIndex = value; },
   get getPlaybackFrameImageData() { return getPlaybackFrameImageData; },
   set getPlaybackFrameImageData(value) { getPlaybackFrameImageData = value; },
-  get isSimulationLayer() { return isSimulationLayer; },
-  set isSimulationLayer(value) { isSimulationLayer = value; },
   get isTiledLayerIndices() { return documentModel.isTiledLayerIndices; },
   get isVoxelExtensionModeEnabled() { return isVoxelExtensionModeEnabled; },
   set isVoxelExtensionModeEnabled(value) { isVoxelExtensionModeEnabled = value; },
@@ -7905,7 +7858,6 @@
     upgradeLegacyRasterDocumentsToCopyOnWrite,
     detachSharedLayerRaster,
     ensureLayerDirect,
-    isSimulationLayer,
     cloneSimulationColor,
     normalizeSimulationDisplayMode,
     normalizeSimulationStyle,
@@ -9121,6 +9073,8 @@
   window.addEventListener('pagehide', () => {
     releaseSharedProjectSessionLock().catch(() => {});
   });
+  let sharedProjectRecoveryLifecycleUtilsModule = null;
+
   document.addEventListener('visibilitychange', handleAutosaveVisibilityChange);
   document.addEventListener('visibilitychange', handleMultiVisibilityChange);
   document.addEventListener('visibilitychange', () => {
@@ -9847,7 +9801,6 @@
   const MULTI_PALETTE_HISTORY_LABELS = new Set(['paletteAdd', 'paletteRemove', 'paletteReorder', 'paletteColor', 'paletteApplyPreset']);
   const COPY_ON_WRITE_METADATA_ONLY_HISTORY_LABELS = new Set([
     'addLayer',
-    'addSimulationLayer',
     'duplicateLayer',
     'pasteLayer',
     'removeLayer',
@@ -9863,7 +9816,6 @@
   const SHARED_PROJECT_STRUCTURE_HISTORY_LABELS = new Set([
     'addSheet',
     'addLayer',
-    'addSimulationLayer',
     'duplicateLayer',
     'pasteLayer',
     'removeLayer',
@@ -9995,11 +9947,6 @@
     height: 0,
     radius: 0,
     byFrame: new Map(),
-  };
-  const simulationRuntime = {
-    playing: false,
-    handle: null,
-    lastTickAt: 0,
   };
   const simulationEditorState = {
     paintMode: 'element',
@@ -11757,7 +11704,6 @@
     getActiveFrame: (...args) => getActiveFrame(...args),
     getViewportBounds: (...args) => getViewportBounds(...args),
     getStoredRasterLayerPaletteIndex: (...args) => getStoredRasterLayerPaletteIndex(...args),
-    isSimulationLayer: (...args) => isSimulationLayer(...args),
     isVoxelExtensionModeEnabled: (...args) => isVoxelExtensionModeEnabled(...args),
     loadFloatingPreviewReferenceMediaForProject: (...args) => loadFloatingPreviewReferenceMediaForProject(...args),
     localizeText: (...args) => localizeText(...args),
@@ -11770,7 +11716,6 @@
     renderFloatingPreviewGizmo: (...args) => renderFloatingPreviewGizmo(...args),
     requestOverlayRender: (...args) => requestOverlayRender(...args),
     requestRender: (...args) => requestRender(...args),
-    resolveSimulationPixelColor: (...args) => resolveSimulationPixelColor(...args),
     scheduleAutosaveSnapshot: (...args) => scheduleAutosaveSnapshot(...args),
     scheduleSessionPersist: (...args) => scheduleSessionPersist(...args),
     setVoxelPreviewOrientationForFrameIndex: (...args) => setVoxelPreviewOrientationForFrameIndex(...args),
@@ -12168,14 +12113,6 @@
   getCurrentExportFrames,
   buildStillExportFrameSet,
   buildExportFrameSet,
-  getSimulationActiveLayer,
-  updateSimulationElementPaletteUi,
-  buildSimulationElementPaletteButtons,
-  mixSimulationColor,
-  brightenSimulationColor,
-  sampleSimulationPaletteColor,
-  resolveSimulationPixelColor,
-  compositeSimulationLayerRegion,
   compositeFramePixels,
   resetExportScaleDefaults,
   getExportFormatLabel,
@@ -12535,7 +12472,6 @@
     getActiveLayer,
     getActiveProjectCanvasDocument,
     getActiveFrame,
-    isSimulationLayer,
     getProjectCanvasDocumentById,
     ensureLayerDirect,
     getRasterLayerRuntimeStoredIndex,
@@ -12582,7 +12518,7 @@
     if (pixelPatchPending) {
       if (Number(state.rasterModelVersion) >= 1) {
         const activeLayer = getActiveLayer();
-        if (activeLayer && !isSimulationLayer(activeLayer)) {
+        if (activeLayer) {
           const sparseReady = SPARSE_RASTER_DRAW_HISTORY_LABELS.has(label)
             && ensureSparseWritableRasterLayerIndices(activeLayer, state.width, state.height);
           if (!sparseReady) {
@@ -13795,7 +13731,7 @@
   }
 
   /** @type {any} */
-  const sharedProjectRecoveryLifecycleUtilsModule = window.PiXiEEDrawModules?.sharedProjectRecoveryLifecycleUtils?.createSharedProjectRecoveryLifecycleUtils?.({
+  sharedProjectRecoveryLifecycleUtilsModule = window.PiXiEEDrawModules?.sharedProjectRecoveryLifecycleUtils?.createSharedProjectRecoveryLifecycleUtils?.({
   get activeSharedProjectChannelKey() { return activeSharedProjectChannelKey; },
   set activeSharedProjectChannelKey(value) { activeSharedProjectChannelKey = value; },
   get activeSharedProjectDocumentLoaded() { return activeSharedProjectDocumentLoaded; },
@@ -14108,7 +14044,7 @@
   }
 
   function handleMultiPageShow(...args) {
-    return sharedProjectRecoveryLifecycleUtilsModule.handleMultiPageShow(...args);
+    return sharedProjectRecoveryLifecycleUtilsModule?.handleMultiPageShow?.(...args);
   }
 
   function handleMultiDocumentResume(...args) {
@@ -14307,7 +14243,6 @@
     getDisplayedLayerVisibility,
     getDisplayedLayerPreviewOpacity,
     normalizeLayerBlendMode,
-    isSimulationLayer,
     compositeFramePixels,
   }) || {};
   const {
@@ -19058,16 +18993,6 @@
   set MULTI_ASSIGNMENT_BORDER_COLORS(value) { MULTI_ASSIGNMENT_BORDER_COLORS = value; },
   get PLAYBACK_MAX_CATCHUP_STEPS() { return PLAYBACK_MAX_CATCHUP_STEPS; },
   set PLAYBACK_MAX_CATCHUP_STEPS(value) { PLAYBACK_MAX_CATCHUP_STEPS = value; },
-  get SIM_ELEMENT_FIRE() { return SIM_ELEMENT_FIRE; },
-  set SIM_ELEMENT_FIRE(value) { SIM_ELEMENT_FIRE = value; },
-  get SIM_ELEMENT_LIGHT() { return SIM_ELEMENT_LIGHT; },
-  set SIM_ELEMENT_LIGHT(value) { SIM_ELEMENT_LIGHT = value; },
-  get SIM_ELEMENT_METAL() { return SIM_ELEMENT_METAL; },
-  set SIM_ELEMENT_METAL(value) { SIM_ELEMENT_METAL = value; },
-  get SIM_ELEMENT_WATER() { return SIM_ELEMENT_WATER; },
-  set SIM_ELEMENT_WATER(value) { SIM_ELEMENT_WATER = value; },
-  get SIM_MIXED() { return SIM_MIXED; },
-  set SIM_MIXED(value) { SIM_MIXED = value; },
   get TIMELINE_BUTTON_VARIANTS() { return TIMELINE_BUTTON_VARIANTS; },
   set TIMELINE_BUTTON_VARIANTS(value) { TIMELINE_BUTTON_VARIANTS = value; },
   get TIMELINE_CELL_SIZE() { return TIMELINE_CELL_SIZE; },
@@ -19098,8 +19023,6 @@
   set applyPixelFrameBackground(value) { applyPixelFrameBackground = value; },
   get beginHistory() { return beginHistory; },
   set beginHistory(value) { beginHistory = value; },
-  get buildSimulationElementPaletteButtons() { return buildSimulationElementPaletteButtons; },
-  set buildSimulationElementPaletteButtons(value) { buildSimulationElementPaletteButtons = value; },
   get canCurrentClientEditProjectStructure() { return canCurrentClientEditProjectStructure; },
   set canCurrentClientEditProjectStructure(value) { canCurrentClientEditProjectStructure = value; },
   get canCurrentGuestFreelyMoveAssignedCell() { return canCurrentGuestFreelyMoveAssignedCell; },
@@ -19130,8 +19053,6 @@
   set createLayer(value) { createLayer = value; },
   get createLayerFromClipboardSnapshot() { return createLayerFromClipboardSnapshot; },
   set createLayerFromClipboardSnapshot(value) { createLayerFromClipboardSnapshot = value; },
-  get createSimulationLayer() { return createSimulationLayer; },
-  set createSimulationLayer(value) { createSimulationLayer = value; },
   get dom() { return dom; },
   set dom(value) { dom = value; },
   get enforceGuestAssignedLayerSelection() { return enforceGuestAssignedLayerSelection; },
@@ -19164,8 +19085,6 @@
   set getProjectCanvasDocuments(value) { getProjectCanvasDocuments = value; },
   get getSharedProjectCellPresenceEntriesForCell() { return getSharedProjectCellPresenceEntriesForCell; },
   set getSharedProjectCellPresenceEntriesForCell(value) { getSharedProjectCellPresenceEntriesForCell = value; },
-  get getSimulationActiveLayer() { return getSimulationActiveLayer; },
-  set getSimulationActiveLayer(value) { getSimulationActiveLayer = value; },
   get hasRecentViewportInteraction() { return hasRecentViewportInteraction; },
   set hasRecentViewportInteraction(value) { hasRecentViewportInteraction = value; },
   get history() { return history; },
@@ -19188,8 +19107,6 @@
   set isMultiReadOnlyMode(value) { isMultiReadOnlyMode = value; },
   get isSharedProjectCollaborativeMode() { return isSharedProjectCollaborativeMode; },
   set isSharedProjectCollaborativeMode(value) { isSharedProjectCollaborativeMode = value; },
-  get isSimulationLayer() { return isSimulationLayer; },
-  set isSimulationLayer(value) { isSimulationLayer = value; },
   get isVoxelExtensionModeEnabled() { return isVoxelExtensionModeEnabled; },
   set isVoxelExtensionModeEnabled(value) { isVoxelExtensionModeEnabled = value; },
   get jumpToTimelineEdgeOnActiveLayer() { return jumpToTimelineEdgeOnActiveLayer; },
@@ -19216,10 +19133,6 @@
   set normalizeOnionFrameCount(value) { normalizeOnionFrameCount = value; },
   get normalizeOnionSkinState() { return normalizeOnionSkinState; },
   set normalizeOnionSkinState(value) { normalizeOnionSkinState = value; },
-  get normalizeSimulationDisplayMode() { return normalizeSimulationDisplayMode; },
-  set normalizeSimulationDisplayMode(value) { normalizeSimulationDisplayMode = value; },
-  get normalizeSimulationStyle() { return normalizeSimulationStyle; },
-  set normalizeSimulationStyle(value) { normalizeSimulationStyle = value; },
   get playbackHandle() { return playbackHandle; },
   set playbackHandle(value) { playbackHandle = value; },
   get playbackStartSelectionSnapshot() { return playbackStartSelectionSnapshot; },
@@ -19266,8 +19179,6 @@
   set setMultiStatus(value) { setMultiStatus = value; },
   get sharedProjectCellPresenceByClient() { return sharedProjectCellPresenceByClient; },
   set sharedProjectCellPresenceByClient(value) { sharedProjectCellPresenceByClient = value; },
-  get simulationEditorState() { return simulationEditorState; },
-  set simulationEditorState(value) { simulationEditorState = value; },
   get snapshotFrameForClipboard() { return snapshotFrameForClipboard; },
   set snapshotFrameForClipboard(value) { snapshotFrameForClipboard = value; },
   get snapshotLayerForClipboard() { return snapshotLayerForClipboard; },
@@ -19300,8 +19211,6 @@
   set updateFloatingPreviewPanelPlaybackButtons(value) { updateFloatingPreviewPanelPlaybackButtons = value; },
   get updatePixfindModeUI() { return updatePixfindModeUI; },
   set updatePixfindModeUI(value) { updatePixfindModeUI = value; },
-  get updateSimulationElementPaletteUi() { return updateSimulationElementPaletteUi; },
-  set updateSimulationElementPaletteUi(value) { updateSimulationElementPaletteUi = value; },
   get virtualCursorDrawState() { return virtualCursorDrawState; },
   set virtualCursorDrawState(value) { virtualCursorDrawState = value; },
   }) || {};
@@ -19588,45 +19497,6 @@
     updatePaletteFromWheelEvent,
   } = palettePanelUtils;
 
-
-  const simulationPlaybackWorkflowUtilsModule = window.PiXiEEDrawModules?.simulationPlaybackWorkflowUtils?.createSimulationPlaybackWorkflowUtils?.({
-  get SIM_DEFAULT_SETTINGS() { return SIM_DEFAULT_SETTINGS; },
-  set SIM_DEFAULT_SETTINGS(value) { SIM_DEFAULT_SETTINGS = value; },
-  get SIM_ELEMENT_EMPTY() { return SIM_ELEMENT_EMPTY; },
-  set SIM_ELEMENT_EMPTY(value) { SIM_ELEMENT_EMPTY = value; },
-  get SIM_ELEMENT_FIRE() { return SIM_ELEMENT_FIRE; },
-  set SIM_ELEMENT_FIRE(value) { SIM_ELEMENT_FIRE = value; },
-  get SIM_ELEMENT_LIGHT() { return SIM_ELEMENT_LIGHT; },
-  set SIM_ELEMENT_LIGHT(value) { SIM_ELEMENT_LIGHT = value; },
-  get SIM_ELEMENT_SAND() { return SIM_ELEMENT_SAND; },
-  set SIM_ELEMENT_SAND(value) { SIM_ELEMENT_SAND = value; },
-  get SIM_ELEMENT_SMOKE() { return SIM_ELEMENT_SMOKE; },
-  set SIM_ELEMENT_SMOKE(value) { SIM_ELEMENT_SMOKE = value; },
-  get SIM_ELEMENT_WALL() { return SIM_ELEMENT_WALL; },
-  set SIM_ELEMENT_WALL(value) { SIM_ELEMENT_WALL = value; },
-  get SIM_ELEMENT_WATER() { return SIM_ELEMENT_WATER; },
-  set SIM_ELEMENT_WATER(value) { SIM_ELEMENT_WATER = value; },
-  get SIM_MAX_LIGHT_RADIUS() { return SIM_MAX_LIGHT_RADIUS; },
-  set SIM_MAX_LIGHT_RADIUS(value) { SIM_MAX_LIGHT_RADIUS = value; },
-  get clearPlaybackFrameCache() { return clearPlaybackFrameCache; },
-  set clearPlaybackFrameCache(value) { clearPlaybackFrameCache = value; },
-  get getActiveFrame() { return getActiveFrame; },
-  set getActiveFrame(value) { getActiveFrame = value; },
-  get getSimulationActiveLayer() { return getSimulationActiveLayer; },
-  set getSimulationActiveLayer(value) { getSimulationActiveLayer = value; },
-  get isSimulationLayer() { return isSimulationLayer; },
-  set isSimulationLayer(value) { isSimulationLayer = value; },
-  get markCanvasDirty() { return markCanvasDirty; },
-  set markCanvasDirty(value) { markCanvasDirty = value; },
-  get requestOverlayRender() { return requestOverlayRender; },
-  set requestOverlayRender(value) { requestOverlayRender = value; },
-  get requestRender() { return requestRender; },
-  set requestRender(value) { requestRender = value; },
-  get simulationRuntime() { return simulationRuntime; },
-  set simulationRuntime(value) { simulationRuntime = value; },
-  get state() { return state; },
-  set state(value) { state = value; },
-  }) || {};
 
   function setupCanvas() {
     resizeCanvases({ syncViewportScale: true });

@@ -104,12 +104,6 @@
       heightInput.value = String(height);
     }
 
-    const sameSize = width === state.width && height === state.height;
-    const applyDisabled = !canResize || sameSize;
-    if (dom.controls.applyCanvasResize instanceof HTMLButtonElement) {
-      dom.controls.applyCanvasResize.disabled = applyDisabled;
-    }
-
     const decWidthDisabled = !canResize || width <= MIN_CANVAS_SIZE;
     const incWidthDisabled = !canResize || width >= MAX_CANVAS_SIZE;
     const decHeightDisabled = !canResize || height <= MIN_CANVAS_SIZE;

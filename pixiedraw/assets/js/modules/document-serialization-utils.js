@@ -41,6 +41,56 @@
     return encodeTypedArray(value);
   }
 
+  // Simulation layers are retired.  Keep this check at the document boundary
+  // so an old PXD/autosave can still open with its ordinary raster layers,
+  // while no subsequent save writes the retired payload back out.
+  function isRetiredSimulationLayerPayload(layer) {
+    return layer?.type === 'simulation';
+  }
+
+  function serializeRasterLayersForDocument(layers, options) {
+    return (Array.isArray(layers) ? layers : [])
+      .filter(layer => !isRetiredSimulationLayerPayload(layer))
+      .map(layer => serializeLayerForDocument(layer, options));
+  }
+
+  function deserializeRasterLayersFromDocument(
+    sourceLayers,
+    pixelCount,
+    fallbackIdPrefix,
+    width,
+    height,
+    options
+  ) {
+    const rasterLayers = sourceLayers.filter(layer => !isRetiredSimulationLayerPayload(layer));
+    if (!rasterLayers.length) {
+      // A simulation-only legacy frame has no drawable data after retirement.
+      // Keep the document structurally valid with one transparent raster cell.
+      return [deserializeLayerFromDocument(
+        {
+          id: `${fallbackIdPrefix}-raster`,
+          name: getDefaultLayerName(1),
+          indices: new Int16Array(pixelCount).fill(-1),
+        },
+        pixelCount,
+        `${fallbackIdPrefix}-raster`,
+        getDefaultLayerName(1),
+        width,
+        height,
+        options
+      )];
+    }
+    return rasterLayers.map((layer, layerIndex) => deserializeLayerFromDocument(
+      layer,
+      pixelCount,
+      `${fallbackIdPrefix}-${layerIndex}`,
+      getDefaultLayerName(layerIndex + 1),
+      width,
+      height,
+      options
+    ));
+  }
+
   function serializeDocumentSnapshot(snapshot, options = {}) {
     const preserveTypedArrays = options?.preserveTypedArrays === true;
     const compactIndicesForStorage = preserveTypedArrays && options?.compactIndicesForStorage === true;
@@ -79,13 +129,13 @@
           duration: frame.duration,
           voxelPreviewYawDeg: normalizeVoxelPreviewYawDegrees(frame?.voxelPreviewYawDeg),
           voxelPreviewPitchDeg: normalizeVoxelPreviewPitchDegrees(frame?.voxelPreviewPitchDeg),
-          layers: frame.layers.map(layer => serializeLayerForDocument(layer, {
+          layers: serializeRasterLayersForDocument(frame.layers, {
             preserveTypedArrays,
             compactIndicesForStorage,
             width: canvas.width,
             height: canvas.height,
             palette,
-          })),
+          }),
         })),
       }))
       : null;
@@ -101,13 +151,13 @@
         duration: frame.duration,
         voxelPreviewYawDeg: normalizeVoxelPreviewYawDegrees(frame?.voxelPreviewYawDeg),
         voxelPreviewPitchDeg: normalizeVoxelPreviewPitchDegrees(frame?.voxelPreviewPitchDeg),
-        layers: frame.layers.map(layer => serializeLayerForDocument(layer, {
+        layers: serializeRasterLayersForDocument(frame.layers, {
           preserveTypedArrays,
           compactIndicesForStorage,
           width: snapshot.width,
           height: snapshot.height,
           palette,
-        })),
+        }),
       })),
       activeFrame: snapshot.activeFrame,
       activeLayer: snapshot.activeLayer,
@@ -249,15 +299,14 @@
       if (!frame || !Array.isArray(frame.layers) || !frame.layers.length) {
         throw new Error(`Frame ${frameIndex} has no layers`);
       }
-      const layers = frame.layers.map((layer, layerIndex) => deserializeLayerFromDocument(
-        layer,
+      const layers = deserializeRasterLayersFromDocument(
+        frame.layers,
         pixelCount,
-        `layer-${frameIndex}-${layerIndex}`,
-        getDefaultLayerName(layerIndex + 1),
+        `layer-${frameIndex}`,
         width,
         height,
         { reuseTypedArrays, trustStoredLayerFlags, recoverTruncatedRasterLayers }
-      ));
+      );
       return {
         id: typeof frame.id === 'string' ? frame.id : `frame-${frameIndex + 1}`,
         name: typeof frame.name === 'string' ? frame.name : getDefaultFrameName(frameIndex + 1),
@@ -410,15 +459,14 @@
             duration: clamp(Number(frame.duration) || 1000 / 12, 16, 2000),
             voxelPreviewYawDeg: normalizeVoxelPreviewYawDegrees(frame?.voxelPreviewYawDeg),
             voxelPreviewPitchDeg: normalizeVoxelPreviewPitchDegrees(frame?.voxelPreviewPitchDeg),
-            layers: frame.layers.map((layer, layerIndex) => deserializeLayerFromDocument(
-              layer,
+            layers: deserializeRasterLayersFromDocument(
+              frame.layers,
               canvasPixelCount,
-              `layer-${selectedCanvasIndex}-${frameIndex}-${layerIndex}`,
-              getDefaultLayerName(layerIndex + 1),
+              `layer-${selectedCanvasIndex}-${frameIndex}`,
               canvasWidth,
               canvasHeight,
               { reuseTypedArrays, trustStoredLayerFlags, recoverTruncatedRasterLayers }
-            )),
+            ),
           };
         });
         normalizeFrameLayerTrackIds(deserializedFrames);

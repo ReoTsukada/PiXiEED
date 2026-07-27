@@ -17,7 +17,6 @@
     getDisplayedLayerVisibility,
     getDisplayedLayerPreviewOpacity,
     normalizeLayerBlendMode,
-    isSimulationLayer,
     compositeFramePixels,
   } = {}) {
     function clearPlaybackFrameCache() {
@@ -55,8 +54,7 @@
         if (direct
           && layer.directOnly === true
           && getDisplayedLayerPreviewOpacity(layer, 1) >= 1
-          && normalizeLayerBlendMode(layer.blendMode) === DEFAULT_LAYER_BLEND_MODE
-          && !isSimulationLayer(layer)) {
+          && normalizeLayerBlendMode(layer.blendMode) === DEFAULT_LAYER_BLEND_MODE) {
           return new ImageData(new Uint8ClampedArray(direct.subarray(0, width * height * 4)), width, height);
         }
       }

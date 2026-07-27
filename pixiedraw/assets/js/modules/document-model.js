@@ -636,7 +636,7 @@
     }
 
     function materializeLayerIndices(layer, width, height, paletteOverride = null) {
-      if (!layer || isSimulationLayer(layer)) {
+      if (!layer) {
         return null;
       }
       const size = Math.max(0, Math.floor(Number(width) || 0))
@@ -671,7 +671,7 @@
     }
 
     function detachSharedLayerRaster(layer) {
-      if (!layer || !sharedRasterLayers.has(layer) || isSimulationLayer(layer)) {
+      if (!layer || !sharedRasterLayers.has(layer)) {
         return false;
       }
       if (isTiledLayerIndices(layer) && layer.indicesTiles instanceof Map) {
@@ -706,7 +706,6 @@
     function ensureSparseWritableLayerIndices(layer, width, height) {
       if (
         !layer
-        || isSimulationLayer(layer)
         || Number(state?.rasterModelVersion) < RASTER_MODEL_COPY_ON_WRITE_VERSION
         || (Array.isArray(state?.palette) && state.palette.length > 255)
       ) {
@@ -783,7 +782,7 @@
         const height = Math.max(1, Math.round(Number(documentEntry?.height) || 1));
         (Array.isArray(documentEntry?.frames) ? documentEntry.frames : []).forEach(frame => {
           (Array.isArray(frame?.layers) ? frame.layers : []).forEach(layer => {
-            if (!layer || isSimulationLayer(layer)) return;
+            if (!layer) return;
             targets.push({ layer, width, height, snapshot: captureLayerRasterStorage(layer) });
           });
         });
@@ -841,7 +840,7 @@
         const height = Math.max(1, Math.round(Number(documentEntry?.height) || 1));
         (Array.isArray(documentEntry?.frames) ? documentEntry.frames : []).forEach(frame => {
           (Array.isArray(frame?.layers) ? frame.layers : []).forEach(layer => {
-            if (!layer || isSimulationLayer(layer) || (layer.directOnly && layer.direct instanceof Uint8ClampedArray)) {
+            if (!layer || (layer.directOnly && layer.direct instanceof Uint8ClampedArray)) {
               return;
             }
             targets.push({ layer, width, height, snapshot: captureLayerRasterStorage(layer) });
@@ -1074,48 +1073,10 @@
     }
 
     function cloneGenericLayer(baseLayer, width, height, options = {}) {
-      return isSimulationLayer(baseLayer)
-        ? cloneSimulationLayer(baseLayer, width, height, options)
-        : cloneLayer(baseLayer, width, height, options);
+      return cloneLayer(baseLayer, width, height, options);
     }
 
     function createGenericLayerFromSnapshot(snapshot, width, height, options = {}) {
-      if (snapshot?.type === SIM_LAYER_TYPE) {
-        const layer = createSimulationLayer(snapshot.name || getDefaultLayerName(1), width, height, {
-          trackId: typeof options?.trackId === 'string' && options.trackId
-            ? options.trackId
-            : (options?.preserveTrackId === true ? snapshot?.trackId : ''),
-        });
-        layer.visible = snapshot?.visible !== false;
-        layer.opacity = normalizeLayerOpacity(snapshot?.opacity);
-        layer.blendMode = normalizeLayerBlendMode(snapshot?.blendMode);
-        [
-          'elementMap',
-          'sourceColorMap',
-          'velXMap',
-          'velYMap',
-          'lifeMap',
-          'tempMap',
-          'lightMap',
-          'depthMap',
-          'airMap',
-          'auxMap',
-          'activeMap',
-        ].forEach(key => {
-          if (ArrayBuffer.isView(snapshot?.[key]) && snapshot[key].length === layer[key].length) {
-            layer[key].set(snapshot[key]);
-          }
-        });
-        layer.settings = normalizeSimulationSettings(snapshot?.settings);
-        layer.elementStyle = {
-          [SIM_ELEMENT_WATER]: normalizeSimulationStyle(SIM_ELEMENT_WATER, snapshot?.elementStyle?.[SIM_ELEMENT_WATER]),
-          [SIM_ELEMENT_FIRE]: normalizeSimulationStyle(SIM_ELEMENT_FIRE, snapshot?.elementStyle?.[SIM_ELEMENT_FIRE]),
-          [SIM_ELEMENT_METAL]: normalizeSimulationStyle(SIM_ELEMENT_METAL, snapshot?.elementStyle?.[SIM_ELEMENT_METAL]),
-          [SIM_ELEMENT_SMOKE]: normalizeSimulationStyle(SIM_ELEMENT_SMOKE, snapshot?.elementStyle?.[SIM_ELEMENT_SMOKE]),
-          [SIM_ELEMENT_LIGHT]: normalizeSimulationStyle(SIM_ELEMENT_LIGHT, snapshot?.elementStyle?.[SIM_ELEMENT_LIGHT]),
-        };
-        return layer;
-      }
       return createLayerFromClipboardSnapshot(snapshot, width, height, options);
     }
 
@@ -1125,9 +1086,6 @@
       height,
       { copyPixels = true, sharePixels = false, deferPixelAllocation = false } = {}
     ) {
-      if (isSimulationLayer(baseLayer)) {
-        return cloneSimulationLayer(baseLayer, width, height, { copyPixels });
-      }
       const size = width * height;
       const useRuntimeUint8 = isRuntimeUint8LayerIndices(baseLayer)
         || baseLayer?.indicesEncoding === RUNTIME_LAYER_INDEX_ENCODING;
@@ -1192,7 +1150,7 @@
         voxelPreviewPitchDeg: normalizeVoxelPreviewPitchDegrees(frame?.voxelPreviewPitchDeg),
         layers: frame.layers.map(layer => cloneGenericLayer(layer, width, height, {
           copyPixels: true,
-          sharePixels: !isSimulationLayer(layer),
+          sharePixels: true,
         })),
       };
     }
@@ -1385,9 +1343,6 @@
     }
 
     function createLayerFromClipboardSnapshot(snapshot, width = state.width, height = state.height, options = {}) {
-      if (snapshot?.type === SIM_LAYER_TYPE) {
-        return createGenericLayerFromSnapshot(snapshot, width, height, options);
-      }
       const layerName = typeof snapshot?.name === 'string' && snapshot.name.trim()
         ? snapshot.name.trim()
         : getDefaultLayerName(1);
@@ -1478,9 +1433,6 @@
             nextLayer.id = typeof layer?.id === 'string' && layer.id
               ? layer.id
               : (crypto.randomUUID ? crypto.randomUUID() : `layer-${Math.random().toString(36).slice(2)}`);
-            if (isSimulationLayer(layer)) {
-              return cloneSimulationLayer(layer, width, height, { copyPixels: clonePixelData });
-            }
 	          nextLayer.visible = layer?.visible !== false;
 	          nextLayer.opacity = normalizeLayerOpacity(layer?.opacity);
 	          nextLayer.blendMode = normalizeLayerBlendMode(layer?.blendMode);
@@ -1530,9 +1482,6 @@
     }
 
     function cloneLayerForSnapshot(layer, { clonePixelData = true } = {}) {
-      if (isSimulationLayer(layer)) {
-        return cloneSimulationLayer(layer, state.width, state.height, { copyPixels: clonePixelData });
-      }
       const compactIndices = isCompactLayerIndices(layer);
       const tiledIndices = isTiledLayerIndices(layer);
       const runtimeUint8Indices = isRuntimeUint8LayerIndices(layer);
@@ -1623,34 +1572,6 @@
     function serializeLayerForDocument(layer, options = {}) {
       const preserveTypedArrays = options?.preserveTypedArrays === true;
       const compactIndicesForStorage = preserveTypedArrays && options?.compactIndicesForStorage === true;
-      if (isSimulationLayer(layer)) {
-        return {
-          id: layer.id,
-          trackId: typeof layer.trackId === 'string' ? layer.trackId : '',
-          type: SIM_LAYER_TYPE,
-          name: layer.name,
-          visible: layer.visible !== false,
-          opacity: normalizeLayerOpacity(layer.opacity),
-          blendMode: normalizeLayerBlendMode(layer.blendMode),
-          elementMap: serializeLayerTypedArray(layer.elementMap, { preserveTypedArrays }),
-          sourceColorMap: serializeLayerTypedArray(layer.sourceColorMap, { preserveTypedArrays }),
-          velXMap: serializeLayerTypedArray(layer.velXMap, { preserveTypedArrays }),
-          velYMap: serializeLayerTypedArray(layer.velYMap, { preserveTypedArrays }),
-          lifeMap: serializeLayerTypedArray(layer.lifeMap, { preserveTypedArrays }),
-          tempMap: serializeLayerTypedArray(layer.tempMap, { preserveTypedArrays }),
-          lightMap: serializeLayerTypedArray(layer.lightMap, { preserveTypedArrays }),
-          depthMap: serializeLayerTypedArray(layer.depthMap, { preserveTypedArrays }),
-          airMap: serializeLayerTypedArray(layer.airMap, { preserveTypedArrays }),
-          auxMap: serializeLayerTypedArray(layer.auxMap, { preserveTypedArrays }),
-          activeMap: serializeLayerTypedArray(layer.activeMap, { preserveTypedArrays }),
-          settings: JSON.stringify(normalizeSimulationSettings(layer.settings)),
-          waterStyle: serializeSimulationStyleForDocument(layer.elementStyle?.[SIM_ELEMENT_WATER]),
-          fireStyle: serializeSimulationStyleForDocument(layer.elementStyle?.[SIM_ELEMENT_FIRE]),
-          metalStyle: serializeSimulationStyleForDocument(layer.elementStyle?.[SIM_ELEMENT_METAL]),
-          smokeStyle: serializeSimulationStyleForDocument(layer.elementStyle?.[SIM_ELEMENT_SMOKE]),
-          lightStyle: serializeSimulationStyleForDocument(layer.elementStyle?.[SIM_ELEMENT_LIGHT]),
-        };
-      }
       const expectedLength = Math.max(0, Math.floor(Number(options?.width) || 0))
         * Math.max(0, Math.floor(Number(options?.height) || 0));
       let serializableIndices = layer.indices;
@@ -1856,36 +1777,6 @@
       const reuseTypedArrays = options?.reuseTypedArrays === true;
       const trustStoredLayerFlags = options?.trustStoredLayerFlags === true;
       const recoverTruncatedRasterLayers = options?.recoverTruncatedRasterLayers === true;
-      if (layer?.type === SIM_LAYER_TYPE) {
-        const simLayer = createSimulationLayer(fallbackName, width, height);
-        simLayer.id = typeof layer.id === 'string' ? layer.id : fallbackId;
-        simLayer.trackId = typeof layer.trackId === 'string' ? layer.trackId : simLayer.trackId;
-        simLayer.name = typeof layer.name === 'string' ? layer.name : fallbackName;
-        simLayer.visible = layer.visible !== false;
-        simLayer.opacity = normalizeLayerOpacity(layer.opacity);
-        simLayer.blendMode = normalizeLayerBlendMode(layer.blendMode);
-        const typedOptions = { reuseTypedArrays };
-        simLayer.elementMap = deserializeSimulationTypedArray(layer.elementMap, Uint8Array, pixelCount, typedOptions);
-        simLayer.sourceColorMap = deserializeSimulationTypedArray(layer.sourceColorMap, Uint8ClampedArray, pixelCount * 4, typedOptions);
-        simLayer.velXMap = deserializeSimulationTypedArray(layer.velXMap, Int8Array, pixelCount, typedOptions);
-        simLayer.velYMap = deserializeSimulationTypedArray(layer.velYMap, Int8Array, pixelCount, typedOptions);
-        simLayer.lifeMap = deserializeSimulationTypedArray(layer.lifeMap, Uint8Array, pixelCount, typedOptions);
-        simLayer.tempMap = deserializeSimulationTypedArray(layer.tempMap, Uint16Array, pixelCount, typedOptions);
-        simLayer.lightMap = deserializeSimulationTypedArray(layer.lightMap, Uint8Array, pixelCount, typedOptions);
-        simLayer.depthMap = deserializeSimulationTypedArray(layer.depthMap, Uint8Array, pixelCount, typedOptions);
-        simLayer.airMap = deserializeSimulationTypedArray(layer.airMap, Uint8Array, pixelCount, typedOptions);
-        simLayer.auxMap = deserializeSimulationTypedArray(layer.auxMap, Uint8Array, pixelCount, typedOptions);
-        simLayer.activeMap = deserializeSimulationTypedArray(layer.activeMap, Uint8Array, pixelCount, typedOptions);
-        simLayer.settings = normalizeSimulationSettings(typeof layer.settings === 'string' ? JSON.parse(layer.settings) : layer.settings);
-        simLayer.elementStyle = {
-          [SIM_ELEMENT_WATER]: parseSimulationStyleFromDocument(layer.waterStyle, SIM_ELEMENT_WATER),
-          [SIM_ELEMENT_FIRE]: parseSimulationStyleFromDocument(layer.fireStyle, SIM_ELEMENT_FIRE),
-          [SIM_ELEMENT_METAL]: parseSimulationStyleFromDocument(layer.metalStyle, SIM_ELEMENT_METAL),
-          [SIM_ELEMENT_SMOKE]: parseSimulationStyleFromDocument(layer.smokeStyle, SIM_ELEMENT_SMOKE),
-          [SIM_ELEMENT_LIGHT]: parseSimulationStyleFromDocument(layer.lightStyle, SIM_ELEMENT_LIGHT),
-        };
-        return simLayer;
-      }
       if (!layer || typeof layer !== 'object') {
         throw new Error('Layer is missing index data');
       }

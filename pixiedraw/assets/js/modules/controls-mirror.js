@@ -2224,10 +2224,6 @@
     dom.controls.canvasHeightIncrement?.addEventListener('click', () => {
       adjustCanvasResizeInputBy('height', 1);
     });
-    dom.controls.applyCanvasResize?.addEventListener('click', () => {
-      applySettingsSizeChanges();
-    });
-
     dom.controls.clearCanvas?.addEventListener('click', () => {
       if (!canCurrentClientEditProjectStructure({ announce: true })) {
         if (!isSharedProjectCollaborativeMode()) {

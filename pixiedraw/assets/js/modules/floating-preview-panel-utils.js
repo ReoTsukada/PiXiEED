@@ -60,22 +60,15 @@
           const sourceIndex = (sourceY * sourceWidth) + sourceX;
           const outputIndex = ((previewY * width) + previewX) * 4;
           let color = null;
-          if (isSimulationLayer(layer)) {
-            color = resolveSimulationPixelColor(layer, sourceIndex, sourceWidth, sourceHeight, {
-              r: output[outputIndex], g: output[outputIndex + 1],
-              b: output[outputIndex + 2], a: output[outputIndex + 3],
-            });
-          } else {
-            const paletteIndex = getStoredRasterLayerPaletteIndex(layer, sourceIndex);
-            if (paletteIndex >= 0 && palette?.[paletteIndex]) {
-              color = palette[paletteIndex];
-            } else if (direct) {
-              const directIndex = sourceIndex * 4;
-              color = {
-                r: direct[directIndex], g: direct[directIndex + 1],
-                b: direct[directIndex + 2], a: direct[directIndex + 3],
-              };
-            }
+          const paletteIndex = getStoredRasterLayerPaletteIndex(layer, sourceIndex);
+          if (paletteIndex >= 0 && palette?.[paletteIndex]) {
+            color = palette[paletteIndex];
+          } else if (direct) {
+            const directIndex = sourceIndex * 4;
+            color = {
+              r: direct[directIndex], g: direct[directIndex + 1],
+              b: direct[directIndex + 2], a: direct[directIndex + 3],
+            };
           }
           if (!color || !Number.isFinite(color.a) || color.a <= 0) continue;
           compositeLayerPixelNormalized(

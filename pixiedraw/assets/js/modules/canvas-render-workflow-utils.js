@@ -52,7 +52,6 @@
         getDisplayedLayerPreviewOpacity(layer, 1),
         normalizeLayerBlendMode(layer?.blendMode),
         layer?.directOnly === true ? 1 : 0,
-        isSimulationLayer(layer) ? 1 : 0,
       ].join(':'))
       .join('|');
     return `${width}x${height}|${paletteKey}|${layerKey}`;
@@ -311,8 +310,7 @@
         && getDisplayedLayerPreviewOpacity(layer, 1) > 0
       ));
       const isImplicitlyEmptyFrame = visibleLayers.length === 0 || visibleLayers.every(layer => (
-        !isSimulationLayer(layer)
-        && !isTiledLayerIndices(layer)
+        !isTiledLayerIndices(layer)
         && (layer.indices instanceof Int16Array || layer.indices instanceof Uint8Array)
         && layer.indices.length === 0
         && !(layer.direct instanceof Uint8ClampedArray && layer.direct.length > 0)
@@ -328,8 +326,7 @@
         if (direct
           && layer.directOnly === true
           && getDisplayedLayerPreviewOpacity(layer, 1) >= 1
-          && normalizeLayerBlendMode(layer.blendMode) === DEFAULT_LAYER_BLEND_MODE
-          && !isSimulationLayer(layer)) {
+          && normalizeLayerBlendMode(layer.blendMode) === DEFAULT_LAYER_BLEND_MODE) {
           const directImage = new ImageData(new Uint8ClampedArray(direct.subarray(0, width * height * 4)), width, height);
           renderCtx.putImageData(directImage, 0, 0);
           writeCanvasCompositeFrameCache(activeFrame, width, height, directImage);
@@ -347,7 +344,6 @@
           && !direct
           && getDisplayedLayerPreviewOpacity(layer, 1) >= 1
           && normalizeLayerBlendMode(layer.blendMode) === DEFAULT_LAYER_BLEND_MODE
-          && !isSimulationLayer(layer)
         ) {
           const indexedImage = renderCtx.createImageData(width, height);
           const indexedPixels = layer.indices;
@@ -392,10 +388,6 @@
       if (!layer || !getDisplayedLayerVisibility(layer, true) || getDisplayedLayerPreviewOpacity(layer, 1) <= 0) continue;
       const opacity = getDisplayedLayerPreviewOpacity(layer, 1);
       if (opacity <= 0) continue;
-      if (isSimulationLayer(layer)) {
-        compositeSimulationLayerRegion(data, getActiveFrame(), layer, width, height, x0, y0, x1, y1);
-        continue;
-      }
       const layerBlendMode = normalizeLayerBlendMode(layer.blendMode);
       const layerDirect = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
       for (let py = y0; py <= y1; py += 1) {
