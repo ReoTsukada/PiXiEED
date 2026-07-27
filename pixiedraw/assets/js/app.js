@@ -9796,6 +9796,7 @@
   // Removing a layer track must retain every frame-local cell verbatim so
   // undo never relies on a coincident array position or recreates IDs.
   const HISTORY_ENTRY_TYPE_LAYER_REMOVE = 'layerRemove';
+  const HISTORY_ENTRY_TYPE_CANVAS_RESIZE = 'resizeCanvas';
   const HISTORY_ENTRY_TYPE_FRAME_ADD = 'frameAdd';
   const PIXEL_PATCH_HISTORY_LABELS = new Set([
     'pen',
@@ -12648,6 +12649,38 @@
       return;
     }
     if (
+      label === 'resizeCanvas'
+      && !multiState.connected
+      && !activeSharedProjectKey
+      && !isSharedProjectCollaborativeMode()
+      && !isVoxelExtensionModeEnabled()
+    ) {
+      const canvas = getActiveProjectCanvasDocument();
+      const width = Math.max(1, Math.round(Number(state.width) || 1));
+      const height = Math.max(1, Math.round(Number(state.height) || 1));
+      const cells = state.frames.flatMap(frame => (
+        Array.isArray(frame?.layers)
+          ? frame.layers.map((layer, index) => ({
+              frameId: frame.id,
+              layerId: layer?.id || '',
+              trackId: layer?.trackId || '',
+              index,
+              layer: cloneLayerForSnapshot(layer, { clonePixelData: true }),
+            }))
+          : []
+      ));
+      history.pending = {
+        __historyEntryType: HISTORY_ENTRY_TYPE_CANVAS_RESIZE,
+        dirty: false,
+        label,
+        canvasId: canvas?.id || '',
+        beforeWidth: width,
+        beforeHeight: height,
+        cells,
+      };
+      return;
+    }
+    if (
       label === 'addFrame'
       && !multiState.connected
       && !activeSharedProjectKey
@@ -12760,6 +12793,117 @@
 
   function isLayerRemoveHistoryEntry(entry) {
     return Boolean(entry && entry.__historyEntryType === HISTORY_ENTRY_TYPE_LAYER_REMOVE);
+  }
+
+  function isCanvasResizeHistoryEntry(entry) {
+    return Boolean(entry && entry.__historyEntryType === HISTORY_ENTRY_TYPE_CANVAS_RESIZE);
+  }
+
+  function finalizeCanvasResizeHistoryEntry(pending) {
+    if (
+      !isCanvasResizeHistoryEntry(pending)
+      || !pending.dirty
+      || !pending.canvasId
+      || !Array.isArray(pending.cells)
+      || !pending.cells.length
+    ) {
+      return null;
+    }
+    const afterWidth = Math.max(1, Math.round(Number(state.width) || 1));
+    const afterHeight = Math.max(1, Math.round(Number(state.height) || 1));
+    if (afterWidth === pending.beforeWidth && afterHeight === pending.beforeHeight) {
+      return null;
+    }
+    const estimatedBytes = pending.cells.reduce((total, cell) => {
+      const layer = cell?.layer;
+      return total
+        + (ArrayBuffer.isView(layer?.indices) ? layer.indices.byteLength : 0)
+        + (ArrayBuffer.isView(layer?.direct) ? layer.direct.byteLength : 0)
+        + (ArrayBuffer.isView(layer?.importSourceDirect) ? layer.importSourceDirect.byteLength : 0);
+    }, 0);
+    return {
+      __historyEntryType: HISTORY_ENTRY_TYPE_CANVAS_RESIZE,
+      kind: 'resize-canvas',
+      version: 1,
+      historyLabel: pending.label,
+      canvasId: pending.canvasId,
+      beforeWidth: pending.beforeWidth,
+      beforeHeight: pending.beforeHeight,
+      afterWidth,
+      afterHeight,
+      offsetX: Math.round(Number(pending.offsetX) || 0),
+      offsetY: Math.round(Number(pending.offsetY) || 0),
+      cells: pending.cells,
+      estimatedBytes,
+    };
+  }
+
+  function setPendingCanvasResizeHistoryResult({ offsetX = 0, offsetY = 0 } = {}) {
+    if (!isCanvasResizeHistoryEntry(history.pending)) return false;
+    history.pending.offsetX = Math.round(Number(offsetX) || 0);
+    history.pending.offsetY = Math.round(Number(offsetY) || 0);
+    return true;
+  }
+
+  function applyCanvasResizeHistoryEntry(entry, direction = 'undo') {
+    if (!isCanvasResizeHistoryEntry(entry) || !Array.isArray(entry.cells) || !entry.cells.length) {
+      return false;
+    }
+    const undoing = direction === 'undo';
+    const expectedWidth = undoing ? entry.afterWidth : entry.beforeWidth;
+    const expectedHeight = undoing ? entry.afterHeight : entry.beforeHeight;
+    const targetWidth = undoing ? entry.beforeWidth : entry.afterWidth;
+    const targetHeight = undoing ? entry.beforeHeight : entry.afterHeight;
+    const activeCanvas = getActiveProjectCanvasDocument();
+    if (
+      activeCanvas?.id !== entry.canvasId
+      || state.width !== expectedWidth
+      || state.height !== expectedHeight
+    ) {
+      return false;
+    }
+    // Validate every target before mutating any pixel or canvas dimension.
+    const targets = [];
+    for (const cell of entry.cells) {
+      const frame = state.frames.find(candidate => candidate?.id === cell.frameId);
+      const index = frame?.layers?.findIndex(layer => (
+        layer?.id === cell.layerId && layer?.trackId === cell.trackId
+      ));
+      if (!frame || index < 0 || !cell.layer) return false;
+      targets.push({ frame, index, cell });
+    }
+    if (undoing) {
+      state.width = targetWidth;
+      state.height = targetHeight;
+      activeCanvas.width = targetWidth;
+      activeCanvas.height = targetHeight;
+      for (const { frame, index, cell } of targets) {
+        frame.layers[index] = cloneLayerForSnapshot(cell.layer, { clonePixelData: true });
+      }
+    } else {
+      resizeAllLayers(targetWidth, targetHeight, {
+        offsetX: entry.offsetX,
+        offsetY: entry.offsetY,
+      });
+      state.width = targetWidth;
+      state.height = targetHeight;
+      activeCanvas.width = targetWidth;
+      activeCanvas.height = targetHeight;
+    }
+    if (dom.controls.canvasWidth instanceof HTMLInputElement) {
+      dom.controls.canvasWidth.value = String(targetWidth);
+    }
+    if (dom.controls.canvasHeight instanceof HTMLInputElement) {
+      dom.controls.canvasHeight.value = String(targetHeight);
+    }
+    clearSelection();
+    invalidateActiveCanvasCompositeRenderState();
+    resizeCanvases();
+    renderFrameList();
+    renderLayerList();
+    requestRender();
+    requestOverlayRender();
+    return true;
   }
 
   function recordPendingLayerRemoveHistoryLayer(frame, layer, index) {
@@ -14220,6 +14364,8 @@
   set applyLayerAddHistoryEntry(value) { applyLayerAddHistoryEntry = value; },
   get applyLayerRemoveHistoryEntry() { return applyLayerRemoveHistoryEntry; },
   set applyLayerRemoveHistoryEntry(value) { applyLayerRemoveHistoryEntry = value; },
+  get applyCanvasResizeHistoryEntry() { return applyCanvasResizeHistoryEntry; },
+  set applyCanvasResizeHistoryEntry(value) { applyCanvasResizeHistoryEntry = value; },
   get applyFrameAddHistoryEntry() { return applyFrameAddHistoryEntry; },
   set applyFrameAddHistoryEntry(value) { applyFrameAddHistoryEntry = value; },
   get cancelPendingCurveInteraction() { return cancelPendingCurveInteraction; },
@@ -14244,6 +14390,8 @@
   set finalizeLayerAddHistoryEntry(value) { finalizeLayerAddHistoryEntry = value; },
   get finalizeLayerRemoveHistoryEntry() { return finalizeLayerRemoveHistoryEntry; },
   set finalizeLayerRemoveHistoryEntry(value) { finalizeLayerRemoveHistoryEntry = value; },
+  get finalizeCanvasResizeHistoryEntry() { return finalizeCanvasResizeHistoryEntry; },
+  set finalizeCanvasResizeHistoryEntry(value) { finalizeCanvasResizeHistoryEntry = value; },
   get finalizeFrameAddHistoryEntry() { return finalizeFrameAddHistoryEntry; },
   set finalizeFrameAddHistoryEntry(value) { finalizeFrameAddHistoryEntry = value; },
   get getActiveProjectCanvasDocument() { return getActiveProjectCanvasDocument; },
@@ -14284,6 +14432,8 @@
   set isLayerAddHistoryEntry(value) { isLayerAddHistoryEntry = value; },
   get isLayerRemoveHistoryEntry() { return isLayerRemoveHistoryEntry; },
   set isLayerRemoveHistoryEntry(value) { isLayerRemoveHistoryEntry = value; },
+  get isCanvasResizeHistoryEntry() { return isCanvasResizeHistoryEntry; },
+  set isCanvasResizeHistoryEntry(value) { isCanvasResizeHistoryEntry = value; },
   get isFrameAddHistoryEntry() { return isFrameAddHistoryEntry; },
   set isFrameAddHistoryEntry(value) { isFrameAddHistoryEntry = value; },
   get isSharedProjectCollaborativeMode() { return isSharedProjectCollaborativeMode; },
@@ -18842,6 +18992,8 @@
   set rollbackPendingHistory(value) { rollbackPendingHistory = value; },
   get scheduleSessionPersist() { return scheduleSessionPersist; },
   set scheduleSessionPersist(value) { scheduleSessionPersist = value; },
+  get setPendingCanvasResizeHistoryResult() { return setPendingCanvasResizeHistoryResult; },
+  set setPendingCanvasResizeHistoryResult(value) { setPendingCanvasResizeHistoryResult = value; },
   get setMultiStatus() { return setMultiStatus; },
   set setMultiStatus(value) { setMultiStatus = value; },
   get state() { return state; },
@@ -18888,6 +19040,10 @@
 
   function setupNumberSteppers(...args) {
     return canvasResizeWorkflowUtilsModule.setupNumberSteppers(...args);
+  }
+
+  function resizeAllLayers(...args) {
+    return canvasResizeWorkflowUtilsModule.resizeAllLayers(...args);
   }
 
 

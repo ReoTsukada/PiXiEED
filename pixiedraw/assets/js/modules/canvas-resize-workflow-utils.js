@@ -168,13 +168,9 @@
     const previousWidth = state.width;
     const previousHeight = state.height;
     const scale = getPixelAlignedCanvasDisplayScale(state.scale);
-    // Canvas dimensions are not an Undo/Redo entry for a local project. A
-    // shared project still uses the existing structural history transport so
-    // peers receive the resize operation.
-    const shouldUseHistoryTransport = isSharedProjectCollaborativeMode();
-    if (shouldUseHistoryTransport) {
-      beginHistory('resizeCanvas');
-    }
+    // Local projects use a dedicated resize entry; shared projects keep the
+    // established structural snapshot transport for peer synchronization.
+    beginHistory('resizeCanvas');
     const historyPreparedAt = typeof performance?.now === 'function' ? performance.now() : Date.now();
     resizeAllLayers(nextWidth, nextHeight, {
       offsetX: Math.round(Number(contentOffsetX) || 0),
@@ -183,6 +179,10 @@
     const layersResizedAt = typeof performance?.now === 'function' ? performance.now() : Date.now();
     state.width = nextWidth;
     state.height = nextHeight;
+    setPendingCanvasResizeHistoryResult({
+      offsetX: Math.round(Number(contentOffsetX) || 0),
+      offsetY: Math.round(Number(contentOffsetY) || 0),
+    });
     translateMirrorPivotForCanvasResize(nextWidth, nextHeight, {
       offsetX: Math.round(Number(contentOffsetX) || 0),
       offsetY: Math.round(Number(contentOffsetY) || 0),
@@ -208,9 +208,7 @@
     clearSelection();
     requestRender();
     requestOverlayRender();
-    if (shouldUseHistoryTransport) {
-      commitHistory();
-    }
+    commitHistory();
     const historyCommittedAt = typeof performance?.now === 'function' ? performance.now() : Date.now();
     scheduleSessionPersist();
     updateCanvasResizeControls({ normalizeValues: true });

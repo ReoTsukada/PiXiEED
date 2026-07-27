@@ -79,6 +79,17 @@
         snapshotByteEstimateCache.set(snapshot, total);
         return total;
       }
+      if (snapshot.kind === 'resize-canvas' && Array.isArray(snapshot.cells)) {
+        const seenBuffers = new Set();
+        const total = snapshot.cells.reduce((sum, cell) => {
+          const layer = cell?.layer;
+          if (!layer) return sum;
+          return sum + bytesForLayer(layer, seenBuffers)
+            + estimateEncodedByteLength(layer.importSourceDirect, 1);
+        }, 128);
+        snapshotByteEstimateCache.set(snapshot, total);
+        return total;
+      }
       let total = 0;
       const seenIndexBuffers = new Set();
       if (Array.isArray(snapshot.frames)) {

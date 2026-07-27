@@ -62,9 +62,11 @@ function commitHistory() {
           ? finalizeLayerAddHistoryEntry(history.pending)
           : (isLayerRemoveHistoryEntry(history.pending)
             ? finalizeLayerRemoveHistoryEntry(history.pending)
-            : (isFrameAddHistoryEntry(history.pending)
-              ? finalizeFrameAddHistoryEntry(history.pending)
-              : setHistoryEntryLabel(history.pending.before, pendingLabel))));
+            : (isCanvasResizeHistoryEntry(history.pending)
+              ? finalizeCanvasResizeHistoryEntry(history.pending)
+              : (isFrameAddHistoryEntry(history.pending)
+                ? finalizeFrameAddHistoryEntry(history.pending)
+                : setHistoryEntryLabel(history.pending.before, pendingLabel)))));
       if (!historyEntry) {
         history.pending = null;
         updateHistoryButtons();
@@ -222,6 +224,28 @@ function undo() {
       if (hasColdHistoryEntries('past')) {
         requestColdHistoryRefill('past');
       }
+      return;
+    }
+    // Resize entries validate and apply before either stack is moved. A
+    // missing cell or unexpected canvas size must leave Undo/Redo untouched.
+    const resizePrevious = history.past[history.past.length - 1];
+    if (isCanvasResizeHistoryEntry(resizePrevious)) {
+      if (!applyCanvasResizeHistoryEntry(resizePrevious, 'undo')) {
+        return;
+      }
+      history.past.pop();
+      history.future.push(resizePrevious);
+      if (history.future.length > history.limit) {
+        archiveEvictedHistoryEntry('future', history.future.shift());
+      }
+      updateHistoryButtons();
+      markAutosaveDirty();
+      markDocumentUnsavedChange();
+      markActiveLocalProjectJournalNeedsCheckpoint?.(
+        normalizeAutosaveProjectId?.(autosaveProjectId || '') || ''
+      );
+      scheduleAutosaveSnapshot();
+      scheduleQrEditReadabilityCheck();
       return;
     }
     const previous = history.past.pop();
@@ -451,6 +475,26 @@ function redo() {
       }
       return;
     }
+    const resizeNext = history.future[history.future.length - 1];
+    if (isCanvasResizeHistoryEntry(resizeNext)) {
+      if (!applyCanvasResizeHistoryEntry(resizeNext, 'redo')) {
+        return;
+      }
+      history.future.pop();
+      history.past.push(resizeNext);
+      if (history.past.length > history.limit) {
+        archiveEvictedHistoryEntry('past', history.past.shift());
+      }
+      updateHistoryButtons();
+      markAutosaveDirty();
+      markDocumentUnsavedChange();
+      markActiveLocalProjectJournalNeedsCheckpoint?.(
+        normalizeAutosaveProjectId?.(autosaveProjectId || '') || ''
+      );
+      scheduleAutosaveSnapshot();
+      scheduleQrEditReadabilityCheck();
+      return;
+    }
     const next = history.future.pop();
     const historyLabel = getHistoryEntryLabel(next);
     if (isFrameAddHistoryEntry(next)) {
@@ -606,6 +650,12 @@ function rollbackPendingHistory({ reRender = true } = {}) {
         markAutosaveDirty();
         markDocumentUnsavedChange();
       }
+      return rolledBack;
+    }
+    if (isCanvasResizeHistoryEntry(history.pending)) {
+      const rolledBack = applyCanvasResizeHistoryEntry(history.pending, 'undo');
+      history.pending = null;
+      updateHistoryButtons();
       return rolledBack;
     }
     if (isLayerRemoveHistoryEntry(history.pending)) {
