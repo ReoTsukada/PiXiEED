@@ -17,7 +17,7 @@ assert.match(css, /creator-panel \{[\s\S]*max-height: 100%;/);
 assert.match(css, /Do not add those bar dimensions twice/);
 assert.match(css, /The catalog must use one scroll surface/);
 assert.match(css, /screen--difficulty \.puzzle-list \{[\s\S]*overflow: visible/);
-assert.match(html, /app\.js\?v=20260728-transient-feedback1/);
+assert.match(html, /app\.js\?v=20260728-ogp-dispatch1/);
 assert.match(html, /class="puzzle-gallery pixfind-catalog"/);
 assert.match(html, /id="creatorMarkerViewport"/);
 assert.match(html, /id="creatorMarkerSourceCanvas"/);

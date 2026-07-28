@@ -1979,6 +1979,13 @@ async function handleCreatorPublish() {
       queueShareTask({ puzzleId, title, mode, originalDataUrl: creatorState.originalDataUrl, diffDataUrl: creatorState.diffDataUrl });
     }
 
+    try {
+      await requestPixfindOgpPageGeneration(puzzleId);
+    } catch (error) {
+      // The direct game URL stays available. The scheduled workflow is the recovery path.
+      console.warn('PiXFiND OGP generation dispatch failed', puzzleId, error);
+    }
+
     const createdPuzzle = normalized ?? normalizePublishedPuzzleEntry(payload, payload);
     if (!createdPuzzle) throw new Error('published puzzle could not be normalized');
     closeCreatorOverlay();
@@ -2485,6 +2492,22 @@ function supabaseHeaders() {
     Authorization: `Bearer ${token || SUPABASE_ANON_KEY}`,
     'x-client-id': clientId || '',
   };
+}
+
+async function requestPixfindOgpPageGeneration(puzzleId) {
+  if (!puzzleId || isLocalFileProtocol()) return false;
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/pixfind-ogp-dispatch`, {
+    method: 'POST',
+    headers: {
+      ...supabaseHeaders(),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ puzzle_id: puzzleId }),
+  });
+  if (!response.ok) {
+    throw new Error(`OGP dispatch failed: ${response.status} ${await response.text()}`);
+  }
+  return true;
 }
 
 function getStoredSupabaseAccessToken() {

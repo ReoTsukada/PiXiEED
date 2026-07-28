@@ -1,6 +1,8 @@
 name: Generate PiXFiND OGP pages
 
 on:
+  repository_dispatch:
+    types: [pixfind-ogp-published]
   schedule:
     - cron: '*/5 * * * *'
   workflow_dispatch:

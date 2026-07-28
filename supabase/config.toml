@@ -19,6 +19,9 @@ verify_jwt = true
 [functions.market-public-preview]
 verify_jwt = false
 
+[functions.pixfind-ogp-dispatch]
+verify_jwt = false
+
 [functions.market-reconcile-purchase]
 enabled = true
 verify_jwt = true
