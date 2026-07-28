@@ -364,7 +364,6 @@ const LEGACY_CONTEST_PUBLIC_BASE = `${SUPABASE_STORAGE_URL}/public/${LEGACY_CONT
 const PIXFIND_SHARE_BASE_URL = 'https://pixieed.jp/pixfind/';
 const PIXFIND_SHARE_OGP_WIDTH = 1280;
 const PIXFIND_SHARE_OGP_HEIGHT = 720;
-const PIXFIND_SHARE_OGP_SQUARE_SIZE = 1200;
 const SUPABASE_MAINTENANCE_KEY = 'pixieed_supabase_maintenance';
 const PUBLISHED_CACHE_KEY = 'pixfind_published_cache';
 const SHARE_QUEUE_KEY = 'pixfind_share_queue';
@@ -1996,7 +1995,6 @@ async function handleCreatorPublish() {
       renderPuzzles(state.currentDifficulty, state.currentMode);
     }
 
-    let ogpReady = false;
     try {
       await uploadPuzzleShareAssets({
         puzzleId,
@@ -2005,17 +2003,9 @@ async function handleCreatorPublish() {
         originalImage: creatorState.originalImage,
         diffImage: creatorState.diffImage,
       });
-      ogpReady = true;
     } catch (error) {
       console.warn('puzzle OGP upload failed', puzzleId, error);
       queueShareTask({ puzzleId, title, mode, originalDataUrl: creatorState.originalDataUrl, diffDataUrl: creatorState.diffDataUrl });
-    }
-
-    try {
-      await requestPixfindOgpPageGeneration(puzzleId);
-    } catch (error) {
-      // The direct game URL stays available. The scheduled workflow is the recovery path.
-      console.warn('PiXFiND OGP generation dispatch failed', puzzleId, error);
     }
 
     const createdPuzzle = normalized ?? normalizePublishedPuzzleEntry(payload, payload);
@@ -5282,11 +5272,6 @@ function getPixfindOgpImageUrl(puzzleId) {
   return getSupabasePublicUrl(`puzzles/${puzzleId}/ogp.png`);
 }
 
-function getPixfindOgpSquareImageUrl(puzzleId) {
-  if (!puzzleId) return null;
-  return getSupabasePublicUrl(`puzzles/${puzzleId}/ogp-square.png`);
-}
-
 function drawContainImage(ctx, image, x, y, width, height) {
   if (!ctx || !image) return;
   const iw = image.naturalWidth || image.width || 1;
@@ -5315,11 +5300,6 @@ function drawPostedPuzzleOgp(ctx, { mode, originalImage, diffImage, width, heigh
   const padding = Math.max(8, Math.round(Math.min(width, height) * 0.012));
   if (isHiddenObjectMode(mode)) {
     drawContainImage(ctx, originalImage, padding, padding, width - padding * 2, height - padding * 2);
-  } else if (height > width * 0.9) {
-    const gap = padding;
-    const imageHeight = (height - padding * 2 - gap) / 2;
-    drawContainImage(ctx, originalImage, padding, padding, width - padding * 2, imageHeight);
-    drawContainImage(ctx, diffImage, padding, padding + imageHeight + gap, width - padding * 2, imageHeight);
   } else {
     const gap = padding;
     const imageWidth = (width - padding * 2 - gap) / 2;
@@ -5341,30 +5321,20 @@ async function createPuzzleOgpBlob({ mode, originalImage, diffImage, width = PIX
 }
 
 async function uploadPuzzleShareAssets({ puzzleId, mode, originalImage, diffImage }) {
-  if (!puzzleId || !originalImage || !diffImage) return null;
-  const [ogpBlob, squareOgpBlob] = await Promise.all([
-    createPuzzleOgpBlob({ mode, originalImage, diffImage }),
-    createPuzzleOgpBlob({
-      mode,
-      originalImage,
-      diffImage,
-      width: PIXFIND_SHARE_OGP_SQUARE_SIZE,
-      height: PIXFIND_SHARE_OGP_SQUARE_SIZE,
-    }),
-  ]);
-  if (!ogpBlob || !squareOgpBlob) return null;
+  if (!puzzleId || !originalImage || !diffImage) {
+    throw new Error('OGP source images are unavailable');
+  }
+  const ogpBlob = await createPuzzleOgpBlob({ mode, originalImage, diffImage });
+  if (!ogpBlob) throw new Error('OGP image creation failed');
 
   const ogpPath = `puzzles/${puzzleId}/ogp.png`;
-  const squareOgpPath = `puzzles/${puzzleId}/ogp-square.png`;
   const ogpUrl = getPixfindOgpImageUrl(puzzleId);
-  const squareOgpUrl = getPixfindOgpSquareImageUrl(puzzleId);
   const shareUrl = getPixfindShareHtmlUrl(puzzleId);
 
-  await Promise.all([
-    uploadPuzzleFile(ogpPath, ogpBlob, 'image/png', { upsert: true }),
-    uploadPuzzleFile(squareOgpPath, squareOgpBlob, 'image/png', { upsert: true }),
-  ]);
-  return { shareUrl, ogpUrl, squareOgpUrl };
+  await uploadPuzzleFile(ogpPath, ogpBlob, 'image/png', { upsert: true });
+  // The static OGP page must never reference an image that failed to upload.
+  await requestPixfindOgpPageGeneration(puzzleId);
+  return { shareUrl, ogpUrl };
 }
 
 async function normalizePixelImage(image, fallbackDataUrl, options = {}) {

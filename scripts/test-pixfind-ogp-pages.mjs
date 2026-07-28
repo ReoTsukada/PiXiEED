@@ -7,7 +7,8 @@ const dispatchFunction = fs.readFileSync('supabase/functions/pixfind-ogp-dispatc
 const pixfindApp = fs.readFileSync('pixfind/app.js', 'utf8');
 
 assert.match(generator, /pixfind_puzzles/);
-assert.match(generator, /ogp-square\.png/);
+assert.match(generator, /ogp\.png/);
+assert.doesNotMatch(generator, /ogp-square\.png/);
 assert.match(generator, /og:type/);
 assert.match(generator, /pixfind\/puzzles/);
 assert.match(generator, /window\.location\.replace/);
@@ -22,5 +23,14 @@ assert.match(dispatchFunction, /event_type: EVENT_TYPE/);
 assert.match(dispatchFunction, /client_id/);
 assert.match(dispatchFunction, /creator_user_id/);
 assert.match(pixfindApp, /function requestPixfindOgpPageGeneration\(puzzleId\)/);
-assert.match(pixfindApp, /await requestPixfindOgpPageGeneration\(puzzleId\)/);
+assert.match(pixfindApp, /await uploadPuzzleFile\(ogpPath, ogpBlob, 'image\/png', \{ upsert: true \}\);[\s\S]*await requestPixfindOgpPageGeneration\(puzzleId\);/);
+assert.doesNotMatch(pixfindApp, /PIXFIND_SHARE_OGP_SQUARE_SIZE|ogp-square\.png/);
+
+for (const entry of fs.readdirSync('pixfind/puzzles', { withFileTypes: true })) {
+  if (!entry.isDirectory()) continue;
+  const page = fs.readFileSync(`pixfind/puzzles/${entry.name}/index.html`, 'utf8');
+  assert.equal((page.match(/<meta property="og:image"/g) || []).length, 1, `${entry.name} must publish one OGP image`);
+  assert.match(page, /<meta property="og:image" content="[^"]+\/ogp\.png"\/>/);
+  assert.doesNotMatch(page, /ogp-square\.png/);
+}
 console.log('PiXFiND OGP page checks passed.');

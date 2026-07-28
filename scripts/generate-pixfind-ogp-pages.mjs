@@ -46,7 +46,6 @@ function staticPage(puzzle) {
   const url = pageUrl(puzzle.id);
   const targetUrl = gameUrl(puzzle.id);
   const imageUrl = publicObjectUrl(puzzle.id, 'ogp.png');
-  const squareImageUrl = publicObjectUrl(puzzle.id, 'ogp-square.png');
   return `<!doctype html>
 <html lang="ja">
 <head>
@@ -60,9 +59,6 @@ function staticPage(puzzle) {
   <meta property="og:image" content="${escapeHtml(imageUrl)}"/>
   <meta property="og:image:width" content="1280"/>
   <meta property="og:image:height" content="720"/>
-  <meta property="og:image" content="${escapeHtml(squareImageUrl)}"/>
-  <meta property="og:image:width" content="1200"/>
-  <meta property="og:image:height" content="1200"/>
   <meta property="og:url" content="${escapeHtml(url)}"/>
   <meta property="og:site_name" content="PiXFiND"/>
   <meta name="twitter:card" content="summary_large_image"/>
