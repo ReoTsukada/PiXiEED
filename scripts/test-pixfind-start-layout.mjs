@@ -11,13 +11,13 @@ const toolFullscreen = fs.readFileSync(path.join(root, 'scripts/tool-fullscreen.
 const maoitu = fs.readFileSync(path.join(root, 'maoitu/index.html'), 'utf8');
 
 assert.match(html, /<body data-pixfind-screen="start">/);
-assert.match(html, /styles\.css\?v=20260728-creator-native-preview1/);
+assert.match(html, /styles\.css\?v=20260728-transient-feedback1/);
 assert.match(css, /creator-overlay \{[\s\S]*z-index: 950;/);
 assert.match(css, /creator-panel \{[\s\S]*max-height: 100%;/);
 assert.match(css, /Do not add those bar dimensions twice/);
 assert.match(css, /The catalog must use one scroll surface/);
 assert.match(css, /screen--difficulty \.puzzle-list \{[\s\S]*overflow: visible/);
-assert.match(html, /app\.js\?v=20260728-published-regions1/);
+assert.match(html, /app\.js\?v=20260728-transient-feedback1/);
 assert.match(html, /class="puzzle-gallery pixfind-catalog"/);
 assert.match(html, /id="creatorMarkerViewport"/);
 assert.match(html, /id="creatorMarkerSourceCanvas"/);
@@ -77,6 +77,11 @@ assert.doesNotMatch(app, /idx === 7/);
 assert.match(app, /function createPuzzleListAd\(\)/);
 assert.match(app, /function normalizeMarkerRegions\(/);
 assert.match(app, /function normalizePuzzleDifferenceRegions\(/);
+assert.match(app, /function renderMarker\(region\)[\s\S]*window\.setTimeout\(\(\) => marker\.remove\(\), 680\)/);
+assert.match(app, /function addMissMarker\([\s\S]*paintMissMarker\(\{ target, x: imageX, y: imageY \}\)/);
+assert.match(app, /function paintMissMarker\([\s\S]*window\.setTimeout\(\(\) => marker\.remove\(\), 560\)/);
+assert.doesNotMatch(app, /missMarkers/);
+assert.doesNotMatch(app, /paintAllMissMarkers/);
 assert.match(app, /regions: mode === GAME_MODE_SPOT_DIFFERENCE \? creatorState\.diffResult\.regions : \[\]/);
 assert.match(app, /payload\.regions = publishTask\.regions/);
 assert.match(app, /payload\.regions = regions/);

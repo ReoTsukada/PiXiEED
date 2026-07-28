@@ -310,7 +310,6 @@ const state = {
   found: 0,
   total: 0,
   mistakes: 0,
-  missMarkers: [],
   roundCompleted: false,
   imageSize: { width: 0, height: 0 },
   startTimestamp: null,
@@ -3322,8 +3321,6 @@ function setActiveScreen(target) {
       updateGameFrameSize();
       fitCanvasesToFrame();
       clearMarkers();
-      state.differences.filter(region => region.found).forEach(region => renderMarker(region));
-      paintAllMissMarkers();
     });
   } else {
     dom.app?.classList.remove('is-playing');
@@ -3711,7 +3708,6 @@ function prepareGameBoard(originalImage, challengeImage, diffResult, metadata = 
   state.total = state.differences.length;
   state.found = 0;
   state.mistakes = 0;
-  state.missMarkers = [];
   state.roundCompleted = false;
   if (state.resetTimeout != null) {
     clearTimeout(state.resetTimeout);
@@ -3892,8 +3888,6 @@ function handleFullscreenChange() {
     updateGameFrameSize();
     fitCanvasesToFrame();
     clearMarkers();
-    state.differences.filter(region => region.found).forEach(region => renderMarker(region));
-    paintAllMissMarkers();
   });
 }
 
@@ -3902,8 +3896,6 @@ window.addEventListener('resize', () => {
   updateGameFrameSize();
   fitCanvasesToFrame();
   clearMarkers();
-  state.differences.filter(region => region.found).forEach(region => renderMarker(region));
-  paintAllMissMarkers();
 });
 
 function resetRound() {
@@ -3918,7 +3910,6 @@ function resetRound() {
       target.found = false;
     });
     state.mistakes = 0;
-    state.missMarkers = [];
     state.roundCompleted = false;
     updateGameModePresentation();
     updateProgressLabel();
@@ -3929,14 +3920,12 @@ function resetRound() {
   }
   state.differences.forEach(region => {
     region.found = false;
-    region.markers = {};
   });
   state.hiddenTargets.forEach(target => {
     target.found = false;
   });
   state.found = 0;
   state.mistakes = 0;
-  state.missMarkers = [];
   state.roundCompleted = false;
   updateGameModePresentation();
   updateProgressLabel();
@@ -3970,7 +3959,6 @@ function leaveGame(targetScreen) {
   state.found = 0;
   state.total = 0;
   state.mistakes = 0;
-  state.missMarkers = [];
   state.roundCompleted = false;
   if (state.resetTimeout != null) {
     clearTimeout(state.resetTimeout);
@@ -4105,14 +4093,7 @@ function renderMarker(region) {
     marker.style.left = `${offsetX + centerX * scaleX - markerSize / 2}px`;
     marker.style.top = `${offsetY + centerY * scaleY - markerSize / 2}px`;
     overlay.append(marker);
-    if (!region.markers) {
-      region.markers = {};
-    }
-    if (overlay === dom.overlayOriginal) {
-      region.markers.original = marker;
-    } else {
-      region.markers.challenge = marker;
-    }
+    window.setTimeout(() => marker.remove(), 680);
   });
 }
 
@@ -4121,9 +4102,7 @@ function addMissMarker(canvas, imageX, imageY) {
   if (!target || !state.imageSize.width || !state.imageSize.height) {
     return;
   }
-  const record = { target, x: imageX, y: imageY };
-  state.missMarkers.push(record);
-  paintMissMarker(record);
+  paintMissMarker({ target, x: imageX, y: imageY });
 }
 
 function getOverlayPoint(canvas, overlay, imageX, imageY) {
@@ -4220,11 +4199,7 @@ function paintMissMarker(record) {
   marker.style.left = `${offsetX + x * scaleX - markerSize / 2}px`;
   marker.style.top = `${offsetY + y * scaleY - markerSize / 2}px`;
   overlay.append(marker);
-}
-
-function paintAllMissMarkers() {
-  if (!state.missMarkers.length) return;
-  state.missMarkers.forEach(record => paintMissMarker(record));
+  window.setTimeout(() => marker.remove(), 560);
 }
 
 function clearMarkers() {
