@@ -11,7 +11,7 @@ const toolFullscreen = fs.readFileSync(path.join(root, 'scripts/tool-fullscreen.
 const maoitu = fs.readFileSync(path.join(root, 'maoitu/index.html'), 'utf8');
 
 assert.match(html, /<body data-pixfind-screen="start">/);
-assert.match(html, /styles\.css\?v=20260725-catalog-scroll1/);
+assert.match(html, /styles\.css\?v=20260728-creator-native-preview1/);
 assert.match(css, /creator-overlay \{[\s\S]*z-index: 950;/);
 assert.match(css, /creator-panel \{[\s\S]*max-height: 100%;/);
 assert.match(css, /Do not add those bar dimensions twice/);
