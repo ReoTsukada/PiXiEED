@@ -85,10 +85,9 @@
   function createCard(entry) {
     const puzzleId = String(entry?.id || '').trim();
     const puzzleUrl = asset(`../pixfind/index.html?puzzle=${encodeURIComponent(puzzleId)}`);
-    // Static OGP pages are generated asynchronously, so use the game URL for
-    // sharing as well. It works immediately for every published post.
+    // Share each published work through its generated static OGP page.
     const shareUrl = puzzleId
-      ? `https://pixieed.jp/pixfind/?puzzle=${encodeURIComponent(puzzleId)}`
+      ? `https://pixieed.jp/pixfind/puzzles/${encodeURIComponent(puzzleId)}/`
       : puzzleUrl;
     const card = document.createElement('article');
     card.className = 'account-pixfind-card';

@@ -3112,6 +3112,8 @@ body[data-pixieed-page="pixfind"] .creator-overlay {
 .creator-complete-panel h2 { margin: -.1rem 0 0; color: #ff4f83; font-size: clamp(1.8rem, 7vw, 2.65rem); line-height: 1; }
 .creator-complete-panel__message { margin: 0; color: #52627e; font-size: .83rem; line-height: 1.55; }
 .creator-complete-panel__message strong { color: #253552; }
+.creator-complete-panel__share-status { margin: -.3rem 0 0; color: #6f7e99; font-size: .74rem; font-weight: 800; line-height: 1.45; }
+.creator-complete-panel__share-status[data-ready="true"] { color: #1c9a72; }
 .creator-complete-panel__preview { display: grid; grid-template-columns: 48px minmax(0, 1fr); align-items: center; gap: .55rem; min-width: 0; padding: .42rem; border: 1px solid rgba(83,119,184,.16); border-radius: 14px; background: rgba(255,255,255,.7); }
 .creator-complete-panel__preview img { width: 48px; height: 48px; border-radius: 9px; object-fit: cover; image-rendering: pixelated; background: #e7edf8; }
 .creator-complete-panel__preview div { display: grid; min-width: 0; gap: .08rem; }

@@ -51,6 +51,7 @@ const dom = {
   creatorCompletePreview: document.getElementById('creatorCompletePreview'),
   creatorCompleteMode: document.getElementById('creatorCompleteMode'),
   creatorCompleteCount: document.getElementById('creatorCompleteCount'),
+  creatorCompleteShareStatus: document.getElementById('creatorCompleteShareStatus'),
   creatorCompletePlay: document.getElementById('creatorCompletePlay'),
   creatorCompleteShare: document.getElementById('creatorCompleteShare'),
   creatorCompleteCopy: document.getElementById('creatorCompleteCopy'),
@@ -347,6 +348,7 @@ let creatorPublishedPuzzle = null;
 let creatorCompleteLastFocused = null;
 let creatorAnalysisToken = 0;
 let creatorPreviewToken = 0;
+let creatorOgpAvailabilityToken = 0;
 const creatorDroppedFiles = new WeakMap();
 const creatorMarkerView = { scale: 1, fitScale: 1, pan: { x: 0, y: 0 }, pointerId: null, activeIndex: -1, image: null };
 let clientId = null;
@@ -827,6 +829,7 @@ function openCreatorCompletePanel(puzzle, { isEditing = false } = {}) {
   dom.creatorCompleteOverlay.setAttribute('aria-hidden', 'false');
   requestAnimationFrame(() => dom.creatorCompleteOverlay?.classList.add('is-visible'));
   dom.creatorCompletePlay?.focus();
+  prepareCreatorPublishedOgpShare(puzzle);
 }
 
 function closeCreatorCompletePanel({ restoreFocus = true } = {}) {
@@ -837,10 +840,12 @@ function closeCreatorCompletePanel({ restoreFocus = true } = {}) {
   dom.creatorCompleteOverlay.setAttribute('aria-hidden', 'true');
   if (restoreFocus && creatorCompleteLastFocused?.isConnected) creatorCompleteLastFocused.focus();
   creatorCompleteLastFocused = null;
+  creatorOgpAvailabilityToken += 1;
 }
 
 async function copyCreatorPublishedLink() {
   if (!creatorPublishedPuzzle) return;
+  if (dom.creatorCompleteCopy?.disabled) return;
   const shareMessage = `${createShareUrl(creatorPublishedPuzzle)}\n${SHARE_HASHTAG}`;
   try {
     if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable');
@@ -849,6 +854,33 @@ async function copyCreatorPublishedLink() {
   } catch (_) {
     window.prompt('共有リンクをコピーしてください。', shareMessage);
   }
+}
+
+function setCreatorPublishedOgpShareReady(ready, message) {
+  if (dom.creatorCompleteShare) dom.creatorCompleteShare.disabled = !ready;
+  if (dom.creatorCompleteCopy) dom.creatorCompleteCopy.disabled = !ready;
+  if (dom.creatorCompleteShareStatus) {
+    dom.creatorCompleteShareStatus.textContent = message;
+    dom.creatorCompleteShareStatus.dataset.ready = String(ready);
+  }
+}
+
+async function prepareCreatorPublishedOgpShare(puzzle) {
+  const pageUrl = puzzle?.source === 'published' ? getPixfindShareHtmlUrl(puzzle.id) : null;
+  if (!pageUrl || isLocalFileProtocol()) {
+    setCreatorPublishedOgpShareReady(true, '個別OGPの共有リンクを利用できます。');
+    return;
+  }
+  const token = ++creatorOgpAvailabilityToken;
+  setCreatorPublishedOgpShareReady(false, '個別OGPを準備しています。公開完了後に共有できます。');
+  const ready = await waitForPixfindOgpPage(pageUrl);
+  if (token !== creatorOgpAvailabilityToken || creatorPublishedPuzzle?.id !== puzzle.id) return;
+  setCreatorPublishedOgpShareReady(
+    ready,
+    ready
+      ? '個別OGPの共有リンクを利用できます。'
+      : '個別OGPを準備中です。少し待つと自動で共有できるようになります。',
+  );
 }
 
 function setupCreatorFileDropzone(dropzone, input) {
@@ -3230,11 +3262,8 @@ function normalizePuzzleEntry(entry) {
 }
 
 function createShareUrl(puzzle) {
-  // OGP pages are generated asynchronously by GitHub Actions. Sharing their
-  // path immediately after posting can therefore lead to a temporary 404.
-  // The game URL is available as soon as the database row is published.
   if (puzzle?.source === 'published' && puzzle?.id) {
-    return getPixfindShareTargetUrl(puzzle.id);
+    return getPixfindShareHtmlUrl(puzzle.id);
   }
   const url = new URL(window.location.href);
   const shareId = puzzle?.source === 'published' ? puzzle.id : (puzzle.slug ?? puzzle.id);
@@ -5232,6 +5261,20 @@ function getPixfindShareTargetUrl(puzzleId) {
 function getPixfindShareHtmlUrl(puzzleId) {
   if (!puzzleId) return null;
   return `${PIXFIND_SHARE_BASE_URL}puzzles/${encodeURIComponent(puzzleId)}/`;
+}
+
+async function waitForPixfindOgpPage(pageUrl, timeoutMs = 120000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(pageUrl, { method: 'HEAD', cache: 'no-store' });
+      if (response.ok) return true;
+    } catch (_) {
+      // The generated GitHub Pages path is not ready yet.
+    }
+    await new Promise(resolve => window.setTimeout(resolve, 3000));
+  }
+  return false;
 }
 
 function getPixfindOgpImageUrl(puzzleId) {

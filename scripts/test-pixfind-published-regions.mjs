@@ -36,7 +36,8 @@ assert.match(app, /const usesPublishedSpotDifferenceGrid = mode === GAME_MODE_SP
 assert.match(app, /if \(usesPublishedSpotDifferenceGrid\) \{[\s\S]*normalizedOriginal = \{ image: rawOriginal \}/);
 assert.match(app, /publishedRegions\.length[\s\S]*\? \{ regions: publishedRegions/);
 assert.match(app, /function createShareUrl\(puzzle\) \{/);
-assert.match(app, /return getPixfindShareTargetUrl\(puzzle\.id\);/);
+assert.match(app, /return getPixfindShareHtmlUrl\(puzzle\.id\);/);
+assert.match(app, /function waitForPixfindOgpPage\(pageUrl, timeoutMs = 120000\)/);
 assert.match(app, /computeDifferenceRegions\(originalImage, challengeImage, \{[\s\S]*mergeDistance: resolveMergeDistanceForSize\(CREATOR_MERGE_DISTANCE/);
 
 console.log('PiXFiND published-region contract checks passed.');
