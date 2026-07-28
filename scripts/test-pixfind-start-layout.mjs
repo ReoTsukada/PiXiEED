@@ -34,6 +34,7 @@ assert.match(html, /class="creator-marker-reset" id="creatorMarkerZoomReset" typ
 assert.match(html, /id="creatorOriginalPicker"/);
 assert.match(html, /id="creatorOriginalFilePreview"/);
 assert.match(html, /id="creatorDiffPreviewOverlay"/);
+assert.match(html, /class="creator-file__media"><img alt="選択した間違い画像のプレビュー"[\s\S]*preserveAspectRatio="none"/);
 assert.match(html, /data-empty-label="お手本画像を追加"/);
 assert.match(html, /class="creator-preview" hidden="" id="creatorPreview"/);
 assert.match(html, /id="creatorMarkerReplace"/);
@@ -114,6 +115,9 @@ assert.match(css, /\.puzzle-card,\s*\.puzzle-card--official \{[^}]*overflow: hid
 assert.match(css, /\.puzzle-card__actions \{[^}]*repeat\(2, minmax\(0, 1fr\)\)/s);
 assert.match(css, /\.puzzle-list-ad \{[^}]*grid-column: 1 \/ -1;/s);
 assert.match(css, /\.creator-file__picker \{/);
+assert.match(css, /\.creator-file__media \{[\s\S]*width: max-content;/);
+assert.match(css, /\.creator-dropzone\.has-preview \{[\s\S]*overflow: auto;/);
+assert.match(css, /\.creator-diff-preview-overlay \{[\s\S]*inset: 0;[\s\S]*width: 100%;/);
 assert.match(css, /\.creator-dropzone\.is-marker-editor/);
 assert.match(css, /body\[data-pixieed-page="pixfind"\] \.pixieed-common-tabbar \{[^}]*left: 0 !important;[^}]*right: 0 !important;/s);
 assert.match(css, /\/\* Game-first board: the two images always share the available game surface\. \*\//);

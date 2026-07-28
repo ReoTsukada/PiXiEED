@@ -11,5 +11,6 @@ assert.match(generator, /pixfind\/puzzles/);
 assert.match(generator, /window\.location\.replace/);
 assert.match(workflow, /cron: '\*\/5 \* \* \* \*'/);
 assert.match(workflow, /node scripts\/generate-pixfind-ogp-pages\.mjs/);
+assert.match(workflow, /git status --porcelain --untracked-files=all -- pixfind\/puzzles/);
 assert.match(workflow, /git add pixfind\/puzzles/);
 console.log('PiXFiND OGP page checks passed.');

@@ -401,7 +401,7 @@
 <div class="creator-file creator-dropzone" id="creatorOriginalDropzone">
 <input accept="image/png,image/jpeg,image/webp" class="creator-file__input" id="creatorOriginalInput" type="file"/>
 <button class="creator-file__picker" data-empty-label="お手本画像を追加" id="creatorOriginalPicker" type="button"><span class="creator-file__title">お手本画像を追加</span><span class="creator-file__hint">クリック／タップ、またはここへドロップ</span></button>
-<img alt="選択したお手本画像のプレビュー" class="creator-file__preview" hidden="" id="creatorOriginalFilePreview"/>
+<div class="creator-file__media"><img alt="選択したお手本画像のプレビュー" class="creator-file__preview" hidden="" id="creatorOriginalFilePreview"/></div>
 <div class="creator-marker-workspace" hidden="" id="creatorMarkerWorkspace">
 <div class="creator-marker-workspace__head"><strong>画像上で探す場所をマーク</strong><button class="button button--ghost button--compact" id="creatorMarkerReplace" type="button">画像を変更</button></div>
 <div class="creator-marker-toolbar" aria-label="マーカー編集操作"><button id="creatorMarkerZoomOut" type="button" aria-label="縮小">−</button><button class="creator-marker-reset" id="creatorMarkerZoomReset" type="button" aria-label="位置をリセット" title="位置をリセット"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 1-2.35-5.65L20 8"></path><path d="M20 4v4h-4"></path></svg></button><button id="creatorMarkerZoomIn" type="button" aria-label="拡大">＋</button><button id="creatorMarkerUndo" type="button">ひとつ戻す</button></div>
@@ -412,8 +412,7 @@
 <div class="creator-file creator-dropzone" id="creatorDiffDropzone">
 <input accept="image/png,image/jpeg,image/webp" class="creator-file__input" id="creatorDiffInput" type="file"/>
 <button class="creator-file__picker" data-empty-label="間違い画像を追加" id="creatorDiffPicker" type="button"><span class="creator-file__title" id="creatorDiffLabelText">間違い画像を追加</span><span class="creator-file__hint">クリック／タップ、またはここへドロップ</span></button>
-<img alt="選択した間違い画像のプレビュー" class="creator-file__preview" hidden="" id="creatorDiffFilePreview"/>
-<svg aria-hidden="true" class="creator-diff-preview-overlay" hidden="" id="creatorDiffPreviewOverlay" preserveAspectRatio="xMidYMid meet"></svg>
+<div class="creator-file__media"><img alt="選択した間違い画像のプレビュー" class="creator-file__preview" hidden="" id="creatorDiffFilePreview"/><svg aria-hidden="true" class="creator-diff-preview-overlay" hidden="" id="creatorDiffPreviewOverlay" preserveAspectRatio="none"></svg></div>
 </div>
 </div>
 </div>

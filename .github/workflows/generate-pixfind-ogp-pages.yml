@@ -36,7 +36,7 @@ jobs:
 
       - name: Commit generated PiXFiND OGP pages
         run: |
-          if git diff --quiet -- pixfind/puzzles; then
+          if [ -z "$(git status --porcelain --untracked-files=all -- pixfind/puzzles)" ]; then
             echo "No PiXFiND OGP changes to commit."
             exit 0
           fi

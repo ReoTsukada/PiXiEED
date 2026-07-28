@@ -3207,9 +3207,12 @@ function normalizePuzzleEntry(entry) {
   };
 }
 
-function createShareUrl(puzzle, { ogp = true } = {}) {
-  if (ogp && puzzle?.source === 'published' && puzzle?.id) {
-    return getPixfindShareHtmlUrl(puzzle.id);
+function createShareUrl(puzzle) {
+  // OGP pages are generated asynchronously by GitHub Actions. Sharing their
+  // path immediately after posting can therefore lead to a temporary 404.
+  // The game URL is available as soon as the database row is published.
+  if (puzzle?.source === 'published' && puzzle?.id) {
+    return getPixfindShareTargetUrl(puzzle.id);
   }
   const url = new URL(window.location.href);
   const shareId = puzzle?.source === 'published' ? puzzle.id : (puzzle.slug ?? puzzle.id);
