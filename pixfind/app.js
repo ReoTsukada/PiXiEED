@@ -559,6 +559,38 @@ function normalizePuzzleMarkerRegions(rawTargets, width = 0, height = 0) {
   });
 }
 
+// Spot-difference regions are the creator's published game contract.  Do not
+// re-run detection with a different merge threshold when a player opens it.
+function normalizePuzzleDifferenceRegions(rawRegions, width = 0, height = 0) {
+  let source = rawRegions;
+  if (typeof source === 'string') {
+    try { source = JSON.parse(source); } catch (_) { return []; }
+  }
+  if (!Array.isArray(source)) return [];
+  const safeWidth = Math.max(0, Math.round(Number(width) || 0));
+  const safeHeight = Math.max(0, Math.round(Number(height) || 0));
+  return source.map((region) => {
+    const minX = Math.round(Number(region?.minX));
+    const maxX = Math.round(Number(region?.maxX));
+    const minY = Math.round(Number(region?.minY));
+    const maxY = Math.round(Number(region?.maxY));
+    if (![minX, maxX, minY, maxY].every(Number.isFinite)) return null;
+    const boundedMinX = safeWidth ? clamp(Math.min(minX, maxX), 0, safeWidth - 1) : Math.max(0, Math.min(minX, maxX));
+    const boundedMaxX = safeWidth ? clamp(Math.max(minX, maxX), 0, safeWidth - 1) : Math.max(0, Math.max(minX, maxX));
+    const boundedMinY = safeHeight ? clamp(Math.min(minY, maxY), 0, safeHeight - 1) : Math.max(0, Math.min(minY, maxY));
+    const boundedMaxY = safeHeight ? clamp(Math.max(minY, maxY), 0, safeHeight - 1) : Math.max(0, Math.max(minY, maxY));
+    return {
+      minX: boundedMinX,
+      maxX: boundedMaxX,
+      minY: boundedMinY,
+      maxY: boundedMaxY,
+      centerX: Number.isFinite(Number(region?.centerX)) ? Number(region.centerX) : (boundedMinX + boundedMaxX) / 2,
+      centerY: Number.isFinite(Number(region?.centerY)) ? Number(region.centerY) : (boundedMinY + boundedMaxY) / 2,
+      count: Math.max(1, Math.round(Number(region?.count) || 1)),
+    };
+  }).filter(Boolean);
+}
+
 function buildHiddenTargets(regions, labels = []) {
   return regions.map((region, index) => ({
     id: `target-${index + 1}`,
@@ -1852,6 +1884,7 @@ async function handleCreatorPublish() {
     difficulty,
     mode,
     targets,
+    regions: mode === GAME_MODE_SPOT_DIFFERENCE ? creatorState.diffResult.regions : [],
     authorName,
     authorXUrl,
     authorAvatar,
@@ -1907,6 +1940,9 @@ async function handleCreatorPublish() {
     payload.play_mode = mode;
     if (mode === GAME_MODE_HIDDEN_OBJECT && targets.length) {
       payload.targets = targets;
+    }
+    if (mode === GAME_MODE_SPOT_DIFFERENCE && publishTask.regions.length) {
+      payload.regions = publishTask.regions;
     }
     if (clientIdValue && !isEditing) {
       payload.client_id = clientIdValue;
@@ -2681,6 +2717,7 @@ function normalizePublishTask(task) {
     : { width: 0, height: 0 };
   const labels = normalizePuzzleTargets(task.targets);
   const rawTargets = Array.isArray(task.targets) ? task.targets : [];
+  const regions = normalizePuzzleDifferenceRegions(task.regions, size.width, size.height);
   const targets = labels.map((label, index) => {
     const raw = rawTargets[index];
     const marker = raw && typeof raw === 'object'
@@ -2699,6 +2736,7 @@ function normalizePublishTask(task) {
     clientId: clientIdValue,
     mode,
     targets,
+    regions,
     originalDataUrl,
     diffDataUrl,
     size,
@@ -2740,6 +2778,7 @@ async function publishQueuedTask(task) {
     clientId: clientIdValue,
     mode,
     targets,
+    regions,
     originalDataUrl,
     diffDataUrl,
     size,
@@ -2776,6 +2815,9 @@ async function publishQueuedTask(task) {
   payload.play_mode = mode;
   if (mode === GAME_MODE_HIDDEN_OBJECT && targets.length) {
     payload.targets = targets;
+  }
+  if (mode === GAME_MODE_SPOT_DIFFERENCE && regions.length) {
+    payload.regions = regions;
   }
   if (clientIdValue) {
     payload.client_id = clientIdValue;
@@ -2947,6 +2989,7 @@ function normalizePublishedPuzzleEntry(entry, fallback = null) {
     mode,
     targets,
     rawTargets,
+    regions: normalizePuzzleDifferenceRegions(source.regions ?? source.difference_regions),
     markerRegions: normalizePuzzleMarkerRegions(rawTargets),
     thumbnail: resolvePuzzleThumbnail(mode, original, diff, explicitThumbnail),
     shareUrl: source.share_url ?? source.shareUrl ?? null,
@@ -3530,12 +3573,20 @@ async function startOfficialPuzzle(puzzle) {
     let normalizedOriginal;
     let normalizedChallenge;
     let hiddenPairInfo = null;
+    // Published spot-difference uploads are already in the creator's image
+    // grid. A second heuristic normalization can shrink that grid and shift
+    // markers; older posts also need the creator's merge rule on this grid.
+    const usesPublishedSpotDifferenceGrid = mode === GAME_MODE_SPOT_DIFFERENCE
+      && puzzle.source === 'published';
     const markerRegions = normalizePuzzleMarkerRegions(
       puzzle.rawTargets ?? puzzle.targets,
       rawOriginal.width,
       rawOriginal.height,
     );
-    if (mode === GAME_MODE_HIDDEN_OBJECT && markerRegions.length) {
+    if (usesPublishedSpotDifferenceGrid) {
+      normalizedOriginal = { image: rawOriginal };
+      normalizedChallenge = { image: rawChallenge };
+    } else if (mode === GAME_MODE_HIDDEN_OBJECT && markerRegions.length) {
       normalizedOriginal = await normalizePixelImage(rawOriginal, null);
       normalizedChallenge = normalizedOriginal;
     } else if (mode === GAME_MODE_HIDDEN_OBJECT) {
@@ -3559,6 +3610,11 @@ async function startOfficialPuzzle(puzzle) {
     }
     const originalImage = normalizedOriginal.image;
     const challengeImage = normalizedChallenge.image;
+    const publishedRegions = normalizePuzzleDifferenceRegions(
+      puzzle.regions,
+      originalImage.width,
+      originalImage.height,
+    );
     if (originalImage.width !== challengeImage.width || originalImage.height !== challengeImage.height) {
       setHint(
         mode === GAME_MODE_HIDDEN_OBJECT
@@ -3572,7 +3628,14 @@ async function startOfficialPuzzle(puzzle) {
       ? { regions: markerRegions, tooClosePair: null }
       : mode === GAME_MODE_HIDDEN_OBJECT
       ? computeHiddenObjectRegions(challengeImage, { minDistance: CREATOR_HIDDEN_OBJECT_MIN_DISTANCE })
-      : computeDifferenceRegions(originalImage, challengeImage, { difficulty: puzzle.difficulty });
+      : publishedRegions.length
+        ? { regions: publishedRegions, width: originalImage.width, height: originalImage.height }
+        : computeDifferenceRegions(originalImage, challengeImage, {
+          mergeDistance: resolveMergeDistanceForSize(CREATOR_MERGE_DISTANCE, {
+            width: originalImage.width,
+            height: originalImage.height,
+          }),
+        });
     if (!diffResult || !diffResult.regions.length) {
       setHint(mode === GAME_MODE_HIDDEN_OBJECT ? '探し物が見つかりませんでした。' : '差分が見つかりませんでした。');
       return;
