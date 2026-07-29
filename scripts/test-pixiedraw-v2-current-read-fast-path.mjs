@@ -104,6 +104,7 @@ try {
     });
     const currentRecords = await indexed.loadCurrentProjectSchemaRecords('large-project');
     const allRecords = await indexed.loadAllProjectSchemaRecords('large-project');
+    const currentManifest = await indexed.readCurrentSchemaV2Manifest('large-project');
     const checksumDebug = {
       write1: schema.hasValidChecksum(write1.bundle.checkpoints[0]),
       write2: schema.hasValidChecksum(write2.bundle.checkpoints[0]),
@@ -152,6 +153,11 @@ try {
         checkpoints: currentRecords.checkpoints.length,
         journals: currentRecords.journals.length,
       },
+      currentManifest: {
+        revision: currentManifest?.revision || 0,
+        projectLayout: currentManifest?.projectLayout || '',
+        checkpointKey: currentManifest?.project?.checkpointRef?.key || '',
+      },
       allRecordCounts: {
         checkpoints: allRecords.checkpoints.length,
         journals: allRecords.journals.length,
@@ -172,6 +178,9 @@ try {
 
   assert.deepEqual(result.revisions, [1, 2]);
   assert.deepEqual(result.currentRecordCounts, { checkpoints: 1, journals: 1 });
+  assert.equal(result.currentManifest.revision, 2);
+  assert.equal(result.currentManifest.projectLayout, 'single-project');
+  assert.ok(result.currentManifest.checkpointKey);
   assert.deepEqual(result.allRecordCounts, { checkpoints: 2, journals: 2 });
   assert.equal(result.fastPathUsed, true);
   assert.equal(result.fastDocumentName, 'current');

@@ -32,6 +32,10 @@
     return ((scope) => {
       with (scope) {
   let selectionDashRefreshTimer = null;
+  let deferredBrushPreviewCache = null;
+  let lastOverlayVisualSignature = null;
+  let lastShapePreviewSignature = null;
+  let lastSelectionPreviewSignature = null;
   const SELECTION_DASH_REFRESH_INTERVAL_MS = 120;
   // Whole-canvas Same Color previews stay cached and are painted as scanline
   // runs. Keep a full 1024x1024 target set instead of clipping at 256 Ki
@@ -39,6 +43,138 @@
   // The extra slot prevents an exact full-canvas match from being flagged as
   // truncated before the scan proves there are more matching pixels.
   const FILL_PREVIEW_GLOBAL_MAX_PIXELS = 1048577;
+
+  function overlayPointSignature(point) {
+    if (!point) return '-';
+    return `${Math.round(Number(point.x) || 0)},${Math.round(Number(point.y) || 0)}`;
+  }
+
+  function overlayBoundsSignature(bounds) {
+    if (!bounds) return '-';
+    return `${bounds.x0 ?? ''},${bounds.y0 ?? ''},${bounds.x1 ?? ''},${bounds.y1 ?? ''}`;
+  }
+
+  function isShapePreviewTool(tool) {
+    return tool === 'line'
+      || tool === 'rect'
+      || tool === 'rectFill'
+      || tool === 'ellipse'
+      || tool === 'ellipseFill'
+      || tool === 'curve';
+  }
+
+  function getShapePreviewSignature() {
+    const preview = pointerState.preview || null;
+    const tool = pointerState.tool || state.tool;
+    if (!pointerState.active || !preview || !isShapePreviewTool(tool)) {
+      return '';
+    }
+    const color = state.activeRgb || state.palette?.[state.activePaletteIndex] || {};
+    const mirror = state.mirror || {};
+    const axes = mirror.axes || {};
+    return [
+      tool,
+      overlayPointSignature(preview.start), overlayPointSignature(preview.end),
+      state.width, state.height, state.brushSize, state.brushShape,
+      state.activePaletteIndex, color.r, color.g, color.b, color.a,
+      state.selectionMask ? getSelectionMaskCacheId(state.selectionMask) : 'none',
+      mirror.enabled ? 1 : 0, axes.vertical ? 1 : 0, axes.horizontal ? 1 : 0,
+      axes.diagonalDown ? 1 : 0, axes.diagonalUp ? 1 : 0,
+      overlayPointSignature(mirror.pivot),
+    ].join('|');
+  }
+
+  function getSelectionPreviewSignature() {
+    const preview = pointerState.selectionPreview || null;
+    const tool = pointerState.tool || state.tool;
+    if (
+      !pointerState.active
+      || !preview
+      || (tool !== 'selectLasso' && tool !== 'selectRect' && tool !== POINTER_TOOL_CUSTOM_BRUSH_RECT)
+    ) {
+      return '';
+    }
+    const points = Array.isArray(preview.points) ? preview.points : [];
+    const lastPoint = points[points.length - 1] || preview.end || null;
+    return [
+      tool,
+      overlayPointSignature(preview.start), overlayPointSignature(preview.end),
+      points.length, overlayPointSignature(lastPoint),
+      preview.gridCellMode ? 1 : 0,
+      preview.gridAnchorCell?.x ?? '', preview.gridAnchorCell?.y ?? '',
+      preview.gridCurrentCell?.x ?? '', preview.gridCurrentCell?.y ?? '',
+    ].join('|');
+  }
+
+  // Every interactive tool feeds this one visual-state key. A request to
+  // redraw is deliberately not enough by itself: if no visible preview input
+  // changed, the canvases keep their contents and no clear/composite work is
+  // performed. This is the common scheduling contract for brush, fill,
+  // shapes, selection, mirror guides, virtual cursor, and onion skin.
+  function getOverlayVisualSignature() {
+    const preview = pointerState.preview || null;
+    const previewPoints = Array.isArray(preview?.points) ? preview.points : [];
+    const previewLastPoint = previewPoints.length ? previewPoints[previewPoints.length - 1] : null;
+    const selectionPreview = pointerState.selectionPreview || null;
+    const selectionPoints = Array.isArray(selectionPreview?.points) ? selectionPreview.points : [];
+    const selectionLastPoint = selectionPoints.length ? selectionPoints[selectionPoints.length - 1] : null;
+    const selectionMaskKey = state.selectionMask ? getSelectionMaskCacheId(state.selectionMask) : 'none';
+    const activeCanvasId = getActiveProjectCanvasDocument?.()?.id || '';
+    const color = state.activeRgb || state.palette?.[state.activePaletteIndex] || {};
+    const onion = state.onionSkin || {};
+    const mirror = state.mirror || {};
+    const mirrorAxes = mirror.axes || {};
+    const shapePreviewIsSeparate = Boolean(
+      pointerState.active
+      && pointerState.preview
+      && isShapePreviewTool(pointerState.tool || state.tool)
+      && !state.showPixelGuides
+      && !state.showVirtualCursor
+    );
+    const selectionPreviewIsSeparate = Boolean(
+      pointerState.active
+      && selectionPreview
+      && (pointerState.tool === 'selectLasso'
+        || pointerState.tool === 'selectRect'
+        || pointerState.tool === POINTER_TOOL_CUSTOM_BRUSH_RECT)
+      && canRenderSelectionOutlineAsSvg()
+      && !state.showPixelGuides
+      && !state.showVirtualCursor
+    );
+    const pointerPreviewIsSeparate = shapePreviewIsSeparate || selectionPreviewIsSeparate;
+    return [
+      activeCanvasId,
+      state.width, state.height, state.scale,
+      ctx.overlay?.canvas?.width || 0, ctx.overlay?.canvas?.height || 0,
+      ctx.brushPreview?.canvas?.width || 0, ctx.brushPreview?.canvas?.height || 0,
+      state.tool, state.brushSize, state.brushShape,
+      state.activePaletteIndex, state.secondaryPaletteIndex,
+      color.r, color.g, color.b, color.a,
+      state.showPixelGuides ? 1 : 0,
+      state.showVirtualCursor ? 1 : 0,
+      state.activeFrame, state.frames?.length || 0,
+      onion.enabled ? 1 : 0, onion.prevFrames, onion.nextFrames, onion.opacity,
+      mirror.enabled ? 1 : 0, mirrorAxes.vertical ? 1 : 0, mirrorAxes.horizontal ? 1 : 0,
+      mirrorAxes.diagonalDown ? 1 : 0, mirrorAxes.diagonalUp ? 1 : 0,
+      overlayPointSignature(mirror.pivot),
+      selectionMaskKey, overlayBoundsSignature(state.selectionBounds), state.selectionOutlineMode,
+      hoveredProjectCanvasId || '', overlayPointSignature(hoverPixel), overlayPointSignature(virtualCursor),
+      pointerState.active ? 1 : 0, pointerState.tool || '',
+      pointerPreviewIsSeparate ? '-' : overlayPointSignature(pointerState.start),
+      pointerPreviewIsSeparate ? '-' : overlayPointSignature(pointerState.current),
+      pointerPreviewIsSeparate ? '-' : overlayPointSignature(pointerState.last),
+      shapePreviewIsSeparate ? 'shape-layer' : (preview?.kind || ''),
+      shapePreviewIsSeparate ? 0 : previewPoints.length,
+      shapePreviewIsSeparate ? '-' : overlayPointSignature(previewLastPoint),
+      shapePreviewIsSeparate ? 0 : (preview?.committedStampCount || 0),
+      selectionPreviewIsSeparate ? 'selection-layer' : (selectionPreview?.tool || ''),
+      selectionPreviewIsSeparate ? 0 : selectionPoints.length,
+      selectionPreviewIsSeparate ? '-' : overlayPointSignature(selectionLastPoint),
+      selectionPreviewIsSeparate ? '-' : overlayPointSignature(selectionPreview?.start),
+      selectionPreviewIsSeparate ? '-' : overlayPointSignature(selectionPreview?.end),
+      curveBuilder ? (pointerState.path?.length || 0) : 0,
+    ].join('|');
+  }
 
   function canRenderSelectionOutlineAsSvg() {
     return typeof SVGSVGElement !== 'undefined' && typeof SVGPathElement !== 'undefined';
@@ -50,6 +186,14 @@
     }
     selectionDashRefreshTimer = window.setTimeout(() => {
       selectionDashRefreshTimer = null;
+      // Modern browsers render the selection outline as SVG. Updating only
+      // its dash offset must not cause the overlay canvas (including fill
+      // previews and onion skin) to be cleared and rebuilt every 120ms.
+      // Keep the canvas fallback on the established rAF path.
+      if (refreshSelectionDashSvg()) {
+        scheduleSelectionDashRefresh();
+        return;
+      }
       requestOverlayRender();
     }, SELECTION_DASH_REFRESH_INTERVAL_MS);
   }
@@ -279,7 +423,60 @@
     ctx.overlay.restore();
   }
 
-  function renderOverlay(timestamp) {
+  function renderOverlay(timestamp, _trace = null) {
+    const metrics = {
+      timings: {
+        virtualCursorMs: 0,
+        clearMs: 0,
+        onionSkinMs: 0,
+        selectionMs: 0,
+        movePreviewMs: 0,
+        transformHandlesMs: 0,
+        guidesCursorMirrorMs: 0,
+        hoverPreviewMs: 0,
+        fillPreviewMs: 0,
+        deferredBrushPreviewMs: 0,
+        deferredBrushPreviewCacheUpdateMs: 0,
+        deferredBrushPreviewDrawImageMs: 0,
+        shapePreviewMs: 0,
+        selectionPreviewMs: 0,
+      },
+      counts: {
+        skippedUnchanged: false,
+        deferredBrushPreview: false,
+        previewStampCount: 0,
+        previewStartIndex: 0,
+        newPreviewStampCount: 0,
+        renderedPreviewStampCount: 0,
+        deferredPreviewCacheReset: false,
+        previewCacheCanvasWidth: 0,
+        previewCacheCanvasHeight: 0,
+        previewCacheCanvasArea: 0,
+        previewDirtyRectArea: 0,
+        overlayWidth: Math.max(0, Number(state.width) || 0),
+        overlayHeight: Math.max(0, Number(state.height) || 0),
+        clearPixelArea: 0,
+        hasSelection: Boolean(state.selectionMask),
+        onionSkinEnabled: Boolean(state.onionSkin?.enabled),
+        mirrorEnabled: false,
+        shapePreviewUpdated: false,
+        selectionPreviewUpdated: false,
+      },
+    };
+    const visualSignature = getOverlayVisualSignature();
+    const shapePreviewSignature = getShapePreviewSignature();
+    const selectionPreviewSignature = getSelectionPreviewSignature();
+    const forceVisualRefresh = _trace?.reason === 'main-render' || _trace?.force === true;
+    const overlayVisualUnchanged = visualSignature === lastOverlayVisualSignature;
+    const shouldRefreshShapePreview = shapePreviewSignature !== lastShapePreviewSignature;
+    const shouldRefreshSelectionPreview = selectionPreviewSignature !== lastSelectionPreviewSignature;
+    if (!forceVisualRefresh && overlayVisualUnchanged && !shouldRefreshShapePreview && !shouldRefreshSelectionPreview) {
+      metrics.counts.skippedUnchanged = true;
+      return metrics;
+    }
+    lastOverlayVisualSignature = visualSignature;
+    lastShapePreviewSignature = shapePreviewSignature;
+    lastSelectionPreviewSignature = selectionPreviewSignature;
     if (
       pointerState.active
       && pointerState.surface?.drawing instanceof HTMLCanvasElement
@@ -291,7 +488,46 @@
       }
     }
     const { width, height } = state;
+    const hasShapePreview = Boolean(shapePreviewSignature);
+    const hasDeferredBrushPreview = pointerState.preview?.kind === 'deferredBrushStroke';
+    if (!hasShapePreview && !hasDeferredBrushPreview && deferredBrushPreviewCache && ctx.brushPreview) {
+      const previewCanvas = deferredBrushPreviewCache.canvas;
+      ctx.brushPreview.save();
+      ctx.brushPreview.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.brushPreview.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+      ctx.brushPreview.restore();
+      deferredBrushPreviewCache = null;
+    }
+    if (shouldRefreshShapePreview && ctx.brushPreview) {
+      const shapePreviewStartedAt = performance.now();
+      const previewCanvas = dom.canvases.brushPreview;
+      ctx.brushPreview.save();
+      ctx.brushPreview.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.brushPreview.clearRect(0, 0, previewCanvas?.width || width, previewCanvas?.height || height);
+      ctx.brushPreview.restore();
+      if (hasShapePreview) {
+        drawPreviewShape({
+          preview: pointerState.preview,
+          tool: pointerState.tool || state.tool,
+        }, ctx.brushPreview);
+      }
+      metrics.timings.shapePreviewMs = performance.now() - shapePreviewStartedAt;
+      metrics.counts.shapePreviewUpdated = true;
+    }
+    if (shouldRefreshSelectionPreview) {
+      const selectionPreviewStartedAt = performance.now();
+      syncSelectionOutlineToViewportTransform();
+      metrics.timings.selectionPreviewMs = performance.now() - selectionPreviewStartedAt;
+      metrics.counts.selectionPreviewUpdated = true;
+    }
+    // Shape pixels live on their own preview canvas. While a drag changes
+    // only that layer, leave the interaction overlay, selection SVG and onion
+    // skin untouched instead of clearing and rebuilding them every move.
+    if (!forceVisualRefresh && overlayVisualUnchanged && (shouldRefreshShapePreview || shouldRefreshSelectionPreview)) {
+      return metrics;
+    }
     if (state.playback.isPlaying) {
+      const clearStartedAt = performance.now();
       cancelSelectionDashRefresh();
       resizeVirtualCursorCanvas();
       clearVirtualCursorCanvas();
@@ -305,7 +541,9 @@
         ctx.selection.clearRect(0, 0, clearWidth, clearHeight);
       }
       clearSelectionOutlineSvg();
-      return;
+      metrics.timings.clearMs = performance.now() - clearStartedAt;
+      metrics.counts.clearPixelArea = width * height;
+      return metrics;
     }
     const now = Number.isFinite(timestamp) ? timestamp : performance.now();
     const moveState = getPendingSelectionMoveState();
@@ -319,10 +557,14 @@
       || hasSelectionPreview
       || Boolean(moveState && moveState.hasCleared);
 
+    const virtualCursorStartedAt = performance.now();
     resizeVirtualCursorCanvas();
     clearVirtualCursorCanvas();
+    metrics.timings.virtualCursorMs = performance.now() - virtualCursorStartedAt;
+    const clearStartedAt = performance.now();
     if (ctx.overlay) {
       ctx.overlay.clearRect(0, 0, width, height);
+      metrics.counts.clearPixelArea += width * height;
     }
     // All supported browsers use the SVG outline path below. Keeping a
     // high-resolution fallback canvas alive meant clearing up to 2048² pixels
@@ -348,7 +590,11 @@
         selectionCanvasActive = false;
       }
     }
+    metrics.timings.clearMs = performance.now() - clearStartedAt;
+    const onionSkinStartedAt = performance.now();
     renderOnionSkin();
+    metrics.timings.onionSkinMs = performance.now() - onionSkinStartedAt;
+    const selectionStateStartedAt = performance.now();
     if (hasSelectionOutline) {
       updateSelectionDashAnimation(now);
     } else {
@@ -356,12 +602,19 @@
       resetSelectionDashAnimation();
       clearSelectionOutlineSvg();
     }
+    metrics.timings.selectionMs += performance.now() - selectionStateStartedAt;
     if (moveState && moveState.hasCleared) {
+      const movePreviewStartedAt = performance.now();
       drawSelectionMovePreview(moveState);
+      metrics.timings.movePreviewMs = performance.now() - movePreviewStartedAt;
     } else if (state.selectionMask) {
+      const selectionStartedAt = performance.now();
       drawSelectionOverlay();
+      metrics.timings.selectionMs += performance.now() - selectionStartedAt;
     }
+    const transformHandlesStartedAt = performance.now();
     drawSelectionTransformHandles();
+    metrics.timings.transformHandlesMs = performance.now() - transformHandlesStartedAt;
 
     const hoveredSurface = !pointerState.active
       ? getProjectCanvasSurfaceByCanvasId(hoveredProjectCanvasId)
@@ -379,59 +632,74 @@
       ? virtualCursorDrawState.tool
       : getActiveTool();
     const shouldShowGuidePreview = state.showPixelGuides || state.showVirtualCursor;
+    const guidesStartedAt = performance.now();
     if (shouldShowGuidePreview && focusPixel) {
       const overrideSize = FILL_TOOLS.has(activeTool) ? 1 : undefined;
+      const hoverPreviewStartedAt = performance.now();
       drawBrushPreview(focusPixel, activeTool, overrideSize);
+      metrics.timings.hoverPreviewMs += performance.now() - hoverPreviewStartedAt;
     }
 
-    const isTouchFillHoldPreview = pointerState.active && FILL_TOOLS.has(pointerState.tool);
+    const activeFillPreviewStyle = pointerState.active && FILL_TOOLS.has(pointerState.tool)
+      ? getFillStyleForInteraction(pointerState.tool, pointerState.start, pointerState.current || focusPixel)
+      : null;
+    // Solid bucket fills have no moving intermediate state. Keep their
+    // preview as the inexpensive cursor above; only a gradient needs a live
+    // drag preview because its endpoint changes the eventual pixels.
+    const isTouchFillHoldPreview = Boolean(
+      pointerState.active
+      && FILL_TOOLS.has(pointerState.tool)
+      && activeFillPreviewStyle
+      && isGradientFillStyle(activeFillPreviewStyle)
+      && pointerState.start
+    );
     if (
       ctx.overlay
       && FILL_TOOLS.has(activeTool)
       && focusPixel
-      && (!pointerState.active || isTouchFillHoldPreview)
-      // Fill preview is already rendered in drawBrushPreview when guides are visible.
-      // When guides are hidden, keep the normal hover preview visible too.
+      && isTouchFillHoldPreview
+      // A gradient is the only fill with a changing pre-commit result.
       && !shouldShowGuidePreview
     ) {
-      const interactionFillStyle = pointerState.active
-        ? getFillStyleForInteraction(pointerState.tool, pointerState.start, pointerState.current || focusPixel)
-        : getActiveFillStyle(activeTool);
-      const gradientPreview = pointerState.active
-        && FILL_TOOLS.has(pointerState.tool)
-        && isGradientFillStyle(interactionFillStyle)
-        && pointerState.start;
-      const seed = gradientPreview ? pointerState.start : focusPixel;
-      const endpoint = gradientPreview ? (pointerState.current || focusPixel) : focusPixel;
-      const previewPixels = getFillPreviewPixels(seed.x, seed.y, { fillStyle: interactionFillStyle });
+      const seed = pointerState.start;
+      const endpoint = pointerState.current || focusPixel;
+      const previewPixels = getFillPreviewPixels(seed.x, seed.y, { fillStyle: activeFillPreviewStyle });
       if (previewPixels && previewPixels.length) {
+        const fillPreviewStartedAt = performance.now();
         ctx.overlay.save();
-        drawFillPreviewPixels(previewPixels, seed, endpoint, activeTool, { fillStyle: interactionFillStyle });
+        drawFillPreviewPixels(previewPixels, seed, endpoint, activeTool, { fillStyle: activeFillPreviewStyle });
         ctx.overlay.restore();
+        metrics.timings.fillPreviewMs += performance.now() - fillPreviewStartedAt;
       }
     }
+    metrics.timings.guidesCursorMirrorMs += performance.now() - guidesStartedAt;
 
     const previewTool = (virtualCursorDrawState.active && virtualCursorDrawState.tool)
       ? virtualCursorDrawState.tool
       : (pointerState.tool || state.tool);
-    if (
-      pointerState.preview
-      && ctx.overlay
-      && (previewTool === 'line'
-        || previewTool === 'rect'
-        || previewTool === 'rectFill'
-        || previewTool === 'ellipse'
-        || previewTool === 'ellipseFill'
-        || previewTool === 'curve')
-    ) {
-      drawPreviewShape({
-        preview: pointerState.preview,
-        tool: previewTool,
-      });
-    }
+    // Shape previews are rendered above on brushPreviewCanvas so their
+    // updates do not require an Overlay Canvas redraw.
 
-    if (pointerState.preview?.kind === 'deferredBrushStroke' && ctx.overlay) {
-      drawDeferredBrushStrokePreview(pointerState.preview.points, pointerState.tool);
+    if (hasDeferredBrushPreview && ctx.brushPreview) {
+      const deferredBrushStartedAt = performance.now();
+      metrics.counts.deferredBrushPreview = true;
+      metrics.counts.previewStampCount = Array.isArray(pointerState.preview.points)
+        ? pointerState.preview.points.length
+        : 0;
+      const previewStats = drawDeferredBrushStrokePreview(pointerState.preview.points, pointerState.tool) || {};
+      metrics.timings.deferredBrushPreviewMs = performance.now() - deferredBrushStartedAt;
+      metrics.timings.deferredBrushPreviewCacheUpdateMs = Number(previewStats.cacheUpdateMs) || 0;
+      metrics.timings.deferredBrushPreviewDrawImageMs = Number(previewStats.drawImageMs) || 0;
+      metrics.counts.previewStartIndex = Math.max(0, Number(previewStats.previewStartIndex) || 0);
+      metrics.counts.newPreviewStampCount = Math.max(0, Number(previewStats.newPreviewStampCount) || 0);
+      metrics.counts.renderedPreviewStampCount = Math.max(0, Number(previewStats.renderedPreviewStampCount) || 0);
+      metrics.counts.pendingPreviewStampCount = Math.max(0, Number(previewStats.pendingPreviewStampCount) || 0);
+      metrics.counts.deferredPreviewCacheReset = previewStats.cacheReset === true;
+      metrics.counts.previewCacheCanvasWidth = Math.max(0, Number(previewStats.cacheCanvasWidth) || 0);
+      metrics.counts.previewCacheCanvasHeight = Math.max(0, Number(previewStats.cacheCanvasHeight) || 0);
+      metrics.counts.previewCacheCanvasArea = Math.max(0, Number(previewStats.cacheCanvasArea) || 0);
+      metrics.counts.previewDirtyRectArea = Math.max(0, Number(previewStats.dirtyRectArea) || 0);
+      metrics.counts.mirrorEnabled = previewStats.mirrorEnabled === true;
     }
 
     if ((state.showPixelGuides || state.showVirtualCursor) && ctx.overlay && state.tool === 'curve' && curveBuilder) {
@@ -450,7 +718,9 @@
     }
 
     if (state.showVirtualCursor && virtualCursor) {
+      const virtualCursorDrawStartedAt = performance.now();
       drawVirtualCursor(virtualCursor);
+      metrics.timings.virtualCursorMs += performance.now() - virtualCursorDrawStartedAt;
     }
 
     if (hasSelectionOutline) {
@@ -459,6 +729,7 @@
       // is intentionally capped to keep editing responsive.
       scheduleSelectionDashRefresh();
     }
+    return metrics;
   }
 
   function getBackgroundTileColor(x, y) {
@@ -696,6 +967,20 @@
       && !mirrorEnabled
       && normalizeSelectSameMode(state.selectSameMode, SELECT_SAME_MODE_CONNECTED) === SELECT_SAME_MODE_GLOBAL;
     const painted = mirrorEnabled && useMirrorDedup ? new Set() : null;
+    // For an opaque solid fill, overlapping source-over writes produce the
+    // same result as one write. Batch the common connected-fill preview into
+    // one path to avoid a canvas API call per pixel. Keep gradients, alpha
+    // colors, very large regions, and the existing global scanline fast path
+    // on their specialised paths.
+    const canBatchOpaqueSolidPixels = !gradientPreview
+      && !useGlobalRuns
+      && Number(solidColor?.a) >= 255
+      && pixels.length <= 131072;
+    let hasBatchedOpaquePixel = false;
+    if (canBatchOpaqueSolidPixels) {
+      ctx.overlay.fillStyle = rgbaToCss(solidColor);
+      ctx.overlay.beginPath();
+    }
     let lastColorKey = '';
     const paintPoint = (px, py) => {
       if (px < 0 || py < 0 || px >= width || py >= height) {
@@ -711,18 +996,23 @@
       if (painted) {
         painted.add(maskIndex);
       }
-      const color = gradientContext
-        ? resolveFillGradientPixel(px, py, gradientContext).color
-        : solidColor;
-      if (!color) {
-        return;
+      if (canBatchOpaqueSolidPixels) {
+        ctx.overlay.rect(px, py, 1, 1);
+        hasBatchedOpaquePixel = true;
+      } else {
+        const color = gradientContext
+          ? resolveFillGradientPixel(px, py, gradientContext).color
+          : solidColor;
+        if (!color) {
+          return;
+        }
+        const colorKey = `${color.r}-${color.g}-${color.b}-${color.a}`;
+        if (colorKey !== lastColorKey) {
+          ctx.overlay.fillStyle = rgbaToCss(color);
+          lastColorKey = colorKey;
+        }
+        ctx.overlay.fillRect(px, py, 1, 1);
       }
-      const colorKey = `${color.r}-${color.g}-${color.b}-${color.a}`;
-      if (colorKey !== lastColorKey) {
-        ctx.overlay.fillStyle = rgbaToCss(color);
-        lastColorKey = colorKey;
-      }
-      ctx.overlay.fillRect(px, py, 1, 1);
     };
 
     if (useGlobalRuns) {
@@ -774,6 +1064,9 @@
       }
       forEachMirroredPoint(px, py, tool, paintPoint);
     }
+    if (canBatchOpaqueSolidPixels && hasBatchedOpaquePixel) {
+      ctx.overlay.fill();
+    }
   }
 
   function drawBrushPreview(center, tool = getActiveTool(), sizeOverride) {
@@ -806,24 +1099,12 @@
     }
 
     if (FILL_TOOLS.has(tool)) {
-      const interactionFillStyle = pointerState.active
-        ? getFillStyleForInteraction(pointerState.tool, pointerState.start, pointerState.current || center)
-        : getActiveFillStyle(tool);
-      const gradientPreview = pointerState.active
-        && FILL_TOOLS.has(pointerState.tool)
-        && isGradientFillStyle(interactionFillStyle)
-        && pointerState.start;
-      const seed = gradientPreview ? pointerState.start : center;
-      const endpoint = gradientPreview ? (pointerState.current || center) : center;
-      const pixels = getFillPreviewPixels(seed.x, seed.y, { fillStyle: interactionFillStyle });
-      if (pixels && pixels.length) {
-        drawFillPreviewPixels(pixels, seed, endpoint, tool, { fillStyle: interactionFillStyle });
-        if (isFillPreviewPixelsTruncated(pixels)) {
-          drawBrushCrosshair(center, 1, selectionMask);
-        }
-        ctx.overlay.restore();
-        return;
-      }
+      // Paint Bucket is direct like Aseprite: show only its target cursor
+      // while hovering.  Computing and rasterizing a flood preview for every
+      // hover cell makes large canvases feel slower than the actual fill.
+      drawBrushCrosshair(center, 1, selectionMask);
+      ctx.overlay.restore();
+      return;
     }
 
     const color = getActiveDrawColor();
@@ -833,39 +1114,176 @@
   }
 
   function drawDeferredBrushStrokePreview(points, tool = pointerState.tool || state.tool) {
-    if (!Array.isArray(points) || !points.length || !ctx.overlay) return;
+    if (!Array.isArray(points) || !points.length || !ctx.brushPreview || !(dom.canvases.brushPreview instanceof HTMLCanvasElement)) return null;
+    const cacheUpdateStartedAt = performance.now();
     const size = clamp(Math.round(state.brushSize || 1), 1, 64);
-    const color = tool === 'eraser'
-      ? getEraserPreviewColor(points[points.length - 1].x, points[points.length - 1].y)
-      : getActiveDrawColor();
-    if (!color) return;
+    const width = Math.max(1, Math.round(Number(state.width) || 1));
+    const height = Math.max(1, Math.round(Number(state.height) || 1));
+    const shape = state.brushShape || 'square';
+    const paletteIndex = Number.isFinite(pointerState.drawPaletteIndex)
+      ? pointerState.drawPaletteIndex
+      : undefined;
+    const color = tool === 'eraser' ? null : getActiveDrawColor(undefined, paletteIndex);
+    const colorKey = color ? `${color.r}-${color.g}-${color.b}-${color.a}` : '';
+    const committedStampCount = clamp(
+      Math.round(Number(pointerState.preview?.committedStampCount) || 0),
+      0,
+      points.length
+    );
+    const shouldResetCache = !deferredBrushPreviewCache
+      || deferredBrushPreviewCache.points !== points
+      || deferredBrushPreviewCache.width !== width
+      || deferredBrushPreviewCache.height !== height
+      || deferredBrushPreviewCache.size !== size
+      || deferredBrushPreviewCache.shape !== shape
+      || deferredBrushPreviewCache.tool !== tool
+      || deferredBrushPreviewCache.colorKey !== colorKey
+      || deferredBrushPreviewCache.committedStampCount !== committedStampCount;
+    if (shouldResetCache) {
+      const canvas = dom.canvases.brushPreview;
+      const context = ctx.brushPreview;
+      context.clearRect(0, 0, width, height);
+      context.imageSmoothingEnabled = false;
+      deferredBrushPreviewCache = {
+        points,
+        width,
+        height,
+        size,
+        shape,
+        tool,
+        colorKey,
+        canvas,
+        context,
+        offsets: getBrushOffsets(size),
+        committedStampCount,
+        processedPointCount: committedStampCount,
+        lastStamp: null,
+      };
+    }
+
+    const cache = deferredBrushPreviewCache;
+    const previewStartIndex = Math.max(0, cache.processedPointCount);
+    let renderedPreviewStampCount = 0;
+    let dirtyX0 = width;
+    let dirtyY0 = height;
+    let dirtyX1 = -1;
+    let dirtyY1 = -1;
     const previewStride = Math.max(1, Math.floor(size / 5));
-    // A deferred large stroke is feedback, not a second renderer. Drawing
-    // the entire accumulated path each animation frame makes preview cost
-    // grow with stroke length and causes the pointer to lag behind.
-    const startIndex = Math.max(0, points.length - Math.max(3, previewStride + 1));
-    ctx.overlay.save();
-    ctx.overlay.strokeStyle = rgbaToCss(color);
-    ctx.overlay.fillStyle = rgbaToCss(color);
-    ctx.overlay.globalAlpha = 0.72;
-    ctx.overlay.lineWidth = size;
-    ctx.overlay.lineCap = state.brushShape === 'square' ? 'square' : 'round';
-    ctx.overlay.lineJoin = 'round';
-    ctx.overlay.beginPath();
-    ctx.overlay.moveTo(points[startIndex].x + 0.5, points[startIndex].y + 0.5);
-    for (let index = startIndex + previewStride; index < points.length; index += previewStride) {
-      const point = points[index];
-      ctx.overlay.lineTo(point.x + 0.5, point.y + 0.5);
+    const minDistanceSq = previewStride * previewStride;
+    // Read once for this preview pass. The stamp loop already needs this
+    // value, so the metric does not introduce an additional mirror check.
+    const mirrorEnabled = isMirrorEnabledForTool(tool);
+    // Mirrored thick brushes expand one logical stamp into hundreds of canvas
+    // rectangles.  The preview is deliberately progressive: limiting the
+    // uncommitted work per rAF keeps pointer feedback responsive while the
+    // incremental raster writer catches up with the exact stroke underneath.
+    const previewStampBudget = mirrorEnabled
+      ? Math.max(1, Math.floor(512 / Math.max(1, cache.offsets.length * 2)))
+      : Number.POSITIVE_INFINITY;
+    const previewInputPointBudget = mirrorEnabled ? 2 : Number.POSITIVE_INFINITY;
+    let remainingPreviewStamps = previewStampBudget;
+    const colorResolver = tool === 'eraser'
+      ? (x, y) => getEraserPreviewColor(x, y)
+      : () => color;
+    // A normal opaque brush always produces the same final pixel even when
+    // mirrored stamps overlap.  Accumulating its 1px rectangles into one
+    // canvas path removes thousands of fillRect calls without changing that
+    // result. Eraser and translucent colors retain the per-pixel path because
+    // their source-over compositing can depend on write order.
+    const canBatchOpaqueBrushPixels = tool !== 'eraser' && Number(color?.a) >= 255;
+    if (canBatchOpaqueBrushPixels) {
+      cache.context.fillStyle = rgbaToCss(color);
+      cache.context.beginPath();
     }
+    const stampPreview = (point, { force = false } = {}) => {
+      if (!point) return;
+      const dx = cache.lastStamp ? point.x - cache.lastStamp.x : Infinity;
+      const dy = cache.lastStamp ? point.y - cache.lastStamp.y : Infinity;
+      if (!force && cache.lastStamp && (dx * dx) + (dy * dy) < minDistanceSq) return;
+      if (remainingPreviewStamps <= 0) return false;
+      remainingPreviewStamps -= 1;
+      renderedPreviewStampCount += 1;
+      cache.offsets.forEach(({ dx: offsetX, dy: offsetY }) => {
+        const paintPixel = (x, y) => {
+          if (x < 0 || y < 0 || x >= width || y >= height) return;
+          const index = (y * width) + x;
+          if (state.selectionMask && state.selectionMask[index] !== 1) return;
+          if (canBatchOpaqueBrushPixels) {
+            cache.context.rect(x, y, 1, 1);
+          } else {
+            const pixelColor = colorResolver(x, y);
+            if (!pixelColor) return;
+            cache.context.fillStyle = rgbaToCss(pixelColor);
+            cache.context.fillRect(x, y, 1, 1);
+          }
+          if (x < dirtyX0) dirtyX0 = x;
+          if (y < dirtyY0) dirtyY0 = y;
+          if (x > dirtyX1) dirtyX1 = x;
+          if (y > dirtyY1) dirtyY1 = y;
+        };
+        const x = point.x + offsetX;
+        const y = point.y + offsetY;
+        if (mirrorEnabled) {
+          forEachMirroredPoint(x, y, tool, paintPixel);
+        } else {
+          paintPixel(x, y);
+        }
+      });
+      cache.lastStamp = point;
+      return true;
+    };
+
+    if (cache.processedPointCount === 0) {
+      stampPreview(points[0]);
+      cache.processedPointCount = 1;
+    }
+    const previewEndIndex = Math.min(
+      points.length,
+      Math.max(1, cache.processedPointCount) + previewInputPointBudget
+    );
+    for (let index = Math.max(1, cache.processedPointCount); index < previewEndIndex; index += 1) {
+      const previous = points[index - 1];
+      const current = points[index];
+      const segment = bresenhamLine(previous.x, previous.y, current.x, current.y);
+      const segmentStep = mirrorEnabled
+        ? Math.max(1, Math.ceil(Math.max(0, segment.length - 1) / Math.max(1, remainingPreviewStamps)))
+        : 1;
+      for (let pointIndex = 1; pointIndex < segment.length && remainingPreviewStamps > 0; pointIndex += segmentStep) {
+        stampPreview(segment[pointIndex]);
+      }
+      cache.processedPointCount = index + 1;
+    }
+    const hasPendingPreviewPoints = cache.processedPointCount < points.length;
     const last = points[points.length - 1];
-    ctx.overlay.lineTo(last.x + 0.5, last.y + 0.5);
-    ctx.overlay.stroke();
-    if (points.length === 1) {
-      ctx.overlay.beginPath();
-      ctx.overlay.arc(last.x + 0.5, last.y + 0.5, size / 2, 0, Math.PI * 2);
-      ctx.overlay.fill();
+    if (!hasPendingPreviewPoints && last && (!cache.lastStamp || last.x !== cache.lastStamp.x || last.y !== cache.lastStamp.y)) {
+      // applyBrushPath() always stamps the final coordinate. Mirror that
+      // contract so the in-progress preview reaches the pointer exactly.
+      stampPreview(last, { force: true });
     }
-    ctx.overlay.restore();
+    if (canBatchOpaqueBrushPixels) {
+      cache.context.fill();
+    }
+    const drawImageStartedAt = performance.now();
+    const dirtyRectArea = dirtyX1 >= dirtyX0 && dirtyY1 >= dirtyY0
+      ? (dirtyX1 - dirtyX0 + 1) * (dirtyY1 - dirtyY0 + 1)
+      : 0;
+    if (hasPendingPreviewPoints) {
+      requestOverlayRender();
+    }
+    return {
+      cacheReset: shouldResetCache,
+      previewStartIndex,
+      newPreviewStampCount: Math.max(0, cache.processedPointCount - previewStartIndex),
+      renderedPreviewStampCount,
+      pendingPreviewStampCount: Math.max(0, points.length - cache.processedPointCount),
+      cacheCanvasWidth: cache.canvas.width,
+      cacheCanvasHeight: cache.canvas.height,
+      cacheCanvasArea: cache.canvas.width * cache.canvas.height,
+      dirtyRectArea,
+      mirrorEnabled,
+      cacheUpdateMs: drawImageStartedAt - cacheUpdateStartedAt,
+      drawImageMs: performance.now() - drawImageStartedAt,
+    };
   }
 
   function drawFilledPreview(center, size, selectionMask, colorResolver, tool = pointerState.tool || state.tool) {
@@ -1200,6 +1618,25 @@
     lastSelectionDashTime = 0;
   }
 
+  function refreshSelectionDashSvg() {
+    if (
+      !(selectionOutlineSvg instanceof SVGSVGElement)
+      || !(selectionOutlinePathDark instanceof SVGPathElement)
+      || !(selectionOutlinePathLight instanceof SVGPathElement)
+      || selectionOutlineSvg.classList.contains('is-hidden')
+      || !selectionOutlinePathDark.getAttribute('d')
+    ) {
+      return false;
+    }
+    updateSelectionDashAnimation(performance.now());
+    const dashPattern = [8, 5];
+    const dashCycle = dashPattern.reduce((sum, value) => sum + value, 0) || 8;
+    const dashOffset = ((selectionDashScreenOffset % dashCycle) + dashCycle) % dashCycle;
+    selectionOutlinePathDark.setAttribute('stroke-dashoffset', String(dashOffset));
+    selectionOutlinePathLight.setAttribute('stroke-dashoffset', String(dashOffset + dashPattern[0]));
+    return true;
+  }
+
   function getSelectionOutlineSvg() {
     const stack = activeCanvasSurface?.stack instanceof HTMLElement
       ? activeCanvasSurface.stack
@@ -1452,12 +1889,12 @@
     pathCtx.lineTo(x0, y0);
   }
 
-  function drawPreviewShape(previewState) {
+  function drawPreviewShape(previewState, targetContext = ctx.overlay) {
     const tool = (previewState && typeof previewState.tool === 'string')
       ? previewState.tool
       : (pointerState.tool || state.tool);
     const preview = previewState.preview;
-    if (!preview) return;
+    if (!preview || !targetContext) return;
     const { start, end, points } = preview;
     if (!start || !end) return;
     const width = state.width;
@@ -1466,6 +1903,9 @@
     const color = getActiveDrawColor();
     const previewTool = tool;
     const mirrorEnabled = isMirrorEnabledForTool(previewTool);
+    // Mirror axes and pivot cannot change during this render. Normalize them
+    // once, then reuse the same state for every source pixel in this shape.
+    const normalizedMirrorState = mirrorEnabled ? getNormalizedMirrorState() : null;
     const offsets = getBrushOffsets(state.brushSize || 1);
     const usePaintDedup = mirrorEnabled || Boolean(selectionMask);
     const painted = usePaintDedup ? new Set() : null;
@@ -1480,8 +1920,51 @@
       const finalPoint = sequence[sequence.length - 1];
       if (finalPoint && finalPoint !== last) stamp(finalPoint.x, finalPoint.y);
     };
-    ctx.overlay.save();
-    ctx.overlay.fillStyle = rgbaToCss(color);
+    // A shape preview can contain thousands of stamped pixels when a thick
+    // brush or mirror is active.  Build one opaque canvas path per preview
+    // instead of issuing a fillRect call for each pixel.
+    const canBatchOpaqueShapePixels = Number(color?.a) >= 255;
+    let hasBatchedOpaqueShapePixel = false;
+    // Consecutive thick mirrored stamps overlap heavily. Cache their reflected
+    // point sets for this one preview and coalesce opaque pixels into runs so
+    // the hot loop does not repeat Set/object work or emit one path rect per
+    // reflected pixel.
+    const mirroredPointCache = mirrorEnabled ? new Map() : null;
+    const opaqueMirrorRows = mirrorEnabled && canBatchOpaqueShapePixels ? new Map() : null;
+    targetContext.save();
+    targetContext.fillStyle = rgbaToCss(color);
+    if (canBatchOpaqueShapePixels) {
+      targetContext.beginPath();
+    }
+    const paintPixel = (px, py) => {
+      if (px < 0 || py < 0 || px >= width || py >= height) {
+        return;
+      }
+      const idx = py * width + px;
+      if (selectionMask && selectionMask[idx] !== 1) {
+        return;
+      }
+      if (painted && painted.has(idx)) {
+        return;
+      }
+      if (painted) {
+        painted.add(idx);
+      }
+      if (opaqueMirrorRows) {
+        let row = opaqueMirrorRows.get(py);
+        if (!row) {
+          row = new Set();
+          opaqueMirrorRows.set(py, row);
+        }
+        row.add(px);
+        hasBatchedOpaqueShapePixel = true;
+      } else if (canBatchOpaqueShapePixels) {
+        targetContext.rect(px, py, 1, 1);
+        hasBatchedOpaqueShapePixel = true;
+      } else {
+        targetContext.fillRect(px, py, 1, 1);
+      }
+    };
     const stamp = (x, y) => {
       for (let offsetIndex = 0; offsetIndex < offsets.length; offsetIndex += 1) {
         const { dx, dy } = offsets[offsetIndex];
@@ -1489,39 +1972,29 @@
         const py = y + dy;
 
         if (!mirrorEnabled) {
-          if (px < 0 || py < 0 || px >= width || py >= height) {
-            continue;
-          }
-          const idx = py * width + px;
-          if (selectionMask && selectionMask[idx] !== 1) {
-            continue;
-          }
-          if (painted && painted.has(idx)) {
-            continue;
-          }
-          if (painted) {
-            painted.add(idx);
-          }
-          ctx.overlay.fillRect(px, py, 1, 1);
+          paintPixel(px, py);
           continue;
         }
-
-        forEachMirroredPoint(px, py, previewTool, (mx, my) => {
-          if (mx < 0 || my < 0 || mx >= width || my >= height) {
-            return;
-          }
-          if (selectionMask && selectionMask[my * width + mx] !== 1) {
-            return;
-          }
-          const idx = my * width + mx;
-          if (painted && painted.has(idx)) {
-            return;
-          }
-          if (painted) {
-            painted.add(idx);
-          }
-          ctx.overlay.fillRect(mx, my, 1, 1);
-        });
+        const sourceIndex = (py >= 0 && py < height && px >= 0 && px < width)
+          ? (py * width) + px
+          : -1;
+        if (sourceIndex >= 0 && painted?.has(sourceIndex)) {
+          continue;
+        }
+        const cacheKey = sourceIndex >= 0 ? sourceIndex : `${px},${py}`;
+        let mirroredPoints = mirroredPointCache.get(cacheKey);
+        if (!mirroredPoints) {
+          mirroredPoints = getMirroredPointSet(px, py, {
+            tool: previewTool,
+            includeOriginal: true,
+            mirrorState: normalizedMirrorState,
+          });
+          mirroredPointCache.set(cacheKey, mirroredPoints);
+        }
+        for (let pointIndex = 0; pointIndex < mirroredPoints.length; pointIndex += 1) {
+          const point = mirroredPoints[pointIndex];
+          paintPixel(point.x, point.y);
+        }
       }
     };
 
@@ -1538,20 +2011,20 @@
         const rectHeight = Math.max(0, (y1 - y0) + 1);
         if (rectWidth > 0 && rectHeight > 0) {
           if (tool === 'rectFill') {
-            ctx.overlay.fillRect(x0, y0, rectWidth, rectHeight);
+            targetContext.fillRect(x0, y0, rectWidth, rectHeight);
           } else {
-            ctx.overlay.fillRect(x0, y0, rectWidth, 1);
+            targetContext.fillRect(x0, y0, rectWidth, 1);
             if (rectHeight > 1) {
-              ctx.overlay.fillRect(x0, y1, rectWidth, 1);
+              targetContext.fillRect(x0, y1, rectWidth, 1);
             }
             if (rectHeight > 2) {
-              ctx.overlay.fillRect(x0, y0 + 1, 1, rectHeight - 2);
+              targetContext.fillRect(x0, y0 + 1, 1, rectHeight - 2);
               if (rectWidth > 1) {
-                ctx.overlay.fillRect(x1, y0 + 1, 1, rectHeight - 2);
+                targetContext.fillRect(x1, y0 + 1, 1, rectHeight - 2);
               }
             }
           }
-          ctx.overlay.restore();
+          targetContext.restore();
           return;
         }
       }
@@ -1592,7 +2065,31 @@
       if (lastPoint && ((pixelCount - 1) % stampStride) !== 0) stamp(lastPoint.x, lastPoint.y);
     }
 
-    ctx.overlay.restore();
+    if (opaqueMirrorRows) {
+      opaqueMirrorRows.forEach((row, y) => {
+        const xs = Array.from(row).sort((a, b) => a - b);
+        let startX = -1;
+        let previousX = -2;
+        const flushRun = () => {
+          if (startX >= 0) {
+            targetContext.rect(startX, y, previousX - startX + 1, 1);
+          }
+        };
+        for (let index = 0; index < xs.length; index += 1) {
+          const x = xs[index];
+          if (x !== previousX + 1) {
+            flushRun();
+            startX = x;
+          }
+          previousX = x;
+        }
+        flushRun();
+      });
+    }
+    if (canBatchOpaqueShapePixels && hasBatchedOpaqueShapePixel) {
+      targetContext.fill();
+    }
+    targetContext.restore();
   }
 
   function drawLassoPreview(points) {

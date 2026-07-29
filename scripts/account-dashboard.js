@@ -57,6 +57,8 @@
       sales_microyen: safeNumber(row?.sales_microyen),
       lineage_microyen: safeNumber(row?.lineage_microyen),
       pageview_microyen: safeNumber(row?.pageview_microyen),
+      provisional_microyen: safeNumber(row?.provisional_microyen),
+      provisional_points: safeNumber(row?.provisional_points),
       valid_view_count: safeNumber(row?.valid_view_count),
       provisional_valid_view_count: safeNumber(row?.provisional_valid_view_count),
       sale_count: safeNumber(row?.sale_count),
@@ -252,10 +254,10 @@
       const label = document.createElement('em'); label.textContent = '有効表示'; label.style.fontStyle = 'normal';
       const value = document.createElement('b'); value.textContent = `${row.valid_view_count.toLocaleString('ja-JP')}回`; value.style.color = '#fbbf24';
       line.append(label, value); fragment.append(line);
-      if (row.provisional_valid_view_count) {
+      if (row.provisional_points || row.provisional_microyen) {
         const provisional = document.createElement('span');
-        const provisionalLabel = document.createElement('em'); provisionalLabel.textContent = '暫定有効表示'; provisionalLabel.style.fontStyle = 'normal';
-        const provisionalValue = document.createElement('b'); provisionalValue.textContent = `${row.provisional_valid_view_count.toLocaleString('ja-JP')}回`; provisionalValue.style.color = '#fde68a';
+        const provisionalLabel = document.createElement('em'); provisionalLabel.textContent = '暫定ポイント'; provisionalLabel.style.fontStyle = 'normal';
+        const provisionalValue = document.createElement('b'); provisionalValue.textContent = `${row.provisional_points.toLocaleString('ja-JP')}点・${formatYen(row.provisional_microyen)}`; provisionalValue.style.color = '#fde68a';
         provisional.append(provisionalLabel, provisionalValue); fragment.append(provisional);
       }
     }
@@ -306,7 +308,7 @@
     if (!chartTable) return;
     chartTable.replaceChildren(...rows.slice().reverse().map((row) => {
       const tr = document.createElement('tr');
-      const values = [formatMonth(row.month), formatYen(row.sales_microyen), formatYen(row.lineage_microyen), formatYen(row.pageview_microyen), `${row.valid_view_count.toLocaleString('ja-JP')}回`, `${row.provisional_valid_view_count.toLocaleString('ja-JP')}回`];
+      const values = [formatMonth(row.month), formatYen(row.sales_microyen), formatYen(row.lineage_microyen), formatYen(row.pageview_microyen), formatYen(row.provisional_microyen), `${row.provisional_points.toLocaleString('ja-JP')}点`];
       values.forEach((value) => { const td = document.createElement('td'); td.textContent = value; tr.append(td); });
       return tr;
     }));
@@ -327,16 +329,16 @@
     setText('accountSummaryBalance', formatYen(totals.available_microyen));
     setText('accountSummarySalesMeta', `直近${months}か月・${safeNumber(totals.sale_count).toLocaleString('ja-JP')}件`);
     setText('accountSummaryLineageMeta', `直近${months}か月・${safeNumber(totals.lineage_sale_count).toLocaleString('ja-JP')}件`);
-    setText('accountSummaryViews', `確定 ${safeNumber(totals.valid_view_count).toLocaleString('ja-JP')}回・暫定 ${safeNumber(totals.provisional_valid_view_count).toLocaleString('ja-JP')}回`);
+    setText('accountSummaryViews', `確定 ${formatYen(totals.pageview_microyen)}・暫定 ${formatYen(totals.provisional_microyen)}`);
     setText('accountSummaryPending', `保留中 ${formatYen(totals.pending_microyen)}`);
     renderTable(chartRows);
-    const hasData = chartRows.some((row) => row.sales_microyen || row.lineage_microyen || row.pageview_microyen || row.valid_view_count || row.provisional_valid_view_count);
+    const hasData = chartRows.some((row) => row.sales_microyen || row.lineage_microyen || row.pageview_microyen || row.provisional_microyen || row.provisional_points);
     if (chartEmpty) {
       chartEmpty.hidden = hasData;
       chartEmpty.textContent = hasData ? '' : 'この期間に確定した売上・報酬・有効表示はまだありません。';
     }
-    setStatus(overviewStatus, hasData ? `直近${months}か月の確定データと暫定有効表示です。` : '確定した売上・報酬はまだありません。');
-    setStatus(dashboardStatus, '暫定有効表示は5秒以上の記録済み閲覧です。月次確定後に確定値・表示報酬へ反映します。');
+    setStatus(overviewStatus, hasData ? `直近${months}か月の確定報酬と、現在のポイント比による暫定額です。` : '確定した売上・報酬はまだありません。');
+    setStatus(dashboardStatus, '暫定額は、管理者が設定した当月予算を全ポイントで山分けした現在の試算です。新しい表示・プレイにより変動し、月次確定後に確定額となります。');
     hoveredIndex = -1;
     if (chartTooltip) chartTooltip.hidden = true;
     scheduleDraw();

@@ -816,7 +816,7 @@
       return;
     }
     const choice = window.prompt(
-      '出力形式を入力してください (png / jpeg / svg / gif / project)',
+      '出力形式を入力してください (png / jpeg / svg / gif / timelapse / project)',
       'png'
     );
     if (!choice) {
@@ -829,9 +829,10 @@
       && inputMode !== 'jpeg'
       && inputMode !== 'svg'
       && inputMode !== 'gif'
+      && inputMode !== 'timelapse'
       && inputMode !== 'project'
     ) {
-      window.alert('png / jpeg / svg / gif / project のいずれかを入力してください。');
+      window.alert('png / jpeg / svg / gif / timelapse / project のいずれかを入力してください。');
       return;
     }
     const normalized = normalizeExportFormat(inputMode);
@@ -864,6 +865,8 @@
         await exportProjectAsAllFormatsZip({
           selectedFormats: Array.isArray(selectedFormats) ? selectedFormats : getSelectedBatchZipFormats(),
         });
+      } else if (normalized === 'timelapse') {
+        await exportTimelapseGif();
       } else if (normalized === 'gif') {
         await exportProjectAsGif();
       } else if (normalized === 'jpeg') {

@@ -690,6 +690,7 @@
     style.textContent = `
       :root{
         --pixieed-common-tabbar-height:54px;
+        --pixieed-common-action-bar-background:rgb(7,13,27);
         --pixieed-common-content-top:calc(var(--pixieed-top-ad-offset, 0px) + var(--pixieed-common-tabbar-height));
       }
       html{
@@ -701,7 +702,7 @@
         flex:0 0 auto;width:auto;height:var(--pixieed-common-tabbar-height);min-height:var(--pixieed-common-tabbar-height);
         display:flex;align-items:center;gap:7px;
         padding:6px max(9px, env(safe-area-inset-right, 0px)) 6px max(9px, env(safe-area-inset-left, 0px));
-        border-bottom:1px solid rgba(148,163,184,.2);background:rgba(7,13,27,.97);
+        border-bottom:1px solid rgba(148,163,184,.2);background:var(--pixieed-common-action-bar-background);
         box-shadow:0 8px 22px rgba(2,6,23,.24);box-sizing:border-box;
         font-family:'Fredoka','DotGothic16',system-ui,sans-serif;
       }
@@ -859,7 +860,8 @@
         }
         .pixieed-common-tabbar{
           top:0;
-          right:calc(var(--pixieed-shared-side-nav-width, 72px) + var(--pixieed-shared-side-nav-gap, 6px));
+          /* The action bar meets the landscape navigation rail directly. */
+          right:var(--pixieed-shared-side-nav-width, 72px);
           width:auto;
         }
         body.has-pixieed-common-tabbar:not([data-pixieed-page='pixiedraw']):not([data-pixieed-page='pixiee-lens']):not([data-pixieed-page='maoitu']):not([data-pixieed-page='pixfind']){

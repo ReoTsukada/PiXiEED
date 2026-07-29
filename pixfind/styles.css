@@ -3073,6 +3073,45 @@ body[data-pixieed-page="pixfind"] .creator-overlay {
   font-weight: 700;
 }
 
+/* The completion ad is deliberately part of the result card, rather than a
+   fixed layer.  The shared chrome already reduces the overlay to the safe
+   area above the bottom navigation, so this creative can never sit over a
+   game action or the navigation controls. */
+.result-panel__ad {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 66px;
+  margin: .05rem 0;
+  padding: .95rem 0 .1rem;
+  overflow: hidden;
+  border-top: 1px solid rgba(83, 119, 184, .14);
+}
+
+.result-panel__ad-label {
+  position: absolute;
+  top: .3rem;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #7b869c;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.result-panel__ad ins.adsbygoogle {
+  display: block;
+  width: min(100%, 420px) !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  min-height: 50px;
+  max-height: 90px;
+  margin: 0 auto;
+  overflow: hidden;
+}
+
 .result-panel__actions {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -3083,6 +3122,14 @@ body[data-pixieed-page="pixfind"] .creator-overlay {
   min-height: 42px;
   padding-inline: .35rem;
   font-size: .72rem;
+}
+
+/* Keep the completion action panel compact in landscape and short viewports.
+   In those layouts the game and its controls take precedence over an ad. */
+@media (max-height: 700px) {
+  .result-panel__ad {
+    display: none;
+  }
 }
 
 .creator-complete-overlay { z-index: 999; }
@@ -3529,7 +3576,7 @@ body[data-pixieed-page="pixfind"] .pixieed-common-tabbar {
   grid-column: 1 / -1;
   width: 100%;
   min-width: 0;
-  min-height: 120px;
+  min-height: 100px;
   margin: 8px 0;
   padding: 20px 0 10px;
   overflow: hidden;

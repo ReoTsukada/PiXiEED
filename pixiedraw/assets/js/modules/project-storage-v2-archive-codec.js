@@ -759,8 +759,10 @@
       const height = Math.max(1, Math.round(Number(nextCanvas.height) || 1));
       nextCanvas.frames = await Promise.all((Array.isArray(canvasPayload?.frames) ? canvasPayload.frames : []).map(async frame => {
         const nextFrame = cloneJsonValue(frame) || {};
-        nextFrame.layers = await Promise.all((Array.isArray(frame?.layers) ? frame.layers : []).map(async layer => {
-          if (!layer || typeof layer !== 'object' || layer.type === 'simulation') {
+        const sourceLayers = (Array.isArray(frame?.layers) ? frame.layers : [])
+          .filter(layer => layer?.type !== 'simulation');
+        nextFrame.layers = await Promise.all(sourceLayers.map(async layer => {
+          if (!layer || typeof layer !== 'object') {
             return cloneJsonValue(layer);
           }
           const nextLayer = cloneJsonValue(layer) || {};
@@ -1131,7 +1133,7 @@
     }
 
     async function restoreCanvasLayer(layer, width, height, entries) {
-      if (!layer || typeof layer !== 'object' || layer.type === 'simulation') {
+      if (!layer || typeof layer !== 'object') {
         return cloneJsonValue(layer);
       }
       const nextLayer = cloneJsonValue(layer) || {};
@@ -1193,7 +1195,9 @@
       const height = Math.max(1, Math.round(Number(nextCanvas.height) || 1));
       nextCanvas.frames = await Promise.all((Array.isArray(canvasPayload?.frames) ? canvasPayload.frames : []).map(async frame => {
         const nextFrame = cloneJsonValue(frame) || {};
-        nextFrame.layers = await Promise.all((Array.isArray(frame?.layers) ? frame.layers : []).map(layer => (
+        const sourceLayers = (Array.isArray(frame?.layers) ? frame.layers : [])
+          .filter(layer => layer?.type !== 'simulation');
+        nextFrame.layers = await Promise.all(sourceLayers.map(layer => (
           restoreCanvasLayer(layer, width, height, entries)
         )));
         return nextFrame;

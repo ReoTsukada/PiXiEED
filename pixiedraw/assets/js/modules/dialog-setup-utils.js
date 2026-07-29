@@ -179,9 +179,13 @@
           .filter(item => item instanceof HTMLButtonElement && item.getAttribute('aria-pressed') === 'true')
           .map(item => String(item.dataset.exportFormatChoice || ''));
         const isSelected = choice.getAttribute('aria-pressed') === 'true';
-        const next = isSelected
+        const next = format === 'timelapse' && !isSelected
+          ? [format]
+          : (selected.includes('timelapse') && !isSelected
+            ? [format]
+            : (isSelected
           ? selected.filter(value => value !== format)
-          : [...selected, format];
+          : [...selected, format]));
         if (!next.length) {
           return;
         }

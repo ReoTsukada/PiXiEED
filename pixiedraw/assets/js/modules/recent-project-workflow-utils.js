@@ -70,19 +70,10 @@
       }
 
       if (isSharedRecentProjectEntry(original)) {
-        const normalizedShared = normalizeSharedRecentProjectEntry({ ...original, id: normalizedId, project: null });
-        if (!normalizedShared) {
-          changed = true;
-          removedCount += 1;
-          continue;
-        }
-        const sharedChanged = JSON.stringify(normalizedShared) !== JSON.stringify(original);
-        seenIds.add(normalizedId);
-        if (sharedChanged) {
-          changed = true;
-          repairedCount += 1;
-        }
-        sanitizedEntries.push(normalizedShared);
+        // Collaboration is retired. Do not keep remote-only entries in the
+        // on-device project list: they cannot be opened as normal projects.
+        changed = true;
+        removedCount += 1;
         continue;
       }
 
@@ -518,40 +509,10 @@
     // The former startup/project-home duplicate lists were removed.
   }
 
-  async function ensureSharedRecentProjectsAccountSynced({ force = false } = {}) {
-    if (!AUTOSAVE_SUPPORTED || !accountState.isLoggedIn || accountState.isAnonymous) {
-      return [];
-    }
-    const now = Date.now();
-    if (!force && sharedRecentProjectsAccountSyncPromise) {
-      return sharedRecentProjectsAccountSyncPromise;
-    }
-    if (
-      force
-      && sharedRecentProjectsLastAccountSyncAt > 0
-      && (now - sharedRecentProjectsLastAccountSyncAt) < SHARED_RECENT_PROJECTS_FORCE_SYNC_COOLDOWN_MS
-    ) {
-      return [];
-    }
-    if (
-      !force
-      && sharedRecentProjectsLastAccountSyncAt > 0
-      && (now - sharedRecentProjectsLastAccountSyncAt) < SHARED_RECENT_PROJECTS_ACCOUNT_SYNC_COOLDOWN_MS
-    ) {
-      return [];
-    }
-    if (sharedRecentProjectsAccountSyncPromise) {
-      return sharedRecentProjectsAccountSyncPromise;
-    }
-    sharedRecentProjectsAccountSyncPromise = (async () => {
-      try {
-        return await syncSharedRecentProjectsFromAccount();
-      } finally {
-        sharedRecentProjectsLastAccountSyncAt = Date.now();
-        sharedRecentProjectsAccountSyncPromise = null;
-      }
-    })();
-    return sharedRecentProjectsAccountSyncPromise;
+  async function ensureSharedRecentProjectsAccountSynced() {
+    // Shared projects are retired. Local recent projects never trigger an
+    // account-side project sync.
+    return [];
   }
 
   async function refreshRecentProjectsUI(options = {}) {
@@ -562,13 +523,6 @@
       console.info('[pixiedraw:recent-projects]', { phase: 'recent-projects-load-success', count: 0, code: 'AUTOSAVE_UNSUPPORTED' });
       return;
     }
-    if (options?.syncSharedFromAccount !== false) {
-      try {
-        await ensureSharedRecentProjectsAccountSynced({ force: Boolean(options?.forceSharedAccountSync) });
-      } catch (error) {
-        console.warn('Failed to sync shared recent projects from account', error);
-      }
-    }
     const shouldSanitize = options?.sanitize !== false;
     if (shouldSanitize) {
       await sanitizeRecentProjectsStore({ announce: false });
@@ -576,12 +530,8 @@
       return;
     }
     const entries = await loadRecentProjectsMetadata();
-    const limitedEntries = enforceSharedRecentProjectLimit(entries);
-    if (limitedEntries.length !== entries.length) {
-      await saveRecentProjectsList(entries, limitedEntries);
-    }
-    setRecentProjectsCache(limitedEntries);
-    console.info('[pixiedraw:recent-projects]', { phase: 'recent-projects-load-success', count: limitedEntries.length, code: '' });
+    setRecentProjectsCache(entries);
+    console.info('[pixiedraw:recent-projects]', { phase: 'recent-projects-load-success', count: entries.length, code: '' });
   }
 
 

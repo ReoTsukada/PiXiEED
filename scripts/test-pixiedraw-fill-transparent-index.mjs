@@ -147,7 +147,6 @@ const drawing = window.PiXiEEDrawModules.canvasDrawingWorkflowUtils.createCanvas
   getLayerPixelMatchState: utils.getLayerPixelMatchState,
   layerPixelMatchesMatchState: utils.layerPixelMatchesMatchState,
   isMirrorEnabledForTool: () => false,
-  isSimulationLayer: () => false,
   getRasterLayerRuntimeStoredIndex: (layer, index) => {
     const paletteIndex = getStoredRasterLayerPaletteIndex(layer, index);
     return paletteIndex >= 0 ? paletteIndex : 0;
@@ -297,7 +296,7 @@ const fillHistoryUtils = window.PiXiEEDrawModules.pixelPatchHistoryUtils.createP
   state: historyState, history: historyStore, HISTORY_ENTRY_TYPE_PIXEL_PATCH: 'pixelPatch', PIXEL_PATCH_HISTORY_LABELS: new Set(['fill']),
   multiState: { connected: false }, getActiveSharedProjectKey: () => '', isSharedProjectCollaborativeMode: () => false, isVoxelExtensionModeEnabled: () => false,
   getActiveLayer: () => historyLayer, getActiveProjectCanvasDocument: () => historyCanvas, getActiveFrame: () => historyFrame,
-  isSimulationLayer: () => false, getProjectCanvasDocumentById: id => id === 'canvas-fill' ? historyCanvas : null,
+  getProjectCanvasDocumentById: id => id === 'canvas-fill' ? historyCanvas : null,
   ensureLayerDirect: () => { throw new Error('solid index fill must not allocate direct pixels'); },
   getRasterLayerRuntimeStoredIndex: (layer, index) => layer.indices[index], setRasterLayerRuntimeStoredIndex: (layer, index, value) => { layer.indices[index] = value; },
   clamp: value => value, refreshLayerDirectOnlyFlag: () => {}, invalidateFillPreviewCache: () => {}, invalidateOnionSkinCache: () => {}, clearPlaybackFrameCache: () => {},
@@ -341,5 +340,51 @@ const largePasteEntry = fillHistoryUtils.finalizePixelPatchHistoryEntry(historyS
 assert.equal(largePasteEntry?.kind, 'raster-tile-patch', 'promoted paste history remains a tile patch');
 assert.equal(fillHistoryUtils.applyPixelPatchHistoryEntry(largePasteEntry, 'undo'), true);
 assert.deepEqual(Array.from(historyLayer.indices), [1, 1, 2, 1, 1, 2, 2, 1, 1, 2], 'promoted paste undo restores the affected tile data');
+
+// Mirrored large brushes must snapshot reflected target tiles before writing.
+// Without this capture, pixels appeared but the tile Undo entry was empty.
+const mirrorWidth = 128;
+const mirrorState = { width: mirrorWidth, height: 3, brushSize: 12, brushShape: 'square', selectionMask: null, activePaletteIndex: 1 };
+const mirrorLayer = { id: 'mirror-layer', indices: new Uint8Array(mirrorWidth * mirrorState.height), direct: null, directOnly: false };
+const mirrorFrame = { id: 'mirror-frame', layers: [mirrorLayer] };
+const mirrorCanvas = { id: 'mirror-canvas', width: mirrorWidth, height: mirrorState.height, frames: [mirrorFrame] };
+const mirrorHistoryStore = { pending: null };
+const mirrorHistoryUtils = window.PiXiEEDrawModules.pixelPatchHistoryUtils.createPixelPatchHistoryUtils({
+  state: mirrorState, history: mirrorHistoryStore, HISTORY_ENTRY_TYPE_PIXEL_PATCH: 'pixelPatch', PIXEL_PATCH_HISTORY_LABELS: new Set(['pen']),
+  multiState: { connected: false }, getActiveSharedProjectKey: () => '', isSharedProjectCollaborativeMode: () => false, isVoxelExtensionModeEnabled: () => false,
+  getActiveLayer: () => mirrorLayer, getActiveProjectCanvasDocument: () => mirrorCanvas, getActiveFrame: () => mirrorFrame,
+  getProjectCanvasDocumentById: id => id === mirrorCanvas.id ? mirrorCanvas : null,
+  ensureLayerDirect: () => { throw new Error('mirror index brush must not allocate direct pixels'); },
+  getRasterLayerRuntimeStoredIndex: (layer, index) => layer.indices[index], setRasterLayerRuntimeStoredIndex: (layer, index, value) => { layer.indices[index] = value; },
+  clamp: (value, min, max) => Math.max(min, Math.min(max, value)), refreshLayerDirectOnlyFlag: () => {}, invalidateFillPreviewCache: () => {}, invalidateOnionSkinCache: () => {}, clearPlaybackFrameCache: () => {},
+  markDirtyRect: () => {}, requestRender: () => {}, requestOverlayRender: () => {}, renderAllProjectCanvasSurfaces: () => {},
+});
+mirrorHistoryStore.pending = mirrorHistoryUtils.createRasterTilePatchPending('pen');
+const mirrorDrawing = window.PiXiEEDrawModules.canvasDrawingWorkflowUtils.createCanvasDrawingWorkflowUtils({
+  state: mirrorState, pointerState: { tool: 'pen' }, Uint8Array, Int16Array, Uint8ClampedArray, Number, Math,
+  BRUSH_SHAPE_SQUARE: 'square', BRUSH_SHAPE_CIRCLE: 'circle', BRUSH_SHAPE_CUSTOM: 'custom',
+  brushOffsetCache: new Map(), brushCircleOffsetCache: new Map(), isCustomBrushData: () => false,
+  clamp: (value, min, max) => Math.max(min, Math.min(max, value)), getEffectiveBrushShape: value => value || 'square',
+  getActiveProjectCanvasDocument: () => mirrorCanvas, getActiveLayer: () => mirrorLayer,
+  getRasterLayerRuntimeStoredIndex: (layer, index) => layer.indices[index], setRasterLayerRuntimeStoredIndex: (layer, index, value) => { layer.indices[index] = value; },
+  getRasterLayerTransparentStorageValue: () => 0, resolveTransparentStoragePaletteIndex: () => 0,
+  isMirrorEnabledForTool: () => true, getMirroredPointSet: (x, y) => [{ x, y }, { x: mirrorWidth - 1 - x, y }],
+  isRasterTilePatchPending: () => mirrorHistoryStore.pending?.kind === 'raster-tile-patch-pending',
+  capturePendingRasterTilesForRect: (...args) => mirrorHistoryUtils.capturePendingRasterTilesForRect(...args),
+  recordPendingPixelPatchBefore: () => {}, recordPendingPixelPatchAfter: () => {},
+  markHistoryDirty: () => { mirrorHistoryStore.pending.dirty = true; }, markDirtyPixel: () => {}, markDirtyRect: () => {}, markDirtyTilesRect: () => {},
+  isIndexColorMode: () => true, isRgbColorMode: () => false, isMultiPaletteIsolationEnabled: () => false,
+  resolveDrawPaletteIndex: () => 1, getActiveDrawColor: () => ({ r: 255, g: 32, b: 32, a: 255 }), normalizeColorValue: value => value,
+  ensureLayerDirect: () => { throw new Error('mirror index brush must not allocate direct pixels'); },
+});
+mirrorDrawing.stampBrush(mirrorLayer, 8, 1);
+const mirrorEntry = mirrorHistoryUtils.finalizePixelPatchHistoryEntry(mirrorHistoryStore.pending);
+assert.equal(mirrorEntry?.kind, 'raster-tile-patch', 'mirrored large brush must create a tile Undo entry');
+assert.ok(mirrorEntry.tiles.length >= 2, 'mirrored brush must capture both reflected tile regions');
+const mirrorAfter = mirrorLayer.indices.slice();
+assert.equal(mirrorHistoryUtils.applyPixelPatchHistoryEntry(mirrorEntry, 'undo'), true);
+assert.ok(mirrorLayer.indices.every(value => value === 0), 'mirrored brush Undo must clear every reflected write');
+assert.equal(mirrorHistoryUtils.applyPixelPatchHistoryEntry(mirrorEntry, 'redo'), true);
+assert.deepEqual(Array.from(mirrorLayer.indices), Array.from(mirrorAfter), 'mirrored brush Redo must restore every reflected write');
 
 console.log(`PiXiEEDraw transparent index fill guard passed (${elapsedMs.toFixed(1)}ms for 512px fill; ${largeFillElapsedMs.toFixed(1)}ms for 1024px fill).`);

@@ -43,6 +43,11 @@
   const retiredFactories = Object.freeze({
     multiInviteUtils: 'createMultiInviteUtils',
     multiHistoryUtils: 'createMultiHistoryUtils',
+    sharedRecentProjectUtils: 'createSharedRecentProjectUtils',
+    sharedRuntimeUtils: 'createSharedRuntimeUtils',
+    sharedProjectBackendRpcUtils: 'createSharedProjectBackendRpcUtils',
+    sharedProjectSnapshotFetchUtils: 'createSharedProjectSnapshotFetchUtils',
+    sharedProjectLocalConversionUtils: 'createSharedProjectLocalConversionUtils',
     sharedProjectRecentStateUtils: 'createSharedProjectRecentStateUtils',
     sharedProjectParticipantUtils: 'createSharedProjectParticipantUtils',
     sharedProjectCommentUtils: 'createSharedProjectCommentUtils',

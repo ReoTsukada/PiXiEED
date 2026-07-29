@@ -125,6 +125,53 @@ assert.equal(
   'structural journal must reuse the immutable checkpoint'
 );
 
+// A compact sparse layer has no dense indices buffer. Journal replay must
+// update its tile directly; allocating a dense buffer here would discard the
+// already-checkpointed sparse pixels after a reload.
+const sparseTileSize = 8;
+const sparseWidth = 16;
+const sparseHeight = 8;
+const sparseTile = new Uint8Array(sparseTileSize * sparseTileSize);
+sparseTile[0] = 2; // Stored palette index 1 at (0, 0).
+const sparseProject = {
+  type: 'pixieedraw-project',
+  packageVersion: 2,
+  version: 2,
+  document: {
+    id: 'canvas-sparse', activeCanvasId: 'canvas-sparse', width: sparseWidth, height: sparseHeight,
+    activeFrame: 0, activeLayer: 'layer-sparse', palette: [{ r: 0, g: 0, b: 0, a: 0 }],
+    frames: [{
+      id: 'frame-sparse', name: 'Frame 1', duration: 100,
+      layers: [{
+        id: 'layer-sparse', trackId: 'track-sparse', name: 'Layer 1', visible: true, opacity: 1, blendMode: 'normal',
+        indicesEncoding: 'uint8-tiled-zero-transparent-v1', indices: new Uint8Array(0),
+        indicesTiles: new Map([[0, sparseTile]]), indicesWidth: sparseWidth, indicesHeight: sparseHeight,
+        indicesTileSize: sparseTileSize, direct: null, importSourceDirect: null, directOnly: false,
+      }],
+    }],
+  },
+  session: {},
+};
+const sparseCheckpointBundle = schema.createSchemaV2Revision({
+  projectId: 'project-sparse-journal', name: 'sparse-journal.pxd', fileName: 'sparse-journal.pxd', project: sparseProject,
+}, { revision: 1 });
+const sparseCheckpoint = sparseCheckpointBundle.checkpoints[0];
+const sparseJournalBundle = schema.createSchemaV2JournalRevision(sparseCheckpointBundle.manifest, [{
+  sequence: 1, kind: 'pixel-patch', canvasId: 'canvas-sparse', frameId: 'frame-sparse', layerId: 'layer-sparse',
+  changes: [{ index: 9, after: { paletteIndex: 3 } }],
+}], { revision: 2 });
+const sparseJournal = sparseJournalBundle.journals[0];
+const sparseRestored = schema.restoreSchemaV2Manifest(
+  sparseJournalBundle.manifest,
+  new Map([[sparseCheckpoint.key, sparseCheckpoint]]),
+  new Map([[sparseJournal.key, sparseJournal]])
+);
+const sparseRestoredLayer = sparseRestored.document.frames[0].layers[0];
+assert.equal(sparseRestoredLayer.indices.length, 0, 'sparse journal replay must not materialize a dense buffer');
+assert.ok(sparseRestoredLayer.indicesTiles instanceof Map, 'sparse journal replay must retain tile storage');
+assert.equal(sparseRestoredLayer.indicesTiles.get(0)?.[0], 2, 'checkpoint sparse pixel must survive journal replay');
+assert.equal(sparseRestoredLayer.indicesTiles.get(1)?.[1], 4, 'journal pixel must be written using sparse storage encoding');
+
 console.log(JSON.stringify({
   checkpointRevision: checkpointBundle.manifest.revision,
   journalRevision: journalBundle.manifest.revision,
@@ -133,4 +180,5 @@ console.log(JSON.stringify({
   restoredFrameCount: restored.document.frames.length,
   addedLayerHasPixelBuffer: restored.document.frames[0].layers[1].indices != null,
   addedFrameHasPixelBuffer: restored.document.frames[1].layers.some(layer => layer.indices != null),
+  sparseJournalRetainedTiles: sparseRestoredLayer.indicesTiles.size,
 }, null, 2));

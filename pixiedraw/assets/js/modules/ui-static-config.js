@@ -68,7 +68,7 @@
     TOOL_SHORTCUT_SHAPE_GROUP,
   } = {}) {
     const LEFT_TAB_KEYS = ['tools', 'color'];
-    const RIGHT_TAB_KEYS = ['frames', 'settings', 'extensions', 'help', 'file', 'multi'];
+    const RIGHT_TAB_KEYS = ['frames', 'settings', 'extensions', 'help', 'file'];
     const TOOL_GROUPS = {
       selection: { label: '範囲選択', tools: ['move', 'selectRect', 'selectLasso', 'selectSame'] },
       pen: { label: 'ペン', tools: ['pen'] },
@@ -123,7 +123,6 @@
       extensions: 'full',
       help: 'full',
       file: 'full',
-      multi: 'full',
     });
     return Object.freeze({
       LEFT_TAB_KEYS,
@@ -342,6 +341,7 @@
     const STARTUP_RESTORE_TIMEOUT_MS = 8000;
     const UPDATE_TOAST_SEEN_PREFIX = 'pixieedraw:update-toast-seen:';
     const STARTUP_UPDATE_TOAST_HIDDEN_KEY = 'pixieedraw:update-toast-hidden';
+    // Kept until the remaining compatibility reader is removed from app.js.
     const HIDDEN_SHARED_PROJECT_KEYS_STORAGE_PREFIX = 'pixieedraw:hidden-shared-projects:';
     const UPDATE_HISTORY_STORAGE_KEY = 'pixieedraw:update-history-log-v1';
     const UPDATE_HISTORY_RETENTION_MS = 365 * 24 * 60 * 60 * 1000;

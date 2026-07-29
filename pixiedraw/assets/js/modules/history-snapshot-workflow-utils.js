@@ -503,30 +503,7 @@
           duration: frame.duration,
           voxelPreviewYawDeg: normalizeVoxelPreviewYawDegrees(frame?.voxelPreviewYawDeg),
           voxelPreviewPitchDeg: normalizeVoxelPreviewPitchDegrees(frame?.voxelPreviewPitchDeg),
-          layers: frame.layers.filter(layer => !isSimulationLayer(layer)).map(layer => isSimulationLayer(layer)
-            ? {
-              id: layer.id,
-              trackId: typeof layer.trackId === 'string' ? layer.trackId : '',
-              type: SIM_LAYER_TYPE,
-              name: layer.name,
-              visible: layer.visible,
-              opacity: normalizeLayerOpacity(layer.opacity),
-              blendMode: normalizeLayerBlendMode(layer.blendMode),
-              elementMap: compressUint8Array(layer.elementMap, { clamped: false }),
-              sourceColorMap: compressUint8Array(layer.sourceColorMap, { clamped: true }),
-              velXMap: compressUint8Array(new Uint8Array(layer.velXMap.buffer, layer.velXMap.byteOffset, layer.velXMap.byteLength), { clamped: false }),
-              velYMap: compressUint8Array(new Uint8Array(layer.velYMap.buffer, layer.velYMap.byteOffset, layer.velYMap.byteLength), { clamped: false }),
-              lifeMap: compressUint8Array(layer.lifeMap, { clamped: false }),
-              tempMap: compressUint8Array(new Uint8Array(layer.tempMap.buffer, layer.tempMap.byteOffset, layer.tempMap.byteLength), { clamped: false }),
-              lightMap: compressUint8Array(layer.lightMap, { clamped: false }),
-              depthMap: compressUint8Array(layer.depthMap, { clamped: false }),
-              airMap: compressUint8Array(layer.airMap, { clamped: false }),
-              auxMap: compressUint8Array(layer.auxMap, { clamped: false }),
-              activeMap: compressUint8Array(layer.activeMap, { clamped: false }),
-              settings: JSON.stringify(normalizeSimulationSettings(layer.settings)),
-              elementStyle: JSON.stringify(layer.elementStyle || {}),
-            }
-            : {
+          layers: frame.layers.map(layer => ({
               id: layer.id,
               trackId: typeof layer.trackId === 'string' ? layer.trackId : '',
               name: layer.name,
@@ -537,7 +514,7 @@
 	              direct: layer.direct ? compressUint8Array(layer.direct, { clamped: true }) : null,
 	              importSourceDirect: layer.importSourceDirect ? compressUint8Array(layer.importSourceDirect, { clamped: true }) : null,
 	              directOnly: inferDirectOnlyLayer(layer, layer.indices, layer.direct),
-	            }),
+            })),
         })),
       }))
       : null;
@@ -556,30 +533,7 @@
         duration: frame.duration,
         voxelPreviewYawDeg: normalizeVoxelPreviewYawDegrees(frame?.voxelPreviewYawDeg),
         voxelPreviewPitchDeg: normalizeVoxelPreviewPitchDegrees(frame?.voxelPreviewPitchDeg),
-        layers: frame.layers.filter(layer => !isSimulationLayer(layer)).map(layer => isSimulationLayer(layer)
-          ? {
-            id: layer.id,
-            trackId: typeof layer.trackId === 'string' ? layer.trackId : '',
-            type: SIM_LAYER_TYPE,
-            name: layer.name,
-            visible: layer.visible,
-            opacity: normalizeLayerOpacity(layer.opacity),
-            blendMode: normalizeLayerBlendMode(layer.blendMode),
-            elementMap: compressUint8Array(layer.elementMap, { clamped: false }),
-            sourceColorMap: compressUint8Array(layer.sourceColorMap, { clamped: true }),
-            velXMap: compressUint8Array(new Uint8Array(layer.velXMap.buffer, layer.velXMap.byteOffset, layer.velXMap.byteLength), { clamped: false }),
-            velYMap: compressUint8Array(new Uint8Array(layer.velYMap.buffer, layer.velYMap.byteOffset, layer.velYMap.byteLength), { clamped: false }),
-            lifeMap: compressUint8Array(layer.lifeMap, { clamped: false }),
-            tempMap: compressUint8Array(new Uint8Array(layer.tempMap.buffer, layer.tempMap.byteOffset, layer.tempMap.byteLength), { clamped: false }),
-            lightMap: compressUint8Array(layer.lightMap, { clamped: false }),
-            depthMap: compressUint8Array(layer.depthMap, { clamped: false }),
-            airMap: compressUint8Array(layer.airMap, { clamped: false }),
-            auxMap: compressUint8Array(layer.auxMap, { clamped: false }),
-            activeMap: compressUint8Array(layer.activeMap, { clamped: false }),
-            settings: JSON.stringify(normalizeSimulationSettings(layer.settings)),
-            elementStyle: JSON.stringify(layer.elementStyle || {}),
-          }
-          : {
+        layers: frame.layers.map(layer => ({
             id: layer.id,
             trackId: typeof layer.trackId === 'string' ? layer.trackId : '',
             name: layer.name,
@@ -590,7 +544,7 @@
 	            direct: layer.direct ? compressUint8Array(layer.direct, { clamped: true }) : null,
 	            importSourceDirect: layer.importSourceDirect ? compressUint8Array(layer.importSourceDirect, { clamped: true }) : null,
 	            directOnly: inferDirectOnlyLayer(layer, layer.indices, layer.direct),
-	          }),
+          })),
       })),
       showGrid: snapshot.showGrid,
       showMajorGrid: snapshot.showMajorGrid,
@@ -682,30 +636,7 @@
           duration: frame.duration,
           voxelPreviewYawDeg: normalizeVoxelPreviewYawDegrees(frame?.voxelPreviewYawDeg),
           voxelPreviewPitchDeg: normalizeVoxelPreviewPitchDegrees(frame?.voxelPreviewPitchDeg),
-          layers: frame.layers.filter(layer => layer?.type !== 'simulation').map(layer => {
-            if (layer?.type === SIM_LAYER_TYPE) {
-              const simLayer = createSimulationLayer(layer.name || getDefaultLayerName(1), canvas.width, canvas.height);
-              simLayer.id = layer.id;
-              simLayer.trackId = typeof layer.trackId === 'string' ? layer.trackId : simLayer.trackId;
-              simLayer.visible = layer.visible !== false;
-              simLayer.opacity = normalizeLayerOpacity(layer.opacity);
-              simLayer.blendMode = normalizeLayerBlendMode(layer.blendMode);
-              simLayer.elementMap = decodeUint8Data(layer.elementMap, { clamped: false }) || simLayer.elementMap;
-              simLayer.sourceColorMap = decodeUint8Data(layer.sourceColorMap, { clamped: true }) || simLayer.sourceColorMap;
-              simLayer.velXMap = new Int8Array((decodeUint8Data(layer.velXMap, { clamped: false }) || new Uint8Array(simLayer.velXMap.byteLength)).buffer.slice(0));
-              simLayer.velYMap = new Int8Array((decodeUint8Data(layer.velYMap, { clamped: false }) || new Uint8Array(simLayer.velYMap.byteLength)).buffer.slice(0));
-              simLayer.lifeMap = decodeUint8Data(layer.lifeMap, { clamped: false }) || simLayer.lifeMap;
-              simLayer.tempMap = new Uint16Array((decodeUint8Data(layer.tempMap, { clamped: false }) || new Uint8Array(simLayer.tempMap.byteLength)).buffer.slice(0));
-              simLayer.lightMap = decodeUint8Data(layer.lightMap, { clamped: false }) || simLayer.lightMap;
-              simLayer.depthMap = decodeUint8Data(layer.depthMap, { clamped: false }) || simLayer.depthMap;
-              simLayer.airMap = decodeUint8Data(layer.airMap, { clamped: false }) || simLayer.airMap;
-              simLayer.auxMap = decodeUint8Data(layer.auxMap, { clamped: false }) || simLayer.auxMap;
-              simLayer.activeMap = decodeUint8Data(layer.activeMap, { clamped: false }) || simLayer.activeMap;
-              simLayer.settings = normalizeSimulationSettings(typeof layer.settings === 'string' ? JSON.parse(layer.settings) : layer.settings);
-              simLayer.elementStyle = typeof layer.elementStyle === 'string' ? JSON.parse(layer.elementStyle) : (layer.elementStyle || simLayer.elementStyle);
-              return simLayer;
-            }
-            return {
+          layers: frame.layers.filter(layer => layer?.type !== 'simulation').map(layer => ({
               id: layer.id,
               trackId: typeof layer.trackId === 'string' ? layer.trackId : '',
               name: layer.name,
@@ -716,8 +647,7 @@
 	              direct: layer.direct ? decodeUint8Data(layer.direct, { clamped: true }) : null,
 	              importSourceDirect: layer.importSourceDirect ? decodeUint8Data(layer.importSourceDirect, { clamped: true }) : null,
 	              directOnly: inferDirectOnlyLayer(layer, decodeInt16Data(layer.indices), layer.direct ? decodeUint8Data(layer.direct, { clamped: true }) : null),
-	            };
-          }),
+            })),
         })),
       }))
       : null;
@@ -739,30 +669,7 @@
         duration: frame.duration,
         voxelPreviewYawDeg: normalizeVoxelPreviewYawDegrees(frame?.voxelPreviewYawDeg),
         voxelPreviewPitchDeg: normalizeVoxelPreviewPitchDegrees(frame?.voxelPreviewPitchDeg),
-        layers: frame.layers.filter(layer => layer?.type !== 'simulation').map(layer => {
-          if (layer?.type === SIM_LAYER_TYPE) {
-            const simLayer = createSimulationLayer(layer.name || getDefaultLayerName(1), snapshot.width, snapshot.height);
-            simLayer.id = layer.id;
-            simLayer.trackId = typeof layer.trackId === 'string' ? layer.trackId : simLayer.trackId;
-            simLayer.visible = layer.visible !== false;
-            simLayer.opacity = normalizeLayerOpacity(layer.opacity);
-            simLayer.blendMode = normalizeLayerBlendMode(layer.blendMode);
-            simLayer.elementMap = decodeUint8Data(layer.elementMap, { clamped: false }) || simLayer.elementMap;
-            simLayer.sourceColorMap = decodeUint8Data(layer.sourceColorMap, { clamped: true }) || simLayer.sourceColorMap;
-            simLayer.velXMap = new Int8Array((decodeUint8Data(layer.velXMap, { clamped: false }) || new Uint8Array(simLayer.velXMap.byteLength)).buffer.slice(0));
-            simLayer.velYMap = new Int8Array((decodeUint8Data(layer.velYMap, { clamped: false }) || new Uint8Array(simLayer.velYMap.byteLength)).buffer.slice(0));
-            simLayer.lifeMap = decodeUint8Data(layer.lifeMap, { clamped: false }) || simLayer.lifeMap;
-            simLayer.tempMap = new Uint16Array((decodeUint8Data(layer.tempMap, { clamped: false }) || new Uint8Array(simLayer.tempMap.byteLength)).buffer.slice(0));
-            simLayer.lightMap = decodeUint8Data(layer.lightMap, { clamped: false }) || simLayer.lightMap;
-            simLayer.depthMap = decodeUint8Data(layer.depthMap, { clamped: false }) || simLayer.depthMap;
-            simLayer.airMap = decodeUint8Data(layer.airMap, { clamped: false }) || simLayer.airMap;
-            simLayer.auxMap = decodeUint8Data(layer.auxMap, { clamped: false }) || simLayer.auxMap;
-            simLayer.activeMap = decodeUint8Data(layer.activeMap, { clamped: false }) || simLayer.activeMap;
-            simLayer.settings = normalizeSimulationSettings(typeof layer.settings === 'string' ? JSON.parse(layer.settings) : layer.settings);
-            simLayer.elementStyle = typeof layer.elementStyle === 'string' ? JSON.parse(layer.elementStyle) : (layer.elementStyle || simLayer.elementStyle);
-            return simLayer;
-          }
-          return {
+        layers: frame.layers.filter(layer => layer?.type !== 'simulation').map(layer => ({
             id: layer.id,
             trackId: typeof layer.trackId === 'string' ? layer.trackId : '',
             name: layer.name,
@@ -773,8 +680,7 @@
 	            direct: layer.direct ? decodeUint8Data(layer.direct, { clamped: true }) : null,
 	            importSourceDirect: layer.importSourceDirect ? decodeUint8Data(layer.importSourceDirect, { clamped: true }) : null,
 	            directOnly: inferDirectOnlyLayer(layer, decodeInt16Data(layer.indices), layer.direct ? decodeUint8Data(layer.direct, { clamped: true }) : null),
-	          };
-        }),
+          })),
       })),
       showGrid: snapshot.showGrid,
       showMajorGrid: snapshot.showMajorGrid,

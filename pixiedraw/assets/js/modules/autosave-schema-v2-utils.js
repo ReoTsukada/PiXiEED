@@ -56,6 +56,12 @@
       if (value instanceof ArrayBuffer) {
         return stableStringify(new Uint8Array(value));
       }
+      if (value instanceof Map) {
+        const entries = Array.from(value.entries()).sort(([leftKey], [rightKey]) => (
+          String(leftKey).localeCompare(String(rightKey), undefined, { numeric: true })
+        ));
+        return `{"$map":[${entries.map(([key, child]) => `${stableStringify(key)}:${stableStringify(child)}`).join(',')}]}`;
+      }
       if (Array.isArray(value)) {
         return `[${value.map(item => stableStringify(item)).join(',')}]`;
       }
@@ -95,6 +101,12 @@
       }
       if (Array.isArray(value)) {
         return value.map(item => sanitizeRuntimeValues(item));
+      }
+      if (value instanceof Map) {
+        return new Map(Array.from(value.entries(), ([key, child]) => [
+          sanitizeRuntimeValues(key),
+          sanitizeRuntimeValues(child),
+        ]));
       }
       if (!value || typeof value !== 'object') {
         return value;
@@ -644,6 +656,52 @@
       return layer[key];
     }
 
+    function isSparseTiledIndices(layer, width, height) {
+      return Boolean(
+        layer?.indicesEncoding === 'uint8-tiled-zero-transparent-v1'
+        && layer.indices instanceof Uint8Array
+        && layer.indices.length === 0
+        && (layer.indicesTiles instanceof Map || Array.isArray(layer.indicesTiles))
+        && Math.max(1, Math.round(Number(layer.indicesWidth) || 1)) === width
+        && Math.max(1, Math.round(Number(layer.indicesHeight) || 1)) === height
+      );
+    }
+
+    function writeSparseTiledPaletteIndex(layer, index, paletteIndex, width, height) {
+      if (!isSparseTiledIndices(layer, width, height) || index < 0 || index >= width * height) {
+        return false;
+      }
+      const tileSize = Math.max(1, Math.round(Number(layer.indicesTileSize) || 32));
+      if (!(layer.indicesTiles instanceof Map)) {
+        const tiles = new Map();
+        layer.indicesTiles.forEach((tile, tileIndex) => {
+          if (tile instanceof Uint8Array && tile.some(value => value !== 0)) {
+            tiles.set(tileIndex, tile);
+          }
+        });
+        layer.indicesTiles = tiles;
+      }
+      const x = index % width;
+      const y = Math.floor(index / width);
+      const tileColumns = Math.ceil(width / tileSize);
+      const tileIndex = Math.floor(y / tileSize) * tileColumns + Math.floor(x / tileSize);
+      const localIndex = (y % tileSize) * tileSize + (x % tileSize);
+      const storedValue = paletteIndex <= 0 ? 0 : Math.min(255, paletteIndex + 1);
+      let tile = layer.indicesTiles.get(tileIndex) || null;
+      if (!tile && storedValue === 0) {
+        return true;
+      }
+      if (!tile) {
+        tile = new Uint8Array(tileSize * tileSize);
+        layer.indicesTiles.set(tileIndex, tile);
+      }
+      tile[localIndex] = storedValue;
+      if (storedValue === 0 && !tile.some(value => value !== 0)) {
+        layer.indicesTiles.delete(tileIndex);
+      }
+      return true;
+    }
+
     function applyPixelPatch(project, op) {
       if (!op || op.kind !== 'pixel-patch') {
         return false;
@@ -658,8 +716,11 @@
       if (!canvas || !frame || !layer || !Array.isArray(op.changes)) {
         return false;
       }
-      const pixelCount = Math.max(1, Math.round(Number(canvas.width) || 1) * Math.round(Number(canvas.height) || 1));
-      const indices = ensureLayerArray(layer, 'indices', pixelCount);
+      const width = Math.max(1, Math.round(Number(canvas.width) || 1));
+      const height = Math.max(1, Math.round(Number(canvas.height) || 1));
+      const pixelCount = width * height;
+      const sparseTiledIndices = isSparseTiledIndices(layer, width, height);
+      const indices = sparseTiledIndices ? null : ensureLayerArray(layer, 'indices', pixelCount);
       op.changes.forEach(change => {
         const index = Math.max(0, Math.round(Number(change?.index) || 0));
         if (index >= pixelCount || !change?.after) {
@@ -667,7 +728,12 @@
         }
         const after = change.after;
         const paletteIndex = Number(after.paletteIndex);
-        indices[index] = Number.isFinite(paletteIndex) ? Math.round(paletteIndex) : -1;
+        const normalizedPaletteIndex = Number.isFinite(paletteIndex) ? Math.round(paletteIndex) : -1;
+        if (sparseTiledIndices) {
+          writeSparseTiledPaletteIndex(layer, index, normalizedPaletteIndex, width, height);
+        } else {
+          indices[index] = normalizedPaletteIndex;
+        }
         [['direct', after.direct], ['importSourceDirect', after.importSourceDirect]].forEach(([key, rgba]) => {
           if (!Array.isArray(rgba) || rgba.length !== 4) {
             return;

@@ -591,6 +591,9 @@
         justify-content:center;
         align-items:center;
         pointer-events:auto;
+        /* Match the common action bar and remain fully opaque so page content
+           never shows through the fixed shared advertisement surface. */
+        background:var(--pixieed-common-action-bar-background, rgb(7,13,27));
         overflow:hidden;
         contain:layout paint;
         isolation:isolate;
@@ -598,7 +601,7 @@
       .pixieed-shared-top-ad .ad-block{
         border:1px dashed rgba(255,255,255,0.2);
         border-radius:8px;
-        background:linear-gradient(150deg, rgba(255,255,255,0.04), rgba(15,23,42,0.9));
+        background:var(--pixieed-common-action-bar-background, rgb(7,13,27));
         padding:0;
         box-shadow:0 10px 30px rgba(0,0,0,0.28);
         position:relative;

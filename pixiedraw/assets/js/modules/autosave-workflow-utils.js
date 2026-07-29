@@ -36,6 +36,7 @@
   // window resumes. This also carries an immediate flush across an in-flight
   // write, so a fast second stroke is not left waiting for the next interval.
   let autosaveCommittedFlushQueued = false;
+  let autosaveCommitReadyFlushQueued = false;
 
   function beginAutosavePerformanceSpan(name, details = null) {
     const perf = window?.performance;
@@ -76,9 +77,6 @@
   }
 
   function getAutosaveBlockedStatusMessage() {
-    if (multiState.connected && !isMultiMasterMode() && !isCurrentProjectSharedEntry()) {
-      return MULTI_REPLICA_AUTOSAVE_BLOCKED_STATUS;
-    }
     return '';
   }
 
@@ -266,7 +264,7 @@
     }
   }
 
-  function scheduleAutosaveSnapshot({ delayMs = AUTOSAVE_WRITE_DELAY } = {}) {
+  function scheduleAutosaveSnapshot({ delayMs = AUTOSAVE_WRITE_DELAY, commitReady = false } = {}) {
     if (!AUTOSAVE_SUPPORTED) return;
     if (autosaveRestoring) return;
     const blockedStatus = getAutosaveBlockedStatusMessage();
@@ -280,6 +278,9 @@
       return;
     }
     if (!autosaveDirty) return;
+    if (commitReady) {
+      autosaveCommitReadyFlushQueued = true;
+    }
     const largeDocumentDelay = isLargeDocumentPerformanceMode() ? 4200 : 120;
     const safeDelayMs = Math.max(largeDocumentDelay, Math.round(Number(delayMs) || AUTOSAVE_WRITE_DELAY));
     const deadline = Date.now() + safeDelayMs;
@@ -298,7 +299,12 @@
     autosaveWriteTimer = window.setTimeout(() => {
       autosaveWriteTimer = null;
       autosaveWriteDeadline = 0;
-      writeAutosaveSnapshot().catch(error => {
+      // A completed raster stroke is safe to save as soon as its post-render
+      // delay expires. Bypass only the short recent-input grace period; never
+      // serialize while a following pointer interaction is actually active.
+      const forceCommittedWrite = autosaveCommitReadyFlushQueued && !isAutosaveInteractionBusy();
+      autosaveCommitReadyFlushQueued = false;
+      writeAutosaveSnapshot(forceCommittedWrite).catch(error => {
         console.warn('Autosave failed', error);
         updateAutosaveStatus('自動保存: 保存に失敗しました', 'error');
       });
@@ -469,40 +475,29 @@
     autosaveWriteQueued = false;
     const autosaveSpan = beginAutosavePerformanceSpan('pixiedraw:autosave:total', { projectId });
     try {
-      if (shouldUseLightweightSharedProjectLocalSave(projectId)) {
-        updateAutosaveStatus('自動保存: 共有プロジェクトの復帰情報を保存中…');
-        const dirtyGenerationAtStart = autosaveDirtyGeneration;
-        const unsavedTokenAtStart = unsavedChangeToken;
-        const savedEntry = await recordSharedProjectLightweightLocalSave({ projectId });
-        if (!savedEntry) {
-          throw new Error('Failed to record shared project restore metadata');
-        }
-        const stillCurrentWrite = (
-          normalizeAutosaveProjectId(autosaveProjectId || '') === projectId
-          && autosaveDirtyGeneration === dirtyGenerationAtStart
-          && unsavedChangeToken === unsavedTokenAtStart
-        );
-        if (!stillCurrentWrite) {
-          autosaveWriteQueued = true;
-          updateAutosaveStatus('自動保存: 追加変更を保存します', 'info');
-          return false;
-        }
-        autosaveDirty = false;
-        updateAutosaveStatus('自動保存: 共有プロジェクトの復帰情報を保存済み', 'success');
-        return true;
-      }
-
       updateAutosaveStatus('自動保存: 端末内へ保存中…');
       const buildInternalAutosavePayload = (snapshotValue, options = {}) => buildPackagedProjectPayload(
         snapshotValue,
         { ...options, internalBinary: true }
       );
-      const journalSavePlan = buildActiveLocalProjectSavePlan?.({
+      const journalPlanSpan = beginAutosavePerformanceSpan('pixiedraw:autosave:build-save-plan:sync', {
         projectId,
-        snapshot: null,
-        buildPackagedProjectPayload: buildInternalAutosavePayload,
-        buildAutosaveSessionPayload: buildProjectSessionPayload,
-      }) || null;
+        snapshotProvided: false,
+      });
+      let journalSavePlan = null;
+      try {
+        journalSavePlan = buildActiveLocalProjectSavePlan?.({
+          projectId,
+          snapshot: null,
+          buildPackagedProjectPayload: buildInternalAutosavePayload,
+          buildAutosaveSessionPayload: buildProjectSessionPayload,
+        }) || null;
+      } finally {
+        endAutosavePerformanceSpan(journalPlanSpan, {
+          journalOnly: journalSavePlan?.journalOnly === true,
+          dirtyOpCount: Math.max(0, Number(journalSavePlan?.dirtyOpCount) || 0),
+        });
+      }
       const normalizedJournalOps = journalSavePlan?.journalOnly === true
         ? normalizeV2PixelPatchJournalOps?.(journalSavePlan.journalPayload)
         : null;
@@ -534,12 +529,23 @@
           markActiveLocalProjectJournalNeedsCheckpoint?.(projectId);
         }
         ensureCurrentSnapshot();
-        activeSavePlan = buildActiveLocalProjectSavePlan?.({
+        const checkpointPlanSpan = beginAutosavePerformanceSpan('pixiedraw:autosave:build-save-plan:sync', {
           projectId,
-          snapshot,
-          buildPackagedProjectPayload: buildInternalAutosavePayload,
-          buildAutosaveSessionPayload: buildProjectSessionPayload,
-        }) || null;
+          snapshotProvided: true,
+        });
+        try {
+          activeSavePlan = buildActiveLocalProjectSavePlan?.({
+            projectId,
+            snapshot,
+            buildPackagedProjectPayload: buildInternalAutosavePayload,
+            buildAutosaveSessionPayload: buildProjectSessionPayload,
+          }) || null;
+        } finally {
+          endAutosavePerformanceSpan(checkpointPlanSpan, {
+            journalOnly: activeSavePlan?.journalOnly === true,
+            dirtyOpCount: Math.max(0, Number(activeSavePlan?.dirtyOpCount) || 0),
+          });
+        }
       }
 
       const dirtyGenerationAtStart = autosaveDirtyGeneration;

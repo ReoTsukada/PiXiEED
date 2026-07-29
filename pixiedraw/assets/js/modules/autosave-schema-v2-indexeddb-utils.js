@@ -34,6 +34,11 @@
           }
         }
 
+        function logAutosaveV2Performance(phase, startedAt, details = {}) {
+          const elapsedMs = Math.round((globalThis.performance?.now?.() ?? Date.now()) - startedAt);
+          console.info('[pixiedraw:performance]', { phase, elapsedMs, ...details });
+        }
+
         function requiredStoreNames() {
           return [
             LOCAL_PROJECT_MANIFESTS_STORE,
@@ -130,6 +135,26 @@
             const request = tx.objectStore(LOCAL_PROJECT_CURRENT_MANIFESTS_STORE).get(id);
             const [value] = await Promise.all([requestValue(request), waitForTransaction(tx, db)]);
             return value && typeof value === 'object' ? value : null;
+          } catch (error) {
+            try { db.close(); } catch (_error) {}
+            throw error;
+          }
+        }
+
+        // Startup migration only needs the manifest's layout metadata.  Keep
+        // this separate from readSchemaV2Project(), which intentionally also
+        // loads checkpoint and journal bodies to reconstruct the document.
+        async function readCurrentSchemaV2Manifest(projectId) {
+          const current = await readCurrentManifestReference(projectId);
+          const manifestKey = typeof current?.manifestKey === 'string' ? current.manifestKey.trim() : '';
+          if (!manifestKey) return null;
+          const db = await openSchemaV2Database();
+          try {
+            ensureStoresExist(db);
+            const tx = db.transaction([LOCAL_PROJECT_MANIFESTS_STORE], 'readonly');
+            const request = tx.objectStore(LOCAL_PROJECT_MANIFESTS_STORE).get(manifestKey);
+            const [value] = await Promise.all([requestValue(request), waitForTransaction(tx, db)]);
+            return value && typeof value === 'object' ? cloneJsonValue(value, null) : null;
           } catch (error) {
             try { db.close(); } catch (_error) {}
             throw error;
@@ -237,7 +262,15 @@
           if (!id) {
             throw new Error('Autosave schema V2 projectId is required');
           }
+          const readStartedAt = globalThis.performance?.now?.() ?? Date.now();
           const records = await loadAllProjectSchemaRecords(id);
+          logAutosaveV2Performance('pixiedraw:autosave:journal-read:await', readStartedAt, {
+            projectId: id,
+            manifestCount: records.manifests.length,
+            checkpointCount: records.checkpoints.length,
+            journalCount: records.journals.length,
+            thumbnailCount: records.thumbnails.length,
+          });
           const baseManifest = records.manifests.find(record => record?.key === records.current?.manifestKey) || null;
           if (!baseManifest) {
             throw new Error('Autosave schema V2 current manifest is unavailable for journal save');
@@ -246,12 +279,22 @@
             Math.round(Number(baseManifest.revision) || 0) + 1,
             Math.round(Number(options.revision) || 0)
           );
+          const buildStartedAt = globalThis.performance?.now?.() ?? Date.now();
           const bundle = autosaveSchemaV2Utils.createSchemaV2JournalRevision(
             baseManifest,
             journalsBySheet,
             { ...options, revision: nextRevision }
           );
+          logAutosaveV2Performance('pixiedraw:autosave:journal-bundle:sync', buildStartedAt, {
+            projectId: id,
+            journalWriteCount: bundle.journals.length,
+          });
+          const writeStartedAt = globalThis.performance?.now?.() ?? Date.now();
           const result = await commitSchemaV2Bundle(bundle, options);
+          logAutosaveV2Performance('pixiedraw:autosave:journal-write:await', writeStartedAt, {
+            projectId: id,
+            journalWriteCount: bundle.journals.length,
+          });
           return { ...result, bundle };
         }
 
@@ -564,6 +607,7 @@
         return Object.freeze({
           requiredStoreNames,
           readCurrentManifestReference,
+          readCurrentSchemaV2Manifest,
           commitSchemaV2Bundle,
           writeSchemaV2Project,
           writeSchemaV2JournalRevision,

@@ -612,7 +612,11 @@
       const resolvedProjectId = activateProject
         ? setActiveAutosaveProjectId(projectId || autosaveProjectId || createAutosaveProjectId())
         : (normalizeAutosaveProjectId(projectId || autosaveProjectId || '') || createAutosaveProjectId());
-      const initialEntries = await loadRecentProjectsMetadata();
+      // The in-memory list is kept in sync after each successful local save.
+      // Reusing it avoids an IndexedDB read before packaging every stroke.
+      const initialEntries = recentProjectsCache.size
+        ? Array.from(recentProjectsCache.values())
+        : await loadRecentProjectsMetadata();
       const previousEntry = initialEntries.find(entry => entry?.id === resolvedProjectId) || null;
       const sharedProjectKey = SHARED_PROJECTS_ENABLED
         ? (
@@ -732,7 +736,11 @@
       if (dotStats) {
         updatedEntry.dotStats = dotStats;
       }
-      const latestEntries = await loadRecentProjectsMetadata();
+      // Autosaves are serialized, so the cache is the authoritative list for
+      // this write.  Falling back keeps first-save and cold-start behavior.
+      const latestEntries = recentProjectsCache.size
+        ? Array.from(recentProjectsCache.values())
+        : initialEntries;
       const latestPreviousEntry = latestEntries.find(entry => entry?.id === resolvedProjectId) || previousEntry;
       const workingEntries = latestEntries.filter(entry => entry && entry.id && entry.id !== resolvedProjectId);
       workingEntries.unshift({

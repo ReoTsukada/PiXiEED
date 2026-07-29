@@ -2357,7 +2357,20 @@
     });
   }
 
-  function renderLocalViewportCanvasOverlays() {
+  function renderLocalViewportCanvasOverlays(_trace = null) {
+    const metrics = {
+      timings: {
+        enumerateSurfacesMs: 0,
+        overlayClearMs: 0,
+        selectionClearMs: 0,
+        overlayRedrawMs: 0,
+      },
+      surfaceCount: 0,
+      overlaySurfaceCount: 0,
+      selectionSurfaceCount: 0,
+      clearCount: 0,
+      clearPixelArea: 0,
+    };
     const activeDrawing = activeCanvasSurface?.drawing instanceof HTMLCanvasElement
       ? activeCanvasSurface.drawing
       : null;
@@ -2370,8 +2383,14 @@
     const hoveredDrawing = hoveredSurface?.drawing instanceof HTMLCanvasElement
       ? hoveredSurface.drawing
       : null;
-    getProjectCanvasSurfaceEntries().forEach(surface => {
+    const enumerateStartedAt = performance.now();
+    const surfaces = getProjectCanvasSurfaceEntries();
+    metrics.timings.enumerateSurfacesMs = performance.now() - enumerateStartedAt;
+    metrics.surfaceCount = surfaces.length;
+    surfaces.forEach(surface => {
       ensureCanvasSurfaceContexts(surface);
+      if (surface.overlayCtx) metrics.overlaySurfaceCount += 1;
+      if (surface.selectionCtx) metrics.selectionSurfaceCount += 1;
       const keepOverlay = Boolean(
         surface.drawing === activeDrawing
         || surface.drawing === interactionDrawing
@@ -2382,12 +2401,27 @@
         || surface.drawing === interactionDrawing
       );
       if (!keepOverlay) {
+        const clearStartedAt = performance.now();
         surface.overlayCtx?.clearRect(0, 0, surface.overlay.width, surface.overlay.height);
+        metrics.timings.overlayClearMs += performance.now() - clearStartedAt;
+        if (surface.overlayCtx) {
+          metrics.clearCount += 1;
+          metrics.clearPixelArea += Math.max(0, Number(surface.overlay.width) || 0)
+            * Math.max(0, Number(surface.overlay.height) || 0);
+        }
       }
       if (!keepSelection) {
+        const clearStartedAt = performance.now();
         surface.selectionCtx?.clearRect(0, 0, surface.selection.width, surface.selection.height);
+        metrics.timings.selectionClearMs += performance.now() - clearStartedAt;
+        if (surface.selectionCtx) {
+          metrics.clearCount += 1;
+          metrics.clearPixelArea += Math.max(0, Number(surface.selection.width) || 0)
+            * Math.max(0, Number(surface.selection.height) || 0);
+        }
       }
     });
+    const redrawStartedAt = performance.now();
     renderVoxelGuideOverlays();
     drawVoxelProjectionOverlayOnMainSurface();
     if (
@@ -2398,6 +2432,8 @@
     ) {
       drawHoverPreviewOnSurface(hoveredSurface, hoverPixel, getActiveTool());
     }
+    metrics.timings.overlayRedrawMs = performance.now() - redrawStartedAt;
+    return metrics;
   }
 
   function syncLocalViewportCanvasDockVisibility({ persist = false, render = true } = {}) {

@@ -241,33 +241,7 @@
   }
 
   function setupGlobalHistoryConfirmDialog() {
-    const config = dom.globalHistoryConfirm;
-    if (!config) {
-      return;
-    }
-    const dialog = config.dialog;
-    if (!(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== 'function') {
-      if (dialog) {
-        dialog.hidden = true;
-      }
-      return;
-    }
-    config.cancel?.addEventListener('click', () => {
-      closeGlobalHistoryConfirmDialog({ accepted: false });
-    });
-    config.confirm?.addEventListener('click', () => {
-      closeGlobalHistoryConfirmDialog({ accepted: true });
-    });
-    dialog.addEventListener('cancel', event => {
-      event.preventDefault();
-      closeGlobalHistoryConfirmDialog({ accepted: false });
-    });
-    dialog.addEventListener('close', () => {
-      if (globalHistoryConfirmState.closing) {
-        return;
-      }
-      resolveGlobalHistoryConfirm(false);
-    });
+    // Shared-project global-history confirmation was retired with collaboration.
   }
 
   async function openRecentProjectDeleteConfirmDialog(entry = null, { deletesOwnedSharedProject = null } = {}) {
@@ -424,6 +398,53 @@
         return;
       }
       await exportProjectToMarket();
+    } finally {
+      actionButton.disabled = false;
+    }
+  }
+
+  async function openRecentProjectForExport(entry, actionButton) {
+    if (!entry?.id || !(actionButton instanceof HTMLButtonElement)) return;
+    actionButton.disabled = true;
+    try {
+      const opened = await openRecentProject(entry, {
+        hideStartup: false,
+        silent: false,
+        allowProjectMismatchLoad: true,
+        replaceOpenProjectTabs: true,
+      });
+      if (!opened) {
+        setProjectHomeVisible(true, { refresh: false });
+        return;
+      }
+      hideStartupScreen();
+      hideProjectHomeScreen();
+      dom.controls?.exportProject?.click();
+    } finally {
+      actionButton.disabled = false;
+    }
+  }
+
+  async function duplicateRecentProject(entry, actionButton) {
+    if (!entry?.id || !(actionButton instanceof HTMLButtonElement)) return;
+    actionButton.disabled = true;
+    try {
+      const duplicate = await duplicateDeviceLocalProject(entry);
+      if (!duplicate?.id) {
+        throw new Error('Duplicate project was not created');
+      }
+      await refreshStartupWorkspaceProjects();
+      const opened = await openRecentProject(duplicate, {
+        hideStartup: true,
+        silent: false,
+        allowProjectMismatchLoad: true,
+        replaceOpenProjectTabs: true,
+      });
+      if (opened) {
+        hideStartupScreen();
+        hideProjectHomeScreen();
+        updateAutosaveStatus(localizeText('独立したコピーを作成しました', 'Created an independent copy'), 'success');
+      }
     } finally {
       actionButton.disabled = false;
     }
@@ -1585,12 +1606,22 @@
         const menu = document.createElement('div');
         menu.className = 'startup-workspace__project-menu';
         menu.hidden = true;
+        const duplicateButton = document.createElement('button');
+        duplicateButton.type = 'button';
+        duplicateButton.className = 'startup-workspace__project-duplicate';
+        duplicateButton.dataset.workspaceProjectDuplicateIndex = String(entryIndex);
+        duplicateButton.textContent = localizeText('複製', 'Duplicate');
+        const exportButton = document.createElement('button');
+        exportButton.type = 'button';
+        exportButton.className = 'startup-workspace__project-export';
+        exportButton.dataset.workspaceProjectExportIndex = String(entryIndex);
+        exportButton.textContent = localizeText('出力', 'Export');
         const deleteButton = document.createElement('button');
         deleteButton.type = 'button';
         deleteButton.className = 'startup-workspace__project-delete';
         deleteButton.dataset.workspaceProjectDeleteIndex = String(entryIndex);
         deleteButton.textContent = localizeText('削除', 'Delete');
-        menu.appendChild(deleteButton);
+        menu.append(duplicateButton, exportButton, deleteButton);
         actions.append(pixfindButton, marketButton, menuButton, menu);
         card.appendChild(actions);
       }
@@ -1718,6 +1749,18 @@
       if (marketButton instanceof HTMLButtonElement) {
         const entry = startupWorkspaceEntries[Number(marketButton.dataset.workspaceProjectMarketIndex)] || null;
         if (entry) await openRecentProjectMarket(entry, marketButton);
+        return;
+      }
+      const duplicateButton = source.closest('button[data-workspace-project-duplicate-index]');
+      if (duplicateButton instanceof HTMLButtonElement) {
+        const entry = startupWorkspaceEntries[Number(duplicateButton.dataset.workspaceProjectDuplicateIndex)] || null;
+        if (entry) await duplicateRecentProject(entry, duplicateButton);
+        return;
+      }
+      const exportButton = source.closest('button[data-workspace-project-export-index]');
+      if (exportButton instanceof HTMLButtonElement) {
+        const entry = startupWorkspaceEntries[Number(exportButton.dataset.workspaceProjectExportIndex)] || null;
+        if (entry) await openRecentProjectForExport(entry, exportButton);
         return;
       }
       const deleteButton = source.closest('button[data-workspace-project-delete-index]');

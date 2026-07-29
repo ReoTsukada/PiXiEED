@@ -433,18 +433,17 @@
   }
 
   function normalizeColorMode(mode, fallback = COLOR_MODE_INDEX) {
-    if (mode === COLOR_MODE_INDEX || mode === COLOR_MODE_RGB) {
-      return mode;
-    }
-    return fallback === COLOR_MODE_RGB ? COLOR_MODE_RGB : COLOR_MODE_INDEX;
+    // RGB is a read-time legacy format only. Runtime drawing, imports and
+    // persistence are uniformly palette-indexed.
+    return COLOR_MODE_INDEX;
   }
 
   function isRgbColorMode(mode = state.colorMode) {
-    return normalizeColorMode(mode, COLOR_MODE_INDEX) === COLOR_MODE_RGB;
+    return false;
   }
 
   function isIndexColorMode(mode = state.colorMode) {
-    return !isRgbColorMode(mode);
+    return true;
   }
 
   function colorsMatchRgba(a, b) {

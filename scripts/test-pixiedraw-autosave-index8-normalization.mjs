@@ -31,7 +31,6 @@ try {
     const model = window.PiXiEEDrawModules.documentModel.createDocumentModel({
       state: { palette },
       DEFAULT_LAYER_BLEND_MODE: 'normal',
-      SIM_LAYER_TYPE: 'simulation',
       normalizeLayerOpacity: value => value,
       normalizeLayerBlendMode: value => value,
       encodeTypedArray: value => value,

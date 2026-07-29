@@ -49,17 +49,6 @@ const model = window.PiXiEEDrawModules.documentModel.createDocumentModel({
   normalizeDocumentName: value => value,
   getTransparentPaletteIndex: () => 0,
   DEFAULT_LAYER_BLEND_MODE: 'normal',
-  SIM_SOURCE_COLOR: 'source',
-  SIM_ELEMENT_PALETTE: 'palette',
-  SIM_MIXED: 'mixed',
-  SIM_DEFAULT_STYLE: {},
-  SIM_DEFAULT_SETTINGS: {},
-  SIM_LAYER_TYPE: 'simulation',
-  SIM_ELEMENT_WATER: 1,
-  SIM_ELEMENT_FIRE: 2,
-  SIM_ELEMENT_METAL: 3,
-  SIM_ELEMENT_SMOKE: 4,
-  SIM_ELEMENT_LIGHT: 5,
   normalizeLayerOpacity: value => value ?? 1,
   normalizeLayerBlendMode: value => value || 'normal',
   VOXEL_EXTENSION_DEFAULT_YAW_DEG: 0,
@@ -104,14 +93,21 @@ const layer = {
 
 const internal = model.serializeLayerForDocument(layer, { preserveTypedArrays: true });
 assert.strictEqual(internal.indices, indices, 'internal autosave must keep the Int16Array');
-assert.strictEqual(internal.direct, direct, 'internal autosave must keep the Uint8ClampedArray');
+assert.equal(Object.hasOwn(internal, 'direct'), false, 'new checkpoints must not retain direct RGB pixels');
+assert.equal(Object.hasOwn(internal, 'importSourceDirect'), false, 'new checkpoints must not retain legacy import pixels');
+assert.equal(Object.hasOwn(internal, 'directOnly'), false, 'new checkpoints must not retain direct-layer flags');
 
 const external = model.serializeLayerForDocument(layer);
 assert.equal(typeof external.indices, 'string', 'file serialization remains Base64-compatible');
-assert.equal(typeof external.direct, 'string', 'file serialization remains Base64-compatible');
+assert.equal(Object.hasOwn(external, 'direct'), false, 'new file saves must not emit direct RGB pixels');
 
+const legacyExternal = {
+  ...external,
+  direct: Buffer.from(direct.buffer, direct.byteOffset, direct.byteLength).toString('base64'),
+  directOnly: true,
+};
 const legacyRestored = model.deserializeLayerFromDocument(
-  external,
+  legacyExternal,
   pixelCount,
   'layer-1',
   'Layer',
@@ -135,8 +131,8 @@ const restored = model.deserializeLayerFromDocument(
   { reuseTypedArrays: true, trustStoredLayerFlags: true }
 );
 assert.strictEqual(restored.indices, indices, 'trusted V2 restore must reuse indices without copying');
-assert.strictEqual(restored.direct, direct, 'trusted V2 restore must reuse direct pixels without copying');
-assert.equal(restored.directOnly, true, 'trusted V2 restore must use the stored direct-only flag');
+assert.equal(restored.direct, null, 'new checkpoints restore without direct pixels');
+assert.equal(restored.directOnly, false, 'new checkpoints restore as indexed layers');
 assert.equal(decodeCalls, legacyDecodeCalls, 'trusted TypedArray restore must not add Base64 decoding');
 
 const runtimeDirect = new Uint8ClampedArray(pixelCount * 4);
@@ -161,8 +157,14 @@ const serializedDeferredRuntime = model.serializeLayerForDocument(deferredRuntim
 assert.ok(serializedDeferredRuntime.indices instanceof Uint8Array, 'deferred runtime indices stay Uint8');
 assert.equal(serializedDeferredRuntime.indices.length, pixelCount, 'deferred direct layer must serialize a full index buffer');
 assert.equal(serializedDeferredRuntime.indicesEncoding, 'uint8-palette-zero-transparent-v2');
+assert.equal(Object.hasOwn(serializedDeferredRuntime, 'direct'), false, 'deferred legacy runtime pixels are not persisted');
+const legacyDeferredRuntime = {
+  ...serializedDeferredRuntime,
+  direct: runtimeDirect,
+  directOnly: true,
+};
 const restoredDeferredRuntime = model.deserializeLayerFromDocument(
-  serializedDeferredRuntime,
+  legacyDeferredRuntime,
   pixelCount,
   'runtime-direct-layer',
   'Runtime direct layer',
@@ -175,7 +177,7 @@ assert.equal(restoredDeferredRuntime.indices.length, pixelCount, 'restored runti
 assert.deepEqual(Array.from(restoredDeferredRuntime.direct.subarray(0, 4)), [90, 80, 70, 255]);
 
 const malformedBuild116Runtime = {
-  ...serializedDeferredRuntime,
+  ...legacyDeferredRuntime,
   indices: new Int16Array(pixelCount).fill(-1),
   indicesEncoding: 'uint8-palette-zero-transparent-v2',
 };
@@ -213,7 +215,7 @@ assert.equal(recoveredBuild116EncodedRuntime.indices.length, pixelCount, 'encode
 
 const unmarkedRuntimeLayer = model.deserializeLayerFromDocument(
   {
-    ...serializedDeferredRuntime,
+    ...legacyDeferredRuntime,
     indices: new Uint8Array(pixelCount),
     indicesEncoding: undefined,
   },
@@ -233,7 +235,7 @@ assert.equal(unmarkedRuntimeLayer.indices.length, pixelCount, 'unmarked runtime 
 
 const damagedDirectIndexLayer = model.deserializeLayerFromDocument(
   {
-    ...serializedDeferredRuntime,
+    ...legacyDeferredRuntime,
     indices: new Uint8Array([0]),
     indicesEncoding: undefined,
   },
@@ -257,7 +259,7 @@ assert.deepEqual(
 
 const unmarkedEncodedRuntimeLayer = model.deserializeLayerFromDocument(
   {
-    ...serializedDeferredRuntime,
+    ...legacyDeferredRuntime,
     indices: Buffer.from(new Uint8Array(pixelCount)).toString('base64'),
     indicesEncoding: undefined,
   },
@@ -344,9 +346,9 @@ console.log(JSON.stringify({
   legacyDecodeCalls,
   typedRestoreDecodeCalls: decodeCalls - legacyDecodeCalls,
   internalIndicesType: internal.indices.constructor.name,
-  internalDirectType: internal.direct.constructor.name,
+  internalDirectType: Object.hasOwn(internal, 'direct') ? internal.direct?.constructor?.name || null : null,
   externalIndicesType: typeof external.indices,
-  externalDirectType: typeof external.direct,
+  externalDirectType: Object.hasOwn(external, 'direct') ? typeof external.direct : null,
   deferredRuntimeIndexLength: serializedDeferredRuntime.indices.length,
   recoveredBuild116IndexLength: recoveredBuild116Runtime.indices.length,
   recoveredBuild116EncodedIndexLength: recoveredBuild116EncodedRuntime.indices.length,

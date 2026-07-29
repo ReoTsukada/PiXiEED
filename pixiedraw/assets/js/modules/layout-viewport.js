@@ -341,6 +341,7 @@
       updateCanvasResizeHandlePosition();
       syncCanvasResizeHandleVisibility();
     }
+    window.dispatchEvent(new Event('pixiedraw:viewport-transform'));
     return clampResult;
   }
 

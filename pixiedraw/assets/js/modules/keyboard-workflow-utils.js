@@ -36,7 +36,6 @@
       dom.newProject?.dialog,
       dom.exportDialog?.dialog,
       dom.exportInterstitial?.dialog,
-      dom.globalHistoryConfirm?.dialog,
       dom.shortcutHelp?.dialog,
       dom.updateHistory?.dialog,
       dom.toolSpotlight?.dialog,
@@ -131,6 +130,20 @@
     return false;
   }
 
+  function allowsHistoryShortcutFromTarget(target) {
+    // Range sliders and selects have no browser text-undo stack. Treat
+    // Cmd/Ctrl+Z/Y as editor history even while they retain focus. Text,
+    // number and textarea inputs keep their native editing shortcuts.
+    if (!target || typeof target.tagName !== 'string') {
+      return false;
+    }
+    if (target.tagName === 'SELECT') {
+      return true;
+    }
+    return target.tagName === 'INPUT'
+      && String(target.type || '').toLowerCase() === 'range';
+  }
+
   function setupKeyboard() {
     document.addEventListener('keydown', event => {
       const target = event.target;
@@ -143,6 +156,11 @@
       }
       if (event.key === 'Escape') {
         if (startupVisible || hasOpenBlockingDialog()) {
+          return;
+        }
+        if (pointerState.active && pointerState.preview?.kind === 'deferredBrushStroke') {
+          cancelActiveViewportGesture('escape');
+          event.preventDefault();
           return;
         }
         if (hasPendingSelectionMove()) {
@@ -186,7 +204,7 @@
       if (!isModifier) {
         return;
       }
-      if (editable) {
+      if (editable && !allowsHistoryShortcutFromTarget(target)) {
         return;
       }
       const key = event.key.toLowerCase();
@@ -254,6 +272,7 @@
   return Object.freeze({
     hasOpenBlockingDialog,
     resolveToolShortcut,
+    allowsHistoryShortcutFromTarget,
     handleToolShortcut,
     handleFramePlaybackShortcut,
     setupKeyboard,

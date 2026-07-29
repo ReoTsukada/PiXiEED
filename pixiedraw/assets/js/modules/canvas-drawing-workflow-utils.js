@@ -50,29 +50,85 @@
 
   let rasterBatchDepth = 0;
   let rasterBatchBounds = null;
-  function beginRasterBatch() { rasterBatchDepth += 1; }
+  let rasterBatchWrittenPixels = null;
+  let rasterBatchCanvasSize = null;
+  let rasterBatchMirroredPointCache = null;
+  let rasterBatchMirrorTool = null;
+  let rasterBatchMirrorEnabled = false;
+  let rasterBatchMirrorState = null;
+  const brushSpanCache = new Map();
+  function getCurrentNormalizedMirrorState() {
+    return typeof getNormalizedMirrorState === 'function'
+      ? getNormalizedMirrorState()
+      : state.mirror;
+  }
+  function beginRasterBatch() {
+    if (!rasterBatchDepth) {
+      const canvas = getActiveProjectCanvasDocument();
+      rasterBatchWrittenPixels = new Set();
+      rasterBatchCanvasSize = {
+        width: Math.max(1, Math.round(Number(canvas?.width) || Number(state.width) || 1)),
+        height: Math.max(1, Math.round(Number(canvas?.height) || Number(state.height) || 1)),
+      };
+      rasterBatchMirroredPointCache = new Map();
+      rasterBatchMirrorTool = null;
+      rasterBatchMirrorEnabled = false;
+      rasterBatchMirrorState = null;
+    }
+    rasterBatchDepth += 1;
+  }
   function endRasterBatch() {
     rasterBatchDepth = Math.max(0, rasterBatchDepth - 1);
-    if (rasterBatchDepth || !rasterBatchBounds) return;
+    if (rasterBatchDepth) return;
     const bounds = rasterBatchBounds;
     rasterBatchBounds = null;
-    markDirtyRect(bounds.x0, bounds.y0, bounds.x1, bounds.y1);
+    rasterBatchWrittenPixels = null;
+    rasterBatchCanvasSize = null;
+    rasterBatchMirroredPointCache = null;
+    rasterBatchMirrorTool = null;
+    rasterBatchMirrorEnabled = false;
+    rasterBatchMirrorState = null;
+    if (!bounds) return;
+    if (typeof markDirtyTilesRect === 'function') {
+      markDirtyTilesRect(bounds.x0, bounds.y0, bounds.x1, bounds.y1);
+    } else {
+      markDirtyRect(bounds.x0, bounds.y0, bounds.x1, bounds.y1);
+    }
   }
   function noteRasterPixelDirty(x, y) {
-    if (!rasterBatchDepth) { markDirtyPixel(x, y); return; }
-    if (!rasterBatchBounds) rasterBatchBounds = { x0: x, y0: y, x1: x, y1: y };
-    else {
-      rasterBatchBounds.x0 = Math.min(rasterBatchBounds.x0, x); rasterBatchBounds.y0 = Math.min(rasterBatchBounds.y0, y);
-      rasterBatchBounds.x1 = Math.max(rasterBatchBounds.x1, x); rasterBatchBounds.y1 = Math.max(rasterBatchBounds.y1, y);
+    // A brush path is wrapped in one outer raster batch. Registering a dirty
+    // tile for every covered pixel repeatedly traverses the same tile set,
+    // then endRasterBatch() registers the accumulated bounds a second time.
+    // Keep only the bounds while batched; the final registration is identical
+    // to the already-established batch result, including mirrored strokes.
+    if (rasterBatchDepth) {
+      if (!rasterBatchBounds) rasterBatchBounds = { x0: x, y0: y, x1: x, y1: y };
+      else {
+        rasterBatchBounds.x0 = Math.min(rasterBatchBounds.x0, x); rasterBatchBounds.y0 = Math.min(rasterBatchBounds.y0, y);
+        rasterBatchBounds.x1 = Math.max(rasterBatchBounds.x1, x); rasterBatchBounds.y1 = Math.max(rasterBatchBounds.y1, y);
+      }
+      return;
     }
+    if (typeof markDirtyTilesRect === 'function') {
+      markDirtyTilesRect(x, y, x, y);
+      return;
+    }
+    markDirtyPixel(x, y);
   }
   function noteRasterRectDirty(x0, y0, x1, y1) {
-    if (!rasterBatchDepth) { markDirtyRect(x0, y0, x1, y1); return; }
-    if (!rasterBatchBounds) rasterBatchBounds = { x0, y0, x1, y1 };
-    else {
-      rasterBatchBounds.x0 = Math.min(rasterBatchBounds.x0, x0); rasterBatchBounds.y0 = Math.min(rasterBatchBounds.y0, y0);
-      rasterBatchBounds.x1 = Math.max(rasterBatchBounds.x1, x1); rasterBatchBounds.y1 = Math.max(rasterBatchBounds.y1, y1);
+    if (rasterBatchDepth) {
+      if (!rasterBatchBounds) rasterBatchBounds = { x0, y0, x1, y1 };
+      else {
+        rasterBatchBounds.x0 = Math.min(rasterBatchBounds.x0, x0); rasterBatchBounds.y0 = Math.min(rasterBatchBounds.y0, y0);
+        rasterBatchBounds.x1 = Math.max(rasterBatchBounds.x1, x1); rasterBatchBounds.y1 = Math.max(rasterBatchBounds.y1, y1);
+      }
+      return;
     }
+    if (typeof markDirtyTilesRect === 'function') {
+      markDirtyTilesRect(x0, y0, x1, y1);
+      return;
+    }
+    markDirtyRect(x0, y0, x1, y1);
   }
   function withRasterBatch(callback) {
     beginRasterBatch();
@@ -84,13 +140,64 @@
       return;
     }
     const tool = pointerState.tool || state.tool;
-    if (!isMirrorEnabledForTool(tool)) {
+    let mirrorEnabled;
+    if (rasterBatchMirroredPointCache) {
+      if (rasterBatchMirrorTool !== tool) {
+        rasterBatchMirrorTool = tool;
+        rasterBatchMirrorState = getCurrentNormalizedMirrorState();
+        rasterBatchMirrorEnabled = isMirrorEnabledForTool(tool, rasterBatchMirrorState);
+      }
+      mirrorEnabled = rasterBatchMirrorEnabled;
+    } else {
+      mirrorEnabled = isMirrorEnabledForTool(tool);
+    }
+    if (!mirrorEnabled) {
       setPixelSingle(layer, x, y, paletteIndexOverride);
       return;
     }
-    const points = getMirroredPointSet(x, y, { tool, includeOriginal: true });
+    const canvasWidth = rasterBatchCanvasSize?.width || Math.max(1, Number(state.width) || 1);
+    const canvasHeight = rasterBatchCanvasSize?.height || Math.max(1, Number(state.height) || 1);
+    if (x < 0 || y < 0 || x >= canvasWidth || y >= canvasHeight) {
+      return;
+    }
+    const sourceIndex = (y * canvasWidth) + x;
+    let points = rasterBatchMirroredPointCache?.get(sourceIndex);
+    if (!points) {
+      points = getMirroredPointSet(x, y, {
+        tool,
+        includeOriginal: true,
+        mirrorState: rasterBatchMirrorState,
+      });
+      rasterBatchMirroredPointCache?.set(sourceIndex, points);
+    }
     if (!points.length) {
       return;
+    }
+    // Large brushes use a tile snapshot Undo entry. The non-mirror fast path
+    // captures the source stamp bounds before writing, but reflected writes
+    // used to bypass that capture entirely. Snapshot every tile touched by
+    // the already-resolved mirror set before its first write, so Undo and
+    // Redo restore all reflected pixels as one stroke.
+    if (isRasterTilePatchPending?.()) {
+      let x0 = canvasWidth;
+      let y0 = canvasHeight;
+      let x1 = -1;
+      let y1 = -1;
+      for (let index = 0; index < points.length; index += 1) {
+        const point = points[index];
+        if (!point) continue;
+        const pointIndex = (point.y * canvasWidth) + point.x;
+        // The batch already wrote this reflected pixel through an overlapping
+        // stamp, so its tile was captured earlier as well.
+        if (rasterBatchWrittenPixels?.has(pointIndex)) continue;
+        x0 = Math.min(x0, point.x);
+        y0 = Math.min(y0, point.y);
+        x1 = Math.max(x1, point.x);
+        y1 = Math.max(y1, point.y);
+      }
+      if (x1 >= x0 && y1 >= y0) {
+        capturePendingRasterTilesForRect?.(layer, x0, y0, x1, y1);
+      }
     }
     for (let i = 0; i < points.length; i += 1) {
       const point = points[i];
@@ -99,9 +206,11 @@
   }
 
   function setPixelSingle(layer, x, y, paletteIndexOverride) {
-    const activeCanvasDoc = getActiveProjectCanvasDocument();
-    const canvasWidth = Math.max(1, Math.round(Number(activeCanvasDoc?.width) || Number(state.width) || 1));
-    const canvasHeight = Math.max(1, Math.round(Number(activeCanvasDoc?.height) || Number(state.height) || 1));
+    const activeCanvasDoc = rasterBatchCanvasSize ? null : getActiveProjectCanvasDocument();
+    const canvasWidth = rasterBatchCanvasSize?.width
+      || Math.max(1, Math.round(Number(activeCanvasDoc?.width) || Number(state.width) || 1));
+    const canvasHeight = rasterBatchCanvasSize?.height
+      || Math.max(1, Math.round(Number(activeCanvasDoc?.height) || Number(state.height) || 1));
     if (x < 0 || y < 0 || x >= canvasWidth || y >= canvasHeight) return;
     const selectionIndex = y * canvasWidth + x;
     if (
@@ -113,6 +222,16 @@
       return;
     }
     const index = y * canvasWidth + x;
+    // A stroke with a large brush (especially with mirrors) covers the same
+    // pixel through many overlapping stamps. The first write already records
+    // the correct Undo-before value and produces the same final colour, so
+    // later writes in this one raster transaction are redundant.
+    if (rasterBatchWrittenPixels) {
+      if (rasterBatchWrittenPixels.has(index)) {
+        return;
+      }
+      rasterBatchWrittenPixels.add(index);
+    }
     const base = index * 4;
     let direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
     const transparentStorageIndex = resolveTransparentStoragePaletteIndex();
@@ -348,8 +467,32 @@
     }
   }
 
+  function getBrushSpans(size, shapeOverride = state.brushShape) {
+    const shape = getEffectiveBrushShape(shapeOverride);
+    if (shape === BRUSH_SHAPE_CUSTOM) {
+      return null;
+    }
+    const base = clamp(Math.round(size || 1), 1, 64);
+    const key = `${shape}:${base}`;
+    let spans = brushSpanCache.get(key);
+    if (spans) return spans;
+    const rows = new Map();
+    getBrushOffsets(base, shape).forEach(({ dx, dy }) => {
+      const row = rows.get(dy);
+      if (row) {
+        row.x0 = Math.min(row.x0, dx);
+        row.x1 = Math.max(row.x1, dx);
+      } else {
+        rows.set(dy, { dy, x0: dx, x1: dx });
+      }
+    });
+    spans = Array.from(rows.values()).sort((left, right) => left.dy - right.dy);
+    brushSpanCache.set(key, spans);
+    return spans;
+  }
+
   function stampLargeSnapshotBrush(layer, cx, cy) {
-    if (!isRasterTilePatchPending?.() || !layer || !isIndexColorMode() || isMultiPaletteIsolationEnabled() || isMirrorEnabledForTool(pointerState.tool || state.tool)) {
+    if (!isRasterTilePatchPending?.() || !layer || !isIndexColorMode() || isMultiPaletteIsolationEnabled()) {
       return false;
     }
     const canvas = getActiveProjectCanvasDocument();
@@ -361,6 +504,7 @@
     const shape = getEffectiveBrushShape();
     const brushSize = clamp(Math.round(state.brushSize || 1), 1, 64);
     const offsets = getBrushOffsets(brushSize, shape);
+    const spans = getBrushSpans(brushSize, shape);
     let captureX0 = width; let captureY0 = height; let captureX1 = -1; let captureY1 = -1;
     if (shape !== BRUSH_SHAPE_CUSTOM) {
       const halfDown = Math.floor(brushSize / 2);
@@ -385,6 +529,125 @@
       ? layer.indices
       : null;
     const selectionMask = state.selectionMask instanceof Uint8Array ? state.selectionMask : null;
+    const normalizedMirrorState = getCurrentNormalizedMirrorState();
+    const mirrorEnabled = isMirrorEnabledForTool(tool, normalizedMirrorState);
+    // Resolve reflected pixels once per stamp and write contiguous horizontal
+    // runs directly. This keeps diagonal mirrors correct while avoiding a
+    // per-pixel history/write call for every mirrored brush offset.
+    if (mirrorEnabled && indexBuffer && indexBuffer.length >= width * height && !selectionMask && !direct) {
+      const rowPixels = new Map();
+      let mirrorX0 = width; let mirrorY0 = height; let mirrorX1 = -1; let mirrorY1 = -1;
+      for (let offsetIndex = 0; offsetIndex < offsets.length; offsetIndex += 1) {
+        const sourceX = cx + offsets[offsetIndex].dx;
+        const sourceY = cy + offsets[offsetIndex].dy;
+        if (sourceX < 0 || sourceY < 0 || sourceX >= width || sourceY >= height) continue;
+        const sourceIndex = (sourceY * width) + sourceX;
+        let points = rasterBatchMirroredPointCache?.get(sourceIndex);
+        if (!points) {
+          points = getMirroredPointSet(sourceX, sourceY, {
+            tool,
+            includeOriginal: true,
+            mirrorState: normalizedMirrorState,
+          });
+          rasterBatchMirroredPointCache?.set(sourceIndex, points);
+        }
+        for (let pointIndex = 0; pointIndex < points.length; pointIndex += 1) {
+          const point = points[pointIndex];
+          const pixelIndex = (point.y * width) + point.x;
+          if (rasterBatchWrittenPixels?.has(pixelIndex)) continue;
+          let xs = rowPixels.get(point.y);
+          if (!xs) { xs = new Set(); rowPixels.set(point.y, xs); }
+          xs.add(point.x);
+          mirrorX0 = Math.min(mirrorX0, point.x); mirrorY0 = Math.min(mirrorY0, point.y);
+          mirrorX1 = Math.max(mirrorX1, point.x); mirrorY1 = Math.max(mirrorY1, point.y);
+        }
+      }
+      if (mirrorX1 < mirrorX0 || mirrorY1 < mirrorY0) return true;
+      capturePendingRasterTilesForRect?.(layer, mirrorX0, mirrorY0, mirrorX1, mirrorY1);
+      let changed = false;
+      rowPixels.forEach((xs, y) => {
+        const ordered = Array.from(xs).sort((left, right) => left - right);
+        let runStart = -1;
+        let previousX = -2;
+        const flushRun = endX => {
+          if (runStart < 0) return;
+          const rowStart = (y * width) + runStart;
+          const rowEnd = (y * width) + endX + 1;
+          let runChanged = false;
+          for (let index = rowStart; index < rowEnd; index += 1) {
+            if (indexBuffer[index] !== paletteIndex) { runChanged = true; break; }
+          }
+          if (runChanged) { indexBuffer.fill(paletteIndex, rowStart, rowEnd); changed = true; }
+          if (rasterBatchWrittenPixels) {
+            for (let x = runStart; x <= endX; x += 1) rasterBatchWrittenPixels.add((y * width) + x);
+          }
+          runStart = -1;
+        };
+        for (let index = 0; index < ordered.length; index += 1) {
+          const x = ordered[index];
+          if (runStart < 0) { runStart = x; previousX = x; continue; }
+          if (x === previousX + 1) { previousX = x; continue; }
+          flushRun(previousX);
+          runStart = x;
+          previousX = x;
+        }
+        flushRun(previousX);
+      });
+      if (!changed) return true;
+      layer.directOnly = false;
+      markHistoryDirty();
+      noteRasterRectDirty(mirrorX0, mirrorY0, mirrorX1, mirrorY1);
+      return true;
+    }
+    // The normal indexed dense-raster path can write one row at a time. This
+    // avoids per-pixel helper calls for large brushes while preserving the
+    // existing tile-history snapshot taken above. Sparse tiles, selections,
+    // mirrors and legacy direct buffers keep the conservative path below.
+    if (spans && indexBuffer && indexBuffer.length >= width * height && !selectionMask && !direct) {
+      let x0 = width; let y0 = height; let x1 = -1; let y1 = -1;
+      for (const span of spans) {
+        const y = cy + span.dy;
+        if (y < 0 || y >= height) continue;
+        const fromX = Math.max(0, cx + span.x0);
+        const toX = Math.min(width - 1, cx + span.x1);
+        if (toX < fromX) continue;
+        const rowStart = (y * width) + fromX;
+        const rowEnd = (y * width) + toX + 1;
+        let changed = false;
+        for (let index = rowStart; index < rowEnd; index += 1) {
+          if (indexBuffer[index] !== paletteIndex) {
+            changed = true;
+            break;
+          }
+        }
+        if (!changed) continue;
+        indexBuffer.fill(paletteIndex, rowStart, rowEnd);
+        x0 = Math.min(x0, fromX); y0 = Math.min(y0, y);
+        x1 = Math.max(x1, toX); y1 = Math.max(y1, y);
+      }
+      if (x1 < x0 || y1 < y0) return true;
+      layer.directOnly = false;
+      markHistoryDirty();
+      noteRasterRectDirty(x0, y0, x1, y1);
+      return true;
+    }
+    if (spans && indexBuffer && indexBuffer.length === 0 && !selectionMask && !direct && typeof setRasterLayerRuntimeStoredSpan === 'function') {
+      let x0 = width; let y0 = height; let x1 = -1; let y1 = -1;
+      for (const span of spans) {
+        const y = cy + span.dy;
+        const fromX = Math.max(0, cx + span.x0);
+        const toX = Math.min(width - 1, cx + span.x1);
+        if (y < 0 || y >= height || toX < fromX) continue;
+        if (!setRasterLayerRuntimeStoredSpan(layer, y, fromX, toX, paletteIndex)) continue;
+        x0 = Math.min(x0, fromX); y0 = Math.min(y0, y);
+        x1 = Math.max(x1, toX); y1 = Math.max(y1, y);
+      }
+      if (x1 < x0 || y1 < y0) return true;
+      layer.directOnly = false;
+      markHistoryDirty();
+      noteRasterRectDirty(x0, y0, x1, y1);
+      return true;
+    }
     for (let i = 0; i < offsets.length; i += 1) {
       const x = cx + offsets[i].dx;
       const y = cy + offsets[i].dy;

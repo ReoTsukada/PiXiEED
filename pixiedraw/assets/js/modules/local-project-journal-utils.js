@@ -116,6 +116,10 @@
       if (!normalizedProjectId) {
         return createEmptyActiveState('');
       }
+      const restoredFromV2Manifest = Boolean(
+        Number(entry?.autosaveSchemaVersion) >= 2
+        && entry?.manifestKey
+      );
       const journal = entry?.projectJournal && typeof entry.projectJournal === 'object'
         ? entry.projectJournal
         : null;
@@ -129,11 +133,16 @@
           : null,
         checkpointPersisted: Boolean(
           (entry?.project && typeof entry.project === 'object')
-          || (Number(entry?.autosaveSchemaVersion) >= 2 && entry?.manifestKey)
+          || restoredFromV2Manifest
         ),
         ops: Array.isArray(journal?.ops) ? (cloneJsonValue(journal.ops, []) || []) : [],
         dirtyOpCount: Math.max(0, Math.round(Number(journal?.dirtyOpCount) || (Array.isArray(journal?.ops) ? journal.ops.length : 0))),
-        forceCheckpoint: false,
+        // V2 recent-project metadata contains only a manifest reference, not
+        // the complete journal that was replayed while opening the project.
+        // Writing a new journal from this empty in-memory list would replace
+        // the persisted one and discard older strokes. The first edit after a
+        // V2 restore must therefore establish a fresh full checkpoint.
+        forceCheckpoint: restoredFromV2Manifest,
         historyPast: [],
         historyFuture: [],
         historyLimit: Math.max(1, Math.round(Number(journal?.historyLimit) || Math.round(Number(history?.limit) || 30))),
@@ -732,15 +741,11 @@
         return next;
       }
       if (historyEntry?.kind === 'raster-tile-patch' && Array.isArray(historyEntry.tiles) && historyEntry.tiles.length) {
-        next.ops.push({
-          kind: 'raster-tile-patch',
-          historyLabel: String(historyLabel || historyEntry.historyLabel || ''),
-          historyEntry: cloneJsonValue(historyEntry, null),
-        });
-        if (next.ops.length > Math.max(1, Math.round(Number(LOCAL_PROJECT_CHECKPOINT_HISTORY_INTERVAL) || 30))) {
-          next.forceCheckpoint = true;
-        }
-        next.dirtyOpCount = next.ops.length;
+        // Thick brushes, large fills, and large selection pastes use tiled
+        // history. The V2 replayer does not accept that format, so preserve
+        // the completed document as a checkpoint instead of saving a journal
+        // that would be acknowledged but could not be restored.
+        next.forceCheckpoint = true;
         activeState = next;
         return next;
       }
@@ -800,15 +805,7 @@
           continue;
         }
         if (wrapped?.kind === 'raster-tile-patch') {
-          const entry = wrapped.historyEntry;
-          if (!entry || entry.kind !== 'raster-tile-patch' || !Array.isArray(entry.tiles) || !entry.tiles.length) return null;
-          normalized.push({
-            sequence: opIndex + 1,
-            kind: 'raster-tile-patch',
-            canvasId: String(entry.canvasId || ''), frameId: String(entry.frameId || ''), layerId: String(entry.layerId || ''),
-            tiles: cloneJsonValue(entry.tiles, []),
-          });
-          continue;
+          return null;
         }
         const entry = wrapped?.kind === 'pixel-patch' ? wrapped.historyEntry : null;
         if (!entry || !isPixelPatchHistoryEntry(entry) || !Array.isArray(entry.changes) || !entry.changes.length) {

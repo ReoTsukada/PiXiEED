@@ -31,6 +31,17 @@
 
     return ((scope) => {
       with (scope) {
+  let canvasResizeViewportPreviewRefreshRaf = 0;
+
+  function queueCanvasResizeViewportPreviewRefresh() {
+    if (canvasResizeViewportPreviewRefreshRaf || !(dom.canvasResizeExpansionPreview instanceof HTMLElement)) return;
+    canvasResizeViewportPreviewRefreshRaf = window.requestAnimationFrame(() => {
+      canvasResizeViewportPreviewRefreshRaf = 0;
+      const { width, height, edges } = syncCanvasResizeDimensionsFromEdges();
+      updateCanvasResizePreview(width, height, { offsetX: edges.left, offsetY: edges.top });
+    });
+  }
+
   function applyEmbedGuardrails() {
     const lockWidth = lockedCanvasWidth !== null;
     const lockHeight = lockedCanvasHeight !== null;
@@ -77,6 +88,123 @@
     return clamp(numeric, MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
   }
 
+  function getCanvasResizeEdgeValue(input) {
+    const value = Math.round(Number(input?.value));
+    return Number.isFinite(value) ? clamp(value, -(MAX_CANVAS_SIZE - 1), MAX_CANVAS_SIZE - 1) : 0;
+  }
+
+  function getCanvasResizeEdges() {
+    return {
+      top: getCanvasResizeEdgeValue(dom.controls.canvasExpandTop),
+      right: getCanvasResizeEdgeValue(dom.controls.canvasExpandRight),
+      bottom: getCanvasResizeEdgeValue(dom.controls.canvasExpandBottom),
+      left: getCanvasResizeEdgeValue(dom.controls.canvasExpandLeft),
+    };
+  }
+
+  function syncCanvasResizeDimensionsFromEdges({ normalizeValues = false } = {}) {
+    const edges = getCanvasResizeEdges();
+    const width = clamp(state.width + edges.left + edges.right, MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
+    const height = clamp(state.height + edges.top + edges.bottom, MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
+    if (dom.controls.canvasWidth instanceof HTMLInputElement) dom.controls.canvasWidth.value = String(width);
+    if (dom.controls.canvasHeight instanceof HTMLInputElement) dom.controls.canvasHeight.value = String(height);
+    if (normalizeValues) {
+      const inputByEdge = { top: dom.controls.canvasExpandTop, right: dom.controls.canvasExpandRight, bottom: dom.controls.canvasExpandBottom, left: dom.controls.canvasExpandLeft };
+      Object.entries(edges).forEach(([edge, value]) => {
+        if (inputByEdge[edge] instanceof HTMLInputElement) inputByEdge[edge].value = String(value);
+      });
+    }
+    return { width, height, edges };
+  }
+
+  function updateCanvasResizePreview(width, height, { offsetX, offsetY }) {
+    const preview = dom.controls.canvasResizeViewportPreview;
+    const shades = Array.isArray(dom.controls.canvasResizeViewportShades) ? dom.controls.canvasResizeViewportShades : [];
+    const expansionPreview = dom.canvasResizeExpansionPreview;
+    const expansionRegions = Array.isArray(dom.canvasResizeExpansionRegions) ? dom.canvasResizeExpansionRegions : [];
+    const cropLeft = clamp(-offsetX, 0, state.width);
+    const cropTop = clamp(-offsetY, 0, state.height);
+    const cropRight = clamp(state.width - (width - offsetX), 0, state.width);
+    const cropBottom = clamp(state.height - (height - offsetY), 0, state.height);
+    const crop = { top: cropTop, right: cropRight, bottom: cropBottom, left: cropLeft };
+    const expansion = {
+      left: clamp(offsetX, 0, Number.MAX_SAFE_INTEGER),
+      top: clamp(offsetY, 0, Number.MAX_SAFE_INTEGER),
+      right: clamp(width - offsetX - state.width, 0, Number.MAX_SAFE_INTEGER),
+      bottom: clamp(height - offsetY - state.height, 0, Number.MAX_SAFE_INTEGER),
+    };
+    const drawingCanvas = dom.canvases?.drawing;
+    const expansionHost = dom.mainCanvasArea;
+    const drawingRect = drawingCanvas instanceof HTMLCanvasElement ? drawingCanvas.getBoundingClientRect() : null;
+    const hostRect = expansionHost instanceof HTMLElement ? expansionHost.getBoundingClientRect() : null;
+    if (preview instanceof HTMLElement) {
+      preview.hidden = !Object.values(crop).some(value => value > 0);
+      shades.forEach(shade => {
+        if (!(shade instanceof HTMLElement)) return;
+        const side = shade.dataset.canvasResizeShade;
+        const value = crop[side] || 0;
+        shade.style.setProperty('--canvas-resize-crop', `${(value / (side === 'top' || side === 'bottom' ? Math.max(1, state.height) : Math.max(1, state.width))) * 100}%`);
+        shade.hidden = value <= 0;
+      });
+    }
+    if (!(expansionPreview instanceof HTMLElement) || !drawingRect || !hostRect) return;
+    const hasExpansion = Object.values(expansion).some(value => value > 0);
+    expansionPreview.hidden = !hasExpansion;
+    if (!hasExpansion) return;
+    const scaleX = drawingRect.width / Math.max(1, state.width);
+    const scaleY = drawingRect.height / Math.max(1, state.height);
+    const leftPx = expansion.left * scaleX;
+    const rightPx = expansion.right * scaleX;
+    const topPx = expansion.top * scaleY;
+    const bottomPx = expansion.bottom * scaleY;
+    expansionPreview.style.left = `${Math.round(drawingRect.left - hostRect.left - leftPx)}px`;
+    expansionPreview.style.top = `${Math.round(drawingRect.top - hostRect.top - topPx)}px`;
+    expansionPreview.style.width = `${Math.round(drawingRect.width + leftPx + rightPx)}px`;
+    expansionPreview.style.height = `${Math.round(drawingRect.height + topPx + bottomPx)}px`;
+    expansionRegions.forEach(region => {
+      if (!(region instanceof HTMLElement)) return;
+      const side = region.dataset.canvasResizeExpansion;
+      const value = side === 'left' || side === 'right'
+        ? expansion[side] * scaleX
+        : expansion[side] * scaleY;
+      region.hidden = value <= 0;
+      region.style.setProperty('--canvas-resize-expansion-size', `${Math.round(value)}px`);
+      region.style.setProperty('--canvas-resize-expansion-top', `${Math.round(topPx)}px`);
+      region.style.setProperty('--canvas-resize-expansion-bottom', `${Math.round(bottomPx)}px`);
+    });
+  }
+
+  function resetCanvasResizeEdges() {
+    [dom.controls.canvasExpandTop, dom.controls.canvasExpandRight, dom.controls.canvasExpandBottom, dom.controls.canvasExpandLeft].forEach(input => {
+      if (input instanceof HTMLInputElement) input.value = '0';
+    });
+    syncCanvasResizeDimensionsFromEdges({ normalizeValues: true });
+  }
+
+  function updateCanvasResizeEdgeControls() {
+    const disabled = !canCurrentClientEditProjectStructure()
+      || lockedCanvasWidth !== null
+      || lockedCanvasHeight !== null;
+    [dom.controls.canvasExpandTop, dom.controls.canvasExpandRight, dom.controls.canvasExpandBottom, dom.controls.canvasExpandLeft].forEach(input => {
+      if (input instanceof HTMLInputElement) input.disabled = disabled;
+    });
+    if (dom.controls.resetCanvasResize instanceof HTMLButtonElement) dom.controls.resetCanvasResize.disabled = disabled;
+  }
+
+  function updateCanvasResizeAnchorControls() {
+    updateCanvasResizeEdgeControls();
+    updateCanvasResizeSummary();
+  }
+
+  function updateCanvasResizeSummary() {
+    const summary = dom.controls.canvasResizeSummary;
+    const { width, height, edges } = syncCanvasResizeDimensionsFromEdges();
+    const offset = { offsetX: edges.left, offsetY: edges.top };
+    updateCanvasResizePreview(width, height, offset);
+    if (!(summary instanceof HTMLOutputElement)) return;
+    summary.textContent = `${width} × ${height} px`;
+  }
+
   function updateCanvasResizeControls({ normalizeValues = false } = {}) {
     const widthInput = dom.controls.canvasWidth;
     const heightInput = dom.controls.canvasHeight;
@@ -94,8 +222,9 @@
     heightInput.max = String(MAX_CANVAS_SIZE);
     heightInput.step = '1';
 
-    const width = getCanvasResizeInputValue(widthInput, state.width);
-    const height = getCanvasResizeInputValue(heightInput, state.height);
+    const edgeResize = syncCanvasResizeDimensionsFromEdges({ normalizeValues });
+    const width = edgeResize.width;
+    const height = edgeResize.height;
     const active = document.activeElement;
     if (normalizeValues || active !== widthInput) {
       widthInput.value = String(width);
@@ -120,6 +249,7 @@
     if (dom.controls.canvasHeightIncrement instanceof HTMLButtonElement) {
       dom.controls.canvasHeightIncrement.disabled = incHeightDisabled;
     }
+    updateCanvasResizeAnchorControls();
     updateSettingsSizeApplyButtonState();
   }
 
@@ -197,6 +327,7 @@
     if (dom.controls.canvasHeight instanceof HTMLInputElement) {
       dom.controls.canvasHeight.value = String(nextHeight);
     }
+    resetCanvasResizeEdges();
     markHistoryDirty();
     resizeCanvases();
     clearSelection();
@@ -286,8 +417,7 @@
       restoreFocus();
       return;
     }
-    const width = getCanvasResizeInputValue(dom.controls.canvasWidth, state.width);
-    const height = getCanvasResizeInputValue(dom.controls.canvasHeight, state.height);
+    const { width, height, edges } = syncCanvasResizeDimensionsFromEdges({ normalizeValues: true });
     if (width === state.width && height === state.height) {
       dom.controls.canvasWidth.value = String(state.width);
       dom.controls.canvasHeight.value = String(state.height);
@@ -295,7 +425,11 @@
       restoreFocus();
       return;
     }
-    applyCanvasResizeDimensions(width, height, { restoreFocusInput });
+    applyCanvasResizeDimensions(width, height, {
+      restoreFocusInput,
+      contentOffsetX: edges.left,
+      contentOffsetY: edges.top,
+    });
   }
 
   function applySettingsSizeChanges() {
@@ -322,6 +456,31 @@
   }
 
   function setupNumberSteppers() {
+    const expansionPreview = dom.canvasResizeExpansionPreview;
+    if (expansionPreview instanceof HTMLElement && expansionPreview.dataset.viewportFollowBound !== 'true') {
+      expansionPreview.dataset.viewportFollowBound = 'true';
+      window.addEventListener('pixiedraw:viewport-transform', queueCanvasResizeViewportPreviewRefresh);
+      window.addEventListener('resize', queueCanvasResizeViewportPreviewRefresh, { passive: true });
+    }
+    [dom.controls.canvasExpandTop, dom.controls.canvasExpandRight, dom.controls.canvasExpandBottom, dom.controls.canvasExpandLeft].forEach(input => {
+      if (!(input instanceof HTMLInputElement) || input.dataset.canvasResizeBound === 'true') return;
+      input.dataset.canvasResizeBound = 'true';
+      input.addEventListener('input', () => updateCanvasResizeControls());
+      input.addEventListener('change', () => updateCanvasResizeControls({ normalizeValues: true }));
+      input.addEventListener('keydown', event => {
+        if (event.key !== 'Enter' || event.isComposing) return;
+        event.preventDefault();
+        applySettingsSizeChanges();
+      });
+    });
+    const resetButton = dom.controls.resetCanvasResize;
+    if (resetButton instanceof HTMLButtonElement && resetButton.dataset.canvasResizeBound !== 'true') {
+      resetButton.dataset.canvasResizeBound = 'true';
+      resetButton.addEventListener('click', () => {
+        resetCanvasResizeEdges();
+        updateCanvasResizeControls({ normalizeValues: true });
+      });
+    }
     const inputs = document.querySelectorAll('input[type="number"][data-stepper]');
     inputs.forEach(input => {
       const wrapper = input.closest('.number-stepper');

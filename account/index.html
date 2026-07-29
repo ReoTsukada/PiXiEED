@@ -317,7 +317,7 @@
             <div>
               <p class="account-eyebrow">REVENUE ANALYTICS</p>
               <h2 class="section-title" id="accountRewardDashboardTitle">売上・報酬の推移</h2>
-              <p class="helper">販売収益、祖先作品として受け取った継承ロイヤリティー、確定した表示報酬を分けて表示します。</p>
+              <p class="helper">表示は2点を作品系列で、PiXFiNDの有効プレイは3点を作者へ加算し、月次報酬予算をポイント比で配分します。</p>
             </div>
             <label class="account-chart-period">表示期間
               <select id="accountRewardPeriod">
@@ -339,9 +339,9 @@
               <small id="accountSummaryLineageMeta">直近12か月</small>
             </article>
             <article class="account-summary-card account-summary-card--views">
-              <span>有効表示による報酬</span>
+              <span>ポイント報酬</span>
               <strong id="accountSummaryPageview">0円</strong>
-              <small id="accountSummaryViews">確定 0回・暫定 0回</small>
+              <small id="accountSummaryViews">確定 0円・暫定 0円</small>
             </article>
             <article class="account-summary-card account-summary-card--balance">
               <span>出金可能な残高</span>
@@ -365,7 +365,7 @@
             <summary>月別の数値を表で確認</summary>
             <div class="account-chart-table-scroll">
               <table class="account-chart-table">
-                <thead><tr><th scope="col">月</th><th scope="col">販売収益</th><th scope="col">継承ロイヤリティー</th><th scope="col">表示報酬</th><th scope="col">確定表示</th><th scope="col">暫定表示</th></tr></thead>
+                <thead><tr><th scope="col">月</th><th scope="col">販売収益</th><th scope="col">継承ロイヤリティー</th><th scope="col">確定報酬</th><th scope="col">暫定額</th><th scope="col">暫定ポイント</th></tr></thead>
                 <tbody id="accountRewardChartTable"></tbody>
               </table>
             </div>

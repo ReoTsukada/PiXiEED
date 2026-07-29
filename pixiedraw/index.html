@@ -472,7 +472,7 @@
 
 
 
-<link href="assets/css/style.css?v=20260726-puzzle-frame-picker1" rel="stylesheet"/>
+<link href="assets/css/style.css?v=20260729-file-panel-type1" rel="stylesheet"/>
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-4.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-4.png"/>
 <style>
@@ -626,10 +626,17 @@
 <div class="stage__main-canvas" id="mainCanvasArea">
 <div aria-live="off" class="canvas-stack" id="canvasStack">
 <canvas aria-label="描画キャンバス" height="32" id="drawingCanvas" width="32"></canvas>
+<canvas aria-hidden="true" height="32" id="brushPreviewCanvas" width="32"></canvas>
 <canvas aria-hidden="true" height="32" id="overlayCanvas" width="32"></canvas>
 <canvas aria-hidden="true" height="32" id="selectionCanvas" width="32"></canvas>
+<div aria-hidden="true" class="canvas-resize-viewport-preview" hidden="" id="canvasResizeViewportPreview">
+<span data-canvas-resize-shade="top"></span><span data-canvas-resize-shade="right"></span><span data-canvas-resize-shade="bottom"></span><span data-canvas-resize-shade="left"></span>
+</div>
 </div>
 <div aria-hidden="true" class="canvas-surface-badge" hidden="" id="mainCanvasSurfaceBadge"></div>
+<div aria-hidden="true" class="canvas-resize-expansion-preview" hidden="" id="canvasResizeExpansionPreview">
+<span data-canvas-resize-expansion="top"></span><span data-canvas-resize-expansion="right"></span><span data-canvas-resize-expansion="bottom"></span><span data-canvas-resize-expansion="left"></span>
+</div>
 </div>
 <div aria-hidden="true" class="canvas-resize-preview is-hidden" hidden="" id="canvasResizePreview"></div>
 <button aria-label="キャンバス左上をドラッグしてサイズ変更" class="canvas-resize-handle canvas-resize-handle--corner-start is-hidden" data-resize-anchor="start" hidden="" id="canvasResizeHandleStart" type="button"></button>
@@ -769,8 +776,6 @@
   </div>
 </div>
 <button aria-label="描画ボタン。左半分で主色、右半分で副色を描画" class="floating-draw-button" id="floatingDrawButton" type="button">
-<span aria-hidden="true" class="floating-draw-button__side floating-draw-button__side--primary"><span class="floating-draw-button__side-key">左</span><span class="floating-draw-button__side-label">主</span></span>
-<span aria-hidden="true" class="floating-draw-button__side floating-draw-button__side--secondary"><span class="floating-draw-button__side-key">右</span><span class="floating-draw-button__side-label">副</span></span>
 </button>
 <div aria-hidden="true" aria-label="選択範囲移動" class="floating-move-pad is-hidden" hidden="" id="floatingMovePad" role="group">
 <button aria-label="選択範囲を上へ移動" class="floating-move-pad__btn floating-move-pad__btn--up" data-move-pad-dir="up" type="button">▲</button>
@@ -1115,14 +1120,6 @@
 <button aria-label="現在レイヤーの末尾フレームへ" class="pixel-button pixel-frame" id="forwardAnimation" title="末尾へ" type="button">⏭</button>
 <button aria-label="ループ再生" aria-pressed="true" class="pixel-button pixel-frame" id="loopAnimation" title="ループ再生" type="button">↻</button>
 </div>
-<div aria-label="フレームレート設定" class="timeline-fps" role="group">
-<label class="field field--tiny timeline-fps-control">
-<span>fps</span>
-<input data-stepper="true" id="animationFps" max="60" min="1" type="number" value="12"/>
-</label>
-<span class="timeline-fps-hint" id="animationFpsMs">83ms</span>
-<button aria-label="全フレームに現在の fps を適用" class="chip" id="applyFpsAll" type="button">全体適用</button>
-</div>
 </div>
 <div aria-label="選択中レイヤー設定" class="timeline-layer-settings" id="timelineLayerSettings" role="group">
 <p class="timeline-layer-settings__target" id="layerSettingsTarget">対象: レイヤー 1</p>
@@ -1171,6 +1168,14 @@
 <output class="timeline-layer-settings__value" for="onionOpacity" id="onionOpacityValue">35%</output>
 </label>
 </div>
+<div aria-label="フレームレート設定" class="timeline-fps" role="group">
+<label class="field field--tiny timeline-fps-control">
+<span>fps</span>
+<input data-stepper="true" id="animationFps" max="60" min="1" type="number" value="12"/>
+</label>
+<span class="timeline-fps-hint" id="animationFpsMs">83ms</span>
+<button aria-label="全フレームに現在の fps を適用" class="chip" id="applyFpsAll" type="button">全体適用</button>
+</div>
 </div>
 </div>
 <div class="panel-ad-mount" data-panel-ad-mount="left"></div>
@@ -1191,6 +1196,7 @@
 <button class="button" id="openDocument" type="button">ファイルを開く</button>
 <button class="button" id="showLocalProjects" type="button">プロジェクト一覧</button>
 <button class="button button--primary" id="exportProject" type="button">出力設定を開く</button>
+<button class="button" id="openTimelapse" type="button">タイムラプスを見る</button>
 </div>
 <div class="file-panel-summary">
 <p class="help-text ui-guide-text">描画内容はこの端末に自動保存されます。</p>
@@ -1223,33 +1229,17 @@
 <div class="panel-section__body">
 <div class="settings-size-grid">
 <div class="field settings-size-row settings-size-row--canvas settings-size-row--combined">
-<span id="settingsSizeTitle">サイズ</span>
-<div class="field field--inline settings-size-controls settings-size-controls--canvas">
-<label class="field field--tiny">
-<span>X</span>
-<div class="canvas-size-stepper">
-<input data-stepper="true" enterkeyhint="done" id="canvasWidth" inputmode="numeric" max="512" min="1" step="1" type="number" value="32"/>
+<span id="settingsSizeTitle">キャンバスを広げる・切り取る</span>
+<input aria-hidden="true" id="canvasWidth" tabindex="-1" type="hidden" value="32"/>
+<input aria-hidden="true" id="canvasHeight" tabindex="-1" type="hidden" value="32"/>
+<div aria-label="キャンバスの各辺を調整" class="canvas-resize-control-grid">
+<label class="field field--tiny canvas-resize-edge"><span>上 Y</span><input aria-label="上へ広げる・切り取るピクセル数" id="canvasExpandTop" inputmode="numeric" max="511" min="-511" step="1" type="number" value="0"/></label>
+<label class="field field--tiny canvas-resize-edge"><span>下 −Y</span><input aria-label="下へ広げる・切り取るピクセル数" id="canvasExpandBottom" inputmode="numeric" max="511" min="-511" step="1" type="number" value="0"/></label>
+<label class="field field--tiny canvas-resize-edge"><span>左 −X</span><input aria-label="左へ広げる・切り取るピクセル数" id="canvasExpandLeft" inputmode="numeric" max="511" min="-511" step="1" type="number" value="0"/></label>
+<label class="field field--tiny canvas-resize-edge"><span>右 X</span><input aria-label="右へ広げる・切り取るピクセル数" id="canvasExpandRight" inputmode="numeric" max="511" min="-511" step="1" type="number" value="0"/></label>
+<output aria-live="polite" class="canvas-resize-summary" id="canvasResizeSummary">32 × 32 px</output>
+<button class="button canvas-resize-apply" disabled="" id="applySpriteScale" type="button">サイズを適用</button>
 </div>
-</label>
-<label class="field field--tiny">
-<span>Y</span>
-<div class="canvas-size-stepper">
-<input data-stepper="true" enterkeyhint="done" id="canvasHeight" inputmode="numeric" max="512" min="1" step="1" type="number" value="32"/>
-</div>
-</label>
-<label class="field field--tiny settings-size-field--sprite">
-<span>倍率</span>
-<div class="sprite-scale-stepper">
-<button aria-label="倍率を1下げる" class="number-stepper__btn" id="spriteScaleDecrement" type="button">−</button>
-<input data-stepper="true" id="spriteScaleInput" inputmode="decimal" min="0.2" step="0.01" type="number" value="1"/>
-<button aria-label="倍率を1上げる" class="number-stepper__btn" id="spriteScaleIncrement" type="button">＋</button>
-</div>
-</label>
-</div>
-<div class="settings-size-apply-row">
-<button class="button" disabled="" id="applySpriteScale" type="button">適用</button>
-</div>
-<p class="help-text ui-guide-text" id="canvasSizeHint">X/Y と倍率をまとめて調整</p>
 </div>
 </div>
 <div class="panel-ad-mount panel-ad-mount--context" data-panel-ad-mount="right"></div>
@@ -1342,6 +1332,12 @@
 </div>
 <p class="help-text ui-guide-text" id="settingsDisplayHint">背景とUI配色を切り替えます（描画色には影響しません）。</p>
 </div>
+<details class="settings-history" id="settingsHistory" open="">
+<summary>履歴 <span aria-live="polite" id="historySummary">戻す 0 / やり直す 0</span></summary>
+<div aria-live="polite" class="settings-history__list" id="historyList" role="log">
+<p class="settings-history__empty">履歴はまだありません。</p>
+</div>
+</details>
 <div class="panel-ad-mount" data-panel-ad-mount="left"></div>
 </div>
 </section>
@@ -1381,6 +1377,22 @@
 </div>
 </form>
 </dialog>
+<dialog aria-labelledby="timelapseDialogTitle" class="modal" id="timelapseDialog">
+<form class="modal__form" method="dialog">
+<header class="modal__header">
+<h2 class="modal__title" id="timelapseDialogTitle">タイムラプス</h2>
+<button aria-label="閉じる" class="icon-button" value="cancel">×</button>
+</header>
+<div class="modal__body">
+<p class="help-text">Undoした操作は再生に含まれません。</p>
+<canvas aria-label="タイムラプス再生" id="timelapseCanvas" style="display:block;width:min(100%,560px);height:auto;margin:0 auto;image-rendering:pixelated;background:transparent;border:1px solid var(--border-color, #667);border-radius:8px"></canvas>
+<label class="field" for="timelapsePosition"><span>操作位置 <output id="timelapseStepCount">0 / 0</output></span><input id="timelapsePosition" min="0" step="1" type="range" value="0"/></label>
+<label class="field" for="timelapseSpeed"><span>再生速度 <output id="timelapseSpeedValue">1.0×</output></span><input id="timelapseSpeed" max="4" min="0.25" step="0.25" type="range" value="1"/></label>
+<div class="field-group"><button class="button button--primary" id="playTimelapse" type="button">再生</button><button class="button" disabled="" id="stopTimelapse" type="button">停止</button><button class="button" id="restartTimelapse" type="button">最初へ</button><button class="button" id="exportTimelapse" type="button">GIF出力</button></div>
+<p aria-live="polite" class="help-text" id="timelapseStatus"></p>
+</div>
+</form>
+</dialog>
 <dialog aria-labelledby="exportDialogTitle" class="modal" id="exportDialog">
 <form class="modal__form" id="exportDialogForm" method="dialog">
 <header class="modal__header">
@@ -1405,6 +1417,7 @@
 <div aria-label="出力形式。複数選択可能" class="export-format-pad-grid" role="group">
 <button aria-pressed="true" class="export-format-pad is-active" data-export-format-choice="png" data-export-tone="png" type="button"><span>PNG</span><small>画像</small></button>
 <button aria-pressed="false" class="export-format-pad" data-export-format-choice="gif" data-export-tone="gif" type="button"><span>GIF</span><small>アニメ</small></button>
+<button aria-pressed="false" class="export-format-pad" data-export-format-choice="timelapse" data-export-tone="gif" type="button"><span>タイムラプスGIF</span><small>制作記録</small></button>
 <button aria-pressed="false" class="export-format-pad" data-export-format-choice="svg" data-export-tone="svg" type="button"><span>SVG</span><small>ベクター</small></button>
 <button aria-pressed="false" class="export-format-pad" data-export-format-choice="jpeg" data-export-tone="jpeg" type="button"><span>JPEG</span><small>軽量画像</small></button>
 <button aria-pressed="false" class="export-format-pad" data-export-format-choice="spritemap" data-export-tone="spritemap" type="button"><span>SpriteMAP</span><small>並び画像</small></button>
@@ -1420,6 +1433,7 @@
 <select id="exportFormat">
 <option value="png">PNG（画像）</option>
 <option value="gif">GIF（アニメーション）</option>
+<option value="timelapse">タイムラプスGIF（制作記録）</option>
 <option value="svg">SVG（画像）</option>
 <option value="jpeg">JPEG（画像）</option>
 <option value="spritemap">SpriteMAP（並び画像）</option>
@@ -1595,21 +1609,6 @@
 <button class="button button--ghost" id="cancelNewProject" type="button">キャンセル</button>
 <button class="button button--primary" id="confirmNewProject" type="submit">作成</button>
 </div>
-</form>
-</dialog>
-<dialog aria-labelledby="globalHistoryConfirmTitle" class="modal" id="globalHistoryConfirmDialog">
-<form class="modal__form" method="dialog">
-<header class="modal__header">
-<h2 class="modal__title" id="globalHistoryConfirmTitle">全体Undo</h2>
-</header>
-<div class="modal__body">
-<p id="globalHistoryConfirmMessage">この操作はプロジェクト全体に反映されます。</p>
-<p class="help-text" id="globalHistoryConfirmDetail">続ける前に内容を確認してください。</p>
-</div>
-<footer class="modal__footer">
-<button class="button button--ghost" id="globalHistoryConfirmCancel" type="button">キャンセル</button>
-<button class="button button--primary" id="globalHistoryConfirmConfirm" type="button">全体Undoする</button>
-</footer>
 </form>
 </dialog>
 <dialog aria-labelledby="startupRecoveryTitle" class="modal" id="startupRecoveryDialog">
@@ -1794,8 +1793,8 @@
 	<script defer="" src="assets/js/modules/storage-utils.js?v=2026.06.28-file-split-step3"></script>
 	<script defer="" src="assets/js/modules/autosave-database-utils.js?v=2026.07.02-startup-helper-split-v1"></script>
 	<script defer="" src="assets/js/modules/open-performance-utils.js?v=20260723-open-perf1"></script>
-	<script defer="" src="assets/js/modules/autosave-schema-v2-utils.js?v=20260721-runtime-index8-1"></script>
-	<script defer="" src="assets/js/modules/autosave-schema-v2-indexeddb-utils.js?v=20260719-open-typed1"></script>
+	<script defer="" src="assets/js/modules/autosave-schema-v2-utils.js?v=20260728-sparse-journal-replay1"></script>
+	<script defer="" src="assets/js/modules/autosave-schema-v2-indexeddb-utils.js?v=20260729-startup-manifest1"></script>
 	<script defer="" src="assets/js/modules/autosave-schema-v2-restore-preview-utils.js?v=20260713-047"></script>
 	<script defer="" src="assets/js/modules/autosave-schema-v2-recovery-utils.js?v=20260727-cleanup2"></script>
 	<script defer="" src="assets/js/modules/project-storage-utils.js?v=20260715-local-true-v2-cleanup1"></script>
@@ -1819,8 +1818,11 @@
 		<script defer="" src="assets/js/modules/open-project-tab-view.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/open-project-tab-lifecycle.js?v=20260719-active-metadata1"></script>
 	<script defer="" src="assets/js/modules/open-project-tab-interactions.js?v=20260715-local-true-v2-cleanup1"></script>
-	<script defer="" src="assets/js/modules/local-project-journal-utils.js?v=20260724-raster-tile-journal1"></script>
+	<script defer="" src="assets/js/modules/local-project-journal-utils.js?v=20260728-replay-safe-checkpoint1"></script>
 	<script defer="" src="assets/js/modules/pixel-patch-history-utils.js?v=20260724-fill-runs-direct1"></script>
+	<script defer="" src="assets/js/modules/timelapse-operation-store-utils.js?v=20260729-resize-placement1"></script>
+	<script defer="" src="assets/js/modules/timelapse-replay-utils.js?v=20260729-replay3"></script>
+	<script defer="" src="assets/js/modules/timelapse-dialog-utils.js?v=20260729-resize-placement2"></script>
 	<script defer="" src="assets/js/modules/cold-history-store-utils.js?v=20260715-cold-history-p6"></script>
 	<script defer="" src="assets/js/modules/history-snapshot-workflow-utils.js?v=20260724-cow-raster1"></script>
 	<script defer="" src="assets/js/modules/memory-utils.js?v=20260724-cow-raster3"></script>
@@ -1828,8 +1830,8 @@
 	<script defer="" src="assets/js/modules/reload-snapshot-utils.js?v=2026.06.30-reload-snapshot-v1"></script>
 	<script defer="" src="assets/js/modules/reload-session-workflow-utils.js?v=20260717-session-history1"></script>
 	<script defer="" src="assets/js/modules/canvas-core-workflow-utils.js?v=20260724-editable-transparent1"></script>
-	<script defer="" src="assets/js/modules/canvas-drawing-workflow-utils.js?v=20260724-editable-transparent1"></script>
-	<script defer="" src="assets/js/modules/canvas-overlay-workflow-utils.js?v=20260724-editable-transparent1"></script>
+	<script defer="" src="assets/js/modules/canvas-drawing-workflow-utils.js?v=20260728-mirror-state-reuse1"></script>
+	<script defer="" src="assets/js/modules/canvas-overlay-workflow-utils.js?v=20260728-mirror-state-reuse1"></script>
 	<script defer="" src="assets/js/modules/canvas-render-workflow-utils.js?v=20260724-full-dirty-cache1"></script>
 	<script defer="" src="assets/js/modules/viewport-gesture-arbiter-utils.js?v=20260726-directional-pan1"></script>
 	<script defer="" src="assets/js/modules/canvas-zoom-workflow-utils.js?v=2026.07.11-touch-arbiter-v3"></script>
@@ -1843,8 +1845,8 @@
 	<script defer="" src="assets/vendor/jsQR.min.js?v=1.4.0"></script>
 	<script defer="" src="assets/js/modules/image-import-decode-utils.js?v=20260721-runtime-index8-2"></script>
 	<script defer="" src="assets/js/modules/palette-panel-utils.js?v=20260721-runtime-index8-2"></script>
-	<script defer="" src="assets/js/modules/timeline-layers.js?v=20260724-timeline-tap-sync10"></script>
-	<script defer="" src="assets/js/modules/ui-localization-utils.js?v=20260726-on-device-copy1"></script>
+	<script defer="" src="assets/js/modules/timeline-layers.js?v=20260729-complete-history7"></script>
+	<script defer="" src="assets/js/modules/ui-localization-utils.js?v=20260729-canvas-compact-panel1"></script>
 	<script defer="" src="assets/js/modules/ui-language-utils.js?v=2026.07.03-small-helper-batch-split-v1"></script>
 	<script defer="" src="assets/js/modules/scroll-input-utils.js?v=2026.07.03-small-helper-batch-split-v1"></script>
 	<script defer="" src="assets/js/modules/sprite-scale-utils.js?v=2026.06.30-zh-localization-v1"></script>
@@ -1853,36 +1855,35 @@
 	<script defer="" src="assets/js/modules/retired-extension-compat.js?v=20260721-voxel-retired1"></script>
 	<script defer="" src="assets/js/modules/floating-draw-controls-utils.js?v=2026.07.01-floating-draw-controls-v1"></script>
 	<script defer="" src="assets/js/modules/floating-preview-panel-utils.js?v=20260724-lowres-navigator1"></script>
-	<script defer="" src="assets/js/modules/keyboard-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
-	<script defer="" src="assets/js/modules/canvas-pointer-workflow-utils.js?v=20260724-selection-rect-full1"></script>
+	<script defer="" src="assets/js/modules/keyboard-workflow-utils.js?v=20260729-history-shortcuts1"></script>
+	<script defer="" src="assets/js/modules/canvas-pointer-workflow-utils.js?v=20260728-direct-tool-feedback3"></script>
 	<script defer="" src="assets/js/modules/canvas-tool-state-workflow-utils.js?v=2026.07.14-selection-keep-v1"></script>
 	<script defer="" src="assets/js/modules/export-rendering.js?v=20260721-runtime-index8-output1"></script>
-	<script defer="" src="assets/js/modules/dialog-setup-utils.js?v=20260720-export-batch-direct1"></script>
-	<script defer="" src="assets/js/modules/canvas-resize-workflow-utils.js?v=20260726-import-sprite-scale2"></script>
+	<script defer="" src="assets/js/modules/dialog-setup-utils.js?v=20260729-timelapse-export1"></script>
+	<script defer="" src="assets/js/modules/canvas-resize-workflow-utils.js?v=20260729-canvas-resize-preview-follow1"></script>
 	<script defer="" src="assets/js/modules/canvas-resize-handle-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/local-viewport-canvas-workflow-utils.js?v=20260715-safari-viewport-scroll-v1"></script>
 	<script defer="" src="assets/js/modules/floating-draw-button-workflow-utils.js?v=20260715-remove-oval1"></script>
 	<script defer="" src="assets/js/modules/selection-move-workflow-utils.js?v=20260724-editable-transparent1"></script>
 	<script defer="" src="assets/js/modules/snapshot-integer-scale-utils.js?v=2026.07.19-visual-scale3"></script>
-	<script defer="" src="assets/js/modules/layout-viewport.js?v=20260721-memory-monitor-off1"></script>
+	<script defer="" src="assets/js/modules/layout-viewport.js?v=20260729-canvas-resize-preview-follow1"></script>
 	<script defer="" src="assets/js/modules/rail-tool-ui-utils.js?v=2026.07.17-common-details4"></script>
 	<script defer="" src="assets/js/modules/control-ui-utils.js?v=2026.07.01-control-ui-split-v1"></script>
 	<script defer="" src="assets/js/modules/ui-action-buttons-workflow-utils.js?v=20260721-icons1"></script>
 	<script defer="" src="assets/js/modules/ui-action-router-workflow-utils.js?v=2026.07.17-global-help22"></script>
 	<script defer="" src="assets/js/modules/canvas-control-actions-workflow-utils.js?v=20260726-clipboard-state2"></script>
-	<script defer="" src="assets/js/modules/history-core-workflow-utils.js?v=20260724-raster-autosave-defer1"></script>
-	<script defer="" src="assets/js/modules/history-guard-workflow-utils.js?v=2026.07.04-shared-project-disabled1"></script>
+	<script defer="" src="assets/js/modules/history-core-workflow-utils.js?v=20260729-history-list1"></script>
 	<script defer="" src="assets/js/modules/curve-workflow-utils.js?v=2026.07.03-curve-workflow-split-v1"></script>
 	<script defer="" src="assets/js/modules/canvas-grid-workflow-utils.js?v=2026.07.03-grid-workflow-split-v1"></script>
 	<script defer="" src="assets/js/modules/timeline-navigation-workflow-utils.js?v=20260724-active-cell-selection1"></script>
-		<script defer="" src="assets/js/modules/autosave-workflow-utils.js?v=20260726-on-device-copy1"></script>
+		<script defer="" src="assets/js/modules/autosave-workflow-utils.js?v=20260728-commit-ready-save1"></script>
 	<script defer="" src="assets/js/modules/project-provenance-utils.js?v=20260714-provenance-v1"></script>
 	<script defer="" src="assets/js/modules/open-import-workflow-utils.js?v=20260721-indexed-raster-import1"></script>
 	<script defer="" src="assets/js/modules/export-format-workflow-utils.js?v=20260720-export-grid-format1"></script>
-	<script defer="" src="assets/js/modules/export-dialog-workflow-utils.js?v=20260726-export-loading-paint2"></script>
-		<script defer="" src="assets/js/modules/startup-workflow-utils.js?v=20260726-workspace-project-actions1"></script>
+	<script defer="" src="assets/js/modules/export-dialog-workflow-utils.js?v=20260729-timelapse-export1"></script>
+		<script defer="" src="assets/js/modules/startup-workflow-utils.js?v=20260729-workspace-project-actions2"></script>
 		<script defer="" src="assets/js/modules/recent-project-workflow-utils.js?v=20260726-project-card-actions2"></script>
-		<script defer="" src="assets/js/modules/project-package-workflow-utils.js?v=20260721-autosave-index8-1"></script>
+		<script defer="" src="assets/js/modules/project-package-workflow-utils.js?v=20260728-autosave-delta1"></script>
 		<script defer="" src="assets/js/modules/project-storage-adapter-utils.js?v=20260715-legacy-project-card-recovery1"></script>
 		<script defer="" src="assets/js/modules/project-storage-v1-json-adapter.js?v=20260720-pxd2"></script>
 		<script defer="" src="assets/js/modules/project-storage-v2-archive-codec.js?v=20260720-pxd3"></script>
@@ -1893,21 +1894,15 @@
 	<script defer="" src="assets/js/modules/recent-account-workflow-utils.js?v=2026.07.03-safe-helper-split-v1"></script>
 	<script defer="" src="assets/js/modules/pixieed-profile-local-utils.js?v=2026.07.03-safe-helper-split-v1"></script>
 	<script defer="" src="assets/js/modules/retired-collaboration-compat.js?v=20260724-timeline-selection2"></script>
-	<!-- Read-only retirement bridge: converts saved shared projects into local single-project V2 data. -->
-	<script defer="" src="assets/js/modules/shared-recent-project-utils.js?v=20260723-local-conversion1"></script>
-	<script defer="" src="assets/js/modules/shared-runtime-utils.js?v=20260723-local-conversion1"></script>
-	<script defer="" src="assets/js/modules/shared-project-backend-rpc-utils.js?v=20260723-local-conversion1"></script>
-	<script defer="" src="assets/js/modules/shared-project-snapshot-fetch-utils.js?v=20260723-local-conversion1"></script>
-	<script defer="" src="assets/js/modules/shared-project-local-conversion-utils.js?v=20260723-local-conversion1"></script>
 	<script defer="" src="assets/js/modules/pixieed-account-workflow-utils.js?v=2026.07.04-shared-project-disabled1"></script>
 	<script defer="" src="assets/js/modules/startup-tail-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
-	<script defer="" src="assets/js/modules/controls-mirror.js?v=20260721-runtime-index8-2"></script>
+	<script defer="" src="assets/js/modules/controls-mirror.js?v=20260728-mirror-state-reuse1"></script>
 	<script defer="" src="assets/js/modules/external-tool-workflow-utils.js?v=2026.07.02-external-tool-workflow-split-v1"></script>
 	<script defer="" src="assets/js/modules/canonical-v2-project-utils.js?v=20260714-originality-v1"></script>
 	<script defer="" src="assets/js/modules/local-project-v2-migration-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/pre-update-checkpoint-utils.js?v=20260712-pre-update-checkpoint-u3"></script>
 	<script defer="" src="assets/js/active-project-session-utils.js?v=20260715-local-true-v2-cleanup1"></script>
-	<script defer="" src="assets/js/app.js?v=20260726-durable-thumb1"></script>
+    <script defer="" src="assets/js/app.js?v=20260729-project-duplicate1"></script>
 	<script defer="" src="assets/js/modules/update-detection-utils.js?v=20260719-file-protocol1"></script>
   <script>
     (function initPanelAdDocking() {
@@ -2051,24 +2046,49 @@
         });
       }
 
-      const observer = new MutationObserver(refresh);
+      let refreshFrame = 0;
+
+      function isPanelAdDockMutation(mutation) {
+        const isRelevantNode = node => {
+          if (!(node instanceof Element)) return false;
+          return node === document.body
+            || node.matches?.('.panel-section, .mobile-panel, [data-panel-ad-mount], #panelAdPreloadHost')
+            || Boolean(node.closest?.('.panel-section, .mobile-panel, #panelAdPreloadHost'))
+            || Boolean(node.querySelector?.('[data-panel-ad-mount], #panelAdPreloadHost'));
+        };
+        if (mutation.type === 'attributes') return isRelevantNode(mutation.target);
+        return Array.from(mutation.addedNodes).some(isRelevantNode)
+          || Array.from(mutation.removedNodes).some(isRelevantNode);
+      }
+
+      function queueRefresh() {
+        if (refreshFrame) return;
+        refreshFrame = window.requestAnimationFrame(() => {
+          refreshFrame = 0;
+          refresh();
+        });
+      }
+
+      const observer = new MutationObserver(mutations => {
+        if (mutations.some(isPanelAdDockMutation)) queueRefresh();
+      });
       observer.observe(document.body, {
         attributes: true,
         attributeFilter: ['class', 'hidden'],
         childList: true,
         subtree: true,
       });
-      window.addEventListener('resize', refresh);
+      window.addEventListener('resize', queueRefresh, { passive: true });
       document.addEventListener('pixieedraw:ads-ready', () => {
-        refresh();
+        queueRefresh();
         queueContextAdRender();
       });
       if (document.readyState === 'complete') {
-        refresh();
+        queueRefresh();
       } else {
-        window.addEventListener('load', refresh, { once: true });
+        window.addEventListener('load', queueRefresh, { once: true });
       }
-      refresh();
+      queueRefresh();
     })();
   </script>
   <script>
@@ -2164,16 +2184,23 @@
         const useDrawerWidth = isMobileDrawerPanelSlot(container);
         const widthPx = useDrawerWidth ? '100%' : `${frame.width}px`;
         const heightPx = `${frame.height}px`;
-        container.style.setProperty('--panel-ad-width', widthPx);
-        container.style.setProperty('--panel-ad-height', heightPx);
-        container.style.width = widthPx;
-        container.style.minWidth = widthPx;
-        container.style.maxWidth = widthPx;
-        container.style.height = heightPx;
-        container.style.minHeight = heightPx;
-        container.style.maxHeight = heightPx;
-        container.style.marginLeft = 'auto';
-        container.style.marginRight = 'auto';
+        const setStyle = (property, value) => {
+          if (container.style.getPropertyValue(property) === value) return false;
+          container.style.setProperty(property, value);
+          return true;
+        };
+        return [
+          setStyle('--panel-ad-width', widthPx),
+          setStyle('--panel-ad-height', heightPx),
+          setStyle('width', widthPx),
+          setStyle('min-width', widthPx),
+          setStyle('max-width', widthPx),
+          setStyle('height', heightPx),
+          setStyle('min-height', heightPx),
+          setStyle('max-height', heightPx),
+          setStyle('margin-left', 'auto'),
+          setStyle('margin-right', 'auto'),
+        ].some(Boolean);
       }
 
       function queueAllSlots() {
@@ -2343,7 +2370,9 @@
 
       function tryRender(container) {
         if (!isSideRailExpanded(container)) return false;
-        applySideSlotGeometry(container);
+        // Do not synchronously read layout after changing slot geometry.  The
+        // caller retries on the next animation frame, once layout is current.
+        if (applySideSlotGeometry(container)) return false;
         if (!isContainerRenderable(container)) return false;
         if (!isMobileBottomSlot(container) && getSideAdFrameSize(container).width < MIN_SIDE_AD_WIDTH) {
           return false;
@@ -2380,7 +2409,10 @@
         if (resizeObserverByContainer.has(container)) return;
         if (typeof ResizeObserver !== 'function') return;
         const observer = new ResizeObserver(() => {
-          applySideSlotGeometry(container);
+          if (applySideSlotGeometry(container)) {
+            window.requestAnimationFrame(() => tryRender(container));
+            return;
+          }
           if (isContainerRenderable(container)) {
             tryRender(container);
           }
@@ -2398,10 +2430,14 @@
           return;
         }
 
-        applySideSlotGeometry(container);
+        const geometryChanged = applySideSlotGeometry(container);
+        const hadIns = container.querySelector('ins') instanceof HTMLElement;
         getOrCreateIns(container, slotConfig.slot);
         ensureContainerObserver(container);
-        if (tryRender(container)) return;
+        // Creating the <ins> node and applying its geometry both invalidate
+        // layout.  Let the retry below perform visibility measurement in the
+        // following frame instead of forcing a synchronous reflow here.
+        if (!geometryChanged && hadIns && tryRender(container)) return;
 
         if (container.dataset.pixiedRetryLoop === '1') return;
         container.dataset.pixiedRetryLoop = '1';
@@ -2461,7 +2497,23 @@
       window.addEventListener('focus', queueAllSlotsOnce);
       window.addEventListener('online', queueAllSlotsOnce);
 
-      const observer = new MutationObserver(queueAllSlotsOnce);
+      function isStaticAdMutation(mutation) {
+        const selector = '#leftRail, #rightRail, #leftPanelAdSlot, #panelAdPreloadHost, .panel-ad, .mobile-panel';
+        const isRelevantNode = node => {
+          if (!(node instanceof Element)) return false;
+          return node === document.body
+            || node.matches(selector)
+            || Boolean(node.closest(selector))
+            || Boolean(node.querySelector(selector));
+        };
+        if (mutation.type === 'attributes') return isRelevantNode(mutation.target);
+        return Array.from(mutation.addedNodes).some(isRelevantNode)
+          || Array.from(mutation.removedNodes).some(isRelevantNode);
+      }
+
+      const observer = new MutationObserver(mutations => {
+        if (mutations.some(isStaticAdMutation)) queueAllSlotsOnce();
+      });
       observer.observe(document.body, {
         attributes: true,
         attributeFilter: ['class', 'hidden', 'style', 'aria-hidden', 'data-compact', 'data-collapsed'],

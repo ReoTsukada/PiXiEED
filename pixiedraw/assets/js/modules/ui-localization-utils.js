@@ -59,7 +59,6 @@
         extensions: { ja: '拡張', en: 'Extensions', zh: '扩展' },
         help: { ja: '使い方ヘルプ', en: 'Help', zh: '使用帮助' },
         file: { ja: 'ファイル', en: 'File', zh: '文件' },
-        multi: { ja: '共有モード', en: 'Collab', zh: '协作模式' },
       };
   
       dom.mobileTabs.forEach(button => {
@@ -307,7 +306,6 @@
       setLocalizedTextContent('#startupWorkspaceConnect', 'PiXiEEDフォルダに接続', 'Connect PiXiEED Folder');
       setLocalizedTextContent('#startupActionSkip', '編集へ戻る', 'Back to editor');
       setLocalizedTextContent('#globalLoadingIndicatorCancel', 'キャンセル', 'Cancel');
-      setLocalizedTextContent('#multiInviteShare', '共有', 'Share');
       setLocalizedTextContent('#updateToastCloseBtn', '閉じる', 'Close');
   
       applyTabLocalization();
@@ -364,94 +362,8 @@
       setLocalizedSelectOption(dom.controls.layerBlendMode, 'difference', '差の絶対値', 'Difference');
       setLocalizedSelectOption(dom.controls.layerBlendMode, 'exclusion', '除外', 'Exclusion');
   
-      setLocalizedTextContent('#multiEntryMasterTitle', '共有', 'Share');
-      setLocalizedTextContent('#multiEntryMasterMeta', '空欄なら作成、リンクなら開く', 'Create if empty, open if link pasted');
-      setLocalizedTextContent('#multiEntryGuestTitle', '共有を開く', 'Open Shared');
-      setLocalizedTextContent('#multiEntryGuestMeta', '共有リンクを貼り付け', 'Paste invite link');
-      setLocalizedTextContent('#multiEntryJoinAsGuestTitle', '共有を開く', 'Open Shared Project');
-      setLocalizedTextContent('#multiEntryJoinAsGuestMeta', '共有プロジェクトをそのまま開く', 'Open the shared project directly');
-      setLocalizedTextContent('#multiEntrySpectatorTitle', '視聴で入る', 'Join as Viewer');
-      setLocalizedTextContent('#multiEntrySpectatorMeta', '見るだけで入室', 'View-only mode');
-      setLocalizedTextContent('#multiEntryJoinBack', '戻る', 'Back');
-      setLocalizedTextContent('#multiToggleCodeVisibility', '表示', 'Show');
-      setLocalizedTextContent('#multiApplyAccessCode', '確定', 'Apply');
-      setLocalizedTextContent('#multiCopyAccessCode', 'コピー', 'Copy');
       setLocalizedSelectOption(dom.newProject?.createMode, 'local', '通常', 'Normal');
-      setLocalizedSelectOption(dom.newProject?.createMode, 'shared', '共有', 'Shared');
-      setLocalizedToggleLabel('multiDanmakuToggle', 'コメント弾幕', 'Comment Overlay');
-      setLocalizedTextContent('#multiCommentSend', '送信', 'Send');
-      setLocalizedTextContent('#multiLeaveSession', '切断', 'Disconnect');
-      setLocalizedControlLabel('multiJoinProjectKey', '共有リンク / 招待コード', 'Invite Link / Code');
-      setLocalizedControlLabel('multiProjectKey', '共有リンク / 招待コード', 'Invite Link / Code');
-      setLocalizedTextContent('#multiProjectKeyFieldLabel', '共有リンク / 招待コード', 'Invite Link / Code');
-      setLocalizedTextContent('#multiProjectKeyFieldHint', '空欄のまま下の共有ボタンを押すと、新しい共有プロジェクトを作成します。', 'Press Share below with an empty field to create a new shared project.');
-      setLocalizedTextContent('#multiCopyKey', 'コピー', 'Copy');
-      setLocalizedAttribute('#multiCopyKey', 'aria-label', '共有リンクまたは共有IDをコピー', 'Copy invite link or shared ID');
-      setLocalizedAttribute('#multiCopyKey', 'title', '共有リンクまたは共有IDをコピー', 'Copy invite link or shared ID');
-      setLocalizedTextContent('#panelMulti .multi-master-actions > span', '共有', 'Share');
-      setLocalizedTextContent('#multiBroadcastState', '全員に同期', 'Sync to All');
-      setLocalizedTextContent('#multiBroadcastStateLabel', '再同期', 'Resync');
-      setLocalizedTextContent('#multiBroadcastStateHint', '表示ずれや割り当て反映ずれが起きた時だけ使います。', 'Use this only when displays or assignment updates fall out of sync.');
-      setLocalizedTextContent('#multiInviteCopy', '共有URLをコピー', 'Copy Shared URL');
-      setLocalizedTextContent('#multiInviteShare', '招待を共有', 'Share Invite');
-      setLocalizedTextContent('#multiRequestGuestRole', 'そのまま編集できます', 'Edit Immediately');
-      setLocalizedTextContent('#multiJoinRequestHint', '共有リンクを開いた人は、そのまま編集できます。', 'Anyone who opens the invite link can edit immediately.');
-      setLocalizedTextContent('#multiStatus', '共有リンクを作成', 'Create Shared Link');
-      setLocalizedTextContent('#multiFlowTabCollabLabel', '共同', 'Collab');
-      setLocalizedTextContent('#multiFlowTabCommentsLabel', 'コメント', 'Comments');
-      setLocalizedTextContent('#multiParticipantsPanelTabLabel', '参加者一覧', 'Participants');
-      setLocalizedTextContent('#multiCommentsPanelTabLabel', 'コメント', 'Comments');
-      setLocalizedTextContent('#multiOverviewSummary', '共有リンクで開いたプロジェクトを、そのまま共同編集できます。', 'Projects opened from invite links can be edited together immediately.');
-      setLocalizedTextContent('#multiOverviewHint', '描画はリアルタイム反映され、共有プロジェクトの最新状態が基準になります。', 'Drawing updates live, and the shared project snapshot stays the source of truth.');
-      setLocalizedAttribute('#multiHelpToggle', 'aria-label', 'マルチ説明を表示', 'Show collab help');
-      setLocalizedTextContent('#multiHelpPanel > span', 'マルチ説明', 'Collab Help');
-      setLocalizedTextContent('#multiHelpPanel .help-text:nth-of-type(1)', '共有リンクを開いた人は、そのまま同じプロジェクトを編集できます。', 'Anyone who opens the invite link can edit the same project immediately.');
-      setLocalizedTextContent('#multiHelpPanel .help-text:nth-of-type(2)', '描画はリアルタイム反映され、構造変更は共有スナップショット基準で同期されます。', 'Drawing updates live, and structure changes sync from the shared snapshot.');
-      setLocalizedTextContent('#multiHelpPanel .help-text:nth-of-type(3)', '共有プロジェクトは自分のプロジェクト一覧にも残るので、あとから開き直せます。', 'Shared projects stay in your project list so you can reopen them later.');
-      setLocalizedTextContent('#multiHelpPanel .help-text:nth-of-type(4)', '上の入力欄には共有リンクをそのまま貼り付けできます。', 'You can paste the full invite link directly into the field above.');
-      setLocalizedTextContent('#multiHelpClose', '閉じる', 'Close');
-      setLocalizedTextContent('#panelMulti .multi-master-advanced > summary', '部屋設定', 'Room Settings');
-      setLocalizedTextContent('#multiParticipants .help-text', '未接続', 'Not connected');
-      setLocalizedTextContent('#multiPresetFriends', '友達向け', 'Friends');
-      setLocalizedTextContent('#multiPresetStream', '配信向け', 'Streaming');
-      setLocalizedTextContent('#multiPresetHint', '友達向け: 自動参加 / 配信向け: 承認制', 'Friends: auto join / Streaming: approval');
-      setLocalizedTextContent('#multiMasterAdvanced > summary', '詳細設定（必要なときだけ）', 'Advanced (Only When Needed)');
-      setLocalizedTextContent('#panelMulti .multi-capacity-field > span', '参加管理', 'Participant Management');
-      setLocalizedControlLabel('multiMaxGuests', '参加枠 (1〜3)', 'Participant Slots (1-3)');
-      setLocalizedTextContent('#multiGuestCapacityHint', '参加枠: 0 / 1（無料は最大2人）', 'Participant slots: 0 / 1 (2 people max on free)');
-      setLocalizedControlLabel('multiRoomVisibility', '作成する共有', 'Shared Project Type');
-      setLocalizedTextContent('#multiRoomVisibilityHint', '限定はログイン後にコードまたはURLで参加できます。公開はURLからログインなしで参加できます。', 'Limited projects require sign-in to join by code or URL. Public projects can be joined from the URL without signing in.');
-      setLocalizedControlLabel('multiExportPermission', '出力権限', 'Export Permission');
-      setLocalizedControlLabel('multiJoinPolicy', '参加方式', 'Join Policy');
-      setLocalizedTextContent('#multiJoinPolicyHint', '自動参加: 招待リンクは参加者入室になります。', 'Auto Join: invite link opens as participant join.');
-      setLocalizedToggleLabel('multiParticipantFreeCellMove', '参加者が空きセルへ自由移動できるようにする', 'Allow participants to move to any free cell');
-      setLocalizedTextContent('#multiParticipantFreeCellMoveHint', '同じセルへの同時参加はできません。', 'Two participants cannot use the same cell at the same time.');
-      setLocalizedTextContent('#panelMulti .multi-join-requests-field > span', '参加一覧', 'Participants');
-      setLocalizedControlLabel('multiJoinRequestTarget', '対象', 'Target');
-      setLocalizedTextContent('#multiJoinRequestApprove', '承認', 'Approve');
-      setLocalizedTextContent('#multiJoinRequestReject', '却下', 'Reject');
-      setLocalizedTextContent('#panelMulti .multi-master-ops-toggle-field > span', '運営モード', 'Ops Mode');
-      setLocalizedToggleLabel('multiMasterOpsMode', 'キック / BAN / 強制切替を表示', 'Show kick / ban / force role switch');
-      setLocalizedTextContent('#multiMasterOpsHint', '通常はOFF推奨です。', 'OFF is recommended for normal use.');
-      setLocalizedTextContent('#panelMulti .multi-role-control-field > span', '参加/視聴の切替', 'Participant/Viewer Switch');
-      setLocalizedControlLabel('multiAssignTarget', '対象', 'Target');
-      setLocalizedTextContent('#multiForceGuest', '参加者にする', 'Set Participant');
-      setLocalizedTextContent('#multiForceSpectator', '視聴者にする', 'Set Viewer');
-      setLocalizedTextContent('#panelMulti .multi-assignment-field > span', '参加者セル移動', 'Move Participant Cell');
-      setLocalizedControlLabel('multiAssignFrame', 'フレーム', 'Frame');
-      setLocalizedControlLabel('multiAssignLayer', 'レイヤー', 'Layer');
-      setLocalizedTextContent('#multiAssignApply', '参加者を移動', 'Move Participant');
-      setLocalizedTextContent('#multiAssignLockToggle', 'セルロック', 'Cell Lock');
-      setLocalizedTextContent('#multiAssignKick', 'キック', 'Kick');
-      setLocalizedTextContent('#multiAssignBan', 'BAN', 'Ban');
-  
       setLocalizedTextContent('#goHomeButton span:last-child', 'ホーム', 'Home');
-      setLocalizedTextContent('#multiEntryAccountCard .multi-account-card__head > span', '共有プロジェクトを作成', 'Create Shared Project');
-      setLocalizedTextContent('#multiFlowAccountCard .multi-account-card__head > span', '共有プロジェクトを作成', 'Create Shared Project');
-      setLocalizedTextContent('#multiEntryAccountLogin', 'ログインして共有を作成', 'Sign In to Create Shared Project');
-      setLocalizedTextContent('#multiFlowAccountLogin', 'ログインして共有を作成', 'Sign In to Create Shared Project');
-      setLocalizedTextContent('#multiSupportCard .multi-support-card__head > span', '利用枠', 'Availability');
-      setLocalizedTextContent('#multiSupportPurchase', '利用可能', 'Available');
       setLocalizedTextContent('#detailSupportPurchase span:last-child', '利用可能', 'Available');
       setLocalizedTextContent('#supportTipLink', 'サポート', 'Support');
       setLocalizedAttribute('#supportTipLink', 'aria-label', 'サポート', 'Support');
@@ -467,12 +379,9 @@
       setLocalizedTextContent('#pixieedPwaInstallField > span', 'アプリとして使う', 'Install as App');
       setLocalizedTextContent('#pixieedPwaInstallButton', 'インストール案内を開く', 'Open Install Guide');
   
-      setLocalizedTextContent('#settingsSizeTitle', 'サイズ', 'Size');
-      setLocalizedControlLabel('canvasWidth', 'X', 'X');
-      setLocalizedControlLabel('canvasHeight', 'Y', 'Y');
-      setLocalizedTextContent('#canvasSizeHint', 'X/Y と倍率をまとめて調整', 'Adjust X/Y and scale together.');
-      setLocalizedControlLabel('spriteScaleInput', '倍率', 'Scale');
-      setLocalizedTextContent('#applySpriteScale', '適用', 'Apply');
+      setLocalizedTextContent('#settingsSizeTitle', 'キャンバスを広げる・切り取る', 'Extend or Crop Canvas');
+      setLocalizedTextContent('#applySpriteScale', 'サイズを適用', 'Apply Size');
+      setLocalizedTextContent('#resetCanvasResize', '変更を戻す', 'Reset Changes');
       setLocalizedTextContent('#panelSettings .settings-color-mode-field > span', 'カラーモード', 'Color Mode');
       setLocalizedAttribute('#settingsColorModeSwitch', 'aria-label', 'カラーモード', 'Color Mode');
       setLocalizedTextContent('#colorModeIndexLabel', 'インデックスカラー', 'Indexed Color');
@@ -613,11 +522,6 @@
       setLocalizedTextContent('#newProjectModeLocal', '通常', 'Normal');
       setLocalizedTextContent('#newProjectAdContainer .export-ad__label', '広告', 'Ad');
       setLocalizedTextContent('#cancelNewProject', 'キャンセル', 'Cancel');
-      setLocalizedTextContent('#globalHistoryConfirmTitle', '全体Undo', 'Shared Undo');
-      setLocalizedTextContent('#globalHistoryConfirmMessage', 'この操作はプロジェクト全体に反映されます。', 'This action updates the whole project.');
-      setLocalizedTextContent('#globalHistoryConfirmDetail', '続ける前に内容を確認してください。', 'Check before continuing.');
-      setLocalizedTextContent('#globalHistoryConfirmCancel', 'キャンセル', 'Cancel');
-      setLocalizedTextContent('#globalHistoryConfirmConfirm', '全体Undoする', 'Run Shared Undo');
   
       setLocalizedTextContent('#shortcutHelpTitle', 'ショートカット一覧', 'Keyboard Shortcuts');
       setLocalizedTextContent('#closeShortcutHelp', '閉じる', 'Close');
@@ -641,7 +545,7 @@
       setLocalizedTextContent('#helpPanelTitle', '使い方ヘルプ', 'Help');
       setLocalizedTextContent('#helpPanelLead', '操作方法を検索できます。必要なキーワードを入力してください。', 'Search operation guides by keyword.');
       setLocalizedTextContent('#helpSearchLabel', '検索', 'Search');
-      setLocalizedAttribute('#helpSearchInput', 'placeholder', '例: 選択移動 / ミラー / GIF / マルチ', 'e.g. selection move / mirror / gif / collab');
+      setLocalizedAttribute('#helpSearchInput', 'placeholder', '例: 選択移動 / ミラー / GIF', 'e.g. selection move / mirror / gif');
       setLocalizedTextContent('#helpSearchHint', '検索は日本語/英語どちらでも使えます。', 'Search works with both Japanese and English terms.');
       setLocalizedTextContent('#toggleInlineHelpLabel', '画面内の説明ラベルを表示', 'Show inline guide labels');
       setLocalizedTextContent('#helpClearSearch', 'クリア', 'Clear');

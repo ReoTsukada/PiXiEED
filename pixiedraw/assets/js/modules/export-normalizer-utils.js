@@ -43,6 +43,7 @@
   function normalizeExportFormat(mode) {
     const normalized = String(mode || '').trim().toLowerCase();
     if (normalized === 'gif') return 'gif';
+    if (normalized === 'timelapse' || normalized === 'timelapsegif' || normalized === 'timelapse-gif') return 'timelapse';
     if (normalized === 'jpeg' || normalized === 'jpg') return 'jpeg';
     if (normalized === 'svg') return 'svg';
     if (normalized === 'voxelpreview' || normalized === 'voxel-preview' || normalized === 'previewpng') return 'voxelpreview';

@@ -415,7 +415,9 @@
           height:var(--viewport-height, var(--app-height, 100dvh)) !important;
           min-height:var(--viewport-height, var(--app-height, 100dvh)) !important;
           max-height:var(--viewport-height, var(--app-height, 100dvh)) !important;
-          flex-direction:column !important;
+          /* Keep the primary destinations nearest the thumb in landscape:
+             account at the top and home at the bottom. */
+          flex-direction:column-reverse !important;
           justify-content:center !important;
           gap:2px;
           padding:calc(var(--safe-top, env(safe-area-inset-top, 0px)) + 8px) 0 calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 8px) !important;

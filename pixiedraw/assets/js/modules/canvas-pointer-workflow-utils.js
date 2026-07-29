@@ -41,8 +41,6 @@
   });
   const VIEWPORT_GESTURE_CONFIG = viewportGestureArbiter.VIEWPORT_GESTURE_CONFIG || {};
   const COMPRESSED_SELECTION_MOVE_MIN_PIXELS = 32768;
-  const DEFERRED_LARGE_BRUSH_SIZE = 12;
-  const BRUSH_APPLY_FRAME_MIN_SIZE = 3;
 
   function readLayerPaletteIndex(layer, pixelIndex) {
     if (typeof getStoredRasterLayerPaletteIndex === 'function') {
@@ -114,27 +112,6 @@
     return true;
   }
 
-  function shouldDeferLargeBrushStroke() {
-    return (pointerState.tool === 'pen' || pointerState.tool === 'eraser')
-      && Math.max(1, Math.round(Number(state.brushSize) || 1)) >= DEFERRED_LARGE_BRUSH_SIZE;
-  }
-
-  function flushQueuedBrushPath({ force = false } = {}) {
-    pointerState.brushApplyFrame = null;
-    if ((!force && !pointerState.active) || (pointerState.tool !== 'pen' && pointerState.tool !== 'eraser')) return;
-    const cursor = Math.max(0, Math.floor(Number(pointerState.brushApplyCursor) || 0));
-    const path = Array.isArray(pointerState.path) ? pointerState.path : [];
-    if (path.length <= cursor) return;
-    const segmentStart = Math.max(0, cursor - 1);
-    applyBrushPath(path.slice(segmentStart));
-    pointerState.brushApplyCursor = path.length;
-  }
-
-  function scheduleQueuedBrushPath() {
-    if (pointerState.brushApplyFrame !== null && pointerState.brushApplyFrame !== undefined) return;
-    pointerState.brushApplyFrame = window.requestAnimationFrame(flushQueuedBrushPath);
-  }
-
   function detachPointerListeners() {
     window.removeEventListener('pointermove', handlePointerMove);
     window.removeEventListener('pointerup', handlePointerUp);
@@ -177,6 +154,7 @@
     pointerState.path = [];
     pointerState.brushApplyCursor = 0;
     pointerState.brushApplyFrame = null;
+    pointerState.brushApplyStats = null;
     pointerState.shapeDrag = null;
     pointerState.preview = null;
     pointerState.selectionPreview = null;
@@ -221,6 +199,7 @@
     pointerState.path = [];
     pointerState.brushApplyCursor = 0;
     pointerState.brushApplyFrame = null;
+    pointerState.brushApplyStats = null;
     pointerState.shapeDrag = null;
     pointerState.preview = null;
     pointerState.selectionPreview = null;
@@ -624,9 +603,10 @@
       abortActivePointerInteraction({ commitHistory: false });
       if (!wasSelectionTransform) {
         if (HISTORY_DRAW_TOOLS.has(toolBaseline?.tool)) {
-          // The layer baseline below restores pixels directly. Discarding the
-          // pending history avoids rebuilding document state and losing touch IDs.
-          discardPendingHistory();
+          // A pen may have committed a small raster batch before a second
+          // touch promotes the interaction to pan. Restore that pending
+          // batch; merely discarding history would leave cancelled pixels.
+          rollbackPendingHistory({ reRender: false });
         } else {
           rollbackPendingHistory();
         }
@@ -805,6 +785,9 @@
       finishPanInteraction();
     } else if (pointerState.active) {
       abortActivePointerInteraction({ commitHistory: false });
+      // Brush stamps can already be committed incrementally when a window or
+      // gesture is cancelled. Roll back the one pending history entry so a
+      // cancelled stroke never survives merely because its overlay is gone.
       rollbackPendingHistory({ reRender: false });
       clearSharedProjectInFlightStroke();
     }
@@ -1238,8 +1221,15 @@
     pointerState.current = position;
     pointerState.last = position;
     pointerState.path = position ? [position] : [];
+    pointerState.stamps = position ? [{ ...position }] : [];
     pointerState.brushApplyCursor = 0;
     pointerState.brushApplyFrame = null;
+    pointerState.brushApplyStats = {
+      stampCount: 0,
+      rasterWriteMs: 0,
+      scheduleRenderMs: 0,
+      frameListMs: 0,
+    };
     pointerState.preview = null;
     pointerState.selectionPreview = null;
     if (HISTORY_DRAW_TOOLS.has(activeTool)) {
@@ -1299,12 +1289,13 @@
       pointerState.preview = { start: position, end: position, points: [position] };
     } else {
       beginSharedProjectStrokeCapture(activeTool, position, interactionSurface);
-      if (shouldDeferLargeBrushStroke()) {
-        pointerState.preview = { kind: 'deferredBrushStroke', points: pointerState.path };
+      // A pen is direct manipulation: commit its first stamp immediately,
+      // then let the normal canvas rAF present it.  Do not queue a visible
+      // trail behind the pointer; the pending history entry still supports
+      // a full cancellation of this stroke.
+      applyPendingBrushStamps({ flush: true });
+      if (state.showPixelGuides || state.showVirtualCursor) {
         requestOverlayRender();
-      } else {
-        applyBrushStroke(position.x, position.y, position.x, position.y);
-        pointerState.brushApplyCursor = pointerState.path.length;
       }
     }
 
@@ -1384,30 +1375,54 @@
       return;
     }
 
+    if (pointerState.tool === 'pen' || pointerState.tool === 'eraser') {
+      const samples = typeof event.getCoalescedEvents === 'function'
+        ? event.getCoalescedEvents()
+        : [event];
+      const sourceSamples = samples?.length ? samples : [event];
+      let appended = false;
+      for (const sample of sourceSamples) {
+        const position = getPointerPosition(sample, { clampToCanvas: true, surface: pointerState.surface });
+        if (!position) continue;
+        const previous = pointerState.last || position;
+        pointerState.current = position;
+        pointerState.path.push(position);
+        appendBrushStrokeStamps(pointerState.stamps, previous, position);
+        appendSharedProjectStrokePoint(position);
+        pointerState.last = position;
+        appended = true;
+      }
+      if (!appended) return;
+      // Apply all samples received for this browser event as one raster batch.
+      // This matches a direct pen instead of slowly replaying a queue over
+      // later animation frames.
+      applyPendingBrushStamps({ flush: true });
+      if (state.showPixelGuides || state.showVirtualCursor) {
+        requestOverlayRender();
+      }
+      return;
+    }
+
     const position = getPointerPosition(event, { clampToCanvas: true, surface: pointerState.surface });
     if (!position) return;
     pointerState.current = position;
     pointerState.path.push(position);
 
-    if (pointerState.tool === 'pen' || pointerState.tool === 'eraser') {
-      appendSharedProjectStrokePoint(position);
-      if (shouldDeferLargeBrushStroke()) {
-        pointerState.preview = { kind: 'deferredBrushStroke', points: pointerState.path };
-        requestOverlayRender();
-      } else {
-        if (Math.max(1, Math.round(Number(state.brushSize) || 1)) >= BRUSH_APPLY_FRAME_MIN_SIZE) {
-          scheduleQueuedBrushPath();
-        } else {
-          applyBrushStroke(pointerState.last.x, pointerState.last.y, position.x, position.y);
-          pointerState.brushApplyCursor = pointerState.path.length;
-        }
-      }
-      pointerState.last = position;
-    } else if (FILL_TOOLS.has(pointerState.tool)) {
+    if (FILL_TOOLS.has(pointerState.tool)) {
       const last = pointerState.last;
       if (!last || last.x !== position.x || last.y !== position.y) {
         pointerState.last = position;
-        requestOverlayRender();
+        // Solid bucket output is determined only at commit, so it needs no
+        // drag-time canvas work. A gradient remains live because its endpoint
+        // changes the eventual pixels.
+        const fillStyle = getFillStyleForInteraction(
+          pointerState.tool,
+          pointerState.start,
+          pointerState.current
+        );
+        if (isGradientFillStyle(fillStyle)) {
+          requestOverlayRender();
+        }
       }
     } else if (pointerState.tool === 'line' || pointerState.tool === 'rect' || pointerState.tool === 'rectFill' || pointerState.tool === 'ellipse' || pointerState.tool === 'ellipseFill') {
       const shapePoints = getConstrainedShapePoints(pointerState.tool, position, event);
@@ -1583,10 +1598,41 @@
 
     const shapeStart = pointerState.preview?.start || pointerState.start;
     const shapeEnd = pointerState.preview?.end || pointerState.current;
-    if ((tool === 'pen' || tool === 'eraser') && pointerState.preview?.kind === 'deferredBrushStroke') {
-      applyBrushPath(pointerState.path);
-    } else if (tool === 'pen' || tool === 'eraser') {
-      flushQueuedBrushPath({ force: true });
+    let brushCommitMetrics = null;
+    if (tool === 'pen' || tool === 'eraser') {
+      const brushCommitStartedAt = performance.now();
+      const inputPointCount = Array.isArray(pointerState.path) ? pointerState.path.length : 0;
+      const finalizePathStartedAt = performance.now();
+      const finalPosition = getPointerPosition(event, { clampToCanvas: true, surface: pointerState.surface });
+      if (finalPosition) {
+        const previous = pointerState.last || finalPosition;
+        if (!pointerState.current || finalPosition.x !== pointerState.current.x || finalPosition.y !== pointerState.current.y) {
+          pointerState.current = finalPosition;
+          pointerState.path.push(finalPosition);
+        }
+        appendBrushStrokeStamps(pointerState.stamps, previous, finalPosition, { forceFinal: true });
+      }
+      const finalizePathMs = performance.now() - finalizePathStartedAt;
+      cancelIncrementalBrushApply();
+      const flushApplyStats = applyPendingBrushStamps({ flush: true }) || {};
+      const accumulatedApplyStats = pointerState.brushApplyStats || {};
+      const frameListStartedAt = performance.now();
+      renderFrameList();
+      const frameListMs = performance.now() - frameListStartedAt;
+      brushCommitMetrics = {
+        startedAt: brushCommitStartedAt,
+        finalizePathMs,
+        inputPointCount,
+        applyStats: {
+          // PointerUp must report only the tail that still required a
+          // synchronous write. The accumulated value happened during the
+          // stroke and is logged separately for truthful comparison.
+          ...flushApplyStats,
+          frameListMs,
+          stampCount: Math.max(0, Number(accumulatedApplyStats.stampCount) || 0),
+          incrementalRasterWriteMs: Math.max(0, Number(accumulatedApplyStats.rasterWriteMs) || 0),
+        },
+      };
     } else if (tool === 'line') {
       captureSharedProjectShapeCommand(tool, shapeStart, shapeEnd, pointerState.surface);
       drawLine(shapeStart, shapeEnd);
@@ -1674,8 +1720,37 @@
     }
 
     if (HISTORY_DRAW_TOOLS.has(tool)) {
+      const historyCommitStartedAt = performance.now();
       commitHistory();
+      const historyCommitMs = performance.now() - historyCommitStartedAt;
       clearSharedProjectInFlightStroke();
+      if (brushCommitMetrics) {
+        const pointerUpElapsedMs = performance.now() - brushCommitMetrics.startedAt;
+        if (pointerUpElapsedMs >= 16) {
+          const applyStats = brushCommitMetrics.applyStats || {};
+          try {
+            console.info('[pixiedraw:performance]', {
+              phase: 'pixiedraw:pointerup:brush-commit',
+              elapsedMs: Math.round(pointerUpElapsedMs * 10) / 10,
+              pointerActive: Boolean(pointerState.active),
+              timings: {
+                finalizePathMs: Math.round(brushCommitMetrics.finalizePathMs * 10) / 10,
+                rasterWriteMs: Math.round((Number(applyStats.rasterWriteMs) || 0) * 10) / 10,
+                scheduleRenderMs: Math.round((Number(applyStats.scheduleRenderMs) || 0) * 10) / 10,
+                frameListMs: Math.round((Number(applyStats.frameListMs) || 0) * 10) / 10,
+                incrementalRasterWriteMs: Math.round((Number(applyStats.incrementalRasterWriteMs) || 0) * 10) / 10,
+                createUndoEntryMs: Math.round(historyCommitMs * 10) / 10,
+              },
+              counts: {
+                inputPointCount: brushCommitMetrics.inputPointCount,
+                totalStampCount: Math.max(0, Number(applyStats.stampCount) || 0),
+              },
+            });
+          } catch (error) {
+            console.warn('[pixiedraw:performance] pointerup logging failed', error);
+          }
+        }
+      }
     } else if (tool === 'selectSame') {
       const target = pointerState.current || pointerState.start;
       if (target) {
@@ -1694,8 +1769,11 @@
     pointerState.selectionClearedOnDown = false;
     pointerState.selectionExtendOnDown = false;
     pointerState.path = [];
+    pointerState.stamps = [];
+    cancelIncrementalBrushApply();
     pointerState.brushApplyCursor = 0;
     pointerState.brushApplyFrame = null;
+    pointerState.brushApplyStats = null;
     pointerState.shapeDrag = null;
     pointerState.surface = null;
     flushActiveProjectCanvasUiSync();
@@ -1759,6 +1837,13 @@
         return;
       }
       if (FILL_TOOLS.has(pointerState.tool)) {
+        abortActivePointerInteraction({ commitHistory: false });
+        rollbackPendingHistory({ reRender: false });
+        clearSharedProjectInFlightStroke();
+        requestOverlayRender();
+        return;
+      }
+      if (pointerState.tool === 'pen' || pointerState.tool === 'eraser') {
         abortActivePointerInteraction({ commitHistory: false });
         rollbackPendingHistory({ reRender: false });
         clearSharedProjectInFlightStroke();
@@ -4352,40 +4437,115 @@
       }
     });
     requestRender();
+    renderFrameList();
   }
 
-  function applyBrushPath(path) {
-    const layer = getActiveLayer();
-    if (!layer || !Array.isArray(path) || !path.length) return;
+  function getBrushStrokeStampStride() {
     const brushSize = Math.max(1, Math.round(Number(state.brushSize) || 1));
-    const stampStride = brushSize >= DEFERRED_LARGE_BRUSH_SIZE ? Math.max(1, Math.floor(brushSize / 5)) : 1;
-    const minDistanceSq = stampStride * stampStride;
-    let lastStamp = null;
-    const stampIfNeeded = point => {
-      if (!point) return;
+    return brushSize >= 12 ? Math.max(1, Math.floor(brushSize / 5)) : 1;
+  }
+
+  function appendBrushStrokeStamps(stamps, previous, current, { forceFinal = false } = {}) {
+    if (!Array.isArray(stamps) || !current) return;
+    const stride = getBrushStrokeStampStride();
+    const minDistanceSq = stride * stride;
+    const appendIfSpaced = point => {
+      const lastStamp = stamps[stamps.length - 1] || null;
       const dx = lastStamp ? point.x - lastStamp.x : Infinity;
       const dy = lastStamp ? point.y - lastStamp.y : Infinity;
       if (!lastStamp || (dx * dx) + (dy * dy) >= minDistanceSq) {
-        stampBrush(layer, point.x, point.y);
-        lastStamp = point;
+        stamps.push({ x: point.x, y: point.y });
       }
     };
-    withRasterBatch(() => {
-      stampIfNeeded(path[0]);
-      for (let segmentIndex = 1; segmentIndex < path.length; segmentIndex += 1) {
-        const previous = path[segmentIndex - 1];
-        const current = path[segmentIndex];
-        const points = bresenhamLine(previous.x, previous.y, current.x, current.y);
-        for (let pointIndex = 1; pointIndex < points.length; pointIndex += 1) {
-          stampIfNeeded(points[pointIndex]);
-        }
+    const from = previous || current;
+    const segment = bresenhamLine(from.x, from.y, current.x, current.y);
+    for (let index = 1; index < segment.length; index += 1) {
+      appendIfSpaced(segment[index]);
+    }
+    const lastStamp = stamps[stamps.length - 1] || null;
+    if (forceFinal && (!lastStamp || lastStamp.x !== current.x || lastStamp.y !== current.y)) {
+      stamps.push({ x: current.x, y: current.y });
+    }
+  }
+
+  function applyBrushPath(path, {
+    precomputedStamps = false,
+    requestRender: shouldRequestRender = true,
+    renderFrameList: shouldRenderFrameList = true,
+  } = {}) {
+    const layer = getActiveLayer();
+    if (!layer || !Array.isArray(path) || !path.length) return;
+    const stamps = precomputedStamps ? path : (() => {
+      const output = [{ x: path[0].x, y: path[0].y }];
+      for (let index = 1; index < path.length; index += 1) {
+        appendBrushStrokeStamps(output, path[index - 1], path[index]);
       }
-      const finalPoint = path[path.length - 1];
-      if (finalPoint && (!lastStamp || finalPoint.x !== lastStamp.x || finalPoint.y !== lastStamp.y)) {
-        stampBrush(layer, finalPoint.x, finalPoint.y);
+      appendBrushStrokeStamps(output, path[path.length - 1], path[path.length - 1], { forceFinal: true });
+      return output;
+    })();
+    const rasterWriteStartedAt = performance.now();
+    withRasterBatch(() => {
+      for (const point of stamps) {
+        stampBrush(layer, point.x, point.y);
       }
     });
-    requestRender();
+    const rasterWriteMs = performance.now() - rasterWriteStartedAt;
+    let scheduleRenderMs = 0;
+    if (shouldRequestRender) {
+      const scheduleRenderStartedAt = performance.now();
+      requestRender();
+      scheduleRenderMs = performance.now() - scheduleRenderStartedAt;
+    }
+    let frameListMs = 0;
+    if (shouldRenderFrameList) {
+      const frameListStartedAt = performance.now();
+      renderFrameList();
+      frameListMs = performance.now() - frameListStartedAt;
+    }
+    return {
+      stampCount: stamps.length,
+      rasterWriteMs,
+      scheduleRenderMs,
+      frameListMs,
+    };
+  }
+
+  function cancelIncrementalBrushApply() {
+    if (pointerState.brushApplyFrame !== null && pointerState.brushApplyFrame !== undefined) {
+      window.cancelAnimationFrame(pointerState.brushApplyFrame);
+    }
+    pointerState.brushApplyFrame = null;
+  }
+
+  function applyPendingBrushStamps({ flush = false } = {}) {
+    const stamps = Array.isArray(pointerState.stamps) ? pointerState.stamps : [];
+    const start = clamp(Math.round(Number(pointerState.brushApplyCursor) || 0), 0, stamps.length);
+    if (start >= stamps.length) return null;
+    // Pointer events are batched into one direct raster write.  The optional
+    // non-flush limit remains available for callers that explicitly need a
+    // bounded background drain, but pen input always flushes its event range.
+    const maxStamps = flush
+      ? (stamps.length - start)
+      : (isMirrorEnabledForTool(pointerState.tool) ? 1 : 4);
+    const end = Math.min(stamps.length, start + Math.max(1, maxStamps));
+    const stats = applyBrushPath(stamps.slice(start, end), {
+      precomputedStamps: true,
+      renderFrameList: false,
+    }) || null;
+    pointerState.brushApplyCursor = end;
+    if (stats) {
+      const total = pointerState.brushApplyStats || {
+        stampCount: 0,
+        rasterWriteMs: 0,
+        scheduleRenderMs: 0,
+        frameListMs: 0,
+      };
+      total.stampCount += Math.max(0, Number(stats.stampCount) || 0);
+      total.rasterWriteMs += Math.max(0, Number(stats.rasterWriteMs) || 0);
+      total.scheduleRenderMs += Math.max(0, Number(stats.scheduleRenderMs) || 0);
+      pointerState.brushApplyStats = total;
+    }
+    return stats;
   }
 
   function resolveDrawPaletteIndex(paletteIndexOverride) {

@@ -113,6 +113,40 @@
     return frame.layers.find(layer => layer?.trackId === trackId) || null;
   }
 
+  // Timeline markers represent raster content, not merely the existence of a
+  // frame/layer cell. Empty cels remain selectable, but do not show a green
+  // dot. Sparse tiles make the common empty case O(1).
+  function layerHasTimelineRasterContent(layer) {
+    if (!layer) {
+      return false;
+    }
+    const hasVisibleDirectPixel = value => {
+      if (!(value instanceof Uint8ClampedArray)) return false;
+      for (let index = 3; index < value.length; index += 4) {
+        if (value[index] !== 0) return true;
+      }
+      return false;
+    };
+    if (hasVisibleDirectPixel(layer.direct) || hasVisibleDirectPixel(layer.importSourceDirect)) {
+      return true;
+    }
+    if (layer.indicesTiles instanceof Map) {
+      return layer.indicesTiles.size > 0;
+    }
+    if (Array.isArray(layer.indicesTiles)) {
+      return layer.indicesTiles.some(tile => tile instanceof Uint8Array && tile.some(value => value !== 0));
+    }
+    if (Array.isArray(layer.indices) || ArrayBuffer.isView(layer.indices)) {
+      const usesNegativeTransparentIndex = layer.indices instanceof Int16Array
+        || layer.indices instanceof Int32Array;
+      return Array.prototype.some.call(
+        layer.indices,
+        value => usesNegativeTransparentIndex ? value >= 0 : value !== 0
+      );
+    }
+    return false;
+  }
+
   function getActiveLayerTrackId() {
     const frame = getActiveFrame();
     const layer = frame?.layers?.find(item => item?.id === state.activeLayer) || null;
@@ -1432,11 +1466,17 @@
 
     if (dom.controls.layerOpacity instanceof HTMLInputElement) {
       const opacityControl = dom.controls.layerOpacity;
+      let layerOpacityHistoryActive = false;
       const readOpacityPercent = () => {
         const percent = clamp(Math.round(Number(opacityControl.value) || 0), 0, 100);
         opacityControl.value = String(percent);
         updateLayerOpacityOutput(percent);
         return percent;
+      };
+      const finalizeLayerOpacityHistory = () => {
+        if (!layerOpacityHistoryActive) return;
+        layerOpacityHistoryActive = false;
+        commitHistory();
       };
 
       opacityControl.addEventListener('input', () => {
@@ -1445,10 +1485,17 @@
           syncActiveLayerSettingsUI();
           return;
         }
+        if (!layerOpacityHistoryActive) {
+          beginHistory('setLayerOpacity', {
+            trackId: getLayerTrackIdForRow(getActiveLayerTrackIndex()),
+          });
+          layerOpacityHistoryActive = Boolean(history.pending);
+        }
         const changed = setActiveLayerTrackOpacity(opacityPercent / 100);
         if (!changed) {
           return;
         }
+        markHistoryDirty();
         clearPlaybackFrameCache();
         requestRender();
         requestOverlayRender();
@@ -1456,6 +1503,9 @@
         renderTimelineMatrix();
         scheduleSessionPersist({ includeSnapshots: false });
       });
+      opacityControl.addEventListener('change', finalizeLayerOpacityHistory);
+      opacityControl.addEventListener('blur', finalizeLayerOpacityHistory);
+      opacityControl.addEventListener('pointercancel', finalizeLayerOpacityHistory);
     }
 
     if (dom.controls.layerBlendMode instanceof HTMLSelectElement) {
@@ -1463,7 +1513,9 @@
       blendControl.addEventListener('change', () => {
         const normalizedBlendMode = normalizeLayerBlendMode(blendControl.value);
         blendControl.value = normalizedBlendMode;
-        beginHistory('setLayerBlendMode');
+        beginHistory('setLayerBlendMode', {
+          trackId: getLayerTrackIdForRow(getActiveLayerTrackIndex()),
+        });
         const changed = setActiveLayerTrackBlendMode(normalizedBlendMode);
         if (changed) {
           markHistoryDirty();
@@ -1614,15 +1666,35 @@
       applyTimelineToolbarFrames();
       scheduleSessionPersist();
     });
-    dom.controls.animationFps?.addEventListener('change', () => {
+    let frameFpsHistoryActive = false;
+    const applyActiveFrameFps = ({ finalize = false } = {}) => {
       const frame = getActiveFrame();
       const fps = normalizeFpsValue(dom.controls.animationFps.value);
       const nextDuration = getDurationFromFps(fps);
-      if (frame) {
+      if (frame && Math.abs((Number(frame.duration) || 0) - nextDuration) > 0.001) {
+        if (!frameFpsHistoryActive) {
+          beginHistory('setFrameFps');
+          frameFpsHistoryActive = Boolean(history.pending);
+        }
         frame.duration = nextDuration;
         markHistoryDirty();
+        scheduleSessionPersist();
+        renderTimelineMatrix();
       }
       updateAnimationFpsDisplay(fps, nextDuration);
+      if (finalize && frameFpsHistoryActive) {
+        frameFpsHistoryActive = false;
+        commitHistory();
+      }
+    };
+    dom.controls.animationFps?.addEventListener('input', () => {
+      applyActiveFrameFps();
+    });
+    dom.controls.animationFps?.addEventListener('change', () => {
+      applyActiveFrameFps({ finalize: true });
+    });
+    dom.controls.animationFps?.addEventListener('blur', () => {
+      applyActiveFrameFps({ finalize: true });
     });
 
     dom.controls.applyFpsAll?.addEventListener('click', () => {
@@ -1888,6 +1960,7 @@
     if (!needsChange) {
       return;
     }
+    beginHistory('setLayerVisibility', { trackId });
     state.frames.forEach(frame => {
       const targetLayer = getLayerByTrackId(frame, trackId);
       if (targetLayer && getDisplayedLayerVisibility(targetLayer, true) !== nextVisible) {
@@ -1896,11 +1969,13 @@
       }
     });
     clearPlaybackFrameCache();
+    markHistoryDirty();
     scheduleSessionPersist({ includeSnapshots: false });
     renderLayerList();
     renderTimelineMatrix();
     requestRender();
     requestOverlayRender();
+    commitHistory();
   }
 
   function toggleLayerVisibilityForRow(rowIndex) {
@@ -3536,10 +3611,12 @@
             }
             event.stopPropagation();
           });
-          const marker = document.createElement('span');
-          marker.className = 'timeline-slot__marker';
-          marker.setAttribute('aria-hidden', 'true');
-          slot.appendChild(marker);
+          if (layerHasTimelineRasterContent(targetLayer)) {
+            const marker = document.createElement('span');
+            marker.className = 'timeline-slot__marker';
+            marker.setAttribute('aria-hidden', 'true');
+            slot.appendChild(marker);
+          }
 
           let slotVariant = 'default';
           if (!targetLayer.visible) {

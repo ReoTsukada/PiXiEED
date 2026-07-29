@@ -503,8 +503,11 @@
     return MIRROR_AXIS_KEYS.includes(axis);
   }
 
-  function isMirrorEnabledForTool(tool = pointerState.tool || state.tool) {
-    const mirrorState = getNormalizedMirrorState();
+  function isMirrorEnabledForTool(tool = pointerState.tool || state.tool, normalizedMirrorState = null) {
+    // Callers which expand many pixels for one operation can provide the
+    // already-normalized state. This keeps the exact mirror rules while
+    // avoiding a state normalization for every source pixel.
+    const mirrorState = normalizedMirrorState || getNormalizedMirrorState();
     if (!mirrorState.enabled) {
       return false;
     }
@@ -891,14 +894,15 @@
     const {
       tool = pointerState.tool || state.tool,
       includeOriginal = true,
+      mirrorState: suppliedMirrorState = null,
     } = options;
     const width = Math.max(1, Number(state.width) || 1);
     const height = Math.max(1, Number(state.height) || 1);
     const result = [];
     const queue = [];
     const visited = new Set();
-    const mirrorState = getNormalizedMirrorState();
-    const mirrorEnabled = isMirrorEnabledForTool(tool);
+    const mirrorState = suppliedMirrorState || getNormalizedMirrorState();
+    const mirrorEnabled = isMirrorEnabledForTool(tool, mirrorState);
 
     const addPoint = (candidateX, candidateY) => {
       if (!Number.isFinite(candidateX) || !Number.isFinite(candidateY)) {
@@ -1781,12 +1785,6 @@
         requestManualAppReload('manual-toolbar-reload');
       });
     }
-    if (dom.controls.sharedStatusRecoverAction instanceof HTMLButtonElement) {
-      dom.controls.sharedStatusRecoverAction.addEventListener('click', () => {
-        requestManualAppReload('manual-status-reload');
-      });
-    }
-
     updateCanvasControlButtons();
 
     dom.controls.brushSize?.addEventListener('input', event => {
@@ -1794,6 +1792,10 @@
       if (dom.controls.brushSizeValue) {
         dom.controls.brushSizeValue.textContent = `${state.brushSize}px`;
       }
+      // Keep a stationary hover/virtual-cursor preview in sync with the
+      // slider. Without this, the old 1px overlay remained until the pointer
+      // moved even though the actual brush size had already changed.
+      requestOverlayRender();
       scheduleUiStatePersist();
     });
 

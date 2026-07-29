@@ -42,17 +42,6 @@
     normalizeDocumentName,
     getTransparentPaletteIndex,
     DEFAULT_LAYER_BLEND_MODE,
-    SIM_SOURCE_COLOR,
-    SIM_ELEMENT_PALETTE,
-    SIM_MIXED,
-    SIM_DEFAULT_STYLE,
-    SIM_DEFAULT_SETTINGS,
-    SIM_LAYER_TYPE,
-    SIM_ELEMENT_WATER,
-    SIM_ELEMENT_FIRE,
-    SIM_ELEMENT_METAL,
-    SIM_ELEMENT_SMOKE,
-    SIM_ELEMENT_LIGHT,
     normalizeLayerOpacity,
     normalizeLayerBlendMode,
     VOXEL_EXTENSION_DEFAULT_YAW_DEG,
@@ -317,9 +306,26 @@
     function clearTiledLayerIndexMetadata(layer) {
       if (!layer) return;
       delete layer.indicesTiles;
+      delete layer.indicesTileNonZeroCounts;
       delete layer.indicesWidth;
       delete layer.indicesHeight;
       delete layer.indicesTileSize;
+    }
+
+    function getTiledLayerNonZeroCount(layer, tileIndex, tile) {
+      if (!(layer?.indicesTileNonZeroCounts instanceof Map)) {
+        layer.indicesTileNonZeroCounts = new Map();
+      }
+      const known = layer.indicesTileNonZeroCounts.get(tileIndex);
+      if (Number.isInteger(known) && known >= 0) {
+        return known;
+      }
+      let count = 0;
+      for (let index = 0; index < tile.length; index += 1) {
+        if (tile[index] !== 0) count += 1;
+      }
+      layer.indicesTileNonZeroCounts.set(tileIndex, count);
+      return count;
     }
 
     function getTiledLayerStoredValue(layer, pixelIndex) {
@@ -396,21 +402,82 @@
       if (!tile) {
         tile = new Uint8Array(tileSize * tileSize);
         layer.indicesTiles.set(tileIndex, tile);
+        if (layer.indicesTileNonZeroCounts instanceof Map) {
+          layer.indicesTileNonZeroCounts.set(tileIndex, 0);
+        }
       }
+      const previous = tile[localIndex];
+      if (previous === stored) {
+        return true;
+      }
+      const previousCount = getTiledLayerNonZeroCount(layer, tileIndex, tile);
       tile[localIndex] = stored;
-      if (stored === 0) {
-        let hasContent = false;
-        for (let index = 0; index < tile.length; index += 1) {
-          if (tile[index] !== 0) {
-            hasContent = true;
-            break;
-          }
-        }
-        if (!hasContent) {
-          layer.indicesTiles.delete(tileIndex);
-        }
+      const nextCount = previousCount
+        + (previous === 0 && stored !== 0 ? 1 : 0)
+        - (previous !== 0 && stored === 0 ? 1 : 0);
+      if (nextCount <= 0) {
+        layer.indicesTiles.delete(tileIndex);
+        layer.indicesTileNonZeroCounts.delete(tileIndex);
+      } else {
+        layer.indicesTileNonZeroCounts.set(tileIndex, nextCount);
       }
       return true;
+    }
+
+    function setLayerRuntimeStoredSpan(layer, y, x0, x1, value) {
+      if (!isTiledLayerIndices(layer) || !(layer.indicesTiles instanceof Map)) return false;
+      const width = layer.indicesWidth;
+      const height = layer.indicesHeight;
+      const row = Math.round(Number(y));
+      if (!Number.isFinite(row) || row < 0 || row >= height) return false;
+      const left = Math.max(0, Math.min(width - 1, Math.floor(Math.min(x0, x1))));
+      const right = Math.max(0, Math.min(width - 1, Math.floor(Math.max(x0, x1))));
+      if (right < left) return false;
+      const normalized = Math.round(Number(value) || 0);
+      if (normalized >= 255) return false;
+      const stored = normalized <= 0 ? 0 : normalized + 1;
+      const tileSize = layer.indicesTileSize;
+      const tileCols = Math.ceil(width / tileSize);
+      const tileY = Math.floor(row / tileSize);
+      let changed = false;
+      for (let tileX = Math.floor(left / tileSize); tileX <= Math.floor(right / tileSize); tileX += 1) {
+        const tileIndex = (tileY * tileCols) + tileX;
+        const localStart = Math.max(0, left - (tileX * tileSize));
+        const localEnd = Math.min(tileSize - 1, right - (tileX * tileSize));
+        const rowOffset = (row % tileSize) * tileSize;
+        const from = rowOffset + localStart;
+        const to = rowOffset + localEnd + 1;
+        let tile = layer.indicesTiles.get(tileIndex) || null;
+        if (!tile && stored === 0) continue;
+        if (!tile) {
+          tile = new Uint8Array(tileSize * tileSize);
+          layer.indicesTiles.set(tileIndex, tile);
+          if (layer.indicesTileNonZeroCounts instanceof Map) {
+            layer.indicesTileNonZeroCounts.set(tileIndex, 0);
+          }
+        }
+        const previousCount = getTiledLayerNonZeroCount(layer, tileIndex, tile);
+        let delta = 0;
+        let segmentChanged = false;
+        for (let index = from; index < to; index += 1) {
+          const previous = tile[index];
+          if (previous === stored) continue;
+          segmentChanged = true;
+          if (previous === 0 && stored !== 0) delta += 1;
+          if (previous !== 0 && stored === 0) delta -= 1;
+        }
+        if (!segmentChanged) continue;
+        tile.fill(stored, from, to);
+        const nextCount = previousCount + delta;
+        if (nextCount <= 0) {
+          layer.indicesTiles.delete(tileIndex);
+          layer.indicesTileNonZeroCounts.delete(tileIndex);
+        } else {
+          layer.indicesTileNonZeroCounts.set(tileIndex, nextCount);
+        }
+        changed = true;
+      }
+      return changed;
     }
 
     function getStoredLayerPaletteIndex(layer, pixelIndex) {
@@ -511,6 +578,7 @@
       const tileLength = tileSize * tileSize;
       const useSparseTiles = Number(state?.rasterModelVersion) >= RASTER_MODEL_COPY_ON_WRITE_VERSION;
       const tiles = useSparseTiles ? new Map() : [];
+      const nonZeroCounts = useSparseTiles ? new Map() : null;
       const tilePool = new Map();
       const baseIsTiled = isTiledLayerIndices(baseLayer, expectedLength)
         && baseLayer.indicesWidth === safeWidth
@@ -567,6 +635,7 @@
           if (baseTile && tilesEqual(tile, baseTile)) {
             if (useSparseTiles) {
               tiles.set(tileIndex, baseTile);
+              nonZeroCounts.set(tileIndex, getTiledLayerNonZeroCount(baseLayer, tileIndex, baseTile));
             } else {
               tiles.push(baseTile);
             }
@@ -578,6 +647,7 @@
           if (pooledTile) {
             if (useSparseTiles) {
               tiles.set(tileIndex, pooledTile);
+              nonZeroCounts.set(tileIndex, pooledTile.reduce((count, value) => count + (value !== 0 ? 1 : 0), 0));
             } else {
               tiles.push(pooledTile);
             }
@@ -586,6 +656,7 @@
             tilePool.set(hash, pooledTiles);
             if (useSparseTiles) {
               tiles.set(tileIndex, tile);
+              nonZeroCounts.set(tileIndex, tile.reduce((count, value) => count + (value !== 0 ? 1 : 0), 0));
             } else {
               tiles.push(tile);
             }
@@ -595,6 +666,11 @@
       layer.indices = new Uint8Array(0);
       layer.indicesEncoding = TILED_LAYER_INDEX_ENCODING;
       layer.indicesTiles = tiles;
+      if (nonZeroCounts) {
+        layer.indicesTileNonZeroCounts = nonZeroCounts;
+      } else {
+        delete layer.indicesTileNonZeroCounts;
+      }
       layer.indicesWidth = safeWidth;
       layer.indicesHeight = safeHeight;
       layer.indicesTileSize = tileSize;
@@ -679,6 +755,9 @@
           tileIndex,
           new Uint8Array(tile),
         ])));
+        layer.indicesTileNonZeroCounts = layer.indicesTileNonZeroCounts instanceof Map
+          ? new Map(layer.indicesTileNonZeroCounts)
+          : new Map();
       } else if (isTiledLayerIndices(layer)) {
         // Tiled data is expanded into a new buffer by materialization, so
         // copying every shared tile first would only duplicate work.
@@ -723,6 +802,7 @@
       layer.indices = new Uint8Array(0);
       layer.indicesEncoding = TILED_LAYER_INDEX_ENCODING;
       layer.indicesTiles = new Map();
+      layer.indicesTileNonZeroCounts = new Map();
       layer.indicesWidth = safeWidth;
       layer.indicesHeight = safeHeight;
       layer.indicesTileSize = COMPACT_LAYER_TILE_SIZE;
@@ -739,6 +819,7 @@
         indices: layer.indices,
         indicesEncoding: layer.indicesEncoding,
         indicesTiles: layer.indicesTiles,
+        indicesTileNonZeroCounts: layer.indicesTileNonZeroCounts,
         indicesWidth: layer.indicesWidth,
         indicesHeight: layer.indicesHeight,
         indicesTileSize: layer.indicesTileSize,
@@ -751,6 +832,8 @@
       else layer.indicesEncoding = snapshot.indicesEncoding;
       if (snapshot.indicesTiles === undefined) delete layer.indicesTiles;
       else layer.indicesTiles = snapshot.indicesTiles;
+      if (snapshot.indicesTileNonZeroCounts === undefined) delete layer.indicesTileNonZeroCounts;
+      else layer.indicesTileNonZeroCounts = snapshot.indicesTileNonZeroCounts;
       if (snapshot.indicesWidth === undefined) delete layer.indicesWidth;
       else layer.indicesWidth = snapshot.indicesWidth;
       if (snapshot.indicesHeight === undefined) delete layer.indicesHeight;
@@ -912,6 +995,9 @@
           : source.indicesTiles.slice());
       target.indicesEncoding = TILED_LAYER_INDEX_ENCODING;
       target.indicesTiles = clonedTiles;
+      target.indicesTileNonZeroCounts = source.indicesTileNonZeroCounts instanceof Map
+        ? new Map(source.indicesTileNonZeroCounts)
+        : new Map();
       target.indicesWidth = source.indicesWidth;
       target.indicesHeight = source.indicesHeight;
       target.indicesTileSize = source.indicesTileSize;
@@ -938,138 +1024,6 @@
         return new Uint8ClampedArray(importSourceDirect);
       }
       return direct instanceof Uint8ClampedArray ? direct : null;
-    }
-
-    function isSimulationLayer(layer) {
-      return Boolean(layer && layer.type === 'simulation' && layer.elementMap instanceof Uint8Array);
-    }
-
-    function cloneSimulationColor(color, fallback = { r: 0, g: 0, b: 0, a: 255 }) {
-      const source = color && typeof color === 'object' ? color : fallback;
-      return {
-        r: clamp(Math.round(Number(source.r) || 0), 0, 255),
-        g: clamp(Math.round(Number(source.g) || 0), 0, 255),
-        b: clamp(Math.round(Number(source.b) || 0), 0, 255),
-        a: clamp(Math.round(Number(source.a) || 255), 0, 255),
-      };
-    }
-
-    function normalizeSimulationDisplayMode(value, fallback = SIM_SOURCE_COLOR) {
-      return value === SIM_ELEMENT_PALETTE || value === SIM_MIXED || value === SIM_SOURCE_COLOR
-        ? value
-        : fallback;
-    }
-
-    function normalizeSimulationStyle(element, style) {
-      const defaults = SIM_DEFAULT_STYLE[element] || {
-        displayMode: SIM_SOURCE_COLOR,
-        mixStrength: 0,
-        palette: {},
-      };
-      const next = style && typeof style === 'object' ? style : defaults;
-      const normalized = {
-        displayMode: normalizeSimulationDisplayMode(next.displayMode, defaults.displayMode),
-        mixStrength: clamp(Number.isFinite(Number(next.mixStrength)) ? Number(next.mixStrength) : defaults.mixStrength, 0, 1),
-        palette: {},
-      };
-      Object.keys(defaults.palette || {}).forEach(key => {
-        normalized.palette[key] = cloneSimulationColor(next.palette?.[key], defaults.palette[key]);
-      });
-      return normalized;
-    }
-
-    function normalizeSimulationSettings(settings = {}) {
-      const source = settings && typeof settings === 'object' ? settings : {};
-      return {
-        gravityX: clamp(Math.round(Number(source.gravityX) || SIM_DEFAULT_SETTINGS.gravityX), -1, 1),
-        gravityY: clamp(Math.round(Number(source.gravityY) || SIM_DEFAULT_SETTINGS.gravityY), -1, 1),
-        windX: clamp(Math.round(Number(source.windX) || SIM_DEFAULT_SETTINGS.windX), -2, 2),
-        windY: clamp(Math.round(Number(source.windY) || SIM_DEFAULT_SETTINGS.windY), -2, 2),
-        tickRate: clamp(Math.round(Number(source.tickRate) || SIM_DEFAULT_SETTINGS.tickRate), 1, 60),
-        lightingEnabled: source.lightingEnabled !== false,
-        atmosphereEnabled: source.atmosphereEnabled !== false,
-        fireEffectEnabled: source.fireEffectEnabled !== false,
-        waterEffectEnabled: source.waterEffectEnabled !== false,
-        metalReflectionEnabled: source.metalReflectionEnabled !== false,
-        fogColor: cloneSimulationColor(source.fogColor, SIM_DEFAULT_SETTINGS.fogColor),
-        atmosphereStrength: clamp(
-          Number.isFinite(Number(source.atmosphereStrength)) ? Number(source.atmosphereStrength) : SIM_DEFAULT_SETTINGS.atmosphereStrength,
-          0,
-          1
-        ),
-      };
-    }
-
-    function createSimulationLayer(name, width, height, options = {}) {
-      const size = Math.max(1, Math.floor(width) || 1) * Math.max(1, Math.floor(height) || 1);
-      return {
-        id: crypto.randomUUID ? crypto.randomUUID() : `layer-${Math.random().toString(36).slice(2)}`,
-        trackId: typeof options?.trackId === 'string' && options.trackId
-          ? options.trackId
-          : (crypto.randomUUID ? crypto.randomUUID() : `track-${Math.random().toString(36).slice(2)}`),
-        type: SIM_LAYER_TYPE,
-        name,
-        visible: true,
-        opacity: 1,
-        blendMode: DEFAULT_LAYER_BLEND_MODE,
-        elementMap: new Uint8Array(size),
-        sourceColorMap: new Uint8ClampedArray(size * 4),
-        velXMap: new Int8Array(size),
-        velYMap: new Int8Array(size),
-        lifeMap: new Uint8Array(size),
-        tempMap: new Uint16Array(size),
-        lightMap: new Uint8Array(size),
-        depthMap: new Uint8Array(size),
-        airMap: new Uint8Array(size),
-        auxMap: new Uint8Array(size),
-        activeMap: new Uint8Array(size),
-        settings: normalizeSimulationSettings(),
-        elementStyle: {
-          [SIM_ELEMENT_WATER]: normalizeSimulationStyle(SIM_ELEMENT_WATER),
-          [SIM_ELEMENT_FIRE]: normalizeSimulationStyle(SIM_ELEMENT_FIRE),
-          [SIM_ELEMENT_METAL]: normalizeSimulationStyle(SIM_ELEMENT_METAL),
-          [SIM_ELEMENT_SMOKE]: normalizeSimulationStyle(SIM_ELEMENT_SMOKE),
-          [SIM_ELEMENT_LIGHT]: normalizeSimulationStyle(SIM_ELEMENT_LIGHT),
-        },
-      };
-    }
-
-    function cloneSimulationLayer(baseLayer, width, height, { copyPixels = true } = {}) {
-      const layer = createSimulationLayer(baseLayer?.name || getDefaultLayerName(1), width, height, {
-        trackId: baseLayer?.trackId,
-      });
-      layer.visible = baseLayer?.visible !== false;
-      layer.opacity = normalizeLayerOpacity(baseLayer?.opacity);
-      layer.blendMode = normalizeLayerBlendMode(baseLayer?.blendMode);
-      layer.settings = normalizeSimulationSettings(baseLayer?.settings);
-      layer.elementStyle = {
-        [SIM_ELEMENT_WATER]: normalizeSimulationStyle(SIM_ELEMENT_WATER, baseLayer?.elementStyle?.[SIM_ELEMENT_WATER]),
-        [SIM_ELEMENT_FIRE]: normalizeSimulationStyle(SIM_ELEMENT_FIRE, baseLayer?.elementStyle?.[SIM_ELEMENT_FIRE]),
-        [SIM_ELEMENT_METAL]: normalizeSimulationStyle(SIM_ELEMENT_METAL, baseLayer?.elementStyle?.[SIM_ELEMENT_METAL]),
-        [SIM_ELEMENT_SMOKE]: normalizeSimulationStyle(SIM_ELEMENT_SMOKE, baseLayer?.elementStyle?.[SIM_ELEMENT_SMOKE]),
-        [SIM_ELEMENT_LIGHT]: normalizeSimulationStyle(SIM_ELEMENT_LIGHT, baseLayer?.elementStyle?.[SIM_ELEMENT_LIGHT]),
-      };
-      if (!copyPixels) {
-        return layer;
-      }
-      [
-        'elementMap',
-        'sourceColorMap',
-        'velXMap',
-        'velYMap',
-        'lifeMap',
-        'tempMap',
-        'lightMap',
-        'depthMap',
-        'airMap',
-        'auxMap',
-        'activeMap',
-      ].forEach(key => {
-        if (ArrayBuffer.isView(baseLayer?.[key]) && baseLayer[key].length === layer[key].length) {
-          layer[key].set(baseLayer[key]);
-        }
-      });
-      return layer;
     }
 
     function cloneGenericLayer(baseLayer, width, height, options = {}) {
@@ -1173,48 +1127,6 @@
         return {
           ...frame,
           layers: frame.layers.map(layer => {
-            if (isSimulationLayer(layer)) {
-              const resizedSimulation = createSimulationLayer(layer?.name || getDefaultLayerName(1), targetWidth, targetHeight, {
-                trackId: layer?.trackId,
-              });
-              resizedSimulation.id = layer?.id || resizedSimulation.id;
-              resizedSimulation.visible = layer?.visible !== false;
-              resizedSimulation.opacity = normalizeLayerOpacity(layer?.opacity);
-              resizedSimulation.blendMode = normalizeLayerBlendMode(layer?.blendMode);
-              resizedSimulation.settings = normalizeSimulationSettings(layer?.settings);
-              resizedSimulation.elementStyle = {
-                [SIM_ELEMENT_WATER]: normalizeSimulationStyle(SIM_ELEMENT_WATER, layer?.elementStyle?.[SIM_ELEMENT_WATER]),
-                [SIM_ELEMENT_FIRE]: normalizeSimulationStyle(SIM_ELEMENT_FIRE, layer?.elementStyle?.[SIM_ELEMENT_FIRE]),
-                [SIM_ELEMENT_METAL]: normalizeSimulationStyle(SIM_ELEMENT_METAL, layer?.elementStyle?.[SIM_ELEMENT_METAL]),
-                [SIM_ELEMENT_SMOKE]: normalizeSimulationStyle(SIM_ELEMENT_SMOKE, layer?.elementStyle?.[SIM_ELEMENT_SMOKE]),
-                [SIM_ELEMENT_LIGHT]: normalizeSimulationStyle(SIM_ELEMENT_LIGHT, layer?.elementStyle?.[SIM_ELEMENT_LIGHT]),
-              };
-              const copyWidth = Math.min(sourceWidth, targetWidth);
-              const copyHeight = Math.min(sourceHeight, targetHeight);
-              const simKeys = ['elementMap', 'velXMap', 'velYMap', 'lifeMap', 'tempMap', 'lightMap', 'depthMap', 'airMap', 'auxMap', 'activeMap'];
-              for (let y = 0; y < copyHeight; y += 1) {
-                for (let x = 0; x < copyWidth; x += 1) {
-                  const srcIndex = (y * sourceWidth) + x;
-                  const dstIndex = (y * targetWidth) + x;
-                  const srcBase = srcIndex * 4;
-                  const dstBase = dstIndex * 4;
-                  if (layer?.sourceColorMap instanceof Uint8ClampedArray && srcBase + 3 < layer.sourceColorMap.length) {
-                    resizedSimulation.sourceColorMap[dstBase] = layer.sourceColorMap[srcBase];
-                    resizedSimulation.sourceColorMap[dstBase + 1] = layer.sourceColorMap[srcBase + 1];
-                    resizedSimulation.sourceColorMap[dstBase + 2] = layer.sourceColorMap[srcBase + 2];
-                    resizedSimulation.sourceColorMap[dstBase + 3] = layer.sourceColorMap[srcBase + 3];
-                  }
-                  for (let i = 0; i < simKeys.length; i += 1) {
-                    const key = simKeys[i];
-                    const source = ArrayBuffer.isView(layer?.[key]) ? layer[key] : null;
-                    if (source && srcIndex < source.length) {
-                      resizedSimulation[key][dstIndex] = source[srcIndex];
-                    }
-                  }
-                }
-              }
-              return resizedSimulation;
-            }
             const resized = createLayer(layer?.name || getDefaultLayerName(1), targetWidth, targetHeight, null, {
               trackId: layer?.trackId,
             });
@@ -1276,40 +1188,6 @@
     function snapshotLayerForClipboard(layer, width = state.width, height = state.height) {
       if (!layer) {
         return null;
-      }
-      if (isSimulationLayer(layer)) {
-        const sim = createSimulationLayer(typeof layer.name === 'string' ? layer.name : getDefaultLayerName(1), width, height, {
-          trackId: layer?.trackId,
-        });
-        sim.visible = layer.visible !== false;
-        sim.opacity = normalizeLayerOpacity(layer.opacity);
-        sim.blendMode = normalizeLayerBlendMode(layer.blendMode);
-        [
-          'elementMap',
-          'sourceColorMap',
-          'velXMap',
-          'velYMap',
-          'lifeMap',
-          'tempMap',
-          'lightMap',
-          'depthMap',
-          'airMap',
-          'auxMap',
-          'activeMap',
-        ].forEach(key => {
-          if (ArrayBuffer.isView(layer[key]) && layer[key].length === sim[key].length) {
-            sim[key].set(layer[key]);
-          }
-        });
-        sim.settings = normalizeSimulationSettings(layer.settings);
-        sim.elementStyle = {
-          [SIM_ELEMENT_WATER]: normalizeSimulationStyle(SIM_ELEMENT_WATER, layer?.elementStyle?.[SIM_ELEMENT_WATER]),
-          [SIM_ELEMENT_FIRE]: normalizeSimulationStyle(SIM_ELEMENT_FIRE, layer?.elementStyle?.[SIM_ELEMENT_FIRE]),
-          [SIM_ELEMENT_METAL]: normalizeSimulationStyle(SIM_ELEMENT_METAL, layer?.elementStyle?.[SIM_ELEMENT_METAL]),
-          [SIM_ELEMENT_SMOKE]: normalizeSimulationStyle(SIM_ELEMENT_SMOKE, layer?.elementStyle?.[SIM_ELEMENT_SMOKE]),
-          [SIM_ELEMENT_LIGHT]: normalizeSimulationStyle(SIM_ELEMENT_LIGHT, layer?.elementStyle?.[SIM_ELEMENT_LIGHT]),
-        };
-        return sim;
       }
       const size = Math.max(0, Math.floor(width) || 0) * Math.max(0, Math.floor(height) || 0);
       const runtimeUint8 = isRuntimeUint8LayerIndices(layer);
@@ -1513,22 +1391,6 @@
       return clonedLayer;
     }
 
-    function serializeSimulationStyleForDocument(style) {
-      return JSON.stringify({
-        displayMode: normalizeSimulationDisplayMode(style?.displayMode, SIM_SOURCE_COLOR),
-        mixStrength: clamp(Number(style?.mixStrength), 0, 1),
-        palette: style?.palette || {},
-      });
-    }
-
-    function parseSimulationStyleFromDocument(value, element) {
-      try {
-        return normalizeSimulationStyle(element, typeof value === 'string' ? JSON.parse(value) : value);
-      } catch (error) {
-        return normalizeSimulationStyle(element);
-      }
-    }
-
     function hasOnlyEmptyLayerIndices(indices) {
       if (!(indices instanceof Int16Array || indices instanceof Uint8Array)) {
         return false;
@@ -1664,34 +1526,10 @@
           : ((compactIndices || tiledIndices || createdCompactStorageIndices) && preserveTypedArrays
             ? { indicesEncoding: COMPACT_LAYER_INDEX_ENCODING }
             : {})),
-        direct: serializeLayerTypedArray(layer.direct, { preserveTypedArrays }),
-        importSourceDirect: serializeLayerTypedArray(layer.importSourceDirect, { preserveTypedArrays }),
-        directOnly: Boolean(layer.directOnly),
+        // Direct RGBA buffers are accepted only by the legacy read path and
+        // converted before a document reaches this serializer. Do not let a
+        // checkpoint, autosave or PXD write them back out.
       };
-    }
-
-    function deserializeSimulationTypedArray(value, Type, expectedLength, { reuseTypedArrays = false } = {}) {
-      if (value instanceof Type && value.length === expectedLength) {
-        return reuseTypedArrays ? value : new Type(value);
-      }
-      if (Array.isArray(value) || ArrayBuffer.isView(value)) {
-        if (value.length !== expectedLength) {
-          throw new Error('Simulation layer typed array mismatch');
-        }
-        return new Type(value);
-      }
-      if (typeof value !== 'string') {
-        return new Type(expectedLength);
-      }
-      const bytes = decodeBase64(value);
-      const itemSize = Type.BYTES_PER_ELEMENT || 1;
-      if (bytes.length !== expectedLength * itemSize) {
-        throw new Error('Simulation layer typed array mismatch');
-      }
-      const view = new Type(bytes.buffer, bytes.byteOffset, bytes.byteLength / itemSize);
-      const output = new Type(view.length);
-      output.set(view);
-      return output;
     }
 
     function deserializeRasterTypedArray(value, Type, expectedLength, mismatchMessage, {
@@ -2287,6 +2125,7 @@
       getStoredLayerPaletteIndex,
       getLayerRuntimeStoredIndex,
       setLayerRuntimeStoredIndex,
+      setLayerRuntimeStoredSpan,
       compactLayerIndices,
       createCompactLayerIndicesForStorage,
       compactLayerIndicesToTiles,
@@ -2297,13 +2136,6 @@
       upgradeLegacyRasterDocumentsToCopyOnWrite,
       detachSharedLayerRaster,
       ensureLayerDirect,
-      isSimulationLayer,
-      cloneSimulationColor,
-      normalizeSimulationDisplayMode,
-      normalizeSimulationStyle,
-      normalizeSimulationSettings,
-      createSimulationLayer,
-      cloneSimulationLayer,
       cloneGenericLayer,
       createGenericLayerFromSnapshot,
       cloneLayer,
@@ -2317,13 +2149,10 @@
       getDefaultProjectCanvasName,
       cloneCanvasDocumentFrames,
       cloneLayerForSnapshot,
-      serializeSimulationStyleForDocument,
-      parseSimulationStyleFromDocument,
       hasOnlyEmptyLayerIndices,
       inferDirectOnlyLayer,
       frameListHasDirectPixelData,
       serializeLayerForDocument,
-      deserializeSimulationTypedArray,
       deserializeLayerFromDocument,
       normalizeCanvasSelectionMask,
       normalizeCanvasSelectionBounds,

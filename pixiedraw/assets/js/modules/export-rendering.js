@@ -1199,214 +1199,6 @@
     };
   }
 
-  function getSimulationActiveLayer(frame = getActiveFrame()) {
-    if (!frame || !Array.isArray(frame.layers)) {
-      return null;
-    }
-    const layer = frame.layers.find(item => item?.id === state.activeLayer) || null;
-    return isSimulationLayer(layer) ? layer : null;
-  }
-
-  function updateSimulationElementPaletteUi() {
-    const selected = clamp(Math.round(Number(simulationEditorState.element) || 0), 0, SIM_ELEMENT_LIGHT);
-    [dom.controls.simulationElementPalette, dom.controls.leftSimulationElementPalette].forEach(container => {
-      if (!(container instanceof HTMLElement)) {
-        return;
-      }
-      const buttons = container.querySelectorAll('[data-simulation-element]');
-      buttons.forEach(button => {
-        const value = clamp(Math.round(Number(button.getAttribute('data-simulation-element')) || 0), 0, SIM_ELEMENT_LIGHT);
-        button.classList.toggle('is-active', value === selected);
-        button.setAttribute('aria-pressed', value === selected ? 'true' : 'false');
-      });
-    });
-    if (dom.controls.leftSimulationElementPaletteWrap instanceof HTMLElement) {
-      dom.controls.leftSimulationElementPaletteWrap.hidden = true;
-    }
-    if (dom.controls.simulationShowLeftPaletteValue) {
-      dom.controls.simulationShowLeftPaletteValue.textContent = simulationEditorState.showLeftPalette ? 'ON' : 'OFF';
-    }
-  }
-
-  function buildSimulationElementPaletteButtons(container) {
-    if (!(container instanceof HTMLElement) || container.dataset.simulationPaletteBuilt === 'true') {
-      return;
-    }
-    container.dataset.simulationPaletteBuilt = 'true';
-    const labels = ['EMPTY', 'WALL', 'WATER', 'SAND', 'METAL', 'FIRE', 'SMOKE', 'LIGHT'];
-    labels.forEach((label, index) => {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'pixel-button pixel-frame';
-      button.dataset.simulationElement = String(index);
-      button.textContent = label;
-      button.addEventListener('click', () => {
-        simulationEditorState.element = index;
-        if (dom.controls.simulationElement instanceof HTMLSelectElement) {
-          dom.controls.simulationElement.value = String(index);
-        }
-        updateSimulationElementPaletteUi();
-      });
-      container.appendChild(button);
-    });
-  }
-
-  function mixSimulationColor(a, b, amount) {
-    const t = clamp(Number(amount), 0, 1);
-    return {
-      r: Math.round((a.r * (1 - t)) + (b.r * t)),
-      g: Math.round((a.g * (1 - t)) + (b.g * t)),
-      b: Math.round((a.b * (1 - t)) + (b.b * t)),
-      a: Math.round((a.a * (1 - t)) + (b.a * t)),
-    };
-  }
-
-  function brightenSimulationColor(color, amount, tint = null) {
-    const source = cloneSimulationColor(color, { r: 255, g: 255, b: 255, a: 255 });
-    const highlight = tint ? mixSimulationColor(source, cloneSimulationColor(tint, source), 0.35) : { ...source };
-    return mixSimulationColor(source, {
-      r: Math.min(255, Math.round(highlight.r + ((255 - highlight.r) * 0.85))),
-      g: Math.min(255, Math.round(highlight.g + ((255 - highlight.g) * 0.85))),
-      b: Math.min(255, Math.round(highlight.b + ((255 - highlight.b) * 0.85))),
-      a: source.a,
-    }, amount);
-  }
-
-  function sampleSimulationPaletteColor(layer, element, index, width, height, baseColor, tickSeed = 0) {
-    const style = layer?.elementStyle?.[element];
-    const depth = layer?.depthMap?.[index] || 0;
-    const light = layer?.lightMap?.[index] || 0;
-    const air = layer?.airMap?.[index] || 0;
-    const aux = layer?.auxMap?.[index] || 0;
-    let paletteColor = baseColor;
-    if (element === SIM_ELEMENT_WATER) {
-      const palette = style?.palette || {};
-      paletteColor = depth < 72
-        ? cloneSimulationColor(palette.shallow, baseColor)
-        : depth < 168
-          ? cloneSimulationColor(palette.mid, baseColor)
-          : cloneSimulationColor(palette.deep, baseColor);
-      if (aux === 2 || aux === 3) {
-        paletteColor = mixSimulationColor(paletteColor, cloneSimulationColor(palette.foam, paletteColor), 0.45);
-      }
-      const x = index % width;
-      const y = Math.floor(index / width);
-      const above = y > 0 ? layer.elementMap[index - width] : SIM_ELEMENT_EMPTY;
-      if (above === SIM_ELEMENT_EMPTY || above === SIM_ELEMENT_SMOKE) {
-        const shimmer = ((x * 17) + (y * 31) + tickSeed) & 7;
-        if (shimmer < 2) {
-          paletteColor = mixSimulationColor(paletteColor, cloneSimulationColor(palette.highlight, paletteColor), 0.35 + ((light / 255) * 0.18));
-        }
-      }
-    } else if (element === SIM_ELEMENT_FIRE) {
-      const palette = style?.palette || {};
-      const flicker = (((index * 13) + tickSeed) & 15) / 15;
-      paletteColor = flicker > 0.68
-        ? cloneSimulationColor(palette.core, baseColor)
-        : flicker > 0.34
-          ? cloneSimulationColor(palette.mid, baseColor)
-          : cloneSimulationColor(palette.edge, baseColor);
-    } else if (element === SIM_ELEMENT_METAL) {
-      const palette = style?.palette || {};
-      paletteColor = cloneSimulationColor(palette.base, baseColor);
-      if (light > 96) {
-        paletteColor = mixSimulationColor(paletteColor, cloneSimulationColor(palette.highlight, paletteColor), Math.min(0.5, light / 255));
-      }
-    } else if (element === SIM_ELEMENT_SMOKE) {
-      const palette = style?.palette || {};
-      paletteColor = air > 140
-        ? cloneSimulationColor(palette.light, baseColor)
-        : cloneSimulationColor(palette.dark, baseColor);
-    } else if (element === SIM_ELEMENT_LIGHT) {
-      paletteColor = cloneSimulationColor(style?.palette?.core, baseColor);
-    } else if (element === SIM_ELEMENT_WALL) {
-      paletteColor = baseColor;
-    }
-    return paletteColor;
-  }
-
-  function resolveSimulationPixelColor(layer, index, width, height, underlying) {
-    const element = layer?.elementMap?.[index] || 0;
-    if (element === SIM_ELEMENT_EMPTY) {
-      return null;
-    }
-    const sourceBase = layer?.sourceColorMap instanceof Uint8ClampedArray && ((index * 4) + 3) < layer.sourceColorMap.length
-      ? {
-        r: layer.sourceColorMap[index * 4],
-        g: layer.sourceColorMap[(index * 4) + 1],
-        b: layer.sourceColorMap[(index * 4) + 2],
-        a: layer.sourceColorMap[(index * 4) + 3],
-      }
-      : (underlying && underlying.a > 0
-        ? underlying
-        : { r: 0, g: 0, b: 0, a: 0 });
-    const style = layer?.elementStyle?.[element] || { displayMode: SIM_SOURCE_COLOR, mixStrength: 0, palette: {} };
-    const tickSeed = ((Date.now() / 80) | 0);
-    const paletteColor = sampleSimulationPaletteColor(layer, element, index, width, height, sourceBase.a > 0 ? sourceBase : { r: 255, g: 255, b: 255, a: 255 }, tickSeed);
-    let color;
-    if (style.displayMode === SIM_ELEMENT_PALETTE) {
-      color = paletteColor;
-    } else if (style.displayMode === SIM_MIXED) {
-      color = mixSimulationColor(sourceBase.a > 0 ? sourceBase : paletteColor, paletteColor, style.mixStrength);
-    } else {
-      color = sourceBase.a > 0 ? { ...sourceBase } : paletteColor;
-    }
-    const light = layer.lightMap?.[index] || 0;
-    if (element === SIM_ELEMENT_FIRE || element === SIM_ELEMENT_LIGHT) {
-      const emissive = brightenSimulationColor(sourceBase.a > 0 ? sourceBase : paletteColor, 0.45 + (light / 400), { r: 255, g: 220, b: 120, a: 255 });
-      color = mixSimulationColor(color, emissive, 0.25 + (light / 510));
-    } else if (element === SIM_ELEMENT_METAL && layer.settings?.metalReflectionEnabled !== false) {
-      const reflection = brightenSimulationColor(sourceBase.a > 0 ? sourceBase : cloneSimulationColor(style?.palette?.reflection, color), Math.max(0.2, light / 255), { r: 220, g: 236, b: 255, a: 255 });
-      color = mixSimulationColor(color, reflection, Math.max(0, ((light / 255) * 0.45) - ((layer.depthMap?.[index] || 0) / 700)));
-    } else if (element === SIM_ELEMENT_WATER && layer.settings?.waterEffectEnabled !== false) {
-      const speed = Math.min(1, (Math.abs(layer.velXMap?.[index] || 0) + Math.abs(layer.velYMap?.[index] || 0)) / 4);
-      const reflection = brightenSimulationColor(sourceBase.a > 0 ? sourceBase : cloneSimulationColor(style?.palette?.highlight, color), 0.22 + (light / 600) + (speed * 0.1), { r: 210, g: 244, b: 255, a: 255 });
-      color = mixSimulationColor(color, reflection, (light / 255) * 0.2 + speed * 0.18);
-    }
-    if (layer.settings?.lightingEnabled !== false && light > 0) {
-      const boost = 1 + (light / 255) * 0.22;
-      color = {
-        r: clamp(Math.round(color.r * boost), 0, 255),
-        g: clamp(Math.round(color.g * boost), 0, 255),
-        b: clamp(Math.round(color.b * boost), 0, 255),
-        a: color.a,
-      };
-    }
-    if (layer.settings?.atmosphereEnabled !== false) {
-      const fog = ((layer.depthMap?.[index] || 0) / 255) * ((layer.airMap?.[index] || 0) / 255) * clamp(Number(layer.settings?.atmosphereStrength), 0, 1);
-      color = mixSimulationColor(color, cloneSimulationColor(layer.settings?.fogColor, SIM_DEFAULT_SETTINGS.fogColor), fog);
-    }
-    if (color.a <= 0) {
-      color.a = 255;
-    }
-    return color;
-  }
-
-  function compositeSimulationLayerRegion(data, frame, layer, width, height, x0, y0, x1, y1) {
-    const opacity = getDisplayedLayerPreviewOpacity(layer, 1);
-    const blendMode = normalizeLayerBlendMode(layer.blendMode);
-    const regionWidth = x1 - x0 + 1;
-    for (let py = y0; py <= y1; py += 1) {
-      const rowOffset = (py - y0) * regionWidth * 4;
-      const layerRow = py * width;
-      for (let px = x0; px <= x1; px += 1) {
-        const pixelIndex = layerRow + px;
-        const destIndex = rowOffset + ((px - x0) * 4);
-        const underlying = {
-          r: data[destIndex],
-          g: data[destIndex + 1],
-          b: data[destIndex + 2],
-          a: data[destIndex + 3],
-        };
-        const resolved = resolveSimulationPixelColor(layer, pixelIndex, width, height, underlying);
-        if (!resolved || resolved.a <= 0) {
-          continue;
-        }
-        compositeLayerPixelNormalized(data, destIndex, resolved.r, resolved.g, resolved.b, resolved.a, opacity, blendMode);
-      }
-    }
-  }
-
   function compositeFramePixels(frame, width, height, palette, options = {}) {
     const includeHiddenLayers = Boolean(options && options.includeHiddenLayers);
     const useLocalLayerPreviewVisibility = Boolean(options && options.useLocalLayerPreviewVisibility);
@@ -1602,6 +1394,7 @@
   function normalizeExportFormat(mode) {
     const normalized = String(mode || '').trim().toLowerCase();
     if (normalized === 'gif') return 'gif';
+    if (normalized === 'timelapse' || normalized === 'timelapsegif' || normalized === 'timelapse-gif') return 'timelapse';
     if (normalized === 'jpeg' || normalized === 'jpg') return 'jpeg';
     if (normalized === 'svg') return 'svg';
     if (normalized === 'voxelpreview' || normalized === 'voxel-preview' || normalized === 'previewpng') return 'voxelpreview';
@@ -1626,6 +1419,7 @@
     if (normalized === 'allzip') return localizeText('全形式ZIP', 'All formats ZIP');
     if (normalized === 'gridpng') return localizeText('PNG（グリッド分割）', 'PNG (Grid Split)');
     if (normalized === 'gif') return 'GIF';
+    if (normalized === 'timelapse') return localizeText('タイムラプスGIF', 'Timelapse GIF');
     if (normalized === 'project') return localizeText('プロジェクト保存', 'Project Save');
     return 'PNG';
   }
@@ -3236,14 +3030,6 @@
           buildStillExportFrameSet,
           buildExportFrameSet,
           getSelectedBatchZipFormats,
-          getSimulationActiveLayer,
-          updateSimulationElementPaletteUi,
-          buildSimulationElementPaletteButtons,
-          mixSimulationColor,
-          brightenSimulationColor,
-          sampleSimulationPaletteColor,
-          resolveSimulationPixelColor,
-          compositeSimulationLayerRegion,
           compositeFramePixels,
           resetExportScaleDefaults,
           normalizeExportFormat,

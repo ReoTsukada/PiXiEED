@@ -12,7 +12,7 @@ const drawStartup = read('pixiedraw/assets/js/modules/startup-workflow-utils.js'
 
 assert.match(market, /\(index \+ 1\) % 8 !== 0/);
 assert.doesNotMatch(market, /children\.splice\(8/);
-assert.match(pixfind, /\(idx \+ 1\) % 8 === 0/);
+assert.match(pixfind, /\(idx \+ 1\) % 4 === 0/);
 assert.doesNotMatch(pixfind, /idx === 7/);
 // PiXiEEDraw now renders project cards only in the startup workspace. The
 // retired duplicate recent-project renderer intentionally has no ad cadence.

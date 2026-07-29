@@ -40,7 +40,6 @@ const modelState = { width: 2, height: 2, palette, rasterModelVersion: 1 };
 const model = context.window.PiXiEEDrawModules.documentModel.createDocumentModel({
   state: modelState,
   DEFAULT_LAYER_BLEND_MODE: 'normal',
-  SIM_LAYER_TYPE: 'simulation',
   clamp: (value, min, max) => Math.min(max, Math.max(min, value)),
   getDefaultLayerName: index => `Layer ${index}`,
   getDefaultFrameName: index => `Frame ${index}`,
@@ -439,7 +438,6 @@ const renderer = context.window.PiXiEEDrawModules.canvasRenderWorkflowUtils
     compositeLayerPixelNormalized: (data, offset, r, g, b, a) => {
       data[offset] = r; data[offset + 1] = g; data[offset + 2] = b; data[offset + 3] = a;
     },
-    compositeSimulationLayerRegion: noOp,
     ctx: { drawing: renderContext },
     getCanvasRenderContext: () => renderContext,
     presentCanvasRenderOutput: noOp,
@@ -450,7 +448,6 @@ const renderer = context.window.PiXiEEDrawModules.canvasRenderWorkflowUtils
     getDisplayedLayerVisibility: () => true,
     getStoredRasterLayerPaletteIndex: model.getStoredLayerPaletteIndex,
     getPlaybackFrameImageData: () => null,
-    isSimulationLayer: () => false,
     isTiledLayerIndices: model.isTiledLayerIndices,
     isVoxelExtensionModeEnabled: () => false,
     isVoxelPreviewCanvasId: () => false,

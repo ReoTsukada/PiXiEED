@@ -3426,7 +3426,9 @@ function renderPuzzles(level, mode = state.currentMode) {
   ));
   official.forEach((puzzle, idx) => {
     dom.puzzleList.append(createOfficialCard(puzzle));
-    if ((idx + 1) % 8 === 0) {
+    // Two rows on phones / a compact card group on larger screens keeps the
+    // catalog scannable while giving each in-feed placement real visibility.
+    if ((idx + 1) % 4 === 0) {
       dom.puzzleList.append(createPuzzleListAd());
     }
   });
