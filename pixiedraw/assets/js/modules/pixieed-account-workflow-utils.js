@@ -796,75 +796,6 @@
     }
   }
 
-  function updatePixieedShareAccountCard(statusNode, hintNode, loginAnchor) {
-    if (!SHARED_PROJECTS_ENABLED) {
-      if (statusNode instanceof HTMLElement) {
-        statusNode.textContent = localizeText('シェアプロジェクト停止中', 'Shared projects unavailable');
-      }
-      if (hintNode instanceof HTMLElement) {
-        hintNode.textContent = localizeText(
-          'シェアプロジェクトは只今ご利用いただけません。',
-          'Shared projects are currently unavailable.'
-        );
-      }
-      if (loginAnchor instanceof HTMLAnchorElement) {
-        loginAnchor.hidden = true;
-        loginAnchor.setAttribute('aria-hidden', 'true');
-      }
-      return;
-    }
-    const nickname = readPixieedAccountNickname();
-    const isSignedInAccount = accountState.isLoggedIn && !accountState.isAnonymous;
-    const canUseSharedAccount = canUseSharedProjectsBackend() || supportsSharedProjectsBackend;
-    const { ownedProjectCount, effectiveLimit } = getSharedProjectOwnershipStatus();
-    const maxSharedProjects = Math.max(1, effectiveLimit);
-    const usageLabel = buildSharedProjectUsageLabel({ ownedProjectCount, effectiveLimit });
-    if (statusNode instanceof HTMLElement) {
-      if (isSignedInAccount) {
-        const email = accountState.session?.user?.email || '';
-        const label = nickname || email;
-        const slotLabel = maxSharedProjects > SHARED_PROJECT_LIMIT_DEFAULT
-          ? localizeText(`作成枠 ${usageLabel}`, `Slots ${usageLabel}`)
-          : localizeText(`無料枠 ${usageLabel}`, `Free slot ${usageLabel}`);
-        statusNode.textContent = label
-          ? `${slotLabel} / ${label}`
-          : slotLabel;
-      } else if (canUseSharedAccount) {
-        const label = nickname || localizeText('共有ゲスト', 'Shared guest');
-        statusNode.textContent = `${localizeText(`無料枠 ${usageLabel}`, `Free slot ${usageLabel}`)} / ${label}`;
-      } else {
-        statusNode.textContent = localizeText(
-          `無料枠 ${usageLabel}`,
-          `Free slot ${usageLabel}`
-        );
-      }
-    }
-    if (hintNode instanceof HTMLElement) {
-      if (isSignedInAccount) {
-        hintNode.textContent = localizeText(
-          `このアカウントで共有プロジェクトを最大${maxSharedProjects}件、共同編集最大4人、マルチキャンバス追加3つまで利用できます。`,
-          `This account can create up to ${maxSharedProjects} shared projects, edit with up to 4 people, and add up to 3 Multi Canvases.`
-        );
-      } else if (canUseSharedAccount) {
-        hintNode.textContent = localizeText(
-          'ログインすると共有プロジェクトを作成できます。マルチキャンバスはログインなしで利用できます。',
-          'Sign in to create shared projects. Multi Canvas is available without sign-in.'
-        );
-      } else {
-        hintNode.textContent = localizeText(
-          '共有プロジェクトの作成とコード参加にはログインが必要です。マルチキャンバスはログインなしで利用できます。',
-          'Sign-in is required to create shared projects and join by code. Multi Canvas is available without sign-in.'
-        );
-      }
-    }
-    if (loginAnchor instanceof HTMLAnchorElement) {
-      syncPixieedAccountLoginAnchor(loginAnchor);
-      loginAnchor.textContent = localizeText('ログインして管理', 'Sign In to Manage');
-      loginAnchor.hidden = isSignedInAccount;
-      loginAnchor.setAttribute('aria-hidden', String(isSignedInAccount));
-    }
-  }
-
   function updatePixieedAccountUi() {
     const status = dom.controls.pixieedAccountStatus;
     const loginLink = dom.controls.pixieedAccountLogin;
@@ -879,16 +810,6 @@
     const accountLabel = nickname || email || localizeText('ログイン', 'Sign In');
     syncPixieedAccountLoginPromptLink();
     syncPixieedAccountLoginAnchor(detailAccountAction);
-    updatePixieedShareAccountCard(
-      dom.controls.multiEntryAccountStatus,
-      dom.controls.multiEntryAccountHint,
-      dom.controls.multiEntryAccountLogin
-    );
-    updatePixieedShareAccountCard(
-      dom.controls.multiFlowAccountStatus,
-      dom.controls.multiFlowAccountHint,
-      dom.controls.multiFlowAccountLogin
-    );
     if (dom.controls.projectHomeJoinProjectKey instanceof HTMLInputElement) {
       dom.controls.projectHomeJoinProjectKey.disabled = true;
       dom.controls.projectHomeJoinProjectKey.placeholder = localizeText('コード適用は停止中です', 'Code application disabled');
@@ -1219,7 +1140,6 @@
           isBrokenSharedInviteBinding,
           getPixieedAccountProfileFallback,
           syncPixieedAccountProfile,
-          updatePixieedShareAccountCard,
           updatePixieedAccountUi,
           initPixieedAccount,
           maybePromptAndTransferRecentProjectsOnLogin,

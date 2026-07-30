@@ -667,9 +667,9 @@
 <img alt="" aria-hidden="true" height="20" src="assets/icons/menu-settings.png?v=2026.07.19-ui-icons1" width="20"/>
 <span class="sr-only">設定</span>
 </button>
-<button aria-controls="panelMulti" aria-label="シェアプロジェクト" class="chip canvas-quick-action" data-quick-right-tab="multi" hidden="" id="pixisyncQuickOpen" title="シェアプロジェクト" type="button">
+<button aria-controls="panelMulti" aria-label="PiXiSYNC" class="chip canvas-quick-action" data-quick-right-tab="multi" hidden="" id="pixisyncQuickOpen" title="PiXiSYNC" type="button">
 <img alt="" aria-hidden="true" height="20" src="assets/icons/maltimode.svg" width="20"/>
-<span class="sr-only">シェアプロジェクト</span>
+<span class="sr-only">PiXiSYNC</span>
 </button>
 <button aria-controls="panelFile" aria-label="ファイル" class="chip canvas-quick-action" data-quick-right-tab="file" title="ファイル" type="button">
 <img alt="" aria-hidden="true" height="20" src="assets/icons/menu-file.png?v=2026.07.19-ui-icons1" width="20"/>
@@ -832,9 +832,9 @@
 <img alt="" class="tab-icon" src="assets/icons/menu-settings.png?v=2026.07.19-ui-icons1"/>
 <span class="sr-only">設定</span>
 </button>
-<button aria-controls="mobilePanelMulti" aria-label="シェアプロジェクト" aria-selected="false" class="mobile-tab" data-mobile-tab="multi" hidden="" id="mobileTabMulti" role="tab" tabindex="-1" type="button">
+<button aria-controls="mobilePanelMulti" aria-label="PiXiSYNC" aria-selected="false" class="mobile-tab" data-mobile-tab="multi" hidden="" id="mobileTabMulti" role="tab" tabindex="-1" type="button">
 <img alt="" class="tab-icon" src="assets/icons/maltimode.svg"/>
-<span class="sr-only">シェアプロジェクト</span>
+<span class="sr-only">PiXiSYNC</span>
 </button>
 <button aria-controls="mobilePanelExtensions" aria-label="拡張" aria-selected="false" class="mobile-tab" data-mobile-tab="extensions" hidden="" id="mobileTabExtensions" role="tab" tabindex="-1" type="button">
 <img alt="" class="tab-icon" src="assets/icons/EXicon.png"/>
@@ -1211,7 +1211,7 @@
 <button aria-controls="pixisyncCommentsView" aria-selected="false" class="multi-participants-tab" id="pixisyncCommentsTab" role="tab" tabindex="-1" type="button">コメント</button>
 </div>
 <div class="pixisync-panel__header">
-<h3 id="pixisyncPanelTitle">シェアプロジェクト</h3>
+<h3 id="pixisyncPanelTitle">PiXiSYNC</h3>
 <span class="pixisync-status" data-phase="local" id="pixisyncStatusLabel">未共有</span>
 </div>
 <div aria-label="共同編集の接続情報" class="pixisync-panel__meta">
@@ -1219,9 +1219,8 @@
 <span id="pixisyncConnectionLabel">未接続</span>
 </div>
 <div aria-label="共同編集操作" class="pixisync-actions">
-<button class="button button--primary" id="pixisyncStart" type="button">シェアプロジェクトを作成</button>
+<button class="button button--primary" id="pixisyncStart" type="button">PiXiSYNCを開始</button>
 <button class="button" hidden="" id="pixisyncCopyInvite" type="button">招待コードを発行・コピー</button>
-<button class="button" hidden="" id="pixisyncOpenShared" type="button">共有プロジェクトを開く</button>
 <button class="button" hidden="" id="pixisyncLeave" type="button">退出</button>
 <button class="button button--danger" hidden="" id="pixisyncArchive" type="button">共同編集を終了</button>
 </div>
@@ -1905,7 +1904,7 @@
 	<script defer="" src="assets/js/modules/image-import-decode-utils.js?v=20260721-runtime-index8-2"></script>
 	<script defer="" src="assets/js/modules/palette-panel-utils.js?v=20260721-runtime-index8-2"></script>
 	<script defer="" src="assets/js/modules/timeline-layers.js?v=20260730-shared-frame-delete-confirm1"></script>
-	<script defer="" src="assets/js/modules/ui-localization-utils.js?v=20260730-pixisync-share-panel1"></script>
+	<script defer="" src="assets/js/modules/ui-localization-utils.js?v=20260730-pixisync-project-card1"></script>
 	<script defer="" src="assets/js/modules/ui-language-utils.js?v=2026.07.03-small-helper-batch-split-v1"></script>
 	<script defer="" src="assets/js/modules/scroll-input-utils.js?v=2026.07.03-small-helper-batch-split-v1"></script>
 	<script defer="" src="assets/js/modules/sprite-scale-utils.js?v=2026.06.30-zh-localization-v1"></script>
@@ -1961,9 +1960,9 @@
 	<script defer="" src="assets/js/modules/pixisync-pixel-mutation-bridge-utils.js?v=20260730-v1-foundation1"></script>
 	<script defer="" src="assets/js/modules/pixisync-collaboration-controller-utils.js?v=20260730-v1-history-bridge1"></script>
 	<script defer="" src="assets/js/modules/pixisync-session-state.js?v=20260730-v1-session-state1"></script>
-	<script defer="" src="assets/js/modules/pixisync-minimal-ui-utils.js?v=20260730-pixisync-share-panel5"></script>
-	<script defer="" src="assets/js/modules/pixisync-runtime-adapter-utils.js?v=20260730-pixisync-share-panel1"></script>
-	<script defer="" src="assets/js/modules/pixieed-account-workflow-utils.js?v=2026.07.04-shared-project-disabled1"></script>
+	<script defer="" src="assets/js/modules/pixisync-minimal-ui-utils.js?v=20260730-pixisync-project-card1"></script>
+	<script defer="" src="assets/js/modules/pixisync-runtime-adapter-utils.js?v=20260730-pixisync-project-card1"></script>
+	<script defer="" src="assets/js/modules/pixieed-account-workflow-utils.js?v=20260730-remove-legacy-share-card1"></script>
 	<script defer="" src="assets/js/modules/startup-tail-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/controls-mirror.js?v=20260728-mirror-state-reuse1"></script>
 	<script defer="" src="assets/js/modules/external-tool-workflow-utils.js?v=2026.07.02-external-tool-workflow-split-v1"></script>
@@ -1971,7 +1970,7 @@
 	<script defer="" src="assets/js/modules/local-project-v2-migration-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/pre-update-checkpoint-utils.js?v=20260712-pre-update-checkpoint-u3"></script>
 	<script defer="" src="assets/js/active-project-session-utils.js?v=20260715-local-true-v2-cleanup1"></script>
-    <script defer="" src="assets/js/app.js?v=20260730-pixisync-initial-gate3"></script>
+    <script defer="" src="assets/js/app.js?v=20260730-pixisync-project-card1"></script>
 	<script defer="" src="assets/js/modules/update-detection-utils.js?v=20260719-file-protocol1"></script>
   <script>
     (function initPanelAdDocking() {

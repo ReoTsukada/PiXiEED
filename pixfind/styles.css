@@ -2959,7 +2959,13 @@ body[data-pixieed-page="pixfind"] .creator-overlay {
   position: fixed;
   inset: 0;
   display: grid;
-  place-items: center;
+  justify-items: center;
+  align-content: start;
+  box-sizing: border-box;
+  padding: max(1rem, env(safe-area-inset-top)) clamp(.75rem, 4vw, 2rem) max(1rem, env(safe-area-inset-bottom));
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   pointer-events: none;
   opacity: 0;
   transform: scale(0.94);
@@ -2996,9 +3002,12 @@ body[data-pixieed-page="pixfind"] .creator-overlay {
   position: relative;
   z-index: 2;
   display: grid;
-  width: min(92vw, 460px);
+  width: min(100%, 460px);
+  max-width: 100%;
   gap: 0.8rem;
   padding: clamp(1.15rem, 4vmin, 2rem);
+  box-sizing: border-box;
+  margin-block: auto;
   border: 1px solid rgba(255,255,255,.76);
   border-radius: 28px;
   background: linear-gradient(155deg, rgba(255,255,255,.98), rgba(239,246,255,.96));
@@ -3103,12 +3112,16 @@ body[data-pixieed-page="pixfind"] .creator-overlay {
 
 .result-panel__ad ins.adsbygoogle {
   display: block;
-  width: min(100%, 420px) !important;
+  /* A bounded horizontal creative keeps AdSense's injected iframe centered,
+     rather than allowing it to choose a wider, left-aligned slot. */
+  width: min(100%, 320px) !important;
   min-width: 0 !important;
   max-width: 100% !important;
   min-height: 50px;
   max-height: 90px;
-  margin: 0 auto;
+  justify-self: center !important;
+  margin-inline: auto !important;
+  box-sizing: border-box;
   overflow: hidden;
 }
 

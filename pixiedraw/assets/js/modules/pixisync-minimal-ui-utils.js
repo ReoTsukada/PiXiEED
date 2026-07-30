@@ -5,7 +5,7 @@
   const PHASE_COPY = Object.freeze({
     disabled: ['未接続', '共同編集は現在利用できません。', 'オフライン'],
     local: ['未共有', '通常プロジェクトとして編集中です。', '未接続'],
-    invited: ['招待あり', '共有プロジェクトを開くと同期を開始します。', '未接続'],
+    invited: ['招待あり', '招待リンクから同期用の作業コピーを開けます。', '未接続'],
     creating: ['共有を作成中', '最初のチェックポイントを安全に保存しています。', '処理中'],
     joining: ['参加処理中', '参加権限を確認しています。', '確認中'],
     syncing: ['同期中', 'チェックポイントと最新の変更を同期しています。', '同期中'],
@@ -42,7 +42,6 @@
     const actionButtons = Object.freeze({
       start: elements.start,
       copyInvite: elements.copyInvite,
-      openShared: elements.openShared,
       joinCode: elements.joinCode,
       leave: elements.leave,
       archive: elements.archive,
@@ -195,13 +194,9 @@
 
       setHidden(actionButtons.start, !(phase === 'local' && typeof commands.start === 'function'));
       if (actionButtons.start) {
-        actionButtons.start.textContent = 'シェアプロジェクトを作成';
+        actionButtons.start.textContent = 'PiXiSYNCを開始';
       }
       setHidden(actionButtons.copyInvite, !(owner && active && typeof commands.createInviteLink === 'function'));
-      setHidden(actionButtons.openShared, !(
-        ['invited', 'left'].includes(phase)
-        && typeof commands.openShared === 'function'
-      ));
       setHidden(actionButtons.leave, !(
         !owner
         && ['syncing', 'active', 'reconnecting'].includes(phase)
@@ -306,11 +301,6 @@
         successMessage: '招待リンクをコピーしました。',
         failureMessage: '招待リンクをコピーできませんでした。',
       }),
-      openShared: () => runAction('openShared', commands.openShared, {
-        pendingMessage: '共有プロジェクトを開いています…',
-        successMessage: '共有プロジェクトを開きました。',
-        failureMessage: '共有プロジェクトを開けませんでした。',
-      }),
       joinCode: () => {
         const snapshot = getSnapshot();
         if (snapshot.phase === 'active' && typeof commands.sendComment === 'function') {
@@ -340,7 +330,7 @@
           }
         }, {
           pendingMessage: '招待を確認しています…',
-          successMessage: 'シェアプロジェクトに参加しました。',
+        successMessage: 'PiXiSYNCに参加しました。',
           failureMessage: '招待を確認できませんでした。',
         });
       },
@@ -409,7 +399,7 @@
         setNotice('招待リンクが正しくありません。');
         return false;
       }
-      return runAction('openShared', async () => {
+      return runAction('joinCode', async () => {
         try {
           await commands.join(token);
         } finally {

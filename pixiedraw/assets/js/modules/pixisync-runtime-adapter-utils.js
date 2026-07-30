@@ -17,10 +17,11 @@
     restoreCheckpoint,
     getProjectKey = () => '',
     getProjectTitle = () => '',
+    readProjectBinding = async () => null,
+    writeProjectBinding = async () => {},
+    clearProjectBinding = async () => {},
     getClientId,
     locationRef = window.location,
-    localStorageRef = window.localStorage,
-    storageKey = 'pixieed.pixisync.v1.session',
     uiEnabled = true,
     onStatus = () => {},
     onError = () => {},
@@ -44,6 +45,7 @@
     let roomId = '';
     let role = 'owner';
     let clientId = '';
+    let boundProjectKey = '';
     let operationQueue = Promise.resolve();
     let replayedJournalEpoch = -1;
     let disposed = false;
@@ -53,7 +55,7 @@
     const commands = Object.freeze({
       start,
       join,
-      openShared,
+      resumeBoundProject,
       createInviteLink,
       sendComment,
       leave,
@@ -89,30 +91,23 @@
       onStatus(details);
       runtimeBridge.refreshUi?.();
     };
-    const persistSession = value => {
-      if (!localStorageRef) return;
-      if (!value) {
-        localStorageRef.removeItem(storageKey);
-        return;
-      }
-      localStorageRef.setItem(storageKey, JSON.stringify({
-        roomId: value.roomId,
-        role: value.role,
-        projectKey: value.projectKey || '',
-      }));
+    const normalizeProjectBinding = value => {
+      if (!ROOM_ID_PATTERN.test(String(value?.roomId || ''))) return null;
+      const projectKey = String(value?.projectKey || '');
+      if (!projectKey) return null;
+      return Object.freeze({
+        roomId: String(value.roomId),
+        role: value.role === 'owner' ? 'owner' : 'participant',
+        projectKey,
+      });
     };
-    const readPersistedSession = () => {
-      try {
-        const parsed = JSON.parse(localStorageRef?.getItem?.(storageKey) || 'null');
-        if (!ROOM_ID_PATTERN.test(String(parsed?.roomId || ''))) return null;
-        return {
-          roomId: String(parsed.roomId),
-          role: parsed.role === 'owner' ? 'owner' : 'participant',
-          projectKey: String(parsed.projectKey || ''),
-        };
-      } catch (_) {
-        return null;
-      }
+    const persistProjectBinding = async () => {
+      const binding = normalizeProjectBinding({ roomId, role, projectKey: boundProjectKey });
+      if (!binding) throw new Error('PiXiSYNC runtime: project-binding-unavailable');
+      await writeProjectBinding(binding.projectKey, binding);
+    };
+    const removeProjectBinding = async () => {
+      if (boundProjectKey) await clearProjectBinding(boundProjectKey);
     };
     const rpc = async (name, params) => {
       const response = await supabase.rpc(name, params);
@@ -335,7 +330,7 @@
           break;
         }
         case 'SYNC_ACTIVE':
-          persistSession({ roomId, role, projectKey: currentSnapshot()?.projectKey || getProjectKey() });
+          await persistProjectBinding();
           configureBridge();
           break;
         case 'RECONNECT_CHANNEL':
@@ -381,6 +376,8 @@
         installSession('owner');
       }
       const projectKey = String(getProjectKey() || '');
+      if (!projectKey) throw new Error('PiXiSYNC runtime: local-project-required');
+      boundProjectKey = projectKey;
       const opening = session.dispatch({ type: 'OPEN_REQUEST', projectKey });
       runtimeBridge.refreshUi?.();
       const epoch = opening.state.epoch;
@@ -417,7 +414,9 @@
       const token = String(inviteToken || '').toLowerCase();
       if (!TOKEN_PATTERN.test(token)) throw new Error('PiXiSYNC runtime: invalid-invite-token');
       installSession('participant');
-      const joining = session.dispatch({ type: 'JOIN_REQUEST', projectKey: String(getProjectKey() || '') });
+      boundProjectKey = String(getProjectKey() || '');
+      if (!boundProjectKey) throw new Error('PiXiSYNC runtime: local-project-required');
+      const joining = session.dispatch({ type: 'JOIN_REQUEST', projectKey: boundProjectKey });
       runtimeBridge.refreshUi?.();
       const epoch = joining.state.epoch;
       try {
@@ -439,22 +438,26 @@
       }
     }
 
-    async function openShared() {
+    async function resumeBoundProject() {
       await ensureSupabase();
-      const stored = readPersistedSession();
-      if (!stored) throw new Error('PiXiSYNC runtime: saved-session-unavailable');
-      installSession(stored.role, { resumeAvailable: true });
+      const projectKey = String(getProjectKey() || '');
+      const binding = normalizeProjectBinding(await readProjectBinding(projectKey));
+      if (!binding || binding.projectKey !== projectKey) {
+        throw new Error('PiXiSYNC runtime: project-binding-unavailable');
+      }
+      boundProjectKey = binding.projectKey;
+      installSession(binding.role, { resumeAvailable: true });
       const opening = session.dispatch({
         type: 'RESUME_REQUEST',
-        roomId: stored.roomId,
-        projectKey: stored.projectKey,
+        roomId: binding.roomId,
+        projectKey: binding.projectKey,
       });
       runtimeBridge.refreshUi?.();
       const epoch = opening.state.epoch;
       try {
-        manifest = await openManifest(stored.roomId);
-        roomId = stored.roomId;
-        const event = stored.role === 'owner'
+        manifest = await openManifest(binding.roomId);
+        roomId = binding.roomId;
+        const event = binding.role === 'owner'
           ? {
               type: 'ROOM_READY',
               epoch,
@@ -535,7 +538,7 @@
       runtimeBridge.refreshUi?.();
       await rpc('pixisync_leave_session', { p_room_id: roomId });
       for (const effect of result.effects) await runEffect(effect);
-      persistSession(null);
+      await removeProjectBinding();
       await dispatchNow({ type: 'LEFT', epoch: result.state.epoch });
     }
 
@@ -616,14 +619,15 @@
       const closing = session.dispatch({ type: 'CLOSE_REQUEST' });
       runtimeBridge.refreshUi?.();
       for (const effect of closing.effects) await runEffect(effect);
-      persistSession(null);
+      await removeProjectBinding();
       await dispatchNow({ type: 'CLOSED', epoch: closing.state.epoch });
     }
 
     async function initialize() {
       await ensureSupabase();
-      const stored = readPersistedSession();
-      installSession(stored?.role || 'owner', { resumeAvailable: Boolean(stored) });
+      const binding = normalizeProjectBinding(await readProjectBinding(String(getProjectKey() || '')));
+      boundProjectKey = binding?.projectKey || '';
+      installSession(binding?.role || 'owner', { resumeAvailable: Boolean(binding) });
       configureBridge({ collaboration: false });
       await runtimeBridge.consumeInviteFromUrl?.();
       return snapshot();
@@ -666,7 +670,7 @@
       commands,
       start,
       join,
-      openShared,
+      resumeBoundProject,
       leave,
       archive,
       createInviteLink,

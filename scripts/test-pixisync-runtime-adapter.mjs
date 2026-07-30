@@ -196,7 +196,7 @@ function createBridge() {
   };
 }
 
-function createAdapter({ server, actor, clientId, storage, checkpointText }) {
+function createAdapter({ server, actor, clientId, storage, bindings, checkpointText }) {
   const bridge = createBridge();
   let restored = '';
   const adapter = window.PiXiEEDrawModules.pixisyncRuntimeAdapterUtils.createPiXiSyncRuntimeAdapter({
@@ -208,9 +208,11 @@ function createAdapter({ server, actor, clientId, storage, checkpointText }) {
     restoreCheckpoint: async blob => { restored = await blob.text(); },
     getProjectKey: () => `project-${actor}`,
     getProjectTitle: () => `Project ${actor}`,
+    readProjectBinding: async projectKey => bindings.get(projectKey) || null,
+    writeProjectBinding: async (projectKey, binding) => { bindings.set(projectKey, binding); },
+    clearProjectBinding: async projectKey => { bindings.delete(projectKey); },
     getClientId: () => clientId,
     localStorageRef: storage,
-    storageKey: `pixisync-test-${actor}`,
   });
   return { adapter, bridge, get restored() { return restored; } };
 }
@@ -218,13 +220,26 @@ function createAdapter({ server, actor, clientId, storage, checkpointText }) {
 const server = new LifecycleServer();
 const ownerStorage = createStorage();
 const editorStorage = createStorage();
-const owner = createAdapter({ server, actor: 'owner', clientId: OWNER_CLIENT, storage: ownerStorage, checkpointText: 'checkpoint-owner' });
+const ownerBindings = new Map();
+const editorBindings = new Map();
+let owner = createAdapter({ server, actor: 'owner', clientId: OWNER_CLIENT, storage: ownerStorage, bindings: ownerBindings, checkpointText: 'checkpoint-owner' });
 await owner.adapter.initialize();
 assert.equal(owner.adapter.snapshot().session.phase, 'local');
 assert.equal(await owner.adapter.start(), ROOM_ID);
 assert.equal(owner.adapter.snapshot().session.phase, 'active');
+assert.deepEqual(ownerBindings.get('project-owner'), {
+  roomId: ROOM_ID,
+  role: 'owner',
+  projectKey: 'project-owner',
+});
 assert.equal(owner.restored, 'checkpoint-owner');
 assert.equal(server.checkpointHash, await sha256(server.objects.get(server.checkpointPath)));
+await owner.adapter.dispose();
+owner = createAdapter({ server, actor: 'owner', clientId: OWNER_CLIENT, storage: ownerStorage, bindings: ownerBindings, checkpointText: 'checkpoint-owner' });
+await owner.adapter.initialize();
+assert.equal(owner.adapter.snapshot().session.phase, 'invited');
+assert.equal(await owner.adapter.resumeBoundProject(), ROOM_ID);
+assert.equal(owner.adapter.snapshot().session.phase, 'active');
 const sentComment = await owner.adapter.commands.sendComment(' owner message ');
 assert.equal(sentComment.text, 'owner message');
 assert.equal(server.broadcasts.at(-1).event, 'pixisync-comment');
@@ -232,10 +247,15 @@ assert.equal(server.broadcasts.at(-1).event, 'pixisync-comment');
 const inviteUrl = await owner.adapter.createInviteLink();
 assert.equal(new URL(inviteUrl).searchParams.get('pixisync_invite'), INVITE_TOKEN);
 
-const editor = createAdapter({ server, actor: 'editor', clientId: EDITOR_CLIENT, storage: editorStorage, checkpointText: 'checkpoint-editor' });
+const editor = createAdapter({ server, actor: 'editor', clientId: EDITOR_CLIENT, storage: editorStorage, bindings: editorBindings, checkpointText: 'checkpoint-editor' });
 await editor.adapter.initialize();
 assert.equal(await editor.adapter.join(INVITE_TOKEN), ROOM_ID);
 assert.equal(editor.adapter.snapshot().session.phase, 'active');
+assert.deepEqual(editorBindings.get('project-editor'), {
+  roomId: ROOM_ID,
+  role: 'participant',
+  projectKey: 'project-editor',
+});
 assert.equal(editor.restored, 'checkpoint-owner');
 server.realtimeOptions.at(-1).onBroadcast('pixisync-comment', sentComment);
 assert.equal(editor.bridge.comments.length, 1);
@@ -248,11 +268,13 @@ assert.deepEqual(editor.bridge.participants.map(item => item.name), ['Owner', 'è
 await editor.adapter.leave();
 assert.equal(editor.adapter.snapshot().session.phase, 'left');
 assert.equal(server.members.has('editor'), false);
+assert.equal(editorBindings.has('project-editor'), false);
 
 await owner.adapter.archive();
 assert.equal(owner.adapter.snapshot().session.phase, 'archived');
 assert.equal(server.status, 'archived');
 assert.equal(server.checkpointHash, await sha256(server.objects.get(server.checkpointPath)));
+assert.equal(ownerBindings.has('project-owner'), false);
 
 await Promise.all([owner.adapter.dispose(), editor.adapter.dispose()]);
 console.log('PiXiSYNC runtime adapter lifecycle integration tests passed');

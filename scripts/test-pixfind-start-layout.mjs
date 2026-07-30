@@ -11,7 +11,7 @@ const toolFullscreen = fs.readFileSync(path.join(root, 'scripts/tool-fullscreen.
 const maoitu = fs.readFileSync(path.join(root, 'maoitu/index.html'), 'utf8');
 
 assert.match(html, /<body data-pixfind-screen="start">/);
-assert.match(html, /styles\.css\?v=20260730-row-ad-reserve1/);
+assert.match(html, /styles\.css\?v=20260730-result-panel-scroll1/);
 assert.match(css, /creator-overlay \{[\s\S]*z-index: 950;/);
 assert.match(css, /creator-panel \{[\s\S]*max-height: 100%;/);
 assert.match(css, /Do not add those bar dimensions twice/);
@@ -170,6 +170,8 @@ assert.match(css, /\.hit-burst__piece/);
 assert.match(css, /\.miss-impact/);
 assert.match(css, /\.completion-confetti/);
 assert.match(css, /\.result-panel \{/);
+assert.match(css, /\.completion-overlay \{[\s\S]*?overflow-y: auto;/);
+assert.match(css, /\.result-panel__ad ins\.adsbygoogle \{[\s\S]*?width: min\(100%, 320px\) !important;/);
 assert.match(css, /html:fullscreen \.app/);
 
 console.log('PiXFiND start layout checks passed.');

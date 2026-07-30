@@ -350,7 +350,6 @@
       pixisyncConnectionLabel: document.getElementById('pixisyncConnectionLabel'),
       pixisyncStart: document.getElementById('pixisyncStart'),
       pixisyncCopyInvite: document.getElementById('pixisyncCopyInvite'),
-      pixisyncOpenShared: document.getElementById('pixisyncOpenShared'),
       pixisyncLeave: document.getElementById('pixisyncLeave'),
       pixisyncArchive: document.getElementById('pixisyncArchive'),
       pixisyncAccessCodeField: document.getElementById('pixisyncAccessCodeField'),
@@ -11923,7 +11922,6 @@
         connectionLabel: dom.controls.pixisyncConnectionLabel,
         start: dom.controls.pixisyncStart,
         copyInvite: dom.controls.pixisyncCopyInvite,
-        openShared: dom.controls.pixisyncOpenShared,
         accessCodeField: dom.controls.pixisyncAccessCodeField,
         accessCode: dom.controls.pixisyncAccessCode,
         joinCode: dom.controls.pixisyncJoinCode,
@@ -17239,7 +17237,8 @@
         source: Number(latestEntry.autosaveSchemaVersion) === 2 ? 'indexeddb-v2' : 'recent-local',
         autosaveSchemaVersion: Number(latestEntry.autosaveSchemaVersion) || 0,
       }) || '';
-      const finishRecentProjectOpen = (message = '自動保存: 端末内プロジェクトを開きました') => {
+      const finishRecentProjectOpen = async (message = '自動保存: 端末内プロジェクトを開きました') => {
+        await resumePiXiSyncProjectCard(latestEntry);
         if (!silent) {
           updateAutosaveStatus(message, 'success');
         }
@@ -26263,8 +26262,56 @@
       },
       getProjectKey: () => normalizeAutosaveProjectId?.(autosaveProjectId || '') || '',
       getProjectTitle: () => state.documentName || DEFAULT_DOCUMENT_NAME,
+      readProjectBinding: async projectKey => {
+        const normalizedProjectKey = normalizeAutosaveProjectId(projectKey || '');
+        if (!normalizedProjectKey) return null;
+        const entry = recentProjectsCache.get(normalizedProjectKey)
+          || await loadRecentProjectMetadataById(normalizedProjectKey);
+        const binding = entry?.pixisync;
+        if (!binding || typeof binding !== 'object') return null;
+        return {
+          roomId: binding.roomId,
+          role: binding.role,
+          projectKey: normalizedProjectKey,
+        };
+      },
+      writeProjectBinding: async (projectKey, binding) => {
+        const normalizedProjectKey = normalizeAutosaveProjectId(projectKey || '');
+        if (!normalizedProjectKey) throw new Error('PiXiSYNC project binding requires a local project');
+        let entries = await loadRecentProjectsMetadata();
+        let entry = entries.find(candidate => candidate?.id === normalizedProjectKey) || null;
+        if (!entry) {
+          await recordRecentProjectSnapshot();
+          entries = await loadRecentProjectsMetadata();
+          entry = entries.find(candidate => candidate?.id === normalizedProjectKey) || null;
+        }
+        if (!entry) throw new Error('PiXiSYNC local project card is unavailable');
+        const nextBinding = {
+          version: 1,
+          roomId: String(binding.roomId || ''),
+          role: binding.role === 'owner' ? 'owner' : 'participant',
+        };
+        const nextEntries = entries.map(candidate => candidate?.id === normalizedProjectKey
+          ? { ...candidate, pixisync: nextBinding }
+          : candidate);
+        await saveRecentProjectsList(entries, nextEntries);
+        setRecentProjectsCache(nextEntries);
+      },
+      clearProjectBinding: async projectKey => {
+        const normalizedProjectKey = normalizeAutosaveProjectId(projectKey || '');
+        if (!normalizedProjectKey) return;
+        const entries = await loadRecentProjectsMetadata();
+        const entry = entries.find(candidate => candidate?.id === normalizedProjectKey) || null;
+        if (!entry || !Object.prototype.hasOwnProperty.call(entry, 'pixisync')) return;
+        const nextEntries = entries.map(candidate => {
+          if (candidate?.id !== normalizedProjectKey) return candidate;
+          const { pixisync, ...localProject } = candidate;
+          return localProject;
+        });
+        await saveRecentProjectsList(entries, nextEntries);
+        setRecentProjectsCache(nextEntries);
+      },
       getClientId,
-      storageKey: String(config.storageKey || 'pixieed:pixisync:v1:session'),
       uiEnabled: config.uiEnabled !== false,
       onStatus: details => console.info('[pixisync:v1-runtime]', details),
       onError: error => console.warn('[pixisync:v1-runtime] error', error?.message || error),
@@ -26272,6 +26319,28 @@
     window.__PIXISYNC_V1_RUNTIME__ = runtime;
     await runtime.initialize();
     return runtime;
+  }
+
+  async function resumePiXiSyncProjectCard(entry) {
+    if (!entry?.pixisync || typeof entry.pixisync !== 'object') return false;
+    const config = window.__PIXISYNC_V1_CONFIG__ || { enabled: PIXISYNC_V1_ENABLED };
+    if (config?.enabled !== true) return false;
+    try {
+      const runtime = window.__PIXISYNC_V1_RUNTIME__ || await initializePiXiSyncRuntime();
+      if (!runtime) return false;
+      await runtime.resumeBoundProject();
+      return true;
+    } catch (error) {
+      console.warn('PiXiSYNC project-card resume failed', error);
+      updateAutosaveStatus(
+        localizeText(
+          '端末内プロジェクトを開きました。PiXiSYNCの再開には失敗しました。',
+          'The local project opened, but PiXiSYNC could not be resumed.'
+        ),
+        'warn'
+      );
+      return false;
+    }
   }
 
   let pixisyncInitialGateUnlocked = false;

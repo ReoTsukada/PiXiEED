@@ -15596,8 +15596,8 @@ body.is-mobile-layout .mobile-drawer[data-mode='full'] #panelMulti .multi-partic
 
 @media (orientation: portrait) {
   #pixisyncQuickOpen,
-  .pixieed-common-tabbar__button[data-common-action='share-project'],
-  .pixieed-common-details__item[data-common-action='share-project'] {
+  .pixieed-common-tabbar__button[data-common-action='pixisync'],
+  .pixieed-common-details__item[data-common-action='pixisync'] {
     display: none !important;
   }
 }

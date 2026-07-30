@@ -90,7 +90,6 @@ const createElements = () => {
     connectionLabel: new FakeElement(),
     start: new FakeElement(),
     copyInvite: new FakeElement(),
-    openShared: new FakeElement(),
     leave: new FakeElement(),
     archive: new FakeElement(),
     accessCodeField: new FakeElement(),
@@ -290,7 +289,6 @@ inviteUi.configure({
       joinSawSanitizedUrl = !replacedUrl.includes('pixisync_invite');
       assert.equal(token, inviteToken);
     },
-    openShared: async () => {},
   },
 });
 assert.equal(await inviteUi.consumeInviteFromUrl(), true);
@@ -321,7 +319,6 @@ for (const id of [
   'pixisyncPanel',
   'pixisyncStart',
   'pixisyncCopyInvite',
-  'pixisyncOpenShared',
   'pixisyncLeave',
   'pixisyncArchive',
   'pixisyncAccessCode',
@@ -344,11 +341,11 @@ assert.ok(
 );
 assert.match(app, /runtime\?\.uiEnabled === true/);
 assert.match(app, /pixisyncMinimalUi\?\.consumeInviteFromUrl/);
-assert.match(sharedTabBar, /id: 'share-project', label: 'シェアプロジェクト', selector: '#pixisyncQuickOpen'/);
+assert.match(sharedTabBar, /id: 'pixisync', label: 'PiXiSYNC', selector: '#pixisyncQuickOpen'/);
 const portraitShareRule = style.match(
   /@media \(orientation: portrait\) \{\s*#pixisyncQuickOpen,[\s\S]*?\n\}/,
 )?.[0] || '';
-assert.match(portraitShareRule, /data-common-action='share-project'/);
+assert.match(portraitShareRule, /data-common-action='pixisync'/);
 assert.doesNotMatch(portraitShareRule, /#mobileTabMulti/);
 
 console.log('PiXiSYNC minimal UI tests passed');
