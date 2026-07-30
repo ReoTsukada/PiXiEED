@@ -8,10 +8,11 @@
   const APP_BUILD_INFO = window.__PIXIEEDRAW_BUILD_INFO__ || {};
   const APP_BUILD_VERSION = String(APP_BUILD_INFO.buildId || 'unknown-build');
   const APP_SW_VERSION = APP_BUILD_VERSION;
-  // PiXiSYNC is production-capable, but its initial rollout is deliberately
-  // gated behind a local settings-button gesture.  Do not expose or start a
-  // collaboration runtime until that gate has been unlocked in this tab.
-  const SHARED_PROJECTS_ENABLED = true;
+  // Keep the retired legacy shared-project flow disabled. PiXiSYNC v1 has its
+  // own runtime and initial gesture gate, so it must not re-enable legacy
+  // project-loading branches.
+  const SHARED_PROJECTS_ENABLED = false;
+  const PIXISYNC_V1_ENABLED = true;
   const PIXISYNC_INITIAL_GATE_TAP_COUNT = 10;
   const PIXISYNC_INITIAL_GATE_RESET_MS = 1800;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
@@ -26167,7 +26168,7 @@
 
   async function initializePiXiSyncRuntime() {
     const config = window.__PIXISYNC_V1_CONFIG__ || {
-      enabled: SHARED_PROJECTS_ENABLED,
+      enabled: PIXISYNC_V1_ENABLED,
       uiEnabled: true,
     };
     const adapterFactory = window.PiXiEEDrawModules?.pixisyncRuntimeAdapterUtils
