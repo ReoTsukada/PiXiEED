@@ -367,7 +367,9 @@ function commitHistory() {
               ? finalizeCanvasResizeHistoryEntry(history.pending)
             : (isFrameAddHistoryEntry(history.pending)
               ? finalizeFrameAddHistoryEntry(history.pending)
-              : setHistoryEntryLabel(history.pending.before, pendingLabel)))))));
+              : (isFrameRemoveHistoryEntry(history.pending)
+                ? finalizeFrameRemoveHistoryEntry(history.pending)
+                : setHistoryEntryLabel(history.pending.before, pendingLabel))))))));
       if (!historyEntry) {
         history.pending = null;
         updateHistoryButtons();
@@ -375,6 +377,10 @@ function commitHistory() {
         return;
       }
       history.past.push(historyEntry);
+      // PiXiSYNC observes the exact finalized entry used by local Undo/Redo.
+      // It is intentionally non-blocking: drawing remains responsive while
+      // the collaboration layer journals and confirms the immutable delta.
+      onCommittedHistoryEntry?.(historyEntry, pendingLabel);
       noteActiveLocalProjectHistoryEntry?.(
         normalizeAutosaveProjectId?.(autosaveProjectId || '') || '',
         historyEntry,
@@ -470,6 +476,20 @@ function undo() {
       markActiveLocalProjectJournalNeedsCheckpoint?.(
         normalizeAutosaveProjectId?.(autosaveProjectId || '') || ''
       );
+      scheduleAutosaveSnapshot();
+      scheduleQrEditReadabilityCheck();
+      return;
+    }
+    if (isFrameRemoveHistoryEntry(previous)) {
+      history.future.push(previous);
+      if (!applyFrameRemoveHistoryEntry(previous, 'undo')) {
+        history.future.pop();
+        history.past.push(previous);
+        return;
+      }
+      updateHistoryButtons();
+      markAutosaveDirty();
+      markDocumentUnsavedChange();
       scheduleAutosaveSnapshot();
       scheduleQrEditReadabilityCheck();
       return;
@@ -640,6 +660,20 @@ function redo() {
       markActiveLocalProjectJournalNeedsCheckpoint?.(
         normalizeAutosaveProjectId?.(autosaveProjectId || '') || ''
       );
+      scheduleAutosaveSnapshot();
+      scheduleQrEditReadabilityCheck();
+      return;
+    }
+    if (isFrameRemoveHistoryEntry(next)) {
+      history.past.push(next);
+      if (!applyFrameRemoveHistoryEntry(next, 'redo')) {
+        history.past.pop();
+        history.future.push(next);
+        return;
+      }
+      updateHistoryButtons();
+      markAutosaveDirty();
+      markDocumentUnsavedChange();
       scheduleAutosaveSnapshot();
       scheduleQrEditReadabilityCheck();
       return;

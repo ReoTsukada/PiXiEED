@@ -68,7 +68,7 @@
     TOOL_SHORTCUT_SHAPE_GROUP,
   } = {}) {
     const LEFT_TAB_KEYS = ['tools', 'color'];
-    const RIGHT_TAB_KEYS = ['frames', 'settings', 'extensions', 'help', 'file'];
+    const RIGHT_TAB_KEYS = ['frames', 'settings', 'extensions', 'help', 'file', 'multi'];
     const TOOL_GROUPS = {
       selection: { label: '範囲選択', tools: ['move', 'selectRect', 'selectLasso', 'selectSame'] },
       pen: { label: 'ペン', tools: ['pen'] },
@@ -123,6 +123,7 @@
       extensions: 'full',
       help: 'full',
       file: 'full',
+      multi: 'half',
     });
     return Object.freeze({
       LEFT_TAB_KEYS,

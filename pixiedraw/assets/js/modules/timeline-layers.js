@@ -440,6 +440,48 @@
     return getTimelineSelectedFrameIndexes().length > 0 || getTimelineSelectedLayerIndexes().length > 0;
   }
 
+  function syncTimelineStructureRemoveButton() {
+    const removeStructure = dom.controls.timelineMatrix?.querySelector(
+      '.timeline-cell--structure-remove .timeline-frame-button'
+    );
+    if (!(removeStructure instanceof HTMLButtonElement)) {
+      return false;
+    }
+    const removalKind = getTimelineSelectedFrameIndexes().length
+      ? 'frame'
+      : (getTimelineSelectedLayerIndexes().length ? 'layer' : '');
+    removeStructure.disabled = !removalKind;
+    const label = removalKind === 'frame'
+      ? localizeText('選択中のフレームを削除', 'Delete selected frame')
+      : removalKind === 'layer'
+        ? localizeText('選択中のレイヤーを削除', 'Delete selected layer')
+        : localizeText('フレーム番号またはレイヤー番号を選択すると削除できます', 'Select a frame or layer number to delete');
+    removeStructure.setAttribute('aria-label', label);
+    removeStructure.title = label;
+    return true;
+  }
+
+  function syncTimelineStructureDuplicateButton() {
+    const duplicateStructure = dom.controls.timelineMatrix?.querySelector(
+      '.timeline-cell--structure-duplicate .timeline-frame-button'
+    );
+    if (!(duplicateStructure instanceof HTMLButtonElement)) {
+      return false;
+    }
+    const duplicateKind = getTimelineSelectedFrameIndexes().length
+      ? 'frame'
+      : (getTimelineSelectedLayerIndexes().length ? 'layer' : '');
+    duplicateStructure.disabled = !duplicateKind;
+    const label = duplicateKind === 'frame'
+      ? localizeText('選択中のフレームを次へ複製', 'Duplicate selected frame after it')
+      : duplicateKind === 'layer'
+        ? localizeText('選択中のレイヤーを次へ複製', 'Duplicate selected layer after it')
+        : localizeText('フレーム番号またはレイヤー番号を選択すると複製できます', 'Select a frame or layer number to duplicate');
+    duplicateStructure.setAttribute('aria-label', label);
+    duplicateStructure.title = label;
+    return true;
+  }
+
   function copyTimelineSelection() {
     const selectedFrameIndexes = getTimelineSelectedFrameIndexes();
     if (selectedFrameIndexes.length) {
@@ -1415,6 +1457,12 @@
       }
       if (state.frames.length <= 1) return;
       if (isSharedProjectCollaborativeMode()) {
+        const frameNumber = clamp(state.activeFrame, 0, state.frames.length - 1) + 1;
+        const accepted = window.confirm(localizeText(
+          `共有プロジェクトからフレーム ${frameNumber} を削除しますか？\nこの操作は参加者全員に同期されます。`,
+          `Delete Frame ${frameNumber} from the shared project?\nThis change will be synchronized to every participant.`
+        ));
+        if (!accepted) return;
         const simulatedCanvases = cloneProjectCanvasDocumentsForStructureChange();
         if (!Array.isArray(simulatedCanvases)) {
           return;
@@ -1442,11 +1490,22 @@
         });
         state.activeFrame = clamp(state.activeFrame, 0, state.frames.length - 1);
       } else {
-        state.frames.splice(state.activeFrame, 1);
+        const [removedFrame] = state.frames.splice(state.activeFrame, 1);
+        if (history.pending?.__historyEntryType === 'frameRemove' && removedFrame) {
+          history.pending.frames.push({
+            frameId: typeof removedFrame.id === 'string' ? removedFrame.id : '',
+            index: state.activeFrame,
+            frame: removedFrame,
+          });
+        }
         state.activeFrame = clamp(state.activeFrame, 0, state.frames.length - 1);
       }
       const frame = getActiveFrame();
       state.activeLayer = frame.layers[frame.layers.length - 1].id;
+      if (history.pending?.__historyEntryType === 'frameRemove') {
+        history.pending.activeFrameAfter = state.activeFrame;
+        history.pending.activeLayerAfter = state.activeLayer;
+      }
       markHistoryDirty();
       scheduleSessionPersist();
       renderFrameList();
@@ -2479,6 +2538,8 @@
       respectSharedCellOccupancy: false,
     });
     setTimelineLayerSelection(layerIndex, { append });
+    syncTimelineStructureRemoveButton();
+    syncTimelineStructureDuplicateButton();
     scheduleSessionPersist({ includeSnapshots: false, includeReloadSnapshot: false });
     scheduleTimelineMatrixRenderSoon();
     scheduleSharedProjectCellPresenceBroadcast('layer');
@@ -2492,6 +2553,8 @@
       || candidateLayers[candidateLayers.length - 1]
       || candidateLayers[0];
     setTimelineFrameSelection(frameIndex, { append });
+    syncTimelineStructureRemoveButton();
+    syncTimelineStructureDuplicateButton();
     if (nextLayer) {
       const nextTrackIndex = state.frames[frameIndex]?.layers?.findIndex(layer => layer?.trackId === nextLayer.trackId) ?? -1;
       if (nextTrackIndex >= 0) {
@@ -2504,6 +2567,71 @@
     scheduleTimelineMatrixRenderSoon();
     scheduleSharedProjectCellPresenceBroadcast('frame');
     return true;
+  }
+
+  function enableTimelineStructureLongPressDrag(button, kind, sourceIndex) {
+    if (!(button instanceof HTMLElement)) return;
+    let pressTimer = 0;
+    let dragging = false;
+    let pointerId = null;
+    let suppressClickUntil = 0;
+    const cancel = () => {
+      if (pressTimer) window.clearTimeout(pressTimer);
+      pressTimer = 0;
+      if (dragging) button.classList.remove('is-dragging');
+      dragging = false;
+      pointerId = null;
+    };
+    button.addEventListener('pointerdown', event => {
+      if (event.button !== 0 || !canCurrentClientEditProjectStructure({ announce: false })) return;
+      pointerId = event.pointerId;
+      pressTimer = window.setTimeout(() => {
+        dragging = true;
+        button.classList.add('is-dragging');
+        button.setPointerCapture?.(pointerId);
+      }, 320);
+    });
+    button.addEventListener('pointerup', event => {
+      if (!dragging) { cancel(); return; }
+      const target = document.elementFromPoint(event.clientX, event.clientY);
+      const selector = kind === 'frame' ? '.timeline-frame-button' : '.timeline-layer-tag';
+      const targetButton = target instanceof Element ? target.closest(selector) : null;
+      const targetIndex = Number.parseInt(targetButton?.dataset[kind === 'frame' ? 'timelineFrameIndex' : 'timelineLayerIndex'] || '', 10);
+      cancel();
+      suppressClickUntil = Date.now() + 400;
+      if (!Number.isInteger(targetIndex)) return;
+      if (targetIndex === sourceIndex) {
+        const label = kind === 'frame'
+          ? localizeText(`フレーム ${sourceIndex + 1} を削除しますか？`, `Delete Frame ${sourceIndex + 1}?`)
+          : localizeText('このレイヤーを削除しますか？', 'Delete this layer?');
+        if (kind === 'frame' && isSharedProjectCollaborativeMode()) {
+          selectTimelineFrameDirectly(sourceIndex);
+          dom.controls.removeFrame?.click();
+        } else if (window.confirm(label)) {
+          if (kind === 'frame') {
+            selectTimelineFrameDirectly(sourceIndex);
+            dom.controls.removeFrame?.click();
+          } else {
+            selectTimelineLayerDirectly(sourceIndex);
+            dom.controls.removeLayer?.click();
+          }
+        }
+        return;
+      }
+      if (kind === 'frame') {
+        if (selectTimelineFrameDirectly(sourceIndex)) moveActiveFrame(targetIndex - sourceIndex);
+      } else if (selectTimelineLayerDirectly(sourceIndex)) {
+        moveActiveLayer(targetIndex - sourceIndex);
+      }
+    });
+    button.addEventListener('pointercancel', cancel);
+    button.addEventListener('pointerleave', event => { if (!dragging && event.buttons === 0) cancel(); });
+    button.addEventListener('click', event => {
+      if (Date.now() < suppressClickUntil) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    }, true);
   }
 
   function bindTimelineMatrixInteractions() {
@@ -3056,6 +3184,8 @@
         isHidden: isHiddenCell,
       }));
     });
+    syncTimelineStructureRemoveButton();
+    syncTimelineStructureDuplicateButton();
     return true;
   }
 
@@ -3240,16 +3370,82 @@
     }
     timelineMatrixRenderKey = nextTimelineRenderKey;
 
-    const cellSizePx = `${TIMELINE_CELL_SIZE}px`;
-    container.style.setProperty('--timeline-cell-size', cellSizePx);
+    // CSS owns the touch-target scale so portrait compact mode can keep three
+    // layer rows visible without JavaScript overwriting it on each render.
+    const cellSize = 'var(--timeline-cell-size)';
     const layerHeaderColumnCount = 2;
     const frameColumnStart = layerHeaderColumnCount + 1;
-    const columnCount = frameCount + layerHeaderColumnCount;
-    const rowCount = layerCount + 1;
-    container.style.gridTemplateColumns = `repeat(${columnCount}, ${cellSizePx})`;
-    container.style.gridTemplateRows = `repeat(${rowCount}, ${cellSizePx})`;
+    const columnCount = frameCount + layerHeaderColumnCount + 1;
+    const rowCount = layerCount + 2;
+    container.style.gridTemplateColumns = `repeat(${columnCount}, ${cellSize})`;
+    container.style.gridTemplateRows = `repeat(${rowCount}, ${cellSize})`;
 
     const fragment = document.createDocumentFragment();
+
+    const selectedFrameIndexes = getTimelineSelectedFrameIndexes();
+    const selectedLayerIndexes = getTimelineSelectedLayerIndexes();
+    const removalKind = selectedFrameIndexes.length
+      ? 'frame'
+      : (selectedLayerIndexes.length ? 'layer' : '');
+    const duplicateStructureHeader = document.createElement('div');
+    duplicateStructureHeader.className = 'timeline-cell timeline-cell--frame-header timeline-cell--structure-duplicate pixel-frame';
+    duplicateStructureHeader.style.gridColumn = '1';
+    duplicateStructureHeader.style.gridRow = '1';
+    applyTimelineCellFrame(duplicateStructureHeader, 'frameHeader');
+    const duplicateStructure = document.createElement('button');
+    duplicateStructure.type = 'button';
+    duplicateStructure.className = 'timeline-frame-button pixel-frame';
+    duplicateStructure.textContent = '⧉';
+    duplicateStructure.disabled = !removalKind;
+    duplicateStructure.setAttribute(
+      'aria-label',
+      removalKind === 'frame'
+        ? localizeText('選択中のフレームを次へ複製', 'Duplicate selected frame after it')
+        : removalKind === 'layer'
+          ? localizeText('選択中のレイヤーを次へ複製', 'Duplicate selected layer after it')
+          : localizeText('フレーム番号またはレイヤー番号を選択すると複製できます', 'Select a frame or layer number to duplicate')
+    );
+    duplicateStructure.title = duplicateStructure.getAttribute('aria-label') || '';
+    duplicateStructure.addEventListener('click', () => {
+      if (getTimelineSelectedFrameIndexes().length) {
+        duplicateSelectedTimelineFrames();
+      } else if (getTimelineSelectedLayerIndexes().length) {
+        duplicateSelectedTimelineLayers();
+      }
+    });
+    applyTimelineSlotFrame(duplicateStructure, 'default');
+    duplicateStructureHeader.appendChild(duplicateStructure);
+    fragment.appendChild(duplicateStructureHeader);
+
+    const removeStructureHeader = document.createElement('div');
+    removeStructureHeader.className = 'timeline-cell timeline-cell--frame-header timeline-cell--structure-remove pixel-frame';
+    removeStructureHeader.style.gridColumn = '2';
+    removeStructureHeader.style.gridRow = '1';
+    applyTimelineCellFrame(removeStructureHeader, 'frameHeader');
+    const removeStructure = document.createElement('button');
+    removeStructure.type = 'button';
+    removeStructure.className = 'timeline-frame-button pixel-frame';
+    removeStructure.textContent = '－';
+    removeStructure.disabled = !removalKind;
+    removeStructure.setAttribute(
+      'aria-label',
+      removalKind === 'frame'
+        ? localizeText('選択中のフレームを削除', 'Delete selected frame')
+        : removalKind === 'layer'
+          ? localizeText('選択中のレイヤーを削除', 'Delete selected layer')
+          : localizeText('フレーム番号またはレイヤー番号を選択すると削除できます', 'Select a frame or layer number to delete')
+    );
+    removeStructure.title = removeStructure.getAttribute('aria-label') || '';
+    removeStructure.addEventListener('click', () => {
+      if (getTimelineSelectedFrameIndexes().length) {
+        dom.controls.removeFrame?.click();
+      } else if (getTimelineSelectedLayerIndexes().length) {
+        dom.controls.removeLayer?.click();
+      }
+    });
+    applyTimelineSlotFrame(removeStructure, 'default');
+    removeStructureHeader.appendChild(removeStructure);
+    fragment.appendChild(removeStructureHeader);
 
     frames.forEach((frame, frameIndex) => {
       const col = frameIndex + frameColumnStart;
@@ -3317,9 +3513,32 @@
       });
 
       header.appendChild(button);
+      enableTimelineStructureLongPressDrag(button, 'frame', frameIndex);
       applyTimelineSlotFrame(button, frameIndex === activeFrameIndex ? 'active' : 'default');
       fragment.appendChild(header);
     });
+
+    const frameAddHeader = document.createElement('div');
+    frameAddHeader.className = 'timeline-cell timeline-cell--frame-header timeline-cell--structure-add pixel-frame';
+    frameAddHeader.style.gridColumn = String(frameCount + frameColumnStart);
+    frameAddHeader.style.gridRow = '1';
+    applyTimelineCellFrame(frameAddHeader, 'frameHeader');
+    const frameAdd = document.createElement('button');
+    frameAdd.type = 'button';
+    frameAdd.className = 'timeline-frame-button pixel-frame';
+    frameAdd.setAttribute('aria-label', localizeText('フレームを追加', 'Add frame'));
+    frameAdd.textContent = '＋';
+    frameAdd.addEventListener('click', () => {
+      clearTimelineSelection();
+      const lastFrameIndex = state.frames.length - 1;
+      if (lastFrameIndex >= 0) {
+        setActiveFrameIndex(lastFrameIndex, { persist: false, render: false, syncUi: false, broadcastPresence: false });
+      }
+      dom.controls.addFrame?.click();
+    });
+    applyTimelineSlotFrame(frameAdd, 'default');
+    frameAddHeader.appendChild(frameAdd);
+    fragment.appendChild(frameAddHeader);
 
     for (let rowIndex = 0; rowIndex < layerCount; rowIndex += 1) {
       const row = rowIndex + 2;
@@ -3416,6 +3635,7 @@
           event.stopPropagation();
         });
         rowHeader.appendChild(tag);
+        enableTimelineStructureLongPressDrag(tag, 'layer', layerTrackIndex);
       } else {
         rowVisibilityCell.dataset.timelineNodeKey = `layer-visibility:placeholder:${rowIndex}`;
         rowHeader.dataset.timelineNodeKey = `layer-main:placeholder:${rowIndex}`;
@@ -3640,6 +3860,32 @@
         fragment.appendChild(cell);
       });
     }
+
+    const layerAddCell = document.createElement('div');
+    layerAddCell.className = 'timeline-cell timeline-cell--layer timeline-cell--layer-main timeline-cell--structure-add pixel-frame';
+    layerAddCell.style.gridColumn = '2';
+    layerAddCell.style.gridRow = String(layerCount + 2);
+    applyTimelineCellFrame(layerAddCell, 'layer');
+    const layerAdd = document.createElement('button');
+    layerAdd.type = 'button';
+    layerAdd.className = 'timeline-frame-button pixel-frame';
+    layerAdd.setAttribute('aria-label', localizeText('レイヤーを追加', 'Add layer'));
+    layerAdd.textContent = '＋';
+    layerAdd.addEventListener('click', () => {
+      const activeFrame = getActiveFrame();
+      const lastLayerIndex = Math.max(0, (activeFrame?.layers?.length || 1) - 1);
+      clearTimelineSelection();
+      setActiveLayerTrackIndex(lastLayerIndex, {
+        persist: false,
+        render: false,
+        syncUi: false,
+        respectSharedCellOccupancy: false,
+      });
+      dom.controls.addLayer?.click();
+    });
+    applyTimelineSlotFrame(layerAdd, 'default');
+    layerAddCell.appendChild(layerAdd);
+    fragment.appendChild(layerAddCell);
 
     reconcileTimelineMatrixChildren(container, fragment);
 

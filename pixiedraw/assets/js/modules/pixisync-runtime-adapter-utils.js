@@ -1,0 +1,681 @@
+(() => {
+  'use strict';
+
+  const root = window.PiXiEEDrawModules = window.PiXiEEDrawModules || {};
+  const ROOM_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const TOKEN_PATTERN = /^[0-9a-f]{64}$/;
+  const HASH_PATTERN = /^[0-9a-f]{64}$/;
+  const CHECKPOINT_BUCKET = 'pixisync-checkpoints';
+  const COMMENT_MAX_LENGTH = 140;
+
+  function createPiXiSyncRuntimeAdapter({
+    createSession,
+    createRealtimeClient,
+    runtimeBridge,
+    getSupabase,
+    captureCheckpoint,
+    restoreCheckpoint,
+    getProjectKey = () => '',
+    getProjectTitle = () => '',
+    getClientId,
+    locationRef = window.location,
+    localStorageRef = window.localStorage,
+    storageKey = 'pixieed.pixisync.v1.session',
+    uiEnabled = true,
+    onStatus = () => {},
+    onError = () => {},
+  } = {}) {
+    if (
+      typeof createSession !== 'function'
+      || typeof createRealtimeClient !== 'function'
+      || !runtimeBridge?.configure
+      || typeof getSupabase !== 'function'
+      || typeof captureCheckpoint !== 'function'
+      || typeof restoreCheckpoint !== 'function'
+      || typeof getClientId !== 'function'
+    ) {
+      throw new Error('PiXiSYNC runtime: missing dependencies');
+    }
+
+    let supabase = null;
+    let session = null;
+    let realtimeClient = null;
+    let manifest = null;
+    let roomId = '';
+    let role = 'owner';
+    let clientId = '';
+    let operationQueue = Promise.resolve();
+    let replayedJournalEpoch = -1;
+    let disposed = false;
+    let unsubscribeSession = null;
+    const attestationWaiters = new Map();
+
+    const commands = Object.freeze({
+      start,
+      join,
+      openShared,
+      createInviteLink,
+      sendComment,
+      leave,
+      archive,
+    });
+
+    const firstRow = data => Array.isArray(data) ? data[0] : data;
+    const toHexBytes = hex => `\\x${String(hex || '').toLowerCase()}`;
+    const currentSnapshot = () => session?.getSnapshot?.() || null;
+    const currentEpoch = () => Number(currentSnapshot()?.epoch || 0);
+    const currentGeneration = () => String(currentSnapshot()?.sessionGeneration || '0');
+    const assertRoomId = value => {
+      const normalized = String(value || '');
+      if (!ROOM_ID_PATTERN.test(normalized)) throw new Error('PiXiSYNC runtime: invalid-room-id');
+      return normalized;
+    };
+    const assertHash = value => {
+      const normalized = String(value || '').toLowerCase();
+      if (!HASH_PATTERN.test(normalized)) throw new Error('PiXiSYNC runtime: invalid-checkpoint-hash');
+      return normalized;
+    };
+    const assertClientId = value => {
+      const normalized = String(value || '');
+      if (!ROOM_ID_PATTERN.test(normalized)) throw new Error('PiXiSYNC runtime: invalid-client-id');
+      return normalized;
+    };
+    const sha256Hex = async blob => {
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      const digest = new Uint8Array(await window.crypto.subtle.digest('SHA-256', bytes));
+      return [...digest].map(value => value.toString(16).padStart(2, '0')).join('');
+    };
+    const report = details => {
+      onStatus(details);
+      runtimeBridge.refreshUi?.();
+    };
+    const persistSession = value => {
+      if (!localStorageRef) return;
+      if (!value) {
+        localStorageRef.removeItem(storageKey);
+        return;
+      }
+      localStorageRef.setItem(storageKey, JSON.stringify({
+        roomId: value.roomId,
+        role: value.role,
+        projectKey: value.projectKey || '',
+      }));
+    };
+    const readPersistedSession = () => {
+      try {
+        const parsed = JSON.parse(localStorageRef?.getItem?.(storageKey) || 'null');
+        if (!ROOM_ID_PATTERN.test(String(parsed?.roomId || ''))) return null;
+        return {
+          roomId: String(parsed.roomId),
+          role: parsed.role === 'owner' ? 'owner' : 'participant',
+          projectKey: String(parsed.projectKey || ''),
+        };
+      } catch (_) {
+        return null;
+      }
+    };
+    const rpc = async (name, params) => {
+      const response = await supabase.rpc(name, params);
+      if (response?.error) throw response.error;
+      return response?.data;
+    };
+    const uploadCheckpoint = async (path, blob) => {
+      const response = await supabase.storage.from(CHECKPOINT_BUCKET).upload(path, blob, {
+        contentType: 'application/octet-stream',
+        upsert: false,
+      });
+      if (response?.error) throw response.error;
+    };
+    const downloadCheckpoint = async path => {
+      const response = await supabase.storage.from(CHECKPOINT_BUCKET).download(path);
+      if (response?.error || !(response?.data instanceof Blob)) {
+        throw response?.error || new Error('PiXiSYNC runtime: checkpoint-download-failed');
+      }
+      return response.data;
+    };
+
+    function configureBridge({ collaboration = Boolean(realtimeClient) } = {}) {
+      runtimeBridge.configure({
+        session,
+        realtimeClient: collaboration ? realtimeClient : null,
+        structureEpoch: Number(manifest?.structure_epoch || 0),
+        commands,
+        participants: [],
+        uiEnabled,
+        consumeInviteFromUrl: false,
+      });
+    }
+
+    function installSession(nextRole, { resumeAvailable = false } = {}) {
+      unsubscribeSession?.();
+      role = nextRole === 'owner' ? 'owner' : 'participant';
+      session = createSession({ role, resumeAvailable });
+      unsubscribeSession = session.subscribe(snapshot => {
+        report({ phase: snapshot.phase, roomId: snapshot.roomId, revision: snapshot.appliedRevision });
+      });
+      configureBridge({ collaboration: false });
+      return session;
+    }
+
+    async function ensureSupabase() {
+      if (!supabase) supabase = await getSupabase();
+      if (!supabase?.rpc || !supabase?.storage || !supabase?.channel) {
+        throw new Error('PiXiSYNC runtime: invalid-supabase-client');
+      }
+      clientId = assertClientId(await getClientId());
+      return supabase;
+    }
+
+    async function openManifest(targetRoomId) {
+      const row = firstRow(await rpc('pixisync_open_session', { p_room_id: assertRoomId(targetRoomId) }));
+      if (!row) throw new Error('PiXiSYNC runtime: session-manifest-missing');
+      if (
+        String(row.status) !== 'active'
+        || !ROOM_ID_PATTERN.test(String(row.room_id || ''))
+        || !HASH_PATTERN.test(String(row.state_sha256_hex || ''))
+      ) {
+        throw new Error('PiXiSYNC runtime: invalid-session-manifest');
+      }
+      manifest = row;
+      roomId = String(row.room_id);
+      return row;
+    }
+
+    async function dispatchNow(event) {
+      if (!session || disposed) return null;
+      const result = session.dispatch(event);
+      runtimeBridge.refreshUi?.();
+      for (const effect of result.effects || []) {
+        await runEffect(effect);
+      }
+      return result;
+    }
+
+    function enqueue(event) {
+      operationQueue = operationQueue
+        .then(() => dispatchNow(event))
+        .catch(async error => {
+          onError(error);
+          report({ phase: 'error', error: error?.message || 'unknown' });
+          if (
+            session
+            && role !== 'owner'
+            && /active_session_not_available|membership_revoked|permission|row-level security/i
+              .test(String(error?.message || ''))
+          ) {
+            await dispatchNow({ type: 'ROOM_ACCESS_REVOKED', epoch: currentEpoch() });
+          }
+        });
+      return operationQueue;
+    }
+
+    async function createRealtime() {
+      if (realtimeClient) await realtimeClient.stop().catch(() => {});
+      realtimeClient = createRealtimeClient({
+        supabase,
+        roomId,
+        clientId,
+        initialRevision: String(manifest?.checkpoint_revision || 0),
+        recoverOnSubscribe: false,
+        applyConfirmed: (operation, metadata) => runtimeBridge.applyConfirmed(operation, metadata),
+        onChannelStatus: status => {
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            void enqueue({ type: 'CHANNEL_CLOSED', epoch: currentEpoch() });
+          }
+        },
+        onBroadcast: (event, payload) => {
+          if (event === 'session-archived') {
+            void enqueue({ type: 'ROOM_ARCHIVED', epoch: currentEpoch() });
+          } else if (event === 'pixisync-comment') {
+            const comment = normalizeComment(payload);
+            if (comment && comment.senderClientId !== clientId) {
+              runtimeBridge.receiveComment?.(comment);
+            }
+          } else if (event === 'checkpoint-attestation-request') {
+            void attestRemoteCheckpoint(payload).catch(onError);
+          } else if (event === 'checkpoint-attested') {
+            attestationWaiters.get(String(payload?.checkpointId || ''))?.();
+          }
+        },
+        onPresenceChange: entries => {
+          const seen = new Set();
+          const participants = [];
+          for (const entry of Array.isArray(entries) ? entries : []) {
+            const participantClientId = String(entry?.clientId || '');
+            if (!ROOM_ID_PATTERN.test(participantClientId) || seen.has(participantClientId)) continue;
+            seen.add(participantClientId);
+            const participantRole = entry?.role === 'owner' ? 'owner' : 'editor';
+            participants.push({
+              id: participantClientId,
+              name: participantClientId === clientId
+                ? '自分'
+                : (participantRole === 'owner' ? 'Owner' : 'Editor'),
+              role: participantRole,
+              connection: 'online',
+            });
+          }
+          runtimeBridge.updateParticipants?.(participants);
+        },
+        onRecoveryRequired: details => {
+          onError(details?.error || new Error(details?.reason || 'recovery-required'));
+          void enqueue({ type: 'GAP_DETECTED', epoch: currentEpoch() });
+        },
+      });
+      return realtimeClient;
+    }
+
+    async function runEffect(effect) {
+      if (!effect || disposed) return;
+      const effectEpoch = Number(effect.epoch ?? currentEpoch());
+      switch (effect.type) {
+        case 'OPEN_PRIVATE_CHANNEL':
+          await createRealtime();
+          await realtimeClient.start();
+          await realtimeClient.trackPresence({ clientId, role, onlineAt: new Date().toISOString() });
+          await dispatchNow({
+            type: 'CHANNEL_SUBSCRIBED',
+            epoch: effectEpoch,
+            generation: currentGeneration(),
+            topic: effect.topic,
+            private: effect.private === true,
+          });
+          break;
+        case 'LOAD_CHECKPOINT': {
+          manifest = await openManifest(roomId);
+          const blob = await downloadCheckpoint(String(manifest.storage_path || ''));
+          if (blob.size !== Number(manifest.encoded_bytes) || await sha256Hex(blob) !== assertHash(manifest.state_sha256_hex)) {
+            await dispatchNow({ type: 'HASH_MISMATCH', epoch: effectEpoch });
+            return;
+          }
+          configureBridge();
+          runtimeBridge.beginAuthoritativeResync?.(manifest.checkpoint_revision);
+          await restoreCheckpoint(blob);
+          realtimeClient.resetConfirmedRevision(manifest.checkpoint_revision);
+          await dispatchNow({
+            type: 'CHECKPOINT_LOADED',
+            epoch: effectEpoch,
+            generation: currentGeneration(),
+            revision: String(manifest.checkpoint_revision),
+          });
+          break;
+        }
+        case 'FETCH_INITIAL_TAIL': {
+          const revision = await realtimeClient.syncFrom(effect.afterRevision);
+          runtimeBridge.reapplyPendingAfterResync?.();
+          await dispatchNow({
+            type: 'INITIAL_TAIL_APPLIED',
+            epoch: effectEpoch,
+            generation: currentGeneration(),
+            revision: revision.toString(),
+          });
+          break;
+        }
+        case 'READ_AUTHORITATIVE_HEAD': {
+          if (replayedJournalEpoch !== effectEpoch) {
+            replayedJournalEpoch = effectEpoch;
+            await realtimeClient.replayPendingJournal();
+          }
+          manifest = await openManifest(roomId);
+          await dispatchNow({
+            type: 'AUTHORITATIVE_HEAD',
+            epoch: effectEpoch,
+            generation: currentGeneration(),
+            revision: String(manifest.head_revision),
+          });
+          break;
+        }
+        case 'FETCH_RETAIL': {
+          const revision = await realtimeClient.syncFrom(effect.afterRevision);
+          await dispatchNow({
+            type: 'RETAIL_APPLIED',
+            epoch: effectEpoch,
+            generation: currentGeneration(),
+            revision: revision.toString(),
+          });
+          break;
+        }
+        case 'SYNC_ACTIVE':
+          persistSession({ roomId, role, projectKey: currentSnapshot()?.projectKey || getProjectKey() });
+          configureBridge();
+          break;
+        case 'RECONNECT_CHANNEL':
+          await realtimeClient?.stop?.().catch(() => {});
+          manifest = await openManifest(roomId);
+          await createRealtime();
+          await realtimeClient.start();
+          await realtimeClient.trackPresence({ clientId, role, onlineAt: new Date().toISOString() });
+          await dispatchNow({
+            type: 'CHANNEL_SUBSCRIBED',
+            epoch: effectEpoch,
+            generation: currentGeneration(),
+            topic: `pixisync:room:${roomId}`,
+            private: true,
+          });
+          break;
+        case 'FLUSH_PENDING':
+          if (realtimeClient?.pendingOperationCount) throw new Error('PiXiSYNC runtime: pending-operations-remain');
+          break;
+        case 'STOP_PRESENCE':
+          await realtimeClient?.untrackPresence?.().catch(() => {});
+          break;
+        case 'REMOVE_CHANNEL':
+          await realtimeClient?.stop?.().catch(() => {});
+          realtimeClient = null;
+          configureBridge({ collaboration: false });
+          break;
+        case 'QUARANTINE_PENDING':
+          break;
+        case 'ENSURE_ROOM':
+        case 'VERIFY_MEMBERSHIP':
+        case 'VERIFY_EXISTING_SESSION':
+        case 'FULL_RESYNC':
+          break;
+        default:
+          throw new Error(`PiXiSYNC runtime: unsupported-effect-${effect.type}`);
+      }
+    }
+
+    async function start() {
+      await ensureSupabase();
+      if (!session || currentSnapshot()?.phase !== 'local' || currentSnapshot()?.role !== 'owner') {
+        installSession('owner');
+      }
+      const projectKey = String(getProjectKey() || '');
+      const opening = session.dispatch({ type: 'OPEN_REQUEST', projectKey });
+      runtimeBridge.refreshUi?.();
+      const epoch = opening.state.epoch;
+      try {
+        const blob = await captureCheckpoint();
+        if (!(blob instanceof Blob) || blob.size < 1) throw new Error('PiXiSYNC runtime: empty-checkpoint');
+        const stateHash = await sha256Hex(blob);
+        const begun = firstRow(await rpc('pixisync_begin_session', {
+          p_title: String(getProjectTitle() || '').slice(0, 120),
+          p_state_sha256: toHexBytes(stateHash),
+          p_encoded_bytes: blob.size,
+          p_codec_version: 1,
+        }));
+        roomId = assertRoomId(begun?.room_id);
+        await uploadCheckpoint(String(begun?.storage_path || ''), blob);
+        const activated = firstRow(await rpc('pixisync_activate_initial_checkpoint', { p_room_id: roomId }));
+        manifest = await openManifest(roomId);
+        await dispatchNow({
+          type: 'ROOM_READY',
+          epoch,
+          roomId,
+          status: activated?.status,
+          generation: String(activated?.session_generation || manifest.session_generation),
+        });
+        return roomId;
+      } catch (error) {
+        await dispatchNow({ type: 'FAIL', epoch, reason: error?.message || 'start-failed' });
+        throw error;
+      }
+    }
+
+    async function join(inviteToken) {
+      await ensureSupabase();
+      const token = String(inviteToken || '').toLowerCase();
+      if (!TOKEN_PATTERN.test(token)) throw new Error('PiXiSYNC runtime: invalid-invite-token');
+      installSession('participant');
+      const joining = session.dispatch({ type: 'JOIN_REQUEST', projectKey: String(getProjectKey() || '') });
+      runtimeBridge.refreshUi?.();
+      const epoch = joining.state.epoch;
+      try {
+        const joined = firstRow(await rpc('pixisync_join_session', { p_invite_token: token }));
+        roomId = assertRoomId(joined?.room_id);
+        manifest = await openManifest(roomId);
+        await dispatchNow({
+          type: 'MEMBERSHIP_OK',
+          epoch,
+          roomId,
+          status: joined?.status,
+          generation: String(joined?.session_generation),
+          canEdit: joined?.can_edit === true,
+        });
+        return roomId;
+      } catch (error) {
+        await dispatchNow({ type: 'DENIED', epoch, reason: error?.message || 'join-failed' });
+        throw error;
+      }
+    }
+
+    async function openShared() {
+      await ensureSupabase();
+      const stored = readPersistedSession();
+      if (!stored) throw new Error('PiXiSYNC runtime: saved-session-unavailable');
+      installSession(stored.role, { resumeAvailable: true });
+      const opening = session.dispatch({
+        type: 'RESUME_REQUEST',
+        roomId: stored.roomId,
+        projectKey: stored.projectKey,
+      });
+      runtimeBridge.refreshUi?.();
+      const epoch = opening.state.epoch;
+      try {
+        manifest = await openManifest(stored.roomId);
+        roomId = stored.roomId;
+        const event = stored.role === 'owner'
+          ? {
+              type: 'ROOM_READY',
+              epoch,
+              roomId,
+              status: manifest.status,
+              generation: String(manifest.session_generation),
+            }
+          : {
+              type: 'MEMBERSHIP_OK',
+              epoch,
+              roomId,
+              status: manifest.status,
+              generation: String(manifest.session_generation),
+              canEdit: manifest.can_edit === true,
+            };
+        await dispatchNow(event);
+        return roomId;
+      } catch (error) {
+        await dispatchNow({ type: 'FAIL', epoch, reason: error?.message || 'open-failed' });
+        throw error;
+      }
+    }
+
+    async function createInviteLink() {
+      if (!session?.canDraw?.() || role !== 'owner') throw new Error('PiXiSYNC runtime: active-owner-required');
+      const invite = firstRow(await rpc('pixisync_create_invite', {
+        p_room_id: roomId,
+        p_role: 'editor',
+        p_expires_at: new Date(Date.now() + 86400000).toISOString(),
+        p_max_uses: 1,
+      }));
+      const token = String(invite?.invite_token || '');
+      if (!TOKEN_PATTERN.test(token)) throw new Error('PiXiSYNC runtime: invalid-invite-response');
+      const url = new URL(locationRef.href);
+      url.searchParams.set('pixisync_invite', token);
+      return url.toString();
+    }
+
+    function normalizeComment(payload) {
+      const id = String(payload?.id || '');
+      const senderClientId = String(payload?.senderClientId || '');
+      const senderRole = payload?.senderRole === 'owner' ? 'owner' : 'editor';
+      const text = String(payload?.text || '').trim();
+      const sentAt = String(payload?.sentAt || '');
+      if (
+        !ROOM_ID_PATTERN.test(id)
+        || !ROOM_ID_PATTERN.test(senderClientId)
+        || !text
+        || text.length > COMMENT_MAX_LENGTH
+        || !Number.isFinite(Date.parse(sentAt))
+      ) {
+        return null;
+      }
+      return Object.freeze({ id, senderClientId, senderRole, text, sentAt });
+    }
+
+    async function sendComment(value) {
+      if (!session?.canDraw?.() || !realtimeClient) {
+        throw new Error('PiXiSYNC runtime: active-session-required');
+      }
+      const text = String(value || '').trim().slice(0, COMMENT_MAX_LENGTH);
+      if (!text) throw new Error('PiXiSYNC runtime: empty-comment');
+      const comment = normalizeComment({
+        id: window.crypto.randomUUID(),
+        senderClientId: clientId,
+        senderRole: role,
+        text,
+        sentAt: new Date().toISOString(),
+      });
+      if (!comment) throw new Error('PiXiSYNC runtime: invalid-comment');
+      await realtimeClient.sendBroadcast('pixisync-comment', comment);
+      return comment;
+    }
+
+    async function leave() {
+      if (role === 'owner') throw new Error('PiXiSYNC runtime: owner-must-archive');
+      const result = session.dispatch({ type: 'LEAVE_REQUEST' });
+      runtimeBridge.refreshUi?.();
+      await rpc('pixisync_leave_session', { p_room_id: roomId });
+      for (const effect of result.effects) await runEffect(effect);
+      persistSession(null);
+      await dispatchNow({ type: 'LEFT', epoch: result.state.epoch });
+    }
+
+    async function waitForAttestation(checkpointId, timeoutMs = 10000) {
+      let timeoutId;
+      await new Promise(resolve => {
+        timeoutId = window.setTimeout(resolve, timeoutMs);
+        attestationWaiters.set(checkpointId, resolve);
+      });
+      window.clearTimeout(timeoutId);
+      attestationWaiters.delete(checkpointId);
+    }
+
+    async function attestRemoteCheckpoint(payload) {
+      if (!session?.canDraw?.() || role === 'owner') return false;
+      const checkpointId = String(payload?.checkpointId || '');
+      const path = String(payload?.storagePath || '');
+      const expectedHash = assertHash(payload?.stateSha256);
+      const blob = await downloadCheckpoint(path);
+      if (blob.size !== Number(payload?.encodedBytes) || await sha256Hex(blob) !== expectedHash) {
+        await enqueue({ type: 'HASH_MISMATCH', epoch: currentEpoch() });
+        return false;
+      }
+      await rpc('pixisync_attest_checkpoint', {
+        p_checkpoint_id: checkpointId,
+        p_client_id: clientId,
+        p_state_sha256: toHexBytes(expectedHash),
+      });
+      await realtimeClient?.sendBroadcast?.('checkpoint-attested', { checkpointId });
+      return true;
+    }
+
+    async function archive() {
+      if (!session?.canDraw?.() || role !== 'owner') throw new Error('PiXiSYNC runtime: active-owner-required');
+      if (realtimeClient?.pendingOperationCount) throw new Error('PiXiSYNC runtime: pending-operations-remain');
+      const blob = await captureCheckpoint();
+      const stateHash = await sha256Hex(blob);
+      const checkpointId = window.crypto.randomUUID();
+      const prepared = firstRow(await rpc('pixisync_prepare_checkpoint', {
+        p_room_id: roomId,
+        p_checkpoint_id: checkpointId,
+        p_state_sha256: toHexBytes(stateHash),
+        p_encoded_bytes: blob.size,
+        p_codec_version: 1,
+      }));
+      await uploadCheckpoint(String(prepared?.storage_path || ''), blob);
+      await rpc('pixisync_register_checkpoint', {
+        p_room_id: roomId,
+        p_checkpoint_id: checkpointId,
+      });
+      let attested = firstRow(await rpc('pixisync_attest_checkpoint', {
+        p_checkpoint_id: checkpointId,
+        p_client_id: clientId,
+        p_state_sha256: toHexBytes(stateHash),
+      }));
+      if (attested?.status !== 'verified') {
+        const waitForPeer = waitForAttestation(checkpointId);
+        await realtimeClient.sendBroadcast('checkpoint-attestation-request', {
+          checkpointId,
+          storagePath: prepared.storage_path,
+          stateSha256: stateHash,
+          encodedBytes: blob.size,
+          revision: String(prepared.revision),
+        });
+        await waitForPeer;
+        attested = firstRow(await rpc('pixisync_attest_checkpoint', {
+          p_checkpoint_id: checkpointId,
+          p_client_id: clientId,
+          p_state_sha256: toHexBytes(stateHash),
+        }));
+      }
+      if (attested?.status !== 'verified') throw new Error('PiXiSYNC runtime: checkpoint-attestation-incomplete');
+      await rpc('pixisync_archive_session', {
+        p_room_id: roomId,
+        p_final_checkpoint_id: checkpointId,
+      });
+      await realtimeClient.sendBroadcast('session-archived', { roomId, checkpointId }).catch(() => {});
+      const closing = session.dispatch({ type: 'CLOSE_REQUEST' });
+      runtimeBridge.refreshUi?.();
+      for (const effect of closing.effects) await runEffect(effect);
+      persistSession(null);
+      await dispatchNow({ type: 'CLOSED', epoch: closing.state.epoch });
+    }
+
+    async function initialize() {
+      await ensureSupabase();
+      const stored = readPersistedSession();
+      installSession(stored?.role || 'owner', { resumeAvailable: Boolean(stored) });
+      configureBridge({ collaboration: false });
+      await runtimeBridge.consumeInviteFromUrl?.();
+      return snapshot();
+    }
+
+    async function dispose() {
+      disposed = true;
+      unsubscribeSession?.();
+      unsubscribeSession = null;
+      await realtimeClient?.stop?.().catch(() => {});
+      realtimeClient = null;
+      runtimeBridge.clear?.();
+    }
+
+    function snapshot() {
+      return {
+        enabled: !disposed,
+        roomId,
+        role,
+        clientId,
+        manifest: manifest ? {
+          status: manifest.status,
+          headRevision: String(manifest.head_revision),
+          checkpointRevision: String(manifest.checkpoint_revision),
+          sessionGeneration: String(manifest.session_generation),
+        } : null,
+        session: currentSnapshot(),
+        realtime: realtimeClient ? {
+          confirmedRevision: realtimeClient.confirmedRevision.toString(),
+          pendingOperationCount: realtimeClient.pendingOperationCount,
+          confirmedOperationIds: realtimeClient.confirmedOperationIds,
+        } : null,
+        collaboration: runtimeBridge.snapshot?.() || null,
+      };
+    }
+
+    return Object.freeze({
+      initialize,
+      dispose,
+      commands,
+      start,
+      join,
+      openShared,
+      leave,
+      archive,
+      createInviteLink,
+      sendComment,
+      snapshot,
+      get session() { return session; },
+      get realtimeClient() { return realtimeClient; },
+    });
+  }
+
+  root.pixisyncRuntimeAdapterUtils = Object.freeze({ createPiXiSyncRuntimeAdapter });
+})();

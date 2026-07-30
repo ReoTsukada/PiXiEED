@@ -56,6 +56,7 @@
 }
 </script>
 <script src="../scripts/ad-account-control.js?v=20260719-no-ad-fallback1"></script>
+<script src="../scripts/card-feed-ads.js?v=20260730-progressive-feed1"></script>
 <script src="../scripts/third-party-error-guard.js"></script>
 <script>
   (function configureEmbedMode() {
@@ -472,7 +473,7 @@
 
 
 
-<link href="assets/css/style.css?v=20260729-file-panel-type1" rel="stylesheet"/>
+<link href="assets/css/style.css?v=20260730-timeline-compact-add2" rel="stylesheet"/>
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-4.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-4.png"/>
 <style>
@@ -633,6 +634,10 @@
 <span data-canvas-resize-shade="top"></span><span data-canvas-resize-shade="right"></span><span data-canvas-resize-shade="bottom"></span><span data-canvas-resize-shade="left"></span>
 </div>
 </div>
+<div aria-live="polite" class="pixisync-draw-lock" hidden="" id="pixisyncDrawLock">
+<span aria-hidden="true" class="pixisync-draw-lock__dot"></span>
+<span id="pixisyncDrawLockLabel">共同編集を同期しています…</span>
+</div>
 <div aria-hidden="true" class="canvas-surface-badge" hidden="" id="mainCanvasSurfaceBadge"></div>
 <div aria-hidden="true" class="canvas-resize-expansion-preview" hidden="" id="canvasResizeExpansionPreview">
 <span data-canvas-resize-expansion="top"></span><span data-canvas-resize-expansion="right"></span><span data-canvas-resize-expansion="bottom"></span><span data-canvas-resize-expansion="left"></span>
@@ -661,6 +666,10 @@
 <button aria-controls="panelSettings" aria-label="設定" class="chip canvas-quick-action" data-quick-right-tab="settings" title="設定" type="button">
 <img alt="" aria-hidden="true" height="20" src="assets/icons/menu-settings.png?v=2026.07.19-ui-icons1" width="20"/>
 <span class="sr-only">設定</span>
+</button>
+<button aria-controls="panelMulti" aria-label="シェアプロジェクト" class="chip canvas-quick-action" data-quick-right-tab="multi" hidden="" id="pixisyncQuickOpen" title="シェアプロジェクト" type="button">
+<img alt="" aria-hidden="true" height="20" src="assets/icons/maltimode.svg" width="20"/>
+<span class="sr-only">シェアプロジェクト</span>
 </button>
 <button aria-controls="panelFile" aria-label="ファイル" class="chip canvas-quick-action" data-quick-right-tab="file" title="ファイル" type="button">
 <img alt="" aria-hidden="true" height="20" src="assets/icons/menu-file.png?v=2026.07.19-ui-icons1" width="20"/>
@@ -823,6 +832,10 @@
 <img alt="" class="tab-icon" src="assets/icons/menu-settings.png?v=2026.07.19-ui-icons1"/>
 <span class="sr-only">設定</span>
 </button>
+<button aria-controls="mobilePanelMulti" aria-label="シェアプロジェクト" aria-selected="false" class="mobile-tab" data-mobile-tab="multi" hidden="" id="mobileTabMulti" role="tab" tabindex="-1" type="button">
+<img alt="" class="tab-icon" src="assets/icons/maltimode.svg"/>
+<span class="sr-only">シェアプロジェクト</span>
+</button>
 <button aria-controls="mobilePanelExtensions" aria-label="拡張" aria-selected="false" class="mobile-tab" data-mobile-tab="extensions" hidden="" id="mobileTabExtensions" role="tab" tabindex="-1" type="button">
 <img alt="" class="tab-icon" src="assets/icons/EXicon.png"/>
 <span class="sr-only">拡張</span>
@@ -849,6 +862,7 @@
 <div aria-labelledby="mobileTabExtensions" class="mobile-panel" hidden="" id="mobilePanelExtensions" role="tabpanel"></div>
 <div aria-labelledby="mobileTabHelp" class="mobile-panel" hidden="" id="mobilePanelHelp" role="tabpanel"></div>
 <div aria-labelledby="mobileTabFile" class="mobile-panel" hidden="" id="mobilePanelFile" role="tabpanel"></div>
+<div aria-labelledby="mobileTabMulti" class="mobile-panel" hidden="" id="mobilePanelMulti" role="tabpanel"></div>
 </div>
 </div>
 <section class="panel-section" data-section="tools" id="panelTools">
@@ -1187,6 +1201,51 @@
 <span>拡張機能</span>
 <p class="help-text ui-guide-text">今は使用不可です。立体作成モードは設定のトグルへ移動しました。</p>
 </div>
+</div>
+</section>
+<section class="panel-section" data-section="multi" hidden="" id="panelMulti">
+<div class="panel-section__body">
+<section aria-labelledby="pixisyncPanelTitle" class="pixisync-panel" hidden="" id="pixisyncPanel">
+<div aria-label="参加者とコメント" class="multi-participants-tabs" role="tablist">
+<button aria-controls="pixisyncParticipantsView" aria-selected="true" class="multi-participants-tab is-active" id="pixisyncParticipantsTab" role="tab" type="button">参加者</button>
+<button aria-controls="pixisyncCommentsView" aria-selected="false" class="multi-participants-tab" id="pixisyncCommentsTab" role="tab" tabindex="-1" type="button">コメント</button>
+</div>
+<div class="pixisync-panel__header">
+<h3 id="pixisyncPanelTitle">シェアプロジェクト</h3>
+<span class="pixisync-status" data-phase="local" id="pixisyncStatusLabel">未共有</span>
+</div>
+<div aria-label="共同編集の接続情報" class="pixisync-panel__meta">
+<span><strong id="pixisyncParticipantCount">1</strong> 人</span>
+<span id="pixisyncConnectionLabel">未接続</span>
+</div>
+<div aria-label="共同編集操作" class="pixisync-actions">
+<button class="button button--primary" id="pixisyncStart" type="button">シェアプロジェクトを作成</button>
+<button class="button" hidden="" id="pixisyncCopyInvite" type="button">招待コードを発行・コピー</button>
+<button class="button" hidden="" id="pixisyncOpenShared" type="button">共有プロジェクトを開く</button>
+<button class="button" hidden="" id="pixisyncLeave" type="button">退出</button>
+<button class="button button--danger" hidden="" id="pixisyncArchive" type="button">共同編集を終了</button>
+</div>
+<div class="multi-participants-panel">
+<div class="multi-participants-view" id="pixisyncParticipantsView" role="tabpanel">
+<div class="multi-participants-scroll">
+<ul aria-label="参加者" class="pixisync-participants multi-participants-list" id="pixisyncParticipantList"></ul>
+</div>
+</div>
+<div class="multi-participants-view" hidden="" id="pixisyncCommentsView" role="tabpanel">
+<div class="multi-comment-field">
+<ol aria-live="polite" aria-label="コメント" class="multi-comment-log" id="pixisyncCommentList"></ol>
+</div>
+</div>
+</div>
+<p aria-live="polite" class="pixisync-panel__notice" id="pixisyncNotice"></p>
+<div class="multi-project-key-field" id="pixisyncAccessCodeField">
+<label class="sr-only" for="pixisyncAccessCode">招待リンクまたは招待コード</label>
+<div class="multi-project-key-row">
+<input autocomplete="off" id="pixisyncAccessCode" placeholder="招待リンク / コード" spellcheck="false" type="text"/>
+<button class="button" id="pixisyncJoinCode" type="button">参加</button>
+</div>
+</div>
+</section>
 </div>
 </section>
 <section class="panel-section" data-section="file" id="panelFile">
@@ -1785,7 +1844,7 @@
 	<script defer="" src="assets/js/modules/document-utils.js?v=20260720-pxd1"></script>
 	<script defer="" src="assets/js/modules/document-model.js?v=20260724-legacy-cow-migration1"></script>
 	<script defer="" src="assets/js/modules/state-normalizers.js?v=20260715-true-v2-single-canvas-v1"></script>
-	<script defer="" src="assets/js/modules/ui-static-config.js?v=20260720-pxd2"></script>
+	<script defer="" src="assets/js/modules/ui-static-config.js?v=20260730-pixisync-share-panel2"></script>
 	<script defer="" src="assets/js/modules/geometry-utils.js?v=2026.06.30-geometry-utils-v1"></script>
 	<script defer="" src="assets/js/modules/viewport-zoom-utils.js?v=2026.06.30-viewport-zoom-v1"></script>
 	<script defer="" src="assets/js/modules/local-layer-preferences-utils.js?v=2026.06.30-local-layer-preferences-v1"></script>
@@ -1845,8 +1904,8 @@
 	<script defer="" src="assets/vendor/jsQR.min.js?v=1.4.0"></script>
 	<script defer="" src="assets/js/modules/image-import-decode-utils.js?v=20260721-runtime-index8-2"></script>
 	<script defer="" src="assets/js/modules/palette-panel-utils.js?v=20260721-runtime-index8-2"></script>
-	<script defer="" src="assets/js/modules/timeline-layers.js?v=20260729-complete-history7"></script>
-	<script defer="" src="assets/js/modules/ui-localization-utils.js?v=20260729-canvas-compact-panel1"></script>
+	<script defer="" src="assets/js/modules/timeline-layers.js?v=20260730-shared-frame-delete-confirm1"></script>
+	<script defer="" src="assets/js/modules/ui-localization-utils.js?v=20260730-pixisync-share-panel1"></script>
 	<script defer="" src="assets/js/modules/ui-language-utils.js?v=2026.07.03-small-helper-batch-split-v1"></script>
 	<script defer="" src="assets/js/modules/scroll-input-utils.js?v=2026.07.03-small-helper-batch-split-v1"></script>
 	<script defer="" src="assets/js/modules/sprite-scale-utils.js?v=2026.06.30-zh-localization-v1"></script>
@@ -1866,13 +1925,13 @@
 	<script defer="" src="assets/js/modules/floating-draw-button-workflow-utils.js?v=20260715-remove-oval1"></script>
 	<script defer="" src="assets/js/modules/selection-move-workflow-utils.js?v=20260724-editable-transparent1"></script>
 	<script defer="" src="assets/js/modules/snapshot-integer-scale-utils.js?v=2026.07.19-visual-scale3"></script>
-	<script defer="" src="assets/js/modules/layout-viewport.js?v=20260729-canvas-resize-preview-follow1"></script>
+	<script defer="" src="assets/js/modules/layout-viewport.js?v=20260730-timeline-compact-first-frame1"></script>
 	<script defer="" src="assets/js/modules/rail-tool-ui-utils.js?v=2026.07.17-common-details4"></script>
 	<script defer="" src="assets/js/modules/control-ui-utils.js?v=2026.07.01-control-ui-split-v1"></script>
 	<script defer="" src="assets/js/modules/ui-action-buttons-workflow-utils.js?v=20260721-icons1"></script>
 	<script defer="" src="assets/js/modules/ui-action-router-workflow-utils.js?v=2026.07.17-global-help22"></script>
 	<script defer="" src="assets/js/modules/canvas-control-actions-workflow-utils.js?v=20260726-clipboard-state2"></script>
-	<script defer="" src="assets/js/modules/history-core-workflow-utils.js?v=20260729-history-list1"></script>
+	<script defer="" src="assets/js/modules/history-core-workflow-utils.js?v=20260730-remove-frame-undo1"></script>
 	<script defer="" src="assets/js/modules/curve-workflow-utils.js?v=2026.07.03-curve-workflow-split-v1"></script>
 	<script defer="" src="assets/js/modules/canvas-grid-workflow-utils.js?v=2026.07.03-grid-workflow-split-v1"></script>
 	<script defer="" src="assets/js/modules/timeline-navigation-workflow-utils.js?v=20260724-active-cell-selection1"></script>
@@ -1881,7 +1940,7 @@
 	<script defer="" src="assets/js/modules/open-import-workflow-utils.js?v=20260721-indexed-raster-import1"></script>
 	<script defer="" src="assets/js/modules/export-format-workflow-utils.js?v=20260720-export-grid-format1"></script>
 	<script defer="" src="assets/js/modules/export-dialog-workflow-utils.js?v=20260729-timelapse-export1"></script>
-		<script defer="" src="assets/js/modules/startup-workflow-utils.js?v=20260729-workspace-project-actions2"></script>
+		<script defer="" src="assets/js/modules/startup-workflow-utils.js?v=20260730-progressive-feed1"></script>
 		<script defer="" src="assets/js/modules/recent-project-workflow-utils.js?v=20260726-project-card-actions2"></script>
 		<script defer="" src="assets/js/modules/project-package-workflow-utils.js?v=20260728-autosave-delta1"></script>
 		<script defer="" src="assets/js/modules/project-storage-adapter-utils.js?v=20260715-legacy-project-card-recovery1"></script>
@@ -1894,6 +1953,16 @@
 	<script defer="" src="assets/js/modules/recent-account-workflow-utils.js?v=2026.07.03-safe-helper-split-v1"></script>
 	<script defer="" src="assets/js/modules/pixieed-profile-local-utils.js?v=2026.07.03-safe-helper-split-v1"></script>
 	<script defer="" src="assets/js/modules/retired-collaboration-compat.js?v=20260724-timeline-selection2"></script>
+	<script defer="" src="assets/js/modules/pixisync-operation-codec-utils.js?v=20260730-v1-foundation1"></script>
+	<script defer="" src="assets/js/modules/pixisync-writer-stamp-utils.js?v=20260730-v1-foundation1"></script>
+	<script defer="" src="assets/js/modules/pixisync-order-keeper-utils.js?v=20260730-v1-foundation1"></script>
+	<script defer="" src="assets/js/modules/pixisync-journal-utils.js?v=20260730-v1-foundation1"></script>
+	<script defer="" src="assets/js/modules/pixisync-realtime-client-utils.js?v=20260730-pixisync-share-panel1"></script>
+	<script defer="" src="assets/js/modules/pixisync-pixel-mutation-bridge-utils.js?v=20260730-v1-foundation1"></script>
+	<script defer="" src="assets/js/modules/pixisync-collaboration-controller-utils.js?v=20260730-v1-history-bridge1"></script>
+	<script defer="" src="assets/js/modules/pixisync-session-state.js?v=20260730-v1-session-state1"></script>
+	<script defer="" src="assets/js/modules/pixisync-minimal-ui-utils.js?v=20260730-pixisync-share-panel5"></script>
+	<script defer="" src="assets/js/modules/pixisync-runtime-adapter-utils.js?v=20260730-pixisync-share-panel1"></script>
 	<script defer="" src="assets/js/modules/pixieed-account-workflow-utils.js?v=2026.07.04-shared-project-disabled1"></script>
 	<script defer="" src="assets/js/modules/startup-tail-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/controls-mirror.js?v=20260728-mirror-state-reuse1"></script>
@@ -1902,7 +1971,7 @@
 	<script defer="" src="assets/js/modules/local-project-v2-migration-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/pre-update-checkpoint-utils.js?v=20260712-pre-update-checkpoint-u3"></script>
 	<script defer="" src="assets/js/active-project-session-utils.js?v=20260715-local-true-v2-cleanup1"></script>
-    <script defer="" src="assets/js/app.js?v=20260729-project-duplicate1"></script>
+    <script defer="" src="assets/js/app.js?v=20260730-pixisync-initial-gate1"></script>
 	<script defer="" src="assets/js/modules/update-detection-utils.js?v=20260719-file-protocol1"></script>
   <script>
     (function initPanelAdDocking() {
@@ -2525,7 +2594,7 @@
   </script>
 
 	<script src="../scripts/tool-fullscreen.js?v=2026.07.20-pixiedraw-fullscreen-ad1"></script>
-	<script src="../scripts/shared-bottom-nav.js?v=20260724-fullscreen-icons2"></script>
+	<script src="../scripts/shared-bottom-nav.js?v=20260730-pixiedraw-local-preview1"></script>
 	<script>
     (function initOperationHelpAd() {
       if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.('operation-help-dialog')) return;

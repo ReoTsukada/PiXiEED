@@ -123,7 +123,7 @@
         details: { ja: '詳細', en: 'Details', zh: '详情' },
         settings: { ja: '設定', en: 'Settings', zh: '设置' },
         file: { ja: 'ファイル', en: 'File', zh: '文件' },
-        multi: { ja: '共有モード', en: 'Share Mode', zh: '协作模式' },
+        multi: { ja: 'シェアプロジェクト', en: 'Share Project', zh: '共享项目' },
       };
   
       dom.topActionButtons.forEach(button => {

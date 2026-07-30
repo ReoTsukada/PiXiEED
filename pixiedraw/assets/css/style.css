@@ -5029,6 +5029,278 @@ input[type='range']::-moz-focus-outer {
   gap: 4px;
 }
 
+#panelMulti .pixisync-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--accent) 8%, transparent), transparent 58%),
+    var(--bg-panel);
+}
+
+#panelMulti .pixisync-panel > * {
+  grid-area: auto;
+}
+
+#panelMulti .pixisync-panel[hidden],
+#pixisyncQuickOpen[hidden],
+#mobileTabMulti[hidden] {
+  display: none;
+}
+
+/* Initial production rollout: PiXiSYNC is unlocked only by the settings
+   gesture in the current tab.  This is a discovery gate, not authorization. */
+body:not([data-pixisync-initial-gate='unlocked']) #panelMulti,
+body:not([data-pixisync-initial-gate='unlocked']) #pixisyncQuickOpen,
+body:not([data-pixisync-initial-gate='unlocked']) #mobileTabMulti {
+  display: none !important;
+}
+
+#panelMulti .multi-project-key-field {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+#panelMulti .multi-project-key-field .multi-project-key-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+}
+
+#panelMulti #pixisyncAccessCode {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+}
+
+#panelMulti #pixisyncJoinCode {
+  min-width: 64px;
+}
+
+#panelMulti .multi-project-key-field > .help-text {
+  margin: 5px 0 0;
+}
+
+.pixisync-panel__header,
+.pixisync-panel__meta,
+.pixisync-participants li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pixisync-panel__header h3 {
+  margin: 1px 0 0;
+  font-size: 0.88rem;
+}
+
+.pixisync-panel__eyebrow {
+  color: var(--fg-muted);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.pixisync-status {
+  min-width: 4.8em;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--fg-muted) 16%, transparent);
+  color: var(--fg-muted);
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.pixisync-status[data-phase='active'] {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+}
+
+.pixisync-status[data-phase='creating'],
+.pixisync-status[data-phase='joining'],
+.pixisync-status[data-phase='syncing'],
+.pixisync-status[data-phase='reconnecting'] {
+  background: color-mix(in srgb, #e8b44b 18%, transparent);
+  color: #e8b44b;
+}
+
+.pixisync-status[data-phase='archived'],
+.pixisync-status[data-phase='left'],
+.pixisync-status[data-phase='permission_lost'] {
+  background: color-mix(in srgb, #df7272 16%, transparent);
+  color: #df8a8a;
+}
+
+.pixisync-panel__detail,
+.pixisync-panel__notice {
+  min-height: 1.25em;
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+
+.pixisync-panel__meta {
+  color: var(--fg-muted);
+  font-size: 0.68rem;
+}
+
+.pixisync-participants {
+  display: grid;
+  gap: 4px;
+  max-height: 84px;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+.pixisync-participants li {
+  min-height: 24px;
+  padding: 2px 4px;
+  font-size: 0.7rem;
+}
+
+.pixisync-participants small {
+  color: var(--fg-muted);
+  font-size: 0.62rem;
+}
+
+.pixisync-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.pixisync-actions .button {
+  min-width: 0;
+  min-height: 32px;
+  padding-inline: 7px;
+  font-size: 0.68rem;
+}
+
+.pixisync-actions .button[hidden] {
+  display: none;
+}
+
+.pixisync-actions #pixisyncStart,
+.pixisync-actions #pixisyncOpenShared,
+.pixisync-actions #pixisyncLeave {
+  grid-column: 1 / -1;
+}
+
+#panelMulti .multi-participants-panel {
+  flex: 1 1 auto;
+  height: clamp(190px, 40vh, 300px);
+  min-height: 190px;
+  border-color: rgba(var(--ui-rgb), 0.18);
+}
+
+#panelMulti .pixisync-participants {
+  max-height: none;
+}
+
+#panelMulti .pixisync-participants li {
+  padding: 7px 0;
+  border-bottom: 1px solid rgba(var(--ui-rgb), 0.1);
+}
+
+#panelMulti .multi-comment-log {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
+  list-style: none;
+}
+
+#panelMulti .multi-comment-log > li {
+  display: grid;
+  gap: 3px;
+  padding: 9px 0;
+  border-bottom: 1px solid rgba(var(--ui-rgb), 0.12);
+}
+
+#panelMulti .multi-comment-log > li:last-child {
+  border-bottom: 0;
+}
+
+#panelMulti .multi-comment-log > li > span {
+  color: var(--fg-muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+#panelMulti .multi-comment-log > li > p {
+  margin: 0;
+  color: var(--fg);
+  font-size: 0.86rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+#panelMulti .multi-comment-log > li.is-empty {
+  color: var(--fg-muted);
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+#panelMulti .multi-comment-compose {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+}
+
+#panelMulti .multi-comment-compose input {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+}
+
+#panelMulti .multi-comment-field > .help-text {
+  margin: 0;
+}
+
+.pixisync-draw-lock {
+  position: absolute;
+  z-index: 16;
+  left: 50%;
+  bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  max-width: min(88%, 360px);
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-panel) 90%, #000);
+  box-shadow: 0 5px 18px rgba(0, 0, 0, 0.28);
+  color: var(--fg);
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.pixisync-draw-lock[hidden] {
+  display: none;
+}
+
+.pixisync-draw-lock__dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #e8b44b;
+  box-shadow: 0 0 8px color-mix(in srgb, #e8b44b 65%, transparent);
+}
+
 #panelFile .file-panel-summary .help-text {
   margin: 0;
   font-size: 0.8rem;
@@ -5748,7 +6020,7 @@ body.is-mobile-layout .mobile-draw-help {
 }
 
 #panelMulti .multi-entry-action {
-  min-height: 68px;
+  min-height: calc(var(--timeline-cell-size) * 4);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -7790,9 +8062,13 @@ body.is-mobile-layout .mobile-draw-help {
   letter-spacing: 0.08em;
 }
 
+#panelFrames {
+  /* Slightly smaller than a panel tab, while remaining a touch target. */
+  --timeline-cell-size: 40px;
+}
+
 .timeline-matrix-wrapper {
   grid-area: matrix;
-  --timeline-cell-size: 32px;
   overflow: auto;
   overscroll-behavior: contain;
   touch-action: none;
@@ -8063,6 +8339,34 @@ body.is-mobile-layout .mobile-draw-help {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.timeline-frame-button,
+.timeline-layer-tag,
+.timeline-slot {
+  min-width: var(--timeline-cell-size);
+  min-height: var(--timeline-cell-size);
+}
+
+/* Add/move controls live on the frame/layer headers.  Keep the original
+   controls mounted for their existing command bindings, but do not expose a
+   second toolbar path. */
+.timeline-toolbar #addLayer,
+.timeline-toolbar #addFrame,
+.timeline-toolbar #removeLayer,
+.timeline-toolbar #removeFrame,
+.timeline-toolbar #moveLayerUp,
+.timeline-toolbar #moveLayerDown,
+.timeline-toolbar #moveFrameUp,
+.timeline-toolbar #moveFrameDown { display: none; }
+
+.timeline-frame-button.is-dragging,
+.timeline-layer-tag.is-dragging { opacity: .5; }
+
+.timeline-cell--structure-remove .timeline-frame-button:disabled,
+.timeline-cell--structure-duplicate .timeline-frame-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
 }
 
 .timeline-frame-button:focus-visible {
@@ -8454,8 +8758,8 @@ body.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data
 }
 
 .timeline-playback .pixel-button {
-  width: 36px;
-  height: 36px;
+  width: var(--timeline-cell-size);
+  height: var(--timeline-cell-size);
 }
 
 #rewindAnimation {
@@ -13929,7 +14233,7 @@ body.is-mobile-layout .panel-ad-mount[hidden] {
     height: 100%;
     min-height: 0;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: 30px minmax(68px, 1fr);
+    grid-template-rows: var(--timeline-cell-size) calc(var(--timeline-cell-size) * 2);
     grid-template-areas:
       "playback"
       "matrix";
@@ -13939,8 +14243,8 @@ body.is-mobile-layout .panel-ad-mount[hidden] {
 
   body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFrames .timeline-playback {
     grid-area: playback;
-    grid-template-columns: 30px;
-    grid-auto-rows: 30px;
+    grid-template-columns: var(--timeline-cell-size);
+    grid-auto-rows: var(--timeline-cell-size);
     justify-self: start;
     align-self: start;
     width: max-content;
@@ -13948,8 +14252,8 @@ body.is-mobile-layout .panel-ad-mount[hidden] {
   }
 
   body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFrames .timeline-playback .pixel-button {
-    width: 30px;
-    height: 30px;
+    width: var(--timeline-cell-size);
+    height: var(--timeline-cell-size);
   }
 
   body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFrames #rewindAnimation {
@@ -13971,9 +14275,10 @@ body.is-mobile-layout .panel-ad-mount[hidden] {
 
   body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFrames .timeline-matrix-wrapper {
     align-self: stretch;
-    height: 100%;
-    min-height: 68px;
-    max-height: 100%;
+    height: calc(var(--timeline-cell-size) * 2);
+    min-height: calc(var(--timeline-cell-size) * 2);
+    max-height: calc(var(--timeline-cell-size) * 2);
+    margin-top: 0;
     overflow-x: auto;
     overflow-y: hidden;
     touch-action: pan-x;
@@ -13981,7 +14286,6 @@ body.is-mobile-layout .panel-ad-mount[hidden] {
 
   body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFrames .timeline-matrix {
     grid-template-rows: repeat(2, var(--timeline-cell-size)) !important;
-    margin-left: calc(var(--timeline-cell-size) * -2);
   }
 
   body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFrames .timeline-cell--layer,
@@ -13995,6 +14299,23 @@ body.is-mobile-layout .panel-ad-mount[hidden] {
 
   body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFrames .timeline-cell--body.is-active-layer-row {
     display: flex;
+    grid-row: 2 !important;
+  }
+
+  body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFrames .timeline-cell--layer.is-active-layer {
+    display: flex;
+  }
+
+  body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFrames .timeline-cell--layer.timeline-cell--structure-add {
+    display: none;
+  }
+
+  body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFrames .timeline-cell--frame-header.timeline-cell--structure-add {
+    display: flex;
+    grid-row: 1 !important;
+  }
+
+  body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFrames .timeline-cell--layer.is-active-layer {
     grid-row: 2 !important;
   }
 
@@ -14032,6 +14353,24 @@ body.is-mobile-layout .panel-ad-mount[hidden] {
   }
 }
 
+/* Portrait half-drawers have only 120px for the quick timeline. Keep both
+   rows fully above the common navigation without leaving a dead gap below
+   playback controls. */
+@media (orientation: portrait) {
+  body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFrames {
+    --timeline-cell-size: 38px;
+  }
+
+  body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFrames .timeline-card {
+    gap: 2px 5px;
+    padding-bottom: 2px;
+  }
+
+  body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFrames .panel-section__body {
+    padding-bottom: 0;
+  }
+}
+
 @media (max-width: 360px) and (orientation: portrait) {
   body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFrames .timeline-card {
     gap: 4px;
@@ -14043,8 +14382,8 @@ body.is-mobile-layout .panel-ad-mount[hidden] {
 
   body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFrames .timeline-toolbar__group--frame .pixel-button,
   body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFrames .timeline-playback .pixel-button {
-    width: 28px;
-    height: 28px;
+    width: var(--timeline-cell-size);
+    height: var(--timeline-cell-size);
   }
 
   body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFrames .timeline-playback {
@@ -14833,7 +15172,6 @@ body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom
 }
 
 body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data-compact="true"] #panelFrames .timeline-matrix {
-  margin-left: calc(var(--timeline-cell-size) * -2);
   min-width: max-content;
   height: max-content;
   min-height: max-content;
@@ -14999,7 +15337,8 @@ body.is-mobile-layout .mobile-panel.is-active #panelFrames .panel-section__body 
 body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelTools .panel-section__body,
 body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelColor .panel-section__body,
 body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelSettings .panel-section__body,
-body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFrames .panel-section__body {
+body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFrames .panel-section__body,
+body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelMulti .panel-section__body {
   overflow: hidden;
   overscroll-behavior: none;
 }
@@ -15023,6 +15362,7 @@ body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFrames .panel-secti
 .rail--right #panelExtensions,
 .rail--right #panelHelp,
 .rail--right #panelFile,
+.rail--right #panelMulti,
 .panel-section.is-compact-flyout .panel-section__body {
   padding-inline: var(--panel-control-gutter);
 }
@@ -15037,6 +15377,7 @@ body.is-mobile-layout #panelColor .panel-section__body,
 body.is-mobile-layout #panelFrames .panel-section__body,
 body.is-mobile-layout #panelSettings .panel-section__body,
 body.is-mobile-layout #panelFile .panel-section__body,
+body.is-mobile-layout #panelMulti .panel-section__body,
 body.is-mobile-layout #panelDetails .panel-section__body {
   padding-left: var(--panel-control-gutter) !important;
   padding-right: var(--panel-control-gutter) !important;
@@ -15074,6 +15415,7 @@ body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelSettings .panel-sec
 }
 
 body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFile .file-panel-summary,
+body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFile .pixisync-panel,
 body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFile .panel-ad-mount,
 body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFile #autosaveStatus,
 body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFile #projectFileStatus,
@@ -15081,8 +15423,183 @@ body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFile .file-danger-z
   display: none;
 }
 
+.rail--right[data-compact='true'] #panelFile .pixisync-panel {
+  display: none;
+}
+
 body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFile #openTimelapse {
   display: none;
+}
+
+/* PiXiSYNC keeps one primary input: invite before joining, comment while
+   active. Half/compact panels expose only this input and session actions. */
+#panelMulti .pixisync-panel {
+  gap: 6px;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: transparent;
+}
+
+#panelMulti .pixisync-panel > .multi-participants-tabs {
+  flex: 0 0 auto;
+  order: -1;
+}
+
+#panelMulti .pixisync-panel__header h3 {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+#panelMulti .pixisync-panel__meta {
+  min-height: 20px;
+}
+
+#panelMulti .multi-project-key-row {
+  align-items: stretch;
+  background: transparent;
+}
+
+#panelMulti #pixisyncJoinCode {
+  width: 64px;
+  min-height: 34px;
+  min-width: 64px;
+  max-width: 64px;
+  height: 34px;
+  max-height: 34px;
+  padding: 0 8px;
+  border-radius: 4px;
+}
+
+#panelMulti .multi-project-key-field {
+  position: sticky;
+  z-index: 1;
+  bottom: 0;
+  flex: 0 0 auto;
+  margin-top: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+#panelMulti #pixisyncAccessCode {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  min-height: 34px;
+  padding-inline: 2px;
+  border: 0;
+  border-bottom: 1px solid rgba(var(--ui-rgb), 0.24);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+#panelMulti #pixisyncAccessCode:focus {
+  border-bottom-color: rgba(var(--ui-rgb-focus), 0.78);
+  background: transparent;
+  box-shadow: none;
+}
+
+#panelMulti #pixisyncAccessCode::placeholder {
+  color: color-mix(in srgb, var(--fg-muted) 72%, transparent);
+}
+
+#panelMulti .pixisync-actions .button {
+  min-height: 30px;
+}
+
+#panelMulti .multi-participants-panel {
+  height: auto;
+  min-height: 150px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  overflow: hidden;
+}
+
+#panelMulti .multi-participants-tabs {
+  flex: 0 0 auto;
+  min-height: 34px;
+}
+
+#panelMulti .multi-participants-tab {
+  min-height: 34px;
+  background: transparent;
+  font-size: 0.76rem;
+}
+
+#panelMulti .multi-participants-scroll {
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-x: none;
+  padding: 2px 0 0;
+  background: transparent;
+  touch-action: pan-y;
+}
+
+#panelMulti .multi-participants-view,
+#panelMulti .multi-comment-field {
+  min-height: 0;
+  overflow: hidden;
+}
+
+#panelMulti .multi-comment-log {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-x: none;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  touch-action: pan-y;
+}
+
+#panelMulti .pixisync-panel__notice:empty {
+  display: none;
+}
+
+body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelMulti .pixisync-panel,
+.rail--right[data-compact='true'] #panelMulti .pixisync-panel {
+  gap: 2px;
+  justify-content: flex-start;
+  overflow: hidden;
+}
+
+body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelMulti .pixisync-panel__meta,
+body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelMulti .pixisync-panel__header,
+body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelMulti .pixisync-panel__notice,
+body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelMulti .multi-participants-panel,
+body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelMulti .multi-participants-tabs,
+.rail--right[data-compact='true'] #panelMulti .pixisync-panel__meta,
+.rail--right[data-compact='true'] #panelMulti .pixisync-panel__header,
+.rail--right[data-compact='true'] #panelMulti .pixisync-panel__notice,
+.rail--right[data-compact='true'] #panelMulti .multi-participants-panel,
+.rail--right[data-compact='true'] #panelMulti .multi-participants-tabs {
+  display: none;
+}
+
+body.is-mobile-layout .mobile-drawer[data-mode='full'] #panelMulti .panel-section__body {
+  overflow: hidden;
+}
+
+body.is-mobile-layout .mobile-drawer[data-mode='full'] #panelMulti .pixisync-panel {
+  min-height: 100%;
+}
+
+body.is-mobile-layout .mobile-drawer[data-mode='full'] #panelMulti .multi-participants-panel {
+  flex: 1 1 220px;
+  min-height: 180px;
+}
+
+@media (orientation: portrait) {
+  #pixisyncQuickOpen,
+  .pixieed-common-tabbar__button[data-common-action='share-project'],
+  .pixieed-common-details__item[data-common-action='share-project'] {
+    display: none !important;
+  }
 }
 
 
@@ -15199,4 +15716,80 @@ body.is-mobile-layout.is-unified-left-tools-color .mobile-panel.is-active > .pan
   .startup-screen__content {
     scroll-padding-bottom: 16px;
   }
+}
+
+/* Landscape compact mode shows only the frame-number row, so it can retain
+   the standard timeline cell size inside the 64px bottom dock. */
+body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data-compact="true"] #panelFrames .timeline-card {
+  grid-template-columns: var(--timeline-cell-size) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-areas: "playback matrix";
+  align-items: stretch;
+  gap: 3px;
+  padding: 1px 2px;
+}
+
+body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data-compact="true"] #panelFrames .timeline-toolbar,
+body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data-compact="true"] #panelFrames .timeline-fps,
+body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data-compact="true"] #panelFrames .timeline-layer-settings {
+  display: none;
+}
+
+body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data-compact="true"] #panelFrames .timeline-playback {
+  display: grid;
+  grid-area: playback;
+  grid-template-columns: var(--timeline-cell-size);
+  grid-auto-rows: var(--timeline-cell-size);
+  align-self: start;
+  justify-self: start;
+  width: max-content;
+}
+
+body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data-compact="true"] #panelFrames .timeline-playback .pixel-button {
+  width: var(--timeline-cell-size);
+  min-width: var(--timeline-cell-size);
+  height: var(--timeline-cell-size);
+  min-height: var(--timeline-cell-size);
+}
+
+body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data-compact="true"] #panelFrames #rewindAnimation,
+body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data-compact="true"] #panelFrames #forwardAnimation,
+body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data-compact="true"] #panelFrames #loopAnimation {
+  display: none;
+}
+
+body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data-compact="true"] #panelFrames #playAnimation,
+body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data-compact="true"] #panelFrames #stopAnimation {
+  grid-column: 1;
+}
+
+body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data-compact="true"] #panelFrames .timeline-matrix-wrapper {
+  grid-area: matrix;
+  min-height: var(--timeline-cell-size);
+  height: var(--timeline-cell-size);
+  max-height: var(--timeline-cell-size);
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data-compact="true"] #panelFrames .timeline-matrix {
+  grid-template-rows: var(--timeline-cell-size) !important;
+}
+
+/* Compact mode keeps only the frame-number row visible. */
+
+body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data-compact="true"] #panelFrames .timeline-cell--frame-header {
+  display: flex;
+  grid-row: 1 !important;
+}
+
+body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data-compact="true"] #panelFrames .timeline-cell--layer,
+body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data-compact="true"] #panelFrames .timeline-cell--body,
+body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data-compact="true"] #panelFrames .timeline-cell--layer.timeline-cell--structure-add {
+  display: none;
+}
+
+body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom-timeline-dock[data-compact="true"] #panelFrames .timeline-cell--frame-header.timeline-cell--structure-add {
+  display: flex;
+  grid-row: 1 !important;
 }

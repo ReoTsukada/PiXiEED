@@ -1503,6 +1503,8 @@
           .toLocaleLowerCase()
           .includes(startupWorkspaceSearchQuery))
       : startupWorkspaceEntries;
+    const renderId = String(Number(list.dataset.pixieedFeedRenderId || '0') + 1);
+    list.dataset.pixieedFeedRenderId = renderId;
     list.replaceChildren();
     if (!startupWorkspaceEntries.length) {
       const empty = document.createElement('p');
@@ -1518,7 +1520,8 @@
       list.appendChild(empty);
       return;
     }
-    visibleEntries.forEach((entry, visibleIndex) => {
+    const cards = [];
+    visibleEntries.forEach((entry) => {
       const entryIndex = startupWorkspaceEntries.indexOf(entry);
       const card = document.createElement('article');
       card.className = 'startup-workspace__project';
@@ -1625,31 +1628,45 @@
         actions.append(pixfindButton, marketButton, menuButton, menu);
         card.appendChild(actions);
       }
-      list.appendChild(card);
-      if ((visibleIndex + 1) % 8 === 0 && window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.()) {
-        const adCard = document.createElement('div');
-        adCard.className = 'startup-recent-card--ad startup-recent-ad startup-workspace__ad';
-        adCard.dataset.pixieedReserveAdSpace = 'true';
-        adCard.setAttribute('role', 'listitem');
-        adCard.setAttribute('aria-label', localizeText('広告', 'Advertisement'));
-        const frame = document.createElement('div');
-        frame.className = 'startup-recent-ad__frame';
-        const label = document.createElement('span');
-        label.className = 'startup-recent-ad__label';
-        label.textContent = localizeText('広告', 'Advertisement');
-        const ad = document.createElement('ins');
-        ad.className = 'startup-recent-card__ad-ins startup-recent-ad__slot';
-        ad.setAttribute('data-ad-client', 'ca-pub-9801602250480253');
-        ad.setAttribute('data-ad-format', 'horizontal');
-        ad.setAttribute('data-ad-slot', '2141591954');
-        ad.setAttribute('data-full-width-responsive', 'true');
-        ad.dataset.pixieedProjectFeedAd = 'true';
-        ad.style.display = 'block';
-        frame.append(label, ad);
-        adCard.appendChild(frame);
-        list.appendChild(adCard);
-      }
+      cards.push(card);
     });
+    const createWorkspaceAd = () => {
+      const adCard = document.createElement('div');
+      adCard.className = 'startup-recent-card--ad startup-recent-ad startup-workspace__ad';
+      window.PiXiEEDCardFeedAds?.reserve(adCard, '90px');
+      adCard.setAttribute('role', 'listitem');
+      adCard.setAttribute('aria-label', localizeText('広告', 'Advertisement'));
+      const frame = document.createElement('div');
+      frame.className = 'startup-recent-ad__frame';
+      const label = document.createElement('span');
+      label.className = 'startup-recent-ad__label';
+      label.textContent = localizeText('広告', 'Advertisement');
+      const ad = document.createElement('ins');
+      ad.className = 'startup-recent-card__ad-ins startup-recent-ad__slot';
+      ad.setAttribute('data-ad-client', 'ca-pub-9801602250480253');
+      ad.setAttribute('data-ad-format', 'horizontal');
+      ad.setAttribute('data-ad-slot', window.PiXiEEDCardFeedAds?.COMMON_SLOT || '2141591954');
+      ad.setAttribute('data-full-width-responsive', 'true');
+      ad.dataset.pixieedProjectFeedAd = 'true';
+      ad.style.display = 'block';
+      frame.append(label, ad);
+      adCard.appendChild(frame);
+      return adCard;
+    };
+    const renderFeed = window.PiXiEEDCardFeedAds?.renderProgressively;
+    if (window.__PIXIEEDRAW_SHOULD_SHOW_ADS__?.() && typeof renderFeed === 'function') {
+      void renderFeed({
+        grid: list,
+        cards,
+        createAd: createWorkspaceAd,
+        requestAd: () => queueStartupRecentAdRender(),
+        isCurrent: () => list.dataset.pixieedFeedRenderId === renderId,
+      }).then(() => {
+        if (list.dataset.pixieedFeedRenderId === renderId && startupVisible) queueStartupRecentAdRender();
+      });
+    } else {
+      list.append(...cards);
+    }
     if (startupVisible) {
       window.requestAnimationFrame(() => queueStartupRecentAdRender());
     }

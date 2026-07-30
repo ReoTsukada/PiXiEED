@@ -913,6 +913,12 @@
     event.preventDefault();
     const position = getPointerPosition(event, { surface: interactionSurface });
     const activeTool = state.tool;
+    if (
+      typeof canBeginPiXiSyncLocalOperation === 'function'
+      && !canBeginPiXiSyncLocalOperation(activeTool)
+    ) {
+      return;
+    }
     // If playback is active, don't allow drawing except pan
     if (state.playback.isPlaying && activeTool !== 'pan') {
       return;

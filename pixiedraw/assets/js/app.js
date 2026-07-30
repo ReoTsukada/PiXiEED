@@ -8,9 +8,12 @@
   const APP_BUILD_INFO = window.__PIXIEEDRAW_BUILD_INFO__ || {};
   const APP_BUILD_VERSION = String(APP_BUILD_INFO.buildId || 'unknown-build');
   const APP_SW_VERSION = APP_BUILD_VERSION;
-  // PiXiEEDraw is a single-user editor. Shared-project state is being retired
-  // in controlled stages; ordinary UI no longer exposes a collaboration tab.
-  const SHARED_PROJECTS_ENABLED = false;
+  // PiXiSYNC is production-capable, but its initial rollout is deliberately
+  // gated behind a local settings-button gesture.  Do not expose or start a
+  // collaboration runtime until that gate has been unlocked in this tab.
+  const SHARED_PROJECTS_ENABLED = true;
+  const PIXISYNC_INITIAL_GATE_TAP_COUNT = 10;
+  const PIXISYNC_INITIAL_GATE_RESET_MS = 1800;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
   const PWA_CONTROLLER_CHANGE_RELOAD_SUPPRESS_MS = 8000;
 
@@ -129,6 +132,7 @@
       extensions: document.getElementById('panelExtensions'),
       help: document.getElementById('panelHelp'),
       file: document.getElementById('panelFile'),
+      multi: document.getElementById('panelMulti'),
     },
     canvases: {
       stack: document.getElementById('canvasStack'),
@@ -336,6 +340,29 @@
       openDocument: document.getElementById('openDocument'),
       showLocalProjects: document.getElementById('showLocalProjects'),
       exportProject: document.getElementById('exportProject'),
+      pixisyncPanel: document.getElementById('pixisyncPanel'),
+      pixisyncQuickOpen: document.getElementById('pixisyncQuickOpen'),
+      pixisyncMobileTab: document.getElementById('mobileTabMulti'),
+      pixisyncStatusLabel: document.getElementById('pixisyncStatusLabel'),
+      pixisyncParticipantCount: document.getElementById('pixisyncParticipantCount'),
+      pixisyncParticipantList: document.getElementById('pixisyncParticipantList'),
+      pixisyncConnectionLabel: document.getElementById('pixisyncConnectionLabel'),
+      pixisyncStart: document.getElementById('pixisyncStart'),
+      pixisyncCopyInvite: document.getElementById('pixisyncCopyInvite'),
+      pixisyncOpenShared: document.getElementById('pixisyncOpenShared'),
+      pixisyncLeave: document.getElementById('pixisyncLeave'),
+      pixisyncArchive: document.getElementById('pixisyncArchive'),
+      pixisyncAccessCodeField: document.getElementById('pixisyncAccessCodeField'),
+      pixisyncAccessCode: document.getElementById('pixisyncAccessCode'),
+      pixisyncJoinCode: document.getElementById('pixisyncJoinCode'),
+      pixisyncParticipantsTab: document.getElementById('pixisyncParticipantsTab'),
+      pixisyncCommentsTab: document.getElementById('pixisyncCommentsTab'),
+      pixisyncParticipantsView: document.getElementById('pixisyncParticipantsView'),
+      pixisyncCommentsView: document.getElementById('pixisyncCommentsView'),
+      pixisyncCommentList: document.getElementById('pixisyncCommentList'),
+      pixisyncNotice: document.getElementById('pixisyncNotice'),
+      pixisyncDrawLock: document.getElementById('pixisyncDrawLock'),
+      pixisyncDrawLockLabel: document.getElementById('pixisyncDrawLockLabel'),
       toggleLanguageMode: document.getElementById('toggleLanguageMode'),
       operationHelpDialog: document.getElementById('operationHelpDialog'),
       openOperationHelpPanel: document.getElementById('openOperationHelpPanel'),
@@ -3514,6 +3541,8 @@
   const canvasPointerWorkflowUtilsModule = window.PiXiEEDrawModules?.canvasPointerWorkflowUtils?.createCanvasPointerWorkflowUtils?.({
   get activeTouchPointers() { return activeTouchPointers; },
   set activeTouchPointers(value) { activeTouchPointers = value; },
+  get canBeginPiXiSyncLocalOperation() { return canBeginPiXiSyncLocalOperation; },
+  set canBeginPiXiSyncLocalOperation(value) { canBeginPiXiSyncLocalOperation = value; },
   get appendSharedProjectStrokePoint() { return appendSharedProjectStrokePoint; },
   set appendSharedProjectStrokePoint(value) { appendSharedProjectStrokePoint = value; },
   get beginHistory() { return beginHistory; },
@@ -9207,6 +9236,7 @@
   const HISTORY_ENTRY_TYPE_LAYER_REMOVE = 'layerRemove';
   const HISTORY_ENTRY_TYPE_CANVAS_RESIZE = 'resizeCanvas';
   const HISTORY_ENTRY_TYPE_FRAME_ADD = 'frameAdd';
+  const HISTORY_ENTRY_TYPE_FRAME_REMOVE = 'frameRemove';
   const PIXEL_PATCH_HISTORY_LABELS = new Set([
     'pen',
     'eraser',
@@ -11835,6 +11865,132 @@
     rollbackPixelPatchHistoryPending,
   } = pixelPatchHistoryUtils;
 
+  const pixisyncWriterStampUtils = window.PiXiEEDrawModules?.pixisyncWriterStampUtils
+    ?.createPiXiSyncWriterStampUtils?.() || null;
+  const pixisyncPixelMutationBridge = window.PiXiEEDrawModules?.pixisyncPixelMutationBridgeUtils
+    ?.createPiXiSyncPixelMutationBridgeUtils?.({
+      resolveTarget: mutation => {
+        const target = resolvePixelPatchHistoryTarget?.({
+          __historyEntryType: HISTORY_ENTRY_TYPE_PIXEL_PATCH,
+          canvasId: mutation?.canvasId,
+          frameId: mutation?.frameId,
+          layerId: mutation?.layerId,
+          width: mutation?.canvasWidth,
+          height: mutation?.canvasHeight,
+        });
+        if (!target) return null;
+        return {
+          ...target,
+          v1Compatible: state.colorMode === COLOR_MODE_INDEX && target.layer?.directOnly !== true,
+        };
+      },
+      writeLayerPixelPatchValue,
+      markDirtyRect: (...args) => {
+        invalidateFillPreviewCache();
+        invalidateOnionSkinCache();
+        clearPlaybackFrameCache();
+        markDirtyRect(...args);
+      },
+      requestRender,
+      requestOverlayRender,
+      historyEntryType: HISTORY_ENTRY_TYPE_PIXEL_PATCH,
+    }) || null;
+  const pixisyncCollaborationController = (
+    pixisyncPixelMutationBridge
+    && pixisyncWriterStampUtils
+    && window.PiXiEEDrawModules?.pixisyncCollaborationControllerUtils
+      ?.createPiXiSyncCollaborationControllerUtils?.({
+        mutationBridge: pixisyncPixelMutationBridge,
+        writerStampUtils: pixisyncWriterStampUtils,
+        onBlocked: details => {
+          console.warn('[pixisync:v1] local operation blocked', details?.reason || 'unknown');
+        },
+        onRecoveryRequired: details => {
+          console.warn('[pixisync:v1] recovery required', details?.reason || 'unknown');
+        },
+      })
+  ) || null;
+  const pixisyncMinimalUi = window.PiXiEEDrawModules?.pixisyncMinimalUiUtils
+    ?.createPiXiSyncMinimalUi?.({
+      elements: {
+        panel: dom.controls.pixisyncPanel,
+        quickOpen: dom.controls.pixisyncQuickOpen,
+        mobileTab: dom.controls.pixisyncMobileTab,
+        statusLabel: dom.controls.pixisyncStatusLabel,
+        participantCount: dom.controls.pixisyncParticipantCount,
+        participantList: dom.controls.pixisyncParticipantList,
+        connectionLabel: dom.controls.pixisyncConnectionLabel,
+        start: dom.controls.pixisyncStart,
+        copyInvite: dom.controls.pixisyncCopyInvite,
+        openShared: dom.controls.pixisyncOpenShared,
+        accessCodeField: dom.controls.pixisyncAccessCodeField,
+        accessCode: dom.controls.pixisyncAccessCode,
+        joinCode: dom.controls.pixisyncJoinCode,
+        leave: dom.controls.pixisyncLeave,
+        archive: dom.controls.pixisyncArchive,
+        participantsTab: dom.controls.pixisyncParticipantsTab,
+        commentsTab: dom.controls.pixisyncCommentsTab,
+        participantsView: dom.controls.pixisyncParticipantsView,
+        commentsView: dom.controls.pixisyncCommentsView,
+        commentList: dom.controls.pixisyncCommentList,
+        notice: dom.controls.pixisyncNotice,
+        drawLock: dom.controls.pixisyncDrawLock,
+        drawLockLabel: dom.controls.pixisyncDrawLockLabel,
+        canvasViewport: dom.canvasViewport,
+      },
+    }) || null;
+  if (pixisyncCollaborationController) {
+    window.PiXiEEDrawModules.pixisyncRuntimeBridge = Object.freeze({
+      configure: runtime => {
+        if (runtime?.session?.canDraw && runtime?.realtimeClient?.commit) {
+          pixisyncCollaborationController.configure(runtime);
+        } else {
+          pixisyncCollaborationController.clear();
+        }
+        pixisyncMinimalUi?.configure?.({
+          session: runtime?.session,
+          commands: runtime?.commands,
+          participants: runtime?.participants,
+          enabled: runtime?.uiEnabled === true,
+        });
+        if (runtime?.uiEnabled === true && runtime?.consumeInviteFromUrl !== false) {
+          void pixisyncMinimalUi?.consumeInviteFromUrl?.();
+        }
+      },
+      clear: () => {
+        pixisyncCollaborationController.clear();
+        pixisyncMinimalUi?.clear?.();
+      },
+      applyConfirmed: (operation, metadata) => (
+        pixisyncCollaborationController.applyConfirmed(operation, metadata)
+      ),
+      beginAuthoritativeResync: revision => (
+        pixisyncCollaborationController.beginAuthoritativeResync(revision)
+      ),
+      reapplyPendingAfterResync: () => (
+        pixisyncCollaborationController.reapplyPendingAfterResync()
+      ),
+      snapshot: () => pixisyncCollaborationController.snapshot(),
+      refreshUi: () => pixisyncMinimalUi?.render?.(),
+      updateParticipants: participants => pixisyncMinimalUi?.updateParticipants?.(participants),
+      receiveComment: comment => pixisyncMinimalUi?.receiveComment?.(comment),
+      consumeInviteFromUrl: () => pixisyncMinimalUi?.consumeInviteFromUrl?.(),
+    });
+  }
+
+  function canBeginPiXiSyncLocalOperation(label) {
+    if (!pixisyncCollaborationController?.enabled) return true;
+    const layer = getActiveLayer();
+    return pixisyncCollaborationController.canBeginLocalOperation(label, {
+      colorMode: state.colorMode,
+      v1Compatible: Boolean(layer && layer.directOnly !== true),
+    });
+  }
+
+  function onCommittedHistoryEntry(entry, label) {
+    return pixisyncCollaborationController?.handleCommittedHistoryEntry(entry, label);
+  }
+
   function beginHistory(label, context = null) {
     if (history.pending) return;
     const timelapseBaselineSnapshot = historyCoreWorkflowUtilsModule.captureTimelapseBaselineSnapshot?.() || null;
@@ -11981,11 +12137,35 @@
       history.pending.timelapseBaselineSnapshot = timelapseBaselineSnapshot;
       return;
     }
+    if (
+      label === 'removeFrame'
+      && !multiState.connected
+      && !activeSharedProjectKey
+      && !isSharedProjectCollaborativeMode()
+      && !isVoxelExtensionModeEnabled()
+    ) {
+      history.pending = {
+        __historyEntryType: HISTORY_ENTRY_TYPE_FRAME_REMOVE,
+        dirty: false,
+        label,
+        canvasId: getActiveProjectCanvasDocument()?.id || '',
+        activeFrameBefore: state.activeFrame,
+        activeLayerBefore: state.activeLayer,
+        activeFrameAfter: null,
+        activeLayerAfter: null,
+        frames: [],
+      };
+      history.pending.timelapseBaselineSnapshot = timelapseBaselineSnapshot;
+      return;
+    }
     // Structural and palette-wide operations still use legacy snapshot
     // writers. Expand compact GIF frames once before those operations so all
     // existing mutation code keeps its established Int16/-1 semantics.
     materializeAllCompactRasterLayerIndices();
     history.pending = {
+      // A removed frame leaves the live document array altogether. Keep an
+      // independent pixel payload for this structural Undo entry so restoring
+      // it cannot depend on arrays still owned by the current document.
       before: compressHistorySnapshot(makeHistorySnapshot({ clonePixelData: false })),
       dirty: false,
       label,
@@ -12288,6 +12468,50 @@
 
   function isFrameAddHistoryEntry(entry) {
     return Boolean(entry && entry.__historyEntryType === HISTORY_ENTRY_TYPE_FRAME_ADD);
+  }
+
+  function isFrameRemoveHistoryEntry(entry) {
+    return Boolean(entry && entry.__historyEntryType === HISTORY_ENTRY_TYPE_FRAME_REMOVE);
+  }
+
+  function recordPendingFrameRemoveHistoryFrame(frame, index) {
+    if (!isFrameRemoveHistoryEntry(history.pending) || !frame) return false;
+    history.pending.frames.push({ frameId: typeof frame.id === 'string' ? frame.id : '', index, frame });
+    return true;
+  }
+
+  function finalizeFrameRemoveHistoryEntry(pending) {
+    if (!isFrameRemoveHistoryEntry(pending) || !pending.dirty || !pending.frames?.length) return null;
+    return { ...pending, version: 1, historyLabel: pending.label };
+  }
+
+  function applyFrameRemoveHistoryEntry(entry, direction = 'undo') {
+    if (!isFrameRemoveHistoryEntry(entry) || !entry.frames?.length) return false;
+    const undoing = direction === 'undo';
+    let changed = false;
+    entry.frames.forEach(item => {
+      const index = state.frames.findIndex(frame => frame?.id === item.frameId);
+      if (undoing && index < 0 && item.frame) {
+        state.frames.splice(clamp(item.index, 0, state.frames.length), 0, item.frame);
+        changed = true;
+      } else if (!undoing && index >= 0 && state.frames.length > 1) {
+        state.frames.splice(index, 1);
+        changed = true;
+      }
+    });
+    if (!changed || !state.frames.length) return false;
+    state.activeFrame = clamp(undoing ? entry.activeFrameBefore : entry.activeFrameAfter, 0, state.frames.length - 1);
+    const activeFrame = getActiveFrame();
+    const preferredLayer = undoing ? entry.activeLayerBefore : entry.activeLayerAfter;
+    state.activeLayer = activeFrame?.layers?.some(layer => layer?.id === preferredLayer)
+      ? preferredLayer
+      : (activeFrame?.layers?.[activeFrame.layers.length - 1]?.id || null);
+    invalidateActiveCanvasCompositeRenderState();
+    renderFrameList();
+    renderLayerList();
+    requestRender();
+    requestOverlayRender();
+    return true;
   }
 
   function recordPendingFrameAddHistoryFrame(frame, index) {
@@ -13400,6 +13624,8 @@
   set finalizeCanvasResizeHistoryEntry(value) { finalizeCanvasResizeHistoryEntry = value; },
   get finalizeFrameAddHistoryEntry() { return finalizeFrameAddHistoryEntry; },
   set finalizeFrameAddHistoryEntry(value) { finalizeFrameAddHistoryEntry = value; },
+  get finalizeFrameRemoveHistoryEntry() { return finalizeFrameRemoveHistoryEntry; },
+  set finalizeFrameRemoveHistoryEntry(value) { finalizeFrameRemoveHistoryEntry = value; },
   get getActiveProjectCanvasDocument() { return getActiveProjectCanvasDocument; },
   set getActiveProjectCanvasDocument(value) { getActiveProjectCanvasDocument = value; },
   get getHistoryEntryLabel() { return getHistoryEntryLabel; },
@@ -13442,6 +13668,10 @@
   set isCanvasResizeHistoryEntry(value) { isCanvasResizeHistoryEntry = value; },
   get isFrameAddHistoryEntry() { return isFrameAddHistoryEntry; },
   set isFrameAddHistoryEntry(value) { isFrameAddHistoryEntry = value; },
+  get isFrameRemoveHistoryEntry() { return isFrameRemoveHistoryEntry; },
+  set isFrameRemoveHistoryEntry(value) { isFrameRemoveHistoryEntry = value; },
+  get applyFrameRemoveHistoryEntry() { return applyFrameRemoveHistoryEntry; },
+  set applyFrameRemoveHistoryEntry(value) { applyFrameRemoveHistoryEntry = value; },
   get isSharedProjectCollaborativeMode() { return isSharedProjectCollaborativeMode; },
   set isSharedProjectCollaborativeMode(value) { isSharedProjectCollaborativeMode = value; },
   get isVoxelExtensionModeEnabled() { return isVoxelExtensionModeEnabled; },
@@ -13456,6 +13686,8 @@
   set multiState(value) { multiState = value; },
   get noteActiveLocalProjectHistoryEntry() { return noteActiveLocalProjectHistoryEntry; },
   set noteActiveLocalProjectHistoryEntry(value) { noteActiveLocalProjectHistoryEntry = value; },
+  get onCommittedHistoryEntry() { return onCommittedHistoryEntry; },
+  set onCommittedHistoryEntry(value) { onCommittedHistoryEntry = value; },
   get queueSharedProjectCurrentSnapshotCapture() { return queueSharedProjectCurrentSnapshotCapture; },
   set queueSharedProjectCurrentSnapshotCapture(value) { queueSharedProjectCurrentSnapshotCapture = value; },
   get requestImmediateAutosaveSnapshot() { return requestImmediateAutosaveSnapshot; },
@@ -13526,11 +13758,61 @@
     return historyCoreWorkflowUtilsModule.commitHistory(...args);
   }
 
+  let pixisyncGuardedHistoryBusy = false;
+
+  async function runPiXiSyncGuardedHistory(direction) {
+    if (!pixisyncCollaborationController?.enabled || pixisyncGuardedHistoryBusy) return false;
+    historyCoreWorkflowUtilsModule.commitHistory();
+    const source = direction === 'undo' ? history.past : history.future;
+    const destination = direction === 'undo' ? history.future : history.past;
+    const entry = source[source.length - 1];
+    if (!entry || !isPixelPatchHistoryEntry(entry)) {
+      console.warn('[pixisync:v1] guarded history blocked', 'unsupported-history-entry');
+      return false;
+    }
+    const request = direction === 'undo'
+      ? pixisyncCollaborationController.requestUndo(entry)
+      : pixisyncCollaborationController.requestRedo(entry);
+    if (request?.status !== 'accepted') return false;
+    pixisyncGuardedHistoryBusy = true;
+    updateHistoryButtons();
+    try {
+      await request.promise;
+      if (source[source.length - 1] !== entry) {
+        throw new Error('history-stack-changed-during-guarded-operation');
+      }
+      source.pop();
+      destination.push(entry);
+      if (destination.length > history.limit) {
+        archiveEvictedHistoryEntry(direction === 'undo' ? 'future' : 'past', destination.shift());
+      }
+      markAutosaveDirty();
+      markDocumentUnsavedChange();
+      scheduleAutosaveSnapshot();
+      scheduleQrEditReadabilityCheck();
+      return true;
+    } catch (error) {
+      console.warn('[pixisync:v1] guarded history failed', direction, error?.message || 'unknown');
+      return false;
+    } finally {
+      pixisyncGuardedHistoryBusy = false;
+      updateHistoryButtons();
+    }
+  }
+
   function undo(...args) {
+    if (pixisyncCollaborationController?.enabled) {
+      void runPiXiSyncGuardedHistory('undo');
+      return;
+    }
     return historyCoreWorkflowUtilsModule.undo(...args);
   }
 
   function redo(...args) {
+    if (pixisyncCollaborationController?.enabled) {
+      void runPiXiSyncGuardedHistory('redo');
+      return;
+    }
     return historyCoreWorkflowUtilsModule.redo(...args);
   }
 
@@ -19681,10 +19963,9 @@
   }
 
   function maybeApplyInviteAutoJoin() {
-    // Shared projects are retired. Legacy invite parameters must never start
-    // an account/session/backend workflow while this remaining code is being
-    // removed; ordinary local startup continues unchanged.
-    if (!SHARED_PROJECTS_ENABLED) {
+    // The initial production rollout must not auto-start collaboration from an
+    // invite URL.  The same-tab settings gesture unlocks PiXiSYNC explicitly.
+    if (!SHARED_PROJECTS_ENABLED || !pixisyncInitialGateUnlocked) {
       multiInviteAutoJoinHandled = true;
       clearPendingSharedInvite();
       clearMultiInviteQueryParamsFromUrl();
@@ -25873,6 +26154,155 @@
     }
   }
 
+  async function initializePiXiSyncRuntime() {
+    const config = window.__PIXISYNC_V1_CONFIG__ || {
+      enabled: SHARED_PROJECTS_ENABLED,
+      uiEnabled: true,
+    };
+    const adapterFactory = window.PiXiEEDrawModules?.pixisyncRuntimeAdapterUtils
+      ?.createPiXiSyncRuntimeAdapter;
+    if (config?.enabled !== true || typeof adapterFactory !== 'function') {
+      window.PiXiEEDrawModules?.pixisyncRuntimeBridge?.clear?.();
+      return null;
+    }
+    const codec = window.PiXiEEDrawModules?.pixisyncOperationCodecUtils
+      ?.createPiXiSyncOperationCodecUtils?.();
+    const orderKeeper = window.PiXiEEDrawModules?.pixisyncOrderKeeperUtils
+      ?.createPiXiSyncOrderKeeperUtils?.();
+    const journal = window.PiXiEEDrawModules?.pixisyncJournalUtils
+      ?.createPiXiSyncJournalUtils?.();
+    const realtime = (
+      codec
+      && orderKeeper
+      && window.PiXiEEDrawModules?.pixisyncRealtimeClientUtils
+        ?.createPiXiSyncRealtimeClientUtils?.({
+          codec,
+          orderKeeperFactory: options => orderKeeper.createOrderKeeper(options),
+          journal,
+        })
+    ) || null;
+    if (!realtime) throw new Error('PiXiSYNC runtime dependencies are unavailable');
+
+    const clientStorageKey = String(config.clientStorageKey || 'pixieed:pixisync:v1:client-id');
+    const getClientId = () => {
+      const stored = String(window.localStorage?.getItem?.(clientStorageKey) || '');
+      if (/^[0-9a-f-]{36}$/i.test(stored)) return stored;
+      const created = window.crypto.randomUUID();
+      window.localStorage?.setItem?.(clientStorageKey, created);
+      return created;
+    };
+    const runtime = adapterFactory({
+      createSession: options => window.PiXiEEDrawModules.pixisyncSessionState
+        .createPiXiSyncSessionState(options),
+      createRealtimeClient: options => realtime.createClient(options),
+      runtimeBridge: window.PiXiEEDrawModules.pixisyncRuntimeBridge,
+      getSupabase: async () => {
+        if (config.supabaseClient) return config.supabaseClient;
+        if (window.__PIXISYNC_V1_SUPABASE_CLIENT__) return window.__PIXISYNC_V1_SUPABASE_CLIENT__;
+        if (
+          /^https:\/\/[a-z]+\.supabase\.co$/i.test(String(config.supabaseUrl || ''))
+          && /^(sb_publishable_|eyJ)/.test(String(config.publishableKey || ''))
+        ) {
+          const module = await import(MULTI_SUPABASE_MODULE_URL);
+          const isolatedClient = module.createClient(config.supabaseUrl, config.publishableKey, {
+            auth: {
+              persistSession: true,
+              autoRefreshToken: true,
+              detectSessionInUrl: false,
+              storageKey: String(config.authStorageKey || 'pixieed:pixisync:v1:test-auth'),
+            },
+            global: { headers: { 'x-client-id': getClientId() } },
+          });
+          window.__PIXISYNC_V1_SUPABASE_CLIENT__ = isolatedClient;
+          return isolatedClient;
+        }
+        return ensurePixieedAccountClient();
+      },
+      captureCheckpoint: async () => {
+        const snapshot = makeHistorySnapshot({ clonePixelData: true });
+        const [projectSession, thumbnail] = await Promise.all([
+          buildProjectSessionPayload(),
+          generateSnapshotThumbnail(snapshot),
+        ]);
+        const packaged = buildPackagedProjectPayload(snapshot, {
+          session: projectSession,
+          includeSheets: false,
+          internalBinary: true,
+        });
+        const serialized = await serializeProjectStorageSnapshot({
+          snapshot,
+          session: projectSession,
+          packaged,
+          thumbnail,
+        }, {
+          fileNameBase: state.documentName || DEFAULT_DOCUMENT_NAME,
+        });
+        if (!(serialized?.blob instanceof Blob)) throw new Error('PiXiSYNC checkpoint serialization failed');
+        return serialized.blob;
+      },
+      restoreCheckpoint: async blob => {
+        const loaded = await loadDocumentFromBlob(blob, null, {
+          suppressAutosaveStatus: true,
+          allowProjectMismatchLoad: true,
+          forceV2WorkingCopy: true,
+        });
+        if (!loaded || loaded === 'deferred') throw new Error('PiXiSYNC checkpoint restore failed');
+        return true;
+      },
+      getProjectKey: () => normalizeAutosaveProjectId?.(autosaveProjectId || '') || '',
+      getProjectTitle: () => state.documentName || DEFAULT_DOCUMENT_NAME,
+      getClientId,
+      storageKey: String(config.storageKey || 'pixieed:pixisync:v1:session'),
+      uiEnabled: config.uiEnabled !== false,
+      onStatus: details => console.info('[pixisync:v1-runtime]', details),
+      onError: error => console.warn('[pixisync:v1-runtime] error', error?.message || error),
+    });
+    window.__PIXISYNC_V1_RUNTIME__ = runtime;
+    await runtime.initialize();
+    return runtime;
+  }
+
+  let pixisyncInitialGateUnlocked = false;
+  let pixisyncInitialGateTapCount = 0;
+  let pixisyncInitialGateResetTimer = 0;
+
+  function setupPiXiSyncInitialGate() {
+    const settingsButtons = Array.from(new Set([
+      document.querySelector('[data-quick-right-tab="settings"]'),
+      document.getElementById('mobileTabSettings'),
+    ].filter(button => button instanceof HTMLButtonElement)));
+    const resetTapCount = () => {
+      pixisyncInitialGateTapCount = 0;
+      pixisyncInitialGateResetTimer = 0;
+    };
+    const unlock = async () => {
+      if (pixisyncInitialGateUnlocked) return;
+      pixisyncInitialGateTapCount += 1;
+      if (pixisyncInitialGateResetTimer) window.clearTimeout(pixisyncInitialGateResetTimer);
+      pixisyncInitialGateResetTimer = window.setTimeout(resetTapCount, PIXISYNC_INITIAL_GATE_RESET_MS);
+      if (pixisyncInitialGateTapCount < PIXISYNC_INITIAL_GATE_TAP_COUNT) return;
+
+      resetTapCount();
+      pixisyncInitialGateUnlocked = true;
+      document.body?.setAttribute('data-pixisync-initial-gate', 'unlocked');
+      try {
+        const runtime = await initializePiXiSyncRuntime();
+        if (!runtime) throw new Error('PiXiSYNC runtime is unavailable');
+        if (layoutMode === 'mobilePortrait') {
+          activateMobileTab('multi', { ensureDrawer: true });
+        } else {
+          dom.controls.pixisyncQuickOpen?.click();
+        }
+      } catch (error) {
+        pixisyncInitialGateUnlocked = false;
+        document.body?.removeAttribute('data-pixisync-initial-gate');
+        window.PiXiEEDrawModules?.pixisyncRuntimeBridge?.clear?.();
+        console.warn('PiXiSYNC initial gate bootstrap failed', error);
+      }
+    };
+    settingsButtons.forEach(button => button.addEventListener('click', () => { void unlock(); }));
+  }
+
   async function init() {
     startupReady = false;
     console.info('[pixiedraw:startup]', { phase: 'startup-bootstrap-start' });
@@ -25938,6 +26368,7 @@
         console.warn('Account bootstrap failed', error);
         return false;
       });
+      setupPiXiSyncInitialGate();
       console.info('[pixiedraw:startup]', { phase: 'startup-session-restore-skipped', reason: 'always-start-from-home' });
       let openedExternalImportProject = false;
       try {

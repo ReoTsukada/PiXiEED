@@ -1067,9 +1067,11 @@
 
   function setBottomTimelineHeight(height, { persist = true } = {}) {
     const normalized = normalizeBottomTimelineHeight(height);
+    const wasCompact = document.body.classList.contains('is-bottom-timeline-compact');
     bottomTimelineSizing.height = normalized;
     const isCompact = normalized <= BOTTOM_TIMELINE_COMPACT_HEIGHT;
-    document.body.classList.toggle('is-bottom-timeline-compact', isCompact && isBottomTimelineDockEnabled());
+    const isDockedCompact = isCompact && isBottomTimelineDockEnabled();
+    document.body.classList.toggle('is-bottom-timeline-compact', isDockedCompact);
     if (dom.bottomTimelineDock instanceof HTMLElement) {
       dom.bottomTimelineDock.dataset.compact = String(isCompact);
     }
@@ -1077,6 +1079,12 @@
       dom.layout.style.setProperty('--bottom-rail-height', `${normalized}px`);
     } else {
       document.documentElement.style.setProperty('--bottom-rail-height', `${normalized}px`);
+    }
+    if (isDockedCompact && !wasCompact) {
+      const timelineViewport = document.querySelector('#panelFrames .timeline-matrix-wrapper');
+      if (timelineViewport instanceof HTMLElement) {
+        timelineViewport.scrollLeft = 0;
+      }
     }
     if (persist) {
       scheduleSessionPersist({ includeSnapshots: false });
@@ -1999,6 +2007,12 @@
             if (activeBody instanceof HTMLElement) {
               activeBody.scrollTop = 0;
             }
+            if (normalizedTarget === 'frames') {
+              const timelineViewport = activePanel.querySelector('.timeline-matrix-wrapper');
+              if (timelineViewport instanceof HTMLElement) {
+                timelineViewport.scrollLeft = 0;
+              }
+            }
           }
         }
       }
@@ -2272,7 +2286,7 @@
           activateMobileTab('multi', { ensureDrawer: false });
           return;
         }
-        activateMobileTab(target, { ensureDrawer: false });
+        activateMobileTab(target, { ensureDrawer: target === 'multi' });
       });
     });
     dom.mobileQuickPanelButtons = Array.from(document.querySelectorAll('[data-mobile-quick-open-panel]'));
