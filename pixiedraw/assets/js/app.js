@@ -26326,6 +26326,10 @@
     const config = window.__PIXISYNC_V1_CONFIG__ || { enabled: PIXISYNC_V1_ENABLED };
     if (config?.enabled !== true) return false;
     try {
+      // A bound card is an explicit PiXiSYNC entry point. Unlike the initial
+      // discovery gesture, reopening it must expose the sync panel at once.
+      pixisyncInitialGateUnlocked = true;
+      document.body?.setAttribute('data-pixisync-initial-gate', 'unlocked');
       const runtime = window.__PIXISYNC_V1_RUNTIME__ || await initializePiXiSyncRuntime();
       if (!runtime) return false;
       await runtime.resumeBoundProject();
