@@ -4,7 +4,7 @@
   if (window.PiXiEEDMarketAds) return;
 
   const CLIENT = 'ca-pub-9801602250480253';
-  const LIST_SLOT = '5001430253';
+  const LIST_SLOT = window.PiXiEEDCardFeedAds?.COMMON_SLOT || '2141591954';
   const DETAIL_SLOT = '9279466474';
   const observedSlots = new WeakSet();
   const resizeObservers = new WeakMap();
@@ -17,6 +17,7 @@
   function createSlot(kind, slotId) {
     const wrapper = document.createElement('aside');
     wrapper.className = `market-ad market-ad--${kind}`;
+    window.PiXiEEDCardFeedAds?.reserve(wrapper, '180px');
     wrapper.dataset.marketAdSlot = slotId;
     wrapper.setAttribute('aria-label', '広告');
 
@@ -124,7 +125,7 @@
   }
 
   function createListAd() {
-    return observe(createSlot('list', LIST_SLOT));
+    return createSlot('list', LIST_SLOT);
   }
 
   function showDetailAd() {
@@ -153,5 +154,5 @@
     document.querySelectorAll('[data-market-ad-slot]').forEach((wrapper) => renderSlot(wrapper));
   });
 
-  window.PiXiEEDMarketAds = Object.freeze({ createListAd, showDetailAd });
+  window.PiXiEEDMarketAds = Object.freeze({ createListAd, observe, showDetailAd });
 })();

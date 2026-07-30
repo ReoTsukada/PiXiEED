@@ -3576,7 +3576,8 @@ body[data-pixieed-page="pixfind"] .pixieed-common-tabbar {
   grid-column: 1 / -1;
   width: 100%;
   min-width: 0;
-  min-height: 100px;
+  min-height: var(--pixieed-card-feed-ad-height, 180px);
+  height: var(--pixieed-card-feed-ad-height, 180px);
   margin: 8px 0;
   padding: 20px 0 10px;
   overflow: hidden;
@@ -3602,6 +3603,8 @@ body[data-pixieed-page="pixfind"] .pixieed-common-tabbar {
   min-width: 0 !important;
   max-width: 100% !important;
   overflow: hidden;
+  min-height: calc(var(--pixieed-card-feed-ad-height, 180px) - 30px) !important;
+  height: calc(var(--pixieed-card-feed-ad-height, 180px) - 30px) !important;
 }
 
 @media (max-width: 720px) and (orientation: portrait) {
@@ -3635,9 +3638,7 @@ body[data-pixieed-page="pixfind"] .pixieed-common-tabbar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .puzzle-list-ad {
-    min-height: 180px;
-  }
+  .puzzle-list-ad { --pixieed-card-feed-ad-height: 180px; }
 }
 
 @media (max-width: 360px) {

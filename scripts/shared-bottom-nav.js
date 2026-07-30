@@ -68,7 +68,7 @@
     const controller = doc.createElement('script');
     controller.defer = true;
     controller.dataset.pixieedFooterAdController = 'true';
-    controller.src = relHref('scripts/bottom-nav-footer-ad.js?v=20260719-shared-top-resume1');
+    controller.src = relHref('scripts/bottom-nav-footer-ad.js?v=20260730-pixiedraw-local-preview1');
     doc.body.appendChild(controller);
   }
 
@@ -103,7 +103,7 @@
     const controller = doc.createElement('script');
     controller.async = false;
     controller.dataset.pixieedCommonTabBar = 'true';
-    controller.src = relHref('scripts/shared-tab-bar.js?v=20260726-paste-actions2');
+    controller.src = relHref('scripts/shared-tab-bar.js?v=20260730-pixisync-share-panel1');
     controller.addEventListener('load', ensureNotificationController, { once: true });
     doc.body.appendChild(controller);
   }

@@ -95,6 +95,7 @@
         actions: [
           { id: 'file', label: 'ファイル', selector: '[data-quick-right-tab="file"]', icon: 'assets/icons/File.png?v=2026.07.19-ui-icons1' },
           { id: 'settings', label: '設定', selector: '[data-quick-right-tab="settings"]', icon: 'assets/icons/Settings.png?v=2026.07.19-icons2' },
+          { id: 'share-project', label: 'シェアプロジェクト', selector: '#pixisyncQuickOpen', icon: 'pixiedraw/assets/icons/maltimode.svg', mirrorState: true, mirrorVisibility: true },
           { id: 'camera', label: 'カメラ', selector: '[data-ui-action="openLensCamera"]', icon: 'assets/icons/Camera.png', gapBefore: true },
           { id: 'qr', label: 'QR編集', selector: '[data-ui-action="openQrEditor"]', icon: 'assets/icons/QR.png' },
           { id: 'copy', label: 'コピー', selector: '#canvasClipboardCopy', icon: 'pixiedraw/assets/icons/action-copy.png?v=20260726-clipboard-actions1', mirrorState: true, mirrorVisibility: true, placement: 'trailing' },

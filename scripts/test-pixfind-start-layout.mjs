@@ -11,13 +11,13 @@ const toolFullscreen = fs.readFileSync(path.join(root, 'scripts/tool-fullscreen.
 const maoitu = fs.readFileSync(path.join(root, 'maoitu/index.html'), 'utf8');
 
 assert.match(html, /<body data-pixfind-screen="start">/);
-assert.match(html, /styles\.css\?v=20260728-transient-feedback1/);
+assert.match(html, /styles\.css\?v=20260730-row-ad-reserve1/);
 assert.match(css, /creator-overlay \{[\s\S]*z-index: 950;/);
 assert.match(css, /creator-panel \{[\s\S]*max-height: 100%;/);
 assert.match(css, /Do not add those bar dimensions twice/);
 assert.match(css, /The catalog must use one scroll surface/);
 assert.match(css, /screen--difficulty \.puzzle-list \{[\s\S]*overflow: visible/);
-assert.match(html, /app\.js\?v=20260729-result-ad1/);
+assert.match(html, /app\.js\?v=20260730-progressive-feed1/);
 assert.match(html, /class="puzzle-gallery pixfind-catalog"/);
 assert.match(html, /id="creatorMarkerViewport"/);
 assert.match(html, /id="creatorMarkerSourceCanvas"/);
@@ -75,7 +75,8 @@ assert.doesNotMatch(app, /minimumVisible/);
 assert.match(app, /frame\.addEventListener\('wheel', handleWheel/);
 assert.match(app, /frame\.setPointerCapture\(event\.pointerId\)/);
 assert.match(app, /const label = active \? '縮小' : '拡大';/);
-assert.match(app, /\(idx \+ 1\) % 4 === 0/);
+assert.match(app, /PiXiEEDCardFeedAds\?\.renderProgressively/);
+assert.match(app, /data-ad-slot="2141591954"/);
 assert.doesNotMatch(app, /idx === 7/);
 assert.match(app, /function createPuzzleListAd\(\)/);
 assert.match(app, /function normalizeMarkerRegions\(/);

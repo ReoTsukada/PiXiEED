@@ -27,6 +27,7 @@
   let renderLimit = INITIAL_RENDER_COUNT;
   let catalogClient = null;
   let loadMoreObserver = null;
+  let cardFeedRenderId = 0;
   const requestedPreviewIds = new Set();
   const pendingPreviewIds = new Set();
 
@@ -220,23 +221,33 @@
       renderEmpty(assets.length ? '条件に合う素材がありません' : '公開中の素材はまだありません', assets.length ? '検索語、価格、派生条件を変えてお試しください。' : '出品された素材はここへ表示されます。');
       return;
     }
-    const children = [];
-    shown.forEach((asset, index) => {
-      children.push(createCard(asset));
-      if ((index + 1) % 8 !== 0) return;
-      const listAd = window.PiXiEEDMarketAds?.createListAd?.();
-      if (listAd) children.push(listAd);
-    });
-    if (shown.length < visible.length) {
-      const marker = document.createElement('button');
-      marker.type = 'button'; marker.className = 'market-load-more'; marker.textContent = '続きを読み込む';
-      marker.setAttribute('aria-label', `残り${visible.length - shown.length}件を読み込む`);
-      children.push(marker);
-      window.requestAnimationFrame(() => observeLoadMore(marker));
+    const renderId = ++cardFeedRenderId;
+    const cards = shown.map(createCard);
+    const appendLoadMore = () => {
+      if (renderId !== cardFeedRenderId) return;
+      if (shown.length < visible.length) {
+        const marker = document.createElement('button');
+        marker.type = 'button'; marker.className = 'market-load-more'; marker.textContent = '続きを読み込む';
+        marker.setAttribute('aria-label', `残り${visible.length - shown.length}件を読み込む`);
+        grid.appendChild(marker);
+        window.requestAnimationFrame(() => observeLoadMore(marker));
+      } else {
+        loadMoreObserver?.disconnect();
+      }
+    };
+    const renderFeed = window.PiXiEEDCardFeedAds?.renderProgressively;
+    if (typeof renderFeed !== 'function') {
+      grid.replaceChildren(...cards);
+      appendLoadMore();
     } else {
-      loadMoreObserver?.disconnect();
+      void renderFeed({
+        grid,
+        cards,
+        createAd: () => window.PiXiEEDMarketAds?.createListAd?.(),
+        requestAd: (ad) => window.PiXiEEDMarketAds?.observe?.(ad),
+        isCurrent: () => renderId === cardFeedRenderId,
+      }).then(appendLoadMore);
     }
-    grid.replaceChildren(...children);
     requestVisiblePreviews(shown);
   }
 

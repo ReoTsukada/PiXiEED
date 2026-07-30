@@ -3418,40 +3418,39 @@ function selectDifficulty(level) {
 
 function renderPuzzles(level, mode = state.currentMode) {
   if (!dom.puzzleList) return;
-  dom.puzzleList.innerHTML = '';
+  const renderId = String(Number(dom.puzzleList.dataset.pixieedFeedRenderId || '0') + 1);
+  dom.puzzleList.dataset.pixieedFeedRenderId = renderId;
 
   const official = [...state.officialPuzzles].sort((left, right) => (
     Number(right.validPlayCount || 0) - Number(left.validPlayCount || 0)
     || Number(right.difficulty || 0) - Number(left.difficulty || 0)
   ));
-  official.forEach((puzzle, idx) => {
-    dom.puzzleList.append(createOfficialCard(puzzle));
-    // Two rows on phones / a compact card group on larger screens keeps the
-    // catalog scannable while giving each in-feed placement real visibility.
-    if ((idx + 1) % 4 === 0) {
-      dom.puzzleList.append(createPuzzleListAd());
-    }
-  });
+  const cards = official.map(createOfficialCard);
 
   if (!official.length) {
     const info = document.createElement('p');
     info.className = 'section-subtitle';
     info.textContent = '公開されている問題はまだありません。';
-    dom.puzzleList.append(info);
+    cards.push(info);
   }
-
-  try {
-    if (window.pixieedObserveAds) {
-      window.pixieedObserveAds(dom.puzzleList);
-    }
-  } catch (error) {
-    console.warn('ads render skipped', error);
+  const renderFeed = window.PiXiEEDCardFeedAds?.renderProgressively;
+  if (typeof renderFeed !== 'function') {
+    dom.puzzleList.replaceChildren(...cards);
+    return;
   }
+  void renderFeed({
+    grid: dom.puzzleList,
+    cards,
+    createAd: createPuzzleListAd,
+    requestAd: (ad) => window.pixieedObserveAds?.(ad),
+    isCurrent: () => dom.puzzleList?.dataset.pixieedFeedRenderId === renderId,
+  }).catch((error) => console.warn('ads render skipped', error));
 }
 
 function createPuzzleListAd() {
   const ad = document.createElement('aside');
   ad.className = 'puzzle-list-ad';
+  window.PiXiEEDCardFeedAds?.reserve(ad, '180px');
   ad.setAttribute('aria-label', '広告');
   ad.innerHTML = `
     <small class="puzzle-list-ad__label">広告</small>
@@ -3459,7 +3458,7 @@ function createPuzzleListAd() {
       <ins class="adsbygoogle"
            style="display:block"
            data-ad-client="ca-pub-9801602250480253"
-           data-ad-slot="2261515379"
+           data-ad-slot="2141591954"
            data-ad-format="auto"
            data-full-width-responsive="true"></ins>
     </div>

@@ -477,7 +477,8 @@ html[data-pixieed-market-access="denied"] body > #marketDevGate { visibility: vi
 
 .market-ad--list {
   grid-column: 1 / -1;
-  min-height: 120px;
+  min-height: var(--pixieed-card-feed-ad-height, 180px);
+  height: var(--pixieed-card-feed-ad-height, 180px);
   margin: 8px 0;
   padding: 18px 0 10px;
   border-top: 1px solid rgba(255,255,255,.07);
@@ -507,6 +508,8 @@ html[data-pixieed-market-access="denied"] body > #marketDevGate { visibility: vi
   display: block;
   width: 100% !important;
   min-width: 0 !important;
+  min-height: calc(var(--pixieed-card-feed-ad-height, 180px) - 28px) !important;
+  height: calc(var(--pixieed-card-feed-ad-height, 180px) - 28px) !important;
 }
 
 /* 詳細下の関連商品はPCで3列、広告は必ずその3列分の幅を確保する。 */

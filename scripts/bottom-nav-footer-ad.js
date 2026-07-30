@@ -17,6 +17,16 @@
     return window.location.protocol === 'file:';
   }
 
+  // PiXiEEDraw has a persistent portrait advertisement rail.  A local server
+  // must show its reserved geometry too, without making an external ad request,
+  // so editor layout can be reviewed exactly as it is in production.
+  function isLocalPiXiEEDrawPreview() {
+    if (isLocalFilePreview()) return true;
+    if (!isPixiedrawPage()) return false;
+    const host = String(window.location.hostname || '').toLowerCase();
+    return host === 'localhost' || host === '127.0.0.1' || host === '::1';
+  }
+
   function shouldReserveFooterAdOnly() {
     try {
       const path = String(window.location.pathname || '').toLowerCase();
@@ -865,7 +875,7 @@
       `;
       document.body.appendChild(banner);
     }
-    const localFilePreview = isLocalFilePreview();
+    const localFilePreview = isLocalPiXiEEDrawPreview();
     banner.classList.toggle('is-local-preview', localFilePreview);
     banner.dataset.pixieedReserveAdSpace = 'true';
     document.body?.classList.add('has-pixieed-shared-top-ad');

@@ -12,9 +12,9 @@ assert.match(draw, /id="pixieedPwaInstallButton" type="button">インストー�
 assert.match(tabBar, /id: 'fullscreen', label: '拡大', selector: '#fullscreenButton', icon: '拡大\.png', iconWhenPressed: '縮小\.png', mirrorState: true, mode: 'fullscreen', fullscreenController: 'tool', placement: 'leading'/);
 assert.match(tabBar, /label: 'アプリとして使う', selector: '#pixieedPwaInstallButton'[\s\S]{0,160}mirrorDisabled: true/);
 assert.match(tabBar, /const fullscreenActions = state\.actions\.filter\(isFullscreenAction\);/);
-assert.match(tabBar, /\[myPage, state\.reloadAction, \.\.\.state\.details\.filter/);
+assert.match(tabBar, /\[myPage, notifications, state\.reloadAction, \.\.\.state\.details\.filter/);
 assert.doesNotMatch(tabBar, /createActionControl\(state\.reloadAction, 'pixieed-common-tabbar__button'\)/);
-assert.match(bottomNav, /shared-tab-bar\.js\?v=20260726-selection-actions1/);
+assert.match(bottomNav, /shared-tab-bar\.js\?v=20260730-pixisync-share-panel1/);
 assert.doesNotMatch(fullscreen, /html:fullscreen \.bottom-nav,html:fullscreen \.pixieed-shared-top-ad/);
 
 console.log('PiXiEEDraw fullscreen common-action checks passed.');
