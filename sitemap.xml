@@ -2,7 +2,7 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://pixieed.jp/</loc>
-    <lastmod>2026-07-19</lastmod>
+    <lastmod>2026-07-30</lastmod>
   </url>
   <url>
     <loc>https://pixieed.jp/notes/</loc>
@@ -62,7 +62,7 @@
   </url>
   <url>
     <loc>https://pixieed.jp/pixiedraw/</loc>
-    <lastmod>2026-07-19</lastmod>
+    <lastmod>2026-07-30</lastmod>
   </url>
   <url>
     <loc>https://pixieed.jp/pixiee-lens/</loc>
@@ -78,11 +78,15 @@
   </url>
   <url>
     <loc>https://pixieed.jp/maoitu/</loc>
-    <lastmod>2026-07-19</lastmod>
+    <lastmod>2026-07-30</lastmod>
   </url>
   <url>
     <loc>https://pixieed.jp/pixfind/</loc>
-    <lastmod>2026-07-19</lastmod>
+    <lastmod>2026-07-30</lastmod>
+  </url>
+  <url>
+    <loc>https://pixieed.jp/projects/pixfind/</loc>
+    <lastmod>2026-07-30</lastmod>
   </url>
   <url>
     <loc>https://pixieed.jp/projects/</loc>
