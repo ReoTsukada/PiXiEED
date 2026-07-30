@@ -15276,7 +15276,18 @@
   }
 
   function getSharedProjectOwnershipStatus(entries = null) {
-    return sharedRecentProjectUtilsModule.getSharedProjectOwnershipStatus(...arguments);
+    const status = sharedRecentProjectUtilsModule.getSharedProjectOwnershipStatus?.(...arguments);
+    if (status && typeof status === 'object') {
+      return status;
+    }
+    // PiXiSYNC's initial rollout does not revive the retired shared-project
+    // recent-project module.  Account/startup UI must still have a safe
+    // zero-usage value until the v1 runtime owns a room.
+    return {
+      ownedProjectCount: 0,
+      effectiveLimit: SHARED_PROJECT_LIMIT_DEFAULT,
+      excessCount: 0,
+    };
   }
 
   function buildSharedProjectCreationBlockedMessage({
