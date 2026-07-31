@@ -346,6 +346,9 @@ await lifecycleOwner.adapter.start();
 assert.equal(lifecycleOwner.adapter.snapshot().session.phase, 'active');
 assert.equal(lifecycleOwner.bridge.inputLocked, false);
 const initialRealtimeCount = lifecycleServer.realtimeOptions.length;
+assert.equal(await lifecycleOwner.adapter.handleLifecycleResume('focus'), false);
+assert.equal(lifecycleOwner.adapter.snapshot().session.phase, 'active');
+assert.equal(lifecycleServer.realtimeOptions.length, initialRealtimeCount);
 lifecycleServer.emitClosedOnStop = true;
 assert.equal(await lifecycleOwner.adapter.handleLifecycleSuspend('visibility-hidden'), true);
 assert.equal(lifecycleOwner.adapter.snapshot().session.phase, 'reconnecting');
@@ -355,6 +358,8 @@ assert.equal(await lifecycleOwner.adapter.handleLifecycleResume('pageshow-bfcach
 assert.equal(lifecycleOwner.adapter.snapshot().session.phase, 'active');
 assert.equal(lifecycleOwner.adapter.session.canDraw(), true);
 assert.equal(lifecycleOwner.bridge.inputLocked, false);
+assert.equal(lifecycleServer.realtimeOptions.length, initialRealtimeCount + 1);
+assert.equal(await lifecycleOwner.adapter.handleLifecycleResume('focus'), false);
 assert.equal(lifecycleServer.realtimeOptions.length, initialRealtimeCount + 1);
 
 // A second view of the same local card still receives remote updates, but is

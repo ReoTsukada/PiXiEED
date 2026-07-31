@@ -26544,7 +26544,16 @@
       ensureAuthenticatedStart: options => ensureSharedProjectAuthenticatedStart(options),
       getClientId,
       uiEnabled: config.uiEnabled !== false,
-      onStatus: details => console.info('[pixisync:v1-runtime]', details),
+      onStatus: details => {
+        const commandLock = inspectProjectCommandLock();
+        console.info('[pixisync:v1-runtime]', {
+          ...details,
+          commandLocked: commandLock.locked,
+          lockOwner: commandLock.owner || null,
+          drawingLocked: pixisyncInputLocked,
+          inputEnabled: !pixisyncInputLocked && details?.drawingAllowed === true,
+        });
+      },
       onError: error => console.warn('[pixisync:v1-runtime] error', error?.message || error),
     });
     window.__PIXISYNC_V1_RUNTIME__ = runtime;

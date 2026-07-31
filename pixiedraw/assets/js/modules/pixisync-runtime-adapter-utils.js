@@ -216,7 +216,16 @@
         // a start/resume cannot create an unsynchronised local stroke.
         runtimeBridge.setInputLocked?.(!['local', 'invited', 'left', 'archived', 'active'].includes(snapshot.phase));
         if (snapshot.phase === 'active') clearReconnectRetry();
-        report({ phase: snapshot.phase, roomId: snapshot.roomId, revision: snapshot.appliedRevision });
+        report({
+          phase: snapshot.phase,
+          roomId: snapshot.roomId,
+          revision: snapshot.appliedRevision,
+          authoritativeRevision: snapshot.authoritativeRevision,
+          drawingAllowed: session.canDraw?.() === true,
+          localReadOnly,
+          lifecycleSuspended,
+          realtimeConnected: Boolean(realtimeClient),
+        });
       });
       configureBridge({ collaboration: false });
       return session;
@@ -364,8 +373,18 @@
     }
 
     async function handleLifecycleResume(reason = 'visible') {
+      const wasSuspended = lifecycleSuspended;
       lifecycleSuspended = false;
-      if (!isReconnectablePhase() || lifecycleResumeQueued) return false;
+      const phase = currentSnapshot()?.phase;
+      // focus/pageshow/online may all fire for the same healthy foreground
+      // page. They are visibility hints, not proof that the socket was lost.
+      // Reconnect only after an actual suspend/offline transition, or while a
+      // previous reconnect is still incomplete.
+      if (
+        !isReconnectablePhase()
+        || lifecycleResumeQueued
+        || (phase === 'active' && !wasSuspended)
+      ) return false;
       lifecycleResumeQueued = true;
       try {
         await enqueue({ type: 'SOCKET_OFFLINE', epoch: currentEpoch(), reason });
