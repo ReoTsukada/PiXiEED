@@ -26428,6 +26428,7 @@
         setRecentProjectsCache(nextEntries);
       },
       acquireProjectLease,
+      ensureAuthenticatedStart: options => ensureSharedProjectAuthenticatedStart(options),
       getClientId,
       uiEnabled: config.uiEnabled !== false,
       onStatus: details => console.info('[pixisync:v1-runtime]', details),
@@ -26600,17 +26601,18 @@
         return false;
       });
       setupPiXiSyncInitialGate();
+      let openedPixiSyncInvite = false;
       // 招待URLで開いた受信側は、設定ボタンのゲート操作を要求せず
       // V1シェアランタイムを先に起動してリンクを消費する。
       // これにより送信先でも現在のローカルプロジェクトへ参加バインドを作成できる。
       try {
         const inviteUrl = new URL(window.location.href);
         if (inviteUrl.searchParams.has('pixisync_invite')) {
+          openedPixiSyncInvite = true;
           pixisyncInitialGateUnlocked = true;
           window.__PIXISYNC_SHARE_START_UNLOCKED__ = true;
           document.body?.setAttribute('data-pixisync-initial-gate', 'unlocked');
           setPiXiSyncInitialGateButtonsEnabled(true);
-          await initializePiXiSyncRuntime();
         }
       } catch (error) {
         console.warn('PiXiSYNC invite bootstrap failed', error);
@@ -26643,6 +26645,16 @@
           console.warn('Requested project bootstrap failed', error);
         }
       }
+      if (openedPixiSyncInvite) {
+        try {
+          // Startup project selection must finish before the runtime captures
+          // or restores a checkpoint; otherwise the normal bootstrap can
+          // replace the shared canvas with a fresh local document.
+          await initializePiXiSyncRuntime();
+        } catch (error) {
+          console.warn('PiXiSYNC invite bootstrap failed', error);
+        }
+      }
       setStartupProgressLabel(localizeText('起動を完了しています…', 'Finalizing startup...'));
       setStartupBootLoadingProgress(97, {
         label: localizeText('起動を完了しています…', 'Finalizing startup...'),
@@ -26652,7 +26664,7 @@
       refreshLocalizedUi();
       scheduleDeferredUiSetup();
       hideProjectHomeScreen();
-      if (openedExternalImportProject || openedRequestedProject) {
+      if (openedExternalImportProject || openedRequestedProject || openedPixiSyncInvite) {
         // External imports and explicit My Page requests already opened a
         // project. Do not cover it with the normal project chooser.
         hideStartupScreen();
