@@ -399,7 +399,9 @@
             // card and only begin the authoritative tail from revision 0.
             preserveInitialOwnerDocument = false;
             configureBridge();
-            runtimeBridge.beginAuthoritativeResync?.(manifest.checkpoint_revision);
+            // The owner is already showing the exact document serialized into
+            // the initial checkpoint. Do not reset the canvas/controller here;
+            // doing so can roll the visible drawing back before tail sync.
             realtimeClient.resetConfirmedRevision(manifest.checkpoint_revision);
             await dispatchNow({
               type: 'CHECKPOINT_LOADED',
