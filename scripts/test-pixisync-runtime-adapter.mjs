@@ -288,6 +288,11 @@ assert.deepEqual(editorBindings.get('project-editor'), {
 });
 assert.equal(editor.restored, 'checkpoint-owner');
 assert.deepEqual(editor.restoreContext, { projectKey: 'project-editor', role: 'participant' });
+const editorRestoreCount = editor.restored;
+await editor.adapter.handleLifecycleSuspend('visibility-hidden');
+await editor.adapter.handleLifecycleResume('visibility-visible');
+assert.equal(editor.adapter.snapshot().session.phase, 'active');
+assert.equal(editor.restored, editorRestoreCount, 'reconnect must not replace the participant canvas with a checkpoint');
 server.realtimeOptions.at(-1).onBroadcast('pixisync-comment', sentComment);
 assert.equal(editor.bridge.comments.length, 1);
 assert.equal(editor.bridge.comments[0].text, 'owner message');

@@ -98,10 +98,19 @@
       };
       const transitionToReconnect = (effects, reason = '') => {
         if (!isOpenPhase()) return;
+        const resumeRevision = context.appliedRevision;
+        const resumeCurrentDocument = context.phase === 'active' || context.checkpointLoaded;
         context.epoch += 1;
         context.phase = 'reconnecting';
         context.lastError = reason;
         resetSyncGates();
+        // A reconnect resumes from the locally confirmed revision. The
+        // checkpoint is an initial-join fallback, not a reason to replace the
+        // currently visible canvas on every socket wake/retry.
+        context.appliedRevision = resumeRevision;
+        context.authoritativeRevision = resumeRevision;
+        context.checkpointRevision = resumeRevision;
+        context.resumeCurrentDocument = resumeCurrentDocument;
         effects.push({ type: 'RECONNECT_CHANNEL' });
       };
       const maybeConverge = effects => {
@@ -215,8 +224,14 @@
               effects.unshift({ type: 'REMOVE_CHANNEL' });
               break;
             }
-            if (context.phase === 'creating' || context.phase === 'joining') beginSync(effects);
-            else effects.push({ type: 'LOAD_CHECKPOINT' });
+            if (context.phase === 'creating' || context.phase === 'joining') {
+              beginSync(effects);
+            } else if (context.resumeCurrentDocument) {
+              context.checkpointLoaded = true;
+              effects.push({ type: 'FETCH_INITIAL_TAIL', afterRevision: context.appliedRevision.toString() });
+            } else {
+              effects.push({ type: 'LOAD_CHECKPOINT' });
+            }
             context.channelSubscribed = true;
             context.privateSubscribed = true;
             break;
