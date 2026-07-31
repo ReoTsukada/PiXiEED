@@ -464,7 +464,11 @@
           }
           configureBridge();
           runtimeBridge.beginAuthoritativeResync?.(manifest.checkpoint_revision);
-          await restoreCheckpoint(blob, { projectKey: boundProjectKey, role });
+          await restoreCheckpoint(blob, {
+            projectKey: boundProjectKey,
+            role,
+            preserveProjectIdentity: true,
+          });
           realtimeClient.resetConfirmedRevision(manifest.checkpoint_revision);
           await dispatchNow({
             type: 'CHECKPOINT_LOADED',

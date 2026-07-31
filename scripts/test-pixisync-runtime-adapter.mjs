@@ -276,7 +276,11 @@ assert.equal(await owner.adapter.resumeBoundProject(), ROOM_ID);
 assert.equal(owner.adapter.snapshot().session.phase, 'active');
 assert.equal(owner.bridge.inputLocked, false);
 assert.equal(owner.restored, 'checkpoint-owner');
-assert.deepEqual(owner.restoreContext, { projectKey: 'project-owner', role: 'owner' });
+assert.deepEqual(owner.restoreContext, {
+  projectKey: 'project-owner',
+  role: 'owner',
+  preserveProjectIdentity: true,
+});
 const sentComment = await owner.adapter.commands.sendComment(' owner message ');
 assert.equal(sentComment.text, 'owner message');
 assert.equal(server.broadcasts.at(-1).event, 'pixisync-comment');
@@ -303,7 +307,11 @@ assert.equal(resumedEditor.adapter.snapshot().session.phase, 'active');
 assert.equal(resumedEditor.bridge.inputLocked, false);
 const activeEditor = resumedEditor;
 assert.equal(activeEditor.restored, 'checkpoint-owner');
-assert.deepEqual(activeEditor.restoreContext, { projectKey: 'project-editor', role: 'participant' });
+assert.deepEqual(activeEditor.restoreContext, {
+  projectKey: 'project-editor',
+  role: 'participant',
+  preserveProjectIdentity: true,
+});
 const editorRestoreCount = activeEditor.restored;
 await activeEditor.adapter.handleLifecycleSuspend('visibility-hidden');
 await activeEditor.adapter.handleLifecycleResume('visibility-visible');

@@ -11915,6 +11915,7 @@
   ) || null;
   let pixisyncInputLocked = false;
   let pixisyncLocalReadOnly = false;
+  let pixisyncLastDrawGateWarning = '';
   const pixisyncMinimalUi = window.PiXiEEDrawModules?.pixisyncMinimalUiUtils
     ?.createPiXiSyncMinimalUi?.({
       elements: {
@@ -11996,13 +11997,63 @@
   }
 
   function canBeginPiXiSyncLocalOperation(label) {
-    if (pixisyncInputLocked) return false;
+    if (pixisyncInputLocked) {
+      const warningKey = `input-locked:${String(label || '')}`;
+      if (warningKey !== pixisyncLastDrawGateWarning) {
+        pixisyncLastDrawGateWarning = warningKey;
+        console.warn('[pixiedraw:draw-gate]', {
+          allowed: false,
+          reason: pixisyncLocalReadOnly ? 'project-lease-read-only' : 'pixisync-input-locked',
+          tool: String(label || ''),
+          activeTabId: activeOpenProjectTabId || '',
+          projectId: normalizeAutosaveProjectId(autosaveProjectId || '') || '',
+        });
+      }
+      return false;
+    }
     if (!pixisyncCollaborationController?.enabled) return true;
     const layer = getActiveLayer();
-    return pixisyncCollaborationController.canBeginLocalOperation(label, {
+    const v1Compatible = isPiXiSyncLayerV1Compatible(layer);
+    const allowed = pixisyncCollaborationController.canBeginLocalOperation(label, {
       colorMode: state.colorMode,
-      v1Compatible: isPiXiSyncLayerV1Compatible(layer),
+      v1Compatible,
     });
+    if (allowed) {
+      pixisyncLastDrawGateWarning = '';
+      return true;
+    }
+    const runtimeSnapshot = pixisyncCollaborationController.snapshot?.() || null;
+    const warningKey = [
+      String(label || ''),
+      state.colorMode,
+      v1Compatible,
+      runtimeSnapshot?.session?.phase || '',
+      activeOpenProjectTabId || '',
+      layer?.id || '',
+    ].join(':');
+    if (warningKey !== pixisyncLastDrawGateWarning) {
+      pixisyncLastDrawGateWarning = warningKey;
+      console.warn('[pixiedraw:draw-gate]', {
+        allowed: false,
+        reason: runtimeSnapshot?.session?.phase !== 'active'
+          ? 'session-not-active'
+          : (state.colorMode !== COLOR_MODE_INDEX
+            ? 'unsupported-color-mode'
+            : (!v1Compatible ? 'incompatible-active-layer' : 'unsupported-tool')),
+        tool: String(label || ''),
+        phase: runtimeSnapshot?.session?.phase || '',
+        drawingAllowed: runtimeSnapshot?.session?.phase === 'active'
+          && runtimeSnapshot?.session?.appliedRevision === runtimeSnapshot?.session?.authoritativeRevision,
+        colorMode: state.colorMode,
+        activeTabId: activeOpenProjectTabId || '',
+        projectId: normalizeAutosaveProjectId(autosaveProjectId || '') || '',
+        canvasId: getActiveProjectCanvasDocument?.()?.id || null,
+        frameId: getActiveFrame?.()?.id || null,
+        layerId: layer?.id || null,
+        v1Compatible,
+      });
+    }
+    return false;
   }
 
   function onCommittedHistoryEntry(entry, label) {
@@ -26498,14 +26549,52 @@
       restoreCheckpoint: async (blob, context = {}) => {
         const projectId = normalizeAutosaveProjectId(context?.projectKey || '')
           || normalizeAutosaveProjectId(autosaveProjectId || '');
+        const activeTabBeforeRestore = getActiveOpenProjectTab?.() || null;
+        const activeTabIdBeforeRestore = String(activeTabBeforeRestore?.id || activeOpenProjectTabId || '');
+        const sourcePersistenceState = {
+          sourceStorageAdapterId: activeTabBeforeRestore?.sourceStorageAdapterId ?? null,
+          sourceKind: activeTabBeforeRestore?.sourceKind || 'recent',
+          sourceProjectToken: activeTabBeforeRestore?.sourceProjectToken || null,
+          lastSavedStorageAdapterId: activeTabBeforeRestore?.lastSavedStorageAdapterId ?? null,
+        };
         const loaded = await loadDocumentFromBlob(blob, null, {
           suppressAutosaveStatus: true,
           allowProjectMismatchLoad: true,
-          forceV2WorkingCopy: true,
+          openedFromRecent: true,
+          suppressProjectSheetsRestore: context?.preserveProjectIdentity === true,
+          preserveDocumentIds: context?.preserveProjectIdentity === true,
+          preserveCanvasIds: context?.preserveProjectIdentity === true,
+          preserveFrameIds: context?.preserveProjectIdentity === true,
+          preserveLayerIds: context?.preserveProjectIdentity === true,
+          preserveView: context?.preserveProjectIdentity === true,
           projectId,
-          sourceKind: 'pixisync-checkpoint',
+          sourceKind: sourcePersistenceState.sourceKind,
+          sourcePersistenceState,
         });
         if (!loaded || loaded === 'deferred') throw new Error('PiXiSYNC checkpoint restore failed');
+        const activeTabAfterRestore = getActiveOpenProjectTab?.() || null;
+        const activeTabIdAfterRestore = String(activeTabAfterRestore?.id || activeOpenProjectTabId || '');
+        const activeProjectIdAfterRestore = normalizeAutosaveProjectId(
+          activeTabAfterRestore?.projectId || autosaveProjectId || ''
+        );
+        if (
+          context?.preserveProjectIdentity === true
+          && (
+            (activeTabIdBeforeRestore && activeTabIdAfterRestore !== activeTabIdBeforeRestore)
+            || (projectId && activeProjectIdAfterRestore !== projectId)
+          )
+        ) {
+          throw new Error('PiXiSYNC checkpoint restore changed the active project identity');
+        }
+        console.info('[pixisync:checkpoint]', {
+          phase: 'checkpoint-restored-in-place',
+          projectId: activeProjectIdAfterRestore,
+          activeTabId: activeTabIdAfterRestore,
+          tabIdentityPreserved: !activeTabIdBeforeRestore || activeTabIdAfterRestore === activeTabIdBeforeRestore,
+          canvasId: getActiveProjectCanvasDocument?.()?.id || null,
+          frameId: getActiveFrame?.()?.id || null,
+          layerId: getActiveLayer?.()?.id || null,
+        });
         return true;
       },
       getProjectKey: () => normalizeAutosaveProjectId?.(autosaveProjectId || '') || '',
