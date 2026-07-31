@@ -4,15 +4,15 @@
   const root = window.PiXiEEDrawModules = window.PiXiEEDrawModules || {};
   const PHASE_COPY = Object.freeze({
     disabled: ['未接続', '共同編集は現在利用できません。', 'オフライン'],
-    local: ['未共有', '通常プロジェクトとして編集中です。', '未接続'],
+    local: ['未接続', '通常プロジェクトとして編集中です。', '未接続'],
     invited: ['招待あり', '招待リンクから同期用の作業コピーを開けます。', '未接続'],
-    creating: ['共有を作成中', '最初のチェックポイントを安全に保存しています。', '処理中'],
+    creating: ['シェアを作成中', '最初のチェックポイントを安全に保存しています。', '処理中'],
     joining: ['参加処理中', '参加権限を確認しています。', '確認中'],
     syncing: ['同期中', 'チェックポイントと最新の変更を同期しています。', '同期中'],
     active: ['接続中', 'サーバー正本と一致しています。', 'オンライン'],
     reconnecting: ['再接続中', '最新状態へ追いつくまで描画を停止しています。', '再接続中'],
     leaving: ['退出処理中', '共同編集から安全に退出しています。', '切断中'],
-    left: ['退出済み', 'この共有プロジェクトの編集権限はありません。', '切断済み'],
+    left: ['退出済み', 'このシェアプロジェクトの編集権限はありません。', '切断済み'],
     permission_lost: ['権限なし', '共同編集の権限が失効しました。', '切断済み'],
     closing: ['終了処理中', '保留操作と最終状態を確認しています。', '終了中'],
     archived: ['共同編集終了', 'このセッションには新しい変更を送信できません。', '終了済み'],
@@ -196,7 +196,7 @@
 
       setHidden(actionButtons.start, !(phase === 'local' && typeof commands.start === 'function'));
       if (actionButtons.start) {
-        actionButtons.start.textContent = 'PiXiSYNCを開始';
+        actionButtons.start.textContent = 'シェアモードを開始';
       }
       setHidden(actionButtons.copyInvite, !(owner && active && typeof commands.createInviteLink === 'function'));
       setHidden(actionButtons.leave, !(
@@ -285,11 +285,21 @@
     }
 
     const handlers = {
-      start: () => runAction('start', commands.start, {
+      start: () => {
+        if (
+          typeof window !== 'undefined'
+          && window.__PIXISYNC_SHARE_START_UNLOCKED__ !== true
+        ) {
+          setNotice('テスト中のため、シェアモード開始には設定ボタンを10回連打してください。');
+          render();
+          return false;
+        }
+        return runAction('start', commands.start, {
         pendingMessage: '共有を作成しています…',
         successMessage: '共有セッションを開始しました。',
         failureMessage: '共有を開始できませんでした。',
-      }),
+        });
+      },
       copyInvite: () => runAction('copyInvite', async () => {
         let inviteLink = await commands.createInviteLink();
         try {
