@@ -59,6 +59,10 @@
     let reconnectRetryAttempt = 0;
     let projectLease = null;
     let localReadOnly = false;
+    // Supabase may emit CLOSED asynchronously after removeChannel/stop().
+    // Those intentional shutdowns must not be fed back into the session as a
+    // transport failure while a lifecycle reconnect is already in progress.
+    const intentionallyStoppedRealtimeClients = new WeakSet();
     const attestationWaiters = new Map();
 
     const commands = Object.freeze({
@@ -271,7 +275,12 @@
     }
 
     async function createRealtime() {
-      if (realtimeClient) await realtimeClient.stop().catch(() => {});
+      const previousRealtime = realtimeClient;
+      if (previousRealtime) {
+        intentionallyStoppedRealtimeClients.add(previousRealtime);
+        realtimeClient = null;
+        await previousRealtime.stop().catch(() => {});
+      }
       let createdRealtime = null;
       createdRealtime = createRealtimeClient({
         supabase,
@@ -282,7 +291,10 @@
         operationTimeoutMs,
         applyConfirmed: (operation, metadata) => runtimeBridge.applyConfirmed(operation, metadata),
         onChannelStatus: status => {
-          if (realtimeClient !== createdRealtime) return;
+          if (
+            realtimeClient !== createdRealtime
+            || intentionallyStoppedRealtimeClients.has(createdRealtime)
+          ) return;
           if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
             void enqueue({ type: 'CHANNEL_CLOSED', epoch: currentEpoch() });
           }
@@ -342,7 +354,11 @@
       session.dispatch({ type: 'SOCKET_OFFLINE', epoch: currentEpoch(), reason });
       runtimeBridge.refreshUi?.();
       void realtimeClient?.untrackPresence?.().catch(() => {});
-      void realtimeClient?.stop?.().catch(() => {});
+      const stoppingRealtime = realtimeClient;
+      if (stoppingRealtime) {
+        intentionallyStoppedRealtimeClients.add(stoppingRealtime);
+        void stoppingRealtime.stop?.().catch(() => {});
+      }
       return true;
     }
 
