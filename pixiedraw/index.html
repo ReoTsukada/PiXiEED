@@ -636,7 +636,7 @@
 </div>
 <div aria-live="polite" class="pixisync-draw-lock" hidden="" id="pixisyncDrawLock">
 <span aria-hidden="true" class="pixisync-draw-lock__dot"></span>
-<span id="pixisyncDrawLockLabel">共同編集を同期しています…</span>
+<span id="pixisyncDrawLockLabel">シェア状態を同期しています…</span>
 </div>
 <div aria-hidden="true" class="canvas-surface-badge" hidden="" id="mainCanvasSurfaceBadge"></div>
 <div aria-hidden="true" class="canvas-resize-expansion-preview" hidden="" id="canvasResizeExpansionPreview">
@@ -667,7 +667,7 @@
 <img alt="" aria-hidden="true" height="20" src="assets/icons/menu-settings.png?v=2026.07.19-ui-icons1" width="20"/>
 <span class="sr-only">設定</span>
 </button>
-<button aria-controls="panelMulti" aria-disabled="true" aria-label="PiXiSYNC（準備中）" class="chip canvas-quick-action" data-quick-right-tab="multi" disabled="" id="pixisyncQuickOpen" title="PiXiSYNCは準備中です" type="button">
+<button aria-controls="panelMulti" aria-disabled="false" aria-label="シェアモード" class="chip canvas-quick-action" data-quick-right-tab="multi" id="pixisyncQuickOpen" title="シェアモード" type="button">
 <img alt="" aria-hidden="true" height="20" src="../pixisync.png?v=20260731-pixisync-icon2" width="20"/>
 <span class="sr-only">PiXiSYNC</span>
 </button>
@@ -832,7 +832,7 @@
 <img alt="" class="tab-icon" src="assets/icons/menu-settings.png?v=2026.07.19-ui-icons1"/>
 <span class="sr-only">設定</span>
 </button>
-<button aria-controls="mobilePanelMulti" aria-disabled="true" aria-label="PiXiSYNC（準備中）" aria-selected="false" class="mobile-tab" data-mobile-tab="multi" disabled="" id="mobileTabMulti" role="tab" tabindex="-1" title="PiXiSYNCは準備中です" type="button">
+<button aria-controls="mobilePanelMulti" aria-disabled="false" aria-label="シェアモード" aria-selected="false" class="mobile-tab" data-mobile-tab="multi" id="mobileTabMulti" role="tab" tabindex="-1" title="シェアモード" type="button">
 <img alt="" class="tab-icon" src="../pixisync.png?v=20260731-pixisync-icon2"/>
 <span class="sr-only">PiXiSYNC</span>
 </button>
@@ -1205,8 +1205,8 @@
 </section>
 <section class="panel-section" data-section="multi" hidden="" id="panelMulti">
 <header class="landscape-panel-window__header" data-landscape-window-drag-handle="">
-<h2>PiXiSYNC</h2>
-<button aria-label="PiXiSYNCを閉じる" class="landscape-panel-window__close" data-close-right-flyout="" type="button">×</button>
+<h2>シェアモード</h2>
+<button aria-label="シェアモードを閉じる" class="landscape-panel-window__close" data-close-right-flyout="" type="button">×</button>
 </header>
 <div class="panel-section__body">
 <section aria-labelledby="pixisyncPanelTitle" class="pixisync-panel" hidden="" id="pixisyncPanel">
@@ -1215,15 +1215,15 @@
 <button aria-controls="pixisyncCommentsView" aria-selected="false" class="multi-participants-tab" id="pixisyncCommentsTab" role="tab" tabindex="-1" type="button">コメント</button>
 </div>
 <div class="pixisync-panel__header">
-<h3 id="pixisyncPanelTitle">PiXiSYNC</h3>
-<span class="pixisync-status" data-phase="local" id="pixisyncStatusLabel">未共有</span>
+<h3 id="pixisyncPanelTitle">シェアモード</h3>
+<span class="pixisync-status" data-phase="local" id="pixisyncStatusLabel">未接続</span>
 </div>
 <div aria-label="共同編集の接続情報" class="pixisync-panel__meta">
 <span><strong id="pixisyncParticipantCount">1</strong> 人</span>
 <span id="pixisyncConnectionLabel">未接続</span>
 </div>
 <div aria-label="共同編集操作" class="pixisync-actions">
-<button class="button button--primary" id="pixisyncStart" type="button">PiXiSYNCを開始</button>
+<button class="button button--primary" id="pixisyncStart" type="button">シェアモードを開始</button>
 <button class="button" hidden="" id="pixisyncCopyInvite" type="button">招待コードを発行・コピー</button>
 <button class="button" hidden="" id="pixisyncLeave" type="button">退出</button>
 <button class="button button--danger" hidden="" id="pixisyncArchive" type="button">共同編集を終了</button>
