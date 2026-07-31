@@ -64,6 +64,7 @@ const fakeDocument = {
 };
 globalThis.window = {
   PiXiEEDrawModules: {},
+  __PIXISYNC_SHARE_START_UNLOCKED__: true,
   document: fakeDocument,
   navigator: {},
   location: { href: 'https://example.test/pixiedraw/' },
@@ -347,12 +348,11 @@ assert.ok(
 assert.match(app, /runtime\?\.uiEnabled === true/);
 assert.match(app, /pixisyncMinimalUi\?\.consumeInviteFromUrl/);
 assert.match(sharedTabBar, /id: 'pixisync', label: 'PiXiSYNC', selector: '#pixisyncQuickOpen'/);
-assert.match(html, /<button[^>]*disabled=""[^>]*id="pixisyncQuickOpen"/);
+assert.match(html, /aria-disabled="false"[^>]*id="pixisyncQuickOpen"/);
 assert.match(html, /src="\.\.\/pixisync\.png\?v=20260731-pixisync-icon2"/);
-assert.match(html, /<button[^>]*disabled=""[^>]*id="mobileTabMulti"/);
+assert.match(html, /aria-disabled="false"[^>]*id="mobileTabMulti"/);
 assert.match(html, /id="mobileTabMulti"[\s\S]*?src="\.\.\/pixisync\.png\?v=20260731-pixisync-icon2"/);
 assert.match(sharedTabBar, /id: 'pixisync',[\s\S]*?cloneIcon: true,[\s\S]*?iconSourceSelector: '#mobileTabMulti'/);
-assert.match(style, /body:not\(\[data-pixisync-initial-gate='unlocked'\]\) #mobileTabMulti/);
-assert.match(style, /#pixisyncQuickOpen,[\s\S]*?data-common-action='pixisync'[\s\S]*?display: none !important/);
+assert.doesNotMatch(style, /body:not\(\[data-pixisync-initial-gate='unlocked'\]\) #panelMulti/);
 
 console.log('PiXiSYNC minimal UI tests passed');
