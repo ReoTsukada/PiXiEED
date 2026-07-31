@@ -467,7 +467,6 @@
           clearReconnectRetry();
           break;
         case 'RECONNECT_CHANNEL':
-          await realtimeClient?.stop?.().catch(() => {});
           manifest = await openManifest(roomId);
           await createRealtime();
           await withTimeout('realtime-reconnect', realtimeClient.start());
