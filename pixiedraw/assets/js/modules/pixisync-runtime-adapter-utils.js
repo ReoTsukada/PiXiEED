@@ -22,6 +22,7 @@
     clearProjectBinding = async () => {},
     acquireProjectLease = async () => ({ acquired: true, release: async () => {} }),
     getClientId,
+    ensureAuthenticatedStart = async () => true,
     locationRef = window.location,
     operationTimeoutMs = 20000,
     uiEnabled = true,
@@ -505,6 +506,9 @@
     }
 
     async function start() {
+      if (await ensureAuthenticatedStart({ requireLogin: true }) !== true) {
+        throw new Error('PiXiSYNC runtime: authentication-required');
+      }
       await ensureSupabase();
       if (!session || currentSnapshot()?.phase !== 'local' || currentSnapshot()?.role !== 'owner') {
         installSession('owner');
@@ -548,6 +552,9 @@
     }
 
     async function join(inviteToken) {
+      if (await ensureAuthenticatedStart({ requireLogin: true }) !== true) {
+        throw new Error('PiXiSYNC runtime: authentication-required');
+      }
       await ensureSupabase();
       const token = String(inviteToken || '').toLowerCase();
       if (!TOKEN_PATTERN.test(token)) throw new Error('PiXiSYNC runtime: invalid-invite-token');
