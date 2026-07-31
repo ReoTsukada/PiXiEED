@@ -348,6 +348,7 @@ assert.equal(lifecycleOwner.adapter.session.canDraw(), false);
 assert.equal(lifecycleOwner.bridge.inputLocked, true);
 assert.equal(await lifecycleOwner.adapter.handleLifecycleResume('pageshow-bfcache'), true);
 assert.equal(lifecycleOwner.adapter.snapshot().session.phase, 'active');
+assert.equal(lifecycleOwner.adapter.session.canDraw(), true);
 assert.equal(lifecycleOwner.bridge.inputLocked, false);
 assert.equal(lifecycleServer.realtimeOptions.length, initialRealtimeCount + 1);
 
