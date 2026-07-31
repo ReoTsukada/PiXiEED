@@ -901,6 +901,97 @@ body.is-mobile-layout.is-unified-left-tools-color:not(.is-unified-left-color-foc
   box-shadow: none;
 }
 
+/* Landscape workspace windows keep their chrome and usable interior stable
+   regardless of which right-side action opened them. */
+.landscape-panel-window__header {
+  display: none;
+}
+
+.panel-section.is-compact-flyout:has(.landscape-panel-window__header) {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-panel);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
+  overflow: hidden !important;
+  resize: both;
+  min-width: 320px;
+  min-height: 240px;
+  max-width: calc(100vw - 16px);
+  max-height: calc(100vh - 16px);
+}
+
+.panel-section.is-compact-flyout .landscape-panel-window__header {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 48px;
+  padding: 0 10px 0 16px;
+  border-bottom: 1px solid rgba(var(--ui-rgb), 0.24);
+  background: rgba(var(--ui-rgb), 0.09);
+  cursor: move;
+  touch-action: none;
+}
+
+.panel-section.is-compact-flyout .landscape-panel-window__header h2 {
+  margin: 0;
+  font-size: 0.9rem;
+  letter-spacing: 0.07em;
+}
+
+.landscape-panel-window__close {
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid rgba(var(--ui-rgb), 0.34);
+  border-radius: 9px;
+  background: rgba(var(--ui-rgb), 0.1);
+  color: var(--fg);
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.panel-section.is-compact-flyout .panel-section__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 14px 16px 18px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+@media (orientation: landscape) {
+  #timelapseDialog.modal {
+    width: clamp(360px, 46vw, 560px);
+    min-width: min(360px, calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
+    max-height: min(78vh, 600px);
+    border: 2px solid var(--border);
+    border-radius: 14px;
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
+    z-index: 2147483000 !important;
+    resize: both;
+    min-height: 240px;
+    overflow: hidden;
+  }
+
+  #timelapseDialog .modal__header {
+    min-height: 48px;
+    padding: 0 10px 0 16px;
+    cursor: move;
+    touch-action: none;
+  }
+
+  #timelapseDialog .modal__body {
+    padding: 14px 16px 18px;
+    overflow: auto;
+  }
+}
+
 .rail--left[data-compact="true"] .rail-tabpanes {
   display: flex;
   gap: 4px;
@@ -4259,7 +4350,7 @@ body.is-mobile-layout .qr-edit-panel__preview-wrap {
 }
 
 .floating-preview-panel {
-  position: absolute;
+  position: fixed;
   left: 16px;
   top: 72px;
   width: 220px;
@@ -4269,7 +4360,7 @@ body.is-mobile-layout .qr-edit-panel__preview-wrap {
   border: 2px solid rgba(var(--ui-rgb), 0.78);
   background: rgba(5, 12, 18, 0.95);
   box-shadow: none;
-  z-index: 72;
+  z-index: 2147483647;
   pointer-events: auto;
   overflow: hidden;
 }
@@ -4283,6 +4374,13 @@ body.is-mobile-layout .qr-edit-panel__preview-wrap {
 
 .floating-preview-panel.is-hidden {
   display: none;
+}
+
+/* The project list/startup surface owns the whole page; a preview from the
+   previous editor session must not float above that screen. */
+body.is-project-home-active #floatingPreviewPanel,
+body.is-startup-active #floatingPreviewPanel {
+  display: none !important;
 }
 
 .floating-preview-panel.is-moving .floating-preview-panel__header {
@@ -15595,9 +15693,15 @@ body.is-mobile-layout .mobile-drawer[data-mode='full'] #panelMulti .multi-partic
 }
 
 @media (orientation: portrait) {
+  /* Portrait has its own PiXiSYNC tab. Keep it visible but disabled until
+     the settings gesture enables sharing. */
+  body:not([data-pixisync-initial-gate='unlocked']) #mobileTabMulti,
+  body #mobileTabMulti {
+    display: inline-flex !important;
+  }
   #pixisyncQuickOpen,
-  .pixieed-common-tabbar__button[data-common-action='pixisync'],
-  .pixieed-common-details__item[data-common-action='pixisync'] {
+  body .pixieed-common-tabbar__button[data-common-action='pixisync'],
+  body .pixieed-common-details__item[data-common-action='pixisync'] {
     display: none !important;
   }
 }

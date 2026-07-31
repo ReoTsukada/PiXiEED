@@ -95,7 +95,7 @@
         actions: [
           { id: 'file', label: 'ファイル', selector: '[data-quick-right-tab="file"]', icon: 'assets/icons/File.png?v=2026.07.19-ui-icons1' },
           { id: 'settings', label: '設定', selector: '[data-quick-right-tab="settings"]', icon: 'assets/icons/Settings.png?v=2026.07.19-icons2' },
-          { id: 'pixisync', label: 'PiXiSYNC', selector: '#pixisyncQuickOpen', icon: 'pixiedraw/assets/icons/maltimode.svg', mirrorState: true, mirrorVisibility: true },
+          { id: 'pixisync', label: 'PiXiSYNC', selector: '#pixisyncQuickOpen', cloneIcon: true, iconSourceSelector: '#mobileTabMulti', mirrorState: true, mirrorVisibility: true },
           { id: 'camera', label: 'カメラ', selector: '[data-ui-action="openLensCamera"]', icon: 'assets/icons/Camera.png', gapBefore: true },
           { id: 'qr', label: 'QR編集', selector: '[data-ui-action="openQrEditor"]', icon: 'assets/icons/QR.png' },
           { id: 'copy', label: 'コピー', selector: '#canvasClipboardCopy', icon: 'pixiedraw/assets/icons/action-copy.png?v=20260726-clipboard-actions1', mirrorState: true, mirrorVisibility: true, placement: 'trailing' },
@@ -318,7 +318,7 @@
     const isLink = typeof item.path === 'string' && item.path;
     const control = document.createElement(isLink ? 'a' : 'button');
     const label = String(item.label || '操作');
-    const clonedIcon = item.cloneIcon ? cloneTargetIcon(item.selector) : null;
+    const clonedIcon = item.cloneIcon ? cloneTargetIcon(item.iconSourceSelector || item.selector) : null;
     const hasIcon = Boolean(item.icon || clonedIcon);
     const isDetailsItem = className.includes('pixieed-common-details__item');
     control.className = `${className}${hasIcon ? ' pixieed-common-tabbar__button--icon' : ''}`;

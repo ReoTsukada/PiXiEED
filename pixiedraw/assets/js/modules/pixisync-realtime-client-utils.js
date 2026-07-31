@@ -13,6 +13,7 @@
       applyConfirmed,
       initialRevision = 0,
       recoverOnSubscribe = true,
+      operationTimeoutMs = 20000,
       onLocalConfirmed = () => {},
       onStatus = () => {},
       onChannelStatus = () => {},
@@ -26,6 +27,22 @@
       let recovering = false;
       const pendingLocalOperations = new Map();
       const confirmedOperationIds = new Set();
+      const withTimeout = async (operation, promise) => {
+        const timeoutMs = Math.max(1000, Number(operationTimeoutMs) || 20000);
+        const schedule = window.setTimeout?.bind(window) || globalThis.setTimeout;
+        const cancel = window.clearTimeout?.bind(window) || globalThis.clearTimeout;
+        let timer = null;
+        try {
+          return await Promise.race([
+            Promise.resolve(promise),
+            new Promise((_, reject) => {
+              timer = schedule(() => reject(new Error(`PiXiSYNC realtime: ${operation}-timeout`)), timeoutMs);
+            }),
+          ]);
+        } finally {
+          if (timer !== null) cancel(timer);
+        }
+      };
       const keeper = orderKeeperFactory({
         confirmedRevision: initialRevision,
         applyConfirmed: operation => {
@@ -72,11 +89,11 @@
         let cursor = BigInt(afterRevision);
         while (true) {
           const pageStartRevision = cursor;
-          const { data, error } = await supabase.rpc('pixisync_get_ops_since', {
+          const { data, error } = await withTimeout('get-ops-since', supabase.rpc('pixisync_get_ops_since', {
             p_room_id: roomId,
             p_after_revision: cursor.toString(),
             p_limit: 500,
-          });
+          }));
           if (error) throw error;
           const rows = data || [];
           for (const row of rows) {
@@ -130,14 +147,14 @@
         const payload = codec.encodePixelPatch(changes, { cellCount, guarded });
         const canonicalChanges = codec.decodePixelPatch(payload, { cellCount });
         const payloadSha256 = await codec.sha256Hex(payload);
-        const record = { roomId, operationId, kind, structureEpoch, changes: canonicalChanges, canvasId, frameId, layerId, canvasWidth, canvasHeight, undoOfOperationId, payloadB64: codec.bytesToBase64(payload), payloadSha256 };
+        const record = { roomId, clientId, operationId, kind, structureEpoch, changes: canonicalChanges, canvasId, frameId, layerId, canvasWidth, canvasHeight, undoOfOperationId, payloadB64: codec.bytesToBase64(payload), payloadSha256 };
         await journal?.put?.(record);
         pendingLocalOperations.set(operationId, { optimistic: !guarded, record });
-        const { data, error } = await supabase.rpc('pixisync_commit_operation', {
+        const { data, error } = await withTimeout('commit-operation', supabase.rpc('pixisync_commit_operation', {
           p_room_id: roomId, p_operation_id: operationId, p_client_id: clientId, p_kind: kind, p_structure_epoch: structureEpoch,
           p_codec_version: 1, p_canvas_id: canvasId, p_frame_id: frameId, p_layer_id: layerId, p_canvas_width: canvasWidth, p_canvas_height: canvasHeight,
           p_payload: `\\x${bytesToHex(payload)}`, p_payload_sha256: `\\x${payloadSha256}`, p_pixel_count: canonicalChanges.length, p_undo_of_operation_id: undoOfOperationId,
-        });
+        }));
         if (error) {
           throw error;
         }
@@ -167,7 +184,7 @@
           onLocalConfirmed(confirmedOperation);
         }
         await recover('rpc-commit');
-        await channel?.send({ type: 'broadcast', event: 'operation-hint', payload: { revision: committed?.revision || null, operationId } });
+        await withTimeout('operation-hint', channel?.send({ type: 'broadcast', event: 'operation-hint', payload: { revision: committed?.revision || null, operationId } }));
         return committed;
       }
       async function syncFrom(afterRevision = keeper.confirmedRevision) {
@@ -177,7 +194,7 @@
         return keeper.confirmedRevision;
       }
       async function replayPendingJournal() {
-        const records = await journal?.list?.(roomId) || [];
+        const records = await journal?.list?.(roomId, clientId) || [];
         for (const record of records) {
           await commit(record);
         }
@@ -185,17 +202,21 @@
       }
       async function sendBroadcast(event, payload = {}) {
         if (!channel) throw new Error('PiXiSYNC realtime: channel-not-started');
-        return channel.send({ type: 'broadcast', event, payload });
+        return withTimeout(`broadcast-${event}`, channel.send({ type: 'broadcast', event, payload }));
       }
       async function trackPresence(payload = {}) {
         if (!channel?.track) return null;
-        return channel.track(payload);
+        return withTimeout('presence-track', channel.track(payload));
       }
       async function untrackPresence() {
         if (!channel?.untrack) return null;
-        return channel.untrack();
+        return withTimeout('presence-untrack', channel.untrack());
       }
-      async function stop() { started = false; if (channel) await supabase.removeChannel(channel); channel = null; }
+      async function stop() {
+        started = false;
+        if (channel) await withTimeout('remove-channel', supabase.removeChannel(channel));
+        channel = null;
+      }
       return {
         start,
         stop,

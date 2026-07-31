@@ -32,9 +32,31 @@
       return transact('readwrite', store => store.put({ ...record, savedAt: Date.now() }));
     }
     function remove(roomId, operationId) { return transact('readwrite', store => store.delete([roomId, operationId])); }
-    function list(roomId) {
-      return transact('readonly', store => store.getAll())
-        .then(items => (items || []).filter(item => item.roomId === roomId).sort((a, b) => a.savedAt - b.savedAt));
+    function list(roomId, clientId = '') {
+      if (!clientId) {
+        return transact('readonly', store => store.getAll())
+          .then(items => (items || [])
+            .filter(item => item.roomId === roomId)
+            .sort((a, b) => a.savedAt - b.savedAt));
+      }
+      // Pre tab-identity records have no clientId. Claim them atomically in
+      // the same IndexedDB transaction so exactly one resumed tab replays
+      // each legacy operation after an upgrade.
+      return transact('readwrite', store => {
+        const result = { result: [] };
+        const request = store.getAll();
+        request.onsuccess = () => {
+          const records = (request.result || [])
+            .filter(item => item.roomId === roomId && (item.clientId === clientId || !item.clientId));
+          records.forEach(item => {
+            if (!item.clientId) store.put({ ...item, clientId });
+          });
+          result.result = records
+            .map(item => item.clientId ? item : { ...item, clientId })
+            .sort((a, b) => a.savedAt - b.savedAt);
+        };
+        return result;
+      });
     }
     return { put, remove, list };
   }

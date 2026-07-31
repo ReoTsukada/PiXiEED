@@ -183,6 +183,7 @@ function createBridge() {
   let runtime = null;
   const comments = [];
   let participants = [];
+  let inputLocked = false;
   return {
     configure: next => { runtime = next; },
     clear: () => { runtime = null; },
@@ -190,31 +191,55 @@ function createBridge() {
     applyConfirmed: () => {},
     receiveComment: comment => comments.push(comment),
     updateParticipants: next => { participants = next; },
+    setInputLocked: next => { inputLocked = next === true; },
     snapshot: () => ({ configured: Boolean(runtime), collaboration: Boolean(runtime?.realtimeClient) }),
     comments,
     get participants() { return participants; },
+    get inputLocked() { return inputLocked; },
+    get runtime() { return runtime; },
   };
 }
 
-function createAdapter({ server, actor, clientId, storage, bindings, checkpointText }) {
+function createAdapter({
+  server,
+  actor,
+  clientId,
+  storage,
+  bindings,
+  checkpointText,
+  realtimeFactory = createRealtimeHarness(server),
+  operationTimeoutMs,
+  acquireProjectLease,
+}) {
   const bridge = createBridge();
   let restored = '';
+  let restoreContext = null;
   const adapter = window.PiXiEEDrawModules.pixisyncRuntimeAdapterUtils.createPiXiSyncRuntimeAdapter({
     createSession: options => window.PiXiEEDrawModules.pixisyncSessionState.createPiXiSyncSessionState(options),
-    createRealtimeClient: createRealtimeHarness(server),
+    createRealtimeClient: realtimeFactory,
     runtimeBridge: bridge,
     getSupabase: async () => server.client(actor),
     captureCheckpoint: async () => new Blob([checkpointText]),
-    restoreCheckpoint: async blob => { restored = await blob.text(); },
+    restoreCheckpoint: async (blob, context) => {
+      restored = await blob.text();
+      restoreContext = context;
+    },
     getProjectKey: () => `project-${actor}`,
     getProjectTitle: () => `Project ${actor}`,
     readProjectBinding: async projectKey => bindings.get(projectKey) || null,
     writeProjectBinding: async (projectKey, binding) => { bindings.set(projectKey, binding); },
     clearProjectBinding: async projectKey => { bindings.delete(projectKey); },
+    acquireProjectLease,
     getClientId: () => clientId,
     localStorageRef: storage,
+    operationTimeoutMs,
   });
-  return { adapter, bridge, get restored() { return restored; } };
+  return {
+    adapter,
+    bridge,
+    get restored() { return restored; },
+    get restoreContext() { return restoreContext; },
+  };
 }
 
 const server = new LifecycleServer();
@@ -232,7 +257,7 @@ assert.deepEqual(ownerBindings.get('project-owner'), {
   role: 'owner',
   projectKey: 'project-owner',
 });
-assert.equal(owner.restored, 'checkpoint-owner');
+assert.equal(owner.restored, '');
 assert.equal(server.checkpointHash, await sha256(server.objects.get(server.checkpointPath)));
 await owner.adapter.dispose();
 owner = createAdapter({ server, actor: 'owner', clientId: OWNER_CLIENT, storage: ownerStorage, bindings: ownerBindings, checkpointText: 'checkpoint-owner' });
@@ -240,6 +265,8 @@ await owner.adapter.initialize();
 assert.equal(owner.adapter.snapshot().session.phase, 'invited');
 assert.equal(await owner.adapter.resumeBoundProject(), ROOM_ID);
 assert.equal(owner.adapter.snapshot().session.phase, 'active');
+assert.equal(owner.restored, 'checkpoint-owner');
+assert.deepEqual(owner.restoreContext, { projectKey: 'project-owner', role: 'owner' });
 const sentComment = await owner.adapter.commands.sendComment(' owner message ');
 assert.equal(sentComment.text, 'owner message');
 assert.equal(server.broadcasts.at(-1).event, 'pixisync-comment');
@@ -257,6 +284,7 @@ assert.deepEqual(editorBindings.get('project-editor'), {
   projectKey: 'project-editor',
 });
 assert.equal(editor.restored, 'checkpoint-owner');
+assert.deepEqual(editor.restoreContext, { projectKey: 'project-editor', role: 'participant' });
 server.realtimeOptions.at(-1).onBroadcast('pixisync-comment', sentComment);
 assert.equal(editor.bridge.comments.length, 1);
 assert.equal(editor.bridge.comments[0].text, 'owner message');
@@ -276,5 +304,65 @@ assert.equal(server.status, 'archived');
 assert.equal(server.checkpointHash, await sha256(server.objects.get(server.checkpointPath)));
 assert.equal(ownerBindings.has('project-owner'), false);
 
-await Promise.all([owner.adapter.dispose(), editor.adapter.dispose()]);
+// A failed Realtime subscription must return the owner to local mode instead
+// of leaving the start button in the creating state forever.
+const timeoutServer = new LifecycleServer();
+const timeoutRealtimeBase = createRealtimeHarness(timeoutServer);
+const timeoutOwner = createAdapter({
+  server: timeoutServer,
+  actor: 'owner',
+  clientId: OWNER_CLIENT,
+  storage: createStorage(),
+  bindings: new Map(),
+  checkpointText: 'checkpoint-timeout',
+  operationTimeoutMs: 10,
+  realtimeFactory: options => ({ ...timeoutRealtimeBase(options), start: () => new Promise(() => {}) }),
+});
+await timeoutOwner.adapter.initialize();
+await assert.rejects(timeoutOwner.adapter.start(), /realtime-subscribe-timeout/);
+assert.equal(timeoutOwner.adapter.snapshot().session.phase, 'local');
+
+// Backgrounding must close the drawing gate without waiting for network I/O;
+// the first visible lifecycle event performs one authoritative reconnect.
+const lifecycleServer = new LifecycleServer();
+const lifecycleOwner = createAdapter({
+  server: lifecycleServer,
+  actor: 'owner',
+  clientId: OWNER_CLIENT,
+  storage: createStorage(),
+  bindings: new Map(),
+  checkpointText: 'checkpoint-lifecycle',
+});
+await lifecycleOwner.adapter.initialize();
+await lifecycleOwner.adapter.start();
+assert.equal(lifecycleOwner.adapter.snapshot().session.phase, 'active');
+assert.equal(lifecycleOwner.bridge.inputLocked, false);
+const initialRealtimeCount = lifecycleServer.realtimeOptions.length;
+assert.equal(await lifecycleOwner.adapter.handleLifecycleSuspend('visibility-hidden'), true);
+assert.equal(lifecycleOwner.adapter.snapshot().session.phase, 'reconnecting');
+assert.equal(lifecycleOwner.adapter.session.canDraw(), false);
+assert.equal(lifecycleOwner.bridge.inputLocked, true);
+assert.equal(await lifecycleOwner.adapter.handleLifecycleResume('pageshow-bfcache'), true);
+assert.equal(lifecycleOwner.adapter.snapshot().session.phase, 'active');
+assert.equal(lifecycleOwner.bridge.inputLocked, false);
+assert.equal(lifecycleServer.realtimeOptions.length, initialRealtimeCount + 1);
+
+// A second view of the same local card still receives remote updates, but is
+// explicitly configured as read-only and cannot write the shared autosave.
+const readOnlyServer = new LifecycleServer();
+const readOnlyOwner = createAdapter({
+  server: readOnlyServer,
+  actor: 'owner',
+  clientId: OWNER_CLIENT,
+  storage: createStorage(),
+  bindings: new Map(),
+  checkpointText: 'checkpoint-read-only',
+  acquireProjectLease: async () => ({ acquired: false }),
+});
+await readOnlyOwner.adapter.initialize();
+await readOnlyOwner.adapter.start();
+assert.equal(readOnlyOwner.adapter.snapshot().session.phase, 'active');
+assert.equal(readOnlyOwner.bridge.runtime.localReadOnly, true);
+
+await Promise.all([owner.adapter.dispose(), editor.adapter.dispose(), lifecycleOwner.adapter.dispose(), readOnlyOwner.adapter.dispose()]);
 console.log('PiXiSYNC runtime adapter lifecycle integration tests passed');

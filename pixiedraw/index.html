@@ -667,8 +667,8 @@
 <img alt="" aria-hidden="true" height="20" src="assets/icons/menu-settings.png?v=2026.07.19-ui-icons1" width="20"/>
 <span class="sr-only">設定</span>
 </button>
-<button aria-controls="panelMulti" aria-label="PiXiSYNC" class="chip canvas-quick-action" data-quick-right-tab="multi" hidden="" id="pixisyncQuickOpen" title="PiXiSYNC" type="button">
-<img alt="" aria-hidden="true" height="20" src="assets/icons/maltimode.svg" width="20"/>
+<button aria-controls="panelMulti" aria-disabled="true" aria-label="PiXiSYNC（準備中）" class="chip canvas-quick-action" data-quick-right-tab="multi" disabled="" id="pixisyncQuickOpen" title="PiXiSYNCは準備中です" type="button">
+<img alt="" aria-hidden="true" height="20" src="../pixisync.png?v=20260731-pixisync-icon2" width="20"/>
 <span class="sr-only">PiXiSYNC</span>
 </button>
 <button aria-controls="panelFile" aria-label="ファイル" class="chip canvas-quick-action" data-quick-right-tab="file" title="ファイル" type="button">
@@ -832,8 +832,8 @@
 <img alt="" class="tab-icon" src="assets/icons/menu-settings.png?v=2026.07.19-ui-icons1"/>
 <span class="sr-only">設定</span>
 </button>
-<button aria-controls="mobilePanelMulti" aria-label="PiXiSYNC" aria-selected="false" class="mobile-tab" data-mobile-tab="multi" hidden="" id="mobileTabMulti" role="tab" tabindex="-1" type="button">
-<img alt="" class="tab-icon" src="assets/icons/maltimode.svg"/>
+<button aria-controls="mobilePanelMulti" aria-disabled="true" aria-label="PiXiSYNC（準備中）" aria-selected="false" class="mobile-tab" data-mobile-tab="multi" disabled="" id="mobileTabMulti" role="tab" tabindex="-1" title="PiXiSYNCは準備中です" type="button">
+<img alt="" class="tab-icon" src="../pixisync.png?v=20260731-pixisync-icon2"/>
 <span class="sr-only">PiXiSYNC</span>
 </button>
 <button aria-controls="mobilePanelExtensions" aria-label="拡張" aria-selected="false" class="mobile-tab" data-mobile-tab="extensions" hidden="" id="mobileTabExtensions" role="tab" tabindex="-1" type="button">
@@ -1204,6 +1204,10 @@
 </div>
 </section>
 <section class="panel-section" data-section="multi" hidden="" id="panelMulti">
+<header class="landscape-panel-window__header" data-landscape-window-drag-handle="">
+<h2>PiXiSYNC</h2>
+<button aria-label="PiXiSYNCを閉じる" class="landscape-panel-window__close" data-close-right-flyout="" type="button">×</button>
+</header>
 <div class="panel-section__body">
 <section aria-labelledby="pixisyncPanelTitle" class="pixisync-panel" hidden="" id="pixisyncPanel">
 <div aria-label="参加者とコメント" class="multi-participants-tabs" role="tablist">
@@ -1248,6 +1252,10 @@
 </div>
 </section>
 <section class="panel-section" data-section="file" id="panelFile">
+<header class="landscape-panel-window__header" data-landscape-window-drag-handle="">
+<h2>ファイル</h2>
+<button aria-label="ファイルを閉じる" class="landscape-panel-window__close" data-close-right-flyout="" type="button">×</button>
+</header>
 <div class="panel-section__body">
 <div class="field-group field-group--file-actions">
 <button class="button" id="newProject" type="button">新規作成</button>
@@ -1284,6 +1292,10 @@
 </div>
 </div>
 <section class="panel-section" data-section="settings" id="panelSettings">
+<header class="landscape-panel-window__header" data-landscape-window-drag-handle="">
+<h2>設定</h2>
+<button aria-label="設定を閉じる" class="landscape-panel-window__close" data-close-right-flyout="" type="button">×</button>
+</header>
 <div class="panel-section__body">
 <div class="settings-size-grid">
 <div class="field settings-size-row settings-size-row--canvas settings-size-row--combined">
@@ -1437,7 +1449,7 @@
 </dialog>
 <dialog aria-labelledby="timelapseDialogTitle" class="modal" id="timelapseDialog">
 <form class="modal__form" method="dialog">
-<header class="modal__header">
+<header class="modal__header" data-landscape-window-drag-handle="">
 <h2 class="modal__title" id="timelapseDialogTitle">タイムラプス</h2>
 <button aria-label="閉じる" class="icon-button" value="cancel">×</button>
 </header>
@@ -1955,13 +1967,13 @@
 	<script defer="" src="assets/js/modules/pixisync-operation-codec-utils.js?v=20260730-v1-foundation1"></script>
 	<script defer="" src="assets/js/modules/pixisync-writer-stamp-utils.js?v=20260730-v1-foundation1"></script>
 	<script defer="" src="assets/js/modules/pixisync-order-keeper-utils.js?v=20260730-v1-foundation1"></script>
-	<script defer="" src="assets/js/modules/pixisync-journal-utils.js?v=20260730-v1-foundation1"></script>
-	<script defer="" src="assets/js/modules/pixisync-realtime-client-utils.js?v=20260730-pixisync-share-panel1"></script>
+	<script defer="" src="assets/js/modules/pixisync-journal-utils.js?v=20260731-lifecycle-recovery3"></script>
+	<script defer="" src="assets/js/modules/pixisync-realtime-client-utils.js?v=20260731-lifecycle-recovery2"></script>
 	<script defer="" src="assets/js/modules/pixisync-pixel-mutation-bridge-utils.js?v=20260730-v1-foundation1"></script>
 	<script defer="" src="assets/js/modules/pixisync-collaboration-controller-utils.js?v=20260730-v1-history-bridge1"></script>
 	<script defer="" src="assets/js/modules/pixisync-session-state.js?v=20260730-v1-session-state1"></script>
-	<script defer="" src="assets/js/modules/pixisync-minimal-ui-utils.js?v=20260730-pixisync-project-card1"></script>
-	<script defer="" src="assets/js/modules/pixisync-runtime-adapter-utils.js?v=20260730-pixisync-project-card1"></script>
+	<script defer="" src="assets/js/modules/pixisync-minimal-ui-utils.js?v=20260731-lifecycle-recovery3"></script>
+	<script defer="" src="assets/js/modules/pixisync-runtime-adapter-utils.js?v=20260731-lifecycle-recovery3"></script>
 	<script defer="" src="assets/js/modules/pixieed-account-workflow-utils.js?v=20260730-remove-legacy-share-card1"></script>
 	<script defer="" src="assets/js/modules/startup-tail-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/controls-mirror.js?v=20260728-mirror-state-reuse1"></script>
@@ -1970,7 +1982,7 @@
 	<script defer="" src="assets/js/modules/local-project-v2-migration-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/pre-update-checkpoint-utils.js?v=20260712-pre-update-checkpoint-u3"></script>
 	<script defer="" src="assets/js/active-project-session-utils.js?v=20260715-local-true-v2-cleanup1"></script>
-    <script defer="" src="assets/js/app.js?v=20260730-pixisync-project-card1"></script>
+    <script defer="" src="assets/js/app.js?v=20260731-lifecycle-recovery3"></script>
 	<script defer="" src="assets/js/modules/update-detection-utils.js?v=20260719-file-protocol1"></script>
   <script>
     (function initPanelAdDocking() {
@@ -2593,7 +2605,7 @@
   </script>
 
 	<script src="../scripts/tool-fullscreen.js?v=2026.07.20-pixiedraw-fullscreen-ad1"></script>
-	<script src="../scripts/shared-bottom-nav.js?v=20260730-pixiedraw-local-preview1"></script>
+	<script src="../scripts/shared-bottom-nav.js?v=20260731-pixisync-share-icon1"></script>
 	<script>
     (function initOperationHelpAd() {
       if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.('operation-help-dialog')) return;

@@ -34,6 +34,8 @@
     let participants = [];
     let comments = [];
     let enabled = false;
+    let externalDrawLocked = false;
+    let externalDrawLockMessage = '';
     let busyAction = '';
     let activeView = 'participants';
     let disposed = false;
@@ -167,7 +169,7 @@
         : 'disabled';
       const copy = PHASE_COPY[phase] || PHASE_COPY.reconnecting;
       const engaged = isEngaged(snapshot);
-      const drawingAllowed = canDraw();
+      const drawingAllowed = canDraw() && !externalDrawLocked;
       const owner = snapshot.role === 'owner';
       const active = phase === 'active';
       const commentMode = active && typeof commands.sendComment === 'function';
@@ -248,7 +250,7 @@
 
       const drawLocked = enabled && engaged && !drawingAllowed;
       setHidden(elements.drawLock, !drawLocked);
-      setText(elements.drawLockLabel, copy[1]);
+      setText(elements.drawLockLabel, externalDrawLocked && externalDrawLockMessage ? externalDrawLockMessage : copy[1]);
       if (elements.canvasViewport) {
         elements.canvasViewport.setAttribute('aria-disabled', drawLocked ? 'true' : 'false');
       }
@@ -419,6 +421,8 @@
       commands = runtime.commands && typeof runtime.commands === 'object' ? runtime.commands : {};
       participants = Array.isArray(runtime.participants) ? runtime.participants.slice() : [];
       enabled = Boolean(session && runtime.enabled === true);
+      externalDrawLocked = runtime.externalDrawLocked === true;
+      externalDrawLockMessage = String(runtime.externalDrawLockMessage || '');
       unsubscribeSession = session?.subscribe?.(() => render()) || null;
       setNotice('');
       render();
@@ -427,6 +431,12 @@
 
     function updateParticipants(nextParticipants = []) {
       participants = Array.isArray(nextParticipants) ? nextParticipants.slice() : [];
+      render();
+    }
+
+    function setExternalDrawLock(locked, message = '') {
+      externalDrawLocked = locked === true;
+      externalDrawLockMessage = String(message || '');
       render();
     }
 
@@ -442,6 +452,8 @@
       participants = [];
       comments = [];
       enabled = false;
+      externalDrawLocked = false;
+      externalDrawLockMessage = '';
       busyAction = '';
       activeView = 'participants';
       if (elements.accessCode) elements.accessCode.value = '';
@@ -469,6 +481,7 @@
       render,
       consumeInviteFromUrl,
       updateParticipants,
+      setExternalDrawLock,
       receiveComment,
       clear,
       dispose,

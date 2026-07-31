@@ -179,6 +179,11 @@ assert.equal(ownerElements.copyInvite.hidden, false);
 assert.equal(ownerElements.archive.hidden, false);
 assert.equal(ownerElements.leave.hidden, true);
 assert.equal(ownerElements.participantCount.textContent, '2');
+ownerUi.setExternalDrawLock(true, '別のタブで編集中です。閲覧専用です。');
+assert.equal(ownerElements.drawLock.hidden, false);
+assert.equal(ownerElements.drawLockLabel.textContent, '別のタブで編集中です。閲覧専用です。');
+ownerUi.setExternalDrawLock(false);
+assert.equal(ownerElements.drawLock.hidden, true);
 await ownerElements.copyInvite.click();
 assert.match(copied, /pixisync_invite=/);
 assert.equal(ownerElements.accessCode.value, '');
@@ -342,10 +347,12 @@ assert.ok(
 assert.match(app, /runtime\?\.uiEnabled === true/);
 assert.match(app, /pixisyncMinimalUi\?\.consumeInviteFromUrl/);
 assert.match(sharedTabBar, /id: 'pixisync', label: 'PiXiSYNC', selector: '#pixisyncQuickOpen'/);
-const portraitShareRule = style.match(
-  /@media \(orientation: portrait\) \{\s*#pixisyncQuickOpen,[\s\S]*?\n\}/,
-)?.[0] || '';
-assert.match(portraitShareRule, /data-common-action='pixisync'/);
-assert.doesNotMatch(portraitShareRule, /#mobileTabMulti/);
+assert.match(html, /<button[^>]*disabled=""[^>]*id="pixisyncQuickOpen"/);
+assert.match(html, /src="\.\.\/pixisync\.png\?v=20260731-pixisync-icon2"/);
+assert.match(html, /<button[^>]*disabled=""[^>]*id="mobileTabMulti"/);
+assert.match(html, /id="mobileTabMulti"[\s\S]*?src="\.\.\/pixisync\.png\?v=20260731-pixisync-icon2"/);
+assert.match(sharedTabBar, /id: 'pixisync',[\s\S]*?cloneIcon: true,[\s\S]*?iconSourceSelector: '#mobileTabMulti'/);
+assert.match(style, /body:not\(\[data-pixisync-initial-gate='unlocked'\]\) #mobileTabMulti/);
+assert.match(style, /#pixisyncQuickOpen,[\s\S]*?data-common-action='pixisync'[\s\S]*?display: none !important/);
 
 console.log('PiXiSYNC minimal UI tests passed');

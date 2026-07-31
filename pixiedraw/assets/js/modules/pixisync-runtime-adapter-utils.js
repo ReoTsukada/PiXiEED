@@ -20,8 +20,10 @@
     readProjectBinding = async () => null,
     writeProjectBinding = async () => {},
     clearProjectBinding = async () => {},
+    acquireProjectLease = async () => ({ acquired: true, release: async () => {} }),
     getClientId,
     locationRef = window.location,
+    operationTimeoutMs = 20000,
     uiEnabled = true,
     onStatus = () => {},
     onError = () => {},
@@ -46,10 +48,17 @@
     let role = 'owner';
     let clientId = '';
     let boundProjectKey = '';
+    let preserveInitialOwnerDocument = false;
     let operationQueue = Promise.resolve();
     let replayedJournalEpoch = -1;
     let disposed = false;
     let unsubscribeSession = null;
+    let lifecycleSuspended = false;
+    let lifecycleResumeQueued = false;
+    let reconnectRetryTimer = 0;
+    let reconnectRetryAttempt = 0;
+    let projectLease = null;
+    let localReadOnly = false;
     const attestationWaiters = new Map();
 
     const commands = Object.freeze({
@@ -60,6 +69,7 @@
       sendComment,
       leave,
       archive,
+      handleLifecycleResume,
     });
 
     const firstRow = data => Array.isArray(data) ? data[0] : data;
@@ -87,6 +97,40 @@
       const digest = new Uint8Array(await window.crypto.subtle.digest('SHA-256', bytes));
       return [...digest].map(value => value.toString(16).padStart(2, '0')).join('');
     };
+    const withTimeout = async (operation, promise) => {
+      const timeoutMs = Math.max(1000, Number(operationTimeoutMs) || 20000);
+      let timer = null;
+      try {
+        return await Promise.race([
+          Promise.resolve(promise),
+          new Promise((_, reject) => {
+            timer = window.setTimeout(
+              () => reject(new Error(`PiXiSYNC runtime: ${operation}-timeout`)),
+              timeoutMs
+            );
+          }),
+        ]);
+      } finally {
+        if (timer !== null) window.clearTimeout(timer);
+      }
+    };
+    const isReconnectablePhase = () => ['active', 'reconnecting'].includes(currentSnapshot()?.phase);
+    const clearReconnectRetry = () => {
+      if (reconnectRetryTimer) window.clearTimeout(reconnectRetryTimer);
+      reconnectRetryTimer = 0;
+      reconnectRetryAttempt = 0;
+    };
+    const scheduleReconnectRetry = reason => {
+      if (disposed || lifecycleSuspended || !isReconnectablePhase() || reconnectRetryTimer) return;
+      const attempt = reconnectRetryAttempt++;
+      const baseDelay = Math.min(30000, 750 * (2 ** Math.min(attempt, 5)));
+      const jitter = Math.floor(Math.random() * 250);
+      reconnectRetryTimer = window.setTimeout(() => {
+        reconnectRetryTimer = 0;
+        void handleLifecycleResume(`retry-${reason || 'reconnect'}`);
+      }, baseDelay + jitter);
+      report({ phase: 'reconnecting', retryInMs: baseDelay + jitter, reason });
+    };
     const report = details => {
       onStatus(details);
       runtimeBridge.refreshUi?.();
@@ -109,20 +153,34 @@
     const removeProjectBinding = async () => {
       if (boundProjectKey) await clearProjectBinding(boundProjectKey);
     };
+    const releaseProjectLease = async () => {
+      const lease = projectLease;
+      projectLease = null;
+      localReadOnly = false;
+      try { await lease?.release?.(); } catch (_) {}
+    };
+    const acquireEditingLease = async projectKey => {
+      if (projectLease?.projectKey === projectKey) return !localReadOnly;
+      await releaseProjectLease();
+      const lease = await acquireProjectLease(projectKey);
+      localReadOnly = lease?.acquired !== true;
+      projectLease = localReadOnly ? null : { projectKey, release: lease.release };
+      return !localReadOnly;
+    };
     const rpc = async (name, params) => {
-      const response = await supabase.rpc(name, params);
+      const response = await withTimeout(`rpc-${name}`, supabase.rpc(name, params));
       if (response?.error) throw response.error;
       return response?.data;
     };
     const uploadCheckpoint = async (path, blob) => {
-      const response = await supabase.storage.from(CHECKPOINT_BUCKET).upload(path, blob, {
+      const response = await withTimeout('checkpoint-upload', supabase.storage.from(CHECKPOINT_BUCKET).upload(path, blob, {
         contentType: 'application/octet-stream',
         upsert: false,
-      });
+      }));
       if (response?.error) throw response.error;
     };
     const downloadCheckpoint = async path => {
-      const response = await supabase.storage.from(CHECKPOINT_BUCKET).download(path);
+      const response = await withTimeout('checkpoint-download', supabase.storage.from(CHECKPOINT_BUCKET).download(path));
       if (response?.error || !(response?.data instanceof Blob)) {
         throw response?.error || new Error('PiXiSYNC runtime: checkpoint-download-failed');
       }
@@ -136,6 +194,8 @@
         structureEpoch: Number(manifest?.structure_epoch || 0),
         commands,
         participants: [],
+        localReadOnly,
+        localReadOnlyMessage: localReadOnly ? 'このプロジェクトは別のタブで編集中です。この画面は閲覧専用です。' : '',
         uiEnabled,
         consumeInviteFromUrl: false,
       });
@@ -146,6 +206,11 @@
       role = nextRole === 'owner' ? 'owner' : 'participant';
       session = createSession({ role, resumeAvailable });
       unsubscribeSession = session.subscribe(snapshot => {
+        // The collaboration controller is installed only after a channel is
+        // available. Keep canvas input locked throughout every transition so
+        // a start/resume cannot create an unsynchronised local stroke.
+        runtimeBridge.setInputLocked?.(!['local', 'invited', 'left', 'archived', 'active'].includes(snapshot.phase));
+        if (snapshot.phase === 'active') clearReconnectRetry();
         report({ phase: snapshot.phase, roomId: snapshot.roomId, revision: snapshot.appliedRevision });
       });
       configureBridge({ collaboration: false });
@@ -200,25 +265,30 @@
           ) {
             await dispatchNow({ type: 'ROOM_ACCESS_REVOKED', epoch: currentEpoch() });
           }
+          if (isReconnectablePhase()) scheduleReconnectRetry(error?.message || 'runtime-error');
         });
       return operationQueue;
     }
 
     async function createRealtime() {
       if (realtimeClient) await realtimeClient.stop().catch(() => {});
-      realtimeClient = createRealtimeClient({
+      let createdRealtime = null;
+      createdRealtime = createRealtimeClient({
         supabase,
         roomId,
         clientId,
         initialRevision: String(manifest?.checkpoint_revision || 0),
         recoverOnSubscribe: false,
+        operationTimeoutMs,
         applyConfirmed: (operation, metadata) => runtimeBridge.applyConfirmed(operation, metadata),
         onChannelStatus: status => {
+          if (realtimeClient !== createdRealtime) return;
           if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
             void enqueue({ type: 'CHANNEL_CLOSED', epoch: currentEpoch() });
           }
         },
         onBroadcast: (event, payload) => {
+          if (realtimeClient !== createdRealtime) return;
           if (event === 'session-archived') {
             void enqueue({ type: 'ROOM_ARCHIVED', epoch: currentEpoch() });
           } else if (event === 'pixisync-comment') {
@@ -233,6 +303,7 @@
           }
         },
         onPresenceChange: entries => {
+          if (realtimeClient !== createdRealtime) return;
           const seen = new Set();
           const participants = [];
           for (const entry of Array.isArray(entries) ? entries : []) {
@@ -252,11 +323,39 @@
           runtimeBridge.updateParticipants?.(participants);
         },
         onRecoveryRequired: details => {
+          if (realtimeClient !== createdRealtime) return;
           onError(details?.error || new Error(details?.reason || 'recovery-required'));
           void enqueue({ type: 'GAP_DETECTED', epoch: currentEpoch() });
         },
       });
+      realtimeClient = createdRealtime;
       return realtimeClient;
+    }
+
+    async function handleLifecycleSuspend(reason = 'hidden') {
+      lifecycleSuspended = true;
+      clearReconnectRetry();
+      if (!isReconnectablePhase()) return false;
+      // Do not await reconnect work while the page is being frozen.  Move the
+      // state machine to its draw-locked state now; pageshow/visibility will
+      // start the authoritative reconnect path.
+      session.dispatch({ type: 'SOCKET_OFFLINE', epoch: currentEpoch(), reason });
+      runtimeBridge.refreshUi?.();
+      void realtimeClient?.untrackPresence?.().catch(() => {});
+      void realtimeClient?.stop?.().catch(() => {});
+      return true;
+    }
+
+    async function handleLifecycleResume(reason = 'visible') {
+      lifecycleSuspended = false;
+      if (!isReconnectablePhase() || lifecycleResumeQueued) return false;
+      lifecycleResumeQueued = true;
+      try {
+        await enqueue({ type: 'SOCKET_OFFLINE', epoch: currentEpoch(), reason });
+        return true;
+      } finally {
+        lifecycleResumeQueued = false;
+      }
     }
 
     async function runEffect(effect) {
@@ -265,8 +364,8 @@
       switch (effect.type) {
         case 'OPEN_PRIVATE_CHANNEL':
           await createRealtime();
-          await realtimeClient.start();
-          await realtimeClient.trackPresence({ clientId, role, onlineAt: new Date().toISOString() });
+          await withTimeout('realtime-subscribe', realtimeClient.start());
+          await withTimeout('presence-track', realtimeClient.trackPresence({ clientId, role, onlineAt: new Date().toISOString() }));
           await dispatchNow({
             type: 'CHANNEL_SUBSCRIBED',
             epoch: effectEpoch,
@@ -277,6 +376,23 @@
           break;
         case 'LOAD_CHECKPOINT': {
           manifest = await openManifest(roomId);
+          if (preserveInitialOwnerDocument) {
+            // The owner has just serialized this exact document as revision 0.
+            // Reloading it creates a new local working-copy ID and can replace
+            // the visible frame/layer with an empty import. Keep the original
+            // card and only begin the authoritative tail from revision 0.
+            preserveInitialOwnerDocument = false;
+            configureBridge();
+            runtimeBridge.beginAuthoritativeResync?.(manifest.checkpoint_revision);
+            realtimeClient.resetConfirmedRevision(manifest.checkpoint_revision);
+            await dispatchNow({
+              type: 'CHECKPOINT_LOADED',
+              epoch: effectEpoch,
+              generation: currentGeneration(),
+              revision: String(manifest.checkpoint_revision),
+            });
+            break;
+          }
           const blob = await downloadCheckpoint(String(manifest.storage_path || ''));
           if (blob.size !== Number(manifest.encoded_bytes) || await sha256Hex(blob) !== assertHash(manifest.state_sha256_hex)) {
             await dispatchNow({ type: 'HASH_MISMATCH', epoch: effectEpoch });
@@ -284,7 +400,7 @@
           }
           configureBridge();
           runtimeBridge.beginAuthoritativeResync?.(manifest.checkpoint_revision);
-          await restoreCheckpoint(blob);
+          await restoreCheckpoint(blob, { projectKey: boundProjectKey, role });
           realtimeClient.resetConfirmedRevision(manifest.checkpoint_revision);
           await dispatchNow({
             type: 'CHECKPOINT_LOADED',
@@ -332,13 +448,14 @@
         case 'SYNC_ACTIVE':
           await persistProjectBinding();
           configureBridge();
+          clearReconnectRetry();
           break;
         case 'RECONNECT_CHANNEL':
           await realtimeClient?.stop?.().catch(() => {});
           manifest = await openManifest(roomId);
           await createRealtime();
-          await realtimeClient.start();
-          await realtimeClient.trackPresence({ clientId, role, onlineAt: new Date().toISOString() });
+          await withTimeout('realtime-reconnect', realtimeClient.start());
+          await withTimeout('presence-retrack', realtimeClient.trackPresence({ clientId, role, onlineAt: new Date().toISOString() }));
           await dispatchNow({
             type: 'CHANNEL_SUBSCRIBED',
             epoch: effectEpoch,
@@ -378,6 +495,9 @@
       const projectKey = String(getProjectKey() || '');
       if (!projectKey) throw new Error('PiXiSYNC runtime: local-project-required');
       boundProjectKey = projectKey;
+      await acquireEditingLease(projectKey);
+      configureBridge({ collaboration: false });
+      runtimeBridge.setInputLocked?.(true);
       const opening = session.dispatch({ type: 'OPEN_REQUEST', projectKey });
       runtimeBridge.refreshUi?.();
       const epoch = opening.state.epoch;
@@ -395,6 +515,7 @@
         await uploadCheckpoint(String(begun?.storage_path || ''), blob);
         const activated = firstRow(await rpc('pixisync_activate_initial_checkpoint', { p_room_id: roomId }));
         manifest = await openManifest(roomId);
+        preserveInitialOwnerDocument = true;
         await dispatchNow({
           type: 'ROOM_READY',
           epoch,
@@ -416,6 +537,9 @@
       installSession('participant');
       boundProjectKey = String(getProjectKey() || '');
       if (!boundProjectKey) throw new Error('PiXiSYNC runtime: local-project-required');
+      await acquireEditingLease(boundProjectKey);
+      configureBridge({ collaboration: false });
+      runtimeBridge.setInputLocked?.(true);
       const joining = session.dispatch({ type: 'JOIN_REQUEST', projectKey: boundProjectKey });
       runtimeBridge.refreshUi?.();
       const epoch = joining.state.epoch;
@@ -446,6 +570,9 @@
         throw new Error('PiXiSYNC runtime: project-binding-unavailable');
       }
       boundProjectKey = binding.projectKey;
+      await acquireEditingLease(binding.projectKey);
+      configureBridge({ collaboration: false });
+      runtimeBridge.setInputLocked?.(true);
       installSession(binding.role, { resumeAvailable: true });
       const opening = session.dispatch({
         type: 'RESUME_REQUEST',
@@ -539,6 +666,7 @@
       await rpc('pixisync_leave_session', { p_room_id: roomId });
       for (const effect of result.effects) await runEffect(effect);
       await removeProjectBinding();
+      await releaseProjectLease();
       await dispatchNow({ type: 'LEFT', epoch: result.state.epoch });
     }
 
@@ -620,6 +748,7 @@
       runtimeBridge.refreshUi?.();
       for (const effect of closing.effects) await runEffect(effect);
       await removeProjectBinding();
+      await releaseProjectLease();
       await dispatchNow({ type: 'CLOSED', epoch: closing.state.epoch });
     }
 
@@ -635,10 +764,12 @@
 
     async function dispose() {
       disposed = true;
+      clearReconnectRetry();
       unsubscribeSession?.();
       unsubscribeSession = null;
       await realtimeClient?.stop?.().catch(() => {});
       realtimeClient = null;
+      await releaseProjectLease();
       runtimeBridge.clear?.();
     }
 
@@ -671,6 +802,8 @@
       start,
       join,
       resumeBoundProject,
+      handleLifecycleSuspend,
+      handleLifecycleResume,
       leave,
       archive,
       createInviteLink,

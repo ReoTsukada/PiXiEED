@@ -31,6 +31,8 @@
 
     return ((scope) => {
       with (scope) {
+  let landscapeWindowZIndex = 2147483000;
+
   function isDualLeftRailEnabled() {
     return false;
   }
@@ -444,10 +446,14 @@
     const safeRight = viewportBounds.right - safeArea.right;
     const safeBottom = viewportBounds.bottom - safeArea.bottom;
     const safeWidth = Math.max(1, safeRight - safeLeft);
-    const isWideFlyout = state.activeRightTab === 'frames' || state.activeRightTab === 'help';
-    const widthRatio = isWideFlyout ? 0.4 : 0.34;
-    const minWidth = isWideFlyout ? 360 : 320;
-    const maxWidth = isWideFlyout ? 520 : 440;
+    // Landscape file/settings/PiXiSYNC use one workspace-window geometry.
+    // Keeping the dimensions independent from the narrow icon rail prevents
+    // controls from being compressed merely because the rail is compact.
+    const isWorkspaceWindow = ['file', 'settings', 'multi'].includes(state.activeRightTab);
+    const isWideFlyout = isWorkspaceWindow || state.activeRightTab === 'frames' || state.activeRightTab === 'help';
+    const widthRatio = isWorkspaceWindow ? 0.46 : (isWideFlyout ? 0.4 : 0.34);
+    const minWidth = isWorkspaceWindow ? 360 : (isWideFlyout ? 360 : 320);
+    const maxWidth = isWorkspaceWindow ? 560 : (isWideFlyout ? 520 : 440);
     const minLeft = safeLeft + edgePadding;
     const maxAvailableWidth = Math.max(160, Math.round(safeRight - minLeft - edgePadding));
     const maxAvailableWidthByRail = Math.max(1, Math.round(railRect.left - minLeft - railGap));
@@ -476,15 +482,12 @@
     // Keep the portal in the layout viewport and only use the rail as a hint.
     const minTop = Math.round(safeTop + edgePadding);
     const maxBottom = Math.round(safeBottom - edgePadding);
-    const preferredVisibleHeight = Math.min(420, Math.max(220, Math.round((safeBottom - safeTop) * 0.72)));
-    const maxTopForPreferredHeight = Math.max(minTop, maxBottom - preferredVisibleHeight);
-    const railTop = Math.round(railRect.top + 4);
-    let top = clamp(railTop, minTop, maxTopForPreferredHeight);
-    let maxHeight = Math.max(140, maxBottom - top);
-    if (maxHeight < 220) {
-      top = Math.max(minTop, maxBottom - 220);
-      maxHeight = Math.max(140, maxBottom - top);
-    }
+    const safeHeight = Math.max(1, maxBottom - minTop);
+    const preferredVisibleHeight = isWorkspaceWindow
+      ? Math.min(600, Math.max(300, Math.round(safeHeight * 0.78)))
+      : Math.min(420, Math.max(220, Math.round(safeHeight * 0.72)));
+    const maxHeight = Math.min(preferredVisibleHeight, safeHeight);
+    const top = Math.round(minTop + Math.max(0, (safeHeight - maxHeight) * 0.5));
     clearCompactRightFlyoutStyles();
     ensureCompactRightFlyoutPortal(true, section);
     section.classList.add('is-compact-flyout');
@@ -493,7 +496,7 @@
     section.style.top = `${top}px`;
     section.style.width = `${width}px`;
     section.style.maxHeight = `${maxHeight}px`;
-    section.style.zIndex = '14000';
+    section.style.zIndex = String(++landscapeWindowZIndex);
     section.style.overflow = 'auto';
     scheduleRailLayoutRefresh();
   }
@@ -720,6 +723,7 @@
   }
 
   function setupRightTabs() {
+    setupLandscapeWindowInteractions();
     dom.rightTabButtons = Array.from(document.querySelectorAll('[data-right-tab]'));
     if (!RIGHT_TAB_KEYS.includes(state.activeRightTab) || state.activeRightTab === 'extensions') {
       state.activeRightTab = 'settings';
@@ -769,6 +773,18 @@
     }
     if (!compactRightFlyoutDismissBound) {
       compactRightFlyoutDismissBound = true;
+      document.querySelectorAll('[data-close-right-flyout]').forEach(button => {
+        if (!(button instanceof HTMLButtonElement) || button.dataset.rightFlyoutCloseBound === 'true') {
+          return;
+        }
+        button.dataset.rightFlyoutCloseBound = 'true';
+        button.addEventListener('click', event => {
+          event.preventDefault();
+          event.stopPropagation();
+          setCompactRightFlyoutOpen(false);
+          updateRightTabVisibility();
+        });
+      });
       const dismissCompactRightFlyout = event => {
         const target = event.target;
         if (!(target instanceof Node)) {
@@ -782,20 +798,14 @@
           if (dom.rightRail instanceof HTMLElement && dom.rightRail.contains(target)) {
             return;
           }
-          const dismissOnOutsideInteraction = state.activeRightTab === 'file'
-            || state.activeRightTab === 'settings';
-          if (dismissOnOutsideInteraction || !shouldKeepRailPanelsPinned()) {
+          const closesOnlyByButton = ['file', 'settings', 'multi'].includes(state.activeRightTab);
+          if (!closesOnlyByButton && !shouldKeepRailPanelsPinned()) {
             setCompactRightFlyoutOpen(false);
             updateRightTabVisibility();
             return;
           }
         }
-        if ((state.activeRightTab === 'file' || state.activeRightTab === 'settings')
-          && shouldDismissRightTransientPanelForTarget(target)) {
-          closeRightTransientPanel({ persist: true });
-          return;
-        }
-        if (shouldDismissRightTransientPanelForTarget(target)) {
+        if (!isRightTransientPanelOpen() && shouldDismissRightTransientPanelForTarget(target)) {
           closeRightTransientPanel({ persist: true });
         }
       };
@@ -806,14 +816,7 @@
         if (event.key !== 'Escape') {
           return;
         }
-        if (isCompactRightFlyoutOpen() && !shouldKeepRailPanelsPinned()) {
-          setCompactRightFlyoutOpen(false);
-          updateRightTabVisibility();
-          return;
-        }
-        if (isRightTransientPanelOpen()) {
-          closeRightTransientPanel({ persist: true });
-        }
+        // Workspace windows deliberately close only through their × button.
       });
     }
     if (!compactRightFlyoutPositionBound) {
@@ -838,6 +841,92 @@
     setCompactRightFlyoutOpen(false);
     updateRightTabUI();
     updateRightTabVisibility();
+  }
+
+  function setupLandscapeWindowInteractions() {
+    document.querySelectorAll('[data-landscape-window-drag-handle]').forEach(handle => {
+      if (!(handle instanceof HTMLElement) || handle.dataset.landscapeWindowDragBound === 'true') {
+        return;
+      }
+      handle.dataset.landscapeWindowDragBound = 'true';
+      observeLandscapeWindowBounds(handle.closest('.panel-section, #timelapseDialog'));
+      handle.addEventListener('pointerdown', event => {
+        if (!window.matchMedia('(orientation: landscape)').matches
+          || !(event.target instanceof Element)
+          || event.target.closest('button, input, select, textarea, a')) {
+          return;
+        }
+        const windowElement = handle.closest('.panel-section.is-compact-flyout, #timelapseDialog');
+        if (!(windowElement instanceof HTMLElement)) {
+          return;
+        }
+        windowElement.style.zIndex = String(++landscapeWindowZIndex);
+        observeLandscapeWindowBounds(windowElement);
+        event.preventDefault();
+        const startX = event.clientX;
+        const startY = event.clientY;
+        const offsetX = Number(windowElement.dataset.landscapeWindowOffsetX || 0) || 0;
+        const offsetY = Number(windowElement.dataset.landscapeWindowOffsetY || 0) || 0;
+        const pointerId = event.pointerId;
+        handle.setPointerCapture?.(pointerId);
+        const move = moveEvent => {
+          applyLandscapeWindowOffset(
+            windowElement,
+            offsetX + moveEvent.clientX - startX,
+            offsetY + moveEvent.clientY - startY
+          );
+        };
+        const finish = finishEvent => {
+          handle.releasePointerCapture?.(pointerId);
+          handle.removeEventListener('pointermove', move);
+          handle.removeEventListener('pointerup', finish);
+          handle.removeEventListener('pointercancel', finish);
+          if (finishEvent.type === 'pointercancel') {
+            move(finishEvent);
+          }
+        };
+        handle.addEventListener('pointermove', move);
+        handle.addEventListener('pointerup', finish);
+        handle.addEventListener('pointercancel', finish);
+      });
+    });
+  }
+
+  function applyLandscapeWindowOffset(windowElement, requestedX, requestedY) {
+    const currentX = Number(windowElement.dataset.landscapeWindowOffsetX || 0) || 0;
+    const currentY = Number(windowElement.dataset.landscapeWindowOffsetY || 0) || 0;
+    const rect = windowElement.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) {
+      return;
+    }
+    const baseLeft = rect.left - currentX;
+    const baseTop = rect.top - currentY;
+    const edge = 8;
+    const minX = edge - baseLeft;
+    const maxX = Math.max(minX, window.innerWidth - edge - rect.width - baseLeft);
+    const minY = edge - baseTop;
+    const maxY = Math.max(minY, window.innerHeight - edge - rect.height - baseTop);
+    const nextX = Math.round(Math.min(Math.max(Number(requestedX) || 0, minX), maxX));
+    const nextY = Math.round(Math.min(Math.max(Number(requestedY) || 0, minY), maxY));
+    windowElement.dataset.landscapeWindowOffsetX = String(nextX);
+    windowElement.dataset.landscapeWindowOffsetY = String(nextY);
+    windowElement.style.transform = `translate(${nextX}px, ${nextY}px)`;
+  }
+
+  function observeLandscapeWindowBounds(windowElement) {
+    if (!(windowElement instanceof HTMLElement) || windowElement.dataset.landscapeWindowBoundsBound === 'true') {
+      return;
+    }
+    windowElement.dataset.landscapeWindowBoundsBound = 'true';
+    const keepReachable = () => applyLandscapeWindowOffset(
+      windowElement,
+      Number(windowElement.dataset.landscapeWindowOffsetX || 0) || 0,
+      Number(windowElement.dataset.landscapeWindowOffsetY || 0) || 0
+    );
+    if (typeof ResizeObserver === 'function') {
+      new ResizeObserver(keepReachable).observe(windowElement);
+    }
+    window.addEventListener('resize', keepReachable, { passive: true });
   }
 
   function setRightTab(tab) {

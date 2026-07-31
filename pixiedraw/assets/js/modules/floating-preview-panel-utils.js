@@ -81,13 +81,9 @@
   }
 
   function getFloatingPreviewViewportSize() {
-    const host = dom.canvasViewport;
-    if (!(host instanceof HTMLElement)) {
-      return { width: 0, height: 0 };
-    }
     return {
-      width: Math.max(0, Math.round(host.clientWidth || host.getBoundingClientRect().width || 0)),
-      height: Math.max(0, Math.round(host.clientHeight || host.getBoundingClientRect().height || 0)),
+      width: Math.max(0, Math.round(window.innerWidth || 0)),
+      height: Math.max(0, Math.round(window.innerHeight || 0)),
     };
   }
 
@@ -719,6 +715,7 @@
     panel.style.top = `${y}px`;
     panel.style.width = `${width}px`;
     panel.style.height = `${height}px`;
+    panel.style.zIndex = '2147483647';
     fitFloatingPreviewCanvasToPanel();
     if (render) {
       renderFloatingPreviewPanel();
@@ -976,11 +973,17 @@
     if (!(panel instanceof HTMLElement)) {
       return;
     }
+    // Escape canvas/rail stacking contexts so the preview can never be
+    // painted underneath the shared navigation or action bars.
+    if (panel.parentElement !== document.body) {
+      document.body.appendChild(panel);
+    }
     applyFloatingPreviewTabUI();
     setFloatingPreviewReferenceImageUrl('');
     syncFloatingPreviewZoomUI();
     panel.addEventListener('pointerdown', event => {
       event.stopPropagation();
+      panel.style.zIndex = '2147483647';
     });
     panel.addEventListener('click', event => {
       event.stopPropagation();

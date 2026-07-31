@@ -11910,6 +11910,8 @@
         },
       })
   ) || null;
+  let pixisyncInputLocked = false;
+  let pixisyncLocalReadOnly = false;
   const pixisyncMinimalUi = window.PiXiEEDrawModules?.pixisyncMinimalUiUtils
     ?.createPiXiSyncMinimalUi?.({
       elements: {
@@ -11941,6 +11943,8 @@
   if (pixisyncCollaborationController) {
     window.PiXiEEDrawModules.pixisyncRuntimeBridge = Object.freeze({
       configure: runtime => {
+        pixisyncLocalReadOnly = runtime?.localReadOnly === true;
+        pixisyncInputLocked = pixisyncLocalReadOnly;
         if (runtime?.session?.canDraw && runtime?.realtimeClient?.commit) {
           pixisyncCollaborationController.configure(runtime);
         } else {
@@ -11951,14 +11955,25 @@
           commands: runtime?.commands,
           participants: runtime?.participants,
           enabled: runtime?.uiEnabled === true,
+          externalDrawLocked: pixisyncLocalReadOnly,
+          externalDrawLockMessage: runtime?.localReadOnlyMessage,
         });
         if (runtime?.uiEnabled === true && runtime?.consumeInviteFromUrl !== false) {
           void pixisyncMinimalUi?.consumeInviteFromUrl?.();
         }
       },
       clear: () => {
+        pixisyncInputLocked = false;
+        pixisyncLocalReadOnly = false;
         pixisyncCollaborationController.clear();
         pixisyncMinimalUi?.clear?.();
+      },
+      setInputLocked: locked => {
+        pixisyncInputLocked = locked === true || pixisyncLocalReadOnly;
+        pixisyncMinimalUi?.setExternalDrawLock?.(
+          pixisyncLocalReadOnly,
+          pixisyncLocalReadOnly ? 'このプロジェクトは別のタブで編集中です。この画面は閲覧専用です。' : ''
+        );
       },
       applyConfirmed: (operation, metadata) => (
         pixisyncCollaborationController.applyConfirmed(operation, metadata)
@@ -11978,6 +11993,7 @@
   }
 
   function canBeginPiXiSyncLocalOperation(label) {
+    if (pixisyncInputLocked) return false;
     if (!pixisyncCollaborationController?.enabled) return true;
     const layer = getActiveLayer();
     return pixisyncCollaborationController.canBeginLocalOperation(label, {
@@ -15860,7 +15876,10 @@
             || previous.projectJournal !== entry.projectJournal
             || previous.checkpointId !== entry.checkpointId
             || previous.dirtyOpCount !== entry.dirtyOpCount
-            || previous.dotStats !== entry.dotStats;
+            || previous.dotStats !== entry.dotStats
+            // PiXiSYNC is card metadata.  It must participate in the write
+            // decision or binding a room can be silently dropped as a no-op.
+            || JSON.stringify(previous.pixisync || null) !== JSON.stringify(entry.pixisync || null);
         });
         const removedIds = currentEntries
           .filter(entry => entry?.id && !nextIds.has(entry.id))
@@ -17027,6 +17046,9 @@
       updatedAt: manifest.updatedAt,
       thumbnail: thumbnail || null,
       dotStats: projectState?.dotStats || previousEntry?.dotStats || null,
+      // Keep the collaboration-room binding while regular local autosave
+      // refreshes the rest of this card's metadata.
+      pixisync: previousEntry?.pixisync || undefined,
       // A newly-created FileSystemHandle is still a 0-byte placeholder until
       // the destination write commits. Existing filenames remain trustworthy;
       // new bindings are discovered from the real workspace file list.
@@ -26165,6 +26187,91 @@
     }
   }
 
+  let pixisyncLifecycleListenersInstalled = false;
+
+  function installPiXiSyncLifecycleListeners(runtime) {
+    if (pixisyncLifecycleListenersInstalled || !runtime) return;
+    pixisyncLifecycleListenersInstalled = true;
+    const suspend = reason => { void runtime.handleLifecycleSuspend?.(reason); };
+    const resume = reason => { void runtime.handleLifecycleResume?.(reason); };
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') suspend('visibility-hidden');
+      else resume('visibility-visible');
+    });
+    window.addEventListener('pagehide', () => suspend('pagehide'));
+    window.addEventListener('pageshow', event => resume(event?.persisted ? 'pageshow-bfcache' : 'pageshow'));
+    window.addEventListener('focus', () => resume('focus'));
+    window.addEventListener('online', () => resume('online'));
+    window.addEventListener('offline', () => suspend('offline'));
+    document.addEventListener('resume', () => resume('device-resume'));
+  }
+
+  function createPiXiSyncProjectLeaseManager() {
+    const tabStorageKey = 'pixieed:pixisync:v1:tab-lease-id';
+    const fallbackPrefix = 'pixieed:pixisync:v1:project-lease:';
+    let tabId = '';
+    const getTabId = () => {
+      if (tabId) return tabId;
+      try { tabId = String(window.sessionStorage?.getItem(tabStorageKey) || ''); } catch (_) {}
+      if (!/^[0-9a-f-]{36}$/i.test(tabId)) {
+        tabId = window.crypto.randomUUID();
+        try { window.sessionStorage?.setItem(tabStorageKey, tabId); } catch (_) {}
+      }
+      return tabId;
+    };
+    return async projectKey => {
+      const normalized = normalizeAutosaveProjectId(projectKey || '');
+      if (!normalized) return { acquired: false };
+      const lockName = `pixisync:project:${normalized}`;
+      if (window.navigator?.locks?.request) {
+        let resolveAcquired;
+        const acquired = new Promise(resolve => { resolveAcquired = resolve; });
+        let release = null;
+        void window.navigator.locks.request(lockName, { mode: 'exclusive', ifAvailable: true }, async lock => {
+          if (!lock) {
+            resolveAcquired({ acquired: false });
+            return;
+          }
+          await new Promise(resolve => {
+            release = resolve;
+            resolveAcquired({ acquired: true, release: () => release?.() });
+          });
+        }).catch(() => resolveAcquired({ acquired: false }));
+        return acquired;
+      }
+      // Fallback for engines without Web Locks.  The native lock is the
+      // authoritative path; this lease prevents a stale tab from immediately
+      // taking over and is refreshed while the tab remains open.
+      const storageKey = `${fallbackPrefix}${normalized}`;
+      const owner = getTabId();
+      const now = Date.now();
+      let current = null;
+      try { current = JSON.parse(window.localStorage?.getItem(storageKey) || 'null'); } catch (_) {}
+      if (current?.owner && current.owner !== owner && Number(current.expiresAt) > now) {
+        return { acquired: false };
+      }
+      const writeLease = () => {
+        try {
+          window.localStorage?.setItem(storageKey, JSON.stringify({ owner, expiresAt: Date.now() + 15000 }));
+          const verified = JSON.parse(window.localStorage?.getItem(storageKey) || 'null');
+          return verified?.owner === owner;
+        } catch (_) { return false; }
+      };
+      if (!writeLease()) return { acquired: false };
+      const refreshTimer = window.setInterval(writeLease, 5000);
+      return {
+        acquired: true,
+        release: () => {
+          window.clearInterval(refreshTimer);
+          try {
+            const latest = JSON.parse(window.localStorage?.getItem(storageKey) || 'null');
+            if (latest?.owner === owner) window.localStorage?.removeItem(storageKey);
+          } catch (_) {}
+        },
+      };
+    };
+  }
+
   async function initializePiXiSyncRuntime() {
     const config = window.__PIXISYNC_V1_CONFIG__ || {
       enabled: PIXISYNC_V1_ENABLED,
@@ -26196,12 +26303,17 @@
 
     const clientStorageKey = String(config.clientStorageKey || 'pixieed:pixisync:v1:client-id');
     const getClientId = () => {
-      const stored = String(window.localStorage?.getItem?.(clientStorageKey) || '');
+      // A device identity is not a Realtime connection identity.  Keeping
+      // this value per tab prevents two windows from sharing Presence and
+      // pending-operation ownership, while a reload of the same tab retains
+      // its retry identity.
+      const stored = String(window.sessionStorage?.getItem?.(clientStorageKey) || '');
       if (/^[0-9a-f-]{36}$/i.test(stored)) return stored;
       const created = window.crypto.randomUUID();
-      window.localStorage?.setItem?.(clientStorageKey, created);
+      window.sessionStorage?.setItem?.(clientStorageKey, created);
       return created;
     };
+    const acquireProjectLease = createPiXiSyncProjectLeaseManager();
     const runtime = adapterFactory({
       createSession: options => window.PiXiEEDrawModules.pixisyncSessionState
         .createPiXiSyncSessionState(options),
@@ -26251,11 +26363,15 @@
         if (!(serialized?.blob instanceof Blob)) throw new Error('PiXiSYNC checkpoint serialization failed');
         return serialized.blob;
       },
-      restoreCheckpoint: async blob => {
+      restoreCheckpoint: async (blob, context = {}) => {
+        const projectId = normalizeAutosaveProjectId(context?.projectKey || '')
+          || normalizeAutosaveProjectId(autosaveProjectId || '');
         const loaded = await loadDocumentFromBlob(blob, null, {
           suppressAutosaveStatus: true,
           allowProjectMismatchLoad: true,
           forceV2WorkingCopy: true,
+          projectId,
+          sourceKind: 'pixisync-checkpoint',
         });
         if (!loaded || loaded === 'deferred') throw new Error('PiXiSYNC checkpoint restore failed');
         return true;
@@ -26311,6 +26427,7 @@
         await saveRecentProjectsList(entries, nextEntries);
         setRecentProjectsCache(nextEntries);
       },
+      acquireProjectLease,
       getClientId,
       uiEnabled: config.uiEnabled !== false,
       onStatus: details => console.info('[pixisync:v1-runtime]', details),
@@ -26318,6 +26435,7 @@
     });
     window.__PIXISYNC_V1_RUNTIME__ = runtime;
     await runtime.initialize();
+    installPiXiSyncLifecycleListeners(runtime);
     return runtime;
   }
 
@@ -26330,6 +26448,7 @@
       // discovery gesture, reopening it must expose the sync panel at once.
       pixisyncInitialGateUnlocked = true;
       document.body?.setAttribute('data-pixisync-initial-gate', 'unlocked');
+      setPiXiSyncInitialGateButtonsEnabled(true);
       const runtime = window.__PIXISYNC_V1_RUNTIME__ || await initializePiXiSyncRuntime();
       if (!runtime) return false;
       await runtime.resumeBoundProject();
@@ -26351,6 +26470,17 @@
   let pixisyncInitialGateTapCount = 0;
   let pixisyncInitialGateResetTimer = 0;
 
+  function setPiXiSyncInitialGateButtonsEnabled(enabled) {
+    const active = enabled === true;
+    [dom.controls.pixisyncQuickOpen, dom.controls.pixisyncMobileTab].forEach(button => {
+      if (!(button instanceof HTMLButtonElement)) return;
+      button.disabled = !active;
+      button.setAttribute('aria-disabled', String(!active));
+      button.setAttribute('aria-label', active ? 'PiXiSYNC' : 'PiXiSYNC（準備中）');
+      button.title = active ? 'PiXiSYNC' : 'PiXiSYNCは準備中です';
+    });
+  }
+
   function setupPiXiSyncInitialGate() {
     const settingsButtons = Array.from(new Set([
       document.querySelector('[data-quick-right-tab="settings"]'),
@@ -26370,6 +26500,7 @@
       resetTapCount();
       pixisyncInitialGateUnlocked = true;
       document.body?.setAttribute('data-pixisync-initial-gate', 'unlocked');
+      setPiXiSyncInitialGateButtonsEnabled(true);
       try {
         const runtime = await initializePiXiSyncRuntime();
         if (!runtime) throw new Error('PiXiSYNC runtime is unavailable');
@@ -26381,6 +26512,7 @@
       } catch (error) {
         pixisyncInitialGateUnlocked = false;
         document.body?.removeAttribute('data-pixisync-initial-gate');
+        setPiXiSyncInitialGateButtonsEnabled(false);
         window.PiXiEEDrawModules?.pixisyncRuntimeBridge?.clear?.();
         console.warn('PiXiSYNC initial gate bootstrap failed', error);
       }
