@@ -37,6 +37,7 @@
     markDirtyRect,
     requestRender,
     requestOverlayRender,
+    resolvePaletteColor = () => null,
     historyEntryType = 'pixelPatch',
   } = {}) {
     // Keep this aligned with the local HISTORY_DRAW_TOOLS set. All of these
@@ -53,11 +54,21 @@
       'fill',
       'fillDither',
       'fillGradient',
+      'selectionMove',
+      'selectionTransform',
+      'selectionCut',
+      'selectionPastePixels',
     ]);
     const MAX_CHANGES = 8192;
 
-    function isTransparentRgba(value) {
-      return !Array.isArray(value) || value.length !== 4 || Number(value[3]) === 0;
+    function isCompatibleIndexedRgba(value, paletteIndex) {
+      if (!Array.isArray(value) || value.length !== 4 || Number(value[3]) === 0) return true;
+      const color = resolvePaletteColor?.(paletteIndex);
+      if (!color || typeof color !== 'object') return false;
+      return Number(value[0]) === Number(color.r)
+        && Number(value[1]) === Number(color.g)
+        && Number(value[2]) === Number(color.b)
+        && Number(value[3]) === Number(color.a);
     }
 
     function appendChange(changes, index, before, after) {
@@ -73,10 +84,10 @@
         || !Number.isSafeInteger(paletteValue)
         || paletteValue < 0
         || paletteValue > 254
-        || !isTransparentRgba(before?.direct)
-        || !isTransparentRgba(after?.direct)
-        || !isTransparentRgba(before?.importSourceDirect)
-        || !isTransparentRgba(after?.importSourceDirect)
+        || !isCompatibleIndexedRgba(before?.direct, beforePaletteValue)
+        || !isCompatibleIndexedRgba(after?.direct, paletteValue)
+        || !isCompatibleIndexedRgba(before?.importSourceDirect, beforePaletteValue)
+        || !isCompatibleIndexedRgba(after?.importSourceDirect, paletteValue)
       ) {
         return false;
       }
@@ -174,6 +185,77 @@
       return valueOffset === entry.beforeIndices.length;
     }
 
+    function expandCompressedSelectionMove(entry, changes) {
+      const sourceMask = entry?.sourceMask;
+      const sourceIndices = entry?.sourceIndices;
+      const sourceDirect = entry?.sourceDirect;
+      const targetPositions = entry?.targetPositions;
+      const targetBeforeIndices = entry?.targetBeforeIndices;
+      const targetAfterIndices = entry?.targetAfterIndices;
+      const targetBeforeDirect = entry?.targetBeforeDirect;
+      const targetAfterDirect = entry?.targetAfterDirect;
+      const moveWidth = Math.trunc(Number(entry?.moveWidth));
+      const moveHeight = Math.trunc(Number(entry?.moveHeight));
+      const sourceX = Math.trunc(Number(entry?.sourceX));
+      const sourceY = Math.trunc(Number(entry?.sourceY));
+      if (
+        !(sourceMask instanceof Uint8Array)
+        || !(sourceIndices instanceof Int16Array || sourceIndices instanceof Uint8Array)
+        || !(targetPositions instanceof Int32Array)
+        || !(targetBeforeIndices instanceof Int16Array || targetBeforeIndices instanceof Uint8Array)
+        || !(targetAfterIndices instanceof Int16Array || targetAfterIndices instanceof Uint8Array)
+        || !Number.isSafeInteger(moveWidth)
+        || !Number.isSafeInteger(moveHeight)
+        || moveWidth < 1
+        || moveHeight < 1
+        || sourceMask.length !== moveWidth * moveHeight
+        || sourceIndices.length !== sourceMask.length
+        || targetBeforeIndices.length !== targetPositions.length
+        || targetAfterIndices.length !== targetPositions.length
+        || (sourceDirect != null && (!(sourceDirect instanceof Uint8ClampedArray) || sourceDirect.length !== sourceMask.length * 4))
+        || (targetBeforeDirect != null && (!(targetBeforeDirect instanceof Uint8ClampedArray) || targetBeforeDirect.length !== targetPositions.length * 4))
+        || (targetAfterDirect != null && (!(targetAfterDirect instanceof Uint8ClampedArray) || targetAfterDirect.length !== targetPositions.length * 4))
+      ) return false;
+      const byIndex = new Map();
+      for (let offset = 0; offset < targetPositions.length; offset += 1) {
+        const index = Number(targetPositions[offset]);
+        if (!Number.isSafeInteger(index) || index < 0 || byIndex.has(index)) return false;
+        const directOffset = offset * 4;
+        byIndex.set(index, {
+          index,
+          before: {
+            paletteIndex: targetBeforeIndices[offset],
+            direct: targetBeforeDirect ? [...targetBeforeDirect.subarray(directOffset, directOffset + 4)] : null,
+          },
+          after: {
+            paletteIndex: targetAfterIndices[offset],
+            direct: targetAfterDirect ? [...targetAfterDirect.subarray(directOffset, directOffset + 4)] : null,
+          },
+        });
+      }
+      for (let localIndex = 0; localIndex < sourceMask.length; localIndex += 1) {
+        if (sourceMask[localIndex] !== 1) continue;
+        const x = sourceX + (localIndex % moveWidth);
+        const y = sourceY + Math.floor(localIndex / moveWidth);
+        if (x < 0 || y < 0 || x >= Number(entry.width) || y >= Number(entry.height)) continue;
+        const index = (y * Number(entry.width)) + x;
+        const directOffset = localIndex * 4;
+        const existing = byIndex.get(index);
+        byIndex.set(index, {
+          index,
+          before: {
+            paletteIndex: sourceIndices[localIndex],
+            direct: sourceDirect ? [...sourceDirect.subarray(directOffset, directOffset + 4)] : null,
+          },
+          after: existing?.after || { paletteIndex: 0, direct: null },
+        });
+      }
+      for (const change of byIndex.values()) {
+        if (!appendChange(changes, change.index, change.before, change.after)) return false;
+      }
+      return true;
+    }
+
     function toPixelMutations(entry) {
       if (
         !entry
@@ -197,6 +279,8 @@
         if (!expandRasterTiles(entry, changes)) return null;
       } else if (entry.kind === 'solid-fill-runs') {
         if (!expandSolidFillRuns(entry, changes)) return null;
+      } else if (entry.kind === 'selection-move-compressed') {
+        if (!expandCompressedSelectionMove(entry, changes)) return null;
       } else {
         return null;
       }

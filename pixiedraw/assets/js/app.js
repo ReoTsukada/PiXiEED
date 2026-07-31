@@ -11896,6 +11896,7 @@
       },
       requestRender,
       requestOverlayRender,
+      resolvePaletteColor: paletteIndex => state.palette?.[paletteIndex] || null,
       historyEntryType: HISTORY_ENTRY_TYPE_PIXEL_PATCH,
     }) || null;
   const pixisyncCollaborationController = (

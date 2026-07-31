@@ -333,9 +333,24 @@ assert.equal(clientA.controller.canBeginLocalOperation('pen', {
   colorMode: 'rgb',
   v1Compatible: true,
 }), false, 'RGB mutations remain outside the indexed-patch protocol');
+for (const label of ['selectRect', 'selectLasso', 'selectSame']) {
+  assert.equal(clientA.controller.canBeginLocalOperation(label), true, `${label} must remain locally usable`);
+}
+for (const label of ['move', 'selectionMove', 'selectionTransform', 'selectionCut', 'selectionPastePixels']) {
+  assert.equal(clientA.controller.canBeginLocalOperation(label, {
+    colorMode: 'index',
+    v1Compatible: true,
+  }), true, `${label} must be available for indexed collaborative edits`);
+}
 assert.equal(clientA.controller.canBeginLocalOperation('pan'), true);
 await drawAndConverge(clientA, 'line', [{ index: 2, paletteValue: 6 }]);
 assert.equal(clientB.pixels[2], 6);
+await drawAndConverge(clientA, 'selectionMove', [
+  { index: 2, paletteValue: 0 },
+  { index: 12, paletteValue: 6 },
+]);
+assert.equal(clientA.pixels[2], 0);
+assert.equal(clientB.pixels[12], 6);
 await drawAndConverge(clientB, 'fillGradient', [{ index: 3, paletteValue: 7 }]);
 assert.equal(clientA.pixels[3], 7);
 const largeFill = clientA.drawSolidFill(1000, 9000, 18);
@@ -508,5 +523,7 @@ assert.match(
   /history\.past\.push\(historyEntry\)[\s\S]*onCommittedHistoryEntry\?\.\(historyEntry, pendingLabel\)/
 );
 assert.match(pointerSource, /!canBeginPiXiSyncLocalOperation\(activeTool\)/);
+assert.match(pointerSource, /!canBeginPiXiSyncLocalOperation\('selectionMove'\)/);
+assert.match(pointerSource, /!canBeginPiXiSyncLocalOperation\('selectionTransform'\)/);
 
 console.log('PiXiSYNC two-client finalized-history E2E passed');

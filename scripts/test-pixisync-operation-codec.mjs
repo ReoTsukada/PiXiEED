@@ -253,6 +253,76 @@ assert.deepEqual(largeFillMutations[1].changes.at(-1), {
   paletteValue: 9,
   beforePaletteValue: 0,
 });
+const indexedPalette = {
+  2: { r: 20, g: 40, b: 60, a: 255 },
+  3: { r: 30, g: 60, b: 90, a: 255 },
+  4: { r: 40, g: 80, b: 120, a: 255 },
+};
+const indexedDirectBridge = bridgeRoot.pixisyncPixelMutationBridgeUtils.createPiXiSyncPixelMutationBridgeUtils({
+  resolveTarget: mutation => ({ layer: {}, width: mutation.canvasWidth, height: mutation.canvasHeight }),
+  writeLayerPixelPatchValue: () => true,
+  resolvePaletteColor: paletteIndex => indexedPalette[paletteIndex] || null,
+});
+const redundantDirectFill = indexedDirectBridge.toPixelMutation({
+  __historyEntryType: 'pixelPatch',
+  kind: 'solid-fill-runs',
+  historyLabel: 'fill',
+  canvasId: 'canvas-a',
+  frameId: 'frame-a',
+  layerId: 'layer-a',
+  width: 4,
+  height: 2,
+  runs: new Int32Array([0, 2]),
+  beforeIndices: new Uint8Array([2, 2]),
+  beforeDirect: new Uint8ClampedArray([20, 40, 60, 255, 20, 40, 60, 255]),
+  afterPaletteIndex: 4,
+});
+assert.deepEqual(redundantDirectFill.changes, [
+  { index: 0, paletteValue: 4, beforePaletteValue: 2 },
+  { index: 1, paletteValue: 4, beforePaletteValue: 2 },
+]);
+assert.equal(indexedDirectBridge.toPixelMutation({
+  __historyEntryType: 'pixelPatch',
+  kind: 'solid-fill-runs',
+  historyLabel: 'fill',
+  canvasId: 'canvas-a',
+  frameId: 'frame-a',
+  layerId: 'layer-a',
+  width: 4,
+  height: 2,
+  runs: new Int32Array([0, 1]),
+  beforeIndices: new Uint8Array([2]),
+  beforeDirect: new Uint8ClampedArray([255, 0, 0, 255]),
+  afterPaletteIndex: 4,
+}), null, 'non-palette direct pixels must remain outside the indexed protocol');
+const compressedSelectionMove = indexedDirectBridge.toPixelMutation({
+  __historyEntryType: 'pixelPatch',
+  kind: 'selection-move-compressed',
+  historyLabel: 'selectionMove',
+  canvasId: 'canvas-a',
+  frameId: 'frame-a',
+  layerId: 'layer-a',
+  width: 4,
+  height: 2,
+  sourceX: 0,
+  sourceY: 0,
+  moveWidth: 2,
+  moveHeight: 1,
+  sourceMask: new Uint8Array([1, 1]),
+  sourceIndices: new Uint8Array([2, 3]),
+  sourceDirect: new Uint8ClampedArray([20, 40, 60, 255, 30, 60, 90, 255]),
+  targetPositions: new Int32Array([2, 3]),
+  targetBeforeIndices: new Uint8Array([0, 0]),
+  targetAfterIndices: new Uint8Array([2, 3]),
+  targetBeforeDirect: new Uint8ClampedArray(8),
+  targetAfterDirect: new Uint8ClampedArray([20, 40, 60, 255, 30, 60, 90, 255]),
+});
+assert.deepEqual(compressedSelectionMove.changes, [
+  { index: 0, paletteValue: 0, beforePaletteValue: 2 },
+  { index: 1, paletteValue: 0, beforePaletteValue: 3 },
+  { index: 2, paletteValue: 2, beforePaletteValue: 0 },
+  { index: 3, paletteValue: 3, beforePaletteValue: 0 },
+]);
 assert.equal(largeBridge.toPixelMutations({
   __historyEntryType: 'pixelPatch',
   kind: 'solid-fill-runs',

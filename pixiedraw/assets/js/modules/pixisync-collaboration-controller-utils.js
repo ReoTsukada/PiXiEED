@@ -29,8 +29,20 @@
       'fill',
       'fillDither',
       'fillGradient',
+      'move',
+      'selectionMove',
+      'selectionTransform',
+      'selectionCut',
+      'selectionPastePixels',
     ]);
-    const VIEW_ONLY_LABELS = new Set(['pan', 'zoom', 'eyedropper']);
+    const VIEW_ONLY_LABELS = new Set([
+      'pan',
+      'zoom',
+      'eyedropper',
+      'selectRect',
+      'selectLasso',
+      'selectSame',
+    ]);
     let runtime = null;
     const pendingOptimistic = new Map();
     const pendingGuarded = new Map();

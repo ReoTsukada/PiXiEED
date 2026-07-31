@@ -1895,6 +1895,10 @@
   }
 
   function beginSelectionMove(event, startPosition, options = {}) {
+    if (
+      typeof canBeginPiXiSyncLocalOperation === 'function'
+      && !canBeginPiXiSyncLocalOperation('selectionMove')
+    ) return false;
     const { reuseOffset = false } = options || {};
     hideSelectionTransformMenu();
     const layer = getActiveLayer();
@@ -1967,6 +1971,10 @@
   }
 
   function beginSelectionMoveFromVirtualCursor(startPosition, options = {}) {
+    if (
+      typeof canBeginPiXiSyncLocalOperation === 'function'
+      && !canBeginPiXiSyncLocalOperation('selectionMove')
+    ) return false;
     const { reuseOffset = false } = options || {};
     hideSelectionTransformMenu();
     if (!startPosition) {
@@ -4046,6 +4054,10 @@
     if (!dom.canvases.drawing || !handle) {
       return false;
     }
+    if (
+      typeof canBeginPiXiSyncLocalOperation === 'function'
+      && !canBeginPiXiSyncLocalOperation('selectionTransform')
+    ) return false;
     const moveState = ensureSelectionMoveForTransform();
     if (!moveState) {
       return false;
