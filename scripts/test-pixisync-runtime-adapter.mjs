@@ -47,6 +47,7 @@ class LifecycleServer {
     this.members = new Set(['owner']);
     this.broadcasts = [];
     this.realtimeOptions = [];
+    this.emitClosedOnStop = false;
   }
 
   manifest(role) {
@@ -158,7 +159,9 @@ function createRealtimeHarness(server) {
     let revision = BigInt(options.initialRevision || 0);
     return {
       start: async () => {},
-      stop: async () => {},
+      stop: async () => {
+        if (server.emitClosedOnStop) options.onChannelStatus?.('CLOSED');
+      },
       trackPresence: async () => {},
       untrackPresence: async () => {},
       syncFrom: async after => {
@@ -338,6 +341,7 @@ await lifecycleOwner.adapter.start();
 assert.equal(lifecycleOwner.adapter.snapshot().session.phase, 'active');
 assert.equal(lifecycleOwner.bridge.inputLocked, false);
 const initialRealtimeCount = lifecycleServer.realtimeOptions.length;
+lifecycleServer.emitClosedOnStop = true;
 assert.equal(await lifecycleOwner.adapter.handleLifecycleSuspend('visibility-hidden'), true);
 assert.equal(lifecycleOwner.adapter.snapshot().session.phase, 'reconnecting');
 assert.equal(lifecycleOwner.adapter.session.canDraw(), false);
