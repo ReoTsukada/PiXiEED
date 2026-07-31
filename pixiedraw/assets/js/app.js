@@ -350,8 +350,6 @@
       pixisyncConnectionLabel: document.getElementById('pixisyncConnectionLabel'),
       pixisyncStart: document.getElementById('pixisyncStart'),
       pixisyncCopyInvite: document.getElementById('pixisyncCopyInvite'),
-      pixisyncLeave: document.getElementById('pixisyncLeave'),
-      pixisyncArchive: document.getElementById('pixisyncArchive'),
       pixisyncAccessCodeField: document.getElementById('pixisyncAccessCodeField'),
       pixisyncAccessCode: document.getElementById('pixisyncAccessCode'),
       pixisyncJoinCode: document.getElementById('pixisyncJoinCode'),
@@ -11927,8 +11925,6 @@
         accessCodeField: dom.controls.pixisyncAccessCodeField,
         accessCode: dom.controls.pixisyncAccessCode,
         joinCode: dom.controls.pixisyncJoinCode,
-        leave: dom.controls.pixisyncLeave,
-        archive: dom.controls.pixisyncArchive,
         participantsTab: dom.controls.pixisyncParticipantsTab,
         commentsTab: dom.controls.pixisyncCommentsTab,
         participantsView: dom.controls.pixisyncParticipantsView,
@@ -11971,8 +11967,10 @@
       setInputLocked: locked => {
         pixisyncInputLocked = locked === true || pixisyncLocalReadOnly;
         pixisyncMinimalUi?.setExternalDrawLock?.(
-          pixisyncLocalReadOnly,
-          pixisyncLocalReadOnly ? 'このプロジェクトは別のタブで編集中です。この画面は閲覧専用です。' : ''
+          pixisyncInputLocked,
+          pixisyncLocalReadOnly
+            ? 'このプロジェクトは別のタブで編集中です。この画面は閲覧専用です。'
+            : (pixisyncInputLocked ? 'シェア状態を同期しています…' : '')
         );
       },
       applyConfirmed: (operation, metadata) => (
@@ -17260,9 +17258,25 @@
         autosaveSchemaVersion: Number(latestEntry.autosaveSchemaVersion) || 0,
       }) || '';
       const finishRecentProjectOpen = async (message = '自動保存: 端末内プロジェクトを開きました') => {
-        await resumePiXiSyncProjectCard(latestEntry);
+        const isPiXiSyncCard = Boolean(latestEntry?.pixisync && typeof latestEntry.pixisync === 'object');
+        const sharedSessionResumed = await resumePiXiSyncProjectCard(latestEntry);
         if (!silent) {
-          updateAutosaveStatus(message, 'success');
+          if (isPiXiSyncCard && !sharedSessionResumed) {
+            updateAutosaveStatus(
+              localizeText(
+                'シェアプロジェクトへ再接続しています。同期完了まで描画できません。',
+                'Reconnecting to the shared project. Drawing stays locked until sync completes.'
+              ),
+              'warn'
+            );
+          } else {
+            updateAutosaveStatus(
+              isPiXiSyncCard
+                ? localizeText('シェアプロジェクトへ再接続しました', 'Reconnected to the shared project')
+                : message,
+              'success'
+            );
+          }
         }
         if (hideStartupOnSuccess) {
           hideStartupScreen();
@@ -26579,13 +26593,6 @@
       return true;
     } catch (error) {
       console.warn('PiXiSYNC project-card resume failed', error);
-      updateAutosaveStatus(
-        localizeText(
-          '端末内プロジェクトを開きました。PiXiSYNCの再開には失敗しました。',
-          'The local project opened, but PiXiSYNC could not be resumed.'
-        ),
-        'warn'
-      );
       return false;
     }
   }

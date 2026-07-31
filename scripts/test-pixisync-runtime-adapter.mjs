@@ -48,6 +48,7 @@ class LifecycleServer {
     this.broadcasts = [];
     this.realtimeOptions = [];
     this.emitClosedOnStop = false;
+    this.failOpen = false;
   }
 
   manifest(role) {
@@ -86,6 +87,7 @@ class LifecycleServer {
             return { data: [{ room_id: ROOM_ID, status: 'active', head_revision: '0', active_checkpoint_id: this.checkpointId, session_generation: '1' }], error: null };
           }
           if (name === 'pixisync_open_session') {
+            if (this.failOpen) throw new Error('temporary-network-failure');
             assert.equal(params.p_room_id, ROOM_ID);
             assert.equal(this.status, 'active');
             assert.ok(this.members.has(actor));
@@ -266,8 +268,10 @@ await owner.adapter.dispose();
 owner = createAdapter({ server, actor: 'owner', clientId: OWNER_CLIENT, storage: ownerStorage, bindings: ownerBindings, checkpointText: 'checkpoint-owner' });
 await owner.adapter.initialize();
 assert.equal(owner.adapter.snapshot().session.phase, 'invited');
+assert.equal(owner.bridge.inputLocked, true, 'a persisted shared card must stay locked until resume is active');
 assert.equal(await owner.adapter.resumeBoundProject(), ROOM_ID);
 assert.equal(owner.adapter.snapshot().session.phase, 'active');
+assert.equal(owner.bridge.inputLocked, false);
 assert.equal(owner.restored, 'checkpoint-owner');
 assert.deepEqual(owner.restoreContext, { projectKey: 'project-owner', role: 'owner' });
 const sentComment = await owner.adapter.commands.sendComment(' owner message ');
@@ -286,23 +290,32 @@ assert.deepEqual(editorBindings.get('project-editor'), {
   role: 'participant',
   projectKey: 'project-editor',
 });
-assert.equal(editor.restored, 'checkpoint-owner');
-assert.deepEqual(editor.restoreContext, { projectKey: 'project-editor', role: 'participant' });
-const editorRestoreCount = editor.restored;
-await editor.adapter.handleLifecycleSuspend('visibility-hidden');
-await editor.adapter.handleLifecycleResume('visibility-visible');
-assert.equal(editor.adapter.snapshot().session.phase, 'active');
-assert.equal(editor.restored, editorRestoreCount, 'reconnect must not replace the participant canvas with a checkpoint');
+await editor.adapter.dispose();
+const resumedEditor = createAdapter({ server, actor: 'editor', clientId: EDITOR_CLIENT, storage: editorStorage, bindings: editorBindings, checkpointText: 'checkpoint-editor' });
+await resumedEditor.adapter.initialize();
+assert.equal(resumedEditor.adapter.snapshot().session.phase, 'invited');
+assert.equal(resumedEditor.bridge.inputLocked, true, 'a participant card must not reopen as editable local data');
+assert.equal(await resumedEditor.adapter.resumeBoundProject(), ROOM_ID);
+assert.equal(resumedEditor.adapter.snapshot().session.phase, 'active');
+assert.equal(resumedEditor.bridge.inputLocked, false);
+const activeEditor = resumedEditor;
+assert.equal(activeEditor.restored, 'checkpoint-owner');
+assert.deepEqual(activeEditor.restoreContext, { projectKey: 'project-editor', role: 'participant' });
+const editorRestoreCount = activeEditor.restored;
+await activeEditor.adapter.handleLifecycleSuspend('visibility-hidden');
+await activeEditor.adapter.handleLifecycleResume('visibility-visible');
+assert.equal(activeEditor.adapter.snapshot().session.phase, 'active');
+assert.equal(activeEditor.restored, editorRestoreCount, 'reconnect must not replace the participant canvas with a checkpoint');
 server.realtimeOptions.at(-1).onBroadcast('pixisync-comment', sentComment);
-assert.equal(editor.bridge.comments.length, 1);
-assert.equal(editor.bridge.comments[0].text, 'owner message');
+assert.equal(activeEditor.bridge.comments.length, 1);
+assert.equal(activeEditor.bridge.comments[0].text, 'owner message');
 server.realtimeOptions.at(-1).onPresenceChange([
   { clientId: OWNER_CLIENT, role: 'owner' },
   { clientId: EDITOR_CLIENT, role: 'editor' },
 ]);
-assert.deepEqual(editor.bridge.participants.map(item => item.name), ['Owner', '自分']);
-await editor.adapter.leave();
-assert.equal(editor.adapter.snapshot().session.phase, 'left');
+assert.deepEqual(activeEditor.bridge.participants.map(item => item.name), ['Owner', '自分']);
+await activeEditor.adapter.leave();
+assert.equal(activeEditor.adapter.snapshot().session.phase, 'left');
 assert.equal(server.members.has('editor'), false);
 assert.equal(editorBindings.has('project-editor'), false);
 
@@ -311,6 +324,41 @@ assert.equal(owner.adapter.snapshot().session.phase, 'archived');
 assert.equal(server.status, 'archived');
 assert.equal(server.checkpointHash, await sha256(server.objects.get(server.checkpointPath)));
 assert.equal(ownerBindings.has('project-owner'), false);
+
+// A persisted shared card never degrades to editable local data when its
+// first network reopen fails; it stays locked and queued for reconnect.
+const reopenFailureServer = new LifecycleServer();
+reopenFailureServer.status = 'active';
+reopenFailureServer.checkpointId = randomUUID();
+reopenFailureServer.checkpointPath = `rooms/${ROOM_ID}/checkpoints/0/${reopenFailureServer.checkpointId}.pxd`;
+const reopenFailureCheckpoint = new Blob(['checkpoint-reopen-failure']);
+reopenFailureServer.checkpointHash = await sha256(reopenFailureCheckpoint);
+reopenFailureServer.checkpointBytes = reopenFailureCheckpoint.size;
+reopenFailureServer.objects.set(reopenFailureServer.checkpointPath, reopenFailureCheckpoint);
+reopenFailureServer.failOpen = true;
+const reopenFailureBindings = new Map([['project-owner', {
+  roomId: ROOM_ID,
+  role: 'owner',
+  projectKey: 'project-owner',
+}]]);
+const reopenFailureOwner = createAdapter({
+  server: reopenFailureServer,
+  actor: 'owner',
+  clientId: OWNER_CLIENT,
+  storage: createStorage(),
+  bindings: reopenFailureBindings,
+  checkpointText: 'checkpoint-reopen-failure',
+});
+await reopenFailureOwner.adapter.initialize();
+await assert.rejects(reopenFailureOwner.adapter.resumeBoundProject(), /temporary-network-failure/);
+assert.equal(reopenFailureOwner.adapter.snapshot().session.phase, 'local');
+assert.equal(reopenFailureOwner.bridge.inputLocked, true);
+assert.equal(reopenFailureBindings.has('project-owner'), true);
+reopenFailureServer.failOpen = false;
+assert.equal(await reopenFailureOwner.adapter.resumeBoundProject(), ROOM_ID);
+assert.equal(reopenFailureOwner.adapter.snapshot().session.phase, 'active');
+assert.equal(reopenFailureOwner.bridge.inputLocked, false);
+await reopenFailureOwner.adapter.dispose();
 
 // A failed Realtime subscription must return the owner to local mode instead
 // of leaving the start button in the creating state forever.
@@ -379,5 +427,5 @@ await readOnlyOwner.adapter.start();
 assert.equal(readOnlyOwner.adapter.snapshot().session.phase, 'active');
 assert.equal(readOnlyOwner.bridge.runtime.localReadOnly, true);
 
-await Promise.all([owner.adapter.dispose(), editor.adapter.dispose(), lifecycleOwner.adapter.dispose(), readOnlyOwner.adapter.dispose()]);
+await Promise.all([owner.adapter.dispose(), activeEditor.adapter.dispose(), lifecycleOwner.adapter.dispose(), readOnlyOwner.adapter.dispose()]);
 console.log('PiXiSYNC runtime adapter lifecycle integration tests passed');

@@ -45,8 +45,6 @@
       start: elements.start,
       copyInvite: elements.copyInvite,
       joinCode: elements.joinCode,
-      leave: elements.leave,
-      archive: elements.archive,
     });
 
     const getSnapshot = () => session?.getSnapshot?.() || {
@@ -199,16 +197,6 @@
         actionButtons.start.textContent = 'シェアモードを開始';
       }
       setHidden(actionButtons.copyInvite, !(owner && active && typeof commands.createInviteLink === 'function'));
-      setHidden(actionButtons.leave, !(
-        !owner
-        && ['syncing', 'active', 'reconnecting'].includes(phase)
-        && typeof commands.leave === 'function'
-      ));
-      setHidden(actionButtons.archive, !(
-        owner
-        && active
-        && typeof commands.archive === 'function'
-      ));
       setHidden(actionButtons.joinCode, !(
         phase === 'disabled'
         || commentMode
@@ -223,7 +211,6 @@
         button.disabled = Boolean(
           !enabled
           || busyAction
-          || (name === 'archive' && Number(snapshot.pendingOperationCount) > 0)
         );
         button.setAttribute('aria-busy', busyAction === name ? 'true' : 'false');
       });
@@ -346,16 +333,6 @@
           failureMessage: '招待を確認できませんでした。',
         });
       },
-      leave: () => runAction('leave', commands.leave, {
-        pendingMessage: '共同編集から退出しています…',
-        successMessage: '共同編集から退出しました。',
-        failureMessage: '共同編集から退出できませんでした。',
-      }),
-      archive: () => runAction('archive', commands.archive, {
-        pendingMessage: '共同編集を終了しています…',
-        successMessage: '共同編集を終了しました。',
-        failureMessage: '共同編集を終了できませんでした。',
-      }),
     };
 
     Object.entries(actionButtons).forEach(([name, button]) => {

@@ -60,6 +60,10 @@
     let reconnectRetryAttempt = 0;
     let projectLease = null;
     let localReadOnly = false;
+    // Once a card has been bound to a room, it must never silently fall back
+    // to an editable local document. Keep it draw-locked until the
+    // authoritative shared session is active again.
+    let projectBindingPersisted = false;
     // Supabase may emit CLOSED asynchronously after removeChannel/stop().
     // Those intentional shutdowns must not be fed back into the session as a
     // transport failure while a lifecycle reconnect is already in progress.
@@ -136,6 +140,17 @@
       }, baseDelay + jitter);
       report({ phase: 'reconnecting', retryInMs: baseDelay + jitter, reason });
     };
+    const scheduleBoundProjectResumeRetry = reason => {
+      if (disposed || lifecycleSuspended || !projectBindingPersisted || reconnectRetryTimer) return;
+      const attempt = reconnectRetryAttempt++;
+      const baseDelay = Math.min(30000, 750 * (2 ** Math.min(attempt, 5)));
+      const jitter = Math.floor(Math.random() * 250);
+      reconnectRetryTimer = window.setTimeout(() => {
+        reconnectRetryTimer = 0;
+        void resumeBoundProject().catch(() => {});
+      }, baseDelay + jitter);
+      report({ phase: 'reconnecting', retryInMs: baseDelay + jitter, reason });
+    };
     const report = details => {
       onStatus(details);
       runtimeBridge.refreshUi?.();
@@ -154,9 +169,11 @@
       const binding = normalizeProjectBinding({ roomId, role, projectKey: boundProjectKey });
       if (!binding) throw new Error('PiXiSYNC runtime: project-binding-unavailable');
       await writeProjectBinding(binding.projectKey, binding);
+      projectBindingPersisted = true;
     };
     const removeProjectBinding = async () => {
       if (boundProjectKey) await clearProjectBinding(boundProjectKey);
+      projectBindingPersisted = false;
     };
     const releaseProjectLease = async () => {
       const lease = projectLease;
@@ -210,11 +227,13 @@
       unsubscribeSession?.();
       role = nextRole === 'owner' ? 'owner' : 'participant';
       session = createSession({ role, resumeAvailable });
-      unsubscribeSession = session.subscribe(snapshot => {
+      const applySessionSnapshot = snapshot => {
         // The collaboration controller is installed only after a channel is
         // available. Keep canvas input locked throughout every transition so
         // a start/resume cannot create an unsynchronised local stroke.
-        runtimeBridge.setInputLocked?.(!['local', 'invited', 'left', 'archived', 'active'].includes(snapshot.phase));
+        const phaseAllowsLocalInput = ['local', 'invited', 'left', 'archived', 'active'].includes(snapshot.phase);
+        const boundSharedCardIsInactive = projectBindingPersisted && snapshot.phase !== 'active';
+        runtimeBridge.setInputLocked?.(!phaseAllowsLocalInput || boundSharedCardIsInactive);
         if (snapshot.phase === 'active') clearReconnectRetry();
         report({
           phase: snapshot.phase,
@@ -226,8 +245,13 @@
           lifecycleSuspended,
           realtimeConnected: Boolean(realtimeClient),
         });
-      });
+      };
+      unsubscribeSession = session.subscribe(applySessionSnapshot);
       configureBridge({ collaboration: false });
+      // subscribe() reports transitions only. Apply the initial invited/local
+      // state now so a persisted shared card cannot be edited between open and
+      // the first network transition.
+      applySessionSnapshot(currentSnapshot());
       return session;
     }
 
@@ -661,6 +685,10 @@
         throw new Error('PiXiSYNC runtime: project-binding-unavailable');
       }
       boundProjectKey = binding.projectKey;
+      // Retain the durable target before the first network attempt so a
+      // temporary open failure can retry the same room without consuming the
+      // original invite again.
+      roomId = binding.roomId;
       await acquireEditingLease(binding.projectKey);
       configureBridge({ collaboration: false });
       runtimeBridge.setInputLocked?.(true);
@@ -673,8 +701,7 @@
       runtimeBridge.refreshUi?.();
       const epoch = opening.state.epoch;
       try {
-        manifest = await openManifest(binding.roomId);
-        roomId = binding.roomId;
+        manifest = await openManifest(roomId);
         const event = binding.role === 'owner'
           ? {
               type: 'ROOM_READY',
@@ -694,7 +721,11 @@
         await dispatchNow(event);
         return roomId;
       } catch (error) {
+        // A persisted card is still a shared project when the first reopen
+        // attempt fails. Reset the incomplete open transaction, keep the
+        // persisted card draw-locked, and retry the complete bound-card open.
         await dispatchNow({ type: 'FAIL', epoch, reason: error?.message || 'open-failed' });
+        scheduleBoundProjectResumeRetry(error?.message || 'open-failed');
         throw error;
       }
     }
@@ -846,6 +877,7 @@
     async function initialize() {
       await ensureSupabase();
       const binding = normalizeProjectBinding(await readProjectBinding(String(getProjectKey() || '')));
+      projectBindingPersisted = Boolean(binding);
       boundProjectKey = binding?.projectKey || '';
       installSession(binding?.role || 'owner', { resumeAvailable: Boolean(binding) });
       configureBridge({ collaboration: false });

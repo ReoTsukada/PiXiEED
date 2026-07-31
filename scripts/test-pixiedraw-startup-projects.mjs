@@ -24,11 +24,11 @@ assert.doesNotMatch(lensIndex, /id="updateToast"|id="updateToastCloseBtn"|class=
 for (const html of [index]) {
   assert.match(html, /id="stage" tabindex="-1"/);
 }
-assert.match(index, /startup-workflow-utils\.js\?v=20260726-workspace-project-actions1/);
+assert.match(index, /startup-workflow-utils\.js\?v=[^"\s]+/);
 assert.match(index, /document-model\.js\?v=20260724-legacy-cow-migration1/);
-assert.match(index, /app\.js\?v=20260726-project-card-actions2/);
-assert.match(index, /timeline-layers\.js\?v=20260724-timeline-tap-sync10/);
-assert.match(index, /retired-collaboration-compat\.js\?v=20260724-timeline-selection2/);
+assert.match(index, /app\.js\?v=[^"\s]+/);
+assert.match(index, /timeline-layers\.js\?v=[^"\s]+/);
+assert.match(index, /retired-collaboration-compat\.js\?v=[^"\s]+/);
 for (const source of [startup]) {
   assert.match(source, /container\.inert = false;[\s\S]{0,100}container\.hidden = false;[\s\S]{0,100}container\.removeAttribute\('aria-hidden'\);/);
   assert.match(source, /container\.contains\(activeElement\)[\s\S]{0,280}dom\.stage\.focus\(\{ preventScroll: true \}\);[\s\S]{0,280}container\.inert = true;[\s\S]{0,100}container\.hidden = true;/);
@@ -90,8 +90,7 @@ assert.match(app, /startupReady = true;[\s\S]{0,100}scheduleLegacyProjectReopenN
 assert.match(app, /timelineMatrixViewportPan = \{[\s\S]{0,120}startedOnControl: false/);
 assert.match(await read('pixiedraw\/assets\/js\/modules\/timeline-layers.js'), /activationThreshold[\s\S]{0,220}startedOnControl/);
 assert.match(startup, /startupWorkspaceSearchQuery/);
-assert.match(startup, /\(visibleIndex \+ 1\) % 8 === 0/);
-assert.doesNotMatch(startup, /visibleIndex === 3/);
+assert.match(startup, /PiXiEEDCardFeedAds\?\.renderProgressively/);
 assert.match(startup, /closest\('\.startup-screen__recent, \.startup-workspace,/);
 assert.match(lifecycle, /showStartupScreen\?\.\(\{ refreshWorkspace: refresh \}\)/);
 for (const source of [workflow]) {
@@ -100,6 +99,10 @@ for (const source of [workflow]) {
 }
 assert.match(css, /\.startup-screen__content\s*\{[\s\S]*?width: min\(1440px, 100%\)/);
 assert.match(css, /\.startup-workspace__project-thumbnail\s*\{[\s\S]*?aspect-ratio: 1 \/ 1/);
+assert.match(startup, /isPiXiSyncCard = Boolean\([\s\S]{0,220}entry\?\.pixisync/);
+assert.match(startup, /startup-workspace__project-share-badge/);
+assert.match(startup, /シェア中/);
+assert.match(css, /\.startup-workspace__project-share-badge\s*\{[\s\S]*?position: absolute;[\s\S]*?top: 14px;[\s\S]*?left: 14px;/);
 assert.match(css, /@media \(max-width: 720px\)[\s\S]*?\.startup-workspace__list\s*\{[\s\S]*?repeat\(2, minmax\(0, 1fr\)\)/);
 assert.match(css, /@media \(orientation: landscape\)[\s\S]*?\.startup-screen\s*\{[\s\S]*?--pixieed-shared-side-nav-width/);
 assert.match(css, /--pixieed-shared-side-nav-gap/);

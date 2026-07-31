@@ -91,8 +91,6 @@ const createElements = () => {
     connectionLabel: new FakeElement(),
     start: new FakeElement(),
     copyInvite: new FakeElement(),
-    leave: new FakeElement(),
-    archive: new FakeElement(),
     accessCodeField: new FakeElement(),
     accessCode: new FakeElement(),
     joinCode: new FakeElement(),
@@ -154,7 +152,7 @@ resolveStart();
 assert.equal(await firstStart, true);
 assert.equal(elements.start.disabled, false);
 
-// Active owner sees only the owner actions. Pending work blocks archive.
+// Active owner can issue invites, but permanent sharing has no end action.
 const ownerSession = createSession({ role: 'owner' });
 activate(ownerSession);
 let copied = '';
@@ -169,7 +167,6 @@ ownerUi.configure({
   session: ownerSession,
   commands: {
     createInviteLink: async () => `https://example.test/pixiedraw/?pixisync_invite=${'a'.repeat(64)}`,
-    archive: async () => {},
   },
   participants: [
     { id: 'owner', name: 'Owner', role: 'owner', connection: 'online' },
@@ -177,8 +174,6 @@ ownerUi.configure({
   ],
 });
 assert.equal(ownerElements.copyInvite.hidden, false);
-assert.equal(ownerElements.archive.hidden, false);
-assert.equal(ownerElements.leave.hidden, true);
 assert.equal(ownerElements.participantCount.textContent, '2');
 ownerUi.setExternalDrawLock(true, '別のタブで編集中です。閲覧専用です。');
 assert.equal(ownerElements.drawLock.hidden, false);
@@ -189,8 +184,6 @@ await ownerElements.copyInvite.click();
 assert.match(copied, /pixisync_invite=/);
 assert.equal(ownerElements.accessCode.value, '');
 assert.equal(ownerElements.accessCode.placeholder, '招待リンク / コード');
-ownerSession.dispatch({ type: 'PENDING_OPERATION_COUNT', epoch: ownerSession.getSnapshot().epoch, count: 32 });
-assert.equal(ownerElements.archive.disabled, true);
 
 // Reconnecting is rendered from session state and immediately locks drawing.
 ownerSession.dispatch({ type: 'SOCKET_OFFLINE', epoch: ownerSession.getSnapshot().epoch });
@@ -198,7 +191,7 @@ assert.equal(ownerElements.statusLabel.textContent, '再接続中');
 assert.equal(ownerElements.drawLock.hidden, false);
 assert.equal(ownerElements.canvasViewport.attributes.get('aria-disabled'), 'true');
 
-// Participant actions never expose owner controls.
+// Participant sharing is permanent and exposes no leave action.
 const participantSession = createSession({ role: 'participant' });
 activate(participantSession, { role: 'participant' });
 const participantElements = createElements();
@@ -206,10 +199,8 @@ const participantUi = createUi({ elements: participantElements, body: fakeDocume
 participantUi.configure({
   enabled: true,
   session: participantSession,
-  commands: { leave: async () => {} },
+  commands: {},
 });
-assert.equal(participantElements.leave.hidden, false);
-assert.equal(participantElements.archive.hidden, true);
 assert.equal(participantElements.drawLock.hidden, true);
 
 // The same input accepts an invite before joining and sends comments while active.
@@ -222,7 +213,6 @@ participantUi.configure({
   session: participantSession,
   commands: {
     join: async token => { manualJoinToken = token; },
-    leave: async () => {},
     sendComment: async text => {
       sentComment = text;
       return {
@@ -325,8 +315,6 @@ for (const id of [
   'pixisyncPanel',
   'pixisyncStart',
   'pixisyncCopyInvite',
-  'pixisyncLeave',
-  'pixisyncArchive',
   'pixisyncAccessCode',
   'pixisyncJoinCode',
   'panelMulti',
@@ -334,6 +322,7 @@ for (const id of [
   'pixisyncQuickOpen',
   'pixisyncDrawLock',
 ]) assert.match(html, new RegExp(`id="${id}"`));
+assert.doesNotMatch(html, /id="pixisyncLeave"|id="pixisyncArchive"/);
 assert.match(html, /pixisync-minimal-ui-utils\.js/);
 assert.doesNotMatch(html, /pixisyncStatusDetail|pixisyncCommentInput|pixisyncCommentSend/);
 assert.doesNotMatch(html, /受け取ったリンクまたはコード|コメントは共同編集中/);

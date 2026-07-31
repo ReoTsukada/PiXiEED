@@ -1523,13 +1523,31 @@
     const cards = [];
     visibleEntries.forEach((entry) => {
       const entryIndex = startupWorkspaceEntries.indexOf(entry);
+      const isPiXiSyncCard = Boolean(
+        entry?.pixisync
+        && typeof entry.pixisync === 'object'
+        && entry.pixisync.roomId
+      );
       const card = document.createElement('article');
       card.className = 'startup-workspace__project';
+      card.classList.toggle('is-pixisync', isPiXiSyncCard);
       card.setAttribute('role', 'listitem');
       const openButton = document.createElement('button');
       openButton.type = 'button';
       openButton.className = 'startup-workspace__project-open';
       openButton.dataset.workspaceProjectOpenIndex = String(entryIndex);
+      if (isPiXiSyncCard) {
+        const shareBadge = document.createElement('span');
+        shareBadge.className = 'startup-workspace__project-share-badge';
+        shareBadge.title = localizeText('シェア中のプロジェクト', 'Shared project');
+        shareBadge.setAttribute('aria-label', localizeText('シェア中', 'Shared'));
+        const shareIcon = document.createElement('img');
+        shareIcon.src = '../pixisync.png?v=20260731-pixisync-icon2';
+        shareIcon.alt = '';
+        shareIcon.setAttribute('aria-hidden', 'true');
+        shareBadge.appendChild(shareIcon);
+        openButton.appendChild(shareBadge);
+      }
       if (entry?.deviceLocalProject !== true && entry?.migrationRecovery !== true && Number(entry?.size) === 0) {
         openButton.title = localizeText(
           'このファイルは0バイトのため開けません。端末内の元データが残っている場合は「V2移行待ち」のカードから復旧してください。ファイルは自動削除しません。',
@@ -1574,6 +1592,8 @@
             : localizeText('更新日時不明', 'Unknown date'));
       meta.textContent = entry?.migrationRecovery === true
         ? `${modified} / ${localizeText('端末内・V2移行待ち', 'On device · awaiting V2 migration')}`
+        : isPiXiSyncCard
+          ? `${modified} / ${localizeText('シェア中', 'Shared')}`
         : entry?.deviceLocalProject === true
           ? `${modified} / ${localizeText('端末内保存', 'On-device storage')}`
           : modified;

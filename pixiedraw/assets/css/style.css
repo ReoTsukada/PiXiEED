@@ -10546,6 +10546,7 @@ body.is-startup-active .pixieed-shared-top-ad {
 }
 
 .startup-workspace__project-open {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -10559,6 +10560,32 @@ body.is-startup-active .pixieed-shared-top-ad {
   font: inherit;
   text-align: left;
   cursor: pointer;
+}
+
+.startup-workspace__project-share-badge {
+  position: absolute;
+  z-index: 2;
+  top: 14px;
+  left: 14px;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid rgba(88, 225, 255, 0.72);
+  border-radius: 10px;
+  background: rgba(4, 17, 29, 0.9);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.38), 0 0 12px rgba(53, 211, 255, 0.24);
+  pointer-events: none;
+}
+
+.startup-workspace__project-share-badge img {
+  width: 23px;
+  height: 23px;
+  object-fit: contain;
+}
+
+.startup-workspace__project.is-pixisync {
+  border-color: rgba(88, 225, 255, 0.46);
 }
 
 .startup-workspace__project-open:focus-visible {
@@ -10892,6 +10919,19 @@ body.is-startup-active .pixieed-shared-top-ad {
     width: 100%;
     height: auto;
     border-radius: 8px;
+  }
+
+  .startup-workspace__project-share-badge {
+    top: 13px;
+    left: 13px;
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+  }
+
+  .startup-workspace__project-share-badge img {
+    width: 20px;
+    height: 20px;
   }
 
   .startup-workspace__project-name {
