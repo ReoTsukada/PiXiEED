@@ -150,6 +150,16 @@
         const record = { roomId, clientId, operationId, kind, structureEpoch, changes: canonicalChanges, canvasId, frameId, layerId, canvasWidth, canvasHeight, undoOfOperationId, payloadB64: codec.bytesToBase64(payload), payloadSha256 };
         await journal?.put?.(record);
         pendingLocalOperations.set(operationId, { optimistic: !guarded, record });
+        // Broadcast is only a low-latency hint. Send the operation identity
+        // before the RPC so peers can begin their authoritative fetch while
+        // Postgres is assigning the canonical revision. No pixel payload is
+        // trusted from this message; the RPC response remains the source of
+        // truth and the post-commit hint below closes delivery races.
+        void withTimeout('operation-hint-precommit', channel?.send({
+          type: 'broadcast',
+          event: 'operation-hint',
+          payload: { operationId },
+        })).catch(() => {});
         const { data, error } = await withTimeout('commit-operation', supabase.rpc('pixisync_commit_operation', {
           p_room_id: roomId, p_operation_id: operationId, p_client_id: clientId, p_kind: kind, p_structure_epoch: structureEpoch,
           p_codec_version: 1, p_canvas_id: canvasId, p_frame_id: frameId, p_layer_id: layerId, p_canvas_width: canvasWidth, p_canvas_height: canvasHeight,

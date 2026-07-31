@@ -26350,8 +26350,26 @@
         const packaged = buildPackagedProjectPayload(snapshot, {
           session: projectSession,
           includeSheets: false,
-          internalBinary: true,
+          // Checkpoints must be portable across the document deserializer.
+          // The compact typed-array form can mismatch when a live tiled/direct
+          // layer is being captured; expanded indices are still used only for
+          // the infrequent checkpoint, while live sync remains pixel-delta based.
+          internalBinary: false,
         });
+        // Validate the exact document payload before it leaves the browser.
+        // A malformed compact/direct layer must never become the room's
+        // revision-0 checkpoint and force every participant into reconnect.
+        const validatedSnapshot = deserializeDocumentPayload(packaged.document);
+        if (
+          !validatedSnapshot
+          || validatedSnapshot.width !== snapshot.width
+          || validatedSnapshot.height !== snapshot.height
+          || !Array.isArray(validatedSnapshot.frames)
+          || validatedSnapshot.frames.length !== snapshot.frames.length
+          || validatedSnapshot.frames.some(frame => !Array.isArray(frame?.layers) || frame.layers.length === 0)
+        ) {
+          throw new Error('PiXiSYNC checkpoint validation failed');
+        }
         const serialized = await serializeProjectStorageSnapshot({
           snapshot,
           session: projectSession,
