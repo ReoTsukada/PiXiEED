@@ -26447,6 +26447,7 @@
       // A bound card is an explicit PiXiSYNC entry point. Unlike the initial
       // discovery gesture, reopening it must expose the sync panel at once.
       pixisyncInitialGateUnlocked = true;
+      window.__PIXISYNC_SHARE_START_UNLOCKED__ = true;
       document.body?.setAttribute('data-pixisync-initial-gate', 'unlocked');
       setPiXiSyncInitialGateButtonsEnabled(true);
       const runtime = window.__PIXISYNC_V1_RUNTIME__ || await initializePiXiSyncRuntime();
@@ -26482,6 +26483,7 @@
   }
 
   function setupPiXiSyncInitialGate() {
+    window.__PIXISYNC_SHARE_START_UNLOCKED__ = false;
     const settingsButtons = Array.from(new Set([
       document.querySelector('[data-quick-right-tab="settings"]'),
       document.getElementById('mobileTabSettings'),
@@ -26490,6 +26492,17 @@
       pixisyncInitialGateTapCount = 0;
       pixisyncInitialGateResetTimer = 0;
     };
+    // 参加者は設定ボタンの隠しゲートを経由せず、シェアモード入口から
+    // 招待リンク／コードを通常操作できるようにする。
+    setPiXiSyncInitialGateButtonsEnabled(true);
+    [dom.controls.pixisyncQuickOpen, dom.controls.pixisyncMobileTab].forEach(button => {
+      button?.addEventListener?.('click', () => {
+        if (window.__PIXISYNC_V1_RUNTIME__) return;
+        void initializePiXiSyncRuntime().catch(error => {
+          console.warn('PiXiSYNC share-mode bootstrap failed', error);
+        });
+      }, { once: false });
+    });
     const unlock = async () => {
       if (pixisyncInitialGateUnlocked) return;
       pixisyncInitialGateTapCount += 1;
@@ -26499,6 +26512,7 @@
 
       resetTapCount();
       pixisyncInitialGateUnlocked = true;
+      window.__PIXISYNC_SHARE_START_UNLOCKED__ = true;
       document.body?.setAttribute('data-pixisync-initial-gate', 'unlocked');
       setPiXiSyncInitialGateButtonsEnabled(true);
       try {
@@ -26586,6 +26600,21 @@
         return false;
       });
       setupPiXiSyncInitialGate();
+      // 招待URLで開いた受信側は、設定ボタンのゲート操作を要求せず
+      // V1シェアランタイムを先に起動してリンクを消費する。
+      // これにより送信先でも現在のローカルプロジェクトへ参加バインドを作成できる。
+      try {
+        const inviteUrl = new URL(window.location.href);
+        if (inviteUrl.searchParams.has('pixisync_invite')) {
+          pixisyncInitialGateUnlocked = true;
+          window.__PIXISYNC_SHARE_START_UNLOCKED__ = true;
+          document.body?.setAttribute('data-pixisync-initial-gate', 'unlocked');
+          setPiXiSyncInitialGateButtonsEnabled(true);
+          await initializePiXiSyncRuntime();
+        }
+      } catch (error) {
+        console.warn('PiXiSYNC invite bootstrap failed', error);
+      }
       console.info('[pixiedraw:startup]', { phase: 'startup-session-restore-skipped', reason: 'always-start-from-home' });
       let openedExternalImportProject = false;
       try {
