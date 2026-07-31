@@ -2,6 +2,35 @@
   if (typeof window === 'undefined') return;
   const root = window.PiXiEEDrawModules = window.PiXiEEDrawModules || {};
 
+  function isIndexedLayerCompatible(layer) {
+    if (!layer || typeof layer !== 'object') return false;
+    if (layer.directOnly !== true) return true;
+    const hasVisiblePixels = pixels => {
+      if (!(pixels instanceof Uint8ClampedArray)) return false;
+      for (let alpha = 3; alpha < pixels.length; alpha += 4) {
+        if (pixels[alpha] !== 0) return true;
+      }
+      return false;
+    };
+    // A newly restored blank layer can retain an allocated direct buffer even
+    // though every pixel is transparent. Local drawing converts that layer on
+    // its first write, so PiXiSYNC must not block the pointer before that write.
+    if (hasVisiblePixels(layer.direct) || hasVisiblePixels(layer.importSourceDirect)) return false;
+    const indices = layer.indices;
+    if (indices instanceof Uint8Array) {
+      for (let index = 0; index < indices.length; index += 1) {
+        if (indices[index] !== 0) return false;
+      }
+    } else if (indices instanceof Int16Array) {
+      for (let index = 0; index < indices.length; index += 1) {
+        if (indices[index] >= 0) return false;
+      }
+    } else {
+      return false;
+    }
+    return true;
+  }
+
   function createPiXiSyncPixelMutationBridgeUtils({
     resolveTarget,
     writeLayerPixelPatchValue,
@@ -10,7 +39,21 @@
     requestOverlayRender,
     historyEntryType = 'pixelPatch',
   } = {}) {
-    const ELIGIBLE_LABELS = new Set(['pen', 'eraser']);
+    // Keep this aligned with the local HISTORY_DRAW_TOOLS set. All of these
+    // tools finalize to the same indexed pixelPatch representation.
+    const ELIGIBLE_LABELS = new Set([
+      'pen',
+      'eraser',
+      'line',
+      'curve',
+      'rect',
+      'rectFill',
+      'ellipse',
+      'ellipseFill',
+      'fill',
+      'fillDither',
+      'fillGradient',
+    ]);
     const MAX_CHANGES = 8192;
 
     function isTransparentRgba(value) {
@@ -19,8 +62,8 @@
 
     function appendChange(changes, index, before, after) {
       const safeIndex = Math.trunc(Number(index));
-      const beforePaletteValue = Math.trunc(Number(before?.paletteIndex));
-      const paletteValue = Math.trunc(Number(after?.paletteIndex));
+      const beforePaletteValue = Math.max(0, Math.trunc(Number(before?.paletteIndex)));
+      const paletteValue = Math.max(0, Math.trunc(Number(after?.paletteIndex)));
       if (
         !Number.isSafeInteger(safeIndex)
         || safeIndex < 0
@@ -39,7 +82,7 @@
       }
       if (beforePaletteValue === paletteValue) return true;
       changes.push({ index: safeIndex, paletteValue, beforePaletteValue });
-      return changes.length <= MAX_CHANGES;
+      return true;
     }
 
     function expandRasterTiles(entry, changes) {
@@ -87,7 +130,51 @@
       return true;
     }
 
-    function toPixelMutation(entry) {
+    function expandSolidFillRuns(entry, changes) {
+      if (
+        !(entry.runs instanceof Int32Array)
+        || entry.runs.length < 2
+        || entry.runs.length % 2 !== 0
+        || !(entry.beforeIndices instanceof Int16Array || entry.beforeIndices instanceof Uint8Array)
+        || !Number.isSafeInteger(Number(entry.afterPaletteIndex))
+        || Number(entry.afterPaletteIndex) < 0
+        || Number(entry.afterPaletteIndex) > 254
+      ) return false;
+      const beforeDirect = entry.beforeDirect;
+      if (beforeDirect != null && (!(beforeDirect instanceof Uint8ClampedArray) || beforeDirect.length !== entry.beforeIndices.length * 4)) {
+        return false;
+      }
+      let valueOffset = 0;
+      let previousEnd = 0;
+      for (let offset = 0; offset < entry.runs.length; offset += 2) {
+        const start = Number(entry.runs[offset]);
+        const length = Number(entry.runs[offset + 1]);
+        if (
+          !Number.isSafeInteger(start)
+          || !Number.isSafeInteger(length)
+          || start < previousEnd
+          || length < 1
+          || start < 0
+          || start + length > Number(entry.width) * Number(entry.height)
+        ) return false;
+        for (let local = 0; local < length; local += 1, valueOffset += 1) {
+          if (valueOffset >= entry.beforeIndices.length) return false;
+          const direct = beforeDirect
+            ? [...beforeDirect.subarray(valueOffset * 4, (valueOffset + 1) * 4)]
+            : null;
+          if (!appendChange(
+            changes,
+            start + local,
+            { paletteIndex: entry.beforeIndices[valueOffset], direct },
+            { paletteIndex: entry.afterPaletteIndex, direct: null }
+          )) return false;
+        }
+        previousEnd = start + length;
+      }
+      return valueOffset === entry.beforeIndices.length;
+    }
+
+    function toPixelMutations(entry) {
       if (
         !entry
         || entry.__historyEntryType !== historyEntryType
@@ -108,29 +195,42 @@
         }
       } else if (entry.kind === 'raster-tile-patch') {
         if (!expandRasterTiles(entry, changes)) return null;
+      } else if (entry.kind === 'solid-fill-runs') {
+        if (!expandSolidFillRuns(entry, changes)) return null;
       } else {
         return null;
       }
-      if (!changes.length || changes.length > MAX_CHANGES) return null;
+      if (!changes.length) return null;
       changes.sort((a, b) => a.index - b.index);
-      const mutation = {
+      for (let index = 1; index < changes.length; index += 1) {
+        if (changes[index - 1].index === changes[index].index) return null;
+      }
+      const base = {
         canvasId: entry.canvasId,
         frameId: entry.frameId,
         layerId: entry.layerId,
         canvasWidth: Number(entry.width),
         canvasHeight: Number(entry.height),
-        changes,
       };
-      const target = resolveTarget?.(mutation);
+      const target = resolveTarget?.({ ...base, changes });
       if (
         target
         && (
-          Number(target.width) !== mutation.canvasWidth
-          || Number(target.height) !== mutation.canvasHeight
+          Number(target.width) !== base.canvasWidth
+          || Number(target.height) !== base.canvasHeight
           || target.v1Compatible === false
         )
       ) return null;
-      return mutation;
+      const mutations = [];
+      for (let offset = 0; offset < changes.length; offset += MAX_CHANGES) {
+        mutations.push({ ...base, changes: changes.slice(offset, offset + MAX_CHANGES) });
+      }
+      return mutations;
+    }
+
+    function toPixelMutation(entry) {
+      const mutations = toPixelMutations(entry);
+      return mutations?.length === 1 ? mutations[0] : null;
     }
 
     function applyPixelMutation(mutation, { useBefore = false } = {}) {
@@ -157,7 +257,10 @@
       if (applied) { markDirtyRect?.(x0, y0, x1, y1); requestRender?.(); requestOverlayRender?.(); }
       return { applied, appliedIndices, x0, y0, x1, y1 };
     }
-    return { ELIGIBLE_LABELS, MAX_CHANGES, toPixelMutation, applyPixelMutation };
+    return { ELIGIBLE_LABELS, MAX_CHANGES, toPixelMutation, toPixelMutations, applyPixelMutation };
   }
-  root.pixisyncPixelMutationBridgeUtils = { createPiXiSyncPixelMutationBridgeUtils };
+  root.pixisyncPixelMutationBridgeUtils = {
+    createPiXiSyncPixelMutationBridgeUtils,
+    isIndexedLayerCompatible,
+  };
 })();

@@ -11865,7 +11865,12 @@
 
   const pixisyncWriterStampUtils = window.PiXiEEDrawModules?.pixisyncWriterStampUtils
     ?.createPiXiSyncWriterStampUtils?.() || null;
-  const pixisyncPixelMutationBridge = window.PiXiEEDrawModules?.pixisyncPixelMutationBridgeUtils
+  const pixisyncPixelMutationBridgeUtils = window.PiXiEEDrawModules?.pixisyncPixelMutationBridgeUtils;
+  const isPiXiSyncLayerV1Compatible = layer => Boolean(
+    state.colorMode === COLOR_MODE_INDEX
+    && pixisyncPixelMutationBridgeUtils?.isIndexedLayerCompatible?.(layer)
+  );
+  const pixisyncPixelMutationBridge = pixisyncPixelMutationBridgeUtils
     ?.createPiXiSyncPixelMutationBridgeUtils?.({
       resolveTarget: mutation => {
         const target = resolvePixelPatchHistoryTarget?.({
@@ -11879,7 +11884,7 @@
         if (!target) return null;
         return {
           ...target,
-          v1Compatible: state.colorMode === COLOR_MODE_INDEX && target.layer?.directOnly !== true,
+          v1Compatible: isPiXiSyncLayerV1Compatible(target.layer),
         };
       },
       writeLayerPixelPatchValue,
@@ -11996,7 +12001,7 @@
     const layer = getActiveLayer();
     return pixisyncCollaborationController.canBeginLocalOperation(label, {
       colorMode: state.colorMode,
-      v1Compatible: Boolean(layer && layer.directOnly !== true),
+      v1Compatible: isPiXiSyncLayerV1Compatible(layer),
     });
   }
 

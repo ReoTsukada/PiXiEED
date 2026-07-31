@@ -10,11 +10,26 @@
     onBlocked = () => {},
     onRecoveryRequired = () => {},
   } = {}) {
-    if (!mutationBridge?.toPixelMutation || !mutationBridge?.applyPixelMutation || !writerStampUtils?.createWriterStamps) {
+    if (!mutationBridge?.toPixelMutations || !mutationBridge?.applyPixelMutation || !writerStampUtils?.createWriterStamps) {
       throw new Error('PiXiSYNC controller: missing mutation dependencies');
     }
 
-    const MUTATION_LABELS = new Set(['pen', 'eraser']);
+    // Every local drawing tool below commits a finalized pixelPatch history
+    // entry. PiXiSYNC transports that patch, not the gesture/tool itself, so
+    // shapes and fills are as safe to synchronize as pen and eraser strokes.
+    const MUTATION_LABELS = new Set([
+      'pen',
+      'eraser',
+      'line',
+      'curve',
+      'rect',
+      'rectFill',
+      'ellipse',
+      'ellipseFill',
+      'fill',
+      'fillDither',
+      'fillGradient',
+    ]);
     const VIEW_ONLY_LABELS = new Set(['pan', 'zoom', 'eyedropper']);
     let runtime = null;
     const pendingOptimistic = new Map();
@@ -96,6 +111,21 @@
       pendingOptimistic.forEach(record => mutationBridge.applyPixelMutation(record.mutation));
     }
 
+    function recordHistorySegment(entry, kind, groupIndex, groupSize, operationId, revision) {
+      if (!entry || !Number.isSafeInteger(groupIndex) || !Number.isSafeInteger(groupSize) || groupSize < 1) return;
+      const previous = historyMetadata.get(entry) || {};
+      const key = kind === 'undo' ? 'undoSegments' : 'sourceSegments';
+      const segments = Array.isArray(previous[key]) && previous[key].length === groupSize
+        ? previous[key].slice()
+        : new Array(groupSize).fill(null);
+      segments[groupIndex] = { operationId: String(operationId), revision };
+      historyMetadata.set(entry, {
+        ...previous,
+        [key]: segments,
+        ...(kind === 'source' ? { undoSegments: [] } : {}),
+      });
+    }
+
     function applyConfirmed(operation, metadata = {}) {
       const revision = normalizeRevision(operation?.revision);
       if (revision !== appliedRevision + 1n) {
@@ -113,12 +143,14 @@
       if (canPromoteWithoutRewrite) {
         pendingOptimistic.delete(String(operation.operationId));
         if (localPending.entry) {
-          historyMetadata.set(localPending.entry, {
-            sourceOperationId: String(operation.operationId),
-            sourceRevision: revision,
-            undoOperationId: '',
-            undoRevision: 0n,
-          });
+          recordHistorySegment(
+            localPending.entry,
+            'source',
+            localPending.groupIndex,
+            localPending.groupSize,
+            operation.operationId,
+            revision
+          );
         }
         stampConfirmed(operation);
         updateSessionPendingCount();
@@ -135,28 +167,24 @@
       }
       stampConfirmed(operation, result.appliedIndices);
       if (localPending?.entry) {
-        historyMetadata.set(localPending.entry, {
-          sourceOperationId: String(operation.operationId),
-          sourceRevision: revision,
-          undoOperationId: '',
-          undoRevision: 0n,
-        });
+        recordHistorySegment(
+          localPending.entry,
+          'source',
+          localPending.groupIndex,
+          localPending.groupSize,
+          operation.operationId,
+          revision
+        );
       }
       if (guardedPending?.entry) {
-        const previous = historyMetadata.get(guardedPending.entry) || {};
-        historyMetadata.set(guardedPending.entry, guardedPending.direction === 'undo'
-          ? {
-              ...previous,
-              undoOperationId: String(operation.operationId),
-              undoRevision: revision,
-            }
-          : {
-              ...previous,
-              sourceOperationId: String(operation.operationId),
-              sourceRevision: revision,
-              undoOperationId: '',
-              undoRevision: 0n,
-            });
+        recordHistorySegment(
+          guardedPending.entry,
+          guardedPending.direction === 'undo' ? 'undo' : 'source',
+          guardedPending.groupIndex,
+          guardedPending.groupSize,
+          operation.operationId,
+          revision
+        );
         pendingGuarded.delete(String(operation.operationId));
       }
       reapplyPending();
@@ -207,22 +235,25 @@
       if (!runtime) return { status: 'disabled', promise: Promise.resolve(null) };
       if (!MUTATION_LABELS.has(String(label || ''))) return reject('unsupported-operation', entry);
       if (!sessionCanDraw()) return reject('session-not-active', entry);
-      const mutation = mutationBridge.toPixelMutation(entry);
-      if (!mutation) {
+      const mutations = mutationBridge.toPixelMutations(entry);
+      if (!mutations?.length) {
         onRecoveryRequired({ reason: 'unsupported-confirmed-history-entry', entry });
         return reject('unsupported-confirmed-history-entry', entry);
       }
-      const operationId = String(operationIdFactory?.() || '');
-      if (!/^[0-9a-f-]{36}$/i.test(operationId)) return reject('invalid-operation-id', entry);
-      const record = {
-        operationId,
+      const records = mutations.map((mutation, groupIndex) => ({
+        operationId: String(operationIdFactory?.() || ''),
         mutation,
         submittedRevision: appliedRevision,
         entry,
-      };
-      pendingOptimistic.set(operationId, record);
+        groupIndex,
+        groupSize: mutations.length,
+      }));
+      if (records.some(record => !/^[0-9a-f-]{36}$/i.test(record.operationId))) {
+        return reject('invalid-operation-id', entry);
+      }
+      records.forEach(record => pendingOptimistic.set(record.operationId, record));
       updateSessionPendingCount();
-      const promise = Promise.resolve(runtime.realtimeClient.commit({
+      const promise = Promise.all(records.map(({ operationId, mutation }) => runtime.realtimeClient.commit({
         operationId,
         kind: 'pixel_patch',
         structureEpoch: runtime.structureEpoch || 0,
@@ -232,14 +263,21 @@
         layerId: mutation.layerId,
         canvasWidth: mutation.canvasWidth,
         canvasHeight: mutation.canvasHeight,
-      })).catch(error => {
+      }))).catch(error => {
         const session = currentSession();
         const snapshot = session?.getSnapshot?.();
         if (snapshot) session.dispatch?.({ type: 'SOCKET_OFFLINE', epoch: snapshot.epoch });
-        onRecoveryRequired({ reason: 'commit-failed', error, operationId });
-        return { commitStatus: 'failed', operationId };
+        onRecoveryRequired({ reason: 'commit-group-failed', error, operationIds: records.map(record => record.operationId) });
+        throw error;
       });
-      return { status: 'accepted', operationId, mutation, promise };
+      return {
+        status: 'accepted',
+        operationId: records[0].operationId,
+        operationIds: records.map(record => record.operationId),
+        mutation: mutations[0],
+        mutations,
+        promise,
+      };
     }
 
     function requestGuardedHistory(entry, direction) {
@@ -249,47 +287,64 @@
         entry
       );
       if (direction !== 'undo' && direction !== 'redo') return reject('invalid-history-direction', entry);
-      const mutation = mutationBridge.toPixelMutation(entry);
-      if (!mutation) return reject('unsupported-history-entry', entry);
+      const mutations = mutationBridge.toPixelMutations(entry);
+      if (!mutations?.length) return reject('unsupported-history-entry', entry);
       const meta = historyMetadata.get(entry);
-      const targetOperationId = direction === 'undo'
-        ? String(meta?.sourceOperationId || '')
-        : String(meta?.undoOperationId || '');
-      const expectedRevision = direction === 'undo'
-        ? meta?.sourceRevision
-        : meta?.undoRevision;
-      if (!/^[0-9a-f-]{36}$/i.test(targetOperationId)) {
+      const targetSegments = direction === 'undo' ? meta?.sourceSegments : meta?.undoSegments;
+      if (
+        !Array.isArray(targetSegments)
+        || targetSegments.length !== mutations.length
+        || targetSegments.some(segment => !/^[0-9a-f-]{36}$/i.test(String(segment?.operationId || '')))
+      ) {
         return reject('history-operation-not-confirmed', entry);
       }
-      let guardRevision;
-      try { guardRevision = normalizeRevision(expectedRevision); } catch (_) {
-        return reject('history-revision-not-confirmed', entry);
-      }
-      const operationId = String(operationIdFactory?.() || '');
-      if (!/^[0-9a-f-]{36}$/i.test(operationId)) return reject('invalid-operation-id', entry);
-      const changes = mutation.changes.map(change => ({
-        index: change.index,
-        paletteValue: direction === 'undo' ? change.beforePaletteValue : change.paletteValue,
-        expectedWriterRevision: guardRevision,
+      const records = mutations.map((mutation, groupIndex) => {
+        let guardRevision;
+        try { guardRevision = normalizeRevision(targetSegments[groupIndex].revision); } catch (_) { guardRevision = null; }
+        return {
+          operationId: String(operationIdFactory?.() || ''),
+          mutation,
+          guardRevision,
+          targetOperationId: String(targetSegments[groupIndex].operationId),
+          groupIndex,
+          groupSize: mutations.length,
+        };
+      });
+      if (records.some(record => !record.guardRevision)) return reject('history-revision-not-confirmed', entry);
+      if (records.some(record => !/^[0-9a-f-]{36}$/i.test(record.operationId))) return reject('invalid-operation-id', entry);
+      records.forEach(record => pendingGuarded.set(record.operationId, {
+        entry,
+        direction,
+        groupIndex: record.groupIndex,
+        groupSize: record.groupSize,
       }));
-      pendingGuarded.set(operationId, { entry, direction });
-      const promise = Promise.resolve(runtime.realtimeClient.commit({
-        operationId,
+      const promise = Promise.all(records.map(record => runtime.realtimeClient.commit({
+        operationId: record.operationId,
         kind: direction === 'undo' ? 'undo_pixel_patch' : 'redo_pixel_patch',
         structureEpoch: runtime.structureEpoch || 0,
-        changes,
-        canvasId: mutation.canvasId,
-        frameId: mutation.frameId,
-        layerId: mutation.layerId,
-        canvasWidth: mutation.canvasWidth,
-        canvasHeight: mutation.canvasHeight,
-        undoOfOperationId: targetOperationId,
-      })).catch(error => {
-        pendingGuarded.delete(operationId);
-        onRecoveryRequired({ reason: `${direction}-commit-failed`, error, operationId });
+        changes: record.mutation.changes.map(change => ({
+          index: change.index,
+          paletteValue: direction === 'undo' ? change.beforePaletteValue : change.paletteValue,
+          expectedWriterRevision: record.guardRevision,
+        })),
+        canvasId: record.mutation.canvasId,
+        frameId: record.mutation.frameId,
+        layerId: record.mutation.layerId,
+        canvasWidth: record.mutation.canvasWidth,
+        canvasHeight: record.mutation.canvasHeight,
+        undoOfOperationId: record.targetOperationId,
+      }))).catch(error => {
+        onRecoveryRequired({ reason: `${direction}-commit-group-failed`, error, operationIds: records.map(record => record.operationId) });
         throw error;
       });
-      return { status: 'accepted', operationId, mutation, promise };
+      return {
+        status: 'accepted',
+        operationId: records[0].operationId,
+        operationIds: records.map(record => record.operationId),
+        mutation: mutations[0],
+        mutations,
+        promise,
+      };
     }
 
     function requestUndo(entry) {

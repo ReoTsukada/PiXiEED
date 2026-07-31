@@ -31,8 +31,8 @@ const realtimeUtils = modules.pixisyncRealtimeClientUtils.createPiXiSyncRealtime
   journal: { put: async () => {}, remove: async () => {} },
 });
 const createSession = modules.pixisyncSessionState.createPiXiSyncSessionState;
-const WIDTH = 16;
-const HEIGHT = 16;
+const WIDTH = 128;
+const HEIGHT = 128;
 const CELL_COUNT = WIDTH * HEIGHT;
 const TARGET = Object.freeze({
   canvasId: 'canvas-v1',
@@ -247,6 +247,30 @@ function createClientHarness(server, role, clientOrdinal) {
     return accepted;
   }
 
+  function drawSolidFill(start, length, paletteValue) {
+    const beforeIndices = new Uint8Array(length);
+    for (let offset = 0; offset < length; offset += 1) {
+      beforeIndices[offset] = pixels[start + offset];
+      pixels[start + offset] = paletteValue;
+    }
+    const entry = {
+      __historyEntryType: 'pixelPatch',
+      kind: 'solid-fill-runs',
+      version: 1,
+      historyLabel: 'fill',
+      ...TARGET,
+      width: WIDTH,
+      height: HEIGHT,
+      runs: new Int32Array([start, length]),
+      beforeIndices,
+      beforeDirect: null,
+      afterPaletteIndex: paletteValue,
+    };
+    const accepted = controller.handleCommittedHistoryEntry(entry, 'fill');
+    accepted.entry = entry;
+    return accepted;
+  }
+
   return {
     role,
     pixels,
@@ -254,6 +278,7 @@ function createClientHarness(server, role, clientOrdinal) {
     controller,
     realtimeClient,
     draw,
+    drawSolidFill,
     get writeCount() { return writeCount; },
     reverseNextTail() { reverseNextTail = true; },
   };
@@ -282,8 +307,46 @@ assert.equal(clientA.pixels[1], 5);
 assert.equal(clientB.pixels[1], 5);
 assert.equal(clientA.writeCount, 0);
 assert.ok(clientB.writeCount > 0);
-assert.equal(clientA.controller.canBeginLocalOperation('line'), false);
+for (const label of [
+  'pen',
+  'eraser',
+  'line',
+  'curve',
+  'rect',
+  'rectFill',
+  'ellipse',
+  'ellipseFill',
+  'fill',
+  'fillDither',
+  'fillGradient',
+]) {
+  assert.equal(clientA.controller.canBeginLocalOperation(label), true, `${label} must be drawable while active`);
+}
 assert.equal(clientA.controller.canBeginLocalOperation('pan'), true);
+await drawAndConverge(clientA, 'line', [{ index: 2, paletteValue: 6 }]);
+assert.equal(clientB.pixels[2], 6);
+await drawAndConverge(clientB, 'fillGradient', [{ index: 3, paletteValue: 7 }]);
+assert.equal(clientA.pixels[3], 7);
+const largeFill = clientA.drawSolidFill(1000, 9000, 18);
+assert.equal(largeFill.status, 'accepted');
+await largeFill.promise;
+await converge();
+assert.equal(largeFill.operationIds.length, 2);
+assert.equal(clientB.pixels[9999], 18);
+const largeFillUndo = clientA.controller.requestUndo(largeFill.entry);
+assert.equal(largeFillUndo.status, 'accepted');
+assert.equal(largeFillUndo.operationIds.length, 2);
+await largeFillUndo.promise;
+await converge();
+assert.equal(clientA.pixels[9999], 0);
+assert.equal(clientB.pixels[9999], 0);
+const largeFillRedo = clientA.controller.requestRedo(largeFill.entry);
+assert.equal(largeFillRedo.status, 'accepted');
+assert.equal(largeFillRedo.operationIds.length, 2);
+await largeFillRedo.promise;
+await converge();
+assert.equal(clientA.pixels[9999], 18);
+assert.equal(clientB.pixels[9999], 18);
 await drawAndConverge(clientB, 'eraser', [{ index: 1, paletteValue: 0 }]);
 assert.equal(clientA.pixels[1], 0);
 assert.equal(clientB.pixels[1], 0);

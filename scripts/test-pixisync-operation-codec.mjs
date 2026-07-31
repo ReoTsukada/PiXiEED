@@ -153,6 +153,21 @@ assert.equal(realtimeClient.confirmedRevision, 3n);
 console.log('PiXiSYNC realtime RPC adapter tests passed');
 
 const bridgeRoot = await loadModule(new URL('../pixiedraw/assets/js/modules/pixisync-pixel-mutation-bridge-utils.js', import.meta.url));
+const blankDirectLayer = {
+  directOnly: true,
+  indices: new Uint8Array(8 * 8),
+  direct: new Uint8ClampedArray(8 * 8 * 4),
+  importSourceDirect: new Uint8ClampedArray(8 * 8 * 4),
+};
+assert.equal(bridgeRoot.pixisyncPixelMutationBridgeUtils.isIndexedLayerCompatible(blankDirectLayer), true);
+assert.equal(blankDirectLayer.directOnly, true, 'compatibility checks must not mutate the layer');
+const visibleDirectLayer = {
+  directOnly: true,
+  direct: new Uint8ClampedArray(8 * 8 * 4),
+};
+visibleDirectLayer.direct[3] = 255;
+assert.equal(bridgeRoot.pixisyncPixelMutationBridgeUtils.isIndexedLayerCompatible(visibleDirectLayer), false);
+assert.equal(visibleDirectLayer.directOnly, true);
 const writes = [];
 const bridge = bridgeRoot.pixisyncPixelMutationBridgeUtils.createPiXiSyncPixelMutationBridgeUtils({
   resolveTarget: mutation => mutation.canvasId === 'canvas-a' ? { layer: {}, width: 8, height: 8 } : null,
@@ -160,6 +175,34 @@ const bridge = bridgeRoot.pixisyncPixelMutationBridgeUtils.createPiXiSyncPixelMu
 });
 const mutation = bridge.toPixelMutation({ __historyEntryType: 'pixelPatch', historyLabel: 'pen', canvasId: 'canvas-a', frameId: 'frame-a', layerId: 'layer-a', width: 8, height: 8, changes: [{ index: 2, before: { paletteIndex: 0, direct: [0, 0, 0, 0] }, after: { paletteIndex: 4, direct: [0, 0, 0, 0] } }] });
 assert.deepEqual(mutation.changes, [{ index: 2, paletteValue: 4, beforePaletteValue: 0 }]);
+for (const historyLabel of [
+  'pen',
+  'eraser',
+  'line',
+  'curve',
+  'rect',
+  'rectFill',
+  'ellipse',
+  'ellipseFill',
+  'fill',
+  'fillDither',
+  'fillGradient',
+]) {
+  assert.ok(bridge.toPixelMutation({
+    __historyEntryType: 'pixelPatch',
+    historyLabel,
+    canvasId: 'canvas-a',
+    frameId: 'frame-a',
+    layerId: 'layer-a',
+    width: 8,
+    height: 8,
+    changes: [{
+      index: 3,
+      before: { paletteIndex: 0, direct: null, importSourceDirect: null },
+      after: { paletteIndex: 5, direct: null, importSourceDirect: null },
+    }],
+  }), `${historyLabel} must convert to a PiXiSYNC pixel mutation`);
+}
 assert.equal(bridge.applyPixelMutation(mutation).applied, 1);
 assert.deepEqual(writes, [{ index: 2, value: { paletteIndex: 4 } }]);
 const tileMutation = bridge.toPixelMutation({
@@ -183,6 +226,46 @@ const tileMutation = bridge.toPixelMutation({
   }],
 });
 assert.deepEqual(tileMutation.changes, [{ index: 11, paletteValue: 0, beforePaletteValue: 3 }]);
+const largeFillCount = 9000;
+const largeBridge = bridgeRoot.pixisyncPixelMutationBridgeUtils.createPiXiSyncPixelMutationBridgeUtils({
+  resolveTarget: mutation => ({ layer: {}, width: mutation.canvasWidth, height: mutation.canvasHeight }),
+  writeLayerPixelPatchValue: () => true,
+});
+const largeFillMutations = largeBridge.toPixelMutations({
+  __historyEntryType: 'pixelPatch',
+  kind: 'solid-fill-runs',
+  historyLabel: 'fill',
+  canvasId: 'canvas-a',
+  frameId: 'frame-a',
+  layerId: 'layer-a',
+  width: 100,
+  height: 100,
+  runs: new Int32Array([0, largeFillCount]),
+  beforeIndices: new Uint8Array(largeFillCount),
+  beforeDirect: null,
+  afterPaletteIndex: 9,
+});
+assert.equal(largeFillMutations.length, 2);
+assert.equal(largeFillMutations[0].changes.length, 8192);
+assert.equal(largeFillMutations[1].changes.length, largeFillCount - 8192);
+assert.deepEqual(largeFillMutations[1].changes.at(-1), {
+  index: largeFillCount - 1,
+  paletteValue: 9,
+  beforePaletteValue: 0,
+});
+assert.equal(largeBridge.toPixelMutations({
+  __historyEntryType: 'pixelPatch',
+  kind: 'solid-fill-runs',
+  historyLabel: 'fill',
+  canvasId: 'canvas-a',
+  frameId: 'frame-a',
+  layerId: 'layer-a',
+  width: 8,
+  height: 8,
+  runs: new Int32Array([0, 4, 3, 2]),
+  beforeIndices: new Uint8Array(6),
+  afterPaletteIndex: 2,
+}), null, 'overlapping fill runs must be rejected');
 assert.equal(bridge.toPixelMutation({ __historyEntryType: 'pixelPatch', historyLabel: 'pen', changes: [{ index: 0, after: { paletteIndex: 0, direct: [1, 2, 3, 255] } }] }), null);
 console.log('PiXiSYNC pixel mutation bridge tests passed');
 
