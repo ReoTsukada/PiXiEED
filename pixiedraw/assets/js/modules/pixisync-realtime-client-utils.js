@@ -2,7 +2,7 @@
   if (typeof window === 'undefined') return;
   const root = window.PiXiEEDrawModules = window.PiXiEEDrawModules || {};
 
-  function createPiXiSyncRealtimeClientUtils({ codec, orderKeeperFactory, journal } = {}) {
+  function createPiXiSyncRealtimeClientUtils({ codec, documentCodec = null, orderKeeperFactory, journal } = {}) {
     if (!codec || typeof orderKeeperFactory !== 'function') throw new Error('PiXiSYNC realtime: missing codec or order keeper');
     const bytesToHex = bytes => [...bytes].map(byte => byte.toString(16).padStart(2, '0')).join('');
 
@@ -11,6 +11,7 @@
       roomId,
       clientId,
       applyConfirmed,
+      prepareConfirmed = async () => {},
       initialRevision = 0,
       recoverOnSubscribe = true,
       operationTimeoutMs = 20000,
@@ -26,6 +27,7 @@
       let started = false;
       let recovering = false;
       const pendingLocalOperations = new Map();
+      const discardedOperationIds = new Set();
       const confirmedOperationIds = new Set();
       const withTimeout = async (operation, promise) => {
         const timeoutMs = Math.max(1000, Number(operationTimeoutMs) || 20000);
@@ -62,6 +64,14 @@
         onRecoveryRequired: details => recover(details.reason),
       });
 
+      async function prepareBeforeReceive(operation) {
+        const pending = pendingLocalOperations.get(String(operation?.operationId || '')) || null;
+        await prepareConfirmed(operation, {
+          local: Boolean(pending),
+          pendingRecord: pending?.record || null,
+        });
+      }
+
       async function normalizeOperation(row) {
         const payload = codec.base64ToBytes(row.payload_b64 || row.payloadB64 || '');
         const hash = await codec.sha256Hex(payload);
@@ -71,6 +81,33 @@
         const canvasHeight = Number(row.canvas_height || row.canvasHeight);
         const kind = row.kind;
         const pixelCount = Number(row.pixel_count ?? row.pixelCount);
+        if (kind === 'document_patch') {
+          if (!documentCodec?.decode) throw new Error('PiXiSYNC realtime: document-codec-unavailable');
+          if (Number(row.codec_version ?? row.codecVersion) !== 2 || pixelCount !== 0) {
+            throw new Error('PiXiSYNC realtime: invalid-document-operation-shape');
+          }
+          const documentOperation = documentCodec.decode(payload);
+          const structureEpoch = Number(row.structure_epoch ?? row.structureEpoch);
+          if (!Number.isSafeInteger(structureEpoch) || structureEpoch < 1) {
+            throw new Error('PiXiSYNC realtime: invalid-document-structure-epoch');
+          }
+          return {
+            operationId: row.operation_id || row.operationId,
+            revision: row.revision,
+            payloadSha256: expected,
+            payload,
+            changes: [],
+            kind,
+            structureEpoch,
+            documentOperation,
+            canvasId: '__document__',
+            frameId: '__document__',
+            layerId: '__document__',
+            canvasWidth: 1,
+            canvasHeight: 1,
+            undoOfOperationId: null,
+          };
+        }
         const guarded = kind === 'undo_pixel_patch' || kind === 'redo_pixel_patch';
         if (kind !== 'pixel_patch' && !guarded) throw new Error('PiXiSYNC realtime: unsupported-operation-kind');
         if (payload[5] !== codec.FLAGS.NONE) {
@@ -97,7 +134,9 @@
           if (error) throw error;
           const rows = data || [];
           for (const row of rows) {
-            keeper.receive(await normalizeOperation(row));
+            const operation = await normalizeOperation(row);
+            await prepareBeforeReceive(operation);
+            keeper.receive(operation);
             cursor = keeper.confirmedRevision;
           }
           if (rows.length < 500) break;
@@ -166,6 +205,11 @@
           p_payload: `\\x${bytesToHex(payload)}`, p_payload_sha256: `\\x${payloadSha256}`, p_pixel_count: canonicalChanges.length, p_undo_of_operation_id: undoOfOperationId,
         }));
         if (error) {
+          if (discardedOperationIds.delete(operationId)) {
+            pendingLocalOperations.delete(operationId);
+            Promise.resolve(journal?.remove?.(roomId, operationId)).catch(() => {});
+            return { commit_status: 'discarded', discarded: true };
+          }
           throw error;
         }
         const committed = Array.isArray(data) ? data[0] : data;
@@ -186,6 +230,7 @@
           payload_sha256_hex: committed.payload_sha256_hex,
           undo_of_operation_id: undoOfOperationId,
         });
+        await prepareBeforeReceive(confirmedOperation);
         const confirmation = keeper.receive(confirmedOperation);
         if (confirmation.status === 'duplicate' && pendingLocalOperations.has(operationId)) {
           pendingLocalOperations.delete(operationId);
@@ -197,6 +242,75 @@
         await withTimeout('operation-hint', channel?.send({ type: 'broadcast', event: 'operation-hint', payload: { revision: committed?.revision || null, operationId } }));
         return committed;
       }
+      async function commitDocument({ operationId, structureEpoch = 0, baseRevision = keeper.confirmedRevision, documentOperation }) {
+        if (!documentCodec?.encode) throw new Error('PiXiSYNC realtime: document-codec-unavailable');
+        const payload = documentCodec.encode(documentOperation);
+        const payloadSha256 = await codec.sha256Hex(payload);
+        const record = {
+          roomId,
+          clientId,
+          operationId,
+          kind: 'document_patch',
+          structureEpoch,
+          baseRevision: String(baseRevision),
+          documentOperation,
+          payloadB64: codec.bytesToBase64(payload),
+          payloadSha256,
+        };
+        await journal?.put?.(record);
+        pendingLocalOperations.set(operationId, { optimistic: true, record });
+        void withTimeout('document-operation-hint-precommit', channel?.send({
+          type: 'broadcast',
+          event: 'operation-hint',
+          payload: { operationId },
+        })).catch(() => {});
+        let response;
+        try {
+          response = await withTimeout('commit-document-operation', supabase.rpc('pixisync_commit_document_operation', {
+            p_room_id: roomId,
+            p_operation_id: operationId,
+            p_client_id: clientId,
+            p_base_revision: String(baseRevision),
+            p_structure_epoch: structureEpoch,
+            p_payload: `\\x${bytesToHex(payload)}`,
+            p_payload_sha256: `\\x${payloadSha256}`,
+          }));
+          if (response?.error) throw response.error;
+        } catch (error) {
+          if (discardedOperationIds.delete(operationId)) {
+            pendingLocalOperations.delete(operationId);
+            Promise.resolve(journal?.remove?.(roomId, operationId)).catch(() => {});
+            return { commit_status: 'discarded', discarded: true };
+          }
+          throw error;
+        }
+        const { data } = response;
+        const committed = Array.isArray(data) ? data[0] : data;
+        if (!committed?.revision || !committed?.payload_b64 || !committed?.payload_sha256_hex) {
+          throw new Error('PiXiSYNC realtime: invalid-document-commit-response');
+        }
+        const confirmedOperation = await normalizeOperation({
+          ...committed,
+          operation_id: operationId,
+          kind: 'document_patch',
+          codec_version: 2,
+        });
+        await prepareBeforeReceive(confirmedOperation);
+        const confirmation = keeper.receive(confirmedOperation);
+        if (confirmation.status === 'duplicate' && pendingLocalOperations.has(operationId)) {
+          pendingLocalOperations.delete(operationId);
+          confirmedOperationIds.add(operationId);
+          Promise.resolve(journal?.remove?.(roomId, operationId)).catch(() => {});
+          onLocalConfirmed(confirmedOperation);
+        }
+        await recover('rpc-document-commit');
+        await withTimeout('document-operation-hint', channel?.send({
+          type: 'broadcast',
+          event: 'operation-hint',
+          payload: { revision: committed.revision, operationId },
+        }));
+        return committed;
+      }
       async function syncFrom(afterRevision = keeper.confirmedRevision) {
         const revision = BigInt(afterRevision);
         if (keeper.confirmedRevision !== revision) keeper.reset(revision);
@@ -206,9 +320,31 @@
       async function replayPendingJournal() {
         const records = await journal?.list?.(roomId, clientId) || [];
         for (const record of records) {
-          await commit(record);
+          if (record?.kind === 'document_patch') await commitDocument(record);
+          else await commit(record);
         }
         return records.length;
+      }
+      function discardPixelPendingBeforeEpoch(structureEpoch) {
+        const nextEpoch = Math.max(0, Number(structureEpoch) || 0);
+        const discarded = [];
+        pendingLocalOperations.forEach((pending, operationId) => {
+          const record = pending?.record;
+          if (record?.kind === 'document_patch' || Number(record?.structureEpoch) >= nextEpoch) return;
+          pendingLocalOperations.delete(operationId);
+          discardedOperationIds.add(operationId);
+          discarded.push(operationId);
+          Promise.resolve(journal?.remove?.(roomId, operationId)).catch(() => {});
+        });
+        return discarded;
+      }
+      function discardPendingOperation(operationId) {
+        const normalizedId = String(operationId || '');
+        if (!normalizedId || !pendingLocalOperations.has(normalizedId)) return false;
+        pendingLocalOperations.delete(normalizedId);
+        discardedOperationIds.add(normalizedId);
+        Promise.resolve(journal?.remove?.(roomId, normalizedId)).catch(() => {});
+        return true;
       }
       async function sendBroadcast(event, payload = {}) {
         if (!channel) throw new Error('PiXiSYNC realtime: channel-not-started');
@@ -231,9 +367,12 @@
         start,
         stop,
         commit,
+        commitDocument,
         recover,
         syncFrom,
         replayPendingJournal,
+        discardPixelPendingBeforeEpoch,
+        discardPendingOperation,
         sendBroadcast,
         trackPresence,
         untrackPresence,

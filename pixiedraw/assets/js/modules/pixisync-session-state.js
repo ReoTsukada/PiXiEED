@@ -113,6 +113,15 @@
         context.resumeCurrentDocument = resumeCurrentDocument;
         effects.push({ type: 'RECONNECT_CHANNEL' });
       };
+      const transitionToFullResync = (effects, reason = '') => {
+        if (!isOpenPhase()) return;
+        context.epoch += 1;
+        context.phase = 'reconnecting';
+        context.lastError = reason;
+        resetSyncGates();
+        context.resumeCurrentDocument = false;
+        effects.push({ type: 'RECONNECT_CHANNEL' });
+      };
       const maybeConverge = effects => {
         if (context.phase !== 'syncing' && context.phase !== 'reconnecting') return;
         if (!context.channelSubscribed || !context.checkpointLoaded || !context.initialTailApplied || !context.headRead) return;
@@ -288,6 +297,9 @@
           case 'CHANNEL_CLOSED':
           case 'HASH_MISMATCH':
             transitionToReconnect(effects, event.type.toLowerCase());
+            break;
+          case 'FORCE_FULL_RESYNC':
+            transitionToFullResync(effects, String(event.reason || 'force-full-resync'));
             break;
           case 'PENDING_OPERATION_COUNT':
             context.pendingOperationCount = Math.max(0, Number(event.count) || 0);

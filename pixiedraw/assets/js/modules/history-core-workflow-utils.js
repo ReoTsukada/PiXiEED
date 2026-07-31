@@ -120,6 +120,17 @@ function beginPaletteStateHistory(label) {
       dirty: false,
       label,
       before: capturePaletteHistoryState(),
+      ...(PIXISYNC_CHECKPOINT_PALETTE_HISTORY_LABELS.has(label)
+        && isSharedProjectCollaborativeMode?.()
+        ? {
+            // Palette removal/reordering remaps raster indices. Preserve the
+            // exact pre-edit document so collaborative Undo can upload its
+            // checkpoint without temporarily mutating the live canvas.
+            pixisyncCheckpointBefore: compressHistorySnapshot(
+              makeHistorySnapshot({ clonePixelData: false })
+            ),
+          }
+        : {}),
     };
     return true;
   }
@@ -294,6 +305,12 @@ function isPaletteStateHistoryEntry(entry) {
     'paletteApplyPreset',
     'paletteImport',
   ]);
+  const PIXISYNC_CHECKPOINT_PALETTE_HISTORY_LABELS = new Set([
+    'paletteRemove',
+    'paletteReorder',
+    'paletteApplyPreset',
+    'paletteImport',
+  ]);
 
   function capturePaletteHistoryState() {
     const palette = Array.isArray(state.palette)
@@ -319,6 +336,9 @@ function isPaletteStateHistoryEntry(entry) {
       historyLabel: pending.label,
       before: pending.before,
       after: capturePaletteHistoryState(),
+      ...(pending.pixisyncCheckpointBefore
+        ? { pixisyncCheckpointBefore: pending.pixisyncCheckpointBefore }
+        : {}),
     };
   }
 
@@ -792,6 +812,28 @@ function redo() {
   }
 
 function rollbackPendingHistory({ reRender = true } = {}) {
+    if (isTimelineVisualHistoryEntry(history.pending)) {
+      const pending = history.pending;
+      history.pending = null;
+      const rolledBack = applyTimelineVisualHistoryEntry({
+        __historyEntryType: 'timeline-visual-state',
+        before: pending.before,
+        after: pending.before,
+      }, 'undo');
+      updateHistoryButtons();
+      return rolledBack;
+    }
+    if (isPaletteStateHistoryEntry(history.pending)) {
+      const pending = history.pending;
+      history.pending = null;
+      const rolledBack = applyPaletteStateHistoryEntry({
+        __historyEntryType: 'palette-state',
+        before: pending.before,
+        after: pending.before,
+      }, 'undo');
+      updateHistoryButtons();
+      return rolledBack;
+    }
     if (isLayerAddHistoryEntry(history.pending)) {
       const rolledBack = applyLayerAddHistoryEntry(history.pending, 'undo');
       history.pending = null;

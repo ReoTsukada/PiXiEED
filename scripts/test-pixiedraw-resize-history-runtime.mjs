@@ -37,15 +37,10 @@ try {
   }, pixelPoint);
   assert.notDeepEqual(pixelBeforeShrink, [0, 0, 0, 0], 'a pixel outside the future cropped area is drawn');
   const after = { width: before.width + 7, height: before.height + 5 };
-  await page.evaluate(next => {
-    const width = document.getElementById('canvasWidth');
-    const height = document.getElementById('canvasHeight');
-    width.value = String(next.width);
-    height.value = String(next.height);
-    width.dispatchEvent(new Event('input', { bubbles: true }));
-    height.dispatchEvent(new Event('input', { bubbles: true }));
-    document.getElementById('applySpriteScale')?.click();
-  }, after);
+  await page.fill('#canvasExpandRight', String(after.width - before.width));
+  await page.fill('#canvasExpandBottom', String(after.height - before.height));
+  assert.equal(await page.isEnabled('#applySpriteScale'), true, 'resize apply is enabled after changing dimensions');
+  await page.click('#applySpriteScale');
   const readCanvasSize = () => page.evaluate(() => {
     const canvas = document.getElementById('drawingCanvas');
     return { width: canvas?.width || 0, height: canvas?.height || 0 };
@@ -72,15 +67,9 @@ try {
   assert.deepEqual(await readCanvasSize(), after, 'redo reapplies the exact target dimensions');
 
   const widthOnly = { width: after.width + 3, height: after.height };
-  await page.evaluate(next => {
-    const width = document.getElementById('canvasWidth');
-    const height = document.getElementById('canvasHeight');
-    width.value = String(next.width);
-    height.value = String(next.height);
-    width.dispatchEvent(new Event('input', { bubbles: true }));
-    height.dispatchEvent(new Event('input', { bubbles: true }));
-    document.getElementById('applySpriteScale')?.click();
-  }, widthOnly);
+  await page.fill('#canvasExpandRight', String(widthOnly.width - after.width));
+  await page.fill('#canvasExpandBottom', '0');
+  await page.click('#applySpriteScale');
   await page.waitForFunction(next => {
     const canvas = document.getElementById('drawingCanvas');
     return canvas?.width === next.width && canvas?.height === next.height;
@@ -110,15 +99,9 @@ try {
   assert.equal(await page.isEnabled('#redoAction'), false, 'a new drawing after resize undo clears resize redo');
 
   const cropped = { width: before.width - 8, height: before.height - 8 };
-  await page.evaluate(next => {
-    const width = document.getElementById('canvasWidth');
-    const height = document.getElementById('canvasHeight');
-    width.value = String(next.width);
-    height.value = String(next.height);
-    width.dispatchEvent(new Event('input', { bubbles: true }));
-    height.dispatchEvent(new Event('input', { bubbles: true }));
-    document.getElementById('applySpriteScale')?.click();
-  }, cropped);
+  await page.fill('#canvasExpandRight', String(cropped.width - after.width));
+  await page.fill('#canvasExpandBottom', String(cropped.height - after.height));
+  await page.click('#applySpriteScale');
   await page.waitForFunction(next => {
     const canvas = document.getElementById('drawingCanvas');
     return canvas?.width === next.width && canvas?.height === next.height;

@@ -1080,7 +1080,13 @@
   }
 
   function compositeDocumentFrames(frames, width, height, palette) {
-    return frames.map(frame => compositeFramePixels(frame, width, height, palette));
+    return frames.map(frame => compositeFramePixels(frame, width, height, palette, {
+      // Layer visibility is deliberately personal in shared projects. Apply
+      // the same local view to still and animation exports.
+      useLocalLayerPreviewVisibility: true,
+      // Opacity changes the authored result and is therefore canonical.
+      useLocalLayerPreviewOpacity: false,
+    }));
   }
 
   function getCurrentExportFrames() {
@@ -1112,7 +1118,7 @@
     return {
       pixels: compositeFramePixels(frame, width, height, state.palette, {
         useLocalLayerPreviewVisibility: true,
-        useLocalLayerPreviewOpacity: true,
+        useLocalLayerPreviewOpacity: false,
       }),
       width,
       height,
@@ -1313,7 +1319,7 @@
     const sourceXFor = x => Math.min(sourceWidth - 1, Math.floor(((x + 0.5) * sourceWidth) / previewWidth));
     const sourceYFor = y => Math.min(sourceHeight - 1, Math.floor(((y + 0.5) * sourceHeight) / previewHeight));
     frame.layers.forEach(layer => {
-      if (!layer || layer.visible === false) {
+      if (!layer || !getDisplayedLayerVisibility(layer, true)) {
         return;
       }
       const opacity = normalizeLayerOpacity(layer.opacity);

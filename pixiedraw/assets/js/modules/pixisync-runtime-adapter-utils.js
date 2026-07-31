@@ -6,7 +6,35 @@
   const TOKEN_PATTERN = /^[0-9a-f]{64}$/;
   const HASH_PATTERN = /^[0-9a-f]{64}$/;
   const CHECKPOINT_BUCKET = 'pixisync-checkpoints';
+  const MAX_CHECKPOINT_BYTES = 52428800;
   const COMMENT_MAX_LENGTH = 140;
+
+  function resolvePiXiSyncRecentProjectTarget(entries = [], roomId = '', fallbackProjectKey = '') {
+    const normalizedRoomId = String(roomId || '').trim().toLowerCase();
+    const fallback = String(fallbackProjectKey || '').trim();
+    if (!ROOM_ID_PATTERN.test(normalizedRoomId)) return fallback;
+    const match = (Array.isArray(entries) ? entries : []).find(entry => (
+      entry
+      && typeof entry.id === 'string'
+      && entry.id.trim()
+      && String(entry.pixisync?.roomId || '').trim().toLowerCase() === normalizedRoomId
+    ));
+    return String(match?.id || '').trim() || fallback;
+  }
+
+  function collectPiXiSyncRecentProjectCleanupEntries(entries = [], nextEntries = [], activeProjectKey = '') {
+    const active = String(activeProjectKey || '').trim();
+    const retained = new Set((Array.isArray(nextEntries) ? nextEntries : [])
+      .map(entry => String(entry?.id || '').trim())
+      .filter(Boolean));
+    return (Array.isArray(entries) ? entries : []).filter(entry => {
+      const projectId = String(entry?.id || '').trim();
+      return projectId
+        && projectId !== active
+        && !retained.has(projectId)
+        && Number(entry?.autosaveSchemaVersion) === 2;
+    });
+  }
 
   function createPiXiSyncRuntimeAdapter({
     createSession,
@@ -20,6 +48,7 @@
     readProjectBinding = async () => null,
     writeProjectBinding = async () => {},
     clearProjectBinding = async () => {},
+    resolveProjectBindingTarget = async ({ projectKey } = {}) => projectKey,
     acquireProjectLease = async () => ({ acquired: true, release: async () => {} }),
     getClientId,
     ensureAuthenticatedStart = async () => true,
@@ -65,11 +94,16 @@
     // to an editable local document. Keep it draw-locked until the
     // authoritative shared session is active again.
     let projectBindingPersisted = false;
+    let reusableInviteToken = '';
+    let reusableInviteExpiresAt = '';
+    let reusableInvitePersistent = false;
+    let replacedProjectKey = '';
     // Supabase may emit CLOSED asynchronously after removeChannel/stop().
     // Those intentional shutdowns must not be fed back into the session as a
     // transport failure while a lifecycle reconnect is already in progress.
     const intentionallyStoppedRealtimeClients = new WeakSet();
     const attestationWaiters = new Map();
+    const preparedDocumentCheckpoints = new Map();
 
     const commands = Object.freeze({
       start,
@@ -80,6 +114,7 @@
       leave,
       archive,
       handleLifecycleResume,
+      prepareCheckpointOperation,
     });
 
     const firstRow = data => Array.isArray(data) ? data[0] : data;
@@ -164,13 +199,47 @@
         roomId: String(value.roomId),
         role: value.role === 'owner' ? 'owner' : 'participant',
         projectKey,
+        inviteToken: TOKEN_PATTERN.test(String(value.inviteToken || ''))
+          ? String(value.inviteToken).toLowerCase()
+          : '',
+        inviteExpiresAt: typeof value.inviteExpiresAt === 'string'
+          ? value.inviteExpiresAt
+          : '',
+        invitePersistent: value.invitePersistent === true,
+        replacedProjectKey: String(value.replacedProjectKey || '').trim(),
       });
     };
     const persistProjectBinding = async () => {
-      const binding = normalizeProjectBinding({ roomId, role, projectKey: boundProjectKey });
+      const binding = normalizeProjectBinding({
+        roomId,
+        role,
+        projectKey: boundProjectKey,
+        inviteToken: role === 'owner' ? reusableInviteToken : '',
+        inviteExpiresAt: role === 'owner' ? reusableInviteExpiresAt : '',
+        invitePersistent: role === 'owner' && reusableInvitePersistent,
+        replacedProjectKey,
+      });
       if (!binding) throw new Error('PiXiSYNC runtime: project-binding-unavailable');
-      await writeProjectBinding(binding.projectKey, binding);
+      const persisted = await writeProjectBinding(binding.projectKey, binding);
+      const persistedProjectKey = String(persisted?.projectKey || persisted || '').trim();
+      if (persistedProjectKey) boundProjectKey = persistedProjectKey;
+      replacedProjectKey = '';
       projectBindingPersisted = true;
+    };
+    const resolveBindingTargetForRoom = async () => {
+      if (!ROOM_ID_PATTERN.test(roomId) || !boundProjectKey) return boundProjectKey;
+      const resolved = await resolveProjectBindingTarget({
+        roomId,
+        role,
+        projectKey: boundProjectKey,
+      });
+      const nextProjectKey = String(resolved?.projectKey || resolved || '').trim();
+      if (!nextProjectKey || nextProjectKey === boundProjectKey) return boundProjectKey;
+      replacedProjectKey = boundProjectKey;
+      boundProjectKey = nextProjectKey;
+      await acquireEditingLease(boundProjectKey);
+      configureBridge({ collaboration: false });
+      return boundProjectKey;
     };
     const removeProjectBinding = async () => {
       if (boundProjectKey) await clearProjectBinding(boundProjectKey);
@@ -209,6 +278,177 @@
       }
       return response.data;
     };
+    const removeCheckpointObject = async path => {
+      const normalizedPath = String(path || '');
+      if (!normalizedPath) return;
+      const response = await withTimeout(
+        'checkpoint-remove',
+        supabase.storage.from(CHECKPOINT_BUCKET).remove([normalizedPath])
+      );
+      if (response?.error) throw response.error;
+    };
+
+    async function prepareConfirmedDocumentOperation(operation, metadata = {}) {
+      const documentOperation = operation?.documentOperation;
+      if (documentOperation?.type !== 'checkpoint_restore') return;
+      const operationId = String(operation?.operationId || '');
+      const objectPath = String(documentOperation.objectPath || '');
+      const expectedHash = assertHash(documentOperation.sha256Hex);
+      const expectedBytes = Number(documentOperation.byteLength);
+      if (
+        !ROOM_ID_PATTERN.test(operationId)
+        || !objectPath.startsWith(`rooms/${roomId}/document-checkpoints/`)
+        || !Number.isSafeInteger(expectedBytes)
+        || expectedBytes < 1
+        || expectedBytes > MAX_CHECKPOINT_BYTES
+      ) throw new Error('PiXiSYNC runtime: invalid-document-checkpoint-reference');
+      const cached = preparedDocumentCheckpoints.get(operationId);
+      const blob = cached?.blob instanceof Blob ? cached.blob : await downloadCheckpoint(objectPath);
+      if (blob.size !== expectedBytes || await sha256Hex(blob) !== expectedHash) {
+        preparedDocumentCheckpoints.delete(operationId);
+        throw new Error('PiXiSYNC runtime: document-checkpoint-hash-mismatch');
+      }
+      if (metadata.local === true && cached?.direction === 'forward') {
+        preparedDocumentCheckpoints.delete(operationId);
+        Object.defineProperty(operation, 'preparedCheckpoint', {
+          value: Object.freeze({
+            verified: true,
+            applied: true,
+            alreadyLocal: true,
+            objectPath,
+          }),
+          enumerable: false,
+          configurable: false,
+        });
+        return;
+      }
+      runtimeBridge.setInputLocked?.(true);
+      try {
+        await restoreCheckpoint(blob, {
+          projectKey: boundProjectKey,
+          role,
+          preserveProjectIdentity: true,
+          operationId,
+          documentCheckpoint: true,
+        });
+        Object.defineProperty(operation, 'preparedCheckpoint', {
+          value: Object.freeze({ verified: true, applied: true, objectPath }),
+          enumerable: false,
+          configurable: false,
+        });
+      } finally {
+        preparedDocumentCheckpoints.delete(operationId);
+        runtimeBridge.setInputLocked?.(currentSnapshot()?.phase !== 'active' || localReadOnly);
+      }
+    }
+
+    async function cleanupStaleDocumentCheckpointUploads() {
+      const stale = await rpc('pixisync_list_stale_document_checkpoint_uploads', {
+        p_room_id: roomId,
+        p_limit: 16,
+      }).catch(() => []);
+      for (const row of Array.isArray(stale) ? stale : []) {
+        const uploadId = String(row?.upload_id || '');
+        const path = String(row?.storage_path || '');
+        if (!ROOM_ID_PATTERN.test(uploadId) || !path) continue;
+        await cleanupDocumentCheckpointUpload(uploadId, path).catch(() => {});
+      }
+    }
+
+    async function cleanupDocumentCheckpointUpload(uploadId, expectedPath = '') {
+      const claimed = firstRow(await rpc('pixisync_abort_document_checkpoint_upload', {
+        p_room_id: roomId,
+        p_upload_id: uploadId,
+      }));
+      const claimedPath = String(claimed?.storage_path || '');
+      if (!claimedPath) return false;
+      if (expectedPath && claimedPath !== expectedPath) {
+        throw new Error('PiXiSYNC runtime: document-checkpoint-cleanup-path-mismatch');
+      }
+      await removeCheckpointObject(claimedPath);
+      await rpc('pixisync_finalize_document_checkpoint_upload_cleanup', {
+        p_room_id: roomId,
+        p_upload_id: uploadId,
+      });
+      return true;
+    }
+
+    async function prepareCheckpointOperation({
+      operationId,
+      structureEpoch,
+      captureContext = null,
+      direction = 'forward',
+    } = {}) {
+      if (!session?.canDraw?.() || !realtimeClient || localReadOnly) {
+        throw new Error('PiXiSYNC runtime: active-editor-required');
+      }
+      const normalizedOperationId = String(operationId || '');
+      const normalizedEpoch = Number(structureEpoch);
+      if (!ROOM_ID_PATTERN.test(normalizedOperationId) || !Number.isSafeInteger(normalizedEpoch) || normalizedEpoch < 0) {
+        throw new Error('PiXiSYNC runtime: invalid-document-checkpoint-request');
+      }
+      if (realtimeClient.pendingOperationCount) {
+        throw new Error('PiXiSYNC runtime: pending-operations-remain');
+      }
+      void cleanupStaleDocumentCheckpointUploads();
+      const baseRevision = realtimeClient.confirmedRevision;
+      const blob = await captureCheckpoint(captureContext);
+      if (!(blob instanceof Blob) || blob.size < 1 || blob.size > MAX_CHECKPOINT_BYTES) {
+        throw new Error('PiXiSYNC runtime: document-checkpoint-size-out-of-range');
+      }
+      const stateHash = await sha256Hex(blob);
+      const prepared = firstRow(await rpc('pixisync_prepare_document_checkpoint_upload', {
+        p_room_id: roomId,
+        p_upload_id: normalizedOperationId,
+        p_client_id: clientId,
+        p_base_revision: baseRevision.toString(),
+        p_structure_epoch: normalizedEpoch,
+        p_state_sha256: toHexBytes(stateHash),
+        p_encoded_bytes: blob.size,
+        p_codec_version: 1,
+      }));
+      const objectPath = String(prepared?.storage_path || '');
+      if (!objectPath.startsWith(`rooms/${roomId}/document-checkpoints/`)) {
+        await cleanupDocumentCheckpointUpload(normalizedOperationId).catch(() => {});
+        throw new Error('PiXiSYNC runtime: invalid-document-checkpoint-path');
+      }
+      preparedDocumentCheckpoints.set(normalizedOperationId, {
+        blob,
+        direction: direction === 'undo' || direction === 'redo' ? direction : 'forward',
+      });
+      try {
+        await uploadCheckpoint(objectPath, blob);
+        const documentOperation = Object.freeze({
+          version: 1,
+          type: 'checkpoint_restore',
+          objectPath,
+          sha256Hex: stateHash,
+          byteLength: blob.size,
+        });
+        return {
+          documentOperation,
+          cleanup: async () => {
+            preparedDocumentCheckpoints.delete(normalizedOperationId);
+            await cleanupDocumentCheckpointUpload(normalizedOperationId, objectPath).catch(() => {});
+          },
+        };
+      } catch (error) {
+        preparedDocumentCheckpoints.delete(normalizedOperationId);
+        await cleanupDocumentCheckpointUpload(normalizedOperationId, objectPath).catch(() => {});
+        throw error;
+      }
+    }
+
+    async function requestAuthoritativeRecovery(reason = 'document-operation-recovery') {
+      if (!session || disposed || !isReconnectablePhase()) return false;
+      runtimeBridge.setInputLocked?.(true);
+      await enqueue({
+        type: 'FORCE_FULL_RESYNC',
+        epoch: currentEpoch(),
+        reason: String(reason || 'document-operation-recovery'),
+      });
+      return true;
+    }
 
     function configureBridge({ collaboration = Boolean(realtimeClient) } = {}) {
       runtimeBridge.configure({
@@ -216,6 +456,8 @@
         realtimeClient: collaboration ? realtimeClient : null,
         structureEpoch: Number(manifest?.structure_epoch || 0),
         commands,
+        prepareCheckpointOperation,
+        requestAuthoritativeRecovery,
         participants: [],
         localReadOnly,
         localReadOnlyMessage: localReadOnly ? 'このプロジェクトは別のタブで編集中です。この画面は閲覧専用です。' : '',
@@ -325,6 +567,7 @@
         recoverOnSubscribe: false,
         operationTimeoutMs,
         applyConfirmed: (operation, metadata) => runtimeBridge.applyConfirmed(operation, metadata),
+        prepareConfirmed: (operation, metadata) => prepareConfirmedDocumentOperation(operation, metadata),
         onChannelStatus: status => {
           if (
             realtimeClient !== createdRealtime
@@ -607,6 +850,10 @@
       const projectKey = String(getProjectKey() || '');
       if (!projectKey) throw new Error('PiXiSYNC runtime: local-project-required');
       boundProjectKey = projectKey;
+      replacedProjectKey = '';
+      reusableInviteToken = '';
+      reusableInviteExpiresAt = '';
+      reusableInvitePersistent = false;
       await acquireEditingLease(projectKey);
       configureBridge({ collaboration: false });
       runtimeBridge.setInputLocked?.(true);
@@ -701,6 +948,7 @@
       if (!TOKEN_PATTERN.test(token)) throw new Error('PiXiSYNC runtime: invalid-invite-token');
       installSession('participant');
       boundProjectKey = String(getProjectKey() || '');
+      replacedProjectKey = '';
       if (!boundProjectKey) throw new Error('PiXiSYNC runtime: local-project-required');
       await acquireEditingLease(boundProjectKey);
       configureBridge({ collaboration: false });
@@ -711,6 +959,7 @@
       try {
         const joined = firstRow(await rpc('pixisync_join_session', { p_invite_token: token }));
         roomId = assertRoomId(joined?.room_id);
+        await resolveBindingTargetForRoom();
         manifest = await openManifest(roomId);
         await dispatchNow({
           type: 'MEMBERSHIP_OK',
@@ -735,6 +984,9 @@
         throw new Error('PiXiSYNC runtime: project-binding-unavailable');
       }
       boundProjectKey = binding.projectKey;
+      reusableInviteToken = binding.role === 'owner' ? binding.inviteToken : '';
+      reusableInviteExpiresAt = binding.role === 'owner' ? binding.inviteExpiresAt : '';
+      reusableInvitePersistent = binding.role === 'owner' && binding.invitePersistent === true;
       // Retain the durable target before the first network attempt so a
       // temporary open failure can retry the same room without consuming the
       // original invite again.
@@ -782,16 +1034,34 @@
 
     async function createInviteLink() {
       if (!session?.canDraw?.() || role !== 'owner') throw new Error('PiXiSYNC runtime: active-owner-required');
+      if (
+        TOKEN_PATTERN.test(reusableInviteToken)
+        && (
+          reusableInvitePersistent
+          || (
+            Number.isFinite(Date.parse(reusableInviteExpiresAt))
+            && Date.parse(reusableInviteExpiresAt) > Date.now() + 60000
+          )
+        )
+      ) {
+        const reusableUrl = new URL(locationRef.href);
+        reusableUrl.searchParams.set('pixisync_invite', reusableInviteToken);
+        return reusableUrl.toString();
+      }
       const invite = firstRow(await rpc('pixisync_create_invite', {
         p_room_id: roomId,
         p_role: 'editor',
-        p_expires_at: new Date(Date.now() + 86400000).toISOString(),
-        p_max_uses: 1,
+        p_expires_at: null,
+        p_max_uses: null,
       }));
       const token = String(invite?.invite_token || '');
       if (!TOKEN_PATTERN.test(token)) throw new Error('PiXiSYNC runtime: invalid-invite-response');
+      reusableInviteToken = token.toLowerCase();
+      reusableInviteExpiresAt = String(invite?.expires_at || '');
+      reusableInvitePersistent = true;
+      await persistProjectBinding();
       const url = new URL(locationRef.href);
-      url.searchParams.set('pixisync_invite', token);
+      url.searchParams.set('pixisync_invite', reusableInviteToken);
       return url.toString();
     }
 
@@ -929,6 +1199,9 @@
       const binding = normalizeProjectBinding(await readProjectBinding(String(getProjectKey() || '')));
       projectBindingPersisted = Boolean(binding);
       boundProjectKey = binding?.projectKey || '';
+      reusableInviteToken = binding?.role === 'owner' ? binding.inviteToken : '';
+      reusableInviteExpiresAt = binding?.role === 'owner' ? binding.inviteExpiresAt : '';
+      reusableInvitePersistent = binding?.role === 'owner' && binding.invitePersistent === true;
       installSession(binding?.role || 'owner', { resumeAvailable: Boolean(binding) });
       configureBridge({ collaboration: false });
       await runtimeBridge.consumeInviteFromUrl?.();
@@ -981,11 +1254,16 @@
       archive,
       createInviteLink,
       sendComment,
+      prepareCheckpointOperation,
       snapshot,
       get session() { return session; },
       get realtimeClient() { return realtimeClient; },
     });
   }
 
-  root.pixisyncRuntimeAdapterUtils = Object.freeze({ createPiXiSyncRuntimeAdapter });
+  root.pixisyncRuntimeAdapterUtils = Object.freeze({
+    createPiXiSyncRuntimeAdapter,
+    resolvePiXiSyncRecentProjectTarget,
+    collectPiXiSyncRecentProjectCleanupEntries,
+  });
 })();

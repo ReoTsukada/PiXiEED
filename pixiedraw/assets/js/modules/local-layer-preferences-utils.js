@@ -12,17 +12,22 @@
     getLocalLayerPreviewOpacityById,
     setLocalLayerPreviewOpacityById,
     normalizeLayerOpacity,
+    isSharedProjectCollaborativeMode = () => false,
   } = {}) {
+    function usesCanonicalSharedLayerState() {
+      return Boolean(isSharedProjectCollaborativeMode?.());
+    }
+
     function cloneLocalLayerVisibilityMap(source = getLocalLayerVisibilityById?.()) {
       const map = new Map();
       if (!(source instanceof Map)) {
         return map;
       }
       source.forEach((value, layerId) => {
-        if (typeof layerId !== 'string' || !layerId || value !== false) {
+        if (typeof layerId !== 'string' || !layerId || typeof value !== 'boolean') {
           return;
         }
-        map.set(layerId, false);
+        map.set(layerId, value);
       });
       return map;
     }
@@ -44,11 +49,7 @@
         if (typeof layerId !== 'string' || !layerId) {
           return;
         }
-        if (value === false) {
-          map.set(layerId, false);
-        } else {
-          map.delete(layerId);
-        }
+        if (typeof value === 'boolean') map.set(layerId, value);
       });
       return map;
     }
@@ -61,11 +62,7 @@
       if (!(localLayerVisibilityById instanceof Map)) {
         return;
       }
-      if (visible === false) {
-        localLayerVisibilityById.set(layerId, false);
-        return;
-      }
-      localLayerVisibilityById.delete(layerId);
+      localLayerVisibilityById.set(layerId, visible !== false);
     }
 
     function getDisplayedLayerVisibility(layer, fallback = true) {
@@ -80,6 +77,7 @@
     }
 
     function applyLocalLayerVisibilityToState() {
+      if (usesCanonicalSharedLayerState()) return;
       (state.frames || []).forEach(frame => {
         if (!frame || !Array.isArray(frame.layers)) {
           return;
@@ -94,6 +92,7 @@
     }
 
     function syncLocalLayerVisibilityMapFromState() {
+      if (usesCanonicalSharedLayerState()) return;
       const next = cloneLocalLayerVisibilityMap(getLocalLayerVisibilityById?.());
       (state.frames || []).forEach(frame => {
         if (!frame || !Array.isArray(frame.layers)) {
@@ -103,11 +102,9 @@
           if (!layer || typeof layer.id !== 'string' || !layer.id) {
             return;
           }
-          if (layer.visible === false) {
-            next.set(layer.id, false);
-          } else {
-            next.delete(layer.id);
-          }
+          const displayed = getDisplayedLayerVisibility(layer, true);
+          if (next.has(layer.id) || displayed !== (layer.visible !== false)) next.set(layer.id, displayed);
+          else next.delete(layer.id);
         });
       });
       setLocalLayerVisibilityById?.(next);
@@ -115,6 +112,7 @@
 
     function cloneLocalLayerPreviewOpacityMap(source = getLocalLayerPreviewOpacityById?.()) {
       const map = new Map();
+      if (usesCanonicalSharedLayerState()) return map;
       if (!(source instanceof Map)) {
         return map;
       }
@@ -159,6 +157,7 @@
     }
 
     function rememberLocalLayerPreviewOpacity(layerId, opacity) {
+      if (usesCanonicalSharedLayerState()) return;
       if (typeof layerId !== 'string' || !layerId) {
         return;
       }
@@ -178,7 +177,9 @@
       if (!layer || typeof layer !== 'object') {
         return normalizeLayerOpacity(fallback);
       }
-      const localLayerPreviewOpacityById = getLocalLayerPreviewOpacityById?.();
+      const localLayerPreviewOpacityById = usesCanonicalSharedLayerState()
+        ? null
+        : getLocalLayerPreviewOpacityById?.();
       if (localLayerPreviewOpacityById instanceof Map && typeof layer.id === 'string' && layer.id && localLayerPreviewOpacityById.has(layer.id)) {
         return normalizeLayerOpacity(localLayerPreviewOpacityById.get(layer.id));
       }
@@ -186,6 +187,7 @@
     }
 
     function applyLocalLayerPreviewOpacityToState() {
+      if (usesCanonicalSharedLayerState()) return;
       (state.frames || []).forEach(frame => {
         if (!frame || !Array.isArray(frame.layers)) {
           return;
@@ -200,6 +202,7 @@
     }
 
     function syncLocalLayerPreviewOpacityMapFromState() {
+      if (usesCanonicalSharedLayerState()) return;
       const next = cloneLocalLayerPreviewOpacityMap(getLocalLayerPreviewOpacityById?.());
       (state.frames || []).forEach(frame => {
         if (!frame || !Array.isArray(frame.layers)) {
@@ -220,6 +223,34 @@
       setLocalLayerPreviewOpacityById?.(next);
     }
 
+    function forgetLocalLayerPreferences(layerId) {
+      if (typeof layerId !== 'string' || !layerId) return;
+      getLocalLayerVisibilityById?.()?.delete?.(layerId);
+      getLocalLayerPreviewOpacityById?.()?.delete?.(layerId);
+    }
+
+    function beginCanonicalLayerVisibilityTransaction(layers = []) {
+      const records = [];
+      const seen = new Set();
+      for (const layer of layers || []) {
+        if (!layer || typeof layer !== 'object' || seen.has(layer)) continue;
+        seen.add(layer);
+        const layerId = typeof layer.id === 'string' ? layer.id : '';
+        if (layerId) rememberLocalLayerVisibility(layerId, getDisplayedLayerVisibility(layer, true));
+        records.push({ layer, visible: layer.visible !== false });
+        layer.visible = true;
+      }
+      let settled = false;
+      return Object.freeze({
+        commit() { settled = true; },
+        rollback() {
+          if (settled) return;
+          settled = true;
+          records.forEach(record => { record.layer.visible = record.visible; });
+        },
+      });
+    }
+
     return {
       cloneLocalLayerVisibilityMap,
       serializeLocalLayerVisibilityMap,
@@ -235,6 +266,8 @@
       getDisplayedLayerPreviewOpacity,
       applyLocalLayerPreviewOpacityToState,
       syncLocalLayerPreviewOpacityMapFromState,
+      forgetLocalLayerPreferences,
+      beginCanonicalLayerVisibilityTransaction,
     };
   }
 

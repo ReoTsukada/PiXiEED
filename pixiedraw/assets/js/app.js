@@ -7184,6 +7184,8 @@
   set activeCanvasSurface(value) { activeCanvasSurface = value; },
   get beginHistory() { return beginHistory; },
   set beginHistory(value) { beginHistory = value; },
+  get canBeginPiXiSyncLocalOperation() { return canBeginPiXiSyncLocalOperation; },
+  set canBeginPiXiSyncLocalOperation(value) { canBeginPiXiSyncLocalOperation = value; },
   get buildIndexedPaletteFromFrameDataList() { return buildIndexedPaletteFromFrameDataList; },
   set buildIndexedPaletteFromFrameDataList(value) { buildIndexedPaletteFromFrameDataList = value; },
   get buildVoxelPreviewCanvasCompositeImageDataForFrameIndex() { return buildVoxelPreviewCanvasCompositeImageDataForFrameIndex; },
@@ -7706,6 +7708,15 @@
   let pendingProjectCanvasUiSync = false;
   let localLayerVisibilityById = new Map();
   let localLayerPreviewOpacityById = new Map();
+  function isCanonicalCollaborationMode() {
+    const pixisyncRoomId = String(
+      window.PiXiEEDrawModules?.pixisyncRuntimeBridge?.snapshot?.()?.session?.roomId || ''
+    ).trim();
+    return Boolean(
+      isSharedProjectCollaborativeMode()
+      || /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pixisyncRoomId)
+    );
+  }
   const localLayerPreferencesUtils = window.PiXiEEDrawModules?.localLayerPreferencesUtils?.createLocalLayerPreferencesUtils?.({
     state,
     getLocalLayerVisibilityById: () => localLayerVisibilityById,
@@ -7717,6 +7728,7 @@
       localLayerPreviewOpacityById = value;
     },
     normalizeLayerOpacity,
+    isSharedProjectCollaborativeMode: () => isCanonicalCollaborationMode(),
   }) || {};
   const {
     cloneLocalLayerVisibilityMap,
@@ -7733,6 +7745,8 @@
     getDisplayedLayerPreviewOpacity,
     applyLocalLayerPreviewOpacityToState,
     syncLocalLayerPreviewOpacityMapFromState,
+    forgetLocalLayerPreferences,
+    beginCanonicalLayerVisibilityTransaction,
   } = localLayerPreferencesUtils;
   if (EMBED_CONFIG.lockCanvasSize) {
     lockedCanvasWidth = state.width;
@@ -11865,6 +11879,7 @@
 
   const pixisyncWriterStampUtils = window.PiXiEEDrawModules?.pixisyncWriterStampUtils
     ?.createPiXiSyncWriterStampUtils?.() || null;
+  const pixisyncDocumentOperationUtils = window.PiXiEEDrawModules?.pixisyncDocumentOperationUtils || null;
   const pixisyncPixelMutationBridgeUtils = window.PiXiEEDrawModules?.pixisyncPixelMutationBridgeUtils;
   const isPiXiSyncLayerV1Compatible = layer => Boolean(
     state.colorMode === COLOR_MODE_INDEX
@@ -11899,12 +11914,317 @@
       resolvePaletteColor: paletteIndex => state.palette?.[paletteIndex] || null,
       historyEntryType: HISTORY_ENTRY_TYPE_PIXEL_PATCH,
     }) || null;
+  const visitPiXiSyncDocumentLayers = visitor => {
+    getProjectCanvasDocuments().forEach(canvas => {
+      (canvas?.frames || []).forEach(frame => {
+        (frame?.layers || []).forEach(layer => visitor(layer, frame, canvas));
+      });
+    });
+  };
+  const capturePiXiSyncDocumentStructure = (snapshot = null) => {
+    const canvases = Array.isArray(snapshot?.canvases) && snapshot.canvases.length
+      ? snapshot.canvases
+      : (Array.isArray(snapshot?.frames)
+        ? [{
+            id: snapshot.activeCanvasId || getActiveProjectCanvasDocument()?.id || '',
+            name: getActiveProjectCanvasDocument()?.name || '',
+            width: snapshot.width,
+            height: snapshot.height,
+            frames: snapshot.frames,
+          }]
+        : getProjectCanvasDocuments());
+    const paletteSource = Array.isArray(snapshot?.palette) ? snapshot.palette : state.palette;
+    return {
+    palette: paletteSource.map(color => normalizeColorValue(color)),
+    canvases: canvases.map(canvas => ({
+      id: String(canvas.id || ''),
+      name: String(canvas.name || ''),
+      width: Math.max(1, Math.round(Number(canvas.width) || 1)),
+      height: Math.max(1, Math.round(Number(canvas.height) || 1)),
+      frames: (canvas.frames || []).map(frame => ({
+        id: String(frame.id || ''),
+        name: String(frame.name || ''),
+        duration: Math.max(1, Number(frame.duration) || 1),
+        layers: (frame.layers || []).map(layer => ({
+          id: String(layer.id || ''),
+          trackId: String(layer.trackId || ''),
+          name: String(layer.name || ''),
+          opacity: normalizeLayerOpacity(layer.opacity),
+          blendMode: normalizeLayerBlendMode(layer.blendMode),
+        })),
+      })),
+    })),
+  };
+  };
+  const applyPiXiSyncDocumentStructure = document => {
+    const previousLayerIds = new Set();
+    const previousLayers = new Map();
+    const previousCanvasSelections = new Map();
+    visitPiXiSyncDocumentLayers(layer => previousLayerIds.add(String(layer?.id || '')));
+    getProjectCanvasDocuments().forEach(canvas => {
+      const frames = canvas.frames || [];
+      const activeFrame = frames[Math.max(0, Number(canvas.activeFrame) || 0)] || frames[0] || null;
+      previousCanvasSelections.set(String(canvas.id || ''), {
+        frameId: String(activeFrame?.id || ''),
+        layerId: String(canvas.activeLayer || activeFrame?.layers?.[0]?.id || ''),
+      });
+      frames.forEach(frame => (
+        (frame.layers || []).forEach(layer => previousLayers.set(`${canvas.id}/${frame.id}/${layer.id}`, {
+          layer,
+          width: canvas.width,
+          height: canvas.height,
+        }))
+      ));
+    });
+    const previousActiveCanvasId = getActiveProjectCanvasDocument()?.id || '';
+    const current = makeHistorySnapshot({ clonePixelData: false });
+    const palette = document.palette.map(color => normalizeColorValue(color));
+    const canvases = document.canvases.map(canvas => {
+      const previousSelection = previousCanvasSelections.get(String(canvas.id || '')) || {};
+      return {
+      id: canvas.id,
+      name: canvas.name,
+      width: canvas.width,
+      height: canvas.height,
+      frames: canvas.frames.map(frame => ({
+        id: frame.id,
+        name: frame.name,
+        duration: frame.duration,
+        layers: frame.layers.map(metadata => {
+          const reusable = previousLayers.get(`${canvas.id}/${frame.id}/${metadata.id}`);
+          const reuseRaster = reusable
+            && Number(reusable.width) === Number(canvas.width)
+            && Number(reusable.height) === Number(canvas.height);
+          const layer = reuseRaster
+            ? reusable.layer
+            : createLayer(metadata.name, canvas.width, canvas.height, palette, {
+                trackId: metadata.trackId,
+                deferPixelAllocation: true,
+              });
+          layer.id = metadata.id;
+          layer.trackId = metadata.trackId;
+          layer.name = metadata.name;
+          layer.opacity = normalizeLayerOpacity(metadata.opacity);
+          layer.blendMode = normalizeLayerBlendMode(metadata.blendMode);
+          if (!reuseRaster) layer.visible = true;
+          previousLayerIds.delete(layer.id);
+          return layer;
+        }),
+      })),
+      activeFrame: Math.max(0, canvas.frames.findIndex(frame => frame.id === previousSelection.frameId)),
+      activeLayer: canvas.frames.flatMap(frame => frame.layers).some(layer => layer.id === previousSelection.layerId)
+        ? previousSelection.layerId
+        : (canvas.frames[0]?.layers[0]?.id || ''),
+      };
+    });
+    previousLayerIds.forEach(layerId => forgetLocalLayerPreferences?.(layerId));
+    const activeCanvasId = canvases.some(canvas => canvas.id === previousActiveCanvasId)
+      ? previousActiveCanvasId
+      : canvases[0].id;
+    const activeCanvas = canvases.find(canvas => canvas.id === activeCanvasId) || canvases[0];
+    applyHistorySnapshot({
+      ...current,
+      width: activeCanvas.width,
+      height: activeCanvas.height,
+      palette,
+      canvases,
+      activeCanvasId,
+      frames: activeCanvas.frames,
+      activeFrame: activeCanvas.activeFrame,
+      activeLayer: activeCanvas.activeLayer,
+    }, {
+      preserveView: true,
+      preservePersonalPreferences: true,
+      preserveDocumentIds: true,
+    });
+    return true;
+  };
+  let pixisyncCheckpointOperationPreparer = null;
+  let pixisyncAuthoritativeRecoveryRequester = null;
+  const pixisyncDocumentBridge = pixisyncDocumentOperationUtils ? {
+    classifyHistoryLabel: label => pixisyncDocumentOperationUtils.classifyHistoryLabel(label),
+    requestAuthoritativeRecovery: reason => (
+      pixisyncAuthoritativeRecoveryRequester?.(reason) || Promise.resolve(false)
+    ),
+    discardInvalidatedHistoryEntries: entries => {
+      const invalidated = new Set(Array.isArray(entries) ? entries : []);
+      if (!invalidated.size) return 0;
+      let removed = 0;
+      for (const list of [history.past, history.future]) {
+        for (let index = list.length - 1; index >= 0; index -= 1) {
+          if (!invalidated.has(list[index])) continue;
+          setTimelapseHistoryEntryState(list[index], 'discarded');
+          list.splice(index, 1);
+          removed += 1;
+        }
+      }
+      updateHistoryButtons();
+      return removed;
+    },
+    rollbackRejectedDocumentEntry: entry => {
+      const historyIndex = entry ? history.past.indexOf(entry) : -1;
+      if (historyIndex < 0) throw new Error('pixisync-rejected-history-entry-not-found');
+      let rolledBack = false;
+      if (isPaletteStateHistoryEntry(entry)) {
+        rolledBack = applyPaletteStateHistoryEntry(entry, 'undo');
+      } else if (isTimelineVisualHistoryEntry(entry)) {
+        rolledBack = applyTimelineVisualHistoryEntry(entry, 'undo');
+      } else if (isLayerAddHistoryEntry(entry)) {
+        rolledBack = applyLayerAddHistoryEntry(entry, 'undo');
+      } else if (isLayerRemoveHistoryEntry(entry)) {
+        rolledBack = applyLayerRemoveHistoryEntry(entry, 'undo');
+      } else if (isFrameAddHistoryEntry(entry)) {
+        rolledBack = applyFrameAddHistoryEntry(entry, 'undo');
+      } else if (isFrameRemoveHistoryEntry(entry)) {
+        rolledBack = applyFrameRemoveHistoryEntry(entry, 'undo');
+      } else if (isCanvasResizeHistoryEntry(entry)) {
+        rolledBack = applyCanvasResizeHistoryEntry(entry, 'undo');
+      } else {
+        const snapshot = decompressHistorySnapshot(entry);
+        if (snapshot?.frames?.length) {
+          applyHistorySnapshot(snapshot, {
+            preserveView: true,
+            preservePersonalPreferences: true,
+            preserveSharedProjectDocumentIdentity: false,
+          });
+          rolledBack = true;
+        }
+      }
+      if (!rolledBack) throw new Error('pixisync-rejected-history-entry-rollback-failed');
+      history.past.splice(historyIndex, 1);
+      setTimelapseHistoryEntryState(entry, 'discarded');
+      updateHistoryButtons();
+      markAutosaveDirty();
+      markDocumentUnsavedChange();
+      scheduleAutosaveSnapshot();
+      return true;
+    },
+    toDocumentOperation: async (_entry, _label, kind, options = {}) => {
+      if (options.reuseDocumentOperation) {
+        return { documentOperation: options.reuseDocumentOperation };
+      }
+      if (kind === 'checkpoint_restore') {
+        if (isVoxelExtensionModeEnabled()) return null;
+        if (typeof pixisyncCheckpointOperationPreparer !== 'function') return null;
+        let snapshot = null;
+        if (options.direction === 'undo') {
+          const source = _entry?.pixisyncCheckpointBefore || _entry?.before || null;
+          if (source) {
+            try { snapshot = decompressHistorySnapshot(source); } catch (_) { snapshot = null; }
+          }
+          if (!snapshot) return null;
+        } else if (options.direction === 'redo') {
+          // Redo must reuse the immutable forward checkpoint stored in the
+          // controller history metadata. Recapturing the current (undone)
+          // document here would publish the wrong raster state.
+          return null;
+        }
+        return await pixisyncCheckpointOperationPreparer({
+          operationId: options.operationId,
+          structureEpoch: options.structureEpoch,
+          label: String(_label || ''),
+          direction: options.direction || 'forward',
+          captureContext: snapshot ? { snapshot } : {},
+        });
+      }
+      const historySource = options.direction === 'undo'
+        ? _entry?.before
+        : (options.direction === 'redo' ? _entry?.after : null);
+      if (kind === 'document_structure') {
+        let targetSnapshot = null;
+        if (historySource) {
+          try { targetSnapshot = decompressHistorySnapshot(historySource); } catch (_) { targetSnapshot = null; }
+        }
+        return {
+          documentOperation: { version: 1, type: kind, document: capturePiXiSyncDocumentStructure(targetSnapshot) },
+        };
+      }
+      if (kind === 'palette') {
+        const palette = Array.isArray(historySource?.palette) ? historySource.palette : state.palette;
+        return { documentOperation: { version: 1, type: kind, palette: palette.map(color => normalizeColorValue(color)) } };
+      }
+      if (kind === 'layer_properties') {
+        if (historySource?.kind === 'layer-track' && Array.isArray(historySource.layers)) {
+          return { documentOperation: {
+            version: 1,
+            type: kind,
+            layers: historySource.layers.map(layer => ({
+              layerId: String(layer.layerId || ''),
+              ...(historySource.property === 'opacity' ? { opacity: normalizeLayerOpacity(layer.opacity) } : {}),
+              ...(historySource.property === 'blendMode' ? { blendMode: normalizeLayerBlendMode(layer.blendMode) } : {}),
+            })),
+          } };
+        }
+        const layers = [];
+        visitPiXiSyncDocumentLayers(layer => layers.push({
+          layerId: String(layer.id || ''),
+          opacity: normalizeLayerOpacity(layer.opacity),
+          blendMode: normalizeLayerBlendMode(layer.blendMode),
+        }));
+        return { documentOperation: { version: 1, type: kind, layers } };
+      }
+      if (kind === 'frame_properties') {
+        if (historySource?.kind === 'frame-duration' && Array.isArray(historySource.frames)) {
+          return { documentOperation: {
+            version: 1,
+            type: kind,
+            frames: historySource.frames.map(frame => ({
+              frameId: String(frame.frameId || ''),
+              duration: Math.max(1, Number(frame.duration) || 1),
+            })),
+          } };
+        }
+        const frames = getProjectCanvasDocuments().flatMap(canvas => (canvas.frames || []).map(frame => ({
+          frameId: String(frame.id || ''),
+          duration: Math.max(1, Number(frame.duration) || 1),
+        })));
+        return { documentOperation: { version: 1, type: kind, frames } };
+      }
+      return null;
+    },
+    applyDocumentOperation: operation => {
+      if (operation?.type === 'checkpoint_restore') {
+        return operation?.preparedCheckpoint?.verified === true
+          && operation?.preparedCheckpoint?.applied === true;
+      }
+      if (operation?.type === 'document_structure') return applyPiXiSyncDocumentStructure(operation.document);
+      if (operation?.type === 'palette') {
+        state.palette = operation.palette.map(color => normalizeColorValue(color));
+        syncCurrentPalettePresetFromPalette(state.palette, { syncControl: true });
+        renderPalette();
+        syncPaletteInputs();
+      } else if (operation?.type === 'layer_properties') {
+        const byId = new Map(operation.layers.map(layer => [layer.layerId, layer]));
+        visitPiXiSyncDocumentLayers(layer => {
+          const properties = byId.get(layer.id);
+          if (!properties) return;
+          if (properties.opacity !== undefined) layer.opacity = normalizeLayerOpacity(properties.opacity);
+          if (properties.blendMode !== undefined) layer.blendMode = normalizeLayerBlendMode(properties.blendMode);
+        });
+      } else if (operation?.type === 'frame_properties') {
+        const byId = new Map(operation.frames.map(frame => [frame.frameId, frame.duration]));
+        getProjectCanvasDocuments().forEach(canvas => (canvas.frames || []).forEach(frame => {
+          if (byId.has(frame.id)) frame.duration = Math.max(1, Number(byId.get(frame.id)) || 1);
+        }));
+      } else {
+        return false;
+      }
+      clearPlaybackFrameCache();
+      renderLayerList();
+      renderTimelineMatrix();
+      renderAllProjectCanvasSurfaces();
+      requestRender();
+      requestOverlayRender();
+      return true;
+    },
+  } : null;
   const pixisyncCollaborationController = (
     pixisyncPixelMutationBridge
     && pixisyncWriterStampUtils
     && window.PiXiEEDrawModules?.pixisyncCollaborationControllerUtils
       ?.createPiXiSyncCollaborationControllerUtils?.({
         mutationBridge: pixisyncPixelMutationBridge,
+        documentBridge: pixisyncDocumentBridge,
         writerStampUtils: pixisyncWriterStampUtils,
         onBlocked: details => {
           console.warn('[pixisync:v1] local operation blocked', details?.reason || 'unknown');
@@ -11947,6 +12267,12 @@
     window.PiXiEEDrawModules.pixisyncRuntimeBridge = Object.freeze({
       configure: runtime => {
         pixisyncLocalReadOnly = runtime?.localReadOnly === true;
+        pixisyncCheckpointOperationPreparer = typeof runtime?.prepareCheckpointOperation === 'function'
+          ? runtime.prepareCheckpointOperation
+          : null;
+        pixisyncAuthoritativeRecoveryRequester = typeof runtime?.requestAuthoritativeRecovery === 'function'
+          ? runtime.requestAuthoritativeRecovery
+          : null;
         pixisyncInputLocked = pixisyncLocalReadOnly;
         if (runtime?.session?.canDraw && runtime?.realtimeClient?.commit) {
           pixisyncCollaborationController.configure(runtime);
@@ -11968,6 +12294,8 @@
       clear: () => {
         pixisyncInputLocked = false;
         pixisyncLocalReadOnly = false;
+        pixisyncCheckpointOperationPreparer = null;
+        pixisyncAuthoritativeRecoveryRequester = null;
         pixisyncCollaborationController.clear();
         pixisyncMinimalUi?.clear?.();
       },
@@ -12013,6 +12341,12 @@
       return false;
     }
     if (!pixisyncCollaborationController?.enabled) return true;
+    if (
+      pixisyncDocumentOperationUtils?.classifyHistoryLabel?.(label) === 'checkpoint_restore'
+      && isVoxelExtensionModeEnabled()
+    ) {
+      return false;
+    }
     const layer = getActiveLayer();
     const v1Compatible = isPiXiSyncLayerV1Compatible(layer);
     const allowed = pixisyncCollaborationController.canBeginLocalOperation(label, {
@@ -13742,7 +14076,9 @@
   set isFrameRemoveHistoryEntry(value) { isFrameRemoveHistoryEntry = value; },
   get applyFrameRemoveHistoryEntry() { return applyFrameRemoveHistoryEntry; },
   set applyFrameRemoveHistoryEntry(value) { applyFrameRemoveHistoryEntry = value; },
-  get isSharedProjectCollaborativeMode() { return isSharedProjectCollaborativeMode; },
+  // History must treat PiXiSYNC rooms as canonical collaboration too. This
+  // keeps reversible pre-edit snapshots for structure and palette operations.
+  get isSharedProjectCollaborativeMode() { return isCanonicalCollaborationMode; },
   set isSharedProjectCollaborativeMode(value) { isSharedProjectCollaborativeMode = value; },
   get isVoxelExtensionModeEnabled() { return isVoxelExtensionModeEnabled; },
   set isVoxelExtensionModeEnabled(value) { isVoxelExtensionModeEnabled = value; },
@@ -13778,6 +14114,8 @@
   set rememberLocalLayerPreviewOpacity(value) { rememberLocalLayerPreviewOpacity = value; },
   get rememberLocalLayerVisibility() { return rememberLocalLayerVisibility; },
   set rememberLocalLayerVisibility(value) { rememberLocalLayerVisibility = value; },
+  get forgetLocalLayerPreferences() { return forgetLocalLayerPreferences; },
+  set forgetLocalLayerPreferences(value) { forgetLocalLayerPreferences = value; },
   get scheduleAutosaveSnapshot() { return scheduleAutosaveSnapshot; },
   set scheduleAutosaveSnapshot(value) { scheduleAutosaveSnapshot = value; },
   get scheduleGuestLayerPatchSend() { return scheduleGuestLayerPatchSend; },
@@ -13836,7 +14174,7 @@
     const source = direction === 'undo' ? history.past : history.future;
     const destination = direction === 'undo' ? history.future : history.past;
     const entry = source[source.length - 1];
-    if (!entry || !isPixelPatchHistoryEntry(entry)) {
+    if (!entry) {
       console.warn('[pixisync:v1] guarded history blocked', 'unsupported-history-entry');
       return false;
     }
@@ -18557,6 +18895,10 @@
   set beginHistory(value) { beginHistory = value; },
   get canCurrentClientEditProjectStructure() { return canCurrentClientEditProjectStructure; },
   set canCurrentClientEditProjectStructure(value) { canCurrentClientEditProjectStructure = value; },
+  get canBeginPiXiSyncLocalOperation() { return canBeginPiXiSyncLocalOperation; },
+  set canBeginPiXiSyncLocalOperation(value) { canBeginPiXiSyncLocalOperation = value; },
+  get rollbackPendingHistory() { return rollbackPendingHistory; },
+  set rollbackPendingHistory(value) { rollbackPendingHistory = value; },
   get canCurrentGuestFreelyMoveAssignedCell() { return canCurrentGuestFreelyMoveAssignedCell; },
   set canCurrentGuestFreelyMoveAssignedCell(value) { canCurrentGuestFreelyMoveAssignedCell = value; },
   get canNormalizeMultiAssignmentsForCanvasDocuments() { return canNormalizeMultiAssignmentsForCanvasDocuments; },
@@ -18639,6 +18981,8 @@
   set isMultiReadOnlyMode(value) { isMultiReadOnlyMode = value; },
   get isSharedProjectCollaborativeMode() { return isSharedProjectCollaborativeMode; },
   set isSharedProjectCollaborativeMode(value) { isSharedProjectCollaborativeMode = value; },
+  get isCanonicalCollaborationMode() { return isCanonicalCollaborationMode; },
+  set isCanonicalCollaborationMode(value) { isCanonicalCollaborationMode = value; },
   get isVoxelExtensionModeEnabled() { return isVoxelExtensionModeEnabled; },
   set isVoxelExtensionModeEnabled(value) { isVoxelExtensionModeEnabled = value; },
   get jumpToTimelineEdgeOnActiveLayer() { return jumpToTimelineEdgeOnActiveLayer; },
@@ -18683,6 +19027,8 @@
   set rememberLocalLayerPreviewOpacity(value) { rememberLocalLayerPreviewOpacity = value; },
   get rememberLocalLayerVisibility() { return rememberLocalLayerVisibility; },
   set rememberLocalLayerVisibility(value) { rememberLocalLayerVisibility = value; },
+  get forgetLocalLayerPreferences() { return forgetLocalLayerPreferences; },
+  set forgetLocalLayerPreferences(value) { forgetLocalLayerPreferences = value; },
   get renderFloatingPreviewPanel() { return renderFloatingPreviewPanel; },
   set renderFloatingPreviewPanel(value) { renderFloatingPreviewPanel = value; },
   get renderInactiveProjectCanvasSurfaces() { return renderInactiveProjectCanvasSurfaces; },
@@ -18906,6 +19252,7 @@
     colorsMatchRgba: (...args) => colorsMatchRgba(...args),
     getPaletteEditorTargetColor: (...args) => getPaletteEditorTargetColor(...args),
     canCurrentClientEditPaletteColors: (...args) => canCurrentClientEditPaletteColors(...args),
+    canBeginPiXiSyncLocalOperation: (...args) => canBeginPiXiSyncLocalOperation(...args),
     isMultiPaletteIsolationEnabled: (...args) => isMultiPaletteIsolationEnabled(...args),
     canCurrentClientReindexPalette: (...args) => canCurrentClientReindexPalette(...args),
     announcePaletteReindexRestriction: (...args) => announcePaletteReindexRestriction(...args),
@@ -21307,6 +21654,21 @@
   }
 
   function canCurrentClientEditProjectStructure({ announce = false, ignoreLocalInteraction = false } = {}) {
+    if (pixisyncCollaborationController?.enabled && isVoxelExtensionModeEnabled()) {
+      return false;
+    }
+    if (
+      pixisyncCollaborationController?.enabled
+      && !pixisyncCollaborationController.canBeginDocumentOperation?.()
+    ) {
+      if (announce) {
+        updateAutosaveStatus(
+          localizeText('シェア変更の確定を待ってから構造を変更してください', 'Wait for the shared change to be confirmed before editing structure'),
+          'warn'
+        );
+      }
+      return false;
+    }
     if (isSharedProjectCollaborativeMode()) {
       if (!canCurrentSharedProjectEdit()) {
         if (announce) {
@@ -23311,7 +23673,8 @@
           }
           hash = mixTextHash(hash, layer.id || '');
           hash = mixUint32Hash(hash, layerIndex);
-          hash = mixUint32Hash(hash, layer.visible === false ? 0 : 1);
+          // Visibility is a per-user shared-project view and must not affect
+          // canonical convergence.
           hash = mixUint32Hash(hash, Math.round(normalizeLayerOpacity(layer.opacity) * 1000));
           hash = mixTextHash(hash, normalizeLayerBlendMode(layer.blendMode));
           const indices = layer.indices;
@@ -23364,7 +23727,7 @@
     hash = mixTextHash(hash, layer.id || layerId);
     hash = mixUint32Hash(hash, Math.max(1, Math.round(Number(targetCanvas.width) || 1)));
     hash = mixUint32Hash(hash, Math.max(1, Math.round(Number(targetCanvas.height) || 1)));
-    hash = mixUint32Hash(hash, layer.visible === false ? 0 : 1);
+    // Visibility is intentionally excluded from canonical layer hashes.
     hash = mixUint32Hash(hash, Math.round(normalizeLayerOpacity(layer.opacity) * 1000));
     hash = mixTextHash(hash, normalizeLayerBlendMode(layer.blendMode));
     const indices = layer.indices instanceof Int16Array || layer.indices instanceof Uint8Array
@@ -26422,6 +26785,7 @@
     }
     const codec = window.PiXiEEDrawModules?.pixisyncOperationCodecUtils
       ?.createPiXiSyncOperationCodecUtils?.();
+    const documentCodec = window.PiXiEEDrawModules?.pixisyncDocumentOperationUtils || null;
     const orderKeeper = window.PiXiEEDrawModules?.pixisyncOrderKeeperUtils
       ?.createPiXiSyncOrderKeeperUtils?.();
     const journal = window.PiXiEEDrawModules?.pixisyncJournalUtils
@@ -26432,6 +26796,7 @@
       && window.PiXiEEDrawModules?.pixisyncRealtimeClientUtils
         ?.createPiXiSyncRealtimeClientUtils?.({
           codec,
+          documentCodec,
           orderKeeperFactory: options => orderKeeper.createOrderKeeper(options),
           journal,
         })
@@ -26478,9 +26843,30 @@
         }
         return ensurePixieedAccountClient();
       },
-      captureCheckpoint: async () => {
+      captureCheckpoint: async (captureContext = {}) => {
         const checkpointStartedAt = performance.now();
-        const snapshot = makeHistorySnapshot({ clonePixelData: true });
+        const providedSnapshot = captureContext?.snapshot && typeof captureContext.snapshot === 'object'
+          ? captureContext.snapshot
+          : null;
+        const checkpointLayers = [];
+        if (!providedSnapshot) {
+          getProjectCanvasDocuments().forEach(canvas => {
+            (canvas?.frames || []).forEach(frame => checkpointLayers.push(...(frame?.layers || [])));
+          });
+          (state.frames || []).forEach(frame => checkpointLayers.push(...(frame?.layers || [])));
+        }
+        const visibilityTransaction = providedSnapshot
+          ? null
+          : beginCanonicalLayerVisibilityTransaction(checkpointLayers);
+        try {
+        const snapshot = providedSnapshot || makeHistorySnapshot({ clonePixelData: true });
+        if (providedSnapshot) {
+          const canonicalizeVisibility = frames => (frames || []).forEach(frame => (
+            (frame?.layers || []).forEach(layer => { layer.visible = true; })
+          ));
+          canonicalizeVisibility(snapshot.frames);
+          (snapshot.canvases || []).forEach(canvas => canonicalizeVisibility(canvas?.frames));
+        }
         const runtimeMetrics = inspectPiXiSyncCheckpointSnapshot(snapshot, { requireExpanded: false });
         console.info('[pixisync:checkpoint]', {
           phase: 'checkpoint-snapshot-complete',
@@ -26545,11 +26931,22 @@
           blobSize: serialized.blob.size,
           elapsedMs: Math.round(performance.now() - checkpointStartedAt),
         });
+        visibilityTransaction?.commit?.();
         return serialized.blob;
+        } catch (error) {
+          visibilityTransaction?.rollback?.();
+          throw error;
+        }
       },
       restoreCheckpoint: async (blob, context = {}) => {
         const projectId = normalizeAutosaveProjectId(context?.projectKey || '')
           || normalizeAutosaveProjectId(autosaveProjectId || '');
+        const preservedHistory = context?.documentCheckpoint === true ? {
+          past: history.past,
+          future: history.future,
+          limit: history.limit,
+          pending: history.pending,
+        } : null;
         const activeTabBeforeRestore = getActiveOpenProjectTab?.() || null;
         const activeTabIdBeforeRestore = String(activeTabBeforeRestore?.id || activeOpenProjectTabId || '');
         const sourcePersistenceState = {
@@ -26573,6 +26970,17 @@
           sourcePersistenceState,
         });
         if (!loaded || loaded === 'deferred') throw new Error('PiXiSYNC checkpoint restore failed');
+        if (preservedHistory) {
+          // Ordered document checkpoints change the document model, not the
+          // local Undo stack. Keep the exact array identities because the
+          // guarded Undo/Redo runner holds references while awaiting restore.
+          history.past = preservedHistory.past;
+          history.future = preservedHistory.future;
+          history.limit = preservedHistory.limit;
+          history.pending = preservedHistory.pending;
+          updateHistoryButtons();
+          updateMemoryStatus();
+        }
         const activeTabAfterRestore = getActiveOpenProjectTab?.() || null;
         const activeTabIdAfterRestore = String(activeTabAfterRestore?.id || activeOpenProjectTabId || '');
         const activeProjectIdAfterRestore = normalizeAutosaveProjectId(
@@ -26611,10 +27019,41 @@
           roomId: binding.roomId,
           role: binding.role,
           projectKey: normalizedProjectKey,
+          inviteToken: binding.inviteToken,
+          inviteExpiresAt: binding.inviteExpiresAt,
+          invitePersistent: binding.invitePersistent === true,
         };
+      },
+      resolveProjectBindingTarget: async ({ roomId = '', projectKey = '' } = {}) => {
+        const normalizedProjectKey = normalizeAutosaveProjectId(projectKey || '');
+        const normalizedRoomId = String(roomId || '').trim().toLowerCase();
+        if (!normalizedProjectKey || !/^[0-9a-f-]{36}$/i.test(normalizedRoomId)) {
+          return normalizedProjectKey;
+        }
+        const entries = await loadRecentProjectsMetadata();
+        const targetProjectKey = normalizeAutosaveProjectId(
+          window.PiXiEEDrawModules?.pixisyncRuntimeAdapterUtils
+            ?.resolvePiXiSyncRecentProjectTarget?.(entries, normalizedRoomId, normalizedProjectKey)
+          || normalizedProjectKey
+        ) || normalizedProjectKey;
+        if (targetProjectKey !== normalizedProjectKey) {
+          retargetAutosaveProjectId(normalizedProjectKey, targetProjectKey);
+          const activeTab = getActiveOpenProjectTab?.() || null;
+          replaceActiveProjectSessionFromTab(activeTab, {
+            phase: 'pixisync-room-card-retarget',
+          });
+          console.info('[pixisync:project-binding]', {
+            phase: 'room-card-reused',
+            roomId: normalizedRoomId,
+            previousProjectId: normalizedProjectKey,
+            projectId: targetProjectKey,
+          });
+        }
+        return targetProjectKey;
       },
       writeProjectBinding: async (projectKey, binding) => {
         const normalizedProjectKey = normalizeAutosaveProjectId(projectKey || '');
+        const replacedProjectKey = normalizeAutosaveProjectId(binding?.replacedProjectKey || '');
         if (!normalizedProjectKey) throw new Error('PiXiSYNC project binding requires a local project');
         let entries = await loadRecentProjectsMetadata();
         let entry = entries.find(candidate => candidate?.id === normalizedProjectKey) || null;
@@ -26625,15 +27064,45 @@
         }
         if (!entry) throw new Error('PiXiSYNC local project card is unavailable');
         const nextBinding = {
-          version: 1,
+          version: 2,
           roomId: String(binding.roomId || ''),
           role: binding.role === 'owner' ? 'owner' : 'participant',
+          inviteToken: binding.role === 'owner' && /^[0-9a-f]{64}$/i.test(String(binding.inviteToken || ''))
+            ? String(binding.inviteToken).toLowerCase()
+            : '',
+          inviteExpiresAt: binding.role === 'owner' ? String(binding.inviteExpiresAt || '') : '',
+          invitePersistent: binding.role === 'owner' && binding.invitePersistent === true,
         };
-        const nextEntries = entries.map(candidate => candidate?.id === normalizedProjectKey
-          ? { ...candidate, pixisync: nextBinding }
-          : candidate);
+        const normalizedRoomId = nextBinding.roomId.trim().toLowerCase();
+        const nextEntries = entries
+          .filter(candidate => (
+            candidate?.id !== replacedProjectKey
+            && (
+              candidate?.id === normalizedProjectKey
+              || String(candidate?.pixisync?.roomId || '').trim().toLowerCase() !== normalizedRoomId
+            )
+          ))
+          .map(candidate => candidate?.id === normalizedProjectKey
+            ? { ...candidate, pixisync: nextBinding, updatedAt: new Date().toISOString() }
+            : candidate);
+        const cleanupEntries = window.PiXiEEDrawModules?.pixisyncRuntimeAdapterUtils
+          ?.collectPiXiSyncRecentProjectCleanupEntries?.(
+            entries,
+            nextEntries,
+            normalizedProjectKey
+          ) || [];
         await saveRecentProjectsList(entries, nextEntries);
+        await Promise.all(cleanupEntries.map(removed => (
+          removeAutosaveV2ProjectData(removed.id).catch(error => {
+            console.warn('[pixisync:project-binding] duplicate V2 cleanup deferred', {
+              projectId: removed.id,
+              error,
+            });
+            return false;
+          })
+        )));
         setRecentProjectsCache(nextEntries);
+        return { projectKey: normalizedProjectKey };
       },
       clearProjectBinding: async projectKey => {
         const normalizedProjectKey = normalizeAutosaveProjectId(projectKey || '');

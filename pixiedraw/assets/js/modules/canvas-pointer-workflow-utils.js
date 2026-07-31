@@ -2386,7 +2386,12 @@
     const bounds = { x0, y0, x1: x0 + width - 1, y1: y0 + height - 1 };
     commitHistory();
     const paletteExpansionCount = getClipboardPaletteExpansionCount(clip);
-    beginHistory(paletteExpansionCount > 0 ? 'selectionPaste' : 'selectionPastePixels');
+    const historyLabel = paletteExpansionCount > 0 ? 'selectionPaste' : 'selectionPastePixels';
+    if (!canBeginPiXiSyncLocalOperation(historyLabel)) {
+      updateCanvasControlButtons();
+      return false;
+    }
+    beginHistory(historyLabel);
     const moveState = createMoveStateFromClipboard(clip, bounds, layer, { autoExpandPalette: true });
     if (!moveState) {
       rollbackPendingHistory({ reRender: false });

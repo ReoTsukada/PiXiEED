@@ -5,6 +5,7 @@
 
   function createPiXiSyncCollaborationControllerUtils({
     mutationBridge,
+    documentBridge = null,
     writerStampUtils,
     operationIdFactory = () => window.crypto?.randomUUID?.(),
     onBlocked = () => {},
@@ -46,6 +47,7 @@
     let runtime = null;
     const pendingOptimistic = new Map();
     const pendingGuarded = new Map();
+    let pendingDocument = null;
     const stampsByTarget = new Map();
     const confirmedOperationIds = new Set();
     const historyMetadata = new WeakMap();
@@ -144,6 +146,75 @@
         onRecoveryRequired({ reason: 'noncontiguous-controller-apply', operation, appliedRevision });
         return { applied: 0, recovery: true };
       }
+      if (operation?.kind === 'document_patch') {
+        const localDocument = pendingDocument?.operationId === String(operation.operationId);
+        const discardedPendingIds = [];
+        let invalidatedLocalDocument = null;
+        if (!localDocument && pendingDocument) {
+          // Another editor won the exact-base document revision while this
+          // client was preparing/uploading. The remote operation is now the
+          // authority; never restore our older before-snapshot in the local
+          // promise's eventual stale-base catch.
+          pendingDocument.invalidatedByRemote = true;
+          invalidatedLocalDocument = pendingDocument;
+          runtime.realtimeClient.discardPendingOperation?.(pendingDocument.operationId);
+        }
+        if (!localDocument && (pendingOptimistic.size || pendingGuarded.size)) {
+          const invalidatedEntries = new Set();
+          if (pendingOptimistic.size) rollbackPending();
+          pendingOptimistic.forEach(record => {
+            if (record?.entry) invalidatedEntries.add(record.entry);
+          });
+          pendingGuarded.forEach(record => {
+            if (record?.entry) invalidatedEntries.add(record.entry);
+          });
+          discardedPendingIds.push(...pendingOptimistic.keys(), ...pendingGuarded.keys());
+          pendingOptimistic.clear();
+          pendingGuarded.clear();
+          runtime.realtimeClient.discardPixelPendingBeforeEpoch?.(operation.structureEpoch);
+          if (invalidatedEntries.size) {
+            documentBridge?.discardInvalidatedHistoryEntries?.([...invalidatedEntries]);
+          }
+        }
+        if (!localDocument) {
+          const applied = documentBridge?.applyDocumentOperation?.(operation.documentOperation);
+          if (applied !== true) {
+            onRecoveryRequired({ reason: 'confirmed-document-operation-apply-failed', operation });
+            return { applied: 0, recovery: true };
+          }
+        } else {
+          pendingDocument.confirmed = true;
+          if (pendingDocument.entry && typeof pendingDocument.entry === 'object') {
+            const previous = historyMetadata.get(pendingDocument.entry) || {};
+            const key = pendingDocument.direction === 'undo'
+              ? 'undoDocumentRevision'
+              : 'sourceDocumentRevision';
+            historyMetadata.set(pendingDocument.entry, {
+              ...previous,
+              [key]: revision.toString(),
+            });
+          }
+        }
+        stampsByTarget.clear();
+        runtime.structureEpoch = Math.max(0, Number(operation.structureEpoch) || 0);
+        stampConfirmed(operation);
+        updateSessionPendingCount();
+        if (discardedPendingIds.length) onBlocked({
+          reason: 'pending-pixels-invalidated-by-document-operation',
+          operation,
+          operationIds: discardedPendingIds,
+        });
+        if (invalidatedLocalDocument) {
+          // A semantic remote patch may not overwrite every optimistic local
+          // structural field. Force a checkpoint+tail reload immediately;
+          // waiting for the stale local RPC to fail can leave a hybrid model
+          // visible for the full network timeout.
+          Promise.resolve().then(() => documentBridge?.requestAuthoritativeRecovery?.(
+            'remote-document-invalidated-local-document'
+          )).catch(() => {});
+        }
+        return { applied: 1, promotedOptimistic: localDocument };
+      }
       const localPending = pendingOptimistic.get(String(operation.operationId)) || null;
       const guardedPending = pendingGuarded.get(String(operation.operationId)) || null;
       const canPromoteWithoutRewrite = Boolean(
@@ -210,7 +281,7 @@
 
     function sessionCanDraw() {
       try {
-        return Boolean(currentSession()?.canDraw?.()) && pendingGuarded.size === 0;
+        return Boolean(currentSession()?.canDraw?.()) && pendingGuarded.size === 0 && !pendingDocument;
       } catch (_) {
         return false;
       }
@@ -223,7 +294,7 @@
       session.dispatch?.({
         type: 'PENDING_OPERATION_COUNT',
         epoch: snapshot.epoch,
-        count: pendingOptimistic.size,
+        count: pendingOptimistic.size + (pendingDocument ? 1 : 0),
       });
     }
 
@@ -231,6 +302,9 @@
       if (!runtime) return true;
       const normalized = String(label || '');
       if (VIEW_ONLY_LABELS.has(normalized)) return true;
+      const documentKind = documentBridge?.classifyHistoryLabel?.(normalized) || '';
+      if (documentKind === 'local-only') return true;
+      if (documentKind) return canBeginDocumentOperation();
       if (!MUTATION_LABELS.has(normalized)) return false;
       if (!sessionCanDraw()) return false;
       if (
@@ -242,6 +316,14 @@
       return true;
     }
 
+    function canBeginDocumentOperation() {
+      if (!runtime) return true;
+      return Boolean(currentSession()?.canDraw?.())
+        && pendingOptimistic.size === 0
+        && pendingGuarded.size === 0
+        && !pendingDocument;
+    }
+
     function reject(reason, entry = null) {
       onBlocked({ reason, entry });
       return { status: 'rejected', reason, promise: Promise.resolve(null) };
@@ -249,6 +331,11 @@
 
     function handleCommittedHistoryEntry(entry, label = entry?.historyLabel) {
       if (!runtime) return { status: 'disabled', promise: Promise.resolve(null) };
+      const documentKind = documentBridge?.classifyHistoryLabel?.(String(label || '')) || '';
+      if (documentKind === 'local-only') {
+        return { status: 'ignored', reason: 'local-only', promise: Promise.resolve(null) };
+      }
+      if (documentKind) return handleCommittedDocumentEntry(entry, label, documentKind);
       if (!MUTATION_LABELS.has(String(label || ''))) return reject('unsupported-operation', entry);
       if (!sessionCanDraw()) return reject('session-not-active', entry);
       const mutations = mutationBridge.toPixelMutations(entry);
@@ -296,8 +383,142 @@
       };
     }
 
+    function handleCommittedDocumentEntry(entry, label, documentKind, options = {}) {
+      if (!runtime?.realtimeClient?.commitDocument || !documentBridge?.toDocumentOperation) {
+        return reject('document-operation-unavailable', entry);
+      }
+      if (!currentSession()?.canDraw?.() || pendingGuarded.size || pendingDocument) {
+        onRecoveryRequired({ reason: 'document-operation-not-serialized', entry, label });
+        return reject('document-operation-not-serialized', entry);
+      }
+      const operationId = String(operationIdFactory?.() || '');
+      if (!/^[0-9a-f-]{36}$/i.test(operationId)) return reject('invalid-operation-id', entry);
+      pendingDocument = {
+        operationId,
+        entry,
+        label,
+        direction: options.direction || 'forward',
+        confirmed: false,
+      };
+      updateSessionPendingCount();
+      let cleanupPreparedDocument = null;
+      let documentCommitStarted = false;
+      let retainDocumentLockForRecovery = false;
+      const promise = (async () => {
+        const waitStartedAt = Date.now();
+        while (pendingOptimistic.size) {
+          if ((Date.now() - waitStartedAt) > 20000) throw new Error('pending-pixel-confirmation-timeout');
+          await new Promise(resolve => window.setTimeout(resolve, 10));
+        }
+        // Checkpoint-backed operations may upload a large immutable object.
+        // Acquire the document lock before preparation so no local mutation can
+        // overtake the snapshot that will be committed at this revision.
+        const prepared = await documentBridge.toDocumentOperation(
+          entry,
+          String(label || ''),
+          documentKind,
+          {
+            direction: options.direction || 'forward',
+            operationId,
+            structureEpoch: runtime.structureEpoch || 0,
+            reuseDocumentOperation: options.reuseDocumentOperation || null,
+          }
+        );
+        if (!prepared?.documentOperation) throw new Error('invalid-document-operation');
+        cleanupPreparedDocument = typeof prepared.cleanup === 'function' ? prepared.cleanup : null;
+        if (pendingDocument?.operationId !== operationId || pendingDocument.invalidatedByRemote) {
+          throw new Error('document-operation-invalidated-by-remote');
+        }
+        if (entry && typeof entry === 'object') {
+          const previous = historyMetadata.get(entry) || {};
+          const key = options.direction === 'undo'
+            ? 'undoDocumentOperation'
+            : 'sourceDocumentOperation';
+          historyMetadata.set(entry, { ...previous, [key]: prepared.documentOperation });
+        }
+        documentCommitStarted = true;
+        await runtime.realtimeClient.commitDocument({
+          operationId,
+          structureEpoch: runtime.structureEpoch || 0,
+          baseRevision: appliedRevision,
+          documentOperation: prepared.documentOperation,
+        });
+        if (!pendingDocument?.confirmed) throw new Error('document-operation-not-confirmed');
+        if (options.applyLocalAfterConfirm === true) {
+          if (documentBridge.applyDocumentOperation?.(prepared.documentOperation) !== true) {
+            throw new Error('local-document-history-apply-failed');
+          }
+        }
+        return { operationId, structureEpoch: runtime.structureEpoch };
+      })().catch(async error => {
+        try { await cleanupPreparedDocument?.(); } catch (_) {}
+        if (pendingDocument?.operationId === operationId && pendingDocument.confirmed) {
+          // The DB row and ordered local confirmation already succeeded. A
+          // post-confirm tail/broadcast failure must not turn success into a
+          // local rollback or a stuck history operation.
+          return { operationId, structureEpoch: runtime.structureEpoch };
+        }
+        const invalidatedByRemote = pendingDocument?.operationId === operationId
+          && pendingDocument.invalidatedByRemote === true;
+        if (
+          !invalidatedByRemote
+          && !documentCommitStarted
+          && (options.direction || 'forward') === 'forward'
+        ) {
+          try {
+            await documentBridge?.rollbackRejectedDocumentEntry?.(entry);
+          } catch (rollbackError) {
+            onRecoveryRequired({
+              reason: 'document-operation-local-rollback-failed',
+              error: rollbackError,
+              operationId,
+            });
+          }
+        }
+        if (invalidatedByRemote || documentCommitStarted) {
+          // Once the commit RPC has started, a timeout/network error is
+          // ambiguous: Postgres may already have committed the operation.
+          // Keep input locked until an authoritative checkpoint+tail recovery
+          // proves the room state instead of guessing and rolling back.
+          retainDocumentLockForRecovery = true;
+          await documentBridge?.requestAuthoritativeRecovery?.(
+            invalidatedByRemote
+              ? 'remote-document-invalidated-local-document'
+              : 'ambiguous-document-operation-commit'
+          );
+        }
+        onRecoveryRequired({ reason: 'document-operation-commit-failed', error, operationId });
+        throw error;
+      }).finally(() => {
+        if (!retainDocumentLockForRecovery && pendingDocument?.operationId === operationId) {
+          pendingDocument = null;
+        }
+        updateSessionPendingCount();
+      });
+      return { status: 'accepted', operationId, promise };
+    }
+
     function requestGuardedHistory(entry, direction) {
       if (!runtime) return reject('disabled', entry);
+      const historyLabel = String(entry?.historyLabel || entry?.label || '');
+      const documentKind = documentBridge?.classifyHistoryLabel?.(historyLabel) || '';
+      if (documentKind && documentKind !== 'local-only') {
+        if (direction !== 'undo' && direction !== 'redo') return reject('invalid-history-direction', entry);
+        const metadata = historyMetadata.get(entry) || {};
+        const expectedRevision = direction === 'undo'
+          ? metadata.sourceDocumentRevision
+          : metadata.undoDocumentRevision;
+        if (!expectedRevision || BigInt(expectedRevision) !== appliedRevision) {
+          return reject('document-history-not-current', entry);
+        }
+        return handleCommittedDocumentEntry(entry, historyLabel, documentKind, {
+          direction,
+          applyLocalAfterConfirm: true,
+          reuseDocumentOperation: direction === 'undo'
+            ? metadata.undoDocumentOperation
+            : metadata.sourceDocumentOperation,
+        });
+      }
       if (!sessionCanDraw()) return reject(
         pendingGuarded.size ? 'guarded-operation-pending' : 'session-not-active',
         entry
@@ -388,7 +609,13 @@
     }
 
     function beginAuthoritativeResync(checkpointRevision = 0) {
+      const discardPendingForDocumentRecovery = Boolean(pendingDocument);
       rollbackPending();
+      if (discardPendingForDocumentRecovery) {
+        pendingOptimistic.clear();
+        pendingGuarded.clear();
+      }
+      pendingDocument = null;
       stampsByTarget.clear();
       confirmedOperationIds.clear();
       appliedRevision = normalizeRevision(checkpointRevision, { allowZero: true });
@@ -407,6 +634,7 @@
       runtime = null;
       pendingOptimistic.clear();
       pendingGuarded.clear();
+      pendingDocument = null;
       stampsByTarget.clear();
       confirmedOperationIds.clear();
       appliedRevision = 0n;
@@ -418,6 +646,7 @@
         session: currentSession()?.getSnapshot?.() || null,
         appliedRevision: appliedRevision.toString(),
         pendingOperationCount: pendingOptimistic.size,
+        pendingDocumentOperation: Boolean(pendingDocument),
         guardedOperationPending: pendingGuarded.size > 0,
         pendingOperationIds: [...pendingOptimistic.keys()],
         confirmedOperationIds: [...confirmedOperationIds],
@@ -441,6 +670,7 @@
       beginAuthoritativeResync,
       reapplyPendingAfterResync,
       snapshot,
+      canBeginDocumentOperation,
       get enabled() { return Boolean(runtime); },
       get appliedRevision() { return appliedRevision; },
       get pendingOperationCount() { return pendingOptimistic.size; },

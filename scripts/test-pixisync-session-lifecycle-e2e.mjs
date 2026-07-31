@@ -598,4 +598,17 @@ for (const contract of [
   /grant execute on function public\.pixisync_join_session\(text\) to authenticated/,
 ]) assert.match(lifecycleMigration, contract);
 
+const persistentInviteMigration = await readFile(
+  new URL('../supabase/migrations/20260801093000_pixisync_persistent_reusable_invites.sql', import.meta.url),
+  'utf8'
+);
+for (const contract of [
+  /add column if not exists persistent boolean not null default false/,
+  /p_expires_at timestamptz default null/,
+  /v_persistent boolean := p_expires_at is null and p_max_uses is null/,
+  /not v_invite\.persistent/,
+  /v_invite\.revoked_at is not null/,
+  /extensions\.digest\(v_token, 'sha256'\)/,
+]) assert.match(persistentInviteMigration, contract);
+
 console.log('PiXiSYNC session lifecycle E2E passed');

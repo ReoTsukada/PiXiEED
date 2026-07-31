@@ -974,6 +974,10 @@
       let remapToRgbResult = null;
       let customIndexPaletteResult = null;
       let remapMutated = false;
+      if (!canBeginPiXiSyncLocalOperation('colorModeConvert')) {
+        syncColorModeControls();
+        return false;
+      }
       const paletteLengthBefore = Array.isArray(state.palette) ? state.palette.length : 0;
       const activePaletteIndexBefore = state.activePaletteIndex;
       const paletteUiSwatchCountBefore = getPaletteUiSwatchCount();
@@ -1332,6 +1336,7 @@
       const applyPresetToRgbSwatchesOnly = isRgbColorMode() && !isMultiPaletteIsolationEnabled();
       if (isMultiPaletteIsolationEnabled() || applyPresetToRgbSwatchesOnly) {
         if (applyPresetToRgbSwatchesOnly) {
+          if (!canBeginPiXiSyncLocalOperation('paletteApplyPreset')) return false;
           beginHistory('paletteApplyPreset');
         }
         state.palette = nextPalette.map(color => normalizeColorValue(color));
@@ -1376,6 +1381,7 @@
         }
         return true;
       }
+      if (!canBeginPiXiSyncLocalOperation('paletteApplyPreset')) return false;
       beginHistory('paletteApplyPreset');
       state.palette = nextPalette.map(color => normalizeColorValue(color));
       const remapResult = remapDocumentColorsToPaletteApprox(
@@ -1465,6 +1471,7 @@
       if (!Array.isArray(state.palette) || state.palette.length < 2) {
         return false;
       }
+      if (!canBeginPiXiSyncLocalOperation('paletteReorder')) return false;
       beginHistory('paletteReorder');
       const metrics = state.palette.map((color, index) => buildPaletteSortMetrics(color, index));
       const preserveFirstTransparent = metrics[0] && metrics[0].alpha <= 0;
@@ -1786,6 +1793,7 @@
         syncPaletteReindexControlState();
         return;
       }
+      if (!canBeginPiXiSyncLocalOperation('paletteAdd')) return;
       beginHistory('paletteAdd');
       const nextIndex = state.palette.length;
       const nextColor = isRgbColorMode()
@@ -1814,6 +1822,7 @@
       const sourceIndex = clamp(Math.round(Number(currentIndex) || 0), 0, paletteLength - 1);
       const destinationIndex = clamp(Math.round(Number(targetIndex) || 0), 0, paletteLength - 1);
       if (sourceIndex === destinationIndex) return;
+      if (!canBeginPiXiSyncLocalOperation('paletteReorder')) return;
       beginHistory('paletteReorder');
       const order = state.palette.map((_, index) => index);
       const [movedOriginalIndex] = order.splice(sourceIndex, 1);
@@ -2131,6 +2140,7 @@
                   const raw = String(reader.result || '');
                   const parsed = JSON.parse(raw);
                   if (Array.isArray(parsed)) {
+                    if (!canBeginPiXiSyncLocalOperation('paletteImport')) return;
                     beginHistory('paletteImport');
                     state.palette = parsed.map(entry => normalizeColorValue(entry));
                     state.activePaletteIndex = normalizePaletteIndex(0, 0);
@@ -2235,6 +2245,7 @@
       const paletteLength = Array.isArray(state.palette) ? state.palette.length : 0;
       const targetIndex = Math.round(Number(index));
       if (!Number.isFinite(targetIndex) || targetIndex < 0 || targetIndex >= paletteLength) return;
+      if (!canBeginPiXiSyncLocalOperation('paletteRemove')) return;
       beginHistory('paletteRemove');
       const mapping = state.palette.map((_, oldIndex) => {
         if (oldIndex === targetIndex) return -1;
@@ -2307,6 +2318,7 @@
       if (history.pending) {
         return;
       }
+      if (!canBeginPiXiSyncLocalOperation('paletteColor')) return;
       beginHistory('paletteColor');
       if (history.pending?.label !== 'paletteColor') {
         return;

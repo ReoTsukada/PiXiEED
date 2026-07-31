@@ -1413,6 +1413,7 @@
         const targetIndex = frame.layers.findIndex(layer => layer?.trackId === removeTrackId);
         if (targetIndex >= 0) {
           const [removedLayer] = frame.layers.splice(targetIndex, 1);
+          forgetLocalLayerPreferences(removedLayer?.id);
           recordPendingLayerRemoveHistoryLayer(frame, removedLayer, targetIndex);
         }
       });
@@ -1539,6 +1540,14 @@
       };
 
       opacityControl.addEventListener('input', () => {
+        if (!canBeginPiXiSyncLocalOperation('setLayerOpacity')) {
+          if (layerOpacityHistoryActive) {
+            layerOpacityHistoryActive = false;
+            rollbackPendingHistory();
+          }
+          syncActiveLayerSettingsUI();
+          return;
+        }
         const opacityPercent = readOpacityPercent();
         if (getActiveLayerTrackIndex() < 0) {
           syncActiveLayerSettingsUI();
@@ -1570,6 +1579,10 @@
     if (dom.controls.layerBlendMode instanceof HTMLSelectElement) {
       const blendControl = dom.controls.layerBlendMode;
       blendControl.addEventListener('change', () => {
+        if (!canBeginPiXiSyncLocalOperation('setLayerBlendMode')) {
+          syncActiveLayerSettingsUI();
+          return;
+        }
         const normalizedBlendMode = normalizeLayerBlendMode(blendControl.value);
         blendControl.value = normalizedBlendMode;
         beginHistory('setLayerBlendMode', {
@@ -1727,6 +1740,14 @@
     });
     let frameFpsHistoryActive = false;
     const applyActiveFrameFps = ({ finalize = false } = {}) => {
+      if (!canBeginPiXiSyncLocalOperation('setFrameFps')) {
+        if (frameFpsHistoryActive) {
+          frameFpsHistoryActive = false;
+          rollbackPendingHistory();
+        }
+        syncAnimationFpsDisplayFromState();
+        return;
+      }
       const frame = getActiveFrame();
       const fps = normalizeFpsValue(dom.controls.animationFps.value);
       const nextDuration = getDurationFromFps(fps);
@@ -2017,6 +2038,24 @@
       }
     });
     if (!needsChange) {
+      return;
+    }
+    if (isCanonicalCollaborationMode()) {
+      state.frames.forEach(frame => {
+        const targetLayer = getLayerByTrackId(frame, trackId);
+        if (targetLayer && getDisplayedLayerVisibility(targetLayer, true) !== nextVisible) {
+          // Visibility is a personal shared-project view preference. Keep the
+          // canonical layer field untouched so checkpoints and peers are not
+          // changed by a local preview/export choice.
+          rememberLocalLayerVisibility(targetLayer.id, nextVisible);
+        }
+      });
+      clearPlaybackFrameCache();
+      scheduleSessionPersist({ includeSnapshots: false });
+      renderLayerList();
+      renderTimelineMatrix();
+      requestRender();
+      requestOverlayRender();
       return;
     }
     beginHistory('setLayerVisibility', { trackId });

@@ -31,6 +31,26 @@ const ROOM_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const OWNER_CLIENT = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const EDITOR_CLIENT = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const INVITE_TOKEN = 'de'.repeat(32);
+const resolveRecentProjectTarget = window.PiXiEEDrawModules.pixisyncRuntimeAdapterUtils
+  .resolvePiXiSyncRecentProjectTarget;
+assert.equal(resolveRecentProjectTarget([
+  { id: 'local-new', pixisync: null },
+  { id: 'local-existing-room', pixisync: { roomId: ROOM_ID.toUpperCase() } },
+], ROOM_ID, 'local-new'), 'local-existing-room');
+assert.equal(resolveRecentProjectTarget([], ROOM_ID, 'local-new'), 'local-new');
+const collectCleanupEntries = window.PiXiEEDrawModules.pixisyncRuntimeAdapterUtils
+  .collectPiXiSyncRecentProjectCleanupEntries;
+const activeV2Entry = { id: 'local-existing-room', autosaveSchemaVersion: 2 };
+const duplicateV2Entry = { id: 'local-duplicate-room', autosaveSchemaVersion: 2 };
+assert.deepEqual(
+  collectCleanupEntries(
+    [activeV2Entry, duplicateV2Entry, { id: 'legacy-duplicate', autosaveSchemaVersion: 1 }],
+    [activeV2Entry],
+    activeV2Entry.id
+  ),
+  [duplicateV2Entry],
+  'duplicate V2 payloads are cleaned while the active canonical target is always retained'
+);
 const sha256 = blob => blob.arrayBuffer()
   .then(bytes => createHash('sha256').update(Buffer.from(bytes)).digest('hex'));
 
@@ -50,6 +70,7 @@ class LifecycleServer {
     this.syncFromCalls = [];
     this.emitClosedOnStop = false;
     this.failOpen = false;
+    this.inviteCreateCalls = 0;
   }
 
   manifest(role) {
@@ -96,7 +117,10 @@ class LifecycleServer {
           }
           if (name === 'pixisync_create_invite') {
             assert.equal(actor, 'owner');
-            return { data: [{ invite_id: randomUUID(), invite_token: INVITE_TOKEN, role: 'editor', expires_at: params.p_expires_at, max_uses: 1 }], error: null };
+            this.inviteCreateCalls += 1;
+            assert.equal(params.p_expires_at, null);
+            assert.equal(params.p_max_uses, null);
+            return { data: [{ invite_id: randomUUID(), invite_token: INVITE_TOKEN, role: 'editor', expires_at: 'infinity', max_uses: 16 }], error: null };
           }
           if (name === 'pixisync_join_session') {
             assert.equal(params.p_invite_token, INVITE_TOKEN);
@@ -113,6 +137,18 @@ class LifecycleServer {
             this.checkpointHash = String(params.p_state_sha256).slice(2);
             this.checkpointBytes = params.p_encoded_bytes;
             return { data: [{ checkpoint_id: this.checkpointId, revision: String(this.head), storage_path: this.checkpointPath }], error: null };
+          }
+          if (name === 'pixisync_prepare_document_checkpoint_upload') {
+            assert.equal(params.p_room_id, ROOM_ID);
+            assert.equal(params.p_base_revision, String(this.head));
+            const storagePath = `rooms/${ROOM_ID}/document-checkpoints/${params.p_upload_id}.pxd`;
+            return { data: [{ upload_id: params.p_upload_id, storage_path: storagePath, base_revision: params.p_base_revision, structure_epoch: params.p_structure_epoch }], error: null };
+          }
+          if (name === 'pixisync_list_stale_document_checkpoint_uploads') {
+            return { data: [], error: null };
+          }
+          if (name === 'pixisync_abort_document_checkpoint_upload') {
+            return { data: true, error: null };
           }
           if (name === 'pixisync_register_checkpoint') {
             assert.ok(this.objects.has(this.checkpointPath));
@@ -147,6 +183,10 @@ class LifecycleServer {
               return blob
                 ? { data: blob, error: null }
                 : { data: null, error: new Error('missing-object') };
+            },
+            remove: async paths => {
+              paths.forEach(path => this.objects.delete(path));
+              return { data: paths, error: null };
             },
           };
         },
@@ -217,25 +257,41 @@ function createAdapter({
   realtimeFactory = createRealtimeHarness(server),
   operationTimeoutMs,
   acquireProjectLease,
+  initialProjectKey = `project-${actor}`,
+  resolveProjectBindingTarget,
 }) {
   const bridge = createBridge();
   let restored = '';
   let restoreContext = null;
+  let captureContext = null;
+  let currentProjectKey = initialProjectKey;
   const adapter = window.PiXiEEDrawModules.pixisyncRuntimeAdapterUtils.createPiXiSyncRuntimeAdapter({
     createSession: options => window.PiXiEEDrawModules.pixisyncSessionState.createPiXiSyncSessionState(options),
     createRealtimeClient: realtimeFactory,
     runtimeBridge: bridge,
     getSupabase: async () => server.client(actor),
-    captureCheckpoint: async () => new Blob([checkpointText]),
+    captureCheckpoint: async context => {
+      captureContext = context;
+      return new Blob([checkpointText]);
+    },
     restoreCheckpoint: async (blob, context) => {
       restored = await blob.text();
       restoreContext = context;
     },
-    getProjectKey: () => `project-${actor}`,
+    getProjectKey: () => currentProjectKey,
     getProjectTitle: () => `Project ${actor}`,
     readProjectBinding: async projectKey => bindings.get(projectKey) || null,
-    writeProjectBinding: async (projectKey, binding) => { bindings.set(projectKey, binding); },
+    writeProjectBinding: async (projectKey, binding) => {
+      bindings.set(projectKey, binding);
+      return { projectKey };
+    },
     clearProjectBinding: async projectKey => { bindings.delete(projectKey); },
+    resolveProjectBindingTarget: async details => {
+      const resolved = await resolveProjectBindingTarget?.(details);
+      const projectKey = String(resolved?.projectKey || resolved || details.projectKey);
+      currentProjectKey = projectKey;
+      return projectKey;
+    },
     acquireProjectLease,
     getClientId: () => clientId,
     localStorageRef: storage,
@@ -246,6 +302,7 @@ function createAdapter({
     bridge,
     get restored() { return restored; },
     get restoreContext() { return restoreContext; },
+    get captureContext() { return captureContext; },
   };
 }
 
@@ -259,13 +316,44 @@ await owner.adapter.initialize();
 assert.equal(owner.adapter.snapshot().session.phase, 'local');
 assert.equal(await owner.adapter.start(), ROOM_ID);
 assert.equal(owner.adapter.snapshot().session.phase, 'active');
+assert.equal(typeof owner.bridge.runtime.requestAuthoritativeRecovery, 'function');
 assert.equal(server.syncFromCalls.length, 0, 'a new owner room must activate from its known revision without a redundant tail RPC');
 assert.deepEqual(ownerBindings.get('project-owner'), {
   roomId: ROOM_ID,
   role: 'owner',
   projectKey: 'project-owner',
+  inviteToken: '',
+  inviteExpiresAt: '',
+  invitePersistent: false,
+  replacedProjectKey: '',
 });
 assert.equal(owner.restored, '');
+const checkpointOperationId = randomUUID();
+const preparedDocumentCheckpoint = await owner.adapter.commands.prepareCheckpointOperation({
+  operationId: checkpointOperationId,
+  structureEpoch: 0,
+  captureContext: { snapshot: 'after-fill' },
+});
+assert.deepEqual(owner.captureContext, { snapshot: 'after-fill' });
+assert.equal(preparedDocumentCheckpoint.documentOperation.type, 'checkpoint_restore');
+assert.equal(preparedDocumentCheckpoint.documentOperation.byteLength, new Blob(['checkpoint-owner']).size);
+assert.ok(server.objects.has(preparedDocumentCheckpoint.documentOperation.objectPath));
+const confirmedCheckpointOperation = {
+  operationId: checkpointOperationId,
+  documentOperation: preparedDocumentCheckpoint.documentOperation,
+};
+await server.realtimeOptions.at(-1).prepareConfirmed(confirmedCheckpointOperation, { local: true });
+assert.equal(confirmedCheckpointOperation.preparedCheckpoint.verified, true);
+assert.equal(confirmedCheckpointOperation.preparedCheckpoint.alreadyLocal, true);
+assert.equal(owner.restored, '');
+const remoteCheckpointOperation = {
+  operationId: randomUUID(),
+  documentOperation: preparedDocumentCheckpoint.documentOperation,
+};
+await server.realtimeOptions.at(-1).prepareConfirmed(remoteCheckpointOperation, { local: false });
+assert.equal(remoteCheckpointOperation.preparedCheckpoint.verified, true);
+assert.equal(owner.restored, 'checkpoint-owner');
+assert.equal(owner.restoreContext.documentCheckpoint, true);
 assert.equal(server.checkpointHash, await sha256(server.objects.get(server.checkpointPath)));
 await owner.adapter.dispose();
 owner = createAdapter({ server, actor: 'owner', clientId: OWNER_CLIENT, storage: ownerStorage, bindings: ownerBindings, checkpointText: 'checkpoint-owner' });
@@ -287,18 +375,42 @@ assert.equal(server.broadcasts.at(-1).event, 'pixisync-comment');
 
 const inviteUrl = await owner.adapter.createInviteLink();
 assert.equal(new URL(inviteUrl).searchParams.get('pixisync_invite'), INVITE_TOKEN);
+assert.equal(await owner.adapter.createInviteLink(), inviteUrl, 'an active room must reuse its persistent invite URL');
+assert.equal(server.inviteCreateCalls, 1, 'copying an invite twice must not create a second server invite');
+assert.deepEqual(ownerBindings.get('project-owner'), {
+  roomId: ROOM_ID,
+  role: 'owner',
+  projectKey: 'project-owner',
+  inviteToken: INVITE_TOKEN,
+  inviteExpiresAt: 'infinity',
+  invitePersistent: true,
+  replacedProjectKey: '',
+});
 
-const editor = createAdapter({ server, actor: 'editor', clientId: EDITOR_CLIENT, storage: editorStorage, bindings: editorBindings, checkpointText: 'checkpoint-editor' });
+const editor = createAdapter({
+  server,
+  actor: 'editor',
+  clientId: EDITOR_CLIENT,
+  storage: editorStorage,
+  bindings: editorBindings,
+  checkpointText: 'checkpoint-editor',
+  resolveProjectBindingTarget: ({ roomId }) => roomId === ROOM_ID ? 'project-editor-existing-room-card' : '',
+});
 await editor.adapter.initialize();
 assert.equal(await editor.adapter.join(INVITE_TOKEN), ROOM_ID);
 assert.equal(editor.adapter.snapshot().session.phase, 'active');
-assert.deepEqual(editorBindings.get('project-editor'), {
+assert.deepEqual(editorBindings.get('project-editor-existing-room-card'), {
   roomId: ROOM_ID,
   role: 'participant',
-  projectKey: 'project-editor',
+  projectKey: 'project-editor-existing-room-card',
+  inviteToken: '',
+  inviteExpiresAt: '',
+  invitePersistent: false,
+  replacedProjectKey: 'project-editor',
 });
+assert.equal(editor.restoreContext.projectKey, 'project-editor-existing-room-card');
 await editor.adapter.dispose();
-const resumedEditor = createAdapter({ server, actor: 'editor', clientId: EDITOR_CLIENT, storage: editorStorage, bindings: editorBindings, checkpointText: 'checkpoint-editor' });
+const resumedEditor = createAdapter({ server, actor: 'editor', clientId: EDITOR_CLIENT, storage: editorStorage, bindings: editorBindings, checkpointText: 'checkpoint-editor', initialProjectKey: 'project-editor-existing-room-card' });
 await resumedEditor.adapter.initialize();
 assert.equal(resumedEditor.adapter.snapshot().session.phase, 'invited');
 assert.equal(resumedEditor.bridge.inputLocked, true, 'a participant card must not reopen as editable local data');
@@ -308,7 +420,7 @@ assert.equal(resumedEditor.bridge.inputLocked, false);
 const activeEditor = resumedEditor;
 assert.equal(activeEditor.restored, 'checkpoint-owner');
 assert.deepEqual(activeEditor.restoreContext, {
-  projectKey: 'project-editor',
+  projectKey: 'project-editor-existing-room-card',
   role: 'participant',
   preserveProjectIdentity: true,
 });
@@ -328,7 +440,7 @@ assert.deepEqual(activeEditor.bridge.participants.map(item => item.name), ['Owne
 await activeEditor.adapter.leave();
 assert.equal(activeEditor.adapter.snapshot().session.phase, 'left');
 assert.equal(server.members.has('editor'), false);
-assert.equal(editorBindings.has('project-editor'), false);
+assert.equal(editorBindings.has('project-editor-existing-room-card'), false);
 
 await owner.adapter.archive();
 assert.equal(owner.adapter.snapshot().session.phase, 'archived');

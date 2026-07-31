@@ -305,11 +305,12 @@ assert.equal(elements.statusLabel.textContent, '未接続');
 assert.equal(fakeDocument.body.dataset.pixisyncPhase, 'disabled');
 
 // Production wiring regression: explicit markup and module must remain present.
-const [html, app, style, sharedTabBar] = await Promise.all([
+const [html, app, style, sharedTabBar, startupWorkflow] = await Promise.all([
   readFile(new URL('../pixiedraw/index.html', import.meta.url), 'utf8'),
   readFile(new URL('../pixiedraw/assets/js/app.js', import.meta.url), 'utf8'),
   readFile(new URL('../pixiedraw/assets/css/style.css', import.meta.url), 'utf8'),
   readFile(new URL('../scripts/shared-tab-bar.js', import.meta.url), 'utf8'),
+  readFile(new URL('../pixiedraw/assets/js/modules/startup-workflow-utils.js', import.meta.url), 'utf8'),
 ]);
 for (const id of [
   'pixisyncPanel',
@@ -336,6 +337,12 @@ assert.ok(
 );
 assert.match(app, /runtime\?\.uiEnabled === true/);
 assert.match(app, /pixisyncMinimalUi\?\.consumeInviteFromUrl/);
+assert.match(app, /resolveProjectBindingTarget:[\s\S]*?resolvePiXiSyncRecentProjectTarget/);
+assert.match(app, /candidate\?\.id !== replacedProjectKey/);
+assert.match(app, /String\(candidate\?\.pixisync\?\.roomId \|\| ''\)[\s\S]*?!== normalizedRoomId/);
+assert.match(app, /collectPiXiSyncRecentProjectCleanupEntries[\s\S]*?removeAutosaveV2ProjectData\(removed\.id\)/);
+assert.match(startupWorkflow, /const isPiXiSyncCard = Boolean\([\s\S]*?entry\.pixisync\.roomId/);
+assert.match(startupWorkflow, /className = 'startup-workspace__project-share-badge'/);
 assert.match(sharedTabBar, /id: 'pixisync', label: 'PiXiSYNC', selector: '#pixisyncQuickOpen'/);
 assert.match(html, /aria-disabled="false"[^>]*id="pixisyncQuickOpen"/);
 assert.match(html, /src="\.\.\/pixisync\.png\?v=20260731-pixisync-icon2"/);

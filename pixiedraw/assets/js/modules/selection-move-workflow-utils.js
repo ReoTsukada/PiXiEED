@@ -1112,7 +1112,9 @@
       return false;
     }
 
-    beginHistory(outlineMode === '4' ? 'selectionOutline4' : 'selectionOutline8');
+    const historyLabel = outlineMode === '4' ? 'selectionOutline4' : 'selectionOutline8';
+    if (!canBeginPiXiSyncLocalOperation(historyLabel)) return false;
+    beginHistory(historyLabel);
     const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
     changedIndices.forEach(idx => {
       layer.indices[idx] = paletteIndex;
