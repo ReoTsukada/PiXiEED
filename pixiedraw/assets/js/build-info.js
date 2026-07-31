@@ -3,8 +3,8 @@
   const buildInfo = Object.freeze({
     edition: 'web-free',
     version: '0.9.0',
-    buildId: '20260801-150',
-    releasedAt: '2026-08-01T02:06:36+09:00',
+    buildId: '20260801-151',
+    releasedAt: '2026-08-01T02:18:30+09:00',
   });
 
   runtime.__PIXIEEDRAW_BUILD_INFO__ = buildInfo;

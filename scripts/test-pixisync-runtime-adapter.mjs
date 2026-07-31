@@ -47,6 +47,7 @@ class LifecycleServer {
     this.members = new Set(['owner']);
     this.broadcasts = [];
     this.realtimeOptions = [];
+    this.syncFromCalls = [];
     this.emitClosedOnStop = false;
     this.failOpen = false;
   }
@@ -167,6 +168,7 @@ function createRealtimeHarness(server) {
       trackPresence: async () => {},
       untrackPresence: async () => {},
       syncFrom: async after => {
+        server.syncFromCalls.push({ clientId: options.clientId, after: String(after) });
         revision = BigInt(after);
         return revision;
       },
@@ -257,6 +259,7 @@ await owner.adapter.initialize();
 assert.equal(owner.adapter.snapshot().session.phase, 'local');
 assert.equal(await owner.adapter.start(), ROOM_ID);
 assert.equal(owner.adapter.snapshot().session.phase, 'active');
+assert.equal(server.syncFromCalls.length, 0, 'a new owner room must activate from its known revision without a redundant tail RPC');
 assert.deepEqual(ownerBindings.get('project-owner'), {
   roomId: ROOM_ID,
   role: 'owner',

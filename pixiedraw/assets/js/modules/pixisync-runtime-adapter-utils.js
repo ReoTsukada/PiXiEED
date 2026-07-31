@@ -50,6 +50,7 @@
     let clientId = '';
     let boundProjectKey = '';
     let preserveInitialOwnerDocument = false;
+    let initialOwnerBootstrapRevision = null;
     let operationQueue = Promise.resolve();
     let replayedJournalEpoch = -1;
     let disposed = false;
@@ -447,6 +448,7 @@
             // the initial checkpoint. Do not reset the canvas/controller here;
             // doing so can roll the visible drawing back before tail sync.
             realtimeClient.resetConfirmedRevision(manifest.checkpoint_revision);
+            initialOwnerBootstrapRevision = String(manifest.checkpoint_revision);
             await dispatchNow({
               type: 'CHECKPOINT_LOADED',
               epoch: effectEpoch,
@@ -473,6 +475,19 @@
           break;
         }
         case 'FETCH_INITIAL_TAIL': {
+          if (
+            initialOwnerBootstrapRevision !== null
+            && String(effect.afterRevision) === initialOwnerBootstrapRevision
+          ) {
+            await dispatchNow({
+              type: 'INITIAL_TAIL_APPLIED',
+              epoch: effectEpoch,
+              generation: currentGeneration(),
+              revision: initialOwnerBootstrapRevision,
+            });
+            break;
+          }
+          initialOwnerBootstrapRevision = null;
           const revision = await realtimeClient.syncFrom(effect.afterRevision);
           runtimeBridge.reapplyPendingAfterResync?.();
           await dispatchNow({
@@ -484,6 +499,15 @@
           break;
         }
         case 'READ_AUTHORITATIVE_HEAD': {
+          if (initialOwnerBootstrapRevision !== null) {
+            await dispatchNow({
+              type: 'AUTHORITATIVE_HEAD',
+              epoch: effectEpoch,
+              generation: currentGeneration(),
+              revision: initialOwnerBootstrapRevision,
+            });
+            break;
+          }
           if (replayedJournalEpoch !== effectEpoch) {
             replayedJournalEpoch = effectEpoch;
             await realtimeClient.replayPendingJournal();
@@ -498,6 +522,26 @@
           break;
         }
         case 'FETCH_RETAIL': {
+          if (
+            initialOwnerBootstrapRevision !== null
+            && String(effect.afterRevision) === initialOwnerBootstrapRevision
+          ) {
+            const revision = initialOwnerBootstrapRevision;
+            initialOwnerBootstrapRevision = null;
+            report({
+              phase: 'initial-owner-bootstrap-complete',
+              roomId,
+              revision,
+            });
+            await dispatchNow({
+              type: 'RETAIL_APPLIED',
+              epoch: effectEpoch,
+              generation: currentGeneration(),
+              revision,
+            });
+            break;
+          }
+          initialOwnerBootstrapRevision = null;
           const revision = await realtimeClient.syncFrom(effect.afterRevision);
           await dispatchNow({
             type: 'RETAIL_APPLIED',
@@ -566,6 +610,7 @@
       runtimeBridge.refreshUi?.();
       const epoch = opening.state.epoch;
       const checkpointStartedAt = performance.now();
+      initialOwnerBootstrapRevision = null;
       try {
         const blob = await captureCheckpoint();
         if (!(blob instanceof Blob) || blob.size < 1) throw new Error('PiXiSYNC runtime: empty-checkpoint');
@@ -637,6 +682,7 @@
         });
         return roomId;
       } catch (error) {
+        initialOwnerBootstrapRevision = null;
         await dispatchNow({ type: 'FAIL', epoch, reason: error?.message || 'start-failed' });
         throw error;
       }
