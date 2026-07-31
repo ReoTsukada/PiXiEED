@@ -26272,6 +26272,72 @@
     };
   }
 
+  function inspectPiXiSyncCheckpointSnapshot(snapshot, { requireExpanded = false } = {}) {
+    const canvases = Array.isArray(snapshot?.canvases) && snapshot.canvases.length
+      ? snapshot.canvases
+      : [{
+          id: snapshot?.activeCanvasId || 'active-canvas',
+          width: snapshot?.width,
+          height: snapshot?.height,
+          frames: snapshot?.frames,
+        }];
+    let frameCount = 0;
+    let layerCount = 0;
+    let lazyLayerCount = 0;
+    let expandedPixelCount = 0;
+    const canvasIds = new Set();
+    canvases.forEach((canvas, canvasIndex) => {
+      const width = Math.round(Number(canvas?.width) || 0);
+      const height = Math.round(Number(canvas?.height) || 0);
+      const canvasId = String(canvas?.id || `canvas-${canvasIndex}`);
+      if (width < 1 || height < 1 || canvasIds.has(canvasId)) {
+        throw new Error(`PiXiSYNC checkpoint invalid canvas: ${canvasId}`);
+      }
+      canvasIds.add(canvasId);
+      const expectedLength = width * height;
+      if (!Array.isArray(canvas?.frames) || canvas.frames.length === 0) {
+        throw new Error(`PiXiSYNC checkpoint missing frames: ${canvasId}`);
+      }
+      canvas.frames.forEach((frame, frameIndex) => {
+        frameCount += 1;
+        if (!Array.isArray(frame?.layers) || frame.layers.length === 0) {
+          throw new Error(`PiXiSYNC checkpoint missing layers: ${canvasId}:${frameIndex}`);
+        }
+        const layerIds = new Set();
+        const trackIds = new Set();
+        frame.layers.forEach((layer, layerIndex) => {
+          layerCount += 1;
+          const layerId = String(layer?.id || '');
+          const trackId = String(layer?.trackId || '');
+          if (!layerId || layerIds.has(layerId) || (trackId && trackIds.has(trackId))) {
+            throw new Error(`PiXiSYNC checkpoint duplicate layer identity: ${canvasId}:${frameIndex}:${layerIndex}`);
+          }
+          layerIds.add(layerId);
+          if (trackId) trackIds.add(trackId);
+          const indices = layer?.indices;
+          if (!indices || !Number.isSafeInteger(indices.length)) {
+            throw new Error(`PiXiSYNC checkpoint layer indices missing: ${layerId}`);
+          }
+          if (indices.length === 0 && !requireExpanded) {
+            lazyLayerCount += 1;
+            return;
+          }
+          if (indices.length !== expectedLength) {
+            throw new Error(`PiXiSYNC checkpoint layer pixel count mismatch: ${layerId}:${indices.length}:${expectedLength}`);
+          }
+          expandedPixelCount += indices.length;
+        });
+      });
+    });
+    return {
+      canvasCount: canvases.length,
+      frameCount,
+      layerCount,
+      lazyLayerCount,
+      expandedPixelCount,
+    };
+  }
+
   async function initializePiXiSyncRuntime() {
     const config = window.__PIXISYNC_V1_CONFIG__ || {
       enabled: PIXISYNC_V1_ENABLED,
@@ -26342,7 +26408,15 @@
         return ensurePixieedAccountClient();
       },
       captureCheckpoint: async () => {
+        const checkpointStartedAt = performance.now();
         const snapshot = makeHistorySnapshot({ clonePixelData: true });
+        const runtimeMetrics = inspectPiXiSyncCheckpointSnapshot(snapshot, { requireExpanded: false });
+        console.info('[pixisync:checkpoint]', {
+          phase: 'checkpoint-snapshot-complete',
+          projectKey: normalizeAutosaveProjectId?.(autosaveProjectId || '') || '',
+          ...runtimeMetrics,
+          elapsedMs: Math.round(performance.now() - checkpointStartedAt),
+        });
         const [projectSession, thumbnail] = await Promise.all([
           buildProjectSessionPayload(),
           generateSnapshotThumbnail(snapshot),
@@ -26356,10 +26430,20 @@
           // the infrequent checkpoint, while live sync remains pixel-delta based.
           internalBinary: false,
         });
+        console.info('[pixisync:checkpoint]', {
+          phase: 'checkpoint-expanded-complete',
+          ...runtimeMetrics,
+          elapsedMs: Math.round(performance.now() - checkpointStartedAt),
+        });
         // Validate the exact document payload before it leaves the browser.
         // A malformed compact/direct layer must never become the room's
         // revision-0 checkpoint and force every participant into reconnect.
         const validatedSnapshot = deserializeDocumentPayload(packaged.document);
+        console.info('[pixisync:checkpoint]', {
+          phase: 'checkpoint-decode-complete',
+          elapsedMs: Math.round(performance.now() - checkpointStartedAt),
+        });
+        const expandedMetrics = inspectPiXiSyncCheckpointSnapshot(validatedSnapshot, { requireExpanded: true });
         if (
           !validatedSnapshot
           || validatedSnapshot.width !== snapshot.width
@@ -26370,6 +26454,11 @@
         ) {
           throw new Error('PiXiSYNC checkpoint validation failed');
         }
+        console.info('[pixisync:checkpoint]', {
+          phase: 'checkpoint-structure-validation-complete',
+          ...expandedMetrics,
+          elapsedMs: Math.round(performance.now() - checkpointStartedAt),
+        });
         const serialized = await serializeProjectStorageSnapshot({
           snapshot,
           session: projectSession,
@@ -26379,6 +26468,12 @@
           fileNameBase: state.documentName || DEFAULT_DOCUMENT_NAME,
         });
         if (!(serialized?.blob instanceof Blob)) throw new Error('PiXiSYNC checkpoint serialization failed');
+        console.info('[pixisync:checkpoint]', {
+          phase: 'checkpoint-encode-complete',
+          ...expandedMetrics,
+          blobSize: serialized.blob.size,
+          elapsedMs: Math.round(performance.now() - checkpointStartedAt),
+        });
         return serialized.blob;
       },
       restoreCheckpoint: async (blob, context = {}) => {

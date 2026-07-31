@@ -522,6 +522,7 @@
       const opening = session.dispatch({ type: 'OPEN_REQUEST', projectKey });
       runtimeBridge.refreshUi?.();
       const epoch = opening.state.epoch;
+      const checkpointStartedAt = performance.now();
       try {
         const blob = await captureCheckpoint();
         if (!(blob instanceof Blob) || blob.size < 1) throw new Error('PiXiSYNC runtime: empty-checkpoint');
@@ -533,8 +534,55 @@
           p_codec_version: 1,
         }));
         roomId = assertRoomId(begun?.room_id);
-        await uploadCheckpoint(String(begun?.storage_path || ''), blob);
+        report({
+          phase: 'begin-session-complete',
+          roomId,
+          checkpointId: String(begun?.checkpoint_id || ''),
+          blobSize: blob.size,
+          elapsedMs: Math.round(performance.now() - checkpointStartedAt),
+        });
+        report({
+          phase: 'storage-upload-start',
+          roomId,
+          checkpointId: String(begun?.checkpoint_id || ''),
+          blobSize: blob.size,
+          timeoutMs: Math.max(1000, Number(operationTimeoutMs) || 20000),
+          online: typeof navigator === 'undefined' ? null : navigator.onLine !== false,
+          elapsedMs: Math.round(performance.now() - checkpointStartedAt),
+        });
+        try {
+          await uploadCheckpoint(String(begun?.storage_path || ''), blob);
+        } catch (error) {
+          report({
+            phase: 'storage-upload-failed',
+            roomId,
+            checkpointId: String(begun?.checkpoint_id || ''),
+            blobSize: blob.size,
+            errorName: String(error?.name || ''),
+            errorMessage: String(error?.message || 'unknown'),
+            statusCode: Number(error?.statusCode || error?.status || 0) || null,
+            supabaseErrorCode: String(error?.code || ''),
+            timeoutMs: Math.max(1000, Number(operationTimeoutMs) || 20000),
+            online: typeof navigator === 'undefined' ? null : navigator.onLine !== false,
+            elapsedMs: Math.round(performance.now() - checkpointStartedAt),
+          });
+          throw error;
+        }
+        report({
+          phase: 'storage-upload-complete',
+          roomId,
+          checkpointId: String(begun?.checkpoint_id || ''),
+          blobSize: blob.size,
+          elapsedMs: Math.round(performance.now() - checkpointStartedAt),
+        });
         const activated = firstRow(await rpc('pixisync_activate_initial_checkpoint', { p_room_id: roomId }));
+        report({
+          phase: 'activate-checkpoint-complete',
+          roomId,
+          checkpointId: String(begun?.checkpoint_id || ''),
+          blobSize: blob.size,
+          elapsedMs: Math.round(performance.now() - checkpointStartedAt),
+        });
         manifest = await openManifest(roomId);
         preserveInitialOwnerDocument = true;
         await dispatchNow({
