@@ -5149,14 +5149,6 @@ input[type='range']::-moz-focus-outer {
   display: none;
 }
 
-/* Initial production rollout: PiXiSYNC is unlocked only by the settings
-   gesture in the current tab.  This is a discovery gate, not authorization. */
-body:not([data-pixisync-initial-gate='unlocked']) #panelMulti,
-body:not([data-pixisync-initial-gate='unlocked']) #pixisyncQuickOpen,
-body:not([data-pixisync-initial-gate='unlocked']) #mobileTabMulti {
-  display: none !important;
-}
-
 #panelMulti .multi-project-key-field {
   padding: 0;
   border: 0;
@@ -15693,9 +15685,7 @@ body.is-mobile-layout .mobile-drawer[data-mode='full'] #panelMulti .multi-partic
 }
 
 @media (orientation: portrait) {
-  /* Portrait has its own PiXiSYNC tab. Keep it visible but disabled until
-     the settings gesture enables sharing. */
-  body:not([data-pixisync-initial-gate='unlocked']) #mobileTabMulti,
+  /* Portrait has its own share-mode tab. */
   body #mobileTabMulti {
     display: inline-flex !important;
   }
