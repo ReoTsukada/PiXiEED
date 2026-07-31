@@ -221,7 +221,11 @@
       if (VIEW_ONLY_LABELS.has(normalized)) return true;
       if (!MUTATION_LABELS.has(normalized)) return false;
       if (!sessionCanDraw()) return false;
-      if (context.colorMode && context.colorMode !== 'indexed') return false;
+      if (
+        context.colorMode
+        && context.colorMode !== 'index'
+        && context.colorMode !== 'indexed'
+      ) return false;
       if (context.v1Compatible === false) return false;
       return true;
     }

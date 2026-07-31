@@ -320,8 +320,19 @@ for (const label of [
   'fillDither',
   'fillGradient',
 ]) {
-  assert.equal(clientA.controller.canBeginLocalOperation(label), true, `${label} must be drawable while active`);
+  assert.equal(clientA.controller.canBeginLocalOperation(label, {
+    colorMode: 'index',
+    v1Compatible: true,
+  }), true, `${label} must be drawable in the app's canonical index mode while active`);
 }
+assert.equal(clientA.controller.canBeginLocalOperation('pen', {
+  colorMode: 'indexed',
+  v1Compatible: true,
+}), true, 'legacy indexed mode spelling remains compatible');
+assert.equal(clientA.controller.canBeginLocalOperation('pen', {
+  colorMode: 'rgb',
+  v1Compatible: true,
+}), false, 'RGB mutations remain outside the indexed-patch protocol');
 assert.equal(clientA.controller.canBeginLocalOperation('pan'), true);
 await drawAndConverge(clientA, 'line', [{ index: 2, paletteValue: 6 }]);
 assert.equal(clientB.pixels[2], 6);
