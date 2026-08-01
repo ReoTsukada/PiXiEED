@@ -1,4 +1,4 @@
-importScripts('./assets/js/build-info.js?v=20260801-156');
+importScripts('./assets/js/build-info.js?v=20260801-157');
 
 const APP_BUILD_VERSION = String(self.__PIXIEEDRAW_BUILD_INFO__?.buildId || 'unknown-build');
 const CACHE_VERSION = `pixieedraw-v${APP_BUILD_VERSION}`;
@@ -97,7 +97,10 @@ self.addEventListener('fetch', event => {
 
   if (isNetworkFirstRequest(request, url)) {
     event.respondWith(
-      fetch(request).then(response => {
+      // A navigation or executable asset is the release boundary.  Do not
+      // allow the browser's HTTP cache to keep a previous PWA build alive;
+      // Cache Storage remains the offline fallback only.
+      fetch(request, { cache: 'no-store' }).then(response => {
         const copy = response.clone();
         caches.open(CACHE_VERSION).then(cache => cache.put(request, copy)).catch(() => {});
         return response;

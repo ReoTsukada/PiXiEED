@@ -13644,12 +13644,22 @@
     }
     let hadController = Boolean(navigator.serviceWorker.controller);
     const suppressControllerChangeReloadUntil = 0;
+    let controllerChangeReloaded = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       if (!hadController) {
         hadController = true;
         return;
       }
       if (suppressControllerChangeReloadUntil && Date.now() <= suppressControllerChangeReloadUntil) {
+        return;
+      }
+      // The first controller replacement during startup is safe to reload:
+      // no project interaction has started yet, and reloading immediately
+      // picks up the matching HTML/module generation. Never interrupt an
+      // already-open document; it will receive the update on its next launch.
+      if (!startupReady && !controllerChangeReloaded && !isProjectCommandLocked()) {
+        controllerChangeReloaded = true;
+        window.location.reload();
         return;
       }
       console.info('[pixiedraw:update]', {
@@ -13661,7 +13671,7 @@
       });
     });
     const swUrl = `service-worker.js?v=${encodeURIComponent(APP_SW_VERSION)}`;
-    navigator.serviceWorker.register(swUrl).catch(error => {
+    navigator.serviceWorker.register(swUrl, { updateViaCache: 'none' }).catch(error => {
       console.warn('Failed to register service worker', error);
     });
   }
