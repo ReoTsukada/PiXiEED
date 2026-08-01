@@ -284,6 +284,7 @@ function createAdapter({
   acquireProjectLease,
   initialProjectKey = `project-${actor}`,
   resolveProjectBindingTarget,
+  readProjectBinding,
 }) {
   const bridge = createBridge();
   let restored = '';
@@ -305,7 +306,11 @@ function createAdapter({
     },
     getProjectKey: () => currentProjectKey,
     getProjectTitle: () => `Project ${actor}`,
-    readProjectBinding: async projectKey => bindings.get(projectKey) || null,
+    readProjectBinding: async projectKey => (
+      typeof readProjectBinding === 'function'
+        ? await readProjectBinding(projectKey)
+        : bindings.get(projectKey) || null
+    ),
     writeProjectBinding: async (projectKey, binding) => {
       bindings.set(projectKey, binding);
       return { projectKey };
@@ -337,6 +342,34 @@ const editorStorage = createStorage();
 const ownerBindings = new Map();
 const editorBindings = new Map();
 let owner = createAdapter({ server, actor: 'owner', clientId: OWNER_CLIENT, storage: ownerStorage, bindings: ownerBindings, checkpointText: 'checkpoint-owner' });
+
+// Disposing while initialize() is awaiting persistent metadata must never let
+// that stale initialization reinstall its document bridge afterward.
+let releaseInitializationBinding;
+let markInitializationBindingStarted;
+const initializationBindingStarted = new Promise(resolve => { markInitializationBindingStarted = resolve; });
+const initializationBindingGate = new Promise(resolve => { releaseInitializationBinding = resolve; });
+const initializationRace = createAdapter({
+  server,
+  actor: 'owner',
+  clientId: OWNER_CLIENT,
+  storage: createStorage(),
+  bindings: new Map(),
+  checkpointText: 'checkpoint-initialization-race',
+  readProjectBinding: async () => {
+    markInitializationBindingStarted();
+    await initializationBindingGate;
+    return null;
+  },
+});
+const staleInitialization = initializationRace.adapter.initialize();
+await initializationBindingStarted;
+const disposalDuringInitialization = initializationRace.adapter.dispose();
+releaseInitializationBinding();
+await Promise.all([staleInitialization, disposalDuringInitialization]);
+assert.equal(initializationRace.bridge.runtime, null);
+assert.equal(initializationRace.adapter.snapshot().enabled, false);
+
 await owner.adapter.initialize();
 assert.equal(owner.adapter.snapshot().session.phase, 'local');
 assert.equal(await owner.adapter.start(), ROOM_ID);

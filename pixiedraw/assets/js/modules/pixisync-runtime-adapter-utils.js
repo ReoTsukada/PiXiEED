@@ -213,6 +213,7 @@
       report({ phase: 'reconnecting', retryInMs: baseDelay + jitter, reason });
     };
     const report = details => {
+      if (disposed) return;
       onStatus(details);
       runtimeBridge.refreshUi?.();
     };
@@ -659,6 +660,7 @@
     }
 
     function configureBridge({ collaboration = Boolean(realtimeClient) } = {}) {
+      if (disposed) return false;
       runtimeBridge.configure({
         session,
         realtimeClient: collaboration ? realtimeClient : null,
@@ -674,9 +676,11 @@
         uiEnabled,
         consumeInviteFromUrl: false,
       });
+      return true;
     }
 
     function installSession(nextRole, { resumeAvailable = false } = {}) {
+      if (disposed) throw new Error('PiXiSYNC runtime: disposed');
       unsubscribeSession?.();
       role = nextRole === 'owner' ? 'owner' : 'participant';
       session = createSession({ role, resumeAvailable });
@@ -1538,8 +1542,11 @@
     }
 
     async function initialize() {
+      if (disposed) return snapshot();
       await ensureSupabase();
+      if (disposed) return snapshot();
       const binding = normalizeProjectBinding(await readProjectBinding(String(getProjectKey() || '')));
+      if (disposed) return snapshot();
       projectBindingPersisted = Boolean(binding);
       boundProjectKey = binding?.projectKey || '';
       reusableInviteToken = binding?.role === 'owner' ? binding.inviteToken : '';
@@ -1548,16 +1555,26 @@
       installSession(binding?.role || 'owner', { resumeAvailable: Boolean(binding) });
       configureBridge({ collaboration: false });
       await runtimeBridge.consumeInviteFromUrl?.();
+      if (disposed) runtimeBridge.clear?.();
       return snapshot();
     }
 
     async function dispose() {
+      if (disposed) {
+        runtimeBridge.clear?.();
+        return;
+      }
       disposed = true;
+      // Revoke the document bridge before any awaited transport cleanup. All
+      // later configure attempts are rejected by configureBridge().
+      runtimeBridge.clear?.();
       clearReconnectRetry();
       unsubscribeSession?.();
       unsubscribeSession = null;
+      const pendingOperations = operationQueue;
       await realtimeClient?.stop?.().catch(() => {});
       realtimeClient = null;
+      await pendingOperations.catch(() => {});
       await releaseProjectLease();
       runtimeBridge.clear?.();
     }

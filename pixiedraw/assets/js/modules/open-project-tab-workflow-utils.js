@@ -806,6 +806,7 @@
         updateAutosaveStatus(localizeText('シートの切替に失敗しました', 'Failed to switch sheet'), 'error');
         return false;
       }
+      await reconcilePiXiSyncProjectForActivatedProject?.(targetProjectId);
       queueProjectTabViewportReset(target.id);
       if (target.unsaved) {
         markDocumentUnsavedChange();

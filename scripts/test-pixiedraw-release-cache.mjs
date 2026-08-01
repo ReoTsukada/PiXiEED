@@ -22,19 +22,26 @@ for (const moduleName of [
   'pixisync-realtime-client-utils',
   'pixisync-pixel-mutation-bridge-utils',
   'pixisync-collaboration-controller-utils',
-  'pixisync-runtime-adapter-utils',
 ]) {
   assert.match(indexHtml, new RegExp(`${moduleName}\\.js\\?v=20260801-sync-convergence1`));
 }
 assert.match(indexHtml, /pixisync-document-operation-utils\.js\?v=20260801-adaptive-output2/);
 for (const assetName of [
   'assets\/css\/style.css',
-  'assets\/js\/modules\/startup-workflow-utils.js',
-  'assets\/js\/modules\/pixisync-project-switch-utils.js',
   'assets\/js\/modules\/pixisync-minimal-ui-utils.js',
-  'assets\/js\/app.js',
 ]) {
   assert.match(indexHtml, new RegExp(`${assetName}\\?v=20260801-startup-code1`));
+}
+for (const assetName of [
+  'assets\/js\/modules\/open-project-tab-workflow-utils.js',
+  'assets\/js\/modules\/open-import-workflow-utils.js',
+  'assets\/js\/modules\/startup-workflow-utils.js',
+  'assets\/js\/modules\/document-session-workflow-utils.js',
+  'assets\/js\/modules\/pixisync-project-switch-utils.js',
+  'assets\/js\/modules\/pixisync-runtime-adapter-utils.js',
+  'assets\/js\/app.js',
+]) {
+  assert.match(indexHtml, new RegExp(`${assetName}\\?v=20260802-project-share-scope1`));
 }
 assert.match(serviceWorker, /fetch\(request, \{ cache: 'no-store' \}\)/);
 assert.match(app, /serviceWorker\.register\(swUrl, \{ updateViaCache: 'none' \}\)/);

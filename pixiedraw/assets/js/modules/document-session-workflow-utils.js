@@ -708,6 +708,10 @@
       failureY: Number.isInteger(nativeScaleOptimization.failureY) ? nativeScaleOptimization.failureY : -1,
       failureAxis: nativeScaleOptimization.failureAxis || '',
     });
+    const requestedProjectId = normalizeAutosaveProjectId(options?.projectId || '');
+    await preparePiXiSyncProjectSwitch?.(requestedProjectId, {
+      preserveMatchingRuntime: options?.preservePiXiSyncRuntime === true,
+    });
     let snapshotApplyResult = null;
     autosaveRestoring = true;
     try {
@@ -762,7 +766,6 @@
       preserveLocalCanvasLayout: Boolean(projectSession?.localViewportCanvases),
     });
 
-    const requestedProjectId = normalizeAutosaveProjectId(options?.projectId || '');
     const requestedSharedProjectKey = normalizeMultiProjectKey(options?.sharedProjectKey || '');
     const requestedSharedProjectRevision = Math.max(0, Math.round(Number(options?.sharedProjectRevision) || 0));
     const requestedSharedProjectStructureRevision = Math.max(0, Math.round(Number(options?.sharedProjectStructureRevision) || 0));

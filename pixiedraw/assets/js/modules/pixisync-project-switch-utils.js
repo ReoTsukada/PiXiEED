@@ -32,6 +32,75 @@
     });
   }
 
+  function inspectRuntimeProject(runtime = null) {
+    let snapshot = null;
+    try {
+      snapshot = runtime?.snapshot?.() || null;
+    } catch (_error) {
+      snapshot = null;
+    }
+    return Object.freeze({
+      enabled: snapshot?.enabled !== false,
+      projectKey: String(snapshot?.session?.projectKey || '').trim(),
+      roomId: String(snapshot?.roomId || snapshot?.session?.roomId || '').trim().toLowerCase(),
+      role: String(snapshot?.role || snapshot?.session?.role || ''),
+      phase: String(snapshot?.session?.phase || ''),
+    });
+  }
+
+  function runtimeMatchesProjectBinding(runtime, projectKey, binding = null) {
+    if (!runtime || !binding || typeof binding !== 'object') return false;
+    const targetProjectKey = String(projectKey || '').trim();
+    const targetRoomId = String(binding.roomId || '').trim().toLowerCase();
+    const targetRole = binding.role === 'owner'
+      ? 'owner'
+      : (binding.role === 'participant' ? 'participant' : '');
+    if (!targetProjectKey || !targetRoomId) return false;
+    const current = inspectRuntimeProject(runtime);
+    return current.enabled
+      && ['creating', 'joining', 'syncing', 'active', 'reconnecting'].includes(current.phase)
+      && current.projectKey === targetProjectKey
+      && current.roomId === targetRoomId
+      && (!targetRole || current.role === targetRole);
+  }
+
+  async function prepareProjectRuntimeSwitch({
+    targetProjectKey = '',
+    targetBinding = null,
+    preserveMatchingRuntime = false,
+    runtime = null,
+    disposeRuntime = async target => target?.dispose?.(),
+    clearRuntimeBridge = () => {},
+  } = {}) {
+    const normalizedTarget = String(targetProjectKey || '').trim();
+    const current = inspectRuntimeProject(runtime);
+    if (!runtime) {
+      return Object.freeze({ disposed: false, kept: false, current, targetProjectKey: normalizedTarget });
+    }
+    if (preserveMatchingRuntime === true
+      && runtimeMatchesProjectBinding(runtime, normalizedTarget, targetBinding)) {
+      return Object.freeze({ disposed: false, kept: true, current, targetProjectKey: normalizedTarget });
+    }
+    let disposeError = null;
+    // Stop document-operation routing immediately, before waiting for the
+    // transport and editing lease to finish shutting down.
+    try { clearRuntimeBridge(); } catch (_error) {}
+    try {
+      await disposeRuntime(runtime);
+    } catch (error) {
+      disposeError = error instanceof Error ? error : new Error(String(error || 'runtime-dispose-failed'));
+    } finally {
+      try { clearRuntimeBridge(); } catch (_error) {}
+    }
+    return Object.freeze({
+      disposed: true,
+      kept: false,
+      current,
+      targetProjectKey: normalizedTarget,
+      disposeError,
+    });
+  }
+
   async function runSafeProjectJoin({
     inviteValue = '',
     locationHref = window.location?.href || '',
@@ -111,6 +180,9 @@
 
   root.pixisyncProjectSwitchUtils = Object.freeze({
     parseInviteToken,
+    inspectRuntimeProject,
+    runtimeMatchesProjectBinding,
+    prepareProjectRuntimeSwitch,
     runSafeProjectJoin,
   });
 })();

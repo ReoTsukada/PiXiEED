@@ -1,4 +1,4 @@
-importScripts('./assets/js/build-info.js?v=20260801-169');
+importScripts('./assets/js/build-info.js?v=20260802-170');
 
 const APP_BUILD_VERSION = String(self.__PIXIEEDRAW_BUILD_INFO__?.buildId || 'unknown-build');
 const CACHE_VERSION = `pixieedraw-v${APP_BUILD_VERSION}`;

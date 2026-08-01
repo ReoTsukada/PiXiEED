@@ -117,6 +117,13 @@ const frameInsert = {
   },
 };
 assert.deepEqual(codec.decode(codec.encode(frameInsert)), frameInsert);
+const fractionalFrameInsert = structuredClone(frameInsert);
+fractionalFrameInsert.data.frame.duration = 1000 / 12;
+assert.deepEqual(
+  codec.decode(codec.encode(fractionalFrameInsert)),
+  fractionalFrameInsert,
+  'frame_insert preserves the canonical fractional 12fps duration',
+);
 const rasterRegionSet = {
   version: 1,
   type: 'raster_region_set',
@@ -142,6 +149,13 @@ const frameClone = {
   data: { canvasId: 'canvas-a', afterFrameId: 'frame-a', clones: [{ sourceFrameId: 'frame-a', frameId: 'frame-b', name: 'Frame 2', duration: 150, layerIds: ['layer-b'] }] },
 };
 assert.deepEqual(codec.decode(codec.encode(frameClone)), frameClone);
+const fractionalFrameClone = structuredClone(frameClone);
+fractionalFrameClone.data.clones[0].duration = 1000 / 12;
+assert.deepEqual(
+  codec.decode(codec.encode(fractionalFrameClone)),
+  fractionalFrameClone,
+  'frame_clone preserves the canonical fractional 12fps duration',
+);
 const trackClone = {
   version: 1,
   type: 'structure_delta',
@@ -170,5 +184,22 @@ assert.throws(() => codec.encode({ ...resize, data: { ...resize.data, width: 0 }
 assert.throws(() => codec.encode({ ...layerInsert, data: { ...layerInsert.data, cells: [...layerInsert.data.cells, layerInsert.data.cells[0]] } }), /duplicate-layer-track-cell/);
 assert.throws(() => codec.encode({ ...frameClone, data: { ...frameClone.data, clones: [{ ...frameClone.data.clones[0], name: '' }] } }), /invalid-frame-clone-name/);
 assert.throws(() => codec.encode({ ...frameClone, data: { ...frameClone.data, clones: [{ ...frameClone.data.clones[0], duration: 0 }] } }), /invalid-frame-clone-duration/);
+
+const fractionalDurationMigration = await readFile(new URL(
+  '../supabase/migrations/20260802010000_pixisync_fractional_frame_durations.sql',
+  import.meta.url,
+), 'utf8');
+assert.doesNotMatch(
+  fractionalDurationMigration,
+  /frame'->>'duration'\)::numeric\s*<>\s*trunc/,
+  'frame_insert SQL validation must not reject fractional milliseconds',
+);
+assert.doesNotMatch(
+  fractionalDurationMigration,
+  /v_item->>'duration'\)::numeric\s*<>\s*trunc/,
+  'frame_clone SQL validation must not reject fractional milliseconds',
+);
+assert.match(fractionalDurationMigration, /frame'->>'duration'\)::numeric not between 1 and 655350/);
+assert.match(fractionalDurationMigration, /v_item->>'duration'\)::numeric not between 1 and 655350/);
 
 console.log('PiXiSYNC document operation codec tests passed');

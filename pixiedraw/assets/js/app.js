@@ -5736,6 +5736,8 @@
   set ensureAutosaveForLensImport(value) { ensureAutosaveForLensImport = value; },
   get ensureCurrentClientCanReplaceActiveProject() { return ensureCurrentClientCanReplaceActiveProject; },
   set ensureCurrentClientCanReplaceActiveProject(value) { ensureCurrentClientCanReplaceActiveProject = value; },
+  get preparePiXiSyncProjectSwitch() { return preparePiXiSyncProjectSwitch; },
+  set preparePiXiSyncProjectSwitch(value) { preparePiXiSyncProjectSwitch = value; },
   get ensureLayerDirect() { return ensureLayerDirect; },
   set ensureLayerDirect(value) { ensureLayerDirect = value; },
   get ensureOpenProjectTabsInitialized() { return ensureOpenProjectTabsInitialized; },
@@ -6262,6 +6264,8 @@
   set openSharedRecentProject(value) { openSharedRecentProject = value; },
   get pendingNewProjectCreateShared() { return pendingNewProjectCreateShared; },
   set pendingNewProjectCreateShared(value) { pendingNewProjectCreateShared = value; },
+  get preparePiXiSyncProjectSwitch() { return preparePiXiSyncProjectSwitch; },
+  set preparePiXiSyncProjectSwitch(value) { preparePiXiSyncProjectSwitch = value; },
   get projectHomeVisible() { return projectHomeVisible; },
   set projectHomeVisible(value) { projectHomeVisible = value; },
   get purgeDeletedSharedProjectLocalReferences() { return purgeDeletedSharedProjectLocalReferences; },
@@ -6790,6 +6794,8 @@
   get ensureCurrentClientCanReplaceActiveProject() { return ensureCurrentClientCanReplaceActiveProject; },
   set ensureCurrentClientCanReplaceActiveProject(value) { ensureCurrentClientCanReplaceActiveProject = value; },
   get getActiveOpenProjectTab() { return getActiveOpenProjectTab; },
+  get preparePiXiSyncProjectSwitch() { return preparePiXiSyncProjectSwitch; },
+  set preparePiXiSyncProjectSwitch(value) { preparePiXiSyncProjectSwitch = value; },
   set getActiveOpenProjectTab(value) { getActiveOpenProjectTab = value; },
   get getActiveQrEditPayload() { return getActiveQrEditPayload; },
   set getActiveQrEditPayload(value) { getActiveQrEditPayload = value; },
@@ -10721,6 +10727,8 @@
   get persistActiveOpenProjectTab() { return persistActiveOpenProjectTab; },
   set persistActiveOpenProjectTab(value) { persistActiveOpenProjectTab = value; },
   get projectHomeVisible() { return projectHomeVisible; },
+  get reconcilePiXiSyncProjectForActivatedProject() { return reconcilePiXiSyncProjectForActivatedProject; },
+  set reconcilePiXiSyncProjectForActivatedProject(value) { reconcilePiXiSyncProjectForActivatedProject = value; },
   set projectHomeVisible(value) { projectHomeVisible = value; },
   get queueProjectTabViewportReset() { return queueProjectTabViewportReset; },
   set queueProjectTabViewportReset(value) { queueProjectTabViewportReset = value; },
@@ -18438,8 +18446,14 @@
         autosaveSchemaVersion: Number(latestEntry.autosaveSchemaVersion) || 0,
       }) || '';
       const finishRecentProjectOpen = async (message = '自動保存: 端末内プロジェクトを開きました') => {
-        const isPiXiSyncCard = Boolean(latestEntry?.pixisync && typeof latestEntry.pixisync === 'object');
-        const sharedSessionResumed = await resumePiXiSyncProjectCard(latestEntry);
+        const pixisyncProjectState = await reconcilePiXiSyncProjectForActivatedProject(latestEntry);
+        // A newer project-open command won while this one was awaiting the
+        // persisted binding. Do not let the stale completion hide the startup
+        // screen or overwrite the current project's status message.
+        if (pixisyncProjectState?.stale === true) return false;
+        const isPiXiSyncCard = pixisyncProjectState?.bound === true;
+        const sharedSessionResumed = pixisyncProjectState?.kept === true
+          || pixisyncProjectState?.resumed === true;
         if (!silent) {
           if (isPiXiSyncCard && !sharedSessionResumed) {
             updateAutosaveStatus(
@@ -27407,6 +27421,10 @@
   }
 
   let pixisyncLifecycleListenersInstalled = false;
+  let pixisyncRuntimeDisposalPromise = Promise.resolve(true);
+  let pixisyncRuntimeInitializationPromise = null;
+  let pixisyncRuntimeLifecycleEpoch = 0;
+  const pixisyncRuntimeDisposals = new WeakMap();
 
   function installPiXiSyncLifecycleListeners(runtime) {
     if (pixisyncLifecycleListenersInstalled || !runtime) return;
@@ -27427,15 +27445,189 @@
   }
 
   async function disposePiXiSyncRuntimeForProjectSwitch(runtime = window.__PIXISYNC_V1_RUNTIME__ || null) {
-    if (!runtime) return true;
-    try {
-      await runtime.dispose?.();
-    } finally {
-      if (window.__PIXISYNC_V1_RUNTIME__ === runtime) {
-        window.__PIXISYNC_V1_RUNTIME__ = null;
+    if (!runtime) {
+      return await pixisyncRuntimeDisposalPromise;
+    }
+    const existingDisposal = pixisyncRuntimeDisposals.get(runtime);
+    if (existingDisposal) return await existingDisposal;
+    if (window.__PIXISYNC_V1_RUNTIME__ && window.__PIXISYNC_V1_RUNTIME__ !== runtime) {
+      // A delayed caller must never tear down the bridge owned by a newer
+      // project runtime. Known disposals are returned above; unknown stale
+      // instances are ignored here.
+      return false;
+    }
+    if (window.__PIXISYNC_V1_RUNTIME__ === runtime) {
+      window.__PIXISYNC_V1_RUNTIME__ = null;
+    }
+    pixisyncRuntimeLifecycleEpoch += 1;
+    // Cut document-operation routing synchronously. Transport shutdown and
+    // lease release may await network/IndexedDB work, but no old-room action
+    // may reach the document that is about to be loaded.
+    window.PiXiEEDrawModules?.pixisyncRuntimeBridge?.clear?.();
+    const previousDisposal = pixisyncRuntimeDisposalPromise;
+    const initializationAtDisposal = pixisyncRuntimeInitializationPromise;
+    const currentDisposal = (async () => {
+      // The serialization tail is deliberately non-rejecting, but retain the
+      // guard for sessions created by an older cached build.
+      await previousDisposal.catch?.(() => false);
+      let disposeError = null;
+      try {
+        await runtime.dispose?.();
+      } catch (error) {
+        disposeError = error;
+      } finally {
+        // runtime.dispose() marks the adapter disposed synchronously. Wait for
+        // an initialize() that was already in flight to observe that state,
+        // then perform the ownership-safe final bridge clear.
+        await initializationAtDisposal?.catch?.(() => null);
+        if (window.__PIXISYNC_V1_RUNTIME__ === runtime) {
+          window.__PIXISYNC_V1_RUNTIME__ = null;
+        }
+        if (!window.__PIXISYNC_V1_RUNTIME__) {
+          window.PiXiEEDrawModules?.pixisyncRuntimeBridge?.clear?.();
+        }
+      }
+      if (disposeError) throw disposeError;
+      return true;
+    })();
+    pixisyncRuntimeDisposals.set(runtime, currentDisposal);
+    // Callers disposing this exact runtime still receive its failure through
+    // currentDisposal. The shared tail must recover so later projects can
+    // initialize and dispose normally.
+    pixisyncRuntimeDisposalPromise = currentDisposal.catch(() => false);
+    return await currentDisposal;
+  }
+
+  async function preparePiXiSyncProjectSwitch(targetProjectId = '', {
+    preserveMatchingRuntime = false,
+  } = {}) {
+    const targetProjectKey = normalizeAutosaveProjectId(targetProjectId || '');
+    const buildSupersededError = () => {
+      const error = new Error('PiXiSYNC project switch was superseded');
+      error.code = 'ERR_PIXISYNC_PROJECT_SWITCH_SUPERSEDED';
+      return error;
+    };
+    let runtime = null;
+    if (preserveMatchingRuntime === true) {
+      // An authoritative checkpoint restore runs inside the runtime operation
+      // queue. If a project switch has already detached that runtime, waiting
+      // on its disposal tail here would deadlock (dispose waits for the same
+      // operation queue). Abort the stale restore instead.
+      runtime = window.__PIXISYNC_V1_RUNTIME__ || null;
+      if (!runtime) throw buildSupersededError();
+    } else {
+      // Also supersede an initialization that has not published its runtime
+      // yet. This is required when a second project is opened immediately.
+      pixisyncRuntimeLifecycleEpoch += 1;
+      await pixisyncRuntimeDisposalPromise;
+      runtime = window.__PIXISYNC_V1_RUNTIME__ || null;
+    }
+    if (!runtime) {
+      return { disposed: false, kept: false, targetProjectKey };
+    }
+    const targetEntry = targetProjectKey
+      ? ((await loadRecentProjectMetadataById(targetProjectKey)) || recentProjectsCache.get(targetProjectKey))
+      : null;
+    if (window.__PIXISYNC_V1_RUNTIME__ !== runtime) {
+      throw buildSupersededError();
+    }
+    let targetBinding = targetEntry?.pixisync && typeof targetEntry.pixisync === 'object'
+      ? targetEntry.pixisync
+      : null;
+    const switchUtils = window.PiXiEEDrawModules?.pixisyncProjectSwitchUtils;
+    if (!targetBinding && preserveMatchingRuntime === true
+      && typeof switchUtils?.inspectRuntimeProject === 'function') {
+      const current = switchUtils.inspectRuntimeProject(runtime);
+      if (current.projectKey === targetProjectKey && current.roomId) {
+        targetBinding = { roomId: current.roomId, role: current.role };
       }
     }
-    return true;
+    if (typeof switchUtils?.prepareProjectRuntimeSwitch === 'function') {
+      const result = await switchUtils.prepareProjectRuntimeSwitch({
+        targetProjectKey,
+        targetBinding,
+        preserveMatchingRuntime,
+        runtime,
+        disposeRuntime: target => disposePiXiSyncRuntimeForProjectSwitch(target),
+        clearRuntimeBridge: () => window.PiXiEEDrawModules?.pixisyncRuntimeBridge?.clear?.(),
+      });
+      if (result?.disposeError) throw result.disposeError;
+      return result;
+    }
+    const runtimeMatchesTarget = typeof switchUtils?.runtimeMatchesProjectBinding === 'function'
+      && switchUtils.runtimeMatchesProjectBinding(runtime, targetProjectKey, targetBinding);
+    if (preserveMatchingRuntime === true && runtimeMatchesTarget) {
+      return { disposed: false, kept: true, targetProjectKey };
+    }
+    try {
+      await disposePiXiSyncRuntimeForProjectSwitch(runtime);
+    } catch (error) {
+      console.warn('[pixisync:project-switch] runtime dispose failed', error);
+      throw error;
+    }
+    return { disposed: true, kept: false, targetProjectKey };
+  }
+
+  async function reconcilePiXiSyncProjectForActivatedProject(projectOrEntry = '') {
+    const suppliedEntry = projectOrEntry && typeof projectOrEntry === 'object'
+      ? projectOrEntry
+      : null;
+    const targetProjectKey = normalizeAutosaveProjectId(
+      suppliedEntry?.id || projectOrEntry || autosaveProjectId || ''
+    );
+    const buildStaleResult = () => ({
+      bound: false,
+      kept: false,
+      resumed: false,
+      stale: true,
+      projectKey: targetProjectKey,
+      activeProjectKey: normalizeAutosaveProjectId(autosaveProjectId || ''),
+    });
+    const isTargetActive = () => (
+      Boolean(targetProjectKey)
+      && targetProjectKey === normalizeAutosaveProjectId(autosaveProjectId || '')
+    );
+    if (!isTargetActive()) return buildStaleResult();
+    const persistedEntry = targetProjectKey
+      ? await loadRecentProjectMetadataById(targetProjectKey)
+      : null;
+    const entry = persistedEntry
+      || suppliedEntry
+      || (targetProjectKey ? recentProjectsCache.get(targetProjectKey) : null)
+      || { id: targetProjectKey };
+    if (!isTargetActive()) return buildStaleResult();
+    const binding = entry?.pixisync && typeof entry.pixisync === 'object'
+      ? entry.pixisync
+      : null;
+    const runtime = window.__PIXISYNC_V1_RUNTIME__ || null;
+    const switchUtils = window.PiXiEEDrawModules?.pixisyncProjectSwitchUtils;
+    if (!binding) {
+      if (runtime) {
+        try {
+          await disposePiXiSyncRuntimeForProjectSwitch(runtime);
+        } catch (error) {
+          console.warn('[pixisync:project-switch] stale runtime dispose failed', error);
+          throw error;
+        }
+      } else {
+        window.PiXiEEDrawModules?.pixisyncRuntimeBridge?.clear?.();
+      }
+      return { bound: false, kept: false, resumed: false, projectKey: targetProjectKey };
+    }
+    if (typeof switchUtils?.runtimeMatchesProjectBinding === 'function'
+      && switchUtils.runtimeMatchesProjectBinding(runtime, targetProjectKey, binding)) {
+      return { bound: true, kept: true, resumed: false, projectKey: targetProjectKey };
+    }
+    if (runtime) {
+      try {
+        await disposePiXiSyncRuntimeForProjectSwitch(runtime);
+      } catch (error) {
+        console.warn('[pixisync:project-switch] mismatched runtime dispose failed', error);
+        throw error;
+      }
+    }
+    const resumed = await resumePiXiSyncProjectCard(entry);
+    return { bound: true, kept: false, resumed, projectKey: targetProjectKey };
   }
 
   async function joinPiXiSyncFromStartupWorkspace(inviteValue) {
@@ -27677,6 +27869,40 @@
   }
 
   async function initializePiXiSyncRuntime() {
+    if (pixisyncRuntimeInitializationPromise) {
+      try {
+        const pendingRuntime = await pixisyncRuntimeInitializationPromise;
+        if (pendingRuntime) return pendingRuntime;
+      } catch (error) {
+        // A project switch can intentionally dispose a runtime while its
+        // initialization is still awaiting auth/storage. Once that tracked
+        // attempt settles, continue with the active project's clean runtime.
+        if (window.__PIXISYNC_V1_RUNTIME__) throw error;
+      }
+    }
+    if (window.__PIXISYNC_V1_RUNTIME__) {
+      return window.__PIXISYNC_V1_RUNTIME__;
+    }
+    const initializationEpoch = pixisyncRuntimeLifecycleEpoch;
+    const initialization = (async () => {
+      await pixisyncRuntimeDisposalPromise;
+      if (initializationEpoch !== pixisyncRuntimeLifecycleEpoch) return null;
+      if (window.__PIXISYNC_V1_RUNTIME__) {
+        return window.__PIXISYNC_V1_RUNTIME__;
+      }
+      return await initializePiXiSyncRuntimeUnlocked(initializationEpoch);
+    })();
+    const trackedInitialization = initialization.finally(() => {
+      if (pixisyncRuntimeInitializationPromise === trackedInitialization) {
+        pixisyncRuntimeInitializationPromise = null;
+      }
+    });
+    pixisyncRuntimeInitializationPromise = trackedInitialization;
+    return await trackedInitialization;
+  }
+
+  async function initializePiXiSyncRuntimeUnlocked(initializationEpoch = pixisyncRuntimeLifecycleEpoch) {
+    if (initializationEpoch !== pixisyncRuntimeLifecycleEpoch) return null;
     const config = window.__PIXISYNC_V1_CONFIG__ || {
       enabled: PIXISYNC_V1_ENABLED,
       uiEnabled: true,
@@ -27869,6 +28095,7 @@
           preserveFrameIds: context?.preserveProjectIdentity === true,
           preserveLayerIds: context?.preserveProjectIdentity === true,
           preserveView: context?.preserveProjectIdentity === true,
+          preservePiXiSyncRuntime: context?.preserveProjectIdentity === true,
           projectId,
           sourceKind: sourcePersistenceState.sourceKind,
           sourcePersistenceState,
@@ -27919,8 +28146,8 @@
       readProjectBinding: async projectKey => {
         const normalizedProjectKey = normalizeAutosaveProjectId(projectKey || '');
         if (!normalizedProjectKey) return null;
-        const entry = recentProjectsCache.get(normalizedProjectKey)
-          || await loadRecentProjectMetadataById(normalizedProjectKey);
+        const entry = await loadRecentProjectMetadataById(normalizedProjectKey)
+          || recentProjectsCache.get(normalizedProjectKey);
         const binding = entry?.pixisync;
         if (!binding || typeof binding !== 'object') return null;
         return {
@@ -28042,8 +28269,32 @@
       },
       onError: error => console.warn('[pixisync:v1-runtime] error', error?.message || error),
     });
+    if (initializationEpoch !== pixisyncRuntimeLifecycleEpoch) {
+      await runtime.dispose?.().catch?.(() => {});
+      return null;
+    }
     window.__PIXISYNC_V1_RUNTIME__ = runtime;
-    await runtime.initialize();
+    try {
+      await runtime.initialize();
+    } catch (error) {
+      if (window.__PIXISYNC_V1_RUNTIME__ === runtime) {
+        window.__PIXISYNC_V1_RUNTIME__ = null;
+      }
+      throw error;
+    }
+    if (
+      window.__PIXISYNC_V1_RUNTIME__ !== runtime
+      || initializationEpoch !== pixisyncRuntimeLifecycleEpoch
+    ) {
+      if (window.__PIXISYNC_V1_RUNTIME__ === runtime) {
+        window.__PIXISYNC_V1_RUNTIME__ = null;
+        await runtime.dispose?.().catch?.(() => {});
+        if (!window.__PIXISYNC_V1_RUNTIME__) {
+          window.PiXiEEDrawModules?.pixisyncRuntimeBridge?.clear?.();
+        }
+      }
+      return null;
+    }
     installPiXiSyncLifecycleListeners(runtime);
     return runtime;
   }
@@ -28052,6 +28303,12 @@
     if (!entry?.pixisync || typeof entry.pixisync !== 'object') return false;
     const config = window.__PIXISYNC_V1_CONFIG__ || { enabled: PIXISYNC_V1_ENABLED };
     if (config?.enabled !== true) return false;
+    const expectedProjectKey = normalizeAutosaveProjectId(entry.id || '');
+    const isExpectedProjectActive = () => (
+      Boolean(expectedProjectKey)
+      && normalizeAutosaveProjectId(autosaveProjectId || '') === expectedProjectKey
+    );
+    if (!isExpectedProjectActive()) return false;
     try {
       // A bound card is an explicit PiXiSYNC entry point. Unlike the initial
       // discovery gesture, reopening it must expose the sync panel at once.
@@ -28059,9 +28316,24 @@
       window.__PIXISYNC_SHARE_START_UNLOCKED__ = true;
       document.body?.setAttribute('data-pixisync-initial-gate', 'unlocked');
       setPiXiSyncInitialGateButtonsEnabled(true);
-      const runtime = window.__PIXISYNC_V1_RUNTIME__ || await initializePiXiSyncRuntime();
+      let runtime = window.__PIXISYNC_V1_RUNTIME__ || await initializePiXiSyncRuntime();
+      if (!runtime && isExpectedProjectActive()) {
+        runtime = await initializePiXiSyncRuntime();
+      }
       if (!runtime) return false;
+      if (!isExpectedProjectActive()) {
+        if (window.__PIXISYNC_V1_RUNTIME__ === runtime) {
+          await disposePiXiSyncRuntimeForProjectSwitch(runtime);
+        }
+        return false;
+      }
       await runtime.resumeBoundProject();
+      if (!isExpectedProjectActive()) {
+        if (window.__PIXISYNC_V1_RUNTIME__ === runtime) {
+          await disposePiXiSyncRuntimeForProjectSwitch(runtime);
+        }
+        return false;
+      }
       return true;
     } catch (error) {
       console.warn('PiXiSYNC project-card resume failed', error);

@@ -942,6 +942,8 @@
       uiTheme: state.uiTheme,
       palettePreset: normalizedPalettePreset,
     });
+    const newProjectId = createAutosaveProjectId();
+    await preparePiXiSyncProjectSwitch?.(newProjectId);
 
     applyHistorySnapshot(snapshot);
     setCurrentPalettePresetId(normalizedPalettePreset, { syncControl: true });
@@ -958,7 +960,6 @@
     setTrackedProjectDotBaseline(snapshot, null);
     resetOpenedDocumentViewport({ defer: true });
 
-    const newProjectId = createAutosaveProjectId();
     setActiveAutosaveProjectId(newProjectId);
     clearActiveLocalProjectJournal?.();
     clearActiveSharedProjectSession();

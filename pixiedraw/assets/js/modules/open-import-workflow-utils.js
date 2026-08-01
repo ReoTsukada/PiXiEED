@@ -1177,6 +1177,8 @@
       return buildPackagedProjectPayload(snapshot, { session: {}, includeSheets: false });
     }
 
+    const importedProjectId = createAutosaveProjectId();
+    await preparePiXiSyncProjectSwitch?.(importedProjectId);
     const applySnapshotSpan = beginImportPerformanceSpan('pixiedraw:import:apply-history-snapshot', {
       frameCount: frames.length,
       width,
@@ -1197,7 +1199,7 @@
     setTrackedProjectDotBaseline(snapshot, null);
     resetOpenedDocumentViewport({ defer: true });
 
-    setActiveAutosaveProjectId(createAutosaveProjectId());
+    setActiveAutosaveProjectId(importedProjectId);
     clearActiveSharedProjectSession();
     storeMultiProjectKey('');
     syncMultiProjectKeyInputValues('', { preserveFocused: false });
