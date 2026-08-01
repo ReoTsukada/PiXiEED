@@ -13020,10 +13020,15 @@
       });
     }
     clearCanvasCompositeFrameCache();
+    // PiXiSYNC cards retain a legacy shared-project key for card persistence.
+    // That key must not send layer/frame structure edits through the retired
+    // snapshot-history branch: PiXiSYNC only accepts the finalized semantic
+    // entry and otherwise leaves the new local target unsynchronised.
+    const usePiXiSyncStructureHistory = Boolean(pixisyncCollaborationController?.enabled);
     if (
       label === 'addLayer'
       && !multiState.connected
-      && !activeSharedProjectKey
+      && (!activeSharedProjectKey || usePiXiSyncStructureHistory)
       && !isVoxelExtensionModeEnabled()
     ) {
       history.pending = {
@@ -13042,7 +13047,7 @@
     if (
       label === 'removeLayer'
       && !multiState.connected
-      && !activeSharedProjectKey
+      && (!activeSharedProjectKey || usePiXiSyncStructureHistory)
       && !isVoxelExtensionModeEnabled()
     ) {
       history.pending = {
@@ -13063,7 +13068,7 @@
     if (
       label === 'resizeCanvas'
       && !multiState.connected
-      && !activeSharedProjectKey
+      && (!activeSharedProjectKey || usePiXiSyncStructureHistory)
       && !isVoxelExtensionModeEnabled()
     ) {
       const canvas = getActiveProjectCanvasDocument();
@@ -13116,7 +13121,7 @@
     if (
       label === 'removeFrame'
       && !multiState.connected
-      && !activeSharedProjectKey
+      && (!activeSharedProjectKey || usePiXiSyncStructureHistory)
       && !isVoxelExtensionModeEnabled()
     ) {
       history.pending = {

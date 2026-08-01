@@ -1,11 +1,17 @@
 {
-  "generatedAt": "2026-08-01T06:47:07.637Z",
+  "generatedAt": "2026-08-01T11:45:57.466Z",
   "projects": [
     {
       "id": "site",
       "name": "PiXiEED 全体",
       "url": "/index.html",
       "entries": [
+        {
+          "date": "2026-08-01",
+          "items": [
+            "SEOを更新"
+          ]
+        },
         {
           "date": "2026-07-30",
           "items": [
@@ -46,12 +52,6 @@
           "date": "2026-07-20",
           "items": [
             "SEOを更新"
-          ]
-        },
-        {
-          "date": "2026-07-19",
-          "items": [
-            "SEO / 画面 / ドキュメント / 機能を更新"
           ]
         }
       ]
@@ -226,6 +226,12 @@
     {
       "date": "2026-08-01",
       "updates": [
+        {
+          "id": "site",
+          "name": "PiXiEED 全体",
+          "url": "/index.html",
+          "summary": "SEOを更新"
+        },
         {
           "id": "pixiedraw",
           "name": "PiXiEEDraw",
