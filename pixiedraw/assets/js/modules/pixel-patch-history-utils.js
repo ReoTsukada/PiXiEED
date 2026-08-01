@@ -440,16 +440,35 @@
       const frame = getActiveFrame();
       if (pending.canvasId !== (canvasDoc?.id || '') || pending.frameId !== (frame?.id || '') || pending.layerId !== (layer.id || '')) return null;
       const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
+      // Connected flood fill discovers scanlines in traversal order, which is
+      // intentionally not guaranteed to be top-to-bottom.  Persist a
+      // canonical, non-overlapping run list so every peer expands the exact
+      // same cells independent of the local traversal order.
+      const orderedRuns = [];
+      for (let offset = 0; offset + 1 < runs.length; offset += 2) {
+        const start = Math.max(0, Math.floor(Number(runs[offset]) || 0));
+        const length = Math.max(0, Math.floor(Number(runs[offset + 1]) || 0));
+        const end = Math.min(layer.indices.length, start + length);
+        if (end > start) orderedRuns.push([start, end]);
+      }
+      orderedRuns.sort((left, right) => left[0] - right[0] || left[1] - right[1]);
+      const canonicalRuns = [];
+      for (const [start, end] of orderedRuns) {
+        const previous = canonicalRuns[canonicalRuns.length - 1];
+        if (previous && start <= previous[1]) {
+          previous[1] = Math.max(previous[1], end);
+        } else {
+          canonicalRuns.push([start, end]);
+        }
+      }
       let changedCount = 0;
-      for (let offset = 0; offset + 1 < runs.length; offset += 2) changedCount += Math.max(0, Math.floor(Number(runs[offset + 1]) || 0));
+      canonicalRuns.forEach(([start, end]) => { changedCount += end - start; });
       if (!changedCount) return null;
       const beforeIndices = layer.indices instanceof Int16Array ? new Int16Array(changedCount) : new Uint8Array(changedCount);
       const beforeDirect = direct ? new Uint8ClampedArray(changedCount * 4) : null;
       let writeOffset = 0;
-      for (let offset = 0; offset + 1 < runs.length; offset += 2) {
-        const start = Math.max(0, Math.floor(Number(runs[offset]) || 0));
-        const length = Math.max(0, Math.floor(Number(runs[offset + 1]) || 0));
-        for (let index = start, end = Math.min(layer.indices.length, start + length); index < end; index += 1) {
+      for (const [start, end] of canonicalRuns) {
+        for (let index = start; index < end; index += 1) {
           beforeIndices[writeOffset] = getRasterLayerRuntimeStoredIndex(layer, index);
           if (beforeDirect) beforeDirect.set(direct.subarray(index * 4, (index * 4) + 4), writeOffset * 4);
           writeOffset += 1;
@@ -461,7 +480,7 @@
         kind: 'solid-fill-runs', version: 1, historyLabel: pending.label,
         canvasId: pending.canvasId, frameId: pending.frameId, layerId: pending.layerId,
         width: pending.width, height: pending.height,
-        runs: runs instanceof Int32Array ? runs : new Int32Array(runs),
+        runs: new Int32Array(canonicalRuns.flatMap(([start, end]) => [start, end - start])),
         beforeIndices: writeOffset === beforeIndices.length ? beforeIndices : beforeIndices.slice(0, writeOffset),
         beforeDirect: beforeDirect ? (writeOffset * 4 === beforeDirect.length ? beforeDirect : beforeDirect.slice(0, writeOffset * 4)) : null,
         afterPaletteIndex: Math.round(Number(paletteIndex) || 0),

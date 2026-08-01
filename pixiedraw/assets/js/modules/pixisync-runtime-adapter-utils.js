@@ -564,16 +564,24 @@
     }
 
     async function cleanupRasterRegionUpload(uploadId, objectPath = '') {
-      const claimed = await rpc('pixisync_abort_raster_region_upload', {
+      const claimed = firstRow(await rpc('pixisync_abort_raster_region_upload', {
         p_room_id: roomId,
         p_upload_id: uploadId,
-      }).catch(() => null);
-      const path = String(objectPath || firstRow(claimed)?.storage_path || '');
-      if (path) await removeCheckpointObject(path).catch(() => {});
+      }).catch(() => null));
+      const claimedPath = String(claimed?.storage_path || '');
+      // The abort RPC returns no row once an asset is committed. Never fall
+      // back to the caller path: doing so can delete an immutable object that
+      // an already-confirmed revision references.
+      if (!claimedPath) return false;
+      if (objectPath && claimedPath !== objectPath) {
+        throw new Error('PiXiSYNC runtime: raster-region-cleanup-path-mismatch');
+      }
+      await removeCheckpointObject(claimedPath);
       await rpc('pixisync_finalize_raster_region_upload_cleanup', {
         p_room_id: roomId,
         p_upload_id: uploadId,
-      }).catch(() => {});
+      });
+      return true;
     }
 
     async function prepareRasterRegionAsset({ operationId, structureEpoch, region } = {}) {

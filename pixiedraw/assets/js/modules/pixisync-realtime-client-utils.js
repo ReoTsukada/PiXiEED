@@ -247,8 +247,20 @@
           Promise.resolve(journal?.remove?.(roomId, operationId)).catch(() => {});
           onLocalConfirmed(confirmedOperation);
         }
-        await recover('rpc-commit');
-        await withTimeout('operation-hint', channel?.send({ type: 'broadcast', event: 'operation-hint', payload: { revision: committed?.revision || null, operationId } }));
+        // The commit response is already authoritative and the contiguous
+        // operation was applied above. Do not keep Undo/Redo waiting for a
+        // redundant tail fetch or Broadcast acknowledgement. A real gap still
+        // blocks here until recovery; routine catch-up continues in background.
+        if (confirmation.status === 'gap' || confirmation.status === 'buffered' || confirmation.status === 'recovery') {
+          await recover('rpc-commit-gap');
+        } else {
+          void recover('rpc-commit').catch(() => {});
+        }
+        void withTimeout('operation-hint', channel?.send({
+          type: 'broadcast',
+          event: 'operation-hint',
+          payload: { revision: committed?.revision || null, operationId },
+        })).catch(() => {});
         return committed;
       }
       async function commitDocument({ operationId, structureEpoch = 0, baseRevision = keeper.confirmedRevision, documentOperation }) {
@@ -312,12 +324,16 @@
           Promise.resolve(journal?.remove?.(roomId, operationId)).catch(() => {});
           onLocalConfirmed(confirmedOperation);
         }
-        await recover('rpc-document-commit');
-        await withTimeout('document-operation-hint', channel?.send({
+        if (confirmation.status === 'gap' || confirmation.status === 'buffered' || confirmation.status === 'recovery') {
+          await recover('rpc-document-commit-gap');
+        } else {
+          void recover('rpc-document-commit').catch(() => {});
+        }
+        void withTimeout('document-operation-hint', channel?.send({
           type: 'broadcast',
           event: 'operation-hint',
           payload: { revision: committed.revision, operationId },
-        }));
+        })).catch(() => {});
         return committed;
       }
       async function syncFrom(afterRevision = keeper.confirmedRevision) {

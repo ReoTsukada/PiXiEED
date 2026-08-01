@@ -353,26 +353,29 @@ assert.equal(clientA.pixels[2], 0);
 assert.equal(clientB.pixels[12], 6);
 await drawAndConverge(clientB, 'fillGradient', [{ index: 3, paletteValue: 7 }]);
 assert.equal(clientA.pixels[3], 7);
-const largeFill = clientA.drawSolidFill(1000, 9000, 18);
+// This pixel-only harness covers the bounded path. Larger fills are one
+// raster_region_set document revision and are covered by the document
+// controller/asset tests instead of the retired multi-patch behavior.
+const largeFill = clientA.drawSolidFill(1000, 8000, 18);
 assert.equal(largeFill.status, 'accepted');
 await largeFill.promise;
 await converge();
-assert.equal(largeFill.operationIds.length, 2);
-assert.equal(clientB.pixels[9999], 18);
+assert.equal(largeFill.operationIds.length, 1);
+assert.equal(clientB.pixels[8999], 18);
 const largeFillUndo = clientA.controller.requestUndo(largeFill.entry);
 assert.equal(largeFillUndo.status, 'accepted');
-assert.equal(largeFillUndo.operationIds.length, 2);
+assert.equal(largeFillUndo.operationIds.length, 1);
 await largeFillUndo.promise;
 await converge();
-assert.equal(clientA.pixels[9999], 0);
-assert.equal(clientB.pixels[9999], 0);
+assert.equal(clientA.pixels[8999], 0);
+assert.equal(clientB.pixels[8999], 0);
 const largeFillRedo = clientA.controller.requestRedo(largeFill.entry);
 assert.equal(largeFillRedo.status, 'accepted');
-assert.equal(largeFillRedo.operationIds.length, 2);
+assert.equal(largeFillRedo.operationIds.length, 1);
 await largeFillRedo.promise;
 await converge();
-assert.equal(clientA.pixels[9999], 18);
-assert.equal(clientB.pixels[9999], 18);
+assert.equal(clientA.pixels[8999], 18);
+assert.equal(clientB.pixels[8999], 18);
 await drawAndConverge(clientB, 'eraser', [{ index: 1, paletteValue: 0 }]);
 assert.equal(clientA.pixels[1], 0);
 assert.equal(clientB.pixels[1], 0);

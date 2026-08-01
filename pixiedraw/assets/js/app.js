@@ -12204,7 +12204,30 @@
   }
 
   function getPiXiSyncCanvasForDelta(canvasId) {
-    return getProjectCanvasDocuments().find(canvas => canvas?.id === canvasId && Array.isArray(canvas.frames)) || null;
+    const exact = getProjectCanvasDocuments()
+      .find(canvas => canvas?.id === canvasId && Array.isArray(canvas.frames)) || null;
+    if (exact) return exact;
+    // A shared project has one authoritative output canvas. Older checkpoints
+    // can retain a peer-local canvas id; use the established canonical-id
+    // adoption path only for that sole-canvas case. Never redirect a delta to
+    // an arbitrary active canvas in a multi-canvas document.
+    const adopted = adoptSingleProjectCanvasId?.(canvasId) || null;
+    return adopted && Array.isArray(adopted.frames) ? adopted : null;
+  }
+
+  function rejectPiXiSyncStructureDelta(operation, reason, details = {}) {
+    const data = operation?.data || {};
+    console.warn(
+      '[pixisync:structure-delta]',
+      'result=rejected',
+      `reason=${String(reason || 'unknown')}`,
+      `action=${String(operation?.action || '')}`,
+      `canvasId=${String(data.canvasId || '')}`,
+      `from=${Number(data.fromWidth) || 0}x${Number(data.fromHeight) || 0}`,
+      `to=${Number(data.width) || 0}x${Number(data.height) || 0}`,
+      ...Object.entries(details).map(([key, value]) => `${key}=${String(value ?? '')}`)
+    );
+    return false;
   }
 
   function finalizePiXiSyncDeltaRender() {
@@ -12221,7 +12244,9 @@
   function applyPiXiSyncStructureDelta(operation) {
     const data = operation?.data || null;
     const canvas = data && getPiXiSyncCanvasForDelta(data.canvasId);
-    if (!canvas) return false;
+    if (!canvas) return rejectPiXiSyncStructureDelta(operation, 'canvas-not-found', {
+      availableCanvasIds: getProjectCanvasDocuments().map(item => item?.id || '').join(','),
+    });
     const frames = canvas.frames;
     const isActiveCanvas = getActiveProjectCanvasDocument()?.id === canvas.id;
     if (operation.action === 'layer_track_insert') {
@@ -12297,11 +12322,18 @@
       }
     } else if (operation.action === 'frame_insert') {
       const descriptor = data.frame;
-      if (!descriptor || frames.some(frame => frame?.id === descriptor.id)) return false;
+      if (!descriptor) return rejectPiXiSyncStructureDelta(operation, 'frame-descriptor-missing');
+      if (frames.some(frame => frame?.id === descriptor.id)) {
+        return rejectPiXiSyncStructureDelta(operation, 'frame-id-exists', { frameId: descriptor.id });
+      }
       const anchorIndex = data.afterFrameId === null ? -1 : frames.findIndex(frame => frame?.id === data.afterFrameId);
-      if (data.afterFrameId !== null && anchorIndex < 0) return false;
+      if (data.afterFrameId !== null && anchorIndex < 0) {
+        return rejectPiXiSyncStructureDelta(operation, 'frame-anchor-missing', { afterFrameId: data.afterFrameId });
+      }
       const layers = descriptor.layers.map(layer => makePiXiSyncLayerFromDescriptor(layer, canvas.width, canvas.height));
-      if (!layers.length || layers.some(layer => !layer)) return false;
+      if (!layers.length || layers.some(layer => !layer)) {
+        return rejectPiXiSyncStructureDelta(operation, 'frame-layer-descriptor-invalid', { frameId: descriptor.id });
+      }
       frames.splice(anchorIndex + 1, 0, {
         id: descriptor.id,
         name: String(descriptor.name || 'Frame'),
@@ -12388,11 +12420,16 @@
         clearSelection(); resizeCanvases();
       }
     } else if (operation.action === 'canvas_resize') {
-      if (canvas.width !== data.fromWidth || canvas.height !== data.fromHeight) return false;
+      if (canvas.width !== data.fromWidth || canvas.height !== data.fromHeight) {
+        return rejectPiXiSyncStructureDelta(operation, 'canvas-size-mismatch', {
+          currentWidth: canvas.width,
+          currentHeight: canvas.height,
+        });
+      }
       if (!canvasResizeWorkflowUtilsModule.resizeCanvasDocumentLayers(
         canvas, data.width, data.height,
         { offsetX: data.offsetX, offsetY: data.offsetY, palette: state.palette }
-      )) return false;
+      )) return rejectPiXiSyncStructureDelta(operation, 'canvas-resize-apply-failed');
       if (isActiveCanvas) {
         state.width = data.width;
         state.height = data.height;
@@ -12885,10 +12922,32 @@
         documentBridge: pixisyncDocumentBridge,
         writerStampUtils: pixisyncWriterStampUtils,
         onBlocked: details => {
-          console.warn('[pixisync:v1] local operation blocked', details?.reason || 'unknown');
+          const entry = details?.entry;
+          console.warn(
+            '[pixisync:v1] local operation blocked',
+            `reason=${String(details?.reason || 'unknown')}`,
+            `label=${String(entry?.historyLabel || entry?.label || '')}`,
+            `kind=${String(entry?.kind || '')}`
+          );
         },
         onRecoveryRequired: details => {
-          console.warn('[pixisync:v1] recovery required', details?.reason || 'unknown');
+          const operation = details?.operation;
+          const documentOperation = operation?.documentOperation;
+          const historySummary = details?.history || {};
+          console.warn(
+            '[pixisync:v1] recovery required',
+            `reason=${String(details?.reason || 'unknown')}`,
+            `revision=${String(operation?.revision || '')}`,
+            `operationId=${String(operation?.operationId || details?.operationId || '')}`,
+            `type=${String(documentOperation?.type || '')}`,
+            `action=${String(documentOperation?.action || '')}`,
+            `canvasId=${String(documentOperation?.data?.canvasId || operation?.canvasId || '')}`,
+            `historyLabel=${String(historySummary.label || '')}`,
+            `historyKind=${String(historySummary.kind || '')}`,
+            `runCount=${String(historySummary.runCount || 0)}`,
+            `changeCount=${String(historySummary.changeCount || 0)}`,
+            `rollbackScheduled=${String(details?.rollbackScheduled === true)}`
+          );
         },
       })
   ) || null;

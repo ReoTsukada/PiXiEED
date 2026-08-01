@@ -228,7 +228,7 @@ function createClient(server, actor, ordinal) {
     toDocumentOperation(entry, _label, kind, { direction = 'forward', rasterRegion = null } = {}) {
       if (entry?.failPrepare) throw new Error('forced_prepare_failure');
       if (kind === 'raster_region_set') {
-        assert.equal(rasterRegion, entry.rasterRegion, 'precomputed region must be reused');
+        if (rasterRegion) assert.equal(rasterRegion, entry.rasterRegion, 'precomputed forward region must be reused');
         return { documentOperation: structuredClone(entry.regionForward) };
       }
       const documentOperation = structuredClone(entry[direction] || entry.forward);
@@ -237,6 +237,30 @@ function createClient(server, actor, ordinal) {
     applyDocumentOperation(operation) {
       if (operation?.type === 'checkpoint_restore'
         && operation?.preparedCheckpoint?.verified !== true) return false;
+      if (operation?.type === 'raster_region_set'
+        && operation?.preparedRasterRegion?.verified !== true) return false;
+      if (operation?.type === 'structure_delta' && operation?.action === 'canvas_resize') {
+        if (Number(document?.width) !== Number(operation.data?.fromWidth)
+          || Number(document?.height) !== Number(operation.data?.fromHeight)) return false;
+        document = {
+          ...structuredClone(document),
+          width: operation.data.width,
+          height: operation.data.height,
+        };
+        return true;
+      }
+      if (operation?.type === 'structure_delta' && operation?.action === 'frame_insert') {
+        const frames = Array.isArray(document?.frames) ? document.frames : null;
+        const descriptor = operation.data?.frame;
+        if (!frames || !descriptor?.id || frames.some(frame => frame?.id === descriptor.id)) return false;
+        const anchorIndex = operation.data?.afterFrameId === null
+          ? -1
+          : frames.findIndex(frame => frame?.id === operation.data?.afterFrameId);
+        if (operation.data?.afterFrameId !== null && anchorIndex < 0) return false;
+        document = structuredClone(document);
+        document.frames.splice(anchorIndex + 1, 0, structuredClone(descriptor));
+        return true;
+      }
       document = structuredClone(operation);
       return true;
     },
@@ -278,10 +302,14 @@ function createClient(server, actor, ordinal) {
     clientId: `bbbbbbbb-bbbb-4bbb-8bbb-${String(ordinal).padStart(12, '0')}`,
     recoverOnSubscribe: false,
     prepareConfirmed: async operation => {
-      if (operation?.documentOperation?.type !== 'checkpoint_restore') return;
+      const type = operation?.documentOperation?.type;
+      if (type !== 'checkpoint_restore' && type !== 'raster_region_set') return;
       const prepared = { ...operation.documentOperation };
-      Object.defineProperty(prepared, 'preparedCheckpoint', {
-        value: Object.freeze({ verified: true, applied: true }), enumerable: false,
+      Object.defineProperty(prepared, type === 'checkpoint_restore' ? 'preparedCheckpoint' : 'preparedRasterRegion', {
+        value: Object.freeze(type === 'checkpoint_restore'
+          ? { verified: true, applied: true }
+          : { verified: true, changes: [{ x: 0, y: 0, paletteValue: 1 }] }),
+        enumerable: false,
       });
       operation.documentOperation = prepared;
     },
@@ -348,6 +376,42 @@ const checkpointCommit = owner.controller.handleCommittedHistoryEntry(checkpoint
 await checkpointCommit.promise;
 await converge();
 assert.equal(editor.document.type, 'checkpoint_restore');
+
+// A large raster edit and its guarded history apply must use the exact
+// confirmed operation carrying the non-enumerable verified asset marker.
+// Reusing the pre-commit JSON object here reproduces the production Undo bug.
+const regionReference = {
+  objectPath: 'rooms/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/raster-assets/abababab-abab-4bab-8bab-abababababab.pxra',
+  sha256Hex: 'cd'.repeat(32), byteLength: 32, codecVersion: 1, pixelFormat: 'indexed-mask-v1',
+};
+const regionOperation = {
+  version: 1, type: 'raster_region_set',
+  canvasId: 'canvas-1', frameId: 'frame-1', layerId: 'layer-1',
+  canvasWidth: 4, canvasHeight: 4,
+  x: 0, y: 0, width: 1, height: 1,
+  asset: regionReference,
+};
+const regionEntry = {
+  historyLabel: 'fill',
+  mutations: [
+    { ...TARGET, changes: Array.from({ length: 8192 }, (_, index) => ({ index, paletteValue: 1, beforePaletteValue: 0 })) },
+    { ...TARGET, changes: [{ index: 8192, paletteValue: 1, beforePaletteValue: 0 }] },
+  ],
+  rasterRegion: { bytes: new Uint8Array([1]), rect: { x: 0, y: 0, width: 1, height: 1 } },
+  regionForward: regionOperation,
+};
+// The fake mutation coordinates are irrelevant to this document-path test;
+// only the >1 segment routing decision and verified marker hand-off matter.
+const regionForward = owner.controller.handleCommittedHistoryEntry(regionEntry, 'fill');
+assert.equal(regionForward.status, 'accepted');
+await regionForward.promise;
+await converge();
+assert.equal(editor.document.type, 'raster_region_set');
+const regionUndo = owner.controller.requestUndo(regionEntry);
+assert.equal(regionUndo.status, 'accepted');
+await regionUndo.promise;
+await converge();
+assert.equal(owner.document.type, 'raster_region_set', 'self-confirmed region Undo receives its verified marker');
 
 // Visibility is a per-user preference; canonical metadata is gated and synced.
 assert.equal(owner.controller.canBeginLocalOperation('setLayerVisibility'), true);
@@ -418,6 +482,99 @@ const rejected = owner.controller.handleCommittedHistoryEntry({
 await assert.rejects(rejected.promise, /forced_document_failure/);
 assert.deepEqual(owner.document, beforeRejected);
 assert.equal(owner.controller.snapshot().pendingDocumentOperation, false);
+
+// Preconditioned structure deltas must roll back a losing optimistic local
+// resize before applying the winning remote resize from the same base.
+const resizeBase = { width: 4, height: 4, tag: 'base' };
+const localResizeTarget = { ...resizeBase, width: 6, tag: 'local-loser' };
+const remoteResizeOperation = {
+  version: 1, type: 'structure_delta', action: 'canvas_resize',
+  data: {
+    canvasId: 'canvas-1', fromWidth: 4, fromHeight: 4, width: 3, height: 4, offsetX: 0, offsetY: 0,
+    inverseAsset: {
+      objectPath: 'rooms/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/document-checkpoints/edededed-eded-4ded-8ded-edededededed.pxd',
+      sha256Hex: 'ef'.repeat(32), byteLength: 32, codecVersion: 1,
+    },
+  },
+};
+server.delayNextDocumentActor = 'owner';
+owner.document = localResizeTarget;
+owner.authoritativeRecoveryDocument = { ...resizeBase, width: 3, tag: 'remote-winner' };
+const losingResize = owner.controller.handleCommittedHistoryEntry({
+  historyLabel: 'resizeCanvas',
+  forward: {
+    version: 1, type: 'structure_delta', action: 'canvas_resize',
+    data: { canvasId: 'canvas-1', fromWidth: 4, fromHeight: 4, width: 6, height: 4, offsetX: 0, offsetY: 0 },
+  },
+  rollbackTo: resizeBase,
+}, 'resizeCanvas');
+await new Promise(resolve => setTimeout(resolve, 0));
+editor.document = resizeBase;
+const winningResize = editor.controller.handleCommittedHistoryEntry({
+  historyLabel: 'resizeCanvas',
+  forward: remoteResizeOperation,
+  rollbackTo: resizeBase,
+}, 'resizeCanvas');
+await winningResize.promise;
+await owner.realtimeClient.recover('remote-resize-wins-race');
+assert.equal(owner.document.width, 3, 'remote resize applies after losing optimistic resize rollback');
+server.releaseDelayedDocument();
+await assert.rejects(losingResize.promise, /document-operation-(not-confirmed|invalidated-by-remote)|base_revision_mismatch/);
+assert.equal(owner.document.width, 3);
+
+// Frame insertion has the same positional precondition as resize: when the
+// remote insert wins, the local optimistic frame must be removed first so the
+// confirmed insertion is applied exactly once at the shared anchor.
+const frameRaceBase = {
+  frames: [{
+    id: 'frame-1', name: 'Frame 1', duration: 100,
+    layers: [{ id: 'layer-1', trackId: 'track-1', name: 'Layer 1', opacity: 1, blendMode: 'normal' }],
+  }],
+};
+const makeInsertedFrame = (frameId, layerId, name) => ({
+  id: frameId,
+  name,
+  duration: 100,
+  layers: [{ id: layerId, trackId: 'track-1', name: 'Layer 1', opacity: 1, blendMode: 'normal' }],
+});
+const localFrame = makeInsertedFrame('frame-local', 'layer-local', 'Local loser');
+const remoteFrame = makeInsertedFrame('frame-remote', 'layer-remote', 'Remote winner');
+const localFrameOperation = {
+  version: 1, type: 'structure_delta', action: 'frame_insert',
+  data: { canvasId: 'canvas-1', afterFrameId: 'frame-1', frame: localFrame },
+};
+const remoteFrameOperation = {
+  version: 1, type: 'structure_delta', action: 'frame_insert',
+  data: { canvasId: 'canvas-1', afterFrameId: 'frame-1', frame: remoteFrame },
+};
+server.delayNextDocumentActor = 'owner';
+owner.document = { ...structuredClone(frameRaceBase), frames: [...frameRaceBase.frames, localFrame] };
+owner.authoritativeRecoveryDocument = {
+  ...structuredClone(frameRaceBase),
+  frames: [...frameRaceBase.frames, remoteFrame],
+};
+const losingFrameInsert = owner.controller.handleCommittedHistoryEntry({
+  historyLabel: 'addFrame',
+  forward: localFrameOperation,
+  rollbackTo: frameRaceBase,
+}, 'addFrame');
+await new Promise(resolve => setTimeout(resolve, 0));
+editor.document = frameRaceBase;
+const winningFrameInsert = editor.controller.handleCommittedHistoryEntry({
+  historyLabel: 'addFrame',
+  forward: remoteFrameOperation,
+  rollbackTo: frameRaceBase,
+}, 'addFrame');
+await winningFrameInsert.promise;
+await owner.realtimeClient.recover('remote-frame-insert-wins-race');
+assert.deepEqual(owner.document.frames.map(frame => frame.id), ['frame-1', 'frame-remote']);
+server.releaseDelayedDocument();
+await assert.rejects(losingFrameInsert.promise, /document-operation-(not-confirmed|invalidated-by-remote)|base_revision_mismatch/);
+assert.deepEqual(
+  owner.document.frames.map(frame => frame.id),
+  ['frame-1', 'frame-remote'],
+  'remote frame insertion applies once after the losing optimistic insertion rolls back',
+);
 
 // If another document revision wins while our commit is pending, the winning
 // remote state stays authoritative; the stale local catch must not restore its

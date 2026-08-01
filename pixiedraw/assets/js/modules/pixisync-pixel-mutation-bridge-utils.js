@@ -156,14 +156,12 @@
         return false;
       }
       let valueOffset = 0;
-      let previousEnd = 0;
       for (let offset = 0; offset < entry.runs.length; offset += 2) {
         const start = Number(entry.runs[offset]);
         const length = Number(entry.runs[offset + 1]);
         if (
           !Number.isSafeInteger(start)
           || !Number.isSafeInteger(length)
-          || start < previousEnd
           || length < 1
           || start < 0
           || start + length > Number(entry.width) * Number(entry.height)
@@ -180,7 +178,6 @@
             { paletteIndex: entry.afterPaletteIndex, direct: null }
           )) return false;
         }
-        previousEnd = start + length;
       }
       return valueOffset === entry.beforeIndices.length;
     }
@@ -317,11 +314,19 @@
       return mutations?.length === 1 ? mutations[0] : null;
     }
 
-    function toRasterRegionAsset(entry, { useBefore = false } = {}) {
-      const mutations = toPixelMutations(entry);
-      if (!mutations?.length) return null;
-      const base = mutations[0];
-      const changes = mutations.flatMap(mutation => mutation.changes).map(change => ({
+    function toRasterRegionAsset(entry, { useBefore = false, mutations = null } = {}) {
+      const resolvedMutations = Array.isArray(mutations) ? mutations : toPixelMutations(entry);
+      if (!resolvedMutations?.length) return null;
+      const base = resolvedMutations[0];
+      if (resolvedMutations.some(mutation => (
+        mutation?.canvasId !== base.canvasId
+        || mutation?.frameId !== base.frameId
+        || mutation?.layerId !== base.layerId
+        || Number(mutation?.canvasWidth) !== Number(base.canvasWidth)
+        || Number(mutation?.canvasHeight) !== Number(base.canvasHeight)
+        || !Array.isArray(mutation?.changes)
+      ))) return null;
+      const changes = resolvedMutations.flatMap(mutation => mutation.changes).map(change => ({
         ...change,
         paletteValue: useBefore ? change.beforePaletteValue : change.paletteValue,
       }));

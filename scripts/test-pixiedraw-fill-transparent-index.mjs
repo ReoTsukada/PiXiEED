@@ -315,6 +315,21 @@ assert.deepEqual(Array.from(historyLayer.indices), [0, 0, 2, 0, 0, 2, 2, 0, 0, 2
 assert.equal(fillHistoryUtils.applyPixelPatchHistoryEntry(scopedFill, 'redo'), true);
 assert.deepEqual(Array.from(historyLayer.indices), [1, 1, 2, 1, 1, 2, 2, 1, 1, 2], 'redo reapplies the same run patch');
 
+historyStore.pending = {
+  __historyEntryType: 'pixelPatch', label: 'fill', canvasId: 'canvas-fill', frameId: 'frame-fill', layerId: 'layer-fill',
+  width: 5, height: 2, dirty: false, changesByIndex: new Map(),
+};
+const traversalFill = fillHistoryUtils.preparePendingSolidFillRuns(
+  historyLayer,
+  new Int32Array([7, 2, 0, 2, 3, 2]),
+  3
+);
+assert.deepEqual(
+  Array.from(traversalFill.runs),
+  [0, 2, 3, 2, 7, 2],
+  'solid fill history must store traversal-discovered runs in canonical coordinate order'
+);
+
 historyStore.pending = fillHistoryUtils.createRasterTilePatchPending('pen');
 assert.equal(historyStore.pending?.kind, 'raster-tile-patch-pending', 'large brushes must retain touched tiles only');
 assert.equal(fillHistoryUtils.capturePendingRasterTilesForRect(historyLayer, 0, 0, 2, 1), true);

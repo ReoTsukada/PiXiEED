@@ -37,6 +37,8 @@ try {
   }, pixelPoint);
   assert.notDeepEqual(pixelBeforeShrink, [0, 0, 0, 0], 'a pixel outside the future cropped area is drawn');
   const after = { width: before.width + 7, height: before.height + 5 };
+  await page.click('.pixieed-common-tabbar__button[aria-label="設定"]');
+  await page.waitForSelector('#panelSettings', { state: 'visible' });
   await page.fill('#canvasExpandRight', String(after.width - before.width));
   await page.fill('#canvasExpandBottom', String(after.height - before.height));
   assert.equal(await page.isEnabled('#applySpriteScale'), true, 'resize apply is enabled after changing dimensions');
@@ -51,7 +53,7 @@ try {
   }, after, { timeout: 15_000 });
   assert.equal(await page.isEnabled('#undoAction'), true, 'local resize records an undo entry');
 
-  await page.click('#undoAction');
+  await page.click('.pixieed-common-tabbar__button[aria-label="元に戻す"]');
   await page.waitForFunction(previous => {
     const canvas = document.getElementById('drawingCanvas');
     return canvas?.width === previous.width && canvas?.height === previous.height;
@@ -59,7 +61,7 @@ try {
   assert.deepEqual(await readCanvasSize(), before, 'undo restores the original canvas dimensions');
   assert.equal(await page.isEnabled('#redoAction'), true, 'undo exposes resize redo');
 
-  await page.click('#redoAction');
+  await page.click('.pixieed-common-tabbar__button[aria-label="やり直す"]');
   await page.waitForFunction(next => {
     const canvas = document.getElementById('drawingCanvas');
     return canvas?.width === next.width && canvas?.height === next.height;
@@ -74,17 +76,17 @@ try {
     const canvas = document.getElementById('drawingCanvas');
     return canvas?.width === next.width && canvas?.height === next.height;
   }, widthOnly, { timeout: 15_000 });
-  await page.click('#undoAction');
+  await page.click('.pixieed-common-tabbar__button[aria-label="元に戻す"]');
   await page.waitForFunction(previous => {
     const canvas = document.getElementById('drawingCanvas');
     return canvas?.width === previous.width && canvas?.height === previous.height;
   }, after, { timeout: 15_000 });
-  await page.click('#redoAction');
+  await page.click('.pixieed-common-tabbar__button[aria-label="やり直す"]');
   await page.waitForFunction(next => {
     const canvas = document.getElementById('drawingCanvas');
     return canvas?.width === next.width && canvas?.height === next.height;
   }, widthOnly, { timeout: 15_000 });
-  await page.click('#undoAction');
+  await page.click('.pixieed-common-tabbar__button[aria-label="元に戻す"]');
   await page.waitForFunction(previous => {
     const canvas = document.getElementById('drawingCanvas');
     return canvas?.width === previous.width && canvas?.height === previous.height;
@@ -106,7 +108,7 @@ try {
     const canvas = document.getElementById('drawingCanvas');
     return canvas?.width === next.width && canvas?.height === next.height;
   }, cropped, { timeout: 15_000 });
-  await page.click('#undoAction');
+  await page.click('.pixieed-common-tabbar__button[aria-label="元に戻す"]');
   await page.waitForFunction(previous => {
     const canvas = document.getElementById('drawingCanvas');
     return canvas?.width === previous.width && canvas?.height === previous.height;

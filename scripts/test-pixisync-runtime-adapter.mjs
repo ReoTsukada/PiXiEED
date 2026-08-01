@@ -71,6 +71,8 @@ class LifecycleServer {
     this.emitClosedOnStop = false;
     this.failOpen = false;
     this.inviteCreateCalls = 0;
+    this.rasterUploads = new Map();
+    this.committedRasterUploads = new Set();
   }
 
   manifest(role) {
@@ -146,6 +148,29 @@ class LifecycleServer {
           }
           if (name === 'pixisync_list_stale_document_checkpoint_uploads') {
             return { data: [], error: null };
+          }
+          if (name === 'pixisync_prepare_raster_region_upload') {
+            const storagePath = `rooms/${ROOM_ID}/raster-assets/${params.p_upload_id}.pxra`;
+            this.rasterUploads.set(params.p_upload_id, storagePath);
+            return { data: [{
+              upload_id: params.p_upload_id,
+              storage_path: storagePath,
+              base_revision: params.p_base_revision,
+              structure_epoch: params.p_structure_epoch,
+            }], error: null };
+          }
+          if (name === 'pixisync_abort_raster_region_upload') {
+            const path = this.rasterUploads.get(params.p_upload_id) || '';
+            return {
+              data: path && !this.committedRasterUploads.has(params.p_upload_id)
+                ? [{ storage_path: path }]
+                : [],
+              error: null,
+            };
+          }
+          if (name === 'pixisync_finalize_raster_region_upload_cleanup') {
+            this.rasterUploads.delete(params.p_upload_id);
+            return { data: true, error: null };
           }
           if (name === 'pixisync_abort_document_checkpoint_upload') {
             return { data: true, error: null };
@@ -328,6 +353,37 @@ assert.deepEqual(ownerBindings.get('project-owner'), {
   replacedProjectKey: '',
 });
 assert.equal(owner.restored, '');
+const regionShape = {
+  canvasId: 'canvas-1', frameId: 'frame-1', layerId: 'layer-1',
+  canvasWidth: 4, canvasHeight: 4,
+  rect: { x: 0, y: 0, width: 1, height: 1 },
+  bytes: new Uint8Array([0x50, 0x58, 0x52, 0x41, 1, 0, 0, 1]),
+  pixelFormat: 'indexed-mask-v1',
+};
+const committedRegionId = randomUUID();
+const committedRegion = await owner.bridge.runtime.prepareRasterRegionAsset({
+  operationId: committedRegionId,
+  structureEpoch: 0,
+  region: regionShape,
+});
+const committedRegionPath = committedRegion.documentOperation.asset.objectPath;
+assert.ok(server.objects.has(committedRegionPath));
+server.committedRasterUploads.add(committedRegionId);
+await committedRegion.cleanup();
+assert.ok(
+  server.objects.has(committedRegionPath),
+  'cleanup must never remove an asset once the abort RPC no longer claims it'
+);
+const stagedRegionId = randomUUID();
+const stagedRegion = await owner.bridge.runtime.prepareRasterRegionAsset({
+  operationId: stagedRegionId,
+  structureEpoch: 0,
+  region: regionShape,
+});
+const stagedRegionPath = stagedRegion.documentOperation.asset.objectPath;
+assert.ok(server.objects.has(stagedRegionPath));
+await stagedRegion.cleanup();
+assert.equal(server.objects.has(stagedRegionPath), false, 'an uncommitted claimed upload remains safely removable');
 const checkpointOperationId = randomUUID();
 const preparedDocumentCheckpoint = await owner.adapter.commands.prepareCheckpointOperation({
   operationId: checkpointOperationId,

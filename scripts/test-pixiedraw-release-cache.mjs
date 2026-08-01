@@ -17,8 +17,17 @@ assert.equal(release.buildId, buildId, 'version.json must advertise the same dep
 assert.match(indexHtml, new RegExp(`build-info\\.js\\?v=${buildId}`));
 assert.match(serviceWorker, new RegExp(`build-info\\.js\\?v=${buildId}`));
 assert.match(indexHtml, /pixisync-operation-codec-utils\.js\?v=20260801-document-payload2/);
-assert.match(indexHtml, /pixisync-realtime-client-utils\.js\?v=20260801-document-payload2/);
-assert.match(indexHtml, /pixisync-document-operation-utils\.js\?v=20260801-structure-checkpoint2/);
+for (const moduleName of [
+  'pixel-patch-history-utils',
+  'pixisync-realtime-client-utils',
+  'pixisync-pixel-mutation-bridge-utils',
+  'pixisync-collaboration-controller-utils',
+  'pixisync-runtime-adapter-utils',
+]) {
+  assert.match(indexHtml, new RegExp(`${moduleName}\\.js\\?v=20260801-sync-convergence1`));
+}
+assert.match(indexHtml, /pixisync-document-operation-utils\.js\?v=20260801-adaptive-output2/);
+assert.match(indexHtml, /app\.js\?v=20260801-sync-convergence1/);
 assert.match(serviceWorker, /fetch\(request, \{ cache: 'no-store' \}\)/);
 assert.match(app, /serviceWorker\.register\(swUrl, \{ updateViaCache: 'none' \}\)/);
 assert.match(app, /!startupReady && !controllerChangeReloaded && !isProjectCommandLocked\(\)/);

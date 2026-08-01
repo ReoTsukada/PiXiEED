@@ -259,6 +259,30 @@ assert.deepEqual(largeFillMutations[1].changes.at(-1), {
   paletteValue: 9,
   beforePaletteValue: 0,
 });
+const traversalOrderedFill = largeBridge.toPixelMutations({
+  __historyEntryType: 'pixelPatch',
+  kind: 'solid-fill-runs',
+  historyLabel: 'fill',
+  canvasId: 'canvas-a', frameId: 'frame-a', layerId: 'layer-a',
+  width: 4, height: 3,
+  // A connected fill started on the middle row discovers rows in traversal,
+  // not coordinate, order. This is a valid local history entry.
+  runs: new Int32Array([4, 4, 8, 4, 0, 4]),
+  beforeIndices: new Uint8Array(12),
+  beforeDirect: null,
+  afterPaletteIndex: 9,
+});
+assert.deepEqual(
+  traversalOrderedFill.flatMap(mutation => mutation.changes.map(change => change.index)),
+  Array.from({ length: 12 }, (_, index) => index),
+  'connected fill traversal order must canonicalize to the same pixel set'
+);
+assert.equal(largeBridge.toPixelMutations({
+  __historyEntryType: 'pixelPatch', kind: 'solid-fill-runs', historyLabel: 'fill',
+  canvasId: 'canvas-a', frameId: 'frame-a', layerId: 'layer-a', width: 4, height: 2,
+  runs: new Int32Array([0, 4, 3, 2]),
+  beforeIndices: new Uint8Array(6), beforeDirect: null, afterPaletteIndex: 9,
+}), null, 'overlapping fill runs remain invalid after canonical sorting');
 const largeRegion = largeBridge.toRasterRegionAsset({
   __historyEntryType: 'pixelPatch',
   kind: 'solid-fill-runs',
@@ -273,6 +297,8 @@ const largeRegion = largeBridge.toRasterRegionAsset({
 assert.equal(largeRegion.changedCount, largeFillCount);
 assert.deepEqual(largeRegion.rect, { x: 0, y: 0, width: 100, height: 90 });
 assert.ok(largeRegion.bytes.length < largeFillCount + 2000);
+const reusedLargeRegion = largeBridge.toRasterRegionAsset(null, { mutations: largeFillMutations });
+assert.equal(reusedLargeRegion.changedCount, largeFillCount, 'pre-expanded fill mutations are reused for one region encode');
 const indexedPalette = {
   2: { r: 20, g: 40, b: 60, a: 255 },
   3: { r: 30, g: 60, b: 90, a: 255 },

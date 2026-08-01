@@ -162,6 +162,32 @@
           pendingDocument.invalidatedByRemote = true;
           invalidatedLocalDocument = pendingDocument;
           runtime.realtimeClient.discardPendingOperation?.(pendingDocument.operationId);
+          // Forward document edits are already visible locally while their
+          // exact-base commit is pending. Restore their before-state before
+          // applying the winning remote delta; otherwise preconditioned
+          // operations such as resize/frame insert are evaluated against the
+          // losing optimistic document and poison this revision on every retry.
+          if (pendingDocument.direction === 'forward') {
+            let rolledBack = false;
+            try {
+              rolledBack = documentBridge?.rollbackRejectedDocumentEntry?.(
+                pendingDocument.entry
+              ) === true;
+            } catch (_) {
+              rolledBack = false;
+            }
+            if (!rolledBack) {
+              Promise.resolve().then(() => documentBridge?.requestAuthoritativeRecovery?.(
+                'remote-document-invalidated-unrollbackable-local-document'
+              )).catch(() => {});
+              onRecoveryRequired({
+                reason: 'remote-document-local-rollback-failed',
+                operation,
+                pendingOperationId: pendingDocument.operationId,
+              });
+              throw new Error('PiXiSYNC controller: remote-document-local-rollback-failed');
+            }
+          }
         }
         if (!localDocument && (pendingOptimistic.size || pendingGuarded.size)) {
           const invalidatedEntries = new Set();
@@ -188,6 +214,7 @@
           }
         } else {
           pendingDocument.confirmed = true;
+          pendingDocument.confirmedOperation = operation.documentOperation;
           if (pendingDocument.entry && typeof pendingDocument.entry === 'object') {
             const previous = historyMetadata.get(pendingDocument.entry) || {};
             const key = pendingDocument.direction === 'undo'
@@ -333,6 +360,19 @@
       return { status: 'rejected', reason, promise: Promise.resolve(null) };
     }
 
+    function summarizeHistoryEntry(entry, label = entry?.historyLabel) {
+      return {
+        label: String(label || ''),
+        kind: String(entry?.kind || ''),
+        width: Number(entry?.width) || 0,
+        height: Number(entry?.height) || 0,
+        changeCount: Array.isArray(entry?.changes) ? entry.changes.length : 0,
+        runCount: entry?.runs?.length ? Math.floor(entry.runs.length / 2) : 0,
+        beforeValueCount: Number(entry?.beforeIndices?.length) || 0,
+        tileCount: Array.isArray(entry?.tiles) ? entry.tiles.length : 0,
+      };
+    }
+
     function handleCommittedHistoryEntry(entry, label = entry?.historyLabel) {
       if (!runtime) return { status: 'disabled', promise: Promise.resolve(null) };
       const documentKind = documentBridge?.classifyHistoryLabel?.(String(label || '')) || '';
@@ -344,14 +384,34 @@
       if (!sessionCanDraw()) return reject('session-not-active', entry);
       const mutations = mutationBridge.toPixelMutations(entry);
       if (!mutations?.length) {
-        onRecoveryRequired({ reason: 'unsupported-confirmed-history-entry', entry });
+        // This callback runs from inside commitHistory. Defer rollback until
+        // that transaction has finished updating its own arrays/timelapse;
+        // mutating history.past re-entrantly can persist a discarded entry.
+        Promise.resolve().then(async () => {
+          let rolledBack = false;
+          try {
+            rolledBack = documentBridge?.rollbackRejectedDocumentEntry?.(entry) === true;
+          } catch (_) {
+            rolledBack = false;
+          }
+          if (!rolledBack) {
+            await documentBridge?.requestAuthoritativeRecovery?.(
+              'unsupported-confirmed-history-entry'
+            );
+          }
+        }).catch(() => {});
+        onRecoveryRequired({
+          reason: 'unsupported-confirmed-history-entry',
+          rollbackScheduled: true,
+          history: summarizeHistoryEntry(entry, label),
+        });
         return reject('unsupported-confirmed-history-entry', entry);
       }
       // Large finalized raster edits must be one ordered revision. Splitting
       // them into 8192-cell commits exposes partial fills/pastes and permits a
       // structural edit to interleave between chunks.
       if (mutations.length > 1) {
-        const rasterRegion = mutationBridge.toRasterRegionAsset?.(entry) || null;
+        const rasterRegion = mutationBridge.toRasterRegionAsset?.(entry, { mutations }) || null;
         // Never fall back to multiple ordered commits: another structural
         // operation could interleave and expose only part of this raster edit.
         return handleCommittedDocumentEntry(entry, label, 'raster_region_set', { rasterRegion });
@@ -412,6 +472,7 @@
         label,
         direction: options.direction || 'forward',
         confirmed: false,
+        confirmedOperation: null,
       };
       updateSessionPendingCount();
       let cleanupPreparedDocument = null;
@@ -459,14 +520,38 @@
         });
         if (!pendingDocument?.confirmed) throw new Error('document-operation-not-confirmed');
         if (options.applyLocalAfterConfirm === true) {
-          if (documentBridge.applyDocumentOperation?.(prepared.documentOperation) !== true) {
+          const confirmedDocumentOperation = pendingDocument.confirmedOperation
+            || prepared.documentOperation;
+          if (documentBridge.applyDocumentOperation?.(confirmedDocumentOperation) !== true) {
             throw new Error('local-document-history-apply-failed');
           }
         }
         return { operationId, structureEpoch: runtime.structureEpoch };
       })().catch(async error => {
-        try { await cleanupPreparedDocument?.(); } catch (_) {}
-        if (pendingDocument?.operationId === operationId && pendingDocument.confirmed) {
+        const confirmed = pendingDocument?.operationId === operationId
+          && pendingDocument.confirmed;
+        // Once the revision is committed, its immutable asset belongs to the
+        // ordered room history. It must never be removed by local post-confirm
+        // handling, even when local apply/recovery fails.
+        if (!confirmed) {
+          try { await cleanupPreparedDocument?.(); } catch (_) {}
+        }
+        if (confirmed) {
+          if (error?.message === 'local-document-history-apply-failed') {
+            retainDocumentLockForRecovery = true;
+            const recovered = await documentBridge?.requestAuthoritativeRecovery?.(
+              'local-document-history-apply-failed'
+            );
+            if (recovered === true) {
+              return { operationId, structureEpoch: runtime.structureEpoch };
+            }
+            onRecoveryRequired({
+              reason: 'local-document-history-apply-failed',
+              error,
+              operationId,
+            });
+            throw error;
+          }
           // The DB row and ordered local confirmation already succeeded. A
           // post-confirm tail/broadcast failure must not turn success into a
           // local rollback or a stuck history operation.
