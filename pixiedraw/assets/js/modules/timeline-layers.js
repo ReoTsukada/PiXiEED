@@ -696,6 +696,27 @@
     return !history.pending;
   }
 
+  // Keep the collaboration representation deliberately separate from the
+  // local Undo snapshot.  The operation controller can publish this compact
+  // identity/anchor record after commit without serializing the raster again.
+  // Do not use this for paste: pasted pixels do not necessarily exist in the
+  // shared document at the operation base revision.
+  function recordPendingPiXiSyncStructureDelta(action, data, inverseData = null) {
+    if (!history.pending || typeof history.pending !== 'object') return false;
+    const canvasId = String(getActiveProjectCanvasDocument?.()?.id || '');
+    if (!canvasId || !action || !data || typeof data !== 'object') return false;
+    history.pending.pixisyncStructureDelta = {
+      action: String(action),
+      data: { canvasId, ...data },
+      // Local history carries the inverse order; the published forward record
+      // remains the minimal semantic delta.
+      ...(inverseData && typeof inverseData === 'object'
+        ? { inverseData: { canvasId, ...inverseData } }
+        : {}),
+    };
+    return true;
+  }
+
   function duplicateSelectedTimelineFrames() {
     const selectedFrameIndexes = getTimelineSelectedFrameIndexes();
     if (!selectedFrameIndexes.length) {
@@ -720,22 +741,27 @@
     const preferredLayerIndex = getActiveLayerIndex();
     const useCopyOnWriteRaster = Number(state.rasterModelVersion) >= 1
       && typeof cloneFrameWithSharedRaster === 'function';
-    const duplicatedFrames = selectedFrameIndexes
+    const duplicatedFrameRecords = selectedFrameIndexes
       .map(index => {
         const sourceFrame = state.frames[index];
+        if (!sourceFrame?.id) return null;
+        let frame = null;
         if (useCopyOnWriteRaster) {
-          return cloneFrameWithSharedRaster(sourceFrame, state.width, state.height);
+          frame = cloneFrameWithSharedRaster(sourceFrame, state.width, state.height);
+        } else {
+          const snapshot = snapshotFrameForClipboard(sourceFrame, state.width, state.height);
+          frame = snapshot
+            ? createFrameFromClipboardSnapshot(snapshot, state.width, state.height)
+            : null;
         }
-        const snapshot = snapshotFrameForClipboard(sourceFrame, state.width, state.height);
-        return snapshot
-          ? createFrameFromClipboardSnapshot(snapshot, state.width, state.height)
-          : null;
+        return frame ? { sourceFrame, frame } : null;
       })
       .filter(Boolean)
       .map((frame, offset) => {
-        frame.name = getDefaultFrameName(insertIndex + offset + 1);
+        frame.frame.name = getDefaultFrameName(insertIndex + offset + 1);
         return frame;
       });
+    const duplicatedFrames = duplicatedFrameRecords.map(record => record.frame);
     if (!duplicatedFrames.length) {
       return false;
     }
@@ -744,6 +770,16 @@
     }
     beginHistory('duplicateFrame');
     state.frames.splice(insertIndex, 0, ...duplicatedFrames);
+    recordPendingPiXiSyncStructureDelta('frame_clone', {
+      afterFrameId: insertIndex > 0 ? String(state.frames[insertIndex - 1]?.id || '') : null,
+      clones: duplicatedFrameRecords.map(({ sourceFrame, frame }) => ({
+        sourceFrameId: String(sourceFrame.id),
+        frameId: String(frame.id || ''),
+        name: String(frame.name || 'Frame'),
+        duration: Math.max(1, Number(frame.duration) || 1),
+        layerIds: (frame.layers || []).map(layer => String(layer?.id || '')),
+      })),
+    });
     clearPendingMultiAssignmentMoveRequests();
     state.activeFrame = insertIndex;
     const activeDuplicatedFrame = state.frames[insertIndex];
@@ -793,17 +829,24 @@
       return false;
     }
     const insertIndex = selectedLayerIndexes[selectedLayerIndexes.length - 1] + 1;
+    const activeFrameBeforeDuplicate = getActiveFrame();
+    const afterTrackId = insertIndex > 0
+      ? String(activeFrameBeforeDuplicate?.layers?.[insertIndex - 1]?.trackId || '')
+      : null;
     const trackSnapshots = selectedLayerIndexes.map(layerIndex => ({
+      sourceTrackId: String(activeFrameBeforeDuplicate?.layers?.[layerIndex]?.trackId || ''),
       layers: state.frames.map(frame => snapshotLayerForClipboard(frame?.layers?.[layerIndex], state.width, state.height)),
     }));
     if (!trackSnapshots.length) {
       return false;
     }
     beginHistory('duplicateLayer');
+    const clones = [];
     trackSnapshots.forEach((track, offset) => {
       const layerSnapshots = Array.isArray(track?.layers) ? track.layers : [];
       const fallbackLayerSnapshot = layerSnapshots.find(Boolean) || null;
       let addedTrackId = '';
+      const cells = [];
       state.frames.forEach((frame, frameIndex) => {
         if (!frame || !Array.isArray(frame.layers)) {
           return;
@@ -814,8 +857,11 @@
         });
         addedTrackId = newLayer.trackId;
         frame.layers.splice(insertIndex + offset, 0, newLayer);
+        cells.push({ frameId: String(frame.id || ''), layerId: String(newLayer.id || '') });
       });
+      clones.push({ sourceTrackId: track.sourceTrackId, trackId: addedTrackId, cells });
     });
+    recordPendingPiXiSyncStructureDelta('layer_track_clone', { afterTrackId, clones });
     clearPendingMultiAssignmentMoveRequests();
     const insertedIndexes = trackSnapshots.map((_, offset) => insertIndex + offset);
     const activeFrame = getActiveFrame();
@@ -1189,6 +1235,8 @@
       const activeLayerRef = activeFrameForLayerMove && activeLayerIndex >= 0
         ? activeFrameForLayerMove.layers[activeLayerIndex]
         : null;
+      const previousTrackIds = (activeFrameForLayerMove?.layers || [])
+        .map(layer => String(layer?.trackId || ''));
       beginHistory(offset < 0 ? 'moveLayerGroupUp' : 'moveLayerGroupDown');
       const moveResult = moveLayerIndexesByOffset(selectedLayers, offset);
       if (!moveResult.moved) {
@@ -1210,6 +1258,9 @@
       timelineSelection.frameIndexes.clear();
       timelineSelection.slotKeys.clear();
       normalizeTimelineSelectionState();
+      recordPendingPiXiSyncStructureDelta('layer_order', {
+        trackIds: (getActiveFrame()?.layers || []).map(layer => String(layer?.trackId || '')),
+      }, { trackIds: previousTrackIds });
       markHistoryDirty();
       scheduleSessionPersist();
       renderFrameList();
@@ -1224,6 +1275,7 @@
     const currentIndex = getActiveLayerIndex();
     if (currentIndex < 0) return;
     const activeTrackId = getActiveLayerTrackId();
+    const previousTrackIds = (activeFrame.layers || []).map(layer => String(layer?.trackId || ''));
     beginHistory(offset < 0 ? 'moveLayerUp' : 'moveLayerDown');
     const moveResult = moveLayerIndexesByOffset([currentIndex], offset);
     if (!moveResult.moved) {
@@ -1236,6 +1288,9 @@
     if (updatedActiveLayer) {
       state.activeLayer = updatedActiveLayer.id;
     }
+    recordPendingPiXiSyncStructureDelta('layer_order', {
+      trackIds: (getActiveFrame()?.layers || []).map(layer => String(layer?.trackId || '')),
+    }, { trackIds: previousTrackIds });
     markHistoryDirty();
     scheduleSessionPersist();
     renderFrameList();
@@ -1277,6 +1332,7 @@
     const selectedFrames = getTimelineSelectedFrameIndexes();
     const frameIndexesToMove = selectedFrames.length ? selectedFrames : [currentIndex];
     const activeFrameRef = state.frames[currentIndex];
+    const previousFrameIds = state.frames.map(frame => String(frame?.id || ''));
     beginHistory(offset < 0 ? 'moveFrameLeft' : 'moveFrameRight');
     const moveResult = moveFrameIndexesByOffset(frameIndexesToMove, offset);
     if (!moveResult.moved) {
@@ -1296,6 +1352,9 @@
       timelineSelection.slotKeys.clear();
       normalizeTimelineSelectionState();
     }
+    recordPendingPiXiSyncStructureDelta('frame_order', {
+      frameIds: state.frames.map(frame => String(frame?.id || '')),
+    }, { frameIds: previousFrameIds });
     markHistoryDirty();
     scheduleSessionPersist();
     renderFrameList();

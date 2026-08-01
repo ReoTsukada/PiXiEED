@@ -17,6 +17,15 @@
   ]);
   const LAYER_PROPERTY_LABELS = new Set(['setLayerOpacity', 'setLayerBlendMode']);
   const FRAME_PROPERTY_LABELS = new Set(['setFrameFps', 'setAllFrameFps']);
+  const STRUCTURE_DELTA_LABELS = new Set([
+    // Adding a blank track is fully reversible without raster data. Deletion
+    // and resize stay on the recoverable path until their inverse sparse
+    // raster bands are part of the operation format.
+    'addLayer',
+    'removeLayer', 'duplicateLayer', 'duplicateFrame', 'removeFrame', 'resizeCanvas',
+    'moveLayerUp', 'moveLayerDown', 'moveLayerGroupUp', 'moveLayerGroupDown',
+    'moveFrameLeft', 'moveFrameRight',
+  ]);
   const LOCAL_ONLY_LABELS = new Set([
     'setLayerVisibility',
     'setOnionSkin',
@@ -28,7 +37,7 @@
   // divergence.  Use an ordered full-document checkpoint for *every*
   // structure edit; personal visibility remains excluded by checkpoint capture.
   const CHECKPOINT_STRUCTURE_LABELS = new Set([
-    ...STRUCTURE_LABELS,
+    ...[...STRUCTURE_LABELS].filter(label => !STRUCTURE_DELTA_LABELS.has(label)),
     'clearCanvas', 'scaleSprite',
     'selectionOutline4', 'selectionOutline8',
     'selectionPaste',
@@ -129,10 +138,199 @@
     });
   }
 
+  // Structure edits deliberately carry identities and intent, never raster
+  // planes.  Receivers validate every referenced target before changing their
+  // local document, so a malformed or stale operation becomes a recovery
+  // request instead of a partially-applied timeline mutation.
+  function assertLayerDescriptor(layer, field = 'layer') {
+    if (!layer || typeof layer !== 'object' || Object.prototype.hasOwnProperty.call(layer, 'visible')) {
+      fail(`invalid-${field}`);
+    }
+    assertKeys(layer, ['id', 'trackId', 'name', 'opacity', 'blendMode'], field);
+    assertId(layer.id, `${field}-id`);
+    assertId(layer.trackId, `${field}-track-id`);
+    if (typeof layer.name !== 'string' || layer.name.length > 120) fail(`invalid-${field}-name`);
+    if (!Number.isFinite(layer.opacity) || layer.opacity < 0 || layer.opacity > 1) fail(`invalid-${field}-opacity`);
+    if (typeof layer.blendMode !== 'string' || layer.blendMode.length < 1 || layer.blendMode.length > 32) {
+      fail(`invalid-${field}-blend-mode`);
+    }
+  }
+
+  function assertNullableId(value, field) {
+    if (value !== null) assertId(value, field);
+  }
+
+  function assertRasterAsset(asset, field = 'raster-asset') {
+    if (!asset || typeof asset !== 'object') fail(`invalid-${field}`);
+    assertKeys(asset, ['objectPath', 'sha256Hex', 'byteLength', 'codecVersion'], field);
+    if (typeof asset.objectPath !== 'string'
+      || !/^rooms\/[0-9a-f-]{36}\/document-checkpoints\/[0-9a-f-]{36}\.pxd$/i.test(asset.objectPath)) {
+      fail(`invalid-${field}-path`);
+    }
+    if (typeof asset.sha256Hex !== 'string' || !/^[0-9a-f]{64}$/i.test(asset.sha256Hex)) fail(`invalid-${field}-hash`);
+    if (!Number.isSafeInteger(asset.byteLength) || asset.byteLength < 1 || asset.byteLength > 52428800) fail(`invalid-${field}-size`);
+    if (asset.codecVersion !== 1) fail(`invalid-${field}-codec`);
+  }
+
+  function validateStructureDelta(operation) {
+    assertKeys(operation, ['version', 'type', 'action', 'data'], 'operation');
+    if (typeof operation.action !== 'string' || !operation.action) fail('invalid-delta-action');
+    const data = operation.data;
+    if (!data || typeof data !== 'object') fail('invalid-delta-data');
+    const assertCanvas = () => assertId(data.canvasId, 'canvas-id');
+    switch (operation.action) {
+      case 'layer_track_insert':
+        assertKeys(data, ['canvasId', 'afterTrackId', 'cells'], 'layer-track-insert');
+        assertCanvas();
+        assertNullableId(data.afterTrackId, 'after-track-id');
+        if (!Array.isArray(data.cells) || !data.cells.length || data.cells.length > 4096) fail('invalid-layer-track-cells');
+        const frameIds = new Set();
+        const layerIds = new Set();
+        let trackId = '';
+        data.cells.forEach(cell => {
+          assertKeys(cell, ['frameId', 'layer'], 'layer-track-cell');
+          assertId(cell.frameId, 'frame-id');
+          assertLayerDescriptor(cell.layer, 'layer');
+          if (frameIds.has(cell.frameId) || layerIds.has(cell.layer.id)) fail('duplicate-layer-track-cell');
+          frameIds.add(cell.frameId);
+          layerIds.add(cell.layer.id);
+          if (trackId && trackId !== cell.layer.trackId) fail('mixed-layer-track-id');
+          trackId = cell.layer.trackId;
+        });
+        break;
+      case 'layer_track_remove':
+        assertKeys(data, ['canvasId', 'trackIds', 'inverseAsset'], 'layer-track-remove');
+        assertCanvas();
+        if (!Array.isArray(data.trackIds) || !data.trackIds.length || data.trackIds.length > 1024) fail('invalid-track-ids');
+        data.trackIds.forEach(id => assertId(id, 'track-id'));
+        if (new Set(data.trackIds).size !== data.trackIds.length) fail('duplicate-track-id');
+        assertRasterAsset(data.inverseAsset);
+        break;
+      case 'layer_track_clone':
+        assertKeys(data, ['canvasId', 'afterTrackId', 'clones'], 'layer-track-clone');
+        assertCanvas();
+        assertNullableId(data.afterTrackId, 'after-track-id');
+        if (!Array.isArray(data.clones) || !data.clones.length || data.clones.length > 1024) fail('invalid-layer-track-clones');
+        {
+          const sourceTrackIds = new Set(); const trackIds = new Set(); const layerIds = new Set();
+          data.clones.forEach(clone => {
+            assertKeys(clone, ['sourceTrackId', 'trackId', 'cells'], 'layer-track-clone');
+            assertId(clone.sourceTrackId, 'source-track-id'); assertId(clone.trackId, 'track-id');
+            if (sourceTrackIds.has(clone.sourceTrackId) || trackIds.has(clone.trackId)) fail('duplicate-layer-track-clone');
+            sourceTrackIds.add(clone.sourceTrackId); trackIds.add(clone.trackId);
+            if (!Array.isArray(clone.cells) || !clone.cells.length || clone.cells.length > 4096) fail('invalid-layer-track-clone-cells');
+            const frameIds = new Set();
+            clone.cells.forEach(cell => {
+              assertKeys(cell, ['frameId', 'layerId'], 'layer-track-clone-cell');
+              assertId(cell.frameId, 'frame-id'); assertId(cell.layerId, 'layer-id');
+              if (frameIds.has(cell.frameId) || layerIds.has(cell.layerId)) fail('duplicate-layer-track-clone-cell');
+              frameIds.add(cell.frameId); layerIds.add(cell.layerId);
+            });
+          });
+        }
+        break;
+      case 'frame_insert':
+        assertKeys(data, ['canvasId', 'afterFrameId', 'frame'], 'frame-insert');
+        assertCanvas();
+        assertNullableId(data.afterFrameId, 'after-frame-id');
+        if (!data.frame || typeof data.frame !== 'object') fail('invalid-frame');
+        assertKeys(data.frame, ['id', 'name', 'duration', 'layers'], 'frame');
+        assertId(data.frame.id, 'frame-id');
+        if (typeof data.frame.name !== 'string' || data.frame.name.length > 120) fail('invalid-frame-name');
+        if (!Number.isFinite(data.frame.duration) || data.frame.duration < 1 || data.frame.duration > 655350) fail('invalid-frame-duration');
+        if (!Array.isArray(data.frame.layers) || !data.frame.layers.length || data.frame.layers.length > 4096) fail('invalid-frame-layers');
+        data.frame.layers.forEach(layer => assertLayerDescriptor(layer, 'layer'));
+        break;
+      case 'frame_remove':
+        assertKeys(data, ['canvasId', 'frameIds', 'inverseAsset'], 'frame-remove');
+        assertCanvas();
+        if (!Array.isArray(data.frameIds) || !data.frameIds.length || data.frameIds.length > 1024) fail('invalid-frame-ids');
+        data.frameIds.forEach(id => assertId(id, 'frame-id'));
+        if (new Set(data.frameIds).size !== data.frameIds.length) fail('duplicate-frame-id');
+        assertRasterAsset(data.inverseAsset);
+        break;
+      case 'raster_restore':
+        assertKeys(data, ['canvasId', 'afterFrameId', 'afterTrackId', 'inverseAsset'], 'raster-restore');
+        assertCanvas();
+        assertNullableId(data.afterFrameId, 'after-frame-id');
+        assertNullableId(data.afterTrackId, 'after-track-id');
+        assertRasterAsset(data.inverseAsset);
+        break;
+      case 'canvas_resize_restore':
+        assertKeys(data, ['canvasId', 'fromWidth', 'fromHeight', 'width', 'height', 'offsetX', 'offsetY', 'inverseAsset'], 'canvas-resize-restore');
+        assertCanvas();
+        for (const field of ['fromWidth', 'fromHeight', 'width', 'height']) {
+          if (!Number.isInteger(data[field]) || data[field] < 1 || data[field] > 16384) fail(`invalid-${field}`);
+        }
+        if ((data.width * data.height) > 268435456) fail('canvas-too-large');
+        for (const field of ['offsetX', 'offsetY']) {
+          if (!Number.isInteger(data[field]) || Math.abs(data[field]) > 16384) fail(`invalid-${field}`);
+        }
+        assertRasterAsset(data.inverseAsset);
+        break;
+      case 'frame_clone':
+        assertKeys(data, ['canvasId', 'afterFrameId', 'clones'], 'frame-clone');
+        assertCanvas();
+        assertNullableId(data.afterFrameId, 'after-frame-id');
+        if (!Array.isArray(data.clones) || !data.clones.length || data.clones.length > 1024) fail('invalid-frame-clones');
+        {
+          const sourceFrameIds = new Set(); const frameIds = new Set(); const layerIds = new Set();
+          data.clones.forEach(clone => {
+            assertKeys(clone, ['sourceFrameId', 'frameId', 'name', 'duration', 'layerIds'], 'frame-clone');
+            assertId(clone.sourceFrameId, 'source-frame-id'); assertId(clone.frameId, 'frame-id');
+            if (sourceFrameIds.has(clone.sourceFrameId) || frameIds.has(clone.frameId)) fail('duplicate-frame-clone');
+            sourceFrameIds.add(clone.sourceFrameId); frameIds.add(clone.frameId);
+            // The UI assigns a new default frame name during duplication.  It
+            // cannot be derived from the source frame on a receiver because
+            // peer-local ordering may differ before this ordered operation.
+            if (typeof clone.name !== 'string' || clone.name.length < 1 || clone.name.length > 120) fail('invalid-frame-clone-name');
+            if (!Number.isFinite(clone.duration) || clone.duration < 1 || clone.duration > 655350) {
+              fail('invalid-frame-clone-duration');
+            }
+            if (!Array.isArray(clone.layerIds) || !clone.layerIds.length || clone.layerIds.length > 4096) fail('invalid-frame-clone-layers');
+            clone.layerIds.forEach(id => { assertId(id, 'layer-id'); if (layerIds.has(id)) fail('duplicate-frame-clone-layer'); layerIds.add(id); });
+          });
+        }
+        break;
+      case 'canvas_resize':
+        assertKeys(data, ['canvasId', 'fromWidth', 'fromHeight', 'width', 'height', 'offsetX', 'offsetY', 'inverseAsset'], 'canvas-resize');
+        assertCanvas();
+        for (const field of ['fromWidth', 'fromHeight', 'width', 'height']) {
+          if (!Number.isInteger(data[field]) || data[field] < 1 || data[field] > 16384) fail(`invalid-${field}`);
+        }
+        if ((data.width * data.height) > 268435456) fail('canvas-too-large');
+        for (const field of ['offsetX', 'offsetY']) {
+          if (!Number.isInteger(data[field]) || Math.abs(data[field]) > 16384) fail(`invalid-${field}`);
+        }
+        if ((data.width < data.fromWidth || data.height < data.fromHeight) && !data.inverseAsset) fail('missing-raster-asset');
+        if (data.inverseAsset !== undefined) assertRasterAsset(data.inverseAsset);
+        break;
+      case 'frame_order':
+        assertKeys(data, ['canvasId', 'frameIds'], 'frame-order');
+        assertCanvas();
+        if (!Array.isArray(data.frameIds) || !data.frameIds.length || data.frameIds.length > 4096) fail('invalid-frame-order');
+        data.frameIds.forEach(id => assertId(id, 'frame-id'));
+        if (new Set(data.frameIds).size !== data.frameIds.length) fail('duplicate-frame-id');
+        break;
+      case 'layer_order':
+        assertKeys(data, ['canvasId', 'trackIds'], 'layer-order');
+        assertCanvas();
+        if (!Array.isArray(data.trackIds) || !data.trackIds.length || data.trackIds.length > 4096) fail('invalid-layer-order');
+        data.trackIds.forEach(id => assertId(id, 'track-id'));
+        if (new Set(data.trackIds).size !== data.trackIds.length) fail('duplicate-track-id');
+        break;
+      default:
+        fail('unsupported-delta-action');
+    }
+  }
+
   function validateOperation(operation) {
     assertPlainJson(operation);
     if (operation?.version !== 1) fail('unsupported-version');
     switch (operation.type) {
+      case 'structure_delta':
+        validateStructureDelta(operation);
+        break;
       case 'document_structure':
         assertKeys(operation, ['version', 'type', 'document'], 'operation');
         validateStructure(operation.document);
@@ -200,6 +398,7 @@
   function classifyHistoryLabel(label) {
     const normalized = String(label || '');
     if (LOCAL_ONLY_LABELS.has(normalized)) return 'local-only';
+    if (STRUCTURE_DELTA_LABELS.has(normalized)) return 'structure_delta';
     if (CHECKPOINT_STRUCTURE_LABELS.has(normalized) || CHECKPOINT_PALETTE_LABELS.has(normalized)) {
       return 'checkpoint_restore';
     }
@@ -216,6 +415,7 @@
     PALETTE_LABELS,
     LAYER_PROPERTY_LABELS,
     FRAME_PROPERTY_LABELS,
+    STRUCTURE_DELTA_LABELS,
     LOCAL_ONLY_LABELS,
     CHECKPOINT_STRUCTURE_LABELS,
     CHECKPOINT_PALETTE_LABELS,

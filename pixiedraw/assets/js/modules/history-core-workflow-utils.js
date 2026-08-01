@@ -389,7 +389,15 @@ function commitHistory() {
               ? finalizeFrameAddHistoryEntry(history.pending)
               : (isFrameRemoveHistoryEntry(history.pending)
                 ? finalizeFrameRemoveHistoryEntry(history.pending)
-                : setHistoryEntryLabel(history.pending.before, pendingLabel))))))));
+                : (() => {
+                    const entry = setHistoryEntryLabel(history.pending.before, pendingLabel);
+                    // Timeline clone/move operations retain their compact
+                    // collaboration intent beside the local reversible
+                    // snapshot. The snapshot remains local-history only.
+                    return history.pending.pixisyncStructureDelta
+                      ? { ...entry, pixisyncStructureDelta: history.pending.pixisyncStructureDelta }
+                      : entry;
+                  })())))))));
       if (!historyEntry) {
         history.pending = null;
         updateHistoryButtons();

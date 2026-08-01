@@ -27,21 +27,27 @@ const structure = {
 
 const encoded = codec.encode(structure);
 assert.deepEqual(codec.decode(encoded), structure);
-assert.equal(codec.classifyHistoryLabel('addLayer'), 'checkpoint_restore');
+assert.equal(codec.classifyHistoryLabel('addLayer'), 'structure_delta');
 assert.equal(codec.classifyHistoryLabel('setLayerOpacity'), 'layer_properties');
 assert.equal(codec.classifyHistoryLabel('setFrameFps'), 'frame_properties');
 assert.equal(codec.classifyHistoryLabel('setLayerVisibility'), 'local-only');
 assert.equal(codec.classifyHistoryLabel('setOnionSkin'), 'local-only');
 assert.equal(codec.classifyHistoryLabel('toggleOnionSkin'), 'local-only');
-assert.equal(codec.classifyHistoryLabel('duplicateLayer'), 'checkpoint_restore');
-assert.equal(codec.classifyHistoryLabel('resizeCanvas'), 'checkpoint_restore');
+assert.equal(codec.classifyHistoryLabel('duplicateLayer'), 'structure_delta');
+assert.equal(codec.classifyHistoryLabel('resizeCanvas'), 'structure_delta');
 assert.equal(codec.classifyHistoryLabel('paletteReorder'), 'checkpoint_restore');
 for (const label of [
-  'duplicateLayer', 'pasteLayer', 'removeLayer', 'moveLayer', 'moveLayerUp', 'moveLayerDown', 'reorderLayer',
-  'addFrame', 'duplicateFrame', 'pasteFrame', 'removeFrame', 'moveFrame', 'moveFrameLeft', 'moveFrameRight', 'reorderFrame',
-  'addCanvas', 'removeCanvas', 'reorderCanvas', 'resizeCanvas',
+  'pasteLayer', 'moveLayer', 'reorderLayer',
+  'pasteFrame', 'moveFrame', 'reorderFrame',
+  'addCanvas', 'removeCanvas', 'reorderCanvas',
   'clearCanvas', 'scaleSprite', 'selectionOutline4', 'selectionOutline8', 'selectionPaste',
 ]) assert.equal(codec.classifyHistoryLabel(label), 'checkpoint_restore', label);
+for (const label of ['addLayer']) {
+  assert.equal(codec.classifyHistoryLabel(label), 'structure_delta', label);
+}
+for (const label of ['removeLayer', 'duplicateLayer', 'duplicateFrame', 'removeFrame', 'resizeCanvas', 'moveLayerUp', 'moveLayerDown', 'moveLayerGroupUp', 'moveLayerGroupDown', 'moveFrameLeft', 'moveFrameRight']) {
+  assert.equal(codec.classifyHistoryLabel(label), 'structure_delta', label);
+}
 assert.equal(codec.classifyHistoryLabel('colorModeConvert'), '');
 assert.equal(codec.classifyHistoryLabel('pen'), '');
 
@@ -84,5 +90,56 @@ assert.throws(() => codec.encode({
 }), /raster-not-allowed-in-structure/);
 assert.throws(() => codec.decode(new TextEncoder().encode('{{')), /invalid-json/);
 assert.throws(() => codec.encode({ version: 1, type: 'layer_properties', layers: [{ layerId: 'layer-a', visible: true }] }), /visibility-must-be-local/);
+
+const layerDescriptor = { id: 'layer-b', trackId: 'track-b', name: 'Layer B', opacity: 1, blendMode: 'normal' };
+const layerInsert = {
+  version: 1,
+  type: 'structure_delta',
+  action: 'layer_track_insert',
+  data: { canvasId: 'canvas-a', afterTrackId: 'track-a', cells: [{ frameId: 'frame-a', layer: layerDescriptor }] },
+};
+assert.deepEqual(codec.decode(codec.encode(layerInsert)), layerInsert);
+const resize = {
+  version: 1,
+  type: 'structure_delta',
+  action: 'canvas_resize',
+  data: { canvasId: 'canvas-a', fromWidth: 16, fromHeight: 16, width: 24, height: 20, offsetX: 4, offsetY: 2 },
+};
+assert.deepEqual(codec.decode(codec.encode(resize)), resize);
+const frameClone = {
+  version: 1,
+  type: 'structure_delta',
+  action: 'frame_clone',
+  data: { canvasId: 'canvas-a', afterFrameId: 'frame-a', clones: [{ sourceFrameId: 'frame-a', frameId: 'frame-b', name: 'Frame 2', duration: 150, layerIds: ['layer-b'] }] },
+};
+assert.deepEqual(codec.decode(codec.encode(frameClone)), frameClone);
+const trackClone = {
+  version: 1,
+  type: 'structure_delta',
+  action: 'layer_track_clone',
+  data: { canvasId: 'canvas-a', afterTrackId: 'track-a', clones: [{ sourceTrackId: 'track-a', trackId: 'track-b', cells: [{ frameId: 'frame-a', layerId: 'layer-b' }] }] },
+};
+assert.deepEqual(codec.decode(codec.encode(trackClone)), trackClone);
+const rasterAsset = {
+  objectPath: 'rooms/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/document-checkpoints/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.pxd',
+  sha256Hex: 'ab'.repeat(32), byteLength: 128, codecVersion: 1,
+};
+const rasterRestore = {
+  version: 1, type: 'structure_delta', action: 'raster_restore',
+  data: { canvasId: 'canvas-a', afterFrameId: null, afterTrackId: 'track-a', inverseAsset: rasterAsset },
+};
+assert.deepEqual(codec.decode(codec.encode(rasterRestore)), rasterRestore);
+const resizeRestore = {
+  version: 1, type: 'structure_delta', action: 'canvas_resize_restore',
+  data: { canvasId: 'canvas-a', fromWidth: 12, fromHeight: 12, width: 16, height: 16, offsetX: 0, offsetY: 0, inverseAsset: rasterAsset },
+};
+assert.deepEqual(codec.decode(codec.encode(resizeRestore)), resizeRestore);
+assert.throws(() => codec.encode({ ...rasterRestore, data: { ...rasterRestore.data, afterTrackId: 1 } }), /invalid-after-track-id/);
+assert.throws(() => codec.encode({ ...resizeRestore, data: { ...resizeRestore.data, inverseAsset: { ...rasterAsset, byteLength: 0 } } }), /invalid-raster-asset-size/);
+assert.throws(() => codec.encode({ ...layerInsert, data: { ...layerInsert.data, cells: [{ ...layerInsert.data.cells[0], layer: { ...layerDescriptor, visible: false } }] } }), /invalid-layer/);
+assert.throws(() => codec.encode({ ...resize, data: { ...resize.data, width: 0 } }), /invalid-width/);
+assert.throws(() => codec.encode({ ...layerInsert, data: { ...layerInsert.data, cells: [...layerInsert.data.cells, layerInsert.data.cells[0]] } }), /duplicate-layer-track-cell/);
+assert.throws(() => codec.encode({ ...frameClone, data: { ...frameClone.data, clones: [{ ...frameClone.data.clones[0], name: '' }] } }), /invalid-frame-clone-name/);
+assert.throws(() => codec.encode({ ...frameClone, data: { ...frameClone.data, clones: [{ ...frameClone.data.clones[0], duration: 0 }] } }), /invalid-frame-clone-duration/);
 
 console.log('PiXiSYNC document operation codec tests passed');

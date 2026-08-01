@@ -290,6 +290,30 @@
 
     async function prepareConfirmedDocumentOperation(operation, metadata = {}) {
       const documentOperation = operation?.documentOperation;
+      if (documentOperation?.type === 'structure_delta'
+        && ['raster_restore', 'canvas_resize_restore'].includes(documentOperation?.action)) {
+        const reference = documentOperation?.data?.inverseAsset;
+        const objectPath = String(reference?.objectPath || '');
+        const expectedHash = assertHash(reference?.sha256Hex);
+        const expectedBytes = Number(reference?.byteLength);
+        if (
+          !objectPath.startsWith(`rooms/${roomId}/document-checkpoints/`)
+          || !Number.isSafeInteger(expectedBytes)
+          || expectedBytes < 1
+          || expectedBytes > MAX_CHECKPOINT_BYTES
+        ) throw new Error('PiXiSYNC runtime: invalid-document-raster-asset-reference');
+        const blob = await downloadCheckpoint(objectPath);
+        if (blob.size !== expectedBytes || await sha256Hex(blob) !== expectedHash) {
+          throw new Error('PiXiSYNC runtime: document-raster-asset-hash-mismatch');
+        }
+        const bytes = new Uint8Array(await blob.arrayBuffer());
+        const asset = window.PiXiEEDrawModules?.pixisyncRasterAssetUtils?.decode?.(bytes);
+        if (!asset) throw new Error('PiXiSYNC runtime: invalid-document-raster-asset');
+        Object.defineProperty(documentOperation, 'preparedRasterAsset', {
+          value: Object.freeze(asset), enumerable: false, configurable: false,
+        });
+        return;
+      }
       if (documentOperation?.type !== 'checkpoint_restore') return;
       const operationId = String(operation?.operationId || '');
       const objectPath = String(documentOperation.objectPath || '');
@@ -439,6 +463,54 @@
       }
     }
 
+    // A semantic delta may need to preserve only the raster that would
+    // otherwise be discarded (for example a cropped edge band). It uses the
+    // same authenticated, exact-revision staging lifecycle as a checkpoint,
+    // but the object itself is a small immutable raster asset rather than a
+    // full document. The operation trigger binds it to operationId exactly
+    // once before it becomes visible to peers.
+    async function prepareDocumentRasterAsset({ operationId, structureEpoch, blob } = {}) {
+      if (!session?.canDraw?.() || !realtimeClient || localReadOnly) {
+        throw new Error('PiXiSYNC runtime: active-editor-required');
+      }
+      const normalizedOperationId = String(operationId || '');
+      const normalizedEpoch = Number(structureEpoch);
+      if (!ROOM_ID_PATTERN.test(normalizedOperationId) || !Number.isSafeInteger(normalizedEpoch) || normalizedEpoch < 0) {
+        throw new Error('PiXiSYNC runtime: invalid-document-raster-asset-request');
+      }
+      if (!(blob instanceof Blob) || blob.size < 1 || blob.size > MAX_CHECKPOINT_BYTES) {
+        throw new Error('PiXiSYNC runtime: document-raster-asset-size-out-of-range');
+      }
+      if (realtimeClient.pendingOperationCount) throw new Error('PiXiSYNC runtime: pending-operations-remain');
+      const baseRevision = realtimeClient.confirmedRevision;
+      const sha256HexValue = await sha256Hex(blob);
+      const prepared = firstRow(await rpc('pixisync_prepare_document_checkpoint_upload', {
+        p_room_id: roomId,
+        p_upload_id: normalizedOperationId,
+        p_client_id: clientId,
+        p_base_revision: baseRevision.toString(),
+        p_structure_epoch: normalizedEpoch,
+        p_state_sha256: toHexBytes(sha256HexValue),
+        p_encoded_bytes: blob.size,
+        p_codec_version: 1,
+      }));
+      const objectPath = String(prepared?.storage_path || '');
+      if (!objectPath.startsWith(`rooms/${roomId}/document-checkpoints/`)) {
+        await cleanupDocumentCheckpointUpload(normalizedOperationId).catch(() => {});
+        throw new Error('PiXiSYNC runtime: invalid-document-raster-asset-path');
+      }
+      try {
+        await uploadCheckpoint(objectPath, blob);
+        return {
+          rasterAsset: Object.freeze({ objectPath, sha256Hex: sha256HexValue, byteLength: blob.size, codecVersion: 1 }),
+          cleanup: async () => cleanupDocumentCheckpointUpload(normalizedOperationId, objectPath).catch(() => {}),
+        };
+      } catch (error) {
+        await cleanupDocumentCheckpointUpload(normalizedOperationId, objectPath).catch(() => {});
+        throw error;
+      }
+    }
+
     async function requestAuthoritativeRecovery(reason = 'document-operation-recovery') {
       if (!session || disposed || !isReconnectablePhase()) return false;
       runtimeBridge.setInputLocked?.(true);
@@ -457,6 +529,7 @@
         structureEpoch: Number(manifest?.structure_epoch || 0),
         commands,
         prepareCheckpointOperation,
+        prepareDocumentRasterAsset,
         requestAuthoritativeRecovery,
         participants: [],
         localReadOnly,
