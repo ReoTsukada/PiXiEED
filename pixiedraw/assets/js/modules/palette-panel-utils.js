@@ -21,6 +21,7 @@
     colorsMatchRgba,
     getPaletteEditorTargetColor,
     canCurrentClientEditPaletteColors,
+    canBeginPiXiSyncLocalOperation,
     isMultiPaletteIsolationEnabled,
     canCurrentClientReindexPalette,
     announcePaletteReindexRestriction,
@@ -2313,18 +2314,19 @@
   
     function beginPaletteColorHistorySession() {
       if (paletteEditorState.colorHistoryActive) {
-        return;
+        return true;
       }
       if (history.pending) {
-        return;
+        return false;
       }
-      if (!canBeginPiXiSyncLocalOperation('paletteColor')) return;
+      if (!canBeginPiXiSyncLocalOperation('paletteColor')) return false;
       beginHistory('paletteColor');
       if (history.pending?.label !== 'paletteColor') {
-        return;
+        return false;
       }
       paletteEditorState.colorHistoryActive = true;
       paletteEditorState.colorHistoryDirty = false;
+      return true;
     }
   
   
@@ -2355,7 +2357,10 @@
     function handlePaletteSliderInput({ source = 'unknown' } = {}) {
       if (!canCurrentClientEditPaletteColors()) return;
       if (!getPaletteEditorTargetColor()) return;
-      beginPaletteColorHistorySession();
+      if (!beginPaletteColorHistorySession()) {
+        syncPaletteInputs();
+        return false;
+      }
       focusUnifiedLeftContext('color', { persist: false });
       const hueValue = clamp(Number(dom.controls.paletteHue?.value ?? paletteEditorState.hsv.h), 0, 360);
       const saturationValue = clamp(Number(dom.controls.paletteSaturation?.value ?? paletteEditorState.hsv.s * 100), 0, 100) / 100;
@@ -2652,6 +2657,10 @@
         window.removeEventListener('pointercancel', paletteEditorState.wheelPointer.upHandler);
         paletteEditorState.wheelPointer.upHandler = null;
       }
+      if (!beginPaletteColorHistorySession()) {
+        syncPaletteInputs();
+        return false;
+      }
       paletteEditorState.wheelPointer.active = true;
       paletteEditorState.wheelPointer.pointerId = event.pointerId;
       paletteEditorState.wheelPointer.mode = null;
@@ -2661,7 +2670,6 @@
       } catch (error) {
         // Some mobile browsers may reject pointer capture in edge cases.
       }
-      beginPaletteColorHistorySession();
       updatePaletteFromWheelEvent(event);
       window.addEventListener('pointermove', handlePaletteWheelPointerMove, { passive: false });
       const pointerUpHandler = evt => handlePaletteWheelPointerUp(evt);

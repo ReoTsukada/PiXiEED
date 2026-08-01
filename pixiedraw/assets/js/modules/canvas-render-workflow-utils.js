@@ -67,9 +67,12 @@
     return elapsedMs;
   }
 
-  function getCanvasCompositeFrameCacheKey(frame = getActiveFrame()) {
+  function getCanvasCompositeFrameCacheKey(
+    frame = getActiveFrame(),
+    canvasDoc = getActiveProjectCanvasDocument()
+  ) {
     if (!frame?.id) return '';
-    const canvasId = getActiveProjectCanvasDocument()?.id || 'canvas';
+    const canvasId = canvasDoc?.id || 'canvas';
     return `${canvasId}:${frame.id}`;
   }
 
@@ -102,8 +105,11 @@
     return true;
   }
 
-  function invalidateCanvasCompositeFrameCacheEntry(frame = getActiveFrame()) {
-    return deleteCanvasCompositeFrameCacheEntry(getCanvasCompositeFrameCacheKey(frame));
+  function invalidateCanvasCompositeFrameCacheEntry(
+    frame = getActiveFrame(),
+    canvasDoc = getActiveProjectCanvasDocument()
+  ) {
+    return deleteCanvasCompositeFrameCacheEntry(getCanvasCompositeFrameCacheKey(frame, canvasDoc));
   }
 
   function clearCanvasCompositeFrameCache({ resetStats = false } = {}) {

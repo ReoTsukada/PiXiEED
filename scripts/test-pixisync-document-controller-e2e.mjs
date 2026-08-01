@@ -453,6 +453,11 @@ server.delayNextPixelActor = 'owner';
 const delayedPixel = owner.draw(5, 9);
 assert.equal(delayedPixel.status, 'accepted');
 assert.equal(owner.pixels[5], 9);
+assert.equal(
+  owner.controller.canBeginLocalOperation('paletteColor'),
+  false,
+  'palette edits must wait for the preceding optimistic pixel confirmation'
+);
 await new Promise(resolve => setTimeout(resolve, 0));
 const remotePaletteEntry = { historyLabel: 'paletteColor', forward: paletteOperation(90) };
 editor.document = remotePaletteEntry.forward;
@@ -466,6 +471,7 @@ await converge();
 assert.equal(owner.recoveries.length, 0, 'discarded stale pixel must not force recovery');
 assert.equal(owner.controller.snapshot().pendingOperationCount, 0);
 assert.equal(owner.controller.canBeginLocalOperation('pen', { colorMode: 'index', v1Compatible: true }), true);
+assert.equal(owner.controller.canBeginLocalOperation('paletteColor'), true);
 
 // A rejected document commit rolls the optimistic local document back before
 // the controller releases its input lock.

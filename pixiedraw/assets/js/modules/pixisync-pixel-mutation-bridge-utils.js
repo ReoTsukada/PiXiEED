@@ -369,7 +369,7 @@
         const x = change.index % target.width; const y = Math.floor(change.index / target.width);
         x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
       });
-      if (applied) { markDirtyRect?.(x0, y0, x1, y1); requestRender?.(); requestOverlayRender?.(); }
+      if (applied) { markDirtyRect?.(x0, y0, x1, y1, target); requestRender?.(); requestOverlayRender?.(); }
       return { applied, appliedIndices, x0, y0, x1, y1 };
     }
     return { ELIGIBLE_LABELS, MAX_CHANGES, toPixelMutation, toPixelMutations, toRasterRegionAsset, applyPixelMutation };

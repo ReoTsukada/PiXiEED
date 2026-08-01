@@ -19,6 +19,8 @@
     getActiveFrame,
     getProjectCanvasDocumentById,
     ensureLayerDirect,
+    ensureSparseWritableLayerIndices,
+    ensureWritableLayerIndices,
     getRasterLayerRuntimeStoredIndex,
     setRasterLayerRuntimeStoredIndex,
     clamp,
@@ -518,10 +520,26 @@
       if (safeIndex >= Math.max(1, width * height)) {
         return false;
       }
+      if (layer.indices.length === 0) {
+        const sparseReady = ensureSparseWritableLayerIndices?.(layer, width, height) === true;
+        if (!sparseReady) {
+          ensureWritableLayerIndices?.(layer, width, height);
+        }
+      }
       const base = safeIndex * 4;
       if (typeof setRasterLayerRuntimeStoredIndex === 'function') {
-        setRasterLayerRuntimeStoredIndex(layer, safeIndex, Math.round(Number(value.paletteIndex) || 0));
+        const written = setRasterLayerRuntimeStoredIndex(
+          layer,
+          safeIndex,
+          Math.round(Number(value.paletteIndex) || 0)
+        );
+        if (written !== true) {
+          return false;
+        }
       } else {
+        if (safeIndex >= layer.indices.length) {
+          return false;
+        }
         layer.indices[safeIndex] = Math.round(Number(value.paletteIndex) || 0);
       }
       if (Array.isArray(value.direct) && value.direct.length === 4) {

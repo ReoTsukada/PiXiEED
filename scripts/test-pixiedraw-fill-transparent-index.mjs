@@ -298,7 +298,7 @@ const fillHistoryUtils = window.PiXiEEDrawModules.pixelPatchHistoryUtils.createP
   getActiveLayer: () => historyLayer, getActiveProjectCanvasDocument: () => historyCanvas, getActiveFrame: () => historyFrame,
   getProjectCanvasDocumentById: id => id === 'canvas-fill' ? historyCanvas : null,
   ensureLayerDirect: () => { throw new Error('solid index fill must not allocate direct pixels'); },
-  getRasterLayerRuntimeStoredIndex: (layer, index) => layer.indices[index], setRasterLayerRuntimeStoredIndex: (layer, index, value) => { layer.indices[index] = value; },
+  getRasterLayerRuntimeStoredIndex: (layer, index) => layer.indices[index], setRasterLayerRuntimeStoredIndex: (layer, index, value) => { layer.indices[index] = value; return true; },
   clamp: value => value, refreshLayerDirectOnlyFlag: () => {}, invalidateFillPreviewCache: () => {}, invalidateOnionSkinCache: () => {}, clearPlaybackFrameCache: () => {},
   markDirtyRect: () => {}, requestRender: () => {}, requestOverlayRender: () => {}, renderAllProjectCanvasSurfaces: () => {},
 });
@@ -370,7 +370,7 @@ const mirrorHistoryUtils = window.PiXiEEDrawModules.pixelPatchHistoryUtils.creat
   getActiveLayer: () => mirrorLayer, getActiveProjectCanvasDocument: () => mirrorCanvas, getActiveFrame: () => mirrorFrame,
   getProjectCanvasDocumentById: id => id === mirrorCanvas.id ? mirrorCanvas : null,
   ensureLayerDirect: () => { throw new Error('mirror index brush must not allocate direct pixels'); },
-  getRasterLayerRuntimeStoredIndex: (layer, index) => layer.indices[index], setRasterLayerRuntimeStoredIndex: (layer, index, value) => { layer.indices[index] = value; },
+  getRasterLayerRuntimeStoredIndex: (layer, index) => layer.indices[index], setRasterLayerRuntimeStoredIndex: (layer, index, value) => { layer.indices[index] = value; return true; },
   clamp: (value, min, max) => Math.max(min, Math.min(max, value)), refreshLayerDirectOnlyFlag: () => {}, invalidateFillPreviewCache: () => {}, invalidateOnionSkinCache: () => {}, clearPlaybackFrameCache: () => {},
   markDirtyRect: () => {}, requestRender: () => {}, requestOverlayRender: () => {}, renderAllProjectCanvasSurfaces: () => {},
 });
@@ -381,7 +381,7 @@ const mirrorDrawing = window.PiXiEEDrawModules.canvasDrawingWorkflowUtils.create
   brushOffsetCache: new Map(), brushCircleOffsetCache: new Map(), isCustomBrushData: () => false,
   clamp: (value, min, max) => Math.max(min, Math.min(max, value)), getEffectiveBrushShape: value => value || 'square',
   getActiveProjectCanvasDocument: () => mirrorCanvas, getActiveLayer: () => mirrorLayer,
-  getRasterLayerRuntimeStoredIndex: (layer, index) => layer.indices[index], setRasterLayerRuntimeStoredIndex: (layer, index, value) => { layer.indices[index] = value; },
+  getRasterLayerRuntimeStoredIndex: (layer, index) => layer.indices[index], setRasterLayerRuntimeStoredIndex: (layer, index, value) => { layer.indices[index] = value; return true; },
   getRasterLayerTransparentStorageValue: () => 0, resolveTransparentStoragePaletteIndex: () => 0,
   isMirrorEnabledForTool: () => true, getMirroredPointSet: (x, y) => [{ x, y }, { x: mirrorWidth - 1 - x, y }],
   isRasterTilePatchPending: () => mirrorHistoryStore.pending?.kind === 'raster-tile-patch-pending',

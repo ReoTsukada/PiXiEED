@@ -4639,6 +4639,10 @@
     return canvasRenderWorkflowUtilsModule.clearCanvasCompositeFrameCache(...args);
   }
 
+  function invalidateCanvasCompositeFrameCacheEntry(...args) {
+    return canvasRenderWorkflowUtilsModule.invalidateCanvasCompositeFrameCacheEntry(...args);
+  }
+
   function getCanvasCompositeFrameCacheStats(...args) {
     return canvasRenderWorkflowUtilsModule.getCanvasCompositeFrameCacheStats(...args);
   }
@@ -11863,6 +11867,8 @@
     getActiveFrame,
     getProjectCanvasDocumentById,
     ensureLayerDirect,
+    ensureSparseWritableLayerIndices: ensureSparseWritableRasterLayerIndices,
+    ensureWritableLayerIndices: ensureWritableRasterLayerIndices,
     getRasterLayerRuntimeStoredIndex,
     setRasterLayerRuntimeStoredIndex,
     clamp,
@@ -11922,11 +11928,28 @@
         };
       },
       writeLayerPixelPatchValue,
-      markDirtyRect: (...args) => {
+      markDirtyRect: (x0, y0, x1, y1, target = null) => {
         invalidateFillPreviewCache();
         invalidateOnionSkinCache();
         clearPlaybackFrameCache();
-        markDirtyRect(...args);
+        invalidateCanvasCompositeFrameCacheEntry(target?.frame, target?.canvasDoc);
+        scheduleTimelineMatrixRenderSoon();
+        const activeCanvas = getActiveProjectCanvasDocument();
+        const activeFrame = getActiveFrame();
+        const targetsActiveCanvas = Boolean(
+          target?.canvasDoc?.id
+          && target.canvasDoc.id === activeCanvas?.id
+        );
+        const targetsActiveCell = Boolean(
+          targetsActiveCanvas
+          && target?.frame?.id
+          && target.frame.id === activeFrame?.id
+        );
+        if (targetsActiveCell) {
+          markDirtyRect(x0, y0, x1, y1);
+        } else if (!targetsActiveCanvas) {
+          renderAllProjectCanvasSurfaces();
+        }
       },
       requestRender,
       requestOverlayRender,
