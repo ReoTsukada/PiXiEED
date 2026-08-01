@@ -350,6 +350,7 @@
       pixisyncConnectionLabel: document.getElementById('pixisyncConnectionLabel'),
       pixisyncStart: document.getElementById('pixisyncStart'),
       pixisyncCopyInvite: document.getElementById('pixisyncCopyInvite'),
+      pixisyncCopyInviteCode: document.getElementById('pixisyncCopyInviteCode'),
       pixisyncAccessCodeField: document.getElementById('pixisyncAccessCodeField'),
       pixisyncAccessCode: document.getElementById('pixisyncAccessCode'),
       pixisyncJoinCode: document.getElementById('pixisyncJoinCode'),
@@ -12820,6 +12821,7 @@
         connectionLabel: dom.controls.pixisyncConnectionLabel,
         start: dom.controls.pixisyncStart,
         copyInvite: dom.controls.pixisyncCopyInvite,
+        copyInviteCode: dom.controls.pixisyncCopyInviteCode,
         accessCodeField: dom.controls.pixisyncAccessCodeField,
         accessCode: dom.controls.pixisyncAccessCode,
         joinCode: dom.controls.pixisyncJoinCode,
@@ -27598,6 +27600,10 @@
       },
       getProjectKey: () => normalizeAutosaveProjectId?.(autosaveProjectId || '') || '',
       getProjectTitle: () => state.documentName || DEFAULT_DOCUMENT_NAME,
+      getParticipantIdentity: () => ({
+        name: getLocalMultiParticipantName?.() || state.profile?.nickname || '参加者',
+        avatarId: getLocalMultiParticipantAvatarId?.() || state.profile?.avatarId || 'mao',
+      }),
       readProjectBinding: async projectKey => {
         const normalizedProjectKey = normalizeAutosaveProjectId(projectKey || '');
         if (!normalizedProjectKey) return null;

@@ -91,6 +91,7 @@ const createElements = () => {
     connectionLabel: new FakeElement(),
     start: new FakeElement(),
     copyInvite: new FakeElement(),
+    copyInviteCode: new FakeElement(),
     accessCodeField: new FakeElement(),
     accessCode: new FakeElement(),
     joinCode: new FakeElement(),
@@ -167,6 +168,7 @@ ownerUi.configure({
   session: ownerSession,
   commands: {
     createInviteLink: async () => `https://example.test/pixiedraw/?pixisync_invite=${'a'.repeat(64)}`,
+    createInviteCode: async () => 'AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA',
   },
   participants: [
     { id: 'owner', name: 'Owner', role: 'owner', connection: 'online' },
@@ -174,6 +176,7 @@ ownerUi.configure({
   ],
 });
 assert.equal(ownerElements.copyInvite.hidden, false);
+assert.equal(ownerElements.copyInviteCode.hidden, false);
 assert.equal(ownerElements.participantCount.textContent, '2');
 ownerUi.setExternalDrawLock(true, '別のタブで編集中です。閲覧専用です。');
 assert.equal(ownerElements.drawLock.hidden, false);
@@ -182,6 +185,8 @@ ownerUi.setExternalDrawLock(false);
 assert.equal(ownerElements.drawLock.hidden, true);
 await ownerElements.copyInvite.click();
 assert.match(copied, /pixisync_invite=/);
+await ownerElements.copyInviteCode.click();
+assert.match(copied, /^AAAA-/);
 assert.equal(ownerElements.accessCode.value, '');
 assert.equal(ownerElements.accessCode.placeholder, '招待リンク / コード');
 
@@ -236,6 +241,9 @@ manualUi.configure({
 });
 assert.equal(manualElements.joinCode.textContent, '参加');
 manualElements.accessCode.value = `https://example.test/pixiedraw/?pixisync_invite=${inviteToken}`;
+assert.equal(await manualElements.joinCode.click(), true);
+assert.equal(manualJoinToken, inviteToken);
+manualElements.accessCode.value = inviteToken.toUpperCase().match(/.{1,4}/g).join('-');
 assert.equal(await manualElements.joinCode.click(), true);
 assert.equal(manualJoinToken, inviteToken);
 
@@ -316,6 +324,7 @@ for (const id of [
   'pixisyncPanel',
   'pixisyncStart',
   'pixisyncCopyInvite',
+  'pixisyncCopyInviteCode',
   'pixisyncAccessCode',
   'pixisyncJoinCode',
   'panelMulti',

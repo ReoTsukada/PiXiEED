@@ -84,7 +84,7 @@
 </script>
 <script>window.__PIXIEEDRAW_BUILD_EDITION__ = 'web-free';</script>
 <script src="assets/js/modules/edition-capabilities-utils.js?v=20260719-file-no-ads1"></script>
-<script src="assets/js/build-info.js?v=20260801-162"></script>
+<script src="assets/js/build-info.js?v=20260801-163"></script>
 <script>
   (function configurePixieedAds() {
     const shouldShowAds = typeof window.__PIXIEEDRAW_SHOULD_SHOW_ADS__ === 'function'
@@ -1224,7 +1224,8 @@
 </div>
 <div aria-label="共同編集操作" class="pixisync-actions">
 <button class="button button--primary" id="pixisyncStart" type="button">シェアモードを開始</button>
-<button class="button" hidden="" id="pixisyncCopyInvite" type="button">招待コードを発行・コピー</button>
+<button class="button" hidden="" id="pixisyncCopyInvite" type="button">シェアURLをコピー</button>
+<button class="button" hidden="" id="pixisyncCopyInviteCode" type="button">参加コードをコピー</button>
 </div>
 <div class="multi-participants-panel">
 <div class="multi-participants-view" id="pixisyncParticipantsView" role="tabpanel">
@@ -1242,7 +1243,7 @@
 <div class="multi-project-key-field" id="pixisyncAccessCodeField">
 <label class="sr-only" for="pixisyncAccessCode">招待リンクまたは招待コード</label>
 <div class="multi-project-key-row">
-<input autocomplete="off" id="pixisyncAccessCode" placeholder="招待リンク / コード" spellcheck="false" type="text"/>
+<input autocomplete="off" id="pixisyncAccessCode" placeholder="招待URL / 参加コード" spellcheck="false" type="text"/>
 <button class="button" id="pixisyncJoinCode" type="button">参加</button>
 </div>
 </div>
@@ -1972,8 +1973,8 @@
 	<script defer="" src="assets/js/modules/pixisync-pixel-mutation-bridge-utils.js?v=20260801-selection-fill1"></script>
 	<script defer="" src="assets/js/modules/pixisync-collaboration-controller-utils.js?v=20260801-pixisync-document-checkpoint1"></script>
 	<script defer="" src="assets/js/modules/pixisync-session-state.js?v=20260731-checkpoint-diagnostics1"></script>
-	<script defer="" src="assets/js/modules/pixisync-minimal-ui-utils.js?v=20260731-persistent-card1"></script>
-	<script defer="" src="assets/js/modules/pixisync-runtime-adapter-utils.js?v=20260801-semantic-delta1"></script>
+	<script defer="" src="assets/js/modules/pixisync-minimal-ui-utils.js?v=20260801-persistent-card-code1"></script>
+	<script defer="" src="assets/js/modules/pixisync-runtime-adapter-utils.js?v=20260801-checkpoint-promotion1"></script>
 	<script defer="" src="assets/js/modules/pixieed-account-workflow-utils.js?v=20260730-remove-legacy-share-card1"></script>
 	<script defer="" src="assets/js/modules/startup-tail-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/controls-mirror.js?v=20260728-mirror-state-reuse1"></script>
@@ -1982,7 +1983,7 @@
 	<script defer="" src="assets/js/modules/local-project-v2-migration-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/pre-update-checkpoint-utils.js?v=20260712-pre-update-checkpoint-u3"></script>
 	<script defer="" src="assets/js/active-project-session-utils.js?v=20260715-local-true-v2-cleanup1"></script>
-    <script defer="" src="assets/js/app.js?v=20260801-structure-checkpoint3"></script>
+    <script defer="" src="assets/js/app.js?v=20260801-persistent-card-code1"></script>
 	<script defer="" src="assets/js/modules/update-detection-utils.js?v=20260719-file-protocol1"></script>
   <script>
     (function initPanelAdDocking() {

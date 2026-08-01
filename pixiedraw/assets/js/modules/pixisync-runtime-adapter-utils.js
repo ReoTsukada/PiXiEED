@@ -45,6 +45,7 @@
     restoreCheckpoint,
     getProjectKey = () => '',
     getProjectTitle = () => '',
+    getParticipantIdentity = () => ({}),
     readProjectBinding = async () => null,
     writeProjectBinding = async () => {},
     clearProjectBinding = async () => {},
@@ -110,6 +111,7 @@
       join,
       resumeBoundProject,
       createInviteLink,
+      createInviteCode,
       sendComment,
       leave,
       archive,
@@ -137,6 +139,24 @@
       if (!ROOM_ID_PATTERN.test(normalized)) throw new Error('PiXiSYNC runtime: invalid-client-id');
       return normalized;
     };
+    const normalizeParticipantIdentity = value => {
+      const name = String(value?.name || '').trim().slice(0, 32) || '参加者';
+      const rawAvatarId = String(value?.avatarId || '').trim().toLowerCase();
+      const avatarId = (
+        rawAvatarId === 'mao'
+        || rawAvatarId === 'baburin'
+        || /^jerin[1-8]$/.test(rawAvatarId)
+        || /^jellnall(?:[1-9]|1[0-9])$/.test(rawAvatarId)
+      ) ? rawAvatarId : 'mao';
+      return Object.freeze({ name, avatarId });
+    };
+    const currentParticipantIdentity = () => normalizeParticipantIdentity(getParticipantIdentity?.());
+    const presencePayload = () => ({
+      clientId,
+      role,
+      ...currentParticipantIdentity(),
+      onlineAt: new Date().toISOString(),
+    });
     const sha256Hex = async blob => {
       const bytes = new Uint8Array(await blob.arrayBuffer());
       const digest = new Uint8Array(await window.crypto.subtle.digest('SHA-256', bytes));
@@ -632,6 +652,39 @@
         await previousRealtime.stop().catch(() => {});
       }
       let createdRealtime = null;
+      const promoteConfirmedDocumentCheckpoint = async operation => {
+        if (
+          operation?.kind !== 'document_patch'
+          || operation?.documentOperation?.type !== 'checkpoint_restore'
+          || !ROOM_ID_PATTERN.test(String(operation?.operationId || ''))
+        ) return false;
+        try {
+          const promoted = firstRow(await rpc('pixisync_promote_document_checkpoint', {
+            p_room_id: roomId,
+            p_upload_id: String(operation.operationId),
+          }));
+          if (promoted?.checkpoint_revision !== undefined) {
+            manifest = {
+              ...(manifest || {}),
+              checkpoint_revision: String(promoted.checkpoint_revision),
+              head_revision: String(promoted.head_revision),
+              structure_epoch: String(promoted.structure_epoch),
+            };
+          }
+          report({
+            phase: 'document-checkpoint-promoted',
+            roomId,
+            checkpointRevision: String(promoted?.checkpoint_revision || operation.revision || ''),
+          });
+          return true;
+        } catch (error) {
+          // The operation is already ordered and durable. Promotion only
+          // compacts future opens, so a transient failure must never reject a
+          // confirmed edit or roll the local document back.
+          onError(error);
+          return false;
+        }
+      };
       createdRealtime = createRealtimeClient({
         supabase,
         roomId,
@@ -640,6 +693,7 @@
         recoverOnSubscribe: false,
         operationTimeoutMs,
         applyConfirmed: (operation, metadata) => runtimeBridge.applyConfirmed(operation, metadata),
+        onLocalConfirmed: operation => { void promoteConfirmedDocumentCheckpoint(operation); },
         prepareConfirmed: (operation, metadata) => prepareConfirmedDocumentOperation(operation, metadata),
         onChannelStatus: status => {
           if (
@@ -677,8 +731,9 @@
             participants.push({
               id: participantClientId,
               name: participantClientId === clientId
-                ? '自分'
-                : (participantRole === 'owner' ? 'Owner' : 'Editor'),
+                ? `${String(entry?.name || currentParticipantIdentity().name)}（自分）`
+                : String(entry?.name || (participantRole === 'owner' ? 'Owner' : 'Editor')),
+              avatarId: String(entry?.avatarId || 'mao'),
               role: participantRole,
               connection: 'online',
             });
@@ -742,7 +797,7 @@
         case 'OPEN_PRIVATE_CHANNEL':
           await createRealtime();
           await withTimeout('realtime-subscribe', realtimeClient.start());
-          await withTimeout('presence-track', realtimeClient.trackPresence({ clientId, role, onlineAt: new Date().toISOString() }));
+          await withTimeout('presence-track', realtimeClient.trackPresence(presencePayload()));
           await dispatchNow({
             type: 'CHANNEL_SUBSCRIBED',
             epoch: effectEpoch,
@@ -880,7 +935,7 @@
           manifest = await openManifest(roomId);
           await createRealtime();
           await withTimeout('realtime-reconnect', realtimeClient.start());
-          await withTimeout('presence-retrack', realtimeClient.trackPresence({ clientId, role, onlineAt: new Date().toISOString() }));
+          await withTimeout('presence-retrack', realtimeClient.trackPresence(presencePayload()));
           await dispatchNow({
             type: 'CHANNEL_SUBSCRIBED',
             epoch: effectEpoch,
@@ -1034,6 +1089,10 @@
         roomId = assertRoomId(joined?.room_id);
         await resolveBindingTargetForRoom();
         manifest = await openManifest(roomId);
+        // A successful membership is sufficient to make this local card a
+        // durable shared card.  Do this before the initial checkpoint/tail
+        // finishes so reopening survives an interrupted first synchronization.
+        await persistProjectBinding();
         await dispatchNow({
           type: 'MEMBERSHIP_OK',
           epoch,
@@ -1136,6 +1195,15 @@
       const url = new URL(locationRef.href);
       url.searchParams.set('pixisync_invite', reusableInviteToken);
       return url.toString();
+    }
+
+    async function createInviteCode() {
+      const link = await createInviteLink();
+      const token = new URL(link, locationRef.href).searchParams.get('pixisync_invite') || '';
+      if (!TOKEN_PATTERN.test(token)) throw new Error('PiXiSYNC runtime: invalid-invite-code');
+      // This is the same durable credential as the URL, formatted only for
+      // human entry. The join parser removes separators before validation.
+      return token.toUpperCase().match(/.{1,4}/g).join('-');
     }
 
     function normalizeComment(payload) {
@@ -1326,6 +1394,7 @@
       leave,
       archive,
       createInviteLink,
+      createInviteCode,
       sendComment,
       prepareCheckpointOperation,
       snapshot,

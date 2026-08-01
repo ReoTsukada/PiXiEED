@@ -44,6 +44,7 @@
     const actionButtons = Object.freeze({
       start: elements.start,
       copyInvite: elements.copyInvite,
+      copyInviteCode: elements.copyInviteCode,
       joinCode: elements.joinCode,
     });
 
@@ -78,6 +79,8 @@
     function parseInviteToken(value) {
       const raw = String(value || '').trim();
       if (URL_TOKEN_PATTERN.test(raw)) return raw.toLowerCase();
+      const compactCode = raw.replace(/[\s-]/g, '').toLowerCase();
+      if (URL_TOKEN_PATTERN.test(compactCode)) return compactCode;
       try {
         const url = new URL(raw, locationRef.href);
         let token = url.searchParams.get(INVITE_QUERY_KEY) || '';
@@ -115,11 +118,25 @@
       const documentRef = elements.participantList.ownerDocument || window.document;
       const items = normalized.map(participant => {
         const item = documentRef.createElement('li');
+        const avatar = documentRef.createElement('img');
         const name = documentRef.createElement('span');
         const meta = documentRef.createElement('small');
+        const avatarId = String(participant?.avatarId || 'mao').toLowerCase();
+        const avatarSrc = avatarId === 'baburin'
+          ? '../character-dots/baburinpng.png'
+          : /^jerin[1-8]$/.test(avatarId)
+            ? `../character-dots/Jerin${avatarId.slice(5)}.png`
+            : /^jellnall(?:[1-9]|1[0-9])$/.test(avatarId)
+              ? `../character-dots/${avatarId.toUpperCase()}.png`
+              : '../character-dots/mao1.png';
+        avatar.className = 'pixisync-participant__avatar';
+        avatar.src = avatarSrc;
+        avatar.alt = '';
+        avatar.width = 24;
+        avatar.height = 24;
         name.textContent = String(participant?.name || '参加者');
         meta.textContent = `${participant?.role === 'owner' ? 'Owner' : 'Editor'}・${participant?.connection === 'online' ? '接続中' : 'オフライン'}`;
-        item.append(name, meta);
+        item.append(avatar, name, meta);
         return item;
       });
       elements.participantList.replaceChildren(...items);
@@ -197,6 +214,7 @@
         actionButtons.start.textContent = 'シェアモードを開始';
       }
       setHidden(actionButtons.copyInvite, !(owner && active && typeof commands.createInviteLink === 'function'));
+      setHidden(actionButtons.copyInviteCode, !(owner && active && typeof commands.createInviteCode === 'function'));
       setHidden(actionButtons.joinCode, !(
         phase === 'disabled'
         || commentMode
@@ -299,6 +317,19 @@
         pendingMessage: '招待リンクを発行しています…',
         successMessage: '招待リンクをコピーしました。',
         failureMessage: '招待リンクをコピーできませんでした。',
+      }),
+      copyInviteCode: () => runAction('copyInviteCode', async () => {
+        let inviteCode = await commands.createInviteCode();
+        try {
+          if (typeof inviteCode !== 'string' || !inviteCode) throw new Error('invite-code-unavailable');
+          await navigatorRef?.clipboard?.writeText?.(inviteCode);
+        } finally {
+          inviteCode = '';
+        }
+      }, {
+        pendingMessage: '参加コードを用意しています…',
+        successMessage: '参加コードをコピーしました。',
+        failureMessage: '参加コードをコピーできませんでした。',
       }),
       joinCode: () => {
         const snapshot = getSnapshot();

@@ -376,6 +376,7 @@ assert.equal(server.broadcasts.at(-1).event, 'pixisync-comment');
 const inviteUrl = await owner.adapter.createInviteLink();
 assert.equal(new URL(inviteUrl).searchParams.get('pixisync_invite'), INVITE_TOKEN);
 assert.equal(await owner.adapter.createInviteLink(), inviteUrl, 'an active room must reuse its persistent invite URL');
+assert.equal(await owner.adapter.createInviteCode(), INVITE_TOKEN.toUpperCase().match(/.{1,4}/g).join('-'));
 assert.equal(server.inviteCreateCalls, 1, 'copying an invite twice must not create a second server invite');
 assert.deepEqual(ownerBindings.get('project-owner'), {
   roomId: ROOM_ID,
@@ -406,7 +407,7 @@ assert.deepEqual(editorBindings.get('project-editor-existing-room-card'), {
   inviteToken: '',
   inviteExpiresAt: '',
   invitePersistent: false,
-  replacedProjectKey: 'project-editor',
+  replacedProjectKey: '',
 });
 assert.equal(editor.restoreContext.projectKey, 'project-editor-existing-room-card');
 await editor.adapter.dispose();
@@ -436,7 +437,7 @@ server.realtimeOptions.at(-1).onPresenceChange([
   { clientId: OWNER_CLIENT, role: 'owner' },
   { clientId: EDITOR_CLIENT, role: 'editor' },
 ]);
-assert.deepEqual(activeEditor.bridge.participants.map(item => item.name), ['Owner', '自分']);
+assert.deepEqual(activeEditor.bridge.participants.map(item => item.name), ['Owner', '参加者（自分）']);
 await activeEditor.adapter.leave();
 assert.equal(activeEditor.adapter.snapshot().session.phase, 'left');
 assert.equal(server.members.has('editor'), false);

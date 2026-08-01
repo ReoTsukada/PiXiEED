@@ -15639,6 +15639,21 @@ body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFile #openTimelapse
   min-height: 30px;
 }
 
+#panelMulti .pixisync-participants > li {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  column-gap: 8px;
+  align-items: center;
+}
+
+#panelMulti .pixisync-participant__avatar {
+  grid-row: span 2;
+  width: 24px;
+  height: 24px;
+  image-rendering: pixelated;
+  object-fit: contain;
+}
+
 #panelMulti .multi-participants-panel {
   height: auto;
   min-height: 150px;
