@@ -6,7 +6,7 @@
   const MAX_DOCUMENT_DEPTH = 12;
   const STRUCTURE_LABELS = new Set([
     'addLayer', 'duplicateLayer', 'pasteLayer', 'removeLayer',
-    'moveLayer', 'moveLayerUp', 'moveLayerDown', 'reorderLayer',
+    'moveLayer', 'moveLayerUp', 'moveLayerDown', 'moveLayerGroupUp', 'moveLayerGroupDown', 'reorderLayer',
     'addFrame', 'duplicateFrame', 'pasteFrame', 'removeFrame',
     'moveFrame', 'moveFrameLeft', 'moveFrameRight', 'reorderFrame',
     'addCanvas', 'removeCanvas', 'reorderCanvas', 'resizeCanvas',
@@ -17,25 +17,19 @@
   ]);
   const LAYER_PROPERTY_LABELS = new Set(['setLayerOpacity', 'setLayerBlendMode']);
   const FRAME_PROPERTY_LABELS = new Set(['setFrameFps', 'setAllFrameFps']);
-  const STRUCTURE_DELTA_LABELS = new Set([
-    // Adding a blank track is fully reversible without raster data. Deletion
-    // and resize stay on the recoverable path until their inverse sparse
-    // raster bands are part of the operation format.
-    'addLayer',
-    'removeLayer', 'duplicateLayer', 'duplicateFrame', 'removeFrame', 'resizeCanvas',
-    'moveLayerUp', 'moveLayerDown', 'moveLayerGroupUp', 'moveLayerGroupDown',
-    'moveFrameLeft', 'moveFrameRight',
-  ]);
+  // Raster mutations stay as compact pixel patches.  Every structural edit
+  // is a checkpoint boundary: this makes the document itself authoritative
+  // across joins/recovery, rather than depending on replaying a shape tail
+  // against an older checkpoint.
+  const STRUCTURE_DELTA_LABELS = new Set();
   const LOCAL_ONLY_LABELS = new Set([
     'setLayerVisibility',
     'setOnionSkin',
     'toggleOnionSkin',
   ]);
   // A structural edit changes the meaning of every following pixel target.
-  // Sending only its layer/frame metadata made each peer retain its own raster
-  // snapshot, so a small delivery difference could become a permanent visual
-  // divergence.  Use an ordered full-document checkpoint for *every*
-  // structure edit; personal visibility remains excluded by checkpoint capture.
+  // Use an ordered full-document checkpoint for every structure edit;
+  // personal visibility remains excluded by checkpoint capture.
   const CHECKPOINT_STRUCTURE_LABELS = new Set([
     ...[...STRUCTURE_LABELS].filter(label => !STRUCTURE_DELTA_LABELS.has(label)),
     'clearCanvas', 'scaleSprite',

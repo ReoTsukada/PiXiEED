@@ -27,27 +27,21 @@ const structure = {
 
 const encoded = codec.encode(structure);
 assert.deepEqual(codec.decode(encoded), structure);
-assert.equal(codec.classifyHistoryLabel('addLayer'), 'structure_delta');
+assert.equal(codec.classifyHistoryLabel('addLayer'), 'checkpoint_restore');
 assert.equal(codec.classifyHistoryLabel('setLayerOpacity'), 'layer_properties');
 assert.equal(codec.classifyHistoryLabel('setFrameFps'), 'frame_properties');
 assert.equal(codec.classifyHistoryLabel('setLayerVisibility'), 'local-only');
 assert.equal(codec.classifyHistoryLabel('setOnionSkin'), 'local-only');
 assert.equal(codec.classifyHistoryLabel('toggleOnionSkin'), 'local-only');
-assert.equal(codec.classifyHistoryLabel('duplicateLayer'), 'structure_delta');
-assert.equal(codec.classifyHistoryLabel('resizeCanvas'), 'structure_delta');
+assert.equal(codec.classifyHistoryLabel('duplicateLayer'), 'checkpoint_restore');
+assert.equal(codec.classifyHistoryLabel('resizeCanvas'), 'checkpoint_restore');
 assert.equal(codec.classifyHistoryLabel('paletteReorder'), 'checkpoint_restore');
 for (const label of [
-  'pasteLayer', 'moveLayer', 'reorderLayer',
-  'pasteFrame', 'moveFrame', 'reorderFrame',
+  'pasteLayer', 'removeLayer', 'duplicateLayer', 'moveLayer', 'moveLayerUp', 'moveLayerDown', 'moveLayerGroupUp', 'moveLayerGroupDown', 'reorderLayer',
+  'addFrame', 'pasteFrame', 'removeFrame', 'duplicateFrame', 'moveFrame', 'moveFrameLeft', 'moveFrameRight', 'reorderFrame',
   'addCanvas', 'removeCanvas', 'reorderCanvas',
   'clearCanvas', 'scaleSprite', 'selectionOutline4', 'selectionOutline8', 'selectionPaste',
 ]) assert.equal(codec.classifyHistoryLabel(label), 'checkpoint_restore', label);
-for (const label of ['addLayer']) {
-  assert.equal(codec.classifyHistoryLabel(label), 'structure_delta', label);
-}
-for (const label of ['removeLayer', 'duplicateLayer', 'duplicateFrame', 'removeFrame', 'resizeCanvas', 'moveLayerUp', 'moveLayerDown', 'moveLayerGroupUp', 'moveLayerGroupDown', 'moveFrameLeft', 'moveFrameRight']) {
-  assert.equal(codec.classifyHistoryLabel(label), 'structure_delta', label);
-}
 assert.equal(codec.classifyHistoryLabel('colorModeConvert'), '');
 assert.equal(codec.classifyHistoryLabel('pen'), '');
 

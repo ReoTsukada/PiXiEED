@@ -13020,15 +13020,15 @@
       });
     }
     clearCanvasCompositeFrameCache();
-    // PiXiSYNC cards retain a legacy shared-project key for card persistence.
-    // That key must not send layer/frame structure edits through the retired
-    // snapshot-history branch: PiXiSYNC only accepts the finalized semantic
-    // entry and otherwise leaves the new local target unsynchronised.
-    const usePiXiSyncStructureHistory = Boolean(pixisyncCollaborationController?.enabled);
+    // PiXiSYNC commits each structure change as a checkpoint. Its local Undo
+    // entry must therefore retain the ordinary before snapshot as well; the
+    // compact local-only history forms do not carry that recovery baseline.
+    const useLocalCompactStructureHistory = !pixisyncCollaborationController?.enabled;
     if (
       label === 'addLayer'
       && !multiState.connected
-      && (!activeSharedProjectKey || usePiXiSyncStructureHistory)
+      && !activeSharedProjectKey
+      && useLocalCompactStructureHistory
       && !isVoxelExtensionModeEnabled()
     ) {
       history.pending = {
@@ -13047,7 +13047,8 @@
     if (
       label === 'removeLayer'
       && !multiState.connected
-      && (!activeSharedProjectKey || usePiXiSyncStructureHistory)
+      && !activeSharedProjectKey
+      && useLocalCompactStructureHistory
       && !isVoxelExtensionModeEnabled()
     ) {
       history.pending = {
@@ -13068,7 +13069,8 @@
     if (
       label === 'resizeCanvas'
       && !multiState.connected
-      && (!activeSharedProjectKey || usePiXiSyncStructureHistory)
+      && !activeSharedProjectKey
+      && useLocalCompactStructureHistory
       && !isVoxelExtensionModeEnabled()
     ) {
       const canvas = getActiveProjectCanvasDocument();
@@ -13102,6 +13104,7 @@
       && !multiState.connected
       && !activeSharedProjectKey
       && !isSharedProjectCollaborativeMode()
+      && useLocalCompactStructureHistory
       && !isVoxelExtensionModeEnabled()
     ) {
       history.pending = {
@@ -13121,7 +13124,8 @@
     if (
       label === 'removeFrame'
       && !multiState.connected
-      && (!activeSharedProjectKey || usePiXiSyncStructureHistory)
+      && !activeSharedProjectKey
+      && useLocalCompactStructureHistory
       && !isVoxelExtensionModeEnabled()
     ) {
       history.pending = {
