@@ -84,7 +84,7 @@
 </script>
 <script>window.__PIXIEEDRAW_BUILD_EDITION__ = 'web-free';</script>
 <script src="assets/js/modules/edition-capabilities-utils.js?v=20260719-file-no-ads1"></script>
-<script src="assets/js/build-info.js?v=20260801-168"></script>
+<script src="assets/js/build-info.js?v=20260801-169"></script>
 <script>
   (function configurePixieedAds() {
     const shouldShowAds = typeof window.__PIXIEEDRAW_SHOULD_SHOW_ADS__ === 'function'
@@ -473,7 +473,7 @@
 
 
 
-<link href="assets/css/style.css?v=20260731-pixisync-card1" rel="stylesheet"/>
+<link href="assets/css/style.css?v=20260801-startup-code1" rel="stylesheet"/>
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-4.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-4.png"/>
 <style>
@@ -583,10 +583,14 @@
 <p aria-live="polite" class="startup-workspace__status" id="startupWorkspaceStatus">端末内プロジェクトを確認しています…</p>
 </div>
 </div>
+<div class="startup-workspace__search-row">
 <label class="startup-workspace__search" for="startupWorkspaceSearch">
-<span class="sr-only">プロジェクトを検索</span>
-<input autocomplete="off" id="startupWorkspaceSearch" placeholder="プロジェクト名を検索" spellcheck="false" type="search"/>
+<span class="sr-only">プロジェクト名を検索、またはPiXiSYNC参加コードを入力</span>
+<input autocomplete="off" enterkeyhint="go" id="startupWorkspaceSearch" placeholder="プロジェクト名を検索 / 参加コードを入力" spellcheck="false" type="search"/>
 </label>
+<button class="button startup-workspace__join-code" disabled="" id="startupWorkspaceJoinCode" type="button">コードで参加</button>
+</div>
+<p aria-live="polite" class="startup-workspace__code-status" hidden="" id="startupWorkspaceCodeStatus"></p>
 <div aria-live="polite" class="startup-workspace__list" id="startupWorkspaceProjectList" role="list">
 <p class="startup-workspace__empty">保存済みプロジェクトを確認しています…</p>
 </div>
@@ -1950,7 +1954,7 @@
 	<script defer="" src="assets/js/modules/open-import-workflow-utils.js?v=20260721-indexed-raster-import1"></script>
 	<script defer="" src="assets/js/modules/export-format-workflow-utils.js?v=20260720-export-grid-format1"></script>
 	<script defer="" src="assets/js/modules/export-dialog-workflow-utils.js?v=20260729-timelapse-export1"></script>
-		<script defer="" src="assets/js/modules/startup-workflow-utils.js?v=20260731-pixisync-card1"></script>
+		<script defer="" src="assets/js/modules/startup-workflow-utils.js?v=20260801-startup-code1"></script>
 		<script defer="" src="assets/js/modules/recent-project-workflow-utils.js?v=20260726-project-card-actions2"></script>
 		<script defer="" src="assets/js/modules/project-package-workflow-utils.js?v=20260728-autosave-delta1"></script>
 		<script defer="" src="assets/js/modules/project-storage-adapter-utils.js?v=20260715-legacy-project-card-recovery1"></script>
@@ -1974,7 +1978,8 @@
 	<script defer="" src="assets/js/modules/pixisync-pixel-mutation-bridge-utils.js?v=20260801-sync-convergence1"></script>
 	<script defer="" src="assets/js/modules/pixisync-collaboration-controller-utils.js?v=20260801-sync-convergence1"></script>
 	<script defer="" src="assets/js/modules/pixisync-session-state.js?v=20260731-checkpoint-diagnostics1"></script>
-	<script defer="" src="assets/js/modules/pixisync-minimal-ui-utils.js?v=20260801-persistent-card-code1"></script>
+	<script defer="" src="assets/js/modules/pixisync-project-switch-utils.js?v=20260801-startup-code1"></script>
+	<script defer="" src="assets/js/modules/pixisync-minimal-ui-utils.js?v=20260801-startup-code1"></script>
 	<script defer="" src="assets/js/modules/pixisync-runtime-adapter-utils.js?v=20260801-sync-convergence1"></script>
 	<script defer="" src="assets/js/modules/pixieed-account-workflow-utils.js?v=20260730-remove-legacy-share-card1"></script>
 	<script defer="" src="assets/js/modules/startup-tail-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
@@ -1984,7 +1989,7 @@
 	<script defer="" src="assets/js/modules/local-project-v2-migration-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/pre-update-checkpoint-utils.js?v=20260712-pre-update-checkpoint-u3"></script>
 	<script defer="" src="assets/js/active-project-session-utils.js?v=20260715-local-true-v2-cleanup1"></script>
-    <script defer="" src="assets/js/app.js?v=20260801-sync-convergence1"></script>
+    <script defer="" src="assets/js/app.js?v=20260801-startup-code1"></script>
 	<script defer="" src="assets/js/modules/update-detection-utils.js?v=20260719-file-protocol1"></script>
   <script>
     (function initPanelAdDocking() {

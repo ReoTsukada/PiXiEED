@@ -17,7 +17,6 @@
     closing: ['終了処理中', '保留操作と最終状態を確認しています。', '終了中'],
     archived: ['共同編集終了', 'このセッションには新しい変更を送信できません。', '終了済み'],
   });
-  const URL_TOKEN_PATTERN = /^[0-9a-f]{64}$/;
   const INVITE_QUERY_KEY = 'pixisync_invite';
   const COMMENT_MAX_LENGTH = 140;
   const COMMENT_MAX_ITEMS = 50;
@@ -77,20 +76,9 @@
     );
 
     function parseInviteToken(value) {
-      const raw = String(value || '').trim();
-      if (URL_TOKEN_PATTERN.test(raw)) return raw.toLowerCase();
-      const compactCode = raw.replace(/[\s-]/g, '').toLowerCase();
-      if (URL_TOKEN_PATTERN.test(compactCode)) return compactCode;
-      try {
-        const url = new URL(raw, locationRef.href);
-        let token = url.searchParams.get(INVITE_QUERY_KEY) || '';
-        if (!token && url.hash.startsWith('#')) {
-          token = new URLSearchParams(url.hash.slice(1)).get(INVITE_QUERY_KEY) || '';
-        }
-        return URL_TOKEN_PATTERN.test(token) ? token.toLowerCase() : '';
-      } catch (_) {
-        return '';
-      }
+      return root.pixisyncProjectSwitchUtils?.parseInviteToken?.(value, {
+        locationHref: locationRef.href,
+      }) || '';
     }
 
     function setActiveView(nextView) {
@@ -414,8 +402,8 @@
       }
       if (!token) return false;
       removeInviteTokenFromUrl(url);
-      if (!URL_TOKEN_PATTERN.test(token)) {
-        token = '';
+      token = parseInviteToken(token);
+      if (!token) {
         setNotice('招待リンクが正しくありません。');
         return false;
       }

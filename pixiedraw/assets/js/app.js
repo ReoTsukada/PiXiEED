@@ -508,6 +508,8 @@
       workspace: document.getElementById('startupWorkspace'),
       workspaceStatus: document.getElementById('startupWorkspaceStatus'),
       workspaceSearch: document.getElementById('startupWorkspaceSearch'),
+      workspaceJoinCode: document.getElementById('startupWorkspaceJoinCode'),
+      workspaceCodeStatus: document.getElementById('startupWorkspaceCodeStatus'),
       workspaceProjectList: document.getElementById('startupWorkspaceProjectList'),
     },
     newProject: {
@@ -6196,6 +6198,8 @@
   set history(value) { history = value; },
   get initPixieedAccount() { return initPixieedAccount; },
   set initPixieedAccount(value) { initPixieedAccount = value; },
+  get joinPiXiSyncFromStartupWorkspace() { return joinPiXiSyncFromStartupWorkspace; },
+  set joinPiXiSyncFromStartupWorkspace(value) { joinPiXiSyncFromStartupWorkspace = value; },
   get isSharedRecentProjectEntry() { return isSharedRecentProjectEntry; },
   set isSharedRecentProjectEntry(value) { isSharedRecentProjectEntry = value; },
   get isTinyStartupSnapshot() { return isTinyStartupSnapshot; },
@@ -27407,8 +27411,9 @@
   function installPiXiSyncLifecycleListeners(runtime) {
     if (pixisyncLifecycleListenersInstalled || !runtime) return;
     pixisyncLifecycleListenersInstalled = true;
-    const suspend = reason => { void runtime.handleLifecycleSuspend?.(reason); };
-    const resume = reason => { void runtime.handleLifecycleResume?.(reason); };
+    const getRuntime = () => window.__PIXISYNC_V1_RUNTIME__ || null;
+    const suspend = reason => { void getRuntime()?.handleLifecycleSuspend?.(reason); };
+    const resume = reason => { void getRuntime()?.handleLifecycleResume?.(reason); };
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') suspend('visibility-hidden');
       else resume('visibility-visible');
@@ -27419,6 +27424,124 @@
     window.addEventListener('online', () => resume('online'));
     window.addEventListener('offline', () => suspend('offline'));
     document.addEventListener('resume', () => resume('device-resume'));
+  }
+
+  async function disposePiXiSyncRuntimeForProjectSwitch(runtime = window.__PIXISYNC_V1_RUNTIME__ || null) {
+    if (!runtime) return true;
+    try {
+      await runtime.dispose?.();
+    } finally {
+      if (window.__PIXISYNC_V1_RUNTIME__ === runtime) {
+        window.__PIXISYNC_V1_RUNTIME__ = null;
+      }
+    }
+    return true;
+  }
+
+  async function joinPiXiSyncFromStartupWorkspace(inviteValue) {
+    const switchUtils = window.PiXiEEDrawModules?.pixisyncProjectSwitchUtils;
+    if (typeof switchUtils?.runSafeProjectJoin !== 'function') {
+      return { ok: false, reason: 'runtime-unavailable' };
+    }
+    const result = await switchUtils.runSafeProjectJoin({
+      inviteValue,
+      locationHref: window.location.href,
+      ensureAuthenticated: () => ensureSharedProjectAuthenticatedStart({ requireLogin: true }),
+      captureCurrentProject: async () => {
+        const id = normalizeAutosaveProjectId(autosaveProjectId || '');
+        return {
+          id,
+          name: state.documentName || DEFAULT_DOCUMENT_NAME,
+          entry: id ? await loadRecentProjectMetadataById(id) : null,
+        };
+      },
+      disconnectCurrentRuntime: async () => {
+        const currentProjectId = normalizeAutosaveProjectId(autosaveProjectId || '');
+        if (currentProjectId) {
+          const saved = await writeAutosaveSnapshot(true);
+          if (saved !== true) {
+            const error = new Error('PiXiSYNC project switch: local-project-save-failed');
+            error.reason = 'local-project-save-failed';
+            throw error;
+          }
+        }
+        return await disposePiXiSyncRuntimeForProjectSwitch();
+      },
+      createSharedWorkingProject: async () => {
+        const created = await createNewProject({
+          name: localizeText('シェアプロジェクト', 'Shared project'),
+          width: DEFAULT_CANVAS_SIZE,
+          height: DEFAULT_CANVAS_SIZE,
+        });
+        return {
+          ok: created === true,
+          projectId: created === true
+            ? normalizeAutosaveProjectId(autosaveProjectId || '')
+            : '',
+        };
+      },
+      initializeRuntime: async () => {
+        const runtime = await initializePiXiSyncRuntime();
+        if (runtime) installPiXiSyncLifecycleListeners(runtime);
+        return runtime;
+      },
+      disposeRuntime: runtime => disposePiXiSyncRuntimeForProjectSwitch(runtime),
+      removeProject: projectId => removeRecentProjectEntry(projectId),
+      restoreProject: async previousProject => {
+        const previousProjectId = normalizeAutosaveProjectId(previousProject?.id || '');
+        if (!previousProjectId) return false;
+        const entry = await loadRecentProjectMetadataById(previousProjectId)
+          || previousProject?.entry
+          || null;
+        if (!entry) return false;
+        return await openRecentProject(entry, {
+          hideStartup: false,
+          silent: true,
+          allowProjectMismatchLoad: true,
+          replaceOpenProjectTabs: true,
+        });
+      },
+    });
+    if (result?.ok !== true) {
+      console.warn('[pixisync:project-switch]', {
+        phase: 'startup-code-join-failed',
+        reason: result?.reason || 'unknown',
+        stage: result?.stage || '',
+        restoredPreviousProject: result?.restoredPreviousProject === true,
+      });
+      return result;
+    }
+
+    pixisyncInitialGateUnlocked = true;
+    window.__PIXISYNC_SHARE_START_UNLOCKED__ = true;
+    document.body?.setAttribute('data-pixisync-initial-gate', 'unlocked');
+    setPiXiSyncInitialGateButtonsEnabled(true);
+    try {
+      const saved = await writeAutosaveSnapshot(true);
+      if (!saved) scheduleAutosaveSnapshot();
+    } catch (error) {
+      console.warn('[pixisync:project-switch] joined card autosave deferred', error);
+      scheduleAutosaveSnapshot();
+    }
+    await refreshRecentProjectsUI().catch(error => {
+      console.warn('[pixisync:project-switch] recent project refresh deferred', error);
+    });
+    hideStartupScreen();
+    hideProjectHomeScreen();
+    updateAutosaveStatus(
+      localizeText('シェアプロジェクトへ参加しました', 'Joined the shared project'),
+      'success'
+    );
+    console.info('[pixisync:project-switch]', {
+      phase: 'startup-code-join-complete',
+      roomId: result.roomId,
+      previousProjectId: result.previousProjectId,
+      projectId: normalizeAutosaveProjectId(autosaveProjectId || ''),
+    });
+    return {
+      ...result,
+      projectId: normalizeAutosaveProjectId(autosaveProjectId || ''),
+    };
   }
 
   function createPiXiSyncProjectLeaseManager() {

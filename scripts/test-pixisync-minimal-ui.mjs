@@ -73,6 +73,7 @@ globalThis.window = {
 
 for (const relativePath of [
   '../pixiedraw/assets/js/modules/pixisync-session-state.js',
+  '../pixiedraw/assets/js/modules/pixisync-project-switch-utils.js',
   '../pixiedraw/assets/js/modules/pixisync-minimal-ui-utils.js',
 ]) {
   new Function(await readFile(new URL(relativePath, import.meta.url), 'utf8'))();

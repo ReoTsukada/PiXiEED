@@ -16,6 +16,8 @@ const [index, css, app, startup, lifecycle, workflow, lensIndex] = await Promise
 
 assert.match(index, /id="startupScreen"[\s\S]*id="startupScreenTitle">プロジェクト</);
 assert.match(index, /id="startupWorkspaceSearch"/);
+assert.match(index, /id="startupWorkspaceJoinCode"/);
+assert.match(index, /id="startupWorkspaceCodeStatus"/);
 assert.match(index, /id="startupWorkspaceProjectList"/);
 assert.match(index, /id="startupActionNew"[\s\S]*id="startupActionOpen"[\s\S]*id="startupActionSkip"/);
 assert.doesNotMatch(index, /id="projectHomeScreen"|id="projectHomeRecentList"/);
@@ -90,6 +92,10 @@ assert.match(app, /startupReady = true;[\s\S]{0,100}scheduleLegacyProjectReopenN
 assert.match(app, /timelineMatrixViewportPan = \{[\s\S]{0,120}startedOnControl: false/);
 assert.match(await read('pixiedraw\/assets\/js\/modules\/timeline-layers.js'), /activationThreshold[\s\S]{0,220}startedOnControl/);
 assert.match(startup, /startupWorkspaceSearchQuery/);
+assert.match(startup, /joinPiXiSyncFromStartupWorkspace\(inviteToken\)/);
+assert.match(app, /runSafeProjectJoin\([\s\S]{0,2200}createNewProject\([\s\S]{0,900}initializePiXiSyncRuntime\(\)/);
+assert.match(app, /restoreProject:[\s\S]{0,500}openRecentProject\(entry,[\s\S]{0,300}replaceOpenProjectTabs: true/);
+assert.match(app, /getRuntime = \(\) => window\.__PIXISYNC_V1_RUNTIME__/);
 assert.match(startup, /PiXiEEDCardFeedAds\?\.renderProgressively/);
 assert.match(startup, /closest\('\.startup-screen__recent, \.startup-workspace,/);
 assert.match(lifecycle, /showStartupScreen\?\.\(\{ refreshWorkspace: refresh \}\)/);
@@ -103,6 +109,7 @@ assert.match(startup, /isPiXiSyncCard = Boolean\([\s\S]{0,220}entry\?\.pixisync/
 assert.match(startup, /startup-workspace__project-share-badge/);
 assert.match(startup, /シェア中/);
 assert.match(css, /\.startup-workspace__project-share-badge\s*\{[\s\S]*?position: absolute;[\s\S]*?top: 14px;[\s\S]*?left: 14px;/);
+assert.match(css, /\.startup-workspace__search-row\s*\{[\s\S]*?display: flex;/);
 assert.match(css, /@media \(max-width: 720px\)[\s\S]*?\.startup-workspace__list\s*\{[\s\S]*?repeat\(2, minmax\(0, 1fr\)\)/);
 assert.match(css, /@media \(orientation: landscape\)[\s\S]*?\.startup-screen\s*\{[\s\S]*?--pixieed-shared-side-nav-width/);
 assert.match(css, /--pixieed-shared-side-nav-gap/);

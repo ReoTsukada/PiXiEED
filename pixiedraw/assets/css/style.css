@@ -10467,6 +10467,15 @@ body.is-startup-active .pixieed-shared-top-ad {
 .startup-workspace__search {
   display: block;
   width: min(460px, 100%);
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
+.startup-workspace__search-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  width: min(620px, 100%);
 }
 
 .startup-workspace__search input {
@@ -10484,6 +10493,32 @@ body.is-startup-active .pixieed-shared-top-ad {
 .startup-workspace__search input:focus {
   border-color: rgba(var(--ui-rgb), 0.72);
   box-shadow: 0 0 0 2px rgba(var(--ui-rgb), 0.12);
+}
+
+.startup-workspace__join-code {
+  flex: 0 0 auto;
+  min-height: 42px;
+  white-space: nowrap;
+}
+
+.startup-workspace__code-status {
+  width: min(620px, 100%);
+  margin: -2px 0 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.startup-workspace__code-status[data-tone='success'] {
+  color: rgba(120, 230, 172, 0.95);
+}
+
+.startup-workspace__code-status[data-tone='warn'] {
+  color: rgba(255, 208, 124, 0.95);
+}
+
+.startup-workspace__code-status[data-tone='error'] {
+  color: rgba(255, 143, 143, 0.95);
 }
 
 .startup-workspace__status {

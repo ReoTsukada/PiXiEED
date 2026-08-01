@@ -1465,6 +1465,7 @@
   let startupWorkspaceEntries = [];
   let startupWorkspaceSearchQuery = '';
   let startupWorkspaceMigrationPrompted = false;
+  let startupWorkspaceJoinBusy = false;
 
   function setStartupWorkspaceStatus(message, tone = 'info') {
     const node = dom.startup?.workspaceStatus;
@@ -1474,6 +1475,88 @@
       node.dataset.tone = tone;
     } else {
       delete node.dataset.tone;
+    }
+  }
+
+  function parseStartupWorkspaceInviteToken() {
+    return window.PiXiEEDrawModules?.pixisyncProjectSwitchUtils?.parseInviteToken?.(
+      dom.startup?.workspaceSearch?.value || '',
+      { locationHref: window.location?.href || '' }
+    ) || '';
+  }
+
+  function setStartupWorkspaceCodeStatus(message = '', tone = 'info') {
+    const node = dom.startup?.workspaceCodeStatus;
+    if (!(node instanceof HTMLElement)) return;
+    node.textContent = String(message || '');
+    node.hidden = !message;
+    if (tone && tone !== 'info') node.dataset.tone = tone;
+    else delete node.dataset.tone;
+  }
+
+  function syncStartupWorkspaceJoinControl() {
+    const button = dom.startup?.workspaceJoinCode;
+    if (!(button instanceof HTMLButtonElement)) return;
+    const inviteToken = parseStartupWorkspaceInviteToken();
+    button.disabled = startupWorkspaceJoinBusy || !inviteToken;
+    button.textContent = startupWorkspaceJoinBusy
+      ? localizeText('参加処理中…', 'Joining…')
+      : localizeText('コードで参加', 'Join with code');
+    if (!startupWorkspaceJoinBusy) {
+      setStartupWorkspaceCodeStatus(
+        inviteToken
+          ? localizeText(
+              '参加コードを確認しました。元のプロジェクトを保存してから共有プロジェクトを開きます。',
+              'Invite code detected. The current project will be saved before the shared project opens.'
+            )
+          : ''
+      );
+    }
+  }
+
+  async function joinStartupWorkspaceByCode() {
+    if (startupWorkspaceJoinBusy) return false;
+    const inviteToken = parseStartupWorkspaceInviteToken();
+    if (!inviteToken) {
+      setStartupWorkspaceCodeStatus(
+        localizeText('有効な参加コードまたはシェアURLを入力してください。', 'Enter a valid invite code or share URL.'),
+        'warn'
+      );
+      return false;
+    }
+    startupWorkspaceJoinBusy = true;
+    syncStartupWorkspaceJoinControl();
+    setStartupWorkspaceCodeStatus(
+      localizeText('現在のプロジェクトを端末内へ保存しています…', 'Saving the current project on this device…')
+    );
+    try {
+      const result = await joinPiXiSyncFromStartupWorkspace(inviteToken);
+      if (result?.ok === true) {
+        setStartupWorkspaceCodeStatus(
+          localizeText('共有プロジェクトを開きました。', 'Shared project opened.'),
+          'success'
+        );
+        if (dom.startup?.workspaceSearch) dom.startup.workspaceSearch.value = '';
+        startupWorkspaceSearchQuery = '';
+        return true;
+      }
+      const message = result?.reason === 'authentication-required'
+        ? localizeText('参加にはログインが必要です。ログイン後にもう一度コードを適用してください。', 'Sign in, then apply the code again.')
+        : result?.reason === 'local-project-save-failed'
+          ? localizeText('現在のプロジェクトを保存できなかったため、切り替えを中止しました。', 'The switch was canceled because the current project could not be saved.')
+          : localizeText('共有プロジェクトを開けませんでした。元のローカルプロジェクトへ戻しました。', 'Unable to open the shared project. The previous local project was restored.');
+      setStartupWorkspaceCodeStatus(message, 'error');
+      return false;
+    } catch (error) {
+      console.warn('PiXiSYNC startup code join failed', error);
+      setStartupWorkspaceCodeStatus(
+        localizeText('共有プロジェクトを開けませんでした。元のプロジェクトは保持されています。', 'Unable to open the shared project. The previous project was retained.'),
+        'error'
+      );
+      return false;
+    } finally {
+      startupWorkspaceJoinBusy = false;
+      syncStartupWorkspaceJoinControl();
     }
   }
 
@@ -1756,8 +1839,18 @@
     projectList.dataset.bound = 'true';
     dom.startup?.workspaceSearch?.addEventListener('input', () => {
       startupWorkspaceSearchQuery = String(dom.startup.workspaceSearch.value || '').trim().toLocaleLowerCase();
+      syncStartupWorkspaceJoinControl();
       renderStartupWorkspaceProjects(startupWorkspaceEntries);
     });
+    dom.startup?.workspaceSearch?.addEventListener('keydown', event => {
+      if (event.key !== 'Enter' || !parseStartupWorkspaceInviteToken()) return;
+      event.preventDefault();
+      void joinStartupWorkspaceByCode();
+    });
+    dom.startup?.workspaceJoinCode?.addEventListener('click', () => {
+      void joinStartupWorkspaceByCode();
+    });
+    syncStartupWorkspaceJoinControl();
     projectList.addEventListener('click', async event => {
       const source = event.target instanceof Element ? event.target : null;
       if (!source) return;

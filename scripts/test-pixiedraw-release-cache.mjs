@@ -27,7 +27,15 @@ for (const moduleName of [
   assert.match(indexHtml, new RegExp(`${moduleName}\\.js\\?v=20260801-sync-convergence1`));
 }
 assert.match(indexHtml, /pixisync-document-operation-utils\.js\?v=20260801-adaptive-output2/);
-assert.match(indexHtml, /app\.js\?v=20260801-sync-convergence1/);
+for (const assetName of [
+  'assets\/css\/style.css',
+  'assets\/js\/modules\/startup-workflow-utils.js',
+  'assets\/js\/modules\/pixisync-project-switch-utils.js',
+  'assets\/js\/modules\/pixisync-minimal-ui-utils.js',
+  'assets\/js\/app.js',
+]) {
+  assert.match(indexHtml, new RegExp(`${assetName}\\?v=20260801-startup-code1`));
+}
 assert.match(serviceWorker, /fetch\(request, \{ cache: 'no-store' \}\)/);
 assert.match(app, /serviceWorker\.register\(swUrl, \{ updateViaCache: 'none' \}\)/);
 assert.match(app, /!startupReady && !controllerChangeReloaded && !isProjectCommandLocked\(\)/);
