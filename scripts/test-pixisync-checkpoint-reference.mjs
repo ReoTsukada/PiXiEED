@@ -61,7 +61,10 @@ const realtime = modules.pixisyncRealtimeClientUtils.createPiXiSyncRealtimeClien
 });
 const client = realtime.createClient({
   supabase: {
-    rpc: async () => ({ data: rows, error: null }),
+    rpc: async (_name, params = {}) => ({
+      data: rows.filter(row => BigInt(row.revision) > BigInt(params.p_after_revision || 0)),
+      error: null,
+    }),
     channel: () => ({
       on() { return this; },
       subscribe(callback) { callback('SUBSCRIBED'); return this; },
@@ -87,6 +90,13 @@ assert.deepEqual(events, ['restore-start'], 'no operation may apply while checkp
 releaseRestore();
 assert.equal(await syncing, 2n);
 assert.deepEqual(events, ['restore-start', 'restore-complete', 'apply-1', 'apply-2']);
+
+// A broadcast-triggered recovery can finish before the session's initial-tail
+// effect. That later effect must never rewind the order keeper to an older
+// checkpoint revision and reapply confirmed operations.
+const eventsAfterAuthoritativeRecovery = [...events];
+assert.equal(await client.syncFrom(0), 2n);
+assert.deepEqual(events, eventsAfterAuthoritativeRecovery);
 
 const [documentMigration, uploadMigration, runtimeAdapter] = await Promise.all([
   readFile(new URL('../supabase/migrations/20260801094501_pixisync_document_operations.sql', import.meta.url), 'utf8'),

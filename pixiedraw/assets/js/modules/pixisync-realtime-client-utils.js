@@ -313,8 +313,13 @@
       }
       async function syncFrom(afterRevision = keeper.confirmedRevision) {
         const revision = BigInt(afterRevision);
-        if (keeper.confirmedRevision !== revision) keeper.reset(revision);
-        await fetchSince(revision);
+        // A Realtime hint can finish recovery while the session bootstrap is
+        // still waiting to fetch its initial tail.  Never move the order
+        // keeper backward in that race: the controller may already have
+        // applied the newer revision, and replaying it would corrupt the
+        // controller/keeper agreement.
+        if (keeper.confirmedRevision < revision) keeper.reset(revision);
+        await fetchSince(keeper.confirmedRevision);
         return keeper.confirmedRevision;
       }
       async function replayPendingJournal() {
