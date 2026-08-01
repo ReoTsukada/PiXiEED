@@ -148,8 +148,10 @@
       return window.btoa(binary);
     }
 
-    function base64ToBytes(value) {
-      if (typeof value !== 'string' || !value.length || value.length > 64 * 1024) fail('invalid-base64');
+    function base64ToBytes(value, { maxEncodedLength = 64 * 1024 } = {}) {
+      const maximum = Math.trunc(Number(maxEncodedLength));
+      if (!Number.isSafeInteger(maximum) || maximum < 1
+        || typeof value !== 'string' || !value.length || value.length > maximum) fail('invalid-base64');
       let binary;
       try { binary = window.atob(value); } catch (_) { fail('invalid-base64'); }
       return Uint8Array.from(binary, char => char.charCodeAt(0));

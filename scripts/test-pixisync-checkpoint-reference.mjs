@@ -26,7 +26,12 @@ const checkpointReference = {
   sha256Hex: 'ab'.repeat(32),
   byteLength: 123,
 };
-const documentBytes = new TextEncoder().encode(JSON.stringify(checkpointReference));
+// Document operations may be 256 KiB on the server.  Their Base64 form is
+// larger than the pixel-patch 64 KiB ceiling and must still replay cleanly.
+const documentBytes = new TextEncoder().encode(JSON.stringify({
+  ...checkpointReference,
+  padding: 'x'.repeat(70 * 1024),
+}));
 const pixelBytes = codec.encodePixelPatch([{ index: 0, paletteValue: 1 }], { cellCount: 1 });
 const rows = [
   {

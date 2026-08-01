@@ -73,13 +73,21 @@
       }
 
       async function normalizeOperation(row) {
-        const payload = codec.base64ToBytes(row.payload_b64 || row.payloadB64 || '');
+        const kind = row.kind;
+        // Pixel patches are capped below 64 KiB, but document operations are
+        // permitted to contain up to 256 KiB of UTF-8 JSON.  Decode the latter
+        // with the document codec's matching Base64 ceiling; otherwise a valid
+        // structure/checkpoint operation leaves the room in a recovery loop.
+        const maxDocumentBytes = Math.max(2, Number(documentCodec?.MAX_DOCUMENT_OPERATION_BYTES) || 262144);
+        const maxEncodedLength = kind === 'document_patch'
+          ? Math.ceil(maxDocumentBytes / 3) * 4
+          : 64 * 1024;
+        const payload = codec.base64ToBytes(row.payload_b64 || row.payloadB64 || '', { maxEncodedLength });
         const hash = await codec.sha256Hex(payload);
         const expected = String(row.payload_sha256_hex || row.payloadSha256 || '').toLowerCase();
         if (hash !== expected) throw new Error('PiXiSYNC realtime: payload-hash-mismatch');
         const canvasWidth = Number(row.canvas_width || row.canvasWidth);
         const canvasHeight = Number(row.canvas_height || row.canvasHeight);
-        const kind = row.kind;
         const pixelCount = Number(row.pixel_count ?? row.pixelCount);
         if (kind === 'document_patch') {
           if (!documentCodec?.decode) throw new Error('PiXiSYNC realtime: document-codec-unavailable');
