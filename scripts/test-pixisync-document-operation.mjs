@@ -27,7 +27,7 @@ const structure = {
 
 const encoded = codec.encode(structure);
 assert.deepEqual(codec.decode(encoded), structure);
-assert.equal(codec.classifyHistoryLabel('addLayer'), 'document_structure');
+assert.equal(codec.classifyHistoryLabel('addLayer'), 'checkpoint_restore');
 assert.equal(codec.classifyHistoryLabel('setLayerOpacity'), 'layer_properties');
 assert.equal(codec.classifyHistoryLabel('setFrameFps'), 'frame_properties');
 assert.equal(codec.classifyHistoryLabel('setLayerVisibility'), 'local-only');
@@ -37,7 +37,9 @@ assert.equal(codec.classifyHistoryLabel('duplicateLayer'), 'checkpoint_restore')
 assert.equal(codec.classifyHistoryLabel('resizeCanvas'), 'checkpoint_restore');
 assert.equal(codec.classifyHistoryLabel('paletteReorder'), 'checkpoint_restore');
 for (const label of [
-  'removeLayer', 'removeFrame', 'removeCanvas',
+  'duplicateLayer', 'pasteLayer', 'removeLayer', 'moveLayer', 'moveLayerUp', 'moveLayerDown', 'reorderLayer',
+  'addFrame', 'duplicateFrame', 'pasteFrame', 'removeFrame', 'moveFrame', 'moveFrameLeft', 'moveFrameRight', 'reorderFrame',
+  'addCanvas', 'removeCanvas', 'reorderCanvas', 'resizeCanvas',
   'clearCanvas', 'scaleSprite', 'selectionOutline4', 'selectionOutline8', 'selectionPaste',
 ]) assert.equal(codec.classifyHistoryLabel(label), 'checkpoint_restore', label);
 assert.equal(codec.classifyHistoryLabel('colorModeConvert'), '');

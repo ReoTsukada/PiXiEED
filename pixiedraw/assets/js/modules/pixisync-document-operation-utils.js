@@ -22,13 +22,13 @@
     'setOnionSkin',
     'toggleOnionSkin',
   ]);
+  // A structural edit changes the meaning of every following pixel target.
+  // Sending only its layer/frame metadata made each peer retain its own raster
+  // snapshot, so a small delivery difference could become a permanent visual
+  // divergence.  Use an ordered full-document checkpoint for *every*
+  // structure edit; personal visibility remains excluded by checkpoint capture.
   const CHECKPOINT_STRUCTURE_LABELS = new Set([
-    'duplicateLayer', 'pasteLayer',
-    'removeLayer',
-    'duplicateFrame', 'pasteFrame',
-    'removeFrame',
-    'resizeCanvas',
-    'removeCanvas',
+    ...STRUCTURE_LABELS,
     'clearCanvas', 'scaleSprite',
     'selectionOutline4', 'selectionOutline8',
     'selectionPaste',
