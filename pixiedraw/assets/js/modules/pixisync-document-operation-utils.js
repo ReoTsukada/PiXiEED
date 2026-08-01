@@ -10,6 +10,8 @@
     'addFrame', 'duplicateFrame', 'pasteFrame', 'removeFrame',
     'moveFrame', 'moveFrameLeft', 'moveFrameRight', 'reorderFrame',
     'addCanvas', 'removeCanvas', 'reorderCanvas', 'resizeCanvas',
+    'moveLayerCellsUp', 'moveLayerCellsDown',
+    'moveSlotFrameLeft', 'moveSlotFrameRight',
   ]);
   const PALETTE_LABELS = new Set([
     'paletteColor', 'paletteAdd', 'paletteRemove', 'paletteReorder',
@@ -17,11 +19,17 @@
   ]);
   const LAYER_PROPERTY_LABELS = new Set(['setLayerOpacity', 'setLayerBlendMode']);
   const FRAME_PROPERTY_LABELS = new Set(['setFrameFps', 'setAllFrameFps']);
-  // Raster mutations stay as compact pixel patches.  Every structural edit
-  // is a checkpoint boundary: this makes the document itself authoritative
-  // across joins/recovery, rather than depending on replaying a shape tail
-  // against an older checkpoint.
-  const STRUCTURE_DELTA_LABELS = new Set();
+  // A newly added empty layer/frame has no raster payload.  Transport the
+  // already-decided identity/anchor record rather than serializing the whole
+  // document.  Other structural operations remain checkpoint-backed until
+  // their inverse/raster contracts have their own end-to-end coverage.
+  const STRUCTURE_DELTA_LABELS = new Set([
+    'addLayer', 'duplicateLayer', 'removeLayer',
+    'moveLayerUp', 'moveLayerDown', 'moveLayerGroupUp', 'moveLayerGroupDown',
+    'addFrame', 'duplicateFrame', 'removeFrame',
+    'moveFrameLeft', 'moveFrameRight',
+    'resizeCanvas',
+  ]);
   const LOCAL_ONLY_LABELS = new Set([
     'setLayerVisibility',
     'setOnionSkin',
@@ -35,6 +43,7 @@
     'clearCanvas', 'scaleSprite',
     'selectionOutline4', 'selectionOutline8',
     'selectionPaste',
+    'colorModeConvert',
   ]);
   const CHECKPOINT_PALETTE_LABELS = new Set([
     'paletteRemove', 'paletteReorder', 'paletteApplyPreset', 'paletteImport',
@@ -164,6 +173,16 @@
     if (typeof asset.sha256Hex !== 'string' || !/^[0-9a-f]{64}$/i.test(asset.sha256Hex)) fail(`invalid-${field}-hash`);
     if (!Number.isSafeInteger(asset.byteLength) || asset.byteLength < 1 || asset.byteLength > 52428800) fail(`invalid-${field}-size`);
     if (asset.codecVersion !== 1) fail(`invalid-${field}-codec`);
+  }
+
+  function assertRegionAsset(asset) {
+    if (!asset || typeof asset !== 'object') fail('invalid-region-asset');
+    assertKeys(asset, ['objectPath', 'sha256Hex', 'byteLength', 'codecVersion', 'pixelFormat'], 'region-asset');
+    if (typeof asset.objectPath !== 'string'
+      || !/^rooms\/[0-9a-f-]{36}\/raster-assets\/[0-9a-f-]{36}\.pxra$/i.test(asset.objectPath)) fail('invalid-region-asset-path');
+    if (typeof asset.sha256Hex !== 'string' || !/^[0-9a-f]{64}$/i.test(asset.sha256Hex)) fail('invalid-region-asset-hash');
+    if (!Number.isSafeInteger(asset.byteLength) || asset.byteLength < 1 || asset.byteLength > 52428800) fail('invalid-region-asset-size');
+    if (asset.codecVersion !== 1 || asset.pixelFormat !== 'indexed-mask-v1') fail('invalid-region-asset-codec');
   }
 
   function validateStructureDelta(operation) {
@@ -337,23 +356,52 @@
       case 'layer_properties':
         assertKeys(operation, ['version', 'type', 'layers'], 'operation');
         if (!Array.isArray(operation.layers) || !operation.layers.length) fail('invalid-layer-properties');
-        operation.layers.forEach(layer => {
+        {
+          const layerIds = new Set();
+          operation.layers.forEach(layer => {
           if (Object.prototype.hasOwnProperty.call(layer, 'visible')) fail('visibility-must-be-local');
           assertKeys(layer, ['layerId', 'opacity', 'blendMode'], 'layer-properties');
           assertId(layer?.layerId, 'layer-id');
           if (layer.opacity !== undefined && (!Number.isFinite(layer.opacity) || layer.opacity < 0 || layer.opacity > 1)) fail('invalid-layer-opacity');
           if (layer.blendMode !== undefined && (typeof layer.blendMode !== 'string' || !layer.blendMode || layer.blendMode.length > 32)) fail('invalid-blend-mode');
           if (layer.opacity === undefined && layer.blendMode === undefined) fail('empty-layer-properties');
-        });
+            if (layerIds.has(layer.layerId)) fail('duplicate-layer-property-id');
+            layerIds.add(layer.layerId);
+          });
+        }
         break;
       case 'frame_properties':
         assertKeys(operation, ['version', 'type', 'frames'], 'operation');
         if (!Array.isArray(operation.frames) || !operation.frames.length) fail('invalid-frame-properties');
-        operation.frames.forEach(frame => {
+        {
+          const frameIds = new Set();
+          operation.frames.forEach(frame => {
           assertKeys(frame, ['frameId', 'duration'], 'frame-properties');
           assertId(frame?.frameId, 'frame-id');
           if (!Number.isFinite(frame.duration) || frame.duration < 1 || frame.duration > 655350) fail('invalid-frame-duration');
-        });
+            if (frameIds.has(frame.frameId)) fail('duplicate-frame-property-id');
+            frameIds.add(frame.frameId);
+          });
+        }
+        break;
+      case 'raster_region_set':
+        assertKeys(operation, [
+          'version', 'type', 'canvasId', 'frameId', 'layerId',
+          'canvasWidth', 'canvasHeight', 'x', 'y', 'width', 'height', 'asset',
+        ], 'operation');
+        assertId(operation.canvasId, 'canvas-id');
+        assertId(operation.frameId, 'frame-id');
+        assertId(operation.layerId, 'layer-id');
+        for (const field of ['canvasWidth', 'canvasHeight', 'width', 'height']) {
+          if (!Number.isInteger(operation[field]) || operation[field] < 1 || operation[field] > 16384) fail(`invalid-${field}`);
+        }
+        for (const field of ['x', 'y']) {
+          if (!Number.isInteger(operation[field]) || operation[field] < 0) fail(`invalid-${field}`);
+        }
+        if (operation.canvasWidth * operation.canvasHeight > 268435456
+          || operation.x + operation.width > operation.canvasWidth
+          || operation.y + operation.height > operation.canvasHeight) fail('invalid-region-bounds');
+        assertRegionAsset(operation.asset);
         break;
       case 'checkpoint_restore':
         assertKeys(operation, ['version', 'type', 'objectPath', 'sha256Hex', 'byteLength'], 'operation');

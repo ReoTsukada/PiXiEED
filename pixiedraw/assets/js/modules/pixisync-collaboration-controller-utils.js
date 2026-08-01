@@ -144,7 +144,11 @@
       const revision = normalizeRevision(operation?.revision);
       if (revision !== appliedRevision + 1n) {
         onRecoveryRequired({ reason: 'noncontiguous-controller-apply', operation, appliedRevision });
-        return { applied: 0, recovery: true };
+        // The order keeper advances only after this callback returns.  Never
+        // acknowledge an operation that the document controller rejected;
+        // doing so makes every following revision look contiguous to the
+        // transport while this controller remains at the older revision.
+        throw new Error('PiXiSYNC controller: noncontiguous-controller-apply');
       }
       if (operation?.kind === 'document_patch') {
         const localDocument = pendingDocument?.operationId === String(operation.operationId);
@@ -180,7 +184,7 @@
           const applied = documentBridge?.applyDocumentOperation?.(operation.documentOperation);
           if (applied !== true) {
             onRecoveryRequired({ reason: 'confirmed-document-operation-apply-failed', operation });
-            return { applied: 0, recovery: true };
+            throw new Error('PiXiSYNC controller: confirmed-document-operation-apply-failed');
           }
         } else {
           pendingDocument.confirmed = true;
@@ -246,7 +250,7 @@
       const result = mutationBridge.applyPixelMutation(mutation);
       if (result.applied !== operation.changes.length) {
         onRecoveryRequired({ reason: 'confirmed-patch-apply-mismatch', operation, result });
-        return { ...result, recovery: true };
+        throw new Error('PiXiSYNC controller: confirmed-patch-apply-mismatch');
       }
       stampConfirmed(operation, result.appliedIndices);
       if (localPending?.entry) {
@@ -343,6 +347,15 @@
         onRecoveryRequired({ reason: 'unsupported-confirmed-history-entry', entry });
         return reject('unsupported-confirmed-history-entry', entry);
       }
+      // Large finalized raster edits must be one ordered revision. Splitting
+      // them into 8192-cell commits exposes partial fills/pastes and permits a
+      // structural edit to interleave between chunks.
+      if (mutations.length > 1) {
+        const rasterRegion = mutationBridge.toRasterRegionAsset?.(entry) || null;
+        // Never fall back to multiple ordered commits: another structural
+        // operation could interleave and expose only part of this raster edit.
+        return handleCommittedDocumentEntry(entry, label, 'raster_region_set', { rasterRegion });
+      }
       const records = mutations.map((mutation, groupIndex) => ({
         operationId: String(operationIdFactory?.() || ''),
         mutation,
@@ -422,6 +435,7 @@
             operationId,
             structureEpoch: runtime.structureEpoch || 0,
             reuseDocumentOperation: options.reuseDocumentOperation || null,
+            rasterRegion: options.rasterRegion || null,
           }
         );
         if (!prepared?.documentOperation) throw new Error('invalid-document-operation');
@@ -502,16 +516,19 @@
       if (!runtime) return reject('disabled', entry);
       const historyLabel = String(entry?.historyLabel || entry?.label || '');
       const documentKind = documentBridge?.classifyHistoryLabel?.(historyLabel) || '';
-      if (documentKind && documentKind !== 'local-only') {
+      const metadata = historyMetadata.get(entry) || {};
+      const rasterDocumentKind = metadata.sourceDocumentOperation?.type === 'raster_region_set'
+        ? 'raster_region_set'
+        : '';
+      if ((documentKind && documentKind !== 'local-only') || rasterDocumentKind) {
         if (direction !== 'undo' && direction !== 'redo') return reject('invalid-history-direction', entry);
-        const metadata = historyMetadata.get(entry) || {};
         const expectedRevision = direction === 'undo'
           ? metadata.sourceDocumentRevision
           : metadata.undoDocumentRevision;
         if (!expectedRevision || BigInt(expectedRevision) !== appliedRevision) {
           return reject('document-history-not-current', entry);
         }
-        return handleCommittedDocumentEntry(entry, historyLabel, documentKind, {
+        return handleCommittedDocumentEntry(entry, historyLabel, rasterDocumentKind || documentKind, {
           direction,
           applyLocalAfterConfirm: true,
           reuseDocumentOperation: direction === 'undo'

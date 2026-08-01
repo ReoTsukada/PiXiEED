@@ -1403,6 +1403,28 @@
           }
         }
       });
+      // Do not ask peers to run their own add-layer UI path.  That would use
+      // their active selection/name counter.  Freeze this local method's
+      // anchor and generated identities as one ordered semantic operation.
+      const activeLayerAnchor = insertIndex > 0
+        ? String(activeFrame.layers[insertIndex - 1]?.trackId || '')
+        : null;
+      recordPendingPiXiSyncStructureDelta('layer_track_insert', {
+        afterTrackId: activeLayerAnchor || null,
+        cells: state.frames.map(frame => {
+          const layer = frame.layers.find(candidate => candidate?.trackId === addedTrackId) || null;
+          return {
+            frameId: String(frame?.id || ''),
+            layer: {
+              id: String(layer?.id || ''),
+              trackId: String(layer?.trackId || ''),
+              name: String(layer?.name || 'Layer'),
+              opacity: Number(layer?.opacity),
+              blendMode: String(layer?.blendMode || 'normal'),
+            },
+          };
+        }),
+      });
       clearPendingMultiAssignmentMoveRequests();
       markHistoryDirty();
       scheduleSessionPersist();

@@ -27,22 +27,32 @@ const structure = {
 
 const encoded = codec.encode(structure);
 assert.deepEqual(codec.decode(encoded), structure);
-assert.equal(codec.classifyHistoryLabel('addLayer'), 'checkpoint_restore');
+assert.equal(codec.classifyHistoryLabel('addLayer'), 'structure_delta');
 assert.equal(codec.classifyHistoryLabel('setLayerOpacity'), 'layer_properties');
 assert.equal(codec.classifyHistoryLabel('setFrameFps'), 'frame_properties');
 assert.equal(codec.classifyHistoryLabel('setLayerVisibility'), 'local-only');
 assert.equal(codec.classifyHistoryLabel('setOnionSkin'), 'local-only');
 assert.equal(codec.classifyHistoryLabel('toggleOnionSkin'), 'local-only');
-assert.equal(codec.classifyHistoryLabel('duplicateLayer'), 'checkpoint_restore');
-assert.equal(codec.classifyHistoryLabel('resizeCanvas'), 'checkpoint_restore');
+assert.equal(codec.classifyHistoryLabel('duplicateLayer'), 'structure_delta');
+assert.equal(codec.classifyHistoryLabel('resizeCanvas'), 'structure_delta');
 assert.equal(codec.classifyHistoryLabel('paletteReorder'), 'checkpoint_restore');
 for (const label of [
-  'pasteLayer', 'removeLayer', 'duplicateLayer', 'moveLayer', 'moveLayerUp', 'moveLayerDown', 'moveLayerGroupUp', 'moveLayerGroupDown', 'reorderLayer',
-  'addFrame', 'pasteFrame', 'removeFrame', 'duplicateFrame', 'moveFrame', 'moveFrameLeft', 'moveFrameRight', 'reorderFrame',
+  'pasteLayer',
+  'pasteFrame',
   'addCanvas', 'removeCanvas', 'reorderCanvas',
+  'moveLayer', 'reorderLayer', 'moveFrame', 'reorderFrame',
   'clearCanvas', 'scaleSprite', 'selectionOutline4', 'selectionOutline8', 'selectionPaste',
 ]) assert.equal(codec.classifyHistoryLabel(label), 'checkpoint_restore', label);
-assert.equal(codec.classifyHistoryLabel('colorModeConvert'), '');
+assert.equal(codec.classifyHistoryLabel('addFrame'), 'structure_delta');
+for (const label of [
+  'removeLayer', 'moveLayerUp', 'moveLayerDown', 'moveLayerGroupUp', 'moveLayerGroupDown',
+  'removeFrame', 'duplicateFrame', 'moveFrameLeft', 'moveFrameRight',
+]) assert.equal(codec.classifyHistoryLabel(label), 'structure_delta', label);
+assert.equal(codec.classifyHistoryLabel('colorModeConvert'), 'checkpoint_restore');
+assert.equal(codec.classifyHistoryLabel('moveLayerCellsUp'), 'checkpoint_restore');
+assert.equal(codec.classifyHistoryLabel('moveLayerCellsDown'), 'checkpoint_restore');
+assert.equal(codec.classifyHistoryLabel('moveSlotFrameLeft'), 'checkpoint_restore');
+assert.equal(codec.classifyHistoryLabel('moveSlotFrameRight'), 'checkpoint_restore');
 assert.equal(codec.classifyHistoryLabel('pen'), '');
 
 const checkpoint = {
@@ -93,6 +103,31 @@ const layerInsert = {
   data: { canvasId: 'canvas-a', afterTrackId: 'track-a', cells: [{ frameId: 'frame-a', layer: layerDescriptor }] },
 };
 assert.deepEqual(codec.decode(codec.encode(layerInsert)), layerInsert);
+const frameInsert = {
+  version: 1,
+  type: 'structure_delta',
+  action: 'frame_insert',
+  data: {
+    canvasId: 'canvas-a',
+    afterFrameId: 'frame-a',
+    frame: {
+      id: 'frame-b', name: 'Frame 2', duration: 150,
+      layers: [{ id: 'layer-c', trackId: 'track-a', name: 'Layer 1', opacity: 1, blendMode: 'normal' }],
+    },
+  },
+};
+assert.deepEqual(codec.decode(codec.encode(frameInsert)), frameInsert);
+const rasterRegionSet = {
+  version: 1,
+  type: 'raster_region_set',
+  canvasId: 'canvas-a', frameId: 'frame-a', layerId: 'layer-a',
+  canvasWidth: 16, canvasHeight: 16, x: 2, y: 3, width: 5, height: 4,
+  asset: {
+    objectPath: 'rooms/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/raster-assets/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.pxra',
+    sha256Hex: 'cd'.repeat(32), byteLength: 64, codecVersion: 1, pixelFormat: 'indexed-mask-v1',
+  },
+};
+assert.deepEqual(codec.decode(codec.encode(rasterRegionSet)), rasterRegionSet);
 const resize = {
   version: 1,
   type: 'structure_delta',

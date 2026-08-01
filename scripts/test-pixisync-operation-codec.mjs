@@ -64,6 +64,11 @@ assert.equal(keeper.confirmedRevision, 2n);
 assert.equal(keeper.receive(operation(2)).status, 'duplicate');
 assert.equal(gaps.length, 1);
 assert.equal(recoveries.length, 0);
+const rejectedKeeper = order.createOrderKeeper({
+  applyConfirmed: () => { throw new Error('controller rejected operation'); },
+});
+assert.throws(() => rejectedKeeper.receive(operation(1)), /controller rejected operation/);
+assert.equal(rejectedKeeper.confirmedRevision, 0n, 'a rejected controller apply must not advance the ordered revision');
 const highStart = 9007199254740993n;
 const highApplied = [];
 const highKeeper = order.createOrderKeeper({ confirmedRevision: highStart, applyConfirmed: item => highApplied.push(item.revision) });
@@ -153,6 +158,7 @@ assert.equal(realtimeClient.confirmedRevision, 3n);
 console.log('PiXiSYNC realtime RPC adapter tests passed');
 
 const bridgeRoot = await loadModule(new URL('../pixiedraw/assets/js/modules/pixisync-pixel-mutation-bridge-utils.js', import.meta.url));
+new Function(await readFile(new URL('../pixiedraw/assets/js/modules/pixisync-raster-region-asset-utils.js', import.meta.url), 'utf8'))();
 const blankDirectLayer = {
   directOnly: true,
   indices: new Uint8Array(8 * 8),
@@ -253,6 +259,20 @@ assert.deepEqual(largeFillMutations[1].changes.at(-1), {
   paletteValue: 9,
   beforePaletteValue: 0,
 });
+const largeRegion = largeBridge.toRasterRegionAsset({
+  __historyEntryType: 'pixelPatch',
+  kind: 'solid-fill-runs',
+  historyLabel: 'fill',
+  canvasId: 'canvas-a', frameId: 'frame-a', layerId: 'layer-a',
+  width: 100, height: 100,
+  runs: new Int32Array([0, largeFillCount]),
+  beforeIndices: new Uint8Array(largeFillCount),
+  beforeDirect: null,
+  afterPaletteIndex: 9,
+});
+assert.equal(largeRegion.changedCount, largeFillCount);
+assert.deepEqual(largeRegion.rect, { x: 0, y: 0, width: 100, height: 90 });
+assert.ok(largeRegion.bytes.length < largeFillCount + 2000);
 const indexedPalette = {
   2: { r: 20, g: 40, b: 60, a: 255 },
   3: { r: 30, g: 60, b: 90, a: 255 },

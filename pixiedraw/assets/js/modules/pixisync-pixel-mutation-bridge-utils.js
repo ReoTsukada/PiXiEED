@@ -317,6 +317,32 @@
       return mutations?.length === 1 ? mutations[0] : null;
     }
 
+    function toRasterRegionAsset(entry, { useBefore = false } = {}) {
+      const mutations = toPixelMutations(entry);
+      if (!mutations?.length) return null;
+      const base = mutations[0];
+      const changes = mutations.flatMap(mutation => mutation.changes).map(change => ({
+        ...change,
+        paletteValue: useBefore ? change.beforePaletteValue : change.paletteValue,
+      }));
+      const codec = window.PiXiEEDrawModules?.pixisyncRasterRegionAssetUtils;
+      if (!codec?.encode || !changes.length) return null;
+      try {
+        const encoded = codec.encode({ width: base.canvasWidth, height: base.canvasHeight, changes });
+        return {
+          canvasId: base.canvasId,
+          frameId: base.frameId,
+          layerId: base.layerId,
+          canvasWidth: base.canvasWidth,
+          canvasHeight: base.canvasHeight,
+          changes,
+          ...encoded,
+        };
+      } catch (_) {
+        return null;
+      }
+    }
+
     function applyPixelMutation(mutation, { useBefore = false } = {}) {
       const target = resolveTarget?.(mutation);
       if (
@@ -341,7 +367,7 @@
       if (applied) { markDirtyRect?.(x0, y0, x1, y1); requestRender?.(); requestOverlayRender?.(); }
       return { applied, appliedIndices, x0, y0, x1, y1 };
     }
-    return { ELIGIBLE_LABELS, MAX_CHANGES, toPixelMutation, toPixelMutations, applyPixelMutation };
+    return { ELIGIBLE_LABELS, MAX_CHANGES, toPixelMutation, toPixelMutations, toRasterRegionAsset, applyPixelMutation };
   }
   root.pixisyncPixelMutationBridgeUtils = {
     createPiXiSyncPixelMutationBridgeUtils,

@@ -99,6 +99,7 @@
           if (!Number.isSafeInteger(structureEpoch) || structureEpoch < 1) {
             throw new Error('PiXiSYNC realtime: invalid-document-structure-epoch');
           }
+          const rasterRegion = documentOperation?.type === 'raster_region_set';
           return {
             operationId: row.operation_id || row.operationId,
             revision: row.revision,
@@ -108,11 +109,11 @@
             kind,
             structureEpoch,
             documentOperation,
-            canvasId: '__document__',
-            frameId: '__document__',
-            layerId: '__document__',
-            canvasWidth: 1,
-            canvasHeight: 1,
+            canvasId: rasterRegion ? documentOperation.canvasId : '__document__',
+            frameId: rasterRegion ? documentOperation.frameId : '__document__',
+            layerId: rasterRegion ? documentOperation.layerId : '__document__',
+            canvasWidth: rasterRegion ? documentOperation.canvasWidth : 1,
+            canvasHeight: rasterRegion ? documentOperation.canvasHeight : 1,
             undoOfOperationId: null,
           };
         }

@@ -492,17 +492,18 @@
     });
   }
 
-  function resizeAllLayers(width, height, { offsetX = 0, offsetY = 0 } = {}) {
+  function resizeCanvasDocumentLayers(canvas, width, height, { offsetX = 0, offsetY = 0, palette = state.palette } = {}) {
+    if (!canvas || !Array.isArray(canvas.frames)) return false;
     const shiftX = Math.round(Number(offsetX) || 0);
     const shiftY = Math.round(Number(offsetY) || 0);
-    const sourceWidth = state.width;
-    const sourceHeight = state.height;
+    const sourceWidth = Math.max(1, Math.round(Number(canvas.width) || 1));
+    const sourceHeight = Math.max(1, Math.round(Number(canvas.height) || 1));
     const sourceStartX = Math.max(0, -shiftX);
     const sourceEndX = Math.min(sourceWidth, width - shiftX);
     const sourceStartY = Math.max(0, -shiftY);
     const sourceEndY = Math.min(sourceHeight, height - shiftY);
     const copyWidth = Math.max(0, sourceEndX - sourceStartX);
-    state.frames.forEach(frame => {
+    canvas.frames.forEach(frame => {
       frame.layers = frame.layers.map(layer => {
         // Imported GIF frames and inactive cels can use compact/tiled backing
         // storage. Their `indices` buffer is intentionally empty, with the
@@ -514,7 +515,7 @@
           isCompactLayerIndices(layer, sourceWidth * sourceHeight)
           || isTiledLayerIndices(layer, sourceWidth * sourceHeight)
         ) {
-          materializeLayerIndices(layer, sourceWidth, sourceHeight, state.palette);
+          materializeLayerIndices(layer, sourceWidth, sourceHeight, palette);
         }
         const sourceUsesRuntimeUint8 = isRuntimeUint8LayerIndices(layer, sourceWidth * sourceHeight);
         const resized = createLayer(
@@ -524,7 +525,7 @@
           // Preserve the source storage encoding. Compact/tiled layers are
           // materialized as Int16, while imported indexed images remain in
           // their Uint8 runtime representation.
-          sourceUsesRuntimeUint8 ? state.palette : [],
+          sourceUsesRuntimeUint8 ? palette : [],
           { trackId: layer.trackId }
         );
         resized.id = layer.id;
@@ -570,6 +571,18 @@
         return resized;
       });
     });
+    canvas.width = width;
+    canvas.height = height;
+    return true;
+  }
+
+  function resizeAllLayers(width, height, { offsetX = 0, offsetY = 0 } = {}) {
+    const activeCanvas = getActiveProjectCanvasDocument?.() || {
+      width: state.width,
+      height: state.height,
+      frames: state.frames,
+    };
+    return resizeCanvasDocumentLayers(activeCanvas, width, height, { offsetX, offsetY, palette: state.palette });
   }
 
   function scaleDocumentByRatio(numerator, denominator) {
@@ -756,6 +769,7 @@
     applySettingsSizeChanges,
     setupNumberSteppers,
     resizeAllLayers,
+    resizeCanvasDocumentLayers,
     scaleDocumentByRatio,
     getSpriteScaleRatioForValue,
     applySpriteScaleMultiplier,

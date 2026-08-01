@@ -343,15 +343,15 @@ const confirmedCheckpointOperation = {
   documentOperation: preparedDocumentCheckpoint.documentOperation,
 };
 await server.realtimeOptions.at(-1).prepareConfirmed(confirmedCheckpointOperation, { local: true });
-assert.equal(confirmedCheckpointOperation.preparedCheckpoint.verified, true);
-assert.equal(confirmedCheckpointOperation.preparedCheckpoint.alreadyLocal, true);
+assert.equal(confirmedCheckpointOperation.documentOperation.preparedCheckpoint.verified, true);
+assert.equal(confirmedCheckpointOperation.documentOperation.preparedCheckpoint.alreadyLocal, true);
 assert.equal(owner.restored, '');
 const remoteCheckpointOperation = {
   operationId: randomUUID(),
   documentOperation: preparedDocumentCheckpoint.documentOperation,
 };
 await server.realtimeOptions.at(-1).prepareConfirmed(remoteCheckpointOperation, { local: false });
-assert.equal(remoteCheckpointOperation.preparedCheckpoint.verified, true);
+assert.equal(remoteCheckpointOperation.documentOperation.preparedCheckpoint.verified, true);
 assert.equal(owner.restored, 'checkpoint-owner');
 assert.equal(owner.restoreContext.documentCheckpoint, true);
 assert.equal(server.checkpointHash, await sha256(server.objects.get(server.checkpointPath)));

@@ -99,6 +99,11 @@
     let reusableInviteExpiresAt = '';
     let reusableInvitePersistent = false;
     let replacedProjectKey = '';
+    // An owner card can contain the only intact local copy of a legacy room
+    // before an obsolete checkpoint replaces it. Capture it before restore so
+    // a failed historical tail can be repaired without changing the room URL.
+    let ownerRecoveryBlob = null;
+    let ownerRecoveryAttempted = false;
     // Supabase may emit CLOSED asynchronously after removeChannel/stop().
     // Those intentional shutdowns must not be fed back into the session as a
     // transport failure while a lifecycle reconnect is already in progress.
@@ -284,10 +289,11 @@
       if (response?.error) throw response.error;
       return response?.data;
     };
-    const uploadCheckpoint = async (path, blob) => {
+    const uploadCheckpoint = async (path, blob, metadata = undefined) => {
       const response = await withTimeout('checkpoint-upload', supabase.storage.from(CHECKPOINT_BUCKET).upload(path, blob, {
         contentType: 'application/octet-stream',
         upsert: false,
+        ...(metadata && typeof metadata === 'object' ? { metadata } : {}),
       }));
       if (response?.error) throw response.error;
     };
@@ -308,8 +314,44 @@
       if (response?.error) throw response.error;
     };
 
+    function attachPreparedDocumentMarker(operation, key, value) {
+      const prepared = { ...(operation?.documentOperation || {}) };
+      Object.defineProperty(prepared, key, {
+        value: Object.freeze(value), enumerable: false, configurable: false,
+      });
+      operation.documentOperation = prepared;
+      return prepared;
+    }
+
     async function prepareConfirmedDocumentOperation(operation, metadata = {}) {
       const documentOperation = operation?.documentOperation;
+      if (documentOperation?.type === 'raster_region_set') {
+        const reference = documentOperation.asset;
+        const objectPath = String(reference?.objectPath || '');
+        const expectedHash = assertHash(reference?.sha256Hex);
+        const expectedBytes = Number(reference?.byteLength);
+        if (
+          !objectPath.startsWith(`rooms/${roomId}/raster-assets/`)
+          || reference?.codecVersion !== 1
+          || reference?.pixelFormat !== 'indexed-mask-v1'
+          || !Number.isSafeInteger(expectedBytes)
+          || expectedBytes < 1
+          || expectedBytes > MAX_CHECKPOINT_BYTES
+        ) throw new Error('PiXiSYNC runtime: invalid-raster-region-reference');
+        const blob = await downloadCheckpoint(objectPath);
+        if (blob.size !== expectedBytes || await sha256Hex(blob) !== expectedHash) {
+          throw new Error('PiXiSYNC runtime: raster-region-hash-mismatch');
+        }
+        const decoded = window.PiXiEEDrawModules?.pixisyncRasterRegionAssetUtils
+          ?.decode?.(new Uint8Array(await blob.arrayBuffer()));
+        if (!decoded
+          || decoded.rect?.x !== documentOperation.x || decoded.rect?.y !== documentOperation.y
+          || decoded.rect?.width !== documentOperation.width || decoded.rect?.height !== documentOperation.height) {
+          throw new Error('PiXiSYNC runtime: raster-region-shape-mismatch');
+        }
+        attachPreparedDocumentMarker(operation, 'preparedRasterRegion', { ...decoded, verified: true });
+        return;
+      }
       if (documentOperation?.type === 'structure_delta'
         && ['raster_restore', 'canvas_resize_restore'].includes(documentOperation?.action)) {
         const reference = documentOperation?.data?.inverseAsset;
@@ -329,9 +371,7 @@
         const bytes = new Uint8Array(await blob.arrayBuffer());
         const asset = window.PiXiEEDrawModules?.pixisyncRasterAssetUtils?.decode?.(bytes);
         if (!asset) throw new Error('PiXiSYNC runtime: invalid-document-raster-asset');
-        Object.defineProperty(documentOperation, 'preparedRasterAsset', {
-          value: Object.freeze(asset), enumerable: false, configurable: false,
-        });
+        attachPreparedDocumentMarker(operation, 'preparedRasterAsset', asset);
         return;
       }
       if (documentOperation?.type !== 'checkpoint_restore') return;
@@ -354,15 +394,11 @@
       }
       if (metadata.local === true && cached?.direction === 'forward') {
         preparedDocumentCheckpoints.delete(operationId);
-        Object.defineProperty(operation, 'preparedCheckpoint', {
-          value: Object.freeze({
+        attachPreparedDocumentMarker(operation, 'preparedCheckpoint', {
             verified: true,
             applied: true,
             alreadyLocal: true,
             objectPath,
-          }),
-          enumerable: false,
-          configurable: false,
         });
         return;
       }
@@ -375,11 +411,7 @@
           operationId,
           documentCheckpoint: true,
         });
-        Object.defineProperty(operation, 'preparedCheckpoint', {
-          value: Object.freeze({ verified: true, applied: true, objectPath }),
-          enumerable: false,
-          configurable: false,
-        });
+        attachPreparedDocumentMarker(operation, 'preparedCheckpoint', { verified: true, applied: true, objectPath });
       } finally {
         preparedDocumentCheckpoints.delete(operationId);
         runtimeBridge.setInputLocked?.(currentSnapshot()?.phase !== 'active' || localReadOnly);
@@ -531,6 +563,82 @@
       }
     }
 
+    async function cleanupRasterRegionUpload(uploadId, objectPath = '') {
+      const claimed = await rpc('pixisync_abort_raster_region_upload', {
+        p_room_id: roomId,
+        p_upload_id: uploadId,
+      }).catch(() => null);
+      const path = String(objectPath || firstRow(claimed)?.storage_path || '');
+      if (path) await removeCheckpointObject(path).catch(() => {});
+      await rpc('pixisync_finalize_raster_region_upload_cleanup', {
+        p_room_id: roomId,
+        p_upload_id: uploadId,
+      }).catch(() => {});
+    }
+
+    async function prepareRasterRegionAsset({ operationId, structureEpoch, region } = {}) {
+      if (!session?.canDraw?.() || !realtimeClient || localReadOnly) {
+        throw new Error('PiXiSYNC runtime: active-editor-required');
+      }
+      const normalizedOperationId = String(operationId || '');
+      const normalizedEpoch = Number(structureEpoch);
+      const bytes = region?.bytes;
+      const rect = region?.rect;
+      if (!ROOM_ID_PATTERN.test(normalizedOperationId)
+        || !Number.isSafeInteger(normalizedEpoch) || normalizedEpoch < 0
+        || !(bytes instanceof Uint8Array) || bytes.length < 1 || bytes.length > MAX_CHECKPOINT_BYTES
+        || region?.pixelFormat !== 'indexed-mask-v1' || !rect) {
+        throw new Error('PiXiSYNC runtime: invalid-raster-region-request');
+      }
+      if (realtimeClient.pendingOperationCount) throw new Error('PiXiSYNC runtime: pending-operations-remain');
+      const blob = new Blob([bytes], { type: 'application/octet-stream' });
+      const assetHash = await sha256Hex(blob);
+      const baseRevision = realtimeClient.confirmedRevision;
+      const prepared = firstRow(await rpc('pixisync_prepare_raster_region_upload', {
+        p_room_id: roomId,
+        p_upload_id: normalizedOperationId,
+        p_client_id: clientId,
+        p_base_revision: baseRevision.toString(),
+        p_structure_epoch: normalizedEpoch,
+        p_canvas_id: String(region.canvasId || ''),
+        p_frame_id: String(region.frameId || ''),
+        p_layer_id: String(region.layerId || ''),
+        p_canvas_width: Number(region.canvasWidth),
+        p_canvas_height: Number(region.canvasHeight),
+        p_x: Number(rect.x), p_y: Number(rect.y),
+        p_width: Number(rect.width), p_height: Number(rect.height),
+        p_asset_sha256: toHexBytes(assetHash),
+        p_encoded_bytes: blob.size,
+        p_codec_version: 1,
+        p_pixel_format: 'indexed-mask-v1',
+      }));
+      const objectPath = String(prepared?.storage_path || '');
+      if (!objectPath.startsWith(`rooms/${roomId}/raster-assets/`) || !objectPath.endsWith('.pxra')) {
+        await cleanupRasterRegionUpload(normalizedOperationId, objectPath).catch(() => {});
+        throw new Error('PiXiSYNC runtime: invalid-raster-region-path');
+      }
+      try {
+        await uploadCheckpoint(objectPath, blob, { sha256Hex: assetHash });
+        return {
+          documentOperation: Object.freeze({
+            version: 1,
+            type: 'raster_region_set',
+            canvasId: String(region.canvasId), frameId: String(region.frameId), layerId: String(region.layerId),
+            canvasWidth: Number(region.canvasWidth), canvasHeight: Number(region.canvasHeight),
+            x: Number(rect.x), y: Number(rect.y), width: Number(rect.width), height: Number(rect.height),
+            asset: Object.freeze({
+              objectPath, sha256Hex: assetHash, byteLength: blob.size,
+              codecVersion: 1, pixelFormat: 'indexed-mask-v1',
+            }),
+          }),
+          cleanup: async () => cleanupRasterRegionUpload(normalizedOperationId, objectPath),
+        };
+      } catch (error) {
+        await cleanupRasterRegionUpload(normalizedOperationId, objectPath).catch(() => {});
+        throw error;
+      }
+    }
+
     async function requestAuthoritativeRecovery(reason = 'document-operation-recovery') {
       if (!session || disposed || !isReconnectablePhase()) return false;
       runtimeBridge.setInputLocked?.(true);
@@ -550,6 +658,7 @@
         commands,
         prepareCheckpointOperation,
         prepareDocumentRasterAsset,
+        prepareRasterRegionAsset,
         requestAuthoritativeRecovery,
         participants: [],
         localReadOnly,
@@ -652,6 +761,80 @@
         await previousRealtime.stop().catch(() => {});
       }
       let createdRealtime = null;
+      const repairLegacyTailFromOwnerSnapshot = async details => {
+        if (
+          ownerRecoveryAttempted
+          || role !== 'owner'
+          || !(ownerRecoveryBlob instanceof Blob)
+          || ownerRecoveryBlob.size < 1
+          || !manifest?.head_revision
+        ) return false;
+        ownerRecoveryAttempted = true;
+        const checkpointId = window.crypto?.randomUUID?.();
+        if (!ROOM_ID_PATTERN.test(String(checkpointId || ''))) return false;
+        try {
+          const stateHash = await sha256Hex(ownerRecoveryBlob);
+          const prepared = firstRow(await rpc('pixisync_prepare_checkpoint', {
+            p_room_id: roomId,
+            p_checkpoint_id: checkpointId,
+            p_state_sha256: toHexBytes(stateHash),
+            p_encoded_bytes: ownerRecoveryBlob.size,
+            p_codec_version: 1,
+          }));
+          // The head is locked by prepare_checkpoint. If another editor won a
+          // revision while uploading, registration rejects this snapshot
+          // instead of installing a stale owner document.
+          await uploadCheckpoint(String(prepared?.storage_path || ''), ownerRecoveryBlob);
+          await rpc('pixisync_register_checkpoint', {
+            p_room_id: roomId,
+            p_checkpoint_id: checkpointId,
+          });
+          let attested = firstRow(await rpc('pixisync_attest_checkpoint', {
+            p_checkpoint_id: checkpointId,
+            p_client_id: clientId,
+            p_state_sha256: toHexBytes(stateHash),
+          }));
+          if (attested?.status !== 'verified') {
+            const waitForPeer = waitForAttestation(checkpointId);
+            await realtimeClient?.sendBroadcast?.('checkpoint-attestation-request', {
+              checkpointId,
+              storagePath: prepared.storage_path,
+              stateSha256: stateHash,
+              encodedBytes: ownerRecoveryBlob.size,
+              revision: String(prepared.revision),
+            });
+            await waitForPeer;
+            attested = firstRow(await rpc('pixisync_attest_checkpoint', {
+              p_checkpoint_id: checkpointId,
+              p_client_id: clientId,
+              p_state_sha256: toHexBytes(stateHash),
+            }));
+          }
+          if (attested?.status !== 'verified') throw new Error('PiXiSYNC runtime: recovery-checkpoint-attestation-incomplete');
+          const activated = firstRow(await rpc('pixisync_activate_verified_checkpoint', {
+            p_room_id: roomId,
+            p_checkpoint_id: checkpointId,
+          }));
+          manifest = {
+            ...(manifest || {}),
+            checkpoint_revision: String(activated?.checkpoint_revision || prepared.revision),
+            head_revision: String(activated?.head_revision || prepared.revision),
+            structure_epoch: String(activated?.structure_epoch || manifest?.structure_epoch || 0),
+          };
+          ownerRecoveryBlob = null;
+          report({
+            phase: 'legacy-tail-recovered',
+            roomId,
+            checkpointRevision: String(manifest.checkpoint_revision),
+            reason: String(details?.reason || 'recovery-required'),
+          });
+          return true;
+        } catch (error) {
+          onError(error);
+          report({ phase: 'legacy-tail-recovery-failed', roomId, error: error?.message || 'unknown' });
+          return false;
+        }
+      };
       const promoteConfirmedDocumentCheckpoint = async operation => {
         if (
           operation?.kind !== 'document_patch'
@@ -743,7 +926,12 @@
         onRecoveryRequired: details => {
           if (realtimeClient !== createdRealtime) return;
           onError(details?.error || new Error(details?.reason || 'recovery-required'));
-          void enqueue({ type: 'GAP_DETECTED', epoch: currentEpoch() });
+          void repairLegacyTailFromOwnerSnapshot(details).then(repaired => {
+            void enqueue({
+              type: repaired ? 'FORCE_FULL_RESYNC' : 'GAP_DETECTED',
+              epoch: currentEpoch(),
+            });
+          });
         },
       });
       realtimeClient = createdRealtime;
@@ -827,6 +1015,12 @@
               revision: String(manifest.checkpoint_revision),
             });
             break;
+          }
+          if (role === 'owner' && !ownerRecoveryBlob) {
+            const localSnapshot = await captureCheckpoint();
+            if (localSnapshot instanceof Blob && localSnapshot.size > 0 && localSnapshot.size <= MAX_CHECKPOINT_BYTES) {
+              ownerRecoveryBlob = localSnapshot;
+            }
           }
           const blob = await downloadCheckpoint(String(manifest.storage_path || ''));
           if (blob.size !== Number(manifest.encoded_bytes) || await sha256Hex(blob) !== assertHash(manifest.state_sha256_hex)) {

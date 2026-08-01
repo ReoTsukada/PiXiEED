@@ -214,7 +214,8 @@ function createClient(server, actor, ordinal) {
   const recoveries = [];
   const blocked = [];
   const mutationBridge = {
-    toPixelMutations(entry) { return entry?.mutation ? [entry.mutation] : []; },
+    toPixelMutations(entry) { return entry?.mutations || (entry?.mutation ? [entry.mutation] : []); },
+    toRasterRegionAsset(entry) { return entry?.rasterRegion || null; },
     applyPixelMutation(mutation, { useBefore = false } = {}) {
       mutation.changes.forEach(change => {
         pixels[change.index] = useBefore ? change.beforePaletteValue : change.paletteValue;
@@ -224,12 +225,18 @@ function createClient(server, actor, ordinal) {
   };
   const documentBridge = {
     classifyHistoryLabel: label => documentCodec.classifyHistoryLabel(label),
-    toDocumentOperation(entry, _label, _kind, { direction = 'forward' } = {}) {
+    toDocumentOperation(entry, _label, kind, { direction = 'forward', rasterRegion = null } = {}) {
       if (entry?.failPrepare) throw new Error('forced_prepare_failure');
+      if (kind === 'raster_region_set') {
+        assert.equal(rasterRegion, entry.rasterRegion, 'precomputed region must be reused');
+        return { documentOperation: structuredClone(entry.regionForward) };
+      }
       const documentOperation = structuredClone(entry[direction] || entry.forward);
       return { documentOperation };
     },
     applyDocumentOperation(operation) {
+      if (operation?.type === 'checkpoint_restore'
+        && operation?.preparedCheckpoint?.verified !== true) return false;
       document = structuredClone(operation);
       return true;
     },
@@ -270,6 +277,14 @@ function createClient(server, actor, ordinal) {
     roomId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     clientId: `bbbbbbbb-bbbb-4bbb-8bbb-${String(ordinal).padStart(12, '0')}`,
     recoverOnSubscribe: false,
+    prepareConfirmed: async operation => {
+      if (operation?.documentOperation?.type !== 'checkpoint_restore') return;
+      const prepared = { ...operation.documentOperation };
+      Object.defineProperty(prepared, 'preparedCheckpoint', {
+        value: Object.freeze({ verified: true, applied: true }), enumerable: false,
+      });
+      operation.documentOperation = prepared;
+    },
     applyConfirmed: (operation, metadata) => controller.applyConfirmed(operation, metadata),
   });
   controller.configure({ session, realtimeClient, structureEpoch: 0 });
@@ -315,6 +330,24 @@ assert.deepEqual(editor.document, paletteEntry.forward);
 assert.equal(owner.controller.appliedRevision, 1n);
 assert.equal(editor.controller.appliedRevision, 1n);
 assert.equal(server.structureEpoch, 1);
+
+// Checkpoint-backed output changes must carry the verified restore marker on
+// the inner document operation consumed by the controller/app bridge.
+const checkpointEntry = {
+  historyLabel: 'pasteFrame',
+  forward: {
+    version: 1,
+    type: 'checkpoint_restore',
+    objectPath: 'rooms/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/document-checkpoints/cccccccc-cccc-4ccc-8ccc-cccccccccccc.pxd',
+    sha256Hex: 'ab'.repeat(32),
+    byteLength: 20,
+  },
+};
+owner.document = checkpointEntry.forward;
+const checkpointCommit = owner.controller.handleCommittedHistoryEntry(checkpointEntry, checkpointEntry.historyLabel);
+await checkpointCommit.promise;
+await converge();
+assert.equal(editor.document.type, 'checkpoint_restore');
 
 // Visibility is a per-user preference; canonical metadata is gated and synced.
 assert.equal(owner.controller.canBeginLocalOperation('setLayerVisibility'), true);

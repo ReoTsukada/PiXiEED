@@ -2588,6 +2588,8 @@
   set getPendingSelectionMoveState(value) { getPendingSelectionMoveState = value; },
   get getPixelAlignedCanvasDisplayScale() { return getPixelAlignedCanvasDisplayScale; },
   set getPixelAlignedCanvasDisplayScale(value) { getPixelAlignedCanvasDisplayScale = value; },
+  get getActiveProjectCanvasDocument() { return getActiveProjectCanvasDocument; },
+  set getActiveProjectCanvasDocument(value) { getActiveProjectCanvasDocument = value; },
   get getPointerPosition() { return getPointerPosition; },
   set getPointerPosition(value) { getPointerPosition = value; },
   get getViewportVisibilityTargetSurface() { return getViewportVisibilityTargetSurface; },
@@ -12046,6 +12048,7 @@
   };
   let pixisyncCheckpointOperationPreparer = null;
   let pixisyncDocumentRasterAssetPreparer = null;
+  let pixisyncRasterRegionAssetPreparer = null;
   let pixisyncAuthoritativeRecoveryRequester = null;
 
   function makePiXiSyncLayerFromDescriptor(descriptor, width = state.width, height = state.height) {
@@ -12352,36 +12355,52 @@
       if (!applyPiXiSyncRasterRestore(operation, canvas)) return false;
     } else if (operation.action === 'canvas_resize_restore') {
       const asset = operation.preparedRasterAsset;
-      if (!isActiveCanvas || !asset || asset.kind !== 'canvas-resize-lost'
+      if (!asset || asset.kind !== 'canvas-resize-lost'
         || asset.canvasId !== canvas.id || asset.width !== data.width || asset.height !== data.height
-        || state.width !== data.fromWidth || state.height !== data.fromHeight) return false;
-      resizeAllLayers(data.width, data.height, { offsetX: data.offsetX, offsetY: data.offsetY });
-      state.width = data.width; state.height = data.height;
-      canvas.width = data.width; canvas.height = data.height;
+        || canvas.width !== data.fromWidth || canvas.height !== data.fromHeight) return false;
+      const restorePlans = [];
       for (const savedFrame of asset.frames) {
         const frame = frames.find(candidate => candidate?.id === savedFrame.frameId);
         if (!frame) return false;
         for (const savedLayer of savedFrame.layers) {
           const layer = frame.layers.find(candidate => candidate?.id === savedLayer.id && candidate?.trackId === savedLayer.trackId);
-          if (!layer) return false;
-          if (!(layer.indices instanceof Int16Array || layer.indices instanceof Uint8Array) || layer.indices.length !== data.width * data.height) return false;
-          for (const [index, value] of savedLayer.pixels) layer.indices[index] = value;
+          if (!layer || !Array.isArray(savedLayer.pixels)
+            || savedLayer.pixels.some(pixel => !Array.isArray(pixel) || pixel.length !== 2
+              || !Number.isInteger(pixel[0]) || pixel[0] < 0 || pixel[0] >= data.width * data.height
+              || !Number.isInteger(pixel[1]) || pixel[1] < 1 || pixel[1] > 254)) return false;
+          restorePlans.push({ frameId: savedFrame.frameId, layerId: savedLayer.id, trackId: savedLayer.trackId, pixels: savedLayer.pixels });
         }
       }
-      if (dom.controls.canvasWidth instanceof HTMLInputElement) dom.controls.canvasWidth.value = String(data.width);
-      if (dom.controls.canvasHeight instanceof HTMLInputElement) dom.controls.canvasHeight.value = String(data.height);
-      clearSelection(); resizeCanvases();
+      if (!canvasResizeWorkflowUtilsModule.resizeCanvasDocumentLayers(
+        canvas, data.width, data.height,
+        { offsetX: data.offsetX, offsetY: data.offsetY, palette: state.palette }
+      )) return false;
+      for (const plan of restorePlans) {
+        const frame = frames.find(candidate => candidate?.id === plan.frameId);
+        const layer = frame.layers.find(candidate => candidate?.id === plan.layerId && candidate?.trackId === plan.trackId);
+        if (!(layer.indices instanceof Int16Array || layer.indices instanceof Uint8Array) || layer.indices.length !== data.width * data.height) return false;
+        for (const [index, value] of plan.pixels) layer.indices[index] = value;
+      }
+      if (isActiveCanvas) {
+        state.width = data.width; state.height = data.height;
+        if (dom.controls.canvasWidth instanceof HTMLInputElement) dom.controls.canvasWidth.value = String(data.width);
+        if (dom.controls.canvasHeight instanceof HTMLInputElement) dom.controls.canvasHeight.value = String(data.height);
+        clearSelection(); resizeCanvases();
+      }
     } else if (operation.action === 'canvas_resize') {
-      if (!isActiveCanvas || state.width !== data.fromWidth || state.height !== data.fromHeight) return false;
-      resizeAllLayers(data.width, data.height, { offsetX: data.offsetX, offsetY: data.offsetY });
-      state.width = data.width;
-      state.height = data.height;
-      canvas.width = data.width;
-      canvas.height = data.height;
-      if (dom.controls.canvasWidth instanceof HTMLInputElement) dom.controls.canvasWidth.value = String(data.width);
-      if (dom.controls.canvasHeight instanceof HTMLInputElement) dom.controls.canvasHeight.value = String(data.height);
-      clearSelection();
-      resizeCanvases();
+      if (canvas.width !== data.fromWidth || canvas.height !== data.fromHeight) return false;
+      if (!canvasResizeWorkflowUtilsModule.resizeCanvasDocumentLayers(
+        canvas, data.width, data.height,
+        { offsetX: data.offsetX, offsetY: data.offsetY, palette: state.palette }
+      )) return false;
+      if (isActiveCanvas) {
+        state.width = data.width;
+        state.height = data.height;
+        if (dom.controls.canvasWidth instanceof HTMLInputElement) dom.controls.canvasWidth.value = String(data.width);
+        if (dom.controls.canvasHeight instanceof HTMLInputElement) dom.controls.canvasHeight.value = String(data.height);
+        clearSelection();
+        resizeCanvases();
+      }
     } else if (operation.action === 'frame_order') {
       if (data.frameIds.length !== frames.length) return false;
       const byId = new Map(frames.map(frame => [frame?.id, frame]));
@@ -12429,7 +12448,9 @@
       const historyIndex = entry ? history.past.indexOf(entry) : -1;
       if (historyIndex < 0) throw new Error('pixisync-rejected-history-entry-not-found');
       let rolledBack = false;
-      if (isPaletteStateHistoryEntry(entry)) {
+      if (isPixelPatchHistoryEntry(entry)) {
+        rolledBack = applyPixelPatchHistoryEntry(entry, 'undo');
+      } else if (isPaletteStateHistoryEntry(entry)) {
         rolledBack = applyPaletteStateHistoryEntry(entry, 'undo');
       } else if (isTimelineVisualHistoryEntry(entry)) {
         rolledBack = applyTimelineVisualHistoryEntry(entry, 'undo');
@@ -12466,6 +12487,18 @@
     toDocumentOperation: async (_entry, _label, kind, options = {}) => {
       if (options.reuseDocumentOperation) {
         return { documentOperation: options.reuseDocumentOperation };
+      }
+      if (kind === 'raster_region_set') {
+        if (typeof pixisyncRasterRegionAssetPreparer !== 'function') return null;
+        const region = options.rasterRegion || pixisyncPixelMutationBridge?.toRasterRegionAsset?.(_entry, {
+          useBefore: options.direction === 'undo',
+        });
+        if (!region?.bytes || !region?.rect) return null;
+        return await pixisyncRasterRegionAssetPreparer({
+          operationId: options.operationId,
+          structureEpoch: options.structureEpoch,
+          region,
+        });
       }
       if (kind === 'checkpoint_restore') {
         if (isVoxelExtensionModeEnabled()) return null;
@@ -12553,6 +12586,16 @@
               data: { canvasId: canvas.id, frameIds }, assetKind: 'frame-remove', targetFrames, options,
             });
           }
+          if (source.action === 'frame_insert') {
+            const frameId = String(source.data?.frame?.id || '');
+            const targetFrame = canvas.frames.find(frame => frame?.id === frameId) || null;
+            if (!frameId || !targetFrame) return null;
+            return await preparePiXiSyncRemovalDelta({
+              action: 'frame_remove', canvas,
+              data: { canvasId: canvas.id, frameIds: [frameId] },
+              assetKind: 'frame-remove', targetFrames: [targetFrame], options,
+            });
+          }
           // Ordered identity clones are reversible. Reordering requires a
           // separate pre-order record and remains checkpoint-backed until it
           // is available, rather than guessing an inverse order.
@@ -12619,9 +12662,14 @@
           const index = state.frames.findIndex(frame => frame?.id === item?.frameId);
           if (!item?.frame || index < 0) return null;
           if (direction === 'undo') {
-            return { documentOperation: { version: 1, type: 'structure_delta', action: 'frame_remove', data: {
-              canvasId: _entry.canvasId, frameId: item.frameId,
-            } } };
+            const canvas = getPiXiSyncCanvasForDelta(_entry.canvasId);
+            const targetFrame = canvas?.frames?.find(frame => frame?.id === item.frameId) || null;
+            if (!canvas || !targetFrame) return null;
+            return await preparePiXiSyncRemovalDelta({
+              action: 'frame_remove', canvas,
+              data: { canvasId: canvas.id, frameIds: [item.frameId] },
+              assetKind: 'frame-remove', targetFrames: [targetFrame], options,
+            });
           }
           return { documentOperation: { version: 1, type: 'structure_delta', action: 'frame_insert', data: {
             canvasId: _entry.canvasId,
@@ -12759,6 +12807,35 @@
           && operation?.preparedCheckpoint?.applied === true;
       }
       if (operation?.type === 'structure_delta') return applyPiXiSyncStructureDelta(operation);
+      if (operation?.type === 'raster_region_set') {
+        const prepared = operation.preparedRasterRegion;
+        const target = resolvePixelPatchHistoryTarget?.({
+          __historyEntryType: HISTORY_ENTRY_TYPE_PIXEL_PATCH,
+          canvasId: operation.canvasId,
+          frameId: operation.frameId,
+          layerId: operation.layerId,
+          width: operation.canvasWidth,
+          height: operation.canvasHeight,
+        });
+        if (!prepared?.verified || !target?.layer
+          || Number(target.width) !== Number(operation.canvasWidth)
+          || Number(target.height) !== Number(operation.canvasHeight)
+          || prepared.rect?.x !== operation.x || prepared.rect?.y !== operation.y
+          || prepared.rect?.width !== operation.width || prepared.rect?.height !== operation.height) return false;
+        const changes = (prepared.changes || []).map(change => ({
+          index: (Number(change.y) * Number(operation.canvasWidth)) + Number(change.x),
+          paletteValue: Number(change.paletteValue),
+        }));
+        if (!changes.length) return false;
+        return pixisyncPixelMutationBridge.applyPixelMutation({
+          canvasId: operation.canvasId,
+          frameId: operation.frameId,
+          layerId: operation.layerId,
+          canvasWidth: operation.canvasWidth,
+          canvasHeight: operation.canvasHeight,
+          changes,
+        }).applied === changes.length;
+      }
       if (operation?.type === 'document_structure') return applyPiXiSyncDocumentStructure(operation.document);
       if (operation?.type === 'palette') {
         state.palette = operation.palette.map(color => normalizeColorValue(color));
@@ -12766,18 +12843,27 @@
         renderPalette();
         syncPaletteInputs();
       } else if (operation?.type === 'layer_properties') {
-        const byId = new Map(operation.layers.map(layer => [layer.layerId, layer]));
+        const targets = new Map();
         visitPiXiSyncDocumentLayers(layer => {
-          const properties = byId.get(layer.id);
-          if (!properties) return;
+          if (targets.has(layer.id)) targets.set(layer.id, null);
+          else targets.set(layer.id, layer);
+        });
+        if (operation.layers.some(properties => !targets.get(properties.layerId))) return false;
+        operation.layers.forEach(properties => {
+          const layer = targets.get(properties.layerId);
           if (properties.opacity !== undefined) layer.opacity = normalizeLayerOpacity(properties.opacity);
           if (properties.blendMode !== undefined) layer.blendMode = normalizeLayerBlendMode(properties.blendMode);
         });
       } else if (operation?.type === 'frame_properties') {
-        const byId = new Map(operation.frames.map(frame => [frame.frameId, frame.duration]));
+        const targets = new Map();
         getProjectCanvasDocuments().forEach(canvas => (canvas.frames || []).forEach(frame => {
-          if (byId.has(frame.id)) frame.duration = Math.max(1, Number(byId.get(frame.id)) || 1);
+          if (targets.has(frame.id)) targets.set(frame.id, null);
+          else targets.set(frame.id, frame);
         }));
+        if (operation.frames.some(properties => !targets.get(properties.frameId))) return false;
+        operation.frames.forEach(properties => {
+          targets.get(properties.frameId).duration = Math.max(1, Number(properties.duration) || 1);
+        });
       } else {
         return false;
       }
@@ -12846,6 +12932,9 @@
         pixisyncDocumentRasterAssetPreparer = typeof runtime?.prepareDocumentRasterAsset === 'function'
           ? runtime.prepareDocumentRasterAsset
           : null;
+        pixisyncRasterRegionAssetPreparer = typeof runtime?.prepareRasterRegionAsset === 'function'
+          ? runtime.prepareRasterRegionAsset
+          : null;
         pixisyncAuthoritativeRecoveryRequester = typeof runtime?.requestAuthoritativeRecovery === 'function'
           ? runtime.requestAuthoritativeRecovery
           : null;
@@ -12872,6 +12961,7 @@
         pixisyncLocalReadOnly = false;
         pixisyncCheckpointOperationPreparer = null;
         pixisyncDocumentRasterAssetPreparer = null;
+        pixisyncRasterRegionAssetPreparer = null;
         pixisyncAuthoritativeRecoveryRequester = null;
         pixisyncCollaborationController.clear();
         pixisyncMinimalUi?.clear?.();
@@ -13022,10 +13112,11 @@
       });
     }
     clearCanvasCompositeFrameCache();
-    // PiXiSYNC commits each structure change as a checkpoint. Its local Undo
-    // entry must therefore retain the ordinary before snapshot as well; the
-    // compact local-only history forms do not carry that recovery baseline.
-    const useLocalCompactStructureHistory = !pixisyncCollaborationController?.enabled;
+    // Semantic structure deltas carry their own exact IDs/anchors and inverse
+    // asset references. Keep the same compact history representation used by
+    // local editing so synchronization does not force a document snapshot.
+    const useLocalCompactStructureHistory = !pixisyncCollaborationController?.enabled
+      || pixisyncDocumentOperationUtils?.classifyHistoryLabel?.(label) === 'structure_delta';
     if (
       label === 'addLayer'
       && !multiState.connected
@@ -15926,8 +16017,47 @@
         newFrame.name = getDefaultFrameName(nextFrameNumber);
       }
       state.frames.splice(insertIndex, 0, newFrame);
-      if (!duplicate) {
+      if (duplicate && !isVoxelExtensionModeEnabled() && history.pending && typeof history.pending === 'object') {
+        history.pending.pixisyncStructureDelta = {
+          action: 'frame_clone',
+          data: {
+            canvasId: String(getActiveProjectCanvasDocument()?.id || ''),
+            afterFrameId: insertIndex > 0 ? String(state.frames[insertIndex - 1]?.id || '') : null,
+            clones: [{
+              sourceFrameId: String(baseFrame.id || ''),
+              frameId: String(newFrame.id || ''),
+              name: String(newFrame.name || 'Frame'),
+              duration: Math.max(1, Number(newFrame.duration) || 1),
+              layerIds: (newFrame.layers || []).map(layer => String(layer?.id || '')),
+            }],
+          },
+        };
+      } else if (!duplicate) {
         recordPendingFrameAddHistoryFrame(newFrame, insertIndex);
+        // The peer must apply this already-decided result, not recompute the
+        // default name, duration, IDs, or insertion point from its own UI.
+        // Empty raster data is implicit and deliberately not transported.
+        if (!isVoxelExtensionModeEnabled() && history.pending && typeof history.pending === 'object') {
+          history.pending.pixisyncStructureDelta = {
+            action: 'frame_insert',
+            data: {
+              canvasId: String(getActiveProjectCanvasDocument()?.id || ''),
+              afterFrameId: insertIndex > 0 ? String(state.frames[insertIndex - 1]?.id || '') : null,
+              frame: {
+                id: String(newFrame?.id || ''),
+                name: String(newFrame?.name || 'Frame'),
+                duration: Math.max(1, Number(newFrame?.duration) || 1),
+                layers: (newFrame?.layers || []).map(layer => ({
+                  id: String(layer?.id || ''),
+                  trackId: String(layer?.trackId || ''),
+                  name: String(layer?.name || 'Layer'),
+                  opacity: normalizeLayerOpacity(layer?.opacity),
+                  blendMode: normalizeLayerBlendMode(layer?.blendMode),
+                })),
+              },
+            },
+          };
+        }
       }
     }
     clearPendingMultiAssignmentMoveRequests();
