@@ -10,6 +10,11 @@
     operationIdFactory = () => window.crypto?.randomUUID?.(),
     onBlocked = () => {},
     onRecoveryRequired = () => {},
+    shouldDeferConfirmedMutation = () => false,
+    deferConfirmedMutation = null,
+    flushDeferredPixelMutations = null,
+    clearDeferredPixelMutations = null,
+    getDeferredPixelSnapshot = null,
   } = {}) {
     if (!mutationBridge?.toPixelMutations || !mutationBridge?.applyPixelMutation || !writerStampUtils?.createWriterStamps) {
       throw new Error('PiXiSYNC controller: missing mutation dependencies');
@@ -151,6 +156,14 @@
         throw new Error('PiXiSYNC controller: noncontiguous-controller-apply');
       }
       if (operation?.kind === 'document_patch') {
+        const documentType = String(operation?.documentOperation?.type || '');
+        if (documentType === 'checkpoint_restore' || documentType === 'structure_delta' || documentType === 'raster_region_set') {
+          const deferredFlush = flushDeferredPixelMutations?.();
+          if (deferredFlush?.ok === false) {
+            onRecoveryRequired({ reason: 'deferred-pixel-flush-failed', operation, result: deferredFlush });
+            throw new Error('PiXiSYNC controller: deferred-pixel-flush-failed');
+          }
+        }
         const localDocument = pendingDocument?.operationId === String(operation.operationId);
         const discardedPendingIds = [];
         let invalidatedLocalDocument = null;
@@ -274,7 +287,13 @@
       rollbackPending();
       if (localPending) pendingOptimistic.delete(String(operation.operationId));
       const mutation = mutationFromConfirmed(operation);
-      const result = mutationBridge.applyPixelMutation(mutation);
+      const mayDefer = !localPending
+        && !guardedPending
+        && typeof deferConfirmedMutation === 'function'
+        && shouldDeferConfirmedMutation(mutation, operation) === true;
+      const result = mayDefer
+        ? deferConfirmedMutation(mutation, revision)
+        : mutationBridge.applyPixelMutation(mutation);
       if (result.applied !== operation.changes.length) {
         onRecoveryRequired({ reason: 'confirmed-patch-apply-mismatch', operation, result });
         throw new Error('PiXiSYNC controller: confirmed-patch-apply-mismatch');
@@ -720,6 +739,7 @@
       pendingDocument = null;
       stampsByTarget.clear();
       confirmedOperationIds.clear();
+      clearDeferredPixelMutations?.();
       appliedRevision = normalizeRevision(checkpointRevision, { allowZero: true });
     }
 
@@ -739,6 +759,7 @@
       pendingDocument = null;
       stampsByTarget.clear();
       confirmedOperationIds.clear();
+      clearDeferredPixelMutations?.();
       appliedRevision = 0n;
     }
 
@@ -750,6 +771,7 @@
         pendingOperationCount: pendingOptimistic.size,
         pendingDocumentOperation: Boolean(pendingDocument),
         guardedOperationPending: pendingGuarded.size > 0,
+        deferredPixels: getDeferredPixelSnapshot?.() || null,
         pendingOperationIds: [...pendingOptimistic.keys()],
         confirmedOperationIds: [...confirmedOperationIds],
         writerTargets: [...stampsByTarget.entries()].map(([key, stamps]) => ({

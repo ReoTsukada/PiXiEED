@@ -11956,6 +11956,44 @@
       resolvePaletteColor: paletteIndex => state.palette?.[paletteIndex] || null,
       historyEntryType: HISTORY_ENTRY_TYPE_PIXEL_PATCH,
     }) || null;
+  const pixisyncLazyCellSync = window.PiXiEEDrawModules?.pixisyncLazyCellSyncUtils
+    ?.createPiXiSyncLazyCellSyncUtils?.({
+      isTargetActive: target => {
+        const canvasDoc = getActiveProjectCanvasDocument();
+        const frame = getActiveFrame();
+        const layer = getActiveLayer();
+        return Boolean(
+          canvasDoc?.id === target?.canvasId
+          && frame?.id === target?.frameId
+          && layer?.id === target?.layerId
+        );
+      },
+      applyPixelMutation: mutation => pixisyncPixelMutationBridge?.applyPixelMutation?.(mutation)
+        || { applied: 0, appliedIndices: [] },
+      onDeferred: target => {
+        const resolved = resolvePixelPatchHistoryTarget?.({
+          __historyEntryType: HISTORY_ENTRY_TYPE_PIXEL_PATCH,
+          canvasId: target?.canvasId,
+          frameId: target?.frameId,
+          layerId: target?.layerId,
+          width: target?.canvasWidth,
+          height: target?.canvasHeight,
+        });
+        invalidateCanvasCompositeFrameCacheEntry(resolved?.frame, resolved?.canvasDoc);
+        scheduleTimelineMatrixRenderSoon();
+      },
+    }) || null;
+  function hydratePiXiSyncActiveCell() {
+    const result = pixisyncLazyCellSync?.flushActive?.() || { applied: 0, ok: true };
+    if (result.ok === false) {
+      console.warn('[pixisync:v1] lazy cell hydrate failed', result);
+      void pixisyncAuthoritativeRecoveryRequester?.('lazy-cell-hydrate-failed');
+    }
+    return result;
+  }
+  function flushPiXiSyncDeferredCells() {
+    return pixisyncLazyCellSync?.flushAll?.() || { applied: 0, ok: true };
+  }
   const visitPiXiSyncDocumentLayers = visitor => {
     getProjectCanvasDocuments().forEach(canvas => {
       (canvas?.frames || []).forEach(frame => {
@@ -12899,14 +12937,18 @@
           paletteValue: Number(change.paletteValue),
         }));
         if (!changes.length) return false;
-        return pixisyncPixelMutationBridge.applyPixelMutation({
+        const mutation = {
           canvasId: operation.canvasId,
           frameId: operation.frameId,
           layerId: operation.layerId,
           canvasWidth: operation.canvasWidth,
           canvasHeight: operation.canvasHeight,
           changes,
-        }).applied === changes.length;
+        };
+        const result = pixisyncLazyCellSync?.shouldDefer?.(mutation)
+          ? pixisyncLazyCellSync.defer(mutation)
+          : pixisyncPixelMutationBridge.applyPixelMutation(mutation);
+        return result.applied === changes.length;
       }
       if (operation?.type === 'document_structure') return applyPiXiSyncDocumentStructure(operation.document);
       if (operation?.type === 'palette') {
@@ -12984,6 +13026,12 @@
             `rollbackScheduled=${String(details?.rollbackScheduled === true)}`
           );
         },
+        shouldDeferConfirmedMutation: mutation => pixisyncLazyCellSync?.shouldDefer?.(mutation) === true,
+        deferConfirmedMutation: (mutation, revision) => pixisyncLazyCellSync?.defer?.(mutation, revision)
+          || { applied: 0, appliedIndices: [] },
+        flushDeferredPixelMutations: () => flushPiXiSyncDeferredCells(),
+        clearDeferredPixelMutations: () => pixisyncLazyCellSync?.clear?.(),
+        getDeferredPixelSnapshot: () => pixisyncLazyCellSync?.snapshot?.() || null,
       })
   ) || null;
   let pixisyncInputLocked = false;
@@ -13102,8 +13150,15 @@
       return false;
     }
     if (!pixisyncCollaborationController?.enabled) return true;
+    const hydrated = hydratePiXiSyncActiveCell();
+    if (hydrated.ok === false) return false;
+    const documentKind = pixisyncDocumentOperationUtils?.classifyHistoryLabel?.(label) || '';
+    if (documentKind === 'checkpoint_restore' || documentKind === 'structure_delta') {
+      const flushed = flushPiXiSyncDeferredCells();
+      if (flushed.ok === false) return false;
+    }
     if (
-      pixisyncDocumentOperationUtils?.classifyHistoryLabel?.(label) === 'checkpoint_restore'
+      documentKind === 'checkpoint_restore'
       && isVoxelExtensionModeEnabled()
     ) {
       return false;
@@ -15925,6 +15980,7 @@
   set getVoxelPreviewOrientationForFrameIndex(value) { getVoxelPreviewOrientationForFrameIndex = value; },
   get hoverPixel() { return hoverPixel; },
   set hoverPixel(value) { hoverPixel = value; },
+  get hydratePiXiSyncActiveCell() { return hydratePiXiSyncActiveCell; },
   get invalidateActiveCanvasCompositeRenderState() { return invalidateActiveCanvasCompositeRenderState; },
   set invalidateActiveCanvasCompositeRenderState(value) { invalidateActiveCanvasCompositeRenderState = value; },
   get isMultiAssignedCellRestrictedEditorMode() { return isMultiAssignedCellRestrictedEditorMode; },

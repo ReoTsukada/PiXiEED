@@ -23,12 +23,14 @@ const state = {
   playback: { isPlaying: false },
 };
 const noop = () => {};
+const hydratedCells = [];
 const navigation = window.PiXiEEDrawModules.timelineNavigationWorkflowUtils.createTimelineNavigationWorkflowUtils({
   state,
   clamp: (value, min, max) => Math.max(min, Math.min(max, value)),
   getActiveFrame: () => state.frames[state.activeFrame] || null,
   getProjectCanvasDocuments: () => [],
   getActiveProjectCanvasDocument: () => null,
+  hydratePiXiSyncActiveCell: () => hydratedCells.push(`${state.frames[state.activeFrame]?.id}/${state.activeLayer}`),
   pointerState: { active: false, selectionMove: null, lastSelectionMove: null },
   virtualCursorDrawState: { active: false, lastPosition: null, currentPosition: null },
   clearSelection: noop,
@@ -80,7 +82,9 @@ assert.equal(
   'frame-2-track-b',
   'frame navigation must retain the selected track even when the target frame order differs'
 );
+assert.equal(hydratedCells.at(-1), 'frame-2/frame-2-track-b', 'the destination cell must hydrate before rendering');
 navigation.setActiveFrameIndex(0, { persist: false, render: false, syncUi: false, broadcastPresence: false });
 assert.equal(state.activeLayer, 'frame-1-track-b', 'reverse navigation must retain the same track');
+assert.equal(hydratedCells.at(-1), 'frame-1/frame-1-track-b');
 
 console.log(JSON.stringify({ activeTrackId: navigation.getActiveLayerTrackId(), activeLayer: state.activeLayer }, null, 2));

@@ -164,6 +164,7 @@
         state.activeLayer = syncedLayer.id;
       }
     }
+    hydratePiXiSyncActiveCell?.();
     if (isVoxelExtensionModeEnabled()) {
       const frameOrientation = getVoxelPreviewOrientationForFrameIndex(
         normalizedIndex,
@@ -273,6 +274,7 @@
       activeCanvasDoc.activeFrame = normalizedFrameIndex;
       activeCanvasDoc.activeLayer = targetLayer.id;
     }
+    hydratePiXiSyncActiveCell?.();
     const changed = previousFrame !== normalizedFrameIndex || previousLayer !== targetLayer.id;
     if (changed) {
       invalidateActiveCanvasCompositeRenderState({ preserveFrameCache: true });
@@ -367,6 +369,7 @@
     if (activeCanvasDoc) {
       activeCanvasDoc.activeLayer = nextLayer.id;
     }
+    hydratePiXiSyncActiveCell?.();
     if (persist) {
       scheduleSessionPersist({ includeSnapshots: false, includeReloadSnapshot: false });
     }
