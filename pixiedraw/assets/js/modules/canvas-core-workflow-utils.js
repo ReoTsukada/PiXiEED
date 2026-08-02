@@ -114,6 +114,44 @@
     data[destBase + 3] = Math.round(outAlpha * 255);
   }
 
+  function resolveLayerPixelRgba(layer, pixelIndex, palette = state.palette, target = null) {
+    if (!layer || !Number.isInteger(pixelIndex) || pixelIndex < 0) {
+      return null;
+    }
+    const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
+    if (layer.directOnly !== true) {
+      const paletteIndex = typeof getStoredRasterLayerPaletteIndex === 'function'
+        ? getStoredRasterLayerPaletteIndex(layer, pixelIndex)
+        : (layer.indices instanceof Int16Array ? layer.indices[pixelIndex] : -1);
+      if (paletteIndex >= 0) {
+        const color = Array.isArray(palette) ? palette[paletteIndex] : null;
+        if (!color || !Number.isFinite(Number(color.a)) || Number(color.a) <= 0) {
+          return null;
+        }
+        const resolved = target && typeof target === 'object' ? target : {};
+        resolved.r = color.r;
+        resolved.g = color.g;
+        resolved.b = color.b;
+        resolved.a = color.a;
+        resolved.mode = 'index';
+        resolved.index = paletteIndex;
+        return resolved;
+      }
+    }
+    const directBase = pixelIndex * 4;
+    if (!direct || directBase + 3 >= direct.length || direct[directBase + 3] <= 0) {
+      return null;
+    }
+    const resolved = target && typeof target === 'object' ? target : {};
+    resolved.r = direct[directBase];
+    resolved.g = direct[directBase + 1];
+    resolved.b = direct[directBase + 2];
+    resolved.a = direct[directBase + 3];
+    resolved.mode = 'rgb';
+    resolved.index = -1;
+    return resolved;
+  }
+
   function blendColors(target, source, opacity) {
     const srcA = (source.a / 255) * opacity;
     const dstA = target.a / 255;
@@ -192,6 +230,7 @@
   return Object.freeze({
     blendChannelByMode,
     compositeLayerPixelNormalized,
+    resolveLayerPixelRgba,
     blendColors,
     getActiveFrame,
     getActiveLayer,

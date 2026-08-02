@@ -447,6 +447,11 @@ const renderer = context.window.PiXiEEDrawModules.canvasRenderWorkflowUtils
     getDisplayedLayerPreviewOpacity: () => 1,
     getDisplayedLayerVisibility: () => true,
     getStoredRasterLayerPaletteIndex: model.getStoredLayerPaletteIndex,
+    resolveLayerPixelRgba: (layer, pixelIndex, sourcePalette) => {
+      const paletteIndex = model.getStoredLayerPaletteIndex(layer, pixelIndex);
+      const color = paletteIndex >= 0 ? sourcePalette?.[paletteIndex] : null;
+      return color && color.a > 0 ? { ...color, mode: 'index', index: paletteIndex } : null;
+    },
     getPlaybackFrameImageData: () => null,
     isTiledLayerIndices: model.isTiledLayerIndices,
     isVoxelExtensionModeEnabled: () => false,

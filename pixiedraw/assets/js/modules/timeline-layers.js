@@ -2119,11 +2119,11 @@
     if (isEmpty) {
       return 'bodyEmpty';
     }
-    if (isActiveCell) {
-      return 'bodyActiveCell';
-    }
     if (isHidden) {
       return 'bodyHidden';
+    }
+    if (isActiveCell) {
+      return 'bodyActiveCell';
     }
     if (isActiveLayerRow && isActiveFrameColumn) {
       return 'bodyActiveCell';
@@ -2192,6 +2192,9 @@
           rememberLocalLayerVisibility(targetLayer.id, nextVisible);
         }
       });
+      if (nextVisible) {
+        hydratePiXiSyncActiveCell?.();
+      }
       clearPlaybackFrameCache();
       scheduleSessionPersist({ includeSnapshots: false });
       renderLayerList();
@@ -3268,11 +3271,15 @@
     layerHeaders.forEach(header => {
       const rowIndex = Number.parseInt(header.dataset.layerRowIndex || '', 10);
       const layerTrackIndex = Number.parseInt(header.dataset.timelineLayerIndex || '', 10);
-      const isActiveLayer = rowIndex === activeLayerRow && !header.classList.contains('is-placeholder');
+      const isVisibilityHeader = header.classList.contains('timeline-cell--layer-visibility');
+      const isActiveLayerRow = rowIndex === activeLayerRow
+        && !header.classList.contains('is-placeholder');
+      const isActiveLayer = !isVisibilityHeader && isActiveLayerRow;
       const isSelectedLayer = isLayerSelectionMode
         && Number.isFinite(layerTrackIndex)
         && timelineSelection.layerIndexes.has(layerTrackIndex);
       header.classList.toggle('is-active-layer', isActiveLayer);
+      header.classList.toggle('is-active-layer-row', isActiveLayerRow);
       header.classList.toggle('is-multi-selected-layer', isSelectedLayer);
       header.classList.toggle('is-structure-selected', isSelectedLayer);
       header.classList.toggle('is-structure-selected-layer', isSelectedLayer);
@@ -3291,9 +3298,11 @@
       const rowVisible = rowVisibilityByIndex.get(rowIndex) !== false;
       const layerVariant = header.classList.contains('is-placeholder')
         ? 'layerPlaceholder'
-        : isActiveLayer
-          ? (rowVisible ? 'layerActive' : 'layerActiveHidden')
-          : (rowVisible ? 'layer' : 'layerHidden');
+        : isVisibilityHeader
+          ? (rowVisible ? 'layer' : 'layerHidden')
+          : isActiveLayer
+            ? (rowVisible ? 'layerActive' : 'layerActiveHidden')
+            : (rowVisible ? 'layer' : 'layerHidden');
       applyTimelineCellFrame(header, layerVariant);
     });
 
@@ -3353,7 +3362,7 @@
         slot.classList.toggle('is-active', isActiveCell);
         slot.classList.toggle('is-selected', isSelectedSlot);
         cell.classList.toggle('is-selected-slot-cell', isSelectedSlot);
-        applyTimelineSlotFrame(slot, isActiveCell ? 'active' : (isHiddenCell ? 'hidden' : 'default'));
+        applyTimelineSlotFrame(slot, isHiddenCell ? 'hidden' : (isActiveCell ? 'active' : 'default'));
       } else {
         cell.classList.remove('is-selected-slot-cell');
       }
@@ -3538,7 +3547,7 @@
       const frameLayers = frame.layers;
       for (let layerIndex = 0; layerIndex < frameLayers.length; layerIndex += 1) {
         const layer = frameLayers[layerIndex];
-        timelineKeyParts.push(`ly:${layer.id}:${layer.name}:${layer.visible ? 1 : 0}`);
+        timelineKeyParts.push(`ly:${layer.id}:${layer.name}:${getDisplayedLayerVisibility(layer, true) ? 1 : 0}`);
       }
     }
     const nextTimelineRenderKey = timelineKeyParts.join('|');
@@ -3745,7 +3754,8 @@
       const rowVisibility = getLayerVisibilityForRow(rowIndex);
 
       if (rowIndex === activeLayerRow) {
-        rowVisibilityCell.classList.add('is-active-layer');
+        rowVisibilityCell.classList.add('is-active-layer-row');
+        rowHeader.classList.add('is-active-layer-row');
         rowHeader.classList.add('is-active-layer');
       }
       const isMultiSelectedLayer = timelineSelection.mode === TIMELINE_SELECTION_MODE_LAYER
@@ -3786,7 +3796,7 @@
             : localizeText('レイヤーを表示', 'Show layer')
         );
         visibilityToggle.title = visibilityToggle.getAttribute('aria-label') || '';
-        visibilityToggle.textContent = rowVisibility ? '●' : '×';
+        visibilityToggle.textContent = '●';
         rowVisibilityCell.appendChild(visibilityToggle);
 
         const tag = document.createElement('button');
@@ -3833,7 +3843,7 @@
         : rowIndex === activeLayerRow
           ? (rowVisibility ? 'layerActive' : 'layerActiveHidden')
           : (rowVisibility ? 'layer' : 'layerHidden');
-      applyTimelineCellFrame(rowVisibilityCell, layerVariant);
+      applyTimelineCellFrame(rowVisibilityCell, rowVisibility ? 'layer' : 'layerHidden');
       applyTimelineCellFrame(rowHeader, layerVariant);
       fragment.appendChild(rowVisibilityCell);
       fragment.appendChild(rowHeader);
@@ -3943,7 +3953,7 @@
             )
             : `${frame.name} / ${targetLayer.name}`;
           slot.setAttribute('aria-label', slotLabel);
-          if (!targetLayer.visible) {
+          if (!getDisplayedLayerVisibility(targetLayer, true)) {
             slot.classList.add('is-hidden');
             isHiddenCell = true;
           }
@@ -4023,11 +4033,8 @@
             timelineRasterContentMarkedLayers.delete(targetLayer);
           }
 
-          let slotVariant = 'default';
-          if (!targetLayer.visible) {
-            slotVariant = 'hidden';
-          }
-          if (slot.classList.contains('is-active')) {
+          let slotVariant = slot.classList.contains('is-hidden') ? 'hidden' : 'default';
+          if (slot.classList.contains('is-active') && !slot.classList.contains('is-hidden')) {
             slotVariant = 'active';
           }
           applyTimelineSlotFrame(slot, slotVariant);

@@ -99,11 +99,11 @@ assert.match(rendering, /function renderExportPreviewOutputs\(mode, previewData 
 assert.match(rendering, /function createExportPreviewOutputVisual\(card, previewData\)/, 'output cards must use lightweight real-content thumbnails');
 assert.match(rendering, /add\('PiXiEEDraw', '\.pxd 編集データ'/, 'project export must be named as a .pxd file in the preview');
 assert.match(rendering, /add\('SpriteMAP', '全フレームを PNG ×1 で配置'/, 'SpriteMAP preview must state its fixed ×1 placement');
-assert.match(index, /export-rendering\.js\?v=20260721-runtime-index8-output1/);
-assert.match(index, /dialog-setup-utils\.js\?v=20260720-export-batch-direct1/);
-assert.match(index, /export-dialog-workflow-utils\.js\?v=20260726-export-loading-paint2/);
+assert.match(index, /export-rendering\.js\?v=20260802-layer-transparency-visibility1/);
+assert.match(index, /dialog-setup-utils\.js\?v=20260729-timelapse-export1/);
+assert.match(index, /export-dialog-workflow-utils\.js\?v=20260729-timelapse-export1/);
 assert.match(index, /export-normalizer-utils\.js\?v=20260720-export-batchzip1/);
-assert.match(index, /app\.js\?v=20260726-project-card-actions2/);
+assert.match(index, /app\.js\?v=20260802-layer-transparency-visibility1/);
 assert.match(
   dialogWorkflow,
   /function waitForBlockingLoadingPaint\(\)[\s\S]{0,520}requestAnimationFrame\([\s\S]{0,220}requestAnimationFrame\(/,

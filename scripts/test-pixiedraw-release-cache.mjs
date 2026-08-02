@@ -16,9 +16,18 @@ assert.match(buildId, /^\d{8}-\d+$/, 'build-info must publish a cache-safe build
 assert.equal(release.buildId, buildId, 'version.json must advertise the same deployed build');
 assert.match(indexHtml, new RegExp(`build-info\\.js\\?v=${buildId}`));
 assert.match(serviceWorker, new RegExp(`build-info\\.js\\?v=${buildId}`));
-assert.match(indexHtml, /assets\/css\/style\.css\?v=20260802-timeline-cell-state1/);
-assert.match(indexHtml, /canvas-drawing-workflow-utils\.js\?v=20260802-timeline-cell-state1/);
-assert.match(indexHtml, /timeline-layers\.js\?v=20260802-timeline-cell-state1/);
+assert.match(indexHtml, /assets\/css\/style\.css\?v=20260802-layer-transparency-visibility1/);
+for (const moduleName of [
+  'timelapse-replay-utils',
+  'canvas-core-workflow-utils',
+  'canvas-drawing-workflow-utils',
+  'canvas-render-workflow-utils',
+  'timeline-layers',
+  'floating-preview-panel-utils',
+  'export-rendering',
+]) {
+  assert.match(indexHtml, new RegExp(`${moduleName}\\.js\\?v=20260802-layer-transparency-visibility1`));
+}
 assert.match(indexHtml, /pixisync-operation-codec-utils\.js\?v=20260801-document-payload2/);
 for (const moduleName of [
   'timeline-navigation-workflow-utils',
@@ -30,7 +39,6 @@ for (const moduleName of [
 }
 for (const moduleName of [
   'pixel-patch-history-utils',
-  'canvas-render-workflow-utils',
   'palette-panel-utils',
   'pixisync-pixel-mutation-bridge-utils',
 ]) {
@@ -52,7 +60,7 @@ for (const assetName of [
 ]) {
   assert.match(indexHtml, new RegExp(`${assetName}\\?v=20260802-project-share-scope1`));
 }
-assert.match(indexHtml, /assets\/js\/app\.js\?v=20260802-timeline-cell-state1/);
+assert.match(indexHtml, /assets\/js\/app\.js\?v=20260802-layer-transparency-visibility1/);
 assert.match(serviceWorker, /fetch\(request, \{ cache: 'no-store' \}\)/);
 assert.match(app, /serviceWorker\.register\(swUrl, \{ updateViaCache: 'none' \}\)/);
 assert.match(app, /!startupReady && !controllerChangeReloaded && !isProjectCommandLocked\(\)/);

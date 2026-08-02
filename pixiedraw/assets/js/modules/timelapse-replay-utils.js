@@ -55,6 +55,31 @@
       return stored;
     }
 
+    function getLayerPixelColor(layer, index, palette, target) {
+      const direct = layer?.direct instanceof Uint8ClampedArray ? layer.direct : null;
+      const directOffset = index * 4;
+      if (layer?.directOnly !== true) {
+        const paletteIndex = getPaletteIndex(layer, index);
+        if (paletteIndex >= 0) {
+          const color = palette?.[paletteIndex];
+          if (!color || Number(color.a) <= 0) return null;
+          target.r = color.r;
+          target.g = color.g;
+          target.b = color.b;
+          target.a = color.a;
+          return target;
+        }
+      }
+      if (!direct || directOffset + 3 >= direct.length || direct[directOffset + 3] <= 0) {
+        return null;
+      }
+      target.r = direct[directOffset];
+      target.g = direct[directOffset + 1];
+      target.b = direct[directOffset + 2];
+      target.a = direct[directOffset + 3];
+      return target;
+    }
+
     function writeTiledPaletteIndex(layer, index, paletteIndex) {
       const width = Math.max(1, Math.round(Number(layer?.indicesWidth) || 1));
       const height = Math.max(1, Math.round(Number(layer?.indicesHeight) || 1));
@@ -86,6 +111,9 @@
         else layer.indices[index] = paletteIndex;
       } else {
         return;
+      }
+      if (paletteIndex >= 0) {
+        layer.directOnly = false;
       }
       if (Array.isArray(value.direct) && value.direct.length === 4) {
         if (!(layer.direct instanceof Uint8ClampedArray)) {
@@ -150,13 +178,10 @@
       (frame?.layers || []).forEach(layer => {
         if (layer?.visible === false || !layer?.indices) return;
         const opacity = Math.max(0, Math.min(1, Number(layer.opacity ?? 1)));
+        const resolvedColor = {};
         for (let index = 0; index < width * height; index += 1) {
           const directOffset = index * 4;
-          const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
-          const paletteIndex = getPaletteIndex(layer, index);
-          const color = direct && direct[directOffset + 3] > 0
-            ? { r: direct[directOffset], g: direct[directOffset + 1], b: direct[directOffset + 2], a: direct[directOffset + 3] }
-            : (paletteIndex >= 0 ? palette[paletteIndex] : null);
+          const color = getLayerPixelColor(layer, index, palette, resolvedColor);
           if (!color || !color.a) continue;
           const alpha = (safeByte(color.a) / 255) * opacity;
           const destinationAlpha = image.data[directOffset + 3] / 255;

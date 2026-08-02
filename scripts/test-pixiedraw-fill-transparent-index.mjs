@@ -49,6 +49,18 @@ const getStoredRasterLayerPaletteIndex = (layer, index) => {
   }
   return Number.isFinite(stored) ? stored : -1;
 };
+const resolveLayerPixelRgba = (layer, index, palette = state.palette) => {
+  const paletteIndex = layer?.directOnly === true ? -1 : getStoredRasterLayerPaletteIndex(layer, index);
+  if (paletteIndex >= 0) {
+    const color = palette?.[paletteIndex];
+    return color && color.a > 0 ? { ...color, mode: 'index', index: paletteIndex } : null;
+  }
+  const direct = layer?.direct instanceof Uint8ClampedArray ? layer.direct : null;
+  const base = index * 4;
+  return direct && direct[base + 3] > 0
+    ? { r: direct[base], g: direct[base + 1], b: direct[base + 2], a: direct[base + 3], mode: 'rgb', index: -1 }
+    : null;
+};
 const setRasterLayerRuntimeStoredIndex = (layer, index, value) => {
   if (!(layer?.indicesTiles instanceof Map)) {
     layer.indices[index] = value;
@@ -72,6 +84,7 @@ const setRasterLayerRuntimeStoredIndex = (layer, index, value) => {
 const utils = window.PiXiEEDrawModules.canvasPointerWorkflowUtils.createCanvasPointerWorkflowUtils({
   state,
   getStoredRasterLayerPaletteIndex,
+  resolveLayerPixelRgba,
   window,
   Uint8Array,
   Int16Array,
@@ -138,6 +151,7 @@ const drawing = window.PiXiEEDrawModules.canvasDrawingWorkflowUtils.createCanvas
   getActiveFrame: () => ({ layers: [fillLayer] }),
   getActiveProjectCanvasDocument: () => fillState,
   getStoredRasterLayerPaletteIndex,
+  resolveLayerPixelRgba,
   isIndexColorMode: () => true,
   isRgbColorMode: () => false,
   isMultiPaletteIsolationEnabled: () => false,

@@ -3291,12 +3291,17 @@
   get getActiveProjectCanvasDocument() { return getActiveProjectCanvasDocument; },
   get getProjectCanvasActiveFrame() { return getProjectCanvasActiveFrame; },
   get getProjectCanvasCount() { return getProjectCanvasCount; },
+  get getStoredRasterLayerPaletteIndex() { return getStoredRasterLayerPaletteIndex; },
   get materializeRasterLayerIndices() { return materializeRasterLayerIndices; },
   get state() { return state; },
   }) || {};
 
   function compositeLayerPixelNormalized(...args) {
     return canvasCoreWorkflowUtilsModule.compositeLayerPixelNormalized(...args);
+  }
+
+  function resolveLayerPixelRgba(...args) {
+    return canvasCoreWorkflowUtilsModule.resolveLayerPixelRgba(...args);
   }
 
   function getActiveFrame(...args) {
@@ -3452,6 +3457,7 @@
   get getRasterLayerTransparentStorageValue() { return getRasterLayerTransparentStorageValue; },
   get getRasterLayerRuntimeStoredIndex() { return getRasterLayerRuntimeStoredIndex; },
   get getStoredRasterLayerPaletteIndex() { return getStoredRasterLayerPaletteIndex; },
+  get resolveLayerPixelRgba() { return resolveLayerPixelRgba; },
   get isCustomBrushData() { return isCustomBrushData; },
   get isGradientFillStyle() { return isGradientFillStyle; },
   get isIndexColorMode() { return isIndexColorMode; },
@@ -11972,11 +11978,14 @@
       isTargetActive: target => {
         const canvasDoc = getActiveProjectCanvasDocument();
         const frame = getActiveFrame();
-        const layer = getActiveLayer();
+        const targetLayer = Array.isArray(frame?.layers)
+          ? frame.layers.find(layer => layer?.id === target?.layerId)
+          : null;
         return Boolean(
           canvasDoc?.id === target?.canvasId
           && frame?.id === target?.frameId
-          && layer?.id === target?.layerId
+          && targetLayer
+          && getDisplayedLayerVisibility(targetLayer, true)
         );
       },
       applyPixelMutation: mutation => pixisyncPixelMutationBridge?.applyPixelMutation?.(mutation)
@@ -19852,6 +19861,7 @@
   set hasRecentViewportInteraction(value) { hasRecentViewportInteraction = value; },
   get history() { return history; },
   set history(value) { history = value; },
+  get hydratePiXiSyncActiveCell() { return hydratePiXiSyncActiveCell; },
   get internalClipboard() { return internalClipboard; },
   set internalClipboard(value) { internalClipboard = value; },
   get isAutosaveInteractionBusy() { return isAutosaveInteractionBusy; },

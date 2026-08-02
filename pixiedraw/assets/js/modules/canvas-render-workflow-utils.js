@@ -442,6 +442,7 @@
       const opacity = getDisplayedLayerPreviewOpacity(layer, 1);
       if (opacity <= 0) continue;
       const layerBlendMode = normalizeLayerBlendMode(layer.blendMode);
+      const useIndexedPixels = layer.directOnly !== true;
       const layerDirect = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
       for (let py = y0; py <= y1; py += 1) {
         const rowOffset = (py - y0) * regionWidth * 4;
@@ -450,35 +451,51 @@
           metrics.counts.composedPixelCount += 1;
           if (layerUsesSparseTiles) metrics.counts.tileLookupCount += 1;
           const pixelIndex = layerRow + px;
-          const paletteIndex = typeof getStoredRasterLayerPaletteIndex === 'function'
-            ? getStoredRasterLayerPaletteIndex(layer, pixelIndex)
-            : (layer.indices instanceof Int16Array ? layer.indices[pixelIndex] : -1);
           let srcR;
           let srcG;
           let srcB;
           let srcA;
+          const paletteIndex = useIndexedPixels
+            ? (typeof getStoredRasterLayerPaletteIndex === 'function'
+              ? getStoredRasterLayerPaletteIndex(layer, pixelIndex)
+              : (layer.indices instanceof Int16Array ? layer.indices[pixelIndex] : -1))
+            : -1;
           if (paletteIndex >= 0) {
             metrics.counts.paletteLookupCount += 1;
-            if (paletteIndex === 0) metrics.counts.transparentPixelCount += 1;
             const color = palette[paletteIndex];
-            if (!color) continue;
+            if (!color || color.a <= 0) {
+              metrics.counts.transparentPixelCount += 1;
+              continue;
+            }
             srcR = color.r;
             srcG = color.g;
             srcB = color.b;
             srcA = color.a;
           } else if (layerDirect) {
             const directBase = pixelIndex * 4;
-            srcA = layerDirect[directBase + 3];
-            if (srcA === 0) continue;
+            if (directBase + 3 >= layerDirect.length || layerDirect[directBase + 3] <= 0) {
+              metrics.counts.transparentPixelCount += 1;
+              continue;
+            }
             srcR = layerDirect[directBase];
             srcG = layerDirect[directBase + 1];
             srcB = layerDirect[directBase + 2];
+            srcA = layerDirect[directBase + 3];
           } else {
             metrics.counts.transparentPixelCount += 1;
             continue;
           }
           const destIndex = rowOffset + (px - x0) * 4;
-          compositeLayerPixelNormalized(data, destIndex, srcR, srcG, srcB, srcA, opacity, layerBlendMode);
+          compositeLayerPixelNormalized(
+            data,
+            destIndex,
+            srcR,
+            srcG,
+            srcB,
+            srcA,
+            opacity,
+            layerBlendMode
+          );
         }
       }
     }

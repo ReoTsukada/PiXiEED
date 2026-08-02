@@ -1435,42 +1435,17 @@
       if (layerOpacity <= 0) {
         continue;
       }
-      const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
-      const paletteIndex = typeof getStoredRasterLayerPaletteIndex === 'function'
-        ? getStoredRasterLayerPaletteIndex(layer, pixelIndex)
-        : readLayerRuntimeIndex(layer, pixelIndex);
-      let srcR = 0;
-      let srcG = 0;
-      let srcB = 0;
-      let srcA = 0;
-      if (paletteIndex >= 0) {
-        const color = state.palette[paletteIndex];
-        if (!color) {
-          continue;
-        }
-        srcR = color.r;
-        srcG = color.g;
-        srcB = color.b;
-        srcA = color.a;
-      } else if (direct) {
-        const base = pixelIndex * 4;
-        srcR = direct[base];
-        srcG = direct[base + 1];
-        srcB = direct[base + 2];
-        srcA = direct[base + 3];
-      } else {
-        continue;
-      }
-      if (!Number.isFinite(srcA) || srcA <= 0) {
+      const source = resolveLayerPixelRgba(layer, pixelIndex, state.palette);
+      if (!source) {
         continue;
       }
       compositeLayerPixelNormalized(
         composite,
         0,
-        srcR,
-        srcG,
-        srcB,
-        srcA,
+        source.r,
+        source.g,
+        source.b,
+        source.a,
         layerOpacity,
         normalizeLayerBlendMode(layer.blendMode)
       );

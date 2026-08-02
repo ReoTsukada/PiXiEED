@@ -49,6 +49,7 @@
       const opacity = getDisplayedLayerPreviewOpacity(layer, 1);
       if (opacity <= 0) return;
       const blendMode = normalizeLayerBlendMode(layer.blendMode);
+      const useIndexedPixels = layer.directOnly !== true;
       const direct = layer.direct instanceof Uint8ClampedArray
         && layer.direct.length >= sourceWidth * sourceHeight * 4
         ? layer.direct
@@ -60,17 +61,22 @@
           const sourceIndex = (sourceY * sourceWidth) + sourceX;
           const outputIndex = ((previewY * width) + previewX) * 4;
           let color = null;
-          const paletteIndex = getStoredRasterLayerPaletteIndex(layer, sourceIndex);
-          if (paletteIndex >= 0 && palette?.[paletteIndex]) {
-            color = palette[paletteIndex];
-          } else if (direct) {
+          if (useIndexedPixels) {
+            const paletteIndex = getStoredRasterLayerPaletteIndex(layer, sourceIndex);
+            if (paletteIndex >= 0) {
+              color = palette?.[paletteIndex] || null;
+              if (!color || color.a <= 0) continue;
+            }
+          }
+          if (!color && direct) {
             const directIndex = sourceIndex * 4;
+            if (direct[directIndex + 3] <= 0) continue;
             color = {
               r: direct[directIndex], g: direct[directIndex + 1],
               b: direct[directIndex + 2], a: direct[directIndex + 3],
             };
           }
-          if (!color || !Number.isFinite(color.a) || color.a <= 0) continue;
+          if (!color) continue;
           compositeLayerPixelNormalized(
             output, outputIndex, color.r, color.g, color.b, color.a, opacity, blendMode
           );

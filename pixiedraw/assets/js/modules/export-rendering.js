@@ -1266,35 +1266,43 @@
         return;
       }
       const layerBlendMode = normalizeLayerBlendMode(layer.blendMode);
-      const direct = layer.direct instanceof Uint8ClampedArray && layer.direct.length >= pixelCount * 4 ? layer.direct : null;
+      const useIndexedPixels = layer.directOnly !== true;
+      const direct = layer.direct instanceof Uint8ClampedArray && layer.direct.length >= pixelCount * 4
+        ? layer.direct
+        : null;
       for (let i = 0; i < pixelCount; i += 1) {
-        const paletteIndex = typeof getStoredRasterLayerPaletteIndex === 'function'
-          ? getStoredRasterLayerPaletteIndex(layer, i)
-          : (layer.indices instanceof Int16Array ? layer.indices[i] : -1);
-        let srcR;
-        let srcG;
-        let srcB;
-        let srcA;
-        if (paletteIndex >= 0 && palette && palette[paletteIndex]) {
-          const color = palette[paletteIndex];
-          srcR = color.r;
-          srcG = color.g;
-          srcB = color.b;
-          srcA = color.a;
-        } else if (direct) {
-          const base = i * 4;
-          srcR = direct[base];
-          srcG = direct[base + 1];
-          srcB = direct[base + 2];
-          srcA = direct[base + 3];
-        } else {
-          continue;
+        let color = null;
+        if (useIndexedPixels) {
+          const paletteIndex = typeof getStoredRasterLayerPaletteIndex === 'function'
+            ? getStoredRasterLayerPaletteIndex(layer, i)
+            : (layer.indices instanceof Int16Array ? layer.indices[i] : -1);
+          if (paletteIndex >= 0) {
+            color = palette?.[paletteIndex] || null;
+            if (!color || color.a <= 0) continue;
+          }
         }
-        if (!Number.isFinite(srcA) || srcA <= 0) {
-          continue;
+        if (!color && direct) {
+          const directIndex = i * 4;
+          if (direct[directIndex + 3] <= 0) continue;
+          color = {
+            r: direct[directIndex],
+            g: direct[directIndex + 1],
+            b: direct[directIndex + 2],
+            a: direct[directIndex + 3],
+          };
         }
+        if (!color) continue;
         const destIndex = i * 4;
-        compositeLayerPixelNormalized(output, destIndex, srcR, srcG, srcB, srcA, layerOpacity, layerBlendMode);
+        compositeLayerPixelNormalized(
+          output,
+          destIndex,
+          color.r,
+          color.g,
+          color.b,
+          color.a,
+          layerOpacity,
+          layerBlendMode
+        );
       }
     });
     return output;
@@ -1307,7 +1315,6 @@
   function compositeFramePixelsForExportPreview(frame, width, height, palette, maxEdge = 256) {
     const sourceWidth = Math.max(1, Math.floor(Number(width) || 1));
     const sourceHeight = Math.max(1, Math.floor(Number(height) || 1));
-    const sourcePixelCount = sourceWidth * sourceHeight;
     const scale = Math.min(1, Math.max(1, Math.floor(Number(maxEdge) || 256)) / Math.max(sourceWidth, sourceHeight));
     const previewWidth = Math.max(1, Math.round(sourceWidth * scale));
     const previewHeight = Math.max(1, Math.round(sourceHeight * scale));
@@ -1327,7 +1334,9 @@
         return;
       }
       const blendMode = normalizeLayerBlendMode(layer.blendMode);
-      const direct = layer.direct instanceof Uint8ClampedArray && layer.direct.length >= sourcePixelCount * 4
+      const useIndexedPixels = layer.directOnly !== true;
+      const direct = layer.direct instanceof Uint8ClampedArray
+        && layer.direct.length >= sourceWidth * sourceHeight * 4
         ? layer.direct
         : null;
       for (let previewY = 0; previewY < previewHeight; previewY += 1) {
@@ -1337,13 +1346,18 @@
           const sourceIndex = (sourceY * sourceWidth) + sourceX;
           const outputIndex = ((previewY * previewWidth) + previewX) * 4;
           let color = null;
-          const paletteIndex = typeof getStoredRasterLayerPaletteIndex === 'function'
-            ? getStoredRasterLayerPaletteIndex(layer, sourceIndex)
-            : (layer.indices instanceof Int16Array ? layer.indices[sourceIndex] : -1);
-          if (paletteIndex >= 0 && palette?.[paletteIndex]) {
-            color = palette[paletteIndex];
-          } else if (direct) {
+          if (useIndexedPixels) {
+            const paletteIndex = typeof getStoredRasterLayerPaletteIndex === 'function'
+              ? getStoredRasterLayerPaletteIndex(layer, sourceIndex)
+              : (layer.indices instanceof Int16Array ? layer.indices[sourceIndex] : -1);
+            if (paletteIndex >= 0) {
+              color = palette?.[paletteIndex] || null;
+              if (!color || color.a <= 0) continue;
+            }
+          }
+          if (!color && direct) {
             const directIndex = sourceIndex * 4;
+            if (direct[directIndex + 3] <= 0) continue;
             color = {
               r: direct[directIndex],
               g: direct[directIndex + 1],
@@ -1351,9 +1365,7 @@
               a: direct[directIndex + 3],
             };
           }
-          if (!color || !Number.isFinite(color.a) || color.a <= 0) {
-            continue;
-          }
+          if (!color) continue;
           compositeLayerPixelNormalized(
             output,
             outputIndex,
