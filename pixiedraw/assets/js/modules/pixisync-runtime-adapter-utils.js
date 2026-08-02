@@ -41,6 +41,7 @@
     createRealtimeClient,
     runtimeBridge,
     getSupabase,
+    refreshSupabaseClient = null,
     captureCheckpoint,
     restoreCheckpoint,
     getProjectKey = () => '',
@@ -89,6 +90,10 @@
     let lifecycleResumeQueued = false;
     let reconnectRetryTimer = 0;
     let reconnectRetryAttempt = 0;
+    let consecutiveOpenSessionTimeouts = 0;
+    let lastReportedErrorMessage = '';
+    let lastReportedErrorAt = 0;
+    let suppressedErrorCount = 0;
     let projectLease = null;
     let localReadOnly = false;
     // Once a card has been bound to a room, it must never silently fall back
@@ -167,17 +172,17 @@
       const digest = new Uint8Array(await window.crypto.subtle.digest('SHA-256', bytes));
       return [...digest].map(value => value.toString(16).padStart(2, '0')).join('');
     };
-    const withTimeout = async (operation, promise) => {
+    const withTimeout = async (operation, promise, { onTimeout = null } = {}) => {
       const timeoutMs = Math.max(1000, Number(operationTimeoutMs) || 20000);
       let timer = null;
       try {
         return await Promise.race([
           Promise.resolve(promise),
           new Promise((_, reject) => {
-            timer = window.setTimeout(
-              () => reject(new Error(`PiXiSYNC runtime: ${operation}-timeout`)),
-              timeoutMs
-            );
+            timer = window.setTimeout(() => {
+              reject(new Error(`PiXiSYNC runtime: ${operation}-timeout`));
+              try { onTimeout?.(); } catch (_) {}
+            }, timeoutMs);
           }),
         ]);
       } finally {
@@ -216,6 +221,19 @@
       if (disposed) return;
       onStatus(details);
       runtimeBridge.refreshUi?.();
+    };
+    const reportRuntimeError = error => {
+      const message = String(error?.message || error || 'unknown');
+      const now = Date.now();
+      if (message === lastReportedErrorMessage && now - lastReportedErrorAt < 60000) {
+        suppressedErrorCount += 1;
+        return;
+      }
+      const repeatedCount = suppressedErrorCount;
+      lastReportedErrorMessage = message;
+      lastReportedErrorAt = now;
+      suppressedErrorCount = 0;
+      onError(error, { repeatedCount });
     };
     const normalizeProjectBinding = value => {
       if (!ROOM_ID_PATTERN.test(String(value?.roomId || ''))) return null;
@@ -286,9 +304,59 @@
       return !localReadOnly;
     };
     const rpc = async (name, params) => {
-      const response = await withTimeout(`rpc-${name}`, supabase.rpc(name, params));
-      if (response?.error) throw response.error;
-      return response?.data;
+      const abortController = typeof window.AbortController === 'function'
+        ? new window.AbortController()
+        : (typeof AbortController === 'function' ? new AbortController() : null);
+      let request = supabase.rpc(name, params);
+      if (abortController && typeof request?.abortSignal === 'function') {
+        request = request.abortSignal(abortController.signal);
+      }
+      try {
+        const response = await withTimeout(`rpc-${name}`, request, {
+          onTimeout: () => abortController?.abort(),
+        });
+        if (response?.error) throw response.error;
+        if (name === 'pixisync_open_session') {
+          consecutiveOpenSessionTimeouts = 0;
+          lastReportedErrorMessage = '';
+          lastReportedErrorAt = 0;
+          suppressedErrorCount = 0;
+        }
+        return response?.data;
+      } catch (error) {
+        if (
+          name === 'pixisync_open_session'
+          && /rpc-pixisync_open_session-timeout/.test(String(error?.message || ''))
+        ) {
+          consecutiveOpenSessionTimeouts += 1;
+          if (
+            consecutiveOpenSessionTimeouts >= 2
+            && typeof refreshSupabaseClient === 'function'
+          ) {
+            const previousClient = supabase;
+            const refreshedClient = await withTimeout(
+              'supabase-client-refresh',
+              refreshSupabaseClient({
+                previousClient,
+                roomId,
+                reason: error.message,
+                consecutiveTimeouts: consecutiveOpenSessionTimeouts,
+              })
+            );
+            if (!refreshedClient?.rpc || !refreshedClient?.storage || !refreshedClient?.channel) {
+              throw new Error('PiXiSYNC runtime: invalid-refreshed-supabase-client');
+            }
+            supabase = refreshedClient;
+            consecutiveOpenSessionTimeouts = 0;
+            report({
+              phase: 'transport-client-refreshed',
+              reason: error.message,
+              roomId,
+            });
+          }
+        }
+        throw error;
+      }
     };
     const uploadCheckpoint = async (path, blob, metadata = undefined) => {
       const response = await withTimeout('checkpoint-upload', supabase.storage.from(CHECKPOINT_BUCKET).upload(path, blob, {
@@ -750,7 +818,7 @@
       operationQueue = operationQueue
         .then(() => dispatchNow(event))
         .catch(async error => {
-          onError(error);
+          reportRuntimeError(error);
           report({ phase: 'error', error: error?.message || 'unknown' });
           if (
             session
@@ -842,7 +910,7 @@
           });
           return true;
         } catch (error) {
-          onError(error);
+          reportRuntimeError(error);
           report({ phase: 'legacy-tail-recovery-failed', roomId, error: error?.message || 'unknown' });
           return false;
         }
@@ -876,7 +944,7 @@
           // The operation is already ordered and durable. Promotion only
           // compacts future opens, so a transient failure must never reject a
           // confirmed edit or roll the local document back.
-          onError(error);
+          reportRuntimeError(error);
           return false;
         }
       };
@@ -937,7 +1005,7 @@
         },
         onRecoveryRequired: details => {
           if (realtimeClient !== createdRealtime) return;
-          onError(details?.error || new Error(details?.reason || 'recovery-required'));
+          reportRuntimeError(details?.error || new Error(details?.reason || 'recovery-required'));
           void repairLegacyTailFromOwnerSnapshot(details).then(repaired => {
             void enqueue({
               type: repaired ? 'FORCE_FULL_RESYNC' : 'GAP_DETECTED',

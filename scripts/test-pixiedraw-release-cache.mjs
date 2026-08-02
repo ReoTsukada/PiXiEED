@@ -56,11 +56,11 @@ for (const assetName of [
   'assets\/js\/modules\/startup-workflow-utils.js',
   'assets\/js\/modules\/document-session-workflow-utils.js',
   'assets\/js\/modules\/pixisync-project-switch-utils.js',
-  'assets\/js\/modules\/pixisync-runtime-adapter-utils.js',
 ]) {
   assert.match(indexHtml, new RegExp(`${assetName}\\?v=20260802-project-share-scope1`));
 }
-assert.match(indexHtml, /assets\/js\/app\.js\?v=20260802-layer-transparency-visibility1/);
+assert.match(indexHtml, /assets\/js\/modules\/pixisync-runtime-adapter-utils\.js\?v=20260803-pixisync-timeout-recovery1/);
+assert.match(indexHtml, /assets\/js\/app\.js\?v=20260803-pixisync-timeout-recovery1/);
 assert.match(serviceWorker, /fetch\(request, \{ cache: 'no-store' \}\)/);
 assert.match(app, /serviceWorker\.register\(swUrl, \{ updateViaCache: 'none' \}\)/);
 assert.match(app, /!startupReady && !controllerChangeReloaded && !isProjectCommandLocked\(\)/);

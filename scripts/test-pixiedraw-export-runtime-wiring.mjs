@@ -103,7 +103,7 @@ assert.match(index, /export-rendering\.js\?v=20260802-layer-transparency-visibil
 assert.match(index, /dialog-setup-utils\.js\?v=20260729-timelapse-export1/);
 assert.match(index, /export-dialog-workflow-utils\.js\?v=20260729-timelapse-export1/);
 assert.match(index, /export-normalizer-utils\.js\?v=20260720-export-batchzip1/);
-assert.match(index, /app\.js\?v=20260802-layer-transparency-visibility1/);
+assert.match(index, /app\.js\?v=20260803-pixisync-timeout-recovery1/);
 assert.match(
   dialogWorkflow,
   /function waitForBlockingLoadingPaint\(\)[\s\S]{0,520}requestAnimationFrame\([\s\S]{0,220}requestAnimationFrame\(/,

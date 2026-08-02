@@ -28047,6 +28047,78 @@
       window.sessionStorage?.setItem?.(clientStorageKey, created);
       return created;
     };
+    const readConfiguredAuthSession = storageKey => {
+      try {
+        const raw = window.localStorage?.getItem?.(String(storageKey || ''));
+        const parsed = raw ? JSON.parse(raw) : null;
+        const session = parsed?.currentSession || parsed?.session || parsed;
+        if (session?.access_token && session?.refresh_token) return session;
+      } catch (_) {}
+      const accountSession = pixieedAccountWorkflowUtilsModule
+        ?.readPixieedStoredAuthSessionSnapshot?.()
+        || pixieedAccountWorkflowUtilsModule?.readPixieedCachedAuthSession?.();
+      return accountSession?.access_token && accountSession?.refresh_token ? accountSession : null;
+    };
+    const refreshPiXiSyncSupabaseClient = async details => {
+      if (typeof config.refreshSupabaseClient === 'function') {
+        return await config.refreshSupabaseClient(details);
+      }
+      const supabaseUrl = String(config.supabaseUrl || MULTI_SUPABASE_URL || '');
+      const publishableKey = String(config.publishableKey || MULTI_SUPABASE_ANON_KEY || '');
+      if (
+        !/^https:\/\/[a-z]+\.supabase\.co$/i.test(supabaseUrl)
+        || !/^(sb_publishable_|eyJ)/.test(publishableKey)
+      ) {
+        throw new Error('PiXiSYNC runtime: supabase-refresh-config-missing');
+      }
+      const authStorageKey = String(config.authStorageKey || PIXIEED_AUTH_STORAGE_KEY);
+      const authSession = readConfiguredAuthSession(authStorageKey);
+      if (!authSession) throw new Error('PiXiSYNC runtime: supabase-refresh-session-missing');
+      const module = await import(MULTI_SUPABASE_MODULE_URL);
+      const refreshedClient = module.createClient(supabaseUrl, publishableKey, {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: true,
+          detectSessionInUrl: false,
+        },
+        global: { headers: { 'x-client-id': getClientId() } },
+      });
+      const { data, error } = await refreshedClient.auth.setSession({
+        access_token: authSession.access_token,
+        refresh_token: authSession.refresh_token,
+      });
+      if (error || !data?.session) {
+        throw error || new Error('PiXiSYNC runtime: supabase-refresh-auth-failed');
+      }
+      window.__PIXISYNC_V1_SUPABASE_CLIENT__ = refreshedClient;
+      return refreshedClient;
+    };
+    const runtimeConsoleStatusTimes = new Map();
+    let suppressedRuntimeConsoleStatuses = 0;
+    const logPiXiSyncRuntimeStatus = details => {
+      const phase = String(details?.phase || 'unknown');
+      const repetitive = phase === 'error' || phase === 'reconnecting';
+      const signature = `${phase}:${String(details?.error || details?.reason || '')}`;
+      const now = Date.now();
+      if (
+        repetitive
+        && now - Number(runtimeConsoleStatusTimes.get(signature) || 0) < 60000
+      ) {
+        suppressedRuntimeConsoleStatuses += 1;
+        return;
+      }
+      const commandLock = inspectProjectCommandLock();
+      console.info('[pixisync:v1-runtime]', {
+        ...details,
+        suppressedRepeatedStatuses: suppressedRuntimeConsoleStatuses,
+        commandLocked: commandLock.locked,
+        lockOwner: commandLock.owner || null,
+        drawingLocked: pixisyncInputLocked,
+        inputEnabled: !pixisyncInputLocked && details?.drawingAllowed === true,
+      });
+      runtimeConsoleStatusTimes.set(signature, now);
+      suppressedRuntimeConsoleStatuses = 0;
+    };
     const acquireProjectLease = createPiXiSyncProjectLeaseManager();
     const runtime = adapterFactory({
       createSession: options => window.PiXiEEDrawModules.pixisyncSessionState
@@ -28075,6 +28147,7 @@
         }
         return ensurePixieedAccountClient();
       },
+      refreshSupabaseClient: refreshPiXiSyncSupabaseClient,
       captureCheckpoint: async (captureContext = {}) => {
         const checkpointStartedAt = performance.now();
         const providedSnapshot = captureContext?.snapshot && typeof captureContext.snapshot === 'object'
@@ -28359,17 +28432,11 @@
       ensureAuthenticatedStart: options => ensureSharedProjectAuthenticatedStart(options),
       getClientId,
       uiEnabled: config.uiEnabled !== false,
-      onStatus: details => {
-        const commandLock = inspectProjectCommandLock();
-        console.info('[pixisync:v1-runtime]', {
-          ...details,
-          commandLocked: commandLock.locked,
-          lockOwner: commandLock.owner || null,
-          drawingLocked: pixisyncInputLocked,
-          inputEnabled: !pixisyncInputLocked && details?.drawingAllowed === true,
-        });
-      },
-      onError: error => console.warn('[pixisync:v1-runtime] error', error?.message || error),
+      onStatus: logPiXiSyncRuntimeStatus,
+      onError: (error, details = {}) => console.warn('[pixisync:v1-runtime] error', {
+        message: error?.message || error,
+        suppressedRepeatedErrors: Number(details.repeatedCount || 0),
+      }),
     });
     if (initializationEpoch !== pixisyncRuntimeLifecycleEpoch) {
       await runtime.dispose?.().catch?.(() => {});

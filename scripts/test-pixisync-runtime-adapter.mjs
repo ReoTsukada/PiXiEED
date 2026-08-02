@@ -285,6 +285,10 @@ function createAdapter({
   initialProjectKey = `project-${actor}`,
   resolveProjectBindingTarget,
   readProjectBinding,
+  getSupabase,
+  refreshSupabaseClient,
+  onStatus,
+  onError,
 }) {
   const bridge = createBridge();
   let restored = '';
@@ -295,7 +299,10 @@ function createAdapter({
     createSession: options => window.PiXiEEDrawModules.pixisyncSessionState.createPiXiSyncSessionState(options),
     createRealtimeClient: realtimeFactory,
     runtimeBridge: bridge,
-    getSupabase: async () => server.client(actor),
+    getSupabase: async () => typeof getSupabase === 'function'
+      ? await getSupabase()
+      : server.client(actor),
+    refreshSupabaseClient,
     captureCheckpoint: async context => {
       captureContext = context;
       return new Blob([checkpointText]);
@@ -326,6 +333,8 @@ function createAdapter({
     getClientId: () => clientId,
     localStorageRef: storage,
     operationTimeoutMs,
+    onStatus,
+    onError,
   });
   return {
     adapter,
@@ -623,6 +632,74 @@ assert.equal(lifecycleServer.realtimeOptions.length, initialRealtimeCount + 1);
 assert.equal(await lifecycleOwner.adapter.handleLifecycleResume('focus'), false);
 assert.equal(lifecycleServer.realtimeOptions.length, initialRealtimeCount + 1);
 
+// An open-session timeout must abort the stale PostgREST request. After two
+// consecutive timeouts the runtime replaces the Supabase transport, retains
+// its authoritative revision, and unlocks drawing only after convergence.
+const transportRecoveryServer = new LifecycleServer();
+const transportRecoveryClient = transportRecoveryServer.client('owner');
+let hangOpenSession = false;
+let abortedOpenSessions = 0;
+let refreshedClientCount = 0;
+const hangingTransportClient = {
+  ...transportRecoveryClient,
+  rpc(name, params) {
+    if (!hangOpenSession || name !== 'pixisync_open_session') {
+      return transportRecoveryClient.rpc(name, params);
+    }
+    let signal = null;
+    const pending = new Promise(() => {});
+    return {
+      abortSignal(nextSignal) {
+        signal = nextSignal;
+        signal?.addEventListener?.('abort', () => { abortedOpenSessions += 1; }, { once: true });
+        return this;
+      },
+      then(resolve, reject) {
+        return pending.then(resolve, reject);
+      },
+    };
+  },
+};
+const transportRecoveryStatuses = [];
+const transportRecoveryErrors = [];
+const transportRecoveryOwner = createAdapter({
+  server: transportRecoveryServer,
+  actor: 'owner',
+  clientId: OWNER_CLIENT,
+  storage: createStorage(),
+  bindings: new Map(),
+  checkpointText: 'checkpoint-transport-recovery',
+  operationTimeoutMs: 10,
+  getSupabase: () => hangingTransportClient,
+  refreshSupabaseClient: async () => {
+    refreshedClientCount += 1;
+    return transportRecoveryServer.client('owner');
+  },
+  onStatus: details => transportRecoveryStatuses.push(details),
+  onError: error => transportRecoveryErrors.push(error),
+});
+await transportRecoveryOwner.adapter.initialize();
+await transportRecoveryOwner.adapter.start();
+assert.equal(transportRecoveryOwner.adapter.snapshot().session.phase, 'active');
+const revisionBeforeTransportFailure = transportRecoveryOwner.adapter.snapshot().session.appliedRevision;
+hangOpenSession = true;
+await transportRecoveryOwner.adapter.handleLifecycleSuspend('visibility-hidden');
+await transportRecoveryOwner.adapter.handleLifecycleResume('visibility-visible');
+assert.equal(transportRecoveryOwner.adapter.snapshot().session.phase, 'reconnecting');
+assert.equal(transportRecoveryOwner.bridge.inputLocked, true);
+await transportRecoveryOwner.adapter.handleLifecycleResume('manual-retry-1');
+assert.equal(abortedOpenSessions, 2, 'each timed-out open-session request must be aborted');
+assert.equal(refreshedClientCount, 1, 'two consecutive open-session timeouts must refresh the client once');
+assert.equal(
+  transportRecoveryStatuses.some(details => details?.phase === 'transport-client-refreshed'),
+  true
+);
+assert.equal(transportRecoveryErrors.length, 1, 'repeated identical timeout errors are throttled');
+await transportRecoveryOwner.adapter.handleLifecycleResume('manual-retry-2');
+assert.equal(transportRecoveryOwner.adapter.snapshot().session.phase, 'active');
+assert.equal(transportRecoveryOwner.adapter.snapshot().session.appliedRevision, revisionBeforeTransportFailure);
+assert.equal(transportRecoveryOwner.bridge.inputLocked, false);
+
 // A second view of the same local card still receives remote updates, but is
 // explicitly configured as read-only and cannot write the shared autosave.
 const readOnlyServer = new LifecycleServer();
@@ -640,5 +717,11 @@ await readOnlyOwner.adapter.start();
 assert.equal(readOnlyOwner.adapter.snapshot().session.phase, 'active');
 assert.equal(readOnlyOwner.bridge.runtime.localReadOnly, true);
 
-await Promise.all([owner.adapter.dispose(), activeEditor.adapter.dispose(), lifecycleOwner.adapter.dispose(), readOnlyOwner.adapter.dispose()]);
+await Promise.all([
+  owner.adapter.dispose(),
+  activeEditor.adapter.dispose(),
+  lifecycleOwner.adapter.dispose(),
+  transportRecoveryOwner.adapter.dispose(),
+  readOnlyOwner.adapter.dispose(),
+]);
 console.log('PiXiSYNC runtime adapter lifecycle integration tests passed');
