@@ -21,6 +21,12 @@ for (const root of ['pixiedraw']) {
     `${root}: Frames\/Layers owns a normal scrolling content flow`);
   assert.match(css, /#panelFrames \.timeline-card,[\s\S]*?#panelFrames \.panel-ad-mount[\s\S]*?position: static !important;/,
     `${root}: the timeline and its final ad cannot overlap by positioning`);
+  assert.doesNotMatch(css, /mobile-drawer\[data-mode='half'\][^{]*#panelFile #openTimelapse\s*\{[^}]*display:\s*none/,
+    `${root}: the timelapse action remains reachable in the mobile half drawer`);
+  assert.match(css, /mobile-drawer\[data-mode='full'\][^{]*\.mobile-panel\.is-active \.panel-ad-mount--owned\s*\{[\s\S]*?display:\s*block !important;/,
+    `${root}: owned panel ads remain in normal flow only in the full drawer`);
+  assert.match(css, /mobile-drawer:not\(\[data-mode='full'\]\)[\s\S]{0,500}panel-ad-mount\[data-panel-ad-mount='left'\]/,
+    `${root}: compact drawers continue suppressing editing-panel ads`);
 }
 
 console.log('PiXiEEDraw mobile drawer ad flow checks passed.');

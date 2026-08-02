@@ -1204,6 +1204,20 @@
           await persistProjectBinding();
           configureBridge();
           clearReconnectRetry();
+          // Session subscribers observe the `active` transition before this
+          // effect finishes installing the collaboration controller. Expose a
+          // final ready signal so structure controls disabled during sync can
+          // be evaluated again against the fully configured bridge.
+          report({
+            phase: 'active-ready',
+            roomId,
+            revision: currentSnapshot()?.appliedRevision,
+            authoritativeRevision: currentSnapshot()?.authoritativeRevision,
+            drawingAllowed: session.canDraw?.() === true,
+            localReadOnly,
+            lifecycleSuspended,
+            realtimeConnected: Boolean(realtimeClient),
+          });
           break;
         case 'RECONNECT_CHANNEL':
           manifest = await openManifest(roomId);

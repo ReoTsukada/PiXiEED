@@ -114,15 +114,55 @@
     });
   }
 
-  async function renderProgressively({ grid, cards = [], createAd, requestAd, isCurrent = () => true } = {}) {
+  async function renderProgressively({
+    grid,
+    cards = [],
+    createAd,
+    createLeadingAd = null,
+    leadingAdAfterCards = 0,
+    requestAd,
+    isCurrent = () => true,
+  } = {}) {
     if (!(grid instanceof HTMLElement)) return;
     const items = Array.isArray(cards) ? cards.filter((card) => card instanceof HTMLElement) : [];
     const batchSize = Math.max(1, gridColumnCount(grid) * ROWS_PER_AD);
     grid.replaceChildren();
-    for (let index = 0; index < items.length && isCurrent(); index += batchSize) {
+    let index = 0;
+    const leadingCount = Math.min(items.length, Math.max(0, Number(leadingAdAfterCards) || 0));
+    if (leadingCount > 0 && isCurrent()) {
+      grid.append(...items.slice(0, leadingCount));
+      index = leadingCount;
+      const leadingAd = (createLeadingAd || createAd)?.({ placement: 'leading' });
+      if (leadingAd instanceof HTMLElement) {
+        grid.appendChild(leadingAd);
+        // The leading placement raises viewability for short lists, but must
+        // never block project interaction while AdSense settles.
+        void waitForSharedAdPriority().then(() => {
+          if (!isCurrent()) return;
+          try {
+            requestAd?.(leadingAd);
+          } catch (_error) {
+            leadingAd.dataset.pixieedAdOutcome = 'request-failed';
+          }
+        });
+      }
+      // Count the leading ad as one rendered grid cell so the first reveal
+      // still occupies exactly three rows at the current responsive width.
+      const firstBatchCardCount = Math.max(0, batchSize - leadingCount - (leadingAd instanceof HTMLElement ? 1 : 0));
+      grid.append(...items.slice(index, index + firstBatchCardCount));
+      index += firstBatchCardCount;
+      if (index < items.length && isCurrent()) {
+        const ad = createAd?.({ placement: 'between-batches' });
+        if (ad instanceof HTMLElement) {
+          grid.appendChild(ad);
+          await waitForAdOutcome(ad, requestAd);
+        }
+      }
+    }
+    for (; index < items.length && isCurrent(); index += batchSize) {
       grid.append(...items.slice(index, index + batchSize));
       if (index + batchSize >= items.length || !isCurrent()) break;
-      const ad = createAd?.();
+      const ad = createAd?.({ placement: 'between-batches' });
       if (!(ad instanceof HTMLElement)) continue;
       grid.appendChild(ad);
       await waitForAdOutcome(ad, requestAd);

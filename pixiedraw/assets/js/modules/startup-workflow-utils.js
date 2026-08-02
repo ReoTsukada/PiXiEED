@@ -1734,10 +1734,12 @@
       }
       cards.push(card);
     });
-    const createWorkspaceAd = () => {
+    const createWorkspaceAd = ({ placement = 'between-batches' } = {}) => {
+      const isLeading = placement === 'leading';
       const adCard = document.createElement('div');
       adCard.className = 'startup-recent-card--ad startup-recent-ad startup-workspace__ad';
-      window.PiXiEEDCardFeedAds?.reserve(adCard, '90px');
+      if (isLeading) adCard.classList.add('startup-workspace__ad--leading');
+      window.PiXiEEDCardFeedAds?.reserve(adCard, isLeading ? 'clamp(150px, 42vw, 220px)' : '90px');
       adCard.setAttribute('role', 'listitem');
       adCard.setAttribute('aria-label', localizeText('広告', 'Advertisement'));
       const frame = document.createElement('div');
@@ -1748,7 +1750,7 @@
       const ad = document.createElement('ins');
       ad.className = 'startup-recent-card__ad-ins startup-recent-ad__slot';
       ad.setAttribute('data-ad-client', 'ca-pub-9801602250480253');
-      ad.setAttribute('data-ad-format', 'horizontal');
+      ad.setAttribute('data-ad-format', isLeading ? 'auto' : 'horizontal');
       ad.setAttribute('data-ad-slot', window.PiXiEEDCardFeedAds?.COMMON_SLOT || '2141591954');
       ad.setAttribute('data-full-width-responsive', 'true');
       ad.dataset.pixieedProjectFeedAd = 'true';
@@ -1763,6 +1765,8 @@
         grid: list,
         cards,
         createAd: createWorkspaceAd,
+        createLeadingAd: createWorkspaceAd,
+        leadingAdAfterCards: 1,
         requestAd: () => queueStartupRecentAdRender(),
         isCurrent: () => list.dataset.pixieedFeedRenderId === renderId,
       }).then(() => {

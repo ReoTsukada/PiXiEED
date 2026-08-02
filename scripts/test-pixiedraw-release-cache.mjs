@@ -16,7 +16,10 @@ assert.match(buildId, /^\d{8}-\d+$/, 'build-info must publish a cache-safe build
 assert.equal(release.buildId, buildId, 'version.json must advertise the same deployed build');
 assert.match(indexHtml, new RegExp(`build-info\\.js\\?v=${buildId}`));
 assert.match(serviceWorker, new RegExp(`build-info\\.js\\?v=${buildId}`));
-assert.match(indexHtml, /assets\/css\/style\.css\?v=20260802-layer-transparency-visibility1/);
+assert.match(indexHtml, /assets\/css\/style\.css\?v=20260803-ad-placement1/);
+assert.match(indexHtml, /scripts\/card-feed-ads\.js\?v=20260803-leading-project-ad1/);
+assert.match(indexHtml, /startup-workflow-utils\.js\?v=20260803-leading-project-ad1/);
+assert.match(indexHtml, /shared-bottom-nav\.js\?v=20260803-details-ad-placement1/);
 for (const moduleName of [
   'timelapse-replay-utils',
   'canvas-core-workflow-utils',
@@ -53,16 +56,17 @@ for (const assetName of [
 for (const assetName of [
   'assets\/js\/modules\/open-project-tab-workflow-utils.js',
   'assets\/js\/modules\/open-import-workflow-utils.js',
-  'assets\/js\/modules\/startup-workflow-utils.js',
   'assets\/js\/modules\/document-session-workflow-utils.js',
   'assets\/js\/modules\/pixisync-project-switch-utils.js',
 ]) {
   assert.match(indexHtml, new RegExp(`${assetName}\\?v=20260802-project-share-scope1`));
 }
-assert.match(indexHtml, /assets\/js\/modules\/pixisync-runtime-adapter-utils\.js\?v=20260803-pixisync-timeout-recovery1/);
-assert.match(indexHtml, /assets\/js\/app\.js\?v=20260803-pixisync-timeout-recovery1/);
+assert.match(indexHtml, /assets\/js\/modules\/pixisync-runtime-adapter-utils\.js\?v=20260803-pixisync-structure-controls1/);
+assert.match(indexHtml, /assets\/js\/app\.js\?v=20260803-pixisync-structure-controls1/);
 assert.match(serviceWorker, /fetch\(request, \{ cache: 'no-store' \}\)/);
 assert.match(app, /serviceWorker\.register\(swUrl, \{ updateViaCache: 'none' \}\)/);
 assert.match(app, /!startupReady && !controllerChangeReloaded && !isProjectCommandLocked\(\)/);
+assert.match(app, /const syncPiXiSyncStructureControls = details =>/);
+assert.match(app, /syncPiXiSyncStructureControls\(details\)/);
 
 console.log('PiXiEEDraw release cache generation checks passed');

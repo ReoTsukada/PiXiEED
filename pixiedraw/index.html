@@ -56,7 +56,7 @@
 }
 </script>
 <script src="../scripts/ad-account-control.js?v=20260719-no-ad-fallback1"></script>
-<script src="../scripts/card-feed-ads.js?v=20260730-progressive-feed1"></script>
+<script src="../scripts/card-feed-ads.js?v=20260803-leading-project-ad1"></script>
 <script src="../scripts/third-party-error-guard.js"></script>
 <script>
   (function configureEmbedMode() {
@@ -84,7 +84,7 @@
 </script>
 <script>window.__PIXIEEDRAW_BUILD_EDITION__ = 'web-free';</script>
 <script src="assets/js/modules/edition-capabilities-utils.js?v=20260719-file-no-ads1"></script>
-<script src="assets/js/build-info.js?v=20260803-171"></script>
+<script src="assets/js/build-info.js?v=20260803-172"></script>
 <script>
   (function configurePixieedAds() {
     const shouldShowAds = typeof window.__PIXIEEDRAW_SHOULD_SHOW_ADS__ === 'function'
@@ -473,7 +473,7 @@
 
 
 
-<link href="assets/css/style.css?v=20260802-layer-transparency-visibility1" rel="stylesheet"/>
+<link href="assets/css/style.css?v=20260803-ad-placement1" rel="stylesheet"/>
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-4.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-4.png"/>
 <style>
@@ -778,13 +778,6 @@
     <div class="ad-box" id="leftPanelAdSlot">
     <ins class="ad-seed" data-ad-client="ca-pub-9801602250480253" data-ad-format="horizontal" data-ad-slot="3806415737" data-full-width-responsive="true" style="display:block"></ins>
     </div>
-    </div>
-  </div>
-  <div id="rightPanelAdPreloadMount" style="width:320px;min-width:320px;max-width:320px;height:96px;min-height:96px;max-height:96px;overflow:hidden;">
-    <div aria-label="広告" class="panel-ad panel-ad--context" data-pixieed-reserve-ad-space="true" id="rightPanelContextAd">
-      <div class="ad-box" id="rightPanelContextAdSlot">
-        <ins class="ad-seed" data-ad-client="ca-pub-9801602250480253" data-ad-format="horizontal" data-ad-slot="1180252398" data-full-width-responsive="false" style="display:block"></ins>
-      </div>
     </div>
   </div>
 </div>
@@ -1267,11 +1260,17 @@
 <button class="button button--primary" id="exportProject" type="button">出力設定を開く</button>
 <button class="button" id="openTimelapse" type="button">タイムラプスを見る</button>
 </div>
+<div class="panel-ad-mount panel-ad-mount--context panel-ad-mount--owned" data-panel-ad-mount="right">
+<div aria-label="広告" class="panel-ad panel-ad--context panel-ad--owned" data-pixieed-owned-panel-ad="file" data-pixieed-reserve-ad-space="true" id="rightPanelContextAd">
+<div class="ad-box" id="rightPanelContextAdSlot">
+<ins class="ad-seed" data-ad-client="ca-pub-9801602250480253" data-ad-format="horizontal" data-ad-slot="1180252398" data-full-width-responsive="false" style="display:block"></ins>
+</div>
+</div>
+</div>
 <div class="file-panel-summary">
 <p class="help-text ui-guide-text">描画内容はこの端末に自動保存されます。</p>
 <p class="help-text ui-guide-text">外部ファイルへは自動出力しません。画像・GIF・PiXiEEDraw形式は出力パネルからダウンロードします。</p>
 </div>
-<div class="panel-ad-mount panel-ad-mount--context" data-panel-ad-mount="right"></div>
 <p aria-live="polite" class="help-text" id="autosaveStatus"></p>
 <p aria-live="polite" class="help-text" id="projectFileStatus">未保存</p>
 <details class="file-danger-zone">
@@ -1315,7 +1314,13 @@
 </div>
 </div>
 </div>
-<div class="panel-ad-mount panel-ad-mount--context" data-panel-ad-mount="right"></div>
+<div class="panel-ad-mount panel-ad-mount--context panel-ad-mount--owned" data-panel-ad-mount="right">
+<div aria-label="広告" class="panel-ad panel-ad--context panel-ad--owned" data-pixieed-owned-panel-ad="settings" data-pixieed-reserve-ad-space="true" id="settingsPanelContextAd">
+<div class="ad-box" id="settingsPanelContextAdSlot">
+<ins class="ad-seed" data-ad-client="ca-pub-9801602250480253" data-ad-format="horizontal" data-ad-slot="1180252398" data-full-width-responsive="false" style="display:block"></ins>
+</div>
+</div>
+</div>
 <div aria-label="表示設定" class="field field--list" role="group">
 <ul class="toggle-list">
 <li>
@@ -1439,14 +1444,14 @@
 <button class="chip" id="helpClearSearch" type="button">クリア</button>
 </div>
 </div>
-<div class="help-panel__list" id="helpArticleList" role="list"></div>
-<p class="help-text" hidden="" id="helpNoResults">一致する項目はありません。</p>
 <div aria-label="広告" class="export-ad operation-help__ad" data-pixieed-reserve-ad-space="true" id="operationHelpAdContainer">
 <div class="export-ad__slot">
 <ins class="operation-help-ad-ins" data-ad-client="ca-pub-9801602250480253" data-ad-format="auto" data-ad-slot="2141591954" data-full-width-responsive="true" id="operationHelpAdSlot" style="display:block"></ins>
 </div>
 <small class="export-ad__label">広告</small>
 </div>
+<div class="help-panel__list" id="helpArticleList" role="list"></div>
+<p class="help-text" hidden="" id="helpNoResults">一致する項目はありません。</p>
 </div>
 </form>
 </dialog>
@@ -1954,7 +1959,7 @@
 	<script defer="" src="assets/js/modules/open-import-workflow-utils.js?v=20260802-project-share-scope1"></script>
 	<script defer="" src="assets/js/modules/export-format-workflow-utils.js?v=20260720-export-grid-format1"></script>
 	<script defer="" src="assets/js/modules/export-dialog-workflow-utils.js?v=20260729-timelapse-export1"></script>
-		<script defer="" src="assets/js/modules/startup-workflow-utils.js?v=20260802-project-share-scope1"></script>
+		<script defer="" src="assets/js/modules/startup-workflow-utils.js?v=20260803-leading-project-ad1"></script>
 		<script defer="" src="assets/js/modules/recent-project-workflow-utils.js?v=20260726-project-card-actions2"></script>
 		<script defer="" src="assets/js/modules/project-package-workflow-utils.js?v=20260728-autosave-delta1"></script>
 		<script defer="" src="assets/js/modules/project-storage-adapter-utils.js?v=20260715-legacy-project-card-recovery1"></script>
@@ -1981,7 +1986,7 @@
 	<script defer="" src="assets/js/modules/pixisync-session-state.js?v=20260731-checkpoint-diagnostics1"></script>
 	<script defer="" src="assets/js/modules/pixisync-project-switch-utils.js?v=20260802-project-share-scope1"></script>
 	<script defer="" src="assets/js/modules/pixisync-minimal-ui-utils.js?v=20260801-startup-code1"></script>
-	<script defer="" src="assets/js/modules/pixisync-runtime-adapter-utils.js?v=20260803-pixisync-timeout-recovery1"></script>
+	<script defer="" src="assets/js/modules/pixisync-runtime-adapter-utils.js?v=20260803-pixisync-structure-controls1"></script>
 	<script defer="" src="assets/js/modules/pixieed-account-workflow-utils.js?v=20260730-remove-legacy-share-card1"></script>
 	<script defer="" src="assets/js/modules/startup-tail-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/controls-mirror.js?v=20260728-mirror-state-reuse1"></script>
@@ -1990,7 +1995,7 @@
 	<script defer="" src="assets/js/modules/local-project-v2-migration-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/pre-update-checkpoint-utils.js?v=20260712-pre-update-checkpoint-u3"></script>
 	<script defer="" src="assets/js/active-project-session-utils.js?v=20260715-local-true-v2-cleanup1"></script>
-    <script defer="" src="assets/js/app.js?v=20260803-pixisync-timeout-recovery1"></script>
+    <script defer="" src="assets/js/app.js?v=20260803-pixisync-structure-controls1"></script>
 	<script defer="" src="assets/js/modules/update-detection-utils.js?v=20260719-file-protocol1"></script>
   <script>
     (function initPanelAdDocking() {
@@ -2004,7 +2009,7 @@
       };
       const sideSections = {
         left: ['panelColor', 'panelTools', 'panelFrames'],
-        right: ['panelFile', 'panelSettings'],
+        right: ['panelFile'],
       };
       const mobileMountOrigins = new WeakMap();
       if (!(ads.left instanceof HTMLElement) && !(ads.right instanceof HTMLElement)) return;
@@ -2111,26 +2116,31 @@
       }
 
       function queueContextAdRender() {
-        const ad = ads.right;
-        const slot = ad?.querySelector?.('#rightPanelContextAdSlot > ins');
-        if (!(ad instanceof HTMLElement) || !(slot instanceof HTMLElement)
-          || ad.closest('#panelAdPreloadHost') || slot.dataset.contextRenderQueued === '1'
-          || slot.dataset.loaded === '1' || slot.getAttribute('data-adsbygoogle-status') === 'done') {
-          return;
-        }
-        slot.dataset.contextRenderQueued = '1';
-        window.requestAnimationFrame(() => {
-          delete slot.dataset.contextRenderQueued;
-          if (!ad.isConnected || ad.closest('#panelAdPreloadHost')) {
+        const contextAds = Array.from(new Set([
+          ads.right,
+          ...document.querySelectorAll('[data-pixieed-owned-panel-ad]'),
+        ].filter(ad => ad instanceof HTMLElement)));
+        contextAds.forEach(ad => {
+          const slot = ad.querySelector('.ad-box > ins');
+          if (!(slot instanceof HTMLElement) || !isMountRenderable(ad)
+            || ad.closest('#panelAdPreloadHost') || slot.dataset.contextRenderQueued === '1'
+            || slot.dataset.loaded === '1' || slot.getAttribute('data-adsbygoogle-status') === 'done') {
             return;
           }
-          const result = window.__PIXIEEDRAW_RENDER_AD_SLOT__?.(slot, {
-            owner: 'right-panel-context',
-            reason: 'visible-panel-bottom',
+          slot.dataset.contextRenderQueued = '1';
+          window.requestAnimationFrame(() => {
+            delete slot.dataset.contextRenderQueued;
+            if (!ad.isConnected || !isMountRenderable(ad) || ad.closest('#panelAdPreloadHost')) {
+              return;
+            }
+            const result = window.__PIXIEEDRAW_RENDER_AD_SLOT__?.(slot, {
+              owner: `panel-context-${ad.dataset.pixieedOwnedPanelAd || 'file'}`,
+              reason: 'visible-panel-context',
+            });
+            if (result?.ok) {
+              slot.dataset.loaded = '1';
+            }
           });
-          if (result?.ok) {
-            slot.dataset.loaded = '1';
-          }
         });
       }
 
@@ -2613,7 +2623,7 @@
   </script>
 
 	<script src="../scripts/tool-fullscreen.js?v=2026.07.20-pixiedraw-fullscreen-ad1"></script>
-	<script src="../scripts/shared-bottom-nav.js?v=20260731-pixisync-share-icon1"></script>
+	<script src="../scripts/shared-bottom-nav.js?v=20260803-details-ad-placement1"></script>
 	<script>
     (function initOperationHelpAd() {
       if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.('operation-help-dialog')) return;

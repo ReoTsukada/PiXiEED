@@ -492,13 +492,20 @@
       return itemPathname !== currentPathname;
     })]
       .map((item) => (item.icon || item.cloneIcon ? item : { ...item, icon: fallbackIcon }));
-    container.replaceChildren(...items.map((item) => {
+    const controls = items.map((item) => {
       const control = createActionControl(item, 'pixieed-common-details__item');
       if (!item.keepOpen) {
         control.addEventListener('click', () => setDetailsPanelOpen(ui, false));
       }
       return control;
-    }));
+    });
+    if (pageKind === 'draw' && ui?.ad instanceof HTMLElement) {
+      ui.ad.classList.add('is-inline-after-primary-actions');
+      const insertAt = Math.min(4, controls.length);
+      container.replaceChildren(...controls.slice(0, insertAt), ui.ad, ...controls.slice(insertAt));
+      return;
+    }
+    container.replaceChildren(...controls);
   }
 
   function runTargetAction(item) {
@@ -791,6 +798,9 @@
       [data-common-action="notifications"][data-has-unread="true"] .pixieed-notification-badge{display:block}
       .pixieed-common-details__ad{
         width:calc(100% + 20px);min-height:100px;margin:12px -10px -10px;overflow:hidden;background:#050a14;
+      }
+      .pixieed-common-details__links>.pixieed-common-details__ad.is-inline-after-primary-actions{
+        grid-column:1/-1;width:100%;min-width:0;margin:4px 0;align-self:stretch;
       }
       .pixieed-common-details__ad[hidden]{display:none!important}
       .pixieed-common-details__ad ins.adsbygoogle{

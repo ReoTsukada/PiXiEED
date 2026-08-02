@@ -28119,6 +28119,15 @@
       runtimeConsoleStatusTimes.set(signature, now);
       suppressedRuntimeConsoleStatuses = 0;
     };
+    const syncPiXiSyncStructureControls = details => {
+      const phase = String(details?.phase || '');
+      // `active` is published before the adapter's SYNC_ACTIVE effect has
+      // finished configuring the collaboration controller. The matching
+      // `active-ready` signal below is the authoritative enable point.
+      if (phase === 'active') return;
+      updateCanvasResizeControls();
+      syncCanvasResizeHandleVisibility();
+    };
     const acquireProjectLease = createPiXiSyncProjectLeaseManager();
     const runtime = adapterFactory({
       createSession: options => window.PiXiEEDrawModules.pixisyncSessionState
@@ -28432,7 +28441,10 @@
       ensureAuthenticatedStart: options => ensureSharedProjectAuthenticatedStart(options),
       getClientId,
       uiEnabled: config.uiEnabled !== false,
-      onStatus: logPiXiSyncRuntimeStatus,
+      onStatus: details => {
+        logPiXiSyncRuntimeStatus(details);
+        syncPiXiSyncStructureControls(details);
+      },
       onError: (error, details = {}) => console.warn('[pixisync:v1-runtime] error', {
         message: error?.message || error,
         suppressedRepeatedErrors: Number(details.repeatedCount || 0),

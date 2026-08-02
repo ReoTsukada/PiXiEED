@@ -603,6 +603,7 @@ assert.equal(timeoutOwner.adapter.snapshot().session.phase, 'local');
 // Backgrounding must close the drawing gate without waiting for network I/O;
 // the first visible lifecycle event performs one authoritative reconnect.
 const lifecycleServer = new LifecycleServer();
+const lifecycleStatuses = [];
 const lifecycleOwner = createAdapter({
   server: lifecycleServer,
   actor: 'owner',
@@ -610,6 +611,7 @@ const lifecycleOwner = createAdapter({
   storage: createStorage(),
   bindings: new Map(),
   checkpointText: 'checkpoint-lifecycle',
+  onStatus: details => lifecycleStatuses.push(details),
 });
 await lifecycleOwner.adapter.initialize();
 await lifecycleOwner.adapter.start();
@@ -629,6 +631,11 @@ assert.equal(lifecycleOwner.adapter.snapshot().session.phase, 'active');
 assert.equal(lifecycleOwner.adapter.session.canDraw(), true);
 assert.equal(lifecycleOwner.bridge.inputLocked, false);
 assert.equal(lifecycleServer.realtimeOptions.length, initialRealtimeCount + 1);
+assert.equal(
+  lifecycleStatuses.at(-1)?.phase,
+  'active-ready',
+  'the final reconnect status must be emitted after the collaboration bridge is configured'
+);
 assert.equal(await lifecycleOwner.adapter.handleLifecycleResume('focus'), false);
 assert.equal(lifecycleServer.realtimeOptions.length, initialRealtimeCount + 1);
 

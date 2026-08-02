@@ -103,7 +103,7 @@
     const controller = doc.createElement('script');
     controller.async = false;
     controller.dataset.pixieedCommonTabBar = 'true';
-    controller.src = relHref('scripts/shared-tab-bar.js?v=20260731-pixisync-share-icon1');
+    controller.src = relHref('scripts/shared-tab-bar.js?v=20260803-details-ad-placement1');
     controller.addEventListener('load', ensureNotificationController, { once: true });
     doc.body.appendChild(controller);
   }

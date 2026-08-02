@@ -26,12 +26,18 @@ assert.match(index, /reason: 'entered-viewport'/);
 assert.doesNotMatch(index, /scheduleActiveModeReload|resetSlotContainer/);
 assert.doesNotMatch(index, /mobileBottomAdSlot', slot: '6568310446'/);
 assert.match(index, /rect\.right > 0[\s\S]*rect\.top < window\.innerHeight/);
-assert.match(index, /file-panel-summary[\s\S]{0,600}data-panel-ad-mount="right"/);
+assert.match(index, /field-group field-group--file-actions[\s\S]{0,1200}data-pixieed-owned-panel-ad="file"[\s\S]{0,600}file-panel-summary/);
 assert.match(index, /settings-size-grid[\s\S]{0,2200}data-panel-ad-mount="right"/);
+assert.match(index, /data-pixieed-owned-panel-ad="settings"/);
+assert.match(index, /sideSections\s*=\s*\{[\s\S]*right:\s*\['panelFile'\]/);
+assert.match(index, /document\.querySelectorAll\('\[data-pixieed-owned-panel-ad\]'\)/);
+assert.match(index, /id="operationHelpAdContainer"[\s\S]{0,600}id="helpArticleList"/);
 assert.match(index, /data-ad-slot="1180252398"/);
 assert.match(index, /id="leftPanelAd"[^>]*data-pixieed-reserve-ad-space="true"|data-pixieed-reserve-ad-space="true"[^>]*id="leftPanelAd"/);
 assert.match(index, /id="exportAdContainer"[^>]*data-pixieed-reserve-ad-space="true"|data-pixieed-reserve-ad-space="true"[^>]*id="exportAdContainer"/);
 assert.match(css, /\.panel-ad-mount--context\s*\{\s*margin: 12px 0 4px;/);
+assert.match(css, /\.startup-workspace__ad--leading\s*\{[\s\S]{0,240}grid-column:\s*auto/);
+assert.match(css, /\.startup-workspace__ad--leading \.startup-recent-ad__slot\s*\{[\s\S]{0,240}min-height:\s*120px/);
 assert.match(css, /\.panel-ad\.is-ad-unfilled-reserved ins[\s\S]{0,800}visibility: hidden !important;/);
 assert.match(css, /html\[data-pixieed-ad-free-account='true'\] \.panel-ad-mount[\s\S]{0,800}display: none !important;/);
 assert.match(css, /\.panel-ad\.is-ad-unfilled,[\s\S]{0,800}height: 0 !important;/);
@@ -43,6 +49,8 @@ assert.match(sharedTopAd, /arePixieedAdsDisabled\(\)[\s\S]*\|\| isLandscapeViewp
 assert.doesNotMatch(sharedTopAd, /arePixieedAdsDisabled\(\)[\s\S]{0,80}\|\| isPixiedrawPage\(\)/);
 assert.match(sharedTopAd, /data-ad-slot="2141591954"/);
 assert.match(sharedTabBar, /pixieed-common-details__ad[\s\S]*data-ad-slot="4859859838"/);
+assert.match(sharedTabBar, /const insertAt = Math\.min\(4, controls\.length\)/);
+assert.match(sharedTabBar, /is-inline-after-primary-actions/);
 assert.match(sharedTabBar, /\.pixieed-common-details__ad\{[\s\S]{0,220}width:calc\(100% \+ 20px\);min-height:100px/);
 assert.match(sharedTabBar, /\.pixieed-common-details__ad ins\.adsbygoogle\{[\s\S]{0,260}min-height:100px!important/);
 assert.doesNotMatch(sharedTabBar, /\.pixieed-common-details__ad\{[^}]*aspect-ratio/);
@@ -50,9 +58,9 @@ assert.doesNotMatch(sharedTabBar, /\.pixieed-common-details__ad ins\.adsbygoogle
 
 assert.doesNotMatch(recentProjects, /PiXiEEDを支援|Supports PiXiEED/);
 assert.doesNotMatch(recentProjects, /\(index \+ 1\) % 8 === 0/);
-assert.match(startupWorkflow, /\(visibleIndex \+ 1\) % 8 === 0/);
-assert.doesNotMatch(startupWorkflow, /visibleIndex === 3/);
 assert.match(startupWorkflow, /startup-recent-ad/);
+assert.match(startupWorkflow, /leadingAdAfterCards:\s*1/);
+assert.match(startupWorkflow, /startup-workspace__ad--leading/);
 assert.match(startupWorkflow, /data-full-width-responsive', 'true'/);
 
 console.log('PiXiEEDraw ad placement guards passed.');

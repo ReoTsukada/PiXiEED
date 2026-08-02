@@ -16,6 +16,8 @@ assert.match(helper, /const COMMON_SLOT = '2141591954'/);
 assert.match(helper, /function shouldInsertAfterRows/);
 assert.match(helper, /count % \(gridColumnCount\(grid\) \* rowCount\) === 0/);
 assert.match(helper, /function renderProgressively/);
+assert.match(helper, /leadingAdAfterCards = 0/);
+assert.match(helper, /createLeadingAd = null/);
 assert.match(helper, /waitForSharedAdPriority/);
 assert.match(market, /PiXiEEDCardFeedAds\?\.renderProgressively/);
 assert.doesNotMatch(market, /children\.splice\(8/);
@@ -27,6 +29,8 @@ assert.doesNotMatch(drawRecent, /\(index \+ 1\) % 8 === 0/);
 assert.doesNotMatch(drawRecent, /index === 3/);
 assert.match(drawStartup, /PiXiEEDCardFeedAds\?\.renderProgressively/);
 assert.match(drawStartup, /data-ad-slot', window\.PiXiEEDCardFeedAds\?\.COMMON_SLOT \|\| '2141591954'/);
+assert.match(drawStartup, /leadingAdAfterCards:\s*1/);
+assert.match(drawStartup, /createLeadingAd:\s*createWorkspaceAd/);
 assert.doesNotMatch(drawStartup, /visibleIndex === 3/);
 assert.doesNotMatch(drawStartup, /!startupWorkspaceSearchQuery && \(visibleIndex \+ 1\) % 8/);
 
