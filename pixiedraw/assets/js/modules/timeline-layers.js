@@ -116,6 +116,8 @@
   // Timeline markers represent raster content, not merely the existence of a
   // frame/layer cell. Empty cels remain selectable, but do not show a green
   // dot. Sparse tiles make the common empty case O(1).
+  const timelineRasterContentMarkedLayers = new WeakSet();
+
   function layerHasTimelineRasterContent(layer) {
     if (!layer) {
       return false;
@@ -145,6 +147,65 @@
       );
     }
     return false;
+  }
+
+  function findTimelineSlotForLayer(layer, frame = getActiveFrame()) {
+    const container = dom.controls.timelineMatrix;
+    if (!container?.childElementCount || !frame?.id || !layer?.id) {
+      return null;
+    }
+    const cells = container.querySelectorAll(
+      '.timeline-cell--body[data-timeline-frame-id][data-timeline-layer-id]'
+    );
+    for (let index = 0; index < cells.length; index += 1) {
+      const cell = cells[index];
+      if (
+        cell.dataset.timelineFrameId === String(frame.id)
+        && cell.dataset.timelineLayerId === String(layer.id)
+      ) {
+        return cell.querySelector('.timeline-slot');
+      }
+    }
+    return null;
+  }
+
+  function markTimelineLayerRasterContent(layer, frame = getActiveFrame(), { verifyContent = false } = {}) {
+    if (!layer || typeof layer !== 'object' || timelineRasterContentMarkedLayers.has(layer)) {
+      return false;
+    }
+    if (verifyContent && !layerHasTimelineRasterContent(layer)) {
+      return false;
+    }
+    const slot = findTimelineSlotForLayer(layer, frame);
+    if (!slot) {
+      return false;
+    }
+    timelineRasterContentMarkedLayers.add(layer);
+    if (!slot.querySelector('.timeline-slot__marker')) {
+      const marker = document.createElement('span');
+      marker.className = 'timeline-slot__marker';
+      marker.setAttribute('aria-hidden', 'true');
+      slot.appendChild(marker);
+    }
+    return true;
+  }
+
+  function reconcileTimelineLayerRasterContent(layer, frame = getActiveFrame()) {
+    if (!layer || typeof layer !== 'object') {
+      return false;
+    }
+    const hasContent = layerHasTimelineRasterContent(layer);
+    const slot = findTimelineSlotForLayer(layer, frame);
+    if (hasContent) {
+      return markTimelineLayerRasterContent(layer, frame, { verifyContent: false });
+    }
+    timelineRasterContentMarkedLayers.delete(layer);
+    const marker = slot?.querySelector('.timeline-slot__marker');
+    if (!marker) {
+      return false;
+    }
+    marker.remove();
+    return true;
   }
 
   function getActiveLayerTrackId() {
@@ -3724,7 +3785,8 @@
             ? localizeText('レイヤーを非表示', 'Hide layer')
             : localizeText('レイヤーを表示', 'Show layer')
         );
-        visibilityToggle.textContent = rowVisibility ? '●' : '○';
+        visibilityToggle.title = visibilityToggle.getAttribute('aria-label') || '';
+        visibilityToggle.textContent = rowVisibility ? '●' : '×';
         rowVisibilityCell.appendChild(visibilityToggle);
 
         const tag = document.createElement('button');
@@ -3952,10 +4014,13 @@
             event.stopPropagation();
           });
           if (layerHasTimelineRasterContent(targetLayer)) {
+            timelineRasterContentMarkedLayers.add(targetLayer);
             const marker = document.createElement('span');
             marker.className = 'timeline-slot__marker';
             marker.setAttribute('aria-hidden', 'true');
             slot.appendChild(marker);
+          } else {
+            timelineRasterContentMarkedLayers.delete(targetLayer);
           }
 
           let slotVariant = 'default';
@@ -4117,6 +4182,8 @@
           flushTimelineMatrixRenderIfVisible,
           scheduleTimelineMatrixRenderSoon,
           scheduleDeferredTimelineMatrixRender,
+          markTimelineLayerRasterContent,
+          reconcileTimelineLayerRasterContent,
           renderTimelineMatrix,
           renderFrameList,
           renderLayerList,

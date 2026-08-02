@@ -56,6 +56,7 @@
   let rasterBatchMirrorTool = null;
   let rasterBatchMirrorEnabled = false;
   let rasterBatchMirrorState = null;
+  let rasterBatchContentLayer = null;
   const brushSpanCache = new Map();
   function getCurrentNormalizedMirrorState() {
     return typeof getNormalizedMirrorState === 'function'
@@ -74,6 +75,7 @@
       rasterBatchMirrorTool = null;
       rasterBatchMirrorEnabled = false;
       rasterBatchMirrorState = null;
+      rasterBatchContentLayer = null;
     }
     rasterBatchDepth += 1;
   }
@@ -81,6 +83,8 @@
     rasterBatchDepth = Math.max(0, rasterBatchDepth - 1);
     if (rasterBatchDepth) return;
     const bounds = rasterBatchBounds;
+    const contentLayer = rasterBatchContentLayer;
+    const shouldReconcileContent = pointerState.tool === 'eraser';
     rasterBatchBounds = null;
     rasterBatchWrittenPixels = null;
     rasterBatchCanvasSize = null;
@@ -88,11 +92,15 @@
     rasterBatchMirrorTool = null;
     rasterBatchMirrorEnabled = false;
     rasterBatchMirrorState = null;
+    rasterBatchContentLayer = null;
     if (!bounds) return;
     if (typeof markDirtyTilesRect === 'function') {
       markDirtyTilesRect(bounds.x0, bounds.y0, bounds.x1, bounds.y1);
     } else {
       markDirtyRect(bounds.x0, bounds.y0, bounds.x1, bounds.y1);
+    }
+    if (shouldReconcileContent && contentLayer) {
+      reconcileTimelineLayerRasterContent?.(contentLayer);
     }
   }
   function noteRasterPixelDirty(x, y) {
@@ -129,6 +137,15 @@
       return;
     }
     markDirtyRect(x0, y0, x1, y1);
+  }
+  function markRasterHistoryDirty(layer) {
+    markHistoryDirty();
+    notifyTimelineLayerRasterContent?.(layer);
+    if (rasterBatchDepth) {
+      rasterBatchContentLayer = layer;
+    } else if (pointerState.tool === 'eraser') {
+      reconcileTimelineLayerRasterContent?.(layer);
+    }
   }
   function withRasterBatch(callback) {
     beginRasterBatch();
@@ -250,7 +267,7 @@
         direct[base + 3] = 0;
       }
       recordPendingPixelPatchAfter(layer, index);
-      markHistoryDirty();
+      markRasterHistoryDirty(layer);
       noteRasterPixelDirty(x, y);
       return;
     }
@@ -269,7 +286,7 @@
           direct[base + 3] = 0;
         }
         recordPendingPixelPatchAfter(layer, index);
-        markHistoryDirty();
+        markRasterHistoryDirty(layer);
         noteRasterPixelDirty(x, y);
         return;
       }
@@ -292,7 +309,7 @@
       direct[base + 2] = rgbColor.b;
       direct[base + 3] = rgbColor.a;
       recordPendingPixelPatchAfter(layer, index);
-      markHistoryDirty();
+      markRasterHistoryDirty(layer);
       noteRasterPixelDirty(x, y);
       return;
     }
@@ -312,7 +329,7 @@
           direct[base + 3] = 0;
         }
         recordPendingPixelPatchAfter(layer, index);
-        markHistoryDirty();
+        markRasterHistoryDirty(layer);
         noteRasterPixelDirty(x, y);
         return;
       }
@@ -333,7 +350,7 @@
       direct[base + 2] = drawColor.b;
       direct[base + 3] = drawColor.a;
       recordPendingPixelPatchAfter(layer, index);
-      markHistoryDirty();
+      markRasterHistoryDirty(layer);
       noteRasterPixelDirty(x, y);
       return;
     }
@@ -349,7 +366,7 @@
       direct[base + 3] = 0;
     }
     recordPendingPixelPatchAfter(layer, index);
-    markHistoryDirty();
+    markRasterHistoryDirty(layer);
     noteRasterPixelDirty(x, y);
   }
 
@@ -393,7 +410,7 @@
       }
       if (markDirty) {
         recordPendingPixelPatchAfter(layer, index);
-        markHistoryDirty();
+        markRasterHistoryDirty(layer);
         noteRasterPixelDirty(x, y);
       }
       return true;
@@ -416,7 +433,7 @@
     direct[base + 3] = rgba.a;
     if (markDirty) {
       recordPendingPixelPatchAfter(layer, index);
-      markHistoryDirty();
+      markRasterHistoryDirty(layer);
       noteRasterPixelDirty(x, y);
     }
     return true;
@@ -595,7 +612,7 @@
       });
       if (!changed) return true;
       layer.directOnly = false;
-      markHistoryDirty();
+      markRasterHistoryDirty(layer);
       noteRasterRectDirty(mirrorX0, mirrorY0, mirrorX1, mirrorY1);
       return true;
     }
@@ -627,7 +644,7 @@
       }
       if (x1 < x0 || y1 < y0) return true;
       layer.directOnly = false;
-      markHistoryDirty();
+      markRasterHistoryDirty(layer);
       noteRasterRectDirty(x0, y0, x1, y1);
       return true;
     }
@@ -644,7 +661,7 @@
       }
       if (x1 < x0 || y1 < y0) return true;
       layer.directOnly = false;
-      markHistoryDirty();
+      markRasterHistoryDirty(layer);
       noteRasterRectDirty(x0, y0, x1, y1);
       return true;
     }
@@ -665,7 +682,7 @@
     }
     if (x1 < x0 || y1 < y0) return true;
     layer.directOnly = false;
-    markHistoryDirty();
+    markRasterHistoryDirty(layer);
     noteRasterRectDirty(x0, y0, x1, y1);
     return true;
   }
@@ -1144,7 +1161,7 @@
       return false;
     }
     layer.directOnly = false;
-    markHistoryDirty();
+    markRasterHistoryDirty(layer);
     markDirtyRect(x0, y0, x1, y1);
     return true;
   }
@@ -1193,7 +1210,7 @@
     }
     if (!changed) return false;
     layer.directOnly = false;
-    markHistoryDirty();
+    markRasterHistoryDirty(layer);
     markDirtyRect(x0, y0, x1, y1);
     return true;
   }

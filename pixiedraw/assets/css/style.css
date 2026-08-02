@@ -8389,13 +8389,15 @@ body.is-mobile-layout .mobile-draw-help {
   align-items: center;
   justify-content: center;
   line-height: 1;
+  font-weight: 800;
   transition: background 140ms ease, border 140ms ease, color 140ms ease;
 }
 
 .timeline-visibility[aria-pressed='false'] {
-  background: transparent;
-  color: rgba(255, 255, 255, 0.5);
-  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(176, 52, 72, 0.82);
+  color: rgba(255, 255, 255, 0.96);
+  border-color: rgba(255, 164, 178, 0.9) !important;
+  box-shadow: 0 0 0 1px rgba(90, 18, 32, 0.45);
 }
 
 .timeline-visibility:focus-visible {

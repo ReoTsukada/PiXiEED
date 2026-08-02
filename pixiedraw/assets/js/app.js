@@ -3412,6 +3412,14 @@
     return changed;
   }
 
+  function notifyTimelineLayerRasterContent(...args) {
+    return markTimelineLayerRasterContent?.(...args);
+  }
+
+  function reconcileTimelineLayerRasterContentAfterDraw(...args) {
+    return reconcileTimelineLayerRasterContent?.(...args);
+  }
+
   const canvasDrawingWorkflowUtilsModule = window.PiXiEEDrawModules?.canvasDrawingWorkflowUtils?.createCanvasDrawingWorkflowUtils?.({
   get BRUSH_SHAPE_CIRCLE() { return BRUSH_SHAPE_CIRCLE; },
   get BRUSH_SHAPE_CUSTOM() { return BRUSH_SHAPE_CUSTOM; },
@@ -3459,6 +3467,8 @@
   get markDirtyTilesRect() { return markDirtyTilesRect; },
   get markFillPreviewPixelsTruncated() { return markFillPreviewPixelsTruncated; },
   get markHistoryDirty() { return markHistoryDirty; },
+  get notifyTimelineLayerRasterContent() { return notifyTimelineLayerRasterContent; },
+  get reconcileTimelineLayerRasterContent() { return reconcileTimelineLayerRasterContentAfterDraw; },
   get normalizeColorValue() { return normalizeColorValue; },
   get normalizeFillStyle() { return normalizeFillStyle; },
   get normalizeLayerBlendMode() { return normalizeLayerBlendMode; },
@@ -11933,6 +11943,7 @@
         invalidateOnionSkinCache();
         clearPlaybackFrameCache();
         invalidateCanvasCompositeFrameCacheEntry(target?.frame, target?.canvasDoc);
+        notifyTimelineLayerRasterContent(target?.layer, target?.frame, { verifyContent: true });
         scheduleTimelineMatrixRenderSoon();
         const activeCanvas = getActiveProjectCanvasDocument();
         const activeFrame = getActiveFrame();
@@ -20048,6 +20059,8 @@
   flushTimelineMatrixRenderIfVisible,
   scheduleTimelineMatrixRenderSoon,
   scheduleDeferredTimelineMatrixRender,
+  markTimelineLayerRasterContent,
+  reconcileTimelineLayerRasterContent,
   renderTimelineMatrix,
   renderFrameList,
   renderLayerList,
