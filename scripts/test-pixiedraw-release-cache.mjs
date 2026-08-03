@@ -16,7 +16,7 @@ assert.match(buildId, /^\d{8}-\d+$/, 'build-info must publish a cache-safe build
 assert.equal(release.buildId, buildId, 'version.json must advertise the same deployed build');
 assert.match(indexHtml, new RegExp(`build-info\\.js\\?v=${buildId}`));
 assert.match(serviceWorker, new RegExp(`build-info\\.js\\?v=${buildId}`));
-assert.match(indexHtml, /assets\/css\/style\.css\?v=20260803-ad-responsive2/);
+assert.match(indexHtml, /assets\/css\/style\.css\?v=20260803-ad-responsive2-file-icons2/);
 assert.match(indexHtml, /scripts\/card-feed-ads\.js\?v=20260803-leading-project-ad1/);
 assert.match(indexHtml, /startup-workflow-utils\.js\?v=20260803-leading-project-ad1/);
 assert.match(indexHtml, /shared-bottom-nav\.js\?v=20260803-details-ad-responsive2/);

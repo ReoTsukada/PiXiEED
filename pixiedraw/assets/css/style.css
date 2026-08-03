@@ -5468,6 +5468,11 @@ input[type='range']::-moz-focus-outer {
   background-image: url('../icons/file-export.png');
 }
 
+#panelFile #openTimelapse::before {
+  content: '';
+  background-image: url('../icons/file-timelapse.png');
+}
+
 #panelDetails .panel-section__body {
   gap: 8px;
 }
