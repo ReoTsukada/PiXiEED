@@ -612,7 +612,7 @@ for (const contract of [
 ]) assert.match(persistentInviteMigration, contract);
 
 const ownerRoomLimitMigration = await readFile(
-  new URL('../supabase/migrations/20260803042921_pixisync_single_owned_room_limit.sql', import.meta.url),
+  new URL('../supabase/migrations/20260803062016_pixisync_single_owned_room_limit.sql', import.meta.url),
   'utf8'
 );
 for (const contract of [

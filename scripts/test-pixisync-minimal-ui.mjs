@@ -121,8 +121,19 @@ const createElements = () => {
     startConfirmDialog: new FakeDialog(),
     startConfirmCancel: new FakeElement(),
     startConfirmConfirm: new FakeElement(),
+    resumeNoticeDialog: new FakeDialog(),
+    resumeNoticeClose: new FakeElement(),
     copyInvite: new FakeElement(),
     copyInviteCode: new FakeElement(),
+    slotCard: new FakeElement(),
+    slotSummary: new FakeElement(),
+    buySlot: new FakeElement(),
+    slotPurchaseDialog: new FakeDialog(),
+    slotPurchaseStatus: new FakeElement(),
+    slotPurchaseNotice: new FakeElement(),
+    slotPurchaseRefresh: new FakeElement(),
+    slotPurchaseClose: new FakeElement(),
+    slotPurchaseConfirm: new FakeElement(),
     accessCodeField: new FakeElement(),
     accessCode: new FakeElement(),
     joinCode: new FakeElement(),
@@ -138,6 +149,21 @@ const createElements = () => {
   };
   return elements;
 };
+
+// The revival notice opens after startup only once for the current release.
+const resumeNoticeElements = createElements();
+const resumeNoticeStorage = createSessionStorage();
+const resumeNoticeUi = createUi({
+  elements: resumeNoticeElements,
+  body: fakeDocument.body,
+  localStorageRef: resumeNoticeStorage,
+});
+assert.equal(resumeNoticeUi.showResumeNoticeOnce(), true);
+assert.equal(resumeNoticeElements.resumeNoticeDialog.open, true);
+resumeNoticeElements.resumeNoticeClose.click();
+assert.equal(resumeNoticeElements.resumeNoticeDialog.open, false);
+assert.equal(resumeNoticeUi.showResumeNoticeOnce(), false);
+resumeNoticeUi.dispose();
 
 function activate(session, { role = 'owner', head = 0 } = {}) {
   let result = session.dispatch(role === 'owner'
@@ -206,9 +232,81 @@ limitedElements.startConfirmConfirm.click();
 assert.equal(await limitedStart, false);
 assert.equal(
   limitedElements.notice.textContent,
-  'シェアプロジェクトは1アカウントにつき1つまでです。現在のプロジェクトを引き続き利用してください。'
+  'シェアプロジェクトの作成枠が上限に達しています。'
+);
+assert.equal(limitedElements.slotPurchaseDialog.open, true);
+assert.equal(
+  limitedElements.slotPurchaseNotice.textContent,
+  '作成枠を追加すると、このプロジェクトをシェアできます。'
 );
 limitedUi.dispose();
+
+// The slot purchase UI shows server-owned quota and redirects only to the returned Stripe URL.
+const slotElements = createElements();
+let assignedCheckoutUrl = '';
+const slotUi = createUi({
+  elements: slotElements,
+  body: fakeDocument.body,
+  locationRef: {
+    href: 'https://example.test/pixiedraw/',
+    assign: value => { assignedCheckoutUrl = value; },
+  },
+});
+slotUi.configure({
+  enabled: true,
+  session: createSession({ role: 'owner' }),
+  commands: {
+    getProjectSlotStatus: async () => ({
+      includedSlots: 1,
+      purchasedSlots: 1,
+      allowedSlots: 2,
+      openOwnedProjects: 1,
+      availableSlots: 1,
+    }),
+    createProjectSlotCheckout: async () => 'https://checkout.stripe.com/c/pay/test',
+  },
+});
+await Promise.resolve();
+await Promise.resolve();
+assert.equal(slotElements.slotSummary.textContent, '利用中 1 / 2枠');
+assert.equal(slotElements.buySlot.click(), true);
+assert.equal(slotElements.slotPurchaseDialog.open, true);
+assert.match(slotElements.slotPurchaseStatus.textContent, /現在は2枠/);
+assert.equal(await slotElements.slotPurchaseConfirm.click(), true);
+assert.equal(assignedCheckoutUrl, 'https://checkout.stripe.com/c/pay/test');
+slotUi.dispose();
+
+// Returning from Stripe reconciles the authenticated purchase and removes checkout parameters.
+const returnElements = createElements();
+const returnLocation = { href: 'https://example.test/pixiedraw/' };
+let returnUrl = '';
+let reconciledSessionId = '';
+const returnUi = createUi({
+  elements: returnElements,
+  body: fakeDocument.body,
+  locationRef: returnLocation,
+  historyRef: { state: null, replaceState: (_state, _title, value) => { returnUrl = value; } },
+});
+returnUi.configure({
+  enabled: true,
+  session: createSession({ role: 'owner' }),
+  commands: {
+    getProjectSlotStatus: async () => ({
+      includedSlots: 1, purchasedSlots: 0, allowedSlots: 1, openOwnedProjects: 1, availableSlots: 0,
+    }),
+    reconcileProjectSlotPurchase: async sessionId => {
+      reconciledSessionId = sessionId;
+      return { includedSlots: 1, purchasedSlots: 1, allowedSlots: 2, openOwnedProjects: 1, availableSlots: 1 };
+    },
+  },
+});
+returnLocation.href = 'https://example.test/pixiedraw/?pixisync_slot_purchase=success&session_id=cs_test_slot_123&keep=1';
+assert.equal(await returnUi.consumeSlotPurchaseReturn(), true);
+assert.equal(reconciledSessionId, 'cs_test_slot_123');
+assert.equal(returnUrl, '/pixiedraw/?keep=1');
+assert.equal(returnElements.slotSummary.textContent, '利用中 1 / 2枠');
+assert.match(returnElements.slotPurchaseNotice.textContent, /1枠追加しました/);
+returnUi.dispose();
 
 // Active owner can issue invites, but permanent sharing has no end action.
 const ownerSession = createSession({ role: 'owner' });
@@ -424,8 +522,19 @@ for (const id of [
   'pixisyncStartConfirmDialog',
   'pixisyncStartConfirmCancel',
   'pixisyncStartConfirmConfirm',
+  'pixisyncResumeNoticeDialog',
+  'pixisyncResumeNoticeClose',
   'pixisyncCopyInvite',
   'pixisyncCopyInviteCode',
+  'pixisyncSlotCard',
+  'pixisyncSlotSummary',
+  'pixisyncBuySlot',
+  'pixisyncSlotPurchaseDialog',
+  'pixisyncSlotPurchaseStatus',
+  'pixisyncSlotPurchaseNotice',
+  'pixisyncSlotPurchaseRefresh',
+  'pixisyncSlotPurchaseClose',
+  'pixisyncSlotPurchaseConfirm',
   'pixisyncAccessCode',
   'pixisyncJoinCode',
   'panelMulti',
@@ -434,12 +543,15 @@ for (const id of [
   'pixisyncDrawLock',
 ]) assert.match(html, new RegExp(`id="${id}"`));
 assert.doesNotMatch(html, /id="pixisyncLeave"|id="pixisyncArchive"/);
-assert.match(html, /pixisync-minimal-ui-utils\.js\?v=20260803-pixisync-return2/);
-assert.match(html, /static-content\.js\?v=20260803-pixisync-return1/);
-assert.match(html, /app\.js\?v=20260803-pixisync-return2/);
+assert.match(html, /pixisync-minimal-ui-utils\.js\?v=20260803-pixisync-resume1/);
+assert.match(html, /pixisync-runtime-adapter-utils\.js\?v=20260803-pixisync-slots1/);
+assert.match(html, /static-content\.js\?v=20260803-pixisync-slots1/);
+assert.match(html, /app\.js\?v=20260803-pixisync-resume-delete1/);
 assert.match(html, /PiXiSYNCが復活しました/);
+assert.match(html, /シェアプロジェクトが復活しました/);
 assert.match(html, /シェアプロジェクトを楽しんでください/);
 assert.match(app, /startConfirmDialog: dom\.controls\.pixisyncStartConfirmDialog/);
+assert.match(app, /pixisyncMinimalUi\?\.showResumeNoticeOnce/);
 assert.match(staticContent, /id: 'pixisync-share-project'/);
 assert.match(staticContent, /id: '2026-08-03-pixisync-return'/);
 assert.match(staticContent, /シェアプロジェクト（PiXiSYNC）が復活しました/);
@@ -447,7 +559,7 @@ new Function(staticContent)();
 const staticContentApi = window.PiXiEEDrawModules.staticContent.createStaticContent();
 const pixisyncHelp = staticContentApi.HELP_GUIDE_ITEMS.find(entry => entry.id === 'pixisync-share-project');
 const pixisyncUpdate = staticContentApi.BUILTIN_UPDATE_HISTORY_ENTRIES.find(entry => entry.id === '2026-08-03-pixisync-return');
-assert.ok(pixisyncHelp?.points?.ja?.some(point => point.includes('1アカウントにつき1つまで')));
+assert.ok(pixisyncHelp?.points?.ja?.some(point => point.includes('1枠追加・100円')));
 assert.ok(pixisyncHelp?.points?.ja?.some(point => point.includes('参加コード')));
 assert.ok(pixisyncUpdate?.details?.some(point => point.includes('シェアプロジェクトを楽しんでください')));
 assert.doesNotMatch(html, /pixisyncStatusDetail|pixisyncCommentInput|pixisyncCommentSend/);

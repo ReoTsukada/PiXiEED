@@ -9,6 +9,7 @@ import {
   syncStripeAccount,
   verifyStripeWebhook,
 } from "../_shared/market-stripe.ts";
+import { handlePixisyncSlotStripeEvent } from "../_shared/pixisync-slot-webhook.ts";
 
 function recordValue(value: unknown): JsonRecord {
   return value && typeof value === "object" ? value as JsonRecord : {};
@@ -131,6 +132,9 @@ serve(async (request) => {
   const eventType = stringValue(event.type);
   const object = recordValue(recordValue(recordValue(event.data).object));
   if (!eventId || !eventType) return jsonResponse(request, { ok: false, error: "invalid Stripe event" }, 400);
+
+  const pixisyncResponse = await handlePixisyncSlotStripeEvent(request, event);
+  if (pixisyncResponse) return pixisyncResponse;
 
   const admin = createAdminClient();
   const { data: shouldProcess, error: claimError } = await admin.rpc("market_claim_payment_event_v1", {

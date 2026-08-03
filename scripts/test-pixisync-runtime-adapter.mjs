@@ -71,6 +71,8 @@ class LifecycleServer {
     this.emitClosedOnStop = false;
     this.failOpen = false;
     this.inviteCreateCalls = 0;
+    this.slotPurchased = 0;
+    this.slotFunctionCalls = [];
     this.rasterUploads = new Map();
     this.committedRasterUploads = new Set();
   }
@@ -104,6 +106,15 @@ class LifecycleServer {
             this.checkpointHash = String(params.p_state_sha256).slice(2);
             this.checkpointBytes = params.p_encoded_bytes;
             return { data: [{ room_id: ROOM_ID, checkpoint_id: this.checkpointId, storage_path: this.checkpointPath, status: this.status, session_generation: '1' }], error: null };
+          }
+          if (name === 'pixisync_get_project_slot_status') {
+            return { data: [{
+              included_slots: 1,
+              purchased_slots: this.slotPurchased,
+              allowed_slots: 1 + this.slotPurchased,
+              open_owned_projects: this.status === 'active' || this.status === 'initializing' ? 1 : 0,
+              available_slots: Math.max(0, 1 + this.slotPurchased - (this.status === 'active' || this.status === 'initializing' ? 1 : 0)),
+            }], error: null };
           }
           if (name === 'pixisync_activate_initial_checkpoint') {
             assert.ok(this.objects.has(this.checkpointPath));
@@ -192,6 +203,20 @@ class LifecycleServer {
         } catch (error) {
           return { data: null, error };
         }
+      },
+      functions: {
+        invoke: async (name, options) => {
+          this.slotFunctionCalls.push({ name, body: options?.body || {} });
+          if (name === 'pixisync-create-slot-checkout') {
+            return { data: { ok: true, url: 'https://checkout.stripe.com/c/pay/cs_test_slot' }, error: null };
+          }
+          if (name === 'pixisync-reconcile-slot-purchase') {
+            assert.equal(options?.body?.session_id, 'cs_test_slot_123');
+            this.slotPurchased = 1;
+            return { data: { ok: true }, error: null };
+          }
+          return { data: null, error: new Error(`unexpected function ${name}`) };
+        },
       },
       storage: {
         from: bucket => {
@@ -387,6 +412,24 @@ assert.equal(initializationRace.adapter.snapshot().enabled, false);
 
 await owner.adapter.initialize();
 assert.equal(owner.adapter.snapshot().session.phase, 'local');
+assert.deepEqual(await owner.adapter.commands.getProjectSlotStatus(), {
+  includedSlots: 1,
+  purchasedSlots: 0,
+  allowedSlots: 1,
+  openOwnedProjects: 0,
+  availableSlots: 1,
+});
+assert.equal(
+  await owner.adapter.commands.createProjectSlotCheckout(),
+  'https://checkout.stripe.com/c/pay/cs_test_slot'
+);
+assert.deepEqual(await owner.adapter.commands.reconcileProjectSlotPurchase('cs_test_slot_123'), {
+  includedSlots: 1,
+  purchasedSlots: 1,
+  allowedSlots: 2,
+  openOwnedProjects: 0,
+  availableSlots: 2,
+});
 assert.equal(await owner.adapter.start(), ROOM_ID);
 assert.equal(owner.adapter.snapshot().session.phase, 'active');
 assert.equal(typeof owner.bridge.runtime.requestAuthoritativeRecovery, 'function');

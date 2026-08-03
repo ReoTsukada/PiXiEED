@@ -350,8 +350,19 @@
       pixisyncStartConfirmDialog: document.getElementById('pixisyncStartConfirmDialog'),
       pixisyncStartConfirmCancel: document.getElementById('pixisyncStartConfirmCancel'),
       pixisyncStartConfirmConfirm: document.getElementById('pixisyncStartConfirmConfirm'),
+      pixisyncResumeNoticeDialog: document.getElementById('pixisyncResumeNoticeDialog'),
+      pixisyncResumeNoticeClose: document.getElementById('pixisyncResumeNoticeClose'),
       pixisyncCopyInvite: document.getElementById('pixisyncCopyInvite'),
       pixisyncCopyInviteCode: document.getElementById('pixisyncCopyInviteCode'),
+      pixisyncSlotCard: document.getElementById('pixisyncSlotCard'),
+      pixisyncSlotSummary: document.getElementById('pixisyncSlotSummary'),
+      pixisyncBuySlot: document.getElementById('pixisyncBuySlot'),
+      pixisyncSlotPurchaseDialog: document.getElementById('pixisyncSlotPurchaseDialog'),
+      pixisyncSlotPurchaseStatus: document.getElementById('pixisyncSlotPurchaseStatus'),
+      pixisyncSlotPurchaseNotice: document.getElementById('pixisyncSlotPurchaseNotice'),
+      pixisyncSlotPurchaseRefresh: document.getElementById('pixisyncSlotPurchaseRefresh'),
+      pixisyncSlotPurchaseClose: document.getElementById('pixisyncSlotPurchaseClose'),
+      pixisyncSlotPurchaseConfirm: document.getElementById('pixisyncSlotPurchaseConfirm'),
       pixisyncAccessCodeField: document.getElementById('pixisyncAccessCodeField'),
       pixisyncAccessCode: document.getElementById('pixisyncAccessCode'),
       pixisyncJoinCode: document.getElementById('pixisyncJoinCode'),
@@ -6414,6 +6425,8 @@
   set createAutosaveProjectId(value) { createAutosaveProjectId = value; },
   get createSharedProjectSnapshotTitle() { return createSharedProjectSnapshotTitle; },
   set createSharedProjectSnapshotTitle(value) { createSharedProjectSnapshotTitle = value; },
+  get disconnectPiXiSyncDeletedProject() { return disconnectPiXiSyncDeletedProject; },
+  set disconnectPiXiSyncDeletedProject(value) { disconnectPiXiSyncDeletedProject = value; },
   get dom() { return dom; },
   set dom(value) { dom = value; },
   get enforceSharedRecentProjectLimit() { return enforceSharedRecentProjectLimit; },
@@ -13076,8 +13089,19 @@
         startConfirmDialog: dom.controls.pixisyncStartConfirmDialog,
         startConfirmCancel: dom.controls.pixisyncStartConfirmCancel,
         startConfirmConfirm: dom.controls.pixisyncStartConfirmConfirm,
+        resumeNoticeDialog: dom.controls.pixisyncResumeNoticeDialog,
+        resumeNoticeClose: dom.controls.pixisyncResumeNoticeClose,
         copyInvite: dom.controls.pixisyncCopyInvite,
         copyInviteCode: dom.controls.pixisyncCopyInviteCode,
+        slotCard: dom.controls.pixisyncSlotCard,
+        slotSummary: dom.controls.pixisyncSlotSummary,
+        buySlot: dom.controls.pixisyncBuySlot,
+        slotPurchaseDialog: dom.controls.pixisyncSlotPurchaseDialog,
+        slotPurchaseStatus: dom.controls.pixisyncSlotPurchaseStatus,
+        slotPurchaseNotice: dom.controls.pixisyncSlotPurchaseNotice,
+        slotPurchaseRefresh: dom.controls.pixisyncSlotPurchaseRefresh,
+        slotPurchaseClose: dom.controls.pixisyncSlotPurchaseClose,
+        slotPurchaseConfirm: dom.controls.pixisyncSlotPurchaseConfirm,
         accessCodeField: dom.controls.pixisyncAccessCodeField,
         accessCode: dom.controls.pixisyncAccessCode,
         joinCode: dom.controls.pixisyncJoinCode,
@@ -27765,6 +27789,44 @@
     return { bound: true, kept: false, resumed, projectKey: targetProjectKey };
   }
 
+  async function disconnectPiXiSyncDeletedProject(entry = null) {
+    const projectKey = normalizeAutosaveProjectId(entry?.id || '');
+    const binding = entry?.pixisync && typeof entry.pixisync === 'object'
+      ? entry.pixisync
+      : null;
+    const roomId = String(binding?.roomId || '').trim().toLowerCase();
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(roomId)) {
+      return true;
+    }
+    if (!(await ensureSharedProjectAuthenticatedStart({ requireLogin: true }))) {
+      throw new Error('PiXiSYNC project deletion: authentication-required');
+    }
+
+    const runtime = window.__PIXISYNC_V1_RUNTIME__ || null;
+    const switchUtils = window.PiXiEEDrawModules?.pixisyncProjectSwitchUtils;
+    if (
+      runtime
+      && typeof switchUtils?.runtimeMatchesProjectBinding === 'function'
+      && switchUtils.runtimeMatchesProjectBinding(runtime, projectKey, binding)
+    ) {
+      await disposePiXiSyncRuntimeForProjectSwitch(runtime);
+    }
+
+    const client = window.__PIXISYNC_V1_SUPABASE_CLIENT__ || await ensurePixieedAccountClient();
+    if (typeof client?.rpc !== 'function') {
+      throw new Error('PiXiSYNC project deletion: supabase-unavailable');
+    }
+    const { data, error } = await client.rpc('pixisync_detach_deleted_project', {
+      p_room_id: roomId,
+    });
+    if (error) throw error;
+    const result = Array.isArray(data) ? data[0] : data;
+    if (!['owner_archived', 'participant_left', 'already_detached'].includes(String(result?.action || ''))) {
+      throw new Error('PiXiSYNC project deletion: remote-detach-unconfirmed');
+    }
+    return true;
+  }
+
   async function joinPiXiSyncFromStartupWorkspace(inviteValue) {
     const switchUtils = window.PiXiEEDrawModules?.pixisyncProjectSwitchUtils;
     if (typeof switchUtils?.runSafeProjectJoin !== 'function') {
@@ -28579,6 +28641,7 @@
       force: true,
     });
     const endStartupProgress = beginStartupProgress(localizeText('起動準備中…', 'Preparing startup...'));
+    let shouldShowPiXiSyncResumeNotice = false;
     try {
       try {
         setStartupProgressLabel(localizeText('起動設定を確認中…', 'Checking startup settings...'));
@@ -28637,16 +28700,21 @@
       });
       setupPiXiSyncShareMode();
       let openedPixiSyncInvite = false;
+      let openedPixiSyncPurchaseReturn = false;
       // 招待URLで開いた受信側は、設定ボタンのゲート操作を要求せず
       // V1シェアランタイムを先に起動してリンクを消費する。
       // これにより送信先でも現在のローカルプロジェクトへ参加バインドを作成できる。
       try {
+        const pixisyncUrl = new URL(window.location.href);
         const inviteToken = window.PiXiEEDrawModules?.pixisyncProjectSwitchUtils?.parseInviteToken?.(window.location.href, {
           locationHref: window.location.href,
         }) || '';
         if (inviteToken || pixisyncMinimalUi?.hasPendingInvite?.()) {
           openedPixiSyncInvite = true;
         }
+        openedPixiSyncPurchaseReturn = ['success', 'cancelled'].includes(
+          pixisyncUrl.searchParams.get('pixisync_slot_purchase') || ''
+        );
       } catch (error) {
         console.warn('PiXiSYNC invite bootstrap failed', error);
       }
@@ -28678,7 +28746,7 @@
           console.warn('Requested project bootstrap failed', error);
         }
       }
-      if (openedPixiSyncInvite) {
+      if (openedPixiSyncInvite || openedPixiSyncPurchaseReturn) {
         try {
           // Startup project selection must finish before the runtime captures
           // or restores a checkpoint; otherwise the normal bootstrap can
@@ -28704,6 +28772,9 @@
       } else {
         showStartupScreen({ refreshWorkspace: false });
       }
+      if (!openedPixiSyncInvite && !openedPixiSyncPurchaseReturn) {
+        shouldShowPiXiSyncResumeNotice = true;
+      }
     } finally {
       setStartupBootLoadingProgress(100, {
         label: localizeText('起動完了', 'Ready'),
@@ -28716,6 +28787,9 @@
         document.body.classList.add('app-ready');
       }
       startupReady = true;
+      if (shouldShowPiXiSyncResumeNotice) {
+        window.setTimeout(() => pixisyncMinimalUi?.showResumeNoticeOnce?.(), 0);
+      }
       scheduleLegacyProjectReopenNotice();
       if (typeof window !== 'undefined') {
         window.__PIXIEEDRAW_EDITOR_READY__ = true;

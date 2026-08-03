@@ -5370,6 +5370,111 @@ input[type='range']::-moz-focus-outer {
   grid-column: 1 / -1;
 }
 
+.pixisync-slot-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid rgba(var(--ui-rgb), 0.16);
+  border-radius: 8px;
+  background: rgba(var(--ui-rgb), 0.055);
+}
+
+.pixisync-slot-card > div {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.pixisync-slot-card span {
+  color: var(--fg-muted);
+  font-size: 0.62rem;
+}
+
+.pixisync-slot-card strong {
+  overflow: hidden;
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pixisync-slot-card .button {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding-inline: 8px;
+  font-size: 0.66rem;
+}
+
+.pixisync-slot-purchase .modal__form {
+  width: 100%;
+}
+
+.pixisync-slot-purchase__eyebrow {
+  display: inline-block;
+  margin-bottom: 3px;
+  color: var(--accent);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.pixisync-slot-purchase__body {
+  display: grid;
+  gap: 12px;
+}
+
+.pixisync-slot-purchase__price {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(var(--ui-rgb), 0.18);
+  border-radius: 10px;
+  background: rgba(var(--ui-rgb), 0.065);
+}
+
+.pixisync-slot-purchase__price strong {
+  color: var(--accent);
+  font-size: 1.65rem;
+  line-height: 1;
+}
+
+.pixisync-slot-purchase__price span,
+.pixisync-slot-purchase__status,
+.pixisync-slot-purchase__notice {
+  margin: 0;
+  font-size: 0.78rem;
+}
+
+.pixisync-slot-purchase__status {
+  font-weight: 700;
+}
+
+.pixisync-slot-purchase__points {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 1.25rem;
+  color: var(--fg-muted);
+  font-size: 0.75rem;
+  line-height: 1.55;
+}
+
+.pixisync-slot-purchase__notice {
+  min-height: 1.2em;
+  color: var(--accent);
+}
+
+.pixisync-slot-purchase .modal__footer {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.pixisync-slot-purchase #pixisyncSlotPurchaseConfirm {
+  grid-column: 1 / -1;
+  grid-row: 1;
+}
+
 #panelMulti .multi-participants-panel {
   flex: 1 1 auto;
   height: clamp(190px, 40vh, 300px);

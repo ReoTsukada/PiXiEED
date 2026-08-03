@@ -208,6 +208,12 @@
     if (nextEntries.length === existingEntries.length) {
       return false;
     }
+    if (removedEntry?.pixisync?.roomId) {
+      const disconnected = await disconnectPiXiSyncDeletedProject(removedEntry);
+      if (disconnected !== true) {
+        throw new Error('PiXiSYNC project deletion: remote-detach-required');
+      }
+    }
     await saveRecentProjectsList(existingEntries, nextEntries);
     if (Number(removedEntry?.autosaveSchemaVersion) === 2) {
       await removeAutosaveV2ProjectData?.(normalizedId);

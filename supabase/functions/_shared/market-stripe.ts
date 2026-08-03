@@ -176,7 +176,11 @@ function constantTimeEqual(left: Uint8Array, right: Uint8Array): boolean {
   return mismatch === 0;
 }
 
-export async function verifyStripeWebhook(rawBody: string, signatureHeader: string): Promise<void> {
+export async function verifyStripeWebhook(
+  rawBody: string,
+  signatureHeader: string,
+  secretName = "STRIPE_WEBHOOK_SECRET",
+): Promise<void> {
   const parts = signatureHeader.split(",").map((part) => part.trim());
   const timestamp = parts.find((part) => part.startsWith("t="))?.slice(2) || "";
   const signatures = parts.filter((part) => part.startsWith("v1=")).map((part) => part.slice(3));
@@ -188,7 +192,7 @@ export async function verifyStripeWebhook(rawBody: string, signatureHeader: stri
 
   const key = await crypto.subtle.importKey(
     "raw",
-    new TextEncoder().encode(requiredEnv("STRIPE_WEBHOOK_SECRET")),
+    new TextEncoder().encode(requiredEnv(secretName)),
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"],

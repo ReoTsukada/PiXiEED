@@ -10,6 +10,15 @@ verify_jwt = true
 [functions.market-stripe-webhook]
 verify_jwt = false
 
+[functions.pixisync-create-slot-checkout]
+verify_jwt = false
+
+[functions.pixisync-reconcile-slot-purchase]
+verify_jwt = false
+
+[functions.pixisync-stripe-webhook]
+verify_jwt = false
+
 [functions.market-stripe-payout]
 verify_jwt = false
 

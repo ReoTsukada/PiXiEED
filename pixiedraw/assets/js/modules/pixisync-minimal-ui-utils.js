@@ -19,6 +19,7 @@
   });
   const INVITE_QUERY_KEY = 'pixisync_invite';
   const PENDING_INVITE_STORAGE_KEY = 'pixiedraw:pixisync:v1:pending-invite';
+  const RESUME_NOTICE_STORAGE_KEY = 'pixieedraw:pixisync:resume-notice:20260803-v1';
   const COMMENT_MAX_LENGTH = 140;
   const COMMENT_MAX_ITEMS = 50;
 
@@ -28,12 +29,15 @@
     locationRef = window.location,
     historyRef = window.history,
     sessionStorageRef = window.sessionStorage,
+    localStorageRef = window.localStorage,
     body = window.document?.body || null,
   } = {}) {
     let session = null;
     let commands = {};
     let participants = [];
     let comments = [];
+    let slotStatus = null;
+    let slotStatusLoading = false;
     let enabled = false;
     let externalDrawLocked = false;
     let externalDrawLockMessage = '';
@@ -47,6 +51,7 @@
       copyInvite: elements.copyInvite,
       copyInviteCode: elements.copyInviteCode,
       joinCode: elements.joinCode,
+      buySlot: elements.buySlot,
     });
 
     const getSnapshot = () => session?.getSnapshot?.() || {
@@ -76,6 +81,36 @@
       || elements.participantList?.ownerDocument
       || window.document
     );
+
+    function rememberResumeNotice() {
+      try {
+        localStorageRef?.setItem?.(RESUME_NOTICE_STORAGE_KEY, 'seen');
+      } catch (_) {}
+    }
+
+    function closeResumeNotice() {
+      rememberResumeNotice();
+      if (elements.resumeNoticeDialog?.open) elements.resumeNoticeDialog.close?.('seen');
+    }
+
+    function cancelResumeNotice(event) {
+      event?.preventDefault?.();
+      closeResumeNotice();
+    }
+
+    function showResumeNoticeOnce() {
+      const dialog = elements.resumeNoticeDialog;
+      if (!dialog || typeof dialog.showModal !== 'function') return false;
+      try {
+        if (localStorageRef?.getItem?.(RESUME_NOTICE_STORAGE_KEY) === 'seen') return false;
+      } catch (_) {}
+      if (dialog.open) return true;
+      dialog.showModal();
+      window.requestAnimationFrame?.(() => {
+        elements.resumeNoticeClose?.focus?.({ preventScroll: true });
+      });
+      return true;
+    }
 
     function parseInviteToken(value) {
       return root.pixisyncProjectSwitchUtils?.parseInviteToken?.(value, {
@@ -108,7 +143,7 @@
     }
 
     function confirmShareStart() {
-      const message = 'シェアプロジェクト（PiXiSYNC）が復活しました。\n作成できるシェアプロジェクトは1アカウントにつき1つまでです。\nシェアプロジェクトを楽しんでください。';
+      const message = 'シェアプロジェクト（PiXiSYNC）が復活しました。\n無料の作成枠は1枠で、必要な場合は1枠100円の買い切りで追加できます。\nシェアプロジェクトを楽しんでください。';
       const dialog = elements.startConfirmDialog;
       if (!dialog || typeof dialog.showModal !== 'function') {
         return Promise.resolve(window.confirm(message));
@@ -254,6 +289,14 @@
       setText(elements.connectionLabel, copy[2]);
       renderParticipants(snapshot);
       renderComments();
+      const slotCommandsAvailable = typeof commands.getProjectSlotStatus === 'function';
+      setHidden(elements.slotCard, !(enabled && slotCommandsAvailable));
+      setText(elements.slotSummary, slotStatus
+        ? `利用中 ${slotStatus.openOwnedProjects} / ${slotStatus.allowedSlots}枠`
+        : (slotStatusLoading ? '確認中…' : '枠を確認'));
+      setText(elements.slotPurchaseStatus, slotStatus
+        ? `現在は${slotStatus.allowedSlots}枠（利用中${slotStatus.openOwnedProjects}枠・追加購入${slotStatus.purchasedSlots}枠）です。`
+        : (slotStatusLoading ? '現在の作成枠を確認しています…' : '作成枠を再確認してください。'));
       setHidden(elements.quickOpen, false);
       setHidden(elements.mobileTab, false);
       setHidden(elements.accessCodeField, !(
@@ -285,6 +328,15 @@
         );
         button.setAttribute('aria-busy', busyAction === name ? 'true' : 'false');
       });
+      if (elements.slotPurchaseRefresh) {
+        elements.slotPurchaseRefresh.disabled = Boolean(!enabled || busyAction || slotStatusLoading);
+      }
+      if (elements.slotPurchaseConfirm) {
+        elements.slotPurchaseConfirm.disabled = Boolean(
+          !enabled || busyAction || typeof commands.createProjectSlotCheckout !== 'function'
+        );
+        elements.slotPurchaseConfirm.setAttribute('aria-busy', busyAction === 'purchaseSlot' ? 'true' : 'false');
+      }
       if (elements.accessCode) {
         elements.accessCode.disabled = Boolean(
           !enabled
@@ -317,6 +369,109 @@
         body.dataset.pixisyncDrawLocked = drawLocked ? 'true' : 'false';
       }
       return { snapshot, drawLocked };
+    }
+
+    function normalizeSlotStatus(value) {
+      const normalized = {
+        includedSlots: Number(value?.includedSlots),
+        purchasedSlots: Number(value?.purchasedSlots),
+        allowedSlots: Number(value?.allowedSlots),
+        openOwnedProjects: Number(value?.openOwnedProjects),
+        availableSlots: Number(value?.availableSlots),
+      };
+      if (
+        !Number.isSafeInteger(normalized.includedSlots)
+        || normalized.includedSlots < 1
+        || !Number.isSafeInteger(normalized.purchasedSlots)
+        || normalized.purchasedSlots < 0
+        || normalized.allowedSlots !== normalized.includedSlots + normalized.purchasedSlots
+        || !Number.isSafeInteger(normalized.openOwnedProjects)
+        || normalized.openOwnedProjects < 0
+        || !Number.isSafeInteger(normalized.availableSlots)
+        || normalized.availableSlots < 0
+      ) return null;
+      return Object.freeze(normalized);
+    }
+
+    async function refreshProjectSlotStatus({ quiet = false } = {}) {
+      if (!enabled || slotStatusLoading || typeof commands.getProjectSlotStatus !== 'function') return slotStatus;
+      slotStatusLoading = true;
+      render();
+      try {
+        const nextStatus = normalizeSlotStatus(await commands.getProjectSlotStatus());
+        if (!nextStatus) throw new Error('invalid-project-slot-status');
+        slotStatus = nextStatus;
+        if (!quiet) setText(elements.slotPurchaseNotice, '作成枠を更新しました。');
+        return slotStatus;
+      } catch (error) {
+        console.warn('[pixisync:v1-ui] slot status failed', error?.message || 'unknown');
+        if (!quiet) setText(elements.slotPurchaseNotice, '作成枠を確認できませんでした。');
+        return null;
+      } finally {
+        slotStatusLoading = false;
+        render();
+      }
+    }
+
+    function showSlotPurchaseDialog(message = '') {
+      const dialog = elements.slotPurchaseDialog;
+      if (!dialog || typeof dialog.showModal !== 'function') return false;
+      setText(elements.slotPurchaseNotice, message);
+      if (!dialog.open) dialog.showModal();
+      void refreshProjectSlotStatus({ quiet: true });
+      return true;
+    }
+
+    function removeSlotPurchaseFromUrl(url) {
+      url.searchParams.delete('pixisync_slot_purchase');
+      url.searchParams.delete('session_id');
+      historyRef?.replaceState?.(historyRef.state, '', `${url.pathname}${url.search}${url.hash}`);
+    }
+
+    function readSlotPurchaseReturn() {
+      try {
+        const url = new URL(locationRef.href);
+        const result = url.searchParams.get('pixisync_slot_purchase') || '';
+        if (!['success', 'cancelled'].includes(result)) return null;
+        return { url, result, sessionId: url.searchParams.get('session_id') || '' };
+      } catch (_) {
+        return null;
+      }
+    }
+
+    async function consumeSlotPurchaseReturn() {
+      const purchaseReturn = readSlotPurchaseReturn();
+      if (!purchaseReturn || !enabled) return false;
+      removeSlotPurchaseFromUrl(purchaseReturn.url);
+      showSlotPurchaseDialog(purchaseReturn.result === 'cancelled'
+        ? '購入はキャンセルされました。作成枠は変更されていません。'
+        : 'Stripe決済を確認しています…');
+      if (purchaseReturn.result === 'cancelled') {
+        await refreshProjectSlotStatus({ quiet: true });
+        return true;
+      }
+      if (
+        !/^cs_(?:test|live)_[A-Za-z0-9_]+$/.test(purchaseReturn.sessionId)
+        || typeof commands.reconcileProjectSlotPurchase !== 'function'
+      ) {
+        setText(elements.slotPurchaseNotice, '決済情報を確認できません。枠を再確認してください。');
+        return false;
+      }
+      try {
+        const reconciledStatus = normalizeSlotStatus(
+          await commands.reconcileProjectSlotPurchase(purchaseReturn.sessionId)
+        );
+        if (!reconciledStatus) throw new Error('invalid-project-slot-status');
+        slotStatus = reconciledStatus;
+        setText(elements.slotPurchaseNotice, '購入が完了し、作成枠を1枠追加しました。');
+        render();
+        return true;
+      } catch (error) {
+        console.warn('[pixisync:v1-ui] slot reconcile failed', error?.message || 'unknown');
+        await refreshProjectSlotStatus({ quiet: true });
+        setText(elements.slotPurchaseNotice, '決済処理を確認中です。少し待ってから「枠を再確認」を押してください。');
+        return false;
+      }
     }
 
     async function runAction(name, action, {
@@ -354,8 +509,13 @@
           pendingMessage: '共有を作成しています…',
           successMessage: '共有セッションを開始しました。',
           failureMessage: error => /pixisync_owner_room_limit_reached/.test(String(error?.message || error || ''))
-            ? 'シェアプロジェクトは1アカウントにつき1つまでです。現在のプロジェクトを引き続き利用してください。'
+            ? 'シェアプロジェクトの作成枠が上限に達しています。'
             : '共有を開始できませんでした。',
+          onFailure: error => {
+            if (/pixisync_owner_room_limit_reached/.test(String(error?.message || error || ''))) {
+              showSlotPurchaseDialog('作成枠を追加すると、このプロジェクトをシェアできます。');
+            }
+          },
         });
       },
       copyInvite: () => runAction('copyInvite', async () => {
@@ -417,6 +577,7 @@
           failureMessage: '招待を確認できませんでした。',
         });
       },
+      buySlot: () => showSlotPurchaseDialog(),
     };
 
     Object.entries(actionButtons).forEach(([name, button]) => {
@@ -444,6 +605,31 @@
     elements.commentsTab?.addEventListener?.('click', viewHandlers.comments);
     elements.accessCode?.addEventListener?.('input', viewHandlers.input);
     elements.accessCode?.addEventListener?.('keydown', viewHandlers.input);
+    const slotHandlers = {
+      refresh: () => refreshProjectSlotStatus(),
+      close: () => elements.slotPurchaseDialog?.close?.('close'),
+      confirm: () => runAction('purchaseSlot', async () => {
+        setText(elements.slotPurchaseNotice, 'Stripeの購入画面を準備しています…');
+        const checkoutUrl = await commands.createProjectSlotCheckout();
+        if (typeof locationRef.assign === 'function') locationRef.assign(checkoutUrl);
+        else locationRef.href = checkoutUrl;
+      }, {
+        pendingMessage: '購入画面を準備しています…',
+        failureMessage: '購入画面を開けませんでした。',
+        onFailure: error => setText(
+          elements.slotPurchaseNotice,
+          /authentication-required/.test(String(error?.message || error || ''))
+            ? '購入するにはPiXiEEDアカウントへログインしてください。'
+            : '購入画面を開けませんでした。時間をおいてもう一度お試しください。'
+        ),
+      }),
+    };
+    elements.slotPurchaseRefresh?.addEventListener?.('click', slotHandlers.refresh);
+    elements.slotPurchaseClose?.addEventListener?.('click', slotHandlers.close);
+    elements.slotPurchaseConfirm?.addEventListener?.('click', slotHandlers.confirm);
+    elements.resumeNoticeClose?.addEventListener?.('click', closeResumeNotice);
+    elements.resumeNoticeDialog?.addEventListener?.('cancel', cancelResumeNotice);
+    elements.resumeNoticeDialog?.addEventListener?.('close', rememberResumeNotice);
 
     function removeInviteTokenFromUrl(url) {
       url.searchParams.delete(INVITE_QUERY_KEY);
@@ -506,6 +692,7 @@
     function configure(runtime = {}) {
       unsubscribeSession?.();
       unsubscribeSession = null;
+      const previousCommands = commands;
       session = runtime.session || null;
       commands = runtime.commands && typeof runtime.commands === 'object' ? runtime.commands : {};
       participants = Array.isArray(runtime.participants) ? runtime.participants.slice() : [];
@@ -515,6 +702,11 @@
       unsubscribeSession = session?.subscribe?.(() => render()) || null;
       setNotice('');
       render();
+      if (enabled && readSlotPurchaseReturn()) {
+        void consumeSlotPurchaseReturn();
+      } else if (enabled && commands !== previousCommands) {
+        void refreshProjectSlotStatus({ quiet: true });
+      }
       return enabled;
     }
 
@@ -540,6 +732,8 @@
       commands = {};
       participants = [];
       comments = [];
+      slotStatus = null;
+      slotStatusLoading = false;
       enabled = false;
       externalDrawLocked = false;
       externalDrawLockMessage = '';
@@ -561,6 +755,12 @@
       elements.commentsTab?.removeEventListener?.('click', viewHandlers.comments);
       elements.accessCode?.removeEventListener?.('input', viewHandlers.input);
       elements.accessCode?.removeEventListener?.('keydown', viewHandlers.input);
+      elements.slotPurchaseRefresh?.removeEventListener?.('click', slotHandlers.refresh);
+      elements.slotPurchaseClose?.removeEventListener?.('click', slotHandlers.close);
+      elements.slotPurchaseConfirm?.removeEventListener?.('click', slotHandlers.confirm);
+      elements.resumeNoticeClose?.removeEventListener?.('click', closeResumeNotice);
+      elements.resumeNoticeDialog?.removeEventListener?.('cancel', cancelResumeNotice);
+      elements.resumeNoticeDialog?.removeEventListener?.('close', rememberResumeNotice);
       clear();
     }
 
@@ -569,6 +769,9 @@
       configure,
       render,
       consumeInviteFromUrl,
+      consumeSlotPurchaseReturn,
+      refreshProjectSlotStatus,
+      showResumeNoticeOnce,
       hasPendingInvite: () => Boolean(readPendingInviteToken()),
       updateParticipants,
       setExternalDrawLock,

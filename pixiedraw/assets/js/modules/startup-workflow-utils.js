@@ -252,9 +252,16 @@
       const config = dom.recentProjectDeleteConfirm;
       const dialog = config?.dialog;
       const isSharedEntry = isSharedRecentProjectEntry(entry);
+      const isPiXiSyncEntry = Boolean(entry?.pixisync?.roomId);
       const willDeleteOwnedSharedProject = isSharedEntry && resolvedDeletesOwnedSharedProject;
+      const willArchiveOwnedPiXiSync = isPiXiSyncEntry && entry?.pixisync?.role === 'owner';
       const displayLabel = extractDocumentBaseName(entry?.fileName || entry?.name || DEFAULT_DOCUMENT_NAME);
-      const message = isSharedEntry
+      const message = isPiXiSyncEntry
+        ? localizeText(
+          `シェアプロジェクト「${displayLabel}」を削除しますか？`,
+          `Delete shared project "${displayLabel}"?`
+        )
+        : isSharedEntry
         ? localizeText(
           willDeleteOwnedSharedProject
             ? `共有プロジェクト「${displayLabel}」を削除しますか？`
@@ -267,7 +274,16 @@
           `端末内プロジェクト「${displayLabel}」を削除しますか？`,
           `Delete local project "${displayLabel}"?`
         );
-      const detail = isSharedEntry
+      const detail = isPiXiSyncEntry
+        ? localizeText(
+          willArchiveOwnedPiXiSync
+            ? 'シェア状態を終了し、参加者を切断してから端末内データを削除します。この操作は取り消せません。'
+            : 'このシェアプロジェクトから退出してから、端末内データを削除します。この操作は取り消せません。',
+          willArchiveOwnedPiXiSync
+            ? 'Sharing will end and participants will be disconnected before on-device data is deleted. This cannot be undone.'
+            : 'You will leave this shared project before its on-device data is deleted. This cannot be undone.'
+        )
+        : isSharedEntry
         ? localizeText(
           willDeleteOwnedSharedProject
             ? 'あなたが所有している共有プロジェクト本体を削除します。この操作は取り消せません。'
@@ -1902,11 +1918,27 @@
       if (deleteButton instanceof HTMLButtonElement) {
         const entry = startupWorkspaceEntries[Number(deleteButton.dataset.workspaceProjectDeleteIndex)] || null;
         if (!entry?.id) return;
-        const name = extractDocumentBaseName(entry.fileName || entry.name || DEFAULT_DOCUMENT_NAME);
-        if (!window.confirm(localizeText(`端末内プロジェクト「${name}」を削除しますか？`, `Delete on-device project "${name}"?`))) return;
+        if (!(await openRecentProjectDeleteConfirmDialog(entry, {
+          deletesOwnedSharedProject: entry?.pixisync?.role === 'owner',
+        }))) return;
         deleteButton.disabled = true;
-        await removeRecentProjectEntry(entry.id);
-        await refreshStartupWorkspaceProjects();
+        try {
+          await removeRecentProjectEntry(entry.id);
+          await refreshStartupWorkspaceProjects();
+        } catch (error) {
+          console.warn('Failed to delete recent project', error);
+          updateAutosaveStatus(
+            entry?.pixisync?.roomId
+              ? localizeText(
+                'シェア状態を終了できなかったため、プロジェクトは削除していません。ログイン状態と通信を確認してください。',
+                'The project was not deleted because sharing could not be disconnected. Check your login and connection.'
+              )
+              : localizeText('プロジェクトを削除できませんでした。', 'Could not delete the project.'),
+            'error'
+          );
+        } finally {
+          deleteButton.disabled = false;
+        }
         return;
       }
       const target = source.closest('button[data-workspace-project-open-index]');

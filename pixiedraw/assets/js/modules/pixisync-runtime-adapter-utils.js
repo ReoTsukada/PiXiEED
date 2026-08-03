@@ -122,6 +122,9 @@
       resumeBoundProject,
       createInviteLink,
       createInviteCode,
+      getProjectSlotStatus,
+      createProjectSlotCheckout,
+      reconcileProjectSlotPurchase,
       sendComment,
       leave,
       archive,
@@ -1512,6 +1515,72 @@
       // This is the same durable credential as the URL, formatted only for
       // human entry. The join parser removes separators before validation.
       return token.toUpperCase().match(/.{1,4}/g).join('-');
+    }
+
+    async function getProjectSlotStatus() {
+      await ensureSupabase();
+      const status = firstRow(await rpc('pixisync_get_project_slot_status', {}));
+      const includedSlots = Number(status?.included_slots);
+      const purchasedSlots = Number(status?.purchased_slots);
+      const allowedSlots = Number(status?.allowed_slots);
+      const openOwnedProjects = Number(status?.open_owned_projects);
+      const availableSlots = Number(status?.available_slots);
+      if (
+        !Number.isSafeInteger(includedSlots)
+        || includedSlots < 1
+        || !Number.isSafeInteger(purchasedSlots)
+        || purchasedSlots < 0
+        || !Number.isSafeInteger(allowedSlots)
+        || allowedSlots !== includedSlots + purchasedSlots
+        || !Number.isSafeInteger(openOwnedProjects)
+        || openOwnedProjects < 0
+        || !Number.isSafeInteger(availableSlots)
+        || availableSlots < 0
+      ) throw new Error('PiXiSYNC runtime: invalid-project-slot-status');
+      return Object.freeze({
+        includedSlots,
+        purchasedSlots,
+        allowedSlots,
+        openOwnedProjects,
+        availableSlots,
+      });
+    }
+
+    async function invokeSlotFunction(name, body = {}) {
+      if (await ensureAuthenticatedStart({ requireLogin: true }) !== true) {
+        throw new Error('PiXiSYNC runtime: authentication-required');
+      }
+      await ensureSupabase();
+      if (typeof supabase?.functions?.invoke !== 'function') {
+        throw new Error('PiXiSYNC runtime: functions-unavailable');
+      }
+      const response = await withTimeout(
+        `function-${name}`,
+        supabase.functions.invoke(name, { body })
+      );
+      if (response?.error) throw response.error;
+      if (response?.data?.ok !== true) {
+        throw new Error(String(response?.data?.error || `PiXiSYNC runtime: ${name}-failed`));
+      }
+      return response.data;
+    }
+
+    async function createProjectSlotCheckout() {
+      const data = await invokeSlotFunction('pixisync-create-slot-checkout');
+      const checkoutUrl = new URL(String(data?.url || ''));
+      if (checkoutUrl.protocol !== 'https:' || checkoutUrl.hostname !== 'checkout.stripe.com') {
+        throw new Error('PiXiSYNC runtime: invalid-slot-checkout-url');
+      }
+      return checkoutUrl.href;
+    }
+
+    async function reconcileProjectSlotPurchase(sessionId) {
+      const normalized = String(sessionId || '').trim();
+      if (!/^cs_(?:test|live)_[A-Za-z0-9_]+$/.test(normalized)) {
+        throw new Error('PiXiSYNC runtime: invalid-slot-checkout-session');
+      }
+      await invokeSlotFunction('pixisync-reconcile-slot-purchase', { session_id: normalized });
+      return getProjectSlotStatus();
     }
 
     function normalizeComment(payload) {
