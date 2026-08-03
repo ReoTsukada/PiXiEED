@@ -153,7 +153,7 @@
         reason,
         dialogPresent: Boolean(dialog),
         dialogOpen: Boolean(dialog?.open),
-        showModal: typeof dialog?.showModal === 'function',
+        show: typeof dialog?.show === 'function',
         markupVersion: String(dialog?.dataset?.pixisyncResumeNoticeVersion || ''),
         expectedVersion: RESUME_NOTICE_UI_VERSION,
         scripts,
@@ -188,9 +188,13 @@
       try {
         if (localStorageRef?.getItem?.(RESUME_NOTICE_STORAGE_KEY) === 'seen') return false;
       } catch (_) {}
-      if (!dialog || typeof dialog.showModal !== 'function') {
+      // Do not use showModal() here. Some embedded WebViews occasionally
+      // leave its native ::backdrop painted after close(), which makes the
+      // project screen look dark and prevents taps. This notice is
+      // informational, so a non-modal dialog is both sufficient and safer.
+      if (!dialog || typeof dialog.show !== 'function') {
         return showResumeNoticeFallback(
-          !dialog ? 'dialog-missing' : 'showModal-unsupported'
+          !dialog ? 'dialog-missing' : 'show-unsupported'
         );
       }
       if (String(dialog.dataset?.pixisyncResumeNoticeVersion || '') !== RESUME_NOTICE_UI_VERSION) {
@@ -198,7 +202,7 @@
       }
       if (dialog.open) return true;
       try {
-        dialog.showModal();
+        dialog.show();
         scheduleResumeNoticeAutoClose();
         window.requestAnimationFrame?.(() => {
           elements.resumeNoticeClose?.focus?.({ preventScroll: true });

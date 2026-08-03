@@ -66,6 +66,10 @@ class FakeDialog extends FakeElement {
     this.dataset.pixisyncResumeNoticeVersion = '20260803-v2';
   }
 
+  show() {
+    this.open = true;
+  }
+
   showModal() {
     this.open = true;
   }
@@ -173,7 +177,7 @@ assert.equal(resumeNoticeElements.resumeNoticeDialog.open, false);
 assert.equal(resumeNoticeUi.showResumeNoticeOnce(), false);
 resumeNoticeUi.dispose();
 
-// Browsers without native <dialog>.showModal() still receive the notice via
+// Browsers without native <dialog>.show() still receive the notice via
 // the alert fallback instead of silently losing the startup message.
 let fallbackAlertMessage = '';
 window.alert = message => { fallbackAlertMessage = String(message || ''); };
@@ -602,7 +606,7 @@ for (const id of [
   'pixisyncDrawLock',
 ]) assert.match(html, new RegExp(`id="${id}"`));
 assert.doesNotMatch(html, /id="pixisyncLeave"|id="pixisyncArchive"/);
-assert.match(html, /pixisync-minimal-ui-utils\.js\?v=20260803-pixisync-resume-notice3/);
+assert.match(html, /pixisync-minimal-ui-utils\.js\?v=20260803-pixisync-resume-notice4/);
 assert.match(html, /<dialog[^>]*id="pixisyncResumeNoticeDialog"[^>]*data-pixisync-resume-notice-version="20260803-v2"|<dialog[^>]*data-pixisync-resume-notice-version="20260803-v2"[^>]*id="pixisyncResumeNoticeDialog"/);
 assert.match(html, /pixisync-runtime-adapter-utils\.js\?v=20260803-pixisync-localize1/);
 assert.match(html, /static-content\.js\?v=20260803-pixisync-localize1/);
