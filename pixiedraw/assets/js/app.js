@@ -11984,19 +11984,12 @@
     }) || null;
   const pixisyncLazyCellSync = window.PiXiEEDrawModules?.pixisyncLazyCellSyncUtils
     ?.createPiXiSyncLazyCellSyncUtils?.({
-      isTargetActive: target => {
-        const canvasDoc = getActiveProjectCanvasDocument();
-        const frame = getActiveFrame();
-        const targetLayer = Array.isArray(frame?.layers)
-          ? frame.layers.find(layer => layer?.id === target?.layerId)
-          : null;
-        return Boolean(
-          canvasDoc?.id === target?.canvasId
-          && frame?.id === target?.frameId
-          && targetLayer
-          && getDisplayedLayerVisibility(targetLayer, true)
-        );
-      },
+      // Receiving pixels must never wait for an unrelated structural edit.
+      // Raster layers use sparse storage, so materializing the authoritative
+      // final value is inexpensive even for an offscreen cell. Rendering is
+      // still scoped in markDirtyRect above; this only prevents a local view
+      // preference or a transient active-cell mismatch from deferring data.
+      isTargetActive: () => true,
       applyPixelMutation: mutation => pixisyncPixelMutationBridge?.applyPixelMutation?.(mutation)
         || { applied: 0, appliedIndices: [] },
       onDeferred: target => {
