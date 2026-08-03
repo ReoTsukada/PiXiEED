@@ -21,6 +21,7 @@
   const PENDING_INVITE_STORAGE_KEY = 'pixiedraw:pixisync:v1:pending-invite';
   const RESUME_NOTICE_STORAGE_KEY = 'pixieedraw:pixisync:resume-notice:20260803-v2';
   const RESUME_NOTICE_UI_VERSION = '20260803-v2';
+  const RESUME_NOTICE_AUTO_CLOSE_MS = 10_000;
   const COMMENT_MAX_LENGTH = 140;
   const COMMENT_MAX_ITEMS = 50;
   const SLOT_PRICE_YEN = 100;
@@ -64,6 +65,7 @@
     let activeView = 'participants';
     let disposed = false;
     let unsubscribeSession = null;
+    let resumeNoticeAutoCloseTimer = null;
 
     const actionButtons = Object.freeze({
       start: elements.start,
@@ -114,7 +116,22 @@
       } catch (_) {}
     }
 
+    function clearResumeNoticeAutoClose() {
+      if (resumeNoticeAutoCloseTimer === null) return;
+      globalThis.clearTimeout(resumeNoticeAutoCloseTimer);
+      resumeNoticeAutoCloseTimer = null;
+    }
+
+    function scheduleResumeNoticeAutoClose() {
+      clearResumeNoticeAutoClose();
+      resumeNoticeAutoCloseTimer = globalThis.setTimeout(() => {
+        resumeNoticeAutoCloseTimer = null;
+        closeResumeNotice();
+      }, RESUME_NOTICE_AUTO_CLOSE_MS);
+    }
+
     function closeResumeNotice() {
+      clearResumeNoticeAutoClose();
       rememberResumeNotice();
       if (elements.resumeNoticeDialog?.open) elements.resumeNoticeDialog.close?.('seen');
     }
@@ -182,6 +199,7 @@
       if (dialog.open) return true;
       try {
         dialog.showModal();
+        scheduleResumeNoticeAutoClose();
         window.requestAnimationFrame?.(() => {
           elements.resumeNoticeClose?.focus?.({ preventScroll: true });
         });
@@ -779,7 +797,11 @@
     elements.slotQuantity?.addEventListener?.('change', slotQuantityHandler);
     elements.resumeNoticeClose?.addEventListener?.('click', closeResumeNotice);
     elements.resumeNoticeDialog?.addEventListener?.('cancel', cancelResumeNotice);
-    elements.resumeNoticeDialog?.addEventListener?.('close', rememberResumeNotice);
+    const handleResumeNoticeClosed = () => {
+      clearResumeNoticeAutoClose();
+      rememberResumeNotice();
+    };
+    elements.resumeNoticeDialog?.addEventListener?.('close', handleResumeNoticeClosed);
 
     function removeInviteTokenFromUrl(url) {
       url.searchParams.delete(INVITE_QUERY_KEY);
@@ -912,7 +934,8 @@
       elements.slotQuantity?.removeEventListener?.('change', slotQuantityHandler);
       elements.resumeNoticeClose?.removeEventListener?.('click', closeResumeNotice);
       elements.resumeNoticeDialog?.removeEventListener?.('cancel', cancelResumeNotice);
-      elements.resumeNoticeDialog?.removeEventListener?.('close', rememberResumeNotice);
+      elements.resumeNoticeDialog?.removeEventListener?.('close', handleResumeNoticeClosed);
+      clearResumeNoticeAutoClose();
       clear();
     }
 

@@ -31,6 +31,90 @@
 
     return ((scope) => {
       with (scope) {
+  function setupDialogAutoDismiss({ delayMs = 10_000 } = {}) {
+    const documentRef = window.document;
+    const normalizedDelayMs = Math.max(1, Number(delayMs) || 10_000);
+    const timers = new Map();
+    const boundDialogs = new WeakSet();
+
+    const clearTimer = dialog => {
+      const timer = timers.get(dialog);
+      if (timer !== undefined) {
+        window.clearTimeout(timer);
+        timers.delete(dialog);
+      }
+    };
+
+    const schedule = dialog => {
+      if (!(dialog instanceof HTMLDialogElement)) return;
+      clearTimer(dialog);
+      if (!dialog.open) return;
+      const timer = window.setTimeout(() => {
+        timers.delete(dialog);
+        if (!dialog.open) return;
+        // Let existing cancel handlers resolve pending confirmation promises
+        // before forcing the native dialog closed. This also removes the
+        // native ::backdrop together with the dialog.
+        try {
+          dialog.dispatchEvent(new Event('cancel', { cancelable: true }));
+        } catch (error) {
+          console.warn('[pixiedraw:dialog] auto-dismiss cancel dispatch failed', error);
+        }
+        if (dialog.open) {
+          try {
+            dialog.close('timeout');
+          } catch (error) {
+            console.warn('[pixiedraw:dialog] auto-dismiss close failed', error);
+          }
+        }
+      }, normalizedDelayMs);
+      timers.set(dialog, timer);
+    };
+
+    const bind = dialog => {
+      if (!(dialog instanceof HTMLDialogElement) || boundDialogs.has(dialog)) return;
+      boundDialogs.add(dialog);
+      dialog.addEventListener('close', () => clearTimer(dialog));
+      dialog.addEventListener('cancel', () => {
+        clearTimer(dialog);
+        // A consumer may prevent the cancel event. Keep the timeout contract
+        // in that case, while allowing the normal native close to finish.
+        window.setTimeout(() => schedule(dialog), 0);
+      }, true);
+      schedule(dialog);
+    };
+
+    documentRef.querySelectorAll('dialog').forEach(bind);
+    const observer = typeof MutationObserver === 'function'
+      ? new MutationObserver(records => {
+          records.forEach(record => {
+            if (record.type === 'attributes') {
+              bind(record.target);
+              schedule(record.target);
+              return;
+            }
+            record.addedNodes.forEach(node => {
+              if (!(node instanceof Element)) return;
+              if (node instanceof HTMLDialogElement) bind(node);
+              node.querySelectorAll?.('dialog').forEach(bind);
+            });
+          });
+        })
+      : null;
+    observer?.observe(documentRef.documentElement, {
+      attributes: true,
+      attributeFilter: ['open'],
+      childList: true,
+      subtree: true,
+    });
+
+    return () => {
+      observer?.disconnect();
+      timers.forEach(timer => window.clearTimeout(timer));
+      timers.clear();
+    };
+  }
+
   function setupHelpPanel() {
     setInlineGuidesVisible(inlineGuidesVisible, { persist: false });
 
@@ -425,6 +509,7 @@
   }
 
   return Object.freeze({
+    setupDialogAutoDismiss,
     setupHelpPanel,
     setupUpdateHistoryDialog,
     setupExportDialog,

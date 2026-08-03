@@ -11851,6 +11851,23 @@ body.is-project-home-active .modal[open] {
   min-height: 0;
 }
 
+/* Some embedded WebViews paint a native dialog backdrop above the startup
+ * screen but lose the dialog box itself. Keep the PiXiSYNC return notice in
+ * the same guaranteed viewport layer as the project-delete confirmation. */
+#pixisyncResumeNoticeDialog[open] {
+  z-index: 2147483647;
+  width: min(420px, calc(100vw - 24px));
+  min-width: min(320px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px);
+}
+
+#pixisyncResumeNoticeDialog[open] .modal__form {
+  flex: 0 1 auto;
+  height: auto;
+  min-height: 0;
+}
+
 .modal::backdrop {
   background: rgba(0, 0, 0, 0.6);
 }

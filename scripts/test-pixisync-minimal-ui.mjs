@@ -602,11 +602,11 @@ for (const id of [
   'pixisyncDrawLock',
 ]) assert.match(html, new RegExp(`id="${id}"`));
 assert.doesNotMatch(html, /id="pixisyncLeave"|id="pixisyncArchive"/);
-assert.match(html, /pixisync-minimal-ui-utils\.js\?v=20260803-pixisync-resume-notice2/);
+assert.match(html, /pixisync-minimal-ui-utils\.js\?v=20260803-pixisync-resume-notice3/);
 assert.match(html, /<dialog[^>]*id="pixisyncResumeNoticeDialog"[^>]*data-pixisync-resume-notice-version="20260803-v2"|<dialog[^>]*data-pixisync-resume-notice-version="20260803-v2"[^>]*id="pixisyncResumeNoticeDialog"/);
 assert.match(html, /pixisync-runtime-adapter-utils\.js\?v=20260803-pixisync-localize1/);
 assert.match(html, /static-content\.js\?v=20260803-pixisync-localize1/);
-assert.match(html, /app\.js\?v=20260803-project-list-panel-reset-resume-notice3/);
+assert.match(html, /app\.js\?v=20260803-project-list-panel-reset-resume-notice4/);
 assert.match(html, /PiXiSYNCが復活しました/);
 assert.match(html, /シェアプロジェクトが復活しました/);
 assert.match(html, /シェアプロジェクトを楽しんでください/);

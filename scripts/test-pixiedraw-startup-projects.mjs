@@ -4,7 +4,7 @@ import vm from 'node:vm';
 
 const root = new URL('../', import.meta.url);
 const read = path => readFile(new URL(path, root), 'utf8');
-const [index, css, app, startup, lifecycle, workflow, lensIndex, documentSession] = await Promise.all([
+const [index, css, app, startup, lifecycle, workflow, lensIndex, documentSession, dialogSetup] = await Promise.all([
   read('pixiedraw/index.html'),
   read('pixiedraw/assets/css/style.css'),
   read('pixiedraw/assets/js/app.js'),
@@ -13,6 +13,7 @@ const [index, css, app, startup, lifecycle, workflow, lensIndex, documentSession
   read('pixiedraw/assets/js/modules/open-project-tab-workflow-utils.js'),
   read('pixiee-lens/index.html'),
   read('pixiedraw/assets/js/modules/document-session-workflow-utils.js'),
+  read('pixiedraw/assets/js/modules/dialog-setup-utils.js'),
 ]);
 
 assert.match(index, /id="startupScreen"[\s\S]*id="startupScreenTitle">プロジェクト</);
@@ -30,6 +31,7 @@ for (const html of [index]) {
 assert.match(index, /startup-workflow-utils\.js\?v=[^"\s]+/);
 assert.match(index, /document-model\.js\?v=20260724-legacy-cow-migration1/);
 assert.match(index, /app\.js\?v=[^"\s]+/);
+assert.match(index, /dialog-setup-utils\.js\?v=20260803-dialog-auto-dismiss10s1/);
 assert.match(index, /timeline-layers\.js\?v=[^"\s]+/);
 assert.match(index, /retired-collaboration-compat\.js\?v=[^"\s]+/);
 for (const source of [startup]) {
@@ -115,6 +117,9 @@ assert.doesNotMatch(startup, /migrateLegacyLocalProjectsToTrueV2/);
 assert.doesNotMatch(index, /legacyProjectMigrationDialog/);
 assert.doesNotMatch(app, /legacyProjectMigration|requestLegacyV2MigrationConsent/);
 assert.match(documentSession, /選択したプロジェクトをV2へ自動変換しています/);
+assert.match(dialogSetup, /setupDialogAutoDismiss\(\{ delayMs = 10_000 \} = \{\}\)/);
+assert.match(dialogSetup, /dialog\.close\('timeout'\)/);
+assert.match(app, /setupDialogAutoDismiss\?\.\(\)/);
 assert.match(startup, /startup-workspace__project-share-badge/);
 assert.match(startup, /シェア中/);
 assert.match(css, /\.startup-workspace__project-share-badge\s*\{[\s\S]*?position: absolute;[\s\S]*?top: 14px;[\s\S]*?left: 14px;/);

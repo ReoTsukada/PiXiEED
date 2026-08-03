@@ -11654,6 +11654,7 @@
     updateExportProjectCompanionToggleUI: (...args) => updateExportProjectCompanionToggleUI(...args),
   }) || {};
   const {
+    setupDialogAutoDismiss,
     setupHelpPanel,
     setupUpdateHistoryDialog,
     setupExportDialog,
@@ -28685,6 +28686,7 @@
       setupExportInterstitialDialog();
       setupLoginPromptDialog();
       setupUpdateHistoryDialog();
+      setupDialogAutoDismiss?.();
       exportDialogWorkflowUtilsModule.syncUpdateHistoryNotice?.();
       setupToolSpotlightDialog();
       setupRecentProjectDeleteConfirmDialog();
