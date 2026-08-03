@@ -58,6 +58,24 @@ class FakeElement {
   }
 }
 
+class FakeDialog extends FakeElement {
+  constructor(ownerDocument = null) {
+    super(ownerDocument);
+    this.open = false;
+    this.returnValue = '';
+  }
+
+  showModal() {
+    this.open = true;
+  }
+
+  close(returnValue = '') {
+    this.returnValue = String(returnValue || '');
+    this.open = false;
+    this.dispatch('close');
+  }
+}
+
 const fakeDocument = {
   body: new FakeElement(),
   createElement: () => new FakeElement(fakeDocument),
@@ -68,6 +86,16 @@ globalThis.window = {
   navigator: {},
   location: { href: 'https://example.test/pixiedraw/' },
   history: {},
+  requestAnimationFrame: callback => callback(),
+};
+
+const createSessionStorage = () => {
+  const values = new Map();
+  return {
+    getItem: key => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, String(value)),
+    removeItem: key => values.delete(key),
+  };
 };
 
 for (const relativePath of [
@@ -90,6 +118,9 @@ const createElements = () => {
     participantList: new FakeElement(fakeDocument),
     connectionLabel: new FakeElement(),
     start: new FakeElement(),
+    startConfirmDialog: new FakeDialog(),
+    startConfirmCancel: new FakeElement(),
+    startConfirmConfirm: new FakeElement(),
     copyInvite: new FakeElement(),
     copyInviteCode: new FakeElement(),
     accessCodeField: new FakeElement(),
@@ -145,6 +176,10 @@ assert.equal(elements.panel.hidden, false);
 assert.equal(elements.start.hidden, false);
 assert.equal(elements.drawLock.hidden, true);
 const firstStart = elements.start.click();
+assert.equal(elements.startConfirmDialog.open, true);
+assert.equal(startCount, 0);
+elements.startConfirmConfirm.click();
+await Promise.resolve();
 const secondStart = elements.start.click();
 assert.equal(startCount, 1);
 assert.equal(await secondStart, false);
@@ -152,6 +187,28 @@ assert.equal(elements.start.disabled, true);
 resolveStart();
 assert.equal(await firstStart, true);
 assert.equal(elements.start.disabled, false);
+
+// The database quota error is explained without exposing an internal RPC name.
+const limitedElements = createElements();
+const limitedUi = createUi({ elements: limitedElements, body: fakeDocument.body });
+limitedUi.configure({
+  enabled: true,
+  session: createSession({ role: 'owner' }),
+  commands: {
+    start: async () => {
+      throw new Error('pixisync_owner_room_limit_reached');
+    },
+  },
+});
+const limitedStart = limitedElements.start.click();
+assert.equal(limitedElements.startConfirmDialog.open, true);
+limitedElements.startConfirmConfirm.click();
+assert.equal(await limitedStart, false);
+assert.equal(
+  limitedElements.notice.textContent,
+  'シェアプロジェクトは1アカウントにつき1つまでです。現在のプロジェクトを引き続き利用してください。'
+);
+limitedUi.dispose();
 
 // Active owner can issue invites, but permanent sharing has no end action.
 const ownerSession = createSession({ role: 'owner' });
@@ -274,6 +331,7 @@ manualUi.dispose();
 // Raw invite tokens are removed from the URL before the join command executes.
 const invitedSession = createSession({ role: 'participant' });
 const inviteElements = createElements();
+const inviteSessionStorage = createSessionStorage();
 let replacedUrl = '';
 let joinSawSanitizedUrl = false;
 const inviteUi = createUi({
@@ -284,6 +342,7 @@ const inviteUi = createUi({
     state: { preserved: true },
     replaceState: (_state, _title, url) => { replacedUrl = url; },
   },
+  sessionStorageRef: inviteSessionStorage,
 });
 inviteUi.configure({
   enabled: true,
@@ -298,6 +357,44 @@ inviteUi.configure({
 assert.equal(await inviteUi.consumeInviteFromUrl(), true);
 assert.equal(joinSawSanitizedUrl, true);
 assert.equal(replacedUrl, '/pixiedraw/?keep=1');
+assert.equal(inviteUi.hasPendingInvite(), false);
+
+// Logged-out URL recipients keep the invite across account navigation and retry it after login.
+const pendingSessionStorage = createSessionStorage();
+const loggedOutInviteUi = createUi({
+  elements: createElements(),
+  body: fakeDocument.body,
+  locationRef: { href: `https://example.test/pixiedraw/?pixisync_invite=${inviteToken}` },
+  historyRef: { state: null, replaceState: () => {} },
+  sessionStorageRef: pendingSessionStorage,
+});
+loggedOutInviteUi.configure({
+  enabled: true,
+  session: createSession({ role: 'participant' }),
+  commands: {
+    join: async () => { throw new Error('PiXiSYNC runtime: authentication-required'); },
+  },
+});
+assert.equal(await loggedOutInviteUi.consumeInviteFromUrl(), false);
+assert.equal(loggedOutInviteUi.hasPendingInvite(), true);
+
+let resumedToken = '';
+const resumedInviteUi = createUi({
+  elements: createElements(),
+  body: fakeDocument.body,
+  locationRef: { href: 'https://example.test/pixiedraw/' },
+  historyRef: { state: null, replaceState: () => {} },
+  sessionStorageRef: pendingSessionStorage,
+});
+resumedInviteUi.configure({
+  enabled: true,
+  session: createSession({ role: 'participant' }),
+  commands: { join: async token => { resumedToken = token; } },
+});
+assert.equal(resumedInviteUi.hasPendingInvite(), true);
+assert.equal(await resumedInviteUi.consumeInviteFromUrl(), true);
+assert.equal(resumedToken, inviteToken);
+assert.equal(resumedInviteUi.hasPendingInvite(), false);
 
 ui.clear();
 assert.equal(elements.panel.hidden, false);
@@ -313,16 +410,20 @@ assert.equal(elements.statusLabel.textContent, '未接続');
 assert.equal(fakeDocument.body.dataset.pixisyncPhase, 'disabled');
 
 // Production wiring regression: explicit markup and module must remain present.
-const [html, app, style, sharedTabBar, startupWorkflow] = await Promise.all([
+const [html, app, style, sharedTabBar, startupWorkflow, staticContent] = await Promise.all([
   readFile(new URL('../pixiedraw/index.html', import.meta.url), 'utf8'),
   readFile(new URL('../pixiedraw/assets/js/app.js', import.meta.url), 'utf8'),
   readFile(new URL('../pixiedraw/assets/css/style.css', import.meta.url), 'utf8'),
   readFile(new URL('../scripts/shared-tab-bar.js', import.meta.url), 'utf8'),
   readFile(new URL('../pixiedraw/assets/js/modules/startup-workflow-utils.js', import.meta.url), 'utf8'),
+  readFile(new URL('../pixiedraw/assets/js/modules/static-content.js', import.meta.url), 'utf8'),
 ]);
 for (const id of [
   'pixisyncPanel',
   'pixisyncStart',
+  'pixisyncStartConfirmDialog',
+  'pixisyncStartConfirmCancel',
+  'pixisyncStartConfirmConfirm',
   'pixisyncCopyInvite',
   'pixisyncCopyInviteCode',
   'pixisyncAccessCode',
@@ -333,7 +434,22 @@ for (const id of [
   'pixisyncDrawLock',
 ]) assert.match(html, new RegExp(`id="${id}"`));
 assert.doesNotMatch(html, /id="pixisyncLeave"|id="pixisyncArchive"/);
-assert.match(html, /pixisync-minimal-ui-utils\.js/);
+assert.match(html, /pixisync-minimal-ui-utils\.js\?v=20260803-pixisync-return2/);
+assert.match(html, /static-content\.js\?v=20260803-pixisync-return1/);
+assert.match(html, /app\.js\?v=20260803-pixisync-return2/);
+assert.match(html, /PiXiSYNCが復活しました/);
+assert.match(html, /シェアプロジェクトを楽しんでください/);
+assert.match(app, /startConfirmDialog: dom\.controls\.pixisyncStartConfirmDialog/);
+assert.match(staticContent, /id: 'pixisync-share-project'/);
+assert.match(staticContent, /id: '2026-08-03-pixisync-return'/);
+assert.match(staticContent, /シェアプロジェクト（PiXiSYNC）が復活しました/);
+new Function(staticContent)();
+const staticContentApi = window.PiXiEEDrawModules.staticContent.createStaticContent();
+const pixisyncHelp = staticContentApi.HELP_GUIDE_ITEMS.find(entry => entry.id === 'pixisync-share-project');
+const pixisyncUpdate = staticContentApi.BUILTIN_UPDATE_HISTORY_ENTRIES.find(entry => entry.id === '2026-08-03-pixisync-return');
+assert.ok(pixisyncHelp?.points?.ja?.some(point => point.includes('1アカウントにつき1つまで')));
+assert.ok(pixisyncHelp?.points?.ja?.some(point => point.includes('参加コード')));
+assert.ok(pixisyncUpdate?.details?.some(point => point.includes('シェアプロジェクトを楽しんでください')));
 assert.doesNotMatch(html, /pixisyncStatusDetail|pixisyncCommentInput|pixisyncCommentSend/);
 assert.doesNotMatch(html, /受け取ったリンクまたはコード|コメントは共同編集中/);
 assert.ok(
@@ -348,6 +464,7 @@ assert.match(app, /runtime\?\.uiEnabled === true/);
 assert.match(app, /function setupPiXiSyncShareMode\(\)/);
 assert.doesNotMatch(app, /PIXISYNC_INITIAL_GATE_TAP_COUNT|PIXISYNC_SHARE_START_UNLOCKED|pixisyncInitialGate/);
 assert.match(app, /pixisyncMinimalUi\?\.consumeInviteFromUrl/);
+assert.match(app, /pixisyncMinimalUi\?\.hasPendingInvite\?\.\(\)/);
 assert.match(app, /resolveProjectBindingTarget:[\s\S]*?resolvePiXiSyncRecentProjectTarget/);
 assert.match(app, /candidate\?\.id !== replacedProjectKey/);
 assert.match(app, /String\(candidate\?\.pixisync\?\.roomId \|\| ''\)[\s\S]*?!== normalizedRoomId/);

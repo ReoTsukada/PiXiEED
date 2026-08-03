@@ -230,6 +230,34 @@
       },
     }),
     Object.freeze({
+      id: 'pixisync-share-project',
+      title: { ja: 'シェアプロジェクト（PiXiSYNC）', en: 'Shared Projects (PiXiSYNC)', zh: '共享项目（PiXiSYNC）' },
+      keywords: { ja: 'PiXiSYNC シェア 共有 招待 参加コード 共同編集', en: 'PiXiSYNC share invite join code collaboration', zh: 'PiXiSYNC 共享 邀请 参加码 协作' },
+      points: {
+        ja: [
+          'ログイン後、シェアモードを開いて「シェアモードを開始」を押し、確認ダイアログから開始します。',
+          '開始後は「シェアURLをコピー」または「参加コードをコピー」で相手を招待できます。',
+          '参加する人は、受け取ったURLを開くか、プロジェクト一覧またはシェアモードへ参加コードを入力します。',
+          '描画とコメントはリアルタイムで共有され、シェアプロジェクトのカードからあとで開き直せます。',
+          '自分で作成できるシェアプロジェクトは1アカウントにつき1つまでです。他の人のシェアプロジェクトへの参加はこの上限に含まれません。',
+        ],
+        en: [
+          'After signing in, open Share Mode, select Start Share Mode, and confirm the dialog.',
+          'Use Copy Share URL or Copy Join Code to invite someone.',
+          'Participants can open the received URL or enter the join code from the project list or Share Mode.',
+          'Drawing and comments are shared in real time, and the shared-project card can be reopened later.',
+          'Each account can create one shared project. Joining a project owned by someone else does not use this slot.',
+        ],
+        zh: [
+          '登录后打开共享模式，按“开始共享模式”，并在确认对话框中开始。',
+          '开始后可通过“复制共享URL”或“复制参加码”邀请对方。',
+          '参与者可打开收到的URL，或在项目列表或共享模式中输入参加码。',
+          '绘制和评论会实时共享，也可稍后从共享项目卡片重新打开。',
+          '每个账号最多可创建1个共享项目。参加他人创建的共享项目不计入此上限。',
+        ],
+      },
+    }),
+    Object.freeze({
       id: 'shortcut',
       title: { ja: 'ショートカットと履歴', en: 'Shortcuts & History', zh: '快捷键与历史' },
       keywords: { ja: 'ショートカット 元に戻す やり直す 更新情報', en: 'shortcut undo redo updates', zh: '快捷键 撤销 重做 更新信息' },
@@ -254,6 +282,19 @@
   ]);
 
   const BUILTIN_UPDATE_HISTORY_ENTRIES = Object.freeze([
+    Object.freeze({
+      id: '2026-08-03-pixisync-return',
+      at: '2026-08-03T13:45:00+09:00',
+      title: 'シェアプロジェクト（PiXiSYNC）が復活しました',
+      published: true,
+      details: Object.freeze([
+        'PiXiEEDrawでリアルタイム共同編集できるシェアプロジェクト（PiXiSYNC）を再開しました。シェアプロジェクトを楽しんでください。',
+        'シェアモードから共有を開始し、シェアURLまたは参加コードをコピーして相手を招待できます。',
+        '受け取った人はURLを開くか、プロジェクト一覧またはシェアモードへ参加コードを入力して参加できます。',
+        '描画とコメントをリアルタイムで共有し、シェアプロジェクトのカードからあとで開き直せます。',
+        '今後新しく作成できるシェアプロジェクトは1アカウントにつき1つまでです。他の人のプロジェクトへの参加は上限に含まれません。',
+      ]),
+    }),
     Object.freeze({
       id: '2026-07-24-drawing-performance-preview',
       at: '2026-07-24T18:30:00+09:00',

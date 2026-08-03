@@ -347,6 +347,9 @@
       pixisyncParticipantList: document.getElementById('pixisyncParticipantList'),
       pixisyncConnectionLabel: document.getElementById('pixisyncConnectionLabel'),
       pixisyncStart: document.getElementById('pixisyncStart'),
+      pixisyncStartConfirmDialog: document.getElementById('pixisyncStartConfirmDialog'),
+      pixisyncStartConfirmCancel: document.getElementById('pixisyncStartConfirmCancel'),
+      pixisyncStartConfirmConfirm: document.getElementById('pixisyncStartConfirmConfirm'),
       pixisyncCopyInvite: document.getElementById('pixisyncCopyInvite'),
       pixisyncCopyInviteCode: document.getElementById('pixisyncCopyInviteCode'),
       pixisyncAccessCodeField: document.getElementById('pixisyncAccessCodeField'),
@@ -13070,6 +13073,9 @@
         participantList: dom.controls.pixisyncParticipantList,
         connectionLabel: dom.controls.pixisyncConnectionLabel,
         start: dom.controls.pixisyncStart,
+        startConfirmDialog: dom.controls.pixisyncStartConfirmDialog,
+        startConfirmCancel: dom.controls.pixisyncStartConfirmCancel,
+        startConfirmConfirm: dom.controls.pixisyncStartConfirmConfirm,
         copyInvite: dom.controls.pixisyncCopyInvite,
         copyInviteCode: dom.controls.pixisyncCopyInviteCode,
         accessCodeField: dom.controls.pixisyncAccessCodeField,
@@ -28635,8 +28641,10 @@
       // V1シェアランタイムを先に起動してリンクを消費する。
       // これにより送信先でも現在のローカルプロジェクトへ参加バインドを作成できる。
       try {
-        const inviteUrl = new URL(window.location.href);
-        if (inviteUrl.searchParams.has('pixisync_invite')) {
+        const inviteToken = window.PiXiEEDrawModules?.pixisyncProjectSwitchUtils?.parseInviteToken?.(window.location.href, {
+          locationHref: window.location.href,
+        }) || '';
+        if (inviteToken || pixisyncMinimalUi?.hasPendingInvite?.()) {
           openedPixiSyncInvite = true;
         }
       } catch (error) {

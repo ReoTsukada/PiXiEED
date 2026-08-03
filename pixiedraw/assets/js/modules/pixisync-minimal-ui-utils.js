@@ -18,6 +18,7 @@
     archived: ['共同編集終了', 'このセッションには新しい変更を送信できません。', '終了済み'],
   });
   const INVITE_QUERY_KEY = 'pixisync_invite';
+  const PENDING_INVITE_STORAGE_KEY = 'pixiedraw:pixisync:v1:pending-invite';
   const COMMENT_MAX_LENGTH = 140;
   const COMMENT_MAX_ITEMS = 50;
 
@@ -26,6 +27,7 @@
     navigatorRef = window.navigator,
     locationRef = window.location,
     historyRef = window.history,
+    sessionStorageRef = window.sessionStorage,
     body = window.document?.body || null,
   } = {}) {
     let session = null;
@@ -79,6 +81,69 @@
       return root.pixisyncProjectSwitchUtils?.parseInviteToken?.(value, {
         locationHref: locationRef.href,
       }) || '';
+    }
+
+    function readPendingInviteToken() {
+      try {
+        const stored = sessionStorageRef?.getItem?.(PENDING_INVITE_STORAGE_KEY) || '';
+        return stored ? parseInviteToken(stored) : '';
+      } catch (_) {
+        return '';
+      }
+    }
+
+    function writePendingInviteToken(token) {
+      try {
+        sessionStorageRef?.setItem?.(PENDING_INVITE_STORAGE_KEY, token);
+        return sessionStorageRef?.getItem?.(PENDING_INVITE_STORAGE_KEY) === token;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    function clearPendingInviteToken() {
+      try {
+        sessionStorageRef?.removeItem?.(PENDING_INVITE_STORAGE_KEY);
+      } catch (_) {}
+    }
+
+    function confirmShareStart() {
+      const message = 'シェアプロジェクト（PiXiSYNC）が復活しました。\n作成できるシェアプロジェクトは1アカウントにつき1つまでです。\nシェアプロジェクトを楽しんでください。';
+      const dialog = elements.startConfirmDialog;
+      if (!dialog || typeof dialog.showModal !== 'function') {
+        return Promise.resolve(window.confirm(message));
+      }
+      return new Promise(resolve => {
+        let settled = false;
+        const finish = result => {
+          if (settled) return;
+          settled = true;
+          elements.startConfirmCancel?.removeEventListener?.('click', onCancel);
+          elements.startConfirmConfirm?.removeEventListener?.('click', onConfirm);
+          dialog.removeEventListener?.('cancel', onDialogCancel);
+          dialog.removeEventListener?.('close', onDialogClose);
+          resolve(result);
+        };
+        const close = returnValue => {
+          finish(returnValue === 'confirm');
+          if (dialog.open) dialog.close?.(returnValue);
+        };
+        const onCancel = () => close('cancel');
+        const onConfirm = () => close('confirm');
+        const onDialogCancel = event => {
+          event?.preventDefault?.();
+          close('cancel');
+        };
+        const onDialogClose = () => finish(dialog.returnValue === 'confirm');
+        elements.startConfirmCancel?.addEventListener?.('click', onCancel, { once: true });
+        elements.startConfirmConfirm?.addEventListener?.('click', onConfirm, { once: true });
+        dialog.addEventListener?.('cancel', onDialogCancel, { once: true });
+        dialog.addEventListener?.('close', onDialogClose, { once: true });
+        dialog.showModal();
+        window.requestAnimationFrame?.(() => {
+          elements.startConfirmConfirm?.focus?.({ preventScroll: true });
+        });
+      });
     }
 
     function setActiveView(nextView) {
@@ -258,6 +323,7 @@
       pendingMessage = '',
       successMessage = '',
       failureMessage = '操作を完了できませんでした。',
+      onFailure = null,
     } = {}) {
       if (!enabled || busyAction || typeof action !== 'function') return false;
       busyAction = name;
@@ -269,7 +335,10 @@
         return true;
       } catch (error) {
         console.warn('[pixisync:v1-ui] action failed', name, error?.message || 'unknown');
-        setNotice(failureMessage);
+        onFailure?.(error);
+        setNotice(typeof failureMessage === 'function'
+          ? failureMessage(error)
+          : failureMessage);
         return false;
       } finally {
         busyAction = '';
@@ -278,11 +347,17 @@
     }
 
     const handlers = {
-      start: () => runAction('start', commands.start, {
-        pendingMessage: '共有を作成しています…',
-        successMessage: '共有セッションを開始しました。',
-        failureMessage: '共有を開始できませんでした。',
-      }),
+      start: async () => {
+        if (!enabled || busyAction || typeof commands.start !== 'function') return false;
+        if (!(await confirmShareStart())) return false;
+        return runAction('start', commands.start, {
+          pendingMessage: '共有を作成しています…',
+          successMessage: '共有セッションを開始しました。',
+          failureMessage: error => /pixisync_owner_room_limit_reached/.test(String(error?.message || error || ''))
+            ? 'シェアプロジェクトは1アカウントにつき1つまでです。現在のプロジェクトを引き続き利用してください。'
+            : '共有を開始できませんでした。',
+        });
+      },
       copyInvite: () => runAction('copyInvite', async () => {
         let inviteLink = await commands.createInviteLink();
         try {
@@ -390,14 +465,24 @@
       if (!token && url.hash.startsWith('#')) {
         token = new URLSearchParams(url.hash.slice(1)).get(INVITE_QUERY_KEY) || '';
       }
+      const hasUrlToken = Boolean(token);
+      if (!token) token = readPendingInviteToken();
       if (!token) return false;
-      removeInviteTokenFromUrl(url);
       token = parseInviteToken(token);
       if (!token) {
+        clearPendingInviteToken();
+        if (hasUrlToken) removeInviteTokenFromUrl(url);
         setNotice('招待リンクが正しくありません。');
         return false;
       }
-      return runAction('joinCode', async () => {
+      const pendingStored = writePendingInviteToken(token);
+      let urlSanitized = false;
+      if (hasUrlToken && pendingStored) {
+        removeInviteTokenFromUrl(url);
+        urlSanitized = true;
+      }
+      let actionError = null;
+      const joined = await runAction('joinCode', async () => {
         try {
           await commands.join(token);
         } finally {
@@ -407,7 +492,15 @@
         pendingMessage: '招待を確認しています…',
         successMessage: '共有プロジェクトに参加しました。',
         failureMessage: '招待を確認できませんでした。',
+        onFailure: error => { actionError = error; },
       });
+      if (joined) {
+        clearPendingInviteToken();
+        if (hasUrlToken && !urlSanitized) removeInviteTokenFromUrl(url);
+      } else if (!/authentication-required/.test(String(actionError?.message || actionError || ''))) {
+        clearPendingInviteToken();
+      }
+      return joined;
     }
 
     function configure(runtime = {}) {
@@ -476,6 +569,7 @@
       configure,
       render,
       consumeInviteFromUrl,
+      hasPendingInvite: () => Boolean(readPendingInviteToken()),
       updateParticipants,
       setExternalDrawLock,
       receiveComment,

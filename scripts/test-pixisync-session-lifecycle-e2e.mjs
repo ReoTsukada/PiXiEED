@@ -611,4 +611,19 @@ for (const contract of [
   /extensions\.digest\(v_token, 'sha256'\)/,
 ]) assert.match(persistentInviteMigration, contract);
 
+const ownerRoomLimitMigration = await readFile(
+  new URL('../supabase/migrations/20260803042921_pixisync_single_owned_room_limit.sql', import.meta.url),
+  'utf8'
+);
+for (const contract of [
+  /create function collab_v1\.enforce_single_owned_open_room\(\)/,
+  /pg_catalog\.pg_advisory_xact_lock/,
+  /room\.owner_user_id = new\.owner_user_id/,
+  /room\.status in \('initializing', 'active'\)/,
+  /tg_op = 'INSERT'/,
+  /old\.status not in \('initializing', 'active'\)/,
+  /message = 'pixisync_owner_room_limit_reached'/,
+  /before insert or update of owner_user_id, status on collab_v1\.rooms/,
+]) assert.match(ownerRoomLimitMigration, contract);
+
 console.log('PiXiSYNC session lifecycle E2E passed');
